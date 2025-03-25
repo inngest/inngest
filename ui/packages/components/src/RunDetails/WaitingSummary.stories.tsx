@@ -1,5 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react';
 
+import { HistoryParser, type RawHistoryItem } from '../utils/historyParser';
 import { WaitingSummary } from './WaitingSummary';
 
 const meta = {
@@ -24,39 +25,33 @@ export default meta;
 
 type Story = StoryObj<typeof WaitingSummary>;
 
-const second = 1000;
-const minute = 60 * second;
-
-const baseWaitNode = {
+const baseItem: RawHistoryItem = {
   attempt: 0,
-  groupID: 'a',
-  scheduledAt: new Date(),
-  status: 'waiting',
-  waitForEventConfig: {
-    eventName: 'app/MyEvent',
-    expression: 'async.data.foo == event.data.foo',
-    timeout: new Date(Date.now() + minute),
+  cancel: null,
+  createdAt: '2023-09-29T11:56:58.808606-04:00',
+  functionVersion: 1,
+  groupID: 'dca64663-efce-458b-8eff-5fa8e06b11a4',
+  id: '01HBGTGM1R3YX0PWD92WXFPZVK',
+  sleep: null,
+  stepName: 'bar',
+  type: 'StepWaiting',
+  url: null,
+  waitForEvent: {
+    eventName: 'bar',
+    expression: null,
+    timeout: '2023-09-29T11:57:58.808601-04:00',
   },
-} as const;
+  waitResult: null,
+};
 
 export const OneWait: Story = {
   args: {
-    history: {
-      a: baseWaitNode,
-    },
+    history: new HistoryParser([baseItem]),
   },
 };
 
 export const TwoWaits: Story = {
   args: {
-    history: {
-      a: {
-        ...baseWaitNode,
-      },
-      b: {
-        ...baseWaitNode,
-        groupID: 'b',
-      },
-    },
+    history: new HistoryParser([baseItem, { ...baseItem, groupID: 'b' }]),
   },
 };

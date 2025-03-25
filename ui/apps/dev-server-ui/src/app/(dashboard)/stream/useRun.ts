@@ -1,9 +1,11 @@
 import { useMemo } from 'react';
+import type { Event } from '@inngest/components/types/event';
 import {
-  baseFetchFailed,
-  baseFetchLoading,
   baseFetchSkipped,
   baseFetchSucceeded,
+  baseInitialFetchFailed,
+  baseInitialFetchLoading,
+  baseRefetchLoading,
   type FetchResult,
 } from '@inngest/components/types/fetch';
 import type { Function } from '@inngest/components/types/function';
@@ -15,7 +17,12 @@ import { useGetFunctionRunQuery } from '@/store/generated';
 type Data = {
   func: Pick<Function, 'name' | 'triggers'>;
   history: HistoryParser;
-  run: Pick<FunctionRun, 'endedAt' | 'id' | 'output' | 'startedAt' | 'status'>;
+  run: Pick<
+    FunctionRun,
+    'batchCreatedAt' | 'batchID' | 'endedAt' | 'id' | 'output' | 'startedAt' | 'status'
+  > & {
+    events: Event[];
+  };
 };
 
 export function useRun(runID: string | null): FetchResult<Data, { skippable: true }> {
@@ -25,7 +32,7 @@ export function useRun(runID: string | null): FetchResult<Data, { skippable: tru
     { pollingInterval: 1000, skip, refetchOnMountOrArgChange: true }
   );
 
-  const data = useMemo((): Data | undefined => {
+  const data = useMemo(() => {
     const rawRun = query.data?.functionRun;
     if (!rawRun || !rawRun.function) {
       return undefined;
@@ -34,20 +41,39 @@ export function useRun(runID: string | null): FetchResult<Data, { skippable: tru
     return {
       func: {
         ...rawRun.function,
-        name: rawRun.name ?? 'unknown',
         triggers: rawRun.function.triggers ?? [],
       },
       history: new HistoryParser(rawRun.history ?? []),
       run: {
         ...rawRun,
+        batchCreatedAt: rawRun.batchCreatedAt ? new Date(rawRun.batchCreatedAt) : null,
         endedAt: rawRun.finishedAt,
+        events: (rawRun.events ?? []).map((event) => {
+          return {
+            ...event,
+            name: event.name ?? 'Unknown',
+            payload: event.raw ?? 'null',
+            receivedAt: event.createdAt ? new Date(event.createdAt) : new Date(),
+          };
+        }),
         status: rawRun.status ?? 'RUNNING',
       },
     } as const;
   }, [query.data?.functionRun]);
 
   if (query.isLoading) {
-    return baseFetchLoading;
+    if (!data) {
+      return {
+        ...baseInitialFetchLoading,
+        refetch: query.refetch,
+      };
+    }
+
+    return {
+      ...baseRefetchLoading,
+      data,
+      refetch: query.refetch,
+    };
   }
 
   if (skip) {
@@ -56,21 +82,24 @@ export function useRun(runID: string | null): FetchResult<Data, { skippable: tru
 
   if (query.error) {
     return {
-      ...baseFetchFailed,
+      ...baseInitialFetchFailed,
       error: new Error(query.error.message),
+      refetch: query.refetch,
     };
   }
 
   if (!data) {
     // Should be unreachable.
     return {
-      ...baseFetchFailed,
+      ...baseInitialFetchFailed,
       error: new Error('finished loading but missing data'),
+      refetch: query.refetch,
     };
   }
 
   return {
     ...baseFetchSucceeded,
     data,
+    refetch: query.refetch,
   };
 }

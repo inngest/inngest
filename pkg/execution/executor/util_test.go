@@ -1,118 +1,145 @@
 package executor
 
 import (
-	"context"
 	"testing"
-	"time"
 
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/state"
-	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/stretchr/testify/require"
 )
 
-func TestParseWait(t *testing.T) {
-	ctx := context.Background()
-
-	event := map[string]any{
-		"data": time.Now().Format(time.RFC3339),
-	}
-
-	state := state.NewStateInstance(
-		inngest.Function{},
-		state.Identifier{},
-		state.Metadata{},
-		[]map[string]any{event},
-		map[string]any{
-			"step-1": map[string]any{
-				"wait": time.Now().Format(time.RFC3339),
-			},
-		},
-		nil,
-		[]string{},
-	)
-
-	tests := []struct {
-		wait     string
-		duration time.Duration
-		err      error
-	}{
-		{
-			wait:     "1h30m",
-			duration: 90 * time.Minute,
-			err:      nil,
-		},
-		// expression as duration
-		{
-			wait:     "duration('1h')",
-			duration: time.Hour,
-			err:      nil,
-		},
-		// event data as expression
-		{
-			wait:     "date(event.data) + duration('45m30s')",
-			duration: (time.Minute * 45) + (time.Second * 30),
-			err:      nil,
-		},
-		// step output
-		{
-			wait:     "date(steps['step-1'].wait) + duration('30s')",
-			duration: (time.Second * 30),
-			err:      nil,
-		},
-		// response
-		{
-			wait:     "date(response.wait) + duration('45m30s')",
-			duration: (time.Minute * 45) + (time.Second * 30),
-			err:      nil,
-		},
-	}
-
-	for _, test := range tests {
-		t.Run(test.wait, func(t *testing.T) {
-			duration, err := ParseWait(ctx, test.wait, state, "step-1")
-			require.NoError(t, err)
-			require.WithinDuration(
-				t,
-				time.Now().Add(test.duration),
-				time.Now().Add(duration),
-				time.Second+100*time.Millisecond,
-			)
-		})
-	}
-
-}
-
-func TestSortOps(t *testing.T) {
+func TestOpGroups(t *testing.T) {
 	input := []*state.GeneratorOpcode{
 		{
-			Op: enums.OpcodeStep,
-		},
-		{
-			Op: enums.OpcodeStep,
-		},
-		{
 			Op: enums.OpcodeSleep,
+			ID: "1",
 		},
 		{
 			Op: enums.OpcodeWaitForEvent,
-		},
-	}
-	expected := []*state.GeneratorOpcode{
-		{
-			Op: enums.OpcodeWaitForEvent,
+			ID: "2",
 		},
 		{
-			Op: enums.OpcodeStep,
-		},
-		{
-			Op: enums.OpcodeStep,
+			Op: enums.OpcodeStepRun,
+			ID: "3",
 		},
 		{
 			Op: enums.OpcodeSleep,
+			ID: "4",
+		},
+		{
+			Op: enums.OpcodeWaitForEvent,
+			ID: "5",
 		},
 	}
 
-	sortOps(input)
-	require.EqualValues(t, expected, input)
+	expected := OpcodeGroups{
+		PriorityGroup: OpcodeGroup{
+			Opcodes: []*state.GeneratorOpcode{
+				{
+					Op: enums.OpcodeWaitForEvent,
+					ID: "2",
+				},
+				{
+					Op: enums.OpcodeWaitForEvent,
+					ID: "5",
+				},
+			},
+			ShouldStartHistoryGroup: true,
+		},
+		OtherGroup: OpcodeGroup{
+			Opcodes: []*state.GeneratorOpcode{
+				{
+					Op: enums.OpcodeSleep,
+					ID: "1",
+				},
+				{
+					Op: enums.OpcodeStepRun,
+					ID: "3",
+				},
+				{
+					Op: enums.OpcodeSleep,
+					ID: "4",
+				},
+			},
+			ShouldStartHistoryGroup: true,
+		},
+	}
+	actual := opGroups(input)
+
+	require.EqualValues(t, expected, actual)
+}
+
+func TestOpGroupsNoInput(t *testing.T) {
+	input := []*state.GeneratorOpcode{}
+
+	expected := OpcodeGroups{
+		PriorityGroup: OpcodeGroup{
+			Opcodes:                 []*state.GeneratorOpcode{},
+			ShouldStartHistoryGroup: false,
+		},
+		OtherGroup: OpcodeGroup{
+			Opcodes:                 []*state.GeneratorOpcode{},
+			ShouldStartHistoryGroup: false,
+		},
+	}
+	actual := opGroups(input)
+
+	require.EqualValues(t, expected, actual)
+}
+
+func TestOpGroupsSingleInput(t *testing.T) {
+	input := []*state.GeneratorOpcode{
+		{
+			Op: enums.OpcodeSleep,
+			ID: "1",
+		},
+	}
+
+	expected := OpcodeGroups{
+		PriorityGroup: OpcodeGroup{
+			Opcodes:                 []*state.GeneratorOpcode{},
+			ShouldStartHistoryGroup: false,
+		},
+		OtherGroup: OpcodeGroup{
+			Opcodes: []*state.GeneratorOpcode{
+				{
+					Op: enums.OpcodeSleep,
+					ID: "1",
+				},
+			},
+			ShouldStartHistoryGroup: false,
+		},
+	}
+	actual := opGroups(input)
+
+	require.EqualValues(t, expected, actual)
+}
+
+func TestOpcodeGroupsAllWithMixedInput(t *testing.T) {
+	input := []*state.GeneratorOpcode{
+		{Op: enums.OpcodeWaitForEvent, ID: "1"},
+		{Op: enums.OpcodeStepRun, ID: "2"},
+	}
+	groups := opGroups(input)
+
+	expected := []OpcodeGroup{
+		groups.PriorityGroup,
+		groups.OtherGroup,
+	}
+	actual := groups.All()
+
+	require.EqualValues(t, expected, actual)
+}
+
+func TestOpcodeGroupsAllWithEmptyInput(t *testing.T) {
+	input := []*state.GeneratorOpcode{}
+	groups := opGroups(input)
+
+	expected := []OpcodeGroup{
+		groups.PriorityGroup,
+		groups.OtherGroup,
+	}
+	actual := groups.All()
+
+	require.EqualValues(t, expected, actual)
 }

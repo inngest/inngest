@@ -8,6 +8,22 @@ scalar Environment
 scalar Uint
 scalar ULID
 scalar UUID
+scalar Bytes
+
+"The pagination information in a connection."
+type PageInfo {
+  "Indicates if there are any pages subsequent to the current page."
+  hasNextPage: Boolean!
+
+  "Indicates if there are any pages prior to the current page."
+  hasPreviousPage: Boolean!
+
+  "When paginating backward, the cursor to query the previous page."
+  startCursor: String
+
+  "When paginating forward, the cursor to query the next page."
+  endCursor: String
+}
 
 type Workspace {
   id: ID!
@@ -19,6 +35,7 @@ type StreamItem {
   type: StreamType!
   createdAt: Time!
   runs: [FunctionRun]
+  inBatch: Boolean!
 }
 
 enum StreamType {
@@ -38,7 +55,8 @@ type FunctionVersion {
 }
 
 type Event {
-  id: ID!
+  id: ULID!
+  externalID: String
   workspace: Workspace
   name: String
   createdAt: Time
@@ -77,7 +95,6 @@ enum EventStatus {
   NO_FUNCTIONS
 }
 
-
 enum FunctionStatus {
   RUNNING
   COMPLETED
@@ -88,6 +105,7 @@ enum FunctionStatus {
 
 type App {
   id: ID!
+  externalID: String!
   name: String!
   sdkLanguage: String!
   sdkVersion: String!
@@ -96,6 +114,13 @@ type App {
   checksum: String
   error: String
   functions: [Function!]!
+
+	@deprecated(reason: "connectionType is deprecated. Use method instead.")
+  connectionType: AppConnectionType!
+
+  method: AppMethod!
+
+  appVersion: String
 
   # These fields are UI convenience fields
   connected: Boolean!
@@ -130,6 +155,7 @@ enum FunctionRunStatus {
   FAILED
   CANCELLED
   RUNNING
+  QUEUED
 }
 
 enum FunctionEventType {
@@ -183,6 +209,9 @@ type FunctionRun {
   function: Function
   workspace: Workspace
   event: Event
+  events: [Event!]!
+  batchID: ULID
+  batchCreatedAt: Time
 
   status: FunctionRunStatus
   waitingFor: StepEventWait
@@ -190,28 +219,27 @@ type FunctionRun {
   startedAt: Time
   finishedAt: Time
   output: String # JSON encoded output of the function, or JSON encoded error if this is a failure.
-
   history: [RunHistoryItem!]!
   historyItemOutput(id: ULID!): String
-  name: String @deprecated # use the embedded function field instead.
   eventID: ID!
+  cron: String
 }
 
 enum HistoryType {
-	FunctionCancelled
-	FunctionCompleted
-	FunctionFailed
-	FunctionScheduled
-	FunctionStarted
-	FunctionStatusUpdated
-	None
-	StepCompleted
-	StepErrored
-	StepFailed
-	StepScheduled
-	StepSleeping
-	StepStarted
-	StepWaiting
+  FunctionCancelled
+  FunctionCompleted
+  FunctionFailed
+  FunctionScheduled
+  FunctionStarted
+  FunctionStatusUpdated
+  None
+  StepCompleted
+  StepErrored
+  StepFailed
+  StepScheduled
+  StepSleeping
+  StepStarted
+  StepWaiting
 }
 
 enum HistoryStepType {
@@ -282,4 +310,271 @@ type RunHistoryInvokeFunctionResult {
   eventID: ULID
   timeout: Boolean!
   runID: ULID
+}
+
+# trace runs
+input RunsFilterV2 {
+  from: Time!
+  until: Time
+  timeField: RunsV2OrderByField = QUEUED_AT
+
+  status: [FunctionRunStatus!]
+  functionIDs: [UUID!]
+  appIDs: [UUID!]
+
+  query: String # CEL query string
+}
+
+input RunsV2OrderBy {
+  field: RunsV2OrderByField!
+  direction: RunsOrderByDirection!
+}
+
+enum RunsV2OrderByField {
+  QUEUED_AT
+  STARTED_AT
+  ENDED_AT
+}
+
+enum RunsOrderByDirection {
+  ASC
+  DESC
+}
+
+type FunctionRunV2 {
+  id: ULID!
+  appID: UUID!
+  app: App!
+  functionID: UUID!
+  function: Function!
+  traceID: String!
+
+  # timestamps
+  queuedAt: Time!
+  startedAt: Time
+  endedAt: Time
+
+  status: FunctionRunStatus!
+  sourceID: String # The parent trace / run that triggered this run
+  triggerIDs: [ULID!]!
+  eventName: String
+  isBatch: Boolean!
+  batchCreatedAt: Time
+  cronSchedule: String
+
+  output: Bytes
+
+  trace: RunTraceSpan
+  hasAI: Boolean!
+}
+
+type RunsV2Connection {
+  edges: [FunctionRunV2Edge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type FunctionRunV2Edge {
+  node: FunctionRunV2!
+  cursor: String!
+}
+
+enum RunTraceSpanStatus {
+  FAILED # step completed with an error
+  QUEUED # step of run is queued but not started
+  RUNNING # actively being executed right now
+  COMPLETED # step completed successfully
+  # TIMED_OUT # wait for event timed out waiting
+  WAITING # sleeping, waiting for an event
+  CANCELLED # cancelled run
+}
+
+enum StepOp {
+  INVOKE # invoke another function
+  RUN # run a step
+  SLEEP # sleep for a duration
+  WAIT_FOR_EVENT # wait for an event
+  AI_GATEWAY
+}
+
+union StepInfo =
+    InvokeStepInfo
+  | SleepStepInfo
+  | WaitForEventStepInfo
+  | RunStepInfo
+
+type InvokeStepInfo {
+  triggeringEventID: ULID!
+  functionID: String!
+  timeout: Time!
+  returnEventID: ULID
+  runID: ULID
+  timedOut: Boolean
+}
+
+type SleepStepInfo {
+  sleepUntil: Time!
+}
+
+type WaitForEventStepInfo {
+  eventName: String!
+  expression: String
+  timeout: Time!
+  foundEventID: ULID
+  timedOut: Boolean
+}
+
+type RunStepInfo {
+  type: String
+}
+
+type RunTraceSpan {
+  appID: UUID!
+  functionID: UUID!
+
+  runID: ULID!
+  run: FunctionRun! # the run that generated this span <== links should be here
+  # Internal
+  spanID: String! # internal span ID, or a virtual span ID
+  traceID: String! # the internal ID of the trace this span belongs to
+  # Required
+  name: String! # the name of the span
+  status: RunTraceSpanStatus! # the status of the span
+  attempts: Int # if this node contains retry attempts, this is the current attempt number
+  # groupID: String!
+
+  # cursor: String! # used for "pagination", is just a hash to the user
+  duration: Int # the duration of the span in milliseconds (calculated), if null, it's still running
+  outputID: String
+  queuedAt: Time!
+  startedAt: Time # the start time of the span
+  endedAt: Time # the end time of the span, only present if it's ended
+  childrenSpans: [RunTraceSpan!]! # the children spans of this span - invoke
+  stepOp: StepOp # the operation this span represents; nil means it can't be attributed to a step yet
+  stepID: String # the ID of the step this span is associated with
+  stepInfo: StepInfo # info about the step - use fragments to access appropriately
+  # Nice-to-haves for navigating the trace
+  isRoot: Boolean! # whether this span is the root span of the trace (shortcut for presence of rootspan)
+  parentSpanID: String
+  parentSpan: RunTraceSpan # the parent span of this span
+}
+
+type RunTraceSpanOutput {
+  input: Bytes
+  data: Bytes
+  error: StepError
+}
+
+type StepError {
+  message: String!
+  name: String
+  stack: String
+}
+
+type RunTraceTrigger {
+  eventName: String
+  IDs: [ULID!]! # the ULIDs of all events associated with this run
+  payloads: [Bytes!]! # a list of event objects
+  timestamp: Time! # the timestamp of the single event or the batch
+  isBatch: Boolean! # indicates if this trigger is a batch trigger
+  batchID: ULID # the batchID of this list of events if available
+  cron: String # The cron expression if available
+}
+
+# connect
+
+enum ConnectV1ConnectionStatus {
+  CONNECTED
+  READY
+  DRAINING
+  DISCONNECTING
+  DISCONNECTED
+}
+
+input ConnectV1WorkerConnectionsFilter {
+  from: Time
+  until: Time
+  timeField: ConnectV1WorkerConnectionsOrderByField = CONNECTED_AT
+
+  status: [ConnectV1ConnectionStatus!]
+  appIDs: [UUID!]
+}
+
+input ConnectV1WorkerConnectionsOrderBy {
+  field: ConnectV1WorkerConnectionsOrderByField!
+  direction: ConnectV1WorkerConnectionsOrderByDirection!
+}
+
+enum ConnectV1WorkerConnectionsOrderByField {
+  CONNECTED_AT
+  LAST_HEARTBEAT_AT
+  DISCONNECTED_AT
+}
+
+enum ConnectV1WorkerConnectionsOrderByDirection {
+  ASC
+  DESC
+}
+
+type ConnectV1WorkerConnection {
+  id: ULID!
+  gatewayId: ULID!
+  instanceId: String!
+  workerIp: String!
+
+	appName: String
+  appID: UUID
+  app: App
+
+  # timestamps
+  connectedAt: Time!
+  lastHeartbeatAt: Time
+  disconnectedAt: Time
+
+  disconnectReason: String
+
+  status: ConnectV1ConnectionStatus!
+
+  groupHash: String!
+  sdkLang: String!
+  sdkVersion: String!
+  sdkPlatform: String!
+  syncId: UUID
+
+	@deprecated(reason: "buildId is deprecated. Use appVersion instead.")
+  buildId: String
+  appVersion: String
+
+  functionCount: Int!
+
+  cpuCores: Int!
+  memBytes: Int!
+  os: String!
+}
+
+type ConnectV1WorkerConnectionsConnection {
+  edges: [ConnectV1WorkerConnectionEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type ConnectV1WorkerConnectionEdge {
+  node: ConnectV1WorkerConnection!
+  cursor: String!
+}
+
+enum AppConnectionType {
+	SERVERLESS
+	CONNECT
+}
+
+enum AppMethod {
+	SERVE
+	CONNECT
+}
+
+input AppsFilterV1 {
+	connectionType: AppConnectionType @deprecated(reason: "connectionType is deprecated. Use method instead.")
+
+	method: AppMethod
 }

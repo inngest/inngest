@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -10,11 +9,15 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/inngest/inngest/pkg/config"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/pubsub"
 	"github.com/inngest/inngest/pkg/service"
-	"github.com/oklog/ulid/v2"
+	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // NewService returns a new API service for ingesting events.  Any additional
@@ -28,10 +31,28 @@ type Mount struct {
 	Handler http.Handler
 }
 
-func NewService(c config.Config, mounts ...Mount) service.Service {
+type APIServiceOptions struct {
+	Config config.Config
+	Mounts []Mount
+
+	// LocalEventKeys are the keys used to send events to the local event API
+	// from an app. If this is set, only keys that match one of these values
+	// will be accepted.
+	LocalEventKeys []string
+
+	// requireKeys defines whether event and signing keys are required for the
+	// server to function. If this is true and signing keys are not defined,
+	// the server will still boot but core actions such as syncing, runs, and
+	// ingesting events will not work.
+	RequireKeys bool
+}
+
+func NewService(opts APIServiceOptions) service.Service {
 	return &apiServer{
-		config: c,
-		mounts: mounts,
+		config:         opts.Config,
+		mounts:         opts.Mounts,
+		localEventKeys: opts.LocalEventKeys,
+		requireKeys:    opts.RequireKeys,
 	}
 }
 
@@ -41,6 +62,17 @@ type apiServer struct {
 	publisher pubsub.Publisher
 
 	mounts []Mount
+
+	// localEventKeys are the keys used to send events to the local event API
+	// from an app. If this is set, only keys that match one of these values
+	// will be accepted.
+	localEventKeys []string
+
+	// requireKeys defines whether event and signing keys are required for the
+	// server to function. If this is true and signing keys are not defined,
+	// the server will still boot but core actions such as syncing, runs, and
+	// ingesting events will not work.
+	requireKeys bool
 }
 
 func (a *apiServer) Name() string {
@@ -51,9 +83,11 @@ func (a *apiServer) Pre(ctx context.Context) error {
 	var err error
 
 	api, err := NewAPI(Options{
-		Config:       a.config,
-		Logger:       logger.From(ctx),
-		EventHandler: a.handleEvent,
+		Config:         a.config,
+		Logger:         logger.From(ctx),
+		EventHandler:   a.handleEvent,
+		LocalEventKeys: a.localEventKeys,
+		RequireKeys:    a.requireKeys,
 	})
 	if err != nil {
 		return err
@@ -89,23 +123,28 @@ func (a *apiServer) handleEvent(ctx context.Context, e *event.Event) (string, er
 	// the caller here.
 	l := logger.From(ctx).With().Str("caller", "api").Logger()
 	ctx = logger.With(ctx, l)
+	span := trace.SpanFromContext(ctx)
 
 	l.Debug().Str("event", e.Name).Msg("handling event")
 
-	internalID := ulid.MustNew(ulid.Now(), rand.Reader)
+	trackedEvent := event.NewOSSTrackedEvent(*e)
 
-	if e.ID == "" {
-		// Always ensure that the event has an ID, for idempotency.
-		e.ID = internalID.String()
-	}
-
-	byt, err := json.Marshal(e)
+	byt, err := json.Marshal(trackedEvent)
 	if err != nil {
 		l.Error().Err(err).Msg("error unmarshalling event as JSON")
+		span.SetStatus(codes.Error, "error parsing event as JSON")
 		return "", err
 	}
 
-	l.Info().Str("event_name", e.Name).Str("id", e.ID).Interface("event", e).Msg("publishing event")
+	l.Info().
+		Str("event_name", trackedEvent.GetEvent().Name).
+		Str("internal_id", trackedEvent.GetInternalID().String()).
+		Str("external_id", trackedEvent.GetEvent().ID).
+		Interface("event", trackedEvent.GetEvent()).
+		Msg("publishing event")
+
+	carrier := itrace.NewTraceCarrier()
+	itrace.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
 
 	err = a.publisher.Publish(
 		ctx,
@@ -114,10 +153,16 @@ func (a *apiServer) handleEvent(ctx context.Context, e *event.Event) (string, er
 			Name:      event.EventReceivedName,
 			Data:      string(byt),
 			Timestamp: time.Now(),
+			Metadata: map[string]any{
+				consts.OtelPropagationKey: carrier,
+			},
 		},
 	)
+	if err != nil {
+		span.SetStatus(codes.Error, err.Error())
+	}
 
-	return e.ID, err
+	return trackedEvent.GetInternalID().String(), err
 }
 
 func (a *apiServer) Stop(ctx context.Context) error {

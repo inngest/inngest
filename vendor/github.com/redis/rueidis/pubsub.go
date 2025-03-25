@@ -42,9 +42,9 @@ func newSubs() *subs {
 }
 
 type subs struct {
+	cnt uint64
 	chs map[string]chs
 	sub map[uint64]*sub
-	cnt uint64
 	mu  sync.RWMutex
 }
 

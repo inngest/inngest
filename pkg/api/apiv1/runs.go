@@ -1,18 +1,20 @@
 package apiv1
 
 import (
+	"context"
 	"net/http"
 	"time"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/queue"
+	"github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/publicerr"
 	"github.com/oklog/ulid/v2"
 )
 
 // GetEventRuns returns function runs given an event ID.
-func (a api) GetFunctionRun(w http.ResponseWriter, r *http.Request) {
+func (a router) GetFunctionRun(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	auth, err := a.opts.AuthFinder(ctx)
 	if err != nil {
@@ -37,18 +39,10 @@ func (a api) GetFunctionRun(w http.ResponseWriter, r *http.Request) {
 }
 
 // CancelFunctionRun cancels a function run.
-func (a api) CancelFunctionRun(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
+func (a API) CancelFunctionRun(ctx context.Context, runID ulid.ULID) error {
 	auth, err := a.opts.AuthFinder(ctx)
 	if err != nil {
-		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 401, "No auth found"))
-		return
-	}
-
-	runID, err := ulid.Parse(chi.URLParam(r, "runID"))
-	if err != nil {
-		_ = publicerr.WriteHTTP(w, publicerr.Wrapf(err, 400, "Invalid run ID: %s", chi.URLParam(r, "runID")))
-		return
+		return publicerr.Wrap(err, 401, "No auth found")
 	}
 
 	fr, err := a.opts.FunctionRunReader.GetFunctionRun(
@@ -58,22 +52,40 @@ func (a api) CancelFunctionRun(w http.ResponseWriter, r *http.Request) {
 		runID,
 	)
 	if err != nil {
-		_ = publicerr.WriteHTTP(w, publicerr.Wrapf(err, 404, "Unable to load function run: %s", chi.URLParam(r, "runID")))
-		return
+		return publicerr.Wrapf(err, 404, "Unable to load function run: %s", runID)
 	}
-
 	if fr.WorkspaceID != auth.WorkspaceID() {
-		_ = publicerr.WriteHTTP(w, publicerr.Wrapf(err, 404, "Unable to load function run: %s", chi.URLParam(r, "runID")))
-		return
+		return publicerr.Wrapf(err, 404, "Unable to load function run: %s", runID)
 	}
 
-	if err := a.opts.Executor.Cancel(ctx, runID, execution.CancelRequest{}); err != nil {
-		_ = publicerr.WriteHTTP(w, publicerr.Wrapf(err, 500, "Unable to cancel function run: %s", err))
+	id := state.ID{
+		RunID:      runID,
+		FunctionID: fr.FunctionID,
+		Tenant: state.Tenant{
+			// TODO: AppID is missing
+			EnvID:     auth.WorkspaceID(),
+			AccountID: auth.AccountID(),
+		},
+	}
+	if err := a.opts.Executor.Cancel(ctx, id, execution.CancelRequest{}); err != nil {
+		return publicerr.Wrapf(err, 500, "Unable to cancel function run: %s", err)
+	}
+	return nil
+}
+
+func (a router) cancelFunctionRun(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	runID, err := ulid.Parse(chi.URLParam(r, "runID"))
+	if err != nil {
+		_ = publicerr.WriteHTTP(w, publicerr.Wrapf(err, 400, "Invalid run ID: %s", chi.URLParam(r, "runID")))
 		return
+	}
+	if err := a.CancelFunctionRun(ctx, runID); err != nil {
+		_ = publicerr.WriteHTTP(w, err)
 	}
 }
 
-func (a api) GetFunctionRunJobs(w http.ResponseWriter, r *http.Request) {
+func (a router) GetFunctionRunJobs(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	auth, err := a.opts.AuthFinder(ctx)
 	if err != nil {
@@ -98,8 +110,15 @@ func (a api) GetFunctionRunJobs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	shard, err := a.opts.QueueShardSelector(ctx, auth.AccountID(), nil)
+	if err != nil {
+		_ = publicerr.WriteHTTP(w, publicerr.Wrapf(err, 500, "Internal server error"))
+		return
+	}
+
 	jobs, err := a.opts.JobQueueReader.RunJobs(
 		ctx,
+		shard.Name,
 		auth.WorkspaceID(),
 		fr.FunctionID,
 		runID,

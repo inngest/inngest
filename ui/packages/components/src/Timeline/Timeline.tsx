@@ -1,6 +1,6 @@
 'use client';
 
-import { Badge } from '@inngest/components/Badge/Badge';
+import { Pill } from '@inngest/components/Pill';
 import type { HistoryNode, HistoryParser } from '@inngest/components/utils/historyParser';
 import * as AccordionPrimitive from '@radix-ui/react-accordion';
 
@@ -24,27 +24,20 @@ export function Timeline({ getOutput, history, navigateToRun }: Props) {
   return (
     <div>
       {nodes.length === 0 ? (
-        <div className=" text-center text-white">No history yet</div>
+        <div className=" text-basis text-center">No history yet</div>
       ) : (
         <AccordionPrimitive.Root
           type="multiple"
-          className="w-full text-slate-100 last:border-b last:border-slate-800/50"
+          className="border-subtle text-muted w-full last:border-b"
         >
           {nodes.map((node, i) => {
-            let position: 'first' | 'last' | 'middle' = 'middle';
             if (!isVisible(node)) {
               return null;
-            }
-            if (i === 0) {
-              position = 'first';
-            } else if (i === nodes.length - 1) {
-              position = 'last';
             }
 
             return (
               <TimelineNode
                 key={node.groupID}
-                position={position}
                 getOutput={getOutput}
                 node={node}
                 navigateToRun={navigateToRun}
@@ -52,10 +45,10 @@ export function Timeline({ getOutput, history, navigateToRun }: Props) {
                 {Object.values(node.attempts).length > 0 && (
                   <>
                     <div className="flex items-center gap-2 pt-4">
-                      <p className="py-4 text-sm text-slate-400">Attempts</p>
-                      <Badge kind="outlined">
+                      <p className="text-subtle py-4 text-sm">Attempts</p>
+                      <Pill appearance="outlined">
                         {Object.values(node.attempts).length.toString() || '0'}
-                      </Badge>
+                      </Pill>
                     </div>
                     {Object.values(node.attempts).map((attempt) => (
                       <TimelineNode
@@ -75,14 +68,6 @@ export function Timeline({ getOutput, history, navigateToRun }: Props) {
       )}
     </div>
   );
-}
-
-function sortAscending(a: HistoryNode, b: HistoryNode) {
-  if (a.startedAt && b.startedAt) {
-    return a.startedAt.getTime() - b.startedAt.getTime();
-  } else {
-    return 0;
-  }
 }
 
 function isVisible(node: HistoryNode) {

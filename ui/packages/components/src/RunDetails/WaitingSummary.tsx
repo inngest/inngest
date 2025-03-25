@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Card } from '@inngest/components/Card';
 import { MetadataItem } from '@inngest/components/Metadata';
-import { IconEvent } from '@inngest/components/icons/Event';
+import { EventsIcon } from '@inngest/components/icons/sections/Events';
 import type { HistoryNode, HistoryParser } from '@inngest/components/utils/historyParser';
 
 type Props = {
@@ -28,7 +28,7 @@ export function WaitingSummary({ history }: Props) {
 
         return (
           <Card
-            accentColor="bg-sky-400"
+            accentColor="bg-status-running"
             className={i < waits.length - 1 ? 'mb-4' : undefined}
             key={wait.groupID}
           >
@@ -39,7 +39,7 @@ export function WaitingSummary({ history }: Props) {
                 label="Event Name"
                 value={
                   <>
-                    <IconEvent className="inline-block" /> {config.eventName}
+                    <EventsIcon className="inline-block h-4 w-4" /> {config.eventName}
                   </>
                 }
               />

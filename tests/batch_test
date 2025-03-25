@@ -1,0 +1,7 @@
+#!/bin/bash
+
+for ((i=1; i<=12; i++))
+do
+  datetime=$(date +"%Y-%m-%d %H:%M:%S.%3N")
+  curl -X POST http://localhost:8288/e/test --data "{ \"name\": \"test/batch\", \"data\": { \"num\": ${i} } }"
+done

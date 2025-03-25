@@ -8,7 +8,6 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/state"
-	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngestgo"
 )
 
@@ -28,13 +27,13 @@ func TestSDKSteps(t *testing.T) {
 	}
 
 	hashes := map[string]string{
-		"first step":  "ffd46aab701259a8c1e39bcd9adeaff6fa752340",
-		"sleep":       "518add570bed90f1ad3191f40d346d47bd25da83",
-		"second step": "555cb806535e79feaa831b5b2a5044f5d243930f",
+		"first step":  "98bf98df193bcce7c33e6bc50927cf2ac21206cb",
+		"sleep":       "dd44d5dc73e81cfbd3c93d03c50160b0b8dc3d6a",
+		"second step": "764e20ec975d4ef820d0f42e6a5833384bd7ee36",
 	}
 
-	fnID := "test-suite-sdk-step-test"
 	test := &Test{
+		ID:   "test-suite-step-test",
 		Name: "SDK Steps",
 		Description: `
 			This test asserts that steps works across the SDK.  This tests steps and sleeps
@@ -44,24 +43,6 @@ func TestSDKSteps(t *testing.T) {
 			- step.sleep
 			- step.run
 		`,
-		Function: inngest.Function{
-			Name: "SDK Step Test",
-			Slug: fnID,
-			Triggers: []inngest.Trigger{
-				{
-					EventTrigger: &inngest.EventTrigger{
-						Event: "tests/step.test",
-					},
-				},
-			},
-			Steps: []inngest.Step{
-				{
-					ID:   "step",
-					Name: "step",
-					URI:  stepURL(fnID, "step"),
-				},
-			},
-		},
 		EventTrigger: evt,
 		Timeout:      2 * time.Second,
 	}
@@ -69,14 +50,6 @@ func TestSDKSteps(t *testing.T) {
 	test.SetAssertions(
 		// All executor requests should have this event.
 		test.SetRequestEvent(evt),
-		// And the executor should start its requests with this context.
-		test.SetRequestContext(driver.SDKRequestContext{
-			FunctionID: inngest.DeterministicUUID(test.Function),
-			StepID:     "step",
-			Stack: &driver.FunctionStack{
-				Current: 0,
-			},
-		}),
 
 		test.SendTrigger(),
 
@@ -84,10 +57,11 @@ func TestSDKSteps(t *testing.T) {
 		// optimizes single steps to run immediately.
 		test.ExpectRequest("Initial request plan", "step", time.Second),
 		test.ExpectGeneratorResponse([]state.GeneratorOpcode{{
-			Op:   enums.OpcodeStep,
-			ID:   hashes["first step"],
-			Name: "first step",
-			Data: []byte(`"first step"`),
+			Op:          enums.OpcodeStepRun,
+			ID:          hashes["first step"],
+			Name:        "first step",
+			DisplayName: inngestgo.StrPtr("first step"),
+			Data:        []byte(`"first step"`),
 		}}),
 		// Stack is updated
 		test.AddRequestStack(driver.FunctionStack{
@@ -96,15 +70,17 @@ func TestSDKSteps(t *testing.T) {
 		}),
 		// State is updated with step data
 		test.AddRequestSteps(map[string]any{
-			hashes["first step"]: "first step",
+			hashes["first step"]: map[string]any{"data": "first step"},
 		}),
 
 		// Execute the step again, get a wait
 		test.ExpectRequest("Wait step run", "step", time.Second),
 		test.ExpectGeneratorResponse([]state.GeneratorOpcode{{
-			Op:   enums.OpcodeSleep,
-			ID:   hashes["sleep"],
-			Name: "2s",
+			Op:          enums.OpcodeSleep,
+			ID:          hashes["sleep"],
+			Data:        json.RawMessage("null"),
+			Name:        "2s",
+			DisplayName: inngestgo.StrPtr("for 2s"),
 		}}),
 		// Update stack and state
 		test.AddRequestStack(driver.FunctionStack{
@@ -118,10 +94,11 @@ func TestSDKSteps(t *testing.T) {
 		// After the wait we should re-invoke the request _again_
 		test.ExpectRequest("Post wait", "step", 3*time.Second),
 		test.ExpectGeneratorResponse([]state.GeneratorOpcode{{
-			Op:   enums.OpcodeStep,
-			ID:   hashes["second step"],
-			Name: "second step",
-			Data: json.RawMessage(`{"first":"first step","second":true}`),
+			Op:          enums.OpcodeStepRun,
+			ID:          hashes["second step"],
+			DisplayName: inngestgo.StrPtr("second step"),
+			Name:        "second step",
+			Data:        json.RawMessage(`{"first":"first step","second":true}`),
 		}}),
 
 		// Update state with step data
@@ -131,8 +108,10 @@ func TestSDKSteps(t *testing.T) {
 		}),
 		test.AddRequestSteps(map[string]any{
 			hashes["second step"]: map[string]any{
-				"first":  "first step",
-				"second": true,
+				"data": map[string]any{
+					"first":  "first step",
+					"second": true,
+				},
 			},
 		}),
 

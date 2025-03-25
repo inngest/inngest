@@ -1,5 +1,46 @@
 # Changelog
 
+## [v0.27.0] - 2024-04-16
+
+### Added
+- Added support for throttling function runs
+- Added support for function timeouts
+- Added support for new metrics
+
+### Changed
+- Improved support for tracing
+- Improved SDK registration handling
+
+### Fixed
+- Various dev server fixes
+
+
+## [v0.26.0] - 2024-02-22
+
+### Added
+- Added support for batching in the dev server
+
+### Fixed
+- Various dev server fixes, battery life improvements
+
+
+## [v0.25.0] - 2024-01-25
+
+### Added
+- Added support for per-step errors
+- Added support for StepRun opcode
+
+## [v0.24.0] - 2024-01-17
+
+### Added
+- Added debounce timeouts
+- Added multiple concurrency keys
+- Added step invocation
+- Added improvements to apps, registration
+
+### Fixed
+- Removed goroutine handling of jobs, leading to FIFO guarantees within the job queue itself
+
 ## [v0.17.0] - 2023-09-26
 
 ### Added

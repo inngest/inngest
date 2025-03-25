@@ -3,6 +3,7 @@ package cqrs
 import (
 	"context"
 	"database/sql"
+	"github.com/inngest/inngest/pkg/enums"
 	"time"
 
 	"github.com/google/uuid"
@@ -21,6 +22,8 @@ type App struct {
 	CreatedAt   time.Time
 	DeletedAt   time.Time
 	Url         string
+	Method      string
+	AppVersion  string
 }
 
 type AppManager interface {
@@ -30,20 +33,22 @@ type AppManager interface {
 
 type AppReader interface {
 	// GetApps returns apps that have not been deleted.
-	GetApps(ctx context.Context) ([]*App, error)
+	GetApps(ctx context.Context, envID uuid.UUID, filter *FilterAppParam) ([]*App, error)
 	// GetAppByChecksum returns an app by checksum.
-	GetAppByChecksum(ctx context.Context, checksum string) (*App, error)
+	GetAppByChecksum(ctx context.Context, envID uuid.UUID, checksum string) (*App, error)
 	// GetAppByURL returns an app by URL
-	GetAppByURL(ctx context.Context, url string) (*App, error)
+	GetAppByURL(ctx context.Context, envID uuid.UUID, url string) (*App, error)
+	// GetAppByName returns an app by name
+	GetAppByName(ctx context.Context, envID uuid.UUID, name string) (*App, error)
 	// GetAllApps returns all apps.
-	GetAllApps(ctx context.Context) ([]*App, error)
+	GetAllApps(ctx context.Context, envID uuid.UUID) ([]*App, error)
 
 	GetAppByID(ctx context.Context, id uuid.UUID) (*App, error)
 }
 
 type AppWriter interface {
-	// InsertApp creates a new app.
-	InsertApp(ctx context.Context, arg InsertAppParams) (*App, error)
+	// UpsertApp creates or updates an app.
+	UpsertApp(ctx context.Context, arg UpsertAppParams) (*App, error)
 	// UpdateAppError sets an app error.  A nil string
 	// clears the app error.
 	UpdateAppError(ctx context.Context, arg UpdateAppErrorParams) (*App, error)
@@ -53,7 +58,7 @@ type AppWriter interface {
 	DeleteApp(ctx context.Context, id uuid.UUID) error
 }
 
-type InsertAppParams struct {
+type UpsertAppParams struct {
 	ID          uuid.UUID
 	Name        string
 	SdkLanguage string
@@ -64,6 +69,8 @@ type InsertAppParams struct {
 	Error       sql.NullString
 	Checksum    string
 	Url         string
+	Method      string
+	AppVersion  string
 }
 
 type UpdateAppErrorParams struct {
@@ -74,4 +81,8 @@ type UpdateAppErrorParams struct {
 type UpdateAppURLParams struct {
 	ID  uuid.UUID
 	Url string
+}
+
+type FilterAppParam struct {
+	Method *enums.AppMethod
 }

@@ -13,7 +13,7 @@ const getCron = (schedule: string) => {
     pattern = pattern.replace(timezonePattern, ''); // remove timezone from schedule
   }
 
-  return Cron(pattern, { timezone: timezone });
+  return Cron(pattern.trim(), { timezone: timezone });
 };
 
 interface CronDetails {

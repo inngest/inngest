@@ -3,6 +3,7 @@ package httpdriver
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -11,36 +12,43 @@ import (
 	"net/url"
 	"strconv"
 	"strings"
-	"syscall"
 	"time"
 
+	"github.com/google/uuid"
+	"github.com/inngest/go-httpstat"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
-	headers_lib "github.com/inngest/inngest/pkg/headers"
+	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/inngest"
+	"github.com/inngest/inngest/pkg/inngest/log"
+	"github.com/inngest/inngest/pkg/syscode"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
+	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
+	"github.com/oklog/ulid/v2"
+	"go.opentelemetry.io/otel/propagation"
 )
 
 var (
 	dialer = &net.Dialer{KeepAlive: 15 * time.Second}
 
 	DefaultTransport = &http.Transport{
-		Proxy:                 http.ProxyFromEnvironment,
 		DialContext:           dialer.DialContext,
 		ForceAttemptHTTP2:     true,
-		MaxIdleConns:          0,
-		IdleConnTimeout:       0,
+		MaxIdleConns:          5,
+		IdleConnTimeout:       2 * time.Second,
 		TLSHandshakeTimeout:   10 * time.Second,
 		ExpectContinueTimeout: 1 * time.Second,
+		DisableKeepAlives:     true,
 		// New, ensuring that services can take their time before
 		// responding with headers as they process long running
-		// kjobs.
+		// jobs.
 		ResponseHeaderTimeout: consts.MaxFunctionTimeout,
 	}
 	DefaultClient = &http.Client{
 		Timeout:       consts.MaxFunctionTimeout,
-		CheckRedirect: checkRedirect,
+		CheckRedirect: CheckRedirect,
 		Transport:     DefaultTransport,
 	}
 
@@ -48,12 +56,17 @@ var (
 
 	ErrEmptyResponse = fmt.Errorf("no response data")
 	ErrNoRetryAfter  = fmt.Errorf("no retry after present")
-	ErrNotSDK        = errors.New("response is not from an SDK")
+	ErrNotSDK        = syscode.Error{Code: syscode.CodeNotSDK}
 )
 
+type HTTPDoer interface {
+	Do(req *http.Request) (*http.Response, error)
+}
+
 type executor struct {
-	Client     *http.Client
-	signingKey []byte
+	Client                 *http.Client
+	localSigningKey        []byte
+	requireLocalSigningKey bool
 }
 
 // RuntimeType fulfiils the inngest.Runtime interface.
@@ -61,19 +74,23 @@ func (e executor) RuntimeType() string {
 	return "http"
 }
 
-func (e executor) Execute(ctx context.Context, s state.State, item queue.Item, edge inngest.Edge, step inngest.Step, idx, attempt int) (*state.DriverResponse, error) {
+func (e executor) Execute(ctx context.Context, sl sv2.StateLoader, s sv2.Metadata, item queue.Item, edge inngest.Edge, step inngest.Step, idx, attempt int) (*state.DriverResponse, error) {
+	if e.requireLocalSigningKey && len(e.localSigningKey) == 0 {
+		return nil, fmt.Errorf("server requires that a signing key is set to run functions")
+	}
+
 	uri, err := url.Parse(step.URI)
 	if err != nil {
 		return nil, err
 	}
 
-	input, err := driver.MarshalV1(ctx, s, step, idx, "", attempt)
+	input, err := driver.MarshalV1(ctx, sl, s, step, idx, "", attempt)
 	if err != nil {
 		return nil, err
 	}
 
 	return DoRequest(ctx, e.Client, Request{
-		SigningKey: e.signingKey,
+		SigningKey: e.localSigningKey,
 		URL:        *uri,
 		Input:      input,
 		Edge:       edge,
@@ -82,15 +99,29 @@ func (e executor) Execute(ctx context.Context, s state.State, item queue.Item, e
 }
 
 type Request struct {
+	// WorkflowID is used for logging purposes, and is not used in the request
+	WorkflowID uuid.UUID
+	// RunID is used for logging purposes, and is not used in the request
+	RunID ulid.ULID
+
+	// Signature, if set, is the signature to use for the request.  If unset,
+	// the SigningKey below will be used to sign the input.
+	Signature string
+	// SigningKey, if set, signs the input using this key.
 	SigningKey []byte
 	URL        url.URL
 	Input      []byte
 	Edge       inngest.Edge
 	Step       inngest.Step
+
+	// SkipStats prevents statistics from being tracked.
+	SkipStats bool
+	// statter is a function added in testing, called with httpstat info
+	statter func(s *httpstat.Result)
 }
 
 // DoRequest executes the HTTP request with the given input.
-func DoRequest(ctx context.Context, c *http.Client, r Request) (*state.DriverResponse, error) {
+func DoRequest(ctx context.Context, c HTTPDoer, r Request) (*state.DriverResponse, error) {
 	if c == nil {
 		c = DefaultClient
 	}
@@ -114,125 +145,201 @@ func DoRequest(ctx context.Context, c *http.Client, r Request) (*state.DriverRes
 		return nil, err
 	}
 
-	if resp.statusCode == 206 {
+	return HandleHttpResponse(ctx, r, resp)
+}
+
+func HandleHttpResponse(ctx context.Context, r Request, resp *Response) (*state.DriverResponse, error) {
+	var err error
+	if resp.StatusCode == 206 {
 		// This is a generator-based function returning opcodes.
 		dr := &state.DriverResponse{
 			Step:           r.Step,
-			Duration:       resp.duration,
-			Output:         string(resp.body),
-			OutputSize:     len(resp.body),
-			NoRetry:        resp.noRetry,
-			RetryAt:        resp.retryAt,
-			RequestVersion: resp.requestVersion,
-			StatusCode:     resp.statusCode,
-			SDK:            resp.sdk,
+			Duration:       resp.Duration,
+			Output:         string(resp.Body),
+			OutputSize:     len(resp.Body),
+			NoRetry:        resp.NoRetry,
+			RetryAt:        resp.RetryAt,
+			RequestVersion: resp.RequestVersion,
+			StatusCode:     resp.StatusCode,
+			SDK:            resp.Sdk,
+			Header:         resp.Header,
 		}
-		dr.Generator, err = ParseGenerator(ctx, resp.body)
+		dr.Generator, err = ParseGenerator(ctx, resp.Body, resp.NoRetry)
 		if err != nil {
 			return nil, err
 		}
-		if resp.noRetry {
-			// Ensure we return a NonRetriableError to indicate that
-			// we're not retrying when we store the error message.
-			err = errors.New("NonRetriableError")
-			dr.SetError(err)
-		}
+
+		// NOTE: Generator responses never set dr.Err, as we assume that the
+		// SDK finished processing successfully.  An empty array is OpcodeNone.
 
 		// If this was a generator response with a single op, set some
 		// relevant step data so that it's easier to identify this step in
 		// history.
-		if op := dr.SingleStep(); op != nil {
+		if op := dr.HistoryVisibleStep(); op != nil {
 			dr.Step.ID = op.ID
 			dr.Step.Name = op.UserDefinedName()
-
-			if dr.IsSingleStepError() {
-				defaultErrMsg := state.DefaultStepErrorMessage
-				userErr := state.UserErrorFromRaw(&defaultErrMsg, op.Error)
-				if mapped, ok := userErr["message"].(string); ok {
-					dr.Err = &mapped
-				} else {
-					dr.Err = &defaultErrMsg
-				}
-			}
 		}
 
-		if !resp.isSDK {
+		if resp.SysErr != nil {
+			dr.SetError(resp.SysErr)
+		}
+
+		if !resp.IsSDK {
 			dr.SetError(ErrNotSDK)
 		}
 		return dr, nil
 	}
 
-	body := parseResponse(resp.body)
+	body := ParseResponse(resp.Body)
 	dr := &state.DriverResponse{
 		Step:           r.Step,
 		Output:         body,
-		Duration:       resp.duration,
-		OutputSize:     len(resp.body),
-		NoRetry:        resp.noRetry,
-		RetryAt:        resp.retryAt,
-		RequestVersion: resp.requestVersion,
-		StatusCode:     resp.statusCode,
-		SDK:            resp.sdk,
+		Duration:       resp.Duration,
+		OutputSize:     len(resp.Body),
+		NoRetry:        resp.NoRetry,
+		RetryAt:        resp.RetryAt,
+		RequestVersion: resp.RequestVersion,
+		StatusCode:     resp.StatusCode,
+		SDK:            resp.Sdk,
+		Header:         resp.Header,
 	}
-	if resp.statusCode < 200 || resp.statusCode > 299 {
+	if resp.SysErr != nil {
+		dr.SetError(resp.SysErr)
+	}
+
+	if dr.Err == nil && resp.StatusCode == 200 && !resp.IsSDK {
+		log.From(ctx).Info().
+			Interface("headers", resp.Header).
+			Str("run_id", r.RunID.String()).
+			Str("url", r.URL.String()).
+			Msg("response did not come from an Inngest SDK")
+		// TODO: Call dr.SetError and set dr.Output. We aren't doing that yet
+		// because we want to observe logs first
+	}
+
+	if resp.StatusCode < 200 || resp.StatusCode > 299 {
 		// Add an error to driver.Response if the status code isn't 2XX.
-		err = fmt.Errorf("invalid status code: %d", resp.statusCode)
+		//
+		// This is IMPERATIVE, as dr.Err is used to indicate communication errors,
+		// SDK failures without graceful responses - each of which uses r.Err to
+		// handle retrying.
+		//
+		// Non 2xx errors are thrown when:
+		// - The SDK isn't invoked (proxy error, etc.)
+		// - The SDK has a catastrophic failure and does not respond gracefully.
+		// - The function fails or errors (these are not *yet* opcodes, but should be).
+		err = fmt.Errorf("invalid status code: %d", resp.StatusCode)
 		dr.SetError(err)
 	}
-	if resp.noRetry {
+	if resp.NoRetry {
 		// Ensure we return a NonRetriableError to indicate that
 		// we're not retrying when we store the error message.
+		//
+		// This ensures that errors are handled appropriately from non-SDK step
+		// errors.
 		err = errors.New("NonRetriableError")
 		dr.SetError(err)
 	}
-	if !resp.isSDK {
+
+	// If there's a RetryAt, ensure we wrap the status code correctly.
+	if resp.RetryAt != nil {
+		err = queue.RetryAtError(err, resp.RetryAt)
+		dr.SetError(err)
+	}
+
+	if !resp.IsSDK {
 		dr.SetError(ErrNotSDK)
 	}
+
 	return dr, err
 }
 
-func do(ctx context.Context, c *http.Client, r Request) (*response, error) {
+func do(ctx context.Context, c HTTPDoer, r Request) (*Response, error) {
 	if c == nil {
 		c = DefaultClient
 	}
 
 	ctx, cancel := context.WithTimeout(ctx, consts.MaxFunctionTimeout)
 	defer cancel()
+
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, r.URL.String(), bytes.NewBuffer(r.Input))
 	if err != nil {
 		return nil, fmt.Errorf("error creating request: %w", err)
 	}
 	req.Header.Add("Content-Type", "application/json")
 
+	// Always close the request after reading the body, ensuring the connection is not recycled.
+	req.Close = true
+
 	if len(r.SigningKey) > 0 {
 		req.Header.Add("X-Inngest-Signature", Sign(ctx, r.SigningKey, r.Input))
 	}
-
-	pre := time.Now()
-	resp, err := c.Do(req)
-	dur := time.Since(pre)
-
-	if err != nil {
-		if urlErr, ok := err.(*url.Error); ok && urlErr.Err == context.DeadlineExceeded {
-			// This timed out.
-			return nil, context.DeadlineExceeded
-		}
-		if errors.Is(err, syscall.EPIPE) {
-			return nil, fmt.Errorf("Your server closed the request before finishing.")
-		}
-		if errors.Is(err, syscall.ECONNRESET) {
-			return nil, fmt.Errorf("Your server reset the request connection.")
-		}
-		return nil, fmt.Errorf("Error performing request to SDK URL: %w", err)
+	if len(r.Signature) > 0 {
+		// Use this if provided, and override any sig added.
+		req.Header.Add("X-Inngest-Signature", r.Signature)
 	}
 
-	if err != nil {
-		return nil, fmt.Errorf("error executing request: %w", err)
+	// Add `traceparent` and `tracestate` headers to the request from `ctx`
+	itrace.UserTracer().Propagator().Inject(ctx, propagation.HeaderCarrier(req.Header))
+
+	// Track HTTP stats, eg. TLS handshake timeouts, DNS lookups, etc.
+	tracking := &httpstat.Result{}
+	req = req.WithContext(httpstat.WithHTTPStat(req.Context(), tracking))
+
+	// Perform the request.
+	resp, byt, dur, err := ExecuteRequest(ctx, c, req)
+	tracking.End(time.Now())
+
+	if r.statter != nil {
+		r.statter(tracking)
 	}
-	defer resp.Body.Close()
-	byt, err := io.ReadAll(io.LimitReader(resp.Body, consts.MaxBodySize))
-	if err != nil {
-		return nil, fmt.Errorf("error reading response body: %w", err)
+
+	if !r.SkipStats { // opt-out
+		go trackRequestStats(ctx, tracking)
+		statbyt, _ := json.Marshal(tracking)
+		if resp != nil {
+			resp.Header.Add("x-inngest-request-stats", string(statbyt))
+		}
+	}
+
+	// Handle no response errors.
+	if errors.Is(err, ErrUnableToReach) {
+		log.From(ctx).
+			Warn().
+			Str("url", r.URL.String()).
+			Interface("step", r.Step).
+			Interface("edge	", r.Edge).
+			Int64("req_dur_ms", dur.Milliseconds()).
+			Msg("EOF writing request to SDK")
+		return nil, err
+	}
+	if err != nil && len(byt) == 0 {
+		return nil, err
+	}
+
+	var sysErr *syscode.Error
+	if errors.Is(err, ErrBodyTooLarge) {
+		sysErr = &syscode.Error{Code: syscode.CodeOutputTooLarge}
+		//
+		// downstream executor code expects system error codes here for traces
+		// and history to work properly
+		err = sysErr
+
+		// Override the output so the user sees the syserrV in the UI rather
+		// than a JSON parsing error
+		byt, _ = json.Marshal(sysErr.Code)
+	}
+
+	if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+		log.From(ctx).
+			Error().
+			Err(err).
+			Str("url", r.URL.String()).
+			Str("response", string(byt)).
+			Interface("headers", resp.Header).
+			Interface("step", r.Step).
+			Interface("edge	", r.Edge).
+			Msg("http eof reading response")
 	}
 
 	// These variables are extracted from streaming and non-streaming responses separately.
@@ -254,9 +361,6 @@ func do(ctx context.Context, c *http.Client, r Request) (*response, error) {
 		headers[strings.ToLower(k)] = v[0]
 	}
 
-	// Check the retry status from the headers and versions.
-	noRetry = !shouldRetry(statusCode, headers[headerNoRetry], headers[headerSDK])
-
 	// Check if this was a streaming response.  If so, extract headers sent
 	// from _after_ the response started within the payload.
 	//
@@ -268,21 +372,32 @@ func do(ctx context.Context, c *http.Client, r Request) (*response, error) {
 	// Only SDK versions that include the status in the body are expected to
 	// send a 201 status code and namespace in this way, so failing to parse
 	// here is an error.
-	if resp.StatusCode == 201 {
+	if resp.StatusCode == 201 && sysErr == nil {
 		stream, err := ParseStream(byt)
 		if err != nil {
-			return nil, err
-		}
-		// These are all contained within a single wrapper.
-		body = stream.Body
-		statusCode = stream.StatusCode
-		retryAtStr = stream.RetryAt
-		noRetry = stream.NoRetry
-		// Upsert headers from the stream.
-		for k, v := range stream.Headers {
-			headers[k] = v
+			return nil, fmt.Errorf("error parsing stream: %w", err)
+		} else {
+			// These are all contained within a single wrapper.
+			body = stream.Body
+			statusCode = stream.StatusCode
+
+			// Upsert headers from the stream.
+			for k, v := range stream.Headers {
+				headers[k] = v
+			}
 		}
 	}
+
+	if statusCode == 0 {
+		// Unreachable
+		log.From(ctx).Error().Err(err).
+			Str("body", string(byt)).
+			Str("run_id", r.RunID.String()).
+			Msg("status code is 0")
+	}
+
+	// Check the retry status from the headers and versions.
+	noRetry = !ShouldRetry(statusCode, headers[headerNoRetry], headers[headerSDK])
 
 	// Extract the retry at header if it hasn't been set explicitly in streaming.
 	if after := headers["retry-after"]; retryAtStr == nil && after != "" {
@@ -294,38 +409,61 @@ func do(ctx context.Context, c *http.Client, r Request) (*response, error) {
 		}
 	}
 
-	isSDK := headers_lib.ValueFromMap(headers_lib.HeaderKeySDK, headers) != ""
+	isSDK := false
+	for k := range resp.Header {
+		if strings.HasPrefix(strings.ToLower(k), "x-inngest-") {
+			isSDK = true
+			break
+		}
+	}
 
 	// Get the request version
 	rv, _ := strconv.Atoi(headers[headerRequestVersion])
-	return &response{
-		body:           body,
-		statusCode:     statusCode,
-		duration:       dur,
-		retryAt:        retryAt,
-		noRetry:        noRetry,
-		requestVersion: rv,
-		sdk:            headers[headerSDK],
-		isSDK:          isSDK,
+	return &Response{
+		Body:           body,
+		StatusCode:     statusCode,
+		Duration:       dur,
+		RetryAt:        retryAt,
+		NoRetry:        noRetry,
+		RequestVersion: rv,
+		IsSDK:          isSDK,
+		Sdk:            headers[headerSDK],
+		Header:         resp.Header,
+		SysErr:         sysErr,
 	}, err
 
 }
 
-type response struct {
-	body           []byte
-	statusCode     int
-	duration       time.Duration
-	requestVersion int
+type Response struct {
+	Body           []byte
+	StatusCode     int
+	Duration       time.Duration
+	RequestVersion int
 	// retryAt is the time to retry this step at, on failure, if specified in the
 	// Retry-After headers, or X-Retry-After.
 	//
 	// This adheres to the HTTP spec; we support both seconds and times in this header.
-	retryAt *time.Time
-	noRetry bool
+	RetryAt *time.Time
+	// noRetry indicates whether this is a non-retryable error
+	NoRetry bool
 	// sdk represents the SDK language and version used for these
 	// functions, in the format: "js:v0.1.0"
-	sdk string
+	Sdk string
 
-	// If response came from the SDK
-	isSDK bool
+	Header http.Header
+
+	SysErr *syscode.Error
+	IsSDK  bool
+}
+
+func trackRequestStats(ctx context.Context, r *httpstat.Result) {
+	tags := map[string]any{"ipv6": r.IsIPv6}
+	opts := metrics.HistogramOpt{
+		PkgName: "httpdriver",
+		Tags:    tags,
+	}
+	metrics.HistogramHTTPDNSLookupDuration(ctx, r.DNSLookup.Milliseconds(), opts)
+	metrics.HistogramHTTPTCPConnDuration(ctx, r.TCPConnection.Milliseconds(), opts)
+	metrics.HistogramHTTPTLSHandshakeDuration(ctx, r.TLSHandshake.Milliseconds(), opts)
+	metrics.HistogramHTTPServerProcessingDuration(ctx, r.ServerProcessing.Milliseconds(), opts)
 }

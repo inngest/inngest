@@ -7,18 +7,42 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/oklog/ulid/v2"
 )
 
 func (r *queryResolver) Stream(ctx context.Context, q models.StreamQuery) ([]*models.StreamItem, error) {
-	tb := cqrs.Timebound{
-		Before: q.Before,
-		After:  q.After,
+	var before *ulid.ULID
+	var after *ulid.ULID
+
+	if q.Before != nil {
+		val := ulid.MustParse(*q.Before)
+		before = &val
 	}
 
-	evts, err := r.Data.GetEventsTimebound(ctx, tb, q.Limit)
+	if q.After != nil {
+		val := ulid.MustParse(*q.After)
+		after = &val
+	}
+
+	bound := cqrs.IDBound{
+		Before: before,
+		After:  after,
+	}
+
+	includeInternalEvents := false
+	if q.IncludeInternalEvents != nil {
+		includeInternalEvents = *q.IncludeInternalEvents
+	}
+
+	evts, err := r.Data.GetEventsIDbound(
+		ctx,
+		bound,
+		q.Limit,
+		includeInternalEvents,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -28,11 +52,13 @@ func (r *queryResolver) Stream(ctx context.Context, q models.StreamQuery) ([]*mo
 		ids[n] = evt.InternalID()
 	}
 
-	// Fetch all function runs by event
-	fns, err := r.Data.GetFunctionRunsFromEvents(
+	accountID := consts.DevServerAccountID
+	workspaceID := consts.DevServerEnvID
+
+	fns, err := r.HistoryReader.GetFunctionRunsFromEvents(
 		ctx,
-		uuid.UUID{},
-		uuid.UUID{},
+		accountID,
+		workspaceID,
 		ids,
 	)
 	if err != nil {
@@ -41,7 +67,7 @@ func (r *queryResolver) Stream(ctx context.Context, q models.StreamQuery) ([]*mo
 	fnsByID := map[ulid.ULID][]*models.FunctionRun{}
 	for _, fn := range fns {
 		run := models.MakeFunctionRun(fn)
-		_, err := r.Data.GetFunctionByID(ctx, uuid.MustParse(run.FunctionID))
+		_, err := r.Data.GetFunctionByInternalUUID(ctx, consts.DevServerEnvID, uuid.MustParse(run.FunctionID))
 		if err == sql.ErrNoRows {
 			// Skip run since its function doesn't exist. This can happen when
 			// deleting a function or changing its ID.
@@ -60,42 +86,20 @@ func (r *queryResolver) Stream(ctx context.Context, q models.StreamQuery) ([]*mo
 			CreatedAt: time.UnixMilli(i.EventTS),
 			Runs:      []*models.FunctionRun{},
 		}
-		if len(fnsByID[i.ID]) > 0 {
-			items[n].Runs = fnsByID[i.ID]
-		}
-	}
 
-	// Query all function runs received, and filter by crons.
-	fns, err = r.Data.GetFunctionRunsTimebound(ctx, tb, q.Limit)
-	if err != nil {
-		return nil, err
-	}
-	for _, i := range fns {
-		if i.Cron == nil {
-			// These are children of events.
-			continue
-		}
+		runs := fnsByID[i.ID]
+		if len(runs) > 0 {
+			// If any of the runs is a cron, then the stream item is a cron
+			for _, run := range runs {
+				if run.Cron != nil && *run.Cron != "" {
+					items[n].Trigger = *run.Cron
+					items[n].Type = models.StreamTypeCron
+					break
+				}
+			}
 
-		var trigger string
-		if i.Cron != nil {
-			trigger = *i.Cron
+			items[n].Runs = runs
 		}
-
-		runs := []*models.FunctionRun{models.MakeFunctionRun(i)}
-		_, err := r.Data.GetFunctionByID(ctx, uuid.MustParse(runs[0].FunctionID))
-		if err == sql.ErrNoRows {
-			// Skip run since its function doesn't exist. This can happen when
-			// deleting a function or changing its ID.
-			runs = []*models.FunctionRun{}
-		}
-
-		items = append(items, &models.StreamItem{
-			ID:        i.RunID.String(),
-			Trigger:   trigger,
-			Type:      models.StreamTypeCron,
-			CreatedAt: i.RunStartedAt,
-			Runs:      runs,
-		})
 	}
 
 	sort.Slice(items, func(i, j int) bool {

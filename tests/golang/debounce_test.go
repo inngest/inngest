@@ -18,30 +18,31 @@ type DebounceEventData struct {
 	Name    string `json:"name"`
 }
 
-type DebounceEvent = inngestgo.GenericEvent[DebounceEventData, any]
+type DebounceEvent = inngestgo.GenericEvent[DebounceEventData]
 
 func TestDebounceWithSingleKey(t *testing.T) {
-	h, server, registerFuncs := NewSDKHandler(t)
+	inngestClient, server, registerFuncs := NewSDKHandler(t, "debounce")
 	defer server.Close()
 
 	var (
 		counter    int32
-		calledWith DebounceEvent
+		calledWith inngestgo.GenericEvent[DebounceEventData]
 	)
 
 	period := 5 * time.Second
 
 	at := time.Now()
-	a := inngestgo.CreateFunction(
+	_, err := inngestgo.CreateFunction(
+		inngestClient,
 		inngestgo.FunctionOpts{
-			Name: "test sdk",
+			ID: "test-sdk",
 			Debounce: &inngestgo.Debounce{
 				Key:    "event.data.name",
 				Period: period,
 			},
 		},
 		inngestgo.EventTrigger("test/sdk", nil),
-		func(ctx context.Context, input inngestgo.Input[DebounceEvent]) (any, error) {
+		func(ctx context.Context, input inngestgo.Input[DebounceEventData]) (any, error) {
 			// We expect that this function is called after at least the debounce period
 			// of 5 seconds.
 			now := time.Now()
@@ -60,21 +61,22 @@ func TestDebounceWithSingleKey(t *testing.T) {
 				calledWith = input.Event
 			}
 
-			name := step.Run(ctx, "get name", func(ctx context.Context) (string, error) {
+			name, err := step.Run(ctx, "get name", func(ctx context.Context) (string, error) {
 				fmt.Printf("running debounce fn after %s: %s\n", delta, time.Now().Format(time.RFC3339Nano))
 				return input.Event.Data.Name, nil
 			})
+			require.NoError(t, err)
 
 			atomic.AddInt32(&counter, 1)
 
 			return name, nil
 		},
 	)
-	h.Register(a)
+	require.NoError(t, err)
 	registerFuncs()
 
 	sendEvent := func(i int) {
-		_, err := inngestgo.Send(context.Background(), DebounceEvent{
+		_, err := inngestClient.Send(context.Background(), DebounceEvent{
 			Name: "test/sdk",
 			Data: DebounceEventData{
 				Counter: i,
@@ -125,14 +127,15 @@ func TestDebounceWithSingleKey(t *testing.T) {
 
 // TestDebounecWithMultipleKeys
 func TestDebounecWithMultipleKeys(t *testing.T) {
-	h, server, registerFuncs := NewSDKHandler(t)
+	inngestClient, server, registerFuncs := NewSDKHandler(t, "debounce")
 	defer server.Close()
 
 	var counter int32
 
-	a := inngestgo.CreateFunction(
+	_, err := inngestgo.CreateFunction(
+		inngestClient,
 		inngestgo.FunctionOpts{
-			Name: "test sdk",
+			ID: "test-sdk",
 			Debounce: &inngestgo.Debounce{
 				Key:    "event.data.name",
 				Period: 5 * time.Second,
@@ -145,12 +148,12 @@ func TestDebounecWithMultipleKeys(t *testing.T) {
 			return nil, nil
 		},
 	)
-	h.Register(a)
+	require.NoError(t, err)
 	registerFuncs()
 
 	n := 5
 	for i := 0; i < n; i++ {
-		_, err := inngestgo.Send(context.Background(), DebounceEvent{
+		_, err := inngestClient.Send(context.Background(), DebounceEvent{
 			Name: "test/sdk",
 			Data: DebounceEventData{
 				Counter: i,
@@ -163,4 +166,109 @@ func TestDebounecWithMultipleKeys(t *testing.T) {
 	require.Eventually(t, func() bool {
 		return atomic.LoadInt32(&counter) == int32(n)
 	}, 10*time.Second, 100*time.Millisecond, "Expected %d, got %d", n, counter)
+}
+
+func TestDebounce_OutOfOrderTS(t *testing.T) {
+	inngestClient, server, registerFuncs := NewSDKHandler(t, "debounce")
+	defer server.Close()
+
+	var counter int32
+
+	_, err := inngestgo.CreateFunction(
+		inngestClient,
+		inngestgo.FunctionOpts{
+			ID: "test-out-of-order-debounce-ignored",
+			Debounce: &inngestgo.Debounce{
+				Period: 5 * time.Second,
+			},
+		},
+		inngestgo.EventTrigger("test/sdk", nil),
+		func(ctx context.Context, input inngestgo.Input[DebounceEvent]) (any, error) {
+			fmt.Println("Debounced function ran", input.Event.Data.Name)
+			require.Equal(t, "future", input.Event.Data.Name)
+			atomic.AddInt32(&counter, 1)
+			return nil, nil
+		},
+	)
+	require.NoError(t, err)
+	registerFuncs()
+
+	now := time.Now()
+	in_2_s := now.Add(time.Second * 2)
+
+	_, err = inngestClient.Send(context.Background(), DebounceEvent{
+		Name: "test/sdk",
+		Data: DebounceEventData{
+			Name: "future",
+		},
+		Timestamp: in_2_s.UnixMilli(),
+	})
+	require.NoError(t, err)
+
+	_, err = inngestClient.Send(context.Background(), DebounceEvent{
+		Name: "test/sdk",
+		Data: DebounceEventData{
+			Name: "now",
+		},
+		Timestamp: now.UnixMilli(),
+	})
+	require.NoError(t, err)
+
+	require.Eventually(t, func() bool {
+		return atomic.LoadInt32(&counter) == 1
+	}, 10*time.Second, 100*time.Millisecond, "Expected 1, got %d", counter)
+}
+
+func TestDebounce_Timeout(t *testing.T) {
+	inngestClient, server, registerFuncs := NewSDKHandler(t, "debounce")
+	defer server.Close()
+
+	var counter int32
+
+	start := time.Now()
+	period := 5 * time.Second
+	max := 10 * time.Second
+
+	_, err := inngestgo.CreateFunction(
+		inngestClient,
+		inngestgo.FunctionOpts{
+			ID: "test-out-of-order-debounce-ignored",
+			Debounce: &inngestgo.Debounce{
+				Period:  period,
+				Timeout: &max,
+			},
+		},
+		inngestgo.EventTrigger("test/sdk", nil),
+		func(ctx context.Context, input inngestgo.Input[DebounceEvent]) (any, error) {
+			fmt.Println("Debounced function ran", input.Event.Data.Name)
+
+			// It should occur after the max period.
+			require.True(t, time.Now().After(start.Add(max)))
+
+			atomic.AddInt32(&counter, 1)
+			return nil, nil
+		},
+	)
+	require.NoError(t, err)
+	registerFuncs()
+
+	go func() {
+		// Send an event every second for 20 seconds in a goroutine.
+		// This ensures that we wait up to 15s - just past the max - to receive
+		// a fn invocation.
+		for i := 0; i <= 20; i++ {
+			_, err := inngestClient.Send(context.Background(), DebounceEvent{
+				Name: "test/sdk",
+				Data: DebounceEventData{
+					Name: "debounce",
+				},
+			})
+			require.NoError(t, err)
+			<-time.After(time.Second)
+		}
+	}()
+
+	require.Eventually(t, func() bool {
+		return atomic.LoadInt32(&counter) == 1
+	}, 15*time.Second, 100*time.Millisecond, "Expected 1, got %d", counter)
 }

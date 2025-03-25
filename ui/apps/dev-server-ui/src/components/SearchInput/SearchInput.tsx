@@ -1,6 +1,5 @@
-import { classNames } from '@inngest/components/utils/classNames';
-
-import { IconMagnifyingGlass } from '@/icons';
+import { cn } from '@inngest/components/utils/classNames';
+import { RiSearchLine } from '@remixicon/react';
 
 interface SearchInputProps extends Omit<React.InputHTMLAttributes<HTMLInputElement>, 'onChange'> {
   value: string;
@@ -18,14 +17,14 @@ export default function SearchInput({
 }: SearchInputProps) {
   return (
     <div
-      className={classNames(
-        'bg-slate-910 relative flex items-center pl-6 text-slate-400 ',
-        className ?? ''
+      className={cn(
+        'bg-canvasBase text-muted border-subtle relative flex items-center border pl-4 text-sm',
+        className
       )}
     >
       <input
         type="text"
-        className="w-96 bg-transparent py-1 pl-4 text-slate-100 placeholder-slate-400"
+        className="text-muted placeholder-subtle w-96 bg-transparent py-1 pl-4 outline-none"
         placeholder={props?.placeholder ?? 'Search...'}
         value={value ?? ''}
         onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
@@ -34,7 +33,7 @@ export default function SearchInput({
         }}
         {...props}
       />
-      <IconMagnifyingGlass className="text--slate-400 absolute left-6 h-3 w-3" />
+      <RiSearchLine className="text-muted absolute left-2 h-4 w-4" />
     </div>
   );
 }

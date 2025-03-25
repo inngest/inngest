@@ -1,10 +1,13 @@
 package consts
 
-import "time"
+import (
+	"time"
+)
 
 const (
 	// DefaultRetryCount is used when no retry count for a step is specified.
-	DefaultRetryCount = 3
+	// Given 4 retries, each step or function is attempted 5 times by default.
+	DefaultRetryCount = 4
 
 	// DefaultMaxEventSize represents the maximum size of the event payload we process,
 	// currently 512KB.
@@ -24,8 +27,22 @@ const (
 	// our system.
 	MaxFunctionTimeout = 2 * time.Hour
 
-	// MaxBodySize is the maximum payload size read on any HTTP response.
-	MaxBodySize = 1024 * 1024 * 4 // 4MB
+	// MaxStepOutputSize is the maximum size of the output of a step.
+	MaxStepOutputSize = 1024 * 1024 * 4 // 4MB
+
+	// MaxStepInputSize is the maximum size of the input of a step.
+	MaxStepInputSize = 1024 * 1024 * 4 // 4MB
+
+	// MaxSDKResponseBodySize is the maximum payload size in the response from
+	// the SDK.
+	MaxSDKResponseBodySize = MaxStepOutputSize + MaxStepInputSize
+
+	// MaxSDKRequestBodySize is the maximum payload size in the request to the
+	// SDK.
+	MaxSDKRequestBodySize = 1024 * 1024 * 4 // 4MB
+
+	// DefaultMaxStateSizeLimit is the maximum number of bytes of output state per function run allowed.
+	DefaultMaxStateSizeLimit = 1024 * 1024 * 32 // 32MB
 
 	// MaxRetries represents the maximum number of retries for a particular function or step
 	// possible.
@@ -51,6 +68,12 @@ const (
 	// MaxConcurrencyLimits limits the max concurrency constraints for a specific function.
 	MaxConcurrencyLimits = 2
 
+	// MaxTriggers represents the maximum number of triggers a function can have.
+	MaxTriggers = 10
+
+	// MaxBatchTTL represents the maximum amount of duration the batch key will last
+	MaxBatchTTL = 10 * time.Minute
+
 	// DefaultConcurrencyLimit is the default concurrency limit applied when not specified
 	DefaultConcurrencyLimit = 1_000
 
@@ -58,8 +81,8 @@ const (
 	// when using idempotency keys.
 	FunctionIdempotencyPeriod = 24 * time.Hour
 
-	DefaultBatchSize = 100
-	MaxBatchTimeout  = 60 * time.Second
+	DefaultBatchSizeLimit = 100
+	DefaultBatchTimeout   = 60 * time.Second
 
 	// MaxEvents is the maximum number of events we can parse in a single batch.
 	MaxEvents = 5_000
@@ -82,10 +105,40 @@ const (
 	RequestVersionUnknown = -1
 
 	// PriorityFactorMin is the minimum priority factor for any function run, in seconds.
-	PriorityFactorMin = int64(-600)
+	PriorityFactorMin = int64(-1 * 60 * 60 * 12)
 	// PriorityFactorMax is the maximum priority factor for any function run, in seconds.
-	PriorityFactorMax = int64(600)
+	// This is set to 12 hours.
+	PriorityFactorMax = int64(60 * 60 * 12)
 	// FutureQueeueFudgeLimit is the inclusive time range between [now, now() + FutureAtLimit]
 	// in which priority factors are taken into account.
 	FutureAtLimit = 2 * time.Second
+
+	DefaultQueueContinueLimit = uint(5)
+
+	PauseExpiredDeletionGracePeriod = time.Minute * 5
+
+	DefaultQueueShardName = "default"
+
+	// Minimum number of pauses before using the aggregate pause handler.
+	AggregatePauseThreshold = 50
+
+	// QueueContinuationCooldownPeriod is the cooldown period for a continuations, eg.
+	// how long we wait after a partition has continued the maximum times.
+	// This prevents partitions from greedily acquiring resources in each scan loop.
+	QueueContinuationCooldownPeriod = time.Second * 10
+	// QueueContinuationMaxPartitions represents the total capacity for partitions
+	// that can be continued.
+	QueueContinuationMaxPartitions = 50
+	// QueueContinuationSkipProbability is the probability of skipping a continuation
+	// scan loop.
+	QueueContinuationSkipProbability = 0.2
+
+	//
+	// Streaming
+	//
+	MaxStreamingMessageSizeBytes = 1024 * 512 // 512KB
+	StreamingChunkSize           = 1024       // 1KB
+	MaxStreamingChunks           = 1000       // Allow up to 1000 chunks per stream
+
+	RedisBlockingPoolSize = 10
 )

@@ -2,6 +2,7 @@ package expressions
 
 import (
 	"fmt"
+	"sync"
 
 	"github.com/google/cel-go/cel"
 	"github.com/google/cel-go/checker/decls"
@@ -11,42 +12,42 @@ import (
 var (
 	defaultKeys = []string{
 		"event",
-		"steps",
-		"response",
 		"async",
-		"user",
-		"actions", // deprecated
-		"action",  // deprecated
+		"vars",
 	}
+
+	envSingleton *cel.Env
+	envError     error
+	envCreation  sync.Once
 )
 
 // env creates a new environment in which we define a single user attribute as a map
 // of string to dynamic types, plus functions to augment date handling
 func env(keys ...string) (*cel.Env, error) {
-	if len(keys) == 0 {
-		keys = defaultKeys
-	}
+	envCreation.Do(func() {
+		if len(keys) == 0 {
+			keys = defaultKeys
+		}
 
-	vars := []*exprpb.Decl{}
+		vars := []*exprpb.Decl{}
 
-	// declare top-level variable names as containers.
-	for _, key := range keys {
-		vars = append(
-			vars,
-			decls.NewVar(key, decls.NewMapType(decls.String, decls.Dyn)),
+		// declare top-level variable names as containers.
+		for _, key := range keys {
+			vars = append(
+				vars,
+				decls.NewVar(key, decls.NewMapType(decls.String, decls.Dyn)),
+			)
+		}
+
+		// create a new environment in which we define a single user attribute as a map
+		// of string to dynamic types.
+		envSingleton, envError = cel.NewCustomEnv(
+			cel.Lib(customLibrary{}),
+			cel.Declarations(vars...),
 		)
+	})
+	if envError != nil {
+		return nil, fmt.Errorf("error initializing expression env: %w", envError)
 	}
-
-	// create a new environment in which we define a single user attribute as a map
-	// of string to dynamic types.
-	env, err := cel.NewCustomEnv(
-		cel.Lib(customLibrary{}),
-		cel.Declarations(vars...),
-	)
-
-	if err != nil {
-		return nil, fmt.Errorf("error initializing expression env: %w", err)
-	}
-
-	return env, nil
+	return envSingleton, nil
 }

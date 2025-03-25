@@ -3,42 +3,31 @@
 Consumes a pause.
 
 Output:
-  0: Successfully consumed
-  1: Pause not found
+  -1: Pause already consumed
+  0: Successfully consumed, no pending steps
+  1: Successfully consumed, at least one pending step remains
 
 ]]
 
--- The pause ID is always provided as a key, as is the lease ID.
-local pauseKey      = KEYS[1]
-local pauseStepKey  = KEYS[2]
-local pauseEventKey = KEYS[3]
-local actionKey     = KEYS[4]
-local stackKey      = KEYS[5]
+local actionKey     = KEYS[1]
+local stackKey      = KEYS[2]
+local keyMetadata   = KEYS[3]
+local keyStepsPending = KEYS[4]
 
-local pauseID      = ARGV[1]
-local pauseDataKey = ARGV[2] -- used to set data in run state store
-local pauseDataVal = ARGV[3] -- data to set
-
-local pause = redis.call("GET", pauseKey)
-if pause == false or pause == nil then
-	-- Pause no longer exists.
-	if pauseEventKey ~= "" then
-		-- Clean up regardless
-		redis.call("HDEL", pauseEventKey, pauseID)
-	end
-	return 1
-end
-
-redis.call("DEL", pauseKey)
-redis.call("DEL", pauseStepKey)
-
-if pauseEventKey ~= "" then
-	redis.call("HDEL", pauseEventKey, pauseID)
-end
+local pauseDataKey = ARGV[1] -- used to set data in run state store
+local pauseDataVal = ARGV[2] -- data to set
 
 if actionKey ~= nil and pauseDataKey ~= "" then
-	redis.call("RPUSH", stackKey, pauseDataKey)
-	redis.call("HSET", actionKey, pauseDataKey, pauseDataVal)
+  -- idempotency check: only ever consume a pause once
+  if redis.call("HEXISTS", actionKey, pauseDataKey) == 1 then
+    return -1
+  end
+
+  redis.call("RPUSH", stackKey, pauseDataKey)
+  redis.call("HSET", actionKey, pauseDataKey, pauseDataVal)
+  redis.call("HINCRBY", keyMetadata, "step_count", 1)
+  redis.call("HINCRBY", keyMetadata, "state_size", #pauseDataVal)
+  redis.call("SREM", keyStepsPending, pauseDataKey)
 end
 
-return 0
+return redis.call("SCARD", keyStepsPending) > 0 and 1 or 0

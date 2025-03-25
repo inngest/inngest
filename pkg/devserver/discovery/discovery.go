@@ -9,6 +9,8 @@ import (
 	"strconv"
 	"sync"
 	"time"
+
+	"github.com/inngest/inngest/pkg/util"
 )
 
 var (
@@ -19,6 +21,8 @@ var (
 		80, 443,
 		// Rails, Express & N*xt routes
 		3000, 3001, 3002, 3003, 3004, 3005, 3006, 3007, 3008, 3009, 3010,
+		// Astro
+		4321,
 		// Django
 		5000,
 		// Vite/SvelteKit
@@ -27,6 +31,8 @@ var (
 		8000, 8080, 8081, 8888,
 		// Redwood
 		8910, 8911, 8912, 8913, 8914, 8915,
+		// Cloudflare Workers
+		8787,
 	}
 
 	// Paths indicate the paths we attempt to hit when a web server is available.
@@ -71,7 +77,7 @@ func Autodiscover(ctx context.Context) map[string]struct{} {
 		for _, path := range Paths {
 			// These requests _should_ be fast as we know a port is open,
 			// so we do these sequentially.
-			url := fmt.Sprintf("http://127.0.0.1:%d%s", port, path)
+			url := util.NormalizeAppURL(fmt.Sprintf("http://127.0.0.1:%d%s", port, path), false)
 			if err := checkURL(ctx, url); err == nil {
 				if _, ok := urls[url]; !ok {
 					// only add if the URL doesn't exist;  this ensures

@@ -1,18 +1,14 @@
 version: 2
-overrides:
-  go:
-    overrides:
-      - column: "apps.id"
-        go_type: "github.com/google/uuid.UUID"
+
 sql:
-  - engine: "sqlite"
-    schema: "pkg/cqrs/sqlitecqrs/sqlc/schema.sql"
-    queries: "pkg/cqrs/sqlitecqrs/sqlc/queries.sql"
+  - engine: "postgresql"
+    schema: "pkg/cqrs/base_cqrs/sqlc/postgres/schema.sql"
+    queries: "pkg/cqrs/base_cqrs/sqlc/postgres/queries.sql"
     gen:
       go:
         emit_result_struct_pointers: true
         package: "sqlc"
-        out: "pkg/cqrs/sqlitecqrs/sqlc"
+        out: "pkg/cqrs/base_cqrs/sqlc/postgres"
         overrides:
           - column: "apps.id"
             go_type: "github.com/google/uuid.UUID"
@@ -22,6 +18,25 @@ sql:
             go_type: "github.com/google/uuid.UUID"
 
           - column: "events.internal_id"
+            go_type:
+              import: "github.com/oklog/ulid/v2"
+              package: "ulid"
+              type: "ULID"
+
+          - column: "event_batches.id"
+            go_type:
+              import: "github.com/oklog/ulid/v2"
+              package: "ulid"
+              type: "ULID"
+          - column: "event_batches.account_id"
+            go_type: "github.com/google/uuid.UUID"
+          - column: "event_batches.workspace_id"
+            go_type: "github.com/google/uuid.UUID"
+          - column: "event_batches.app_id"
+            go_type: "github.com/google/uuid.UUID"
+          - column: "event_batches.workflow_id"
+            go_type: "github.com/google/uuid.UUID"
+          - column: "event_batches.run_id"
             go_type:
               import: "github.com/oklog/ulid/v2"
               package: "ulid"
@@ -77,3 +92,199 @@ sql:
               import: "github.com/oklog/ulid/v2"
               package: "ulid"
               type: "ULID"
+          - column: "function_runs.workspace_id"
+            go_type: "github.com/google/uuid.UUID"
+
+          - column: "traces.run_id"
+            go_type:
+              import: "github.com/oklog/ulid/v2"
+              package: "ulid"
+              type: "ULID"
+
+          - column: "trace_runs.run_id"
+            go_type:
+              import: "github.com/oklog/ulid/v2"
+              package: "ulid"
+              type: "ULID"
+          - column: "trace_runs.account_id"
+            go_type: "github.com/google/uuid.UUID"
+          - column: "trace_runs.workspace_id"
+            go_type: "github.com/google/uuid.UUID"
+          - column: "trace_runs.app_id"
+            go_type: "github.com/google/uuid.UUID"
+          - column: "trace_runs.function_id"
+            go_type: "github.com/google/uuid.UUID"
+          - column: "trace_runs.batch_id"
+            go_type:
+              import: "github.com/oklog/ulid/v2"
+              package: "ulid"
+              type: "ULID"
+
+          - column: "worker_connections.id"
+            go_type:
+              import: "github.com/oklog/ulid/v2"
+              package: "ulid"
+              type: "ULID"
+          - column: "worker_connections.gateway_id"
+            go_type:
+              import: "github.com/oklog/ulid/v2"
+              package: "ulid"
+              type: "ULID"
+          - column: "worker_connections.account_id"
+            go_type: "github.com/google/uuid.UUID"
+          - column: "worker_connections.workspace_id"
+            go_type: "github.com/google/uuid.UUID"
+          - column: "worker_connections.app_id"
+            go_type:
+              import: "github.com/google/uuid"
+              type: "UUID"
+              pointer: true
+          - column: "worker_connections.sync_id"
+            go_type:
+              import: "github.com/google/uuid"
+              type: "UUID"
+              pointer: true
+  - engine: "sqlite"
+    schema: "pkg/cqrs/base_cqrs/sqlc/sqlite/schema.sql"
+    queries: "pkg/cqrs/base_cqrs/sqlc/sqlite/queries.sql"
+    gen:
+      go:
+        emit_interface: true
+        emit_result_struct_pointers: true
+        package: "sqlc"
+        out: "pkg/cqrs/base_cqrs/sqlc/sqlite"
+        overrides:
+          - column: "apps.id"
+            go_type: "github.com/google/uuid.UUID"
+          - column: "functions.id"
+            go_type: "github.com/google/uuid.UUID"
+          - column: "functions.app_id"
+            go_type: "github.com/google/uuid.UUID"
+
+          - column: "events.internal_id"
+            go_type:
+              import: "github.com/oklog/ulid/v2"
+              package: "ulid"
+              type: "ULID"
+
+          - column: "event_batches.id"
+            go_type:
+              import: "github.com/oklog/ulid/v2"
+              package: "ulid"
+              type: "ULID"
+          - column: "event_batches.account_id"
+            go_type: "github.com/google/uuid.UUID"
+          - column: "event_batches.workspace_id"
+            go_type: "github.com/google/uuid.UUID"
+          - column: "event_batches.app_id"
+            go_type: "github.com/google/uuid.UUID"
+          - column: "event_batches.workflow_id"
+            go_type: "github.com/google/uuid.UUID"
+          - column: "event_batches.run_id"
+            go_type:
+              import: "github.com/oklog/ulid/v2"
+              package: "ulid"
+              type: "ULID"
+
+          - column: "history.id"
+            go_type:
+              import: "github.com/oklog/ulid/v2"
+              package: "ulid"
+              type: "ULID"
+          - column: "history.function_id"
+            go_type: "github.com/google/uuid.UUID"
+          - column: "history.run_id"
+            go_type:
+              import: "github.com/oklog/ulid/v2"
+              package: "ulid"
+              type: "ULID"
+          - column: "history.batch_id"
+            go_type:
+              import: "github.com/oklog/ulid/v2"
+              package: "ulid"
+              type: "ULID"
+          - column: "history.event_id"
+            go_type:
+              import: "github.com/oklog/ulid/v2"
+              package: "ulid"
+              type: "ULID"
+
+          - column: "function_runs.function_id"
+            go_type: "github.com/google/uuid.UUID"
+          - column: "function_runs.run_id"
+            go_type:
+              import: "github.com/oklog/ulid/v2"
+              package: "ulid"
+              type: "ULID"
+          - column: "function_runs.batch_id"
+            go_type:
+              import: "github.com/oklog/ulid/v2"
+              package: "ulid"
+              type: "ULID"
+          - column: "function_runs.event_id"
+            go_type:
+              import: "github.com/oklog/ulid/v2"
+              package: "ulid"
+              type: "ULID"
+          - column: "function_runs.original_run_id"
+            go_type:
+              import: "github.com/oklog/ulid/v2"
+              package: "ulid"
+              type: "ULID"
+          - column: "function_finishes.run_id"
+            go_type:
+              import: "github.com/oklog/ulid/v2"
+              package: "ulid"
+              type: "ULID"
+          - column: "function_runs.workspace_id"
+            go_type: "github.com/google/uuid.UUID"
+
+          - column: "traces.run_id"
+            go_type:
+              import: "github.com/oklog/ulid/v2"
+              package: "ulid"
+              type: "ULID"
+
+          - column: "trace_runs.run_id"
+            go_type:
+              import: "github.com/oklog/ulid/v2"
+              package: "ulid"
+              type: "ULID"
+          - column: "trace_runs.account_id"
+            go_type: "github.com/google/uuid.UUID"
+          - column: "trace_runs.workspace_id"
+            go_type: "github.com/google/uuid.UUID"
+          - column: "trace_runs.app_id"
+            go_type: "github.com/google/uuid.UUID"
+          - column: "trace_runs.function_id"
+            go_type: "github.com/google/uuid.UUID"
+          - column: "trace_runs.batch_id"
+            go_type:
+              import: "github.com/oklog/ulid/v2"
+              package: "ulid"
+              type: "ULID"
+          - column: "worker_connections.id"
+            go_type:
+              import: "github.com/oklog/ulid/v2"
+              package: "ulid"
+              type: "ULID"
+          - column: "worker_connections.gateway_id"
+            go_type:
+              import: "github.com/oklog/ulid/v2"
+              package: "ulid"
+              type: "ULID"
+          - column: "worker_connections.account_id"
+            go_type: "github.com/google/uuid.UUID"
+          - column: "worker_connections.workspace_id"
+            go_type: "github.com/google/uuid.UUID"
+          - column: "worker_connections.app_id"
+            go_type:
+              import: "github.com/google/uuid"
+              type: "UUID"
+              pointer: true
+          - column: "worker_connections.sync_id"
+            go_type:
+              import: "github.com/google/uuid"
+              type: "UUID"
+              pointer: true
+

@@ -1,9 +1,21 @@
+import { type Metadata } from 'next';
 import { cookies } from 'next/headers';
 import { SignUp } from '@clerk/nextjs';
 
-import SplitView from '@/app/(logged-out)/SplitView';
+import SplitView from '@/app/(auth)/SplitView';
 
-export default function SignUpPage() {
+export const metadata: Metadata = {
+  title: 'Sign up - Inngest Cloud',
+  description: 'Create a new account',
+  alternates: {
+    canonical: new URL(
+      '/sign-up',
+      process.env.NEXT_PUBLIC_APP_URL || 'https://app.inngest.com'
+    ).toString(),
+  },
+};
+
+export default async function SignUpPage() {
   const cookieStore = cookies();
   const anonymousIDCookie = cookieStore.get('inngest_anonymous_id');
 
@@ -16,28 +28,18 @@ export default function SignUpPage() {
           }}
           appearance={{
             elements: {
-              // We need to hide the name fields because we don't want to overwhelm users with too
-              // many fields, but we still want to allow them later to set their name if they want to.
-              formFieldRow__name: 'hidden',
+              footer: 'bg-none',
             },
           }}
         />
       </div>
-      <p className="mt-auto text-center text-xs text-slate-400">
+      <p className="text-subtle mt-auto text-center text-xs">
         By signing up, you agree to our{' '}
-        <a
-          className="text-indigo-400 hover:underline"
-          href="https://inngest.com/terms"
-          target="_blank"
-        >
+        <a className="text-link hover:underline" href="https://inngest.com/terms" target="_blank">
           Terms of Service
         </a>{' '}
         and{' '}
-        <a
-          className="text-indigo-400 hover:underline"
-          href="https://inngest.com/privacy"
-          target="_blank"
-        >
+        <a className="text-link hover:underline" href="https://inngest.com/privacy" target="_blank">
           Privacy Policy
         </a>
         .

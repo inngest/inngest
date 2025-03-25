@@ -1,4 +1,4 @@
-import { IconStatusCircleCheck } from '@inngest/components/icons/StatusCircleCheck';
+import { IconStatusCompleted } from '@inngest/components/icons/status/Completed';
 import type { Meta, StoryObj } from '@storybook/react';
 
 import { TimelineNodeHeader } from './TimelineNodeHeader';
@@ -20,7 +20,7 @@ const meta = {
   ],
   argTypes: {
     icon: {
-      options: [<IconStatusCircleCheck />],
+      options: [<IconStatusCompleted />],
       control: { type: 'select' },
     },
   },
@@ -33,7 +33,7 @@ type Story = StoryObj<typeof TimelineNodeHeader>;
 
 export const Default: Story = {
   args: {
-    icon: <IconStatusCircleCheck />,
+    icon: <IconStatusCompleted />,
     badge: 'Step',
     title: 'This is a Function Step',
     metadata: {
@@ -45,7 +45,7 @@ export const Default: Story = {
 
 export const NoBadge: Story = {
   args: {
-    icon: <IconStatusCircleCheck />,
+    icon: <IconStatusCompleted />,
     title: 'This is a Function',
     metadata: {
       label: 'Queued At:',

@@ -1,11 +1,13 @@
 package inngest
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/inngest/inngest/pkg/expressions"
 	"time"
 
-	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/syscode"
 )
 
 func NewEventBatchConfig(conf map[string]any) (*EventBatchConfig, error) {
@@ -23,16 +25,8 @@ func NewEventBatchConfig(conf map[string]any) (*EventBatchConfig, error) {
 		return nil, fmt.Errorf("failed to decode batch config: %v", err)
 	}
 
-	if config.MaxSize <= 0 {
-		config.MaxSize = consts.DefaultBatchSize
-	}
-
-	dur, err := time.ParseDuration(config.Timeout)
-	if err != nil {
+	if _, err = time.ParseDuration(config.Timeout); err != nil {
 		return nil, fmt.Errorf("failed to parse time duration: %v", err)
-	}
-	if dur > consts.MaxBatchTimeout {
-		config.Timeout = "60s"
 	}
 
 	return config, nil
@@ -46,6 +40,8 @@ func NewEventBatchConfig(conf map[string]any) (*EventBatchConfig, error) {
 // - The batch is full
 // - The time to wait is up
 type EventBatchConfig struct {
+	Key *string `json:"key,omitempty"`
+
 	// MaxSize is the maximum number of events that can be
 	// included in a batch
 	MaxSize int `json:"maxSize"`
@@ -60,13 +56,37 @@ func (c EventBatchConfig) IsEnabled() bool {
 	return c.MaxSize > 1 && c.Timeout != ""
 }
 
-func (c EventBatchConfig) IsValid() error {
+func (c EventBatchConfig) IsValid(ctx context.Context) error {
 	if c.MaxSize < 2 {
-		return fmt.Errorf("batch size cannot be smaller than 2: %d", c.MaxSize)
+		return syscode.Error{
+			Code:    syscode.CodeBatchSizeInvalid,
+			Message: fmt.Sprintf("batch size cannot be smaller than 2: %d", c.MaxSize),
+		}
 	}
 
-	if _, err := time.ParseDuration(c.Timeout); err != nil {
-		return fmt.Errorf("invalid timeout string: %v", err)
+	dur, err := time.ParseDuration(c.Timeout)
+	if err != nil {
+		return syscode.Error{
+			Code:    syscode.CodeBatchTimeoutInvalid,
+			Message: fmt.Sprintf("invalid timeout string: %s", c.Timeout),
+		}
+	}
+
+	if dur < time.Second {
+		return syscode.Error{
+			Code:    syscode.CodeBatchTimeoutInvalid,
+			Message: "batch timeout should be more than 1s",
+		}
+	}
+
+	if c.Key != nil {
+		// Ensure the expression is valid if present.
+		if exprErr := expressions.Validate(ctx, *c.Key); exprErr != nil {
+			return syscode.Error{
+				Code:    syscode.CodeBatchKeyExpressionInvalid,
+				Message: fmt.Sprintf("batch key expression is invalid: %s", exprErr),
+			}
+		}
 	}
 
 	return nil

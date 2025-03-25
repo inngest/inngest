@@ -8,26 +8,27 @@ import (
 	"time"
 
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngestgo"
 	"github.com/stretchr/testify/require"
 )
 
 func TestConcurrency_ScopeAccount(t *testing.T) {
-	h, server, registerFuncs := NewSDKHandler(t)
+	inngestClient, server, registerFuncs := NewSDKHandler(t, "concurrency")
 	defer server.Close()
 
 	var (
 		inProgress, total int32
 
 		numEvents  = 3
-		fnDuration = 5
+		fnDuration = 2
 	)
 
 	trigger := "test/concurrency-acct"
 
-	handler := func(ctx context.Context, input inngestgo.Input[inngestgo.GenericEvent[any, any]]) (any, error) {
-		fmt.Println("Running func", *input.Event.ID, input.Event.Data)
+	handler := func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
+		fmt.Println("Running func", *input.Event.ID, input.Event.Data, time.Now().Format(time.RFC3339))
 		atomic.AddInt32(&total, 1)
 
 		next := atomic.AddInt32(&inProgress, 1)
@@ -38,9 +39,10 @@ func TestConcurrency_ScopeAccount(t *testing.T) {
 		return true, nil
 	}
 
-	a := inngestgo.CreateFunction(
+	_, err := inngestgo.CreateFunction(
+		inngestClient,
 		inngestgo.FunctionOpts{
-			Name: "acct concurrency",
+			ID: "acct-concurrency",
 			Concurrency: []inngest.Concurrency{
 				{
 					Limit: 1,
@@ -52,9 +54,11 @@ func TestConcurrency_ScopeAccount(t *testing.T) {
 		inngestgo.EventTrigger(trigger, nil),
 		handler,
 	)
-	b := inngestgo.CreateFunction(
+	require.NoError(t, err)
+	_, err = inngestgo.CreateFunction(
+		inngestClient,
 		inngestgo.FunctionOpts{
-			Name: "acct concurrency v2",
+			ID: "acct-concurrency-v2",
 			Concurrency: []inngest.Concurrency{
 				{
 					Limit: 1,
@@ -66,12 +70,12 @@ func TestConcurrency_ScopeAccount(t *testing.T) {
 		inngestgo.EventTrigger(trigger, nil),
 		handler,
 	)
-	h.Register(a, b)
+	require.NoError(t, err)
 	registerFuncs()
 
 	for i := 0; i < numEvents; i++ {
 		go func() {
-			_, err := inngestgo.Send(context.Background(), inngestgo.Event{
+			_, err := inngestClient.Send(context.Background(), inngestgo.Event{
 				Name: trigger,
 				Data: map[string]any{
 					"test": true,
@@ -91,5 +95,7 @@ func TestConcurrency_ScopeAccount(t *testing.T) {
 		require.LessOrEqual(t, atomic.LoadInt32(&inProgress), int32(1))
 	}
 
-	require.EqualValues(t, 6, atomic.LoadInt32(&total))
+	require.Eventually(t, func() bool {
+		return 6 == atomic.LoadInt32(&total)
+	}, redis_state.PartitionConcurrencyLimitRequeueExtension/2, time.Millisecond*10)
 }

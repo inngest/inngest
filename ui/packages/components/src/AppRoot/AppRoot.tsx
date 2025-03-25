@@ -1,13 +1,16 @@
-import { interTight, robotoMono } from './fonts';
 import './globals.css';
+import './fonts.css';
+import { ThemeProvider } from 'next-themes';
 
-export function AppRoot({ children, mode }: { children: React.ReactNode; mode?: 'dark' }) {
+export function AppRoot({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${interTight.variable} ${robotoMono.variable} ${mode || ''}`}>
-      <body className="dark:bg-slate-940 bg-white">
+    <html lang="en" className="h-full" suppressHydrationWarning>
+      <body className=" bg-canvasBase text-basis h-full overflow-auto">
         <div id="app" />
         <div id="modals" />
-        {children}
+        <ThemeProvider attribute="class" defaultTheme="system">
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );

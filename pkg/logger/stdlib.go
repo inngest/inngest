@@ -2,6 +2,7 @@ package logger
 
 import (
 	"context"
+	"io"
 	"log/slog"
 	"os"
 	"strings"
@@ -21,7 +22,21 @@ func StdlibLogger(ctx context.Context) *slog.Logger {
 	logger := ctx.Value(stdlibCtxKey)
 	if logger == nil {
 		return slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
-			Level: StdlibLevel(),
+			Level: StdlibLevel("LOG_LEVEL"),
+		}))
+	}
+	return logger.(*slog.Logger)
+}
+
+func VoidLogger() *slog.Logger {
+	return slog.New(slog.NewJSONHandler(io.Discard, &slog.HandlerOptions{}))
+}
+
+func StdlibLoggerWithCustomVarName(ctx context.Context, varName string) *slog.Logger {
+	logger := ctx.Value(stdlibCtxKey)
+	if logger == nil {
+		return slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
+			Level: StdlibLevel(varName),
 		}))
 	}
 	return logger.(*slog.Logger)
@@ -31,8 +46,10 @@ func WithStdlib(ctx context.Context, logger *slog.Logger) context.Context {
 	return context.WithValue(ctx, stdlibCtxKey, logger)
 }
 
-func StdlibLevel() slog.Level {
-	switch strings.ToLower(Level()) {
+func StdlibLevel(levelVarName string) slog.Level {
+	switch strings.ToLower(Level(levelVarName)) {
+	case "trace":
+		return slog.LevelDebug
 	case "debug":
 		return slog.LevelDebug
 	case "info":
@@ -47,6 +64,6 @@ func StdlibLevel() slog.Level {
 	}
 }
 
-func Level() string {
-	return os.Getenv("LOG_LEVEL")
+func Level(levelVarName string) string {
+	return os.Getenv(levelVarName)
 }

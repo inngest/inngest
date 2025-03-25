@@ -1,9 +1,17 @@
 'use client';
 
 import { useMemo, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { BlankSlate } from '@inngest/components/BlankSlate';
+import { Header } from '@inngest/components/Header/Header';
+import { Info } from '@inngest/components/Info/Info';
+import { InvokeButton } from '@inngest/components/InvokeButton';
+import { Link } from '@inngest/components/Link/Link';
+import { HorizontalPillList, Pill, PillContent } from '@inngest/components/Pill';
+import { Skeleton } from '@inngest/components/Skeleton/Skeleton';
 import { Table } from '@inngest/components/Table';
-import { TriggerTags } from '@inngest/components/Tag/TriggerTags';
+import useDebounce from '@inngest/components/hooks/useDebounce';
+import { useSearchParam } from '@inngest/components/hooks/useSearchParam';
 import {
   createColumnHelper,
   getCoreRowModel,
@@ -11,18 +19,20 @@ import {
   getSortedRowModel,
   type SortingState,
 } from '@tanstack/react-table';
+import { toast } from 'sonner';
 
-import SendEventButton from '@/components/Event/SendEventButton';
-import TriggerCronButton from '@/components/Event/TriggerCronButton';
 import SearchInput from '@/components/SearchInput/SearchInput';
-import Skeleton from '@/components/Skeleton';
-import useDebounce from '@/hooks/useDebounce';
-import { FunctionTriggerTypes, useGetFunctionsQuery, type Function } from '@/store/generated';
+import {
+  FunctionTriggerTypes,
+  useGetFunctionsQuery,
+  useInvokeFunctionMutation,
+  type Function,
+} from '@/store/generated';
 
 const columnHelper = createColumnHelper<Function>();
 const columns = [
   columnHelper.accessor('name', {
-    header: () => <span>Function Name</span>,
+    header: () => <span>Function name</span>,
     cell: (props) => <p className="text-sm font-medium leading-7">{props.getValue()}</p>,
     sortingFn: 'text',
     filterFn: 'equalsString',
@@ -35,14 +45,27 @@ const columns = [
       if (!triggers || triggers.length === 0) {
         return <></>;
       }
-      return <TriggerTags triggers={triggers} />;
+      return (
+        <HorizontalPillList
+          alwaysVisibleCount={2}
+          pills={triggers.map((trigger, i) => (
+            <Pill appearance="outlined" key={i}>
+              <PillContent type={trigger.type}>{trigger.value}</PillContent>
+            </Pill>
+          ))}
+        />
+      );
     },
     enableSorting: false,
     enableGlobalFilter: false,
   }),
   columnHelper.accessor('app', {
     header: () => <span>App</span>,
-    cell: (props) => props.getValue()?.name,
+    cell: (props) => (
+      <Pill appearance="outlined">
+        <PillContent type="APP">{props.getValue()?.name}</PillContent>
+      </Pill>
+    ),
     enableSorting: false,
     enableGlobalFilter: false,
   }),
@@ -60,36 +83,31 @@ const columns = [
     id: 'triggerCTA',
     size: 55,
     cell: (props) => {
-      const getFirstEventValue = () => {
-        const eventTrigger = props.row?.original?.triggers?.find(
-          (trigger) => trigger.type === FunctionTriggerTypes.Event
-        );
-        return eventTrigger ? eventTrigger.value : null;
-      };
-      const isCron = (): boolean => {
+      const router = useRouter();
+      const doesFunctionAcceptPayload = useMemo(() => {
         return Boolean(
           props.row?.original?.triggers?.some(
-            (trigger) => trigger.type === FunctionTriggerTypes.Cron
+            (trigger) => trigger.type === FunctionTriggerTypes.Event
           )
         );
-      };
+      }, [props.row.original.triggers]);
+
+      const [invokeFunction] = useInvokeFunctionMutation();
+
       return (
-        <>
-          {getFirstEventValue() && (
-            <SendEventButton
-              appearance="outlined"
-              label="Trigger"
-              data={JSON.stringify({
-                name: getFirstEventValue(),
-                data: {},
-                user: {},
-              })}
-            />
-          )}
-          {isCron() && (
-            <TriggerCronButton appearance="outlined" functionId={props.row?.original?.slug} />
-          )}
-        </>
+        <InvokeButton
+          disabled={false}
+          doesFunctionAcceptPayload={doesFunctionAcceptPayload}
+          btnAction={async ({ data, user }) => {
+            await invokeFunction({
+              data,
+              functionSlug: props.row.original.slug,
+              user,
+            });
+            toast.success('Function invoked');
+            router.push('/runs');
+          }}
+        />
       );
     },
     enableSorting: false,
@@ -105,11 +123,19 @@ export default function FunctionList() {
       desc: false,
     },
   ]);
-  const [searchInput, setSearchInput] = useState('');
-  const [globalFilter, setGlobalFilter] = useState('');
+  const [value, upsert, remove] = useSearchParam('query');
+
+  const [searchInput, setSearchInput] = useState(value || '');
+  const [globalFilter, setGlobalFilter] = useState(value || '');
+
   const debouncedSearch = useDebounce(() => {
+    if (searchInput) {
+      upsert(searchInput);
+    } else {
+      remove();
+    }
     setGlobalFilter(searchInput);
-  });
+  }, 200);
 
   const { data, isFetching } = useGetFunctionsQuery(undefined, {
     refetchOnMountOrArgChange: true,
@@ -126,7 +152,7 @@ export default function FunctionList() {
       isFetching
         ? columns.map((column) => ({
             ...column,
-            cell: () => <Skeleton className="my-[0.3rem] block h-5" />,
+            cell: () => <Skeleton className="my-[0.3rem] h-5" />,
           }))
         : columns,
     [isFetching, functions]
@@ -134,13 +160,32 @@ export default function FunctionList() {
 
   return (
     <div className="flex min-h-0 min-w-0 flex-col">
-      <SearchInput
-        placeholder="Search function..."
-        value={searchInput}
-        onChange={setSearchInput}
-        debouncedSearch={debouncedSearch}
-        className="py-4"
+      <Header
+        breadcrumb={[{ text: 'Functions' }]}
+        infoIcon={
+          <Info
+            text="List of all function in the development environment."
+            action={
+              <Link
+                arrowOnHover
+                className="text-sm"
+                href={'https://www.inngest.com/docs/functions'}
+              >
+                Learn how to create a function
+              </Link>
+            }
+          />
+        }
+        action={
+          <SearchInput
+            placeholder="Search function..."
+            value={searchInput}
+            onChange={setSearchInput}
+            debouncedSearch={debouncedSearch}
+          />
+        }
       />
+
       <main className="min-h-0 overflow-y-auto" ref={tableContainerRef}>
         <Table
           options={{
@@ -170,7 +215,7 @@ export default function FunctionList() {
               subtitle="Read our documentation to learn how to serve your functions"
               imageUrl="/images/no-results.png"
               link={{
-                text: 'Serving Functions',
+                text: 'Serving functions',
                 url: 'https://www.inngest.com/docs/sdk/serve',
               }}
             />

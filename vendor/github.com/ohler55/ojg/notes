@@ -1,0 +1,39 @@
+
+ - @.foo without a comparison indicates existance
+
+- parse
+ - add discover option to find JSON or SEN in a string or file
+  - 3 states
+   - DiscoverOff
+   - DiscoverAny
+   - DiscoverSets - only discover {} and []
+  - starting map/mode is like value but no errors on invalid
+   - same as value but replace errChar with a skip or skip and drop to drop current
+    - if number then cb and drop
+  - errors don't panic but close off current (if whole) and then back to discover maps
+ - implement on all parsers
+
+- embedded struct pointer encoding issue
+- json.Unmarshaler
+ - use alt.Recompose and convert simple to bytes and pass to unmarshaller
+
+- pretty
+ - align maps as well as arrays
+
+- unit tests and example for cmd/oj
+
+- optimize unmarshal
+ - direct parse to struct
+
+----------------
+
+- option to detect duplicate keys or make part of validator
+ - change stack to include array and map or maybe just map and nil means array
+  - check performance hit
+  - check added condition of whether keys should be checked. If too high then copy code
+ - or separate stack in func for key maps along with dip code
+
+-------------
+
+- Match a JavaScript regular expression. For example, [?(@.description =~ /cat.*/i)]
+- Exists syntax? [?(@.x exists)]

@@ -1,7 +1,7 @@
 {
   "name": "inngest-cli",
   "version": "",
-  "description": "The event-driven queue for any language.",
+  "description": "The leading workflow orchestration platform. Run stateful step functions and AI workflows on serverless, servers, or the edge.",
   "license": "SEE LICENSE IN LICENSE.md",
   "scripts": {
     "prepublishOnly": "touch bin/inngest && cp ../README.md .",
@@ -29,7 +29,7 @@
     "adm-zip": "^0.5.10",
     "debug": "^4.3.4",
     "node-fetch": "2.6.7",
-    "tar": "6.1.11"
+    "tar": "6.2.1"
   },
   "devDependencies": {
     "@types/adm-zip": "^0.5.0",

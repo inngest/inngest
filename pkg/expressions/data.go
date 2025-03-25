@@ -26,6 +26,14 @@ type Data struct {
 }
 
 // Map returns the data as a map.
+func (d Data) Clone() *Data {
+	return &Data{
+		data: mapify(d.data),
+	}
+
+}
+
+// Map returns the data as a map.
 func (d Data) Map() map[string]interface{} {
 	return d.data
 }

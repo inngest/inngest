@@ -1,51 +1,172 @@
 'use client';
 
 import { useMemo } from 'react';
+import { AppCard } from '@inngest/components/Apps/AppCard';
+import { Button } from '@inngest/components/Button/Button';
+import { InlineCode } from '@inngest/components/Code';
+import { Header } from '@inngest/components/Header/Header';
+import { Info } from '@inngest/components/Info/Info';
 import { Link } from '@inngest/components/Link';
+import { Pill } from '@inngest/components/Pill/Pill';
+import WorkerCounter from '@inngest/components/Workers/ConnectedWorkersDescription';
+import { IconSpinner } from '@inngest/components/icons/Spinner';
+import { transformFramework, transformLanguage } from '@inngest/components/utils/appsParser';
+import { RiExternalLinkLine, RiInformationLine } from '@remixicon/react';
 
 import AddAppButton from '@/components/App/AddAppButton';
-import AppCard from '@/components/App/AppCard';
-import { IconSpinner, IconWindow } from '@/icons';
-import { useGetAppsQuery } from '@/store/generated';
+import AppActions from '@/components/App/AppActions';
+import getAppCardContent from '@/components/App/AppCardContent';
+import AppFAQ from '@/components/App/AppFAQ';
+import { useGetWorkerCount } from '@/hooks/useGetWorkerCount';
+import { useInfoQuery } from '@/store/devApi';
+import { AppMethod, useGetAppsQuery } from '@/store/generated';
 
 export default function AppList() {
   const { data } = useGetAppsQuery(undefined, { pollingInterval: 1500 });
+  const getWorkerCount = useGetWorkerCount();
   const apps = data?.apps || [];
 
-  const connectedApps = apps.filter((app) => app.connected === true);
-  const numberOfConnectedApps = connectedApps.length;
+  const syncedApps = apps.filter((app) => app.connected === true);
+  const numberOfSyncedApps = syncedApps.length;
 
   const memoizedAppCards = useMemo(() => {
     return apps.map((app) => {
-      return <AppCard key={app?.id} app={app} />;
+      const { appKind, status, footerHeaderTitle, footerHeaderSecondaryCTA, footerContent } =
+        getAppCardContent({ app });
+
+      return (
+        <AppCard key={app?.id} kind={appKind}>
+          <AppCard.Content
+            url={app.method === AppMethod.Connect ? `/apps/app?id=${app.id}` : undefined}
+            app={{
+              ...app,
+              framework: transformFramework(app.framework),
+              sdkLanguage: transformLanguage(app.sdkLanguage),
+              url: app.method === AppMethod.Connect ? '' : app.url,
+              name: !app.name ? 'Syncing...' : !app.connected ? `Syncing to ${app.name}` : app.name,
+            }}
+            pill={
+              status || app.autodiscovered ? (
+                <>
+                  {status && (
+                    <Pill appearance="outlined" kind={appKind}>
+                      {status}
+                    </Pill>
+                  )}
+                  {app.autodiscovered && (
+                    <Pill appearance="outlined" kind="default">
+                      Auto-detected
+                    </Pill>
+                  )}
+                </>
+              ) : null
+            }
+            actions={
+              <div className="items-top flex gap-2">
+                {app.method === AppMethod.Connect && (
+                  <Button
+                    appearance="outlined"
+                    label="View details"
+                    href={`/apps/app?id=${app.id}`}
+                  />
+                )}
+                {!app.autodiscovered && <AppActions id={app.id} name={app.name} />}
+              </div>
+            }
+            workerCounter={<WorkerCounter appID={app.id} getWorkerCount={getWorkerCount} />}
+          />
+          <AppCard.Footer
+            kind={appKind}
+            headerTitle={footerHeaderTitle}
+            headerSecondaryCTA={footerHeaderSecondaryCTA}
+            content={footerContent}
+          />
+        </AppCard>
+      );
     });
   }, [apps]);
 
+  const { data: info } = useInfoQuery();
+
   return (
-    <div className="flex h-full flex-col overflow-y-scroll px-10 py-6">
-      <header className="mb-8">
-        <h1 className="text-lg text-slate-50">Connected Apps</h1>
-        <p className="my-4 flex gap-1">
-          This is a list of all apps. We auto-detect apps that you have defined in{' '}
-          <Link href="https://www.inngest.com/docs/local-development#connecting-apps-to-the-dev-server">
-            specific ports.
+    <div className="flex h-full flex-col overflow-y-scroll">
+      <Header
+        breadcrumb={[{ text: 'Apps' }]}
+        infoIcon={
+          <Info
+            text="This is a list of all apps. We auto-detect apps that you have defined in specific ports."
+            action={
+              <Link
+                iconAfter={<RiExternalLinkLine className="h-4 w-4" />}
+                size="small"
+                href="https://www.inngest.com/docs/local-development#connecting-apps-to-the-dev-server"
+              >
+                Go to specific ports
+              </Link>
+            }
+          />
+        }
+        action={
+          <div className="flex items-center gap-5">
+            <AddAppButton />
+          </div>
+        }
+      />
+
+      <div className="mx-auto w-full max-w-4xl px-6 pb-4 pt-16">
+        <h2 className="mb-1 text-xl">Synced Apps</h2>
+        <p className="text-subtle text-sm">
+          Apps can be synced manually with the CLI's <InlineCode>-u</InlineCode> flag, a config
+          file, the button below, or via auto-discovery.{' '}
+          <Link
+            target="_blank"
+            size="small"
+            className="inline"
+            href="https://www.inngest.com/docs/dev-server#connecting-apps-to-the-dev-server"
+          >
+            Learn more
           </Link>
         </p>
-        <div className="flex items-center gap-5">
-          <AddAppButton />
-          <p className="flex items-center gap-2 text-sky-400">
-            <IconSpinner />
-            Auto-detecting Apps
-          </p>
-        </div>
-      </header>
-      <div className="mb-4 flex items-center gap-3">
-        <IconWindow className="h-5 w-5" />
-        <p className="text-slate-200">
-          {numberOfConnectedApps} / {apps.length} Apps Connected
-        </p>
+        {apps.length === 0 && (
+          <>
+            <div className="bg-disabled my-4 mb-4 flex items-center justify-between gap-1 rounded p-4">
+              <p className="text-subtle text-sm">
+                {numberOfSyncedApps} / {apps.length} apps synced
+              </p>
+              <div className="flex items-center gap-2">
+                {info?.isDiscoveryEnabled ? (
+                  <p className="text-btnPrimary flex items-center gap-2 text-sm leading-tight">
+                    <IconSpinner className="fill-btnPrimary" />
+                    Auto-discovering apps
+                  </p>
+                ) : null}
+                <AddAppButton secondary />
+              </div>
+            </div>
+            {info?.isDiscoveryEnabled && (
+              <div className="text-light flex items-center gap-1">
+                <RiInformationLine className="h-4 w-4" />
+                <p className="text-sm">
+                  Auto-discovery scans common ports and paths for apps. Use the{' '}
+                  <InlineCode>--no-discovery</InlineCode> flag in your CLI to disable it.{' '}
+                  <Link
+                    target="_blank"
+                    size="small"
+                    className="inline"
+                    href="https://www.inngest.com/docs/dev-server#auto-discovery"
+                  >
+                    Learn more
+                  </Link>
+                  .
+                </p>
+              </div>
+            )}
+          </>
+        )}
+
+        <div className="my-6 flex w-full flex-col gap-10">{memoizedAppCards}</div>
+        <AppFAQ openByDefault={numberOfSyncedApps === 0} />
       </div>
-      <div className="grid min-h-max grid-cols-1 gap-6 md:grid-cols-2">{memoizedAppCards}</div>
     </div>
   );
 }

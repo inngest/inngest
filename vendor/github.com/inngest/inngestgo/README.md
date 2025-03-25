@@ -3,7 +3,7 @@
   <br/>
   <br/>
   <p>
-    A durable event-driven workflow engine SDK for Golang.<br />
+    Write durable functions in Go via the <a href="https://www.inngest.com">Inngest</a> SDK.<br />
     Read the <a href="https://www.inngest.com/docs?ref=github-inngest-js-readme">documentation</a> and get started in minutes.
   </p>
   <p>
@@ -17,9 +17,10 @@
 	  
 <hr />
 
-# Inngest Go SDK
+# `inngestgo`: Durable execution in Go
 
-Inngest's Go SDK allows you to create event-driven, durable workflows in your existing API — without new infrastructure.
+`inngestgo` allows you to create durable functions in your existing HTTP handlers or via outbound TCP connections,
+without managing orchestrators, state, scheduling, or new infrastructure.
 
 It's useful if you want to build reliable software without worrying about queues, events, subscribers, workers, or other
 complex primitives such as concurrency, parallelism, event batching, or distributed debounce. These are all built in.
@@ -36,7 +37,7 @@ complex primitives such as concurrency, parallelism, event batching, or distribu
 
 # Examples
 
-The following is the bare minimum setup for a fully distributed durable workflow server:
+The following is the bare minimum setup for a fully distributed durable workflow:
 
 ```go
 package main
@@ -52,18 +53,27 @@ import (
 )
 
 func main() {
-	h := inngestgo.NewHandler("core", inngestgo.HandlerOpts{})
-	f := inngestgo.CreateFunction(
+	client, err := inngestgo.NewClient(inngestgo.ClientOpts{
+		AppID: "core",
+	})
+	if err != nil {
+		panic(err)
+	}
+
+	_, err = inngestgo.CreateFunction(
+		client,
 		inngestgo.FunctionOpts{
-			ID:   "account-created",
-			Name: "Account creation flow",
+			ID: "account-created",
 		},
 		// Run on every api/account.created event.
 		inngestgo.EventTrigger("api/account.created", nil),
 		AccountCreated,
 	)
-	h.Register(f)
-	http.ListenAndServe(":8080", h)
+	if err != nil {
+		panic(err)
+	}
+
+	http.ListenAndServe(":8080", client.Serve())
 }
 
 // AccountCreated is a durable function which runs any time the "api/account.created"
@@ -72,17 +82,24 @@ func main() {
 // It is invoked by Inngest, with each step being backed by Inngest's orchestrator.
 // Function state is automatically managed, and persists across server restarts,
 // cloud migrations, and language changes.
-func AccountCreated(ctx context.Context, input inngestgo.Input[AccountCreatedEvent]) (any, error) {
+func AccountCreated(
+	ctx context.Context,
+	input inngestgo.Input[AccountCreatedEventData],
+) (any, error) {
 	// Sleep for a second, minute, hour, week across server restarts.
 	step.Sleep(ctx, "initial-delay", time.Second)
 
 	// Run a step which emails the user.  This automatically retries on error.
 	// This returns the fully typed result of the lambda.
-	result := step.Run(ctx, "on-user-created", func(ctx context.Context) (bool, error) {
+	result, err := step.Run(ctx, "on-user-created", func(ctx context.Context) (bool, error) {
 		// Run any code inside a step.
 		result, err := emails.Send(emails.Opts{})
 		return result, err
 	})
+	if err != nil {
+		// This step retried 5 times by default and permanently failed.
+		return nil, err
+	}
 	// `result` is  fully typed from the lambda
 	_ = result
 
@@ -122,16 +139,16 @@ func AccountCreated(ctx context.Context, input inngestgo.Input[AccountCreatedEve
 //	type AccountCreatedEvent struct {
 //		Name      string                  `json:"name"`
 //		Data      AccountCreatedEventData `json:"data"`
-//		User      any                     `json:"user"`
+//		User      map[string]any          `json:"user"`
 //		Timestamp int64                   `json:"ts,omitempty"`
 //		Version   string                  `json:"v,omitempty"`
 //	}
-type AccountCreatedEvent inngestgo.GenericEvent[AccountCreatedEventData, any]
+type AccountCreatedEvent inngestgo.GenericEvent[AccountCreatedEventData]
 type AccountCreatedEventData struct {
 	AccountID string
 }
 
-type FunctionCreatedEvent inngestgo.GenericEvent[FunctionCreatedEventData, any]
+type FunctionCreatedEvent inngestgo.GenericEvent[FunctionCreatedEventData]
 type FunctionCreatedEventData struct {
 	FunctionID string
 }

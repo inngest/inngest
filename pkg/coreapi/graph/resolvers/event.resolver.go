@@ -3,8 +3,8 @@ package resolvers
 import (
 	"context"
 	"encoding/json"
-	"sort"
 
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/oklog/ulid/v2"
@@ -12,54 +12,23 @@ import (
 
 // TODO Duplicate code. Move to field-level resolvers and add dataloaders.
 func (r *eventResolver) FunctionRuns(ctx context.Context, obj *models.Event) ([]*models.FunctionRun, error) {
-	state, err := r.Runner.Runs(ctx, obj.ID)
+	runs, err := r.Data.GetFunctionRunsFromEvents(ctx, consts.DevServerAccountID, consts.DevServerEnvID, []ulid.ULID{obj.ID})
 	if err != nil {
 		return nil, err
 	}
 
-	var runs []*models.FunctionRun
+	var out []*models.FunctionRun
 
-	for _, s := range state {
-		status := models.FunctionRunStatusRunning
-
-		switch s.Metadata().Status {
-		case enums.RunStatusCompleted:
-			status = models.FunctionRunStatusCompleted
-		case enums.RunStatusFailed:
-			status = models.FunctionRunStatusFailed
-		case enums.RunStatusCancelled:
-			status = models.FunctionRunStatusCancelled
-		}
-
-		startedAt := ulid.Time(s.Metadata().Identifier.RunID.Time())
-
-		name := s.Function().Name
-
-		pending, _ := r.Queue.OutstandingJobCount(
-			ctx,
-			s.Identifier().WorkspaceID,
-			s.Identifier().WorkflowID,
-			s.Identifier().RunID,
-		)
-
-		runs = append(runs, &models.FunctionRun{
-			ID:           s.Metadata().Identifier.RunID.String(),
-			Name:         &name,
-			Status:       &status,
-			PendingSteps: &pending,
-			StartedAt:    &startedAt,
-		})
+	for _, run := range runs {
+		outRun := models.MakeFunctionRun(run)
+		out = append(out, outRun)
 	}
 
-	sort.Slice(runs, func(i, j int) bool {
-		return runs[i].ID > runs[j].ID
-	})
-
-	return runs, nil
+	return out, nil
 }
 
 func (r *eventResolver) PendingRuns(ctx context.Context, obj *models.Event) (*int, error) {
-	state, err := r.Runner.Runs(ctx, obj.ID)
+	state, err := r.Runner.Runs(ctx, consts.DevServerAccountID, obj.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -76,7 +45,7 @@ func (r *eventResolver) PendingRuns(ctx context.Context, obj *models.Event) (*in
 }
 
 func (r *eventResolver) Status(ctx context.Context, obj *models.Event) (*models.EventStatus, error) {
-	state, err := r.Runner.Runs(ctx, obj.ID)
+	state, err := r.Runner.Runs(ctx, consts.DevServerAccountID, obj.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -118,7 +87,8 @@ func (r *eventResolver) Status(ctx context.Context, obj *models.Event) (*models.
 }
 
 func (r *eventResolver) Raw(ctx context.Context, obj *models.Event) (*string, error) {
-	evts, err := r.Runner.Events(ctx, obj.ID)
+	eventID := obj.ID.String()
+	evts, err := r.Runner.Events(ctx, eventID)
 	if err != nil {
 		return nil, err
 	}
@@ -141,7 +111,7 @@ func (r *eventResolver) Raw(ctx context.Context, obj *models.Event) (*string, er
 }
 
 func (r *eventResolver) TotalRuns(ctx context.Context, obj *models.Event) (*int, error) {
-	metadata, err := r.Runner.Runs(ctx, obj.ID)
+	metadata, err := r.Runner.Runs(ctx, consts.DevServerAccountID, obj.ID)
 	if err != nil {
 		return nil, err
 	}

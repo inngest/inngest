@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { classNames } from '@inngest/components/utils/classNames';
+import { useEffect, useState } from 'react';
+import { cn } from '@inngest/components/utils/classNames';
 import * as Dialog from '@radix-ui/react-dialog';
 import { AnimatePresence, motion } from 'framer-motion';
 
@@ -12,7 +12,14 @@ type SlideOverProps = {
 };
 
 export function SlideOver({ children, onClose, size = 'large' }: SlideOverProps) {
-  const [isOpen, setOpen] = useState(true);
+  // This hack is needed to prevent hydration errors.
+  // The Radix Dialog is not rendered correctly server side, so we need to prevent it from rendering until the client side hydration is complete (and `useEffect` is run).
+  // The issue is reported here: https://github.com/radix-ui/primitives/issues/1386
+  const [isOpen, setOpen] = useState(false);
+
+  useEffect(() => {
+    setOpen(true);
+  }, []);
 
   function handleClose() {
     setOpen(false);
@@ -29,7 +36,7 @@ export function SlideOver({ children, onClose, size = 'large' }: SlideOverProps)
           <Dialog.Portal forceMount>
             <Dialog.Overlay asChild>
               <motion.div
-                className="fixed inset-0 z-50 bg-[#04060C]/90 backdrop-blur-[2px] transition-opacity"
+                className="fixed inset-0 z-50 bg-black/50 backdrop-blur-[2px] transition-opacity dark:bg-[#04060C]/90"
                 aria-hidden="true"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -41,7 +48,7 @@ export function SlideOver({ children, onClose, size = 'large' }: SlideOverProps)
               />
             </Dialog.Overlay>
             {/* Content container */}
-            <div className={classNames(size === 'small' ? 'w-2/5' : 'w-4/5', 'fixed inset-0 z-50')}>
+            <div className={cn(size === 'small' ? 'w-2/5' : 'w-4/5', 'fixed inset-0 z-50')}>
               <motion.div
                 className="flex h-full w-screen items-center justify-end"
                 initial={{ x: '100%' }}
@@ -53,9 +60,10 @@ export function SlideOver({ children, onClose, size = 'large' }: SlideOverProps)
                 }}
               >
                 <Dialog.Content
-                  className={classNames(
+                  onOpenAutoFocus={(event: Event) => event.preventDefault()}
+                  className={cn(
                     size === 'small' ? 'w-2/5' : 'w-4/5',
-                    'bg-slate-910 flex h-full flex-col shadow-xl'
+                    'bg-canvasBase flex h-full flex-col shadow-xl'
                   )}
                 >
                   {children}

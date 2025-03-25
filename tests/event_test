@@ -1,0 +1,4 @@
+#!/bin/bash
+
+datetime=$(date +"%Y-%m-%d %H:%M:%S.%3N")
+curl -X POST http://localhost:8288/e/test --data "{ \"name\": \"test/yolo\", \"data\": { \"datetime\": \"${datetime}\", \"unix\": ${EPOCHSECONDS}, \"yolo\": true } }"

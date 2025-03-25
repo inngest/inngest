@@ -1,14 +1,15 @@
 import { Client, useQuery, type UseQueryResponse } from 'urql';
 
-import type { TimeRange } from '@/app/(dashboard)/env/[environmentSlug]/functions/[slug]/logs/TimeRangeFilter';
+import type { TimeRange } from '@/types/TimeRangeFilter';
+import { useEnvironment } from '@/components/Environments/environment-context';
 import { graphql } from '@/gql';
-import type { GetFunctionQuery, WorkflowVersion } from '@/gql/graphql';
-import { useEnvironment } from '@/queries/environments';
+import type { GetFunctionQuery } from '@/gql/graphql';
+import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
 
 const GetFunctionsUsageDocument = graphql(`
-  query GetFunctionsUsage($environmentID: ID!, $page: Int, $archived: Boolean) {
+  query GetFunctionsUsage($environmentID: ID!, $page: Int, $archived: Boolean, $pageSize: Int) {
     workspace(id: $environmentID) {
-      workflows(archived: $archived) @paginated(perPage: 50, page: $page) {
+      workflows(archived: $archived) @paginated(perPage: $pageSize, page: $page) {
         page {
           page
           perPage
@@ -19,6 +20,18 @@ const GetFunctionsUsageDocument = graphql(`
           id
           slug
           dailyStarts: usage(opts: { period: "hour", range: "day" }, event: "started") {
+            total
+            data {
+              count
+            }
+          }
+          dailyCompleted: usage(opts: { period: "hour", range: "day" }, event: "completed") {
+            total
+            data {
+              count
+            }
+          }
+          dailyCancelled: usage(opts: { period: "hour", range: "day" }, event: "cancelled") {
             total
             data {
               count
@@ -37,9 +50,15 @@ const GetFunctionsUsageDocument = graphql(`
 `);
 
 const GetFunctionsDocument = graphql(`
-  query GetFunctions($environmentID: ID!, $page: Int, $archived: Boolean) {
+  query GetFunctions(
+    $environmentID: ID!
+    $page: Int
+    $archived: Boolean
+    $search: String
+    $pageSize: Int
+  ) {
     workspace(id: $environmentID) {
-      workflows(archived: $archived) @paginated(perPage: 50, page: $page) {
+      workflows(archived: $archived, search: $search) @paginated(perPage: $pageSize, page: $page) {
         page {
           page
           perPage
@@ -51,6 +70,7 @@ const GetFunctionsDocument = graphql(`
           id
           slug
           name
+          isPaused
           isArchived
           current {
             triggers {
@@ -64,19 +84,69 @@ const GetFunctionsDocument = graphql(`
   }
 `);
 
-export function getFunctions(args: {
-  client: Client;
-  environmentID: string;
-  isArchived: boolean;
+export function useFunctionsPage({
+  archived,
+  search,
+  envID,
+  page,
+}: {
+  archived: boolean;
+  search: string;
+  envID: string;
   page: number;
 }) {
-  return args.client
-    .query(GetFunctionsDocument, {
-      environmentID: args.environmentID,
-      archived: args.isArchived,
-      page: args.page,
-    })
-    .toPromise();
+  const pageSize = 50;
+  const res = useGraphQLQuery({
+    query: GetFunctionsDocument,
+    variables: {
+      archived,
+      search,
+      environmentID: envID,
+      page,
+      pageSize,
+    },
+  });
+  if (!res.data) {
+    return {
+      ...res,
+      data: undefined,
+    };
+  }
+
+  return {
+    ...res,
+    data: {
+      functions: res.data.workspace.workflows.data.map((fn) => {
+        let triggers: { type: 'EVENT' | 'CRON'; value: string }[] = [];
+        if (fn.current) {
+          for (const trigger of fn.current.triggers) {
+            if (trigger.schedule) {
+              triggers.push({
+                type: 'CRON',
+                value: trigger.schedule,
+              });
+            } else if (trigger.eventName) {
+              triggers.push({
+                type: 'EVENT',
+                value: trigger.eventName,
+              });
+            }
+          }
+        }
+
+        return {
+          ...fn,
+          failureRate: undefined,
+          triggers,
+          usage: undefined,
+        };
+      }),
+      page: {
+        ...res.data.workspace.workflows.page,
+        hasNextPage: res.data.workspace.workflows.data.length === pageSize,
+      },
+    },
+  };
 }
 
 const GetFunctionDocument = graphql(`
@@ -87,6 +157,7 @@ const GetFunctionDocument = graphql(`
         id
         name
         slug
+        isPaused
         isArchived
         appName
         current {
@@ -118,6 +189,7 @@ const GetFunctionDocument = graphql(`
           eventsBatch {
             maxSize
             timeout
+            key
           }
           concurrency {
             scope
@@ -136,6 +208,12 @@ const GetFunctionDocument = graphql(`
             period
             key
           }
+          throttle {
+            burst
+            key
+            limit
+            period
+          }
         }
       }
     }
@@ -143,30 +221,25 @@ const GetFunctionDocument = graphql(`
 `);
 
 type UseFunctionParams = {
-  environmentSlug: string;
   functionSlug: string;
 };
 
 export const useFunction = ({
-  environmentSlug,
   functionSlug,
 }: UseFunctionParams): UseQueryResponse<
   GetFunctionQuery,
   { environmentID: string; slug: string }
 > => {
-  const [{ data: environment, fetching: isFetchingEnvironment }] = useEnvironment({
-    environmentSlug,
-  });
+  const environment = useEnvironment();
   const [result, refetch] = useQuery({
     query: GetFunctionDocument,
     variables: {
-      environmentID: environment?.id!,
+      environmentID: environment.id,
       slug: functionSlug,
     },
-    pause: !environment?.id,
   });
 
-  return [{ ...result, fetching: isFetchingEnvironment || result.fetching }, refetch];
+  return [{ ...result, fetching: result.fetching }, refetch];
 };
 
 const GetFunctionUsageDocument = graphql(`
@@ -174,6 +247,22 @@ const GetFunctionUsageDocument = graphql(`
     workspace(id: $environmentID) {
       workflow(id: $id) {
         dailyStarts: usage(opts: { from: $startTime, to: $endTime }, event: "started") {
+          period
+          total
+          data {
+            slot
+            count
+          }
+        }
+        dailyCancelled: usage(opts: { from: $startTime, to: $endTime }, event: "cancelled") {
+          period
+          total
+          data {
+            slot
+            count
+          }
+        }
+        dailyCompleted: usage(opts: { from: $startTime, to: $endTime }, event: "completed") {
           period
           total
           data {
@@ -194,19 +283,64 @@ const GetFunctionUsageDocument = graphql(`
   }
 `);
 
-export function getFunctionUsages(args: {
+export async function getFunctionUsagesPage(args: {
+  archived: boolean;
   client: Client;
-  environmentID: string;
-  isArchived: boolean;
+  envID: string;
   page: number;
 }) {
-  return args.client
+  const pageSize = 50;
+
+  const res = await args.client
     .query(GetFunctionsUsageDocument, {
-      environmentID: args.environmentID,
-      archived: args.isArchived,
+      environmentID: args.envID,
+      archived: args.archived,
       page: args.page,
+      pageSize,
     })
     .toPromise();
+  if (res.error) {
+    throw res.error;
+  }
+  if (!res.data) {
+    throw new Error('no data returned');
+  }
+
+  res.data.workspace;
+
+  return {
+    ...res,
+    data: {
+      functions: res.data.workspace.workflows.data.map((fn) => {
+        const dailyFailureCount = fn.dailyFailures.total;
+        const dailyFinishedCount =
+          fn.dailyCompleted.total + fn.dailyCancelled.total + dailyFailureCount;
+
+        // Calculates the daily failure rate percentage and rounds it up to 2 decimal places
+        const failureRate = dailyFinishedCount
+          ? Math.round((dailyFailureCount / dailyFinishedCount) * 10000) / 100
+          : 0;
+
+        // Creates an array of objects containing the start and failure count for each usage slot (1 hour)
+        const slots = fn.dailyStarts.data.map((usageSlot, index) => ({
+          startCount: usageSlot.count,
+          failureCount: fn.dailyFailures.data[index]?.count ?? 0,
+        }));
+
+        const usage = {
+          slots,
+          total: dailyFinishedCount,
+        };
+
+        return {
+          failureRate,
+          slug: fn.slug,
+          usage,
+        };
+      }),
+      page: res.data.workspace.workflows.page,
+    },
+  };
 }
 
 type UsageItem = {
@@ -219,51 +353,52 @@ type UsageItem = {
 };
 
 type UseFunctionUsageParams = {
-  environmentSlug: string;
   functionSlug: string;
   timeRange: TimeRange;
 };
 
 export const useFunctionUsage = ({
-  environmentSlug,
   functionSlug,
   timeRange,
 }: UseFunctionUsageParams): UseQueryResponse<UsageItem[]> => {
-  const [{ data: functionData }] = useFunction({ environmentSlug, functionSlug });
+  const environment = useEnvironment();
+  const [{ data: functionData }] = useFunction({ functionSlug });
   const functionId = functionData?.workspace.workflow?.id;
-
-  const [{ data: environment, fetching: isFetchingEnvironment }] = useEnvironment({
-    environmentSlug,
-  });
 
   const [{ data, ...rest }, refetch] = useQuery({
     query: GetFunctionUsageDocument,
     variables: {
-      environmentID: environment?.id!,
+      environmentID: environment.id,
       id: functionId!,
       startTime: timeRange.start.toISOString(),
       endTime: timeRange.end.toISOString(),
     },
-    pause: !functionId || !environment?.id,
+    pause: !functionId,
   });
 
   // Combine usage arrays into single array
   let usage: UsageItem[] = [];
-  const starts = data?.workspace.workflow?.dailyStarts;
-  const failures = data?.workspace.workflow?.dailyFailures;
-  if (starts && failures) {
-    usage = starts.data.map((d, idx) => {
-      const failureCount = failures.data[idx]?.count || 0;
+
+  const completed = data?.workspace.workflow?.dailyCompleted;
+  const cancelled = data?.workspace.workflow?.dailyCancelled;
+  const failed = data?.workspace.workflow?.dailyFailures;
+
+  if (completed && cancelled && failed) {
+    usage = completed.data.map((d, idx) => {
+      const failureCount = failed.data[idx]?.count || 0;
+      const finishedCount =
+        (completed.data[idx]?.count || 0) + (cancelled.data[idx]?.count || 0) + failureCount;
+
       return {
         name: d.slot,
         values: {
-          totalRuns: d.count,
-          successes: d.count - failureCount,
+          totalRuns: finishedCount,
+          successes: finishedCount - failureCount,
           failures: failureCount,
         },
       };
     });
   }
 
-  return [{ ...rest, data: usage, fetching: isFetchingEnvironment || rest.fetching }, refetch];
+  return [{ ...rest, data: usage, fetching: rest.fetching }, refetch];
 };

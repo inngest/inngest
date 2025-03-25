@@ -1,13 +1,14 @@
-import { classNames } from '@inngest/components/utils/classNames';
+import { cn } from '@inngest/components/utils/classNames';
 
 import { MetadataItem, type MetadataItemProps } from './MetadataItem';
 
 type Props = {
   metadataItems: MetadataItemProps[];
   columns?: 2 | 3;
+  loading?: boolean;
 };
 
-export function MetadataGrid({ metadataItems, columns = 3 }: Props) {
+export function MetadataGrid({ metadataItems, columns = 3, loading = false }: Props) {
   // Each metadata element that has a large size counts as two items
   const items = metadataItems.reduce((count, item) => {
     return count + (item.size === 'large' ? 2 : 1);
@@ -28,7 +29,7 @@ export function MetadataGrid({ metadataItems, columns = 3 }: Props) {
 
   return (
     <dl
-      className={`dark:bg-slate-910 grid rounded-lg border border-slate-200 bg-white p-2.5 dark:border-slate-800 grid-cols-${gridColumns} grid-rows-${rows} gap-5`}
+      className={`bg-canvasBase border-subtle grid rounded-md border p-2.5 grid-cols-${gridColumns} grid-rows-${rows} gap-5`}
     >
       {metadataItems.map((item, index) => {
         const spanIndex = currentIndex;
@@ -43,19 +44,20 @@ export function MetadataGrid({ metadataItems, columns = 3 }: Props) {
             currentIndex - spanIndex < metadataItems.length) ||
           spanIndex >= metadataItems.length - (metadataItems.length % gridColumns);
         const verticalDividers =
-          'before:absolute before:top-0 before:-left-2.5 before:h-full before:border-l dark:before:border-slate-800/50 before:border-slate-200';
+          'before:absolute before:top-0 before:-left-2.5 before:h-full before:border-l before:border-subtle';
         const horizontalDividers =
-          'after:absolute after:-bottom-2.5 after:left-0 after:w-full dark:after:border-slate-800/50 after:border-slate-200 after:border-b';
+          'after:absolute after:-bottom-2.5 after:left-0 after:w-full after:border-subtle after:border-b';
 
         return (
           <MetadataItem
             key={index}
-            className={classNames(
+            className={cn(
               'relative overflow-visible',
               spanIndex !== 0 && spanIndex % gridColumns !== 0 && verticalDividers,
               !lastOrOnlyRow && horizontalDividers,
               item.size === 'large' ? 'col-span-2' : 'col-span-1'
             )}
+            loading={loading}
             {...item}
           />
         );

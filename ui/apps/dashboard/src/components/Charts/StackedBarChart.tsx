@@ -1,7 +1,15 @@
 'use client';
 
 import { useMemo } from 'react';
-import { ExclamationCircleIcon } from '@heroicons/react/20/solid';
+import { Error } from '@inngest/components/Error/Error';
+import {
+  Tooltip as CustomTooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@inngest/components/Tooltip';
+import { cn } from '@inngest/components/utils/classNames';
+import { minuteTime } from '@inngest/components/utils/date';
+import { RiInformationLine } from '@remixicon/react';
 import {
   Bar,
   BarChart,
@@ -14,17 +22,12 @@ import {
 } from 'recharts';
 
 import LoadingIcon from '@/icons/LoadingIcon';
-import cn from '@/utils/cn';
-import { minuteTime } from '@/utils/date';
-
-type NestedKeyOf<T> = {
-  [Values in keyof T]: T[Values];
-};
 
 type BarChartProps = {
   className?: string;
   height?: number;
   title: string | React.ReactNode;
+  desc?: string;
   data?: {
     name: string;
     values: {
@@ -55,23 +58,15 @@ type AxisProps = {
 
 function CustomizedXAxisTick(props: AxisProps) {
   return (
-    <text
-      x={props.x}
-      y={props.y}
-      dy={16}
-      fill="#94A3B8"
-      fontSize={10}
-      className="font-medium"
-      textAnchor="middle"
-    >
-      {minuteTime(props.payload.value)}
+    <text x={props.x} y={props.y} dy={16} fontSize={12} className="fill-muted" textAnchor="middle">
+      {minuteTime(new Date(props.payload.value))}
     </text>
   );
 }
 
 function CustomizedYAxisTick(props: AxisProps) {
   return (
-    <text x={props.x} y={props.y} dy={16} fill="#94A3B8" fontSize={10} className="font-medium">
+    <text x={props.x} y={props.y} dy={2} fontSize={12} className="fill-muted">
       {props.index > 0 ? props.payload.value : undefined}
     </text>
   );
@@ -81,6 +76,7 @@ export default function StackedBarChart({
   className = '',
   height = 200,
   title,
+  desc,
   data = [],
   legend = [],
   error,
@@ -92,16 +88,24 @@ export default function StackedBarChart({
   const defaultDataKey = defaultLegend?.dataKey;
 
   return (
-    <div className={cn('border-b border-slate-200 bg-white px-6 py-4', className)}>
-      <header className="flex items-center justify-between">
+    <div className={cn('border-subtle bg-canvasBase border-b px-6 py-4', className)}>
+      <header className="mb-2 flex items-center justify-between">
         <div className="flex gap-4">
-          <h3 className="flex flex-row items-center gap-2 font-medium">{title}</h3>
+          <h3 className="flex flex-row items-center gap-2 text-base">{title}</h3>
+          {desc && (
+            <CustomTooltip>
+              <TooltipTrigger>
+                <RiInformationLine className="text-subtle h-4 w-4" />
+              </TooltipTrigger>
+              <TooltipContent>{desc}</TooltipContent>
+            </CustomTooltip>
+          )}
         </div>
         <div className="flex justify-end gap-4">
           {legend.map((l) => (
-            <span key={l.name} className="inline-flex items-center text-sm text-slate-800">
+            <span key={l.name} className="inline-flex items-center text-xs">
               <span
-                className="mr-2 inline-flex h-3 w-3 rounded"
+                className="mr-2 inline-flex h-3 w-3 rounded-full"
                 style={{ backgroundColor: l.color }}
               ></span>
               {l.name}
@@ -116,11 +120,8 @@ export default function StackedBarChart({
               <LoadingIcon />
             </div>
           ) : error ? (
-            <div className="flex h-full w-full flex-col items-center justify-center gap-5">
-              <div className="inline-flex items-center gap-2 text-red-600">
-                <ExclamationCircleIcon className="h-4 w-4" />
-                <h2 className="text-sm">Failed to load chart</h2>
-              </div>
+            <div className="h-full w-full">
+              <Error message="Failed to load chart" />
             </div>
           ) : (
             <BarChart
@@ -130,8 +131,9 @@ export default function StackedBarChart({
                 bottom: 16,
               }}
             >
-              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <CartesianGrid strokeDasharray="0" vertical={false} className="stroke-disabled" />
               <XAxis
+                allowDecimals={false}
                 dataKey="name"
                 axisLine={false}
                 tickLine={false}
@@ -139,28 +141,28 @@ export default function StackedBarChart({
                 tick={CustomizedXAxisTick}
               />
               <YAxis
+                allowDecimals={false}
                 domain={[0, 'auto']}
                 allowDataOverflow
                 axisLine={false}
                 tickLine={false}
                 tick={CustomizedYAxisTick}
-                width={10}
+                width={20}
+                tickMargin={8}
               />
 
               <Tooltip
                 content={(props) => {
                   const { label, payload } = props;
                   return (
-                    <div className="rounded-md border bg-white/90 px-3 pb-2 pt-1 text-sm shadow backdrop-blur-md">
-                      <span className="text-xs text-slate-500">
-                        {new Date(label).toLocaleString()}
-                      </span>
+                    <div className="bg-canvasBase shadow-tooltip rounded-md px-3 pb-2 pt-1 text-sm shadow-md">
+                      <div className="text-muted pb-2">{new Date(label).toLocaleString()}</div>
                       {payload?.map((p, idx) => {
                         const l = legend.find((l) => l.dataKey == p.name);
                         return (
                           <div
                             key={idx}
-                            className="flex items-center text-sm font-medium text-slate-800"
+                            className="text-muted flex items-center text-sm font-medium"
                           >
                             <span
                               className="mr-2 inline-flex h-3 w-3 rounded"

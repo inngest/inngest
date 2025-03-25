@@ -12,6 +12,8 @@ import (
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/expressions"
+	"github.com/inngest/inngest/pkg/syscode"
+	"github.com/inngest/inngest/pkg/util"
 )
 
 // ConcurrencyLimits represents concurrency limits specified for a function.
@@ -36,7 +38,10 @@ func (c ConcurrencyLimits) PartitionConcurrency() int {
 
 func (c ConcurrencyLimits) Validate(ctx context.Context) error {
 	if len(c.Limits) > consts.MaxConcurrencyLimits {
-		return fmt.Errorf("There are more concurrency limits specified than the allowed max of: %d", consts.MaxConcurrencyLimits)
+		return syscode.Error{
+			Code:    syscode.CodeConcurrencyLimitInvalid,
+			Message: fmt.Sprintf("There are more concurrency limits specified than the allowed max of: %d", consts.MaxConcurrencyLimits),
+		}
 	}
 	for _, l := range c.Limits {
 		if err := l.Validate(ctx); err != nil {
@@ -141,22 +146,11 @@ func (c Concurrency) Evaluate(ctx context.Context, scopeID uuid.UUID, input map[
 			evaluated = fmt.Sprintf("%v", v)
 		}
 	}
-	target := strconv.FormatUint(xxhash.Sum64String(evaluated), 36)
-	return fmt.Sprintf("%s:%s:%s", c.Prefix(), scopeID, target)
-
+	return util.ConcurrencyKey(c.Scope, scopeID, evaluated)
 }
 
 func (c Concurrency) Prefix() string {
-	switch c.Scope {
-	case enums.ConcurrencyScopeFn:
-		return "f"
-	case enums.ConcurrencyScopeEnv:
-		return "e"
-	case enums.ConcurrencyScopeAccount:
-		return "a"
-	default:
-		return "?"
-	}
+	return util.ConcurrencyScopePrefix(c.Scope)
 }
 
 func (c Concurrency) IsCustomLimit() bool {

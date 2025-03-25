@@ -1,5 +1,6 @@
 'use client';
 
+import { Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
 import SlideOver from '@/components/SlideOver';
@@ -25,4 +26,12 @@ const StreamSlideOver = () => {
   );
 };
 
-export default StreamSlideOver;
+const StreamWrapper = () => {
+  return (
+    <Suspense>
+      <StreamSlideOver />
+    </Suspense>
+  );
+};
+
+export default StreamWrapper;

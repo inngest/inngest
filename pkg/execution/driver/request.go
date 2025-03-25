@@ -4,13 +4,12 @@ import (
 	"encoding/json"
 
 	"github.com/google/uuid"
-	"github.com/inngest/inngest/pkg/consts"
 	"github.com/oklog/ulid/v2"
 )
 
 type SDKRequest struct {
-	Event   map[string]any     `json:"event,omitempty"`
-	Events  []map[string]any   `json:"events,omitempty"`
+	Event   map[string]any     `json:"event"`
+	Events  []map[string]any   `json:"events"`
 	Actions map[string]any     `json:"steps"`
 	Context *SDKRequestContext `json:"ctx"`
 	// Version indicates the version used to manage the SDK request context.
@@ -20,18 +19,6 @@ type SDKRequest struct {
 
 	// DEPRECATED: NOTE: This is moved into SDKRequestContext for V3+/Non-TS SDKs
 	UseAPI bool `json:"use_api"`
-}
-
-// TODO:
-// This can be improved with a static map reference of size limits
-// for each serverless providers so we don't always enforced it at
-// the lowest common denominator, since those limits rarely changes.
-func (req *SDKRequest) IsBodySizeTooLarge() bool {
-	byt, err := json.Marshal(req)
-	if err != nil {
-		return false
-	}
-	return len(byt) >= consts.MaxBodySize
 }
 
 type SDKRequestContext struct {
@@ -73,4 +60,13 @@ type SDKRequestContext struct {
 type FunctionStack struct {
 	Stack   []string `json:"stack"`
 	Current int      `json:"current"`
+}
+
+func (m FunctionStack) MarshalJSON() ([]byte, error) {
+	if m.Stack == nil {
+		m.Stack = make([]string, 0)
+	}
+
+	type alias FunctionStack // Avoid infinite recursion
+	return json.Marshal(alias(m))
 }

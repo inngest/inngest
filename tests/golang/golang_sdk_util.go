@@ -1,7 +1,9 @@
 package golang
 
 import (
+	"context"
 	"fmt"
+	"log/slog"
 	"math/rand"
 	"net/http"
 	"net/url"
@@ -9,42 +11,42 @@ import (
 	"testing"
 	"time"
 
+	"github.com/inngest/inngest/pkg/logger"
+
 	"github.com/inngest/inngestgo"
 	"github.com/stretchr/testify/require"
-	"golang.org/x/exp/slog"
 )
+
+const DEV_URL = "http://127.0.0.1:8288"
 
 type RegisterFunc func()
 
-type opt func(h *inngestgo.HandlerOpts)
+type opt func(h *inngestgo.ClientOpts)
 
-func NewSDKHandler(t *testing.T, hopts ...opt) (inngestgo.Handler, *HTTPServer, RegisterFunc) {
+func NewSDKHandler(t *testing.T, appID string, copts ...opt) (inngestgo.Client, *HTTPServer, RegisterFunc) {
 	t.Helper()
+	_ = os.Setenv("INNGEST_DEV", DEV_URL)
 
 	key := "test"
-	inngestgo.DefaultClient = inngestgo.NewClient(inngestgo.ClientOpts{
-		EventKey: &key,
-	})
-
-	os.Setenv("INNGEST_DEV", "http://127.0.0.1:8288")
-
-	opts := inngestgo.HandlerOpts{
-		RegisterURL: inngestgo.StrPtr("http://127.0.0.1:8288/fn/register"),
+	opts := inngestgo.ClientOpts{
+		AppID:       appID,
+		EventKey:    &key,
 		Logger:      slog.Default(),
-		// Env:         inngestgo.Str("test-env"),
+		RegisterURL: inngestgo.StrPtr(fmt.Sprintf("%s/fn/register", DEV_URL)),
 	}
 
-	for _, o := range hopts {
+	for _, o := range copts {
 		o(&opts)
 	}
 
-	h := inngestgo.NewHandler("Billing", opts)
+	client, err := inngestgo.NewClient(opts)
+	require.NoError(t, err)
 
-	server := NewHTTPServer(h)
+	server := NewHTTPServer(client.Serve())
 
 	// Update the handler's URL with this server.
 	opts.URL, _ = url.Parse(server.URL())
-	h.SetOptions(opts)
+	client.SetURL(opts.URL)
 	<-time.After(20 * time.Millisecond)
 
 	r := func() {
@@ -56,7 +58,29 @@ func NewSDKHandler(t *testing.T, hopts ...opt) (inngestgo.Handler, *HTTPServer, 
 		require.Equal(t, 200, resp.StatusCode)
 		_ = resp.Body.Close()
 	}
-	return h, server, r
+	return client, server, r
+}
+
+func NewSDKConnectHandler(t *testing.T, appID string, copts ...opt) inngestgo.Client {
+	t.Helper()
+	_ = os.Setenv("INNGEST_DEV", DEV_URL)
+
+	key := "test"
+	opts := inngestgo.ClientOpts{
+		AppID:       appID,
+		EventKey:    &key,
+		Logger:      logger.StdlibLogger(context.Background()),
+		RegisterURL: inngestgo.StrPtr(fmt.Sprintf("%s/fn/register", DEV_URL)),
+	}
+
+	for _, o := range copts {
+		o(&opts)
+	}
+
+	client, err := inngestgo.NewClient(opts)
+	require.NoError(t, err)
+
+	return client
 }
 
 type HTTPServer struct {
@@ -103,8 +127,15 @@ func NewHTTPServer(f http.Handler) *HTTPServer {
 		MaxHeaderBytes: 1 << 20,
 	}
 	go func() {
-		_ = s.ListenAndServe()
+		err := s.ListenAndServe()
+		// Check if server is closed error
+		if err != nil && err != http.ErrServerClosed {
+			panic(err)
+		}
 	}()
+
+	// Give it ime to start.
+	<-time.After(20 * time.Millisecond)
 
 	return &HTTPServer{Server: s, Port: port}
 }

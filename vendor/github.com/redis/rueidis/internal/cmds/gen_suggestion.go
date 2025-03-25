@@ -4,7 +4,7 @@ package cmds
 
 import "strconv"
 
-type FtSugadd Completed
+type FtSugadd Incomplete
 
 func (b Builder) FtSugadd() (c FtSugadd) {
 	c = FtSugadd{cs: get(), ks: b.ks}
@@ -17,7 +17,7 @@ func (c FtSugadd) Key(key string) FtSugaddKey {
 	return (FtSugaddKey)(c)
 }
 
-type FtSugaddIncrementScoreIncr Completed
+type FtSugaddIncrementScoreIncr Incomplete
 
 func (c FtSugaddIncrementScoreIncr) Payload(payload string) FtSugaddPayload {
 	c.cs.s = append(c.cs.s, "PAYLOAD", payload)
@@ -26,24 +26,24 @@ func (c FtSugaddIncrementScoreIncr) Payload(payload string) FtSugaddPayload {
 
 func (c FtSugaddIncrementScoreIncr) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type FtSugaddKey Completed
+type FtSugaddKey Incomplete
 
 func (c FtSugaddKey) String(string string) FtSugaddString {
 	c.cs.s = append(c.cs.s, string)
 	return (FtSugaddString)(c)
 }
 
-type FtSugaddPayload Completed
+type FtSugaddPayload Incomplete
 
 func (c FtSugaddPayload) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type FtSugaddScore Completed
+type FtSugaddScore Incomplete
 
 func (c FtSugaddScore) Incr() FtSugaddIncrementScoreIncr {
 	c.cs.s = append(c.cs.s, "INCR")
@@ -57,17 +57,17 @@ func (c FtSugaddScore) Payload(payload string) FtSugaddPayload {
 
 func (c FtSugaddScore) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type FtSugaddString Completed
+type FtSugaddString Incomplete
 
 func (c FtSugaddString) Score(score float64) FtSugaddScore {
 	c.cs.s = append(c.cs.s, strconv.FormatFloat(score, 'f', -1, 64))
 	return (FtSugaddScore)(c)
 }
 
-type FtSugdel Completed
+type FtSugdel Incomplete
 
 func (b Builder) FtSugdel() (c FtSugdel) {
 	c = FtSugdel{cs: get(), ks: b.ks}
@@ -80,21 +80,21 @@ func (c FtSugdel) Key(key string) FtSugdelKey {
 	return (FtSugdelKey)(c)
 }
 
-type FtSugdelKey Completed
+type FtSugdelKey Incomplete
 
 func (c FtSugdelKey) String(string string) FtSugdelString {
 	c.cs.s = append(c.cs.s, string)
 	return (FtSugdelString)(c)
 }
 
-type FtSugdelString Completed
+type FtSugdelString Incomplete
 
 func (c FtSugdelString) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type FtSugget Completed
+type FtSugget Incomplete
 
 func (b Builder) FtSugget() (c FtSugget) {
 	c = FtSugget{cs: get(), ks: b.ks}
@@ -107,7 +107,7 @@ func (c FtSugget) Key(key string) FtSuggetKey {
 	return (FtSuggetKey)(c)
 }
 
-type FtSuggetFuzzy Completed
+type FtSuggetFuzzy Incomplete
 
 func (c FtSuggetFuzzy) Withscores() FtSuggetWithscores {
 	c.cs.s = append(c.cs.s, "WITHSCORES")
@@ -126,24 +126,24 @@ func (c FtSuggetFuzzy) Max(max int64) FtSuggetMax {
 
 func (c FtSuggetFuzzy) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type FtSuggetKey Completed
+type FtSuggetKey Incomplete
 
 func (c FtSuggetKey) Prefix(prefix string) FtSuggetPrefix {
 	c.cs.s = append(c.cs.s, prefix)
 	return (FtSuggetPrefix)(c)
 }
 
-type FtSuggetMax Completed
+type FtSuggetMax Incomplete
 
 func (c FtSuggetMax) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type FtSuggetPrefix Completed
+type FtSuggetPrefix Incomplete
 
 func (c FtSuggetPrefix) Fuzzy() FtSuggetFuzzy {
 	c.cs.s = append(c.cs.s, "FUZZY")
@@ -167,10 +167,10 @@ func (c FtSuggetPrefix) Max(max int64) FtSuggetMax {
 
 func (c FtSuggetPrefix) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type FtSuggetWithpayloads Completed
+type FtSuggetWithpayloads Incomplete
 
 func (c FtSuggetWithpayloads) Max(max int64) FtSuggetMax {
 	c.cs.s = append(c.cs.s, "MAX", strconv.FormatInt(max, 10))
@@ -179,10 +179,10 @@ func (c FtSuggetWithpayloads) Max(max int64) FtSuggetMax {
 
 func (c FtSuggetWithpayloads) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type FtSuggetWithscores Completed
+type FtSuggetWithscores Incomplete
 
 func (c FtSuggetWithscores) Withpayloads() FtSuggetWithpayloads {
 	c.cs.s = append(c.cs.s, "WITHPAYLOADS")
@@ -196,10 +196,10 @@ func (c FtSuggetWithscores) Max(max int64) FtSuggetMax {
 
 func (c FtSuggetWithscores) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }
 
-type FtSuglen Completed
+type FtSuglen Incomplete
 
 func (b Builder) FtSuglen() (c FtSuglen) {
 	c = FtSuglen{cs: get(), ks: b.ks}
@@ -212,9 +212,9 @@ func (c FtSuglen) Key(key string) FtSuglenKey {
 	return (FtSuglenKey)(c)
 }
 
-type FtSuglenKey Completed
+type FtSuglenKey Incomplete
 
 func (c FtSuglenKey) Build() Completed {
 	c.cs.Build()
-	return Completed(c)
+	return Completed{cs: c.cs, cf: uint16(c.cf), ks: c.ks}
 }

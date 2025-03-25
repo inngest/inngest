@@ -2,6 +2,7 @@ package state
 
 import (
 	"context"
+	"regexp"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
@@ -9,6 +10,8 @@ import (
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/oklog/ulid/v2"
 )
+
+var tsSuffix = regexp.MustCompile(`\s*&&\s*\(\s*async.ts\s+==\s*null\s*\|\|\s*async.ts\s*>\s*\d*\)\s*$`)
 
 // PauseMutater manages creating, leasing, and consuming pauses from a backend implementation.
 type PauseMutater interface {
@@ -35,7 +38,7 @@ type PauseMutater interface {
 	//
 	// Any data passed when consuming a pause will be stored within function run state
 	// for future reference using the pause's DataKey.
-	ConsumePause(ctx context.Context, id uuid.UUID, data any) error
+	ConsumePause(ctx context.Context, id uuid.UUID, data any) (ConsumePauseResult, error)
 
 	// DeletePause permanently deletes a pause.
 	DeletePause(ctx context.Context, p Pause) error
@@ -62,13 +65,39 @@ type PauseGetter interface {
 	//
 	// This should not return consumed pauses.
 	PauseByID(ctx context.Context, pauseID uuid.UUID) (*Pause, error)
+
+	// PauseByID returns a given pause by pause ID.  This must return expired pauses
+	// that have not yet been consumed in order to properly handle timeouts.
+	//
+	// This should not return consumed pauses.
+	PausesByID(ctx context.Context, pauseID ...uuid.UUID) ([]*Pause, error)
+
+	// PauseByInvokeCorrelationID returns a given pause by the correlation ID.
+	// This must return expired invoke pauses that have not yet been consumed in order to properly handle timeouts.
+	//
+	// This should not return consumed pauses.
+	PauseByInvokeCorrelationID(ctx context.Context, wsID uuid.UUID, correlationID string) (*Pause, error)
+}
+
+type ConsumePauseResult struct {
+	// DidConsume indicates whether the pause was consumed.
+	DidConsume bool
+
+	// HasPendingSteps indicates whether the run still has pending steps.
+	HasPendingSteps bool
 }
 
 // PauseIterator allows the runner to iterate over all pauses returned by a PauseGetter.  This
 // ensures that, at scale, all pauses do not need to be loaded into memory.
 type PauseIterator interface {
-	// Next advances the iterator and returns whether the next call to Val will
-	// return a non-nil pause.
+	// Count returns the count of the pause iteration at the time of querying.
+	//
+	// Due to concurrent processing, the total number of iterated fields may not match
+	// this count;  the count is a snapshot in time.
+	Count() int
+
+	// Next advances the iterator, returning an erorr or context.Canceled if the iteration
+	// is complete.
 	//
 	// Next should be called prior to any call to the iterator's Val method, after
 	// the iterator has been created.
@@ -76,8 +105,15 @@ type PauseIterator interface {
 	// The order of the iterator is unspecified.
 	Next(ctx context.Context) bool
 
+	// Error returns the error returned during iteration, if any.  Use this to check
+	// for errors during iteration when Next() returns false.
+	Error() error
+
 	// Val returns the current Pause from the iterator.
 	Val(context.Context) *Pause
+
+	// Index shows how far the iterator has progressed
+	Index() int64
 }
 
 // PauseManager manages mutating and fetching pauses from a backend implementation.
@@ -130,6 +166,12 @@ type Pause struct {
 	// this is empty and the pause contains an expression, function state will
 	// be loaded from the store.
 	ExpressionData map[string]any `json:"data"`
+	// InvokeCorrelationID is the correlation ID for the invoke pause.
+	InvokeCorrelationID *string `json:"icID,omitempty"`
+	// InvokeTargetFnID is the target function ID for the invoke pause.
+	// This is used to be able to accurately reconstruct the entire invocation
+	// span.
+	InvokeTargetFnID *string `json:"itFnID,omitempty"`
 	// OnTimeout indicates that this incoming edge should only be ran
 	// when the pause times out, if set to true.
 	OnTimeout bool `json:"onTimeout"`
@@ -152,12 +194,45 @@ type Pause struct {
 	// via an async driver.  This lets the executor resume as-is with the current
 	// context, ensuring that we retry correctly.
 	Attempt int `json:"att,omitempty"`
+	// MaxAttempts is the maximum number of attempts we can retry.  This is
+	// included in the pause to allow the executor to set the correct maximum
+	// number of retries when enqueuing next steps.
+	MaxAttempts *int `json:"maxAtts,omitempty"`
 	// GroupID stores the group ID for this step and history, allowing us to correlate
 	// event receives with other history items.
 	GroupID string `json:"groupID"`
 	// TriggeringEventID is the event that triggered the original run.  This allows us
 	// to exclude the original event ID when considering triggers.
 	TriggeringEventID *string `json:"tID,omitempty"`
+	// Metadata is additional metadata that should be stored with the pause
+	Metadata map[string]any
+}
+
+func (p Pause) GetID() uuid.UUID {
+	return p.ID
+}
+
+func (p Pause) GetExpression() string {
+	if p.Expression == nil {
+		return ""
+	}
+
+	// If this is a cancellation, ensure it doesn't have our `event.ts` suffix
+	// added, eg:
+	//  && (async.ts == null || async.ts > 1731035030976)
+	if p.Cancel {
+		return tsSuffix.ReplaceAllString(*p.Expression, "")
+	}
+
+	return *p.Expression
+}
+
+func (p Pause) GetEvent() *string {
+	return p.Event
+}
+
+func (p Pause) GetWorkspaceID() uuid.UUID {
+	return p.WorkspaceID
 }
 
 func (p Pause) Edge() inngest.Edge {
@@ -165,6 +240,10 @@ func (p Pause) Edge() inngest.Edge {
 		Outgoing: p.Outgoing,
 		Incoming: p.Incoming,
 	}
+}
+
+func (p Pause) IsInvoke() bool {
+	return p.Opcode != nil && *p.Opcode == enums.OpcodeInvokeFunction.String()
 }
 
 type ResumeData struct {
@@ -186,8 +265,7 @@ func (p Pause) GetResumeData(evt event.Event) ResumeData {
 	// data and return only what the function returned. We do this here by unpacking the function
 	// finished event to pull out the correct data to place in state.
 	isInvokeFunctionOpcode := p.Opcode != nil && *p.Opcode == enums.OpcodeInvokeFunction.String()
-	isFnFinishedEvent := evt.Name == event.FnFinishedName
-	if isInvokeFunctionOpcode && isFnFinishedEvent {
+	if isInvokeFunctionOpcode && evt.IsFinishedEvent() {
 		if retRunID, ok := evt.Data["run_id"].(string); ok {
 			if ulidRunID, _ := ulid.Parse(retRunID); ulidRunID != (ulid.ULID{}) {
 				ret.RunID = &ulidRunID

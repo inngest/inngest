@@ -1,0 +1,189 @@
+syntax = "proto3";
+package connect.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/inngest/inngest/proto/gen/connect/v1;connect";
+
+enum GatewayMessageType {
+  GATEWAY_HELLO = 0;
+  WORKER_CONNECT = 1;
+  GATEWAY_CONNECTION_READY = 2;
+  GATEWAY_EXECUTOR_REQUEST = 3;
+  WORKER_READY = 4;
+  WORKER_REQUEST_ACK = 5;
+  WORKER_REPLY = 6;
+  WORKER_REPLY_ACK = 7;
+  WORKER_PAUSE = 8;
+  WORKER_HEARTBEAT = 9;
+  GATEWAY_HEARTBEAT = 10;
+  GATEWAY_CLOSING = 11;
+}
+
+message ConnectMessage {
+	GatewayMessageType kind = 1;
+	bytes payload = 2;
+}
+
+message AppConfiguration {
+	string app_name = 1;
+	optional string app_version = 2;
+	bytes functions = 4;
+}
+
+message AuthData {
+	string session_token = 1;
+	string sync_token = 2;
+}
+
+message WorkerConnectRequestData {
+	string connection_id = 1;
+	string instance_id = 2;
+
+	AuthData auth_data = 3;
+
+	bytes capabilities = 4;
+	repeated AppConfiguration apps = 5;
+
+	bool worker_manual_readiness_ack = 6;
+
+	SystemAttributes system_attributes = 7;
+	optional string environment = 8;
+	string framework = 9;
+	optional string platform = 10;
+	string sdk_version = 11;
+	string sdk_language = 12;
+
+	google.protobuf.Timestamp started_at = 13;
+}
+
+message GatewayExecutorRequestData {
+	string request_id = 1;
+
+	string account_id = 2;
+	string env_id = 3;
+
+	string app_id = 4;
+	string app_name = 5;
+
+	string function_id = 6;
+	string function_slug = 7;
+
+	optional string step_id = 8;
+	bytes request_payload = 9;
+
+	bytes system_trace_ctx = 10;
+	bytes user_trace_ctx = 11;
+
+	string run_id = 12;
+}
+
+message WorkerRequestAckData {
+	string request_id = 1;
+	string account_id = 2;
+	string env_id = 3;
+	string app_id = 4;
+	string function_slug = 5;
+	optional string step_id = 6;
+	bytes system_trace_ctx = 7;
+	bytes user_trace_ctx = 8;
+	string run_id = 9;
+}
+
+enum SDKResponseStatus {
+	NOT_COMPLETED = 0;
+	DONE = 1;
+	ERROR = 2;
+}
+
+message SDKResponse {
+	string request_id = 1;
+	string account_id = 2;
+	string env_id = 3;
+	string app_id = 4;
+	SDKResponseStatus status = 5;
+	bytes body = 6;
+	bool no_retry = 7;
+	optional string retry_after = 8;
+	string sdk_version = 9;
+	uint32 request_version = 10;
+	bytes system_trace_ctx = 11;
+	bytes user_trace_ctx = 12;
+	string run_id = 13;
+}
+
+message WorkerReplyAckData {
+	string request_id = 1;
+}
+
+enum ConnectionStatus {
+	CONNECTED = 0;
+	READY = 1;
+	DRAINING = 2;
+	DISCONNECTING = 3;
+	DISCONNECTED = 4;
+}
+
+// Connection metadata
+message ConnMetadata {
+	string id = 1;
+	string gateway_id = 2;
+	string instance_id = 3;
+	map<string,string> all_worker_groups = 4;
+	map<string,string> synced_worker_groups = 5;
+	ConnectionStatus status = 6;
+	google.protobuf.Timestamp last_heartbeat_at = 7;
+	string sdk_language = 8;
+	string sdk_version = 9;
+	SystemAttributes attributes = 10;
+}
+
+message SystemAttributes {
+	int32 cpu_cores = 1;
+	int64 mem_bytes = 2;
+	string os = 3;
+}
+
+message ConnGroup {
+	string env_id = 1;
+	string app_id = 2;
+	string app_name = 3;
+	string hash = 4;
+	repeated ConnMetadata conns = 5;
+	optional string sync_id = 6;
+	optional string app_version = 7;
+}
+
+enum WorkerDisconnectReason {
+	WORKER_SHUTDOWN = 0;
+	UNEXPECTED = 1;
+	GATEWAY_DRAINING = 2;
+}
+
+message StartResponse {
+	string connection_id = 1;
+	string gateway_endpoint = 2;
+	string gateway_group = 3;
+	string session_token = 4;
+	string sync_token = 5;
+}
+
+message StartRequest {
+	repeated string exclude_gateways = 1;
+}
+
+message FlushResponse {
+	string request_id = 1;
+}
+
+message PubSubAckMessage {
+	google.protobuf.Timestamp ts = 1;
+	optional bool nack = 2;
+	optional SystemError nack_reason = 3;
+}
+
+message SystemError {
+	string code = 1;
+	optional bytes data = 2;
+	string message = 3;
+}

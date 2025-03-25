@@ -36,6 +36,10 @@ func init() {
 		_ = State{ClientID: uuid.New()}.Persist(ctx)
 		return
 	}
+	if err != nil {
+		_ = State{ClientID: uuid.New()}.Persist(ctx)
+		return
+	}
 	// Ensure we have a client ID.
 	if state.ClientID == uuid.Nil {
 		state.ClientID = uuid.New()

@@ -6,20 +6,18 @@ Output:
 
 ]]
 
-local idempotencyKey = KEYS[1]
-local eventsKey = KEYS[2]
-local metadataKey = KEYS[3]
-local stepKey = KEYS[4]
+local eventsKey = KEYS[1]
+local metadataKey = KEYS[2]
+local stepKey = KEYS[3]
+local stepStackKey = KEYS[4]
+local stepInputsKey = KEYS[5]
 
 local events = ARGV[1]
 local metadata = ARGV[2]
 local steps = ARGV[3]
+local stepInputs = ARGV[4]
 
-if redis.call("SETNX", idempotencyKey, "") == 0 then
-  -- If this key exists, everything must've been initialised, so we can exit early
-  return 1
-end
-
+-- Save all metadata
 local metadataJson = cjson.decode(metadata)
 for k, v in pairs(metadataJson) do
   if k == "ctx" or k == "id" then
@@ -28,14 +26,27 @@ for k, v in pairs(metadataJson) do
   redis.call("HSET", metadataKey, k, tostring(v))
 end
 
-if steps ~= nil and steps ~= "" then
-  local stepsJson = cjson.decode(steps)
+-- Save pre-memoized steps
+if steps ~= nil and #steps > 0 then
+  local stepsArray = cjson.decode(steps)
 
-  for k, v in pairs(stepsJson) do
-    redis.call("HSET", stepKey, k, cjson.encode(v))
+  for _, step in ipairs(stepsArray) do
+    redis.call("HSET", stepKey, step.id, cjson.encode(step.data))
+    redis.call("RPUSH", stepStackKey, step.id)
   end
 end
 
+-- Save pre-memoized step inputs
+if stepInputs ~= nil and #stepInputs > 0 then
+  local stepInputsArray = cjson.decode(stepInputs)
+
+  for _, stepInput in ipairs(stepInputsArray) do
+    redis.call("HSET", stepInputsKey, stepInput.id, cjson.encode(stepInput.data))
+  end
+end
+
+-- Save events
 redis.call("SETNX", eventsKey, events)
+redis.call("HINCRBY", metadataKey, "event_size", #events)
 
 return 0

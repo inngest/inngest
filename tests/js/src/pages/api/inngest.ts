@@ -9,12 +9,15 @@ import { testNonRetriableError } from "@/inngest/non_retryable";
 import { testParallelism } from "@/inngest/sdk_parallel_test";
 import { testWaitForEvent } from "@/inngest/sdk_wait_for_event_test";
 
-export default serve(inngest, [
-  testSdkFunctions,
-  testSdkSteps,
-  testCancel,
-  testRetry,
-  testNonRetriableError,
-  testParallelism,
-  testWaitForEvent,
-]);
+export default serve({
+  client: inngest,
+  functions: [
+    testSdkFunctions,
+    testSdkSteps,
+    testCancel,
+    testRetry,
+    testNonRetriableError,
+    testParallelism,
+    testWaitForEvent,
+  ],
+});

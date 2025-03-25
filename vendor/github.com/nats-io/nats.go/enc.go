@@ -1,4 +1,4 @@
-// Copyright 2012-2019 The NATS Authors
+// Copyright 2012-2023 The NATS Authors
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
 // You may obtain a copy of the License at
@@ -24,10 +24,14 @@ import (
 	"github.com/nats-io/nats.go/encoders/builtin"
 )
 
+//lint:file-ignore SA1019 Ignore deprecation warnings for EncodedConn
+
 // Encoder interface is for all register encoders
+//
+// Deprecated: Encoded connections are no longer supported.
 type Encoder interface {
-	Encode(subject string, v interface{}) ([]byte, error)
-	Decode(subject string, data []byte, vPtr interface{}) error
+	Encode(subject string, v any) ([]byte, error)
+	Decode(subject string, data []byte, vPtr any) error
 }
 
 var encMap map[string]Encoder
@@ -51,6 +55,8 @@ func init() {
 // EncodedConn are the preferred way to interface with NATS. They wrap a bare connection to
 // a nats server and have an extendable encoder system that will encode and decode messages
 // from raw Go types.
+//
+// Deprecated: Encoded connections are no longer supported.
 type EncodedConn struct {
 	Conn *Conn
 	Enc  Encoder
@@ -58,6 +64,8 @@ type EncodedConn struct {
 
 // NewEncodedConn will wrap an existing Connection and utilize the appropriate registered
 // encoder.
+//
+// Deprecated: Encoded connections are no longer supported.
 func NewEncodedConn(c *Conn, encType string) (*EncodedConn, error) {
 	if c == nil {
 		return nil, errors.New("nats: Nil Connection")
@@ -73,6 +81,8 @@ func NewEncodedConn(c *Conn, encType string) (*EncodedConn, error) {
 }
 
 // RegisterEncoder will register the encType with the given Encoder. Useful for customization.
+//
+// Deprecated: Encoded connections are no longer supported.
 func RegisterEncoder(encType string, enc Encoder) {
 	encLock.Lock()
 	defer encLock.Unlock()
@@ -80,6 +90,8 @@ func RegisterEncoder(encType string, enc Encoder) {
 }
 
 // EncoderForType will return the registered Encoder for the encType.
+//
+// Deprecated: Encoded connections are no longer supported.
 func EncoderForType(encType string) Encoder {
 	encLock.Lock()
 	defer encLock.Unlock()
@@ -88,7 +100,9 @@ func EncoderForType(encType string) Encoder {
 
 // Publish publishes the data argument to the given subject. The data argument
 // will be encoded using the associated encoder.
-func (c *EncodedConn) Publish(subject string, v interface{}) error {
+//
+// Deprecated: Encoded connections are no longer supported.
+func (c *EncodedConn) Publish(subject string, v any) error {
 	b, err := c.Enc.Encode(subject, v)
 	if err != nil {
 		return err
@@ -99,7 +113,9 @@ func (c *EncodedConn) Publish(subject string, v interface{}) error {
 // PublishRequest will perform a Publish() expecting a response on the
 // reply subject. Use Request() for automatically waiting for a response
 // inline.
-func (c *EncodedConn) PublishRequest(subject, reply string, v interface{}) error {
+//
+// Deprecated: Encoded connections are no longer supported.
+func (c *EncodedConn) PublishRequest(subject, reply string, v any) error {
 	b, err := c.Enc.Encode(subject, v)
 	if err != nil {
 		return err
@@ -110,7 +126,9 @@ func (c *EncodedConn) PublishRequest(subject, reply string, v interface{}) error
 // Request will create an Inbox and perform a Request() call
 // with the Inbox reply for the data v. A response will be
 // decoded into the vPtr Response.
-func (c *EncodedConn) Request(subject string, v interface{}, vPtr interface{}, timeout time.Duration) error {
+//
+// Deprecated: Encoded connections are no longer supported.
+func (c *EncodedConn) Request(subject string, v any, vPtr any, timeout time.Duration) error {
 	b, err := c.Enc.Encode(subject, v)
 	if err != nil {
 		return err
@@ -129,8 +147,8 @@ func (c *EncodedConn) Request(subject string, v interface{}, vPtr interface{}, t
 }
 
 // Handler is a specific callback used for Subscribe. It is generalized to
-// an interface{}, but we will discover its format and arguments at runtime
-// and perform the correct callback, including de-marshaling encoded data
+// an any, but we will discover its format and arguments at runtime
+// and perform the correct callback, including demarshaling encoded data
 // back into the appropriate struct based on the signature of the Handler.
 //
 // Handlers are expected to have one of four signatures.
@@ -150,7 +168,9 @@ func (c *EncodedConn) Request(subject string, v interface{}, vPtr interface{}, t
 // and demarshal it into the given struct, e.g. person.
 // There are also variants where the callback wants either the subject, or the
 // subject and the reply subject.
-type Handler interface{}
+//
+// Deprecated: Encoded connections are no longer supported.
+type Handler any
 
 // Dissect the cb Handler's signature
 func argInfo(cb Handler) (reflect.Type, int) {
@@ -170,6 +190,8 @@ var emptyMsgType = reflect.TypeOf(&Msg{})
 // Subscribe will create a subscription on the given subject and process incoming
 // messages using the specified Handler. The Handler should be a func that matches
 // a signature from the description of Handler from above.
+//
+// Deprecated: Encoded connections are no longer supported.
 func (c *EncodedConn) Subscribe(subject string, cb Handler) (*Subscription, error) {
 	return c.subscribe(subject, _EMPTY_, cb)
 }
@@ -177,6 +199,8 @@ func (c *EncodedConn) Subscribe(subject string, cb Handler) (*Subscription, erro
 // QueueSubscribe will create a queue subscription on the given subject and process
 // incoming messages using the specified Handler. The Handler should be a func that
 // matches a signature from the description of Handler from above.
+//
+// Deprecated: Encoded connections are no longer supported.
 func (c *EncodedConn) QueueSubscribe(subject, queue string, cb Handler) (*Subscription, error) {
 	return c.subscribe(subject, queue, cb)
 }
@@ -238,18 +262,24 @@ func (c *EncodedConn) subscribe(subject, queue string, cb Handler) (*Subscriptio
 }
 
 // FlushTimeout allows a Flush operation to have an associated timeout.
+//
+// Deprecated: Encoded connections are no longer supported.
 func (c *EncodedConn) FlushTimeout(timeout time.Duration) (err error) {
 	return c.Conn.FlushTimeout(timeout)
 }
 
 // Flush will perform a round trip to the server and return when it
 // receives the internal reply.
+//
+// Deprecated: Encoded connections are no longer supported.
 func (c *EncodedConn) Flush() error {
 	return c.Conn.Flush()
 }
 
 // Close will close the connection to the server. This call will release
 // all blocking calls, such as Flush(), etc.
+//
+// Deprecated: Encoded connections are no longer supported.
 func (c *EncodedConn) Close() {
 	c.Conn.Close()
 }
@@ -259,11 +289,15 @@ func (c *EncodedConn) Close() {
 // will be drained and can not publish any additional messages. Upon draining
 // of the publishers, the connection will be closed. Use the ClosedCB()
 // option to know when the connection has moved from draining to closed.
+//
+// Deprecated: Encoded connections are no longer supported.
 func (c *EncodedConn) Drain() error {
 	return c.Conn.Drain()
 }
 
 // LastError reports the last error encountered via the Connection.
+//
+// Deprecated: Encoded connections are no longer supported.
 func (c *EncodedConn) LastError() error {
-	return c.Conn.err
+	return c.Conn.LastError()
 }

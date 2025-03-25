@@ -86,7 +86,7 @@ func ParseStream(ctx context.Context, r io.Reader, stream chan StreamItem, maxSi
 		// Parse a stream of tokens
 		for d.More() {
 			if i == consts.MaxEvents {
-				return fmt.Errorf("maximum events parsed within a batch: %d", consts.MaxEvents)
+				return &ErrEventCount{Max: consts.MaxEvents}
 			}
 
 			jsonEvt := json.RawMessage{}

@@ -14,7 +14,7 @@ import (
 )
 
 func TestFunctionPriorityRun(t *testing.T) {
-	h, server, registerFuncs := NewSDKHandler(t)
+	inngestClient, server, registerFuncs := NewSDKHandler(t, "priority")
 	defer server.Close()
 
 	var (
@@ -29,9 +29,10 @@ func TestFunctionPriorityRun(t *testing.T) {
 
 	results := make(chan result)
 
-	a := inngestgo.CreateFunction(
+	_, err := inngestgo.CreateFunction(
+		inngestClient,
 		inngestgo.FunctionOpts{
-			Name: "Priority.Run test",
+			ID: "priority-run-test",
 			Concurrency: []inngest.Concurrency{
 				{
 					Limit: 1,
@@ -41,8 +42,8 @@ func TestFunctionPriorityRun(t *testing.T) {
 				Run: inngestgo.StrPtr(`event.data.priority == "high" ? 5 : 0`),
 			},
 		},
-		inngestgo.EventTrigger("test/sdk", nil),
-		func(ctx context.Context, input inngestgo.Input[inngestgo.GenericEvent[map[string]any, any]]) (any, error) {
+		inngestgo.EventTrigger("test/priority", nil),
+		func(ctx context.Context, input inngestgo.Input[map[string]any]) (any, error) {
 			priority, _ := input.Event.Data["priority"].(string)
 			results <- result{
 				runID:    ulid.MustParse(input.InputCtx.RunID),
@@ -55,7 +56,7 @@ func TestFunctionPriorityRun(t *testing.T) {
 			return true, nil
 		},
 	)
-	h.Register(a)
+	require.NoError(t, err)
 	registerFuncs()
 
 	go func() {
@@ -78,8 +79,8 @@ func TestFunctionPriorityRun(t *testing.T) {
 	// For 3 priorities, run 3 events.  The first priority, "none", should run without blocking.
 	priorities := []string{"none", "low", "high"}
 	for _, p := range priorities {
-		_, err := inngestgo.Send(context.Background(), inngestgo.Event{
-			Name: "test/sdk",
+		_, err = inngestClient.Send(context.Background(), inngestgo.Event{
+			Name: "test/priority",
 			Data: map[string]any{
 				"priority": p,
 			},

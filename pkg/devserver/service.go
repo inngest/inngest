@@ -3,46 +3,68 @@ package devserver
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"fmt"
+	v0 "github.com/inngest/inngest/pkg/connect/rest/v0"
+	"github.com/inngest/inngest/pkg/enums"
 	"net"
+	"net/url"
 	"os"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
-	"github.com/coocood/freecache"
-	"github.com/eko/gocache/lib/v4/cache"
-	freecachestore "github.com/eko/gocache/store/freecache/v4"
-	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
-	"github.com/google/uuid"
-	"github.com/inngest/inngest/pkg/api"
-	"github.com/inngest/inngest/pkg/api/apiv1"
+	"github.com/inngest/inngest/pkg/connect/auth"
+
 	"github.com/inngest/inngest/pkg/cli"
-	"github.com/inngest/inngest/pkg/coreapi"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/deploy"
 	"github.com/inngest/inngest/pkg/devserver/discovery"
+	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
+	"github.com/inngest/inngest/pkg/execution/history"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/runner"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/inngest/log"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/pubsub"
 	"github.com/inngest/inngest/pkg/sdk"
 	"github.com/inngest/inngest/pkg/service"
+	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/mattn/go-isatty"
+	"github.com/redis/rueidis"
+	"go.opentelemetry.io/otel/propagation"
 )
 
-const (
-	SDKPollInterval = 5 * time.Second
-)
+func NewService(opts StartOpts, runner runner.Runner, data cqrs.Manager, pb pubsub.Publisher, stepLimitOverrides map[string]int, stateSizeLimitOverrides map[string]int, rc rueidis.Client, hw history.Driver, snso *SingleNodeServiceOpts) *devserver {
+	// If the polling interval is 0, reset it to a sensible value to avoid
+	// hammering the SDKs and burning CPU.
+	if opts.PollInterval == 0 {
+		opts.PollInterval = DefaultPollInterval
+	}
 
-func newService(opts StartOpts, runner runner.Runner, data cqrs.Manager) *devserver {
+	// Fill in some defaults in they're not set
+	if snso != nil {
+		if snso.snapshotLock == nil {
+			snso.snapshotLock = &sync.Mutex{}
+		}
+	}
+
 	return &devserver{
-		data:        data,
-		runner:      runner,
-		opts:        opts,
-		handlerLock: &sync.Mutex{},
+		Data:                    data,
+		Runner:                  runner,
+		Opts:                    opts,
+		handlerLock:             &sync.Mutex{},
+		publisher:               pb,
+		stepLimitOverrides:      stepLimitOverrides,
+		stateSizeLimitOverrides: stateSizeLimitOverrides,
+		redisClient:             rc,
+		historyWriter:           hw,
+		singleNodeServiceOpts:   snso,
 	}
 }
 
@@ -53,156 +75,228 @@ func newService(opts StartOpts, runner runner.Runner, data cqrs.Manager) *devser
 // in a single router on a single port.  This simplifies the CLI args (--port) and
 // SDKs, as they can test and use a single URL.
 type devserver struct {
-	opts StartOpts
+	Opts StartOpts
 
-	data cqrs.Manager
+	Data cqrs.Manager
 
-	// runner stores the runner
-	runner   runner.Runner
-	tracker  *runner.Tracker
-	state    state.Manager
-	queue    queue.Queue
-	executor execution.Executor
+	stepLimitOverrides      map[string]int
+	stateSizeLimitOverrides map[string]int
 
-	apiservice service.Service
+	// Runner stores the Runner
+	Runner      runner.Runner
+	Tracker     *runner.Tracker
+	State       state.Manager
+	Queue       queue.Queue
+	Executor    execution.Executor
+	publisher   pubsub.Publisher
+	redisClient rueidis.Client
+
+	Apiservice service.Service
+
+	historyWriter history.Driver
 
 	// handlers are updated by the API (d.apiservice) when registering functions.
 	handlers    []SDKHandler
 	handlerLock *sync.Mutex
+
+	// These options are used to configure the server's behaviour as a
+	// single-node service instead of a dev environment.
+	singleNodeServiceOpts *SingleNodeServiceOpts
 }
 
-func (devserver) Name() string {
+type SingleNodeServiceOpts struct {
+	// PersistenceInterval is the interval at which the dev server will
+	// snapshot the Redis queue to disk if it is using an in-memory Redis
+	// instance.
+	PersistenceInterval *time.Duration
+
+	// Used to lock the snapshotting process.
+	snapshotLock *sync.Mutex
+}
+
+func (d *devserver) Name() string {
+	if d.IsSingleNodeService() {
+		return "persistence"
+	}
+
 	return "devserver"
 }
 
-func (d *devserver) Pre(ctx context.Context) error {
-	// Create a new API endpoint which hosts SDK-related functionality for
-	// registering functions.
-	devAPI := newDevAPI(d)
-
-	devAPI.Route("/v1", func(r chi.Router) {
-		// Add the V1 API to our dev server API.
-		cache := cache.New[[]byte](freecachestore.NewFreecache(freecache.NewCache(1024 * 1024)))
-		caching := apiv1.NewCacheMiddleware(cache)
-
-		apiv1.AddRoutes(r, apiv1.Opts{
-			CachingMiddleware: caching,
-			EventReader:       d.data,
-			FunctionRunReader: d.data,
-			JobQueueReader:    d.queue.(queue.JobQueueReader),
-			Executor:          d.executor,
-		})
-	})
-
-	core, err := coreapi.NewCoreApi(coreapi.Options{
-		Data:    d.data,
-		Config:  d.opts.Config,
-		Logger:  logger.From(ctx),
-		Runner:  d.runner,
-		Tracker: d.tracker,
-		State:   d.state,
-		Queue:   d.queue,
-	})
-	if err != nil {
-		return err
+func (d *devserver) PrettyName() string {
+	if d.Name() != "devserver" {
+		return ""
 	}
-	// Create a new data API directly in the devserver.  This allows us to inject
-	// the data API into the dev server port, providing a single router for the dev
-	// server UI, events, and API for loading data.
-	//
-	// Merge the dev server API (for handling files & registration) with the data
-	// API into the event API router.
-	d.apiservice = api.NewService(
-		d.opts.Config,
-		api.Mount{At: "/", Router: devAPI},
-		api.Mount{At: "/v0", Router: core.Router},
-		api.Mount{At: "/debug", Handler: middleware.Profiler()},
-	)
+
+	return "Dev Server"
+}
+
+func (d *devserver) IsSingleNodeService() bool {
+	return d.singleNodeServiceOpts != nil
+}
+
+func (d *devserver) HasSigningKey() bool {
+	return d.Opts.SigningKey != nil && *d.Opts.SigningKey != ""
+}
+
+func (d *devserver) HasEventKeys() bool {
+	return len(d.Opts.EventKeys) > 0
+}
+
+func (d *devserver) Pre(ctx context.Context) error {
+	// Import Redis if we can and have persistence enabled
+	if d.HasRedisSnapshotsEnabled() {
+		_, _ = d.importRedisSnapshot(ctx)
+	}
 
 	// Autodiscover the URLs that are hosting Inngest SDKs on the local machine.
-	go d.runDiscovery(ctx)
+	if d.Opts.Autodiscover {
+		go d.runDiscovery(ctx)
+	}
 
-	return d.apiservice.Pre(ctx)
+	return nil
 }
 
 func (d *devserver) Run(ctx context.Context) error {
+	// Start persisting Redis data if we have an interval present.
+	go d.startPersistenceRoutine(ctx)
+
 	// Start polling the SDKs as the APIs are going live.
-	if d.opts.Poll {
-		go d.pollSDKs(ctx)
-	}
+	go d.pollSDKs(ctx)
 
 	// Add a nice output to the terminal.
 	if isatty.IsTerminal(os.Stdout.Fd()) {
 		go func() {
 			<-time.After(25 * time.Millisecond)
-			addr := fmt.Sprintf("%s:%d", d.opts.Config.EventAPI.Addr, d.opts.Config.EventAPI.Port)
+			addr := fmt.Sprintf("%s:%d", d.Opts.Config.EventAPI.Addr, d.Opts.Config.EventAPI.Port)
+			prettyName := d.PrettyName()
+			if prettyName != "" {
+				prettyName = " " + prettyName
+			}
+
 			fmt.Println("")
 			fmt.Println("")
-			fmt.Print(cli.BoldStyle.Render("\tInngest dev server online "))
-			fmt.Printf(cli.TextStyle.Render(fmt.Sprintf("at %s, visible at the following URLs:", addr)) + "\n\n")
+			fmt.Print(cli.BoldStyle.Render(fmt.Sprintf("\tInngest%s online ", prettyName)))
+			fmt.Printf("%s\n\n", cli.TextStyle.Render(fmt.Sprintf("at %s, visible at the following URLs:", addr)))
 			for n, ip := range localIPs() {
 				style := cli.BoldStyle
 				if n > 0 {
 					style = cli.TextStyle
 				}
-				fmt.Print(style.Render(fmt.Sprintf("\t - http://%s:%d", ip.IP.String(), d.opts.Config.EventAPI.Port)))
+				fmt.Print(style.Render(fmt.Sprintf("\t - http://%s:%d", ip.IP.String(), d.Opts.Config.EventAPI.Port)))
 				if ip.IP.IsLoopback() {
-					fmt.Print(cli.TextStyle.Render(fmt.Sprintf(" (http://localhost:%d)", d.opts.Config.EventAPI.Port)))
+					fmt.Print(cli.TextStyle.Render(fmt.Sprintf(" (http://localhost:%d)", d.Opts.Config.EventAPI.Port)))
 				}
 				fmt.Println("")
 			}
 			fmt.Println("")
-			if d.opts.Autodiscover {
+			if d.Opts.Autodiscover {
 				fmt.Printf("\tScanning for available serve handlers.\n")
 				fmt.Printf("\tTo disable scanning run `inngest dev` with flags: --no-discovery -u <your-serve-url>")
 				fmt.Println("")
 			}
 			fmt.Println("")
+
+			if d.Opts.RequireKeys {
+				if !d.HasSigningKey() {
+					fmt.Println(cli.WarningStyle.Render("\tWARNING: No signing key provided. Syncs and runs will not function.\n\t\t Add a signing key with a flag, environment variable, or config file.\n"))
+				}
+				if !d.HasEventKeys() {
+					fmt.Println(cli.WarningStyle.Render("\tWARNING: No event keys provided. Events will not be accepted.\n\t\t Add event keys with a flag, environment variable, or config file.\n"))
+				}
+			}
 		}()
 	}
 
-	return d.apiservice.Run(ctx)
+	<-ctx.Done()
+
+	return nil
 }
 
 func (d *devserver) Stop(ctx context.Context) error {
-	return d.apiservice.Stop(ctx)
+	if d.HasRedisSnapshotsEnabled() {
+		return d.exportRedisSnapshot(ctx)
+	}
+
+	return nil
+}
+
+// HasRedisSnapshotsEnabled returns true if Redis is persisted via snapshots to the database.
+// External redis-servers do not require snapshots.
+func (d *devserver) HasRedisSnapshotsEnabled() bool {
+	return d.singleNodeServiceOpts != nil && d.singleNodeServiceOpts.PersistenceInterval != nil
+}
+
+func (d *devserver) startPersistenceRoutine(ctx context.Context) {
+	if !d.HasRedisSnapshotsEnabled() {
+		return
+	}
+
+	ticker := time.NewTicker(*d.singleNodeServiceOpts.PersistenceInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ticker.C:
+			if err := d.exportRedisSnapshot(ctx); err != nil {
+				logger.From(ctx).Error().Err(err).Msg("error exporting Redis snapshot")
+			}
+		case <-ctx.Done():
+			return
+		}
+	}
 }
 
 // runDiscovery attempts to run autodiscovery while the dev server is running.
 //
 // This lets the dev server start and wait for the SDK server to come up at
-
 // any point.
 func (d *devserver) runDiscovery(ctx context.Context) {
 	logger.From(ctx).Info().Msg("autodiscovering locally hosted SDKs")
-	for {
+	pollInterval := time.Duration(d.Opts.PollInterval) * time.Second
+	for d.Opts.Autodiscover {
 		if ctx.Err() != nil {
 			return
 		}
-
-		if d.opts.Autodiscover {
+		// If we have found any app, disable auto-discovery
+		apps, err := d.Data.GetApps(ctx, consts.DevServerEnvID, nil)
+		if err == nil && len(apps) > 0 {
+			logger.From(ctx).Info().Msg("apps synced, disabling auto-discovery")
+			d.Opts.Autodiscover = false
+		} else {
 			_ = discovery.Autodiscover(ctx)
 		}
 
-		<-time.After(5 * time.Second)
+		<-time.After(pollInterval)
 	}
 }
 
 // pollSDKs hits each SDK's register endpoint, asking them to communicate with
 // the dev server to re-register their functions.
 func (d *devserver) pollSDKs(ctx context.Context) {
+	pollInterval := time.Duration(d.Opts.PollInterval) * time.Second
+
+	sk := ""
+	if d.Opts.SigningKey != nil {
+		sk = *d.Opts.SigningKey
+	}
+
 	// Initially, add every app started with the `-u` flag
-	for _, url := range d.opts.URLs {
+	for _, url := range d.Opts.URLs {
+		// URLs must contain a protocol. If not, add http since very few apps
+		// use https during development
+		if !strings.Contains(url, "://") {
+			url = "http://" + url
+		}
+
 		// Create a new app which holds the error message.
-		params := cqrs.InsertAppParams{
-			ID:  uuid.New(),
+		params := cqrs.UpsertAppParams{
+			ID:  inngest.DeterministicAppUUID(url),
 			Url: url,
 			Error: sql.NullString{
 				Valid:  true,
 				String: deploy.DeployErrUnreachable.Error(),
 			},
 		}
-		if _, err := d.data.InsertApp(ctx, params); err != nil {
+		if _, err := d.Data.UpsertApp(ctx, params); err != nil {
 			log.From(ctx).Error().Err(err).Msg("error inserting app from scan")
 		}
 	}
@@ -215,28 +309,28 @@ func (d *devserver) pollSDKs(ctx context.Context) {
 		}
 
 		urls := map[string]struct{}{}
-		if apps, err := d.data.GetApps(ctx); err == nil {
+		if apps, err := d.Data.GetApps(ctx, consts.DevServerEnvID, nil); err == nil {
 			for _, app := range apps {
+				if app.Method == enums.AppMethodConnect.String() {
+					continue
+				}
+
 				// We've seen this URL.
 				urls[app.Url] = struct{}{}
 
+				if !d.Opts.Poll && len(app.Error.String) == 0 {
+					continue
+				}
+
 				// Make a new PUT request to each app, indicating that the
 				// SDK should push functions to the dev server.
-				err := deploy.Ping(ctx, app.Url)
-				if err != nil {
-					_, _ = d.data.UpdateAppError(ctx, cqrs.UpdateAppErrorParams{
+				res := deploy.Ping(ctx, app.Url, d.Opts.Config.ServerKind, sk, d.Opts.RequireKeys)
+				if res.Err != nil {
+					_, _ = d.Data.UpdateAppError(ctx, cqrs.UpdateAppErrorParams{
 						ID: app.ID,
 						Error: sql.NullString{
-							String: err.Error(),
+							String: res.Err.Error(),
 							Valid:  true,
-						},
-					})
-				} else {
-					_, _ = d.data.UpdateAppError(ctx, cqrs.UpdateAppErrorParams{
-						ID: app.ID,
-						Error: sql.NullString{
-							String: "",
-							Valid:  false,
 						},
 					})
 				}
@@ -245,16 +339,338 @@ func (d *devserver) pollSDKs(ctx context.Context) {
 
 		// Attempt to add new apps for each discovered URL that's _not_ already
 		// an app.
-		if d.opts.Autodiscover {
+		if d.Opts.Autodiscover {
 			for u := range discovery.URLs() {
 				if _, ok := urls[u]; ok {
 					continue
 				}
-				_ = deploy.Ping(ctx, u)
+
+				res := deploy.Ping(ctx, u, d.Opts.Config.ServerKind, sk, d.Opts.RequireKeys)
+
+				// If there was an SDK error then we should still ensure the app
+				// exists. Otherwise, users will have a harder time figuring out
+				// why the Dev Server can't find their app.
+				if res.Err != nil && res.IsSDK {
+					upsertErroredApp(ctx, d.Data, u, res.Err)
+				}
 			}
 		}
-		<-time.After(SDKPollInterval)
+		<-time.After(pollInterval)
 	}
+}
+
+func (d *devserver) HandleEvent(ctx context.Context, e *event.Event) (string, error) {
+	// ctx is the request context, so we need to re-add
+	// the caller here.
+	l := logger.From(ctx).With().Str("caller", d.Name()).Logger()
+	ctx = logger.With(ctx, l)
+
+	l.Debug().Str("event", e.Name).Msg("handling event")
+
+	trackedEvent := event.NewOSSTrackedEvent(*e)
+
+	byt, err := json.Marshal(trackedEvent)
+	if err != nil {
+		l.Error().Err(err).Msg("error unmarshalling event as JSON")
+		return "", err
+	}
+
+	l.Info().
+		Str("event_name", trackedEvent.GetEvent().Name).
+		Str("internal_id", trackedEvent.GetInternalID().String()).
+		Str("external_id", trackedEvent.GetEvent().ID).
+		Interface("event", trackedEvent.GetEvent()).
+		Msg("publishing event")
+
+	carrier := itrace.NewTraceCarrier()
+	itrace.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
+
+	err = d.publisher.Publish(
+		ctx,
+		d.Opts.Config.EventStream.Service.TopicName(),
+		pubsub.Message{
+			Name:      event.EventReceivedName,
+			Data:      string(byt),
+			Timestamp: time.Now(),
+			Metadata: map[string]any{
+				consts.OtelPropagationKey: carrier,
+			},
+		},
+	)
+
+	return trackedEvent.GetInternalID().String(), err
+}
+
+func (d *devserver) exportRedisSnapshot(ctx context.Context) (err error) {
+	d.singleNodeServiceOpts.snapshotLock.Lock()
+	defer d.singleNodeServiceOpts.snapshotLock.Unlock()
+
+	var (
+		snapshotID cqrs.SnapshotID
+		snapshot   = make(map[string]cqrs.SnapshotValue)
+		l          = logger.From(ctx).With().Str("caller", d.Name()).Logger()
+	)
+
+	l.Info().Msg("exporting Redis snapshot")
+	defer func() {
+		if err != nil {
+			l.Error().Err(err).Msg("error exporting Redis snapshot")
+		}
+
+		jsonData, _ := json.Marshal(snapshot)
+		humanSize := fmt.Sprintf("%.2fKB", float64(len(jsonData))/1024)
+		l.Info().Str("size", humanSize).Str("snapshot_id", snapshotID.String()).Msg("exported Redis snapshot")
+	}()
+
+	// Get a dedicated client for this operation, which should block all other
+	// operations if we only have a pool size of 1.
+	rc, _ := d.redisClient.Dedicate()
+	defer func() {
+		// We'd usually call `done()` to release the client to the pool, but
+		// let's just close the entire connection here to ensure nothing else
+		// can write.
+		rc.Close()
+	}()
+
+	// Give an arbitrary amount of time to allow for any writes to finish
+	<-time.After(150 * time.Millisecond)
+
+	cmd := rc.B().Keys().Pattern("*").Build()
+	keys, err := rc.Do(ctx, cmd).AsStrSlice()
+	if err != nil {
+		err = fmt.Errorf("error getting keys: %w", err)
+		return
+	}
+
+	for _, key := range keys {
+		typeCmd := rc.B().Type().Key(key).Build()
+		var typ string
+		typ, err = rc.Do(ctx, typeCmd).ToString()
+		if err != nil {
+			err = fmt.Errorf("error getting type for key %s: %w", key, err)
+			return
+		}
+
+		switch typ {
+		case "string":
+			getCmd := rc.B().Get().Key(key).Build()
+			var val string
+			val, err = rc.Do(ctx, getCmd).ToString()
+			if err != nil {
+				err = fmt.Errorf("error getting value for string key %s: %w", key, err)
+				return
+			}
+			snapshot[key] = cqrs.SnapshotValue{
+				Type:  typ,
+				Value: val,
+			}
+		case "list":
+			lrangeCmd := rc.B().Lrange().Key(key).Start(0).Stop(-1).Build()
+			var vals []string
+			vals, err = rc.Do(ctx, lrangeCmd).AsStrSlice()
+			if err != nil {
+				err = fmt.Errorf("error getting values for list key %s: %w", key, err)
+				return
+			}
+			snapshot[key] = cqrs.SnapshotValue{
+				Type:  typ,
+				Value: vals,
+			}
+		case "set":
+			smembersCmd := rc.B().Smembers().Key(key).Build()
+			var vals []string
+			vals, err = rc.Do(ctx, smembersCmd).AsStrSlice()
+			if err != nil {
+				err = fmt.Errorf("error getting values for set key %s: %w", key, err)
+				return
+			}
+			snapshot[key] = cqrs.SnapshotValue{
+				Type:  typ,
+				Value: vals,
+			}
+		case "zset":
+			zrangeCmd := rc.B().Zrange().Key(key).Min("-inf").Max("+inf").Byscore().Withscores().Build()
+			var vals []string
+			vals, err = rc.Do(ctx, zrangeCmd).AsStrSlice()
+			if err != nil {
+				err = fmt.Errorf("error getting values for zset key %s: %w", key, err)
+				return
+			}
+			snapshot[key] = cqrs.SnapshotValue{
+				Type:  typ,
+				Value: vals,
+			}
+		case "hash":
+			hgetallCmd := rc.B().Hgetall().Key(key).Build()
+			var rawVals map[string]rueidis.RedisMessage
+			rawVals, err = rc.Do(ctx, hgetallCmd).AsMap()
+			if err != nil {
+				err = fmt.Errorf("error getting values for hash key %s: %w", key, err)
+				return
+			}
+			vals := make(map[string]string, len(rawVals))
+			for k, v := range rawVals {
+				strVal, _ := v.ToString()
+				vals[k] = strVal
+			}
+			snapshot[key] = cqrs.SnapshotValue{
+				Type:  typ,
+				Value: vals,
+			}
+		case "none":
+			// the key was deleted between fetching keys and fetching its
+			// type. For now we continue and ignore it; we should make sure
+			// the client is read-only before we try to dump.
+		default:
+			err = fmt.Errorf("unsupported type: %s", typ)
+			return
+		}
+	}
+
+	snapshotID, err = d.Data.InsertQueueSnapshot(ctx, cqrs.InsertQueueSnapshotParams{
+		Snapshot: snapshot,
+	})
+	if err != nil {
+		err = fmt.Errorf("error inserting queue snapshot: %w", err)
+		return
+	}
+
+	return
+}
+
+func (d *devserver) importRedisSnapshot(ctx context.Context) (imported bool, err error) {
+	d.singleNodeServiceOpts.snapshotLock.Lock()
+	defer d.singleNodeServiceOpts.snapshotLock.Unlock()
+
+	l := logger.From(ctx).With().Str("caller", d.Name()).Logger()
+	l.Info().Msg("importing Redis snapshot")
+
+	snapshot, err := d.Data.GetLatestQueueSnapshot(ctx)
+	defer func() {
+		if err != nil {
+			l.Error().Err(err).Msg("error importing Redis snapshot")
+		} else if imported {
+			jsonData, _ := json.Marshal(snapshot)
+			humanSize := fmt.Sprintf("%.2fKB", float64(len(jsonData))/1024)
+			l.Info().Str("size", humanSize).Msg("imported Redis snapshot")
+		} else {
+			l.Info().Msg("no snapshot to import")
+		}
+	}()
+	if err != nil {
+		err = fmt.Errorf("error getting latest queue snapshot: %w", err)
+		return
+	}
+	if snapshot == nil {
+		return
+	}
+
+	rc, done := d.redisClient.Dedicate()
+	defer done()
+
+	for key, data := range *snapshot {
+		switch data.Type {
+		case "string":
+			strVal := data.Value.(string)
+			setCmd := rc.B().Set().Key(key).Value(strVal).Build()
+			err = rc.Do(ctx, setCmd).Error()
+			if err != nil {
+				err = fmt.Errorf("error setting string key %s: %w", key, err)
+				return
+			}
+
+		case "list":
+			vals := data.Value.([]interface{})
+			strValues := make([]string, len(vals))
+			for i, v := range vals {
+				strVal, _ := v.(string)
+				strValues[i] = strVal
+			}
+			rpushCmd := rc.B().Rpush().Key(key).Element(strValues...).Build()
+			err = rc.Do(ctx, rpushCmd).Error()
+			if err != nil {
+				err = fmt.Errorf("error pushing to list key %s: %w", key, err)
+				return
+			}
+
+		case "set":
+			strValues := data.Value.([]string)
+			// err = rc.SAdd(ctx, key, strValues...).Err()
+			saddCmd := rc.B().Sadd().Key(key).Member(strValues...).Build()
+			err = rc.Do(ctx, saddCmd).Error()
+			if err != nil {
+				err = fmt.Errorf("error adding to set key %s: %w", key, err)
+				return
+			}
+
+		case "zset":
+			vals := data.Value.([]interface{})
+			zaddCmd := rc.B().Zadd().Key(key).ScoreMember()
+			for i := 0; i < len(vals); i += 2 {
+				member := vals[i].(string)
+				score, _ := strconv.ParseFloat(vals[i+1].(string), 64)
+				zaddCmd = zaddCmd.ScoreMember(score, member)
+			}
+			err = rc.Do(ctx, zaddCmd.Build()).Error()
+			if err != nil {
+				err = fmt.Errorf("error adding to zset key %s: %w", key, err)
+				return
+			}
+
+		case "hash":
+			values := data.Value.(map[string]interface{})
+			hmsetCmd := rc.B().Hmset().Key(key).FieldValue()
+			for k, v := range values {
+				strVal, _ := v.(string)
+				hmsetCmd = hmsetCmd.FieldValue(k, strVal)
+			}
+			err = rc.Do(ctx, hmsetCmd.Build()).Error()
+			if err != nil {
+				err = fmt.Errorf("error setting hash key %s: %w", key, err)
+				return
+			}
+
+		default:
+			err = fmt.Errorf("unsupported key type: %s", data.Type)
+			return
+		}
+	}
+
+	imported = true
+
+	return
+}
+
+func (d *devserver) AuthenticateRequest(_ context.Context, _, _ string) (*auth.Response, error) {
+	return &auth.Response{
+		AccountID: consts.DevServerAccountID,
+		EnvID:     consts.DevServerEnvID,
+	}, nil
+}
+
+func (d *devserver) RetrieveConnectEntitlements(_ context.Context, _ *auth.Response) (auth.Entitlements, error) {
+	return auth.Entitlements{
+		ConnectionAllowed: true,
+	}, nil
+}
+
+func (d *devserver) RetrieveGateway(_ context.Context, opts v0.RetrieveGatewayOpts) (string, *url.URL, error) {
+	parsed, err := url.Parse(fmt.Sprintf("ws://%s:%d/v0/connect", d.Opts.ConnectGatewayHost, d.Opts.ConnectGatewayPort))
+	if err != nil {
+		return "", nil, err
+	}
+
+	// Devserver-specific convenience implementation: If request host was included in the Start request,
+	// use this instead of the default loopback address. This is important for scenarios where the devserver
+	// needs to be accessed from within a Docker container.
+	if opts.RequestHost != "" {
+		parts := strings.Split(opts.RequestHost, ":")
+		if len(parts) > 0 {
+			parsed.Host = fmt.Sprintf("%s:%d", parts[0], d.Opts.ConnectGatewayPort)
+		}
+	}
+
+	return "gw-dev", parsed, nil
 }
 
 // SDKHandler represents a handler that has registered with the dev server.
@@ -281,4 +697,74 @@ func localIPs() []*net.IPNet {
 	}
 
 	return ips
+}
+
+func upsertErroredApp(
+	ctx context.Context,
+	mgr cqrs.Manager,
+	appURL string,
+	pingError error,
+) {
+	tx, err := mgr.WithTx(ctx)
+	if err != nil {
+		logger.From(ctx).Error().Err(err).Msg("error creating transaction")
+		return
+	}
+
+	rollback := func(ctx context.Context) {
+		if err := tx.Rollback(ctx); err != nil {
+			logger.From(ctx).Error().Err(err).Msg("error rolling back transaction")
+		}
+	}
+
+	appID := inngest.DeterministicAppUUID(appURL)
+	_, err = tx.GetAppByID(ctx, appID)
+	if err == sql.ErrNoRows {
+		// App doesn't exist so create it.
+		_, err = tx.UpsertApp(ctx, cqrs.UpsertAppParams{
+			Error: sql.NullString{
+				String: pingError.Error(),
+				Valid:  true,
+			},
+			ID:  appID,
+			Url: appURL,
+		})
+		if err != nil {
+			logger.From(ctx).Error().Err(err).Msg("error inserting app")
+			rollback(ctx)
+			return
+		}
+
+		if err = tx.Commit(ctx); err != nil {
+			logger.From(ctx).Error().Err(err).Msg("error inserting app")
+			rollback(ctx)
+			return
+		}
+
+		return
+	}
+
+	if err != nil {
+		logger.From(ctx).Error().Err(err).Msg("error getting app")
+		rollback(ctx)
+		return
+	}
+	_, err = tx.UpdateAppError(ctx, cqrs.UpdateAppErrorParams{
+		ID: appID,
+		Error: sql.NullString{
+			String: pingError.Error(),
+			Valid:  true,
+		},
+	})
+	if err != nil {
+		logger.From(ctx).Error().Err(err).Msg("error updating app")
+		rollback(ctx)
+		return
+	}
+
+	if err = tx.Commit(ctx); err != nil {
+		logger.From(ctx).Error().Err(err).Msg("error updating app")
+		rollback(ctx)
+		return
+	}
 }

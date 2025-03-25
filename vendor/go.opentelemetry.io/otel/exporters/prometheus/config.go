@@ -24,12 +24,13 @@ import (
 
 // config contains options for the exporter.
 type config struct {
-	registerer        prometheus.Registerer
-	disableTargetInfo bool
-	withoutUnits      bool
-	aggregation       metric.AggregationSelector
-	disableScopeInfo  bool
-	namespace         string
+	registerer             prometheus.Registerer
+	disableTargetInfo      bool
+	withoutUnits           bool
+	withoutCounterSuffixes bool
+	readerOpts             []metric.ManualReaderOption
+	disableScopeInfo       bool
+	namespace              string
 }
 
 // newConfig creates a validated config configured with options.
@@ -44,14 +45,6 @@ func newConfig(opts ...Option) config {
 	}
 
 	return cfg
-}
-
-func (cfg config) manualReaderOptions() []metric.ManualReaderOption {
-	opts := []metric.ManualReaderOption{}
-	if cfg.aggregation != nil {
-		opts = append(opts, metric.WithAggregationSelector(cfg.aggregation))
-	}
-	return opts
 }
 
 // Option sets exporter option values.
@@ -80,7 +73,16 @@ func WithRegisterer(reg prometheus.Registerer) Option {
 // used.
 func WithAggregationSelector(agg metric.AggregationSelector) Option {
 	return optionFunc(func(cfg config) config {
-		cfg.aggregation = agg
+		cfg.readerOpts = append(cfg.readerOpts, metric.WithAggregationSelector(agg))
+		return cfg
+	})
+}
+
+// WithProducer configure the metric Producer the exporter will use as a source
+// of external metric data.
+func WithProducer(producer metric.Producer) Option {
+	return optionFunc(func(cfg config) config {
+		cfg.readerOpts = append(cfg.readerOpts, metric.WithProducer(producer))
 		return cfg
 	})
 }
@@ -106,6 +108,19 @@ func WithoutTargetInfo() Option {
 func WithoutUnits() Option {
 	return optionFunc(func(cfg config) config {
 		cfg.withoutUnits = true
+		return cfg
+	})
+}
+
+// WithoutCounterSuffixes disables exporter's addition _total suffixes on counters.
+//
+// By default, metric names include a _total suffix to follow Prometheus naming
+// conventions. For example, the counter metric happy.people would become
+// happy_people_total. With this option set, the name would instead be
+// happy_people.
+func WithoutCounterSuffixes() Option {
+	return optionFunc(func(cfg config) config {
+		cfg.withoutCounterSuffixes = true
 		return cfg
 	})
 }

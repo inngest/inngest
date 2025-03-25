@@ -19,7 +19,7 @@
 // mempubsub should not be used for production: it is intended for local
 // development and testing.
 //
-// URLs
+// # URLs
 //
 // For pubsub.OpenTopic and pubsub.OpenSubscription, mempubsub registers
 // for the scheme "mem".
@@ -27,14 +27,14 @@
 // see URLOpener.
 // See https://gocloud.dev/concepts/urls/ for background information.
 //
-// Message Delivery Semantics
+// # Message Delivery Semantics
 //
 // mempubsub supports at-least-once semantics; applications must
 // call Message.Ack after processing a message, or it will be redelivered.
 // See https://godoc.org/gocloud.dev/pubsub#hdr-At_most_once_and_At_least_once_Delivery
 // for more background.
 //
-// As
+// # As
 //
 // mempubsub does not support any types for As.
 package mempubsub // import "gocloud.dev/pubsub/mempubsub"
@@ -51,6 +51,7 @@ import (
 
 	"gocloud.dev/gcerrors"
 	"gocloud.dev/pubsub"
+	"gocloud.dev/pubsub/batcher"
 	"gocloud.dev/pubsub/driver"
 )
 
@@ -69,7 +70,7 @@ const Scheme = "mem"
 //
 // Query parameters:
 //   - ackdeadline: The ack deadline for OpenSubscription, in time.ParseDuration formats.
-//       Defaults to 1m.
+//     Defaults to 1m.
 type URLOpener struct {
 	mu     sync.Mutex
 	topics map[string]*pubsub.Topic
@@ -131,9 +132,23 @@ type topic struct {
 	nextAckID int
 }
 
+// TopicOptions contains configuration options for topics.
+type TopicOptions struct {
+	// BatcherOptions adds constraints to the default batching done for sends.
+	BatcherOptions batcher.Options
+}
+
 // NewTopic creates a new in-memory topic.
 func NewTopic() *pubsub.Topic {
-	return pubsub.NewTopic(&topic{}, nil)
+	return NewTopicWithOptions(nil)
+}
+
+// NewTopicWithOptions is similar to NewTopic, but supports TopicOptions.
+func NewTopicWithOptions(opts *TopicOptions) *pubsub.Topic {
+	if opts == nil {
+		opts = &TopicOptions{}
+	}
+	return pubsub.NewTopic(&topic{}, &opts.BatcherOptions)
 }
 
 // SendBatch implements driver.Topic.SendBatch.
@@ -211,6 +226,15 @@ func (*topic) ErrorCode(err error) gcerrors.ErrorCode {
 // Close implements driver.Topic.Close.
 func (*topic) Close() error { return nil }
 
+// SubscriptionOptions will contain configuration for subscriptions.
+type SubscriptionOptions struct {
+	// ReceiveBatcherOptions adds constraints to the default batching done for receives.
+	ReceiveBatcherOptions batcher.Options
+
+	// AckBatcherOptions adds constraints to the default batching done for acks.
+	AckBatcherOptions batcher.Options
+}
+
 type subscription struct {
 	mu          sync.Mutex
 	topic       *topic
@@ -223,11 +247,19 @@ type subscription struct {
 // If a message is not acked within in the given ack deadline from when
 // it is received, then it will be redelivered.
 func NewSubscription(pstopic *pubsub.Topic, ackDeadline time.Duration) *pubsub.Subscription {
+	return NewSubscriptionWithOptions(pstopic, ackDeadline, nil)
+}
+
+// NewSubscriptionWithOptions is similar to NewSubscription, but supports SubscriptionOptions.
+func NewSubscriptionWithOptions(pstopic *pubsub.Topic, ackDeadline time.Duration, opts *SubscriptionOptions) *pubsub.Subscription {
+	if opts == nil {
+		opts = &SubscriptionOptions{}
+	}
 	var t *topic
 	if !pstopic.As(&t) {
 		panic("mempubsub: NewSubscription passed a Topic not from mempubsub")
 	}
-	return pubsub.NewSubscription(newSubscription(t, ackDeadline), nil, nil)
+	return pubsub.NewSubscription(newSubscription(t, ackDeadline), &opts.ReceiveBatcherOptions, &opts.AckBatcherOptions)
 }
 
 func newSubscription(topic *topic, ackDeadline time.Duration) *subscription {

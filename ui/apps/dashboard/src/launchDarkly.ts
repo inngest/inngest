@@ -1,20 +1,21 @@
-// This probably won't work for edge functions! When we start using feature
-// flags in edge functions, we'll probably need to use
-// @launchdarkly/vercel-server-sdk.
-import { init, type LDClient } from 'launchdarkly-node-server-sdk';
+import { init, type LDClient } from '@launchdarkly/node-server-sdk';
 
-let client: LDClient | undefined = undefined;
+let launchDarklyClient: LDClient;
+
+function initialize() {
+  const launchDarklySDKKey = process.env.LAUNCH_DARKLY_SDK_KEY;
+  if (!launchDarklySDKKey) {
+    throw new Error('LAUNCH_DARKLY_SDK_KEY environment variable is not set.');
+  }
+  launchDarklyClient = init(launchDarklySDKKey, { stream: false });
+}
 
 export async function getLaunchDarklyClient(): Promise<LDClient> {
-  if (!client) {
-    const { LAUNCH_DARKLY_SDK_KEY } = process.env;
-    if (!LAUNCH_DARKLY_SDK_KEY) {
-      throw new Error('missing LAUNCH_DARKLY_SDK_KEY env var');
-    }
-
-    client = init(LAUNCH_DARKLY_SDK_KEY);
-    await client.waitForInitialization();
+  // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- Since we run our app in a serverless environment, launchDarklyClient can potentially be persisted between invocations.
+  if (!launchDarklyClient) {
+    initialize();
   }
 
-  return client;
+  await launchDarklyClient.waitForInitialization();
+  return launchDarklyClient;
 }

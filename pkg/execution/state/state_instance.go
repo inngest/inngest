@@ -3,7 +3,6 @@ package state
 import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/event"
-	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -18,28 +17,22 @@ import (
 //
 // This is safe to use and fulfils that requirement.
 func NewStateInstance(
-	f inngest.Function,
 	id Identifier,
 	metadata Metadata,
 	events []map[string]any,
-	actions map[string]any,
-	errors map[string]error,
+	actions []MemoizedStep,
 	stack []string,
 ) State {
 	return &memstate{
-		function:   f,
 		identifier: id,
 		metadata:   metadata,
 		events:     events,
 		actions:    actions,
-		errors:     errors,
 		stack:      stack,
 	}
 }
 
 type memstate struct {
-	function inngest.Function
-
 	identifier Identifier
 
 	metadata Metadata
@@ -51,7 +44,7 @@ type memstate struct {
 	stack []string
 
 	// Actions stores a map of all output from each individual action
-	actions map[string]any
+	actions []MemoizedStep
 
 	// errors stores a map of action errors
 	errors map[string]error
@@ -63,10 +56,6 @@ func (s memstate) Metadata() Metadata {
 
 func (s memstate) Identifier() Identifier {
 	return s.identifier
-}
-
-func (s memstate) Function() inngest.Function {
-	return s.function
 }
 
 func (s memstate) WorkflowID() uuid.UUID {
@@ -90,7 +79,12 @@ func (s memstate) Events() []map[string]any {
 }
 
 func (s memstate) Actions() map[string]any {
-	return s.actions
+	actions := make(map[string]any, len(s.actions))
+	for _, action := range s.actions {
+		actions[action.ID] = action.Data
+	}
+
+	return actions
 }
 
 func (s memstate) Errors() map[string]error {
@@ -117,18 +111,15 @@ func (s memstate) CronSchedule() *string {
 	}
 
 	if data, ok := s.Event()["data"].(map[string]any); ok {
-		if cron, ok := data["cron"].(string); ok && cron != "" {
-			return &cron
-		}
+		return event.CronSchedule(data)
 	}
 
 	return nil
 }
 
 func (s memstate) IsCron() bool {
-	if name, _ := s.Event()["name"].(string); name != event.FnCronName {
-		return false
+	if name, _ := s.Event()["name"].(string); event.IsCron(name) {
+		return true
 	}
-
-	return true
+	return false
 }

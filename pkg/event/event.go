@@ -5,20 +5,26 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
+	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/oklog/ulid/v2"
 )
 
 const (
-	EventReceivedName = "event/event.received"
-	FnFailedName      = "inngest/function.failed"
-	FnFinishedName    = "inngest/function.finished"
+	EventReceivedName  = "event/event.received"
+	InternalNamePrefix = "inngest/"
+	FnFailedName       = InternalNamePrefix + "function.failed"
+	FnFinishedName     = InternalNamePrefix + "function.finished"
+	FnCancelledName    = InternalNamePrefix + "function.cancelled"
 	// InvokeEventName is the event name used to invoke specific functions via an
 	// API.  Note that invoking functions still sends an event in the usual manner.
-	InvokeFnName = "inngest/function.invoked"
-	FnCronName   = "inngest/scheduled.timer"
+	InvokeFnName = InternalNamePrefix + "function.invoked"
+	FnCronName   = InternalNamePrefix + "scheduled.timer"
 )
 
 var (
@@ -27,13 +33,14 @@ var (
 )
 
 type TrackedEvent interface {
+	GetWorkspaceID() uuid.UUID
 	GetInternalID() ulid.ULID
 	GetEvent() Event
 }
 
-func NewEvent(data string) (*Event, error) {
+func NewEvent(data []byte) (*Event, error) {
 	evt := &Event{}
-	if err := json.Unmarshal([]byte(data), evt); err != nil {
+	if err := json.Unmarshal(data, evt); err != nil {
 		return nil, err
 	}
 
@@ -107,59 +114,154 @@ func (e Event) Validate(ctx context.Context) error {
 	return nil
 }
 
-type InngestMetadata struct {
-	InvokeFnID          string `json:"fn_id"`
-	InvokeCorrelationId string `json:"correlation_id"`
+// CorrelationID returns the correlation ID for the event.
+func (e Event) CorrelationID() string {
+	if e.Name == InvokeFnName {
+		if metadata, err := e.InngestMetadata(); err == nil {
+			return metadata.InvokeCorrelationId
+		}
+	}
+
+	if e.IsFinishedEvent() {
+		if corrId, ok := e.Data[consts.InvokeCorrelationId].(string); ok {
+			return corrId
+		}
+	}
+
+	return ""
 }
 
-func (e Event) InngestMetadata() *InngestMetadata {
-	rawData, ok := e.Data[consts.InngestEventDataPrefix].(map[string]interface{})
-	if !ok {
+func (e Event) IsInternal() bool {
+	return strings.HasPrefix(e.Name, InternalNamePrefix)
+}
+
+// IsFinishedEvent returns true if the event is a function finished event.
+func (e Event) IsFinishedEvent() bool {
+	return e.Name == FnFinishedName
+}
+
+func (e Event) IsInvokeEvent() bool {
+	return e.Name == InvokeFnName
+}
+
+// InngestMetadata represents metadata for an event that is used to invoke a
+// function. Note that this metadata is not present on all functions. For
+// accessing an event's correlation ID, prefer using `Event.CorrelationID()`.
+type InngestMetadata struct {
+	SourceAppID         string               `json:"source_app_id"`
+	SourceFnID          string               `json:"source_fn_id"`
+	SourceFnVersion     int                  `json:"source_fn_v"`
+	InvokeFnID          string               `json:"fn_id"`
+	InvokeCorrelationId string               `json:"correlation_id,omitempty"`
+	InvokeTraceCarrier  *itrace.TraceCarrier `json:"tc,omitempty"`
+	InvokeExpiresAt     int64                `json:"expire"`
+	InvokeGroupID       string               `json:"gid"`
+	InvokeDisplayName   string               `json:"name"`
+}
+
+func (m *InngestMetadata) Decode(data any) error {
+	byt, err := json.Marshal(data)
+	if err != nil {
+		return err
+	}
+	return json.Unmarshal(byt, m)
+}
+
+func (m *InngestMetadata) RunID() *ulid.ULID {
+	if len(m.InvokeCorrelationId) == 0 {
+		return nil
+	}
+	s := strings.Split(m.InvokeCorrelationId, ".")
+	if len(s) != 2 {
 		return nil
 	}
 
-	var metadata InngestMetadata
-	jsonData, err := json.Marshal(rawData)
-	if err != nil {
-		return nil
+	if id, err := ulid.Parse(s[0]); err == nil {
+		return &id
 	}
-	if err := json.Unmarshal(jsonData, &metadata); err != nil {
-		return nil
+	return nil
+}
+
+func (e Event) InngestMetadata() (*InngestMetadata, error) {
+	raw, ok := e.Data[consts.InngestEventDataPrefix]
+	if !ok {
+		return nil, fmt.Errorf("no data found in prefix '%s'", consts.InngestEventDataPrefix)
 	}
-	return &metadata
+
+	switch v := raw.(type) {
+	case InngestMetadata:
+		return &v, nil
+
+	default:
+		var metadata InngestMetadata
+		jsonData, err := json.Marshal(raw)
+		if err != nil {
+			return nil, err
+		}
+		if err := json.Unmarshal(jsonData, &metadata); err != nil {
+			return nil, err
+		}
+		return &metadata, nil
+	}
 }
 
 func NewOSSTrackedEvent(e Event) TrackedEvent {
-	id, err := ulid.Parse(e.ID)
-	if err != nil {
-		id = ulid.MustNew(ulid.Now(), rand.Reader)
-	}
+	// Never use e.ID as the internal ID, since it's specified by the sender
+	internalID := ulid.MustNew(ulid.Now(), rand.Reader)
 	if e.ID == "" {
-		e.ID = id.String()
+		e.ID = internalID.String()
 	}
 	return ossTrackedEvent{
-		id:    id,
-		event: e,
+		Id:    internalID,
+		Event: e,
 	}
+}
+
+func NewOSSTrackedEventWithID(e Event, id ulid.ULID) TrackedEvent {
+	return ossTrackedEvent{
+		Id:    id,
+		Event: e,
+	}
+}
+
+func NewOSSTrackedEventFromString(data string) (*ossTrackedEvent, error) {
+	evt := &ossTrackedEvent{}
+	if err := json.Unmarshal([]byte(data), evt); err != nil {
+		return nil, err
+	}
+
+	return evt, nil
 }
 
 type ossTrackedEvent struct {
-	id    ulid.ULID
-	event Event
+	Id    ulid.ULID `json:"internal_id"`
+	Event Event     `json:"event"`
 }
 
 func (o ossTrackedEvent) GetEvent() Event {
-	return o.event
+	return o.Event
 }
 
 func (o ossTrackedEvent) GetInternalID() ulid.ULID {
-	return o.id
+	return o.Id
+}
+
+func (o ossTrackedEvent) GetWorkspaceID() uuid.UUID {
+	// There are no workspaces in OSS yet.
+	return consts.DevServerEnvID
 }
 
 type NewInvocationEventOpts struct {
-	Event         Event
-	FnID          string
-	CorrelationID *string
+	SourceAppID     string
+	SourceFnID      string
+	SourceFnVersion int
+	Event           Event
+	FnID            string
+	CorrelationID   *string
+	TraceCarrier    *itrace.TraceCarrier
+	ExpiresAt       int64
+	GroupID         string
+	DisplayName     string
 }
 
 func NewInvocationEvent(opts NewInvocationEventOpts) Event {
@@ -176,15 +278,44 @@ func NewInvocationEvent(opts NewInvocationEventOpts) Event {
 	}
 	evt.Name = InvokeFnName
 
+	correlationID := ""
+	if opts.CorrelationID != nil {
+		correlationID = *opts.CorrelationID
+	}
+
 	evt.Data[consts.InngestEventDataPrefix] = InngestMetadata{
-		InvokeFnID: opts.FnID,
-		InvokeCorrelationId: func() string {
-			if opts.CorrelationID != nil {
-				return *opts.CorrelationID
-			}
-			return ""
-		}(),
+		InvokeFnID:          opts.FnID,
+		InvokeCorrelationId: correlationID,
+		InvokeTraceCarrier:  opts.TraceCarrier,
+		InvokeExpiresAt:     opts.ExpiresAt,
+		InvokeGroupID:       opts.GroupID,
+		InvokeDisplayName:   opts.DisplayName,
+		SourceAppID:         opts.SourceAppID,
+		SourceFnID:          opts.SourceFnID,
+		SourceFnVersion:     opts.SourceFnVersion,
 	}
 
 	return evt
+}
+
+func (e Event) IsCron() bool {
+	return IsCron(e.Name)
+}
+
+func (e Event) CronSchedule() *string {
+	if !IsCron(e.Name) {
+		return nil
+	}
+	return CronSchedule(e.Data)
+}
+
+func IsCron(evtName string) bool {
+	return evtName == FnCronName
+}
+
+func CronSchedule(evtData map[string]any) *string {
+	if cron, ok := evtData["cron"].(string); ok && cron != "" {
+		return &cron
+	}
+	return nil
 }

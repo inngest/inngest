@@ -29,7 +29,7 @@ import (
 type Subscriber interface {
 	// OnMessage is invoked when a new message is published. Implementations
 	// must not block in this method.
-	OnMessage(msg interface{})
+	OnMessage(msg any)
 }
 
 // PubSub is a simple one-to-many publish-subscribe system that supports
@@ -40,25 +40,23 @@ type Subscriber interface {
 // subscribers interested in receiving these messages register a callback
 // via the Subscribe() method.
 //
-// Once a PubSub is stopped, no more messages can be published, and
-// it is guaranteed that no more subscriber callback will be invoked.
+// Once a PubSub is stopped, no more messages can be published, but any pending
+// published messages will be delivered to the subscribers.  Done may be used
+// to determine when all published messages have been delivered.
 type PubSub struct {
-	cs     *CallbackSerializer
-	cancel context.CancelFunc
+	cs *CallbackSerializer
 
 	// Access to the below fields are guarded by this mutex.
 	mu          sync.Mutex
-	msg         interface{}
+	msg         any
 	subscribers map[Subscriber]bool
-	stopped     bool
 }
 
-// NewPubSub returns a new PubSub instance.
-func NewPubSub() *PubSub {
-	ctx, cancel := context.WithCancel(context.Background())
+// NewPubSub returns a new PubSub instance.  Users should cancel the
+// provided context to shutdown the PubSub.
+func NewPubSub(ctx context.Context) *PubSub {
 	return &PubSub{
 		cs:          NewCallbackSerializer(ctx),
-		cancel:      cancel,
 		subscribers: map[Subscriber]bool{},
 	}
 }
@@ -75,15 +73,11 @@ func (ps *PubSub) Subscribe(sub Subscriber) (cancel func()) {
 	ps.mu.Lock()
 	defer ps.mu.Unlock()
 
-	if ps.stopped {
-		return func() {}
-	}
-
 	ps.subscribers[sub] = true
 
 	if ps.msg != nil {
 		msg := ps.msg
-		ps.cs.Schedule(func(context.Context) {
+		ps.cs.TrySchedule(func(context.Context) {
 			ps.mu.Lock()
 			defer ps.mu.Unlock()
 			if !ps.subscribers[sub] {
@@ -102,18 +96,14 @@ func (ps *PubSub) Subscribe(sub Subscriber) (cancel func()) {
 
 // Publish publishes the provided message to the PubSub, and invokes
 // callbacks registered by subscribers asynchronously.
-func (ps *PubSub) Publish(msg interface{}) {
+func (ps *PubSub) Publish(msg any) {
 	ps.mu.Lock()
 	defer ps.mu.Unlock()
-
-	if ps.stopped {
-		return
-	}
 
 	ps.msg = msg
 	for sub := range ps.subscribers {
 		s := sub
-		ps.cs.Schedule(func(context.Context) {
+		ps.cs.TrySchedule(func(context.Context) {
 			ps.mu.Lock()
 			defer ps.mu.Unlock()
 			if !ps.subscribers[s] {
@@ -124,13 +114,8 @@ func (ps *PubSub) Publish(msg interface{}) {
 	}
 }
 
-// Stop shuts down the PubSub and releases any resources allocated by it.
-// It is guaranteed that no subscriber callbacks would be invoked once this
-// method returns.
-func (ps *PubSub) Stop() {
-	ps.mu.Lock()
-	defer ps.mu.Unlock()
-	ps.stopped = true
-
-	ps.cancel()
+// Done returns a channel that is closed after the context passed to NewPubSub
+// is canceled and all updates have been sent to subscribers.
+func (ps *PubSub) Done() <-chan struct{} {
+	return ps.cs.Done()
 }

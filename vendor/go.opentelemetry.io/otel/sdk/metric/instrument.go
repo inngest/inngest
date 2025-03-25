@@ -1,16 +1,7 @@
 // Copyright The OpenTelemetry Authors
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
+
+//go:generate stringer -type=InstrumentKind -trimprefix=InstrumentKind
 
 package metric // import "go.opentelemetry.io/otel/sdk/metric"
 
@@ -18,20 +9,16 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/metric/embedded"
 	"go.opentelemetry.io/otel/sdk/instrumentation"
-	"go.opentelemetry.io/otel/sdk/metric/aggregation"
-	"go.opentelemetry.io/otel/sdk/metric/internal"
-	"go.opentelemetry.io/otel/sdk/metric/metricdata"
+	"go.opentelemetry.io/otel/sdk/metric/internal/aggregate"
 )
 
-var (
-	zeroInstrumentKind InstrumentKind
-	zeroScope          instrumentation.Scope
-)
+var zeroScope instrumentation.Scope
 
 // InstrumentKind is the identifier of a group of instruments that all
 // performing the same function.
@@ -40,28 +27,32 @@ type InstrumentKind uint8
 const (
 	// instrumentKindUndefined is an undefined instrument kind, it should not
 	// be used by any initialized type.
-	instrumentKindUndefined InstrumentKind = iota // nolint:deadcode,varcheck,unused
+	instrumentKindUndefined InstrumentKind = 0 // nolint:deadcode,varcheck,unused
 	// InstrumentKindCounter identifies a group of instruments that record
 	// increasing values synchronously with the code path they are measuring.
-	InstrumentKindCounter
+	InstrumentKindCounter InstrumentKind = 1
 	// InstrumentKindUpDownCounter identifies a group of instruments that
 	// record increasing and decreasing values synchronously with the code path
 	// they are measuring.
-	InstrumentKindUpDownCounter
+	InstrumentKindUpDownCounter InstrumentKind = 2
 	// InstrumentKindHistogram identifies a group of instruments that record a
 	// distribution of values synchronously with the code path they are
 	// measuring.
-	InstrumentKindHistogram
+	InstrumentKindHistogram InstrumentKind = 3
 	// InstrumentKindObservableCounter identifies a group of instruments that
 	// record increasing values in an asynchronous callback.
-	InstrumentKindObservableCounter
+	InstrumentKindObservableCounter InstrumentKind = 4
 	// InstrumentKindObservableUpDownCounter identifies a group of instruments
 	// that record increasing and decreasing values in an asynchronous
 	// callback.
-	InstrumentKindObservableUpDownCounter
+	InstrumentKindObservableUpDownCounter InstrumentKind = 5
 	// InstrumentKindObservableGauge identifies a group of instruments that
 	// record current values in an asynchronous callback.
-	InstrumentKindObservableGauge
+	InstrumentKindObservableGauge InstrumentKind = 6
+	// InstrumentKindGauge identifies a group of instruments that record
+	// instantaneous values synchronously with the code path they are
+	// measuring.
+	InstrumentKindGauge InstrumentKind = 7
 )
 
 type nonComparable [0]func() // nolint: unused  // This is indeed used.
@@ -83,11 +74,11 @@ type Instrument struct {
 	nonComparable // nolint: unused
 }
 
-// empty returns if all fields of i are their zero-value.
-func (i Instrument) empty() bool {
+// IsEmpty returns if all Instrument fields are their zero-value.
+func (i Instrument) IsEmpty() bool {
 	return i.Name == "" &&
 		i.Description == "" &&
-		i.Kind == zeroInstrumentKind &&
+		i.Kind == instrumentKindUndefined &&
 		i.Unit == "" &&
 		i.Scope == zeroScope
 }
@@ -118,7 +109,7 @@ func (i Instrument) matchesDescription(other Instrument) bool {
 // matchesKind returns true if the Kind of i is its zero-value or it equals the
 // Kind of other, otherwise false.
 func (i Instrument) matchesKind(other Instrument) bool {
-	return i.Kind == zeroInstrumentKind || i.Kind == other.Kind
+	return i.Kind == instrumentKindUndefined || i.Kind == other.Kind
 }
 
 // matchesUnit returns true if the Unit of i is its zero-value or it equals the
@@ -144,43 +135,56 @@ type Stream struct {
 	// Unit is the unit of measurement recorded.
 	Unit string
 	// Aggregation the stream uses for an instrument.
-	Aggregation aggregation.Aggregation
-	// AttributeFilter applied to all attributes recorded for an instrument.
+	Aggregation Aggregation
+	// AttributeFilter is an attribute Filter applied to the attributes
+	// recorded for an instrument's measurement. If the filter returns false
+	// the attribute will not be recorded, otherwise, if it returns true, it
+	// will record the attribute.
+	//
+	// Use NewAllowKeysFilter from "go.opentelemetry.io/otel/attribute" to
+	// provide an allow-list of attribute keys here.
 	AttributeFilter attribute.Filter
 }
 
-// streamID are the identifying properties of a stream.
-type streamID struct {
+// instID are the identifying properties of a instrument.
+type instID struct {
 	// Name is the name of the stream.
 	Name string
 	// Description is the description of the stream.
 	Description string
+	// Kind defines the functional group of the instrument.
+	Kind InstrumentKind
 	// Unit is the unit of the stream.
 	Unit string
-	// Aggregation is the aggregation data type of the stream.
-	Aggregation string
-	// Monotonic is the monotonicity of an instruments data type. This field is
-	// not used for all data types, so a zero value needs to be understood in the
-	// context of Aggregation.
-	Monotonic bool
-	// Temporality is the temporality of a stream's data type. This field is
-	// not used by some data types.
-	Temporality metricdata.Temporality
 	// Number is the number type of the stream.
 	Number string
 }
 
+// Returns a normalized copy of the instID i.
+//
+// Instrument names are considered case-insensitive. Standardize the instrument
+// name to always be lowercase for the returned instID so it can be compared
+// without the name casing affecting the comparison.
+func (i instID) normalize() instID {
+	i.Name = strings.ToLower(i.Name)
+	return i
+}
+
 type int64Inst struct {
-	aggregators []internal.Aggregator[int64]
+	measures []aggregate.Measure[int64]
 
 	embedded.Int64Counter
 	embedded.Int64UpDownCounter
 	embedded.Int64Histogram
+	embedded.Int64Gauge
 }
 
-var _ metric.Int64Counter = (*int64Inst)(nil)
-var _ metric.Int64UpDownCounter = (*int64Inst)(nil)
-var _ metric.Int64Histogram = (*int64Inst)(nil)
+var (
+	_ metric.Int64Counter       = (*int64Inst)(nil)
+	_ metric.Int64UpDownCounter = (*int64Inst)(nil)
+	_ metric.Int64Histogram     = (*int64Inst)(nil)
+	_ metric.Int64Gauge         = (*int64Inst)(nil)
+)
 
 func (i *int64Inst) Add(ctx context.Context, val int64, opts ...metric.AddOption) {
 	c := metric.NewAddConfig(opts)
@@ -192,26 +196,27 @@ func (i *int64Inst) Record(ctx context.Context, val int64, opts ...metric.Record
 	i.aggregate(ctx, val, c.Attributes())
 }
 
-func (i *int64Inst) aggregate(ctx context.Context, val int64, s attribute.Set) {
-	if err := ctx.Err(); err != nil {
-		return
-	}
-	for _, agg := range i.aggregators {
-		agg.Aggregate(val, s)
+func (i *int64Inst) aggregate(ctx context.Context, val int64, s attribute.Set) { // nolint:revive  // okay to shadow pkg with method.
+	for _, in := range i.measures {
+		in(ctx, val, s)
 	}
 }
 
 type float64Inst struct {
-	aggregators []internal.Aggregator[float64]
+	measures []aggregate.Measure[float64]
 
 	embedded.Float64Counter
 	embedded.Float64UpDownCounter
 	embedded.Float64Histogram
+	embedded.Float64Gauge
 }
 
-var _ metric.Float64Counter = (*float64Inst)(nil)
-var _ metric.Float64UpDownCounter = (*float64Inst)(nil)
-var _ metric.Float64Histogram = (*float64Inst)(nil)
+var (
+	_ metric.Float64Counter       = (*float64Inst)(nil)
+	_ metric.Float64UpDownCounter = (*float64Inst)(nil)
+	_ metric.Float64Histogram     = (*float64Inst)(nil)
+	_ metric.Float64Gauge         = (*float64Inst)(nil)
+)
 
 func (i *float64Inst) Add(ctx context.Context, val float64, opts ...metric.AddOption) {
 	c := metric.NewAddConfig(opts)
@@ -224,11 +229,8 @@ func (i *float64Inst) Record(ctx context.Context, val float64, opts ...metric.Re
 }
 
 func (i *float64Inst) aggregate(ctx context.Context, val float64, s attribute.Set) {
-	if err := ctx.Err(); err != nil {
-		return
-	}
-	for _, agg := range i.aggregators {
-		agg.Aggregate(val, s)
+	for _, in := range i.measures {
+		in(ctx, val, s)
 	}
 }
 
@@ -250,13 +252,15 @@ type float64Observable struct {
 	embedded.Float64ObservableGauge
 }
 
-var _ metric.Float64ObservableCounter = float64Observable{}
-var _ metric.Float64ObservableUpDownCounter = float64Observable{}
-var _ metric.Float64ObservableGauge = float64Observable{}
+var (
+	_ metric.Float64ObservableCounter       = float64Observable{}
+	_ metric.Float64ObservableUpDownCounter = float64Observable{}
+	_ metric.Float64ObservableGauge         = float64Observable{}
+)
 
-func newFloat64Observable(scope instrumentation.Scope, kind InstrumentKind, name, desc, u string, agg []internal.Aggregator[float64]) float64Observable {
+func newFloat64Observable(m *meter, kind InstrumentKind, name, desc, u string) float64Observable {
 	return float64Observable{
-		observable: newObservable(scope, kind, name, desc, u, agg),
+		observable: newObservable[float64](m, kind, name, desc, u),
 	}
 }
 
@@ -269,13 +273,15 @@ type int64Observable struct {
 	embedded.Int64ObservableGauge
 }
 
-var _ metric.Int64ObservableCounter = int64Observable{}
-var _ metric.Int64ObservableUpDownCounter = int64Observable{}
-var _ metric.Int64ObservableGauge = int64Observable{}
+var (
+	_ metric.Int64ObservableCounter       = int64Observable{}
+	_ metric.Int64ObservableUpDownCounter = int64Observable{}
+	_ metric.Int64ObservableGauge         = int64Observable{}
+)
 
-func newInt64Observable(scope instrumentation.Scope, kind InstrumentKind, name, desc, u string, agg []internal.Aggregator[int64]) int64Observable {
+func newInt64Observable(m *meter, kind InstrumentKind, name, desc, u string) int64Observable {
 	return int64Observable{
-		observable: newObservable(scope, kind, name, desc, u, agg),
+		observable: newObservable[int64](m, kind, name, desc, u),
 	}
 }
 
@@ -283,26 +289,39 @@ type observable[N int64 | float64] struct {
 	metric.Observable
 	observablID[N]
 
-	aggregators []internal.Aggregator[N]
+	meter           *meter
+	measures        measures[N]
+	dropAggregation bool
 }
 
-func newObservable[N int64 | float64](scope instrumentation.Scope, kind InstrumentKind, name, desc, u string, agg []internal.Aggregator[N]) *observable[N] {
+func newObservable[N int64 | float64](m *meter, kind InstrumentKind, name, desc, u string) *observable[N] {
 	return &observable[N]{
 		observablID: observablID[N]{
 			name:        name,
 			description: desc,
 			kind:        kind,
 			unit:        u,
-			scope:       scope,
+			scope:       m.scope,
 		},
-		aggregators: agg,
+		meter: m,
 	}
 }
 
 // observe records the val for the set of attrs.
 func (o *observable[N]) observe(val N, s attribute.Set) {
-	for _, agg := range o.aggregators {
-		agg.Aggregate(val, s)
+	o.measures.observe(val, s)
+}
+
+func (o *observable[N]) appendMeasures(meas []aggregate.Measure[N]) {
+	o.measures = append(o.measures, meas...)
+}
+
+type measures[N int64 | float64] []aggregate.Measure[N]
+
+// observe records the val for the set of attrs.
+func (m measures[N]) observe(val N, s attribute.Set) {
+	for _, in := range m {
+		in(context.Background(), val, s)
 	}
 }
 
@@ -312,16 +331,16 @@ var errEmptyAgg = errors.New("no aggregators for observable instrument")
 // and nil if it should. An errEmptyAgg error is returned if o is effectively a
 // no-op because it does not have any aggregators. Also, an error is returned
 // if scope defines a Meter other than the one o was created by.
-func (o *observable[N]) registerable(scope instrumentation.Scope) error {
-	if len(o.aggregators) == 0 {
+func (o *observable[N]) registerable(m *meter) error {
+	if len(o.measures) == 0 {
 		return errEmptyAgg
 	}
-	if scope != o.scope {
+	if m != o.meter {
 		return fmt.Errorf(
 			"invalid registration: observable %q from Meter %q, registered with Meter %q",
 			o.name,
 			o.scope.Name,
-			scope.Name,
+			m.scope.Name,
 		)
 	}
 	return nil

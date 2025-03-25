@@ -4,17 +4,21 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
+	"errors"
 	"fmt"
 	"net/url"
-	"sort"
 	"strings"
+	"time"
 
 	petname "github.com/dustinkirkland/golang-petname"
+	"github.com/fatih/structs"
 	"github.com/google/uuid"
 	"github.com/gosimple/slug"
 	multierror "github.com/hashicorp/go-multierror"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/expressions"
+	"github.com/inngest/inngest/pkg/syscode"
 	"github.com/xhit/go-str2duration/v2"
 )
 
@@ -53,6 +57,9 @@ type Function struct {
 
 	Priority *Priority `json:"priority,omitempty"`
 
+	// Timeouts represents timeouts for a function.
+	Timeouts *Timeouts `json:"timeouts,omitempty"`
+
 	// ConcurrencyLimits allows limiting the concurrency of running functions, optionally constrained
 	// by individual concurrency keys.
 	//
@@ -62,13 +69,20 @@ type Function struct {
 	Debounce *Debounce `json:"debounce,omitempty"`
 
 	// Trigger represnets the trigger for the function.
-	Triggers []Trigger `json:"triggers"`
+	Triggers MultipleTriggers `json:"triggers"`
 
 	// EventBatch determines how the function will process a list of incoming events
 	EventBatch *EventBatchConfig `json:"batchEvents,omitempty"`
 
-	// RateLimit allows specifying custom rate limiting for the function.
+	// RateLimit allows specifying custom rate limiting for the function.  A RateLimit is
+	// hard rate limiting:  any function invocations over the rate limit will be ignored and
+	// will never run.
 	RateLimit *RateLimit `json:"rateLimit,omitempty"`
+
+	// Throttle represents a soft rate limit for gating function starts.  Any function runs
+	// over the throttle period will be enqueued in the backlog to run at the next available
+	// time.
+	Throttle *Throttle `json:"throttle,omitempty"`
 
 	// Cancel specifies cancellation signals for the function
 	Cancel []Cancel `json:"cancel,omitempty"`
@@ -76,9 +90,146 @@ type Function struct {
 	// Actions represents the actions to take for this function.  If empty, this assumes
 	// that we have a single action specified in the current directory using
 	Steps []Step `json:"steps,omitempty"`
+}
 
-	// Edges represent edges between steps in the dag.
-	Edges []Edge `json:"edges,omitempty"`
+type RateLimit struct {
+	// Limit is how often the function can be called within the specified period
+	Limit uint `json:"limit"`
+	// Period represents the time period for throttling the function
+	Period string `json:"period"`
+	// Key is an optional string to constrain throttling using event data.  For
+	// example, if you want to throttle incoming notifications based off of a user's
+	// ID in an event you can use the following key: "{{ event.user.id }}".  This ensures
+	// that we throttle functions for each user independently.
+	Key *string `json:"key,omitempty"`
+}
+
+func (r RateLimit) IsValid(ctx context.Context) error {
+	if r.Limit <= 0 {
+		return errors.New("limit must be greater than 0")
+	}
+
+	if r.Key != nil {
+		if err := expressions.Validate(ctx, *r.Key); err != nil {
+			return fmt.Errorf("key is invalid: %w", err)
+		}
+	}
+
+	if r.Period == "" {
+		return errors.New("period must be specified")
+	}
+	dur, err := str2duration.ParseDuration(r.Period)
+	if err != nil {
+		return fmt.Errorf("failed to parse time duration: %w", err)
+	}
+	if dur > consts.FunctionIdempotencyPeriod {
+		return fmt.Errorf("period must be less than %s", consts.FunctionIdempotencyPeriod)
+	}
+
+	return nil
+}
+
+// DeterministicUUID returns a deterministic V3 UUID based off of the SHA1
+// hash of the function's name.
+func (f *Function) DeterministicUUID() uuid.UUID {
+	return DeterministicSha1UUID(f.Name + f.Steps[0].URI)
+}
+
+// Throttle represents concurrency over time.
+type Throttle struct {
+	// Limit is how often the function can be called within the specified period.  The
+	// minimum limit is 1.
+	Limit uint `json:"limit"`
+	// Period represents the time period for throttling the function.  The minimum
+	// granularity is a single second.
+	Period time.Duration `json:"period"`
+	// Burst...
+	Burst uint `json:"burst"`
+	// Key is an optional string to constrain throttling using event data.  For
+	// example, if you want to throttle incoming notifications based off of a user's
+	// ID in an event you can use the following key: "{{ event.user.id }}".  This ensures
+	// that we throttle functions for each user independently.
+	Key *string `json:"key,omitempty"`
+}
+
+func (t *Throttle) UnmarshalJSON(in []byte) error {
+	if t == nil {
+		t = &Throttle{}
+	}
+
+	var err error
+	input := struct {
+		Limit  uint    `json:"limit"`
+		Period string  `json:"period"`
+		Burst  uint    `json:"burst"`
+		Key    *string `json:"key,omitempty"`
+	}{}
+	if err = json.Unmarshal(in, &input); err != nil {
+		return err
+	}
+
+	t.Limit = input.Limit
+	t.Burst = input.Burst
+	t.Key = input.Key
+	t.Period, err = str2duration.ParseDuration(input.Period)
+
+	// Normalization
+	if t.Limit == 0 {
+		t.Limit = 1
+	}
+	if t.Burst == 0 {
+		t.Burst = 1
+	}
+	return err
+}
+
+func (t Throttle) MarshalJSON() ([]byte, error) {
+	s := structs.New(t)
+	s.TagName = "json"
+	val := s.Map()
+	// convert period to a string.
+	val["period"] = str2duration.String(t.Period)
+	return json.Marshal(val)
+}
+
+// Timeouts represents timeouts for the function. If any of the timeouts are hit, the function
+// will be marked as cancelled with a cancellation reason.
+type Timeouts struct {
+	// Start represents the timeout for starting a function.  If the time between scheduling
+	// and starting a function exceeds this value, the function will be cancelled.  Note that
+	// this is inclusive of time between retries.
+	//
+	// A function may exceed this duration because of concurrency limits, throttling, etc.
+	Start *string `json:"start,omitempty"`
+
+	// Finish represents the time between a function starting and the function finishing.
+	// If a function takes longer than this time to finish, the function is marked as cancelled.
+	// The start time is taken from the time that the first successful function request begins,
+	// and does not include the time spent in the queue before the function starts.
+	//
+	// Note that if the final request to a function begins before this timeout, and completes
+	// after this timeout, the function will succeed.
+	Finish *string `json:"finish,omitempty"`
+}
+
+func (t Timeouts) StartDuration() *time.Duration {
+	if t.Start == nil || *t.Start == "" {
+		return nil
+	}
+	if dur, err := str2duration.ParseDuration(*t.Start); err == nil {
+		return &dur
+	}
+	return nil
+}
+
+func (t Timeouts) FinishDuration() *time.Duration {
+	if t.Finish == nil || *t.Finish == "" {
+		return nil
+	}
+	if dur, err := str2duration.ParseDuration(*t.Finish); err == nil {
+		return &dur
+	}
+	return nil
 }
 
 type Priority struct {
@@ -86,8 +237,19 @@ type Priority struct {
 }
 
 type Debounce struct {
-	Key    *string `json:"key"`
-	Period string  `json:"period"`
+	Key     *string `json:"key,omitempty"`
+	Period  string  `json:"period"`
+	Timeout *string `json:"timeout,omitempty"`
+}
+
+func (d Debounce) TimeoutDuration() *time.Duration {
+	if d.Timeout == nil || *d.Timeout == "" {
+		return nil
+	}
+	if dur, err := str2duration.ParseDuration(*d.Timeout); err == nil {
+		return &dur
+	}
+	return nil
 }
 
 // Cancel represents a cancellation signal for a function.  When specified, this
@@ -125,6 +287,13 @@ func (f Function) IsScheduled() bool {
 	return false
 }
 
+func (f Function) IsBatchEnabled() bool {
+	if f.EventBatch == nil {
+		return false
+	}
+	return f.EventBatch.IsEnabled()
+}
+
 // Validate returns an error if the function definition is invalid.
 func (f Function) Validate(ctx context.Context) error {
 	var err error
@@ -141,15 +310,27 @@ func (f Function) Validate(ctx context.Context) error {
 		}
 	}
 
-	for _, t := range f.Triggers {
-		if terr := t.Validate(ctx); terr != nil {
-			err = multierror.Append(err, terr)
-		}
+	if terr := f.Triggers.Validate(ctx); terr != nil {
+		err = multierror.Append(err, terr)
 	}
 
 	if f.EventBatch != nil {
-		if berr := f.EventBatch.IsValid(); berr != nil {
+		if berr := f.EventBatch.IsValid(ctx); berr != nil {
 			err = multierror.Append(err, berr)
+		}
+
+		if len(f.Cancel) > 0 {
+			err = multierror.Append(err, syscode.Error{
+				Code:    syscode.CodeComboUnsupported,
+				Message: "Batching and cancellation are mutually exclusive",
+			})
+		}
+
+		if f.Debounce != nil {
+			err = multierror.Append(err, syscode.Error{
+				Code:    syscode.CodeComboUnsupported,
+				Message: "Batching and debouncing are mutually exclusive",
+			})
 		}
 	}
 
@@ -157,48 +338,21 @@ func (f Function) Validate(ctx context.Context) error {
 		if step.Name == "" {
 			err = multierror.Append(err, fmt.Errorf("All steps must have a name"))
 		}
+
 		uri, serr := url.Parse(step.URI)
 		if serr != nil {
 			err = multierror.Append(err, fmt.Errorf("Steps must have a valid URI"))
 		}
 		switch uri.Scheme {
-		case "http", "https":
+		case "http", "https", "ws", "wss":
 			continue
 		default:
-			err = multierror.Append(err, fmt.Errorf("Non-HTTP steps are not yet supported"))
+			err = multierror.Append(err, fmt.Errorf("Non-supported step schema: %s", uri.Scheme))
 		}
-	}
-
-	edges, aerr := f.AllEdges(ctx)
-	if aerr != nil {
-		return multierror.Append(err, aerr)
 	}
 
 	if len(f.Steps) != 1 {
 		err = multierror.Append(err, fmt.Errorf("Functions must contain one step"))
-	}
-
-	// Validate edges.
-	for _, edge := range edges {
-		// Ensure that any expressions are also valid.
-		if edge.Metadata == nil {
-			continue
-		}
-		if edge.Metadata.If != "" {
-			if _, verr := expressions.NewExpressionEvaluator(ctx, edge.Metadata.If); verr != nil {
-				err = multierror.Append(err, verr)
-			}
-		}
-		if edge.Metadata.Wait != nil {
-			// Ensure that this is a valid duration or expression.
-			if _, err := str2duration.ParseDuration(*edge.Metadata.Wait); err == nil {
-				continue
-			}
-			if _, err := expressions.NewExpressionEvaluator(ctx, *edge.Metadata.Wait); err == nil {
-				continue
-			}
-			err = multierror.Append(err, fmt.Errorf("Unable to parse wait as a duration or expression: %s", *edge.Metadata.Wait))
-		}
 	}
 
 	// Validate priority expression
@@ -215,7 +369,7 @@ func (f Function) Validate(ctx context.Context) error {
 	// Validate cancellation expressions
 	for _, c := range f.Cancel {
 		if c.If != nil {
-			if _, exprErr := expressions.NewExpressionEvaluator(ctx, *c.If); exprErr != nil {
+			if exprErr := expressions.Validate(ctx, *c.If); exprErr != nil {
 				err = multierror.Append(err, fmt.Errorf("Cancellation expression is invalid: %s", exprErr))
 			}
 		}
@@ -225,14 +379,18 @@ func (f Function) Validate(ctx context.Context) error {
 		err = multierror.Append(err, fmt.Errorf("This function exceeds the max number of cancellation events: %d", consts.MaxCancellations))
 	}
 
-	if f.Debounce != nil && f.Debounce.Key != nil {
-		if _, exprErr := expressions.NewExpressionEvaluator(ctx, *f.Debounce.Key); exprErr != nil {
-			err = multierror.Append(err, fmt.Errorf("Debounce expression is invalid: %s", exprErr))
+	if f.Debounce != nil {
+		if f.Debounce.Key != nil && *f.Debounce.Key == "" {
+			// Some clients may send an empty string.
+			f.Debounce.Key = nil
 		}
-		// NOTE: Debounce is not valid when batch is enabled.
-		if f.EventBatch != nil {
-			err = multierror.Append(err, fmt.Errorf("A function cannot specify batch and debounce"))
+		if f.Debounce.Key != nil {
+			// Ensure the expression is valid if present.
+			if exprErr := expressions.Validate(ctx, *f.Debounce.Key); exprErr != nil {
+				err = multierror.Append(err, fmt.Errorf("Debounce expression is invalid: %s", exprErr))
+			}
 		}
+
 		period, perr := str2duration.ParseDuration(f.Debounce.Period)
 		if perr != nil {
 			err = multierror.Append(err, fmt.Errorf("The debounce period of '%s' is invalid: %w", f.Debounce.Period, perr))
@@ -246,9 +404,9 @@ func (f Function) Validate(ctx context.Context) error {
 	}
 
 	// Validate rate limit expression
-	if f.RateLimit != nil && f.RateLimit.Key != nil {
-		if _, exprErr := expressions.NewExpressionEvaluator(ctx, *f.RateLimit.Key); exprErr != nil {
-			err = multierror.Append(err, fmt.Errorf("Rate limit expression is invalid: %s", exprErr))
+	if f.RateLimit != nil {
+		if rateLimitErr := f.RateLimit.IsValid(ctx); rateLimitErr != nil {
+			err = multierror.Append(err, rateLimitErr)
 		}
 	}
 
@@ -261,8 +419,14 @@ func (f Function) RunPriorityFactor(ctx context.Context, event map[string]any) (
 		return 0, nil
 	}
 
+	// Validate the expression first.
+	if err := expressions.Validate(ctx, *f.Priority.Run); err != nil {
+		return 0, fmt.Errorf("Priority.Run expression is invalid: %s", err)
+	}
+
 	expr, err := expressions.NewExpressionEvaluator(ctx, *f.Priority.Run)
 	if err != nil {
+		// This should never happen.
 		return 0, fmt.Errorf("Priority.Run expression is invalid: %s", err)
 	}
 
@@ -302,58 +466,15 @@ func (f Function) URI() (*url.URL, error) {
 	return nil, fmt.Errorf("No steps configured")
 }
 
-// AllEdges produces edge configuration for steps defined within the function.
-// If no edges for a step exists, an automatic step from the tirgger is added.
-func (f Function) AllEdges(ctx context.Context) ([]Edge, error) {
-	edges := []Edge{}
-
-	// O1 lookup of steps.
-	stepmap := map[string]Step{}
-	// Track whether incoming edges exist for each step
-	seen := map[string]bool{}
-	for _, s := range f.Steps {
-		stepmap[s.ID] = s
-		seen[s.ID] = false
-	}
-
-	var err error
-
-	// Map all edges for incoming steps.
-	for _, edge := range f.Edges {
-		if _, ok := seen[edge.Incoming]; !ok {
-			err = multierror.Append(
-				err,
-				fmt.Errorf("Step '%s' doesn't exist within edge", edge.Incoming),
-			)
-			continue
-		}
-		seen[edge.Incoming] = true
-		edges = append(edges, edge)
-	}
-
-	// For all unseen edges, add a trigger edge.
-	for step, ok := range seen {
-		if ok {
-			continue
-		}
-		edges = append(edges, Edge{
-			Outgoing: TriggerName,
-			Incoming: step,
-		})
-	}
-
-	// Ensure that the edges are sorted by name, giving us
-	// deterministic output.
-	sort.SliceStable(edges, func(i, j int) bool {
-		return edges[i].Outgoing < edges[j].Outgoing
-	})
-	return edges, nil
+// DeterminsiticAppUUID returns a deterministic V3 UUID based off of the SHA1
+// hash of the app's URL.
+func DeterministicAppUUID(url string) uuid.UUID {
+	return DeterministicSha1UUID(url)
 }
 
-// DeterministicUUID returns a deterministic V3 UUID based off of the SHA1
-// hash of the function's name.
-func DeterministicUUID(f Function) uuid.UUID {
-	str := f.Name + f.Steps[0].URI
+// DeterministicSha1UUID returns a deterministic V3 UUID based off of the SHA1
+// hash of the input string.
+func DeterministicSha1UUID(str string) uuid.UUID {
 	return uuid.NewSHA1(uuid.NameSpaceOID, []byte(str))
 }
 

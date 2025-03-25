@@ -1,6 +1,7 @@
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react';
+import { z } from 'zod';
 
-import { api, type Event } from './generated';
+import { api } from './generated';
 
 const baseURL = process.env.NEXT_PUBLIC_API_BASE_URL
   ? new URL('/', process.env.NEXT_PUBLIC_API_BASE_URL)
@@ -10,10 +11,37 @@ export interface EventPayload {
   name: string;
 }
 
+const serverInfoSchema = z.object({
+  version: z.string().optional(),
+  isSingleNodeService: z.boolean().optional(),
+  startOpts: z.record(z.unknown()).optional(),
+});
+
+export interface ServerInfo extends z.output<typeof serverInfoSchema> {
+  isDiscoveryEnabled?: boolean;
+}
+
 export const devApi = createApi({
   reducerPath: 'devApi',
   baseQuery: fetchBaseQuery({ baseUrl: baseURL.toString() }),
   endpoints: (builder) => ({
+    info: builder.query<ServerInfo, void>({
+      query() {
+        return {
+          url: '/dev',
+          method: 'GET',
+        };
+      },
+      transformResponse(baseQueryReturnValue) {
+        const info: ServerInfo = serverInfoSchema.parse(baseQueryReturnValue);
+
+        if (info.startOpts) {
+          info.isDiscoveryEnabled = Boolean(info.startOpts.autodiscover);
+        }
+
+        return info;
+      },
+    }),
     sendEvent: builder.mutation<
       void,
       { id: string; name: string; ts: number; data?: object; user?: object; functionId?: string }
@@ -51,39 +79,10 @@ export const devApi = createApi({
             }
           )
         );
-
-        // Optimistically update the `GetEventsStreamQuery` cache with the new event so that it
-        // shows up in the UI immediately.
-        const patchEventsStreamsResult = dispatch(
-          api.util.updateQueryData('GetEventsStream', undefined, (draftEvents) => {
-            const normalizedEvent: Event = {
-              __typename: 'Event',
-              functionRuns: null,
-              id: event.id,
-              name: event.name,
-              createdAt: event.ts,
-              payload: null,
-              pendingRuns: null,
-              raw: null,
-              schema: null,
-              status: null,
-              totalRuns: null,
-              workspace: null,
-            } as const;
-            if (draftEvents.events) {
-              draftEvents.events.unshift(normalizedEvent);
-            } else {
-              draftEvents.events = [normalizedEvent];
-            }
-          })
-        );
-
-        // If the event fails to send, undo the optimistic update.
-        queryFulfilled.catch(patchEventsStreamsResult.undo);
       },
     }),
   }),
 });
 
-export const { useSendEventMutation } = devApi;
+export const { useSendEventMutation, useInfoQuery } = devApi;
 export default devApi;

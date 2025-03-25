@@ -8,12 +8,18 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/history_reader"
+	ulid "github.com/oklog/ulid/v2"
 )
 
 type FunctionRunEvent interface {
 	IsFunctionRunEvent()
+}
+
+type StepInfo interface {
+	IsStepInfo()
 }
 
 type ActionVersionQuery struct {
@@ -22,12 +28,62 @@ type ActionVersionQuery struct {
 	VersionMinor *int   `json:"versionMinor,omitempty"`
 }
 
+type AppsFilterV1 struct {
+	ConnectionType *AppConnectionType `json:"connectionType,omitempty"`
+	Method         *AppMethod         `json:"method,omitempty"`
+}
+
+type ConnectV1WorkerConnection struct {
+	ID               ulid.ULID                 `json:"id"`
+	GatewayID        ulid.ULID                 `json:"gatewayId"`
+	InstanceID       string                    `json:"instanceId"`
+	WorkerIP         string                    `json:"workerIp"`
+	AppName          *string                   `json:"appName,omitempty"`
+	AppID            *uuid.UUID                `json:"appID,omitempty"`
+	App              *cqrs.App                 `json:"app,omitempty"`
+	ConnectedAt      time.Time                 `json:"connectedAt"`
+	LastHeartbeatAt  *time.Time                `json:"lastHeartbeatAt,omitempty"`
+	DisconnectedAt   *time.Time                `json:"disconnectedAt,omitempty"`
+	DisconnectReason *string                   `json:"disconnectReason,omitempty"`
+	Status           ConnectV1ConnectionStatus `json:"status"`
+	GroupHash        string                    `json:"groupHash"`
+	SdkLang          string                    `json:"sdkLang"`
+	SdkVersion       string                    `json:"sdkVersion"`
+	SdkPlatform      string                    `json:"sdkPlatform"`
+	SyncID           *uuid.UUID                `json:"syncId,omitempty"`
+	BuildID          *string                   `json:"buildId,omitempty"`
+	AppVersion       *string                   `json:"appVersion,omitempty"`
+	FunctionCount    int                       `json:"functionCount"`
+	CPUCores         int                       `json:"cpuCores"`
+	MemBytes         int                       `json:"memBytes"`
+	Os               string                    `json:"os"`
+}
+
+type ConnectV1WorkerConnectionEdge struct {
+	Node   *ConnectV1WorkerConnection `json:"node"`
+	Cursor string                     `json:"cursor"`
+}
+
+type ConnectV1WorkerConnectionsFilter struct {
+	From      *time.Time                              `json:"from,omitempty"`
+	Until     *time.Time                              `json:"until,omitempty"`
+	TimeField *ConnectV1WorkerConnectionsOrderByField `json:"timeField,omitempty"`
+	Status    []ConnectV1ConnectionStatus             `json:"status,omitempty"`
+	AppIDs    []uuid.UUID                             `json:"appIDs,omitempty"`
+}
+
+type ConnectV1WorkerConnectionsOrderBy struct {
+	Field     ConnectV1WorkerConnectionsOrderByField     `json:"field"`
+	Direction ConnectV1WorkerConnectionsOrderByDirection `json:"direction"`
+}
+
 type CreateAppInput struct {
 	URL string `json:"url"`
 }
 
 type Event struct {
-	ID           string         `json:"id"`
+	ID           ulid.ULID      `json:"id"`
+	ExternalID   *string        `json:"externalID,omitempty"`
 	Workspace    *Workspace     `json:"workspace,omitempty"`
 	Name         *string        `json:"name,omitempty"`
 	CreatedAt    *time.Time     `json:"createdAt,omitempty"`
@@ -78,6 +134,9 @@ type FunctionRun struct {
 	Function          *Function                    `json:"function,omitempty"`
 	Workspace         *Workspace                   `json:"workspace,omitempty"`
 	Event             *Event                       `json:"event,omitempty"`
+	Events            []*Event                     `json:"events"`
+	BatchID           *ulid.ULID                   `json:"batchID,omitempty"`
+	BatchCreatedAt    *time.Time                   `json:"batchCreatedAt,omitempty"`
 	Status            *FunctionRunStatus           `json:"status,omitempty"`
 	WaitingFor        *StepEventWait               `json:"waitingFor,omitempty"`
 	PendingSteps      *int                         `json:"pendingSteps,omitempty"`
@@ -86,13 +145,40 @@ type FunctionRun struct {
 	Output            *string                      `json:"output,omitempty"`
 	History           []*history_reader.RunHistory `json:"history"`
 	HistoryItemOutput *string                      `json:"historyItemOutput,omitempty"`
-	Name              *string                      `json:"name,omitempty"`
 	EventID           string                       `json:"eventID"`
+	Cron              *string                      `json:"cron,omitempty"`
 }
 
 type FunctionRunQuery struct {
 	WorkspaceID   string `json:"workspaceId"`
 	FunctionRunID string `json:"functionRunId"`
+}
+
+type FunctionRunV2 struct {
+	ID             ulid.ULID         `json:"id"`
+	AppID          uuid.UUID         `json:"appID"`
+	App            *cqrs.App         `json:"app"`
+	FunctionID     uuid.UUID         `json:"functionID"`
+	Function       *Function         `json:"function"`
+	TraceID        string            `json:"traceID"`
+	QueuedAt       time.Time         `json:"queuedAt"`
+	StartedAt      *time.Time        `json:"startedAt,omitempty"`
+	EndedAt        *time.Time        `json:"endedAt,omitempty"`
+	Status         FunctionRunStatus `json:"status"`
+	SourceID       *string           `json:"sourceID,omitempty"`
+	TriggerIDs     []ulid.ULID       `json:"triggerIDs"`
+	EventName      *string           `json:"eventName,omitempty"`
+	IsBatch        bool              `json:"isBatch"`
+	BatchCreatedAt *time.Time        `json:"batchCreatedAt,omitempty"`
+	CronSchedule   *string           `json:"cronSchedule,omitempty"`
+	Output         *string           `json:"output,omitempty"`
+	Trace          *RunTraceSpan     `json:"trace,omitempty"`
+	HasAi          bool              `json:"hasAI"`
+}
+
+type FunctionRunV2Edge struct {
+	Node   *FunctionRunV2 `json:"node"`
+	Cursor string         `json:"cursor"`
 }
 
 type FunctionRunsQuery struct {
@@ -102,6 +188,107 @@ type FunctionRunsQuery struct {
 type FunctionTrigger struct {
 	Type  FunctionTriggerTypes `json:"type"`
 	Value string               `json:"value"`
+}
+
+type InvokeStepInfo struct {
+	TriggeringEventID ulid.ULID  `json:"triggeringEventID"`
+	FunctionID        string     `json:"functionID"`
+	Timeout           time.Time  `json:"timeout"`
+	ReturnEventID     *ulid.ULID `json:"returnEventID,omitempty"`
+	RunID             *ulid.ULID `json:"runID,omitempty"`
+	TimedOut          *bool      `json:"timedOut,omitempty"`
+}
+
+func (InvokeStepInfo) IsStepInfo() {}
+
+// The pagination information in a connection.
+type PageInfo struct {
+	// Indicates if there are any pages subsequent to the current page.
+	HasNextPage bool `json:"hasNextPage"`
+	// Indicates if there are any pages prior to the current page.
+	HasPreviousPage bool `json:"hasPreviousPage"`
+	// When paginating backward, the cursor to query the previous page.
+	StartCursor *string `json:"startCursor,omitempty"`
+	// When paginating forward, the cursor to query the next page.
+	EndCursor *string `json:"endCursor,omitempty"`
+}
+
+type RerunFromStepInput struct {
+	StepID string  `json:"stepID"`
+	Input  *string `json:"input,omitempty"`
+}
+
+type RunStepInfo struct {
+	Type *string `json:"type,omitempty"`
+}
+
+func (RunStepInfo) IsStepInfo() {}
+
+type RunTraceSpan struct {
+	AppID         uuid.UUID          `json:"appID"`
+	FunctionID    uuid.UUID          `json:"functionID"`
+	RunID         ulid.ULID          `json:"runID"`
+	Run           *FunctionRun       `json:"run"`
+	SpanID        string             `json:"spanID"`
+	TraceID       string             `json:"traceID"`
+	Name          string             `json:"name"`
+	Status        RunTraceSpanStatus `json:"status"`
+	Attempts      *int               `json:"attempts,omitempty"`
+	Duration      *int               `json:"duration,omitempty"`
+	OutputID      *string            `json:"outputID,omitempty"`
+	QueuedAt      time.Time          `json:"queuedAt"`
+	StartedAt     *time.Time         `json:"startedAt,omitempty"`
+	EndedAt       *time.Time         `json:"endedAt,omitempty"`
+	ChildrenSpans []*RunTraceSpan    `json:"childrenSpans"`
+	StepOp        *StepOp            `json:"stepOp,omitempty"`
+	StepID        *string            `json:"stepID,omitempty"`
+	StepInfo      StepInfo           `json:"stepInfo,omitempty"`
+	IsRoot        bool               `json:"isRoot"`
+	ParentSpanID  *string            `json:"parentSpanID,omitempty"`
+	ParentSpan    *RunTraceSpan      `json:"parentSpan,omitempty"`
+}
+
+type RunTraceSpanOutput struct {
+	Input *string    `json:"input,omitempty"`
+	Data  *string    `json:"data,omitempty"`
+	Error *StepError `json:"error,omitempty"`
+}
+
+type RunTraceTrigger struct {
+	EventName *string     `json:"eventName,omitempty"`
+	IDs       []ulid.ULID `json:"IDs"`
+	Payloads  []string    `json:"payloads"`
+	Timestamp time.Time   `json:"timestamp"`
+	IsBatch   bool        `json:"isBatch"`
+	BatchID   *ulid.ULID  `json:"batchID,omitempty"`
+	Cron      *string     `json:"cron,omitempty"`
+}
+
+type RunsFilterV2 struct {
+	From        time.Time           `json:"from"`
+	Until       *time.Time          `json:"until,omitempty"`
+	TimeField   *RunsV2OrderByField `json:"timeField,omitempty"`
+	Status      []FunctionRunStatus `json:"status,omitempty"`
+	FunctionIDs []uuid.UUID         `json:"functionIDs,omitempty"`
+	AppIDs      []uuid.UUID         `json:"appIDs,omitempty"`
+	Query       *string             `json:"query,omitempty"`
+}
+
+type RunsV2OrderBy struct {
+	Field     RunsV2OrderByField   `json:"field"`
+	Direction RunsOrderByDirection `json:"direction"`
+}
+
+type SleepStepInfo struct {
+	SleepUntil time.Time `json:"sleepUntil"`
+}
+
+func (SleepStepInfo) IsStepInfo() {}
+
+type StepError struct {
+	Message string  `json:"message"`
+	Name    *string `json:"name,omitempty"`
+	Stack   *string `json:"stack,omitempty"`
 }
 
 type StepEvent struct {
@@ -129,12 +316,14 @@ type StreamItem struct {
 	Type      StreamType     `json:"type"`
 	CreatedAt time.Time      `json:"createdAt"`
 	Runs      []*FunctionRun `json:"runs,omitempty"`
+	InBatch   bool           `json:"inBatch"`
 }
 
 type StreamQuery struct {
-	After  *time.Time `json:"after,omitempty"`
-	Before *time.Time `json:"before,omitempty"`
-	Limit  int        `json:"limit"`
+	After                 *string `json:"after,omitempty"`
+	Before                *string `json:"before,omitempty"`
+	Limit                 int     `json:"limit"`
+	IncludeInternalEvents *bool   `json:"includeInternalEvents,omitempty"`
 }
 
 type UpdateAppInput struct {
@@ -142,8 +331,231 @@ type UpdateAppInput struct {
 	URL string `json:"url"`
 }
 
+type WaitForEventStepInfo struct {
+	EventName    string     `json:"eventName"`
+	Expression   *string    `json:"expression,omitempty"`
+	Timeout      time.Time  `json:"timeout"`
+	FoundEventID *ulid.ULID `json:"foundEventID,omitempty"`
+	TimedOut     *bool      `json:"timedOut,omitempty"`
+}
+
+func (WaitForEventStepInfo) IsStepInfo() {}
+
 type Workspace struct {
 	ID string `json:"id"`
+}
+
+type AppConnectionType string
+
+const (
+	AppConnectionTypeServerless AppConnectionType = "SERVERLESS"
+	AppConnectionTypeConnect    AppConnectionType = "CONNECT"
+)
+
+var AllAppConnectionType = []AppConnectionType{
+	AppConnectionTypeServerless,
+	AppConnectionTypeConnect,
+}
+
+func (e AppConnectionType) IsValid() bool {
+	switch e {
+	case AppConnectionTypeServerless, AppConnectionTypeConnect:
+		return true
+	}
+	return false
+}
+
+func (e AppConnectionType) String() string {
+	return string(e)
+}
+
+func (e *AppConnectionType) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = AppConnectionType(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid AppConnectionType", str)
+	}
+	return nil
+}
+
+func (e AppConnectionType) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+type AppMethod string
+
+const (
+	AppMethodServe   AppMethod = "SERVE"
+	AppMethodConnect AppMethod = "CONNECT"
+)
+
+var AllAppMethod = []AppMethod{
+	AppMethodServe,
+	AppMethodConnect,
+}
+
+func (e AppMethod) IsValid() bool {
+	switch e {
+	case AppMethodServe, AppMethodConnect:
+		return true
+	}
+	return false
+}
+
+func (e AppMethod) String() string {
+	return string(e)
+}
+
+func (e *AppMethod) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = AppMethod(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid AppMethod", str)
+	}
+	return nil
+}
+
+func (e AppMethod) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+type ConnectV1ConnectionStatus string
+
+const (
+	ConnectV1ConnectionStatusConnected     ConnectV1ConnectionStatus = "CONNECTED"
+	ConnectV1ConnectionStatusReady         ConnectV1ConnectionStatus = "READY"
+	ConnectV1ConnectionStatusDraining      ConnectV1ConnectionStatus = "DRAINING"
+	ConnectV1ConnectionStatusDisconnecting ConnectV1ConnectionStatus = "DISCONNECTING"
+	ConnectV1ConnectionStatusDisconnected  ConnectV1ConnectionStatus = "DISCONNECTED"
+)
+
+var AllConnectV1ConnectionStatus = []ConnectV1ConnectionStatus{
+	ConnectV1ConnectionStatusConnected,
+	ConnectV1ConnectionStatusReady,
+	ConnectV1ConnectionStatusDraining,
+	ConnectV1ConnectionStatusDisconnecting,
+	ConnectV1ConnectionStatusDisconnected,
+}
+
+func (e ConnectV1ConnectionStatus) IsValid() bool {
+	switch e {
+	case ConnectV1ConnectionStatusConnected, ConnectV1ConnectionStatusReady, ConnectV1ConnectionStatusDraining, ConnectV1ConnectionStatusDisconnecting, ConnectV1ConnectionStatusDisconnected:
+		return true
+	}
+	return false
+}
+
+func (e ConnectV1ConnectionStatus) String() string {
+	return string(e)
+}
+
+func (e *ConnectV1ConnectionStatus) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = ConnectV1ConnectionStatus(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid ConnectV1ConnectionStatus", str)
+	}
+	return nil
+}
+
+func (e ConnectV1ConnectionStatus) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+type ConnectV1WorkerConnectionsOrderByDirection string
+
+const (
+	ConnectV1WorkerConnectionsOrderByDirectionAsc  ConnectV1WorkerConnectionsOrderByDirection = "ASC"
+	ConnectV1WorkerConnectionsOrderByDirectionDesc ConnectV1WorkerConnectionsOrderByDirection = "DESC"
+)
+
+var AllConnectV1WorkerConnectionsOrderByDirection = []ConnectV1WorkerConnectionsOrderByDirection{
+	ConnectV1WorkerConnectionsOrderByDirectionAsc,
+	ConnectV1WorkerConnectionsOrderByDirectionDesc,
+}
+
+func (e ConnectV1WorkerConnectionsOrderByDirection) IsValid() bool {
+	switch e {
+	case ConnectV1WorkerConnectionsOrderByDirectionAsc, ConnectV1WorkerConnectionsOrderByDirectionDesc:
+		return true
+	}
+	return false
+}
+
+func (e ConnectV1WorkerConnectionsOrderByDirection) String() string {
+	return string(e)
+}
+
+func (e *ConnectV1WorkerConnectionsOrderByDirection) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = ConnectV1WorkerConnectionsOrderByDirection(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid ConnectV1WorkerConnectionsOrderByDirection", str)
+	}
+	return nil
+}
+
+func (e ConnectV1WorkerConnectionsOrderByDirection) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+type ConnectV1WorkerConnectionsOrderByField string
+
+const (
+	ConnectV1WorkerConnectionsOrderByFieldConnectedAt     ConnectV1WorkerConnectionsOrderByField = "CONNECTED_AT"
+	ConnectV1WorkerConnectionsOrderByFieldLastHeartbeatAt ConnectV1WorkerConnectionsOrderByField = "LAST_HEARTBEAT_AT"
+	ConnectV1WorkerConnectionsOrderByFieldDisconnectedAt  ConnectV1WorkerConnectionsOrderByField = "DISCONNECTED_AT"
+)
+
+var AllConnectV1WorkerConnectionsOrderByField = []ConnectV1WorkerConnectionsOrderByField{
+	ConnectV1WorkerConnectionsOrderByFieldConnectedAt,
+	ConnectV1WorkerConnectionsOrderByFieldLastHeartbeatAt,
+	ConnectV1WorkerConnectionsOrderByFieldDisconnectedAt,
+}
+
+func (e ConnectV1WorkerConnectionsOrderByField) IsValid() bool {
+	switch e {
+	case ConnectV1WorkerConnectionsOrderByFieldConnectedAt, ConnectV1WorkerConnectionsOrderByFieldLastHeartbeatAt, ConnectV1WorkerConnectionsOrderByFieldDisconnectedAt:
+		return true
+	}
+	return false
+}
+
+func (e ConnectV1WorkerConnectionsOrderByField) String() string {
+	return string(e)
+}
+
+func (e *ConnectV1WorkerConnectionsOrderByField) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = ConnectV1WorkerConnectionsOrderByField(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid ConnectV1WorkerConnectionsOrderByField", str)
+	}
+	return nil
+}
+
+func (e ConnectV1WorkerConnectionsOrderByField) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
 type EventStatus string
@@ -247,6 +659,7 @@ const (
 	FunctionRunStatusFailed    FunctionRunStatus = "FAILED"
 	FunctionRunStatusCancelled FunctionRunStatus = "CANCELLED"
 	FunctionRunStatusRunning   FunctionRunStatus = "RUNNING"
+	FunctionRunStatusQueued    FunctionRunStatus = "QUEUED"
 )
 
 var AllFunctionRunStatus = []FunctionRunStatus{
@@ -254,11 +667,12 @@ var AllFunctionRunStatus = []FunctionRunStatus{
 	FunctionRunStatusFailed,
 	FunctionRunStatusCancelled,
 	FunctionRunStatusRunning,
+	FunctionRunStatusQueued,
 }
 
 func (e FunctionRunStatus) IsValid() bool {
 	switch e {
-	case FunctionRunStatusCompleted, FunctionRunStatusFailed, FunctionRunStatusCancelled, FunctionRunStatusRunning:
+	case FunctionRunStatusCompleted, FunctionRunStatusFailed, FunctionRunStatusCancelled, FunctionRunStatusRunning, FunctionRunStatusQueued:
 		return true
 	}
 	return false
@@ -371,6 +785,139 @@ func (e FunctionTriggerTypes) MarshalGQL(w io.Writer) {
 	fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
+type RunTraceSpanStatus string
+
+const (
+	RunTraceSpanStatusFailed    RunTraceSpanStatus = "FAILED"
+	RunTraceSpanStatusQueued    RunTraceSpanStatus = "QUEUED"
+	RunTraceSpanStatusRunning   RunTraceSpanStatus = "RUNNING"
+	RunTraceSpanStatusCompleted RunTraceSpanStatus = "COMPLETED"
+	RunTraceSpanStatusWaiting   RunTraceSpanStatus = "WAITING"
+	RunTraceSpanStatusCancelled RunTraceSpanStatus = "CANCELLED"
+)
+
+var AllRunTraceSpanStatus = []RunTraceSpanStatus{
+	RunTraceSpanStatusFailed,
+	RunTraceSpanStatusQueued,
+	RunTraceSpanStatusRunning,
+	RunTraceSpanStatusCompleted,
+	RunTraceSpanStatusWaiting,
+	RunTraceSpanStatusCancelled,
+}
+
+func (e RunTraceSpanStatus) IsValid() bool {
+	switch e {
+	case RunTraceSpanStatusFailed, RunTraceSpanStatusQueued, RunTraceSpanStatusRunning, RunTraceSpanStatusCompleted, RunTraceSpanStatusWaiting, RunTraceSpanStatusCancelled:
+		return true
+	}
+	return false
+}
+
+func (e RunTraceSpanStatus) String() string {
+	return string(e)
+}
+
+func (e *RunTraceSpanStatus) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = RunTraceSpanStatus(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid RunTraceSpanStatus", str)
+	}
+	return nil
+}
+
+func (e RunTraceSpanStatus) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+type RunsOrderByDirection string
+
+const (
+	RunsOrderByDirectionAsc  RunsOrderByDirection = "ASC"
+	RunsOrderByDirectionDesc RunsOrderByDirection = "DESC"
+)
+
+var AllRunsOrderByDirection = []RunsOrderByDirection{
+	RunsOrderByDirectionAsc,
+	RunsOrderByDirectionDesc,
+}
+
+func (e RunsOrderByDirection) IsValid() bool {
+	switch e {
+	case RunsOrderByDirectionAsc, RunsOrderByDirectionDesc:
+		return true
+	}
+	return false
+}
+
+func (e RunsOrderByDirection) String() string {
+	return string(e)
+}
+
+func (e *RunsOrderByDirection) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = RunsOrderByDirection(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid RunsOrderByDirection", str)
+	}
+	return nil
+}
+
+func (e RunsOrderByDirection) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+type RunsV2OrderByField string
+
+const (
+	RunsV2OrderByFieldQueuedAt  RunsV2OrderByField = "QUEUED_AT"
+	RunsV2OrderByFieldStartedAt RunsV2OrderByField = "STARTED_AT"
+	RunsV2OrderByFieldEndedAt   RunsV2OrderByField = "ENDED_AT"
+)
+
+var AllRunsV2OrderByField = []RunsV2OrderByField{
+	RunsV2OrderByFieldQueuedAt,
+	RunsV2OrderByFieldStartedAt,
+	RunsV2OrderByFieldEndedAt,
+}
+
+func (e RunsV2OrderByField) IsValid() bool {
+	switch e {
+	case RunsV2OrderByFieldQueuedAt, RunsV2OrderByFieldStartedAt, RunsV2OrderByFieldEndedAt:
+		return true
+	}
+	return false
+}
+
+func (e RunsV2OrderByField) String() string {
+	return string(e)
+}
+
+func (e *RunsV2OrderByField) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = RunsV2OrderByField(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid RunsV2OrderByField", str)
+	}
+	return nil
+}
+
+func (e RunsV2OrderByField) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
 type StepEventType string
 
 const (
@@ -417,6 +964,53 @@ func (e *StepEventType) UnmarshalGQL(v interface{}) error {
 }
 
 func (e StepEventType) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+type StepOp string
+
+const (
+	StepOpInvoke       StepOp = "INVOKE"
+	StepOpRun          StepOp = "RUN"
+	StepOpSleep        StepOp = "SLEEP"
+	StepOpWaitForEvent StepOp = "WAIT_FOR_EVENT"
+	StepOpAiGateway    StepOp = "AI_GATEWAY"
+)
+
+var AllStepOp = []StepOp{
+	StepOpInvoke,
+	StepOpRun,
+	StepOpSleep,
+	StepOpWaitForEvent,
+	StepOpAiGateway,
+}
+
+func (e StepOp) IsValid() bool {
+	switch e {
+	case StepOpInvoke, StepOpRun, StepOpSleep, StepOpWaitForEvent, StepOpAiGateway:
+		return true
+	}
+	return false
+}
+
+func (e StepOp) String() string {
+	return string(e)
+}
+
+func (e *StepOp) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = StepOp(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid StepOp", str)
+	}
+	return nil
+}
+
+func (e StepOp) MarshalGQL(w io.Writer) {
 	fmt.Fprint(w, strconv.Quote(e.String()))
 }
 

@@ -4,10 +4,10 @@ on:
   push:
     branches: [main]
     paths-ignore:
-      - "ui/apps/dashboard/**"
+      - "ui/**"
   pull_request:
     paths-ignore:
-      - "ui/apps/dashboard/**"
+      - "ui/**"
 
 jobs:
   ts:
@@ -17,18 +17,18 @@ jobs:
         os: [ubuntu-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - name: Set up Go
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v5
         with:
-          go-version: "1.21"
-      - uses: actions/setup-node@v3
+          go-version: "1.24"
+      - uses: actions/setup-node@v4
         with:
           node-version: "18"
       - name: Install pnpm
-        uses: pnpm/action-setup@v2
+        uses: pnpm/action-setup@v4
         with:
-          version: 8.6.2
+          version: 8.15.8
       - name: Build UI
         run: make build-ui
       - name: Build dev serve
@@ -51,6 +51,7 @@ jobs:
           INNGEST_SIGNING_KEY: test
           API_URL: http://127.0.0.1:8288
           SDK_URL: http://127.0.0.1:3000/api/inngest
+          ENABLE_TEST_API: true
   golang:
     name: Go SDK Tests
     strategy:
@@ -58,11 +59,11 @@ jobs:
         os: [ubuntu-latest]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v4
       - name: Set up Go
-        uses: actions/setup-go@v2
+        uses: actions/setup-go@v5
         with:
-          go-version: "1.21"
+          go-version: "1.24"
       - name: Build dev server
         run: |
           go build -o ./inngest-bin ./cmd/main.go
@@ -75,5 +76,8 @@ jobs:
           curl http://127.0.0.1:8288/dev > /dev/null 2> /dev/null
           go test ./tests/golang -v -count=1
         env:
+          API_URL: http://127.0.0.1:8288
+          INNGEST_EVENT_KEY: test
           INNGEST_SIGNING_KEY: 7468697320697320612074657374206b6579
           INNGEST_DEV: http://127.0.0.1:8288
+          ENABLE_TEST_API: true

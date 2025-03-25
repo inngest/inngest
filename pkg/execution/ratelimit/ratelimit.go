@@ -4,13 +4,12 @@ import (
 	"context"
 	"fmt"
 	"log"
-	"strconv"
 	"time"
 
-	"github.com/cespare/xxhash/v2"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/expressions"
 	"github.com/inngest/inngest/pkg/inngest"
+	"github.com/inngest/inngest/pkg/util"
 	"github.com/throttled/throttled/v2"
 	"github.com/xhit/go-str2duration/v2"
 )
@@ -18,6 +17,7 @@ import (
 var (
 	ErrRateLimitExceeded             = fmt.Errorf("rate limit exceeded")
 	ErrEvaluatingRateLimitExpression = fmt.Errorf("rate limit expression evaluation failed")
+	ErrNotRateLimited                = fmt.Errorf("not rate limited")
 )
 
 type RateLimiter interface {
@@ -38,6 +38,9 @@ func RateLimitKey(ctx context.Context, id uuid.UUID, c inngest.RateLimit, evt ma
 	if err != nil {
 		return "", ErrEvaluatingRateLimitExpression
 	}
+	if v, ok := res.(bool); ok && !v {
+		return "", ErrNotRateLimited
+	}
 
 	// Take a checksum of this data.  It doesn't matter if this is a map or a string;
 	// as long as we're consistent here.
@@ -45,8 +48,7 @@ func RateLimitKey(ctx context.Context, id uuid.UUID, c inngest.RateLimit, evt ma
 }
 
 func hash(res any, id uuid.UUID) string {
-	ui := xxhash.Sum64String(fmt.Sprintf("%v", res))
-	sum := strconv.FormatUint(ui, 36)
+	sum := util.XXHash(res)
 	return fmt.Sprintf("%s-%s", id, sum)
 }
 

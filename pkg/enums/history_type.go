@@ -23,4 +23,6 @@ const (
 	HistoryTypeStepWaiting
 	HistoryTypeStepSleeping
 	HistoryTypeStepInvoking
+
+	HistoryTypeFunctionSkipped // for reasons, see enums.SkipReason
 )

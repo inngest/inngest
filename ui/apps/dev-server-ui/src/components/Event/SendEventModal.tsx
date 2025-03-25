@@ -1,14 +1,8 @@
-import {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type KeyboardEvent,
-  type SyntheticEvent,
-} from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { Button } from '@inngest/components/Button';
 import { Modal } from '@inngest/components/Modal';
+import { FONT, LINE_HEIGHT, createColors, createRules } from '@inngest/components/utils/monaco';
+import { isDark } from '@inngest/components/utils/theme';
 import Editor, { useMonaco } from '@monaco-editor/react';
 import { toast } from 'sonner';
 import { ulid } from 'ulid';
@@ -25,6 +19,8 @@ type SendEventModalProps = {
 };
 
 export default function SendEventModal({ data, isOpen, onClose }: SendEventModalProps) {
+  const [dark, setDark] = useState(isDark());
+  const wrapperRef = useRef<HTMLDivElement>(null);
   const [_sendEvent, sendEventState] = useSendEventMutation();
   const portal = usePortal();
   const eventDataStr = data;
@@ -113,43 +109,22 @@ export default function SendEventModal({ data, isOpen, onClose }: SendEventModal
   }, [sendEvent]);
 
   useEffect(() => {
+    // We don't have a DOM ref until we're rendered, so check for dark theme parent classes then
+    if (wrapperRef.current) {
+      setDark(isDark(wrapperRef.current));
+    }
+  });
+
+  useEffect(() => {
     if (!monaco) {
       return;
     }
 
     monaco.editor.defineTheme('inngest-theme', {
-      base: 'vs-dark',
+      base: dark ? 'vs-dark' : 'vs',
       inherit: true,
-      rules: [
-        {
-          token: 'delimiter.bracket.json',
-          foreground: 'cbd5e1', //slate-300
-        },
-        {
-          token: 'string.key.json',
-          foreground: '818cf8', //indigo-400
-        },
-        {
-          token: 'number.json',
-          foreground: 'fbbf24', //amber-400
-        },
-        {
-          token: 'string.value.json',
-          foreground: '6ee7b7', //emerald-300
-        },
-        {
-          token: 'keyword.json',
-          foreground: 'f0abfc', //fuschia-300
-        },
-      ],
-      colors: {
-        'editor.background': '#1e293b4d', // slate-800/40
-        'editor.lineHighlightBorder': '#cbd5e11a', // slate-300/10
-        'editorIndentGuide.background': '#cbd5e133', // slate-300/20
-        'editorIndentGuide.activeBackground': '#cbd5e14d', // slate-300/30
-        'editorLineNumber.foreground': '#cbd5e14d', // slate-300/30
-        'editorLineNumber.activeForeground': '#CBD5E1', // slate-300
-      },
+      rules: dark ? createRules(true) : createRules(false),
+      colors: dark ? createColors(true) : createColors(false),
     });
 
     monaco.languages.json.jsonDefaults.setDiagnosticsOptions({
@@ -190,31 +165,20 @@ export default function SendEventModal({ data, isOpen, onClose }: SendEventModal
         },
       ],
     });
-  }, [monaco]);
+  }, [monaco, dark]);
 
   return portal(
-    <Modal
-      isOpen={isOpen}
-      onClose={onClose}
-      title="Send Event"
-      description="Send an event manually by filling or pasting a payload"
-      className="w-full max-w-5xl"
-      footer={
-        <div className="flex items-center justify-between">
-          <Button label="Cancel" appearance="outlined" btnAction={onClose} />
-          <Button
-            disabled={sendEventState.isLoading}
-            label="Send Event"
-            btnAction={() => sendEvent()}
-            keys={[useModifierKey(), '↵']}
-          />
-        </div>
-      }
-    >
-      <div className="p-6">
-        <div className="relative flex h-[20rem] w-full flex-col overflow-hidden rounded-lg">
-          <div className="flex items-center justify-between border-b border-slate-700/20 bg-slate-800/40 shadow">
-            <p className=" px-5 py-4 text-xs text-slate-400">Payload</p>
+    <Modal isOpen={isOpen} onClose={onClose} className="w-full max-w-5xl">
+      <Modal.Header description="Send an event manually by filling or pasting a payload">
+        Send Event
+      </Modal.Header>
+      <Modal.Body>
+        <div
+          className="border-subtle relative flex h-[20rem] w-full flex-col overflow-hidden rounded-md border"
+          ref={wrapperRef}
+        >
+          <div className="border-subtle flex items-center justify-between border-b">
+            <p className=" text-subtle px-5 py-2.5 text-sm">Payload</p>
           </div>
           {monaco ? (
             <Editor
@@ -245,10 +209,10 @@ export default function SendEventModal({ data, isOpen, onClose }: SendEventModal
                 },
                 scrollBeyondLastLine: false,
                 wordWrap: 'on',
-                fontFamily: 'RobotoMono',
-                fontSize: 13,
+                fontFamily: FONT.font,
+                fontSize: FONT.size,
                 fontWeight: 'light',
-                lineHeight: 26,
+                lineHeight: LINE_HEIGHT,
                 padding: {
                   top: 10,
                   bottom: 10,
@@ -257,7 +221,17 @@ export default function SendEventModal({ data, isOpen, onClose }: SendEventModal
             />
           ) : null}
         </div>
-      </div>
+      </Modal.Body>
+      <Modal.Footer className="flex justify-end gap-2">
+        <Button kind="secondary" label="Cancel" appearance="outlined" onClick={onClose} />
+        <Button
+          kind="primary"
+          disabled={sendEventState.isLoading}
+          label="Send event"
+          onClick={() => sendEvent()}
+          keys={[useModifierKey(), '↵']}
+        />
+      </Modal.Footer>
     </Modal>
   );
 }

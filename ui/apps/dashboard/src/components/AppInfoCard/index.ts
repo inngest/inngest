@@ -1,0 +1,1 @@
+export { AppInfoCard } from './AppInfoCard';

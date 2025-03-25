@@ -1,44 +1,71 @@
 'use client';
 
-import { Badge } from '@inngest/components/Badge';
+import { useCallback } from 'react';
 import { ContentCard } from '@inngest/components/ContentCard';
-import { FunctionRunStatusIcon } from '@inngest/components/FunctionRunStatusIcon';
+import { RunStatusIcon } from '@inngest/components/FunctionRunStatusIcons';
 import { MetadataGrid } from '@inngest/components/Metadata';
 import { OutputCard } from '@inngest/components/OutputCard';
+import { Pill } from '@inngest/components/Pill';
 import { Timeline } from '@inngest/components/Timeline';
-import { IconClock } from '@inngest/components/icons/Clock';
 import type { Function } from '@inngest/components/types/function';
 import type { FunctionRun } from '@inngest/components/types/functionRun';
 import type { FunctionVersion } from '@inngest/components/types/functionVersion';
 import type { HistoryParser } from '@inngest/components/utils/historyParser';
+import { RiTimeLine } from '@remixicon/react';
 
+import { CancelRunButton } from '../CancelRunButton';
+import { RerunButton } from '../RerunButton';
+import { CancellationSummary } from './CancellationSummary';
 import { SleepingSummary } from './SleepingSummary';
 import { WaitingSummary } from './WaitingSummary';
 import { renderRunMetadata } from './runMetadataRenderer';
 
-interface Props {
-  func: Pick<Function, 'name' | 'triggers'>;
+type FuncProps = {
+  cancelRun?: (runID: string) => Promise<unknown>;
   functionVersion?: Pick<FunctionVersion, 'url' | 'version'>;
-  getHistoryItemOutput: (historyItemID: string) => Promise<string | undefined>;
+  rerun?: () => Promise<unknown>;
+};
+type LoadingRun = {
+  func?: Pick<Function, 'name' | 'triggers'>;
+  loading: true;
+  history?: undefined;
+  run?: Pick<FunctionRun, 'endedAt' | 'id' | 'output' | 'startedAt' | 'status'>;
+  getHistoryItemOutput?: (historyItemID: string) => Promise<string | undefined>;
+  navigateToRun?: undefined;
+};
+
+type WithRun = {
+  func: Pick<Function, 'name' | 'triggers'>;
+  loading?: false;
   history: HistoryParser;
-
-  // TODO: Replace this with an imported component.
-  rerunButton?: React.ReactNode;
-
+  getHistoryItemOutput: (historyItemID: string) => Promise<string | undefined>;
   run: Pick<FunctionRun, 'endedAt' | 'id' | 'output' | 'startedAt' | 'status'>;
   navigateToRun: React.ComponentProps<typeof Timeline>['navigateToRun'];
-}
+};
 
-export function RunDetails({
-  func,
-  functionVersion,
-  getHistoryItemOutput,
-  history,
-  rerunButton,
-  run,
-  navigateToRun,
-}: Props) {
-  const firstTrigger = func.triggers[0] ?? null;
+type Props = FuncProps & (WithRun | LoadingRun);
+
+export function RunDetails(props: Props) {
+  const {
+    func,
+    functionVersion,
+    getHistoryItemOutput,
+    history,
+    rerun,
+    run,
+    navigateToRun,
+    loading = false,
+  } = props;
+
+  const runID = run?.id;
+  const cancelRun = useCallback(async () => {
+    if (!props.cancelRun || !runID) {
+      return;
+    }
+    await props.cancelRun(runID);
+  }, [props.cancelRun, runID]);
+
+  const firstTrigger = (func?.triggers && func.triggers[0]) ?? null;
   const cron = firstTrigger && firstTrigger.type === 'CRON';
 
   const metadataItems = renderRunMetadata({
@@ -47,49 +74,60 @@ export function RunDetails({
     history,
   });
 
-  const isSuccess = run.status === 'COMPLETED';
+  const isSuccess = run?.status === 'COMPLETED';
 
   return (
     <ContentCard
       active
-      button={rerunButton}
-      title={func.name}
-      icon={run.status && <FunctionRunStatusIcon status={run.status} className="h-5 w-5" />}
+      button={
+        !loading && (
+          <div className="flex gap-2">
+            {runID && <CancelRunButton disabled={Boolean(run?.endedAt)} hasIcon runID={runID} />}
+            {rerun && <RerunButton onClick={rerun} />}
+          </div>
+        )
+      }
+      title={func?.name || '...'}
+      icon={run?.status && <RunStatusIcon status={run?.status} className="h-5 w-5" />}
       type="run"
       badge={
         cron ? (
           <div className="py-2">
-            <Badge className="bg-orange-400/10 text-orange-400" kind="solid">
-              <IconClock />
+            <Pill kind="warning" appearance="outlined">
+              <RiTimeLine className="h-4 w-4" />
               {firstTrigger.value}
-            </Badge>
+            </Pill>
           </div>
         ) : null
       }
       metadata={
         <div className="pt-8">
-          <MetadataGrid metadataItems={metadataItems} />
+          <MetadataGrid metadataItems={metadataItems} loading={loading} />
         </div>
       }
     >
-      <div className="px-5 pt-4">
-        {run.status && run.endedAt && run.output && isSuccess && (
-          <OutputCard content={run.output} isSuccess={isSuccess} />
-        )}
+      {run && history && getHistoryItemOutput && (
+        <>
+          <div className="px-5 pt-4">
+            {run.status && run.endedAt && run.output && (
+              <OutputCard content={run.output} isSuccess={isSuccess} />
+            )}
+            <CancellationSummary history={history} />
+            <WaitingSummary history={history} />
+            <SleepingSummary history={history} />
+          </div>
 
-        <WaitingSummary history={history} />
-        <SleepingSummary history={history} />
-      </div>
-
-      <hr className="mt-8 border-slate-800/50" />
-      <div className="px-5 pt-4">
-        <h3 className="py-4 text-sm text-slate-400">Timeline</h3>
-        <Timeline
-          getOutput={getHistoryItemOutput}
-          history={history}
-          navigateToRun={navigateToRun}
-        />
-      </div>
+          <hr className="border-muted mt-8" />
+          <div className="px-5 pt-4">
+            <h3 className="text-muted py-4 text-sm">Timeline</h3>
+            <Timeline
+              getOutput={getHistoryItemOutput}
+              history={history}
+              navigateToRun={navigateToRun}
+            />
+          </div>
+        </>
+      )}
     </ContentCard>
   );
 }

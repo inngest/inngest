@@ -1,10 +1,11 @@
 import { useMemo } from 'react';
 import type { Event } from '@inngest/components/types/event';
 import {
-  baseFetchFailed,
-  baseFetchLoading,
   baseFetchSkipped,
   baseFetchSucceeded,
+  baseInitialFetchFailed,
+  baseInitialFetchLoading,
+  baseRefetchLoading,
   type FetchResult,
 } from '@inngest/components/types/fetch';
 import type { FunctionRun } from '@inngest/components/types/functionRun';
@@ -29,7 +30,7 @@ export function useEvent(eventID: string | null): FetchResult<Data, { skippable:
     const functionRuns: Data['functionRuns'] = (event.functionRuns ?? []).map((run) => {
       return {
         id: run.id,
-        name: run.name ?? 'Unknown',
+        name: run.function?.name ?? 'Unknown',
         output: run.output ?? null,
         status: run.status ?? FunctionRunStatus.Running,
       };
@@ -45,7 +46,18 @@ export function useEvent(eventID: string | null): FetchResult<Data, { skippable:
   }, [query.data?.event]);
 
   if (query.isLoading) {
-    return baseFetchLoading;
+    if (!data) {
+      return {
+        ...baseInitialFetchLoading,
+        refetch: query.refetch,
+      };
+    }
+
+    return {
+      ...baseRefetchLoading,
+      data,
+      refetch: query.refetch,
+    };
   }
 
   if (skip) {
@@ -54,21 +66,24 @@ export function useEvent(eventID: string | null): FetchResult<Data, { skippable:
 
   if (query.error) {
     return {
-      ...baseFetchFailed,
+      ...baseInitialFetchFailed,
       error: new Error(query.error.message),
+      refetch: query.refetch,
     };
   }
 
   if (!data) {
     // Should be unreachable.
     return {
-      ...baseFetchFailed,
+      ...baseInitialFetchFailed,
       error: new Error('finished loading but missing data'),
+      refetch: query.refetch,
     };
   }
 
   return {
     ...baseFetchSucceeded,
     data,
+    refetch: query.refetch,
   };
 }

@@ -11,7 +11,7 @@ The following instructions will help you build and run the Inngest CLI locally.
 - [Git](https://git-scm.com/downloads)
 - [Go 1.18 or higher](https://golang.org/doc/install)
 - [GoReleaser](https://goreleaser.com/install/)
-- [GolangCI-Lint](https://golangci-lint.run/usage/install/#local-installation)
+- [GolangCI-Lint](https://golangci-lint.run/welcome/install/#local-installation)
 
 ### Instructions
 

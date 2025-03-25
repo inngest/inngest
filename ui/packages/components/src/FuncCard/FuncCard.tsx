@@ -1,5 +1,5 @@
-import { FunctionRunStatusIcon } from '@inngest/components/FunctionRunStatusIcon';
-import { classNames } from '@inngest/components/utils/classNames';
+import { RunStatusIcon } from '@inngest/components/FunctionRunStatusIcons';
+import { cn } from '@inngest/components/utils/classNames';
 
 import type { FunctionRunStatus } from '../types/functionRun';
 
@@ -8,19 +8,16 @@ interface FuncCardProps {
   id: string;
   status?: FunctionRunStatus;
   active?: boolean;
-  footer?: React.ReactNode;
   onClick?: () => void;
 }
 
-export function FuncCard({ title, id, status, active = false, footer, onClick }: FuncCardProps) {
+export function FuncCard({ title, id, status, active = false, onClick }: FuncCardProps) {
   return (
     <a
-      className={classNames(
-        active
-          ? `outline-offset-3 border-slate-700/50 bg-slate-900 outline outline-2 outline-indigo-400`
-          : undefined,
-        `block w-full overflow-hidden rounded-lg bg-slate-800/50`,
-        onClick ? 'cursor-pointer hover:bg-slate-800/80' : undefined
+      className={cn(
+        active ? `border-muted bg-canvasBase border` : undefined,
+        `bg-canvasSubtle block w-full overflow-hidden rounded-md`,
+        onClick ? 'hover:bg-surfaceMuted cursor-pointer' : undefined
       )}
       onClick={
         onClick
@@ -32,14 +29,13 @@ export function FuncCard({ title, id, status, active = false, footer, onClick }:
       }
     >
       <div className="flex items-center gap-2 px-5 py-3.5">
-        {status && <FunctionRunStatusIcon status={status} className="h-4 w-4" />}
-        <h2 className="text-white">{title}</h2>
+        {status && <RunStatusIcon status={status} className="h-4 w-4" />}
+        <h2 className="text-basis">{title}</h2>
       </div>
-      <hr className="border-slate-800/50" />
-      <div className="px-5 py-3.5 text-xs leading-none text-slate-500">
+      <hr className="border-muted" />
+      <div className="text-subtle px-5 py-3.5 text-xs leading-none">
         Run ID: <span className="font-mono">{id}</span>
       </div>
-      {footer}
     </a>
   );
 }

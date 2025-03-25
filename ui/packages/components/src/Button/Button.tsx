@@ -1,132 +1,153 @@
 import type { UrlObject } from 'url';
-import React, { forwardRef } from 'react';
+import React, { forwardRef, type ButtonHTMLAttributes, type ReactNode } from 'react';
 import type { Route } from 'next';
-import Link from 'next/link';
+import NextLink, { type LinkProps as NextLinkProps } from 'next/link';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
 import { IconSpinner } from '@inngest/components/icons/Spinner';
 
-import { classNames } from '../utils/classNames';
+import { cn } from '../utils/classNames';
 import {
   getButtonColors,
   getButtonSizeStyles,
-  getDisabledStyles,
   getIconSizeStyles,
-  getKeyColor,
   getSpinnerStyles,
 } from './buttonStyles';
 
-type ButtonProps<PassedHref extends string> = {
-  kind?: 'default' | 'primary' | 'success' | 'danger';
-  appearance?: 'solid' | 'outlined' | 'text';
-  size?: 'small' | 'regular' | 'large';
-  iconSide?: 'right' | 'left';
-  label?: React.ReactNode;
-  icon?: React.ReactNode;
-  disabled?: boolean;
+export type ButtonKind = 'primary' | 'secondary' | 'danger';
+export type ButtonAppearance = 'solid' | 'outlined' | 'ghost';
+export type ButtonSize = 'small' | 'medium' | 'large';
+
+export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+  kind?: ButtonKind;
+  appearance?: ButtonAppearance;
+  size?: ButtonSize;
   loading?: boolean;
-  type?: 'submit' | 'button';
-  btnAction?: (e: React.MouseEvent | React.SyntheticEvent) => void;
-  href?: PassedHref | UrlObject;
-  keys?: string[];
-  isSplit?: boolean;
-  className?: string;
+  href?: string | UrlObject;
   target?: string;
-  rel?: string;
-  title?: string;
-  form?: string;
-};
+  tooltip?: ReactNode;
+  label?: ReactNode;
+  icon?: ReactNode;
+  iconSide?: 'right' | 'left';
+  keys?: string[];
+  prefetch?: boolean;
+  scroll?: boolean;
+}
 
-export const Button = forwardRef<HTMLButtonElement, ButtonProps<string>>(function Button(
-  {
-    kind = 'default',
-    appearance = 'solid',
-    size = 'regular',
-    label,
-    icon,
-    iconSide = 'left',
-    loading = false,
-    disabled,
-    btnAction,
-    href,
-    isSplit,
-    type = 'button',
-    keys,
-    className,
-    ...props
-  }: ButtonProps<string>,
-  ref
-) {
-  const buttonColors = getButtonColors({ kind, appearance });
-  const buttonSizes = getButtonSizeStyles({ size, icon, label });
-  const disabledStyles = getDisabledStyles({ kind, appearance });
-  const spinnerStyles = getSpinnerStyles({ kind, appearance });
-  const iconSizes = getIconSizeStyles({ size });
-  const keyColor = getKeyColor({ kind, appearance });
+type LinkWrapperProps = {
+  children: ReactNode;
+  href?: string | UrlObject;
+  target?: string;
+  prefetch?: boolean;
+  scroll?: boolean;
+} & Omit<NextLinkProps, 'href'>;
 
-  const iconElement = React.isValidElement(icon)
-    ? React.cloneElement(icon as React.ReactElement, {
-        className: classNames(iconSizes, icon.props.className),
-      })
-    : null;
+export const LinkWrapper = forwardRef<HTMLAnchorElement, LinkWrapperProps>(
+  ({ children, href, target, prefetch = false, scroll = true, ...props }, ref) =>
+    href ? (
+      <NextLink
+        href={href as Route}
+        target={target}
+        prefetch={prefetch}
+        scroll={scroll}
+        ref={ref}
+        {...props}
+      >
+        {children}
+      </NextLink>
+    ) : (
+      children
+    )
+);
+LinkWrapper.displayName = 'LinkWrapper';
 
-  const children = (
-    <>
-      {loading && <IconSpinner className={classNames(spinnerStyles, iconSizes)} />}
-      {!loading && iconSide === 'left' && iconElement}
-      {label && label}
-      {!loading && iconSide === 'right' && iconElement}
-      {!loading && keys && (
-        <kbd className="ml-auto flex items-center gap-1">
-          {keys.map((key, i) => (
-            <kbd
-              key={i}
-              className={classNames(
-                disabled
-                  ? 'bg-slate-200 text-slate-400 dark:bg-slate-800 dark:text-slate-500'
-                  : keyColor,
-                'ml-auto flex h-6 w-6 items-center justify-center rounded font-sans text-xs'
-              )}
-            >
-              {key}
-            </kbd>
-          ))}
-        </kbd>
-      )}
-    </>
-  );
-
-  const Element = href ? (
-    <Link
-      className={classNames(
-        buttonColors,
-        buttonSizes,
-        disabledStyles,
-        'flex items-center justify-center gap-1.5 rounded drop-shadow-sm transition-all active:scale-95',
-        className
-      )}
-      href={href as Route}
-      {...props}
-    >
-      {children}
-    </Link>
+export const TooltipWrapper = ({
+  children,
+  tooltip,
+}: {
+  children: ReactNode;
+  tooltip?: ReactNode;
+}) =>
+  tooltip ? (
+    <Tooltip>
+      <TooltipTrigger asChild>{children}</TooltipTrigger>
+      <TooltipContent>{tooltip}</TooltipContent>
+    </Tooltip>
   ) : (
-    <button
-      ref={ref}
-      className={classNames(
-        buttonColors,
-        buttonSizes,
-        disabledStyles,
-        isSplit ? 'rounded-l' : 'rounded',
-        'flex items-center justify-center gap-1.5 drop-shadow-sm transition-all active:scale-95 ',
-        className
-      )}
-      type={type}
-      onClick={btnAction}
-      disabled={disabled}
-      {...props}
-    >
-      {children}
-    </button>
+    children
   );
 
-  return Element;
-});
+export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
+  (
+    {
+      kind = 'primary',
+      appearance = 'solid',
+      size = 'medium',
+      label,
+      icon,
+      iconSide,
+      loading = false,
+      href,
+      type = 'button',
+      keys,
+      className,
+      tooltip,
+      disabled,
+      target,
+      prefetch = false,
+      scroll = true,
+      ...props
+    }: ButtonProps,
+    ref
+  ) => {
+    const buttonColors = getButtonColors({ kind, appearance, loading });
+    const buttonSizes = getButtonSizeStyles({ size, icon, label });
+    const spinnerStyles = getSpinnerStyles({ kind, appearance });
+    const iconSizes = getIconSizeStyles({ size });
+
+    const iconElement = React.isValidElement(icon)
+      ? React.cloneElement(icon as React.ReactElement, {
+          className: cn(iconSizes, icon.props.className, loading && 'invisible'),
+        })
+      : null;
+
+    const children = (
+      <>
+        {loading && (
+          <IconSpinner className={cn(spinnerStyles, iconSizes, 'top-50% left-50% absolute')} />
+        )}
+        {icon && iconSide === 'left' && (
+          <span className={cn(size === 'small' ? 'pr-1' : 'pr-1.5')}>{iconElement}</span>
+        )}
+        {label ? (
+          <span className={loading ? 'invisible' : 'visible'}>{label}</span>
+        ) : (
+          icon && !iconSide && iconElement
+        )}
+        {icon && iconSide === 'right' && (
+          <span className={cn(size === 'small' ? 'pl-1' : 'pl-1.5')}>{iconElement}</span>
+        )}
+      </>
+    );
+
+    return (
+      <TooltipWrapper tooltip={tooltip}>
+        <LinkWrapper href={href} target={target} prefetch={prefetch} scroll={scroll}>
+          <button
+            ref={ref}
+            className={cn(
+              buttonColors,
+              buttonSizes,
+              'flex items-center justify-center whitespace-nowrap rounded-md disabled:cursor-not-allowed',
+              className
+            )}
+            type={type}
+            disabled={disabled}
+            {...props}
+          >
+            {children}
+          </button>
+        </LinkWrapper>
+      </TooltipWrapper>
+    );
+  }
+);

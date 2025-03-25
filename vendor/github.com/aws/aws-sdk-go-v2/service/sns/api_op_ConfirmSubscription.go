@@ -4,8 +4,8 @@ package sns
 
 import (
 	"context"
+	"fmt"
 	awsmiddleware "github.com/aws/aws-sdk-go-v2/aws/middleware"
-	"github.com/aws/aws-sdk-go-v2/aws/signer/v4"
 	"github.com/aws/smithy-go/middleware"
 	smithyhttp "github.com/aws/smithy-go/transport/http"
 )
@@ -13,8 +13,8 @@ import (
 // Verifies an endpoint owner's intent to receive messages by validating the token
 // sent to the endpoint by an earlier Subscribe action. If the token is valid, the
 // action creates a new subscription and returns its Amazon Resource Name (ARN).
-// This call requires an AWS signature only when the AuthenticateOnUnsubscribe flag
-// is set to "true".
+// This call requires an AWS signature only when the AuthenticateOnUnsubscribe
+// flag is set to "true".
 func (c *Client) ConfirmSubscription(ctx context.Context, params *ConfirmSubscriptionInput, optFns ...func(*Options)) (*ConfirmSubscriptionOutput, error) {
 	if params == nil {
 		params = &ConfirmSubscriptionInput{}
@@ -43,10 +43,10 @@ type ConfirmSubscriptionInput struct {
 	// This member is required.
 	TopicArn *string
 
-	// Disallows unauthenticated unsubscribes of the subscription. If the value of this
-	// parameter is true and the request has an Amazon Web Services signature, then
-	// only the topic owner and the subscription owner can unsubscribe the endpoint.
-	// The unsubscribe action requires Amazon Web Services authentication.
+	// Disallows unauthenticated unsubscribes of the subscription. If the value of
+	// this parameter is true and the request has an Amazon Web Services signature,
+	// then only the topic owner and the subscription owner can unsubscribe the
+	// endpoint. The unsubscribe action requires Amazon Web Services authentication.
 	AuthenticateOnUnsubscribe *string
 
 	noSmithyDocumentSerde
@@ -65,6 +65,9 @@ type ConfirmSubscriptionOutput struct {
 }
 
 func (c *Client) addOperationConfirmSubscriptionMiddlewares(stack *middleware.Stack, options Options) (err error) {
+	if err := stack.Serialize.Add(&setOperationInputMiddleware{}, middleware.After); err != nil {
+		return err
+	}
 	err = stack.Serialize.Add(&awsAwsquery_serializeOpConfirmSubscription{}, middleware.After)
 	if err != nil {
 		return err
@@ -73,34 +76,38 @@ func (c *Client) addOperationConfirmSubscriptionMiddlewares(stack *middleware.St
 	if err != nil {
 		return err
 	}
+	if err := addProtocolFinalizerMiddlewares(stack, options, "ConfirmSubscription"); err != nil {
+		return fmt.Errorf("add protocol finalizers: %v", err)
+	}
+
+	if err = addlegacyEndpointContextSetter(stack, options); err != nil {
+		return err
+	}
 	if err = addSetLoggerMiddleware(stack, options); err != nil {
 		return err
 	}
-	if err = awsmiddleware.AddClientRequestIDMiddleware(stack); err != nil {
+	if err = addClientRequestID(stack); err != nil {
 		return err
 	}
-	if err = smithyhttp.AddComputeContentLengthMiddleware(stack); err != nil {
+	if err = addComputeContentLength(stack); err != nil {
 		return err
 	}
 	if err = addResolveEndpointMiddleware(stack, options); err != nil {
 		return err
 	}
-	if err = v4.AddComputePayloadSHA256Middleware(stack); err != nil {
+	if err = addComputePayloadSHA256(stack); err != nil {
 		return err
 	}
-	if err = addRetryMiddlewares(stack, options); err != nil {
+	if err = addRetry(stack, options); err != nil {
 		return err
 	}
-	if err = addHTTPSignerV4Middleware(stack, options); err != nil {
+	if err = addRawResponseToMetadata(stack); err != nil {
 		return err
 	}
-	if err = awsmiddleware.AddRawResponseToMetadata(stack); err != nil {
+	if err = addRecordResponseTiming(stack); err != nil {
 		return err
 	}
-	if err = awsmiddleware.AddRecordResponseTiming(stack); err != nil {
-		return err
-	}
-	if err = addClientUserAgent(stack); err != nil {
+	if err = addClientUserAgent(stack, options); err != nil {
 		return err
 	}
 	if err = smithyhttp.AddErrorCloseResponseBodyMiddleware(stack); err != nil {
@@ -109,10 +116,22 @@ func (c *Client) addOperationConfirmSubscriptionMiddlewares(stack *middleware.St
 	if err = smithyhttp.AddCloseResponseBodyMiddleware(stack); err != nil {
 		return err
 	}
+	if err = addSetLegacyContextSigningOptionsMiddleware(stack); err != nil {
+		return err
+	}
+	if err = addTimeOffsetBuild(stack, c); err != nil {
+		return err
+	}
+	if err = addUserAgentRetryMode(stack, options); err != nil {
+		return err
+	}
 	if err = addOpConfirmSubscriptionValidationMiddleware(stack); err != nil {
 		return err
 	}
 	if err = stack.Initialize.Add(newServiceMetadataMiddleware_opConfirmSubscription(options.Region), middleware.Before); err != nil {
+		return err
+	}
+	if err = addRecursionDetection(stack); err != nil {
 		return err
 	}
 	if err = addRequestIDRetrieverMiddleware(stack); err != nil {
@@ -124,6 +143,9 @@ func (c *Client) addOperationConfirmSubscriptionMiddlewares(stack *middleware.St
 	if err = addRequestResponseLogging(stack, options); err != nil {
 		return err
 	}
+	if err = addDisableHTTPSMiddleware(stack, options); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -131,7 +153,6 @@ func newServiceMetadataMiddleware_opConfirmSubscription(region string) *awsmiddl
 	return &awsmiddleware.RegisterServiceMetadata{
 		Region:        region,
 		ServiceID:     ServiceID,
-		SigningName:   "sns",
 		OperationName: "ConfirmSubscription",
 	}
 }

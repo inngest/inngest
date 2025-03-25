@@ -5,8 +5,6 @@ import { type NonEmptyArray } from '@/utils/isNonEmptyArray';
 
 export { EnvironmentType };
 
-export const LEGACY_TEST_MODE_NAME = 'Test';
-
 /** Environment is a "workspace" right now */
 export type Environment = {
   type: EnvironmentType;
@@ -17,7 +15,6 @@ export type Environment = {
   webhookSigningKey: string;
   createdAt: string;
   isArchived: boolean;
-  functionCount: number;
   isAutoArchiveEnabled: boolean | null | undefined;
   lastDeployedAt: string | null | undefined;
 };
@@ -33,18 +30,10 @@ export function getActiveEnvironment(
   return null;
 }
 
-export function getProductionEnvironment(
+export function getDefaultEnvironment(
   environments: NonEmptyArray<Environment>
 ): Environment | null {
-  return environments?.find((e) => e.type === EnvironmentType.Production) || null;
-}
-
-export function getLegacyTestMode(environments: NonEmptyArray<Environment>): Environment | null {
-  return (
-    environments?.find(
-      (env) => env.type === EnvironmentType.Test && env.name === LEGACY_TEST_MODE_NAME
-    ) || null
-  );
+  return environments.find((e) => e.type === EnvironmentType.Production) || null;
 }
 
 function getRecentCutOffDate(): Date {
@@ -52,10 +41,16 @@ function getRecentCutOffDate(): Date {
 }
 
 export function getSortedBranchEnvironments(
-  environments: NonEmptyArray<Environment>
+  environments: NonEmptyArray<Environment>,
+  includeArchived = true
 ): Environment[] {
   return environments
-    ?.filter((env) => env.type === EnvironmentType.BranchChild)
+    .filter((env) => {
+      if (!includeArchived && env.isArchived) {
+        return false;
+      }
+      return env.type === EnvironmentType.BranchChild;
+    })
     .sort((a, b) => {
       // Active envs are always before archived envs.
       if (!a.isArchived && b.isArchived) {
@@ -86,7 +81,7 @@ export function getRecentBranchEnvironments(
   environments: NonEmptyArray<Environment>
 ): Environment[] {
   const cutOffDate = getRecentCutOffDate();
-  return getSortedBranchEnvironments(environments)?.filter(
+  return getSortedBranchEnvironments(environments).filter(
     (env) => new Date(env.createdAt) > cutOffDate
   );
 }
@@ -94,16 +89,22 @@ export function getNonRecentBranchEnvironments(
   environments: NonEmptyArray<Environment>
 ): Environment[] {
   const cutOffDate = getRecentCutOffDate();
-  return getSortedBranchEnvironments(environments)?.filter(
+  return getSortedBranchEnvironments(environments).filter(
     (env) => new Date(env.createdAt) < cutOffDate
   );
 }
 
 // Get parent test environments created by the user, not branch envs or legacy test mode
-export function getTestEnvironments(environments: NonEmptyArray<Environment>): Environment[] {
-  return environments?.filter(
-    (env) => env.type === EnvironmentType.Test && env.name !== LEGACY_TEST_MODE_NAME
-  );
+export function getTestEnvironments(
+  environments: NonEmptyArray<Environment>,
+  includeArchived = true
+): Environment[] {
+  return environments.filter((env) => {
+    if (!includeArchived && env.isArchived) {
+      return false;
+    }
+    return env.type === EnvironmentType.Test;
+  });
 }
 
 export function workspaceToEnvironment(
@@ -111,31 +112,28 @@ export function workspaceToEnvironment(
     Workspace,
     | 'id'
     | 'name'
+    | 'slug'
     | 'parentID'
     | 'test'
     | 'type'
     | 'webhookSigningKey'
     | 'createdAt'
     | 'isArchived'
-    | 'functionCount'
     | 'isAutoArchiveEnabled'
     | 'lastDeployedAt'
   >
 ): Environment {
   const isProduction = workspace.type === EnvironmentType.Production;
-  const isTestWorkspace = workspace.type === EnvironmentType.Test;
-  const isLegacyTestMode = isTestWorkspace && workspace.name === 'default';
 
   let environmentName = workspace.name;
-  if (isLegacyTestMode) {
-    environmentName = LEGACY_TEST_MODE_NAME;
-  } else if (isProduction) {
+  if (isProduction) {
     environmentName = 'Production';
   }
 
   const slug = getEnvironmentSlug({
     environmentID: workspace.id,
     environmentName,
+    environmentSlug: workspace.slug,
     environmentType: workspace.type,
   });
 
@@ -148,7 +146,6 @@ export function workspaceToEnvironment(
     webhookSigningKey: workspace.webhookSigningKey,
     createdAt: workspace.createdAt,
     isArchived: workspace.isArchived,
-    functionCount: workspace.functionCount,
     isAutoArchiveEnabled: workspace.isAutoArchiveEnabled,
     lastDeployedAt: workspace.lastDeployedAt,
   };
@@ -162,27 +159,24 @@ export const staticSlugs = {
 type getEnvironmentSlugProps = {
   environmentID: string;
   environmentName: string;
+  environmentSlug: string | null;
   environmentType: string;
 };
 
 export function getEnvironmentSlug({
   environmentID,
   environmentName,
+  environmentSlug,
   environmentType,
 }: getEnvironmentSlugProps): string {
   const isProduction = environmentType === EnvironmentType.Production;
-  const isTestWorkspace = environmentType === EnvironmentType.Test;
-  const isLegacyTestMode = isTestWorkspace && environmentName === 'default';
 
-  let slug: string;
-  if (isLegacyTestMode) {
-    environmentName = LEGACY_TEST_MODE_NAME;
-    slug = slugify(environmentName);
-  } else if (isProduction) {
+  let slug = environmentSlug || '';
+  if (isProduction) {
     slug = staticSlugs.production;
   } else if (environmentType === EnvironmentType.BranchParent) {
     slug = staticSlugs.branch;
-  } else {
+  } else if (!slug) {
     slug = `${slugify(environmentName)}-${environmentID.split('-')[0]}`;
   }
 
@@ -196,13 +190,13 @@ export function workspacesToEnvironments(
     Workspace,
     | 'id'
     | 'name'
+    | 'slug'
     | 'parentID'
     | 'test'
     | 'type'
     | 'webhookSigningKey'
     | 'createdAt'
     | 'isArchived'
-    | 'functionCount'
     | 'isAutoArchiveEnabled'
     | 'lastDeployedAt'
   >[]

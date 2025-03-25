@@ -5,10 +5,10 @@ import { Button } from '@inngest/components/Button';
 import { MetadataGrid } from '@inngest/components/Metadata';
 import { OutputCard } from '@inngest/components/OutputCard';
 import { renderStepMetadata } from '@inngest/components/RunDetails/stepMetadataRenderer';
-import { IconChevron } from '@inngest/components/icons/Chevron';
-import { classNames } from '@inngest/components/utils/classNames';
 import { type HistoryNode } from '@inngest/components/utils/historyParser';
+import { isEndStatus, type Status } from '@inngest/components/utils/historyParser/types';
 import * as AccordionPrimitive from '@radix-ui/react-accordion';
+import { RiArrowDownSLine } from '@remixicon/react';
 import { AnimatePresence, motion } from 'framer-motion';
 
 import type { Timeline } from '..';
@@ -18,20 +18,12 @@ import { renderTimelineNode } from './TimelineNodeRenderer';
 type Props = {
   getOutput: (historyItemID: string) => Promise<string | undefined>;
   node: HistoryNode;
-  position?: 'first' | 'last' | 'middle';
   children?: React.ReactNode;
   isAttempt?: boolean;
   navigateToRun: React.ComponentProps<typeof Timeline>['navigateToRun'];
 };
 
-export function TimelineNode({
-  position,
-  getOutput,
-  node,
-  children,
-  isAttempt,
-  navigateToRun,
-}: Props) {
+export function TimelineNode({ getOutput, node, children, isAttempt, navigateToRun }: Props) {
   const { icon, badge, name, metadata, runLink } = renderTimelineNode({ node, isAttempt });
   const isExpandable = node.scope === 'step';
   const [openItems, setOpenItems] = useState<string[]>([]);
@@ -55,30 +47,27 @@ export function TimelineNode({
 
   return (
     <AccordionPrimitive.Item
-      className="relative border-t border-slate-800/50"
+      className="border-subtle border-t"
       disabled={!isExpandable}
       value={value}
     >
-      <span
-        className={classNames(
-          'absolute left-[0.85rem] top-0 w-px bg-slate-800',
-          position === 'first' && 'top-[1.9rem] h-[calc(100%-1.8rem)]',
-          position === 'last' && 'h-[1.9rem]',
-          position === 'middle' && 'h-[calc(100%+2px)]'
-        )}
-        aria-hidden="true"
-      />
-      <AccordionPrimitive.Header className="flex items-start gap-2 py-6">
+      <AccordionPrimitive.Header className="bg-canvasBase flex items-start gap-2 py-6">
         <div className="z-10 flex-1">
           <TimelineNodeHeader icon={icon} badge={badge} title={name} metadata={metadata} />
         </div>
 
         {isExpandable && (
-          <AccordionPrimitive.Trigger asChild onClick={() => toggleItem(value)}>
+          <AccordionPrimitive.Trigger
+            asChild
+            onClick={() => toggleItem(value)}
+            className="bg-canvasBase hover:bg-canvasSubtle group"
+          >
             <Button
               className="group"
+              appearance="outlined"
+              kind="secondary"
               icon={
-                <IconChevron className="transform-90 text-slate-500 transition-transform duration-500 group-data-[state=open]:-rotate-180" />
+                <RiArrowDownSLine className="transform-90 bg-canvasBase group-hover:bg-canvasSubtle text-subtle transition-transform duration-500 group-data-[state=open]:-rotate-180" />
               }
             />
           </AccordionPrimitive.Trigger>
@@ -86,7 +75,7 @@ export function TimelineNode({
       </AccordionPrimitive.Header>
       <AnimatePresence>
         {openItems.includes(value) && (
-          <AccordionPrimitive.Content className="ml-9" forceMount>
+          <AccordionPrimitive.Content className="ml-8" forceMount>
             <motion.div
               initial={{ y: -20, opacity: 0.2 }}
               animate={{ y: 0, opacity: 1 }}
@@ -129,16 +118,14 @@ function Content({
   const output = useOutput({
     getOutput,
     outputItemID: node.outputItemID,
-    isSuccess: node.status === 'completed',
+    nodeStatus: node.status,
   });
 
   const metadataItems = renderStepMetadata({ node, isAttempt });
 
   return (
     <>
-      {links?.length ? (
-        <div className="flex flex-row justify-end gap-x-5 pb-5">{...links}</div>
-      ) : null}
+      {links?.length ? <div className="flex flex-row justify-end gap-x-5 pb-5">{links}</div> : null}
 
       <div className="pb-5">
         <MetadataGrid metadataItems={metadataItems} />
@@ -152,16 +139,23 @@ function Content({
 function useOutput({
   getOutput,
   outputItemID,
-  isSuccess,
+  nodeStatus,
 }: {
   getOutput: (historyItemID: string) => Promise<string | undefined>;
   outputItemID?: string;
-  isSuccess: boolean;
+  nodeStatus: Status;
 }): React.ReactNode | undefined {
   const [output, setOutput] = useState<React.ReactNode>(undefined);
 
   useEffect(() => {
     if (!outputItemID) {
+      return;
+    }
+
+    // We should only fetch output if the node has ended or errored ("errored"
+    // means there will be a retry). There are some edge cases where a node can
+    // have an output item ID but not be in an end state
+    if (!isEndStatus(nodeStatus) && nodeStatus != 'errored') {
       return;
     }
 
@@ -175,7 +169,7 @@ function useOutput({
           return;
         }
 
-        setOutput(<OutputCard content={data} isSuccess={isSuccess} />);
+        setOutput(<OutputCard content={data} isSuccess={nodeStatus === 'completed'} />);
       } catch (e) {
         let text = 'Error loading';
         if (e instanceof Error) {

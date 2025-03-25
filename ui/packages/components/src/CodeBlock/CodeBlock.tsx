@@ -1,50 +1,70 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { Alert } from '@inngest/components/Alert';
 import { Button } from '@inngest/components/Button';
 import { CopyButton } from '@inngest/components/CopyButton';
 import { maxRenderedOutputSizeBytes } from '@inngest/components/constants';
 import { useCopyToClipboard } from '@inngest/components/hooks/useCopyToClipboard';
-import { IconArrayDownTray } from '@inngest/components/icons/ArrayDownTray';
 import { IconExpandText } from '@inngest/components/icons/ExpandText';
 import { IconOverflowText } from '@inngest/components/icons/OverflowText';
 import { IconShrinkText } from '@inngest/components/icons/ShrinkText';
 import { IconWrapText } from '@inngest/components/icons/WrapText';
-import { classNames } from '@inngest/components/utils/classNames';
+import { cn } from '@inngest/components/utils/classNames';
+import { FONT, LINE_HEIGHT, createColors, createRules } from '@inngest/components/utils/monaco';
 import Editor, { useMonaco } from '@monaco-editor/react';
+import { RiCollapseDiagonalLine, RiDownload2Line, RiExpandDiagonalLine } from '@remixicon/react';
 import { type editor } from 'monaco-editor';
 import { useLocalStorage } from 'react-use';
-import colors from 'tailwindcss/colors';
 
-const LINE_HEIGHT = 26;
+import { isDark } from '../utils/theme';
+
 const MAX_HEIGHT = 280; // Equivalent to 10 lines + padding
 const MAX_LINES = 10;
-const FONT = {
-  size: 13,
-  type: 'monospace',
-  font: 'RobotoMono',
-};
 
 type MonacoEditorType = editor.IStandaloneCodeEditor | null;
 
+export type CodeBlockAction = {
+  label: string;
+  title?: string;
+  icon?: React.ReactNode;
+  onClick: () => void;
+  disabled?: boolean;
+};
+
 interface CodeBlockProps {
+  className?: string;
   header?: {
     title?: string;
-    description?: string;
-    color?: string;
+    status?: 'success' | 'error';
   };
-  tabs: {
-    label?: string;
+  tab: {
     content: string;
     readOnly?: boolean;
     language?: string;
     handleChange?: (value: string) => void;
-  }[];
+  };
+  actions?: CodeBlockAction[];
+  minLines?: number;
+  allowFullScreen?: boolean;
+  resize?: boolean;
+  alwaysFullHeight?: boolean;
 }
 
-export function CodeBlock({ header, tabs }: CodeBlockProps) {
-  const [activeTab, setActiveTab] = useState(0);
+export function CodeBlock({
+  header,
+  tab,
+  actions = [],
+  minLines = 0,
+  allowFullScreen = false,
+  resize = false,
+  alwaysFullHeight = false,
+}: CodeBlockProps) {
+  const [dark, setDark] = useState(isDark());
+  const [editorHeight, setEditorHeight] = useState(0);
+  const [fullScreen, setFullScreen] = useState(false);
   const editorRef = useRef<MonacoEditorType>(null);
+  const wrapperRef = useRef<HTMLDivElement>(null);
 
   const [isWordWrap, setIsWordWrap] = useLocalStorage('isWordWrap', false);
   const [isFullHeight, setIsFullHeight] = useLocalStorage('isFullHeight', false);
@@ -52,10 +72,14 @@ export function CodeBlock({ header, tabs }: CodeBlockProps) {
   const { handleCopyClick, isCopying } = useCopyToClipboard();
 
   const monaco = useMonaco();
-  const content = tabs[activeTab]?.content;
-  const readOnly = tabs[activeTab]?.readOnly ?? true;
-  const language = tabs[activeTab]?.language ?? 'json';
-  const handleChange = tabs[activeTab]?.handleChange ?? undefined;
+  const { content, readOnly = true, language = 'json', handleChange = undefined } = tab;
+
+  useEffect(() => {
+    // We don't have a DOM ref until we're rendered, so check for dark theme parent classes then
+    if (wrapperRef.current) {
+      setDark(isDark(wrapperRef.current));
+    }
+  });
 
   useEffect(() => {
     if (!monaco) {
@@ -63,75 +87,18 @@ export function CodeBlock({ header, tabs }: CodeBlockProps) {
     }
 
     monaco.editor.defineTheme('inngest-theme', {
-      base: 'vs-dark',
+      base: dark ? 'vs-dark' : 'vs',
       inherit: true,
-      rules: [
-        {
-          token: 'delimiter.bracket.json',
-          foreground: colors.slate['300'],
-        },
-        {
-          token: 'string.key.json',
-          foreground: colors.indigo['400'],
-        },
-        {
-          token: 'number.json',
-          foreground: colors.amber['400'],
-        },
-        {
-          token: 'string.value.json',
-          foreground: colors.emerald['300'],
-        },
-        {
-          token: 'keyword.json',
-          foreground: colors.fuchsia['300'],
-        },
-        {
-          token: 'comment',
-          fontStyle: 'italic',
-          foreground: colors.slate['500'],
-        },
-        {
-          token: 'string',
-          foreground: colors.teal['400'],
-        },
-        {
-          token: 'keyword',
-          foreground: colors.indigo['400'],
-        },
-        {
-          token: 'entity.name.function',
-          foreground: colors.red['500'],
-        },
-      ],
-      colors: {
-        'editor.background': '#1e293b4d', // slate-800/40
-        'editorLineNumber.foreground': '#cbd5e14d', // slate-300/30
-        'editorLineNumber.activeForeground': colors.slate['300'], // slate-300
-        'editorWidget.background': colors.slate['800'],
-        'editorWidget.border': colors.slate['500'],
-      },
+      rules: dark ? createRules(true) : createRules(false),
+      colors: dark ? createColors(true) : createColors(false),
     });
-  }, [monaco]);
+  }, [monaco, dark]);
 
   useEffect(() => {
-    if (editorRef.current) {
+    if (editorRef.current && !alwaysFullHeight) {
       updateEditorLayout(editorRef.current);
     }
-  }, [isWordWrap, isFullHeight]);
-
-  const handleTabClick = (index: number) => {
-    setActiveTab(index);
-  };
-
-  function handleEditorDidMount(editor: MonacoEditorType) {
-    editorRef.current = editor;
-
-    const element = document.querySelector('.overflow-guard');
-    if (element) {
-      element.classList.add('rounded-b-lg');
-    }
-  }
+  }, [isWordWrap, isFullHeight, fullScreen, resize, alwaysFullHeight]);
 
   function getTextWidth(text: string, font: string) {
     const canvas = document.createElement('canvas');
@@ -145,9 +112,14 @@ export function CodeBlock({ header, tabs }: CodeBlockProps) {
     }
   }
 
+  function handleEditorDidMount(editor: MonacoEditorType) {
+    editorRef.current = editor;
+  }
+
   function updateEditorLayout(editor: MonacoEditorType) {
     const container = editor?.getDomNode();
     if (!editor || !container) return;
+    setEditorHeight(editor.getScrollHeight());
     const containerWidthWithLineNumbers = container.getBoundingClientRect().width;
 
     if (!isWordWrap) {
@@ -178,9 +150,12 @@ export function CodeBlock({ header, tabs }: CodeBlockProps) {
 
       if (isFullHeight) {
         editor.layout({ height: newHeight, width: containerWidthWithLineNumbers });
+        setEditorHeight(newHeight);
       } else {
-        const height = Math.min(MAX_HEIGHT, contentHeight);
+        const minHeight = minLines * LINE_HEIGHT + 20;
+        const height = Math.max(Math.min(MAX_HEIGHT, contentHeight), minHeight);
         editor.layout({ height: height, width: containerWidthWithLineNumbers });
+        setEditorHeight(height);
       }
     }
 
@@ -227,13 +202,15 @@ export function CodeBlock({ header, tabs }: CodeBlockProps) {
         }
       }
 
-      if (totalLinesThatFit > MAX_LINES && !isFullHeight) {
+      if (totalLinesThatFit > MAX_LINES && !isFullHeight && !alwaysFullHeight) {
         editor.layout({ height: MAX_HEIGHT, width: containerWidthWithLineNumbers });
+        setEditorHeight(MAX_HEIGHT);
       } else {
         editor.layout({
           height: totalLinesThatFit * LINE_HEIGHT + 20,
           width: containerWidthWithLineNumbers,
         });
+        setEditorHeight(totalLinesThatFit * LINE_HEIGHT + 20);
       }
     }
   }
@@ -272,130 +249,163 @@ export function CodeBlock({ header, tabs }: CodeBlockProps) {
   return (
     <>
       {monaco && (
-        <div className="bg-slate-910 w-full rounded-lg border border-slate-700/30 bg-slate-800/40 shadow">
-          {header && (
-            <div className={classNames(header.color, 'rounded-t-lg pt-3')}>
-              {(header.title || header.description) && (
-                <div className="flex flex-col gap-1 px-5 pb-2.5 font-mono text-xs">
-                  <p className="text-white">{header.title}</p>
-                  <p className="text-white/60">{header.description}</p>
+        <div className={cn('relative', fullScreen && 'bg-canvasBase fixed inset-0 z-[52]')}>
+          <div className={cn('bg-canvasBase border-subtle border-b')}>
+            <div
+              className={cn(
+                'flex items-center justify-between border-l-4 border-l-transparent',
+                header?.status === 'error' && 'border-l-status-failed',
+                header?.status === 'success' && 'border-l-status-completed'
+              )}
+            >
+              <p
+                className={cn(
+                  header?.status === 'error' ? 'text-status-failedText' : 'text-subtle',
+                  ' px-5 py-2.5 text-sm',
+                  'max-h-24 text-ellipsis break-words' // Handle long titles
+                )}
+              >
+                {header?.title}
+              </p>
+              {!isOutputTooLarge && (
+                <div className="mr-4 flex items-center gap-2 py-2">
+                  {actions.map(({ label, title, icon, onClick, disabled }, idx) => (
+                    <Button
+                      key={idx}
+                      icon={icon}
+                      onClick={onClick}
+                      size="small"
+                      aria-label={label}
+                      title={title ?? label}
+                      label={label}
+                      disabled={disabled}
+                      appearance="outlined"
+                      kind="secondary"
+                    />
+                  ))}
+                  <CopyButton
+                    size="small"
+                    code={content}
+                    isCopying={isCopying}
+                    handleCopyClick={handleCopyClick}
+                    appearance="outlined"
+                  />
+                  <Button
+                    icon={isWordWrap ? <IconOverflowText /> : <IconWrapText />}
+                    onClick={handleWrapText}
+                    size="small"
+                    aria-label={isWordWrap ? 'Do not wrap text' : 'Wrap text'}
+                    title={isWordWrap ? 'Do not wrap text' : 'Wrap text'}
+                    tooltip={isWordWrap ? 'Do not wrap text' : 'Wrap text'}
+                    appearance="outlined"
+                    kind="secondary"
+                  />
+                  {!alwaysFullHeight && (
+                    <Button
+                      onClick={handleFullHeight}
+                      size="small"
+                      icon={isFullHeight ? <IconShrinkText /> : <IconExpandText />}
+                      aria-label={isFullHeight ? 'Shrink text' : 'Expand text'}
+                      title={isFullHeight ? 'Shrink text' : 'Expand text'}
+                      tooltip={isFullHeight ? 'Shrink text' : 'Expand text'}
+                      appearance="outlined"
+                      kind="secondary"
+                    />
+                  )}
+                  {allowFullScreen && (
+                    <Button
+                      onClick={() => setFullScreen(!fullScreen)}
+                      size="small"
+                      icon={fullScreen ? <RiCollapseDiagonalLine /> : <RiExpandDiagonalLine />}
+                      aria-label="Full screen"
+                      title="Full screen"
+                      tooltip="Full screen"
+                      appearance="outlined"
+                      kind="secondary"
+                    />
+                  )}
                 </div>
               )}
             </div>
-          )}
+          </div>
           <div
-            className={classNames(
-              !header && 'rounded-t-lg',
-              'flex justify-between border-b border-slate-700/20 bg-slate-800/40 shadow'
-            )}
+            ref={wrapperRef}
+            className={cn('relative', (alwaysFullHeight || fullScreen) && 'h-screen')}
           >
-            <div className="-mb-px flex">
-              {tabs.map((tab, i) => {
-                const isSingleTab = tabs.length === 1;
-                const isActive = i === activeTab && !isSingleTab;
+            {isOutputTooLarge ? (
+              <>
+                <Alert severity="warning">Output size is too large to render {`( > 1MB )`}</Alert>
+                <div className="flex h-24 items-center justify-center	">
+                  <Button
+                    label="Download Raw"
+                    icon={<RiDownload2Line />}
+                    onClick={() => downloadJson({ content: content })}
+                    appearance="outlined"
+                    kind="secondary"
+                  />
+                </div>
+              </>
+            ) : (
+              <Editor
+                className={cn('relative', (alwaysFullHeight || fullScreen) && 'h-full')}
+                height={alwaysFullHeight || fullScreen ? '100%' : editorHeight}
+                defaultLanguage={language}
+                value={content}
+                theme="inngest-theme"
+                options={{
+                  // Need to set automaticLayout to true to avoid a resizing bug
+                  // (code block never narrows). This is combined with the
+                  // `absolute` class and explicit height prop
+                  automaticLayout: true,
 
-                return (
-                  <button
-                    key={i}
-                    className={classNames(
-                      `px-5 py-2.5 text-xs`,
-                      isSingleTab
-                        ? 'text-slate-400'
-                        : 'block border-b outline-none transition-all duration-150',
-                      isActive && 'border-indigo-400 text-white',
-                      !isActive && !isSingleTab && 'border-transparent text-slate-400'
-                    )}
-                    onClick={() => handleTabClick(i)}
-                  >
-                    {tab?.label}
-                  </button>
-                );
-              })}
-            </div>
-            {!isOutputTooLarge && (
-              <div className="mr-2 flex items-center gap-2 py-2">
-                <CopyButton
-                  size="small"
-                  code={content}
-                  isCopying={isCopying}
-                  handleCopyClick={handleCopyClick}
-                />
-                <Button
-                  icon={isWordWrap ? <IconOverflowText /> : <IconWrapText />}
-                  btnAction={handleWrapText}
-                  size="small"
-                  aria-label={isWordWrap ? 'Do not wrap text' : 'Wrap text'}
-                  title={isWordWrap ? 'Do not wrap text' : 'Wrap text'}
-                />
-                <Button
-                  btnAction={handleFullHeight}
-                  size="small"
-                  icon={isFullHeight ? <IconShrinkText /> : <IconExpandText />}
-                  aria-label={isFullHeight ? 'Shrink text' : 'Expand text'}
-                  title={isFullHeight ? 'Shrink text' : 'Expand text'}
-                />
-              </div>
+                  extraEditorClassName: '!w-full',
+                  readOnly: readOnly,
+                  minimap: {
+                    enabled: false,
+                  },
+                  lineNumbers: 'on',
+                  contextmenu: false,
+                  scrollBeyondLastLine: alwaysFullHeight ? true : false,
+                  fontFamily: FONT.font,
+                  fontSize: FONT.size,
+                  fontWeight: 'light',
+                  lineHeight: LINE_HEIGHT,
+                  renderLineHighlight: 'none',
+                  renderWhitespace: 'none',
+                  guides: {
+                    indentation: false,
+                    highlightActiveBracketPair: false,
+                    highlightActiveIndentation: false,
+                  },
+                  scrollbar: {
+                    verticalScrollbarSize: 10,
+                    alwaysConsumeMouseWheel: false,
+                  },
+                  padding: {
+                    top: 10,
+                    bottom: 10,
+                  },
+                  wordWrap: isWordWrap ? 'on' : 'off',
+                }}
+                onMount={(editor) => {
+                  handleEditorDidMount(editor);
+                  !alwaysFullHeight && updateEditorLayout(editor);
+                }}
+                onChange={(value) => {
+                  if (value !== undefined) {
+                    handleChange && handleChange(value);
+                    !alwaysFullHeight && updateEditorLayout(editorRef.current);
+                  }
+                }}
+              />
             )}
           </div>
-          {isOutputTooLarge ? (
-            <>
-              <div className="bg-amber-500/40 px-5 py-2.5 text-xs text-white">
-                Output size is too large to render {`( > 1MB )`}
-              </div>
-              <div className="flex h-24 items-center justify-center	">
-                <Button
-                  label="Download Raw"
-                  icon={<IconArrayDownTray />}
-                  btnAction={() => downloadJson({ content: content })}
-                />
-              </div>
-            </>
-          ) : (
-            <Editor
-              defaultLanguage={language}
-              value={content}
-              theme="inngest-theme"
-              options={{
-                extraEditorClassName: 'rounded-b-lg !w-full',
-                readOnly: readOnly,
-                minimap: {
-                  enabled: false,
-                },
-                lineNumbers: 'on',
-                contextmenu: false,
-                scrollBeyondLastLine: false,
-                fontFamily: FONT.font,
-                fontSize: FONT.size,
-                fontWeight: 'light',
-                lineHeight: LINE_HEIGHT,
-                renderLineHighlight: 'none',
-                renderWhitespace: 'none',
-                guides: {
-                  indentation: false,
-                  highlightActiveBracketPair: false,
-                  highlightActiveIndentation: false,
-                },
-                scrollbar: { verticalScrollbarSize: 10, alwaysConsumeMouseWheel: false },
-                padding: {
-                  top: 10,
-                  bottom: 10,
-                },
-                wordWrap: isWordWrap ? 'on' : 'off',
-              }}
-              onMount={(editor) => {
-                handleEditorDidMount(editor);
-                updateEditorLayout(editor);
-              }}
-              onChange={(value) => {
-                if (value !== undefined) {
-                  handleChange && handleChange(value);
-                  updateEditorLayout(editorRef.current);
-                }
-              }}
-            />
-          )}
         </div>
       )}
     </>
   );
 }
+
+CodeBlock.Wrapper = ({ children }: React.PropsWithChildren) => {
+  return <div className="border-subtle w-full overflow-hidden rounded-md border">{children}</div>;
+};

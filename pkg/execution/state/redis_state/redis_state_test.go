@@ -3,7 +3,9 @@ package redis_state
 import (
 	"context"
 	"crypto/rand"
-	"errors"
+	"encoding/json"
+	"fmt"
+	"strconv"
 	"testing"
 
 	"github.com/alicebob/miniredis/v2"
@@ -18,6 +20,8 @@ import (
 )
 
 func TestNewRunMetadata(t *testing.T) {
+	byt, _ := json.Marshal(state.Identifier{})
+
 	tests := []struct {
 		name          string
 		data          map[string]string
@@ -28,57 +32,34 @@ func TestNewRunMetadata(t *testing.T) {
 			name: "should return value if data is valid",
 			data: map[string]string{
 				"status":   "1",
-				"pending":  "0",
 				"version":  "1",
 				"debugger": "false",
+				"id":       string(byt),
 			},
 			expectedVal: &runMetadata{
 				Status:   enums.RunStatusCompleted,
-				Pending:  0,
 				Version:  1,
 				Debugger: false,
 			},
 			expectedError: nil,
 		},
 		{
-			name:          "should error with missing status",
+			name:          "should error with missing identifier",
 			data:          map[string]string{},
-			expectedError: errors.New("no status stored in metadata"),
+			expectedError: state.ErrRunNotFound,
 		},
 		{
-			name: "should error with non int status",
+			name: "missing ID should return err run not found",
 			data: map[string]string{
 				"status": "hello",
 			},
-			expectedError: errors.New("invalid function status stored in run metadata: \"hello\""),
-		},
-		{
-			name: "missing version should return 0",
-			data: map[string]string{
-				"status":  "1",
-				"pending": "0",
-			},
-			expectedVal: &runMetadata{
-				Status:  enums.RunStatusCompleted,
-				Pending: 0,
-				Version: 0,
-			},
-			expectedError: nil,
-		},
-		{
-			name: "invalid version should return error",
-			data: map[string]string{
-				"status":  "1",
-				"pending": "0",
-				"version": "yolo",
-			},
-			expectedError: errors.New("invalid metadata version detected: \"yolo\""),
+			expectedError: state.ErrRunNotFound,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			runMeta, err := NewRunMetadata(test.data)
+			runMeta, err := newRunMetadata(test.data)
 			require.Equal(t, test.expectedError, err)
 			require.Equal(t, test.expectedVal, runMeta)
 		})
@@ -87,14 +68,27 @@ func TestNewRunMetadata(t *testing.T) {
 
 func TestStateHarness(t *testing.T) {
 	r := miniredis.RunT(t)
+
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+
+	unshardedClient := NewUnshardedClient(rc, StateDefaultKey, QueueDefaultKey)
+	shardedClient := NewShardedClient(ShardedClientOpts{
+		UnshardedClient:        unshardedClient,
+		FunctionRunStateClient: rc,
+		BatchClient:            rc,
+		StateDefaultKey:        StateDefaultKey,
+		QueueDefaultKey:        QueueDefaultKey,
+		FnRunIsSharded:         AlwaysShardOnRun,
+	})
+
 	sm, err := New(
 		context.Background(),
-		WithKeyPrefix("{test}:"),
-		WithFunctionLoader(testharness.FunctionLoader()),
-		WithConnectOpts(rueidis.ClientOption{
-			InitAddress:  []string{r.Addr()},
-			DisableCache: true,
-		}),
+		WithUnshardedClient(unshardedClient),
+		WithShardedClient(shardedClient),
 	)
 	require.NoError(t, err)
 
@@ -107,14 +101,106 @@ func TestStateHarness(t *testing.T) {
 	testharness.CheckState(t, create)
 }
 
+func TestScanIter(t *testing.T) {
+	ctx := context.Background()
+	redis := miniredis.RunT(t)
+	r, err := rueidis.NewClient(rueidis.ClientOption{
+		// InitAddress: []string{"127.0.0.1:6379"},
+		InitAddress:  []string{redis.Addr()},
+		Password:     "",
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+
+	entries := 50_000
+	key := "test-scan"
+	for i := 0; i < entries; i++ {
+
+		cmd := r.B().Hset().Key(key).FieldValue().
+			FieldValue(strconv.Itoa(i), strconv.Itoa(i)).
+			Build()
+		require.NoError(t, r.Do(ctx, cmd).Error())
+	}
+	fmt.Println("loaded keys")
+
+	// Create a new scanIter, which iterates through all items.
+	si := &scanIter{r: r}
+	err = si.init(ctx, key, 1000)
+	require.NoError(t, err)
+
+	listed := 0
+
+	for n := 0; n < entries*2; n++ {
+		if !si.Next(ctx) {
+			break
+		}
+		listed++
+	}
+
+	require.Equal(t, context.Canceled, si.Error())
+	require.Equal(t, entries, listed)
+}
+
+func TestBufIter(t *testing.T) {
+	ctx := context.Background()
+	redis := miniredis.RunT(t)
+	r, err := rueidis.NewClient(rueidis.ClientOption{
+		// InitAddress: []string{"127.0.0.1:6379"},
+		InitAddress:  []string{redis.Addr()},
+		Password:     "",
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+
+	entries := 10_000
+	key := "test-bufiter"
+	for i := 0; i < entries; i++ {
+		cmd := r.B().Hset().Key(key).FieldValue().FieldValue(strconv.Itoa(i), "{}").Build()
+		require.NoError(t, r.Do(ctx, cmd).Error())
+	}
+	fmt.Println("loaded keys")
+
+	// Create a new scanIter, which iterates through all items.
+	bi := &bufIter{r: r}
+	err = bi.init(ctx, key)
+	require.NoError(t, err)
+
+	listed := 0
+	for n := 0; n < entries*2; n++ {
+		if !bi.Next(ctx) {
+			break
+		}
+		listed++
+	}
+
+	require.Equal(t, context.Canceled, bi.Error())
+	require.Equal(t, entries, listed)
+}
+
 func BenchmarkNew(b *testing.B) {
 	r := miniredis.RunT(b)
+
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(b, err)
+
+	statePrefix := "state"
+	unshardedClient := NewUnshardedClient(rc, statePrefix, QueueDefaultKey)
+	shardedClient := NewShardedClient(ShardedClientOpts{
+		UnshardedClient:        unshardedClient,
+		FunctionRunStateClient: rc,
+		BatchClient:            rc,
+		StateDefaultKey:        statePrefix,
+		QueueDefaultKey:        QueueDefaultKey,
+		FnRunIsSharded:         AlwaysShardOnRun,
+	})
+
 	sm, err := New(
 		context.Background(),
-		WithConnectOpts(rueidis.ClientOption{
-			InitAddress:  []string{r.Addr()},
-			DisableCache: true,
-		}),
+		WithUnshardedClient(unshardedClient),
+		WithShardedClient(shardedClient),
 	)
 	require.NoError(b, err)
 

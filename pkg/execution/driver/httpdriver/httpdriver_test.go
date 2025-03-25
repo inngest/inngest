@@ -2,18 +2,22 @@ package httpdriver
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/inngest/go-httpstat"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/syscode"
 	"github.com/stretchr/testify/require"
 )
 
@@ -22,6 +26,11 @@ func parseURL(s string) url.URL {
 	return *u
 }
 
+// TODO:
+//
+// Test returning a Step opcode with NonRetriableHeader semantics does NOT fill
+// .err in DriverResponse.
+
 func TestRedirect(t *testing.T) {
 	input := []byte(`{"event":{"name":"hi","data":{}}}`)
 
@@ -29,7 +38,7 @@ func TestRedirect(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch count {
 		case 8:
-			require.Equal(t, http.MethodPost, r.Method)
+			require.Equal(t, http.MethodGet, r.Method)
 			byt, err := io.ReadAll(r.Body)
 			require.NoError(t, err)
 			require.Equal(t, input, byt)
@@ -45,8 +54,8 @@ func TestRedirect(t *testing.T) {
 
 	res, err := do(context.Background(), DefaultClient, Request{URL: parseURL(ts.URL), Input: input})
 	require.NoError(t, err)
-	require.Equal(t, 200, res.statusCode)
-	require.Equal(t, []byte("ok"), res.body)
+	require.Equal(t, 200, res.StatusCode)
+	require.Equal(t, []byte("ok"), res.Body)
 }
 
 func TestRetryAfter(t *testing.T) {
@@ -66,10 +75,10 @@ func TestRetryAfter(t *testing.T) {
 
 		res, err := do(context.Background(), DefaultClient, Request{URL: parseURL(ts.URL), Input: input})
 		require.NoError(t, err)
-		require.Equal(t, 500, res.statusCode)
-		require.Equal(t, []byte(`{"error":true}`), res.body)
-		require.NotNil(t, res.retryAt)
-		require.EqualValues(t, at, *res.retryAt)
+		require.Equal(t, 500, res.StatusCode)
+		require.Equal(t, []byte(`{"error":true}`), res.Body)
+		require.NotNil(t, res.RetryAt)
+		require.EqualValues(t, at, *res.RetryAt)
 	}
 }
 
@@ -178,4 +187,55 @@ func TestParseStream(t *testing.T) {
 		require.NotNil(t, actual)
 		require.Equal(t, r, *actual)
 	})
+}
+
+func TestStreamResponseTooLarge(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		data := make([]byte, consts.MaxSDKResponseBodySize)
+		_, err := rand.Read(data)
+		require.NoError(t, err)
+
+		// Indicate a streaming response.
+		w.WriteHeader(201)
+		err = json.NewEncoder(w).Encode(data)
+		require.NoError(t, err)
+	}))
+
+	defer ts.Close()
+	u, _ := url.Parse(ts.URL)
+	r, err := do(context.Background(), nil, Request{
+		URL: *u,
+	})
+	require.NotNil(t, r)
+	require.NotNil(t, r.SysErr)
+	require.Equal(t, r.SysErr.Code, syscode.CodeOutputTooLarge)
+	require.NotNil(t, err)
+}
+
+func TestTiming(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Delay the read by 1 second.
+		<-time.After(time.Second)
+		_, _ = io.ReadAll(r.Body)
+		r.Body.Close()
+		w.WriteHeader(200)
+	}))
+
+	result := &httpstat.Result{}
+
+	defer ts.Close()
+	u, _ := url.Parse(ts.URL)
+	r, err := do(context.Background(), nil, Request{
+		URL:     *u,
+		Input:   []byte("test"),
+		statter: func(r *httpstat.Result) { result = r },
+	})
+
+	require.NotNil(t, r)
+	require.Nil(t, err)
+
+	require.Equal(t, strings.ReplaceAll(ts.URL, "http://", ""), result.ConnectedTo.String())
+	require.True(t, result.StartTransfer > time.Second)
+	require.True(t, result.ServerProcessing > time.Second)
+	require.True(t, result.Total(time.Time{}) > time.Second)
 }

@@ -1,10 +1,10 @@
 package inngest
 
 import (
+	"context"
 	"errors"
 	"testing"
 
-	"github.com/inngest/inngest/pkg/consts"
 	"github.com/stretchr/testify/require"
 )
 
@@ -23,17 +23,6 @@ func TestNewEventBatchConfig(t *testing.T) {
 			},
 			expected: &EventBatchConfig{
 				MaxSize: 10,
-				Timeout: "2s",
-			},
-		},
-		{
-			name: "should use default batch size if provided value is <= 0",
-			data: map[string]any{
-				"maxSize": -1,
-				"timeout": "2s",
-			},
-			expected: &EventBatchConfig{
-				MaxSize: consts.DefaultBatchSize,
 				Timeout: "2s",
 			},
 		},
@@ -129,11 +118,20 @@ func TestEventBatchConfigIsValid(t *testing.T) {
 			},
 			expected: errors.New("invalid timeout string"),
 		},
+		{
+			name: "should return error if timeout is larger less than a second",
+			config: &EventBatchConfig{
+				MaxSize: 10,
+				Timeout: "100ms",
+			},
+			expected: errors.New("batch timeout should be more than 1s"),
+		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			if err := test.config.IsValid(); err != nil {
+			err := test.config.IsValid(context.Background())
+			if test.expected != nil {
 				require.ErrorContains(t, err, test.expected.Error())
 			}
 		})

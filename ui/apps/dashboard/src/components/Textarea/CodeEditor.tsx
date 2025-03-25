@@ -1,7 +1,7 @@
 import { useId, useRef, useState } from 'react';
+import { cn } from '@inngest/components/utils/classNames';
 
 import SyntaxHighlighter from '@/components/SyntaxHighlighter';
-import cn from '@/utils/cn';
 
 type CodeEditorProps = {
   language: string;
@@ -48,7 +48,7 @@ export default function CodeEditor({
         {label ?? name}
       </label>
       <div
-        className="overflow-y-hidden py-2 pr-3 text-right text-sm text-slate-500"
+        className="text-subtle overflow-y-hidden py-2 pr-3 text-right text-sm"
         aria-hidden="true"
         ref={LineNumbersRef}
       >
@@ -67,7 +67,7 @@ export default function CodeEditor({
         </SyntaxHighlighter>
         {!readOnly && (
           <textarea
-            className="absolute inset-0 z-10 h-full w-full resize-none overflow-auto whitespace-pre border-none bg-transparent py-2 pl-2 text-sm leading-5 text-transparent caret-white focus:ring-0 focus-visible:outline-none"
+            className="text-basis bg-codeEditor caret-basis absolute inset-0 z-10 h-full w-full resize-none overflow-auto whitespace-pre border-none py-2 pl-2 font-[CircularXXMono] text-sm leading-5 focus:ring-0 focus-visible:outline-none"
             id={textAreaID}
             name={name}
             value={code}

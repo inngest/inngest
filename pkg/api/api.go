@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"strings"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -18,7 +17,10 @@ import (
 	"github.com/inngest/inngest/pkg/eventstream"
 	"github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/publicerr"
+	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/rs/zerolog"
+	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -29,16 +31,29 @@ type Options struct {
 
 	EventHandler EventHandler
 	Logger       *zerolog.Logger
+
+	// LocalEventKeys are the keys used to send events to the local event API
+	// from an app. If this is set, only keys that match one of these values
+	// will be accepted.
+	LocalEventKeys []string
+
+	// RequireKeys defines whether event and signing keys are required for the
+	// server to function. If this is true and signing keys are not defined,
+	// the server will still boot but core actions such as syncing, runs, and
+	// ingesting events will not work.
+	RequireKeys bool
 }
 
 func NewAPI(o Options) (chi.Router, error) {
 	logger := o.Logger.With().Str("caller", "api").Logger()
 
 	api := &API{
-		Router:  chi.NewMux(),
-		config:  o.Config,
-		handler: o.EventHandler,
-		log:     &logger,
+		Router:         chi.NewMux(),
+		config:         o.Config,
+		handler:        o.EventHandler,
+		log:            &logger,
+		localEventKeys: o.LocalEventKeys,
+		requireKeys:    o.RequireKeys,
 	}
 
 	cors := cors.New(cors.Options{
@@ -50,7 +65,7 @@ func NewAPI(o Options) (chi.Router, error) {
 		MaxAge:           60 * 60, // 1 hour
 	})
 	api.Use(cors.Handler)
-	api.Use(headers.StaticHeadersMiddleware(headers.ServerKindDev))
+	api.Use(headers.StaticHeadersMiddleware(o.Config.GetServerKind()))
 
 	api.Get("/health", api.HealthCheck)
 	api.Post("/e/{key}", api.ReceiveEvent)
@@ -68,6 +83,17 @@ type API struct {
 	log     *zerolog.Logger
 
 	server *http.Server
+
+	// localEventKeys are the keys used to send events to the local event API
+	// from an app. If this is set, only keys that match one of these values
+	// will be accepted.
+	localEventKeys []string
+
+	// requireKeys defines whether event and signing keys are required for the
+	// server to function. If this is true and signing keys are not defined,
+	// the server will still boot but core actions such as syncing, runs, and
+	// ingesting events will not work.
+	requireKeys bool
 }
 
 func (a *API) AddRoutes() {
@@ -79,7 +105,19 @@ func (a *API) Start(ctx context.Context) error {
 		Handler: a.Router,
 	}
 	a.log.Info().Str("addr", a.server.Addr).Msg("starting server")
-	return a.server.ListenAndServe()
+
+	lerrChan := make(chan error)
+	go func() {
+		lerrChan <- a.server.ListenAndServe()
+	}()
+
+	select {
+	case <-ctx.Done():
+		a.log.Info().Msg("shutting down server")
+		return a.server.Shutdown(ctx)
+	case err := <-lerrChan:
+		return err
+	}
 }
 
 func (a API) Stop(ctx context.Context) error {
@@ -92,6 +130,7 @@ func (a API) Stop(ctx context.Context) error {
 
 func (a API) HealthCheck(w http.ResponseWriter, r *http.Request) {
 	a.log.Trace().Msg("healthcheck")
+	w.Header().Add("Content-Type", "application/json")
 	a.writeResponse(w, apiResponse{
 		StatusCode: http.StatusOK,
 		Message:    "OK",
@@ -102,17 +141,55 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	defer r.Body.Close()
 
-	key := chi.URLParam(r, "key")
-	if key == "" {
+	// If self hosting and keys are not defined, error.
+	if a.requireKeys && len(a.localEventKeys) == 0 {
+		a.log.Error().Msg("rejecting event; event keys are required to process events securely")
+		w.Header().Add("Content-Type", "application/json")
 		a.writeResponse(w, apiResponse{
-			StatusCode: http.StatusUnauthorized,
-			Error:      "Event key is required",
+			StatusCode: http.StatusServiceUnavailable,
+			Error:      "Event keys are required to process events securely",
 		})
 		return
 	}
 
-	// Create a new channel which receives a stream of events from the incoming HTTP request
+	key := chi.URLParam(r, "key")
+	if key == "" {
+		a.log.Error().Msg("rejecting event; event key is required")
+		w.Header().Add("Content-Type", "application/json")
+		a.writeResponse(w, apiResponse{
+			StatusCode: http.StatusUnauthorized,
+			Error:      "Event key is required",
+		})
+
+		return
+	}
+
+	if len(a.localEventKeys) > 0 {
+		var found bool
+		for _, k := range a.localEventKeys {
+			if k == key {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			a.log.Error().Msg("rejecting event; event key not recognized")
+			w.Header().Add("Content-Type", "application/json")
+			a.writeResponse(w, apiResponse{
+				StatusCode: http.StatusUnauthorized,
+				Error:      "Event key not found",
+			})
+			return
+		}
+	}
+
 	ctx, cancel := context.WithCancel(ctx)
+
+	// Create a new trace that may have a link to a previous one
+	ctx = itrace.UserTracer().Propagator().Extract(ctx, propagation.HeaderCarrier(r.Header))
+
+	// Create a new channel which receives a stream of events from the incoming HTTP request
 	stream := make(chan eventstream.StreamItem)
 	eg, ctx := errgroup.WithContext(ctx)
 	eg.Go(func() error {
@@ -149,16 +226,39 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 				return err
 			}
 
-			if strings.HasPrefix(strings.ToLower(evt.Name), "inngest/") {
+			if evt.IsInternal() {
 				err := fmt.Errorf("event name is reserved for internal use: %s", evt.Name)
 				return err
 			}
 
+			// External event (i.e. doesn't have the "inngest/" prefix) data
+			// must not have internal metadata since it can cause issues. For
+			// example, if an invoked function's event data is forwarded into a
+			// new event then it may accidentally fulfill the invocation
+			delete(evt.Data, "_inngest")
+
+			ts := time.Now()
 			if evt.Timestamp == 0 {
-				evt.Timestamp = time.Now().UnixMilli()
+				evt.Timestamp = ts.UnixMilli()
+			}
+			if evt.User == nil {
+				evt.User = map[string]any{}
 			}
 
-			id, err := a.handler(r.Context(), &evt)
+			if err := evt.Validate(ctx); err != nil {
+				return err
+			}
+
+			ctx, span := itrace.UserTracer().Provider().
+				Tracer(consts.OtelScopeEvent).
+				Start(ctx, consts.OtelSpanEvent,
+					trace.WithTimestamp(ts),
+					trace.WithNewRoot(),
+					trace.WithLinks(trace.LinkFromContext(ctx)),
+				)
+			defer span.End()
+
+			id, err := a.handler(ctx, &evt)
 			if err != nil {
 				a.log.Error().Str("event", evt.Name).Err(err).Msg("error handling event")
 				return err
@@ -184,8 +284,9 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(apiutil.EventAPIResponse{
 			IDs:    ids[0 : max+1],
 			Status: 400,
-			Error:  err,
+			Error:  err.Error(),
 		})
+
 		return
 	}
 

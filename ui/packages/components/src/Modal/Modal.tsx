@@ -1,15 +1,23 @@
-import { classNames } from '@inngest/components/utils/classNames';
+import { cn } from '@inngest/components/utils/classNames';
 import * as Dialog from '@radix-ui/react-dialog';
 import { AnimatePresence, motion } from 'framer-motion';
 
 type ModalProps = {
   children?: React.ReactNode;
   isOpen: boolean;
-  onClose: () => void;
+  onClose: (open: boolean) => void;
+
+  /** @deprecated Use Modal.Header instead. */
   title?: string | React.ReactNode;
+
+  /** @deprecated Use description prop in Modal.Header instead. */
   description?: string;
   className?: string;
+
+  /** @deprecated Use Modal.Footer instead. */
   footer?: React.ReactNode;
+
+  alignTop?: boolean;
 };
 
 export function Modal({
@@ -20,60 +28,79 @@ export function Modal({
   description,
   className = 'max-w-lg',
   footer,
+  alignTop,
 }: ModalProps) {
+  const container = typeof document !== 'undefined' ? document.getElementById('modals') : undefined;
   return (
     <Dialog.Root open={isOpen} onOpenChange={onClose} modal>
       <AnimatePresence>
-        <Dialog.Portal>
-          <Dialog.Overlay asChild>
-            <div
-              className="fixed inset-0 z-50 bg-white/30 backdrop-blur-[2px] transition-opacity dark:bg-[#04060C]/90"
-              aria-hidden="true"
-            />
-          </Dialog.Overlay>
-          {/* Full-screen container to center the panel */}
-          <div className="fixed inset-0 z-50 overflow-y-auto">
-            <motion.div
-              className="flex min-h-full w-full items-center justify-center p-6"
-              initial={{ y: -20, opacity: 0.2 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{
-                y: -20,
-                opacity: 0.2,
-                transition: { duration: 0.2, type: 'tween' },
-              }}
-              transition={{
-                duration: 0.15,
-                type: 'tween',
-              }}
-            >
-              <Dialog.Content
-                className={classNames(
-                  className,
-                  'dark:bg-slate-910 transform overflow-hidden rounded-lg bg-white shadow-xl transition-all'
+        <Dialog.Portal container={container}>
+          <Dialog.Overlay
+            asChild
+            className="bg-overlay/20 dark:bg-overlay/50 fixed inset-0 z-[100] transition-opacity"
+            aria-hidden="true"
+          >
+            {/* Full-screen container to center the panel */}
+            <div className="fixed inset-0 z-[100]">
+              <motion.div
+                className={cn(
+                  alignTop ? 'items-baseline' : 'items-center',
+                  'flex h-full w-full justify-center p-6'
                 )}
+                initial={{ y: -20, opacity: 0.2 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{
+                  y: -20,
+                  opacity: 0.2,
+                  transition: { duration: 0.2, type: 'tween' },
+                }}
+                transition={{
+                  duration: 0.15,
+                  type: 'tween',
+                }}
               >
-                {(title || description) && (
-                  <div className="dark:bg-slate-910 border-b border-slate-200 bg-slate-900 p-6 dark:border-slate-800">
-                    <Dialog.Title className="text-xl font-semibold text-white">
-                      {title}
-                    </Dialog.Title>
-                    <Dialog.Description className="text-sm text-indigo-100 dark:font-medium dark:text-slate-400">
-                      {description}
-                    </Dialog.Description>
-                  </div>
-                )}
-                {children}
-                {footer && (
-                  <div className="border-t border-slate-200 p-6 dark:border-slate-800">
-                    {footer}
-                  </div>
-                )}
-              </Dialog.Content>
-            </motion.div>
-          </div>
+                <Dialog.Content
+                  className={cn(
+                    className,
+                    'bg-modalBase shadow-tooltip border-subtle max-h-full overflow-y-auto overflow-x-hidden rounded-md border shadow-2xl'
+                  )}
+                >
+                  {(title || description) && <Header description={description}>{title}</Header>}
+                  {children}
+                  {footer && <Footer>{footer}</Footer>}
+                </Dialog.Content>
+              </motion.div>
+            </div>
+          </Dialog.Overlay>
         </Dialog.Portal>
       </AnimatePresence>
     </Dialog.Root>
   );
 }
+
+function Body({ children }: React.PropsWithChildren<{}>) {
+  return <div className="text-basis m-6">{children}</div>;
+}
+
+function Footer({ children, className }: React.PropsWithChildren<{ className?: string }>) {
+  return <div className={cn('border-subtle border-t p-6', className)}>{children}</div>;
+}
+
+function Header({
+  children,
+  description,
+}: React.PropsWithChildren<{ description?: React.ReactNode }>) {
+  return (
+    <div className="bg-modalBase border-subtle border-b p-6">
+      <Dialog.Title className="text-basis text-xl">{children}</Dialog.Title>
+
+      {description && (
+        <Dialog.Description className="text-subtle pt-1">{description}</Dialog.Description>
+      )}
+    </div>
+  );
+}
+
+Modal.Body = Body;
+Modal.Footer = Footer;
+Modal.Header = Header;

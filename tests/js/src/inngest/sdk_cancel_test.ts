@@ -2,7 +2,7 @@ import { inngest } from "@/inngest/client";
 
 export const testCancel = inngest.createFunction(
   {
-    name: "Cancel test",
+    id: "cancel-test",
     retries: 10,
     cancelOn: [
       {
@@ -15,7 +15,7 @@ export const testCancel = inngest.createFunction(
   { event: "tests/cancel.test" },
   async ({ event, step }) => {
     // Wait for 10 seconds.
-    await step.sleep("10s");
+    await step.sleep("sleep", "10s");
 
     // Run a step, if not cancelled.
     await step.run("After the sleep", () => {

@@ -3,27 +3,36 @@ package executor
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"sync"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/config"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
+	"github.com/inngest/inngest/pkg/execution/batch"
 	"github.com/inngest/inngest/pkg/execution/debounce"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
+	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/pubsub"
+	"github.com/inngest/inngest/pkg/run"
 	"github.com/inngest/inngest/pkg/service"
+	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/propagation"
 	"golang.org/x/sync/errgroup"
 )
 
 type Opt func(s *svc)
 
-func WithExecutionLoader(l cqrs.ExecutionLoader) func(s *svc) {
+func WithExecutionManager(l cqrs.Manager) func(s *svc) {
 	return func(s *svc) {
 		s.data = l
 	}
@@ -59,6 +68,12 @@ func WithServiceDebouncer(d debounce.Debouncer) func(s *svc) {
 	}
 }
 
+func WithServiceBatcher(b batch.BatchManager) func(s *svc) {
+	return func(s *svc) {
+		s.batcher = b
+	}
+}
+
 func NewService(c config.Config, opts ...Opt) service.Service {
 	svc := &svc{config: c}
 	for _, o := range opts {
@@ -69,8 +84,8 @@ func NewService(c config.Config, opts ...Opt) service.Service {
 
 type svc struct {
 	config config.Config
-	// data provides the ability to load action versions when running steps.
-	data cqrs.ExecutionLoader
+	// data provides an interface for data access
+	data cqrs.Manager
 	// state allows us to record step results
 	state state.Manager
 	// queue allows us to enqueue next steps.
@@ -78,6 +93,7 @@ type svc struct {
 	// exec runs the specific actions.
 	exec      execution.Executor
 	debouncer debounce.Debouncer
+	batcher   batch.BatchManager
 
 	wg sync.WaitGroup
 
@@ -103,7 +119,7 @@ func (s *svc) Pre(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("failed to create finish handler: %w", err)
 	}
-	s.exec.SetFinishHandler(finishHandler)
+	s.exec.SetFinalizer(finishHandler)
 
 	return nil
 }
@@ -112,7 +128,7 @@ func (s *svc) Executor() execution.Executor {
 	return s.exec
 }
 
-func (s *svc) getFinishHandler(ctx context.Context) (func(context.Context, state.State, []event.Event) error, error) {
+func (s *svc) getFinishHandler(ctx context.Context) (func(context.Context, sv2.ID, []event.Event) error, error) {
 	pb, err := pubsub.NewPublisher(ctx, s.config.EventStream.Service)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create publisher: %w", err)
@@ -120,16 +136,20 @@ func (s *svc) getFinishHandler(ctx context.Context) (func(context.Context, state
 
 	topicName := s.config.EventStream.Service.Concrete.TopicName()
 
-	return func(ctx context.Context, st state.State, events []event.Event) error {
+	return func(ctx context.Context, id sv2.ID, events []event.Event) error {
 		eg := errgroup.Group{}
 
 		for _, e := range events {
 			evt := e
 			eg.Go(func() error {
-				byt, err := json.Marshal(evt)
+				trackedEvent := event.NewOSSTrackedEvent(evt)
+				byt, err := json.Marshal(trackedEvent)
 				if err != nil {
 					return fmt.Errorf("error marshalling event: %w", err)
 				}
+
+				carrier := itrace.NewTraceCarrier()
+				itrace.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
 
 				err = pb.Publish(
 					ctx,
@@ -137,7 +157,10 @@ func (s *svc) getFinishHandler(ctx context.Context) (func(context.Context, state
 					pubsub.Message{
 						Name:      event.EventReceivedName,
 						Data:      string(byt),
-						Timestamp: evt.Time(),
+						Timestamp: trackedEvent.GetEvent().Time(),
+						Metadata: map[string]any{
+							consts.OtelPropagationKey: carrier,
+						},
 					},
 				)
 				if err != nil {
@@ -153,116 +176,97 @@ func (s *svc) getFinishHandler(ctx context.Context) (func(context.Context, state
 
 func (s *svc) Run(ctx context.Context) error {
 	logger.From(ctx).Info().Msg("subscribing to function queue")
-	return s.queue.Run(ctx, func(ctx context.Context, item queue.Item) error {
+	return s.queue.Run(ctx, func(ctx context.Context, info queue.RunInfo, item queue.Item) (queue.RunResult, error) {
 		// Don't stop the service on errors.
 		s.wg.Add(1)
 		defer s.wg.Done()
 
-		var err error
+		item.RunInfo = &info
+
+		var (
+			err          error
+			continuation bool
+		)
+
 		switch item.Kind {
-		case queue.KindEdge, queue.KindSleep:
-			err = s.handleQueueItem(ctx, item)
+		case queue.KindStart, queue.KindEdge, queue.KindSleep, queue.KindEdgeError:
+			continuation, err = s.handleQueueItem(ctx, item)
 		case queue.KindPause:
 			err = s.handlePauseTimeout(ctx, item)
 		case queue.KindDebounce:
-			d := debounce.DebouncePayload{}
-			if err := json.Unmarshal(item.Payload.(json.RawMessage), &d); err != nil {
-				return fmt.Errorf("error unmarshalling debounce payload: %w", err)
-			}
-
-			all, err := s.data.Functions(ctx)
-			if err != nil {
-				return err
-			}
-
-			for _, f := range all {
-				if f.ID == d.FunctionID {
-					di, err := s.debouncer.GetDebounceItem(ctx, d.DebounceID)
-					if err != nil {
-						return err
-					}
-					_, err = s.exec.Schedule(ctx, execution.ScheduleRequest{
-						Function:        f,
-						AccountID:       di.AccountID,
-						WorkspaceID:     di.WorkspaceID,
-						Events:          []event.TrackedEvent{di},
-						PreventDebounce: true,
-					})
-					if err != nil {
-						return err
-					}
-					_ = s.debouncer.DeleteDebounceItem(ctx, d.DebounceID)
-				}
-			}
-
+			err = s.handleDebounce(ctx, item)
+		case queue.KindScheduleBatch:
+			err = s.handleScheduledBatch(ctx, item)
+		case queue.KindQueueMigrate:
+			// NOOP:
+			// this kind don't work in the Dev server
 		default:
 			err = fmt.Errorf("unknown payload type: %T", item.Payload)
 		}
-		return err
+
+		if err != nil {
+			logger.StdlibLogger(ctx).Error("error handling queue item", "error", err)
+		}
+
+		return queue.RunResult{
+			ScheduledImmediateJob: continuation,
+		}, err
 	})
 }
 
 func (s *svc) Stop(ctx context.Context) error {
+	s.exec.CloseLifecycleListeners(ctx)
+
 	// Wait for all in-flight queue runs to finish
 	s.wg.Wait()
 	return nil
 }
 
-func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) error {
+func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) (bool, error) {
 	payload, err := queue.GetEdge(item)
 	if err != nil {
-		return fmt.Errorf("unable to get edge from queue item: %w", err)
+		return false, fmt.Errorf("unable to get edge from queue item: %w", err)
 	}
 	edge := payload.Edge
 
-	// If this is of type sleep, ensure that we save "nil" within the state store
-	// for the outgoing edge ID.  This ensures that we properly increase the stack
-	// for `tools.sleep` within generator functions.
-	var stackIdx int
-	if item.Kind == queue.KindSleep && item.Attempt == 0 {
-		stackIdx, err = s.state.SaveResponse(ctx, item.Identifier, state.DriverResponse{
-			Step: inngest.Step{ID: edge.Outgoing}, // XXX: Save edge name here.
-		}, 0)
-		if err != nil {
-			return err
-		}
-		// After the sleep, we start a new step.  THis means we also want to start a new
-		// group ID, ensuring that we correlate the next step _after_ this sleep (to be
-		// scheduled in this executor run)
-		ctx = state.WithGroupID(ctx, uuid.New().String())
-	} else if edge.Outgoing != inngest.TriggerName {
-		// Load the position within the stack for standard edges.
-		stackIdx, err = s.state.StackIndex(ctx, item.Identifier.RunID, edge.Outgoing)
-		if err != nil {
-			return fmt.Errorf("unable to find stack index: %w", err)
-		}
-	}
-
-	resp, err := s.exec.Execute(ctx, item.Identifier, item, edge, stackIdx)
-
+	resp, err := s.exec.Execute(ctx, item.Identifier, item, edge)
 	// Check if the execution is cancelled, and if so finalize and terminate early.
 	// This prevents steps from scheduling children.
-	if err == state.ErrFunctionCancelled {
-		return nil
+	if errors.Is(err, state.ErrFunctionCancelled) {
+		return false, nil
 	}
-	if err != nil || resp.Err != nil {
+
+	if errors.Is(err, state.ErrFunctionPaused) {
+		return false, queue.AlwaysRetryError(err)
+	}
+
+	if errors.Is(err, ErrHandledStepError) {
+		// Retry any next steps.
+		return false, err
+	}
+
+	if err != nil || (resp != nil && resp.Err != nil) {
 		// Accordingly, we check if the driver's response is retryable here;
 		// this will let us know whether we can re-enqueue.
 		if resp != nil && !resp.Retryable() {
-			return nil
+			return false, nil
 		}
 
 		// If the error is not of type response error, we assume the step is
 		// always retryable.
 		if resp == nil || err != nil {
-			return err
+			return false, err
 		}
 
 		// Always retry; non-retryable is covered above.
-		return fmt.Errorf("%s", resp.Error())
+		return false, fmt.Errorf("%s", resp.Error())
 	}
 
-	return nil
+	if resp != nil && len(resp.Generator) > 0 {
+		return true, nil
+	}
+
+	return false, nil
 }
 
 func (s *svc) handlePauseTimeout(ctx context.Context, item queue.Item) error {
@@ -270,7 +274,7 @@ func (s *svc) handlePauseTimeout(ctx context.Context, item queue.Item) error {
 
 	pauseTimeout, ok := item.Payload.(queue.PayloadPauseTimeout)
 	if !ok {
-		return fmt.Errorf("unable to get pause timeout form queue item: %T", item.Payload)
+		return fmt.Errorf("unable to get pause timeout from queue item: %T", item.Payload)
 	}
 
 	pause, err := s.state.PauseByID(ctx, pauseTimeout.PauseID)
@@ -286,5 +290,134 @@ func (s *svc) handlePauseTimeout(ctx context.Context, item queue.Item) error {
 		return nil
 	}
 
-	return s.exec.Resume(ctx, *pause, execution.ResumeRequest{})
+	r := execution.ResumeRequest{
+		IsTimeout: true,
+	}
+
+	// If the pause timeout is for an invocation, store an error to cause the
+	// step to fail.
+	if pause.Opcode != nil && *pause.Opcode == enums.OpcodeInvokeFunction.String() {
+		r.SetInvokeTimeoutError()
+	}
+
+	return s.exec.Resume(ctx, *pause, r)
+}
+
+// handleScheduledBatch checks for
+func (s *svc) handleScheduledBatch(ctx context.Context, item queue.Item) error {
+	opts := batch.ScheduleBatchOpts{}
+	if err := json.Unmarshal(item.Payload.(json.RawMessage), &opts); err != nil {
+		return err
+	}
+
+	batchID := opts.BatchID
+
+	status, err := s.batcher.StartExecution(ctx, opts.FunctionID, batchID, opts.BatchPointer)
+	if err != nil {
+		return err
+	}
+	if status == enums.BatchStatusStarted.String() {
+		// batch already started, abort
+		return nil
+	}
+	if status == enums.BatchStatusAbsent.String() {
+		// just attempt clean up, don't care about the result
+		_ = s.batcher.DeleteKeys(ctx, opts.FunctionID, batchID)
+		return nil
+	}
+
+	fn, err := s.findFunctionByID(ctx, opts.FunctionID)
+	if err != nil {
+		return err
+	}
+
+	if err := s.exec.RetrieveAndScheduleBatch(ctx, *fn, batch.ScheduleBatchPayload{
+		BatchID:         batchID,
+		BatchPointer:    opts.BatchPointer,
+		AccountID:       item.Identifier.AccountID,
+		WorkspaceID:     item.Identifier.WorkspaceID,
+		AppID:           item.Identifier.AppID,
+		FunctionID:      item.Identifier.WorkflowID,
+		FunctionVersion: fn.FunctionVersion,
+	}, nil); err != nil {
+		return fmt.Errorf("could not retrieve and schedule batch items: %w", err)
+	}
+
+	return nil
+}
+
+func (s *svc) handleDebounce(ctx context.Context, item queue.Item) error {
+	d := debounce.DebouncePayload{}
+	if err := json.Unmarshal(item.Payload.(json.RawMessage), &d); err != nil {
+		return fmt.Errorf("error unmarshalling debounce payload: %w", err)
+	}
+
+	all, err := s.data.Functions(ctx)
+	if err != nil {
+		return err
+	}
+
+	for _, f := range all {
+		if f.ID == d.FunctionID {
+			di, err := s.debouncer.GetDebounceItem(ctx, d.DebounceID)
+			if err != nil {
+				if errors.Is(err, debounce.ErrDebounceNotFound) {
+					// This is expected after migrating items to a new primary cluster
+					logger.StdlibLogger(ctx).Info("debounce not found during timeout job, skipping",
+						"fn_id", d.FunctionID.String(),
+						"debounce_id", d.DebounceID.String(),
+					)
+					continue
+				}
+
+				return err
+			}
+
+			if err := s.debouncer.StartExecution(ctx, *di, f, d.DebounceID); err != nil {
+				return err
+			}
+
+			ctx, span := run.NewSpan(ctx,
+				run.WithScope(consts.OtelScopeDebounce),
+				run.WithName(consts.OtelSpanDebounce),
+				run.WithSpanAttributes(
+					attribute.String(consts.OtelSysAccountID, item.Identifier.AccountID.String()),
+					attribute.String(consts.OtelSysWorkspaceID, item.Identifier.WorkspaceID.String()),
+					attribute.String(consts.OtelSysAppID, item.Identifier.AppID.String()),
+					attribute.String(consts.OtelSysFunctionID, item.Identifier.WorkflowID.String()),
+					attribute.Bool(consts.OtelSysDebounceTimeout, true),
+				),
+			)
+			defer span.End()
+
+			_, err = s.exec.Schedule(ctx, execution.ScheduleRequest{
+				Function:         f,
+				AccountID:        di.AccountID,
+				WorkspaceID:      di.WorkspaceID,
+				AppID:            di.AppID,
+				Events:           []event.TrackedEvent{di},
+				PreventDebounce:  true,
+				FunctionPausedAt: di.FunctionPausedAt,
+			})
+			if err != nil {
+				return err
+			}
+			_ = s.debouncer.DeleteDebounceItem(ctx, d.DebounceID)
+		}
+	}
+
+	return nil
+}
+
+func (s *svc) findFunctionByID(ctx context.Context, fnID uuid.UUID) (*inngest.Function, error) {
+	fns, err := s.data.Functions(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for _, f := range fns {
+		if f.ID == fnID {
+			return &f, nil
+		}
+	}
+	return nil, fmt.Errorf("no function found with ID: %s", fnID)
 }

@@ -3,20 +3,30 @@
   "extends": "@inngest/tsconfig/nextjs.json",
   "compilerOptions": {
     "tsBuildInfoFile": "node_modules/.cache/tsbuildinfo.json",
-    "plugins": [{ "name": "next" }],
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
     "baseUrl": "./",
-    "paths": { "@/*": ["./src/*"] }
+    "paths": {
+      "@/*": ["./src/*"]
+    },
+    "strictNullChecks": true
   },
   "include": [
     "./src/**/*",
     "./next-env.d.ts",
     ".next/types/**/*.ts",
     "./next.config.js",
+    "./graphql.config.js",
     "./tailwind.config.ts",
     "./svgo.config.js",
     "./sentry.client.config.ts",
     "./sentry.edge.config.ts",
-    "./sentry.server.config.ts"
+    "./sentry.server.config.ts",
+    "../../packages/components/src/Menu/MenuItem.tsx",
+    "../../packages/components/src/Tooltip/OptionalTooltip.tsx"
   ],
   "exclude": ["node_modules"]
 }

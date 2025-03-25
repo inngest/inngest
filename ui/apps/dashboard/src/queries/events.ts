@@ -1,8 +1,8 @@
 import { useQuery, type UseQueryResponse } from 'urql';
 
+import { useEnvironment } from '@/components/Environments/environment-context';
 import { graphql } from '@/gql';
-import type { Event, GetEventTypesQuery } from '@/gql/graphql';
-import { useEnvironment } from '@/queries/environments';
+import type { GetEventTypesQuery, GetEventTypesVolumeQuery } from '@/gql/graphql';
 
 const GetEventTypesDocument = graphql(`
   query GetEventTypes($environmentID: ID!, $page: Int) {
@@ -15,6 +15,22 @@ const GetEventTypesDocument = graphql(`
             slug
             name
           }
+        }
+        page {
+          page
+          totalPages
+        }
+      }
+    }
+  }
+`);
+
+const GetEventTypesVolumeDocument = graphql(`
+  query GetEventTypesVolume($environmentID: ID!, $page: Int) {
+    workspace(id: $environmentID) {
+      events @paginated(perPage: 50, page: $page) {
+        data {
+          name
           dailyVolume: usage(opts: { period: "hour", range: "day" }) {
             total
             data {
@@ -32,30 +48,35 @@ const GetEventTypesDocument = graphql(`
 `);
 
 type UseEventTypesParams = {
-  environmentSlug: string;
   page?: number;
 };
 
 export const useEventTypes = ({
-  environmentSlug,
   page = 0,
-}: UseEventTypesParams): UseQueryResponse<
-  GetEventTypesQuery,
-  { environmentID: string; page?: number }
-> => {
-  const [{ data: environment, fetching: isFetchingEnvironment }] = useEnvironment({
-    environmentSlug,
-  });
-
+}: UseEventTypesParams): UseQueryResponse<GetEventTypesQuery, { page?: number }> => {
+  const env = useEnvironment();
   const [result, refetch] = useQuery({
     query: GetEventTypesDocument,
     variables: {
-      environmentID: environment?.id!,
+      environmentID: env.id,
       page,
     },
-    pause: !environment?.id,
   });
-  return [{ ...result, fetching: isFetchingEnvironment || result.fetching }, refetch];
+  return [{ ...result, fetching: result.fetching }, refetch];
+};
+
+export const useEventTypesVolume = ({
+  page = 0,
+}: UseEventTypesParams): UseQueryResponse<GetEventTypesVolumeQuery, { page?: number }> => {
+  const env = useEnvironment();
+  const [result, refetch] = useQuery({
+    query: GetEventTypesVolumeDocument,
+    variables: {
+      environmentID: env.id,
+      page,
+    },
+  });
+  return [{ ...result, fetching: result.fetching }, refetch];
 };
 
 const GetEventTypeDocument = graphql(`
@@ -68,6 +89,14 @@ const GetEventTypeDocument = graphql(`
           data {
             slot
             count
+          }
+        }
+        workflows {
+          id
+          slug
+          name
+          current {
+            createdAt
           }
         }
       }
@@ -84,31 +113,45 @@ type UsageItem = {
 };
 
 type UseEventTypeParams = {
-  environmentSlug: string;
   name: string;
 };
 
+type Event = {
+  name: string;
+  workflows: {
+    id: string;
+    slug: string;
+    name: string;
+    current: {
+      createdAt: string;
+    } | null;
+  }[];
+  usage: {
+    total: number;
+    data: {
+      slot: string;
+      count: number;
+    }[];
+  };
+};
+
 export const useEventType = ({
-  environmentSlug,
   name,
 }: UseEventTypeParams): UseQueryResponse<{
   eventType: Event | undefined;
   dailyUsage: UsageItem[] | undefined;
 }> => {
-  const [{ data: environment, fetching: isFetchingEnvironment }] = useEnvironment({
-    environmentSlug,
-  });
+  const environment = useEnvironment();
   const [{ data, ...rest }, refetch] = useQuery({
     query: GetEventTypeDocument,
     variables: {
-      environmentID: environment?.id!,
+      environmentID: environment.id,
       eventName: name,
     },
-    pause: !environment?.id,
   });
 
-  const eventType = data?.events?.data?.[0] as Event | undefined;
-  const dailyUsage: UsageItem[] | undefined = data?.events?.data?.[0]?.usage.data.map((d) => ({
+  const eventType = data?.events?.data[0];
+  const dailyUsage: UsageItem[] | undefined = data?.events?.data[0]?.usage.data.map((d) => ({
     name: d.slot,
     values: {
       count: d.count,
@@ -122,7 +165,7 @@ export const useEventType = ({
         dailyUsage,
       },
       ...rest,
-      fetching: isFetchingEnvironment || rest.fetching,
+      fetching: rest.fetching,
     },
     refetch,
   ];

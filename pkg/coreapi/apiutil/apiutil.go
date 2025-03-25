@@ -3,6 +3,7 @@ package apiutil
 import (
 	"context"
 	"fmt"
+	"github.com/google/uuid"
 
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/state"
@@ -18,7 +19,7 @@ var (
 type EventAPIResponse struct {
 	IDs    []string `json:"ids"`
 	Status int      `json:"status"`
-	Error  error    `json:"error,omitempty"`
+	Error  string   `json:"error,omitempty"`
 }
 
 // InvokeAPIResponse is the API response sent when responding to an invoke
@@ -30,12 +31,12 @@ type InvokeAPIResponse struct {
 }
 
 // CancelRun cancels a run for a given run ID, returning consistent errors for public APIs
-func CancelRun(ctx context.Context, sm state.Manager, runID ulid.ULID) error {
+func CancelRun(ctx context.Context, sm state.Manager, accountId uuid.UUID, runID ulid.ULID) error {
 	if sm == nil {
 		return fmt.Errorf("no state manager supplied to cancel run")
 	}
 
-	md, err := sm.Metadata(ctx, runID)
+	md, err := sm.Metadata(ctx, accountId, runID)
 	if err != nil {
 		return publicerr.Error{
 			Message: "A function run with the given ID could not be found",

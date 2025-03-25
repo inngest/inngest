@@ -77,8 +77,6 @@ const updaters: Record<HistoryType, Updater> = {
     } satisfies HistoryNode;
   },
   StepErrored: (node, rawItem) => {
-    rawItem.attempt;
-
     return {
       ...node,
       endedAt: new Date(rawItem.createdAt),
@@ -157,6 +155,7 @@ const updaters: Record<HistoryType, Updater> = {
     return {
       ...node,
       scope: 'step',
+      startedAt: new Date(rawItem.createdAt),
       status: 'waiting',
       waitForEventConfig,
     } satisfies HistoryNode;

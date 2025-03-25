@@ -3,8 +3,9 @@ const { withSentryConfig } = require('@sentry/nextjs');
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  productionBrowserSourceMaps: true,
   experimental: {
-    typedRoutes: true,
+    // typedRoutes: true,
   },
   images: {
     remotePatterns: [
@@ -19,18 +20,23 @@ const nextConfig = {
     return [
       {
         source: '/',
-        destination: '/env/production/functions',
-        permanent: true,
+        destination: '/env/production/apps',
+        permanent: false,
       },
       {
         source: '/env/:slug/manage',
         destination: '/env/:slug/manage/keys',
-        permanent: true,
+        permanent: false,
       },
       {
-        source: '/env/:slug/settings',
-        destination: '/env/:slug/settings/team',
-        permanent: true,
+        source: '/env/:slug/onboarding',
+        destination: '/env/production/onboarding/create-app',
+        permanent: false,
+      },
+      {
+        source: '/env/:slug((?!production)[^/]+)/onboarding/:step',
+        destination: '/env/:slug/apps',
+        permanent: false,
       },
       {
         source: '/integrations/vercel',
@@ -38,43 +44,48 @@ const nextConfig = {
         permanent: false,
       },
       {
-        source: '/settings/integrations',
-        destination: '/settings/integrations/vercel',
+        source: '/settings/billing',
+        destination: '/billing',
         permanent: false,
       },
       {
         source: '/login',
         destination: '/sign-in',
-        permanent: true,
+        permanent: false,
       },
       {
         source: '/reset-password/reset',
-        destination: '/password-reset/complete',
-        permanent: true,
+        destination: '/sign-in',
+        permanent: false,
+      },
+      // Legacy Pages
+      {
+        source: '/env/:slug/deploys',
+        destination: '/env/:slug/apps',
+        permanent: false,
+      },
+      {
+        source: '/settings/team',
+        destination: '/settings/organization',
+        permanent: false,
       },
       // Legacy signing key locations
       {
         source: '/secrets',
         destination: '/env/production/manage/signing-key',
-        permanent: true,
+        permanent: false,
       },
       {
         source: '/test/secrets',
         destination: '/env/branch/manage/signing-key',
-        permanent: true,
+        permanent: false,
       },
     ];
   },
   // Optional build-time configuration for Sentry.
   // See https://docs.sentry.io/platforms/javascript/guides/nextjs/manual-setup/#extend-nextjs-configuration
   sentry: {
-    // Use `hidden-source-map` rather than `source-map` as the Webpack `devtool`
-    // for client-side builds. (This will be the default starting in
-    // `@sentry/nextjs` version 8.0.0.) See
-    // https://webpack.js.org/configuration/devtool/ and
-    // https://docs.sentry.io/platforms/javascript/guides/nextjs/manual-setup/#use-hidden-source-map
-    // for more information.
-    hideSourceMaps: true,
+    hideSourceMaps: false,
     // Tunnel sentry events to help circumvent ad-blockers.
     tunnelRoute: '/api/sentry',
   },

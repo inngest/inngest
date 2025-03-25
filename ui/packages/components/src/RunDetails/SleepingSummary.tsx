@@ -27,7 +27,7 @@ export function SleepingSummary({ history }: Props) {
 
         return (
           <Card
-            accentColor="bg-sky-400"
+            accentColor="bg-status-running"
             className={i < sleeps.length - 1 ? 'mb-4' : undefined}
             key={sleep.groupID}
           >

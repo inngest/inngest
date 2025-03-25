@@ -15,3 +15,8 @@ pkg/devserver/static/
 Thumbs.db
 
 /.vercel/
+.inngest
+
+.idea
+/tmp/
+!/tmp/nats/.gitkeep

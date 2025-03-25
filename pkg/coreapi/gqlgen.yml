@@ -24,6 +24,9 @@ models:
     model: github.com/inngest/inngest/pkg/coreapi/graph/models.Environment
   App:
     model: github.com/inngest/inngest/pkg/cqrs.App
+    fields:
+      externalID:
+        resolver: true
   Runtime:
     model: github.com/inngest/inngest/pkg/inngest.RuntimeWrapper
   FunctionVersion:
@@ -56,17 +59,37 @@ models:
         resolver: true
       event:
         resolver: true
+      events:
+        resolver: true
+      batchCreatedAt:
+        resolver: true
       waitingFor:
         resolver: true
       pendingSteps:
         resolver: true
-      status:
+      function:
+        resolver: true
+  FunctionRunV2:
+    fields:
+      app:
         resolver: true
       function:
         resolver: true
-      output:
+      trace:
         resolver: true
-      finishedAt:
+  ConnectV1WorkerConnection:
+    fields:
+      app:
+        resolver: true
+  RunsV2Connection:
+    model: github.com/inngest/inngest/pkg/coreapi/graph/models.RunsV2Connection
+    fields:
+      totalCount:
+        resolver: true
+  ConnectV1WorkerConnectionsConnection:
+    model: github.com/inngest/inngest/pkg/coreapi/graph/models.WorkerConnectionsConnection
+    fields:
+      totalCount:
         resolver: true
   HistoryType:
     model: github.com/inngest/inngest/pkg/enums.HistoryType
@@ -88,6 +111,10 @@ models:
     model: github.com/inngest/inngest/pkg/history_reader.RunHistoryInvokeFunction
   RunHistoryInvokeFunctionResult:
     model: github.com/inngest/inngest/pkg/history_reader.RunHistoryInvokeFunctionResult
+  StreamItem:
+    fields:
+      inBatch:
+        resolver: true
   ULID:
     model: github.com/inngest/inngest/pkg/gql_scalars.ULID
   UUID:

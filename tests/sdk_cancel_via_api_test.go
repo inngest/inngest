@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"io"
 	"net/http"
 	"testing"
 	"time"
@@ -11,9 +10,7 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/state"
-	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngestgo"
-	"github.com/oklog/ulid/v2"
 )
 
 func TestCancelFunctionViaAPI(t *testing.T) {
@@ -26,43 +23,17 @@ func TestCancelFunctionViaAPI(t *testing.T) {
 	}
 
 	hashes := map[string]string{
-		"Sleep 10s": "af731ad68b75abe9679cc9fc324a4ad3cd8075a2",
+		"Sleep 10s": "c3ca5f787365eae0dea86250e27d476406956478",
 	}
 
 	// This uses the ame
 	fnID := "test-suite-cancel-test"
-	retries := 10
 	abstract := Test{
+		ID:   fnID,
 		Name: "Cancel via API test",
 		Description: `
 			This test asserts that the V0 cancellation API works as expected, cancelling functions.
 		`,
-		Function: inngest.Function{
-			Name: "Cancel test",
-			Slug: fnID,
-			Triggers: []inngest.Trigger{
-				{
-					EventTrigger: &inngest.EventTrigger{
-						Event: "tests/cancel.test",
-					},
-				},
-			},
-			Steps: []inngest.Step{
-				{
-					ID:      "step",
-					Name:    "step",
-					URI:     stepURL(fnID, "step"),
-					Retries: &retries,
-				},
-			},
-			Cancel: []inngest.Cancel{
-				{
-					Event:   "cancel/please",
-					Timeout: strptr("1h"),
-					If:      strptr("async.data.request_id == event.data.request_id"),
-				},
-			},
-		},
 		EventTrigger: evt,
 		Timeout:      20 * time.Second,
 	}
@@ -75,8 +46,7 @@ func TestCancelFunctionViaAPI(t *testing.T) {
 			test.SetRequestEvent(evt),
 			// And the executor should start its requests with this context.
 			test.SetRequestContext(driver.SDKRequestContext{
-				FunctionID: inngest.DeterministicUUID(abstract.Function),
-				StepID:     "step",
+				StepID: "step",
 				Stack: &driver.FunctionStack{
 					Current: 0,
 				},
@@ -86,9 +56,11 @@ func TestCancelFunctionViaAPI(t *testing.T) {
 			// Execute the step again, get a wait
 			test.ExpectRequest("Wait step run", "step", time.Second),
 			test.ExpectGeneratorResponse([]state.GeneratorOpcode{{
-				Op:   enums.OpcodeSleep,
-				ID:   hashes["Sleep 10s"],
-				Name: "10s",
+				Op:          enums.OpcodeSleep,
+				ID:          hashes["Sleep 10s"],
+				DisplayName: inngestgo.StrPtr("sleep"),
+				Data:        json.RawMessage("null"),
+				Name:        "10s",
 			}}),
 
 			test.After(time.Second),
@@ -100,38 +72,19 @@ func TestCancelFunctionViaAPI(t *testing.T) {
 					return fmt.Errorf("no event ID found")
 				}
 
-				// Get run ID from event
-				route := fmt.Sprintf("%s/v0/events/%s/runs", apiURL.String(), *test.lastEventID)
-				req, _ := http.NewRequest(http.MethodGet, route, nil)
+				route := fmt.Sprintf("%s/v1/runs/%s", apiURL.String(), test.requestCtx.RunID)
+				req, _ := http.NewRequest(http.MethodDelete, route, nil)
 				req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", eventKey))
 				resp, err := http.DefaultClient.Do(req)
-
 				if err != nil {
-					return err
+					return fmt.Errorf("error making delete request: %w", err)
 				}
+
 				defer resp.Body.Close()
-
-				byt, _ := io.ReadAll(resp.Body)
-
-				ids := []ulid.ULID{}
-				if err := json.Unmarshal(byt, &ids); err != nil {
-					return fmt.Errorf("cannot get event runs: %w\n\n%s", err, byt)
+				if resp.StatusCode > 299 {
+					return fmt.Errorf("unexpected cancel status code: %d", resp.StatusCode)
 				}
 
-				for _, id := range ids {
-					// Cancel run
-					route = fmt.Sprintf("%s/v0/runs/%s", apiURL.String(), id)
-					req, _ = http.NewRequest(http.MethodDelete, route, nil)
-					req.Header.Add("Authorization", fmt.Sprintf("Bearer %s", eventKey))
-					resp, err = http.DefaultClient.Do(req)
-					if err != nil {
-						return fmt.Errorf("error making delete request: %w", err)
-					}
-					defer resp.Body.Close()
-					if resp.StatusCode != 204 {
-						return fmt.Errorf("unexpected cancel status code: %d", resp.StatusCode)
-					}
-				}
 				return nil
 			}),
 		)

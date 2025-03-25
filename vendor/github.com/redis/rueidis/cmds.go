@@ -5,6 +5,9 @@ import "github.com/redis/rueidis/internal/cmds"
 // Builder represents a command builder. It should only be created from the client.B() method.
 type Builder = cmds.Builder
 
+// Incomplete represents an incomplete Redis command. It should then be completed by calling the Build().
+type Incomplete = cmds.Incomplete
+
 // Completed represents a completed Redis command. It should only be created from the Build() of a command builder.
 type Completed = cmds.Completed
 

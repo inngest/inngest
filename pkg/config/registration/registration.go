@@ -2,6 +2,8 @@ package registration
 
 import (
 	"context"
+	"github.com/inngest/inngest/pkg/connect/pubsub"
+	"github.com/inngest/inngest/pkg/telemetry/trace"
 
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/queue"
@@ -55,9 +57,17 @@ func RegisterState(f func() any) {
 	registeredStates[driver.StateName()] = f
 }
 
+type NewDriverOpts struct {
+	LocalSigningKey        *string
+	RequireLocalSigningKey bool
+
+	ConnectForwarder  pubsub.RequestForwarder
+	ConditionalTracer trace.ConditionalTracer
+}
+
 // DriverConfig is an interface used to determine driver config structs.
 type DriverConfig interface {
-	NewDriver() (driver.Driver, error)
+	NewDriver(opts ...NewDriverOpts) (driver.Driver, error)
 
 	// DriverName returns the name of the specific driver.
 	DriverName() string
@@ -75,5 +85,5 @@ type QueueConfig interface {
 
 type StateConfig interface {
 	StateName() string
-	Manager(context.Context) (state.Manager, error)
+	SingleClusterManager(context.Context) (state.Manager, error)
 }

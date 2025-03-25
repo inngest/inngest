@@ -1,16 +1,5 @@
 // Copyright The OpenTelemetry Authors
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 
 package otlpmetricgrpc // import "go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc"
 
@@ -22,8 +11,8 @@ import (
 	"google.golang.org/grpc/credentials"
 
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/exporters/otlp/internal/retry"
-	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/internal/oconf"
+	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc/internal/oconf"
+	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc/internal/retry"
 	"go.opentelemetry.io/otel/sdk/metric"
 )
 
@@ -80,12 +69,35 @@ func WithInsecure() Option {
 // value will be used. If both are set, OTEL_EXPORTER_OTLP_METRICS_ENDPOINT
 // will take precedence.
 //
+// If both this option and WithEndpointURL are used, the last used option will
+// take precedence.
+//
 // By default, if an environment variable is not set, and this option is not
 // passed, "localhost:4317" will be used.
 //
 // This option has no effect if WithGRPCConn is used.
 func WithEndpoint(endpoint string) Option {
 	return wrappedOption{oconf.WithEndpoint(endpoint)}
+}
+
+// WithEndpointURL sets the target endpoint URL the Exporter will connect to.
+//
+// If the OTEL_EXPORTER_OTLP_ENDPOINT or OTEL_EXPORTER_OTLP_METRICS_ENDPOINT
+// environment variable is set, and this option is not passed, that variable
+// value will be used. If both are set, OTEL_EXPORTER_OTLP_METRICS_ENDPOINT
+// will take precedence.
+//
+// If both this option and WithEndpoint are used, the last used option will
+// take precedence.
+//
+// If an invalid URL is provided, the default value will be kept.
+//
+// By default, if an environment variable is not set, and this option is not
+// passed, "localhost:4317" will be used.
+//
+// This option has no effect if WithGRPCConn is used.
+func WithEndpointURL(u string) Option {
+	return wrappedOption{oconf.WithEndpointURL(u)}
 }
 
 // WithReconnectionPeriod set the minimum amount of time between connection
@@ -109,13 +121,7 @@ func compressorToCompression(compressor string) oconf.Compression {
 }
 
 // WithCompressor sets the compressor the gRPC client uses.
-//
-// It is the responsibility of the caller to ensure that the compressor set
-// has been registered with google.golang.org/grpc/encoding (see
-// encoding.RegisterCompressor for more information). For example, to register
-// the gzip compressor import the package:
-//
-//	import _ "google.golang.org/grpc/encoding/gzip"
+// Supported compressor values: "gzip".
 //
 // If the OTEL_EXPORTER_OTLP_COMPRESSION or
 // OTEL_EXPORTER_OTLP_METRICS_COMPRESSION environment variable is set, and
@@ -179,6 +185,8 @@ func WithServiceConfig(serviceConfig string) Option {
 // gRPC connection. The options here are appended to the internal grpc.DialOptions
 // used so they will take precedence over any other internal grpc.DialOptions
 // they might conflict with.
+// The [grpc.WithBlock], [grpc.WithTimeout], and [grpc.WithReturnConnectionError]
+// grpc.DialOptions are ignored.
 //
 // This option has no effect if WithGRPCConn is used.
 func WithDialOption(opts ...grpc.DialOption) Option {
