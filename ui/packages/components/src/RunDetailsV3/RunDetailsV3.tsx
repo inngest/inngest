@@ -209,7 +209,6 @@ export const RunDetailsV3 = (props: Props) => {
           className="border-muted flex flex-col justify-start"
           style={{ width: `${100 - leftWidth}%`, height: standalone ? '85vh' : height }}
         >
-          <div className="sticky top-0"></div>
           {selectedStep && !selectedStep.trace.isRoot ? (
             <StepInfo selectedStep={selectedStep} />
           ) : (

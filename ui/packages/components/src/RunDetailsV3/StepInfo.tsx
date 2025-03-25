@@ -140,7 +140,7 @@ export const StepInfo = ({ selectedStep }: { selectedStep: StepInfoType }) => {
 
   return (
     <div className="sticky top-14 flex flex-col justify-start gap-2 overflow-hidden">
-      <div className="flex h-11 w-full flex-row items-center justify-between border-none px-4">
+      <div className="flex min-h-11 w-full flex-row items-center justify-between border-none px-4">
         <div
           className="text-basis flex cursor-pointer items-center justify-start gap-2"
           onClick={() => setExpanded(!expanded)}
