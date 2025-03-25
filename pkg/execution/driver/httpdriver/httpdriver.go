@@ -21,6 +21,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
+	headerspkg "github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/inngest/log"
 	"github.com/inngest/inngest/pkg/syscode"
@@ -409,14 +410,6 @@ func do(ctx context.Context, c HTTPDoer, r Request) (*Response, error) {
 		}
 	}
 
-	isSDK := false
-	for k := range resp.Header {
-		if strings.HasPrefix(strings.ToLower(k), "x-inngest-") {
-			isSDK = true
-			break
-		}
-	}
-
 	// Get the request version
 	rv, _ := strconv.Atoi(headers[headerRequestVersion])
 	return &Response{
@@ -426,7 +419,7 @@ func do(ctx context.Context, c HTTPDoer, r Request) (*Response, error) {
 		RetryAt:        retryAt,
 		NoRetry:        noRetry,
 		RequestVersion: rv,
-		IsSDK:          isSDK,
+		IsSDK:          headerspkg.IsSDK(resp.Header),
 		Sdk:            headers[headerSDK],
 		Header:         resp.Header,
 		SysErr:         sysErr,
