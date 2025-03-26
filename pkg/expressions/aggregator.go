@@ -111,6 +111,7 @@ func (a *aggregator) EvaluateAsyncEvent(ctx context.Context, event event.Tracked
 
 	log.Debug("loading evaluator")
 
+	pre := time.Now()
 	name := event.GetEvent().Name
 	eval, err := a.LoadEventEvaluator(ctx, event.GetWorkspaceID(), name, event.GetEvent().Time())
 	if err != nil {
@@ -185,6 +186,8 @@ func (a *aggregator) EvaluateAsyncEvent(ctx context.Context, event event.Tracked
 		"slow_expression_len", eval.SlowLen(),
 		"mixed_expression_len", eval.MixedLen(),
 		"fast_expression_len", eval.FastLen(),
+		"eval_dur_ms", time.Since(start).Milliseconds(),
+		"total_dur_ms", time.Since(pre).Milliseconds(),
 	)
 
 	return found, evalCount, err
