@@ -1,4 +1,4 @@
-package connect
+package state
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 	"github.com/coder/websocket"
 	"github.com/gowebpki/jcs"
 	"github.com/inngest/inngest/pkg/connect/auth"
-	"github.com/inngest/inngest/pkg/connect/state"
+	connecterrors "github.com/inngest/inngest/pkg/connect/errors"
 	"github.com/inngest/inngest/pkg/sdk"
 	"github.com/inngest/inngest/pkg/syscode"
 	"github.com/inngest/inngest/proto/gen/connect/v1"
@@ -66,7 +66,7 @@ func NewWorkerGroupFromConnRequest(
 	req *connect.WorkerConnectRequestData,
 	authResp *auth.Response,
 	appConfig *connect.AppConfiguration,
-) (*state.WorkerGroup, error) {
+) (*WorkerGroup, error) {
 	functionHash, err := functionConfigHash(appConfig)
 	if err != nil {
 		return nil, fmt.Errorf("could not compute function config hash: %w", err)
@@ -74,7 +74,7 @@ func NewWorkerGroupFromConnRequest(
 
 	hash, err := workerGroupHashFromConnRequest(req, authResp, appConfig, functionHash)
 	if err != nil {
-		return nil, &SocketError{
+		return nil, &connecterrors.SocketError{
 			SysCode:    syscode.CodeConnectInternal,
 			StatusCode: websocket.StatusInternalError,
 			Msg:        "Internal error",
@@ -88,7 +88,7 @@ func NewWorkerGroupFromConnRequest(
 		capabilities sdk.Capabilities
 	)
 	if err := json.Unmarshal(appConfig.Functions, &functions); err != nil {
-		return nil, SocketError{
+		return nil, connecterrors.SocketError{
 			SysCode:    syscode.CodeConnectInvalidFunctionConfig,
 			Msg:        "Invalid function config",
 			StatusCode: websocket.StatusPolicyViolation,
@@ -96,7 +96,7 @@ func NewWorkerGroupFromConnRequest(
 	}
 
 	if err := json.Unmarshal(req.Capabilities, &capabilities); err != nil {
-		return nil, &SocketError{
+		return nil, &connecterrors.SocketError{
 			SysCode:    syscode.CodeConnectInternal,
 			StatusCode: websocket.StatusInternalError,
 			Msg:        "Invalid SDK capabilities",
@@ -109,7 +109,7 @@ func NewWorkerGroupFromConnRequest(
 		slugs[i] = fn.Slug
 	}
 
-	workerGroup := &state.WorkerGroup{
+	workerGroup := &WorkerGroup{
 		AccountID:     authResp.AccountID,
 		EnvID:         authResp.EnvID,
 		AppName:       appConfig.AppName,
@@ -119,7 +119,7 @@ func NewWorkerGroupFromConnRequest(
 		AppVersion:    appConfig.AppVersion,
 		FunctionSlugs: slugs,
 		Hash:          hash,
-		SyncData: state.SyncData{
+		SyncData: SyncData{
 			Functions: functions,
 			SyncToken: req.AuthData.SyncToken,
 			AppConfig: appConfig,

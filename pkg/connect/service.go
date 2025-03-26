@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/inngest/inngest/pkg/connect/auth"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/rs/zerolog"
 	"log/slog"
@@ -25,9 +26,7 @@ import (
 )
 
 const (
-	GatewayHeartbeatInterval  = 5 * time.Second
 	GatewayInstrumentInterval = 20 * time.Second
-	WorkerHeartbeatInterval   = 10 * time.Second
 )
 
 type gatewayOpt func(*connectGatewaySvc)
@@ -247,7 +246,7 @@ func (c *connectGatewaySvc) Pre(ctx context.Context) error {
 }
 
 func (c *connectGatewaySvc) heartbeat(ctx context.Context) {
-	heartbeatTicker := time.NewTicker(GatewayHeartbeatInterval)
+	heartbeatTicker := time.NewTicker(consts.ConnectGatewayHeartbeatInterval)
 	defer heartbeatTicker.Stop()
 	for {
 		select {

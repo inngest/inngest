@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/inngest/inngest/pkg/backoff"
+	"github.com/inngest/inngest/pkg/cqrs/sync"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/publicerr"
 	"github.com/inngest/inngest/pkg/syscode"
@@ -18,7 +19,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/sdk"
 	connpb "github.com/inngest/inngest/proto/gen/connect/v1"
@@ -32,8 +32,6 @@ type StateManager interface {
 	ConnectionManager
 	WorkerGroupManager
 	GatewayManager
-
-	SetRequestIdempotency(ctx context.Context, appId uuid.UUID, requestId string) error
 }
 
 type ConnectionManager interface {
@@ -225,7 +223,7 @@ func (g *WorkerGroup) Sync(ctx context.Context, groupManager WorkerGroupManager,
 	attempt := 0
 
 	// Retrieve the deploy ID for the sync and update state with it if available
-	var syncReply cqrs.SyncReply
+	var syncReply sync.Reply
 	for {
 		attempt++
 
