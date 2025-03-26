@@ -97,17 +97,13 @@ type redisPubSubConnector struct {
 	logger *slog.Logger
 	tracer trace.ConditionalTracer
 
+	stateManager state.StateManager
+	rnd          *util.FrandRNG
+
 	RequestReceiver
 }
 
-type redisForwarder struct {
-	*redisPubSubConnector
-
-	stateManager state.StateManager
-	rnd          *util.FrandRNG
-}
-
-func newRedisPubSubConnector(client rueidis.Client, logger *slog.Logger, tracer trace.ConditionalTracer) *redisPubSubConnector {
+func newRedisPubSubConnector(client rueidis.Client, logger *slog.Logger, tracer trace.ConditionalTracer, stateMan state.StateManager) *redisPubSubConnector {
 	return &redisPubSubConnector{
 		client:          client,
 		subscribers:     make(map[string]map[string]chan string),
@@ -115,16 +111,10 @@ func newRedisPubSubConnector(client rueidis.Client, logger *slog.Logger, tracer 
 		logger:          logger,
 		tracer:          tracer,
 		setup:           make(chan struct{}),
-	}
-}
 
-func newRedisPubSubForwarder(client rueidis.Client, logger *slog.Logger, tracer trace.ConditionalTracer, stateMan state.StateManager) *redisForwarder {
-	connector := newRedisPubSubConnector(client, logger, tracer)
-
-	return &redisForwarder{
-		redisPubSubConnector: connector,
-		stateManager:         stateMan,
-		rnd:                  util.NewFrandRNG(),
+		// For routing
+		stateManager: stateMan,
+		rnd:          util.NewFrandRNG(),
 	}
 }
 
@@ -139,7 +129,7 @@ type ProxyOpts struct {
 //
 // If the gateway does not ack the message within a 10-second timeout, an error is returned.
 // If no response is received before the context is canceled, an error is returned.
-func (i *redisForwarder) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*connectproto.SDKResponse, error) {
+func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*connectproto.SDKResponse, error) {
 	<-i.setup
 
 	if opts.Data.RequestId == "" {

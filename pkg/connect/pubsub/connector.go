@@ -28,7 +28,7 @@ func WithRedis(opt rueidis.ClientOption, logger *slog.Logger, tracer trace.Condi
 			return nil, fmt.Errorf("error initializing redis client for connector: %w", err)
 		}
 
-		connector, err := newRedisPubSubForwarder(rc, logger, tracer, stateMan), nil
+		connector, err := newRedisPubSubConnector(rc, logger, tracer, stateMan), nil
 		if listen {
 			go func() {
 				if err := connector.Wait(ctx); err != nil {
