@@ -1,5 +1,4 @@
 import { useCallback } from 'react';
-import { getTimestampDaysAgo } from '@inngest/components/utils/date';
 import { convertWorkerStatus } from '@inngest/components/utils/workerParser';
 import { useClient } from 'urql';
 
@@ -15,7 +14,7 @@ const query = graphql(`
   query GetWorkerConnections(
     $envID: ID!
     $appID: UUID!
-    $startTime: Time!
+    $startTime: Time
     $status: [ConnectV1ConnectionStatus!]
     $timeField: ConnectV1WorkerConnectionsOrderByField!
     $cursor: String = null
@@ -78,14 +77,13 @@ export function useWorkers() {
   const client = useClient();
   return useCallback(
     async ({ appID, orderBy, cursor, pageSize, status }: QueryVariables) => {
-      const startTime = getTimestampDaysAgo({ currentDate: new Date(), days: 1 }).toISOString();
       const result = await client
         .query(
           query,
           {
             timeField: ConnectV1WorkerConnectionsOrderByField.ConnectedAt,
             orderBy,
-            startTime,
+            startTime: null, // Display entire connection history
             appID: appID,
             status,
             cursor,
@@ -130,7 +128,7 @@ const countQuery = graphql(`
   query GetWorkerCountConnections(
     $envID: ID!
     $appID: UUID!
-    $startTime: Time!
+    $startTime: Time
     $status: [ConnectV1ConnectionStatus!] = []
     $timeField: ConnectV1WorkerConnectionsOrderByField!
   ) {
@@ -150,13 +148,12 @@ export function useWorkersCount() {
   const client = useClient();
   return useCallback(
     async ({ appID, status }: CountQueryVariables) => {
-      const startTime = getTimestampDaysAgo({ currentDate: new Date(), days: 1 }).toISOString();
       const result = await client
         .query(
           countQuery,
           {
             timeField: ConnectV1WorkerConnectionsOrderByField.ConnectedAt,
-            startTime,
+            startTime: null, // Display entire connection history
             appID: appID,
             envID,
             status,
