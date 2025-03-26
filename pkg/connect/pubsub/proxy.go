@@ -28,7 +28,7 @@ import (
 )
 
 const (
-	pkgName = "connectproto.execution.proxy"
+	pkgName = "connect.execution.proxy"
 )
 
 /*
