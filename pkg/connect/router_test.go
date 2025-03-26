@@ -229,7 +229,7 @@ func TestFullConnectRouting(t *testing.T) {
 			newTestConn(connect.ConnectionStatus_READY, time.Now()),
 		)
 
-		conn, err := svc.getSuitableConnection(context.Background(), setupRes.envId, setupRes.appId, setupRes.fnSlug, log)
+		conn, err := getSuitableConnection(context.Background(), svc.rnd, stateMan, setupRes.envId, setupRes.appId, setupRes.fnSlug, log)
 		require.NoError(t, err)
 
 		require.Equal(t, setupRes.connIds[0].String(), conn.Id)
@@ -247,7 +247,7 @@ func TestFullConnectRouting(t *testing.T) {
 			newTestConn(connect.ConnectionStatus_READY, time.Now()),
 		)
 
-		conn, err := svc.getSuitableConnection(context.Background(), setupRes.envId, setupRes.appId, setupRes.fnSlug, log)
+		conn, err := getSuitableConnection(context.Background(), svc.rnd, stateMan, setupRes.envId, setupRes.appId, setupRes.fnSlug, log)
 		require.NoError(t, err)
 
 		require.Equal(t, setupRes.connIds[3].String(), conn.Id)
@@ -276,7 +276,7 @@ func TestFullConnectRouting(t *testing.T) {
 			newTestConn(connect.ConnectionStatus_DISCONNECTED, time.Now()),
 		)
 
-		_, err := svc.getSuitableConnection(context.Background(), setupRes.envId, setupRes.appId, setupRes.fnSlug, log)
+		_, err := getSuitableConnection(context.Background(), svc.rnd, stateMan, setupRes.envId, setupRes.appId, setupRes.fnSlug, log)
 		require.Error(t, err)
 		require.ErrorIs(t, err, ErrNoHealthyConnection)
 	})
@@ -311,7 +311,7 @@ func TestFullConnectRouting(t *testing.T) {
 			newTestConn(connect.ConnectionStatus_READY, time.Now()),
 		)
 
-		conn, err := svc.getSuitableConnection(context.Background(), setupOldVersion.envId, setupOldVersion.appId, setupOldVersion.fnSlug, log)
+		conn, err := getSuitableConnection(context.Background(), svc.rnd, stateMan, setupOldVersion.envId, setupOldVersion.appId, setupOldVersion.fnSlug, log)
 		require.NoError(t, err)
 		require.Equal(t, setupNewVersion.connIds[0].String(), conn.Id)
 		require.NotEqual(t, setupOldVersion.connIds[0].String(), conn.Id)
@@ -327,7 +327,7 @@ func TestFullConnectRouting(t *testing.T) {
 		)
 
 		// Try to route message for fn-1 (this does not exist)
-		_, err := svc.getSuitableConnection(context.Background(), setupRes.envId, setupRes.appId, "fn-2", log)
+		_, err := getSuitableConnection(context.Background(), svc.rnd, stateMan, setupRes.envId, setupRes.appId, "fn-2", log)
 		require.Error(t, err)
 		require.ErrorIs(t, err, ErrNoHealthyConnection)
 	})
@@ -358,7 +358,7 @@ func TestFullConnectRouting(t *testing.T) {
 		)
 
 		// Try to route message for fn-1 (this does not exist in newer version)
-		conn, err := svc.getSuitableConnection(context.Background(), setupOldVersion.envId, setupOldVersion.appId, setupOldVersion.fnSlug, log)
+		conn, err := getSuitableConnection(context.Background(), svc.rnd, stateMan, setupOldVersion.envId, setupOldVersion.appId, setupOldVersion.fnSlug, log)
 		require.NoError(t, err)
 		require.NotEqual(t, setupNewVersion.connIds[0].String(), conn.Id)
 		require.Equal(t, setupOldVersion.connIds[0].String(), conn.Id)
