@@ -1,0 +1,97 @@
+import { Button } from '@inngest/components/Button';
+import { HorizontalPillList, Pill, PillContent } from '@inngest/components/Pill';
+import { TextCell } from '@inngest/components/Table';
+import { type EventType } from '@inngest/components/types/eventType';
+import { RiMoreLine } from '@remixicon/react';
+import { createColumnHelper, type Row } from '@tanstack/react-table';
+
+const columnHelper = createColumnHelper<EventType>();
+
+const columnsIDs = ['name', 'functions', 'volume'] as const;
+export type ColumnID = (typeof columnsIDs)[number];
+export function isColumnID(value: unknown): value is ColumnID {
+  return columnsIDs.includes(value as ColumnID);
+}
+
+// Ensure that the column ID is valid at compile time
+function ensureColumnID(id: ColumnID): ColumnID {
+  return id;
+}
+
+export function useColumns() {
+  const columns = [
+    columnHelper.accessor('name', {
+      cell: (info) => {
+        const name = info.getValue();
+
+        return (
+          <div className="flex items-center">
+            <TextCell>{name}</TextCell>
+          </div>
+        );
+      },
+      header: 'Event name',
+      enableSorting: false,
+      id: ensureColumnID('name'),
+    }),
+    columnHelper.accessor('functions', {
+      cell: (info) => {
+        const functions = info.getValue();
+
+        return (
+          <HorizontalPillList
+            alwaysVisibleCount={2}
+            pills={functions.map((function_) => (
+              <Pill
+                appearance="outlined"
+                // href={pathCreator.function({
+                //   envSlug: env.slug,
+                //   functionSlug: function_.slug,
+                // })}
+                key={function_.name}
+              >
+                <PillContent type="FUNCTION">{function_.name}</PillContent>
+              </Pill>
+            ))}
+          />
+        );
+      },
+      header: 'Functions triggered',
+      enableSorting: false,
+      id: ensureColumnID('functions'),
+    }),
+    columnHelper.accessor('volume', {
+      cell: (info) => {
+        const volume = info.getValue();
+
+        return (
+          <div className="flex items-center">
+            {volume.totalVolume}
+            {volume.chart}
+          </div>
+        );
+      },
+      header: 'Volume (24h)',
+      enableSorting: true,
+      id: ensureColumnID('volume'),
+    }),
+    columnHelper.display({
+      id: 'actions',
+      header: () => null,
+      size: 30,
+      cell: ({ row }: { row: Row<EventType> }) => {
+        return (
+          <Button
+            appearance="ghost"
+            kind="secondary"
+            size="small"
+            onClick={() => {}}
+            icon={<RiMoreLine />}
+          />
+        );
+      },
+    }),
+  ];
+
+  return columns;
+}
