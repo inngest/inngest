@@ -46,7 +46,7 @@ const (
 
 	// MaxRetries represents the maximum number of retries for a particular function or step
 	// possible.
-	MaxRetries = 30
+	MaxRetries = 20
 
 	// MaxRetryDuration is the furthest a retry can be scheduled.  If retries are scheduled further
 	// than now plus this duration, the retry duration will automatically be lowered to this value.
@@ -95,12 +95,6 @@ const (
 
 	// CancelTimeout is the maximum time a cancellation can exist
 	CancelTimeout = time.Hour * 24 * 365
-
-	// SourceEdgeRetries represents the number of times we'll retry running a source edge.
-	// Each edge gets their own set of retries in our execution engine, embedded directly
-	// in the job.  The retry count is taken from function config for every step _but_
-	// initialization.
-	SourceEdgeRetries = 20
 
 	RequestVersionUnknown = -1
 

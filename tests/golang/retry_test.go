@@ -2,6 +2,7 @@ package golang
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync/atomic"
 	"testing"
@@ -181,5 +182,47 @@ func TestRetry(t *testing.T) {
 			}
 		})
 	})
+}
 
+func TestMaxRetries(t *testing.T) {
+	t.Parallel()
+	r := require.New(t)
+	ctx := context.Background()
+
+	c := client.New(t)
+	ic, server, sync := NewSDKHandler(t, randomSuffix("app"))
+	defer server.Close()
+
+	var attempt int
+	var runID string
+	evtName := "event"
+	_, err := inngestgo.CreateFunction(
+		ic,
+		inngestgo.FunctionOpts{
+			ID:      "fn",
+			Retries: inngestgo.IntPtr(consts.MaxRetries),
+		},
+		inngestgo.EventTrigger(evtName, nil),
+		func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
+			runID = input.InputCtx.RunID
+			return step.Run(ctx, "a", func(ctx context.Context) (any, error) {
+				attempt = input.InputCtx.Attempt
+				return nil, inngestgo.RetryAtError(errors.New("oh no"), time.Now())
+			})
+		},
+	)
+	r.NoError(err)
+	sync()
+
+	_, err = ic.Send(ctx, inngestgo.Event{Name: evtName})
+	r.NoError(err)
+
+	c.WaitForRunStatus(ctx, t,
+		models.FunctionStatusFailed.String(),
+		&runID,
+		client.WaitForRunStatusOpts{
+			Timeout: 30 * time.Second,
+		},
+	)
+	r.EqualValues(20, attempt)
 }

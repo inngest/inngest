@@ -27,7 +27,9 @@ type Step struct {
 // RetryCount returns the number of retries for this step.
 func (s Step) RetryCount() int {
 	if s.Retries != nil {
-		return *s.Retries
+		// This should be handled elsewhere, but we'll also handle it here just
+		// in case.
+		return min(*s.Retries, consts.MaxRetries)
 	}
 	return consts.DefaultRetryCount
 }
