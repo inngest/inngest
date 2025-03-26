@@ -36,9 +36,9 @@ const (
 
 	Execution requests are forwarded from the executor to the SDK via the connect infrastructure, including the following components:
 
-	Executor -> Router -> Gateway -> SDK
+	Executor -> Embedded Router -> Gateway -> SDK
 
-	The router is responsible for selecting a gateway with an active, healthy connection for a given app. It is only responsible for
+	The embedded routing layer is responsible for selecting a gateway with an active, healthy connection for a given app. It is only responsible for
 	routing requests to the correct gateway, not for returning the SDK response back to the executor. This is directly handled by the gateway.
 
 	The gateway will acknowledge the request, forward it to the SDK, and return the response to the executor.
@@ -57,7 +57,6 @@ type AckSource string
 const (
 	AckSourceWorker  AckSource = "worker"
 	AckSourceGateway AckSource = "gateway"
-	AckSourceRouter  AckSource = "router"
 )
 
 type ResponseNotifier interface {
@@ -71,7 +70,7 @@ type RequestReceiver interface {
 	// RouteExecutorRequest forwards an executor request to the respective gateway
 	RouteExecutorRequest(ctx context.Context, gatewayId ulid.ULID, connId ulid.ULID, data *connectpb.GatewayExecutorRequestData) error
 
-	// ReceiveRouterMessages listens for incoming PubSub messages for a specific gateway and app and calls the provided callback.
+	// ReceiveRoutedRequest listens for incoming PubSub messages for a specific gateway and app and calls the provided callback.
 	// This is a blocking call which only stops once the context is canceled.
 	ReceiveRoutedRequest(ctx context.Context, gatewayId ulid.ULID, connId ulid.ULID, onMessage func(rawBytes []byte, data *connectpb.GatewayExecutorRequestData), onSubscribed chan struct{}) error
 
