@@ -84,8 +84,7 @@ func GetRoute(ctx context.Context, stateMgr state.StateManager, rnd *util.FrandR
 	}
 
 	groupHash := routeTo.SyncedWorkerGroups[data.AppId]
-	log = log.With("gateway_id", routeTo.GatewayId, "conn_id", routeTo.Id, "group_hash", groupHash)
-
+ 
 	group, err := stateMgr.GetWorkerGroupByHash(ctx, envID, groupHash)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load worker group after successful connection selection: %w", err)

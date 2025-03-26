@@ -486,13 +486,6 @@ func start(ctx context.Context, opts StartOpts) error {
 			}),
 	)
 
-	routerRequestReceiver, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectRcOpt, connectPubSubLogger.With("svc", "connect-router"), conditionalTracer, connectionManager, false))
-	if err != nil {
-		return fmt.Errorf("failed to create connect pubsub connector: %w", err)
-	}
-
-	connRouter := connect.NewConnectMessageRouterService(connectionManager, routerRequestReceiver, conditionalTracer)
-
 	// Create a new data API directly in the devserver.  This allows us to inject
 	// the data API into the dev server port, providing a single router for the dev
 	// server UI, events, and API for loading data.
@@ -510,7 +503,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		RequireKeys:    true,
 	})
 
-	return service.StartAll(ctx, ds, runner, executorSvc, ds.Apiservice, connGateway, connRouter)
+	return service.StartAll(ctx, ds, runner, executorSvc, ds.Apiservice, connGateway)
 }
 
 func connectToOrCreateRedis(redisURI string) (rueidis.Client, error) {

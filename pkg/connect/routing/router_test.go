@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"github.com/alicebob/miniredis/v2"
 	"github.com/google/uuid"
-	"github.com/inngest/inngest/pkg/connect"
 	"github.com/inngest/inngest/pkg/connect/auth"
 	"github.com/inngest/inngest/pkg/connect/state"
 	"github.com/inngest/inngest/pkg/consts"
@@ -171,7 +170,7 @@ func setup(t *testing.T, stateMan state.StateManager, opts setupOpts, connsToCre
 			},
 		}
 
-		group, err := connect.NewWorkerGroupFromConnRequest(context.Background(), fakeReq, &auth.Response{
+		group, err := state.NewWorkerGroupFromConnRequest(context.Background(), fakeReq, &auth.Response{
 			AccountID: acctId,
 			EnvID:     envId,
 		}, app1Config)
