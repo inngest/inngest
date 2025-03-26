@@ -67,7 +67,6 @@ type ResponseNotifier interface {
 
 type RequestReceiver interface {
 	ResponseNotifier
-	routing.RouterForwarder
 
 	// RouteExecutorRequest forwards an executor request to the respective gateway
 	RouteExecutorRequest(ctx context.Context, gatewayId ulid.ULID, connId ulid.ULID, data *connectproto.GatewayExecutorRequestData) error
@@ -262,7 +261,7 @@ func (i *redisForwarder) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*
 		<-replySubscribed
 	}
 
-	err := routing.Route(ctx, i.stateManager, i.RequestReceiver, i.rnd, i.tracer, l, opts.Data)
+	res, err := routing.GetRoute(ctx, i.stateManager, i.rnd, i.tracer, l, opts.Data)
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "failed to route message")
@@ -276,6 +275,17 @@ func (i *redisForwarder) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*
 
 		return nil, fmt.Errorf("failed to route message: %w", err)
 	}
+
+	// Forward message to the gateway
+	err = i.RouteExecutorRequest(ctx, res.GatewayID, res.ConnectionID, opts.Data)
+	if err != nil {
+		span.RecordError(err)
+		span.SetStatus(codes.Error, " could not forward request to gateway")
+
+		return nil, fmt.Errorf("failed to route request to gateway: %w", err)
+	}
+
+	l.Debug("forwarded executor request to gateway", "gateway_id", res.GatewayID, "conn_id", res.ConnectionID)
 
 	{
 		err := <-gatewayAckErrChan

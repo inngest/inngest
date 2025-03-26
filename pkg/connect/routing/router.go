@@ -14,7 +14,6 @@ import (
 	connectpb "github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/oklog/ulid/v2"
 	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/propagation"
 	"gonum.org/v1/gonum/stat/sampleuv"
 	"log/slog"
@@ -26,48 +25,33 @@ const (
 	pkgNameRouter = "connect.router"
 )
 
-type RouterForwarder interface {
-	// RouteExecutorRequest forwards an executor request to the respective gateway
-	RouteExecutorRequest(ctx context.Context, gatewayId ulid.ULID, connId ulid.ULID, data *connectpb.GatewayExecutorRequestData) error
-}
-
 var ErrNoHealthyConnection = fmt.Errorf("no healthy connection")
 
-func Route(ctx context.Context, stateMgr state.StateManager, publisher RouterForwarder, rnd *util.FrandRNG, tracer trace.ConditionalTracer, log *slog.Logger, data *connectpb.GatewayExecutorRequestData) error {
+type RouteResult struct {
+	GatewayID    ulid.ULID
+	ConnectionID ulid.ULID
+}
+
+func GetRoute(ctx context.Context, stateMgr state.StateManager, rnd *util.FrandRNG, tracer trace.ConditionalTracer, log *slog.Logger, data *connectpb.GatewayExecutorRequestData) (*RouteResult, error) {
 	appID, err := uuid.Parse(data.AppId)
 	if err != nil {
-		return fmt.Errorf("could not parse app ID: %w", err)
+		return nil, fmt.Errorf("could not parse app ID: %w", err)
 	}
 
 	accountID, err := uuid.Parse(data.AccountId)
 	if err != nil {
-		return fmt.Errorf("could not parse account ID: %w", err)
+		return nil, fmt.Errorf("could not parse account ID: %w", err)
 	}
 
 	envID, err := uuid.Parse(data.EnvId)
 	if err != nil {
-		return fmt.Errorf("could not parse env ID: %w", err)
+		return nil, fmt.Errorf("could not parse env ID: %w", err)
 	}
-
-	log.Debug("router received msg")
-
-	// We need to add an idempotency key to ensure only one router instance processes the message
-	err = stateMgr.SetRequestIdempotency(ctx, appID, data.RequestId)
-	if err != nil {
-		if errors.Is(err, state.ErrIdempotencyKeyExists) {
-			// Another connection was faster than us, we can ignore this message
-			return nil
-		}
-
-		return fmt.Errorf("could not store idempotency key: %w", err)
-	}
-
-	// Now we're guaranteed to be the exclusive connection processing this message!
 
 	{
 		systemTraceCtx := propagation.MapCarrier{}
 		if err := json.Unmarshal(data.SystemTraceCtx, &systemTraceCtx); err != nil {
-			return fmt.Errorf("could not unmarshal system trace ctx: %w", err)
+			return nil, fmt.Errorf("could not unmarshal system trace ctx: %w", err)
 		}
 
 		ctx = trace.SystemTracer().Propagator().Extract(ctx, systemTraceCtx)
@@ -77,7 +61,7 @@ func Route(ctx context.Context, stateMgr state.StateManager, publisher RouterFor
 
 	routeTo, err := getSuitableConnection(ctx, rnd, stateMgr, envID, appID, data.FunctionSlug, log)
 	if err != nil && !errors.Is(err, ErrNoHealthyConnection) {
-		return fmt.Errorf("could not retrieve suitable connection: %w", err)
+		return nil, fmt.Errorf("could not retrieve suitable connection: %w", err)
 	}
 
 	if routeTo == nil {
@@ -86,17 +70,17 @@ func Route(ctx context.Context, stateMgr state.StateManager, publisher RouterFor
 			PkgName: pkgNameRouter,
 		})
 
-		return ErrNoHealthyConnection
+		return nil, ErrNoHealthyConnection
 	}
 
 	gatewayId, err := ulid.Parse(routeTo.GatewayId)
 	if err != nil {
-		return fmt.Errorf("invalid gatewayId %q: %w", routeTo.GatewayId, err)
+		return nil, fmt.Errorf("invalid gatewayId %q: %w", routeTo.GatewayId, err)
 	}
 
 	connId, err := ulid.Parse(routeTo.Id)
 	if err != nil {
-		return fmt.Errorf("invalid connectionID %q: %w", routeTo.Id, err)
+		return nil, fmt.Errorf("invalid connectionID %q: %w", routeTo.Id, err)
 	}
 
 	groupHash := routeTo.SyncedWorkerGroups[data.AppId]
@@ -104,7 +88,7 @@ func Route(ctx context.Context, stateMgr state.StateManager, publisher RouterFor
 
 	group, err := stateMgr.GetWorkerGroupByHash(ctx, envID, groupHash)
 	if err != nil {
-		return fmt.Errorf("failed to load worker group after successful connection selection: %w", err)
+		return nil, fmt.Errorf("failed to load worker group after successful connection selection: %w", err)
 	}
 
 	// Set app name: This is important to help the SDK find the respective function to invoke
@@ -115,20 +99,10 @@ func Route(ctx context.Context, stateMgr state.StateManager, publisher RouterFor
 		attribute.String("route_to_conn_id", connId.String()),
 	)
 
-	// TODO What if something goes wrong inbetween setting idempotency (claiming exclusivity) and forwarding the req?
-	// We'll potentially lose data here
-
-	// Forward message to the gateway
-	err = publisher.RouteExecutorRequest(ctx, gatewayId, connId, data)
-	if err != nil {
-		span.RecordError(err)
-		span.SetStatus(codes.Error, " could not forward request to gateway")
-		return fmt.Errorf("failed to route request to gateway: %w", err)
-	}
-
-	log.Debug("forwarded executor request to gateway")
-
-	return nil
+	return &RouteResult{
+		GatewayID:    gatewayId,
+		ConnectionID: connId,
+	}, nil
 }
 
 type connWithGroup struct {

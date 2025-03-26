@@ -32,8 +32,6 @@ type StateManager interface {
 	ConnectionManager
 	WorkerGroupManager
 	GatewayManager
-
-	SetRequestIdempotency(ctx context.Context, appId uuid.UUID, requestId string) error
 }
 
 type ConnectionManager interface {
