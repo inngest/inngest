@@ -21,6 +21,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
+	headerspkg "github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/inngest/log"
 	"github.com/inngest/inngest/pkg/syscode"
@@ -56,6 +57,7 @@ var (
 
 	ErrEmptyResponse = fmt.Errorf("no response data")
 	ErrNoRetryAfter  = fmt.Errorf("no retry after present")
+	ErrNotSDK        = syscode.Error{Code: syscode.CodeNotSDK}
 )
 
 type HTTPDoer interface {
@@ -183,6 +185,9 @@ func HandleHttpResponse(ctx context.Context, r Request, resp *Response) (*state.
 			dr.SetError(resp.SysErr)
 		}
 
+		if !resp.IsSDK {
+			dr.SetError(ErrNotSDK)
+		}
 		return dr, nil
 	}
 
@@ -241,6 +246,10 @@ func HandleHttpResponse(ctx context.Context, r Request, resp *Response) (*state.
 	if resp.RetryAt != nil {
 		err = queue.RetryAtError(err, resp.RetryAt)
 		dr.SetError(err)
+	}
+
+	if !resp.IsSDK {
+		dr.SetError(ErrNotSDK)
 	}
 
 	return dr, err
@@ -401,14 +410,6 @@ func do(ctx context.Context, c HTTPDoer, r Request) (*Response, error) {
 		}
 	}
 
-	isSDK := false
-	for k := range resp.Header {
-		if strings.HasPrefix(strings.ToLower(k), "x-inngest-") {
-			isSDK = true
-			break
-		}
-	}
-
 	// Get the request version
 	rv, _ := strconv.Atoi(headers[headerRequestVersion])
 	return &Response{
@@ -418,7 +419,7 @@ func do(ctx context.Context, c HTTPDoer, r Request) (*Response, error) {
 		RetryAt:        retryAt,
 		NoRetry:        noRetry,
 		RequestVersion: rv,
-		IsSDK:          isSDK,
+		IsSDK:          headerspkg.IsSDK(resp.Header),
 		Sdk:            headers[headerSDK],
 		Header:         resp.Header,
 		SysErr:         sysErr,
