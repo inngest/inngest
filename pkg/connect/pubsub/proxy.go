@@ -6,12 +6,14 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/inngest/inngest/pkg/connect/routing"
+	"github.com/inngest/inngest/pkg/connect/state"
 	"github.com/inngest/inngest/pkg/syscode"
 	"github.com/inngest/inngest/pkg/telemetry/trace"
+	"github.com/inngest/inngest/pkg/util"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/propagation"
-	oteltrace "go.opentelemetry.io/otel/trace"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"log/slog"
 	"sync"
@@ -99,8 +101,14 @@ type redisPubSubConnector struct {
 	logger *slog.Logger
 	tracer trace.ConditionalTracer
 
-	RequestForwarder
 	RequestReceiver
+}
+
+type redisForwarder struct {
+	*redisPubSubConnector
+
+	stateManager state.StateManager
+	rnd          *util.FrandRNG
 }
 
 func newRedisPubSubConnector(client rueidis.Client, logger *slog.Logger, tracer trace.ConditionalTracer) *redisPubSubConnector {
@@ -111,6 +119,16 @@ func newRedisPubSubConnector(client rueidis.Client, logger *slog.Logger, tracer 
 		logger:          logger,
 		tracer:          tracer,
 		setup:           make(chan struct{}),
+	}
+}
+
+func newRedisPubSubForwarder(client rueidis.Client, logger *slog.Logger, tracer trace.ConditionalTracer, stateMan state.StateManager) *redisForwarder {
+	connector := newRedisPubSubConnector(client, logger, tracer)
+
+	return &redisForwarder{
+		redisPubSubConnector: connector,
+		stateManager:         stateMan,
+		rnd:                  util.NewFrandRNG(),
 	}
 }
 
@@ -125,7 +143,7 @@ type ProxyOpts struct {
 //
 // If the gateway does not ack the message within a 10-second timeout, an error is returned.
 // If no response is received before the context is canceled, an error is returned.
-func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*connect.SDKResponse, error) {
+func (i *redisForwarder) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*connect.SDKResponse, error) {
 	<-i.setup
 
 	if opts.Data.RequestId == "" {
@@ -178,45 +196,6 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 	dataBytes, err := proto.Marshal(opts.Data)
 	if err != nil {
 		return nil, fmt.Errorf("could not marshal executor request: %w", err)
-	}
-
-	// Await ack from router BEFORE response
-	routerAckErrChan := make(chan error)
-	var routerAcked connect.PubSubAckMessage
-	{
-		routerAckSubscribed := make(chan struct{})
-		withAckTimeout, cancel := context.WithTimeout(ctx, 10*time.Second)
-		defer cancel()
-		go func() {
-			err = i.subscribe(withAckTimeout, i.channelAppRequestsAck(opts.Data.RequestId, AckSourceRouter), func(msgData string) {
-				err := proto.Unmarshal([]byte(msgData), &routerAcked)
-				if err != nil {
-					span.RecordError(err)
-					span.SetStatus(codes.Error, "unmarshaling router ack message failed")
-					return
-				}
-
-				if routerAcked.GetNack() {
-					attrs := []attribute.KeyValue{}
-					if routerAcked.GetNackReason() != nil {
-						attrs = append(attrs, attribute.String("reason_code", routerAcked.GetNackReason().GetCode()))
-						attrs = append(attrs, attribute.String("reason_message", routerAcked.GetNackReason().GetMessage()))
-					}
-					span.AddEvent("RouterNack", oteltrace.WithAttributes(attrs...))
-				} else {
-					span.AddEvent("RouterAck")
-				}
-
-				metrics.HistogramConnectProxyAckTime(ctx, time.Since(proxyStartTime).Milliseconds(), metrics.HistogramOpt{
-					PkgName: pkgName,
-					Tags: map[string]any{
-						"kind": "router",
-					},
-				})
-			}, true, routerAckSubscribed)
-			routerAckErrChan <- err
-		}()
-		<-routerAckSubscribed
 	}
 
 	gatewayAckErrChan := make(chan error)
@@ -291,42 +270,19 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 		<-replySubscribed
 	}
 
-	// After setting up ack and reply subscriptions, publish the request to the router, which forwards to the most suitable gateway
-	channelName := i.channelExecutorRequests()
-
-	err = i.client.Do(ctx, i.client.B().Publish().Channel(channelName).Message(string(dataBytes)).Build()).Error()
+	err = routing.Route(ctx, i.stateManager, i.RequestReceiver, i.rnd, i.tracer, l, opts.Data)
 	if err != nil {
 		span.RecordError(err)
-		span.SetStatus(codes.Error, "publishing message to router failed")
-		return nil, fmt.Errorf("could not publish executor request: %w", err)
-	}
+		span.SetStatus(codes.Error, "failed to route message")
 
-	l.Debug("published connect pubsub message", "channel", channelName, "request_id", opts.Data.RequestId)
-
-	// Sanity check: Ensure the router received the message using a request-specific ack channel (ack must come in before SDK response)
-	{
-		err := <-routerAckErrChan
-		close(routerAckErrChan)
-		if err != nil && !errors.Is(err, context.DeadlineExceeded) {
-			span.RecordError(err)
-			span.SetStatus(codes.Error, "unexpected error waiting for router ack")
-			return nil, fmt.Errorf("could not receive executor request ack by router: %w", err)
-		}
-
-		if routerAcked.Ts == nil {
-			span.SetStatus(codes.Error, "router did not ack")
-			return nil, fmt.Errorf("router did not ack in time")
-		}
-
-		if routerAcked.GetNack() {
-			if routerAcked.GetNackReason() != nil {
-				return nil, syscode.Error{
-					Code:    routerAcked.GetNackReason().GetCode(),
-					Message: routerAcked.GetNackReason().GetMessage(),
-				}
+		if errors.Is(err, routing.ErrNoHealthyConnection) {
+			return nil, syscode.Error{
+				Code:    syscode.CodeConnectNoHealthyConnection,
+				Message: "Could not find a healthy connection",
 			}
-			return nil, fmt.Errorf("router sent nack without reason")
 		}
+
+		return nil, fmt.Errorf("failed to route message: %w", err)
 	}
 
 	{
