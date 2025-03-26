@@ -2,15 +2,16 @@ package routing
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"github.com/google/uuid"
-	"github.com/inngest/inngest/pkg/connect/pubsub"
 	"github.com/inngest/inngest/pkg/connect/state"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/inngest/inngest/pkg/util"
-	"github.com/inngest/inngest/proto/gen/connect/v1"
+	connectpb "github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/oklog/ulid/v2"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -21,9 +22,18 @@ import (
 	"time"
 )
 
+const (
+	pkgNameRouter = "connect.router"
+)
+
+type RouterForwarder interface {
+	// RouteExecutorRequest forwards an executor request to the respective gateway
+	RouteExecutorRequest(ctx context.Context, gatewayId ulid.ULID, connId ulid.ULID, data *connectpb.GatewayExecutorRequestData) error
+}
+
 var ErrNoHealthyConnection = fmt.Errorf("no healthy connection")
 
-func Route(ctx context.Context, stateMgr state.StateManager, publisher pubsub.RequestReceiver, rnd *util.FrandRNG, tracer trace.ConditionalTracer, log *slog.Logger, data *connect.GatewayExecutorRequestData) error {
+func Route(ctx context.Context, stateMgr state.StateManager, publisher RouterForwarder, rnd *util.FrandRNG, tracer trace.ConditionalTracer, log *slog.Logger, data *connectpb.GatewayExecutorRequestData) error {
 	appID, err := uuid.Parse(data.AppId)
 	if err != nil {
 		return fmt.Errorf("could not parse app ID: %w", err)
@@ -122,11 +132,11 @@ func Route(ctx context.Context, stateMgr state.StateManager, publisher pubsub.Re
 }
 
 type connWithGroup struct {
-	conn  *connect.ConnMetadata
+	conn  *connectpb.ConnMetadata
 	group *state.WorkerGroup
 }
 
-func getSuitableConnection(ctx context.Context, rnd *util.FrandRNG, stateMgr state.StateManager, envID uuid.UUID, appID uuid.UUID, fnSlug string, log *slog.Logger) (*connect.ConnMetadata, error) {
+func getSuitableConnection(ctx context.Context, rnd *util.FrandRNG, stateMgr state.StateManager, envID uuid.UUID, appID uuid.UUID, fnSlug string, log *slog.Logger) (*connectpb.ConnMetadata, error) {
 	conns, err := stateMgr.GetConnectionsByAppID(ctx, envID, appID)
 	if err != nil {
 		return nil, fmt.Errorf("could not get connections by app ID: %w", err)
@@ -167,7 +177,7 @@ func getSuitableConnection(ctx context.Context, rnd *util.FrandRNG, stateMgr sta
 	return pickConnection(healthy, rnd)
 }
 
-func cleanupUnhealthyGateway(stateManager state.StateManager, conn *connect.ConnMetadata, log *slog.Logger) {
+func cleanupUnhealthyGateway(stateManager state.StateManager, conn *connectpb.ConnMetadata, log *slog.Logger) {
 	gatewayId, err := ulid.Parse(conn.GatewayId)
 	if err != nil {
 		log.Error("could not clean up unhealthy gateway, invalid gateway ID", "gateway_id", conn.GatewayId, "err", err)
@@ -181,7 +191,7 @@ func cleanupUnhealthyGateway(stateManager state.StateManager, conn *connect.Conn
 	}
 }
 
-func cleanupUnhealthyConnection(stateManager state.StateManager, envID uuid.UUID, conn *connect.ConnMetadata, log *slog.Logger) {
+func cleanupUnhealthyConnection(stateManager state.StateManager, envID uuid.UUID, conn *connectpb.ConnMetadata, log *slog.Logger) {
 	connId, err := ulid.Parse(conn.Id)
 	if err != nil {
 		log.Error("could not clean up inactive connection, invalid connection ID", "conn_id", conn.Id, "err", err)
@@ -238,7 +248,7 @@ func sortByGroupCreatedAt(candidates []connWithGroup) {
 	})
 }
 
-func pickConnection(candidates []connWithGroup, rnd *util.FrandRNG) (*connect.ConnMetadata, error) {
+func pickConnection(candidates []connWithGroup, rnd *util.FrandRNG) (*connectpb.ConnMetadata, error) {
 	// First, sort candidate connections by CreatedAt timestamp (newest first)
 	sortByGroupCreatedAt(candidates)
 
@@ -272,7 +282,7 @@ type isHealthyRes struct {
 	workerGroup                     *state.WorkerGroup
 }
 
-func isHealthy(ctx context.Context, stateManager state.StateManager, envID uuid.UUID, appID uuid.UUID, fnSlug string, conn *connect.ConnMetadata, log *slog.Logger) isHealthyRes {
+func isHealthy(ctx context.Context, stateManager state.StateManager, envID uuid.UUID, appID uuid.UUID, fnSlug string, conn *connectpb.ConnMetadata, log *slog.Logger) isHealthyRes {
 	log.Debug("evaluating connection", "connection_id", conn.Id, "status", conn.Status, "last_heartbeat_at", conn.LastHeartbeatAt.AsTime())
 
 	gatewayId, err := ulid.Parse(conn.GatewayId)
@@ -285,10 +295,10 @@ func isHealthy(ctx context.Context, stateManager state.StateManager, envID uuid.
 		}
 	}
 
-	if conn.Status != connect.ConnectionStatus_READY {
+	if conn.Status != connectpb.ConnectionStatus_READY {
 		log.Debug("connection is not ready")
 
-		if conn.Status == connect.ConnectionStatus_DISCONNECTED {
+		if conn.Status == connectpb.ConnectionStatus_DISCONNECTED {
 			// Clean up disconnected connection
 			return isHealthyRes{
 				shouldDeleteUnhealthyConnection: true,
@@ -299,7 +309,7 @@ func isHealthy(ctx context.Context, stateManager state.StateManager, envID uuid.
 	}
 
 	// If more than two consecutive heartbeats were missed, the connection is not healthy
-	connectionHeartbeatMissed := conn.LastHeartbeatAt.AsTime().Before(time.Now().Add(-2 * WorkerHeartbeatInterval))
+	connectionHeartbeatMissed := conn.LastHeartbeatAt.AsTime().Before(time.Now().Add(-2 * consts.ConnectWorkerHeartbeatInterval))
 	if connectionHeartbeatMissed {
 		log.Debug("last heartbeat is too old")
 
@@ -352,7 +362,7 @@ func isHealthy(ctx context.Context, stateManager state.StateManager, envID uuid.
 	log.Debug("retrieved gateway for connection", "conn_id", conn.Id, "gateway_id", gatewayId.String(), "status", gw.Status, "last_heartbeat_at", gw.LastHeartbeatAt)
 
 	gatewayIsActive := gw.Status == state.GatewayStatusActive
-	gatewayHeartbeatTimedOut := gw.LastHeartbeatAt.Before(time.Now().Add(-2 * GatewayHeartbeatInterval))
+	gatewayHeartbeatTimedOut := gw.LastHeartbeatAt.Before(time.Now().Add(-2 * consts.ConnectGatewayHeartbeatInterval))
 	if !gatewayIsActive || gatewayHeartbeatTimedOut {
 		log.Debug("gateway is unhealthy", "conn_id", conn.Id, "gateway_id", gatewayId.String(), "status", gw.Status, "last_heartbeat_at", gw.LastHeartbeatAt)
 

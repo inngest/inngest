@@ -10,6 +10,7 @@ import (
 	"github.com/inngest/inngest/pkg/connect"
 	"github.com/inngest/inngest/pkg/connect/auth"
 	"github.com/inngest/inngest/pkg/connect/state"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/sdk"
 	"github.com/inngest/inngest/pkg/util"
 	connectpb "github.com/inngest/inngest/proto/gen/connect/v1"
@@ -380,7 +381,7 @@ func TestIsHealthy(t *testing.T) {
 		{
 			name:           "ready but timed out connection should not be marked as healthy",
 			status:         connectpb.ConnectionStatus_READY,
-			heartbeatDelay: 3 * connect.WorkerHeartbeatInterval,
+			heartbeatDelay: 3 * consts.ConnectWorkerHeartbeatInterval,
 			expected: isHealthyRes{
 				isHealthy:                       false,
 				shouldDeleteUnhealthyConnection: true,
