@@ -1,4 +1,5 @@
 import { useCallback } from 'react';
+import { getTimestampDaysAgo } from '@inngest/components/utils/date';
 import { convertWorkerStatus } from '@inngest/components/utils/workerParser';
 import { useClient } from 'urql';
 
@@ -83,7 +84,7 @@ export function useWorkers() {
           {
             timeField: ConnectV1WorkerConnectionsOrderByField.ConnectedAt,
             orderBy,
-            startTime: null, // Display entire connection history
+            startTime: getTimestampDaysAgo({ currentDate: new Date(), days: 1 }).toISOString(),
             appID: appID,
             status,
             cursor,
@@ -153,7 +154,7 @@ export function useWorkersCount() {
           countQuery,
           {
             timeField: ConnectV1WorkerConnectionsOrderByField.ConnectedAt,
-            startTime: null, // Display entire connection history
+            startTime: getTimestampDaysAgo({ currentDate: new Date(), days: 1 }).toISOString(),
             appID: appID,
             envID,
             status,
