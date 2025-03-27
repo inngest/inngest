@@ -135,4 +135,7 @@ const (
 	MaxStreamingChunks           = 1000       // Allow up to 1000 chunks per stream
 
 	RedisBlockingPoolSize = 10
+
+	ConnectWorkerHeartbeatInterval  = 10 * time.Second
+	ConnectGatewayHeartbeatInterval = 5 * time.Second
 )
