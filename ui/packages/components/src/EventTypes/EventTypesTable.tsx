@@ -113,13 +113,14 @@ export function EventTypesTable({
           onStatusChange={onStatusFilterChange}
         />
       </div>
-      {/* Change to table */}
       <NewTable
         columns={columns}
         data={eventTypesData?.events || []}
         isLoading={isPending}
         sorting={sorting}
         setSorting={setSorting}
+        // TODO: Link to events urls
+        onRowClick={(row) => console.log(row)}
       />
     </div>
   );

@@ -1,9 +1,9 @@
-import { Button } from '@inngest/components/Button';
 import { HorizontalPillList, Pill, PillContent } from '@inngest/components/Pill';
 import { TextCell } from '@inngest/components/Table';
 import { type EventType } from '@inngest/components/types/eventType';
-import { RiMoreLine } from '@remixicon/react';
 import { createColumnHelper, type Row } from '@tanstack/react-table';
+
+import { ActionsMenu } from './ActionsMenu';
 
 const columnHelper = createColumnHelper<EventType>();
 
@@ -78,17 +78,9 @@ export function useColumns() {
     columnHelper.display({
       id: 'actions',
       header: () => null,
-      size: 30,
+      size: 20,
       cell: ({ row }: { row: Row<EventType> }) => {
-        return (
-          <Button
-            appearance="ghost"
-            kind="secondary"
-            size="small"
-            onClick={() => {}}
-            icon={<RiMoreLine />}
-          />
-        );
+        return <ActionsMenu isArchived={row.original.archived} />;
       },
     }),
   ];

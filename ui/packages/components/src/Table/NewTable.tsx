@@ -22,6 +22,7 @@ type TableProps<T> = {
   enableExpanding?: boolean;
   columns: ColumnDef<T, any>[];
   getRowCanExpand?: (row: Row<T>) => boolean;
+  onRowClick?: (row: Row<T>) => void;
   blankState?: React.ReactNode;
 };
 
@@ -33,6 +34,7 @@ export default function Table<T>({
   enableExpanding = false,
   getRowCanExpand = () => false,
   renderSubComponent,
+  onRowClick,
   blankState,
   columns,
 }: TableProps<T>) {
@@ -136,7 +138,13 @@ export default function Table<T>({
           {!isEmpty &&
             table.getRowModel().rows.map((row) => (
               <Fragment key={row.id}>
-                <tr className={row.getIsExpanded() ? 'h-12' : 'border-light h-12 border-b'}>
+                <tr
+                  className={cn(
+                    row.getIsExpanded() ? 'h-12' : 'border-light h-12 border-b',
+                    onRowClick ? 'hover:bg-canvasSubtle cursor-pointer' : ''
+                  )}
+                  onClick={() => onRowClick?.(row)}
+                >
                   {row.getVisibleCells().map((cell, i) => {
                     return (
                       <td
