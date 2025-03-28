@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import type { Route } from 'next';
+import { useRouter } from 'next/navigation';
 import NewTable from '@inngest/components/Table/NewTable';
 import {
   EventTypesOrderByDirection,
@@ -21,25 +22,24 @@ const refreshInterval = 5000;
 
 export function EventTypesTable({
   getEventTypes,
-  envID,
   pathCreator,
 }: {
-  envID: string;
   pathCreator: {
     function: (params: { functionSlug: string }) => Route;
+    eventType: (params: { eventName: string }) => Route;
   };
   getEventTypes: ({
     cursor,
     pageSize,
     archived,
   }: {
-    envID: string;
     cursor: string | null;
     pageSize: number;
     archived: boolean;
     orderBy: EventTypesOrderBy[];
   }) => Promise<{ events: EventType[]; pageInfo: PageInfo; totalCount: number }>;
 }) {
+  const router = useRouter();
   const columns = useColumns({ pathCreator });
   const [sorting, setSorting] = useState<SortingState>([
     {
@@ -79,11 +79,12 @@ export function EventTypesTable({
     error,
     data: eventTypesData,
     isFetching, // refetching
+    // TODO: implement infinite scrolling
   } = useQuery({
-    queryKey: ['event-types', { envID, orderBy, cursor, pageSize, archived }],
+    queryKey: ['event-types', { orderBy, cursor, pageSize, archived }],
     queryFn: useCallback(() => {
-      return getEventTypes({ envID, orderBy, cursor, pageSize, archived });
-    }, [getEventTypes, envID, orderBy, cursor, pageSize, archived]),
+      return getEventTypes({ orderBy, cursor, pageSize, archived });
+    }, [getEventTypes, orderBy, cursor, pageSize, archived]),
     placeholderData: keepPreviousData,
     refetchInterval: !cursor || page === 1 ? refreshInterval : 0,
   });
@@ -125,7 +126,7 @@ export function EventTypesTable({
         sorting={sorting}
         setSorting={setSorting}
         // TODO: Link to events urls
-        onRowClick={(row) => console.log(row)}
+        onRowClick={(row) => router.push(pathCreator.eventType({ eventName: row.original.name }))}
       />
     </div>
   );

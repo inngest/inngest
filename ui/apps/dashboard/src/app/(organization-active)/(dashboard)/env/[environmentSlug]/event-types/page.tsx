@@ -20,21 +20,19 @@ export default function EventTypesPage({
       // generate URLs without knowing about environments
       function: (params: { functionSlug: string }) =>
         pathCreator.function({ envSlug: envSlug, functionSlug: params.functionSlug }),
+      eventType: (params: { eventName: string }) =>
+        pathCreator.eventType({ envSlug: envSlug, eventName: params.eventName }),
     };
   }, [envSlug]);
 
   return (
     <>
       <Header
-        breadcrumb={[{ text: 'Events' }]}
+        breadcrumb={[{ text: 'Event Types' }]}
         infoIcon={<EventInfo />}
         action={<SendEventButton />}
       />
-      <EventTypesTable
-        envID="env_123"
-        pathCreator={internalPathCreator}
-        getEventTypes={fakeGetEventTypes}
-      />
+      <EventTypesTable pathCreator={internalPathCreator} getEventTypes={fakeGetEventTypes} />
     </>
   );
 }
