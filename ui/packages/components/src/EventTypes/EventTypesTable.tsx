@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { Route } from 'next';
 import { useRouter } from 'next/navigation';
+import TableBlankState from '@inngest/components/EventTypes/TableBlankState';
 import NewTable from '@inngest/components/Table/NewTable';
 import {
   EventTypesOrderByDirection,
@@ -23,7 +24,9 @@ const refreshInterval = 5000;
 export function EventTypesTable({
   getEventTypes,
   pathCreator,
+  emptyActions,
 }: {
+  emptyActions: React.ReactNode;
   pathCreator: {
     function: (params: { functionSlug: string }) => Route;
     eventType: (params: { eventName: string }) => Route;
@@ -125,7 +128,7 @@ export function EventTypesTable({
         isLoading={isPending}
         sorting={sorting}
         setSorting={setSorting}
-        // TODO: Link to events urls
+        blankState={<TableBlankState actions={emptyActions} />}
         onRowClick={(row) => router.push(pathCreator.eventType({ eventName: row.original.name }))}
       />
     </div>

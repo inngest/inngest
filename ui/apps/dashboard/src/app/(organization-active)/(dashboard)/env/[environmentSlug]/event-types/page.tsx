@@ -1,8 +1,11 @@
 'use client';
 
 import { useMemo } from 'react';
+import { useRouter } from 'next/navigation';
+import { Button } from '@inngest/components/Button/Button';
 import { EventTypesTable } from '@inngest/components/EventTypes/EventTypesTable';
 import { Header } from '@inngest/components/Header/Header';
+import { RiExternalLinkLine, RiRefreshLine } from '@remixicon/react';
 
 import { EventInfo } from '@/components/Events/EventInfo';
 import SendEventButton from '@/components/Events/SendEventButton';
@@ -14,6 +17,7 @@ export default function EventTypesPage({
 }: {
   params: { environmentSlug: string };
 }) {
+  const router = useRouter();
   const internalPathCreator = useMemo(() => {
     return {
       // The shared component library is environment-agnostic, so it needs a way to
@@ -32,7 +36,28 @@ export default function EventTypesPage({
         infoIcon={<EventInfo />}
         action={<SendEventButton />}
       />
-      <EventTypesTable pathCreator={internalPathCreator} getEventTypes={fakeGetEventTypes} />
+      <EventTypesTable
+        pathCreator={internalPathCreator}
+        getEventTypes={fakeGetEventTypes}
+        emptyActions={
+          <>
+            <Button
+              appearance="outlined"
+              label="Refresh"
+              onClick={() => router.refresh()}
+              icon={<RiRefreshLine />}
+              iconSide="left"
+            />
+            <Button
+              label="Go to docs"
+              href="https://www.inngest.com/docs/events"
+              target="_blank"
+              icon={<RiExternalLinkLine />}
+              iconSide="left"
+            />
+          </>
+        }
+      />
     </>
   );
 }
