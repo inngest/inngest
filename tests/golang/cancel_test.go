@@ -17,7 +17,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-type testCancelEvt inngestgo.GenericEvent[any, any]
+type testCancelEvt inngestgo.GenericEvent[any]
 
 func TestEventCancellation(t *testing.T) {
 	ctx := context.Background()

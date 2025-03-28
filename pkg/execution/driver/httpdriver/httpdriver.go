@@ -21,6 +21,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
+	headerspkg "github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/inngest/log"
 	"github.com/inngest/inngest/pkg/syscode"
@@ -56,6 +57,7 @@ var (
 
 	ErrEmptyResponse = fmt.Errorf("no response data")
 	ErrNoRetryAfter  = fmt.Errorf("no retry after present")
+	ErrNotSDK        = syscode.Error{Code: syscode.CodeNotSDK}
 )
 
 type HTTPDoer interface {
@@ -133,6 +135,11 @@ type Request struct {
 	Step       inngest.Step
 	// Headers are additional headers to add to the request.
 	Headers map[string]string
+
+	// SkipStats prevents statistics from being tracked.
+	SkipStats bool
+	// statter is a function added in testing, called with httpstat info
+	statter func(s *httpstat.Result)
 }
 
 // DoRequest executes the HTTP request with the given input.
@@ -199,6 +206,9 @@ func HandleHttpResponse(ctx context.Context, r Request, resp *Response) (*state.
 			dr.SetError(resp.SysErr)
 		}
 
+		if !resp.IsSDK {
+			dr.SetError(ErrNotSDK)
+		}
 		return dr, nil
 	}
 
@@ -259,6 +269,10 @@ func HandleHttpResponse(ctx context.Context, r Request, resp *Response) (*state.
 		dr.SetError(err)
 	}
 
+	if !resp.IsSDK {
+		dr.SetError(ErrNotSDK)
+	}
+
 	return dr, err
 }
 
@@ -297,8 +311,19 @@ func do(ctx context.Context, c HTTPDoer, r Request) (*Response, error) {
 
 	// Perform the request.
 	resp, byt, dur, err := ExecuteRequest(ctx, c, req)
+	tracking.End(time.Now())
 
-	go trackRequestStats(ctx, tracking)
+	if r.statter != nil {
+		r.statter(tracking)
+	}
+
+	if !r.SkipStats { // opt-out
+		go trackRequestStats(ctx, tracking)
+		statbyt, _ := json.Marshal(tracking)
+		if resp != nil {
+			resp.Header.Add("x-inngest-request-stats", string(statbyt))
+		}
+	}
 
 	// Handle no response errors.
 	if errors.Is(err, ErrUnableToReach) {
@@ -407,14 +432,6 @@ func do(ctx context.Context, c HTTPDoer, r Request) (*Response, error) {
 		}
 	}
 
-	isSDK := false
-	for k := range resp.Header {
-		if strings.HasPrefix(strings.ToLower(k), "x-inngest-") {
-			isSDK = true
-			break
-		}
-	}
-
 	// Get the request version
 	rv, _ := strconv.Atoi(headers[headerRequestVersion])
 	return &Response{
@@ -424,7 +441,7 @@ func do(ctx context.Context, c HTTPDoer, r Request) (*Response, error) {
 		RetryAt:        retryAt,
 		NoRetry:        noRetry,
 		RequestVersion: rv,
-		IsSDK:          isSDK,
+		IsSDK:          headerspkg.IsSDK(resp.Header),
 		Sdk:            headers[headerSDK],
 		Header:         resp.Header,
 		SysErr:         sysErr,
@@ -461,6 +478,7 @@ func trackRequestStats(ctx context.Context, r *httpstat.Result) {
 		Tags:    tags,
 	}
 	metrics.HistogramHTTPDNSLookupDuration(ctx, r.DNSLookup.Milliseconds(), opts)
+	metrics.HistogramHTTPTCPConnDuration(ctx, r.TCPConnection.Milliseconds(), opts)
 	metrics.HistogramHTTPTLSHandshakeDuration(ctx, r.TLSHandshake.Milliseconds(), opts)
 	metrics.HistogramHTTPServerProcessingDuration(ctx, r.ServerProcessing.Milliseconds(), opts)
 }

@@ -36,7 +36,7 @@ func TestThrottle(t *testing.T) {
 				},
 			},
 			inngestgo.EventTrigger(trigger, nil),
-			func(ctx context.Context, input inngestgo.Input[inngestgo.GenericEvent[any, any]]) (any, error) {
+			func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
 				fmt.Println(time.Now().Format(time.RFC3339))
 				if _, ok := runs[input.InputCtx.RunID]; !ok {
 					startTimes = append(startTimes, time.Now())
@@ -109,7 +109,7 @@ func TestThrottle(t *testing.T) {
 				},
 			},
 			inngestgo.EventTrigger(trigger, nil),
-			func(ctx context.Context, input inngestgo.Input[inngestgo.GenericEvent[any, any]]) (any, error) {
+			func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
 				// Add two steps to ensure steps aren't throttled.
 				_, _ = step.Run(ctx, "b", func(ctx context.Context) (any, error) {
 					return nil, nil

@@ -288,7 +288,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	// Create a new expression aggregator, using Redis to load evaluables.
 	agg := expressions.NewAggregator(ctx, 100, 100, sm.(expressions.EvaluableLoader), nil)
 
-	executorProxy, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectPubSubRedis, connectPubSubLogger.With("svc", "executor"), conditionalTracer, true))
+	executorProxy, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectPubSubRedis, connectPubSubLogger.With("svc", "executor"), conditionalTracer, connectionManager, true))
 	if err != nil {
 		return fmt.Errorf("failed to create connect pubsub connector: %w", err)
 	}
@@ -420,7 +420,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	})
 
 	// ds.opts.Config.EventStream.Service.TopicName()
-	apiConnectProxy, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectPubSubRedis, connectPubSubLogger.With("svc", "api"), conditionalTracer, false))
+	apiConnectProxy, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectPubSubRedis, connectPubSubLogger.With("svc", "api"), conditionalTracer, connectionManager, false))
 	if err != nil {
 		return fmt.Errorf("failed to create connect pubsub connector: %w", err)
 	}
@@ -452,7 +452,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		return err
 	}
 
-	connectGatewayProxy, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectPubSubRedis, connectPubSubLogger.With("svc", "connect-gateway"), conditionalTracer, false))
+	connectGatewayProxy, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectPubSubRedis, connectPubSubLogger.With("svc", "connect-gateway"), conditionalTracer, connectionManager, false))
 	if err != nil {
 		return fmt.Errorf("failed to create connect pubsub connector: %w", err)
 	}
@@ -469,13 +469,6 @@ func start(ctx context.Context, opts StartOpts) error {
 				lifecycles.NewHistoryLifecycle(dbcqrs),
 			}),
 	)
-
-	connectRouterProxy, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectPubSubRedis, connectPubSubLogger.With("svc", "connect-router"), conditionalTracer, false))
-	if err != nil {
-		return fmt.Errorf("failed to create connect pubsub connector: %w", err)
-	}
-
-	connRouter := connect.NewConnectMessageRouterService(connectionManager, connectRouterProxy, conditionalTracer)
 
 	// Create a new data API directly in the devserver.  This allows us to inject
 	// the data API into the dev server port, providing a single router for the dev
@@ -505,7 +498,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		LocalEventKeys: opts.EventKeys,
 	})
 
-	return service.StartAll(ctx, ds, runner, executorSvc, ds.Apiservice, connGateway, connRouter)
+	return service.StartAll(ctx, ds, runner, executorSvc, ds.Apiservice, connGateway)
 }
 
 func createInmemoryRedis(ctx context.Context, tick time.Duration) (rueidis.Client, error) {

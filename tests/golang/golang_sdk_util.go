@@ -11,6 +11,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/logger"
 
 	"github.com/inngest/inngestgo"
@@ -161,4 +162,8 @@ func NewHTTPSServer(f http.Handler) *HTTPServer {
 	}()
 
 	return &HTTPServer{Server: s, Port: port}
+}
+
+func randomSuffix(s string) string {
+	return fmt.Sprintf("%s-%s", s, uuid.NewString())
 }

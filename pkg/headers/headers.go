@@ -50,3 +50,7 @@ func ContentTypeJsonResponse() func(http.Handler) http.Handler {
 		})
 	}
 }
+
+func IsSDK(headers http.Header) bool {
+	return headers.Get(HeaderKeySDK) != ""
+}

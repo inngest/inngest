@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import dynamic from 'next/dynamic';
 import { Alert } from '@inngest/components/Alert/Alert';
 
 import { SharedContextProvider } from '@/app/SharedContextProvider';
@@ -8,6 +9,10 @@ import { EnvironmentProvider } from '@/components/Environments/environment-conte
 import Layout from '@/components/Layout/Layout';
 import Toaster from '@/components/Toaster';
 import type { Environment } from '@/utils/environments';
+
+const Feedback = dynamic(() => import('@/components/Surveys/Feedback'), {
+  ssr: false,
+});
 
 type RootLayoutProps = {
   params: {
@@ -43,6 +48,7 @@ export default async function RootLayout({
       <Layout activeEnv={env}>
         <Env env={env}>
           <SharedContextProvider>{children}</SharedContextProvider>
+          <Feedback />
         </Env>
       </Layout>
       <Toaster />

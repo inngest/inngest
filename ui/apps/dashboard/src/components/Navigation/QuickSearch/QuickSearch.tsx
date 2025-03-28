@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Button } from '@inngest/components/Button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip/Tooltip';
+import { RiSearchLine } from '@remixicon/react';
 
 import { QuickSearchModal } from './QuickSearchModal';
 
@@ -38,26 +39,23 @@ export function QuickSearch({ collapsed, envSlug, envName }: Props) {
             <Button
               appearance="outlined"
               aria-label="Search by ID"
-              className="h-[28px] w-[42px] overflow-hidden px-2"
-              icon={
-                <kbd className="mx-auto flex w-full items-center justify-center space-x-1">
-                  <kbd className={`text-muted text-[20px]`}>⌘</kbd>
-                  <kbd className="text-muted text-xs">K</kbd>
-                </kbd>
-              }
+              className="group/search overflow-hidden px-1.5"
+              icon={<RiSearchLine className="-mr-1 group-hover/search:mr-0" />}
+              iconSide="left"
               kind="secondary"
               onClick={() => setIsOpen(true)}
-              size="medium"
+              size="small"
+              label={<span className="hidden group-hover/search:block">Search</span>}
             />
           </TooltipTrigger>
 
           <TooltipContent
-            className="border-muted text-muted rounded border text-xs"
+            className="border-muted text-muted w-32 rounded border text-xs"
             side="bottom"
             sideOffset={2}
           >
-            Use <span className="font-bold">⌘ K</span> or <span className="font-bold">Ctrl K</span>{' '}
-            to search
+            You can also use <span className="font-bold">⌘ K</span> or{' '}
+            <span className="font-bold">Ctrl K</span> to search
           </TooltipContent>
         </Tooltip>
       )}

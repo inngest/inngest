@@ -83,7 +83,7 @@ type Migrator interface {
 	SetFunctionMigrate(ctx context.Context, sourceShard string, fnID uuid.UUID, migrate bool) error
 	// Migration does a peek operation like the normal peek, but ignores leases and other conditions a normal peek cares about.
 	// The sore goal is to grab things and migrate them to somewhere else
-	Migrate(ctx context.Context, shard string, fnID uuid.UUID, limit int64, handler QueueMigrationHandler) (int64, error)
+	Migrate(ctx context.Context, shard string, fnID uuid.UUID, limit int64, concurrency int, handler QueueMigrationHandler) (int64, error)
 }
 
 type QueueDirectAccess interface {
@@ -254,4 +254,7 @@ type MigratePayload struct {
 	// DisableFnPause is a flag to disable the function pausing during migration
 	// if it's considered okay to do so
 	DisableFnPause bool
+
+	// Concurrency optionally specifies the concurrency for running the migrate handler over each batch of queue items.
+	Concurrency int
 }

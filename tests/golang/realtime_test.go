@@ -14,8 +14,8 @@ import (
 	"github.com/inngest/inngest/pkg/execution/realtime"
 	"github.com/inngest/inngest/pkg/execution/realtime/streamingtypes"
 	"github.com/inngest/inngestgo"
+	sdkrealtime "github.com/inngest/inngestgo/realtime"
 	"github.com/inngest/inngestgo/step"
-	"github.com/inngest/inngestgo/streaming"
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/require"
 )
@@ -47,7 +47,7 @@ func TestRealtime(t *testing.T) {
 				return "step 1 data", nil
 			})
 
-			err := streaming.PublishWithURL(
+			err := sdkrealtime.PublishWithURL(
 				ctx,
 				os.Getenv("API_URL")+"/v1/realtime/publish",
 				input.InputCtx.RunID,
@@ -83,7 +83,7 @@ func TestRealtime(t *testing.T) {
 		require.NoError(t, err)
 
 		url := os.Getenv("API_URL") + "/v1/realtime/connect"
-		stream, err := streaming.SubscribeWithURL(ctx, url, jwt)
+		stream, err := sdkrealtime.SubscribeWithURL(ctx, url, jwt)
 		require.NoError(t, err)
 
 		messages := []realtime.Message{}
@@ -91,7 +91,7 @@ func TestRealtime(t *testing.T) {
 		go func() {
 			for msg := range stream {
 				switch msg.Kind() {
-				case streaming.StreamMessage:
+				case sdkrealtime.StreamMessage:
 					messages = append(messages, msg.Message())
 				}
 			}
