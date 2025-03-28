@@ -15,6 +15,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngestgo"
 	"github.com/stretchr/testify/require"
 )
@@ -24,8 +25,8 @@ func TestSendIdempotentRetry(t *testing.T) {
 	// function runs.
 
 	t.Parallel()
-	ctx := context.Background()
 	r := require.New(t)
+	ctx := context.Background()
 
 	var proxyCounter int32
 
@@ -78,7 +79,6 @@ func TestSendIdempotentRetry(t *testing.T) {
 		inngestgo.FunctionOpts{ID: "fn"},
 		inngestgo.EventTrigger(eventName, nil),
 		func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
-			fmt.Println("trigger")
 			atomic.AddInt32(&fnCounter, 1)
 			return nil, nil
 		},
@@ -102,6 +102,57 @@ func TestSendIdempotentRetry(t *testing.T) {
 	time.Sleep(5 * time.Second)
 	r.Equal(int32(2), atomic.LoadInt32(&proxyCounter))
 	r.Equal(int32(2), atomic.LoadInt32(&fnCounter))
+
+	events, err := getEvents(ctx, eventName)
+	r.NoError(err)
+
+	// 4 events were stored: 2 from the first attempt and 2 from the second
+	// attempt. This isn't ideal but it's the best we can do until we add
+	// first-class event idempotency (it's currently enforced when scheduling
+	// runs).
+	r.Len(events, 4)
+
+	uniqueIDs := map[string]struct{}{}
+	for _, event := range events {
+		r.NotNil(event.ID)
+		uniqueIDs[*event.ID] = struct{}{}
+	}
+
+	// Only 2 unique IDs because their internal IDs are deterministically
+	// generated from the same seed.
+	r.Len(uniqueIDs, 2)
+}
+
+// getEvents returns all events with the given name.
+func getEvents(ctx context.Context, name string) ([]inngestgo.Event, error) {
+	req, err := http.NewRequestWithContext(
+		ctx,
+		http.MethodGet,
+		fmt.Sprintf("http://0.0.0.0:8288/v1/events?name=%s", name),
+		nil,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("status code %d", resp.StatusCode)
+	}
+
+	var body struct {
+		Data []inngestgo.Event `json:"data"`
+	}
+
+	err = json.NewDecoder(resp.Body).Decode(&body)
+	if err != nil {
+		return nil, err
+	}
+	return body.Data, nil
 }
 
 // sendEvents mimics the idempotent retry logic of the inngestgo client.
@@ -138,7 +189,7 @@ func sendEvents(
 	}
 	randomBase64 := base64.StdEncoding.EncodeToString(randomByt)
 	req.Header.Set(
-		"x-inngest-idempotency-key",
+		headers.HeaderEventIDSeed,
 		fmt.Sprintf("%d,%s", millis, randomBase64),
 	)
 

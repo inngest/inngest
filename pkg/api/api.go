@@ -261,7 +261,7 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 			defer span.End()
 
 			seed := event.SeededIDFromString(
-				r.Header.Get("x-inngest-idempotency-key"),
+				r.Header.Get(headers.HeaderEventIDSeed),
 				index,
 			)
 			id, err := a.handler(ctx, &evt, seed)
@@ -333,7 +333,7 @@ func (a API) Invoke(w http.ResponseWriter, r *http.Request) {
 	evt := event.NewInvocationEvent(newInvOpts)
 
 	seed := event.SeededIDFromString(
-		r.Header.Get("x-inngest-idempotency-key"),
+		r.Header.Get(headers.HeaderEventIDSeed),
 		0,
 	)
 	evtID, err := a.handler(r.Context(), &evt, seed)

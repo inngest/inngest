@@ -107,7 +107,8 @@ func SeededIDFromString(value string, index int) *SeededID {
 		return nil
 	}
 
-	//
+	// Add the index to the entropy to allow a single seed string to generate
+	// many unique ULIDs.
 	binary.BigEndian.PutUint32(
 		entropy[6:10],
 		binary.BigEndian.Uint32(entropy[6:10])+uint32(index),
@@ -284,6 +285,10 @@ func NewOSSTrackedEvent(e Event, seed *SeededID) TrackedEvent {
 	if seed != nil {
 		newInternalID, err := seed.ToULID()
 		if err == nil {
+			// IMPORTANT: This means it's possible for duplicate internal IDs in
+			// the event store. This is not ideal but it's the best we can do
+			// until we add first-class event idempotency (it's currently
+			// enforced when scheduling runs).
 			internalID = newInternalID
 		}
 	}
