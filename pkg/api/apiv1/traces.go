@@ -182,9 +182,7 @@ func (a router) convertOTLPAndSend(auth apiv1auth.V1Auth, req *collecttrace.Expo
 					// This is the "root" span created by an SDK, so let's
 					// set its parent to our span ID
 					opts = append(opts, run.WithParentSpanID(trace.SpanID(tp.SpanID)))
-				}
-
-				if len(s.ParentSpanId) == 12 {
+				} else if len(s.ParentSpanId) == 12 {
 					opts = append(opts, run.WithParentSpanID(trace.SpanID(s.ParentSpanId)))
 				}
 
