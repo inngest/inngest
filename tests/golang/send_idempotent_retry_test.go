@@ -23,6 +23,7 @@ func TestSendIdempotentRetry(t *testing.T) {
 	// Resending events with the same idempotency key header results in skipped
 	// function runs.
 
+	t.Parallel()
 	ctx := context.Background()
 	r := require.New(t)
 

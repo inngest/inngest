@@ -278,7 +278,6 @@ func (e Event) InngestMetadata() (*InngestMetadata, error) {
 }
 
 func NewOSSTrackedEvent(e Event, seed *SeededID) TrackedEvent {
-	fmt.Println("\nNewOSSTrackedEvent")
 	// Never use e.ID as the internal ID, since it's specified by the sender
 	internalID := ulid.MustNew(ulid.Now(), rand.Reader)
 
@@ -287,7 +286,6 @@ func NewOSSTrackedEvent(e Event, seed *SeededID) TrackedEvent {
 		if err == nil {
 			internalID = newInternalID
 		}
-		fmt.Println("internalID", internalID.String())
 	}
 
 	if e.ID == "" {
