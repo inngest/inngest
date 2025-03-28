@@ -118,7 +118,11 @@ func (a *apiServer) Run(ctx context.Context) error {
 	return err
 }
 
-func (a *apiServer) handleEvent(ctx context.Context, e *event.Event) (string, error) {
+func (a *apiServer) handleEvent(
+	ctx context.Context,
+	e *event.Event,
+	seed *event.SeededID,
+) (string, error) {
 	// ctx is the request context, so we need to re-add
 	// the caller here.
 	l := logger.From(ctx).With().Str("caller", "api").Logger()
@@ -127,7 +131,10 @@ func (a *apiServer) handleEvent(ctx context.Context, e *event.Event) (string, er
 
 	l.Debug().Str("event", e.Name).Msg("handling event")
 
-	trackedEvent := event.NewOSSTrackedEvent(*e)
+	trackedEvent := event.NewOSSTrackedEvent(
+		*e,
+		seed,
+	)
 
 	byt, err := json.Marshal(trackedEvent)
 	if err != nil {

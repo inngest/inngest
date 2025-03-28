@@ -142,7 +142,7 @@ func (s *svc) getFinishHandler(ctx context.Context) (func(context.Context, sv2.I
 		for _, e := range events {
 			evt := e
 			eg.Go(func() error {
-				trackedEvent := event.NewOSSTrackedEvent(evt)
+				trackedEvent := event.NewOSSTrackedEvent(evt, nil)
 				byt, err := json.Marshal(trackedEvent)
 				if err != nil {
 					return fmt.Errorf("error marshalling event: %w", err)
