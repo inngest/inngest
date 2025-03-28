@@ -1018,6 +1018,37 @@ func (q *Queries) GetQueueSnapshotChunks(ctx context.Context, snapshotID string)
 	return items, nil
 }
 
+const getTraceRoot = `-- name: GetTraceRoot :one
+SELECT timestamp, timestamp_unix_ms, trace_id, span_id, parent_span_id, trace_state, span_name, span_kind, service_name, resource_attributes, scope_name, scope_version, span_attributes, duration, status_code, status_message, events, links, run_id FROM traces WHERE trace_id = $1 ORDER BY timestamp_unix_ms DESC, duration DESC LIMIT 1
+`
+
+func (q *Queries) GetTraceRoot(ctx context.Context, traceID string) (*Trace, error) {
+	row := q.db.QueryRowContext(ctx, getTraceRoot, traceID)
+	var i Trace
+	err := row.Scan(
+		&i.Timestamp,
+		&i.TimestampUnixMs,
+		&i.TraceID,
+		&i.SpanID,
+		&i.ParentSpanID,
+		&i.TraceState,
+		&i.SpanName,
+		&i.SpanKind,
+		&i.ServiceName,
+		&i.ResourceAttributes,
+		&i.ScopeName,
+		&i.ScopeVersion,
+		&i.SpanAttributes,
+		&i.Duration,
+		&i.StatusCode,
+		&i.StatusMessage,
+		&i.Events,
+		&i.Links,
+		&i.RunID,
+	)
+	return &i, err
+}
+
 const getTraceRun = `-- name: GetTraceRun :one
 SELECT run_id, account_id, workspace_id, app_id, function_id, trace_id, queued_at, started_at, ended_at, status, source_id, trigger_ids, output, is_debounce, batch_id, cron_schedule, has_ai FROM trace_runs WHERE run_id = $1::CHAR(26)
 `

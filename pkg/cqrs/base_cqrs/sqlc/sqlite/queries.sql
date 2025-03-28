@@ -207,8 +207,8 @@ VALUES
 
 -- name: InsertTraceRun :exec
 INSERT INTO trace_runs (
-    run_id, account_id, workspace_id, app_id, function_id, trace_id, 
-    queued_at, started_at, ended_at, status, source_id, trigger_ids, 
+    run_id, account_id, workspace_id, app_id, function_id, trace_id,
+    queued_at, started_at, ended_at, status, source_id, trigger_ids,
     output, batch_id, is_debounce, cron_schedule, has_ai
 )
 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -236,6 +236,9 @@ DO UPDATE SET
 
 -- name: GetTraceRun :one
 SELECT * FROM trace_runs WHERE run_id = @run_id;
+
+-- name: GetTraceRoot :one
+SELECT * FROM traces WHERE trace_id = @trace_id ORDER BY timestamp_unix_ms DESC, duration DESC LIMIT 1;
 
 -- name: GetTraceSpans :many
 SELECT * FROM traces WHERE trace_id = @trace_id AND run_id = @run_id ORDER BY timestamp_unix_ms DESC, duration DESC;
