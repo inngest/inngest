@@ -30,6 +30,7 @@ export const fakeGetEventTypes = async ({}: {}) => {
                 name: 'Slack: New account notification',
               },
             ],
+            // TODO: This will be another query, lazy loaded
             volume: { totalVolume: 0, chart: null },
           },
         ],
