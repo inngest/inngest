@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"strconv"
 	"strings"
 	"sync"
@@ -15,6 +16,7 @@ import (
 	"time"
 
 	"github.com/inngest/inngest/pkg/syscode"
+	"github.com/inngest/inngest/pkg/util/gateway"
 
 	"github.com/fatih/structs"
 	"github.com/google/uuid"
@@ -712,6 +714,7 @@ type runInstance struct {
 	item       queue.Item
 	edge       inngest.Edge
 	resp       *state.DriverResponse
+	httpClient *http.Client
 	stackIndex int
 }
 
@@ -880,6 +883,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		item:       item,
 		edge:       edge,
 		stackIndex: stackIndex,
+		httpClient: httpdriver.DefaultClient,
 	}
 
 	resp, err := e.run(ctx, &instance)
@@ -1956,6 +1960,8 @@ func (e *executor) handleGenerator(ctx context.Context, i *runInstance, gen stat
 		return e.handleGeneratorInvokeFunction(ctx, i, gen, edge)
 	case enums.OpcodeAIGateway:
 		return e.handleGeneratorAIGateway(ctx, i, gen, edge)
+	case enums.OpcodeGateway:
+		return e.handleGeneratorGateway(ctx, i, gen, edge)
 	}
 
 	return fmt.Errorf("unknown opcode: %s", gen.Op)
@@ -2240,6 +2246,120 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, i *runInstance, gen
 	return err
 }
 
+func (e *executor) handleGeneratorGateway(ctx context.Context, i *runInstance, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
+	input, err := gen.GatewayOpts()
+	if err != nil {
+		return fmt.Errorf("error parsing gateway step: %w", err)
+	}
+
+	req, err := input.HTTPRequest()
+	if err != nil {
+		return fmt.Errorf("error creating gateway request: %w", err)
+	}
+
+	var output []byte
+
+	hr, body, _, err := httpdriver.ExecuteRequest(ctx, i.httpClient, req)
+	if err != nil {
+		// Request failed entirely. Create an error.
+		userLandErr := state.UserError{
+			Name:    "GatewayError",
+			Message: fmt.Sprintf("Error making gateway request: %s", err),
+		}
+		i.resp.UpdateOpcodeError(&gen, userLandErr)
+
+		if queue.ShouldRetry(nil, i.item.Attempt, i.item.GetMaxAttempts()) {
+			i.resp.SetError(err)
+
+			for _, e := range e.lifecycles {
+				go e.OnStepGatewayRequestFinished(context.WithoutCancel(ctx), i.md, i.item, i.edge, gen, hr, &userLandErr)
+			}
+
+			// This will retry, as it hits the queue directly.
+			return fmt.Errorf("error making inference request: %w", err)
+		}
+
+		userLandErrByt, _ := json.Marshal(userLandErr)
+		output, _ = json.Marshal(map[string]json.RawMessage{
+			execution.StateErrorKey: userLandErrByt,
+		})
+
+		for _, e := range e.lifecycles {
+			go e.OnStepGatewayRequestFinished(context.WithoutCancel(ctx), i.md, i.item, i.edge, gen, hr, &userLandErr)
+		}
+	} else {
+		headers := make(map[string]string)
+		for k, v := range hr.Header {
+			headers[k] = strings.Join(v, ",")
+		}
+
+		output, err = json.Marshal(map[string]gateway.Response{
+			execution.StateDataKey: {
+				URL:        req.URL.String(),
+				Headers:    headers,
+				Body:       string(body),
+				StatusCode: hr.StatusCode,
+			},
+		})
+		if err != nil {
+			return fmt.Errorf("error wrapping gateway result in map: %w", err)
+		}
+
+		i.resp.UpdateOpcodeOutput(&gen, output)
+		for _, e := range e.lifecycles {
+			// OnStepFinished handles step success and step errors/failures.  It is
+			// currently the responsibility of the lifecycle manager to handle the differing
+			// step statuses when a step finishes.
+			go e.OnStepGatewayRequestFinished(context.WithoutCancel(ctx), i.md, i.item, i.edge, gen, hr, nil)
+		}
+	}
+
+	// Save the output as the step result.
+	hasPendingSteps, err := e.smv2.SaveStep(ctx, i.md.ID, gen.ID, output)
+	if err != nil {
+		return err
+	}
+
+	groupID := uuid.New().String()
+	ctx = state.WithGroupID(ctx, groupID)
+
+	// Enqueue the next step
+	nextEdge := inngest.Edge{
+		Outgoing: gen.ID,             // Going from the current step
+		Incoming: edge.Edge.Incoming, // And re-calling the incoming function in a loop
+	}
+	jobID := fmt.Sprintf("%s-%s", i.md.IdempotencyKey(), gen.ID)
+	now := time.Now()
+	nextItem := queue.Item{
+		JobID:                 &jobID,
+		WorkspaceID:           i.md.ID.Tenant.EnvID,
+		GroupID:               groupID,
+		Kind:                  queue.KindEdge,
+		Identifier:            i.item.Identifier,
+		PriorityFactor:        i.item.PriorityFactor,
+		CustomConcurrencyKeys: i.item.CustomConcurrencyKeys,
+		Attempt:               0,
+		MaxAttempts:           i.item.MaxAttempts,
+		Payload:               queue.PayloadEdge{Edge: nextEdge},
+	}
+
+	if !hasPendingSteps {
+		err = e.queue.Enqueue(ctx, nextItem, now, queue.EnqueueOpts{})
+		if err == redis_state.ErrQueueItemExists {
+			return nil
+		}
+	}
+
+	for _, l := range e.lifecycles {
+		// We can't specify step name here since that will result in the
+		// "followup discovery step" having the same name as its predecessor.
+		var stepName *string = nil
+		go l.OnStepScheduled(ctx, i.md, nextItem, stepName)
+	}
+
+	return err
+}
+
 func (e *executor) handleGeneratorAIGateway(ctx context.Context, i *runInstance, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
 	input, err := gen.AIGatewayOpts()
 	if err != nil {
@@ -2255,7 +2375,7 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, i *runInstance,
 		return fmt.Errorf("error creating ai gateway request: %w", err)
 	}
 
-	hr, output, _, err := httpdriver.ExecuteRequest(ctx, httpdriver.DefaultClient, req)
+	hr, output, _, err := httpdriver.ExecuteRequest(ctx, i.httpClient, req)
 	failure := err != nil || (hr != nil && hr.StatusCode > 299)
 
 	// Update the driver response appropriately for the trace lifecycles.
@@ -2307,7 +2427,7 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, i *runInstance,
 		// error wrapping of step errors.
 		userLandErrByt, _ := json.Marshal(userLandErr)
 		output, _ = json.Marshal(map[string]json.RawMessage{
-			"error": userLandErrByt,
+			execution.StateErrorKey: userLandErrByt,
 		})
 
 		for _, e := range e.lifecycles {
@@ -2324,7 +2444,7 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, i *runInstance,
 		// to differentiate between success and failure in the SDK in the single
 		// opcode map.
 		output, err = json.Marshal(map[string]json.RawMessage{
-			"data": output,
+			execution.StateDataKey: output,
 		})
 		if err != nil {
 			return fmt.Errorf("error wrapping ai result in map: %w", err)
