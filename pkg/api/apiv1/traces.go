@@ -163,6 +163,10 @@ func (a router) convertOTLPAndSend(auth apiv1auth.V1Auth, req *collecttrace.Expo
 				// Add built-in inngest attributes to the span (run ID etc)
 				for k, v := range traceRoot.SpanAttributes {
 					if _, ok := copyableAttrs[k]; ok {
+						if _, ok := ignoredAttrs[k]; ok {
+							continue
+						}
+
 						attrs = append(attrs, attribute.KeyValue{
 							Key:   attribute.Key(k),
 							Value: attribute.StringValue(v),
@@ -336,6 +340,10 @@ func traceStatusCode(code tracev1.Status_StatusCode) codes.Code {
 	default:
 		return codes.Unset
 	}
+}
+
+var ignoredAttrs = map[string]struct{}{
+	consts.OtelSysStepGroupID: {},
 }
 
 var copyableAttrs = map[string]struct{}{
