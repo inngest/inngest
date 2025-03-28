@@ -2,10 +2,9 @@
 
 import { useEffect } from 'react';
 import { useSearchParams } from 'next/navigation';
-import { Alert } from '@inngest/components/Alert';
-import { IconSpinner } from '@inngest/components/icons/Spinner';
 import { useMutation } from 'urql';
 
+import ConnectingView from '@/components/DatadogIntegration/ConnectingView';
 import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import IntegrationNotEnabledMessage from '@/components/Integration/IntegrationNotEnabledMessage';
 import { graphql } from '@/gql';
@@ -42,28 +41,5 @@ export default function StartPage({}) {
     window.location.href = data.datadogOAuthRedirectURL;
   }
 
-  return (
-    <div className="mx-auto mt-16 flex w-[800px]  flex-col">
-      {error ? (
-        <>
-          <Alert severity="error">
-            Please{' '}
-            <a href="/support" className="underline">
-              contact Inngest support
-            </a>{' '}
-            if this error persists.
-            <br />
-            <br />
-            <code>{error.message}</code>
-          </Alert>
-        </>
-      ) : (
-        <>
-          <div className="text-link flex items-center gap-1.5 text-sm">
-            <IconSpinner className="fill-link h-16 w-16" />
-          </div>
-        </>
-      )}
-    </div>
-  );
+  return <ConnectingView errorMessage={error?.message} />;
 }
