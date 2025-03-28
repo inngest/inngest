@@ -23,7 +23,6 @@ export default function EventTypesStatusFilter({
       label="Select event status"
       multiple={false}
       value={archived ? archivedOption : activeOption}
-      className="mb-5"
     >
       <Select.Button className="h-[28px] w-[136px] px-2 py-1">
         <div className="text-basis mr-1 flex flex-row items-center text-xs font-medium leading-tight">

@@ -95,32 +95,38 @@ export default function Table<T>({
         <thead className={tableHeadStyles}>
           {table.getHeaderGroups().map((headerGroup) => (
             <tr key={headerGroup.id} className="h-9">
-              {headerGroup.headers.map((header) => (
-                <th
-                  key={header.id}
-                  style={{
-                    width: header.getSize(),
-                    maxWidth: header.getSize(),
-                  }}
-                  className={cn(tableColumnStyles, 'text-muted text-left text-xs font-medium')}
-                >
-                  {header.isPlaceholder ? null : (
-                    <div
-                      className={cn(
-                        header.column.getCanSort() &&
-                          'flex cursor-pointer select-none items-center gap-1'
-                      )}
-                      onClick={header.column.getToggleSortingHandler()}
-                    >
-                      {flexRender(header.column.columnDef.header, header.getContext())}
-                      {{
-                        asc: <RiSortAsc className="h-4 w-4" />,
-                        desc: <RiSortDesc className="h-4 w-4" />,
-                      }[header.column.getIsSorted() as string] ?? null}
-                    </div>
-                  )}
-                </th>
-              ))}
+              {headerGroup.headers.map((header) => {
+                const isIconOnlyColumn = header.column.columnDef.header === undefined;
+                return (
+                  <th
+                    key={header.id}
+                    style={{
+                      width: header.getSize(),
+                      maxWidth: header.getSize(),
+                    }}
+                    className={cn(
+                      isIconOnlyColumn ? '' : tableColumnStyles,
+                      'text-muted text-left text-xs font-medium'
+                    )}
+                  >
+                    {header.isPlaceholder ? null : (
+                      <div
+                        className={cn(
+                          header.column.getCanSort() &&
+                            'flex cursor-pointer select-none items-center gap-1'
+                        )}
+                        onClick={header.column.getToggleSortingHandler()}
+                      >
+                        {flexRender(header.column.columnDef.header, header.getContext())}
+                        {{
+                          asc: <RiSortAsc className="text-light h-4 w-4" />,
+                          desc: <RiSortDesc className="text-light h-4 w-4" />,
+                        }[header.column.getIsSorted() as string] ?? null}
+                      </div>
+                    )}
+                  </th>
+                );
+              })}
             </tr>
           ))}
         </thead>
@@ -146,6 +152,7 @@ export default function Table<T>({
                   onClick={() => onRowClick?.(row)}
                 >
                   {row.getVisibleCells().map((cell, i) => {
+                    const isIconOnlyColumn = cell.column.columnDef.header === undefined;
                     return (
                       <td
                         key={cell.id}
@@ -155,7 +162,7 @@ export default function Table<T>({
                         }}
                         className={cn(
                           i === 0 && row.getIsExpanded() ? expandedRowSideBorder : '',
-                          tableColumnStyles
+                          isIconOnlyColumn ? '' : tableColumnStyles
                         )}
                       >
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}

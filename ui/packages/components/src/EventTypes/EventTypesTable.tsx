@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import type { Route } from 'next';
 import NewTable from '@inngest/components/Table/NewTable';
 import {
   EventTypesOrderByDirection,
@@ -21,8 +22,12 @@ const refreshInterval = 5000;
 export function EventTypesTable({
   getEventTypes,
   envID,
+  pathCreator,
 }: {
   envID: string;
+  pathCreator: {
+    function: (params: { functionSlug: string }) => Route;
+  };
   getEventTypes: ({
     cursor,
     pageSize,
@@ -35,7 +40,7 @@ export function EventTypesTable({
     orderBy: EventTypesOrderBy[];
   }) => Promise<{ events: EventType[]; pageInfo: PageInfo; totalCount: number }>;
 }) {
-  const columns = useColumns();
+  const columns = useColumns({ pathCreator });
   const [sorting, setSorting] = useState<SortingState>([
     {
       id: 'name',

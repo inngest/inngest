@@ -1,9 +1,11 @@
 import { HorizontalPillList, Pill, PillContent } from '@inngest/components/Pill';
 import { TextCell } from '@inngest/components/Table';
 import { type EventType } from '@inngest/components/types/eventType';
+import { cn } from '@inngest/components/utils/classNames';
 import { createColumnHelper, type Row } from '@tanstack/react-table';
 
 import { ActionsMenu } from './ActionsMenu';
+import type { EventTypesTable } from './EventTypesTable';
 
 const columnHelper = createColumnHelper<EventType>();
 
@@ -18,19 +20,31 @@ function ensureColumnID(id: ColumnID): ColumnID {
   return id;
 }
 
-export function useColumns() {
+export function useColumns({
+  pathCreator,
+}: {
+  pathCreator: React.ComponentProps<typeof EventTypesTable>['pathCreator'];
+}) {
   const columns = [
     columnHelper.accessor('name', {
-      cell: (info) => {
-        const name = info.getValue();
+      cell: ({ row }: { row: Row<EventType> }) => {
+        const name = row.original.name;
+        const archived = row.original.archived;
 
         return (
-          <div className="flex items-center">
+          <div className="flex items-center gap-2">
+            <div
+              className={cn(
+                archived ? 'bg-surfaceMuted' : 'bg-primary-subtle',
+                'mx-1 h-2.5 w-2.5 shrink-0 rounded-full'
+              )}
+            />
             <TextCell>{name}</TextCell>
           </div>
         );
       },
       header: 'Event name',
+      maxSize: 400,
       enableSorting: true,
       id: ensureColumnID('name'),
     }),
@@ -44,10 +58,7 @@ export function useColumns() {
             pills={functions.map((function_) => (
               <Pill
                 appearance="outlined"
-                // href={pathCreator.function({
-                //   envSlug: env.slug,
-                //   functionSlug: function_.slug,
-                // })}
+                href={pathCreator.function({ functionSlug: function_.slug })}
                 key={function_.name}
               >
                 <PillContent type="FUNCTION">{function_.name}</PillContent>
@@ -72,12 +83,13 @@ export function useColumns() {
         );
       },
       header: 'Volume (24h)',
+      size: 100,
       enableSorting: false,
       id: ensureColumnID('volume'),
     }),
     columnHelper.display({
       id: 'actions',
-      header: () => null,
+      header: undefined, // Needed to enable the iconOnly styles in the table
       size: 20,
       cell: ({ row }: { row: Row<EventType> }) => {
         return <ActionsMenu isArchived={row.original.archived} />;
