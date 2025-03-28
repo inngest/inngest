@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { Table } from '@inngest/components/Table';
+import NewTable from '@inngest/components/Table/NewTable';
 import {
   EventTypesOrderByDirection,
   EventTypesOrderByField,
@@ -12,7 +12,6 @@ import {
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { type SortingState } from '@tanstack/react-table';
 
-import CompactPaginatedTable from '../Table/CompactPaginatedTable';
 import { useSearchParam } from '../hooks/useSearchParam';
 import EventTypesStatusFilter from './EventTypesStatusFilter';
 import { useColumns } from './columns';
@@ -115,15 +114,12 @@ export function EventTypesTable({
         />
       </div>
       {/* Change to table */}
-      <CompactPaginatedTable
+      <NewTable
         columns={columns}
         data={eventTypesData?.events || []}
         isLoading={isPending}
         sorting={sorting}
         setSorting={setSorting}
-        enableExpanding={false}
-        renderSubComponent={() => <></>}
-        getRowCanExpand={() => false}
       />
     </div>
   );

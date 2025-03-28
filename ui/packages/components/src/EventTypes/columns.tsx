@@ -31,7 +31,7 @@ export function useColumns() {
         );
       },
       header: 'Event name',
-      enableSorting: false,
+      enableSorting: true,
       id: ensureColumnID('name'),
     }),
     columnHelper.accessor('functions', {
@@ -72,7 +72,7 @@ export function useColumns() {
         );
       },
       header: 'Volume (24h)',
-      enableSorting: true,
+      enableSorting: false,
       id: ensureColumnID('volume'),
     }),
     columnHelper.display({
