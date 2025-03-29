@@ -296,10 +296,10 @@ func do(ctx context.Context, c HTTPDoer, r Request) (*Response, *httpstat.Result
 			Interface("edge	", r.Edge).
 			Int64("req_dur_ms", dur.Milliseconds()).
 			Msg("EOF writing request to SDK")
-		return nil, nil, err
+		return nil, tracking, err
 	}
 	if err != nil && len(byt) == 0 {
-		return nil, nil, err
+		return nil, tracking, err
 	}
 
 	var sysErr *syscode.Error
@@ -360,7 +360,7 @@ func do(ctx context.Context, c HTTPDoer, r Request) (*Response, *httpstat.Result
 	if resp.StatusCode == 201 && sysErr == nil {
 		stream, err := ParseStream(byt)
 		if err != nil {
-			return nil, nil, fmt.Errorf("error parsing stream: %w", err)
+			return nil, tracking, fmt.Errorf("error parsing stream: %w", err)
 		} else {
 			// These are all contained within a single wrapper.
 			body = stream.Body
