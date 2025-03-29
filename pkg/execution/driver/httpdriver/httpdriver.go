@@ -138,7 +138,7 @@ func DoRequest(ctx context.Context, c HTTPDoer, r Request) (*state.DriverRespons
 
 	resp, tracking, err := do(ctx, c, r)
 	if err != nil {
-		return nil, nil, err
+		return nil, tracking, err
 	}
 
 	dr, err := HandleHttpResponse(ctx, r, resp)
