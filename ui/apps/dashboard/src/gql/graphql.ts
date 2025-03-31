@@ -112,10 +112,8 @@ export type Addons = {
 
 export type App = {
   __typename?: 'App';
-  /** @deprecated connectionType is deprecated. Use method instead. */
   appVersion: Maybe<Scalars['String']>;
   archivedAt: Maybe<Scalars['Time']>;
-  connectionType: AppConnectionType;
   createdAt: Scalars['Time'];
   externalID: Scalars['String'];
   functionCount: Scalars['Int'];
@@ -175,11 +173,6 @@ export type AppCheckResult = {
   signingKeyStatus: SecretCheck;
 };
 
-export enum AppConnectionType {
-  Connect = 'CONNECT',
-  Serverless = 'SERVERLESS'
-}
-
 export enum AppMethod {
   Connect = 'CONNECT',
   Serve = 'SERVE'
@@ -199,7 +192,6 @@ export type AppliedAddons = {
 
 export type AppsFilter = {
   archived?: InputMaybe<Scalars['Boolean']>;
-  connectionType?: InputMaybe<AppConnectionType>;
   method?: InputMaybe<AppMethod>;
 };
 
