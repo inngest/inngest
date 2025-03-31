@@ -60,10 +60,7 @@ func AddRoutes(r chi.Router, o Opts) http.Handler {
 		Router: r,
 		API:    impl,
 	}
-	// Add the auth middleware, if specified.
-	if o.AuthMiddleware != nil {
-		instance.Use(o.AuthMiddleware)
-	}
+
 	instance.setup()
 	return instance
 }
@@ -95,6 +92,10 @@ func (a *router) setup() {
 		}
 
 		r.Group(func(r chi.Router) {
+			if a.opts.AuthMiddleware != nil {
+				r.Use(a.opts.AuthMiddleware)
+			}
+
 			if a.opts.CachingMiddleware != nil {
 				r.Use(a.opts.CachingMiddleware.Middleware)
 			}
