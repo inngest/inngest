@@ -205,6 +205,13 @@ func (tb *runTree) toRunSpan(ctx context.Context, s *cqrs.Span) (span *rpbv2.Run
 		return nil, skipped, nil
 	}
 
+	//
+	// return userland spans as is for now
+	if internal, ok := s.SpanAttributes[consts.OtelScopeUserland]; ok && internal == "true" {
+		tb.markProcessed(s)
+		return res, false, nil
+	}
+
 	// NOTE: step status will be updated in the individual opcode updates
 	switch s.ScopeName {
 	case consts.OtelScopeFunction:
@@ -295,6 +302,23 @@ func (tb *runTree) toRunSpan(ctx context.Context, s *cqrs.Span) (span *rpbv2.Run
 				if err := tb.processExecGroup(ctx, s, res); err != nil {
 					return nil, false, fmt.Errorf("error grouping executions: %w", err)
 				}
+			}
+		}
+	}
+
+	//
+	// Process children recursively
+	if len(s.Children) > 0 {
+		for _, child := range s.Children {
+			childSpan, childSkipped, childErr := tb.toRunSpan(ctx, child)
+			if childErr != nil {
+				return nil, false, fmt.Errorf("error converting child span: %w", childErr)
+			}
+			if !childSkipped {
+				if res.Children == nil {
+					res.Children = []*rpbv2.RunSpan{}
+				}
+				res.Children = append(res.Children, childSpan)
 			}
 		}
 	}

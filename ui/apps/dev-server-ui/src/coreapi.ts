@@ -410,6 +410,12 @@ export const GET_RUN = gql`
           ...TraceDetails
           childrenSpans {
             ...TraceDetails
+            childrenSpans {
+              ...TraceDetails
+              childrenSpans {
+                ...TraceDetails
+              }
+            }
           }
         }
       }

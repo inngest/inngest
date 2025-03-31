@@ -3,6 +3,7 @@ package loader
 import (
 	"context"
 	"fmt"
+	"sort"
 	"sync"
 	"time"
 
@@ -122,11 +123,6 @@ func (tr *traceReader) GetRunTrace(ctx context.Context, keys dataloader.Keys) []
 }
 
 func convertRunTreeToGQLModel(pb *rpbv2.RunSpan) (*models.RunTraceSpan, error) {
-	// no need to show the function success span, if it's the only one and has no children
-	// meaning, there were no function level retries
-	if pb.GetName() == consts.OtelExecFnOk && pb.GetStatus() == rpbv2.SpanStatus_COMPLETED && len(pb.GetChildren()) < 1 {
-		return nil, ErrSkipSuccess
-	}
 
 	var (
 		startedAt *time.Time
@@ -265,13 +261,25 @@ func convertRunTreeToGQLModel(pb *rpbv2.RunSpan) (*models.RunTraceSpan, error) {
 
 		for _, cp := range pb.Children {
 			cspan, err := convertRunTreeToGQLModel(cp)
-			if err == ErrSkipSuccess {
-				continue
-			}
+
 			if err != nil {
 				return nil, err
 			}
 			span.ChildrenSpans = append(span.ChildrenSpans, cspan)
+		}
+
+		//
+		// function success spans should appear last
+		if len(span.ChildrenSpans) > 1 {
+			sort.SliceStable(span.ChildrenSpans, func(i, j int) bool {
+				if span.ChildrenSpans[j].Name == consts.OtelExecFnOk {
+					return true
+				}
+				if span.ChildrenSpans[i].Name == consts.OtelExecFnOk {
+					return false
+				}
+				return i < j
+			})
 		}
 	}
 
