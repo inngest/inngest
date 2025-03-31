@@ -25,7 +25,6 @@ import (
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/inngest/log"
 	"github.com/inngest/inngest/pkg/syscode"
-	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/oklog/ulid/v2"
 	"go.opentelemetry.io/otel/propagation"
@@ -90,13 +89,14 @@ func (e executor) Execute(ctx context.Context, sl sv2.StateLoader, s sv2.Metadat
 		return nil, err
 	}
 
-	return DoRequest(ctx, e.Client, Request{
+	dr, _, err := DoRequest(ctx, e.Client, Request{
 		SigningKey: e.localSigningKey,
 		URL:        *uri,
 		Input:      input,
 		Edge:       edge,
 		Step:       step,
 	})
+	return dr, err
 }
 
 type Request struct {
@@ -114,21 +114,16 @@ type Request struct {
 	Input      []byte
 	Edge       inngest.Edge
 	Step       inngest.Step
-
-	// SkipStats prevents statistics from being tracked.
-	SkipStats bool
-	// statter is a function added in testing, called with httpstat info
-	statter func(s *httpstat.Result)
 }
 
 // DoRequest executes the HTTP request with the given input.
-func DoRequest(ctx context.Context, c HTTPDoer, r Request) (*state.DriverResponse, error) {
+func DoRequest(ctx context.Context, c HTTPDoer, r Request) (*state.DriverResponse, *httpstat.Result, error) {
 	if c == nil {
 		c = DefaultClient
 	}
 
 	if r.URL.Scheme != "http" && r.URL.Scheme != "https" {
-		return nil, fmt.Errorf("Unable to use HTTP executor for non-HTTP runtime")
+		return nil, nil, fmt.Errorf("Unable to use HTTP executor for non-HTTP runtime")
 	}
 
 	// If we have a generator step name, ensure we add the step ID parameter
@@ -141,12 +136,13 @@ func DoRequest(ctx context.Context, c HTTPDoer, r Request) (*state.DriverRespons
 		r.URL.RawQuery = values.Encode()
 	}
 
-	resp, err := do(ctx, c, r)
+	resp, tracking, err := do(ctx, c, r)
 	if err != nil {
-		return nil, err
+		return nil, tracking, err
 	}
 
-	return HandleHttpResponse(ctx, r, resp)
+	dr, err := HandleHttpResponse(ctx, r, resp)
+	return dr, tracking, err
 }
 
 func HandleHttpResponse(ctx context.Context, r Request, resp *Response) (*state.DriverResponse, error) {
@@ -255,7 +251,7 @@ func HandleHttpResponse(ctx context.Context, r Request, resp *Response) (*state.
 	return dr, err
 }
 
-func do(ctx context.Context, c HTTPDoer, r Request) (*Response, error) {
+func do(ctx context.Context, c HTTPDoer, r Request) (*Response, *httpstat.Result, error) {
 	if c == nil {
 		c = DefaultClient
 	}
@@ -265,7 +261,7 @@ func do(ctx context.Context, c HTTPDoer, r Request) (*Response, error) {
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, r.URL.String(), bytes.NewBuffer(r.Input))
 	if err != nil {
-		return nil, fmt.Errorf("error creating request: %w", err)
+		return nil, nil, fmt.Errorf("error creating request: %w", err)
 	}
 	req.Header.Add("Content-Type", "application/json")
 
@@ -291,18 +287,6 @@ func do(ctx context.Context, c HTTPDoer, r Request) (*Response, error) {
 	resp, byt, dur, err := ExecuteRequest(ctx, c, req)
 	tracking.End(time.Now())
 
-	if r.statter != nil {
-		r.statter(tracking)
-	}
-
-	if !r.SkipStats { // opt-out
-		go trackRequestStats(ctx, tracking)
-		statbyt, _ := json.Marshal(tracking)
-		if resp != nil {
-			resp.Header.Add("x-inngest-request-stats", string(statbyt))
-		}
-	}
-
 	// Handle no response errors.
 	if errors.Is(err, ErrUnableToReach) {
 		log.From(ctx).
@@ -312,10 +296,10 @@ func do(ctx context.Context, c HTTPDoer, r Request) (*Response, error) {
 			Interface("edge	", r.Edge).
 			Int64("req_dur_ms", dur.Milliseconds()).
 			Msg("EOF writing request to SDK")
-		return nil, err
+		return nil, tracking, err
 	}
 	if err != nil && len(byt) == 0 {
-		return nil, err
+		return nil, tracking, err
 	}
 
 	var sysErr *syscode.Error
@@ -376,7 +360,7 @@ func do(ctx context.Context, c HTTPDoer, r Request) (*Response, error) {
 	if resp.StatusCode == 201 && sysErr == nil {
 		stream, err := ParseStream(byt)
 		if err != nil {
-			return nil, fmt.Errorf("error parsing stream: %w", err)
+			return nil, tracking, fmt.Errorf("error parsing stream: %w", err)
 		} else {
 			// These are all contained within a single wrapper.
 			body = stream.Body
@@ -423,7 +407,7 @@ func do(ctx context.Context, c HTTPDoer, r Request) (*Response, error) {
 		Sdk:            headers[headerSDK],
 		Header:         resp.Header,
 		SysErr:         sysErr,
-	}, err
+	}, tracking, err
 
 }
 
@@ -447,16 +431,4 @@ type Response struct {
 
 	SysErr *syscode.Error
 	IsSDK  bool
-}
-
-func trackRequestStats(ctx context.Context, r *httpstat.Result) {
-	tags := map[string]any{"ipv6": r.IsIPv6}
-	opts := metrics.HistogramOpt{
-		PkgName: "httpdriver",
-		Tags:    tags,
-	}
-	metrics.HistogramHTTPDNSLookupDuration(ctx, r.DNSLookup.Milliseconds(), opts)
-	metrics.HistogramHTTPTCPConnDuration(ctx, r.TCPConnection.Milliseconds(), opts)
-	metrics.HistogramHTTPTLSHandshakeDuration(ctx, r.TLSHandshake.Milliseconds(), opts)
-	metrics.HistogramHTTPServerProcessingDuration(ctx, r.ServerProcessing.Milliseconds(), opts)
 }
