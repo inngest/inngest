@@ -537,7 +537,7 @@ func createConnectPubSubRedis() rueidis.ClientOption {
 
 func getSendingEventHandler(ctx context.Context, pb pubsub.Publisher, topic string) execution.HandleSendingEvent {
 	return func(ctx context.Context, evt event.Event, item queue.Item) error {
-		trackedEvent := event.NewOSSTrackedEvent(evt)
+		trackedEvent := event.NewOSSTrackedEvent(evt, nil)
 		byt, err := json.Marshal(trackedEvent)
 		if err != nil {
 			return fmt.Errorf("error marshalling invocation event: %w", err)
@@ -573,7 +573,7 @@ func getInvokeFailHandler(ctx context.Context, pb pubsub.Publisher, topic string
 		for _, e := range evts {
 			evt := e
 			eg.Go(func() error {
-				trackedEvent := event.NewOSSTrackedEvent(evt)
+				trackedEvent := event.NewOSSTrackedEvent(evt, nil)
 				byt, err := json.Marshal(trackedEvent)
 				if err != nil {
 					return fmt.Errorf("error marshalling function finished event: %w", err)
