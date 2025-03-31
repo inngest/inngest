@@ -205,13 +205,6 @@ func (tb *runTree) toRunSpan(ctx context.Context, s *cqrs.Span) (span *rpbv2.Run
 		return nil, skipped, nil
 	}
 
-	//
-	// return userland spans as is for now
-	if internal, ok := s.SpanAttributes[consts.OtelScopeUserland]; ok && internal == "true" {
-		tb.markProcessed(s)
-		return res, false, nil
-	}
-
 	// NOTE: step status will be updated in the individual opcode updates
 	switch s.ScopeName {
 	case consts.OtelScopeFunction:
@@ -251,6 +244,12 @@ func (tb *runTree) toRunSpan(ctx context.Context, s *cqrs.Span) (span *rpbv2.Run
 
 	// the rest are grouped executions
 	default:
+		// Allow userland spans to be constructed, but don't process them like
+		// steps
+		if s.IsUserland() {
+			break
+		}
+
 		// NOTE:
 		// check last item in group for op code
 		// due to how we wrap up function errors with the next step execution, first item might not hold the accurate op code
@@ -306,20 +305,15 @@ func (tb *runTree) toRunSpan(ctx context.Context, s *cqrs.Span) (span *rpbv2.Run
 		}
 	}
 
-	//
-	// Process children recursively
-	if len(s.Children) > 0 {
-		for _, child := range s.Children {
-			childSpan, childSkipped, childErr := tb.toRunSpan(ctx, child)
-			if childErr != nil {
-				return nil, false, fmt.Errorf("error converting child span: %w", childErr)
-			}
-			if !childSkipped {
-				if res.Children == nil {
-					res.Children = []*rpbv2.RunSpan{}
-				}
-				res.Children = append(res.Children, childSpan)
-			}
+	// If we have child spans that are userland, we need to add them to the
+	// tree
+	for _, child := range s.UserlandChildren() {
+		userlandSpan, userlandSkipped, err := tb.toRunSpan(ctx, child)
+		if err != nil {
+			return nil, false, err
+		}
+		if !userlandSkipped {
+			res.Children = append(res.Children, userlandSpan)
 		}
 	}
 
@@ -393,6 +387,11 @@ func (tb *runTree) constructSpan(ctx context.Context, s *cqrs.Span) (*rpbv2.RunS
 		}
 	}
 
+	status := rpbv2.SpanStatus_RUNNING
+	if s.IsUserland() {
+		status = rpbv2.SpanStatus_COMPLETED
+	}
+
 	var stepID *string
 	if attrStepID, ok := s.SpanAttributes[consts.OtelSysStepID]; ok && attrStepID != "" {
 		stepID = &attrStepID
@@ -408,7 +407,7 @@ func (tb *runTree) constructSpan(ctx context.Context, s *cqrs.Span) (*rpbv2.RunS
 		ParentSpanId: s.ParentSpanID,
 		SpanId:       s.SpanID,
 		Name:         name,
-		Status:       rpbv2.SpanStatus_RUNNING,
+		Status:       status,
 		QueuedAt:     timestamppb.New(queuedAt),
 		StartedAt:    timestamppb.New(s.Timestamp),
 		EndedAt:      timestamppb.New(endedAt),
