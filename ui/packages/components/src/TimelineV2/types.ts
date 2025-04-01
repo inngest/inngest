@@ -12,6 +12,8 @@ export type Trace = {
   status: string;
   stepInfo: StepInfoInvoke | StepInfoSleep | StepInfoWait | StepInfoRun | null;
   stepOp?: string | null;
+  isUserland: boolean;
+  userlandAttrs?: string | null;
 };
 
 type StepInfoInvoke = {
