@@ -37,7 +37,7 @@ jobs:
       - name: Run E2E tests
         run: |
           cd ./tests/js
-          pnpm install
+          pnpm install --frozen-lockfile
           pnpm dev &
           sleep 5
           cd ../../
@@ -52,6 +52,7 @@ jobs:
           API_URL: http://127.0.0.1:8288
           SDK_URL: http://127.0.0.1:3000/api/inngest
           ENABLE_TEST_API: true
+
   golang:
     name: Go SDK Tests
     strategy:
