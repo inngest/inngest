@@ -12,7 +12,7 @@ export type Trace = {
   status: string;
   stepInfo: StepInfoInvoke | StepInfoSleep | StepInfoWait | StepInfoRun | null;
   stepOp?: string | null;
-  userlandAttrs?: string;
+  userlandAttrs?: string | null;
   isUserland: boolean;
 };
 
