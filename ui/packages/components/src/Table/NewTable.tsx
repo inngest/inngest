@@ -149,8 +149,7 @@ export default function Table<T>({
                     row.getIsExpanded() ? 'h-12' : 'border-light h-12 border-b',
                     onRowClick ? 'hover:bg-canvasSubtle cursor-pointer' : ''
                   )}
-                  onClick={(e) => {
-                    e.preventDefault();
+                  onClick={() => {
                     const modalsContainer = document.getElementById('modals');
                     const hasModals = modalsContainer && modalsContainer.children.length > 0;
                     if (!hasModals) {
