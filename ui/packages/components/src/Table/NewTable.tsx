@@ -151,7 +151,11 @@ export default function Table<T>({
                   )}
                   onClick={(e) => {
                     e.preventDefault();
-                    onRowClick?.(row);
+                    const modalsContainer = document.getElementById('modals');
+                    const hasModals = modalsContainer && modalsContainer.children.length > 0;
+                    if (!hasModals) {
+                      onRowClick?.(row);
+                    }
                   }}
                 >
                   {row.getVisibleCells().map((cell, i) => {

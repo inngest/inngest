@@ -14,12 +14,14 @@ import { RiArchive2Line, RiMoreFill, RiPlayLine } from '@remixicon/react';
 import { type Row } from '@tanstack/react-table';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
+import ArchiveEventModal from '../Events/ArchiveEventModal';
 import { SendEventModal } from '../Events/SendEventModal';
 
 export const ActionsMenu = (row: Row<EventType>) => {
   const { isArchived } = useEnvironment();
 
-  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [isSendEventModalVisible, setIsSendEventModalVisible] = useState(false);
+  const [isArchiveEventModalVisible, setIsArchiveEventModalVisible] = useState(false);
   return (
     <>
       <DropdownMenu>
@@ -27,39 +29,43 @@ export const ActionsMenu = (row: Row<EventType>) => {
           <Button kind="secondary" appearance="ghost" size="small" icon={<RiMoreFill />} />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          <OptionalTooltip tooltip={isArchived && 'Cannot send events. Environment is archived'}>
+          <OptionalTooltip tooltip={isArchived && 'Cannot send events. Environment is archived.'}>
             <DropdownMenuItem
               onClick={(e) => {
                 e.stopPropagation();
-                setIsModalVisible(true);
               }}
+              onSelect={() => setIsSendEventModalVisible(true)}
               disabled={isArchived}
             >
               <RiPlayLine className="h-4 w-4" />
               Send test event
             </DropdownMenuItem>
           </OptionalTooltip>
-
-          {/* TODO: implement onSelect action */}
-          <DropdownMenuItem
-            onSelect={(e) => {
-              e.preventDefault();
-            }}
-            className="text-error"
-          >
-            <RiArchive2Line className="h-4 w-4" />
-            {isArchived ? 'Unarchive event' : 'Archive event'}
-          </DropdownMenuItem>
+          <OptionalTooltip tooltip={row.original.archived && 'Send event to unarchive it.'}>
+            <DropdownMenuItem
+              onClick={(e) => {
+                e.stopPropagation();
+              }}
+              onSelect={() => setIsArchiveEventModalVisible(true)}
+              disabled={row.original.archived}
+              className="text-error"
+            >
+              <RiArchive2Line className="h-4 w-4" />
+              {row.original.archived ? 'Unarchive event' : 'Archive event'}
+            </DropdownMenuItem>
+          </OptionalTooltip>
         </DropdownMenuContent>
       </DropdownMenu>
 
       <SendEventModal
-        isOpen={isModalVisible}
+        isOpen={isSendEventModalVisible}
         eventName={row.original.name}
-        onClose={(e) => {
-          e?.stopPropagation();
-          setIsModalVisible(false);
-        }}
+        onClose={() => setIsSendEventModalVisible(false)}
+      />
+      <ArchiveEventModal
+        isOpen={isArchiveEventModalVisible}
+        eventName={row.original.name}
+        onClose={() => setIsArchiveEventModalVisible(false)}
       />
     </>
   );
