@@ -4,7 +4,6 @@ import { type EventType } from '@inngest/components/types/eventType';
 import { cn } from '@inngest/components/utils/classNames';
 import { createColumnHelper, type Row } from '@tanstack/react-table';
 
-import { ActionsMenu } from './ActionsMenu';
 import type { EventTypesTable } from './EventTypesTable';
 
 const columnHelper = createColumnHelper<EventType>();
@@ -22,8 +21,10 @@ function ensureColumnID(id: ColumnID): ColumnID {
 
 export function useColumns({
   pathCreator,
+  rowActions,
 }: {
   pathCreator: React.ComponentProps<typeof EventTypesTable>['pathCreator'];
+  rowActions: React.ComponentProps<typeof EventTypesTable>['rowActions'];
 }) {
   const columns = [
     columnHelper.accessor('name', {
@@ -92,7 +93,7 @@ export function useColumns({
       header: undefined, // Needed to enable the iconOnly styles in the table
       size: 20,
       cell: ({ row }: { row: Row<EventType> }) => {
-        return <ActionsMenu isArchived={row.original.archived} />;
+        return rowActions(row);
       },
     }),
   ];

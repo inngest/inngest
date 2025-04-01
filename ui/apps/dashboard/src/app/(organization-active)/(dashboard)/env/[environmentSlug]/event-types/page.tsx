@@ -7,6 +7,7 @@ import { EventTypesTable } from '@inngest/components/EventTypes/EventTypesTable'
 import { Header } from '@inngest/components/Header/Header';
 import { RiExternalLinkLine, RiRefreshLine } from '@remixicon/react';
 
+import { ActionsMenu } from '@/components/EventTypes/ActionsMenu';
 import { EventInfo } from '@/components/Events/EventInfo';
 import SendEventButton from '@/components/Events/SendEventButton';
 import { pathCreator } from '@/utils/urls';
@@ -39,6 +40,7 @@ export default function EventTypesPage({
       <EventTypesTable
         pathCreator={internalPathCreator}
         getEventTypes={fakeGetEventTypes}
+        rowActions={(props) => <ActionsMenu {...props} />}
         emptyActions={
           <>
             <Button

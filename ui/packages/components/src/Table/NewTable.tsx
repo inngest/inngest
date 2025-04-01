@@ -149,7 +149,10 @@ export default function Table<T>({
                     row.getIsExpanded() ? 'h-12' : 'border-light h-12 border-b',
                     onRowClick ? 'hover:bg-canvasSubtle cursor-pointer' : ''
                   )}
-                  onClick={() => onRowClick?.(row)}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    onRowClick?.(row);
+                  }}
                 >
                   {row.getVisibleCells().map((cell, i) => {
                     const isIconOnlyColumn = cell.column.columnDef.header === undefined;

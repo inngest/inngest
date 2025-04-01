@@ -37,7 +37,7 @@ const GetEventKeysDocument = graphql(/* GraphQL */ `
 type SendEventModalProps = {
   eventName?: string;
   isOpen: boolean;
-  onClose: () => void;
+  onClose: (e?: React.MouseEvent<HTMLButtonElement, MouseEvent>) => void;
 };
 
 type TabType = {
@@ -222,7 +222,7 @@ export function SendEventModal({
   ]);
 
   return (
-    <Modal className="max-w-6xl" isOpen={isOpen} onClose={onClose}>
+    <Modal className="max-w-6xl" isOpen={isOpen} onClose={() => onClose()}>
       <Modal.Body>
         <TabCards
           defaultValue="JSON Editor"

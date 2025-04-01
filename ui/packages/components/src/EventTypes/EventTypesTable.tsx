@@ -13,7 +13,7 @@ import {
   type PageInfo,
 } from '@inngest/components/types/eventType';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { type SortingState } from '@tanstack/react-table';
+import { type Row, type SortingState } from '@tanstack/react-table';
 
 import { useSearchParam } from '../hooks/useSearchParam';
 import EventTypesStatusFilter from './EventTypesStatusFilter';
@@ -25,8 +25,10 @@ export function EventTypesTable({
   getEventTypes,
   pathCreator,
   emptyActions,
+  rowActions,
 }: {
   emptyActions: React.ReactNode;
+  rowActions: (props: Row<EventType>) => React.ReactElement;
   pathCreator: {
     function: (params: { functionSlug: string }) => Route;
     eventType: (params: { eventName: string }) => Route;
@@ -43,7 +45,7 @@ export function EventTypesTable({
   }) => Promise<{ events: EventType[]; pageInfo: PageInfo; totalCount: number }>;
 }) {
   const router = useRouter();
-  const columns = useColumns({ pathCreator });
+  const columns = useColumns({ pathCreator, rowActions });
   const [sorting, setSorting] = useState<SortingState>([
     {
       id: 'name',
