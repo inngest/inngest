@@ -21,10 +21,10 @@ function ensureColumnID(id: ColumnID): ColumnID {
 
 export function useColumns({
   pathCreator,
-  rowActions,
+  eventTypeActions,
 }: {
   pathCreator: React.ComponentProps<typeof EventTypesTable>['pathCreator'];
-  rowActions: React.ComponentProps<typeof EventTypesTable>['rowActions'];
+  eventTypeActions: React.ComponentProps<typeof EventTypesTable>['eventTypeActions'];
 }) {
   const columns = [
     columnHelper.accessor('name', {
@@ -93,7 +93,7 @@ export function useColumns({
       header: undefined, // Needed to enable the iconOnly styles in the table
       size: 20,
       cell: ({ row }: { row: Row<EventType> }) => {
-        return rowActions(row);
+        return eventTypeActions(row);
       },
     }),
   ];

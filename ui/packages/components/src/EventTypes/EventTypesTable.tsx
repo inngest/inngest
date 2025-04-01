@@ -25,10 +25,10 @@ export function EventTypesTable({
   getEventTypes,
   pathCreator,
   emptyActions,
-  rowActions,
+  eventTypeActions,
 }: {
   emptyActions: React.ReactNode;
-  rowActions: (props: Row<EventType>) => React.ReactElement;
+  eventTypeActions: (props: Row<EventType>) => React.ReactElement;
   pathCreator: {
     function: (params: { functionSlug: string }) => Route;
     eventType: (params: { eventName: string }) => Route;
@@ -45,7 +45,7 @@ export function EventTypesTable({
   }) => Promise<{ events: EventType[]; pageInfo: PageInfo; totalCount: number }>;
 }) {
   const router = useRouter();
-  const columns = useColumns({ pathCreator, rowActions });
+  const columns = useColumns({ pathCreator, eventTypeActions });
   const [sorting, setSorting] = useState<SortingState>([
     {
       id: 'name',

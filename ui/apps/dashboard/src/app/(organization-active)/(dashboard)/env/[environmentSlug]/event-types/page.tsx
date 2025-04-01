@@ -40,7 +40,7 @@ export default function EventTypesPage({
       <EventTypesTable
         pathCreator={internalPathCreator}
         getEventTypes={fakeGetEventTypes}
-        rowActions={(props) => <ActionsMenu {...props} />}
+        eventTypeActions={(props) => <ActionsMenu {...props} />}
         emptyActions={
           <>
             <Button
