@@ -5,6 +5,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '../Tooltip';
 import { cn } from '../utils/classNames';
 import { toMaybeDate } from '../utils/date';
 import { Span } from './Span';
+import { UserlandSpan } from './UserlandSpan';
 import { formatDuration, getSpanName } from './utils';
 
 type Props = {
@@ -70,6 +71,9 @@ export function InlineSpans({ className, minTime, maxTime, name, spans, widths }
           {spans[0] && (
             <Times isDelayVisible={spans.length === 1} name={spanName} span={spans[0]} />
           )}
+          {spans[0] && spans[0].isUserland && spans[0].userlandAttrs && (
+            <UserlandSpan userlandAttrs={spans[0].userlandAttrs} />
+          )}
 
           {spans.length > 1 &&
             spans.map((span) => {
@@ -78,6 +82,9 @@ export function InlineSpans({ className, minTime, maxTime, name, spans, widths }
                   <hr className="my-2" />
                   <Times name={spanName} span={span} />
                   {span.spanID}
+                  {span.isUserland && span.userlandAttrs && (
+                    <UserlandSpan userlandAttrs={span.userlandAttrs} />
+                  )}
                 </Fragment>
               );
             })}

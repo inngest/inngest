@@ -177,25 +177,32 @@ func convertRunTreeToGQLModel(pb *rpbv2.RunSpan) (*models.RunTraceSpan, error) {
 
 	attempts := int(pb.GetAttempts())
 	duration := int(pb.GetDurationMs())
+	var userlandAttrs *string
+	if attrs := pb.GetUserlandAttrs(); len(attrs) > 0 {
+		s := string(attrs)
+		userlandAttrs = &s
+	}
 
 	span := &models.RunTraceSpan{
-		AppID:        uuid.MustParse(pb.GetAppId()),
-		FunctionID:   uuid.MustParse(pb.GetFunctionId()),
-		TraceID:      pb.GetTraceId(),
-		ParentSpanID: pb.ParentSpanId,
-		SpanID:       pb.GetSpanId(),
-		RunID:        ulid.MustParse(pb.GetRunId()),
-		IsRoot:       pb.GetIsRoot(),
-		Name:         pb.GetName(),
-		Status:       status,
-		Attempts:     &attempts,
-		Duration:     &duration,
-		QueuedAt:     pb.GetQueuedAt().AsTime(),
-		StartedAt:    startedAt,
-		EndedAt:      endedAt,
-		OutputID:     pb.OutputId,
-		StepOp:       stepOp,
-		StepID:       pb.StepId,
+		AppID:         uuid.MustParse(pb.GetAppId()),
+		FunctionID:    uuid.MustParse(pb.GetFunctionId()),
+		TraceID:       pb.GetTraceId(),
+		ParentSpanID:  pb.ParentSpanId,
+		SpanID:        pb.GetSpanId(),
+		RunID:         ulid.MustParse(pb.GetRunId()),
+		IsRoot:        pb.GetIsRoot(),
+		IsUserland:    pb.GetIsUserland(),
+		UserlandAttrs: userlandAttrs,
+		Name:          pb.GetName(),
+		Status:        status,
+		Attempts:      &attempts,
+		Duration:      &duration,
+		QueuedAt:      pb.GetQueuedAt().AsTime(),
+		StartedAt:     startedAt,
+		EndedAt:       endedAt,
+		OutputID:      pb.OutputId,
+		StepOp:        stepOp,
+		StepID:        pb.StepId,
 	}
 
 	if pb.GetStepInfo() != nil {

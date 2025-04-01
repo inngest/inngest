@@ -332,6 +332,7 @@ type ComplexityRoot struct {
 		EndedAt       func(childComplexity int) int
 		FunctionID    func(childComplexity int) int
 		IsRoot        func(childComplexity int) int
+		IsUserland    func(childComplexity int) int
 		Name          func(childComplexity int) int
 		OutputID      func(childComplexity int) int
 		ParentSpan    func(childComplexity int) int
@@ -346,6 +347,7 @@ type ComplexityRoot struct {
 		StepInfo      func(childComplexity int) int
 		StepOp        func(childComplexity int) int
 		TraceID       func(childComplexity int) int
+		UserlandAttrs func(childComplexity int) int
 	}
 
 	RunTraceSpanOutput struct {
@@ -1982,6 +1984,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.RunTraceSpan.IsRoot(childComplexity), true
 
+	case "RunTraceSpan.isUserland":
+		if e.complexity.RunTraceSpan.IsUserland == nil {
+			break
+		}
+
+		return e.complexity.RunTraceSpan.IsUserland(childComplexity), true
+
 	case "RunTraceSpan.name":
 		if e.complexity.RunTraceSpan.Name == nil {
 			break
@@ -2079,6 +2088,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.RunTraceSpan.TraceID(childComplexity), true
+
+	case "RunTraceSpan.userlandAttrs":
+		if e.complexity.RunTraceSpan.UserlandAttrs == nil {
+			break
+		}
+
+		return e.complexity.RunTraceSpan.UserlandAttrs(childComplexity), true
 
 	case "RunTraceSpanOutput.data":
 		if e.complexity.RunTraceSpanOutput.Data == nil {
@@ -2665,8 +2681,7 @@ type App {
   checksum: String
   error: String
   functions: [Function!]!
-
-	@deprecated(reason: "connectionType is deprecated. Use method instead.")
+    @deprecated(reason: "connectionType is deprecated. Use method instead.")
   connectionType: AppConnectionType!
 
   method: AppMethod!
@@ -3008,6 +3023,9 @@ type RunTraceSpan {
   isRoot: Boolean! # whether this span is the root span of the trace (shortcut for presence of rootspan)
   parentSpanID: String
   parentSpan: RunTraceSpan # the parent span of this span
+  isUserland: Boolean! # whether this span is a userland span
+  # raw JSON of userland attrs since they can be anything
+  userlandAttrs: Bytes
 }
 
 type RunTraceSpanOutput {
@@ -3073,7 +3091,7 @@ type ConnectV1WorkerConnection {
   instanceId: String!
   workerIp: String!
 
-	appName: String
+  appName: String
   appID: UUID
   app: App
 
@@ -3091,8 +3109,7 @@ type ConnectV1WorkerConnection {
   sdkVersion: String!
   sdkPlatform: String!
   syncId: UUID
-
-	@deprecated(reason: "buildId is deprecated. Use appVersion instead.")
+    @deprecated(reason: "buildId is deprecated. Use appVersion instead.")
   buildId: String
   appVersion: String
 
@@ -3115,19 +3132,20 @@ type ConnectV1WorkerConnectionEdge {
 }
 
 enum AppConnectionType {
-	SERVERLESS
-	CONNECT
+  SERVERLESS
+  CONNECT
 }
 
 enum AppMethod {
-	SERVE
-	CONNECT
+  SERVE
+  CONNECT
 }
 
 input AppsFilterV1 {
-	connectionType: AppConnectionType @deprecated(reason: "connectionType is deprecated. Use method instead.")
+  connectionType: AppConnectionType
+    @deprecated(reason: "connectionType is deprecated. Use method instead.")
 
-	method: AppMethod
+  method: AppMethod
 }
 `, BuiltIn: false},
 }
@@ -8541,6 +8559,10 @@ func (ec *executionContext) fieldContext_FunctionRunV2_trace(ctx context.Context
 				return ec.fieldContext_RunTraceSpan_parentSpanID(ctx, field)
 			case "parentSpan":
 				return ec.fieldContext_RunTraceSpan_parentSpan(ctx, field)
+			case "isUserland":
+				return ec.fieldContext_RunTraceSpan_isUserland(ctx, field)
+			case "userlandAttrs":
+				return ec.fieldContext_RunTraceSpan_userlandAttrs(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type RunTraceSpan", field.Name)
 		},
@@ -13629,6 +13651,10 @@ func (ec *executionContext) fieldContext_RunTraceSpan_childrenSpans(ctx context.
 				return ec.fieldContext_RunTraceSpan_parentSpanID(ctx, field)
 			case "parentSpan":
 				return ec.fieldContext_RunTraceSpan_parentSpan(ctx, field)
+			case "isUserland":
+				return ec.fieldContext_RunTraceSpan_isUserland(ctx, field)
+			case "userlandAttrs":
+				return ec.fieldContext_RunTraceSpan_userlandAttrs(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type RunTraceSpan", field.Name)
 		},
@@ -13922,8 +13948,97 @@ func (ec *executionContext) fieldContext_RunTraceSpan_parentSpan(ctx context.Con
 				return ec.fieldContext_RunTraceSpan_parentSpanID(ctx, field)
 			case "parentSpan":
 				return ec.fieldContext_RunTraceSpan_parentSpan(ctx, field)
+			case "isUserland":
+				return ec.fieldContext_RunTraceSpan_isUserland(ctx, field)
+			case "userlandAttrs":
+				return ec.fieldContext_RunTraceSpan_userlandAttrs(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type RunTraceSpan", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RunTraceSpan_isUserland(ctx context.Context, field graphql.CollectedField, obj *models.RunTraceSpan) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RunTraceSpan_isUserland(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.IsUserland, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(bool)
+	fc.Result = res
+	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RunTraceSpan_isUserland(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RunTraceSpan",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RunTraceSpan_userlandAttrs(ctx context.Context, field graphql.CollectedField, obj *models.RunTraceSpan) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RunTraceSpan_userlandAttrs(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.UserlandAttrs, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOBytes2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RunTraceSpan_userlandAttrs(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RunTraceSpan",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Bytes does not have child fields")
 		},
 	}
 	return fc, nil
@@ -20509,6 +20624,17 @@ func (ec *executionContext) _RunTraceSpan(ctx context.Context, sel ast.Selection
 		case "parentSpan":
 
 			out.Values[i] = ec._RunTraceSpan_parentSpan(ctx, field, obj)
+
+		case "isUserland":
+
+			out.Values[i] = ec._RunTraceSpan_isUserland(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "userlandAttrs":
+
+			out.Values[i] = ec._RunTraceSpan_userlandAttrs(ctx, field, obj)
 
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))

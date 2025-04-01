@@ -14,6 +14,8 @@ type Props = {
     spanID: string;
     startedAt: string | null;
     status: string;
+    userlandAttrs?: string;
+    isUserland: boolean;
   };
 };
 

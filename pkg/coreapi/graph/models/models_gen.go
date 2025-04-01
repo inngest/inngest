@@ -246,6 +246,8 @@ type RunTraceSpan struct {
 	IsRoot        bool               `json:"isRoot"`
 	ParentSpanID  *string            `json:"parentSpanID,omitempty"`
 	ParentSpan    *RunTraceSpan      `json:"parentSpan,omitempty"`
+	IsUserland    bool               `json:"isUserland"`
+	UserlandAttrs *string            `json:"userlandAttrs,omitempty"`
 }
 
 type RunTraceSpanOutput struct {

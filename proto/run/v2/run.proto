@@ -32,6 +32,8 @@ message RunSpan {
 
   repeated RunSpan children = 20;
   optional string step_id = 21;
+  bool is_userland = 22;
+  optional bytes userland_attrs = 23;
 }
 
 enum SpanStatus {

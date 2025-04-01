@@ -362,6 +362,8 @@ export const TRACE_DETAILS_FRAGMENT = gql`
     startedAt
     endedAt
     isRoot
+    isUserland
+    userlandAttrs
     outputID
     spanID
     stepID
