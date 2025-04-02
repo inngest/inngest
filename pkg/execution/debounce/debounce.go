@@ -200,7 +200,7 @@ type debouncer struct {
 
 func (d debouncer) usePrimary(shouldMigrate bool) bool {
 	// Use primary cluster, if no secondary cluster is configured
-	if d.secondaryDebounceClient == nil {
+	if d.secondaryDebounceClient == nil || d.secondaryQueueManager == nil || d.secondaryQueueShard.Name == "" {
 		return true
 	}
 
