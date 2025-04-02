@@ -359,7 +359,7 @@ func (s *svc) handleDebounce(ctx context.Context, item queue.Item) error {
 
 	for _, f := range all {
 		if f.ID == d.FunctionID {
-			di, err := s.debouncer.GetDebounceItem(ctx, d.DebounceID)
+			di, err := s.debouncer.GetDebounceItem(ctx, d.DebounceID, d.AccountID)
 			if err != nil {
 				if errors.Is(err, debounce.ErrDebounceNotFound) {
 					// This is expected after migrating items to a new primary cluster
@@ -402,7 +402,7 @@ func (s *svc) handleDebounce(ctx context.Context, item queue.Item) error {
 			if err != nil {
 				return err
 			}
-			_ = s.debouncer.DeleteDebounceItem(ctx, d.DebounceID)
+			_ = s.debouncer.DeleteDebounceItem(ctx, d.DebounceID, d.AccountID)
 		}
 	}
 

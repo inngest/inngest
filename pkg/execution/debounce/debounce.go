@@ -133,8 +133,8 @@ type DebounceMigrator interface {
 // until a specific time period passes when no more events matching a key are received.
 type Debouncer interface {
 	Debounce(ctx context.Context, d DebounceItem, fn inngest.Function) error
-	GetDebounceItem(ctx context.Context, debounceID ulid.ULID) (*DebounceItem, error)
-	DeleteDebounceItem(ctx context.Context, debounceID ulid.ULID) error
+	GetDebounceItem(ctx context.Context, debounceID ulid.ULID, accountID uuid.UUID) (*DebounceItem, error)
+	DeleteDebounceItem(ctx context.Context, debounceID ulid.ULID, accountID uuid.UUID) error
 	StartExecution(ctx context.Context, d DebounceItem, fn inngest.Function, debounceID ulid.ULID) error
 }
 
@@ -144,7 +144,7 @@ func NewRedisDebouncer(primaryDebounceClient *redis_state.DebounceClient, primar
 		primaryDebounceClient: primaryDebounceClient,
 		primaryQueueManager:   primaryQueueManager,
 		primaryQueueShard:     primaryQueueShard,
-		shouldMigrate: func(ctx context.Context) bool {
+		shouldMigrate: func(ctx context.Context, accountID uuid.UUID) bool {
 			return false
 		},
 	}
@@ -161,7 +161,7 @@ type DebouncerOpts struct {
 	SecondaryQueue          redis_state.QueueManager
 	SecondaryQueueShard     redis_state.QueueShard
 
-	ShouldMigrate func(ctx context.Context) bool
+	ShouldMigrate func(ctx context.Context, accountID uuid.UUID) bool
 }
 
 func NewRedisDebouncerWithMigration(o DebouncerOpts) Debouncer {
@@ -195,7 +195,7 @@ type debouncer struct {
 	secondaryQueueShard     redis_state.QueueShard
 
 	// shouldMigrate determines if old debounces should be migrated to new cluster on the fly
-	shouldMigrate func(ctx context.Context) bool
+	shouldMigrate func(ctx context.Context, accountID uuid.UUID) bool
 }
 
 func (d debouncer) usePrimary(shouldMigrate bool) bool {
@@ -238,8 +238,8 @@ func (d debouncer) queueManager(shouldMigrate bool) redis_state.QueueManager {
 }
 
 // DeleteDebounceItem removes a debounce from the map.
-func (d debouncer) DeleteDebounceItem(ctx context.Context, debounceID ulid.ULID) error {
-	shouldMigrate := d.shouldMigrate(ctx)
+func (d debouncer) DeleteDebounceItem(ctx context.Context, debounceID ulid.ULID, accountID uuid.UUID) error {
+	shouldMigrate := d.shouldMigrate(ctx, accountID)
 
 	client := d.client(shouldMigrate)
 
@@ -260,8 +260,8 @@ func (d debouncer) deleteDebounceItem(ctx context.Context, debounceID ulid.ULID,
 }
 
 // GetDebounceItem returns a DebounceItem given a debounce ID.
-func (d debouncer) GetDebounceItem(ctx context.Context, debounceID ulid.ULID) (*DebounceItem, error) {
-	client := d.client(d.shouldMigrate(ctx))
+func (d debouncer) GetDebounceItem(ctx context.Context, debounceID ulid.ULID, accountID uuid.UUID) (*DebounceItem, error) {
+	client := d.client(d.shouldMigrate(ctx, accountID))
 
 	keyDbc := client.KeyGenerator().Debounce(ctx)
 
@@ -287,7 +287,7 @@ func (d debouncer) StartExecution(ctx context.Context, di DebounceItem, fn innge
 
 	newDebounceID := ulid.MustNew(ulid.Now(), rand.Reader)
 
-	client := d.client(d.shouldMigrate(ctx))
+	client := d.client(d.shouldMigrate(ctx, di.AccountID))
 
 	keys := []string{client.KeyGenerator().DebouncePointer(ctx, fn.ID, dkey)}
 	args := []string{
@@ -319,7 +319,7 @@ func (d debouncer) Migrate(ctx context.Context, debounceId ulid.ULID, di Debounc
 		return fmt.Errorf("fn has no debounce config")
 	}
 
-	shouldMigrate := d.shouldMigrate(ctx)
+	shouldMigrate := d.shouldMigrate(ctx, di.AccountID)
 	if !shouldMigrate {
 		return fmt.Errorf("expected migration mode to be enable")
 	}
@@ -337,7 +337,7 @@ func (d debouncer) Debounce(ctx context.Context, di DebounceItem, fn inngest.Fun
 		return fmt.Errorf("invalid debounce duration: %w", err)
 	}
 
-	shouldMigrate := d.shouldMigrate(ctx)
+	shouldMigrate := d.shouldMigrate(ctx, di.AccountID)
 
 	return d.debounce(ctx, di, fn, ttl, 0, shouldMigrate)
 }
