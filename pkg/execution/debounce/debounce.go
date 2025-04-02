@@ -164,7 +164,11 @@ type DebouncerOpts struct {
 	ShouldMigrate func(ctx context.Context, accountID uuid.UUID) bool
 }
 
-func NewRedisDebouncerWithMigration(o DebouncerOpts) Debouncer {
+func NewRedisDebouncerWithMigration(o DebouncerOpts) (Debouncer, error) {
+	if o.PrimaryQueue == nil || o.PrimaryQueueShard.Name == "" || o.PrimaryDebounceClient == nil {
+		return nil, fmt.Errorf("missing primary")
+	}
+
 	return debouncer{
 		c: clockwork.NewRealClock(),
 
@@ -179,7 +183,7 @@ func NewRedisDebouncerWithMigration(o DebouncerOpts) Debouncer {
 		secondaryQueueShard:     o.SecondaryQueueShard,
 
 		shouldMigrate: o.ShouldMigrate,
-	}
+	}, nil
 }
 
 type debouncer struct {
@@ -199,12 +203,13 @@ type debouncer struct {
 }
 
 func (d debouncer) usePrimary(shouldMigrate bool) bool {
-	// Use primary cluster, if no secondary cluster is configured
+	// Use primary cluster, if no secondary cluster is configured. This is set
+	// before the migration started or after the migration is completed.
+	// As soon as both (new) primary and (current) secondary are provided, we must
+	// only use the primary if we're actively migrating.
 	if d.secondaryDebounceClient == nil || d.secondaryQueueManager == nil || d.secondaryQueueShard.Name == "" {
 		return true
 	}
-
-	// Secondary cluster is configured
 
 	// If migrate feature flag is enabled, use primary
 	if shouldMigrate {
@@ -242,6 +247,9 @@ func (d debouncer) DeleteDebounceItem(ctx context.Context, debounceID ulid.ULID,
 	shouldMigrate := d.shouldMigrate(ctx, accountID)
 
 	client := d.client(shouldMigrate)
+	if client == nil {
+		return fmt.Errorf("client did not return DebounceClient")
+	}
 
 	return d.deleteDebounceItem(ctx, debounceID, client)
 }
@@ -262,6 +270,9 @@ func (d debouncer) deleteDebounceItem(ctx context.Context, debounceID ulid.ULID,
 // GetDebounceItem returns a DebounceItem given a debounce ID.
 func (d debouncer) GetDebounceItem(ctx context.Context, debounceID ulid.ULID, accountID uuid.UUID) (*DebounceItem, error) {
 	client := d.client(d.shouldMigrate(ctx, accountID))
+	if client == nil {
+		return nil, fmt.Errorf("client did not return DebounceClient")
+	}
 
 	keyDbc := client.KeyGenerator().Debounce(ctx)
 
@@ -288,6 +299,9 @@ func (d debouncer) StartExecution(ctx context.Context, di DebounceItem, fn innge
 	newDebounceID := ulid.MustNew(ulid.Now(), rand.Reader)
 
 	client := d.client(d.shouldMigrate(ctx, di.AccountID))
+	if client == nil {
+		return fmt.Errorf("client did not return DebounceClient")
+	}
 
 	keys := []string{client.KeyGenerator().DebouncePointer(ctx, fn.ID, dkey)}
 	args := []string{
@@ -504,6 +518,9 @@ func (d debouncer) newDebounce(ctx context.Context, di DebounceItem, fn inngest.
 	}
 
 	client := d.client(shouldMigrate)
+	if client == nil {
+		return nil, fmt.Errorf("client did not return DebounceClient")
+	}
 
 	keyPtr := client.KeyGenerator().DebouncePointer(ctx, fn.ID, key)
 	keyDbc := client.KeyGenerator().Debounce(ctx)
@@ -531,6 +548,9 @@ func (d debouncer) newDebounce(ctx context.Context, di DebounceItem, fn inngest.
 		qi := d.queueItem(ctx, di, newDebounceID)
 
 		queueManager := d.queueManager(shouldMigrate)
+		if queueManager == nil {
+			return nil, fmt.Errorf("queueManager did not return QueueManager")
+		}
 
 		err = queueManager.Enqueue(ctx, qi, now.Add(ttl).Add(buffer).Add(time.Second), queue.EnqueueOpts{})
 		if err != nil {
@@ -634,8 +654,19 @@ func (d debouncer) updateDebounce(ctx context.Context, di DebounceItem, fn innge
 	defer cancel()
 
 	client := d.client(shouldMigrate)
+	if client == nil {
+		return fmt.Errorf("client did not return DebounceClient")
+	}
+
 	queueManager := d.queueManager(shouldMigrate)
+	if queueManager == nil {
+		return fmt.Errorf("queueManager did not return QueueManager")
+	}
+
 	queueShard := d.queueShard(shouldMigrate)
+	if queueShard.Name == "" {
+		return fmt.Errorf("queueShard did not return QueueShard")
+	}
 
 	keyPtr := client.KeyGenerator().DebouncePointer(ctx, fn.ID, key)
 	keyDbc := client.KeyGenerator().Debounce(ctx)

@@ -336,7 +336,7 @@ func TestJITDebounceMigration(t *testing.T) {
 	oldRedisDebouncer := NewRedisDebouncer(unshardedDebounceClient, defaultQueueShard, oldQueue).(debouncer)
 	oldRedisDebouncer.c = fakeClock
 
-	newRedisDebouncer := NewRedisDebouncerWithMigration(DebouncerOpts{
+	deb, err := NewRedisDebouncerWithMigration(DebouncerOpts{
 		PrimaryDebounceClient: newSystemDebounceClient,
 		PrimaryQueue:          newQueue,
 		PrimaryQueueShard:     newSystemShard,
@@ -348,7 +348,9 @@ func TestJITDebounceMigration(t *testing.T) {
 		ShouldMigrate: func(ctx context.Context, accountID uuid.UUID) bool {
 			return true
 		},
-	}).(debouncer)
+	})
+	require.NoError(t, err)
+	newRedisDebouncer := deb.(debouncer)
 	newRedisDebouncer.c = fakeClock
 
 	ctx := context.Background()
@@ -607,7 +609,7 @@ func TestDebounceMigrationWithoutTimeout(t *testing.T) {
 	oldRedisDebouncer := NewRedisDebouncer(unshardedDebounceClient, defaultQueueShard, oldQueue).(debouncer)
 	oldRedisDebouncer.c = fakeClock
 
-	newRedisDebouncer := NewRedisDebouncerWithMigration(DebouncerOpts{
+	deb, err := NewRedisDebouncerWithMigration(DebouncerOpts{
 		PrimaryDebounceClient: newSystemDebounceClient,
 		PrimaryQueue:          newQueue,
 		PrimaryQueueShard:     newSystemShard,
@@ -619,7 +621,9 @@ func TestDebounceMigrationWithoutTimeout(t *testing.T) {
 		ShouldMigrate: func(ctx context.Context, accountID uuid.UUID) bool {
 			return true
 		},
-	}).(debouncer)
+	})
+	require.NoError(t, err)
+	newRedisDebouncer := deb.(debouncer)
 	newRedisDebouncer.c = fakeClock
 
 	ctx := context.Background()
@@ -859,7 +863,7 @@ func TestDebounceTimeoutIsPreserved(t *testing.T) {
 	oldRedisDebouncer := NewRedisDebouncer(unshardedDebounceClient, defaultQueueShard, oldQueue).(debouncer)
 	oldRedisDebouncer.c = fakeClock
 
-	newRedisDebouncer := NewRedisDebouncerWithMigration(DebouncerOpts{
+	deb, err := NewRedisDebouncerWithMigration(DebouncerOpts{
 		PrimaryDebounceClient: newSystemDebounceClient,
 		PrimaryQueue:          newQueue,
 		PrimaryQueueShard:     newSystemShard,
@@ -871,7 +875,9 @@ func TestDebounceTimeoutIsPreserved(t *testing.T) {
 		ShouldMigrate: func(ctx context.Context, accountID uuid.UUID) bool {
 			return true
 		},
-	}).(debouncer)
+	})
+	require.NoError(t, err)
+	newRedisDebouncer := deb.(debouncer)
 	newRedisDebouncer.c = fakeClock
 
 	ctx := context.Background()
@@ -1075,7 +1081,7 @@ func TestDebounceExplicitMigration(t *testing.T) {
 	oldRedisDebouncer := NewRedisDebouncer(unshardedDebounceClient, defaultQueueShard, oldQueue).(debouncer)
 	oldRedisDebouncer.c = fakeClock
 
-	newRedisDebouncer := NewRedisDebouncerWithMigration(DebouncerOpts{
+	deb, err := NewRedisDebouncerWithMigration(DebouncerOpts{
 		PrimaryDebounceClient: newSystemDebounceClient,
 		PrimaryQueue:          newQueue,
 		PrimaryQueueShard:     newSystemShard,
@@ -1087,7 +1093,9 @@ func TestDebounceExplicitMigration(t *testing.T) {
 		ShouldMigrate: func(ctx context.Context, accountID uuid.UUID) bool {
 			return true
 		},
-	}).(debouncer)
+	})
+	require.NoError(t, err)
+	newRedisDebouncer := deb.(debouncer)
 	newRedisDebouncer.c = fakeClock
 
 	ctx := context.Background()
