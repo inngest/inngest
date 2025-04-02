@@ -1,6 +1,7 @@
 import { getStatusBackgroundClass, getStatusBorderClass } from '../Status/statusClasses';
 import { cn } from '../utils/classNames';
 import { toMaybeDate } from '../utils/date';
+import type { Trace } from './types';
 import { createSpanWidths } from './utils';
 
 type Props = {
@@ -8,18 +9,10 @@ type Props = {
   isInline?: boolean;
   maxTime: Date;
   minTime: Date;
-  trace: {
-    endedAt: string | null;
-    queuedAt: string;
-    spanID: string;
-    startedAt: string | null;
-    status: string;
-    userlandAttrs?: string | null;
-    isUserland: boolean;
-  };
+  span: Trace;
 };
 
-export function Span({ className, isInline, maxTime, minTime, trace }: Props) {
+export function Span({ className, isInline, maxTime, minTime, span: trace }: Props) {
   const widths = createSpanWidths({
     ended: toMaybeDate(trace.endedAt)?.getTime() ?? null,
     max: maxTime.getTime(),
@@ -43,14 +36,14 @@ export function Span({ className, isInline, maxTime, minTime, trace }: Props) {
       }}
     >
       {/* Gray line to the left of the span */}
-      <div className="bg-contrast h-px" style={{ flexGrow: widths.before }}></div>
+      <div className="bg-contrast h-px" style={{ flexGrow: widths.before }} />
 
       {/* Queued part of the span */}
       {widths.queued > 0 && (
         <div
           className="bg-surfaceSubtle dark:bg-surfaceMuted h-1"
           style={{ flexGrow: widths.queued }}
-        ></div>
+        />
       )}
 
       {/* Running part of the span */}
@@ -58,11 +51,11 @@ export function Span({ className, isInline, maxTime, minTime, trace }: Props) {
         <div
           className={cn(
             'z-0 h-5 rounded-sm transition-shadow',
-            getStatusBackgroundClass(trace.status),
-            getStatusBorderClass(trace.status)
+            trace.isUserland ? 'bg-accent-intense' : getStatusBackgroundClass(trace.status),
+            trace.isUserland ? 'border-accent-intense' : getStatusBorderClass(trace.status)
           )}
           style={{ flexGrow: widths.running }}
-        ></div>
+        />
       )}
 
       {/* Gray line to the right of the span */}
