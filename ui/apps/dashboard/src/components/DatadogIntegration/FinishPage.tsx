@@ -5,8 +5,6 @@ import { useSearchParams } from 'next/navigation';
 import { useMutation } from 'urql';
 
 import ConnectingView from '@/components/DatadogIntegration/ConnectingView';
-import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
-import IntegrationNotEnabledMessage from '@/components/Integration/IntegrationNotEnabledMessage';
 import { graphql } from '@/gql';
 
 const FinishDatadogIntegrationDocument = graphql(`
@@ -31,7 +29,6 @@ const FinishDatadogIntegrationDocument = graphql(`
 
 export default function FinishPage({}) {
   const [{ data, error }, finishDdInt] = useMutation(FinishDatadogIntegrationDocument);
-  const { value: ddIntFlagEnabled } = useBooleanFlag('datadog-integration');
   const searchParams = useSearchParams();
   const ddSite = searchParams.get('site');
   const ddDomain = searchParams.get('domain');
@@ -40,7 +37,7 @@ export default function FinishPage({}) {
   const orgName = searchParams.get('dd_org_name');
 
   useEffect(() => {
-    if (!ddSite || !ddDomain || !ddIntFlagEnabled || !authCode || !orgID || !orgName) {
+    if (!ddSite || !ddDomain || !authCode || !orgID || !orgName) {
       return;
     }
 
@@ -51,11 +48,7 @@ export default function FinishPage({}) {
       ddSite: ddSite,
       ddDomain: ddDomain,
     });
-  }, [finishDdInt, orgID, orgName, authCode, ddSite, ddDomain, ddIntFlagEnabled]);
-
-  if (!ddIntFlagEnabled) {
-    return <IntegrationNotEnabledMessage integrationName="Datadog" />;
-  }
+  }, [finishDdInt, orgID, orgName, authCode, ddSite, ddDomain]);
 
   if (data) {
     window.location.href = '/settings/integrations/datadog';
