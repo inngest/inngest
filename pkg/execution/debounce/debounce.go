@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/jonboulle/clockwork"
 	"io/fs"
 	"regexp"
@@ -26,6 +27,10 @@ import (
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 	"github.com/xhit/go-str2duration/v2"
+)
+
+const (
+	pkgName = "execution.debounce"
 )
 
 //go:embed lua/*
@@ -133,8 +138,8 @@ type DebounceMigrator interface {
 // until a specific time period passes when no more events matching a key are received.
 type Debouncer interface {
 	Debounce(ctx context.Context, d DebounceItem, fn inngest.Function) error
-	GetDebounceItem(ctx context.Context, debounceID ulid.ULID) (*DebounceItem, error)
-	DeleteDebounceItem(ctx context.Context, debounceID ulid.ULID) error
+	GetDebounceItem(ctx context.Context, debounceID ulid.ULID, accountID uuid.UUID) (*DebounceItem, error)
+	DeleteDebounceItem(ctx context.Context, debounceID ulid.ULID, accountID uuid.UUID) error
 	StartExecution(ctx context.Context, d DebounceItem, fn inngest.Function, debounceID ulid.ULID) error
 }
 
@@ -144,7 +149,7 @@ func NewRedisDebouncer(primaryDebounceClient *redis_state.DebounceClient, primar
 		primaryDebounceClient: primaryDebounceClient,
 		primaryQueueManager:   primaryQueueManager,
 		primaryQueueShard:     primaryQueueShard,
-		shouldMigrate: func(ctx context.Context) bool {
+		shouldMigrate: func(ctx context.Context, accountID uuid.UUID) bool {
 			return false
 		},
 	}
@@ -161,10 +166,14 @@ type DebouncerOpts struct {
 	SecondaryQueue          redis_state.QueueManager
 	SecondaryQueueShard     redis_state.QueueShard
 
-	ShouldMigrate func(ctx context.Context) bool
+	ShouldMigrate func(ctx context.Context, accountID uuid.UUID) bool
 }
 
-func NewRedisDebouncerWithMigration(o DebouncerOpts) Debouncer {
+func NewRedisDebouncerWithMigration(o DebouncerOpts) (Debouncer, error) {
+	if o.PrimaryQueue == nil || o.PrimaryQueueShard.Name == "" || o.PrimaryDebounceClient == nil {
+		return nil, fmt.Errorf("missing primary")
+	}
+
 	return debouncer{
 		c: clockwork.NewRealClock(),
 
@@ -179,7 +188,7 @@ func NewRedisDebouncerWithMigration(o DebouncerOpts) Debouncer {
 		secondaryQueueShard:     o.SecondaryQueueShard,
 
 		shouldMigrate: o.ShouldMigrate,
-	}
+	}, nil
 }
 
 type debouncer struct {
@@ -195,16 +204,17 @@ type debouncer struct {
 	secondaryQueueShard     redis_state.QueueShard
 
 	// shouldMigrate determines if old debounces should be migrated to new cluster on the fly
-	shouldMigrate func(ctx context.Context) bool
+	shouldMigrate func(ctx context.Context, accountID uuid.UUID) bool
 }
 
 func (d debouncer) usePrimary(shouldMigrate bool) bool {
-	// Use primary cluster, if no secondary cluster is configured
-	if d.secondaryDebounceClient == nil {
+	// Use primary cluster, if no secondary cluster is configured. This is set
+	// before the migration started or after the migration is completed.
+	// As soon as both (new) primary and (current) secondary are provided, we must
+	// only use the primary if we're actively migrating.
+	if d.secondaryDebounceClient == nil || d.secondaryQueueManager == nil || d.secondaryQueueShard.Name == "" {
 		return true
 	}
-
-	// Secondary cluster is configured
 
 	// If migrate feature flag is enabled, use primary
 	if shouldMigrate {
@@ -238,12 +248,40 @@ func (d debouncer) queueManager(shouldMigrate bool) redis_state.QueueManager {
 }
 
 // DeleteDebounceItem removes a debounce from the map.
-func (d debouncer) DeleteDebounceItem(ctx context.Context, debounceID ulid.ULID) error {
-	shouldMigrate := d.shouldMigrate(ctx)
+func (d debouncer) DeleteDebounceItem(ctx context.Context, debounceID ulid.ULID, accountID uuid.UUID) error {
+	// Determine the flag value once and pass down to prevent inconsistent values mid-deletion
+	shouldMigrate := d.shouldMigrate(ctx, accountID)
 
 	client := d.client(shouldMigrate)
+	if client == nil {
+		return fmt.Errorf("client did not return DebounceClient")
+	}
 
-	return d.deleteDebounceItem(ctx, debounceID, client)
+	queueShard := d.queueShard(shouldMigrate)
+	if queueShard.Name == "" {
+		return fmt.Errorf("queueShard did not return QueueShard")
+	}
+
+	success := "false"
+	defer func() {
+		metrics.IncrQueueDebounceOperationCounter(ctx, metrics.CounterOpt{
+			PkgName: pkgName,
+			Tags: map[string]any{
+				"op":          "deleted",
+				"queue_shard": queueShard.Name,
+				"success":     success,
+			},
+		})
+	}()
+
+	err := d.deleteDebounceItem(ctx, debounceID, client)
+	if err != nil {
+		return fmt.Errorf("could not delete debounce item: %w", err)
+	}
+
+	success = "true"
+
+	return nil
 }
 
 func (d debouncer) deleteDebounceItem(ctx context.Context, debounceID ulid.ULID, client *redis_state.DebounceClient) error {
@@ -256,12 +294,17 @@ func (d debouncer) deleteDebounceItem(ctx context.Context, debounceID ulid.ULID,
 	if err != nil {
 		return fmt.Errorf("error removing debounce: %w", err)
 	}
+
 	return nil
 }
 
 // GetDebounceItem returns a DebounceItem given a debounce ID.
-func (d debouncer) GetDebounceItem(ctx context.Context, debounceID ulid.ULID) (*DebounceItem, error) {
-	client := d.client(d.shouldMigrate(ctx))
+func (d debouncer) GetDebounceItem(ctx context.Context, debounceID ulid.ULID, accountID uuid.UUID) (*DebounceItem, error) {
+	// Determine the flag value once and pass down to prevent inconsistent values mid-retrieval
+	client := d.client(d.shouldMigrate(ctx, accountID))
+	if client == nil {
+		return nil, fmt.Errorf("client did not return DebounceClient")
+	}
 
 	keyDbc := client.KeyGenerator().Debounce(ctx)
 
@@ -287,7 +330,18 @@ func (d debouncer) StartExecution(ctx context.Context, di DebounceItem, fn innge
 
 	newDebounceID := ulid.MustNew(ulid.Now(), rand.Reader)
 
-	client := d.client(d.shouldMigrate(ctx))
+	// Determine the flag value once and pass down to prevent inconsistent values mid-execution
+	shouldMigrate := d.shouldMigrate(ctx, di.AccountID)
+
+	client := d.client(shouldMigrate)
+	if client == nil {
+		return fmt.Errorf("client did not return DebounceClient")
+	}
+
+	queueShard := d.queueShard(shouldMigrate)
+	if queueShard.Name == "" {
+		return fmt.Errorf("queueShard did not return QueueShard")
+	}
 
 	keys := []string{client.KeyGenerator().DebouncePointer(ctx, fn.ID, dkey)}
 	args := []string{
@@ -307,6 +361,14 @@ func (d debouncer) StartExecution(ctx context.Context, di DebounceItem, fn innge
 
 	switch res {
 	case 0, 1:
+		metrics.IncrQueueDebounceOperationCounter(ctx, metrics.CounterOpt{
+			PkgName: pkgName,
+			Tags: map[string]any{
+				"op":          "started",
+				"queue_shard": queueShard.Name,
+			},
+		})
+
 		return nil
 	default:
 		return fmt.Errorf("invalid status returned when starting debounce: %d", res)
@@ -319,7 +381,8 @@ func (d debouncer) Migrate(ctx context.Context, debounceId ulid.ULID, di Debounc
 		return fmt.Errorf("fn has no debounce config")
 	}
 
-	shouldMigrate := d.shouldMigrate(ctx)
+	// Determine the flag value once and pass down to prevent inconsistent values mid-migration
+	shouldMigrate := d.shouldMigrate(ctx, di.AccountID)
 	if !shouldMigrate {
 		return fmt.Errorf("expected migration mode to be enable")
 	}
@@ -337,7 +400,8 @@ func (d debouncer) Debounce(ctx context.Context, di DebounceItem, fn inngest.Fun
 		return fmt.Errorf("invalid debounce duration: %w", err)
 	}
 
-	shouldMigrate := d.shouldMigrate(ctx)
+	// Determine the flag value once and pass down to prevent inconsistent values while debouncing
+	shouldMigrate := d.shouldMigrate(ctx, di.AccountID)
 
 	return d.debounce(ctx, di, fn, ttl, 0, shouldMigrate)
 }
@@ -369,6 +433,10 @@ func (d debouncer) debounce(ctx context.Context, di DebounceItem, fn inngest.Fun
 	// - We must carry over the previous timeout to ensure debounces don't run longer than intended.
 	//
 	if shouldMigrate {
+		if d.secondaryQueueShard.Name == "" || d.secondaryQueueManager == nil || d.secondaryDebounceClient == nil {
+			return fmt.Errorf("missing secondary configuration")
+		}
+
 		debounceID, debounceTimeout, err := d.prepareMigration(ctx, di, fn)
 		if err != nil {
 			return fmt.Errorf("could not prepare debounce migration: %w", err)
@@ -408,6 +476,14 @@ func (d debouncer) debounce(ctx context.Context, di DebounceItem, fn inngest.Fun
 			} else {
 				l.Debug("deleted migrated debounce")
 			}
+
+			metrics.IncrQueueDebounceOperationCounter(ctx, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags: map[string]any{
+					"op":          "migration_prepared",
+					"queue_shard": d.secondaryQueueShard.Name,
+				},
+			})
 		}
 	}
 
@@ -504,6 +580,9 @@ func (d debouncer) newDebounce(ctx context.Context, di DebounceItem, fn inngest.
 	}
 
 	client := d.client(shouldMigrate)
+	if client == nil {
+		return nil, fmt.Errorf("client did not return DebounceClient")
+	}
 
 	keyPtr := client.KeyGenerator().DebouncePointer(ctx, fn.ID, key)
 	keyDbc := client.KeyGenerator().Debounce(ctx)
@@ -531,11 +610,31 @@ func (d debouncer) newDebounce(ctx context.Context, di DebounceItem, fn inngest.
 		qi := d.queueItem(ctx, di, newDebounceID)
 
 		queueManager := d.queueManager(shouldMigrate)
+		if queueManager == nil {
+			return nil, fmt.Errorf("queueManager did not return QueueManager")
+		}
 
-		err = queueManager.Enqueue(ctx, qi, now.Add(ttl).Add(buffer).Add(time.Second), queue.EnqueueOpts{})
+		queueShard := d.queueShard(shouldMigrate)
+		if queueShard.Name == "" {
+			return nil, fmt.Errorf("queueShard did not return QueueShard")
+		}
+
+		err = queueManager.Enqueue(ctx, qi, now.Add(ttl).Add(buffer).Add(time.Second), queue.EnqueueOpts{
+			// Debounce timeout items must live on the same Redis instance as the state.
+			ForceQueueShardName: queueShard.Name,
+		})
 		if err != nil {
 			return &newDebounceID, fmt.Errorf("error enqueueing debounce job: %w", err)
 		}
+
+		metrics.IncrQueueDebounceOperationCounter(ctx, metrics.CounterOpt{
+			PkgName: pkgName,
+			Tags: map[string]any{
+				"op":          "created",
+				"queue_shard": queueShard.Name,
+			},
+		})
+
 		return &newDebounceID, nil
 	}
 
@@ -634,8 +733,19 @@ func (d debouncer) updateDebounce(ctx context.Context, di DebounceItem, fn innge
 	defer cancel()
 
 	client := d.client(shouldMigrate)
+	if client == nil {
+		return fmt.Errorf("client did not return DebounceClient")
+	}
+
 	queueManager := d.queueManager(shouldMigrate)
+	if queueManager == nil {
+		return fmt.Errorf("queueManager did not return QueueManager")
+	}
+
 	queueShard := d.queueShard(shouldMigrate)
+	if queueShard.Name == "" {
+		return fmt.Errorf("queueShard did not return QueueShard")
+	}
 
 	keyPtr := client.KeyGenerator().DebouncePointer(ctx, fn.ID, key)
 	keyDbc := client.KeyGenerator().Debounce(ctx)
@@ -677,7 +787,10 @@ func (d debouncer) updateDebounce(ctx context.Context, di DebounceItem, fn innge
 		// enqueue a new item
 		qi := d.queueItem(ctx, di, debounceID)
 
-		return queueManager.Enqueue(ctx, qi, now.Add(ttl).Add(buffer).Add(time.Second), queue.EnqueueOpts{})
+		return queueManager.Enqueue(ctx, qi, now.Add(ttl).Add(buffer).Add(time.Second), queue.EnqueueOpts{
+			// Debounce timeout items must live on the same Redis instance as the state.
+			ForceQueueShardName: queueShard.Name,
+		})
 	default:
 		// Debounces should have a maximum timeout;  updating the debounce returns
 		// the timeout to use.
@@ -699,6 +812,15 @@ func (d debouncer) updateDebounce(ctx context.Context, di DebounceItem, fn innge
 		if err != nil {
 			return fmt.Errorf("error requeueing debounce job '%s': %w", debounceID, err)
 		}
+
+		metrics.IncrQueueDebounceOperationCounter(ctx, metrics.CounterOpt{
+			PkgName: pkgName,
+			Tags: map[string]any{
+				"op":          "updated",
+				"queue_shard": queueShard.Name,
+			},
+		})
+
 		return nil
 	}
 }
