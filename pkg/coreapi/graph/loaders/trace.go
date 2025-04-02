@@ -3,13 +3,11 @@ package loader
 import (
 	"context"
 	"fmt"
-	"sort"
 	"sync"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/graph-gophers/dataloader"
-	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/run"
@@ -275,19 +273,6 @@ func convertRunTreeToGQLModel(pb *rpbv2.RunSpan) (*models.RunTraceSpan, error) {
 			span.ChildrenSpans = append(span.ChildrenSpans, cspan)
 		}
 
-		//
-		// function success spans should appear last
-		if len(span.ChildrenSpans) > 1 {
-			sort.SliceStable(span.ChildrenSpans, func(i, j int) bool {
-				if span.ChildrenSpans[j].Name == consts.OtelExecFnOk {
-					return true
-				}
-				if span.ChildrenSpans[i].Name == consts.OtelExecFnOk {
-					return false
-				}
-				return i < j
-			})
-		}
 	}
 
 	return span, nil
