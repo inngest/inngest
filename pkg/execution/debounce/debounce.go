@@ -262,18 +262,24 @@ func (d debouncer) DeleteDebounceItem(ctx context.Context, debounceID ulid.ULID,
 		return fmt.Errorf("queueShard did not return QueueShard")
 	}
 
+	success := "false"
+	defer func() {
+		metrics.IncrQueueDebounceOperationCounter(ctx, metrics.CounterOpt{
+			PkgName: pkgName,
+			Tags: map[string]any{
+				"op":          "deleted",
+				"queue_shard": queueShard.Name,
+				"success":     success,
+			},
+		})
+	}()
+
 	err := d.deleteDebounceItem(ctx, debounceID, client)
 	if err != nil {
 		return fmt.Errorf("could not delete debounce item: %w", err)
 	}
 
-	metrics.IncrQueueDebounceOperationCounter(ctx, metrics.CounterOpt{
-		PkgName: pkgName,
-		Tags: map[string]any{
-			"op":          "deleted",
-			"queue_shard": queueShard.Name,
-		},
-	})
+	success = "true"
 
 	return nil
 }
