@@ -1,24 +1,19 @@
 'use client';
 
 import { useState } from 'react';
-import { Alert } from '@inngest/components/Alert';
 import { Button } from '@inngest/components/Button';
-import { Card } from '@inngest/components/Card/Card';
-import { Input } from '@inngest/components/Forms/Input';
 import { AlertModal } from '@inngest/components/Modal';
 import { StatusDot } from '@inngest/components/Status/StatusDot';
 import { Time } from '@inngest/components/Time';
 import { IconDatadog } from '@inngest/components/icons/platforms/Datadog';
+import { RiOrganizationChart } from '@remixicon/react';
 import { toast } from 'sonner';
 import { useMutation, useQuery } from 'urql';
 
 import IntegrationNotEnabledMessage from '@/components/Integration/IntegrationNotEnabledMessage';
 import MetricsExportEntitlementBanner from '@/components/Integration/MetricsExportEntitlementsBanner';
-import EnvSelectMenu from '@/components/PrometheusIntegration/EnvSelectMenu';
 import { graphql } from '@/gql';
-import type { DatadogIntegration } from '@/gql/graphql';
-import { useEnvironments } from '@/queries';
-import type { Environment } from '@/utils/environments';
+import type { DatadogConnectionStatus } from '@/gql/graphql';
 import { useBooleanFlag } from '../FeatureFlags/hooks';
 
 type Props = {
@@ -27,180 +22,112 @@ type Props = {
   metricsFreshnessSeconds: number;
 };
 
-const GetDatadogIntegrationDocument = graphql(`
-  query GetDatadogIntegration($workspaceID: ID!) {
-    workspace(id: $workspaceID) {
-      datadogIntegration {
-        id
-        datadogSite
-        appKey
-        appKeyUpdatedAt
-        apiKey
-        apiKeyUpdatedAt
-      }
-    }
-  }
-`);
-
-const ListDatadogIntegrationsDocument = graphql(`
-  query ListDatadogIntegrations {
+const GetDatadogSetupDataDocument = graphql(`
+  query GetDatadogSetupData {
     account {
-      datadogIntegrations {
+      datadogConnections {
         id
-        accountID
+        orgID
+        orgName
         envID
-        datadogSite
-        appKey
-        appKeyUpdatedAt
-        apiKey
-        apiKeyUpdatedAt
+        envName
+        healthy
+        lastErrorMessage
         lastSentAt
-        createdAt
-        updatedAt
-        statusOk
-        error
       }
-    }
-  }
-`);
-
-const SetupDatadogIntegrationDocument = graphql(`
-  mutation SetupDatadogIntegration(
-    $workspaceID: UUID!
-    $apiKey: String!
-    $appKey: String!
-    $ddSite: String!
-  ) {
-    setupDatadogIntegration(
-      envID: $workspaceID
-      apiKey: $apiKey
-      appKey: $appKey
-      datadogSite: $ddSite
-    ) {
-      integration {
+      datadogOrganizations {
         id
+        datadogDomain
+        datadogOrgName
       }
-      error
     }
   }
 `);
 
-const RemoveDatadogIntegrationDocument = graphql(`
-  mutation RemoveDatadogIntegration($integrationID: UUID!) {
-    removeDatadogIntegration(integrationID: $integrationID) {
-      removedIntegrationID
-      removedIntegrationEnvID
-    }
+const DisableDatadogConnectionDocument = graphql(`
+  mutation DisableDatadogConnection($connectionID: UUID!) {
+    disableDatadogConnection(connectionID: $connectionID)
   }
 `);
 
-function dotStatusForIntegration(integration: DatadogIntegration) {
-  if (integration.statusOk) {
+const RemoveDatadogOrganizationDocument = graphql(`
+  mutation RemoveDatadogOrganization($organizationID: UUID!) {
+    removeDatadogOrganization(organizationID: $organizationID)
+  }
+`);
+
+type ConnectionToDisable = {
+  envName: string;
+  connectionID: string;
+  orgName: string;
+};
+
+type OrganizationToRemove = {
+  orgName: string;
+  organizationID: string;
+};
+
+function dotStatusForConnection(conn: DatadogConnectionStatus) {
+  if (conn.healthy) {
     return 'ACTIVE';
   } else {
     return 'FAILED';
   }
 }
 
-function findEnvName(envs: Environment[], id: string) {
-  const env = envs.find((env) => env.id === id);
-  return env ? env.name : id;
+function alertTextBeforeRemovingOrg(
+  org: OrganizationToRemove | null,
+  allConnections: DatadogConnectionStatus[]
+): string {
+  if (!org) {
+    return '';
+  }
+  const affectedConns = allConnections.filter((conn) => conn.orgID == org.organizationID);
+  let text =
+    'Are you certain you want to disconnect Inngest from the “' +
+    org.orgName +
+    '” Datadog organization?';
+  if (affectedConns.length == 1) {
+    text +=
+      ' This will disable metrics export from the “' + affectedConns[0]?.envName + '” environment.';
+  } else if (affectedConns.length > 1) {
+    text += ' This will disable metrics export from ' + affectedConns.length + ' environments.';
+  }
+  return text;
 }
-
-type IntegrationToRemove = {
-  envName: string;
-  integrationID: string;
-};
 
 export default function SetupPage({
   metricsExportEnabled,
   metricsGranularitySeconds,
   metricsFreshnessSeconds,
 }: Props) {
-  const [{ data: envs = [], error: envsErr }] = useEnvironments();
-  const [selectedEnv, setSelectedEnv] = useState<Environment | null>(null);
-  const selectedEnvName = selectedEnv ? selectedEnv.name : '';
-  const [{ data: ddIntData, fetching: ddIntFetching }, refetchDdInt] = useQuery({
-    query: GetDatadogIntegrationDocument,
-    variables: {
-      workspaceID: selectedEnv?.id || '',
-    },
-    pause: !selectedEnv,
+  const [{ data: ddSetupData }, refetchDdSetupData] = useQuery({
+    query: GetDatadogSetupDataDocument,
   });
-  const [{ data: allDatadogInts }, refetchAllDatadogInts] = useQuery({
-    query: ListDatadogIntegrationsDocument,
-  });
-  const [, setupDdInt] = useMutation(SetupDatadogIntegrationDocument);
-  const [isFormDisabled, setFormDisabled] = useState(false);
-  const [formError, setFormError] = useState('');
-  const [selectedIntegrationForRemove, setSelectedIntegrationForRemove] =
-    useState<IntegrationToRemove | null>(null);
-  const [, removeDdInt] = useMutation(RemoveDatadogIntegrationDocument);
-  const { value: ddIntFlagEnabled } = useBooleanFlag('datadog-integration');
+  const [, disableConnection] = useMutation(DisableDatadogConnectionDocument);
+  const [, removeOrganization] = useMutation(RemoveDatadogOrganizationDocument);
+
+  const [selectedConnToDisable, setSelectedConnToDisable] = useState<ConnectionToDisable | null>(
+    null
+  );
+  const [selectedOrgToRemove, setSelectedOrgToRemove] = useState<OrganizationToRemove | null>(null);
 
   if (!ddIntFlagEnabled) {
     return <IntegrationNotEnabledMessage integrationName="Datadog" />;
   }
 
-  if (envsErr) {
-    console.error('error fetching envs', envsErr);
-  }
-
-  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setFormDisabled(true);
-
-    const form = new FormData(event.currentTarget);
-    const appKey = form.get('appKey') as string | null;
-    if (!appKey) {
+  const commitRemoveSelectedOrganization = async () => {
+    if (!selectedOrgToRemove) {
       return;
     }
-    const apiKey = form.get('apiKey') as string | null;
-    if (!apiKey) {
-      return;
-    }
-    const ddSite = form.get('datadogSite') as string | null;
 
-    const result = await setupDdInt(
-      {
-        workspaceID: selectedEnv?.id || '',
-        appKey,
-        apiKey,
-        ddSite: ddSite || '',
-      },
-      { additionalTypenames: ['DatadogIntegration'] }
+    const result = await removeOrganization(
+      { organizationID: selectedOrgToRemove.organizationID },
+      { additionalTypenames: ['DatadogOrganization', 'DatadogConnectionStatus'] }
     );
+    setSelectedOrgToRemove(null);
+    refetchDdSetupData();
 
-    setFormDisabled(false);
-    refetchAllDatadogInts();
-
-    if (result.error) {
-      toast.error(`Failed: ${result.error}`);
-      setFormError(result.error.message);
-      console.error(result.error);
-      return;
-    }
-
-    if (result.data?.setupDatadogIntegration?.error) {
-      setFormError(result.data.setupDatadogIntegration.error);
-      return;
-    }
-
-    (event.target as HTMLFormElement).reset();
-    refetchDdInt();
-    toast.success(`Datadog integration configured for ${selectedEnvName}`);
-    setFormError('');
-    setSelectedEnv(selectedEnv);
-  }
-
-  const onIntRemove = async (integrationID: string) => {
-    const result = await removeDdInt(
-      { integrationID },
-      { additionalTypenames: ['DatadogIntegration'] }
-    );
-    setSelectedIntegrationForRemove(null);
-    refetchAllDatadogInts();
-    refetchDdInt();
     if (result.error) {
       toast.error(`Failed: ${result.error}`);
       console.error(result.error);
@@ -208,12 +135,24 @@ export default function SetupPage({
     }
   };
 
-  const onEnvSelect = (env: Environment) => {
-    setSelectedEnv(env);
-    setFormError('');
-  };
+  const commitDisableSelectedConnection = async () => {
+    if (!selectedConnToDisable) {
+      return;
+    }
 
-  const isNewIntegration = !ddIntData?.workspace.datadogIntegration;
+    const result = await disableConnection(
+      { connectionID: selectedConnToDisable.connectionID },
+      { additionalTypenames: ['DatadogConnectionStatus'] }
+    );
+    setSelectedConnToDisable(null);
+    refetchDdSetupData();
+
+    if (result.error) {
+      toast.error(`Failed: ${result.error}`);
+      console.error(result.error);
+      return;
+    }
+  };
 
   return (
     <div className="mx-auto mt-16 flex w-[800px] flex-col">
@@ -225,7 +164,7 @@ export default function SetupPage({
       </div>
 
       <div className="text-muted mb-6 w-full text-base font-normal">
-        Connect to send key Inngest metrics directly to your Datadog account.
+        Send key Inngest metrics directly to your Datadog account.
         {/* TODO: Link to Datadog docs, once we've written them */}
         {/*<Link target="_blank" size="medium" href="https://www.inngest.com/docs/deploy/vercel">*/}
         {/*  Read documentation*/}
@@ -235,19 +174,36 @@ export default function SetupPage({
       {!metricsExportEnabled && <IntegrationNotEnabledMessage integrationName="Datadog" />}
 
       <AlertModal
-        isOpen={selectedIntegrationForRemove !== null}
-        onClose={() => setSelectedIntegrationForRemove(null)}
+        isOpen={selectedConnToDisable !== null}
+        onClose={() => setSelectedConnToDisable(null)}
         title={
-          'Are you sure you want remove the Datadog integration for the “' +
-          selectedIntegrationForRemove?.envName +
-          '” environment?'
+          'Disable metrics export from “' +
+          selectedConnToDisable?.envName +
+          '” to “' +
+          selectedConnToDisable?.orgName +
+          '”'
         }
         description={
-          'This action cannot be undone. To re-enable the integration, you will need access to an application key and API key for the Datadog account.'
+          'Are you sure you want to disable metrics export to the “' +
+          selectedConnToDisable?.orgName +
+          '” Datadog organization for the “' +
+          selectedConnToDisable?.envName +
+          '” environment?'
         }
-        onSubmit={() => {
-          onIntRemove(selectedIntegrationForRemove?.integrationID || '');
-        }}
+        confirmButtonLabel="Remove"
+        onSubmit={commitDisableSelectedConnection}
+      />
+
+      <AlertModal
+        isOpen={selectedOrgToRemove !== null}
+        onClose={() => setSelectedOrgToRemove(null)}
+        title={'Remove “' + selectedOrgToRemove?.orgName + '”'}
+        description={alertTextBeforeRemovingOrg(
+          selectedOrgToRemove,
+          ddSetupData?.account.datadogConnections || []
+        )}
+        confirmButtonLabel="Remove"
+        onSubmit={commitRemoveSelectedOrganization}
       />
 
       {metricsExportEnabled && (
@@ -255,49 +211,120 @@ export default function SetupPage({
           <MetricsExportEntitlementBanner
             granularitySeconds={metricsGranularitySeconds}
             freshnessSeconds={metricsFreshnessSeconds}
-            className={'mb-6'}
+            className={'mb-12'}
           />
-          {allDatadogInts && allDatadogInts.account.datadogIntegrations.length > 0 && (
-            <div className="mb-10">
-              <div className="text-basis mb-4 justify-start text-xl font-medium">
-                Integration Status
+
+          {ddSetupData && ddSetupData.account.datadogConnections.length > 0 && (
+            <div className="mb-12">
+              <div className="mb-2 flex flex-row justify-start">
+                <div className="text-basis flex-1 text-xl font-medium">Environments</div>
+                {ddSetupData.account.datadogConnections.length > 0 && (
+                  <Button
+                    appearance="outlined"
+                    kind="primary"
+                    label="Connect Environment"
+                    href="/settings/integrations/datadog/connect-env"
+                    className="mr-2"
+                  />
+                )}
               </div>
-              {allDatadogInts.account.datadogIntegrations.map((ddInt, i) => (
+              {/* TODO(cdzombak): Handle "no connections" case */}
+
+              {ddSetupData.account.datadogConnections.length > 0 &&
+                ddSetupData.account.datadogConnections.map((ddConn, i) => (
+                  <div
+                    className={`text-basis flex flex-row justify-start gap-3 border-t px-2 pb-2 pt-3 ${
+                      i === ddSetupData.account.datadogConnections.length - 1 ? 'border-b' : ''
+                    }`}
+                    key={i}
+                  >
+                    <StatusDot status={dotStatusForConnection(ddConn)} />
+                    <div className="-mt-1 flex flex-1 flex-col">
+                      <div>
+                        <span className="font-medium">{ddConn.envName}</span>
+                      </div>
+                      {ddConn.lastErrorMessage ? (
+                        <div className="font-normal">
+                          <span className="text-error font-bold">Error:</span>{' '}
+                          <code>{ddConn.lastErrorMessage}</code>
+                        </div>
+                      ) : ddConn.lastSentAt ? (
+                        <div className="text-muted">
+                          <span className="italic">Metrics last sent:</span>{' '}
+                          <Time value={ddConn.lastSentAt} />
+                        </div>
+                      ) : ddConn.healthy ? (
+                        <div className="text-muted">
+                          <span className="italic">Setting up…</span>
+                        </div>
+                      ) : (
+                        <div className="font-normal">
+                          <span className="text-error font-bold">Error:</span>{' '}
+                          <code>Please contact Inngest Support.</code>
+                        </div>
+                      )}
+                    </div>
+                    {ddSetupData.account.datadogOrganizations.length > 1 && (
+                      <div className="mr-1 mt-1">
+                        <span className="text-muted italic">connected to</span>{' '}
+                        <span className="font-medium">{ddConn.orgName}</span>
+                      </div>
+                    )}
+                    <div>
+                      <Button
+                        appearance="outlined"
+                        kind="danger"
+                        label="Disable"
+                        onClick={() => {
+                          setSelectedConnToDisable({
+                            envName: ddConn.envName,
+                            orgName: ddConn.orgName,
+                            connectionID: ddConn.id,
+                          });
+                        }}
+                      />
+                    </div>
+                  </div>
+                ))}
+            </div>
+          )}
+
+          <div className="mb-12">
+            <div className="mb-2 flex flex-row justify-start">
+              <div className="text-basis flex-1 text-xl font-medium">
+                Connected Datadog Organizations
+              </div>
+              {ddSetupData && ddSetupData.account.datadogOrganizations.length > 0 && (
+                <Button
+                  appearance="outlined"
+                  kind="primary"
+                  label="Add Organization"
+                  href="https://app.datadoghq.com/marketplace"
+                  className="mr-2"
+                />
+              )}
+              {/* TODO(cdzombak): update link once Marketplace listing is live */}
+            </div>
+
+            {/* TODO(cdzombak): Handle "no organizations" case */}
+
+            {ddSetupData &&
+              ddSetupData.account.datadogOrganizations.length > 0 &&
+              ddSetupData.account.datadogOrganizations.map((ddOrg, i) => (
                 <div
-                  className={`text-basis flex flex-row justify-start gap-3 border-t px-2 pb-2 pt-3 ${
-                    i === allDatadogInts.account.datadogIntegrations.length - 1 ? 'border-b' : ''
+                  className={`text-basis flex flex-row justify-start gap-2 border-t px-2 pb-2 pt-3 ${
+                    i === ddSetupData.account.datadogOrganizations.length - 1 ? 'border-b' : ''
                   }`}
                   key={i}
                 >
-                  <StatusDot status={dotStatusForIntegration(ddInt)}></StatusDot>
+                  <RiOrganizationChart className="text-muted h-4 w-4" />
                   <div className="-mt-1 flex flex-1 flex-col">
                     <div>
-                      <span className="font-medium">{findEnvName(envs, ddInt.envID)}</span>
+                      <span className="font-medium">{ddOrg.datadogOrgName}</span>
                     </div>
-                    {ddInt.error ? (
-                      <div className="font-normal">
-                        <span className="text-error font-bold">Error:</span>{' '}
-                        <code>{ddInt.error}</code>
-                        <br />
-                        <span className="text-error">
-                          Please verify your Datadog API key, App key, and URL.
-                        </span>
-                      </div>
-                    ) : ddInt.lastSentAt ? (
-                      <div className="text-muted">
-                        <span className="italic">Metrics last sent:</span>{' '}
-                        <Time value={ddInt.lastSentAt} />
-                      </div>
-                    ) : ddInt.statusOk ? (
-                      <div className="text-muted">
-                        <span className="italic">Setting up…</span>
-                      </div>
-                    ) : (
-                      <div className="font-normal">
-                        <span className="text-error font-bold">Error:</span>{' '}
-                        <code>Please contact Inngest Support.</code>
-                      </div>
-                    )}
+                    <div className="text-muted">
+                      <code>{ddOrg.datadogDomain}</code>
+                    </div>
                   </div>
                   <div>
                     <Button
@@ -305,99 +332,16 @@ export default function SetupPage({
                       kind="danger"
                       label="Remove"
                       onClick={() => {
-                        setSelectedIntegrationForRemove({
-                          envName: findEnvName(envs, ddInt.envID),
-                          integrationID: ddInt.id,
+                        setSelectedOrgToRemove({
+                          orgName: ddOrg.datadogOrgName || ddOrg.id,
+                          organizationID: ddOrg.id,
                         });
                       }}
                     />
                   </div>
                 </div>
               ))}
-            </div>
-          )}
-
-          <div className="text-basis mb-4 justify-start text-xl font-medium">Configuration</div>
-          <Card
-            accentColor={formError !== '' ? 'bg-errorContrast' : 'bg-surfaceMuted'}
-            accentPosition="left"
-            className="w-full"
-          >
-            <Card.Header>
-              <div className="text-basis mb-1 text-sm">
-                Select an environment to manage its Datadog integration:
-              </div>
-              <EnvSelectMenu onSelect={onEnvSelect} className="mb-2" />
-            </Card.Header>
-            <Card.Content>
-              <form onSubmit={handleSubmit} className="flex flex-col items-start">
-                <label htmlFor="appKey" className="text-muted mt-1">
-                  Datadog App Key
-                </label>
-                <div className="flex flex-row gap-4">
-                  <Input
-                    className="mb-2 min-w-[300px]"
-                    type="text"
-                    name="appKey"
-                    placeholder=""
-                    defaultValue={ddIntData?.workspace.datadogIntegration?.appKey || ''}
-                    required
-                    disabled={isFormDisabled || ddIntFetching}
-                  />
-                  {!isNewIntegration && ddIntData.workspace.datadogIntegration && (
-                    <div className="text-muted mt-1 italic">
-                      Updated:{' '}
-                      <Time value={ddIntData.workspace.datadogIntegration.appKeyUpdatedAt} />
-                    </div>
-                  )}
-                </div>
-                <label htmlFor="apiKey" className="text-muted mt-1">
-                  Datadog API Key
-                </label>
-                <div className="flex flex-row gap-4">
-                  <Input
-                    className="mb-2 min-w-[300px]"
-                    type="text"
-                    name="apiKey"
-                    placeholder=""
-                    defaultValue={ddIntData?.workspace.datadogIntegration?.apiKey || ''}
-                    required
-                    disabled={isFormDisabled || ddIntFetching}
-                  />
-                  {!isNewIntegration && ddIntData.workspace.datadogIntegration && (
-                    <div className="text-muted mt-1 italic">
-                      Updated:{' '}
-                      <Time value={ddIntData.workspace.datadogIntegration.apiKeyUpdatedAt} />
-                    </div>
-                  )}
-                </div>
-                <label htmlFor="datadogSite" className="text-muted mt-1">
-                  Datadog Site
-                </label>
-                <div className="flex flex-row gap-4">
-                  <Input
-                    className="mb-2 min-w-[300px]"
-                    type="text"
-                    name="datadogSite"
-                    placeholder="datadoghq.com"
-                    defaultValue={ddIntData?.workspace.datadogIntegration?.datadogSite || ''}
-                    disabled={isFormDisabled || ddIntFetching}
-                  />
-                  <Button
-                    kind="primary"
-                    type="submit"
-                    disabled={isFormDisabled || ddIntFetching}
-                    label={isNewIntegration ? 'Create integration' : 'Update integration'}
-                  />
-                </div>
-              </form>
-              {formError !== '' && (
-                <Alert severity="error" className="mx-auto mb-3 mt-3">
-                  <p className="text-balance">{formError}</p>
-                </Alert>
-              )}
-            </Card.Content>
-          </Card>
+          </div>
         </div>
       )}
     </div>
