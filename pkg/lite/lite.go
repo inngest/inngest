@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"time"
 
 	"github.com/inngest/inngest/pkg/connect"
@@ -386,7 +387,12 @@ func start(ctx context.Context, opts StartOpts) error {
 		// manage snapshotting
 		persistenceInterval = nil
 
-		logger.From(ctx).Info().Msgf("using external Redis %s; disabling in-memory persistence and snapshotting", opts.RedisURI)
+		// Mask Redis URI credentials before logging
+		loggedURI := ""
+		if u, err := url.Parse(opts.RedisURI); err == nil {
+			loggedURI = " " + u.Redacted()
+		}
+		logger.From(ctx).Info().Msgf("using external Redis%s; disabling in-memory persistence and snapshotting", loggedURI)
 	}
 
 	dsOpts := devserver.StartOpts{
