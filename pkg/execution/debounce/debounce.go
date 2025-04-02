@@ -249,6 +249,7 @@ func (d debouncer) queueManager(shouldMigrate bool) redis_state.QueueManager {
 
 // DeleteDebounceItem removes a debounce from the map.
 func (d debouncer) DeleteDebounceItem(ctx context.Context, debounceID ulid.ULID, accountID uuid.UUID) error {
+	// Determine the flag value once and pass down to prevent inconsistent values mid-deletion
 	shouldMigrate := d.shouldMigrate(ctx, accountID)
 
 	client := d.client(shouldMigrate)
@@ -293,6 +294,7 @@ func (d debouncer) deleteDebounceItem(ctx context.Context, debounceID ulid.ULID,
 
 // GetDebounceItem returns a DebounceItem given a debounce ID.
 func (d debouncer) GetDebounceItem(ctx context.Context, debounceID ulid.ULID, accountID uuid.UUID) (*DebounceItem, error) {
+	// Determine the flag value once and pass down to prevent inconsistent values mid-retrieval
 	client := d.client(d.shouldMigrate(ctx, accountID))
 	if client == nil {
 		return nil, fmt.Errorf("client did not return DebounceClient")
@@ -322,6 +324,7 @@ func (d debouncer) StartExecution(ctx context.Context, di DebounceItem, fn innge
 
 	newDebounceID := ulid.MustNew(ulid.Now(), rand.Reader)
 
+	// Determine the flag value once and pass down to prevent inconsistent values mid-execution
 	shouldMigrate := d.shouldMigrate(ctx, di.AccountID)
 
 	client := d.client(shouldMigrate)
@@ -372,6 +375,7 @@ func (d debouncer) Migrate(ctx context.Context, debounceId ulid.ULID, di Debounc
 		return fmt.Errorf("fn has no debounce config")
 	}
 
+	// Determine the flag value once and pass down to prevent inconsistent values mid-migration
 	shouldMigrate := d.shouldMigrate(ctx, di.AccountID)
 	if !shouldMigrate {
 		return fmt.Errorf("expected migration mode to be enable")
@@ -390,6 +394,7 @@ func (d debouncer) Debounce(ctx context.Context, di DebounceItem, fn inngest.Fun
 		return fmt.Errorf("invalid debounce duration: %w", err)
 	}
 
+	// Determine the flag value once and pass down to prevent inconsistent values while debouncing
 	shouldMigrate := d.shouldMigrate(ctx, di.AccountID)
 
 	return d.debounce(ctx, di, fn, ttl, 0, shouldMigrate)
