@@ -1203,3 +1203,153 @@ func TestDebounceExplicitMigration(t *testing.T) {
 		}
 	})
 }
+
+func TestDebouncePrimaryChooser(t *testing.T) {
+	unshardedCluster := miniredis.RunT(t)
+	unshardedRc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{unshardedCluster.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+
+	unshardedClient := redis_state.NewUnshardedClient(unshardedRc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
+	unshardedDebounceClient := unshardedClient.Debounce()
+
+	defaultQueueShard := redis_state.QueueShard{Name: consts.DefaultQueueShardName, RedisClient: unshardedClient.Queue(), Kind: string(enums.QueueShardKindRedis)}
+
+	// Create new single-shard (but multi-replica) Valkey cluster for system queues + colocated debounce state
+	newSystemCluster := miniredis.RunT(t)
+	newSystemClusterRc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{newSystemCluster.Addr()},
+		DisableCache: true,
+	})
+	newSystemClusterClient := redis_state.NewUnshardedClient(newSystemClusterRc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
+	require.NoError(t, err)
+	newSystemShard := redis_state.QueueShard{Name: "new-system", RedisClient: newSystemClusterClient.Queue(), Kind: string(enums.QueueShardKindRedis)}
+	newSystemDebounceClient := newSystemClusterClient.Debounce()
+
+	oldQueue := redis_state.NewQueue(
+		defaultQueueShard,
+		redis_state.WithQueueShardClients(
+			map[string]redis_state.QueueShard{
+				defaultQueueShard.Name: defaultQueueShard,
+			},
+		),
+		redis_state.WithShardSelector(func(ctx context.Context, accountId uuid.UUID, queueName *string) (redis_state.QueueShard, error) {
+			return defaultQueueShard, nil
+		}),
+		redis_state.WithKindToQueueMapping(map[string]string{
+			queue.KindDebounce: queue.KindDebounce,
+		}),
+	)
+
+	newQueue := redis_state.NewQueue(
+		newSystemShard, // Primary
+		redis_state.WithQueueShardClients(
+			map[string]redis_state.QueueShard{
+				defaultQueueShard.Name: defaultQueueShard,
+				newSystemShard.Name:    newSystemShard,
+			},
+		),
+		redis_state.WithShardSelector(func(ctx context.Context, accountId uuid.UUID, queueName *string) (redis_state.QueueShard, error) {
+			// Enqueue new system queue items to new system queue shard
+			if queueName != nil {
+				return newSystemShard, nil
+			}
+
+			return defaultQueueShard, nil
+		}),
+		redis_state.WithKindToQueueMapping(map[string]string{
+			queue.KindDebounce: queue.KindDebounce,
+		}),
+	)
+
+	fakeClock := clockwork.NewFakeClock()
+
+	oldRedisDebouncer := NewRedisDebouncer(unshardedDebounceClient, defaultQueueShard, oldQueue).(debouncer)
+	oldRedisDebouncer.c = fakeClock
+
+	t.Run("before two clusters are configured for migration, use primary", func(t *testing.T) {
+		deb, err := NewRedisDebouncerWithMigration(DebouncerOpts{
+			PrimaryDebounceClient: newSystemDebounceClient,
+			PrimaryQueue:          newQueue,
+			PrimaryQueueShard:     newSystemShard,
+
+			ShouldMigrate: func(ctx context.Context, accountID uuid.UUID) bool {
+				return true
+			},
+		})
+		require.NoError(t, err)
+		newRedisDebouncer := deb.(debouncer)
+		newRedisDebouncer.c = fakeClock
+
+		// If only a single cluster is configured as primary, use that. This is the target state.
+		require.True(t, newRedisDebouncer.usePrimary(false))
+	})
+
+	t.Run("when two clusters are configured, use secondary", func(t *testing.T) {
+		deb, err := NewRedisDebouncerWithMigration(DebouncerOpts{
+			PrimaryDebounceClient: newSystemDebounceClient,
+			PrimaryQueue:          newQueue,
+			PrimaryQueueShard:     newSystemShard,
+
+			SecondaryDebounceClient: unshardedDebounceClient,
+			SecondaryQueue:          oldQueue,
+			SecondaryQueueShard:     defaultQueueShard,
+
+			ShouldMigrate: func(ctx context.Context, accountID uuid.UUID) bool {
+				return true
+			},
+		})
+		require.NoError(t, err)
+		newRedisDebouncer := deb.(debouncer)
+		newRedisDebouncer.c = fakeClock
+
+		// When the feature flag is not yet enabled, keep using the (previous/old) secondary cluster.
+		// This is important because we'd otherwise lose existing debounces and create inconsistencies.
+		require.False(t, newRedisDebouncer.usePrimary(false))
+	})
+
+	t.Run("during migration, use primary", func(t *testing.T) {
+		deb, err := NewRedisDebouncerWithMigration(DebouncerOpts{
+			PrimaryDebounceClient: newSystemDebounceClient,
+			PrimaryQueue:          newQueue,
+			PrimaryQueueShard:     newSystemShard,
+
+			SecondaryDebounceClient: unshardedDebounceClient,
+			SecondaryQueue:          oldQueue,
+			SecondaryQueueShard:     defaultQueueShard,
+
+			ShouldMigrate: func(ctx context.Context, accountID uuid.UUID) bool {
+				return true
+			},
+		})
+		require.NoError(t, err)
+		newRedisDebouncer := deb.(debouncer)
+		newRedisDebouncer.c = fakeClock
+
+		// When the feature flag is flipped, start using the primary. Also migrate existing entries.
+		require.True(t, newRedisDebouncer.usePrimary(true))
+	})
+
+	t.Run("after removing secondary once migration is completed, use primary", func(t *testing.T) {
+		deb, err := NewRedisDebouncerWithMigration(DebouncerOpts{
+			PrimaryDebounceClient: newSystemDebounceClient,
+			PrimaryQueue:          newQueue,
+			PrimaryQueueShard:     newSystemShard,
+
+			ShouldMigrate: func(ctx context.Context, accountID uuid.UUID) bool {
+				return true
+			},
+		})
+		require.NoError(t, err)
+		newRedisDebouncer := deb.(debouncer)
+		newRedisDebouncer.c = fakeClock
+
+		// This is similar to the first test case, but the feature flag is still enabled because there
+		// may be containers still running the old code which has both clusters configured and relies on the flag
+		// for choosing the primary. If we reset the flag too early, we would use the secondary.
+		require.True(t, newRedisDebouncer.usePrimary(true))
+	})
+
+}
