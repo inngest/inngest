@@ -135,8 +135,8 @@ func TestDebounce(t *testing.T) {
 			itemScore, err := unshardedCluster.ZScore(defaultQueueShard.RedisClient.KeyGenerator().PartitionQueueSet(enums.PartitionTypeDefault, queue.KindDebounce, ""), qi.ID)
 			require.NoError(t, err)
 			expectedQueueScore := eventTime.
-				Add(10 * time.Second).       // Debounce period
-				Add(buffer).                 // Buffer
+				Add(10 * time.Second). // Debounce period
+				Add(buffer). // Buffer
 				Add(time.Second).UnixMilli() // Allow updateDebounce on TTL 0
 			require.Equal(t, expectedQueueScore, int64(itemScore))
 		}
@@ -216,12 +216,12 @@ func TestDebounce(t *testing.T) {
 			require.NoError(t, err)
 
 			initialScore := evt0Time.
-				Add(10 * time.Second).       // Debounce period
-				Add(buffer).                 // Buffer
+				Add(10 * time.Second). // Debounce period
+				Add(buffer). // Buffer
 				Add(time.Second).UnixMilli() // Allow updateDebounce on TTL 0
 			expectedRequeueScore := eventTime.
-				Add(10 * time.Second).       // Debounce period
-				Add(buffer).                 // Buffer
+				Add(10 * time.Second). // Debounce period
+				Add(buffer). // Buffer
 				Add(time.Second).UnixMilli() // Allow updateDebounce on TTL 0
 
 			require.NotEqual(t, initialScore, expectedRequeueScore)
@@ -432,8 +432,8 @@ func TestJITDebounceMigration(t *testing.T) {
 			itemScore, err := unshardedCluster.ZScore(defaultQueueShard.RedisClient.KeyGenerator().PartitionQueueSet(enums.PartitionTypeDefault, queue.KindDebounce, ""), qi.ID)
 			require.NoError(t, err)
 			expectedQueueScore := eventTime.
-				Add(10 * time.Second).       // Debounce period
-				Add(buffer).                 // Buffer
+				Add(10 * time.Second). // Debounce period
+				Add(buffer). // Buffer
 				Add(time.Second).UnixMilli() // Allow updateDebounce on TTL 0
 			require.Equal(t, expectedQueueScore, int64(itemScore))
 		}
@@ -517,8 +517,8 @@ func TestJITDebounceMigration(t *testing.T) {
 				Add(buffer).
 				Add(time.Second).UnixMilli() // Allow updateDebounce on TTL 0
 			expectedRequeueScore := eventTime.
-				Add(10 * time.Second).       // Debounce period
-				Add(buffer).                 // Buffer
+				Add(10 * time.Second). // Debounce period
+				Add(buffer). // Buffer
 				Add(time.Second).UnixMilli() // Allow updateDebounce on TTL 0
 
 			require.NotEqual(t, initialScore, expectedRequeueScore)
@@ -701,8 +701,8 @@ func TestDebounceMigrationWithoutTimeout(t *testing.T) {
 			itemScore, err := unshardedCluster.ZScore(defaultQueueShard.RedisClient.KeyGenerator().PartitionQueueSet(enums.PartitionTypeDefault, queue.KindDebounce, ""), qi.ID)
 			require.NoError(t, err)
 			expectedQueueScore := eventTime.
-				Add(10 * time.Second).       // Debounce period
-				Add(buffer).                 // Buffer
+				Add(10 * time.Second). // Debounce period
+				Add(buffer). // Buffer
 				Add(time.Second).UnixMilli() // Allow updateDebounce on TTL 0
 			require.Equal(t, expectedQueueScore, int64(itemScore))
 		}
@@ -780,12 +780,12 @@ func TestDebounceMigrationWithoutTimeout(t *testing.T) {
 			require.NoError(t, err)
 
 			initialScore := evt0Time.
-				Add(10 * time.Second).       // Debounce period
-				Add(buffer).                 // Buffer
+				Add(10 * time.Second). // Debounce period
+				Add(buffer). // Buffer
 				Add(time.Second).UnixMilli() // Allow updateDebounce on TTL 0
 			expectedRequeueScore := eventTime.
-				Add(10 * time.Second).       // Debounce period
-				Add(buffer).                 // Buffer
+				Add(10 * time.Second). // Debounce period
+				Add(buffer). // Buffer
 				Add(time.Second).UnixMilli() // Allow updateDebounce on TTL 0
 
 			require.NotEqual(t, initialScore, expectedRequeueScore)
@@ -1003,8 +1003,8 @@ func TestDebounceTimeoutIsPreserved(t *testing.T) {
 			require.NoError(t, err)
 
 			expectedRequeueScore := eventTime.
-				Add(3 * time.Second).        // Remaining TTL applied
-				Add(buffer).                 // Buffer
+				Add(3 * time.Second). // Remaining TTL applied
+				Add(buffer). // Buffer
 				Add(time.Second).UnixMilli() // Allow updateDebounce on TTL 0
 
 			require.Equal(t, expectedRequeueScore, int64(itemScore))
@@ -1192,8 +1192,8 @@ func TestDebounceExplicitMigration(t *testing.T) {
 			require.NoError(t, err)
 
 			expectedRequeueScore := eventTime.
-				Add(5 * time.Second).        // Remaining TTL applied
-				Add(buffer).                 // Buffer
+				Add(5 * time.Second). // Remaining TTL applied
+				Add(buffer). // Buffer
 				Add(time.Second).UnixMilli() // Allow updateDebounce on TTL 0
 
 			require.Equal(t, expectedRequeueScore, int64(itemScore))
@@ -1269,6 +1269,7 @@ func TestDebouncePrimaryChooser(t *testing.T) {
 	oldRedisDebouncer := NewRedisDebouncer(unshardedDebounceClient, defaultQueueShard, oldQueue).(debouncer)
 	oldRedisDebouncer.c = fakeClock
 
+	// Initial state: Only one primary configured, feature flag off.
 	t.Run("before two clusters are configured for migration, use primary", func(t *testing.T) {
 		deb, err := NewRedisDebouncerWithMigration(DebouncerOpts{
 			PrimaryDebounceClient: newSystemDebounceClient,
@@ -1287,6 +1288,7 @@ func TestDebouncePrimaryChooser(t *testing.T) {
 		require.True(t, newRedisDebouncer.usePrimary(false))
 	})
 
+	// Preparation for migration: Switch primary -> secondary and add new primary.
 	t.Run("when two clusters are configured, use secondary", func(t *testing.T) {
 		deb, err := NewRedisDebouncerWithMigration(DebouncerOpts{
 			PrimaryDebounceClient: newSystemDebounceClient,
@@ -1310,6 +1312,13 @@ func TestDebouncePrimaryChooser(t *testing.T) {
 		require.False(t, newRedisDebouncer.usePrimary(false))
 	})
 
+	// In a real migration: Wait until all clusters are safely deployed before flipping feature toggle.
+	// Also set feature toggle to a future date to ensure the feature flag is loaded into memory in time,
+	// to prevent clock drift. Alternatively, hard code feature flag switch timestamp (as we did with the function
+	// run state sharding rollout). Or use an atomic value in Redis.
+
+	// Start migration: Enable feature flag. This test assumes the change propagation is immediate and is registered by
+	// all consumers at once.
 	t.Run("during migration, use primary", func(t *testing.T) {
 		deb, err := NewRedisDebouncerWithMigration(DebouncerOpts{
 			PrimaryDebounceClient: newSystemDebounceClient,
@@ -1332,6 +1341,10 @@ func TestDebouncePrimaryChooser(t *testing.T) {
 		require.True(t, newRedisDebouncer.usePrimary(true))
 	})
 
+	// In a real migration: Wait until all debounces are migrated. Manually move leftover debounces.
+
+	// Once all debounces are moved from the old shard, we can remove the reference (by dropping the secondary).
+	// To prevent old deployments from using the old cluster again, we must keep the feature flag enabled during this time.
 	t.Run("after removing secondary once migration is completed, use primary", func(t *testing.T) {
 		deb, err := NewRedisDebouncerWithMigration(DebouncerOpts{
 			PrimaryDebounceClient: newSystemDebounceClient,
@@ -1352,4 +1365,6 @@ func TestDebouncePrimaryChooser(t *testing.T) {
 		require.True(t, newRedisDebouncer.usePrimary(true))
 	})
 
+	// In a real migration: Wait for rollout to finish so that the secondary cluster is not referenced in any
+	// deployment anymore. Then toggle the feature flag off again. After that, we'll wrap around to the first test case.
 }
