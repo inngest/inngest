@@ -7,7 +7,7 @@ export const UserlandAttrs = ({ userlandSpan }: { userlandSpan: UserlandSpanType
   let attrs = null;
 
   try {
-    attrs = JSON.parse(userlandSpan.spanAttrs);
+    attrs = userlandSpan.spanAttrs && JSON.parse(userlandSpan.spanAttrs);
   } catch (error) {
     console.info('Error parsing userland span attributes', error);
   }
