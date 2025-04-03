@@ -138,6 +138,8 @@ export default function SetupPage({}) {
     }
   };
 
+  // TODO(cdzombak): handle ddSetupData error
+
   return (
     <>
       <AlertModal
