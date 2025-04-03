@@ -534,7 +534,7 @@ func TestJITDebounceMigration(t *testing.T) {
 
 			// Queue should be cleaned up
 			_, err = unshardedCluster.ZMembers(unshardedClient.Queue().KeyGenerator().PartitionQueueSet(enums.PartitionTypeDefault, queue.KindDebounce, ""))
-			require.Error(t, err)
+			require.Error(t, err, "expected no key for the debounce partition", unshardedCluster.Keys())
 			require.ErrorContains(t, err, "no such key")
 		}
 	})
