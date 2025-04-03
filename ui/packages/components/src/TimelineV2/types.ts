@@ -15,7 +15,7 @@ export type Trace = {
   stepInfo: StepInfoInvoke | StepInfoSleep | StepInfoWait | StepInfoRun | null;
   stepOp?: string | null;
   isUserland: boolean;
-  userlandSpan?: UserlandSpanType | null;
+  userlandSpan: UserlandSpanType | null;
 };
 
 type StepInfoInvoke = {
