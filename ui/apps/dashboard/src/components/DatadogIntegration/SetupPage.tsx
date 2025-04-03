@@ -5,6 +5,7 @@ import { Button } from '@inngest/components/Button';
 import { AlertModal } from '@inngest/components/Modal';
 import { StatusDot } from '@inngest/components/Status/StatusDot';
 import { Time } from '@inngest/components/Time';
+import { IconSpinner } from '@inngest/components/icons/Spinner';
 import { RiOrganizationChart } from '@remixicon/react';
 import { toast } from 'sonner';
 import { useMutation, useQuery } from 'urql';
@@ -175,9 +176,7 @@ export default function SetupPage({}) {
         onSubmit={commitRemoveSelectedOrganization}
       />
 
-      {/* TODO(cdzombak): fetching states */}
-
-      {ddSetupData && ddSetupData.account.datadogConnections.length > 0 && (
+      {ddSetupData && ddSetupData.account.datadogOrganizations.length > 0 && (
         <div className="mb-12">
           <div className="mb-2 flex flex-row justify-start">
             <div className="text-basis flex-1 text-xl font-medium">Environments</div>
@@ -270,6 +269,8 @@ export default function SetupPage({}) {
         </div>
 
         {/* TODO(cdzombak): Handle "no organizations" case */}
+
+        {!ddSetupData && <IconSpinner className="fill-link h-8 w-8 text-center" />}
 
         {ddSetupData &&
           ddSetupData.account.datadogOrganizations.length > 0 &&
