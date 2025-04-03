@@ -172,6 +172,8 @@ type DebouncerOpts struct {
 	SecondaryQueueShard     redis_state.QueueShard
 
 	ShouldMigrate func(ctx context.Context, accountID uuid.UUID) bool
+
+	Clock clockwork.Clock
 }
 
 func NewRedisDebouncerWithMigration(o DebouncerOpts) (Debouncer, error) {
@@ -179,8 +181,12 @@ func NewRedisDebouncerWithMigration(o DebouncerOpts) (Debouncer, error) {
 		return nil, fmt.Errorf("missing primary")
 	}
 
+	if o.Clock == nil {
+		o.Clock = clockwork.NewRealClock()
+	}
+
 	return debouncer{
-		c: clockwork.NewRealClock(),
+		c: o.Clock,
 
 		// New
 		primaryDebounceClient: o.PrimaryDebounceClient,
