@@ -19,6 +19,7 @@ import (
 	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/inngest"
+	"github.com/inngest/inngest/pkg/logger"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/inngest/inngest/pkg/util/aigateway"
 	"github.com/oklog/ulid/v2"
@@ -184,6 +185,12 @@ func (l traceLifecycle) OnFunctionStarted(
 	// spanID should always exists
 	spanID, err := md.Config.GetSpanID()
 	if err != nil {
+		logger.StdlibLogger(ctx).Error("error retrieving spanID",
+			"error", err,
+			"lifecycle", "OnFunctionStarted",
+			"meta", md,
+		)
+
 		// generate a new one here to be used for subsequent runs.
 		// this could happen for runs that started before this feature was introduced.
 		sid := NewSpanID(ctx)
@@ -355,9 +362,10 @@ func (l traceLifecycle) OnFunctionCancelled(ctx context.Context, md sv2.Metadata
 
 	fnSpanID, err := md.Config.GetSpanID()
 	if err != nil {
-		l.log.Error("error retrieving spanID for cancelled function run",
-			"err", err,
-			"identifier", md.ID,
+		l.log.Error("error retrieving spanID",
+			"error", err,
+			"lifecycle", "OnFunctionCancelled",
+			"meta", md,
 		)
 		return
 	}
