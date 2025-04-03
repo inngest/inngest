@@ -44,7 +44,7 @@ export default async function DatadogSetupPage({
           {subtitle}
           {/* TODO(cdzombak): Link to Datadog docs, once we've written them */}
           {showSubtitleDocsLink && (
-            <Link target="_blank" size="medium" href="https://www.inngest.com/docs/deploy/vercel">
+            <Link target="_blank" size="medium" href="https://www.inngest.com/docs/">
               Read documentation
             </Link>
           )}
