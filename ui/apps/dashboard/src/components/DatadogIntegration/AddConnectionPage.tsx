@@ -131,9 +131,10 @@ export default function AddConnectionPage({}) {
         )}
 
         {availableDatadogOrgsForEnv.length > 0 && (
-          <form onSubmit={handleSubmit} className="flex flex-col items-start">
+          <form onSubmit={handleSubmit} className="flex flex-col items-start gap-4">
+            <div>Choose the Datadog organization to send metrics to:</div>
             {availableDatadogOrgsForEnv.map((org, i) => (
-              <div className="flex flex-row gap-4" key={org.id}>
+              <div className="flex flex-row gap-2" key={org.id}>
                 <input
                   type="radio"
                   name="selectedOrg"
@@ -142,11 +143,19 @@ export default function AddConnectionPage({}) {
                   disabled={isFormDisabled}
                   defaultChecked={i === 0}
                 />
-                <label htmlFor={org.id}>{org.datadogOrgName || org.id}</label>
+                <label htmlFor={org.id} className="-mt-0.5">
+                  {org.datadogOrgName || org.id}
+                </label>
               </div>
             ))}
 
-            <Button kind="primary" type="submit" disabled={isFormDisabled} label="Connect" />
+            <Button
+              kind="primary"
+              type="submit"
+              disabled={isFormDisabled}
+              label="Connect"
+              className="mt-4"
+            />
           </form>
         )}
       </Card.Content>
