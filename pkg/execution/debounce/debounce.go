@@ -468,7 +468,8 @@ func (d debouncer) debounce(ctx context.Context, di DebounceItem, fn inngest.Fun
 			err = d.secondaryQueueManager.RemoveQueueItem(
 				ctx,
 				d.secondaryQueueShard.Name,
-				d.secondaryQueueShard.RedisClient.KeyGenerator().PartitionQueueSet(enums.PartitionTypeDefault, di.FunctionID.String(), ""),
+				// Debounce timeouts are stored in a system queue
+				d.secondaryQueueShard.RedisClient.KeyGenerator().PartitionQueueSet(enums.PartitionTypeDefault, queue.KindDebounce, ""),
 				queueItemId,
 			)
 			if err != nil {
