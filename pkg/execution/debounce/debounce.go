@@ -41,6 +41,7 @@ var (
 	ErrDebounceExists     = fmt.Errorf("a debounce exists for this function")
 	ErrDebounceNotFound   = fmt.Errorf("debounce not found")
 	ErrDebounceInProgress = fmt.Errorf("debounce is in progress")
+	ErrDebounceMigrating  = fmt.Errorf("debounce is migrating")
 )
 
 var (
@@ -322,6 +323,20 @@ func (d debouncer) deleteDebounceItem(ctx context.Context, debounceID ulid.ULID,
 	return nil
 }
 
+func (d debouncer) deleteMigratingFlag(ctx context.Context, debounceID ulid.ULID, client *redis_state.DebounceClient) error {
+	keyDbc := client.KeyGenerator().DebounceMigrating(ctx)
+	cmd := client.Client().B().Hdel().Key(keyDbc).Field(debounceID.String()).Build()
+	err := client.Client().Do(ctx, cmd).Error()
+	if rueidis.IsRedisNil(err) {
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("error removing debounce migrating flag: %w", err)
+	}
+
+	return nil
+}
+
 // GetDebounceItem returns a DebounceItem given a debounce ID.
 func (d debouncer) GetDebounceItem(ctx context.Context, debounceID ulid.ULID, accountID uuid.UUID) (*DebounceItem, error) {
 	shouldMigrate := d.shouldMigrate(ctx, accountID)
@@ -419,7 +434,13 @@ func (d debouncer) StartExecution(ctx context.Context, di DebounceItem, fn innge
 		queueShard = d.secondaryQueueShard
 	}
 
-	keys := []string{client.KeyGenerator().DebouncePointer(ctx, fn.ID, dkey)}
+	keys := []string{
+		client.KeyGenerator().DebouncePointer(ctx, fn.ID, dkey),
+
+		// Make sure this debounce is not currently being migrated. If so, we need to prevent timeout execution.
+		// The migration will go on to delete debounce state and the timeout item.
+		client.KeyGenerator().DebounceMigrating(ctx),
+	}
 	args := []string{
 		newDebounceID.String(),
 		debounceID.String(),
@@ -451,10 +472,10 @@ func (d debouncer) StartExecution(ctx context.Context, di DebounceItem, fn innge
 	switch res {
 	// If another Start() or prepareMigration() raced us, we must not process the
 	// debounce again.
-	case 0:
-		status = "raced"
-		return ErrDebounceNotFound
-	case 1:
+	case -1:
+		status = "migrating"
+		return ErrDebounceMigrating
+	case 0, 1:
 		status = "started"
 		return nil
 	default:
@@ -564,6 +585,11 @@ func (d debouncer) debounce(ctx context.Context, di DebounceItem, fn inngest.Fun
 				l.Error("could not remove queue item", "item_id", queueItemId)
 			} else {
 				l.Debug("deleted migrated debounce")
+			}
+
+			err = d.deleteMigratingFlag(ctx, newDebounceID, d.secondaryDebounceClient)
+			if err != nil {
+				l.Error("unable to delete debounce migrating flag", "err", err)
 			}
 
 			metrics.IncrQueueDebounceOperationCounter(ctx, metrics.CounterOpt{
@@ -747,11 +773,12 @@ func (d debouncer) prepareMigration(ctx context.Context, di DebounceItem, fn inn
 
 	keyPtr := d.secondaryDebounceClient.KeyGenerator().DebouncePointer(ctx, fn.ID, key)
 	keyDbc := d.secondaryDebounceClient.KeyGenerator().Debounce(ctx)
+	keyMigrating := d.secondaryDebounceClient.KeyGenerator().DebounceMigrating(ctx)
 
 	out, err := scripts["prepareMigration"].Exec(
 		ctx,
 		d.secondaryDebounceClient.Client(),
-		[]string{keyPtr, keyDbc},
+		[]string{keyPtr, keyDbc, keyMigrating},
 		[]string{fakeDebounceID.String()},
 	).ToAny()
 
