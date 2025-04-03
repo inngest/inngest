@@ -393,6 +393,9 @@ type DebounceKeyGenerator interface {
 	DebouncePointer(ctx context.Context, fnID uuid.UUID, key string) string
 	// Debounce returns the key for storing debounce-related data given a debounce ID.
 	Debounce(ctx context.Context) string
+	// DebounceMigrating returns the key for storing the in-progress debounce migration flag to prevent
+	// migrations and timeout execution from racing. This is a hash.
+	DebounceMigrating(ctx context.Context) string
 }
 
 type debounceKeyGenerator struct {
@@ -410,6 +413,12 @@ func (u debounceKeyGenerator) DebouncePointer(ctx context.Context, fnID uuid.UUI
 // This is a hash of debounce IDs -> debounces.
 func (u debounceKeyGenerator) Debounce(ctx context.Context) string {
 	return fmt.Sprintf("{%s}:debounce-hash", u.queueDefaultKey)
+}
+
+// DebounceMigrating returns the key for storing the in-progress debounce migration flag to prevent
+// migrations and timeout execution from racing. This is a hash.
+func (u debounceKeyGenerator) DebounceMigrating(ctx context.Context) string {
+	return fmt.Sprintf("{%s}:debounce-migrating", u.queueDefaultKey)
 }
 
 type PauseKeyGenerator interface {

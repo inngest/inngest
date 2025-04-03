@@ -4,13 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/url"
+	"time"
+
 	"github.com/inngest/inngest/pkg/connect"
 	"github.com/inngest/inngest/pkg/connect/auth"
 	"github.com/inngest/inngest/pkg/connect/lifecycles"
 	connectpubsub "github.com/inngest/inngest/pkg/connect/pubsub"
 	connectv0 "github.com/inngest/inngest/pkg/connect/rest/v0"
 	connstate "github.com/inngest/inngest/pkg/connect/state"
-	"time"
 
 	"github.com/inngest/inngest/pkg/enums"
 
@@ -280,7 +282,7 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	connectPubSubLogger := logger.StdlibLoggerWithCustomVarName(ctx, "CONNECT_PUBSUB_LOG_LEVEL")
 
-	executorProxy, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectRcOpt, connectPubSubLogger.With("svc", "executor"), conditionalTracer, true))
+	executorProxy, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectRcOpt, connectPubSubLogger.With("svc", "executor"), conditionalTracer, connectionManager, true))
 	if err != nil {
 		return fmt.Errorf("failed to create connect pubsub connector: %w", err)
 	}
@@ -385,7 +387,12 @@ func start(ctx context.Context, opts StartOpts) error {
 		// manage snapshotting
 		persistenceInterval = nil
 
-		logger.From(ctx).Info().Msgf("using external Redis %s; disabling in-memory persistence and snapshotting", opts.RedisURI)
+		// Mask Redis URI credentials before logging
+		loggedURI := ""
+		if u, err := url.Parse(opts.RedisURI); err == nil {
+			loggedURI = " " + u.Redacted()
+		}
+		logger.From(ctx).Info().Msgf("using external Redis%s; disabling in-memory persistence and snapshotting", loggedURI)
 	}
 
 	dsOpts := devserver.StartOpts{
@@ -435,7 +442,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		})
 	})
 
-	apiConnectProxy, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectRcOpt, connectPubSubLogger.With("svc", "api"), conditionalTracer, false))
+	apiConnectProxy, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectRcOpt, connectPubSubLogger.With("svc", "api"), conditionalTracer, connectionManager, false))
 	if err != nil {
 		return fmt.Errorf("failed to create connect pubsub connector: %w", err)
 	}
@@ -468,7 +475,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		return err
 	}
 
-	gatewayRequestReceiver, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectRcOpt, connectPubSubLogger.With("svc", "connect-gateway"), conditionalTracer, false))
+	gatewayRequestReceiver, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectRcOpt, connectPubSubLogger.With("svc", "connect-gateway"), conditionalTracer, connectionManager, false))
 	if err != nil {
 		return fmt.Errorf("failed to create connect pubsub connector: %w", err)
 	}
@@ -485,13 +492,6 @@ func start(ctx context.Context, opts StartOpts) error {
 				lifecycles.NewHistoryLifecycle(dbcqrs),
 			}),
 	)
-
-	routerRequestReceiver, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectRcOpt, connectPubSubLogger.With("svc", "connect-router"), conditionalTracer, false))
-	if err != nil {
-		return fmt.Errorf("failed to create connect pubsub connector: %w", err)
-	}
-
-	connRouter := connect.NewConnectMessageRouterService(connectionManager, routerRequestReceiver, conditionalTracer)
 
 	// Create a new data API directly in the devserver.  This allows us to inject
 	// the data API into the dev server port, providing a single router for the dev
@@ -510,7 +510,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		RequireKeys:    true,
 	})
 
-	return service.StartAll(ctx, ds, runner, executorSvc, ds.Apiservice, connGateway, connRouter)
+	return service.StartAll(ctx, ds, runner, executorSvc, ds.Apiservice, connGateway)
 }
 
 func connectToOrCreateRedis(redisURI string) (rueidis.Client, error) {
@@ -572,7 +572,7 @@ func createInmemoryRedisConnectionOpt() (rueidis.ClientOption, error) {
 
 func getSendingEventHandler(pb pubsub.Publisher, topic string) execution.HandleSendingEvent {
 	return func(ctx context.Context, evt event.Event, item queue.Item) error {
-		trackedEvent := event.NewOSSTrackedEvent(evt)
+		trackedEvent := event.NewOSSTrackedEvent(evt, nil)
 		byt, err := json.Marshal(trackedEvent)
 		if err != nil {
 			return fmt.Errorf("error marshalling invocation event: %w", err)
@@ -608,7 +608,7 @@ func getInvokeFailHandler(ctx context.Context, pb pubsub.Publisher, topic string
 		for _, e := range evts {
 			evt := e
 			eg.Go(func() error {
-				trackedEvent := event.NewOSSTrackedEvent(evt)
+				trackedEvent := event.NewOSSTrackedEvent(evt, nil)
 				byt, err := json.Marshal(trackedEvent)
 				if err != nil {
 					return fmt.Errorf("error marshalling function finished event: %w", err)

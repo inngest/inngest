@@ -100,23 +100,6 @@ func NewRedisConnectionStateManager(client rueidis.Client) *redisConnectionState
 	}
 }
 
-func (r *redisConnectionStateManager) SetRequestIdempotency(ctx context.Context, appId uuid.UUID, requestId string) error {
-	idempotencyKey := fmt.Sprintf("{%s}:idempotency:%s", appId, requestId)
-	res := r.client.Do(
-		ctx,
-		r.client.B().Set().Key(idempotencyKey).Value("1").Nx().Ex(time.Second*10).Build(),
-	)
-	set, err := res.AsBool()
-	if (err == nil || rueidis.IsRedisNil(err)) && !set {
-		return ErrIdempotencyKeyExists
-	}
-	if err != nil {
-		return fmt.Errorf("could not set idempotency key: %w", err)
-	}
-
-	return nil
-}
-
 func (r *redisConnectionStateManager) GetConnection(ctx context.Context, envID uuid.UUID, connId ulid.ULID) (*connpb.ConnMetadata, error) {
 	key := r.connectionHash(envID)
 	cmd := r.client.B().Hget().Key(key).Field(connId.String()).Build()

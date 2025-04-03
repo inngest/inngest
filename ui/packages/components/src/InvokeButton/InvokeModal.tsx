@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Alert } from '@inngest/components/Alert';
 import { Button } from '@inngest/components/Button';
 import { CodeBlock } from '@inngest/components/CodeBlock';
@@ -6,7 +6,12 @@ import { Modal } from '@inngest/components/Modal';
 
 import { parseCode } from './utils';
 
-const initialCode = JSON.stringify({ data: {} }, null, 2);
+const LOCAL_STORAGE_KEY = 'lastInvokePayload';
+
+const getInitialCode = () => {
+  const storedPayload = localStorage.getItem(LOCAL_STORAGE_KEY);
+  return storedPayload || JSON.stringify({ data: {} }, null, 2);
+};
 
 type Props = {
   doesFunctionAcceptPayload: boolean;
@@ -20,7 +25,12 @@ type Props = {
 
 export function InvokeModal({ doesFunctionAcceptPayload, isOpen, onCancel, onConfirm }: Props) {
   const [error, setError] = useState<string>();
-  const [rawPayload, setRawPayload] = useState(initialCode);
+  const [rawPayload, setRawPayload] = useState(getInitialCode());
+
+  useEffect(() => {
+    // Ensure the component uses the latest stored payload when (re)opened
+    setRawPayload(getInitialCode());
+  }, [isOpen]);
 
   function onSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -29,6 +39,7 @@ export function InvokeModal({ doesFunctionAcceptPayload, isOpen, onCancel, onCon
       let payload: ReturnType<typeof parseCode>;
       if (doesFunctionAcceptPayload) {
         payload = parseCode(rawPayload);
+        localStorage.setItem(LOCAL_STORAGE_KEY, rawPayload);
       } else {
         payload = { data: {}, user: null };
       }
