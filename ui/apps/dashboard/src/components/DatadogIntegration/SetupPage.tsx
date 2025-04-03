@@ -13,6 +13,11 @@ import { useMutation, useQuery } from 'urql';
 import { graphql } from '@/gql';
 import type { DatadogConnectionStatus } from '@/gql/graphql';
 
+{
+  /* TODO(cdzombak): update link once Marketplace listing is live */
+}
+export const ddMarketplaceHref = 'https://app.datadoghq.com/marketplace';
+
 export const GetDatadogSetupDataDocument = graphql(`
   query GetDatadogSetupData {
     account {
@@ -268,23 +273,35 @@ export default function SetupPage({}) {
       <div className="mb-12">
         <div className="mb-2 flex flex-row justify-start">
           <div className="text-basis flex-1 text-xl font-medium">
-            Connected Datadog Organizations
+            {!ddSetupData || ddSetupData.account.datadogOrganizations.length === 0
+              ? 'Datadog Connections'
+              : 'Connected Datadog Organizations'}
           </div>
           {ddSetupData && ddSetupData.account.datadogOrganizations.length > 0 && (
             <Button
               appearance="outlined"
               kind="primary"
               label="Add Organization"
-              href="https://app.datadoghq.com/marketplace"
+              href={ddMarketplaceHref}
               className="mr-2"
             />
           )}
-          {/* TODO(cdzombak): update link once Marketplace listing is live */}
         </div>
 
-        {/* TODO(cdzombak): Handle "no organizations" case */}
-
         {!ddSetupData && <IconSpinner className="fill-link h-8 w-8 text-center" />}
+
+        {ddSetupData && ddSetupData.account.datadogOrganizations.length === 0 && (
+          <div className="border-subtle flex flex-col items-center gap-4 rounded border p-8 text-center">
+            Inngest isn’t connected to Datadog yet.
+            <Button
+              appearance="solid"
+              kind="primary"
+              label="Connect to Datadog"
+              href={ddMarketplaceHref}
+              className="text-sm"
+            />
+          </div>
+        )}
 
         {ddSetupData &&
           ddSetupData.account.datadogOrganizations.length > 0 &&

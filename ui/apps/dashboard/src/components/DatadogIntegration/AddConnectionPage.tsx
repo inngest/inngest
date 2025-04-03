@@ -14,7 +14,7 @@ import EnvSelectMenu from '@/components/PrometheusIntegration/EnvSelectMenu';
 import { graphql } from '@/gql';
 import { useEnvironments } from '@/queries';
 import type { Environment } from '@/utils/environments';
-import { GetDatadogSetupDataDocument } from './SetupPage';
+import { GetDatadogSetupDataDocument, ddMarketplaceHref } from './SetupPage';
 
 const EnableDatadogConnectionDocument = graphql(`
   mutation EnableDatadogConnection($organizationID: UUID!, $envID: UUID!) {
@@ -126,12 +126,11 @@ export default function AddConnectionPage({}) {
             </p>
             <p>
               To connect a new Datadog organization, please{' '}
-              <Link href={'https://app.datadoghq.com/marketplace'} className="underline">
+              <Link href={ddMarketplaceHref} className="underline">
                 navigate to the Inngest integration from your Datadog organization
               </Link>{' '}
               and start the connection process from there.
             </p>
-            {/* TODO(cdzombak): correct link when marketplace is live */}
           </Alert>
         )}
 
