@@ -99,11 +99,7 @@ export default function AddConnectionPage({}) {
   let cardAccentColor = 'bg-surfaceMuted';
   if (formError) {
     cardAccentColor = 'bg-errorContrast';
-  } else if (availableDatadogOrgsForEnv.length === 0) {
-    cardAccentColor = 'bg-warningContrast';
   }
-
-  // TODO(cdzombak): change to step 1 / step 2 design
 
   return (
     <Card accentColor={cardAccentColor} accentPosition="left" className="w-full">
@@ -119,7 +115,7 @@ export default function AddConnectionPage({}) {
         )}
 
         {availableDatadogOrgsForEnv.length === 0 && (
-          <Alert severity="warning" className="mx-auto mb-3 mt-3">
+          <Alert severity="info" className="mx-auto mb-3 mt-3">
             <p className="text-balance">
               <span className="font-semibold">{selectedEnv?.name}</span> is already connected to all
               available Datadog organizations.

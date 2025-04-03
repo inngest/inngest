@@ -9,7 +9,22 @@ type Props = {
 
 export default function SetupPage({ errorMessage }: Props) {
   if (errorMessage) {
-    // TODO(cdzombak): "An API key with this name already exists" -> needs user action to resolve
+    if (errorMessage.toLowerCase().includes('api key with this name already exists')) {
+      return (
+        <Alert severity="warning" className="text-base">
+          This Datadog organization was previously connected to Inngest, and you’ll need to remove
+          Inngest’s old API key from your Datadog account manually before reconnecting.
+          <br />
+          <br />
+          Please{' '}
+          <a target="_blank" className="underline" href="https://www.inngest.com/docs/">
+            see our documentation
+          </a>{' '}
+          for instructions.
+          {/* TODO(cdzombak): update docs link once it's written */}
+        </Alert>
+      );
+    }
 
     return (
       <Alert severity="error">
