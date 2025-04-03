@@ -9,7 +9,7 @@ type Props = {
 
 export default function SetupPage({ errorMessage }: Props) {
   if (errorMessage) {
-    // TODO(cdzombak): provide useful instructions for "api key already exists" err
+    // TODO(cdzombak): "An API key with this name already exists" -> needs user action to resolve
 
     return (
       <Alert severity="error">
