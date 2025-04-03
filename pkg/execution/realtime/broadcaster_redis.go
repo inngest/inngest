@@ -81,6 +81,12 @@ func (b *redisBroadcaster) publish(ctx context.Context, channel, message string)
 			<-time.After(redisRetryInterval)
 		}
 		if ctx.Err() != nil {
+			logger.StdlibLogger(ctx).Error(
+				"error publishing to realtime redis pubsub; ctx closed",
+				"channel", channel,
+				"error", ctx.Err(),
+				"attempt", i,
+			)
 			return
 		}
 		err := b.pubc.Do(ctx, cmd).Error()
