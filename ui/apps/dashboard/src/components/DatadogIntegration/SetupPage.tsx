@@ -141,6 +141,8 @@ export default function SetupPage({}) {
 
   // TODO(cdzombak): handle ddSetupData error
 
+  const connectEnvHref = '/settings/integrations/datadog/connect-env';
+
   return (
     <>
       <AlertModal
@@ -185,12 +187,24 @@ export default function SetupPage({}) {
                 appearance="outlined"
                 kind="primary"
                 label="Connect Environment"
-                href="/settings/integrations/datadog/connect-env"
+                href={connectEnvHref}
                 className="mr-2"
               />
             )}
           </div>
-          {/* TODO(cdzombak): Handle "no connections" case */}
+
+          {ddSetupData.account.datadogConnections.length === 0 && (
+            <div className="border-subtle flex flex-col items-center gap-4 rounded border p-8 text-center">
+              No environments are sending metrics to Datadog right now.
+              <Button
+                appearance="solid"
+                kind="primary"
+                label="Connect Environment"
+                href={connectEnvHref}
+                className="text-sm"
+              />
+            </div>
+          )}
 
           {ddSetupData.account.datadogConnections.length > 0 &&
             ddSetupData.account.datadogConnections.map((ddConn, i) => (
