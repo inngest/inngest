@@ -389,10 +389,16 @@ func (tb *runTree) constructSpan(ctx context.Context, s *cqrs.Span) (*rpbv2.RunS
 	}
 
 	status := rpbv2.SpanStatus_RUNNING
-	var userlandAttrs []byte
+	var userlandSpan rpbv2.UserlandSpan
 	if s.IsUserland() {
 		status = rpbv2.SpanStatus_COMPLETED
-		userlandAttrs, _ = json.Marshal(s.SpanAttributes)
+		userlandSpan.SpanName = name
+		userlandSpan.SpanKind = s.SpanKind
+		userlandSpan.ServiceName = &s.ServiceName
+		userlandSpan.ScopeName = &s.ScopeName
+		userlandSpan.ScopeVersion = &s.ScopeVersion
+		userlandSpan.SpanAttrs, _ = json.Marshal(s.SpanAttributes)
+		userlandSpan.ResourceAttrs, _ = json.Marshal(s.ResourceAttributes)
 	}
 
 	var stepID *string
@@ -401,23 +407,23 @@ func (tb *runTree) constructSpan(ctx context.Context, s *cqrs.Span) (*rpbv2.RunS
 	}
 
 	return &rpbv2.RunSpan{
-		AccountId:     acctID.String(),
-		WorkspaceId:   wsID.String(),
-		AppId:         appID.String(),
-		FunctionId:    fnID.String(),
-		RunId:         runID.String(),
-		TraceId:       s.TraceID,
-		ParentSpanId:  s.ParentSpanID,
-		SpanId:        s.SpanID,
-		Name:          name,
-		Status:        status,
-		QueuedAt:      timestamppb.New(queuedAt),
-		StartedAt:     timestamppb.New(s.Timestamp),
-		EndedAt:       timestamppb.New(endedAt),
-		DurationMs:    dur,
-		StepId:        stepID,
-		IsUserland:    s.IsUserland(),
-		UserlandAttrs: userlandAttrs,
+		AccountId:    acctID.String(),
+		WorkspaceId:  wsID.String(),
+		AppId:        appID.String(),
+		FunctionId:   fnID.String(),
+		RunId:        runID.String(),
+		TraceId:      s.TraceID,
+		ParentSpanId: s.ParentSpanID,
+		SpanId:       s.SpanID,
+		Name:         name,
+		Status:       status,
+		QueuedAt:     timestamppb.New(queuedAt),
+		StartedAt:    timestamppb.New(s.Timestamp),
+		EndedAt:      timestamppb.New(endedAt),
+		DurationMs:   dur,
+		StepId:       stepID,
+		IsUserland:   s.IsUserland(),
+		UserlandSpan: &userlandSpan,
 	}, false
 }
 

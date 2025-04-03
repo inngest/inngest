@@ -457,8 +457,17 @@ type RunTraceSpan {
   parentSpanID: String
   parentSpan: RunTraceSpan # the parent span of this span
   isUserland: Boolean! # whether this span is a userland span
-  # raw JSON of userland attrs since they can be anything
-  userlandAttrs: Bytes
+  userlandSpan: UserlandSpan
+}
+
+type UserlandSpan {
+  spanName: String
+  spanKind: String
+  serviceName: String
+  resourceAttrs: Bytes
+  scopeName: String
+  scopeVersion: String
+  spanAttrs: Bytes
 }
 
 type RunTraceSpanOutput {

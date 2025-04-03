@@ -363,7 +363,15 @@ export const TRACE_DETAILS_FRAGMENT = gql`
     endedAt
     isRoot
     isUserland
-    userlandAttrs
+    userlandSpan {
+      spanName
+      spanKind
+      serviceName
+      scopeName
+      scopeVersion
+      spanAttrs
+      resourceAttrs
+    }
     outputID
     spanID
     stepID

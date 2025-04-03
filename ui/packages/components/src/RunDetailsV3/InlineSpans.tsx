@@ -86,8 +86,8 @@ export function InlineSpans({ className, minTime, maxTime, trace }: Props) {
       <TooltipContent>
         <div className="text-basis">
           <Times isDelayVisible={spans.length === 0} name={spanName} span={trace} />
-          {trace.isUserland && trace.userlandAttrs && (
-            <UserlandSpan userlandAttrs={trace.userlandAttrs} />
+          {trace.isUserland && trace.userlandSpan && (
+            <UserlandSpan userlandSpan={trace.userlandSpan} />
           )}
           {spans.map((span) => {
             return (
