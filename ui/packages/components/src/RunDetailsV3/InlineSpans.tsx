@@ -5,7 +5,6 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '../Tooltip';
 import { cn } from '../utils/classNames';
 import { toMaybeDate } from '../utils/date';
 import { Span } from './Span';
-import { UserlandSpan } from './UserlandSpan';
 import { type Trace } from './types';
 import { createSpanWidths, formatDuration, getSpanName } from './utils';
 
@@ -86,9 +85,6 @@ export function InlineSpans({ className, minTime, maxTime, trace }: Props) {
       <TooltipContent>
         <div className="text-basis">
           <Times isDelayVisible={spans.length === 0} name={spanName} span={trace} />
-          {trace.isUserland && trace.userlandSpan && (
-            <UserlandSpan userlandSpan={trace.userlandSpan} />
-          )}
           {spans.map((span) => {
             return (
               <Fragment key={span.spanID}>

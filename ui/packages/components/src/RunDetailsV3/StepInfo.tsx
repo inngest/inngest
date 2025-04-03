@@ -17,6 +17,7 @@ import { usePrettyJson } from '../hooks/usePrettyJson';
 import { formatMilliseconds, toMaybeDate } from '../utils/date';
 import { IO } from './IO';
 import { Tabs } from './Tabs';
+import { UserlandAttrs } from './UserlandAttrs';
 import {
   isStepInfoInvoke,
   isStepInfoSleep,
@@ -106,7 +107,6 @@ const getStepKindInfo = (props: StepKindInfoProps): JSX.Element | null =>
 export const StepInfo = ({ selectedStep }: { selectedStep: StepInfoType }) => {
   const [expanded, setExpanded] = useState(true);
   const [rerunModalOpen, setRerunModalOpen] = useState(false);
-
   const { runID, result, trace, pathCreator } = selectedStep;
 
   const delayText = formatMilliseconds(
@@ -151,7 +151,10 @@ export const StepInfo = ({ selectedStep }: { selectedStep: StepInfoType }) => {
             }`}
           />
 
-          <span className="text-basis text-sm font-normal">{trace.name}</span>
+          <span className="text-basis text-sm font-normal">
+            {trace.isUserland && 'OTel/'}
+            {trace.name}
+          </span>
         </div>
         {runID && trace.stepID && prettyInput && (
           <>
@@ -206,6 +209,9 @@ export const StepInfo = ({ selectedStep }: { selectedStep: StepInfoType }) => {
           {stepKindInfo}
 
           {aiOutput && <AITrace aiOutput={aiOutput} />}
+          {trace.isUserland && trace.userlandSpan && (
+            <UserlandAttrs userlandSpan={trace.userlandSpan} />
+          )}
         </div>
       )}
 

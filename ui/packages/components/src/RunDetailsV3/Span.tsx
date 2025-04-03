@@ -51,8 +51,8 @@ export function Span({ className, isInline, maxTime, minTime, span: trace }: Pro
         <div
           className={cn(
             'z-0 h-5 rounded-sm transition-shadow',
-            trace.isUserland ? 'bg-accent-intense' : getStatusBackgroundClass(trace.status),
-            trace.isUserland ? 'border-accent-intense' : getStatusBorderClass(trace.status)
+            trace.isUserland ? 'bg-quaternary-coolxSubtle' : getStatusBackgroundClass(trace.status),
+            trace.isUserland ? 'border-quaternary-coolxSubtle' : getStatusBorderClass(trace.status)
           )}
           style={{ flexGrow: widths.running }}
         />
