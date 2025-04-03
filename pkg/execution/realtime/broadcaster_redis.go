@@ -57,7 +57,7 @@ func (b *redisBroadcaster) Publish(ctx context.Context, m Message) {
 		return
 	}
 
-	pubCtx := context.Background()
+	pubCtx := context.WithoutCancel(ctx)
 
 	for _, t := range m.Topics() {
 		go func(t Topic) {
