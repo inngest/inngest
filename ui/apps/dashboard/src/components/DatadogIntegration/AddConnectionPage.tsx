@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Alert } from '@inngest/components/Alert';
 import { Card } from '@inngest/components/Card';
-import { Input } from '@inngest/components/Forms/Input';
+import { IconSpinner } from '@inngest/components/icons/Spinner';
 import { Button } from 'node_modules/@inngest/components/src/Button';
 import { toast } from 'sonner';
 import { useMutation, useQuery } from 'urql';
@@ -54,8 +54,7 @@ export default function AddConnectionPage({}) {
   }
 
   if (!ddSetupData || envs.length === 0) {
-    /* TODO(cdzombak): fetching state */
-    return 'loading';
+    return <IconSpinner className="fill-link h-8 w-8 text-center" />;
   }
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
