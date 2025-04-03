@@ -209,9 +209,6 @@ export const StepInfo = ({ selectedStep }: { selectedStep: StepInfoType }) => {
           {stepKindInfo}
 
           {aiOutput && <AITrace aiOutput={aiOutput} />}
-          {trace.isUserland && trace.userlandSpan && (
-            <UserlandAttrs userlandSpan={trace.userlandSpan} />
-          )}
         </div>
       )}
 
@@ -250,6 +247,9 @@ export const StepInfo = ({ selectedStep }: { selectedStep: StepInfoType }) => {
               : []),
           ]}
         />
+        {trace.isUserland && trace.userlandSpan && (
+          <UserlandAttrs userlandSpan={trace.userlandSpan} />
+        )}
       </div>
     </div>
   );
