@@ -19,7 +19,6 @@ import (
 	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/inngest"
-	"github.com/inngest/inngest/pkg/logger"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/inngest/inngest/pkg/util/aigateway"
 	"github.com/oklog/ulid/v2"
@@ -185,7 +184,7 @@ func (l traceLifecycle) OnFunctionStarted(
 	// spanID should always exists
 	spanID, err := md.Config.GetSpanID()
 	if err != nil {
-		logger.StdlibLogger(ctx).Error("error retrieving spanID",
+		l.log.Error("error retrieving spanID",
 			"error", err,
 			"lifecycle", "OnFunctionStarted",
 			"meta", md,
