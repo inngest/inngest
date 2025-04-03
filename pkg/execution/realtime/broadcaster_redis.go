@@ -57,9 +57,11 @@ func (b *redisBroadcaster) Publish(ctx context.Context, m Message) {
 		return
 	}
 
+	pubCtx := context.Background()
+
 	for _, t := range m.Topics() {
 		go func(t Topic) {
-			b.publish(ctx, t.String(), string(content))
+			b.publish(pubCtx, t.String(), string(content))
 		}(t)
 	}
 }
