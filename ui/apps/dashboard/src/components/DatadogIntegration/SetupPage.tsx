@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { Alert } from '@inngest/components/Alert';
 import { Button } from '@inngest/components/Button';
 import { AlertModal } from '@inngest/components/Modal';
 import { StatusDot } from '@inngest/components/Status/StatusDot';
@@ -95,7 +96,7 @@ function alertTextBeforeRemovingOrg(
 }
 
 export default function SetupPage({}) {
-  const [{ data: ddSetupData }, refetchDdSetupData] = useQuery({
+  const [{ data: ddSetupData, error: ddSetupFetchError }, refetchDdSetupData] = useQuery({
     query: GetDatadogSetupDataDocument,
   });
   const [, disableConnection] = useMutation(DisableDatadogConnectionDocument);
@@ -144,7 +145,9 @@ export default function SetupPage({}) {
     }
   };
 
-  // TODO(cdzombak): handle ddSetupData error
+  if (ddSetupFetchError) {
+    console.error(ddSetupFetchError);
+  }
 
   const connectEnvHref = '/settings/integrations/datadog/connect-env';
 
@@ -288,7 +291,17 @@ export default function SetupPage({}) {
           )}
         </div>
 
-        {!ddSetupData && <IconSpinner className="fill-link h-8 w-8 text-center" />}
+        {ddSetupFetchError && (
+          <Alert severity="error" className="mx-auto mb-3 mt-3">
+            <p className="text-balance">
+              An error occurred when communicating with Inngest; please refresh this page.
+            </p>
+          </Alert>
+        )}
+
+        {!ddSetupData && !ddSetupFetchError && (
+          <IconSpinner className="fill-link h-8 w-8 text-center" />
+        )}
 
         {ddSetupData && ddSetupData.account.datadogOrganizations.length === 0 && (
           <div className="border-subtle flex flex-col items-center gap-4 rounded border p-8 text-center">
