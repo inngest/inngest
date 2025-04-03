@@ -10,7 +10,7 @@ overrides:
   vite@>=4.0.0 <=4.5.1: '>=4.5.2'
   undici@<5.26.2: '>=5.26.2'
   debug@>=4.0.0 <4.3.1: '>=4.3.1'
-  jose@>=3.0.0 <=4.15.4: '>=4.15.5'
+  jose: '>=5.0.0 <6.0.0'
   vite@>=4.0.0 <=4.5.2: '>=4.5.3'
   undici@<5.28.4: '>=5.28.4'
   undici@<=5.28.2: '>=5.28.3'
@@ -3882,7 +3882,7 @@ packages:
       graphql-request: 6.1.0(graphql@16.8.1)
       http-proxy-agent: 6.1.1
       https-proxy-agent: 6.2.1
-      jose: 6.0.10
+      jose: 5.2.2
       js-yaml: 4.1.0
       json-stable-stringify: 1.0.2
       lodash: 4.17.21
@@ -6175,7 +6175,7 @@ packages:
     resolution: {integrity: sha512-USm05zrsFxYLPdWWq+K3STlWiT/3ELn3RcV5hJMghpeAIhxfsUIg6mt12CBJBInWMV4VneoV7SfGv8xIwo2qNQ==}
     engines: {node: '>=14.0.0'}
     peerDependencies:
-      rollup: '>=2.79.2'
+      rollup: '>=3.29.5'
     peerDependenciesMeta:
       rollup:
         optional: true
@@ -14441,12 +14441,8 @@ packages:
     resolution: {integrity: sha512-2yTgeWTWzMWkHu6Jp9NKgePDaYHbntiwvYuuJLbbN9vl7DC9DvXKOB2BC3ZZ92D3cvV/aflH0osDfwpHepQ53w==}
     hasBin: true
 
-  /jose@5.9.6:
-    resolution: {integrity: sha512-AMlnetc9+CV9asI19zHmrgS/WYsWUwCn2R7RzlbJWD7F9eWYUTGyBmU9o6PxngtLGOiDGPRu+Uc4fhKzbpteZQ==}
-    dev: true
-
-  /jose@6.0.10:
-    resolution: {integrity: sha512-skIAxZqcMkOrSwjJvplIPYrlXGpxTPnro2/QWTDCxAdWQrSTV5/KqspMWmi5WAx5+ULswASJiZ0a+1B/Lxt9cw==}
+  /jose@5.2.2:
+    resolution: {integrity: sha512-/WByRr4jDcsKlvMd1dRJnPfS1GVO3WuKyaurJ/vvXcOaUQO8rnNObCQMlv/5uCceVQIq5Q4WLF44ohsdiTohdg==}
     dev: true
 
   /js-cookie@2.2.1:
@@ -19320,7 +19316,7 @@ packages:
       '@vercel/ruby': 2.2.0
       '@vercel/static-build': 2.7.6
       chokidar: 4.0.0
-      jose: 5.9.6
+      jose: 5.2.2
     transitivePeerDependencies:
       - '@swc/core'
       - '@swc/wasm'
