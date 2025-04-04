@@ -2,7 +2,10 @@ package sqlc
 
 import (
 	"database/sql"
+	"encoding/json"
+
 	sqlc "github.com/inngest/inngest/pkg/cqrs/base_cqrs/sqlc/sqlite"
+	"github.com/sqlc-dev/pqtype"
 )
 
 func (a *App) ToSQLite() (*sqlc.App, error) {
@@ -322,4 +325,15 @@ func (wc *WorkerConnection) ToSQLite() (*sqlc.WorkerConnection, error) {
 		MemBytes:         wc.MemBytes,
 		Os:               wc.Os,
 	}, nil
+}
+
+func toNullRawMessage(v interface{}) pqtype.NullRawMessage {
+	data, err := json.Marshal(v)
+	if err != nil {
+		return pqtype.NullRawMessage{Valid: false}
+	}
+	return pqtype.NullRawMessage{
+		RawMessage: json.RawMessage(data),
+		Valid:      true,
+	}
 }

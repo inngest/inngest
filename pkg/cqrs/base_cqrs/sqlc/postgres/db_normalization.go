@@ -4,10 +4,11 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"math"
+
 	"github.com/google/uuid"
 	sqlc_sqlite "github.com/inngest/inngest/pkg/cqrs/base_cqrs/sqlc/sqlite"
 	"github.com/oklog/ulid/v2"
-	"math"
 )
 
 func NewNormalized(db DBTX) sqlc_sqlite.Querier {
@@ -770,4 +771,23 @@ func (q NormalizedQueries) GetFunctionRuns(ctx context.Context) ([]*sqlc_sqlite.
 	}
 
 	return sqliteRows, nil
+}
+
+func (q NormalizedQueries) GetSpansByRunID(ctx context.Context, runID sql.NullString) ([]*sqlc_sqlite.Span, error) {
+	return nil, nil
+}
+
+func (q NormalizedQueries) InsertSpan(ctx context.Context, arg sqlc_sqlite.InsertSpanParams) error {
+	pgArg := InsertSpanParams{
+		SpanID:       arg.SpanID,
+		TraceID:      arg.TraceID,
+		ParentSpanID: arg.ParentSpanID,
+		Name:         arg.Name,
+		StartTime:    arg.StartTime,
+		EndTime:      arg.EndTime,
+		RunID:        arg.RunID,
+		Attributes:   toNullRawMessage(arg.Attributes),
+	}
+
+	return q.db.InsertSpan(ctx, pgArg)
 }

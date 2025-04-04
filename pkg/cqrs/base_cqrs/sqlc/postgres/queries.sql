@@ -351,3 +351,14 @@ DO UPDATE SET
 
 -- name: GetWorkerConnection :one
 SELECT * FROM worker_connections WHERE account_id = sqlc.arg('account_id') AND workspace_id = sqlc.arg('workspace_id') AND id = sqlc.arg('connection_id');
+
+-- New
+
+-- name: InsertSpan :exec
+INSERT INTO spans (
+  span_id, trace_id, parent_span_id, name,
+  start_time, end_time, run_id, attributes
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8);
+
+-- name: GetSpansByRunID :many
+SELECT * FROM spans WHERE run_id = CAST($1 AS CHAR(26));

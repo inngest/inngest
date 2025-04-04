@@ -120,6 +120,17 @@ type QueueSnapshotChunk struct {
 	Data       []byte
 }
 
+type Span struct {
+	SpanID       string
+	TraceID      string
+	ParentSpanID sql.NullString
+	Name         string
+	StartTime    time.Time
+	EndTime      time.Time
+	RunID        sql.NullString
+	Attributes   interface{}
+}
+
 type Trace struct {
 	Timestamp          time.Time
 	TimestampUnixMs    int64

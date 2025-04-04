@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/lib/pq"
 	ulid "github.com/oklog/ulid/v2"
+	"github.com/sqlc-dev/pqtype"
 )
 
 const deleteApp = `-- name: DeleteApp :exec
@@ -1018,6 +1019,42 @@ func (q *Queries) GetQueueSnapshotChunks(ctx context.Context, snapshotID string)
 	return items, nil
 }
 
+const getSpansByRunID = `-- name: GetSpansByRunID :many
+SELECT span_id, trace_id, parent_span_id, name, start_time, end_time, run_id, attributes FROM spans WHERE run_id = CAST($1 AS CHAR(26))
+`
+
+func (q *Queries) GetSpansByRunID(ctx context.Context, dollar_1 string) ([]*Span, error) {
+	rows, err := q.db.QueryContext(ctx, getSpansByRunID, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*Span
+	for rows.Next() {
+		var i Span
+		if err := rows.Scan(
+			&i.SpanID,
+			&i.TraceID,
+			&i.ParentSpanID,
+			&i.Name,
+			&i.StartTime,
+			&i.EndTime,
+			&i.RunID,
+			&i.Attributes,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getTraceRun = `-- name: GetTraceRun :one
 SELECT run_id, account_id, workspace_id, app_id, function_id, trace_id, queued_at, started_at, ended_at, status, source_id, trigger_ids, output, is_debounce, batch_id, cron_schedule, has_ai FROM trace_runs WHERE run_id = $1::CHAR(26)
 `
@@ -1453,6 +1490,40 @@ type InsertQueueSnapshotChunkParams struct {
 
 func (q *Queries) InsertQueueSnapshotChunk(ctx context.Context, arg InsertQueueSnapshotChunkParams) error {
 	_, err := q.db.ExecContext(ctx, insertQueueSnapshotChunk, arg.SnapshotID, arg.ChunkID, arg.Data)
+	return err
+}
+
+const insertSpan = `-- name: InsertSpan :exec
+
+INSERT INTO spans (
+  span_id, trace_id, parent_span_id, name,
+  start_time, end_time, run_id, attributes
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+`
+
+type InsertSpanParams struct {
+	SpanID       string
+	TraceID      string
+	ParentSpanID sql.NullString
+	Name         string
+	StartTime    time.Time
+	EndTime      time.Time
+	RunID        sql.NullString
+	Attributes   pqtype.NullRawMessage
+}
+
+// New
+func (q *Queries) InsertSpan(ctx context.Context, arg InsertSpanParams) error {
+	_, err := q.db.ExecContext(ctx, insertSpan,
+		arg.SpanID,
+		arg.TraceID,
+		arg.ParentSpanID,
+		arg.Name,
+		arg.StartTime,
+		arg.EndTime,
+		arg.RunID,
+		arg.Attributes,
+	)
 	return err
 }
 

@@ -1039,6 +1039,42 @@ func (q *Queries) GetQueueSnapshotChunks(ctx context.Context, snapshotID interfa
 	return items, nil
 }
 
+const getSpansByRunID = `-- name: GetSpansByRunID :many
+SELECT span_id, trace_id, parent_span_id, name, start_time, end_time, run_id, attributes FROM spans WHERE run_id = ?
+`
+
+func (q *Queries) GetSpansByRunID(ctx context.Context, runID sql.NullString) ([]*Span, error) {
+	rows, err := q.db.QueryContext(ctx, getSpansByRunID, runID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*Span
+	for rows.Next() {
+		var i Span
+		if err := rows.Scan(
+			&i.SpanID,
+			&i.TraceID,
+			&i.ParentSpanID,
+			&i.Name,
+			&i.StartTime,
+			&i.EndTime,
+			&i.RunID,
+			&i.Attributes,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getTraceRun = `-- name: GetTraceRun :one
 SELECT run_id, account_id, workspace_id, app_id, function_id, trace_id, queued_at, started_at, ended_at, status, source_id, trigger_ids, output, is_debounce, batch_id, cron_schedule, has_ai FROM trace_runs WHERE run_id = ?1
 `
@@ -1480,6 +1516,40 @@ func (q *Queries) InsertQueueSnapshotChunk(ctx context.Context, arg InsertQueueS
 	return err
 }
 
+const insertSpan = `-- name: InsertSpan :exec
+
+INSERT INTO spans (
+  span_id, trace_id, parent_span_id, name,
+  start_time, end_time, run_id, attributes
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+`
+
+type InsertSpanParams struct {
+	SpanID       string
+	TraceID      string
+	ParentSpanID sql.NullString
+	Name         string
+	StartTime    time.Time
+	EndTime      time.Time
+	RunID        sql.NullString
+	Attributes   interface{}
+}
+
+// New
+func (q *Queries) InsertSpan(ctx context.Context, arg InsertSpanParams) error {
+	_, err := q.db.ExecContext(ctx, insertSpan,
+		arg.SpanID,
+		arg.TraceID,
+		arg.ParentSpanID,
+		arg.Name,
+		arg.StartTime,
+		arg.EndTime,
+		arg.RunID,
+		arg.Attributes,
+	)
+	return err
+}
+
 const insertTrace = `-- name: InsertTrace :exec
 
 INSERT INTO traces
@@ -1538,8 +1608,8 @@ func (q *Queries) InsertTrace(ctx context.Context, arg InsertTraceParams) error 
 
 const insertTraceRun = `-- name: InsertTraceRun :exec
 INSERT INTO trace_runs (
-    run_id, account_id, workspace_id, app_id, function_id, trace_id, 
-    queued_at, started_at, ended_at, status, source_id, trigger_ids, 
+    run_id, account_id, workspace_id, app_id, function_id, trace_id,
+    queued_at, started_at, ended_at, status, source_id, trigger_ids,
     output, batch_id, is_debounce, cron_schedule, has_ai
 )
 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)

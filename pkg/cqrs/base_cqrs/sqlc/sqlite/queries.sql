@@ -207,8 +207,8 @@ VALUES
 
 -- name: InsertTraceRun :exec
 INSERT INTO trace_runs (
-    run_id, account_id, workspace_id, app_id, function_id, trace_id, 
-    queued_at, started_at, ended_at, status, source_id, trigger_ids, 
+    run_id, account_id, workspace_id, app_id, function_id, trace_id,
+    queued_at, started_at, ended_at, status, source_id, trigger_ids,
     output, batch_id, is_debounce, cron_schedule, has_ai
 )
 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -323,3 +323,14 @@ DO UPDATE SET
 
 -- name: GetWorkerConnection :one
 SELECT * FROM worker_connections WHERE account_id = @account_id AND workspace_id = @workspace_id AND id = @connection_id;
+
+-- New
+
+-- name: InsertSpan :exec
+INSERT INTO spans (
+  span_id, trace_id, parent_span_id, name,
+  start_time, end_time, run_id, attributes
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+
+-- name: GetSpansByRunID :many
+SELECT * FROM spans WHERE run_id = ?;
