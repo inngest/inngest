@@ -35,9 +35,10 @@ export default function FinishPage({}) {
   const authCode = searchParams.get('code');
   const orgID = searchParams.get('dd_oid');
   const orgName = searchParams.get('dd_org_name');
+  const oauthStateReady = ddSite && ddDomain && authCode && orgID && orgName;
 
   useEffect(() => {
-    if (!ddSite || !ddDomain || !authCode || !orgID || !orgName) {
+    if (!oauthStateReady) {
       return;
     }
 
@@ -48,10 +49,16 @@ export default function FinishPage({}) {
       ddSite: ddSite,
       ddDomain: ddDomain,
     });
-  }, [finishDdInt, orgID, orgName, authCode, ddSite, ddDomain]);
+  }, [finishDdInt, orgID, orgName, authCode, ddSite, ddDomain, oauthStateReady]);
 
   if (data) {
     window.location.href = '/settings/integrations/datadog';
+  }
+
+  if (!oauthStateReady) {
+    return (
+      <ConnectingView errorMessage="Expected authentication flow parameters are missing. Please try connecting to Datadog again from the beginning." />
+    );
   }
 
   return <ConnectingView errorMessage={error?.message} />;
