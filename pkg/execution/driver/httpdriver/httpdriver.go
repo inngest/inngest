@@ -32,7 +32,7 @@ import (
 )
 
 var (
-	dialer = &net.Dialer{KeepAlive: 15 * time.Second}
+	Dialer = &net.Dialer{KeepAlive: 15 * time.Second}
 
 	DefaultTransport = func() *http.Transport {
 		t := &http.Transport{
@@ -55,7 +55,7 @@ var (
 
 		if util.InTestMode() {
 			// Allow local requests during testing
-			t.DialContext = dialer.DialContext
+			t.DialContext = Dialer.DialContext
 		}
 
 		return t
