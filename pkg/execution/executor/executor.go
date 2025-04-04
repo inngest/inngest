@@ -702,7 +702,15 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 			Edge: inngest.SourceEdge,
 		},
 		Throttle: throttle,
+		Metadata: map[string]string{},
 	}
+
+	// Always the root span.
+	_, tracer := e.tracerProvider.NewTracer(ctx, metadata, item)
+	spanCtx, span := tracer.Tracer().Start(ctx, tracing.SpanNameRun, trace.WithNewRoot())
+	e.tracerProvider.Inject(spanCtx, propagation.MapCarrier(item.Metadata))
+	span.End()
+
 	err = e.queue.Enqueue(ctx, item, at, queue.EnqueueOpts{})
 	if err == redis_state.ErrQueueItemExists {
 		return nil, state.ErrIdentifierExists
@@ -710,11 +718,6 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	if err != nil {
 		return nil, fmt.Errorf("error enqueueing source edge '%v': %w", queueKey, err)
 	}
-
-	// Always the root span.
-	_, tracer := e.tracerProvider.NewTracer(ctx, metadata, item)
-	_, span := tracer.Tracer().Start(ctx, tracing.SpanNameRun, trace.WithNewRoot())
-	span.End()
 
 	for _, e := range e.lifecycles {
 		go e.OnFunctionScheduled(context.WithoutCancel(ctx), metadata, item, req.Events)
@@ -893,7 +896,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		}
 	}
 
-	ctx, tracer := e.tracerProvider.NewTracer(ctx, md, item)
+	tCtx, tp := e.tracerProvider.NewTracer(ctx, md, item)
 	instance := runInstance{
 		md:         md,
 		f:          *ef.Function,
@@ -902,19 +905,19 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		edge:       edge,
 		stackIndex: stackIndex,
 		httpClient: httpdriver.DefaultClient,
-		tracer:     tracer.Tracer(),
+		tracer:     tp.Tracer(),
 	}
 
 	// If first attempt, this is the creation of a step, and then an attempt.
 	// Otherwise it's just an attempt.
 	if instance.item.Attempt == 0 {
 		var stepSpan trace.Span
-		ctx, stepSpan = instance.tracer.Start(ctx, tracing.SpanNameStep)
+		tCtx, stepSpan = instance.tracer.Start(tCtx, tracing.SpanNameStep)
 		stepSpan.End()
 	}
 
 	// If it's an attempt, it should now be correctly under the step span.
-	ctx, executionSpan := instance.tracer.Start(ctx, tracing.SpanNameExecution)
+	tCtx, executionSpan := instance.tracer.Start(tCtx, tracing.SpanNameExecution)
 	resp, err := e.run(ctx, &instance)
 	tracing.ApplyResponseToSpan(executionSpan, resp)
 	executionSpan.End()
@@ -932,7 +935,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		return nil, err
 	}
 
-	if handleErr := e.HandleResponse(ctx, &instance); handleErr != nil {
+	if handleErr := e.HandleResponse(tCtx, &instance); handleErr != nil {
 		return resp, handleErr
 	}
 	return resp, err
@@ -2031,6 +2034,8 @@ func (e *executor) handleGeneratorStep(ctx context.Context, i *runInstance, gen 
 	// Re-enqueue the exact same edge to run now.
 	jobID := fmt.Sprintf("%s-%s", i.md.IdempotencyKey(), gen.ID)
 	now := time.Now()
+	metadata := map[string]string{}
+	e.tracerProvider.Inject(ctx, metadata)
 	nextItem := queue.Item{
 		JobID:                 &jobID,
 		WorkspaceID:           i.md.ID.Tenant.EnvID,
@@ -2042,6 +2047,7 @@ func (e *executor) handleGeneratorStep(ctx context.Context, i *runInstance, gen 
 		Attempt:               0,
 		MaxAttempts:           i.item.MaxAttempts,
 		Payload:               queue.PayloadEdge{Edge: nextEdge},
+		Metadata:              metadata,
 	}
 
 	if !hasPendingSteps {

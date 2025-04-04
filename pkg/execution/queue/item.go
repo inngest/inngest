@@ -192,9 +192,6 @@ type Item struct {
 	// this run has.  All next steps will use this as the factor when scheduling
 	// future edge jobs (on their first attempt).
 	PriorityFactor *int64 `json:"pf,omitempty"`
-	// TraceParentID is the trace parent ID for the current job, used to
-	// correctly assign child spans to the parent span.
-	TraceParentID *string `json:"traceParentID,omitempty"`
 }
 
 type Throttle struct {

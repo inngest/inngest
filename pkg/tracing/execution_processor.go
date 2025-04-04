@@ -78,8 +78,8 @@ func (p *executionProcessor) OnStart(parent context.Context, s sdktrace.ReadWrit
 
 func (p *executionProcessor) OnEnd(s sdktrace.ReadOnlySpan) {
 	for _, attr := range s.Attributes() {
-		if string(attr.Key) == AttributeExecutionIsDiscovery && attr.Value.AsBool() {
-			return // Don't export discovery spans
+		if string(attr.Key) == AttributeDropSpan && attr.Value.AsBool() {
+			return // Don't export dropped spans
 		}
 	}
 
