@@ -16,11 +16,11 @@ type Retryable[T any] func(ctx context.Context) (T, error)
 
 // RetryConf specifies the control of how a function should be retried
 type RetryConf struct {
-	MaxAttempts     int
-	InitialBackoff  time.Duration
-	MaxBackoff      time.Duration
-	BackoffFactor   int
-	RetryableErrors func(error) bool
+	MaxAttempts     int              `json:"max_attempts"`
+	InitialBackoff  time.Duration    `json:"initial_backoff"`
+	MaxBackoff      time.Duration    `json:"max_backoff"`
+	BackoffFactor   int              `json:"backoff_factor"`
+	RetryableErrors func(error) bool `json:"-"`
 }
 
 type RetryConfSetting func(rc *RetryConf)
