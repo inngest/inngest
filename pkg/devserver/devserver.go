@@ -112,6 +112,9 @@ func New(ctx context.Context, opts StartOpts) error {
 	// Before running the development service, ensure that we change the http
 	// driver in development to use our AWS Gateway http client, attempting to
 	// automatically transform dev requests to lambda invocations.
+	//
+	// We also make sure to allow local requests.
+	httpdriver.DefaultTransport.DialContext = httpdriver.Dialer.DialContext
 	httpdriver.DefaultExecutor.Client.Transport = awsgateway.NewTransformTripper(httpdriver.DefaultExecutor.Client.Transport)
 	deploy.Client.Transport = awsgateway.NewTransformTripper(deploy.Client.Transport)
 

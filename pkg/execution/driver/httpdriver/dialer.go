@@ -62,7 +62,7 @@ type DialFunc = func(ctx context.Context, network, addr string) (net.Conn, error
 func SecureDialer(o SecureDialerOpts) DialFunc {
 	if o.dial == nil {
 		// Always use the default dialer.  Only allow overrides in testing.
-		o.dial = dialer.DialContext
+		o.dial = Dialer.DialContext
 	}
 
 	return func(ctx context.Context, network, addr string) (net.Conn, error) {
