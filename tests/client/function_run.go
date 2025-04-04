@@ -185,13 +185,28 @@ func (c *Client) Run(ctx context.Context, runID string) Run {
 	return data.FunctionRun
 }
 
+type WaitForRunStatusOpts struct {
+	Timeout time.Duration
+}
+
 func (c *Client) WaitForRunStatus(
 	ctx context.Context,
 	t *testing.T,
 	expectedStatus string,
 	runID *string,
+	opts ...WaitForRunStatusOpts,
 ) Run {
 	t.Helper()
+
+	var o WaitForRunStatusOpts
+	if len(opts) > 0 {
+		o = opts[0]
+	}
+
+	timeout := 5 * time.Second
+	if o.Timeout > 0 {
+		timeout = o.Timeout
+	}
 
 	start := time.Now()
 	var run Run
@@ -203,7 +218,7 @@ func (c *Client) WaitForRunStatus(
 			}
 		}
 
-		if time.Since(start) > 5*time.Second {
+		if time.Since(start) > timeout {
 			var msg string
 			if runID == nil || *runID == "" {
 				msg = "Run ID is empty"

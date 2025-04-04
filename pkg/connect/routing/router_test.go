@@ -1,4 +1,4 @@
-package connect
+package routing
 
 import (
 	"context"
@@ -8,25 +8,24 @@ import (
 	"github.com/alicebob/miniredis/v2"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/connect/auth"
-	"github.com/inngest/inngest/pkg/connect/pubsub"
 	"github.com/inngest/inngest/pkg/connect/state"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/sdk"
-	"github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/inngest/inngest/pkg/util"
-	"github.com/inngest/inngest/proto/gen/connect/v1"
+	connectpb "github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 	"github.com/stretchr/testify/require"
-	"go.opentelemetry.io/otel/trace/noop"
 	"log/slog"
 	"os"
 	"testing"
 	"time"
 )
 
-func setupRedis(t *testing.T) (*connectRouterSvc, state.StateManager, func()) {
-	ctx := context.Background()
+// For weighted shuffles generate a new rand.
+var rnd = util.NewFrandRNG()
 
+func setupRedis(t *testing.T) (state.StateManager, func()) {
 	r := miniredis.RunT(t)
 
 	rc, err := rueidis.NewClient(rueidis.ClientOption{
@@ -36,18 +35,8 @@ func setupRedis(t *testing.T) (*connectRouterSvc, state.StateManager, func()) {
 	require.NoError(t, err)
 
 	stateMan := state.NewRedisConnectionStateManager(rc)
-	rcv, _ := pubsub.NewConnector(ctx, pubsub.WithNoop())
 
-	cond := trace.NewConditionalTracer(noop.Tracer{}, trace.AlwaysTrace)
-
-	svc := NewConnectMessageRouterService(
-		stateMan,
-		rcv,
-		cond,
-	)
-	require.NoError(t, svc.Pre(context.Background()))
-
-	return svc, stateMan, func() {
+	return stateMan, func() {
 		rc.Close()
 	}
 }
@@ -65,11 +54,11 @@ type setupRes struct {
 }
 
 type testConnection struct {
-	status          connect.ConnectionStatus
+	status          connectpb.ConnectionStatus
 	lastHeartbeatAt time.Time
 }
 
-func newTestConn(status connect.ConnectionStatus, lastHeartbeatAt time.Time) testConnection {
+func newTestConn(status connectpb.ConnectionStatus, lastHeartbeatAt time.Time) testConnection {
 	return testConnection{
 		status:          status,
 		lastHeartbeatAt: lastHeartbeatAt,
@@ -151,7 +140,7 @@ func setup(t *testing.T, stateMan state.StateManager, opts setupOpts, connsToCre
 	fnBytes, err := json.Marshal([]sdk.SDKFunction{fn1})
 	require.NoError(t, err)
 
-	app1Config := &connect.AppConfiguration{
+	app1Config := &connectpb.AppConfiguration{
 		AppName:    appName,
 		AppVersion: util.StrPtr("v1"),
 		Functions:  fnBytes,
@@ -161,13 +150,13 @@ func setup(t *testing.T, stateMan state.StateManager, opts setupOpts, connsToCre
 	for i, connToCreate := range connsToCreate {
 		connId := ulid.MustNew(ulid.Now(), rand.Reader)
 
-		fakeReq := &connect.WorkerConnectRequestData{
+		fakeReq := &connectpb.WorkerConnectRequestData{
 			ConnectionId: connId.String(),
 			InstanceId:   "my-worker",
-			Apps: []*connect.AppConfiguration{
+			Apps: []*connectpb.AppConfiguration{
 				app1Config,
 			},
-			SystemAttributes: &connect.SystemAttributes{
+			SystemAttributes: &connectpb.SystemAttributes{
 				CpuCores: 10,
 				MemBytes: 1024 * 1024 * 16,
 				Os:       "linux",
@@ -175,13 +164,13 @@ func setup(t *testing.T, stateMan state.StateManager, opts setupOpts, connsToCre
 			SdkVersion:   "fake-ver",
 			SdkLanguage:  "fake-sdk",
 			Capabilities: caps,
-			AuthData: &connect.AuthData{
+			AuthData: &connectpb.AuthData{
 				SessionToken: "fake-session-token",
 				SyncToken:    "fake-sync-token",
 			},
 		}
 
-		group, err := NewWorkerGroupFromConnRequest(context.Background(), fakeReq, &auth.Response{
+		group, err := state.NewWorkerGroupFromConnRequest(context.Background(), fakeReq, &auth.Response{
 			AccountID: acctId,
 			EnvID:     envId,
 		}, app1Config)
@@ -222,14 +211,14 @@ func TestFullConnectRouting(t *testing.T) {
 	log := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
 
 	t.Run("single healthy connection should receive requests", func(t *testing.T) {
-		svc, stateMan, cleanup := setupRedis(t)
+		stateMan, cleanup := setupRedis(t)
 		defer cleanup()
 
 		setupRes := setup(t, stateMan, setupOpts{},
-			newTestConn(connect.ConnectionStatus_READY, time.Now()),
+			newTestConn(connectpb.ConnectionStatus_READY, time.Now()),
 		)
 
-		conn, err := svc.getSuitableConnection(context.Background(), setupRes.envId, setupRes.appId, setupRes.fnSlug, log)
+		conn, err := getSuitableConnection(context.Background(), rnd, stateMan, setupRes.envId, setupRes.appId, setupRes.fnSlug, log)
 		require.NoError(t, err)
 
 		require.Equal(t, setupRes.connIds[0].String(), conn.Id)
@@ -237,17 +226,17 @@ func TestFullConnectRouting(t *testing.T) {
 	})
 
 	t.Run("unhealthy connection should be filtered out", func(t *testing.T) {
-		svc, stateMan, cleanup := setupRedis(t)
+		stateMan, cleanup := setupRedis(t)
 		defer cleanup()
 
 		setupRes := setup(t, stateMan, setupOpts{},
-			newTestConn(connect.ConnectionStatus_CONNECTED, time.Now()),
-			newTestConn(connect.ConnectionStatus_DISCONNECTING, time.Now()),
-			newTestConn(connect.ConnectionStatus_DISCONNECTED, time.Now()),
-			newTestConn(connect.ConnectionStatus_READY, time.Now()),
+			newTestConn(connectpb.ConnectionStatus_CONNECTED, time.Now()),
+			newTestConn(connectpb.ConnectionStatus_DISCONNECTING, time.Now()),
+			newTestConn(connectpb.ConnectionStatus_DISCONNECTED, time.Now()),
+			newTestConn(connectpb.ConnectionStatus_READY, time.Now()),
 		)
 
-		conn, err := svc.getSuitableConnection(context.Background(), setupRes.envId, setupRes.appId, setupRes.fnSlug, log)
+		conn, err := getSuitableConnection(context.Background(), rnd, stateMan, setupRes.envId, setupRes.appId, setupRes.fnSlug, log)
 		require.NoError(t, err)
 
 		require.Equal(t, setupRes.connIds[3].String(), conn.Id)
@@ -268,15 +257,15 @@ func TestFullConnectRouting(t *testing.T) {
 	})
 
 	t.Run("no healthy connection should be handled gracefully", func(t *testing.T) {
-		svc, stateMan, cleanup := setupRedis(t)
+		stateMan, cleanup := setupRedis(t)
 		defer cleanup()
 
 		setupRes := setup(t, stateMan, setupOpts{},
-			newTestConn(connect.ConnectionStatus_DISCONNECTING, time.Now()),
-			newTestConn(connect.ConnectionStatus_DISCONNECTED, time.Now()),
+			newTestConn(connectpb.ConnectionStatus_DISCONNECTING, time.Now()),
+			newTestConn(connectpb.ConnectionStatus_DISCONNECTED, time.Now()),
 		)
 
-		_, err := svc.getSuitableConnection(context.Background(), setupRes.envId, setupRes.appId, setupRes.fnSlug, log)
+		_, err := getSuitableConnection(context.Background(), rnd, stateMan, setupRes.envId, setupRes.appId, setupRes.fnSlug, log)
 		require.Error(t, err)
 		require.ErrorIs(t, err, ErrNoHealthyConnection)
 	})
@@ -288,13 +277,13 @@ func TestFullConnectRouting(t *testing.T) {
 		// it merely increases the chances of a connection running a newer version being picked.
 		t.Skip("this test serves as an explainer and should not run")
 
-		svc, stateMan, cleanup := setupRedis(t)
+		stateMan, cleanup := setupRedis(t)
 		defer cleanup()
 
 		setupOldVersion := setup(t, stateMan, setupOpts{
 			fnId: "fn-1",
 		},
-			newTestConn(connect.ConnectionStatus_READY, time.Now()),
+			newTestConn(connectpb.ConnectionStatus_READY, time.Now()),
 		)
 
 		<-time.After(1 * time.Second)
@@ -308,38 +297,38 @@ func TestFullConnectRouting(t *testing.T) {
 			appId:     setupOldVersion.appId,
 			syncId:    setupOldVersion.syncId,
 		},
-			newTestConn(connect.ConnectionStatus_READY, time.Now()),
+			newTestConn(connectpb.ConnectionStatus_READY, time.Now()),
 		)
 
-		conn, err := svc.getSuitableConnection(context.Background(), setupOldVersion.envId, setupOldVersion.appId, setupOldVersion.fnSlug, log)
+		conn, err := getSuitableConnection(context.Background(), rnd, stateMan, setupOldVersion.envId, setupOldVersion.appId, setupOldVersion.fnSlug, log)
 		require.NoError(t, err)
 		require.Equal(t, setupNewVersion.connIds[0].String(), conn.Id)
 		require.NotEqual(t, setupOldVersion.connIds[0].String(), conn.Id)
 	})
 
 	t.Run("connection without functions should be ignored", func(t *testing.T) {
-		svc, stateMan, cleanup := setupRedis(t)
+		stateMan, cleanup := setupRedis(t)
 		defer cleanup()
 
 		setupRes := setup(t, stateMan, setupOpts{},
-			newTestConn(connect.ConnectionStatus_READY, time.Now()),
-			newTestConn(connect.ConnectionStatus_READY, time.Now()),
+			newTestConn(connectpb.ConnectionStatus_READY, time.Now()),
+			newTestConn(connectpb.ConnectionStatus_READY, time.Now()),
 		)
 
 		// Try to route message for fn-1 (this does not exist)
-		_, err := svc.getSuitableConnection(context.Background(), setupRes.envId, setupRes.appId, "fn-2", log)
+		_, err := getSuitableConnection(context.Background(), rnd, stateMan, setupRes.envId, setupRes.appId, "fn-2", log)
 		require.Error(t, err)
 		require.ErrorIs(t, err, ErrNoHealthyConnection)
 	})
 
 	t.Run("connection without functions should be ignored, even if newer", func(t *testing.T) {
-		svc, stateMan, cleanup := setupRedis(t)
+		stateMan, cleanup := setupRedis(t)
 		defer cleanup()
 
 		setupOldVersion := setup(t, stateMan, setupOpts{
 			fnId: "fn-1",
 		},
-			newTestConn(connect.ConnectionStatus_READY, time.Now()),
+			newTestConn(connectpb.ConnectionStatus_READY, time.Now()),
 		)
 
 		<-time.After(1 * time.Second)
@@ -353,12 +342,12 @@ func TestFullConnectRouting(t *testing.T) {
 			appId:     setupOldVersion.appId,
 			syncId:    setupOldVersion.syncId,
 		},
-			newTestConn(connect.ConnectionStatus_READY, time.Now()),
-			newTestConn(connect.ConnectionStatus_READY, time.Now()),
+			newTestConn(connectpb.ConnectionStatus_READY, time.Now()),
+			newTestConn(connectpb.ConnectionStatus_READY, time.Now()),
 		)
 
 		// Try to route message for fn-1 (this does not exist in newer version)
-		conn, err := svc.getSuitableConnection(context.Background(), setupOldVersion.envId, setupOldVersion.appId, setupOldVersion.fnSlug, log)
+		conn, err := getSuitableConnection(context.Background(), rnd, stateMan, setupOldVersion.envId, setupOldVersion.appId, setupOldVersion.fnSlug, log)
 		require.NoError(t, err)
 		require.NotEqual(t, setupNewVersion.connIds[0].String(), conn.Id)
 		require.Equal(t, setupOldVersion.connIds[0].String(), conn.Id)
@@ -368,12 +357,12 @@ func TestFullConnectRouting(t *testing.T) {
 func TestIsHealthy(t *testing.T) {
 	log := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
 
-	_, stateMan, cleanup := setupRedis(t)
+	stateMan, cleanup := setupRedis(t)
 	defer cleanup()
 
 	type testCase struct {
 		name           string
-		status         connect.ConnectionStatus
+		status         connectpb.ConnectionStatus
 		heartbeatDelay time.Duration
 		expected       isHealthyRes
 	}
@@ -381,7 +370,7 @@ func TestIsHealthy(t *testing.T) {
 	cases := []testCase{
 		{
 			name:   "ready connection should be marked as healthy",
-			status: connect.ConnectionStatus_READY,
+			status: connectpb.ConnectionStatus_READY,
 			expected: isHealthyRes{
 				isHealthy:                       true,
 				shouldDeleteUnhealthyConnection: false,
@@ -390,8 +379,8 @@ func TestIsHealthy(t *testing.T) {
 		},
 		{
 			name:           "ready but timed out connection should not be marked as healthy",
-			status:         connect.ConnectionStatus_READY,
-			heartbeatDelay: 3 * WorkerHeartbeatInterval,
+			status:         connectpb.ConnectionStatus_READY,
+			heartbeatDelay: 3 * consts.ConnectWorkerHeartbeatInterval,
 			expected: isHealthyRes{
 				isHealthy:                       false,
 				shouldDeleteUnhealthyConnection: true,
@@ -400,7 +389,7 @@ func TestIsHealthy(t *testing.T) {
 		},
 		{
 			name:   "non-ready connection should not be marked as healthy",
-			status: connect.ConnectionStatus_DISCONNECTING,
+			status: connectpb.ConnectionStatus_DISCONNECTING,
 			expected: isHealthyRes{
 				isHealthy:                       false,
 				shouldDeleteUnhealthyConnection: false,
@@ -409,7 +398,7 @@ func TestIsHealthy(t *testing.T) {
 		},
 		{
 			name:   "disconnected connection should be cleaned up",
-			status: connect.ConnectionStatus_DISCONNECTED,
+			status: connectpb.ConnectionStatus_DISCONNECTED,
 			expected: isHealthyRes{
 				isHealthy:                       false,
 				shouldDeleteUnhealthyConnection: true,
@@ -442,7 +431,7 @@ func TestGetConnectionWeight(t *testing.T) {
 		group := &state.WorkerGroup{CreatedAt: versionTime}
 		for i := range numCandidates {
 			conns[i] = connWithGroup{
-				conn: &connect.ConnMetadata{
+				conn: &connectpb.ConnMetadata{
 					Id: fmt.Sprintf("%s-%d", prefix, i),
 				},
 				group: group,

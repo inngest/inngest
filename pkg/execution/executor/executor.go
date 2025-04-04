@@ -76,14 +76,6 @@ var (
 	PauseHandleConcurrency = 100
 )
 
-var (
-	// SourceEdgeRetries represents the number of times we'll retry running a source edge.
-	// Each edge gets their own set of retries in our execution engine, embedded directly
-	// in the job.  The retry count is taken from function config for every step _but_
-	// initialization.
-	sourceEdgeRetries = 20
-)
-
 // NewExecutor returns a new executor, responsible for running the specific step of a
 // function (using the available drivers) and storing the step's output or error.
 //
@@ -676,6 +668,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	//
 	// This enures that we only ever enqueue the start job for this function once.
 	queueKey := fmt.Sprintf("%s:%s", req.Function.ID, key)
+	maxAttempts := consts.MaxRetries + 1
 	item := queue.Item{
 		JobID:       &queueKey,
 		GroupID:     uuid.New().String(),
@@ -693,7 +686,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		CustomConcurrencyKeys: metadata.Config.CustomConcurrencyKeys,
 		PriorityFactor:        metadata.Config.PriorityFactor,
 		Attempt:               0,
-		MaxAttempts:           &sourceEdgeRetries,
+		MaxAttempts:           &maxAttempts,
 		Payload: queue.PayloadEdge{
 			Edge: inngest.SourceEdge,
 		},

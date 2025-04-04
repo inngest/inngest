@@ -298,3 +298,12 @@ func IncrQueueContinuationRemovedCounter(ctx context.Context, opts CounterOpt) {
 		Tags:        opts.Tags,
 	})
 }
+
+func IncrQueueDebounceOperationCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "queue_debounce_operation",
+		Description: "The total number of debounce operations",
+		Tags:        opts.Tags,
+	})
+}

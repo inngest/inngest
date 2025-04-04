@@ -121,11 +121,24 @@ func (q *queue) Enqueue(ctx context.Context, item osqueue.Item, at time.Time, op
 	}
 
 	shard := q.primaryQueueShard
-	if q.shardSelector != nil {
+	switch {
+	// If the caller wants us to enqueue the job to a specific queue shard, use that.
+	case opts.ForceQueueShardName != "":
+		foundShard, ok := q.queueShardClients[opts.ForceQueueShardName]
+		if !ok {
+			return fmt.Errorf("tried to force invalid queue shard %q", opts.ForceQueueShardName)
+		}
+
+		shard = foundShard
+	// Otherwise, invoke the shard selector, if configured.
+	case q.shardSelector != nil:
+		// QueueName should be consistently specified on both levels. This safeguard ensures
+		// we'll check for both places, just in case.
 		qn := qi.Data.QueueName
 		if qn == nil {
 			qn = qi.QueueName
 		}
+
 		selected, err := q.shardSelector(ctx, qi.Data.Identifier.AccountID, qn)
 		if err != nil {
 			q.logger.Error().Err(err).Interface("qi", qi).Msg("error selecting shard")

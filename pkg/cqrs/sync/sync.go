@@ -1,9 +1,9 @@
-package cqrs
+package sync
 
 import "github.com/google/uuid"
 
-// SyncReply is used for sync response
-type SyncReply struct {
+// Reply is used for sync response
+type Reply struct {
 	OK       bool       `json:"ok"`
 	Modified bool       `json:"modified"`
 	Message  *string    `json:"message,omitempty"`
@@ -12,6 +12,6 @@ type SyncReply struct {
 	AppID    *uuid.UUID `json:"app_id,omitempty"`
 }
 
-func (sr *SyncReply) IsSuccess() bool {
+func (sr *Reply) IsSuccess() bool {
 	return sr.OK && sr.SyncID != nil && sr.AppID != nil
 }

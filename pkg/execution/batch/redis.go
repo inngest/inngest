@@ -9,14 +9,14 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/inngest/inngest/pkg/event"
-	"github.com/inngest/inngest/pkg/expressions"
-
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
+	"github.com/inngest/inngest/pkg/expressions"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/inngest/log"
 	"github.com/oklog/ulid/v2"
@@ -199,7 +199,7 @@ func (b redisBatchManager) StartExecution(ctx context.Context, functionId uuid.U
 // ScheduleExecution enqueues a job to run the batch job after the specified duration.
 func (b redisBatchManager) ScheduleExecution(ctx context.Context, opts ScheduleBatchOpts) error {
 	jobID := opts.JobID()
-	maxAttempts := 20
+	maxAttempts := consts.MaxRetries + 1
 
 	queueName := queue.KindScheduleBatch
 	err := b.q.Enqueue(ctx, queue.Item{

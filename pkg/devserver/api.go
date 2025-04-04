@@ -6,6 +6,7 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
+	"github.com/inngest/inngest/pkg/cqrs/sync"
 	"github.com/inngest/inngest/pkg/enums"
 	"io"
 	"io/fs"
@@ -196,7 +197,7 @@ func (a devapi) Register(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(resp)
 }
 
-func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*cqrs.SyncReply, error) {
+func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Reply, error) {
 	sum, err := r.Checksum()
 	if err != nil {
 		return nil, publicerr.Wrap(err, 400, "Invalid request")
@@ -209,7 +210,7 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*cqrs.Sync
 		if !app.Error.Valid {
 			// Skip registration since the app was already successfully
 			// registered.
-			return &cqrs.SyncReply{
+			return &sync.Reply{
 				OK:     true,
 				AppID:  &app.ID,
 				SyncID: &syncID,
@@ -332,7 +333,7 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*cqrs.Sync
 		}
 	}
 
-	reply := &cqrs.SyncReply{
+	reply := &sync.Reply{
 		OK:       true,
 		Modified: true,
 		AppID:    &appID,
