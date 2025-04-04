@@ -31,9 +31,11 @@ export default function StartPage({}) {
     });
   }, [startDdInt, ddSite, ddDomain, oauthStateReady]);
 
-  if (data) {
-    window.location.href = data.datadogOAuthRedirectURL;
-  }
+  useEffect(() => {
+    if (data) {
+      window.location.href = data.datadogOAuthRedirectURL;
+    }
+  }, [data]);
 
   if (!oauthStateReady) {
     return (

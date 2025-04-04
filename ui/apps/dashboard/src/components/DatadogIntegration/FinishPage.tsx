@@ -51,9 +51,11 @@ export default function FinishPage({}) {
     });
   }, [finishDdInt, orgID, orgName, authCode, ddSite, ddDomain, oauthStateReady]);
 
-  if (data) {
-    window.location.href = '/settings/integrations/datadog';
-  }
+  useEffect(() => {
+    if (data) {
+      window.location.href = '/settings/integrations/datadog';
+    }
+  }, [data]);
 
   if (!oauthStateReady) {
     return (
