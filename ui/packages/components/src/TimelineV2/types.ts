@@ -1,3 +1,5 @@
+import type { UserlandSpanType } from '../RunDetailsV3/types';
+
 export type Trace = {
   attempts: number | null;
   childrenSpans?: Trace[];
@@ -12,6 +14,8 @@ export type Trace = {
   status: string;
   stepInfo: StepInfoInvoke | StepInfoSleep | StepInfoWait | StepInfoRun | null;
   stepOp?: string | null;
+  isUserland: boolean;
+  userlandSpan: UserlandSpanType | null;
 };
 
 type StepInfoInvoke = {

@@ -1,6 +1,5 @@
 'use client';
 
-import { useCallback } from 'react';
 import { ContentCard } from '@inngest/components/ContentCard';
 import { RunStatusIcon } from '@inngest/components/FunctionRunStatusIcons';
 import { MetadataGrid } from '@inngest/components/Metadata';
@@ -58,12 +57,6 @@ export function RunDetails(props: Props) {
   } = props;
 
   const runID = run?.id;
-  const cancelRun = useCallback(async () => {
-    if (!props.cancelRun || !runID) {
-      return;
-    }
-    await props.cancelRun(runID);
-  }, [props.cancelRun, runID]);
 
   const firstTrigger = (func?.triggers && func.triggers[0]) ?? null;
   const cron = firstTrigger && firstTrigger.type === 'CRON';

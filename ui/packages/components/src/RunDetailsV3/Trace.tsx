@@ -34,19 +34,6 @@ export function Trace({ depth, getResult, maxTime, minTime, pathCreator, trace, 
     }
   }, [expanded, result]);
 
-  const widths = createSpanWidths({
-    ended: toMaybeDate(trace.endedAt)?.getTime() ?? null,
-    max: maxTime.getTime(),
-    min: minTime.getTime(),
-    queued: new Date(trace.queuedAt).getTime(),
-    started: toMaybeDate(trace.startedAt)?.getTime() ?? null,
-  });
-
-  const spans =
-    !trace.isRoot && trace.childrenSpans && trace.childrenSpans.length > 0
-      ? trace.childrenSpans
-      : [trace];
-
   //
   // Don't show single finalization step for successful runs
   // unless they have children (e.g. failed attempts)
@@ -102,13 +89,7 @@ export function Trace({ depth, getResult, maxTime, minTime, pathCreator, trace, 
         </div>
 
         <div className="border-light/80 flex w-[70%] flex-row border-l-2">
-          <InlineSpans
-            maxTime={maxTime}
-            minTime={minTime}
-            name={trace.name}
-            spans={spans}
-            widths={widths}
-          />
+          <InlineSpans maxTime={maxTime} minTime={minTime} trace={trace} />
         </div>
       </div>
 

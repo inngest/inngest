@@ -56,21 +56,6 @@ const (
 	RunServiceLoadStateProcedure = "/state.v2.RunService/LoadState"
 )
 
-// These variables are the protoreflect.Descriptor objects for the RPCs defined in this package.
-var (
-	runServiceServiceDescriptor              = v2.File_state_v2_state_proto.Services().ByName("RunService")
-	runServiceCreateMethodDescriptor         = runServiceServiceDescriptor.Methods().ByName("Create")
-	runServiceDeleteMethodDescriptor         = runServiceServiceDescriptor.Methods().ByName("Delete")
-	runServiceExistsMethodDescriptor         = runServiceServiceDescriptor.Methods().ByName("Exists")
-	runServiceUpdateMetadataMethodDescriptor = runServiceServiceDescriptor.Methods().ByName("UpdateMetadata")
-	runServiceSaveStepMethodDescriptor       = runServiceServiceDescriptor.Methods().ByName("SaveStep")
-	runServiceSavePendingMethodDescriptor    = runServiceServiceDescriptor.Methods().ByName("SavePending")
-	runServiceLoadMetadataMethodDescriptor   = runServiceServiceDescriptor.Methods().ByName("LoadMetadata")
-	runServiceLoadEventsMethodDescriptor     = runServiceServiceDescriptor.Methods().ByName("LoadEvents")
-	runServiceLoadStepsMethodDescriptor      = runServiceServiceDescriptor.Methods().ByName("LoadSteps")
-	runServiceLoadStateMethodDescriptor      = runServiceServiceDescriptor.Methods().ByName("LoadState")
-)
-
 // RunServiceClient is a client for the state.v2.RunService service.
 type RunServiceClient interface {
 	Create(context.Context, *connect.Request[v2.CreateStateRequest]) (*connect.Response[v2.CreateStateResponse], error)
@@ -94,65 +79,66 @@ type RunServiceClient interface {
 // http://api.acme.com or https://acme.com/grpc).
 func NewRunServiceClient(httpClient connect.HTTPClient, baseURL string, opts ...connect.ClientOption) RunServiceClient {
 	baseURL = strings.TrimRight(baseURL, "/")
+	runServiceMethods := v2.File_state_v2_state_proto.Services().ByName("RunService").Methods()
 	return &runServiceClient{
 		create: connect.NewClient[v2.CreateStateRequest, v2.CreateStateResponse](
 			httpClient,
 			baseURL+RunServiceCreateProcedure,
-			connect.WithSchema(runServiceCreateMethodDescriptor),
+			connect.WithSchema(runServiceMethods.ByName("Create")),
 			connect.WithClientOptions(opts...),
 		),
 		delete: connect.NewClient[v2.DeleteStateRequest, v2.DeleteStateResponse](
 			httpClient,
 			baseURL+RunServiceDeleteProcedure,
-			connect.WithSchema(runServiceDeleteMethodDescriptor),
+			connect.WithSchema(runServiceMethods.ByName("Delete")),
 			connect.WithClientOptions(opts...),
 		),
 		exists: connect.NewClient[v2.ExistsRequest, v2.ExistsResponse](
 			httpClient,
 			baseURL+RunServiceExistsProcedure,
-			connect.WithSchema(runServiceExistsMethodDescriptor),
+			connect.WithSchema(runServiceMethods.ByName("Exists")),
 			connect.WithClientOptions(opts...),
 		),
 		updateMetadata: connect.NewClient[v2.UpdateMetadataRequest, v2.UpdateMetadataResponse](
 			httpClient,
 			baseURL+RunServiceUpdateMetadataProcedure,
-			connect.WithSchema(runServiceUpdateMetadataMethodDescriptor),
+			connect.WithSchema(runServiceMethods.ByName("UpdateMetadata")),
 			connect.WithClientOptions(opts...),
 		),
 		saveStep: connect.NewClient[v2.SaveStepRequest, v2.SaveStepResponse](
 			httpClient,
 			baseURL+RunServiceSaveStepProcedure,
-			connect.WithSchema(runServiceSaveStepMethodDescriptor),
+			connect.WithSchema(runServiceMethods.ByName("SaveStep")),
 			connect.WithClientOptions(opts...),
 		),
 		savePending: connect.NewClient[v2.SavePendingRequest, v2.SavePendingResponse](
 			httpClient,
 			baseURL+RunServiceSavePendingProcedure,
-			connect.WithSchema(runServiceSavePendingMethodDescriptor),
+			connect.WithSchema(runServiceMethods.ByName("SavePending")),
 			connect.WithClientOptions(opts...),
 		),
 		loadMetadata: connect.NewClient[v2.LoadMetadataRequest, v2.LoadMetadataResponse](
 			httpClient,
 			baseURL+RunServiceLoadMetadataProcedure,
-			connect.WithSchema(runServiceLoadMetadataMethodDescriptor),
+			connect.WithSchema(runServiceMethods.ByName("LoadMetadata")),
 			connect.WithClientOptions(opts...),
 		),
 		loadEvents: connect.NewClient[v2.LoadEventsRequest, v2.LoadEventsResponse](
 			httpClient,
 			baseURL+RunServiceLoadEventsProcedure,
-			connect.WithSchema(runServiceLoadEventsMethodDescriptor),
+			connect.WithSchema(runServiceMethods.ByName("LoadEvents")),
 			connect.WithClientOptions(opts...),
 		),
 		loadSteps: connect.NewClient[v2.LoadStepsRequest, v2.LoadStepsResponse](
 			httpClient,
 			baseURL+RunServiceLoadStepsProcedure,
-			connect.WithSchema(runServiceLoadStepsMethodDescriptor),
+			connect.WithSchema(runServiceMethods.ByName("LoadSteps")),
 			connect.WithClientOptions(opts...),
 		),
 		loadState: connect.NewClient[v2.LoadStateRequest, v2.LoadStateResponse](
 			httpClient,
 			baseURL+RunServiceLoadStateProcedure,
-			connect.WithSchema(runServiceLoadStateMethodDescriptor),
+			connect.WithSchema(runServiceMethods.ByName("LoadState")),
 			connect.WithClientOptions(opts...),
 		),
 	}
@@ -242,64 +228,65 @@ type RunServiceHandler interface {
 // By default, handlers support the Connect, gRPC, and gRPC-Web protocols with the binary Protobuf
 // and JSON codecs. They also support gzip compression.
 func NewRunServiceHandler(svc RunServiceHandler, opts ...connect.HandlerOption) (string, http.Handler) {
+	runServiceMethods := v2.File_state_v2_state_proto.Services().ByName("RunService").Methods()
 	runServiceCreateHandler := connect.NewUnaryHandler(
 		RunServiceCreateProcedure,
 		svc.Create,
-		connect.WithSchema(runServiceCreateMethodDescriptor),
+		connect.WithSchema(runServiceMethods.ByName("Create")),
 		connect.WithHandlerOptions(opts...),
 	)
 	runServiceDeleteHandler := connect.NewUnaryHandler(
 		RunServiceDeleteProcedure,
 		svc.Delete,
-		connect.WithSchema(runServiceDeleteMethodDescriptor),
+		connect.WithSchema(runServiceMethods.ByName("Delete")),
 		connect.WithHandlerOptions(opts...),
 	)
 	runServiceExistsHandler := connect.NewUnaryHandler(
 		RunServiceExistsProcedure,
 		svc.Exists,
-		connect.WithSchema(runServiceExistsMethodDescriptor),
+		connect.WithSchema(runServiceMethods.ByName("Exists")),
 		connect.WithHandlerOptions(opts...),
 	)
 	runServiceUpdateMetadataHandler := connect.NewUnaryHandler(
 		RunServiceUpdateMetadataProcedure,
 		svc.UpdateMetadata,
-		connect.WithSchema(runServiceUpdateMetadataMethodDescriptor),
+		connect.WithSchema(runServiceMethods.ByName("UpdateMetadata")),
 		connect.WithHandlerOptions(opts...),
 	)
 	runServiceSaveStepHandler := connect.NewUnaryHandler(
 		RunServiceSaveStepProcedure,
 		svc.SaveStep,
-		connect.WithSchema(runServiceSaveStepMethodDescriptor),
+		connect.WithSchema(runServiceMethods.ByName("SaveStep")),
 		connect.WithHandlerOptions(opts...),
 	)
 	runServiceSavePendingHandler := connect.NewUnaryHandler(
 		RunServiceSavePendingProcedure,
 		svc.SavePending,
-		connect.WithSchema(runServiceSavePendingMethodDescriptor),
+		connect.WithSchema(runServiceMethods.ByName("SavePending")),
 		connect.WithHandlerOptions(opts...),
 	)
 	runServiceLoadMetadataHandler := connect.NewUnaryHandler(
 		RunServiceLoadMetadataProcedure,
 		svc.LoadMetadata,
-		connect.WithSchema(runServiceLoadMetadataMethodDescriptor),
+		connect.WithSchema(runServiceMethods.ByName("LoadMetadata")),
 		connect.WithHandlerOptions(opts...),
 	)
 	runServiceLoadEventsHandler := connect.NewUnaryHandler(
 		RunServiceLoadEventsProcedure,
 		svc.LoadEvents,
-		connect.WithSchema(runServiceLoadEventsMethodDescriptor),
+		connect.WithSchema(runServiceMethods.ByName("LoadEvents")),
 		connect.WithHandlerOptions(opts...),
 	)
 	runServiceLoadStepsHandler := connect.NewUnaryHandler(
 		RunServiceLoadStepsProcedure,
 		svc.LoadSteps,
-		connect.WithSchema(runServiceLoadStepsMethodDescriptor),
+		connect.WithSchema(runServiceMethods.ByName("LoadSteps")),
 		connect.WithHandlerOptions(opts...),
 	)
 	runServiceLoadStateHandler := connect.NewUnaryHandler(
 		RunServiceLoadStateProcedure,
 		svc.LoadState,
-		connect.WithSchema(runServiceLoadStateMethodDescriptor),
+		connect.WithSchema(runServiceMethods.ByName("LoadState")),
 		connect.WithHandlerOptions(opts...),
 	)
 	return "/state.v2.RunService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
