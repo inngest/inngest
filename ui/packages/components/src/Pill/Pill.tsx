@@ -31,7 +31,7 @@ export function Pill({
 }) {
   const pillColors = getPillColors({ kind, appearance, clickable: !!href });
   const classNames = cn(
-    'inline-flex items-center h-5 px-2 text-xs leading-none font-medium',
+    'inline-flex items-center h-5 px-2 text-xs leading-none font-medium whitespace-nowrap overflow-hidden text-ellipsis max-w-full',
     pillColors,
     className
   );
@@ -45,7 +45,7 @@ export function Pill({
   if (href) {
     return (
       <NextLink href={href} className={cn('rounded', classNames)}>
-        {children}
+        <span className="truncate">{children}</span>
       </NextLink>
     );
   }
@@ -60,12 +60,12 @@ export type PillContentProps = {
 
 export function PillContent({ children, type }: PillContentProps) {
   return (
-    <div className="flex items-center gap-1 truncate">
+    <div className="flex items-center gap-1">
       {type === 'EVENT' && <EventsIcon className="text-subtle h-3 w-3" />}
       {type === 'CRON' && <RiTimeLine className="text-subtle h-3 w-3" />}
       {type === 'FUNCTION' && <FunctionsIcon className="text-subtle h-3 w-3" />}
       {type === 'APP' && <AppsIcon className="text-subtle h-3 w-3" />}
-      {children}
+      <p className="flex-1 truncate">{children}</p>
     </div>
   );
 }
