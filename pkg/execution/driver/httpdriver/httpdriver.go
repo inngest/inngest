@@ -26,6 +26,7 @@ import (
 	"github.com/inngest/inngest/pkg/inngest/log"
 	"github.com/inngest/inngest/pkg/syscode"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
+	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
 	"go.opentelemetry.io/otel/propagation"
 )
@@ -33,23 +34,32 @@ import (
 var (
 	dialer = &net.Dialer{KeepAlive: 15 * time.Second}
 
-	DefaultTransport = &http.Transport{
-		DialContext: SecureDialer(SecureDialerOpts{
-			AllowHostDocker: false,
-			AllowPrivate:    false,
-			AllowNAT64:      false,
-		}),
-		ForceAttemptHTTP2:     true,
-		MaxIdleConns:          5,
-		IdleConnTimeout:       2 * time.Second,
-		TLSHandshakeTimeout:   10 * time.Second,
-		ExpectContinueTimeout: 1 * time.Second,
-		DisableKeepAlives:     true,
-		// New, ensuring that services can take their time before
-		// responding with headers as they process long running
-		// jobs.
-		ResponseHeaderTimeout: consts.MaxFunctionTimeout,
-	}
+	DefaultTransport = func() *http.Transport {
+		t := &http.Transport{
+			DialContext: SecureDialer(SecureDialerOpts{
+				AllowHostDocker: false,
+				AllowPrivate:    false,
+				AllowNAT64:      false,
+			}),
+			ForceAttemptHTTP2:     true,
+			MaxIdleConns:          5,
+			IdleConnTimeout:       2 * time.Second,
+			TLSHandshakeTimeout:   10 * time.Second,
+			ExpectContinueTimeout: 1 * time.Second,
+			DisableKeepAlives:     true,
+			// New, ensuring that services can take their time before
+			// responding with headers as they process long running
+			// jobs.
+			ResponseHeaderTimeout: consts.MaxFunctionTimeout,
+		}
+
+		if util.InTestMode() {
+			// Allow local requests during testing
+			t.DialContext = dialer.DialContext
+		}
+
+		return t
+	}()
 	DefaultClient = &http.Client{
 		Timeout:       consts.MaxFunctionTimeout,
 		CheckRedirect: CheckRedirect,
