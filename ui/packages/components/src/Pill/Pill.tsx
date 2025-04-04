@@ -1,3 +1,5 @@
+'use client';
+
 import type { UrlObject } from 'url';
 import { Children, isValidElement, useLayoutEffect, useRef, useState } from 'react';
 import type { Route } from 'next';
@@ -106,6 +108,7 @@ export function Pill({
       <span
         ref={hiddenTextRef}
         className={cn(classNames, 'invisible absolute left-0 top-0 whitespace-nowrap')}
+        aria-hidden="true"
       >
         <span>{children}</span>
       </span>
