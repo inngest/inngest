@@ -18,9 +18,10 @@ export default function StartPage({}) {
   const searchParams = useSearchParams();
   const ddSite = searchParams.get('site');
   const ddDomain = searchParams.get('domain');
+  const oauthStateReady = ddSite && ddDomain;
 
   useEffect(() => {
-    if (!ddSite || !ddDomain) {
+    if (!oauthStateReady) {
       return;
     }
 
@@ -28,10 +29,16 @@ export default function StartPage({}) {
       ddSite: ddSite,
       ddDomain: ddDomain,
     });
-  }, [startDdInt, ddSite, ddDomain]);
+  }, [startDdInt, ddSite, ddDomain, oauthStateReady]);
 
   if (data) {
     window.location.href = data.datadogOAuthRedirectURL;
+  }
+
+  if (!oauthStateReady) {
+    return (
+      <ConnectingView errorMessage="Expected authentication flow parameters are missing. Please try connecting to Datadog again from the beginning." />
+    );
   }
 
   return <ConnectingView errorMessage={error?.message} />;
