@@ -1,6 +1,8 @@
 import type { UrlObject } from 'url';
+import { Children, isValidElement, useLayoutEffect, useRef, useState } from 'react';
 import type { Route } from 'next';
 import NextLink from 'next/link';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
 import { AppsIcon } from '@inngest/components/icons/sections/Apps';
 import { EventsIcon } from '@inngest/components/icons/sections/Events';
 import { FunctionsIcon } from '@inngest/components/icons/sections/Functions';
@@ -29,9 +31,13 @@ export function Pill({
    */
   flatSide?: 'left' | 'right';
 }) {
+  const pillRef = useRef<HTMLSpanElement | HTMLAnchorElement | null>(null);
+  const hiddenTextRef = useRef<HTMLSpanElement | null>(null);
+  const [isTruncated, setIsTruncated] = useState(false);
+
   const pillColors = getPillColors({ kind, appearance, clickable: !!href });
   const classNames = cn(
-    'inline-flex items-center h-5 px-2 text-xs leading-none font-medium whitespace-nowrap overflow-hidden text-ellipsis max-w-full',
+    'inline-flex items-center h-5 px-2 text-xs leading-none font-medium truncate max-w-full',
     pillColors,
     className
   );
@@ -41,16 +47,70 @@ export function Pill({
   } else if (flatSide === 'right') {
     roundedClasses = 'rounded-l-2xl';
   }
+  useLayoutEffect(() => {
+    const checkTruncation = () => {
+      if (!pillRef.current || !hiddenTextRef.current) return;
 
-  if (href) {
-    return (
-      <NextLink href={href} className={cn('rounded', classNames)}>
+      // Get the actual width of the pill and its hidden text content
+      const pillWidth = pillRef.current.offsetWidth;
+      const fullTextWidth = hiddenTextRef.current.offsetWidth;
+
+      setIsTruncated(fullTextWidth > pillWidth);
+    };
+
+    checkTruncation();
+    const resizeObserver = new ResizeObserver(checkTruncation);
+    if (pillRef.current) resizeObserver.observe(pillRef.current);
+
+    return () => resizeObserver.disconnect();
+  }, [children]);
+
+  const extractText = (node: React.ReactNode): string => {
+    return Children.toArray(node)
+      .map((child) => {
+        if (typeof child === 'string') return child;
+        if (isValidElement(child)) return extractText(child.props.children);
+        return '';
+      })
+      .join('')
+      .trim();
+  };
+
+  const tooltipText = extractText(children);
+
+  const pillWrapper = href ? (
+    <NextLink href={href}>
+      <span ref={pillRef} className={cn('rounded', classNames)}>
         <span className="truncate">{children}</span>
-      </NextLink>
-    );
-  }
+      </span>
+    </NextLink>
+  ) : (
+    <span ref={pillRef} className={cn(roundedClasses, classNames)}>
+      <span className="truncate">{children}</span>
+    </span>
+  );
+  return (
+    <>
+      {isTruncated ? (
+        <Tooltip delayDuration={0}>
+          <TooltipTrigger asChild>{pillWrapper}</TooltipTrigger>
+          <TooltipContent sideOffset={5} className="text-muted p-2 text-xs" side="bottom">
+            {tooltipText}
+          </TooltipContent>
+        </Tooltip>
+      ) : (
+        pillWrapper
+      )}
 
-  return <span className={cn(roundedClasses, classNames)}>{children}</span>;
+      {/* Hidden text element to measure actual content width */}
+      <span
+        ref={hiddenTextRef}
+        className={cn(classNames, 'invisible absolute left-0 top-0 whitespace-nowrap')}
+      >
+        <span>{children}</span>
+      </span>
+    </>
+  );
 }
 
 export type PillContentProps = {
