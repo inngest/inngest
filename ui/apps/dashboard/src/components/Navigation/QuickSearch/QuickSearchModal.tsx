@@ -61,10 +61,14 @@ export function QuickSearchModal({ envSlug, envName, isOpen, onClose }: Props) {
                   className="text-muted mb-4 text-xs [&_[cmdk-group-heading]]:mb-1"
                 >
                   <ResultItem
+                    isDifferentEnv={envSlug !== coerceEnvSlug(res.data.run.envSlug)}
                     key={res.data.run.id}
                     kind="run"
                     onClick={onClose}
-                    path={pathCreator.runPopout({ envSlug, runID: res.data.run.id })}
+                    path={pathCreator.runPopout({
+                      envSlug: coerceEnvSlug(res.data.run.envSlug),
+                      runID: res.data.run.id,
+                    })}
                     text={res.data.run.id}
                     value={`run-${res.data.run.id}`}
                   />
@@ -110,10 +114,12 @@ export function QuickSearchModal({ envSlug, envName, isOpen, onClose }: Props) {
                   className="text-muted mb-4 text-xs [&_[cmdk-group-heading]]:mb-1"
                 >
                   <ResultItem
+                    isDifferentEnv={envSlug !== coerceEnvSlug(res.data.event.envSlug)}
+                    key={res.data.event.id}
                     kind="event"
                     onClick={onClose}
                     path={pathCreator.event({
-                      envSlug,
+                      envSlug: coerceEnvSlug(res.data.event.envSlug),
                       eventName: res.data.event.name,
                       eventID: res.data.event.id,
                     })}
@@ -166,4 +172,19 @@ export function QuickSearchModal({ envSlug, envName, isOpen, onClose }: Props) {
       </Command>
     </Modal>
   );
+}
+
+function coerceEnvSlug(envSlug: string): string {
+  if (envSlug && envSlug.startsWith('production')) {
+    // This is hacky and flawed. The production env has a pseudo slug in the URL
+    // ("production") which will never match its real slug in the DB. So we'll
+    // coerce the real slug to the pseudo slug.
+    //
+    // This doesn't work if the user created a non-production env that starts
+    // with "production", but should otherwise be fine. This also won't work
+    // when we add support for multiple production environments.
+    return 'production';
+  }
+
+  return envSlug;
 }

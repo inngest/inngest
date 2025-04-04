@@ -2,6 +2,7 @@
 
 import type { Route } from 'next';
 import { useRouter } from 'next/navigation';
+import { Pill } from '@inngest/components/Pill/Pill';
 import { AppsIcon } from '@inngest/components/icons/sections/Apps';
 import { EventLogsIcon } from '@inngest/components/icons/sections/EventLogs';
 import { EventsIcon } from '@inngest/components/icons/sections/Events';
@@ -11,6 +12,7 @@ import { RiQuestionMark } from '@remixicon/react';
 import { Command } from 'cmdk';
 
 type Props = {
+  isDifferentEnv?: boolean;
   kind?: 'app' | 'event' | 'eventType' | 'function' | 'run';
   onClick: () => unknown;
   path?: Route;
@@ -19,7 +21,15 @@ type Props = {
   icon?: React.ReactNode;
 };
 
-export function ResultItem({ kind, onClick, path, text, value, icon }: Props) {
+export function ResultItem({
+  isDifferentEnv = false,
+  kind,
+  onClick,
+  path,
+  text,
+  value,
+  icon,
+}: Props) {
   const router = useRouter();
 
   return (
@@ -37,6 +47,14 @@ export function ResultItem({ kind, onClick, path, text, value, icon }: Props) {
         {kind ? getKindDetails(kind).icon : icon}
       </span>
       <p className="flex-1 truncate">{text}</p>
+
+      {isDifferentEnv && (
+        <span className="h-5">
+          <Pill appearance="solidBright" className="mb-3">
+            Different environment
+          </Pill>
+        </span>
+      )}
     </Command.Item>
   );
 }
