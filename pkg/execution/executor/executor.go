@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/inngest/inngest/pkg/syscode"
+	"github.com/inngest/inngest/pkg/tracing"
 	"github.com/inngest/inngest/pkg/util/gateway"
 
 	"github.com/fatih/structs"
@@ -273,6 +274,13 @@ func WithTraceReader(m cqrs.TraceReader) ExecutorOpt {
 	}
 }
 
+func WithTracerProvider(t *tracing.TracerProvider) ExecutorOpt {
+	return func(e execution.Executor) error {
+		e.(*executor).tracerProvider = t
+		return nil
+	}
+}
+
 func WithRealtimePublisher(b realtime.Publisher) ExecutorOpt {
 	return func(e execution.Executor) error {
 		e.(*executor).rtpub = b
@@ -319,7 +327,8 @@ type executor struct {
 	assignedQueueShard redis_state.QueueShard
 	shardFinder        redis_state.ShardSelector
 
-	traceReader cqrs.TraceReader
+	traceReader    cqrs.TraceReader
+	tracerProvider *tracing.TracerProvider
 }
 
 func (e *executor) SetFinalizer(f execution.FinalizePublisher) {
@@ -490,6 +499,8 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	// If this is paused, immediately end just before creating state.
 	isPaused := req.FunctionPausedAt != nil && req.FunctionPausedAt.Before(time.Now())
 	if isPaused {
+		// TODO Add run span marked as skipped.
+
 		for _, e := range e.lifecycles {
 			go e.OnFunctionSkipped(context.WithoutCancel(ctx), metadata, execution.SkipState{
 				CronSchedule: req.Events[0].GetEvent().CronSchedule(),
@@ -700,6 +711,11 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		return nil, fmt.Errorf("error enqueueing source edge '%v': %w", queueKey, err)
 	}
 
+	// Always the root span.
+	_, tracer := e.tracerProvider.NewTracer(ctx, metadata, item)
+	_, span := tracer.Tracer().Start(ctx, tracing.SpanNameRun, trace.WithNewRoot())
+	span.End()
+
 	for _, e := range e.lifecycles {
 		go e.OnFunctionScheduled(context.WithoutCancel(ctx), metadata, item, req.Events)
 	}
@@ -716,6 +732,7 @@ type runInstance struct {
 	resp       *state.DriverResponse
 	httpClient *http.Client
 	stackIndex int
+	tracer     trace.Tracer
 }
 
 // Execute loads a workflow and the current run state, then executes the
@@ -876,6 +893,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		}
 	}
 
+	ctx, tracer := e.tracerProvider.NewTracer(ctx, md, item)
 	instance := runInstance{
 		md:         md,
 		f:          *ef.Function,
@@ -884,9 +902,23 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		edge:       edge,
 		stackIndex: stackIndex,
 		httpClient: httpdriver.DefaultClient,
+		tracer:     tracer.Tracer(),
 	}
 
+	// If first attempt, this is the creation of a step, and then an attempt.
+	// Otherwise it's just an attempt.
+	if instance.item.Attempt == 0 {
+		var stepSpan trace.Span
+		ctx, stepSpan = instance.tracer.Start(ctx, tracing.SpanNameStep)
+		stepSpan.End()
+	}
+
+	// If it's an attempt, it should now be correctly under the step span.
+	ctx, executionSpan := instance.tracer.Start(ctx, tracing.SpanNameExecution)
 	resp, err := e.run(ctx, &instance)
+	tracing.ApplyResponseToSpan(executionSpan, resp)
+	executionSpan.End()
+
 	// Now we have a response, update the run instance.  We need to do this as request
 	// offloads must mutate the response directly.
 	instance.resp = resp
@@ -899,6 +931,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		}
 		return nil, err
 	}
+
 	if handleErr := e.HandleResponse(ctx, &instance); handleErr != nil {
 		return resp, handleErr
 	}

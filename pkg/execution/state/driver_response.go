@@ -296,6 +296,34 @@ func (r *DriverResponse) IsFunctionResult() bool {
 	return true
 }
 
+// IsDiscoveryResponse returns true if the response is the SDK reporting or
+// requesting steps to be done, or if it is reporting that it itself has done
+// work.
+func (r *DriverResponse) IsDiscoveryResponse() bool {
+	if len(r.Generator) == 0 {
+		// No generator ops, so this is not a discovery response.
+		return false
+	}
+
+	multipleOpsReported := len(r.Generator) > 1
+	if multipleOpsReported {
+		// Multiple ops reported, so this is a discovery response.
+		return true
+	}
+
+	firstOpIsRequest := r.Generator[0].Op != enums.OpcodeStep &&
+		r.Generator[0].Op != enums.OpcodeStepRun &&
+		r.Generator[0].Op != enums.OpcodeStepError
+	if firstOpIsRequest {
+		// First op is a request, so this is still a discovery response.
+		return true
+	}
+
+	// Response has a single op code which indicates the SDK did idempotent
+	// work during this execution.
+	return false
+}
+
 type WrappedStandardError struct {
 	err error
 
