@@ -27,7 +27,7 @@ export default async function DatadogSetupPage({
   const featureAvailable = featureFlagEnabled && metricsEntitlements.metricsExport.enabled;
 
   if (showSubtitleDocsLink && !subtitle) {
-    console.warn('without a subtitle, docs link will not be shown');
+    throw new Error('programming error: without a subtitle, docs link will not be shown');
   }
 
   return (
