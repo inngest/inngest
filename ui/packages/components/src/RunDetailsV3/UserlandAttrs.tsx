@@ -18,7 +18,10 @@ export const UserlandAttrs = ({ userlandSpan }: { userlandSpan: UserlandSpanType
         .filter(([key]) => !internalPrevixes.some((prefix) => key.startsWith(prefix)))
         .map(([key, value], i) => {
           return (
-            <div className="flex flex-row items-center justify-start gap-2">
+            <div
+              key={`userland-span-attr-${key}`}
+              className="flex flex-row items-center justify-start gap-2"
+            >
               <div className="text-muted text-xs">{key}:</div>
               <div className="truncate">{String(value) || '--'}</div>
             </div>
