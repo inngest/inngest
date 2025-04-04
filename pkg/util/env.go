@@ -1,9 +1,12 @@
 package util
 
-import "flag"
+import (
+	"flag"
+	"os"
+)
 
 // InTestMode returns true if the test flag is set, which is injected
 // automatically by `go test`.
 func InTestMode() bool {
-	return flag.Lookup("test.v") != nil
+	return flag.Lookup("test.v") != nil || os.Getenv("ENABLE_TEST_API") == "true"
 }
