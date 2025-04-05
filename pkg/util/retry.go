@@ -73,7 +73,7 @@ func NewRetryConf(opts ...RetryConfSetting) RetryConf {
 
 // WithRetry wraps a function with retry logic and returns the result of the successful call,
 // or the error after retries have been exhausted
-func WithRetry[T any](ctx context.Context, fn Retryable[T], conf RetryConf) (T, error) {
+func WithRetry[T any](ctx context.Context, action string, fn Retryable[T], conf RetryConf) (T, error) {
 	var (
 		result  T
 		lastErr error
@@ -89,12 +89,6 @@ func WithRetry[T any](ctx context.Context, fn Retryable[T], conf RetryConf) (T, 
 			return result, nil
 		}
 
-		l.Warn("error on retriable function attempt",
-			"error", err,
-			"attempt", attempt,
-			"conf", conf,
-		)
-
 		lastErr = err
 		if attempt == conf.MaxAttempts {
 			break
@@ -105,6 +99,13 @@ func WithRetry[T any](ctx context.Context, fn Retryable[T], conf RetryConf) (T, 
 		if conf.RetryableErrors != nil && !conf.RetryableErrors(err) {
 			return result, err
 		}
+
+		l.Warn("error on retriable function attempt",
+			"error", err,
+			"attempt", attempt,
+			"action", action,
+			"conf", conf,
+		)
 
 		// calculate next backoff
 		nextBackoff := backoff * time.Duration(conf.BackoffFactor)
@@ -127,6 +128,7 @@ func WithRetry[T any](ctx context.Context, fn Retryable[T], conf RetryConf) (T, 
 
 	l.Error("retriable function failed",
 		"error", lastErr,
+		"action", action,
 		"conf", conf,
 	)
 	return result, fmt.Errorf("%w: %v", ErrMaxAttemptReached, lastErr)

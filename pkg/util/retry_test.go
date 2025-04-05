@@ -15,14 +15,19 @@ func TestWithRetry(t *testing.T) {
 	t.Run("retry function if errors with default settings", func(t *testing.T) {
 		attempt := 1
 
-		_, err := WithRetry(ctx, func(ctx context.Context) (bool, error) {
-			if attempt%3 == 0 {
-				return true, nil
-			}
+		_, err := WithRetry(
+			ctx,
+			"test",
+			func(ctx context.Context) (bool, error) {
+				if attempt%3 == 0 {
+					return true, nil
+				}
 
-			attempt += 1
-			return false, fmt.Errorf("failed")
-		}, NewRetryConf())
+				attempt += 1
+				return false, fmt.Errorf("failed")
+			},
+			NewRetryConf(),
+		)
 
 		require.NoError(t, err)
 		require.Equal(t, 3, attempt)
@@ -33,18 +38,23 @@ func TestWithRetry(t *testing.T) {
 		ioErr := errors.New("io timeout")
 		notCoveredErr := errors.New("error not covered!!")
 
-		_, err := WithRetry(ctx, func(ctx context.Context) (bool, error) {
-			if attempt%3 == 0 {
-				return false, notCoveredErr
-			}
-			attempt += 1
+		_, err := WithRetry(
+			ctx,
+			"test",
+			func(ctx context.Context) (bool, error) {
+				if attempt%3 == 0 {
+					return false, notCoveredErr
+				}
+				attempt += 1
 
-			return false, ioErr
-		}, NewRetryConf(
-			WithRetryConfRetryableErrors(func(err error) bool {
-				return errors.Is(err, ioErr)
-			}),
-		))
+				return false, ioErr
+			},
+			NewRetryConf(
+				WithRetryConfRetryableErrors(func(err error) bool {
+					return errors.Is(err, ioErr)
+				}),
+			),
+		)
 
 		require.Error(t, err)
 		require.ErrorIs(t, err, notCoveredErr)
