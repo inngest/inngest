@@ -3,23 +3,19 @@ package tracing
 import (
 	"context"
 
+	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"go.opentelemetry.io/otel/attribute"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-
-	"github.com/inngest/inngest/pkg/execution/queue"
-	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
 )
 
 type executionProcessor struct {
 	md   statev2.Metadata
-	qi   queue.Item
 	next sdktrace.SpanProcessor
 }
 
-func newExecutionProcessor(md statev2.Metadata, qi queue.Item, next sdktrace.SpanProcessor) sdktrace.SpanProcessor {
+func newExecutionProcessor(md statev2.Metadata, next sdktrace.SpanProcessor) sdktrace.SpanProcessor {
 	return &executionProcessor{
 		md:   md,
-		qi:   qi,
 		next: next,
 	}
 }
@@ -44,6 +40,7 @@ func (p *executionProcessor) OnStart(parent context.Context, s sdktrace.ReadWrit
 				attribute.String(AttributeAccountID, p.md.ID.Tenant.AccountID.String()),
 				attribute.String(AttributeEnvID, p.md.ID.Tenant.EnvID.String()),
 				attribute.String(AttributeAppID, p.md.ID.Tenant.AppID.String()),
+				attribute.Bool(AttributeDynamicDuration, true),
 			)
 
 			if p.md.Config.CronSchedule() != nil {
@@ -63,6 +60,10 @@ func (p *executionProcessor) OnStart(parent context.Context, s sdktrace.ReadWrit
 
 	case SpanNameStep:
 		{
+			attrs = append(attrs,
+				attribute.Bool(AttributeDynamicDuration, true),
+			)
+
 			break
 		}
 
@@ -79,7 +80,8 @@ func (p *executionProcessor) OnStart(parent context.Context, s sdktrace.ReadWrit
 func (p *executionProcessor) OnEnd(s sdktrace.ReadOnlySpan) {
 	for _, attr := range s.Attributes() {
 		if string(attr.Key) == AttributeDropSpan && attr.Value.AsBool() {
-			return // Don't export dropped spans
+			// Toggle this on and off to see or remove dropped spans
+			// return // Don't export dropped spans
 		}
 	}
 

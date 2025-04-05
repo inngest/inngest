@@ -86,6 +86,7 @@ type Querier interface {
 	UpdateAppError(ctx context.Context, arg UpdateAppErrorParams) (*App, error)
 	UpdateAppURL(ctx context.Context, arg UpdateAppURLParams) (*App, error)
 	UpdateFunctionConfig(ctx context.Context, arg UpdateFunctionConfigParams) (*Function, error)
+	UpdateSpanEnd(ctx context.Context, arg UpdateSpanEndParams) error
 	UpsertApp(ctx context.Context, arg UpsertAppParams) (*App, error)
 	WorkspaceEvents(ctx context.Context, arg WorkspaceEventsParams) ([]*Event, error)
 	WorkspaceNamedEvents(ctx context.Context, arg WorkspaceNamedEventsParams) ([]*Event, error)

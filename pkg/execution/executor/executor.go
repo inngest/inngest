@@ -15,6 +15,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/inngest/inngest/pkg/syscode"
 	"github.com/inngest/inngest/pkg/tracing"
 	"github.com/inngest/inngest/pkg/util/gateway"
@@ -496,6 +497,14 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		Config: config,
 	}
 
+	// Always the root span.
+	_, tracer := e.tracerProvider.NewTracer(ctx, metadata, nil)
+	spanCtx, span := tracer.Tracer().Start(ctx, tracing.SpanNameRun, trace.WithNewRoot(), trace.WithAttributes(attribute.String(tracing.AttributeInternalLocation, "Schedule")))
+	configCtx := map[string]string{}
+	e.tracerProvider.Inject(spanCtx, propagation.MapCarrier(configCtx))
+	config.NewSetFunctionTrace(configCtx)
+	span.End()
+
 	// If this is paused, immediately end just before creating state.
 	isPaused := req.FunctionPausedAt != nil && req.FunctionPausedAt.Before(time.Now())
 	if isPaused {
@@ -705,12 +714,6 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		Metadata: map[string]string{},
 	}
 
-	// Always the root span.
-	_, tracer := e.tracerProvider.NewTracer(ctx, metadata, item)
-	spanCtx, span := tracer.Tracer().Start(ctx, tracing.SpanNameRun, trace.WithNewRoot())
-	e.tracerProvider.Inject(spanCtx, propagation.MapCarrier(item.Metadata))
-	span.End()
-
 	err = e.queue.Enqueue(ctx, item, at, queue.EnqueueOpts{})
 	if err == redis_state.ErrQueueItemExists {
 		return nil, state.ErrIdentifierExists
@@ -745,10 +748,28 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		return nil, fmt.Errorf("no function loader specified running step")
 	}
 
+	// TODO Sucks we have to load this here
+	md, err := e.smv2.LoadMetadata(ctx, sv2.ID{
+		RunID:      id.RunID,
+		FunctionID: id.WorkflowID,
+		Tenant: sv2.Tenant{
+			AppID:     id.AppID,
+			EnvID:     id.WorkspaceID,
+			AccountID: id.AccountID,
+		},
+	})
+	// XXX: MetadataNotFound -> assume fn is deleted.
+	if err != nil {
+		return nil, fmt.Errorf("cannot load metadata to execute run: %w", err)
+	}
+
 	// If this is of type sleep, ensure that we save "nil" within the state store
 	// for the outgoing edge ID.  This ensures that we properly increase the stack
 	// for `tools.sleep` within generator functions.
 	if item.Kind == queue.KindSleep && item.Attempt == 0 {
+		tCtx, _ := e.tracerProvider.NewTracer(ctx, md, &item)
+		e.tracerProvider.UpdateSpanEnd(tCtx, time.Now(), []attribute.KeyValue{})
+
 		hasPendingSteps, err := e.smv2.SaveStep(ctx, sv2.ID{
 			RunID:      id.RunID,
 			FunctionID: id.WorkflowID,
@@ -771,20 +792,6 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		// group ID, ensuring that we correlate the next step _after_ this sleep (to be
 		// scheduled in this executor run)
 		ctx = state.WithGroupID(ctx, uuid.New().String())
-	}
-
-	md, err := e.smv2.LoadMetadata(ctx, sv2.ID{
-		RunID:      id.RunID,
-		FunctionID: id.WorkflowID,
-		Tenant: sv2.Tenant{
-			AppID:     id.AppID,
-			EnvID:     id.WorkspaceID,
-			AccountID: id.AccountID,
-		},
-	})
-	// XXX: MetadataNotFound -> assume fn is deleted.
-	if err != nil {
-		return nil, fmt.Errorf("cannot load metadata to execute run: %w", err)
 	}
 
 	ef, err := e.fl.LoadFunction(ctx, md.ID.Tenant.EnvID, md.ID.FunctionID)
@@ -847,9 +854,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		evtIDs[i] = eid.String()
 	}
 
-	// TODO: find a way to remove this
-	// set function trace context so downstream execution have the function trace context set
-	ctx = extractTraceCtx(ctx, md)
+	isFirstExecution := edge.Incoming == inngest.TriggerName && item.Attempt == 0
 
 	// If this is the trigger, check if we only have one child.  If so, skip to directly executing
 	// that child;  we don't need to handle the trigger individually.
@@ -896,7 +901,9 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		}
 	}
 
-	tCtx, tp := e.tracerProvider.NewTracer(ctx, md, item)
+	spew.Dump("execute and so creating first step")
+	tCtx, tp := e.tracerProvider.NewTracer(ctx, md, &item)
+	spew.Dump(trace.SpanFromContext(tCtx))
 	instance := runInstance{
 		md:         md,
 		f:          *ef.Function,
@@ -910,17 +917,22 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 
 	// If first attempt, this is the creation of a step, and then an attempt.
 	// Otherwise it's just an attempt.
-	if instance.item.Attempt == 0 {
+	if isFirstExecution {
 		var stepSpan trace.Span
-		tCtx, stepSpan = instance.tracer.Start(tCtx, tracing.SpanNameStep)
+		tCtx, stepSpan = instance.tracer.Start(tCtx, tracing.SpanNameStep, trace.WithAttributes(attribute.String(tracing.AttributeInternalLocation, "Execute - initial request")))
 		stepSpan.End()
 	}
 
 	// If it's an attempt, it should now be correctly under the step span.
-	tCtx, executionSpan := instance.tracer.Start(tCtx, tracing.SpanNameExecution)
+	tCtx, executionSpan := instance.tracer.Start(tCtx, tracing.SpanNameExecution, trace.WithAttributes(attribute.String(tracing.AttributeInternalLocation, "Execute")))
 	resp, err := e.run(ctx, &instance)
 	tracing.ApplyResponseToSpan(executionSpan, resp)
 	executionSpan.End()
+
+	// TODO: find a way to remove this
+	// set function trace context so downstream execution have the function
+	// trace context set
+	ctx = extractTraceCtx(ctx, md)
 
 	// Now we have a response, update the run instance.  We need to do this as request
 	// offloads must mutate the response directly.
@@ -2034,8 +2046,6 @@ func (e *executor) handleGeneratorStep(ctx context.Context, i *runInstance, gen 
 	// Re-enqueue the exact same edge to run now.
 	jobID := fmt.Sprintf("%s-%s", i.md.IdempotencyKey(), gen.ID)
 	now := time.Now()
-	metadata := map[string]string{}
-	e.tracerProvider.Inject(ctx, metadata)
 	nextItem := queue.Item{
 		JobID:                 &jobID,
 		WorkspaceID:           i.md.ID.Tenant.EnvID,
@@ -2047,18 +2057,30 @@ func (e *executor) handleGeneratorStep(ctx context.Context, i *runInstance, gen 
 		Attempt:               0,
 		MaxAttempts:           i.item.MaxAttempts,
 		Payload:               queue.PayloadEdge{Edge: nextEdge},
-		Metadata:              metadata,
 	}
 
 	if !hasPendingSteps {
+		metadata := map[string]string{}
+		ctx, tp := e.tracerProvider.NewTracer(ctx, i.md, nil)
+		ctx, span := tp.Tracer().Start(ctx, tracing.SpanNameStep, trace.WithAttributes(attribute.String(tracing.AttributeInternalLocation, "handleGeneratorStep")))
+		e.tracerProvider.Inject(ctx, metadata)
+		metadataByte, _ := json.Marshal(metadata)
+		nextItem.Metadata = map[string]string{
+			"wobbly": string(metadataByte),
+		}
+
 		err = e.queue.Enqueue(ctx, nextItem, now, queue.EnqueueOpts{})
 		if err == redis_state.ErrQueueItemExists {
+			tracing.DropSpan(span)
 			return nil
 		}
 		if err != nil {
 			logger.StdlibLogger(ctx).Error("error scheduling step queue item", "error", err)
+			tracing.DropSpan(span)
 			return err
 		}
+
+		span.End()
 	}
 
 	for _, l := range e.lifecycles {
@@ -2172,10 +2194,22 @@ func (e *executor) handleStepError(ctx context.Context, i *runInstance, gen stat
 	}
 
 	if !hasPendingSteps {
+		metadata := map[string]string{}
+		ctx, tp := e.tracerProvider.NewTracer(ctx, i.md, nil)
+		ctx, span := tp.Tracer().Start(ctx, tracing.SpanNameStep, trace.WithAttributes(attribute.String(tracing.AttributeInternalLocation, "handleStepError")))
+		e.tracerProvider.Inject(ctx, metadata)
+		metadataByte, _ := json.Marshal(metadata)
+		nextItem.Metadata = map[string]string{
+			"wobbly": string(metadataByte),
+		}
+
 		err = e.queue.Enqueue(ctx, nextItem, now, queue.EnqueueOpts{})
 		if err == redis_state.ErrQueueItemExists {
+			tracing.DropSpan(span)
 			return nil
 		}
+
+		span.End()
 	}
 
 	for _, l := range e.lifecycles {
@@ -2225,10 +2259,23 @@ func (e *executor) handleGeneratorStepPlanned(ctx context.Context, i *runInstanc
 			Edge: nextEdge,
 		},
 	}
+
+	metadata := map[string]string{}
+	ctx, tp := e.tracerProvider.NewTracer(ctx, i.md, nil)
+	ctx, span := tp.Tracer().Start(ctx, tracing.SpanNameStep, tracing.WithGeneratorAttrs(gen), trace.WithAttributes(attribute.String(tracing.AttributeInternalLocation, "handleGeneratorStepPlanned")))
+	e.tracerProvider.Inject(ctx, metadata)
+	metadataByte, _ := json.Marshal(metadata)
+	nextItem.Metadata = map[string]string{
+		"wobbly": string(metadataByte),
+	}
+
 	err := e.queue.Enqueue(ctx, nextItem, now, queue.EnqueueOpts{})
 	if err == redis_state.ErrQueueItemExists {
+		tracing.DropSpan(span)
 		return nil
 	}
+
+	span.End()
 
 	for _, l := range e.lifecycles {
 		go l.OnStepScheduled(ctx, i.md, nextItem, &gen.Name)
@@ -2258,8 +2305,7 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, i *runInstance, gen
 	ctx = state.WithGroupID(ctx, groupID)
 
 	jobID := fmt.Sprintf("%s-%s", i.md.IdempotencyKey(), gen.ID)
-	// TODO Should this also include a parent step span? It will never have attempts.
-	err = e.queue.Enqueue(ctx, queue.Item{
+	nextItem := queue.Item{
 		JobID:       &jobID,
 		WorkspaceID: i.md.ID.Tenant.EnvID,
 		// Sleeps re-enqueue the step so that we can mark the step as completed
@@ -2273,10 +2319,25 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, i *runInstance, gen
 		Attempt:               0,
 		MaxAttempts:           i.item.MaxAttempts,
 		Payload:               queue.PayloadEdge{Edge: nextEdge},
-	}, until, queue.EnqueueOpts{})
+	}
+
+	metadata := map[string]string{}
+	ctx, tp := e.tracerProvider.NewTracer(ctx, i.md, nil)
+	ctx, span := tp.Tracer().Start(ctx, tracing.SpanNameStep, tracing.WithGeneratorAttrs(gen), trace.WithAttributes(attribute.String(tracing.AttributeInternalLocation, "handleGeneratorSleep")))
+	e.tracerProvider.Inject(ctx, metadata)
+	metadataByte, _ := json.Marshal(metadata)
+	nextItem.Metadata = map[string]string{
+		"wobbly": string(metadataByte),
+	}
+
+	// TODO Should this also include a parent step span? It will never have attempts.
+	err = e.queue.Enqueue(ctx, nextItem, until, queue.EnqueueOpts{})
 	if err == redis_state.ErrQueueItemExists {
+		tracing.DropSpan(span)
 		return nil
 	}
+
+	span.End()
 
 	for _, e := range e.lifecycles {
 		go e.OnSleep(context.WithoutCancel(ctx), i.md, i.item, gen, until)

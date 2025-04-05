@@ -200,9 +200,10 @@ CREATE TABLE spans (
   parent_span_id TEXT,
   name TEXT NOT NULL,
   start_time TIMESTAMPTZ NOT NULL,
-  end_time TIMESTAMPTZ NOT NULL,
+  end_time TIMESTAMPTZ,
   run_id TEXT,
-  attributes JSONB
+  start_attributes JSONB,
+  end_attributes JSONB
 );
 
 CREATE INDEX idx_spans_run_id ON spans(run_id);

@@ -1040,7 +1040,7 @@ func (q *Queries) GetQueueSnapshotChunks(ctx context.Context, snapshotID interfa
 }
 
 const getSpansByRunID = `-- name: GetSpansByRunID :many
-SELECT span_id, trace_id, parent_span_id, name, start_time, end_time, run_id, attributes FROM spans WHERE run_id = ?
+SELECT span_id, trace_id, parent_span_id, name, start_time, end_time, run_id, start_attributes, end_attributes FROM spans WHERE run_id = ?
 `
 
 func (q *Queries) GetSpansByRunID(ctx context.Context, runID sql.NullString) ([]*Span, error) {
@@ -1060,7 +1060,8 @@ func (q *Queries) GetSpansByRunID(ctx context.Context, runID sql.NullString) ([]
 			&i.StartTime,
 			&i.EndTime,
 			&i.RunID,
-			&i.Attributes,
+			&i.StartAttributes,
+			&i.EndAttributes,
 		); err != nil {
 			return nil, err
 		}
@@ -1520,19 +1521,19 @@ const insertSpan = `-- name: InsertSpan :exec
 
 INSERT INTO spans (
   span_id, trace_id, parent_span_id, name,
-  start_time, end_time, run_id, attributes
+  start_time, end_time, run_id, start_attributes
 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 type InsertSpanParams struct {
-	SpanID       string
-	TraceID      string
-	ParentSpanID sql.NullString
-	Name         string
-	StartTime    time.Time
-	EndTime      time.Time
-	RunID        sql.NullString
-	Attributes   interface{}
+	SpanID          string
+	TraceID         string
+	ParentSpanID    sql.NullString
+	Name            string
+	StartTime       time.Time
+	EndTime         sql.NullTime
+	RunID           sql.NullString
+	StartAttributes interface{}
 }
 
 // New
@@ -1545,7 +1546,7 @@ func (q *Queries) InsertSpan(ctx context.Context, arg InsertSpanParams) error {
 		arg.StartTime,
 		arg.EndTime,
 		arg.RunID,
-		arg.Attributes,
+		arg.StartAttributes,
 	)
 	return err
 }
@@ -1865,6 +1866,21 @@ func (q *Queries) UpdateFunctionConfig(ctx context.Context, arg UpdateFunctionCo
 		&i.ArchivedAt,
 	)
 	return &i, err
+}
+
+const updateSpanEnd = `-- name: UpdateSpanEnd :exec
+UPDATE spans SET end_time = ?, end_attributes = ? WHERE span_id = ?
+`
+
+type UpdateSpanEndParams struct {
+	EndTime       sql.NullTime
+	EndAttributes interface{}
+	SpanID        string
+}
+
+func (q *Queries) UpdateSpanEnd(ctx context.Context, arg UpdateSpanEndParams) error {
+	_, err := q.db.ExecContext(ctx, updateSpanEnd, arg.EndTime, arg.EndAttributes, arg.SpanID)
+	return err
 }
 
 const upsertApp = `-- name: UpsertApp :one

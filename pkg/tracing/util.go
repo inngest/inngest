@@ -6,13 +6,10 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-func extractRunID(attrs []attribute.KeyValue) string {
-	for _, attr := range attrs {
-		if string(attr.Key) == AttributeRunID {
-			return attr.Value.AsString()
-		}
-	}
-	return ""
+// DropSpan marks the span to be dropped.
+func DropSpan(span trace.Span) {
+	span.SetAttributes(attribute.Bool(AttributeDropSpan, true))
+	span.End()
 }
 
 // ApplyResponseToSpan applies details from the given `DriverResponse` to the
@@ -27,4 +24,12 @@ func ApplyResponseToSpan(span trace.Span, resp *state.DriverResponse) {
 	}
 
 	// TODO
+}
+
+func WithGeneratorAttrs(op state.GeneratorOpcode) trace.SpanStartEventOption {
+	return trace.WithAttributes(
+		attribute.String("inngest.op", op.Op.String()),
+		attribute.String("inngest.step_id", op.ID),
+		attribute.String("inngest.step_name", op.UserDefinedName()),
+	)
 }

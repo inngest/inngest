@@ -779,15 +779,24 @@ func (q NormalizedQueries) GetSpansByRunID(ctx context.Context, runID sql.NullSt
 
 func (q NormalizedQueries) InsertSpan(ctx context.Context, arg sqlc_sqlite.InsertSpanParams) error {
 	pgArg := InsertSpanParams{
-		SpanID:       arg.SpanID,
-		TraceID:      arg.TraceID,
-		ParentSpanID: arg.ParentSpanID,
-		Name:         arg.Name,
-		StartTime:    arg.StartTime,
-		EndTime:      arg.EndTime,
-		RunID:        arg.RunID,
-		Attributes:   toNullRawMessage(arg.Attributes),
+		SpanID:          arg.SpanID,
+		TraceID:         arg.TraceID,
+		ParentSpanID:    arg.ParentSpanID,
+		Name:            arg.Name,
+		StartTime:       arg.StartTime,
+		EndTime:         arg.EndTime,
+		RunID:           arg.RunID,
+		StartAttributes: toNullRawMessage(arg.StartAttributes),
 	}
 
 	return q.db.InsertSpan(ctx, pgArg)
+}
+
+func (q NormalizedQueries) UpdateSpanEnd(ctx context.Context, arg sqlc_sqlite.UpdateSpanEndParams) error {
+	pgArg := UpdateSpanEndParams{
+		SpanID:  arg.SpanID,
+		EndTime: arg.EndTime,
+	}
+
+	return q.db.UpdateSpanEnd(ctx, pgArg)
 }

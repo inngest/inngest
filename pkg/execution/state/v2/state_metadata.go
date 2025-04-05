@@ -309,6 +309,47 @@ func (c *Config) FunctionTrace() *itrace.TraceCarrier {
 	return nil
 }
 
+func (c *Config) NewSetFunctionTrace(carrier map[string]string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.initContext()
+	c.Context["wobbly"] = carrier
+}
+
+func (c *Config) NewFunctionTrace() map[string]string {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	if c.Context == nil {
+		return nil
+	}
+
+	if data, ok := c.Context["wobbly"]; ok {
+		switch v := data.(type) {
+		case map[string]string:
+			return v
+		case map[string]any:
+			carrier := map[string]string{}
+			for k, val := range v {
+				if str, ok := val.(string); ok {
+					carrier[k] = str
+				}
+			}
+			c.Context["wobbly"] = carrier
+			return carrier
+		case []byte:
+			carrier := map[string]string{}
+			if err := json.Unmarshal(v, &carrier); err == nil {
+				c.Context["wobbly"] = carrier
+				return carrier
+			}
+		}
+
+	}
+	return nil
+}
+
 // SetEventIDMapping creates an event mapping that can be used for referencing
 // the events to their internal IDs
 //
