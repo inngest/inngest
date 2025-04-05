@@ -3,6 +3,7 @@ package redis_state
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"time"
@@ -186,6 +187,7 @@ func (v v2) LoadMetadata(ctx context.Context, id state.ID) (state.Metadata, erro
 func (v v2) UpdateMetadata(ctx context.Context, id state.ID, mutation state.MutableConfig) error {
 	_, err := util.WithRetry(
 		ctx,
+		"run.UpdateMetadata",
 		func(ctx context.Context) (bool, error) {
 			err := v.mgr.UpdateMetadata(ctx, id.Tenant.AccountID, id.RunID, statev1.MetadataUpdate{
 				DisableImmediateExecution: mutation.ForceStepPlan,
@@ -212,10 +214,13 @@ func (v v2) SaveStep(ctx context.Context, id state.ID, stepID string, data []byt
 
 	return util.WithRetry(
 		ctx,
+		"run.SaveStep",
 		func(ctx context.Context) (bool, error) {
 			return v.mgr.SaveResponse(ctx, v1id, stepID, string(data))
 		},
-		util.NewRetryConf(),
+		util.NewRetryConf(
+			util.WithRetryConfRetryableErrors(v.retryableError),
+		),
 	)
 }
 
@@ -229,6 +234,7 @@ func (v v2) SavePending(ctx context.Context, id state.ID, pending []string) erro
 
 	_, err := util.WithRetry(
 		ctx,
+		"run.SavePending",
 		func(ctx context.Context) (bool, error) {
 			err := v.mgr.SavePending(ctx, v1id, pending)
 			return false, err
@@ -237,4 +243,14 @@ func (v v2) SavePending(ctx context.Context, id state.ID, pending []string) erro
 	)
 
 	return err
+}
+
+// determine what errors are retriable
+func (v v2) retryableError(err error) bool {
+	switch {
+	case errors.Is(err, statev1.ErrDuplicateResponse):
+		return false
+	}
+
+	return true
 }
