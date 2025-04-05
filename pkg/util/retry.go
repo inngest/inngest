@@ -89,13 +89,6 @@ func WithRetry[T any](ctx context.Context, action string, fn Retryable[T], conf 
 			return result, nil
 		}
 
-		l.Warn("error on retriable function attempt",
-			"error", err,
-			"attempt", attempt,
-			"action", action,
-			"conf", conf,
-		)
-
 		lastErr = err
 		if attempt == conf.MaxAttempts {
 			break
@@ -106,6 +99,13 @@ func WithRetry[T any](ctx context.Context, action string, fn Retryable[T], conf 
 		if conf.RetryableErrors != nil && !conf.RetryableErrors(err) {
 			return result, err
 		}
+
+		l.Warn("error on retriable function attempt",
+			"error", err,
+			"attempt", attempt,
+			"action", action,
+			"conf", conf,
+		)
 
 		// calculate next backoff
 		nextBackoff := backoff * time.Duration(conf.BackoffFactor)
