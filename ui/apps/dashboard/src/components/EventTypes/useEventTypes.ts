@@ -7,7 +7,7 @@ import { graphql } from '@/gql';
 const query = graphql(`
   query GetNewEventTypes($envID: ID!) {
     environment: workspace(id: $envID) {
-      events {
+      events @paginated(perPage: 50) {
         data {
           name
           functions: workflows {
@@ -83,7 +83,7 @@ type VolumeQueryVariables = {
 const volumeQuery = graphql(`
   query GetNewEventTypesVolume($envID: ID!) {
     environment: workspace(id: $envID) {
-      events {
+      events @paginated(perPage: 50) {
         data {
           name
           dailyVolume: usage(opts: { period: "hour", range: "day" }) {
