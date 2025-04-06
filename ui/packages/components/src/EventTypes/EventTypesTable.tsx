@@ -23,6 +23,7 @@ const refreshInterval = 5000;
 
 export function EventTypesTable({
   getEventTypes,
+  getEventTypesVolume,
   pathCreator,
   emptyActions,
   eventTypeActions,
@@ -35,14 +36,20 @@ export function EventTypesTable({
   };
   getEventTypes: ({
     cursor,
-    pageSize,
     archived,
   }: {
     cursor: string | null;
-    pageSize: number;
     archived: boolean;
     orderBy: EventTypesOrderBy[];
-  }) => Promise<{ events: EventType[]; pageInfo: PageInfo; totalCount: number }>;
+  }) => Promise<{ events: Omit<EventType, 'volume'>[]; pageInfo: PageInfo }>;
+  getEventTypesVolume: ({
+    cursor,
+    archived,
+  }: {
+    cursor: string | null;
+    archived: boolean;
+    orderBy: EventTypesOrderBy[];
+  }) => Promise<{ events: Pick<EventType, 'volume' | 'name'>[]; pageInfo: PageInfo }>;
 }) {
   const router = useRouter();
   const columns = useColumns({ pathCreator, eventTypeActions });
@@ -57,7 +64,6 @@ export function EventTypesTable({
   const archived = filteredStatus === 'true';
   const [cursor, setCursor] = useState<string | null>(null);
   const [page, setPage] = useState(1);
-  const [pageSize] = useState(20);
   const [orderBy, setOrderBy] = useState<EventTypesOrderBy[]>([
     {
       field: EventTypesOrderByField.Name,
@@ -86,13 +92,40 @@ export function EventTypesTable({
     isFetching, // refetching
     // TODO: implement infinite scrolling
   } = useQuery({
-    queryKey: ['event-types', { orderBy, cursor, pageSize, archived }],
+    queryKey: ['event-types', { orderBy, cursor, archived }],
     queryFn: useCallback(() => {
-      return getEventTypes({ orderBy, cursor, pageSize, archived });
-    }, [getEventTypes, orderBy, cursor, pageSize, archived]),
+      return getEventTypes({ orderBy, cursor, archived });
+    }, [getEventTypes, orderBy, cursor, archived]),
     placeholderData: keepPreviousData,
     refetchInterval: !cursor || page === 1 ? refreshInterval : 0,
   });
+
+  const { data: volumeData, isPending: isVolumePending } = useQuery({
+    queryKey: ['event-types-volume', { orderBy, cursor, archived }],
+    queryFn: useCallback(() => {
+      return getEventTypesVolume({ orderBy, cursor, archived });
+    }, [getEventTypesVolume, orderBy, cursor, archived]),
+    placeholderData: keepPreviousData,
+    refetchInterval: !cursor || page === 1 ? refreshInterval : 0,
+  });
+
+  const mergedData = useCallback(() => {
+    if (!eventTypesData?.events) return [];
+
+    const volumeMap = new Map<string, EventType['volume']>();
+
+    volumeData?.events.forEach((event) => {
+      volumeMap.set(event.name, event.volume);
+    });
+
+    return eventTypesData.events.map((event) => ({
+      ...event,
+      volume: volumeMap.get(event.name) || {
+        totalVolume: 0,
+        dailyVolumeSlots: [],
+      },
+    }));
+  }, [eventTypesData, volumeData]);
 
   useEffect(() => {
     const sortEntry = sorting[0];
@@ -126,7 +159,7 @@ export function EventTypesTable({
       </div>
       <NewTable
         columns={columns}
-        data={eventTypesData?.events || []}
+        data={mergedData() || []}
         isLoading={isPending}
         sorting={sorting}
         setSorting={setSorting}
