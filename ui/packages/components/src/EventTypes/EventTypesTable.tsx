@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { Route } from 'next';
 import { useRouter } from 'next/navigation';
 import TableBlankState from '@inngest/components/EventTypes/TableBlankState';
+import { Search } from '@inngest/components/Forms/Search';
 import NewTable from '@inngest/components/Table/NewTable';
 import {
   EventTypesOrderByDirection,
@@ -150,11 +151,19 @@ export function EventTypesTable({
 
   return (
     <div>
-      <div className="m-3 flex items-center">
+      <div className="m-3 flex items-center gap-2">
         <EventTypesStatusFilter
           archived={archived}
           pathCreator={'/'}
           onStatusChange={onStatusFilterChange}
+        />
+        {/* TODO: Wire search */}
+        <Search
+          name="search"
+          placeholder="Search by event type"
+          value={''}
+          className="h-[30px] w-56 py-3"
+          onUpdate={(value) => {}}
         />
       </div>
       <NewTable
