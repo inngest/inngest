@@ -1,3 +1,4 @@
+import MiniStackedBarChart from '@inngest/components/Chart/MiniStackedBarChart';
 import { HorizontalPillList, Pill, PillContent } from '@inngest/components/Pill';
 import { NumberCell, TextCell } from '@inngest/components/Table';
 import { type EventType } from '@inngest/components/types/eventType';
@@ -75,7 +76,6 @@ export function useColumns({
     columnHelper.accessor('volume', {
       cell: (info) => {
         const volume = info.getValue();
-        console.log(volume);
 
         return (
           <div className="flex items-center">
@@ -85,7 +85,7 @@ export function useColumns({
                 term={volume.totalVolume === 1 ? 'event' : 'events'}
               />
             </div>
-            {/* {volume.chart} */}
+            <MiniStackedBarChart data={volume.dailyVolumeSlots} />
           </div>
         );
       },
