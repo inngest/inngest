@@ -15,9 +15,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/inngest/inngest/pkg/syscode"
-	"github.com/inngest/inngest/pkg/util/gateway"
-
 	"github.com/fatih/structs"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
@@ -40,11 +37,14 @@ import (
 	"github.com/inngest/inngest/pkg/inngest/log"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/run"
+	"github.com/inngest/inngest/pkg/syscode"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/inngest/inngest/pkg/util"
+	"github.com/inngest/inngest/pkg/util/gateway"
 	"github.com/oklog/ulid/v2"
 	"github.com/rs/zerolog"
+	"github.com/sudhirj/uulid.go"
 	"github.com/xhit/go-str2duration/v2"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -575,11 +575,10 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	}
 
 	err := e.smv2.Create(ctx, newState)
-	if err == state.ErrIdentifierExists {
-		// This function was already created.
-		return nil, state.ErrIdentifierExists
-	}
-	if err != nil {
+	switch err {
+	case nil, state.ErrIdentifierExists:
+		// no-op, continue
+	default:
 		return nil, fmt.Errorf("error creating run state: %w", err)
 	}
 
@@ -588,7 +587,8 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	//
 	if req.BatchID == nil {
 		for _, c := range req.Function.Cancel {
-			pauseID := uuid.New()
+			evtID := req.Events[0].GetInternalID()
+			pauseID := uulid.FromULID(evtID).AsUUID()
 			expires := time.Now().Add(consts.CancelTimeout)
 			if c.Timeout != nil {
 				dur, err := str2duration.ParseDuration(*c.Timeout)
@@ -599,7 +599,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 			}
 
 			// The triggering event ID should be the first ID in the batch.
-			triggeringID := req.Events[0].GetInternalID().String()
+			triggeringID := evtID.String()
 
 			var expr *string
 			// Evaluate the expression.  This lets us inspect the expression's attributes
@@ -644,7 +644,10 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 				TriggeringEventID: &triggeringID,
 			}
 			err = e.pm.SavePause(ctx, pause)
-			if err != nil {
+			switch err {
+			case nil, state.ErrPauseAlreadyExists:
+				// no-nop, continue
+			default:
 				return &metadata, fmt.Errorf("error saving pause: %w", err)
 			}
 		}
