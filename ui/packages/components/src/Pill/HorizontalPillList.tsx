@@ -1,3 +1,5 @@
+'use client';
+
 import { useState } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from '@inngest/components/Popover';
 
