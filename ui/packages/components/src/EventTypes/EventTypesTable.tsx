@@ -150,8 +150,8 @@ export function EventTypesTable({
   }, [sorting, setOrderBy]);
 
   return (
-    <div>
-      <div className="m-3 flex items-center gap-2">
+    <div className="bg-canvasBase text-basis no-scrollbar flex-1 overflow-hidden focus-visible:outline-none">
+      <div className="bg-canvasBase sticky top-0 z-50 m-3 flex items-center gap-2">
         <EventTypesStatusFilter
           archived={archived}
           pathCreator={'/'}
@@ -166,15 +166,17 @@ export function EventTypesTable({
           onUpdate={(value) => {}}
         />
       </div>
-      <NewTable
-        columns={columns}
-        data={mergedData() || []}
-        isLoading={isPending}
-        sorting={sorting}
-        setSorting={setSorting}
-        blankState={<TableBlankState actions={emptyActions} />}
-        onRowClick={(row) => router.push(pathCreator.eventType({ eventName: row.original.name }))}
-      />
+      <div className="h-[calc(100%-58px)] overflow-y-auto">
+        <NewTable
+          columns={columns}
+          data={mergedData() || []}
+          isLoading={isPending}
+          sorting={sorting}
+          setSorting={setSorting}
+          blankState={<TableBlankState actions={emptyActions} />}
+          onRowClick={(row) => router.push(pathCreator.eventType({ eventName: row.original.name }))}
+        />
+      </div>
     </div>
   );
 }
