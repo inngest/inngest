@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@inngest/components/Button/Button';
 import { EventTypesTable } from '@inngest/components/EventTypes/EventTypesTable';
 import { Header } from '@inngest/components/Header/Header';
+import { RefreshButton } from '@inngest/components/Refresh/RefreshButton';
 import { RiExternalLinkLine, RiRefreshLine } from '@remixicon/react';
 
 import { ActionsMenu } from '@/components/EventTypes/ActionsMenu';
@@ -37,7 +38,12 @@ export default function EventTypesPage({
       <Header
         breadcrumb={[{ text: 'Event Types' }]}
         infoIcon={<EventInfo />}
-        action={<SendEventButton />}
+        action={
+          <div className="flex items-center gap-1.5">
+            <RefreshButton />
+            <SendEventButton />
+          </div>
+        }
       />
       <EventTypesTable
         pathCreator={internalPathCreator}

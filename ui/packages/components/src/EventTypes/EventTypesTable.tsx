@@ -151,7 +151,7 @@ export function EventTypesTable({
 
   return (
     <div className="bg-canvasBase text-basis no-scrollbar flex-1 overflow-hidden focus-visible:outline-none">
-      <div className="bg-canvasBase sticky top-0 z-50 m-3 flex items-center gap-2">
+      <div className="bg-canvasBase sticky top-0 z-10 m-3 flex items-center gap-2">
         <EventTypesStatusFilter
           archived={archived}
           pathCreator={'/'}
