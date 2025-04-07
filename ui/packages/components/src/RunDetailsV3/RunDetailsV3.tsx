@@ -131,8 +131,12 @@ export const RunDetailsV3 = (props: Props) => {
 
   const run = runRes.data;
   if (run?.trace.endedAt && pollInterval) {
-    // Stop polling since ended runs are immutable
-    setPollInterval(undefined);
+    //
+    // Stop polling for ended runs, but still give it
+    // a few seconds for any lingering userland traces.
+    setTimeout(() => {
+      setPollInterval(undefined);
+    }, 6000);
   }
 
   // Do not show the error if queued and the error is no spans

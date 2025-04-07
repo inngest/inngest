@@ -106,7 +106,7 @@ func respondError(w http.ResponseWriter, r *http.Request, code int, msg string) 
 	}
 
 	w.WriteHeader(code)
-	w.Write(data)
+	_, _ = w.Write(data)
 }
 
 func (a router) convertOTLPAndSend(auth apiv1auth.V1Auth, req *collecttrace.ExportTraceServiceRequest) (rejectedSpans int64) {
