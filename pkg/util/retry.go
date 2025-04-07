@@ -100,7 +100,7 @@ func WithRetry[T any](ctx context.Context, action string, fn Retryable[T], conf 
 			return result, err
 		}
 
-		l.Warn("error on retriable function attempt",
+		l.Debug("retrying function",
 			"error", err,
 			"attempt", attempt,
 			"action", action,
@@ -126,7 +126,7 @@ func WithRetry[T any](ctx context.Context, action string, fn Retryable[T], conf 
 		backoff = nextBackoff
 	}
 
-	l.Error("retriable function failed",
+	l.Error("retriable function failed after max attempts",
 		"error", lastErr,
 		"action", action,
 		"conf", conf,
