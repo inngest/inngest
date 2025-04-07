@@ -480,6 +480,10 @@ func (q *queue) scanPartition(ctx context.Context, partitionKey string, peekLimi
 				if !errors.Is(err, context.Canceled) {
 					q.logger.Error().Err(err).Msg("error processing partition")
 				}
+				// If we run into timeouts, continue processing
+				if errors.Is(err, context.DeadlineExceeded) {
+					return nil
+				}
 				return err
 			}
 
@@ -501,6 +505,10 @@ func (q *queue) scan(ctx context.Context) error {
 
 	// If there are continuations, process those immediately.
 	if err := q.scanContinuations(ctx); err != nil {
+		// Continue processing on timeouts
+		if errors.Is(err, context.DeadlineExceeded) {
+			return nil
+		}
 		return err
 	}
 
