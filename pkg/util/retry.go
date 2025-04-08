@@ -83,11 +83,16 @@ func WithRetry[T any](ctx context.Context, action string, fn Retryable[T], conf 
 	backoff := conf.InitialBackoff
 
 	for attempt := 1; attempt <= conf.MaxAttempts; attempt++ {
-		// run the inner function
-		result, err := fn(ctx)
-		if err == nil {
-			return result, nil
-		}
+		var (
+			result T
+			err    error
+		)
+
+		// run the inner function within a Crit
+		err = Crit(ctx, action, func(ctx context.Context) error {
+			result, err = fn(ctx)
+			return err
+		})
 
 		lastErr = err
 		if attempt == conf.MaxAttempts {
