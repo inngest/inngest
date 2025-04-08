@@ -50,7 +50,7 @@ export function ResultItem({
 
       {isDifferentEnv && (
         <span className="h-5">
-          <Pill appearance="solidBright" className="mb-3">
+          <Pill appearance="solidBright" className="mb-3" kind="warning">
             Different environment
           </Pill>
         </span>
