@@ -1,4 +1,7 @@
-import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
+'use client';
+
+import { useState } from 'react';
+import { Popover, PopoverContent, PopoverTrigger } from '@inngest/components/Popover';
 
 import { Pill } from './Pill';
 
@@ -9,6 +12,7 @@ type FunctionsCellContentProps = {
 
 export function HorizontalPillList({ pills, alwaysVisibleCount }: FunctionsCellContentProps) {
   if (pills.length === 0) return null;
+  const [open, setOpen] = useState(false);
 
   // If no alwaysVisibleCount is specified or there aren't more pills than the limit, show all
   if (!alwaysVisibleCount || pills.length <= alwaysVisibleCount) {
@@ -35,15 +39,24 @@ export function HorizontalPillList({ pills, alwaysVisibleCount }: FunctionsCellC
         </div>
       ))}
 
-      <Tooltip delayDuration={0}>
-        <TooltipTrigger className="flex flex-shrink-0 cursor-default">
-          <Pill className="px-2.5 align-middle">+{hiddenPills.length}</Pill>
-        </TooltipTrigger>
+      <Popover open={open} onOpenChange={setOpen} modal={true}>
+        <PopoverTrigger className="flex flex-shrink-0 cursor-pointer" asChild>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              setOpen(true);
+            }}
+          >
+            <Pill appearance="outlined" className="hover:bg-canvasMuted rounded align-middle">
+              + {hiddenPills.length} more
+            </Pill>
+          </button>
+        </PopoverTrigger>
 
-        <TooltipContent sideOffset={5} className="p-3" side="bottom">
+        <PopoverContent sideOffset={5} className="border-subtle p-3" side="right">
           <div className="flex flex-col gap-2">{hiddenPills}</div>
-        </TooltipContent>
-      </Tooltip>
+        </PopoverContent>
+      </Popover>
     </div>
   );
 }

@@ -91,6 +91,8 @@ const documents = {
     "\n  mutation UnarchiveEnvironment($id: ID!) {\n    unarchiveEnvironment(id: $id) {\n      id\n    }\n  }\n": types.UnarchiveEnvironmentDocument,
     "\n  mutation DisableEnvironmentAutoArchiveDocument($id: ID!) {\n    disableEnvironmentAutoArchive(id: $id) {\n      id\n    }\n  }\n": types.DisableEnvironmentAutoArchiveDocumentDocument,
     "\n  mutation EnableEnvironmentAutoArchive($id: ID!) {\n    enableEnvironmentAutoArchive(id: $id) {\n      id\n    }\n  }\n": types.EnableEnvironmentAutoArchiveDocument,
+    "\n  query GetNewEventTypes($envID: ID!) {\n    environment: workspace(id: $envID) {\n      events @paginated(perPage: 50) {\n        data {\n          name\n          functions: workflows {\n            id\n            slug\n            name\n          }\n        }\n      }\n    }\n  }\n": types.GetNewEventTypesDocument,
+    "\n  query GetNewEventTypesVolume($envID: ID!) {\n    environment: workspace(id: $envID) {\n      events @paginated(perPage: 50) {\n        data {\n          name\n          dailyVolume: usage(opts: { period: \"hour\", range: \"day\" }) {\n            total\n            data {\n              count\n            }\n          }\n        }\n      }\n    }\n  }\n": types.GetNewEventTypesVolumeDocument,
     "\n  mutation ArchiveEvent($environmentId: ID!, $name: String!) {\n    archiveEvent(workspaceID: $environmentId, name: $name) {\n      name\n    }\n  }\n": types.ArchiveEventDocument,
     "\n  query GetLatestEventLogs($name: String, $environmentID: ID!) {\n    events(query: { name: $name, workspaceID: $environmentID }) {\n      data {\n        recent(count: 5) {\n          id\n          receivedAt\n          event\n          source {\n            name\n          }\n        }\n      }\n    }\n  }\n": types.GetLatestEventLogsDocument,
     "\n  query GetEventKeys($environmentID: ID!) {\n    environment: workspace(id: $environmentID) {\n      eventKeys: ingestKeys {\n        name\n        value: presharedKey\n      }\n    }\n  }\n": types.GetEventKeysDocument,
@@ -472,6 +474,14 @@ export function graphql(source: "\n  mutation DisableEnvironmentAutoArchiveDocum
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(source: "\n  mutation EnableEnvironmentAutoArchive($id: ID!) {\n    enableEnvironmentAutoArchive(id: $id) {\n      id\n    }\n  }\n"): (typeof documents)["\n  mutation EnableEnvironmentAutoArchive($id: ID!) {\n    enableEnvironmentAutoArchive(id: $id) {\n      id\n    }\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  query GetNewEventTypes($envID: ID!) {\n    environment: workspace(id: $envID) {\n      events @paginated(perPage: 50) {\n        data {\n          name\n          functions: workflows {\n            id\n            slug\n            name\n          }\n        }\n      }\n    }\n  }\n"): (typeof documents)["\n  query GetNewEventTypes($envID: ID!) {\n    environment: workspace(id: $envID) {\n      events @paginated(perPage: 50) {\n        data {\n          name\n          functions: workflows {\n            id\n            slug\n            name\n          }\n        }\n      }\n    }\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  query GetNewEventTypesVolume($envID: ID!) {\n    environment: workspace(id: $envID) {\n      events @paginated(perPage: 50) {\n        data {\n          name\n          dailyVolume: usage(opts: { period: \"hour\", range: \"day\" }) {\n            total\n            data {\n              count\n            }\n          }\n        }\n      }\n    }\n  }\n"): (typeof documents)["\n  query GetNewEventTypesVolume($envID: ID!) {\n    environment: workspace(id: $envID) {\n      events @paginated(perPage: 50) {\n        data {\n          name\n          dailyVolume: usage(opts: { period: \"hour\", range: \"day\" }) {\n            total\n            data {\n              count\n            }\n          }\n        }\n      }\n    }\n  }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */

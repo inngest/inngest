@@ -2,6 +2,7 @@
 
 import { useMemo } from 'react';
 import { type Route } from 'next';
+import MiniStackedBarChart from '@inngest/components/Chart/MiniStackedBarChart';
 import { Link } from '@inngest/components/Link';
 import { HorizontalPillList, Pill, PillContent } from '@inngest/components/Pill';
 import { Skeleton } from '@inngest/components/Skeleton/Skeleton';
@@ -14,7 +15,6 @@ import {
   useReactTable,
 } from '@tanstack/react-table';
 
-import MiniStackedBarChart from '@/components/Charts/MiniStackedBarChart';
 import { useEnvironment } from '@/components/Environments/environment-context';
 
 export type FunctionTableRow = {
