@@ -91,6 +91,9 @@ func WithRetry[T any](ctx context.Context, action string, fn Retryable[T], conf 
 			result, err = fn(ctx)
 			return err
 		})
+		if err == nil {
+			return result, nil
+		}
 
 		lastErr = err
 		if attempt == conf.MaxAttempts {
@@ -133,6 +136,7 @@ func WithRetry[T any](ctx context.Context, action string, fn Retryable[T], conf 
 		"error", lastErr,
 		"action", action,
 		"conf", conf,
+		"attempts", conf.MaxAttempts,
 	)
 	return result, fmt.Errorf("%w: %v", ErrMaxAttemptReached, lastErr)
 }
