@@ -541,11 +541,8 @@ func (d debouncer) debounce(ctx context.Context, di DebounceItem, fn inngest.Fun
 	// - Subsequent calls to this method will attempt to create/update debounces on the new system, this is desired.
 	// - We must carry over the previous timeout to ensure debounces don't run longer than intended.
 	//
-	if shouldMigrate {
-		if d.secondaryQueueShard.Name == "" || d.secondaryQueueManager == nil || d.secondaryDebounceClient == nil {
-			return fmt.Errorf("missing secondary configuration")
-		}
-
+	hasSecondary := d.secondaryQueueShard.Name != "" && d.secondaryQueueManager != nil && d.secondaryDebounceClient != nil
+	if shouldMigrate && hasSecondary {
 		debounceID, debounceTimeout, err := d.prepareMigration(ctx, di, fn)
 		if err != nil {
 			return fmt.Errorf("could not prepare debounce migration: %w", err)
