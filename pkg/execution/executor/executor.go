@@ -44,7 +44,6 @@ import (
 	"github.com/inngest/inngest/pkg/util/gateway"
 	"github.com/oklog/ulid/v2"
 	"github.com/rs/zerolog"
-	"github.com/sudhirj/uulid.go"
 	"github.com/xhit/go-str2duration/v2"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -587,8 +586,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	//
 	if req.BatchID == nil {
 		for _, c := range req.Function.Cancel {
-			evtID := req.Events[0].GetInternalID()
-			pauseID := uulid.FromULID(evtID).AsUUID()
+			pauseID := uuid.New()
 			expires := time.Now().Add(consts.CancelTimeout)
 			if c.Timeout != nil {
 				dur, err := str2duration.ParseDuration(*c.Timeout)
@@ -599,7 +597,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 			}
 
 			// The triggering event ID should be the first ID in the batch.
-			triggeringID := evtID.String()
+			triggeringID := req.Events[0].GetInternalID().String()
 
 			var expr *string
 			// Evaluate the expression.  This lets us inspect the expression's attributes
@@ -644,10 +642,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 				TriggeringEventID: &triggeringID,
 			}
 			err = e.pm.SavePause(ctx, pause)
-			switch err {
-			case nil, state.ErrPauseAlreadyExists:
-				// no-nop, continue
-			default:
+			if err != nil {
 				return &metadata, fmt.Errorf("error saving pause: %w", err)
 			}
 		}
