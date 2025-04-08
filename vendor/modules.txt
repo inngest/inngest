@@ -832,9 +832,6 @@ github.com/stretchr/testify/require
 # github.com/subosito/gotenv v1.2.0
 ## explicit
 github.com/subosito/gotenv
-# github.com/sudhirj/uulid.go v0.0.0-20250327133557-b8346c6380b6
-## explicit; go 1.18
-github.com/sudhirj/uulid.go
 # github.com/throttled/throttled/v2 v2.11.0
 ## explicit; go 1.13
 github.com/throttled/throttled/v2
