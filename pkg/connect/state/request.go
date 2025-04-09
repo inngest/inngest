@@ -8,6 +8,7 @@ import (
 	"github.com/inngest/inngest/pkg/consts"
 	connpb "github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/oklog/ulid/v2"
+	"github.com/redis/rueidis"
 	"time"
 )
 
@@ -146,6 +147,18 @@ func (r *redisConnectionStateManager) IsRequestLeased(ctx context.Context, envID
 	default:
 		return false, fmt.Errorf("unexpected status %d", status)
 	}
+}
+
+// DeleteLease allows the executor to clean up the lease once the request is done processing.
+func (r *redisConnectionStateManager) DeleteLease(ctx context.Context, envID uuid.UUID, requestID ulid.ULID) error {
+	cmd := r.client.B().Del().Key(r.keyRequestLease(envID, requestID)).Build()
+
+	err := r.client.Do(ctx, cmd).Error()
+	if err != nil && rueidis.IsRedisNil(err) {
+		return fmt.Errorf("could not delete lease: %w", err)
+	}
+
+	return nil
 }
 
 // SaveResponse is an idempotent, atomic write for reliably buffering a response for the executor to pick up

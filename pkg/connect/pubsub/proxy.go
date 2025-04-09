@@ -309,7 +309,7 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 	go func() {
 		for {
 			select {
-			case <-ctx.Done():
+			case <-leaseCtx.Done():
 				return
 			// Verify lease did not expire
 			case <-time.After(consts.ConnectWorkerRequestExtendLeaseInterval / 2):
@@ -345,6 +345,17 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 	// Await SDK response forwarded by gateway
 	// This may take a while: This waits until we receive the SDK response, and we allow for up to 2h in the serverless execution model
 	case <-waitForResponseCtx.Done():
+		// Stop checking for lease
+		cancelLeaseCtx()
+
+		// The lease has a short TTL so it will be cleaned up, but we should try
+		// to garbage-collect unused state as quickly as possible
+		err = i.stateManager.DeleteLease(ctx, opts.EnvID, requestID)
+		if err != nil {
+			span.RecordError(err)
+			l.Error("could not delete lease", "err", err)
+		}
+
 		if reply.RequestId == "" {
 			span.SetStatus(codes.Error, "missing response")
 

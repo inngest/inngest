@@ -37,6 +37,11 @@ func TestLeaseRequest(t *testing.T) {
 
 	var existingLeaseID ulid.ULID
 
+	t.Run("deleting a missing lease should be a no-op", func(t *testing.T) {
+		err = requestStateManager.DeleteLease(ctx, envID, requestID)
+		require.NoError(t, err)
+	})
+
 	t.Run("should not report missing lease as leased", func(t *testing.T) {
 		leased, err := requestStateManager.IsRequestLeased(ctx, envID, requestID)
 		require.NoError(t, err)
@@ -115,6 +120,23 @@ func TestLeaseRequest(t *testing.T) {
 		newLeaseID, err := requestStateManager.ExtendRequestLease(ctx, envID, requestID, existingLeaseID, 0)
 		require.NoError(t, err)
 		require.Nil(t, newLeaseID)
+
+		leased, err = requestStateManager.IsRequestLeased(ctx, envID, requestID)
+		require.NoError(t, err)
+		require.False(t, leased)
+
+		leaseID, err := requestStateManager.LeaseRequest(ctx, envID, requestID, consts.ConnectWorkerRequestLeaseDuration)
+		require.NoError(t, err)
+		require.NotNil(t, leaseID)
+
+		existingLeaseID = *leaseID
+
+		leased, err = requestStateManager.IsRequestLeased(ctx, envID, requestID)
+		require.NoError(t, err)
+		require.True(t, leased)
+
+		err = requestStateManager.DeleteLease(ctx, envID, requestID)
+		require.NoError(t, err)
 
 		leased, err = requestStateManager.IsRequestLeased(ctx, envID, requestID)
 		require.NoError(t, err)

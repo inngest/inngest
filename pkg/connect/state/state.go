@@ -66,6 +66,9 @@ type RequestStateManager interface {
 	// IsRequestLeased checks whether the given request is currently leased and the lease has not expired.
 	IsRequestLeased(ctx context.Context, envID uuid.UUID, requestID ulid.ULID) (bool, error)
 
+	// DeleteLease allows the executor to clean up the lease once the request is done processing.
+	DeleteLease(ctx context.Context, envID uuid.UUID, requestID ulid.ULID) error
+
 	// SaveResponse is an idempotent, atomic write for reliably buffering a response for the executor to pick up
 	// in case Redis PubSub fails to notify the executor.
 	SaveResponse(ctx context.Context, envID uuid.UUID, requestID ulid.ULID, resp *connpb.SDKResponse) error
