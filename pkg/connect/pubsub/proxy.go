@@ -271,37 +271,27 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 		<-replySubscribed
 	}
 
-	res, err := routing.GetRoute(ctx, i.stateManager, i.rnd, i.tracer, l, opts.Data)
-	if err != nil {
-		span.RecordError(err)
-		span.SetStatus(codes.Error, "failed to route message")
-
-		if errors.Is(err, routing.ErrNoHealthyConnection) {
-			return nil, syscode.Error{
-				Code:    syscode.CodeConnectNoHealthyConnection,
-				Message: "Could not find a healthy connection",
-			}
-		}
-
-		return nil, fmt.Errorf("failed to route message: %w", err)
-	}
-
+	// Attempt to lease the request. If the request is still running on a worker,
+	// this will fail with ErrRequestLeased. In this case, we can just wait for the request to complete.
+	// Otherwise, we acquired the lease and need to forward the request to the worker.
 	leaseID, err := i.stateManager.LeaseRequest(ctx, opts.EnvID, opts.Data.RequestId, consts.ConnectWorkerRequestLeaseDuration)
-	if err != nil {
+	if err != nil && !errors.Is(err, state.ErrRequestLeased) {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "failed to lease request")
 
 		return nil, fmt.Errorf("failed to lease request: %w", err)
 	}
 
-	if leaseID == nil {
+	if leaseID == nil && !errors.Is(err, state.ErrRequestLeased) {
 		span.SetStatus(codes.Error, "missing initial lease ID")
 
 		return nil, fmt.Errorf("missing initial lease ID")
 	}
 
-	// Include initial Lease ID in request
-	opts.Data.LeaseId = leaseID.String()
+	if leaseID != nil {
+		// Include initial Lease ID in request
+		opts.Data.LeaseId = leaseID.String()
+	}
 
 	// Periodically check for lease health, if lease expired, we need to retry
 	leaseCtx, cancelLeaseCtx := context.WithCancel(ctx)
@@ -331,16 +321,35 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 		}
 	}()
 
-	// Forward message to the gateway
-	err = i.RouteExecutorRequest(ctx, res.GatewayID, res.ConnectionID, opts.Data)
-	if err != nil {
-		span.RecordError(err)
-		span.SetStatus(codes.Error, " could not forward request to gateway")
+	// Forward message to the gateway if the request wasn't already running
+	if leaseID != nil {
+		// Determine the most suitable connection
+		route, err := routing.GetRoute(ctx, i.stateManager, i.rnd, i.tracer, l, opts.Data)
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, "failed to route message")
 
-		return nil, fmt.Errorf("failed to route request to gateway: %w", err)
+			if errors.Is(err, routing.ErrNoHealthyConnection) {
+				return nil, syscode.Error{
+					Code:    syscode.CodeConnectNoHealthyConnection,
+					Message: "Could not find a healthy connection",
+				}
+			}
+
+			return nil, fmt.Errorf("failed to route message: %w", err)
+		}
+
+		// Forward the request
+		err = i.RouteExecutorRequest(ctx, route.GatewayID, route.ConnectionID, opts.Data)
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, " could not forward request to gateway")
+
+			return nil, fmt.Errorf("failed to route request to gateway: %w", err)
+		}
+
+		l.Debug("forwarded executor request to gateway", "gateway_id", route.GatewayID, "conn_id", route.ConnectionID)
 	}
-
-	l.Debug("forwarded executor request to gateway", "gateway_id", res.GatewayID, "conn_id", res.ConnectionID)
 
 	select {
 	// Await SDK response forwarded by gateway
