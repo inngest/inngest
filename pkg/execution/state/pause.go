@@ -53,13 +53,6 @@ type PauseGetter interface {
 	// EventHasPauses returns whether the event has pauses stored.
 	EventHasPauses(ctx context.Context, workspaceID uuid.UUID, eventName string) (bool, error)
 
-	// PauseByStep returns a specific pause for a given workflow run, from a given step.
-	//
-	// This is required when continuing a step function from an async step, ie. one that
-	// has deferred results which must be continued by resuming the specific pause set
-	// up for the given step ID.
-	PauseByStep(ctx context.Context, i Identifier, actionID string) (*Pause, error)
-
 	// PauseByID returns a given pause by pause ID.  This must return expired pauses
 	// that have not yet been consumed in order to properly handle timeouts.
 	//
@@ -122,16 +115,36 @@ type PauseManager interface {
 	PauseGetter
 }
 
+// PauseIdentifier is a minimal identifier for a pause.  This exists and is used instead of
+// eg. state.ID or state.Identifier for historical reasons:  pauses were added before state.ID
+// existed, and this implements all things backcompat with the bare minimum fields needed for
+// pauses and state to work.
+type PauseIdentifier struct {
+	// RunID is the ID of the run.
+	RunID ulid.ULID `json:"runID"`
+	// FunctionID tracks the internal ID of the function, and is used when saving
+	// step responses.
+	FunctionID uuid.UUID `json:"wID"`
+	// AccountID represents the account ID for this run
+	AccountID uuid.UUID `json:"aID"`
+	// NOTE:
+	// - Workspace ID is in the pause.
+	// - App ID is not necessary to load fn state in the identifier.
+}
+
 // Pause allows steps of a function to be paused until some condition in the future.
 //
 // It pauses a specific workflow run via an Identifier, at a specific step in
 // the function as specified by Target.
 type Pause struct {
+	// ID is a pause ID.  This should be a V7 UUID (incl. timestamp).
 	ID uuid.UUID `json:"id"`
 	// WorkspaceID scopes the pause to a specific workspace.
 	WorkspaceID uuid.UUID `json:"wsID"`
 	// Identifier is the specific workflow run to resume.  This is required.
-	Identifier Identifier `json:"identifier"`
+	// This includes the minimum number of fields required to reload function
+	// state.
+	Identifier PauseIdentifier `json:"identifier"`
 	// Outgoing is the parent step for the pause.
 	Outgoing string `json:"outgoing"`
 	// Incoming is the step to run after the pause completes.
@@ -156,16 +169,10 @@ type Pause struct {
 	Expires Time `json:"expires"`
 	// Event is an optional event that can resume the pause automatically,
 	// often paired with an expression.
-	Event *string `json:"event"`
+	Event *string `json:"event,omitempty"`
 	// Expression is an optional expression that must match for the pause
 	// to be resumed.
-	Expression *string `json:"expression"`
-	// ExpressionData _optionally_ stores only the data that we need to evaluate
-	// the expression from the event.  This allows us to load pauses from the
-	// state store without round trips to fetch the entire function state.  If
-	// this is empty and the pause contains an expression, function state will
-	// be loaded from the store.
-	ExpressionData map[string]any `json:"data"`
+	Expression *string `json:"expression,omitempty"`
 	// InvokeCorrelationID is the correlation ID for the invoke pause.
 	InvokeCorrelationID *string `json:"icID,omitempty"`
 	// InvokeTargetFnID is the target function ID for the invoke pause.
@@ -174,7 +181,7 @@ type Pause struct {
 	InvokeTargetFnID *string `json:"itFnID,omitempty"`
 	// OnTimeout indicates that this incoming edge should only be ran
 	// when the pause times out, if set to true.
-	OnTimeout bool `json:"onTimeout"`
+	OnTimeout bool `json:"onTimeout,omitempty,omitedefault"`
 	// DataKey is the name of the step to use when adding data to the function
 	// run's state after consuming this step.
 	//
@@ -183,21 +190,17 @@ type Pause struct {
 	//
 	// If DataKey is empty and data is provided when consuming a pause, no
 	// data will be saved in the function state.
-	DataKey string `json:"dataKey,omitempty"`
+	DataKey string `json:"dataKey,omitempty,omitdefault"`
 	// Cancellation indicates whether this pause exists as a cancellation
 	// clause for a function.
 	//
 	// If so, when the matching pause is returned after processing an event
 	// the function's status is set to cancelled, preventing any future work.
-	Cancel bool `json:"cancel,omitempty"`
+	Cancel bool `json:"cancel,omitempty,omitdefault"`
 	// Attempt stores the attempt for the current step, if this a pause caused
 	// via an async driver.  This lets the executor resume as-is with the current
 	// context, ensuring that we retry correctly.
 	Attempt int `json:"att,omitempty"`
-	// MaxAttempts is the maximum number of attempts we can retry.  This is
-	// included in the pause to allow the executor to set the correct maximum
-	// number of retries when enqueuing next steps.
-	MaxAttempts *int `json:"maxAtts,omitempty"`
 	// GroupID stores the group ID for this step and history, allowing us to correlate
 	// event receives with other history items.
 	GroupID string `json:"groupID"`
