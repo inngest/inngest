@@ -473,7 +473,6 @@ func (i *redisPubSubConnector) subscribe(ctx context.Context, channel string, on
 	}
 
 	<-done
-	return
 }
 
 // ReceiveExecutorMessages listens for incoming PubSub messages for a specific app and calls the provided callback.
