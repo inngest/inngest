@@ -463,7 +463,7 @@ func (i *redisPubSubConnector) subscribe(ctx context.Context, channel string, on
 
 // ReceiveExecutorMessages listens for incoming PubSub messages for a specific app and calls the provided callback.
 // This is a blocking call which only stops once the context is canceled.
-func (i *redisPubSubConnector) ReceiveRoutedRequest(ctx context.Context, gatewayId ulid.ULID, connId ulid.ULID, onMessage func(rawBytes []byte, data *connectpb.GatewayExecutorRequestData), onSubscribed chan struct{}) {
+func (i *redisPubSubConnector) ReceiveRoutedRequest(ctx context.Context, gatewayId ulid.ULID, connId ulid.ULID, onMessage func(rawBytes []byte, data *connectpb.GatewayExecutorRequestData), onSubscribed chan struct{}) error {
 	i.subscribe(ctx, i.channelGatewayAppRequests(gatewayId, connId), func(msg string) {
 		// TODO Test whether this works with marshaled Protobuf bytes
 		msgBytes := []byte(msg)
@@ -478,6 +478,7 @@ func (i *redisPubSubConnector) ReceiveRoutedRequest(ctx context.Context, gateway
 
 		onMessage(msgBytes, &data)
 	}, false, onSubscribed)
+	return nil
 }
 
 // Wait blocks and listens for incoming PubSub messages for the internal subscribers. This must be run before
