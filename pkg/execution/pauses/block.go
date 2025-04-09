@@ -55,7 +55,7 @@ func (b blockstore) FlushIndexBlock(ctx context.Context, index Index) error {
 		return nil
 	}
 
-	// TODO: CLAIM A LEASE.
+	// TODO: CLAIM A LEASE, then defer releasing it.
 
 	iter, err := b.buf.PausesSince(ctx, index, time.Time{})
 	if err != nil {
@@ -117,6 +117,8 @@ func (b blockstore) FlushIndexBlock(ctx context.Context, index Index) error {
 	// TODO: Write block metadata
 
 	// TODO: Remove len(block.Pauses) from the buffer, as they've been flushed.
+	//       We can't use the standard DeletePause item from the state store as
+	//       this will add delete indexes for compaction.
 
 	return fmt.Errorf("not implemented")
 }
