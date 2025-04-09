@@ -56,9 +56,13 @@ type GatewayManager interface {
 }
 
 type RequestStateManager interface {
-	LeaseRequest(ctx context.Context, requestID ulid.ULID, duration time.Duration) (leaseID *ulid.ULID, err error)
-	ExtendRequestLease(ctx context.Context, requestID ulid.ULID, leaseId ulid.ULID, duration time.Duration) (newLeaseID *ulid.ULID, err error)
-	IsRequestLeased(ctx context.Context, requestID ulid.ULID) (bool, error)
+	LeaseRequest(ctx context.Context, envID uuid.UUID, requestID ulid.ULID, duration time.Duration) (leaseID *ulid.ULID, err error)
+	ExtendRequestLease(ctx context.Context, envID uuid.UUID, requestID ulid.ULID, leaseId ulid.ULID, duration time.Duration) (newLeaseID *ulid.ULID, err error)
+	IsRequestLeased(ctx context.Context, envID uuid.UUID, requestID ulid.ULID) (bool, error)
+
+	SaveResponse(ctx context.Context, envID uuid.UUID, requestID ulid.ULID, resp *connpb.SDKResponse) error
+	GetResponse(ctx context.Context, envID uuid.UUID, requestID ulid.ULID) (*connpb.SDKResponse, error)
+	DeleteResponse(ctx context.Context, envID uuid.UUID, requestID ulid.ULID) error
 }
 
 type AuthContext struct {

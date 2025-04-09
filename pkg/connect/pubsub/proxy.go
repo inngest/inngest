@@ -181,6 +181,7 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 		opts.Data.UserTraceCtx = marshaled
 	}
 
+	// Receive gateway acknowledgement for o11y (this is not a reliable channel - do not depend on it for the critical path)
 	{
 		gatewayAckSubscribed := make(chan struct{})
 		go func() {
@@ -197,6 +198,7 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 		<-gatewayAckSubscribed
 	}
 
+	// Receive worker acknowledgement for o11y (this is not a reliable channel - do not depend on it for the critical path)
 	{
 		workerAckSubscribed := make(chan struct{})
 		go func() {
@@ -214,16 +216,50 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 	}
 
 	// Await SDK response forwarded by gateway
-	replyReceivedChan := make(chan error)
-	var reply connectpb.SDKResponse
+
+	var reply *connectpb.SDKResponse
+
+	waitForResponseCtx, cancelWaitForResponseCtx := context.WithCancel(ctx)
+	go func() {
+		for {
+			select {
+			case <-waitForResponseCtx.Done():
+				return
+			case <-time.After(5 * time.Second):
+			}
+
+			resp, err := i.stateManager.GetResponse(ctx, opts.EnvID, requestID)
+			if err != nil {
+				span.RecordError(err)
+				l.Error("could not check for response", "err", err)
+				continue
+			}
+
+			if resp != nil {
+				reply = resp
+
+				// The response has a short TTL so it will be cleaned up, but we should try
+				// to garbage-collect unused state as quickly as possible
+				err := i.stateManager.DeleteResponse(ctx, opts.EnvID, requestID)
+				if err != nil {
+					span.RecordError(err)
+					l.Error("could not delete response", "err", err)
+				}
+
+				cancelWaitForResponseCtx()
+				return
+			}
+		}
+	}()
+
 	{
 		replySubscribed := make(chan struct{})
 		go func() {
 			// This may take a while: This waits until we receive the SDK response, and we allow for up to 2h in the serverless execution model
-			i.subscribe(ctx, i.channelAppRequestsReply(opts.Data.RequestId), func(msg string) {
+			i.subscribe(waitForResponseCtx, i.channelAppRequestsReply(opts.Data.RequestId), func(msg string) {
 				span.AddEvent("ReplyReceived")
 
-				err := proto.Unmarshal([]byte(msg), &reply)
+				err := proto.Unmarshal([]byte(msg), reply)
 				if err != nil {
 					// This should never happen
 					span.SetAttributes(
@@ -231,11 +267,9 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 					)
 					span.RecordError(err)
 					span.SetStatus(codes.Error, "unmarshaling sdk response proto failed")
-					replyReceivedChan <- err
-					return
 				}
 
-				replyReceivedChan <- nil
+				cancelWaitForResponseCtx()
 			}, true, replySubscribed)
 		}()
 		<-replySubscribed
@@ -256,7 +290,7 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 		return nil, fmt.Errorf("failed to route message: %w", err)
 	}
 
-	leaseID, err := i.stateManager.LeaseRequest(ctx, requestID, consts.ConnectWorkerRequestLeaseDuration)
+	leaseID, err := i.stateManager.LeaseRequest(ctx, opts.EnvID, requestID, consts.ConnectWorkerRequestLeaseDuration)
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "failed to lease request")
@@ -284,7 +318,7 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 			case <-time.After(consts.ConnectWorkerRequestExtendLeaseInterval / 2):
 			}
 
-			leased, err := i.stateManager.IsRequestLeased(ctx, requestID)
+			leased, err := i.stateManager.IsRequestLeased(ctx, opts.EnvID, requestID)
 			if err != nil {
 				span.RecordError(err)
 				l.Error("could not get lease status", "err", err)
@@ -298,7 +332,7 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 			}
 		}
 	}()
-	
+
 	// Forward message to the gateway
 	err = i.RouteExecutorRequest(ctx, res.GatewayID, res.ConnectionID, opts.Data)
 	if err != nil {
@@ -313,16 +347,14 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 	select {
 	// Await SDK response forwarded by gateway
 	// This may take a while: This waits until we receive the SDK response, and we allow for up to 2h in the serverless execution model
-	case err := <-replyReceivedChan:
-		close(replyReceivedChan)
-		if err != nil {
-			span.RecordError(err)
-			span.SetStatus(codes.Error, "could not receive worker response")
+	case <-waitForResponseCtx.Done():
+		if reply == nil {
+			span.SetStatus(codes.Error, "missing response")
 
-			return nil, fmt.Errorf("could not receive executor response: %w", err)
+			return nil, fmt.Errorf("did not receive worker response")
 		}
 
-		return &reply, nil
+		return reply, nil
 	case <-leaseCtx.Done():
 		span.SetStatus(codes.Error, "lease expired")
 
