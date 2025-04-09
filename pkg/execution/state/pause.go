@@ -3,6 +3,7 @@ package state
 import (
 	"context"
 	"regexp"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
@@ -48,6 +49,8 @@ type PauseMutater interface {
 type PauseGetter interface {
 	// PausesByEvent returns all pauses for a given event, in a given workspace.
 	PausesByEvent(ctx context.Context, workspaceID uuid.UUID, eventName string) (PauseIterator, error)
+
+	PausesByEventSince(ctx context.Context, workspaceID uuid.UUID, event string, since time.Time) (PauseIterator, error)
 
 	// EventHasPauses returns whether the event has pauses stored.
 	EventHasPauses(ctx context.Context, workspaceID uuid.UUID, eventName string) (bool, error)
