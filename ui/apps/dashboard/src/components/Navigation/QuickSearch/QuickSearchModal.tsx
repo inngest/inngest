@@ -42,7 +42,7 @@ export function QuickSearchModal({ envSlug, envName, isOpen, onClose }: Props) {
             )}
           />
         </div>
-        <Command.List className="text-subtle bg-modalBase h-[min(330px,calc(var(--cmdk-list-height)+24px))] overflow-scroll px-4 py-3">
+        <Command.List className="text-subtle bg-modalBase h-[min(330px,calc(var(--cmdk-list-height)+24px))] overflow-auto px-4 py-3">
           {(isTyping || res.isFetching) && (
             <Command.Loading className="text-light mb-4 text-xs">
               <div className="flex items-center gap-2 px-2">
