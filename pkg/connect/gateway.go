@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/google/uuid"
 	connecterrors "github.com/inngest/inngest/pkg/connect/errors"
+	"github.com/inngest/inngest/pkg/consts"
 	"io"
 	"log/slog"
 	"net"
@@ -398,8 +399,24 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 
 		// Let the worker know we're ready to receive messages
 		{
+			readyPayload, err := proto.Marshal(&connect.GatewayConnectionReadyData{
+				HeartbeatInterval:   consts.ConnectWorkerHeartbeatInterval.String(),
+				ExtendLeaseInterval: consts.ConnectWorkerRequestExtendLeaseInterval.String(),
+			})
+			if err != nil {
+				ch.log.Error("could not marshal connection ready", "err", err)
+				c.closeWithConnectError(ws, &connecterrors.SocketError{
+					SysCode:    syscode.CodeConnectInternal,
+					StatusCode: websocket.StatusInternalError,
+					Msg:        "could not prepare gateway connection ready",
+				})
+
+				return
+			}
+
 			err = wsproto.Write(ctx, ws, &connect.ConnectMessage{
-				Kind: connect.GatewayMessageType_GATEWAY_CONNECTION_READY,
+				Kind:    connect.GatewayMessageType_GATEWAY_CONNECTION_READY,
+				Payload: readyPayload,
 			})
 			if err != nil {
 				if ctx.Err() != nil {
