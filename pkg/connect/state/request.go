@@ -9,6 +9,7 @@ import (
 	connpb "github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
+	"google.golang.org/protobuf/proto"
 	"time"
 )
 
@@ -16,11 +17,18 @@ var (
 	ErrRequestLeased        = fmt.Errorf("request already leased")
 	ErrRequestLeaseExpired  = fmt.Errorf("request lease expired")
 	ErrRequestLeaseNotFound = fmt.Errorf("request not leased")
+
+	ErrResponseAlreadyBuffered = fmt.Errorf("response already buffered")
 )
 
 // keyRequestLease points to the key storing the request lease
 func (r *redisConnectionStateManager) keyRequestLease(envID uuid.UUID, requestID ulid.ULID) string {
 	return fmt.Sprintf("{%s}:request-lease:%s", envID, requestID)
+}
+
+// keyBufferedResponse points to the key storing the buffered SDK response
+func (r *redisConnectionStateManager) keyBufferedResponse(envID uuid.UUID, requestID ulid.ULID) string {
+	return fmt.Sprintf("{%s}:buffered-response:%s", envID, requestID)
 }
 
 // LeaseRequest attempts to lease the given requestID for <duration>. If the request is already leased, this will fail with ErrRequestLeased.
@@ -154,7 +162,7 @@ func (r *redisConnectionStateManager) DeleteLease(ctx context.Context, envID uui
 	cmd := r.client.B().Del().Key(r.keyRequestLease(envID, requestID)).Build()
 
 	err := r.client.Do(ctx, cmd).Error()
-	if err != nil && rueidis.IsRedisNil(err) {
+	if err != nil && !rueidis.IsRedisNil(err) {
 		return fmt.Errorf("could not delete lease: %w", err)
 	}
 
@@ -164,16 +172,68 @@ func (r *redisConnectionStateManager) DeleteLease(ctx context.Context, envID uui
 // SaveResponse is an idempotent, atomic write for reliably buffering a response for the executor to pick up
 // in case Redis PubSub fails to notify the executor.
 func (r *redisConnectionStateManager) SaveResponse(ctx context.Context, envID uuid.UUID, requestID ulid.ULID, resp *connpb.SDKResponse) error {
-	return fmt.Errorf("not implemented")
+	marshaled, err := proto.Marshal(resp)
+	if err != nil {
+		return fmt.Errorf("could not marshal response: %w", err)
+	}
+
+	responseExpiry := 30 * time.Second
+
+	cmd := r.client.
+		B().
+		Set().
+		Key(r.keyBufferedResponse(envID, requestID)).
+		Value(string(marshaled)).
+		Nx().
+		Ex(responseExpiry).
+		Build()
+
+	set, err := r.client.Do(ctx, cmd).AsBool()
+	if err != nil && !rueidis.IsRedisNil(err) {
+		return fmt.Errorf("could not buffer response: %w", err)
+	}
+
+	if !set {
+		return ErrResponseAlreadyBuffered
+	}
+
+	return nil
 }
 
 // GetResponse retrieves the response for a given request, if exists. Otherwise, the response will be nil.
 func (r *redisConnectionStateManager) GetResponse(ctx context.Context, envID uuid.UUID, requestID ulid.ULID) (*connpb.SDKResponse, error) {
-	return nil, fmt.Errorf("not implemented")
+
+	cmd := r.client.
+		B().
+		Get().
+		Key(r.keyBufferedResponse(envID, requestID)).
+		Build()
+
+	res, err := r.client.Do(ctx, cmd).ToString()
+	if err != nil && !rueidis.IsRedisNil(err) {
+		return nil, fmt.Errorf("could not buffer response: %w", err)
+	}
+
+	if rueidis.IsRedisNil(err) {
+		return nil, nil
+	}
+
+	reply := &connpb.SDKResponse{}
+	if err := proto.Unmarshal([]byte(res), reply); err != nil {
+		return nil, fmt.Errorf("could not unmarshal sdk response: %w", err)
+	}
+
+	return reply, nil
 }
 
 // DeleteResponse is an idempotent delete operation for the temporary response buffer.
 func (r *redisConnectionStateManager) DeleteResponse(ctx context.Context, envID uuid.UUID, requestID ulid.ULID) error {
+	cmd := r.client.B().Del().Key(r.keyBufferedResponse(envID, requestID)).Build()
 
-	return fmt.Errorf("not implemented")
+	err := r.client.Do(ctx, cmd).Error()
+	if err != nil && !rueidis.IsRedisNil(err) {
+		return fmt.Errorf("could not delete buffered response: %w", err)
+	}
+
+	return nil
 }

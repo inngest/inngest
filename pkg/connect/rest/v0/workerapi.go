@@ -11,10 +11,10 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/golang/protobuf/proto"
 	"github.com/inngest/inngest/pkg/connect/auth"
 	"github.com/inngest/inngest/pkg/publicerr"
 	"github.com/inngest/inngest/proto/gen/connect/v1"
+	"google.golang.org/protobuf/proto"
 )
 
 func (a *connectApiRouter) start(w http.ResponseWriter, r *http.Request) {
