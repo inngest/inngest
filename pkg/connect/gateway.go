@@ -729,6 +729,8 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 				return nil
 			}
 
+			c.log.Debug("extended lease for long-running request")
+
 			// Extended lease, all good
 			return nil
 		}

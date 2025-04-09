@@ -238,6 +238,8 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 			}
 
 			if resp != nil {
+				l.Debug("received response via polling")
+
 				reply = resp
 
 				cancelWaitForResponseCtx()
@@ -327,6 +329,8 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 				cancelLeaseCtx()
 				return
 			}
+
+			l.Debug("request is still leased by worker")
 		}
 	}()
 
