@@ -191,6 +191,7 @@ enum WorkerDisconnectReason {
 	WORKER_SHUTDOWN = 0;
 	UNEXPECTED = 1;
 	GATEWAY_DRAINING = 2;
+	CONSECUTIVE_HEARTBEATS_MISSED = 3;
 }
 
 message StartResponse {
