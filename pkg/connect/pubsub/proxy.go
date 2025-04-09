@@ -238,20 +238,15 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 			if resp != nil {
 				reply = resp
 
-				// The response has a short TTL so it will be cleaned up, but we should try
-				// to garbage-collect unused state as quickly as possible
-				err := i.stateManager.DeleteResponse(ctx, opts.EnvID, requestID)
-				if err != nil {
-					span.RecordError(err)
-					l.Error("could not delete response", "err", err)
-				}
-
 				cancelWaitForResponseCtx()
 				return
 			}
 		}
 	}()
 
+	// Alternatively, the gateway will send the response as soon as it comes in.
+	// This is unreliable but quicker than polling for the response, so we use this
+	// as a best-effort notification mechanism.
 	{
 		replySubscribed := make(chan struct{})
 		go func() {
@@ -352,6 +347,14 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 			span.SetStatus(codes.Error, "missing response")
 
 			return nil, fmt.Errorf("did not receive worker response")
+		}
+
+		// The response has a short TTL so it will be cleaned up, but we should try
+		// to garbage-collect unused state as quickly as possible
+		err := i.stateManager.DeleteResponse(ctx, opts.EnvID, requestID)
+		if err != nil {
+			span.RecordError(err)
+			l.Error("could not delete response", "err", err)
 		}
 
 		return reply, nil
