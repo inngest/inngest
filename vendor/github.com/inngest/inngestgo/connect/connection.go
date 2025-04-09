@@ -2,7 +2,6 @@ package connect
 
 import (
 	"context"
-	"crypto/rand"
 	"errors"
 	"fmt"
 	"github.com/coder/websocket"
@@ -144,8 +143,10 @@ func (h *connectHandler) prepareConnection(ctx context.Context, data connectionE
 		return nil, newReconnectErr(fmt.Errorf("could not connect to gateway: %w", err))
 	}
 
-	// Connection ID is unique per connection, reconnections should get a new ID
-	connectionId := ulid.MustNew(ulid.Timestamp(startTime), rand.Reader)
+	connectionId, err := ulid.Parse(startRes.GetConnectionId())
+	if err != nil {
+		return nil, newReconnectErr(fmt.Errorf("could not parse connection ID: %w", err))
+	}
 
 	h.logger.Debug("websocket connection established", "gateway_host", gatewayHost)
 
