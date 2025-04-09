@@ -1,8 +1,8 @@
 -- [[
 --
 -- Output:
---   0: Successfully saved pause
---   1: Pause already exists
+--   [1..N]: Successfully saved pause;  returns # of pauses in AddIdx
+--   -1: Pause already exists
 -- ]]
 
 local pauseKey    = KEYS[1]
@@ -22,7 +22,7 @@ local nowUnixSeconds = tonumber(ARGV[6])
 
 
 if redis.call("SETNX", pauseKey, pause) == 0 then
-	return 1
+	return -1
 end
 
 -- Populate global index
@@ -47,4 +47,4 @@ if invokeCorrelationID ~= false and invokeCorrelationID ~= "" and invokeCorrelat
 	redis.call("HSETNX", pauseInvokeKey, invokeCorrelationID, pauseID)
 end
 
-return 0
+return redis.call("ZCARD", keyPauseAddIdx)

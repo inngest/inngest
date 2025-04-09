@@ -466,8 +466,9 @@ func checkSavePause(t *testing.T, m state.Manager) {
 		Incoming: w.Steps[0].ID,
 		Expires:  state.Time(time.Now().Add(5 * time.Second)),
 	}
-	err := m.SavePause(ctx, pause)
+	n, err := m.SavePause(ctx, pause)
 	require.NoError(t, err)
+	require.EqualValues(t, 1, n)
 
 	// XXX: Saving a pause with a past expiry is a noop.
 }
@@ -492,7 +493,7 @@ func checkLeasePause(t *testing.T, m state.Manager) {
 		Incoming: w.Steps[0].ID,
 		Expires:  state.Time(time.Now().Add(state.PauseLeaseDuration * 3).UTC()),
 	}
-	err = m.SavePause(ctx, pause)
+	_, err = m.SavePause(ctx, pause)
 	require.NoError(t, err)
 
 	now := time.Now()
@@ -586,7 +587,7 @@ func checkDeletePause(t *testing.T, m state.Manager) {
 		Event:    &evt,
 		Expires:  state.Time(time.Now().Add(state.PauseLeaseDuration * 2).UTC().Truncate(time.Second)),
 	}
-	err = m.SavePause(ctx, pause)
+	_, err = m.SavePause(ctx, pause)
 	require.NoError(t, err)
 
 	ok, err := m.EventHasPauses(ctx, s.Identifier().WorkspaceID, evt)
@@ -641,7 +642,7 @@ func checkConsumePause(t *testing.T, m state.Manager) {
 		StepName: w.Steps[0].Name,
 		Expires:  state.Time(time.Now().Add(state.PauseLeaseDuration * 2)),
 	}
-	err = m.SavePause(ctx, pause)
+	_, err = m.SavePause(ctx, pause)
 	require.NoError(t, err)
 
 	t.Run("Consuming a pause works", func(t *testing.T) {
@@ -705,7 +706,7 @@ func checkConsumePauseWithData(t *testing.T, m state.Manager) {
 		Expires:  state.Time(time.Now().Add(state.PauseLeaseDuration * 2)),
 		DataKey:  "my-pause-data-stored-for-eternity",
 	}
-	err = m.SavePause(ctx, pause)
+	_, err = m.SavePause(ctx, pause)
 	require.NoError(t, err)
 
 	// Consuming the pause should work.
@@ -762,7 +763,7 @@ func checkConsumePauseWithDataIndex(t *testing.T, m state.Manager) {
 			Expires:  state.Time(time.Now().Add(state.PauseLeaseDuration * 2)),
 			DataKey:  key,
 		}
-		err := m.SavePause(ctx, pause)
+		_, err := m.SavePause(ctx, pause)
 		require.NoError(t, err)
 
 		// Consuming the pause should work.
@@ -802,7 +803,7 @@ func checkConsumePauseWithDataIndex(t *testing.T, m state.Manager) {
 			Expires:  state.Time(time.Now().Add(state.PauseLeaseDuration * 2)),
 			DataKey:  key,
 		}
-		err = m.SavePause(ctx, pause)
+		_, err = m.SavePause(ctx, pause)
 		require.NoError(t, err)
 
 		data := map[string]any{"allo": "guvna"}
@@ -844,7 +845,7 @@ func checkConsumePauseWithEmptyData(t *testing.T, m state.Manager) {
 		Expires:  state.Time(time.Now().Add(state.PauseLeaseDuration * 2)),
 		DataKey:  "my-pause-data-stored-for-eternity",
 	}
-	err = m.SavePause(ctx, pause)
+	_, err = m.SavePause(ctx, pause)
 	require.NoError(t, err)
 
 	// Consuming the pause should work.
@@ -905,7 +906,7 @@ func checkConsumePauseWithEmptyDataKey(t *testing.T, m state.Manager) {
 		Incoming: w.Steps[0].ID,
 		Expires:  state.Time(time.Now().Add(state.PauseLeaseDuration * 2)),
 	}
-	err = m.SavePause(ctx, pause)
+	_, err = m.SavePause(ctx, pause)
 	require.NoError(t, err)
 
 	// Consuming the pause should work.
@@ -978,7 +979,7 @@ func checkPausesByEvent_single(t *testing.T, m state.Manager) {
 		Expires:  state.Time(time.Now().Add(state.PauseLeaseDuration * 2).Truncate(time.Millisecond).UTC()),
 		Event:    &evtA,
 	}
-	err := m.SavePause(ctx, pause)
+	_, err := m.SavePause(ctx, pause)
 	require.NoError(t, err)
 
 	// Save an unrelated pause to another event in the same workspace
@@ -995,7 +996,7 @@ func checkPausesByEvent_single(t *testing.T, m state.Manager) {
 		Expires:  state.Time(time.Now().Add(state.PauseLeaseDuration * 2).Truncate(time.Millisecond).UTC()),
 		Event:    &evtB,
 	}
-	err = m.SavePause(ctx, unusedA)
+	_, err = m.SavePause(ctx, unusedA)
 	require.NoError(t, err)
 
 	// Save an unrelated pause to the same event in a different workspace
@@ -1012,7 +1013,7 @@ func checkPausesByEvent_single(t *testing.T, m state.Manager) {
 		Expires:  state.Time(time.Now().Add(state.PauseLeaseDuration * 2).Truncate(time.Millisecond).UTC()),
 		Event:    &evtA,
 	}
-	err = m.SavePause(ctx, unusedB)
+	_, err = m.SavePause(ctx, unusedB)
 	require.NoError(t, err)
 
 	exists, err := m.EventHasPauses(ctx, wsA, evtA)
@@ -1053,8 +1054,9 @@ func checkPausesByEvent_multi(t *testing.T, m state.Manager) {
 			Expires:  state.Time(time.Now().Add(time.Duration(i+1) * time.Minute).Truncate(time.Millisecond).UTC()),
 			Event:    &evtA,
 		}
-		err := m.SavePause(ctx, p)
+		n, err := m.SavePause(ctx, p)
 		require.NoError(t, err)
+		require.EqualValues(t, i+1, n)
 		pauses = append(pauses, p)
 	}
 
@@ -1071,7 +1073,7 @@ func checkPausesByEvent_multi(t *testing.T, m state.Manager) {
 		Expires:  state.Time(time.Now().Add(state.PauseLeaseDuration * 2)),
 		Event:    &evtB,
 	}
-	err := m.SavePause(ctx, unused)
+	_, err := m.SavePause(ctx, unused)
 	require.NoError(t, err)
 
 	iter, err := m.PausesByEvent(ctx, uuid.UUID{}, evtA)
@@ -1137,7 +1139,7 @@ func checkPausesByEvent_concurrent(t *testing.T, m state.Manager) {
 			Expires:  state.Time(time.Now().Add(time.Duration(i+1) * time.Minute).Truncate(time.Millisecond).UTC()),
 			Event:    &evtA,
 		}
-		err := m.SavePause(ctx, p)
+		_, err := m.SavePause(ctx, p)
 		require.NoError(t, err)
 		pauses = append(pauses, p)
 	}
@@ -1235,7 +1237,7 @@ func checkPausesByEvent_consumed(t *testing.T, m state.Manager) {
 			Expires:  state.Time(time.Now().Add(time.Duration(i+1) * time.Minute).Truncate(time.Millisecond).UTC()),
 			Event:    &evtA,
 		}
-		err := m.SavePause(ctx, p)
+		_, err := m.SavePause(ctx, p)
 		require.NoError(t, err)
 		pauses = append(pauses, p)
 	}
@@ -1334,9 +1336,9 @@ func checkPausesByEvent_consumed(t *testing.T, m state.Manager) {
 			Expires:  state.Time(time.Now().Add(time.Minute).Truncate(time.Second).UTC()),
 			Event:    &evtA,
 		}
-		err := m.SavePause(ctx, p1)
+		_, err := m.SavePause(ctx, p1)
 		require.NoError(t, err)
-		err = m.SavePause(ctx, p2)
+		_, err = m.SavePause(ctx, p2)
 		require.NoError(t, err)
 
 		//
@@ -1391,7 +1393,7 @@ func checkPauseByID(t *testing.T, m state.Manager) {
 		Incoming: w.Steps[0].ID,
 		Expires:  state.Time(time.Now().Add(time.Second * 2).Truncate(time.Millisecond).UTC()),
 	}
-	err := m.SavePause(ctx, pause)
+	_, err := m.SavePause(ctx, pause)
 	require.NoError(t, err)
 
 	found, err := m.PauseByID(ctx, pause.ID)
@@ -1447,9 +1449,9 @@ func checkPausesByID(t *testing.T, m state.Manager) {
 		Incoming: w.Steps[0].ID,
 		Expires:  state.Time(time.Now().Add(time.Second * 2).Truncate(time.Millisecond).UTC()),
 	}
-	err := m.SavePause(ctx, a)
+	_, err := m.SavePause(ctx, a)
 	require.NoError(t, err)
-	err = m.SavePause(ctx, b)
+	_, err = m.SavePause(ctx, b)
 	require.NoError(t, err)
 
 	found, err := m.PausesByID(ctx, a.ID)
