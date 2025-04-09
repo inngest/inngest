@@ -69,7 +69,7 @@ func (h *connectHandler) connect(ctx context.Context, data connectionEstablishDa
 	}
 
 	// Set up connection lifecycle logic (receiving messages, handling requests, etc.)
-	err = h.handleConnection(h.workerCtx, data, preparedConn.ws, preparedConn.gatewayGroupName)
+	err = h.handleConnection(h.workerCtx, data, preparedConn)
 	if err != nil {
 		h.logger.Error("could not handle connection", "err", err)
 
@@ -101,9 +101,12 @@ type connection struct {
 	ws               *websocket.Conn
 	gatewayGroupName string
 	connectionId     string
+
+	heartbeatInterval   time.Duration
+	extendLeaseInterval time.Duration
 }
 
-func (h *connectHandler) prepareConnection(ctx context.Context, data connectionEstablishData, excludeGateways []string) (connection, error) {
+func (h *connectHandler) prepareConnection(ctx context.Context, data connectionEstablishData, excludeGateways []string) (*connection, error) {
 	connectTimeout, cancelConnectTimeout := context.WithTimeout(ctx, 10*time.Second)
 	defer cancelConnectTimeout()
 
@@ -113,20 +116,20 @@ func (h *connectHandler) prepareConnection(ctx context.Context, data connectionE
 		ExcludeGateways: excludeGateways,
 	}, h.logger)
 	if err != nil {
-		return connection{}, newReconnectErr(fmt.Errorf("could not start connection: %w", err))
+		return nil, newReconnectErr(fmt.Errorf("could not start connection: %w", err))
 	}
 
 	h.logger.Debug("handshake successful", "gateway_endpoint", startRes.GetGatewayEndpoint(), "gateway_group", startRes.GetGatewayGroup())
 
 	gatewayHost, err := url.Parse(startRes.GetGatewayEndpoint())
 	if err != nil {
-		return connection{}, newReconnectErr(fmt.Errorf("received invalid start gateway host: %w", err))
+		return nil, newReconnectErr(fmt.Errorf("received invalid start gateway host: %w", err))
 	}
 
 	if h.opts.RewriteGatewayEndpoint != nil {
 		newGatewayHost, err := h.opts.RewriteGatewayEndpoint(*gatewayHost)
 		if err != nil {
-			return connection{}, newReconnectErr(fmt.Errorf("rewriting gateway host failed: %w", err))
+			return nil, newReconnectErr(fmt.Errorf("rewriting gateway host failed: %w", err))
 		}
 		gatewayHost = &newGatewayHost
 	}
@@ -138,7 +141,7 @@ func (h *connectHandler) prepareConnection(ctx context.Context, data connectionE
 		},
 	})
 	if err != nil {
-		return connection{}, newReconnectErr(fmt.Errorf("could not connect to gateway: %w", err))
+		return nil, newReconnectErr(fmt.Errorf("could not connect to gateway: %w", err))
 	}
 
 	// Connection ID is unique per connection, reconnections should get a new ID
@@ -146,26 +149,38 @@ func (h *connectHandler) prepareConnection(ctx context.Context, data connectionE
 
 	h.logger.Debug("websocket connection established", "gateway_host", gatewayHost)
 
-	err = h.performConnectHandshake(ctx, connectionId.String(), ws, startRes, data, startTime)
+	readyPayload, err := h.performConnectHandshake(ctx, connectionId.String(), ws, startRes, data, startTime)
 	if err != nil {
-		return connection{}, newReconnectErr(fmt.Errorf("could not perform connect handshake: %w", err))
+		return nil, newReconnectErr(fmt.Errorf("could not perform connect handshake: %w", err))
 	}
 
-	return connection{
-		ws:               ws,
-		gatewayGroupName: startRes.GetGatewayGroup(),
-		connectionId:     connectionId.String(),
+	heartbeatInterval, err := time.ParseDuration(readyPayload.GetHeartbeatInterval())
+	if err != nil {
+		return nil, newReconnectErr(fmt.Errorf("could not parse heartbeat interval: %w", err))
+	}
+
+	extendLeaseInterval, err := time.ParseDuration(readyPayload.GetExtendLeaseInterval())
+	if err != nil {
+		return nil, newReconnectErr(fmt.Errorf("could not parse extend lease interval: %w", err))
+	}
+
+	return &connection{
+		ws:                  ws,
+		gatewayGroupName:    startRes.GetGatewayGroup(),
+		connectionId:        connectionId.String(),
+		heartbeatInterval:   heartbeatInterval,
+		extendLeaseInterval: extendLeaseInterval,
 	}, nil
 }
 
-func (h *connectHandler) handleConnection(ctx context.Context, data connectionEstablishData, ws *websocket.Conn, gatewayGroupName string) error {
+func (h *connectHandler) handleConnection(ctx context.Context, data connectionEstablishData, preparedConn *connection) error {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	defer func() {
 		// This is a fallback safeguard to always close the WebSocket connection at the end of the function
 		// Usually, we provide a specific reason, so this is only necessary for unhandled errors
-		_ = ws.CloseNow()
+		_ = preparedConn.ws.CloseNow()
 	}()
 
 	// Send buffered but unsent messages if connection was re-established
@@ -177,14 +192,14 @@ func (h *connectHandler) handleConnection(ctx context.Context, data connectionEs
 	}
 
 	go func() {
-		heartbeatTicker := time.NewTicker(WorkerHeartbeatInterval)
+		heartbeatTicker := time.NewTicker(preparedConn.heartbeatInterval)
 		defer heartbeatTicker.Stop()
 		for {
 			select {
 			case <-ctx.Done():
 				return
 			case <-heartbeatTicker.C:
-				err := wsproto.Write(context.Background(), ws, &connectproto.ConnectMessage{
+				err := wsproto.Write(context.Background(), preparedConn.ws, &connectproto.ConnectMessage{
 					Kind: connectproto.GatewayMessageType_WORKER_HEARTBEAT,
 				})
 				if err != nil {
@@ -202,16 +217,16 @@ func (h *connectHandler) handleConnection(ctx context.Context, data connectionEs
 	var lastGatewayHeartbeatReceived time.Time
 	go func() {
 		// Wait until initial heartbeat was sent out
-		<-time.After(WorkerHeartbeatInterval)
+		<-time.After(preparedConn.heartbeatInterval)
 
-		heartbeatReplyTicker := time.NewTicker(WorkerHeartbeatInterval)
+		heartbeatReplyTicker := time.NewTicker(preparedConn.heartbeatInterval)
 		defer heartbeatReplyTicker.Stop()
 		for {
 			select {
 			case <-ctx.Done():
 				return
 			case <-heartbeatReplyTicker.C:
-				gracePeriod := 2 * WorkerHeartbeatInterval
+				gracePeriod := 2 * preparedConn.heartbeatInterval
 				if lastGatewayHeartbeatReceived.Before(time.Now().Add(-gracePeriod)) {
 					// No heartbeat received in time!
 					h.logger.Error("did not receive gateway heartbeat in time")
@@ -229,7 +244,7 @@ func (h *connectHandler) handleConnection(ctx context.Context, data connectionEs
 			// The context will be canceled for two reasons only:
 			// - Parent context was canceled (user requested graceful shutdown)
 			// - Gateway heartbeat was missed (unexpected connection loss)
-			err := wsproto.Read(readerLifetimeContext, ws, &msg)
+			err := wsproto.Read(readerLifetimeContext, preparedConn.ws, &msg)
 			if err != nil {
 				h.logger.Error("failed to read message", "err", err)
 
@@ -247,8 +262,8 @@ func (h *connectHandler) handleConnection(ctx context.Context, data connectionEs
 			case connectproto.GatewayMessageType_GATEWAY_EXECUTOR_REQUEST:
 				// Handle invoke in a non-blocking way to allow for other messages to be processed
 				h.workerPool.Add(workerPoolMsg{
-					msg: &msg,
-					ws:  ws,
+					msg:          &msg,
+					preparedConn: preparedConn,
 				})
 			case connectproto.GatewayMessageType_GATEWAY_HEARTBEAT:
 				lastGatewayHeartbeatReceived = time.Now()
@@ -256,6 +271,21 @@ func (h *connectHandler) handleConnection(ctx context.Context, data connectionEs
 				if err := h.handleMessageReplyAck(&msg); err != nil {
 					h.logger.Error("could not handle message reply ack", "err", err)
 					continue
+				}
+			case connectproto.GatewayMessageType_WORKER_REQUEST_EXTEND_LEASE_ACK:
+				{
+					var payload connectproto.WorkerRequestExtendLeaseAckData
+					if err := proto.Unmarshal(msg.Payload, &payload); err != nil {
+						h.logger.Error("could not parse extend lease ack", "err", err)
+						continue
+					}
+
+					if payload.NewLeaseId != nil {
+						h.workerPool.inProgressLeases[payload.RequestId] = *payload.NewLeaseId
+					} else {
+						// remove local request lease to stop extending
+						delete(h.workerPool.inProgressLeases, payload.RequestId)
+					}
 				}
 			default:
 				h.logger.Error("got unknown gateway request", "err", err)
@@ -284,7 +314,7 @@ func (h *connectHandler) handleConnection(ctx context.Context, data connectionEs
 			}()
 
 			// Establish new connection, notify the routine above when the new connection is established
-			go h.connect(context.Background(), data, withNotifyConnectedChan(notifyConnectedChan), withExcludeGateways(gatewayGroupName))
+			go h.connect(context.Background(), data, withNotifyConnectedChan(notifyConnectedChan), withExcludeGateways(preparedConn.gatewayGroupName))
 
 			// Wait until the new connection is established before closing the old one
 			<-waitUntilConnected.Done()
@@ -327,7 +357,7 @@ func (h *connectHandler) handleConnection(ctx context.Context, data connectionEs
 	// Signal gateway that we won't process additional messages!
 	{
 		h.logger.Debug("sending worker pause message")
-		err := wsproto.Write(context.Background(), ws, &connectproto.ConnectMessage{
+		err := wsproto.Write(context.Background(), preparedConn.ws, &connectproto.ConnectMessage{
 			Kind: connectproto.GatewayMessageType_WORKER_PAUSE,
 		})
 		if err != nil {
@@ -342,7 +372,7 @@ func (h *connectHandler) handleConnection(ctx context.Context, data connectionEs
 	h.workerPool.Wait()
 
 	// Attempt to shut down connection if not already done
-	_ = ws.Close(websocket.StatusNormalClosure, connectproto.WorkerDisconnectReason_WORKER_SHUTDOWN.String())
+	_ = preparedConn.ws.Close(websocket.StatusNormalClosure, connectproto.WorkerDisconnectReason_WORKER_SHUTDOWN.String())
 
 	// Attempt to flush leftover messages before closing
 	if h.messageBuffer.hasMessages() {

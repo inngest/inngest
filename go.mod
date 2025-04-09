@@ -31,7 +31,6 @@ require (
 	github.com/go-chi/cors v1.2.1
 	github.com/golang-jwt/jwt/v5 v5.2.2
 	github.com/golang-migrate/migrate/v4 v4.16.2
-	github.com/golang/protobuf v1.5.4
 	github.com/google/cel-go v0.21.0
 	github.com/google/uuid v1.6.0
 	github.com/gosimple/slug v1.12.0
@@ -40,7 +39,7 @@ require (
 	github.com/hashicorp/go-multierror v1.1.1
 	github.com/inngest/expr v0.0.0-20241106234328-863dff7deec0
 	github.com/inngest/go-httpstat v0.0.0-20250321152849-8f5b26507651
-	github.com/inngest/inngestgo v0.11.3-0.20250324125939-954263f7122a
+	github.com/inngest/inngestgo v0.11.3-0.20250409214215-26ea0711a33f
 	github.com/jackc/pgx/v5 v5.5.4
 	github.com/jedib0t/go-pretty/v6 v6.3.0
 	github.com/jinzhu/copier v0.3.5

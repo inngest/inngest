@@ -2,30 +2,31 @@ package connect
 
 import (
 	"context"
-	"github.com/coder/websocket"
 	connectproto "github.com/inngest/inngest/proto/gen/connect/v1"
 	"sync"
 )
 
 type workerPoolMsg struct {
-	msg *connectproto.ConnectMessage
-	ws  *websocket.Conn
+	msg          *connectproto.ConnectMessage
+	preparedConn *connection
 }
 
 type workerPool struct {
-	concurrency    int
-	handler        func(msg workerPoolMsg)
-	inProgress     sync.WaitGroup
-	workerPoolMsgs chan workerPoolMsg
+	concurrency      int
+	handler          func(msg workerPoolMsg)
+	inProgress       sync.WaitGroup
+	inProgressLeases map[string]string
+	workerPoolMsgs   chan workerPoolMsg
 }
 
 func NewWorkerPool(ctx context.Context, concurrency int, handler func(msg workerPoolMsg)) *workerPool {
 	wp := &workerPool{
 		// Should this use the same buffer size as the worker pool?
-		workerPoolMsgs: make(chan workerPoolMsg, concurrency),
-		concurrency:    concurrency,
-		inProgress:     sync.WaitGroup{},
-		handler:        handler,
+		workerPoolMsgs:   make(chan workerPoolMsg, concurrency),
+		concurrency:      concurrency,
+		inProgress:       sync.WaitGroup{},
+		inProgressLeases: make(map[string]string),
+		handler:          handler,
 	}
 	for i := 0; i < wp.concurrency; i++ {
 		go wp.workerPool(ctx)

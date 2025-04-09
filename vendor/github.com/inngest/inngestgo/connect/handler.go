@@ -23,10 +23,6 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-const (
-	WorkerHeartbeatInterval = 10 * time.Second
-)
-
 type ConnectionState string
 
 const (
@@ -449,7 +445,7 @@ func (h *connectHandler) processExecutorRequest(msg workerPoolMsg) {
 	// Always make sure the invoke finishes properly
 	processCtx := context.Background()
 
-	err := h.handleInvokeMessage(processCtx, msg.ws, msg.msg)
+	err := h.handleInvokeMessage(processCtx, msg.preparedConn, msg.msg)
 
 	// When we encounter an error, we cannot retry the connection from inside the goroutine.
 	// If we're dealing with connection loss, the next read loop will fail with the same error
