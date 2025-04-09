@@ -766,10 +766,10 @@ func (m shardedMgr) SavePending(ctx context.Context, i state.Identifier, pending
 	return nil
 }
 
-func (m unshardedMgr) SavePause(ctx context.Context, p state.Pause) error {
+func (m unshardedMgr) SavePause(ctx context.Context, p state.Pause) (int64, error) {
 	packed, err := json.Marshal(p)
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "SavePause"), redis_telemetry.ScopePauses)
@@ -817,7 +817,7 @@ func (m unshardedMgr) SavePause(ctx context.Context, p state.Pause) error {
 		nowUnixSeconds,
 	})
 	if err != nil {
-		return err
+		return 0, err
 	}
 
 	status, err := scripts["savePause"].Exec(
@@ -827,16 +827,15 @@ func (m unshardedMgr) SavePause(ctx context.Context, p state.Pause) error {
 		args,
 	).AsInt64()
 	if err != nil {
-		return fmt.Errorf("error finalizing: %w", err)
+		return 0, fmt.Errorf("error finalizing: %w", err)
 	}
 
 	switch status {
-	case 0:
-		return nil
-	case 1:
-		return state.ErrPauseAlreadyExists
+	case -1:
+		return status, state.ErrPauseAlreadyExists
+	default:
+		return status, nil
 	}
-	return fmt.Errorf("unknown response saving pause: %d", status)
 }
 
 func (m unshardedMgr) LeasePause(ctx context.Context, id uuid.UUID) error {
