@@ -639,7 +639,22 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 			}
 
 			requestID, err := ulid.Parse(data.RequestId)
-			leaseID, err := ulid.Parse(data.RequestId)
+			if err != nil {
+				return &connecterrors.SocketError{
+					SysCode:    syscode.CodeConnectWorkerRequestExtendLeaseInvalidPayload,
+					StatusCode: websocket.StatusPolicyViolation,
+					Msg:        "invalid request ID in worker request extend lease payload",
+				}
+			}
+
+			leaseID, err := ulid.Parse(data.LeaseId)
+			if err != nil {
+				return &connecterrors.SocketError{
+					SysCode:    syscode.CodeConnectWorkerRequestExtendLeaseInvalidPayload,
+					StatusCode: websocket.StatusPolicyViolation,
+					Msg:        "invalid lease ID in worker request extend lease payload",
+				}
+			}
 
 			newLeaseID, err := c.svc.stateManager.ExtendRequestLease(ctx, c.conn.EnvID, requestID, leaseID, consts.ConnectWorkerRequestLeaseDuration)
 			if err != nil {
@@ -1000,13 +1015,12 @@ func (c *connectionHandler) establishConnection(ctx context.Context) (*state.Con
 }
 
 func (c *connectionHandler) handleSdkReply(ctx context.Context, msg *connect.ConnectMessage) error {
-	var data connect.SDKResponse
-	if err := proto.Unmarshal(msg.Payload, &data); err != nil {
+	data := &connect.SDKResponse{}
+	if err := proto.Unmarshal(msg.Payload, data); err != nil {
 		return fmt.Errorf("invalid response type: %w", err)
 	}
 
-	c.log.Debug(
-		"notifying executor about response",
+	l := c.log.With(
 		"status", data.Status.String(),
 		"no_retry", data.NoRetry,
 		"retry_after", data.RetryAfter,
@@ -1015,7 +1029,26 @@ func (c *connectionHandler) handleSdkReply(ctx context.Context, msg *connect.Con
 		"run_id", data.RunId,
 	)
 
-	err := c.svc.receiver.NotifyExecutor(ctx, &data)
+	l.Debug("saving response and notifying executor")
+
+	requestID, err := ulid.Parse(data.RequestId)
+	if err != nil {
+		return &connecterrors.SocketError{
+			SysCode:    syscode.CodeConnectWorkerReplyInvalidPayload,
+			StatusCode: websocket.StatusPolicyViolation,
+			Msg:        "invalid request ID in worker reply payload",
+		}
+	}
+
+	// Persist response in buffer, which is polled by executor.
+	err = c.svc.stateManager.SaveResponse(ctx, c.conn.EnvID, requestID, data)
+	if err != nil {
+		return fmt.Errorf("could not save response: %w", err)
+	}
+
+	// Send a best-effort PubSub message to fast-track the response,
+	// this is unreliable and must be combined with a reliable store like the buffer above.
+	err = c.svc.receiver.NotifyExecutor(ctx, data)
 	if err != nil {
 		return fmt.Errorf("could not notify executor: %w", err)
 	}

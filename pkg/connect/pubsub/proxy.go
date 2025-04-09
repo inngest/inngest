@@ -218,7 +218,7 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 
 	// Await SDK response forwarded by gateway
 
-	var reply *connectpb.SDKResponse
+	reply := &connectpb.SDKResponse{}
 
 	waitForResponseCtx, cancelWaitForResponseCtx := context.WithCancel(ctx)
 	go func() {
@@ -345,7 +345,7 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 	// Await SDK response forwarded by gateway
 	// This may take a while: This waits until we receive the SDK response, and we allow for up to 2h in the serverless execution model
 	case <-waitForResponseCtx.Done():
-		if reply == nil {
+		if reply.RequestId == "" {
 			span.SetStatus(codes.Error, "missing response")
 
 			return nil, fmt.Errorf("did not receive worker response")
