@@ -136,6 +136,7 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 
 	<-i.setup
 
+	// TODO Use jobID to derive requestID (or use jobID as request ID)
 	requestID := ulid.MustNew(ulid.Now(), rand.Reader)
 	opts.Data.RequestId = requestID.String()
 
