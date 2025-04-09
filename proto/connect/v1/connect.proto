@@ -83,6 +83,8 @@ message GatewayExecutorRequestData {
 	bytes user_trace_ctx = 11;
 
 	string run_id = 12;
+
+	string lease_id = 13;
 }
 
 message WorkerRequestAckData {

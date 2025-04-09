@@ -32,6 +32,7 @@ type StateManager interface {
 	ConnectionManager
 	WorkerGroupManager
 	GatewayManager
+	RequestStateManager
 }
 
 type ConnectionManager interface {
@@ -52,6 +53,12 @@ type GatewayManager interface {
 	UpsertGateway(ctx context.Context, gateway *Gateway) error
 	DeleteGateway(ctx context.Context, gatewayId ulid.ULID) error
 	GetGateway(ctx context.Context, gatewayId ulid.ULID) (*Gateway, error)
+}
+
+type RequestStateManager interface {
+	LeaseRequest(ctx context.Context, requestID ulid.ULID, duration time.Duration) (leaseID *ulid.ULID, err error)
+	ExtendRequestLease(ctx context.Context, requestID ulid.ULID, leaseId ulid.ULID, duration time.Duration) (newLeaseID *ulid.ULID, err error)
+	IsRequestLeased(ctx context.Context, requestID ulid.ULID) (bool, error)
 }
 
 type AuthContext struct {
