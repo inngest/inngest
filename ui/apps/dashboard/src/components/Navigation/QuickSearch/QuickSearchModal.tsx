@@ -44,7 +44,7 @@ export function QuickSearchModal({ envSlug, envName, isOpen, onClose }: Props) {
         </div>
         <Command.List className="text-subtle bg-modalBase h-[min(330px,calc(var(--cmdk-list-height)+24px))] overflow-auto px-4 py-3">
           {(isTyping || res.isFetching) && (
-            <Command.Loading className="text-light mb-4 text-xs">
+            <Command.Loading className="text-light text-xs">
               <div className="flex items-center gap-2 px-2">
                 <RiSearchLine className="text-light h-4 w-4" />
                 Searching for results matching &quot;{term}&quot;...
