@@ -358,6 +358,8 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 		}
 
 		return reply, nil
+	// If the worker terminates or otherwise fails to continue extending the lease,
+	// we must retry the step as soon as possible.
 	case <-leaseCtx.Done():
 		span.SetStatus(codes.Error, "lease expired")
 
