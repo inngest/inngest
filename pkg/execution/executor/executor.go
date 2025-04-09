@@ -634,7 +634,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 				Cancel:            true,
 				TriggeringEventID: &triggeringID,
 			}
-			err = e.pm.SavePause(ctx, pause)
+			_, err = e.pm.SavePause(ctx, pause)
 			if err != nil {
 				return &metadata, fmt.Errorf("error saving pause: %w", err)
 			}
@@ -2546,7 +2546,7 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, i *runInst
 		SourceFnVersion: i.item.Identifier.WorkflowVersion,
 	})
 
-	err = e.pm.SavePause(ctx, state.Pause{
+	_, err = e.pm.SavePause(ctx, state.Pause{
 		ID:                  pauseID,
 		WorkspaceID:         i.md.ID.Tenant.EnvID,
 		Identifier:          sv2.NewPauseIdentifier(i.md.ID),
@@ -2698,7 +2698,7 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, i *runInstan
 			consts.OtelPropagationKey: carrier,
 		},
 	}
-	err = e.pm.SavePause(ctx, pause)
+	_, err = e.pm.SavePause(ctx, pause)
 	if err != nil {
 		if err == state.ErrPauseAlreadyExists {
 			return nil

@@ -17,9 +17,8 @@ var tsSuffix = regexp.MustCompile(`\s*&&\s*\(\s*async.ts\s+==\s*null\s*\|\|\s*as
 type PauseMutater interface {
 	// SavePause indicates that the traversal of an edge is paused until some future time.
 	//
-	// The runner which coordinates workflow executions is responsible for managing paused
-	// DAG executions.
-	SavePause(ctx context.Context, p Pause) error
+	// This returns the number of pauses in the current pause.Index.
+	SavePause(ctx context.Context, p Pause) (int64, error)
 
 	// LeasePause allows us to lease the pause until the next step is enqueued, at which point
 	// we can 'consume' the pause to remove it.
