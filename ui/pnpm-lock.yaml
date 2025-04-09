@@ -45,6 +45,8 @@ overrides:
   tar-fs@>=2.0.0 <2.1.2: '>=2.1.2'
   vite@<4.5.11: '>=4.5.11'
   vite@>=5.0.0 <5.4.16: '>=5.4.16'
+  vite@>=6.2.0 <6.2.5: '>=6.2.5'
+  image-size@>=1.1.0 <1.2.1: '>=1.2.1'
 
 importers:
 
@@ -3242,11 +3244,11 @@ packages:
       '@graphql-tools/apollo-engine-loader': 7.3.26(graphql@16.8.1)
       '@graphql-tools/code-file-loader': 7.3.23(@babel/core@7.26.10)(graphql@16.8.1)
       '@graphql-tools/git-loader': 7.3.0(@babel/core@7.26.10)(graphql@16.8.1)
-      '@graphql-tools/github-loader': 7.3.28(@babel/core@7.26.10)(graphql@16.8.1)
+      '@graphql-tools/github-loader': 7.3.28(@babel/core@7.26.10)(@types/node@18.19.50)(graphql@16.8.1)
       '@graphql-tools/graphql-file-loader': 7.5.17(graphql@16.8.1)
       '@graphql-tools/json-file-loader': 7.4.18(graphql@16.8.1)
       '@graphql-tools/load': 7.8.14(graphql@16.8.1)
-      '@graphql-tools/prisma-loader': 7.2.72(graphql@16.8.1)
+      '@graphql-tools/prisma-loader': 7.2.72(@types/node@18.19.50)(graphql@16.8.1)
       '@graphql-tools/url-loader': 7.17.18(@types/node@18.19.50)(graphql@16.8.1)
       '@graphql-tools/utils': 9.2.1(graphql@16.8.1)
       '@parcel/watcher': 2.4.1
@@ -3780,26 +3782,6 @@ packages:
       '@graphql-tools/utils': 9.2.1(graphql@16.8.1)
       '@whatwg-node/fetch': 0.8.8
       graphql: 16.8.1
-      tslib: 2.7.0
-      value-or-promise: 1.0.12
-    transitivePeerDependencies:
-      - '@babel/core'
-      - '@types/node'
-      - encoding
-      - supports-color
-    dev: true
-
-  /@graphql-tools/github-loader@7.3.28(@babel/core@7.26.10)(graphql@16.8.1):
-    resolution: {integrity: sha512-OK92Lf9pmxPQvjUNv05b3tnVhw0JRfPqOf15jZjyQ8BfdEUrJoP32b4dRQQem/wyRL24KY4wOfArJNqzpsbwCA==}
-    peerDependencies:
-      graphql: ^14.0.0 || ^15.0.0 || ^16.0.0 || ^17.0.0
-    dependencies:
-      '@ardatan/sync-fetch': 0.0.1
-      '@graphql-tools/executor-http': 0.1.10(@types/node@18.19.50)(graphql@16.8.1)
-      '@graphql-tools/graphql-tag-pluck': 7.5.2(@babel/core@7.26.10)(graphql@16.8.1)
-      '@graphql-tools/utils': 9.2.1(graphql@16.8.1)
-      '@whatwg-node/fetch': 0.8.8
-      graphql: 16.8.1
       tslib: 2.8.1
       value-or-promise: 1.0.12
     transitivePeerDependencies:
@@ -3889,38 +3871,6 @@ packages:
     dev: true
 
   /@graphql-tools/prisma-loader@7.2.72(@types/node@18.19.50)(graphql@16.8.1):
-    resolution: {integrity: sha512-0a7uV7Fky6yDqd0tI9+XMuvgIo6GAqiVzzzFV4OSLry4AwiQlI3igYseBV7ZVOGhedOTqj/URxjpiv07hRcwag==}
-    peerDependencies:
-      graphql: ^14.0.0 || ^15.0.0 || ^16.0.0 || ^17.0.0
-    dependencies:
-      '@graphql-tools/url-loader': 7.17.18(@types/node@18.19.50)(graphql@16.8.1)
-      '@graphql-tools/utils': 9.2.1(graphql@16.8.1)
-      '@types/js-yaml': 4.0.5
-      '@types/json-stable-stringify': 1.0.34
-      '@whatwg-node/fetch': 0.8.8
-      chalk: 4.1.2
-      debug: 4.4.0
-      dotenv: 16.3.1
-      graphql: 16.8.1
-      graphql-request: 6.1.0(graphql@16.8.1)
-      http-proxy-agent: 6.1.1
-      https-proxy-agent: 6.2.1
-      jose: 5.2.2
-      js-yaml: 4.1.0
-      json-stable-stringify: 1.0.2
-      lodash: 4.17.21
-      scuid: 1.1.0
-      tslib: 2.7.0
-      yaml-ast-parser: 0.0.43
-    transitivePeerDependencies:
-      - '@types/node'
-      - bufferutil
-      - encoding
-      - supports-color
-      - utf-8-validate
-    dev: true
-
-  /@graphql-tools/prisma-loader@7.2.72(graphql@16.8.1):
     resolution: {integrity: sha512-0a7uV7Fky6yDqd0tI9+XMuvgIo6GAqiVzzzFV4OSLry4AwiQlI3igYseBV7ZVOGhedOTqj/URxjpiv07hRcwag==}
     peerDependencies:
       graphql: ^14.0.0 || ^15.0.0 || ^16.0.0 || ^17.0.0
@@ -7637,7 +7587,7 @@ packages:
       css-loader: 6.11.0(webpack@5.98.0)
       find-up: 5.0.0
       fs-extra: 11.2.0
-      image-size: 1.1.1
+      image-size: 2.0.2
       loader-utils: 3.3.1
       next: 14.2.26(@babel/core@7.26.10)(react-dom@18.2.0)(react@18.2.0)
       node-polyfill-webpack-plugin: 2.0.1(webpack@5.98.0)
@@ -7723,7 +7673,7 @@ packages:
       css-loader: 6.11.0(webpack@5.98.0)
       find-up: 5.0.0
       fs-extra: 11.2.0
-      image-size: 1.1.1
+      image-size: 2.0.2
       loader-utils: 3.3.1
       next: 14.2.26(@babel/core@7.26.10)(react-dom@18.2.0)(react@18.2.0)
       node-polyfill-webpack-plugin: 2.0.1(webpack@5.98.0)
@@ -13807,12 +13757,10 @@ packages:
     dev: true
     optional: true
 
-  /image-size@1.1.1:
-    resolution: {integrity: sha512-541xKlUw6jr/6gGuk92F+mYM5zaFAc5ahphvkqvNe2bQ6gVBkd6bfrmVJ2t4KDAfikAYZyIqTnktX3i6/aQDrQ==}
+  /image-size@2.0.2:
+    resolution: {integrity: sha512-IRqXKlaXwgSMAMtpNzZa1ZAe8m+Sa1770Dhk8VkSsP9LS+iHD62Zd8FQKs8fbPiagBE7BzoFX23cxFnwshpV6w==}
     engines: {node: '>=16.x'}
     hasBin: true
-    dependencies:
-      queue: 6.0.2
     dev: true
 
   /immediate@3.0.6:
@@ -16439,12 +16387,6 @@ packages:
 
   /queue-microtask@1.2.3:
     resolution: {integrity: sha512-NuaNSa6flKT5JaSYQzJok04JzTL1CA6aGhv5rfLW3PgqA+M2ChpZQnAC8h8i4ZFkBS8X5RqkDBHA7r4hej3K9A==}
-
-  /queue@6.0.2:
-    resolution: {integrity: sha512-iHZWu+q3IdFZFX36ro/lKBkSvfkztY5Y7HMiPlOUjhupPcG2JMfst2KKEpu5XndviX/3UhFbRngUPNKtgvtZiA==}
-    dependencies:
-      inherits: 2.0.4
-    dev: true
 
   /quickjs-emscripten@0.11.0:
     resolution: {integrity: sha512-adOtvmMDEQD9fsFZXgV+vfnAAjPuvEvYv5QpiS3SXM0fj7NOMkY7uSJ61SdWADcT5xa6n6P7JdYIievqODsDyA==}
