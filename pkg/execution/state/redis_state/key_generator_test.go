@@ -3,12 +3,13 @@ package redis_state
 import (
 	"context"
 	"crypto/rand"
+	"testing"
+
 	"github.com/google/uuid"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestVerifyKeyGenerator(t *testing.T) {
@@ -31,12 +32,24 @@ func TestVerifyKeyGenerator(t *testing.T) {
 
 	assert.Equal(t, legacyKg.Idempotency(ctx, state.Identifier{RunID: fakeUlid, WorkspaceID: fakeUuid}), newRunStateKg.Idempotency(ctx, false, state.Identifier{RunID: fakeUlid, WorkspaceID: fakeUuid}))
 
-	assert.Equal(t, legacyKg.Event(ctx, state.Identifier{RunID: fakeUlid}), newRunStateKg.Event(ctx, false, state.Identifier{RunID: fakeUlid}))
+	assert.Equal(
+		t,
+		legacyKg.Event(ctx, state.Identifier{RunID: fakeUlid}),
+		newRunStateKg.Event(ctx, false, fakeUuid, fakeUlid),
+	)
 	assert.Equal(t, legacyKg.Stack(ctx, fakeUlid), newRunStateKg.Stack(ctx, false, fakeUlid))
 
 	assert.Equal(t, legacyKg.RunMetadata(ctx, fakeUlid), newRunStateKg.RunMetadata(ctx, false, fakeUlid))
-	assert.Equal(t, legacyKg.Events(ctx, state.Identifier{RunID: fakeUlid, WorkspaceID: fakeUuid}), newRunStateKg.Events(ctx, false, state.Identifier{RunID: fakeUlid, WorkspaceID: fakeUuid}))
-	assert.Equal(t, legacyKg.Actions(ctx, state.Identifier{RunID: fakeUlid, WorkspaceID: fakeUuid}), newRunStateKg.Actions(ctx, false, state.Identifier{RunID: fakeUlid, WorkspaceID: fakeUuid}))
+	assert.Equal(
+		t,
+		legacyKg.Events(ctx, state.Identifier{RunID: fakeUlid, WorkspaceID: fakeUuid}),
+		newRunStateKg.Events(ctx, false, fakeUuid, fakeUlid),
+	)
+	assert.Equal(
+		t,
+		legacyKg.Actions(ctx, state.Identifier{RunID: fakeUlid, WorkspaceID: fakeUuid}),
+		newRunStateKg.Actions(ctx, false, fakeUuid, fakeUlid),
+	)
 	assert.Equal(t, legacyKg.Errors(ctx, state.Identifier{RunID: fakeUlid, WorkspaceID: fakeUuid}), newRunStateKg.Errors(ctx, false, state.Identifier{RunID: fakeUlid, WorkspaceID: fakeUuid}))
 	assert.Equal(t, legacyKg.History(ctx, fakeUlid), newRunStateKg.History(ctx, false, fakeUlid))
 
@@ -71,8 +84,6 @@ func TestVerifyKeyGenerator(t *testing.T) {
 	assert.Equal(t, legacyKg.PauseID(ctx, fakeUuid), newPausesKg.Pause(ctx, fakeUuid))
 	assert.Equal(t, legacyKg.PauseLease(ctx, fakeUuid), newPausesKg.PauseLease(ctx, fakeUuid))
 	assert.Equal(t, legacyKg.PauseEvent(ctx, fakeUuid, "key"), newPausesKg.PauseEvent(ctx, fakeUuid, "key"))
-	assert.Equal(t, legacyKg.PauseStep(ctx, state.Identifier{RunID: fakeUlid, WorkspaceID: fakeUuid}, "key"), newPausesKg.PauseStep(ctx, state.Identifier{RunID: fakeUlid, WorkspaceID: fakeUuid}, "key"))
-	assert.Equal(t, legacyKg.PauseStepPrefix(ctx, state.Identifier{RunID: fakeUlid, WorkspaceID: fakeUuid}), newPausesKg.PauseStepPrefix(ctx, state.Identifier{RunID: fakeUlid, WorkspaceID: fakeUuid}))
 	assert.Equal(t, legacyKg.PauseIndex(ctx, "kind", fakeUuid, "event"), newPausesKg.PauseIndex(ctx, "kind", fakeUuid, "event"))
 	assert.Equal(t, legacyKg.RunPauses(ctx, fakeUlid), newPausesKg.RunPauses(ctx, fakeUlid))
 

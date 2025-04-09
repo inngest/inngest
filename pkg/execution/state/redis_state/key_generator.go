@@ -21,15 +21,15 @@ type RunStateKeyGenerator interface {
 
 	// Event returns the key used to store the specific event for the
 	// given workflow run.
-	Event(ctx context.Context, isSharded bool, identifier state.Identifier) string
+	Event(ctx context.Context, isSharded bool, fnID uuid.UUID, runID ulid.ULID) string
 
 	// Events returns the key used to store the specific batch for the
 	// given workflow run.
-	Events(ctx context.Context, isSharded bool, identifier state.Identifier) string
+	Events(ctx context.Context, isSharded bool, fnID uuid.UUID, runID ulid.ULID) string
 
 	// Actions returns the key used to store the action response map used
 	// for given workflow run - ie. the results for individual steps.
-	Actions(ctx context.Context, isSharded bool, identifier state.Identifier) string
+	Actions(ctx context.Context, isSharded bool, fnID uuid.UUID, runID ulid.ULID) string
 
 	// Errors returns the key used to store the error hash map used
 	// for given workflow run.
@@ -76,16 +76,16 @@ func (s runStateKeyGenerator) RunMetadata(ctx context.Context, isSharded bool, r
 	return fmt.Sprintf("{%s}:metadata:%s", s.Prefix(ctx, s.stateDefaultKey, isSharded, runID), runID)
 }
 
-func (s runStateKeyGenerator) Event(ctx context.Context, isSharded bool, identifier state.Identifier) string {
-	return fmt.Sprintf("{%s}:events:%s:%s", s.Prefix(ctx, s.stateDefaultKey, isSharded, identifier.RunID), identifier.WorkflowID, identifier.RunID)
+func (s runStateKeyGenerator) Event(ctx context.Context, isSharded bool, fnID uuid.UUID, runID ulid.ULID) string {
+	return fmt.Sprintf("{%s}:events:%s:%s", s.Prefix(ctx, s.stateDefaultKey, isSharded, runID), fnID, runID)
 }
 
-func (s runStateKeyGenerator) Events(ctx context.Context, isSharded bool, identifier state.Identifier) string {
-	return fmt.Sprintf("{%s}:bulk-events:%s:%s", s.Prefix(ctx, s.stateDefaultKey, isSharded, identifier.RunID), identifier.WorkflowID, identifier.RunID)
+func (s runStateKeyGenerator) Events(ctx context.Context, isSharded bool, fnID uuid.UUID, runID ulid.ULID) string {
+	return fmt.Sprintf("{%s}:bulk-events:%s:%s", s.Prefix(ctx, s.stateDefaultKey, isSharded, runID), fnID, runID)
 }
 
-func (s runStateKeyGenerator) Actions(ctx context.Context, isSharded bool, identifier state.Identifier) string {
-	return fmt.Sprintf("{%s}:actions:%s:%s", s.Prefix(ctx, s.stateDefaultKey, isSharded, identifier.RunID), identifier.WorkflowID, identifier.RunID)
+func (s runStateKeyGenerator) Actions(ctx context.Context, isSharded bool, fnID uuid.UUID, runID ulid.ULID) string {
+	return fmt.Sprintf("{%s}:actions:%s:%s", s.Prefix(ctx, s.stateDefaultKey, isSharded, runID), fnID, runID)
 }
 
 func (s runStateKeyGenerator) Errors(ctx context.Context, isSharded bool, identifier state.Identifier) string {
@@ -437,13 +437,6 @@ type PauseKeyGenerator interface {
 	// for easy iteration.
 	PauseLease(ctx context.Context, pauseId uuid.UUID) string
 
-	// PauseStep returns the prefix of the key used within PauseStep.  This lets us
-	// iterate through all pauses for a given identifier
-	PauseStepPrefix(context.Context, state.Identifier) string
-
-	// PauseStep returns the key used to store a pause ID by the run ID and step ID.
-	PauseStep(context.Context, state.Identifier, string) string
-
 	// PauseEvent returns the key used to store data for loading pauses by events.
 	PauseEvent(ctx context.Context, workspaceId uuid.UUID, event string) string
 
@@ -473,15 +466,6 @@ func (u pauseKeyGenerator) RunPauses(ctx context.Context, runID ulid.ULID) strin
 
 func (u pauseKeyGenerator) PauseLease(ctx context.Context, pauseID uuid.UUID) string {
 	return fmt.Sprintf("{%s}:pause-lease:%s", u.stateDefaultKey, pauseID.String())
-}
-
-func (u pauseKeyGenerator) PauseStepPrefix(ctx context.Context, identifier state.Identifier) string {
-	return fmt.Sprintf("{%s}:pause-steps:%s", u.stateDefaultKey, identifier.RunID)
-}
-
-func (u pauseKeyGenerator) PauseStep(ctx context.Context, identifier state.Identifier, stepId string) string {
-	prefix := u.PauseStepPrefix(ctx, identifier)
-	return fmt.Sprintf("%s-%s", prefix, stepId)
 }
 
 func (u pauseKeyGenerator) PauseEvent(ctx context.Context, workspaceID uuid.UUID, s string) string {

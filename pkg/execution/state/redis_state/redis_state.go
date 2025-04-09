@@ -311,9 +311,9 @@ func (m shardedMgr) New(ctx context.Context, input state.Input) (state.State, er
 		redis_telemetry.WithScriptName(ctx, "new"),
 		client,
 		[]string{
-			fnRunState.kg.Events(ctx, isSharded, input.Identifier),
+			fnRunState.kg.Events(ctx, isSharded, input.Identifier.WorkflowID, input.Identifier.RunID),
 			fnRunState.kg.RunMetadata(ctx, isSharded, input.Identifier.RunID),
-			fnRunState.kg.Actions(ctx, isSharded, input.Identifier),
+			fnRunState.kg.Actions(ctx, isSharded, input.Identifier.WorkflowID, input.Identifier.RunID),
 			fnRunState.kg.Stack(ctx, isSharded, input.Identifier.RunID),
 			fnRunState.kg.ActionInputs(ctx, isSharded, input.Identifier),
 		},
@@ -486,17 +486,12 @@ func (m shardedMgr) LoadEvents(ctx context.Context, accountId uuid.UUID, fnID uu
 
 	var (
 		events []json.RawMessage
-		v1id   = state.Identifier{
-			RunID:      runID,
-			WorkflowID: fnID,
-			AccountID:  accountId,
-		}
 	)
 
 	r, isSharded := fnRunState.Client(ctx, accountId, runID)
 
 	byt, err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
-		return client.B().Get().Key(fnRunState.kg.Events(ctx, isSharded, v1id)).Build()
+		return client.B().Get().Key(fnRunState.kg.Events(ctx, isSharded, fnID, runID)).Build()
 	}).AsBytes()
 	if err == nil {
 		if err := json.Unmarshal(byt, &events); err != nil {
@@ -507,7 +502,7 @@ func (m shardedMgr) LoadEvents(ctx context.Context, accountId uuid.UUID, fnID uu
 
 	// Pre-batch days for backcompat.
 	byt, err = r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
-		return client.B().Get().Key(fnRunState.kg.Event(ctx, isSharded, v1id)).Build()
+		return client.B().Get().Key(fnRunState.kg.Event(ctx, isSharded, fnID, runID)).Build()
 	}).AsBytes()
 	if err != nil {
 		if err == rueidis.Nil {
@@ -554,7 +549,7 @@ func (m shardedMgr) LoadSteps(ctx context.Context, accountId uuid.UUID, fnID uui
 
 	// Load the actions.  This is a map of step IDs to JSON-encoded results.
 	rmap, err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
-		return client.B().Hgetall().Key(fnRunState.kg.Actions(ctx, isSharded, v1id)).Build()
+		return client.B().Hgetall().Key(fnRunState.kg.Actions(ctx, isSharded, fnID, runID)).Build()
 	}).AsStrMap()
 	if err != nil {
 		return nil, fmt.Errorf("failed loading actions; %w", err)
@@ -586,7 +581,7 @@ func (m shardedMgr) Load(ctx context.Context, accountId uuid.UUID, runID ulid.UL
 	switch metadata.Version {
 	case 0: // pre-batch days
 		byt, err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
-			return client.B().Get().Key(fnRunState.kg.Event(ctx, isSharded, id)).Build()
+			return client.B().Get().Key(fnRunState.kg.Event(ctx, isSharded, id.WorkflowID, runID)).Build()
 		}).AsBytes()
 		if err != nil {
 			if err == rueidis.Nil {
@@ -602,7 +597,7 @@ func (m shardedMgr) Load(ctx context.Context, accountId uuid.UUID, runID ulid.UL
 	default: // current default is 1
 		// Load the batch of events
 		byt, err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
-			return client.B().Get().Key(fnRunState.kg.Events(ctx, isSharded, id)).Build()
+			return client.B().Get().Key(fnRunState.kg.Events(ctx, isSharded, id.WorkflowID, runID)).Build()
 		}).AsBytes()
 		if err != nil {
 			return nil, fmt.Errorf("failed to get batch; %w", err)
@@ -637,7 +632,7 @@ func (m shardedMgr) Load(ctx context.Context, accountId uuid.UUID, runID ulid.UL
 
 	// Load the actions
 	rmap, err := r.Do(ctx, func(client rueidis.Client) rueidis.Completed {
-		return client.B().Hgetall().Key(fnRunState.kg.Actions(ctx, isSharded, id)).Build()
+		return client.B().Hgetall().Key(fnRunState.kg.Actions(ctx, isSharded, id.WorkflowID, runID)).Build()
 	}).AsStrMap()
 	if err != nil {
 		return nil, fmt.Errorf("failed loading actions; %w", err)
@@ -712,7 +707,7 @@ func (m shardedMgr) SaveResponse(ctx context.Context, i state.Identifier, stepID
 	r, isSharded := fnRunState.Client(ctx, i.AccountID, i.RunID)
 
 	keys := []string{
-		fnRunState.kg.Actions(ctx, isSharded, i),
+		fnRunState.kg.Actions(ctx, isSharded, i.WorkflowID, i.RunID),
 		fnRunState.kg.RunMetadata(ctx, isSharded, i.RunID),
 		fnRunState.kg.Stack(ctx, isSharded, i.RunID),
 		fnRunState.kg.ActionInputs(ctx, isSharded, i),
@@ -924,13 +919,13 @@ func (m shardedMgr) delete(ctx context.Context, callCtx context.Context, i state
 
 	// Clear all other data for a job.
 	keys := []string{
-		fnRunState.kg.Actions(ctx, isSharded, i),
+		fnRunState.kg.Actions(ctx, isSharded, i.WorkflowID, i.RunID),
 		fnRunState.kg.RunMetadata(ctx, isSharded, i.RunID),
-		fnRunState.kg.Events(ctx, isSharded, i),
+		fnRunState.kg.Events(ctx, isSharded, i.WorkflowID, i.RunID),
 		fnRunState.kg.Stack(ctx, isSharded, i.RunID),
 
 		// XXX: remove these in a state store refactor.
-		fnRunState.kg.Event(ctx, isSharded, i),
+		fnRunState.kg.Event(ctx, isSharded, i.WorkflowID, i.RunID),
 		fnRunState.kg.History(ctx, isSharded, i.RunID),
 		fnRunState.kg.Errors(ctx, isSharded, i),
 	}
@@ -1011,12 +1006,10 @@ func (m unshardedMgr) DeletePause(ctx context.Context, p state.Pause) error {
 	}
 
 	pauseKey := pause.kg.Pause(ctx, p.ID)
-	pauseStepKey := pause.kg.PauseStep(ctx, p.Identifier, p.Incoming)
 	runPausesKey := pause.kg.RunPauses(ctx, p.Identifier.RunID)
 
 	keys := []string{
 		pauseKey,
-		pauseStepKey,
 		eventKey,
 		// Warning: We need to access global keys, which must be colocated on the same Redis cluster
 		global.kg.Invoke(ctx, p.WorkspaceID),
@@ -1075,10 +1068,13 @@ func (m shardedMgr) consumePause(ctx context.Context, p *state.Pause, data any) 
 	}
 
 	keys := []string{
-		fnRunState.kg.Actions(ctx, isSharded, p.Identifier),
+		fnRunState.kg.Actions(ctx, isSharded, p.Identifier.FunctionID, p.Identifier.RunID),
 		fnRunState.kg.Stack(ctx, isSharded, p.Identifier.RunID),
 		fnRunState.kg.RunMetadata(ctx, isSharded, p.Identifier.RunID),
-		fnRunState.kg.Pending(ctx, isSharded, p.Identifier),
+		fnRunState.kg.Pending(ctx, isSharded, state.Identifier{
+			RunID:      p.Identifier.RunID,
+			WorkflowID: p.Identifier.FunctionID,
+		}),
 	}
 
 	args, err := StrSlice([]any{
@@ -1197,48 +1193,6 @@ func (m unshardedMgr) PausesByID(ctx context.Context, ids ...uuid.UUID) ([]*stat
 	}
 
 	return pauses, merr
-}
-
-// PauseByStep returns a specific pause for a given workflow run, from a given step.
-//
-// This is required when continuing a step function from an async step, ie. one that
-// has deferred results which must be continued by resuming the specific pause set
-// up for the given step ID.
-func (m unshardedMgr) PauseByStep(ctx context.Context, i state.Identifier, actionID string) (*state.Pause, error) {
-	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "PauseByStep"), redis_telemetry.ScopePauses)
-
-	pauses := m.u.Pauses()
-
-	// Access sharded value first
-	cmd := pauses.Client().B().Get().Key(pauses.kg.PauseStep(ctx, i, actionID)).Build()
-	str, err := pauses.Client().Do(ctx, cmd).ToString()
-
-	if err == rueidis.Nil {
-		return nil, state.ErrPauseNotFound
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	id, err := uuid.Parse(str)
-	if err != nil {
-		return nil, err
-	}
-
-	// Then access value
-	cmd = pauses.Client().B().Get().Key(pauses.kg.Pause(ctx, id)).Build()
-	byt, err := pauses.Client().Do(ctx, cmd).AsBytes()
-
-	if err == rueidis.Nil {
-		return nil, state.ErrPauseNotFound
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	pause := &state.Pause{}
-	err = json.Unmarshal(byt, pause)
-	return pause, err
 }
 
 // PausesByEvent returns all pauses for a given event within a workspace.

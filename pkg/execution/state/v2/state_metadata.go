@@ -45,6 +45,43 @@ func IDFromV1(id statev1.Identifier) ID {
 	}
 }
 
+func V1FromMetadata(md Metadata) statev1.Identifier {
+	return statev1.Identifier{
+		RunID:                 md.ID.RunID,
+		WorkflowID:            md.ID.FunctionID,
+		WorkflowVersion:       md.Config.FunctionVersion,
+		WorkspaceID:           md.ID.Tenant.EnvID,
+		AccountID:             md.ID.Tenant.AccountID,
+		EventID:               md.Config.EventID(),
+		EventIDs:              md.Config.EventIDs,
+		BatchID:               md.Config.BatchID,
+		CustomConcurrencyKeys: md.Config.CustomConcurrencyKeys,
+		PriorityFactor:        md.Config.PriorityFactor,
+		OriginalRunID:         md.Config.OriginalRunID,
+	}
+}
+
+// NewPauseIdentifier crease a PauseIdentifier from an ID
+func NewPauseIdentifier(id ID) state.PauseIdentifier {
+	return state.PauseIdentifier{
+		RunID:      id.RunID,
+		FunctionID: id.FunctionID,
+		AccountID:  id.Tenant.AccountID,
+	}
+}
+
+// IDFromPause creates an ID from a pause.
+func IDFromPause(p state.Pause) ID {
+	return ID{
+		RunID:      p.Identifier.RunID,
+		FunctionID: p.Identifier.FunctionID,
+		Tenant: Tenant{
+			AccountID: p.Identifier.AccountID,
+			EnvID:     p.WorkspaceID,
+		},
+	}
+}
+
 // Metadata represets metadata for the run state.
 type Metadata struct {
 	ID      ID

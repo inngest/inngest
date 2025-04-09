@@ -3,6 +3,7 @@ package redis_state
 import (
 	"context"
 	"fmt"
+
 	"github.com/google/uuid"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
@@ -47,13 +48,6 @@ type legacyKeyGenerator interface {
 
 	// PauseEvent returns the key used to store data for loading pauses by events.
 	PauseEvent(context.Context, uuid.UUID, string) string
-
-	// PauseStep returns the prefix of the key used within PauseStep.  This lets us
-	// iterate through all pauses for a given identifier
-	PauseStepPrefix(context.Context, state.Identifier) string
-
-	// PauseStep returns the key used to store a pause ID by the run ID and step ID.
-	PauseStep(context.Context, state.Identifier, string) string
 
 	// PauseIndex is a key that's used to index added/expired times for pauses.
 	//
@@ -117,15 +111,6 @@ func (d legacyDefaultKeyFunc) PauseLease(ctx context.Context, id uuid.UUID) stri
 
 func (d legacyDefaultKeyFunc) PauseEvent(ctx context.Context, workspaceID uuid.UUID, event string) string {
 	return fmt.Sprintf("%s:pause-events:%s:%s", d.Prefix, workspaceID, event)
-}
-
-func (d legacyDefaultKeyFunc) PauseStepPrefix(ctx context.Context, id state.Identifier) string {
-	return fmt.Sprintf("%s:pause-steps:%s", d.Prefix, id.RunID)
-}
-
-func (d legacyDefaultKeyFunc) PauseStep(ctx context.Context, id state.Identifier, step string) string {
-	prefix := d.PauseStepPrefix(ctx, id)
-	return fmt.Sprintf("%s-%s", prefix, step)
 }
 
 func (d legacyDefaultKeyFunc) PauseIndex(ctx context.Context, kind string, wsID uuid.UUID, event string) string {
