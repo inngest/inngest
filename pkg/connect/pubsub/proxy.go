@@ -136,10 +136,6 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 
 	<-i.setup
 
-	// TODO Use jobID to derive requestID (or use jobID as request ID)
-	requestID := ulid.MustNew(ulid.Now(), rand.Reader)
-	opts.Data.RequestId = requestID.String()
-
 	l := i.logger.With(
 		"app_id", opts.AppID.String(),
 		"env_id", opts.EnvID.String(),
@@ -231,7 +227,7 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 			case <-time.After(2*time.Second + time.Duration(mathRand.Int63n(3))*time.Second):
 			}
 
-			resp, err := i.stateManager.GetResponse(ctx, opts.EnvID, requestID)
+			resp, err := i.stateManager.GetResponse(ctx, opts.EnvID, opts.Data.RequestId)
 			if err != nil {
 				span.RecordError(err)
 				l.Error("could not check for response", "err", err)
@@ -290,7 +286,7 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 		return nil, fmt.Errorf("failed to route message: %w", err)
 	}
 
-	leaseID, err := i.stateManager.LeaseRequest(ctx, opts.EnvID, requestID, consts.ConnectWorkerRequestLeaseDuration)
+	leaseID, err := i.stateManager.LeaseRequest(ctx, opts.EnvID, opts.Data.RequestId, consts.ConnectWorkerRequestLeaseDuration)
 	if err != nil {
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "failed to lease request")
@@ -318,7 +314,7 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 			case <-time.After(consts.ConnectWorkerRequestExtendLeaseInterval / 2):
 			}
 
-			leased, err := i.stateManager.IsRequestLeased(ctx, opts.EnvID, requestID)
+			leased, err := i.stateManager.IsRequestLeased(ctx, opts.EnvID, opts.Data.RequestId)
 			if err != nil {
 				span.RecordError(err)
 				l.Error("could not get lease status", "err", err)
@@ -355,7 +351,7 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 
 		// The lease has a short TTL so it will be cleaned up, but we should try
 		// to garbage-collect unused state as quickly as possible
-		err = i.stateManager.DeleteLease(ctx, opts.EnvID, requestID)
+		err = i.stateManager.DeleteLease(ctx, opts.EnvID, opts.Data.RequestId)
 		if err != nil {
 			span.RecordError(err)
 			l.Error("could not delete lease", "err", err)
@@ -369,7 +365,7 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 
 		// The response has a short TTL so it will be cleaned up, but we should try
 		// to garbage-collect unused state as quickly as possible
-		err := i.stateManager.DeleteResponse(ctx, opts.EnvID, requestID)
+		err := i.stateManager.DeleteResponse(ctx, opts.EnvID, opts.Data.RequestId)
 		if err != nil {
 			span.RecordError(err)
 			l.Error("could not delete response", "err", err)

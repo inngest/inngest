@@ -22,17 +22,17 @@ var (
 )
 
 // keyRequestLease points to the key storing the request lease
-func (r *redisConnectionStateManager) keyRequestLease(envID uuid.UUID, requestID ulid.ULID) string {
+func (r *redisConnectionStateManager) keyRequestLease(envID uuid.UUID, requestID string) string {
 	return fmt.Sprintf("{%s}:request-lease:%s", envID, requestID)
 }
 
 // keyBufferedResponse points to the key storing the buffered SDK response
-func (r *redisConnectionStateManager) keyBufferedResponse(envID uuid.UUID, requestID ulid.ULID) string {
+func (r *redisConnectionStateManager) keyBufferedResponse(envID uuid.UUID, requestID string) string {
 	return fmt.Sprintf("{%s}:buffered-response:%s", envID, requestID)
 }
 
 // LeaseRequest attempts to lease the given requestID for <duration>. If the request is already leased, this will fail with ErrRequestLeased.
-func (r *redisConnectionStateManager) LeaseRequest(ctx context.Context, envID uuid.UUID, requestID ulid.ULID, duration time.Duration) (*ulid.ULID, error) {
+func (r *redisConnectionStateManager) LeaseRequest(ctx context.Context, envID uuid.UUID, requestID string, duration time.Duration) (*ulid.ULID, error) {
 	keys := []string{
 		r.keyRequestLease(envID, requestID),
 	}
@@ -76,7 +76,7 @@ func (r *redisConnectionStateManager) LeaseRequest(ctx context.Context, envID uu
 
 // ExtendRequestLease attempts to extend a lease for the given request. This will fail if the lease expired (ErrRequestLeaseExpired) or
 // the current lease does not match the passed leaseID (ErrRequestLeased).
-func (r *redisConnectionStateManager) ExtendRequestLease(ctx context.Context, envID uuid.UUID, requestID ulid.ULID, leaseID ulid.ULID, duration time.Duration) (*ulid.ULID, error) {
+func (r *redisConnectionStateManager) ExtendRequestLease(ctx context.Context, envID uuid.UUID, requestID string, leaseID ulid.ULID, duration time.Duration) (*ulid.ULID, error) {
 	keys := []string{
 		r.keyRequestLease(envID, requestID),
 	}
@@ -126,7 +126,7 @@ func (r *redisConnectionStateManager) ExtendRequestLease(ctx context.Context, en
 }
 
 // IsRequestLeased checks whether the given request is currently leased and the lease has not expired.
-func (r *redisConnectionStateManager) IsRequestLeased(ctx context.Context, envID uuid.UUID, requestID ulid.ULID) (bool, error) {
+func (r *redisConnectionStateManager) IsRequestLeased(ctx context.Context, envID uuid.UUID, requestID string) (bool, error) {
 	keys := []string{
 		r.keyRequestLease(envID, requestID),
 	}
@@ -158,7 +158,7 @@ func (r *redisConnectionStateManager) IsRequestLeased(ctx context.Context, envID
 }
 
 // DeleteLease allows the executor to clean up the lease once the request is done processing.
-func (r *redisConnectionStateManager) DeleteLease(ctx context.Context, envID uuid.UUID, requestID ulid.ULID) error {
+func (r *redisConnectionStateManager) DeleteLease(ctx context.Context, envID uuid.UUID, requestID string) error {
 	cmd := r.client.B().Del().Key(r.keyRequestLease(envID, requestID)).Build()
 
 	err := r.client.Do(ctx, cmd).Error()
@@ -171,7 +171,7 @@ func (r *redisConnectionStateManager) DeleteLease(ctx context.Context, envID uui
 
 // SaveResponse is an idempotent, atomic write for reliably buffering a response for the executor to pick up
 // in case Redis PubSub fails to notify the executor.
-func (r *redisConnectionStateManager) SaveResponse(ctx context.Context, envID uuid.UUID, requestID ulid.ULID, resp *connpb.SDKResponse) error {
+func (r *redisConnectionStateManager) SaveResponse(ctx context.Context, envID uuid.UUID, requestID string, resp *connpb.SDKResponse) error {
 	marshaled, err := proto.Marshal(resp)
 	if err != nil {
 		return fmt.Errorf("could not marshal response: %w", err)
@@ -201,7 +201,7 @@ func (r *redisConnectionStateManager) SaveResponse(ctx context.Context, envID uu
 }
 
 // GetResponse retrieves the response for a given request, if exists. Otherwise, the response will be nil.
-func (r *redisConnectionStateManager) GetResponse(ctx context.Context, envID uuid.UUID, requestID ulid.ULID) (*connpb.SDKResponse, error) {
+func (r *redisConnectionStateManager) GetResponse(ctx context.Context, envID uuid.UUID, requestID string) (*connpb.SDKResponse, error) {
 
 	cmd := r.client.
 		B().
@@ -227,7 +227,7 @@ func (r *redisConnectionStateManager) GetResponse(ctx context.Context, envID uui
 }
 
 // DeleteResponse is an idempotent delete operation for the temporary response buffer.
-func (r *redisConnectionStateManager) DeleteResponse(ctx context.Context, envID uuid.UUID, requestID ulid.ULID) error {
+func (r *redisConnectionStateManager) DeleteResponse(ctx context.Context, envID uuid.UUID, requestID string) error {
 	cmd := r.client.B().Del().Key(r.keyBufferedResponse(envID, requestID)).Build()
 
 	err := r.client.Do(ctx, cmd).Error()

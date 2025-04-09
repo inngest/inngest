@@ -638,15 +638,6 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 				}
 			}
 
-			requestID, err := ulid.Parse(data.RequestId)
-			if err != nil {
-				return &connecterrors.SocketError{
-					SysCode:    syscode.CodeConnectWorkerRequestExtendLeaseInvalidPayload,
-					StatusCode: websocket.StatusPolicyViolation,
-					Msg:        "invalid request ID in worker request extend lease payload",
-				}
-			}
-
 			leaseID, err := ulid.Parse(data.LeaseId)
 			if err != nil {
 				return &connecterrors.SocketError{
@@ -656,7 +647,7 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 				}
 			}
 
-			newLeaseID, err := c.svc.stateManager.ExtendRequestLease(ctx, c.conn.EnvID, requestID, leaseID, consts.ConnectWorkerRequestLeaseDuration)
+			newLeaseID, err := c.svc.stateManager.ExtendRequestLease(ctx, c.conn.EnvID, data.RequestId, leaseID, consts.ConnectWorkerRequestLeaseDuration)
 			if err != nil {
 				if errors.Is(err, state.ErrRequestLeaseExpired) || errors.Is(err, state.ErrRequestLeased) {
 					// Respond with nack
@@ -1033,17 +1024,8 @@ func (c *connectionHandler) handleSdkReply(ctx context.Context, msg *connect.Con
 
 	l.Debug("saving response and notifying executor")
 
-	requestID, err := ulid.Parse(data.RequestId)
-	if err != nil {
-		return &connecterrors.SocketError{
-			SysCode:    syscode.CodeConnectWorkerReplyInvalidPayload,
-			StatusCode: websocket.StatusPolicyViolation,
-			Msg:        "invalid request ID in worker reply payload",
-		}
-	}
-
 	// Persist response in buffer, which is polled by executor.
-	err = c.svc.stateManager.SaveResponse(ctx, c.conn.EnvID, requestID, data)
+	err := c.svc.stateManager.SaveResponse(ctx, c.conn.EnvID, data.RequestId, data)
 	if err != nil {
 		return fmt.Errorf("could not save response: %w", err)
 	}

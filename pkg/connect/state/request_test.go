@@ -35,7 +35,7 @@ func TestLeaseRequest(t *testing.T) {
 	var requestStateManager RequestStateManager = connManager
 
 	envID := uuid.New()
-	requestID := ulid.MustNew(ulid.Now(), rand.Reader)
+	requestID := ulid.MustNew(ulid.Now(), rand.Reader).String()
 
 	var existingLeaseID ulid.ULID
 
@@ -165,10 +165,10 @@ func TestBufferResponse(t *testing.T) {
 	var requestStateManager RequestStateManager = connManager
 
 	envID := uuid.New()
-	requestID := ulid.MustNew(ulid.Now(), rand.Reader)
+	requestID := ulid.MustNew(ulid.Now(), rand.Reader).String()
 
 	expectedResp := &connpb.SDKResponse{
-		RequestId:      requestID.String(),
+		RequestId:      requestID,
 		AccountId:      "test-account",
 		EnvId:          envID.String(),
 		Status:         connpb.SDKResponseStatus_DONE,
