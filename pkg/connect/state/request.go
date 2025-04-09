@@ -10,8 +10,8 @@ import (
 )
 
 var (
-	ErrRequestLeased       = "request already leased"
-	ErrRequestLeaseExpired = "request lease expired"
+	ErrRequestLeased       = fmt.Errorf("request already leased")
+	ErrRequestLeaseExpired = fmt.Errorf("request lease expired")
 )
 
 // LeaseRequest attempts to lease the given requestID for <duration>. If the request is already leased, this will fail with ErrRequestLeased.

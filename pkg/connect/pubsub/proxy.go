@@ -17,6 +17,7 @@ import (
 	"go.opentelemetry.io/otel/propagation"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"log/slog"
+	mathRand "math/rand"
 	"sync"
 	"time"
 
@@ -225,7 +226,8 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 			select {
 			case <-waitForResponseCtx.Done():
 				return
-			case <-time.After(5 * time.Second):
+			// Poll every two seconds with a jitter of up to 3 seconds
+			case <-time.After(2*time.Second + time.Duration(mathRand.Int63n(3))*time.Second):
 			}
 
 			resp, err := i.stateManager.GetResponse(ctx, opts.EnvID, requestID)

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/aws/smithy-go/ptr"
 	"github.com/google/uuid"
 	connecterrors "github.com/inngest/inngest/pkg/connect/errors"
 	"github.com/inngest/inngest/pkg/consts"
@@ -623,6 +624,98 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 				StatusCode: websocket.StatusInternalError,
 				Msg:        "could not handle SDK reply",
 			}
+		}
+	case connect.GatewayMessageType_WORKER_REQUEST_EXTEND_LEASE:
+		{
+			var data connect.WorkerRequestExtendLeaseData
+			if err := proto.Unmarshal(msg.Payload, &data); err != nil {
+				// This should never happen: Failing the ack means we will redeliver the same request even though
+				// the worker already started processing it.
+				return &connecterrors.SocketError{
+					SysCode:    syscode.CodeConnectWorkerRequestExtendLeaseInvalidPayload,
+					StatusCode: websocket.StatusPolicyViolation,
+					Msg:        "invalid payload in worker request extend lease",
+				}
+			}
+
+			requestID, err := ulid.Parse(data.RequestId)
+			leaseID, err := ulid.Parse(data.RequestId)
+
+			newLeaseID, err := c.svc.stateManager.ExtendRequestLease(ctx, c.conn.EnvID, requestID, leaseID, consts.ConnectWorkerRequestLeaseDuration)
+			if err != nil {
+				if errors.Is(err, state.ErrRequestLeaseExpired) || errors.Is(err, state.ErrRequestLeased) {
+					// Respond with nack
+					nackPayload, marshalErr := proto.Marshal(&connect.WorkerRequestExtendLeaseAckData{
+						RequestId:    data.RequestId,
+						AccountId:    data.AccountId,
+						EnvId:        data.EnvId,
+						AppId:        data.AppId,
+						FunctionSlug: data.FunctionSlug,
+
+						// No new lease ID
+						NewLeaseId: nil,
+					})
+					if marshalErr != nil {
+						// This should never happen
+						return &connecterrors.SocketError{
+							SysCode:    syscode.CodeConnectInternal,
+							StatusCode: websocket.StatusInternalError,
+							Msg:        "failed to marshal nack payload",
+						}
+					}
+
+					if err := wsproto.Write(ctx, c.ws, &connect.ConnectMessage{
+						Kind:    connect.GatewayMessageType_WORKER_REQUEST_EXTEND_LEASE_ACK,
+						Payload: nackPayload,
+					}); err != nil {
+						// The connection will fail to read and be closed in the read loop
+						return nil
+					}
+				}
+
+				c.log.Error("unexpected error extending lease", "err", err)
+
+				// This should never happen
+				return &connecterrors.SocketError{
+					SysCode:    syscode.CodeConnectInternal,
+					StatusCode: websocket.StatusInternalError,
+					Msg:        "unexpected error extending lease",
+				}
+			}
+
+			var newLeaseIDStr *string
+			if newLeaseID != nil {
+				newLeaseIDStr = ptr.String(newLeaseID.String())
+			}
+
+			// Respond with ack
+			ackPayload, marshalErr := proto.Marshal(&connect.WorkerRequestExtendLeaseAckData{
+				RequestId:    data.RequestId,
+				AccountId:    data.AccountId,
+				EnvId:        data.EnvId,
+				AppId:        data.AppId,
+				FunctionSlug: data.FunctionSlug,
+				NewLeaseId:   newLeaseIDStr,
+			})
+			if marshalErr != nil {
+				// This should never happen
+				return &connecterrors.SocketError{
+					SysCode:    syscode.CodeConnectInternal,
+					StatusCode: websocket.StatusInternalError,
+					Msg:        "failed to marshal nack payload",
+				}
+			}
+
+			if err := wsproto.Write(ctx, c.ws, &connect.ConnectMessage{
+				Kind:    connect.GatewayMessageType_WORKER_REQUEST_EXTEND_LEASE_ACK,
+				Payload: ackPayload,
+			}); err != nil {
+				// The connection will fail to read and be closed in the read loop
+				return nil
+			}
+
+			// Extended lease, all good
+			return nil
 		}
 	default:
 		// TODO Should we actually close the connection here?
