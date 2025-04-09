@@ -199,6 +199,18 @@ func (a *connectApiRouter) flushBuffer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Reliable path: Buffer the response to be picked up by the executor
+	err = a.ConnectRequestStateManager.SaveResponse(ctx, res.EnvID, reqBody.RequestId, reqBody)
+	if err != nil {
+		logger.StdlibLogger(ctx).Error("could not buffer response", "err", err)
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "could not buffer response")
+
+		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 500, "could not buffer response"))
+		return
+	}
+
+	// Unreliable fast-track: Notify the executor via PubSub (best-effort, this may be dropped)
 	if err := a.ConnectResponseNotifier.NotifyExecutor(ctx, reqBody); err != nil {
 		logger.StdlibLogger(ctx).Error("could not notify executor to flush connect message", "err", err)
 		span.RecordError(err)
