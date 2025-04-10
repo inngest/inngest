@@ -14,12 +14,14 @@ import (
 const (
 	// DefaultPausesPerBlock is the number of pauses to store in a single block.
 	// A pause equates to roughly ~0.75-1KB of data, so this is a good default
-	// of roughly 40mb blocks.
-	DefaultPausesPerBlock = 40_000
+	// of roughly 25mb blocks.
+	DefaultPausesPerBlock = 25_000
 )
 
 // Block represents a block of pauses.
 type Block struct {
+	// TODO: Maybe metadata in the header.
+
 	// ID is the block ID.
 	ID ulid.ULID
 	// Index is the index for this block, eg. the workspac and event name.
@@ -96,6 +98,9 @@ func (b blockstore) FlushIndexBlock(ctx context.Context, index Index) error {
 
 	return util.Lease(
 		ctx,
+		// NOTE: Lease, Renew, and Revoke are closures because they need
+		// access to the Index field.  This makes util.Lease simple and
+		// minimal.
 		func(ctx context.Context) (ulid.ULID, error) {
 			return b.leaser.Lease(ctx, index)
 		},
@@ -106,9 +111,11 @@ func (b blockstore) FlushIndexBlock(ctx context.Context, index Index) error {
 			return b.leaser.Revoke(ctx, index, leaseID)
 		},
 		func(ctx context.Context) error {
+			// Call this function and block, renewing leases in the background
+			// until this function is done.
 			return b.FlushIndexBlock(ctx, index)
 		},
-		time.Second,
+		10*time.Second,
 	)
 }
 
@@ -158,9 +165,13 @@ func (b blockstore) flushIndexBlock(ctx context.Context, index Index) error {
 	// TODO: Use the last pause ID as the block ID;  this ensures the block ID
 	// encodes the last pause's timestamp, which is useful for ordering.
 	//
-	// NOTE: Pause IDs are UUIDs, and they are NOT v7 UUIDs...  they're random.
+	// NOTE: Pause IDs are UUIDs, and before April 9 were NOT v7 UUIDs...  they
+	//       were random.
+	//
 	//       We generate deterministic ULIDs from pauses here based off of the
-	//       pause timestamp and the UUID.
+	//       pause timestamp and the UUID.  If the UUIDs are NOT v7, we attempt
+	//       to get the "added at" index for the pause (zset score).  If THAT fails,
+	//       we use a hard-coded timestamp in the past (as all new pauses are V7).
 
 	// TODO: Marshal the block.  Parquet/Protobuf/etc.
 
