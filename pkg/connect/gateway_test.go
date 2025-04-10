@@ -30,7 +30,7 @@ import (
 	"net"
 	"net/http"
 	"os"
-	sync2 "sync"
+	gosync "sync"
 	"testing"
 	"time"
 )
@@ -59,6 +59,45 @@ func TestConnectionEstablished(t *testing.T) {
 	require.Equal(t, res.workerGroup.FunctionSlugs, res.lifecycles.onReady[0].Groups[res.workerGroup.Hash].FunctionSlugs)
 }
 
+func TestExecutorMessageForwarding(t *testing.T) {
+	params := testingParameters{
+		consecutiveMissesBeforeClose: 10,
+		heartbeatInterval:            1 * time.Second,
+	}
+	res := createTestingGateway(t, params)
+
+	handshake(t, res)
+
+	expectedPayload := &connect.GatewayExecutorRequestData{
+		RequestId:      "test-req",
+		AccountId:      res.accountID.String(),
+		EnvId:          res.envID.String(),
+		AppId:          res.appID.String(),
+		AppName:        res.appName,
+		FunctionId:     res.fnID.String(),
+		FunctionSlug:   res.fnSlug,
+		StepId:         ptr.String("step"),
+		RequestPayload: []byte("hello world"),
+		RunId:          res.runID.String(),
+		LeaseId:        "lease-test",
+	}
+
+	// Publish message to "PubSub"
+	_ = res.testConn.RouteExecutorRequest(context.Background(), res.svc.gatewayId, res.connID, expectedPayload)
+
+	// Expect message to be received by gateway and forwarded over WebSocket
+	msg := awaitNextMessage(t, res.ws, 2*time.Second)
+	require.Equal(t, connect.GatewayMessageType_GATEWAY_EXECUTOR_REQUEST, msg.Kind)
+
+	payload := &connect.GatewayExecutorRequestData{}
+	err := proto.Unmarshal(msg.Payload, payload)
+	require.NoError(t, err)
+
+	// Expect messages to match
+	require.True(t, proto.Equal(expectedPayload, payload))
+
+}
+
 func TestCloseConnectionOnConsecutiveHeartbeatFail(t *testing.T) {
 	params := testingParameters{
 		consecutiveMissesBeforeClose: 5,
@@ -66,19 +105,7 @@ func TestCloseConnectionOnConsecutiveHeartbeatFail(t *testing.T) {
 	}
 	res := createTestingGateway(t, params)
 
-	msg := awaitNextMessage(t, res.ws, 2*time.Second)
-	require.Equal(t, connect.GatewayMessageType_GATEWAY_HELLO, msg.Kind)
-
-	sendWorkerConnectMessage(t, res)
-
-	msg = awaitNextMessage(t, res.ws, 5*time.Second)
-	require.Equal(t, connect.GatewayMessageType_GATEWAY_CONNECTION_READY, msg.Kind)
-
-	res.lifecycles.Assert(t, testRecorderAssertion{
-		onConnectedCount: 1,
-		onSyncedCount:    1,
-		onReadyCount:     1,
-	})
+	handshake(t, res)
 
 	// Simulate heartbeat failure
 	<-time.After(time.Duration(params.consecutiveMissesBeforeClose)*params.heartbeatInterval + 100*time.Millisecond)
@@ -105,19 +132,7 @@ func TestWorkerHeartbeats(t *testing.T) {
 	}
 	res := createTestingGateway(t, params)
 
-	msg := awaitNextMessage(t, res.ws, 2*time.Second)
-	require.Equal(t, connect.GatewayMessageType_GATEWAY_HELLO, msg.Kind)
-
-	sendWorkerConnectMessage(t, res)
-
-	msg = awaitNextMessage(t, res.ws, 5*time.Second)
-	require.Equal(t, connect.GatewayMessageType_GATEWAY_CONNECTION_READY, msg.Kind)
-
-	res.lifecycles.Assert(t, testRecorderAssertion{
-		onConnectedCount: 1,
-		onSyncedCount:    1,
-		onReadyCount:     1,
-	})
+	handshake(t, res)
 
 	// Expect initial heartbeat to be set to now
 	conn, err := res.stateManager.GetConnection(context.Background(), res.envID, res.connID)
@@ -249,6 +264,9 @@ type testingResources struct {
 	accountID uuid.UUID
 	syncID    uuid.UUID
 	appID     uuid.UUID
+	fnID      uuid.UUID
+
+	runID ulid.ULID
 
 	appName string
 	fnName  string
@@ -271,9 +289,10 @@ func createTestingGateway(t *testing.T, params ...testingParameters) testingReso
 	l := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
 
 	envID, accountID := uuid.New(), uuid.New()
-	syncID, appID := uuid.New(), uuid.New()
+	syncID, appID, fnID := uuid.New(), uuid.New(), uuid.New()
 
 	connID := ulid.MustNew(ulid.Now(), rand.Reader)
+	runID := ulid.MustNew(ulid.Now(), rand.Reader)
 
 	appName := "test-app"
 	fnName := "test-fn"
@@ -516,6 +535,7 @@ func createTestingGateway(t *testing.T, params ...testingParameters) testingReso
 		envID:        envID,
 		accountID:    accountID,
 		syncID:       syncID,
+		fnID:         fnID,
 		appID:        appID,
 		connID:       connID,
 		svc:          svc,
@@ -524,6 +544,7 @@ func createTestingGateway(t *testing.T, params ...testingParameters) testingReso
 		fnSlug:       fnSlug,
 		reqData:      reqData,
 		workerGroup:  workerGroup,
+		runID:        runID,
 	}
 }
 
@@ -541,6 +562,22 @@ func awaitNextMessage(t *testing.T, ws *websocket.Conn, timeout time.Duration) *
 	require.NoError(t, err)
 
 	return &parsed
+}
+
+func handshake(t *testing.T, res testingResources) {
+	msg := awaitNextMessage(t, res.ws, 2*time.Second)
+	require.Equal(t, connect.GatewayMessageType_GATEWAY_HELLO, msg.Kind)
+
+	sendWorkerConnectMessage(t, res)
+
+	msg = awaitNextMessage(t, res.ws, 5*time.Second)
+	require.Equal(t, connect.GatewayMessageType_GATEWAY_CONNECTION_READY, msg.Kind)
+
+	res.lifecycles.Assert(t, testRecorderAssertion{
+		onConnectedCount: 1,
+		onSyncedCount:    1,
+		onReadyCount:     1,
+	})
 }
 
 func sendWorkerConnectMessage(t *testing.T, res testingResources) {
@@ -582,8 +619,9 @@ func withTestingConnector(t *testingConnector) pubsub.ConnectorOpt {
 
 // testingConnector is a blank implementation of the Connector interface
 type testingConnector struct {
-	subsLock sync2.Mutex
-	subs     map[string]chan struct{}
+	subsLock            gosync.Mutex
+	executorRequestSubs map[string][]chan *connect.GatewayExecutorRequestData
+	ackSubs             map[string][]chan pubsub.AckSource
 }
 
 func (t *testingConnector) Proxy(ctx, traceCtx context.Context, opts pubsub.ProxyOpts) (*connect.SDKResponse, error) {
@@ -591,21 +629,83 @@ func (t *testingConnector) Proxy(ctx, traceCtx context.Context, opts pubsub.Prox
 }
 
 func (t *testingConnector) RouteExecutorRequest(ctx context.Context, gatewayId ulid.ULID, connId ulid.ULID, data *connect.GatewayExecutorRequestData) error {
-	return fmt.Errorf("not implemented")
+	t.subsLock.Lock()
+	defer t.subsLock.Unlock()
+
+	subKey := fmt.Sprintf("%s-%s", gatewayId.String(), connId.String())
+
+	sub, ok := t.executorRequestSubs[subKey]
+	if !ok {
+		return nil
+	}
+
+	for _, ch := range sub {
+		ch <- data
+	}
+	return nil
 }
 
 func (t *testingConnector) ReceiveRoutedRequest(ctx context.Context, gatewayId ulid.ULID, connId ulid.ULID, onMessage func(rawBytes []byte, data *connect.GatewayExecutorRequestData), onSubscribed chan struct{}) error {
 	logger.StdlibLogger(ctx).Error("using no-op connector receive routed request", "gateway_id", gatewayId, "conn_id", connId)
 
-	// Simulate setting up subscription and waiting for ctx to be done
-	onSubscribed <- struct{}{}
-	<-ctx.Done()
+	t.subsLock.Lock()
+	if t.executorRequestSubs == nil {
+		t.executorRequestSubs = make(map[string][]chan *connect.GatewayExecutorRequestData)
+	}
+	subKey := fmt.Sprintf("%s-%s", gatewayId.String(), connId.String())
 
-	return nil
+	sub := make(chan *connect.GatewayExecutorRequestData)
+	t.executorRequestSubs[subKey] = append(t.executorRequestSubs[subKey], sub)
+
+	t.subsLock.Unlock()
+
+	onSubscribed <- struct{}{} // Notify that subscription is ready
+	for {
+		select {
+		case <-ctx.Done():
+			t.subsLock.Lock()
+			defer t.subsLock.Unlock()
+
+			// Remove the subscription
+			if subs, ok := t.executorRequestSubs[subKey]; ok {
+				for i, s := range subs {
+					if s == sub {
+						t.executorRequestSubs[subKey] = append(subs[:i], subs[i+1:]...)
+						break
+					}
+				}
+				if len(t.executorRequestSubs[subKey]) == 0 {
+					delete(t.executorRequestSubs, subKey)
+				}
+			}
+
+			return nil
+		case msg := <-sub:
+			marshaled, err := proto.Marshal(msg)
+			if err != nil {
+				return err
+			}
+			onMessage(marshaled, msg)
+		}
+	}
 }
 
 func (t *testingConnector) AckMessage(ctx context.Context, requestId string, source pubsub.AckSource) error {
-	return fmt.Errorf("not implemented")
+	ackKey := fmt.Sprintf("ack:%s", requestId)
+
+	t.subsLock.Lock()
+	defer t.subsLock.Unlock()
+
+	subs, ok := t.ackSubs[ackKey]
+	if !ok {
+		return nil
+	}
+
+	for _, ch := range subs {
+		ch <- source
+	}
+
+	return nil
 }
 
 func (t *testingConnector) NotifyExecutor(ctx context.Context, resp *connect.SDKResponse) error {
