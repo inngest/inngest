@@ -50,8 +50,8 @@ func TestConnectionEstablished(t *testing.T) {
 
 	res.lifecycles.Assert(t, testRecorderAssertion{
 		onConnectedCount: 1,
-		onReadyCount:     1,
 		onSyncedCount:    1,
+		onReadyCount:     1,
 	})
 
 	require.Equal(t, res.connID, res.lifecycles.onReady[0].ConnectionId)
@@ -60,10 +60,11 @@ func TestConnectionEstablished(t *testing.T) {
 }
 
 func TestCloseConnectionOnConsecutiveHeartbeatFail(t *testing.T) {
-	res := createTestingGateway(t, testingParameters{
+	params := testingParameters{
 		consecutiveMissesBeforeClose: 5,
 		heartbeatInterval:            250 * time.Millisecond,
-	})
+	}
+	res := createTestingGateway(t, params)
 
 	msg := awaitNextMessage(t, res.ws, 2*time.Second)
 	require.Equal(t, connect.GatewayMessageType_GATEWAY_HELLO, msg.Kind)
@@ -73,12 +74,73 @@ func TestCloseConnectionOnConsecutiveHeartbeatFail(t *testing.T) {
 	msg = awaitNextMessage(t, res.ws, 5*time.Second)
 	require.Equal(t, connect.GatewayMessageType_GATEWAY_CONNECTION_READY, msg.Kind)
 
+	res.lifecycles.Assert(t, testRecorderAssertion{
+		onConnectedCount: 1,
+		onSyncedCount:    1,
+		onReadyCount:     1,
+	})
+
 	// Simulate heartbeat failure
-	<-time.After(time.Second * 2)
+	<-time.After(time.Duration(params.consecutiveMissesBeforeClose)*params.heartbeatInterval + 100*time.Millisecond)
+
+	res.lifecycles.Assert(t, testRecorderAssertion{
+		onConnectedCount:          1,
+		onSyncedCount:             1,
+		onReadyCount:              1,
+		onHeartbeatCount:          0,
+		onStartDrainingCount:      0,
+		onStartDisconnectingCount: 1,
+		onDisconnectedCount:       1,
+	})
 
 	require.Len(t, res.lifecycles.onDisconnected, 1)
 	require.Equal(t, res.connID, res.lifecycles.onDisconnected[0].conn.ConnectionId)
 	require.Equal(t, connect.WorkerDisconnectReason_CONSECUTIVE_HEARTBEATS_MISSED.String(), res.lifecycles.onDisconnected[0].closeReason)
+}
+
+func TestWorkerHeartbeats(t *testing.T) {
+	params := testingParameters{
+		consecutiveMissesBeforeClose: 10,
+		heartbeatInterval:            1 * time.Second,
+	}
+	res := createTestingGateway(t, params)
+
+	msg := awaitNextMessage(t, res.ws, 2*time.Second)
+	require.Equal(t, connect.GatewayMessageType_GATEWAY_HELLO, msg.Kind)
+
+	sendWorkerConnectMessage(t, res)
+
+	msg = awaitNextMessage(t, res.ws, 5*time.Second)
+	require.Equal(t, connect.GatewayMessageType_GATEWAY_CONNECTION_READY, msg.Kind)
+
+	res.lifecycles.Assert(t, testRecorderAssertion{
+		onConnectedCount: 1,
+		onSyncedCount:    1,
+		onReadyCount:     1,
+	})
+
+	// Expect initial heartbeat to be set to now
+	conn, err := res.stateManager.GetConnection(context.Background(), res.envID, res.connID)
+	require.NoError(t, err)
+	require.WithinDuration(t, time.Now(), conn.LastHeartbeatAt.AsTime(), 500*time.Millisecond)
+
+	// Wait for a bit
+	<-time.After(1 * time.Second)
+
+	// Send first real heartbeat
+	sendWorkerHeartbeatMessage(t, res)
+
+	// Expect lifecycles to be set
+	res.lifecycles.Assert(t, testRecorderAssertion{
+		onConnectedCount: 1,
+		onSyncedCount:    1,
+		onReadyCount:     1,
+		onHeartbeatCount: 1,
+	})
+
+	conn, err = res.stateManager.GetConnection(context.Background(), res.envID, res.connID)
+	require.NoError(t, err)
+	require.WithinDuration(t, time.Now(), conn.LastHeartbeatAt.AsTime(), time.Second)
 }
 
 type websocketDisconnected struct {
@@ -100,11 +162,11 @@ type testRecorderLifecycles struct {
 
 type testRecorderAssertion struct {
 	onConnectedCount          int
+	onSyncedCount             int
 	onReadyCount              int
 	onHeartbeatCount          int
 	onStartDrainingCount      int
 	onStartDisconnectingCount int
-	onSyncedCount             int
 	onDisconnectedCount       int
 }
 
@@ -490,6 +552,15 @@ func sendWorkerConnectMessage(t *testing.T, res testingResources) {
 	err = wsproto.Write(ctx, res.ws, &connect.ConnectMessage{
 		Kind:    connect.GatewayMessageType_WORKER_CONNECT,
 		Payload: connectMsg,
+	})
+	require.NoError(t, err)
+}
+
+func sendWorkerHeartbeatMessage(t *testing.T, res testingResources) {
+	ctx := context.Background()
+
+	err := wsproto.Write(ctx, res.ws, &connect.ConnectMessage{
+		Kind: connect.GatewayMessageType_WORKER_HEARTBEAT,
 	})
 	require.NoError(t, err)
 }
