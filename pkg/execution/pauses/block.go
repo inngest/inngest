@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
 	"gocloud.dev/blob"
 )
@@ -27,6 +28,40 @@ type Block struct {
 	Pauses []*state.Pause
 }
 
+// BlockstoreOpts creates a new BlockStore with dependencies injected.
+type BlockstoreOpts struct {
+	// Bufferer is the bufferer which allows us to read from indexes.
+	Bufferer Bufferer
+	// Bucket is the backing blobstore for reading and writing blocks.
+	Bucket *blob.Bucket
+	// Leaser manages leases for a given index.
+	Leaser BlockLeaser
+	// BlockSize is the number of pauses to store in a single block.
+	BlockSize int
+}
+
+func NewBlockstore(opts BlockstoreOpts) (BlockStore, error) {
+	if opts.Bucket == nil {
+		return nil, fmt.Errorf("bucket is required")
+	}
+	if opts.Bufferer == nil {
+		return nil, fmt.Errorf("bufferer is required")
+	}
+	if opts.Leaser == nil {
+		return nil, fmt.Errorf("leaser is required")
+	}
+	if opts.BlockSize == 0 {
+		opts.BlockSize = DefaultPausesPerBlock
+	}
+
+	return &blockstore{
+		size:   opts.BlockSize,
+		buf:    opts.Bufferer,
+		bucket: opts.Bucket,
+		leaser: opts.Leaser,
+	}, nil
+}
+
 type blockstore struct {
 	// size is the size of blocks when writing
 	size int
@@ -41,7 +76,11 @@ type blockstore struct {
 	// Right now, the backing implementation
 	buf Bufferer
 
+	// bucket is the backing blobstore for reading and writing blocks.
 	bucket *blob.Bucket
+
+	// leaser manages leases for a given index.
+	leaser BlockLeaser
 }
 
 func (b blockstore) BlockSize() int {
@@ -55,8 +94,25 @@ func (b blockstore) FlushIndexBlock(ctx context.Context, index Index) error {
 		return nil
 	}
 
-	// TODO: CLAIM A LEASE, then defer releasing it.
+	return util.Lease(
+		ctx,
+		func(ctx context.Context) (ulid.ULID, error) {
+			return b.leaser.Lease(ctx, index)
+		},
+		func(ctx context.Context, leaseID ulid.ULID) (ulid.ULID, error) {
+			return b.leaser.Renew(ctx, index, leaseID)
+		},
+		func(ctx context.Context, leaseID ulid.ULID) error {
+			return b.leaser.Revoke(ctx, index, leaseID)
+		},
+		func(ctx context.Context) error {
+			return b.FlushIndexBlock(ctx, index)
+		},
+		time.Second,
+	)
+}
 
+func (b blockstore) flushIndexBlock(ctx context.Context, index Index) error {
 	iter, err := b.buf.PausesSince(ctx, index, time.Time{})
 	if err != nil {
 		return fmt.Errorf("failed to load pauses from buffer: %w", err)
