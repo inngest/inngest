@@ -199,6 +199,8 @@ func (q *queue) Run(ctx context.Context, f osqueue.RunFunc) error {
 		Str("poll", q.pollTick.String()).
 		Msg("starting queue worker")
 
+	backoff := time.Millisecond * 250
+
 LOOP:
 	for {
 		select {
@@ -225,6 +227,10 @@ LOOP:
 			if err := q.scan(ctx); err != nil {
 				if errors.Is(err, context.DeadlineExceeded) {
 					q.logger.Warn().Msg("deadline exceeded scanning partition pointers")
+					<-time.After(backoff)
+
+					// Backoff doubles up to 3 seconds.
+					backoff = time.Duration(math.Min(float64(backoff*2), float64(time.Second*5)))
 					continue
 				}
 
@@ -234,6 +240,8 @@ LOOP:
 				}
 				break LOOP
 			}
+
+			backoff = time.Millisecond * 250
 		}
 	}
 
