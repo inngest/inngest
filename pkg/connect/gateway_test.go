@@ -140,7 +140,7 @@ func TestWorkerHeartbeats(t *testing.T) {
 
 	conn, err = res.stateManager.GetConnection(context.Background(), res.envID, res.connID)
 	require.NoError(t, err)
-	require.WithinDuration(t, time.Now(), conn.LastHeartbeatAt.AsTime(), time.Second)
+	require.WithinDuration(t, time.Now(), conn.LastHeartbeatAt.AsTime(), 500*time.Millisecond)
 }
 
 type websocketDisconnected struct {
