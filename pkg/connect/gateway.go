@@ -418,8 +418,8 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 		// Let the worker know we're ready to receive messages
 		{
 			readyPayload, err := proto.Marshal(&connectpb.GatewayConnectionReadyData{
-				HeartbeatInterval:   consts.ConnectWorkerHeartbeatInterval.String(),
-				ExtendLeaseInterval: consts.ConnectWorkerRequestExtendLeaseInterval.String(),
+				HeartbeatInterval:   c.workerHeartbeatInterval.String(),
+				ExtendLeaseInterval: c.workerRequestExtendLeaseInterval.String(),
 			})
 			if err != nil {
 				ch.log.Error("could not marshal connection ready", "err", err)
@@ -516,11 +516,11 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 				select {
 				case <-runLoopCtx.Done():
 					return
-				case <-time.After(consts.ConnectWorkerHeartbeatInterval):
+				case <-time.After(c.workerHeartbeatInterval):
 				}
 
 				consecutiveMisses := 5
-				if time.Since(ch.lastHeartbeatReceivedAt) > time.Duration(consecutiveMisses)*consts.ConnectWorkerHeartbeatInterval {
+				if time.Since(ch.lastHeartbeatReceivedAt) > time.Duration(consecutiveMisses)*c.workerHeartbeatInterval {
 					closeReasonLock.Lock()
 					closeReason = connectpb.WorkerDisconnectReason_CONSECUTIVE_HEARTBEATS_MISSED.String()
 					closeReasonLock.Unlock()

@@ -14,6 +14,7 @@ import (
 	"github.com/inngest/inngest/pkg/connect/state"
 	"github.com/inngest/inngest/pkg/connect/types"
 	"github.com/inngest/inngest/pkg/connect/wsproto"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs/sync"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
@@ -206,6 +207,10 @@ func createTestingGateway(t *testing.T) testingResources {
 		WithLifeCycles([]ConnectGatewayLifecycleListener{lifecycles}),
 		WithApiBaseUrl(fakeApiBaseUrl),
 		WithGatewayPublicPort(gwPort),
+
+		WithWorkerHeartbeatInterval(consts.ConnectGatewayHeartbeatInterval),
+		WithWorkerRequestLeaseDuration(consts.ConnectWorkerRequestLeaseDuration),
+		WithWorkerExtendLeaseInterval(consts.ConnectWorkerRequestExtendLeaseInterval),
 	)
 
 	require.NoError(t, svc.Pre(ctx))
