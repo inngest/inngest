@@ -519,8 +519,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 				case <-time.After(c.workerHeartbeatInterval):
 				}
 
-				consecutiveMisses := 5
-				if time.Since(ch.lastHeartbeatReceivedAt) > time.Duration(consecutiveMisses)*c.workerHeartbeatInterval {
+				if time.Since(ch.lastHeartbeatReceivedAt) > time.Duration(c.consecutiveWorkerHeartbeatMissesBeforeConnectionClose)*c.workerHeartbeatInterval {
 					closeReasonLock.Lock()
 					closeReason = connectpb.WorkerDisconnectReason_CONSECUTIVE_HEARTBEATS_MISSED.String()
 					closeReasonLock.Unlock()
