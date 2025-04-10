@@ -14,7 +14,6 @@ import (
 	"github.com/inngest/inngest/pkg/connect/state"
 	"github.com/inngest/inngest/pkg/connect/types"
 	"github.com/inngest/inngest/pkg/connect/wsproto"
-	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs/sync"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
@@ -34,8 +33,23 @@ import (
 	"time"
 )
 
-func TestCloseConnectionOnConsecutiveHeartbeatFail(t *testing.T) {
+func TestConnectionEstablished(t *testing.T) {
 	res := createTestingGateway(t)
+
+	msg := awaitNextMessage(t, res.ws, 2*time.Second)
+	require.Equal(t, connect.GatewayMessageType_GATEWAY_HELLO, msg.Kind)
+
+	sendWorkerConnectMessage(t, res)
+
+	msg = awaitNextMessage(t, res.ws, 2*time.Second)
+	require.Equal(t, connect.GatewayMessageType_GATEWAY_CONNECTION_READY, msg.Kind)
+}
+
+func TestCloseConnectionOnConsecutiveHeartbeatFail(t *testing.T) {
+	res := createTestingGateway(t, testingParameters{
+		consecutiveMissesBeforeClose: 3,
+		heartbeatInterval:            1 * time.Second,
+	})
 
 	msg := awaitNextMessage(t, res.ws, 2*time.Second)
 	require.Equal(t, connect.GatewayMessageType_GATEWAY_HELLO, msg.Kind)
@@ -44,6 +58,13 @@ func TestCloseConnectionOnConsecutiveHeartbeatFail(t *testing.T) {
 
 	msg = awaitNextMessage(t, res.ws, 5*time.Second)
 	require.Equal(t, connect.GatewayMessageType_GATEWAY_CONNECTION_READY, msg.Kind)
+
+	// Simulate heartbeat failure
+	<-time.After(time.Second * 3)
+
+	require.Len(t, res.lifecycles.onDisconnected, 1)
+	require.Equal(t, res.connID, res.lifecycles.onDisconnected[0].conn.ConnectionId)
+	require.Equal(t, connect.WorkerDisconnectReason_CONSECUTIVE_HEARTBEATS_MISSED.String(), res.lifecycles.onDisconnected[0].closeReason)
 }
 
 type websocketDisconnected struct {
@@ -113,6 +134,7 @@ type testingResources struct {
 
 	ws         *websocket.Conn
 	lifecycles *testRecorderLifecycles
+	svc        *connectGatewaySvc
 
 	envID     uuid.UUID
 	accountID uuid.UUID
@@ -122,7 +144,14 @@ type testingResources struct {
 	connID ulid.ULID
 }
 
-func createTestingGateway(t *testing.T) testingResources {
+type testingParameters struct {
+	heartbeatInterval            time.Duration
+	leaseDuration                time.Duration
+	extendLeaseInterval          time.Duration
+	consecutiveMissesBeforeClose int
+}
+
+func createTestingGateway(t *testing.T, params ...testingParameters) testingResources {
 	envID, accountID := uuid.New(), uuid.New()
 	syncID, appID := uuid.New(), uuid.New()
 
@@ -190,7 +219,7 @@ func createTestingGateway(t *testing.T) testingResources {
 
 	lifecycles := newRecorderLifecycles()
 
-	svc := NewConnectGatewayService(
+	opts := []gatewayOpt{
 		WithGatewayAuthHandler(func(ctx context.Context, data *connect.WorkerConnectRequestData) (*auth.Response, error) {
 			return &auth.Response{
 				AccountID: accountID,
@@ -207,10 +236,28 @@ func createTestingGateway(t *testing.T) testingResources {
 		WithLifeCycles([]ConnectGatewayLifecycleListener{lifecycles}),
 		WithApiBaseUrl(fakeApiBaseUrl),
 		WithGatewayPublicPort(gwPort),
+	}
 
-		WithWorkerHeartbeatInterval(consts.ConnectGatewayHeartbeatInterval),
-		WithWorkerRequestLeaseDuration(consts.ConnectWorkerRequestLeaseDuration),
-		WithWorkerExtendLeaseInterval(consts.ConnectWorkerRequestExtendLeaseInterval),
+	if len(params) > 0 {
+		if params[0].heartbeatInterval > 0 {
+			opts = append(opts, WithWorkerHeartbeatInterval(params[0].heartbeatInterval))
+		}
+
+		if params[0].leaseDuration > 0 {
+			opts = append(opts, WithWorkerRequestLeaseDuration(params[0].leaseDuration))
+		}
+
+		if params[0].extendLeaseInterval > 0 {
+			opts = append(opts, WithWorkerExtendLeaseInterval(params[0].extendLeaseInterval))
+		}
+
+		if params[0].consecutiveMissesBeforeClose > 0 {
+			opts = append(opts, WithConsecutiveWorkerHeartbeatMissesBeforeConnectionClose(params[0].consecutiveMissesBeforeClose))
+		}
+	}
+
+	svc := NewConnectGatewayService(
+		opts...,
 	)
 
 	require.NoError(t, svc.Pre(ctx))
@@ -244,6 +291,7 @@ func createTestingGateway(t *testing.T) testingResources {
 		syncID:       syncID,
 		appID:        appID,
 		connID:       ulid.MustNew(ulid.Now(), rand.Reader),
+		svc:          svc,
 	}
 }
 
