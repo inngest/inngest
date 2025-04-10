@@ -44,6 +44,12 @@ type Bufferer interface {
 	PausesSince(ctx context.Context, index Index, since time.Time) (state.PauseIterator, error)
 }
 
+// BlockStore is an implementation that reads and writes blocks.
+type BlockStore interface {
+	BlockFlusher
+	BlockReader
+}
+
 // BlockFlusher is an interface which writes blocks to a backing store
 type BlockFlusher interface {
 	// FlushIndexBlock processes a given index, fetching pauses from the backing buffer
@@ -64,6 +70,20 @@ type BlockReader interface {
 
 	// ReadBlock reads a single block given an index and block ID.
 	ReadBlock(ctx context.Context, index Index, blockID ulid.ULID) (*Block, error)
+}
+
+// BlockLeaser manages leases when flushing blocks.  This is a separate interface
+// and is supplied to a BlockStore when initializing.
+type BlockLeaser interface {
+	// Lease leases a given index, ensuring that only one worker can
+	// flush an index at a time.
+	Lease(ctx context.Context, index Index) (leaseID ulid.ULID, err error)
+
+	// Renew renews a lease while we are flushing an index.
+	Renew(ctx context.Context, index Index, leaseID ulid.ULID) (newLeaseID ulid.ULID, err error)
+
+	// Revoke drops a lease, allowing any other worker to flush an index.
+	Revoke(ctx context.Context, index Index, leaseID ulid.ULID) (err error)
 }
 
 type BlockKeyGenerator interface {
