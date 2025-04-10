@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 
 type QueryVariables = {
-  eventName?: string;
+  eventName?: string[];
   cursor?: string | null;
   source?: string;
   startTime?: string;
@@ -16,6 +16,7 @@ export function useEvents() {
     // Example mocked data
     const events = [
       {
+        id: '1',
         receivedAt: '2025-04-10T16:43:21.696Z',
         name: 'UserSignedUp',
         functions: [
