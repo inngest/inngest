@@ -1,9 +1,7 @@
-import MiniStackedBarChart from '@inngest/components/Chart/MiniStackedBarChart';
 import { HorizontalPillList, Pill, PillContent } from '@inngest/components/Pill';
-import { NumberCell, TextCell, TimeCell } from '@inngest/components/Table';
+import { TextCell, TimeCell } from '@inngest/components/Table';
 import { type Event } from '@inngest/components/types/event';
-import { cn } from '@inngest/components/utils/classNames';
-import { createColumnHelper, type Row } from '@tanstack/react-table';
+import { createColumnHelper } from '@tanstack/react-table';
 
 import type { EventsTable } from './EventsTable';
 
@@ -29,7 +27,7 @@ export function useColumns({
     columnHelper.accessor('receivedAt', {
       cell: (info) => {
         const receivedAt = info.getValue();
-        return <TimeCell date={receivedAt} />;
+        return <TimeCell date={new Date(receivedAt)} />;
       },
       header: 'Received at',
       maxSize: 400,

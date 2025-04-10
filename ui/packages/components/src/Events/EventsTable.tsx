@@ -7,7 +7,6 @@ import TableBlankState from '@inngest/components/EventTypes/TableBlankState';
 import NewTable from '@inngest/components/Table/NewTable';
 import { type Event, type PageInfo } from '@inngest/components/types/event';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { type Row } from '@tanstack/react-table';
 
 import { useColumns } from './columns';
 
@@ -19,7 +18,6 @@ export function EventsTable({
   emptyActions,
 }: {
   emptyActions: React.ReactNode;
-  eventTypeActions: (props: Row<Event>) => React.ReactElement;
   pathCreator: {
     function: (params: { functionSlug: string }) => Route;
     eventType: (params: { eventName: string }) => Route;
