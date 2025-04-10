@@ -39,9 +39,3 @@ func WithRedis(opt rueidis.ClientOption, logger *slog.Logger, tracer trace.Condi
 		return connector, err
 	}
 }
-
-func WithNoop() ConnectorOpt {
-	return func(ctx context.Context) (Connector, error) {
-		return noopConnector{}, nil
-	}
-}

@@ -29,8 +29,9 @@ func TestLeaseRequest(t *testing.T) {
 
 	fakeClock := clockwork.NewFakeClock()
 
-	connManager := NewRedisConnectionStateManager(rc)
-	connManager.c = fakeClock
+	connManager := NewRedisConnectionStateManager(rc, RedisStateManagerOpt{
+		Clock: fakeClock,
+	})
 
 	var requestStateManager RequestStateManager = connManager
 
@@ -159,8 +160,9 @@ func TestBufferResponse(t *testing.T) {
 
 	fakeClock := clockwork.NewFakeClock()
 
-	connManager := NewRedisConnectionStateManager(rc)
-	connManager.c = fakeClock
+	connManager := NewRedisConnectionStateManager(rc, RedisStateManagerOpt{
+		Clock: fakeClock,
+	})
 
 	var requestStateManager RequestStateManager = connManager
 

@@ -79,9 +79,6 @@ type RequestReceiver interface {
 	// AckMessage sends an acknowledgment for a specific request.
 	AckMessage(ctx context.Context, requestId string, source AckSource) error
 
-	// NackMessage sends a negative acknowledgment for a specific request.
-	NackMessage(ctx context.Context, requestId string, source AckSource, reason syscode.Error) error
-
 	// Wait blocks and listens for incoming PubSub messages for the internal subscribers. This must be run before
 	// subscribing to any channels to ensure that the PubSub client is connected and ready to receive messages.
 	Wait(ctx context.Context) error
@@ -481,7 +478,7 @@ func (i *redisPubSubConnector) subscribe(ctx context.Context, channel string, on
 	<-done
 }
 
-// ReceiveExecutorMessages listens for incoming PubSub messages for a specific app and calls the provided callback.
+// ReceiveRoutedRequest listens for incoming PubSub messages for a specific app and calls the provided callback.
 // This is a blocking call which only stops once the context is canceled.
 func (i *redisPubSubConnector) ReceiveRoutedRequest(ctx context.Context, gatewayId ulid.ULID, connId ulid.ULID, onMessage func(rawBytes []byte, data *connectpb.GatewayExecutorRequestData), onSubscribed chan struct{}) error {
 	i.subscribe(ctx, i.channelGatewayAppRequests(gatewayId, connId), func(msg string) {
@@ -609,45 +606,6 @@ func (i *redisPubSubConnector) AckMessage(ctx context.Context, requestId string,
 			Publish().
 			Channel(i.channelAppRequestsAck(requestId, source)).
 			Message(string(msgBytes)).
-			Build()).
-		Error()
-	if err != nil {
-		return fmt.Errorf("could not publish response: %w", err)
-	}
-
-	return nil
-}
-
-// NackMessage sends a negative acknowledgment for a specific request.
-func (i *redisPubSubConnector) NackMessage(ctx context.Context, requestId string, source AckSource, reason syscode.Error) error {
-	var marshaledData []byte
-	if reason.Data != nil {
-		marshaled, err := json.Marshal(reason.Data)
-		if err != nil {
-			return fmt.Errorf("could not marshal reason data: %w", err)
-		}
-		marshaledData = marshaled
-	}
-
-	nackMessage, err := proto.Marshal(&connectpb.PubSubAckMessage{
-		Ts:   timestamppb.Now(),
-		Nack: proto.Bool(true),
-		NackReason: &connectpb.SystemError{
-			Code:    reason.Code,
-			Data:    marshaledData,
-			Message: reason.Message,
-		},
-	})
-	if err != nil {
-		return fmt.Errorf("could not marshal nack message: %w", err)
-	}
-
-	err = i.client.Do(
-		ctx,
-		i.client.B().
-			Publish().
-			Channel(i.channelAppRequestsAck(requestId, source)).
-			Message(string(nackMessage)).
 			Build()).
 		Error()
 	if err != nil {

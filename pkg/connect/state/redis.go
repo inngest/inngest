@@ -95,11 +95,20 @@ type redisConnectionStateManager struct {
 	logger *slog.Logger
 }
 
-func NewRedisConnectionStateManager(client rueidis.Client) *redisConnectionStateManager {
+type RedisStateManagerOpt struct {
+	Clock clockwork.Clock
+}
+
+func NewRedisConnectionStateManager(client rueidis.Client, opts ...RedisStateManagerOpt) *redisConnectionStateManager {
+	c := clockwork.NewRealClock()
+	if len(opts) > 0 && opts[0].Clock != nil {
+		c = opts[0].Clock
+	}
+
 	return &redisConnectionStateManager{
 		client: client,
 		logger: logger.StdlibLogger(context.Background()),
-		c:      clockwork.NewRealClock(),
+		c:      c,
 	}
 }
 

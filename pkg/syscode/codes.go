@@ -22,7 +22,6 @@ const (
 	CodeConnectWorkerHelloInvalidMsg                  = "connect_worker_hello_invalid_msg"
 	CodeConnectWorkerHelloInvalidPayload              = "connect_worker_hello_invalid_payload"
 	CodeConnectAuthFailed                             = "connect_authentication_failed"
-	CodeConnectConnNotSaved                           = "connect_connection_not_saved"
 	CodeConnectInternal                               = "connect_internal_error"
 	CodeConnectGatewayClosing                         = "connect_gateway_closing"
 	CodeConnectRunInvalidMessage                      = "connect_run_invalid_message"
@@ -31,5 +30,4 @@ const (
 	CodeConnectNoHealthyConnection                    = "connect_no_healthy_connection"
 	CodeConnectTooManyAppsPerConnection               = "connect_too_many_apps_per_connection"
 	CodeConnectWorkerRequestExtendLeaseInvalidPayload = "connect_worker_request_extend_lease_invalid_payload"
-	CodeConnectWorkerReplyInvalidPayload              = "connect_worker_reply_invalid_payload"
 )
