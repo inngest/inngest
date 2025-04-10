@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/aws/smithy-go/ptr"
 	"github.com/google/uuid"
 	connecterrors "github.com/inngest/inngest/pkg/connect/errors"
 	"github.com/inngest/inngest/pkg/consts"
@@ -736,7 +735,7 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 
 			var newLeaseIDStr *string
 			if newLeaseID != nil {
-				newLeaseIDStr = ptr.String(newLeaseID.String())
+				newLeaseIDStr = proto.String(newLeaseID.String())
 			}
 
 			// Respond with ack
