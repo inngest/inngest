@@ -21,15 +21,13 @@ func Lease(
 		return err
 	}
 
-	doneChan := make(chan struct{})
-
 	cancelCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
 	go func() {
 		for {
 			select {
-			case <-doneChan:
+			case <-cancelCtx.Done():
 				// Stop renewing the lease.
 				return
 			case <-time.After(interval):
