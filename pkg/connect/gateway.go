@@ -184,7 +184,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 		defer notifyWorkerDrained()
 
 		go func() {
-			// This is call in two cases
+			// This is called in two cases
 			// - Connection was closed by the worker, and we already ran all defer actions
 			// - Gateway is draining/shutting down and the parent context was canceled
 			<-ctx.Done()
@@ -207,7 +207,9 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 				go l.OnStartDraining(context.Background(), conn)
 			}
 
+			closeReasonLock.Lock()
 			closeReason = connectpb.WorkerDisconnectReason_GATEWAY_DRAINING.String()
+			closeReasonLock.Unlock()
 
 			// Close WS connection once worker established another connection
 			defer func() {
@@ -233,7 +235,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			}
 		}()
 
-		// Once connection is established, we must make sure to update the state on any disconnect,
+		// Once a connection is established, we must make sure to update the state on any disconnect,
 		// regardless of whether it's permanent or temporary
 		defer func() {
 			// This is a transactional operation, it should always complete regardless of context cancellation
@@ -314,8 +316,6 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			ch.log.Debug("synced apps", "app_ids", appIds, "sync_ids", syncIds, "app_names", appNames)
 		}
 
-		eg := errgroup.Group{}
-
 		{
 			onSubscribed := make(chan struct{})
 			// Wait for relevant messages and forward them over the WebSocket connection
@@ -328,6 +328,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 		runLoopCtx, cancelRunLoopContext := context.WithCancel(context.Background())
 		defer cancelRunLoopContext()
 
+		eg := errgroup.Group{}
 		eg.Go(func() error {
 			for {
 				// We already handle context cancellations in a goroutine above.
@@ -342,7 +343,12 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 					}
 
 					for _, l := range c.lifecycles {
-						go l.OnStartDraining(context.Background(), conn)
+						go l.OnStartDisconnecting(context.Background(), conn)
+					}
+
+					// If the run loop was canceled (e.g. missing consecutive heartbeats), just return
+					if errors.Is(err, context.Canceled) && runLoopCtx.Err() != nil {
+						return nil
 					}
 
 					closeErr := websocket.CloseError{}
@@ -386,11 +392,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 					ch.log.Error("failed to read websocket message", "err", err)
 
 					// If we failed to read the message for another reason, we should probably reconnect as well.
-					c.closeWithConnectError(ws, &connecterrors.SocketError{
-						SysCode:    syscode.CodeConnectInternal,
-						StatusCode: websocket.StatusInternalError,
-						Msg:        "could not read next message",
-					})
+					return nil
 				}
 
 				tags := map[string]any{
@@ -484,12 +486,12 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			}
 		}
 
-		ch.log.Debug("connection is ready")
-		if c.devlogger != nil {
-			c.devlogger.Info().Strs("app_names", conn.AppNames()).Msg("worker connected")
-		}
-
 		{
+			ch.log.Debug("connection is ready")
+			if c.devlogger != nil {
+				c.devlogger.Info().Strs("app_names", conn.AppNames()).Msg("worker connected")
+			}
+
 			successTags := map[string]any{
 				"success": true,
 			}
