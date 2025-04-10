@@ -121,11 +121,22 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			remoteAddr: remoteAddr,
 		}
 
+		closeReason := connectpb.WorkerDisconnectReason_UNEXPECTED.String()
+		var closeReasonLock sync.Mutex
+		setCloseReason := func(reason string) {
+			closeReasonLock.Lock()
+			defer closeReasonLock.Unlock()
+
+			if reason != connectpb.WorkerDisconnectReason_UNEXPECTED.String() {
+				closeReason = reason
+			}
+		}
+
 		c.connectionCount.Add()
 		defer func() {
 			// This is deferred so we always update the semaphore
 			defer c.connectionCount.Done()
-			ch.log.Debug("Closing WebSocket connection")
+			ch.log.Debug("Closing WebSocket connection", "reason", closeReason)
 			if c.devlogger != nil {
 				c.devlogger.Info().Msg("worker disconnected")
 			}
@@ -177,9 +188,6 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 
 		ch.log = ch.log.With("account_id", conn.AccountID, "env_id", conn.EnvID, "conn_id", conn.ConnectionId)
 
-		var closeReason string
-		var closeReasonLock sync.Mutex
-
 		workerDrainedCtx, notifyWorkerDrained := context.WithCancel(context.Background())
 		defer notifyWorkerDrained()
 
@@ -207,9 +215,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 				go l.OnStartDraining(context.Background(), conn)
 			}
 
-			closeReasonLock.Lock()
-			closeReason = connectpb.WorkerDisconnectReason_GATEWAY_DRAINING.String()
-			closeReasonLock.Unlock()
+			setCloseReason(connectpb.WorkerDisconnectReason_GATEWAY_DRAINING.String())
 
 			// Close WS connection once worker established another connection
 			defer func() {
@@ -299,6 +305,10 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 				return
 			}
 
+			for _, l := range c.lifecycles {
+				go l.OnSynced(context.Background(), conn)
+			}
+
 			appNames := make([]string, 0, len(conn.Groups))
 			appIds := make([]uuid.UUID, 0, len(conn.Groups))
 			syncIds := make([]uuid.UUID, 0, len(conn.Groups))
@@ -353,27 +363,26 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 
 					closeErr := websocket.CloseError{}
 					if errors.As(err, &closeErr) {
+						// Empty reason (unexpected/draining)
 						if closeErr.Code == websocket.StatusNoStatusRcvd && closeErr.Reason == "" {
-							closeReasonLock.Lock()
-							closeReason = connectpb.WorkerDisconnectReason_UNEXPECTED.String()
-							closeReasonLock.Unlock()
-
 							return nil
 						}
 
 						ch.log.Debug("connection closed with code and reason", "code", closeErr.Code.String(), "reason", closeErr.Reason)
 
+						// Expected worker shutdown
+						if closeErr.Code == websocket.StatusNormalClosure && closeErr.Reason == connectpb.WorkerDisconnectReason_WORKER_SHUTDOWN.String() {
+							setCloseReason(connectpb.WorkerDisconnectReason_WORKER_SHUTDOWN.String())
+							return nil
+						}
+
 						// If client connection closed unexpectedly, we should store the reason, if set.
 						// If the reason is set, it may have been an intentional close, so the connection
 						// may not be re-established.
 						// Workers should always close with code: 1000 and reason: WORKER_SHUTDOWN.
-						closeReasonLock.Lock()
 						if closeErr.Reason != "" {
-							closeReason = closeErr.Reason
-						} else {
-							closeReason = connectpb.WorkerDisconnectReason_UNEXPECTED.String()
+							setCloseReason(closeErr.Reason)
 						}
-						closeReasonLock.Unlock()
 
 						// Do not return an error. We already capture the close reason above.
 						return nil
@@ -382,10 +391,6 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 					// connection was closed (this may not be expected but should not be logged as an error)
 					// this is expected when the gateway is draining
 					if errors.Is(err, net.ErrClosed) || errors.Is(err, io.EOF) {
-						closeReasonLock.Lock()
-						closeReason = connectpb.WorkerDisconnectReason_UNEXPECTED.String()
-						closeReasonLock.Unlock()
-
 						return nil
 					}
 
@@ -511,6 +516,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 		}
 
 		// Safeguard: Clean up connections that haven't sent n consecutive heartbeats.
+		ch.lastHeartbeatReceivedAt = time.Now() // set initial value
 		go func() {
 			for {
 				select {
@@ -520,9 +526,9 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 				}
 
 				if time.Since(ch.lastHeartbeatReceivedAt) > time.Duration(c.consecutiveWorkerHeartbeatMissesBeforeConnectionClose)*c.workerHeartbeatInterval {
-					closeReasonLock.Lock()
-					closeReason = connectpb.WorkerDisconnectReason_CONSECUTIVE_HEARTBEATS_MISSED.String()
-					closeReasonLock.Unlock()
+					setCloseReason(connectpb.WorkerDisconnectReason_CONSECUTIVE_HEARTBEATS_MISSED.String())
+
+					ch.log.Debug("missed consecutive heartbeats, closing connection")
 
 					cancelRunLoopContext()
 					return

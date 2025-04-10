@@ -21,9 +21,11 @@ import (
 	"github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
+	"io"
 	"log/slog"
 	"net"
 	"net/http"
@@ -36,6 +38,8 @@ import (
 func TestConnectionEstablished(t *testing.T) {
 	res := createTestingGateway(t)
 
+	res.lifecycles.Assert(t, testRecorderAssertion{})
+
 	msg := awaitNextMessage(t, res.ws, 2*time.Second)
 	require.Equal(t, connect.GatewayMessageType_GATEWAY_HELLO, msg.Kind)
 
@@ -43,12 +47,22 @@ func TestConnectionEstablished(t *testing.T) {
 
 	msg = awaitNextMessage(t, res.ws, 2*time.Second)
 	require.Equal(t, connect.GatewayMessageType_GATEWAY_CONNECTION_READY, msg.Kind)
+
+	res.lifecycles.Assert(t, testRecorderAssertion{
+		onConnectedCount: 1,
+		onReadyCount:     1,
+		onSyncedCount:    1,
+	})
+
+	require.Equal(t, res.connID, res.lifecycles.onReady[0].ConnectionId)
+	require.Equal(t, *res.workerGroup.AppID, *res.lifecycles.onReady[0].Groups[res.workerGroup.Hash].AppID)
+	require.Equal(t, res.workerGroup.FunctionSlugs, res.lifecycles.onReady[0].Groups[res.workerGroup.Hash].FunctionSlugs)
 }
 
 func TestCloseConnectionOnConsecutiveHeartbeatFail(t *testing.T) {
 	res := createTestingGateway(t, testingParameters{
-		consecutiveMissesBeforeClose: 3,
-		heartbeatInterval:            1 * time.Second,
+		consecutiveMissesBeforeClose: 5,
+		heartbeatInterval:            250 * time.Millisecond,
 	})
 
 	msg := awaitNextMessage(t, res.ws, 2*time.Second)
@@ -60,7 +74,7 @@ func TestCloseConnectionOnConsecutiveHeartbeatFail(t *testing.T) {
 	require.Equal(t, connect.GatewayMessageType_GATEWAY_CONNECTION_READY, msg.Kind)
 
 	// Simulate heartbeat failure
-	<-time.After(time.Second * 3)
+	<-time.After(time.Second * 2)
 
 	require.Len(t, res.lifecycles.onDisconnected, 1)
 	require.Equal(t, res.connID, res.lifecycles.onDisconnected[0].conn.ConnectionId)
@@ -73,6 +87,8 @@ type websocketDisconnected struct {
 }
 
 type testRecorderLifecycles struct {
+	logger *slog.Logger
+
 	onConnected          []*state.Connection
 	onReady              []*state.Connection
 	onHeartbeat          []*state.Connection
@@ -82,36 +98,67 @@ type testRecorderLifecycles struct {
 	onDisconnected       []websocketDisconnected
 }
 
+type testRecorderAssertion struct {
+	onConnectedCount          int
+	onReadyCount              int
+	onHeartbeatCount          int
+	onStartDrainingCount      int
+	onStartDisconnectingCount int
+	onSyncedCount             int
+	onDisconnectedCount       int
+}
+
+func (r *testRecorderLifecycles) Assert(t *testing.T, assertion testRecorderAssertion) {
+	require.EventuallyWithT(t, func(t *assert.CollectT) {
+		assert.Equal(t, assertion.onConnectedCount, len(r.onConnected), "expected %d connections to be connected", assertion.onConnectedCount)
+		assert.Equal(t, assertion.onReadyCount, len(r.onReady), "expected %d connections to be ready", assertion.onReadyCount)
+		assert.Equal(t, assertion.onHeartbeatCount, len(r.onHeartbeat), "expected %d connections to be heartbeat", assertion.onHeartbeatCount)
+		assert.Equal(t, assertion.onStartDrainingCount, len(r.onStartDraining), "expected %d connections to be draining", assertion.onStartDrainingCount)
+		assert.Equal(t, assertion.onStartDisconnectingCount, len(r.onStartDisconnecting), "expected %d connections to be disconnecting", assertion.onStartDisconnectingCount)
+		assert.Equal(t, assertion.onSyncedCount, len(r.onSynced), "expected %d connections to be synced", assertion.onSyncedCount)
+		assert.Equal(t, assertion.onDisconnectedCount, len(r.onDisconnected), "expected %d connections to be disconnected", assertion.onDisconnectedCount)
+	}, 3*time.Second, 200*time.Millisecond)
+}
+
 func (r *testRecorderLifecycles) OnConnected(ctx context.Context, conn *state.Connection) {
+	r.logger.Info("onConnected", "conn", conn)
 	r.onConnected = append(r.onConnected, conn)
 }
 
 func (r *testRecorderLifecycles) OnReady(ctx context.Context, conn *state.Connection) {
+	r.logger.Info("onReady", "conn", conn)
 	r.onReady = append(r.onReady, conn)
 }
 
 func (r *testRecorderLifecycles) OnHeartbeat(ctx context.Context, conn *state.Connection) {
+	r.logger.Info("onHeartbeat", "conn", conn)
 	r.onHeartbeat = append(r.onHeartbeat, conn)
 }
 
 func (r *testRecorderLifecycles) OnStartDraining(ctx context.Context, conn *state.Connection) {
+	r.logger.Info("onStartDraining", "conn", conn)
 	r.onStartDraining = append(r.onStartDraining, conn)
 }
 
 func (r *testRecorderLifecycles) OnStartDisconnecting(ctx context.Context, conn *state.Connection) {
+	r.logger.Info("onStartDisconnecting", "conn", conn)
 	r.onStartDisconnecting = append(r.onStartDisconnecting, conn)
 }
 
 func (r *testRecorderLifecycles) OnSynced(ctx context.Context, conn *state.Connection) {
+	r.logger.Info("onSynced", "conn", conn)
 	r.onSynced = append(r.onSynced, conn)
 }
 
 func (r *testRecorderLifecycles) OnDisconnected(ctx context.Context, conn *state.Connection, closeReason string) {
+	r.logger.Info("onDisconnected", "conn", conn)
 	r.onDisconnected = append(r.onDisconnected, websocketDisconnected{conn, closeReason})
 }
 
-func newRecorderLifecycles() *testRecorderLifecycles {
-	r := &testRecorderLifecycles{}
+func newRecorderLifecycles(logger *slog.Logger) *testRecorderLifecycles {
+	r := &testRecorderLifecycles{
+		logger: logger,
+	}
 	r.reset()
 	return r
 }
@@ -141,7 +188,14 @@ type testingResources struct {
 	syncID    uuid.UUID
 	appID     uuid.UUID
 
+	appName string
+	fnName  string
+	fnSlug  string
+
 	connID ulid.ULID
+
+	reqData     *connect.WorkerConnectRequestData
+	workerGroup *state.WorkerGroup
 }
 
 type testingParameters struct {
@@ -152,8 +206,16 @@ type testingParameters struct {
 }
 
 func createTestingGateway(t *testing.T, params ...testingParameters) testingResources {
+	l := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
+
 	envID, accountID := uuid.New(), uuid.New()
 	syncID, appID := uuid.New(), uuid.New()
+
+	connID := ulid.MustNew(ulid.Now(), rand.Reader)
+
+	appName := "test-app"
+	fnName := "test-fn"
+	fnSlug := "test-app-test-fn"
 
 	ctx := context.Background()
 	r := miniredis.RunT(t)
@@ -176,24 +238,19 @@ func createTestingGateway(t *testing.T, params ...testingParameters) testingReso
 
 	var fakeApiBaseUrl string
 	{
-		// 1. Create a listener on a random port by specifying port 0
-		listener, err := net.Listen("tcp", "127.0.0.1:0")
-		if err != nil {
-			t.Fatalf("Cannot create listener: %v", err)
-		}
+		fakeApiPort := freePort()
 
-		// Get the assigned port
-		port := listener.Addr().(*net.TCPAddr).Port
-		fakeApiBaseUrl = fmt.Sprintf("http://127.0.0.1:%d", port)
+		fakeApiBaseUrl = fmt.Sprintf("http://127.0.0.1:%d", fakeApiPort)
 
 		mux := http.NewServeMux()
 
 		srv := http.Server{
 			Handler: mux,
+			Addr:    fmt.Sprintf("127.0.0.1:%d", fakeApiPort),
 		}
 
 		go func() {
-			_ = srv.Serve(listener)
+			_ = srv.ListenAndServe()
 		}()
 		t.Cleanup(func() {
 			_ = srv.Shutdown(ctx)
@@ -208,8 +265,18 @@ func createTestingGateway(t *testing.T, params ...testingParameters) testingReso
 
 		// Emulate sync endpoint
 		mux.HandleFunc("POST /fn/register", func(writer http.ResponseWriter, request *http.Request) {
+			body, err := io.ReadAll(request.Body)
+			require.NoError(t, err)
+
+			l.Info("got register request", "headers", request.Header, "body", string(body))
+
 			writer.WriteHeader(http.StatusOK)
 			_, _ = writer.Write(reply)
+		})
+
+		mux.HandleFunc("GET /ready", func(writer http.ResponseWriter, request *http.Request) {
+			writer.WriteHeader(http.StatusOK)
+			_, _ = writer.Write([]byte("ok"))
 		})
 	}
 
@@ -217,18 +284,22 @@ func createTestingGateway(t *testing.T, params ...testingParameters) testingReso
 
 	websocketUrl := fmt.Sprintf("ws://127.0.0.1:%d/v0/connect", gwPort)
 
-	lifecycles := newRecorderLifecycles()
+	lifecycles := newRecorderLifecycles(l)
+
+	authResp := &auth.Response{
+		AccountID: accountID,
+		EnvID:     envID,
+		Entitlements: auth.Entitlements{
+			ConnectionAllowed: true,
+			AppsPerConnection: 10,
+		},
+	}
 
 	opts := []gatewayOpt{
 		WithGatewayAuthHandler(func(ctx context.Context, data *connect.WorkerConnectRequestData) (*auth.Response, error) {
-			return &auth.Response{
-				AccountID: accountID,
-				EnvID:     envID,
-				Entitlements: auth.Entitlements{
-					ConnectionAllowed: true,
-					AppsPerConnection: 10,
-				},
-			}, nil
+			l.Info("got auth request", "data", data)
+
+			return authResp, nil
 		}),
 		WithConnectionStateManager(connManager),
 		WithGroupName("gw-1"),
@@ -262,7 +333,7 @@ func createTestingGateway(t *testing.T, params ...testingParameters) testingReso
 
 	require.NoError(t, svc.Pre(ctx))
 
-	svc.logger = slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	svc.logger = l
 
 	go func() {
 		err := svc.Run(ctx)
@@ -274,10 +345,104 @@ func createTestingGateway(t *testing.T, params ...testingParameters) testingReso
 		_ = svc.Stop(context.Background())
 	})
 
+	// Wait until fake API is up
+	maxAttempts := 10
+	for i := 0; i <= maxAttempts; i++ {
+		if i == maxAttempts {
+			require.Fail(t, "failed to connect to fake api")
+		}
+
+		resp, err := http.Get(fakeApiBaseUrl + "/ready")
+		if err == nil && resp.StatusCode == http.StatusOK {
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+
+	// Wait until gateway is up
+	maxAttempts = 10
+	for i := 0; i <= maxAttempts; i++ {
+		if i == maxAttempts {
+			require.Fail(t, "failed to connect to gateway")
+		}
+
+		resp, err := http.Get(fmt.Sprintf("http://127.0.0.1:%d/ready", gwPort))
+		if err == nil && resp.StatusCode == http.StatusOK {
+			break
+		}
+		time.Sleep(100 * time.Millisecond)
+	}
+
 	ws, _, err := websocket.Dial(ctx, websocketUrl, &websocket.DialOptions{
 		Subprotocols: []string{types.GatewaySubProtocol},
 	})
 	require.NoError(t, err)
+
+	caps, err := json.Marshal(sdk.Capabilities{
+		InBandSync: sdk.InBandSyncV1,
+		TrustProbe: sdk.TrustProbeV1,
+		Connect:    sdk.ConnectV1,
+	})
+	require.NoError(t, err)
+
+	fns, err := json.Marshal([]sdk.SDKFunction{
+		{
+			Name: fnName,
+			Slug: fnSlug,
+			Triggers: []inngest.Trigger{
+				{
+					EventTrigger: &inngest.EventTrigger{
+						Event: "hello/world",
+					},
+				},
+			},
+			Steps: map[string]sdk.SDKStep{
+				"step": sdk.SDKStep{
+					ID:   "step",
+					Name: fnName,
+					Runtime: map[string]any{
+						"url": fmt.Sprintf("ws://connect?fnId=%s&step=step", fnSlug),
+					},
+				},
+			},
+		},
+	})
+	require.NoError(t, err)
+
+	testApp := &connect.AppConfiguration{
+		AppName:    appName,
+		AppVersion: ptr.String("v1"),
+		Functions:  fns,
+	}
+
+	reqData := &connect.WorkerConnectRequestData{
+		ConnectionId: connID.String(),
+		InstanceId:   "test-worker",
+		AuthData: &connect.AuthData{
+			SessionToken: "test-session-token",
+			SyncToken:    "test-sync-token",
+		},
+		Capabilities:             caps,
+		Apps:                     []*connect.AppConfiguration{testApp},
+		WorkerManualReadinessAck: false,
+		SystemAttributes: &connect.SystemAttributes{
+			CpuCores: 4,
+			MemBytes: 1024 * 1024 * 1024,
+			Os:       "linux-test",
+		},
+		Environment: nil,
+		Framework:   "",
+		Platform:    nil,
+		SdkVersion:  "test-sdk",
+		SdkLanguage: "test-lang",
+		StartedAt:   timestamppb.Now(),
+	}
+
+	// Worker group to compare against (this is what we expect the synced worker group to look like)
+	workerGroup, err := state.NewWorkerGroupFromConnRequest(ctx, reqData, authResp, testApp)
+	require.NoError(t, err)
+	workerGroup.AppID = &appID
+	workerGroup.SyncID = &syncID
 
 	return testingResources{
 		redis:        r,
@@ -290,8 +455,13 @@ func createTestingGateway(t *testing.T, params ...testingParameters) testingReso
 		accountID:    accountID,
 		syncID:       syncID,
 		appID:        appID,
-		connID:       ulid.MustNew(ulid.Now(), rand.Reader),
+		connID:       connID,
 		svc:          svc,
+		appName:      appName,
+		fnName:       fnName,
+		fnSlug:       fnSlug,
+		reqData:      reqData,
+		workerGroup:  workerGroup,
 	}
 }
 
@@ -314,65 +484,7 @@ func awaitNextMessage(t *testing.T, ws *websocket.Conn, timeout time.Duration) *
 func sendWorkerConnectMessage(t *testing.T, res testingResources) {
 	ctx := context.Background()
 
-	caps, err := json.Marshal(sdk.Capabilities{
-		InBandSync: sdk.InBandSyncV1,
-		TrustProbe: sdk.TrustProbeV1,
-		Connect:    sdk.ConnectV1,
-	})
-	require.NoError(t, err)
-
-	fns, err := json.Marshal([]sdk.SDKFunction{
-		{
-			Name: "test-fn",
-			Slug: "test-app-test-fn",
-			Triggers: []inngest.Trigger{
-				{
-					EventTrigger: &inngest.EventTrigger{
-						Event: "hello/world",
-					},
-				},
-			},
-			Steps: map[string]sdk.SDKStep{
-				"step": sdk.SDKStep{
-					ID:   "step",
-					Name: "test-fn",
-					Runtime: map[string]any{
-						"url": "ws://connect?fnId=test-app-test-fn&step=step",
-					},
-				},
-			},
-		},
-	})
-	require.NoError(t, err)
-
-	testApp := &connect.AppConfiguration{
-		AppName:    "test-app",
-		AppVersion: ptr.String("v1"),
-		Functions:  fns,
-	}
-
-	connectMsg, err := proto.Marshal(&connect.WorkerConnectRequestData{
-		ConnectionId: res.connID.String(),
-		InstanceId:   "test-worker",
-		AuthData: &connect.AuthData{
-			SessionToken: "test-session-token",
-			SyncToken:    "test-sync-token",
-		},
-		Capabilities:             caps,
-		Apps:                     []*connect.AppConfiguration{testApp},
-		WorkerManualReadinessAck: false,
-		SystemAttributes: &connect.SystemAttributes{
-			CpuCores: 4,
-			MemBytes: 1024 * 1024 * 1024,
-			Os:       "linux-test",
-		},
-		Environment: nil,
-		Framework:   "",
-		Platform:    nil,
-		SdkVersion:  "test-sdk",
-		SdkLanguage: "test-lang",
-		StartedAt:   timestamppb.Now(),
-	})
+	connectMsg, err := proto.Marshal(res.reqData)
 	require.NoError(t, err)
 
 	err = wsproto.Write(ctx, res.ws, &connect.ConnectMessage{
