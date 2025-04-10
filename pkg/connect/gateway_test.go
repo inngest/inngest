@@ -14,6 +14,7 @@ import (
 	"github.com/inngest/inngest/pkg/connect/state"
 	"github.com/inngest/inngest/pkg/connect/types"
 	"github.com/inngest/inngest/pkg/connect/wsproto"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs/sync"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
@@ -95,7 +96,79 @@ func TestExecutorMessageForwarding(t *testing.T) {
 
 	// Expect messages to match
 	require.True(t, proto.Equal(expectedPayload, payload))
+}
 
+func TestLeaseRenewal(t *testing.T) {
+	params := testingParameters{
+		consecutiveMissesBeforeClose: 10,
+		heartbeatInterval:            1 * time.Second,
+	}
+	res := createTestingGateway(t, params)
+
+	handshake(t, res)
+
+	requestID := "test-req"
+
+	leaseID, err := res.svc.stateManager.LeaseRequest(context.Background(), res.envID, requestID, time.Second*5)
+	require.NoError(t, err)
+
+	expectedPayload := &connect.GatewayExecutorRequestData{
+		RequestId:      requestID,
+		AccountId:      res.accountID.String(),
+		EnvId:          res.envID.String(),
+		AppId:          res.appID.String(),
+		AppName:        res.appName,
+		FunctionId:     res.fnID.String(),
+		FunctionSlug:   res.fnSlug,
+		StepId:         ptr.String("step"),
+		RequestPayload: []byte("hello world"),
+		RunId:          res.runID.String(),
+		LeaseId:        leaseID.String(),
+	}
+
+	// Publish message to "PubSub"
+	_ = res.testConn.RouteExecutorRequest(context.Background(), res.svc.gatewayId, res.connID, expectedPayload)
+
+	// Expect message to be received by gateway and forwarded over WebSocket
+	msg := awaitNextMessage(t, res.ws, 2*time.Second)
+	require.Equal(t, connect.GatewayMessageType_GATEWAY_EXECUTOR_REQUEST, msg.Kind)
+
+	payload := &connect.GatewayExecutorRequestData{}
+	err = proto.Unmarshal(msg.Payload, payload)
+	require.NoError(t, err)
+
+	// Expect messages to match
+	require.True(t, proto.Equal(expectedPayload, payload))
+
+	sendWorkerExtendLeaseMessage(t, res, &connect.WorkerRequestExtendLeaseData{
+		RequestId:      payload.RequestId,
+		AccountId:      payload.AccountId,
+		EnvId:          payload.EnvId,
+		AppId:          payload.AppId,
+		FunctionSlug:   payload.FunctionSlug,
+		StepId:         payload.StepId,
+		SystemTraceCtx: payload.SystemTraceCtx,
+		UserTraceCtx:   payload.UserTraceCtx,
+		RunId:          payload.RunId,
+		LeaseId:        payload.LeaseId,
+	})
+
+	// Expect lease extension ack
+	msg = awaitNextMessage(t, res.ws, 2*time.Second)
+	require.Equal(t, connect.GatewayMessageType_WORKER_REQUEST_EXTEND_LEASE_ACK, msg.Kind)
+
+	ackPayload := connect.WorkerRequestExtendLeaseAckData{}
+	err = proto.Unmarshal(msg.Payload, &ackPayload)
+	require.NoError(t, err)
+
+	require.Equal(t, payload.RequestId, ackPayload.RequestId)
+	require.Equal(t, payload.AccountId, ackPayload.AccountId)
+	require.NotNil(t, ackPayload.NewLeaseId)
+
+	parsed, err := ulid.Parse(*ackPayload.NewLeaseId)
+	require.NoError(t, err)
+
+	require.WithinDuration(t, time.Now().Add(consts.ConnectWorkerRequestLeaseDuration), ulid.Time(parsed.Time()), 500*time.Millisecond)
 }
 
 func TestCloseConnectionOnConsecutiveHeartbeatFail(t *testing.T) {
@@ -598,6 +671,19 @@ func sendWorkerHeartbeatMessage(t *testing.T, res testingResources) {
 
 	err := wsproto.Write(ctx, res.ws, &connect.ConnectMessage{
 		Kind: connect.GatewayMessageType_WORKER_HEARTBEAT,
+	})
+	require.NoError(t, err)
+}
+
+func sendWorkerExtendLeaseMessage(t *testing.T, res testingResources, payload *connect.WorkerRequestExtendLeaseData) {
+	ctx := context.Background()
+
+	marshaled, err := proto.Marshal(payload)
+	require.NoError(t, err)
+
+	err = wsproto.Write(ctx, res.ws, &connect.ConnectMessage{
+		Kind:    connect.GatewayMessageType_WORKER_REQUEST_EXTEND_LEASE,
+		Payload: marshaled,
 	})
 	require.NoError(t, err)
 }
