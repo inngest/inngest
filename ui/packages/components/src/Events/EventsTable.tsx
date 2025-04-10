@@ -34,7 +34,7 @@ export function EventsTable({
     source?: string;
     startTime?: string;
     celQuery?: string;
-  }) => Promise<{ events: Event[]; pageInfo: PageInfo }>;
+  }) => Promise<{ events: Omit<Event, 'payload'>[]; pageInfo: PageInfo }>;
 }) {
   const router = useRouter();
   const columns = useColumns({ pathCreator });

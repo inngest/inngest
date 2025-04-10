@@ -10,6 +10,7 @@ type QueryVariables = {
 // TODO: Replace with real API
 export function useEvents() {
   return useCallback(async ({ cursor, eventName, source, startTime, celQuery }: QueryVariables) => {
+    console.log(cursor, eventName, source, startTime, celQuery);
     // Simulated delay to mimic real API behavior
     await new Promise((resolve) => setTimeout(resolve, 500));
 
@@ -17,7 +18,7 @@ export function useEvents() {
     const events = [
       {
         id: '1',
-        receivedAt: '2025-04-10T16:43:21.696Z',
+        receivedAt: new Date('2025-04-10T16:43:21.696Z'),
         name: 'UserSignedUp',
         functions: [
           {

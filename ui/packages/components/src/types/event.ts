@@ -1,8 +1,8 @@
 export type Event = {
   id: string;
   name: string;
-  payload?: string;
-  receivedAt: string;
+  payload: string;
+  receivedAt: Date;
   functions?: {
     name: string;
     slug: string;

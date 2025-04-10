@@ -5,7 +5,7 @@ import { createColumnHelper } from '@tanstack/react-table';
 
 import type { EventsTable } from './EventsTable';
 
-const columnHelper = createColumnHelper<Event>();
+const columnHelper = createColumnHelper<Omit<Event, 'payload'>>();
 
 const columnsIDs = ['name', 'functions', 'receivedAt'] as const;
 export type ColumnID = (typeof columnsIDs)[number];
@@ -27,7 +27,7 @@ export function useColumns({
     columnHelper.accessor('receivedAt', {
       cell: (info) => {
         const receivedAt = info.getValue();
-        return <TimeCell date={new Date(receivedAt)} />;
+        return <TimeCell date={receivedAt} />;
       },
       header: 'Received at',
       maxSize: 400,
