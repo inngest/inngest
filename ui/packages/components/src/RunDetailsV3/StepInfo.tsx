@@ -17,6 +17,7 @@ import { usePrettyJson } from '../hooks/usePrettyJson';
 import { formatMilliseconds, toMaybeDate } from '../utils/date';
 import { IO } from './IO';
 import { Tabs } from './Tabs';
+import { UserlandAttrs } from './UserlandAttrs';
 import {
   isStepInfoInvoke,
   isStepInfoSleep,
@@ -106,7 +107,6 @@ const getStepKindInfo = (props: StepKindInfoProps): JSX.Element | null =>
 export const StepInfo = ({ selectedStep }: { selectedStep: StepInfoType }) => {
   const [expanded, setExpanded] = useState(true);
   const [rerunModalOpen, setRerunModalOpen] = useState(false);
-
   const { runID, result, trace, pathCreator } = selectedStep;
 
   const delayText = formatMilliseconds(
@@ -151,7 +151,10 @@ export const StepInfo = ({ selectedStep }: { selectedStep: StepInfoType }) => {
             }`}
           />
 
-          <span className="text-basis text-sm font-normal">{trace.name}</span>
+          <span className="text-basis text-sm font-normal">
+            {trace.isUserland && 'OTel/'}
+            {trace.name}
+          </span>
         </div>
         {runID && trace.stepID && prettyInput && (
           <>
@@ -210,40 +213,50 @@ export const StepInfo = ({ selectedStep }: { selectedStep: StepInfoType }) => {
       )}
 
       <div className="min-h-full">
-        <Tabs
-          defaultActive={result?.error ? 'error' : prettyInput ? 'input' : 'output'}
-          tabs={[
-            ...(prettyInput
-              ? [{ label: 'Input', id: 'input', node: <IO title="Step Input" raw={prettyInput} /> }]
-              : []),
-            ...(prettyOutput
-              ? [
-                  {
-                    label: 'Output',
-                    id: 'output',
-                    node: <IO title="Step Output" raw={prettyOutput} />,
-                  },
-                ]
-              : []),
-            ...(result?.error
-              ? [
-                  {
-                    label: 'Error',
-                    id: 'error',
-                    node: (
-                      <IO
-                        title={`${result.error.name || 'Error'} ${
-                          result.error.message ? `: ${result.error.message}` : ''
-                        }`}
-                        raw={result.error.stack ?? ''}
-                        error={true}
-                      />
-                    ),
-                  },
-                ]
-              : []),
-          ]}
-        />
+        {trace.isUserland && trace.userlandSpan ? (
+          <UserlandAttrs userlandSpan={trace.userlandSpan} />
+        ) : (
+          <Tabs
+            defaultActive={result?.error ? 'error' : prettyInput ? 'input' : 'output'}
+            tabs={[
+              ...(prettyInput
+                ? [
+                    {
+                      label: 'Input',
+                      id: 'input',
+                      node: <IO title="Step Input" raw={prettyInput} />,
+                    },
+                  ]
+                : []),
+              ...(prettyOutput
+                ? [
+                    {
+                      label: 'Output',
+                      id: 'output',
+                      node: <IO title="Step Output" raw={prettyOutput} />,
+                    },
+                  ]
+                : []),
+              ...(result?.error
+                ? [
+                    {
+                      label: 'Error',
+                      id: 'error',
+                      node: (
+                        <IO
+                          title={`${result.error.name || 'Error'} ${
+                            result.error.message ? `: ${result.error.message}` : ''
+                          }`}
+                          raw={result.error.stack ?? ''}
+                          error={true}
+                        />
+                      ),
+                    },
+                  ]
+                : []),
+            ]}
+          />
+        )}
       </div>
     </div>
   );

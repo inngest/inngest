@@ -246,6 +246,8 @@ type RunTraceSpan struct {
 	IsRoot        bool               `json:"isRoot"`
 	ParentSpanID  *string            `json:"parentSpanID,omitempty"`
 	ParentSpan    *RunTraceSpan      `json:"parentSpan,omitempty"`
+	IsUserland    bool               `json:"isUserland"`
+	UserlandSpan  *UserlandSpan      `json:"userlandSpan,omitempty"`
 }
 
 type RunTraceSpanOutput struct {
@@ -329,6 +331,16 @@ type StreamQuery struct {
 type UpdateAppInput struct {
 	ID  string `json:"id"`
 	URL string `json:"url"`
+}
+
+type UserlandSpan struct {
+	SpanName      *string `json:"spanName,omitempty"`
+	SpanKind      *string `json:"spanKind,omitempty"`
+	ServiceName   *string `json:"serviceName,omitempty"`
+	ResourceAttrs *string `json:"resourceAttrs,omitempty"`
+	ScopeName     *string `json:"scopeName,omitempty"`
+	ScopeVersion  *string `json:"scopeVersion,omitempty"`
+	SpanAttrs     *string `json:"spanAttrs,omitempty"`
 }
 
 type WaitForEventStepInfo struct {
