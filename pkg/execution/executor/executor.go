@@ -2379,8 +2379,10 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, i *runInstance,
 	failure := err != nil || (hr != nil && hr.StatusCode > 299)
 
 	// Update the driver response appropriately for the trace lifecycles.
-	i.resp.StatusCode = hr.StatusCode
-	hr.ContentLength = int64(len(output))
+	if hr != nil {
+		i.resp.StatusCode = hr.StatusCode
+		hr.ContentLength = int64(len(output))
+	}
 
 	// Handle errors individually, here.
 	if failure {
