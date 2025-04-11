@@ -520,5 +520,3 @@ func TestGetConnectionWeight(t *testing.T) {
 		}
 	})
 }
-
-func TestPickConnection(t *testing.T) {}

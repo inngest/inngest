@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"github.com/google/uuid"
 	connecterrors "github.com/inngest/inngest/pkg/connect/errors"
+	"github.com/inngest/inngest/pkg/consts"
 	"io"
 	"log/slog"
 	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -21,7 +23,7 @@ import (
 	"github.com/inngest/inngest/pkg/connect/wsproto"
 	"github.com/inngest/inngest/pkg/syscode"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
-	"github.com/inngest/inngest/proto/gen/connect/v1"
+	connectpb "github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/oklog/ulid/v2"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
@@ -36,12 +38,29 @@ const (
 	MaxAppsPerConnection     = 100
 )
 
+func isConnectionClosedErr(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	if errors.Is(err, net.ErrClosed) || errors.Is(err, io.EOF) {
+		return true
+	}
+
+	closeErr := websocket.CloseError{}
+	return errors.As(err, &closeErr)
+}
+
 func (c *connectGatewaySvc) closeWithConnectError(ws *websocket.Conn, serr *connecterrors.SocketError) {
 	// reason must be limited to 125 bytes and should not be dynamic,
 	// so we restrict it to the known syscodes to prevent unintentional overflows
 	err := ws.Close(serr.StatusCode, serr.SysCode)
-	if err != nil {
-		c.logger.Error("could not close WebSocket connection", "err", err)
+	if errors.Is(err, context.DeadlineExceeded) {
+		return
+	}
+
+	if isConnectionClosedErr(err) {
+		c.logger.Error("could not close WebSocket connection", "err", err, "serr", serr)
 	}
 }
 
@@ -55,6 +74,21 @@ type connectionHandler struct {
 	log        *slog.Logger
 
 	remoteAddr string
+
+	lastHeartbeatLock       sync.Mutex
+	lastHeartbeatReceivedAt time.Time
+}
+
+func (c *connectionHandler) setLastHeartbeat(time time.Time) {
+	c.lastHeartbeatLock.Lock()
+	defer c.lastHeartbeatLock.Unlock()
+	c.lastHeartbeatReceivedAt = time
+}
+
+func (c *connectionHandler) getLastHeartbeat() time.Time {
+	c.lastHeartbeatLock.Lock()
+	defer c.lastHeartbeatLock.Unlock()
+	return c.lastHeartbeatReceivedAt
 }
 
 var ErrDraining = connecterrors.SocketError{
@@ -85,6 +119,10 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 		if err != nil {
 			return
 		}
+
+		// Adjust read limit to accommodate large step output responses
+		// The default imposed by the websockets library is 32,678 bytes
+		ws.SetReadLimit(consts.MaxSDKResponseBodySize)
 
 		additionalMetricsTags := c.metricsTags()
 
@@ -117,11 +155,22 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			remoteAddr: remoteAddr,
 		}
 
+		closeReason := connectpb.WorkerDisconnectReason_UNEXPECTED.String()
+		var closeReasonLock sync.Mutex
+		setCloseReason := func(reason string) {
+			closeReasonLock.Lock()
+			defer closeReasonLock.Unlock()
+
+			if reason != connectpb.WorkerDisconnectReason_UNEXPECTED.String() {
+				closeReason = reason
+			}
+		}
+
 		c.connectionCount.Add()
 		defer func() {
 			// This is deferred so we always update the semaphore
 			defer c.connectionCount.Done()
-			ch.log.Debug("Closing WebSocket connection")
+			ch.log.Debug("Closing WebSocket connection", "reason", closeReason)
 			if c.devlogger != nil {
 				c.devlogger.Info().Msg("worker disconnected")
 			}
@@ -139,8 +188,8 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 		ch.log.Debug("WebSocket connection established, sending hello")
 
 		{
-			err = wsproto.Write(ctx, ws, &connect.ConnectMessage{
-				Kind: connect.GatewayMessageType_GATEWAY_HELLO,
+			err = wsproto.Write(ctx, ws, &connectpb.ConnectMessage{
+				Kind: connectpb.GatewayMessageType_GATEWAY_HELLO,
 			})
 			if err != nil {
 				if ctx.Err() != nil {
@@ -148,7 +197,11 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 					return
 				}
 
-				if errors.Is(err, net.ErrClosed) || errors.Is(err, io.EOF) {
+				if errors.Is(err, context.DeadlineExceeded) {
+					return
+				}
+
+				if isConnectionClosedErr(err) {
 					return
 				}
 
@@ -171,16 +224,18 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			return
 		}
 
-		ch.log = ch.log.With("account_id", conn.AccountID, "env_id", conn.EnvID, "conn_id", conn.ConnectionId)
+		// Connection was closed during the handshake process
+		if conn == nil && serr == nil {
+			return
+		}
 
-		var closeReason string
-		var closeReasonLock sync.Mutex
+		ch.log = ch.log.With("account_id", conn.AccountID, "env_id", conn.EnvID, "conn_id", conn.ConnectionId)
 
 		workerDrainedCtx, notifyWorkerDrained := context.WithCancel(context.Background())
 		defer notifyWorkerDrained()
 
 		go func() {
-			// This is call in two cases
+			// This is called in two cases
 			// - Connection was closed by the worker, and we already ran all defer actions
 			// - Gateway is draining/shutting down and the parent context was canceled
 			<-ctx.Done()
@@ -194,7 +249,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			ch.log.Debug("context done, starting draining process")
 
 			// Prevent routing any more messages to this connection
-			err = ch.updateConnStatus(connect.ConnectionStatus_DRAINING)
+			err = ch.updateConnStatus(connectpb.ConnectionStatus_DRAINING)
 			if err != nil {
 				ch.log.Error("could not update connection status after context done", "err", err)
 			}
@@ -203,7 +258,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 				go l.OnStartDraining(context.Background(), conn)
 			}
 
-			closeReason = connect.WorkerDisconnectReason_GATEWAY_DRAINING.String()
+			setCloseReason(connectpb.WorkerDisconnectReason_GATEWAY_DRAINING.String())
 
 			// Close WS connection once worker established another connection
 			defer func() {
@@ -212,8 +267,8 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 
 			// If the parent context timed out or got canceled, we should signal the client that we're going away,
 			// and it should reconnect to another gateway.
-			err := wsproto.Write(context.Background(), ws, &connect.ConnectMessage{
-				Kind: connect.GatewayMessageType_GATEWAY_CLOSING,
+			err := wsproto.Write(context.Background(), ws, &connectpb.ConnectMessage{
+				Kind: connectpb.GatewayMessageType_GATEWAY_CLOSING,
 			})
 			if err != nil {
 				return
@@ -229,7 +284,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			}
 		}()
 
-		// Once connection is established, we must make sure to update the state on any disconnect,
+		// Once a connection is established, we must make sure to update the state on any disconnect,
 		// regardless of whether it's permanent or temporary
 		defer func() {
 			// This is a transactional operation, it should always complete regardless of context cancellation
@@ -282,7 +337,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			}
 
 			// upsert connection to update WorkerGroups map
-			if err := c.stateManager.UpsertConnection(context.Background(), conn, connect.ConnectionStatus_CONNECTED, time.Now()); err != nil {
+			if err := c.stateManager.UpsertConnection(context.Background(), conn, connectpb.ConnectionStatus_CONNECTED, time.Now()); err != nil {
 				ch.log.Error("updating connection state after sync failed", "err", err)
 				c.closeWithConnectError(ws, &connecterrors.SocketError{
 					SysCode:    syscode.CodeConnectInternal,
@@ -291,6 +346,10 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 				})
 
 				return
+			}
+
+			for _, l := range c.lifecycles {
+				go l.OnSynced(context.Background(), conn)
 			}
 
 			appNames := make([]string, 0, len(conn.Groups))
@@ -310,47 +369,68 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			ch.log.Debug("synced apps", "app_ids", appIds, "sync_ids", syncIds, "app_names", appNames)
 		}
 
-		eg := errgroup.Group{}
+		{
+			onSubscribed := make(chan struct{})
+			// Wait for relevant messages and forward them over the WebSocket connection
+			go ch.receiveRouterMessages(ctx, onSubscribed)
 
-		onSubscribed := make(chan struct{})
-		// Wait for relevant messages and forward them over the WebSocket connection
-		go ch.receiveRouterMessages(ctx, onSubscribed)
-
-		<-onSubscribed
+			<-onSubscribed
+		}
 
 		// Run loop
+		runLoopCtx, cancelRunLoopContext := context.WithCancel(context.Background())
+		defer cancelRunLoopContext()
+
+		eg := errgroup.Group{}
 		eg.Go(func() error {
 			for {
 				// We already handle context cancellations in a goroutine above.
 				// If we timed out the read loop, the connection would be closed. This is bad because
 				// when draining, we still want to send a close frame to the client.
-				var msg connect.ConnectMessage
-				err := wsproto.Read(context.Background(), ws, &msg)
+				var msg connectpb.ConnectMessage
+				err := wsproto.Read(runLoopCtx, ws, &msg)
 				if err != nil {
 					// immediately stop routing messages to this connection
-					if err := ch.updateConnStatus(connect.ConnectionStatus_DISCONNECTING); err != nil {
+					if err := ch.updateConnStatus(connectpb.ConnectionStatus_DISCONNECTING); err != nil {
 						ch.log.Error("could not update connection status after read error", "err", err)
 					}
 
 					for _, l := range c.lifecycles {
-						go l.OnStartDraining(context.Background(), conn)
+						go l.OnStartDisconnecting(context.Background(), conn)
+					}
+
+					// If the run loop was canceled (e.g. missing consecutive heartbeats), just return
+					if errors.Is(err, context.Canceled) && runLoopCtx.Err() != nil {
+						return nil
 					}
 
 					closeErr := websocket.CloseError{}
 					if errors.As(err, &closeErr) {
-						ch.log.Debug("connection closed with reason", "reason", closeErr.Reason)
+						// Empty reason (unexpected)
+						if closeErr.Code == websocket.StatusNoStatusRcvd && closeErr.Reason == "" {
+							return nil
+						}
+
+						// Force-closed during draining after timeout
+						if closeErr.Code == ErrDraining.StatusCode && closeErr.Reason == ErrDraining.SysCode {
+							return nil
+						}
+
+						ch.log.Debug("connection closed with code and reason", "code", closeErr.Code.String(), "reason", closeErr.Reason)
+
+						// Expected worker shutdown
+						if closeErr.Code == websocket.StatusNormalClosure && closeErr.Reason == connectpb.WorkerDisconnectReason_WORKER_SHUTDOWN.String() {
+							setCloseReason(connectpb.WorkerDisconnectReason_WORKER_SHUTDOWN.String())
+							return nil
+						}
 
 						// If client connection closed unexpectedly, we should store the reason, if set.
 						// If the reason is set, it may have been an intentional close, so the connection
 						// may not be re-established.
 						// Workers should always close with code: 1000 and reason: WORKER_SHUTDOWN.
-						closeReasonLock.Lock()
 						if closeErr.Reason != "" {
-							closeReason = closeErr.Reason
-						} else {
-							closeReason = connect.WorkerDisconnectReason_UNEXPECTED.String()
+							setCloseReason(closeErr.Reason)
 						}
-						closeReasonLock.Unlock()
 
 						// Do not return an error. We already capture the close reason above.
 						return nil
@@ -358,22 +438,21 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 
 					// connection was closed (this may not be expected but should not be logged as an error)
 					// this is expected when the gateway is draining
-					if errors.Is(err, net.ErrClosed) || errors.Is(err, io.EOF) {
-						closeReasonLock.Lock()
-						closeReason = connect.WorkerDisconnectReason_UNEXPECTED.String()
-						closeReasonLock.Unlock()
+					if isConnectionClosedErr(err) {
+						return nil
+					}
 
+					// Unfortunately, the websocket library does not expose a proper error when the size limit is reached,
+					// so we have to check the error message instead. This should rarely happen.
+					if strings.HasPrefix(err.Error(), "read limited at") {
+						setCloseReason(connectpb.WorkerDisconnectReason_MESSAGE_TOO_LARGE.String())
 						return nil
 					}
 
 					ch.log.Error("failed to read websocket message", "err", err)
 
 					// If we failed to read the message for another reason, we should probably reconnect as well.
-					c.closeWithConnectError(ws, &connecterrors.SocketError{
-						SysCode:    syscode.CodeConnectInternal,
-						StatusCode: websocket.StatusInternalError,
-						Msg:        "could not read next message",
-					})
+					return nil
 				}
 
 				tags := map[string]any{
@@ -398,8 +477,24 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 
 		// Let the worker know we're ready to receive messages
 		{
-			err = wsproto.Write(ctx, ws, &connect.ConnectMessage{
-				Kind: connect.GatewayMessageType_GATEWAY_CONNECTION_READY,
+			readyPayload, err := proto.Marshal(&connectpb.GatewayConnectionReadyData{
+				HeartbeatInterval:   c.workerHeartbeatInterval.String(),
+				ExtendLeaseInterval: c.workerRequestExtendLeaseInterval.String(),
+			})
+			if err != nil {
+				ch.log.Error("could not marshal connection ready", "err", err)
+				c.closeWithConnectError(ws, &connecterrors.SocketError{
+					SysCode:    syscode.CodeConnectInternal,
+					StatusCode: websocket.StatusInternalError,
+					Msg:        "could not prepare gateway connection ready",
+				})
+
+				return
+			}
+
+			err = wsproto.Write(ctx, ws, &connectpb.ConnectMessage{
+				Kind:    connectpb.GatewayMessageType_GATEWAY_CONNECTION_READY,
+				Payload: readyPayload,
 			})
 			if err != nil {
 				if ctx.Err() != nil {
@@ -407,7 +502,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 					return
 				}
 
-				if errors.Is(err, net.ErrClosed) || errors.Is(err, io.EOF) {
+				if isConnectionClosedErr(err) {
 					return
 				}
 
@@ -429,7 +524,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			}
 
 			// Mark connection as ready to receive traffic unless we require manual client ready signal (optional)
-			err = c.stateManager.UpsertConnection(ctx, conn, connect.ConnectionStatus_READY, time.Now())
+			err = c.stateManager.UpsertConnection(ctx, conn, connectpb.ConnectionStatus_READY, time.Now())
 			if err != nil {
 				if ctx.Err() != nil {
 					c.closeDraining(ws)
@@ -451,12 +546,12 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			}
 		}
 
-		ch.log.Debug("connection is ready")
-		if c.devlogger != nil {
-			c.devlogger.Info().Strs("app_names", conn.AppNames()).Msg("worker connected")
-		}
-
 		{
+			ch.log.Debug("connection is ready")
+			if c.devlogger != nil {
+				c.devlogger.Info().Strs("app_names", conn.AppNames()).Msg("worker connected")
+			}
+
 			successTags := map[string]any{
 				"success": true,
 			}
@@ -475,6 +570,27 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			})
 		}
 
+		// Safeguard: Clean up connections that haven't sent n consecutive heartbeats.
+		ch.setLastHeartbeat(time.Now()) // set initial value
+		go func() {
+			for {
+				select {
+				case <-runLoopCtx.Done():
+					return
+				case <-time.After(c.workerHeartbeatInterval):
+				}
+
+				if time.Since(ch.getLastHeartbeat()) > time.Duration(c.consecutiveWorkerHeartbeatMissesBeforeConnectionClose)*c.workerHeartbeatInterval {
+					setCloseReason(connectpb.WorkerDisconnectReason_CONSECUTIVE_HEARTBEATS_MISSED.String())
+
+					ch.log.Debug("missed consecutive heartbeats, closing connection")
+
+					cancelRunLoopContext()
+					return
+				}
+			}
+		}()
+
 		// Connection was drained once it's closed by the worker (even if
 		// the connection broke unintentionally, we can stop waiting)
 		defer notifyWorkerDrained()
@@ -487,16 +603,16 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 	})
 }
 
-func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, msg *connect.ConnectMessage) *connecterrors.SocketError {
+func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, msg *connectpb.ConnectMessage) *connecterrors.SocketError {
 	c.log.Debug("received WebSocket message", "kind", msg.Kind.String())
 
 	switch msg.Kind {
-	case connect.GatewayMessageType_WORKER_READY:
+	case connectpb.GatewayMessageType_WORKER_READY:
 		if c.svc.isDraining {
 			return &ErrDraining
 		}
 
-		err := c.updateConnStatus(connect.ConnectionStatus_READY)
+		err := c.updateConnStatus(connectpb.ConnectionStatus_READY)
 		if err != nil {
 			// TODO Should we actually close the connection here?
 			return &connecterrors.SocketError{
@@ -511,12 +627,12 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 		}
 
 		return nil
-	case connect.GatewayMessageType_WORKER_HEARTBEAT:
+	case connectpb.GatewayMessageType_WORKER_HEARTBEAT:
 		if c.svc.isDraining {
 			return &ErrDraining
 		}
 
-		err := c.updateConnStatus(connect.ConnectionStatus_READY)
+		err := c.updateConnStatus(connectpb.ConnectionStatus_READY)
 		if err != nil {
 			// TODO Should we actually close the connection here?
 			return &connecterrors.SocketError{
@@ -531,20 +647,22 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 		}
 
 		// Respond with gateway heartbeat
-		if err := wsproto.Write(ctx, c.ws, &connect.ConnectMessage{
-			Kind: connect.GatewayMessageType_GATEWAY_HEARTBEAT,
+		if err := wsproto.Write(ctx, c.ws, &connectpb.ConnectMessage{
+			Kind: connectpb.GatewayMessageType_GATEWAY_HEARTBEAT,
 		}); err != nil {
 			// The connection will fail to read and be closed in the read loop
 			return nil
 		}
 
+		c.setLastHeartbeat(time.Now())
+
 		return nil
-	case connect.GatewayMessageType_WORKER_PAUSE:
+	case connectpb.GatewayMessageType_WORKER_PAUSE:
 		if c.svc.isDraining {
 			return &ErrDraining
 		}
 
-		err := c.updateConnStatus(connect.ConnectionStatus_DRAINING)
+		err := c.updateConnStatus(connectpb.ConnectionStatus_DRAINING)
 		if err != nil {
 			// TODO Should we actually close the connection here?
 			return &connecterrors.SocketError{
@@ -559,9 +677,9 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 		}
 
 		return nil
-	case connect.GatewayMessageType_WORKER_REQUEST_ACK:
+	case connectpb.GatewayMessageType_WORKER_REQUEST_ACK:
 		{
-			var data connect.WorkerRequestAckData
+			var data connectpb.WorkerRequestAckData
 			if err := proto.Unmarshal(msg.Payload, &data); err != nil {
 				// This should never happen: Failing the ack means we will redeliver the same request even though
 				// the worker already started processing it.
@@ -595,7 +713,7 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 
 			return nil
 		}
-	case connect.GatewayMessageType_WORKER_REPLY:
+	case connectpb.GatewayMessageType_WORKER_REPLY:
 		// Always handle SDK reply, even if gateway is draining
 		err := c.handleSdkReply(context.Background(), msg)
 		if err != nil {
@@ -607,13 +725,111 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 				Msg:        "could not handle SDK reply",
 			}
 		}
-	default:
-		// TODO Should we actually close the connection here?
-		return &connecterrors.SocketError{
-			SysCode:    syscode.CodeConnectRunInvalidMessage,
-			StatusCode: websocket.StatusPolicyViolation,
-			Msg:        fmt.Sprintf("invalid message kind %q", msg.Kind),
+	case connectpb.GatewayMessageType_WORKER_REQUEST_EXTEND_LEASE:
+		{
+			var data connectpb.WorkerRequestExtendLeaseData
+			if err := proto.Unmarshal(msg.Payload, &data); err != nil {
+				// This should never happen: Failing the ack means we will redeliver the same request even though
+				// the worker already started processing it.
+				return &connecterrors.SocketError{
+					SysCode:    syscode.CodeConnectWorkerRequestExtendLeaseInvalidPayload,
+					StatusCode: websocket.StatusPolicyViolation,
+					Msg:        "invalid payload in worker request extend lease",
+				}
+			}
+
+			leaseID, err := ulid.Parse(data.LeaseId)
+			if err != nil {
+				return &connecterrors.SocketError{
+					SysCode:    syscode.CodeConnectWorkerRequestExtendLeaseInvalidPayload,
+					StatusCode: websocket.StatusPolicyViolation,
+					Msg:        "invalid lease ID in worker request extend lease payload",
+				}
+			}
+
+			newLeaseID, err := c.svc.stateManager.ExtendRequestLease(ctx, c.conn.EnvID, data.RequestId, leaseID, consts.ConnectWorkerRequestLeaseDuration)
+			if err != nil {
+				if errors.Is(err, state.ErrRequestLeaseExpired) || errors.Is(err, state.ErrRequestLeased) {
+					c.log.Error("lease was claimed by other worker or expired", "err", err, "req_id", data.RequestId, "lease_id", leaseID.String())
+
+					// Respond with nack
+					nackPayload, marshalErr := proto.Marshal(&connectpb.WorkerRequestExtendLeaseAckData{
+						RequestId:    data.RequestId,
+						AccountId:    data.AccountId,
+						EnvId:        data.EnvId,
+						AppId:        data.AppId,
+						FunctionSlug: data.FunctionSlug,
+
+						// No new lease ID
+						NewLeaseId: nil,
+					})
+					if marshalErr != nil {
+						// This should never happen
+						return &connecterrors.SocketError{
+							SysCode:    syscode.CodeConnectInternal,
+							StatusCode: websocket.StatusInternalError,
+							Msg:        "failed to marshal nack payload",
+						}
+					}
+
+					if err := wsproto.Write(ctx, c.ws, &connectpb.ConnectMessage{
+						Kind:    connectpb.GatewayMessageType_WORKER_REQUEST_EXTEND_LEASE_ACK,
+						Payload: nackPayload,
+					}); err != nil {
+						// The connection will fail to read and be closed in the read loop
+						return nil
+					}
+				}
+
+				c.log.Error("unexpected error extending lease", "err", err)
+
+				// This should never happen
+				return &connecterrors.SocketError{
+					SysCode:    syscode.CodeConnectInternal,
+					StatusCode: websocket.StatusInternalError,
+					Msg:        "unexpected error extending lease",
+				}
+			}
+
+			var newLeaseIDStr *string
+			if newLeaseID != nil {
+				newLeaseIDStr = proto.String(newLeaseID.String())
+			}
+
+			// Respond with ack
+			ackPayload, marshalErr := proto.Marshal(&connectpb.WorkerRequestExtendLeaseAckData{
+				RequestId:    data.RequestId,
+				AccountId:    data.AccountId,
+				EnvId:        data.EnvId,
+				AppId:        data.AppId,
+				FunctionSlug: data.FunctionSlug,
+				NewLeaseId:   newLeaseIDStr,
+			})
+			if marshalErr != nil {
+				// This should never happen
+				return &connecterrors.SocketError{
+					SysCode:    syscode.CodeConnectInternal,
+					StatusCode: websocket.StatusInternalError,
+					Msg:        "failed to marshal nack payload",
+				}
+			}
+
+			if err := wsproto.Write(ctx, c.ws, &connectpb.ConnectMessage{
+				Kind:    connectpb.GatewayMessageType_WORKER_REQUEST_EXTEND_LEASE_ACK,
+				Payload: ackPayload,
+			}); err != nil {
+				// The connection will fail to read and be closed in the read loop
+				return nil
+			}
+
+			c.log.Debug("extended lease for long-running request")
+
+			// Extended lease, all good
+			return nil
 		}
+	default:
+		c.log.Warn("unexpected message kind received", "kind", msg.Kind.String())
+		return nil
 	}
 
 	return nil
@@ -625,7 +841,7 @@ func (c *connectionHandler) receiveRouterMessages(ctx context.Context, onSubscri
 	// Receive execution-related messages for the app, forwarded by the router.
 	// The router selects only one gateway to handle a request from a pool of one or more workers (and thus WebSockets)
 	// running for each app.
-	err := c.svc.receiver.ReceiveRoutedRequest(ctx, c.svc.gatewayId, c.conn.ConnectionId, func(rawBytes []byte, data *connect.GatewayExecutorRequestData) {
+	err := c.svc.receiver.ReceiveRoutedRequest(ctx, c.svc.gatewayId, c.conn.ConnectionId, func(rawBytes []byte, data *connectpb.GatewayExecutorRequestData) {
 		log := c.log.With(
 			"app_id", data.AppId,
 			"app_name", data.AppName,
@@ -662,12 +878,12 @@ func (c *connectionHandler) receiveRouterMessages(ctx context.Context, onSubscri
 		}
 
 		// Forward message to SDK!
-		err = wsproto.Write(ctx, c.ws, &connect.ConnectMessage{
-			Kind:    connect.GatewayMessageType_GATEWAY_EXECUTOR_REQUEST,
+		err = wsproto.Write(ctx, c.ws, &connectpb.ConnectMessage{
+			Kind:    connectpb.GatewayMessageType_GATEWAY_EXECUTOR_REQUEST,
 			Payload: rawBytes,
 		})
 		if err != nil {
-			if errors.Is(err, net.ErrClosed) || errors.Is(err, io.EOF) {
+			if isConnectionClosedErr(err) {
 				return
 			}
 
@@ -690,8 +906,8 @@ func (c *connectionHandler) receiveRouterMessages(ctx context.Context, onSubscri
 
 func (c *connectionHandler) establishConnection(ctx context.Context) (*state.Connection, *connecterrors.SocketError) {
 	var (
-		initialMessageData connect.WorkerConnectRequestData
-		initialMessage     connect.ConnectMessage
+		initialMessageData connectpb.WorkerConnectRequestData
+		initialMessage     connectpb.ConnectMessage
 	)
 
 	shorterContext, cancelShorter := context.WithTimeout(ctx, 5*time.Second)
@@ -699,6 +915,11 @@ func (c *connectionHandler) establishConnection(ctx context.Context) (*state.Con
 
 	err := wsproto.Read(shorterContext, c.ws, &initialMessage)
 	if err != nil {
+		if isConnectionClosedErr(err) {
+			c.log.Warn("connection was closed during handshake")
+			return nil, nil
+		}
+
 		if ctx.Err() != nil {
 			return nil, &ErrDraining
 		}
@@ -722,7 +943,7 @@ func (c *connectionHandler) establishConnection(ctx context.Context) (*state.Con
 		}
 	}
 
-	if initialMessage.Kind != connect.GatewayMessageType_WORKER_CONNECT {
+	if initialMessage.Kind != connectpb.GatewayMessageType_WORKER_CONNECT {
 		c.log.Debug("initial worker SDK message was not connect")
 
 		return nil, &connecterrors.SocketError{
@@ -869,7 +1090,7 @@ func (c *connectionHandler) establishConnection(ctx context.Context) (*state.Con
 		// This is a transactional operation, it should always complete regardless of context cancellation
 
 		// Connection should always be upserted, we don't want inconsistent state
-		if err := c.svc.stateManager.UpsertConnection(context.Background(), &conn, connect.ConnectionStatus_CONNECTED, time.Now()); err != nil {
+		if err := c.svc.stateManager.UpsertConnection(context.Background(), &conn, connectpb.ConnectionStatus_CONNECTED, time.Now()); err != nil {
 			log.Error("adding connection state failed", "err", err)
 			return nil, &connecterrors.SocketError{
 				SysCode:    syscode.CodeConnectInternal,
@@ -889,14 +1110,13 @@ func (c *connectionHandler) establishConnection(ctx context.Context) (*state.Con
 	return &conn, nil
 }
 
-func (c *connectionHandler) handleSdkReply(ctx context.Context, msg *connect.ConnectMessage) error {
-	var data connect.SDKResponse
-	if err := proto.Unmarshal(msg.Payload, &data); err != nil {
+func (c *connectionHandler) handleSdkReply(ctx context.Context, msg *connectpb.ConnectMessage) error {
+	data := &connectpb.SDKResponse{}
+	if err := proto.Unmarshal(msg.Payload, data); err != nil {
 		return fmt.Errorf("invalid response type: %w", err)
 	}
 
-	c.log.Debug(
-		"notifying executor about response",
+	l := c.log.With(
 		"status", data.Status.String(),
 		"no_retry", data.NoRetry,
 		"retry_after", data.RetryAfter,
@@ -905,20 +1125,30 @@ func (c *connectionHandler) handleSdkReply(ctx context.Context, msg *connect.Con
 		"run_id", data.RunId,
 	)
 
-	err := c.svc.receiver.NotifyExecutor(ctx, &data)
+	l.Debug("saving response and notifying executor")
+
+	// Persist response in buffer, which is polled by executor.
+	err := c.svc.stateManager.SaveResponse(ctx, c.conn.EnvID, data.RequestId, data)
+	if err != nil {
+		return fmt.Errorf("could not save response: %w", err)
+	}
+
+	// Send a best-effort PubSub message to fast-track the response,
+	// this is unreliable and must be combined with a reliable store like the buffer above.
+	err = c.svc.receiver.NotifyExecutor(ctx, data)
 	if err != nil {
 		return fmt.Errorf("could not notify executor: %w", err)
 	}
 
-	replyAck, err := proto.Marshal(&connect.WorkerReplyAckData{
+	replyAck, err := proto.Marshal(&connectpb.WorkerReplyAckData{
 		RequestId: data.RequestId,
 	})
 	if err != nil {
 		return fmt.Errorf("could not marshal reply ack: %w", err)
 	}
 
-	if err := wsproto.Write(ctx, c.ws, &connect.ConnectMessage{
-		Kind:    connect.GatewayMessageType_WORKER_REPLY_ACK,
+	if err := wsproto.Write(ctx, c.ws, &connectpb.ConnectMessage{
+		Kind:    connectpb.GatewayMessageType_WORKER_REPLY_ACK,
 		Payload: replyAck,
 	}); err != nil {
 		return fmt.Errorf("could not send reply ack: %w", err)
@@ -927,7 +1157,7 @@ func (c *connectionHandler) handleSdkReply(ctx context.Context, msg *connect.Con
 	return nil
 }
 
-func (c *connectionHandler) updateConnStatus(status connect.ConnectionStatus) error {
+func (c *connectionHandler) updateConnStatus(status connectpb.ConnectionStatus) error {
 	c.updateLock.Lock()
 	defer c.updateLock.Unlock()
 

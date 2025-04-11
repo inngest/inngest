@@ -138,4 +138,10 @@ const (
 
 	ConnectWorkerHeartbeatInterval  = 10 * time.Second
 	ConnectGatewayHeartbeatInterval = 5 * time.Second
+
+	ConnectWorkerRequestLeaseDuration = 20 * time.Second
+)
+
+var (
+	ConnectWorkerRequestExtendLeaseInterval = ConnectWorkerRequestLeaseDuration / 2
 )
