@@ -207,6 +207,11 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			return
 		}
 
+		// Connection was closed during the handshake process
+		if conn == nil && serr == nil {
+			return
+		}
+
 		ch.log = ch.log.With("account_id", conn.AccountID, "env_id", conn.EnvID, "conn_id", conn.ConnectionId)
 
 		workerDrainedCtx, notifyWorkerDrained := context.WithCancel(context.Background())
@@ -897,6 +902,11 @@ func (c *connectionHandler) establishConnection(ctx context.Context) (*state.Con
 
 	err := wsproto.Read(shorterContext, c.ws, &initialMessage)
 	if err != nil {
+		if isConnectionClosedErr(err) {
+			c.log.Warn("connection was closed during handshake")
+			return nil, nil
+		}
+
 		if ctx.Err() != nil {
 			return nil, &ErrDraining
 		}
