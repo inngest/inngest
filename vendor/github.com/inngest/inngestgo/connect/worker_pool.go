@@ -12,21 +12,24 @@ type workerPoolMsg struct {
 }
 
 type workerPool struct {
-	concurrency      int
-	handler          func(msg workerPoolMsg)
-	inProgress       sync.WaitGroup
-	inProgressLeases map[string]string
-	workerPoolMsgs   chan workerPoolMsg
+	concurrency    int
+	handler        func(msg workerPoolMsg)
+	inProgress     sync.WaitGroup
+	workerPoolMsgs chan workerPoolMsg
+
+	inProgressLeasesLock sync.Mutex
+	inProgressLeases     map[string]string
 }
 
 func NewWorkerPool(ctx context.Context, concurrency int, handler func(msg workerPoolMsg)) *workerPool {
 	wp := &workerPool{
 		// Should this use the same buffer size as the worker pool?
-		workerPoolMsgs:   make(chan workerPoolMsg, concurrency),
-		concurrency:      concurrency,
-		inProgress:       sync.WaitGroup{},
-		inProgressLeases: make(map[string]string),
-		handler:          handler,
+		workerPoolMsgs:       make(chan workerPoolMsg, concurrency),
+		concurrency:          concurrency,
+		inProgress:           sync.WaitGroup{},
+		inProgressLeases:     make(map[string]string),
+		inProgressLeasesLock: sync.Mutex{},
+		handler:              handler,
 	}
 	for i := 0; i < wp.concurrency; i++ {
 		go wp.workerPool(ctx)

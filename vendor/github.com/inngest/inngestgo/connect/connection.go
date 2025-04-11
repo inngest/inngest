@@ -281,12 +281,14 @@ func (h *connectHandler) handleConnection(ctx context.Context, data connectionEs
 						continue
 					}
 
+					h.workerPool.inProgressLeasesLock.Lock()
 					if payload.NewLeaseId != nil {
 						h.workerPool.inProgressLeases[payload.RequestId] = *payload.NewLeaseId
 					} else {
 						// remove local request lease to stop extending
 						delete(h.workerPool.inProgressLeases, payload.RequestId)
 					}
+					h.workerPool.inProgressLeasesLock.Unlock()
 				}
 			default:
 				h.logger.Error("got unknown gateway request", "err", err)

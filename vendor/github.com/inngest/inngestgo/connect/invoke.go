@@ -132,7 +132,9 @@ func (h *connectHandler) connectInvoke(ctx context.Context, preparedConn *connec
 	}
 
 	// Set initial lease ID
+	h.workerPool.inProgressLeasesLock.Lock()
 	h.workerPool.inProgressLeases[body.RequestId] = body.LeaseId
+	h.workerPool.inProgressLeasesLock.Unlock()
 
 	extendLeaseCtx, cancelExtendLeaseCtx := context.WithCancel(ctx)
 	go func() {
@@ -143,7 +145,10 @@ func (h *connectHandler) connectInvoke(ctx context.Context, preparedConn *connec
 			case <-time.After(preparedConn.extendLeaseInterval):
 			}
 
+			h.workerPool.inProgressLeasesLock.Lock()
 			currentLeaseID, ok := h.workerPool.inProgressLeases[body.RequestId]
+			h.workerPool.inProgressLeasesLock.Unlock()
+
 			if !ok {
 				// If the lease is not found (e.g. due to being removed after a nack),
 				// stop extending it.
