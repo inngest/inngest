@@ -94,3 +94,9 @@ func (r redisAdapter) Write(ctx context.Context, index Index, pauses ...*state.P
 func (r redisAdapter) PausesSince(ctx context.Context, index Index, since time.Time) (state.PauseIterator, error) {
 	return r.rsm.PausesByEventSince(ctx, index.WorkspaceID, index.EventName, since)
 }
+
+// Delete deletes a pause from the buffer, or returns ErrNotInBuffer if the pause is not in
+// the buffer.
+func (r redisAdapter) Delete(ctx context.Context, index Index, pause state.Pause) error {
+	return r.rsm.DeletePause(ctx, pause)
+}

@@ -2,11 +2,16 @@ package pauses
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/oklog/ulid/v2"
+)
+
+var (
+	ErrNotInBuffer = fmt.Errorf("pause not in buffer")
 )
 
 // Index represents the index for a specific pause.  A pause is a signal
@@ -24,7 +29,7 @@ type Manager interface {
 	// of this package you need to only write and read pauses since a given date.
 	Bufferer
 
-	// TODO: Delete and consume
+	// TODO: Delete and consumes.
 }
 
 // Bufferer represents a datastore which accepts all writes for pauses.
@@ -44,6 +49,10 @@ type Bufferer interface {
 	//
 	// NOTE: This is NOT INCLUSIVE of since, ie. the range is (since, now].
 	PausesSince(ctx context.Context, index Index, since time.Time) (state.PauseIterator, error)
+
+	// Delete deletes a pause from the buffer, or returns ErrNotInBuffer if the pause is not in
+	// the buffer.
+	Delete(ctx context.Context, index Index, pause state.Pause) error
 }
 
 // BlockStore is an implementation that reads and writes blocks.
@@ -52,7 +61,8 @@ type BlockStore interface {
 	BlockReader
 }
 
-// BlockFlusher is an interface which writes blocks to a backing store
+// BlockFlusher is an interface which writes blocks to a backing store, and deletes pauses from
+// a backing store.  Deleting pauses may write first to a buffer before compacting blocks.
 type BlockFlusher interface {
 	// FlushIndexBlock processes a given index, fetching pauses from the backing buffer
 	// and writing to a block.
@@ -60,6 +70,10 @@ type BlockFlusher interface {
 
 	// BlockSize returns the number of pauses saved in each block.
 	BlockSize() int
+
+	// Delete deletes a pause from the buffer, or returns ErrNotInBuffer if the pause is not in
+	// the buffer.
+	Delete(ctx context.Context, index Index, pause state.Pause) error
 }
 
 // BlockReader reads blocks for a given index.
