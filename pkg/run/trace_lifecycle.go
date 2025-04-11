@@ -660,14 +660,19 @@ func (l traceLifecycle) OnStepGatewayRequestFinished(
 			attribute.Int(consts.OtelSysStepAttempt, item.Attempt),
 			attribute.Int(consts.OtelSysStepMaxAttempt, item.GetMaxAttempts()),
 			attribute.String(consts.OtelSysStepGroupID, item.GroupID),
-			attribute.Int(consts.OtelSysStepStatusCode, resp.StatusCode),
-			attribute.Int(consts.OtelSysStepOutputSizeBytes, int(resp.ContentLength)),
 			attribute.String(consts.OtelSysStepID, op.ID),
 			attribute.String(consts.OtelSysStepDisplayName, op.UserDefinedName()),
 			attribute.String(consts.OtelSysStepOpcode, op.Op.String()),
 		),
 	)
 	defer span.End()
+
+	if resp != nil {
+		span.SetAttributes(
+			attribute.Int(consts.OtelSysStepStatusCode, resp.StatusCode),
+			attribute.Int(consts.OtelSysStepOutputSizeBytes, int(resp.ContentLength)),
+		)
+	}
 
 	if item.RunInfo != nil {
 		span.SetAttributes(
