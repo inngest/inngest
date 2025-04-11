@@ -336,6 +336,13 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 
 			if !leased {
 				span.RecordError(fmt.Errorf("item is no longer leased"))
+
+				// Grace period to wait for the worker to send the response
+				select {
+				case <-waitForResponseCtx.Done():
+				case <-time.After(consts.ConnectWorkerRequestGracePeriod):
+				}
+
 				cancelLeaseCtx()
 				return
 			}

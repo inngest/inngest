@@ -140,6 +140,7 @@ const (
 	ConnectGatewayHeartbeatInterval = 5 * time.Second
 
 	ConnectWorkerRequestLeaseDuration = 20 * time.Second
+	ConnectWorkerRequestGracePeriod   = 5 * time.Second
 )
 
 var (
