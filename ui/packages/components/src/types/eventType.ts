@@ -1,13 +1,14 @@
 import type React from 'react';
 
 export type EventType = {
-  id: string;
   name: string;
   archived: boolean;
   functions: any[];
   volume: {
     totalVolume: number;
-    chart: React.ReactNode;
+    dailyVolumeSlots: {
+      startCount: number;
+    }[];
   };
 };
 

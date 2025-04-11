@@ -16,10 +16,6 @@ import (
 	"time"
 
 	"github.com/davecgh/go-spew/spew"
-	"github.com/inngest/inngest/pkg/syscode"
-	"github.com/inngest/inngest/pkg/tracing"
-	"github.com/inngest/inngest/pkg/util/gateway"
-
 	"github.com/fatih/structs"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
@@ -42,9 +38,12 @@ import (
 	"github.com/inngest/inngest/pkg/inngest/log"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/run"
+	"github.com/inngest/inngest/pkg/syscode"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
+	"github.com/inngest/inngest/pkg/tracing"
 	"github.com/inngest/inngest/pkg/util"
+	"github.com/inngest/inngest/pkg/util/gateway"
 	"github.com/oklog/ulid/v2"
 	"github.com/rs/zerolog"
 	"github.com/xhit/go-str2duration/v2"
@@ -595,11 +594,12 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	}
 
 	err := e.smv2.Create(ctx, newState)
-	if err == state.ErrIdentifierExists {
-		// This function was already created.
-		return nil, state.ErrIdentifierExists
-	}
-	if err != nil {
+	switch err {
+	case nil:
+		// no-op, continue
+	case state.ErrIdentifierExists:
+		return nil, err
+	default:
 		return nil, fmt.Errorf("error creating run state: %w", err)
 	}
 
@@ -2479,8 +2479,10 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, i *runInstance,
 	failure := err != nil || (hr != nil && hr.StatusCode > 299)
 
 	// Update the driver response appropriately for the trace lifecycles.
-	i.resp.StatusCode = hr.StatusCode
-	hr.ContentLength = int64(len(output))
+	if hr != nil {
+		i.resp.StatusCode = hr.StatusCode
+		hr.ContentLength = int64(len(output))
+	}
 
 	// Handle errors individually, here.
 	if failure {

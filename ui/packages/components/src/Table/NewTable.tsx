@@ -82,7 +82,7 @@ export default function Table<T>({
   });
 
   const tableStyles = 'w-full';
-  const tableHeadStyles = 'bg-canvasSubtle';
+  const tableHeadStyles = 'bg-canvasSubtle sticky top-0 z-10';
   const tableColumnStyles = 'px-6';
   const expandedRowSideBorder =
     'before:bg-surfaceMuted relative before:absolute before:bottom-0 before:left-0 before:top-0 before:w-0.5';
@@ -147,7 +147,7 @@ export default function Table<T>({
                 <tr
                   className={cn(
                     row.getIsExpanded() ? 'h-12' : 'border-light h-12 border-b',
-                    onRowClick ? 'hover:bg-canvasSubtle cursor-pointer' : ''
+                    onRowClick ? 'hover:bg-canvasSubtle/40 cursor-pointer' : ''
                   )}
                   onClick={() => {
                     const modalsContainer = document.getElementById('modals');

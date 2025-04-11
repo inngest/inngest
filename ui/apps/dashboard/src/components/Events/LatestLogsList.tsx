@@ -3,7 +3,6 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@inngest/components/Button';
 import { Pill } from '@inngest/components/Pill';
 import { IDCell, TimeCell } from '@inngest/components/Table/Cell';
-import { RiKey2Fill } from '@remixicon/react';
 import { useQuery } from 'urql';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
@@ -106,10 +105,7 @@ export default function LatestLogsList({ environmentSlug, eventName }: LatestLog
                         <IDCell>{e.id}</IDCell>
                       </td>
                       <td>
-                        <Pill appearance="outlined">
-                          <RiKey2Fill className="text-basis h-4 pr-1" />
-                          {e.source?.name}
-                        </Pill>
+                        <Pill appearance="outlined">{e.source?.name}</Pill>
                       </td>
                     </tr>
                   ))
