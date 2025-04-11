@@ -239,6 +239,8 @@ type websocketDisconnected struct {
 type testRecorderLifecycles struct {
 	logger *slog.Logger
 
+	lock gosync.Mutex
+
 	onConnected          []*state.Connection
 	onReady              []*state.Connection
 	onHeartbeat          []*state.Connection
@@ -259,6 +261,9 @@ type testRecorderAssertion struct {
 }
 
 func (r *testRecorderLifecycles) Assert(t *testing.T, assertion testRecorderAssertion) {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+
 	require.EventuallyWithT(t, func(t *assert.CollectT) {
 		assert.Equal(t, assertion.onConnectedCount, len(r.onConnected), "expected %d connections to be connected", assertion.onConnectedCount)
 		assert.Equal(t, assertion.onReadyCount, len(r.onReady), "expected %d connections to be ready", assertion.onReadyCount)
@@ -271,36 +276,57 @@ func (r *testRecorderLifecycles) Assert(t *testing.T, assertion testRecorderAsse
 }
 
 func (r *testRecorderLifecycles) OnConnected(ctx context.Context, conn *state.Connection) {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+
 	r.logger.Info("onConnected", "conn", conn)
 	r.onConnected = append(r.onConnected, conn)
 }
 
 func (r *testRecorderLifecycles) OnReady(ctx context.Context, conn *state.Connection) {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+
 	r.logger.Info("onReady", "conn", conn)
 	r.onReady = append(r.onReady, conn)
 }
 
 func (r *testRecorderLifecycles) OnHeartbeat(ctx context.Context, conn *state.Connection) {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+
 	r.logger.Info("onHeartbeat", "conn", conn)
 	r.onHeartbeat = append(r.onHeartbeat, conn)
 }
 
 func (r *testRecorderLifecycles) OnStartDraining(ctx context.Context, conn *state.Connection) {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+
 	r.logger.Info("onStartDraining", "conn", conn)
 	r.onStartDraining = append(r.onStartDraining, conn)
 }
 
 func (r *testRecorderLifecycles) OnStartDisconnecting(ctx context.Context, conn *state.Connection) {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+
 	r.logger.Info("onStartDisconnecting", "conn", conn)
 	r.onStartDisconnecting = append(r.onStartDisconnecting, conn)
 }
 
 func (r *testRecorderLifecycles) OnSynced(ctx context.Context, conn *state.Connection) {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+
 	r.logger.Info("onSynced", "conn", conn)
 	r.onSynced = append(r.onSynced, conn)
 }
 
 func (r *testRecorderLifecycles) OnDisconnected(ctx context.Context, conn *state.Connection, closeReason string) {
+	r.lock.Lock()
+	defer r.lock.Unlock()
+
 	r.logger.Info("onDisconnected", "conn", conn)
 	r.onDisconnected = append(r.onDisconnected, websocketDisconnected{conn, closeReason})
 }
