@@ -40,7 +40,7 @@ func (noopConnector) ReceiveRoutedRequest(ctx context.Context, gatewayId ulid.UL
 }
 
 func (noopConnector) AckMessage(ctx context.Context, requestId string, source AckSource) error {
-	logger.StdlibLogger(ctx).Error("using no-op connector to ack message", "request_id", requestId, "source", source)
+	logger.StdlibLogger(ctx).Error("using no-op connector to ack message", "req_id", requestId, "source", source)
 
 	return nil
 }

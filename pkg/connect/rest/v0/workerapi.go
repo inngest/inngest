@@ -27,7 +27,7 @@ func (a *connectApiRouter) start(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	l := logger.StdlibLogger(ctx).With("connection_id", connectionId)
+	l := logger.StdlibLogger(ctx).With("conn_id", connectionId)
 
 	hashedSigningKey := r.Header.Get("Authorization")
 	{

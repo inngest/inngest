@@ -340,7 +340,7 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 		err = i.RouteExecutorRequest(ctx, route.GatewayID, route.ConnectionID, opts.Data)
 		if err != nil {
 			span.RecordError(err)
-			span.SetStatus(codes.Error, " could not forward request to gateway")
+			span.SetStatus(codes.Error, "could not forward request to gateway")
 
 			return nil, fmt.Errorf("failed to route request to gateway: %w", err)
 		}
@@ -626,11 +626,11 @@ func (i *redisPubSubConnector) RouteExecutorRequest(ctx context.Context, gateway
 
 	err = i.client.Do(ctx, i.client.B().Publish().Channel(channelName).Message(string(dataBytes)).Build()).Error()
 	if err != nil {
-		i.logger.Error("could not forward request to gateway", "err", err, "gateway_id", gatewayId, "channel", channelName, "request_id", data.RequestId, "conn_id", connId, "app_id", data.AppId)
+		i.logger.Error("could not forward request to gateway", "err", err, "gateway_id", gatewayId, "channel", channelName, "req_id", data.RequestId, "conn_id", connId, "app_id", data.AppId)
 		return fmt.Errorf("could not publish executor request: %w", err)
 	}
 
-	i.logger.Debug("forwarded connect request to gateway", "gateway_id", gatewayId, "channel", channelName, "request_id", data.RequestId, "conn_id", connId, "app_id", data.AppId)
+	i.logger.Debug("forwarded connect request to gateway", "gateway_id", gatewayId, "channel", channelName, "req_id", data.RequestId, "conn_id", connId, "app_id", data.AppId)
 
 	return nil
 }
