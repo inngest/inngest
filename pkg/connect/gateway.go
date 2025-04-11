@@ -699,6 +699,8 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 			newLeaseID, err := c.svc.stateManager.ExtendRequestLease(ctx, c.conn.EnvID, data.RequestId, leaseID, consts.ConnectWorkerRequestLeaseDuration)
 			if err != nil {
 				if errors.Is(err, state.ErrRequestLeaseExpired) || errors.Is(err, state.ErrRequestLeased) {
+					c.log.Error("lease was claimed by other worker or expired", "err", err, "request_id", data.RequestId, "lease_id", leaseID.String())
+
 					// Respond with nack
 					nackPayload, marshalErr := proto.Marshal(&connectpb.WorkerRequestExtendLeaseAckData{
 						RequestId:    data.RequestId,
