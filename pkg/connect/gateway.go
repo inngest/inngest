@@ -184,6 +184,10 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 					return
 				}
 
+				if errors.Is(err, context.DeadlineExceeded) {
+					return
+				}
+
 				if isConnectionClosedErr(err) {
 					return
 				}
