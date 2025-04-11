@@ -323,7 +323,9 @@ func (h *connectHandler) handleConnection(ctx context.Context, data connectionEs
 				h.logger.Error("timed out waiting for new connection to be established")
 			}
 
-			// By returning, we will close the old connection
+			// Send a proper close frame
+			_ = preparedConn.ws.Close(websocket.StatusNormalClosure, connectproto.WorkerDisconnectReason_WORKER_SHUTDOWN.String())
+
 			return errGatewayDraining
 		}
 
