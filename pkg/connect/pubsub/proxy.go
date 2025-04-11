@@ -151,6 +151,32 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 		attribute.String("request_id", opts.Data.RequestId),
 	)
 
+	{
+		// Check if previous request finished. Even if the lease is expired, it's possible for the worker
+		// to have already sent a response and completed the request.
+		resp, err := i.stateManager.GetResponse(ctx, opts.EnvID, opts.Data.RequestId)
+		if err != nil {
+			span.RecordError(err)
+			l.Error("could not check for buffered response", "err", err)
+			return nil, fmt.Errorf("could not check for buffered response: %w", err)
+		}
+
+		if resp != nil {
+			// We have a response already, return it
+			l.Debug("found buffered response")
+
+			// The response has a short TTL so it will be cleaned up, but we should try
+			// to garbage-collect unused state as quickly as possible
+			err := i.stateManager.DeleteResponse(ctx, opts.EnvID, opts.Data.RequestId)
+			if err != nil {
+				span.RecordError(err)
+				l.Error("could not delete buffered response", "err", err)
+			}
+
+			return resp, nil
+		}
+	}
+
 	// Include trace context
 	{
 		// Add `traceparent` and `tracestate` headers to the request from `traceCtx`
