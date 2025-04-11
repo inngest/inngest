@@ -456,7 +456,7 @@ func checkSavePause(t *testing.T, m state.Manager) {
 
 	// Save a pause.
 	pause := state.Pause{
-		ID: uuid.New(),
+		ID: pauseID(t),
 		Identifier: state.PauseIdentifier{
 			RunID:      s.Identifier().RunID,
 			FunctionID: s.Identifier().WorkflowID,
@@ -473,6 +473,12 @@ func checkSavePause(t *testing.T, m state.Manager) {
 	// XXX: Saving a pause with a past expiry is a noop.
 }
 
+func pauseID(t *testing.T) uuid.UUID {
+	id, err := uuid.NewV7()
+	require.NoError(t, err)
+	return id
+}
+
 func checkLeasePause(t *testing.T, m state.Manager) {
 	ctx := context.Background()
 	s := setup(t, m)
@@ -483,7 +489,7 @@ func checkLeasePause(t *testing.T, m state.Manager) {
 
 	// Save a pause.
 	pause := state.Pause{
-		ID: uuid.New(),
+		ID: pauseID(t),
 		Identifier: state.PauseIdentifier{
 			RunID:      s.Identifier().RunID,
 			FunctionID: s.Identifier().WorkflowID,
@@ -547,7 +553,7 @@ func checkLeasePause(t *testing.T, m state.Manager) {
 	//
 
 	pause = state.Pause{
-		ID: uuid.New(),
+		ID: pauseID(t),
 		Identifier: state.PauseIdentifier{
 			RunID:      s.Identifier().RunID,
 			FunctionID: s.Identifier().WorkflowID,
@@ -631,7 +637,7 @@ func checkConsumePause(t *testing.T, m state.Manager) {
 
 	// Save a pause.
 	pause := state.Pause{
-		ID: uuid.New(),
+		ID: pauseID(t),
 		Identifier: state.PauseIdentifier{
 			RunID:      s.Identifier().RunID,
 			FunctionID: s.Identifier().WorkflowID,
@@ -665,7 +671,7 @@ func checkConsumePause(t *testing.T, m state.Manager) {
 	// Assert that completing a leased pause fails.
 	//
 	pause = state.Pause{
-		ID: uuid.New(),
+		ID: pauseID(t),
 		Identifier: state.PauseIdentifier{
 			RunID:      s.Identifier().RunID,
 			FunctionID: s.Identifier().WorkflowID,
@@ -695,7 +701,7 @@ func checkConsumePauseWithData(t *testing.T, m state.Manager) {
 
 	// Save a pause.
 	pause := state.Pause{
-		ID: uuid.New(),
+		ID: pauseID(t),
 		Identifier: state.PauseIdentifier{
 			RunID:      s.Identifier().RunID,
 			FunctionID: s.Identifier().WorkflowID,
@@ -721,7 +727,7 @@ func checkConsumePauseWithData(t *testing.T, m state.Manager) {
 	// Assert that completing a leased pause fails.
 	//
 	pause = state.Pause{
-		ID: uuid.New(),
+		ID: pauseID(t),
 		Identifier: state.PauseIdentifier{
 			RunID:      s.Identifier().RunID,
 			FunctionID: s.Identifier().WorkflowID,
@@ -752,7 +758,7 @@ func checkConsumePauseWithDataIndex(t *testing.T, m state.Manager) {
 
 		// Save a pause.
 		pause := state.Pause{
-			ID: uuid.New(),
+			ID: pauseID(t),
 			Identifier: state.PauseIdentifier{
 				RunID:      s.Identifier().RunID,
 				FunctionID: s.Identifier().WorkflowID,
@@ -834,7 +840,7 @@ func checkConsumePauseWithEmptyData(t *testing.T, m state.Manager) {
 
 	// Save a pause.
 	pause := state.Pause{
-		ID: uuid.New(),
+		ID: pauseID(t),
 		Identifier: state.PauseIdentifier{
 			RunID:      s.Identifier().RunID,
 			FunctionID: s.Identifier().WorkflowID,
@@ -860,7 +866,7 @@ func checkConsumePauseWithEmptyData(t *testing.T, m state.Manager) {
 	// Assert that completing a leased pause fails.
 	//
 	pause = state.Pause{
-		ID: uuid.New(),
+		ID: pauseID(t),
 		Identifier: state.PauseIdentifier{
 			RunID:      s.Identifier().RunID,
 			FunctionID: s.Identifier().WorkflowID,
@@ -896,7 +902,7 @@ func checkConsumePauseWithEmptyDataKey(t *testing.T, m state.Manager) {
 
 	// Save a pause.
 	pause := state.Pause{
-		ID: uuid.New(),
+		ID: pauseID(t),
 		Identifier: state.PauseIdentifier{
 			RunID:      s.Identifier().RunID,
 			FunctionID: s.Identifier().WorkflowID,
@@ -921,7 +927,7 @@ func checkConsumePauseWithEmptyDataKey(t *testing.T, m state.Manager) {
 	// Assert that completing a leased pause fails.
 	//
 	pause = state.Pause{
-		ID: uuid.New(),
+		ID: pauseID(t),
 		Identifier: state.PauseIdentifier{
 			RunID:      s.Identifier().RunID,
 			FunctionID: s.Identifier().WorkflowID,
@@ -1062,7 +1068,7 @@ func checkPausesByEvent_multi(t *testing.T, m state.Manager) {
 
 	// Save an unrelated pause to another event.
 	unused := state.Pause{
-		ID: uuid.New(),
+		ID: pauseID(t),
 		Identifier: state.PauseIdentifier{
 			RunID:      s.Identifier().RunID,
 			FunctionID: s.Identifier().WorkflowID,
@@ -1383,7 +1389,7 @@ func checkPauseByID(t *testing.T, m state.Manager) {
 
 	// Save a pause.
 	pause := state.Pause{
-		ID: uuid.New(),
+		ID: pauseID(t),
 		Identifier: state.PauseIdentifier{
 			RunID:      s.Identifier().RunID,
 			FunctionID: s.Identifier().WorkflowID,
@@ -1428,7 +1434,7 @@ func checkPausesByID(t *testing.T, m state.Manager) {
 
 	// Save a pause.
 	a := state.Pause{
-		ID: uuid.New(),
+		ID: pauseID(t),
 		Identifier: state.PauseIdentifier{
 			RunID:      s.Identifier().RunID,
 			FunctionID: s.Identifier().WorkflowID,
@@ -1439,7 +1445,7 @@ func checkPausesByID(t *testing.T, m state.Manager) {
 		Expires:  state.Time(time.Now().Add(time.Second * 2).Truncate(time.Millisecond).UTC()),
 	}
 	b := state.Pause{
-		ID: uuid.New(),
+		ID: pauseID(t),
 		Identifier: state.PauseIdentifier{
 			RunID:      s.Identifier().RunID,
 			FunctionID: s.Identifier().WorkflowID,
