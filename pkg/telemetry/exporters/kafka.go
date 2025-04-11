@@ -74,6 +74,7 @@ func WithKafkaExporterMaxProduceMB(size int) KafkaSpansExporterOpts {
 func NewKafkaSpanExporter(ctx context.Context, opts ...KafkaSpansExporterOpts) (trace.SpanExporter, error) {
 	conf := &kafkaSpansExporterOpts{
 		maxProduceMB: defaultMaxProduceMB,
+		key:          defaultMsgKey,
 	}
 
 	for _, apply := range opts {
@@ -86,10 +87,6 @@ func NewKafkaSpanExporter(ctx context.Context, opts ...KafkaSpansExporterOpts) (
 
 	if conf.topic == "" {
 		return nil, fmt.Errorf("no topic provided for span exporter")
-	}
-
-	if conf.key != "" {
-		conf.key = defaultMsgKey
 	}
 
 	kclopts := []kgo.Opt{
