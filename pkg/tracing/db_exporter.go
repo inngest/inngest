@@ -7,6 +7,7 @@ import (
 
 	"github.com/davecgh/go-spew/spew"
 	sqlc "github.com/inngest/inngest/pkg/cqrs/base_cqrs/sqlc/sqlite"
+	"github.com/inngest/inngest/pkg/tracing/meta"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
 
@@ -20,16 +21,10 @@ func (e *DBExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlyS
 		spanID := span.SpanContext().SpanID().String()
 		parentID := span.Parent().SpanID().String()
 		var runID string
-		isDynamicDuration := false
 
 		for _, attr := range span.Attributes() {
-			if string(attr.Key) == AttributeRunID {
+			if string(attr.Key) == meta.AttributeRunID {
 				runID = attr.Value.AsString()
-				continue
-			}
-
-			if string(attr.Key) == AttributeDynamicDuration {
-				isDynamicDuration = attr.Value.AsBool()
 				continue
 			}
 		}
@@ -46,12 +41,6 @@ func (e *DBExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlyS
 		}
 
 		endTime := sql.NullTime{Time: span.EndTime(), Valid: true}
-		if isDynamicDuration {
-			// If the span is dynamic, we set the end time to null.
-			// This is because the span will be updated later with the actual
-			// end time.
-			endTime = sql.NullTime{Valid: false}
-		}
 
 		err = e.q.InsertSpan(ctx, sqlc.InsertSpanParams{
 			SpanID:          spanID,

@@ -12,6 +12,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state"
 	statev1 "github.com/inngest/inngest/pkg/execution/state"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
+	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/oklog/ulid/v2"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -309,15 +310,15 @@ func (c *Config) FunctionTrace() *itrace.TraceCarrier {
 	return nil
 }
 
-func (c *Config) NewSetFunctionTrace(carrier map[string]string) {
+func (c *Config) NewSetFunctionTrace(carrier *meta.SpanMetadata) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	c.initContext()
-	c.Context["wobbly"] = carrier
+	c.Context["wobbly"] = *carrier
 }
 
-func (c *Config) NewFunctionTrace() map[string]string {
+func (c *Config) NewFunctionTrace() *meta.SpanMetadata {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
@@ -325,28 +326,15 @@ func (c *Config) NewFunctionTrace() map[string]string {
 		return nil
 	}
 
-	if data, ok := c.Context["wobbly"]; ok {
-		switch v := data.(type) {
-		case map[string]string:
-			return v
-		case map[string]any:
-			carrier := map[string]string{}
-			for k, val := range v {
-				if str, ok := val.(string); ok {
-					carrier[k] = str
-				}
-			}
-			c.Context["wobbly"] = carrier
-			return carrier
-		case []byte:
-			carrier := map[string]string{}
-			if err := json.Unmarshal(v, &carrier); err == nil {
-				c.Context["wobbly"] = carrier
-				return carrier
+	if raw, ok := c.Context["wobbly"]; ok {
+		if data, err := json.Marshal(raw); err == nil {
+			var meta meta.SpanMetadata
+			if err := json.Unmarshal(data, &meta); err == nil {
+				return &meta
 			}
 		}
-
 	}
+
 	return nil
 }
 

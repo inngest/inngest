@@ -15,7 +15,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/fatih/structs"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
@@ -42,6 +41,7 @@ import (
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/inngest/inngest/pkg/tracing"
+	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/inngest/inngest/pkg/util/gateway"
 	"github.com/oklog/ulid/v2"
@@ -497,12 +497,21 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	}
 
 	// Always the root span.
-	_, tracer := e.tracerProvider.NewTracer(ctx, metadata, nil)
-	spanCtx, span := tracer.Tracer().Start(ctx, tracing.SpanNameRun, trace.WithNewRoot(), trace.WithAttributes(attribute.String(tracing.AttributeInternalLocation, "Schedule")))
-	configCtx := map[string]string{}
-	e.tracerProvider.Inject(spanCtx, propagation.MapCarrier(configCtx))
-	config.NewSetFunctionTrace(configCtx)
-	span.End()
+	// _, tracer := e.tracerProvider.NewTracer(ctx, metadata, nil)
+	// spanCtx, span := tracer.Tracer().Start(ctx, tracing.SpanNameRun, trace.WithNewRoot(), trace.WithAttributes(attribute.String(tracing.AttributeInternalLocation, "Schedule")))
+	// configCtx := map[string]string{}
+	// e.tracerProvider.Inject(spanCtx, propagation.MapCarrier(configCtx))
+	// config.NewSetFunctionTrace(configCtx)
+	// span.End()
+	config.NewSetFunctionTrace(
+		e.tracerProvider.CreateSpan(
+			meta.SpanNameRun,
+			&tracing.CreateSpanOptions{
+				Location: "executor.Schedule",
+				Metadata: &metadata,
+			},
+		),
+	)
 
 	// If this is paused, immediately end just before creating state.
 	isPaused := req.FunctionPausedAt != nil && req.FunctionPausedAt.Before(time.Now())
@@ -738,7 +747,6 @@ type runInstance struct {
 	resp       *state.DriverResponse
 	httpClient *http.Client
 	stackIndex int
-	tracer     trace.Tracer
 }
 
 // Execute loads a workflow and the current run state, then executes the
@@ -767,8 +775,16 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	// for the outgoing edge ID.  This ensures that we properly increase the stack
 	// for `tools.sleep` within generator functions.
 	if item.Kind == queue.KindSleep && item.Attempt == 0 {
-		tCtx, _ := e.tracerProvider.NewTracer(ctx, md, &item)
-		e.tracerProvider.UpdateSpanEnd(tCtx, time.Now(), []attribute.KeyValue{})
+		// tCtx, _ := e.tracerProvider.NewTracer(ctx, md, &item)
+		// e.tracerProvider.UpdateSpanEnd(tCtx, time.Now(),
+		// []attribute.KeyValue{})
+		e.tracerProvider.ExtendSpan(&tracing.ExtendSpanOptions{
+			Location:   "executor.Execute",
+			Metadata:   &md,
+			QueueItem:  &item,
+			TargetSpan: tracing.SpanFromQueueItem(&item),
+			EndTime:    time.Now(),
+		})
 
 		hasPendingSteps, err := e.smv2.SaveStep(ctx, sv2.ID{
 			RunID:      id.RunID,
@@ -901,9 +917,6 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		}
 	}
 
-	spew.Dump("execute and so creating first step")
-	tCtx, tp := e.tracerProvider.NewTracer(ctx, md, &item)
-	spew.Dump(trace.SpanFromContext(tCtx))
 	instance := runInstance{
 		md:         md,
 		f:          *ef.Function,
@@ -912,22 +925,49 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		edge:       edge,
 		stackIndex: stackIndex,
 		httpClient: httpdriver.DefaultClient,
-		tracer:     tp.Tracer(),
 	}
 
 	// If first attempt, this is the creation of a step, and then an attempt.
 	// Otherwise it's just an attempt.
+	var execParent *meta.SpanMetadata
 	if isFirstExecution {
-		var stepSpan trace.Span
-		tCtx, stepSpan = instance.tracer.Start(tCtx, tracing.SpanNameStep, trace.WithAttributes(attribute.String(tracing.AttributeInternalLocation, "Execute - initial request")))
-		stepSpan.End()
+		execParent = e.tracerProvider.CreateSpan(
+			meta.SpanNameStep,
+			&tracing.CreateSpanOptions{
+				Location:  "executor.Execute",
+				Parent:    tracing.RunSpanFromMetadata(&md),
+				Metadata:  &md,
+				QueueItem: &item,
+			},
+		)
+	} else {
+		execParent = tracing.SpanFromQueueItem(&item)
 	}
 
-	// If it's an attempt, it should now be correctly under the step span.
-	tCtx, executionSpan := instance.tracer.Start(tCtx, tracing.SpanNameExecution, trace.WithAttributes(attribute.String(tracing.AttributeInternalLocation, "Execute")))
+	execMetadata := e.tracerProvider.CreateSpan(
+		meta.SpanNameExecution,
+		&tracing.CreateSpanOptions{
+			Location:  "executor.Execute",
+			Parent:    execParent,
+			Metadata:  &md,
+			QueueItem: &item,
+		},
+	)
+
 	resp, err := e.run(ctx, &instance)
-	tracing.ApplyResponseToSpan(executionSpan, resp)
-	executionSpan.End()
+
+	e.tracerProvider.ExtendSpan(
+		&tracing.ExtendSpanOptions{
+			Location:   "executor.Execute",
+			TargetSpan: execMetadata,
+			Metadata:   &md,
+			QueueItem:  &item,
+			EndTime:    time.Now(),
+			SpanOptions: []trace.SpanStartOption{
+				tracing.WithDriverResponseAttrs(resp),
+			},
+		},
+	)
 
 	// TODO: find a way to remove this
 	// set function trace context so downstream execution have the function
@@ -947,7 +987,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		return nil, err
 	}
 
-	if handleErr := e.HandleResponse(tCtx, &instance); handleErr != nil {
+	if handleErr := e.HandleResponse(ctx, &instance); handleErr != nil {
 		return resp, handleErr
 	}
 	return resp, err
@@ -2057,17 +2097,29 @@ func (e *executor) handleGeneratorStep(ctx context.Context, i *runInstance, gen 
 		Attempt:               0,
 		MaxAttempts:           i.item.MaxAttempts,
 		Payload:               queue.PayloadEdge{Edge: nextEdge},
+		Metadata:              make(map[string]string),
 	}
 
 	if !hasPendingSteps {
-		metadata := map[string]string{}
-		ctx, tp := e.tracerProvider.NewTracer(ctx, i.md, nil)
-		ctx, span := tp.Tracer().Start(ctx, tracing.SpanNameStep, trace.WithAttributes(attribute.String(tracing.AttributeInternalLocation, "handleGeneratorStep")))
-		e.tracerProvider.Inject(ctx, metadata)
-		metadataByte, _ := json.Marshal(metadata)
-		nextItem.Metadata = map[string]string{
-			"wobbly": string(metadataByte),
-		}
+		// metadata := map[string]string{}
+		// ctx, tp := e.tracerProvider.NewTracer(ctx, i.md, nil)
+		// ctx, span := tp.Tracer().Start(ctx, tracing.SpanNameStep, trace.WithAttributes(attribute.String(tracing.AttributeInternalLocation, "handleGeneratorStep")))
+		// e.tracerProvider.Inject(ctx, metadata)
+		// metadataByte, _ := json.Marshal(metadata)
+		// nextItem.Metadata = map[string]string{
+		// 	"wobbly": string(metadataByte),
+		// }
+
+		span, _ := e.tracerProvider.CreateDroppableSpan(
+			meta.SpanNameStep,
+			&tracing.CreateSpanOptions{
+				Carrier:   nextItem.Metadata,
+				Location:  "executor.handleGeneratorStep",
+				Metadata:  &i.md,
+				QueueItem: &nextItem,
+				Parent:    tracing.SpanFromQueueItem(&i.item),
+			},
+		)
 
 		err = e.queue.Enqueue(ctx, nextItem, now, queue.EnqueueOpts{})
 		if err == redis_state.ErrQueueItemExists {
@@ -2191,17 +2243,29 @@ func (e *executor) handleStepError(ctx context.Context, i *runInstance, gen stat
 		Attempt:               0,
 		MaxAttempts:           i.item.MaxAttempts,
 		Payload:               queue.PayloadEdge{Edge: nextEdge},
+		Metadata:              make(map[string]string),
 	}
 
 	if !hasPendingSteps {
-		metadata := map[string]string{}
-		ctx, tp := e.tracerProvider.NewTracer(ctx, i.md, nil)
-		ctx, span := tp.Tracer().Start(ctx, tracing.SpanNameStep, trace.WithAttributes(attribute.String(tracing.AttributeInternalLocation, "handleStepError")))
-		e.tracerProvider.Inject(ctx, metadata)
-		metadataByte, _ := json.Marshal(metadata)
-		nextItem.Metadata = map[string]string{
-			"wobbly": string(metadataByte),
-		}
+		// metadata := map[string]string{}
+		// ctx, tp := e.tracerProvider.NewTracer(ctx, i.md, nil)
+		// ctx, span := tp.Tracer().Start(ctx, tracing.SpanNameStep, trace.WithAttributes(attribute.String(tracing.AttributeInternalLocation, "handleStepError")))
+		// e.tracerProvider.Inject(ctx, metadata)
+		// metadataByte, _ := json.Marshal(metadata)
+		// nextItem.Metadata = map[string]string{
+		// 	"wobbly": string(metadataByte),
+		// }
+
+		span, _ := e.tracerProvider.CreateDroppableSpan(
+			meta.SpanNameStep,
+			&tracing.CreateSpanOptions{
+				Carrier:   nextItem.Metadata,
+				Location:  "executor.handleStepError",
+				Metadata:  &i.md,
+				QueueItem: &nextItem,
+				Parent:    tracing.SpanFromQueueItem(&i.item),
+			},
+		)
 
 		err = e.queue.Enqueue(ctx, nextItem, now, queue.EnqueueOpts{})
 		if err == redis_state.ErrQueueItemExists {
@@ -2258,16 +2322,39 @@ func (e *executor) handleGeneratorStepPlanned(ctx context.Context, i *runInstanc
 		Payload: queue.PayloadEdge{
 			Edge: nextEdge,
 		},
+		Metadata: make(map[string]string),
 	}
 
-	metadata := map[string]string{}
-	ctx, tp := e.tracerProvider.NewTracer(ctx, i.md, nil)
-	ctx, span := tp.Tracer().Start(ctx, tracing.SpanNameStep, tracing.WithGeneratorAttrs(gen), trace.WithAttributes(attribute.String(tracing.AttributeInternalLocation, "handleGeneratorStepPlanned")))
-	e.tracerProvider.Inject(ctx, metadata)
-	metadataByte, _ := json.Marshal(metadata)
-	nextItem.Metadata = map[string]string{
-		"wobbly": string(metadataByte),
-	}
+	// metadata := map[string]string{}
+	// ctx, tp := e.tracerProvider.NewTracer(ctx, i.md, nil)
+	// ctx, span := tp.Tracer().Start(
+	// 	ctx,
+	// 	tracing.SpanNameStep,
+	// 	tracing.WithGeneratorAttrs(&gen),
+	// 	tracing.WithQueueItemAttrs(&nextItem),
+	// 	trace.WithAttributes(
+	// 		attribute.String(tracing.AttributeInternalLocation, "handleGeneratorStepPlanned"),
+	// 	),
+	// )
+	// e.tracerProvider.Inject(ctx, metadata)
+	// metadataByte, _ := json.Marshal(metadata)
+	// nextItem.Metadata = map[string]string{
+	// 	"wobbly": string(metadataByte),
+	// }
+
+	span, _ := e.tracerProvider.CreateDroppableSpan(
+		meta.SpanNameStep,
+		&tracing.CreateSpanOptions{
+			Carrier:   nextItem.Metadata,
+			Location:  "executor.handleGeneratorStepPlanned",
+			Metadata:  &i.md,
+			QueueItem: &nextItem,
+			Parent:    tracing.SpanFromQueueItem(&i.item),
+			SpanOptions: []trace.SpanStartOption{
+				tracing.WithGeneratorAttrs(&gen),
+			},
+		},
+	)
 
 	err := e.queue.Enqueue(ctx, nextItem, now, queue.EnqueueOpts{})
 	if err == redis_state.ErrQueueItemExists {
@@ -2321,14 +2408,36 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, i *runInstance, gen
 		Payload:               queue.PayloadEdge{Edge: nextEdge},
 	}
 
-	metadata := map[string]string{}
-	ctx, tp := e.tracerProvider.NewTracer(ctx, i.md, nil)
-	ctx, span := tp.Tracer().Start(ctx, tracing.SpanNameStep, tracing.WithGeneratorAttrs(gen), trace.WithAttributes(attribute.String(tracing.AttributeInternalLocation, "handleGeneratorSleep")))
-	e.tracerProvider.Inject(ctx, metadata)
-	metadataByte, _ := json.Marshal(metadata)
-	nextItem.Metadata = map[string]string{
-		"wobbly": string(metadataByte),
-	}
+	// metadata := map[string]string{}
+	// ctx, tp := e.tracerProvider.NewTracer(ctx, i.md, nil)
+	// ctx, span := tp.Tracer().Start(
+	// 	ctx,
+	// 	tracing.SpanNameStep,
+	// 	tracing.WithGeneratorAttrs(&gen),
+	// 	tracing.WithQueueItemAttrs(&nextItem),
+	// 	trace.WithAttributes(
+	// 		attribute.String(tracing.AttributeInternalLocation, "handleGeneratorSleep"),
+	// 	),
+	// )
+	// e.tracerProvider.Inject(ctx, metadata)
+	// metadataByte, _ := json.Marshal(metadata)
+	// nextItem.Metadata = map[string]string{
+	// 	"wobbly": string(metadataByte),
+	// }
+
+	span, _ := e.tracerProvider.CreateDroppableSpan(
+		meta.SpanNameStep,
+		&tracing.CreateSpanOptions{
+			Carrier:   nextItem.Metadata,
+			Location:  "executor.handleGeneratorSleep",
+			Metadata:  &i.md,
+			QueueItem: &nextItem,
+			Parent:    tracing.SpanFromQueueItem(&i.item),
+			SpanOptions: []trace.SpanStartOption{
+				tracing.WithGeneratorAttrs(&gen),
+			},
+		},
+	)
 
 	// TODO Should this also include a parent step span? It will never have attempts.
 	err = e.queue.Enqueue(ctx, nextItem, until, queue.EnqueueOpts{})
