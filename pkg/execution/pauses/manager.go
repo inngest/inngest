@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/execution/state"
 )
 
@@ -23,6 +24,33 @@ type manager struct {
 	buf        Bufferer
 	flusher    BlockFlusher
 	flushDelay time.Duration
+}
+
+func (m manager) ConsumePause(ctx context.Context, id uuid.UUID, data any) (state.ConsumePauseResult, error) {
+	// NOTE: There is a race condition when flushing blocks:  we may copy a pause
+	// into a block, then while writing the block to disk delete/consume a pause
+	// that is being written.  Unfortunately, in this case the metadata for a block
+	// isn't yet in the index. EG:
+	//
+	// 1. We read the buffer and add to a block
+	// 2. And while uploading the block
+	// 3. Kn parallel, we may delete one of the buffer’s pauses
+	//
+	// Unfortunately, we only write the block to indexes after uploads complete.
+	// This means that a pause may exist in a block but have been consumed.
+	//
+	// This is fine technically speaking:  consuming pauses is idempotent and leases
+	// each pause.
+	//
+	// However, in order to eventually compact we need to handle the “pause not found”
+	// case when consuming, and always re-delete the pause.  that’s no big deal, but
+	// not the best.
+	//
+	// In the future, we could add two block indexes:  pending, and stored.  this is a
+	// pain, though, because we may die when uploading pending blocks, and that requires
+	// a bit of thought to work around, so we’ll just go with double deletes for now,
+	// assuming this won’t happen a ton.  this can eb optimized later
+	return state.ConsumePauseResult{}, fmt.Errorf("not implemented")
 }
 
 // Write writes one or more pauses to the backing store.  Note that the index
@@ -75,43 +103,4 @@ func (m manager) FlushIndexBlock(ctx context.Context, index Index) error {
 	// flushDelay is the amount of clock skew we mitigate.
 	time.Sleep(m.flushDelay)
 	return m.flusher.FlushIndexBlock(ctx, index)
-}
-
-// redisAdapter transforms a state.Manager into a state.Buffer, changing the interfaces slightly
-// according to this package.
-type redisAdapter struct {
-	// rsm represents the redis state manager in redis_state.
-	rsm state.Manager
-}
-
-// Write writes one or more pauses to the backing store.  Note that the index
-// for each pause must be the same.
-//
-// This returns the total number of pauses in the buffer.
-func (r redisAdapter) Write(ctx context.Context, index Index, pauses ...*state.Pause) (int, error) {
-	var total int
-	for _, p := range pauses {
-		n, err := r.rsm.SavePause(ctx, *p)
-		if err != nil {
-			return 0, err
-		}
-		total = int(n)
-
-	}
-	return total, nil
-}
-
-// PausesSince loads pauses in the bfufer for a given index, since a given time.
-// If the time is ZeroTime, this must return all indexes in the buffer.
-//
-// Note that this does not return blocks, as this only reads from the backing redis index.
-func (r redisAdapter) PausesSince(ctx context.Context, index Index, since time.Time) (state.PauseIterator, error) {
-	return r.rsm.PausesByEventSince(ctx, index.WorkspaceID, index.EventName, since)
-}
-
-// Delete deletes a pause from the buffer, or returns ErrNotInBuffer if the pause is not in
-// the buffer.
-func (r redisAdapter) Delete(ctx context.Context, index Index, pause state.Pause) error {
-	// TODO: Check if pause is in buffer;  if not, return ErrNotInBuffer.
-	return r.rsm.DeletePause(ctx, pause)
 }
