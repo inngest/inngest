@@ -43,10 +43,6 @@ func isConnectionClosedErr(err error) bool {
 		return false
 	}
 
-	if errors.Is(err, context.DeadlineExceeded) {
-		return true
-	}
-
 	if errors.Is(err, net.ErrClosed) || errors.Is(err, io.EOF) {
 		return true
 	}
@@ -59,6 +55,10 @@ func (c *connectGatewaySvc) closeWithConnectError(ws *websocket.Conn, serr *conn
 	// reason must be limited to 125 bytes and should not be dynamic,
 	// so we restrict it to the known syscodes to prevent unintentional overflows
 	err := ws.Close(serr.StatusCode, serr.SysCode)
+	if errors.Is(err, context.DeadlineExceeded) {
+		return
+	}
+
 	if isConnectionClosedErr(err) {
 		c.logger.Error("could not close WebSocket connection", "err", err, "serr", serr)
 	}
