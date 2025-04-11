@@ -3,18 +3,17 @@
 import { useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@inngest/components/Button/Button';
-import { EventTypesTable } from '@inngest/components/EventTypes/EventTypesTable';
+import { EventsTable } from '@inngest/components/Events/EventsTable';
 import { Header } from '@inngest/components/Header/Header';
 import { RefreshButton } from '@inngest/components/Refresh/RefreshButton';
 import { RiExternalLinkLine, RiRefreshLine } from '@remixicon/react';
 
-import { ActionsMenu } from '@/components/EventTypes/ActionsMenu';
-import { EventTypesInfo } from '@/components/EventTypes/EventTypesInfo';
-import { useEventTypes, useEventTypesVolume } from '@/components/EventTypes/useEventTypes';
+import { EventInfo } from '@/components/Events/EventInfo';
 import SendEventButton from '@/components/Events/SendEventButton';
+import { useEvents } from '@/components/Events/useEvents';
 import { pathCreator } from '@/utils/urls';
 
-export default function EventTypesPage({
+export default function EventsPage({
   params: { environmentSlug: envSlug },
 }: {
   params: { environmentSlug: string };
@@ -30,14 +29,13 @@ export default function EventTypesPage({
         pathCreator.eventType({ envSlug: envSlug, eventName: params.eventName }),
     };
   }, [envSlug]);
-  const getEventTypes = useEventTypes();
-  const getEventTypesVolume = useEventTypesVolume();
+  const getEvents = useEvents();
 
   return (
     <>
       <Header
-        breadcrumb={[{ text: 'Event Types' }]}
-        infoIcon={<EventTypesInfo />}
+        breadcrumb={[{ text: 'Events' }]}
+        infoIcon={<EventInfo />}
         action={
           <div className="flex items-center gap-1.5">
             <RefreshButton />
@@ -45,11 +43,9 @@ export default function EventTypesPage({
           </div>
         }
       />
-      <EventTypesTable
+      <EventsTable
         pathCreator={internalPathCreator}
-        getEventTypes={getEventTypes}
-        getEventTypesVolume={getEventTypesVolume}
-        eventTypeActions={(props) => <ActionsMenu {...props} />}
+        getEvents={getEvents}
         emptyActions={
           <>
             <Button
