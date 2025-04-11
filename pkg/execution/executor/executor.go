@@ -600,7 +600,10 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	//
 	if req.BatchID == nil {
 		for _, c := range req.Function.Cancel {
-			pauseID := uuid.New()
+			pauseID, err := uuid.NewV7()
+			if err != nil {
+				return &metadata, fmt.Errorf("error generating pause ID: %w", err)
+			}
 			expires := time.Now().Add(consts.CancelTimeout)
 			if c.Timeout != nil {
 				dur, err := str2duration.ParseDuration(*c.Timeout)
@@ -2562,7 +2565,11 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, i *runInst
 		return execError{err: fmt.Errorf("failed to create expression to wait for invoked function completion: %w", err)}
 	}
 
-	pauseID := inngest.DeterministicSha1UUID(i.md.ID.RunID.String() + gen.ID)
+	pauseID, err := inngest.DeterministicUUIDV7(i.md.ID.RunID.String() + gen.ID)
+	if err != nil {
+		return fmt.Errorf("failed to generate deterministic pause ID: %w", err)
+	}
+
 	opcode := gen.Op.String()
 	now := time.Now()
 
@@ -2675,7 +2682,10 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, i *runInstan
 		return fmt.Errorf("unable to parse wait for event expires: %w", err)
 	}
 
-	pauseID := inngest.DeterministicSha1UUID(i.md.ID.RunID.String() + gen.ID)
+	pauseID, err := inngest.DeterministicUUIDV7(i.md.ID.RunID.String() + gen.ID)
+	if err != nil {
+		return fmt.Errorf("could not generate deterministic pause ID: %w", err)
+	}
 
 	expr := opts.If
 	if expr != nil && strings.Contains(*expr, "event.") {
