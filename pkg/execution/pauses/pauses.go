@@ -29,7 +29,12 @@ type Manager interface {
 	// of this package you need to only write and read pauses since a given date.
 	Bufferer
 
-	// TODO: Delete and consumes.
+	// ConsumePause consumes a pause.  This must be idempotent and first-write-wins:
+	// only one request to consume a pause can succeed, which requires locking pauses.
+	//
+	// Note that this may return state.ErrPauseNotFound if the current pause ID has already
+	// been consumed by another parallel process or because of a race condition.
+	ConsumePause(ctx context.Context, id uuid.UUID, data any) (state.ConsumePauseResult, error)
 }
 
 // Bufferer represents a datastore which accepts all writes for pauses.
