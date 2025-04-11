@@ -64,7 +64,12 @@ func (g GeneratorOpcode) UserDefinedName() string {
 	// SDK versions < 3.?.? don't respond with the display
 	// name, so we we'll use the deprecated name field as a
 	// fallback.
-	return g.Name
+	if g.Name != "" {
+		return g.Name
+	}
+
+	// If all is lost, just show the ID
+	return g.ID
 }
 
 // HasAI checks if this op is related to AI.
