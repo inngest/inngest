@@ -261,10 +261,10 @@ type testRecorderAssertion struct {
 }
 
 func (r *testRecorderLifecycles) Assert(t *testing.T, assertion testRecorderAssertion) {
-	r.lock.Lock()
-	defer r.lock.Unlock()
-
 	require.EventuallyWithT(t, func(t *assert.CollectT) {
+		r.lock.Lock()
+		defer r.lock.Unlock()
+
 		assert.Equal(t, assertion.onConnectedCount, len(r.onConnected), "expected %d connections to be connected", assertion.onConnectedCount)
 		assert.Equal(t, assertion.onReadyCount, len(r.onReady), "expected %d connections to be ready", assertion.onReadyCount)
 		assert.Equal(t, assertion.onHeartbeatCount, len(r.onHeartbeat), "expected %d connections to be heartbeat", assertion.onHeartbeatCount)
