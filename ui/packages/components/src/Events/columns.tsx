@@ -1,8 +1,10 @@
-import { HorizontalPillList, Pill, PillContent } from '@inngest/components/Pill';
+import { HorizontalPillList, Pill } from '@inngest/components/Pill';
 import { TextCell, TimeCell } from '@inngest/components/Table';
 import { type Event } from '@inngest/components/types/event';
+import { cn } from '@inngest/components/utils/classNames';
 import { createColumnHelper } from '@tanstack/react-table';
 
+import { StatusDot } from '../Status/StatusDot';
 import type { EventsTable } from './EventsTable';
 
 const columnHelper = createColumnHelper<Omit<Event, 'payload'>>();
@@ -60,7 +62,17 @@ export function useColumns({
                 href={pathCreator.function({ functionSlug: function_.slug })}
                 key={function_.name}
               >
-                <PillContent type="FUNCTION">{function_.name}</PillContent>
+                <span className="flex items-center gap-1">
+                  <StatusDot status={function_.status} className="h-2 w-2 shrink-0" />
+                  <p
+                    className={cn(
+                      'truncate',
+                      function_.status === 'CANCELLED' ? 'text-subtle' : 'text-basis'
+                    )}
+                  >
+                    {function_.name}
+                  </p>
+                </span>
               </Pill>
             ))}
           />
