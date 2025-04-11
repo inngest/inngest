@@ -383,7 +383,10 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 	case <-leaseCtx.Done():
 		span.SetStatus(codes.Error, "lease expired")
 
-		return nil, fmt.Errorf("worker stopped processing request")
+		return nil, syscode.Error{
+			Code:    syscode.CodeConnectWorkerStoppedResponding,
+			Message: "The worker stopped responding to the request.",
+		}
 	}
 }
 

@@ -828,12 +828,8 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 			return nil
 		}
 	default:
-		// TODO Should we actually close the connection here?
-		return &connecterrors.SocketError{
-			SysCode:    syscode.CodeConnectRunInvalidMessage,
-			StatusCode: websocket.StatusPolicyViolation,
-			Msg:        fmt.Sprintf("invalid message kind %q", msg.Kind),
-		}
+		c.log.Warn("unexpected message kind received", "kind", msg.Kind.String())
+		return nil
 	}
 
 	return nil
