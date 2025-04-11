@@ -53,6 +53,20 @@ func (m manager) PausesSince(ctx context.Context, index Index, since time.Time) 
 	return nil, fmt.Errorf("not implemented")
 }
 
+// Delete deletes a pause from from block storage or the buffer.
+func (m manager) Delete(ctx context.Context, index Index, pause state.Pause) error {
+	// XXX: Future optimization:  cache the last written block for an index in-memory so
+	// we can fast lookup here: blockID.ts > pause.ts, if so always delete from flusher.
+	err := m.buf.Delete(ctx, index, pause)
+	if err == nil {
+		return nil
+	}
+	if err == ErrNotInBuffer {
+		return m.flusher.Delete(ctx, index, pause)
+	}
+	return fmt.Errorf("error deleting pause from buffer: %w", err)
+}
+
 func (m manager) FlushIndexBlock(ctx context.Context, index Index) error {
 	// Ensure we delay writing the block.  This prevents clock skew on non-precision
 	// clocks from impacting out-of-order pauses;  we want pauses to be stored in-order
@@ -98,5 +112,6 @@ func (r redisAdapter) PausesSince(ctx context.Context, index Index, since time.T
 // Delete deletes a pause from the buffer, or returns ErrNotInBuffer if the pause is not in
 // the buffer.
 func (r redisAdapter) Delete(ctx context.Context, index Index, pause state.Pause) error {
+	// TODO: Check if pause is in buffer;  if not, return ErrNotInBuffer.
 	return r.rsm.DeletePause(ctx, pause)
 }

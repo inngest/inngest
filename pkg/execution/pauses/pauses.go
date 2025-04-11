@@ -71,8 +71,7 @@ type BlockFlusher interface {
 	// BlockSize returns the number of pauses saved in each block.
 	BlockSize() int
 
-	// Delete deletes a pause from the buffer, or returns ErrNotInBuffer if the pause is not in
-	// the buffer.
+	// Delete deletes a pause from from block storage.
 	Delete(ctx context.Context, index Index, pause state.Pause) error
 }
 
