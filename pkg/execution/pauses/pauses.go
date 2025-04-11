@@ -41,6 +41,8 @@ type Bufferer interface {
 	// If the time is ZeroTime, this must return all indexes in the buffer.
 	//
 	// Note that this does not return blocks, as this only reads from the BufferIndexer.
+	//
+	// NOTE: This is NOT INCLUSIVE of since, ie. the range is (since, now].
 	PausesSince(ctx context.Context, index Index, since time.Time) (state.PauseIterator, error)
 }
 
@@ -66,6 +68,8 @@ type BlockReader interface {
 	// since a given time.
 	//
 	// If the time is ZeroTime, all blocks for the index must be returned.
+	//
+	// NOTE: This is NOT INCLUSIVE of since, ie. the range is (since, now].
 	BlocksSince(ctx context.Context, index Index, since time.Time) ([]ulid.ULID, error)
 
 	// ReadBlock reads a single block given an index and block ID.
