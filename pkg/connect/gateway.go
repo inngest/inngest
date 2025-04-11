@@ -89,6 +89,10 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			return
 		}
 
+		// Adjust read limit to accommodate large step output responses
+		// The default imposed by the websockets library is 32,678 bytes
+		ws.SetReadLimit(consts.MaxSDKResponseBodySize)
+
 		additionalMetricsTags := c.metricsTags()
 
 		metrics.IncrConnectGatewayReceiveConnectionAttemptCounter(ctx, 1, metrics.CounterOpt{
