@@ -248,6 +248,12 @@ func (b blockstore) BlockKey(idx Index, blockID ulid.ULID) string {
 	return fmt.Sprintf("pauses/%s/%s/blk_%s", idx.WorkspaceID, idx.EventName, blockID)
 }
 
+// Delete deletes a pause from the buffer, or returns ErrNotInBuffer if the pause is not in
+// the buffer.
+func (b blockstore) Delete(ctx context.Context, index Index, pause state.Pause) error {
+	return fmt.Errorf("not implemented")
+}
+
 func (b blockstore) addBlockIndex(ctx context.Context, idx Index, block *Block) error {
 	// Block indexes are a zset of blocks stored by last pause timestamp,
 	// which is embedded into the pause ID.
