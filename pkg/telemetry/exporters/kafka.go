@@ -14,7 +14,7 @@ import (
 )
 
 var (
-	defaultMsgKey       = "fn_id"
+	defaultMsgKey       = "run_id"
 	defaultMaxProduceMB = 30 // 30MB
 )
 
@@ -170,7 +170,9 @@ func (e *kafkaSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadO
 		case "workflow_id", "wf_id", "function_id", "fn_id":
 			rec.Key = []byte(id.GetFunctionId())
 		case "run_id":
-			rec.Key = []byte(id.GetRunId())
+			if id.GetRunId() != "" {
+				rec.Key = []byte(id.GetRunId())
+			}
 		}
 
 		e.client.Produce(ctx, rec, func(r *kgo.Record, err error) {
