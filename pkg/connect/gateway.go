@@ -38,11 +38,28 @@ const (
 	MaxAppsPerConnection     = 100
 )
 
+func isConnectionClosedErr(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	if errors.Is(err, net.ErrClosed) || errors.Is(err, io.EOF) {
+		return true
+	}
+
+	closeErr := websocket.CloseError{}
+	if errors.As(err, &closeErr) {
+		return true
+	}
+
+	return false
+}
+
 func (c *connectGatewaySvc) closeWithConnectError(ws *websocket.Conn, serr *connecterrors.SocketError) {
 	// reason must be limited to 125 bytes and should not be dynamic,
 	// so we restrict it to the known syscodes to prevent unintentional overflows
 	err := ws.Close(serr.StatusCode, serr.SysCode)
-	if err != nil && !errors.Is(err, net.ErrClosed) && !errors.Is(err, io.EOF) {
+	if isConnectionClosedErr(err) {
 		c.logger.Error("could not close WebSocket connection", "err", err, "serr", serr)
 	}
 }
@@ -167,7 +184,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 					return
 				}
 
-				if errors.Is(err, net.ErrClosed) || errors.Is(err, io.EOF) {
+				if isConnectionClosedErr(err) {
 					return
 				}
 
@@ -399,7 +416,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 
 					// connection was closed (this may not be expected but should not be logged as an error)
 					// this is expected when the gateway is draining
-					if errors.Is(err, net.ErrClosed) || errors.Is(err, io.EOF) {
+					if isConnectionClosedErr(err) {
 						return nil
 					}
 
@@ -463,7 +480,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 					return
 				}
 
-				if errors.Is(err, net.ErrClosed) || errors.Is(err, io.EOF) {
+				if isConnectionClosedErr(err) {
 					return
 				}
 
@@ -848,7 +865,7 @@ func (c *connectionHandler) receiveRouterMessages(ctx context.Context, onSubscri
 			Payload: rawBytes,
 		})
 		if err != nil {
-			if errors.Is(err, net.ErrClosed) || errors.Is(err, io.EOF) {
+			if isConnectionClosedErr(err) {
 				return
 			}
 
