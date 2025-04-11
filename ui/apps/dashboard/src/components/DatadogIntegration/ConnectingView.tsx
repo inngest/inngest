@@ -14,13 +14,9 @@ export default function SetupPage({ errorMessage }: Props) {
         <Alert severity="warning" className="text-base">
           This Datadog organization was previously connected to Inngest, and you’ll need to remove
           Inngest’s old API key from your Datadog account manually before reconnecting.
-          <br />
-          <br />
-          Please{' '}
-          <a target="_blank" className="underline" href="https://www.inngest.com/docs/">
-            see our documentation
-          </a>{' '}
-          for instructions.
+          <Alert.Link severity="warning" target="_blank" href="https://www.inngest.com/docs/">
+            Please see our documentation for instructions.
+          </Alert.Link>
           {/* TODO(cdzombak): update docs link once it's written */}
         </Alert>
       );
@@ -28,12 +24,10 @@ export default function SetupPage({ errorMessage }: Props) {
 
     return (
       <Alert severity="error">
-        Connection failed. Please{' '}
-        <a href="/support" className="underline">
-          contact Inngest support
-        </a>{' '}
-        if this error persists.
-        <br />
+        Connection failed.
+        <Alert.Link severity="error" target="_blank" href="/support">
+          Please contact Inngest support if this error persists.
+        </Alert.Link>{' '}
         <br />
         <code>{errorMessage}</code>
       </Alert>
