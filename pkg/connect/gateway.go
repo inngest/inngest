@@ -362,8 +362,13 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 
 					closeErr := websocket.CloseError{}
 					if errors.As(err, &closeErr) {
-						// Empty reason (unexpected/draining)
+						// Empty reason (unexpected)
 						if closeErr.Code == websocket.StatusNoStatusRcvd && closeErr.Reason == "" {
+							return nil
+						}
+
+						// Force-closed during draining after timeout
+						if closeErr.Code == ErrDraining.StatusCode && closeErr.Reason == ErrDraining.SysCode {
 							return nil
 						}
 
