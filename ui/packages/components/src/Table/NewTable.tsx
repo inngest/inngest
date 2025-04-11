@@ -82,7 +82,7 @@ export default function Table<T>({
   });
 
   const tableStyles = 'w-full';
-  const tableHeadStyles = 'bg-canvasSubtle sticky top-0 z-10';
+  const tableHeadStyles = 'bg-canvasSubtle sticky top-0 z-[2]';
   const tableColumnStyles = 'px-6';
   const expandedRowSideBorder =
     'before:bg-surfaceMuted relative before:absolute before:bottom-0 before:left-0 before:top-0 before:w-0.5';
