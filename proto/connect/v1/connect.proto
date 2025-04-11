@@ -192,6 +192,7 @@ enum WorkerDisconnectReason {
 	UNEXPECTED = 1;
 	GATEWAY_DRAINING = 2;
 	CONSECUTIVE_HEARTBEATS_MISSED = 3;
+	MESSAGE_TOO_LARGE = 4;
 }
 
 message StartResponse {

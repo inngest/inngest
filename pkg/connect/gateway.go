@@ -11,6 +11,7 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -399,6 +400,13 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 					// connection was closed (this may not be expected but should not be logged as an error)
 					// this is expected when the gateway is draining
 					if errors.Is(err, net.ErrClosed) || errors.Is(err, io.EOF) {
+						return nil
+					}
+
+					// Unfortunately, the websocket library does not expose a proper error when the size limit is reached,
+					// so we have to check the error message instead. This should rarely happen.
+					if strings.HasPrefix(err.Error(), "read limited at") {
+						setCloseReason(connectpb.WorkerDisconnectReason_MESSAGE_TOO_LARGE.String())
 						return nil
 					}
 
