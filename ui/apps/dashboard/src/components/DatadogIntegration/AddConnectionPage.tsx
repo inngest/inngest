@@ -4,13 +4,13 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Alert } from '@inngest/components/Alert';
+import { Button } from '@inngest/components/Button';
 import { Card } from '@inngest/components/Card';
 import { IconSpinner } from '@inngest/components/icons/Spinner';
-import { Button } from 'node_modules/@inngest/components/src/Button';
 import { toast } from 'sonner';
 import { useMutation, useQuery } from 'urql';
 
-import EnvSelectMenu from '@/components/PrometheusIntegration/EnvSelectMenu';
+import EnvSelectMenu from '@/components/Environments/EnvSelectMenu';
 import { graphql } from '@/gql';
 import { useEnvironments } from '@/queries';
 import type { Environment } from '@/utils/environments';
