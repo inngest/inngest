@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"time"
 
 	"github.com/inngest/inngest/pkg/execution/state"
@@ -179,11 +180,16 @@ func (b blockstore) flushIndexBlock(ctx context.Context, index Index) error {
 	//       to get the "added at" index for the pause (zset score).  If THAT fails,
 	//       we use a hard-coded timestamp in the past (as all new pauses are V7).
 
-	// TODO: Marshal the block.  Parquet/Protobuf/etc.
+	// Marshal the block.  We currently use JSON encoding everywhere, but
+	// we can amend Serialize to use protobuf if we desire via a new tag.
+	byt, err := Serialize(block, encodingJSON, 0x00)
+	if err != nil {
+		return fmt.Errorf("failed to serialize block: %w", err)
+	}
 
 	// Now that we have our block, write it to the backing store.
 	key := b.BlockKey(index, block.ID)
-	if err := b.bucket.WriteAll(ctx, key, []byte{}, nil); err != nil {
+	if err := b.bucket.WriteAll(ctx, key, byt, nil); err != nil {
 		return fmt.Errorf("failed to write block: %w", err)
 	}
 
@@ -199,9 +205,31 @@ func (b blockstore) flushIndexBlock(ctx context.Context, index Index) error {
 	return fmt.Errorf("not implemented")
 }
 
+// BlocksSince returns all block IDs that have been written for a given index,
+// since a given time.
+//
+// If the time is ZeroTime, all blocks for the index must be returned.
+//
+// NOTE: This is NOT INCLUSIVE of since, ie. the range is (since, now].
 func (b blockstore) BlocksSince(ctx context.Context, index Index, since time.Time) ([]ulid.ULID, error) {
-	// TODO: Read from backing KV (redis/valkey/memorydb/fdb) indexes.
-	return nil, fmt.Errorf("not implemented")
+	// Read from backing KV (redis/valkey/memorydb/fdb) indexes.
+	score := strconv.Itoa(int(since.UnixMilli()))
+	ids, err := b.rc.Do(
+		ctx,
+		b.rc.B().Zrange().Key(b.blockIndexKey(index)).Min("("+score).Max("+inf").Build(),
+	).AsStrSlice()
+	if err != nil {
+		return nil, err
+	}
+
+	ulids := make([]ulid.ULID, len(ids))
+	for i, id := range ids {
+		ulids[i], err = ulid.Parse(id)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return ulids, nil
 }
 
 func (b blockstore) ReadBlock(ctx context.Context, index Index, blockID ulid.ULID) (*Block, error) {
@@ -211,10 +239,8 @@ func (b blockstore) ReadBlock(ctx context.Context, index Index, blockID ulid.ULI
 		return nil, err
 	}
 
-	// TODO: Unmarshal the block
-	_ = byt
-
-	return nil, fmt.Errorf("not implemented")
+	// Unmarshal the block, using the first byte to figure out encoding.
+	return Deserialize(byt)
 }
 
 // GenerateKey generates a key for a given block ID.
