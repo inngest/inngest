@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { RiInformationLine } from '@remixicon/react';
 
 import DashboardCodeBlock from '@/components/DashboardCodeBlock/DashboardCodeBlock';
-import EnvSelectMenu from '@/components/PrometheusIntegration/EnvSelectMenu';
+import EnvSelectMenu from '@/components/Environments/EnvSelectMenu';
 import { type Environment } from '@/utils/environments';
 
 type Props = {
