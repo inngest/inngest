@@ -42,6 +42,8 @@ type PauseMutater interface {
 
 	// DeletePause permanently deletes a pause.
 	DeletePause(ctx context.Context, p Pause) error
+
+	DeletePauseByID(ctx context.Context, pauseID uuid.UUID) error
 }
 
 // PauseGetter allows a runner to return all existing pauses by event or by outgoing ID.  This
