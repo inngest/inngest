@@ -39,9 +39,8 @@ export function SigningKey({ signingKey }: Props) {
   let pill = null;
   if (signingKey.createdAt > new Date(Date.now() - 24 * 60 * 60 * 1000)) {
     pill = (
-      <Pill kind="warning">
-        <RiStarFill size={16} className="pr-1" />
-        <span>New</span>
+      <Pill kind="warning" icon={<RiStarFill size={14} />} iconSide="left">
+        New
       </Pill>
     );
   }

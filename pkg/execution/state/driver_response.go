@@ -33,7 +33,7 @@ type UserError struct {
 	NoRetry bool `json:"noRetry,omitempty"`
 
 	// Cause allows nested errors to be passed back to the SDK.
-	Cause *UserError `json:"cause,omitempty"`
+	Cause json.RawMessage `json:"cause,omitempty"`
 }
 
 // DriverResponse is returned after a driver executes an action.  This represents any

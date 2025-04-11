@@ -1,5 +1,6 @@
+import MiniStackedBarChart from '@inngest/components/Chart/MiniStackedBarChart';
 import { HorizontalPillList, Pill, PillContent } from '@inngest/components/Pill';
-import { TextCell } from '@inngest/components/Table';
+import { NumberCell, TextCell } from '@inngest/components/Table';
 import { type EventType } from '@inngest/components/types/eventType';
 import { cn } from '@inngest/components/utils/classNames';
 import { createColumnHelper, type Row } from '@tanstack/react-table';
@@ -78,8 +79,15 @@ export function useColumns({
 
         return (
           <div className="flex items-center">
-            {volume.totalVolume}
-            {volume.chart}
+            <div className="w-16">
+              <NumberCell
+                value={volume.totalVolume}
+                term={volume.totalVolume === 1 ? 'event' : 'events'}
+              />
+            </div>
+            <div className="hidden md:block">
+              <MiniStackedBarChart data={volume.dailyVolumeSlots} />
+            </div>
           </div>
         );
       },

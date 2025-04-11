@@ -5,13 +5,14 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@inngest/components/Button/Button';
 import { EventTypesTable } from '@inngest/components/EventTypes/EventTypesTable';
 import { Header } from '@inngest/components/Header/Header';
+import { RefreshButton } from '@inngest/components/Refresh/RefreshButton';
 import { RiExternalLinkLine, RiRefreshLine } from '@remixicon/react';
 
 import { ActionsMenu } from '@/components/EventTypes/ActionsMenu';
+import { useEventTypes, useEventTypesVolume } from '@/components/EventTypes/useEventTypes';
 import { EventInfo } from '@/components/Events/EventInfo';
 import SendEventButton from '@/components/Events/SendEventButton';
 import { pathCreator } from '@/utils/urls';
-import { fakeGetEventTypes } from './fakePromise';
 
 export default function EventTypesPage({
   params: { environmentSlug: envSlug },
@@ -29,17 +30,25 @@ export default function EventTypesPage({
         pathCreator.eventType({ envSlug: envSlug, eventName: params.eventName }),
     };
   }, [envSlug]);
+  const getEventTypes = useEventTypes();
+  const getEventTypesVolume = useEventTypesVolume();
 
   return (
     <>
       <Header
         breadcrumb={[{ text: 'Event Types' }]}
         infoIcon={<EventInfo />}
-        action={<SendEventButton />}
+        action={
+          <div className="flex items-center gap-1.5">
+            <RefreshButton />
+            <SendEventButton />
+          </div>
+        }
       />
       <EventTypesTable
         pathCreator={internalPathCreator}
-        getEventTypes={fakeGetEventTypes}
+        getEventTypes={getEventTypes}
+        getEventTypesVolume={getEventTypesVolume}
         eventTypeActions={(props) => <ActionsMenu {...props} />}
         emptyActions={
           <>
