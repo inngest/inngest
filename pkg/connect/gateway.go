@@ -75,7 +75,20 @@ type connectionHandler struct {
 
 	remoteAddr string
 
+	lastHeartbeatLock       sync.Mutex
 	lastHeartbeatReceivedAt time.Time
+}
+
+func (c *connectionHandler) setLastHeartbeat(time time.Time) {
+	c.lastHeartbeatLock.Lock()
+	defer c.lastHeartbeatLock.Unlock()
+	c.lastHeartbeatReceivedAt = time
+}
+
+func (c *connectionHandler) getLastHeartbeat() time.Time {
+	c.lastHeartbeatLock.Lock()
+	defer c.lastHeartbeatLock.Unlock()
+	return c.lastHeartbeatReceivedAt
 }
 
 var ErrDraining = connecterrors.SocketError{
@@ -558,7 +571,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 		}
 
 		// Safeguard: Clean up connections that haven't sent n consecutive heartbeats.
-		ch.lastHeartbeatReceivedAt = time.Now() // set initial value
+		ch.setLastHeartbeat(time.Now()) // set initial value
 		go func() {
 			for {
 				select {
@@ -567,7 +580,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 				case <-time.After(c.workerHeartbeatInterval):
 				}
 
-				if time.Since(ch.lastHeartbeatReceivedAt) > time.Duration(c.consecutiveWorkerHeartbeatMissesBeforeConnectionClose)*c.workerHeartbeatInterval {
+				if time.Since(ch.getLastHeartbeat()) > time.Duration(c.consecutiveWorkerHeartbeatMissesBeforeConnectionClose)*c.workerHeartbeatInterval {
 					setCloseReason(connectpb.WorkerDisconnectReason_CONSECUTIVE_HEARTBEATS_MISSED.String())
 
 					ch.log.Debug("missed consecutive heartbeats, closing connection")
@@ -641,7 +654,7 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 			return nil
 		}
 
-		c.lastHeartbeatReceivedAt = time.Now()
+		c.setLastHeartbeat(time.Now())
 
 		return nil
 	case connectpb.GatewayMessageType_WORKER_PAUSE:
