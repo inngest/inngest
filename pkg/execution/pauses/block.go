@@ -2,12 +2,14 @@ package pauses
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"time"
 
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
+	"github.com/redis/rueidis"
 	"gocloud.dev/blob"
 )
 
@@ -20,8 +22,6 @@ const (
 
 // Block represents a block of pauses.
 type Block struct {
-	// TODO: Maybe metadata in the header.
-
 	// ID is the block ID.
 	ID ulid.ULID
 	// Index is the index for this block, eg. the workspac and event name.
@@ -32,6 +32,9 @@ type Block struct {
 
 // BlockstoreOpts creates a new BlockStore with dependencies injected.
 type BlockstoreOpts struct {
+	// RC is the Redis client used to manage block indexes.
+	RC rueidis.Client
+
 	// Bufferer is the bufferer which allows us to read from indexes.
 	Bufferer Bufferer
 	// Bucket is the backing blobstore for reading and writing blocks.
@@ -83,6 +86,9 @@ type blockstore struct {
 
 	// leaser manages leases for a given index.
 	leaser BlockLeaser
+
+	// rc is the Redis client used to manage block indexes.
+	rc rueidis.Client
 }
 
 func (b blockstore) BlockSize() int {
@@ -181,7 +187,10 @@ func (b blockstore) flushIndexBlock(ctx context.Context, index Index) error {
 		return fmt.Errorf("failed to write block: %w", err)
 	}
 
-	// TODO: Write block metadata
+	// Write block index to our zset.
+	if err := b.addBlockIndex(ctx, index, block); err != nil {
+		return fmt.Errorf("failed to write block index: %w", err)
+	}
 
 	// TODO: Remove len(block.Pauses) from the buffer, as they've been flushed.
 	//       We can't use the standard DeletePause item from the state store as
@@ -211,4 +220,61 @@ func (b blockstore) ReadBlock(ctx context.Context, index Index, blockID ulid.ULI
 // GenerateKey generates a key for a given block ID.
 func (b blockstore) BlockKey(idx Index, blockID ulid.ULID) string {
 	return fmt.Sprintf("pauses/%s/%s/blk_%s", idx.WorkspaceID, idx.EventName, blockID)
+}
+
+func (b blockstore) addBlockIndex(ctx context.Context, idx Index, block *Block) error {
+	// Block indexes are a zset of blocks stored by last pause timestamp,
+	// which is embedded into the pause ID.
+	//
+	// We also have a mapping of block ID -> metadata, storing the timeranges and
+	// current block size.  This is used during compaction.
+	metadata, err := json.Marshal(blockMetadata{
+		Timeranges: [2]int64{}, // TODO: earliest/latest pause TS
+		Len:        len(block.Pauses),
+	})
+	if err != nil {
+		return err
+	}
+
+	cmd := b.rc.B().
+		Zadd().
+		Key(b.blockIndexKey(idx)).
+		ScoreMember().
+		ScoreMember(
+			float64(ulid.Time(block.ID.Time()).UnixMilli()),
+			block.ID.String(),
+		).
+		Build()
+	if err := b.rc.Do(ctx, cmd).Error(); err != nil {
+		return err
+	}
+
+	return b.rc.Do(
+		ctx,
+		b.rc.B().
+			Hset().
+			Key(b.blockMetadataKey(idx)).
+			FieldValue().
+			FieldValue(block.ID.String(), string(metadata)).
+			Build(),
+	).Error()
+
+}
+
+func (b blockstore) blockIndexKey(idx Index) string {
+	return fmt.Sprintf("{estate}:blk:idx:%s:%s", idx.WorkspaceID, util.XXHash(idx.EventName))
+}
+
+func (b blockstore) blockMetadataKey(idx Index) string {
+	return fmt.Sprintf("{estate}:blk:md:%s:%s", idx.WorkspaceID, util.XXHash(idx.EventName))
+}
+
+type blockMetadata struct {
+	// Timeranges are the unix millisecond time ranges that this block covers,
+	// in ascending order.  This includes the earliest and latest pauses *currently*
+	// stored in the block.  This may change when pauses are deleted or blocks are
+	// merged.
+	Timeranges [2]int64 `json:"r"`
+	// Len is the current number of pauses in the block.  This decreases on deletion.
+	Len int `json:"len"`
 }
