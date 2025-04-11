@@ -43,6 +43,10 @@ func isConnectionClosedErr(err error) bool {
 		return false
 	}
 
+	if errors.Is(err, context.DeadlineExceeded) {
+		return true
+	}
+
 	if errors.Is(err, net.ErrClosed) || errors.Is(err, io.EOF) {
 		return true
 	}
