@@ -14,7 +14,7 @@ import (
 )
 
 var (
-	defaultMsgKey       = "fn_id"
+	defaultMsgKey       = "run_id"
 	defaultMaxProduceMB = 30 // 30MB
 )
 
@@ -74,6 +74,7 @@ func WithKafkaExporterMaxProduceMB(size int) KafkaSpansExporterOpts {
 func NewKafkaSpanExporter(ctx context.Context, opts ...KafkaSpansExporterOpts) (trace.SpanExporter, error) {
 	conf := &kafkaSpansExporterOpts{
 		maxProduceMB: defaultMaxProduceMB,
+		key:          defaultMsgKey,
 	}
 
 	for _, apply := range opts {
@@ -86,10 +87,6 @@ func NewKafkaSpanExporter(ctx context.Context, opts ...KafkaSpansExporterOpts) (
 
 	if conf.topic == "" {
 		return nil, fmt.Errorf("no topic provided for span exporter")
-	}
-
-	if conf.key != "" {
-		conf.key = defaultMsgKey
 	}
 
 	kclopts := []kgo.Opt{
@@ -170,7 +167,9 @@ func (e *kafkaSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadO
 		case "workflow_id", "wf_id", "function_id", "fn_id":
 			rec.Key = []byte(id.GetFunctionId())
 		case "run_id":
-			rec.Key = []byte(id.GetRunId())
+			if id.GetRunId() != "" {
+				rec.Key = []byte(id.GetRunId())
+			}
 		}
 
 		e.client.Produce(ctx, rec, func(r *kgo.Record, err error) {
