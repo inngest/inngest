@@ -3,6 +3,7 @@ package tracing
 import (
 	"encoding/json"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
@@ -127,16 +128,23 @@ func WithGeneratorAttrs(op *state.GeneratorOpcode) trace.SpanStartEventOption {
 }
 
 func SpanFromQueueItem(i *queue.Item) *meta.SpanMetadata {
+	spew.Dump("tracing.SpanFromQueueItem")
 	if i == nil || i.Metadata == nil {
+		spew.Dump("tracing.SpanFromQueueItem", "no metadata")
 		return nil
 	}
 
 	if carrier, ok := i.Metadata["wobbly"]; ok {
+		spew.Dump("tracing.SpanFromQueueItem", "found carrier", carrier)
 		var out meta.SpanMetadata
 		if err := json.Unmarshal([]byte(carrier), &out); err == nil {
 			return &out
 		}
+
+		spew.Dump("tracing.SpanFromQueueItem", "error unmarshalling carrier")
 	}
+
+	spew.Dump("tracing.SpanFromQueueItem", "no carrier")
 
 	return nil
 }

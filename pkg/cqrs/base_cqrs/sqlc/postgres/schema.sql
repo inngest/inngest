@@ -200,10 +200,9 @@ CREATE TABLE spans (
   parent_span_id TEXT,
   name TEXT NOT NULL,
   start_time TIMESTAMPTZ NOT NULL,
-  end_time TIMESTAMPTZ,
+  end_time TIMESTAMPTZ NOT NULL,
   run_id TEXT,
-  start_attributes JSONB,
-  end_attributes JSONB,
+  attributes JSONB,
   PRIMARY KEY (trace_id, span_id)
 );
 

@@ -19,6 +19,7 @@ type executionProcessor struct {
 func newExecutionProcessor(md *statev2.Metadata, qi *queue.Item, next sdktrace.SpanProcessor) sdktrace.SpanProcessor {
 	return &executionProcessor{
 		md:   md,
+		qi:   qi,
 		next: next,
 	}
 }
@@ -51,7 +52,6 @@ func (p *executionProcessor) OnStart(parent context.Context, s sdktrace.ReadWrit
 				attribute.String(meta.AttributeAccountID, p.md.ID.Tenant.AccountID.String()),
 				attribute.String(meta.AttributeEnvID, p.md.ID.Tenant.EnvID.String()),
 				attribute.String(meta.AttributeAppID, p.md.ID.Tenant.AppID.String()),
-				attribute.Bool(meta.AttributeDynamicSpanID, true),
 			)
 
 			if p.md.Config.CronSchedule() != nil {
@@ -72,9 +72,6 @@ func (p *executionProcessor) OnStart(parent context.Context, s sdktrace.ReadWrit
 
 	case meta.SpanNameStep:
 		{
-			attrs = append(attrs,
-				attribute.Bool(meta.AttributeDynamicSpanID, true),
-			)
 
 			if p.qi != nil {
 				attrs = append(attrs,

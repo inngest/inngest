@@ -15,6 +15,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/fatih/structs"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
@@ -2117,7 +2118,7 @@ func (e *executor) handleGeneratorStep(ctx context.Context, i *runInstance, gen 
 				Location:  "executor.handleGeneratorStep",
 				Metadata:  &i.md,
 				QueueItem: &nextItem,
-				Parent:    tracing.SpanFromQueueItem(&i.item),
+				Parent:    tracing.RunSpanFromMetadata(&i.md),
 			},
 		)
 
@@ -2263,7 +2264,7 @@ func (e *executor) handleStepError(ctx context.Context, i *runInstance, gen stat
 				Location:  "executor.handleStepError",
 				Metadata:  &i.md,
 				QueueItem: &nextItem,
-				Parent:    tracing.SpanFromQueueItem(&i.item),
+				Parent:    tracing.RunSpanFromMetadata(&i.md),
 			},
 		)
 
@@ -2349,7 +2350,7 @@ func (e *executor) handleGeneratorStepPlanned(ctx context.Context, i *runInstanc
 			Location:  "executor.handleGeneratorStepPlanned",
 			Metadata:  &i.md,
 			QueueItem: &nextItem,
-			Parent:    tracing.SpanFromQueueItem(&i.item),
+			Parent:    tracing.RunSpanFromMetadata(&i.md),
 			SpanOptions: []trace.SpanStartOption{
 				tracing.WithGeneratorAttrs(&gen),
 			},
@@ -2406,6 +2407,7 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, i *runInstance, gen
 		Attempt:               0,
 		MaxAttempts:           i.item.MaxAttempts,
 		Payload:               queue.PayloadEdge{Edge: nextEdge},
+		Metadata:              make(map[string]string),
 	}
 
 	// metadata := map[string]string{}
@@ -2432,12 +2434,14 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, i *runInstance, gen
 			Location:  "executor.handleGeneratorSleep",
 			Metadata:  &i.md,
 			QueueItem: &nextItem,
-			Parent:    tracing.SpanFromQueueItem(&i.item),
+			Parent:    tracing.RunSpanFromMetadata(&i.md),
 			SpanOptions: []trace.SpanStartOption{
 				tracing.WithGeneratorAttrs(&gen),
 			},
 		},
 	)
+
+	spew.Dump("metadata after thing", nextItem.Metadata)
 
 	// TODO Should this also include a parent step span? It will never have attempts.
 	err = e.queue.Enqueue(ctx, nextItem, until, queue.EnqueueOpts{})

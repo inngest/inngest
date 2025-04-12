@@ -40,17 +40,15 @@ func (e *DBExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlyS
 			continue
 		}
 
-		endTime := sql.NullTime{Time: span.EndTime(), Valid: true}
-
 		err = e.q.InsertSpan(ctx, sqlc.InsertSpanParams{
-			SpanID:          spanID,
-			TraceID:         traceID,
-			ParentSpanID:    sql.NullString{String: parentID, Valid: parentID != ""},
-			Name:            span.Name(),
-			StartTime:       span.StartTime(),
-			EndTime:         endTime,
-			RunID:           sql.NullString{String: runID, Valid: runID != ""},
-			StartAttributes: string(data),
+			SpanID:       spanID,
+			TraceID:      traceID,
+			ParentSpanID: sql.NullString{String: parentID, Valid: parentID != ""},
+			Name:         span.Name(),
+			StartTime:    span.StartTime(),
+			EndTime:      span.EndTime(),
+			RunID:        sql.NullString{String: runID, Valid: runID != ""},
+			Attributes:   string(data),
 		})
 		if err != nil {
 			// TODO Log error

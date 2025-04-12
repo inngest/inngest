@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	sqlc "github.com/inngest/inngest/pkg/cqrs/base_cqrs/sqlc/sqlite"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
@@ -67,12 +68,6 @@ func (tp *TracerProvider) CreateSpan(
 	span, spanMetadata := tp.CreateDroppableSpan(name, opts)
 	span.End()
 
-	if opts.Carrier != nil {
-		// TODO err
-		byt, _ := json.Marshal(spanMetadata)
-		opts.Carrier["wobbly"] = string(byt)
-	}
-
 	return spanMetadata
 }
 
@@ -92,11 +87,11 @@ func (tp *TracerProvider) CreateDroppableSpan(
 	}
 
 	tracer := tp.getTracer(opts.Metadata, opts.QueueItem)
-	_, span := tracer.Start(ctx, name, opts.SpanOptions...)
+	ctx, span := tracer.Start(ctx, name, opts.SpanOptions...)
 
 	carrier := propagation.MapCarrier{}
-	// defaultPropagator.Inject(ctx, carrier)
-	defaultPropagator.Inject(trace.ContextWithSpan(ctx, span), carrier)
+	defaultPropagator.Inject(ctx, carrier)
+	// defaultPropagator.Inject(trace.ContextWithSpan(ctx, span), carrier)
 
 	spanMetadata := &meta.SpanMetadata{
 		TraceParent:   carrier["traceparent"],
@@ -105,8 +100,16 @@ func (tp *TracerProvider) CreateDroppableSpan(
 	}
 
 	span.SetAttributes(
-		attribute.String("dynamic_span_id", spanMetadata.DynamicSpanID),
+		attribute.String(meta.AttributeDynamicSpanID, spanMetadata.DynamicSpanID),
 	)
+
+	if opts.Carrier != nil {
+		// TODO err
+		byt, _ := json.Marshal(spanMetadata)
+		opts.Carrier["wobbly"] = string(byt)
+	}
+
+	spew.Dump("tracing.CreateSpan", name, opts.Location, spanMetadata)
 
 	return span, spanMetadata
 }
@@ -124,6 +127,8 @@ type ExtendSpanOptions struct {
 func (tp *TracerProvider) ExtendSpan(
 	opts *ExtendSpanOptions,
 ) *meta.SpanMetadata {
+	spew.Dump("tracing.ExtendSpan", opts.TargetSpan)
+
 	if opts.TargetSpan == nil {
 		// Oof. Not good.
 		panic("no target span")
@@ -138,7 +143,7 @@ func (tp *TracerProvider) ExtendSpan(
 	// TODO It shouldn't have all these extras added though...
 	// Just `nil, nil` this?
 	tracer := tp.getTracer(nil, nil)
-	_, span := tracer.Start(ctx, "", opts.SpanOptions...)
+	_, span := tracer.Start(ctx, "EXTEND", opts.SpanOptions...)
 
 	spanMetadata := &meta.SpanMetadata{
 		TraceParent:   carrier["traceparent"],
