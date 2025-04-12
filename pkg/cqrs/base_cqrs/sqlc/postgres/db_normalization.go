@@ -773,7 +773,7 @@ func (q NormalizedQueries) GetFunctionRuns(ctx context.Context) ([]*sqlc_sqlite.
 	return sqliteRows, nil
 }
 
-func (q NormalizedQueries) GetSpansByRunID(ctx context.Context, runID sql.NullString) ([]*sqlc_sqlite.Span, error) {
+func (q NormalizedQueries) GetSpansByRunID(ctx context.Context, runID string) ([]*sqlc_sqlite.Span, error) {
 	return nil, nil
 }
 

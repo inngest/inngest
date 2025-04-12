@@ -1040,10 +1040,10 @@ func (q *Queries) GetQueueSnapshotChunks(ctx context.Context, snapshotID interfa
 }
 
 const getSpansByRunID = `-- name: GetSpansByRunID :many
-SELECT span_id, trace_id, parent_span_id, name, start_time, end_time, run_id, attributes FROM spans WHERE run_id = ?
+SELECT span_id, trace_id, parent_span_id, name, start_time, end_time, attributes, links, run_id, dynamic_span_id FROM spans WHERE run_id = ?
 `
 
-func (q *Queries) GetSpansByRunID(ctx context.Context, runID sql.NullString) ([]*Span, error) {
+func (q *Queries) GetSpansByRunID(ctx context.Context, runID string) ([]*Span, error) {
 	rows, err := q.db.QueryContext(ctx, getSpansByRunID, runID)
 	if err != nil {
 		return nil, err
@@ -1059,8 +1059,10 @@ func (q *Queries) GetSpansByRunID(ctx context.Context, runID sql.NullString) ([]
 			&i.Name,
 			&i.StartTime,
 			&i.EndTime,
-			&i.RunID,
 			&i.Attributes,
+			&i.Links,
+			&i.RunID,
+			&i.DynamicSpanID,
 		); err != nil {
 			return nil, err
 		}
@@ -1520,19 +1522,21 @@ const insertSpan = `-- name: InsertSpan :exec
 
 INSERT INTO spans (
   span_id, trace_id, parent_span_id, name,
-  start_time, end_time, run_id, attributes
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+  start_time, end_time, run_id, dynamic_span_id, attributes, links
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 type InsertSpanParams struct {
-	SpanID       string
-	TraceID      string
-	ParentSpanID sql.NullString
-	Name         string
-	StartTime    time.Time
-	EndTime      time.Time
-	RunID        sql.NullString
-	Attributes   interface{}
+	SpanID        string
+	TraceID       string
+	ParentSpanID  sql.NullString
+	Name          string
+	StartTime     time.Time
+	EndTime       time.Time
+	RunID         string
+	DynamicSpanID sql.NullString
+	Attributes    interface{}
+	Links         interface{}
 }
 
 // New
@@ -1545,7 +1549,9 @@ func (q *Queries) InsertSpan(ctx context.Context, arg InsertSpanParams) error {
 		arg.StartTime,
 		arg.EndTime,
 		arg.RunID,
+		arg.DynamicSpanID,
 		arg.Attributes,
+		arg.Links,
 	)
 	return err
 }

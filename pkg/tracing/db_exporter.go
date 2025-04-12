@@ -20,23 +20,50 @@ func (e *DBExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlyS
 		traceID := span.SpanContext().TraceID().String()
 		spanID := span.SpanContext().SpanID().String()
 		parentID := span.Parent().SpanID().String()
+		isExtensionSpan := span.Name() == meta.SpanNameDynamicExtension
 		var runID string
+		var dynamicSpanID string
 
+		attrs := make(map[string]any)
 		for _, attr := range span.Attributes() {
+			// Capture but omit the run ID attribute from the span attributes
 			if string(attr.Key) == meta.AttributeRunID {
 				runID = attr.Value.AsString()
 				continue
 			}
-		}
 
-		attrs := make(map[string]interface{})
-		for _, attr := range span.Attributes() {
+			// Capture but omit the dynamic span ID attribute from the span attributes
+			if string(attr.Key) == meta.AttributeDynamicSpanID {
+				dynamicSpanID = attr.Value.AsString()
+				continue
+			}
+
+			// Omit drop span attribute if we're an extension span
+			if isExtensionSpan && string(attr.Key) == meta.AttributeDropSpan {
+				continue
+			}
+
 			attrs[string(attr.Key)] = attr.Value.AsInterface()
 		}
-		data, err := json.Marshal(attrs)
+
+		// If we don't have a run ID, we can't store this span
+		if runID == "" {
+			// TODO Log error
+			spew.Dump("Failed to find run ID for span", span)
+			continue
+		}
+
+		attrsByt, err := json.Marshal(attrs)
 		if err != nil {
 			// TODO Log error
 			spew.Dump("Failed to marshal span attributes", err)
+			continue
+		}
+
+		linksByt, err := json.Marshal(span.Links())
+		if err != nil {
+			// TODO Log error
+			spew.Dump("Failed to marshal span links", err)
 			continue
 		}
 
@@ -47,8 +74,13 @@ func (e *DBExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlyS
 			Name:         span.Name(),
 			StartTime:    span.StartTime(),
 			EndTime:      span.EndTime(),
-			RunID:        sql.NullString{String: runID, Valid: runID != ""},
-			Attributes:   string(data),
+			RunID:        runID,
+			Attributes:   string(attrsByt),
+			Links:        string(linksByt),
+			DynamicSpanID: sql.NullString{
+				String: dynamicSpanID,
+				Valid:  dynamicSpanID != "",
+			},
 		})
 		if err != nil {
 			// TODO Log error

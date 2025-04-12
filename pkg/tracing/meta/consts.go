@@ -1,10 +1,15 @@
 package meta
 
 const (
+	// Implementation
+	PropagationKey = "user-otel-ctx"
+
 	// Top-level span names
-	SpanNameRun       = "executor.run"
-	SpanNameStep      = "executor.step"
-	SpanNameExecution = "executor.execution"
+	SpanNameRun              = "executor.run"
+	SpanNameStepDiscovery    = "executor.step.discovery"
+	SpanNameStep             = "executor.step"
+	SpanNameExecution        = "executor.execution"
+	SpanNameDynamicExtension = "EXTEND"
 
 	// Run attributes
 	AttributeAccountID        = "_inngest.account.id"
@@ -22,6 +27,11 @@ const (
 
 	// Dynamic span controls
 	AttributeDynamicSpanID = "_inngest.dynamic.span.id"
+	AttributeDynamicStatus = "_inngest.dynamic.status"
+
+	// Link attributes
+	LinkAttributeType            = "_inngest.link.type"
+	LinkAttributeTypeFollowsFrom = "follows_from"
 
 	// Generic step attributes
 	AttributeStepID          = "_inngest.step.id"
@@ -30,16 +40,20 @@ const (
 	AttributeStepAttempt     = "_inngest.step.attempt"
 	AttributeStepMaxAttempts = "_inngest.step.max_attempts"
 
+	// Invoke attributes
 	AttributeStepInvokeExpiry         = "_inngest.step.invoke_function.expiry"
 	AttributeStepInvokeFunctionID     = "_inngest.step.invoke_function.id"
 	AttributeStepInvokeTriggerEventID = "_inngest.step.invoke_function.trigger_event_id"
 
+	// Sleep attributes
 	AttributeStepSleepDuration = "_inngest.step.sleep.duration"
 
+	// WaitForEvent attributes
 	AttributeStepWaitForEventExpiry = "_inngest.step.wait_for_event.expiry"
 	AttributeStepWaitForEventIf     = "_inngest.step.wait_for_event.if"
 	AttributeStepWaitForEventName   = "_inngest.step.wait_for_event.name"
 
+	// HTTP (serve) attributes
 	AttributeResponseHeaders    = "_inngest.response.headers"
 	AttributeResponseStatusCode = "_inngest.response.status_code"
 	AttributeResponseOutputSize = "_inngest.response.output_size"

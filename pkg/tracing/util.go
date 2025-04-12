@@ -1,6 +1,7 @@
 package tracing
 
 import (
+	"context"
 	"encoding/json"
 
 	"github.com/davecgh/go-spew/spew"
@@ -10,6 +11,7 @@ import (
 	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/tracing/meta"
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -134,7 +136,7 @@ func SpanFromQueueItem(i *queue.Item) *meta.SpanMetadata {
 		return nil
 	}
 
-	if carrier, ok := i.Metadata["wobbly"]; ok {
+	if carrier, ok := i.Metadata[meta.PropagationKey]; ok {
 		spew.Dump("tracing.SpanFromQueueItem", "found carrier", carrier)
 		var out meta.SpanMetadata
 		if err := json.Unmarshal([]byte(carrier), &out); err == nil {
@@ -149,10 +151,33 @@ func SpanFromQueueItem(i *queue.Item) *meta.SpanMetadata {
 	return nil
 }
 
+// TODO Everywhere this is used, we're creating a step span directly under the
+// run. When supporting userland spans anywhere, this method must be deprecated
+// and all calls should instead use something that fetches which span (run or
+// _userland_) this step should be under.
+//
+// A single exception is maybe the very first execution, but also with that we
+// shoud have the run span inside the queue item's metadata.
 func RunSpanFromMetadata(md *statev2.Metadata) *meta.SpanMetadata {
 	if md == nil {
 		return nil
 	}
 
 	return md.Config.NewFunctionTrace()
+}
+
+func spanContextFromMetadata(m *meta.SpanMetadata) trace.SpanContext {
+	if m == nil {
+		return trace.SpanContext{}
+	}
+
+	carrier := propagation.MapCarrier{
+		"traceparent": m.TraceParent,
+		"tracestate":  m.TraceState,
+	}
+
+	ctx := propagation.TraceContext{}.Extract(context.Background(), carrier)
+	sc := trace.SpanContextFromContext(ctx)
+
+	return sc
 }

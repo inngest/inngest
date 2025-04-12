@@ -33,59 +33,62 @@ func (p *executionProcessor) OnStart(parent context.Context, s sdktrace.ReadWrit
 		)
 	}
 
-	switch s.Name() {
-	case meta.SpanNameRun:
-		{
-			if p.md == nil {
+	// Do not set extra contextual data on extension spans
+	if s.Name() != meta.SpanNameDynamicExtension {
+
+		switch s.Name() {
+		case meta.SpanNameRun:
+			{
+				if p.md == nil {
+					break
+				}
+
+				eventIDs := make([]string, len(p.md.Config.EventIDs))
+				for i, id := range p.md.Config.EventIDs {
+					eventIDs[i] = id.String()
+				}
+
+				attrs = append(attrs,
+					attribute.String(meta.AttributeFunctionID, p.md.ID.FunctionID.String()),
+					attribute.Int(meta.AttributeFunctionVersion, p.md.Config.FunctionVersion),
+					attribute.StringSlice(meta.AttributeEventIDs, eventIDs),
+					attribute.String(meta.AttributeAccountID, p.md.ID.Tenant.AccountID.String()),
+					attribute.String(meta.AttributeEnvID, p.md.ID.Tenant.EnvID.String()),
+					attribute.String(meta.AttributeAppID, p.md.ID.Tenant.AppID.String()),
+				)
+
+				if p.md.Config.CronSchedule() != nil {
+					attrs = append(attrs,
+						attribute.String(meta.AttributeCronSchedule, *p.md.Config.CronSchedule()),
+					)
+				}
+
+				if p.md.Config.BatchID != nil {
+					attrs = append(attrs,
+						attribute.String(meta.AttributeBatchID, p.md.Config.BatchID.String()),
+						attribute.Int64(meta.AttributeBatchTimestamp, int64(p.md.Config.BatchID.Time())),
+					)
+				}
+
 				break
 			}
 
-			eventIDs := make([]string, len(p.md.Config.EventIDs))
-			for i, id := range p.md.Config.EventIDs {
-				eventIDs[i] = id.String()
+		case meta.SpanNameStep:
+			{
+				if p.qi != nil {
+					attrs = append(attrs,
+						attribute.Int(meta.AttributeStepMaxAttempts, p.qi.GetMaxAttempts()),
+						attribute.Int(meta.AttributeStepAttempt, p.qi.Attempt),
+					)
+				}
+
+				break
 			}
 
-			attrs = append(attrs,
-				attribute.String(meta.AttributeFunctionID, p.md.ID.FunctionID.String()),
-				attribute.Int(meta.AttributeFunctionVersion, p.md.Config.FunctionVersion),
-				attribute.StringSlice(meta.AttributeEventIDs, eventIDs),
-				attribute.String(meta.AttributeAccountID, p.md.ID.Tenant.AccountID.String()),
-				attribute.String(meta.AttributeEnvID, p.md.ID.Tenant.EnvID.String()),
-				attribute.String(meta.AttributeAppID, p.md.ID.Tenant.AppID.String()),
-			)
-
-			if p.md.Config.CronSchedule() != nil {
-				attrs = append(attrs,
-					attribute.String(meta.AttributeCronSchedule, *p.md.Config.CronSchedule()),
-				)
+		case meta.SpanNameExecution:
+			{
+				break
 			}
-
-			if p.md.Config.BatchID != nil {
-				attrs = append(attrs,
-					attribute.String(meta.AttributeBatchID, p.md.Config.BatchID.String()),
-					attribute.Int64(meta.AttributeBatchTimestamp, int64(p.md.Config.BatchID.Time())),
-				)
-			}
-
-			break
-		}
-
-	case meta.SpanNameStep:
-		{
-
-			if p.qi != nil {
-				attrs = append(attrs,
-					attribute.Int(meta.AttributeStepMaxAttempts, p.qi.GetMaxAttempts()),
-					attribute.Int(meta.AttributeStepAttempt, p.qi.Attempt),
-				)
-			}
-
-			break
-		}
-
-	case meta.SpanNameExecution:
-		{
-			break
 		}
 	}
 
@@ -94,10 +97,13 @@ func (p *executionProcessor) OnStart(parent context.Context, s sdktrace.ReadWrit
 }
 
 func (p *executionProcessor) OnEnd(s sdktrace.ReadOnlySpan) {
-	for _, attr := range s.Attributes() {
-		if string(attr.Key) == meta.AttributeDropSpan && attr.Value.AsBool() {
-			// Toggle this on and off to see or remove dropped spans
-			return // Don't export dropped spans
+	// If the span isn't an extension span, judge if it should be dropped.
+	if s.Name() != meta.SpanNameDynamicExtension {
+		for _, attr := range s.Attributes() {
+			if string(attr.Key) == meta.AttributeDropSpan && attr.Value.AsBool() {
+				// Toggle this on and off to see or remove dropped spans
+				return // Don't export dropped spans
+			}
 		}
 	}
 

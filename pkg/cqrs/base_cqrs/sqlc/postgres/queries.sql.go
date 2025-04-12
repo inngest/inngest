@@ -1020,7 +1020,7 @@ func (q *Queries) GetQueueSnapshotChunks(ctx context.Context, snapshotID string)
 }
 
 const getSpansByRunID = `-- name: GetSpansByRunID :many
-SELECT span_id, trace_id, parent_span_id, name, start_time, end_time, run_id, attributes FROM spans WHERE run_id = CAST($1 AS CHAR(26))
+SELECT span_id, trace_id, parent_span_id, name, start_time, end_time, attributes, links, run_id, dynamic_span_id FROM spans WHERE run_id = CAST($1 AS CHAR(26))
 `
 
 func (q *Queries) GetSpansByRunID(ctx context.Context, dollar_1 string) ([]*Span, error) {
@@ -1039,8 +1039,10 @@ func (q *Queries) GetSpansByRunID(ctx context.Context, dollar_1 string) ([]*Span
 			&i.Name,
 			&i.StartTime,
 			&i.EndTime,
-			&i.RunID,
 			&i.Attributes,
+			&i.Links,
+			&i.RunID,
+			&i.DynamicSpanID,
 		); err != nil {
 			return nil, err
 		}
@@ -1497,19 +1499,21 @@ const insertSpan = `-- name: InsertSpan :exec
 
 INSERT INTO spans (
   span_id, trace_id, parent_span_id, name,
-  start_time, end_time, run_id, attributes
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+  start_time, end_time, run_id, dynamic_span_id, attributes, links
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
 `
 
 type InsertSpanParams struct {
-	SpanID       string
-	TraceID      string
-	ParentSpanID sql.NullString
-	Name         string
-	StartTime    time.Time
-	EndTime      time.Time
-	RunID        sql.NullString
-	Attributes   pqtype.NullRawMessage
+	SpanID        string
+	TraceID       string
+	ParentSpanID  sql.NullString
+	Name          string
+	StartTime     time.Time
+	EndTime       time.Time
+	RunID         string
+	DynamicSpanID sql.NullString
+	Attributes    pqtype.NullRawMessage
+	Links         pqtype.NullRawMessage
 }
 
 // New
@@ -1522,7 +1526,9 @@ func (q *Queries) InsertSpan(ctx context.Context, arg InsertSpanParams) error {
 		arg.StartTime,
 		arg.EndTime,
 		arg.RunID,
+		arg.DynamicSpanID,
 		arg.Attributes,
+		arg.Links,
 	)
 	return err
 }

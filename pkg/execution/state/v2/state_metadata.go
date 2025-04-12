@@ -315,7 +315,7 @@ func (c *Config) NewSetFunctionTrace(carrier *meta.SpanMetadata) {
 	defer c.mu.Unlock()
 
 	c.initContext()
-	c.Context["wobbly"] = *carrier
+	c.Context[meta.PropagationKey] = *carrier
 }
 
 func (c *Config) NewFunctionTrace() *meta.SpanMetadata {
@@ -326,7 +326,7 @@ func (c *Config) NewFunctionTrace() *meta.SpanMetadata {
 		return nil
 	}
 
-	if raw, ok := c.Context["wobbly"]; ok {
+	if raw, ok := c.Context[meta.PropagationKey]; ok {
 		if data, err := json.Marshal(raw); err == nil {
 			var meta meta.SpanMetadata
 			if err := json.Unmarshal(data, &meta); err == nil {

@@ -329,8 +329,8 @@ SELECT * FROM worker_connections WHERE account_id = @account_id AND workspace_id
 -- name: InsertSpan :exec
 INSERT INTO spans (
   span_id, trace_id, parent_span_id, name,
-  start_time, end_time, run_id, attributes
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+  start_time, end_time, run_id, dynamic_span_id, attributes, links
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 -- name: GetSpansByRunID :many
 SELECT * FROM spans WHERE run_id = ?;

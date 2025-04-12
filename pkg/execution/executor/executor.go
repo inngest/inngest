@@ -775,16 +775,18 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	// If this is of type sleep, ensure that we save "nil" within the state store
 	// for the outgoing edge ID.  This ensures that we properly increase the stack
 	// for `tools.sleep` within generator functions.
-	if item.Kind == queue.KindSleep && item.Attempt == 0 {
+	isSleepResume := item.Kind == queue.KindSleep && item.Attempt == 0
+	if isSleepResume {
 		// tCtx, _ := e.tracerProvider.NewTracer(ctx, md, &item)
 		// e.tracerProvider.UpdateSpanEnd(tCtx, time.Now(),
 		// []attribute.KeyValue{})
 		e.tracerProvider.ExtendSpan(&tracing.ExtendSpanOptions{
+			EndTime:    time.Now(),
 			Location:   "executor.Execute",
 			Metadata:   &md,
 			QueueItem:  &item,
+			Status:     codes.Ok,
 			TargetSpan: tracing.SpanFromQueueItem(&item),
-			EndTime:    time.Now(),
 		})
 
 		hasPendingSteps, err := e.smv2.SaveStep(ctx, sv2.ID{
@@ -928,12 +930,14 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		httpClient: httpdriver.DefaultClient,
 	}
 
-	// If first attempt, this is the creation of a step, and then an attempt.
-	// Otherwise it's just an attempt.
+	// Set the parent span for this execution.
 	var execParent *meta.SpanMetadata
 	if isFirstExecution {
+		// If this is the first ever attempt, we haven't created a step yet. If
+		// this is not the first attempt, the step span is created when it is
+		// enqueued, so we don't need to create one here.
 		execParent = e.tracerProvider.CreateSpan(
-			meta.SpanNameStep,
+			meta.SpanNameStepDiscovery,
 			&tracing.CreateSpanOptions{
 				Location:  "executor.Execute",
 				Parent:    tracing.RunSpanFromMetadata(&md),
@@ -941,11 +945,27 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 				QueueItem: &item,
 			},
 		)
+
+	} else if isSleepResume {
+		// If we're resuming a sleep here, we're also starting a new discovery
+		// step here.
+		execParent = e.tracerProvider.CreateSpan(
+			meta.SpanNameStepDiscovery,
+			&tracing.CreateSpanOptions{
+				FollowsFrom: tracing.SpanFromQueueItem(&item),
+				Location:    "executor.Execute",
+				Metadata:    &md,
+				Parent:      tracing.RunSpanFromMetadata(&md),
+				QueueItem:   &item,
+			},
+		)
 	} else {
+		// If we're here, we assume that the step span has already been
+		// created, so add it here.
 		execParent = tracing.SpanFromQueueItem(&item)
 	}
 
-	execMetadata := e.tracerProvider.CreateSpan(
+	execSpan := e.tracerProvider.CreateSpan(
 		meta.SpanNameExecution,
 		&tracing.CreateSpanOptions{
 			Location:  "executor.Execute",
@@ -957,16 +977,21 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 
 	resp, err := e.run(ctx, &instance)
 
+	status := codes.Ok
+	if err != nil {
+		status = codes.Error
+	}
 	e.tracerProvider.ExtendSpan(
 		&tracing.ExtendSpanOptions{
+			EndTime:    time.Now(),
 			Location:   "executor.Execute",
-			TargetSpan: execMetadata,
 			Metadata:   &md,
 			QueueItem:  &item,
-			EndTime:    time.Now(),
+			TargetSpan: execSpan,
 			SpanOptions: []trace.SpanStartOption{
 				tracing.WithDriverResponseAttrs(resp),
 			},
+			Status: status,
 		},
 	)
 
@@ -2112,13 +2137,14 @@ func (e *executor) handleGeneratorStep(ctx context.Context, i *runInstance, gen 
 		// }
 
 		span, _ := e.tracerProvider.CreateDroppableSpan(
-			meta.SpanNameStep,
+			meta.SpanNameStepDiscovery,
 			&tracing.CreateSpanOptions{
-				Carrier:   nextItem.Metadata,
-				Location:  "executor.handleGeneratorStep",
-				Metadata:  &i.md,
-				QueueItem: &nextItem,
-				Parent:    tracing.RunSpanFromMetadata(&i.md),
+				Carrier:     nextItem.Metadata,
+				FollowsFrom: tracing.SpanFromQueueItem(&i.item),
+				Location:    "executor.handleGeneratorStep",
+				Metadata:    &i.md,
+				Parent:      tracing.RunSpanFromMetadata(&i.md),
+				QueueItem:   &nextItem,
 			},
 		)
 
@@ -2258,13 +2284,14 @@ func (e *executor) handleStepError(ctx context.Context, i *runInstance, gen stat
 		// }
 
 		span, _ := e.tracerProvider.CreateDroppableSpan(
-			meta.SpanNameStep,
+			meta.SpanNameStepDiscovery,
 			&tracing.CreateSpanOptions{
-				Carrier:   nextItem.Metadata,
-				Location:  "executor.handleStepError",
-				Metadata:  &i.md,
-				QueueItem: &nextItem,
-				Parent:    tracing.RunSpanFromMetadata(&i.md),
+				Carrier:     nextItem.Metadata,
+				FollowsFrom: tracing.SpanFromQueueItem(&i.item),
+				Location:    "executor.handleStepError",
+				Metadata:    &i.md,
+				QueueItem:   &nextItem,
+				Parent:      tracing.RunSpanFromMetadata(&i.md),
 			},
 		)
 
@@ -2346,11 +2373,12 @@ func (e *executor) handleGeneratorStepPlanned(ctx context.Context, i *runInstanc
 	span, _ := e.tracerProvider.CreateDroppableSpan(
 		meta.SpanNameStep,
 		&tracing.CreateSpanOptions{
-			Carrier:   nextItem.Metadata,
-			Location:  "executor.handleGeneratorStepPlanned",
-			Metadata:  &i.md,
-			QueueItem: &nextItem,
-			Parent:    tracing.RunSpanFromMetadata(&i.md),
+			Carrier:     nextItem.Metadata,
+			FollowsFrom: tracing.SpanFromQueueItem(&i.item),
+			Location:    "executor.handleGeneratorStepPlanned",
+			Metadata:    &i.md,
+			QueueItem:   &nextItem,
+			Parent:      tracing.RunSpanFromMetadata(&i.md),
 			SpanOptions: []trace.SpanStartOption{
 				tracing.WithGeneratorAttrs(&gen),
 			},
@@ -2430,11 +2458,12 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, i *runInstance, gen
 	span, _ := e.tracerProvider.CreateDroppableSpan(
 		meta.SpanNameStep,
 		&tracing.CreateSpanOptions{
-			Carrier:   nextItem.Metadata,
-			Location:  "executor.handleGeneratorSleep",
-			Metadata:  &i.md,
-			QueueItem: &nextItem,
-			Parent:    tracing.RunSpanFromMetadata(&i.md),
+			Carrier:     nextItem.Metadata,
+			FollowsFrom: tracing.SpanFromQueueItem(&i.item),
+			Location:    "executor.handleGeneratorSleep",
+			Metadata:    &i.md,
+			QueueItem:   &nextItem,
+			Parent:      tracing.RunSpanFromMetadata(&i.md),
 			SpanOptions: []trace.SpanStartOption{
 				tracing.WithGeneratorAttrs(&gen),
 			},
