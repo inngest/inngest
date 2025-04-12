@@ -498,12 +498,6 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	}
 
 	// Always the root span.
-	// _, tracer := e.tracerProvider.NewTracer(ctx, metadata, nil)
-	// spanCtx, span := tracer.Tracer().Start(ctx, tracing.SpanNameRun, trace.WithNewRoot(), trace.WithAttributes(attribute.String(tracing.AttributeInternalLocation, "Schedule")))
-	// configCtx := map[string]string{}
-	// e.tracerProvider.Inject(spanCtx, propagation.MapCarrier(configCtx))
-	// config.NewSetFunctionTrace(configCtx)
-	// span.End()
 	config.NewSetFunctionTrace(
 		e.tracerProvider.CreateSpan(
 			meta.SpanNameRun,
@@ -2127,15 +2121,6 @@ func (e *executor) handleGeneratorStep(ctx context.Context, i *runInstance, gen 
 	}
 
 	if !hasPendingSteps {
-		// metadata := map[string]string{}
-		// ctx, tp := e.tracerProvider.NewTracer(ctx, i.md, nil)
-		// ctx, span := tp.Tracer().Start(ctx, tracing.SpanNameStep, trace.WithAttributes(attribute.String(tracing.AttributeInternalLocation, "handleGeneratorStep")))
-		// e.tracerProvider.Inject(ctx, metadata)
-		// metadataByte, _ := json.Marshal(metadata)
-		// nextItem.Metadata = map[string]string{
-		// 	"wobbly": string(metadataByte),
-		// }
-
 		span, _ := e.tracerProvider.CreateDroppableSpan(
 			meta.SpanNameStepDiscovery,
 			&tracing.CreateSpanOptions{
@@ -2274,15 +2259,6 @@ func (e *executor) handleStepError(ctx context.Context, i *runInstance, gen stat
 	}
 
 	if !hasPendingSteps {
-		// metadata := map[string]string{}
-		// ctx, tp := e.tracerProvider.NewTracer(ctx, i.md, nil)
-		// ctx, span := tp.Tracer().Start(ctx, tracing.SpanNameStep, trace.WithAttributes(attribute.String(tracing.AttributeInternalLocation, "handleStepError")))
-		// e.tracerProvider.Inject(ctx, metadata)
-		// metadataByte, _ := json.Marshal(metadata)
-		// nextItem.Metadata = map[string]string{
-		// 	"wobbly": string(metadataByte),
-		// }
-
 		span, _ := e.tracerProvider.CreateDroppableSpan(
 			meta.SpanNameStepDiscovery,
 			&tracing.CreateSpanOptions{
@@ -2353,23 +2329,6 @@ func (e *executor) handleGeneratorStepPlanned(ctx context.Context, i *runInstanc
 		Metadata: make(map[string]string),
 	}
 
-	// metadata := map[string]string{}
-	// ctx, tp := e.tracerProvider.NewTracer(ctx, i.md, nil)
-	// ctx, span := tp.Tracer().Start(
-	// 	ctx,
-	// 	tracing.SpanNameStep,
-	// 	tracing.WithGeneratorAttrs(&gen),
-	// 	tracing.WithQueueItemAttrs(&nextItem),
-	// 	trace.WithAttributes(
-	// 		attribute.String(tracing.AttributeInternalLocation, "handleGeneratorStepPlanned"),
-	// 	),
-	// )
-	// e.tracerProvider.Inject(ctx, metadata)
-	// metadataByte, _ := json.Marshal(metadata)
-	// nextItem.Metadata = map[string]string{
-	// 	"wobbly": string(metadataByte),
-	// }
-
 	span, _ := e.tracerProvider.CreateDroppableSpan(
 		meta.SpanNameStep,
 		&tracing.CreateSpanOptions{
@@ -2437,23 +2396,6 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, i *runInstance, gen
 		Payload:               queue.PayloadEdge{Edge: nextEdge},
 		Metadata:              make(map[string]string),
 	}
-
-	// metadata := map[string]string{}
-	// ctx, tp := e.tracerProvider.NewTracer(ctx, i.md, nil)
-	// ctx, span := tp.Tracer().Start(
-	// 	ctx,
-	// 	tracing.SpanNameStep,
-	// 	tracing.WithGeneratorAttrs(&gen),
-	// 	tracing.WithQueueItemAttrs(&nextItem),
-	// 	trace.WithAttributes(
-	// 		attribute.String(tracing.AttributeInternalLocation, "handleGeneratorSleep"),
-	// 	),
-	// )
-	// e.tracerProvider.Inject(ctx, metadata)
-	// metadataByte, _ := json.Marshal(metadata)
-	// nextItem.Metadata = map[string]string{
-	// 	"wobbly": string(metadataByte),
-	// }
 
 	span, _ := e.tracerProvider.CreateDroppableSpan(
 		meta.SpanNameStep,

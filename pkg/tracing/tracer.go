@@ -99,7 +99,6 @@ func (tp *TracerProvider) CreateDroppableSpan(
 
 	carrier := propagation.MapCarrier{}
 	defaultPropagator.Inject(ctx, carrier)
-	// defaultPropagator.Inject(trace.ContextWithSpan(ctx, span), carrier)
 
 	spanMetadata := &meta.SpanMetadata{
 		TraceParent: carrier["traceparent"],
