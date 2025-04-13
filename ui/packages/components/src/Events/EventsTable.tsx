@@ -3,7 +3,6 @@
 import { useCallback, useState } from 'react';
 import type { Route } from 'next';
 import dynamic from 'next/dynamic';
-import { useRouter } from 'next/navigation';
 import { Button } from '@inngest/components/Button';
 import TableBlankState from '@inngest/components/EventTypes/TableBlankState';
 import { TimeFilter } from '@inngest/components/Filter/TimeFilter';
@@ -18,7 +17,11 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query';
 
 import type { RangeChangeProps } from '../DatePicker/RangePicker';
 import EntityFilter from '../Filter/EntityFilter';
-import { useBatchedSearchParams, useSearchParam } from '../hooks/useSearchParam';
+import {
+  useBatchedSearchParams,
+  useSearchParam,
+  useStringArraySearchParam,
+} from '../hooks/useSearchParam';
 import type { Features } from '../types/features';
 import { useColumns } from './columns';
 
@@ -54,7 +57,6 @@ export function EventsTable({
   }) => Promise<{ events: Omit<Event, 'payload'>[]; pageInfo: PageInfo }>;
   features: Pick<Features, 'history'>;
 }) {
-  const router = useRouter();
   const columns = useColumns({ pathCreator });
   const [cursor, setCursor] = useState<string | null>(null);
   const [showSearch, setShowSearch] = useState(false);
@@ -62,11 +64,10 @@ export function EventsTable({
   const [startTime] = useSearchParam('start');
   const [endTime] = useSearchParam('end');
   const batchUpdate = useBatchedSearchParams();
-  const eventName = undefined;
-  const source = undefined;
-  const celQuery = undefined;
-
+  const [filteredEvent = [], setFilteredEvent, removeFilteredEvent] =
+    useStringArraySearchParam('filterEvent');
   const [search, setSearch, removeSearch] = useSearchParam('search');
+  const source = undefined;
 
   const {
     isPending, // first load, no data
@@ -75,10 +76,10 @@ export function EventsTable({
     isFetching, // refetching
     // TODO: implement infinite scrolling
   } = useQuery({
-    queryKey: ['events', { cursor, eventName, source, startTime, celQuery }],
+    queryKey: ['events', { cursor, eventName: filteredEvent, source, startTime, celQuery: search }],
     queryFn: useCallback(() => {
-      return getEvents({ cursor, eventName, source, startTime, celQuery });
-    }, [getEvents, cursor, eventName, source, startTime, celQuery]),
+      return getEvents({ cursor, eventName: filteredEvent, source, startTime, celQuery: search });
+    }, [getEvents, cursor, filteredEvent, source, startTime, search]),
     placeholderData: keepPreviousData,
     refetchInterval: !cursor ? refreshInterval : 0,
   });
@@ -92,6 +93,17 @@ export function EventsTable({
       }
     },
     [setSearch]
+  );
+
+  const onEventFilterChange = useCallback(
+    (value: string[]) => {
+      if (value.length > 0) {
+        setFilteredEvent(value);
+      } else {
+        removeFilteredEvent();
+      }
+    },
+    [removeFilteredEvent, setFilteredEvent]
   );
 
   const onDaysChange = useCallback(
@@ -121,8 +133,8 @@ export function EventsTable({
             {/* TODO: Wire entity */}
             <EntityFilter
               type="event"
-              onFilterChange={() => {}}
-              selectedEntities={[]}
+              onFilterChange={onEventFilterChange}
+              selectedEntities={filteredEvent}
               entities={[]}
             />
             <Button
