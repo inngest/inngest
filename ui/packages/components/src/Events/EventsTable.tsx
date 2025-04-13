@@ -6,15 +6,20 @@ import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import { Button } from '@inngest/components/Button';
 import TableBlankState from '@inngest/components/EventTypes/TableBlankState';
+import { TimeFilter } from '@inngest/components/Filter/TimeFilter';
 import { Pill } from '@inngest/components/Pill';
 import NewTable from '@inngest/components/Table/NewTable';
+import { DEFAULT_TIME } from '@inngest/components/hooks/useCalculatedStartTime';
 import { type Event, type PageInfo } from '@inngest/components/types/event';
 import { cn } from '@inngest/components/utils/classNames';
+import { durationToString, parseDuration } from '@inngest/components/utils/date';
 import { RiArrowRightUpLine, RiSearchLine } from '@remixicon/react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 
+import type { RangeChangeProps } from '../DatePicker/RangePicker';
 import EntityFilter from '../Filter/EntityFilter';
-import { useSearchParam } from '../hooks/useSearchParam';
+import { useBatchedSearchParams, useSearchParam } from '../hooks/useSearchParam';
+import type { Features } from '../types/features';
 import { useColumns } from './columns';
 
 const CodeSearch = dynamic(() => import('@inngest/components/CodeSearch/CodeSearch'), {
@@ -27,6 +32,7 @@ export function EventsTable({
   getEvents,
   pathCreator,
   emptyActions,
+  features,
 }: {
   emptyActions: React.ReactNode;
   pathCreator: {
@@ -46,14 +52,18 @@ export function EventsTable({
     startTime?: string;
     celQuery?: string;
   }) => Promise<{ events: Omit<Event, 'payload'>[]; pageInfo: PageInfo }>;
+  features: Pick<Features, 'history'>;
 }) {
   const router = useRouter();
   const columns = useColumns({ pathCreator });
   const [cursor, setCursor] = useState<string | null>(null);
   const [showSearch, setShowSearch] = useState(false);
+  const [lastDays] = useSearchParam('last');
+  const [startTime] = useSearchParam('start');
+  const [endTime] = useSearchParam('end');
+  const batchUpdate = useBatchedSearchParams();
   const eventName = undefined;
   const source = undefined;
-  const startTime = undefined;
   const celQuery = undefined;
 
   const [search, setSearch, removeSearch] = useSearchParam('search');
@@ -84,30 +94,74 @@ export function EventsTable({
     [setSearch]
   );
 
+  const onDaysChange = useCallback(
+    (value: RangeChangeProps) => {
+      if (value.type === 'relative') {
+        batchUpdate({
+          last: durationToString(value.duration),
+          start: null,
+          end: null,
+        });
+      } else {
+        batchUpdate({
+          last: null,
+          start: value.start.toISOString(),
+          end: value.end.toISOString(),
+        });
+      }
+    },
+    [batchUpdate]
+  );
+
   return (
     <div className="bg-canvasBase text-basis no-scrollbar flex-1 overflow-hidden focus-visible:outline-none">
       <div className="bg-canvasBase sticky top-0 z-10">
-        <div className="m-3 flex items-center gap-2">
-          {/* TODO: Wire entity */}
-          <EntityFilter
-            type="event"
-            onFilterChange={() => {}}
-            selectedEntities={[]}
-            entities={[]}
-          />
-          <Button
-            icon={<RiSearchLine />}
-            size="large"
-            iconSide="left"
-            appearance="outlined"
-            label={showSearch ? 'Hide search' : 'Show search'}
-            onClick={() => setShowSearch((prev) => !prev)}
-            className={cn(
-              search
-                ? 'after:bg-secondary-moderate after:mb-3 after:ml-0.5 after:h-2 after:w-2 after:rounded'
-                : ''
-            )}
-          />
+        <div className="m-3 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            {/* TODO: Wire entity */}
+            <EntityFilter
+              type="event"
+              onFilterChange={() => {}}
+              selectedEntities={[]}
+              entities={[]}
+            />
+            <Button
+              icon={<RiSearchLine />}
+              size="large"
+              iconSide="left"
+              appearance="outlined"
+              label={showSearch ? 'Hide search' : 'Show search'}
+              onClick={() => setShowSearch((prev) => !prev)}
+              className={cn(
+                search
+                  ? 'after:bg-secondary-moderate after:mb-3 after:ml-0.5 after:h-2 after:w-2 after:rounded'
+                  : ''
+              )}
+            />
+          </div>
+          <div className="flex">
+            <TimeFilter
+              daysAgoMax={features.history}
+              onDaysChange={onDaysChange}
+              defaultValue={
+                lastDays
+                  ? {
+                      type: 'relative',
+                      duration: parseDuration(lastDays),
+                    }
+                  : startTime && endTime
+                  ? {
+                      type: 'absolute',
+                      start: new Date(startTime),
+                      end: new Date(endTime),
+                    }
+                  : {
+                      type: 'relative',
+                      duration: parseDuration(DEFAULT_TIME),
+                    }
+              }
+            />
+          </div>
         </div>
         {showSearch && (
           <>
@@ -143,7 +197,9 @@ export function EventsTable({
           data={eventsData?.events || []}
           isLoading={isPending}
           blankState={<TableBlankState actions={emptyActions} />}
-          // onRowClick={(row) => router.push(pathCreator.eventType({ eventName: row.original.name }))}
+          renderSubComponent={() => <div>Subcomponent</div>}
+          getRowCanExpand={() => true}
+          enableExpanding
         />
       </div>
     </div>

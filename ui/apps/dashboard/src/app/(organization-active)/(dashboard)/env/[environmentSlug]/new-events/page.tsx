@@ -12,6 +12,7 @@ import { EventInfo } from '@/components/Events/EventInfo';
 import SendEventButton from '@/components/Events/SendEventButton';
 import { useEvents } from '@/components/Events/useEvents';
 import { pathCreator } from '@/utils/urls';
+import { useAccountFeatures } from '@/utils/useAccountFeatures';
 
 export default function EventsPage({
   params: { environmentSlug: envSlug },
@@ -30,6 +31,7 @@ export default function EventsPage({
     };
   }, [envSlug]);
   const getEvents = useEvents();
+  const features = useAccountFeatures();
 
   return (
     <>
@@ -46,6 +48,9 @@ export default function EventsPage({
       <EventsTable
         pathCreator={internalPathCreator}
         getEvents={getEvents}
+        features={{
+          history: features.data?.history ?? 7,
+        }}
         emptyActions={
           <>
             <Button
