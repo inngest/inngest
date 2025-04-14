@@ -3,14 +3,12 @@ package redis_state
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"io"
 	"time"
 
 	statev1 "github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/v2"
-	"github.com/inngest/inngest/pkg/util"
 )
 
 func MustRunServiceV2(m statev1.Manager) state.RunService {
@@ -185,23 +183,12 @@ func (v v2) LoadMetadata(ctx context.Context, id state.ID) (state.Metadata, erro
 // Update updates configuration on the state, eg. setting the execution
 // version after communicating with the SDK.
 func (v v2) UpdateMetadata(ctx context.Context, id state.ID, mutation state.MutableConfig) error {
-	_, err := util.WithRetry(
-		ctx,
-		"state.UpdateMetadata",
-		func(ctx context.Context) (bool, error) {
-			err := v.mgr.UpdateMetadata(ctx, id.Tenant.AccountID, id.RunID, statev1.MetadataUpdate{
-				DisableImmediateExecution: mutation.ForceStepPlan,
-				RequestVersion:            mutation.RequestVersion,
-				StartedAt:                 mutation.StartedAt,
-				HasAI:                     mutation.HasAI,
-			})
-
-			return false, err
-		},
-		util.NewRetryConf(),
-	)
-
-	return err
+	return v.mgr.UpdateMetadata(ctx, id.Tenant.AccountID, id.RunID, statev1.MetadataUpdate{
+		DisableImmediateExecution: mutation.ForceStepPlan,
+		RequestVersion:            mutation.RequestVersion,
+		StartedAt:                 mutation.StartedAt,
+		HasAI:                     mutation.HasAI,
+	})
 }
 
 // SaveStep saves step output for the given run ID and step ID.
@@ -211,17 +198,7 @@ func (v v2) SaveStep(ctx context.Context, id state.ID, stepID string, data []byt
 		WorkflowID: id.FunctionID,
 		AccountID:  id.Tenant.AccountID,
 	}
-
-	return util.WithRetry(
-		ctx,
-		"state.SaveStep",
-		func(ctx context.Context) (bool, error) {
-			return v.mgr.SaveResponse(ctx, v1id, stepID, string(data))
-		},
-		util.NewRetryConf(
-			util.WithRetryConfRetryableErrors(v.retryableError),
-		),
-	)
+	return v.mgr.SaveResponse(ctx, v1id, stepID, string(data))
 }
 
 // SavePending saves pending step IDs for the given run ID.
@@ -231,26 +208,5 @@ func (v v2) SavePending(ctx context.Context, id state.ID, pending []string) erro
 		WorkflowID: id.FunctionID,
 		AccountID:  id.Tenant.AccountID,
 	}
-
-	_, err := util.WithRetry(
-		ctx,
-		"state.SavePending",
-		func(ctx context.Context) (bool, error) {
-			err := v.mgr.SavePending(ctx, v1id, pending)
-			return false, err
-		},
-		util.NewRetryConf(),
-	)
-
-	return err
-}
-
-// determine what errors are retriable
-func (v v2) retryableError(err error) bool {
-	switch {
-	case errors.Is(err, statev1.ErrDuplicateResponse):
-		return false
-	}
-
-	return true
+	return v.mgr.SavePending(ctx, v1id, pending)
 }

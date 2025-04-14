@@ -29,7 +29,7 @@ require (
 	github.com/fatih/structs v1.1.0
 	github.com/go-chi/chi/v5 v5.0.10
 	github.com/go-chi/cors v1.2.1
-	github.com/golang-jwt/jwt/v5 v5.2.2
+	github.com/golang-jwt/jwt/v5 v5.2.1
 	github.com/golang-migrate/migrate/v4 v4.16.2
 	github.com/golang/protobuf v1.5.4
 	github.com/google/cel-go v0.21.0
@@ -62,7 +62,7 @@ require (
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.10.1
-	github.com/stretchr/testify v1.10.0
+	github.com/stretchr/testify v1.9.0
 	github.com/throttled/throttled/v2 v2.11.0
 	github.com/twmb/franz-go v1.18.1
 	github.com/valyala/fastjson v1.6.4

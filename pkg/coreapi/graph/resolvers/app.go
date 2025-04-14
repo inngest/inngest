@@ -99,6 +99,22 @@ func (a appResolver) FunctionCount(ctx context.Context, obj *cqrs.App) (int, err
 	return len(funcs), nil
 }
 
+func (a appResolver) ConnectionType(ctx context.Context, obj *cqrs.App) (models.AppConnectionType, error) {
+	method, err := enums.AppMethodString(obj.Method)
+	if err != nil {
+		return models.AppConnectionTypeConnect, fmt.Errorf("unknown connection type")
+	}
+
+	switch method {
+	case enums.AppMethodServe:
+		return models.AppConnectionTypeServerless, nil
+	case enums.AppMethodConnect:
+		return models.AppConnectionTypeConnect, nil
+	}
+
+	return models.AppConnectionTypeServerless, nil
+}
+
 func (a appResolver) Method(ctx context.Context, obj *cqrs.App) (models.AppMethod, error) {
 	method, err := enums.AppMethodString(obj.Method)
 	if err != nil {

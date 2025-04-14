@@ -11,7 +11,6 @@ const quickSearchQuery = graphql(`
           name
         }
         event {
-          envSlug
           id
           name
         }
@@ -23,7 +22,6 @@ const quickSearchQuery = graphql(`
           slug
         }
         run {
-          envSlug
           id
         }
       }

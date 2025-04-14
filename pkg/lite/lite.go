@@ -4,15 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/url"
-	"time"
-
 	"github.com/inngest/inngest/pkg/connect"
 	"github.com/inngest/inngest/pkg/connect/auth"
 	"github.com/inngest/inngest/pkg/connect/lifecycles"
 	connectpubsub "github.com/inngest/inngest/pkg/connect/pubsub"
 	connectv0 "github.com/inngest/inngest/pkg/connect/rest/v0"
 	connstate "github.com/inngest/inngest/pkg/connect/state"
+	"time"
 
 	"github.com/inngest/inngest/pkg/enums"
 
@@ -107,9 +105,6 @@ func New(ctx context.Context, opts StartOpts) error {
 	// Before running the development service, ensure that we change the http
 	// driver in development to use our AWS Gateway http client, attempting to
 	// automatically transform dev requests to lambda invocations.
-	//
-	// We also make sure to allow local requests.
-	httpdriver.DefaultTransport.DialContext = httpdriver.Dialer.DialContext
 	httpdriver.DefaultExecutor.Client.Transport = awsgateway.NewTransformTripper(httpdriver.DefaultExecutor.Client.Transport)
 	deploy.Client.Transport = awsgateway.NewTransformTripper(deploy.Client.Transport)
 
@@ -390,12 +385,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		// manage snapshotting
 		persistenceInterval = nil
 
-		// Mask Redis URI credentials before logging
-		loggedURI := ""
-		if u, err := url.Parse(opts.RedisURI); err == nil {
-			loggedURI = " " + u.Redacted()
-		}
-		logger.From(ctx).Info().Msgf("using external Redis%s; disabling in-memory persistence and snapshotting", loggedURI)
+		logger.From(ctx).Info().Msgf("using external Redis %s; disabling in-memory persistence and snapshotting", opts.RedisURI)
 	}
 
 	dsOpts := devserver.StartOpts{
@@ -575,7 +565,7 @@ func createInmemoryRedisConnectionOpt() (rueidis.ClientOption, error) {
 
 func getSendingEventHandler(pb pubsub.Publisher, topic string) execution.HandleSendingEvent {
 	return func(ctx context.Context, evt event.Event, item queue.Item) error {
-		trackedEvent := event.NewOSSTrackedEvent(evt, nil)
+		trackedEvent := event.NewOSSTrackedEvent(evt)
 		byt, err := json.Marshal(trackedEvent)
 		if err != nil {
 			return fmt.Errorf("error marshalling invocation event: %w", err)
@@ -611,7 +601,7 @@ func getInvokeFailHandler(ctx context.Context, pb pubsub.Publisher, topic string
 		for _, e := range evts {
 			evt := e
 			eg.Go(func() error {
-				trackedEvent := event.NewOSSTrackedEvent(evt, nil)
+				trackedEvent := event.NewOSSTrackedEvent(evt)
 				byt, err := json.Marshal(trackedEvent)
 				if err != nil {
 					return fmt.Errorf("error marshalling function finished event: %w", err)

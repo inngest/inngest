@@ -184,12 +184,6 @@ func (l traceLifecycle) OnFunctionStarted(
 	// spanID should always exists
 	spanID, err := md.Config.GetSpanID()
 	if err != nil {
-		l.log.Error("error retrieving spanID",
-			"error", err,
-			"lifecycle", "OnFunctionStarted",
-			"meta", md,
-		)
-
 		// generate a new one here to be used for subsequent runs.
 		// this could happen for runs that started before this feature was introduced.
 		sid := NewSpanID(ctx)
@@ -361,10 +355,9 @@ func (l traceLifecycle) OnFunctionCancelled(ctx context.Context, md sv2.Metadata
 
 	fnSpanID, err := md.Config.GetSpanID()
 	if err != nil {
-		l.log.Error("error retrieving spanID",
-			"error", err,
-			"lifecycle", "OnFunctionCancelled",
-			"meta", md,
+		l.log.Error("error retrieving spanID for cancelled function run",
+			"err", err,
+			"identifier", md.ID,
 		)
 		return
 	}
@@ -660,19 +653,14 @@ func (l traceLifecycle) OnStepGatewayRequestFinished(
 			attribute.Int(consts.OtelSysStepAttempt, item.Attempt),
 			attribute.Int(consts.OtelSysStepMaxAttempt, item.GetMaxAttempts()),
 			attribute.String(consts.OtelSysStepGroupID, item.GroupID),
+			attribute.Int(consts.OtelSysStepStatusCode, resp.StatusCode),
+			attribute.Int(consts.OtelSysStepOutputSizeBytes, int(resp.ContentLength)),
 			attribute.String(consts.OtelSysStepID, op.ID),
 			attribute.String(consts.OtelSysStepDisplayName, op.UserDefinedName()),
 			attribute.String(consts.OtelSysStepOpcode, op.Op.String()),
 		),
 	)
 	defer span.End()
-
-	if resp != nil {
-		span.SetAttributes(
-			attribute.Int(consts.OtelSysStepStatusCode, resp.StatusCode),
-			attribute.Int(consts.OtelSysStepOutputSizeBytes, int(resp.ContentLength)),
-		)
-	}
 
 	if item.RunInfo != nil {
 		span.SetAttributes(

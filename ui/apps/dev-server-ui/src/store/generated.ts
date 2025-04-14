@@ -33,10 +33,12 @@ export type App = {
   autodiscovered: Scalars['Boolean'];
   checksum: Maybe<Scalars['String']>;
   connected: Scalars['Boolean'];
+  connectionType: AppConnectionType;
   error: Maybe<Scalars['String']>;
   externalID: Scalars['String'];
   framework: Maybe<Scalars['String']>;
   functionCount: Scalars['Int'];
+  /** @deprecated connectionType is deprecated. Use method instead. */
   functions: Array<Function>;
   id: Scalars['ID'];
   method: AppMethod;
@@ -46,12 +48,19 @@ export type App = {
   url: Maybe<Scalars['String']>;
 };
 
+export enum AppConnectionType {
+  Connect = 'CONNECT',
+  Serverless = 'SERVERLESS'
+}
+
 export enum AppMethod {
   Connect = 'CONNECT',
   Serve = 'SERVE'
 }
 
 export type AppsFilterV1 = {
+  /** @deprecated connectionType is deprecated. Use method instead. */
+  connectionType?: InputMaybe<AppConnectionType>;
   method?: InputMaybe<AppMethod>;
 };
 

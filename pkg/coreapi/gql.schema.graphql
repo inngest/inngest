@@ -114,6 +114,8 @@ type App {
   checksum: String
   error: String
   functions: [Function!]!
+    @deprecated(reason: "connectionType is deprecated. Use method instead.")
+  connectionType: AppConnectionType!
 
   method: AppMethod!
 
@@ -571,11 +573,19 @@ type ConnectV1WorkerConnectionEdge {
   cursor: String!
 }
 
+enum AppConnectionType {
+  SERVERLESS
+  CONNECT
+}
+
 enum AppMethod {
   SERVE
   CONNECT
 }
 
 input AppsFilterV1 {
+  connectionType: AppConnectionType
+    @deprecated(reason: "connectionType is deprecated. Use method instead.")
+
   method: AppMethod
 }

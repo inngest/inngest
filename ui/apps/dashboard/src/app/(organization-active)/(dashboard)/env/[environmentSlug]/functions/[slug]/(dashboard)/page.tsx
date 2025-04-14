@@ -154,7 +154,7 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
               <div className="flex items-center justify-center">
                 <div className="rounded-md p-4">
                   <h2>Something went wrong!</h2>
-                  <div className="bg-canvasBase my-6 overflow-auto rounded-md p-2">
+                  <div className="bg-canvasBase my-6 overflow-scroll rounded-md p-2">
                     {error.toString()}
                   </div>
                   <Button

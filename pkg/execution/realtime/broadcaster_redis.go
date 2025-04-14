@@ -57,11 +57,9 @@ func (b *redisBroadcaster) Publish(ctx context.Context, m Message) {
 		return
 	}
 
-	pubCtx := context.WithoutCancel(ctx)
-
 	for _, t := range m.Topics() {
 		go func(t Topic) {
-			b.publish(pubCtx, t.String(), string(content))
+			b.publish(ctx, t.String(), string(content))
 		}(t)
 	}
 }
@@ -81,12 +79,6 @@ func (b *redisBroadcaster) publish(ctx context.Context, channel, message string)
 			<-time.After(redisRetryInterval)
 		}
 		if ctx.Err() != nil {
-			logger.StdlibLogger(ctx).Error(
-				"error publishing to realtime redis pubsub; ctx closed",
-				"channel", channel,
-				"error", ctx.Err(),
-				"attempt", i,
-			)
 			return
 		}
 		err := b.pubc.Do(ctx, cmd).Error()

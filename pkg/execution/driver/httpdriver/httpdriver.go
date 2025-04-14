@@ -25,41 +25,28 @@ import (
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/inngest/log"
 	"github.com/inngest/inngest/pkg/syscode"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
-	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
 	"go.opentelemetry.io/otel/propagation"
 )
 
 var (
-	Dialer = &net.Dialer{KeepAlive: 15 * time.Second}
+	dialer = &net.Dialer{KeepAlive: 15 * time.Second}
 
-	DefaultTransport = func() *http.Transport {
-		t := &http.Transport{
-			DialContext: SecureDialer(SecureDialerOpts{
-				AllowHostDocker: false,
-				AllowPrivate:    false,
-				AllowNAT64:      false,
-			}),
-			ForceAttemptHTTP2:     true,
-			MaxIdleConns:          5,
-			IdleConnTimeout:       2 * time.Second,
-			TLSHandshakeTimeout:   10 * time.Second,
-			ExpectContinueTimeout: 1 * time.Second,
-			DisableKeepAlives:     true,
-			// New, ensuring that services can take their time before
-			// responding with headers as they process long running
-			// jobs.
-			ResponseHeaderTimeout: consts.MaxFunctionTimeout,
-		}
-
-		if util.InTestMode() {
-			// Allow local requests during testing
-			t.DialContext = Dialer.DialContext
-		}
-
-		return t
-	}()
+	DefaultTransport = &http.Transport{
+		DialContext:           dialer.DialContext,
+		ForceAttemptHTTP2:     true,
+		MaxIdleConns:          5,
+		IdleConnTimeout:       2 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+		DisableKeepAlives:     true,
+		// New, ensuring that services can take their time before
+		// responding with headers as they process long running
+		// jobs.
+		ResponseHeaderTimeout: consts.MaxFunctionTimeout,
+	}
 	DefaultClient = &http.Client{
 		Timeout:       consts.MaxFunctionTimeout,
 		CheckRedirect: CheckRedirect,
@@ -103,14 +90,32 @@ func (e executor) Execute(ctx context.Context, sl sv2.StateLoader, s sv2.Metadat
 		return nil, err
 	}
 
-	dr, _, err := DoRequest(ctx, e.Client, Request{
+	headers := map[string]string{}
+	itrace.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(headers))
+	if headers["traceparent"] != "" {
+		// The span ID will be incorrect here as lifecycles can not affec the
+		// ctx. To patch, we manually set the span ID here to what we know it
+		// should be based on the item
+		parts := strings.Split(headers["traceparent"], "-")
+		if len(parts) == 4 {
+			spanID, err := item.SpanID()
+			if err != nil {
+				return nil, fmt.Errorf("error parsing span ID: %w", err)
+			}
+
+			parts[2] = spanID.String()
+			headers["traceparent"] = strings.Join(parts, "-")
+		}
+	}
+
+	return DoRequest(ctx, e.Client, Request{
 		SigningKey: e.localSigningKey,
 		URL:        *uri,
 		Input:      input,
 		Edge:       edge,
 		Step:       step,
+		Headers:    headers,
 	})
-	return dr, err
 }
 
 type Request struct {
@@ -128,16 +133,23 @@ type Request struct {
 	Input      []byte
 	Edge       inngest.Edge
 	Step       inngest.Step
+	// Headers are additional headers to add to the request.
+	Headers map[string]string
+
+	// SkipStats prevents statistics from being tracked.
+	SkipStats bool
+	// statter is a function added in testing, called with httpstat info
+	statter func(s *httpstat.Result)
 }
 
 // DoRequest executes the HTTP request with the given input.
-func DoRequest(ctx context.Context, c HTTPDoer, r Request) (*state.DriverResponse, *httpstat.Result, error) {
+func DoRequest(ctx context.Context, c HTTPDoer, r Request) (*state.DriverResponse, error) {
 	if c == nil {
 		c = DefaultClient
 	}
 
 	if r.URL.Scheme != "http" && r.URL.Scheme != "https" {
-		return nil, nil, fmt.Errorf("Unable to use HTTP executor for non-HTTP runtime")
+		return nil, fmt.Errorf("Unable to use HTTP executor for non-HTTP runtime")
 	}
 
 	// If we have a generator step name, ensure we add the step ID parameter
@@ -150,13 +162,12 @@ func DoRequest(ctx context.Context, c HTTPDoer, r Request) (*state.DriverRespons
 		r.URL.RawQuery = values.Encode()
 	}
 
-	resp, tracking, err := do(ctx, c, r)
+	resp, err := do(ctx, c, r)
 	if err != nil {
-		return nil, tracking, err
+		return nil, err
 	}
 
-	dr, err := HandleHttpResponse(ctx, r, resp)
-	return dr, tracking, err
+	return HandleHttpResponse(ctx, r, resp)
 }
 
 func HandleHttpResponse(ctx context.Context, r Request, resp *Response) (*state.DriverResponse, error) {
@@ -265,7 +276,7 @@ func HandleHttpResponse(ctx context.Context, r Request, resp *Response) (*state.
 	return dr, err
 }
 
-func do(ctx context.Context, c HTTPDoer, r Request) (*Response, *httpstat.Result, error) {
+func do(ctx context.Context, c HTTPDoer, r Request) (*Response, error) {
 	if c == nil {
 		c = DefaultClient
 	}
@@ -275,7 +286,7 @@ func do(ctx context.Context, c HTTPDoer, r Request) (*Response, *httpstat.Result
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, r.URL.String(), bytes.NewBuffer(r.Input))
 	if err != nil {
-		return nil, nil, fmt.Errorf("error creating request: %w", err)
+		return nil, fmt.Errorf("error creating request: %w", err)
 	}
 	req.Header.Add("Content-Type", "application/json")
 
@@ -290,8 +301,9 @@ func do(ctx context.Context, c HTTPDoer, r Request) (*Response, *httpstat.Result
 		req.Header.Add("X-Inngest-Signature", r.Signature)
 	}
 
-	// Add `traceparent` and `tracestate` headers to the request from `ctx`
-	itrace.UserTracer().Propagator().Inject(ctx, propagation.HeaderCarrier(req.Header))
+	for k, v := range r.Headers {
+		req.Header.Add(k, v)
+	}
 
 	// Track HTTP stats, eg. TLS handshake timeouts, DNS lookups, etc.
 	tracking := &httpstat.Result{}
@@ -300,6 +312,18 @@ func do(ctx context.Context, c HTTPDoer, r Request) (*Response, *httpstat.Result
 	// Perform the request.
 	resp, byt, dur, err := ExecuteRequest(ctx, c, req)
 	tracking.End(time.Now())
+
+	if r.statter != nil {
+		r.statter(tracking)
+	}
+
+	if !r.SkipStats { // opt-out
+		go trackRequestStats(ctx, tracking)
+		statbyt, _ := json.Marshal(tracking)
+		if resp != nil {
+			resp.Header.Add("x-inngest-request-stats", string(statbyt))
+		}
+	}
 
 	// Handle no response errors.
 	if errors.Is(err, ErrUnableToReach) {
@@ -310,10 +334,10 @@ func do(ctx context.Context, c HTTPDoer, r Request) (*Response, *httpstat.Result
 			Interface("edge	", r.Edge).
 			Int64("req_dur_ms", dur.Milliseconds()).
 			Msg("EOF writing request to SDK")
-		return nil, tracking, err
+		return nil, err
 	}
 	if err != nil && len(byt) == 0 {
-		return nil, tracking, err
+		return nil, err
 	}
 
 	var sysErr *syscode.Error
@@ -374,7 +398,7 @@ func do(ctx context.Context, c HTTPDoer, r Request) (*Response, *httpstat.Result
 	if resp.StatusCode == 201 && sysErr == nil {
 		stream, err := ParseStream(byt)
 		if err != nil {
-			return nil, tracking, fmt.Errorf("error parsing stream: %w", err)
+			return nil, fmt.Errorf("error parsing stream: %w", err)
 		} else {
 			// These are all contained within a single wrapper.
 			body = stream.Body
@@ -421,7 +445,7 @@ func do(ctx context.Context, c HTTPDoer, r Request) (*Response, *httpstat.Result
 		Sdk:            headers[headerSDK],
 		Header:         resp.Header,
 		SysErr:         sysErr,
-	}, tracking, err
+	}, err
 
 }
 
@@ -445,4 +469,16 @@ type Response struct {
 
 	SysErr *syscode.Error
 	IsSDK  bool
+}
+
+func trackRequestStats(ctx context.Context, r *httpstat.Result) {
+	tags := map[string]any{"ipv6": r.IsIPv6}
+	opts := metrics.HistogramOpt{
+		PkgName: "httpdriver",
+		Tags:    tags,
+	}
+	metrics.HistogramHTTPDNSLookupDuration(ctx, r.DNSLookup.Milliseconds(), opts)
+	metrics.HistogramHTTPTCPConnDuration(ctx, r.TCPConnection.Milliseconds(), opts)
+	metrics.HistogramHTTPTLSHandshakeDuration(ctx, r.TLSHandshake.Milliseconds(), opts)
+	metrics.HistogramHTTPServerProcessingDuration(ctx, r.ServerProcessing.Milliseconds(), opts)
 }
