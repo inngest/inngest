@@ -14,6 +14,7 @@ import { cn } from '@inngest/components/utils/classNames';
 import { durationToString, parseDuration } from '@inngest/components/utils/date';
 import { RiArrowRightUpLine, RiSearchLine } from '@remixicon/react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { type Row } from '@tanstack/react-table';
 
 import type { RangeChangeProps } from '../DatePicker/RangePicker';
 import EntityFilter from '../Filter/EntityFilter';
@@ -68,6 +69,7 @@ export function EventsTable({
     useStringArraySearchParam('filterEvent');
   const [search, setSearch, removeSearch] = useSearchParam('search');
   const source = undefined;
+  const [expandedIDs, setExpandedIDs] = useState<string[]>([]);
 
   const {
     isPending, // first load, no data
@@ -209,11 +211,25 @@ export function EventsTable({
           data={eventsData?.events || []}
           isLoading={isPending}
           blankState={<TableBlankState actions={emptyActions} />}
-          renderSubComponent={() => <div>Subcomponent</div>}
-          getRowCanExpand={() => true}
-          enableExpanding
+          renderSubComponent={SubComponent}
+          expandedIDs={expandedIDs}
+          onRowClick={(row) => {
+            if (expandedIDs.includes(row.original.id)) {
+              setExpandedIDs((prev) => {
+                return prev.filter((id) => id !== row.original.id);
+              });
+            } else {
+              setExpandedIDs((prev) => {
+                return [...prev, row.original.id];
+              });
+            }
+          }}
         />
       </div>
     </div>
   );
+}
+
+function SubComponent({ row }: { row: Row<Omit<Event, 'payload'>> }) {
+  return <p>Component {row.original.name}</p>;
 }

@@ -5,7 +5,6 @@ import { RiSortAsc, RiSortDesc } from '@remixicon/react';
 import {
   flexRender,
   getCoreRowModel,
-  getExpandedRowModel,
   useReactTable,
   type ColumnDef,
   type OnChangeFn,
@@ -13,30 +12,42 @@ import {
   type SortingState,
 } from '@tanstack/react-table';
 
-type TableProps<T> = {
+interface WithId {
+  id: string;
+}
+
+type ExpandableTableProps<T> = {
+  renderSubComponent: (props: { row: Row<T> }) => React.ReactElement;
+  expandedIDs: string[];
+};
+
+type BaseTableProps<T> = {
   data: T[] | undefined;
   sorting?: SortingState;
   setSorting?: OnChangeFn<SortingState>;
   isLoading?: boolean;
   renderSubComponent?: (props: { row: Row<T> }) => React.ReactElement;
-  enableExpanding?: boolean;
   columns: ColumnDef<T, any>[];
-  getRowCanExpand?: (row: Row<T>) => boolean;
   onRowClick?: (row: Row<T>) => void;
   blankState?: React.ReactNode;
+  expandedIDs?: string[];
 };
+
+type TableProps<T> = BaseTableProps<T> &
+  (T extends WithId
+    ? Partial<ExpandableTableProps<T>>
+    : { renderSubComponent?: never; expandedIDs?: never });
 
 export default function Table<T>({
   data = [],
   isLoading,
   sorting,
   setSorting,
-  enableExpanding = false,
-  getRowCanExpand = () => false,
   renderSubComponent,
   onRowClick,
   blankState,
   columns,
+  expandedIDs = [],
 }: TableProps<T>) {
   // Render empty lines for skeletons when data is loading
   const tableData = useMemo(() => {
@@ -71,9 +82,6 @@ export default function Table<T>({
     data: tableData,
     columns: tableColumns,
     getCoreRowModel: getCoreRowModel(),
-    getRowCanExpand,
-    getExpandedRowModel: getExpandedRowModel(),
-    enableExpanding,
     manualSorting: true,
     onSortingChange: setSorting,
     state: {
@@ -88,6 +96,11 @@ export default function Table<T>({
     'before:bg-surfaceMuted relative before:absolute before:bottom-0 before:left-0 before:top-0 before:w-0.5';
 
   const isEmpty = data.length < 1 && !isLoading;
+
+  // Type guard to check if a row has an id property
+  const hasId = <T,>(obj: T): obj is T & WithId => {
+    return typeof (obj as any).id === 'string';
+  };
 
   return (
     <div className="">
@@ -146,7 +159,9 @@ export default function Table<T>({
               <Fragment key={row.id}>
                 <tr
                   className={cn(
-                    row.getIsExpanded() ? 'h-12' : 'border-light h-12 border-b',
+                    hasId(row.original) && expandedIDs.includes(row.original.id)
+                      ? 'h-12'
+                      : 'border-light h-12 border-b',
                     onRowClick ? 'hover:bg-canvasSubtle/40 cursor-pointer' : ''
                   )}
                   onClick={() => {
@@ -166,26 +181,23 @@ export default function Table<T>({
                           width: cell.column.getSize(),
                           maxWidth: cell.column.getSize(),
                         }}
-                        className={cn(
-                          i === 0 && row.getIsExpanded() ? expandedRowSideBorder : '',
-                          isIconOnlyColumn ? '' : tableColumnStyles
-                        )}
+                        className={cn(isIconOnlyColumn ? '' : tableColumnStyles)}
                       >
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
                       </td>
                     );
                   })}
                 </tr>
-                {row.getIsExpanded() && renderSubComponent && !isLoading && (
-                  <tr className="border-subtle border-b last:border-b-0">
-                    <td
-                      colSpan={row.getVisibleCells().length}
-                      className={cn(row.getIsExpanded() ? expandedRowSideBorder : '')}
-                    >
-                      {renderSubComponent({ row })}
-                    </td>
-                  </tr>
-                )}
+                {hasId(row.original) &&
+                  expandedIDs.includes(row.original.id) &&
+                  renderSubComponent &&
+                  !isLoading && (
+                    <tr className="border-light border-b">
+                      <td colSpan={row.getVisibleCells().length} className={expandedRowSideBorder}>
+                        {renderSubComponent({ row })}
+                      </td>
+                    </tr>
+                  )}
               </Fragment>
             ))}
         </tbody>
