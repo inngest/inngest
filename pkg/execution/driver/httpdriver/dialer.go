@@ -3,13 +3,21 @@ package httpdriver
 import (
 	"context"
 	"fmt"
+	"math/rand/v2"
 	"net"
+	"time"
 
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/rs/dnscache"
+)
+
+const (
+	dnsCacheRefreshInterval = 5 * time.Minute
 )
 
 var privateIPBlocks []*net.IPNet
 var nat64blocks []*net.IPNet
+var cachedResolver *dnscache.Resolver
 
 func init() {
 	for _, cidr := range []string{
@@ -43,6 +51,25 @@ func init() {
 		nat64blocks = append(nat64blocks, block)
 	}
 
+	// Resolver for caching DNS lookups.
+	cachedResolver = &dnscache.Resolver{}
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logger.StdlibLogger(context.Background()).
+					Error("panic in resolver refresh", "error", r)
+			}
+		}()
+
+		t := time.NewTicker(dnsCacheRefreshInterval)
+		defer t.Stop()
+		for range t.C {
+			// Remove entries that haven't been used since the last refresh.
+			removeUnused := true
+
+			cachedResolver.Refresh(removeUnused)
+		}
+	}()
 }
 
 type SecureDialerOpts struct {
@@ -73,7 +100,7 @@ func SecureDialer(o SecureDialerOpts) DialFunc {
 		// "[fe80::1%lo0]:53".
 		//
 		// We always want to ensure we translate the domains to IP addresses.
-		host, _, err := net.SplitHostPort(addr)
+		host, port, err := net.SplitHostPort(addr)
 		if err != nil {
 			return nil, err
 		}
@@ -83,7 +110,7 @@ func SecureDialer(o SecureDialerOpts) DialFunc {
 		}
 
 		// Ensure that the current hostname is not a domain name.
-		addrs, err := net.DefaultResolver.LookupHost(ctx, host)
+		ips, err := cachedResolver.LookupHost(ctx, host)
 		if err != nil {
 			return nil, err
 		}
@@ -91,21 +118,38 @@ func SecureDialer(o SecureDialerOpts) DialFunc {
 		if o.log {
 			logger.StdlibLogger(ctx).Info("domain resolved",
 				"address", addr,
-				"hosts", addrs,
+				"hosts", ips,
 			)
 		}
 
-		for _, a := range addrs {
-			if !o.AllowPrivate && isPrivateHost(a) {
-				return nil, fmt.Errorf("Unable to make request to %s at IP %s: private IP range", addr, a)
+		for _, ip := range ips {
+			if !o.AllowPrivate && isPrivateHost(ip) {
+				return nil, fmt.Errorf("Unable to make request to %s at IP %s: private IP range", addr, ip)
 			}
-			if !o.AllowNAT64 && isNat64(a) {
-				return nil, fmt.Errorf("Unable to make request to %s at IP %s: NAT64 address", addr, a)
+			if !o.AllowNAT64 && isNat64(ip) {
+				return nil, fmt.Errorf("Unable to make request to %s at IP %s: NAT64 address", addr, ip)
 			}
 		}
 
-		// Return the default dialer in the http package
-		return o.dial(ctx, network, addr)
+		// Randomize the order of the IPs. The purpose is to evenly distribute
+		// load across the IPs.
+		rand.Shuffle(len(ips), func(i, j int) {
+			ips[i], ips[j] = ips[j], ips[i]
+		})
+
+		// Try each IP until we get a connection.
+		var conn net.Conn
+		for _, ip := range ips {
+			// We need to give the dialer an IP address. Otherwise, it will do
+			// DNS lookup that doesn't use the cached resolver.
+			addr := net.JoinHostPort(ip, port)
+
+			conn, err = o.dial(ctx, network, addr)
+			if err == nil {
+				break
+			}
+		}
+		return conn, err
 	}
 }
 
