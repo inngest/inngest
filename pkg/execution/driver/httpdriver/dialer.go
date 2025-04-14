@@ -7,8 +7,8 @@ import (
 	"net"
 	"time"
 
+	"github.com/inngest/inngest/pkg/execution/driver/httpdriver/dnscache"
 	"github.com/inngest/inngest/pkg/logger"
-	"github.com/rs/dnscache"
 )
 
 const (

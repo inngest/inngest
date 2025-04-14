@@ -25,7 +25,7 @@ type Resolver struct {
 
 	once  sync.Once
 	mu    sync.RWMutex
-	cache map[string]*cacheEntry
+	cache *cache
 
 	// OnCacheMiss is executed if the host or address is not included in
 	// the cache and the default lookup is executed.
@@ -64,21 +64,23 @@ func (r *Resolver) LookupHost(ctx context.Context, host string) (addrs []string,
 func (r *Resolver) refreshRecords(clearUnused bool, persistOnFailure bool) {
 	r.once.Do(r.init)
 	r.mu.RLock()
-	update := make([]string, 0, len(r.cache))
-	del := make([]string, 0, len(r.cache))
-	for key, entry := range r.cache {
+	update := make([]string, 0, r.cache.cache.ItemCount())
+	del := make([]string, 0, r.cache.cache.ItemCount())
+
+	r.cache.ForEachFunc(func(key string, entry *cacheEntry) bool {
 		if entry.used {
 			update = append(update, key)
 		} else if clearUnused {
 			del = append(del, key)
 		}
-	}
+		return true
+	})
 	r.mu.RUnlock()
 
 	if len(del) > 0 {
 		r.mu.Lock()
 		for _, key := range del {
-			delete(r.cache, key)
+			r.cache.Delete(key)
 		}
 		r.mu.Unlock()
 	}
@@ -97,7 +99,7 @@ func (r *Resolver) RefreshWithOptions(options ResolverRefreshOptions) {
 }
 
 func (r *Resolver) init() {
-	r.cache = make(map[string]*cacheEntry)
+	r.cache = newCache()
 }
 
 // lookupGroup merges lookup calls together for lookups for the same host. The
@@ -214,7 +216,7 @@ func (r *Resolver) prepareCtx(origContext context.Context) (ctx context.Context,
 func (r *Resolver) load(key string) (rrs []string, err error, found bool) {
 	r.mu.RLock()
 	var entry *cacheEntry
-	entry, found = r.cache[key]
+	entry, found = r.cache.Get(key)
 	if !found {
 		r.mu.RUnlock()
 		return
@@ -232,18 +234,18 @@ func (r *Resolver) load(key string) (rrs []string, err error, found bool) {
 }
 
 func (r *Resolver) storeLocked(key string, rrs []string, used bool, err error) {
-	if entry, found := r.cache[key]; found {
+	if entry, found := r.cache.Get(key); found {
 		// Update existing entry in place
 		entry.rrs = rrs
 		entry.err = err
 		entry.used = used
 		return
 	}
-	r.cache[key] = &cacheEntry{
+	r.cache.Set(key, &cacheEntry{
 		rrs:  rrs,
 		err:  err,
 		used: used,
-	}
+	})
 }
 
 var defaultResolver = &defaultResolverWithTrace{

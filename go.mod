@@ -56,7 +56,6 @@ require (
 	github.com/pquerna/cachecontrol v0.2.0
 	github.com/redis/rueidis v1.0.51
 	github.com/robfig/cron/v3 v3.0.1
-	github.com/rs/dnscache v0.0.0-20230804202142-fc85eb664529
 	github.com/rs/zerolog v1.26.1
 	github.com/sashabaranov/go-openai v1.35.6
 	github.com/shirou/gopsutil v3.21.11+incompatible

@@ -772,9 +772,6 @@ github.com/rivo/uniseg
 # github.com/robfig/cron/v3 v3.0.1
 ## explicit; go 1.12
 github.com/robfig/cron/v3
-# github.com/rs/dnscache v0.0.0-20230804202142-fc85eb664529
-## explicit; go 1.12
-github.com/rs/dnscache
 # github.com/rs/zerolog v1.26.1
 ## explicit; go 1.15
 github.com/rs/zerolog
