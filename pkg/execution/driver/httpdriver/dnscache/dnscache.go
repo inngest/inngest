@@ -86,7 +86,7 @@ func (r *Resolver) refreshRecords(clearUnused bool, persistOnFailure bool) {
 	}
 
 	for _, key := range update {
-		r.update(context.Background(), key, false, persistOnFailure)
+		_, _ = r.update(context.Background(), key, false, persistOnFailure)
 	}
 }
 
