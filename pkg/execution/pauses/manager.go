@@ -9,6 +9,10 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state"
 )
 
+var (
+	defaultFlushDelay = 5 * time.Second
+)
+
 // StateBufferer transforms a state.Manager into a state.Bufferer.
 func StateBufferer(rsm state.Manager) Bufferer {
 	return &redisAdapter{rsm}
@@ -17,7 +21,12 @@ func StateBufferer(rsm state.Manager) Bufferer {
 // NewManager returns a new pause writer, writing pauses to a Valkey/Redis/MemoryDB
 // compatible buffer
 func NewManager(buf Bufferer, flusher BlockFlusher) *manager {
-	return nil
+	return &manager{
+		buf:     buf,
+		flusher: flusher,
+		// TODO: should be able to override this
+		flushDelay: defaultFlushDelay,
+	}
 }
 
 type manager struct {

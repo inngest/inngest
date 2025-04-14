@@ -190,7 +190,7 @@ type Pause struct {
 	InvokeTargetFnID *string `json:"itFnID,omitempty"`
 	// OnTimeout indicates that this incoming edge should only be ran
 	// when the pause times out, if set to true.
-	OnTimeout bool `json:"onTimeout,omitempty,omitedefault"`
+	OnTimeout bool `json:"onTimeout,omitempty,omitdefault"`
 	// DataKey is the name of the step to use when adding data to the function
 	// run's state after consuming this step.
 	//
