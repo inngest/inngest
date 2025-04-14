@@ -5,6 +5,8 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	v0 "github.com/inngest/inngest/pkg/connect/rest/v0"
+	"github.com/inngest/inngest/pkg/enums"
 	"net"
 	"net/url"
 	"os"
@@ -12,9 +14,6 @@ import (
 	"strings"
 	"sync"
 	"time"
-
-	v0 "github.com/inngest/inngest/pkg/connect/rest/v0"
-	"github.com/inngest/inngest/pkg/enums"
 
 	"github.com/inngest/inngest/pkg/connect/auth"
 
@@ -360,7 +359,7 @@ func (d *devserver) pollSDKs(ctx context.Context) {
 	}
 }
 
-func (d *devserver) HandleEvent(ctx context.Context, e *event.Event, seed *event.SeededID) (string, error) {
+func (d *devserver) HandleEvent(ctx context.Context, e *event.Event) (string, error) {
 	// ctx is the request context, so we need to re-add
 	// the caller here.
 	l := logger.From(ctx).With().Str("caller", d.Name()).Logger()
@@ -368,7 +367,7 @@ func (d *devserver) HandleEvent(ctx context.Context, e *event.Event, seed *event
 
 	l.Debug().Str("event", e.Name).Msg("handling event")
 
-	trackedEvent := event.NewOSSTrackedEvent(*e, seed)
+	trackedEvent := event.NewOSSTrackedEvent(*e)
 
 	byt, err := json.Marshal(trackedEvent)
 	if err != nil {

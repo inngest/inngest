@@ -268,7 +268,7 @@ func (s *svc) InitializeCrons(ctx context.Context) error {
 					ID:        time.Now().UTC().Format(time.RFC3339),
 					Name:      event.FnCronName,
 					Timestamp: time.Now().UnixMilli(),
-				}, nil)
+				})
 
 				byt, err := json.Marshal(trackedEvent)
 				if err == nil {

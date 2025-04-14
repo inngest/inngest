@@ -50,6 +50,24 @@ type Span struct {
 	Children []*Span `json:"spans"`
 }
 
+func (s *Span) IsUserland() bool {
+	_, isUserland := s.SpanAttributes[consts.OtelScopeUserland]
+
+	return isUserland
+}
+
+func (s *Span) UserlandChildren() []*Span {
+	if s.IsUserland() {
+		return s.Children
+	}
+
+	if len(s.Children) > 0 && s.Children[0].IsUserland() && len(s.Children[0].Children) > 0 {
+		return s.Children[0].Children
+	}
+
+	return nil
+}
+
 func (s *Span) GroupID() *string {
 	if groupID, ok := s.SpanAttributes[consts.OtelSysStepGroupID]; ok {
 		return &groupID
@@ -214,6 +232,8 @@ type TraceWriterDev interface {
 }
 
 type TraceReader interface {
+	// GetTraceRoot retrieves the root span for the specified trace
+	GetTraceRoot(ctx context.Context, id TraceRunIdentifier) (*Span, error)
 	// GetTraceRuns retrieves a list of TraceRun based on the options specified
 	GetTraceRuns(ctx context.Context, opt GetTraceRunOpt) ([]*TraceRun, error)
 	// GetTraceRunsCount returns the total number of items applicable to the specified filter

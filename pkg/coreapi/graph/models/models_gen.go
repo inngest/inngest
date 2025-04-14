@@ -29,7 +29,8 @@ type ActionVersionQuery struct {
 }
 
 type AppsFilterV1 struct {
-	Method *AppMethod `json:"method,omitempty"`
+	ConnectionType *AppConnectionType `json:"connectionType,omitempty"`
+	Method         *AppMethod         `json:"method,omitempty"`
 }
 
 type ConnectV1WorkerConnection struct {
@@ -245,6 +246,8 @@ type RunTraceSpan struct {
 	IsRoot        bool               `json:"isRoot"`
 	ParentSpanID  *string            `json:"parentSpanID,omitempty"`
 	ParentSpan    *RunTraceSpan      `json:"parentSpan,omitempty"`
+	IsUserland    bool               `json:"isUserland"`
+	UserlandSpan  *UserlandSpan      `json:"userlandSpan,omitempty"`
 }
 
 type RunTraceSpanOutput struct {
@@ -330,6 +333,16 @@ type UpdateAppInput struct {
 	URL string `json:"url"`
 }
 
+type UserlandSpan struct {
+	SpanName      *string `json:"spanName,omitempty"`
+	SpanKind      *string `json:"spanKind,omitempty"`
+	ServiceName   *string `json:"serviceName,omitempty"`
+	ResourceAttrs *string `json:"resourceAttrs,omitempty"`
+	ScopeName     *string `json:"scopeName,omitempty"`
+	ScopeVersion  *string `json:"scopeVersion,omitempty"`
+	SpanAttrs     *string `json:"spanAttrs,omitempty"`
+}
+
 type WaitForEventStepInfo struct {
 	EventName    string     `json:"eventName"`
 	Expression   *string    `json:"expression,omitempty"`
@@ -342,6 +355,47 @@ func (WaitForEventStepInfo) IsStepInfo() {}
 
 type Workspace struct {
 	ID string `json:"id"`
+}
+
+type AppConnectionType string
+
+const (
+	AppConnectionTypeServerless AppConnectionType = "SERVERLESS"
+	AppConnectionTypeConnect    AppConnectionType = "CONNECT"
+)
+
+var AllAppConnectionType = []AppConnectionType{
+	AppConnectionTypeServerless,
+	AppConnectionTypeConnect,
+}
+
+func (e AppConnectionType) IsValid() bool {
+	switch e {
+	case AppConnectionTypeServerless, AppConnectionTypeConnect:
+		return true
+	}
+	return false
+}
+
+func (e AppConnectionType) String() string {
+	return string(e)
+}
+
+func (e *AppConnectionType) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = AppConnectionType(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid AppConnectionType", str)
+	}
+	return nil
+}
+
+func (e AppConnectionType) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
 type AppMethod string

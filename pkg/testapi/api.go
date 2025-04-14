@@ -2,8 +2,6 @@ package testapi
 
 import (
 	"encoding/json"
-	"net/http"
-
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
@@ -11,8 +9,9 @@ import (
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
-	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
+	"net/http"
+	"os"
 )
 
 type TestAPI struct {
@@ -32,7 +31,7 @@ type Options struct {
 }
 
 func ShouldEnable() bool {
-	return util.InTestMode()
+	return os.Getenv("ENABLE_TEST_API") == "true"
 }
 
 func New(o Options) http.Handler {

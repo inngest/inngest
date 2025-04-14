@@ -14,7 +14,7 @@ export const StatusMenu = ({ envSlug, archived }: { envSlug: string; archived: b
     <Select
       onChange={() => null}
       isLabelVisible={false}
-      label="Select app status"
+      label="Pause runs"
       multiple={false}
       value={archived ? archivedOption : activeOption}
       className="mb-5"

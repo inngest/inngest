@@ -142,7 +142,7 @@ func (s *svc) getFinishHandler(ctx context.Context) (func(context.Context, sv2.I
 		for _, e := range events {
 			evt := e
 			eg.Go(func() error {
-				trackedEvent := event.NewOSSTrackedEvent(evt, nil)
+				trackedEvent := event.NewOSSTrackedEvent(evt)
 				byt, err := json.Marshal(trackedEvent)
 				if err != nil {
 					return fmt.Errorf("error marshalling event: %w", err)
@@ -359,7 +359,7 @@ func (s *svc) handleDebounce(ctx context.Context, item queue.Item) error {
 
 	for _, f := range all {
 		if f.ID == d.FunctionID {
-			di, err := s.debouncer.GetDebounceItem(ctx, d.DebounceID, d.AccountID)
+			di, err := s.debouncer.GetDebounceItem(ctx, d.DebounceID)
 			if err != nil {
 				if errors.Is(err, debounce.ErrDebounceNotFound) {
 					// This is expected after migrating items to a new primary cluster
@@ -374,16 +374,6 @@ func (s *svc) handleDebounce(ctx context.Context, item queue.Item) error {
 			}
 
 			if err := s.debouncer.StartExecution(ctx, *di, f, d.DebounceID); err != nil {
-				if errors.Is(err, debounce.ErrDebounceMigrating) {
-					// This should rarely happen, but it's possible for another Debounce() that will migrate an existing debounce to come in
-					// at the same time as we're starting the timeout. GetDebounceItem() does not perform an atomic swap, so
-					// the debounce may already be gone as soon as we reach StartExecution().
-					logger.StdlibLogger(ctx).Warn("debounce raced by a migration, skipping",
-						"fn_id", d.FunctionID.String(),
-						"debounce_id", d.DebounceID.String(),
-					)
-					continue
-				}
 				return err
 			}
 
@@ -412,7 +402,7 @@ func (s *svc) handleDebounce(ctx context.Context, item queue.Item) error {
 			if err != nil {
 				return err
 			}
-			_ = s.debouncer.DeleteDebounceItem(ctx, d.DebounceID, *di, d.AccountID)
+			_ = s.debouncer.DeleteDebounceItem(ctx, d.DebounceID)
 		}
 	}
 

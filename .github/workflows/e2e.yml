@@ -24,7 +24,7 @@ jobs:
           go-version: "1.24"
       - uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "18"
       - name: Install pnpm
         uses: pnpm/action-setup@v4
         with:
@@ -37,7 +37,7 @@ jobs:
       - name: Run E2E tests
         run: |
           cd ./tests/js
-          pnpm install --frozen-lockfile
+          pnpm install
           pnpm dev &
           sleep 5
           cd ../../
@@ -51,8 +51,7 @@ jobs:
           INNGEST_SIGNING_KEY: test
           API_URL: http://127.0.0.1:8288
           SDK_URL: http://127.0.0.1:3000/api/inngest
-          TEST_MODE: true
-
+          ENABLE_TEST_API: true
   golang:
     name: Go SDK Tests
     strategy:
@@ -81,4 +80,4 @@ jobs:
           INNGEST_EVENT_KEY: test
           INNGEST_SIGNING_KEY: 7468697320697320612074657374206b6579
           INNGEST_DEV: http://127.0.0.1:8288
-          TEST_MODE: true
+          ENABLE_TEST_API: true

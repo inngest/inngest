@@ -2,12 +2,12 @@
 
 import { useState } from 'react';
 import { Button } from '@inngest/components/Button';
-import MiniStackedBarChart from '@inngest/components/Chart/MiniStackedBarChart';
 import { Link } from '@inngest/components/Link';
 import { HorizontalPillList, Pill, PillContent } from '@inngest/components/Pill';
 import { Skeleton } from '@inngest/components/Skeleton/Skeleton';
 import { cn } from '@inngest/components/utils/classNames';
 
+import MiniStackedBarChart from '@/components/Charts/MiniStackedBarChart';
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { useEventTypes, useEventTypesVolume } from '@/queries';
 import { pathCreator } from '@/utils/urls';

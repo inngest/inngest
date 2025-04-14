@@ -21,13 +21,6 @@ const (
 	HeaderAuthorization = "Authorization"
 	HeaderContentType   = "Content-Type"
 	HeaderUserAgent     = "User-Agent"
-
-	// HeaderEventIDSeed is the header key used to send the event ID seed to the
-	// Inngest server. Its of the form "millis,entropy", where millis is the
-	// number of milliseconds since the Unix epoch, and entropy is a
-	// base64-encoded 10-byte value that's sufficiently random for ULID
-	// generation. For example: "1743130137367,eii2YKXRVTJPuA==".
-	HeaderEventIDSeed = "x-inngest-event-id-seed"
 )
 
 const (

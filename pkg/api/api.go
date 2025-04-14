@@ -24,7 +24,7 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-type EventHandler func(context.Context, *event.Event, *event.SeededID) (string, error)
+type EventHandler func(context.Context, *event.Event) (string, error)
 
 type Options struct {
 	Config config.Config
@@ -220,9 +220,7 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 		// Close the idChan so that we stop appending to the ID slice.
 		defer close(idChan)
 
-		index := 0
 		for s := range stream {
-			index++
 			evt := event.Event{}
 			if err := json.Unmarshal(s.Item, &evt); err != nil {
 				return err
@@ -260,11 +258,7 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 				)
 			defer span.End()
 
-			seed := event.SeededIDFromString(
-				r.Header.Get(headers.HeaderEventIDSeed),
-				index,
-			)
-			id, err := a.handler(ctx, &evt, seed)
+			id, err := a.handler(ctx, &evt)
 			if err != nil {
 				a.log.Error().Str("event", evt.Name).Err(err).Msg("error handling event")
 				return err
@@ -332,11 +326,7 @@ func (a API) Invoke(w http.ResponseWriter, r *http.Request) {
 	}
 	evt := event.NewInvocationEvent(newInvOpts)
 
-	seed := event.SeededIDFromString(
-		r.Header.Get(headers.HeaderEventIDSeed),
-		0,
-	)
-	evtID, err := a.handler(r.Context(), &evt, seed)
+	evtID, err := a.handler(r.Context(), &evt)
 	if err != nil {
 		_ = publicerr.WriteHTTP(w, publicerr.Wrapf(err, 500, "Unable to create invocation event: %s", err))
 		return

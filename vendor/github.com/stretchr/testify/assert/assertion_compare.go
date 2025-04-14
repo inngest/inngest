@@ -7,13 +7,10 @@ import (
 	"time"
 )
 
-// Deprecated: CompareType has only ever been for internal use and has accidentally been published since v1.6.0. Do not use it.
-type CompareType = compareResult
-
-type compareResult int
+type CompareType int
 
 const (
-	compareLess compareResult = iota - 1
+	compareLess CompareType = iota - 1
 	compareEqual
 	compareGreater
 )
@@ -42,7 +39,7 @@ var (
 	bytesType = reflect.TypeOf([]byte{})
 )
 
-func compare(obj1, obj2 interface{}, kind reflect.Kind) (compareResult, bool) {
+func compare(obj1, obj2 interface{}, kind reflect.Kind) (CompareType, bool) {
 	obj1Value := reflect.ValueOf(obj1)
 	obj2Value := reflect.ValueOf(obj2)
 
@@ -328,13 +325,7 @@ func compare(obj1, obj2 interface{}, kind reflect.Kind) (compareResult, bool) {
 				timeObj2 = obj2Value.Convert(timeType).Interface().(time.Time)
 			}
 
-			if timeObj1.Before(timeObj2) {
-				return compareLess, true
-			}
-			if timeObj1.Equal(timeObj2) {
-				return compareEqual, true
-			}
-			return compareGreater, true
+			return compare(timeObj1.UnixNano(), timeObj2.UnixNano(), reflect.Int64)
 		}
 	case reflect.Slice:
 		{
@@ -354,7 +345,7 @@ func compare(obj1, obj2 interface{}, kind reflect.Kind) (compareResult, bool) {
 				bytesObj2 = obj2Value.Convert(bytesType).Interface().([]byte)
 			}
 
-			return compareResult(bytes.Compare(bytesObj1, bytesObj2)), true
+			return CompareType(bytes.Compare(bytesObj1, bytesObj2)), true
 		}
 	case reflect.Uintptr:
 		{
@@ -390,7 +381,7 @@ func Greater(t TestingT, e1 interface{}, e2 interface{}, msgAndArgs ...interface
 	if h, ok := t.(tHelper); ok {
 		h.Helper()
 	}
-	return compareTwoValues(t, e1, e2, []compareResult{compareGreater}, "\"%v\" is not greater than \"%v\"", msgAndArgs...)
+	return compareTwoValues(t, e1, e2, []CompareType{compareGreater}, "\"%v\" is not greater than \"%v\"", msgAndArgs...)
 }
 
 // GreaterOrEqual asserts that the first element is greater than or equal to the second
@@ -403,7 +394,7 @@ func GreaterOrEqual(t TestingT, e1 interface{}, e2 interface{}, msgAndArgs ...in
 	if h, ok := t.(tHelper); ok {
 		h.Helper()
 	}
-	return compareTwoValues(t, e1, e2, []compareResult{compareGreater, compareEqual}, "\"%v\" is not greater than or equal to \"%v\"", msgAndArgs...)
+	return compareTwoValues(t, e1, e2, []CompareType{compareGreater, compareEqual}, "\"%v\" is not greater than or equal to \"%v\"", msgAndArgs...)
 }
 
 // Less asserts that the first element is less than the second
@@ -415,7 +406,7 @@ func Less(t TestingT, e1 interface{}, e2 interface{}, msgAndArgs ...interface{})
 	if h, ok := t.(tHelper); ok {
 		h.Helper()
 	}
-	return compareTwoValues(t, e1, e2, []compareResult{compareLess}, "\"%v\" is not less than \"%v\"", msgAndArgs...)
+	return compareTwoValues(t, e1, e2, []CompareType{compareLess}, "\"%v\" is not less than \"%v\"", msgAndArgs...)
 }
 
 // LessOrEqual asserts that the first element is less than or equal to the second
@@ -428,7 +419,7 @@ func LessOrEqual(t TestingT, e1 interface{}, e2 interface{}, msgAndArgs ...inter
 	if h, ok := t.(tHelper); ok {
 		h.Helper()
 	}
-	return compareTwoValues(t, e1, e2, []compareResult{compareLess, compareEqual}, "\"%v\" is not less than or equal to \"%v\"", msgAndArgs...)
+	return compareTwoValues(t, e1, e2, []CompareType{compareLess, compareEqual}, "\"%v\" is not less than or equal to \"%v\"", msgAndArgs...)
 }
 
 // Positive asserts that the specified element is positive
@@ -440,7 +431,7 @@ func Positive(t TestingT, e interface{}, msgAndArgs ...interface{}) bool {
 		h.Helper()
 	}
 	zero := reflect.Zero(reflect.TypeOf(e))
-	return compareTwoValues(t, e, zero.Interface(), []compareResult{compareGreater}, "\"%v\" is not positive", msgAndArgs...)
+	return compareTwoValues(t, e, zero.Interface(), []CompareType{compareGreater}, "\"%v\" is not positive", msgAndArgs...)
 }
 
 // Negative asserts that the specified element is negative
@@ -452,10 +443,10 @@ func Negative(t TestingT, e interface{}, msgAndArgs ...interface{}) bool {
 		h.Helper()
 	}
 	zero := reflect.Zero(reflect.TypeOf(e))
-	return compareTwoValues(t, e, zero.Interface(), []compareResult{compareLess}, "\"%v\" is not negative", msgAndArgs...)
+	return compareTwoValues(t, e, zero.Interface(), []CompareType{compareLess}, "\"%v\" is not negative", msgAndArgs...)
 }
 
-func compareTwoValues(t TestingT, e1 interface{}, e2 interface{}, allowedComparesResults []compareResult, failMessage string, msgAndArgs ...interface{}) bool {
+func compareTwoValues(t TestingT, e1 interface{}, e2 interface{}, allowedComparesResults []CompareType, failMessage string, msgAndArgs ...interface{}) bool {
 	if h, ok := t.(tHelper); ok {
 		h.Helper()
 	}
@@ -478,7 +469,7 @@ func compareTwoValues(t TestingT, e1 interface{}, e2 interface{}, allowedCompare
 	return true
 }
 
-func containsValue(values []compareResult, value compareResult) bool {
+func containsValue(values []CompareType, value CompareType) bool {
 	for _, v := range values {
 		if v == value {
 			return true

@@ -37,21 +37,9 @@ export default function FilterEvents({ keyID, filter }: FilterEventsProps) {
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (isDisabled) return;
-
-    let filter = newFilter;
-    if (newFilter.events?.length === 0 && newFilter.ips?.length === 0) {
-      // If there are no event or IPs then we need to switch to a denylist. The
-      // backend rejects empty allowlists because that means "reject
-      // everything".
-      const type = 'deny';
-
-      filter = { ...filter, type };
-      setNewFilter(filter);
-    }
-
     save({
       id: keyID,
-      filter,
+      filter: newFilter,
     }).then((result) => {
       if (result.error) {
         toast.error('Event key filter has not been updated');
@@ -62,7 +50,7 @@ export default function FilterEvents({ keyID, filter }: FilterEventsProps) {
     });
   }
 
-  function handleTypeChange(id: String) {
+  function handleClick(id: String) {
     const nextValue = { ...newFilter, type: id as 'allow' | 'deny' };
     validateSubmit(nextValue);
 
@@ -72,14 +60,8 @@ export default function FilterEvents({ keyID, filter }: FilterEventsProps) {
   }
 
   function handleCodeChange(name: 'events' | 'ips', code: string) {
-    const values = [];
-    for (const line of code.trim().split('\n')) {
-      const value = line.trim();
-      if (value) {
-        values.push(value);
-      }
-    }
-    const nextValueFull = { ...newFilter, [name]: values };
+    const trimmedValue = code.trim();
+    const nextValueFull = { ...newFilter, [name]: trimmedValue.split('\n') };
 
     setNewFilter(nextValueFull);
     validateSubmit(nextValueFull);
@@ -101,9 +83,9 @@ export default function FilterEvents({ keyID, filter }: FilterEventsProps) {
       <div className="my-5 inline-block">
         <ToggleGroup
           type="single"
-          value={newFilter.type}
+          defaultValue={newFilter.type}
           size="small"
-          onValueChange={handleTypeChange}
+          onValueChange={handleClick}
         >
           <ToggleGroup.Item value="allow">Allowlist</ToggleGroup.Item>
           <ToggleGroup.Item value="deny">Denylist</ToggleGroup.Item>

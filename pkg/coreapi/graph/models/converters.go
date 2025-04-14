@@ -98,7 +98,7 @@ func ToFunctionRunStatus(s enums.RunStatus) (FunctionRunStatus, error) {
 	}
 }
 
-func FromAppMethod(method AppMethod) (enums.AppMethod, error) {
+func FromAppConnectionType(method AppMethod) (enums.AppMethod, error) {
 	switch method {
 	case AppMethodConnect:
 		return enums.AppMethodConnect, nil
@@ -116,7 +116,7 @@ func FromAppsFilter(in *AppsFilterV1) (*cqrs.FilterAppParam, error) {
 
 	filter := &cqrs.FilterAppParam{}
 	if in.Method != nil {
-		connType, err := FromAppMethod(*in.Method)
+		connType, err := FromAppConnectionType(*in.Method)
 		if err != nil {
 			return nil, err
 		}
