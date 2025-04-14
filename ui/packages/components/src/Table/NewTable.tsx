@@ -26,11 +26,9 @@ type BaseTableProps<T> = {
   sorting?: SortingState;
   setSorting?: OnChangeFn<SortingState>;
   isLoading?: boolean;
-  renderSubComponent?: (props: { row: Row<T> }) => React.ReactElement;
   columns: ColumnDef<T, any>[];
   onRowClick?: (row: Row<T>) => void;
   blankState?: React.ReactNode;
-  expandedIDs?: string[];
 };
 
 type TableProps<T> = BaseTableProps<T> &
