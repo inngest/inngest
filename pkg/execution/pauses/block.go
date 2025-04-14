@@ -47,6 +47,9 @@ type BlockstoreOpts struct {
 }
 
 func NewBlockstore(opts BlockstoreOpts) (BlockStore, error) {
+	if opts.RC == nil {
+		return nil, fmt.Errorf("redis client is required")
+	}
 	if opts.Bucket == nil {
 		return nil, fmt.Errorf("bucket is required")
 	}
@@ -61,6 +64,7 @@ func NewBlockstore(opts BlockstoreOpts) (BlockStore, error) {
 	}
 
 	return &blockstore{
+		rc:     opts.RC,
 		size:   opts.BlockSize,
 		buf:    opts.Bufferer,
 		bucket: opts.Bucket,
@@ -120,7 +124,7 @@ func (b blockstore) FlushIndexBlock(ctx context.Context, index Index) error {
 		func(ctx context.Context) error {
 			// Call this function and block, renewing leases in the background
 			// until this function is done.
-			return b.FlushIndexBlock(ctx, index)
+			return b.flushIndexBlock(ctx, index)
 		},
 		10*time.Second,
 	)
