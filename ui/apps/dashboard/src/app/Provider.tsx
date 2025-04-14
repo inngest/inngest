@@ -102,7 +102,7 @@ export default function Provider({ children }: React.PropsWithChildren) {
             appearance: 'outlined',
             loading: false,
           }),
-          profileSectionContent__activeDevices: 'max-h-80 overflow-scroll',
+          profileSectionContent__activeDevices: 'max-h-80 overflow-auto',
           profileSectionTitleText__activeDevices: 'sticky top-0 bg-canvasBase z-10',
           identityPreviewEditButton: 'text-btnPrimary',
           providerIcon__github: 'dark:invert',

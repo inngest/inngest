@@ -4,7 +4,7 @@ sh -c 'cd ./tests/js && pnpm dev > /dev/null 2> /dev/null' &
 
 sleep 2
 
-export ENABLE_TEST_API=true
+export TEST_MODE=true
 
 go run ./cmd/main.go dev --no-discovery > dev-stdout.txt 2> dev-stderr.txt &
 

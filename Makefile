@@ -5,7 +5,7 @@ dev:
 # specifically for tests
 .PHONY: run
 run:
-	ENABLE_TEST_API=true LOG_LEVEL=debug go run ./cmd/main.go dev --tick=50 --no-poll --no-discovery -v $(PARAMS)
+	TEST_MODE=true LOG_LEVEL=debug go run ./cmd/main.go dev --tick=50 --no-poll --no-discovery -v $(PARAMS)
 
 xgo:
 	xgo -pkg cmd -ldflags="-s -w" -out build/inngest -targets "linux/arm64,linux/amd64,darwin/arm64,darwin/amd64" .
@@ -54,7 +54,7 @@ snapshot:
 
 .PHONY: build-ui
 build-ui:
-	cd ui/apps/dev-server-ui && pnpm install
+	cd ui/apps/dev-server-ui && pnpm install --frozen-lockfile
 	cd ui/apps/dev-server-ui && pnpm build
 	cp -r ./ui/apps/dev-server-ui/dist/* ./pkg/devserver/static/
 	cp -r ./ui/apps/dev-server-ui/.next/routes-manifest.json ./pkg/devserver/static/
