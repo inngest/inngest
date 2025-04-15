@@ -333,4 +333,17 @@ INSERT INTO spans (
 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 
 -- name: GetSpansByRunID :many
-SELECT * FROM spans WHERE run_id = ?;
+SELECT
+  span_id,
+  MIN(start_time) as start_time,
+  MAX(end_time) AS end_time,
+  parent_span_id,
+  json_group_array(json_object(
+    'name', name,
+    'attributes', attributes,
+    'links', links
+  )) AS span_fragments
+FROM spans
+WHERE run_id = ?
+GROUP BY dynamic_span_id
+ORDER BY start_time;

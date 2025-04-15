@@ -327,6 +327,16 @@ func (wc *WorkerConnection) ToSQLite() (*sqlc.WorkerConnection, error) {
 	}, nil
 }
 
+func (r *GetSpansByRunIDRow) ToSQLite() (*sqlc.GetSpansByRunIDRow, error) {
+	return &sqlc.GetSpansByRunIDRow{
+		SpanID:        r.SpanID,
+		ParentSpanID:  r.ParentSpanID,
+		StartTime:     r.StartTime,
+		EndTime:       r.EndTime,
+		SpanFragments: r.SpanFragments,
+	}, nil
+}
+
 func toNullRawMessage(v interface{}) pqtype.NullRawMessage {
 	data, err := json.Marshal(v)
 	if err != nil {

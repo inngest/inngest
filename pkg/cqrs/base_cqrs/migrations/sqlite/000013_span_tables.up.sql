@@ -16,4 +16,5 @@ CREATE TABLE spans (
   PRIMARY KEY (trace_id, span_id)
 );
 
-CREATE INDEX idx_spans_run_id ON spans(run_id);
+CREATE INDEX idx_spans_run_id ON spans(run_id); -- mainly for debugging
+CREATE INDEX idx_spans_run_id_dynamic_start_time ON spans(run_id, dynamic_span_id, start_time);

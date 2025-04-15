@@ -773,8 +773,18 @@ func (q NormalizedQueries) GetFunctionRuns(ctx context.Context) ([]*sqlc_sqlite.
 	return sqliteRows, nil
 }
 
-func (q NormalizedQueries) GetSpansByRunID(ctx context.Context, runID string) ([]*sqlc_sqlite.Span, error) {
-	return nil, nil
+func (q NormalizedQueries) GetSpansByRunID(ctx context.Context, runID string) ([]*sqlc_sqlite.GetSpansByRunIDRow, error) {
+	rows, err := q.db.GetSpansByRunID(ctx, runID)
+	if err != nil {
+		return nil, err
+	}
+
+	sqliteRows := make([]*sqlc_sqlite.GetSpansByRunIDRow, len(rows))
+	for i, row := range rows {
+		sqliteRows[i], _ = row.ToSQLite()
+	}
+
+	return sqliteRows, nil
 }
 
 func (q NormalizedQueries) InsertSpan(ctx context.Context, arg sqlc_sqlite.InsertSpanParams) error {

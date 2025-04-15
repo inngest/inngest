@@ -1040,29 +1040,45 @@ func (q *Queries) GetQueueSnapshotChunks(ctx context.Context, snapshotID interfa
 }
 
 const getSpansByRunID = `-- name: GetSpansByRunID :many
-SELECT span_id, trace_id, parent_span_id, name, start_time, end_time, attributes, links, run_id, dynamic_span_id FROM spans WHERE run_id = ?
+SELECT
+  span_id,
+  MIN(start_time) as start_time,
+  MAX(end_time) AS end_time,
+  parent_span_id,
+  json_group_array(json_object(
+    'name', name,
+    'attributes', attributes,
+    'links', links
+  )) AS span_fragments
+FROM spans
+WHERE run_id = ?
+GROUP BY dynamic_span_id
+ORDER BY start_time
 `
 
-func (q *Queries) GetSpansByRunID(ctx context.Context, runID string) ([]*Span, error) {
+type GetSpansByRunIDRow struct {
+	SpanID        string
+	StartTime     interface{}
+	EndTime       interface{}
+	ParentSpanID  sql.NullString
+	SpanFragments interface{}
+}
+
+func (q *Queries) GetSpansByRunID(ctx context.Context, runID string) ([]*GetSpansByRunIDRow, error) {
 	rows, err := q.db.QueryContext(ctx, getSpansByRunID, runID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []*Span
+	var items []*GetSpansByRunIDRow
 	for rows.Next() {
-		var i Span
+		var i GetSpansByRunIDRow
 		if err := rows.Scan(
 			&i.SpanID,
-			&i.TraceID,
-			&i.ParentSpanID,
-			&i.Name,
 			&i.StartTime,
 			&i.EndTime,
-			&i.Attributes,
-			&i.Links,
-			&i.RunID,
-			&i.DynamicSpanID,
+			&i.ParentSpanID,
+			&i.SpanFragments,
 		); err != nil {
 			return nil, err
 		}
