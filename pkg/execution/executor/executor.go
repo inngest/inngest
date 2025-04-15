@@ -8,7 +8,6 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"net/http"
 	"strconv"
 	"strings"
 	"sync"
@@ -714,7 +713,7 @@ type runInstance struct {
 	item       queue.Item
 	edge       inngest.Edge
 	resp       *state.DriverResponse
-	httpClient *http.Client
+	httpClient util.HTTPDoer
 	stackIndex int
 }
 

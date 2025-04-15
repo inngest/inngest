@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/util"
 	"golang.org/x/mod/semver"
 )
 
@@ -39,7 +40,7 @@ var (
 // our max step size), the duration for the request, and any connection errors.
 //
 // NOTE: This does NOT handle HTTP errors, and instead only handles system errors.
-func ExecuteRequest(ctx context.Context, c HTTPDoer, req *http.Request) (*http.Response, []byte, time.Duration, error) {
+func ExecuteRequest(ctx context.Context, c util.HTTPDoer, req *http.Request) (*http.Response, []byte, time.Duration, error) {
 	pre := time.Now()
 	resp, err := c.Do(req)
 	dur := time.Since(pre)
