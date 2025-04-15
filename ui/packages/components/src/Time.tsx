@@ -29,23 +29,13 @@ export function Time({ className, format, value }: Props) {
     toast.success('Copied to clipboard');
   };
 
-  let date: Date | null;
-  if (value instanceof Date) {
-    date = value;
-  } else {
-    date = toMaybeDate(value);
-  }
+  const date = value instanceof Date ? value : toMaybeDate(value);
 
-  if (!date) {
+  if (!(date instanceof Date)) {
     return <span>Invalid date</span>;
   }
 
-  let dateString: string;
-  if (format === 'relative') {
-    dateString = relativeTime(date);
-  } else {
-    dateString = date.toLocaleString();
-  }
+  const dateString = format === 'relative' ? relativeTime(date) : date.toLocaleString();
 
   const utcTimeString = formatDate(toUTCDate(date));
   const localTimeString = formatDate(date);
