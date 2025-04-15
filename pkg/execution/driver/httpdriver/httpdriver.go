@@ -150,11 +150,6 @@ type Request struct {
 
 	// Headers are additional headers to add to the request.
 	Headers map[string]string
-
-	// SkipStats prevents statistics from being tracked.
-	SkipStats bool
-	// statter is a function added in testing, called with httpstat info
-	statter func(s *httpstat.Result)
 }
 
 // DoRequest executes the HTTP request with the given input.
