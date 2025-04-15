@@ -15,7 +15,7 @@ const (
 
 func newCache() *cache {
 	return &cache{
-		cache: ccache.New(ccache.Configure().MaxSize(1000).ItemsToPrune(100)),
+		cache: ccache.New(ccache.Configure().MaxSize(10_000).ItemsToPrune(500)),
 	}
 }
 
@@ -48,6 +48,10 @@ func (c *cache) Get(key string) (*cacheEntry, bool) {
 	entry, ok := item.Value().(*cacheEntry)
 	if !ok {
 		// Unreachable.
+		return nil, false
+	}
+	if item.Expired() {
+		// ignore expired items.
 		return nil, false
 	}
 

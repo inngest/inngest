@@ -5,6 +5,7 @@ import (
 	"net"
 	"net/http/httptrace"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"golang.org/x/sync/singleflight"
@@ -22,6 +23,8 @@ type Resolver struct {
 	// Resolver is used to perform actual DNS lookup. If nil,
 	// net.DefaultResolver is used instead.
 	Resolver DNSResolver
+
+	lookups int64
 
 	once  sync.Once
 	mu    sync.RWMutex
@@ -177,6 +180,7 @@ func (r *Resolver) lookupFunc(ctx context.Context, key string) func() (interface
 			ctx, cancel := r.prepareCtx(ctx)
 			defer cancel()
 
+			atomic.AddInt64(&r.lookups, 1)
 			return resolver.LookupHost(ctx, key[1:])
 		}
 	case 'r':
@@ -184,6 +188,7 @@ func (r *Resolver) lookupFunc(ctx context.Context, key string) func() (interface
 			ctx, cancel := r.prepareCtx(ctx)
 			defer cancel()
 
+			atomic.AddInt64(&r.lookups, 1)
 			return resolver.LookupAddr(ctx, key[1:])
 		}
 	default:
