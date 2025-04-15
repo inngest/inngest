@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strings"
 	"syscall"
 	"time"
@@ -33,6 +34,7 @@ var (
 	ErrInvalidResponse     = fmt.Errorf("Error performing request to SDK URL")
 	ErrBodyTooLarge        = fmt.Errorf("http response size is greater than the limit")
 	ErrTLSHandshakeTimeout = fmt.Errorf("Your server didn't complete the TLS handshake in time")
+	ErrDNSLookupTimeout    = fmt.Errorf("Gateway proxy request timeout")
 )
 
 // ExecuteRequest executes an HTTP request.  This returns the HTTP response, the body (limited by
@@ -102,6 +104,10 @@ func CommonHTTPErrors(err error) error {
 	// If we get an unexpected EOF and the response is nil, error immediately.
 	if errors.Is(err, io.ErrUnexpectedEOF) {
 		return ErrUnexpectedEnd
+	}
+	// Try to detect internal DNS lookup timeouts to user's do not see raw errors
+	if IsDNSLookupTimeout(err) {
+		return ErrDNSLookupTimeout
 	}
 
 	// use the error as-is, wrapped with a prefix for users.
@@ -212,4 +218,17 @@ func ShouldRetry(status int, noRetryHeader, sdkVersion string) bool {
 	}
 
 	return true
+}
+
+// IsDNSLookupTimeout checks if the error matches a SDK gateway DNS lookup timeout
+func IsDNSLookupTimeout(err error) bool {
+	if err == nil {
+		return false
+	}
+	errStr := err.Error()
+	matched, _ := regexp.MatchString("lookup .* on.*: read udp.*: i/o timeout", errStr)
+	if matched {
+		return true
+	}
+	return false
 }
