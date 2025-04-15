@@ -20,7 +20,7 @@ type Props = {
 };
 
 function formatDate(date: Date) {
-  return format(date, 'dd MMM, HH:mm');
+  return format(date, 'dd MMM yyyy, HH:mm:ss');
 }
 
 export function Time({ className, format, value }: Props) {
@@ -50,7 +50,10 @@ export function Time({ className, format, value }: Props) {
             className
           )}
           dateTime={date.toISOString()}
-          onClick={() => copyToClipboard(date.toISOString())}
+          onClick={(e) => {
+            e.stopPropagation();
+            copyToClipboard(date.toISOString());
+          }}
         >
           {dateString}
           <RiFileCopyLine className="text-subtle hidden h-3 w-3 group-hover:block" />
@@ -68,7 +71,7 @@ export function Time({ className, format, value }: Props) {
         </div>
         <div className="mb-[6px] ml-3 mr-4 mt-3 flex items-center justify-between gap-5 text-sm">
           <div className="text-muted flex items-center gap-1">
-            <RiUserSmileLine className="h-[14px] w-[14px]" /> Your timezone
+            <RiUserSmileLine className="h-[14px] w-[14px]" /> Local
           </div>
           <time className="text-subtle">{localTimeString}</time>
         </div>
