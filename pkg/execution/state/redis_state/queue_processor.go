@@ -121,11 +121,24 @@ func (q *queue) Enqueue(ctx context.Context, item osqueue.Item, at time.Time, op
 	}
 
 	shard := q.primaryQueueShard
-	if q.shardSelector != nil {
+	switch {
+	// If the caller wants us to enqueue the job to a specific queue shard, use that.
+	case opts.ForceQueueShardName != "":
+		foundShard, ok := q.queueShardClients[opts.ForceQueueShardName]
+		if !ok {
+			return fmt.Errorf("tried to force invalid queue shard %q", opts.ForceQueueShardName)
+		}
+
+		shard = foundShard
+	// Otherwise, invoke the shard selector, if configured.
+	case q.shardSelector != nil:
+		// QueueName should be consistently specified on both levels. This safeguard ensures
+		// we'll check for both places, just in case.
 		qn := qi.Data.QueueName
 		if qn == nil {
 			qn = qi.QueueName
 		}
+
 		selected, err := q.shardSelector(ctx, qi.Data.Identifier.AccountID, qn)
 		if err != nil {
 			q.logger.Error().Err(err).Interface("qi", qi).Msg("error selecting shard")
@@ -186,6 +199,8 @@ func (q *queue) Run(ctx context.Context, f osqueue.RunFunc) error {
 		Str("poll", q.pollTick.String()).
 		Msg("starting queue worker")
 
+	backoff := time.Millisecond * 250
+
 LOOP:
 	for {
 		select {
@@ -210,12 +225,23 @@ LOOP:
 			}
 
 			if err := q.scan(ctx); err != nil {
+				if errors.Is(err, context.DeadlineExceeded) {
+					q.logger.Warn().Msg("deadline exceeded scanning partition pointers")
+					<-time.After(backoff)
+
+					// Backoff doubles up to 3 seconds.
+					backoff = time.Duration(math.Min(float64(backoff*2), float64(time.Second*5)))
+					continue
+				}
+
 				// On scan errors, halt the worker entirely.
 				if !errors.Is(err, context.Canceled) {
 					q.logger.Error().Err(err).Msg("error scanning partition pointers")
 				}
 				break LOOP
 			}
+
+			backoff = time.Millisecond * 250
 		}
 	}
 
@@ -488,7 +514,7 @@ func (q *queue) scan(ctx context.Context) error {
 
 	// If there are continuations, process those immediately.
 	if err := q.scanContinuations(ctx); err != nil {
-		return err
+		return fmt.Errorf("error scanning continuations: %w", err)
 	}
 
 	// Store the shard that we processed, allowing us to eventually pass this
@@ -528,7 +554,7 @@ func (q *queue) scan(ctx context.Context) error {
 
 		err := q.scanPartition(ctx, partitionKey, PartitionPeekMax, peekUntil, guaranteedCapacity, metricShardName, &guaranteedCapacity.AccountID, &actualScannedPartitions)
 		if err != nil {
-			return err
+			return fmt.Errorf("error scanning existing lease partition: %w", err)
 		}
 
 		metrics.IncrQueuePartitionScannedCounter(ctx,
@@ -629,7 +655,7 @@ func (q *queue) scan(ctx context.Context) error {
 	var actualScannedPartitions int64
 	err := q.scanPartition(ctx, partitionKey, PartitionPeekMax, peekUntil, nil, metricShardName, nil, &actualScannedPartitions)
 	if err != nil {
-		return err
+		return fmt.Errorf("error scanning partition: %w", err)
 	}
 
 	metrics.IncrQueuePartitionScannedCounter(ctx,

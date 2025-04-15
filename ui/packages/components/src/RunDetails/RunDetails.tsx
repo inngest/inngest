@@ -86,8 +86,12 @@ export function RunDetails(props: Props) {
       badge={
         cron ? (
           <div className="py-2">
-            <Pill kind="warning" appearance="outlined">
-              <RiTimeLine className="h-4 w-4" />
+            <Pill
+              kind="warning"
+              appearance="outlined"
+              icon={<RiTimeLine className="h-4 w-4" />}
+              iconSide="left"
+            >
               {firstTrigger.value}
             </Pill>
           </div>

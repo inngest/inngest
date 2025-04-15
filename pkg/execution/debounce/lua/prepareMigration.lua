@@ -11,6 +11,7 @@ Return values:
 
 local keyPtr = KEYS[1] -- fn -> debounce ptr
 local keyDbc = KEYS[2] -- debounce info key
+local keyDebounceMigrating = KEYS[3]
 
 local newDebounceID = ARGV[1]
 local currentTime 	= tonumber(ARGV[2]) -- in ms
@@ -29,8 +30,14 @@ end
 
 local debounceItem = cjson.decode(existingDebounceItemStr)
 
--- Prevent this debounce from running on the default cluster (we're moving it to the new system queue)
+-- Prevent the next prepareMigration() call from finding the same debounce again. It will immediately
+-- create/update a debounce on the primary.
+-- Note: This does not prevent the debounce from running on the secondary cluster on timeout.
 redis.call("SET", keyPtr, newDebounceID)
+
+-- Prevent the timeout job from running, in case we are racing with StartExecution().
+-- We drop the debounce state and timeout item immediately after prepareMigration(), this is just a protection against data races.
+redis.call("HSET", keyDebounceMigrating, existingDebounceID, 1)
 
 -- If timeout is not provided, only return debounce ID
 if debounceItem.t == nil or debounceItem.t <= 0 then

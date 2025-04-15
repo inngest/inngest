@@ -418,7 +418,7 @@ github.com/gogo/protobuf/proto
 github.com/gogo/protobuf/protoc-gen-gogo/descriptor
 github.com/gogo/protobuf/sortkeys
 github.com/gogo/protobuf/types
-# github.com/golang-jwt/jwt/v5 v5.2.1
+# github.com/golang-jwt/jwt/v5 v5.2.2
 ## explicit; go 1.18
 github.com/golang-jwt/jwt/v5
 # github.com/golang-migrate/migrate/v4 v4.16.2
@@ -824,9 +824,10 @@ github.com/spf13/viper/internal/encoding/yaml
 # github.com/stoewer/go-strcase v1.3.0
 ## explicit; go 1.11
 github.com/stoewer/go-strcase
-# github.com/stretchr/testify v1.9.0
+# github.com/stretchr/testify v1.10.0
 ## explicit; go 1.17
 github.com/stretchr/testify/assert
+github.com/stretchr/testify/assert/yaml
 github.com/stretchr/testify/require
 # github.com/subosito/gotenv v1.2.0
 ## explicit

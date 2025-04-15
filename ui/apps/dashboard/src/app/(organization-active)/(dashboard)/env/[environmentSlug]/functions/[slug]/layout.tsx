@@ -122,8 +122,8 @@ export default function FunctionLayout({
         ]}
         infoIcon={
           isPaused && (
-            <Pill kind="warning">
-              <RiPauseCircleLine className="h-4 w-4" /> Paused
+            <Pill kind="warning" icon={<RiPauseCircleLine className="h-4 w-4" />} iconSide="left">
+              Paused
             </Pill>
           )
         }
