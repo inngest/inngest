@@ -31,6 +31,10 @@ func (p *executionProcessor) OnStart(parent context.Context, s sdktrace.ReadWrit
 		attrs = append(attrs,
 			attribute.String(meta.AttributeRunID, p.md.ID.RunID.String()),
 		)
+	} else if p.qi != nil {
+		attrs = append(attrs,
+			attribute.String(meta.AttributeRunID, p.qi.Identifier.RunID.String()),
+		)
 	}
 
 	// Do not set extra contextual data on extension spans
