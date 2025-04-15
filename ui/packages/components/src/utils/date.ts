@@ -213,3 +213,16 @@ export function getPeriodAbbreviation(period: string): string {
 
   return periodAbbreviations[period] || period;
 }
+
+export function toUTCDate(date: Date) {
+  return new Date(
+    Date.UTC(
+      date.getUTCFullYear(),
+      date.getUTCMonth(),
+      date.getUTCDate(),
+      date.getUTCHours(),
+      date.getUTCMinutes(),
+      date.getUTCSeconds()
+    )
+  );
+}
