@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math/rand/v2"
 	"strconv"
 	"time"
 
@@ -19,6 +20,14 @@ const (
 	// A pause equates to roughly ~0.75-1KB of data, so this is a good default
 	// of roughly 25mb blocks.
 	DefaultPausesPerBlock = 25_000
+
+	// DefaultCompactionSample is the minimum number of deleted pauses within an
+	// index that should trigger a compaction.
+	DefaultCompactionLimit = (DefaultPausesPerBlock / 3)
+
+	// DefaultCompactionSample gives us a 10% chance of running compactions after
+	// a delete.
+	DefaultCompactionSample = 0.1
 )
 
 // Block represents a block of pauses.
@@ -27,7 +36,7 @@ type Block struct {
 	ID ulid.ULID
 	// Index is the index for this block, eg. the workspac and event name.
 	Index Index
-	// Pauses is the slice of pauses in this block.
+	// Pauses is the slice of pauses in this block, in order of earliest -> latest.
 	Pauses []*state.Pause
 }
 
@@ -35,7 +44,6 @@ type Block struct {
 type BlockstoreOpts struct {
 	// RC is the Redis client used to manage block indexes.
 	RC rueidis.Client
-
 	// Bufferer is the bufferer which allows us to read from indexes.
 	Bufferer Bufferer
 	// Bucket is the backing blobstore for reading and writing blocks.
@@ -44,6 +52,11 @@ type BlockstoreOpts struct {
 	Leaser BlockLeaser
 	// BlockSize is the number of pauses to store in a single block.
 	BlockSize int
+	// CompactionLimit is the total number of pauses that should trigger a compaction.
+	// Note that this doesnt always trigger a compaction;
+	CompactionLimit int
+	// CompactionSample is the chance of compaction, from 0-100
+	CompactionSample float64
 }
 
 func NewBlockstore(opts BlockstoreOpts) (BlockStore, error) {
@@ -62,19 +75,33 @@ func NewBlockstore(opts BlockstoreOpts) (BlockStore, error) {
 	if opts.BlockSize == 0 {
 		opts.BlockSize = DefaultPausesPerBlock
 	}
+	if opts.CompactionLimit == 0 {
+		opts.CompactionLimit = DefaultCompactionLimit
+	}
+	if opts.CompactionSample == 0 {
+		opts.CompactionSample = DefaultCompactionSample
+	}
 
 	return &blockstore{
-		rc:     opts.RC,
-		size:   opts.BlockSize,
-		buf:    opts.Bufferer,
-		bucket: opts.Bucket,
-		leaser: opts.Leaser,
+		rc:               opts.RC,
+		blocksize:        opts.BlockSize,
+		compactionLimit:  opts.CompactionLimit,
+		compactionSample: opts.CompactionSample,
+		buf:              opts.Bufferer,
+		bucket:           opts.Bucket,
+		leaser:           opts.Leaser,
 	}, nil
 }
 
 type blockstore struct {
 	// size is the size of blocks when writing
-	size int
+	blocksize int
+
+	// CompactionLimit is the total number of pauses that should trigger a compaction.
+	// Note that this doesnt always trigger a compaction;
+	compactionLimit int
+	// CompactionSample is the chance of compaction, from 0-100
+	compactionSample float64
 
 	// buf is the backing buffer that we process blocks from when flushing.
 	//
@@ -97,13 +124,13 @@ type blockstore struct {
 }
 
 func (b blockstore) BlockSize() int {
-	return b.size
+	return b.blocksize
 }
 
 // FlushIndexBlock processes a given index, fetching pauses from the backing buffer
 // and writing to a block.
 func (b blockstore) FlushIndexBlock(ctx context.Context, index Index) error {
-	if b.buf == nil || b.bucket == nil || b.size == 0 {
+	if b.buf == nil || b.bucket == nil || b.blocksize == 0 {
 		return nil
 	}
 
@@ -138,7 +165,7 @@ func (b blockstore) flushIndexBlock(ctx context.Context, index Index) error {
 
 	block := &Block{
 		Index:  index,
-		Pauses: make([]*state.Pause, b.size),
+		Pauses: make([]*state.Pause, b.blocksize),
 	}
 
 	n := 0
@@ -151,7 +178,7 @@ func (b blockstore) flushIndexBlock(ctx context.Context, index Index) error {
 		block.Pauses[n] = item
 
 		n++
-		if n >= b.size {
+		if n >= b.blocksize {
 			// We've hit our block size. Quit iterating
 			break
 		}
@@ -161,7 +188,7 @@ func (b blockstore) flushIndexBlock(ctx context.Context, index Index) error {
 		return fmt.Errorf("error iterating over buffered pauses: %w", iter.Error())
 	}
 
-	if n < b.size {
+	if n < b.blocksize {
 		// We didn't find enough non-nil pauses to fill the block.  Log a warning
 		// and return.  This shouldn't happen, as we shouldn't return nil pauses
 		// from iterators often;  this only happens in a race where the iterator
@@ -252,20 +279,99 @@ func (b blockstore) BlockKey(idx Index, blockID ulid.ULID) string {
 	return fmt.Sprintf("pauses/%s/%s/blk_%s", idx.WorkspaceID, idx.EventName, blockID)
 }
 
-// Delete deletes a pause from the buffer, or returns ErrNotInBuffer if the pause is not in
-// the buffer.
+// Delete deletes a pause from the backing blob.  Note that blobs are immutable;  we cannot
+// yeet the pause out of a blob as-is.  Instead, we track which blocks have deleted pauses
+// via indexes, and eventually compact blocks.
 func (b blockstore) Delete(ctx context.Context, index Index, pause state.Pause) error {
+	// Check which blocks this pause exists in, then delete from the block index.
+	ts, err := b.buf.PauseTimestamp(ctx, pause)
+	if err != nil {
+		return fmt.Errorf("unable to get timestamp for pause when processing block deletion: %w", err)
+	}
+
+	blockID, err := b.blockIDForTimestamp(ctx, index, ts)
+	if err != nil {
+		return fmt.Errorf("error fetching block for timestamp: %w", err)
+	}
+	if blockID == nil {
+		return nil
+	}
+
+	err = b.rc.Do(ctx, b.rc.B().Sadd().Key(b.blockDeleteKey(index)).Member(pause.ID.String()).Build()).Error()
+	if err != nil {
+		return fmt.Errorf("error tracking pause delete in block index: %w", err)
+	}
+
+	// As an optimization, check how many deletes this index has and trigger compaction if over the
+	// compaction limit.
+	if rand.IntN(100) <= int(b.compactionSample*100) {
+		go func() {
+
+			size, err := b.rc.Do(ctx, b.rc.B().Scard().Key(b.blockDeleteKey(index)).Build()).AsInt64()
+			if err != nil {
+				// TODO: log
+				return
+			}
+			if size < int64(b.compactionLimit) {
+				return
+			}
+
+			// Trigger a new compaction.
+			b.Compact(ctx, index)
+		}()
+	}
+
 	return fmt.Errorf("not implemented")
 }
 
+// Compact reads all indexed deletes from block for an index, then compacts any blocks over a given threshold
+// by removing pauses and rewriting blocks.
+func (b blockstore) Compact(ctx context.Context, idx Index) {
+	// TODO: Lease compaction for the index.
+
+	// TODO: Read all block metadata for the index
+	// TODO: Read all blockDeleteKey entries for the index
+	// TODO: For each deleted entry, record which block the delete is for.
+	//       XXX: we can't embed the timestamp in block IDs because of old parallelism;  how do we track this?
+	// TODO: If len(block_deletes) > block_compact_ratio, rewrite the block by:
+	// 1. fetching the block
+	// 2. filtering deleted pauses from the block
+	// 3. rewriting the block
+}
+
+func (b blockstore) blockIDForTimestamp(ctx context.Context, idx Index, ts time.Time) (*ulid.ULID, error) {
+	score := strconv.Itoa(int(ts.UnixMilli()))
+	ids, err := b.rc.Do(
+		ctx,
+		b.rc.B().Zrange().Key(b.blockIndexKey(idx)).Min("("+score).Max("+inf").Limit(0, 1).Build(),
+	).AsStrSlice()
+	if len(ids) == 1 {
+		id, err := ulid.Parse(ids[0])
+		return &id, err
+	}
+	if err == nil || rueidis.IsRedisNil(err) {
+		return nil, nil
+	}
+	return nil, err
+}
+
 func (b blockstore) addBlockIndex(ctx context.Context, idx Index, block *Block) error {
+	earliest, err := b.buf.PauseTimestamp(ctx, *block.Pauses[0])
+	if err != nil {
+		return fmt.Errorf("error fetching earliest pause time: %w", err)
+	}
+	latest, err := b.buf.PauseTimestamp(ctx, *block.Pauses[len(block.Pauses)-1])
+	if err != nil {
+		return fmt.Errorf("error fetching latest pause time: %w", err)
+	}
+
 	// Block indexes are a zset of blocks stored by last pause timestamp,
 	// which is embedded into the pause ID.
 	//
 	// We also have a mapping of block ID -> metadata, storing the timeranges and
 	// current block size.  This is used during compaction.
 	metadata, err := json.Marshal(blockMetadata{
-		Timeranges: [2]int64{}, // TODO: earliest/latest pause TS
+		Timeranges: [2]int64{earliest.UnixMilli(), latest.UnixMilli()}, // earliest/latest
 		Len:        len(block.Pauses),
 	})
 	if err != nil {
@@ -303,6 +409,12 @@ func (b blockstore) blockIndexKey(idx Index) string {
 
 func (b blockstore) blockMetadataKey(idx Index) string {
 	return fmt.Sprintf("{estate}:blk:md:%s:%s", idx.WorkspaceID, util.XXHash(idx.EventName))
+}
+
+// blockDeleteKey tracks all deletes for a given index.
+// note that block
+func (b blockstore) blockDeleteKey(idx Index) string {
+	return fmt.Sprintf("{estate}:blk:dels:%s:%s", idx.WorkspaceID, util.XXHash(idx.EventName))
 }
 
 type blockMetadata struct {
