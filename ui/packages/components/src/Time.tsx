@@ -5,7 +5,7 @@ import { RiFileCopyLine, RiTimeLine, RiUserSmileLine } from '@remixicon/react';
 import { toast } from 'sonner';
 
 import { cn } from './utils/classNames';
-import { format, relativeTime, toMaybeDate, toUTCDate } from './utils/date';
+import { format, formatInTimeZone, relativeTime, toMaybeDate } from './utils/date';
 
 /**
  * Use this component instead of the builtin <time> element. Since server-side
@@ -23,6 +23,10 @@ function formatDate(date: Date) {
   return format(date, 'dd MMM yyyy, HH:mm:ss');
 }
 
+function formatUTCDate(date: Date) {
+  return formatInTimeZone(date, 'UTC', 'dd MMM yyyy, HH:mm:ss');
+}
+
 export function Time({ className, format, value }: Props) {
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
@@ -37,7 +41,7 @@ export function Time({ className, format, value }: Props) {
 
   const dateString = format === 'relative' ? relativeTime(date) : date.toLocaleString();
 
-  const utcTimeString = formatDate(toUTCDate(date));
+  const utcTimeString = formatUTCDate(date);
   const localTimeString = formatDate(date);
 
   return (

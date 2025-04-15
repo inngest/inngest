@@ -13,6 +13,7 @@ import {
   type Duration,
   type DurationUnit,
 } from 'date-fns';
+import { formatInTimeZone } from 'date-fns-tz';
 
 export type { Duration as DurationType };
 export {
@@ -26,6 +27,7 @@ export {
   lightFormat,
   sub,
   format,
+  formatInTimeZone,
 };
 
 export const DURATION_STRING_REGEX = /^[1-9]\d*[smMhdwy]$/;
@@ -212,17 +214,4 @@ export function getPeriodAbbreviation(period: string): string {
   };
 
   return periodAbbreviations[period] || period;
-}
-
-export function toUTCDate(date: Date) {
-  return new Date(
-    Date.UTC(
-      date.getUTCFullYear(),
-      date.getUTCMonth(),
-      date.getUTCDate(),
-      date.getUTCHours(),
-      date.getUTCMinutes(),
-      date.getUTCSeconds()
-    )
-  );
 }
