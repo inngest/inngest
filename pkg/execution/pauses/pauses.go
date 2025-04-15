@@ -58,6 +58,9 @@ type Bufferer interface {
 	// Delete deletes a pause from the buffer, or returns ErrNotInBuffer if the pause is not in
 	// the buffer.
 	Delete(ctx context.Context, index Index, pause state.Pause) error
+
+	// PauseTimestamp returns the created at timestamp for a pause.
+	PauseTimestamp(ctx context.Context, pause state.Pause) (time.Time, error)
 }
 
 // BlockStore is an implementation that reads and writes blocks.

@@ -2,6 +2,7 @@ package pauses
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -95,13 +96,12 @@ func (m manager) Delete(ctx context.Context, index Index, pause state.Pause) err
 	// XXX: Future optimization:  cache the last written block for an index in-memory so
 	// we can fast lookup here: blockID.ts > pause.ts, if so always delete from flusher.
 	err := m.buf.Delete(ctx, index, pause)
-	if err == nil {
-		return nil
+	if err != nil && !errors.Is(err, ErrNotInBuffer) {
+		return err
 	}
-	if err == ErrNotInBuffer {
-		return m.flusher.Delete(ctx, index, pause)
-	}
-	return fmt.Errorf("error deleting pause from buffer: %w", err)
+	// Always also delegate to the flusher, just in case a block was written whilst
+	// we issued the delete request.
+	return m.flusher.Delete(ctx, index, pause)
 }
 
 func (m manager) FlushIndexBlock(ctx context.Context, index Index) error {
