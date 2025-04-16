@@ -11,7 +11,6 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -346,14 +345,11 @@ func do(ctx context.Context, c util.HTTPDoer, r Request) (*Response, *httpstat.R
 		noRetry    bool
 		retryAtStr *string
 		retryAt    *time.Time
-		headers    = map[string]string{}
 	)
 
 	body = byt
 	statusCode = resp.StatusCode
-	for k, v := range resp.Header {
-		headers[strings.ToLower(k)] = v[0]
-	}
+	headers := resp.Header
 
 	// Check if this was a streaming response.  If so, extract headers sent
 	// from _after_ the response started within the payload.
@@ -377,7 +373,7 @@ func do(ctx context.Context, c util.HTTPDoer, r Request) (*Response, *httpstat.R
 
 			// Upsert headers from the stream.
 			for k, v := range stream.Headers {
-				headers[k] = v
+				headers.Set(k, v)
 			}
 		}
 	}
@@ -391,10 +387,10 @@ func do(ctx context.Context, c util.HTTPDoer, r Request) (*Response, *httpstat.R
 	}
 
 	// Check the retry status from the headers and versions.
-	noRetry = !ShouldRetry(statusCode, headers[headerNoRetry], headers[headerSDK])
+	noRetry = !ShouldRetry(statusCode, headers.Get(headerNoRetry), headers.Get(headerSDK))
 
 	// Extract the retry at header if it hasn't been set explicitly in streaming.
-	if after := headers["retry-after"]; retryAtStr == nil && after != "" {
+	if after := headers.Get("retry-after"); after != "" {
 		retryAtStr = &after
 	}
 	if retryAtStr != nil {
@@ -404,7 +400,7 @@ func do(ctx context.Context, c util.HTTPDoer, r Request) (*Response, *httpstat.R
 	}
 
 	// Get the request version
-	rv, _ := strconv.Atoi(headers[headerRequestVersion])
+	rv, _ := strconv.Atoi(headers.Get(headerRequestVersion))
 	return &Response{
 		Body:           body,
 		StatusCode:     statusCode,
@@ -412,9 +408,9 @@ func do(ctx context.Context, c util.HTTPDoer, r Request) (*Response, *httpstat.R
 		RetryAt:        retryAt,
 		NoRetry:        noRetry,
 		RequestVersion: rv,
-		IsSDK:          headerspkg.IsSDK(resp.Header),
-		Sdk:            headers[headerSDK],
-		Header:         resp.Header,
+		IsSDK:          headerspkg.IsSDK(headers),
+		Sdk:            headers.Get(headerSDK),
+		Header:         headers,
 		SysErr:         sysErr,
 	}, tracking, err
 
