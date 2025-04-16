@@ -885,23 +885,25 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		httpClient: httpdriver.DefaultClient,
 	}
 
-	resp, err := e.run(ctx, &instance)
-	// Now we have a response, update the run instance.  We need to do this as request
-	// offloads must mutate the response directly.
-	instance.resp = resp
-	if resp == nil && err != nil {
-		for _, e := range e.lifecycles {
-			// OnStepFinished handles step success and step errors/failures.  It is
-			// currently the responsibility of the lifecycle manager to handle the differing
-			// step statuses when a step finishes.
-			go e.OnStepFinished(context.WithoutCancel(ctx), md, item, edge, resp, err)
+	return util.CritT(ctx, "run step", func(ctx context.Context) (*state.DriverResponse, error) {
+		resp, err := e.run(ctx, &instance)
+		// Now we have a response, update the run instance.  We need to do this as request
+		// offloads must mutate the response directly.
+		instance.resp = resp
+		if resp == nil && err != nil {
+			for _, e := range e.lifecycles {
+				// OnStepFinished handles step success and step errors/failures.  It is
+				// currently the responsibility of the lifecycle manager to handle the differing
+				// step statuses when a step finishes.
+				go e.OnStepFinished(context.WithoutCancel(ctx), md, item, edge, resp, err)
+			}
+			return nil, err
 		}
-		return nil, err
-	}
-	if handleErr := e.HandleResponse(ctx, &instance); handleErr != nil {
-		return resp, handleErr
-	}
-	return resp, err
+		if handleErr := e.HandleResponse(ctx, &instance); handleErr != nil {
+			return resp, handleErr
+		}
+		return resp, err
+	})
 }
 
 func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
