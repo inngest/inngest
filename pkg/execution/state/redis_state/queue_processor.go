@@ -1027,7 +1027,7 @@ func (q *queue) process(
 	}()
 
 	// XXX: Add a max job time here, configurable.
-	jobCtx, jobCancel := context.WithCancel(ctx)
+	jobCtx, jobCancel := context.WithCancel(context.WithoutCancel(ctx))
 	defer jobCancel()
 	// Add the job ID to the queue context.  This allows any logic that handles the run function
 	// to inspect job IDs, eg. for tracing or logging, without having to thread this down as
