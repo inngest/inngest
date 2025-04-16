@@ -252,7 +252,10 @@ func HandleHttpResponse(ctx context.Context, r Request, resp *Response) (*state.
 		dr.SetError(err)
 	}
 
-	if !resp.IsSDK {
+	if resp.StatusCode >= 200 && resp.StatusCode < 300 && !resp.IsSDK {
+		// If we got a successful response but it wasn't from the SDK, then we
+		// need to fail the attempt. Otherwise, we may incorrectly mark the
+		// function run as "completed".
 		dr.SetError(ErrNotSDK)
 	}
 
