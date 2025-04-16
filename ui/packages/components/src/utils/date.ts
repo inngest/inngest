@@ -13,6 +13,7 @@ import {
   type Duration,
   type DurationUnit,
 } from 'date-fns';
+import { formatInTimeZone } from 'date-fns-tz';
 
 export type { Duration as DurationType };
 export {
@@ -26,6 +27,7 @@ export {
   lightFormat,
   sub,
   format,
+  formatInTimeZone,
 };
 
 export const DURATION_STRING_REGEX = /^[1-9]\d*[smMhdwy]$/;
