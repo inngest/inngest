@@ -82,7 +82,7 @@ const (
 
 	QueuePeekCurrMultiplier int64 = 4 // threshold 25%
 	QueuePeekEWMALen        int   = 10
-	QueueLeaseDuration            = 20 * time.Second
+	QueueLeaseDuration            = 30 * time.Second
 	ConfigLeaseDuration           = 10 * time.Second
 	ConfigLeaseMax                = 20 * time.Second
 
