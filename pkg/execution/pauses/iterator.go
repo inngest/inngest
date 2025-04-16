@@ -2,8 +2,9 @@ package pauses
 
 import (
 	"context"
-	"fmt"
 	"sync"
+	"sync/atomic"
+	"time"
 
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/oklog/ulid/v2"
@@ -19,7 +20,7 @@ const (
 )
 
 func newDualIter(idx Index, bufferedIter state.PauseIterator, rdr BlockReader, blockIDs []ulid.ULID) *dualIter {
-	// NOTE: This is just an estimate
+	// NOTE: This is just an estimate, as pauses may have been compacted / had deletions.
 	count := bufferedIter.Count() + (len(blockIDs) * DefaultPausesPerBlock)
 
 	return &dualIter{
@@ -37,8 +38,16 @@ func newDualIter(idx Index, bufferedIter state.PauseIterator, rdr BlockReader, b
 type dualIter struct {
 	idx Index
 
+	// index is the current iterator index.
+	index int64
+
 	// count is an esitmate of the max pauses in the iterator.
 	count int
+
+	// usingBuffer indicates whether we're using the buffer for the next
+	// .Val() call.  This is set to true to begin with, while the buffer iter
+	// is being used.
+	usingBuffer bool
 
 	// bufferIter is the buffered iterator.
 	bufferIter state.PauseIterator
@@ -80,29 +89,79 @@ func (d *dualIter) Count() int {
 //
 // The order of the iterator is unspecified.
 func (d *dualIter) Next(ctx context.Context) bool {
-	// TODO: Block on this if len(unfetchedBlocks) > 0 and len(pauses) == 0
+	// Always attempt to fetch blocks if there's space.
 	d.fetchNextBlocks()
 
-	return false
+	// Check on the buffer iterator and advance on this.
+	if d.bufferIter.Next(ctx) {
+		d.usingBuffer = true
+		return true
+	}
+
+	d.usingBuffer = false
+
+	d.l.Lock()
+	defer d.l.Unlock()
+
+	if len(d.pauses) == 0 && len(d.inflightBlocks) == 0 {
+		// We are done!  There are no pauses downloaded or inflight.
+		return false
+	}
+
+	// Complex case:  we may be waiting for in flight blocks to download, but only
+	// if we've handled all already downloaded pauses:
+	//
+	// eg:  0 blocks downloaded / 10 being downloaded.  spin until len(d.pauses) > 0.
+	for len(d.inflightBlocks) > 0 && len(d.pauses) == 0 {
+		// Wait 100ms for the block to download and try again.
+		time.Sleep(100 * time.Millisecond)
+	}
+
+	if len(d.pauses) > 0 {
+		// Simple case:  pauses are downloaded, so yeah we have a next value.
+		return true
+	}
+
+	// If we're here and we've already processed all in-flight blocks, attempt
+	// to redownload blocks.
+	return d.Next(ctx)
 }
 
 // Error returns the error returned during iteration, if any.  Use this to check
 // for errors during iteration when Next() returns false.
 func (d *dualIter) Error() error {
-	return fmt.Errorf("not implemented")
+	return d.err
 }
 
 // Val returns the current Pause from the iterator.
-func (d *dualIter) Val(context.Context) *state.Pause {
-	return nil
+func (d *dualIter) Val(ctx context.Context) *state.Pause {
+	atomic.AddInt64(&d.index, 1)
+
+	if d.usingBuffer {
+		return d.bufferIter.Val(ctx)
+	}
+
+	d.l.Lock()
+	defer d.l.Unlock()
+
+	if len(d.pauses) == 0 {
+		return nil
+	}
+
+	pause := d.pauses[0]
+	d.pauses = d.pauses[1:]
+
+	return pause
 }
 
 // Index shows how far the iterator has progressed
 func (d *dualIter) Index() int64 {
-	return 0
+	return d.index
 }
 
-func (d *dualIter) fetchNextBlocks() {
+// fetchNextBlocks fetches blocks, returning whether we're fetching anything
+// in the background.
+func (d *dualIter) fetchNextBlocks() bool {
 	d.l.Lock()
 	defer d.l.Unlock()
 
@@ -112,7 +171,7 @@ func (d *dualIter) fetchNextBlocks() {
 	}
 
 	if maxFetch == 0 {
-		return
+		return false
 	}
 
 	blockIDs := d.unfetchedBlocks[0:maxFetch]
@@ -128,6 +187,8 @@ func (d *dualIter) fetchNextBlocks() {
 		id := bid
 		go d.fetchBlock(context.Background(), id)
 	}
+
+	return true
 }
 
 func (d *dualIter) fetchBlock(ctx context.Context, id ulid.ULID) {
@@ -142,7 +203,13 @@ func (d *dualIter) fetchBlock(ctx context.Context, id ulid.ULID) {
 		return
 	}
 
+	// TODO:  Here we can optionally filter out deleted pauses from
+	// the delete buffer.
+
 	d.l.Lock()
 	defer d.l.Unlock()
+
+	// Remove this from in-flight stuff.
+
 	d.pauses = append(d.pauses, block.Pauses...)
 }
