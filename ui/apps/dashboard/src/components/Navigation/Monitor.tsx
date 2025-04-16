@@ -1,8 +1,10 @@
 import { MenuItem } from '@inngest/components/Menu/MenuItem';
+import { EventLogsIcon } from '@inngest/components/icons/sections/EventLogs';
 import { MetricsIcon } from '@inngest/components/icons/sections/Metrics';
 import { RunsIcon } from '@inngest/components/icons/sections/Runs';
 
 import type { Environment as EnvType } from '@/utils/environments';
+import { ClientFeatureFlag } from '../FeatureFlags/ClientFeatureFlag';
 import { getNavRoute } from './Navigation';
 
 export default function Monitor({
@@ -31,13 +33,14 @@ export default function Monitor({
         text="Runs"
         icon={<RunsIcon className="h-[18px] w-[18px]" />}
       />
-      {/* <MenuItem
-        href={getNavRoute(activeEnv, 'events/monitor')}
-        collapsed={collapsed}
-        text="Event Logs"
-        icon={<EventLogsIcon className="h-[18px] w-[18px]" />}
-        comingSoon={true}
-      /> */}
+      <ClientFeatureFlag flag="events-pages">
+        <MenuItem
+          href={getNavRoute(activeEnv, 'new-events')}
+          collapsed={collapsed}
+          text="Events"
+          icon={<EventLogsIcon className="h-[18px] w-[18px]" />}
+        />
+      </ClientFeatureFlag>
     </div>
   );
 }

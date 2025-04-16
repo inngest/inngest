@@ -60,25 +60,20 @@ var (
 
 		return t
 	}()
-	DefaultClient = &http.Client{
+
+	DefaultClient = util.HTTPDoer(&http.Client{
 		Timeout:       consts.MaxFunctionTimeout,
 		CheckRedirect: CheckRedirect,
 		Transport:     DefaultTransport,
-	}
-
-	DefaultExecutor = &executor{Client: DefaultClient}
+	})
 
 	ErrEmptyResponse = fmt.Errorf("no response data")
 	ErrNoRetryAfter  = fmt.Errorf("no retry after present")
 	ErrNotSDK        = syscode.Error{Code: syscode.CodeNotSDK}
 )
 
-type HTTPDoer interface {
-	Do(req *http.Request) (*http.Response, error)
-}
-
 type executor struct {
-	Client                 *http.Client
+	Client                 util.HTTPDoer
 	localSigningKey        []byte
 	requireLocalSigningKey bool
 }
@@ -153,7 +148,7 @@ type Request struct {
 }
 
 // DoRequest executes the HTTP request with the given input.
-func DoRequest(ctx context.Context, c HTTPDoer, r Request) (*state.DriverResponse, *httpstat.Result, error) {
+func DoRequest(ctx context.Context, c util.HTTPDoer, r Request) (*state.DriverResponse, *httpstat.Result, error) {
 	if c == nil {
 		c = DefaultClient
 	}
@@ -287,7 +282,7 @@ func HandleHttpResponse(ctx context.Context, r Request, resp *Response) (*state.
 	return dr, err
 }
 
-func do(ctx context.Context, c HTTPDoer, r Request) (*Response, *httpstat.Result, error) {
+func do(ctx context.Context, c util.HTTPDoer, r Request) (*Response, *httpstat.Result, error) {
 	if c == nil {
 		c = DefaultClient
 	}

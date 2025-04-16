@@ -4,6 +4,7 @@ import { useCallback, useMemo, useRef, useState, type UIEventHandler } from 'rea
 import dynamic from 'next/dynamic';
 import { Button } from '@inngest/components/Button';
 import TimeFieldFilter from '@inngest/components/Filter/TimeFieldFilter';
+import { TimeFilter } from '@inngest/components/Filter/TimeFilter';
 import { Pill } from '@inngest/components/Pill';
 import { SelectGroup, type Option } from '@inngest/components/Select/Select';
 import { TableFilter } from '@inngest/components/Table';
@@ -34,7 +35,6 @@ import {
 } from '../hooks/useSearchParam';
 import type { Features } from '../types/features';
 import RunsStatusFilter from './RunsStatusFilter';
-import { TimeFilter } from './TimeFilter';
 import { isColumnID, useScopedColumns, type ColumnID } from './columns';
 import type { Run, ViewScope } from './types';
 
@@ -308,6 +308,7 @@ export function RunsPage({
                 onTimeFieldChange={onTimeFieldChange}
               />
               <TimeFilter
+                className="rounded-l-none border-l-0"
                 daysAgoMax={features.history}
                 onDaysChange={onDaysChange}
                 defaultValue={
