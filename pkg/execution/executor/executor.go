@@ -1048,6 +1048,8 @@ func (f functionFinishedData) Map() map[string]any {
 // had parallel steps then it may be false, since parallel steps cause the
 // function end to be reached multiple times in a single run
 func (e *executor) finalize(ctx context.Context, md sv2.Metadata, evts []json.RawMessage, fnSlug string, queueShard redis_state.QueueShard, resp state.DriverResponse) error {
+	ctx = context.WithoutCancel(ctx)
+
 	// Parse events for the fail handler before deleting state.
 	inputEvents := make([]event.Event, len(evts))
 	for n, e := range evts {
