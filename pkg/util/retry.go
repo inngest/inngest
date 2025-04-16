@@ -106,7 +106,7 @@ func WithRetry[T any](ctx context.Context, action string, fn Retryable[T], conf 
 			return result, err
 		}
 
-		l.Debug("retrying function",
+		l.Warn("retrying function",
 			"error", err,
 			"attempt", attempt,
 			"action", action,
