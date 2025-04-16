@@ -1067,7 +1067,11 @@ func (e *executor) finalize(ctx context.Context, md sv2.Metadata, evts []json.Ra
 	// Delete the function state in every case.
 	_, err := e.smv2.Delete(ctx, md.ID)
 	if err != nil {
-		logger.StdlibLogger(ctx).Error("error deleting state in finalize", "error", err)
+		logger.StdlibLogger(ctx).Error(
+			"error deleting state in finalize",
+			"error", err,
+			"run_id", md.ID.RunID.String(),
+		)
 	}
 
 	// We may be cancelling an in-progress run.  If that's the case, we want to delete any
@@ -1087,7 +1091,11 @@ func (e *executor) finalize(ctx context.Context, md sv2.Metadata, evts []json.Ra
 			0,
 		)
 		if err != nil {
-			logger.StdlibLogger(ctx).Error("error fetching run jobs", "error", err)
+			logger.StdlibLogger(ctx).Error(
+				"error fetching run jobs",
+				"error", err,
+				"run_id", md.ID.RunID.String(),
+			)
 		}
 
 		for _, j := range jobs {
@@ -1104,7 +1112,11 @@ func (e *executor) finalize(ctx context.Context, md sv2.Metadata, evts []json.Ra
 
 			err := q.Dequeue(ctx, queueShard, *qi)
 			if err != nil && !errors.Is(err, redis_state.ErrQueueItemNotFound) {
-				logger.StdlibLogger(ctx).Error("error dequeueing run job", "error", err)
+				logger.StdlibLogger(ctx).Error(
+					"error dequeueing run job",
+					"error", err,
+					"run_id", md.ID.RunID.String(),
+				)
 			}
 		}
 	}
