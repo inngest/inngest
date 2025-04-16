@@ -1913,7 +1913,17 @@ func (e *executor) handleGeneratorGroup(ctx context.Context, i *runInstance, gro
 			// parellel step individually.
 			i.item.GroupID = uuid.New().String()
 		}
-		eg.Go(func() error { return e.handleGenerator(ctx, i, copied) })
+		eg.Go(func() error {
+			defer func() {
+				if r := recover(); r != nil {
+					logger.StdlibLogger(ctx).Error(
+						"panic in handleGenerator",
+						"error", r,
+					)
+				}
+			}()
+			return e.handleGenerator(ctx, i, copied)
+		})
 	}
 	if err := eg.Wait(); err != nil {
 		if errors.Is(err, state.ErrStateOverflowed) {
@@ -2393,7 +2403,13 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, i *runInstance,
 		}
 
 		if err == nil {
-			err = fmt.Errorf("unsuccessful status code: %d", hr.StatusCode)
+			if hr != nil {
+				err = fmt.Errorf("unsuccessful status code: %d", hr.StatusCode)
+			} else {
+				// TODO: We should write a better error. This is a quick fix to
+				// stop panics.
+				err = errors.New("missing response")
+			}
 		}
 
 		// Ensure the opcode is treated as an error when calling OnStepFinish.
