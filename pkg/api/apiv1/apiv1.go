@@ -119,7 +119,7 @@ func (a *router) setup() {
 
 			r.Get("/prom/{env}", a.promScrape)
 
-			r.Post("/traces", a.traces)
+			r.Post("/traces/userland", a.traces)
 		})
 	})
 }
