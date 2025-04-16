@@ -29,7 +29,7 @@ func CritT[T any](ctx context.Context, name string, f func(ctx context.Context) 
 	}
 
 	if ctx.Err() == context.Canceled {
-		return resp, fmt.Errorf("context canceled before entering crit: %s", name)
+		logger.StdlibLogger(ctx).Warn("context canceled before entering crit", "name", name)
 	}
 
 	pre := time.Now()

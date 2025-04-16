@@ -103,20 +103,4 @@ func TestCrit(t *testing.T) {
 
 		require.Contains(t, buf.String(), "critical section took longer than boundaries")
 	})
-
-	t.Run("With a cancelled context, the fn fails", func(t *testing.T) {
-		ctx, cancel := context.WithCancel(bg)
-		cancel()
-
-		called := false
-		err := Crit(ctx, "foo", func(ctx context.Context) error {
-			called = true
-			return nil
-		})
-
-		require.False(t, called)
-		require.NotNil(t, err)
-		require.Contains(t, err.Error(), "context canceled before entering crit")
-	})
-
 }
