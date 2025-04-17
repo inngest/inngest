@@ -161,16 +161,18 @@ func (a router) convertOTLPAndSend(auth apiv1auth.V1Auth, req *collecttrace.Expo
 				attrs := convertAttributes(s.Attributes)
 
 				// Add built-in inngest attributes to the span (run ID etc)
-				for k, v := range traceRoot.SpanAttributes {
-					if _, ok := copyableAttrs[k]; ok {
-						if _, ok := ignoredAttrs[k]; ok {
-							continue
-						}
+				if traceRoot != nil && traceRoot.SpanAttributes != nil {
+					for k, v := range traceRoot.SpanAttributes {
+						if _, ok := copyableAttrs[k]; ok {
+							if _, ok := ignoredAttrs[k]; ok {
+								continue
+							}
 
-						attrs = append(attrs, attribute.KeyValue{
-							Key:   attribute.Key(k),
-							Value: attribute.StringValue(v),
-						})
+							attrs = append(attrs, attribute.KeyValue{
+								Key:   attribute.Key(k),
+								Value: attribute.StringValue(v),
+							})
+						}
 					}
 				}
 
