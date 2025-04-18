@@ -110,16 +110,6 @@ func New(ctx context.Context, opts StartOpts) error {
 		opts.Config.Execution.LogOutput = true
 	}
 
-	// Before running the development service, ensure that we change the http
-	// driver in development to use our AWS Gateway http client, attempting to
-	// automatically transform dev requests to lambda invocations.
-	//
-	// We also make sure to allow local requests.
-	httpdriver.DefaultTransport.DialContext = httpdriver.Dialer.DialContext
-
-	httpdriver.DefaultClient.(*http.Client).Transport = awsgateway.NewTransformTripper(httpdriver.DefaultClient.(*http.Client).Transport)
-	deploy.Client.Transport = awsgateway.NewTransformTripper(deploy.Client.Transport)
-
 	return start(ctx, opts)
 }
 
@@ -316,7 +306,21 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	hmw := memory_writer.NewWriter(ctx, memory_writer.WriterOptions{DumpToFile: false})
 
+	// Before running the development service, ensure that we change the http
+	// driver in development to use our AWS Gateway http client, attempting to
+	// automatically transform dev requests to lambda invocations.
+	//
+	// We also make sure to allow local requests.
+	httpClient := httpdriver.Client(httpdriver.SecureDialerOpts{
+		AllowHostDocker: true, // In local dev, this is OK
+		AllowPrivate:    true, // In local dev, this is OK
+		AllowNAT64:      true, // In local dev, this is OK
+	})
+	httpClient.(*http.Client).Transport = awsgateway.NewTransformTripper(httpClient.(*http.Client).Transport)
+	deploy.Client.Transport = awsgateway.NewTransformTripper(deploy.Client.Transport)
+
 	exec, err := executor.NewExecutor(
+		executor.WithHTTPClient(httpClient),
 		executor.WithStateManager(smv2),
 		executor.WithPauseManager(sm),
 		executor.WithRuntimeDrivers(

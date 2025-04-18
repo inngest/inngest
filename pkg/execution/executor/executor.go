@@ -98,11 +98,23 @@ func NewExecutor(opts ...ExecutorOpt) (execution.Executor, error) {
 		return nil, ErrNoPauseManager
 	}
 
+	if m.httpClient == nil {
+		// Default to the secure client.
+		m.httpClient = httpdriver.Client(httpdriver.SecureDialerOpts{})
+	}
+
 	return m, nil
 }
 
 // ExecutorOpt modifies the built-in executor on creation.
 type ExecutorOpt func(m execution.Executor) error
+
+func WithHTTPClient(c util.HTTPDoer) ExecutorOpt {
+	return func(e execution.Executor) error {
+		e.(*executor).httpClient = c
+		return nil
+	}
+}
 
 func WithCancellationChecker(c cancellation.Checker) ExecutorOpt {
 	return func(e execution.Executor) error {
@@ -299,6 +311,7 @@ type executor struct {
 	invokeFailHandler   execution.InvokeFailHandler
 	handleSendingEvent  execution.HandleSendingEvent
 	cancellationChecker cancellation.Checker
+	httpClient          util.HTTPDoer
 
 	lifecycles []execution.LifecycleListener
 
@@ -882,7 +895,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		item:       item,
 		edge:       edge,
 		stackIndex: stackIndex,
-		httpClient: httpdriver.DefaultClient,
+		httpClient: e.httpClient,
 	}
 
 	return util.CritT(ctx, "run step", func(ctx context.Context) (*state.DriverResponse, error) {
