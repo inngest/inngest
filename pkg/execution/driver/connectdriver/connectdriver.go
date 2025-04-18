@@ -2,13 +2,16 @@ package connectdriver
 
 import (
 	"context"
+	"crypto/rand"
 	"errors"
 	"fmt"
 	"github.com/inngest/inngest/pkg/connect/pubsub"
 	"github.com/inngest/inngest/pkg/execution/driver/httpdriver"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/inngest/inngest/proto/gen/connect/v1"
+	"github.com/oklog/ulid/v2"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 	"net/http"
@@ -86,7 +89,7 @@ func (e executor) Execute(ctx context.Context, sl sv2.StateLoader, s sv2.Metadat
 		return nil, err
 	}
 
-	return ProxyRequest(ctx, traceCtx, e.forwarder, s.ID, httpdriver.Request{
+	return ProxyRequest(ctx, traceCtx, e.forwarder, s.ID, item, httpdriver.Request{
 		WorkflowID: s.ID.FunctionID,
 		RunID:      s.ID.RunID,
 		URL:        *uri,
@@ -97,7 +100,17 @@ func (e executor) Execute(ctx context.Context, sl sv2.StateLoader, s sv2.Metadat
 }
 
 // ProxyRequest proxies the request to the SDK over a long-lived connection with the given input.
-func ProxyRequest(ctx, traceCtx context.Context, forwarder pubsub.RequestForwarder, id sv2.ID, r httpdriver.Request) (*state.DriverResponse, error) {
+func ProxyRequest(ctx, traceCtx context.Context, forwarder pubsub.RequestForwarder, id sv2.ID, item queue.Item, r httpdriver.Request) (*state.DriverResponse, error) {
+	var requestID string
+	if item.JobID != nil {
+		// Use the stable queue item ID
+		requestID = *item.JobID
+	} else {
+		// This should never happen, handle it gracefully
+		logger.StdlibLogger(ctx).Warn("queue item missing jobID", "item", item, "id", id)
+		requestID = ulid.MustNew(ulid.Now(), rand.Reader).String()
+	}
+
 	requestToForward := connect.GatewayExecutorRequestData{
 		// TODO Find out if we can supply this in a better way. We still use the URL concept a lot,
 		// even though this has no meaning in connect.
@@ -107,6 +120,7 @@ func ProxyRequest(ctx, traceCtx context.Context, forwarder pubsub.RequestForward
 		EnvId:          id.Tenant.EnvID.String(),
 		AccountId:      id.Tenant.AccountID.String(),
 		RunId:          id.RunID.String(),
+		RequestId:      requestID,
 	}
 	// If we have a generator step name, ensure we add the step ID parameter
 	if r.Edge.IncomingGeneratorStep != "" {

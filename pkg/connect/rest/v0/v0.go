@@ -14,9 +14,10 @@ import (
 )
 
 type Opts struct {
-	ConnectManager          state.ConnectionManager
-	GroupManager            state.WorkerGroupManager
-	ConnectResponseNotifier pubsub.ResponseNotifier
+	ConnectManager             state.ConnectionManager
+	GroupManager               state.WorkerGroupManager
+	ConnectResponseNotifier    pubsub.ResponseNotifier
+	ConnectRequestStateManager state.RequestStateManager
 
 	Signer                  auth.SessionTokenSigner
 	RequestAuther           RequestAuther
