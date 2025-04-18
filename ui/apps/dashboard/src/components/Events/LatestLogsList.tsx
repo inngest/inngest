@@ -105,9 +105,7 @@ export default function LatestLogsList({ environmentSlug, eventName }: LatestLog
                         <IDCell>{e.id}</IDCell>
                       </td>
                       <td>
-                        <Pill appearance="outlined">
-                          {e.source?.name}
-                        </Pill>
+                        <Pill appearance="outlined">{e.source?.name}</Pill>
                       </td>
                     </tr>
                   ))

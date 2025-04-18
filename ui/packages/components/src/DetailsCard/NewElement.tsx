@@ -87,7 +87,11 @@ export function IDElement({ children }: React.PropsWithChildren) {
 }
 
 export function TextElement({ children }: React.PropsWithChildren) {
-  return <span className={cn(cellStyles, 'font-medium')}>{children}</span>;
+  return (
+    <span className={cn(cellStyles, 'max-w-full overflow-hidden text-wrap break-all font-medium')}>
+      {children}
+    </span>
+  );
 }
 
 export function TimeElement({ date }: { date: Date }) {

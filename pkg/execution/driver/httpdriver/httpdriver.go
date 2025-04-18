@@ -97,12 +97,31 @@ func (e executor) Execute(ctx context.Context, sl sv2.StateLoader, s sv2.Metadat
 		return nil, err
 	}
 
+	headers := map[string]string{}
+	itrace.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(headers))
+	if headers["traceparent"] != "" {
+		// The span ID will be incorrect here as lifecycles can not affec the
+		// ctx. To patch, we manually set the span ID here to what we know it
+		// should be based on the item
+		parts := strings.Split(headers["traceparent"], "-")
+		if len(parts) == 4 {
+			spanID, err := item.SpanID()
+			if err != nil {
+				return nil, fmt.Errorf("error parsing span ID: %w", err)
+			}
+
+			parts[2] = spanID.String()
+			headers["traceparent"] = strings.Join(parts, "-")
+		}
+	}
+
 	dr, _, err := DoRequest(ctx, e.Client, Request{
 		SigningKey: e.localSigningKey,
 		URL:        *uri,
 		Input:      input,
 		Edge:       edge,
 		Step:       step,
+		Headers:    headers,
 	})
 	return dr, err
 }
@@ -122,6 +141,9 @@ type Request struct {
 	Input      []byte
 	Edge       inngest.Edge
 	Step       inngest.Step
+
+	// Headers are additional headers to add to the request.
+	Headers map[string]string
 }
 
 // DoRequest executes the HTTP request with the given input.
@@ -287,8 +309,9 @@ func do(ctx context.Context, c util.HTTPDoer, r Request) (*Response, *httpstat.R
 		req.Header.Add("X-Inngest-Signature", r.Signature)
 	}
 
-	// Add `traceparent` and `tracestate` headers to the request from `ctx`
-	itrace.UserTracer().Propagator().Inject(ctx, propagation.HeaderCarrier(req.Header))
+	for k, v := range r.Headers {
+		req.Header.Add(k, v)
+	}
 
 	// Track HTTP stats, eg. TLS handshake timeouts, DNS lookups, etc.
 	tracking := &httpstat.Result{}
