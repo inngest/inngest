@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"net/url"
 	"time"
 
@@ -110,7 +111,7 @@ func New(ctx context.Context, opts StartOpts) error {
 	//
 	// We also make sure to allow local requests.
 	httpdriver.DefaultTransport.DialContext = httpdriver.Dialer.DialContext
-	httpdriver.DefaultExecutor.Client.Transport = awsgateway.NewTransformTripper(httpdriver.DefaultExecutor.Client.Transport)
+	httpdriver.DefaultClient.(*http.Client).Transport = awsgateway.NewTransformTripper(httpdriver.DefaultClient.(*http.Client).Transport)
 	deploy.Client.Transport = awsgateway.NewTransformTripper(deploy.Client.Transport)
 
 	return start(ctx, opts)

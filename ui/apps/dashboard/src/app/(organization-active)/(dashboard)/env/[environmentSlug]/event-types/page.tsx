@@ -9,8 +9,8 @@ import { RefreshButton } from '@inngest/components/Refresh/RefreshButton';
 import { RiExternalLinkLine, RiRefreshLine } from '@remixicon/react';
 
 import { ActionsMenu } from '@/components/EventTypes/ActionsMenu';
+import { EventTypesInfo } from '@/components/EventTypes/EventTypesInfo';
 import { useEventTypes, useEventTypesVolume } from '@/components/EventTypes/useEventTypes';
-import { EventInfo } from '@/components/Events/EventInfo';
 import SendEventButton from '@/components/Events/SendEventButton';
 import { pathCreator } from '@/utils/urls';
 
@@ -37,7 +37,7 @@ export default function EventTypesPage({
     <>
       <Header
         breadcrumb={[{ text: 'Event Types' }]}
-        infoIcon={<EventInfo />}
+        infoIcon={<EventTypesInfo />}
         action={
           <div className="flex items-center gap-1.5">
             <RefreshButton />

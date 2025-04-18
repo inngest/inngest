@@ -21,12 +21,16 @@ export function Pill({
   kind = 'default',
   appearance = 'solid',
   flatSide,
+  icon,
+  iconSide,
 }: {
   children: React.ReactNode;
   className?: string;
   href?: Route | UrlObject;
   appearance?: PillAppearance;
   kind?: PillKind;
+  icon?: React.ReactNode;
+  iconSide?: 'right' | 'left';
   /**
    * Use this when you want one of the sides to be flat. The other sides will be
    * rounded.
@@ -39,7 +43,7 @@ export function Pill({
 
   const pillColors = getPillColors({ kind, appearance, clickable: !!href });
   const classNames = cn(
-    'inline-flex items-center h-5 px-2 text-xs leading-none font-medium truncate max-w-full',
+    'inline-flex items-center gap-0.5 h-5 px-2 text-xs leading-none font-medium truncate max-w-full',
     pillColors,
     className
   );
@@ -83,12 +87,16 @@ export function Pill({
   const pillWrapper = href ? (
     <NextLink href={href} className="flex">
       <span ref={pillRef} className={cn('rounded', classNames)}>
+        {icon && iconSide === 'left' && icon}
         <span className="truncate">{children}</span>
+        {icon && iconSide === 'right' && icon}
       </span>
     </NextLink>
   ) : (
     <span ref={pillRef} className={cn(roundedClasses, classNames)}>
+      {icon && iconSide === 'left' && icon}
       <span className="truncate">{children}</span>
+      {icon && iconSide === 'right' && icon}
     </span>
   );
   return (
