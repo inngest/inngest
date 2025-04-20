@@ -105,10 +105,13 @@ func (d *dualIter) Next(ctx context.Context) bool {
 
 	d.usingBuffer = false
 
+	// NOTE: We must release the lock as soon as possible such that the fetchBlock
+	// background thread can grab the lock to adjust pauses.
 	d.l.Lock()
-	defer d.l.Unlock()
+	quit := len(d.pauses) == 0 && len(d.inflightBlocks) == 0
+	d.l.Unlock()
 
-	if len(d.pauses) == 0 && len(d.inflightBlocks) == 0 {
+	if quit {
 		// We are done!  There are no pauses downloaded or inflight.
 		return false
 	}
@@ -117,11 +120,27 @@ func (d *dualIter) Next(ctx context.Context) bool {
 	// if we've handled all already downloaded pauses:
 	//
 	// eg:  0 blocks downloaded / 10 being downloaded.  spin until len(d.pauses) > 0.
-	for len(d.inflightBlocks) > 0 && len(d.pauses) == 0 {
+	d.l.Lock()
+	spin := len(d.inflightBlocks) > 0 && len(d.pauses) == 0
+	d.l.Unlock()
+
+	for spin {
 		// Wait 100ms for the block to download and try again.
 		time.Sleep(100 * time.Millisecond)
+
+		if d.err != nil {
+			// Skip as we've errored.
+			return false
+		}
+
+		d.l.Lock()
+		spin = len(d.inflightBlocks) > 0 && len(d.pauses) == 0
+		d.l.Unlock()
 	}
 
+	// Now we're good.
+	d.l.Lock()
+	defer d.l.Unlock()
 	if len(d.pauses) > 0 {
 		// Simple case:  pauses are downloaded, so yeah we have a next value.
 		return true
@@ -203,7 +222,7 @@ func (d *dualIter) fetchBlock(ctx context.Context, id ulid.ULID) {
 	}
 
 	block, err := d.blockReader.ReadBlock(ctx, d.idx, id)
-	if err != nil && d.err != nil {
+	if err != nil && d.err == nil {
 		d.err = err
 		return
 	}
