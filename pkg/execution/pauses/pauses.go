@@ -52,7 +52,8 @@ type Bufferer interface {
 	//
 	// Note that this does not return blocks, as this only reads from the BufferIndexer.
 	//
-	// NOTE: This is NOT INCLUSIVE of since, ie. the range is (since, now].
+	// NOTE: This is NOT INCLUSIVE of since, ie. the range is (since, now].  The order
+	// of iteration is NOT guaranteed.
 	PausesSince(ctx context.Context, index Index, since time.Time) (state.PauseIterator, error)
 
 	// Delete deletes a pause from the buffer, or returns ErrNotInBuffer if the pause is not in

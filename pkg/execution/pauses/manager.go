@@ -11,7 +11,7 @@ import (
 )
 
 var (
-	defaultFlushDelay = 5 * time.Second
+	defaultFlushDelay = 10 * time.Second
 )
 
 // StateBufferer transforms a state.Manager into a state.Bufferer.
@@ -21,10 +21,10 @@ func StateBufferer(rsm state.Manager) Bufferer {
 
 // NewManager returns a new pause writer, writing pauses to a Valkey/Redis/MemoryDB
 // compatible buffer
-func NewManager(buf Bufferer, flusher BlockFlusher) *manager {
+func NewManager(buf Bufferer, bs BlockStore) *manager {
 	return &manager{
-		buf:     buf,
-		flusher: flusher,
+		buf: buf,
+		bs:  bs,
 		// TODO: should be able to override this
 		flushDelay: defaultFlushDelay,
 	}
@@ -32,7 +32,7 @@ func NewManager(buf Bufferer, flusher BlockFlusher) *manager {
 
 type manager struct {
 	buf        Bufferer
-	flusher    BlockFlusher
+	bs         BlockStore
 	flushDelay time.Duration
 }
 
@@ -74,7 +74,7 @@ func (m manager) Write(ctx context.Context, index Index, pauses ...*state.Pause)
 	}
 
 	// If this is larger than the max buffer len, schedule a new block write.
-	if m.flusher != nil && n >= m.flusher.BlockSize() {
+	if m.bs != nil && n >= m.bs.BlockSize() {
 		go m.FlushIndexBlock(ctx, index)
 	}
 
@@ -87,21 +87,41 @@ func (m manager) Write(ctx context.Context, index Index, pauses ...*state.Pause)
 // NOTE: On a manager, this reads from a buffer and the backing block reader to read
 // all pauses for an Index, on both blobs and the buffer.
 func (m manager) PausesSince(ctx context.Context, index Index, since time.Time) (state.PauseIterator, error) {
-	// TODO: Read from block stores and the buffer, creating an iterator that does all.
-	return nil, fmt.Errorf("not implemented")
+	bufIter, err := m.buf.PausesSince(ctx, index, since)
+	if err != nil {
+		return nil, err
+	}
+
+	blocks, err := m.bs.BlocksSince(ctx, index, since)
+	if err != nil {
+		return nil, err
+	}
+
+	// Read from block stores and the buffer, creating an iterator that does all.
+	return newDualIter(
+		index,
+		bufIter,
+		m.bs,
+		blocks,
+	), nil
 }
 
 // Delete deletes a pause from from block storage or the buffer.
 func (m manager) Delete(ctx context.Context, index Index, pause state.Pause) error {
-	// XXX: Future optimization:  cache the last written block for an index in-memory so
-	// we can fast lookup here: blockID.ts > pause.ts, if so always delete from flusher.
+	// XXX: Potential future optimization:  cache the last written block for an index
+	// in-memory so we can fast lookup here:
+	//
+	// if blockID.ts > pause.ts, skip deleting from the buffer as the pause is in a block.
+	//
+	// This lets us skip deleting from the buffer, as this is a longer and more complex
+	// transaction than a single lookup.
 	err := m.buf.Delete(ctx, index, pause)
 	if err != nil && !errors.Is(err, ErrNotInBuffer) {
 		return err
 	}
 	// Always also delegate to the flusher, just in case a block was written whilst
 	// we issued the delete request.
-	return m.flusher.Delete(ctx, index, pause)
+	return m.bs.Delete(ctx, index, pause)
 }
 
 func (m manager) FlushIndexBlock(ctx context.Context, index Index) error {
@@ -111,5 +131,5 @@ func (m manager) FlushIndexBlock(ctx context.Context, index Index) error {
 	//
 	// flushDelay is the amount of clock skew we mitigate.
 	time.Sleep(m.flushDelay)
-	return m.flusher.FlushIndexBlock(ctx, index)
+	return m.bs.FlushIndexBlock(ctx, index)
 }

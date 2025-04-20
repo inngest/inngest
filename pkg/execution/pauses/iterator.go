@@ -2,6 +2,7 @@ package pauses
 
 import (
 	"context"
+	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -89,7 +90,11 @@ func (d *dualIter) Count() int {
 //
 // The order of the iterator is unspecified.
 func (d *dualIter) Next(ctx context.Context) bool {
-	// Always attempt to fetch blocks if there's space.
+	// Always attempt to fetch blocks if there's space.  This runs in the
+	// background.  We do this before calling bufferIter to ensure that we
+	// have older pauses loaded when the buffer iteration has finished.
+	//
+	// Iteration does NOT need to happen in-order.
 	d.fetchNextBlocks()
 
 	// Check on the buffer iterator and advance on this.
@@ -208,8 +213,10 @@ func (d *dualIter) fetchBlock(ctx context.Context, id ulid.ULID) {
 
 	d.l.Lock()
 	defer d.l.Unlock()
-
 	// Remove this from in-flight stuff.
-
+	d.inflightBlocks = slices.DeleteFunc(d.inflightBlocks, func(i ulid.ULID) bool {
+		return i == id
+	})
+	// And, of course, add our pauses so that we can iterate through them.
 	d.pauses = append(d.pauses, block.Pauses...)
 }
