@@ -1037,6 +1037,7 @@ go.uber.org/multierr
 gocloud.dev/aws
 gocloud.dev/blob
 gocloud.dev/blob/driver
+gocloud.dev/blob/memblob
 gocloud.dev/gcerrors
 gocloud.dev/gcp
 gocloud.dev/internal/escape
