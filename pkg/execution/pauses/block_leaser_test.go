@@ -91,9 +91,10 @@ func TestRedisBlockLeaser_Renew(t *testing.T) {
 	assert.Contains(t, err.Error(), "unable to renew lease")
 
 	// Test renewal after expiry
-	s.FastForward(6 * time.Second)
+	s.FastForward(7 * time.Second)
+
 	_, err = leaser.Renew(ctx, index, leaseID2)
-	assert.Error(t, err)
+	require.Error(t, err, s.Dump())
 	assert.Contains(t, err.Error(), "unable to renew lease")
 }
 

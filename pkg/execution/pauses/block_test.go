@@ -78,6 +78,9 @@ func TestBlockFlusher(t *testing.T) {
 	require.NotNil(t, block)
 	require.Len(t, block.Pauses, 1)
 	require.Equal(t, mockBufferer.pauses[0].ID, block.Pauses[0].ID)
+
+	// Verify that the pauses are not in the buffer
+	require.Empty(t, mockBufferer.pauses, "pauses should be removed from buffer after flushing")
 }
 
 // mockBufferer implements the Bufferer interface for testing

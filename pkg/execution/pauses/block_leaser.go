@@ -36,7 +36,7 @@ func (r redisBlockLeaser) Lease(ctx context.Context, index Index) (leaseID ulid.
 		r.rc,
 		[]string{r.indexKey(index)},
 		[]string{
-			strconv.Itoa(int(time.Now().Unix())),
+			strconv.Itoa(int(time.Now().UnixMilli())),
 			leaseID.String(),
 			"",
 			strconv.Itoa(int(r.duration.Seconds())),
@@ -64,14 +64,14 @@ func (r redisBlockLeaser) Renew(ctx context.Context, index Index, existingLeaseI
 		r.rc,
 		[]string{r.indexKey(index)},
 		[]string{
-			strconv.Itoa(int(time.Now().Unix())),
+			strconv.Itoa(int(time.Now().UnixMilli())),
 			newLeaseID.String(),
 			existingLeaseID.String(),
 			strconv.Itoa(int(r.duration.Seconds())),
 		},
 	).AsInt64()
 	switch status {
-	case 0:
+	case -1:
 		return newLeaseID, nil
 	default:
 		return newLeaseID, fmt.Errorf("unable to renew lease")
@@ -120,6 +120,11 @@ local function decode_ulid_time(s)
 end
 
 local fetched = redis.call("GET", keyLease)
+
+if existingLeaseID ~= "" and fetched == false then
+	return -2
+end
+
 if fetched == false or decode_ulid_time(fetched) < currentTime or fetched == existingLeaseID then
 	-- Either nil, an expired key, or a release, so we're okay.
 	redis.call("SET", keyLease, newLeaseID, "EX", expirySeconds)
