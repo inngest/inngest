@@ -41,10 +41,11 @@ func (r redisBlockLeaser) Lease(ctx context.Context, index Index) (leaseID ulid.
 			"",
 			strconv.Itoa(int(r.duration.Seconds())),
 		},
-	).AsInt64()
+	).ToInt64()
+
 	switch status {
-	case 0:
-		return leaseID, nil
+	case -1:
+		return leaseID, err
 	default:
 		return leaseID, fmt.Errorf("unable to lease: already leased")
 	}
@@ -73,7 +74,7 @@ func (r redisBlockLeaser) Renew(ctx context.Context, index Index, existingLeaseI
 	case 0:
 		return newLeaseID, nil
 	default:
-		return newLeaseID, fmt.Errorf("unable to lease: already leased")
+		return newLeaseID, fmt.Errorf("unable to renew lease")
 	}
 }
 
@@ -87,8 +88,8 @@ var (
 --[[
 
 Output:
-  0: Successfully leased key
-  1: Lease mismatch / already leased
+  -1: Successfully leased key
+  -2: Lease mismatch / already leased
 
 ]]
 
@@ -97,7 +98,7 @@ local keyLease        = KEYS[1]
 local currentTime     = tonumber(ARGV[1]) -- Current time, in ms, to check if existing lease expired.
 local newLeaseID      = ARGV[2] -- New lease ID
 local existingLeaseID = ARGV[3] -- existing lease ID
-local expirySeconds   = tonumber(ARGV[4])) 
+local expirySeconds   = tonumber(ARGV[4])
 
 -- This table is used when decoding ulid timestamps.
 local ulidMap = { ["0"] = 0, ["1"] = 1, ["2"] = 2, ["3"] = 3, ["4"] = 4, ["5"] = 5, ["6"] = 6, ["7"] = 7, ["8"] = 8, ["9"] = 9, ["A"] = 10, ["B"] = 11, ["C"] = 12, ["D"] = 13, ["E"] = 14, ["F"] = 15, ["G"] = 16, ["H"] = 17, ["J"] = 18, ["K"] = 19, ["M"] = 20, ["N"] = 21, ["P"] = 22, ["Q"] = 23, ["R"] = 24, ["S"] = 25, ["T"] = 26, ["V"] = 27, ["W"] = 28, ["X"] = 29, ["Y"] = 30, ["Z"] = 31 }
@@ -118,13 +119,13 @@ local function decode_ulid_time(s)
 	return time
 end
 
-local fetched = redis.call("GET", leaseKey)
+local fetched = redis.call("GET", keyLease)
 if fetched == false or decode_ulid_time(fetched) < currentTime or fetched == existingLeaseID then
 	-- Either nil, an expired key, or a release, so we're okay.
-	redis.call("SET", leaseKey, newLeaseID, "EX", expirySeconds)
-	return 0
+	redis.call("SET", keyLease, newLeaseID, "EX", expirySeconds)
+	return -1
 end
 
-return 1
+return -2
 	`)
 )
