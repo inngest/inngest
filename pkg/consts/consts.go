@@ -144,5 +144,5 @@ const (
 )
 
 var (
-	ConnectWorkerRequestExtendLeaseInterval = ConnectWorkerRequestLeaseDuration / 2
+	ConnectWorkerRequestExtendLeaseInterval = ConnectWorkerRequestLeaseDuration / 4
 )
