@@ -189,5 +189,3 @@ func (m *mockBlockReader) BlocksSince(ctx context.Context, idx Index, since time
 	// Not needed for this test
 	return nil, nil
 }
-
-// TODO: Use an in-memory blobstore via gocloud.dev/blob/mem, the in-memory buffer in block_test.go, and assert that the iterator reads from the buffer and downloads blocks to iterate through them toos
