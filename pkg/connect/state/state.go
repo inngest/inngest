@@ -32,6 +32,7 @@ type StateManager interface {
 	ConnectionManager
 	WorkerGroupManager
 	GatewayManager
+	RequestStateManager
 }
 
 type ConnectionManager interface {
@@ -52,6 +53,31 @@ type GatewayManager interface {
 	UpsertGateway(ctx context.Context, gateway *Gateway) error
 	DeleteGateway(ctx context.Context, gatewayId ulid.ULID) error
 	GetGateway(ctx context.Context, gatewayId ulid.ULID) (*Gateway, error)
+}
+
+type RequestStateManager interface {
+	// LeaseRequest attempts to lease the given requestID for <duration>. If the request is already leased, this will fail with ErrRequestLeased.
+	LeaseRequest(ctx context.Context, envID uuid.UUID, requestID string, duration time.Duration) (leaseID *ulid.ULID, err error)
+
+	// ExtendRequestLease attempts to extend a lease for the given request. This will fail if the lease expired (ErrRequestLeaseExpired) or
+	// the current lease does not match the passed leaseID (ErrRequestLeased).
+	ExtendRequestLease(ctx context.Context, envID uuid.UUID, requestID string, leaseID ulid.ULID, duration time.Duration) (newLeaseID *ulid.ULID, err error)
+
+	// IsRequestLeased checks whether the given request is currently leased and the lease has not expired.
+	IsRequestLeased(ctx context.Context, envID uuid.UUID, requestID string) (bool, error)
+
+	// DeleteLease allows the executor to clean up the lease once the request is done processing.
+	DeleteLease(ctx context.Context, envID uuid.UUID, requestID string) error
+
+	// SaveResponse is an idempotent, atomic write for reliably buffering a response for the executor to pick up
+	// in case Redis PubSub fails to notify the executor.
+	SaveResponse(ctx context.Context, envID uuid.UUID, requestID string, resp *connpb.SDKResponse) error
+
+	// GetResponse retrieves the response for a given request, if exists. Otherwise, the response will be nil.
+	GetResponse(ctx context.Context, envID uuid.UUID, requestID string) (*connpb.SDKResponse, error)
+
+	// DeleteResponse is an idempotent delete operation for the temporary response buffer.
+	DeleteResponse(ctx context.Context, envID uuid.UUID, requestID string) error
 }
 
 type AuthContext struct {

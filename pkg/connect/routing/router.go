@@ -84,7 +84,7 @@ func GetRoute(ctx context.Context, stateMgr state.StateManager, rnd *util.FrandR
 	}
 
 	groupHash := routeTo.SyncedWorkerGroups[data.AppId]
- 
+
 	group, err := stateMgr.GetWorkerGroupByHash(ctx, envID, groupHash)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load worker group after successful connection selection: %w", err)
@@ -256,7 +256,7 @@ type isHealthyRes struct {
 }
 
 func isHealthy(ctx context.Context, stateManager state.StateManager, envID uuid.UUID, appID uuid.UUID, fnSlug string, conn *connectpb.ConnMetadata, log *slog.Logger) isHealthyRes {
-	log.Debug("evaluating connection", "connection_id", conn.Id, "status", conn.Status, "last_heartbeat_at", conn.LastHeartbeatAt.AsTime())
+	log.Debug("evaluating connection", "conn_id", conn.Id, "status", conn.Status, "last_heartbeat_at", conn.LastHeartbeatAt.AsTime())
 
 	gatewayId, err := ulid.Parse(conn.GatewayId)
 	if err != nil {

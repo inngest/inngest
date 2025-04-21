@@ -11,10 +11,10 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/golang/protobuf/proto"
 	"github.com/inngest/inngest/pkg/connect/auth"
 	"github.com/inngest/inngest/pkg/publicerr"
 	"github.com/inngest/inngest/proto/gen/connect/v1"
+	"google.golang.org/protobuf/proto"
 )
 
 func (a *connectApiRouter) start(w http.ResponseWriter, r *http.Request) {
@@ -27,7 +27,7 @@ func (a *connectApiRouter) start(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	l := logger.StdlibLogger(ctx).With("connection_id", connectionId)
+	l := logger.StdlibLogger(ctx).With("conn_id", connectionId)
 
 	hashedSigningKey := r.Header.Get("Authorization")
 	{
@@ -199,6 +199,18 @@ func (a *connectApiRouter) flushBuffer(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Reliable path: Buffer the response to be picked up by the executor
+	err = a.ConnectRequestStateManager.SaveResponse(ctx, res.EnvID, reqBody.RequestId, reqBody)
+	if err != nil {
+		logger.StdlibLogger(ctx).Error("could not buffer response", "err", err)
+		span.RecordError(err)
+		span.SetStatus(codes.Error, "could not buffer response")
+
+		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 500, "could not buffer response"))
+		return
+	}
+
+	// Unreliable fast-track: Notify the executor via PubSub (best-effort, this may be dropped)
 	if err := a.ConnectResponseNotifier.NotifyExecutor(ctx, reqBody); err != nil {
 		logger.StdlibLogger(ctx).Error("could not notify executor to flush connect message", "err", err)
 		span.RecordError(err)
