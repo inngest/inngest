@@ -234,6 +234,7 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 			}, true, gatewayAckSubscribed)
 			if !gatewayAcked {
 				span.RecordError(fmt.Errorf("gateway ack not received in time"))
+				l.Warn("gateway did not ack request")
 			}
 		}()
 		<-gatewayAckSubscribed
@@ -363,13 +364,16 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 					continue
 				}
 
-				span.RecordError(fmt.Errorf("item is no longer leased"))
-
 				// Grace period to wait for the worker to send the response
 				select {
 				case <-waitForResponseCtx.Done():
+					l.Debug("response arrived during lease expiry grace period")
+					return
 				case <-time.After(consts.ConnectWorkerRequestGracePeriod):
 				}
+
+				l.Debug("request lease expired")
+				span.RecordError(fmt.Errorf("item is no longer leased"))
 
 				cancelLeaseCtx()
 				return
