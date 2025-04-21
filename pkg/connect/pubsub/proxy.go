@@ -140,10 +140,10 @@ type ProxyOpts struct {
 // If the gateway does not ack the message within a 10-second timeout, an error is returned.
 // If no response is received before the context is canceled, an error is returned.
 func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*connectpb.SDKResponse, error) {
+	<-i.setup
+
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
-
-	<-i.setup
 
 	l := i.logger.With(
 		"app_id", opts.AppID.String(),
@@ -216,9 +216,14 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 
 	// Receive gateway acknowledgement for o11y (this is not a reliable channel - do not depend on it for the critical path)
 	{
+		// TODO Replace executor -> gateway PubSub communication with point-to-point (gRPC)
+		var gatewayAcked bool
 		gatewayAckSubscribed := make(chan struct{})
+		withAckTimeout, cancel := context.WithTimeout(ctx, 10*time.Second)
+		defer cancel()
 		go func() {
-			i.subscribe(ctx, i.channelAppRequestsAck(opts.Data.RequestId, AckSourceGateway), func(_ string) {
+			i.subscribe(withAckTimeout, i.channelAppRequestsAck(opts.Data.RequestId, AckSourceGateway), func(_ string) {
+				gatewayAcked = true
 				span.AddEvent("GatewayAck")
 				metrics.HistogramConnectProxyAckTime(ctx, time.Since(proxyStartTime).Milliseconds(), metrics.HistogramOpt{
 					PkgName: pkgName,
@@ -227,6 +232,9 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 					},
 				})
 			}, true, gatewayAckSubscribed)
+			if !gatewayAcked {
+				span.RecordError(fmt.Errorf("gateway ack not received in time"))
+			}
 		}()
 		<-gatewayAckSubscribed
 	}
@@ -390,6 +398,7 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 		}
 
 		// Forward the request
+		// TODO Replace executor -> gateway PubSub communication with point-to-point (gRPC)
 		err = i.RouteExecutorRequest(ctx, route.GatewayID, route.ConnectionID, opts.Data)
 		if err != nil {
 			span.RecordError(err)
