@@ -120,7 +120,7 @@ func SecureDialer(o SecureDialerOpts) DialFunc {
 
 		// Ensure that the current hostname is not a domain name.
 		// ips, err := cachedResolver.LookupHost(ctx, host)
-		ips, err := resolver.Fetch(ctx, addr)
+		ips, err := resolver.Fetch(ctx, host)
 		if err != nil {
 			return nil, err
 		}
