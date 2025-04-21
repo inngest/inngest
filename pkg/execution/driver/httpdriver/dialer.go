@@ -9,15 +9,19 @@ import (
 
 	"github.com/inngest/inngest/pkg/execution/driver/httpdriver/dnscache"
 	"github.com/inngest/inngest/pkg/logger"
+	mdnscache "go.mercari.io/go-dnscache"
 )
 
 const (
 	dnsCacheRefreshInterval = 5 * time.Minute
+	defaultLookupTimeout    = 5 * time.Second
 )
 
-var privateIPBlocks []*net.IPNet
-var nat64blocks []*net.IPNet
-var cachedResolver *dnscache.Resolver
+var (
+	privateIPBlocks []*net.IPNet
+	nat64blocks     []*net.IPNet
+	cachedResolver  *dnscache.Resolver
+)
 
 func init() {
 	for _, cidr := range []string{
@@ -87,9 +91,14 @@ type SecureDialerOpts struct {
 type DialFunc = func(ctx context.Context, network, addr string) (net.Conn, error)
 
 func SecureDialer(o SecureDialerOpts) DialFunc {
+	resolver, err := mdnscache.New(dnsCacheRefreshInterval, defaultLookupTimeout)
+	if err != nil {
+		return nil
+	}
+
 	if o.dial == nil {
 		// Always use the default dialer.  Only allow overrides in testing.
-		o.dial = Dialer.DialContext
+		o.dial = mdnscache.DialFunc(resolver, nil)
 	}
 
 	return func(ctx context.Context, network, addr string) (net.Conn, error) {
@@ -100,39 +109,39 @@ func SecureDialer(o SecureDialerOpts) DialFunc {
 		// "[fe80::1%lo0]:53".
 		//
 		// We always want to ensure we translate the domains to IP addresses.
-		//
-		// NOTE: commenting this out for now due to issue
-		//
-		// host, port, err := net.SplitHostPort(addr)
-		// if err != nil {
-		// 	return nil, err
-		// }
+		host, _, err := net.SplitHostPort(addr)
+		if err != nil {
+			return nil, err
+		}
 
-		// if !o.AllowHostDocker && isDockerHost(host) {
-		// 	return nil, fmt.Errorf("Unable to make request to %s at IP %s: accessing docker host", addr, host)
-		// }
+		if !o.AllowHostDocker && isDockerHost(host) {
+			return nil, fmt.Errorf("Unable to make request to %s at IP %s: accessing docker host", addr, host)
+		}
 
-		// // Ensure that the current hostname is not a domain name.
+		// Ensure that the current hostname is not a domain name.
 		// ips, err := cachedResolver.LookupHost(ctx, host)
-		// if err != nil {
-		// 	return nil, err
-		// }
+		ips, err := resolver.Fetch(ctx, addr)
+		if err != nil {
+			return nil, err
+		}
 
-		// if o.log {
-		// 	logger.StdlibLogger(ctx).Info("domain resolved",
-		// 		"address", addr,
-		// 		"hosts", ips,
-		// 	)
-		// }
+		if o.log {
+			logger.StdlibLogger(ctx).Info("domain resolved",
+				"address", addr,
+				"hosts", ips,
+			)
+		}
 
-		// for _, ip := range ips {
-		// 	if !o.AllowPrivate && isPrivateHost(ip) {
-		// 		return nil, fmt.Errorf("Unable to make request to %s at IP %s: private IP range", addr, ip)
-		// 	}
-		// 	if !o.AllowNAT64 && isNat64(ip) {
-		// 		return nil, fmt.Errorf("Unable to make request to %s at IP %s: NAT64 address", addr, ip)
-		// 	}
-		// }
+		for _, ip := range ips {
+			if !o.AllowPrivate && isPrivateHost(ip.String()) {
+				return nil, fmt.Errorf("Unable to make request to %s at IP %s: private IP range", addr, ip)
+			}
+			if !o.AllowNAT64 && isNat64(ip.String()) {
+				return nil, fmt.Errorf("Unable to make request to %s at IP %s: NAT64 address", addr, ip)
+			}
+		}
+
+		return o.dial(ctx, network, addr)
 
 		// // Randomize the order of the IPs. The purpose is to evenly distribute
 		// // load across the IPs.
@@ -153,51 +162,49 @@ func SecureDialer(o SecureDialerOpts) DialFunc {
 		// 	}
 		// }
 		// return conn, err
-
-		return o.dial(ctx, network, addr)
 	}
 }
 
-// func isDockerHost(host string) bool {
-// 	return host == "host.docker.internal"
-// }
+func isDockerHost(host string) bool {
+	return host == "host.docker.internal"
+}
 
-// func isPrivateHost(host string) bool {
-// 	// fast path;  non-exhaustive for fast lookups.  Basic string matching.
-// 	if host == "localhost" || host == "0.0.0.0" || host == "localhost.localdomain" {
-// 		return true
-// 	}
-// 	ip := net.ParseIP(host)
-// 	if ip != nil {
-// 		return isPrivateIP(ip)
-// 	}
-// 	return false
-// }
+func isPrivateHost(host string) bool {
+	// fast path;  non-exhaustive for fast lookups.  Basic string matching.
+	if host == "localhost" || host == "0.0.0.0" || host == "localhost.localdomain" {
+		return true
+	}
+	ip := net.ParseIP(host)
+	if ip != nil {
+		return isPrivateIP(ip)
+	}
+	return false
+}
 
-// func isPrivateIP(ip net.IP) bool {
-// 	if ip.IsLoopback() ||
-// 		ip.IsUnspecified() ||
-// 		ip.IsLinkLocalUnicast() ||
-// 		ip.IsLinkLocalMulticast() ||
-// 		ip.IsMulticast() {
-// 		return true
-// 	}
+func isPrivateIP(ip net.IP) bool {
+	if ip.IsLoopback() ||
+		ip.IsUnspecified() ||
+		ip.IsLinkLocalUnicast() ||
+		ip.IsLinkLocalMulticast() ||
+		ip.IsMulticast() {
+		return true
+	}
 
-// 	for _, block := range privateIPBlocks {
-// 		if block.Contains(ip) {
-// 			return true
-// 		}
-// 	}
+	for _, block := range privateIPBlocks {
+		if block.Contains(ip) {
+			return true
+		}
+	}
 
-// 	return false
-// }
+	return false
+}
 
-// func isNat64(host string) bool {
-// 	ip := net.ParseIP(host)
-// 	for _, block := range nat64blocks {
-// 		if block.Contains(ip) {
-// 			return true
-// 		}
-// 	}
-// 	return false
-// }
+func isNat64(host string) bool {
+	ip := net.ParseIP(host)
+	for _, block := range nat64blocks {
+		if block.Contains(ip) {
+			return true
+		}
+	}
+	return false
+}
