@@ -275,7 +275,14 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	connectPubSubLogger := logger.StdlibLoggerWithCustomVarName(ctx, "CONNECT_PUBSUB_LOG_LEVEL")
 
-	executorProxy, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectRcOpt, connectPubSubLogger.With("svc", "executor"), conditionalTracer, connectionManager, true))
+	executorProxy, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectRcOpt, true, connectpubsub.RedisPubSubConnectorOpts{
+		Logger:       connectPubSubLogger.With("svc", "executor"),
+		Tracer:       conditionalTracer,
+		StateManager: connectionManager,
+		EnforceLeaseExpiry: func(ctx context.Context, accountID uuid.UUID) bool {
+			return true
+		},
+	}))
 	if err != nil {
 		return fmt.Errorf("failed to create connect pubsub connector: %w", err)
 	}
@@ -443,7 +450,14 @@ func start(ctx context.Context, opts StartOpts) error {
 		})
 	})
 
-	apiConnectProxy, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectRcOpt, connectPubSubLogger.With("svc", "api"), conditionalTracer, connectionManager, false))
+	apiConnectProxy, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectRcOpt, false, connectpubsub.RedisPubSubConnectorOpts{
+		Logger:       connectPubSubLogger.With("svc", "api"),
+		Tracer:       conditionalTracer,
+		StateManager: connectionManager,
+		EnforceLeaseExpiry: func(ctx context.Context, accountID uuid.UUID) bool {
+			return true
+		},
+	}))
 	if err != nil {
 		return fmt.Errorf("failed to create connect pubsub connector: %w", err)
 	}
@@ -477,7 +491,14 @@ func start(ctx context.Context, opts StartOpts) error {
 		return err
 	}
 
-	gatewayRequestReceiver, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectRcOpt, connectPubSubLogger.With("svc", "connect-gateway"), conditionalTracer, connectionManager, false))
+	gatewayRequestReceiver, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectRcOpt, false, connectpubsub.RedisPubSubConnectorOpts{
+		Logger:       connectPubSubLogger.With("svc", "connect-gateway"),
+		Tracer:       conditionalTracer,
+		StateManager: connectionManager,
+		EnforceLeaseExpiry: func(ctx context.Context, accountID uuid.UUID) bool {
+			return true
+		},
+	}))
 	if err != nil {
 		return fmt.Errorf("failed to create connect pubsub connector: %w", err)
 	}

@@ -283,7 +283,14 @@ func start(ctx context.Context, opts StartOpts) error {
 	// Create a new expression aggregator, using Redis to load evaluables.
 	agg := expressions.NewAggregator(ctx, 100, 100, sm.(expressions.EvaluableLoader), nil)
 
-	executorProxy, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectPubSubRedis, connectPubSubLogger.With("svc", "executor"), conditionalTracer, connectionManager, true))
+	executorProxy, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectPubSubRedis, true, connectpubsub.RedisPubSubConnectorOpts{
+		Logger:       connectPubSubLogger.With("svc", "executor"),
+		Tracer:       conditionalTracer,
+		StateManager: connectionManager,
+		EnforceLeaseExpiry: func(ctx context.Context, accountID uuid.UUID) bool {
+			return true
+		},
+	}))
 	if err != nil {
 		return fmt.Errorf("failed to create connect pubsub connector: %w", err)
 	}
@@ -428,7 +435,14 @@ func start(ctx context.Context, opts StartOpts) error {
 	})
 
 	// ds.opts.Config.EventStream.Service.TopicName()
-	apiConnectProxy, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectPubSubRedis, connectPubSubLogger.With("svc", "api"), conditionalTracer, connectionManager, false))
+	apiConnectProxy, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectPubSubRedis, false, connectpubsub.RedisPubSubConnectorOpts{
+		Logger:       connectPubSubLogger.With("svc", "api"),
+		Tracer:       conditionalTracer,
+		StateManager: connectionManager,
+		EnforceLeaseExpiry: func(ctx context.Context, accountID uuid.UUID) bool {
+			return true
+		},
+	}))
 	if err != nil {
 		return fmt.Errorf("failed to create connect pubsub connector: %w", err)
 	}
@@ -461,7 +475,14 @@ func start(ctx context.Context, opts StartOpts) error {
 		return err
 	}
 
-	connectGatewayProxy, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectPubSubRedis, connectPubSubLogger.With("svc", "connect-gateway"), conditionalTracer, connectionManager, false))
+	connectGatewayProxy, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectPubSubRedis, false, connectpubsub.RedisPubSubConnectorOpts{
+		Logger:       connectPubSubLogger.With("svc", "connect-gateway"),
+		Tracer:       conditionalTracer,
+		StateManager: connectionManager,
+		EnforceLeaseExpiry: func(ctx context.Context, accountID uuid.UUID) bool {
+			return true
+		},
+	}))
 	if err != nil {
 		return fmt.Errorf("failed to create connect pubsub connector: %w", err)
 	}

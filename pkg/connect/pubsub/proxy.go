@@ -84,6 +84,8 @@ type RequestReceiver interface {
 	Wait(ctx context.Context) error
 }
 
+type EnforceLeaseExpiryFunc func(ctx context.Context, accountID uuid.UUID) bool
+
 type redisPubSubConnector struct {
 	client       rueidis.Client
 	pubSubClient rueidis.DedicatedClient
@@ -98,20 +100,30 @@ type redisPubSubConnector struct {
 	stateManager state.StateManager
 	rnd          *util.FrandRNG
 
+	enforceLeaseExpiry EnforceLeaseExpiryFunc
+
 	RequestReceiver
 }
 
-func newRedisPubSubConnector(client rueidis.Client, logger *slog.Logger, tracer trace.ConditionalTracer, stateMan state.StateManager) *redisPubSubConnector {
+type RedisPubSubConnectorOpts struct {
+	Logger             *slog.Logger
+	Tracer             trace.ConditionalTracer
+	StateManager       state.StateManager
+	EnforceLeaseExpiry EnforceLeaseExpiryFunc
+}
+
+func newRedisPubSubConnector(client rueidis.Client, opts RedisPubSubConnectorOpts) *redisPubSubConnector {
 	return &redisPubSubConnector{
-		client:          client,
-		subscribers:     make(map[string]map[string]chan string),
-		subscribersLock: sync.RWMutex{},
-		logger:          logger,
-		tracer:          tracer,
-		setup:           make(chan struct{}),
+		client:             client,
+		subscribers:        make(map[string]map[string]chan string),
+		subscribersLock:    sync.RWMutex{},
+		logger:             opts.Logger,
+		tracer:             opts.Tracer,
+		setup:              make(chan struct{}),
+		enforceLeaseExpiry: opts.EnforceLeaseExpiry,
 
 		// For routing
-		stateManager: stateMan,
+		stateManager: opts.StateManager,
 		rnd:          util.NewFrandRNG(),
 	}
 }
@@ -241,6 +253,7 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 	reply := &connectpb.SDKResponse{}
 
 	waitForResponseCtx, cancelWaitForResponseCtx := context.WithCancel(ctx)
+	defer cancelWaitForResponseCtx()
 	go func() {
 		for {
 			select {
@@ -318,6 +331,7 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 
 	// Periodically check for lease health, if lease expired, we need to retry
 	leaseCtx, cancelLeaseCtx := context.WithCancel(ctx)
+	defer cancelLeaseCtx()
 	go func() {
 		for {
 			select {
@@ -335,6 +349,12 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 			}
 
 			if !leased {
+				// Selectively enable lease enforcement to create gradual rollout for existing connect users
+				if i.enforceLeaseExpiry != nil && !i.enforceLeaseExpiry(ctx, opts.AccountID) {
+					l.Warn("lease expired but enforcement flag disabled")
+					continue
+				}
+
 				span.RecordError(fmt.Errorf("item is no longer leased"))
 
 				// Grace period to wait for the worker to send the response
