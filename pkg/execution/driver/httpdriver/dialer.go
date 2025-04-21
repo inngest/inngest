@@ -12,7 +12,7 @@ import (
 )
 
 const (
-	dnsCacheRefreshInterval = 5 * time.Minute
+	dnsCacheRefreshInterval = 3 * time.Second
 )
 
 var privateIPBlocks []*net.IPNet
@@ -66,7 +66,6 @@ func init() {
 		for range t.C {
 			// Remove entries that haven't been used since the last refresh.
 			removeUnused := true
-
 			cachedResolver.Refresh(removeUnused)
 		}
 	}()
