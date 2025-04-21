@@ -156,6 +156,7 @@ func (h *connectHandler) connectInvoke(ctx context.Context, preparedConn *connec
 				return
 			}
 
+			// TODO Extend once more before finishing (to ensure write reaches executor in time)
 			extendPayload, err := proto.Marshal(&connectproto.WorkerRequestExtendLeaseData{
 				RequestId:      body.RequestId,
 				AccountId:      body.AccountId,

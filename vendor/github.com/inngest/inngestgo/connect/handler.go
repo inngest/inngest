@@ -143,7 +143,7 @@ type connectHandler struct {
 	state           ConnectionState
 	workerCtx       context.Context
 	cancelWorkerCtx context.CancelFunc
-	eg              errgroup.Group
+	gracefulCloseEg errgroup.Group
 	auth            authContext
 	closed          atomic.Bool
 }
@@ -360,8 +360,9 @@ func (h *connectHandler) Connect(ctx context.Context) (WorkerConnection, error) 
 	})
 
 	// Handle run loop closure gracefully, this is also triggered on Close()
-	h.eg = errgroup.Group{}
-	h.eg.Go(func() error {
+	h.gracefulCloseEg = errgroup.Group{}
+	h.gracefulCloseEg.Go(func() error {
+		// Wait for run loop to complete (maximum attempts reached, context canceled)
 		runLoopErr := runLoop.Wait()
 		if runLoopErr != nil {
 			h.logger.Error("could not connect", "err", runLoopErr)
@@ -371,6 +372,7 @@ func (h *connectHandler) Connect(ctx context.Context) (WorkerConnection, error) 
 
 		// Wait until current connection is fully terminated
 		select {
+		case <-ctx.Done():
 		case <-time.After(5 * time.Second):
 			h.logger.Warn("shutting down without final signal")
 		case <-h.notifyConnectDoneChan:
@@ -423,7 +425,7 @@ func (h *connectHandler) Close() error {
 	h.cancelWorkerCtx()
 
 	// Wait until connection loop finishes
-	err := h.eg.Wait()
+	err := h.gracefulCloseEg.Wait()
 	if err != nil {
 		return fmt.Errorf("failed to connect: %w", err)
 	}

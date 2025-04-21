@@ -277,7 +277,7 @@ func (a apiClient) SendMany(ctx context.Context, e []any) ([]string, error) {
 		req.Header.Add(HeaderKeyEnv, a.GetEnv())
 	}
 
-	resp, err := a.HTTPClient.Post(url, "application/json", bytes.NewBuffer(byt))
+	resp, err := a.HTTPClient.Do(req)
 	if err != nil {
 		return nil, fmt.Errorf("error sending event request: %w", err)
 	}
