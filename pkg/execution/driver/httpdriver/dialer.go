@@ -9,7 +9,6 @@ import (
 
 	"github.com/inngest/inngest/pkg/execution/driver/httpdriver/dnscache"
 	"github.com/inngest/inngest/pkg/logger"
-	mdnscache "go.mercari.io/go-dnscache"
 )
 
 const (
@@ -88,79 +87,75 @@ type SecureDialerOpts struct {
 type DialFunc = func(ctx context.Context, network, addr string) (net.Conn, error)
 
 func SecureDialer(o SecureDialerOpts) DialFunc {
-	l := logger.StdlibLogger(context.TODO())
-
-	resolver, err := mdnscache.New(3*time.Second, 5*time.Second, mdnscache.WithLogger(l))
-	if err != nil {
-		return nil
+	if o.dial == nil {
+		// Always use the default dialer.  Only allow overrides in testing.
+		o.dial = Dialer.DialContext
 	}
 
-	return mdnscache.DialFunc(resolver, nil)
+	return func(ctx context.Context, network, addr string) (net.Conn, error) {
+		// network will be one of the well defined networks as per
+		// https://pkg.go.dev/net#Dial, eg "tcp", "tcp4", "tcp6", etc.
+		//
+		// addr may be a domain or ip and port: "example.com:443", "192.0.2.1:http",
+		// "[fe80::1%lo0]:53".
+		//
+		// We always want to ensure we translate the domains to IP addresses.
+		//
+		// NOTE: commenting this out for now due to issue
+		//
+		// host, port, err := net.SplitHostPort(addr)
+		// if err != nil {
+		// 	return nil, err
+		// }
 
-	// if o.dial == nil {
-	// 	// Always use the default dialer.  Only allow overrides in testing.
-	// 	o.dial = Dialer.DialContext
-	// }
+		// if !o.AllowHostDocker && isDockerHost(host) {
+		// 	return nil, fmt.Errorf("Unable to make request to %s at IP %s: accessing docker host", addr, host)
+		// }
 
-	// return func(ctx context.Context, network, addr string) (net.Conn, error) {
-	// 	// network will be one of the well defined networks as per
-	// 	// https://pkg.go.dev/net#Dial, eg "tcp", "tcp4", "tcp6", etc.
-	// 	//
-	// 	// addr may be a domain or ip and port: "example.com:443", "192.0.2.1:http",
-	// 	// "[fe80::1%lo0]:53".
-	// 	//
-	// 	// We always want to ensure we translate the domains to IP addresses.
-	// 	host, port, err := net.SplitHostPort(addr)
-	// 	if err != nil {
-	// 		return nil, err
-	// 	}
+		// // Ensure that the current hostname is not a domain name.
+		// ips, err := cachedResolver.LookupHost(ctx, host)
+		// if err != nil {
+		// 	return nil, err
+		// }
 
-	// 	if !o.AllowHostDocker && isDockerHost(host) {
-	// 		return nil, fmt.Errorf("Unable to make request to %s at IP %s: accessing docker host", addr, host)
-	// 	}
+		// if o.log {
+		// 	logger.StdlibLogger(ctx).Info("domain resolved",
+		// 		"address", addr,
+		// 		"hosts", ips,
+		// 	)
+		// }
 
-	// 	// Ensure that the current hostname is not a domain name.
-	// 	ips, err := cachedResolver.LookupHost(ctx, host)
-	// 	if err != nil {
-	// 		return nil, err
-	// 	}
+		// for _, ip := range ips {
+		// 	if !o.AllowPrivate && isPrivateHost(ip) {
+		// 		return nil, fmt.Errorf("Unable to make request to %s at IP %s: private IP range", addr, ip)
+		// 	}
+		// 	if !o.AllowNAT64 && isNat64(ip) {
+		// 		return nil, fmt.Errorf("Unable to make request to %s at IP %s: NAT64 address", addr, ip)
+		// 	}
+		// }
 
-	// 	if o.log {
-	// 		logger.StdlibLogger(ctx).Info("domain resolved",
-	// 			"address", addr,
-	// 			"hosts", ips,
-	// 		)
-	// 	}
+		// // Randomize the order of the IPs. The purpose is to evenly distribute
+		// // load across the IPs.
+		// rand.Shuffle(len(ips), func(i, j int) {
+		// 	ips[i], ips[j] = ips[j], ips[i]
+		// })
 
-	// 	for _, ip := range ips {
-	// 		if !o.AllowPrivate && isPrivateHost(ip) {
-	// 			return nil, fmt.Errorf("Unable to make request to %s at IP %s: private IP range", addr, ip)
-	// 		}
-	// 		if !o.AllowNAT64 && isNat64(ip) {
-	// 			return nil, fmt.Errorf("Unable to make request to %s at IP %s: NAT64 address", addr, ip)
-	// 		}
-	// 	}
+		// // Try each IP until we get a connection.
+		// var conn net.Conn
+		// for _, ip := range ips {
+		// 	// We need to give the dialer an IP address. Otherwise, it will do
+		// 	// DNS lookup that doesn't use the cached resolver.
+		// 	addr := net.JoinHostPort(ip, port)
 
-	// 	// Randomize the order of the IPs. The purpose is to evenly distribute
-	// 	// load across the IPs.
-	// 	rand.Shuffle(len(ips), func(i, j int) {
-	// 		ips[i], ips[j] = ips[j], ips[i]
-	// 	})
+		// 	conn, err = o.dial(ctx, network, addr)
+		// 	if err == nil {
+		// 		break
+		// 	}
+		// }
+		// return conn, err
 
-	// 	// Try each IP until we get a connection.
-	// 	var conn net.Conn
-	// 	for _, ip := range ips {
-	// 		// We need to give the dialer an IP address. Otherwise, it will do
-	// 		// DNS lookup that doesn't use the cached resolver.
-	// 		addr := net.JoinHostPort(ip, port)
-
-	// 		conn, err = o.dial(ctx, network, addr)
-	// 		if err == nil {
-	// 			break
-	// 		}
-	// 	}
-	// 	return conn, err
-	// }
+		return o.dial(ctx, network, addr)
+	}
 }
 
 // func isDockerHost(host string) bool {
