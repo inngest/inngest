@@ -23,8 +23,6 @@ var (
 	// lookupGroup merges lookup calls together for lookups for the same host. The
 	// lookupGroup key is is the LookupIPAddr.host argument.
 	// lookupGroup singleflight.Group
-
-	errNotImplemented = fmt.Errorf("not implemented")
 )
 
 type cacheType []net.IP
@@ -39,7 +37,9 @@ type DNSResolver interface {
 type ResolverOpts func(r *resolver)
 type Dialer func(ctx context.Context, network, addr string) (net.Conn, error)
 
-func New(ctx context.Context, opts ...ResolverOpts) DNSResolver {
+func New(opts ...ResolverOpts) DNSResolver {
+	ctx := context.Background()
+
 	r := resolver{
 		lookupTimeout:   defaultLookupTimeout,
 		refreshInterval: defaultRefreshInterval,
@@ -96,6 +96,12 @@ func WithCacheTTL(ttl time.Duration) ResolverOpts {
 	}
 }
 
+func WithLookupTimeout(t time.Duration) ResolverOpts {
+	return func(r *resolver) {
+		r.lookupTimeout = t
+	}
+}
+
 type resolver struct {
 	// Timeout defines the maximum allowed time allowed for a lookup.
 	Timeout       time.Duration
@@ -130,13 +136,17 @@ func (r *resolver) Dialer() Dialer {
 }
 
 func (r *resolver) Lookup(ctx context.Context, host string) ([]net.IP, error) {
-	return nil, errNotImplemented
-	// key := fmt.Sprintf("h:%s", host)
-	// item, err := r.cache.Fetch(key, r.cacheTTL, func() ([]net.IP, error) {
-	// 	return nil, fmt.Errorf("not implemented")
-	// })
+	key := fmt.Sprintf("h:%s", host)
 
-	// return nil, err
+	// TODO: singleflight
+	item, err := r.cache.Fetch(key, r.cacheTTL, func() (cacheType, error) {
+		return nil, fmt.Errorf("not implemented")
+	})
+	if err != nil {
+		return nil, fmt.Errorf("error fetching ips from cache")
+	}
+
+	return item.Value(), nil
 }
 
 // // LookupAddr performs a reverse lookup for the given address, returning a list

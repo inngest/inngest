@@ -6,16 +6,14 @@ import (
 	"net"
 	"time"
 
-	// "github.com/inngest/inngest/pkg/execution/driver/httpdriver/dnscache"
+	"github.com/inngest/inngest/pkg/execution/driver/httpdriver/dnscache"
 	"github.com/inngest/inngest/pkg/logger"
-	"go.mercari.io/go-dnscache"
 )
 
 var (
 	privateIPBlocks []*net.IPNet
 	nat64blocks     []*net.IPNet
-	// cachedResolver  dnscache.DNSResolver
-	cachedResolver *dnscache.Resolver
+	cachedResolver  dnscache.DNSResolver
 )
 
 const (
@@ -55,13 +53,10 @@ func init() {
 		nat64blocks = append(nat64blocks, block)
 	}
 
-	// Resolver for caching DNS lookups.
-	// cachedResolver = dnscache.New(context.Background())
-	r, err := dnscache.New(dnsCacheRefreshInterval, dnsLookupTimeout)
-	if err != nil {
-		panic(fmt.Errorf("failed to initialize cached dns resolver: %w", err))
-	}
-	cachedResolver = r
+	cachedResolver = dnscache.New(
+		dnscache.WithCacheRefreshInterval(dnsCacheRefreshInterval),
+		dnscache.WithLookupTimeout(dnsLookupTimeout),
+	)
 }
 
 type SecureDialerOpts struct {
@@ -81,8 +76,7 @@ type DialFunc = func(ctx context.Context, network, addr string) (net.Conn, error
 func SecureDialer(o SecureDialerOpts) DialFunc {
 	if o.dial == nil {
 		// Always use the cached dialer.  Only allow overrides in testing.
-		dialer := &net.Dialer{Timeout: 5 * time.Second}
-		o.dial = dnscache.DialFunc(cachedResolver, dialer.DialContext)
+		o.dial = cachedResolver.Dialer()
 	}
 
 	return func(ctx context.Context, network, addr string) (net.Conn, error) {
@@ -103,7 +97,7 @@ func SecureDialer(o SecureDialerOpts) DialFunc {
 		}
 
 		// Ensure that the current hostname is not a domain name.
-		ips, err := cachedResolver.Fetch(ctx, host)
+		ips, err := cachedResolver.Lookup(ctx, host)
 		if err != nil {
 			return nil, err
 		}
