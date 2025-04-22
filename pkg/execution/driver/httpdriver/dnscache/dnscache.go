@@ -34,6 +34,7 @@ func New(ctx context.Context, opts ...ResolverOpts) DNSResolver {
 	r := resolver{
 		refreshInterval: defaultRefreshInterval,
 		dialer:          defaultDialer.DialContext,
+		cache:           newCache(),
 	}
 
 	for _, apply := range opts {
@@ -82,7 +83,6 @@ type resolver struct {
 
 	lookups int64
 
-	once  sync.Once
 	mu    sync.RWMutex
 	cache *cache
 
@@ -110,14 +110,12 @@ func (r *resolver) Dialer() Dialer {
 // LookupAddr performs a reverse lookup for the given address, returning a list
 // of names mapping to that address.
 func (r *resolver) LookupAddr(ctx context.Context, addr string) (names []string, err error) {
-	r.once.Do(r.init)
 	return r.lookup(ctx, "r"+addr)
 }
 
 // LookupHost looks up the given host using the local resolver. It returns a
 // slice of that host's addresses.
 func (r *resolver) LookupHost(ctx context.Context, host string) (addrs []string, err error) {
-	r.once.Do(r.init)
 	return r.lookup(ctx, "h"+host)
 }
 
@@ -126,7 +124,6 @@ func (r *resolver) LookupHost(ctx context.Context, host string) (addrs []string,
 // last Refresh are removed from the cache. If persistOnFailure is true, stale
 // entries will not be removed on failed lookups
 func (r *resolver) refreshRecords(clearUnused bool, persistOnFailure bool) {
-	r.once.Do(r.init)
 	r.mu.RLock()
 	update := make([]string, 0, r.cache.cache.ItemCount())
 	del := make([]string, 0, r.cache.cache.ItemCount())
@@ -156,10 +153,6 @@ func (r *resolver) refreshRecords(clearUnused bool, persistOnFailure bool) {
 
 func (r *resolver) refresh(clearUnused bool) {
 	r.refreshRecords(clearUnused, false)
-}
-
-func (r *resolver) init() {
-	r.cache = newCache()
 }
 
 func (r *resolver) lookup(ctx context.Context, key string) (rrs []string, err error) {
@@ -278,6 +271,7 @@ func (r *resolver) load(key string) (rrs []string, err error, found bool) {
 	err = entry.err
 	used := entry.used
 	r.mu.RUnlock()
+
 	if !used {
 		r.mu.Lock()
 		entry.used = true
@@ -294,6 +288,7 @@ func (r *resolver) storeLocked(key string, rrs []string, used bool, err error) {
 		entry.used = used
 		return
 	}
+
 	r.cache.Set(key, &cacheEntry{
 		rrs:  rrs,
 		err:  err,
