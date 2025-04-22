@@ -30,7 +30,7 @@ export const ActionsMenu = ({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button kind="primary" appearance="outlined" size="medium" icon={<RiMore2Line />} raw />
+        <Button kind="primary" appearance="outlined" size="medium" icon={<RiMore2Line />} />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <OptionalTooltip
