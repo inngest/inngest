@@ -13,7 +13,6 @@ import (
 var (
 	privateIPBlocks []*net.IPNet
 	nat64blocks     []*net.IPNet
-	cachedResolver  dnscache.DNSResolver
 )
 
 const (
@@ -52,11 +51,6 @@ func init() {
 		}
 		nat64blocks = append(nat64blocks, block)
 	}
-
-	cachedResolver = dnscache.New(
-		dnscache.WithCacheRefreshInterval(dnsCacheRefreshInterval),
-		dnscache.WithLookupTimeout(dnsLookupTimeout),
-	)
 }
 
 type SecureDialerOpts struct {
@@ -74,9 +68,14 @@ type SecureDialerOpts struct {
 type DialFunc = func(ctx context.Context, network, addr string) (net.Conn, error)
 
 func SecureDialer(o SecureDialerOpts) DialFunc {
-	if o.dial == nil {
-		// Always use the cached dialer.  Only allow overrides in testing.
-		o.dial = cachedResolver.Dialer()
+	resolver := dnscache.New(
+		dnscache.WithCacheRefreshInterval(dnsCacheRefreshInterval),
+		dnscache.WithLookupTimeout(dnsLookupTimeout),
+	)
+
+	dial := resolver.Dialer()
+	if o.dial != nil {
+		dial = o.dial
 	}
 
 	return func(ctx context.Context, network, addr string) (net.Conn, error) {
@@ -97,7 +96,7 @@ func SecureDialer(o SecureDialerOpts) DialFunc {
 		}
 
 		// Ensure that the current hostname is not a domain name.
-		ips, err := cachedResolver.Lookup(ctx, host)
+		ips, err := resolver.Lookup(ctx, host)
 		if err != nil {
 			return nil, err
 		}
@@ -118,7 +117,7 @@ func SecureDialer(o SecureDialerOpts) DialFunc {
 			}
 		}
 
-		return o.dial(ctx, network, addr)
+		return dial(ctx, network, addr)
 	}
 }
 
