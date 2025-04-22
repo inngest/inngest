@@ -59,7 +59,7 @@ export function useColumns({
             pills={functions.map((function_) => (
               <Pill
                 appearance="outlined"
-                href={pathCreator.function({ functionSlug: function_.slug })}
+                href={pathCreator.runPopout({ runID: function_.id })}
                 key={function_.name}
               >
                 <span className="flex items-center gap-1">
