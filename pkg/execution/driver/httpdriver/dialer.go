@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net"
+	"sync"
 	"time"
 
 	"github.com/inngest/inngest/pkg/execution/driver/httpdriver/dnscache"
@@ -14,6 +15,7 @@ var (
 	privateIPBlocks []*net.IPNet
 	nat64blocks     []*net.IPNet
 	cachedResolver  dnscache.DNSResolver
+	once            sync.Once
 )
 
 const (
@@ -52,11 +54,6 @@ func init() {
 		}
 		nat64blocks = append(nat64blocks, block)
 	}
-
-	cachedResolver = dnscache.New(
-		dnscache.WithCacheRefreshInterval(dnsCacheRefreshInterval),
-		dnscache.WithLookupTimeout(dnsLookupTimeout),
-	)
 }
 
 type SecureDialerOpts struct {
@@ -71,10 +68,23 @@ type SecureDialerOpts struct {
 	dial DialFunc
 }
 
+func initResolver() dnscache.DNSResolver {
+	once.Do(func() {
+		cachedResolver = dnscache.New(
+			dnscache.WithCacheRefreshInterval(dnsCacheRefreshInterval),
+			dnscache.WithLookupTimeout(dnsLookupTimeout),
+		)
+	})
+	return cachedResolver
+}
+
 type DialFunc = func(ctx context.Context, network, addr string) (net.Conn, error)
 
 func SecureDialer(o SecureDialerOpts) DialFunc {
-	dial := cachedResolver.Dialer()
+	// make sure to initialize it if absent
+	resolver := initResolver()
+
+	dial := resolver.Dialer()
 	if o.dial != nil {
 		dial = o.dial
 	}
@@ -97,7 +107,7 @@ func SecureDialer(o SecureDialerOpts) DialFunc {
 		}
 
 		// Ensure that the current hostname is not a domain name.
-		ips, err := cachedResolver.Lookup(ctx, host)
+		ips, err := resolver.Lookup(ctx, host)
 		if err != nil {
 			return nil, err
 		}
