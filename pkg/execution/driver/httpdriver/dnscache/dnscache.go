@@ -3,6 +3,7 @@ package dnscache
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"math/rand/v2"
 	"net"
 	"time"
@@ -36,7 +37,7 @@ type DNSResolver interface {
 type ResolverOpts func(r *resolver)
 type Dialer func(ctx context.Context, network, addr string) (net.Conn, error)
 
-func New(opts ...ResolverOpts) DNSResolver {
+func New(opts ...ResolverOpts) *resolver {
 	r := resolver{
 		lookupTimeout:   defaultLookupTimeout,
 		refreshInterval: defaultRefreshInterval,
@@ -78,6 +79,12 @@ func WithLookupTimeout(t time.Duration) ResolverOpts {
 	}
 }
 
+func WithLogger(l *slog.Logger) ResolverOpts {
+	return func(r *resolver) {
+		r.l = l
+	}
+}
+
 type resolver struct {
 	// lookupTimeout defines the maximum allowed time allowed for a lookup.
 	lookupTimeout time.Duration
@@ -93,6 +100,9 @@ type resolver struct {
 
 	// dialer is the function used to establish the connection
 	dialer Dialer
+
+	// l is an optional logger
+	l *slog.Logger
 }
 
 func (r *resolver) Dialer() Dialer {
@@ -128,11 +138,25 @@ func (r *resolver) Dialer() Dialer {
 func (r *resolver) Lookup(ctx context.Context, host string) ([]net.IP, error) {
 	key := fmt.Sprintf("h:%s", host)
 
-	// TODO: singleflight
+	// should this utilize singleflight to reduce map lookups?
 	item, err := r.cache.Fetch(key, r.cacheTTL, func() (cacheType, error) {
-		return nil, fmt.Errorf("not implemented")
+		// should this provide resolver override?
+		addrs, err := net.DefaultResolver.LookupIPAddr(ctx, host)
+		if err != nil {
+			return nil, err
+		}
+
+		ips := make([]net.IP, len(addrs))
+		for i, addr := range addrs {
+			ips[i] = addr.IP
+		}
+
+		return ips, nil
 	})
 	if err != nil {
+		if r.l != nil {
+			r.l.Error("error fetching ips from cache", "host", host)
+		}
 		return nil, fmt.Errorf("error fetching ips from cache")
 	}
 
@@ -141,4 +165,11 @@ func (r *resolver) Lookup(ctx context.Context, host string) ([]net.IP, error) {
 
 func (r *resolver) randPerm(n int) []int {
 	return rand.Perm(n)
+}
+
+// isCached is mainly used to test if the addr is properly cached
+func (r *resolver) isCached(host string) bool {
+	key := fmt.Sprintf("h:%s", host)
+	item := r.cache.Get(key)
+	return item != nil && !item.Expired()
 }
