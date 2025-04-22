@@ -37,8 +37,10 @@ export const ActionsMenu = ({
           <OptionalTooltip
             tooltip={disableValidate ? 'No syncs. App health check not available.' : undefined}
           >
-            <RiFirstAidKitLine className="h-4 w-4" />
-            Check app health
+            <>
+              <RiFirstAidKitLine className="h-4 w-4" />
+              Check app health
+            </>
           </OptionalTooltip>
         </DropdownMenuItem>
 
@@ -49,8 +51,10 @@ export const ActionsMenu = ({
                 disableArchive ? 'Parent app is archived. Archive action not available.' : undefined
               }
             >
-              <RiArchive2Line className="h-4 w-4" />
-              {isArchived ? 'Unarchive app' : 'Archive app'}
+              <>
+                <RiArchive2Line className="h-4 w-4" />
+                {isArchived ? 'Unarchive app' : 'Archive app'}
+              </>
             </OptionalTooltip>
           </DropdownMenuItem>
         )}
