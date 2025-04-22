@@ -13,6 +13,7 @@ import (
 var (
 	privateIPBlocks []*net.IPNet
 	nat64blocks     []*net.IPNet
+	cachedResolver  dnscache.DNSResolver
 )
 
 const (
@@ -51,6 +52,11 @@ func init() {
 		}
 		nat64blocks = append(nat64blocks, block)
 	}
+
+	cachedResolver = dnscache.New(
+		dnscache.WithCacheRefreshInterval(dnsCacheRefreshInterval),
+		dnscache.WithLookupTimeout(dnsLookupTimeout),
+	)
 }
 
 type SecureDialerOpts struct {
@@ -68,12 +74,7 @@ type SecureDialerOpts struct {
 type DialFunc = func(ctx context.Context, network, addr string) (net.Conn, error)
 
 func SecureDialer(o SecureDialerOpts) DialFunc {
-	resolver := dnscache.New(
-		dnscache.WithCacheRefreshInterval(dnsCacheRefreshInterval),
-		dnscache.WithLookupTimeout(dnsLookupTimeout),
-	)
-
-	dial := resolver.Dialer()
+	dial := cachedResolver.Dialer()
 	if o.dial != nil {
 		dial = o.dial
 	}
@@ -96,7 +97,7 @@ func SecureDialer(o SecureDialerOpts) DialFunc {
 		}
 
 		// Ensure that the current hostname is not a domain name.
-		ips, err := resolver.Lookup(ctx, host)
+		ips, err := cachedResolver.Lookup(ctx, host)
 		if err != nil {
 			return nil, err
 		}
