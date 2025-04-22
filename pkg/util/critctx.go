@@ -8,10 +8,15 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 )
 
+func Crit(ctx context.Context, name string, f func(ctx context.Context) error, withinBounds ...time.Duration) error {
+	_, err := CritT(ctx, name, func(ctx context.Context) (any, error) { return nil, f(ctx) }, withinBounds...)
+	return err
+}
+
 // Crit is a util to wrap a lambda with a non-cancellable context.  It allows an optional time boundary
 // for checking context deadlines;  if the parent ctx has a deadline shorter than the boundary we exit
 // immediately with an error.
-func Crit(ctx context.Context, name string, f func(ctx context.Context) error, withinBounds ...time.Duration) error {
+func CritT[T any](ctx context.Context, name string, f func(ctx context.Context) (T, error), withinBounds ...time.Duration) (resp T, err error) {
 	// If withinBounds is set, we have some time period in which we must complete the Crit
 	// section.
 	//
@@ -19,16 +24,16 @@ func Crit(ctx context.Context, name string, f func(ctx context.Context) error, w
 	// don't even bother.  The crit section must exist within some retryable process.
 	if len(withinBounds) == 1 {
 		if dl, ok := ctx.Deadline(); ok && time.Until(dl) < withinBounds[0] {
-			return fmt.Errorf("context deadline shorter than critical bounds: %s", name)
+			return resp, fmt.Errorf("context deadline shorter than critical bounds: %s", name)
 		}
 	}
 
 	if ctx.Err() == context.Canceled {
-		return fmt.Errorf("context canceled before entering crit: %s", name)
+		logger.StdlibLogger(ctx).Warn("context canceled before entering crit", "name", name)
 	}
 
 	pre := time.Now()
-	err := f(context.WithoutCancel(ctx))
+	resp, err = f(context.WithoutCancel(ctx))
 
 	// XXX: Instrument critical section durations and error responses via the names.
 
@@ -40,5 +45,5 @@ func Crit(ctx context.Context, name string, f func(ctx context.Context) error, w
 		}
 	}
 
-	return err
+	return resp, err
 }

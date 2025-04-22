@@ -98,11 +98,23 @@ func NewExecutor(opts ...ExecutorOpt) (execution.Executor, error) {
 		return nil, ErrNoPauseManager
 	}
 
+	if m.httpClient == nil {
+		// Default to the secure client.
+		m.httpClient = httpdriver.Client(httpdriver.SecureDialerOpts{})
+	}
+
 	return m, nil
 }
 
 // ExecutorOpt modifies the built-in executor on creation.
 type ExecutorOpt func(m execution.Executor) error
+
+func WithHTTPClient(c util.HTTPDoer) ExecutorOpt {
+	return func(e execution.Executor) error {
+		e.(*executor).httpClient = c
+		return nil
+	}
+}
 
 func WithCancellationChecker(c cancellation.Checker) ExecutorOpt {
 	return func(e execution.Executor) error {
@@ -299,6 +311,7 @@ type executor struct {
 	invokeFailHandler   execution.InvokeFailHandler
 	handleSendingEvent  execution.HandleSendingEvent
 	cancellationChecker cancellation.Checker
+	httpClient          util.HTTPDoer
 
 	lifecycles []execution.LifecycleListener
 
@@ -882,26 +895,28 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		item:       item,
 		edge:       edge,
 		stackIndex: stackIndex,
-		httpClient: httpdriver.DefaultClient,
+		httpClient: e.httpClient,
 	}
 
-	resp, err := e.run(ctx, &instance)
-	// Now we have a response, update the run instance.  We need to do this as request
-	// offloads must mutate the response directly.
-	instance.resp = resp
-	if resp == nil && err != nil {
-		for _, e := range e.lifecycles {
-			// OnStepFinished handles step success and step errors/failures.  It is
-			// currently the responsibility of the lifecycle manager to handle the differing
-			// step statuses when a step finishes.
-			go e.OnStepFinished(context.WithoutCancel(ctx), md, item, edge, resp, err)
+	return util.CritT(ctx, "run step", func(ctx context.Context) (*state.DriverResponse, error) {
+		resp, err := e.run(ctx, &instance)
+		// Now we have a response, update the run instance.  We need to do this as request
+		// offloads must mutate the response directly.
+		instance.resp = resp
+		if resp == nil && err != nil {
+			for _, e := range e.lifecycles {
+				// OnStepFinished handles step success and step errors/failures.  It is
+				// currently the responsibility of the lifecycle manager to handle the differing
+				// step statuses when a step finishes.
+				go e.OnStepFinished(context.WithoutCancel(ctx), md, item, edge, resp, err)
+			}
+			return nil, err
 		}
-		return nil, err
-	}
-	if handleErr := e.HandleResponse(ctx, &instance); handleErr != nil {
-		return resp, handleErr
-	}
-	return resp, err
+		if handleErr := e.HandleResponse(ctx, &instance); handleErr != nil {
+			return resp, handleErr
+		}
+		return resp, err
+	})
 }
 
 func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
@@ -1067,7 +1082,11 @@ func (e *executor) finalize(ctx context.Context, md sv2.Metadata, evts []json.Ra
 	// Delete the function state in every case.
 	_, err := e.smv2.Delete(ctx, md.ID)
 	if err != nil {
-		logger.StdlibLogger(ctx).Error("error deleting state in finalize", "error", err)
+		logger.StdlibLogger(ctx).Error(
+			"error deleting state in finalize",
+			"error", err,
+			"run_id", md.ID.RunID.String(),
+		)
 	}
 
 	// We may be cancelling an in-progress run.  If that's the case, we want to delete any
@@ -1087,7 +1106,11 @@ func (e *executor) finalize(ctx context.Context, md sv2.Metadata, evts []json.Ra
 			0,
 		)
 		if err != nil {
-			logger.StdlibLogger(ctx).Error("error fetching run jobs", "error", err)
+			logger.StdlibLogger(ctx).Error(
+				"error fetching run jobs",
+				"error", err,
+				"run_id", md.ID.RunID.String(),
+			)
 		}
 
 		for _, j := range jobs {
@@ -1104,7 +1127,11 @@ func (e *executor) finalize(ctx context.Context, md sv2.Metadata, evts []json.Ra
 
 			err := q.Dequeue(ctx, queueShard, *qi)
 			if err != nil && !errors.Is(err, redis_state.ErrQueueItemNotFound) {
-				logger.StdlibLogger(ctx).Error("error dequeueing run job", "error", err)
+				logger.StdlibLogger(ctx).Error(
+					"error dequeueing run job",
+					"error", err,
+					"run_id", md.ID.RunID.String(),
+				)
 			}
 		}
 	}
@@ -1913,7 +1940,17 @@ func (e *executor) handleGeneratorGroup(ctx context.Context, i *runInstance, gro
 			// parellel step individually.
 			i.item.GroupID = uuid.New().String()
 		}
-		eg.Go(func() error { return e.handleGenerator(ctx, i, copied) })
+		eg.Go(func() error {
+			defer func() {
+				if r := recover(); r != nil {
+					logger.StdlibLogger(ctx).Error(
+						"panic in handleGenerator",
+						"error", r,
+					)
+				}
+			}()
+			return e.handleGenerator(ctx, i, copied)
+		})
 	}
 	if err := eg.Wait(); err != nil {
 		if errors.Is(err, state.ErrStateOverflowed) {
@@ -2393,7 +2430,13 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, i *runInstance,
 		}
 
 		if err == nil {
-			err = fmt.Errorf("unsuccessful status code: %d", hr.StatusCode)
+			if hr != nil {
+				err = fmt.Errorf("unsuccessful status code: %d", hr.StatusCode)
+			} else {
+				// TODO: We should write a better error. This is a quick fix to
+				// stop panics.
+				err = errors.New("missing response")
+			}
 		}
 
 		// Ensure the opcode is treated as an error when calling OnStepFinish.

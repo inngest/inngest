@@ -1,3 +1,5 @@
+'use client';
+
 import { useState } from 'react';
 import { Listbox } from '@headlessui/react';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip/Tooltip';
@@ -12,6 +14,7 @@ type EnvSelectMenuProps = {
 };
 
 // EnvSelectMenu is a dropdown menu that allows selecting a single environment.
+// It has no predefined on-select behavior.
 // It does not allow selecting branch or archived envs.
 // It defaults to the Production env.
 export default function EnvSelectMenu({ onSelect, className }: EnvSelectMenuProps) {

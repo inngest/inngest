@@ -79,6 +79,11 @@ type connectGatewaySvc struct {
 	receiver     pubsub.RequestReceiver
 	apiBaseUrl   string
 
+	consecutiveWorkerHeartbeatMissesBeforeConnectionClose int
+	workerHeartbeatInterval                               time.Duration
+	workerRequestExtendLeaseInterval                      time.Duration
+	workerRequestLeaseDuration                            time.Duration
+
 	hostname string
 
 	// groupName specifies the name of the deployment group in case this gateway is one of many replicas.
@@ -169,12 +174,41 @@ func WithGroupName(groupName string) gatewayOpt {
 	}
 }
 
+func WithWorkerHeartbeatInterval(interval time.Duration) gatewayOpt {
+	return func(svc *connectGatewaySvc) {
+		svc.workerHeartbeatInterval = interval
+	}
+}
+
+func WithWorkerExtendLeaseInterval(interval time.Duration) gatewayOpt {
+	return func(svc *connectGatewaySvc) {
+		svc.workerRequestExtendLeaseInterval = interval
+	}
+}
+
+func WithWorkerRequestLeaseDuration(duration time.Duration) gatewayOpt {
+	return func(svc *connectGatewaySvc) {
+		svc.workerRequestLeaseDuration = duration
+	}
+}
+
+func WithConsecutiveWorkerHeartbeatMissesBeforeConnectionClose(misses int) gatewayOpt {
+	return func(svc *connectGatewaySvc) {
+		svc.consecutiveWorkerHeartbeatMissesBeforeConnectionClose = misses
+	}
+}
+
 func NewConnectGatewayService(opts ...gatewayOpt) *connectGatewaySvc {
 	gateway := &connectGatewaySvc{
 		gatewayId:         ulid.MustNew(ulid.Now(), rand.Reader),
 		lifecycles:        []ConnectGatewayLifecycleListener{},
 		drainListener:     newDrainListener(),
 		gatewayPublicPort: 8080,
+
+		workerHeartbeatInterval:                               consts.ConnectWorkerHeartbeatInterval,
+		workerRequestExtendLeaseInterval:                      consts.ConnectWorkerRequestExtendLeaseInterval,
+		workerRequestLeaseDuration:                            consts.ConnectWorkerRequestLeaseDuration,
+		consecutiveWorkerHeartbeatMissesBeforeConnectionClose: 5,
 	}
 
 	for _, opt := range opts {

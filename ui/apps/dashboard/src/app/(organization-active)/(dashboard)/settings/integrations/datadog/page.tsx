@@ -1,13 +1,12 @@
+import DatadogSetupPage from '@/app/(organization-active)/(dashboard)/settings/integrations/datadog/DatadogSetupPage';
 import SetupPage from '@/components/DatadogIntegration/SetupPage';
-import { MetricsEntitlements } from '@/components/PrometheusIntegration/data';
 
 export default async function Page() {
-  const metricsEntitlements = await MetricsEntitlements();
   return (
-    <SetupPage
-      metricsExportEnabled={metricsEntitlements.metricsExport.enabled}
-      metricsGranularitySeconds={metricsEntitlements.metricsExportGranularity.limit}
-      metricsFreshnessSeconds={metricsEntitlements.metricsExportFreshness.limit}
+    <DatadogSetupPage
+      subtitle={'Send key Inngest metrics directly to your Datadog account.'}
+      showEntitlements={true}
+      content={<SetupPage />}
     />
   );
 }

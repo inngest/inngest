@@ -36,7 +36,7 @@ func (c Config) NewDriver(opts ...registration.NewDriverOpts) (driver.Driver, er
 	}
 
 	return &executor{
-		Client:                 DefaultClient,
+		Client:                 defaultClient,
 		localSigningKey:        skey,
 		requireLocalSigningKey: requireLocalSigningKey,
 	}, nil

@@ -51,7 +51,7 @@ func TestRedirect(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	res, _, err := do(context.Background(), DefaultClient, Request{URL: parseURL(ts.URL), Input: input})
+	res, _, err := do(context.Background(), defaultClient, Request{URL: parseURL(ts.URL), Input: input})
 	require.NoError(t, err)
 	require.Equal(t, 200, res.StatusCode)
 	require.Equal(t, []byte("ok"), res.Body)
@@ -72,7 +72,7 @@ func TestRetryAfter(t *testing.T) {
 		}))
 		defer ts.Close()
 
-		res, _, err := do(context.Background(), DefaultClient, Request{URL: parseURL(ts.URL), Input: input})
+		res, _, err := do(context.Background(), defaultClient, Request{URL: parseURL(ts.URL), Input: input})
 		require.NoError(t, err)
 		require.Equal(t, 500, res.StatusCode)
 		require.Equal(t, []byte(`{"error":true}`), res.Body)

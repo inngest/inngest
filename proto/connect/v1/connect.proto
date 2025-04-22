@@ -12,6 +12,8 @@ enum GatewayMessageType {
   GATEWAY_EXECUTOR_REQUEST = 3;
   WORKER_READY = 4;
   WORKER_REQUEST_ACK = 5;
+  WORKER_REQUEST_EXTEND_LEASE = 12;
+  WORKER_REQUEST_EXTEND_LEASE_ACK = 13;
   WORKER_REPLY = 6;
   WORKER_REPLY_ACK = 7;
   WORKER_PAUSE = 8;
@@ -57,6 +59,11 @@ message WorkerConnectRequestData {
 	google.protobuf.Timestamp started_at = 13;
 }
 
+message GatewayConnectionReadyData {
+	string heartbeat_interval = 1;
+	string extend_lease_interval = 2;
+}
+
 message GatewayExecutorRequestData {
 	string request_id = 1;
 
@@ -76,6 +83,8 @@ message GatewayExecutorRequestData {
 	bytes user_trace_ctx = 11;
 
 	string run_id = 12;
+
+	string lease_id = 13;
 }
 
 message WorkerRequestAckData {
@@ -88,6 +97,30 @@ message WorkerRequestAckData {
 	bytes system_trace_ctx = 7;
 	bytes user_trace_ctx = 8;
 	string run_id = 9;
+}
+
+message WorkerRequestExtendLeaseData {
+	string request_id = 1;
+	string account_id = 2;
+	string env_id = 3;
+	string app_id = 4;
+	string function_slug = 5;
+	optional string step_id = 6;
+	bytes system_trace_ctx = 7;
+	bytes user_trace_ctx = 8;
+	string run_id = 9;
+
+	string lease_id = 10;
+}
+
+message WorkerRequestExtendLeaseAckData {
+	string request_id = 1;
+	string account_id = 2;
+	string env_id = 3;
+	string app_id = 4;
+	string function_slug = 5;
+
+	optional string new_lease_id = 6;
 }
 
 enum SDKResponseStatus {
@@ -158,6 +191,8 @@ enum WorkerDisconnectReason {
 	WORKER_SHUTDOWN = 0;
 	UNEXPECTED = 1;
 	GATEWAY_DRAINING = 2;
+	CONSECUTIVE_HEARTBEATS_MISSED = 3;
+	MESSAGE_TOO_LARGE = 4;
 }
 
 message StartResponse {

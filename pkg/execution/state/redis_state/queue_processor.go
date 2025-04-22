@@ -1009,9 +1009,9 @@ func (q *queue) process(
 					errCh <- fmt.Errorf("cannot extend lease since lease ID is nil")
 					return
 				}
-				leaseID, err = q.ExtendLease(ctx, qi, *leaseID, QueueLeaseDuration)
-				if err != nil && err != ErrQueueItemNotFound && errors.Unwrap(err) != context.Canceled {
-					// XXX: Increase counter here.
+				// Once a job has started, use a BG context to always renew.
+				leaseID, err = q.ExtendLease(context.Background(), qi, *leaseID, QueueLeaseDuration)
+				if err != nil && err != ErrQueueItemNotFound {
 					q.logger.Error().
 						Err(err).
 						Str("account_id", p.AccountID.String()).
@@ -1027,7 +1027,7 @@ func (q *queue) process(
 	}()
 
 	// XXX: Add a max job time here, configurable.
-	jobCtx, jobCancel := context.WithCancel(ctx)
+	jobCtx, jobCancel := context.WithCancel(context.WithoutCancel(ctx))
 	defer jobCancel()
 	// Add the job ID to the queue context.  This allows any logic that handles the run function
 	// to inspect job IDs, eg. for tracing or logging, without having to thread this down as
@@ -1684,7 +1684,7 @@ func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error 
 	}
 
 	// Handle other errors.
-	if err != nil {
+	if err != nil || leaseID == nil {
 		p.err = fmt.Errorf("error leasing in process: %w", err)
 		metrics.IncrQueueItemProcessedCounter(ctx, metrics.CounterOpt{
 			PkgName: pkgName,

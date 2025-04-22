@@ -84,7 +84,7 @@ export function useWorkers() {
           {
             timeField: ConnectV1WorkerConnectionsOrderByField.ConnectedAt,
             orderBy,
-            startTime: getTimestampDaysAgo({ currentDate: new Date(), days: 1 }).toISOString(),
+            startTime: getTimestampDaysAgo({ currentDate: new Date(), days: 30 }).toISOString(),
             appID: appID,
             status,
             cursor,
@@ -154,7 +154,7 @@ export function useWorkersCount() {
           countQuery,
           {
             timeField: ConnectV1WorkerConnectionsOrderByField.ConnectedAt,
-            startTime: getTimestampDaysAgo({ currentDate: new Date(), days: 1 }).toISOString(),
+            startTime: getTimestampDaysAgo({ currentDate: new Date(), days: 30 }).toISOString(),
             appID: appID,
             envID,
             status,
