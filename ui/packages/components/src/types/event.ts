@@ -3,10 +3,13 @@ export type Event = {
   name: string;
   payload: string;
   receivedAt: Date;
-  functions?: {
-    name: string;
-    slug: string;
+  runs?: {
+    fnName: string;
+    fnSlug: string;
+    id: string;
     status: string;
+    startedAt?: Date;
+    completedAt?: Date;
   }[];
 };
 

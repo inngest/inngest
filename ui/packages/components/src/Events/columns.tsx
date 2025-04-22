@@ -9,7 +9,7 @@ import type { EventsTable } from './EventsTable';
 
 const columnHelper = createColumnHelper<Omit<Event, 'payload'>>();
 
-const columnsIDs = ['name', 'functions', 'receivedAt'] as const;
+const columnsIDs = ['name', 'runs', 'receivedAt'] as const;
 export type ColumnID = (typeof columnsIDs)[number];
 export function isColumnID(value: unknown): value is ColumnID {
   return columnsIDs.includes(value as ColumnID);
@@ -46,31 +46,31 @@ export function useColumns({
       enableSorting: false,
       id: ensureColumnID('name'),
     }),
-    columnHelper.accessor('functions', {
+    columnHelper.accessor('runs', {
       cell: (info) => {
-        const functions = info.getValue();
-        if (!functions) {
+        const runs = info.getValue();
+        if (!runs) {
           return null;
         }
 
         return (
           <HorizontalPillList
             alwaysVisibleCount={2}
-            pills={functions.map((function_) => (
+            pills={runs.map((run_) => (
               <Pill
                 appearance="outlined"
-                href={pathCreator.runPopout({ runID: function_.id })}
-                key={function_.name}
+                href={pathCreator.runPopout({ runID: run_.id })}
+                key={run_.id}
               >
                 <span className="flex items-center gap-1">
-                  <StatusDot status={function_.status} className="h-2 w-2 shrink-0" />
+                  <StatusDot status={run_.status} className="h-2 w-2 shrink-0" />
                   <p
                     className={cn(
                       'truncate',
-                      function_.status === 'CANCELLED' ? 'text-subtle' : 'text-basis'
+                      run_.status === 'CANCELLED' ? 'text-subtle' : 'text-basis'
                     )}
                   >
-                    {function_.name}
+                    {run_.fnName}
                   </p>
                 </span>
               </Pill>
@@ -80,7 +80,7 @@ export function useColumns({
       },
       header: 'Functions triggered',
       enableSorting: false,
-      id: ensureColumnID('functions'),
+      id: ensureColumnID('runs'),
     }),
   ];
 

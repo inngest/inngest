@@ -14,7 +14,6 @@ import { cn } from '@inngest/components/utils/classNames';
 import { durationToString, parseDuration } from '@inngest/components/utils/date';
 import { RiArrowRightUpLine, RiSearchLine } from '@remixicon/react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { type Row } from '@tanstack/react-table';
 
 import type { RangeChangeProps } from '../DatePicker/RangePicker';
 import EntityFilter from '../Filter/EntityFilter';
@@ -24,6 +23,8 @@ import {
   useStringArraySearchParam,
 } from '../hooks/useSearchParam';
 import type { Features } from '../types/features';
+import { EventDetails } from './EventDetails';
+import TotalCount from './TotalCount';
 import { useColumns } from './columns';
 
 const CodeSearch = dynamic(() => import('@inngest/components/CodeSearch/CodeSearch'), {
@@ -34,14 +35,17 @@ const refreshInterval = 5000;
 
 export function EventsTable({
   getEvents,
+  getEventDetails,
   pathCreator,
   emptyActions,
+  expandedRowActions,
   features,
 }: {
   emptyActions: React.ReactNode;
+  expandedRowActions: (eventName: string) => React.ReactNode;
   pathCreator: {
-    function: (params: { functionSlug: string }) => Route;
     eventType: (params: { eventName: string }) => Route;
+    runPopout: (params: { runID: string }) => Route;
   };
   getEvents: ({
     cursor,
@@ -55,7 +59,8 @@ export function EventsTable({
     source?: string;
     startTime?: string;
     celQuery?: string;
-  }) => Promise<{ events: Omit<Event, 'payload'>[]; pageInfo: PageInfo }>;
+  }) => Promise<{ events: Omit<Event, 'payload'>[]; pageInfo: PageInfo; totalCount: number }>;
+  getEventDetails: ({ eventName }: { eventName: string }) => Promise<Omit<Event, 'payload'>>;
   features: Pick<Features, 'history'>;
 }) {
   const columns = useColumns({ pathCreator });
@@ -152,6 +157,7 @@ export function EventsTable({
                   : ''
               )}
             />
+            <TotalCount totalCount={eventsData?.totalCount} />
           </div>
           <div className="flex">
             <TimeFilter
@@ -190,8 +196,8 @@ export function EventsTable({
                 icon={<RiArrowRightUpLine />}
                 iconSide="right"
                 size="small"
-                // TODO: add link to docs
-                href=""
+                // TODO: Create "Inspecting an event" doc in Monitor
+                href="https://www.inngest.com/docs/platform/monitor/inspecting-events?ref=events-table"
               />
             </div>
             <div className="border-subtle border-b">
@@ -211,7 +217,14 @@ export function EventsTable({
           data={eventsData?.events || []}
           isLoading={isPending}
           blankState={<TableBlankState actions={emptyActions} />}
-          renderSubComponent={SubComponent}
+          renderSubComponent={({ row }) => (
+            <EventDetails
+              pathCreator={pathCreator}
+              eventName={row.original.name}
+              getEventDetails={getEventDetails}
+              expandedRowActions={expandedRowActions}
+            />
+          )}
           expandedIDs={expandedIDs}
           onRowClick={(row) => {
             if (expandedIDs.includes(row.original.id)) {
@@ -228,8 +241,4 @@ export function EventsTable({
       </div>
     </div>
   );
-}
-
-function SubComponent({ row }: { row: Row<Omit<Event, 'payload'>> }) {
-  return <p>Component {row.original.name}</p>;
 }
