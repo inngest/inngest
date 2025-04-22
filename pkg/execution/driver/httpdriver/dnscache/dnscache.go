@@ -14,7 +14,11 @@ import (
 
 var (
 	defaultRefreshInterval = 5 * time.Second
-	defaultDialer          = &net.Dialer{Timeout: 5 * time.Second, KeepAlive: 15 * time.Second}
+	defaultCacheTTL        = 5 * time.Second
+	defaultLookupTimeout   = 5 * time.Second
+
+	// default dialer to use if not provided
+	defaultDialer = &net.Dialer{Timeout: 5 * time.Second, KeepAlive: 15 * time.Second}
 
 	// lookupGroup merges lookup calls together for lookups for the same host. The
 	// lookupGroup key is is the LookupIPAddr.host argument.
@@ -32,14 +36,18 @@ type Dialer func(ctx context.Context, network, addr string) (net.Conn, error)
 
 func New(ctx context.Context, opts ...ResolverOpts) DNSResolver {
 	r := resolver{
+		lookupTimeout:   defaultLookupTimeout,
 		refreshInterval: defaultRefreshInterval,
 		dialer:          defaultDialer.DialContext,
-		cache:           newCache(),
+		cacheTTL:        defaultCacheTTL,
 	}
 
 	for _, apply := range opts {
 		apply(&r)
 	}
+
+	// initialize the cache
+	r.cache = newCache(r.cacheTTL)
 
 	go func() {
 		defer func() {
@@ -77,9 +85,16 @@ func WithDialer(dialer Dialer) ResolverOpts {
 	}
 }
 
+func WithCacheTTL(ttl time.Duration) ResolverOpts {
+	return func(r *resolver) {
+		r.cacheTTL = ttl
+	}
+}
+
 type resolver struct {
 	// Timeout defines the maximum allowed time allowed for a lookup.
-	Timeout time.Duration
+	Timeout       time.Duration
+	lookupTimeout time.Duration
 
 	lookups int64
 
@@ -89,6 +104,9 @@ type resolver struct {
 	// OnCacheMiss is executed if the host or address is not included in
 	// the cache and the default lookup is executed.
 	OnCacheMiss func()
+
+	// cacheTTL sets the time the cache is valid for
+	cacheTTL time.Duration
 
 	// refreshInterval defines the duration between refresh of IP addresses
 	refreshInterval time.Duration

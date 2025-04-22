@@ -9,18 +9,16 @@ import (
 	"github.com/karlseguin/ccache/v2"
 )
 
-const (
-	cacheTTL = 5 * time.Second
-)
-
-func newCache() *cache {
+func newCache(ttl time.Duration) *cache {
 	return &cache{
 		cache: ccache.New(ccache.Configure().MaxSize(10_000).ItemsToPrune(500)),
+		ttl:   ttl,
 	}
 }
 
 type cache struct {
 	cache *ccache.Cache
+	ttl   time.Duration
 }
 
 func (c *cache) Delete(key string) bool {
@@ -59,5 +57,5 @@ func (c *cache) Get(key string) (*cacheEntry, bool) {
 }
 
 func (c *cache) Set(key string, entry *cacheEntry) {
-	c.cache.Set(key, entry, cacheTTL)
+	c.cache.Set(key, entry, c.ttl)
 }
