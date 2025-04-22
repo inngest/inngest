@@ -1,16 +1,35 @@
 {
-    "run": {
-        "skip-dirs": [
-            "vendor"
-        ],
-        "timeout": "10m"
+  "version": "2",
+  "run": {
+    "timeout": "10m"
+  },
+  "linters": {
+    "exclusions": {
+      "paths": [
+        "vendor"
+      ],
+      "presets": [
+        "comments",
+        "std-error-handling"
+      ]
     },
-    "linters-settings": {
-        "staticcheck": {
-            "checks": [
-                "all",
-                "-SA1019"
-            ]
-        }
+    "settings": {
+      "staticcheck": {
+        "checks": [
+          "all",
+          "-ST1003",
+          "-ST1005",
+          "-SA1019",
+          "-QF1008"
+        ]
+      }
     }
+  },
+  "formatters": {
+    "exclusions": {
+      "paths": [
+        "vendor"
+      ]
+    }
+  }
 }
