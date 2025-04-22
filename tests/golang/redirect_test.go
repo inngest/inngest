@@ -58,7 +58,7 @@ func TestRedirect(t *testing.T) {
 
 	req, err := http.NewRequest(http.MethodPut, redirectServer.URL(), nil)
 	r.NoError(err)
-	resp, err := httpdriver.Client(httpdriver.SecureDialerOpts{}).Do(req)
+	resp, err := httpdriver.Client(httpdriver.SecureDialerOpts{AllowPrivate: true}).Do(req)
 	r.NoError(err)
 	r.Equal(200, resp.StatusCode)
 

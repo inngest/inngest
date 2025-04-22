@@ -57,11 +57,6 @@ func Transport(opts SecureDialerOpts) *http.Transport {
 		ResponseHeaderTimeout: consts.MaxFunctionTimeout,
 	}
 
-	if util.InTestMode() {
-		// Allow local requests during testing
-		t.DialContext = Dialer.DialContext
-	}
-
 	return t
 }
 

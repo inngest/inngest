@@ -295,24 +295,6 @@ func start(ctx context.Context, opts StartOpts) error {
 		return fmt.Errorf("failed to create connect pubsub connector: %w", err)
 	}
 
-	var drivers = []driver.Driver{}
-	for _, driverConfig := range opts.Config.Execution.Drivers {
-		d, err := driverConfig.NewDriver(registration.NewDriverOpts{
-			ConnectForwarder:  executorProxy,
-			ConditionalTracer: conditionalTracer,
-		})
-		if err != nil {
-			return err
-		}
-		drivers = append(drivers, d)
-	}
-	pb, err := pubsub.NewPublisher(ctx, opts.Config.EventStream.Service)
-	if err != nil {
-		return fmt.Errorf("failed to create publisher: %w", err)
-	}
-
-	hmw := memory_writer.NewWriter(ctx, memory_writer.WriterOptions{DumpToFile: false})
-
 	// Before running the development service, ensure that we change the http
 	// driver in development to use our AWS Gateway http client, attempting to
 	// automatically transform dev requests to lambda invocations.
@@ -325,6 +307,25 @@ func start(ctx context.Context, opts StartOpts) error {
 	})
 	httpClient.(*http.Client).Transport = awsgateway.NewTransformTripper(httpClient.(*http.Client).Transport)
 	deploy.Client.Transport = awsgateway.NewTransformTripper(deploy.Client.Transport)
+
+	var drivers = []driver.Driver{}
+	for _, driverConfig := range opts.Config.Execution.Drivers {
+		d, err := driverConfig.NewDriver(registration.NewDriverOpts{
+			ConnectForwarder:  executorProxy,
+			ConditionalTracer: conditionalTracer,
+			HTTPClient:        httpClient,
+		})
+		if err != nil {
+			return err
+		}
+		drivers = append(drivers, d)
+	}
+	pb, err := pubsub.NewPublisher(ctx, opts.Config.EventStream.Service)
+	if err != nil {
+		return fmt.Errorf("failed to create publisher: %w", err)
+	}
+
+	hmw := memory_writer.NewWriter(ctx, memory_writer.WriterOptions{DumpToFile: false})
 
 	exec, err := executor.NewExecutor(
 		executor.WithHTTPClient(httpClient),
