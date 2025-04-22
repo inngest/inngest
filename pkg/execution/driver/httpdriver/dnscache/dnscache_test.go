@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/stretchr/testify/require"
@@ -39,6 +40,12 @@ func TestDNSCache(t *testing.T) {
 
 			t.Run("cached", func(t *testing.T) {
 				require.True(t, cachedResolver.isCached(host))
+			})
+
+			<-time.After(5 * time.Second)
+
+			t.Run("cache expired", func(t *testing.T) {
+				require.False(t, cachedResolver.isCached(host))
 			})
 		})
 	}
