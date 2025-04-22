@@ -28,8 +28,6 @@ var (
 type cacheType []net.IP
 
 type DNSResolver interface {
-	// LookupHost(ctx context.Context, host string) (addrs []string, err error)
-	// LookupAddr(ctx context.Context, addr string) (names []string, err error)
 	Lookup(ctx context.Context, host string) ([]net.IP, error)
 	Dialer() Dialer
 }
