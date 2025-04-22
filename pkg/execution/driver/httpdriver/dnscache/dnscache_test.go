@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"net/url"
 	"testing"
 
 	"github.com/inngest/inngest/pkg/logger"
@@ -24,42 +23,23 @@ func TestDNSCache(t *testing.T) {
 	}
 
 	// inngest and vercel use SNI
-	addrs := []string{"https://www.example.com", "https://www.inngest.com", "https://vercel.com"}
+	hosts := []string{"www.example.com", "www.inngest.com", "vercel.com"}
 
-	for _, addr := range addrs {
-		host := parseHost(addr)
-		testName := fmt.Sprintf("not cached: %s", host)
+	for _, host := range hosts {
+		t.Run(host, func(t *testing.T) {
+			t.Run("non cached", func(t *testing.T) {
+				require.False(t, cachedResolver.isCached(host))
+			})
 
-		t.Run(testName, func(t *testing.T) {
-			require.False(t, cachedResolver.isCached(host))
+			t.Run("request", func(t *testing.T) {
+				resp, err := c.Get(fmt.Sprintf("https://%s", host))
+				require.NoError(t, err)
+				require.EqualValues(t, 200, resp.StatusCode)
+			})
+
+			t.Run("cached", func(t *testing.T) {
+				require.True(t, cachedResolver.isCached(host))
+			})
 		})
 	}
-
-	for _, host := range addrs {
-		testName := fmt.Sprintf("host: %s", host)
-
-		t.Run(testName, func(t *testing.T) {
-			resp, err := c.Get(host)
-			require.NoError(t, err)
-			require.EqualValues(t, 200, resp.StatusCode)
-		})
-	}
-
-	// These shouldn't incur lookups, as we just looked them up.
-	for _, addr := range addrs {
-		host := parseHost(addr)
-		testName := fmt.Sprintf("cached: %s", host)
-
-		t.Run(testName, func(t *testing.T) {
-			require.True(t, cachedResolver.isCached(host))
-		})
-	}
-}
-
-func parseHost(urlstr string) string {
-	parsed, err := url.Parse(urlstr)
-	if err != nil {
-		return ""
-	}
-	return parsed.Host
 }
