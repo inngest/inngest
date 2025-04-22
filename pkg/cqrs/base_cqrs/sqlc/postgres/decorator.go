@@ -7,8 +7,8 @@ import (
 )
 
 // EventIDs convert the blob data to a list of ULIDs
-func (e EventBatch) EventIDs() ([]ulid.ULID, error) {
-	strids := strings.Split(string(e.EventIds), ",")
+func (eb EventBatch) EventIDs() ([]ulid.ULID, error) {
+	strids := strings.Split(string(eb.EventIds), ",")
 	ids := make([]ulid.ULID, len(strids))
 
 	for i, sid := range strids {

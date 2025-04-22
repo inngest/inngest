@@ -11,6 +11,17 @@
       "presets": [
         "comments",
         "std-error-handling"
+      ],
+      "rules": [
+        {
+          "linters": [
+            "staticcheck"
+          ],
+          "path": "pkg/deploy/deploy.go",
+          "exclude": [
+            "ST1012"
+          ]
+        }
       ]
     },
     "settings": {
@@ -20,6 +31,8 @@
           "-ST1003",
           "-ST1005",
           "-SA1019",
+          "-QF1003",
+          "-QF1007",
           "-QF1008"
         ]
       }

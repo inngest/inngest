@@ -805,112 +805,112 @@ func (qp QueuePartition) IsSystem() bool {
 // zsetKey represents the key used to store the zset for this partition's items.
 // For default partitions, this is different to the ID (for backwards compatibility, it's just
 // the fn ID without prefixes)
-func (q QueuePartition) zsetKey(kg QueueKeyGenerator) string {
+func (qp QueuePartition) zsetKey(kg QueueKeyGenerator) string {
 	// For system partitions, return zset using custom queueName
-	if q.IsSystem() {
-		return kg.PartitionQueueSet(enums.PartitionTypeDefault, q.Queue(), "")
+	if qp.IsSystem() {
+		return kg.PartitionQueueSet(enums.PartitionTypeDefault, qp.Queue(), "")
 	}
 
 	// Backwards compatibility with old fn queues
-	if q.PartitionType == int(enums.PartitionTypeDefault) && q.FunctionID != nil {
+	if qp.PartitionType == int(enums.PartitionTypeDefault) && qp.FunctionID != nil {
 		// return the top-level function queue.
-		return kg.PartitionQueueSet(enums.PartitionTypeDefault, q.FunctionID.String(), "")
+		return kg.PartitionQueueSet(enums.PartitionTypeDefault, qp.FunctionID.String(), "")
 	}
 
-	if q.ID == "" {
+	if qp.ID == "" {
 		// return a blank queue key.  This is used for nil queue partitions.
 		return kg.PartitionQueueSet(enums.PartitionTypeDefault, "-", "")
 	}
 
-	// q.ID is already a properly defined key (concurrency key queues).
-	return q.ID
+	// qp.ID is already a properly defined key (concurrency key queues).
+	return qp.ID
 }
 
 // concurrencyKey returns the single concurrency key for the given partition, depending
 // on the partition type.  This is used to check the partition's in-progress items whilst
 // requeueing partitions.
-func (q QueuePartition) concurrencyKey(kg QueueKeyGenerator) string {
-	switch enums.PartitionType(q.PartitionType) {
+func (qp QueuePartition) concurrencyKey(kg QueueKeyGenerator) string {
+	switch enums.PartitionType(qp.PartitionType) {
 	case enums.PartitionTypeDefault:
-		return q.fnConcurrencyKey(kg)
+		return qp.fnConcurrencyKey(kg)
 	case enums.PartitionTypeConcurrencyKey:
 		// Hierarchically, custom keys take precedence.
-		return q.customConcurrencyKey(kg)
+		return qp.customConcurrencyKey(kg)
 	default:
-		panic(fmt.Sprintf("unexpected partition type encountered in concurrencyKey %q", q.PartitionType))
+		panic(fmt.Sprintf("unexpected partition type encountered in concurrencyKey %q", qp.PartitionType))
 	}
 }
 
 // fnConcurrencyKey returns the concurrency key for a function scope limit, on the
 // entire function (not custom keys)
-func (q QueuePartition) fnConcurrencyKey(kg QueueKeyGenerator) string {
+func (qp QueuePartition) fnConcurrencyKey(kg QueueKeyGenerator) string {
 	// Enable system partitions to use the queueName override instead of the fnId
-	if q.IsSystem() {
-		if *q.QueueName == osqueue.KindScheduleBatch {
+	if qp.IsSystem() {
+		if *qp.QueueName == osqueue.KindScheduleBatch {
 			// this is consistent with the concrete WithPartitionConcurrencyKeyGenerator in cloud previously
 			return kg.Concurrency("p", uuid.Nil.String())
 		}
 
 		// for other queues like pauses, this is consistent with the concrete WithPartitionConcurrencyKeyGenerator in cloud previously
-		return kg.Concurrency("p", q.Queue())
+		return kg.Concurrency("p", qp.Queue())
 	}
 
-	if q.FunctionID == nil {
+	if qp.FunctionID == nil {
 		return kg.Concurrency("p", "-")
 	}
-	return kg.Concurrency("p", q.FunctionID.String())
+	return kg.Concurrency("p", qp.FunctionID.String())
 }
 
 // acctConcurrencyKey returns the concurrency key for the account limit, on the
 // entire account (not custom keys)
-func (q QueuePartition) acctConcurrencyKey(kg QueueKeyGenerator) string {
+func (qp QueuePartition) acctConcurrencyKey(kg QueueKeyGenerator) string {
 	// Enable system partitions to use the queueName override instead of the accountId
-	if q.IsSystem() {
-		if *q.QueueName == osqueue.KindScheduleBatch {
+	if qp.IsSystem() {
+		if *qp.QueueName == osqueue.KindScheduleBatch {
 			// this is consistent with the concrete WithAccountConcurrencyKeyGenerator in cloud previously
 			return kg.Concurrency("account", uuid.Nil.String())
 		}
 
 		// for other queues like pauses, this is consistent with the concrete WithAccountConcurrencyKeyGenerator in cloud previously
-		return kg.Concurrency("account", q.Queue())
+		return kg.Concurrency("account", qp.Queue())
 	}
-	if q.AccountID == uuid.Nil {
+	if qp.AccountID == uuid.Nil {
 		return kg.Concurrency("account", "-")
 	}
-	return kg.Concurrency("account", q.AccountID.String())
+	return kg.Concurrency("account", qp.AccountID.String())
 }
 
 // customConcurrencyKey returns the concurrency key if this partition represents
 // a custom concurrnecy limit.
-func (q QueuePartition) customConcurrencyKey(kg QueueKeyGenerator) string {
+func (qp QueuePartition) customConcurrencyKey(kg QueueKeyGenerator) string {
 	// This should never happen, but we attempt to handle it gracefully
-	if q.IsSystem() {
+	if qp.IsSystem() {
 		// this is consistent with the concrete WithCustomConcurrencyKeyGenerator in cloud previously
-		return kg.Concurrency("custom", q.Queue())
+		return kg.Concurrency("custom", qp.Queue())
 	}
 
-	if q.EvaluatedConcurrencyKey == "" {
+	if qp.EvaluatedConcurrencyKey == "" {
 		return kg.Concurrency("custom", "-")
 	}
-	return kg.Concurrency("custom", q.EvaluatedConcurrencyKey)
+	return kg.Concurrency("custom", qp.EvaluatedConcurrencyKey)
 }
 
-func (q QueuePartition) Queue() string {
+func (qp QueuePartition) Queue() string {
 	// This is redundant but acts as a safeguard, so that
 	// we always return the ID (queueName) for system partitions
-	if q.IsSystem() {
-		return *q.QueueName
+	if qp.IsSystem() {
+		return *qp.QueueName
 	}
 
-	if q.ID == "" && q.FunctionID != nil {
-		return q.FunctionID.String()
+	if qp.ID == "" && qp.FunctionID != nil {
+		return qp.FunctionID.String()
 	}
 
-	return q.ID
+	return qp.ID
 }
 
-func (q QueuePartition) MarshalBinary() ([]byte, error) {
-	return json.Marshal(q)
+func (qp QueuePartition) MarshalBinary() ([]byte, error) {
+	return json.Marshal(qp)
 }
 
 // ItemPartitions returns up 3 item partitions for a given queue item, as well as the account concurrency limit.
@@ -3458,7 +3458,7 @@ func (q *queue) ConfigLease(ctx context.Context, key string, duration time.Durat
 }
 
 // peekEWMA returns the calculated EWMA value from the list
-// nolint:golint,unused // this code remains to be enabled on demand
+// nolint:unused // this code remains to be enabled on demand
 func (q *queue) peekEWMA(ctx context.Context, fnID uuid.UUID) (int64, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "peekEWMA"), redis_telemetry.ScopeQueue)
 

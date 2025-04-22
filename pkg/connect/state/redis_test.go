@@ -529,16 +529,16 @@ func TestUpsertConnection(t *testing.T) {
 
 		_, err = connManager.GetWorkerGroupByHash(ctx, envId, group1Id)
 		require.Error(t, err)
-		require.ErrorIs(t, err, WorkerGroupNotFoundErr)
+		require.ErrorIs(t, err, ErrWorkerGroupNotFound)
 
 		_, err = connManager.GetWorkerGroupByHash(ctx, envId, group2Id)
 		require.Error(t, err)
-		require.ErrorIs(t, err, WorkerGroupNotFoundErr)
+		require.ErrorIs(t, err, ErrWorkerGroupNotFound)
 
 		_, err = connManager.GetWorkerGroupsByHash(ctx, envId, []string{group1Id, group2Id})
 		require.Error(t, err)
 		require.ErrorContains(t, err, "could not find group \"app-1-hash\": worker group not found")
-		require.ErrorIs(t, err, WorkerGroupNotFoundErr)
+		require.ErrorIs(t, err, ErrWorkerGroupNotFound)
 
 		group1 := &WorkerGroup{
 			AccountID:     accountId,
@@ -798,16 +798,16 @@ func TestUpsertConnection(t *testing.T) {
 
 			_, err = connManager.GetWorkerGroupByHash(ctx, envId, group1Id)
 			require.Error(t, err)
-			require.ErrorIs(t, err, WorkerGroupNotFoundErr)
+			require.ErrorIs(t, err, ErrWorkerGroupNotFound)
 
 			_, err = connManager.GetWorkerGroupByHash(ctx, envId, group2Id)
 			require.Error(t, err)
-			require.ErrorIs(t, err, WorkerGroupNotFoundErr)
+			require.ErrorIs(t, err, ErrWorkerGroupNotFound)
 
 			_, err = connManager.GetWorkerGroupsByHash(ctx, envId, []string{group1Id, group2Id})
 			require.Error(t, err)
 			require.ErrorContains(t, err, "could not find group \"app-1-hash\": worker group not found")
-			require.ErrorIs(t, err, WorkerGroupNotFoundErr)
+			require.ErrorIs(t, err, ErrWorkerGroupNotFound)
 		})
 	})
 

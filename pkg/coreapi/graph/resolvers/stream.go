@@ -13,7 +13,7 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
-func (r *queryResolver) Stream(ctx context.Context, q models.StreamQuery) ([]*models.StreamItem, error) {
+func (qr *queryResolver) Stream(ctx context.Context, q models.StreamQuery) ([]*models.StreamItem, error) {
 	var before *ulid.ULID
 	var after *ulid.ULID
 
@@ -37,7 +37,7 @@ func (r *queryResolver) Stream(ctx context.Context, q models.StreamQuery) ([]*mo
 		includeInternalEvents = *q.IncludeInternalEvents
 	}
 
-	evts, err := r.Data.GetEventsIDbound(
+	evts, err := qr.Data.GetEventsIDbound(
 		ctx,
 		bound,
 		q.Limit,
@@ -55,7 +55,7 @@ func (r *queryResolver) Stream(ctx context.Context, q models.StreamQuery) ([]*mo
 	accountID := consts.DevServerAccountID
 	workspaceID := consts.DevServerEnvID
 
-	fns, err := r.HistoryReader.GetFunctionRunsFromEvents(
+	fns, err := qr.HistoryReader.GetFunctionRunsFromEvents(
 		ctx,
 		accountID,
 		workspaceID,
@@ -67,7 +67,7 @@ func (r *queryResolver) Stream(ctx context.Context, q models.StreamQuery) ([]*mo
 	fnsByID := map[ulid.ULID][]*models.FunctionRun{}
 	for _, fn := range fns {
 		run := models.MakeFunctionRun(fn)
-		_, err := r.Data.GetFunctionByInternalUUID(ctx, consts.DevServerEnvID, uuid.MustParse(run.FunctionID))
+		_, err := qr.Data.GetFunctionByInternalUUID(ctx, consts.DevServerEnvID, uuid.MustParse(run.FunctionID))
 		if err == sql.ErrNoRows {
 			// Skip run since its function doesn't exist. This can happen when
 			// deleting a function or changing its ID.
