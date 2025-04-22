@@ -15,7 +15,12 @@ func TestDNSCache(t *testing.T) {
 	ctx := context.Background()
 	l := logger.StdlibLogger(ctx)
 
-	cachedResolver := New(WithLogger(l))
+	ttl := 2 * time.Second
+
+	cachedResolver := New(
+		WithCacheTTL(ttl),
+		WithLogger(l),
+	)
 
 	c := http.Client{
 		Transport: &http.Transport{
@@ -42,7 +47,7 @@ func TestDNSCache(t *testing.T) {
 				require.True(t, cachedResolver.isCached(host))
 			})
 
-			<-time.After(5 * time.Second)
+			<-time.After(ttl)
 
 			t.Run("cache expired", func(t *testing.T) {
 				require.False(t, cachedResolver.isCached(host))
