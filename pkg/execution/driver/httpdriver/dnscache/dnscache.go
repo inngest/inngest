@@ -123,7 +123,7 @@ func (r *resolver) Dialer() Dialer {
 		var retErr error
 		for _, idx := range r.randPerm(len(ips)) {
 			ip := ips[idx]
-			conn, err := r.dialer(ctx, "tcp", net.JoinHostPort(ip.String(), port))
+			conn, err := r.dialer(ctx, network, net.JoinHostPort(ip.String(), port))
 			if err == nil {
 				return conn, nil
 			}
