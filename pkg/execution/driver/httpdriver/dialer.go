@@ -5,19 +5,14 @@ import (
 	"fmt"
 	"math/rand/v2"
 	"net"
-	"time"
 
 	"github.com/inngest/inngest/pkg/execution/driver/httpdriver/dnscache"
 	"github.com/inngest/inngest/pkg/logger"
 )
 
-const (
-	dnsCacheRefreshInterval = 3 * time.Second
-)
-
 var privateIPBlocks []*net.IPNet
 var nat64blocks []*net.IPNet
-var cachedResolver *dnscache.Resolver
+var cachedResolver dnscache.DNSResolver
 
 func init() {
 	for _, cidr := range []string{
@@ -52,23 +47,7 @@ func init() {
 	}
 
 	// Resolver for caching DNS lookups.
-	cachedResolver = &dnscache.Resolver{}
-	go func() {
-		defer func() {
-			if r := recover(); r != nil {
-				logger.StdlibLogger(context.Background()).
-					Error("panic in resolver refresh", "error", r)
-			}
-		}()
-
-		t := time.NewTicker(dnsCacheRefreshInterval)
-		defer t.Stop()
-		for range t.C {
-			// Remove entries that haven't been used since the last refresh.
-			removeUnused := true
-			cachedResolver.Refresh(removeUnused)
-		}
-	}()
+	cachedResolver = dnscache.New(context.Background())
 }
 
 type SecureDialerOpts struct {
@@ -88,7 +67,7 @@ type DialFunc = func(ctx context.Context, network, addr string) (net.Conn, error
 func SecureDialer(o SecureDialerOpts) DialFunc {
 	if o.dial == nil {
 		// Always use the default dialer.  Only allow overrides in testing.
-		o.dial = Dialer.DialContext
+		o.dial = cachedResolver.Dialer()
 	}
 
 	return func(ctx context.Context, network, addr string) (net.Conn, error) {

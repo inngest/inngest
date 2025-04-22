@@ -10,7 +10,7 @@ import (
 )
 
 const (
-	cacheTTL = time.Minute
+	cacheTTL = 5 * time.Second
 )
 
 func newCache() *cache {

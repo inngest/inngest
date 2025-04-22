@@ -8,21 +8,77 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/inngest/inngest/pkg/logger"
 	"golang.org/x/sync/singleflight"
+)
+
+var (
+	defaultRefreshInterval = 5 * time.Second
+	defaultDialer          = &net.Dialer{Timeout: 5 * time.Second, KeepAlive: 15 * time.Second}
+
+	// lookupGroup merges lookup calls together for lookups for the same host. The
+	// lookupGroup key is is the LookupIPAddr.host argument.
+	lookupGroup singleflight.Group
 )
 
 type DNSResolver interface {
 	LookupHost(ctx context.Context, host string) (addrs []string, err error)
 	LookupAddr(ctx context.Context, addr string) (names []string, err error)
+	Dialer() Dialer
+}
+
+type ResolverOpts func(r *Resolver)
+type Dialer func(ctx context.Context, network, addr string) (net.Conn, error)
+
+func New(ctx context.Context, opts ...ResolverOpts) DNSResolver {
+	resolver := Resolver{
+		refreshInterval: defaultRefreshInterval,
+		dialer:          defaultDialer.DialContext,
+	}
+
+	for _, apply := range opts {
+		apply(&resolver)
+	}
+
+	go func() {
+		defer func() {
+			if r := recover(); r != nil {
+				logger.StdlibLogger(ctx).Error("panic in resolver refresh", "panic", r)
+			}
+		}()
+
+		t := time.NewTicker(resolver.refreshInterval)
+		defer t.Stop()
+
+		for range t.C {
+			select {
+			case <-ctx.Done():
+				return
+
+			case <-t.C:
+				resolver.refresh(true)
+			}
+		}
+	}()
+
+	return &resolver
+}
+
+func WithCacheRefreshInterval(dur time.Duration) ResolverOpts {
+	return func(r *Resolver) {
+		r.refreshInterval = dur
+	}
+}
+
+func WithDialer(dialer Dialer) ResolverOpts {
+	return func(r *Resolver) {
+		r.dialer = dialer
+	}
 }
 
 type Resolver struct {
 	// Timeout defines the maximum allowed time allowed for a lookup.
 	Timeout time.Duration
-
-	// Resolver is used to perform actual DNS lookup. If nil,
-	// net.DefaultResolver is used instead.
-	Resolver DNSResolver
 
 	lookups int64
 
@@ -33,6 +89,12 @@ type Resolver struct {
 	// OnCacheMiss is executed if the host or address is not included in
 	// the cache and the default lookup is executed.
 	OnCacheMiss func()
+
+	// refreshInterval defines the duration between refresh of IP addresses
+	refreshInterval time.Duration
+
+	// dialer is the function used to establish the connection
+	dialer Dialer
 }
 
 type ResolverRefreshOptions struct {
@@ -44,6 +106,10 @@ type cacheEntry struct {
 	rrs  []string
 	err  error
 	used bool
+}
+
+func (r *Resolver) Dialer() Dialer {
+	return r.dialer
 }
 
 // LookupAddr performs a reverse lookup for the given address, returning a list
@@ -93,21 +159,13 @@ func (r *Resolver) refreshRecords(clearUnused bool, persistOnFailure bool) {
 	}
 }
 
-func (r *Resolver) Refresh(clearUnused bool) {
+func (r *Resolver) refresh(clearUnused bool) {
 	r.refreshRecords(clearUnused, false)
-}
-
-func (r *Resolver) RefreshWithOptions(options ResolverRefreshOptions) {
-	r.refreshRecords(options.ClearUnused, options.PersistOnFailure)
 }
 
 func (r *Resolver) init() {
 	r.cache = newCache()
 }
-
-// lookupGroup merges lookup calls together for lookups for the same host. The
-// lookupGroup key is is the LookupIPAddr.host argument.
-var lookupGroup singleflight.Group
 
 func (r *Resolver) lookup(ctx context.Context, key string) (rrs []string, err error) {
 	var found bool
@@ -169,11 +227,6 @@ func (r *Resolver) lookupFunc(ctx context.Context, key string) func() (interface
 		panic("lookupFunc with empty key")
 	}
 
-	var resolver DNSResolver = defaultResolver
-	if r.Resolver != nil {
-		resolver = r.Resolver
-	}
-
 	switch key[0] {
 	case 'h':
 		return func() (interface{}, error) {
@@ -181,7 +234,7 @@ func (r *Resolver) lookupFunc(ctx context.Context, key string) func() (interface
 			defer cancel()
 
 			atomic.AddInt64(&r.lookups, 1)
-			return resolver.LookupHost(ctx, key[1:])
+			return r.LookupHost(ctx, key[1:])
 		}
 	case 'r':
 		return func() (interface{}, error) {
@@ -189,7 +242,7 @@ func (r *Resolver) lookupFunc(ctx context.Context, key string) func() (interface
 			defer cancel()
 
 			atomic.AddInt64(&r.lookups, 1)
-			return resolver.LookupAddr(ctx, key[1:])
+			return r.LookupAddr(ctx, key[1:])
 		}
 	default:
 		panic("lookupFunc invalid key type: " + key)
@@ -251,65 +304,4 @@ func (r *Resolver) storeLocked(key string, rrs []string, used bool, err error) {
 		err:  err,
 		used: used,
 	})
-}
-
-var defaultResolver = &defaultResolverWithTrace{
-	ipVersion: "ip",
-}
-
-// Create a new resolver that only resolves to IPv4 Addresses when looking up Hosts.
-// Example:
-//
-//	resolver := dnscache.Resolver{
-//	  Resolver: NewResolverOnlyV4(),
-//	}
-func NewResolverOnlyV4() DNSResolver {
-	return &defaultResolverWithTrace{
-		ipVersion: "ip4",
-	}
-}
-
-// Create a new resolver that only resolves to IPv6 Addresses when looking up Hosts.
-// Example:
-//
-//	resolver := dnscache.Resolver{
-//	  Resolver: NewResolverOnlyV6(),
-//	}
-func NewResolverOnlyV6() DNSResolver {
-	return &defaultResolverWithTrace{
-		ipVersion: "ip6",
-	}
-}
-
-// defaultResolverWithTrace calls `LookupIP` instead of `LookupHost` on `net.DefaultResolver` in order to cause invocation of the `DNSStart`
-// and `DNSDone` hooks. By implementing `DNSResolver`, backward compatibility can be ensured.
-type defaultResolverWithTrace struct {
-	ipVersion string
-}
-
-func (d *defaultResolverWithTrace) LookupHost(ctx context.Context, host string) (addrs []string, err error) {
-	ipVersion := d.ipVersion
-	if ipVersion != "ip" && ipVersion != "ip4" && ipVersion != "ip6" {
-		ipVersion = "ip"
-	}
-
-	// `net.Resolver#LookupHost` does not cause invocation of `net.Resolver#lookupIPAddr`, therefore the `DNSStart` and `DNSDone` tracing hooks
-	// built into the stdlib are never called. `LookupIP`, despite it's name, can also be used to lookup a hostname but does cause these hooks to be
-	// triggered. The format of the reponse is different, therefore it needs this thin wrapper converting it.
-	rawIPs, err := net.DefaultResolver.LookupIP(ctx, ipVersion, host)
-	if err != nil {
-		return nil, err
-	}
-
-	cookedIPs := make([]string, len(rawIPs))
-
-	for i, v := range rawIPs {
-		cookedIPs[i] = v.String()
-	}
-
-	return cookedIPs, nil
-}
-
-func (d *defaultResolverWithTrace) LookupAddr(ctx context.Context, addr string) (names []string, err error) {
-	return net.DefaultResolver.LookupAddr(ctx, addr)
 }
