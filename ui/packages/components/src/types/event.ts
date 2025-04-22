@@ -3,6 +3,8 @@ export type Event = {
   name: string;
   payload: string;
   receivedAt: Date;
+  source?: string;
+  version?: string;
   runs?: {
     fnName: string;
     fnSlug: string;
