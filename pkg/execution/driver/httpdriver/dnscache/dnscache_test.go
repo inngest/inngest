@@ -12,7 +12,7 @@ import (
 )
 
 func TestDNSCache(t *testing.T) {
-	cachedResolver := &Resolver{}
+	cachedResolver := &resolver{}
 
 	dialer := &net.Dialer{KeepAlive: 15 * time.Second}
 

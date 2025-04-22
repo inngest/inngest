@@ -27,17 +27,17 @@ type DNSResolver interface {
 	Dialer() Dialer
 }
 
-type ResolverOpts func(r *Resolver)
+type ResolverOpts func(r *resolver)
 type Dialer func(ctx context.Context, network, addr string) (net.Conn, error)
 
 func New(ctx context.Context, opts ...ResolverOpts) DNSResolver {
-	resolver := Resolver{
+	r := resolver{
 		refreshInterval: defaultRefreshInterval,
 		dialer:          defaultDialer.DialContext,
 	}
 
 	for _, apply := range opts {
-		apply(&resolver)
+		apply(&r)
 	}
 
 	go func() {
@@ -47,7 +47,7 @@ func New(ctx context.Context, opts ...ResolverOpts) DNSResolver {
 			}
 		}()
 
-		t := time.NewTicker(resolver.refreshInterval)
+		t := time.NewTicker(r.refreshInterval)
 		defer t.Stop()
 
 		for range t.C {
@@ -56,27 +56,27 @@ func New(ctx context.Context, opts ...ResolverOpts) DNSResolver {
 				return
 
 			case <-t.C:
-				resolver.refresh(true)
+				r.refresh(true)
 			}
 		}
 	}()
 
-	return &resolver
+	return &r
 }
 
 func WithCacheRefreshInterval(dur time.Duration) ResolverOpts {
-	return func(r *Resolver) {
+	return func(r *resolver) {
 		r.refreshInterval = dur
 	}
 }
 
 func WithDialer(dialer Dialer) ResolverOpts {
-	return func(r *Resolver) {
+	return func(r *resolver) {
 		r.dialer = dialer
 	}
 }
 
-type Resolver struct {
+type resolver struct {
 	// Timeout defines the maximum allowed time allowed for a lookup.
 	Timeout time.Duration
 
@@ -97,31 +97,26 @@ type Resolver struct {
 	dialer Dialer
 }
 
-type ResolverRefreshOptions struct {
-	ClearUnused      bool
-	PersistOnFailure bool
-}
-
 type cacheEntry struct {
 	rrs  []string
 	err  error
 	used bool
 }
 
-func (r *Resolver) Dialer() Dialer {
+func (r *resolver) Dialer() Dialer {
 	return r.dialer
 }
 
 // LookupAddr performs a reverse lookup for the given address, returning a list
 // of names mapping to that address.
-func (r *Resolver) LookupAddr(ctx context.Context, addr string) (names []string, err error) {
+func (r *resolver) LookupAddr(ctx context.Context, addr string) (names []string, err error) {
 	r.once.Do(r.init)
 	return r.lookup(ctx, "r"+addr)
 }
 
 // LookupHost looks up the given host using the local resolver. It returns a
 // slice of that host's addresses.
-func (r *Resolver) LookupHost(ctx context.Context, host string) (addrs []string, err error) {
+func (r *resolver) LookupHost(ctx context.Context, host string) (addrs []string, err error) {
 	r.once.Do(r.init)
 	return r.lookup(ctx, "h"+host)
 }
@@ -130,7 +125,7 @@ func (r *Resolver) LookupHost(ctx context.Context, host string) (addrs []string,
 // the last Refresh. If clearUnused is true, entries which haven't be used since the
 // last Refresh are removed from the cache. If persistOnFailure is true, stale
 // entries will not be removed on failed lookups
-func (r *Resolver) refreshRecords(clearUnused bool, persistOnFailure bool) {
+func (r *resolver) refreshRecords(clearUnused bool, persistOnFailure bool) {
 	r.once.Do(r.init)
 	r.mu.RLock()
 	update := make([]string, 0, r.cache.cache.ItemCount())
@@ -159,15 +154,15 @@ func (r *Resolver) refreshRecords(clearUnused bool, persistOnFailure bool) {
 	}
 }
 
-func (r *Resolver) refresh(clearUnused bool) {
+func (r *resolver) refresh(clearUnused bool) {
 	r.refreshRecords(clearUnused, false)
 }
 
-func (r *Resolver) init() {
+func (r *resolver) init() {
 	r.cache = newCache()
 }
 
-func (r *Resolver) lookup(ctx context.Context, key string) (rrs []string, err error) {
+func (r *resolver) lookup(ctx context.Context, key string) (rrs []string, err error) {
 	var found bool
 	rrs, err, found = r.load(key)
 	if !found {
@@ -179,7 +174,7 @@ func (r *Resolver) lookup(ctx context.Context, key string) (rrs []string, err er
 	return
 }
 
-func (r *Resolver) update(ctx context.Context, key string, used bool, persistOnFailure bool) (rrs []string, err error) {
+func (r *resolver) update(ctx context.Context, key string, used bool, persistOnFailure bool) (rrs []string, err error) {
 	c := lookupGroup.DoChan(key, r.lookupFunc(ctx, key))
 	select {
 	case <-ctx.Done():
@@ -222,7 +217,7 @@ func (r *Resolver) update(ctx context.Context, key string, used bool, persistOnF
 
 // lookupFunc returns lookup function for key. The type of the key is stored as
 // the first char and the lookup subject is the rest of the key.
-func (r *Resolver) lookupFunc(ctx context.Context, key string) func() (interface{}, error) {
+func (r *resolver) lookupFunc(ctx context.Context, key string) func() (interface{}, error) {
 	if len(key) == 0 {
 		panic("lookupFunc with empty key")
 	}
@@ -249,7 +244,7 @@ func (r *Resolver) lookupFunc(ctx context.Context, key string) func() (interface
 	}
 }
 
-func (r *Resolver) prepareCtx(origContext context.Context) (ctx context.Context, cancel context.CancelFunc) {
+func (r *resolver) prepareCtx(origContext context.Context) (ctx context.Context, cancel context.CancelFunc) {
 	ctx = context.Background()
 	if r.Timeout > 0 {
 		ctx, cancel = context.WithTimeout(ctx, r.Timeout)
@@ -271,7 +266,7 @@ func (r *Resolver) prepareCtx(origContext context.Context) (ctx context.Context,
 	return
 }
 
-func (r *Resolver) load(key string) (rrs []string, err error, found bool) {
+func (r *resolver) load(key string) (rrs []string, err error, found bool) {
 	r.mu.RLock()
 	var entry *cacheEntry
 	entry, found = r.cache.Get(key)
@@ -291,7 +286,7 @@ func (r *Resolver) load(key string) (rrs []string, err error, found bool) {
 	return rrs, err, true
 }
 
-func (r *Resolver) storeLocked(key string, rrs []string, used bool, err error) {
+func (r *resolver) storeLocked(key string, rrs []string, used bool, err error) {
 	if entry, found := r.cache.Get(key); found {
 		// Update existing entry in place
 		entry.rrs = rrs
