@@ -33,30 +33,29 @@ export const ActionsMenu = ({
         <Button kind="primary" appearance="outlined" size="medium" icon={<RiMore2Line />} />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem disabled={disableValidate} onSelect={showValidate}>
-          <OptionalTooltip
-            tooltip={disableValidate ? 'No syncs. App health check not available.' : undefined}
-          >
-            <>
-              <RiFirstAidKitLine className="h-4 w-4" />
-              Check app health
-            </>
-          </OptionalTooltip>
-        </DropdownMenuItem>
-
-        {(!isArchived || showUnarchive) && (
-          <DropdownMenuItem disabled={disableArchive} onSelect={showArchive} className="text-error">
-            <OptionalTooltip
-              tooltip={
-                disableArchive ? 'Parent app is archived. Archive action not available.' : undefined
-              }
-            >
-              <>
-                <RiArchive2Line className="h-4 w-4" />
-                {isArchived ? 'Unarchive app' : 'Archive app'}
-              </>
-            </OptionalTooltip>
+        <OptionalTooltip
+          tooltip={disableValidate ? 'No syncs. App health check not available.' : undefined}
+        >
+          <DropdownMenuItem disabled={disableValidate} onSelect={showValidate}>
+            <RiFirstAidKitLine className="h-4 w-4" />
+            Check app health
           </DropdownMenuItem>
+        </OptionalTooltip>
+        {(!isArchived || showUnarchive) && (
+          <OptionalTooltip
+            tooltip={
+              disableArchive ? 'Parent app is archived. Archive action not available.' : undefined
+            }
+          >
+            <DropdownMenuItem
+              disabled={disableArchive}
+              onSelect={showArchive}
+              className="text-error"
+            >
+              <RiArchive2Line className="h-4 w-4" />
+              {isArchived ? 'Unarchive app' : 'Archive app'}
+            </DropdownMenuItem>
+          </OptionalTooltip>
         )}
       </DropdownMenuContent>
     </DropdownMenu>
