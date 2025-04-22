@@ -34,7 +34,9 @@ export const ActionsMenu = ({
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <DropdownMenuItem disabled={disableValidate} onSelect={showValidate}>
-          <OptionalTooltip tooltip={disableValidate && 'No syncs. App health check not available.'}>
+          <OptionalTooltip
+            tooltip={disableValidate ? 'No syncs. App health check not available.' : undefined}
+          >
             <RiFirstAidKitLine className="h-4 w-4" />
             Check app health
           </OptionalTooltip>
@@ -43,7 +45,9 @@ export const ActionsMenu = ({
         {(!isArchived || showUnarchive) && (
           <DropdownMenuItem disabled={disableArchive} onSelect={showArchive} className="text-error">
             <OptionalTooltip
-              tooltip={disableArchive && 'Parent app is archived. Archive action not available.'}
+              tooltip={
+                disableArchive ? 'Parent app is archived. Archive action not available.' : undefined
+              }
             >
               <RiArchive2Line className="h-4 w-4" />
               {isArchived ? 'Unarchive app' : 'Archive app'}
