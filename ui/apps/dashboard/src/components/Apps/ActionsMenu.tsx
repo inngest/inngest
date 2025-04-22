@@ -30,7 +30,7 @@ export const ActionsMenu = ({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button kind="primary" appearance="outlined" size="medium" icon={<RiMore2Line />} />
+        <Button kind="primary" appearance="outlined" size="medium" icon={<RiMore2Line />} raw />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <DropdownMenuItem disabled={disableValidate} onSelect={showValidate}>
