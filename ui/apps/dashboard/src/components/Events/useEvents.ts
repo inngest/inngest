@@ -59,12 +59,12 @@ export function useEventDetails() {
     const event = {
       id: '01JGPM6FYSRN9C0ZGJ7PXPVRGY',
       receivedAt: new Date('2025-04-10T16:43:21.696Z'),
-      payloadID: 'custom-payload-id',
+      idempotencyKey: 'custom-payload-id',
       name: 'UserSignedUp',
       source: 'Default Inngest key',
-      ts: 1745226902417,
+      timestamp: 1745226902417,
       version: '2022-12-16',
-      functions: [
+      runs: [
         {
           fnName: 'SendWelcomeEmail',
           fnSlug: 'send-welcome-email',

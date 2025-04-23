@@ -16,6 +16,7 @@ import {
 } from '../DetailsCard/NewElement';
 import { IO } from '../RunDetailsV3/IO';
 import { Tabs } from '../RunDetailsV3/Tabs';
+import { StatusDot } from '../Status/StatusDot';
 import { DragDivider } from '../icons/DragDivider';
 import type { EventsTable } from './EventsTable';
 
@@ -110,16 +111,20 @@ export function EventDetails({
           </div>
           <div className="flex flex-row flex-wrap items-center justify-start gap-x-10 gap-y-4 px-4">
             <ElementWrapper label="Event ID">
-              <IDElement>{eventDetailsData.id}</IDElement>
+              <IDElement>{eventDetailsData?.id}</IDElement>
             </ElementWrapper>
-            <ElementWrapper label="Payload ID">
-              <TextElement>{eventDetailsData?.payloadID}</TextElement>
+            <ElementWrapper label="Idempotency Key">
+              <TextElement>{eventDetailsData?.idempotencyKey}</TextElement>
             </ElementWrapper>
             <ElementWrapper label="Source">
               <PillElement>{eventDetailsData?.source}</PillElement>
             </ElementWrapper>
             <ElementWrapper label="TS">
-              <TimeElement date={eventDetailsData?.receivedAt} />
+              {eventDetailsData?.timestamp ? (
+                <TimeElement date={new Date(eventDetailsData.timestamp)} />
+              ) : (
+                <TextElement>-</TextElement>
+              )}
             </ElementWrapper>
             <ElementWrapper label="Version">
               <TextElement>{eventDetailsData?.version}</TextElement>
@@ -170,28 +175,33 @@ export function EventDetails({
       >
         <div className="px-4 py-2">
           <p className="text-muted mb-4 text-xs font-medium uppercase">Functions Triggered</p>
-          {eventDetailsData?.functions?.length ? (
+          {eventDetailsData?.runs?.length ? (
             <ul className="divide-subtle divide-y [&>*:not(:first-child)]:pt-[6px] [&>*:not(:last-child)]:pb-[6px]">
-              {eventDetailsData.functions.map((fn) => (
-                <li key={fn.slug}>
+              {eventDetailsData.runs.map((run) => (
+                <li key={run.fnSlug}>
                   <NextLink
-                    href={pathCreator.runPopout({ runID: fn.id })}
-                    className="hover:bg-canvasSubtle flex items-center justify-between rounded-md p-1"
+                    href={pathCreator.runPopout({ runID: run.id })}
+                    className="hover:bg-canvasSubtle flex items-center justify-between rounded p-1.5"
                   >
-                    <div>
-                      <p className="text-basis text-sm font-medium">{fn.name}</p>
-                      <div className="flex items-center gap-1">
+                    <div className="flex flex-col gap-0.5">
+                      <div className="flex items-center gap-2">
+                        <StatusDot status={run.status} />
+                        <p className="text-basis text-sm font-medium">{run.fnName}</p>
+                      </div>
+                      <div className="ml-[1.375rem] flex items-center gap-1">
                         <p className="text-subtle text-xs lowercase first-letter:capitalize">
-                          {fn.status}
+                          {run.status}
                         </p>
-                        <Time
-                          className="text-subtle text-xs"
-                          format="relative"
-                          value={fn.createdAt}
-                        />
+                        {(run.completedAt || run.startedAt) && (
+                          <Time
+                            className="text-subtle text-xs"
+                            format="relative"
+                            value={run.completedAt ?? run.startedAt!}
+                          />
+                        )}
                       </div>
                     </div>
-                    <RiArrowRightSLine className="h-5 shrink-0" />
+                    <RiArrowRightSLine className="text-muted h-5 shrink-0" />
                   </NextLink>
                 </li>
               ))}

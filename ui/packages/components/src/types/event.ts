@@ -5,6 +5,8 @@ export type Event = {
   receivedAt: Date;
   source?: string;
   version?: string;
+  idempotencyKey?: string;
+  timestamp?: string;
   runs?: {
     fnName: string;
     fnSlug: string;
