@@ -25,7 +25,7 @@ func NewManager(buf Bufferer, bs BlockStore) *manager {
 	return &manager{
 		buf: buf,
 		bs:  bs,
-		// TODO: should be able to override this
+		// XXX: should be able to override this
 		flushDelay: defaultFlushDelay,
 	}
 }

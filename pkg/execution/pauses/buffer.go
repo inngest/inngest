@@ -52,6 +52,6 @@ func (r redisAdapter) Delete(ctx context.Context, index Index, pause state.Pause
 
 // PauseTimestamp returns the created at timestamp for a pause.
 func (r redisAdapter) PauseTimestamp(ctx context.Context, pause state.Pause) (time.Time, error) {
-	// NOTE: If this is a V7 UUID, use the UUID.
+	// TODO: Fetch timestamp from index.
 	panic("not implemented")
 }

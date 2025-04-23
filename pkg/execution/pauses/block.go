@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
@@ -203,10 +204,7 @@ func (b blockstore) flushIndexBlock(ctx context.Context, index Index) error {
 	// TODO: Use the last pause ID as the block ID;  this ensures the block ID
 	// encodes the last pause's timestamp, which is useful for ordering.
 	//
-	// NOTE: Pause IDs are UUIDs, and before April 9 were NOT v7 UUIDs...  they
-	//       were random.
-	//
-	//       We generate deterministic ULIDs from pauses here based off of the
+	// NOTE: We generate deterministic ULIDs from pauses here based off of the
 	//       pause timestamp and the UUID.  If the UUIDs are NOT v7, we attempt
 	//       to get the "added at" index for the pause (zset score).  If THAT fails,
 	//       we use a hard-coded timestamp in the past (as all new pauses are V7).
@@ -306,10 +304,9 @@ func (b blockstore) Delete(ctx context.Context, index Index, pause state.Pause) 
 	// compaction limit.
 	if rand.IntN(100) <= int(b.compactionSample*100) {
 		go func() {
-
 			size, err := b.rc.Do(ctx, b.rc.B().Scard().Key(b.blockDeleteKey(index)).Build()).AsInt64()
 			if err != nil {
-				// TODO: log
+				logger.StdlibLogger(ctx).Warn("error fetching block delete length", "error", err)
 				return
 			}
 			if size < int64(b.compactionLimit) {
@@ -317,6 +314,7 @@ func (b blockstore) Delete(ctx context.Context, index Index, pause state.Pause) 
 			}
 
 			// Trigger a new compaction.
+			logger.StdlibLogger(ctx).Debug("compacting block deletes", "len", size, "index", index)
 			b.Compact(ctx, index)
 		}()
 	}
