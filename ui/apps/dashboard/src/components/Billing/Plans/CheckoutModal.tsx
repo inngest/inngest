@@ -151,20 +151,26 @@ function CheckoutForm({ items, onSuccess }: { items: CheckoutItem[]; onSuccess: 
       <div className="mb-2 min-h-[290px]">
         <PaymentElement />
       </div>
-      <Alert severity="info" className="text-sm">
-        <p>Subscriptions are billed on the 1st of each month.</p>
-        <ul className="list-inside list-disc">
-          <li>
-            When upgrading, you will be charged a prorated amount for the remaining days of the
-            month based on the new plan.
-          </li>
-          <li>
-            If you switch from one paid plan to another, you will be credited for any unused time
-            from your previous plan, calculated on a prorated basis.
-          </li>
-          <li>Additional usage is calculated and billed at the end of the month.</li>
-        </ul>
-      </Alert>
+      {Boolean(error) ? (
+        <Alert severity="error" className="text-sm">
+          {error}
+        </Alert>
+      ) : (
+        <Alert severity="info" className="text-sm">
+          <p>Subscriptions are billed on the 1st of each month.</p>
+          <ul className="list-inside list-disc">
+            <li>
+              When upgrading, you will be charged a prorated amount for the remaining days of the
+              month based on the new plan.
+            </li>
+            <li>
+              If you switch from one paid plan to another, you will be credited for any unused time
+              from your previous plan, calculated on a prorated basis.
+            </li>
+            <li>Additional usage is calculated and billed at the end of the month.</li>
+          </ul>
+        </Alert>
+      )}
       <div className="mt-6 flex flex-row justify-end">
         <Button
           type="submit"
@@ -174,11 +180,6 @@ function CheckoutForm({ items, onSuccess }: { items: CheckoutItem[]; onSuccess: 
           label="Complete Upgrade"
         />
       </div>
-      {Boolean(error) && (
-        <Alert severity="error" className="text-sm">
-          {error}
-        </Alert>
-      )}
     </form>
   );
 }
