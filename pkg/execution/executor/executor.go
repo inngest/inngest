@@ -715,7 +715,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 			Edge: inngest.SourceEdge,
 		},
 		Throttle: throttle,
-		Metadata: map[string]string{},
+		Metadata: map[string]any{},
 	}
 
 	err = e.queue.Enqueue(ctx, item, at, queue.EnqueueOpts{})
@@ -969,6 +969,9 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			Parent:    execParent,
 			Metadata:  &md,
 			QueueItem: &item,
+			SpanOptions: []trace.SpanStartOption{
+				tracing.WithFunctionAttrs(&instance.f),
+			},
 		},
 	)
 
@@ -1832,6 +1835,21 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 			return nil
 		}
 
+		status := codes.Ok
+		if r.IsTimeout {
+			status = codes.Error // TODO Our own codes pls; this is not an error
+		}
+		pauseSpan := tracing.SpanFromPause(&pause)
+		e.tracerProvider.ExtendSpan(&tracing.ExtendSpanOptions{
+			EndTime:    time.Now(),
+			Location:   "executor.Resume",
+			Status:     status,
+			TargetSpan: pauseSpan,
+			SpanOptions: []trace.SpanStartOption{
+				tracing.WithResumeAttrs(&r),
+			},
+		})
+
 		if pause.OnTimeout && r.EventID != nil {
 			// Delete this pause, as an event has occured which matches
 			// the timeout.  We can do this prior to leasing a pause as it's the
@@ -1864,7 +1882,7 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 			// for the next run.  If the ConsumePause call comes after enqueue, the TCP
 			// conn may drop etc. and running the job may occur prior to saving state data.
 			jobID := fmt.Sprintf("%s-%s", pause.Identifier.IdempotencyKey(), pause.DataKey)
-			err = e.queue.Enqueue(ctx, queue.Item{
+			nextItem := queue.Item{
 				JobID: &jobID,
 				// Add a new group ID for the child;  this will be a new step.
 				GroupID:               uuid.New().String(),
@@ -1877,10 +1895,32 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 				Payload: queue.PayloadEdge{
 					Edge: pause.Edge(),
 				},
-			}, time.Now(), queue.EnqueueOpts{})
-			if err != nil && err != redis_state.ErrQueueItemExists {
-				return fmt.Errorf("error enqueueing after pause: %w", err)
+				Metadata: make(map[string]any),
 			}
+
+			nextStepSpan, _ := e.tracerProvider.CreateDroppableSpan(
+				meta.SpanNameStepDiscovery,
+				&tracing.CreateSpanOptions{
+					Carriers:    []map[string]any{nextItem.Metadata},
+					FollowsFrom: pauseSpan,
+					Location:    "executor.Resume",
+					Metadata:    &md,
+					Parent:      tracing.RunSpanFromMetadata(&md),
+					QueueItem:   &nextItem,
+				},
+			)
+
+			err = e.queue.Enqueue(ctx, nextItem, time.Now(), queue.EnqueueOpts{})
+			if err != nil {
+				if err == redis_state.ErrQueueItemExists {
+					tracing.DropSpan(nextStepSpan)
+				} else {
+					nextStepSpan.End()
+					return fmt.Errorf("error enqueueing after pause: %w", err)
+				}
+			}
+
+			nextStepSpan.End()
 		}
 
 		// And dequeue the timeout job to remove unneeded work from the queue, etc.
@@ -2115,14 +2155,14 @@ func (e *executor) handleGeneratorStep(ctx context.Context, i *runInstance, gen 
 		Attempt:               0,
 		MaxAttempts:           i.item.MaxAttempts,
 		Payload:               queue.PayloadEdge{Edge: nextEdge},
-		Metadata:              make(map[string]string),
+		Metadata:              make(map[string]any),
 	}
 
 	if !hasPendingSteps {
 		span, _ := e.tracerProvider.CreateDroppableSpan(
 			meta.SpanNameStepDiscovery,
 			&tracing.CreateSpanOptions{
-				Carrier:     nextItem.Metadata,
+				Carriers:    []map[string]any{nextItem.Metadata},
 				FollowsFrom: tracing.SpanFromQueueItem(&i.item),
 				Location:    "executor.handleGeneratorStep",
 				Metadata:    &i.md,
@@ -2253,14 +2293,14 @@ func (e *executor) handleStepError(ctx context.Context, i *runInstance, gen stat
 		Attempt:               0,
 		MaxAttempts:           i.item.MaxAttempts,
 		Payload:               queue.PayloadEdge{Edge: nextEdge},
-		Metadata:              make(map[string]string),
+		Metadata:              make(map[string]any),
 	}
 
 	if !hasPendingSteps {
 		span, _ := e.tracerProvider.CreateDroppableSpan(
 			meta.SpanNameStepDiscovery,
 			&tracing.CreateSpanOptions{
-				Carrier:     nextItem.Metadata,
+				Carriers:    []map[string]any{nextItem.Metadata},
 				FollowsFrom: tracing.SpanFromQueueItem(&i.item),
 				Location:    "executor.handleStepError",
 				Metadata:    &i.md,
@@ -2324,13 +2364,13 @@ func (e *executor) handleGeneratorStepPlanned(ctx context.Context, i *runInstanc
 		Payload: queue.PayloadEdge{
 			Edge: nextEdge,
 		},
-		Metadata: make(map[string]string),
+		Metadata: make(map[string]any),
 	}
 
 	span, _ := e.tracerProvider.CreateDroppableSpan(
 		meta.SpanNameStep,
 		&tracing.CreateSpanOptions{
-			Carrier:     nextItem.Metadata,
+			Carriers:    []map[string]any{nextItem.Metadata},
 			FollowsFrom: tracing.SpanFromQueueItem(&i.item),
 			Location:    "executor.handleGeneratorStepPlanned",
 			Metadata:    &i.md,
@@ -2392,13 +2432,13 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, i *runInstance, gen
 		Attempt:               0,
 		MaxAttempts:           i.item.MaxAttempts,
 		Payload:               queue.PayloadEdge{Edge: nextEdge},
-		Metadata:              make(map[string]string),
+		Metadata:              make(map[string]any),
 	}
 
 	span, _ := e.tracerProvider.CreateDroppableSpan(
 		meta.SpanNameStep,
 		&tracing.CreateSpanOptions{
-			Carrier:     nextItem.Metadata,
+			Carriers:    []map[string]any{nextItem.Metadata},
 			FollowsFrom: tracing.SpanFromQueueItem(&i.item),
 			Location:    "executor.handleGeneratorSleep",
 			Metadata:    &i.md,
@@ -2880,6 +2920,11 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, i *runInstan
 	)
 	itrace.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
 
+	// SDK-based event coordination is called both when an event is received
+	// OR on timeout, depending on which happens first.  Both routes consume
+	// the pause so this race will conclude by calling the function once, as only
+	// one thread can lease and consume a pause;  the other will find that the
+	// pause is no longer available and return.
 	pause := state.Pause{
 		ID:          pauseID,
 		WorkspaceID: i.md.ID.Tenant.EnvID,
@@ -2898,23 +2943,8 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, i *runInstan
 			consts.OtelPropagationKey: carrier,
 		},
 	}
-	err = e.pm.SavePause(ctx, pause)
-	if err != nil {
-		if err == state.ErrPauseAlreadyExists {
-			return nil
-		}
-
-		return err
-	}
-
-	// SDK-based event coordination is called both when an event is received
-	// OR on timeout, depending on which happens first.  Both routes consume
-	// the pause so this race will conclude by calling the function once, as only
-	// one thread can lease and consume a pause;  the other will find that the
-	// pause is no longer available and return.
 	jobID := fmt.Sprintf("%s-%s", i.md.IdempotencyKey(), gen.ID)
-	// TODO Is this fine to leave? No attempts.
-	err = e.queue.Enqueue(ctx, queue.Item{
+	nextItem := queue.Item{
 		JobID:       &jobID,
 		WorkspaceID: i.md.ID.Tenant.EnvID,
 		// Use the same group ID, allowing us to track the cancellation of
@@ -2928,10 +2958,41 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, i *runInstan
 			PauseID:   pauseID,
 			OnTimeout: true,
 		},
-	}, expires, queue.EnqueueOpts{})
+		Metadata: make(map[string]any),
+	}
+
+	span, _ := e.tracerProvider.CreateDroppableSpan(
+		meta.SpanNameStep,
+		&tracing.CreateSpanOptions{
+			Carriers:    []map[string]any{pause.Metadata, i.item.Metadata},
+			FollowsFrom: tracing.SpanFromQueueItem(&i.item),
+			Location:    "executor.handleGeneratorWaitForEvent",
+			Metadata:    &i.md,
+			QueueItem:   &nextItem,
+			Parent:      tracing.RunSpanFromMetadata(&i.md),
+			SpanOptions: []trace.SpanStartOption{
+				tracing.WithGeneratorAttrs(&gen),
+			},
+		},
+	)
+
+	err = e.pm.SavePause(ctx, pause)
+	if err != nil {
+		if err == state.ErrPauseAlreadyExists {
+			tracing.DropSpan(span)
+			return nil
+		}
+
+		return err
+	}
+	// TODO Is this fine to leave? No attempts.
+	err = e.queue.Enqueue(ctx, nextItem, expires, queue.EnqueueOpts{})
 	if err == redis_state.ErrQueueItemExists {
+		tracing.DropSpan(span)
 		return nil
 	}
+
+	span.End()
 
 	for _, e := range e.lifecycles {
 		go e.OnWaitForEvent(context.WithoutCancel(ctx), i.md, i.item, gen, pause)

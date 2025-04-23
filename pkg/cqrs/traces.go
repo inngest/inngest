@@ -24,6 +24,17 @@ const (
 	SpanStatusError
 )
 
+type JackSpan struct {
+	Name         string         `json:"name"`
+	Status       string         `json:"status"`
+	SpanID       string         `json:"span_id"`
+	StartTime    time.Time      `json:"start_time"`
+	EndTime      time.Time      `json:"end_time"`
+	ParentSpanID *string        `json:"parent_span_id,omitempty,omitzero"`
+	Attributes   map[string]any `json:"attributes,omitempty,omitzero"`
+	Children     []*JackSpan    `json:"children,omitempty,omitzero"`
+}
+
 // Span represents an distributed span in a function execution flow
 type Span struct {
 	Timestamp          time.Time         `json:"ts"`
@@ -226,6 +237,8 @@ type TraceReader interface {
 	GetSpanOutput(ctx context.Context, id SpanIdentifier) (*SpanOutput, error)
 	// GetSpanStack retrieves the step stack for the specified span
 	GetSpanStack(ctx context.Context, id SpanIdentifier) ([]string, error)
+	// Jack
+	GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*JackSpan, error)
 }
 
 type GetTraceRunOpt struct {

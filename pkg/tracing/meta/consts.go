@@ -40,6 +40,7 @@ const (
 	AttributeStepOp          = "_inngest.step.op"           // _s.op
 	AttributeStepAttempt     = "_inngest.step.attempt"      // _s.a
 	AttributeStepMaxAttempts = "_inngest.step.max_attempts" // _s.m
+	AttributeCodeLocation    = "_inngest.code.location"     // _s.loc
 
 	// Invoke attributes
 	AttributeStepInvokeExpiry         = "_inngest.step.invoke_function.expiry"           // _s.if.exp
@@ -55,6 +56,7 @@ const (
 	AttributeStepWaitForEventName   = "_inngest.step.wait_for_event.name"   // _s.w.name
 
 	// HTTP (serve) attributes
+	AttributeRequestURL         = "_inngest.request.uri"          // _req.u
 	AttributeResponseHeaders    = "_inngest.response.headers"     // _res.h
 	AttributeResponseStatusCode = "_inngest.response.status_code" // _res.st
 	AttributeResponseOutputSize = "_inngest.response.output_size" // _res.sz

@@ -117,6 +117,10 @@ func (a *router) setup() {
 
 			r.Get("/prom/{env}", a.promScrape)
 		})
+
+		r.Group(func(r chi.Router) {
+			r.Get("/jack/{runID}", a.jack)
+		})
 	})
 }
 

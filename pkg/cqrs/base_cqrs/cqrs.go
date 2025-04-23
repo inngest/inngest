@@ -7,11 +7,13 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
 
 	"github.com/aws/smithy-go/ptr"
+	"github.com/davecgh/go-spew/spew"
 	sq "github.com/doug-martin/goqu/v9"
 	_ "github.com/doug-martin/goqu/v9/dialect/postgres"
 	_ "github.com/doug-martin/goqu/v9/dialect/sqlite3"
@@ -27,6 +29,7 @@ import (
 	"github.com/inngest/inngest/pkg/inngest/log"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/run"
+	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/inngest/inngest/pkg/util"
 	connpb "github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/jinzhu/copier"
@@ -79,6 +82,114 @@ func (w wrapper) dialect() string {
 	}
 
 	return "sqlite3"
+}
+
+func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.JackSpan, error) {
+	spans, err := w.q.GetSpansByRunID(ctx, runID.String())
+	if err != nil {
+		logger.StdlibLogger(ctx).Error("error getting spans by run ID", "error", err)
+		return nil, err
+	}
+
+	// out := make([]*cqrs.JackSpan, len(spans))
+	spanMap := make(map[string]*cqrs.JackSpan)
+	var root *cqrs.JackSpan
+
+	for _, span := range spans {
+		st := strings.Split(span.StartTime.(string), " m=")[0]
+		startTime, err := time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", st)
+		if err != nil {
+			logger.StdlibLogger(ctx).Error("error parsing start time", "error", err)
+			return nil, err
+		}
+
+		et := strings.Split(span.EndTime.(string), " m=")[0]
+		endTime, err := time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", et)
+		if err != nil {
+			logger.StdlibLogger(ctx).Error("error parsing end time", "error", err)
+			return nil, err
+		}
+
+		var parentSpanID *string
+		if span.ParentSpanID.Valid {
+			parentSpanID = &span.ParentSpanID.String
+		}
+
+		spanMap[span.SpanID] = &cqrs.JackSpan{
+			Status:       "running",
+			SpanID:       span.SpanID,
+			StartTime:    startTime,
+			EndTime:      endTime,
+			ParentSpanID: parentSpanID,
+			Attributes:   make(map[string]any),
+		}
+
+		var fragments []map[string]interface{}
+		json.Unmarshal([]byte(span.SpanFragments.(string)), &fragments)
+
+		// TODO same for links
+		for _, fragment := range fragments {
+			if spanMap[span.SpanID].Name == "" {
+				if name, ok := fragment["name"].(string); ok {
+					if strings.HasPrefix(name, "executor.") {
+						spanMap[span.SpanID].Name = name
+					}
+				}
+			}
+
+			if attrs, ok := fragment["attributes"].(string); ok {
+				fragmentAttr := map[string]any{}
+				if err := json.Unmarshal([]byte(attrs), &fragmentAttr); err != nil {
+					logger.StdlibLogger(ctx).Error("error unmarshalling span attributes", "error", err)
+					return nil, err
+				}
+
+				for k, v := range fragmentAttr {
+					if k == meta.AttributeDynamicStatus {
+						if status, ok := v.(string); ok {
+							spanMap[span.SpanID].Status = status
+						}
+					} else {
+						spanMap[span.SpanID].Attributes[k] = v
+					}
+				}
+			}
+		}
+	}
+
+	for _, span := range spanMap {
+		if span.ParentSpanID == nil || *span.ParentSpanID == "" || *span.ParentSpanID == "0000000000000000" {
+			root = spanMap[span.SpanID]
+			continue
+		}
+
+		if parent, ok := spanMap[*span.ParentSpanID]; ok {
+			// This is wrong. Either do it properly in DB or infer it
+			// correctly here. e.g. if child failed but more attempts coming,
+			// still running
+			if span.Status != "" && span.Status != "running" && (parent.Status == "" || parent.Status == "running") {
+				parent.Status = span.Status
+			}
+
+			parent.Children = append(parent.Children, spanMap[span.SpanID])
+		} else {
+			spew.Dump("lost lineage :'(")
+		}
+	}
+
+	sorter(root)
+
+	return root, nil
+}
+
+func sorter(span *cqrs.JackSpan) {
+	sort.Slice(span.Children, func(i, j int) bool {
+		return span.Children[i].StartTime.Before(span.Children[j].StartTime)
+	})
+
+	for _, child := range span.Children {
+		sorter(child)
+	}
 }
 
 // LoadFunction implements the state.FunctionLoader interface.

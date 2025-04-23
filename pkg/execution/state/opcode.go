@@ -136,6 +136,44 @@ func (g GeneratorOpcode) IsError() bool {
 	return g.Error != nil
 }
 
+type GenericOpts struct {
+	StackLine string `json:"stackLine,omitempty,omitzero"`
+}
+
+func (r *GenericOpts) UnmarshalAny(a any) error {
+	opts := GenericOpts{}
+	var mappedByt []byte
+	switch typ := a.(type) {
+	case []byte:
+		mappedByt = typ
+	default:
+		byt, err := json.Marshal(a)
+		if err != nil {
+			return err
+		}
+		mappedByt = byt
+	}
+	if err := json.Unmarshal(mappedByt, &opts); err != nil {
+		return err
+	}
+
+	*r = opts
+	return nil
+}
+
+func (g GeneratorOpcode) StackLine() (*string, error) {
+	opts := &GenericOpts{}
+	if err := opts.UnmarshalAny(g.Opts); err != nil {
+		return nil, err
+	}
+
+	if opts.StackLine == "" {
+		return nil, nil
+	}
+
+	return &opts.StackLine, nil
+}
+
 // Returns, if any, the type of a StepRun operation.
 func (g GeneratorOpcode) RunType() string {
 	opts, err := g.RunOpts()

@@ -20,6 +20,25 @@ const (
 	DefaultEvents = 20
 )
 
+func (a router) jack(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	runID := chi.URLParam(r, "eventrunIDID")
+	parsed, err := ulid.Parse(runID)
+	if err != nil {
+		_ = publicerr.WriteHTTP(w, publicerr.Wrapf(err, 400, "Invalid event ID: %s", runID))
+		return
+	}
+
+	// a.API.opts.
+
+	event, err := a.API.GetEvent(ctx, parsed)
+	if err != nil {
+		_ = publicerr.WriteHTTP(w, err)
+		return
+	}
+	_ = WriteCachedResponse(w, event, 5*time.Second)
+}
+
 // GetEvents returns events in reverse chronological order for a workspace, with optional pagination
 // and filtering params.
 //

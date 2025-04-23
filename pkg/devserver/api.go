@@ -6,8 +6,6 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
-	"github.com/inngest/inngest/pkg/cqrs/sync"
-	"github.com/inngest/inngest/pkg/enums"
 	"io"
 	"io/fs"
 	"net/http"
@@ -15,6 +13,9 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/inngest/inngest/pkg/cqrs/sync"
+	"github.com/inngest/inngest/pkg/enums"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -64,6 +65,7 @@ func (a *devapi) addRoutes() {
 	a.Use(headers.StaticHeadersMiddleware(a.devserver.Opts.Config.GetServerKind()))
 
 	a.Get("/dev", a.Info)
+	a.Get("/jack/{runID}", a.Jack)
 	a.Post("/dev/traces", a.OTLPTrace)
 	a.Post("/fn/register", a.Register)
 	// This allows tests to remove apps by URL
@@ -114,6 +116,31 @@ func (a devapi) UI(w http.ResponseWriter, r *http.Request) {
 	tel.SendMetadata(r.Context(), m)
 
 	byt := parsedRoutes.serve(r.Context(), r.URL.Path)
+	_, _ = w.Write(byt)
+}
+
+func (a devapi) Jack(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	runID := chi.URLParam(r, "runID")
+	parsed, err := ulid.Parse(runID)
+	if err != nil {
+		_ = publicerr.WriteHTTP(w, publicerr.Wrapf(err, 400, "Invalid event ID: %s", runID))
+		return
+	}
+
+	spans, err := a.devserver.Data.GetSpansByRunID(ctx, parsed)
+	if err != nil {
+		_ = publicerr.WriteHTTP(w, err)
+		return
+	}
+
+	byt, err := json.MarshalIndent(spans, "", "  ")
+	if err != nil {
+		_ = publicerr.WriteHTTP(w, err)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	_, _ = w.Write(byt)
 }
 

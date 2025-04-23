@@ -47,7 +47,7 @@ func (tp *TracerProvider) getTracer(md *statev2.Metadata, qi *queue.Item) trace.
 }
 
 type CreateSpanOptions struct {
-	Carrier     map[string]string
+	Carriers    []map[string]any
 	FollowsFrom *meta.SpanMetadata
 	Location    string
 	Metadata    *statev2.Metadata
@@ -116,10 +116,13 @@ func (tp *TracerProvider) CreateDroppableSpan(
 		attribute.String(meta.AttributeDynamicSpanID, spanMetadata.DynamicSpanID),
 	)
 
-	if opts.Carrier != nil {
+	if len(opts.Carriers) > 0 {
 		// TODO err
 		byt, _ := json.Marshal(spanMetadata)
-		opts.Carrier[meta.PropagationKey] = string(byt)
+
+		for _, carrier := range opts.Carriers {
+			carrier[meta.PropagationKey] = string(byt)
+		}
 	}
 
 	spew.Dump("tracing.CreateSpan", name, opts.Location, spanMetadata)
