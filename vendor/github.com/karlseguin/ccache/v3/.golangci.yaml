@@ -1,0 +1,35 @@
+run:
+  timeout: 3m
+  modules-download-mode: readonly
+
+linters:
+  enable:
+    - errname
+    - gofmt
+    - goimports
+    - stylecheck
+    - importas
+    - errcheck
+    - gosimple
+    - govet
+    - ineffassign
+    - mirror
+    - staticcheck
+    - tagalign
+    - testifylint
+    - typecheck
+    - unused
+    - unconvert
+    - unparam
+    - wastedassign
+    - whitespace
+    - exhaustive
+    - noctx
+    - promlinter
+
+linters-settings:
+  govet:
+    enable-all: true
+    disable:
+      - shadow
+      - fieldalignment
