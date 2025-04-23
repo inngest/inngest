@@ -18,6 +18,7 @@ import (
 	"github.com/inngest/inngest/pkg/cqrs/sync"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/publicerr"
 	"github.com/inngest/inngest/pkg/sdk"
 	"github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/oklog/ulid/v2"
@@ -231,9 +232,48 @@ func TestWorkerHeartbeats(t *testing.T) {
 	require.WithinDuration(t, time.Now(), conn.LastHeartbeatAt.AsTime(), 500*time.Millisecond)
 }
 
+func TestSyncErrorPropagatesToUser(t *testing.T) {
+	res := createTestingGateway(t, testingParameters{
+		shouldFailSync: true,
+	})
+
+	res.lifecycles.Assert(t, testRecorderAssertion{})
+
+	msg := awaitNextMessage(t, res.ws, 2*time.Second)
+	require.Equal(t, connect.GatewayMessageType_GATEWAY_HELLO, msg.Kind)
+
+	sendWorkerConnectMessage(t, res)
+
+	msg = awaitNextMessage(t, res.ws, 2*time.Second)
+	require.Equal(t, connect.GatewayMessageType_SYNC_FAILED, msg.Kind)
+
+	syncErr := connect.SystemError{}
+	require.NoError(t, proto.Unmarshal(msg.Payload, &syncErr))
+
+	require.Equal(t, exampleSyncError.Code, syncErr.Code)
+	require.Equal(t, exampleSyncError.Message, syncErr.Message)
+
+	code, reason := awaitClosure(t, res.ws, 2*time.Second)
+	require.Equal(t, websocket.StatusPolicyViolation, code)
+	require.Equal(t, exampleSyncError.Code, reason)
+
+	res.lifecycles.Assert(t, testRecorderAssertion{
+		onConnectedCount:    1,
+		onSyncedCount:       0,
+		onReadyCount:        0,
+		onDisconnectedCount: 1,
+	})
+}
+
 type websocketDisconnected struct {
 	conn        *state.Connection
 	closeReason string
+}
+
+var exampleSyncError = publicerr.Error{
+	Code:    "code-test-err",
+	Message: "test err message",
+	Status:  http.StatusBadRequest,
 }
 
 type testRecorderLifecycles struct {
@@ -382,6 +422,7 @@ type testingParameters struct {
 	leaseDuration                time.Duration
 	extendLeaseInterval          time.Duration
 	consecutiveMissesBeforeClose int
+	shouldFailSync               bool
 }
 
 func createTestingGateway(t *testing.T, params ...testingParameters) testingResources {
@@ -436,11 +477,14 @@ func createTestingGateway(t *testing.T, params ...testingParameters) testingReso
 			_ = srv.Shutdown(ctx)
 		})
 
-		reply, err := json.Marshal(sync.Reply{
+		okReply, err := json.Marshal(sync.Reply{
 			OK:     true,
 			SyncID: &syncID,
 			AppID:  &appID,
 		})
+		require.NoError(t, err)
+
+		failReply, err := json.Marshal(exampleSyncError)
 		require.NoError(t, err)
 
 		// Emulate sync endpoint
@@ -450,8 +494,14 @@ func createTestingGateway(t *testing.T, params ...testingParameters) testingReso
 
 			l.Info("got register request", "headers", request.Header, "body", string(body))
 
+			if len(params) > 0 && params[0].shouldFailSync {
+				writer.WriteHeader(exampleSyncError.Status)
+				_, _ = writer.Write(failReply)
+				return
+			}
+
 			writer.WriteHeader(http.StatusOK)
-			_, _ = writer.Write(reply)
+			_, _ = writer.Write(okReply)
 		})
 
 		mux.HandleFunc("GET /ready", func(writer http.ResponseWriter, request *http.Request) {
@@ -661,6 +711,27 @@ func awaitNextMessage(t *testing.T, ws *websocket.Conn, timeout time.Duration) *
 	require.NoError(t, err)
 
 	return &parsed
+}
+
+func awaitClosure(t *testing.T, ws *websocket.Conn, timeout time.Duration) (websocket.StatusCode, string) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	if timeout > 0 {
+		ctx, cancel = context.WithTimeout(context.Background(), timeout)
+		defer cancel()
+	}
+
+	parsed := connect.ConnectMessage{}
+	err := wsproto.Read(ctx, ws, &parsed)
+
+	require.Error(t, err)
+	require.NotErrorIs(t, err, context.DeadlineExceeded)
+
+	cerr := websocket.CloseError{}
+	require.ErrorAs(t, err, &cerr)
+
+	return cerr.Code, cerr.Reason
 }
 
 func handshake(t *testing.T, res testingResources) {

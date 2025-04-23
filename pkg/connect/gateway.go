@@ -323,6 +323,20 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 				// Allow returning user-facing errors to hint about invalid config, etc.
 				serr := connecterrors.SocketError{}
 				if errors.As(err, &serr) {
+					sysErr, err := proto.Marshal(&connectpb.SystemError{
+						Code:    serr.SysCode,
+						Message: serr.Msg,
+					})
+					if err == nil {
+						err := wsproto.Write(ctx, ws, &connectpb.ConnectMessage{
+							Kind:    connectpb.GatewayMessageType_SYNC_FAILED,
+							Payload: sysErr,
+						})
+						if err != nil {
+							ch.log.Warn("failed to send sync err", "err", err, "sync_err", serr)
+						}
+					}
+
 					c.closeWithConnectError(ws, &serr)
 					return
 				}

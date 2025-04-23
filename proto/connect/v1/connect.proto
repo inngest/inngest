@@ -8,6 +8,7 @@ option go_package = "github.com/inngest/inngest/proto/gen/connect/v1;connect";
 enum GatewayMessageType {
   GATEWAY_HELLO = 0;
   WORKER_CONNECT = 1;
+	SYNC_FAILED = 14;
   GATEWAY_CONNECTION_READY = 2;
   GATEWAY_EXECUTOR_REQUEST = 3;
   WORKER_READY = 4;
