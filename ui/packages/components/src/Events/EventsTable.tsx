@@ -220,7 +220,7 @@ export function EventsTable({
           renderSubComponent={({ row }) => (
             <EventDetails
               pathCreator={pathCreator}
-              eventName={row.original.name}
+              row={row}
               getEventDetails={getEventDetails}
               expandedRowActions={expandedRowActions}
             />

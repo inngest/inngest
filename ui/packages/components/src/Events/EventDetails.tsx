@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import NextLink from 'next/link';
 import { Time } from '@inngest/components/Time';
+import { type Event } from '@inngest/components/types/event';
 import { RiArrowRightSLine } from '@remixicon/react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { type Row } from '@tanstack/react-table';
 
 import {
   ElementWrapper,
   IDElement,
-  LinkElement,
-  OptimisticElementWrapper,
   PillElement,
   SkeletonElement,
   TextElement,
@@ -21,12 +21,12 @@ import { DragDivider } from '../icons/DragDivider';
 import type { EventsTable } from './EventsTable';
 
 export function EventDetails({
-  eventName,
+  row,
   getEventDetails,
   pathCreator,
   expandedRowActions,
 }: {
-  eventName: string;
+  row: Row<Omit<Event, 'payload'>>;
   pathCreator: React.ComponentProps<typeof EventsTable>['pathCreator'];
   getEventDetails: React.ComponentProps<typeof EventsTable>['getEventDetails'];
   expandedRowActions: React.ComponentProps<typeof EventsTable>['expandedRowActions'];
@@ -43,12 +43,11 @@ export function EventDetails({
     isPending, // first load, no data
     error,
     data: eventDetailsData,
-    isFetching, // refetching
   } = useQuery({
-    queryKey: ['event-details', { eventName: eventName }],
+    queryKey: ['event-details', { eventName: row.original.name }],
     queryFn: useCallback(() => {
-      return getEventDetails({ eventName });
-    }, [getEventDetails, eventName]),
+      return getEventDetails({ eventName: row.original.name });
+    }, [getEventDetails, row.original.name]),
     placeholderData: keepPreviousData,
     refetchInterval: 5000,
   });
@@ -99,35 +98,52 @@ export function EventDetails({
     };
   }, [isDragging, handleMouseMove, handleMouseUp]);
 
-  if (isPending) return <p>Loading..</p>;
+  if (error) {
+    // TODO: error handling
+    console.log(error.message);
+  }
 
   return (
     <div ref={containerRef} className="flex flex-row">
       <div ref={leftColumnRef} className="flex flex-col gap-2" style={{ width: `${leftWidth}%` }}>
         <div ref={eventInfoRef} className="flex flex-col gap-3">
           <div className="flex h-8 items-center justify-between gap-1 px-4">
-            <p className="text-sm">{eventDetailsData?.name}</p>
-            {expandedRowActions(eventName)}
+            <p className="text-sm">{row.original.name}</p>
+            {expandedRowActions(row.original.name)}
           </div>
           <div className="flex flex-row flex-wrap items-center justify-start gap-x-10 gap-y-4 px-4">
             <ElementWrapper label="Event ID">
-              <IDElement>{eventDetailsData?.id}</IDElement>
+              {isPending ? <SkeletonElement /> : <IDElement>{eventDetailsData?.id}</IDElement>}
             </ElementWrapper>
             <ElementWrapper label="Idempotency Key">
-              <TextElement>{eventDetailsData?.idempotencyKey}</TextElement>
+              {isPending ? (
+                <SkeletonElement />
+              ) : (
+                <TextElement>{eventDetailsData?.idempotencyKey || '-'}</TextElement>
+              )}
             </ElementWrapper>
             <ElementWrapper label="Source">
-              <PillElement>{eventDetailsData?.source}</PillElement>
+              {isPending ? (
+                <SkeletonElement />
+              ) : (
+                <PillElement>{eventDetailsData?.source || 'N/A'}</PillElement>
+              )}
             </ElementWrapper>
             <ElementWrapper label="TS">
-              {eventDetailsData?.timestamp ? (
+              {isPending ? (
+                <SkeletonElement />
+              ) : eventDetailsData?.timestamp ? (
                 <TimeElement date={new Date(eventDetailsData.timestamp)} />
               ) : (
                 <TextElement>-</TextElement>
               )}
             </ElementWrapper>
             <ElementWrapper label="Version">
-              <TextElement>{eventDetailsData?.version}</TextElement>
+              {isPending ? (
+                <SkeletonElement />
+              ) : (
+                <TextElement>{eventDetailsData?.version || '-'}</TextElement>
+              )}
             </ElementWrapper>
           </div>
           <Tabs
@@ -177,6 +193,7 @@ export function EventDetails({
           <p className="text-muted mb-4 text-xs font-medium uppercase">Functions Triggered</p>
           {eventDetailsData?.runs?.length ? (
             <ul className="divide-subtle divide-y [&>*:not(:first-child)]:pt-[6px] [&>*:not(:last-child)]:pb-[6px]">
+              {/* TODO:  optimistically render the name and status from the row prop */}
               {eventDetailsData.runs.map((run) => (
                 <li key={run.fnSlug}>
                   <NextLink
