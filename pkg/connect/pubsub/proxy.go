@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"github.com/inngest/inngest/pkg/connect/routing"
 	"github.com/inngest/inngest/pkg/connect/state"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/syscode"
 	"github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/inngest/inngest/pkg/util"
@@ -16,6 +17,7 @@ import (
 	"go.opentelemetry.io/otel/propagation"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"log/slog"
+	mathRand "math/rand"
 	"sync"
 	"time"
 
@@ -77,13 +79,12 @@ type RequestReceiver interface {
 	// AckMessage sends an acknowledgment for a specific request.
 	AckMessage(ctx context.Context, requestId string, source AckSource) error
 
-	// NackMessage sends a negative acknowledgment for a specific request.
-	NackMessage(ctx context.Context, requestId string, source AckSource, reason syscode.Error) error
-
 	// Wait blocks and listens for incoming PubSub messages for the internal subscribers. This must be run before
 	// subscribing to any channels to ensure that the PubSub client is connected and ready to receive messages.
 	Wait(ctx context.Context) error
 }
+
+type EnforceLeaseExpiryFunc func(ctx context.Context, accountID uuid.UUID) bool
 
 type redisPubSubConnector struct {
 	client       rueidis.Client
@@ -99,20 +100,30 @@ type redisPubSubConnector struct {
 	stateManager state.StateManager
 	rnd          *util.FrandRNG
 
+	enforceLeaseExpiry EnforceLeaseExpiryFunc
+
 	RequestReceiver
 }
 
-func newRedisPubSubConnector(client rueidis.Client, logger *slog.Logger, tracer trace.ConditionalTracer, stateMan state.StateManager) *redisPubSubConnector {
+type RedisPubSubConnectorOpts struct {
+	Logger             *slog.Logger
+	Tracer             trace.ConditionalTracer
+	StateManager       state.StateManager
+	EnforceLeaseExpiry EnforceLeaseExpiryFunc
+}
+
+func newRedisPubSubConnector(client rueidis.Client, opts RedisPubSubConnectorOpts) *redisPubSubConnector {
 	return &redisPubSubConnector{
-		client:          client,
-		subscribers:     make(map[string]map[string]chan string),
-		subscribersLock: sync.RWMutex{},
-		logger:          logger,
-		tracer:          tracer,
-		setup:           make(chan struct{}),
+		client:             client,
+		subscribers:        make(map[string]map[string]chan string),
+		subscribersLock:    sync.RWMutex{},
+		logger:             opts.Logger,
+		tracer:             opts.Tracer,
+		setup:              make(chan struct{}),
+		enforceLeaseExpiry: opts.EnforceLeaseExpiry,
 
 		// For routing
-		stateManager: stateMan,
+		stateManager: opts.StateManager,
 		rnd:          util.NewFrandRNG(),
 	}
 }
@@ -131,9 +142,8 @@ type ProxyOpts struct {
 func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*connectpb.SDKResponse, error) {
 	<-i.setup
 
-	if opts.Data.RequestId == "" {
-		opts.Data.RequestId = ulid.MustNew(ulid.Now(), rand.Reader).String()
-	}
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
 
 	l := i.logger.With(
 		"app_id", opts.AppID.String(),
@@ -152,6 +162,32 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 	span.SetAttributes(
 		attribute.String("request_id", opts.Data.RequestId),
 	)
+
+	{
+		// Check if previous request finished. Even if the lease is expired, it's possible for the worker
+		// to have already sent a response and completed the request.
+		resp, err := i.stateManager.GetResponse(ctx, opts.EnvID, opts.Data.RequestId)
+		if err != nil {
+			span.RecordError(err)
+			l.Error("could not check for buffered response", "err", err)
+			return nil, fmt.Errorf("could not check for buffered response: %w", err)
+		}
+
+		if resp != nil {
+			// We have a response already, return it
+			l.Debug("found buffered response")
+
+			// The response has a short TTL so it will be cleaned up, but we should try
+			// to garbage-collect unused state as quickly as possible
+			err := i.stateManager.DeleteResponse(ctx, opts.EnvID, opts.Data.RequestId)
+			if err != nil {
+				span.RecordError(err)
+				l.Error("could not delete buffered response", "err", err)
+			}
+
+			return resp, nil
+		}
+	}
 
 	// Include trace context
 	{
@@ -178,16 +214,16 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 		opts.Data.UserTraceCtx = marshaled
 	}
 
-	gatewayAckErrChan := make(chan error)
-	var gatewayAcked bool
+	// Receive gateway acknowledgement for o11y (this is not a reliable channel - do not depend on it for the critical path)
 	{
+		// TODO Replace executor -> gateway PubSub communication with point-to-point (gRPC)
+		var gatewayAcked bool
 		gatewayAckSubscribed := make(chan struct{})
 		withAckTimeout, cancel := context.WithTimeout(ctx, 10*time.Second)
 		defer cancel()
 		go func() {
-			err := i.subscribe(withAckTimeout, i.channelAppRequestsAck(opts.Data.RequestId, AckSourceGateway), func(_ string) {
+			i.subscribe(withAckTimeout, i.channelAppRequestsAck(opts.Data.RequestId, AckSourceGateway), func(_ string) {
 				gatewayAcked = true
-
 				span.AddEvent("GatewayAck")
 				metrics.HistogramConnectProxyAckTime(ctx, time.Since(proxyStartTime).Milliseconds(), metrics.HistogramOpt{
 					PkgName: pkgName,
@@ -196,21 +232,19 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 					},
 				})
 			}, true, gatewayAckSubscribed)
-			gatewayAckErrChan <- err
+			if !gatewayAcked {
+				span.RecordError(fmt.Errorf("gateway ack not received in time"))
+				l.Warn("gateway did not ack request")
+			}
 		}()
 		<-gatewayAckSubscribed
 	}
 
-	workerAckErrChan := make(chan error)
-	var workerAcked bool
+	// Receive worker acknowledgement for o11y (this is not a reliable channel - do not depend on it for the critical path)
 	{
 		workerAckSubscribed := make(chan struct{})
-		withAckTimeout, cancel := context.WithTimeout(ctx, 10*time.Second)
-		defer cancel()
 		go func() {
-			err := i.subscribe(withAckTimeout, i.channelAppRequestsAck(opts.Data.RequestId, AckSourceWorker), func(_ string) {
-				workerAcked = true
-
+			i.subscribe(ctx, i.channelAppRequestsAck(opts.Data.RequestId, AckSourceWorker), func(_ string) {
 				span.AddEvent("WorkerAck")
 				metrics.HistogramConnectProxyAckTime(ctx, time.Since(proxyStartTime).Milliseconds(), metrics.HistogramOpt{
 					PkgName: pkgName,
@@ -219,22 +253,54 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 					},
 				})
 			}, true, workerAckSubscribed)
-			workerAckErrChan <- err
 		}()
 		<-workerAckSubscribed
 	}
 
 	// Await SDK response forwarded by gateway
-	replyErrChan := make(chan error)
-	var reply connectpb.SDKResponse
+
+	reply := &connectpb.SDKResponse{}
+
+	waitForResponseCtx, cancelWaitForResponseCtx := context.WithCancel(ctx)
+	defer cancelWaitForResponseCtx()
+	go func() {
+		for {
+			select {
+			case <-waitForResponseCtx.Done():
+				return
+			// Poll every two seconds with a jitter of up to 3 seconds
+			case <-time.After(2*time.Second + time.Duration(mathRand.Int63n(3))*time.Second):
+			}
+
+			resp, err := i.stateManager.GetResponse(ctx, opts.EnvID, opts.Data.RequestId)
+			if err != nil {
+				span.RecordError(err)
+				l.Error("could not check for response", "err", err)
+				continue
+			}
+
+			if resp != nil {
+				l.Debug("received response via polling")
+
+				reply = resp
+
+				cancelWaitForResponseCtx()
+				return
+			}
+		}
+	}()
+
+	// Alternatively, the gateway will send the response as soon as it comes in.
+	// This is unreliable but quicker than polling for the response, so we use this
+	// as a best-effort notification mechanism.
 	{
 		replySubscribed := make(chan struct{})
 		go func() {
 			// This may take a while: This waits until we receive the SDK response, and we allow for up to 2h in the serverless execution model
-			err := i.subscribe(ctx, i.channelAppRequestsReply(opts.Data.RequestId), func(msg string) {
+			i.subscribe(waitForResponseCtx, i.channelAppRequestsReply(opts.Data.RequestId), func(msg string) {
 				span.AddEvent("ReplyReceived")
 
-				err := proto.Unmarshal([]byte(msg), &reply)
+				err := proto.Unmarshal([]byte(msg), reply)
 				if err != nil {
 					// This should never happen
 					span.SetAttributes(
@@ -242,86 +308,152 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 					)
 					span.RecordError(err)
 					span.SetStatus(codes.Error, "unmarshaling sdk response proto failed")
-					return
 				}
+
+				cancelWaitForResponseCtx()
 			}, true, replySubscribed)
-			replyErrChan <- err
 		}()
 		<-replySubscribed
 	}
 
-	res, err := routing.GetRoute(ctx, i.stateManager, i.rnd, i.tracer, l, opts.Data)
-	if err != nil {
+	// Attempt to lease the request. If the request is still running on a worker,
+	// this will fail with ErrRequestLeased. In this case, we can just wait for the request to complete.
+	// Otherwise, we acquired the lease and need to forward the request to the worker.
+	leaseID, err := i.stateManager.LeaseRequest(ctx, opts.EnvID, opts.Data.RequestId, consts.ConnectWorkerRequestLeaseDuration)
+	if err != nil && !errors.Is(err, state.ErrRequestLeased) {
 		span.RecordError(err)
-		span.SetStatus(codes.Error, "failed to route message")
+		span.SetStatus(codes.Error, "failed to lease request")
 
-		if errors.Is(err, routing.ErrNoHealthyConnection) {
-			return nil, syscode.Error{
-				Code:    syscode.CodeConnectNoHealthyConnection,
-				Message: "Could not find a healthy connection",
+		return nil, fmt.Errorf("failed to lease request: %w", err)
+	}
+
+	if leaseID == nil && !errors.Is(err, state.ErrRequestLeased) {
+		span.SetStatus(codes.Error, "missing initial lease ID")
+
+		return nil, fmt.Errorf("missing initial lease ID")
+	}
+
+	if leaseID != nil {
+		// Include initial Lease ID in request
+		opts.Data.LeaseId = leaseID.String()
+	}
+
+	// Periodically check for lease health, if lease expired, we need to retry
+	leaseCtx, cancelLeaseCtx := context.WithCancel(ctx)
+	defer cancelLeaseCtx()
+	go func() {
+		for {
+			select {
+			case <-leaseCtx.Done():
+				return
+			// Verify lease did not expire
+			case <-time.After(consts.ConnectWorkerRequestExtendLeaseInterval / 2):
 			}
+
+			leased, err := i.stateManager.IsRequestLeased(ctx, opts.EnvID, opts.Data.RequestId)
+			if err != nil {
+				span.RecordError(err)
+				l.Error("could not get lease status", "err", err)
+				continue
+			}
+
+			if !leased {
+				// Selectively enable lease enforcement to create gradual rollout for existing connect users
+				if i.enforceLeaseExpiry != nil && !i.enforceLeaseExpiry(ctx, opts.AccountID) {
+					l.Warn("lease expired but enforcement flag disabled")
+					continue
+				}
+
+				// Grace period to wait for the worker to send the response
+				select {
+				case <-waitForResponseCtx.Done():
+					l.Debug("response arrived during lease expiry grace period")
+					return
+				case <-time.After(consts.ConnectWorkerRequestGracePeriod):
+				}
+
+				l.Debug("request lease expired")
+				span.RecordError(fmt.Errorf("item is no longer leased"))
+
+				cancelLeaseCtx()
+				return
+			}
+
+			l.Debug("request is still leased by worker")
 		}
+	}()
 
-		return nil, fmt.Errorf("failed to route message: %w", err)
-	}
-
-	// Forward message to the gateway
-	err = i.RouteExecutorRequest(ctx, res.GatewayID, res.ConnectionID, opts.Data)
-	if err != nil {
-		span.RecordError(err)
-		span.SetStatus(codes.Error, " could not forward request to gateway")
-
-		return nil, fmt.Errorf("failed to route request to gateway: %w", err)
-	}
-
-	l.Debug("forwarded executor request to gateway", "gateway_id", res.GatewayID, "conn_id", res.ConnectionID)
-
-	{
-		err := <-gatewayAckErrChan
-		close(gatewayAckErrChan)
-		if err != nil && !errors.Is(err, context.DeadlineExceeded) {
-			span.RecordError(err)
-			span.SetStatus(codes.Error, "unexpected error waiting for gateway ack")
-			return nil, fmt.Errorf("could not receive executor request ack by gateway: %w", err)
-		}
-
-		if !gatewayAcked {
-			span.SetStatus(codes.Error, "gateway did not ack")
-			return nil, fmt.Errorf("gateway did not ack in time")
-		}
-	}
-
-	{
-		err := <-workerAckErrChan
-		close(workerAckErrChan)
-		if err != nil && !errors.Is(err, context.DeadlineExceeded) {
-			span.RecordError(err)
-			span.SetStatus(codes.Error, "unexpected error waiting for worker ack")
-
-			return nil, fmt.Errorf("could not receive executor request ack by worker: %w", err)
-		}
-
-		if !workerAcked {
-			span.SetStatus(codes.Error, "worker did not ack")
-
-			return nil, fmt.Errorf("worker did not ack in time")
-		}
-	}
-
-	// Await SDK response forwarded by gateway
-	// This may take a while: This waits until we receive the SDK response, and we allow for up to 2h in the serverless execution model
-	{
-		err := <-replyErrChan
-		close(replyErrChan)
+	// Forward message to the gateway if the request wasn't already running
+	if leaseID != nil {
+		// Determine the most suitable connection
+		route, err := routing.GetRoute(ctx, i.stateManager, i.rnd, i.tracer, l, opts.Data)
 		if err != nil {
 			span.RecordError(err)
-			span.SetStatus(codes.Error, "could not receive worker response")
+			span.SetStatus(codes.Error, "failed to route message")
 
-			return nil, fmt.Errorf("could not receive executor response: %w", err)
+			if errors.Is(err, routing.ErrNoHealthyConnection) {
+				return nil, syscode.Error{
+					Code:    syscode.CodeConnectNoHealthyConnection,
+					Message: "Could not find a healthy connection",
+				}
+			}
+
+			return nil, fmt.Errorf("failed to route message: %w", err)
 		}
+
+		// Forward the request
+		// TODO Replace executor -> gateway PubSub communication with point-to-point (gRPC)
+		err = i.RouteExecutorRequest(ctx, route.GatewayID, route.ConnectionID, opts.Data)
+		if err != nil {
+			span.RecordError(err)
+			span.SetStatus(codes.Error, "could not forward request to gateway")
+
+			return nil, fmt.Errorf("failed to route request to gateway: %w", err)
+		}
+
+		l.Debug("forwarded executor request to gateway", "gateway_id", route.GatewayID, "conn_id", route.ConnectionID)
 	}
 
-	return &reply, nil
+	select {
+	// Await SDK response forwarded by gateway
+	// This may take a while: This waits until we receive the SDK response, and we allow for up to 2h in the serverless execution model
+	case <-waitForResponseCtx.Done():
+		// Stop checking for lease
+		cancelLeaseCtx()
+
+		// The lease has a short TTL so it will be cleaned up, but we should try
+		// to garbage-collect unused state as quickly as possible
+		err = i.stateManager.DeleteLease(ctx, opts.EnvID, opts.Data.RequestId)
+		if err != nil {
+			span.RecordError(err)
+			l.Error("could not delete lease", "err", err)
+		}
+
+		if reply.RequestId == "" {
+			span.SetStatus(codes.Error, "missing response")
+
+			return nil, fmt.Errorf("did not receive worker response")
+		}
+
+		// The response has a short TTL so it will be cleaned up, but we should try
+		// to garbage-collect unused state as quickly as possible
+		err := i.stateManager.DeleteResponse(ctx, opts.EnvID, opts.Data.RequestId)
+		if err != nil {
+			span.RecordError(err)
+			l.Error("could not delete response", "err", err)
+		}
+
+		return reply, nil
+	// If the worker terminates or otherwise fails to continue extending the lease,
+	// we must retry the step as soon as possible.
+	case <-leaseCtx.Done():
+		span.SetStatus(codes.Error, "lease expired")
+
+		return nil, syscode.Error{
+			Code:    syscode.CodeConnectWorkerStoppedResponding,
+			Message: "The worker stopped responding to the request.",
+		}
+	}
 }
 
 // channelGatewayAppRequests returns the channel name for routed executor requests received by the gateway for a specific app and connection.
@@ -342,7 +474,7 @@ func (i *redisPubSubConnector) channelAppRequestsReply(requestId string) string 
 //
 // Upon return, the subscription is cleaned up and if the subscription was the last one for the channel, the PubSub client
 // is unsubscribed from the channel.
-func (i *redisPubSubConnector) subscribe(ctx context.Context, channel string, onMessage func(msg string), once bool, onSubscribed chan struct{}) error {
+func (i *redisPubSubConnector) subscribe(ctx context.Context, channel string, onMessage func(msg string), once bool, onSubscribed chan struct{}) {
 	<-i.setup
 
 	msgs := make(chan string)
@@ -413,13 +545,12 @@ func (i *redisPubSubConnector) subscribe(ctx context.Context, channel string, on
 	}
 
 	<-done
-	return nil
 }
 
-// ReceiveExecutorMessages listens for incoming PubSub messages for a specific app and calls the provided callback.
+// ReceiveRoutedRequest listens for incoming PubSub messages for a specific app and calls the provided callback.
 // This is a blocking call which only stops once the context is canceled.
 func (i *redisPubSubConnector) ReceiveRoutedRequest(ctx context.Context, gatewayId ulid.ULID, connId ulid.ULID, onMessage func(rawBytes []byte, data *connectpb.GatewayExecutorRequestData), onSubscribed chan struct{}) error {
-	return i.subscribe(ctx, i.channelGatewayAppRequests(gatewayId, connId), func(msg string) {
+	i.subscribe(ctx, i.channelGatewayAppRequests(gatewayId, connId), func(msg string) {
 		// TODO Test whether this works with marshaled Protobuf bytes
 		msgBytes := []byte(msg)
 
@@ -433,6 +564,7 @@ func (i *redisPubSubConnector) ReceiveRoutedRequest(ctx context.Context, gateway
 
 		onMessage(msgBytes, &data)
 	}, false, onSubscribed)
+	return nil
 }
 
 // Wait blocks and listens for incoming PubSub messages for the internal subscribers. This must be run before
@@ -552,45 +684,6 @@ func (i *redisPubSubConnector) AckMessage(ctx context.Context, requestId string,
 	return nil
 }
 
-// NackMessage sends a negative acknowledgment for a specific request.
-func (i *redisPubSubConnector) NackMessage(ctx context.Context, requestId string, source AckSource, reason syscode.Error) error {
-	var marshaledData []byte
-	if reason.Data != nil {
-		marshaled, err := json.Marshal(reason.Data)
-		if err != nil {
-			return fmt.Errorf("could not marshal reason data: %w", err)
-		}
-		marshaledData = marshaled
-	}
-
-	nackMessage, err := proto.Marshal(&connectpb.PubSubAckMessage{
-		Ts:   timestamppb.Now(),
-		Nack: proto.Bool(true),
-		NackReason: &connectpb.SystemError{
-			Code:    reason.Code,
-			Data:    marshaledData,
-			Message: reason.Message,
-		},
-	})
-	if err != nil {
-		return fmt.Errorf("could not marshal nack message: %w", err)
-	}
-
-	err = i.client.Do(
-		ctx,
-		i.client.B().
-			Publish().
-			Channel(i.channelAppRequestsAck(requestId, source)).
-			Message(string(nackMessage)).
-			Build()).
-		Error()
-	if err != nil {
-		return fmt.Errorf("could not publish response: %w", err)
-	}
-
-	return nil
-}
-
 // RouteExecutorRequest forwards an executor request to the respective gateway
 func (i *redisPubSubConnector) RouteExecutorRequest(ctx context.Context, gatewayId ulid.ULID, connId ulid.ULID, data *connectpb.GatewayExecutorRequestData) error {
 	dataBytes, err := proto.Marshal(data)
@@ -602,11 +695,11 @@ func (i *redisPubSubConnector) RouteExecutorRequest(ctx context.Context, gateway
 
 	err = i.client.Do(ctx, i.client.B().Publish().Channel(channelName).Message(string(dataBytes)).Build()).Error()
 	if err != nil {
-		i.logger.Error("could not forward request to gateway", "err", err, "gateway_id", gatewayId, "channel", channelName, "request_id", data.RequestId, "conn_id", connId, "app_id", data.AppId)
+		i.logger.Error("could not forward request to gateway", "err", err, "gateway_id", gatewayId, "channel", channelName, "req_id", data.RequestId, "conn_id", connId, "app_id", data.AppId)
 		return fmt.Errorf("could not publish executor request: %w", err)
 	}
 
-	i.logger.Debug("forwarded connect request to gateway", "gateway_id", gatewayId, "channel", channelName, "request_id", data.RequestId, "conn_id", connId, "app_id", data.AppId)
+	i.logger.Debug("forwarded connect request to gateway", "gateway_id", gatewayId, "channel", channelName, "req_id", data.RequestId, "conn_id", connId, "app_id", data.AppId)
 
 	return nil
 }

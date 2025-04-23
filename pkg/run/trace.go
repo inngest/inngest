@@ -738,7 +738,7 @@ func (tb *runTree) processWaitForEventGroup(ctx context.Context, span *cqrs.Span
 	// if the total number of children span end up with just one, it means
 	// redundant spans has been excluded, so it's basically the same span
 	// as the parent. We can discard it in this case
-	if len(mod.Children) == 1 && mod.StepOp.String() == mod.Children[0].StepOp.String() {
+	if len(mod.Children) == 1 && mod.StepOp != nil && mod.StepOp.String() == mod.Children[0].StepOp.String() {
 		mod.Children = nil
 	}
 

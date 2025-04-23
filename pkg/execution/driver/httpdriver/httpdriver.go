@@ -11,7 +11,6 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -34,51 +33,43 @@ import (
 var (
 	Dialer = &net.Dialer{KeepAlive: 15 * time.Second}
 
-	DefaultTransport = func() *http.Transport {
-		t := &http.Transport{
-			DialContext: SecureDialer(SecureDialerOpts{
-				AllowHostDocker: false,
-				AllowPrivate:    false,
-				AllowNAT64:      false,
-			}),
-			ForceAttemptHTTP2:     true,
-			MaxIdleConns:          5,
-			IdleConnTimeout:       2 * time.Second,
-			TLSHandshakeTimeout:   10 * time.Second,
-			ExpectContinueTimeout: 1 * time.Second,
-			DisableKeepAlives:     true,
-			// New, ensuring that services can take their time before
-			// responding with headers as they process long running
-			// jobs.
-			ResponseHeaderTimeout: consts.MaxFunctionTimeout,
-		}
-
-		if util.InTestMode() {
-			// Allow local requests during testing
-			t.DialContext = Dialer.DialContext
-		}
-
-		return t
-	}()
-	DefaultClient = &http.Client{
-		Timeout:       consts.MaxFunctionTimeout,
-		CheckRedirect: CheckRedirect,
-		Transport:     DefaultTransport,
-	}
-
-	DefaultExecutor = &executor{Client: DefaultClient}
-
 	ErrEmptyResponse = fmt.Errorf("no response data")
 	ErrNoRetryAfter  = fmt.Errorf("no retry after present")
 	ErrNotSDK        = syscode.Error{Code: syscode.CodeNotSDK}
+
+	defaultClient = Client(SecureDialerOpts{})
 )
 
-type HTTPDoer interface {
-	Do(req *http.Request) (*http.Response, error)
+// Client returns a new HTTP transport.
+func Transport(opts SecureDialerOpts) *http.Transport {
+	t := &http.Transport{
+		DialContext:           SecureDialer(opts),
+		ForceAttemptHTTP2:     true,
+		MaxIdleConns:          5,
+		IdleConnTimeout:       2 * time.Second,
+		TLSHandshakeTimeout:   10 * time.Second,
+		ExpectContinueTimeout: 1 * time.Second,
+		DisableKeepAlives:     true,
+		// New, ensuring that services can take their time before
+		// responding with headers as they process long running
+		// jobs.
+		ResponseHeaderTimeout: consts.MaxFunctionTimeout,
+	}
+
+	return t
+}
+
+// Client returns a new HTTP client.
+func Client(opts SecureDialerOpts) util.HTTPDoer {
+	return util.HTTPDoer(&http.Client{
+		Timeout:       consts.MaxFunctionTimeout,
+		CheckRedirect: CheckRedirect,
+		Transport:     Transport(opts),
+	})
 }
 
 type executor struct {
-	Client                 *http.Client
+	Client                 util.HTTPDoer
 	localSigningKey        []byte
 	requireLocalSigningKey bool
 }
@@ -131,9 +122,9 @@ type Request struct {
 }
 
 // DoRequest executes the HTTP request with the given input.
-func DoRequest(ctx context.Context, c HTTPDoer, r Request) (*state.DriverResponse, *httpstat.Result, error) {
+func DoRequest(ctx context.Context, c util.HTTPDoer, r Request) (*state.DriverResponse, *httpstat.Result, error) {
 	if c == nil {
-		c = DefaultClient
+		c = defaultClient
 	}
 
 	if r.URL.Scheme != "http" && r.URL.Scheme != "https" {
@@ -258,16 +249,19 @@ func HandleHttpResponse(ctx context.Context, r Request, resp *Response) (*state.
 		dr.SetError(err)
 	}
 
-	if !resp.IsSDK {
+	if resp.StatusCode >= 200 && resp.StatusCode < 300 && !resp.IsSDK {
+		// If we got a successful response but it wasn't from the SDK, then we
+		// need to fail the attempt. Otherwise, we may incorrectly mark the
+		// function run as "completed".
 		dr.SetError(ErrNotSDK)
 	}
 
 	return dr, err
 }
 
-func do(ctx context.Context, c HTTPDoer, r Request) (*Response, *httpstat.Result, error) {
+func do(ctx context.Context, c util.HTTPDoer, r Request) (*Response, *httpstat.Result, error) {
 	if c == nil {
-		c = DefaultClient
+		c = defaultClient
 	}
 
 	ctx, cancel := context.WithTimeout(ctx, consts.MaxFunctionTimeout)
@@ -351,14 +345,11 @@ func do(ctx context.Context, c HTTPDoer, r Request) (*Response, *httpstat.Result
 		noRetry    bool
 		retryAtStr *string
 		retryAt    *time.Time
-		headers    = map[string]string{}
 	)
 
 	body = byt
 	statusCode = resp.StatusCode
-	for k, v := range resp.Header {
-		headers[strings.ToLower(k)] = v[0]
-	}
+	headers := resp.Header
 
 	// Check if this was a streaming response.  If so, extract headers sent
 	// from _after_ the response started within the payload.
@@ -382,7 +373,7 @@ func do(ctx context.Context, c HTTPDoer, r Request) (*Response, *httpstat.Result
 
 			// Upsert headers from the stream.
 			for k, v := range stream.Headers {
-				headers[k] = v
+				headers.Set(k, v)
 			}
 		}
 	}
@@ -396,10 +387,10 @@ func do(ctx context.Context, c HTTPDoer, r Request) (*Response, *httpstat.Result
 	}
 
 	// Check the retry status from the headers and versions.
-	noRetry = !ShouldRetry(statusCode, headers[headerNoRetry], headers[headerSDK])
+	noRetry = !ShouldRetry(statusCode, headers.Get(headerNoRetry), headers.Get(headerSDK))
 
 	// Extract the retry at header if it hasn't been set explicitly in streaming.
-	if after := headers["retry-after"]; retryAtStr == nil && after != "" {
+	if after := headers.Get("retry-after"); after != "" {
 		retryAtStr = &after
 	}
 	if retryAtStr != nil {
@@ -409,7 +400,7 @@ func do(ctx context.Context, c HTTPDoer, r Request) (*Response, *httpstat.Result
 	}
 
 	// Get the request version
-	rv, _ := strconv.Atoi(headers[headerRequestVersion])
+	rv, _ := strconv.Atoi(headers.Get(headerRequestVersion))
 	return &Response{
 		Body:           body,
 		StatusCode:     statusCode,
@@ -417,9 +408,9 @@ func do(ctx context.Context, c HTTPDoer, r Request) (*Response, *httpstat.Result
 		RetryAt:        retryAt,
 		NoRetry:        noRetry,
 		RequestVersion: rv,
-		IsSDK:          headerspkg.IsSDK(resp.Header),
-		Sdk:            headers[headerSDK],
-		Header:         resp.Header,
+		IsSDK:          headerspkg.IsSDK(headers),
+		Sdk:            headers.Get(headerSDK),
+		Header:         headers,
 		SysErr:         sysErr,
 	}, tracking, err
 

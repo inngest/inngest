@@ -45,7 +45,7 @@ overrides:
   tar-fs@>=2.0.0 <2.1.2: '>=2.1.2'
   vite@<4.5.11: '>=4.5.11'
   vite@>=5.0.0 <5.4.16: '>=5.4.16'
-  vite@>=6.2.0 <6.2.5: '>=6.2.5'
+  vite@>=6.2.0 <6.2.6: '>=6.2.6'
   image-size@>=1.1.0 <1.2.1: '>=1.2.1'
 
 importers:
@@ -519,6 +519,9 @@ importers:
       date-fns:
         specifier: ^3.6.0
         version: 3.6.0
+      date-fns-tz:
+        specifier: ^3.2.0
+        version: 3.2.0(date-fns@3.6.0)
       echarts:
         specifier: ^5.5.1
         version: 5.5.1
@@ -8532,7 +8535,7 @@ packages:
   /@types/eslint@9.6.1:
     resolution: {integrity: sha512-FXx2pKgId/WyYo2jXw63kk7/+TY7u7AziEJxJAnSFzHlqTAS3Ync6SvgYAN/k4/PQpnnVuzoMuVnByKK2qp0ag==}
     dependencies:
-      '@types/estree': 1.0.6
+      '@types/estree': 1.0.7
       '@types/json-schema': 7.0.15
 
   /@types/estree@0.0.51:
@@ -9357,11 +9360,11 @@ packages:
       tinyrainbow: 1.2.0
     dev: true
 
-  /@vitest/mocker@2.1.9(vite@6.2.5):
+  /@vitest/mocker@2.1.9(vite@6.2.6):
     resolution: {integrity: sha512-tVL6uJgoUdi6icpxmdrn5YNo3g3Dxv+IHJBr0GXHaEdTcw3F+cPKnsXFhli6nO+f/6SDKPHEK1UN+k+TQv0Ehg==}
     peerDependencies:
       msw: ^2.4.9
-      vite: '>=5.4.16'
+      vite: '>=6.2.6'
     peerDependenciesMeta:
       msw:
         optional: true
@@ -9371,7 +9374,7 @@ packages:
       '@vitest/spy': 2.1.9
       estree-walker: 3.0.3
       magic-string: 0.30.17
-      vite: 6.2.5(less@4.2.2)
+      vite: 6.2.6(less@4.2.2)
     dev: true
 
   /@vitest/pretty-format@2.1.9:
@@ -11348,6 +11351,14 @@ packages:
 
   /dataloader@2.2.2:
     resolution: {integrity: sha512-8YnDaaf7N3k/q5HnTJVuzSyLETjoZjVmHc4AeKAzOvKHEFQKcn64OKBfzHYtE9zGjctNM7V9I0MfnUVLpi7M5g==}
+
+  /date-fns-tz@3.2.0(date-fns@3.6.0):
+    resolution: {integrity: sha512-sg8HqoTEulcbbbVXeg84u5UnlsQa8GS5QXMqjjYIhS4abEVVKIUwe0/l/UhrZdKaL/W5eWZNlbTeEIiOXTcsBQ==}
+    peerDependencies:
+      date-fns: ^3.0.0 || ^4.0.0
+    dependencies:
+      date-fns: 3.6.0
+    dev: false
 
   /date-fns@2.30.0:
     resolution: {integrity: sha512-fnULvOpxnC5/Vg3NCiWelDsLiUc9bRwAPs/+LfTLNvetFCtCTN+yQz15C/fs4AwX1R9K5GLtLfn8QW+dWisaAw==}
@@ -19049,7 +19060,7 @@ packages:
       debug: 4.4.0
       es-module-lexer: 1.6.0
       pathe: 1.1.2
-      vite: 6.2.5(less@4.2.2)
+      vite: 6.2.6(less@4.2.2)
     transitivePeerDependencies:
       - '@types/node'
       - jiti
@@ -19065,8 +19076,8 @@ packages:
       - yaml
     dev: true
 
-  /vite@6.2.5(less@4.2.2):
-    resolution: {integrity: sha512-j023J/hCAa4pRIUH6J9HemwYfjB5llR2Ps0CWeikOtdR8+pAURAk0DoJC5/mm9kd+UgdnIy7d6HE4EAvlYhPhA==}
+  /vite@6.2.6(less@4.2.2):
+    resolution: {integrity: sha512-9xpjNl3kR4rVDZgPNdTL0/c6ao4km69a/2ihNQbcANz8RuCOK3hQBmLSJf3bRKVQjVMda+YvizNE8AwvogcPbw==}
     engines: {node: ^18.0.0 || ^20.0.0 || >=22.0.0}
     hasBin: true
     peerDependencies:
@@ -19139,7 +19150,7 @@ packages:
         optional: true
     dependencies:
       '@vitest/expect': 2.1.9
-      '@vitest/mocker': 2.1.9(vite@6.2.5)
+      '@vitest/mocker': 2.1.9(vite@6.2.6)
       '@vitest/pretty-format': 2.1.9
       '@vitest/runner': 2.1.9
       '@vitest/snapshot': 2.1.9
@@ -19155,7 +19166,7 @@ packages:
       tinyexec: 0.3.2
       tinypool: 1.0.2
       tinyrainbow: 1.2.0
-      vite: 6.2.5(less@4.2.2)
+      vite: 6.2.6(less@4.2.2)
       vite-node: 2.1.9(less@4.2.2)
       why-is-node-running: 2.3.0
     transitivePeerDependencies:

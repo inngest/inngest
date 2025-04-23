@@ -888,16 +888,12 @@ func (m unshardedMgr) LeasePause(ctx context.Context, id uuid.UUID) error {
 // parallel steps then it may be false, since parallel steps cause the function
 // end to be reached multiple times in a single run
 func (m mgr) Delete(ctx context.Context, i state.Identifier) (bool, error) {
-	// Ensure this context isn't cancelled;  this is called in a goroutine.
-	callCtx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
-	defer cancel()
-
-	performedDeletion, err := m.shardedMgr.delete(ctx, callCtx, i)
+	performedDeletion, err := m.shardedMgr.delete(ctx, ctx, i)
 	if err != nil {
 		return false, err
 	}
 
-	err = m.deletePausesForRun(ctx, callCtx, i)
+	err = m.deletePausesForRun(ctx, ctx, i)
 	if err != nil {
 		return false, err
 	}

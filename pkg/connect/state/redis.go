@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/jonboulle/clockwork"
 	"github.com/oklog/ulid/v2"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"io/fs"
@@ -89,14 +90,25 @@ func readRedisScripts(path string, entries []fs.DirEntry) {
 }
 
 type redisConnectionStateManager struct {
+	c      clockwork.Clock
 	client rueidis.Client
 	logger *slog.Logger
 }
 
-func NewRedisConnectionStateManager(client rueidis.Client) *redisConnectionStateManager {
+type RedisStateManagerOpt struct {
+	Clock clockwork.Clock
+}
+
+func NewRedisConnectionStateManager(client rueidis.Client, opts ...RedisStateManagerOpt) *redisConnectionStateManager {
+	c := clockwork.NewRealClock()
+	if len(opts) > 0 && opts[0].Clock != nil {
+		c = opts[0].Clock
+	}
+
 	return &redisConnectionStateManager{
 		client: client,
 		logger: logger.StdlibLogger(context.Background()),
+		c:      c,
 	}
 }
 

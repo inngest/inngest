@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
 	"time"
 
 	"github.com/alicebob/miniredis/v2"
@@ -109,15 +110,6 @@ func New(ctx context.Context, opts StartOpts) error {
 	if !opts.Config.Execution.LogOutput {
 		opts.Config.Execution.LogOutput = true
 	}
-
-	// Before running the development service, ensure that we change the http
-	// driver in development to use our AWS Gateway http client, attempting to
-	// automatically transform dev requests to lambda invocations.
-	//
-	// We also make sure to allow local requests.
-	httpdriver.DefaultTransport.DialContext = httpdriver.Dialer.DialContext
-	httpdriver.DefaultExecutor.Client.Transport = awsgateway.NewTransformTripper(httpdriver.DefaultExecutor.Client.Transport)
-	deploy.Client.Transport = awsgateway.NewTransformTripper(deploy.Client.Transport)
 
 	return start(ctx, opts)
 }
@@ -292,16 +284,37 @@ func start(ctx context.Context, opts StartOpts) error {
 	// Create a new expression aggregator, using Redis to load evaluables.
 	agg := expressions.NewAggregator(ctx, 100, 100, sm.(expressions.EvaluableLoader), nil)
 
-	executorProxy, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectPubSubRedis, connectPubSubLogger.With("svc", "executor"), conditionalTracer, connectionManager, true))
+	executorProxy, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectPubSubRedis, true, connectpubsub.RedisPubSubConnectorOpts{
+		Logger:       connectPubSubLogger.With("svc", "executor"),
+		Tracer:       conditionalTracer,
+		StateManager: connectionManager,
+		EnforceLeaseExpiry: func(ctx context.Context, accountID uuid.UUID) bool {
+			return true
+		},
+	}))
 	if err != nil {
 		return fmt.Errorf("failed to create connect pubsub connector: %w", err)
 	}
+
+	// Before running the development service, ensure that we change the http
+	// driver in development to use our AWS Gateway http client, attempting to
+	// automatically transform dev requests to lambda invocations.
+	//
+	// We also make sure to allow local requests.
+	httpClient := httpdriver.Client(httpdriver.SecureDialerOpts{
+		AllowHostDocker: true, // In local dev, this is OK
+		AllowPrivate:    true, // In local dev, this is OK
+		AllowNAT64:      true, // In local dev, this is OK
+	})
+	httpClient.(*http.Client).Transport = awsgateway.NewTransformTripper(httpClient.(*http.Client).Transport)
+	deploy.Client.Transport = awsgateway.NewTransformTripper(deploy.Client.Transport)
 
 	var drivers = []driver.Driver{}
 	for _, driverConfig := range opts.Config.Execution.Drivers {
 		d, err := driverConfig.NewDriver(registration.NewDriverOpts{
 			ConnectForwarder:  executorProxy,
 			ConditionalTracer: conditionalTracer,
+			HTTPClient:        httpClient,
 		})
 		if err != nil {
 			return err
@@ -316,6 +329,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	hmw := memory_writer.NewWriter(ctx, memory_writer.WriterOptions{DumpToFile: false})
 
 	exec, err := executor.NewExecutor(
+		executor.WithHTTPClient(httpClient),
 		executor.WithStateManager(smv2),
 		executor.WithPauseManager(sm),
 		executor.WithRuntimeDrivers(
@@ -424,7 +438,14 @@ func start(ctx context.Context, opts StartOpts) error {
 	})
 
 	// ds.opts.Config.EventStream.Service.TopicName()
-	apiConnectProxy, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectPubSubRedis, connectPubSubLogger.With("svc", "api"), conditionalTracer, connectionManager, false))
+	apiConnectProxy, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectPubSubRedis, false, connectpubsub.RedisPubSubConnectorOpts{
+		Logger:       connectPubSubLogger.With("svc", "api"),
+		Tracer:       conditionalTracer,
+		StateManager: connectionManager,
+		EnforceLeaseExpiry: func(ctx context.Context, accountID uuid.UUID) bool {
+			return true
+		},
+	}))
 	if err != nil {
 		return fmt.Errorf("failed to create connect pubsub connector: %w", err)
 	}
@@ -441,22 +462,30 @@ func start(ctx context.Context, opts StartOpts) error {
 		Executor:      ds.Executor,
 		HistoryReader: memory_reader.NewReader(),
 		ConnectOpts: connectv0.Opts{
-			GroupManager:            connectionManager,
-			ConnectManager:          connectionManager,
-			ConnectResponseNotifier: apiConnectProxy,
-			Signer:                  auth.NewJWTSessionTokenSigner(consts.DevServerConnectJwtSecret),
-			RequestAuther:           ds,
-			ConnectGatewayRetriever: ds,
-			Dev:                     true,
-			EntitlementProvider:     ds,
-			ConditionalTracer:       conditionalTracer,
+			GroupManager:               connectionManager,
+			ConnectManager:             connectionManager,
+			ConnectResponseNotifier:    apiConnectProxy,
+			ConnectRequestStateManager: connectionManager,
+			Signer:                     auth.NewJWTSessionTokenSigner(consts.DevServerConnectJwtSecret),
+			RequestAuther:              ds,
+			ConnectGatewayRetriever:    ds,
+			Dev:                        true,
+			EntitlementProvider:        ds,
+			ConditionalTracer:          conditionalTracer,
 		},
 	})
 	if err != nil {
 		return err
 	}
 
-	connectGatewayProxy, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectPubSubRedis, connectPubSubLogger.With("svc", "connect-gateway"), conditionalTracer, connectionManager, false))
+	connectGatewayProxy, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectPubSubRedis, false, connectpubsub.RedisPubSubConnectorOpts{
+		Logger:       connectPubSubLogger.With("svc", "connect-gateway"),
+		Tracer:       conditionalTracer,
+		StateManager: connectionManager,
+		EnforceLeaseExpiry: func(ctx context.Context, accountID uuid.UUID) bool {
+			return true
+		},
+	}))
 	if err != nil {
 		return fmt.Errorf("failed to create connect pubsub connector: %w", err)
 	}

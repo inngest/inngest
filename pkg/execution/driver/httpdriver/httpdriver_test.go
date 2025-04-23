@@ -51,7 +51,8 @@ func TestRedirect(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	res, _, err := do(context.Background(), DefaultClient, Request{URL: parseURL(ts.URL), Input: input})
+	client := Client(SecureDialerOpts{AllowPrivate: true})
+	res, _, err := do(context.Background(), client, Request{URL: parseURL(ts.URL), Input: input})
 	require.NoError(t, err)
 	require.Equal(t, 200, res.StatusCode)
 	require.Equal(t, []byte("ok"), res.Body)
@@ -72,7 +73,8 @@ func TestRetryAfter(t *testing.T) {
 		}))
 		defer ts.Close()
 
-		res, _, err := do(context.Background(), DefaultClient, Request{URL: parseURL(ts.URL), Input: input})
+		client := Client(SecureDialerOpts{AllowPrivate: true})
+		res, _, err := do(context.Background(), client, Request{URL: parseURL(ts.URL), Input: input})
 		require.NoError(t, err)
 		require.Equal(t, 500, res.StatusCode)
 		require.Equal(t, []byte(`{"error":true}`), res.Body)
@@ -202,7 +204,8 @@ func TestStreamResponseTooLarge(t *testing.T) {
 
 	defer ts.Close()
 	u, _ := url.Parse(ts.URL)
-	r, _, err := do(context.Background(), nil, Request{
+	client := Client(SecureDialerOpts{AllowPrivate: true})
+	r, _, err := do(context.Background(), client, Request{
 		URL: *u,
 	})
 	require.NotNil(t, r)
@@ -222,7 +225,8 @@ func TestTiming(t *testing.T) {
 
 	defer ts.Close()
 	u, _ := url.Parse(ts.URL)
-	r, result, err := do(context.Background(), nil, Request{
+	client := Client(SecureDialerOpts{AllowPrivate: true})
+	r, result, err := do(context.Background(), client, Request{
 		URL:   *u,
 		Input: []byte("test"),
 	})

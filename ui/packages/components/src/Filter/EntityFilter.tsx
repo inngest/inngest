@@ -3,7 +3,7 @@ import { useRef, useState } from 'react';
 import { SelectWithSearch, type Option } from '../Select/Select';
 
 type EntityFilterProps = {
-  type: 'app' | 'function';
+  type: 'app' | 'function' | 'event';
   selectedEntities: string[];
   entities: Option[];
   onFilterChange: (value: string[]) => void;
