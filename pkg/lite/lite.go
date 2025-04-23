@@ -287,6 +287,13 @@ func start(ctx context.Context, opts StartOpts) error {
 		return fmt.Errorf("failed to create connect pubsub connector: %w", err)
 	}
 
+	httpClient := httpdriver.Client(httpdriver.SecureDialerOpts{
+		AllowHostDocker: true, // In self-hosted mode, this is OK
+		AllowPrivate:    true, // In self-hosted mode, this is OK
+		AllowNAT64:      true, // In self-hosted mode, this is OK
+	})
+	httpClient.(*http.Client).Transport = awsgateway.NewTransformTripper(httpClient.(*http.Client).Transport)
+
 	var drivers = []driver.Driver{}
 	for _, driverConfig := range opts.Config.Execution.Drivers {
 		d, err := driverConfig.NewDriver(registration.NewDriverOpts{
@@ -294,6 +301,7 @@ func start(ctx context.Context, opts StartOpts) error {
 			LocalSigningKey:        sk,
 			ConnectForwarder:       executorProxy,
 			ConditionalTracer:      conditionalTracer,
+			HTTPClient:             httpClient,
 		})
 		if err != nil {
 			return err
@@ -304,13 +312,6 @@ func start(ctx context.Context, opts StartOpts) error {
 	if err != nil {
 		return fmt.Errorf("failed to create publisher: %w", err)
 	}
-
-	httpClient := httpdriver.Client(httpdriver.SecureDialerOpts{
-		AllowHostDocker: true, // In self-hosted mode, this is OK
-		AllowPrivate:    true, // In self-hosted mode, this is OK
-		AllowNAT64:      true, // In self-hosted mode, this is OK
-	})
-	httpClient.(*http.Client).Transport = awsgateway.NewTransformTripper(httpClient.(*http.Client).Transport)
 
 	exec, err := executor.NewExecutor(
 		executor.WithHTTPClient(httpClient),
