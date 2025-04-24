@@ -1,20 +1,33 @@
 import { useCallback } from 'react';
+import { getTimestampDaysAgo } from '@inngest/components/utils/date';
 import { useClient } from 'urql';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { graphql } from '@/gql';
 
 const query = graphql(`
-  query GetNewEventTypes($envID: ID!) {
+  query GetEventTypesV2($envID: ID!, $cursor: String, $archived: Boolean) {
     environment: workspace(id: $envID) {
-      events @paginated(perPage: 50) {
-        data {
-          name
-          functions: workflows {
-            id
-            slug
+      eventTypesV2(after: $cursor, first: 30, filter: { archived: $archived }) {
+        edges {
+          node {
             name
+            functions {
+              edges {
+                node {
+                  id
+                  slug
+                  name
+                }
+              }
+            }
           }
+        }
+        pageInfo {
+          hasNextPage
+          endCursor
+          hasPreviousPage
+          startCursor
         }
       }
     }
@@ -51,24 +64,16 @@ export function useEventTypes() {
         throw new Error('no data returned');
       }
 
-      const eventTypesData = result.data.environment.events.data;
-      const events = eventTypesData.map((event) => {
-        return {
-          // TODO: fetch archived
-          archived: false,
-          ...event,
-        };
-      });
+      const eventTypesData = result.data.environment.eventTypesV2;
+      const events = eventTypesData.edges.map(({ node }) => ({
+        name: node.name,
+        functions: node.functions.edges.map((f) => f.node),
+        archived,
+      }));
 
       return {
-        events: events,
-        // TODO: add pagination to API
-        pageInfo: {
-          hasNextPage: false,
-          hasPreviousPage: false,
-          endCursor: null,
-          startCursor: null,
-        },
+        events,
+        pageInfo: eventTypesData.pageInfo,
       };
     },
     [client, envID]
@@ -81,17 +86,31 @@ type VolumeQueryVariables = {
 };
 
 const volumeQuery = graphql(`
-  query GetNewEventTypesVolume($envID: ID!) {
+  query GetEventTypesVolumeV2(
+    $envID: ID!
+    $cursor: String
+    $archived: Boolean
+    $startTime: Time!
+    $endTime: Time!
+  ) {
     environment: workspace(id: $envID) {
-      events @paginated(perPage: 50) {
-        data {
-          name
-          dailyVolume: usage(opts: { period: "hour", range: "day" }) {
-            total
-            data {
-              count
+      eventTypesV2(after: $cursor, first: 30, filter: { archived: $archived }) {
+        edges {
+          node {
+            name
+            usage(opts: { period: day, from: $startTime, to: $endTime }) {
+              total
+              data {
+                count
+              }
             }
           }
+        }
+        pageInfo {
+          hasNextPage
+          endCursor
+          hasPreviousPage
+          startCursor
         }
       }
     }
@@ -104,6 +123,8 @@ export function useEventTypesVolume() {
 
   return useCallback(
     async ({ cursor, archived }: VolumeQueryVariables) => {
+      const startTime = getTimestampDaysAgo({ currentDate: new Date(), days: 1 }).toISOString();
+      const endTime = new Date().toISOString();
       const result = await client
         .query(
           volumeQuery,
@@ -111,6 +132,8 @@ export function useEventTypesVolume() {
             envID,
             archived,
             cursor,
+            startTime,
+            endTime,
           },
           { requestPolicy: 'network-only' }
         )
@@ -124,30 +147,25 @@ export function useEventTypesVolume() {
         throw new Error('no data returned');
       }
 
-      const eventTypes = result.data.environment.events.data;
+      const eventTypes = result.data.environment.eventTypesV2.edges;
 
-      const events = eventTypes.map((event) => {
-        const dailyVolumeSlots = event.dailyVolume.data.map((slot) => ({
+      const events = eventTypes.map(({ node }) => {
+        const dailyVolumeSlots = node.usage.data.map((slot) => ({
           startCount: slot.count,
         }));
 
         return {
-          name: event.name,
+          name: node.name,
           volume: {
-            totalVolume: event.dailyVolume.total,
-            dailyVolumeSlots: dailyVolumeSlots,
+            totalVolume: node.usage.total,
+            dailyVolumeSlots,
           },
         };
       });
 
       return {
         events,
-        pageInfo: {
-          hasNextPage: false, // TODO: Update when pagination is supported
-          hasPreviousPage: false,
-          endCursor: null,
-          startCursor: null,
-        },
+        pageInfo: result.data.environment.eventTypesV2.pageInfo,
       };
     },
     [client, envID]
