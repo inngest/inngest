@@ -1162,6 +1162,10 @@ func (q *queue) EnqueueItem(ctx context.Context, shard QueueShard, i osqueue.Que
 		}
 	}
 
+	// TODO: change the target of where this item will be enqueued to
+	// if q.allowKeyQueues(ctx, i.Data.Identifier.AccountID) {
+	// }
+
 	keys := []string{
 		shard.RedisClient.kg.QueueItem(),            // Queue item
 		shard.RedisClient.kg.PartitionItem(),        // Partition item, map
@@ -2076,6 +2080,10 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 		}
 	}
 
+	// TODO: disable lease checks for queue item
+	// if q.disableLeaseChecks(ctx, item.Data.Identifier.AccountID) {
+	// }
+
 	keys := []string{
 		q.primaryQueueShard.RedisClient.kg.QueueItem(),
 		// Pass in the actual key queue
@@ -2485,6 +2493,10 @@ func (q *queue) PartitionLease(ctx context.Context, p *QueuePartition, duration 
 	if p.FunctionID != nil {
 		fnMetaKey = *p.FunctionID
 	}
+
+	// TODO: disable lease checking by modifying inputs into lua script
+	// if q.disableLeaseChecks(ctx, p.AccountID) {
+	// }
 
 	keys := []string{
 		q.primaryQueueShard.RedisClient.kg.PartitionItem(),
