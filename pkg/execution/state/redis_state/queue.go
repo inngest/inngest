@@ -2066,9 +2066,6 @@ func (q *queue) RequeueByJobID(ctx context.Context, queueShard QueueShard, jobID
 		queueShard.RedisClient.kg.GlobalShadowPartitionSet(),
 		queueShard.RedisClient.kg.ShadowPartitionSet(shadowPartition.ShadowPartitionID),
 		queueShard.RedisClient.kg.ShadowPartitionMeta(),
-		backlogs[0].concurrencyKey(q.primaryQueueShard.RedisClient.kg),
-		backlogs[1].concurrencyKey(q.primaryQueueShard.RedisClient.kg),
-		backlogs[2].concurrencyKey(q.primaryQueueShard.RedisClient.kg),
 	}
 
 	requeueToBacklogsVal := "0"
