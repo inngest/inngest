@@ -793,6 +793,8 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 						// The connection will fail to read and be closed in the read loop
 						return nil
 					}
+
+					return nil
 				}
 
 				c.log.Error("unexpected error extending lease", "err", err)
