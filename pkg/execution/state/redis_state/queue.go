@@ -2430,6 +2430,23 @@ func (q *queue) Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		accountConcurrencyKey = queueShard.RedisClient.kg.Concurrency("account", parts[0].Queue())
 	}
 
+	enableAccountingForKeyQueues := false
+	if parts[0].IsSystem() && q.allowSystemKeyQueues != nil {
+		enableAccountingForKeyQueues = q.allowSystemKeyQueues(ctx)
+	} else if !parts[0].IsSystem() && i.Data.Identifier.AccountID != uuid.Nil {
+		enableAccountingForKeyQueues = q.allowKeyQueues(ctx, i.Data.Identifier.AccountID)
+	}
+
+	var backlogs []QueueBacklog
+	if enableAccountingForKeyQueues {
+		backlogs = q.ItemBacklogs(ctx, i)
+	}
+
+	// Pad backlogs to 3
+	for i := len(backlogs); i < 3; i++ {
+		backlogs = append(backlogs, QueueBacklog{})
+	}
+
 	keys := []string{
 		queueShard.RedisClient.kg.QueueItem(),
 		parts[0].zsetKey(queueShard.RedisClient.kg),
@@ -2452,6 +2469,12 @@ func (q *queue) Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 			keys = append(keys, idx)
 		}
 	}
+
+	keys = append(keys,
+		backlogs[0].concurrencyKey(q.primaryQueueShard.RedisClient.kg),
+		backlogs[1].concurrencyKey(q.primaryQueueShard.RedisClient.kg),
+		backlogs[2].concurrencyKey(q.primaryQueueShard.RedisClient.kg),
+	)
 
 	idempotency := q.idempotencyTTL
 	if q.idempotencyTTLFunc != nil {

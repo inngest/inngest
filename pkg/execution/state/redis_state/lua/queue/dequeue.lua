@@ -26,6 +26,11 @@ local keyPartitionMap    = KEYS[14]
 local keyItemIndexA      = KEYS[15]   -- custom item index 1
 local keyItemIndexB      = KEYS[16]  -- custom item index 2
 
+local keyBacklogConcurrencyA      = ARGV[17]
+local keyBacklogConcurrencyB      = ARGV[18]
+local keyBacklogConcurrencyC      = ARGV[19]
+
+
 local queueID        = ARGV[1]
 local idempotencyTTL = tonumber(ARGV[2])
 local partitionIdA   = ARGV[3]
@@ -134,6 +139,19 @@ handleDequeueConcurrency(keyConcurrencyC, keyPartitionC, partitionIdC, partition
 -- This does not have a scavenger queue, as it's purely an entitlement limitation. See extendLease
 -- and Lease for respective ZADD calls.
 redis.call("ZREM", keyAcctConcurrency, item.id)
+
+-- Accounting for key queues
+if exists_without_ending(keyBacklogConcurrencyA, ":-") == true then
+	redis.call("ZREM", keyBacklogConcurrencyA, item.id)
+end
+
+if exists_without_ending(keyBacklogConcurrencyB, ":-") == true then
+	redis.call("ZREM", keyBacklogConcurrencyB, item.id)
+end
+
+if exists_without_ending(keyBacklogConcurrencyC, ":-") == true then
+	redis.call("ZREM", keyBacklogConcurrencyC, item.id)
+end
 
 -- Add optional indexes.
 if keyItemIndexA ~= "" and keyItemIndexA ~= false and keyItemIndexA ~= nil then
