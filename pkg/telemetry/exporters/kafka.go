@@ -177,8 +177,20 @@ func (e *kafkaSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadO
 		case "workflow_id", "wf_id", "function_id", "fn_id":
 			rec.Key = []byte(id.GetFunctionId())
 		case "run_id":
-			if id.GetRunId() != "" {
+			switch {
+			case id.GetRunId() != "":
 				rec.Key = []byte(id.GetRunId())
+			case id.GetFunctionId() != "":
+				l.Warn("missing run_id, falling back to function_id", "span", sp)
+				rec.Key = []byte(id.GetFunctionId())
+			case id.GetEnvId() != "":
+				l.Warn("missing run_id, falling back to env_id", "span", sp)
+				rec.Key = []byte(id.GetEnvId())
+			case id.GetAccountId() != "":
+				l.Warn("missing run_id, falling back to acct_id", "span", sp)
+				rec.Key = []byte(id.GetAccountId())
+			default:
+				l.Error("missing run_id, no other identifier to fallback to", "span", sp)
 			}
 		}
 
