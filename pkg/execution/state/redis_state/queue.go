@@ -1948,6 +1948,10 @@ func (q *queue) RequeueByJobID(ctx context.Context, queueShard QueueShard, jobID
 	// This is because a single queue item may be present in more than one queue.
 	parts, _ := q.ItemPartitions(ctx, queueShard, i)
 
+	// TODO: change the target of where this item will be enqueued to
+	// if q.allowKeyQueues(ctx, i.Data.Identifier.AccountID) {
+	// }
+
 	keys := []string{
 		queueShard.RedisClient.kg.QueueItem(),
 		queueShard.RedisClient.kg.PartitionItem(), // Partition item, map
@@ -2400,6 +2404,10 @@ func (q *queue) Requeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 			legacyPartitionName = part.Queue()
 		}
 	}
+
+	// TODO: change the target of where this item will be enqueued to
+	// if q.allowKeyQueues(ctx, i.Data.Identifier.AccountID) {
+	// }
 
 	args, err := StrSlice([]any{
 		i,

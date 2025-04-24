@@ -187,7 +187,7 @@ func TestConcurrencyEvaluate(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(fmt.Sprintf("%#v", test), func(t *testing.T) {
-			actual := test.limit.Evaluate(context.Background(), test.scopeID, test.input)
+			actual := test.limit.EvaluatedKey(context.Background(), test.scopeID, test.input)
 			require.EqualValues(t, test.expected, actual, test)
 		})
 	}

@@ -5295,7 +5295,7 @@ func createConcurrencyKey(scope enums.ConcurrencyScope, scopeID uuid.UUID, value
 	//
 	// This replicates that logic.
 
-	// Evaluate expects that value is either `event.data.user_id` - a JSON path - or a quoted string.
+	// EvaluatedKey expects that value is either `event.data.user_id` - a JSON path - or a quoted string.
 	// Always quote for these tests.
 	value = strconv.Quote(value)
 
@@ -5303,7 +5303,7 @@ func createConcurrencyKey(scope enums.ConcurrencyScope, scopeID uuid.UUID, value
 		Key:   &value,
 		Scope: scope,
 	}
-	hash := c.Evaluate(context.Background(), scopeID, map[string]any{})
+	hash := c.EvaluatedKey(context.Background(), scopeID, map[string]any{})
 
 	return state.CustomConcurrency{
 		Key:   hash,

@@ -323,6 +323,18 @@ func (u queueKeyGenerator) PartitionQueueSet(pType enums.PartitionType, scopeID,
 	}
 }
 
+//func (u queueKeyGenerator) FunctionBacklogSet(fnID, hashedKey) string {
+//	return fmt.Sprintf("{%s}:", u.queueDefaultKey)
+//}
+//
+//func (u queueKeyGenerator) SystemBacklogSet(queueName string) string {
+//	return fmt.Sprintf("{%s}:", u.queueDefaultKey)
+//}
+//
+//func (u queueKeyGenerator) FunctionBacklogMeta(fnID, hashedKey) string {
+//	return fmt.Sprintf("{%s}:", u.queueDefaultKey)
+//}
+
 func (u queueKeyGenerator) FnMetadata(fnID uuid.UUID) string {
 	if fnID == uuid.Nil {
 		// None supplied; this means ignore.
