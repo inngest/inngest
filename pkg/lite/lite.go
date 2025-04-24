@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
 	"time"
 
 	"github.com/inngest/inngest/pkg/connect"
@@ -276,12 +277,10 @@ func start(ctx context.Context, opts StartOpts) error {
 	connectPubSubLogger := logger.StdlibLoggerWithCustomVarName(ctx, "CONNECT_PUBSUB_LOG_LEVEL")
 
 	executorProxy, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectRcOpt, true, connectpubsub.RedisPubSubConnectorOpts{
-		Logger:       connectPubSubLogger.With("svc", "executor"),
-		Tracer:       conditionalTracer,
-		StateManager: connectionManager,
-		EnforceLeaseExpiry: func(ctx context.Context, accountID uuid.UUID) bool {
-			return true
-		},
+		Logger:             connectPubSubLogger.With("svc", "executor"),
+		Tracer:             conditionalTracer,
+		StateManager:       connectionManager,
+		EnforceLeaseExpiry: enforceConnectLeaseExpiry,
 	}))
 	if err != nil {
 		return fmt.Errorf("failed to create connect pubsub connector: %w", err)
@@ -452,12 +451,10 @@ func start(ctx context.Context, opts StartOpts) error {
 	})
 
 	apiConnectProxy, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectRcOpt, false, connectpubsub.RedisPubSubConnectorOpts{
-		Logger:       connectPubSubLogger.With("svc", "api"),
-		Tracer:       conditionalTracer,
-		StateManager: connectionManager,
-		EnforceLeaseExpiry: func(ctx context.Context, accountID uuid.UUID) bool {
-			return true
-		},
+		Logger:             connectPubSubLogger.With("svc", "api"),
+		Tracer:             conditionalTracer,
+		StateManager:       connectionManager,
+		EnforceLeaseExpiry: enforceConnectLeaseExpiry,
 	}))
 	if err != nil {
 		return fmt.Errorf("failed to create connect pubsub connector: %w", err)
@@ -493,12 +490,10 @@ func start(ctx context.Context, opts StartOpts) error {
 	}
 
 	gatewayRequestReceiver, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectRcOpt, false, connectpubsub.RedisPubSubConnectorOpts{
-		Logger:       connectPubSubLogger.With("svc", "connect-gateway"),
-		Tracer:       conditionalTracer,
-		StateManager: connectionManager,
-		EnforceLeaseExpiry: func(ctx context.Context, accountID uuid.UUID) bool {
-			return true
-		},
+		Logger:             connectPubSubLogger.With("svc", "connect-gateway"),
+		Tracer:             conditionalTracer,
+		StateManager:       connectionManager,
+		EnforceLeaseExpiry: enforceConnectLeaseExpiry,
 	}))
 	if err != nil {
 		return fmt.Errorf("failed to create connect pubsub connector: %w", err)
@@ -657,4 +652,8 @@ func getInvokeFailHandler(ctx context.Context, pb pubsub.Publisher, topic string
 
 		return eg.Wait()
 	}
+}
+
+func enforceConnectLeaseExpiry(ctx context.Context, accountID uuid.UUID) bool {
+	return os.Getenv("INNGEST_CONNECT_DISABLE_ENFORCE_LEASE_EXPIRY") != "true"
 }

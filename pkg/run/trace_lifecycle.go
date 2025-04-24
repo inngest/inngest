@@ -13,11 +13,9 @@ import (
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/queue"
-	"github.com/inngest/inngest/pkg/execution/state"
 	statev1 "github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
-	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/inngest"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/inngest/inngest/pkg/util/aigateway"
@@ -165,7 +163,7 @@ func (l traceLifecycle) OnFunctionScheduled(ctx context.Context, md statev2.Meta
 
 func (l traceLifecycle) OnFunctionStarted(
 	ctx context.Context,
-	md sv2.Metadata,
+	md statev2.Metadata,
 	item queue.Item,
 	evts []json.RawMessage,
 ) {
@@ -351,7 +349,7 @@ func (l traceLifecycle) OnFunctionFinished(
 	span.SetFnOutput(output)
 }
 
-func (l traceLifecycle) OnFunctionCancelled(ctx context.Context, md sv2.Metadata, req execution.CancelRequest, evts []json.RawMessage) {
+func (l traceLifecycle) OnFunctionCancelled(ctx context.Context, md statev2.Metadata, req execution.CancelRequest, evts []json.RawMessage) {
 	ctx = l.extractTraceCtx(ctx, md, true)
 
 	start := time.Now()
@@ -418,7 +416,7 @@ func (l traceLifecycle) OnFunctionCancelled(ctx context.Context, md sv2.Metadata
 
 func (l traceLifecycle) OnFunctionSkipped(
 	ctx context.Context,
-	md sv2.Metadata,
+	md statev2.Metadata,
 	s execution.SkipState,
 ) {
 	ctx = l.extractTraceCtx(ctx, md, true)
@@ -617,7 +615,7 @@ func (l traceLifecycle) OnStepStarted(
 
 func (l traceLifecycle) OnStepGatewayRequestFinished(
 	ctx context.Context,
-	md sv2.Metadata,
+	md statev2.Metadata,
 	item queue.Item,
 	edge inngest.Edge,
 	// Opcode is the opcode for the offloaded request.  The Data field must be
@@ -626,7 +624,7 @@ func (l traceLifecycle) OnStepGatewayRequestFinished(
 	// Resp is the HTTP response
 	resp *http.Response,
 	// runErr is non-nil on a non-2xx status code.
-	runErr *state.UserError,
+	runErr *statev1.UserError,
 ) {
 	// reassign here to make sure we have the right traceID and such
 	ctx = l.extractTraceCtx(ctx, md, false)
@@ -1000,7 +998,7 @@ func (l traceLifecycle) OnInvokeFunction(
 func (l traceLifecycle) OnInvokeFunctionResumed(
 	ctx context.Context,
 	md statev2.Metadata,
-	pause state.Pause,
+	pause statev1.Pause,
 	r execution.ResumeRequest,
 ) {
 	if pause.Metadata == nil {
@@ -1088,7 +1086,7 @@ func (l traceLifecycle) OnWaitForEvent(
 	md statev2.Metadata,
 	item queue.Item,
 	gen statev1.GeneratorOpcode,
-	pause state.Pause,
+	pause statev1.Pause,
 ) {
 	ctx = l.extractTraceCtx(ctx, md, false)
 
@@ -1147,7 +1145,7 @@ func (l traceLifecycle) OnWaitForEvent(
 func (l traceLifecycle) OnWaitForEventResumed(
 	ctx context.Context,
 	md statev2.Metadata,
-	pause state.Pause,
+	pause statev1.Pause,
 	r execution.ResumeRequest,
 ) {
 	if pause.Metadata == nil {
@@ -1217,7 +1215,7 @@ func (l traceLifecycle) OnWaitForEventResumed(
 // extractTraceCtx extracts the trace context from the given item, if it exists.
 // If it doesn't it falls back to extracting the trace for the run overall.
 // If neither exist or they are invalid, it returns the original context.
-func (l *traceLifecycle) extractTraceCtx(ctx context.Context, md sv2.Metadata, isFnSpan bool) context.Context {
+func (l *traceLifecycle) extractTraceCtx(ctx context.Context, md statev2.Metadata, isFnSpan bool) context.Context {
 	fntrace := md.Config.FunctionTrace()
 	if fntrace != nil {
 		// NOTE:

@@ -96,6 +96,6 @@ func TestConcurrency_ScopeAccount(t *testing.T) {
 	}
 
 	require.Eventually(t, func() bool {
-		return 6 == atomic.LoadInt32(&total)
+		return atomic.LoadInt32(&total) == 6
 	}, redis_state.PartitionConcurrencyLimitRequeueExtension/2, time.Millisecond*10)
 }

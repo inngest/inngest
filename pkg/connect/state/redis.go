@@ -31,8 +31,8 @@ var (
 )
 
 var (
-	WorkerGroupNotFoundErr = fmt.Errorf("worker group not found")
-	GatewayNotFoundErr     = fmt.Errorf("gateway not found")
+	ErrWorkerGroupNotFound = fmt.Errorf("worker group not found")
+	ErrGatewayNotFound     = fmt.Errorf("gateway not found")
 )
 
 func init() {
@@ -548,7 +548,7 @@ func (r *redisConnectionStateManager) GetWorkerGroupByHash(ctx context.Context, 
 	byt, err := r.client.Do(ctx, cmd).AsBytes()
 	if err != nil {
 		if rueidis.IsRedisNil(err) {
-			return nil, WorkerGroupNotFoundErr
+			return nil, ErrWorkerGroupNotFound
 		}
 		return nil, fmt.Errorf("error retrieving worker group: %w", err)
 	}
@@ -574,7 +574,7 @@ func (r *redisConnectionStateManager) GetWorkerGroupsByHash(ctx context.Context,
 	groups := make([]WorkerGroup, 0)
 	for i, meta := range res {
 		if meta == "" {
-			return nil, fmt.Errorf("could not find group %q: %w", hashes[i], WorkerGroupNotFoundErr)
+			return nil, fmt.Errorf("could not find group %q: %w", hashes[i], ErrWorkerGroupNotFound)
 		}
 		var group WorkerGroup
 		if err := json.Unmarshal([]byte(meta), &group); err != nil {
@@ -664,7 +664,7 @@ func (r *redisConnectionStateManager) GetGateway(ctx context.Context, gatewayId 
 	).AsBytes()
 	if err != nil {
 		if rueidis.IsRedisNil(err) {
-			return nil, GatewayNotFoundErr
+			return nil, ErrGatewayNotFound
 		}
 
 		return nil, fmt.Errorf("could not get gateway state: %w", err)
