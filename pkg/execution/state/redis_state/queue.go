@@ -450,7 +450,7 @@ type ConcurrencyLimitGetter func(ctx context.Context, p QueuePartition) Partitio
 type SystemConcurrencyLimitGetter func(ctx context.Context, p QueuePartition) SystemPartitionConcurrencyLimits
 
 // AllowKeyQueues determines if key queues should be enabled for the account
-type AllowKeyQueues func(ctx context.Context, qp QueuePartition) bool
+type AllowKeyQueues func(ctx context.Context, acctID uuid.UUID) bool
 
 func WithAllowKeyQueues(kq AllowKeyQueues) QueueOpt {
 	return func(q *queue) {
@@ -460,7 +460,7 @@ func WithAllowKeyQueues(kq AllowKeyQueues) QueueOpt {
 
 // DisableLeaseChecks determines if existing lease checks on partition leasing and queue item
 // leasing should be disabled or not
-type DisableLeaseChecks func(ctx context.Context, qp QueuePartition) bool
+type DisableLeaseChecks func(ctx context.Context, acctID uuid.UUID) bool
 
 func WithDisableLeaseChecks(lc DisableLeaseChecks) QueueOpt {
 	return func(q *queue) {
@@ -527,10 +527,10 @@ func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 			// No-op: Use whatever's in the queue item by default
 			return item.Data.GetConcurrencyKeys()
 		},
-		allowKeyQueues: func(ctx context.Context, qp QueuePartition) bool {
+		allowKeyQueues: func(ctx context.Context, acctID uuid.UUID) bool {
 			return false
 		},
-		disableLeaseChecks: func(ctx context.Context, qp QueuePartition) bool {
+		disableLeaseChecks: func(ctx context.Context, acctID uuid.UUID) bool {
 			return false
 		},
 		itemIndexer:                     QueueItemIndexerFunc,
