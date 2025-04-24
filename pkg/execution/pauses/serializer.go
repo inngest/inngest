@@ -40,10 +40,10 @@ func serializeJSON(block *Block, metadata byte) ([]byte, error) {
 }
 
 func deserializeJSON(byt []byte) (*Block, error) {
-	// metadata is currently unused.
 	block := &Block{}
-	if err := json.Unmarshal(byt[2:], block); err != nil {
-		return nil, err
+	// metadata is currently unused, so trim the first byte off of the json
+	if err := json.Unmarshal(byt[1:], block); err != nil {
+		return nil, fmt.Errorf("error deserializing json block: %w", err)
 	}
 	return block, nil
 }

@@ -9,6 +9,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/util"
@@ -138,6 +139,7 @@ func (b blockstore) FlushIndexBlock(ctx context.Context, index Index) error {
 
 	return util.Lease(
 		ctx,
+		"flush index block",
 		// NOTE: Lease, Renew, and Revoke are closures because they need
 		// access to the Index field.  This makes util.Lease simple and
 		// minimal.
@@ -229,11 +231,14 @@ func (b blockstore) flushIndexBlock(ctx context.Context, index Index) error {
 		return fmt.Errorf("failed to write block index: %w", err)
 	}
 
-	// TODO: Remove len(block.Pauses) from the buffer, as they've been flushed.
-	//       We can't use the standard DeletePause item from the state store as
-	//       this will add delete indexes for compaction.
+	// Remove len(block.Pauses) from the buffer, as they've been flushed.
+	for _, p := range block.Pauses {
+		if err := b.buf.Delete(ctx, index, *p); err != nil {
+			logger.StdlibLogger(ctx).Warn("error deleting pause from buffer after flushing block", "error", err)
+		}
+	}
 
-	return fmt.Errorf("not implemented")
+	return nil
 }
 
 // BlocksSince returns all block IDs that have been written for a given index,
@@ -244,20 +249,25 @@ func (b blockstore) flushIndexBlock(ctx context.Context, index Index) error {
 // NOTE: This is NOT INCLUSIVE of since, ie. the range is (since, now].
 func (b blockstore) BlocksSince(ctx context.Context, index Index, since time.Time) ([]ulid.ULID, error) {
 	// Read from backing KV (redis/valkey/memorydb/fdb) indexes.
-	score := strconv.Itoa(int(since.UnixMilli()))
+	ms := since.UnixMilli()
+	score := "(" + strconv.Itoa(int(ms))
+	if since.IsZero() {
+		score = "-inf"
+	}
+
 	ids, err := b.rc.Do(
 		ctx,
-		b.rc.B().Zrange().Key(b.blockIndexKey(index)).Min("("+score).Max("+inf").Build(),
+		b.rc.B().Zrangebyscore().Key(b.blockIndexKey(index)).Min(score).Max("+inf").Build(),
 	).AsStrSlice()
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error querying block index: since %s: %w", score, err)
 	}
 
 	ulids := make([]ulid.ULID, len(ids))
 	for i, id := range ids {
 		ulids[i], err = ulid.Parse(id)
 		if err != nil {
-			return nil, err
+			return nil, fmt.Errorf("error parsing block ULID '%s': %w", id, err)
 		}
 	}
 	return ulids, nil
@@ -267,16 +277,11 @@ func (b blockstore) ReadBlock(ctx context.Context, index Index, blockID ulid.ULI
 	key := b.BlockKey(index, blockID)
 	byt, err := b.bucket.ReadAll(ctx, key)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("error reading block from index '%s': id '%s': %w", index, blockID, err)
 	}
 
 	// Unmarshal the block, using the first byte to figure out encoding.
 	return Deserialize(byt)
-}
-
-// GenerateKey generates a key for a given block ID.
-func (b blockstore) BlockKey(idx Index, blockID ulid.ULID) string {
-	return fmt.Sprintf("pauses/%s/%s/blk_%s", idx.WorkspaceID, idx.EventName, blockID)
 }
 
 // Delete deletes a pause from the backing blob.  Note that blobs are immutable;  we cannot
@@ -321,14 +326,15 @@ func (b blockstore) Delete(ctx context.Context, index Index, pause state.Pause) 
 		}()
 	}
 
-	return fmt.Errorf("not implemented")
+	return nil
 }
 
 // Compact reads all indexed deletes from block for an index, then compacts any blocks over a given threshold
 // by removing pauses and rewriting blocks.
 func (b *blockstore) Compact(ctx context.Context, idx Index) {
-	// TODO: Lease compaction for the index.
+	// Implement the following:
 
+	// TODO: Lease compaction for the index.
 	// TODO: Read all block metadata for the index
 	// TODO: Read all blockDeleteKey entries for the index
 	// TODO: For each deleted entry, record which block the delete is for.
@@ -372,6 +378,7 @@ func (b *blockstore) blockMetadata(ctx context.Context, idx Index, block *Block)
 	// current block size.  This is used during compaction.
 	return &blockMetadata{
 		Timeranges: [2]int64{earliest.UnixMilli(), latest.UnixMilli()}, // earliest/latest
+		UUIDranges: [2]uuid.UUID{block.Pauses[0].ID, block.Pauses[len(block.Pauses)-1].ID},
 		Len:        len(block.Pauses),
 	}, nil
 }
@@ -412,10 +419,17 @@ func (b *blockstore) addBlockIndex(ctx context.Context, idx Index, block *Block,
 
 }
 
+// GenerateKey generates a key for a given block ID.
+func (b blockstore) BlockKey(idx Index, blockID ulid.ULID) string {
+	return fmt.Sprintf("pauses/%s/%s/blk_%s", idx.WorkspaceID, idx.EventName, blockID)
+}
+
+// blockIndexKey is internal and stores a list of all blocks for a given index.
 func (b *blockstore) blockIndexKey(idx Index) string {
 	return fmt.Sprintf("{estate}:blk:idx:%s:%s", idx.WorkspaceID, util.XXHash(idx.EventName))
 }
 
+// blockMetadataKey is internal and stores metadata for a given block.
 func (b *blockstore) blockMetadataKey(idx Index) string {
 	return fmt.Sprintf("{estate}:blk:md:%s:%s", idx.WorkspaceID, util.XXHash(idx.EventName))
 }
@@ -428,11 +442,16 @@ func (b *blockstore) blockDeleteKey(idx Index) string {
 
 type blockMetadata struct {
 	// Timeranges are the unix millisecond time ranges that this block covers,
-	// in ascending order.  This includes the earliest and latest pauses *currently*
-	// stored in the block.  This may change when pauses are deleted or blocks are
-	// merged.
-	Timeranges [2]int64 `json:"r"`
-	// Len is the current number of pauses in the block.  This decreases on deletion.
+	// in ascending order.  This includes the earliest and latest pauses stored
+	// in the block AT THE TIME OF BLOCK CREATION.
+	Timeranges [2]int64 `json:"tr"`
+
+	// UUIDranges represents the first and last UUID for the pauses in this block
+	// AT THE TIME OF BLOCK CREATION.
+	UUIDranges [2]uuid.UUID `json:"ur"`
+
+	// Len is the current number of pauses in the block.  This decreases on compaction -
+	// only when a block is compacted and deletes are actually written to a block.
 	Len int `json:"len"`
 }
 

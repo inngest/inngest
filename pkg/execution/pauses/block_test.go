@@ -99,11 +99,12 @@ func TestBlockFlusher(t *testing.T) {
 	}
 
 	// Create a mock bufferer that returns some test pauses
+	pause := &state.Pause{
+		ID: uuid.New(),
+	}
 	mockBufferer := &mockBufferer{
 		pauses: []*state.Pause{
-			{
-				ID: uuid.New(),
-			},
+			pause,
 		},
 	}
 
@@ -135,12 +136,15 @@ func TestBlockFlusher(t *testing.T) {
 	require.NoError(t, err)
 	require.Len(t, blocks, 1)
 
+	// Verify the buffer has deleted the pause.
+	require.Len(t, mockBufferer.pauses, 0)
+
 	// Read the block back
 	block, err := store.ReadBlock(ctx, index, blocks[0])
 	require.NoError(t, err)
 	require.NotNil(t, block)
 	require.Len(t, block.Pauses, 1)
-	require.Equal(t, mockBufferer.pauses[0].ID, block.Pauses[0].ID)
+	require.Equal(t, pause.ID, block.Pauses[0].ID)
 
 	// Verify that the pauses are not in the buffer
 	require.Empty(t, mockBufferer.pauses, "pauses should be removed from buffer after flushing")

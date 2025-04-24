@@ -35,6 +35,10 @@ type Manager interface {
 	// Note that this may return state.ErrPauseNotFound if the current pause ID has already
 	// been consumed by another parallel process or because of a race condition.
 	ConsumePause(ctx context.Context, id uuid.UUID, data any) (state.ConsumePauseResult, error)
+
+	// Delete deletes a pause from either the block index or the buffer, depending on
+	// where the pause is stored.
+	Delete(ctx context.Context, index Index, pause state.Pause) error
 }
 
 // Bufferer represents a datastore which accepts all writes for pauses.
