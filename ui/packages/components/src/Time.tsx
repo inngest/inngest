@@ -56,6 +56,7 @@ export function Time({ className, format, value }: Props) {
           dateTime={date.toISOString()}
           onClick={(e) => {
             e.stopPropagation();
+            e.preventDefault();
             copyToClipboard(date.toISOString());
           }}
         >
