@@ -141,13 +141,14 @@ func (e *kafkaSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadO
 	for _, sp := range spans {
 		wg.Add(1)
 
-		for _, attr := range sp.Attributes() {
-			// don't bother sending to Kafka if it's gonna be deleted anyways
-			if attr.Key == consts.OtelSysStepDelete && attr.Value.AsBool() {
-				wg.Done()
-				continue
-			}
-		}
+		// TODO: skip publishing if delete tag is set
+		// for _, attr := range sp.Attributes() {
+		// 	// don't bother sending to Kafka if it's gonna be deleted anyways
+		// 	if attr.Key == consts.OtelSysStepDelete && attr.Value.AsBool() {
+		// 		wg.Done()
+		// 		continue
+		// 	}
+		// }
 
 		span, err := SpanToProto(ctx, sp)
 		if err != nil {
