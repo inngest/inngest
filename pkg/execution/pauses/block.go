@@ -201,6 +201,11 @@ func (b blockstore) flushIndexBlock(ctx context.Context, index Index) error {
 	// Trim any pauses that are nil.
 	block.Pauses = block.Pauses[:n]
 
+	metadata, err := b.blockMetadata(ctx, index, block)
+	if err != nil {
+		return fmt.Errorf("failed to generate block metadata: %w", err)
+	}
+
 	// TODO: Use the last pause ID as the block ID;  this ensures the block ID
 	// encodes the last pause's timestamp, which is useful for ordering.
 	//
@@ -223,7 +228,7 @@ func (b blockstore) flushIndexBlock(ctx context.Context, index Index) error {
 	}
 
 	// Write block index to our zset.
-	if err := b.addBlockIndex(ctx, index, block); err != nil {
+	if err := b.addBlockIndex(ctx, index, block, metadata); err != nil {
 		return fmt.Errorf("failed to write block index: %w", err)
 	}
 
@@ -324,7 +329,7 @@ func (b blockstore) Delete(ctx context.Context, index Index, pause state.Pause) 
 
 // Compact reads all indexed deletes from block for an index, then compacts any blocks over a given threshold
 // by removing pauses and rewriting blocks.
-func (b blockstore) Compact(ctx context.Context, idx Index) {
+func (b *blockstore) Compact(ctx context.Context, idx Index) {
 	// TODO: Lease compaction for the index.
 
 	// TODO: Read all block metadata for the index
@@ -337,7 +342,7 @@ func (b blockstore) Compact(ctx context.Context, idx Index) {
 	// 3. rewriting the block
 }
 
-func (b blockstore) blockIDForTimestamp(ctx context.Context, idx Index, ts time.Time) (*ulid.ULID, error) {
+func (b *blockstore) blockIDForTimestamp(ctx context.Context, idx Index, ts time.Time) (*ulid.ULID, error) {
 	score := strconv.Itoa(int(ts.UnixMilli()))
 	ids, err := b.rc.Do(
 		ctx,
@@ -353,14 +358,14 @@ func (b blockstore) blockIDForTimestamp(ctx context.Context, idx Index, ts time.
 	return nil, err
 }
 
-func (b blockstore) addBlockIndex(ctx context.Context, idx Index, block *Block) error {
+func (b *blockstore) blockMetadata(ctx context.Context, idx Index, block *Block) (*blockMetadata, error) {
 	earliest, err := b.buf.PauseTimestamp(ctx, idx, *block.Pauses[0])
 	if err != nil {
-		return fmt.Errorf("error fetching earliest pause time: %w", err)
+		return nil, fmt.Errorf("error fetching earliest pause time: %w", err)
 	}
 	latest, err := b.buf.PauseTimestamp(ctx, idx, *block.Pauses[len(block.Pauses)-1])
 	if err != nil {
-		return fmt.Errorf("error fetching latest pause time: %w", err)
+		return nil, fmt.Errorf("error fetching latest pause time: %w", err)
 	}
 
 	// Block indexes are a zset of blocks stored by last pause timestamp,
@@ -368,10 +373,19 @@ func (b blockstore) addBlockIndex(ctx context.Context, idx Index, block *Block) 
 	//
 	// We also have a mapping of block ID -> metadata, storing the timeranges and
 	// current block size.  This is used during compaction.
-	metadata, err := json.Marshal(blockMetadata{
+	return &blockMetadata{
 		Timeranges: [2]int64{earliest.UnixMilli(), latest.UnixMilli()}, // earliest/latest
 		Len:        len(block.Pauses),
-	})
+	}, nil
+}
+
+func (b *blockstore) addBlockIndex(ctx context.Context, idx Index, block *Block, md *blockMetadata) error {
+	// Block indexes are a zset of blocks stored by last pause timestamp,
+	// which is embedded into the pause ID.
+	//
+	// We also have a mapping of block ID -> metadata, storing the timeranges and
+	// current block size.  This is used during compaction.
+	metadata, err := json.Marshal(md)
 	if err != nil {
 		return err
 	}
@@ -401,17 +415,17 @@ func (b blockstore) addBlockIndex(ctx context.Context, idx Index, block *Block) 
 
 }
 
-func (b blockstore) blockIndexKey(idx Index) string {
+func (b *blockstore) blockIndexKey(idx Index) string {
 	return fmt.Sprintf("{estate}:blk:idx:%s:%s", idx.WorkspaceID, util.XXHash(idx.EventName))
 }
 
-func (b blockstore) blockMetadataKey(idx Index) string {
+func (b *blockstore) blockMetadataKey(idx Index) string {
 	return fmt.Sprintf("{estate}:blk:md:%s:%s", idx.WorkspaceID, util.XXHash(idx.EventName))
 }
 
 // blockDeleteKey tracks all deletes for a given index.
 // note that block
-func (b blockstore) blockDeleteKey(idx Index) string {
+func (b *blockstore) blockDeleteKey(idx Index) string {
 	return fmt.Sprintf("{estate}:blk:dels:%s:%s", idx.WorkspaceID, util.XXHash(idx.EventName))
 }
 
