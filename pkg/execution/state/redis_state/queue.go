@@ -1206,14 +1206,6 @@ func (q *queue) EnqueueItem(ctx context.Context, shard QueueShard, i osqueue.Que
 		parts[0].zsetKey(shard.RedisClient.kg),
 		parts[1].zsetKey(shard.RedisClient.kg),
 		parts[2].zsetKey(shard.RedisClient.kg),
-
-		shard.RedisClient.kg.BacklogSet(backlogs[0].BacklogID),
-		shard.RedisClient.kg.BacklogSet(backlogs[1].BacklogID),
-		shard.RedisClient.kg.BacklogSet(backlogs[2].BacklogID),
-		shard.RedisClient.kg.BacklogMeta(),
-		shard.RedisClient.kg.GlobalShadowPartitionSet(),
-		shard.RedisClient.kg.ShadowPartitionSet(shadowPartition.ShadowPartitionID),
-		shard.RedisClient.kg.ShadowPartitionMeta(),
 	}
 	// Append indexes
 	for _, idx := range q.itemIndexer(ctx, i, shard.RedisClient.kg) {
@@ -1221,6 +1213,16 @@ func (q *queue) EnqueueItem(ctx context.Context, shard QueueShard, i osqueue.Que
 			keys = append(keys, idx)
 		}
 	}
+
+	keys = append(keys,
+		shard.RedisClient.kg.BacklogSet(backlogs[0].BacklogID),
+		shard.RedisClient.kg.BacklogSet(backlogs[1].BacklogID),
+		shard.RedisClient.kg.BacklogSet(backlogs[2].BacklogID),
+		shard.RedisClient.kg.BacklogMeta(),
+		shard.RedisClient.kg.GlobalShadowPartitionSet(),
+		shard.RedisClient.kg.ShadowPartitionSet(shadowPartition.ShadowPartitionID),
+		shard.RedisClient.kg.ShadowPartitionMeta(),
+	)
 
 	enqueueToBacklogsVal := "0"
 	if enqueueToBacklogs {
