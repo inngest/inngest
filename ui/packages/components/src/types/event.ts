@@ -6,10 +6,10 @@ export type Event = {
   source?: string;
   version?: string;
   idempotencyKey?: string;
-  timestamp?: string;
+  timestamp?: Date;
   runs?: {
-    fnName: string;
-    fnSlug: string;
+    fnName?: string;
+    fnSlug?: string;
     id: string;
     status: string;
     startedAt?: Date;

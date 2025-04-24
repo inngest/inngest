@@ -62,7 +62,7 @@ export function useEventDetails() {
       idempotencyKey: 'custom-payload-id',
       name: 'UserSignedUp',
       source: 'Default Inngest key',
-      timestamp: 1745226902417,
+      timestamp: new Date(1745226902417),
       version: '2022-12-16',
       runs: [
         {

@@ -6,6 +6,7 @@ import { RiArrowRightSLine } from '@remixicon/react';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { type Row } from '@tanstack/react-table';
 
+import { CodeBlock } from '../CodeBlock';
 import {
   ElementWrapper,
   IDElement,
@@ -14,7 +15,6 @@ import {
   TextElement,
   TimeElement,
 } from '../DetailsCard/NewElement';
-import { IO } from '../RunDetailsV3/IO';
 import { Tabs } from '../RunDetailsV3/Tabs';
 import { StatusDot } from '../Status/StatusDot';
 import { DragDivider } from '../icons/DragDivider';
@@ -36,8 +36,6 @@ export function EventDetails({
   const eventInfoRef = useRef<HTMLDivElement>(null);
   const [leftWidth, setLeftWidth] = useState(55);
   const [isDragging, setIsDragging] = useState(false);
-  const [height, setHeight] = useState(0);
-  const MIN_HEIGHT = 186;
 
   const {
     isPending, // first load, no data
@@ -79,13 +77,6 @@ export function EventDetails({
   );
 
   useEffect(() => {
-    //
-    // left column height is dynamic and should determine right column height
-    const h = leftColumnRef.current?.clientHeight ?? 0;
-    setHeight(h > MIN_HEIGHT ? h : MIN_HEIGHT);
-  }, [leftColumnRef.current?.clientHeight]);
-
-  useEffect(() => {
     if (isDragging) {
       document.body.style.userSelect = 'none';
       window.addEventListener('mousemove', handleMouseMove);
@@ -108,14 +99,14 @@ export function EventDetails({
       <div ref={leftColumnRef} className="flex flex-col gap-2" style={{ width: `${leftWidth}%` }}>
         <div ref={eventInfoRef} className="flex flex-col gap-3">
           <div className="flex h-8 items-center justify-between gap-1 px-4">
-            <p className="text-sm">{row.original.name}</p>
+            <p className="text-muted text-xs">{row.original.name}</p>
             {expandedRowActions(row.original.name)}
           </div>
           <div className="flex flex-row flex-wrap items-center justify-start gap-x-10 gap-y-4 px-4">
             <ElementWrapper label="Event ID">
               {isPending ? <SkeletonElement /> : <IDElement>{eventDetailsData?.id}</IDElement>}
             </ElementWrapper>
-            <ElementWrapper label="Idempotency Key">
+            <ElementWrapper label="Idempotency key">
               {isPending ? (
                 <SkeletonElement />
               ) : (
@@ -153,12 +144,19 @@ export function EventDetails({
                 label: 'Raw payload',
                 id: 'rawPayload',
                 node: (
-                  <IO
-                    title="Payload"
-                    raw={
-                      '{\n  "name": "signup.new",\n  "data": {\n    "account_id": "119f5971-9878-46bd-a18f-4fecd",\n    "method": "",\n    "plan_name": "Free Tier"\n  },\n  "id": "119f5971-9878-46bd-a18f-4f0680174ecd",\n  "ts": 1711051784369,\n  "v": "2021-05-11.01"\n}'
-                    }
-                  ></IO>
+                  <div
+                    className="text-muted h-full overflow-y-scroll"
+                    onWheel={(e) => e.stopPropagation()}
+                  >
+                    <CodeBlock
+                      header={{ title: 'Payload', ...(error && { status: 'error' }) }}
+                      tab={{
+                        content:
+                          '{\n  "name": "signup.new",\n  "data": {\n    "account_id": "119f5971-9878-46bd-a18f-4fecd",\n    "method": "",\n    "plan_name": "Free Tier"\n  },\n  "id": "119f5971-9878-46bd-a18f-4f0680174ecd",\n  "ts": 1711051784369,\n  "v": "2021-05-11.01"\n}',
+                      }}
+                      allowFullScreen={true}
+                    />
+                  </div>
                 ),
               },
               {
@@ -176,9 +174,7 @@ export function EventDetails({
         <div
           className="absolute z-[1] -translate-x-1/2"
           style={{
-            top:
-              (eventInfoRef.current?.clientHeight ?? 0) +
-              (height - (eventInfoRef.current?.clientHeight ?? 0)) / 2,
+            top: (eventInfoRef.current?.clientHeight ?? 0) / 2,
           }}
         >
           <DragDivider className="bg-canvasBase" />
@@ -187,7 +183,7 @@ export function EventDetails({
 
       <div
         className="border-muted flex flex-col justify-start"
-        style={{ width: `${100 - leftWidth}%`, height: height }}
+        style={{ width: `${100 - leftWidth}%` }}
       >
         <div className="px-4 py-2">
           <p className="text-muted mb-4 text-xs font-medium uppercase">Functions Triggered</p>
