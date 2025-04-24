@@ -70,6 +70,9 @@ func (r redisBlockLeaser) Renew(ctx context.Context, index Index, existingLeaseI
 			strconv.Itoa(int(r.duration.Seconds())),
 		},
 	).AsInt64()
+	if err != nil {
+		return newLeaseID, fmt.Errorf("error renewing block lease: %w", err)
+	}
 	switch status {
 	case -1:
 		return newLeaseID, nil

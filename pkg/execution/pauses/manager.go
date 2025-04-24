@@ -8,6 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/logger"
 )
 
 var (
@@ -75,7 +76,11 @@ func (m manager) Write(ctx context.Context, index Index, pauses ...*state.Pause)
 
 	// If this is larger than the max buffer len, schedule a new block write.
 	if m.bs != nil && n >= m.bs.BlockSize() {
-		go m.FlushIndexBlock(ctx, index)
+		go func() {
+			if err := m.FlushIndexBlock(ctx, index); err != nil {
+				logger.StdlibLogger(ctx).Error("error flushing block", "error", err, "index", index)
+			}
+		}()
 	}
 
 	return n, nil
