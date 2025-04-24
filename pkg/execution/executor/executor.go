@@ -450,7 +450,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		}
 		evts[n] = byt
 	}
-	// EvaluatedKey the run priority based off of the input event data.
+	// Evaluate the run priority based off of the input event data.
 	evtMap := req.Events[0].GetEvent().Map()
 	factor, _ := req.Function.RunPriorityFactor(ctx, evtMap)
 	// function run spanID
@@ -621,7 +621,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 			triggeringID := req.Events[0].GetInternalID().String()
 
 			var expr *string
-			// EvaluatedKey the expression.  This lets us inspect the expression's attributes
+			// Evaluate the expression.  This lets us inspect the expression's attributes
 			// so that we can store only the attrs used in the expression in the pause,
 			// saving space, bandwidth, etc.
 			if c.If != nil {

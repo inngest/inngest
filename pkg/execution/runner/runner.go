@@ -550,7 +550,7 @@ func (s *svc) functions(ctx context.Context, tracked event.TrackedEvent) error {
 					continue
 				}
 
-				// EvaluatedKey all expressions for matching triggers
+				// Evaluate all expressions for matching triggers
 				if t.Expression != nil {
 					// Execute expressions here, ensuring that each function is only triggered
 					// under the correct conditions.
