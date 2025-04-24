@@ -2107,7 +2107,7 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 	disableLeaseChecks := false
 	if isSystem && q.disableSystemQueueLeaseChecks != nil {
 		disableLeaseChecks = q.disableSystemQueueLeaseChecks(ctx)
-	} else if !isSystem && q.disableLeaseChecks != nil {
+	} else if !isSystem && q.disableLeaseChecks != nil && item.Data.Identifier.AccountID != uuid.Nil {
 		disableLeaseChecks = q.disableLeaseChecks(ctx, item.Data.Identifier.AccountID)
 	}
 
@@ -2619,9 +2619,17 @@ func (q *queue) PartitionLease(ctx context.Context, p *QueuePartition, duration 
 		fnMetaKey = *p.FunctionID
 	}
 
-	// TODO: disable lease checking by modifying inputs into lua script
-	// if q.disableLeaseChecks(ctx, p.AccountID) {
-	// }
+	disableLeaseChecks := false
+	if p.IsSystem() && q.disableSystemQueueLeaseChecks != nil {
+		disableLeaseChecks = q.disableSystemQueueLeaseChecks(ctx)
+	} else if !p.IsSystem() && q.disableLeaseChecks != nil && p.AccountID != uuid.Nil {
+		disableLeaseChecks = q.disableLeaseChecks(ctx, p.AccountID)
+	}
+
+	disableLeaseChecksVal := "0"
+	if disableLeaseChecks {
+		disableLeaseChecksVal = "1"
+	}
 
 	keys := []string{
 		q.primaryQueueShard.RedisClient.kg.PartitionItem(),
@@ -2650,6 +2658,7 @@ func (q *queue) PartitionLease(ctx context.Context, p *QueuePartition, duration 
 		customKeyLimit,
 		now.Add(PartitionConcurrencyLimitRequeueExtension).Unix(),
 		p.AccountID.String(),
+		disableLeaseChecksVal,
 	})
 
 	if err != nil {
