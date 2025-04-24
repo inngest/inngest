@@ -14,6 +14,69 @@ import (
 	"gocloud.dev/blob/memblob"
 )
 
+func TestBlockID(t *testing.T) {
+	// Create a block with a deterministic pause
+	pauseID, err := uuid.Parse("00000001-0000-0000-0000-000000000001")
+	require.NoError(t, err)
+
+	pause := &state.Pause{
+		ID: pauseID,
+	}
+
+	block := &Block{
+		Index:  Index{WorkspaceID: uuid.New(), EventName: "test.event"},
+		Pauses: []*state.Pause{pause},
+	}
+
+	metadata := &blockMetadata{
+		Timeranges: [2]int64{100000, 200000}, // milliseconds
+		Len:        1,
+	}
+
+	// Generate the block ID
+	id := blockID(block, metadata)
+
+	// Verify the timestamp part of the ULID matches our latest timestamp
+	require.Equal(t, uint64(200000), id.Time())
+
+	// Verify determinism by generating another ID with the same inputs
+	id2 := blockID(block, metadata)
+	require.Equal(t, id.String(), id2.String())
+
+	t.Run("with a new pause ID", func(t *testing.T) {
+		// Create a new block with a different pause ID
+		pauseID2, err := uuid.Parse("00000001-0000-0000-0000-000000000002")
+		require.NoError(t, err)
+
+		block2 := &Block{
+			Index: block.Index,
+			Pauses: []*state.Pause{
+				{ID: pauseID2},
+			},
+		}
+
+		// Generate a block ID with the new pause
+		id3 := blockID(block2, metadata)
+
+		// Verify the IDs are different due to different pause IDs
+		require.NotEqual(t, id.String(), id3.String())
+
+		// But the timestamp part should still be the same
+		require.Equal(t, uint64(200000), id3.Time())
+	})
+
+	t.Run("with a new timestamp", func(t *testing.T) {
+		metadata.Timeranges[1] = 300000
+
+		// Verify determinism by generating another ID with the same inputs
+		id4 := blockID(block, metadata)
+		require.NotEqual(t, id.String(), id4.String())
+
+		// Verify the timestamp part of the ULID matches our latest timestamp
+		require.Equal(t, uint64(300000), id4.Time())
+	})
+}
+
 func TestBlockFlusher(t *testing.T) {
 	// Setup miniredis
 	r := miniredis.RunT(t)
@@ -99,7 +162,7 @@ func (m *mockBufferer) PausesSince(ctx context.Context, index Index, since time.
 	return &mockPauseIterator{pauses: m.pauses}, nil
 }
 
-func (m *mockBufferer) PauseTimestamp(ctx context.Context, pause state.Pause) (time.Time, error) {
+func (m *mockBufferer) PauseTimestamp(ctx context.Context, index Index, pause state.Pause) (time.Time, error) {
 	return time.Now(), nil
 }
 

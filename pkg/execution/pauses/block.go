@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"math/rand/v2"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/inngest/inngest/pkg/execution/state"
@@ -206,13 +207,9 @@ func (b blockstore) flushIndexBlock(ctx context.Context, index Index) error {
 		return fmt.Errorf("failed to generate block metadata: %w", err)
 	}
 
-	// TODO: Use the last pause ID as the block ID;  this ensures the block ID
-	// encodes the last pause's timestamp, which is useful for ordering.
-	//
-	// NOTE: We generate deterministic ULIDs from pauses here based off of the
-	//       pause timestamp and the UUID.  If the UUIDs are NOT v7, we attempt
-	//       to get the "added at" index for the pause (zset score).  If THAT fails,
-	//       we use a hard-coded timestamp in the past (as all new pauses are V7).
+	// Generate a deterministic ULID for the block ID based off of the last pause
+	// timestamp and ID in our block.
+	block.ID = blockID(block, metadata)
 
 	// Marshal the block.  We currently use JSON encoding everywhere, but
 	// we can amend Serialize to use protobuf if we desire via a new tag.
@@ -437,4 +434,12 @@ type blockMetadata struct {
 	Timeranges [2]int64 `json:"r"`
 	// Len is the current number of pauses in the block.  This decreases on deletion.
 	Len int `json:"len"`
+}
+
+// blockID generates a deterministic ULID based off of this timestamp and
+// the last pause ID
+func blockID(b *Block, m *blockMetadata) ulid.ULID {
+	sum := util.XXHash(b.Pauses[len(b.Pauses)-1].ID.String())
+	entropy := ulid.Monotonic(strings.NewReader(sum), 0)
+	return ulid.MustNew(uint64(m.Timeranges[1]), entropy)
 }
