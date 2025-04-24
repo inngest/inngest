@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/twmb/franz-go/pkg/kgo"
