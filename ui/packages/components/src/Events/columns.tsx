@@ -49,8 +49,12 @@ export function useColumns({
     columnHelper.accessor('runs', {
       cell: (info) => {
         const runs = info.getValue();
-        if (!runs) {
-          return null;
+        if (!runs || runs.length === 0) {
+          return (
+            <TextCell>
+              <span className="text-subtle">-</span>
+            </TextCell>
+          );
         }
 
         return (

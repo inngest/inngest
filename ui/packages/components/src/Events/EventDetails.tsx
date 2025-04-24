@@ -15,7 +15,6 @@ import {
   TextElement,
   TimeElement,
 } from '../DetailsCard/NewElement';
-import { Tabs } from '../RunDetailsV3/Tabs';
 import { StatusDot } from '../Status/StatusDot';
 import { DragDivider } from '../icons/DragDivider';
 import type { EventsTable } from './EventsTable';
@@ -36,7 +35,7 @@ export function EventDetails({
   const containerRef = useRef<HTMLDivElement>(null);
   const leftColumnRef = useRef<HTMLDivElement>(null);
   const eventInfoRef = useRef<HTMLDivElement>(null);
-  const [leftWidth, setLeftWidth] = useState(55);
+  const [leftWidth, setLeftWidth] = useState(70);
   const [isDragging, setIsDragging] = useState(false);
 
   const {
@@ -106,7 +105,7 @@ export function EventDetails({
       <div ref={leftColumnRef} className="flex flex-col gap-2" style={{ width: `${leftWidth}%` }}>
         <div ref={eventInfoRef} className="flex flex-col gap-3">
           <div className="flex h-8 items-center justify-between gap-1 px-4">
-            <p className="text-muted text-xs">{row.original.name}</p>
+            <p className="text-muted text-sm">{row.original.name}</p>
             {expandedRowActions(row.original.name)}
           </div>
           <div className="flex flex-row flex-wrap items-center justify-start gap-x-10 gap-y-4 px-4">
@@ -144,34 +143,17 @@ export function EventDetails({
               )}
             </ElementWrapper>
           </div>
-          <Tabs
-            defaultActive="rawPayload"
-            tabs={[
-              {
-                label: 'Raw payload',
-                id: 'rawPayload',
-                node: (
-                  <div
-                    className="text-muted h-full overflow-y-scroll"
-                    onWheel={(e) => e.stopPropagation()}
-                  >
-                    <CodeBlock
-                      header={{ title: 'Payload', ...(error && { status: 'error' }) }}
-                      tab={{
-                        content: eventPayloadData?.payload || 'No payload available',
-                      }}
-                      allowFullScreen={true}
-                    />
-                  </div>
-                ),
-              },
-              {
-                label: 'Formatted data',
-                id: 'formattedData',
-                node: <p></p>,
-              },
-            ]}
-          />
+          {eventPayloadData?.payload && (
+            <div className="border-subtle border-t pl-px">
+              <CodeBlock
+                header={{ title: 'Payload', ...(error && { status: 'error' }) }}
+                tab={{
+                  content: eventPayloadData?.payload,
+                }}
+                allowFullScreen={true}
+              />
+            </div>
+          )}
         </div>
       </div>
 
@@ -194,7 +176,7 @@ export function EventDetails({
         <div className="px-4 py-2">
           <p className="text-muted mb-4 text-xs font-medium uppercase">Functions Triggered</p>
           {row.original?.runs?.length ? (
-            <ul className="divide-subtle divide-y [&>*:not(:first-child)]:pt-[6px] [&>*:not(:last-child)]:pb-[6px]">
+            <ul className="divide-light divide-y [&>*:not(:first-child)]:pt-[6px] [&>*:not(:last-child)]:pb-[6px]">
               {row.original.runs.map((run) => (
                 <li key={run.fnSlug}>
                   <NextLink
