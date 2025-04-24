@@ -449,6 +449,25 @@ type ConcurrencyLimitGetter func(ctx context.Context, p QueuePartition) Partitio
 // SystemConcurrencyLimitGetter returns the concurrency limits for a given system partition.
 type SystemConcurrencyLimitGetter func(ctx context.Context, p QueuePartition) SystemPartitionConcurrencyLimits
 
+// AllowKeyQueues determines if key queues should be enabled for the account
+type AllowKeyQueues func(ctx context.Context, qp QueuePartition) bool
+
+func WithAllowKeyQueues(kq AllowKeyQueues) QueueOpt {
+	return func(q *queue) {
+		q.allowKeyQueues = kq
+	}
+}
+
+// DisableLeaseChecks determines if existing lease checks on partition leasing and queue item
+// leasing should be disabled or not
+type DisableLeaseChecks func(ctx context.Context, qp QueuePartition) bool
+
+func WithDisableLeaseChecks(lc DisableLeaseChecks) QueueOpt {
+	return func(q *queue) {
+		q.disableLeaseChecks = lc
+	}
+}
+
 func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 	q := &queue{
 		primaryQueueShard: primaryQueueShard,
@@ -563,6 +582,9 @@ type queue struct {
 	concurrencyLimitGetter          ConcurrencyLimitGetter
 	systemConcurrencyLimitGetter    SystemConcurrencyLimitGetter
 	customConcurrencyLimitRefresher QueueItemConcurrencyKeyLimitRefresher
+
+	allowKeyQueues     AllowKeyQueues
+	disableLeaseChecks DisableLeaseChecks
 
 	// idempotencyTTL is the default or static idempotency duration apply to jobs,
 	// if idempotencyTTLFunc is not defined.
