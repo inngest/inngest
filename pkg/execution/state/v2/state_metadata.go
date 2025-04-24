@@ -62,8 +62,8 @@ func V1FromMetadata(md Metadata) statev1.Identifier {
 }
 
 // NewPauseIdentifier crease a PauseIdentifier from an ID
-func NewPauseIdentifier(id ID) state.PauseIdentifier {
-	return state.PauseIdentifier{
+func NewPauseIdentifier(id ID) statev1.PauseIdentifier {
+	return statev1.PauseIdentifier{
 		RunID:      id.RunID,
 		FunctionID: id.FunctionID,
 		AccountID:  id.Tenant.AccountID,
@@ -71,7 +71,7 @@ func NewPauseIdentifier(id ID) state.PauseIdentifier {
 }
 
 // IDFromPause creates an ID from a pause.
-func IDFromPause(p state.Pause) ID {
+func IDFromPause(p statev1.Pause) ID {
 	return ID{
 		RunID:      p.Identifier.RunID,
 		FunctionID: p.Identifier.FunctionID,
