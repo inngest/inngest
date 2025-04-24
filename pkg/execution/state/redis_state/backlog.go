@@ -16,7 +16,7 @@ type CustomConcurrencyLimit struct {
 }
 
 type QueueShadowPartition struct {
-	ShadowPartitionID string
+	ShadowPartitionID string `json:"id,omitempty"`
 
 	FunctionID      uuid.UUID `json:"fid,omitempty"`
 	EnvID           uuid.UUID `json:"eid,omitempty"`
@@ -47,7 +47,7 @@ type QueueShadowPartition struct {
 }
 
 type QueueBacklog struct {
-	BacklogID string
+	BacklogID string `json:"id,omitempty"`
 
 	// Set for backlogs for a given custom concurrency key
 
@@ -150,8 +150,7 @@ func (q *queue) ItemBacklogs(ctx context.Context, i osqueue.QueueItem) []QueueBa
 		}
 
 		backlogs = append(backlogs, QueueBacklog{
-			BacklogID: fmt.Sprintf("conc:%s", key.Key),
-
+			BacklogID:        fmt.Sprintf("conc:%s", key.Key),
 			ConcurrencyScope: &scope,
 
 			// Hashed expression to identify which key this is in the shadow partition concurrency key list

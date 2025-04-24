@@ -879,6 +879,24 @@ func (q QueuePartition) concurrencyKey(kg QueueKeyGenerator) string {
 	}
 }
 
+func (q QueueBacklog) concurrencyKey(kg QueueKeyGenerator) string {
+	if q.ConcurrencyKey == nil || q.ConcurrencyScope == nil {
+		return kg.Concurrency("", "")
+	}
+
+	prefix := ""
+	switch *q.ConcurrencyScope {
+	case enums.ConcurrencyScopeFn:
+		prefix = "f"
+	case enums.ConcurrencyScopeAccount:
+		prefix = "a"
+	case enums.ConcurrencyScopeEnv:
+		prefix = "e"
+	}
+
+	return kg.Concurrency(prefix, *q.ConcurrencyKey)
+}
+
 // fnConcurrencyKey returns the concurrency key for a function scope limit, on the
 // entire function (not custom keys)
 func (q QueuePartition) fnConcurrencyKey(kg QueueKeyGenerator) string {
@@ -2072,19 +2090,27 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 		return nil, fmt.Errorf("unsupported queue shard kind for Lease: %s", q.primaryQueueShard.Kind)
 	}
 
-	if item.Data.Throttle != nil && denies != nil && denies.denyThrottle(item.Data.Throttle.Key) {
+	isSystem := item.QueueName != nil || item.Data.QueueName != nil
+
+	disableLeaseChecks := isSystem
+
+	if !disableLeaseChecks && q.disableLeaseChecks != nil {
+		disableLeaseChecks = q.disableLeaseChecks(ctx, item.Data.Identifier.AccountID)
+	}
+
+	if !disableLeaseChecks && item.Data.Throttle != nil && denies != nil && denies.denyThrottle(item.Data.Throttle.Key) {
 		return nil, ErrQueueItemThrottled
 	}
 
 	// Check to see if this key has already been denied in the lease iteration.
 	// If partition concurrency limits were encountered previously, fail early.
-	if denies != nil && denies.denyConcurrency(item.FunctionID.String()) {
+	if !disableLeaseChecks && denies != nil && denies.denyConcurrency(item.FunctionID.String()) {
 		// Note that we do not need to wrap the key as the key is already present.
 		return nil, ErrPartitionConcurrencyLimit
 	}
 
 	// Same for account concurrency limits
-	if denies != nil && denies.denyConcurrency(item.Data.Identifier.AccountID.String()) {
+	if !disableLeaseChecks && denies != nil && denies.denyConcurrency(item.Data.Identifier.AccountID.String()) {
 		return nil, ErrAccountConcurrencyLimit
 	}
 
@@ -2135,9 +2161,27 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 		}
 	}
 
-	// TODO: disable lease checks for queue item
-	// if q.disableLeaseChecks(ctx, item.Data.Identifier.AccountID) {
-	// }
+	enableAccountingForKeyQueues := false
+	if isSystem && q.allowSystemKeyQueues != nil {
+		enableAccountingForKeyQueues = q.allowSystemKeyQueues(ctx)
+	} else if !isSystem && item.Data.Identifier.AccountID != uuid.Nil {
+		enableAccountingForKeyQueues = q.allowKeyQueues(ctx, item.Data.Identifier.AccountID)
+	}
+
+	disableLeaseChecksVal := "0"
+	if disableLeaseChecks {
+		disableLeaseChecksVal = "1"
+	}
+
+	var backlogs []QueueBacklog
+	if enableAccountingForKeyQueues {
+		backlogs = q.ItemBacklogs(ctx, item)
+	}
+
+	// Pad backlogs to 3
+	for i := len(backlogs); i < 3; i++ {
+		backlogs = append(backlogs, QueueBacklog{})
+	}
 
 	keys := []string{
 		q.primaryQueueShard.RedisClient.kg.QueueItem(),
@@ -2156,7 +2200,13 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 		q.primaryQueueShard.RedisClient.kg.ThrottleKey(item.Data.Throttle),
 		// Finally, there are ALWAYS account-level concurrency keys.
 		accountConcurrencyKey,
+
+		// Key queues v2
+		backlogs[0].concurrencyKey(q.primaryQueueShard.RedisClient.kg),
+		backlogs[1].concurrencyKey(q.primaryQueueShard.RedisClient.kg),
+		backlogs[2].concurrencyKey(q.primaryQueueShard.RedisClient.kg),
 	}
+
 	args, err := StrSlice([]any{
 		item.ID,
 		leaseID.String(),
@@ -2172,6 +2222,9 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 		parts[0].PartitionType,
 		parts[1].PartitionType,
 		parts[2].PartitionType,
+
+		// Key queues v2
+		disableLeaseChecksVal,
 	})
 	if err != nil {
 		return nil, err
