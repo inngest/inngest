@@ -24,6 +24,15 @@ local keyPartitionA    = KEYS[6] -- queue:sorted:$workflowID - zset
 local keyPartitionB    = KEYS[7] -- e.g. sorted:c|t:$workflowID - zset
 local keyPartitionC    = KEYS[8] -- e.g. sorted:c|t:$workflowID - zset
 
+-- Key queues v2
+local keyBacklogSetA              = KEYS[9]          -- backlog:sorted:<backlogID> - zset
+local keyBacklogSetB              = KEYS[10]          -- backlog:sorted:<backlogID> - zset
+local keyBacklogSetC              = KEYS[11]          -- backlog:sorted:<backlogID> - zset
+local keyBacklogMeta              = KEYS[12]          -- backlogs - hash
+local keyGlobalShadowPartitionSet = KEYS[13]          -- shadow:sorted
+local keyShadowPartitionSet       = KEYS[14]          -- shadow:sorted:<fnID|queueName> - zset
+local keyShadowPartitionMeta      = KEYS[15]          -- shadows
+
 local jobID            = ARGV[1]           -- queue item ID
 local jobScore         = tonumber(ARGV[2]) -- enqueue at, in milliseconds
 local nowMS            = tonumber(ARGV[3]) -- in ms
@@ -37,6 +46,17 @@ local accountId           = ARGV[10]
 local partitionTypeA = tonumber(ARGV[11])
 local partitionTypeB = tonumber(ARGV[12])
 local partitionTypeC = tonumber(ARGV[13])
+
+-- Key queues v2
+local requeueToBacklog				= tonumber(ARGV[14])
+local shadowPartitionId       = ARGV[15]
+local shadowPartitionItem     = ARGV[16]
+local backlogItemA            = ARGV[17]
+local backlogItemB            = ARGV[18]
+local backlogItemC            = ARGV[19]
+local backlogIdA              = ARGV[20]
+local backlogIdB              = ARGV[21]
+local backlogIdC              = ARGV[22]
 
 -- $include(decode_ulid_time.lua)
 -- $include(get_queue_item.lua)
@@ -63,9 +83,18 @@ item.at = jobScore
 item.wt = jobScore
 redis.call("HSET", keyQueueHash, jobID, cjson.encode(item))
 
--- Update and requeue all partitions
-requeue_to_partition(keyPartitionA, partitionIdA, partitionItemA, partitionTypeA, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, jobScore, jobID, nowMS, accountId)
-requeue_to_partition(keyPartitionB, partitionIdB, partitionItemB, partitionTypeB, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, jobScore, jobID, nowMS, accountId)
-requeue_to_partition(keyPartitionC, partitionIdC, partitionItemC, partitionTypeC, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, jobScore, jobID, nowMS, accountId)
+if requeueToBacklog == 1 then
+		--
+  	-- Requeue item to backlog queues again
+  	--
+  	requeue_to_backlog(keyBacklogSetA, backlogIdA, backlogItemA, shadowPartitionId, shadowPartitionItem, partitionIdA, partitionItemA, partitionTypeA, keyPartitionMap, keyBacklogMeta, keyGlobalShadowPartitionSet, keyShadowPartitionMeta, keyShadowPartitionSet, queueScore, queueID, partitionTime, nowMS)
+    requeue_to_backlog(keyBacklogSetB, backlogIdB, backlogItemB, shadowPartitionId, shadowPartitionItem, partitionIdA, partitionItemA, partitionTypeA, keyPartitionMap, keyBacklogMeta, keyGlobalShadowPartitionSet, keyShadowPartitionMeta, keyShadowPartitionSet, queueScore, queueID, partitionTime, nowMS)
+    requeue_to_backlog(keyBacklogSetC, backlogIdC, backlogItemC, shadowPartitionId, shadowPartitionItem, partitionIdA, partitionItemA, partitionTypeA, keyPartitionMap, keyBacklogMeta, keyGlobalShadowPartitionSet, keyShadowPartitionMeta, keyShadowPartitionSet, queueScore, queueID, partitionTime, nowMS)
+else
+  -- Update and requeue all partitions
+  requeue_to_partition(keyPartitionA, partitionIdA, partitionItemA, partitionTypeA, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, jobScore, jobID, nowMS, accountId)
+  requeue_to_partition(keyPartitionB, partitionIdB, partitionItemB, partitionTypeB, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, jobScore, jobID, nowMS, accountId)
+  requeue_to_partition(keyPartitionC, partitionIdC, partitionItemC, partitionTypeC, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, jobScore, jobID, nowMS, accountId)
+end
 
 return 0

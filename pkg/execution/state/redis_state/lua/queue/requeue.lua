@@ -26,6 +26,18 @@ local concurrencyPointer      = KEYS[13]
 local keyItemIndexA           = KEYS[14]          -- custom item index 1
 local keyItemIndexB           = KEYS[15]          -- custom item index 2
 
+-- Key queues v2
+local keyBacklogSetA              = KEYS[16]          -- backlog:sorted:<backlogID> - zset
+local keyBacklogSetB              = KEYS[17]          -- backlog:sorted:<backlogID> - zset
+local keyBacklogSetC              = KEYS[18]          -- backlog:sorted:<backlogID> - zset
+local keyBacklogMeta              = KEYS[19]          -- backlogs - hash
+local keyGlobalShadowPartitionSet = KEYS[20]          -- shadow:sorted
+local keyShadowPartitionSet       = KEYS[21]          -- shadow:sorted:<fnID|queueName> - zset
+local keyShadowPartitionMeta      = KEYS[22]          -- shadows
+local keyBacklogConcurrencyA      = ARGV[23]
+local keyBacklogConcurrencyB      = ARGV[24]
+local keyBacklogConcurrencyC      = ARGV[25]
+
 local queueItem           = ARGV[1]
 local queueID             = ARGV[2]           -- id
 local queueScore          = tonumber(ARGV[3]) -- vesting time, in ms
@@ -41,6 +53,17 @@ local legacyPartitionName = ARGV[12]
 local partitionTypeA = tonumber(ARGV[13])
 local partitionTypeB = tonumber(ARGV[14])
 local partitionTypeC = tonumber(ARGV[15])
+
+-- Key queues v2
+local requeueToBacklog				= tonumber(ARGV[16])
+local shadowPartitionId       = ARGV[17]
+local shadowPartitionItem     = ARGV[18]
+local backlogItemA            = ARGV[19]
+local backlogItemB            = ARGV[20]
+local backlogItemC            = ARGV[21]
+local backlogIdA              = ARGV[22]
+local backlogIdB              = ARGV[23]
+local backlogIdC              = ARGV[24]
 
 -- $include(get_queue_item.lua)
 -- $include(get_partition_item.lua)
@@ -104,17 +127,39 @@ handleRequeueConcurrency(keyConcurrencyA, partitionIdA, partitionTypeA)
 handleRequeueConcurrency(keyConcurrencyB, partitionIdB, partitionTypeB)
 handleRequeueConcurrency(keyConcurrencyC, partitionIdC, partitionTypeC)
 
+-- Accounting for key queues
+if exists_without_ending(keyBacklogConcurrencyA, ":-") == true then
+	redis.call("ZREM", keyBacklogConcurrencyA, item.id)
+end
+
+if exists_without_ending(keyBacklogConcurrencyB, ":-") == true then
+	redis.call("ZREM", keyBacklogConcurrencyB, item.id)
+end
+
+if exists_without_ending(keyBacklogConcurrencyC, ":-") == true then
+	redis.call("ZREM", keyBacklogConcurrencyC, item.id)
+end
+
 -- Remove item from the account concurrency queue
 -- This does not have a scavenger queue, as it's purely an entitlement limitation. See extendLease
 -- and Lease for respective ZADD calls.
 redis.call("ZREM", keyAcctConcurrency, item.id)
 
---
--- Enqueue item to partition queues again
--- 
-requeue_to_partition(keyPartitionA, partitionIdA, partitionItemA, partitionTypeA, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, queueScore, queueID, nowMS, accountId)
-requeue_to_partition(keyPartitionB, partitionIdB, partitionItemB, partitionTypeB, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, queueScore, queueID, nowMS, accountId)
-requeue_to_partition(keyPartitionC, partitionIdC, partitionItemC, partitionTypeC, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, queueScore, queueID, nowMS, accountId)
+if requeueToBacklog == 1 then
+	--
+	-- Requeue item to backlog queues again
+	--
+	requeue_to_backlog(keyBacklogSetA, backlogIdA, backlogItemA, shadowPartitionId, shadowPartitionItem, partitionIdA, partitionItemA, partitionTypeA, keyPartitionMap, keyBacklogMeta, keyGlobalShadowPartitionSet, keyShadowPartitionMeta, keyShadowPartitionSet, queueScore, queueID, partitionTime, nowMS)
+  requeue_to_backlog(keyBacklogSetB, backlogIdB, backlogItemB, shadowPartitionId, shadowPartitionItem, partitionIdA, partitionItemA, partitionTypeA, keyPartitionMap, keyBacklogMeta, keyGlobalShadowPartitionSet, keyShadowPartitionMeta, keyShadowPartitionSet, queueScore, queueID, partitionTime, nowMS)
+  requeue_to_backlog(keyBacklogSetC, backlogIdC, backlogItemC, shadowPartitionId, shadowPartitionItem, partitionIdA, partitionItemA, partitionTypeA, keyPartitionMap, keyBacklogMeta, keyGlobalShadowPartitionSet, keyShadowPartitionMeta, keyShadowPartitionSet, queueScore, queueID, partitionTime, nowMS)
+else
+  --
+  -- Enqueue item to partition queues again
+  --
+  requeue_to_partition(keyPartitionA, partitionIdA, partitionItemA, partitionTypeA, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, queueScore, queueID, nowMS, accountId)
+  requeue_to_partition(keyPartitionB, partitionIdB, partitionItemB, partitionTypeB, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, queueScore, queueID, nowMS, accountId)
+  requeue_to_partition(keyPartitionC, partitionIdC, partitionItemC, partitionTypeC, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, queueScore, queueID, nowMS, accountId)
+end
 
 -- Add optional indexes.
 if keyItemIndexA ~= "" and keyItemIndexA ~= false and keyItemIndexA ~= nil then

@@ -2029,9 +2029,24 @@ func (q *queue) RequeueByJobID(ctx context.Context, queueShard QueueShard, jobID
 	// This is because a single queue item may be present in more than one queue.
 	parts, _ := q.ItemPartitions(ctx, queueShard, i)
 
-	// TODO: change the target of where this item will be enqueued to
-	// if q.allowKeyQueues(ctx, i.Data.Identifier.AccountID) {
-	// }
+	enqueueToBacklogs := false
+	if parts[0].IsSystem() && q.allowSystemKeyQueues != nil {
+		enqueueToBacklogs = q.allowSystemKeyQueues(ctx)
+	} else if i.Data.Identifier.AccountID != uuid.Nil && q.allowKeyQueues != nil {
+		enqueueToBacklogs = q.allowKeyQueues(ctx, i.Data.Identifier.AccountID)
+	}
+
+	var backlogs []QueueBacklog
+	var shadowPartition QueueShadowPartition
+	if enqueueToBacklogs {
+		backlogs = q.ItemBacklogs(ctx, i)
+		shadowPartition = q.ItemShadowPartition(ctx, i)
+	}
+
+	// Pad backlogs to 3
+	for i := len(backlogs); i < 3; i++ {
+		backlogs = append(backlogs, QueueBacklog{})
+	}
 
 	keys := []string{
 		queueShard.RedisClient.kg.QueueItem(),
@@ -2043,7 +2058,24 @@ func (q *queue) RequeueByJobID(ctx context.Context, queueShard QueueShard, jobID
 		parts[0].zsetKey(queueShard.RedisClient.kg),
 		parts[1].zsetKey(queueShard.RedisClient.kg),
 		parts[2].zsetKey(queueShard.RedisClient.kg),
+
+		queueShard.RedisClient.kg.BacklogSet(backlogs[0].BacklogID),
+		queueShard.RedisClient.kg.BacklogSet(backlogs[1].BacklogID),
+		queueShard.RedisClient.kg.BacklogSet(backlogs[2].BacklogID),
+		queueShard.RedisClient.kg.BacklogMeta(),
+		queueShard.RedisClient.kg.GlobalShadowPartitionSet(),
+		queueShard.RedisClient.kg.ShadowPartitionSet(shadowPartition.ShadowPartitionID),
+		queueShard.RedisClient.kg.ShadowPartitionMeta(),
+		backlogs[0].concurrencyKey(q.primaryQueueShard.RedisClient.kg),
+		backlogs[1].concurrencyKey(q.primaryQueueShard.RedisClient.kg),
+		backlogs[2].concurrencyKey(q.primaryQueueShard.RedisClient.kg),
 	}
+
+	requeueToBacklogsVal := "0"
+	if enqueueToBacklogs {
+		requeueToBacklogsVal = "1"
+	}
+
 	args, err := StrSlice([]any{
 		jobID,
 		strconv.Itoa(int(at.UnixMilli())),
@@ -2058,6 +2090,16 @@ func (q *queue) RequeueByJobID(ctx context.Context, queueShard QueueShard, jobID
 		parts[0].PartitionType,
 		parts[1].PartitionType,
 		parts[2].PartitionType,
+
+		requeueToBacklogsVal,
+		shadowPartition.ShadowPartitionID,
+		shadowPartition,
+		backlogs[0],
+		backlogs[1],
+		backlogs[2],
+		backlogs[0].BacklogID,
+		backlogs[1].BacklogID,
+		backlogs[2].BacklogID,
 	})
 	if err != nil {
 		return err
@@ -2512,6 +2554,43 @@ func (q *queue) Requeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		}
 	}
 
+	enqueueToBacklogs := false
+	if parts[0].IsSystem() && q.allowSystemKeyQueues != nil {
+		enqueueToBacklogs = q.allowSystemKeyQueues(ctx)
+	} else if i.Data.Identifier.AccountID != uuid.Nil && q.allowKeyQueues != nil {
+		enqueueToBacklogs = q.allowKeyQueues(ctx, i.Data.Identifier.AccountID)
+	}
+
+	var backlogs []QueueBacklog
+	var shadowPartition QueueShadowPartition
+	if enqueueToBacklogs {
+		backlogs = q.ItemBacklogs(ctx, i)
+		shadowPartition = q.ItemShadowPartition(ctx, i)
+	}
+
+	// Pad backlogs to 3
+	for i := len(backlogs); i < 3; i++ {
+		backlogs = append(backlogs, QueueBacklog{})
+	}
+
+	keys = append(keys,
+		queueShard.RedisClient.kg.BacklogSet(backlogs[0].BacklogID),
+		queueShard.RedisClient.kg.BacklogSet(backlogs[1].BacklogID),
+		queueShard.RedisClient.kg.BacklogSet(backlogs[2].BacklogID),
+		queueShard.RedisClient.kg.BacklogMeta(),
+		queueShard.RedisClient.kg.GlobalShadowPartitionSet(),
+		queueShard.RedisClient.kg.ShadowPartitionSet(shadowPartition.ShadowPartitionID),
+		queueShard.RedisClient.kg.ShadowPartitionMeta(),
+		backlogs[0].concurrencyKey(q.primaryQueueShard.RedisClient.kg),
+		backlogs[1].concurrencyKey(q.primaryQueueShard.RedisClient.kg),
+		backlogs[2].concurrencyKey(q.primaryQueueShard.RedisClient.kg),
+	)
+
+	requeueToBacklogsVal := "0"
+	if enqueueToBacklogs {
+		requeueToBacklogsVal = "1"
+	}
+
 	// NOTE: For backwards compatibility, we need to also remove the previously-used
 	// concurrency index item. While we use fully-qualified keys in concurrencyKey,
 	// previously we used function IDs or queueNames for system partitions.
@@ -2521,10 +2600,6 @@ func (q *queue) Requeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 			legacyPartitionName = part.Queue()
 		}
 	}
-
-	// TODO: change the target of where this item will be enqueued to
-	// if q.allowKeyQueues(ctx, i.Data.Identifier.AccountID) {
-	// }
 
 	args, err := StrSlice([]any{
 		i,
@@ -2545,6 +2620,16 @@ func (q *queue) Requeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		parts[0].PartitionType,
 		parts[1].PartitionType,
 		parts[2].PartitionType,
+
+		requeueToBacklogsVal,
+		shadowPartition.ShadowPartitionID,
+		shadowPartition,
+		backlogs[0],
+		backlogs[1],
+		backlogs[2],
+		backlogs[0].BacklogID,
+		backlogs[1].BacklogID,
+		backlogs[2].BacklogID,
 	})
 	if err != nil {
 		return err
