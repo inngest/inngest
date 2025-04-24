@@ -50,7 +50,7 @@ queries:
 
 .PHONY: snapshot
 snapshot:
-	goreleaser release --snapshot --skip-publish --rm-dist
+	goreleaser release --snapshot --skip publish --clean
 
 .PHONY: build-ui
 build-ui:
