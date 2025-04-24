@@ -2213,6 +2213,7 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 		}
 	}
 
+	// TODO should this continue working even if we disable allowSystemKeyQueues to roll back?
 	enableAccountingForKeyQueues := false
 	if isSystem && q.allowSystemKeyQueues != nil {
 		enableAccountingForKeyQueues = q.allowSystemKeyQueues(ctx)
@@ -2430,6 +2431,7 @@ func (q *queue) Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		accountConcurrencyKey = queueShard.RedisClient.kg.Concurrency("account", parts[0].Queue())
 	}
 
+	// TODO should this continue working even if we disable allowSystemKeyQueues to roll back?
 	enableAccountingForKeyQueues := false
 	if parts[0].IsSystem() && q.allowSystemKeyQueues != nil {
 		enableAccountingForKeyQueues = q.allowSystemKeyQueues(ctx)
@@ -2583,6 +2585,8 @@ func (q *queue) Requeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 
 	var backlogs []QueueBacklog
 	var shadowPartition QueueShadowPartition
+
+	// TODO should accounting continue working even if we disable allowSystemKeyQueues to roll back?
 	if enqueueToBacklogs {
 		backlogs = q.ItemBacklogs(ctx, i)
 		shadowPartition = q.ItemShadowPartition(ctx, i)
