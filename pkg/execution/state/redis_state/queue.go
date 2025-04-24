@@ -471,9 +471,17 @@ func WithAllowSystemKeyQueues(kq AllowSystemKeyQueues) QueueOpt {
 // leasing should be disabled or not
 type DisableLeaseChecks func(ctx context.Context, acctID uuid.UUID) bool
 
+type DisableSystemQueueLeaseChecks func(ctx context.Context) bool
+
 func WithDisableLeaseChecks(lc DisableLeaseChecks) QueueOpt {
 	return func(q *queue) {
 		q.disableLeaseChecks = lc
+	}
+}
+
+func WithDisableSystemQueueLeaseChecks(lc DisableSystemQueueLeaseChecks) QueueOpt {
+	return func(q *queue) {
+		q.disableSystemQueueLeaseChecks = lc
 	}
 }
 
@@ -542,6 +550,9 @@ func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 		disableLeaseChecks: func(ctx context.Context, acctID uuid.UUID) bool {
 			return false
 		},
+		disableSystemQueueLeaseChecks: func(ctx context.Context) bool {
+			return false
+		},
 		itemIndexer:                     QueueItemIndexerFunc,
 		backoffFunc:                     backoff.DefaultBackoff,
 		accountLeases:                   []leasedAccount{},
@@ -598,9 +609,10 @@ type queue struct {
 	systemConcurrencyLimitGetter    SystemConcurrencyLimitGetter
 	customConcurrencyLimitRefresher QueueItemConcurrencyKeyLimitRefresher
 
-	allowKeyQueues       AllowKeyQueues
-	allowSystemKeyQueues AllowSystemKeyQueues
-	disableLeaseChecks   DisableLeaseChecks
+	allowKeyQueues                AllowKeyQueues
+	allowSystemKeyQueues          AllowSystemKeyQueues
+	disableSystemQueueLeaseChecks DisableSystemQueueLeaseChecks
+	disableLeaseChecks            DisableLeaseChecks
 
 	// idempotencyTTL is the default or static idempotency duration apply to jobs,
 	// if idempotencyTTLFunc is not defined.
@@ -2092,9 +2104,10 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 
 	isSystem := item.QueueName != nil || item.Data.QueueName != nil
 
-	disableLeaseChecks := isSystem
-
-	if !disableLeaseChecks && q.disableLeaseChecks != nil {
+	disableLeaseChecks := false
+	if isSystem && q.disableSystemQueueLeaseChecks != nil {
+		disableLeaseChecks = q.disableSystemQueueLeaseChecks(ctx)
+	} else if !isSystem && q.disableLeaseChecks != nil {
 		disableLeaseChecks = q.disableLeaseChecks(ctx, item.Data.Identifier.AccountID)
 	}
 
