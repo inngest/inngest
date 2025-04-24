@@ -44,18 +44,31 @@ type ShadowPartition struct {
 }
 
 type QueueBacklog struct {
-	ConcurrencyScope enums.ConcurrencyScope `json:"cs"`
+	// Set for backlogs for a given custom concurrency key
 
-	ConcurrencyKey         *string `json:"ck,omitempty"`
-	ConcurrencyKeyRawValue *string `json:"ckv,omitempty"`
+	ConcurrencyScope *enums.ConcurrencyScope `json:"cs,omitempty"`
+
+	// ConcurrencyKey is the hashed concurrency key expression (e.g. hash("event.data.customerId"))
+	ConcurrencyKey *string `json:"ck,omitempty"`
+
+	// ConcurrencyKeyValue is the hashed evaluated key (e.g. hash("customer1"))
+	ConcurrencyKeyValue *string `json:"ckv,omitempty"`
+
+	// ConcurrencyKeyUnhashedValue is the unhashed evaluated key (e.g. "customer1")
+	// This may be truncated for long values and may only be used for observability and debugging.
+	ConcurrencyKeyUnhashedValue *string `json:"ckuv,omitempty"`
 
 	// Set for backlogs containing start items only for a given throttle configuration
-	Throttle            bool    `json:"t,omitempty"`
-	ThrottleKey         *string `json:"tk,omitempty"`
+
+	// ThrottleKey is the hashed evaluated throttle key (e.g. hash("customer1")) or function ID (e.g. hash(fnID))
+	ThrottleKey *string `json:"tk,omitempty"`
+
+	// ThrottleKeyRawValue is the unhashed evaluated throttle key (e.g. "customer1") or function ID.
+	// This may be truncated for long values and may only be used for observability and debugging.
 	ThrottleKeyRawValue *string `json:"tkv,omitempty"`
 }
 
-func (q *queue) ItemBacklogs(ctx context.Context, shard QueueShard, i osqueue.QueueItem) []QueueBacklog {
+func (q *queue) ItemBacklogs(ctx context.Context, i osqueue.QueueItem) []QueueBacklog {
 	backlogs := make([]QueueBacklog, 0)
 
 	queueName := i.QueueName
@@ -80,7 +93,8 @@ func (q *queue) ItemBacklogs(ctx context.Context, shard QueueShard, i osqueue.Qu
 	// Enqueue start items to throttle backlog if throttle is configured
 	if i.Data.Throttle != nil && i.Data.Kind == osqueue.KindStart {
 		b := QueueBacklog{
-			Throttle:    true,
+			// This is always specified, even if no key was configured in the function definition.
+			// In that case, the Throttle Key is the hashed function ID. See Schedule() for more details.
 			ThrottleKey: &i.Data.Throttle.Key,
 		}
 
@@ -119,7 +133,7 @@ func (q *queue) ItemBacklogs(ctx context.Context, shard QueueShard, i osqueue.Qu
 
 	// Create concurrency key backlogs
 	for _, key := range concurrencyKeys {
-		scope, _, _, _ := key.ParseKey()
+		scope, _, checksum, _ := key.ParseKey()
 
 		var rawValue *string
 		if key.UnhashedEvaluatedKeyValue != "" {
@@ -127,10 +141,20 @@ func (q *queue) ItemBacklogs(ctx context.Context, shard QueueShard, i osqueue.Qu
 		}
 
 		backlogs = append(backlogs, QueueBacklog{
-			ConcurrencyScope:       scope,
-			ConcurrencyKey:         &key.Hash,
-			ConcurrencyKeyRawValue: rawValue,
+			ConcurrencyScope: &scope,
+
+			// Hashed expression to identify which key this is in the shadow partition concurrency key list
+			ConcurrencyKey: &key.Hash,
+
+			// Evaluated hashed and unhashed values
+			ConcurrencyKeyValue:         &checksum,
+			ConcurrencyKeyUnhashedValue: rawValue,
 		})
+	}
+
+	// Use default backlog if no concurrency/throttle backlogs are set up
+	if len(backlogs) == 0 {
+		backlogs = append(backlogs, QueueBacklog{})
 	}
 
 	return backlogs
