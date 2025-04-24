@@ -19,6 +19,15 @@ local keyPartitionC           	= KEYS[11]          -- e.g. sorted:c|t:$workflowI
 local keyItemIndexA           	= KEYS[12]          -- custom item index 1
 local keyItemIndexB           	= KEYS[13]          -- custom item index 2
 
+-- Key queues v2
+local keyBacklogSetA              = KEYS[14]          -- backlog:sorted:<backlogID> - zset
+local keyBacklogSetB              = KEYS[15]          -- backlog:sorted:<backlogID> - zset
+local keyBacklogSetC              = KEYS[16]          -- backlog:sorted:<backlogID> - zset
+local keyBacklogMeta              = KEYS[17]          -- backlogs - hash
+local keyGlobalShadowPartitionSet = KEYS[18]          -- shadow:sorted
+local keyShadowPartitionSet       = KEYS[19]          -- shadow:sorted:<fnID|queueName> - zset
+local keyShadowPartitionMeta      = KEYS[20]          -- shadows
+
 local queueItem           		= ARGV[1]           -- {id, lease id, attempt, max attempt, data, etc...}
 local queueID             		= ARGV[2]           -- id
 local queueScore          		= tonumber(ARGV[3]) -- vesting time, in milliseconds
@@ -38,6 +47,17 @@ local accountId           		= ARGV[16]
 local guaranteedCapacity      = ARGV[17]
 local guaranteedCapacityKey   = ARGV[18]
 
+-- Key queues v2
+local enqueueToBacklog				= tonumber(ARGV[19])
+local shadowPartitionId       = ARGV[20]
+local shadowPartitionItem     = ARGV[21]
+local backlogItemA            = ARGV[22]
+local backlogItemB            = ARGV[23]
+local backlogItemC            = ARGV[24]
+local backlogIdA              = ARGV[25]
+local backlogIdB              = ARGV[26]
+local backlogIdC              = ARGV[27]
+
 -- $include(update_pointer_score.lua)
 -- $include(ends_with.lua)
 -- $include(update_account_queues.lua)
@@ -56,9 +76,15 @@ if redis.call("HSETNX", queueKey, queueID, queueItem) == 0 then
     return 1
 end
 
-enqueue_to_partition(keyPartitionA, partitionIdA, partitionItemA, partitionTypeA, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, queueScore, queueID, partitionTime, nowMS)
-enqueue_to_partition(keyPartitionB, partitionIdB, partitionItemB, partitionTypeB, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, queueScore, queueID, partitionTime, nowMS)
-enqueue_to_partition(keyPartitionC, partitionIdC, partitionItemC, partitionTypeC, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, queueScore, queueID, partitionTime, nowMS)
+if enqueueToBacklog == 1 then
+	enqueue_to_backlog(keyBacklogSetA, backlogIdA, backlogItemA, shadowPartitionId, shadowPartitionItem, partitionIdA, partitionItemA, partitionTypeA, keyPartitionMap, keyBacklogMeta, keyGlobalShadowPartitionSet, keyShadowPartitionMeta, keyShadowPartitionSet, queueScore, queueID, partitionTime, nowMS)
+	enqueue_to_backlog(keyBacklogSetB, backlogIdB, backlogItemB, shadowPartitionId, shadowPartitionItem, partitionIdA, partitionItemA, partitionTypeA, keyPartitionMap, keyBacklogMeta, keyGlobalShadowPartitionSet, keyShadowPartitionMeta, keyShadowPartitionSet, queueScore, queueID, partitionTime, nowMS)
+	enqueue_to_backlog(keyBacklogSetC, backlogIdC, backlogItemC, shadowPartitionId, shadowPartitionItem, partitionIdA, partitionItemA, partitionTypeA, keyPartitionMap, keyBacklogMeta, keyGlobalShadowPartitionSet, keyShadowPartitionMeta, keyShadowPartitionSet, queueScore, queueID, partitionTime, nowMS)
+else
+  enqueue_to_partition(keyPartitionA, partitionIdA, partitionItemA, partitionTypeA, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, queueScore, queueID, partitionTime, nowMS)
+  enqueue_to_partition(keyPartitionB, partitionIdB, partitionItemB, partitionTypeB, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, queueScore, queueID, partitionTime, nowMS)
+  enqueue_to_partition(keyPartitionC, partitionIdC, partitionItemC, partitionTypeC, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, queueScore, queueID, partitionTime, nowMS)
+end
 
 if exists_without_ending(keyFnMetadata, ":fnMeta:-") == true then
 	-- note to future devs: if updating metadata, be sure you do not change the "off"

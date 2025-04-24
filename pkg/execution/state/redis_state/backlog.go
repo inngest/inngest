@@ -2,6 +2,7 @@ package redis_state
 
 import (
 	"context"
+	"fmt"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
@@ -14,7 +15,9 @@ type CustomConcurrencyLimit struct {
 	Limit int                    `json:"l"`
 }
 
-type ShadowPartition struct {
+type QueueShadowPartition struct {
+	ShadowPartitionID string
+
 	FunctionID      uuid.UUID `json:"fid,omitempty"`
 	EnvID           uuid.UUID `json:"eid,omitempty"`
 	AccountID       uuid.UUID `json:"aid,omitempty"`
@@ -44,6 +47,8 @@ type ShadowPartition struct {
 }
 
 type QueueBacklog struct {
+	BacklogID string
+
 	// Set for backlogs for a given custom concurrency key
 
 	ConcurrencyScope *enums.ConcurrencyScope `json:"cs,omitempty"`
@@ -86,13 +91,17 @@ func (q *queue) ItemBacklogs(ctx context.Context, i osqueue.QueueItem) []QueueBa
 
 	if queueName != nil {
 		// Simply use default backlog for system queues - there shouldn't be any concurrency or throttle keys involved.
-		backlogs = append(backlogs, QueueBacklog{})
+		backlogs = append(backlogs, QueueBacklog{
+			BacklogID: fmt.Sprintf("system:%s", *queueName),
+		})
 		return backlogs
 	}
 
 	// Enqueue start items to throttle backlog if throttle is configured
 	if i.Data.Throttle != nil && i.Data.Kind == osqueue.KindStart {
 		b := QueueBacklog{
+			BacklogID: fmt.Sprintf("throttle:%s:%s", i.FunctionID, i.Data.Throttle.Key),
+
 			// This is always specified, even if no key was configured in the function definition.
 			// In that case, the Throttle Key is the hashed function ID. See Schedule() for more details.
 			ThrottleKey: &i.Data.Throttle.Key,
@@ -141,6 +150,8 @@ func (q *queue) ItemBacklogs(ctx context.Context, i osqueue.QueueItem) []QueueBa
 		}
 
 		backlogs = append(backlogs, QueueBacklog{
+			BacklogID: fmt.Sprintf("conc:%s", key.Key),
+
 			ConcurrencyScope: &scope,
 
 			// Hashed expression to identify which key this is in the shadow partition concurrency key list
@@ -160,7 +171,7 @@ func (q *queue) ItemBacklogs(ctx context.Context, i osqueue.QueueItem) []QueueBa
 	return backlogs
 }
 
-func (q *queue) ItemShadowPartition(ctx context.Context, i osqueue.QueueItem) ShadowPartition {
+func (q *queue) ItemShadowPartition(ctx context.Context, i osqueue.QueueItem) QueueShadowPartition {
 	var (
 		ckeys = i.Data.GetConcurrencyKeys()
 	)
@@ -190,7 +201,8 @@ func (q *queue) ItemShadowPartition(ctx context.Context, i osqueue.QueueItem) Sh
 		systemLimits := q.systemConcurrencyLimitGetter(ctx, systemPartition)
 		systemPartition.ConcurrencyLimit = systemLimits.PartitionLimit
 
-		return ShadowPartition{
+		return QueueShadowPartition{
+			ShadowPartitionID: *queueName,
 			SystemQueueName:   queueName,
 			SystemConcurrency: systemLimits.PartitionLimit,
 		}
@@ -254,7 +266,9 @@ func (q *queue) ItemShadowPartition(ctx context.Context, i osqueue.QueueItem) Sh
 		}
 	}
 
-	return ShadowPartition{
+	return QueueShadowPartition{
+		ShadowPartitionID: i.FunctionID.String(),
+
 		// Identifiers
 		FunctionID: i.FunctionID,
 		EnvID:      i.WorkspaceID,

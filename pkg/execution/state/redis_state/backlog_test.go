@@ -483,7 +483,7 @@ func TestQueueItemShadowPartition(t *testing.T) {
 	fnID, wsID, accID := uuid.New(), uuid.New(), uuid.New()
 
 	t.Run("basic item", func(t *testing.T) {
-		expected := ShadowPartition{
+		expected := QueueShadowPartition{
 			FunctionID:            fnID,
 			EnvID:                 wsID,
 			AccountID:             accID,
@@ -522,7 +522,7 @@ func TestQueueItemShadowPartition(t *testing.T) {
 	t.Run("system queue", func(t *testing.T) {
 		sysQueueName := osqueue.KindQueueMigrate
 
-		expected := ShadowPartition{
+		expected := QueueShadowPartition{
 			FunctionID:            uuid.UUID{},
 			EnvID:                 uuid.UUID{},
 			AccountID:             uuid.UUID{},
@@ -555,7 +555,7 @@ func TestQueueItemShadowPartition(t *testing.T) {
 		rawThrottleKey := "customer1"
 		hashedThrottleKey := osqueue.HashID(ctx, rawThrottleKey)
 
-		expected := ShadowPartition{
+		expected := QueueShadowPartition{
 			FunctionID:            fnID,
 			EnvID:                 wsID,
 			AccountID:             accID,
@@ -608,7 +608,7 @@ func TestQueueItemShadowPartition(t *testing.T) {
 		unhashedValue := "customer1"
 		fullKey := util.ConcurrencyKey(enums.ConcurrencyScopeFn, fnID, unhashedValue)
 
-		expected := ShadowPartition{
+		expected := QueueShadowPartition{
 			FunctionID:          fnID,
 			EnvID:               wsID,
 			AccountID:           accID,
@@ -667,7 +667,7 @@ func TestQueueItemShadowPartition(t *testing.T) {
 		unhashedValue := "customer1"
 		fullKey := util.ConcurrencyKey(enums.ConcurrencyScopeFn, fnID, unhashedValue)
 
-		expected := ShadowPartition{
+		expected := QueueShadowPartition{
 			FunctionID:          fnID,
 			EnvID:               wsID,
 			AccountID:           accID,

@@ -168,6 +168,16 @@ type QueueKeyGenerator interface {
 	PartitionQueueSet(pType enums.PartitionType, scopeID, xxhash string) string
 
 	//
+	// Backlog keys
+	//
+
+	GlobalShadowPartitionSet() string
+	BacklogSet(backlogID string) string
+	BacklogMeta() string
+	ShadowPartitionSet(shadowPartitionID string) string
+	ShadowPartitionMeta() string
+
+	//
 	// Queue metadata keys
 	//
 
@@ -323,17 +333,25 @@ func (u queueKeyGenerator) PartitionQueueSet(pType enums.PartitionType, scopeID,
 	}
 }
 
-//func (u queueKeyGenerator) FunctionBacklogSet(fnID, hashedKey) string {
-//	return fmt.Sprintf("{%s}:", u.queueDefaultKey)
-//}
-//
-//func (u queueKeyGenerator) SystemBacklogSet(queueName string) string {
-//	return fmt.Sprintf("{%s}:", u.queueDefaultKey)
-//}
-//
-//func (u queueKeyGenerator) FunctionBacklogMeta(fnID, hashedKey) string {
-//	return fmt.Sprintf("{%s}:", u.queueDefaultKey)
-//}
+func (u queueKeyGenerator) BacklogSet(backlogID string) string {
+	return fmt.Sprintf("{%s}:backlog:sorted:%s", u.queueDefaultKey, backlogID)
+}
+
+func (u queueKeyGenerator) BacklogMeta() string {
+	return fmt.Sprintf("{%s}:backlogs", u.queueDefaultKey)
+}
+
+func (u queueKeyGenerator) GlobalShadowPartitionSet() string {
+	return fmt.Sprintf("{%s}:shadow:sorted", u.queueDefaultKey)
+}
+
+func (u queueKeyGenerator) ShadowPartitionSet(shadowPartitionID string) string {
+	return fmt.Sprintf("{%s}:shadow:sorted:%s", u.queueDefaultKey, shadowPartitionID)
+}
+
+func (u queueKeyGenerator) ShadowPartitionMeta() string {
+	return fmt.Sprintf("{%s}:shadows", u.queueDefaultKey)
+}
 
 func (u queueKeyGenerator) FnMetadata(fnID uuid.UUID) string {
 	if fnID == uuid.Nil {

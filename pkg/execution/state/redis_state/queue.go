@@ -449,12 +449,21 @@ type ConcurrencyLimitGetter func(ctx context.Context, p QueuePartition) Partitio
 // SystemConcurrencyLimitGetter returns the concurrency limits for a given system partition.
 type SystemConcurrencyLimitGetter func(ctx context.Context, p QueuePartition) SystemPartitionConcurrencyLimits
 
+// AllowSystemKeyQueues determines if key queues should be enabled for system queues
+type AllowSystemKeyQueues func(ctx context.Context) bool
+
 // AllowKeyQueues determines if key queues should be enabled for the account
 type AllowKeyQueues func(ctx context.Context, acctID uuid.UUID) bool
 
 func WithAllowKeyQueues(kq AllowKeyQueues) QueueOpt {
 	return func(q *queue) {
 		q.allowKeyQueues = kq
+	}
+}
+
+func WithAllowSystemKeyQueues(kq AllowSystemKeyQueues) QueueOpt {
+	return func(q *queue) {
+		q.allowSystemKeyQueues = kq
 	}
 }
 
@@ -589,8 +598,9 @@ type queue struct {
 	systemConcurrencyLimitGetter    SystemConcurrencyLimitGetter
 	customConcurrencyLimitRefresher QueueItemConcurrencyKeyLimitRefresher
 
-	allowKeyQueues     AllowKeyQueues
-	disableLeaseChecks DisableLeaseChecks
+	allowKeyQueues       AllowKeyQueues
+	allowSystemKeyQueues AllowSystemKeyQueues
+	disableLeaseChecks   DisableLeaseChecks
 
 	// idempotencyTTL is the default or static idempotency duration apply to jobs,
 	// if idempotencyTTLFunc is not defined.
@@ -1137,6 +1147,7 @@ func (q *queue) EnqueueItem(ctx context.Context, shard QueueShard, i osqueue.Que
 		partitionTime = q.clock.Now()
 	}
 
+	// TODO Find a way so we don't have to run this when key queues are active
 	parts, _ := q.ItemPartitions(ctx, shard, i)
 	isSystemPartition := parts[0].IsSystem()
 
@@ -1162,9 +1173,24 @@ func (q *queue) EnqueueItem(ctx context.Context, shard QueueShard, i osqueue.Que
 		}
 	}
 
-	// TODO: change the target of where this item will be enqueued to
-	// if q.allowKeyQueues(ctx, i.Data.Identifier.AccountID) {
-	// }
+	enqueueToBacklogs := false
+	if isSystemPartition && q.allowSystemKeyQueues != nil {
+		enqueueToBacklogs = q.allowSystemKeyQueues(ctx)
+	} else if i.Data.Identifier.AccountID != uuid.Nil && q.allowKeyQueues != nil {
+		enqueueToBacklogs = q.allowKeyQueues(ctx, i.Data.Identifier.AccountID)
+	}
+
+	var backlogs []QueueBacklog
+	var shadowPartition QueueShadowPartition
+	if enqueueToBacklogs {
+		backlogs = q.ItemBacklogs(ctx, i)
+		shadowPartition = q.ItemShadowPartition(ctx, i)
+	}
+
+	// Pad backlogs to 3
+	for i := len(backlogs); i < 3; i++ {
+		backlogs = append(backlogs, QueueBacklog{})
+	}
 
 	keys := []string{
 		shard.RedisClient.kg.QueueItem(),            // Queue item
@@ -1180,12 +1206,25 @@ func (q *queue) EnqueueItem(ctx context.Context, shard QueueShard, i osqueue.Que
 		parts[0].zsetKey(shard.RedisClient.kg),
 		parts[1].zsetKey(shard.RedisClient.kg),
 		parts[2].zsetKey(shard.RedisClient.kg),
+
+		shard.RedisClient.kg.BacklogSet(backlogs[0].BacklogID),
+		shard.RedisClient.kg.BacklogSet(backlogs[1].BacklogID),
+		shard.RedisClient.kg.BacklogSet(backlogs[2].BacklogID),
+		shard.RedisClient.kg.BacklogMeta(),
+		shard.RedisClient.kg.GlobalShadowPartitionSet(),
+		shard.RedisClient.kg.ShadowPartitionSet(shadowPartition.ShadowPartitionID),
+		shard.RedisClient.kg.ShadowPartitionMeta(),
 	}
 	// Append indexes
 	for _, idx := range q.itemIndexer(ctx, i, shard.RedisClient.kg) {
 		if idx != "" {
 			keys = append(keys, idx)
 		}
+	}
+
+	enqueueToBacklogsVal := "0"
+	if enqueueToBacklogs {
+		enqueueToBacklogsVal = "1"
 	}
 
 	args, err := StrSlice([]any{
@@ -1216,6 +1255,16 @@ func (q *queue) EnqueueItem(ctx context.Context, shard QueueShard, i osqueue.Que
 
 		guaranteedCapacity,
 		guaranteedCapacityKey,
+
+		enqueueToBacklogsVal,
+		shadowPartition.ShadowPartitionID,
+		shadowPartition,
+		backlogs[0],
+		backlogs[1],
+		backlogs[2],
+		backlogs[0].BacklogID,
+		backlogs[1].BacklogID,
+		backlogs[2].BacklogID,
 	})
 	if err != nil {
 		return i, err
