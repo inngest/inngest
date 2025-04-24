@@ -138,31 +138,31 @@ type Event struct {
 	Version   string `json:"v,omitempty"`
 }
 
-func (evt Event) Time() time.Time {
-	return time.UnixMilli(evt.Timestamp)
+func (e Event) Time() time.Time {
+	return time.UnixMilli(e.Timestamp)
 }
 
-func (evt Event) Map() map[string]any {
-	if evt.Data == nil {
-		evt.Data = make(map[string]any)
+func (e Event) Map() map[string]any {
+	if e.Data == nil {
+		e.Data = make(map[string]any)
 	}
-	if evt.User == nil {
-		evt.User = make(map[string]any)
+	if e.User == nil {
+		e.User = make(map[string]any)
 	}
 
 	data := map[string]any{
-		"name": evt.Name,
-		"data": evt.Data,
-		"user": evt.User,
-		"id":   evt.ID,
+		"name": e.Name,
+		"data": e.Data,
+		"user": e.User,
+		"id":   e.ID,
 		// We cast to float64 because marshalling and unmarshalling from
 		// JSON automatically uses float64 as its type;  JS has no notion
 		// of ints.
-		"ts": float64(evt.Timestamp),
+		"ts": float64(e.Timestamp),
 	}
 
-	if evt.Version != "" {
-		data["v"] = evt.Version
+	if e.Version != "" {
+		data["v"] = e.Version
 	}
 
 	return data

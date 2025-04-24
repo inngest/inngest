@@ -1356,7 +1356,7 @@ func (m unshardedMgr) LoadEvaluablesSince(ctx context.Context, workspaceID uuid.
 		_ = m.DeletePause(ctx, *pause)
 	}
 
-	if it.Error() != context.Canceled && it.Error() != scanDoneErr {
+	if it.Error() != context.Canceled && it.Error() != errScanDone {
 		return it.Error()
 	}
 
@@ -1427,7 +1427,7 @@ func (i *bufIter) Error() error {
 	return i.err
 }
 
-var scanDoneErr = fmt.Errorf("scan done")
+var errScanDone = fmt.Errorf("scan done")
 
 type scanIter struct {
 	r   rueidis.Client
@@ -1485,7 +1485,7 @@ func (i *scanIter) fetch(ctx context.Context) error {
 
 	if i.cursor == 0 {
 		// We're done, no need to fetch.
-		return scanDoneErr
+		return errScanDone
 	}
 
 	// Scan 100 times up until there are values
@@ -1518,7 +1518,7 @@ func (i *scanIter) Next(ctx context.Context) bool {
 
 	if i.i >= (len(i.vals.Elements) - 1) {
 		err := i.fetch(ctx)
-		if err == scanDoneErr {
+		if err == errScanDone {
 			// No more present.
 			i.err = context.Canceled
 			if !i.aggregateStart.IsZero() {
@@ -1695,7 +1695,7 @@ func (i *keyIter) init(ctx context.Context, keys []string, chunk int64) error {
 	i.keys = keys
 	i.chunk = chunk
 	err := i.fetch(ctx)
-	if err == scanDoneErr {
+	if err == errScanDone {
 		return nil
 	}
 	return err
@@ -1718,7 +1718,7 @@ func (i *keyIter) fetch(ctx context.Context) error {
 			PkgName: pkgName,
 			// TODO: tag workspace ID eventually??
 		})
-		return scanDoneErr
+		return errScanDone
 	}
 
 	var load []string
@@ -1750,7 +1750,7 @@ func (i *keyIter) Next(ctx context.Context) bool {
 	}
 
 	err := i.fetch(ctx)
-	if err == scanDoneErr {
+	if err == errScanDone {
 		return false
 	}
 	return err == nil
