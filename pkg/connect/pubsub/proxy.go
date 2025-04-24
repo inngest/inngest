@@ -347,7 +347,7 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 			case <-leaseCtx.Done():
 				return
 			// Verify lease did not expire
-			case <-time.After(consts.ConnectWorkerRequestExtendLeaseInterval / 2):
+			case <-time.After(consts.ConnectWorkerRequestExtendLeaseInterval):
 			}
 
 			leased, err := i.stateManager.IsRequestLeased(ctx, opts.EnvID, opts.Data.RequestId)
@@ -360,7 +360,6 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 			if !leased {
 				// Selectively enable lease enforcement to create gradual rollout for existing connect users
 				if i.enforceLeaseExpiry != nil && !i.enforceLeaseExpiry(ctx, opts.AccountID) {
-					l.Warn("lease expired but enforcement flag disabled")
 					continue
 				}
 
