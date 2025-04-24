@@ -766,6 +766,21 @@ func (m shardedMgr) SavePending(ctx context.Context, i state.Identifier, pending
 	return nil
 }
 
+// PauseCreatedAt returns the timestamp a pause was created, using the given
+// workspace <> event Index.
+func (m unshardedMgr) PauseCreatedAt(ctx context.Context, workspaceID uuid.UUID, event string, pauseID uuid.UUID) (time.Time, error) {
+	pc := m.u.Pauses()
+	idx := pc.kg.PauseIndex(ctx, "add", workspaceID, event)
+	ts, err := pc.Client().Do(ctx, pc.Client().B().Zmscore().Key(idx).Member(pauseID.String()).Build()).AsInt64()
+	if rueidis.IsRedisNil(err) {
+		return time.Time{}, fmt.Errorf("pause timestamp not found")
+	}
+	if err != nil {
+		return time.Time{}, err
+	}
+	return time.Unix(ts, 0), nil
+}
+
 func (m unshardedMgr) SavePause(ctx context.Context, p state.Pause) (int64, error) {
 	packed, err := json.Marshal(p)
 	if err != nil {

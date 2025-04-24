@@ -51,7 +51,7 @@ func (r redisAdapter) Delete(ctx context.Context, index Index, pause state.Pause
 }
 
 // PauseTimestamp returns the created at timestamp for a pause.
-func (r redisAdapter) PauseTimestamp(ctx context.Context, pause state.Pause) (time.Time, error) {
-	// TODO: Fetch timestamp from index.
-	panic("not implemented")
+func (r redisAdapter) PauseTimestamp(ctx context.Context, index Index, pause state.Pause) (time.Time, error) {
+	// Fetch timestamp from index.
+	return r.rsm.PauseCreatedAt(ctx, index.WorkspaceID, index.EventName, pause.ID)
 }

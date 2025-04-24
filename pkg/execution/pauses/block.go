@@ -282,7 +282,7 @@ func (b blockstore) BlockKey(idx Index, blockID ulid.ULID) string {
 // via indexes, and eventually compact blocks.
 func (b blockstore) Delete(ctx context.Context, index Index, pause state.Pause) error {
 	// Check which blocks this pause exists in, then delete from the block index.
-	ts, err := b.buf.PauseTimestamp(ctx, pause)
+	ts, err := b.buf.PauseTimestamp(ctx, index, pause)
 	if err != nil {
 		return fmt.Errorf("unable to get timestamp for pause when processing block deletion: %w", err)
 	}
@@ -354,11 +354,11 @@ func (b blockstore) blockIDForTimestamp(ctx context.Context, idx Index, ts time.
 }
 
 func (b blockstore) addBlockIndex(ctx context.Context, idx Index, block *Block) error {
-	earliest, err := b.buf.PauseTimestamp(ctx, *block.Pauses[0])
+	earliest, err := b.buf.PauseTimestamp(ctx, idx, *block.Pauses[0])
 	if err != nil {
 		return fmt.Errorf("error fetching earliest pause time: %w", err)
 	}
-	latest, err := b.buf.PauseTimestamp(ctx, *block.Pauses[len(block.Pauses)-1])
+	latest, err := b.buf.PauseTimestamp(ctx, idx, *block.Pauses[len(block.Pauses)-1])
 	if err != nil {
 		return fmt.Errorf("error fetching latest pause time: %w", err)
 	}

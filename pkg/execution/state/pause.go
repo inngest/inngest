@@ -79,6 +79,10 @@ type PauseGetter interface {
 	//
 	// This should not return consumed pauses.
 	PauseByInvokeCorrelationID(ctx context.Context, wsID uuid.UUID, correlationID string) (*Pause, error)
+
+	// PauseCreatedAt returns the timestamp a pause was created, using the given
+	// workspace <> event Index.
+	PauseCreatedAt(ctx context.Context, workspaceID uuid.UUID, event string, pauseID uuid.UUID) (time.Time, error)
 }
 
 type ConsumePauseResult struct {
