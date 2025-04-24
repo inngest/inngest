@@ -410,6 +410,7 @@ func (s *svc) handleDebounce(ctx context.Context, item queue.Item) error {
 				FunctionPausedAt: di.FunctionPausedAt,
 			})
 			if err != nil {
+				span.SetAttributes(attribute.Bool(consts.OtelSysStepDelete, true))
 				return err
 			}
 
