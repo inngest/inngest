@@ -164,7 +164,9 @@ func (q *queue) ItemBacklogs(ctx context.Context, i osqueue.QueueItem) []QueueBa
 
 	// Use default backlog if no concurrency/throttle backlogs are set up
 	if len(backlogs) == 0 {
-		backlogs = append(backlogs, QueueBacklog{})
+		backlogs = append(backlogs, QueueBacklog{
+			BacklogID: fmt.Sprintf("default:%s", i.FunctionID),
+		})
 	}
 
 	return backlogs

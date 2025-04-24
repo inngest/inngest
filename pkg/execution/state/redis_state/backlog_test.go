@@ -2,6 +2,7 @@ package redis_state
 
 import (
 	"context"
+	"fmt"
 	"github.com/alicebob/miniredis/v2"
 	"github.com/cespare/xxhash/v2"
 	"github.com/google/uuid"
@@ -54,7 +55,10 @@ func TestQueueItemBacklogs(t *testing.T) {
 
 	t.Run("basic item", func(t *testing.T) {
 		expected := []QueueBacklog{
-			{}, // expect default backlog to be used
+			// expect default backlog to be used
+			{
+				BacklogID: fmt.Sprintf("default:%s", fnID),
+			},
 		}
 
 		backlogs := q.ItemBacklogs(ctx, osqueue.QueueItem{
@@ -83,7 +87,10 @@ func TestQueueItemBacklogs(t *testing.T) {
 		sysQueueName := osqueue.KindQueueMigrate
 
 		expected := []QueueBacklog{
-			{}, // expect default backlog to be used
+			// expect default backlog to be used
+			{
+				BacklogID: fmt.Sprintf("system:%s", sysQueueName),
+			},
 		}
 
 		backlogs := q.ItemBacklogs(ctx, osqueue.QueueItem{
@@ -114,6 +121,8 @@ func TestQueueItemBacklogs(t *testing.T) {
 
 		expected := []QueueBacklog{
 			{
+				BacklogID: fmt.Sprintf("throttle:%s:%s", fnID, hashedThrottleKey),
+
 				ThrottleKey:         &hashedThrottleKey,
 				ThrottleKeyRawValue: &rawThrottleKey,
 			},
@@ -153,6 +162,8 @@ func TestQueueItemBacklogs(t *testing.T) {
 
 		expected := []QueueBacklog{
 			{
+				BacklogID: fmt.Sprintf("throttle:%s:%s", fnID, hashedThrottleKey),
+
 				ThrottleKey:         &hashedThrottleKey,
 				ThrottleKeyRawValue: &rawThrottleKey,
 			},
@@ -191,7 +202,10 @@ func TestQueueItemBacklogs(t *testing.T) {
 		hashedThrottleKey := osqueue.HashID(ctx, rawThrottleKey)
 
 		expected := []QueueBacklog{
-			{}, // edge should go to default backlog if no concurrency keys are specified
+			// edge should go to default backlog if no concurrency keys are specified
+			{
+				BacklogID: fmt.Sprintf("default:%s", fnID),
+			},
 		}
 
 		backlogs := q.ItemBacklogs(ctx, osqueue.QueueItem{
@@ -224,7 +238,10 @@ func TestQueueItemBacklogs(t *testing.T) {
 
 	t.Run("function concurrency", func(t *testing.T) {
 		expected := []QueueBacklog{
-			{}, // expect default backlog to be used
+			// expect default backlog to be used
+			{
+				BacklogID: fmt.Sprintf("default:%s", fnID),
+			},
 		}
 
 		backlogs := q.ItemBacklogs(ctx, osqueue.QueueItem{
@@ -251,7 +268,10 @@ func TestQueueItemBacklogs(t *testing.T) {
 
 	t.Run("account concurrency", func(t *testing.T) {
 		expected := []QueueBacklog{
-			{}, // expect default backlog to be used
+			// expect default backlog to be used
+			{
+				BacklogID: fmt.Sprintf("default:%s", fnID),
+			},
 		}
 
 		backlogs := q.ItemBacklogs(ctx, osqueue.QueueItem{
@@ -289,6 +309,8 @@ func TestQueueItemBacklogs(t *testing.T) {
 
 		expected := []QueueBacklog{
 			{
+				BacklogID: fmt.Sprintf("conc:%s", fullKey),
+
 				ConcurrencyScope:            &scope,
 				ConcurrencyKey:              &hashedConcurrencyKeyExpr,
 				ConcurrencyKeyValue:         &checksum,
@@ -341,10 +363,14 @@ func TestQueueItemBacklogs(t *testing.T) {
 
 		expected := []QueueBacklog{
 			{
+				BacklogID: fmt.Sprintf("throttle:%s:%s", fnID, hashedThrottleKey),
+
 				ThrottleKey:         &hashedThrottleKey,
 				ThrottleKeyRawValue: &rawThrottleKey,
 			},
 			{
+				BacklogID: fmt.Sprintf("conc:%s", fullKey),
+
 				ConcurrencyScope:            &scope,
 				ConcurrencyKey:              &hashedConcurrencyKeyExpr,
 				ConcurrencyKeyValue:         &checksum,
@@ -403,6 +429,8 @@ func TestQueueItemBacklogs(t *testing.T) {
 
 		expected := []QueueBacklog{
 			{
+				BacklogID: fmt.Sprintf("conc:%s", fullKey),
+
 				ConcurrencyScope:            &scope,
 				ConcurrencyKey:              &hashedConcurrencyKeyExpr,
 				ConcurrencyKeyValue:         &checksum,
@@ -484,6 +512,7 @@ func TestQueueItemShadowPartition(t *testing.T) {
 
 	t.Run("basic item", func(t *testing.T) {
 		expected := QueueShadowPartition{
+			ShadowPartitionID:     fnID.String(),
 			FunctionID:            fnID,
 			EnvID:                 wsID,
 			AccountID:             accID,
@@ -523,6 +552,7 @@ func TestQueueItemShadowPartition(t *testing.T) {
 		sysQueueName := osqueue.KindQueueMigrate
 
 		expected := QueueShadowPartition{
+			ShadowPartitionID:     sysQueueName,
 			FunctionID:            uuid.UUID{},
 			EnvID:                 uuid.UUID{},
 			AccountID:             uuid.UUID{},
@@ -556,6 +586,7 @@ func TestQueueItemShadowPartition(t *testing.T) {
 		hashedThrottleKey := osqueue.HashID(ctx, rawThrottleKey)
 
 		expected := QueueShadowPartition{
+			ShadowPartitionID:     fnID.String(),
 			FunctionID:            fnID,
 			EnvID:                 wsID,
 			AccountID:             accID,
@@ -609,6 +640,7 @@ func TestQueueItemShadowPartition(t *testing.T) {
 		fullKey := util.ConcurrencyKey(enums.ConcurrencyScopeFn, fnID, unhashedValue)
 
 		expected := QueueShadowPartition{
+			ShadowPartitionID:   fnID.String(),
 			FunctionID:          fnID,
 			EnvID:               wsID,
 			AccountID:           accID,
@@ -668,6 +700,7 @@ func TestQueueItemShadowPartition(t *testing.T) {
 		fullKey := util.ConcurrencyKey(enums.ConcurrencyScopeFn, fnID, unhashedValue)
 
 		expected := QueueShadowPartition{
+			ShadowPartitionID:   fnID.String(),
 			FunctionID:          fnID,
 			EnvID:               wsID,
 			AccountID:           accID,
