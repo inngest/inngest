@@ -449,6 +449,25 @@ type ConcurrencyLimitGetter func(ctx context.Context, p QueuePartition) Partitio
 // SystemConcurrencyLimitGetter returns the concurrency limits for a given system partition.
 type SystemConcurrencyLimitGetter func(ctx context.Context, p QueuePartition) SystemPartitionConcurrencyLimits
 
+// AllowKeyQueues determines if key queues should be enabled for the account
+type AllowKeyQueues func(ctx context.Context, acctID uuid.UUID) bool
+
+func WithAllowKeyQueues(kq AllowKeyQueues) QueueOpt {
+	return func(q *queue) {
+		q.allowKeyQueues = kq
+	}
+}
+
+// DisableLeaseChecks determines if existing lease checks on partition leasing and queue item
+// leasing should be disabled or not
+type DisableLeaseChecks func(ctx context.Context, acctID uuid.UUID) bool
+
+func WithDisableLeaseChecks(lc DisableLeaseChecks) QueueOpt {
+	return func(q *queue) {
+		q.disableLeaseChecks = lc
+	}
+}
+
 func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 	q := &queue{
 		primaryQueueShard: primaryQueueShard,
@@ -508,6 +527,12 @@ func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 			// No-op: Use whatever's in the queue item by default
 			return item.Data.GetConcurrencyKeys()
 		},
+		allowKeyQueues: func(ctx context.Context, acctID uuid.UUID) bool {
+			return false
+		},
+		disableLeaseChecks: func(ctx context.Context, acctID uuid.UUID) bool {
+			return false
+		},
 		itemIndexer:                     QueueItemIndexerFunc,
 		backoffFunc:                     backoff.DefaultBackoff,
 		accountLeases:                   []leasedAccount{},
@@ -563,6 +588,9 @@ type queue struct {
 	concurrencyLimitGetter          ConcurrencyLimitGetter
 	systemConcurrencyLimitGetter    SystemConcurrencyLimitGetter
 	customConcurrencyLimitRefresher QueueItemConcurrencyKeyLimitRefresher
+
+	allowKeyQueues     AllowKeyQueues
+	disableLeaseChecks DisableLeaseChecks
 
 	// idempotencyTTL is the default or static idempotency duration apply to jobs,
 	// if idempotencyTTLFunc is not defined.
@@ -1133,6 +1161,10 @@ func (q *queue) EnqueueItem(ctx context.Context, shard QueueShard, i osqueue.Que
 			guaranteedCapacityKey = guaranteedCapacity.Key()
 		}
 	}
+
+	// TODO: change the target of where this item will be enqueued to
+	// if q.allowKeyQueues(ctx, i.Data.Identifier.AccountID) {
+	// }
 
 	keys := []string{
 		shard.RedisClient.kg.QueueItem(),            // Queue item
@@ -2048,6 +2080,10 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 		}
 	}
 
+	// TODO: disable lease checks for queue item
+	// if q.disableLeaseChecks(ctx, item.Data.Identifier.AccountID) {
+	// }
+
 	keys := []string{
 		q.primaryQueueShard.RedisClient.kg.QueueItem(),
 		// Pass in the actual key queue
@@ -2457,6 +2493,10 @@ func (q *queue) PartitionLease(ctx context.Context, p *QueuePartition, duration 
 	if p.FunctionID != nil {
 		fnMetaKey = *p.FunctionID
 	}
+
+	// TODO: disable lease checking by modifying inputs into lua script
+	// if q.disableLeaseChecks(ctx, p.AccountID) {
+	// }
 
 	keys := []string{
 		q.primaryQueueShard.RedisClient.kg.PartitionItem(),
