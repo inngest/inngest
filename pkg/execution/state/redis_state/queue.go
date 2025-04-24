@@ -527,6 +527,12 @@ func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 			// No-op: Use whatever's in the queue item by default
 			return item.Data.GetConcurrencyKeys()
 		},
+		allowKeyQueues: func(ctx context.Context, qp QueuePartition) bool {
+			return false
+		},
+		disableLeaseChecks: func(ctx context.Context, qp QueuePartition) bool {
+			return false
+		},
 		itemIndexer:                     QueueItemIndexerFunc,
 		backoffFunc:                     backoff.DefaultBackoff,
 		accountLeases:                   []leasedAccount{},
