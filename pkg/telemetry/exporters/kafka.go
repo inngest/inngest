@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/twmb/franz-go/pkg/kgo"
@@ -140,9 +141,18 @@ func (e *kafkaSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadO
 	for _, sp := range spans {
 		wg.Add(1)
 
+		for _, attr := range sp.Attributes() {
+			// don't bother sending to Kafka if it's gonna be deleted anyways
+			if attr.Key == consts.OtelSysStepDelete && attr.Value.AsBool() {
+				wg.Done()
+				continue
+			}
+		}
+
 		span, err := SpanToProto(ctx, sp)
 		if err != nil {
 			l.Error("error converting span to proto", "err", err)
+			wg.Done()
 			continue
 		}
 
