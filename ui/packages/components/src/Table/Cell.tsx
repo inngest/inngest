@@ -71,12 +71,14 @@ export function NumberCell({ value, term }: { value: number; term?: string }) {
     <Tooltip>
       <TooltipTrigger asChild>
         <span className={cn(cellStyles, 'text-subtle font-medium')}>
-          {value === 0
-            ? '-'
-            : Intl.NumberFormat('en-US', {
-                notation: 'compact',
-                maximumFractionDigits: 1,
-              }).format(value)}
+          {value === 0 ? (
+            <span className="text-light">—</span>
+          ) : (
+            Intl.NumberFormat('en-US', {
+              notation: 'compact',
+              maximumFractionDigits: 1,
+            }).format(value)
+          )}
         </span>
       </TooltipTrigger>
       <TooltipContent

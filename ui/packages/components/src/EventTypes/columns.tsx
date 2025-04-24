@@ -57,7 +57,7 @@ export function useColumns({
         if (!functions || functions.length === 0) {
           return (
             <TextCell>
-              <span className="text-subtle">-</span>
+              <span className="text-light">—</span>
             </TextCell>
           );
         }
