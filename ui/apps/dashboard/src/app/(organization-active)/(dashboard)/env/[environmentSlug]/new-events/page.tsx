@@ -10,7 +10,7 @@ import { RiArrowRightUpLine, RiExternalLinkLine, RiRefreshLine } from '@remixico
 
 import { EventInfo } from '@/components/Events/EventInfo';
 import SendEventButton from '@/components/Events/SendEventButton';
-import { useEventDetails, useEvents } from '@/components/Events/useEvents';
+import { useEventDetails, useEventPayload, useEvents } from '@/components/Events/useEvents';
 import { pathCreator } from '@/utils/urls';
 import { useAccountFeatures } from '@/utils/useAccountFeatures';
 
@@ -32,6 +32,7 @@ export default function EventsPage({
   }, [envSlug]);
   const getEvents = useEvents();
   const getEventDetails = useEventDetails();
+  const getEventPayload = useEventPayload();
   const features = useAccountFeatures();
 
   return (
@@ -50,6 +51,7 @@ export default function EventsPage({
         pathCreator={internalPathCreator}
         getEvents={getEvents}
         getEventDetails={getEventDetails}
+        getEventPayload={getEventPayload}
         features={{
           history: features.data?.history ?? 7,
         }}

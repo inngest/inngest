@@ -36,6 +36,7 @@ const refreshInterval = 5000;
 export function EventsTable({
   getEvents,
   getEventDetails,
+  getEventPayload,
   pathCreator,
   emptyActions,
   expandedRowActions,
@@ -61,6 +62,7 @@ export function EventsTable({
     celQuery?: string;
   }) => Promise<{ events: Omit<Event, 'payload'>[]; pageInfo: PageInfo; totalCount: number }>;
   getEventDetails: ({ eventName }: { eventName: string }) => Promise<Omit<Event, 'payload'>>;
+  getEventPayload: ({ eventName }: { eventName: string }) => Promise<Pick<Event, 'payload'>>;
   features: Pick<Features, 'history'>;
 }) {
   const columns = useColumns({ pathCreator });
@@ -222,6 +224,7 @@ export function EventsTable({
               pathCreator={pathCreator}
               row={row}
               getEventDetails={getEventDetails}
+              getEventPayload={getEventPayload}
               expandedRowActions={expandedRowActions}
             />
           )}

@@ -26,12 +26,16 @@ export function useEvents() {
             fnSlug: 'send-welcome-email',
             status: 'COMPLETED',
             id: 'id-1',
+            startedAt: new Date('2025-04-10T16:43:22.696Z'),
+            completedAt: new Date('2025-04-10T16:43:24.696Z'),
           },
           {
             fnName: 'SendNewsletter',
             fnSlug: 'send-newsletter',
             status: 'CANCELLED',
             id: 'id-2',
+            startedAt: new Date('2025-04-10T16:43:23.696Z'),
+            completedAt: new Date('2025-04-10T16:43:24.696Z'),
           },
         ],
       },
@@ -64,24 +68,21 @@ export function useEventDetails() {
       source: 'Default Inngest key',
       timestamp: new Date(1745226902417),
       version: '2022-12-16',
-      runs: [
-        {
-          fnName: 'SendWelcomeEmail',
-          fnSlug: 'send-welcome-email',
-          id: 'id-1',
-          status: 'COMPLETED',
-          startedAt: new Date('2025-04-10T16:43:22.696Z'),
-          completedAt: new Date('2025-04-10T16:43:24.696Z'),
-        },
-        {
-          fnName: 'SendNewsletter',
-          fnSlug: 'send-newsletter',
-          id: 'id-2',
-          status: 'CANCELLED',
-          startedAt: new Date('2025-04-10T16:43:23.696Z'),
-          completedAt: new Date('2025-04-10T16:43:24.696Z'),
-        },
-      ],
+    };
+
+    return event;
+  }, []);
+}
+
+export function useEventPayload() {
+  return useCallback(async ({ eventName }: { eventName: string }) => {
+    console.log(eventName);
+    await new Promise((resolve) => setTimeout(resolve, 500));
+
+    const event = {
+      name: 'UserSignedUp',
+      payload:
+        '{\n  "name": "signup.new",\n  "data": {\n    "account_id": "119f5971-9878-46bd-a18f-4fecd",\n    "method": "",\n    "plan_name": "Free Tier"\n  },\n  "id": "119f5971-9878-46bd-a18f-4f0680174ecd",\n  "ts": 1711051784369,\n  "v": "2021-05-11.01"\n}',
     };
 
     return event;

@@ -3,7 +3,7 @@ import NextLink from 'next/link';
 import { Time } from '@inngest/components/Time';
 import { type Event } from '@inngest/components/types/event';
 import { RiArrowRightSLine } from '@remixicon/react';
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { type Row } from '@tanstack/react-table';
 
 import { CodeBlock } from '../CodeBlock';
@@ -23,12 +23,14 @@ import type { EventsTable } from './EventsTable';
 export function EventDetails({
   row,
   getEventDetails,
+  getEventPayload,
   pathCreator,
   expandedRowActions,
 }: {
   row: Row<Omit<Event, 'payload'>>;
   pathCreator: React.ComponentProps<typeof EventsTable>['pathCreator'];
   getEventDetails: React.ComponentProps<typeof EventsTable>['getEventDetails'];
+  getEventPayload: React.ComponentProps<typeof EventsTable>['getEventPayload'];
   expandedRowActions: React.ComponentProps<typeof EventsTable>['expandedRowActions'];
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -46,8 +48,13 @@ export function EventDetails({
     queryFn: useCallback(() => {
       return getEventDetails({ eventName: row.original.name });
     }, [getEventDetails, row.original.name]),
-    placeholderData: keepPreviousData,
-    refetchInterval: 5000,
+  });
+
+  const { error: payloadError, data: eventPayloadData } = useQuery({
+    queryKey: ['event-payload', { eventName: row.original.name }],
+    queryFn: useCallback(() => {
+      return getEventPayload({ eventName: row.original.name });
+    }, [getEventPayload, row.original.name]),
   });
 
   const handleMouseDown = useCallback(() => {
@@ -89,9 +96,9 @@ export function EventDetails({
     };
   }, [isDragging, handleMouseMove, handleMouseUp]);
 
-  if (error) {
+  if (error || payloadError) {
     // TODO: error handling
-    console.log(error.message);
+    console.log(error?.message || payloadError?.message);
   }
 
   return (
@@ -151,8 +158,7 @@ export function EventDetails({
                     <CodeBlock
                       header={{ title: 'Payload', ...(error && { status: 'error' }) }}
                       tab={{
-                        content:
-                          '{\n  "name": "signup.new",\n  "data": {\n    "account_id": "119f5971-9878-46bd-a18f-4fecd",\n    "method": "",\n    "plan_name": "Free Tier"\n  },\n  "id": "119f5971-9878-46bd-a18f-4f0680174ecd",\n  "ts": 1711051784369,\n  "v": "2021-05-11.01"\n}',
+                        content: eventPayloadData?.payload || 'No payload available',
                       }}
                       allowFullScreen={true}
                     />
@@ -187,10 +193,9 @@ export function EventDetails({
       >
         <div className="px-4 py-2">
           <p className="text-muted mb-4 text-xs font-medium uppercase">Functions Triggered</p>
-          {eventDetailsData?.runs?.length ? (
+          {row.original?.runs?.length ? (
             <ul className="divide-subtle divide-y [&>*:not(:first-child)]:pt-[6px] [&>*:not(:last-child)]:pb-[6px]">
-              {/* TODO:  optimistically render the name and status from the row prop */}
-              {eventDetailsData.runs.map((run) => (
+              {row.original.runs.map((run) => (
                 <li key={run.fnSlug}>
                   <NextLink
                     href={pathCreator.runPopout({ runID: run.id })}
