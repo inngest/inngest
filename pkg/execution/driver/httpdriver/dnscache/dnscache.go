@@ -23,6 +23,8 @@ var (
 	// lookupGroup merges lookup calls together for lookups for the same host. The
 	// lookupGroup key is is the LookupIPAddr.host argument.
 	// lookupGroup singleflight.Group
+
+	ErrNoIPsAvailable = fmt.Errorf("no ips available for domain")
 )
 
 type cacheType []net.IP
@@ -149,13 +151,17 @@ func (r *resolver) Lookup(ctx context.Context, host string) ([]net.IP, error) {
 			ips[i] = addr.IP
 		}
 
+		if len(ips) == 0 {
+			return nil, ErrNoIPsAvailable
+		}
+
 		return ips, nil
 	})
 	if err != nil {
 		if r.l != nil {
 			r.l.Error("error fetching ips from cache", "host", host)
 		}
-		return nil, fmt.Errorf("error fetching ips from cache")
+		return nil, err
 	}
 
 	return item.Value(), nil
