@@ -128,12 +128,13 @@ func (d *dualIter) Next(ctx context.Context) bool {
 		// Wait 100ms for the block to download and try again.
 		time.Sleep(100 * time.Millisecond)
 
+		d.l.Lock()
 		if d.err != nil {
+			d.l.Unlock()
 			// Skip as we've errored.
 			return false
 		}
 
-		d.l.Lock()
 		spin = len(d.inflightBlocks) > 0 && len(d.pauses) == 0
 		d.l.Unlock()
 	}
@@ -223,7 +224,9 @@ func (d *dualIter) fetchBlock(ctx context.Context, id ulid.ULID) {
 
 	block, err := d.blockReader.ReadBlock(ctx, d.idx, id)
 	if err != nil && d.err == nil {
+		d.l.Lock()
 		d.err = err
+		d.l.Unlock()
 		return
 	}
 
