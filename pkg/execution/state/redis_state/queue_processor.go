@@ -189,6 +189,17 @@ func (q *queue) Run(ctx context.Context, f osqueue.RunFunc) error {
 
 	go q.runInstrumentation(ctx)
 
+	// start execution and shadow scan concurrently
+	eg := errgroup.Group{}
+
+	eg.Go(func() error {
+		return q.executionScan(ctx)
+	})
+
+	return eg.Wait()
+}
+
+func (q *queue) executionScan(ctx context.Context) error {
 	if !q.runMode.Partition && !q.runMode.Account {
 		return fmt.Errorf("need to specify either partition, account, or both in queue run mode")
 	}
