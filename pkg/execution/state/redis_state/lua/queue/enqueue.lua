@@ -77,9 +77,20 @@ if redis.call("HSETNX", queueKey, queueID, queueItem) == 0 then
 end
 
 if enqueueToBacklog == 1 then
+	-- the default function queue could be any of the three, usually the first but possibly the middle or last if a custom concurrency key is used
+
 	enqueue_to_backlog(keyBacklogSetA, backlogIdA, backlogItemA, shadowPartitionId, shadowPartitionItem, partitionIdA, partitionItemA, partitionTypeA, keyPartitionMap, keyBacklogMeta, keyGlobalShadowPartitionSet, keyShadowPartitionMeta, keyShadowPartitionSet, queueScore, queueID, partitionTime, nowMS)
 	enqueue_to_backlog(keyBacklogSetB, backlogIdB, backlogItemB, shadowPartitionId, shadowPartitionItem, partitionIdA, partitionItemA, partitionTypeA, keyPartitionMap, keyBacklogMeta, keyGlobalShadowPartitionSet, keyShadowPartitionMeta, keyShadowPartitionSet, queueScore, queueID, partitionTime, nowMS)
 	enqueue_to_backlog(keyBacklogSetC, backlogIdC, backlogItemC, shadowPartitionId, shadowPartitionItem, partitionIdA, partitionItemA, partitionTypeA, keyPartitionMap, keyBacklogMeta, keyGlobalShadowPartitionSet, keyShadowPartitionMeta, keyShadowPartitionSet, queueScore, queueID, partitionTime, nowMS)
+
+	enqueue_to_backlog(keyBacklogSetA, backlogIdA, backlogItemA, shadowPartitionId, shadowPartitionItem, partitionIdB, partitionItemB, partitionTypeB, keyPartitionMap, keyBacklogMeta, keyGlobalShadowPartitionSet, keyShadowPartitionMeta, keyShadowPartitionSet, queueScore, queueID, partitionTime, nowMS)
+	enqueue_to_backlog(keyBacklogSetB, backlogIdB, backlogItemB, shadowPartitionId, shadowPartitionItem, partitionIdB, partitionItemB, partitionTypeB, keyPartitionMap, keyBacklogMeta, keyGlobalShadowPartitionSet, keyShadowPartitionMeta, keyShadowPartitionSet, queueScore, queueID, partitionTime, nowMS)
+	enqueue_to_backlog(keyBacklogSetC, backlogIdC, backlogItemC, shadowPartitionId, shadowPartitionItem, partitionIdB, partitionItemB, partitionTypeB, keyPartitionMap, keyBacklogMeta, keyGlobalShadowPartitionSet, keyShadowPartitionMeta, keyShadowPartitionSet, queueScore, queueID, partitionTime, nowMS)
+
+	enqueue_to_backlog(keyBacklogSetA, backlogIdA, backlogItemA, shadowPartitionId, shadowPartitionItem, partitionIdC, partitionItemC, partitionTypeC, keyPartitionMap, keyBacklogMeta, keyGlobalShadowPartitionSet, keyShadowPartitionMeta, keyShadowPartitionSet, queueScore, queueID, partitionTime, nowMS)
+	enqueue_to_backlog(keyBacklogSetB, backlogIdB, backlogItemB, shadowPartitionId, shadowPartitionItem, partitionIdC, partitionItemC, partitionTypeC, keyPartitionMap, keyBacklogMeta, keyGlobalShadowPartitionSet, keyShadowPartitionMeta, keyShadowPartitionSet, queueScore, queueID, partitionTime, nowMS)
+	enqueue_to_backlog(keyBacklogSetC, backlogIdC, backlogItemC, shadowPartitionId, shadowPartitionItem, partitionIdC, partitionItemC, partitionTypeC, keyPartitionMap, keyBacklogMeta, keyGlobalShadowPartitionSet, keyShadowPartitionMeta, keyShadowPartitionSet, queueScore, queueID, partitionTime, nowMS)
+
 else
   enqueue_to_partition(keyPartitionA, partitionIdA, partitionItemA, partitionTypeA, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, queueScore, queueID, partitionTime, nowMS)
   enqueue_to_partition(keyPartitionB, partitionIdB, partitionItemB, partitionTypeB, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, queueScore, queueID, partitionTime, nowMS)

@@ -334,6 +334,11 @@ func (u queueKeyGenerator) PartitionQueueSet(pType enums.PartitionType, scopeID,
 }
 
 func (u queueKeyGenerator) BacklogSet(backlogID string) string {
+	if backlogID == "" {
+		// this is a placeholder because passing an empty key into Lua will cause multi-slot key errors
+		return fmt.Sprintf("{%s}:backlog:sorted:-", u.queueDefaultKey)
+	}
+
 	return fmt.Sprintf("{%s}:backlog:sorted:%s", u.queueDefaultKey, backlogID)
 }
 

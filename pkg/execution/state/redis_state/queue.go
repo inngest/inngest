@@ -2180,7 +2180,7 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 	for _, partition := range parts {
 		// Check to see if this key has already been denied in the lease iteration.
 		// If so, fail early.
-		if denies != nil && partition.EvaluatedConcurrencyKey != "" && denies.denyConcurrency(partition.EvaluatedConcurrencyKey) {
+		if !disableLeaseChecks && denies != nil && partition.EvaluatedConcurrencyKey != "" && denies.denyConcurrency(partition.EvaluatedConcurrencyKey) {
 			return nil, ErrConcurrencyLimitCustomKey
 		}
 	}
