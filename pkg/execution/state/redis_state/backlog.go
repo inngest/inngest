@@ -7,6 +7,7 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/oklog/ulid/v2"
 )
 
 type CustomConcurrencyLimit struct {
@@ -17,6 +18,11 @@ type CustomConcurrencyLimit struct {
 
 type QueueShadowPartition struct {
 	ShadowPartitionID string `json:"id,omitempty"`
+
+	// LeaseID represents a lease on this shadow partition.  If the LeaseID is not nil,
+	// this partition can be claimed by a shared-nothing refill worker to work on the
+	// backlogs within this shadow partition.
+	LeaseID *ulid.ULID `json:"leaseID,omitempty"`
 
 	FunctionID      uuid.UUID `json:"fid,omitempty"`
 	EnvID           uuid.UUID `json:"eid,omitempty"`
