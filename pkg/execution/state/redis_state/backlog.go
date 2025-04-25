@@ -17,7 +17,7 @@ type CustomConcurrencyLimit struct {
 }
 
 type QueueShadowPartition struct {
-	ShadowPartitionID string `json:"id,omitempty"`
+	PartitionID string `json:"id,omitempty"`
 
 	// LeaseID represents a lease on this shadow partition.  If the LeaseID is not nil,
 	// this partition can be claimed by a shared-nothing refill worker to work on the
@@ -220,7 +220,7 @@ func (q *queue) ItemShadowPartition(ctx context.Context, i osqueue.QueueItem) Qu
 		systemPartition.ConcurrencyLimit = systemLimits.PartitionLimit
 
 		return QueueShadowPartition{
-			ShadowPartitionID: *queueName,
+			PartitionID:       *queueName,
 			SystemQueueName:   queueName,
 			SystemConcurrency: systemLimits.PartitionLimit,
 		}
@@ -285,7 +285,7 @@ func (q *queue) ItemShadowPartition(ctx context.Context, i osqueue.QueueItem) Qu
 	}
 
 	return QueueShadowPartition{
-		ShadowPartitionID: i.FunctionID.String(),
+		PartitionID: i.FunctionID.String(),
 
 		// Identifiers
 		FunctionID: &i.FunctionID,

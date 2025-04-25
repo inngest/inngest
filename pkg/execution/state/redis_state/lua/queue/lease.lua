@@ -56,7 +56,9 @@ local partitionTypeB = tonumber(ARGV[13])
 local partitionTypeC = tonumber(ARGV[14])
 
 -- key queues v2
-local disableLeaseChecks = tonumber(ARGV[15])
+local enableKeyQueues    = tonumber(ARGV[15])
+local disableLeaseChecks = tonumber(ARGV[16])
+local partitionID        = ARGV[17]
 
 -- Use our custom Go preprocessor to inject the file from ./includes/
 -- $include(decode_ulid_time.lua)
@@ -86,40 +88,42 @@ end
 -- Track the earliest time this job was attempted in the queue.
 item = set_item_peek_time(keyQueueMap, queueID, item, currentTime)
 
--- Track throttling/rate limiting IF the queue item has throttling info set.  This allows
--- us to target specific queue items with rate limiting individually.
---
--- We handle this before concurrency as it's typically not used, and it's faster to handle than concurrency,
--- with o(1) operations vs o(log(n)).
-if disableLeaseChecks ~= 1 and item.data ~= nil and item.data.throttle ~= nil then
-	local throttleResult = gcra(throttleKey, currentTime, item.data.throttle.p * 1000, item.data.throttle.l, item.data.throttle.b)
-	if throttleResult == false then
-		return 7
+if disableLeaseChecks ~= 1 then
+	-- Track throttling/rate limiting IF the queue item has throttling info set.  This allows
+	-- us to target specific queue items with rate limiting individually.
+	--
+	-- We handle this before concurrency as it's typically not used, and it's faster to handle than concurrency,
+	-- with o(1) operations vs o(log(n)).
+	if item.data ~= nil and item.data.throttle ~= nil then
+		local throttleResult = gcra(throttleKey, currentTime, item.data.throttle.p * 1000, item.data.throttle.l, item.data.throttle.b)
+		if throttleResult == false then
+			return 7
+		end
 	end
-end
 
--- Check the concurrency limits for the account and custom key;  partition keys are checked when
--- leasing the partition and do not need to be checked again (only one worker can run a partition at
--- once, and the capacity is kept in memory after leasing a partition)
-if disableLeaseChecks ~= 1 and concurrencyA > 0 then
-    if check_concurrency(currentTime, keyConcurrencyA, concurrencyA) <= 0 then
-        return 3
-    end
-end
-if disableLeaseChecks ~= 1 and concurrencyB > 0 then
-    if check_concurrency(currentTime, keyConcurrencyB, concurrencyB) <= 0 then
-        return 4
-    end
-end
-if disableLeaseChecks ~= 1 and concurrencyC > 0 then
-    if check_concurrency(currentTime, keyConcurrencyC, concurrencyC) <= 0 then
-        return 5
-    end
-end
-if disableLeaseChecks ~= 1 and concurrencyAcct > 0 then
-    if check_concurrency(currentTime, keyAcctConcurrency, concurrencyAcct) <= 0 then
-        return 6
-    end
+	-- Check the concurrency limits for the account and custom key;  partition keys are checked when
+	-- leasing the partition and do not need to be checked again (only one worker can run a partition at
+	-- once, and the capacity is kept in memory after leasing a partition)
+	if concurrencyA > 0 then
+			if check_concurrency(currentTime, keyConcurrencyA, concurrencyA) <= 0 then
+					return 3
+			end
+	end
+	if concurrencyB > 0 then
+			if check_concurrency(currentTime, keyConcurrencyB, concurrencyB) <= 0 then
+					return 4
+			end
+	end
+	if concurrencyC > 0 then
+			if check_concurrency(currentTime, keyConcurrencyC, concurrencyC) <= 0 then
+					return 5
+			end
+	end
+	if concurrencyAcct > 0 then
+			if check_concurrency(currentTime, keyAcctConcurrency, concurrencyAcct) <= 0 then
+					return 6
+			end
+	end
 end
 
 -- Update the item's lease key.
@@ -165,46 +169,60 @@ local function handleLease(keyPartition, keyConcurrency, concurrencyLimit, parti
 end
 
 
--- Always add this to acct level concurrency queues
-redis.call("ZADD", keyAcctConcurrency, nextTime, item.id)
+if enableKeyQueues ~= 1 then
+  -- Always add this to acct level concurrency queues
+  redis.call("ZADD", keyAcctConcurrency, nextTime, item.id)
 
--- NOTE: We check if concurrency > 0 here because this disables concurrency.  AccountID
--- and custom concurrency items may not be set, but the keys need to be set for clustered
--- mode.
-if exists_without_ending(keyConcurrencyA, ":-") == true then
-	handleLease(keyPartitionA, keyConcurrencyA, concurrencyA, partitionIdA, partitionTypeA)
-end
-if exists_without_ending(keyConcurrencyB, ":-") == true then
-	handleLease(keyPartitionB, keyConcurrencyB, concurrencyB, partitionIdB, partitionTypeB)
-end
-if exists_without_ending(keyConcurrencyC, ":-") == true then
-	handleLease(keyPartitionC, keyConcurrencyC, concurrencyC, partitionIdC, partitionTypeC)
-end
-
--- Accounting for key queues v2
-
--- We need to update new key-specific concurrency indexes, as well as account + function level concurrency
--- as accounting is completely separate to allow for a gradual migration. Once key queues v2 are fully rolled out,
--- we can remove the old accounting logic above.
-
--- account-level concurrency (ignored for system queues)
-if exists_without_ending(keyAccountInProgress, ":-") == true then
-	redis.call("ZADD", keyAccountInProgress, nextTime, item.id)
+  -- NOTE: We check if concurrency > 0 here because this disables concurrency.  AccountID
+  -- and custom concurrency items may not be set, but the keys need to be set for clustered
+  -- mode.
+  if exists_without_ending(keyConcurrencyA, ":-") == true then
+    handleLease(keyPartitionA, keyConcurrencyA, concurrencyA, partitionIdA, partitionTypeA)
+  end
+  if exists_without_ending(keyConcurrencyB, ":-") == true then
+    handleLease(keyPartitionB, keyConcurrencyB, concurrencyB, partitionIdB, partitionTypeB)
+  end
+  if exists_without_ending(keyConcurrencyC, ":-") == true then
+    handleLease(keyPartitionC, keyConcurrencyC, concurrencyC, partitionIdC, partitionTypeC)
+  end
 end
 
--- function-level concurrency
-if exists_without_ending(keyInProgress, ":-") == true then
-	redis.call("ZADD", keyInProgress, nextTime, item.id)
-end
+if enableKeyQueues == 1 then
+  -- Accounting for key queues v2
 
--- backlog 1 (concurrency key 1)
-if exists_without_ending(keyActiveJobsKey1, ":-") == true then
-	redis.call("ZADD", keyActiveJobsKey1, nextTime, item.id)
-end
+  -- We need to update new key-specific concurrency indexes, as well as account + function level concurrency
+  -- as accounting is completely separate to allow for a gradual migration. Once key queues v2 are fully rolled out,
+  -- we can remove the old accounting logic above.
 
--- backlog 2 (concurrency key 2)
-if exists_without_ending(keyActiveJobsKey2, ":-") == true then
-	redis.call("ZADD", keyActiveJobsKey2, nextTime, item.id)
+  -- account-level concurrency (ignored for system queues)
+  if exists_without_ending(keyAccountInProgress, ":-") == true then
+    redis.call("ZADD", keyAccountInProgress, nextTime, item.id)
+  end
+
+  -- function-level concurrency
+  if exists_without_ending(keyInProgress, ":-") == true then
+    redis.call("ZADD", keyInProgress, nextTime, item.id)
+
+    -- For every queue that we lease from, ensure that it exists in the scavenger pointer queue
+    -- so that expired leases can be re-processed.  We want to take the earliest time from the
+    -- concurrency queue such that we get a previously lost job if possible.
+    local inProgressScores = redis.call("ZRANGE", keyInProgress, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")
+    if inProgressScores ~= false then
+      local earliestLease = tonumber(inProgressScores[2])
+
+      redis.call("ZADD", concurrencyPointer, earliestLease, partitionID)
+    end
+  end
+
+  -- backlog 1 (concurrency key 1)
+  if exists_without_ending(keyActiveJobsKey1, ":-") == true then
+    redis.call("ZADD", keyActiveJobsKey1, nextTime, item.id)
+  end
+
+  -- backlog 2 (concurrency key 2)
+  if exists_without_ending(keyActiveJobsKey2, ":-") == true then
+    redis.call("ZADD", keyActiveJobsKey2, nextTime, item.id)
+  end
 end
 
 return 0

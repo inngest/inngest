@@ -560,7 +560,7 @@ func TestQueueItemShadowPartition(t *testing.T) {
 
 	t.Run("basic item", func(t *testing.T) {
 		expected := QueueShadowPartition{
-			ShadowPartitionID:     fnID.String(),
+			PartitionID:           fnID.String(),
 			FunctionID:            &fnID,
 			EnvID:                 &wsID,
 			AccountID:             &accID,
@@ -604,7 +604,7 @@ func TestQueueItemShadowPartition(t *testing.T) {
 		sysQueueName := osqueue.KindQueueMigrate
 
 		expected := QueueShadowPartition{
-			ShadowPartitionID:     sysQueueName,
+			PartitionID:           sysQueueName,
 			FunctionID:            nil,
 			EnvID:                 nil,
 			AccountID:             nil,
@@ -644,7 +644,7 @@ func TestQueueItemShadowPartition(t *testing.T) {
 		hashedThrottleKey := osqueue.HashID(ctx, rawThrottleKey)
 
 		expected := QueueShadowPartition{
-			ShadowPartitionID:     fnID.String(),
+			PartitionID:           fnID.String(),
 			FunctionID:            &fnID,
 			EnvID:                 &wsID,
 			AccountID:             &accID,
@@ -702,7 +702,7 @@ func TestQueueItemShadowPartition(t *testing.T) {
 		fullKey := util.ConcurrencyKey(enums.ConcurrencyScopeFn, fnID, unhashedValue)
 
 		expected := QueueShadowPartition{
-			ShadowPartitionID:   fnID.String(),
+			PartitionID:         fnID.String(),
 			FunctionID:          &fnID,
 			EnvID:               &wsID,
 			AccountID:           &accID,
@@ -766,7 +766,7 @@ func TestQueueItemShadowPartition(t *testing.T) {
 		fullKey := util.ConcurrencyKey(enums.ConcurrencyScopeFn, fnID, unhashedValue)
 
 		expected := QueueShadowPartition{
-			ShadowPartitionID:   fnID.String(),
+			PartitionID:         fnID.String(),
 			FunctionID:          &fnID,
 			EnvID:               &wsID,
 			AccountID:           &accID,

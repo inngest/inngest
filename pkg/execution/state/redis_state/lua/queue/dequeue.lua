@@ -157,6 +157,25 @@ end
 -- function-level concurrency
 if exists_without_ending(keyInProgress, ":-") == true then
 	redis.call("ZREM", keyInProgress, item.id)
+
+	-- Get the earliest item in the partition concurrency set.  We may be dequeueing
+	-- the only in-progress job and should remove this from the partition concurrency
+	-- pointers, if this exists.
+	--
+	-- This ensures that scavengeres have updated pointer queues without the currently
+	-- leased job, if exists.
+	local concurrencyScores = redis.call("ZRANGE", keyInProgress, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")
+	if concurrencyScores == false then
+		redis.call("ZREM", concurrencyPointer, partitionID)
+	else
+		local earliestLease = tonumber(concurrencyScores[2])
+		if earliestLease == nil then
+			redis.call("ZREM", concurrencyPointer, partitionID)
+		else
+			-- Ensure that we update the score with the earliest lease
+			redis.call("ZADD", concurrencyPointer, earliestLease, partitionID)
+		end
+	end
 end
 
 -- backlog 1 (concurrency key 1)

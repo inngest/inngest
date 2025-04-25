@@ -275,12 +275,12 @@ func TestQueueEnqueueItem(t *testing.T) {
 		require.Len(t, backlogs, 1)
 
 		shadowPartition := q.ItemShadowPartition(ctx, item)
-		require.NotEmpty(t, shadowPartition.ShadowPartitionID)
+		require.NotEmpty(t, shadowPartition.PartitionID)
 
 		require.False(t, r.Exists(kg.BacklogMeta()))
 		require.False(t, r.Exists(kg.BacklogSet(backlogs[0].BacklogID)))
 		require.False(t, r.Exists(kg.ShadowPartitionMeta()))
-		require.False(t, r.Exists(kg.ShadowPartitionSet(shadowPartition.ShadowPartitionID)), r.Keys())
+		require.False(t, r.Exists(kg.ShadowPartitionSet(shadowPartition.PartitionID)), r.Keys())
 		require.False(t, r.Exists(kg.GlobalShadowPartitionSet()))
 
 	})
@@ -5395,7 +5395,7 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 			require.NoError(t, err)
 
 			shadowPartition := q.ItemShadowPartition(ctx, item)
-			require.NotEmpty(t, shadowPartition.ShadowPartitionID)
+			require.NotEmpty(t, shadowPartition.PartitionID)
 
 			marshaledShadowPartition, err := json.Marshal(shadowPartition)
 			require.NoError(t, err)
@@ -5403,13 +5403,13 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 			require.True(t, r.Exists(kg.BacklogMeta()))
 			require.True(t, r.Exists(kg.BacklogSet(backlogs[0].BacklogID)))
 			require.True(t, r.Exists(kg.ShadowPartitionMeta()))
-			require.True(t, r.Exists(kg.ShadowPartitionSet(shadowPartition.ShadowPartitionID)), r.Keys())
+			require.True(t, r.Exists(kg.ShadowPartitionSet(shadowPartition.PartitionID)), r.Keys())
 			require.True(t, r.Exists(kg.GlobalShadowPartitionSet()))
 			require.Equal(t, string(marshaledBacklog), r.HGet(kg.BacklogMeta(), backlogs[0].BacklogID))
-			require.Equal(t, string(marshaledShadowPartition), r.HGet(kg.ShadowPartitionMeta(), shadowPartition.ShadowPartitionID))
+			require.Equal(t, string(marshaledShadowPartition), r.HGet(kg.ShadowPartitionMeta(), shadowPartition.PartitionID))
 
-			require.Equal(t, at.UnixMilli()/1000, int64(score(t, r, kg.ShadowPartitionSet(shadowPartition.ShadowPartitionID), backlogs[0].BacklogID)))
-			require.Equal(t, at.UnixMilli()/1000, int64(score(t, r, kg.GlobalShadowPartitionSet(), shadowPartition.ShadowPartitionID)))
+			require.Equal(t, at.UnixMilli()/1000, int64(score(t, r, kg.ShadowPartitionSet(shadowPartition.PartitionID), backlogs[0].BacklogID)))
+			require.Equal(t, at.UnixMilli()/1000, int64(score(t, r, kg.GlobalShadowPartitionSet(), shadowPartition.PartitionID)))
 			require.Equal(t, at.UnixMilli(), int64(score(t, r, kg.BacklogSet(backlogs[0].BacklogID), qi.ID)))
 		})
 
@@ -5442,11 +5442,11 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 			require.Len(t, backlogs, 1)
 
 			shadowPartition := q.ItemShadowPartition(ctx, item)
-			require.NotEmpty(t, shadowPartition.ShadowPartitionID)
+			require.NotEmpty(t, shadowPartition.PartitionID)
 
 			// pointers should keep earlier score
-			require.Equal(t, at.UnixMilli()/1000, int64(score(t, r, kg.ShadowPartitionSet(shadowPartition.ShadowPartitionID), backlogs[0].BacklogID)))
-			require.Equal(t, at.UnixMilli()/1000, int64(score(t, r, kg.GlobalShadowPartitionSet(), shadowPartition.ShadowPartitionID)))
+			require.Equal(t, at.UnixMilli()/1000, int64(score(t, r, kg.ShadowPartitionSet(shadowPartition.PartitionID), backlogs[0].BacklogID)))
+			require.Equal(t, at.UnixMilli()/1000, int64(score(t, r, kg.GlobalShadowPartitionSet(), shadowPartition.PartitionID)))
 
 			// item in backlog should have new score
 			require.Equal(t, newScore.UnixMilli(), int64(score(t, r, kg.BacklogSet(backlogs[0].BacklogID), qi.ID)))
@@ -5481,16 +5481,16 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 			require.Len(t, backlogs, 1)
 
 			shadowPartition := q.ItemShadowPartition(ctx, item)
-			require.NotEmpty(t, shadowPartition.ShadowPartitionID)
+			require.NotEmpty(t, shadowPartition.PartitionID)
 
 			// pointers should take on earlier score
 			{
 				expected := newScore.UnixMilli() / 1000
-				actual := int64(score(t, r, kg.ShadowPartitionSet(shadowPartition.ShadowPartitionID), backlogs[0].BacklogID))
+				actual := int64(score(t, r, kg.ShadowPartitionSet(shadowPartition.PartitionID), backlogs[0].BacklogID))
 
 				require.Equal(t, expected, actual, time.Unix(expected, 0).String(), time.Unix(actual, 0).String())
 			}
-			require.Equal(t, newScore.UnixMilli()/1000, int64(score(t, r, kg.GlobalShadowPartitionSet(), shadowPartition.ShadowPartitionID)))
+			require.Equal(t, newScore.UnixMilli()/1000, int64(score(t, r, kg.GlobalShadowPartitionSet(), shadowPartition.PartitionID)))
 
 			// item in backlog should have new score
 			require.Equal(t, newScore.UnixMilli(), int64(score(t, r, kg.BacklogSet(backlogs[0].BacklogID), qi.ID)))
@@ -5597,17 +5597,17 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 			require.NotNil(t, backlogs[0].ConcurrencyKey)
 
 			shadowPartition := q.ItemShadowPartition(ctx, item)
-			require.NotEmpty(t, shadowPartition.ShadowPartitionID)
+			require.NotEmpty(t, shadowPartition.PartitionID)
 			require.Len(t, shadowPartition.CustomConcurrencyKeys, 1)
 
 			require.True(t, r.Exists(kg.BacklogMeta()), r.Keys())
 			require.True(t, r.Exists(kg.BacklogSet(backlogs[0].BacklogID)))
 			require.True(t, r.Exists(kg.ShadowPartitionMeta()))
-			require.True(t, r.Exists(kg.ShadowPartitionSet(shadowPartition.ShadowPartitionID)), r.Keys())
+			require.True(t, r.Exists(kg.ShadowPartitionSet(shadowPartition.PartitionID)), r.Keys())
 			require.True(t, r.Exists(kg.GlobalShadowPartitionSet()))
 
-			require.Equal(t, at.UnixMilli()/1000, int64(score(t, kg.ShadowPartitionSet(shadowPartition.ShadowPartitionID), backlogs[0].BacklogID)))
-			require.Equal(t, at.UnixMilli()/1000, int64(score(t, kg.GlobalShadowPartitionSet(), shadowPartition.ShadowPartitionID)))
+			require.Equal(t, at.UnixMilli()/1000, int64(score(t, kg.ShadowPartitionSet(shadowPartition.PartitionID), backlogs[0].BacklogID)))
+			require.Equal(t, at.UnixMilli()/1000, int64(score(t, kg.GlobalShadowPartitionSet(), shadowPartition.PartitionID)))
 			require.Equal(t, at.UnixMilli(), int64(score(t, kg.BacklogSet(backlogs[0].BacklogID), qi.ID)))
 		})
 	})
@@ -5731,21 +5731,21 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 			require.NoError(t, err)
 
 			shadowPartition := q.ItemShadowPartition(ctx, item)
-			require.NotEmpty(t, shadowPartition.ShadowPartitionID)
+			require.NotEmpty(t, shadowPartition.PartitionID)
 			require.Len(t, shadowPartition.CustomConcurrencyKeys, 2)
 
 			require.True(t, r.Exists(kg.BacklogMeta()), r.Keys())
 			require.True(t, r.Exists(kg.BacklogSet(backlogs[0].BacklogID)))
 			require.True(t, r.Exists(kg.BacklogSet(backlogs[1].BacklogID)))
 			require.True(t, r.Exists(kg.ShadowPartitionMeta()))
-			require.True(t, r.Exists(kg.ShadowPartitionSet(shadowPartition.ShadowPartitionID)), r.Keys())
+			require.True(t, r.Exists(kg.ShadowPartitionSet(shadowPartition.PartitionID)), r.Keys())
 			require.True(t, r.Exists(kg.GlobalShadowPartitionSet()))
 			require.Equal(t, string(marshaledBacklog1), r.HGet(kg.BacklogMeta(), backlogs[0].BacklogID))
 			require.Equal(t, string(marshaledBacklog2), r.HGet(kg.BacklogMeta(), backlogs[1].BacklogID))
 
-			require.Equal(t, at.UnixMilli()/1000, int64(score(t, kg.ShadowPartitionSet(shadowPartition.ShadowPartitionID), backlogs[0].BacklogID)))
-			require.Equal(t, at.UnixMilli()/1000, int64(score(t, kg.ShadowPartitionSet(shadowPartition.ShadowPartitionID), backlogs[1].BacklogID)))
-			require.Equal(t, at.UnixMilli()/1000, int64(score(t, kg.GlobalShadowPartitionSet(), shadowPartition.ShadowPartitionID)))
+			require.Equal(t, at.UnixMilli()/1000, int64(score(t, kg.ShadowPartitionSet(shadowPartition.PartitionID), backlogs[0].BacklogID)))
+			require.Equal(t, at.UnixMilli()/1000, int64(score(t, kg.ShadowPartitionSet(shadowPartition.PartitionID), backlogs[1].BacklogID)))
+			require.Equal(t, at.UnixMilli()/1000, int64(score(t, kg.GlobalShadowPartitionSet(), shadowPartition.PartitionID)))
 			require.Equal(t, at.UnixMilli(), int64(score(t, kg.BacklogSet(backlogs[0].BacklogID), qi.ID)))
 			require.Equal(t, at.UnixMilli(), int64(score(t, kg.BacklogSet(backlogs[1].BacklogID), qi.ID)))
 
@@ -5815,7 +5815,7 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 			require.NoError(t, err)
 
 			shadowPartition := q.ItemShadowPartition(ctx, item)
-			require.NotEmpty(t, shadowPartition.ShadowPartitionID)
+			require.NotEmpty(t, shadowPartition.PartitionID)
 
 			marshaledShadowPartition, err := json.Marshal(shadowPartition)
 			require.NoError(t, err)
@@ -5826,13 +5826,13 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 			require.True(t, r.Exists(kg.BacklogMeta()))
 			require.True(t, r.Exists(kg.BacklogSet(backlogs[0].BacklogID)))
 			require.True(t, r.Exists(kg.ShadowPartitionMeta()))
-			require.True(t, r.Exists(kg.ShadowPartitionSet(shadowPartition.ShadowPartitionID)), r.Keys())
+			require.True(t, r.Exists(kg.ShadowPartitionSet(shadowPartition.PartitionID)), r.Keys())
 			require.True(t, r.Exists(kg.GlobalShadowPartitionSet()))
 			require.Equal(t, string(marshaledBacklog), r.HGet(kg.BacklogMeta(), backlogs[0].BacklogID))
-			require.Equal(t, string(marshaledShadowPartition), r.HGet(kg.ShadowPartitionMeta(), shadowPartition.ShadowPartitionID))
+			require.Equal(t, string(marshaledShadowPartition), r.HGet(kg.ShadowPartitionMeta(), shadowPartition.PartitionID))
 
-			require.Equal(t, at.UnixMilli()/1000, int64(score(t, kg.ShadowPartitionSet(shadowPartition.ShadowPartitionID), backlogs[0].BacklogID)))
-			require.Equal(t, at.UnixMilli()/1000, int64(score(t, kg.GlobalShadowPartitionSet(), shadowPartition.ShadowPartitionID)))
+			require.Equal(t, at.UnixMilli()/1000, int64(score(t, kg.ShadowPartitionSet(shadowPartition.PartitionID), backlogs[0].BacklogID)))
+			require.Equal(t, at.UnixMilli()/1000, int64(score(t, kg.GlobalShadowPartitionSet(), shadowPartition.PartitionID)))
 			require.Equal(t, at.UnixMilli(), int64(score(t, kg.BacklogSet(backlogs[0].BacklogID), qi.ID)))
 		})
 	})
@@ -5929,7 +5929,7 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 			require.Len(t, backlogs, 1)
 
 			shadowPartition := q.ItemShadowPartition(ctx, item1)
-			require.NotEmpty(t, shadowPartition.ShadowPartitionID)
+			require.NotEmpty(t, shadowPartition.PartitionID)
 
 			// key queue v2 accounting
 			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, shadowPartition.accountInProgressKey(kg), qi.ID)))
@@ -6003,11 +6003,6 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 			unhashedValue := "customer1"
 			scope := enums.ConcurrencyScopeFn
 			fullKey := util.ConcurrencyKey(scope, fnID, unhashedValue)
-			_, _, checksum, _ := state.CustomConcurrency{
-				Key:   fullKey,
-				Hash:  hashedConcurrencyKeyExpr,
-				Limit: 123,
-			}.ParseKey()
 
 			item := osqueue.QueueItem{
 				ID:          "test",
@@ -6066,15 +6061,16 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 			require.Len(t, backlogs, 1)
 
 			shadowPartition := q.ItemShadowPartition(ctx, item)
-			require.NotEmpty(t, shadowPartition.ShadowPartitionID)
+			require.NotEmpty(t, shadowPartition.PartitionID)
 			require.Len(t, shadowPartition.CustomConcurrencyKeys, 1)
 
 			// key queue v2 accounting
 			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, shadowPartition.accountInProgressKey(kg), qi.ID)))
 			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, shadowPartition.inProgressKey(kg), qi.ID)))
-			require.Equal(t, kg.Concurrency("custom", util.ConcurrencyKey(scope, fnID, checksum)), backlogs[0].activeKey(kg))
+			require.Equal(t, kg.Concurrency("custom", util.ConcurrencyKey(scope, fnID, unhashedValue)), backlogs[0].activeKey(kg))
 			require.True(t, r.Exists(backlogs[0].activeKey(kg)))
 			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, backlogs[0].activeKey(kg), qi.ID)))
+			require.Equal(t, backlogs[0].activeKey(kg), parts[0].concurrencyKey(kg))
 
 			// expect classic partition concurrency to include item
 			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, kg.Concurrency("account", accountId.String()), qi.ID)))
@@ -6141,21 +6137,11 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 			unhashedValue1 := "user1"
 			scope1 := enums.ConcurrencyScopeFn
 			fullKey1 := util.ConcurrencyKey(scope1, fnID, unhashedValue1)
-			_, _, checksum1, _ := state.CustomConcurrency{
-				Key:   fullKey1,
-				Hash:  hashedConcurrencyKeyExpr1,
-				Limit: 123,
-			}.ParseKey()
 
 			hashedConcurrencyKeyExpr2 := hashConcurrencyKey("event.data.orgId")
 			unhashedValue2 := "org1"
 			scope2 := enums.ConcurrencyScopeEnv
 			fullKey2 := util.ConcurrencyKey(scope2, wsID, unhashedValue2)
-			_, _, checksum2, _ := state.CustomConcurrency{
-				Key:   fullKey2,
-				Hash:  hashedConcurrencyKeyExpr2,
-				Limit: 234,
-			}.ParseKey()
 
 			item := osqueue.QueueItem{
 				ID:          "test",
@@ -6220,7 +6206,7 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 			require.Len(t, backlogs, 2)
 
 			shadowPartition := q.ItemShadowPartition(ctx, item)
-			require.NotEmpty(t, shadowPartition.ShadowPartitionID)
+			require.NotEmpty(t, shadowPartition.PartitionID)
 			require.Len(t, shadowPartition.CustomConcurrencyKeys, 2)
 
 			// key queue v2 accounting
@@ -6228,12 +6214,12 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, shadowPartition.inProgressKey(kg), qi.ID)))
 
 			// first key
-			require.Equal(t, kg.Concurrency("custom", util.ConcurrencyKey(scope1, fnID, checksum1)), backlogs[0].activeKey(kg))
+			require.Equal(t, kg.Concurrency("custom", util.ConcurrencyKey(scope1, fnID, unhashedValue1)), backlogs[0].activeKey(kg))
 			require.True(t, r.Exists(backlogs[0].activeKey(kg)))
 			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, backlogs[0].activeKey(kg), qi.ID)))
 
 			// second key
-			require.Equal(t, kg.Concurrency("custom", util.ConcurrencyKey(scope2, wsID, checksum2)), backlogs[1].activeKey(kg))
+			require.Equal(t, kg.Concurrency("custom", util.ConcurrencyKey(scope2, wsID, unhashedValue2)), backlogs[1].activeKey(kg))
 			require.True(t, r.Exists(backlogs[1].activeKey(kg)))
 			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, backlogs[1].activeKey(kg), qi.ID)))
 
@@ -6324,7 +6310,7 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 			require.Len(t, backlogs, 1)
 
 			shadowPartition := q.ItemShadowPartition(ctx, item1)
-			require.NotEmpty(t, shadowPartition.ShadowPartitionID)
+			require.NotEmpty(t, shadowPartition.PartitionID)
 
 			// key queue v2 accounting
 			// should not track account concurrency for system partition
@@ -6417,7 +6403,7 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 			require.Len(t, backlogs, 1)
 
 			shadowPartition := q.ItemShadowPartition(ctx, item)
-			require.NotEmpty(t, shadowPartition.ShadowPartitionID)
+			require.NotEmpty(t, shadowPartition.PartitionID)
 			require.Len(t, shadowPartition.CustomConcurrencyKeys, 0)
 
 			parts, _ := q.ItemPartitions(ctx, defaultShard, item)
@@ -6508,11 +6494,6 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 			unhashedValue := "customer1"
 			scope := enums.ConcurrencyScopeFn
 			fullKey := util.ConcurrencyKey(scope, fnID, unhashedValue)
-			_, _, checksum, _ := state.CustomConcurrency{
-				Key:   fullKey,
-				Hash:  hashedConcurrencyKeyExpr,
-				Limit: 123,
-			}.ParseKey()
 
 			item := osqueue.QueueItem{
 				ID:          "test",
@@ -6565,7 +6546,7 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 			require.NotNil(t, backlogs[0].ConcurrencyScopeEntity)
 
 			shadowPartition := q.ItemShadowPartition(ctx, item)
-			require.NotEmpty(t, shadowPartition.ShadowPartitionID)
+			require.NotEmpty(t, shadowPartition.PartitionID)
 			require.Len(t, shadowPartition.CustomConcurrencyKeys, 1)
 
 			parts, _ := q.ItemPartitions(ctx, defaultShard, item)
@@ -6581,7 +6562,7 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, shadowPartition.accountInProgressKey(kg), qi.ID)))
 
 			// 1 active set for custom concurrency key
-			require.Equal(t, kg.Concurrency("custom", util.ConcurrencyKey(scope, fnID, checksum)), backlogs[0].activeKey(kg))
+			require.Equal(t, kg.Concurrency("custom", util.ConcurrencyKey(scope, fnID, unhashedValue)), backlogs[0].activeKey(kg))
 			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, backlogs[0].activeKey(kg), qi.ID)))
 
 			// expect old accounting to be updated
@@ -6666,21 +6647,11 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 			unhashedValue1 := "user1"
 			scope1 := enums.ConcurrencyScopeFn
 			fullKey1 := util.ConcurrencyKey(scope1, fnID, unhashedValue1)
-			_, _, checksum1, _ := state.CustomConcurrency{
-				Key:   fullKey1,
-				Hash:  hashedConcurrencyKeyExpr1,
-				Limit: 123,
-			}.ParseKey()
 
 			hashedConcurrencyKeyExpr2 := hashConcurrencyKey("event.data.orgId")
 			unhashedValue2 := "org1"
 			scope2 := enums.ConcurrencyScopeEnv
 			fullKey2 := util.ConcurrencyKey(scope2, wsID, unhashedValue2)
-			_, _, checksum2, _ := state.CustomConcurrency{
-				Key:   fullKey2,
-				Hash:  hashedConcurrencyKeyExpr2,
-				Limit: 234,
-			}.ParseKey()
 
 			item := osqueue.QueueItem{
 				ID:          "test",
@@ -6743,7 +6714,7 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 			require.NotNil(t, backlogs[1].ConcurrencyScopeEntity)
 
 			shadowPartition := q.ItemShadowPartition(ctx, item)
-			require.NotEmpty(t, shadowPartition.ShadowPartitionID)
+			require.NotEmpty(t, shadowPartition.PartitionID)
 			require.Len(t, shadowPartition.CustomConcurrencyKeys, 2)
 
 			parts, _ := q.ItemPartitions(ctx, defaultShard, item)
@@ -6761,10 +6732,10 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 			// 2 active set for custom concurrency keys
 
 			// first key
-			require.Equal(t, kg.Concurrency("custom", util.ConcurrencyKey(scope1, fnID, checksum1)), backlogs[0].activeKey(kg))
+			require.Equal(t, kg.Concurrency("custom", util.ConcurrencyKey(scope1, fnID, unhashedValue1)), backlogs[0].activeKey(kg))
 			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, backlogs[0].activeKey(kg), qi.ID)))
 
-			require.Equal(t, kg.Concurrency("custom", util.ConcurrencyKey(scope2, wsID, checksum2)), backlogs[1].activeKey(kg))
+			require.Equal(t, kg.Concurrency("custom", util.ConcurrencyKey(scope2, wsID, unhashedValue2)), backlogs[1].activeKey(kg))
 			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, backlogs[1].activeKey(kg), qi.ID)))
 
 			// expect old accounting to be updated
@@ -6880,7 +6851,7 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 			require.Len(t, backlogs, 1)
 
 			shadowPartition := q.ItemShadowPartition(ctx, item)
-			require.NotEmpty(t, shadowPartition.ShadowPartitionID)
+			require.NotEmpty(t, shadowPartition.PartitionID)
 			require.Len(t, shadowPartition.CustomConcurrencyKeys, 0)
 
 			parts, _ := q.ItemPartitions(ctx, defaultShard, item)
@@ -7009,7 +6980,7 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 			require.Len(t, backlogs, 1)
 
 			shadowPartition := q.ItemShadowPartition(ctx, item)
-			require.NotEmpty(t, shadowPartition.ShadowPartitionID)
+			require.NotEmpty(t, shadowPartition.PartitionID)
 			require.Len(t, shadowPartition.CustomConcurrencyKeys, 0)
 
 			parts, _ := q.ItemPartitions(ctx, defaultShard, item)
@@ -7096,12 +7067,7 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 			unhashedValue := "customer1"
 			scope := enums.ConcurrencyScopeFn
 			fullKey := util.ConcurrencyKey(scope, fnID, unhashedValue)
-			_, _, checksum, _ := state.CustomConcurrency{
-				Key:   fullKey,
-				Hash:  hashedConcurrencyKeyExpr,
-				Limit: 123,
-			}.ParseKey()
-
+			 
 			item := osqueue.QueueItem{
 				ID:          "test",
 				FunctionID:  fnID,
@@ -7146,7 +7112,7 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 			require.Len(t, backlogs, 1)
 
 			shadowPartition := q.ItemShadowPartition(ctx, item)
-			require.NotEmpty(t, shadowPartition.ShadowPartitionID)
+			require.NotEmpty(t, shadowPartition.PartitionID)
 			require.Len(t, shadowPartition.CustomConcurrencyKeys, 1)
 
 			parts, _ := q.ItemPartitions(ctx, defaultShard, item)
@@ -7162,7 +7128,7 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, shadowPartition.accountInProgressKey(kg), qi.ID)))
 
 			// 1 active set for custom concurrency key
-			require.Equal(t, kg.Concurrency("custom", util.ConcurrencyKey(scope, fnID, checksum)), backlogs[0].activeKey(kg))
+			require.Equal(t, kg.Concurrency("custom", util.ConcurrencyKey(scope, fnID, unhashedValue)), backlogs[0].activeKey(kg))
 			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, backlogs[0].activeKey(kg), qi.ID)))
 
 			// expect old accounting to be updated
@@ -7237,21 +7203,11 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 			unhashedValue1 := "user1"
 			scope1 := enums.ConcurrencyScopeFn
 			fullKey1 := util.ConcurrencyKey(scope1, fnID, unhashedValue1)
-			_, _, checksum1, _ := state.CustomConcurrency{
-				Key:   fullKey1,
-				Hash:  hashedConcurrencyKeyExpr1,
-				Limit: 123,
-			}.ParseKey()
 
 			hashedConcurrencyKeyExpr2 := hashConcurrencyKey("event.data.orgId")
 			unhashedValue2 := "org1"
 			scope2 := enums.ConcurrencyScopeEnv
 			fullKey2 := util.ConcurrencyKey(scope2, wsID, unhashedValue2)
-			_, _, checksum2, _ := state.CustomConcurrency{
-				Key:   fullKey2,
-				Hash:  hashedConcurrencyKeyExpr2,
-				Limit: 234,
-			}.ParseKey()
 
 			item := osqueue.QueueItem{
 				ID:          "test",
@@ -7303,7 +7259,7 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 			require.Len(t, backlogs, 2)
 
 			shadowPartition := q.ItemShadowPartition(ctx, item)
-			require.NotEmpty(t, shadowPartition.ShadowPartitionID)
+			require.NotEmpty(t, shadowPartition.PartitionID)
 			require.Len(t, shadowPartition.CustomConcurrencyKeys, 2)
 
 			parts, _ := q.ItemPartitions(ctx, defaultShard, item)
@@ -7319,10 +7275,10 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, shadowPartition.accountInProgressKey(kg), qi.ID)))
 
 			// 2 active set for custom concurrency keys
-			require.Equal(t, kg.Concurrency("custom", util.ConcurrencyKey(scope1, fnID, checksum1)), backlogs[0].activeKey(kg))
+			require.Equal(t, kg.Concurrency("custom", util.ConcurrencyKey(scope1, fnID, unhashedValue1)), backlogs[0].activeKey(kg))
 			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, backlogs[0].activeKey(kg), qi.ID)))
 
-			require.Equal(t, kg.Concurrency("custom", util.ConcurrencyKey(scope2, wsID, checksum2)), backlogs[1].activeKey(kg))
+			require.Equal(t, kg.Concurrency("custom", util.ConcurrencyKey(scope2, wsID, unhashedValue2)), backlogs[1].activeKey(kg))
 			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, backlogs[1].activeKey(kg), qi.ID)))
 
 			// expect old accounting to be updated
@@ -7425,7 +7381,7 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 			require.Len(t, backlogs, 1)
 
 			shadowPartition := q.ItemShadowPartition(ctx, item)
-			require.NotEmpty(t, shadowPartition.ShadowPartitionID)
+			require.NotEmpty(t, shadowPartition.PartitionID)
 			require.Len(t, shadowPartition.CustomConcurrencyKeys, 0)
 
 			parts, _ := q.ItemPartitions(ctx, defaultShard, item)
