@@ -508,7 +508,7 @@ func (q *queue) shadowWorker(ctx context.Context, qspc chan *int) {
 		case <-ctx.Done():
 			return
 
-		case _ = <-qspc:
+		case <-qspc:
 			// TODO:
 			//
 			// - retrieve countinuation counter
