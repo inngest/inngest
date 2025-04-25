@@ -11,7 +11,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"cuelang.org/go/pkg"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/logger"
