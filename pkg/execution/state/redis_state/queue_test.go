@@ -6448,7 +6448,7 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 			require.False(t, hasMember(t, r, kg.Concurrency("p", parts[0].Queue()), qi.ID))
 
 			// item must not be in classic backlog
-			require.False(t, hasMember(t, r, parts[0].zsetKey(kg), qi.ID))
+			require.False(t, hasMember(t, r, parts[0].zsetKey(kg), qi.ID), r.Keys())
 		})
 	})
 
@@ -7067,7 +7067,7 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 			unhashedValue := "customer1"
 			scope := enums.ConcurrencyScopeFn
 			fullKey := util.ConcurrencyKey(scope, fnID, unhashedValue)
-			 
+
 			item := osqueue.QueueItem{
 				ID:          "test",
 				FunctionID:  fnID,
