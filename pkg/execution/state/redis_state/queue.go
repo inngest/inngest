@@ -2196,7 +2196,7 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 		acctLimit int
 	)
 
-	_, _ = duration(ctx, q.primaryQueueShard.Name, "lease_item_partitions", q.clock.Now(), func(ctx context.Context) (any, error) {
+	_, _ = duration(ctx, q.primaryQueueShard.Name, "lease_item_partitions", now, func(ctx context.Context) (any, error) {
 		parts, acctLimit = q.ItemPartitions(ctx, q.primaryQueueShard, item)
 		return nil, nil
 	})
@@ -2209,7 +2209,7 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 		}
 	}
 
-	leaseID, err := ulid.New(ulid.Timestamp(q.clock.Now().Add(leaseDuration).UTC()), rnd)
+	leaseID, err := ulid.New(ulid.Timestamp(now.Add(leaseDuration).UTC()), rnd)
 	if err != nil {
 		return nil, fmt.Errorf("error generating id: %w", err)
 	}
@@ -2509,7 +2509,7 @@ func (q *queue) Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 			keys = append(keys, idx)
 		}
 	}
- 
+
 	idempotency := q.idempotencyTTL
 	if q.idempotencyTTLFunc != nil {
 		idempotency = q.idempotencyTTLFunc(ctx, i)
@@ -2641,7 +2641,6 @@ func (q *queue) Requeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		shadowPartition.accountInProgressKey(q.primaryQueueShard.RedisClient.kg),
 		backlogs[0].activeKey(q.primaryQueueShard.RedisClient.kg),
 		backlogs[1].activeKey(q.primaryQueueShard.RedisClient.kg),
-		backlogs[2].activeKey(q.primaryQueueShard.RedisClient.kg),
 	}
 	// Append indexes
 	for _, idx := range q.itemIndexer(ctx, i, queueShard.RedisClient.kg) {

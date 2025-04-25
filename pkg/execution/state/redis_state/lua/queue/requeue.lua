@@ -165,9 +165,18 @@ if requeueToBacklog == 1 then
 	--
 	-- Requeue item to backlog queues again
 	--
-	requeue_to_backlog(keyBacklogSetA, backlogIdA, backlogItemA, shadowPartitionId, shadowPartitionItem, partitionIdA, partitionItemA, partitionTypeA, keyPartitionMap, keyBacklogMeta, keyGlobalShadowPartitionSet, keyShadowPartitionMeta, keyShadowPartitionSet, queueScore, queueID, partitionTime, nowMS)
-  requeue_to_backlog(keyBacklogSetB, backlogIdB, backlogItemB, shadowPartitionId, shadowPartitionItem, partitionIdA, partitionItemA, partitionTypeA, keyPartitionMap, keyBacklogMeta, keyGlobalShadowPartitionSet, keyShadowPartitionMeta, keyShadowPartitionSet, queueScore, queueID, partitionTime, nowMS)
-  requeue_to_backlog(keyBacklogSetC, backlogIdC, backlogItemC, shadowPartitionId, shadowPartitionItem, partitionIdA, partitionItemA, partitionTypeA, keyPartitionMap, keyBacklogMeta, keyGlobalShadowPartitionSet, keyShadowPartitionMeta, keyShadowPartitionSet, queueScore, queueID, partitionTime, nowMS)
+	requeue_to_backlog(keyBacklogSetA, backlogIdA, backlogItemA, shadowPartitionId, shadowPartitionItem, partitionIdA, partitionItemA, partitionTypeA, keyPartitionMap, keyBacklogMeta, keyGlobalShadowPartitionSet, keyShadowPartitionMeta, keyShadowPartitionSet, queueScore, queueID, nowMS)
+  requeue_to_backlog(keyBacklogSetB, backlogIdB, backlogItemB, shadowPartitionId, shadowPartitionItem, partitionIdA, partitionItemA, partitionTypeA, keyPartitionMap, keyBacklogMeta, keyGlobalShadowPartitionSet, keyShadowPartitionMeta, keyShadowPartitionSet, queueScore, queueID, nowMS)
+  requeue_to_backlog(keyBacklogSetC, backlogIdC, backlogItemC, shadowPartitionId, shadowPartitionItem, partitionIdA, partitionItemA, partitionTypeA, keyPartitionMap, keyBacklogMeta, keyGlobalShadowPartitionSet, keyShadowPartitionMeta, keyShadowPartitionSet, queueScore, queueID, nowMS)
+
+	requeue_to_backlog(keyBacklogSetA, backlogIdA, backlogItemA, shadowPartitionId, shadowPartitionItem, partitionIdB, partitionItemB, partitionTypeB, keyPartitionMap, keyBacklogMeta, keyGlobalShadowPartitionSet, keyShadowPartitionMeta, keyShadowPartitionSet, queueScore, queueID, nowMS)
+  requeue_to_backlog(keyBacklogSetB, backlogIdB, backlogItemB, shadowPartitionId, shadowPartitionItem, partitionIdB, partitionItemB, partitionTypeB, keyPartitionMap, keyBacklogMeta, keyGlobalShadowPartitionSet, keyShadowPartitionMeta, keyShadowPartitionSet, queueScore, queueID, nowMS)
+  requeue_to_backlog(keyBacklogSetC, backlogIdC, backlogItemC, shadowPartitionId, shadowPartitionItem, partitionIdB, partitionItemB, partitionTypeB, keyPartitionMap, keyBacklogMeta, keyGlobalShadowPartitionSet, keyShadowPartitionMeta, keyShadowPartitionSet, queueScore, queueID, nowMS)
+
+	requeue_to_backlog(keyBacklogSetA, backlogIdA, backlogItemA, shadowPartitionId, shadowPartitionItem, partitionIdC, partitionItemC, partitionTypeC, keyPartitionMap, keyBacklogMeta, keyGlobalShadowPartitionSet, keyShadowPartitionMeta, keyShadowPartitionSet, queueScore, queueID, nowMS)
+  requeue_to_backlog(keyBacklogSetB, backlogIdB, backlogItemB, shadowPartitionId, shadowPartitionItem, partitionIdC, partitionItemC, partitionTypeC, keyPartitionMap, keyBacklogMeta, keyGlobalShadowPartitionSet, keyShadowPartitionMeta, keyShadowPartitionSet, queueScore, queueID, nowMS)
+  requeue_to_backlog(keyBacklogSetC, backlogIdC, backlogItemC, shadowPartitionId, shadowPartitionItem, partitionIdC, partitionItemC, partitionTypeC, keyPartitionMap, keyBacklogMeta, keyGlobalShadowPartitionSet, keyShadowPartitionMeta, keyShadowPartitionSet, queueScore, queueID, nowMS)
+
 else
   --
   -- Enqueue item to partition queues again
