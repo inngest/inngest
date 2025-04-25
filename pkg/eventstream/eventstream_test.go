@@ -3,9 +3,9 @@ package eventstream
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
-	"math/rand"
 	"testing"
 	"time"
 
