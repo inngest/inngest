@@ -2279,13 +2279,14 @@ func (q *queue) Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 	keys := []string{
 		queueShard.RedisClient.kg.QueueItem(),
 		fnPartition.zsetKey(queueShard.RedisClient.kg),
-		customConcurrencyKey1.zsetKey(queueShard.RedisClient.kg),
-		customConcurrencyKey2.zsetKey(queueShard.RedisClient.kg),
+
 		fnPartition.concurrencyKey(queueShard.RedisClient.kg),
 		customConcurrencyKey1.concurrencyKey(queueShard.RedisClient.kg),
 		customConcurrencyKey2.concurrencyKey(queueShard.RedisClient.kg),
 		accountConcurrencyKey,
+
 		queueShard.RedisClient.kg.Idempotency(i.ID),
+
 		queueShard.RedisClient.kg.ConcurrencyIndex(),
 		queueShard.RedisClient.kg.GlobalPartitionIndex(),
 		queueShard.RedisClient.kg.GlobalAccountIndex(),
@@ -2309,13 +2310,7 @@ func (q *queue) Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		int(idempotency.Seconds()),
 
 		fnPartition.ID,
-		customConcurrencyKey1.ID,
-		customConcurrencyKey2.ID,
 		i.Data.Identifier.AccountID.String(),
-
-		fnPartition.PartitionType,
-		customConcurrencyKey1.PartitionType,
-		customConcurrencyKey2.PartitionType,
 	})
 	if err != nil {
 		return err
