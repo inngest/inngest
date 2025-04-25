@@ -11,6 +11,8 @@ import (
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/expressions"
 	cron "github.com/robfig/cron/v3"
+	"golang.org/x/text/cases"
+	"golang.org/x/text/language"
 )
 
 // Triggerable represents a single or multiple triggers for a function.
@@ -127,7 +129,8 @@ func (e EventTrigger) TitleName() string {
 
 	words := strings.Split(rep, joiner)
 	for i, w := range words {
-		words[i] = strings.Title(w)
+		// NOTE: just gonna default to English for now
+		words[i] = cases.Title(language.English).String(w)
 	}
 
 	return strings.Join(words, joiner)
