@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/logger"
 )
@@ -37,15 +36,15 @@ type manager struct {
 	flushDelay time.Duration
 }
 
-func (m manager) ConsumePause(ctx context.Context, id uuid.UUID, data any) (state.ConsumePauseResult, error) {
+func (m manager) ConsumePause(ctx context.Context, pause state.Pause, data any) (state.ConsumePauseResult, error) {
 	// NOTE: There is a race condition when flushing blocks:  we may copy a pause
 	// into a block, then while writing the block to disk delete/consume a pause
-	// that is being written.  Unfortunately, in this case the metadata for a block
+	// that is being written.  In this case the metadata for a block
 	// isn't yet in the index. EG:
 	//
 	// 1. We read the buffer and add to a block
 	// 2. And while uploading the block
-	// 3. Kn parallel, we may delete one of the buffer’s pauses
+	// 3. In parallel, we may delete/consume one of the buffer’s pauses
 	//
 	// Unfortunately, we only write the block to indexes after uploads complete.
 	// This means that a pause may exist in a block but have been consumed.
@@ -60,7 +59,8 @@ func (m manager) ConsumePause(ctx context.Context, id uuid.UUID, data any) (stat
 	// In the future, we could add two block indexes:  pending, and stored.  this is a
 	// pain, though, because we may die when uploading pending blocks, and that requires
 	// a bit of thought to work around, so we’ll just go with double deletes for now,
-	// assuming this won’t happen a ton.  this can eb optimized later
+	// assuming this won’t happen a ton.  this can be improved later.
+
 	return state.ConsumePauseResult{}, fmt.Errorf("not implemented")
 }
 
