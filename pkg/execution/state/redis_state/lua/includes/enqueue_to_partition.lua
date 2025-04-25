@@ -73,22 +73,13 @@ local function enqueue_to_partition(keyPartitionSet, partitionID, partitionItem,
 	end
 end
 
-local function enqueue_to_backlog(keyBacklogSet, backlogID, backlogItem, shadowPartitionID, shadowPartitionItem, partitionID, partitionItem, partitionType, keyPartitionMap, keyBacklogMeta, keyGlobalShadowPartitionSet, keyShadowPartitionMeta, keyShadowPartitionSet, queueScore, queueID, partitionTime, nowMS)
-	if partitionID == "" then
-		-- partitions are padded, so this may be empty
-		return
-	end
+local function enqueue_to_backlog(keyBacklogSet, backlogID, backlogItem, partitionID, shadowPartitionItem, partitionItem, keyPartitionMap, keyBacklogMeta, keyGlobalShadowPartitionSet, keyShadowPartitionMeta, keyShadowPartitionSet, queueScore, queueID, partitionTime, nowMS)
 
 	if backlogID == "" then
     -- This is a blank backlog, so don't even bother.  This allows us to pre-allocate
     -- 3 backlogs per item, even if an item only needs a single backlog.
     return
   end
-
-	-- expect default partition
-	if partitionType ~= 0 then
-		return
-	end
 
 	-- Push the queue item's ID to the given backlog set
 	redis.call("ZADD", keyBacklogSet, queueScore, queueID)
@@ -100,7 +91,7 @@ local function enqueue_to_backlog(keyBacklogSet, backlogID, backlogItem, shadowP
 	redis.call("HSETNX", keyBacklogMeta, backlogID, backlogItem)
 
 	-- Store shadow partition if not exists
-	redis.call("HSETNX", keyShadowPartitionMeta, shadowPartitionID, shadowPartitionItem)
+	redis.call("HSETNX", keyShadowPartitionMeta, partitionID, shadowPartitionItem)
 
 	-- Update the backlog pointer in the shadow partition set if earlier or not exists
 	local currentScore = redis.call("ZSCORE", keyShadowPartitionSet, backlogID)
@@ -109,9 +100,9 @@ local function enqueue_to_backlog(keyBacklogSet, backlogID, backlogItem, shadowP
 	end
 
 	-- Update the shadow partition pointer in the global shadow partition set if earlier or not exists
-	local currentScore = redis.call("ZSCORE", keyGlobalShadowPartitionSet, shadowPartitionID)
+	local currentScore = redis.call("ZSCORE", keyGlobalShadowPartitionSet, partitionID)
 	if currentScore == false or tonumber(currentScore) > partitionTime then
-		update_pointer_score_to(shadowPartitionID, keyGlobalShadowPartitionSet, partitionTime)
+		update_pointer_score_to(partitionID, keyGlobalShadowPartitionSet, partitionTime)
 	end
 end
 
@@ -175,22 +166,12 @@ local function requeue_to_partition(keyPartitionSet, partitionID, partitionItem,
 	end
 end
 
-local function requeue_to_backlog(keyBacklogSet, backlogID, backlogItem, shadowPartitionID, shadowPartitionItem, partitionID, partitionItem, partitionType, keyPartitionMap, keyBacklogMeta, keyGlobalShadowPartitionSet, keyShadowPartitionMeta, keyShadowPartitionSet, queueScore, queueID, partitionTime, nowMS)
-	if partitionID == "" then
-		-- partitions are padded, so this may be empty
-		return
-	end
-
+local function requeue_to_backlog(keyBacklogSet, backlogID, backlogItem, partitionID, shadowPartitionItem, partitionItem, keyPartitionMap, keyBacklogMeta, keyGlobalShadowPartitionSet, keyShadowPartitionMeta, keyShadowPartitionSet, queueScore, queueID, partitionTime, nowMS)
 	if backlogID == "" then
     -- This is a blank backlog, so don't even bother.  This allows us to pre-allocate
     -- 3 backlogs per item, even if an item only needs a single backlog.
     return
   end
-
-	-- expect default partition
-	if partitionType ~= 0 then
-		return
-	end
 
 	-- Push the queue item's ID to the given backlog set
 	redis.call("ZADD", keyBacklogSet, queueScore, queueID)
@@ -202,7 +183,7 @@ local function requeue_to_backlog(keyBacklogSet, backlogID, backlogItem, shadowP
 	redis.call("HSETNX", keyBacklogMeta, backlogID, backlogItem)
 
 	-- Store shadow partition if not exists
-	redis.call("HSETNX", keyShadowPartitionMeta, shadowPartitionID, shadowPartitionItem)
+	redis.call("HSETNX", keyShadowPartitionMeta, partitionID, shadowPartitionItem)
 
 	-- Get the minimum score for the queue.
 	local minScores = redis.call("ZRANGE", keyBacklogSet, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")
@@ -216,8 +197,8 @@ local function requeue_to_backlog(keyBacklogSet, backlogID, backlogItem, shadowP
 	end
 
 	-- Update the shadow partition pointer in the global shadow partition set if earlier or not exists
-	local currentScore = redis.call("ZSCORE", keyGlobalShadowPartitionSet, shadowPartitionID)
+	local currentScore = redis.call("ZSCORE", keyGlobalShadowPartitionSet, partitionID)
 	if currentScore == false or tonumber(currentScore) > earliestScore then
-		update_pointer_score_to(shadowPartitionID, keyGlobalShadowPartitionSet, updateTo)
+		update_pointer_score_to(partitionID, keyGlobalShadowPartitionSet, updateTo)
 	end
 end
