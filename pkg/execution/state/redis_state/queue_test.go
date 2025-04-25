@@ -5398,14 +5398,22 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 			backlogs := q.ItemBacklogs(ctx, item)
 			require.Len(t, backlogs, 1)
 
+			marshaledBacklog, err := json.Marshal(backlogs[0])
+			require.NoError(t, err)
+
 			shadowPartition := q.ItemShadowPartition(ctx, item)
 			require.NotEmpty(t, shadowPartition.ShadowPartitionID)
+
+			marshaledShadowPartition, err := json.Marshal(shadowPartition)
+			require.NoError(t, err)
 
 			require.True(t, r.Exists(kg.BacklogMeta()))
 			require.True(t, r.Exists(kg.BacklogSet(backlogs[0].BacklogID)))
 			require.True(t, r.Exists(kg.ShadowPartitionMeta()))
 			require.True(t, r.Exists(kg.ShadowPartitionSet(shadowPartition.ShadowPartitionID)), r.Keys())
 			require.True(t, r.Exists(kg.GlobalShadowPartitionSet()))
+			require.Equal(t, string(marshaledBacklog), r.HGet(kg.BacklogMeta(), backlogs[0].BacklogID))
+			require.Equal(t, string(marshaledShadowPartition), r.HGet(kg.ShadowPartitionMeta(), shadowPartition.ShadowPartitionID))
 
 			require.Equal(t, at.UnixMilli()/1000, int64(score(t, kg.ShadowPartitionSet(shadowPartition.ShadowPartitionID), backlogs[0].BacklogID)))
 			require.Equal(t, at.UnixMilli()/1000, int64(score(t, kg.GlobalShadowPartitionSet(), shadowPartition.ShadowPartitionID)))
@@ -5608,6 +5616,146 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 			require.Equal(t, at.UnixMilli()/1000, int64(score(t, kg.ShadowPartitionSet(shadowPartition.ShadowPartitionID), backlogs[0].BacklogID)))
 			require.Equal(t, at.UnixMilli()/1000, int64(score(t, kg.GlobalShadowPartitionSet(), shadowPartition.ShadowPartitionID)))
 			require.Equal(t, at.UnixMilli(), int64(score(t, kg.BacklogSet(backlogs[0].BacklogID), qi.ID)))
+		})
+	})
+
+	t.Run("two custom concurrency keys", func(t *testing.T) {
+		r := miniredis.RunT(t)
+		rc, err := rueidis.NewClient(rueidis.ClientOption{
+			InitAddress:  []string{r.Addr()},
+			DisableCache: true,
+		})
+		require.NoError(t, err)
+		defer rc.Close()
+
+		defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+		kg := defaultShard.RedisClient.kg
+
+		q := NewQueue(
+			defaultShard,
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+				return true
+			}),
+			WithAllowSystemKeyQueues(func(ctx context.Context) bool {
+				return true
+			}),
+			WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
+				return false
+			}),
+			WithDisableSystemQueueLeaseChecks(func(ctx context.Context) bool {
+				return false
+			}),
+			WithConcurrencyLimitGetter(func(ctx context.Context, p QueuePartition) PartitionConcurrencyLimits {
+				return PartitionConcurrencyLimits{
+					AccountLimit:   123,
+					FunctionLimit:  45,
+					CustomKeyLimit: 0, // only used for leasing partition
+				}
+			}),
+			WithSystemConcurrencyLimitGetter(func(ctx context.Context, p QueuePartition) SystemPartitionConcurrencyLimits {
+				return SystemPartitionConcurrencyLimits{
+					GlobalLimit:    567,
+					PartitionLimit: 678,
+				}
+			}),
+			WithCustomConcurrencyKeyLimitRefresher(func(ctx context.Context, i osqueue.QueueItem) []state.CustomConcurrency {
+				return i.Data.GetConcurrencyKeys()
+			}),
+		)
+		ctx := context.Background()
+
+		accountId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
+
+		score := func(t *testing.T, key string, member string) float64 {
+			score, err := r.ZScore(key, member)
+			require.NoError(t, err)
+
+			return score
+		}
+
+		// use future timestamp because scores will be bounded to the present
+		at := time.Now().Add(10 * time.Minute)
+
+		t.Run("should enqueue item to backlog", func(t *testing.T) {
+			require.Len(t, r.Keys(), 0)
+
+			hashedConcurrencyKeyExpr1 := hashConcurrencyKey("event.data.userId")
+			unhashedValue1 := "user1"
+			scope1 := enums.ConcurrencyScopeFn
+			fullKey1 := util.ConcurrencyKey(scope1, fnID, unhashedValue1)
+
+			hashedConcurrencyKeyExpr2 := hashConcurrencyKey("event.data.orgId")
+			unhashedValue2 := "org1"
+			scope2 := enums.ConcurrencyScopeEnv
+			fullKey2 := util.ConcurrencyKey(scope2, fnID, unhashedValue2)
+
+			item := osqueue.QueueItem{
+				ID:          "test",
+				FunctionID:  fnID,
+				WorkspaceID: wsID,
+				Data: osqueue.Item{
+					WorkspaceID: wsID,
+					Kind:        osqueue.KindEdge,
+					Identifier: state.Identifier{
+						WorkflowID:  fnID,
+						AccountID:   accountId,
+						WorkspaceID: wsID,
+					},
+					QueueName: nil,
+					Throttle:  nil,
+					CustomConcurrencyKeys: []state.CustomConcurrency{
+						{
+							Key:                       fullKey1,
+							Hash:                      hashedConcurrencyKeyExpr1,
+							Limit:                     123,
+							UnhashedEvaluatedKeyValue: unhashedValue1,
+						},
+						{
+							Key:                       fullKey2,
+							Hash:                      hashedConcurrencyKeyExpr2,
+							Limit:                     234,
+							UnhashedEvaluatedKeyValue: unhashedValue2,
+						},
+					},
+				},
+				QueueName: nil,
+			}
+
+			qi, err := q.EnqueueItem(ctx, defaultShard, item, at, osqueue.EnqueueOpts{})
+			require.NoError(t, err)
+
+			backlogs := q.ItemBacklogs(ctx, item)
+			require.Len(t, backlogs, 2)
+			require.NotNil(t, backlogs[0].ConcurrencyScope)
+			require.NotNil(t, backlogs[0].ConcurrencyKey)
+			require.NotNil(t, backlogs[1].ConcurrencyScope)
+			require.NotNil(t, backlogs[1].ConcurrencyKey)
+
+			marshaledBacklog1, err := json.Marshal(backlogs[0])
+			require.NoError(t, err)
+
+			marshaledBacklog2, err := json.Marshal(backlogs[1])
+			require.NoError(t, err)
+
+			shadowPartition := q.ItemShadowPartition(ctx, item)
+			require.NotEmpty(t, shadowPartition.ShadowPartitionID)
+			require.Len(t, shadowPartition.CustomConcurrencyKeys, 2)
+
+			require.True(t, r.Exists(kg.BacklogMeta()), r.Keys())
+			require.True(t, r.Exists(kg.BacklogSet(backlogs[0].BacklogID)))
+			require.True(t, r.Exists(kg.BacklogSet(backlogs[1].BacklogID)))
+			require.True(t, r.Exists(kg.ShadowPartitionMeta()))
+			require.True(t, r.Exists(kg.ShadowPartitionSet(shadowPartition.ShadowPartitionID)), r.Keys())
+			require.True(t, r.Exists(kg.GlobalShadowPartitionSet()))
+			require.Equal(t, string(marshaledBacklog1), r.HGet(kg.BacklogMeta(), backlogs[0].BacklogID))
+			require.Equal(t, string(marshaledBacklog2), r.HGet(kg.BacklogMeta(), backlogs[1].BacklogID))
+
+			require.Equal(t, at.UnixMilli()/1000, int64(score(t, kg.ShadowPartitionSet(shadowPartition.ShadowPartitionID), backlogs[0].BacklogID)))
+			require.Equal(t, at.UnixMilli()/1000, int64(score(t, kg.ShadowPartitionSet(shadowPartition.ShadowPartitionID), backlogs[1].BacklogID)))
+			require.Equal(t, at.UnixMilli()/1000, int64(score(t, kg.GlobalShadowPartitionSet(), shadowPartition.ShadowPartitionID)))
+			require.Equal(t, at.UnixMilli(), int64(score(t, kg.BacklogSet(backlogs[0].BacklogID), qi.ID)))
+			require.Equal(t, at.UnixMilli(), int64(score(t, kg.BacklogSet(backlogs[1].BacklogID), qi.ID)))
+
 		})
 	})
 }
