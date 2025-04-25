@@ -6,11 +6,11 @@ import { Button } from '@inngest/components/Button/Button';
 import { EventsTable } from '@inngest/components/Events/EventsTable';
 import { Header } from '@inngest/components/Header/Header';
 import { RefreshButton } from '@inngest/components/Refresh/RefreshButton';
-import { RiExternalLinkLine, RiRefreshLine } from '@remixicon/react';
+import { RiArrowRightUpLine, RiExternalLinkLine, RiRefreshLine } from '@remixicon/react';
 
 import { EventInfo } from '@/components/Events/EventInfo';
 import SendEventButton from '@/components/Events/SendEventButton';
-import { useEvents } from '@/components/Events/useEvents';
+import { useEventDetails, useEventPayload, useEvents } from '@/components/Events/useEvents';
 import { pathCreator } from '@/utils/urls';
 import { useAccountFeatures } from '@/utils/useAccountFeatures';
 
@@ -24,13 +24,15 @@ export default function EventsPage({
     return {
       // The shared component library is environment-agnostic, so it needs a way to
       // generate URLs without knowing about environments
-      function: (params: { functionSlug: string }) =>
-        pathCreator.function({ envSlug: envSlug, functionSlug: params.functionSlug }),
       eventType: (params: { eventName: string }) =>
         pathCreator.eventType({ envSlug: envSlug, eventName: params.eventName }),
+      runPopout: (params: { runID: string }) =>
+        pathCreator.runPopout({ envSlug: envSlug, runID: params.runID }),
     };
   }, [envSlug]);
   const getEvents = useEvents();
+  const getEventDetails = useEventDetails();
+  const getEventPayload = useEventPayload();
   const features = useAccountFeatures();
 
   return (
@@ -48,6 +50,8 @@ export default function EventsPage({
       <EventsTable
         pathCreator={internalPathCreator}
         getEvents={getEvents}
+        getEventDetails={getEventDetails}
+        getEventPayload={getEventPayload}
         features={{
           history: features.data?.history ?? 7,
         }}
@@ -69,6 +73,20 @@ export default function EventsPage({
             />
           </>
         }
+        expandedRowActions={(eventName) => (
+          <div className="flex items-center gap-2">
+            <Button
+              label="Go to event page"
+              href={pathCreator.eventType({ envSlug: envSlug, eventName: eventName })}
+              appearance="ghost"
+              size="small"
+              icon={<RiArrowRightUpLine />}
+              iconSide="left"
+            />
+            {/* TODO: Wire replay event */}
+            <Button label="Replay event" onClick={() => {}} appearance="outlined" size="small" />
+          </div>
+        )}
       />
     </>
   );

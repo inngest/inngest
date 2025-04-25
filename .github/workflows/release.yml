@@ -39,7 +39,7 @@ jobs:
         uses: goreleaser/goreleaser-action@v5
         with:
           version: "~> 2"
-          args: release --rm-dist --debug
+          args: release --clean --verbose
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
   npm:

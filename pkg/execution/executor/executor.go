@@ -2952,16 +2952,19 @@ func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Func
 
 	// Don't bother if it's already there
 	if err == redis_state.ErrQueueItemExists {
+		span.SetAttributes(attribute.Bool(consts.OtelSysStepDelete, true))
 		return nil
 	}
 
 	// If function is paused, we do not schedule runs
 	if errors.Is(err, ErrFunctionSkipped) {
+		span.SetAttributes(attribute.Bool(consts.OtelSysStepDelete, true))
 		return nil
 	}
 
 	if err != nil {
 		span.SetStatus(codes.Error, err.Error())
+		span.SetAttributes(attribute.Bool(consts.OtelSysStepDelete, true))
 		return err
 	}
 
@@ -2976,8 +2979,6 @@ func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Func
 
 	if md != nil {
 		span.SetAttributes(attribute.String(consts.OtelAttrSDKRunID, md.ID.RunID.String()))
-	} else {
-		span.SetAttributes(attribute.Bool(consts.OtelSysStepDelete, true))
 	}
 
 	return nil
