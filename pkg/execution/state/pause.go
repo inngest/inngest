@@ -194,7 +194,7 @@ type Pause struct {
 	InvokeTargetFnID *string `json:"itFnID,omitempty"`
 	// OnTimeout indicates that this incoming edge should only be ran
 	// when the pause times out, if set to true.
-	OnTimeout bool `json:"onTimeout,omitempty,omitdefault"`
+	OnTimeout bool `json:"onTimeout,omitempty,omitzero"`
 	// DataKey is the name of the step to use when adding data to the function
 	// run's state after consuming this step.
 	//
@@ -203,13 +203,13 @@ type Pause struct {
 	//
 	// If DataKey is empty and data is provided when consuming a pause, no
 	// data will be saved in the function state.
-	DataKey string `json:"dataKey,omitempty,omitdefault"`
+	DataKey string `json:"dataKey,omitempty,omitzero"`
 	// Cancellation indicates whether this pause exists as a cancellation
 	// clause for a function.
 	//
 	// If so, when the matching pause is returned after processing an event
 	// the function's status is set to cancelled, preventing any future work.
-	Cancel bool `json:"cancel,omitempty,omitdefault"`
+	Cancel bool `json:"cancel,omitempty,omitzero"`
 	// Attempt stores the attempt for the current step, if this a pause caused
 	// via an async driver.  This lets the executor resume as-is with the current
 	// context, ensuring that we retry correctly.
