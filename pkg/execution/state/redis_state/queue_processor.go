@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"cuelang.org/go/pkg"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/logger"
@@ -509,6 +510,8 @@ func (q *queue) shadowWorker(ctx context.Context, qspc chan *int) {
 			return
 
 		case <-qspc:
+			metrics.ActiveShadowScanerCount(ctx, 1, metrics.CounterOpt{PkgName: pkgName})
+
 			// TODO:
 			//
 			// - retrieve countinuation counter
@@ -518,6 +521,10 @@ func (q *queue) shadowWorker(ctx context.Context, qspc chan *int) {
 			// - iterate through backlogs
 			//   + add item to function partition
 			//
+
+			// TODO: probably good to wrap this in a closure with the shadow partition logic
+			// so it can just do a defer
+			metrics.ActiveShadowScanerCount(ctx, -1, metrics.CounterOpt{PkgName: pkgName})
 		}
 	}
 }

@@ -347,3 +347,12 @@ func IncrBacklogRequeuedCounter(ctx context.Context, opts CounterOpt) {
 		Tags:        opts.Tags,
 	})
 }
+
+func ActiveShadowScanerCount(ctx context.Context, incr int64, opts CounterOpt) {
+	RecordUpDownCounterMetric(ctx, incr, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "active_shadow_scanner_count",
+		Description: "The number of active shadow scaners",
+		Tags:        opts.Tags,
+	})
+}
