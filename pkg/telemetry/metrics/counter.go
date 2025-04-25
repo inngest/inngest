@@ -1,6 +1,8 @@
 package metrics
 
-import "context"
+import (
+	"context"
+)
 
 func IncrQueuePartitionLeasedCounter(ctx context.Context, opts CounterOpt) {
 	RecordCounterMetric(ctx, 1, CounterOpt{
@@ -304,6 +306,44 @@ func IncrQueueDebounceOperationCounter(ctx context.Context, opts CounterOpt) {
 		PkgName:     opts.PkgName,
 		MetricName:  "queue_debounce_operation",
 		Description: "The total number of debounce operations",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrBacklogProcessedCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "backlog_processed_total",
+		Description: "The total number of backlogs processed",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrBacklogRefilledCounter(ctx context.Context, value int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, value, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "backlog_refilled_total",
+		Description: "The total number of backlog items that were added to the function partition",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrBacklogRefillLimitsCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "backlog_refill_limit_total",
+		Description: "The total number of limtis hit when refilling a backlog",
+		Tags:        opts.Tags,
+	})
+}
+
+// NOTE: this is a metric that's mainly used for observing migrations to key queues
+// it's not needed once the migration completes
+func IncrBacklogRequeuedCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "backlog_requeued_total",
+		Description: "The total number of queue items that were requeued into backlogs from fn partition",
 		Tags:        opts.Tags,
 	})
 }
