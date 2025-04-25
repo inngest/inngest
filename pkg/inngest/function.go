@@ -369,7 +369,7 @@ func (f Function) Validate(ctx context.Context) error {
 	// Validate cancellation expressions
 	for _, c := range f.Cancel {
 		if c.If != nil {
-			if exprErr := expressions.Validate(ctx, *c.If); exprErr != nil {
+			if exprErr := expressions.Validate(ctx, expressions.DefaultRestrictiveValidationPolicy(), *c.If); exprErr != nil {
 				err = multierror.Append(err, fmt.Errorf("Cancellation expression is invalid: %s", exprErr))
 			}
 		}
