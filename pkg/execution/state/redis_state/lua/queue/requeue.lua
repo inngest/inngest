@@ -13,34 +13,25 @@ local keyPartitionMap         = KEYS[2] -- partition:item - hash: { $workflowID:
 local keyGlobalPointer        = KEYS[3] -- partition:sorted - zset
 local keyGlobalAccountPointer = KEYS[4] -- accounts:sorted - zset
 local keyAccountPartitions    = KEYS[5] -- accounts:$accountId:partition:sorted
-local keyPartitionA           = KEYS[6] -- queue:sorted:$workflowID - zset
-local keyPartitionB           = KEYS[7] -- e.g. sorted:c|t:$workflowID - zset
-local keyPartitionC           = KEYS[8] -- e.g. sorted:c|t:$workflowID - zset
+local keyPartitionFn          = KEYS[6] -- queue:sorted:$workflowID - zset
 -- We remove our queue item ID from each concurrency queue
-local keyConcurrencyA    = KEYS[9] -- Account concurrency level
-local keyConcurrencyB    = KEYS[10] -- When leasing an item we need to place the lease into this key
-local keyConcurrencyC    = KEYS[11] -- Optional for eg. for concurrency amongst steps
-local keyAcctConcurrency = KEYS[12]
+local keyConcurrencyFn            = KEYS[7] -- Account concurrency level
+local keyCustomConcurrencyKey1    = KEYS[8] -- When leasing an item we need to place the lease into this key
+local keyCustomConcurrencyKey2    = KEYS[9] -- Optional for eg. for concurrency amongst steps
+local keyAcctConcurrency          = KEYS[10]
 -- We push pointers to partition concurrency items to the partition concurrency item
-local concurrencyPointer      = KEYS[13]
-local keyItemIndexA           = KEYS[14]          -- custom item index 1
-local keyItemIndexB           = KEYS[15]          -- custom item index 2
+local concurrencyPointer          = KEYS[11]
+
+local keyItemIndexA               = KEYS[12]          -- custom item index 1
+local keyItemIndexB               = KEYS[13]          -- custom item index 2
 
 local queueItem           = ARGV[1]
 local queueID             = ARGV[2]           -- id
 local queueScore          = tonumber(ARGV[3]) -- vesting time, in ms
 local nowMS               = tonumber(ARGV[4]) -- now in ms
-local partitionItemA      = ARGV[5]
-local partitionItemB      = ARGV[6]
-local partitionItemC      = ARGV[7]
-local partitionIdA        = ARGV[8]
-local partitionIdB        = ARGV[9]
-local partitionIdC        = ARGV[10]
-local accountId           = ARGV[11]
-local legacyPartitionName = ARGV[12]
-local partitionTypeA = tonumber(ARGV[13])
-local partitionTypeB = tonumber(ARGV[14])
-local partitionTypeC = tonumber(ARGV[15])
+local partitionItemFn     = ARGV[5]
+local partitionID         = ARGV[6]
+local accountId           = ARGV[7]
 
 -- $include(get_queue_item.lua)
 -- $include(get_partition_item.lua)
@@ -62,47 +53,37 @@ redis.call("HSET", queueKey, queueID, queueItem)
 -- index/scavenger queue is updated to the next earliest item.
 -- This is the first half of requeueing: Removing the in-progress item, which must be followed up
 -- by enqueueing back to the partition queues
-local function handleRequeueConcurrency(keyConcurrency, partitionID, partitionType)
+local function handleRequeueConcurrency(keyConcurrency)
 	redis.call("ZREM", keyConcurrency, item.id) -- Remove from in-progress queue
-
-	if partitionType ~= 0 then
-		-- If this is not a default partition, we don't need to update the concurrency pointer (used by scavenger)
-		return
-	end
-
-	-- Backwards compatibility: For default partitions, use the partition ID (function ID) as the pointer
-	local pointerMember = keyConcurrency
-	if partitionType == 0 then
-		pointerMember = partitionID
-	end
-
-	-- Get the earliest item in the partition concurrency set.  We may be dequeueing
-	-- the only in-progress job and should remove this from the partition concurrency
-	-- pointers, if this exists.
-	--
-	-- This ensures that scavengeres have updated pointer queues without the currently
-	-- leased job, if exists.
-	local concurrencyScores = redis.call("ZRANGE", keyConcurrency, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")
-	if concurrencyScores == false then
-		redis.call("ZREM", concurrencyPointer, pointerMember)
-	else
-		local earliestLease = tonumber(concurrencyScores[2])
-		if earliestLease == nil then
-			redis.call("ZREM", concurrencyPointer, pointerMember)
-		else
-			-- Ensure that we update the score with the earliest lease
-			redis.call("ZADD", concurrencyPointer, earliestLease, pointerMember)
-		end
-	end
 end
 
 --
 -- Concurrency
 --
 
-handleRequeueConcurrency(keyConcurrencyA, partitionIdA, partitionTypeA)
-handleRequeueConcurrency(keyConcurrencyB, partitionIdB, partitionTypeB)
-handleRequeueConcurrency(keyConcurrencyC, partitionIdC, partitionTypeC)
+handleRequeueConcurrency(keyConcurrencyFn)
+
+-- Get the earliest item in the partition concurrency set.  We may be dequeueing
+-- the only in-progress job and should remove this from the partition concurrency
+-- pointers, if this exists.
+--
+-- This ensures that scavengeres have updated pointer queues without the currently
+-- leased job, if exists.
+local concurrencyScores = redis.call("ZRANGE", keyConcurrencyFn, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")
+if concurrencyScores == false then
+  redis.call("ZREM", concurrencyPointer, partitionID)
+else
+  local earliestLease = tonumber(concurrencyScores[2])
+  if earliestLease == nil then
+    redis.call("ZREM", concurrencyPointer, partitionID)
+  else
+    -- Ensure that we update the score with the earliest lease
+    redis.call("ZADD", concurrencyPointer, earliestLease, partitionID)
+  end
+end
+
+handleRequeueConcurrency(keyCustomConcurrencyKey1)
+handleRequeueConcurrency(keyCustomConcurrencyKey2)
 
 -- Remove item from the account concurrency queue
 -- This does not have a scavenger queue, as it's purely an entitlement limitation. See extendLease
@@ -112,9 +93,7 @@ redis.call("ZREM", keyAcctConcurrency, item.id)
 --
 -- Enqueue item to partition queues again
 -- 
-requeue_to_partition(keyPartitionA, partitionIdA, partitionItemA, partitionTypeA, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, queueScore, queueID, nowMS, accountId)
-requeue_to_partition(keyPartitionB, partitionIdB, partitionItemB, partitionTypeB, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, queueScore, queueID, nowMS, accountId)
-requeue_to_partition(keyPartitionC, partitionIdC, partitionItemC, partitionTypeC, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, queueScore, queueID, nowMS, accountId)
+requeue_to_partition(keyPartitionFn, partitionID, partitionItemFn, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, queueScore, queueID, nowMS, accountId)
 
 -- Add optional indexes.
 if keyItemIndexA ~= "" and keyItemIndexA ~= false and keyItemIndexA ~= nil then
