@@ -24,9 +24,10 @@ const (
 	// of roughly 25mb blocks.
 	DefaultPausesPerBlock = 25_000
 
-	// DefaultCompactionSample is the minimum number of deleted pauses within an
-	// index that should trigger a compaction.
-	DefaultCompactionLimit = (DefaultPausesPerBlock / 3)
+	// DefaultCompactionLimit is the number of pauses that have to be deleted from
+	// a block to compact it.  This prevents us from rewriting pauses on every
+	// deletion - a waste of ops.
+	DefaultCompactionLimit = (DefaultPausesPerBlock / 5)
 
 	// DefaultCompactionSample gives us a 10% chance of running compactions after
 	// a delete.
@@ -35,7 +36,8 @@ const (
 
 // Block represents a block of pauses.
 type Block struct {
-	// ID is the block ID.
+	// ID is the block ID.  The timestamp encodes the timestamp of the latest
+	// pause in the block at the time of block creation.
 	ID ulid.ULID
 	// Index is the index for this block, eg. the workspac and event name.
 	Index Index
@@ -100,8 +102,9 @@ type blockstore struct {
 	// size is the size of blocks when writing
 	blocksize int
 
-	// CompactionLimit is the total number of pauses that should trigger a compaction.
-	// Note that this doesnt always trigger a compaction;
+	// compactionLimit is the number of pauses that have to be deleted from
+	// a block to compact it.  This prevents us from rewriting pauses on every
+	// deletion - a waste of ops.
 	compactionLimit int
 	// CompactionSample is the chance of compaction, from 0-100
 	compactionSample float64

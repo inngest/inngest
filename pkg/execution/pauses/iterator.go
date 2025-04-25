@@ -139,10 +139,11 @@ func (d *dualIter) Next(ctx context.Context) bool {
 		d.l.Unlock()
 	}
 
-	// Now we're good.
 	d.l.Lock()
-	defer d.l.Unlock()
-	if len(d.pauses) > 0 {
+	lenPauses := len(d.pauses)
+	d.l.Unlock()
+
+	if lenPauses > 0 {
 		// Simple case:  pauses are downloaded, so yeah we have a next value.
 		return true
 	}
