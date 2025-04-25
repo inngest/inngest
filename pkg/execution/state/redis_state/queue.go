@@ -2500,13 +2500,14 @@ func (q *queue) Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 	keys := []string{
 		queueShard.RedisClient.kg.QueueItem(),
 		fnPartition.zsetKey(queueShard.RedisClient.kg),
-		customConcurrencyKey1.zsetKey(queueShard.RedisClient.kg),
-		customConcurrencyKey2.zsetKey(queueShard.RedisClient.kg),
+
 		fnPartition.concurrencyKey(queueShard.RedisClient.kg),
 		customConcurrencyKey1.concurrencyKey(queueShard.RedisClient.kg),
 		customConcurrencyKey2.concurrencyKey(queueShard.RedisClient.kg),
 		accountConcurrencyKey,
+
 		queueShard.RedisClient.kg.Idempotency(i.ID),
+
 		queueShard.RedisClient.kg.ConcurrencyIndex(),
 		queueShard.RedisClient.kg.GlobalPartitionIndex(),
 		queueShard.RedisClient.kg.GlobalAccountIndex(),
@@ -2518,7 +2519,6 @@ func (q *queue) Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		shadowPartition.accountInProgressKey(q.primaryQueueShard.RedisClient.kg),
 		backlogs[0].activeKey(q.primaryQueueShard.RedisClient.kg),
 		backlogs[1].activeKey(q.primaryQueueShard.RedisClient.kg),
-		backlogs[2].activeKey(q.primaryQueueShard.RedisClient.kg),
 	}
 	// Append indexes
 	for _, idx := range q.itemIndexer(ctx, i, queueShard.RedisClient.kg) {
