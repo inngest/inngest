@@ -97,10 +97,11 @@ const (
 	// times to edge enqueue times.
 	FunctionStartScoreBufferTime = 10 * time.Second
 
-	defaultNumWorkers     = 100
-	defaultPollTick       = 10 * time.Millisecond
-	defaultIdempotencyTTL = 12 * time.Hour
-	defaultConcurrency    = 1000 // TODO: add function to override.
+	defaultNumWorkers       = 100
+	defaultNumShadowWorkers = 100
+	defaultPollTick         = 10 * time.Millisecond
+	defaultIdempotencyTTL   = 12 * time.Hour
+	defaultConcurrency      = 1000 // TODO: add function to override.
 
 	NoConcurrencyLimit = -1
 )
@@ -223,6 +224,12 @@ func WithIdempotencyTTLFunc(f func(context.Context, osqueue.QueueItem) time.Dura
 func WithNumWorkers(n int32) QueueOpt {
 	return func(q *queue) {
 		q.numWorkers = n
+	}
+}
+
+func WithShadowNumWorkers(n int32) QueueOpt {
+	return func(q *queue) {
+		q.numShadowWorkers = n
 	}
 }
 
@@ -489,6 +496,7 @@ func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 			AccountWeight:      85,
 		},
 		numWorkers:               defaultNumWorkers,
+		numShadowWorkers:         defaultNumShadowWorkers,
 		wg:                       &sync.WaitGroup{},
 		seqLeaseLock:             &sync.RWMutex{},
 		scavengerLeaseLock:       &sync.RWMutex{},
@@ -608,6 +616,8 @@ type queue struct {
 	wg *sync.WaitGroup
 	// numWorkers stores the number of workers available to concurrently process jobs.
 	numWorkers int32
+	// numShadowWorkers stores the number of workers available to concurrently scan partitions
+	numShadowWorkers int32
 	// peek min & max sets the range for partitions to peek for items
 	peekMin int64
 	peekMax int64
