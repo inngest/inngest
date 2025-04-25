@@ -61,7 +61,7 @@ type QueueBacklog struct {
 	ConcurrencyScope *enums.ConcurrencyScope `json:"cs,omitempty"`
 
 	// ConcurrencyScopeEntity stores the accountID, envID, or fnID for the respective concurrency scope
-	ConcurrencyScopeEntity *string `json:"cse,omitempty"`
+	ConcurrencyScopeEntity *uuid.UUID `json:"cse,omitempty"`
 
 	// ConcurrencyKey is the hashed concurrency key expression (e.g. hash("event.data.customerId"))
 	ConcurrencyKey *string `json:"ck,omitempty"`
@@ -161,14 +161,13 @@ func (q *queue) ItemBacklogs(ctx context.Context, i osqueue.QueueItem) []QueueBa
 			rawValue = &key.UnhashedEvaluatedKeyValue
 		}
 
-		// Account ID, Env ID, or Function ID to apply to the concurrency key to
-		concurrencyScopeEntity := entityID.String()
-
 		backlogs = append(backlogs, QueueBacklog{
-			BacklogID:              fmt.Sprintf("conc:%s", key.Key),
-			ShadowPartitionID:      i.FunctionID.String(),
-			ConcurrencyScope:       &scope,
-			ConcurrencyScopeEntity: &concurrencyScopeEntity,
+			BacklogID:         fmt.Sprintf("conc:%s", key.Key),
+			ShadowPartitionID: i.FunctionID.String(),
+			ConcurrencyScope:  &scope,
+
+			// Account ID, Env ID, or Function ID to apply to the concurrency key to
+			ConcurrencyScopeEntity: &entityID,
 
 			// Hashed expression to identify which key this is in the shadow partition concurrency key list
 			ConcurrencyKey: &key.Hash,

@@ -5934,7 +5934,7 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 			// key queue v2 accounting
 			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, shadowPartition.accountInProgressKey(kg), qi.ID)))
 			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, shadowPartition.inProgressKey(kg), qi.ID)))
-			require.Equal(t, kg.Active("", "", ""), backlogs[0].activeKey(kg))
+			require.Equal(t, kg.Concurrency("", ""), backlogs[0].activeKey(kg))
 			require.False(t, r.Exists(backlogs[0].activeKey(kg)))
 
 			// expect classic partition concurrency to include item
@@ -6072,7 +6072,7 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 			// key queue v2 accounting
 			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, shadowPartition.accountInProgressKey(kg), qi.ID)))
 			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, shadowPartition.inProgressKey(kg), qi.ID)))
-			require.Equal(t, kg.Active("f", fnID.String(), checksum), backlogs[0].activeKey(kg))
+			require.Equal(t, kg.Concurrency("custom", util.ConcurrencyKey(scope, fnID, checksum)), backlogs[0].activeKey(kg))
 			require.True(t, r.Exists(backlogs[0].activeKey(kg)))
 			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, backlogs[0].activeKey(kg), qi.ID)))
 
@@ -6228,12 +6228,12 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, shadowPartition.inProgressKey(kg), qi.ID)))
 
 			// first key
-			require.Equal(t, kg.Active("f", fnID.String(), checksum1), backlogs[0].activeKey(kg))
+			require.Equal(t, kg.Concurrency("custom", util.ConcurrencyKey(scope1, fnID, checksum1)), backlogs[0].activeKey(kg))
 			require.True(t, r.Exists(backlogs[0].activeKey(kg)))
 			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, backlogs[0].activeKey(kg), qi.ID)))
 
 			// second key
-			require.Equal(t, kg.Active("e", wsID.String(), checksum2), backlogs[1].activeKey(kg))
+			require.Equal(t, kg.Concurrency("custom", util.ConcurrencyKey(scope2, wsID, checksum2)), backlogs[1].activeKey(kg))
 			require.True(t, r.Exists(backlogs[1].activeKey(kg)))
 			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, backlogs[1].activeKey(kg), qi.ID)))
 
@@ -6328,9 +6328,9 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 
 			// key queue v2 accounting
 			// should not track account concurrency for system partition
-			require.False(t, r.Exists(shadowPartition.accountInProgressKey(kg)))
+			require.True(t, r.Exists(shadowPartition.accountInProgressKey(kg)))
 			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, shadowPartition.inProgressKey(kg), qi.ID)))
-			require.Equal(t, kg.Active("", "", ""), backlogs[0].activeKey(kg))
+			require.Equal(t, kg.Concurrency("", ""), backlogs[0].activeKey(kg))
 			require.False(t, r.Exists(backlogs[0].activeKey(kg)))
 
 			// expect classic partition concurrency to include item
@@ -6433,7 +6433,7 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, shadowPartition.accountInProgressKey(kg), qi.ID)))
 
 			// no active set for default partition since this uses the in progress key
-			require.Equal(t, kg.Active("", "", ""), backlogs[0].activeKey(kg))
+			require.Equal(t, kg.Concurrency("", ""), backlogs[0].activeKey(kg))
 
 			// expect old accounting to be updated
 			// TODO Do we actually want to update previous accounting?
@@ -6547,7 +6547,7 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 			enqueueToBacklog = true
 
 			// sanity check: empty key should never be stored
-			require.False(t, r.Exists(kg.Active("", "", "")))
+			require.False(t, r.Exists(kg.Concurrency("", "")))
 
 			// put item in progress, this is tested separately
 			now := q.clock.Now().Truncate(time.Minute)
@@ -6581,7 +6581,7 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, shadowPartition.accountInProgressKey(kg), qi.ID)))
 
 			// 1 active set for custom concurrency key
-			require.Equal(t, kg.Active("f", fnID.String(), checksum), backlogs[0].activeKey(kg))
+			require.Equal(t, kg.Concurrency("custom", util.ConcurrencyKey(scope, fnID, checksum)), backlogs[0].activeKey(kg))
 			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, backlogs[0].activeKey(kg), qi.ID)))
 
 			// expect old accounting to be updated
@@ -6592,7 +6592,7 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, kg.Concurrency("custom", fullKey), qi.ID)))
 
 			// sanity check: empty key should never be stored
-			require.False(t, r.Exists(kg.Active("", "", "")))
+			require.False(t, r.Exists(kg.Concurrency("", "")))
 
 			requeueFor := at.Add(30 * time.Minute).Truncate(time.Minute)
 
@@ -6600,7 +6600,7 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 			require.NoError(t, err)
 
 			// sanity check: empty key should never be stored
-			require.False(t, r.Exists(kg.Active("", "", "")))
+			require.False(t, r.Exists(kg.Concurrency("", "")))
 
 			// expect item to be requeued to backlog
 			require.Equal(t, requeueFor.UnixMilli(), int64(score(t, r, kg.BacklogSet(backlogs[0].BacklogID), qi.ID)))
@@ -6721,7 +6721,7 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 			enqueueToBacklog = true
 
 			// sanity check: empty key should never be stored
-			require.False(t, r.Exists(kg.Active("", "", "")))
+			require.False(t, r.Exists(kg.Concurrency("", "")))
 
 			// put item in progress, this is tested separately
 			now := q.clock.Now().Truncate(time.Minute)
@@ -6761,10 +6761,10 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 			// 2 active set for custom concurrency keys
 
 			// first key
-			require.Equal(t, kg.Active("f", fnID.String(), checksum1), backlogs[0].activeKey(kg))
+			require.Equal(t, kg.Concurrency("custom", util.ConcurrencyKey(scope1, fnID, checksum1)), backlogs[0].activeKey(kg))
 			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, backlogs[0].activeKey(kg), qi.ID)))
 
-			require.Equal(t, kg.Active("e", wsID.String(), checksum2), backlogs[1].activeKey(kg))
+			require.Equal(t, kg.Concurrency("custom", util.ConcurrencyKey(scope2, wsID, checksum2)), backlogs[1].activeKey(kg))
 			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, backlogs[1].activeKey(kg), qi.ID)))
 
 			// expect old accounting to be updated
@@ -6777,7 +6777,7 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, kg.Concurrency("custom", fullKey2), qi.ID)))
 
 			// sanity check: empty key should never be stored
-			require.False(t, r.Exists(kg.Active("", "", "")))
+			require.False(t, r.Exists(kg.Concurrency("", "")))
 
 			requeueFor := at.Add(30 * time.Minute).Truncate(time.Minute)
 
@@ -6785,7 +6785,7 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 			require.NoError(t, err)
 
 			// sanity check: empty key should never be stored
-			require.False(t, r.Exists(kg.Active("", "", "")))
+			require.False(t, r.Exists(kg.Concurrency("", "")))
 
 			// expect item to be requeued to backlog
 			require.Equal(t, requeueFor.UnixMilli(), int64(score(t, r, kg.BacklogSet(backlogs[0].BacklogID), qi.ID)))
@@ -6895,11 +6895,11 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 			// expect key queue accounting to contain item in in-progress
 			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, shadowPartition.inProgressKey(kg), qi.ID)))
 
-			require.Equal(t, kg.AccountInProgress(uuid.Nil), shadowPartition.accountInProgressKey(kg))
-			require.False(t, r.Exists(shadowPartition.accountInProgressKey(kg)))
+			require.Equal(t, kg.Concurrency("account", sysQueueName), shadowPartition.accountInProgressKey(kg))
+			require.True(t, r.Exists(shadowPartition.accountInProgressKey(kg)))
 
 			// no active set for default partition since this uses the in progress key
-			require.Equal(t, kg.Active("", "", ""), backlogs[0].activeKey(kg))
+			require.Equal(t, kg.Concurrency("", ""), backlogs[0].activeKey(kg))
 
 			// expect old accounting to be updated
 			// TODO Do we actually want to update previous accounting?
@@ -7025,7 +7025,7 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, shadowPartition.accountInProgressKey(kg), qi.ID)))
 
 			// no active set for default partition since this uses the in progress key
-			require.Equal(t, kg.Active("", "", ""), backlogs[0].activeKey(kg))
+			require.Equal(t, kg.Concurrency("", ""), backlogs[0].activeKey(kg))
 
 			// expect old accounting to be updated
 			// TODO Do we actually want to update previous accounting?
@@ -7162,7 +7162,7 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, shadowPartition.accountInProgressKey(kg), qi.ID)))
 
 			// 1 active set for custom concurrency key
-			require.Equal(t, kg.Active("f", fnID.String(), checksum), backlogs[0].activeKey(kg))
+			require.Equal(t, kg.Concurrency("custom", util.ConcurrencyKey(scope, fnID, checksum)), backlogs[0].activeKey(kg))
 			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, backlogs[0].activeKey(kg), qi.ID)))
 
 			// expect old accounting to be updated
@@ -7319,10 +7319,10 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, shadowPartition.accountInProgressKey(kg), qi.ID)))
 
 			// 2 active set for custom concurrency keys
-			require.Equal(t, kg.Active("f", fnID.String(), checksum1), backlogs[0].activeKey(kg))
+			require.Equal(t, kg.Concurrency("custom", util.ConcurrencyKey(scope1, fnID, checksum1)), backlogs[0].activeKey(kg))
 			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, backlogs[0].activeKey(kg), qi.ID)))
 
-			require.Equal(t, kg.Active("e", wsID.String(), checksum2), backlogs[1].activeKey(kg))
+			require.Equal(t, kg.Concurrency("custom", util.ConcurrencyKey(scope2, wsID, checksum2)), backlogs[1].activeKey(kg))
 			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, backlogs[1].activeKey(kg), qi.ID)))
 
 			// expect old accounting to be updated
@@ -7440,11 +7440,11 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 			// expect key queue accounting to contain item in in-progress
 			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, shadowPartition.inProgressKey(kg), qi.ID)))
 
-			require.Equal(t, kg.AccountInProgress(uuid.Nil), shadowPartition.accountInProgressKey(kg))
-			require.False(t, r.Exists(shadowPartition.accountInProgressKey(kg)))
+			require.Equal(t, kg.Concurrency("account", sysQueueName), shadowPartition.accountInProgressKey(kg))
+			require.True(t, r.Exists(shadowPartition.accountInProgressKey(kg)))
 
 			// no active set for default partition since this uses the in progress key
-			require.Equal(t, kg.Active("", "", ""), backlogs[0].activeKey(kg))
+			require.Equal(t, kg.Concurrency("", ""), backlogs[0].activeKey(kg))
 
 			// expect old accounting to be updated
 			// TODO Do we actually want to update previous accounting?

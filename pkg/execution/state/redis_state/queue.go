@@ -894,44 +894,34 @@ func (qp QueuePartition) concurrencyKey(kg QueueKeyGenerator) string {
 // concurrencyKey returns the key to the "active" ZSET for key queue v2 concurrency accounting.
 func (q QueueBacklog) activeKey(kg QueueKeyGenerator) string {
 	if q.ConcurrencyScope == nil || q.ConcurrencyScopeEntity == nil || q.ConcurrencyKey == nil {
-		return kg.Active("", "", "")
-	}
-
-	prefix := ""
-	switch *q.ConcurrencyScope {
-	case enums.ConcurrencyScopeFn:
-		prefix = "f"
-	case enums.ConcurrencyScopeAccount:
-		prefix = "a"
-	case enums.ConcurrencyScopeEnv:
-		prefix = "e"
+		return kg.Concurrency("", "")
 	}
 
 	// Concurrency accounting keys are made up of three parts:
 	// - The scope (account, environment, function) to apply the concurrency limit on
 	// - The entity (account ID, envID, or function ID) based on the scope
 	// - The dynamic key value (hashed evaluated expression)
-	return kg.Active(prefix, *q.ConcurrencyScopeEntity, *q.ConcurrencyKeyValue)
+	return kg.Concurrency("custom", util.ConcurrencyKey(*q.ConcurrencyScope, *q.ConcurrencyScopeEntity, *q.ConcurrencyKeyValue))
 }
 
 // inProgressKey returns the key storing the in progress set for the shadow partition
 func (q QueueShadowPartition) inProgressKey(kg QueueKeyGenerator) string {
-	return kg.InProgress(q.ShadowPartitionID)
+	return kg.Concurrency("p", q.ShadowPartitionID)
 }
 
 // accountInProgressKey returns the key storing the in progress set for the shadow partition's account
 func (q QueueShadowPartition) accountInProgressKey(kg QueueKeyGenerator) string {
 	// Do not track account concurrency for system queues
 	if q.SystemQueueName != nil {
-		return kg.AccountInProgress(uuid.Nil)
+		return kg.Concurrency("account", q.ShadowPartitionID)
 	}
 
 	// This should never be unset
 	if q.AccountID == nil {
-		return kg.AccountInProgress(uuid.Nil)
+		return kg.Concurrency("account", "")
 	}
 
-	return kg.AccountInProgress(*q.AccountID)
+	return kg.Concurrency("account", q.AccountID.String())
 }
 
 // fnConcurrencyKey returns the concurrency key for a function scope limit, on the
