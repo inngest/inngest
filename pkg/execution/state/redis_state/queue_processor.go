@@ -13,6 +13,7 @@ import (
 
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/logger"
 
 	"github.com/google/uuid"
 
@@ -170,11 +171,6 @@ func (q *queue) Enqueue(ctx context.Context, item osqueue.Item, at time.Time, op
 }
 
 func (q *queue) Run(ctx context.Context, f osqueue.RunFunc) error {
-
-	for i := int32(0); i < q.numWorkers; i++ {
-		go q.worker(ctx, f)
-	}
-
 	if q.runMode.GuaranteedCapacity {
 		go q.claimUnleasedGuaranteedCapacity(ctx, q.guaranteedCapacityScanTickTime, q.guaranteedCapacityLeaseTickTime)
 	}
@@ -188,6 +184,25 @@ func (q *queue) Run(ctx context.Context, f osqueue.RunFunc) error {
 	}
 
 	go q.runInstrumentation(ctx)
+
+	// start execution and shadow scan concurrently
+	eg := errgroup.Group{}
+
+	eg.Go(func() error {
+		return q.executionScan(ctx, f)
+	})
+
+	eg.Go(func() error {
+		return q.shadowScan(ctx)
+	})
+
+	return eg.Wait()
+}
+
+func (q *queue) executionScan(ctx context.Context, f osqueue.RunFunc) error {
+	for i := int32(0); i < q.numWorkers; i++ {
+		go q.worker(ctx, f)
+	}
 
 	if !q.runMode.Partition && !q.runMode.Account {
 		return fmt.Errorf("need to specify either partition, account, or both in queue run mode")
@@ -250,6 +265,33 @@ LOOP:
 	q.wg.Wait()
 
 	return nil
+}
+
+func (q *queue) shadowScan(ctx context.Context) error {
+	l := logger.StdlibLogger(ctx)
+	// channel for QueueShadowPartition
+	// TODO: replace with the QueueShadowParition struct once available
+	qspc := make(chan *int)
+
+	for i := int32(0); i < q.numShadowWorkers; i++ {
+		go q.shadowWorker(ctx, qspc)
+	}
+
+	tick := q.clock.NewTicker(q.pollTick)
+	l.Debug("starting shadow scanner", "poll", q.pollTick.String())
+
+	for {
+		select {
+		case <-ctx.Done():
+			tick.Stop()
+			return nil
+
+		case <-tick.Chan():
+			// - scan for shadow partitions
+			// - lease the partition
+			// - dump it into the channel for the workers to do their thing
+		}
+	}
 }
 
 // claimSequentialLease is a process which continually runs while listening to the queue,
@@ -453,6 +495,35 @@ func (q *queue) worker(ctx context.Context, f osqueue.RunFunc) {
 			// the item into the queue.  Here, the worker can continue as
 			// usual to process the next item.
 			q.logger.Error().Err(err).Msg("error processing queue item")
+		}
+	}
+}
+
+// shadowWorker runs a blocking process that listens to item being pushed into the
+// shadow queue partition channel. This allows us to process an individual shadow partition.
+// TODO: replace channel type with QueueShadowPartition struct once available
+func (q *queue) shadowWorker(ctx context.Context, qspc chan *int) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+
+		case <-qspc:
+			metrics.ActiveShadowScanerCount(ctx, 1, metrics.CounterOpt{PkgName: pkgName})
+
+			// TODO:
+			//
+			// - retrieve countinuation counter
+			//
+			// loop:
+			// - extend lease for shadow partition
+			// - iterate through backlogs
+			//   + add item to function partition
+			//
+
+			// TODO: probably good to wrap this in a closure with the shadow partition logic
+			// so it can just do a defer
+			metrics.ActiveShadowScanerCount(ctx, -1, metrics.CounterOpt{PkgName: pkgName})
 		}
 	}
 }

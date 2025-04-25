@@ -97,10 +97,11 @@ const (
 	// times to edge enqueue times.
 	FunctionStartScoreBufferTime = 10 * time.Second
 
-	defaultNumWorkers     = 100
-	defaultPollTick       = 10 * time.Millisecond
-	defaultIdempotencyTTL = 12 * time.Hour
-	defaultConcurrency    = 1000 // TODO: add function to override.
+	defaultNumWorkers       = 100
+	defaultNumShadowWorkers = 100
+	defaultPollTick         = 10 * time.Millisecond
+	defaultIdempotencyTTL   = 12 * time.Hour
+	defaultConcurrency      = 1000 // TODO: add function to override.
 
 	NoConcurrencyLimit = -1
 )
@@ -223,6 +224,12 @@ func WithIdempotencyTTLFunc(f func(context.Context, osqueue.QueueItem) time.Dura
 func WithNumWorkers(n int32) QueueOpt {
 	return func(q *queue) {
 		q.numWorkers = n
+	}
+}
+
+func WithShadowNumWorkers(n int32) QueueOpt {
+	return func(q *queue) {
+		q.numShadowWorkers = n
 	}
 }
 
@@ -468,6 +475,18 @@ func WithDisableLeaseChecks(lc DisableLeaseChecks) QueueOpt {
 	}
 }
 
+// QueueShadowPartitionProcessCount determines how many times the shadow scanner
+// continue to process a shadow partition's backlog.
+// This helps with reducing churn on leases for the shadow partition and allow handling
+// larger amount of backlogs if there are a ton of backlog due to keys
+type QueueShadowPartitionProcessCount func(ctx context.Context, acctID uuid.UUID) int
+
+func WithQueueShadowPartitionProcessCount(spc QueueShadowPartitionProcessCount) QueueOpt {
+	return func(q *queue) {
+		q.shadowPartitionProcessCount = spc
+	}
+}
+
 func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 	q := &queue{
 		primaryQueueShard: primaryQueueShard,
@@ -489,6 +508,7 @@ func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 			AccountWeight:      85,
 		},
 		numWorkers:               defaultNumWorkers,
+		numShadowWorkers:         defaultNumShadowWorkers,
 		wg:                       &sync.WaitGroup{},
 		seqLeaseLock:             &sync.RWMutex{},
 		scavengerLeaseLock:       &sync.RWMutex{},
@@ -532,6 +552,9 @@ func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 		},
 		disableLeaseChecks: func(ctx context.Context, acctID uuid.UUID) bool {
 			return false
+		},
+		shadowPartitionProcessCount: func(ctx context.Context, acctID uuid.UUID) int {
+			return 5
 		},
 		itemIndexer:                     QueueItemIndexerFunc,
 		backoffFunc:                     backoff.DefaultBackoff,
@@ -592,6 +615,8 @@ type queue struct {
 	allowKeyQueues     AllowKeyQueues
 	disableLeaseChecks DisableLeaseChecks
 
+	shadowPartitionProcessCount QueueShadowPartitionProcessCount
+
 	// idempotencyTTL is the default or static idempotency duration apply to jobs,
 	// if idempotencyTTLFunc is not defined.
 	idempotencyTTL time.Duration
@@ -608,6 +633,8 @@ type queue struct {
 	wg *sync.WaitGroup
 	// numWorkers stores the number of workers available to concurrently process jobs.
 	numWorkers int32
+	// numShadowWorkers stores the number of workers available to concurrently scan partitions
+	numShadowWorkers int32
 	// peek min & max sets the range for partitions to peek for items
 	peekMin int64
 	peekMax int64
