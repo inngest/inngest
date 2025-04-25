@@ -356,7 +356,7 @@ func newOTLPGRPCTraceProvider(ctx context.Context, opts TracerOpts) (Tracer, err
 	// NOTE:
 	// assuming the otel collector is within the same private network, we can
 	// skip grpc authn, but probably still better to get it work for production eventually
-	conn, err := grpc.Dial(endpoint,
+	conn, err := grpc.NewClient(endpoint,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithDefaultCallOptions(
 			grpc.MaxCallSendMsgSize(maxPayloadSize),
