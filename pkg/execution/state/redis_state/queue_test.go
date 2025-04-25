@@ -6029,19 +6029,20 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 		defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
 		kg := defaultShard.RedisClient.kg
 
+		enqueueToBacklog := false
 		q := NewQueue(
 			defaultShard,
 			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
-				return true
+				return enqueueToBacklog
 			}),
 			WithAllowSystemKeyQueues(func(ctx context.Context) bool {
-				return true
+				return enqueueToBacklog
 			}),
 			WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-				return false
+				return true
 			}),
 			WithDisableSystemQueueLeaseChecks(func(ctx context.Context) bool {
-				return false
+				return true
 			}),
 			WithConcurrencyLimitGetter(func(ctx context.Context, p QueuePartition) PartitionConcurrencyLimits {
 				return PartitionConcurrencyLimits{
@@ -6081,11 +6082,21 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 			unhashedValue1 := "user1"
 			scope1 := enums.ConcurrencyScopeFn
 			fullKey1 := util.ConcurrencyKey(scope1, fnID, unhashedValue1)
+			_, _, checksum1, _ := state.CustomConcurrency{
+				Key:   fullKey1,
+				Hash:  hashedConcurrencyKeyExpr1,
+				Limit: 123,
+			}.ParseKey()
 
 			hashedConcurrencyKeyExpr2 := hashConcurrencyKey("event.data.orgId")
 			unhashedValue2 := "org1"
 			scope2 := enums.ConcurrencyScopeEnv
-			fullKey2 := util.ConcurrencyKey(scope2, fnID, unhashedValue2)
+			fullKey2 := util.ConcurrencyKey(scope2, wsID, unhashedValue2)
+			_, _, checksum2, _ := state.CustomConcurrency{
+				Key:   fullKey2,
+				Hash:  hashedConcurrencyKeyExpr2,
+				Limit: 234,
+			}.ParseKey()
 
 			item := osqueue.QueueItem{
 				ID:          "test",
@@ -6119,41 +6130,61 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 				QueueName: nil,
 			}
 
+			parts, _ := q.ItemPartitions(ctx, defaultShard, item)
+			require.NotEmpty(t, parts[0].ID)
+			require.Equal(t, int(enums.PartitionTypeConcurrencyKey), parts[0].PartitionType)
+			require.NotEmpty(t, parts[1].ID)
+			require.Equal(t, int(enums.PartitionTypeConcurrencyKey), parts[1].PartitionType)
+			require.NotEmpty(t, parts[2].ID)
+			require.Equal(t, int(enums.PartitionTypeDefault), parts[2].PartitionType)
+
+			// for simplicity, this enqueue should go directly to the partition
+			enqueueToBacklog = false
 			qi, err := q.EnqueueItem(ctx, defaultShard, item, at, osqueue.EnqueueOpts{})
 			require.NoError(t, err)
+			enqueueToBacklog = true
+
+			now := q.clock.Now()
+			leaseDur := 5 * time.Second
+			leaseExpiry := now.Add(leaseDur)
+
+			// simulate having hit a partition concurrency limit in a previous operation,
+			// without disabling validation this should cause Lease() to fail
+			denies := newLeaseDenyList()
+			denies.addConcurrency(newKeyError(ErrPartitionConcurrencyLimit, parts[1].Queue()))
+
+			leaseID, err := q.Lease(ctx, qi, leaseDur, now, denies)
+			require.NoError(t, err)
+			require.NotNil(t, leaseID)
 
 			backlogs := q.ItemBacklogs(ctx, item)
 			require.Len(t, backlogs, 2)
-			require.NotNil(t, backlogs[0].ConcurrencyScope)
-			require.NotNil(t, backlogs[0].ConcurrencyKey)
-			require.NotNil(t, backlogs[1].ConcurrencyScope)
-			require.NotNil(t, backlogs[1].ConcurrencyKey)
-
-			marshaledBacklog1, err := json.Marshal(backlogs[0])
-			require.NoError(t, err)
-
-			marshaledBacklog2, err := json.Marshal(backlogs[1])
-			require.NoError(t, err)
 
 			shadowPartition := q.ItemShadowPartition(ctx, item)
 			require.NotEmpty(t, shadowPartition.ShadowPartitionID)
 			require.Len(t, shadowPartition.CustomConcurrencyKeys, 2)
 
-			require.True(t, r.Exists(kg.BacklogMeta()), r.Keys())
-			require.True(t, r.Exists(kg.BacklogSet(backlogs[0].BacklogID)))
-			require.True(t, r.Exists(kg.BacklogSet(backlogs[1].BacklogID)))
-			require.True(t, r.Exists(kg.ShadowPartitionMeta()))
-			require.True(t, r.Exists(kg.ShadowPartitionSet(shadowPartition.ShadowPartitionID)), r.Keys())
-			require.True(t, r.Exists(kg.GlobalShadowPartitionSet()))
-			require.Equal(t, string(marshaledBacklog1), r.HGet(kg.BacklogMeta(), backlogs[0].BacklogID))
-			require.Equal(t, string(marshaledBacklog2), r.HGet(kg.BacklogMeta(), backlogs[1].BacklogID))
+			// key queue v2 accounting
+			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, shadowPartition.accountInProgressKey(kg), qi.ID)))
+			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, shadowPartition.inProgressKey(kg), qi.ID)))
 
-			require.Equal(t, at.UnixMilli()/1000, int64(score(t, kg.ShadowPartitionSet(shadowPartition.ShadowPartitionID), backlogs[0].BacklogID)))
-			require.Equal(t, at.UnixMilli()/1000, int64(score(t, kg.ShadowPartitionSet(shadowPartition.ShadowPartitionID), backlogs[1].BacklogID)))
-			require.Equal(t, at.UnixMilli()/1000, int64(score(t, kg.GlobalShadowPartitionSet(), shadowPartition.ShadowPartitionID)))
-			require.Equal(t, at.UnixMilli(), int64(score(t, kg.BacklogSet(backlogs[0].BacklogID), qi.ID)))
-			require.Equal(t, at.UnixMilli(), int64(score(t, kg.BacklogSet(backlogs[1].BacklogID), qi.ID)))
+			// first key
+			require.Equal(t, kg.Active("f", fnID.String(), checksum1), backlogs[0].activeKey(kg))
+			require.True(t, r.Exists(backlogs[0].activeKey(kg)))
+			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, backlogs[0].activeKey(kg), qi.ID)))
 
+			// second key
+			require.Equal(t, kg.Active("e", wsID.String(), checksum2), backlogs[1].activeKey(kg))
+			require.True(t, r.Exists(backlogs[1].activeKey(kg)))
+			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, backlogs[1].activeKey(kg), qi.ID)))
+
+			// expect classic partition concurrency to include item
+			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, kg.Concurrency("account", accountId.String()), qi.ID)))
+			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, kg.Concurrency("p", fnID.String()), qi.ID)))
+			// first key
+			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, parts[0].concurrencyKey(kg), qi.ID)))
+			// second key
+			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, parts[1].concurrencyKey(kg), qi.ID)))
 		})
 	})
 
