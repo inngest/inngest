@@ -17,6 +17,8 @@ type CustomConcurrencyLimit struct {
 }
 
 type QueueShadowPartition struct {
+	// PartitionID is the function ID or system queue name. The shadow partition
+	// ID is the same as the partition ID used across the queue.
 	PartitionID string `json:"id,omitempty"`
 
 	// LeaseID represents a lease on this shadow partition.  If the LeaseID is not nil,
