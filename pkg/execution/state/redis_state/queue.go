@@ -2254,25 +2254,48 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 		}
 	}
 
-	enableKeyQueues := q.itemEnableKeyQueues(ctx, item)
+	var (
+		keyConcurrencyFn      string
+		keyConcurrencyAcct    string
+		keyCustomConcurrency1 string
+		keyCustomConcurrency2 string
+	)
 
-	disableLeaseChecksVal := "0"
-	if disableLeaseChecks {
-		disableLeaseChecksVal = "1"
-	}
-
-	enableKeyQueuesVal := "0"
 	var backlogs []QueueBacklog
 	var shadowPartition QueueShadowPartition
+
+	enableKeyQueuesVal := "0"
+	enableKeyQueues := q.itemEnableKeyQueues(ctx, item)
 	if enableKeyQueues {
 		enableKeyQueuesVal = "1"
 		backlogs = q.ItemBacklogs(ctx, item)
 		shadowPartition = q.ItemShadowPartition(ctx, item)
+
+		// Pad backlogs to 3
+		for i := len(backlogs); i < 3; i++ {
+			backlogs = append(backlogs, QueueBacklog{})
+		}
+
+		// accounting for key queues v2
+		keyConcurrencyFn = shadowPartition.inProgressKey(q.primaryQueueShard.RedisClient.kg)
+		keyConcurrencyAcct = shadowPartition.accountInProgressKey(q.primaryQueueShard.RedisClient.kg)
+		keyCustomConcurrency1 = backlogs[0].activeKey(q.primaryQueueShard.RedisClient.kg)
+		keyCustomConcurrency2 = backlogs[1].activeKey(q.primaryQueueShard.RedisClient.kg)
+	} else {
+		// Pad backlogs to 3
+		for i := len(backlogs); i < 3; i++ {
+			backlogs = append(backlogs, QueueBacklog{})
+		}
+
+		keyConcurrencyFn = fnPartition.concurrencyKey(q.primaryQueueShard.RedisClient.kg)
+		keyConcurrencyAcct = accountConcurrencyKey
+		keyCustomConcurrency1 = customConcurrencyKey1.concurrencyKey(q.primaryQueueShard.RedisClient.kg)
+		keyCustomConcurrency2 = customConcurrencyKey2.concurrencyKey(q.primaryQueueShard.RedisClient.kg)
 	}
 
-	// Pad backlogs to 3
-	for i := len(backlogs); i < 3; i++ {
-		backlogs = append(backlogs, QueueBacklog{})
+	disableLeaseChecksVal := "0"
+	if disableLeaseChecks {
+		disableLeaseChecksVal = "1"
 	}
 
 	keys := []string{
@@ -2282,9 +2305,9 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 		fnPartition.zsetKey(q.primaryQueueShard.RedisClient.kg),
 
 		// And pass in the key queue's concurrency keys.
-		fnPartition.concurrencyKey(q.primaryQueueShard.RedisClient.kg),
-		customConcurrencyKey1.concurrencyKey(q.primaryQueueShard.RedisClient.kg),
-		customConcurrencyKey2.concurrencyKey(q.primaryQueueShard.RedisClient.kg),
+		keyConcurrencyFn,
+		keyCustomConcurrency1,
+		keyCustomConcurrency2,
 
 		q.primaryQueueShard.RedisClient.kg.ConcurrencyIndex(),
 		q.primaryQueueShard.RedisClient.kg.GlobalPartitionIndex(),
@@ -2292,15 +2315,7 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 		q.primaryQueueShard.RedisClient.kg.AccountPartitionIndex(item.Data.Identifier.AccountID),
 		q.primaryQueueShard.RedisClient.kg.ThrottleKey(item.Data.Throttle),
 		// Finally, there are ALWAYS account-level concurrency keys.
-		accountConcurrencyKey,
-
-		// Key queues v2
-		// track function-level + account-level concurrency
-		shadowPartition.inProgressKey(q.primaryQueueShard.RedisClient.kg),
-		shadowPartition.accountInProgressKey(q.primaryQueueShard.RedisClient.kg),
-		// two custom concurrency keys supported
-		backlogs[0].activeKey(q.primaryQueueShard.RedisClient.kg),
-		backlogs[1].activeKey(q.primaryQueueShard.RedisClient.kg),
+		keyConcurrencyAcct,
 	}
 
 	args, err := StrSlice([]any{
@@ -2485,26 +2500,49 @@ func (q *queue) Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		enableAccountingForKeyQueues = q.allowKeyQueues(ctx, i.Data.Identifier.AccountID)
 	}
 
+	var (
+		keyConcurrencyFn      string
+		keyConcurrencyAcct    string
+		keyCustomConcurrency1 string
+		keyCustomConcurrency2 string
+	)
+
 	var backlogs []QueueBacklog
 	var shadowPartition QueueShadowPartition
 	if enableAccountingForKeyQueues {
 		backlogs = q.ItemBacklogs(ctx, i)
 		shadowPartition = q.ItemShadowPartition(ctx, i)
-	}
 
-	// Pad backlogs to 3
-	for i := len(backlogs); i < 3; i++ {
-		backlogs = append(backlogs, QueueBacklog{})
+		// Pad backlogs to 3
+		for i := len(backlogs); i < 3; i++ {
+			backlogs = append(backlogs, QueueBacklog{})
+		}
+
+		// accounting for key queues v2
+		keyConcurrencyFn = shadowPartition.inProgressKey(q.primaryQueueShard.RedisClient.kg)
+		keyConcurrencyAcct = shadowPartition.accountInProgressKey(q.primaryQueueShard.RedisClient.kg)
+		keyCustomConcurrency1 = backlogs[0].activeKey(q.primaryQueueShard.RedisClient.kg)
+		keyCustomConcurrency2 = backlogs[1].activeKey(q.primaryQueueShard.RedisClient.kg)
+	} else {
+		// Pad backlogs to 3
+		for i := len(backlogs); i < 3; i++ {
+			backlogs = append(backlogs, QueueBacklog{})
+		}
+
+		keyConcurrencyFn = fnPartition.concurrencyKey(queueShard.RedisClient.kg)
+		keyConcurrencyAcct = accountConcurrencyKey
+		keyCustomConcurrency1 = customConcurrencyKey1.concurrencyKey(queueShard.RedisClient.kg)
+		keyCustomConcurrency2 = customConcurrencyKey2.concurrencyKey(queueShard.RedisClient.kg)
 	}
 
 	keys := []string{
 		queueShard.RedisClient.kg.QueueItem(),
 		fnPartition.zsetKey(queueShard.RedisClient.kg),
 
-		fnPartition.concurrencyKey(queueShard.RedisClient.kg),
-		customConcurrencyKey1.concurrencyKey(queueShard.RedisClient.kg),
-		customConcurrencyKey2.concurrencyKey(queueShard.RedisClient.kg),
-		accountConcurrencyKey,
+		keyConcurrencyFn,
+		keyConcurrencyAcct,
+		keyCustomConcurrency1,
+		keyCustomConcurrency2,
 
 		queueShard.RedisClient.kg.Idempotency(i.ID),
 
@@ -2513,12 +2551,6 @@ func (q *queue) Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		queueShard.RedisClient.kg.GlobalAccountIndex(),
 		queueShard.RedisClient.kg.AccountPartitionIndex(i.Data.Identifier.AccountID),
 		queueShard.RedisClient.kg.PartitionItem(),
-
-		// accounting for key queues v2
-		shadowPartition.inProgressKey(q.primaryQueueShard.RedisClient.kg),
-		shadowPartition.accountInProgressKey(q.primaryQueueShard.RedisClient.kg),
-		backlogs[0].activeKey(q.primaryQueueShard.RedisClient.kg),
-		backlogs[1].activeKey(q.primaryQueueShard.RedisClient.kg),
 	}
 	// Append indexes
 	for _, idx := range q.itemIndexer(ctx, i, queueShard.RedisClient.kg) {
@@ -2596,23 +2628,43 @@ func (q *queue) Requeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		accountConcurrencyKey = queueShard.RedisClient.kg.Concurrency("account", fnPartition.Queue())
 	}
 
+	var (
+		keyConcurrencyFn      string
+		keyConcurrencyAcct    string
+		keyCustomConcurrency1 string
+		keyCustomConcurrency2 string
+	)
+
 	var backlogs []QueueBacklog
 	var shadowPartition QueueShadowPartition
 
+	requeueToBacklogsVal := "0"
 	enableKeyQueues := q.itemEnableKeyQueues(ctx, i)
 	if enableKeyQueues {
+		requeueToBacklogsVal = "1"
 		backlogs = q.ItemBacklogs(ctx, i)
 		shadowPartition = q.ItemShadowPartition(ctx, i)
-	}
 
-	// Pad backlogs to 3
-	for i := len(backlogs); i < 3; i++ {
-		backlogs = append(backlogs, QueueBacklog{})
-	}
+		// Pad backlogs to 3
+		for i := len(backlogs); i < 3; i++ {
+			backlogs = append(backlogs, QueueBacklog{})
+		}
 
-	requeueToBacklogsVal := "0"
-	if enableKeyQueues {
-		requeueToBacklogsVal = "1"
+		// accounting for key queues v2
+		keyConcurrencyFn = shadowPartition.inProgressKey(q.primaryQueueShard.RedisClient.kg)
+		keyConcurrencyAcct = shadowPartition.accountInProgressKey(q.primaryQueueShard.RedisClient.kg)
+		keyCustomConcurrency1 = backlogs[0].activeKey(q.primaryQueueShard.RedisClient.kg)
+		keyCustomConcurrency2 = backlogs[1].activeKey(q.primaryQueueShard.RedisClient.kg)
+	} else {
+		// Pad backlogs to 3
+		for i := len(backlogs); i < 3; i++ {
+			backlogs = append(backlogs, QueueBacklog{})
+		}
+
+		keyConcurrencyFn = fnPartition.concurrencyKey(queueShard.RedisClient.kg)
+		keyConcurrencyAcct = accountConcurrencyKey
+		keyCustomConcurrency1 = customConcurrencyKey1.concurrencyKey(queueShard.RedisClient.kg)
+		keyCustomConcurrency2 = customConcurrencyKey2.concurrencyKey(queueShard.RedisClient.kg)
 	}
 
 	keys := []string{
@@ -2622,11 +2674,13 @@ func (q *queue) Requeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		queueShard.RedisClient.kg.GlobalAccountIndex(),
 		queueShard.RedisClient.kg.AccountPartitionIndex(i.Data.Identifier.AccountID),
 		fnPartition.zsetKey(queueShard.RedisClient.kg),
+
 		// And pass in the key queue's concurrency keys.
-		fnPartition.concurrencyKey(queueShard.RedisClient.kg),
-		customConcurrencyKey1.concurrencyKey(queueShard.RedisClient.kg),
-		customConcurrencyKey2.concurrencyKey(queueShard.RedisClient.kg),
-		accountConcurrencyKey,
+		keyConcurrencyFn,
+		keyCustomConcurrency1,
+		keyCustomConcurrency2,
+		keyConcurrencyAcct,
+
 		queueShard.RedisClient.kg.ConcurrencyIndex(),
 
 		// key queues v2
@@ -2637,12 +2691,6 @@ func (q *queue) Requeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		queueShard.RedisClient.kg.GlobalShadowPartitionSet(),
 		queueShard.RedisClient.kg.ShadowPartitionSet(shadowPartition.PartitionID),
 		queueShard.RedisClient.kg.ShadowPartitionMeta(),
-
-		// accounting for key queues v2
-		shadowPartition.inProgressKey(q.primaryQueueShard.RedisClient.kg),
-		shadowPartition.accountInProgressKey(q.primaryQueueShard.RedisClient.kg),
-		backlogs[0].activeKey(q.primaryQueueShard.RedisClient.kg),
-		backlogs[1].activeKey(q.primaryQueueShard.RedisClient.kg),
 	}
 	// Append indexes
 	for _, idx := range q.itemIndexer(ctx, i, queueShard.RedisClient.kg) {

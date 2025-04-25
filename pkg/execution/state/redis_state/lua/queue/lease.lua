@@ -30,12 +30,6 @@ local keyAccountPartitions    = KEYS[9] -- accounts:$accountId:partition:sorted 
 local throttleKey             = KEYS[10] -- key used for throttling function run starts.
 local keyAcctConcurrency      = KEYS[11]
 
--- key queues v2
-local keyInProgress        = KEYS[12]
-local keyAccountInProgress = KEYS[13]
-local keyActiveJobsKey1    = KEYS[14]
-local keyActiveJobsKey2    = KEYS[15]
-
 local queueID      						= ARGV[1]
 local newLeaseKey  						= ARGV[2]
 local currentTime  						= tonumber(ARGV[3]) -- in ms
@@ -49,8 +43,7 @@ local concurrencyAcct 				= tonumber(ARGV[8])
 local accountId       				= ARGV[9]
 
 -- key queues v2
-local enableKeyQueues    = tonumber(ARGV[10])
-local disableLeaseChecks = tonumber(ARGV[11])
+local disableLeaseChecks = tonumber(ARGV[10])
 
 -- Use our custom Go preprocessor to inject the file from ./includes/
 -- $include(decode_ulid_time.lua)
@@ -133,70 +126,32 @@ end
 -- and stored in functionConcurrencyKey.
 redis.call("ZREM", keyPartitionFn, item.id)
 
-if enableKeyQueues ~= 1 then
-  -- Always add this to acct level concurrency queues
-  redis.call("ZADD", keyAcctConcurrency, nextTime, item.id)
+-- Always add this to acct level concurrency queues
+redis.call("ZADD", keyAcctConcurrency, nextTime, item.id)
 
-  -- Always add this to fn level concurrency queues for scavenging
-  redis.call("ZADD", keyConcurrencyFn, nextTime, item.id)
+-- Always add this to fn level concurrency queues for scavenging
+redis.call("ZADD", keyConcurrencyFn, nextTime, item.id)
 
-  -- For every queue that we lease from, ensure that it exists in the scavenger pointer queue
-  -- so that expired leases can be re-processed.  We want to take the earliest time from the
-  -- concurrency queue such that we get a previously lost job if possible.
-  local inProgressScores = redis.call("ZRANGE", keyConcurrencyFn, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")
-  if inProgressScores ~= false then
-    local earliestLease = tonumber(inProgressScores[2])
-    -- Add the earliest time to the pointer queue for in-progress, allowing us to scavenge
-    -- lost jobs easily.
-    -- Note: Previously, we stored the queue name in the zset, so we have to add an extra
-    -- check to the scavenger logic to handle partition uuids for old queue items
+-- For every queue that we lease from, ensure that it exists in the scavenger pointer queue
+-- so that expired leases can be re-processed.  We want to take the earliest time from the
+-- concurrency queue such that we get a previously lost job if possible.
+local inProgressScores = redis.call("ZRANGE", keyConcurrencyFn, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")
+if inProgressScores ~= false then
+  local earliestLease = tonumber(inProgressScores[2])
+  -- Add the earliest time to the pointer queue for in-progress, allowing us to scavenge
+  -- lost jobs easily.
+  -- Note: Previously, we stored the queue name in the zset, so we have to add an extra
+  -- check to the scavenger logic to handle partition uuids for old queue items
 
-    redis.call("ZADD", concurrencyPointer, earliestLease, partitionID)
-  end
+  redis.call("ZADD", concurrencyPointer, earliestLease, partitionID)
+end
 
-  if exists_without_ending(keyCustomConcurrencyKey1, ":-") == true then
-    handleLease(keyCustomConcurrencyKey1, customConcurrencyKey1)
-  end
+if exists_without_ending(keyCustomConcurrencyKey1, ":-") == true then
+  handleLease(keyCustomConcurrencyKey1, customConcurrencyKey1)
+end
 
-  if exists_without_ending(keyCustomConcurrencyKey2, ":-") == true then
-    handleLease(keyCustomConcurrencyKey2, customConcurrencyKey2)
-  end
-else
-  -- Accounting for key queues v2
-
-  -- We need to update new key-specific concurrency indexes, as well as account + function level concurrency
-  -- as accounting is completely separate to allow for a gradual migration. Once key queues v2 are fully rolled out,
-  -- we can remove the old accounting logic above.
-
-  -- account-level concurrency (ignored for system queues)
-  if exists_without_ending(keyAccountInProgress, ":-") == true then
-    redis.call("ZADD", keyAccountInProgress, nextTime, item.id)
-  end
-
-  -- function-level concurrency
-  if exists_without_ending(keyInProgress, ":-") == true then
-    redis.call("ZADD", keyInProgress, nextTime, item.id)
-
-    -- For every queue that we lease from, ensure that it exists in the scavenger pointer queue
-    -- so that expired leases can be re-processed.  We want to take the earliest time from the
-    -- concurrency queue such that we get a previously lost job if possible.
-    local inProgressScores = redis.call("ZRANGE", keyInProgress, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")
-    if inProgressScores ~= false then
-      local earliestLease = tonumber(inProgressScores[2])
-
-      redis.call("ZADD", concurrencyPointer, earliestLease, partitionID)
-    end
-  end
-
-  -- backlog 1 (concurrency key 1)
-  if exists_without_ending(keyActiveJobsKey1, ":-") == true then
-    redis.call("ZADD", keyActiveJobsKey1, nextTime, item.id)
-  end
-
-  -- backlog 2 (concurrency key 2)
-  if exists_without_ending(keyActiveJobsKey2, ":-") == true then
-    redis.call("ZADD", keyActiveJobsKey2, nextTime, item.id)
-  end
+if exists_without_ending(keyCustomConcurrencyKey2, ":-") == true then
+  handleLease(keyCustomConcurrencyKey2, customConcurrencyKey2)
 end
 
 return 0

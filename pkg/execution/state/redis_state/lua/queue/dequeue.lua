@@ -23,14 +23,8 @@ local keyGlobalAccountPointer  = KEYS[10]           -- accounts:sorted - zset
 local keyAccountPartitions     = KEYS[11]           -- accounts:$accountId:partition:sorted - zset
 local keyPartitionMap          = KEYS[12]
 
--- key queues v2
-local keyInProgress        = KEYS[13]
-local keyAccountInProgress = KEYS[14]
-local keyActiveJobsKey1    = KEYS[15]
-local keyActiveJobsKey2    = KEYS[16]
-
-local keyItemIndexA            = KEYS[17]   -- custom item index 1
-local keyItemIndexB            = KEYS[18]  -- custom item index 2
+local keyItemIndexA            = KEYS[13]   -- custom item index 1
+local keyItemIndexB            = KEYS[14]  -- custom item index 2
 
 local queueID        = ARGV[1]
 local idempotencyTTL = tonumber(ARGV[2])
@@ -111,58 +105,12 @@ if minScores ~= nil and minScores ~= false and #minScores ~= 0 then
   end
 end
 
-
 handleDequeueConcurrency(keyCustomConcurrency1)
 handleDequeueConcurrency(keyCustomConcurrency2)
 
 -- This does not have a scavenger queue, as it's purely an entitlement limitation. See extendLease
 -- and Lease for respective ZADD calls.
 redis.call("ZREM", keyAcctConcurrency, item.id)
-
--- Accounting for key queues v2
-
--- We need to update new key-specific concurrency indexes, as well as account + function level concurrency
--- as accounting is completely separate to allow for a gradual migration. Once key queues v2 are fully rolled out,
--- we can remove the old accounting logic above.
-
--- account-level concurrency (ignored for system queues)
-if exists_without_ending(keyAccountInProgress, ":-") == true then
-	redis.call("ZREM", keyAccountInProgress, item.id)
-end
-
--- function-level concurrency
-if exists_without_ending(keyInProgress, ":-") == true then
-	redis.call("ZREM", keyInProgress, item.id)
-
-	-- Get the earliest item in the partition concurrency set.  We may be dequeueing
-	-- the only in-progress job and should remove this from the partition concurrency
-	-- pointers, if this exists.
-	--
-	-- This ensures that scavengeres have updated pointer queues without the currently
-	-- leased job, if exists.
-	local concurrencyScores = redis.call("ZRANGE", keyInProgress, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")
-	if concurrencyScores == false then
-		redis.call("ZREM", concurrencyPointer, partitionID)
-	else
-		local earliestLease = tonumber(concurrencyScores[2])
-		if earliestLease == nil then
-			redis.call("ZREM", concurrencyPointer, partitionID)
-		else
-			-- Ensure that we update the score with the earliest lease
-			redis.call("ZADD", concurrencyPointer, earliestLease, partitionID)
-		end
-	end
-end
-
--- backlog 1 (concurrency key 1)
-if exists_without_ending(keyActiveJobsKey1, ":-") == true then
-	redis.call("ZREM", keyActiveJobsKey1, item.id)
-end
-
--- backlog 2 (concurrency key 2)
-if exists_without_ending(keyActiveJobsKey2, ":-") == true then
-	redis.call("ZREM", keyActiveJobsKey2, item.id)
-end
 
 -- Add optional indexes.
 if keyItemIndexA ~= "" and keyItemIndexA ~= false and keyItemIndexA ~= nil then

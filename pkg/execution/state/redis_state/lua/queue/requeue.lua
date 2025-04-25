@@ -30,13 +30,9 @@ local keyBacklogMeta              = KEYS[15]          -- backlogs - hash
 local keyGlobalShadowPartitionSet = KEYS[16]          -- shadow:sorted
 local keyShadowPartitionSet       = KEYS[17]          -- shadow:sorted:<fnID|queueName> - zset
 local keyShadowPartitionMeta      = KEYS[18]          -- shadows
-local keyInProgress               = KEYS[19]
-local keyAccountInProgress        = KEYS[20]
-local keyActiveJobsKey1           = KEYS[21]
-local keyActiveJobsKey2           = KEYS[22]
 
-local keyItemIndexA           = KEYS[23]          -- custom item index 1
-local keyItemIndexB           = KEYS[24]          -- custom item index 2
+local keyItemIndexA           = KEYS[19]          -- custom item index 1
+local keyItemIndexB           = KEYS[20]          -- custom item index 2
 
 local queueItem           = ARGV[1]
 local queueID             = ARGV[2]           -- id
@@ -107,32 +103,6 @@ end
 
 handleRequeueConcurrency(keyCustomConcurrencyKey1)
 handleRequeueConcurrency(keyCustomConcurrencyKey2)
-
--- Accounting for key queues v2
-
--- We need to update new key-specific concurrency indexes, as well as account + function level concurrency
--- as accounting is completely separate to allow for a gradual migration. Once key queues v2 are fully rolled out,
--- we can remove the old accounting logic above.
-
--- account-level concurrency (ignored for system queues)
-if exists_without_ending(keyAccountInProgress, ":-") == true then
-	redis.call("ZREM", keyAccountInProgress, item.id)
-end
-
--- function-level concurrency
-if exists_without_ending(keyInProgress, ":-") == true then
-	redis.call("ZREM", keyInProgress, item.id)
-end
-
--- backlog 1 (concurrency key 1)
-if exists_without_ending(keyActiveJobsKey1, ":-") == true then
-	redis.call("ZREM", keyActiveJobsKey1, item.id)
-end
-
--- backlog 2 (concurrency key 2)
-if exists_without_ending(keyActiveJobsKey2, ":-") == true then
-	redis.call("ZREM", keyActiveJobsKey2, item.id)
-end
 
 -- Remove item from the account concurrency queue
 -- This does not have a scavenger queue, as it's purely an entitlement limitation. See extendLease
