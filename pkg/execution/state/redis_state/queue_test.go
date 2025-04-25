@@ -5313,3 +5313,172 @@ func createConcurrencyKey(scope enums.ConcurrencyScope, scopeID uuid.UUID, value
 }
 
 func int64ptr(i int64) *int64 { return &i }
+
+func TestQueueEnqueueToBacklog(t *testing.T) {
+	t.Run("simple item", func(t *testing.T) {
+		r := miniredis.RunT(t)
+		rc, err := rueidis.NewClient(rueidis.ClientOption{
+			InitAddress:  []string{r.Addr()},
+			DisableCache: true,
+		})
+		require.NoError(t, err)
+		defer rc.Close()
+
+		defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+		kg := defaultShard.RedisClient.kg
+
+		q := NewQueue(
+			defaultShard,
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+				return true
+			}),
+			WithAllowSystemKeyQueues(func(ctx context.Context) bool {
+				return true
+			}),
+			WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
+				return false
+			}),
+			WithDisableSystemQueueLeaseChecks(func(ctx context.Context) bool {
+				return false
+			}),
+		)
+		ctx := context.Background()
+
+		accountId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
+
+		score := func(t *testing.T, key string, member string) float64 {
+			score, err := r.ZScore(key, member)
+			require.NoError(t, err)
+
+			return score
+		}
+
+		// use future timestamp because scores will be bounded to the present
+		at := time.Now().Add(10 * time.Minute)
+
+		t.Run("should enqueue simple item to backlog", func(t *testing.T) {
+			require.Len(t, r.Keys(), 0)
+
+			item := osqueue.QueueItem{
+				ID:          "test",
+				FunctionID:  fnID,
+				WorkspaceID: wsID,
+				Data: osqueue.Item{
+					WorkspaceID: wsID,
+					Kind:        osqueue.KindEdge,
+					Identifier: state.Identifier{
+						WorkflowID:  fnID,
+						AccountID:   accountId,
+						WorkspaceID: wsID,
+					},
+					QueueName:             nil,
+					Throttle:              nil,
+					CustomConcurrencyKeys: nil,
+				},
+				QueueName: nil,
+			}
+
+			qi, err := q.EnqueueItem(ctx, defaultShard, item, at, osqueue.EnqueueOpts{})
+			require.NoError(t, err)
+
+			backlogs := q.ItemBacklogs(ctx, item)
+			require.Len(t, backlogs, 1)
+
+			shadowPartition := q.ItemShadowPartition(ctx, item)
+			require.NotEmpty(t, shadowPartition.ShadowPartitionID)
+
+			require.True(t, r.Exists(kg.BacklogMeta()))
+			require.True(t, r.Exists(kg.BacklogSet(backlogs[0].BacklogID)))
+			require.True(t, r.Exists(kg.ShadowPartitionMeta()))
+			require.True(t, r.Exists(kg.ShadowPartitionSet(shadowPartition.ShadowPartitionID)), r.Keys())
+			require.True(t, r.Exists(kg.GlobalShadowPartitionSet()))
+
+			require.Equal(t, at.UnixMilli()/1000, int64(score(t, kg.ShadowPartitionSet(shadowPartition.ShadowPartitionID), backlogs[0].BacklogID)))
+			require.Equal(t, at.UnixMilli()/1000, int64(score(t, kg.GlobalShadowPartitionSet(), shadowPartition.ShadowPartitionID)))
+			require.Equal(t, at.UnixMilli(), int64(score(t, kg.BacklogSet(backlogs[0].BacklogID), qi.ID)))
+		})
+
+		t.Run("adding later item should not update scores", func(t *testing.T) {
+			newScore := at.Add(5 * time.Minute)
+
+			item := osqueue.QueueItem{
+				ID:          "item-2",
+				FunctionID:  fnID,
+				WorkspaceID: wsID,
+				Data: osqueue.Item{
+					WorkspaceID: wsID,
+					Kind:        osqueue.KindEdge,
+					Identifier: state.Identifier{
+						WorkflowID:  fnID,
+						AccountID:   accountId,
+						WorkspaceID: wsID,
+					},
+					QueueName:             nil,
+					Throttle:              nil,
+					CustomConcurrencyKeys: nil,
+				},
+				QueueName: nil,
+			}
+
+			qi, err := q.EnqueueItem(ctx, defaultShard, item, newScore, osqueue.EnqueueOpts{})
+			require.NoError(t, err)
+
+			backlogs := q.ItemBacklogs(ctx, item)
+			require.Len(t, backlogs, 1)
+
+			shadowPartition := q.ItemShadowPartition(ctx, item)
+			require.NotEmpty(t, shadowPartition.ShadowPartitionID)
+
+			// pointers should keep earlier score
+			require.Equal(t, at.UnixMilli()/1000, int64(score(t, kg.ShadowPartitionSet(shadowPartition.ShadowPartitionID), backlogs[0].BacklogID)))
+			require.Equal(t, at.UnixMilli()/1000, int64(score(t, kg.GlobalShadowPartitionSet(), shadowPartition.ShadowPartitionID)))
+
+			// item in backlog should have new score
+			require.Equal(t, newScore.UnixMilli(), int64(score(t, kg.BacklogSet(backlogs[0].BacklogID), qi.ID)))
+		})
+
+		t.Run("adding earlier item should pull up pointer scores", func(t *testing.T) {
+			newScore := at.Add(-5 * time.Minute)
+
+			item := osqueue.QueueItem{
+				ID:          "item-3",
+				FunctionID:  fnID,
+				WorkspaceID: wsID,
+				Data: osqueue.Item{
+					WorkspaceID: wsID,
+					Kind:        osqueue.KindEdge,
+					Identifier: state.Identifier{
+						WorkflowID:  fnID,
+						AccountID:   accountId,
+						WorkspaceID: wsID,
+					},
+					QueueName:             nil,
+					Throttle:              nil,
+					CustomConcurrencyKeys: nil,
+				},
+				QueueName: nil,
+			}
+
+			qi, err := q.EnqueueItem(ctx, defaultShard, item, newScore, osqueue.EnqueueOpts{})
+			require.NoError(t, err)
+
+			backlogs := q.ItemBacklogs(ctx, item)
+			require.Len(t, backlogs, 1)
+
+			shadowPartition := q.ItemShadowPartition(ctx, item)
+			require.NotEmpty(t, shadowPartition.ShadowPartitionID)
+
+			// pointers should take on earlier score
+			{
+				expected := newScore.UnixMilli() / 1000
+				actual := int64(score(t, kg.ShadowPartitionSet(shadowPartition.ShadowPartitionID), backlogs[0].BacklogID))
+
+				require.Equal(t, expected, actual, time.Unix(expected, 0).String(), time.Unix(actual, 0).String())
+			}
+			require.Equal(t, newScore.UnixMilli()/1000, int64(score(t, kg.GlobalShadowPartitionSet(), shadowPartition.ShadowPartitionID)))
+
+			// item in backlog should have new score
+			require.Equal(t, newScore.UnixMilli(), int64(score(t, kg.BacklogSet(backlogs[0].BacklogID), qi.ID)))
+		})
+	})
+}

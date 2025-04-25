@@ -103,19 +103,15 @@ local function enqueue_to_backlog(keyBacklogSet, backlogID, backlogItem, shadowP
 	redis.call("HSETNX", keyShadowPartitionMeta, shadowPartitionID, shadowPartitionItem)
 
 	-- Update the backlog pointer in the shadow partition set if earlier or not exists
-	local currentScore = redis.call("ZSCORE", keyShadowPartitionSet, shadowPartitionID)
+	local currentScore = redis.call("ZSCORE", keyShadowPartitionSet, backlogID)
 	if currentScore == false or tonumber(currentScore) > partitionTime then
-		if nowMS == nil or nowMS == false then
-			update_pointer_score_to(backlogID, keyShadowPartitionSet, partitionTime)
-		end
+		update_pointer_score_to(backlogID, keyShadowPartitionSet, partitionTime)
 	end
 
 	-- Update the shadow partition pointer in the global shadow partition set if earlier or not exists
 	local currentScore = redis.call("ZSCORE", keyGlobalShadowPartitionSet, shadowPartitionID)
 	if currentScore == false or tonumber(currentScore) > partitionTime then
-		if nowMS == nil or nowMS == false then
-			update_pointer_score_to(shadowPartitionID, keyGlobalShadowPartitionSet, partitionTime)
-		end
+		update_pointer_score_to(shadowPartitionID, keyGlobalShadowPartitionSet, partitionTime)
 	end
 end
 
@@ -216,16 +212,12 @@ local function requeue_to_backlog(keyBacklogSet, backlogID, backlogItem, shadowP
 	-- Update the backlog pointer in the shadow partition set if earlier or not exists
 	local currentScore = redis.call("ZSCORE", keyShadowPartitionSet, shadowPartitionID)
 	if currentScore == false or tonumber(currentScore) > earliestScore then
-		if nowMS == nil or nowMS == false then
-			update_pointer_score_to(backlogID, keyShadowPartitionSet, updateTo)
-		end
+		update_pointer_score_to(backlogID, keyShadowPartitionSet, updateTo)
 	end
 
 	-- Update the shadow partition pointer in the global shadow partition set if earlier or not exists
 	local currentScore = redis.call("ZSCORE", keyGlobalShadowPartitionSet, shadowPartitionID)
 	if currentScore == false or tonumber(currentScore) > earliestScore then
-		if nowMS == nil or nowMS == false then
-			update_pointer_score_to(shadowPartitionID, keyGlobalShadowPartitionSet, updateTo)
-		end
+		update_pointer_score_to(shadowPartitionID, keyGlobalShadowPartitionSet, updateTo)
 	end
 end
