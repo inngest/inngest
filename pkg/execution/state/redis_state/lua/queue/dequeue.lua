@@ -26,10 +26,11 @@ local keyPartitionMap    = KEYS[14]
 local keyItemIndexA      = KEYS[15]   -- custom item index 1
 local keyItemIndexB      = KEYS[16]  -- custom item index 2
 
-local keyBacklogConcurrencyA      = ARGV[17]
-local keyBacklogConcurrencyB      = ARGV[18]
-local keyBacklogConcurrencyC      = ARGV[19]
-
+-- key queues v2
+local keyInProgress        = KEYS[17]
+local keyAccountInProgress = KEYS[18]
+local keyActiveJobsKey1    = KEYS[19]
+local keyActiveJobsKey2    = KEYS[20]
 
 local queueID        = ARGV[1]
 local idempotencyTTL = tonumber(ARGV[2])
@@ -140,17 +141,30 @@ handleDequeueConcurrency(keyConcurrencyC, keyPartitionC, partitionIdC, partition
 -- and Lease for respective ZADD calls.
 redis.call("ZREM", keyAcctConcurrency, item.id)
 
--- Accounting for key queues
-if exists_without_ending(keyBacklogConcurrencyA, ":-") == true then
-	redis.call("ZREM", keyBacklogConcurrencyA, item.id)
+-- Accounting for key queues v2
+
+-- We need to update new key-specific concurrency indexes, as well as account + function level concurrency
+-- as accounting is completely separate to allow for a gradual migration. Once key queues v2 are fully rolled out,
+-- we can remove the old accounting logic above.
+
+-- account-level concurrency (ignored for system queues)
+if exists_without_ending(keyAccountInProgress, ":-") == true then
+	redis.call("ZREM", keyAccountInProgress, nextTime, item.id)
 end
 
-if exists_without_ending(keyBacklogConcurrencyB, ":-") == true then
-	redis.call("ZREM", keyBacklogConcurrencyB, item.id)
+-- function-level concurrency
+if exists_without_ending(keyInProgress, ":-") == true then
+	redis.call("ZREM", keyInProgress, nextTime, item.id)
 end
 
-if exists_without_ending(keyBacklogConcurrencyC, ":-") == true then
-	redis.call("ZREM", keyBacklogConcurrencyC, item.id)
+-- backlog 1 (concurrency key 1)
+if exists_without_ending(keyActiveJobsKey1, ":-") == true then
+	redis.call("ZREM", keyActiveJobsKey1, nextTime, item.id)
+end
+
+-- backlog 2 (concurrency key 2)
+if exists_without_ending(keyActiveJobsKey2, ":-") == true then
+	redis.call("ZREM", keyActiveJobsKey2, nextTime, item.id)
 end
 
 -- Add optional indexes.

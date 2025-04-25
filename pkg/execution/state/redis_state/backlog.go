@@ -18,7 +18,7 @@ type CustomConcurrencyLimit struct {
 
 type QueueShadowPartition struct {
 	ShadowPartitionID string `json:"id,omitempty"`
-
+	
 	// LeaseID represents a lease on this shadow partition.  If the LeaseID is not nil,
 	// this partition can be claimed by a shared-nothing refill worker to work on the
 	// backlogs within this shadow partition.
@@ -53,11 +53,15 @@ type QueueShadowPartition struct {
 }
 
 type QueueBacklog struct {
-	BacklogID string `json:"id,omitempty"`
+	BacklogID         string `json:"id,omitempty"`
+	ShadowPartitionID string `json:"sid,omitempty"`
 
 	// Set for backlogs for a given custom concurrency key
 
 	ConcurrencyScope *enums.ConcurrencyScope `json:"cs,omitempty"`
+
+	// ConcurrencyScopeEntity stores the accountID, envID, or fnID for the respective concurrency scope
+	ConcurrencyScopeEntity *string `json:"cse,omitempty"`
 
 	// ConcurrencyKey is the hashed concurrency key expression (e.g. hash("event.data.customerId"))
 	ConcurrencyKey *string `json:"ck,omitempty"`
@@ -98,7 +102,8 @@ func (q *queue) ItemBacklogs(ctx context.Context, i osqueue.QueueItem) []QueueBa
 	if queueName != nil {
 		// Simply use default backlog for system queues - there shouldn't be any concurrency or throttle keys involved.
 		backlogs = append(backlogs, QueueBacklog{
-			BacklogID: fmt.Sprintf("system:%s", *queueName),
+			ShadowPartitionID: *queueName,
+			BacklogID:         fmt.Sprintf("system:%s", *queueName),
 		})
 		return backlogs
 	}
@@ -106,7 +111,8 @@ func (q *queue) ItemBacklogs(ctx context.Context, i osqueue.QueueItem) []QueueBa
 	// Enqueue start items to throttle backlog if throttle is configured
 	if i.Data.Throttle != nil && i.Data.Kind == osqueue.KindStart {
 		b := QueueBacklog{
-			BacklogID: fmt.Sprintf("throttle:%s:%s", i.FunctionID, i.Data.Throttle.Key),
+			BacklogID:         fmt.Sprintf("throttle:%s:%s", i.FunctionID, i.Data.Throttle.Key),
+			ShadowPartitionID: i.FunctionID.String(),
 
 			// This is always specified, even if no key was configured in the function definition.
 			// In that case, the Throttle Key is the hashed function ID. See Schedule() for more details.
@@ -148,16 +154,21 @@ func (q *queue) ItemBacklogs(ctx context.Context, i osqueue.QueueItem) []QueueBa
 
 	// Create concurrency key backlogs
 	for _, key := range concurrencyKeys {
-		scope, _, checksum, _ := key.ParseKey()
+		scope, entityID, checksum, _ := key.ParseKey()
 
 		var rawValue *string
 		if key.UnhashedEvaluatedKeyValue != "" {
 			rawValue = &key.UnhashedEvaluatedKeyValue
 		}
 
+		// Account ID, Env ID, or Function ID to apply to the concurrency key to
+		concurrencyScopeEntity := entityID.String()
+
 		backlogs = append(backlogs, QueueBacklog{
-			BacklogID:        fmt.Sprintf("conc:%s", key.Key),
-			ConcurrencyScope: &scope,
+			BacklogID:              fmt.Sprintf("conc:%s", key.Key),
+			ShadowPartitionID:      i.FunctionID.String(),
+			ConcurrencyScope:       &scope,
+			ConcurrencyScopeEntity: &concurrencyScopeEntity,
 
 			// Hashed expression to identify which key this is in the shadow partition concurrency key list
 			ConcurrencyKey: &key.Hash,
@@ -171,7 +182,8 @@ func (q *queue) ItemBacklogs(ctx context.Context, i osqueue.QueueItem) []QueueBa
 	// Use default backlog if no concurrency/throttle backlogs are set up
 	if len(backlogs) == 0 {
 		backlogs = append(backlogs, QueueBacklog{
-			BacklogID: fmt.Sprintf("default:%s", i.FunctionID),
+			BacklogID:         fmt.Sprintf("default:%s", i.FunctionID),
+			ShadowPartitionID: i.FunctionID.String(),
 		})
 	}
 

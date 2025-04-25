@@ -33,9 +33,10 @@ local throttleKey             = KEYS[12] -- key used for throttling function run
 local keyAcctConcurrency      = KEYS[13]
 
 -- key queues v2
-local keyBacklogConcurrencyA = ARGV[14]
-local keyBacklogConcurrencyB = ARGV[15]
-local keyBacklogConcurrencyC = ARGV[16]
+local keyInProgress        = KEYS[14]
+local keyAccountInProgress = KEYS[15]
+local keyActiveJobsKey1    = KEYS[16]
+local keyActiveJobsKey2    = KEYS[17]
 
 local queueID      						= ARGV[1]
 local newLeaseKey  						= ARGV[2]
@@ -180,19 +181,30 @@ if exists_without_ending(keyConcurrencyC, ":-") == true then
 	handleLease(keyPartitionC, keyConcurrencyC, concurrencyC, partitionIdC, partitionTypeC)
 end
 
--- Accounting for key queues
+-- Accounting for key queues v2
 
-if exists_without_ending(keyBacklogConcurrencyA, ":-") == true then
-	redis.call("ZADD", keyBacklogConcurrencyA, nextTime, item.id)
+-- We need to update new key-specific concurrency indexes, as well as account + function level concurrency
+-- as accounting is completely separate to allow for a gradual migration. Once key queues v2 are fully rolled out,
+-- we can remove the old accounting logic above.
+
+-- account-level concurrency (ignored for system queues)
+if exists_without_ending(keyAccountInProgress, ":-") == true then
+	redis.call("ZADD", keyAccountInProgress, nextTime, item.id)
 end
 
-if exists_without_ending(keyBacklogConcurrencyB, ":-") == true then
-	redis.call("ZADD", keyBacklogConcurrencyB, nextTime, item.id)
+-- function-level concurrency
+if exists_without_ending(keyInProgress, ":-") == true then
+	redis.call("ZADD", keyInProgress, nextTime, item.id)
 end
 
-if exists_without_ending(keyBacklogConcurrencyC, ":-") == true then
-	redis.call("ZADD", keyBacklogConcurrencyC, nextTime, item.id)
+-- backlog 1 (concurrency key 1)
+if exists_without_ending(keyActiveJobsKey1, ":-") == true then
+	redis.call("ZADD", keyActiveJobsKey1, nextTime, item.id)
 end
 
+-- backlog 2 (concurrency key 2)
+if exists_without_ending(keyActiveJobsKey2, ":-") == true then
+	redis.call("ZADD", keyActiveJobsKey2, nextTime, item.id)
+end
 
 return 0
