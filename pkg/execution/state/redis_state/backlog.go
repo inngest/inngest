@@ -40,7 +40,7 @@ type QueueShadowPartition struct {
 
 	// Up to two custom concurrency keys on user-defined scopes, optionally specifying a key. The key is required
 	// on env or account level scopes.
-	CustomConcurrencyKeys []CustomConcurrencyLimit `json:"cck,omitempty"`
+	CustomConcurrencyKeys map[string]CustomConcurrencyLimit `json:"cck,omitempty"`
 
 	// Throttle configuration, optionally specifying key. If no key is set, the throttle value will be the function ID.
 	Throttle *osqueue.Throttle `json:"t,omitempty"`
@@ -267,15 +267,15 @@ func (q *queue) ItemShadowPartition(ctx context.Context, i osqueue.QueueItem) Qu
 		fnPartition.ConcurrencyLimit = limits.AccountLimit
 	}
 
-	var customConcurrencyKeyLimits []CustomConcurrencyLimit
+	var customConcurrencyKeyLimits map[string]CustomConcurrencyLimit
 	if len(ckeys) > 0 {
-		customConcurrencyKeyLimits = make([]CustomConcurrencyLimit, len(ckeys))
+		customConcurrencyKeyLimits = make(map[string]CustomConcurrencyLimit)
 
 		// Up to 2 concurrency keys.
-		for j, key := range ckeys {
+		for _, key := range ckeys {
 			scope, _, _, _ := key.ParseKey()
 
-			customConcurrencyKeyLimits[j] = CustomConcurrencyLimit{
+			customConcurrencyKeyLimits[key.Hash] = CustomConcurrencyLimit{
 				Scope: scope,
 				// Key is required to look up the respective limit when checking constraints for a given backlog.
 				Key:   key.Hash, // hash(event.data.customerId)

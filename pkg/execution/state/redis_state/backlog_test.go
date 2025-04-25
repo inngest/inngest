@@ -385,7 +385,7 @@ func TestQueueItemBacklogs(t *testing.T) {
 		require.Equal(t, expected, backlogs)
 
 		kg := queueKeyGenerator{queueDefaultKey: QueueDefaultKey}
-		require.Equal(t, kg.Concurrency("custom", util.ConcurrencyKey(scope, entity, checksum)), backlogs[0].activeKey(kg))
+		require.Equal(t, kg.Concurrency("custom", util.ConcurrencyKey(scope, entity, unhashedValue)), backlogs[0].activeKey(kg))
 	})
 
 	t.Run("concurrency + throttle start item", func(t *testing.T) {
@@ -710,8 +710,8 @@ func TestQueueItemShadowPartition(t *testing.T) {
 			SystemConcurrency:   0,
 			AccountConcurrency:  100,
 			FunctionConcurrency: 25,
-			CustomConcurrencyKeys: []CustomConcurrencyLimit{
-				{
+			CustomConcurrencyKeys: map[string]CustomConcurrencyLimit{
+				hashedConcurrencyKeyExpr: {
 					Scope: enums.ConcurrencyScopeFn,
 					Key:   hashedConcurrencyKeyExpr,
 					Limit: 23,
@@ -774,8 +774,8 @@ func TestQueueItemShadowPartition(t *testing.T) {
 			SystemConcurrency:   0,
 			AccountConcurrency:  100,
 			FunctionConcurrency: 25,
-			CustomConcurrencyKeys: []CustomConcurrencyLimit{
-				{
+			CustomConcurrencyKeys: map[string]CustomConcurrencyLimit{
+				hashedConcurrencyKeyExpr: {
 					Scope: enums.ConcurrencyScopeFn,
 					Key:   hashedConcurrencyKeyExpr,
 					Limit: 23,
