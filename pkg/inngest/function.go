@@ -110,7 +110,7 @@ func (r RateLimit) IsValid(ctx context.Context) error {
 	}
 
 	if r.Key != nil {
-		if err := expressions.Validate(ctx, *r.Key); err != nil {
+		if err := expressions.Validate(ctx, nil, *r.Key); err != nil {
 			return fmt.Errorf("key is invalid: %w", err)
 		}
 	}
@@ -386,7 +386,7 @@ func (f Function) Validate(ctx context.Context) error {
 		}
 		if f.Debounce.Key != nil {
 			// Ensure the expression is valid if present.
-			if exprErr := expressions.Validate(ctx, *f.Debounce.Key); exprErr != nil {
+			if exprErr := expressions.Validate(ctx, nil, *f.Debounce.Key); exprErr != nil {
 				err = multierror.Append(err, fmt.Errorf("Debounce expression is invalid: %s", exprErr))
 			}
 		}
@@ -420,7 +420,7 @@ func (f Function) RunPriorityFactor(ctx context.Context, event map[string]any) (
 	}
 
 	// Validate the expression first.
-	if err := expressions.Validate(ctx, *f.Priority.Run); err != nil {
+	if err := expressions.Validate(ctx, nil, *f.Priority.Run); err != nil {
 		return 0, fmt.Errorf("Priority.Run expression is invalid: %s", err)
 	}
 
