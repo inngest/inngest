@@ -16,17 +16,18 @@ local guaranteedCapacityMapKey	= KEYS[8]           -- shards - hmap of shards
 local keyPartitionA           	= KEYS[9]           -- queue:sorted:$workflowID - zset
 local keyPartitionB           	= KEYS[10]           -- e.g. sorted:c|t:$workflowID - zset
 local keyPartitionC           	= KEYS[11]          -- e.g. sorted:c|t:$workflowID - zset
-local keyItemIndexA           	= KEYS[12]          -- custom item index 1
-local keyItemIndexB           	= KEYS[13]          -- custom item index 2
 
 -- Key queues v2
-local keyBacklogSetA              = KEYS[14]          -- backlog:sorted:<backlogID> - zset
-local keyBacklogSetB              = KEYS[15]          -- backlog:sorted:<backlogID> - zset
-local keyBacklogSetC              = KEYS[16]          -- backlog:sorted:<backlogID> - zset
-local keyBacklogMeta              = KEYS[17]          -- backlogs - hash
-local keyGlobalShadowPartitionSet = KEYS[18]          -- shadow:sorted
-local keyShadowPartitionSet       = KEYS[19]          -- shadow:sorted:<fnID|queueName> - zset
-local keyShadowPartitionMeta      = KEYS[20]          -- shadows
+local keyBacklogSetA              = KEYS[12]          -- backlog:sorted:<backlogID> - zset
+local keyBacklogSetB              = KEYS[13]          -- backlog:sorted:<backlogID> - zset
+local keyBacklogSetC              = KEYS[14]          -- backlog:sorted:<backlogID> - zset
+local keyBacklogMeta              = KEYS[15]          -- backlogs - hash
+local keyGlobalShadowPartitionSet = KEYS[16]          -- shadow:sorted
+local keyShadowPartitionSet       = KEYS[17]          -- shadow:sorted:<fnID|queueName> - zset
+local keyShadowPartitionMeta      = KEYS[18]          -- shadows
+
+local keyItemIndexA           	= KEYS[19]          -- custom item index 1
+local keyItemIndexB           	= KEYS[20]          -- custom item index 2
 
 local queueItem           		= ARGV[1]           -- {id, lease id, attempt, max attempt, data, etc...}
 local queueID             		= ARGV[2]           -- id

@@ -5760,7 +5760,88 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 	})
 
 	t.Run("system queues", func(t *testing.T) {
-		t.Error("missing test")
+		r := miniredis.RunT(t)
+		rc, err := rueidis.NewClient(rueidis.ClientOption{
+			InitAddress:  []string{r.Addr()},
+			DisableCache: true,
+		})
+		require.NoError(t, err)
+		defer rc.Close()
+
+		defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+		kg := defaultShard.RedisClient.kg
+
+		q := NewQueue(
+			defaultShard,
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+				return true
+			}),
+			WithAllowSystemKeyQueues(func(ctx context.Context) bool {
+				return true
+			}),
+			WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
+				return false
+			}),
+			WithDisableSystemQueueLeaseChecks(func(ctx context.Context) bool {
+				return false
+			}),
+		)
+		ctx := context.Background()
+
+		score := func(t *testing.T, key string, member string) float64 {
+			score, err := r.ZScore(key, member)
+			require.NoError(t, err)
+
+			return score
+		}
+
+		// use future timestamp because scores will be bounded to the present
+		at := time.Now().Add(10 * time.Minute)
+
+		sysQueueName := osqueue.KindQueueMigrate
+
+		t.Run("should enqueue simple item to backlog", func(t *testing.T) {
+			require.Len(t, r.Keys(), 0)
+
+			item := osqueue.QueueItem{
+				ID: "test",
+				Data: osqueue.Item{
+					Kind:                  osqueue.KindQueueMigrate,
+					Identifier:            state.Identifier{},
+					QueueName:             &sysQueueName,
+					Throttle:              nil,
+					CustomConcurrencyKeys: nil,
+				},
+				QueueName: &sysQueueName,
+			}
+
+			backlogs := q.ItemBacklogs(ctx, item)
+			require.Len(t, backlogs, 1)
+
+			marshaledBacklog, err := json.Marshal(backlogs[0])
+			require.NoError(t, err)
+
+			shadowPartition := q.ItemShadowPartition(ctx, item)
+			require.NotEmpty(t, shadowPartition.ShadowPartitionID)
+
+			marshaledShadowPartition, err := json.Marshal(shadowPartition)
+			require.NoError(t, err)
+
+			qi, err := q.EnqueueItem(ctx, defaultShard, item, at, osqueue.EnqueueOpts{})
+			require.NoError(t, err)
+
+			require.True(t, r.Exists(kg.BacklogMeta()))
+			require.True(t, r.Exists(kg.BacklogSet(backlogs[0].BacklogID)))
+			require.True(t, r.Exists(kg.ShadowPartitionMeta()))
+			require.True(t, r.Exists(kg.ShadowPartitionSet(shadowPartition.ShadowPartitionID)), r.Keys())
+			require.True(t, r.Exists(kg.GlobalShadowPartitionSet()))
+			require.Equal(t, string(marshaledBacklog), r.HGet(kg.BacklogMeta(), backlogs[0].BacklogID))
+			require.Equal(t, string(marshaledShadowPartition), r.HGet(kg.ShadowPartitionMeta(), shadowPartition.ShadowPartitionID))
+
+			require.Equal(t, at.UnixMilli()/1000, int64(score(t, kg.ShadowPartitionSet(shadowPartition.ShadowPartitionID), backlogs[0].BacklogID)))
+			require.Equal(t, at.UnixMilli()/1000, int64(score(t, kg.GlobalShadowPartitionSet(), shadowPartition.ShadowPartitionID)))
+			require.Equal(t, at.UnixMilli(), int64(score(t, kg.BacklogSet(backlogs[0].BacklogID), qi.ID)))
+		})
 	})
 }
 

@@ -23,14 +23,16 @@ local keyGlobalAccountPointer = KEYS[12]           -- accounts:sorted - zset
 local keyAccountPartitions    = KEYS[13]           -- accounts:$accountId:partition:sorted - zset
 
 local keyPartitionMap    = KEYS[14]
-local keyItemIndexA      = KEYS[15]   -- custom item index 1
-local keyItemIndexB      = KEYS[16]  -- custom item index 2
 
 -- key queues v2
-local keyInProgress        = KEYS[17]
-local keyAccountInProgress = KEYS[18]
-local keyActiveJobsKey1    = KEYS[19]
-local keyActiveJobsKey2    = KEYS[20]
+local keyInProgress        = KEYS[15]
+local keyAccountInProgress = KEYS[16]
+local keyActiveJobsKey1    = KEYS[17]
+local keyActiveJobsKey2    = KEYS[18]
+
+local keyItemIndexA      = KEYS[19]   -- custom item index 1
+local keyItemIndexB      = KEYS[20]  -- custom item index 2
+
 
 local queueID        = ARGV[1]
 local idempotencyTTL = tonumber(ARGV[2])
@@ -149,22 +151,22 @@ redis.call("ZREM", keyAcctConcurrency, item.id)
 
 -- account-level concurrency (ignored for system queues)
 if exists_without_ending(keyAccountInProgress, ":-") == true then
-	redis.call("ZREM", keyAccountInProgress, nextTime, item.id)
+	redis.call("ZREM", keyAccountInProgress, item.id)
 end
 
 -- function-level concurrency
 if exists_without_ending(keyInProgress, ":-") == true then
-	redis.call("ZREM", keyInProgress, nextTime, item.id)
+	redis.call("ZREM", keyInProgress, item.id)
 end
 
 -- backlog 1 (concurrency key 1)
 if exists_without_ending(keyActiveJobsKey1, ":-") == true then
-	redis.call("ZREM", keyActiveJobsKey1, nextTime, item.id)
+	redis.call("ZREM", keyActiveJobsKey1, item.id)
 end
 
 -- backlog 2 (concurrency key 2)
 if exists_without_ending(keyActiveJobsKey2, ":-") == true then
-	redis.call("ZREM", keyActiveJobsKey2, nextTime, item.id)
+	redis.call("ZREM", keyActiveJobsKey2, item.id)
 end
 
 -- Add optional indexes.

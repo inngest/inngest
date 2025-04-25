@@ -23,21 +23,23 @@ local keyConcurrencyC    = KEYS[11] -- Optional for eg. for concurrency amongst 
 local keyAcctConcurrency = KEYS[12]
 -- We push pointers to partition concurrency items to the partition concurrency item
 local concurrencyPointer      = KEYS[13]
-local keyItemIndexA           = KEYS[14]          -- custom item index 1
-local keyItemIndexB           = KEYS[15]          -- custom item index 2
 
 -- Key queues v2
-local keyBacklogSetA              = KEYS[16]          -- backlog:sorted:<backlogID> - zset
-local keyBacklogSetB              = KEYS[17]          -- backlog:sorted:<backlogID> - zset
-local keyBacklogSetC              = KEYS[18]          -- backlog:sorted:<backlogID> - zset
-local keyBacklogMeta              = KEYS[19]          -- backlogs - hash
-local keyGlobalShadowPartitionSet = KEYS[20]          -- shadow:sorted
-local keyShadowPartitionSet       = KEYS[21]          -- shadow:sorted:<fnID|queueName> - zset
-local keyShadowPartitionMeta      = KEYS[22]          -- shadows
-local keyInProgress               = KEYS[23]
-local keyAccountInProgress        = KEYS[24]
-local keyActiveJobsKey1           = KEYS[25]
-local keyActiveJobsKey2           = KEYS[26]
+local keyBacklogSetA              = KEYS[14]          -- backlog:sorted:<backlogID> - zset
+local keyBacklogSetB              = KEYS[15]          -- backlog:sorted:<backlogID> - zset
+local keyBacklogSetC              = KEYS[16]          -- backlog:sorted:<backlogID> - zset
+local keyBacklogMeta              = KEYS[17]          -- backlogs - hash
+local keyGlobalShadowPartitionSet = KEYS[18]          -- shadow:sorted
+local keyShadowPartitionSet       = KEYS[19]          -- shadow:sorted:<fnID|queueName> - zset
+local keyShadowPartitionMeta      = KEYS[20]          -- shadows
+local keyInProgress               = KEYS[21]
+local keyAccountInProgress        = KEYS[22]
+local keyActiveJobsKey1           = KEYS[23]
+local keyActiveJobsKey2           = KEYS[24]
+
+local keyItemIndexA           = KEYS[25]          -- custom item index 1
+local keyItemIndexB           = KEYS[26]          -- custom item index 2
+
 
 local queueItem           = ARGV[1]
 local queueID             = ARGV[2]           -- id
@@ -136,22 +138,22 @@ handleRequeueConcurrency(keyConcurrencyC, partitionIdC, partitionTypeC)
 
 -- account-level concurrency (ignored for system queues)
 if exists_without_ending(keyAccountInProgress, ":-") == true then
-	redis.call("ZREM", keyAccountInProgress, nextTime, item.id)
+	redis.call("ZREM", keyAccountInProgress, item.id)
 end
 
 -- function-level concurrency
 if exists_without_ending(keyInProgress, ":-") == true then
-	redis.call("ZREM", keyInProgress, nextTime, item.id)
+	redis.call("ZREM", keyInProgress, item.id)
 end
 
 -- backlog 1 (concurrency key 1)
 if exists_without_ending(keyActiveJobsKey1, ":-") == true then
-	redis.call("ZREM", keyActiveJobsKey1, nextTime, item.id)
+	redis.call("ZREM", keyActiveJobsKey1, item.id)
 end
 
 -- backlog 2 (concurrency key 2)
 if exists_without_ending(keyActiveJobsKey2, ":-") == true then
-	redis.call("ZREM", keyActiveJobsKey2, nextTime, item.id)
+	redis.call("ZREM", keyActiveJobsKey2, item.id)
 end
 
 -- Remove item from the account concurrency queue

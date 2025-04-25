@@ -18,16 +18,16 @@ type CustomConcurrencyLimit struct {
 
 type QueueShadowPartition struct {
 	ShadowPartitionID string `json:"id,omitempty"`
-	
+
 	// LeaseID represents a lease on this shadow partition.  If the LeaseID is not nil,
 	// this partition can be claimed by a shared-nothing refill worker to work on the
 	// backlogs within this shadow partition.
 	LeaseID *ulid.ULID `json:"leaseID,omitempty"`
 
-	FunctionID      uuid.UUID `json:"fid,omitempty"`
-	EnvID           uuid.UUID `json:"eid,omitempty"`
-	AccountID       uuid.UUID `json:"aid,omitempty"`
-	SystemQueueName *string   `json:"queueName,omitempty"`
+	FunctionID      *uuid.UUID `json:"fid,omitempty"`
+	EnvID           *uuid.UUID `json:"eid,omitempty"`
+	AccountID       *uuid.UUID `json:"aid,omitempty"`
+	SystemQueueName *string    `json:"queueName,omitempty"`
 
 	// SystemConcurrency represents the concurrency limit to apply to system queues. Unset on regular function partitions.
 	SystemConcurrency int `json:"sc,omitempty"`
@@ -289,9 +289,9 @@ func (q *queue) ItemShadowPartition(ctx context.Context, i osqueue.QueueItem) Qu
 		ShadowPartitionID: i.FunctionID.String(),
 
 		// Identifiers
-		FunctionID: i.FunctionID,
-		EnvID:      i.WorkspaceID,
-		AccountID:  i.Data.Identifier.AccountID,
+		FunctionID: &i.FunctionID,
+		EnvID:      &i.WorkspaceID,
+		AccountID:  &i.Data.Identifier.AccountID,
 
 		// Currently configured limits
 		FunctionConcurrency:   fnPartition.ConcurrencyLimit,

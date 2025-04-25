@@ -925,8 +925,13 @@ func (q QueueShadowPartition) accountInProgressKey(kg QueueKeyGenerator) string 
 	if q.SystemQueueName != nil {
 		return kg.AccountInProgress(uuid.Nil)
 	}
-	
-	return kg.AccountInProgress(q.AccountID)
+
+	// This should never be unset
+	if q.AccountID == nil {
+		return kg.AccountInProgress(uuid.Nil)
+	}
+
+	return kg.AccountInProgress(*q.AccountID)
 }
 
 // fnConcurrencyKey returns the concurrency key for a function scope limit, on the
@@ -1256,15 +1261,8 @@ func (q *queue) EnqueueItem(ctx context.Context, shard QueueShard, i osqueue.Que
 		parts[0].zsetKey(shard.RedisClient.kg),
 		parts[1].zsetKey(shard.RedisClient.kg),
 		parts[2].zsetKey(shard.RedisClient.kg),
-	}
-	// Append indexes
-	for _, idx := range q.itemIndexer(ctx, i, shard.RedisClient.kg) {
-		if idx != "" {
-			keys = append(keys, idx)
-		}
-	}
 
-	keys = append(keys,
+		// Key queues v2
 		shard.RedisClient.kg.BacklogSet(backlogs[0].BacklogID),
 		shard.RedisClient.kg.BacklogSet(backlogs[1].BacklogID),
 		shard.RedisClient.kg.BacklogSet(backlogs[2].BacklogID),
@@ -1272,7 +1270,13 @@ func (q *queue) EnqueueItem(ctx context.Context, shard QueueShard, i osqueue.Que
 		shard.RedisClient.kg.GlobalShadowPartitionSet(),
 		shard.RedisClient.kg.ShadowPartitionSet(shadowPartition.ShadowPartitionID),
 		shard.RedisClient.kg.ShadowPartitionMeta(),
-	)
+	}
+	// Append indexes
+	for _, idx := range q.itemIndexer(ctx, i, shard.RedisClient.kg) {
+		if idx != "" {
+			keys = append(keys, idx)
+		}
+	}
 
 	enqueueToBacklogsVal := "0"
 	if enqueueToBacklogs {
@@ -2491,6 +2495,13 @@ func (q *queue) Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		queueShard.RedisClient.kg.GlobalAccountIndex(),
 		queueShard.RedisClient.kg.AccountPartitionIndex(i.Data.Identifier.AccountID),
 		queueShard.RedisClient.kg.PartitionItem(),
+
+		// accounting for key queues v2
+		shadowPartition.inProgressKey(q.primaryQueueShard.RedisClient.kg),
+		shadowPartition.accountInProgressKey(q.primaryQueueShard.RedisClient.kg),
+		backlogs[0].activeKey(q.primaryQueueShard.RedisClient.kg),
+		backlogs[1].activeKey(q.primaryQueueShard.RedisClient.kg),
+		backlogs[2].activeKey(q.primaryQueueShard.RedisClient.kg),
 	}
 	// Append indexes
 	for _, idx := range q.itemIndexer(ctx, i, queueShard.RedisClient.kg) {
@@ -2498,16 +2509,7 @@ func (q *queue) Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 			keys = append(keys, idx)
 		}
 	}
-
-	// accounting for key queues v2
-	keys = append(keys,
-		shadowPartition.inProgressKey(q.primaryQueueShard.RedisClient.kg),
-		shadowPartition.accountInProgressKey(q.primaryQueueShard.RedisClient.kg),
-		backlogs[0].activeKey(q.primaryQueueShard.RedisClient.kg),
-		backlogs[1].activeKey(q.primaryQueueShard.RedisClient.kg),
-		backlogs[2].activeKey(q.primaryQueueShard.RedisClient.kg),
-	)
-
+ 
 	idempotency := q.idempotencyTTL
 	if q.idempotencyTTLFunc != nil {
 		idempotency = q.idempotencyTTLFunc(ctx, i)
@@ -2583,29 +2585,6 @@ func (q *queue) Requeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		accountConcurrencyKey = queueShard.RedisClient.kg.Concurrency("account", parts[0].Queue())
 	}
 
-	keys := []string{
-		queueShard.RedisClient.kg.QueueItem(),
-		queueShard.RedisClient.kg.PartitionItem(), // Partition item, map
-		queueShard.RedisClient.kg.GlobalPartitionIndex(),
-		queueShard.RedisClient.kg.GlobalAccountIndex(),
-		queueShard.RedisClient.kg.AccountPartitionIndex(i.Data.Identifier.AccountID),
-		parts[0].zsetKey(queueShard.RedisClient.kg),
-		parts[1].zsetKey(queueShard.RedisClient.kg),
-		parts[2].zsetKey(queueShard.RedisClient.kg),
-		// And pass in the key queue's concurrency keys.
-		parts[0].concurrencyKey(queueShard.RedisClient.kg),
-		parts[1].concurrencyKey(queueShard.RedisClient.kg),
-		parts[2].concurrencyKey(queueShard.RedisClient.kg),
-		accountConcurrencyKey,
-		queueShard.RedisClient.kg.ConcurrencyIndex(),
-	}
-	// Append indexes
-	for _, idx := range q.itemIndexer(ctx, i, queueShard.RedisClient.kg) {
-		if idx != "" {
-			keys = append(keys, idx)
-		}
-	}
-
 	enqueueToBacklogs := false
 	if parts[0].IsSystem() && q.allowSystemKeyQueues != nil {
 		enqueueToBacklogs = q.allowSystemKeyQueues(ctx)
@@ -2627,7 +2606,28 @@ func (q *queue) Requeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		backlogs = append(backlogs, QueueBacklog{})
 	}
 
-	keys = append(keys,
+	requeueToBacklogsVal := "0"
+	if enqueueToBacklogs {
+		requeueToBacklogsVal = "1"
+	}
+
+	keys := []string{
+		queueShard.RedisClient.kg.QueueItem(),
+		queueShard.RedisClient.kg.PartitionItem(), // Partition item, map
+		queueShard.RedisClient.kg.GlobalPartitionIndex(),
+		queueShard.RedisClient.kg.GlobalAccountIndex(),
+		queueShard.RedisClient.kg.AccountPartitionIndex(i.Data.Identifier.AccountID),
+		parts[0].zsetKey(queueShard.RedisClient.kg),
+		parts[1].zsetKey(queueShard.RedisClient.kg),
+		parts[2].zsetKey(queueShard.RedisClient.kg),
+		// And pass in the key queue's concurrency keys.
+		parts[0].concurrencyKey(queueShard.RedisClient.kg),
+		parts[1].concurrencyKey(queueShard.RedisClient.kg),
+		parts[2].concurrencyKey(queueShard.RedisClient.kg),
+		accountConcurrencyKey,
+		queueShard.RedisClient.kg.ConcurrencyIndex(),
+
+		// key queues v2
 		queueShard.RedisClient.kg.BacklogSet(backlogs[0].BacklogID),
 		queueShard.RedisClient.kg.BacklogSet(backlogs[1].BacklogID),
 		queueShard.RedisClient.kg.BacklogSet(backlogs[2].BacklogID),
@@ -2642,11 +2642,12 @@ func (q *queue) Requeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		backlogs[0].activeKey(q.primaryQueueShard.RedisClient.kg),
 		backlogs[1].activeKey(q.primaryQueueShard.RedisClient.kg),
 		backlogs[2].activeKey(q.primaryQueueShard.RedisClient.kg),
-	)
-
-	requeueToBacklogsVal := "0"
-	if enqueueToBacklogs {
-		requeueToBacklogsVal = "1"
+	}
+	// Append indexes
+	for _, idx := range q.itemIndexer(ctx, i, queueShard.RedisClient.kg) {
+		if idx != "" {
+			keys = append(keys, idx)
+		}
 	}
 
 	// NOTE: For backwards compatibility, we need to also remove the previously-used

@@ -561,9 +561,9 @@ func TestQueueItemShadowPartition(t *testing.T) {
 	t.Run("basic item", func(t *testing.T) {
 		expected := QueueShadowPartition{
 			ShadowPartitionID:     fnID.String(),
-			FunctionID:            fnID,
-			EnvID:                 wsID,
-			AccountID:             accID,
+			FunctionID:            &fnID,
+			EnvID:                 &wsID,
+			AccountID:             &accID,
 			SystemQueueName:       nil,
 			SystemConcurrency:     0,
 			AccountConcurrency:    100,
@@ -605,9 +605,9 @@ func TestQueueItemShadowPartition(t *testing.T) {
 
 		expected := QueueShadowPartition{
 			ShadowPartitionID:     sysQueueName,
-			FunctionID:            uuid.UUID{},
-			EnvID:                 uuid.UUID{},
-			AccountID:             uuid.UUID{},
+			FunctionID:            nil,
+			EnvID:                 nil,
+			AccountID:             nil,
 			SystemQueueName:       &sysQueueName,
 			SystemConcurrency:     250,
 			AccountConcurrency:    0,
@@ -645,9 +645,9 @@ func TestQueueItemShadowPartition(t *testing.T) {
 
 		expected := QueueShadowPartition{
 			ShadowPartitionID:     fnID.String(),
-			FunctionID:            fnID,
-			EnvID:                 wsID,
-			AccountID:             accID,
+			FunctionID:            &fnID,
+			EnvID:                 &wsID,
+			AccountID:             &accID,
 			SystemQueueName:       nil,
 			SystemConcurrency:     0,
 			AccountConcurrency:    100,
@@ -703,9 +703,9 @@ func TestQueueItemShadowPartition(t *testing.T) {
 
 		expected := QueueShadowPartition{
 			ShadowPartitionID:   fnID.String(),
-			FunctionID:          fnID,
-			EnvID:               wsID,
-			AccountID:           accID,
+			FunctionID:          &fnID,
+			EnvID:               &wsID,
+			AccountID:           &accID,
 			SystemQueueName:     nil,
 			SystemConcurrency:   0,
 			AccountConcurrency:  100,
@@ -767,9 +767,9 @@ func TestQueueItemShadowPartition(t *testing.T) {
 
 		expected := QueueShadowPartition{
 			ShadowPartitionID:   fnID.String(),
-			FunctionID:          fnID,
-			EnvID:               wsID,
-			AccountID:           accID,
+			FunctionID:          &fnID,
+			EnvID:               &wsID,
+			AccountID:           &accID,
 			SystemQueueName:     nil,
 			SystemConcurrency:   0,
 			AccountConcurrency:  100,
