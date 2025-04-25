@@ -3,7 +3,7 @@
 Requeues a job by its given ID.  This returns an error if the job
 does not exist within the queue index (outstanding queue).
 
-NOTE: This
+NOTE: This is used by debounce to push back the timeout job. It is not related to Requeue() which moves an in-progress item back to the backlog/queue.
 
 Return values:
 
@@ -20,23 +20,14 @@ local keyGlobalPointer        = KEYS[3] -- partition:sorted - zset
 local keyGlobalAccountPointer = KEYS[4] -- accounts:sorted - zset
 local keyAccountPartitions    = KEYS[5] -- accounts:$accountId:partition:sorted
 
-local keyPartitionA    = KEYS[6] -- queue:sorted:$workflowID - zset
-local keyPartitionB    = KEYS[7] -- e.g. sorted:c|t:$workflowID - zset
-local keyPartitionC    = KEYS[8] -- e.g. sorted:c|t:$workflowID - zset
+local keyPartitionFn    = KEYS[6] -- queue:sorted:$workflowID - zset
 
 local jobID            = ARGV[1]           -- queue item ID
 local jobScore         = tonumber(ARGV[2]) -- enqueue at, in milliseconds
 local nowMS            = tonumber(ARGV[3]) -- in ms
-local partitionItemA      = ARGV[4]
-local partitionItemB      = ARGV[5]
-local partitionItemC      = ARGV[6]
-local partitionIdA        = ARGV[7]
-local partitionIdB        = ARGV[8]
-local partitionIdC        = ARGV[9]
-local accountId           = ARGV[10]
-local partitionTypeA = tonumber(ARGV[11])
-local partitionTypeB = tonumber(ARGV[12])
-local partitionTypeC = tonumber(ARGV[13])
+local partitionItemFn  = ARGV[4]
+local partitionIdFn    = ARGV[5]
+local accountId        = ARGV[6]
 
 -- $include(decode_ulid_time.lua)
 -- $include(get_queue_item.lua)
@@ -64,8 +55,6 @@ item.wt = jobScore
 redis.call("HSET", keyQueueHash, jobID, cjson.encode(item))
 
 -- Update and requeue all partitions
-requeue_to_partition(keyPartitionA, partitionIdA, partitionItemA, partitionTypeA, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, jobScore, jobID, nowMS, accountId)
-requeue_to_partition(keyPartitionB, partitionIdB, partitionItemB, partitionTypeB, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, jobScore, jobID, nowMS, accountId)
-requeue_to_partition(keyPartitionC, partitionIdC, partitionItemC, partitionTypeC, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, jobScore, jobID, nowMS, accountId)
+requeue_to_partition(keyPartitionFn, partitionIdFn, partitionItemFn, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, jobScore, jobID, nowMS, accountId)
 
 return 0

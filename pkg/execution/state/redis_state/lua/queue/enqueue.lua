@@ -13,11 +13,9 @@ local keyAccountPartitions    	= KEYS[5]           -- accounts:$accountId:partit
 local idempotencyKey          	= KEYS[6]           -- seen:$key
 local keyFnMetadata           	= KEYS[7]           -- fnMeta:$id - hash
 local guaranteedCapacityMapKey	= KEYS[8]           -- shards - hmap of shards
-local keyPartitionA           	= KEYS[9]           -- queue:sorted:$workflowID - zset
-local keyPartitionB           	= KEYS[10]           -- e.g. sorted:c|t:$workflowID - zset
-local keyPartitionC           	= KEYS[11]          -- e.g. sorted:c|t:$workflowID - zset
-local keyItemIndexA           	= KEYS[12]          -- custom item index 1
-local keyItemIndexB           	= KEYS[13]          -- custom item index 2
+local keyPartition           	  = KEYS[9]           -- queue:sorted:$workflowID - zset
+local keyItemIndexA           	= KEYS[10]          -- custom item index 1
+local keyItemIndexB           	= KEYS[11]          -- custom item index 2
 
 local queueItem           		= ARGV[1]           -- {id, lease id, attempt, max attempt, data, etc...}
 local queueID             		= ARGV[2]           -- id
@@ -25,18 +23,11 @@ local queueScore          		= tonumber(ARGV[3]) -- vesting time, in milliseconds
 local partitionTime       		= tonumber(ARGV[4]) -- score for partition, lower bounded to now in seconds
 local nowMS               		= tonumber(ARGV[5]) -- now in ms
 local fnMetadata          		= ARGV[6]          -- function meta: {paused}
-local partitionItemA      		= ARGV[7]
-local partitionItemB      		= ARGV[8]
-local partitionItemC      		= ARGV[9]
-local partitionIdA        		= ARGV[10]
-local partitionIdB        		= ARGV[11]
-local partitionIdC        		= ARGV[12]
-local partitionTypeA        	= tonumber(ARGV[13])
-local partitionTypeB        	= tonumber(ARGV[14])
-local partitionTypeC        	= tonumber(ARGV[15])
-local accountId           		= ARGV[16]
-local guaranteedCapacity      = ARGV[17]
-local guaranteedCapacityKey   = ARGV[18]
+local partitionItem      		  = ARGV[7]
+local partitionID        		  = ARGV[8]
+local accountId           		= ARGV[9]
+local guaranteedCapacity      = ARGV[10]
+local guaranteedCapacityKey   = ARGV[11]
 
 -- $include(update_pointer_score.lua)
 -- $include(ends_with.lua)
@@ -56,9 +47,7 @@ if redis.call("HSETNX", queueKey, queueID, queueItem) == 0 then
     return 1
 end
 
-enqueue_to_partition(keyPartitionA, partitionIdA, partitionItemA, partitionTypeA, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, queueScore, queueID, partitionTime, nowMS)
-enqueue_to_partition(keyPartitionB, partitionIdB, partitionItemB, partitionTypeB, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, queueScore, queueID, partitionTime, nowMS)
-enqueue_to_partition(keyPartitionC, partitionIdC, partitionItemC, partitionTypeC, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, queueScore, queueID, partitionTime, nowMS)
+enqueue_to_partition(keyPartition, partitionID, partitionItem, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, queueScore, queueID, partitionTime, nowMS)
 
 if exists_without_ending(keyFnMetadata, ":fnMeta:-") == true then
 	-- note to future devs: if updating metadata, be sure you do not change the "off"
