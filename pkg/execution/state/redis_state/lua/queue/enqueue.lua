@@ -16,16 +16,16 @@ local guaranteedCapacityMapKey	= KEYS[8]           -- shards - hmap of shards
 local keyPartition           	  = KEYS[9]           -- queue:sorted:$workflowID - zset
 
 -- Key queues v2
-local keyBacklogSetA              = KEYS[12]          -- backlog:sorted:<backlogID> - zset
-local keyBacklogSetB              = KEYS[13]          -- backlog:sorted:<backlogID> - zset
-local keyBacklogSetC              = KEYS[14]          -- backlog:sorted:<backlogID> - zset
-local keyBacklogMeta              = KEYS[15]          -- backlogs - hash
-local keyGlobalShadowPartitionSet = KEYS[16]          -- shadow:sorted
-local keyShadowPartitionSet       = KEYS[17]          -- shadow:sorted:<fnID|queueName> - zset
-local keyShadowPartitionMeta      = KEYS[18]          -- shadows
+local keyBacklogSetA              = KEYS[10]          -- backlog:sorted:<backlogID> - zset
+local keyBacklogSetB              = KEYS[11]          -- backlog:sorted:<backlogID> - zset
+local keyBacklogSetC              = KEYS[12]          -- backlog:sorted:<backlogID> - zset
+local keyBacklogMeta              = KEYS[13]          -- backlogs - hash
+local keyGlobalShadowPartitionSet = KEYS[14]          -- shadow:sorted
+local keyShadowPartitionSet       = KEYS[15]          -- shadow:sorted:<fnID|queueName> - zset
+local keyShadowPartitionMeta      = KEYS[16]          -- shadows
 
-local keyItemIndexA           	= KEYS[10]          -- custom item index 1
-local keyItemIndexB           	= KEYS[11]          -- custom item index 2
+local keyItemIndexA           	= KEYS[17]          -- custom item index 1
+local keyItemIndexB           	= KEYS[18]          -- custom item index 2
 
 
 local queueItem           		= ARGV[1]           -- {id, lease id, attempt, max attempt, data, etc...}

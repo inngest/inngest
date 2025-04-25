@@ -42,20 +42,19 @@ local queueItem           = ARGV[1]
 local queueID             = ARGV[2]           -- id
 local queueScore          = tonumber(ARGV[3]) -- vesting time, in ms
 local nowMS               = tonumber(ARGV[4]) -- now in ms
-local partitionItemFn     = ARGV[5]
+local partitionItem     = ARGV[5]
 local partitionID         = ARGV[6]
 local accountId           = ARGV[7]
 
 -- Key queues v2
 local requeueToBacklog				= tonumber(ARGV[8])
-local partitionID             = ARGV[9]
-local shadowPartitionItem     = ARGV[10]
-local backlogItemA            = ARGV[11]
-local backlogItemB            = ARGV[12]
-local backlogItemC            = ARGV[13]
-local backlogIdA              = ARGV[14]
-local backlogIdB              = ARGV[15]
-local backlogIdC              = ARGV[16]
+local shadowPartitionItem     = ARGV[9]
+local backlogItemA            = ARGV[10]
+local backlogItemB            = ARGV[11]
+local backlogItemC            = ARGV[12]
+local backlogIdA              = ARGV[13]
+local backlogIdB              = ARGV[14]
+local backlogIdC              = ARGV[15]
 
 -- $include(get_queue_item.lua)
 -- $include(get_partition_item.lua)
@@ -123,25 +122,6 @@ end
 -- function-level concurrency
 if exists_without_ending(keyInProgress, ":-") == true then
 	redis.call("ZREM", keyInProgress, item.id)
-
-	-- Get the earliest item in the partition concurrency set.  We may be dequeueing
-	-- the only in-progress job and should remove this from the partition concurrency
-	-- pointers, if this exists.
-	--
-	-- This ensures that scavengeres have updated pointer queues without the currently
-	-- leased job, if exists.
-	local concurrencyScores = redis.call("ZRANGE", keyInProgress, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")
-	if concurrencyScores == false then
-		redis.call("ZREM", concurrencyPointer, partitionID)
-	else
-		local earliestLease = tonumber(concurrencyScores[2])
-		if earliestLease == nil then
-			redis.call("ZREM", concurrencyPointer, partitionID)
-		else
-			-- Ensure that we update the score with the earliest lease
-			redis.call("ZADD", concurrencyPointer, earliestLease, partitionID)
-		end
-	end
 end
 
 -- backlog 1 (concurrency key 1)
@@ -170,7 +150,7 @@ else
   --
   -- Enqueue item to partition queues again
   --
-  requeue_to_partition(keyPartitionFn, partitionID, partitionItemFn, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, queueScore, queueID, nowMS, accountId)
+  requeue_to_partition(keyPartitionFn, partitionID, partitionItem, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, queueScore, queueID, nowMS, accountId)
 end
 
 -- Add optional indexes.

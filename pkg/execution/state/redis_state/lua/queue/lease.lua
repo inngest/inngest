@@ -31,10 +31,10 @@ local throttleKey             = KEYS[10] -- key used for throttling function run
 local keyAcctConcurrency      = KEYS[11]
 
 -- key queues v2
-local keyInProgress        = KEYS[14]
-local keyAccountInProgress = KEYS[15]
-local keyActiveJobsKey1    = KEYS[16]
-local keyActiveJobsKey2    = KEYS[17]
+local keyInProgress        = KEYS[12]
+local keyAccountInProgress = KEYS[13]
+local keyActiveJobsKey1    = KEYS[14]
+local keyActiveJobsKey2    = KEYS[15]
 
 local queueID      						= ARGV[1]
 local newLeaseKey  						= ARGV[2]
@@ -49,9 +49,8 @@ local concurrencyAcct 				= tonumber(ARGV[8])
 local accountId       				= ARGV[9]
 
 -- key queues v2
-local enableKeyQueues    = tonumber(ARGV[15])
-local disableLeaseChecks = tonumber(ARGV[16])
-local partitionID        = ARGV[17]
+local enableKeyQueues    = tonumber(ARGV[10])
+local disableLeaseChecks = tonumber(ARGV[11])
 
 -- Use our custom Go preprocessor to inject the file from ./includes/
 -- $include(decode_ulid_time.lua)
@@ -130,6 +129,9 @@ local function handleLease(keyConcurrency, concurrencyLimit)
 	end
 end
 
+-- Remove the item from our sorted index, as this is no longer on the queue; it's in-progress
+-- and stored in functionConcurrencyKey.
+redis.call("ZREM", keyPartitionFn, item.id)
 
 if enableKeyQueues ~= 1 then
   -- Always add this to acct level concurrency queues
@@ -137,10 +139,6 @@ if enableKeyQueues ~= 1 then
 
   -- Always add this to fn level concurrency queues for scavenging
   redis.call("ZADD", keyConcurrencyFn, nextTime, item.id)
-
-  -- Remove the item from our sorted index, as this is no longer on the queue; it's in-progress
-  -- and stored in functionConcurrencyKey.
-  redis.call("ZREM", keyPartitionFn, item.id)
 
   -- For every queue that we lease from, ensure that it exists in the scavenger pointer queue
   -- so that expired leases can be re-processed.  We want to take the earliest time from the
@@ -163,9 +161,7 @@ if enableKeyQueues ~= 1 then
   if exists_without_ending(keyCustomConcurrencyKey2, ":-") == true then
     handleLease(keyCustomConcurrencyKey2, customConcurrencyKey2)
   end
-end
-
-if enableKeyQueues == 1 then
+else
   -- Accounting for key queues v2
 
   -- We need to update new key-specific concurrency indexes, as well as account + function level concurrency

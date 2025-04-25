@@ -2537,13 +2537,7 @@ func (q *queue) Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		int(idempotency.Seconds()),
 
 		fnPartition.ID,
-		customConcurrencyKey1.ID,
-		customConcurrencyKey2.ID,
 		i.Data.Identifier.AccountID.String(),
-
-		fnPartition.PartitionType,
-		customConcurrencyKey1.PartitionType,
-		customConcurrencyKey2.PartitionType,
 	})
 	if err != nil {
 		return err
@@ -2665,8 +2659,6 @@ func (q *queue) Requeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		fnPartition,
 		fnPartition.ID,
 		i.Data.Identifier.AccountID.String(),
-
-		fnPartition.PartitionType,
 
 		requeueToBacklogsVal,
 		shadowPartition,

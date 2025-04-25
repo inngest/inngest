@@ -5898,8 +5898,8 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 				QueueName: nil,
 			}
 
-			parts, _ := q.ItemPartitions(ctx, defaultShard, item1)
-			require.Equal(t, int(enums.PartitionTypeDefault), parts[0].PartitionType)
+			fnPart, _, _, _ := q.ItemPartitions(ctx, defaultShard, item1)
+			require.Equal(t, int(enums.PartitionTypeDefault), fnPart.PartitionType)
 
 			// for simplicity, this enqueue should go directly to the partition
 			enqueueToBacklog = false
@@ -5914,7 +5914,7 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 			// simulate having hit a partition concurrency limit in a previous operation,
 			// without disabling validation this should cause Lease() to fail
 			denies := newLeaseDenyList()
-			denies.addConcurrency(newKeyError(ErrPartitionConcurrencyLimit, parts[0].Queue()))
+			denies.addConcurrency(newKeyError(ErrPartitionConcurrencyLimit, fnPart.Queue()))
 
 			leaseID, err := q.Lease(ctx, qi, leaseDur, now, denies)
 			require.NoError(t, err)
@@ -5936,7 +5936,7 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 			// TODO Do we actually want to update previous accounting?
 			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, kg.Concurrency("account", accountId.String()), qi.ID)))
 			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, kg.Concurrency("p", fnID.String()), qi.ID)))
-			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, parts[0].concurrencyKey(kg), qi.ID)))
+			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, fnPart.concurrencyKey(kg), qi.ID)))
 		})
 	})
 
@@ -6025,13 +6025,13 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 				QueueName: nil,
 			}
 
-			parts, _ := q.ItemPartitions(ctx, defaultShard, item)
-			require.NotEmpty(t, parts[0].ID)
-			require.Equal(t, int(enums.PartitionTypeConcurrencyKey), parts[0].PartitionType)
-			require.NotEmpty(t, parts[1].ID)
-			require.Equal(t, int(enums.PartitionTypeDefault), parts[1].PartitionType)
-			require.Empty(t, parts[2].ID)
-			require.Equal(t, int(enums.PartitionTypeDefault), parts[2].PartitionType)
+			fnPart, custom1, custom2, _ := q.ItemPartitions(ctx, defaultShard, item)
+			require.NotEmpty(t, fnPart.ID)
+			require.Equal(t, int(enums.PartitionTypeDefault), fnPart.PartitionType)
+			require.NotEmpty(t, custom1.ID)
+			require.Equal(t, int(enums.PartitionTypeConcurrencyKey), custom1.PartitionType)
+			require.Empty(t, custom2.ID)
+			require.Equal(t, int(enums.PartitionTypeDefault), custom2.PartitionType)
 
 			// for simplicity, this enqueue should go directly to the partition
 			enqueueToBacklog = false
@@ -6046,7 +6046,7 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 			// simulate having hit a partition concurrency limit in a previous operation,
 			// without disabling validation this should cause Lease() to fail
 			denies := newLeaseDenyList()
-			denies.addConcurrency(newKeyError(ErrPartitionConcurrencyLimit, parts[1].Queue()))
+			denies.addConcurrency(newKeyError(ErrPartitionConcurrencyLimit, fnPart.Queue()))
 
 			leaseID, err := q.Lease(ctx, qi, leaseDur, now, denies)
 			require.NoError(t, err)
@@ -6065,12 +6065,12 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 			require.Equal(t, kg.Concurrency("custom", util.ConcurrencyKey(scope, fnID, unhashedValue)), backlogs[0].activeKey(kg))
 			require.True(t, r.Exists(backlogs[0].activeKey(kg)))
 			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, backlogs[0].activeKey(kg), qi.ID)))
-			require.Equal(t, backlogs[0].activeKey(kg), parts[0].concurrencyKey(kg))
+			require.Equal(t, backlogs[0].activeKey(kg), custom1.concurrencyKey(kg))
 
 			// expect classic partition concurrency to include item
 			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, kg.Concurrency("account", accountId.String()), qi.ID)))
 			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, kg.Concurrency("p", fnID.String()), qi.ID)))
-			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, parts[0].concurrencyKey(kg), qi.ID)))
+			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, custom1.concurrencyKey(kg), qi.ID)))
 		})
 	})
 
@@ -6170,13 +6170,13 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 				QueueName: nil,
 			}
 
-			parts, _ := q.ItemPartitions(ctx, defaultShard, item)
-			require.NotEmpty(t, parts[0].ID)
-			require.Equal(t, int(enums.PartitionTypeConcurrencyKey), parts[0].PartitionType)
-			require.NotEmpty(t, parts[1].ID)
-			require.Equal(t, int(enums.PartitionTypeConcurrencyKey), parts[1].PartitionType)
-			require.NotEmpty(t, parts[2].ID)
-			require.Equal(t, int(enums.PartitionTypeDefault), parts[2].PartitionType)
+			fnPart, custom1, custom2, _ := q.ItemPartitions(ctx, defaultShard, item)
+			require.NotEmpty(t, fnPart.ID)
+			require.Equal(t, int(enums.PartitionTypeDefault), fnPart.PartitionType)
+			require.NotEmpty(t, custom1.ID)
+			require.Equal(t, int(enums.PartitionTypeConcurrencyKey), custom1.PartitionType)
+			require.NotEmpty(t, custom2.ID)
+			require.Equal(t, int(enums.PartitionTypeConcurrencyKey), custom2.PartitionType)
 
 			// for simplicity, this enqueue should go directly to the partition
 			enqueueToBacklog = false
@@ -6191,7 +6191,7 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 			// simulate having hit a partition concurrency limit in a previous operation,
 			// without disabling validation this should cause Lease() to fail
 			denies := newLeaseDenyList()
-			denies.addConcurrency(newKeyError(ErrPartitionConcurrencyLimit, parts[1].Queue()))
+			denies.addConcurrency(newKeyError(ErrPartitionConcurrencyLimit, custom2.Queue()))
 
 			leaseID, err := q.Lease(ctx, qi, leaseDur, now, denies)
 			require.NoError(t, err)
@@ -6222,9 +6222,9 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, kg.Concurrency("account", accountId.String()), qi.ID)))
 			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, kg.Concurrency("p", fnID.String()), qi.ID)))
 			// first key
-			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, parts[0].concurrencyKey(kg), qi.ID)))
+			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, custom1.concurrencyKey(kg), qi.ID)))
 			// second key
-			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, parts[1].concurrencyKey(kg), qi.ID)))
+			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, custom2.concurrencyKey(kg), qi.ID)))
 		})
 	})
 
@@ -6278,9 +6278,9 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 				QueueName: &sysQueueName,
 			}
 
-			parts, _ := q.ItemPartitions(ctx, defaultShard, item1)
-			require.Equal(t, int(enums.PartitionTypeDefault), parts[0].PartitionType)
-			require.True(t, parts[0].IsSystem())
+			fnPart, _, _, _ := q.ItemPartitions(ctx, defaultShard, item1)
+			require.Equal(t, int(enums.PartitionTypeDefault), fnPart.PartitionType)
+			require.True(t, fnPart.IsSystem())
 
 			// for simplicity, this enqueue should go directly to the partition
 			enqueueToBacklog = false
@@ -6295,7 +6295,7 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 			// simulate having hit a partition concurrency limit in a previous operation,
 			// without disabling validation this should cause Lease() to fail
 			denies := newLeaseDenyList()
-			denies.addConcurrency(newKeyError(ErrPartitionConcurrencyLimit, parts[0].Queue()))
+			denies.addConcurrency(newKeyError(ErrPartitionConcurrencyLimit, fnPart.Queue()))
 
 			leaseID, err := q.Lease(ctx, qi, leaseDur, now, denies)
 			require.NoError(t, err)
@@ -6317,7 +6317,7 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 			// expect classic partition concurrency to include item
 			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, kg.Concurrency("account", sysQueueName), qi.ID)))
 			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, kg.Concurrency("p", sysQueueName), qi.ID)))
-			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, parts[0].concurrencyKey(kg), qi.ID)))
+			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, fnPart.concurrencyKey(kg), qi.ID)))
 		})
 	})
 }
@@ -6401,13 +6401,15 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 			require.NotEmpty(t, shadowPartition.PartitionID)
 			require.Len(t, shadowPartition.CustomConcurrencyKeys, 0)
 
-			parts, _ := q.ItemPartitions(ctx, defaultShard, item)
-			require.NotEmpty(t, parts[0].ID)
-			require.Equal(t, int(enums.PartitionTypeDefault), parts[0].PartitionType)
-			require.Empty(t, parts[1].ID)
-			require.Equal(t, int(enums.PartitionTypeDefault), parts[1].PartitionType)
-			require.Empty(t, parts[2].ID)
-			require.Equal(t, int(enums.PartitionTypeDefault), parts[2].PartitionType)
+			fnPart, custom1, custom2, _ := q.ItemPartitions(ctx, defaultShard, item)
+			require.NotEmpty(t, fnPart.ID)
+			require.Equal(t, int(enums.PartitionTypeDefault), fnPart.PartitionType)
+			require.Empty(t, custom1.ID)
+			require.Equal(t, int(enums.PartitionTypeDefault), custom1.PartitionType)
+			require.Empty(t, custom2.ID)
+			require.Equal(t, int(enums.PartitionTypeDefault), custom2.PartitionType)
+
+			require.False(t, hasMember(t, r, fnPart.zsetKey(kg), qi.ID))
 
 			// expect key queue accounting to contain item in in-progress
 			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, shadowPartition.inProgressKey(kg), qi.ID)))
@@ -6418,9 +6420,9 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 
 			// expect old accounting to be updated
 			// TODO Do we actually want to update previous accounting?
-			require.True(t, hasMember(t, r, parts[0].concurrencyKey(kg), qi.ID))
+			require.True(t, hasMember(t, r, fnPart.concurrencyKey(kg), qi.ID))
 			require.True(t, hasMember(t, r, kg.Concurrency("account", accountId.String()), qi.ID))
-			require.True(t, hasMember(t, r, kg.Concurrency("p", parts[0].Queue()), qi.ID))
+			require.True(t, hasMember(t, r, kg.Concurrency("p", fnPart.Queue()), qi.ID))
 
 			requeueFor := at.Add(30 * time.Minute).Truncate(time.Minute)
 
@@ -6438,12 +6440,12 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 
 			// expect old accounting to be updated
 			// TODO Do we actually want to update previous accounting?
-			require.False(t, hasMember(t, r, parts[0].concurrencyKey(kg), qi.ID))
+			require.False(t, hasMember(t, r, fnPart.concurrencyKey(kg), qi.ID))
 			require.False(t, hasMember(t, r, kg.Concurrency("account", accountId.String()), qi.ID))
-			require.False(t, hasMember(t, r, kg.Concurrency("p", parts[0].Queue()), qi.ID))
+			require.False(t, hasMember(t, r, kg.Concurrency("p", fnPart.Queue()), qi.ID))
 
 			// item must not be in classic backlog
-			require.False(t, hasMember(t, r, parts[0].zsetKey(kg), qi.ID), r.Keys())
+			require.False(t, hasMember(t, r, fnPart.zsetKey(kg), qi.ID), r.Keys())
 		})
 	})
 
@@ -6544,13 +6546,13 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 			require.NotEmpty(t, shadowPartition.PartitionID)
 			require.Len(t, shadowPartition.CustomConcurrencyKeys, 1)
 
-			parts, _ := q.ItemPartitions(ctx, defaultShard, item)
-			require.NotEmpty(t, parts[0].ID)
-			require.Equal(t, int(enums.PartitionTypeConcurrencyKey), parts[0].PartitionType)
-			require.NotEmpty(t, parts[1].ID)
-			require.Equal(t, int(enums.PartitionTypeDefault), parts[1].PartitionType)
-			require.Empty(t, parts[2].ID)
-			require.Equal(t, int(enums.PartitionTypeDefault), parts[2].PartitionType)
+			fnPart, custom1, custom2, _ := q.ItemPartitions(ctx, defaultShard, item)
+			require.NotEmpty(t, custom1.ID)
+			require.Equal(t, int(enums.PartitionTypeConcurrencyKey), custom1.PartitionType)
+			require.NotEmpty(t, fnPart.ID)
+			require.Equal(t, int(enums.PartitionTypeDefault), fnPart.PartitionType)
+			require.Empty(t, custom2.ID)
+			require.Equal(t, int(enums.PartitionTypeDefault), custom2.PartitionType)
 
 			// expect key queue accounting to contain item in in-progress
 			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, shadowPartition.inProgressKey(kg), qi.ID)))
@@ -6562,7 +6564,7 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 
 			// expect old accounting to be updated
 			// TODO Do we actually want to update previous accounting?
-			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, parts[0].concurrencyKey(kg), qi.ID)))
+			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, custom1.concurrencyKey(kg), qi.ID)))
 			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, kg.Concurrency("account", accountId.String()), qi.ID)))
 			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, kg.Concurrency("p", fnID.String()), qi.ID)), r.Keys())
 			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, kg.Concurrency("custom", fullKey), qi.ID)))
@@ -6590,13 +6592,13 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 
 			// expect old accounting to be updated
 			// TODO Do we actually want to update previous accounting?
-			require.False(t, hasMember(t, r, parts[0].concurrencyKey(kg), qi.ID))
+			require.False(t, hasMember(t, r, custom1.concurrencyKey(kg), qi.ID))
 			require.False(t, hasMember(t, r, kg.Concurrency("account", accountId.String()), qi.ID))
-			require.False(t, hasMember(t, r, kg.Concurrency("p", parts[0].Queue()), qi.ID))
+			require.False(t, hasMember(t, r, kg.Concurrency("p", fnPart.Queue()), qi.ID))
 			require.False(t, hasMember(t, r, kg.Concurrency("custom", fullKey), qi.ID))
 
 			// item must not be in classic backlog
-			require.False(t, hasMember(t, r, parts[1].zsetKey(kg), qi.ID))
+			require.False(t, hasMember(t, r, fnPart.zsetKey(kg), qi.ID))
 		})
 	})
 
@@ -6712,13 +6714,13 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 			require.NotEmpty(t, shadowPartition.PartitionID)
 			require.Len(t, shadowPartition.CustomConcurrencyKeys, 2)
 
-			parts, _ := q.ItemPartitions(ctx, defaultShard, item)
-			require.NotEmpty(t, parts[0].ID)
-			require.Equal(t, int(enums.PartitionTypeConcurrencyKey), parts[0].PartitionType)
-			require.NotEmpty(t, parts[1].ID)
-			require.Equal(t, int(enums.PartitionTypeConcurrencyKey), parts[1].PartitionType)
-			require.NotEmpty(t, parts[2].ID)
-			require.Equal(t, int(enums.PartitionTypeDefault), parts[2].PartitionType)
+			fnPart, custom1, custom2, _ := q.ItemPartitions(ctx, defaultShard, item)
+			require.NotEmpty(t, custom1.ID)
+			require.Equal(t, int(enums.PartitionTypeConcurrencyKey), custom1.PartitionType)
+			require.NotEmpty(t, custom2.ID)
+			require.Equal(t, int(enums.PartitionTypeConcurrencyKey), custom2.PartitionType)
+			require.NotEmpty(t, fnPart.ID)
+			require.Equal(t, int(enums.PartitionTypeDefault), fnPart.PartitionType)
 
 			// expect key queue accounting to contain item in in-progress
 			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, shadowPartition.inProgressKey(kg), qi.ID)))
@@ -6735,7 +6737,7 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 
 			// expect old accounting to be updated
 			// TODO Do we actually want to update previous accounting?
-			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, parts[0].concurrencyKey(kg), qi.ID)))
+			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, custom1.concurrencyKey(kg), qi.ID)))
 			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, kg.Concurrency("account", accountId.String()), qi.ID)))
 			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, kg.Concurrency("p", fnID.String()), qi.ID)), r.Keys())
 
@@ -6767,14 +6769,14 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 
 			// expect old accounting to be updated
 			// TODO Do we actually want to update previous accounting?
-			require.False(t, hasMember(t, r, parts[0].concurrencyKey(kg), qi.ID))
+			require.False(t, hasMember(t, r, custom1.concurrencyKey(kg), qi.ID))
 			require.False(t, hasMember(t, r, kg.Concurrency("account", accountId.String()), qi.ID))
-			require.False(t, hasMember(t, r, kg.Concurrency("p", parts[0].Queue()), qi.ID))
+			require.False(t, hasMember(t, r, kg.Concurrency("p", fnPart.Queue()), qi.ID))
 			require.False(t, hasMember(t, r, kg.Concurrency("custom", fullKey1), qi.ID))
 			require.False(t, hasMember(t, r, kg.Concurrency("custom", fullKey2), qi.ID))
 
 			// item must not be in classic backlog
-			require.False(t, hasMember(t, r, parts[2].zsetKey(kg), qi.ID))
+			require.False(t, hasMember(t, r, fnPart.zsetKey(kg), qi.ID))
 		})
 	})
 
@@ -6849,14 +6851,16 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 			require.NotEmpty(t, shadowPartition.PartitionID)
 			require.Len(t, shadowPartition.CustomConcurrencyKeys, 0)
 
-			parts, _ := q.ItemPartitions(ctx, defaultShard, item)
-			require.NotEmpty(t, parts[0].ID)
-			require.Equal(t, int(enums.PartitionTypeDefault), parts[0].PartitionType)
-			require.True(t, parts[0].IsSystem())
-			require.Empty(t, parts[1].ID)
-			require.Equal(t, int(enums.PartitionTypeDefault), parts[1].PartitionType)
-			require.Empty(t, parts[2].ID)
-			require.Equal(t, int(enums.PartitionTypeDefault), parts[2].PartitionType)
+			fnPart, custom1, custom2, _ := q.ItemPartitions(ctx, defaultShard, item)
+			require.NotEmpty(t, fnPart.ID)
+			require.Equal(t, int(enums.PartitionTypeDefault), fnPart.PartitionType)
+			require.True(t, fnPart.IsSystem())
+			require.Empty(t, custom1.ID)
+			require.Equal(t, int(enums.PartitionTypeDefault), custom1.PartitionType)
+			require.Empty(t, custom2.ID)
+			require.Equal(t, int(enums.PartitionTypeDefault), custom2.PartitionType)
+
+			require.False(t, hasMember(t, r, fnPart.zsetKey(kg), qi.ID))
 
 			// expect key queue accounting to contain item in in-progress
 			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, shadowPartition.inProgressKey(kg), qi.ID)))
@@ -6869,9 +6873,9 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 
 			// expect old accounting to be updated
 			// TODO Do we actually want to update previous accounting?
-			require.True(t, hasMember(t, r, parts[0].concurrencyKey(kg), qi.ID))
-			require.True(t, hasMember(t, r, kg.Concurrency("account", parts[0].Queue()), qi.ID)) // pseudo-limit for system qeueus
-			require.True(t, hasMember(t, r, kg.Concurrency("p", parts[0].Queue()), qi.ID))
+			require.True(t, hasMember(t, r, fnPart.concurrencyKey(kg), qi.ID))
+			require.True(t, hasMember(t, r, kg.Concurrency("account", fnPart.Queue()), qi.ID)) // pseudo-limit for system qeueus
+			require.True(t, hasMember(t, r, kg.Concurrency("p", fnPart.Queue()), qi.ID))
 
 			requeueFor := at.Add(30 * time.Minute).Truncate(time.Minute)
 
@@ -6889,12 +6893,12 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 
 			// expect old accounting to be updated
 			// TODO Do we actually want to update previous accounting?
-			require.False(t, hasMember(t, r, parts[0].concurrencyKey(kg), qi.ID))
-			require.False(t, hasMember(t, r, kg.Concurrency("account", parts[0].Queue()), qi.ID)) // pseudo-limit for system queues
-			require.False(t, hasMember(t, r, kg.Concurrency("p", parts[0].Queue()), qi.ID))
+			require.False(t, hasMember(t, r, fnPart.concurrencyKey(kg), qi.ID))
+			require.False(t, hasMember(t, r, kg.Concurrency("account", fnPart.Queue()), qi.ID)) // pseudo-limit for system queues
+			require.False(t, hasMember(t, r, kg.Concurrency("p", fnPart.Queue()), qi.ID))
 
 			// item must not be in classic backlog
-			require.False(t, hasMember(t, r, parts[0].zsetKey(kg), qi.ID))
+			require.False(t, hasMember(t, r, fnPart.zsetKey(kg), qi.ID))
 		})
 	})
 }
@@ -6978,13 +6982,13 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 			require.NotEmpty(t, shadowPartition.PartitionID)
 			require.Len(t, shadowPartition.CustomConcurrencyKeys, 0)
 
-			parts, _ := q.ItemPartitions(ctx, defaultShard, item)
-			require.NotEmpty(t, parts[0].ID)
-			require.Equal(t, int(enums.PartitionTypeDefault), parts[0].PartitionType)
-			require.Empty(t, parts[1].ID)
-			require.Equal(t, int(enums.PartitionTypeDefault), parts[1].PartitionType)
-			require.Empty(t, parts[2].ID)
-			require.Equal(t, int(enums.PartitionTypeDefault), parts[2].PartitionType)
+			fnPart, custom1, custom2, _ := q.ItemPartitions(ctx, defaultShard, item)
+			require.NotEmpty(t, fnPart.ID)
+			require.Equal(t, int(enums.PartitionTypeDefault), fnPart.PartitionType)
+			require.Empty(t, custom1.ID)
+			require.Equal(t, int(enums.PartitionTypeDefault), custom1.PartitionType)
+			require.Empty(t, custom2.ID)
+			require.Equal(t, int(enums.PartitionTypeDefault), custom2.PartitionType)
 
 			// expect key queue accounting to contain item in in-progress
 			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, shadowPartition.inProgressKey(kg), qi.ID)))
@@ -6995,9 +6999,9 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 
 			// expect old accounting to be updated
 			// TODO Do we actually want to update previous accounting?
-			require.True(t, hasMember(t, r, parts[0].concurrencyKey(kg), qi.ID))
+			require.True(t, hasMember(t, r, fnPart.concurrencyKey(kg), qi.ID))
 			require.True(t, hasMember(t, r, kg.Concurrency("account", accountId.String()), qi.ID))
-			require.True(t, hasMember(t, r, kg.Concurrency("p", parts[0].Queue()), qi.ID))
+			require.True(t, hasMember(t, r, kg.Concurrency("p", fnPart.Queue()), qi.ID))
 
 			err = q.Dequeue(ctx, defaultShard, qi)
 			require.NoError(t, err)
@@ -7011,12 +7015,12 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 
 			// expect old accounting to be updated
 			// TODO Do we actually want to update previous accounting?
-			require.False(t, hasMember(t, r, parts[0].concurrencyKey(kg), qi.ID))
+			require.False(t, hasMember(t, r, fnPart.concurrencyKey(kg), qi.ID))
 			require.False(t, hasMember(t, r, kg.Concurrency("account", accountId.String()), qi.ID))
-			require.False(t, hasMember(t, r, kg.Concurrency("p", parts[0].Queue()), qi.ID))
+			require.False(t, hasMember(t, r, kg.Concurrency("p", fnPart.Queue()), qi.ID))
 
 			// item must not be in classic backlog
-			require.False(t, hasMember(t, r, parts[0].zsetKey(kg), qi.ID))
+			require.False(t, hasMember(t, r, fnPart.zsetKey(kg), qi.ID))
 		})
 	})
 
@@ -7110,13 +7114,13 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 			require.NotEmpty(t, shadowPartition.PartitionID)
 			require.Len(t, shadowPartition.CustomConcurrencyKeys, 1)
 
-			parts, _ := q.ItemPartitions(ctx, defaultShard, item)
-			require.NotEmpty(t, parts[0].ID)
-			require.Equal(t, int(enums.PartitionTypeConcurrencyKey), parts[0].PartitionType)
-			require.NotEmpty(t, parts[1].ID)
-			require.Equal(t, int(enums.PartitionTypeDefault), parts[1].PartitionType)
-			require.Empty(t, parts[2].ID)
-			require.Equal(t, int(enums.PartitionTypeDefault), parts[2].PartitionType)
+			fnPart, custom1, custom2, _ := q.ItemPartitions(ctx, defaultShard, item)
+			require.NotEmpty(t, fnPart.ID)
+			require.Equal(t, int(enums.PartitionTypeDefault), fnPart.PartitionType)
+			require.NotEmpty(t, custom1.ID)
+			require.Equal(t, int(enums.PartitionTypeConcurrencyKey), custom1.PartitionType)
+			require.Empty(t, custom2.ID)
+			require.Equal(t, int(enums.PartitionTypeDefault), custom2.PartitionType)
 
 			// expect key queue accounting to contain item in in-progress
 			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, shadowPartition.inProgressKey(kg), qi.ID)))
@@ -7128,7 +7132,7 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 
 			// expect old accounting to be updated
 			// TODO Do we actually want to update previous accounting?
-			require.True(t, hasMember(t, r, parts[0].concurrencyKey(kg), qi.ID))
+			require.True(t, hasMember(t, r, custom1.concurrencyKey(kg), qi.ID))
 			require.True(t, hasMember(t, r, kg.Concurrency("account", accountId.String()), qi.ID))
 			require.True(t, hasMember(t, r, kg.Concurrency("p", fnID.String()), qi.ID), r.Keys())
 			require.True(t, hasMember(t, r, kg.Concurrency("custom", fullKey), qi.ID))
@@ -7146,13 +7150,13 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 
 			// expect old accounting to be updated
 			// TODO Do we actually want to update previous accounting?
-			require.False(t, hasMember(t, r, parts[0].concurrencyKey(kg), qi.ID))
+			require.False(t, hasMember(t, r, custom1.concurrencyKey(kg), qi.ID))
 			require.False(t, hasMember(t, r, kg.Concurrency("account", accountId.String()), qi.ID))
 			require.False(t, hasMember(t, r, kg.Concurrency("p", fnID.String()), qi.ID))
 			require.False(t, hasMember(t, r, kg.Concurrency("custom", fullKey), qi.ID))
 
 			// item must not be in classic backlog
-			require.False(t, hasMember(t, r, parts[1].zsetKey(kg), qi.ID))
+			require.False(t, hasMember(t, r, fnPart.zsetKey(kg), qi.ID))
 		})
 	})
 
@@ -7257,13 +7261,13 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 			require.NotEmpty(t, shadowPartition.PartitionID)
 			require.Len(t, shadowPartition.CustomConcurrencyKeys, 2)
 
-			parts, _ := q.ItemPartitions(ctx, defaultShard, item)
-			require.NotEmpty(t, parts[0].ID)
-			require.Equal(t, int(enums.PartitionTypeConcurrencyKey), parts[0].PartitionType)
-			require.NotEmpty(t, parts[1].ID)
-			require.Equal(t, int(enums.PartitionTypeConcurrencyKey), parts[1].PartitionType)
-			require.NotEmpty(t, parts[2].ID)
-			require.Equal(t, int(enums.PartitionTypeDefault), parts[2].PartitionType)
+			fnPart, custom1, custom2, _ := q.ItemPartitions(ctx, defaultShard, item)
+			require.NotEmpty(t, fnPart.ID)
+			require.Equal(t, int(enums.PartitionTypeDefault), fnPart.PartitionType)
+			require.NotEmpty(t, custom1.ID)
+			require.Equal(t, int(enums.PartitionTypeConcurrencyKey), custom1.PartitionType)
+			require.NotEmpty(t, custom2.ID)
+			require.Equal(t, int(enums.PartitionTypeConcurrencyKey), custom2.PartitionType)
 
 			// expect key queue accounting to contain item in in-progress
 			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, shadowPartition.inProgressKey(kg), qi.ID)))
@@ -7278,7 +7282,7 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 
 			// expect old accounting to be updated
 			// TODO Do we actually want to update previous accounting?
-			require.True(t, hasMember(t, r, parts[0].concurrencyKey(kg), qi.ID))
+			require.True(t, hasMember(t, r, custom1.concurrencyKey(kg), qi.ID))
 			require.True(t, hasMember(t, r, kg.Concurrency("account", accountId.String()), qi.ID))
 			require.True(t, hasMember(t, r, kg.Concurrency("p", fnID.String()), qi.ID), r.Keys())
 			require.True(t, hasMember(t, r, kg.Concurrency("custom", fullKey1), qi.ID))
@@ -7297,14 +7301,14 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 
 			// expect old accounting to be updated
 			// TODO Do we actually want to update previous accounting?
-			require.False(t, hasMember(t, r, parts[0].concurrencyKey(kg), qi.ID))
+			require.False(t, hasMember(t, r, custom1.concurrencyKey(kg), qi.ID))
 			require.False(t, hasMember(t, r, kg.Concurrency("account", accountId.String()), qi.ID))
 			require.False(t, hasMember(t, r, kg.Concurrency("p", fnID.String()), qi.ID))
 			require.False(t, hasMember(t, r, kg.Concurrency("custom", fullKey1), qi.ID))
 			require.False(t, hasMember(t, r, kg.Concurrency("custom", fullKey2), qi.ID))
 
 			// item must not be in classic backlog
-			require.False(t, hasMember(t, r, parts[2].zsetKey(kg), qi.ID))
+			require.False(t, hasMember(t, r, fnPart.zsetKey(kg), qi.ID))
 		})
 	})
 
@@ -7379,14 +7383,14 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 			require.NotEmpty(t, shadowPartition.PartitionID)
 			require.Len(t, shadowPartition.CustomConcurrencyKeys, 0)
 
-			parts, _ := q.ItemPartitions(ctx, defaultShard, item)
-			require.NotEmpty(t, parts[0].ID)
-			require.Equal(t, int(enums.PartitionTypeDefault), parts[0].PartitionType)
-			require.True(t, parts[0].IsSystem())
-			require.Empty(t, parts[1].ID)
-			require.Equal(t, int(enums.PartitionTypeDefault), parts[1].PartitionType)
-			require.Empty(t, parts[2].ID)
-			require.Equal(t, int(enums.PartitionTypeDefault), parts[2].PartitionType)
+			fnPart, custom1, custom2, _ := q.ItemPartitions(ctx, defaultShard, item)
+			require.NotEmpty(t, fnPart.ID)
+			require.Equal(t, int(enums.PartitionTypeDefault), fnPart.PartitionType)
+			require.True(t, fnPart.IsSystem())
+			require.Empty(t, custom1.ID)
+			require.Equal(t, int(enums.PartitionTypeDefault), custom1.PartitionType)
+			require.Empty(t, custom2.ID)
+			require.Equal(t, int(enums.PartitionTypeDefault), custom2.PartitionType)
 
 			// expect key queue accounting to contain item in in-progress
 			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, shadowPartition.inProgressKey(kg), qi.ID)))
@@ -7399,9 +7403,9 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 
 			// expect old accounting to be updated
 			// TODO Do we actually want to update previous accounting?
-			require.True(t, hasMember(t, r, parts[0].concurrencyKey(kg), qi.ID))
-			require.True(t, hasMember(t, r, kg.Concurrency("account", parts[0].Queue()), qi.ID)) // pseudo-limit for system queue
-			require.True(t, hasMember(t, r, kg.Concurrency("p", parts[0].Queue()), qi.ID))
+			require.True(t, hasMember(t, r, fnPart.concurrencyKey(kg), qi.ID))
+			require.True(t, hasMember(t, r, kg.Concurrency("account", fnPart.Queue()), qi.ID)) // pseudo-limit for system queue
+			require.True(t, hasMember(t, r, kg.Concurrency("p", fnPart.Queue()), qi.ID))
 
 			err = q.Dequeue(ctx, defaultShard, qi)
 			require.NoError(t, err)
@@ -7415,12 +7419,12 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 
 			// expect old accounting to be updated
 			// TODO Do we actually want to update previous accounting?
-			require.False(t, hasMember(t, r, parts[0].concurrencyKey(kg), qi.ID))
-			require.False(t, hasMember(t, r, kg.Concurrency("account", parts[0].Queue()), qi.ID)) // pseudo-limit for system queue
-			require.False(t, hasMember(t, r, kg.Concurrency("p", parts[0].Queue()), qi.ID))
+			require.False(t, hasMember(t, r, fnPart.concurrencyKey(kg), qi.ID))
+			require.False(t, hasMember(t, r, kg.Concurrency("account", fnPart.Queue()), qi.ID)) // pseudo-limit for system queue
+			require.False(t, hasMember(t, r, kg.Concurrency("p", fnPart.Queue()), qi.ID))
 
 			// item must not be in classic backlog
-			require.False(t, hasMember(t, r, parts[0].zsetKey(kg), qi.ID))
+			require.False(t, hasMember(t, r, fnPart.zsetKey(kg), qi.ID))
 		})
 	})
 }
