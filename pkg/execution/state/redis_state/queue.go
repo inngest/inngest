@@ -2423,17 +2423,48 @@ func (q *queue) ExtendLease(ctx context.Context, i osqueue.QueueItem, leaseID ul
 		accountConcurrencyKey = q.primaryQueueShard.RedisClient.kg.Concurrency("account", fnPartition.Queue())
 	}
 
+	var (
+		keyConcurrencyFn      string
+		keyConcurrencyAcct    string
+		keyCustomConcurrency1 string
+		keyCustomConcurrency2 string
+	)
+
+	var backlogs []QueueBacklog
+	var shadowPartition QueueShadowPartition
+	if q.itemEnableKeyQueues(ctx, i) {
+		backlogs = q.ItemBacklogs(ctx, i)
+		shadowPartition = q.ItemShadowPartition(ctx, i)
+
+		// Pad backlogs to 3
+		for i := len(backlogs); i < 3; i++ {
+			backlogs = append(backlogs, QueueBacklog{})
+		}
+
+		// accounting for key queues v2
+		keyConcurrencyFn = shadowPartition.inProgressKey(q.primaryQueueShard.RedisClient.kg)
+		keyConcurrencyAcct = shadowPartition.accountInProgressKey(q.primaryQueueShard.RedisClient.kg)
+		keyCustomConcurrency1 = backlogs[0].activeKey(q.primaryQueueShard.RedisClient.kg)
+		keyCustomConcurrency2 = backlogs[1].activeKey(q.primaryQueueShard.RedisClient.kg)
+	} else {
+		// Pad backlogs to 3
+		for i := len(backlogs); i < 3; i++ {
+			backlogs = append(backlogs, QueueBacklog{})
+		}
+
+		keyConcurrencyFn = fnPartition.concurrencyKey(q.primaryQueueShard.RedisClient.kg)
+		keyConcurrencyAcct = accountConcurrencyKey
+		keyCustomConcurrency1 = customConcurrencyKey1.concurrencyKey(q.primaryQueueShard.RedisClient.kg)
+		keyCustomConcurrency2 = customConcurrencyKey2.concurrencyKey(q.primaryQueueShard.RedisClient.kg)
+	}
+
 	keys := []string{
 		q.primaryQueueShard.RedisClient.kg.QueueItem(),
-		// Pass in the actual key queue
-		fnPartition.zsetKey(q.primaryQueueShard.RedisClient.kg),
-		customConcurrencyKey1.zsetKey(q.primaryQueueShard.RedisClient.kg),
-		customConcurrencyKey2.zsetKey(q.primaryQueueShard.RedisClient.kg),
 		// And pass in the key queue's concurrency keys.
-		fnPartition.concurrencyKey(q.primaryQueueShard.RedisClient.kg),
-		customConcurrencyKey1.concurrencyKey(q.primaryQueueShard.RedisClient.kg),
-		customConcurrencyKey2.concurrencyKey(q.primaryQueueShard.RedisClient.kg),
-		accountConcurrencyKey,
+		keyConcurrencyFn,
+		keyCustomConcurrency1,
+		keyCustomConcurrency2,
+		keyConcurrencyAcct,
 		q.primaryQueueShard.RedisClient.kg.ConcurrencyIndex(),
 	}
 
@@ -2441,14 +2472,7 @@ func (q *queue) ExtendLease(ctx context.Context, i osqueue.QueueItem, leaseID ul
 		i.ID,
 		leaseID.String(),
 		newLeaseID.String(),
-
-		fnPartition.PartitionType,
-		customConcurrencyKey1.PartitionType,
-		customConcurrencyKey2.PartitionType,
-
 		fnPartition.ID,
-		customConcurrencyKey1.ID,
-		customConcurrencyKey2.ID,
 	})
 	if err != nil {
 		return nil, err
