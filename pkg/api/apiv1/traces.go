@@ -42,9 +42,6 @@ func (a router) traces(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check that the trace ID is valid and accessible to the app.
-	// TODO The quickest call we can do to CH to check that the trace ID
-	// existing with the account and workspace IDs we have
-
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		respondError(w, r, http.StatusBadRequest, "Error reading body")
@@ -129,12 +126,7 @@ func (a router) convertOTLPAndSend(auth apiv1auth.V1Auth, req *collecttrace.Expo
 					continue
 				}
 
-				// TODO This needs to change to channels and each traceRoot will
-				// also check the trace ID against the authed account and
-				// workspace. Just need to fetch the root traceRoot. Once we have
-				// that, we also have all attributes we need like run ID,
-				// which we should set all of here.
-				//
+				// TODO This needs to change to channels
 				// For now we do this synchronously while testing
 				traceRoot, err := a.opts.TraceReader.GetTraceRoot(ctx, cqrs.TraceRunIdentifier{
 					AccountID:   auth.AccountID(),
