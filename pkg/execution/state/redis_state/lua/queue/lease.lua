@@ -42,6 +42,8 @@ local customConcurrencyKey2   = tonumber(ARGV[7])
 local concurrencyAcct 				= tonumber(ARGV[8])
 local accountId       				= ARGV[9]
 
+-- key queues v2
+local disableLeaseChecks = tonumber(ARGV[10])
 
 -- Use our custom Go preprocessor to inject the file from ./includes/
 -- $include(decode_ulid_time.lua)
@@ -71,40 +73,42 @@ end
 -- Track the earliest time this job was attempted in the queue.
 item = set_item_peek_time(keyQueueMap, queueID, item, currentTime)
 
--- Track throttling/rate limiting IF the queue item has throttling info set.  This allows
--- us to target specific queue items with rate limiting individually.
---
--- We handle this before concurrency as it's typically not used, and it's faster to handle than concurrency,
--- with o(1) operations vs o(log(n)).
-if item.data ~= nil and item.data.throttle ~= nil then
-	local throttleResult = gcra(throttleKey, currentTime, item.data.throttle.p * 1000, item.data.throttle.l, item.data.throttle.b)
-	if throttleResult == false then
-		return 7
+if disableLeaseChecks ~= 1 then
+	-- Track throttling/rate limiting IF the queue item has throttling info set.  This allows
+	-- us to target specific queue items with rate limiting individually.
+	--
+	-- We handle this before concurrency as it's typically not used, and it's faster to handle than concurrency,
+	-- with o(1) operations vs o(log(n)).
+	if item.data ~= nil and item.data.throttle ~= nil then
+		local throttleResult = gcra(throttleKey, currentTime, item.data.throttle.p * 1000, item.data.throttle.l, item.data.throttle.b)
+		if throttleResult == false then
+			return 7
+		end
 	end
-end
 
--- Check the concurrency limits for the account and custom key;  partition keys are checked when
--- leasing the partition and do not need to be checked again (only one worker can run a partition at
--- once, and the capacity is kept in memory after leasing a partition)
-if customConcurrencyKey1 > 0 then
-    if check_concurrency(currentTime, keyCustomConcurrencyKey1, customConcurrencyKey1) <= 0 then
-        return 4
-    end
-end
-if customConcurrencyKey2 > 0 then
-    if check_concurrency(currentTime, keyCustomConcurrencyKey2, customConcurrencyKey2) <= 0 then
-        return 5
-    end
-end
-if concurrencyFn > 0 then
-    if check_concurrency(currentTime, keyConcurrencyFn, concurrencyFn) <= 0 then
-        return 3
-    end
-end
-if concurrencyAcct > 0 then
-    if check_concurrency(currentTime, keyAcctConcurrency, concurrencyAcct) <= 0 then
-        return 6
-    end
+  -- Check the concurrency limits for the account and custom key;  partition keys are checked when
+  -- leasing the partition and do not need to be checked again (only one worker can run a partition at
+  -- once, and the capacity is kept in memory after leasing a partition)
+  if customConcurrencyKey1 > 0 then
+      if check_concurrency(currentTime, keyCustomConcurrencyKey1, customConcurrencyKey1) <= 0 then
+          return 4
+      end
+  end
+  if customConcurrencyKey2 > 0 then
+      if check_concurrency(currentTime, keyCustomConcurrencyKey2, customConcurrencyKey2) <= 0 then
+          return 5
+      end
+  end
+  if concurrencyFn > 0 then
+      if check_concurrency(currentTime, keyConcurrencyFn, concurrencyFn) <= 0 then
+          return 3
+      end
+  end
+  if concurrencyAcct > 0 then
+      if check_concurrency(currentTime, keyAcctConcurrency, concurrencyAcct) <= 0 then
+          return 6
+      end
+  end
 end
 
 -- Update the item's lease key.
@@ -118,16 +122,15 @@ local function handleLease(keyConcurrency, concurrencyLimit)
 	end
 end
 
+-- Remove the item from our sorted index, as this is no longer on the queue; it's in-progress
+-- and stored in functionConcurrencyKey.
+redis.call("ZREM", keyPartitionFn, item.id)
 
 -- Always add this to acct level concurrency queues
 redis.call("ZADD", keyAcctConcurrency, nextTime, item.id)
 
 -- Always add this to fn level concurrency queues for scavenging
 redis.call("ZADD", keyConcurrencyFn, nextTime, item.id)
-
--- Remove the item from our sorted index, as this is no longer on the queue; it's in-progress
--- and stored in functionConcurrencyKey.
-redis.call("ZREM", keyPartitionFn, item.id)
 
 -- For every queue that we lease from, ensure that it exists in the scavenger pointer queue
 -- so that expired leases can be re-processed.  We want to take the earliest time from the
@@ -144,11 +147,11 @@ if inProgressScores ~= false then
 end
 
 if exists_without_ending(keyCustomConcurrencyKey1, ":-") == true then
-	handleLease(keyCustomConcurrencyKey1, customConcurrencyKey1)
+  handleLease(keyCustomConcurrencyKey1, customConcurrencyKey1)
 end
 
 if exists_without_ending(keyCustomConcurrencyKey2, ":-") == true then
-	handleLease(keyCustomConcurrencyKey2, customConcurrencyKey2)
+  handleLease(keyCustomConcurrencyKey2, customConcurrencyKey2)
 end
 
 return 0

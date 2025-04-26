@@ -105,7 +105,6 @@ if minScores ~= nil and minScores ~= false and #minScores ~= 0 then
   end
 end
 
-
 handleDequeueConcurrency(keyCustomConcurrency1)
 handleDequeueConcurrency(keyCustomConcurrency2)
 

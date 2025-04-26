@@ -269,6 +269,20 @@ func TestQueueEnqueueItem(t *testing.T) {
 		requirePartitionItemScoreEquals(t, r, kg.GlobalPartitionIndex(), qp, start)
 		requirePartitionItemScoreEquals(t, r, kg.AccountPartitionIndex(accountId), qp, start)
 		requireAccountScoreEquals(t, r, accountId, start)
+
+		// New key queue data structures should not exist with the flag being toggled off
+		backlogs := q.ItemBacklogs(ctx, item)
+		require.Len(t, backlogs, 1)
+
+		shadowPartition := q.ItemShadowPartition(ctx, item)
+		require.NotEmpty(t, shadowPartition.PartitionID)
+
+		require.False(t, r.Exists(kg.BacklogMeta()))
+		require.False(t, r.Exists(kg.BacklogSet(backlogs[0].BacklogID)))
+		require.False(t, r.Exists(kg.ShadowPartitionMeta()))
+		require.False(t, r.Exists(kg.ShadowPartitionSet(shadowPartition.PartitionID)), r.Keys())
+		require.False(t, r.Exists(kg.GlobalShadowPartitionSet()))
+
 	})
 
 	t.Run("It sets the right item score", func(t *testing.T) {
@@ -5298,7 +5312,7 @@ func createConcurrencyKey(scope enums.ConcurrencyScope, scopeID uuid.UUID, value
 		Key:   &value,
 		Scope: scope,
 	}
-	hash := c.Evaluate(context.Background(), scopeID, map[string]any{})
+	hash := c.EvaluatedKey(context.Background(), scopeID, map[string]any{})
 
 	return state.CustomConcurrency{
 		Key:   hash,
@@ -5308,3 +5322,2134 @@ func createConcurrencyKey(scope enums.ConcurrencyScope, scopeID uuid.UUID, value
 }
 
 func int64ptr(i int64) *int64 { return &i }
+
+func TestQueueEnqueueToBacklog(t *testing.T) {
+	t.Run("simple item", func(t *testing.T) {
+		r := miniredis.RunT(t)
+		rc, err := rueidis.NewClient(rueidis.ClientOption{
+			InitAddress:  []string{r.Addr()},
+			DisableCache: true,
+		})
+		require.NoError(t, err)
+		defer rc.Close()
+
+		defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+		kg := defaultShard.RedisClient.kg
+
+		q := NewQueue(
+			defaultShard,
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+				return true
+			}),
+			WithAllowSystemKeyQueues(func(ctx context.Context) bool {
+				return true
+			}),
+			WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
+				return false
+			}),
+			WithDisableSystemQueueLeaseChecks(func(ctx context.Context) bool {
+				return false
+			}),
+		)
+		ctx := context.Background()
+
+		accountId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
+
+		// use future timestamp because scores will be bounded to the present
+		at := time.Now().Add(10 * time.Minute)
+
+		t.Run("should enqueue simple item to backlog", func(t *testing.T) {
+			require.Len(t, r.Keys(), 0)
+
+			item := osqueue.QueueItem{
+				ID:          "test",
+				FunctionID:  fnID,
+				WorkspaceID: wsID,
+				Data: osqueue.Item{
+					WorkspaceID: wsID,
+					Kind:        osqueue.KindEdge,
+					Identifier: state.Identifier{
+						WorkflowID:  fnID,
+						AccountID:   accountId,
+						WorkspaceID: wsID,
+					},
+					QueueName:             nil,
+					Throttle:              nil,
+					CustomConcurrencyKeys: nil,
+				},
+				QueueName: nil,
+			}
+
+			qi, err := q.EnqueueItem(ctx, defaultShard, item, at, osqueue.EnqueueOpts{})
+			require.NoError(t, err)
+
+			backlogs := q.ItemBacklogs(ctx, item)
+			require.Len(t, backlogs, 1)
+
+			marshaledBacklog, err := json.Marshal(backlogs[0])
+			require.NoError(t, err)
+
+			shadowPartition := q.ItemShadowPartition(ctx, item)
+			require.NotEmpty(t, shadowPartition.PartitionID)
+
+			marshaledShadowPartition, err := json.Marshal(shadowPartition)
+			require.NoError(t, err)
+
+			require.True(t, r.Exists(kg.BacklogMeta()))
+			require.True(t, r.Exists(kg.BacklogSet(backlogs[0].BacklogID)))
+			require.True(t, r.Exists(kg.ShadowPartitionMeta()))
+			require.True(t, r.Exists(kg.ShadowPartitionSet(shadowPartition.PartitionID)), r.Keys())
+			require.True(t, r.Exists(kg.GlobalShadowPartitionSet()))
+			require.Equal(t, string(marshaledBacklog), r.HGet(kg.BacklogMeta(), backlogs[0].BacklogID))
+			require.Equal(t, string(marshaledShadowPartition), r.HGet(kg.ShadowPartitionMeta(), shadowPartition.PartitionID))
+
+			require.Equal(t, at.UnixMilli()/1000, int64(score(t, r, kg.ShadowPartitionSet(shadowPartition.PartitionID), backlogs[0].BacklogID)))
+			require.Equal(t, at.UnixMilli()/1000, int64(score(t, r, kg.GlobalShadowPartitionSet(), shadowPartition.PartitionID)))
+			require.Equal(t, at.UnixMilli(), int64(score(t, r, kg.BacklogSet(backlogs[0].BacklogID), qi.ID)))
+		})
+
+		t.Run("adding later item should not update scores", func(t *testing.T) {
+			newScore := at.Add(5 * time.Minute)
+
+			item := osqueue.QueueItem{
+				ID:          "item-2",
+				FunctionID:  fnID,
+				WorkspaceID: wsID,
+				Data: osqueue.Item{
+					WorkspaceID: wsID,
+					Kind:        osqueue.KindEdge,
+					Identifier: state.Identifier{
+						WorkflowID:  fnID,
+						AccountID:   accountId,
+						WorkspaceID: wsID,
+					},
+					QueueName:             nil,
+					Throttle:              nil,
+					CustomConcurrencyKeys: nil,
+				},
+				QueueName: nil,
+			}
+
+			qi, err := q.EnqueueItem(ctx, defaultShard, item, newScore, osqueue.EnqueueOpts{})
+			require.NoError(t, err)
+
+			backlogs := q.ItemBacklogs(ctx, item)
+			require.Len(t, backlogs, 1)
+
+			shadowPartition := q.ItemShadowPartition(ctx, item)
+			require.NotEmpty(t, shadowPartition.PartitionID)
+
+			// pointers should keep earlier score
+			require.Equal(t, at.UnixMilli()/1000, int64(score(t, r, kg.ShadowPartitionSet(shadowPartition.PartitionID), backlogs[0].BacklogID)))
+			require.Equal(t, at.UnixMilli()/1000, int64(score(t, r, kg.GlobalShadowPartitionSet(), shadowPartition.PartitionID)))
+
+			// item in backlog should have new score
+			require.Equal(t, newScore.UnixMilli(), int64(score(t, r, kg.BacklogSet(backlogs[0].BacklogID), qi.ID)))
+		})
+
+		t.Run("adding earlier item should pull up pointer scores", func(t *testing.T) {
+			newScore := at.Add(-5 * time.Minute)
+
+			item := osqueue.QueueItem{
+				ID:          "item-3",
+				FunctionID:  fnID,
+				WorkspaceID: wsID,
+				Data: osqueue.Item{
+					WorkspaceID: wsID,
+					Kind:        osqueue.KindEdge,
+					Identifier: state.Identifier{
+						WorkflowID:  fnID,
+						AccountID:   accountId,
+						WorkspaceID: wsID,
+					},
+					QueueName:             nil,
+					Throttle:              nil,
+					CustomConcurrencyKeys: nil,
+				},
+				QueueName: nil,
+			}
+
+			qi, err := q.EnqueueItem(ctx, defaultShard, item, newScore, osqueue.EnqueueOpts{})
+			require.NoError(t, err)
+
+			backlogs := q.ItemBacklogs(ctx, item)
+			require.Len(t, backlogs, 1)
+
+			shadowPartition := q.ItemShadowPartition(ctx, item)
+			require.NotEmpty(t, shadowPartition.PartitionID)
+
+			// pointers should take on earlier score
+			{
+				expected := newScore.UnixMilli() / 1000
+				actual := int64(score(t, r, kg.ShadowPartitionSet(shadowPartition.PartitionID), backlogs[0].BacklogID))
+
+				require.Equal(t, expected, actual, time.Unix(expected, 0).String(), time.Unix(actual, 0).String())
+			}
+			require.Equal(t, newScore.UnixMilli()/1000, int64(score(t, r, kg.GlobalShadowPartitionSet(), shadowPartition.PartitionID)))
+
+			// item in backlog should have new score
+			require.Equal(t, newScore.UnixMilli(), int64(score(t, r, kg.BacklogSet(backlogs[0].BacklogID), qi.ID)))
+		})
+	})
+
+	t.Run("single custom concurrency key", func(t *testing.T) {
+		r := miniredis.RunT(t)
+		rc, err := rueidis.NewClient(rueidis.ClientOption{
+			InitAddress:  []string{r.Addr()},
+			DisableCache: true,
+		})
+		require.NoError(t, err)
+		defer rc.Close()
+
+		defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+		kg := defaultShard.RedisClient.kg
+
+		q := NewQueue(
+			defaultShard,
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+				return true
+			}),
+			WithAllowSystemKeyQueues(func(ctx context.Context) bool {
+				return true
+			}),
+			WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
+				return false
+			}),
+			WithDisableSystemQueueLeaseChecks(func(ctx context.Context) bool {
+				return false
+			}),
+			WithConcurrencyLimitGetter(func(ctx context.Context, p QueuePartition) PartitionConcurrencyLimits {
+				return PartitionConcurrencyLimits{
+					AccountLimit:   123,
+					FunctionLimit:  45,
+					CustomKeyLimit: 0, // only used for leasing partition
+				}
+			}),
+			WithSystemConcurrencyLimitGetter(func(ctx context.Context, p QueuePartition) SystemPartitionConcurrencyLimits {
+				return SystemPartitionConcurrencyLimits{
+					GlobalLimit:    567,
+					PartitionLimit: 678,
+				}
+			}),
+			WithCustomConcurrencyKeyLimitRefresher(func(ctx context.Context, i osqueue.QueueItem) []state.CustomConcurrency {
+				return i.Data.GetConcurrencyKeys()
+			}),
+		)
+		ctx := context.Background()
+
+		accountId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
+
+		score := func(t *testing.T, key string, member string) float64 {
+			score, err := r.ZScore(key, member)
+			require.NoError(t, err)
+
+			return score
+		}
+
+		// use future timestamp because scores will be bounded to the present
+		at := time.Now().Add(10 * time.Minute)
+
+		t.Run("should enqueue item to backlog", func(t *testing.T) {
+			require.Len(t, r.Keys(), 0)
+
+			hashedConcurrencyKeyExpr := hashConcurrencyKey("event.data.customerId")
+			unhashedValue := "customer1"
+			scope := enums.ConcurrencyScopeFn
+			fullKey := util.ConcurrencyKey(scope, fnID, unhashedValue)
+
+			item := osqueue.QueueItem{
+				ID:          "test",
+				FunctionID:  fnID,
+				WorkspaceID: wsID,
+				Data: osqueue.Item{
+					WorkspaceID: wsID,
+					Kind:        osqueue.KindEdge,
+					Identifier: state.Identifier{
+						WorkflowID:  fnID,
+						AccountID:   accountId,
+						WorkspaceID: wsID,
+					},
+					QueueName: nil,
+					Throttle:  nil,
+					CustomConcurrencyKeys: []state.CustomConcurrency{
+						{
+							Key:                       fullKey,
+							Hash:                      hashedConcurrencyKeyExpr,
+							Limit:                     123,
+							UnhashedEvaluatedKeyValue: unhashedValue,
+						},
+					},
+				},
+				QueueName: nil,
+			}
+
+			qi, err := q.EnqueueItem(ctx, defaultShard, item, at, osqueue.EnqueueOpts{})
+			require.NoError(t, err)
+
+			backlogs := q.ItemBacklogs(ctx, item)
+			require.Len(t, backlogs, 1)
+			require.NotNil(t, backlogs[0].ConcurrencyScope)
+			require.NotNil(t, backlogs[0].ConcurrencyKey)
+
+			shadowPartition := q.ItemShadowPartition(ctx, item)
+			require.NotEmpty(t, shadowPartition.PartitionID)
+			require.Len(t, shadowPartition.CustomConcurrencyKeys, 1)
+
+			require.True(t, r.Exists(kg.BacklogMeta()), r.Keys())
+			require.True(t, r.Exists(kg.BacklogSet(backlogs[0].BacklogID)))
+			require.True(t, r.Exists(kg.ShadowPartitionMeta()))
+			require.True(t, r.Exists(kg.ShadowPartitionSet(shadowPartition.PartitionID)), r.Keys())
+			require.True(t, r.Exists(kg.GlobalShadowPartitionSet()))
+
+			require.Equal(t, at.UnixMilli()/1000, int64(score(t, kg.ShadowPartitionSet(shadowPartition.PartitionID), backlogs[0].BacklogID)))
+			require.Equal(t, at.UnixMilli()/1000, int64(score(t, kg.GlobalShadowPartitionSet(), shadowPartition.PartitionID)))
+			require.Equal(t, at.UnixMilli(), int64(score(t, kg.BacklogSet(backlogs[0].BacklogID), qi.ID)))
+		})
+	})
+
+	t.Run("two custom concurrency keys", func(t *testing.T) {
+		r := miniredis.RunT(t)
+		rc, err := rueidis.NewClient(rueidis.ClientOption{
+			InitAddress:  []string{r.Addr()},
+			DisableCache: true,
+		})
+		require.NoError(t, err)
+		defer rc.Close()
+
+		defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+		kg := defaultShard.RedisClient.kg
+
+		q := NewQueue(
+			defaultShard,
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+				return true
+			}),
+			WithAllowSystemKeyQueues(func(ctx context.Context) bool {
+				return true
+			}),
+			WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
+				return false
+			}),
+			WithDisableSystemQueueLeaseChecks(func(ctx context.Context) bool {
+				return false
+			}),
+			WithConcurrencyLimitGetter(func(ctx context.Context, p QueuePartition) PartitionConcurrencyLimits {
+				return PartitionConcurrencyLimits{
+					AccountLimit:   123,
+					FunctionLimit:  45,
+					CustomKeyLimit: 0, // only used for leasing partition
+				}
+			}),
+			WithSystemConcurrencyLimitGetter(func(ctx context.Context, p QueuePartition) SystemPartitionConcurrencyLimits {
+				return SystemPartitionConcurrencyLimits{
+					GlobalLimit:    567,
+					PartitionLimit: 678,
+				}
+			}),
+			WithCustomConcurrencyKeyLimitRefresher(func(ctx context.Context, i osqueue.QueueItem) []state.CustomConcurrency {
+				return i.Data.GetConcurrencyKeys()
+			}),
+		)
+		ctx := context.Background()
+
+		accountId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
+
+		score := func(t *testing.T, key string, member string) float64 {
+			score, err := r.ZScore(key, member)
+			require.NoError(t, err)
+
+			return score
+		}
+
+		// use future timestamp because scores will be bounded to the present
+		at := time.Now().Add(10 * time.Minute)
+
+		t.Run("should enqueue item to backlog", func(t *testing.T) {
+			require.Len(t, r.Keys(), 0)
+
+			hashedConcurrencyKeyExpr1 := hashConcurrencyKey("event.data.userId")
+			unhashedValue1 := "user1"
+			scope1 := enums.ConcurrencyScopeFn
+			fullKey1 := util.ConcurrencyKey(scope1, fnID, unhashedValue1)
+
+			hashedConcurrencyKeyExpr2 := hashConcurrencyKey("event.data.orgId")
+			unhashedValue2 := "org1"
+			scope2 := enums.ConcurrencyScopeEnv
+			fullKey2 := util.ConcurrencyKey(scope2, fnID, unhashedValue2)
+
+			item := osqueue.QueueItem{
+				ID:          "test",
+				FunctionID:  fnID,
+				WorkspaceID: wsID,
+				Data: osqueue.Item{
+					WorkspaceID: wsID,
+					Kind:        osqueue.KindEdge,
+					Identifier: state.Identifier{
+						WorkflowID:  fnID,
+						AccountID:   accountId,
+						WorkspaceID: wsID,
+					},
+					QueueName: nil,
+					Throttle:  nil,
+					CustomConcurrencyKeys: []state.CustomConcurrency{
+						{
+							Key:                       fullKey1,
+							Hash:                      hashedConcurrencyKeyExpr1,
+							Limit:                     123,
+							UnhashedEvaluatedKeyValue: unhashedValue1,
+						},
+						{
+							Key:                       fullKey2,
+							Hash:                      hashedConcurrencyKeyExpr2,
+							Limit:                     234,
+							UnhashedEvaluatedKeyValue: unhashedValue2,
+						},
+					},
+				},
+				QueueName: nil,
+			}
+
+			qi, err := q.EnqueueItem(ctx, defaultShard, item, at, osqueue.EnqueueOpts{})
+			require.NoError(t, err)
+
+			backlogs := q.ItemBacklogs(ctx, item)
+			require.Len(t, backlogs, 2)
+			require.NotNil(t, backlogs[0].ConcurrencyScope)
+			require.NotNil(t, backlogs[0].ConcurrencyKey)
+			require.NotNil(t, backlogs[1].ConcurrencyScope)
+			require.NotNil(t, backlogs[1].ConcurrencyKey)
+
+			marshaledBacklog1, err := json.Marshal(backlogs[0])
+			require.NoError(t, err)
+
+			marshaledBacklog2, err := json.Marshal(backlogs[1])
+			require.NoError(t, err)
+
+			shadowPartition := q.ItemShadowPartition(ctx, item)
+			require.NotEmpty(t, shadowPartition.PartitionID)
+			require.Len(t, shadowPartition.CustomConcurrencyKeys, 2)
+
+			require.True(t, r.Exists(kg.BacklogMeta()), r.Keys())
+			require.True(t, r.Exists(kg.BacklogSet(backlogs[0].BacklogID)))
+			require.True(t, r.Exists(kg.BacklogSet(backlogs[1].BacklogID)))
+			require.True(t, r.Exists(kg.ShadowPartitionMeta()))
+			require.True(t, r.Exists(kg.ShadowPartitionSet(shadowPartition.PartitionID)), r.Keys())
+			require.True(t, r.Exists(kg.GlobalShadowPartitionSet()))
+			require.Equal(t, string(marshaledBacklog1), r.HGet(kg.BacklogMeta(), backlogs[0].BacklogID))
+			require.Equal(t, string(marshaledBacklog2), r.HGet(kg.BacklogMeta(), backlogs[1].BacklogID))
+
+			require.Equal(t, at.UnixMilli()/1000, int64(score(t, kg.ShadowPartitionSet(shadowPartition.PartitionID), backlogs[0].BacklogID)))
+			require.Equal(t, at.UnixMilli()/1000, int64(score(t, kg.ShadowPartitionSet(shadowPartition.PartitionID), backlogs[1].BacklogID)))
+			require.Equal(t, at.UnixMilli()/1000, int64(score(t, kg.GlobalShadowPartitionSet(), shadowPartition.PartitionID)))
+			require.Equal(t, at.UnixMilli(), int64(score(t, kg.BacklogSet(backlogs[0].BacklogID), qi.ID)))
+			require.Equal(t, at.UnixMilli(), int64(score(t, kg.BacklogSet(backlogs[1].BacklogID), qi.ID)))
+
+		})
+	})
+
+	t.Run("system queues", func(t *testing.T) {
+		r := miniredis.RunT(t)
+		rc, err := rueidis.NewClient(rueidis.ClientOption{
+			InitAddress:  []string{r.Addr()},
+			DisableCache: true,
+		})
+		require.NoError(t, err)
+		defer rc.Close()
+
+		defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+		kg := defaultShard.RedisClient.kg
+
+		q := NewQueue(
+			defaultShard,
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+				return true
+			}),
+			WithAllowSystemKeyQueues(func(ctx context.Context) bool {
+				return true
+			}),
+			WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
+				return false
+			}),
+			WithDisableSystemQueueLeaseChecks(func(ctx context.Context) bool {
+				return false
+			}),
+		)
+		ctx := context.Background()
+
+		score := func(t *testing.T, key string, member string) float64 {
+			score, err := r.ZScore(key, member)
+			require.NoError(t, err)
+
+			return score
+		}
+
+		// use future timestamp because scores will be bounded to the present
+		at := time.Now().Add(10 * time.Minute)
+
+		sysQueueName := osqueue.KindQueueMigrate
+
+		t.Run("should enqueue simple item to backlog", func(t *testing.T) {
+			require.Len(t, r.Keys(), 0)
+
+			item := osqueue.QueueItem{
+				ID: "test",
+				Data: osqueue.Item{
+					Kind:                  osqueue.KindQueueMigrate,
+					Identifier:            state.Identifier{},
+					QueueName:             &sysQueueName,
+					Throttle:              nil,
+					CustomConcurrencyKeys: nil,
+				},
+				QueueName: &sysQueueName,
+			}
+
+			backlogs := q.ItemBacklogs(ctx, item)
+			require.Len(t, backlogs, 1)
+
+			marshaledBacklog, err := json.Marshal(backlogs[0])
+			require.NoError(t, err)
+
+			shadowPartition := q.ItemShadowPartition(ctx, item)
+			require.NotEmpty(t, shadowPartition.PartitionID)
+
+			marshaledShadowPartition, err := json.Marshal(shadowPartition)
+			require.NoError(t, err)
+
+			qi, err := q.EnqueueItem(ctx, defaultShard, item, at, osqueue.EnqueueOpts{})
+			require.NoError(t, err)
+
+			require.True(t, r.Exists(kg.BacklogMeta()))
+			require.True(t, r.Exists(kg.BacklogSet(backlogs[0].BacklogID)))
+			require.True(t, r.Exists(kg.ShadowPartitionMeta()))
+			require.True(t, r.Exists(kg.ShadowPartitionSet(shadowPartition.PartitionID)), r.Keys())
+			require.True(t, r.Exists(kg.GlobalShadowPartitionSet()))
+			require.Equal(t, string(marshaledBacklog), r.HGet(kg.BacklogMeta(), backlogs[0].BacklogID))
+			require.Equal(t, string(marshaledShadowPartition), r.HGet(kg.ShadowPartitionMeta(), shadowPartition.PartitionID))
+
+			require.Equal(t, at.UnixMilli()/1000, int64(score(t, kg.ShadowPartitionSet(shadowPartition.PartitionID), backlogs[0].BacklogID)))
+			require.Equal(t, at.UnixMilli()/1000, int64(score(t, kg.GlobalShadowPartitionSet(), shadowPartition.PartitionID)))
+			require.Equal(t, at.UnixMilli(), int64(score(t, kg.BacklogSet(backlogs[0].BacklogID), qi.ID)))
+		})
+	})
+}
+
+func TestQueueLeaseWithoutValidation(t *testing.T) {
+	t.Run("simple item", func(t *testing.T) {
+		r := miniredis.RunT(t)
+		rc, err := rueidis.NewClient(rueidis.ClientOption{
+			InitAddress:  []string{r.Addr()},
+			DisableCache: true,
+		})
+		require.NoError(t, err)
+		defer rc.Close()
+
+		defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+		kg := defaultShard.RedisClient.kg
+
+		score := func(t *testing.T, key string, member string) float64 {
+			score, err := r.ZScore(key, member)
+			require.NoError(t, err)
+
+			return score
+		}
+
+		enqueueToBacklog := false
+		q := NewQueue(
+			defaultShard,
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+				return enqueueToBacklog
+			}),
+			WithAllowSystemKeyQueues(func(ctx context.Context) bool {
+				return enqueueToBacklog
+			}),
+			WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
+				return true
+			}),
+			WithDisableSystemQueueLeaseChecks(func(ctx context.Context) bool {
+				return true
+			}),
+		)
+		ctx := context.Background()
+
+		accountId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
+
+		// use future timestamp because scores will be bounded to the present
+		at := time.Now().Add(10 * time.Minute).Truncate(time.Minute)
+
+		t.Run("should lease item", func(t *testing.T) {
+			require.Len(t, r.Keys(), 0)
+
+			item1 := osqueue.QueueItem{
+				ID:          "test",
+				FunctionID:  fnID,
+				WorkspaceID: wsID,
+				Data: osqueue.Item{
+					WorkspaceID: wsID,
+					Kind:        osqueue.KindEdge,
+					Identifier: state.Identifier{
+						WorkflowID:  fnID,
+						AccountID:   accountId,
+						WorkspaceID: wsID,
+					},
+					QueueName:             nil,
+					Throttle:              nil,
+					CustomConcurrencyKeys: nil,
+				},
+				QueueName: nil,
+			}
+
+			fnPart, _, _, _ := q.ItemPartitions(ctx, defaultShard, item1)
+			require.Equal(t, int(enums.PartitionTypeDefault), fnPart.PartitionType)
+
+			// for simplicity, this enqueue should go directly to the partition
+			enqueueToBacklog = false
+			qi, err := q.EnqueueItem(ctx, defaultShard, item1, at, osqueue.EnqueueOpts{})
+			require.NoError(t, err)
+			enqueueToBacklog = true
+
+			now := q.clock.Now()
+			leaseDur := 5 * time.Second
+			leaseExpiry := now.Add(leaseDur)
+
+			// simulate having hit a partition concurrency limit in a previous operation,
+			// without disabling validation this should cause Lease() to fail
+			denies := newLeaseDenyList()
+			denies.addConcurrency(newKeyError(ErrPartitionConcurrencyLimit, fnPart.Queue()))
+
+			leaseID, err := q.Lease(ctx, qi, leaseDur, now, denies)
+			require.NoError(t, err)
+			require.NotNil(t, leaseID)
+
+			backlogs := q.ItemBacklogs(ctx, item1)
+			require.Len(t, backlogs, 1)
+
+			shadowPartition := q.ItemShadowPartition(ctx, item1)
+			require.NotEmpty(t, shadowPartition.PartitionID)
+
+			// key queue v2 accounting
+			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, shadowPartition.accountInProgressKey(kg), qi.ID)))
+			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, shadowPartition.inProgressKey(kg), qi.ID)))
+			require.Equal(t, kg.Concurrency("", ""), backlogs[0].activeKey(kg))
+			require.False(t, r.Exists(backlogs[0].activeKey(kg)))
+
+			// expect classic partition concurrency to include item
+			// TODO Do we actually want to update previous accounting?
+			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, kg.Concurrency("account", accountId.String()), qi.ID)))
+			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, kg.Concurrency("p", fnID.String()), qi.ID)))
+			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, fnPart.concurrencyKey(kg), qi.ID)))
+		})
+	})
+
+	t.Run("single custom concurrency key", func(t *testing.T) {
+		r := miniredis.RunT(t)
+		rc, err := rueidis.NewClient(rueidis.ClientOption{
+			InitAddress:  []string{r.Addr()},
+			DisableCache: true,
+		})
+		require.NoError(t, err)
+		defer rc.Close()
+
+		defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+		kg := defaultShard.RedisClient.kg
+
+		enqueueToBacklog := false
+		q := NewQueue(
+			defaultShard,
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+				return enqueueToBacklog
+			}),
+			WithAllowSystemKeyQueues(func(ctx context.Context) bool {
+				return enqueueToBacklog
+			}),
+			WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
+				return true
+			}),
+			WithDisableSystemQueueLeaseChecks(func(ctx context.Context) bool {
+				return true
+			}),
+			WithConcurrencyLimitGetter(func(ctx context.Context, p QueuePartition) PartitionConcurrencyLimits {
+				return PartitionConcurrencyLimits{
+					AccountLimit:   123,
+					FunctionLimit:  45,
+					CustomKeyLimit: 0, // only used for leasing partition
+				}
+			}),
+			WithSystemConcurrencyLimitGetter(func(ctx context.Context, p QueuePartition) SystemPartitionConcurrencyLimits {
+				return SystemPartitionConcurrencyLimits{
+					GlobalLimit:    567,
+					PartitionLimit: 678,
+				}
+			}),
+			WithCustomConcurrencyKeyLimitRefresher(func(ctx context.Context, i osqueue.QueueItem) []state.CustomConcurrency {
+				return i.Data.GetConcurrencyKeys()
+			}),
+		)
+		ctx := context.Background()
+
+		accountId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
+
+		// use future timestamp because scores will be bounded to the present
+		at := time.Now().Add(10 * time.Minute).Truncate(time.Minute)
+
+		t.Run("should enqueue item to backlog", func(t *testing.T) {
+			require.Len(t, r.Keys(), 0)
+
+			hashedConcurrencyKeyExpr := hashConcurrencyKey("event.data.customerId")
+			unhashedValue := "customer1"
+			scope := enums.ConcurrencyScopeFn
+			fullKey := util.ConcurrencyKey(scope, fnID, unhashedValue)
+
+			item := osqueue.QueueItem{
+				ID:          "test",
+				FunctionID:  fnID,
+				WorkspaceID: wsID,
+				Data: osqueue.Item{
+					WorkspaceID: wsID,
+					Kind:        osqueue.KindEdge,
+					Identifier: state.Identifier{
+						WorkflowID:  fnID,
+						AccountID:   accountId,
+						WorkspaceID: wsID,
+					},
+					QueueName: nil,
+					Throttle:  nil,
+					CustomConcurrencyKeys: []state.CustomConcurrency{
+						{
+							Key:                       fullKey,
+							Hash:                      hashedConcurrencyKeyExpr,
+							Limit:                     123,
+							UnhashedEvaluatedKeyValue: unhashedValue,
+						},
+					},
+				},
+				QueueName: nil,
+			}
+
+			fnPart, custom1, custom2, _ := q.ItemPartitions(ctx, defaultShard, item)
+			require.NotEmpty(t, fnPart.ID)
+			require.Equal(t, int(enums.PartitionTypeDefault), fnPart.PartitionType)
+			require.NotEmpty(t, custom1.ID)
+			require.Equal(t, int(enums.PartitionTypeConcurrencyKey), custom1.PartitionType)
+			require.Empty(t, custom2.ID)
+			require.Equal(t, int(enums.PartitionTypeDefault), custom2.PartitionType)
+
+			// for simplicity, this enqueue should go directly to the partition
+			enqueueToBacklog = false
+			qi, err := q.EnqueueItem(ctx, defaultShard, item, at, osqueue.EnqueueOpts{})
+			require.NoError(t, err)
+			enqueueToBacklog = true
+
+			now := q.clock.Now()
+			leaseDur := 5 * time.Second
+			leaseExpiry := now.Add(leaseDur)
+
+			// simulate having hit a partition concurrency limit in a previous operation,
+			// without disabling validation this should cause Lease() to fail
+			denies := newLeaseDenyList()
+			denies.addConcurrency(newKeyError(ErrPartitionConcurrencyLimit, fnPart.Queue()))
+
+			leaseID, err := q.Lease(ctx, qi, leaseDur, now, denies)
+			require.NoError(t, err)
+			require.NotNil(t, leaseID)
+
+			backlogs := q.ItemBacklogs(ctx, item)
+			require.Len(t, backlogs, 1)
+
+			shadowPartition := q.ItemShadowPartition(ctx, item)
+			require.NotEmpty(t, shadowPartition.PartitionID)
+			require.Len(t, shadowPartition.CustomConcurrencyKeys, 1)
+
+			// key queue v2 accounting
+			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, shadowPartition.accountInProgressKey(kg), qi.ID)))
+			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, shadowPartition.inProgressKey(kg), qi.ID)))
+			require.Equal(t, kg.Concurrency("custom", util.ConcurrencyKey(scope, fnID, unhashedValue)), backlogs[0].activeKey(kg))
+			require.True(t, r.Exists(backlogs[0].activeKey(kg)))
+			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, backlogs[0].activeKey(kg), qi.ID)))
+			require.Equal(t, backlogs[0].activeKey(kg), custom1.concurrencyKey(kg))
+
+			// expect classic partition concurrency to include item
+			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, kg.Concurrency("account", accountId.String()), qi.ID)))
+			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, kg.Concurrency("p", fnID.String()), qi.ID)))
+			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, custom1.concurrencyKey(kg), qi.ID)))
+		})
+	})
+
+	t.Run("two custom concurrency keys", func(t *testing.T) {
+		r := miniredis.RunT(t)
+		rc, err := rueidis.NewClient(rueidis.ClientOption{
+			InitAddress:  []string{r.Addr()},
+			DisableCache: true,
+		})
+		require.NoError(t, err)
+		defer rc.Close()
+
+		defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+		kg := defaultShard.RedisClient.kg
+
+		enqueueToBacklog := false
+		q := NewQueue(
+			defaultShard,
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+				return enqueueToBacklog
+			}),
+			WithAllowSystemKeyQueues(func(ctx context.Context) bool {
+				return enqueueToBacklog
+			}),
+			WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
+				return true
+			}),
+			WithDisableSystemQueueLeaseChecks(func(ctx context.Context) bool {
+				return true
+			}),
+			WithConcurrencyLimitGetter(func(ctx context.Context, p QueuePartition) PartitionConcurrencyLimits {
+				return PartitionConcurrencyLimits{
+					AccountLimit:   123,
+					FunctionLimit:  45,
+					CustomKeyLimit: 0, // only used for leasing partition
+				}
+			}),
+			WithSystemConcurrencyLimitGetter(func(ctx context.Context, p QueuePartition) SystemPartitionConcurrencyLimits {
+				return SystemPartitionConcurrencyLimits{
+					GlobalLimit:    567,
+					PartitionLimit: 678,
+				}
+			}),
+			WithCustomConcurrencyKeyLimitRefresher(func(ctx context.Context, i osqueue.QueueItem) []state.CustomConcurrency {
+				return i.Data.GetConcurrencyKeys()
+			}),
+		)
+		ctx := context.Background()
+
+		accountId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
+
+		// use future timestamp because scores will be bounded to the present
+		at := time.Now().Add(10 * time.Minute)
+
+		t.Run("should enqueue item to backlog", func(t *testing.T) {
+			require.Len(t, r.Keys(), 0)
+
+			hashedConcurrencyKeyExpr1 := hashConcurrencyKey("event.data.userId")
+			unhashedValue1 := "user1"
+			scope1 := enums.ConcurrencyScopeFn
+			fullKey1 := util.ConcurrencyKey(scope1, fnID, unhashedValue1)
+
+			hashedConcurrencyKeyExpr2 := hashConcurrencyKey("event.data.orgId")
+			unhashedValue2 := "org1"
+			scope2 := enums.ConcurrencyScopeEnv
+			fullKey2 := util.ConcurrencyKey(scope2, wsID, unhashedValue2)
+
+			item := osqueue.QueueItem{
+				ID:          "test",
+				FunctionID:  fnID,
+				WorkspaceID: wsID,
+				Data: osqueue.Item{
+					WorkspaceID: wsID,
+					Kind:        osqueue.KindEdge,
+					Identifier: state.Identifier{
+						WorkflowID:  fnID,
+						AccountID:   accountId,
+						WorkspaceID: wsID,
+					},
+					QueueName: nil,
+					Throttle:  nil,
+					CustomConcurrencyKeys: []state.CustomConcurrency{
+						{
+							Key:                       fullKey1,
+							Hash:                      hashedConcurrencyKeyExpr1,
+							Limit:                     123,
+							UnhashedEvaluatedKeyValue: unhashedValue1,
+						},
+						{
+							Key:                       fullKey2,
+							Hash:                      hashedConcurrencyKeyExpr2,
+							Limit:                     234,
+							UnhashedEvaluatedKeyValue: unhashedValue2,
+						},
+					},
+				},
+				QueueName: nil,
+			}
+
+			fnPart, custom1, custom2, _ := q.ItemPartitions(ctx, defaultShard, item)
+			require.NotEmpty(t, fnPart.ID)
+			require.Equal(t, int(enums.PartitionTypeDefault), fnPart.PartitionType)
+			require.NotEmpty(t, custom1.ID)
+			require.Equal(t, int(enums.PartitionTypeConcurrencyKey), custom1.PartitionType)
+			require.NotEmpty(t, custom2.ID)
+			require.Equal(t, int(enums.PartitionTypeConcurrencyKey), custom2.PartitionType)
+
+			// for simplicity, this enqueue should go directly to the partition
+			enqueueToBacklog = false
+			qi, err := q.EnqueueItem(ctx, defaultShard, item, at, osqueue.EnqueueOpts{})
+			require.NoError(t, err)
+			enqueueToBacklog = true
+
+			now := q.clock.Now()
+			leaseDur := 5 * time.Second
+			leaseExpiry := now.Add(leaseDur)
+
+			// simulate having hit a partition concurrency limit in a previous operation,
+			// without disabling validation this should cause Lease() to fail
+			denies := newLeaseDenyList()
+			denies.addConcurrency(newKeyError(ErrPartitionConcurrencyLimit, custom2.Queue()))
+
+			leaseID, err := q.Lease(ctx, qi, leaseDur, now, denies)
+			require.NoError(t, err)
+			require.NotNil(t, leaseID)
+
+			backlogs := q.ItemBacklogs(ctx, item)
+			require.Len(t, backlogs, 2)
+
+			shadowPartition := q.ItemShadowPartition(ctx, item)
+			require.NotEmpty(t, shadowPartition.PartitionID)
+			require.Len(t, shadowPartition.CustomConcurrencyKeys, 2)
+
+			// key queue v2 accounting
+			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, shadowPartition.accountInProgressKey(kg), qi.ID)))
+			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, shadowPartition.inProgressKey(kg), qi.ID)))
+
+			// first key
+			require.Equal(t, kg.Concurrency("custom", util.ConcurrencyKey(scope1, fnID, unhashedValue1)), backlogs[0].activeKey(kg))
+			require.True(t, r.Exists(backlogs[0].activeKey(kg)))
+			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, backlogs[0].activeKey(kg), qi.ID)))
+
+			// second key
+			require.Equal(t, kg.Concurrency("custom", util.ConcurrencyKey(scope2, wsID, unhashedValue2)), backlogs[1].activeKey(kg))
+			require.True(t, r.Exists(backlogs[1].activeKey(kg)))
+			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, backlogs[1].activeKey(kg), qi.ID)))
+
+			// expect classic partition concurrency to include item
+			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, kg.Concurrency("account", accountId.String()), qi.ID)))
+			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, kg.Concurrency("p", fnID.String()), qi.ID)))
+			// first key
+			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, custom1.concurrencyKey(kg), qi.ID)))
+			// second key
+			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, custom2.concurrencyKey(kg), qi.ID)))
+		})
+	})
+
+	t.Run("system queues", func(t *testing.T) {
+		r := miniredis.RunT(t)
+		rc, err := rueidis.NewClient(rueidis.ClientOption{
+			InitAddress:  []string{r.Addr()},
+			DisableCache: true,
+		})
+		require.NoError(t, err)
+		defer rc.Close()
+
+		defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+		kg := defaultShard.RedisClient.kg
+
+		enqueueToBacklog := false
+		q := NewQueue(
+			defaultShard,
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+				return enqueueToBacklog
+			}),
+			WithAllowSystemKeyQueues(func(ctx context.Context) bool {
+				return enqueueToBacklog
+			}),
+			WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
+				return true
+			}),
+			WithDisableSystemQueueLeaseChecks(func(ctx context.Context) bool {
+				return true
+			}),
+		)
+		ctx := context.Background()
+
+		// use future timestamp because scores will be bounded to the present
+		at := time.Now().Add(10 * time.Minute).Truncate(time.Minute)
+
+		t.Run("should lease item", func(t *testing.T) {
+			require.Len(t, r.Keys(), 0)
+
+			sysQueueName := osqueue.KindQueueMigrate
+
+			item1 := osqueue.QueueItem{
+				ID: "test",
+				Data: osqueue.Item{
+					Kind:                  osqueue.KindEdge,
+					Identifier:            state.Identifier{},
+					QueueName:             &sysQueueName,
+					Throttle:              nil,
+					CustomConcurrencyKeys: nil,
+				},
+				QueueName: &sysQueueName,
+			}
+
+			fnPart, _, _, _ := q.ItemPartitions(ctx, defaultShard, item1)
+			require.Equal(t, int(enums.PartitionTypeDefault), fnPart.PartitionType)
+			require.True(t, fnPart.IsSystem())
+
+			// for simplicity, this enqueue should go directly to the partition
+			enqueueToBacklog = false
+			qi, err := q.EnqueueItem(ctx, defaultShard, item1, at, osqueue.EnqueueOpts{})
+			require.NoError(t, err)
+			enqueueToBacklog = true
+
+			now := q.clock.Now()
+			leaseDur := 5 * time.Second
+			leaseExpiry := now.Add(leaseDur)
+
+			// simulate having hit a partition concurrency limit in a previous operation,
+			// without disabling validation this should cause Lease() to fail
+			denies := newLeaseDenyList()
+			denies.addConcurrency(newKeyError(ErrPartitionConcurrencyLimit, fnPart.Queue()))
+
+			leaseID, err := q.Lease(ctx, qi, leaseDur, now, denies)
+			require.NoError(t, err)
+			require.NotNil(t, leaseID)
+
+			backlogs := q.ItemBacklogs(ctx, item1)
+			require.Len(t, backlogs, 1)
+
+			shadowPartition := q.ItemShadowPartition(ctx, item1)
+			require.NotEmpty(t, shadowPartition.PartitionID)
+
+			// key queue v2 accounting
+			// should not track account concurrency for system partition
+			require.True(t, r.Exists(shadowPartition.accountInProgressKey(kg)))
+			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, shadowPartition.inProgressKey(kg), qi.ID)))
+			require.Equal(t, kg.Concurrency("", ""), backlogs[0].activeKey(kg))
+			require.False(t, r.Exists(backlogs[0].activeKey(kg)))
+
+			// expect classic partition concurrency to include item
+			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, kg.Concurrency("account", sysQueueName), qi.ID)))
+			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, kg.Concurrency("p", sysQueueName), qi.ID)))
+			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, fnPart.concurrencyKey(kg), qi.ID)))
+		})
+	})
+}
+
+func TestQueueRequeueToBacklog(t *testing.T) {
+	t.Run("simple item", func(t *testing.T) {
+		r := miniredis.RunT(t)
+		rc, err := rueidis.NewClient(rueidis.ClientOption{
+			InitAddress:  []string{r.Addr()},
+			DisableCache: true,
+		})
+		require.NoError(t, err)
+		defer rc.Close()
+
+		defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+		kg := defaultShard.RedisClient.kg
+
+		enqueueToBacklog := false
+		q := NewQueue(
+			defaultShard,
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+				return enqueueToBacklog
+			}),
+			WithAllowSystemKeyQueues(func(ctx context.Context) bool {
+				return enqueueToBacklog
+			}),
+			WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
+				return true
+			}),
+			WithDisableSystemQueueLeaseChecks(func(ctx context.Context) bool {
+				return true
+			}),
+		)
+		ctx := context.Background()
+
+		accountId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
+
+		// use future timestamp because scores will be bounded to the present
+		at := time.Now().Add(10 * time.Minute)
+
+		t.Run("should requeue item to backlog", func(t *testing.T) {
+			require.Len(t, r.Keys(), 0)
+
+			item := osqueue.QueueItem{
+				ID:          "test",
+				FunctionID:  fnID,
+				WorkspaceID: wsID,
+				Data: osqueue.Item{
+					WorkspaceID: wsID,
+					Kind:        osqueue.KindEdge,
+					Identifier: state.Identifier{
+						WorkflowID:  fnID,
+						AccountID:   accountId,
+						WorkspaceID: wsID,
+					},
+					QueueName:             nil,
+					Throttle:              nil,
+					CustomConcurrencyKeys: nil,
+				},
+				QueueName: nil,
+			}
+
+			// directly enqueue to partition
+			enqueueToBacklog = false
+			qi, err := q.EnqueueItem(ctx, defaultShard, item, at, osqueue.EnqueueOpts{})
+			require.NoError(t, err)
+			enqueueToBacklog = true
+
+			// put item in progress, this is tested separately
+			now := q.clock.Now()
+			leaseDur := 5 * time.Second
+			leaseExpires := now.Add(leaseDur)
+			leaseID, err := q.Lease(ctx, qi, leaseDur, now, nil)
+			require.NoError(t, err)
+			require.NotNil(t, leaseID)
+
+			backlogs := q.ItemBacklogs(ctx, item)
+			require.Len(t, backlogs, 1)
+
+			shadowPartition := q.ItemShadowPartition(ctx, item)
+			require.NotEmpty(t, shadowPartition.PartitionID)
+			require.Len(t, shadowPartition.CustomConcurrencyKeys, 0)
+
+			fnPart, custom1, custom2, _ := q.ItemPartitions(ctx, defaultShard, item)
+			require.NotEmpty(t, fnPart.ID)
+			require.Equal(t, int(enums.PartitionTypeDefault), fnPart.PartitionType)
+			require.Empty(t, custom1.ID)
+			require.Equal(t, int(enums.PartitionTypeDefault), custom1.PartitionType)
+			require.Empty(t, custom2.ID)
+			require.Equal(t, int(enums.PartitionTypeDefault), custom2.PartitionType)
+
+			require.False(t, hasMember(t, r, fnPart.zsetKey(kg), qi.ID))
+
+			// expect key queue accounting to contain item in in-progress
+			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, shadowPartition.inProgressKey(kg), qi.ID)))
+			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, shadowPartition.accountInProgressKey(kg), qi.ID)))
+
+			// no active set for default partition since this uses the in progress key
+			require.Equal(t, kg.Concurrency("", ""), backlogs[0].activeKey(kg))
+
+			// expect old accounting to be updated
+			// TODO Do we actually want to update previous accounting?
+			require.True(t, hasMember(t, r, fnPart.concurrencyKey(kg), qi.ID))
+			require.True(t, hasMember(t, r, kg.Concurrency("account", accountId.String()), qi.ID))
+			require.True(t, hasMember(t, r, kg.Concurrency("p", fnPart.Queue()), qi.ID))
+
+			requeueFor := at.Add(30 * time.Minute).Truncate(time.Minute)
+
+			err = q.Requeue(ctx, defaultShard, qi, requeueFor)
+			require.NoError(t, err)
+
+			// expect item to be requeued to backlog
+			require.Equal(t, requeueFor.UnixMilli(), int64(score(t, r, kg.BacklogSet(backlogs[0].BacklogID), qi.ID)))
+
+			// expect key queue accounting to be updated
+			remainingMembers, _ := r.ZMembers(shadowPartition.inProgressKey(kg))
+
+			require.False(t, hasMember(t, r, shadowPartition.inProgressKey(kg), qi.ID), remainingMembers)
+			require.False(t, hasMember(t, r, shadowPartition.accountInProgressKey(kg), qi.ID))
+
+			// expect old accounting to be updated
+			// TODO Do we actually want to update previous accounting?
+			require.False(t, hasMember(t, r, fnPart.concurrencyKey(kg), qi.ID))
+			require.False(t, hasMember(t, r, kg.Concurrency("account", accountId.String()), qi.ID))
+			require.False(t, hasMember(t, r, kg.Concurrency("p", fnPart.Queue()), qi.ID))
+
+			// item must not be in classic backlog
+			require.False(t, hasMember(t, r, fnPart.zsetKey(kg), qi.ID), r.Keys())
+		})
+	})
+
+	t.Run("single custom concurrency key", func(t *testing.T) {
+		r := miniredis.RunT(t)
+		rc, err := rueidis.NewClient(rueidis.ClientOption{
+			InitAddress:  []string{r.Addr()},
+			DisableCache: true,
+		})
+		require.NoError(t, err)
+		defer rc.Close()
+
+		defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+		kg := defaultShard.RedisClient.kg
+
+		enqueueToBacklog := false
+		q := NewQueue(
+			defaultShard,
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+				return enqueueToBacklog
+			}),
+			WithAllowSystemKeyQueues(func(ctx context.Context) bool {
+				return enqueueToBacklog
+			}),
+			WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
+				return true
+			}),
+			WithDisableSystemQueueLeaseChecks(func(ctx context.Context) bool {
+				return true
+			}),
+		)
+		ctx := context.Background()
+
+		accountId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
+
+		// use future timestamp because scores will be bounded to the present
+		at := time.Now().Add(10 * time.Minute)
+
+		t.Run("should requeue item to backlog", func(t *testing.T) {
+			require.Len(t, r.Keys(), 0)
+
+			hashedConcurrencyKeyExpr := hashConcurrencyKey("event.data.customerId")
+			unhashedValue := "customer1"
+			scope := enums.ConcurrencyScopeFn
+			fullKey := util.ConcurrencyKey(scope, fnID, unhashedValue)
+
+			item := osqueue.QueueItem{
+				ID:          "test",
+				FunctionID:  fnID,
+				WorkspaceID: wsID,
+				Data: osqueue.Item{
+					WorkspaceID: wsID,
+					Kind:        osqueue.KindEdge,
+					Identifier: state.Identifier{
+						WorkflowID:  fnID,
+						AccountID:   accountId,
+						WorkspaceID: wsID,
+					},
+					QueueName: nil,
+					Throttle:  nil,
+					CustomConcurrencyKeys: []state.CustomConcurrency{
+						{
+							Key:                       fullKey,
+							Hash:                      hashedConcurrencyKeyExpr,
+							Limit:                     123,
+							UnhashedEvaluatedKeyValue: unhashedValue,
+						},
+					},
+				},
+				QueueName: nil,
+			}
+
+			// directly enqueue to partition
+			enqueueToBacklog = false
+			qi, err := q.EnqueueItem(ctx, defaultShard, item, at, osqueue.EnqueueOpts{})
+			require.NoError(t, err)
+			enqueueToBacklog = true
+
+			// sanity check: empty key should never be stored
+			require.False(t, r.Exists(kg.Concurrency("", "")))
+
+			// put item in progress, this is tested separately
+			now := q.clock.Now().Truncate(time.Minute)
+			leaseDur := 5 * time.Second
+			leaseExpires := now.Add(leaseDur)
+			leaseID, err := q.Lease(ctx, qi, leaseDur, now, nil)
+			require.NoError(t, err)
+			require.NotNil(t, leaseID)
+			require.Equal(t, leaseExpires, ulid.Time(leaseID.Time()), time.Now())
+
+			backlogs := q.ItemBacklogs(ctx, item)
+			require.Len(t, backlogs, 1)
+			require.NotNil(t, backlogs[0].ConcurrencyKey)
+			require.NotNil(t, backlogs[0].ConcurrencyScope)
+			require.NotNil(t, backlogs[0].ConcurrencyScopeEntity)
+
+			shadowPartition := q.ItemShadowPartition(ctx, item)
+			require.NotEmpty(t, shadowPartition.PartitionID)
+			require.Len(t, shadowPartition.CustomConcurrencyKeys, 1)
+
+			fnPart, custom1, custom2, _ := q.ItemPartitions(ctx, defaultShard, item)
+			require.NotEmpty(t, custom1.ID)
+			require.Equal(t, int(enums.PartitionTypeConcurrencyKey), custom1.PartitionType)
+			require.NotEmpty(t, fnPart.ID)
+			require.Equal(t, int(enums.PartitionTypeDefault), fnPart.PartitionType)
+			require.Empty(t, custom2.ID)
+			require.Equal(t, int(enums.PartitionTypeDefault), custom2.PartitionType)
+
+			// expect key queue accounting to contain item in in-progress
+			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, shadowPartition.inProgressKey(kg), qi.ID)))
+			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, shadowPartition.accountInProgressKey(kg), qi.ID)))
+
+			// 1 active set for custom concurrency key
+			require.Equal(t, kg.Concurrency("custom", util.ConcurrencyKey(scope, fnID, unhashedValue)), backlogs[0].activeKey(kg))
+			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, backlogs[0].activeKey(kg), qi.ID)))
+
+			// expect old accounting to be updated
+			// TODO Do we actually want to update previous accounting?
+			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, custom1.concurrencyKey(kg), qi.ID)))
+			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, kg.Concurrency("account", accountId.String()), qi.ID)))
+			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, kg.Concurrency("p", fnID.String()), qi.ID)), r.Keys())
+			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, kg.Concurrency("custom", fullKey), qi.ID)))
+
+			// sanity check: empty key should never be stored
+			require.False(t, r.Exists(kg.Concurrency("", "")))
+
+			requeueFor := at.Add(30 * time.Minute).Truncate(time.Minute)
+
+			err = q.Requeue(ctx, defaultShard, qi, requeueFor)
+			require.NoError(t, err)
+
+			// sanity check: empty key should never be stored
+			require.False(t, r.Exists(kg.Concurrency("", "")))
+
+			// expect item to be requeued to backlog
+			require.Equal(t, requeueFor.UnixMilli(), int64(score(t, r, kg.BacklogSet(backlogs[0].BacklogID), qi.ID)))
+
+			// expect key queue accounting to be updated
+			remainingMembers, _ := r.ZMembers(shadowPartition.inProgressKey(kg))
+
+			require.False(t, hasMember(t, r, shadowPartition.inProgressKey(kg), qi.ID), remainingMembers)
+			require.False(t, hasMember(t, r, shadowPartition.accountInProgressKey(kg), qi.ID))
+			require.False(t, hasMember(t, r, backlogs[0].activeKey(kg), qi.ID))
+
+			// expect old accounting to be updated
+			// TODO Do we actually want to update previous accounting?
+			require.False(t, hasMember(t, r, custom1.concurrencyKey(kg), qi.ID))
+			require.False(t, hasMember(t, r, kg.Concurrency("account", accountId.String()), qi.ID))
+			require.False(t, hasMember(t, r, kg.Concurrency("p", fnPart.Queue()), qi.ID))
+			require.False(t, hasMember(t, r, kg.Concurrency("custom", fullKey), qi.ID))
+
+			// item must not be in classic backlog
+			require.False(t, hasMember(t, r, fnPart.zsetKey(kg), qi.ID))
+		})
+	})
+
+	t.Run("two custom concurrency keys", func(t *testing.T) {
+		r := miniredis.RunT(t)
+		rc, err := rueidis.NewClient(rueidis.ClientOption{
+			InitAddress:  []string{r.Addr()},
+			DisableCache: true,
+		})
+		require.NoError(t, err)
+		defer rc.Close()
+
+		defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+		kg := defaultShard.RedisClient.kg
+
+		enqueueToBacklog := false
+		q := NewQueue(
+			defaultShard,
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+				return enqueueToBacklog
+			}),
+			WithAllowSystemKeyQueues(func(ctx context.Context) bool {
+				return enqueueToBacklog
+			}),
+			WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
+				return true
+			}),
+			WithDisableSystemQueueLeaseChecks(func(ctx context.Context) bool {
+				return true
+			}),
+		)
+		ctx := context.Background()
+
+		accountId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
+
+		// use future timestamp because scores will be bounded to the present
+		at := time.Now().Add(10 * time.Minute)
+
+		t.Run("should requeue item to backlog", func(t *testing.T) {
+			require.Len(t, r.Keys(), 0)
+
+			hashedConcurrencyKeyExpr1 := hashConcurrencyKey("event.data.userId")
+			unhashedValue1 := "user1"
+			scope1 := enums.ConcurrencyScopeFn
+			fullKey1 := util.ConcurrencyKey(scope1, fnID, unhashedValue1)
+
+			hashedConcurrencyKeyExpr2 := hashConcurrencyKey("event.data.orgId")
+			unhashedValue2 := "org1"
+			scope2 := enums.ConcurrencyScopeEnv
+			fullKey2 := util.ConcurrencyKey(scope2, wsID, unhashedValue2)
+
+			item := osqueue.QueueItem{
+				ID:          "test",
+				FunctionID:  fnID,
+				WorkspaceID: wsID,
+				Data: osqueue.Item{
+					WorkspaceID: wsID,
+					Kind:        osqueue.KindEdge,
+					Identifier: state.Identifier{
+						WorkflowID:  fnID,
+						AccountID:   accountId,
+						WorkspaceID: wsID,
+					},
+					QueueName: nil,
+					Throttle:  nil,
+					CustomConcurrencyKeys: []state.CustomConcurrency{
+						{
+							Key:                       fullKey1,
+							Hash:                      hashedConcurrencyKeyExpr1,
+							Limit:                     123,
+							UnhashedEvaluatedKeyValue: unhashedValue1,
+						},
+						{
+							Key:                       fullKey2,
+							Hash:                      hashedConcurrencyKeyExpr2,
+							Limit:                     234,
+							UnhashedEvaluatedKeyValue: unhashedValue2,
+						},
+					},
+				},
+				QueueName: nil,
+			}
+
+			// directly enqueue to partition
+			enqueueToBacklog = false
+			qi, err := q.EnqueueItem(ctx, defaultShard, item, at, osqueue.EnqueueOpts{})
+			require.NoError(t, err)
+			enqueueToBacklog = true
+
+			// sanity check: empty key should never be stored
+			require.False(t, r.Exists(kg.Concurrency("", "")))
+
+			// put item in progress, this is tested separately
+			now := q.clock.Now().Truncate(time.Minute)
+			leaseDur := 5 * time.Second
+			leaseExpires := now.Add(leaseDur)
+			leaseID, err := q.Lease(ctx, qi, leaseDur, now, nil)
+			require.NoError(t, err)
+			require.NotNil(t, leaseID)
+			require.Equal(t, leaseExpires, ulid.Time(leaseID.Time()), time.Now())
+
+			backlogs := q.ItemBacklogs(ctx, item)
+			require.Len(t, backlogs, 2)
+			require.NotNil(t, backlogs[0].ConcurrencyKey)
+			require.NotNil(t, backlogs[0].ConcurrencyScope)
+			require.NotNil(t, backlogs[0].ConcurrencyScopeEntity)
+
+			require.NotNil(t, backlogs[1].ConcurrencyKey)
+			require.NotNil(t, backlogs[1].ConcurrencyScope)
+			require.NotNil(t, backlogs[1].ConcurrencyScopeEntity)
+
+			shadowPartition := q.ItemShadowPartition(ctx, item)
+			require.NotEmpty(t, shadowPartition.PartitionID)
+			require.Len(t, shadowPartition.CustomConcurrencyKeys, 2)
+
+			fnPart, custom1, custom2, _ := q.ItemPartitions(ctx, defaultShard, item)
+			require.NotEmpty(t, custom1.ID)
+			require.Equal(t, int(enums.PartitionTypeConcurrencyKey), custom1.PartitionType)
+			require.NotEmpty(t, custom2.ID)
+			require.Equal(t, int(enums.PartitionTypeConcurrencyKey), custom2.PartitionType)
+			require.NotEmpty(t, fnPart.ID)
+			require.Equal(t, int(enums.PartitionTypeDefault), fnPart.PartitionType)
+
+			// expect key queue accounting to contain item in in-progress
+			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, shadowPartition.inProgressKey(kg), qi.ID)))
+			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, shadowPartition.accountInProgressKey(kg), qi.ID)))
+
+			// 2 active set for custom concurrency keys
+
+			// first key
+			require.Equal(t, kg.Concurrency("custom", util.ConcurrencyKey(scope1, fnID, unhashedValue1)), backlogs[0].activeKey(kg))
+			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, backlogs[0].activeKey(kg), qi.ID)))
+
+			require.Equal(t, kg.Concurrency("custom", util.ConcurrencyKey(scope2, wsID, unhashedValue2)), backlogs[1].activeKey(kg))
+			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, backlogs[1].activeKey(kg), qi.ID)))
+
+			// expect old accounting to be updated
+			// TODO Do we actually want to update previous accounting?
+			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, custom1.concurrencyKey(kg), qi.ID)))
+			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, kg.Concurrency("account", accountId.String()), qi.ID)))
+			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, kg.Concurrency("p", fnID.String()), qi.ID)), r.Keys())
+
+			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, kg.Concurrency("custom", fullKey1), qi.ID)))
+			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, kg.Concurrency("custom", fullKey2), qi.ID)))
+
+			// sanity check: empty key should never be stored
+			require.False(t, r.Exists(kg.Concurrency("", "")))
+
+			requeueFor := at.Add(30 * time.Minute).Truncate(time.Minute)
+
+			err = q.Requeue(ctx, defaultShard, qi, requeueFor)
+			require.NoError(t, err)
+
+			// sanity check: empty key should never be stored
+			require.False(t, r.Exists(kg.Concurrency("", "")))
+
+			// expect item to be requeued to backlog
+			require.Equal(t, requeueFor.UnixMilli(), int64(score(t, r, kg.BacklogSet(backlogs[0].BacklogID), qi.ID)))
+
+			// expect key queue accounting to be updated
+			remainingMembers, _ := r.ZMembers(shadowPartition.inProgressKey(kg))
+
+			require.False(t, hasMember(t, r, shadowPartition.inProgressKey(kg), qi.ID), remainingMembers)
+			require.False(t, hasMember(t, r, shadowPartition.accountInProgressKey(kg), qi.ID))
+
+			require.False(t, hasMember(t, r, backlogs[0].activeKey(kg), qi.ID))
+			require.False(t, hasMember(t, r, backlogs[1].activeKey(kg), qi.ID))
+
+			// expect old accounting to be updated
+			// TODO Do we actually want to update previous accounting?
+			require.False(t, hasMember(t, r, custom1.concurrencyKey(kg), qi.ID))
+			require.False(t, hasMember(t, r, kg.Concurrency("account", accountId.String()), qi.ID))
+			require.False(t, hasMember(t, r, kg.Concurrency("p", fnPart.Queue()), qi.ID))
+			require.False(t, hasMember(t, r, kg.Concurrency("custom", fullKey1), qi.ID))
+			require.False(t, hasMember(t, r, kg.Concurrency("custom", fullKey2), qi.ID))
+
+			// item must not be in classic backlog
+			require.False(t, hasMember(t, r, fnPart.zsetKey(kg), qi.ID))
+		})
+	})
+
+	t.Run("system queues", func(t *testing.T) {
+		r := miniredis.RunT(t)
+		rc, err := rueidis.NewClient(rueidis.ClientOption{
+			InitAddress:  []string{r.Addr()},
+			DisableCache: true,
+		})
+		require.NoError(t, err)
+		defer rc.Close()
+
+		defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+		kg := defaultShard.RedisClient.kg
+
+		enqueueToBacklog := false
+		q := NewQueue(
+			defaultShard,
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+				return enqueueToBacklog
+			}),
+			WithAllowSystemKeyQueues(func(ctx context.Context) bool {
+				return enqueueToBacklog
+			}),
+			WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
+				return true
+			}),
+			WithDisableSystemQueueLeaseChecks(func(ctx context.Context) bool {
+				return true
+			}),
+		)
+		ctx := context.Background()
+
+		// use future timestamp because scores will be bounded to the present
+		at := time.Now().Add(10 * time.Minute)
+
+		sysQueueName := osqueue.KindQueueMigrate
+
+		t.Run("should requeue item to backlog", func(t *testing.T) {
+			require.Len(t, r.Keys(), 0)
+
+			item := osqueue.QueueItem{
+				ID: "test",
+				Data: osqueue.Item{
+					Kind:                  osqueue.KindEdge,
+					Identifier:            state.Identifier{},
+					QueueName:             &sysQueueName,
+					Throttle:              nil,
+					CustomConcurrencyKeys: nil,
+				},
+				QueueName: &sysQueueName,
+			}
+
+			// directly enqueue to partition
+			enqueueToBacklog = false
+			qi, err := q.EnqueueItem(ctx, defaultShard, item, at, osqueue.EnqueueOpts{})
+			require.NoError(t, err)
+			enqueueToBacklog = true
+
+			// put item in progress, this is tested separately
+			now := q.clock.Now()
+			leaseDur := 5 * time.Second
+			leaseExpires := now.Add(leaseDur)
+			leaseID, err := q.Lease(ctx, qi, leaseDur, now, nil)
+			require.NoError(t, err)
+			require.NotNil(t, leaseID)
+
+			backlogs := q.ItemBacklogs(ctx, item)
+			require.Len(t, backlogs, 1)
+
+			shadowPartition := q.ItemShadowPartition(ctx, item)
+			require.NotEmpty(t, shadowPartition.PartitionID)
+			require.Len(t, shadowPartition.CustomConcurrencyKeys, 0)
+
+			fnPart, custom1, custom2, _ := q.ItemPartitions(ctx, defaultShard, item)
+			require.NotEmpty(t, fnPart.ID)
+			require.Equal(t, int(enums.PartitionTypeDefault), fnPart.PartitionType)
+			require.True(t, fnPart.IsSystem())
+			require.Empty(t, custom1.ID)
+			require.Equal(t, int(enums.PartitionTypeDefault), custom1.PartitionType)
+			require.Empty(t, custom2.ID)
+			require.Equal(t, int(enums.PartitionTypeDefault), custom2.PartitionType)
+
+			require.False(t, hasMember(t, r, fnPart.zsetKey(kg), qi.ID))
+
+			// expect key queue accounting to contain item in in-progress
+			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, shadowPartition.inProgressKey(kg), qi.ID)))
+
+			require.Equal(t, kg.Concurrency("account", sysQueueName), shadowPartition.accountInProgressKey(kg))
+			require.True(t, r.Exists(shadowPartition.accountInProgressKey(kg)))
+
+			// no active set for default partition since this uses the in progress key
+			require.Equal(t, kg.Concurrency("", ""), backlogs[0].activeKey(kg))
+
+			// expect old accounting to be updated
+			// TODO Do we actually want to update previous accounting?
+			require.True(t, hasMember(t, r, fnPart.concurrencyKey(kg), qi.ID))
+			require.True(t, hasMember(t, r, kg.Concurrency("account", fnPart.Queue()), qi.ID)) // pseudo-limit for system qeueus
+			require.True(t, hasMember(t, r, kg.Concurrency("p", fnPart.Queue()), qi.ID))
+
+			requeueFor := at.Add(30 * time.Minute).Truncate(time.Minute)
+
+			err = q.Requeue(ctx, defaultShard, qi, requeueFor)
+			require.NoError(t, err)
+
+			// expect item to be requeued to backlog
+			require.Equal(t, requeueFor.UnixMilli(), int64(score(t, r, kg.BacklogSet(backlogs[0].BacklogID), qi.ID)))
+
+			// expect key queue accounting to be updated
+			remainingMembers, _ := r.ZMembers(shadowPartition.inProgressKey(kg))
+
+			require.False(t, hasMember(t, r, shadowPartition.inProgressKey(kg), qi.ID), remainingMembers)
+			require.False(t, hasMember(t, r, shadowPartition.accountInProgressKey(kg), qi.ID))
+
+			// expect old accounting to be updated
+			// TODO Do we actually want to update previous accounting?
+			require.False(t, hasMember(t, r, fnPart.concurrencyKey(kg), qi.ID))
+			require.False(t, hasMember(t, r, kg.Concurrency("account", fnPart.Queue()), qi.ID)) // pseudo-limit for system queues
+			require.False(t, hasMember(t, r, kg.Concurrency("p", fnPart.Queue()), qi.ID))
+
+			// item must not be in classic backlog
+			require.False(t, hasMember(t, r, fnPart.zsetKey(kg), qi.ID))
+		})
+	})
+}
+
+func TestQueueDequeueUpdateAccounting(t *testing.T) {
+	t.Run("simple item", func(t *testing.T) {
+		r := miniredis.RunT(t)
+		rc, err := rueidis.NewClient(rueidis.ClientOption{
+			InitAddress:  []string{r.Addr()},
+			DisableCache: true,
+		})
+		require.NoError(t, err)
+		defer rc.Close()
+
+		defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+		kg := defaultShard.RedisClient.kg
+
+		enqueueToBacklog := false
+		q := NewQueue(
+			defaultShard,
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+				return enqueueToBacklog
+			}),
+			WithAllowSystemKeyQueues(func(ctx context.Context) bool {
+				return enqueueToBacklog
+			}),
+			WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
+				return true
+			}),
+			WithDisableSystemQueueLeaseChecks(func(ctx context.Context) bool {
+				return true
+			}),
+		)
+		ctx := context.Background()
+
+		accountId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
+
+		// use future timestamp because scores will be bounded to the present
+		at := time.Now().Add(10 * time.Minute)
+
+		t.Run("should dequeue item and update accounting", func(t *testing.T) {
+			require.Len(t, r.Keys(), 0)
+
+			item := osqueue.QueueItem{
+				ID:          "test",
+				FunctionID:  fnID,
+				WorkspaceID: wsID,
+				Data: osqueue.Item{
+					WorkspaceID: wsID,
+					Kind:        osqueue.KindEdge,
+					Identifier: state.Identifier{
+						WorkflowID:  fnID,
+						AccountID:   accountId,
+						WorkspaceID: wsID,
+					},
+					QueueName:             nil,
+					Throttle:              nil,
+					CustomConcurrencyKeys: nil,
+				},
+				QueueName: nil,
+			}
+
+			// directly enqueue to partition
+			enqueueToBacklog = false
+			qi, err := q.EnqueueItem(ctx, defaultShard, item, at, osqueue.EnqueueOpts{})
+			require.NoError(t, err)
+			enqueueToBacklog = true
+
+			// put item in progress, this is tested separately
+			now := q.clock.Now()
+			leaseDur := 5 * time.Second
+			leaseExpires := now.Add(leaseDur)
+			leaseID, err := q.Lease(ctx, qi, leaseDur, now, nil)
+			require.NoError(t, err)
+			require.NotNil(t, leaseID)
+
+			backlogs := q.ItemBacklogs(ctx, item)
+			require.Len(t, backlogs, 1)
+
+			shadowPartition := q.ItemShadowPartition(ctx, item)
+			require.NotEmpty(t, shadowPartition.PartitionID)
+			require.Len(t, shadowPartition.CustomConcurrencyKeys, 0)
+
+			fnPart, custom1, custom2, _ := q.ItemPartitions(ctx, defaultShard, item)
+			require.NotEmpty(t, fnPart.ID)
+			require.Equal(t, int(enums.PartitionTypeDefault), fnPart.PartitionType)
+			require.Empty(t, custom1.ID)
+			require.Equal(t, int(enums.PartitionTypeDefault), custom1.PartitionType)
+			require.Empty(t, custom2.ID)
+			require.Equal(t, int(enums.PartitionTypeDefault), custom2.PartitionType)
+
+			// expect key queue accounting to contain item in in-progress
+			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, shadowPartition.inProgressKey(kg), qi.ID)))
+			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, shadowPartition.accountInProgressKey(kg), qi.ID)))
+
+			// no active set for default partition since this uses the in progress key
+			require.Equal(t, kg.Concurrency("", ""), backlogs[0].activeKey(kg))
+
+			// expect old accounting to be updated
+			// TODO Do we actually want to update previous accounting?
+			require.True(t, hasMember(t, r, fnPart.concurrencyKey(kg), qi.ID))
+			require.True(t, hasMember(t, r, kg.Concurrency("account", accountId.String()), qi.ID))
+			require.True(t, hasMember(t, r, kg.Concurrency("p", fnPart.Queue()), qi.ID))
+
+			err = q.Dequeue(ctx, defaultShard, qi)
+			require.NoError(t, err)
+
+			// expect item not to be requeued
+			require.False(t, hasMember(t, r, kg.BacklogSet(backlogs[0].BacklogID), qi.ID))
+
+			// expect key queue accounting to be updated
+			require.False(t, hasMember(t, r, shadowPartition.inProgressKey(kg), qi.ID))
+			require.False(t, hasMember(t, r, shadowPartition.accountInProgressKey(kg), qi.ID))
+
+			// expect old accounting to be updated
+			// TODO Do we actually want to update previous accounting?
+			require.False(t, hasMember(t, r, fnPart.concurrencyKey(kg), qi.ID))
+			require.False(t, hasMember(t, r, kg.Concurrency("account", accountId.String()), qi.ID))
+			require.False(t, hasMember(t, r, kg.Concurrency("p", fnPart.Queue()), qi.ID))
+
+			// item must not be in classic backlog
+			require.False(t, hasMember(t, r, fnPart.zsetKey(kg), qi.ID))
+		})
+	})
+
+	t.Run("single custom concurrency key", func(t *testing.T) {
+		r := miniredis.RunT(t)
+		rc, err := rueidis.NewClient(rueidis.ClientOption{
+			InitAddress:  []string{r.Addr()},
+			DisableCache: true,
+		})
+		require.NoError(t, err)
+		defer rc.Close()
+
+		defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+		kg := defaultShard.RedisClient.kg
+
+		enqueueToBacklog := false
+		q := NewQueue(
+			defaultShard,
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+				return enqueueToBacklog
+			}),
+			WithAllowSystemKeyQueues(func(ctx context.Context) bool {
+				return enqueueToBacklog
+			}),
+			WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
+				return true
+			}),
+			WithDisableSystemQueueLeaseChecks(func(ctx context.Context) bool {
+				return true
+			}),
+		)
+		ctx := context.Background()
+
+		accountId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
+
+		// use future timestamp because scores will be bounded to the present
+		at := time.Now().Add(10 * time.Minute)
+
+		t.Run("should dequeue item and update accounting", func(t *testing.T) {
+			require.Len(t, r.Keys(), 0)
+
+			hashedConcurrencyKeyExpr := hashConcurrencyKey("event.data.customerId")
+			unhashedValue := "customer1"
+			scope := enums.ConcurrencyScopeFn
+			fullKey := util.ConcurrencyKey(scope, fnID, unhashedValue)
+
+			item := osqueue.QueueItem{
+				ID:          "test",
+				FunctionID:  fnID,
+				WorkspaceID: wsID,
+				Data: osqueue.Item{
+					WorkspaceID: wsID,
+					Kind:        osqueue.KindEdge,
+					Identifier: state.Identifier{
+						WorkflowID:  fnID,
+						AccountID:   accountId,
+						WorkspaceID: wsID,
+					},
+					QueueName: nil,
+					Throttle:  nil,
+					CustomConcurrencyKeys: []state.CustomConcurrency{
+						{
+							Key:                       fullKey,
+							Hash:                      hashedConcurrencyKeyExpr,
+							Limit:                     123,
+							UnhashedEvaluatedKeyValue: unhashedValue,
+						},
+					},
+				},
+				QueueName: nil,
+			}
+
+			// directly enqueue to partition
+			enqueueToBacklog = false
+			qi, err := q.EnqueueItem(ctx, defaultShard, item, at, osqueue.EnqueueOpts{})
+			require.NoError(t, err)
+			enqueueToBacklog = true
+
+			// put item in progress, this is tested separately
+			now := q.clock.Now()
+			leaseDur := 5 * time.Second
+			leaseExpires := now.Add(leaseDur)
+			leaseID, err := q.Lease(ctx, qi, leaseDur, now, nil)
+			require.NoError(t, err)
+			require.NotNil(t, leaseID)
+
+			backlogs := q.ItemBacklogs(ctx, item)
+			require.Len(t, backlogs, 1)
+
+			shadowPartition := q.ItemShadowPartition(ctx, item)
+			require.NotEmpty(t, shadowPartition.PartitionID)
+			require.Len(t, shadowPartition.CustomConcurrencyKeys, 1)
+
+			fnPart, custom1, custom2, _ := q.ItemPartitions(ctx, defaultShard, item)
+			require.NotEmpty(t, fnPart.ID)
+			require.Equal(t, int(enums.PartitionTypeDefault), fnPart.PartitionType)
+			require.NotEmpty(t, custom1.ID)
+			require.Equal(t, int(enums.PartitionTypeConcurrencyKey), custom1.PartitionType)
+			require.Empty(t, custom2.ID)
+			require.Equal(t, int(enums.PartitionTypeDefault), custom2.PartitionType)
+
+			// expect key queue accounting to contain item in in-progress
+			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, shadowPartition.inProgressKey(kg), qi.ID)))
+			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, shadowPartition.accountInProgressKey(kg), qi.ID)))
+
+			// 1 active set for custom concurrency key
+			require.Equal(t, kg.Concurrency("custom", util.ConcurrencyKey(scope, fnID, unhashedValue)), backlogs[0].activeKey(kg))
+			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, backlogs[0].activeKey(kg), qi.ID)))
+
+			// expect old accounting to be updated
+			// TODO Do we actually want to update previous accounting?
+			require.True(t, hasMember(t, r, custom1.concurrencyKey(kg), qi.ID))
+			require.True(t, hasMember(t, r, kg.Concurrency("account", accountId.String()), qi.ID))
+			require.True(t, hasMember(t, r, kg.Concurrency("p", fnID.String()), qi.ID), r.Keys())
+			require.True(t, hasMember(t, r, kg.Concurrency("custom", fullKey), qi.ID))
+
+			err = q.Dequeue(ctx, defaultShard, qi)
+			require.NoError(t, err)
+
+			// expect item not to be requeued
+			require.False(t, hasMember(t, r, kg.BacklogSet(backlogs[0].BacklogID), qi.ID))
+
+			// expect key queue accounting to be updated
+			require.False(t, hasMember(t, r, shadowPartition.inProgressKey(kg), qi.ID))
+			require.False(t, hasMember(t, r, shadowPartition.accountInProgressKey(kg), qi.ID))
+			require.False(t, hasMember(t, r, backlogs[0].activeKey(kg), qi.ID))
+
+			// expect old accounting to be updated
+			// TODO Do we actually want to update previous accounting?
+			require.False(t, hasMember(t, r, custom1.concurrencyKey(kg), qi.ID))
+			require.False(t, hasMember(t, r, kg.Concurrency("account", accountId.String()), qi.ID))
+			require.False(t, hasMember(t, r, kg.Concurrency("p", fnID.String()), qi.ID))
+			require.False(t, hasMember(t, r, kg.Concurrency("custom", fullKey), qi.ID))
+
+			// item must not be in classic backlog
+			require.False(t, hasMember(t, r, fnPart.zsetKey(kg), qi.ID))
+		})
+	})
+
+	t.Run("two custom concurrency keys", func(t *testing.T) {
+		r := miniredis.RunT(t)
+		rc, err := rueidis.NewClient(rueidis.ClientOption{
+			InitAddress:  []string{r.Addr()},
+			DisableCache: true,
+		})
+		require.NoError(t, err)
+		defer rc.Close()
+
+		defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+		kg := defaultShard.RedisClient.kg
+
+		enqueueToBacklog := false
+		q := NewQueue(
+			defaultShard,
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+				return enqueueToBacklog
+			}),
+			WithAllowSystemKeyQueues(func(ctx context.Context) bool {
+				return enqueueToBacklog
+			}),
+			WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
+				return true
+			}),
+			WithDisableSystemQueueLeaseChecks(func(ctx context.Context) bool {
+				return true
+			}),
+		)
+		ctx := context.Background()
+
+		accountId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
+
+		// use future timestamp because scores will be bounded to the present
+		at := time.Now().Add(10 * time.Minute)
+
+		t.Run("should dequeue item and update accounting", func(t *testing.T) {
+			require.Len(t, r.Keys(), 0)
+
+			hashedConcurrencyKeyExpr1 := hashConcurrencyKey("event.data.userId")
+			unhashedValue1 := "user1"
+			scope1 := enums.ConcurrencyScopeFn
+			fullKey1 := util.ConcurrencyKey(scope1, fnID, unhashedValue1)
+
+			hashedConcurrencyKeyExpr2 := hashConcurrencyKey("event.data.orgId")
+			unhashedValue2 := "org1"
+			scope2 := enums.ConcurrencyScopeEnv
+			fullKey2 := util.ConcurrencyKey(scope2, wsID, unhashedValue2)
+
+			item := osqueue.QueueItem{
+				ID:          "test",
+				FunctionID:  fnID,
+				WorkspaceID: wsID,
+				Data: osqueue.Item{
+					WorkspaceID: wsID,
+					Kind:        osqueue.KindEdge,
+					Identifier: state.Identifier{
+						WorkflowID:  fnID,
+						AccountID:   accountId,
+						WorkspaceID: wsID,
+					},
+					QueueName: nil,
+					Throttle:  nil,
+					CustomConcurrencyKeys: []state.CustomConcurrency{
+						{
+							Key:                       fullKey1,
+							Hash:                      hashedConcurrencyKeyExpr1,
+							Limit:                     123,
+							UnhashedEvaluatedKeyValue: unhashedValue1,
+						},
+						{
+							Key:                       fullKey2,
+							Hash:                      hashedConcurrencyKeyExpr2,
+							Limit:                     234,
+							UnhashedEvaluatedKeyValue: unhashedValue2,
+						},
+					},
+				},
+				QueueName: nil,
+			}
+
+			// directly enqueue to partition
+			enqueueToBacklog = false
+			qi, err := q.EnqueueItem(ctx, defaultShard, item, at, osqueue.EnqueueOpts{})
+			require.NoError(t, err)
+			enqueueToBacklog = true
+
+			// put item in progress, this is tested separately
+			now := q.clock.Now()
+			leaseDur := 5 * time.Second
+			leaseExpires := now.Add(leaseDur)
+			leaseID, err := q.Lease(ctx, qi, leaseDur, now, nil)
+			require.NoError(t, err)
+			require.NotNil(t, leaseID)
+
+			backlogs := q.ItemBacklogs(ctx, item)
+			require.Len(t, backlogs, 2)
+
+			shadowPartition := q.ItemShadowPartition(ctx, item)
+			require.NotEmpty(t, shadowPartition.PartitionID)
+			require.Len(t, shadowPartition.CustomConcurrencyKeys, 2)
+
+			fnPart, custom1, custom2, _ := q.ItemPartitions(ctx, defaultShard, item)
+			require.NotEmpty(t, fnPart.ID)
+			require.Equal(t, int(enums.PartitionTypeDefault), fnPart.PartitionType)
+			require.NotEmpty(t, custom1.ID)
+			require.Equal(t, int(enums.PartitionTypeConcurrencyKey), custom1.PartitionType)
+			require.NotEmpty(t, custom2.ID)
+			require.Equal(t, int(enums.PartitionTypeConcurrencyKey), custom2.PartitionType)
+
+			// expect key queue accounting to contain item in in-progress
+			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, shadowPartition.inProgressKey(kg), qi.ID)))
+			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, shadowPartition.accountInProgressKey(kg), qi.ID)))
+
+			// 2 active set for custom concurrency keys
+			require.Equal(t, kg.Concurrency("custom", util.ConcurrencyKey(scope1, fnID, unhashedValue1)), backlogs[0].activeKey(kg))
+			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, backlogs[0].activeKey(kg), qi.ID)))
+
+			require.Equal(t, kg.Concurrency("custom", util.ConcurrencyKey(scope2, wsID, unhashedValue2)), backlogs[1].activeKey(kg))
+			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, backlogs[1].activeKey(kg), qi.ID)))
+
+			// expect old accounting to be updated
+			// TODO Do we actually want to update previous accounting?
+			require.True(t, hasMember(t, r, custom1.concurrencyKey(kg), qi.ID))
+			require.True(t, hasMember(t, r, kg.Concurrency("account", accountId.String()), qi.ID))
+			require.True(t, hasMember(t, r, kg.Concurrency("p", fnID.String()), qi.ID), r.Keys())
+			require.True(t, hasMember(t, r, kg.Concurrency("custom", fullKey1), qi.ID))
+			require.True(t, hasMember(t, r, kg.Concurrency("custom", fullKey2), qi.ID))
+
+			err = q.Dequeue(ctx, defaultShard, qi)
+			require.NoError(t, err)
+
+			// expect item not to be requeued
+			require.False(t, hasMember(t, r, kg.BacklogSet(backlogs[0].BacklogID), qi.ID))
+
+			// expect key queue accounting to be updated
+			require.False(t, hasMember(t, r, shadowPartition.inProgressKey(kg), qi.ID))
+			require.False(t, hasMember(t, r, shadowPartition.accountInProgressKey(kg), qi.ID))
+			require.False(t, hasMember(t, r, backlogs[0].activeKey(kg), qi.ID))
+
+			// expect old accounting to be updated
+			// TODO Do we actually want to update previous accounting?
+			require.False(t, hasMember(t, r, custom1.concurrencyKey(kg), qi.ID))
+			require.False(t, hasMember(t, r, kg.Concurrency("account", accountId.String()), qi.ID))
+			require.False(t, hasMember(t, r, kg.Concurrency("p", fnID.String()), qi.ID))
+			require.False(t, hasMember(t, r, kg.Concurrency("custom", fullKey1), qi.ID))
+			require.False(t, hasMember(t, r, kg.Concurrency("custom", fullKey2), qi.ID))
+
+			// item must not be in classic backlog
+			require.False(t, hasMember(t, r, fnPart.zsetKey(kg), qi.ID))
+		})
+	})
+
+	t.Run("system queues", func(t *testing.T) {
+		r := miniredis.RunT(t)
+		rc, err := rueidis.NewClient(rueidis.ClientOption{
+			InitAddress:  []string{r.Addr()},
+			DisableCache: true,
+		})
+		require.NoError(t, err)
+		defer rc.Close()
+
+		defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+		kg := defaultShard.RedisClient.kg
+
+		enqueueToBacklog := false
+		q := NewQueue(
+			defaultShard,
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+				return enqueueToBacklog
+			}),
+			WithAllowSystemKeyQueues(func(ctx context.Context) bool {
+				return enqueueToBacklog
+			}),
+			WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
+				return true
+			}),
+			WithDisableSystemQueueLeaseChecks(func(ctx context.Context) bool {
+				return true
+			}),
+		)
+		ctx := context.Background()
+
+		sysQueueName := osqueue.KindQueueMigrate
+
+		// use future timestamp because scores will be bounded to the present
+		at := time.Now().Add(10 * time.Minute)
+
+		t.Run("should dequeue item and update accounting", func(t *testing.T) {
+			require.Len(t, r.Keys(), 0)
+
+			item := osqueue.QueueItem{
+				ID: "test",
+				Data: osqueue.Item{
+					Kind:                  osqueue.KindQueueMigrate,
+					Identifier:            state.Identifier{},
+					QueueName:             &sysQueueName,
+					Throttle:              nil,
+					CustomConcurrencyKeys: nil,
+				},
+				QueueName: &sysQueueName,
+			}
+
+			// directly enqueue to partition
+			enqueueToBacklog = false
+			qi, err := q.EnqueueItem(ctx, defaultShard, item, at, osqueue.EnqueueOpts{})
+			require.NoError(t, err)
+			enqueueToBacklog = true
+
+			// put item in progress, this is tested separately
+			now := q.clock.Now()
+			leaseDur := 5 * time.Second
+			leaseExpires := now.Add(leaseDur)
+			leaseID, err := q.Lease(ctx, qi, leaseDur, now, nil)
+			require.NoError(t, err)
+			require.NotNil(t, leaseID)
+
+			backlogs := q.ItemBacklogs(ctx, item)
+			require.Len(t, backlogs, 1)
+
+			shadowPartition := q.ItemShadowPartition(ctx, item)
+			require.NotEmpty(t, shadowPartition.PartitionID)
+			require.Len(t, shadowPartition.CustomConcurrencyKeys, 0)
+
+			fnPart, custom1, custom2, _ := q.ItemPartitions(ctx, defaultShard, item)
+			require.NotEmpty(t, fnPart.ID)
+			require.Equal(t, int(enums.PartitionTypeDefault), fnPart.PartitionType)
+			require.True(t, fnPart.IsSystem())
+			require.Empty(t, custom1.ID)
+			require.Equal(t, int(enums.PartitionTypeDefault), custom1.PartitionType)
+			require.Empty(t, custom2.ID)
+			require.Equal(t, int(enums.PartitionTypeDefault), custom2.PartitionType)
+
+			// expect key queue accounting to contain item in in-progress
+			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, shadowPartition.inProgressKey(kg), qi.ID)))
+
+			require.Equal(t, kg.Concurrency("account", sysQueueName), shadowPartition.accountInProgressKey(kg))
+			require.True(t, r.Exists(shadowPartition.accountInProgressKey(kg)))
+
+			// no active set for default partition since this uses the in progress key
+			require.Equal(t, kg.Concurrency("", ""), backlogs[0].activeKey(kg))
+
+			// expect old accounting to be updated
+			// TODO Do we actually want to update previous accounting?
+			require.True(t, hasMember(t, r, fnPart.concurrencyKey(kg), qi.ID))
+			require.True(t, hasMember(t, r, kg.Concurrency("account", fnPart.Queue()), qi.ID)) // pseudo-limit for system queue
+			require.True(t, hasMember(t, r, kg.Concurrency("p", fnPart.Queue()), qi.ID))
+
+			err = q.Dequeue(ctx, defaultShard, qi)
+			require.NoError(t, err)
+
+			// expect item not to be requeued
+			require.False(t, hasMember(t, r, kg.BacklogSet(backlogs[0].BacklogID), qi.ID))
+
+			// expect key queue accounting to be updated
+			require.False(t, hasMember(t, r, shadowPartition.inProgressKey(kg), qi.ID))
+			require.False(t, hasMember(t, r, shadowPartition.accountInProgressKey(kg), qi.ID))
+
+			// expect old accounting to be updated
+			// TODO Do we actually want to update previous accounting?
+			require.False(t, hasMember(t, r, fnPart.concurrencyKey(kg), qi.ID))
+			require.False(t, hasMember(t, r, kg.Concurrency("account", fnPart.Queue()), qi.ID)) // pseudo-limit for system queue
+			require.False(t, hasMember(t, r, kg.Concurrency("p", fnPart.Queue()), qi.ID))
+
+			// item must not be in classic backlog
+			require.False(t, hasMember(t, r, fnPart.zsetKey(kg), qi.ID))
+		})
+	})
+}
+
+func score(t *testing.T, r *miniredis.Miniredis, key string, member string) float64 {
+	require.True(t, r.Exists(key), r.Keys())
+
+	score, err := r.ZScore(key, member)
+	require.NoError(t, err)
+
+	return score
+}
+
+func hasMember(t *testing.T, r *miniredis.Miniredis, key string, member string) bool {
+	if !r.Exists(key) {
+		return false
+	}
+
+	members, err := r.ZMembers(key)
+	require.NoError(t, err)
+
+	for _, s := range members {
+		if s == member {
+			return true
+		}
+	}
+	return false
+}

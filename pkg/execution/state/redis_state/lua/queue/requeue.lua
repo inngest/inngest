@@ -20,18 +20,37 @@ local keyCustomConcurrencyKey1    = KEYS[8] -- When leasing an item we need to p
 local keyCustomConcurrencyKey2    = KEYS[9] -- Optional for eg. for concurrency amongst steps
 local keyAcctConcurrency          = KEYS[10]
 -- We push pointers to partition concurrency items to the partition concurrency item
-local concurrencyPointer          = KEYS[11]
+local concurrencyPointer      = KEYS[11]
 
-local keyItemIndexA               = KEYS[12]          -- custom item index 1
-local keyItemIndexB               = KEYS[13]          -- custom item index 2
+-- Key queues v2
+local keyBacklogSetA              = KEYS[12]          -- backlog:sorted:<backlogID> - zset
+local keyBacklogSetB              = KEYS[13]          -- backlog:sorted:<backlogID> - zset
+local keyBacklogSetC              = KEYS[14]          -- backlog:sorted:<backlogID> - zset
+local keyBacklogMeta              = KEYS[15]          -- backlogs - hash
+local keyGlobalShadowPartitionSet = KEYS[16]          -- shadow:sorted
+local keyShadowPartitionSet       = KEYS[17]          -- shadow:sorted:<fnID|queueName> - zset
+local keyShadowPartitionMeta      = KEYS[18]          -- shadows
+
+local keyItemIndexA           = KEYS[19]          -- custom item index 1
+local keyItemIndexB           = KEYS[20]          -- custom item index 2
 
 local queueItem           = ARGV[1]
 local queueID             = ARGV[2]           -- id
 local queueScore          = tonumber(ARGV[3]) -- vesting time, in ms
 local nowMS               = tonumber(ARGV[4]) -- now in ms
-local partitionItemFn     = ARGV[5]
+local partitionItem     = ARGV[5]
 local partitionID         = ARGV[6]
 local accountId           = ARGV[7]
+
+-- Key queues v2
+local requeueToBacklog				= tonumber(ARGV[8])
+local shadowPartitionItem     = ARGV[9]
+local backlogItemA            = ARGV[10]
+local backlogItemB            = ARGV[11]
+local backlogItemC            = ARGV[12]
+local backlogIdA              = ARGV[13]
+local backlogIdB              = ARGV[14]
+local backlogIdC              = ARGV[15]
 
 -- $include(get_queue_item.lua)
 -- $include(get_partition_item.lua)
@@ -90,10 +109,19 @@ handleRequeueConcurrency(keyCustomConcurrencyKey2)
 -- and Lease for respective ZADD calls.
 redis.call("ZREM", keyAcctConcurrency, item.id)
 
---
--- Enqueue item to partition queues again
--- 
-requeue_to_partition(keyPartitionFn, partitionID, partitionItemFn, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, queueScore, queueID, nowMS, accountId)
+if requeueToBacklog == 1 then
+	--
+	-- Requeue item to backlog queues again
+	--
+  requeue_to_backlog(keyBacklogSetA, backlogIdA, backlogItemA, partitionID, shadowPartitionItem, partitionItem, keyPartitionMap, keyBacklogMeta, keyGlobalShadowPartitionSet, keyShadowPartitionMeta, keyShadowPartitionSet, queueScore, queueID, nowMS)
+  requeue_to_backlog(keyBacklogSetB, backlogIdB, backlogItemB, partitionID, shadowPartitionItem, partitionItem, keyPartitionMap, keyBacklogMeta, keyGlobalShadowPartitionSet, keyShadowPartitionMeta, keyShadowPartitionSet, queueScore, queueID, nowMS)
+  requeue_to_backlog(keyBacklogSetC, backlogIdC, backlogItemC, partitionID, shadowPartitionItem, partitionItem, keyPartitionMap, keyBacklogMeta, keyGlobalShadowPartitionSet, keyShadowPartitionMeta, keyShadowPartitionSet, queueScore, queueID, nowMS)
+else
+  --
+  -- Enqueue item to partition queues again
+  --
+  requeue_to_partition(keyPartitionFn, partitionID, partitionItem, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, queueScore, queueID, nowMS, accountId)
+end
 
 -- Add optional indexes.
 if keyItemIndexA ~= "" and keyItemIndexA ~= false and keyItemIndexA ~= nil then
