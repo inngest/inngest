@@ -4160,12 +4160,11 @@ func TestGuaranteedCapacity(t *testing.T) {
 		q1 := NewQueue(
 			QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey)},
 			WithRunMode(QueueRunMode{
-				Sequential:         false,
-				Scavenger:          false,
-				Partition:          false,
-				Account:            false,
-				AccountWeight:      0,
-				GuaranteedCapacity: false,
+				Sequential:    false,
+				Scavenger:     false,
+				Partition:     false,
+				Account:       false,
+				AccountWeight: 0,
 			}),
 			WithGuaranteedCapacityFinder(sf),
 		)
@@ -4204,12 +4203,11 @@ func TestGuaranteedCapacity(t *testing.T) {
 		q2 := NewQueue(
 			QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey)},
 			WithRunMode(QueueRunMode{
-				Sequential:         false,
-				Scavenger:          false,
-				Partition:          false,
-				Account:            false,
-				AccountWeight:      0,
-				GuaranteedCapacity: false,
+				Sequential:    false,
+				Scavenger:     false,
+				Partition:     false,
+				Account:       false,
+				AccountWeight: 0,
 			}),
 			WithGuaranteedCapacityFinder(sf),
 		)

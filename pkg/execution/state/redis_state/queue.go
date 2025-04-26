@@ -517,12 +517,11 @@ func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 		peekMin: DefaultQueuePeekMin,
 		peekMax: DefaultQueuePeekMax,
 		runMode: QueueRunMode{
-			Sequential:         true,
-			Scavenger:          true,
-			Partition:          true,
-			Account:            true,
-			GuaranteedCapacity: true,
-			AccountWeight:      85,
+			Sequential:    true,
+			Scavenger:     true,
+			Partition:     true,
+			Account:       true,
+			AccountWeight: 85,
 		},
 		numWorkers:               defaultNumWorkers,
 		numShadowWorkers:         defaultNumShadowWorkers,
@@ -760,9 +759,6 @@ type QueueRunMode struct {
 
 	// AccountWeight is the weight of processing accounts over partitions between 0 - 100 where 100 means only process accounts
 	AccountWeight int
-
-	// GuaranteedAccount determines whether accounts with guaranteed capacity are fetched, and one lease is acquired per instance to process the account
-	GuaranteedCapacity bool
 
 	// Continuations enables continuations
 	Continuations bool

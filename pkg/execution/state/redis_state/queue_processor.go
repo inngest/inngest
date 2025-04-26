@@ -171,10 +171,6 @@ func (q *queue) Enqueue(ctx context.Context, item osqueue.Item, at time.Time, op
 }
 
 func (q *queue) Run(ctx context.Context, f osqueue.RunFunc) error {
-	if q.runMode.GuaranteedCapacity {
-		go q.claimUnleasedGuaranteedCapacity(ctx, q.guaranteedCapacityScanTickTime, q.guaranteedCapacityLeaseTickTime)
-	}
-
 	if q.runMode.Sequential {
 		go q.claimSequentialLease(ctx)
 	}
