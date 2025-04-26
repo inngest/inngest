@@ -133,13 +133,6 @@ var (
 	// ErrConcurrencyLimitCustomKey represents a concurrency limit being hit for *some*, but *not all*
 	// jobs in a queue, via custom concurrency keys which are evaluated to a specific string.
 	ErrConcurrencyLimitCustomKey = fmt.Errorf("at concurrency limit")
-
-	// internal guaranteed capacity errors
-	errGuaranteedCapacityNotFound      = fmt.Errorf("guaranteed capacity not found")
-	errGuaranteedCapacityIndexLeased   = fmt.Errorf("guaranteed capacity index is already leased")
-	errGuaranteedCapacityLeaseNotFound = fmt.Errorf("guaranteed capacity lease not found")
-	errGuaranteedCapacityIndexInvalid  = fmt.Errorf("guaranteed capacity lease index is too high (a lease just expired)")
-	errGuaranteedCapacityIndexExceeded = fmt.Errorf("guaranteed capacity index exceeded the maximum limit")
 )
 
 var (
@@ -167,14 +160,6 @@ type PartitionPriorityFinder func(ctx context.Context, part QueuePartition) uint
 // AccountPriorityFinder returns the priority for a given account.
 type AccountPriorityFinder func(ctx context.Context, accountId uuid.UUID) uint
 
-// GuaranteedCapacityFinder returns the given guaranteed capacity for an account ID, or nil if the
-// account does not have guaranteed capacity. We use an account ID because each individual
-// job AND partition/function lease requires this to be called.
-//
-// NOTE: This is called frequently:  for every enqueue, lease, partition lease, and so on.
-// Expect this to be called tens of thousands of times per second.
-type GuaranteedCapacityFinder func(ctx context.Context, queueShardName string, accountId uuid.UUID) *GuaranteedCapacity
-
 type QueueOpt func(q *queue)
 
 func WithName(name string) func(q *queue) {
@@ -198,12 +183,6 @@ func WithPartitionPriorityFinder(ppf PartitionPriorityFinder) QueueOpt {
 func WithAccountPriorityFinder(apf AccountPriorityFinder) QueueOpt {
 	return func(q *queue) {
 		q.apf = apf
-	}
-}
-
-func WithGuaranteedCapacityFinder(sf GuaranteedCapacityFinder) QueueOpt {
-	return func(q *queue) {
-		q.gcf = sf
 	}
 }
 
@@ -578,17 +557,13 @@ func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 		shadowPartitionProcessCount: func(ctx context.Context, acctID uuid.UUID) int {
 			return 5
 		},
-		itemIndexer:                     QueueItemIndexerFunc,
-		backoffFunc:                     backoff.DefaultBackoff,
-		accountLeases:                   []leasedAccount{},
-		accountLeaseLock:                &sync.Mutex{},
-		guaranteedCapacityScanTickTime:  GuaranteedCapacityTickTime,
-		guaranteedCapacityLeaseTickTime: AccountLeaseTime,
-		clock:                           clockwork.NewRealClock(),
-		continuesLock:                   &sync.Mutex{},
-		continues:                       map[string]continuation{},
-		continueCooldown:                map[string]time.Time{},
-		continuationLimit:               consts.DefaultQueueContinueLimit,
+		itemIndexer:       QueueItemIndexerFunc,
+		backoffFunc:       backoff.DefaultBackoff,
+		clock:             clockwork.NewRealClock(),
+		continuesLock:     &sync.Mutex{},
+		continues:         map[string]continuation{},
+		continueCooldown:  map[string]time.Time{},
+		continuationLimit: consts.DefaultQueueContinueLimit,
 	}
 
 	// default to using primary queue client for shard selection
@@ -625,8 +600,6 @@ type queue struct {
 
 	ppf PartitionPriorityFinder
 	apf AccountPriorityFinder
-
-	gcf GuaranteedCapacityFinder
 
 	lifecycles QueueLifecycleListeners
 
@@ -719,10 +692,6 @@ type queue struct {
 	// or reading from scavengerLeaseID in parallel.
 	scavengerLeaseLock *sync.RWMutex
 
-	// accountLeases represents accounts that are leased by the current queue worker.
-	accountLeases    []leasedAccount
-	accountLeaseLock *sync.Mutex
-
 	// backoffFunc is the backoff function to use when retrying operations.
 	backoffFunc backoff.BackoffFunc
 
@@ -730,9 +699,6 @@ type queue struct {
 
 	// runMode defines the processing scopes or capabilities of the queue instances
 	runMode QueueRunMode
-
-	guaranteedCapacityScanTickTime  time.Duration
-	guaranteedCapacityLeaseTickTime time.Duration
 
 	// continues stores a map of all partition IDs to continues for a partition.
 	// this lets us optimize running consecutive steps for a function, as a continuation, to a specific limit.
@@ -778,7 +744,6 @@ type continuation struct {
 type processItem struct {
 	P QueuePartition
 	I osqueue.QueueItem
-	G *GuaranteedCapacity
 
 	// PCtr represents the number of times the partition has been continued.
 	PCtr uint
@@ -1215,24 +1180,6 @@ func (q *queue) EnqueueItem(ctx context.Context, shard QueueShard, i osqueue.Que
 		q.logger.Warn().Interface("item", i).Msg("attempting to enqueue item to non-system partition without account ID")
 	}
 
-	var (
-		guaranteedCapacity *GuaranteedCapacity
-
-		// initialize guaranteed capacity key for automatic cleanup
-		guaranteedCapacityKey = guaranteedCapacityKeyForAccount(i.Data.Identifier.AccountID)
-	)
-	if q.gcf != nil && !isSystemPartition {
-		// Fetch guaranteed capacity for the given account. If there is no guaranteed
-		// capacity configured, this will return nil, and we will remove any leftover
-		// items in the guaranteed capacity map
-		// Note: This function is called _a lot_ so the calls should be memoized.
-		guaranteedCapacity = q.gcf(ctx, shard.Name, i.Data.Identifier.AccountID)
-		if guaranteedCapacity != nil {
-			guaranteedCapacity.Leases = []ulid.ULID{}
-			guaranteedCapacityKey = guaranteedCapacity.Key()
-		}
-	}
-
 	enqueueToBacklogs := false
 	if isSystemPartition && q.allowSystemKeyQueues != nil {
 		enqueueToBacklogs = q.allowSystemKeyQueues(ctx)
@@ -1301,9 +1248,6 @@ func (q *queue) EnqueueItem(ctx context.Context, shard QueueShard, i osqueue.Que
 		defaultPartition,
 		defaultPartition.ID,
 		i.Data.Identifier.AccountID.String(),
-
-		guaranteedCapacity,
-		guaranteedCapacityKey,
 
 		enqueueToBacklogsVal,
 		shadowPartition,
@@ -3500,36 +3444,6 @@ func (q *queue) InProgress(ctx context.Context, prefix string, concurrencyKey st
 }
 
 func (q *queue) Instrument(ctx context.Context) error {
-	// other queue instrumentation
-	go func(ctx context.Context) {
-		// Shard instrumentations
-		guaranteedCapacityMap, err := q.getGuaranteedCapacityMap(ctx)
-		if err != nil {
-			q.logger.Error().Err(err).Msg("error retrieving guaranteedCapacityMap")
-		}
-
-		metrics.GaugeQueueGuaranteedCapacityCount(ctx, int64(len(guaranteedCapacityMap)), metrics.GaugeOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name}})
-		for _, guaranteedCapacity := range guaranteedCapacityMap {
-			tags := map[string]any{"account_id": guaranteedCapacity.AccountID, "queue_shard": q.primaryQueueShard.Name}
-
-			metrics.GaugeQueueAccountGuaranteedCapacityCount(ctx, int64(guaranteedCapacity.GuaranteedCapacity), metrics.GaugeOpt{
-				PkgName: pkgName,
-				Tags:    tags,
-			})
-			metrics.GaugeQueueGuaranteedCapacityLeaseCount(ctx, int64(len(guaranteedCapacity.Leases)), metrics.GaugeOpt{
-				PkgName: pkgName,
-				Tags:    tags,
-			})
-
-			if size, err := q.partitionSize(ctx, q.primaryQueueShard.RedisClient.kg.AccountPartitionIndex(guaranteedCapacity.AccountID), q.clock.Now().Add(PartitionLookahead)); err == nil {
-				metrics.GaugeQueueGuaranteedCapacityAccountPartitionAvailableCount(ctx, size, metrics.GaugeOpt{
-					PkgName: pkgName,
-					Tags:    tags,
-				})
-			}
-		}
-	}(ctx)
-
 	// Check on global partition and queue partition sizes
 	var offset, total int64
 	chunkSize := int64(1000)
