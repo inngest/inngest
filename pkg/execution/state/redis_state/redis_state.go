@@ -1103,6 +1103,7 @@ func (m shardedMgr) consumePause(ctx context.Context, p *state.Pause, data any) 
 	}
 	switch status {
 	case -1:
+		// This could be an ErrDuplicateResponse;  we're attempting to consume a pause twice.
 		return state.ConsumePauseResult{}, nil
 	case 0:
 		return state.ConsumePauseResult{DidConsume: true}, nil
