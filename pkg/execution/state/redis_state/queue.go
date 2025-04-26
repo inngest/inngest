@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"math"
 	mrand "math/rand"
 	"strconv"
@@ -254,7 +255,7 @@ func WithQueueItemIndexer(i QueueItemIndexer) QueueOpt {
 //
 // NOTE: If this is set and this worker claims the sequential lease, there is no guarantee
 // on latency or fairness in the denied queue partitions.
-func WithDenyQueueNames(queues ...string) func(q *queue) {
+func WithDenyQueueNames(queues ...string) QueueOpt {
 	return func(q *queue) {
 		q.denyQueues = queues
 		q.denyQueueMap = make(map[string]*struct{})
@@ -273,7 +274,7 @@ func WithDenyQueueNames(queues ...string) func(q *queue) {
 // WithAllowQueueNames specifies that the worker can only select jobs from queue partitions
 // within the given list of names.  This means that the worker will never work on jobs in
 // other queues.
-func WithAllowQueueNames(queues ...string) func(q *queue) {
+func WithAllowQueueNames(queues ...string) QueueOpt {
 	return func(q *queue) {
 		q.allowQueues = queues
 		q.allowQueueMap = make(map[string]*struct{})
@@ -296,7 +297,7 @@ func WithAllowQueueNames(queues ...string) func(q *queue) {
 // The mapping must be provided in terms of item kind to queue name.  If the item
 // kind doesn't exist in the mapping the job's queue name will be left nil.  This
 // means that the item will be placed in the workflow ID's queue.
-func WithKindToQueueMapping(mapping map[string]string) func(q *queue) {
+func WithKindToQueueMapping(mapping map[string]string) QueueOpt {
 	// XXX: Refactor osqueue.Item and this package to resolve these interfaces
 	// and clean up this function.
 	return func(q *queue) {
@@ -304,21 +305,27 @@ func WithKindToQueueMapping(mapping map[string]string) func(q *queue) {
 	}
 }
 
-func WithDisableFifoForFunctions(mapping map[string]struct{}) func(q *queue) {
+func WithDisableFifoForFunctions(mapping map[string]struct{}) QueueOpt {
 	return func(q *queue) {
 		q.disableFifoForFunctions = mapping
 	}
 }
 
-func WithDisableFifoForAccounts(mapping map[string]struct{}) func(q *queue) {
+func WithDisableFifoForAccounts(mapping map[string]struct{}) QueueOpt {
 	return func(q *queue) {
 		q.disableFifoForAccounts = mapping
 	}
 }
 
-func WithLogger(l *zerolog.Logger) func(q *queue) {
+func WithLogger(l *zerolog.Logger) QueueOpt {
 	return func(q *queue) {
 		q.logger = l
+	}
+}
+
+func WithLog(l *slog.Logger) QueueOpt {
+	return func(q *queue) {
+		q.log = l
 	}
 }
 
@@ -484,6 +491,8 @@ func WithQueueShadowPartitionProcessCount(spc QueueShadowPartitionProcessCount) 
 }
 
 func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
+	ctx := context.Background()
+
 	q := &queue{
 		primaryQueueShard: primaryQueueShard,
 		queueShardClients: map[string]QueueShard{primaryQueueShard.Name: primaryQueueShard},
@@ -511,7 +520,8 @@ func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 		pollTick:                 defaultPollTick,
 		idempotencyTTL:           defaultIdempotencyTTL,
 		queueKindMapping:         make(map[string]string),
-		logger:                   logger.From(context.Background()),
+		logger:                   logger.From(ctx),
+		log:                      logger.StdlibLogger(ctx),
 		concurrencyLimitGetter: func(ctx context.Context, p QueuePartition) PartitionConcurrencyLimits {
 			def := defaultConcurrency
 			if p.ConcurrencyLimit > 0 {
@@ -654,6 +664,7 @@ type queue struct {
 	disableFifoForFunctions map[string]struct{}
 	disableFifoForAccounts  map[string]struct{}
 	logger                  *zerolog.Logger
+	log                     *slog.Logger
 
 	// itemIndexer returns indexes for a given queue item.
 	itemIndexer QueueItemIndexer
