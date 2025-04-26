@@ -170,6 +170,10 @@ func (m *mockBufferer) PauseTimestamp(ctx context.Context, index Index, pause st
 	return time.Now(), nil
 }
 
+func (m *mockBufferer) ConsumePause(ctx context.Context, p state.Pause, data any) (state.ConsumePauseResult, error) {
+	return state.ConsumePauseResult{}, fmt.Errorf("not implemented")
+}
+
 func (m *mockBufferer) Delete(ctx context.Context, index Index, pause state.Pause) error {
 	// For testing purposes, we'll just remove the pause from our mock buffer
 	for i, p := range m.pauses {

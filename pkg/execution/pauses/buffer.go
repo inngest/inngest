@@ -55,3 +55,7 @@ func (r redisAdapter) PauseTimestamp(ctx context.Context, index Index, pause sta
 	// Fetch timestamp from index.
 	return r.rsm.PauseCreatedAt(ctx, index.WorkspaceID, index.EventName, pause.ID)
 }
+
+func (r redisAdapter) ConsumePause(ctx context.Context, pause state.Pause, data any) (state.ConsumePauseResult, error) {
+	return r.rsm.ConsumePause(ctx, pause, data)
+}

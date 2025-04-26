@@ -1052,19 +1052,14 @@ func (m unshardedMgr) DeletePause(ctx context.Context, p state.Pause) error {
 	}
 }
 
-func (m mgr) ConsumePause(ctx context.Context, pauseID uuid.UUID, data any) (state.ConsumePauseResult, error) {
-	p, err := m.unshardedMgr.PauseByID(ctx, pauseID)
-	if err != nil {
-		return state.ConsumePauseResult{}, err
-	}
-
-	result, err := m.shardedMgr.consumePause(ctx, p, data)
+func (m mgr) ConsumePause(ctx context.Context, pause state.Pause, data any) (state.ConsumePauseResult, error) {
+	result, err := m.shardedMgr.consumePause(ctx, &pause, data)
 	if err != nil {
 		return state.ConsumePauseResult{}, err
 	}
 
 	// The pause was now consumed, so let's clean up
-	err = m.unshardedMgr.DeletePause(ctx, *p)
+	err = m.unshardedMgr.DeletePause(ctx, pause)
 	return result, err
 }
 
