@@ -10,9 +10,7 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
-var (
-	ErrNotInBuffer = fmt.Errorf("pause not in buffer")
-)
+var ErrNotInBuffer = fmt.Errorf("pause not in buffer")
 
 // Index represents the index for a specific pause.  A pause is a signal
 // for a given workspace/event combination and expression;  its always bound
@@ -34,7 +32,10 @@ type Manager interface {
 	//
 	// Note that this may return state.ErrPauseNotFound if the current pause ID has already
 	// been consumed by another parallel process or because of a race condition.
-	ConsumePause(ctx context.Context, id uuid.UUID, data any) (state.ConsumePauseResult, error)
+	//
+	// NOTE: This consumes a pause in the buffer, then calls m.Delete to ensure the pause is
+	// deleted from the backing block store.
+	ConsumePause(ctx context.Context, pause state.Pause, data any) (state.ConsumePauseResult, error)
 
 	// Delete deletes a pause from either the block index or the buffer, depending on
 	// where the pause is stored.
@@ -66,6 +67,9 @@ type Bufferer interface {
 
 	// PauseTimestamp returns the created at timestamp for a pause.
 	PauseTimestamp(ctx context.Context, index Index, pause state.Pause) (time.Time, error)
+
+	// ConsumePause consumes a pause, writing the deleted status to the buffer.
+	ConsumePause(ctx context.Context, pause state.Pause, data any) (state.ConsumePauseResult, error)
 }
 
 // BlockStore is an implementation that reads and writes blocks.

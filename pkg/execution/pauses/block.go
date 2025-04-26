@@ -341,7 +341,6 @@ func (b *blockstore) Compact(ctx context.Context, idx Index) {
 	// TODO: Read all block metadata for the index
 	// TODO: Read all blockDeleteKey entries for the index
 	// TODO: For each deleted entry, record which block the delete is for.
-	//       XXX: we can't embed the timestamp in block IDs because of old parallelism;  how do we track this?
 	// TODO: If len(block_deletes) > block_compact_ratio, rewrite the block by:
 	// 1. fetching the block
 	// 2. filtering deleted pauses from the block
@@ -419,7 +418,6 @@ func (b *blockstore) addBlockIndex(ctx context.Context, idx Index, block *Block,
 			FieldValue(block.ID.String(), string(metadata)).
 			Build(),
 	).Error()
-
 }
 
 // GenerateKey generates a key for a given block ID.

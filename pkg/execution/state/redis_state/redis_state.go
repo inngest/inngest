@@ -319,7 +319,6 @@ func (m shardedMgr) New(ctx context.Context, input state.Input) (state.State, er
 		},
 		args,
 	).AsInt64()
-
 	if err != nil {
 		return nil, fmt.Errorf("error storing run state in redis: %w", err)
 	}
@@ -484,9 +483,7 @@ func (m shardedMgr) LoadEvents(ctx context.Context, accountId uuid.UUID, fnID uu
 
 	fnRunState := m.s.FunctionRunState()
 
-	var (
-		events []json.RawMessage
-	)
+	var events []json.RawMessage
 
 	r, isSharded := fnRunState.Client(ctx, accountId, runID)
 
@@ -694,7 +691,6 @@ func (m shardedMgr) StackIndex(ctx context.Context, accountId uuid.UUID, runID u
 		if i == stepID {
 			return n + 1, nil
 		}
-
 	}
 	return 0, fmt.Errorf("step not found in stack: %s", stepID)
 }
@@ -870,7 +866,7 @@ func (m unshardedMgr) LeasePause(ctx context.Context, id uuid.UUID) error {
 		redis_telemetry.WithScriptName(ctx, "leasePause"),
 		pause.Client(),
 		// keys will be sharded/unsharded depending on RunID
-		[]string{pause.kg.Pause(ctx, id), pause.kg.PauseLease(ctx, id)},
+		[]string{pause.kg.PauseLease(ctx, id)},
 		args,
 	).AsInt64()
 	if err != nil {
@@ -881,8 +877,10 @@ func (m unshardedMgr) LeasePause(ctx context.Context, id uuid.UUID) error {
 		return nil
 	case 1:
 		return state.ErrPauseLeased
-	case 2:
-		return state.ErrPauseNotFound
+	// case 2:
+	//  NOTE: This is now not possible, as we flush blocks from redis to a backing block store
+	//  meaning that pauses may never be found,
+	// 	return state.ErrPauseNotFound
 	default:
 		return fmt.Errorf("unknown response leasing pause: %d", status)
 	}
@@ -1299,7 +1297,6 @@ func (m unshardedMgr) EvaluablesByID(ctx context.Context, ids ...uuid.UUID) ([]e
 }
 
 func (m unshardedMgr) LoadEvaluablesSince(ctx context.Context, workspaceID uuid.UUID, eventName string, since time.Time, do func(context.Context, expr.Evaluable) error) error {
-
 	// Keep a list of pauses that should be deleted because they've expired.
 	//
 	// Note that we don't do this in the iteration loop, as redis can use either HSCAN or

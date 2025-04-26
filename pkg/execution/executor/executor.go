@@ -1329,7 +1329,7 @@ func (e *executor) handlePausesAllNaively(ctx context.Context, iter state.PauseI
 	res := execution.HandlePauseResult{0, 0}
 
 	if e.queue == nil || e.smv2 == nil || e.pm == nil {
-		return res, fmt.Errorf("No queue or state manager specified")
+		return res, fmt.Errorf("no queue or state manager specified")
 	}
 
 	log := logger.StdlibLogger(ctx).With("event_id", evt.GetInternalID().String())
@@ -1492,7 +1492,6 @@ func (e *executor) handlePause(
 	res *execution.HandlePauseResult,
 	l *slog.Logger,
 ) error {
-
 	// If this is a cancellation, ensure that we're not handling an event that
 	// was received before the run (due to eg. latency in a bad case).
 	if pause.Cancel && bytes.Compare(evtID[:], pause.Identifier.RunID[:]) <= 0 {
@@ -1712,7 +1711,7 @@ func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequ
 // Resume resumes an in-progress function from the given pause.
 func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.ResumeRequest) error {
 	if e.queue == nil || e.smv2 == nil || e.pm == nil {
-		return fmt.Errorf("No queue or state manager specified")
+		return fmt.Errorf("no queue or state manager specified")
 	}
 
 	md, err := e.smv2.LoadMetadata(ctx, sv2.ID{
@@ -1814,13 +1813,11 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 					logger.StdlibLogger(ctx).Warn("missing pause timeout item", "shard", shard.Name, "pause", pause)
 				} else {
 					logger.StdlibLogger(ctx).Error("error dequeueing consumed pause job when resuming", "error", err)
-
 				}
 			}
 		}
 		return nil
 	}, 20*time.Second)
-
 	if err != nil {
 		return err
 	}
