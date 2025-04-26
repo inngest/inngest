@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
@@ -13,8 +12,6 @@ import (
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 	"gonum.org/v1/gonum/stat/sampleuv"
-	mathRand "math/rand"
-	"sync/atomic"
 	"time"
 )
 
@@ -24,8 +21,6 @@ var (
 	GuaranteedCapacityTickTime = 30 * time.Second
 	// AccountLeaseTime is how long accounts with guaranteed capacity are leased.
 	AccountLeaseTime = 20 * time.Second
-
-	maxAccountLeaseAttempts = 10
 
 	// How many accounts to lease on a single worker when processing guaranteed capacity
 	GuaranteedCapacityLeaseLimit = 1
@@ -276,127 +271,6 @@ func (q *queue) getAccountLeases() []leasedAccount {
 	}
 	q.accountLeaseLock.Unlock()
 	return existingLeases
-}
-
-func (q *queue) claimUnleasedGuaranteedCapacity(ctx context.Context, scanTickTime, leaseTickTime time.Duration) {
-	scanTick := q.clock.NewTicker(scanTickTime)
-	leaseTick := q.clock.NewTicker(leaseTickTime / 2)
-
-	// records whether we're leasing
-	var leasing int32
-
-	// records whether we're renewing
-	var renewing int32
-
-	for {
-		if q.isSequential() {
-			// Sequential workers never lease accounts.  They always run in order
-			// on the global partition queue.
-			// We perform this check every scan iteration to support claiming
-			// guaranteed capacity if the sequential lease expires for some reason
-			<-scanTick.Chan()
-			continue
-		}
-
-		select {
-		case <-ctx.Done():
-			scanTick.Stop()
-			leaseTick.Stop()
-
-			// Copy the slice to prevent locking/concurrent access.
-			existingLeases := q.getAccountLeases()
-
-			// Attempt to expire all leases ASAP, even if the backing store is single threaded.
-			for _, ls := range existingLeases {
-				// Expire leases immediately from backing store.
-				ls := ls
-				go func(ls leasedAccount) {
-					q.logger.Debug().Str("account", ls.GuaranteedCapacity.AccountID.String()).Msg("expiring account lease before shutdown")
-					err := q.expireAccountLease(context.Background(), ls.GuaranteedCapacity, ls.Lease)
-					if err != nil && !errors.Is(err, errGuaranteedCapacityNotFound) {
-						q.logger.Error().Err(err).Msg("error expiring account lease")
-					}
-					q.removeLeasedAccount(ls.GuaranteedCapacity)
-				}(ls)
-			}
-
-			return
-		case <-scanTick.Chan():
-			go func() {
-				if !atomic.CompareAndSwapInt32(&leasing, 0, 1) {
-					// Only one lease can occur at once.
-					q.logger.Debug().Msg("already leasing accounts")
-					return
-				}
-
-				// Always reset the leasing op to zero, allowing us to lease again.
-				defer func() { atomic.StoreInt32(&leasing, 0) }()
-
-				// Retry claiming leases until all accounts have been taken.  All operations
-				// must succeed, even if it leaves us spinning.  Note that scanAndLeaseUnleasedAccounts filters
-				// out unnecessary leases and accounts that have already been leased.
-				retry := true
-				n := 0
-				for retry && n < maxAccountLeaseAttempts {
-					n++
-					var err error
-					retry, err = q.scanAndLeaseUnleasedAccounts(ctx)
-					if err != nil {
-						q.logger.Error().Err(err).Msg("error scanning and leasing accounts")
-						return
-					}
-					if retry {
-						<-q.clock.After(time.Duration(mathRand.Intn(1000)) * time.Millisecond)
-					}
-				}
-			}()
-		case <-leaseTick.Chan():
-			go func() {
-				if !atomic.CompareAndSwapInt32(&renewing, 0, 1) {
-					// Only one lease can occur at once.
-					q.logger.Debug().Msg("already renewing accounts")
-					return
-				}
-
-				// Always reset the renewing op to zero, allowing us to lease again.
-				defer func() { atomic.StoreInt32(&renewing, 0) }()
-
-				// Copy the slice to prevent locking/concurrent access.
-				existingLeases := q.getAccountLeases()
-
-				for _, s := range existingLeases {
-					// Attempt to lease all ASAP, even if the backing store is single threaded.
-					go func(ls leasedAccount) {
-						nextLeaseID, err := q.renewAccountLease(ctx, ls.GuaranteedCapacity, AccountLeaseTime, ls.Lease)
-						if err != nil {
-							// Renewing a lease should never fail, unless guaranteed capacity was removed.
-							// We must stop holding on to the account in any case.
-							q.removeLeasedAccount(ls.GuaranteedCapacity)
-
-							// If guaranteed capacity was removed, we can remove the internal lease state
-							if errors.Is(err, errGuaranteedCapacityNotFound) {
-								return
-							}
-
-							// If our lease was stolen, play nice and remove the leased account
-							if errors.Is(err, errGuaranteedCapacityLeaseNotFound) {
-								q.logger.Warn().Interface("lease", ls).Msg("giving up lease since it was removed in the backing store")
-								return
-							}
-
-							q.logger.Error().Interface("lease", ls).Err(err).Msg("error renewing account lease")
-							return
-						}
-						q.logger.Debug().Interface("account", ls).Msg("renewed account lease")
-						// Update the lease ID so that we have this stored appropriately for
-						// the next renewal.
-						q.addLeasedAccount(ls.GuaranteedCapacity, *nextLeaseID)
-					}(s)
-				}
-			}()
-
-		}
-	}
 }
 
 func (q *queue) scanAndLeaseUnleasedAccounts(ctx context.Context) (retry bool, err error) {
