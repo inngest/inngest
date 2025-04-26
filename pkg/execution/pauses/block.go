@@ -62,6 +62,9 @@ type BlockstoreOpts struct {
 	CompactionLimit int
 	// CompactionSample is the chance of compaction, from 0-100
 	CompactionSample float64
+	// Delete indicates whether we delete from the backing buffer,
+	// or if deletes are ignored.
+	Delete bool
 }
 
 func NewBlockstore(opts BlockstoreOpts) (BlockStore, error) {
@@ -95,6 +98,7 @@ func NewBlockstore(opts BlockstoreOpts) (BlockStore, error) {
 		buf:              opts.Bufferer,
 		bucket:           opts.Bucket,
 		leaser:           opts.Leaser,
+		delete:           opts.Delete,
 	}, nil
 }
 
@@ -127,6 +131,9 @@ type blockstore struct {
 
 	// rc is the Redis client used to manage block indexes.
 	rc rueidis.Client
+
+	// delete, if false, prevents deleting items from the backing buffer when flushed.
+	delete bool
 }
 
 func (b blockstore) BlockSize() int {
@@ -235,9 +242,11 @@ func (b blockstore) flushIndexBlock(ctx context.Context, index Index) error {
 	}
 
 	// Remove len(block.Pauses) from the buffer, as they've been flushed.
-	for _, p := range block.Pauses {
-		if err := b.buf.Delete(ctx, index, *p); err != nil {
-			logger.StdlibLogger(ctx).Warn("error deleting pause from buffer after flushing block", "error", err)
+	if b.delete {
+		for _, p := range block.Pauses {
+			if err := b.buf.Delete(ctx, index, *p); err != nil {
+				logger.StdlibLogger(ctx).Warn("error deleting pause from buffer after flushing block", "error", err)
+			}
 		}
 	}
 
