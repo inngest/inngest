@@ -1207,7 +1207,6 @@ func (q *queue) EnqueueItem(ctx context.Context, shard QueueShard, i osqueue.Que
 		shard.RedisClient.kg.AccountPartitionIndex(i.Data.Identifier.AccountID), // new queue items always contain the account ID
 		shard.RedisClient.kg.Idempotency(i.ID),
 		shard.RedisClient.kg.FnMetadata(i.FunctionID),
-		shard.RedisClient.kg.GuaranteedCapacityMap(),
 
 		// Add all 3 partition sets
 		defaultPartition.zsetKey(shard.RedisClient.kg),

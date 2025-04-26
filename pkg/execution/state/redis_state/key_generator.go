@@ -220,10 +220,6 @@ type QueueKeyGenerator interface {
 	// calculating the EWMA value for the function
 	ConcurrencyFnEWMA(fnID uuid.UUID) string
 
-	// GuaranteedCapacityMap is a key to a hashmap of guaranteed capacities available.  The values of this
-	// key are JSON-encoded GuaranteedCapacity items.
-	GuaranteedCapacityMap() string
-
 	//
 	// ***************** Deprecated *****************
 	//
@@ -240,10 +236,6 @@ type QueueKeyGenerator interface {
 type queueKeyGenerator struct {
 	queueDefaultKey string
 	queueItemKeyGenerator
-}
-
-func (u queueKeyGenerator) GuaranteedCapacityMap() string {
-	return fmt.Sprintf("{%s}:queue:guaranteed-capacity", u.queueDefaultKey)
 }
 
 func (u queueKeyGenerator) QueueIndex(id string) string {

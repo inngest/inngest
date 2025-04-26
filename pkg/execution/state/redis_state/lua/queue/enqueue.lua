@@ -12,20 +12,19 @@ local keyGlobalAccountPointer 	= KEYS[4]           -- accounts:sorted - zset
 local keyAccountPartitions    	= KEYS[5]           -- accounts:$accountId:partition:sorted - zset
 local idempotencyKey          	= KEYS[6]           -- seen:$key
 local keyFnMetadata           	= KEYS[7]           -- fnMeta:$id - hash
-local guaranteedCapacityMapKey	= KEYS[8]           -- shards - hmap of shards
-local keyPartition           	  = KEYS[9]           -- queue:sorted:$workflowID - zset
+local keyPartition           	  = KEYS[8]           -- queue:sorted:$workflowID - zset
 
 -- Key queues v2
-local keyBacklogSetA              = KEYS[10]          -- backlog:sorted:<backlogID> - zset
-local keyBacklogSetB              = KEYS[11]          -- backlog:sorted:<backlogID> - zset
-local keyBacklogSetC              = KEYS[12]          -- backlog:sorted:<backlogID> - zset
-local keyBacklogMeta              = KEYS[13]          -- backlogs - hash
-local keyGlobalShadowPartitionSet = KEYS[14]          -- shadow:sorted
-local keyShadowPartitionSet       = KEYS[15]          -- shadow:sorted:<fnID|queueName> - zset
-local keyShadowPartitionMeta      = KEYS[16]          -- shadows
+local keyBacklogSetA              = KEYS[9]          -- backlog:sorted:<backlogID> - zset
+local keyBacklogSetB              = KEYS[10]          -- backlog:sorted:<backlogID> - zset
+local keyBacklogSetC              = KEYS[11]          -- backlog:sorted:<backlogID> - zset
+local keyBacklogMeta              = KEYS[12]          -- backlogs - hash
+local keyGlobalShadowPartitionSet = KEYS[13]          -- shadow:sorted
+local keyShadowPartitionSet       = KEYS[14]          -- shadow:sorted:<fnID|queueName> - zset
+local keyShadowPartitionMeta      = KEYS[15]          -- shadows
 
-local keyItemIndexA           	= KEYS[17]          -- custom item index 1
-local keyItemIndexB           	= KEYS[18]          -- custom item index 2
+local keyItemIndexA           	= KEYS[16]          -- custom item index 1
+local keyItemIndexB           	= KEYS[17]          -- custom item index 2
 
 
 local queueItem           		= ARGV[1]           -- {id, lease id, attempt, max attempt, data, etc...}
