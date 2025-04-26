@@ -278,29 +278,12 @@ func TestQueueRunExtended(t *testing.T) {
 	require.NoError(t, err)
 	defer rc.Close()
 
-	// In this test, shards must be leased rapidly, as we randomly close and terminate workers
-	// after a minimum of 10 seconds.
-	GuaranteedCapacityTickTime = 5 * time.Second
-	AccountLeaseTime = 5 * time.Second
-
-	sf := func(ctx context.Context, _ string, accountId uuid.UUID) *GuaranteedCapacity {
-		// For nil UUIDs, return a shard.
-		if accountId == uuid.Nil {
-			return &GuaranteedCapacity{
-				AccountID:          uuid.Nil,
-				GuaranteedCapacity: 1,
-			}
-		}
-		return nil
-	}
-
 	q := NewQueue(
 		QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName},
 		// We can't add more than 8128 goroutines when detecting race conditions,
 		// so lower the number of workers.
 		WithNumWorkers(200),
 		WithLogger(&l),
-		WithGuaranteedCapacityFinder(sf),
 	)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -328,7 +311,6 @@ func TestQueueRunExtended(t *testing.T) {
 					// so lower the number of workers.
 					WithNumWorkers(200),
 					WithLogger(&l),
-					WithGuaranteedCapacityFinder(sf),
 				)
 
 				go func() {
