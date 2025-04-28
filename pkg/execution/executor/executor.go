@@ -2684,7 +2684,7 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, i *runInstan
 	}
 
 	if opts.If != nil {
-		err = expressions.Validate(ctx, *opts.If)
+		err = expressions.Validate(ctx, expressions.DefaultRestrictiveValidationPolicy(), *opts.If)
 		if err != nil {
 			return state.WrapInStandardError(
 				err,

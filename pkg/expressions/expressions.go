@@ -237,20 +237,6 @@ type expressionEvaluator struct {
 	attrs *UsedAttributes
 }
 
-// Validate calls parse and check on an ASTs using NON CACHING parsing.  This MUST be non-caching
-// as calling Check on an AST is not thread safe.
-func Validate(ctx context.Context, expression string) error {
-	// Compile the expression as new.
-	env, err := env()
-	if err != nil {
-		return err
-	}
-	if _, issues := env.Compile(expression); issues != nil {
-		return fmt.Errorf("error validating expression: %w", NewCompileError(issues.Err()))
-	}
-	return nil
-}
-
 // Evaluate compiles an expression string against a set of variables, returning whether the
 // expression evaluates to true, the next earliest time to re-test the evaluation (if dates are
 // compared), and any errors.
