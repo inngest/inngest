@@ -34,7 +34,7 @@ func TestVerifyKeyGenerator(t *testing.T) {
 
 	assert.Equal(
 		t,
-		legacyKg.Event(ctx, state.Identifier{RunID: fakeUlid}),
+		legacyKg.Event(ctx, state.Identifier{RunID: fakeUlid, WorkflowID: fakeUuid}),
 		newRunStateKg.Event(ctx, false, fakeUuid, fakeUlid),
 	)
 	assert.Equal(t, legacyKg.Stack(ctx, fakeUlid), newRunStateKg.Stack(ctx, false, fakeUlid))
@@ -42,12 +42,12 @@ func TestVerifyKeyGenerator(t *testing.T) {
 	assert.Equal(t, legacyKg.RunMetadata(ctx, fakeUlid), newRunStateKg.RunMetadata(ctx, false, fakeUlid))
 	assert.Equal(
 		t,
-		legacyKg.Events(ctx, state.Identifier{RunID: fakeUlid, WorkspaceID: fakeUuid}),
+		legacyKg.Events(ctx, state.Identifier{RunID: fakeUlid, WorkflowID: fakeUuid}),
 		newRunStateKg.Events(ctx, false, fakeUuid, fakeUlid),
 	)
 	assert.Equal(
 		t,
-		legacyKg.Actions(ctx, state.Identifier{RunID: fakeUlid, WorkspaceID: fakeUuid}),
+		legacyKg.Actions(ctx, state.Identifier{RunID: fakeUlid, WorkflowID: fakeUuid}),
 		newRunStateKg.Actions(ctx, false, fakeUuid, fakeUlid),
 	)
 	assert.Equal(t, legacyKg.Errors(ctx, state.Identifier{RunID: fakeUlid, WorkspaceID: fakeUuid}), newRunStateKg.Errors(ctx, false, state.Identifier{RunID: fakeUlid, WorkspaceID: fakeUuid}))
@@ -98,6 +98,5 @@ func TestVerifyKeyGenerator(t *testing.T) {
 
 	assert.Equal(t, legacyKg.Invoke(ctx, fakeUuid), globalKg.Invoke(ctx, fakeUuid))
 	// No longer used
-	//assert.Equal(t, legacyKg.Workflow(ctx, fakeUuid, 1), globalKg.Workflow(ctx, fakeUuid, 1))
-
+	// assert.Equal(t, legacyKg.Workflow(ctx, fakeUuid, 1), globalKg.Workflow(ctx, fakeUuid, 1))
 }
