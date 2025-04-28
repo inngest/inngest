@@ -66,31 +66,28 @@ func (m manager) ConsumePause(ctx context.Context, pause state.Pause, data any) 
 	// assuming this won’t happen a ton.  this can be improved later.
 
 	res, err := m.buf.ConsumePause(ctx, pause, data)
-	if errors.Is(err, state.ErrPauseNotFound) {
-		return state.ConsumePauseResult{}, err
-	}
 	// Is this an ErrDuplicateResponse?  If so, we've already consumed this pause,
 	// so delete it.  Similarly, if the error is nil we just consumed, so go ahead
 	// and delete the pause then continue
-	if errors.Is(err, state.ErrDuplicateResponse) || err == nil {
-		idx := Index{
-			pause.WorkspaceID,
-			*pause.Event,
-		}
-		if err := m.Delete(ctx, idx, pause); err != nil {
-			// We only log here if the delete fails. Consuming is idempotent and is the
-			// action that updates state.
-			logger.StdlibLogger(ctx).Error(
-				"error deleting pause once consumed",
-				"error", err,
-				"pause", pause,
-				"index", idx,
-			)
-		}
-		return res, nil
+	if err != nil {
+		return res, err
 	}
 
-	return state.ConsumePauseResult{}, fmt.Errorf("error consuming pause from buffer: %w", err)
+	idx := Index{
+		pause.WorkspaceID,
+		*pause.Event,
+	}
+	if err := m.Delete(ctx, idx, pause); err != nil {
+		// We only log here if the delete fails. Consuming is idempotent and is the
+		// action that updates state.
+		logger.StdlibLogger(ctx).Error(
+			"error deleting pause once consumed",
+			"error", err,
+			"pause", pause,
+			"index", idx,
+		)
+	}
+	return res, nil
 }
 
 // Write writes one or more pauses to the backing store.  Note that the index
