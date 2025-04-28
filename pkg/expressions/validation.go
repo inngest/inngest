@@ -20,10 +20,29 @@ type ValidationPolicy struct {
 
 func DefaultRestrictiveValidationPolicy() *ValidationPolicy {
 	return &ValidationPolicy{
-		DisallowMacros:      true,
+		// DisallowMacros determines whether CEL macros are allowed.
+		DisallowMacros: true,
+
+		// DisallowNonLogicFns determines whether non-logical functions/operators are allowed.
+		// Logic functions (conditionals, and/or/not, less/greater than, equals) are always allowed.
+		// See the logicFnNames function in validation.go for a detailed list.
+		// Indexing and selecting (Index, OptIndex, OptSelect) are always allowed; despite not
+		// being strictly logic functions, CEL expressions without them are usually not useful.
 		DisallowNonLogicFns: true,
-		AllowDateTimeFns:    true,
-		AllowMathFns:        true,
+
+		// AllowDateTimeFns determines whether date/time functions are allowed.
+		// This option is only used if DisallowNonLogicFns is true; it adds some functions (date,
+		// now_plus, now_minus, duration) to the set of allowed functions.
+		// See the dateTimeFnNames function in validation.go for a detailed list.
+		// If DisallowNonLogicFns is false, this option has no effect (i.e. all functions are allowed).
+		AllowDateTimeFns: false,
+
+		// AllowMathFns determines whether mathematical functions are allowed.
+		// This option is only used if DisallowNonLogicFns is true; it adds some functions (e.g. add,
+		// multiply, modulo, negate) to the set of allowed functions.
+		// See the mathFnNames function in validation.go for a detailed list.
+		// If DisallowNonLogicFns is false, this option has no effect (i.e. all functions are allowed).
+		AllowMathFns: false,
 	}
 }
 

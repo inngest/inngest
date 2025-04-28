@@ -52,7 +52,7 @@ func Test_Validation(t *testing.T) {
 		{
 			expr:        `"lol" == event.data || event.name == "foo" || (async.source == 'test' || async.source == 'google') && date(async.next_visit) > now_plus("24h") && async.email == 'test@example.com'`,
 			policy:      DefaultRestrictiveValidationPolicy(),
-			expectValid: true,
+			expectValid: false,
 		},
 		{
 			expr:        "event.data.action == 'opened'",
@@ -82,7 +82,7 @@ func Test_Validation(t *testing.T) {
 		{
 			expr:        "5 + 4",
 			policy:      DefaultRestrictiveValidationPolicy(),
-			expectValid: true,
+			expectValid: false,
 		},
 		{
 			expr:        "event.data.name + '-' + event.data.number + '-' + event.data.bool + '-' + event.data.list + '-' + event.data.obj + '-' + event.data.missing",
@@ -92,7 +92,7 @@ func Test_Validation(t *testing.T) {
 		{
 			expr:        "event.data.name + '-' + event.data.number + '-' + event.data.bool + '-' + event.data.list + '-' + event.data.obj + '-' + event.data.missing",
 			policy:      DefaultRestrictiveValidationPolicy(),
-			expectValid: true,
+			expectValid: false,
 		},
 		{
 			expr:        "uppercase(event.data.name) + ' is my name'",
@@ -302,7 +302,7 @@ func Test_Validation(t *testing.T) {
 		{
 			expr:        "date(event.from) + duration('6h35m10s') == date('2020-01-01T18:35:10')",
 			policy:      DefaultRestrictiveValidationPolicy(),
-			expectValid: true,
+			expectValid: false,
 		},
 	}
 
