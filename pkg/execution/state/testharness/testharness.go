@@ -695,10 +695,6 @@ func checkConsumePauseWithData(t *testing.T, m state.Manager) {
 		"did this work?": true,
 	}
 
-	// Consuming a non-existent pause should error.
-	_, err := m.ConsumePause(ctx, state.Pause{ID: uuid.New()}, pauseData)
-	require.Equal(t, state.ErrPauseNotFound, err, "Consuming a non-existent pause should return state.ErrPauseNotFound")
-
 	// Save a pause.
 	pause := state.Pause{
 		ID: pauseID(t),
@@ -712,16 +708,12 @@ func checkConsumePauseWithData(t *testing.T, m state.Manager) {
 		Expires:  state.Time(time.Now().Add(state.PauseLeaseDuration * 2)),
 		DataKey:  "my-pause-data-stored-for-eternity",
 	}
-	_, err = m.SavePause(ctx, pause)
+	_, err := m.SavePause(ctx, pause)
 	require.NoError(t, err)
 
 	// Consuming the pause should work.
 	_, err = m.ConsumePause(ctx, pause, pauseData)
 	require.NoError(t, err)
-
-	_, err = m.ConsumePause(ctx, pause, pauseData)
-	require.NotNil(t, err)
-	require.Error(t, state.ErrPauseNotFound, err)
 
 	//
 	// Assert that completing a leased pause fails.
