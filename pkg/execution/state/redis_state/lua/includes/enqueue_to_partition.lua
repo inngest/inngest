@@ -102,9 +102,10 @@ local function enqueue_to_backlog(keyBacklogSet, backlogID, backlogItem, partiti
 	local currentScore = redis.call("ZSCORE", keyGlobalShadowPartitionSet, partitionID)
 	if currentScore == false or tonumber(currentScore) > partitionTime then
 		update_pointer_score_to(partitionID, keyGlobalShadowPartitionSet, partitionTime)
-	end
 
-  update_account_shadow_queues(keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, partitionID, accountID, partitionTime)
+    -- Also update account-based shadow partition index
+    update_account_shadow_queues(keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, partitionID, accountID, partitionTime)
+	end
 end
 
 -- requeue_to_partition is similar to enqueue, but always fetches the minimum score for a partition to
@@ -201,7 +202,8 @@ local function requeue_to_backlog(keyBacklogSet, backlogID, backlogItem, partiti
 	local currentScore = redis.call("ZSCORE", keyGlobalShadowPartitionSet, partitionID)
 	if currentScore == false or tonumber(currentScore) > earliestScore then
 		update_pointer_score_to(partitionID, keyGlobalShadowPartitionSet, updateTo)
-	end
 
-  update_account_shadow_queues(keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, partitionID, accountID, updateTo)
+    -- Also update account-based shadow partition index
+    update_account_shadow_queues(keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, partitionID, accountID, updateTo)
+	end
 end
