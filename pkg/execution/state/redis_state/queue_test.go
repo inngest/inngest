@@ -4798,6 +4798,8 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 			// pointers should keep earlier score
 			require.Equal(t, at.UnixMilli()/1000, int64(score(t, r, kg.ShadowPartitionSet(shadowPartition.PartitionID), backlogs[0].BacklogID)))
 			require.Equal(t, at.UnixMilli()/1000, int64(score(t, r, kg.GlobalShadowPartitionSet(), shadowPartition.PartitionID)))
+			require.Equal(t, at.UnixMilli()/1000, int64(score(t, r, kg.GlobalAccountShadowPartitions(), accountId.String())))
+			require.Equal(t, at.UnixMilli()/1000, int64(score(t, r, kg.AccountShadowPartitions(accountId), shadowPartition.PartitionID)))
 
 			// item in backlog should have new score
 			require.Equal(t, newScore.UnixMilli(), int64(score(t, r, kg.BacklogSet(backlogs[0].BacklogID), qi.ID)))
@@ -4842,6 +4844,9 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 				require.Equal(t, expected, actual, time.Unix(expected, 0).String(), time.Unix(actual, 0).String())
 			}
 			require.Equal(t, newScore.UnixMilli()/1000, int64(score(t, r, kg.GlobalShadowPartitionSet(), shadowPartition.PartitionID)))
+
+			require.Equal(t, newScore.UnixMilli()/1000, int64(score(t, r, kg.GlobalAccountShadowPartitions(), accountId.String())))
+			require.Equal(t, newScore.UnixMilli()/1000, int64(score(t, r, kg.AccountShadowPartitions(accountId), shadowPartition.PartitionID)))
 
 			// item in backlog should have new score
 			require.Equal(t, newScore.UnixMilli(), int64(score(t, r, kg.BacklogSet(backlogs[0].BacklogID), qi.ID)))
