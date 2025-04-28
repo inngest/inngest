@@ -181,6 +181,10 @@ type QueueKeyGenerator interface {
 	ShadowPartitionSet(shadowPartitionID string) string
 	// ShadowPartitionMeta returns the key to the hash storing serialized QueueShadowPartition objects by ID.
 	ShadowPartitionMeta() string
+	// AccountShadowPartitions returns the key to the ZSET storing pointers (shadow partition IDs) for a given account.
+	AccountShadowPartitions(accountID uuid.UUID) string
+	// GlobalAccountShadowPartitions returns the key to the ZSET storing pointers (account IDs) for accounts with existing shadow partitions.
+	GlobalAccountShadowPartitions() string
 
 	//
 	// Queue metadata keys
@@ -348,6 +352,20 @@ func (u queueKeyGenerator) BacklogMeta() string {
 // GlobalShadowPartitionSet returns the key to the global ZSET storing shadow partition pointers.
 func (u queueKeyGenerator) GlobalShadowPartitionSet() string {
 	return fmt.Sprintf("{%s}:shadow:sorted", u.queueDefaultKey)
+}
+
+func (u queueKeyGenerator) AccountShadowPartitions(accountID uuid.UUID) string {
+	if accountID == uuid.Nil {
+		// this is a placeholder because passing an empty key into Lua will cause multi-slot key errors
+		return fmt.Sprintf("{%s}:accounts:shadows:sorted:-", u.queueDefaultKey)
+	}
+
+	return fmt.Sprintf("{%s}:accounts:%s:shadows:sorted", u.queueDefaultKey, accountID)
+
+}
+
+func (u queueKeyGenerator) GlobalAccountShadowPartitions() string {
+	return fmt.Sprintf("{%s}:accounts:shadows:sorted", u.queueDefaultKey)
 }
 
 // ShadowPartitionSet returns the key to the ZSET storing pointers (backlog IDs) for a given shadow partition.

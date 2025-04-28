@@ -12,7 +12,7 @@ local queueKey                = KEYS[1] -- queue:item - hash: { $itemID: $item }
 local keyPartitionMap         = KEYS[2] -- partition:item - hash: { $workflowID: $partition }
 local keyGlobalPointer        = KEYS[3] -- partition:sorted - zset
 local keyGlobalAccountPointer = KEYS[4] -- accounts:sorted - zset
-local keyAccountPartitions    = KEYS[5] -- accounts:$accountId:partition:sorted
+local keyAccountPartitions    = KEYS[5] -- accounts:$accountID:partition:sorted
 local keyPartitionFn          = KEYS[6] -- queue:sorted:$workflowID - zset
 -- We remove our queue item ID from each concurrency queue
 local keyConcurrencyFn            = KEYS[7] -- Account concurrency level
@@ -23,24 +23,26 @@ local keyAcctConcurrency          = KEYS[10]
 local concurrencyPointer      = KEYS[11]
 
 -- Key queues v2
-local keyBacklogSetA              = KEYS[12]          -- backlog:sorted:<backlogID> - zset
-local keyBacklogSetB              = KEYS[13]          -- backlog:sorted:<backlogID> - zset
-local keyBacklogSetC              = KEYS[14]          -- backlog:sorted:<backlogID> - zset
-local keyBacklogMeta              = KEYS[15]          -- backlogs - hash
-local keyGlobalShadowPartitionSet = KEYS[16]          -- shadow:sorted
-local keyShadowPartitionSet       = KEYS[17]          -- shadow:sorted:<fnID|queueName> - zset
-local keyShadowPartitionMeta      = KEYS[18]          -- shadows
+local keyBacklogSetA                     = KEYS[12]          -- backlog:sorted:<backlogID> - zset
+local keyBacklogSetB                     = KEYS[13]          -- backlog:sorted:<backlogID> - zset
+local keyBacklogSetC                     = KEYS[14]          -- backlog:sorted:<backlogID> - zset
+local keyBacklogMeta                     = KEYS[15]          -- backlogs - hash
+local keyGlobalShadowPartitionSet        = KEYS[16]          -- shadow:sorted
+local keyShadowPartitionSet              = KEYS[17]          -- shadow:sorted:<fnID|queueName> - zset
+local keyShadowPartitionMeta             = KEYS[18]          -- shadows
+local keyGlobalAccountShadowPartitionSet = KEYS[19]
+local keyAccountShadowPartitionSet       = KEYS[20]
 
-local keyItemIndexA           = KEYS[19]          -- custom item index 1
-local keyItemIndexB           = KEYS[20]          -- custom item index 2
+local keyItemIndexA           = KEYS[21]          -- custom item index 1
+local keyItemIndexB           = KEYS[22]          -- custom item index 2
 
 local queueItem           = ARGV[1]
 local queueID             = ARGV[2]           -- id
 local queueScore          = tonumber(ARGV[3]) -- vesting time, in ms
 local nowMS               = tonumber(ARGV[4]) -- now in ms
-local partitionItem     = ARGV[5]
+local partitionItem       = ARGV[5]
 local partitionID         = ARGV[6]
-local accountId           = ARGV[7]
+local accountID           = ARGV[7]
 
 -- Key queues v2
 local requeueToBacklog				= tonumber(ARGV[8])
@@ -113,14 +115,14 @@ if requeueToBacklog == 1 then
 	--
 	-- Requeue item to backlog queues again
 	--
-  requeue_to_backlog(keyBacklogSetA, backlogIdA, backlogItemA, partitionID, shadowPartitionItem, partitionItem, keyPartitionMap, keyBacklogMeta, keyGlobalShadowPartitionSet, keyShadowPartitionMeta, keyShadowPartitionSet, queueScore, queueID, nowMS)
-  requeue_to_backlog(keyBacklogSetB, backlogIdB, backlogItemB, partitionID, shadowPartitionItem, partitionItem, keyPartitionMap, keyBacklogMeta, keyGlobalShadowPartitionSet, keyShadowPartitionMeta, keyShadowPartitionSet, queueScore, queueID, nowMS)
-  requeue_to_backlog(keyBacklogSetC, backlogIdC, backlogItemC, partitionID, shadowPartitionItem, partitionItem, keyPartitionMap, keyBacklogMeta, keyGlobalShadowPartitionSet, keyShadowPartitionMeta, keyShadowPartitionSet, queueScore, queueID, nowMS)
+  requeue_to_backlog(keyBacklogSetA, backlogIdA, backlogItemA, partitionID, shadowPartitionItem, partitionItem, keyPartitionMap, keyBacklogMeta, keyGlobalShadowPartitionSet, keyShadowPartitionMeta, keyShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, queueScore, queueID, accountID)
+  requeue_to_backlog(keyBacklogSetB, backlogIdB, backlogItemB, partitionID, shadowPartitionItem, partitionItem, keyPartitionMap, keyBacklogMeta, keyGlobalShadowPartitionSet, keyShadowPartitionMeta, keyShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, queueScore, queueID, accountID)
+  requeue_to_backlog(keyBacklogSetC, backlogIdC, backlogItemC, partitionID, shadowPartitionItem, partitionItem, keyPartitionMap, keyBacklogMeta, keyGlobalShadowPartitionSet, keyShadowPartitionMeta, keyShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, queueScore, queueID, accountID)
 else
   --
   -- Enqueue item to partition queues again
   --
-  requeue_to_partition(keyPartitionFn, partitionID, partitionItem, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, queueScore, queueID, nowMS, accountId)
+  requeue_to_partition(keyPartitionFn, partitionID, partitionItem, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, queueScore, queueID, nowMS, accountID)
 end
 
 -- Add optional indexes.

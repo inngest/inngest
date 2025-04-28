@@ -1230,6 +1230,8 @@ func (q *queue) EnqueueItem(ctx context.Context, shard QueueShard, i osqueue.Que
 		shard.RedisClient.kg.GlobalShadowPartitionSet(),
 		shard.RedisClient.kg.ShadowPartitionSet(shadowPartition.PartitionID),
 		shard.RedisClient.kg.ShadowPartitionMeta(),
+		shard.RedisClient.kg.GlobalAccountShadowPartitions(),
+		shard.RedisClient.kg.AccountShadowPartitions(i.Data.Identifier.AccountID), // will be empty for system queues
 	}
 	// Append indexes
 	for _, idx := range q.itemIndexer(ctx, i, shard.RedisClient.kg) {
@@ -2668,6 +2670,8 @@ func (q *queue) Requeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		queueShard.RedisClient.kg.GlobalShadowPartitionSet(),
 		queueShard.RedisClient.kg.ShadowPartitionSet(shadowPartition.PartitionID),
 		queueShard.RedisClient.kg.ShadowPartitionMeta(),
+		queueShard.RedisClient.kg.GlobalAccountShadowPartitions(),
+		queueShard.RedisClient.kg.AccountShadowPartitions(i.Data.Identifier.AccountID), // empty for system partitions
 	}
 	// Append indexes
 	for _, idx := range q.itemIndexer(ctx, i, queueShard.RedisClient.kg) {
