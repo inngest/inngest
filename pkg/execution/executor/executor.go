@@ -600,10 +600,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	//
 	if req.BatchID == nil {
 		for _, c := range req.Function.Cancel {
-			pauseID, err := uuid.NewV7()
-			if err != nil {
-				return &metadata, fmt.Errorf("error generating pause ID: %w", err)
-			}
+			pauseID := uuid.New()
 			expires := time.Now().Add(consts.CancelTimeout)
 			if c.Timeout != nil {
 				dur, err := str2duration.ParseDuration(*c.Timeout)
@@ -2562,11 +2559,7 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, i *runInst
 		return execError{err: fmt.Errorf("failed to create expression to wait for invoked function completion: %w", err)}
 	}
 
-	pauseID, err := inngest.DeterministicUUIDV7(i.md.ID.RunID.String() + gen.ID)
-	if err != nil {
-		return fmt.Errorf("failed to generate deterministic pause ID: %w", err)
-	}
-
+	pauseID := inngest.DeterministicSha1UUID(i.md.ID.RunID.String() + gen.ID)
 	opcode := gen.Op.String()
 	now := time.Now()
 
