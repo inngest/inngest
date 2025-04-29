@@ -3,6 +3,7 @@ local keyShadowPartitionSet              = KEYS[2]
 local keyGlobalShadowPartitionSet        = KEYS[3]
 local keyGlobalAccountShadowPartitionSet = KEYS[4]
 local keyAccountShadowPartitionSet       = KEYS[5]
+local keyReadySet                        = KEYS[6]
 
 local backlogID   = ARGV[1]
 local partitionID = ARGV[2]
@@ -12,9 +13,24 @@ local accountID   = ARGV[3]
 -- $include(ends_with.lua)
 -- $include(update_account_queues.lua)
 
--- TODO Enforce constraints
+local capacity = 100
+
+-- TODO Enforce constraints and adjust capacity
 
 -- TODO Move item(s) out of backlog and into partition
+
+local items = redis.call("ZRANGE", keyBacklogSet, "-inf", "+inf", "BYSCORE", "LIMIT", 0, capacity, "WITHSCORES")
+
+-- Reverse the items to be added to the ready set
+local args = {}
+local remArgs = {}
+for i = 1, #items, 2 do
+  table.insert(args, items[i + 1]) -- score
+  table.insert(args, items[i])     -- item
+  table.insert(remArgs, items[i])  -- item for removal
+end
+redis.call("ZADD", keyReadySet, unpack(args))
+redis.call("ZREM", keyBacklogSet, unpack(remArgs))
 
 --
 -- Adjust pointer scores for shadow scanning, potentially clean up

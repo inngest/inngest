@@ -2861,6 +2861,7 @@ func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueSha
 		q.primaryQueueShard.RedisClient.kg.GlobalShadowPartitionSet(),
 		q.primaryQueueShard.RedisClient.kg.GlobalAccountShadowPartitions(),
 		q.primaryQueueShard.RedisClient.kg.AccountShadowPartitions(accountID),
+		q.primaryQueueShard.RedisClient.kg.PartitionQueueSet(enums.PartitionTypeDefault, sp.PartitionID, ""),
 	}
 	args, err := StrSlice([]any{
 		b.BacklogID,

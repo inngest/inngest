@@ -7091,12 +7091,17 @@ func TestQueueRefillBacklog(t *testing.T) {
 		require.Equal(t, expectedBacklogs[0], *backlogs[0])
 	})
 
-	t.Run("should refill backlog", func(t *testing.T) {
+	t.Run("should refill from backlog", func(t *testing.T) {
+		require.True(t, hasMember(t, r, kg.BacklogSet(expectedBacklogs[0].BacklogID), qi.ID))
+
 		err := q.BacklogRefill(ctx, &expectedBacklogs[0], &shadowPartition)
 		require.NoError(t, err)
 
-		// TODO assertions
-		fmt.Println(qi)
+		require.False(t, hasMember(t, r, kg.BacklogSet(expectedBacklogs[0].BacklogID), qi.ID))
+
+		require.True(t, hasMember(t, r, kg.PartitionQueueSet(enums.PartitionTypeDefault, fnID.String(), ""), qi.ID))
+		require.Equal(t, at.UnixMilli(), int64(score(t, r, kg.PartitionQueueSet(enums.PartitionTypeDefault, fnID.String(), ""), qi.ID)))
+
 		kg.ShadowPartitionSet(shadowPartition.PartitionID)
 	})
 }
