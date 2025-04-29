@@ -4750,12 +4750,18 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 			require.True(t, r.Exists(kg.ShadowPartitionMeta()))
 			require.True(t, r.Exists(kg.ShadowPartitionSet(shadowPartition.PartitionID)), r.Keys())
 			require.True(t, r.Exists(kg.GlobalShadowPartitionSet()))
+			require.True(t, r.Exists(kg.GlobalAccountShadowPartitions()))
+			require.True(t, r.Exists(kg.AccountShadowPartitions(accountId)))
 			require.Equal(t, string(marshaledBacklog), r.HGet(kg.BacklogMeta(), backlogs[0].BacklogID))
 			require.Equal(t, string(marshaledShadowPartition), r.HGet(kg.ShadowPartitionMeta(), shadowPartition.PartitionID))
 
 			require.Equal(t, at.UnixMilli()/1000, int64(score(t, r, kg.ShadowPartitionSet(shadowPartition.PartitionID), backlogs[0].BacklogID)))
 			require.Equal(t, at.UnixMilli()/1000, int64(score(t, r, kg.GlobalShadowPartitionSet(), shadowPartition.PartitionID)))
 			require.Equal(t, at.UnixMilli(), int64(score(t, r, kg.BacklogSet(backlogs[0].BacklogID), qi.ID)))
+
+			require.Equal(t, at.UnixMilli()/1000, int64(score(t, r, kg.GlobalAccountShadowPartitions(), accountId.String())))
+			require.Equal(t, at.UnixMilli()/1000, int64(score(t, r, kg.AccountShadowPartitions(accountId), shadowPartition.PartitionID)))
+
 		})
 
 		t.Run("adding later item should not update scores", func(t *testing.T) {
@@ -4792,6 +4798,8 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 			// pointers should keep earlier score
 			require.Equal(t, at.UnixMilli()/1000, int64(score(t, r, kg.ShadowPartitionSet(shadowPartition.PartitionID), backlogs[0].BacklogID)))
 			require.Equal(t, at.UnixMilli()/1000, int64(score(t, r, kg.GlobalShadowPartitionSet(), shadowPartition.PartitionID)))
+			require.Equal(t, at.UnixMilli()/1000, int64(score(t, r, kg.GlobalAccountShadowPartitions(), accountId.String())))
+			require.Equal(t, at.UnixMilli()/1000, int64(score(t, r, kg.AccountShadowPartitions(accountId), shadowPartition.PartitionID)))
 
 			// item in backlog should have new score
 			require.Equal(t, newScore.UnixMilli(), int64(score(t, r, kg.BacklogSet(backlogs[0].BacklogID), qi.ID)))
@@ -4836,6 +4844,9 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 				require.Equal(t, expected, actual, time.Unix(expected, 0).String(), time.Unix(actual, 0).String())
 			}
 			require.Equal(t, newScore.UnixMilli()/1000, int64(score(t, r, kg.GlobalShadowPartitionSet(), shadowPartition.PartitionID)))
+
+			require.Equal(t, newScore.UnixMilli()/1000, int64(score(t, r, kg.GlobalAccountShadowPartitions(), accountId.String())))
+			require.Equal(t, newScore.UnixMilli()/1000, int64(score(t, r, kg.AccountShadowPartitions(accountId), shadowPartition.PartitionID)))
 
 			// item in backlog should have new score
 			require.Equal(t, newScore.UnixMilli(), int64(score(t, r, kg.BacklogSet(backlogs[0].BacklogID), qi.ID)))
@@ -4888,13 +4899,6 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 		ctx := context.Background()
 
 		accountId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
-
-		score := func(t *testing.T, key string, member string) float64 {
-			score, err := r.ZScore(key, member)
-			require.NoError(t, err)
-
-			return score
-		}
 
 		// use future timestamp because scores will be bounded to the present
 		at := time.Now().Add(10 * time.Minute)
@@ -4950,10 +4954,15 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 			require.True(t, r.Exists(kg.ShadowPartitionMeta()))
 			require.True(t, r.Exists(kg.ShadowPartitionSet(shadowPartition.PartitionID)), r.Keys())
 			require.True(t, r.Exists(kg.GlobalShadowPartitionSet()))
+			require.True(t, r.Exists(kg.GlobalAccountShadowPartitions()))
+			require.True(t, r.Exists(kg.AccountShadowPartitions(accountId)))
 
-			require.Equal(t, at.UnixMilli()/1000, int64(score(t, kg.ShadowPartitionSet(shadowPartition.PartitionID), backlogs[0].BacklogID)))
-			require.Equal(t, at.UnixMilli()/1000, int64(score(t, kg.GlobalShadowPartitionSet(), shadowPartition.PartitionID)))
-			require.Equal(t, at.UnixMilli(), int64(score(t, kg.BacklogSet(backlogs[0].BacklogID), qi.ID)))
+			require.Equal(t, at.UnixMilli()/1000, int64(score(t, r, kg.ShadowPartitionSet(shadowPartition.PartitionID), backlogs[0].BacklogID)))
+			require.Equal(t, at.UnixMilli()/1000, int64(score(t, r, kg.GlobalShadowPartitionSet(), shadowPartition.PartitionID)))
+			require.Equal(t, at.UnixMilli(), int64(score(t, r, kg.BacklogSet(backlogs[0].BacklogID), qi.ID)))
+
+			require.Equal(t, at.UnixMilli()/1000, int64(score(t, r, kg.GlobalAccountShadowPartitions(), accountId.String())))
+			require.Equal(t, at.UnixMilli()/1000, int64(score(t, r, kg.AccountShadowPartitions(accountId), shadowPartition.PartitionID)))
 		})
 	})
 
@@ -5003,13 +5012,6 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 		ctx := context.Background()
 
 		accountId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
-
-		score := func(t *testing.T, key string, member string) float64 {
-			score, err := r.ZScore(key, member)
-			require.NoError(t, err)
-
-			return score
-		}
 
 		// use future timestamp because scores will be bounded to the present
 		at := time.Now().Add(10 * time.Minute)
@@ -5088,11 +5090,11 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 			require.Equal(t, string(marshaledBacklog1), r.HGet(kg.BacklogMeta(), backlogs[0].BacklogID))
 			require.Equal(t, string(marshaledBacklog2), r.HGet(kg.BacklogMeta(), backlogs[1].BacklogID))
 
-			require.Equal(t, at.UnixMilli()/1000, int64(score(t, kg.ShadowPartitionSet(shadowPartition.PartitionID), backlogs[0].BacklogID)))
-			require.Equal(t, at.UnixMilli()/1000, int64(score(t, kg.ShadowPartitionSet(shadowPartition.PartitionID), backlogs[1].BacklogID)))
-			require.Equal(t, at.UnixMilli()/1000, int64(score(t, kg.GlobalShadowPartitionSet(), shadowPartition.PartitionID)))
-			require.Equal(t, at.UnixMilli(), int64(score(t, kg.BacklogSet(backlogs[0].BacklogID), qi.ID)))
-			require.Equal(t, at.UnixMilli(), int64(score(t, kg.BacklogSet(backlogs[1].BacklogID), qi.ID)))
+			require.Equal(t, at.UnixMilli()/1000, int64(score(t, r, kg.ShadowPartitionSet(shadowPartition.PartitionID), backlogs[0].BacklogID)))
+			require.Equal(t, at.UnixMilli()/1000, int64(score(t, r, kg.ShadowPartitionSet(shadowPartition.PartitionID), backlogs[1].BacklogID)))
+			require.Equal(t, at.UnixMilli()/1000, int64(score(t, r, kg.GlobalShadowPartitionSet(), shadowPartition.PartitionID)))
+			require.Equal(t, at.UnixMilli(), int64(score(t, r, kg.BacklogSet(backlogs[0].BacklogID), qi.ID)))
+			require.Equal(t, at.UnixMilli(), int64(score(t, r, kg.BacklogSet(backlogs[1].BacklogID), qi.ID)))
 
 		})
 	})
@@ -5126,19 +5128,12 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 		)
 		ctx := context.Background()
 
-		score := func(t *testing.T, key string, member string) float64 {
-			score, err := r.ZScore(key, member)
-			require.NoError(t, err)
-
-			return score
-		}
-
 		// use future timestamp because scores will be bounded to the present
 		at := time.Now().Add(10 * time.Minute)
 
 		sysQueueName := osqueue.KindQueueMigrate
 
-		t.Run("should enqueue simple item to backlog", func(t *testing.T) {
+		t.Run("should enqueue item to backlog", func(t *testing.T) {
 			require.Len(t, r.Keys(), 0)
 
 			item := osqueue.QueueItem{
@@ -5173,12 +5168,15 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 			require.True(t, r.Exists(kg.ShadowPartitionMeta()))
 			require.True(t, r.Exists(kg.ShadowPartitionSet(shadowPartition.PartitionID)), r.Keys())
 			require.True(t, r.Exists(kg.GlobalShadowPartitionSet()))
+			require.False(t, r.Exists(kg.GlobalAccountShadowPartitions()))
+			require.False(t, r.Exists(kg.AccountShadowPartitions(uuid.Nil)))
+
 			require.Equal(t, string(marshaledBacklog), r.HGet(kg.BacklogMeta(), backlogs[0].BacklogID))
 			require.Equal(t, string(marshaledShadowPartition), r.HGet(kg.ShadowPartitionMeta(), shadowPartition.PartitionID))
 
-			require.Equal(t, at.UnixMilli()/1000, int64(score(t, kg.ShadowPartitionSet(shadowPartition.PartitionID), backlogs[0].BacklogID)))
-			require.Equal(t, at.UnixMilli()/1000, int64(score(t, kg.GlobalShadowPartitionSet(), shadowPartition.PartitionID)))
-			require.Equal(t, at.UnixMilli(), int64(score(t, kg.BacklogSet(backlogs[0].BacklogID), qi.ID)))
+			require.Equal(t, at.UnixMilli()/1000, int64(score(t, r, kg.ShadowPartitionSet(shadowPartition.PartitionID), backlogs[0].BacklogID)))
+			require.Equal(t, at.UnixMilli()/1000, int64(score(t, r, kg.GlobalShadowPartitionSet(), shadowPartition.PartitionID)))
+			require.Equal(t, at.UnixMilli(), int64(score(t, r, kg.BacklogSet(backlogs[0].BacklogID), qi.ID)))
 		})
 	})
 }
@@ -5195,13 +5193,6 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 
 		defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
 		kg := defaultShard.RedisClient.kg
-
-		score := func(t *testing.T, key string, member string) float64 {
-			score, err := r.ZScore(key, member)
-			require.NoError(t, err)
-
-			return score
-		}
 
 		enqueueToBacklog := false
 		q := NewQueue(
@@ -5277,16 +5268,16 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 			require.NotEmpty(t, shadowPartition.PartitionID)
 
 			// key queue v2 accounting
-			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, shadowPartition.accountInProgressKey(kg), qi.ID)))
-			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, shadowPartition.inProgressKey(kg), qi.ID)))
+			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, shadowPartition.accountInProgressKey(kg), qi.ID)))
+			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, shadowPartition.inProgressKey(kg), qi.ID)))
 			require.Equal(t, kg.Concurrency("", ""), backlogs[0].activeKey(kg))
 			require.False(t, r.Exists(backlogs[0].activeKey(kg)))
 
 			// expect classic partition concurrency to include item
 			// TODO Do we actually want to update previous accounting?
-			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, kg.Concurrency("account", accountId.String()), qi.ID)))
-			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, kg.Concurrency("p", fnID.String()), qi.ID)))
-			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, fnPart.concurrencyKey(kg), qi.ID)))
+			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, kg.Concurrency("account", accountId.String()), qi.ID)))
+			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, kg.Concurrency("p", fnID.String()), qi.ID)))
+			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, fnPart.concurrencyKey(kg), qi.ID)))
 		})
 	})
 
@@ -5776,11 +5767,19 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 
 			requeueFor := at.Add(30 * time.Minute).Truncate(time.Minute)
 
+			require.False(t, r.Exists(kg.GlobalAccountShadowPartitions()))
+			require.False(t, r.Exists(kg.AccountShadowPartitions(accountId)))
+
 			err = q.Requeue(ctx, defaultShard, qi, requeueFor)
 			require.NoError(t, err)
 
 			// expect item to be requeued to backlog
 			require.Equal(t, requeueFor.UnixMilli(), int64(score(t, r, kg.BacklogSet(backlogs[0].BacklogID), qi.ID)))
+			require.True(t, r.Exists(kg.GlobalAccountShadowPartitions()))
+			require.True(t, r.Exists(kg.AccountShadowPartitions(accountId)))
+
+			require.Equal(t, requeueFor.UnixMilli()/1000, int64(score(t, r, kg.GlobalAccountShadowPartitions(), accountId.String())))
+			require.Equal(t, requeueFor.UnixMilli()/1000, int64(score(t, r, kg.AccountShadowPartitions(accountId), shadowPartition.PartitionID)))
 
 			// expect key queue accounting to be updated
 			remainingMembers, _ := r.ZMembers(shadowPartition.inProgressKey(kg))

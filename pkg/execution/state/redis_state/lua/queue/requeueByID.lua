@@ -34,9 +34,9 @@ local keyShadowPartitionMeta      = KEYS[15]          -- shadows
 local jobID            = ARGV[1]           -- queue item ID
 local jobScore         = tonumber(ARGV[2]) -- enqueue at, in milliseconds
 local nowMS            = tonumber(ARGV[3]) -- in ms
-local partitionItem  = ARGV[4]
-local partitionID    = ARGV[5]
-local accountId        = ARGV[6]
+local partitionItem    = ARGV[4]
+local partitionID      = ARGV[5]
+local accountID        = ARGV[6]
 
 -- Key queues v2
 local requeueToBacklog				= tonumber(ARGV[14])
@@ -78,12 +78,12 @@ if requeueToBacklog == 1 then
 	--
 	-- Requeue item to backlog queues again
 	--
-	requeue_to_backlog(keyBacklogSetA, backlogIdA, backlogItemA, partitionID, shadowPartitionItem, partitionItem, keyPartitionMap, keyBacklogMeta, keyGlobalShadowPartitionSet, keyShadowPartitionMeta, keyShadowPartitionSet, queueScore, queueID, partitionTime, nowMS)
-	requeue_to_backlog(keyBacklogSetB, backlogIdB, backlogItemB, partitionID, shadowPartitionItem, partitionItem, keyPartitionMap, keyBacklogMeta, keyGlobalShadowPartitionSet, keyShadowPartitionMeta, keyShadowPartitionSet, queueScore, queueID, partitionTime, nowMS)
-	requeue_to_backlog(keyBacklogSetC, backlogIdC, backlogItemC, partitionID, shadowPartitionItem, partitionItem, keyPartitionMap, keyBacklogMeta, keyGlobalShadowPartitionSet, keyShadowPartitionMeta, keyShadowPartitionSet, queueScore, queueID, partitionTime, nowMS)
+	requeue_to_backlog(keyBacklogSetA, backlogIdA, backlogItemA, partitionID, shadowPartitionItem, partitionItem, keyPartitionMap, keyBacklogMeta, keyGlobalShadowPartitionSet, keyShadowPartitionMeta, keyShadowPartitionSet, queueScore, queueID, partitionTime, nowMS, accountID)
+	requeue_to_backlog(keyBacklogSetB, backlogIdB, backlogItemB, partitionID, shadowPartitionItem, partitionItem, keyPartitionMap, keyBacklogMeta, keyGlobalShadowPartitionSet, keyShadowPartitionMeta, keyShadowPartitionSet, queueScore, queueID, partitionTime, nowMS, accountID)
+	requeue_to_backlog(keyBacklogSetC, backlogIdC, backlogItemC, partitionID, shadowPartitionItem, partitionItem, keyPartitionMap, keyBacklogMeta, keyGlobalShadowPartitionSet, keyShadowPartitionMeta, keyShadowPartitionSet, queueScore, queueID, partitionTime, nowMS, accountID)
 else
   -- Update and requeue all partitions
-  requeue_to_partition(keyPartitionFn, partitionID, partitionItem, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, jobScore, jobID, nowMS, accountId)
+  requeue_to_partition(keyPartitionFn, partitionID, partitionItem, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, jobScore, jobID, nowMS, accountID)
 end
 
 return 0
