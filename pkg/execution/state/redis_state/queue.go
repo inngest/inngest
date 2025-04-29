@@ -2,6 +2,7 @@ package redis_state
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -108,6 +109,10 @@ const (
 )
 
 var (
+	ShadowPartitionLeaseDuration = PartitionLeaseDuration
+)
+
+var (
 	ErrQueueItemExists               = fmt.Errorf("queue item already exists")
 	ErrQueueItemNotFound             = fmt.Errorf("queue item not found")
 	ErrQueueItemAlreadyLeased        = fmt.Errorf("queue item already leased")
@@ -124,6 +129,11 @@ var (
 	ErrPartitionPaused               = fmt.Errorf("partition is paused")
 	ErrConfigAlreadyLeased           = fmt.Errorf("config scanner already leased")
 	ErrConfigLeaseExceedsLimits      = fmt.Errorf("config lease duration exceeds the maximum of %d seconds", int(ConfigLeaseMax.Seconds()))
+
+	ErrShadowPartitionAlreadyLeased = fmt.Errorf("shadow partition already leased")
+	ErrShadowPartitionLeaseNotFound = fmt.Errorf("shadow partition lease not found")
+	ErrShadowPartitionNotFound      = fmt.Errorf("shadow partition not found")
+	ErrShadowPartitionPaused        = fmt.Errorf("shadow partition refill is disabled")
 
 	ErrPartitionConcurrencyLimit = fmt.Errorf("at partition concurrency limit")
 	ErrAccountConcurrencyLimit   = fmt.Errorf("at account concurrency limit")
@@ -387,6 +397,14 @@ func WithQueueContinuationLimit(limit uint) QueueOpt {
 	}
 }
 
+// WithQueueShadowContinuationLimit sets the shadow continuation limit in the queue, eg. how many
+// sequential steps cause hints in the queue to continue executing the same shadow partition.
+func WithQueueShadowContinuationLimit(limit uint) QueueOpt {
+	return func(q *queue) {
+		q.shadowContinuationLimit = limit
+	}
+}
+
 type QueueShard struct {
 	Name string
 	Kind string
@@ -567,13 +585,17 @@ func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 		shadowPartitionProcessCount: func(ctx context.Context, acctID uuid.UUID) int {
 			return 5
 		},
-		itemIndexer:       QueueItemIndexerFunc,
-		backoffFunc:       backoff.DefaultBackoff,
-		clock:             clockwork.NewRealClock(),
-		continuesLock:     &sync.Mutex{},
-		continues:         map[string]continuation{},
-		continueCooldown:  map[string]time.Time{},
-		continuationLimit: consts.DefaultQueueContinueLimit,
+		itemIndexer:             QueueItemIndexerFunc,
+		backoffFunc:             backoff.DefaultBackoff,
+		clock:                   clockwork.NewRealClock(),
+		continuesLock:           &sync.Mutex{},
+		continues:               map[string]continuation{},
+		continueCooldown:        map[string]time.Time{},
+		continuationLimit:       consts.DefaultQueueContinueLimit,
+		shadowContinuesLock:     &sync.Mutex{},
+		shadowContinuationLimit: consts.DefaultQueueContinueLimit,
+		shadowContinues:         map[string]shadowContinuation{},
+		shadowContinueCooldown:  map[string]time.Time{},
 	}
 
 	// default to using primary queue client for shard selection
@@ -719,6 +741,11 @@ type queue struct {
 	// continuesLock protects the continues map.
 	continuesLock     *sync.Mutex
 	continuationLimit uint
+
+	shadowContinues         map[string]shadowContinuation
+	shadowContinueCooldown  map[string]time.Time
+	shadowContinuesLock     *sync.Mutex
+	shadowContinuationLimit uint
 }
 
 type QueueRunMode struct {
@@ -739,6 +766,12 @@ type QueueRunMode struct {
 
 	// Continuations enables continuations
 	Continuations bool
+
+	// Shadow enables shadow partition processing
+	ShadowPartition bool
+
+	// ShadowContinuations enables shadow continuations
+	ShadowContinuations bool
 }
 
 // continuation represents a partition continuation, forcung the queue to continue working
@@ -747,6 +780,12 @@ type continuation struct {
 	partition *QueuePartition
 	// count is stored and incremented each time the partition is enqueued.
 	count uint
+}
+
+// shadowContinuation is the equivalent of continuation for shadow partitions
+type shadowContinuation struct {
+	shadowPart *QueueShadowPartition
+	count      uint
 }
 
 // processItem references the queue partition and queue item to be processed by a worker.
@@ -2738,6 +2777,167 @@ func (q *queue) Requeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 	}
 }
 
+func (q *queue) ShadowPartitionLease(ctx context.Context, sp *QueueShadowPartition, duration time.Duration) (*ulid.ULID, error) {
+	now := q.clock.Now()
+	leaseExpiry := now.Add(duration)
+	leaseID, err := ulid.New(ulid.Timestamp(leaseExpiry), rand.Reader)
+	if err != nil {
+		return nil, fmt.Errorf("could not generate leaseID: %w", err)
+	}
+
+	sp.LeaseID = &leaseID
+
+	accountID := uuid.Nil
+	if sp.AccountID != nil {
+		accountID = *sp.AccountID
+	}
+
+	keys := []string{
+		q.primaryQueueShard.RedisClient.kg.ShadowPartitionMeta(),
+		q.primaryQueueShard.RedisClient.kg.GlobalShadowPartitionSet(),
+		q.primaryQueueShard.RedisClient.kg.GlobalAccountShadowPartitions(),
+		q.primaryQueueShard.RedisClient.kg.AccountShadowPartitions(accountID),
+	}
+	args, err := StrSlice([]any{
+		sp.PartitionID,
+		accountID,
+		leaseID,
+		now.UnixMilli(),
+		leaseExpiry.Unix(),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("could not serialize args: %w", err)
+	}
+
+	status, err := scripts["queue/shadowPartitionLease"].Exec(
+		redis_telemetry.WithScriptName(ctx, "shadowPartitionLease"),
+		q.primaryQueueShard.RedisClient.unshardedRc,
+		keys,
+		args,
+	).AsInt64()
+	if err != nil {
+		return nil, fmt.Errorf("error leasing shadow partition: %w", err)
+	}
+	switch status {
+	case 0:
+		return &leaseID, nil
+	case -1:
+		return nil, ErrShadowPartitionNotFound
+	case -2:
+		return nil, ErrShadowPartitionAlreadyLeased
+	case -3:
+		return nil, ErrShadowPartitionPaused
+	default:
+		return nil, fmt.Errorf("unknown response leasing shadow partition: %v (%T)", status, status)
+	}
+}
+
+func (q *queue) ShadowPartitionExtendLease(ctx context.Context, sp *QueueShadowPartition, leaseID ulid.ULID, duration time.Duration) (*ulid.ULID, error) {
+	now := q.clock.Now()
+	leaseExpiry := now.Add(duration)
+	newLeaseID, err := ulid.New(ulid.Timestamp(leaseExpiry), rand.Reader)
+	if err != nil {
+		return nil, fmt.Errorf("could not generate new leaseID: %w", err)
+	}
+
+	sp.LeaseID = &newLeaseID
+
+	accountID := uuid.Nil
+	if sp.AccountID != nil {
+		accountID = *sp.AccountID
+	}
+
+	keys := []string{
+		q.primaryQueueShard.RedisClient.kg.ShadowPartitionMeta(),
+		q.primaryQueueShard.RedisClient.kg.GlobalShadowPartitionSet(),
+		q.primaryQueueShard.RedisClient.kg.GlobalAccountShadowPartitions(),
+		q.primaryQueueShard.RedisClient.kg.AccountShadowPartitions(accountID),
+	}
+	args, err := StrSlice([]any{
+		sp.PartitionID,
+		accountID,
+		leaseID,
+		newLeaseID,
+		now.UnixMilli(),
+		leaseExpiry.Unix(),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("could not serialize args: %w", err)
+	}
+
+	status, err := scripts["queue/shadowPartitionExtendLease"].Exec(
+		redis_telemetry.WithScriptName(ctx, "shadowPartitionExtendLease"),
+		q.primaryQueueShard.RedisClient.unshardedRc,
+		keys,
+		args,
+	).AsInt64()
+	if err != nil {
+		return nil, fmt.Errorf("error extending shadow partition lease: %w", err)
+	}
+	switch status {
+	case 0:
+		return &newLeaseID, nil
+	case -1:
+		return nil, ErrShadowPartitionNotFound
+	case -2:
+		return nil, ErrShadowPartitionLeaseNotFound
+	case -3:
+		return nil, ErrShadowPartitionAlreadyLeased
+	case -4:
+		return nil, ErrShadowPartitionPaused
+	default:
+		return nil, fmt.Errorf("unknown response extending shadow partition lease: %v (%T)", status, status)
+	}
+}
+
+func (q *queue) ShadowPartitionReturnLease(ctx context.Context, sp *QueueShadowPartition, leaseID ulid.ULID) error {
+	sp.LeaseID = nil
+
+	accountID := uuid.Nil
+	if sp.AccountID != nil {
+		accountID = *sp.AccountID
+	}
+
+	keys := []string{
+		q.primaryQueueShard.RedisClient.kg.ShadowPartitionMeta(),
+		q.primaryQueueShard.RedisClient.kg.GlobalShadowPartitionSet(),
+		q.primaryQueueShard.RedisClient.kg.GlobalAccountShadowPartitions(),
+		q.primaryQueueShard.RedisClient.kg.AccountShadowPartitions(accountID),
+		q.primaryQueueShard.RedisClient.kg.ShadowPartitionSet(sp.PartitionID),
+	}
+	args, err := StrSlice([]any{
+		sp.PartitionID,
+		accountID,
+		leaseID,
+		q.clock.Now().UnixMilli(),
+	})
+	if err != nil {
+		return fmt.Errorf("could not serialize args: %w", err)
+	}
+
+	status, err := scripts["queue/shadowPartitionReturnLease"].Exec(
+		redis_telemetry.WithScriptName(ctx, "shadowPartitionReturnLease"),
+		q.primaryQueueShard.RedisClient.unshardedRc,
+		keys,
+		args,
+	).AsInt64()
+	if err != nil {
+		return fmt.Errorf("error returning shadow partition lease: %w", err)
+	}
+	switch status {
+	case 0:
+		return nil
+	case -1:
+		return ErrShadowPartitionNotFound
+	case -2:
+		return ErrShadowPartitionAlreadyLeased
+	case -3:
+		return ErrShadowPartitionLeaseNotFound
+	default:
+		return fmt.Errorf("unknown response returning shadow partition lease: %v (%T)", status, status)
+	}
+}
+
 // PartitionLease leases a partition for a given workflow ID.  It returns the new lease ID.
 //
 // NOTE: This does not check the queue/partition name against allow or denylists;  it assumes
@@ -3916,6 +4116,74 @@ func (q *queue) removeContinue(ctx context.Context, p *QueuePartition, cooldown 
 		// only exist in the current replica.
 		q.continueCooldown[p.Queue()] = time.Now().Add(
 			consts.QueueContinuationCooldownPeriod,
+		)
+	}
+}
+
+// addShadowContinue is the equivalent of addContinue for shadow partitions
+func (q *queue) addShadowContinue(ctx context.Context, p *QueueShadowPartition, ctr uint) {
+	if !q.runMode.ShadowContinuations {
+		// shadow continuations are not enabled.
+		return
+	}
+
+	if ctr >= q.shadowContinuationLimit {
+		q.removeShadowContinue(ctx, p, true)
+		return
+	}
+
+	q.shadowContinuesLock.Lock()
+	defer q.shadowContinuesLock.Unlock()
+
+	// If this is the first shadow continuation, check if we're on a cooldown, or if we're
+	// beyond capacity.
+	if ctr == 1 {
+		if len(q.shadowContinues) > consts.QueueShadowContinuationMaxPartitions {
+			metrics.IncrQueueShadowContinuationOpCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"op": "max_capacity"}})
+			return
+		}
+		if t, ok := q.shadowContinueCooldown[p.PartitionID]; ok && t.After(time.Now()) {
+			metrics.IncrQueueShadowContinuationOpCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"op": "cooldown"}})
+			return
+		}
+
+		// Remove the shadow continuation cooldown.
+		delete(q.shadowContinueCooldown, p.PartitionID)
+	}
+
+	c, ok := q.shadowContinues[p.PartitionID]
+	if !ok || c.count < ctr {
+		// Update the continue count if it doesn't exist, or the current counter
+		// is higher.  This ensures that we always have the highest continuation
+		// count stored for queue processing.
+		q.shadowContinues[p.PartitionID] = shadowContinuation{shadowPart: p, count: ctr}
+		metrics.IncrQueueShadowContinuationOpCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"op": "added"}})
+	}
+}
+
+func (q *queue) removeShadowContinue(ctx context.Context, p *QueueShadowPartition, cooldown bool) {
+	if !q.runMode.ShadowContinuations {
+		// shadow continuations are not enabled.
+		return
+	}
+
+	// This is over the limit for continuing the shadow partition, so force it to be
+	// removed in every case.
+	q.shadowContinuesLock.Lock()
+	defer q.shadowContinuesLock.Unlock()
+
+	metrics.IncrQueueShadowContinuationOpCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"op": "removed"}})
+
+	delete(q.shadowContinues, p.PartitionID)
+
+	if cooldown {
+		// Add a cooldown, preventing this partition from being added as a continuation
+		// for a given period of time.
+		//
+		// Note that this isn't shared across replicas;  cooldowns
+		// only exist in the current replica.
+		q.shadowContinueCooldown[p.PartitionID] = time.Now().Add(
+			consts.QueueShadowContinuationCooldownPeriod,
 		)
 	}
 }

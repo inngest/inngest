@@ -6778,6 +6778,174 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 	})
 }
 
+func TestQueueShadowPartitionLease(t *testing.T) {
+	r := miniredis.RunT(t)
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	ctx := context.Background()
+
+	defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+	kg := defaultShard.RedisClient.kg
+
+	clock := clockwork.NewFakeClock()
+
+	enqueueToBacklog := false
+	q := NewQueue(
+		defaultShard,
+		WithClock(clock),
+		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+			return enqueueToBacklog
+		}),
+		WithAllowSystemKeyQueues(func(ctx context.Context) bool {
+			return enqueueToBacklog
+		}),
+		WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
+			return true
+		}),
+		WithDisableSystemQueueLeaseChecks(func(ctx context.Context) bool {
+			return true
+		}),
+	)
+
+	fnID, accountID, envID := uuid.New(), uuid.New(), uuid.New()
+	shadowPart := &QueueShadowPartition{
+		PartitionID: fnID.String(),
+		LeaseID:     nil,
+		FunctionID:  &fnID,
+		EnvID:       &envID,
+		AccountID:   &accountID,
+		PauseRefill: false,
+	}
+
+	marshaled, err := json.Marshal(shadowPart)
+	require.NoError(t, err)
+
+	t.Run("should not be able to lease missing partition", func(t *testing.T) {
+		_, err = q.ShadowPartitionLease(ctx, shadowPart, ShadowPartitionLeaseDuration)
+		require.Error(t, err)
+		require.ErrorIs(t, err, ErrShadowPartitionNotFound)
+
+		r.HSet(kg.ShadowPartitionMeta(), shadowPart.PartitionID, string(marshaled))
+	})
+
+	var leaseID *ulid.ULID
+
+	t.Run("first lease should lease shadow partition", func(t *testing.T) {
+		dur := ShadowPartitionLeaseDuration
+		expectedLeaseExpiry := clock.Now().Add(dur)
+
+		leaseID, err = q.ShadowPartitionLease(ctx, shadowPart, dur)
+		require.NoError(t, err)
+		require.NotNil(t, leaseID)
+		leaseTime := ulid.Time(leaseID.Time())
+		require.Equal(t, expectedLeaseExpiry.UnixMilli(), leaseTime.UnixMilli())
+
+		leasedPart := QueueShadowPartition{}
+		require.NoError(t, json.Unmarshal([]byte(r.HGet(kg.ShadowPartitionMeta(), shadowPart.PartitionID)), &leasedPart))
+
+		require.NotNil(t, leasedPart.LeaseID)
+		require.Equal(t, *leaseID, *leasedPart.LeaseID)
+
+		// Expect shadow partition to be pushed back
+		require.Equal(t, expectedLeaseExpiry.Unix(), int64(score(t, r, kg.GlobalShadowPartitionSet(), shadowPart.PartitionID)))
+		require.Equal(t, expectedLeaseExpiry.Unix(), int64(score(t, r, kg.AccountShadowPartitions(accountID), shadowPart.PartitionID)))
+		require.Equal(t, expectedLeaseExpiry.Unix(), int64(score(t, r, kg.GlobalAccountShadowPartitions(), accountID.String())))
+	})
+
+	t.Run("should not be able to lease again", func(t *testing.T) {
+		_, err = q.ShadowPartitionLease(ctx, shadowPart, ShadowPartitionLeaseDuration)
+		require.Error(t, err)
+		require.ErrorIs(t, err, ErrShadowPartitionAlreadyLeased)
+	})
+
+	t.Run("extend lease should work", func(t *testing.T) {
+		// Simulate 2s have passed
+		clock.Advance(2 * time.Second)
+		r.FastForward(2 * time.Second)
+
+		dur := ShadowPartitionLeaseDuration
+		expectedLeaseExpiry := clock.Now().Add(dur)
+
+		newLeaseID, err := q.ShadowPartitionExtendLease(ctx, shadowPart, *leaseID, dur)
+		require.NoError(t, err)
+		require.NotNil(t, newLeaseID)
+		leaseID = newLeaseID
+
+		leaseTime := ulid.Time(leaseID.Time())
+		require.Equal(t, expectedLeaseExpiry.UnixMilli(), leaseTime.UnixMilli())
+
+		leasedPart := QueueShadowPartition{}
+		require.NoError(t, json.Unmarshal([]byte(r.HGet(kg.ShadowPartitionMeta(), shadowPart.PartitionID)), &leasedPart))
+
+		require.NotNil(t, leasedPart.LeaseID)
+		require.Equal(t, *leaseID, *leasedPart.LeaseID)
+
+		// Expect shadow partition to be pushed back
+		require.Equal(t, expectedLeaseExpiry.Unix(), int64(score(t, r, kg.GlobalShadowPartitionSet(), shadowPart.PartitionID)))
+		require.Equal(t, expectedLeaseExpiry.Unix(), int64(score(t, r, kg.AccountShadowPartitions(accountID), shadowPart.PartitionID)))
+		require.Equal(t, expectedLeaseExpiry.Unix(), int64(score(t, r, kg.GlobalAccountShadowPartitions(), accountID.String())))
+	})
+
+	t.Run("return lease should work", func(t *testing.T) {
+		// Simulate 2s have passed
+		clock.Advance(2 * time.Second)
+		r.FastForward(2 * time.Second)
+
+		// Simulate next backlog item in shadow partition
+		nextBacklogAt := clock.Now().Add(3 * time.Hour)
+		_, err := r.ZAdd(kg.ShadowPartitionSet(shadowPart.PartitionID), float64(nextBacklogAt.UnixMilli()), "backlog-test")
+		require.NoError(t, err)
+
+		err = q.ShadowPartitionReturnLease(ctx, shadowPart, *leaseID)
+		require.NoError(t, err)
+
+		leasedPart := QueueShadowPartition{}
+		require.NoError(t, json.Unmarshal([]byte(r.HGet(kg.ShadowPartitionMeta(), shadowPart.PartitionID)), &leasedPart))
+
+		require.Nil(t, leasedPart.LeaseID)
+
+		// Expect shadow partition to be pushed back
+		require.Equal(t, nextBacklogAt.Unix(), int64(score(t, r, kg.GlobalShadowPartitionSet(), shadowPart.PartitionID)))
+		require.Equal(t, nextBacklogAt.Unix(), int64(score(t, r, kg.AccountShadowPartitions(accountID), shadowPart.PartitionID)))
+		require.Equal(t, nextBacklogAt.Unix(), int64(score(t, r, kg.GlobalAccountShadowPartitions(), accountID.String())))
+	})
+
+	t.Run("return lease should clean dangling pointers", func(t *testing.T) {
+		r.FlushAll()
+
+		r.HSet(kg.ShadowPartitionMeta(), shadowPart.PartitionID, string(marshaled))
+
+		now := clock.Now()
+		dur := ShadowPartitionLeaseDuration
+		expectedLeaseExpiry := now.Add(dur)
+		leaseID, err := q.ShadowPartitionLease(ctx, shadowPart, dur)
+		require.NoError(t, err)
+		require.NotNil(t, leaseID)
+
+		require.Equal(t, expectedLeaseExpiry.Unix(), int64(score(t, r, kg.GlobalShadowPartitionSet(), shadowPart.PartitionID)))
+		require.Equal(t, expectedLeaseExpiry.Unix(), int64(score(t, r, kg.AccountShadowPartitions(accountID), shadowPart.PartitionID)))
+		require.Equal(t, expectedLeaseExpiry.Unix(), int64(score(t, r, kg.GlobalAccountShadowPartitions(), accountID.String())))
+
+		err = q.ShadowPartitionReturnLease(ctx, shadowPart, *leaseID)
+		require.NoError(t, err)
+
+		leasedPart := QueueShadowPartition{}
+		require.NoError(t, json.Unmarshal([]byte(r.HGet(kg.ShadowPartitionMeta(), shadowPart.PartitionID)), &leasedPart))
+
+		require.Nil(t, leasedPart.LeaseID)
+
+		// Expect pointers to be cleaned up
+		require.False(t, r.Exists(kg.GlobalShadowPartitionSet()))
+		require.False(t, r.Exists(kg.AccountShadowPartitions(accountID)))
+		require.False(t, r.Exists(kg.GlobalAccountShadowPartitions()))
+	})
+}
+
 func score(t *testing.T, r *miniredis.Miniredis, key string, member string) float64 {
 	require.True(t, r.Exists(key), r.Keys())
 
