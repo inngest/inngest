@@ -1,4 +1,4 @@
-package expressions
+package exprenv
 
 import (
 	"encoding/base64"
@@ -83,7 +83,7 @@ func (customLibrary) CompileOptions() []cel.EnvOption {
 					// Add the existing fn traits.
 					decls.OverloadOperandTrait(ol.OperandTrait),
 					// Ensure we pass in the actual function logic here.
-					decls.BinaryBinding(getBindings(fn.Name(), ol.Binary)),
+					decls.BinaryBinding(GetBindings(fn.Name(), ol.Binary)),
 				),
 				decls.DisableTypeGuards(true),
 			)
@@ -107,7 +107,7 @@ func (customLibrary) CompileOptions() []cel.EnvOption {
 	return append(envOpts, celDeclarations()...)
 }
 
-func getBindings(name string, existing functions.BinaryOp) functions.BinaryOp {
+func GetBindings(name string, existing functions.BinaryOp) functions.BinaryOp {
 	switch name {
 	case operators.Add:
 		return func(lhs, rhs ref.Val) ref.Val {
@@ -165,7 +165,7 @@ func getBindings(name string, existing functions.BinaryOp) functions.BinaryOp {
 func (customLibrary) ProgramOptions() []cel.ProgramOption {
 	return []cel.ProgramOption{
 		// Add our custom function implementations (overloads) into the fn.
-		cel.Functions(celOverloads()...),
+		cel.Functions(CELOverloads()...),
 		cel.EvalOptions(cel.OptExhaustiveEval, cel.OptTrackState, cel.OptPartialEval),
 	}
 }
@@ -265,7 +265,7 @@ func celDeclarations() []cel.EnvOption {
 	return custom
 }
 
-func celOverloads() []*functions.Overload {
+func CELOverloads() []*functions.Overload {
 	return []*functions.Overload{
 		{
 			Operator: "date",
