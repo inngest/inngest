@@ -32,6 +32,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/expressions"
+	"github.com/inngest/inngest/pkg/expressions/expragg"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/inngest/log"
 	"github.com/inngest/inngest/pkg/logger"
@@ -149,7 +150,7 @@ func WithPauseManager(pm state.PauseManager) ExecutorOpt {
 
 // WithExpressionAggregator sets the expression aggregator singleton to use
 // for matching events using our aggregate evaluator.
-func WithExpressionAggregator(agg expressions.Aggregator) ExecutorOpt {
+func WithExpressionAggregator(agg expragg.Aggregator) ExecutorOpt {
 	return func(e execution.Executor) error {
 		e.(*executor).exprAggregator = agg
 		return nil
@@ -296,7 +297,7 @@ type executor struct {
 
 	// exprAggregator is an expression aggregator used to parse and aggregate expressions
 	// using trees.
-	exprAggregator expressions.Aggregator
+	exprAggregator expragg.Aggregator
 
 	pm   state.PauseManager
 	smv2 sv2.RunService
@@ -1472,13 +1473,8 @@ func (e *executor) handleAggregatePauses(ctx context.Context, evt event.TrackedE
 	)
 
 	for _, i := range evals {
-		found, ok := i.(*state.Pause)
-		if !ok || found == nil {
-			continue
-		}
-
 		// Copy pause into function
-		pause := *found
+		pause := *i
 		wg.Add(1)
 		go func() {
 			atomic.AddInt32(&res[0], 1)
@@ -1511,7 +1507,6 @@ func (e *executor) handlePause(
 	res *execution.HandlePauseResult,
 	l *slog.Logger,
 ) error {
-
 	// If this is a cancellation, ensure that we're not handling an event that
 	// was received before the run (due to eg. latency in a bad case).
 	if pause.Cancel && bytes.Compare(evtID[:], pause.Identifier.RunID[:]) <= 0 {
@@ -1834,13 +1829,11 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 					logger.StdlibLogger(ctx).Warn("missing pause timeout item", "shard", shard.Name, "pause", pause)
 				} else {
 					logger.StdlibLogger(ctx).Error("error dequeueing consumed pause job when resuming", "error", err)
-
 				}
 			}
 		}
 		return nil
 	}, 20*time.Second)
-
 	if err != nil {
 		return err
 	}

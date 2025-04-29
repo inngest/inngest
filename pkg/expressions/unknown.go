@@ -9,6 +9,7 @@ import (
 	"github.com/google/cel-go/common/types"
 	"github.com/google/cel-go/common/types/ref"
 	"github.com/google/cel-go/interpreter"
+	"github.com/inngest/inngest/pkg/expressions/exprenv"
 )
 
 // unknownDecorator returns a decorator for inspecting and handling unknowns at runtime.  This
@@ -20,7 +21,7 @@ import (
 func unknownDecorator(act interpreter.PartialActivation) interpreter.InterpretableDecorator {
 	// Create a new dispatcher with all functions added
 	dispatcher := interpreter.NewDispatcher()
-	overloads := celOverloads()
+	overloads := exprenv.CELOverloads()
 	_ = dispatcher.Add(overloads...)
 
 	return func(i interpreter.Interpretable) (interpreter.Interpretable, error) {
@@ -126,7 +127,7 @@ func unknownDecorator(act interpreter.PartialActivation) interpreter.Interpretab
 			}
 
 			// Get the actual implementation which we've copied into overloads.go.
-			fn := getBindings(call.Function(), nil)
+			fn := exprenv.GetBindings(call.Function(), nil)
 			if fn == nil {
 				return i, nil
 			}
