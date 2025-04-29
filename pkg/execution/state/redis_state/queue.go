@@ -2913,14 +2913,16 @@ func (q *queue) ShadowPartitionPeek(ctx context.Context, sp *QueueShadowPartitio
 		return nil, err
 	}
 
-	shadowPartitionKey := q.primaryQueueShard.RedisClient.kg.ShadowPartitionSet(sp.PartitionID)
+	rc := q.primaryQueueShard.RedisClient
+
+	shadowPartitionKey := rc.kg.ShadowPartitionSet(sp.PartitionID)
 
 	peekRet, err := scripts["queue/shadowPartitionPeek"].Exec(
 		redis_telemetry.WithScriptName(ctx, "shadowPartitionPeek"),
-		q.primaryQueueShard.RedisClient.Client(),
+		rc.Client(),
 		[]string{
 			shadowPartitionKey,
-			q.primaryQueueShard.RedisClient.kg.BacklogMeta(),
+			rc.kg.BacklogMeta(),
 		},
 		args,
 	).ToAny()
@@ -2995,11 +2997,16 @@ func (q *queue) ShadowPartitionPeek(ctx context.Context, sp *QueueShadowPartitio
 	}
 
 	if len(missingBacklogs) > 0 {
-		// TODO Clean up dangling backlog pointers in shadow partition
+		err := rc.Client().Do(ctx, rc.Client().B().Zrem().Key(rc.kg.ShadowPartitionSet(sp.PartitionID)).Member(missingBacklogs...).Build()).Error()
+		if err != nil {
+			q.logger.Warn().
+				Interface("missing", missingBacklogs).
+				Interface("sp", sp).
+				Msg("failed to clean up dangling backlogs from shard partition")
+		}
 	}
 
 	return backlogs, nil
-
 }
 
 func (q *queue) ShadowPartitionExtendLease(ctx context.Context, sp *QueueShadowPartition, leaseID ulid.ULID, duration time.Duration) (*ulid.ULID, error) {
