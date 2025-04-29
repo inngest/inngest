@@ -31,6 +31,7 @@ func NewAggregator(
 	concurrency int64,
 	loader EvaluableLoader,
 	eval expr.ExpressionEvaluator,
+	kv expr.KV[*state.Pause],
 	log *slog.Logger,
 ) Aggregator {
 	// use the package's singleton caching parser to create a new tree parser.
@@ -101,6 +102,10 @@ type aggregator struct {
 	log *slog.Logger
 
 	records *ccache.Cache
+
+	// kv is the backing storage that the aggregator uses for recording pauses by ID.  This allows us
+	// to use the disk for recording pauses.
+	kv expr.KV[*state.Pause]
 
 	concurrency int64
 	loader      EvaluableLoader
@@ -221,7 +226,7 @@ func (a *aggregator) LoadEventEvaluator(ctx context.Context, wsID uuid.UUID, eve
 				Parser:      a.parser,
 				Eval:        a.evaluator,
 				Concurrency: a.concurrency,
-				// TODO: K
+				KV:          a.kv,
 			}),
 			// updatedAt is a zero time.
 		}
