@@ -492,6 +492,37 @@ func navigateAST(nav expr, parent *Node, vars LiftedArgs, rand RandomReader) ([]
 		total += 1
 	}
 
+	// For each AND, check to see if we have more than one string part, and check to see
+	// whether we have a "!=" and an "==" chained together.  If so, this lets us optimize
+	// != checks so that we only return the aggregate match if the other "==" also matches.
+	//
+	// This is necessary:  != returns basically every expression part, which is hugely costly
+	// in terms of allocation.  We want to avoid that if poss.
+	var (
+		stringEq     uint8
+		hasStringNeq bool
+	)
+	for _, item := range parent.Ands {
+		if item.Predicate == nil {
+			continue
+		}
+		if _, ok := item.Predicate.Literal.(string); !ok {
+			continue
+		}
+		if item.Predicate.Operator == operators.Equals {
+			stringEq++
+		}
+		if item.Predicate.Operator == operators.NotEquals {
+			hasStringNeq = true
+		}
+	}
+
+	flag := byte(OptimizeNone)
+	if stringEq > 0 && hasStringNeq {
+		// The flag is the number of string equality checks in the == group.
+		flag = byte(stringEq)
+	}
+
 	// Create a new group ID which tracks the number of expressions that must match
 	// within this group in order for the group to pass.
 	//
@@ -500,7 +531,7 @@ func navigateAST(nav expr, parent *Node, vars LiftedArgs, rand RandomReader) ([]
 	// When checking an incoming event, we match the event against each node's
 	// ident/variable.  Using the group ID, we can see if we've matched N necessary
 	// items from the same identifier.  If so, the evaluation is true.
-	parent.GroupID = newGroupIDWithReader(uint16(total), rand)
+	parent.GroupID = newGroupIDWithReader(uint16(total), flag, rand)
 
 	// For each sub-group, add the same group IDs to children if there's no nesting.
 	//

@@ -70,12 +70,28 @@ func (l *liftParser) lift() (string, LiftedArgs) {
 
 	l.rewritten = &strings.Builder{}
 
+	comment := false
+
 	for l.idx < len(l.expr) {
 		char := l.expr[l.idx]
 
 		l.idx++
 
+		if comment && char == '\n' {
+			comment = false
+		}
+		if comment && char != '\n' {
+			continue
+		}
+
 		switch char {
+		case '/':
+			// if the next character is a slash, this is a comment line ("//")
+			if len(l.expr) > l.idx && string(l.expr[l.idx]) == "/" {
+				comment = true
+				continue
+			}
+			l.rewritten.WriteByte(char)
 		case '"':
 			// Consume the string arg.
 			val := l.consumeString('"')
@@ -89,7 +105,7 @@ func (l *liftParser) lift() (string, LiftedArgs) {
 		}
 	}
 
-	return l.rewritten.String(), &l.vars
+	return strings.TrimSpace(l.rewritten.String()), &l.vars
 }
 
 func (l *liftParser) addLiftedVar(val argMapValue) {
