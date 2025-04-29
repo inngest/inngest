@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/alicebob/miniredis/v2"
@@ -47,6 +48,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/expressions"
+	"github.com/inngest/inngest/pkg/expressions/expragg"
 	"github.com/inngest/inngest/pkg/history_drivers/memory_reader"
 	"github.com/inngest/inngest/pkg/history_drivers/memory_writer"
 	"github.com/inngest/inngest/pkg/logger"
@@ -111,6 +113,10 @@ func New(ctx context.Context, opts StartOpts) error {
 	}
 
 	return start(ctx, opts)
+}
+
+func enforceConnectLeaseExpiry(ctx context.Context, accountID uuid.UUID) bool {
+	return os.Getenv("INNGEST_CONNECT_DISABLE_ENFORCE_LEASE_EXPIRY") != "true"
 }
 
 func start(ctx context.Context, opts StartOpts) error {
@@ -281,15 +287,13 @@ func start(ctx context.Context, opts StartOpts) error {
 	connectionManager := connstate.NewRedisConnectionStateManager(connectRc)
 
 	// Create a new expression aggregator, using Redis to load evaluables.
-	agg := expressions.NewAggregator(ctx, 100, 100, sm.(expressions.EvaluableLoader), nil)
+	agg := expragg.NewAggregator(ctx, 100, 100, sm.(expragg.EvaluableLoader), expressions.ExprEvaluator, nil, nil)
 
 	executorProxy, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectPubSubRedis, true, connectpubsub.RedisPubSubConnectorOpts{
-		Logger:       connectPubSubLogger.With("svc", "executor"),
-		Tracer:       conditionalTracer,
-		StateManager: connectionManager,
-		EnforceLeaseExpiry: func(ctx context.Context, accountID uuid.UUID) bool {
-			return true
-		},
+		Logger:             connectPubSubLogger.With("svc", "executor"),
+		Tracer:             conditionalTracer,
+		StateManager:       connectionManager,
+		EnforceLeaseExpiry: enforceConnectLeaseExpiry,
 	}))
 	if err != nil {
 		return fmt.Errorf("failed to create connect pubsub connector: %w", err)
@@ -308,7 +312,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	httpClient.(*http.Client).Transport = awsgateway.NewTransformTripper(httpClient.(*http.Client).Transport)
 	deploy.Client.Transport = awsgateway.NewTransformTripper(deploy.Client.Transport)
 
-	var drivers = []driver.Driver{}
+	drivers := []driver.Driver{}
 	for _, driverConfig := range opts.Config.Execution.Drivers {
 		d, err := driverConfig.NewDriver(registration.NewDriverOpts{
 			ConnectForwarder:  executorProxy,
@@ -437,12 +441,10 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	// ds.opts.Config.EventStream.Service.TopicName()
 	apiConnectProxy, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectPubSubRedis, false, connectpubsub.RedisPubSubConnectorOpts{
-		Logger:       connectPubSubLogger.With("svc", "api"),
-		Tracer:       conditionalTracer,
-		StateManager: connectionManager,
-		EnforceLeaseExpiry: func(ctx context.Context, accountID uuid.UUID) bool {
-			return true
-		},
+		Logger:             connectPubSubLogger.With("svc", "api"),
+		Tracer:             conditionalTracer,
+		StateManager:       connectionManager,
+		EnforceLeaseExpiry: enforceConnectLeaseExpiry,
 	}))
 	if err != nil {
 		return fmt.Errorf("failed to create connect pubsub connector: %w", err)
@@ -477,12 +479,10 @@ func start(ctx context.Context, opts StartOpts) error {
 	}
 
 	connectGatewayProxy, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectPubSubRedis, false, connectpubsub.RedisPubSubConnectorOpts{
-		Logger:       connectPubSubLogger.With("svc", "connect-gateway"),
-		Tracer:       conditionalTracer,
-		StateManager: connectionManager,
-		EnforceLeaseExpiry: func(ctx context.Context, accountID uuid.UUID) bool {
-			return true
-		},
+		Logger:             connectPubSubLogger.With("svc", "connect-gateway"),
+		Tracer:             conditionalTracer,
+		StateManager:       connectionManager,
+		EnforceLeaseExpiry: enforceConnectLeaseExpiry,
 	}))
 	if err != nil {
 		return fmt.Errorf("failed to create connect pubsub connector: %w", err)

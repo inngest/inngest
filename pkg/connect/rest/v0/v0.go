@@ -77,21 +77,21 @@ func New(r chi.Router, opts Opts) *connectApiRouter {
 	return api
 }
 
-func (a *connectApiRouter) setup() {
+func (cr *connectApiRouter) setup() {
 	// These routes are testing-only
-	if a.Dev {
-		a.Group(func(r chi.Router) {
+	if cr.Dev {
+		cr.Group(func(r chi.Router) {
 			r.Use(middleware.Recoverer)
 			r.Use(headers.ContentTypeJsonResponse())
 
-			r.Get("/envs/{envID}/conns", a.showConnections)
-			r.Get("/envs/{envID}/groups/{groupID}", a.showWorkerGroup)
+			r.Get("/envs/{envID}/conns", cr.showConnections)
+			r.Get("/envs/{envID}/groups/{groupID}", cr.showWorkerGroup)
 		})
 	}
 
 	// Worker API
-	a.Group(func(r chi.Router) {
-		r.Post("/start", a.start)
-		r.Post("/flush", a.flushBuffer)
+	cr.Group(func(r chi.Router) {
+		r.Post("/start", cr.start)
+		r.Post("/flush", cr.flushBuffer)
 	})
 }

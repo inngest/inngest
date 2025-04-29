@@ -17,6 +17,7 @@ import { RiCollapseDiagonalLine, RiDownload2Line, RiExpandDiagonalLine } from '@
 import { type editor } from 'monaco-editor';
 import { useLocalStorage } from 'react-use';
 
+import { Fullscreen } from '../Fullscreen/Fullscreen';
 import { isDark } from '../utils/theme';
 
 const MAX_HEIGHT = 280; // Equivalent to 10 lines + padding
@@ -249,158 +250,160 @@ export function CodeBlock({
   return (
     <>
       {monaco && (
-        <div className={cn('relative', fullScreen && 'bg-canvasBase fixed inset-0 z-[52]')}>
-          <div className={cn('bg-canvasBase border-subtle border-b')}>
-            <div
-              className={cn(
-                'flex items-center justify-between border-l-4 border-l-transparent',
-                header?.status === 'error' && 'border-l-status-failed',
-                header?.status === 'success' && 'border-l-status-completed'
-              )}
-            >
-              <p
+        <Fullscreen fullScreen={fullScreen}>
+          <div className={cn('relative', fullScreen && 'bg-canvasBase fixed inset-0 z-[52]')}>
+            <div className={cn('bg-canvasBase border-subtle border-b')}>
+              <div
                 className={cn(
-                  header?.status === 'error' ? 'text-status-failedText' : 'text-subtle',
-                  ' px-5 py-2.5 text-sm',
-                  'max-h-24 text-ellipsis break-words' // Handle long titles
+                  'flex items-center justify-between border-l-4 border-l-transparent',
+                  header?.status === 'error' && 'border-l-status-failed',
+                  header?.status === 'success' && 'border-l-status-completed'
                 )}
               >
-                {header?.title}
-              </p>
-              {!isOutputTooLarge && (
-                <div className="mr-4 flex items-center gap-2 py-2">
-                  {actions.map(({ label, title, icon, onClick, disabled }, idx) => (
-                    <Button
-                      key={idx}
-                      icon={icon}
-                      onClick={onClick}
-                      size="small"
-                      aria-label={label}
-                      title={title ?? label}
-                      label={label}
-                      disabled={disabled}
-                      appearance="outlined"
-                      kind="secondary"
-                    />
-                  ))}
-                  <CopyButton
-                    size="small"
-                    code={content}
-                    isCopying={isCopying}
-                    handleCopyClick={handleCopyClick}
-                    appearance="outlined"
-                  />
-                  <Button
-                    icon={isWordWrap ? <IconOverflowText /> : <IconWrapText />}
-                    onClick={handleWrapText}
-                    size="small"
-                    aria-label={isWordWrap ? 'Do not wrap text' : 'Wrap text'}
-                    title={isWordWrap ? 'Do not wrap text' : 'Wrap text'}
-                    tooltip={isWordWrap ? 'Do not wrap text' : 'Wrap text'}
-                    appearance="outlined"
-                    kind="secondary"
-                  />
-                  {!alwaysFullHeight && (
-                    <Button
-                      onClick={handleFullHeight}
-                      size="small"
-                      icon={isFullHeight ? <IconShrinkText /> : <IconExpandText />}
-                      aria-label={isFullHeight ? 'Shrink text' : 'Expand text'}
-                      title={isFullHeight ? 'Shrink text' : 'Expand text'}
-                      tooltip={isFullHeight ? 'Shrink text' : 'Expand text'}
-                      appearance="outlined"
-                      kind="secondary"
-                    />
+                <p
+                  className={cn(
+                    header?.status === 'error' ? 'text-status-failedText' : 'text-subtle',
+                    ' px-5 py-2.5 text-sm',
+                    'max-h-24 text-ellipsis break-words' // Handle long titles
                   )}
-                  {allowFullScreen && (
-                    <Button
-                      onClick={() => setFullScreen(!fullScreen)}
+                >
+                  {header?.title}
+                </p>
+                {!isOutputTooLarge && (
+                  <div className="mr-4 flex items-center gap-2 py-2">
+                    {actions.map(({ label, title, icon, onClick, disabled }, idx) => (
+                      <Button
+                        key={idx}
+                        icon={icon}
+                        onClick={onClick}
+                        size="small"
+                        aria-label={label}
+                        title={title ?? label}
+                        label={label}
+                        disabled={disabled}
+                        appearance="outlined"
+                        kind="secondary"
+                      />
+                    ))}
+                    <CopyButton
                       size="small"
-                      icon={fullScreen ? <RiCollapseDiagonalLine /> : <RiExpandDiagonalLine />}
-                      aria-label="Full screen"
-                      title="Full screen"
-                      tooltip="Full screen"
+                      code={content}
+                      isCopying={isCopying}
+                      handleCopyClick={handleCopyClick}
+                      appearance="outlined"
+                    />
+                    <Button
+                      icon={isWordWrap ? <IconOverflowText /> : <IconWrapText />}
+                      onClick={handleWrapText}
+                      size="small"
+                      aria-label={isWordWrap ? 'Do not wrap text' : 'Wrap text'}
+                      title={isWordWrap ? 'Do not wrap text' : 'Wrap text'}
+                      tooltip={isWordWrap ? 'Do not wrap text' : 'Wrap text'}
                       appearance="outlined"
                       kind="secondary"
                     />
-                  )}
-                </div>
+                    {!alwaysFullHeight && (
+                      <Button
+                        onClick={handleFullHeight}
+                        size="small"
+                        icon={isFullHeight ? <IconShrinkText /> : <IconExpandText />}
+                        aria-label={isFullHeight ? 'Shrink text' : 'Expand text'}
+                        title={isFullHeight ? 'Shrink text' : 'Expand text'}
+                        tooltip={isFullHeight ? 'Shrink text' : 'Expand text'}
+                        appearance="outlined"
+                        kind="secondary"
+                      />
+                    )}
+                    {allowFullScreen && (
+                      <Button
+                        onClick={() => setFullScreen(!fullScreen)}
+                        size="small"
+                        icon={fullScreen ? <RiCollapseDiagonalLine /> : <RiExpandDiagonalLine />}
+                        aria-label="Full screen"
+                        title="Full screen"
+                        tooltip="Full screen"
+                        appearance="outlined"
+                        kind="secondary"
+                      />
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+            <div
+              ref={wrapperRef}
+              className={cn('relative', (alwaysFullHeight || fullScreen) && 'h-screen')}
+            >
+              {isOutputTooLarge ? (
+                <>
+                  <Alert severity="warning">Output size is too large to render {`( > 1MB )`}</Alert>
+                  <div className="flex h-24 items-center justify-center	">
+                    <Button
+                      label="Download Raw"
+                      icon={<RiDownload2Line />}
+                      onClick={() => downloadJson({ content: content })}
+                      appearance="outlined"
+                      kind="secondary"
+                    />
+                  </div>
+                </>
+              ) : (
+                <Editor
+                  className={cn('relative', (alwaysFullHeight || fullScreen) && 'h-full')}
+                  height={alwaysFullHeight || fullScreen ? '100%' : editorHeight}
+                  defaultLanguage={language}
+                  value={content}
+                  theme="inngest-theme"
+                  options={{
+                    // Need to set automaticLayout to true to avoid a resizing bug
+                    // (code block never narrows). This is combined with the
+                    // `absolute` class and explicit height prop
+                    automaticLayout: true,
+
+                    extraEditorClassName: '!w-full',
+                    readOnly: readOnly,
+                    minimap: {
+                      enabled: false,
+                    },
+                    lineNumbers: 'on',
+                    contextmenu: false,
+                    scrollBeyondLastLine: alwaysFullHeight ? true : false,
+                    fontFamily: FONT.font,
+                    fontSize: FONT.size,
+                    fontWeight: 'light',
+                    lineHeight: LINE_HEIGHT,
+                    renderLineHighlight: 'none',
+                    renderWhitespace: 'none',
+                    guides: {
+                      indentation: false,
+                      highlightActiveBracketPair: false,
+                      highlightActiveIndentation: false,
+                    },
+                    scrollbar: {
+                      verticalScrollbarSize: 10,
+                      alwaysConsumeMouseWheel: false,
+                    },
+                    padding: {
+                      top: 10,
+                      bottom: 10,
+                    },
+                    wordWrap: isWordWrap ? 'on' : 'off',
+                  }}
+                  onMount={(editor) => {
+                    handleEditorDidMount(editor);
+                    !alwaysFullHeight && updateEditorLayout(editor);
+                  }}
+                  onChange={(value) => {
+                    if (value !== undefined) {
+                      handleChange && handleChange(value);
+                      !alwaysFullHeight && updateEditorLayout(editorRef.current);
+                    }
+                  }}
+                />
               )}
             </div>
           </div>
-          <div
-            ref={wrapperRef}
-            className={cn('relative', (alwaysFullHeight || fullScreen) && 'h-screen')}
-          >
-            {isOutputTooLarge ? (
-              <>
-                <Alert severity="warning">Output size is too large to render {`( > 1MB )`}</Alert>
-                <div className="flex h-24 items-center justify-center	">
-                  <Button
-                    label="Download Raw"
-                    icon={<RiDownload2Line />}
-                    onClick={() => downloadJson({ content: content })}
-                    appearance="outlined"
-                    kind="secondary"
-                  />
-                </div>
-              </>
-            ) : (
-              <Editor
-                className={cn('relative', (alwaysFullHeight || fullScreen) && 'h-full')}
-                height={alwaysFullHeight || fullScreen ? '100%' : editorHeight}
-                defaultLanguage={language}
-                value={content}
-                theme="inngest-theme"
-                options={{
-                  // Need to set automaticLayout to true to avoid a resizing bug
-                  // (code block never narrows). This is combined with the
-                  // `absolute` class and explicit height prop
-                  automaticLayout: true,
-
-                  extraEditorClassName: '!w-full',
-                  readOnly: readOnly,
-                  minimap: {
-                    enabled: false,
-                  },
-                  lineNumbers: 'on',
-                  contextmenu: false,
-                  scrollBeyondLastLine: alwaysFullHeight ? true : false,
-                  fontFamily: FONT.font,
-                  fontSize: FONT.size,
-                  fontWeight: 'light',
-                  lineHeight: LINE_HEIGHT,
-                  renderLineHighlight: 'none',
-                  renderWhitespace: 'none',
-                  guides: {
-                    indentation: false,
-                    highlightActiveBracketPair: false,
-                    highlightActiveIndentation: false,
-                  },
-                  scrollbar: {
-                    verticalScrollbarSize: 10,
-                    alwaysConsumeMouseWheel: false,
-                  },
-                  padding: {
-                    top: 10,
-                    bottom: 10,
-                  },
-                  wordWrap: isWordWrap ? 'on' : 'off',
-                }}
-                onMount={(editor) => {
-                  handleEditorDidMount(editor);
-                  !alwaysFullHeight && updateEditorLayout(editor);
-                }}
-                onChange={(value) => {
-                  if (value !== undefined) {
-                    handleChange && handleChange(value);
-                    !alwaysFullHeight && updateEditorLayout(editorRef.current);
-                  }
-                }}
-              />
-            )}
-          </div>
-        </div>
+        </Fullscreen>
       )}
     </>
   );

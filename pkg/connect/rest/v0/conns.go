@@ -15,14 +15,14 @@ import (
 //
 // Provides query params to further filter the returned data
 //   - app_id
-func (c *connectApiRouter) showConnections(w http.ResponseWriter, r *http.Request) {
+func (cr *connectApiRouter) showConnections(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	var (
 		envID uuid.UUID
 		appID *uuid.UUID
 	)
-	switch c.Dev {
+	switch cr.Dev {
 	case true:
 		envID = consts.DevServerEnvID
 
@@ -66,7 +66,7 @@ func (c *connectApiRouter) showConnections(w http.ResponseWriter, r *http.Reques
 	)
 	switch {
 	case appID != nil:
-		if conns, err = c.ConnectManager.GetConnectionsByAppID(ctx, envID, *appID); err != nil {
+		if conns, err = cr.ConnectManager.GetConnectionsByAppID(ctx, envID, *appID); err != nil {
 			_ = publicerr.WriteHTTP(w, publicerr.Error{
 				Err:     err,
 				Message: err.Error(),
@@ -75,7 +75,7 @@ func (c *connectApiRouter) showConnections(w http.ResponseWriter, r *http.Reques
 			return
 		}
 	default:
-		if conns, err = c.ConnectManager.GetConnectionsByEnvID(ctx, envID); err != nil {
+		if conns, err = cr.ConnectManager.GetConnectionsByEnvID(ctx, envID); err != nil {
 			_ = publicerr.WriteHTTP(w, publicerr.Error{
 				Err:     err,
 				Message: err.Error(),

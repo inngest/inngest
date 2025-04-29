@@ -54,6 +54,14 @@ export function useColumns({
       cell: (info) => {
         const functions = info.getValue();
 
+        if (!functions || functions.length === 0) {
+          return (
+            <TextCell>
+              <span className="text-light">—</span>
+            </TextCell>
+          );
+        }
+
         return (
           <HorizontalPillList
             alwaysVisibleCount={2}

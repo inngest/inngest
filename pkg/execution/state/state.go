@@ -109,6 +109,9 @@ type CustomConcurrency struct {
 	// NOTE: If the value is removed from the last deployed function we could also disregard
 	// this concurrency key.
 	Limit int `json:"l"`
+
+	// UnhashedEvaluatedKeyValue stores the unhashed evaluated key value
+	UnhashedEvaluatedKeyValue string `json:"-"`
 }
 
 func (c CustomConcurrency) Validate() error {

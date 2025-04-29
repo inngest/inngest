@@ -128,17 +128,14 @@ func (b *broker) SubscribeN(ctx context.Context, topic string, run PerformFunc, 
 	// completed.
 	var unrecoverableErr error
 
-	for {
-		if unrecoverableErr != nil {
-			break
-		}
-
+	for unrecoverableErr == nil {
 		// We always have to check the context err, as semaphores can be acquired and return
 		// no error after the context is cancelled.  It only errors if we're blocking and waiting
 		// to acquire tokens.
 		if err := sem.Acquire(ctx, math.MaxInt64/concurrency); err != nil || ctx.Err() != nil {
 			// The subscription closed.
 			unrecoverableErr = err
+			// Break out of the loop and wait for all existing functions to complete.
 			break
 		}
 

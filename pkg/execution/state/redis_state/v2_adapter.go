@@ -10,6 +10,7 @@ import (
 
 	statev1 "github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/v2"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/util"
 )
 
@@ -212,16 +213,35 @@ func (v v2) SaveStep(ctx context.Context, id state.ID, stepID string, data []byt
 		AccountID:  id.Tenant.AccountID,
 	}
 
-	return util.WithRetry(
+	attempt := 0
+	hasPending, err := util.WithRetry(
 		ctx,
 		"state.SaveStep",
 		func(ctx context.Context) (bool, error) {
+			attempt++
 			return v.mgr.SaveResponse(ctx, v1id, stepID, string(data))
 		},
 		util.NewRetryConf(
 			util.WithRetryConfRetryableErrors(v.retryableError),
 		),
 	)
+
+	if errors.Is(err, statev1.ErrDuplicateResponse) && attempt > 1 {
+		// Swallow the error. Since the 2nd attempt has a "duplicate response"
+		// (i.e. already exists in Redis), we can assume that the first attempt
+		// successfully updated Redis despite the retry. This can happen if we
+		// get a context timeout in Go code but Redis actually completed the
+		// operation.
+		logger.StdlibLogger(ctx).Warn(
+			"swallowing duplicate response",
+			"attempt", attempt,
+			"run_id", id.RunID,
+			"step_id", stepID,
+		)
+		return false, nil
+	}
+
+	return hasPending, err
 }
 
 // SavePending saves pending step IDs for the given run ID.

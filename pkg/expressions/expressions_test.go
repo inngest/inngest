@@ -1006,7 +1006,7 @@ func TestEvaluateExpression(t *testing.T) {
 					// Test thread safety of evaluate and Validate().  We don't care about the results,
 					// as these are checked below.
 					_, _, _ = Evaluate(context.Background(), test.expr, test.data)
-					_ = Validate(context.Background(), test.expr)
+					_ = Validate(context.Background(), nil, test.expr)
 				}()
 			}
 

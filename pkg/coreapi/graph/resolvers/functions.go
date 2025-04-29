@@ -9,8 +9,8 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
-func (r *queryResolver) Functions(ctx context.Context) ([]*models.Function, error) {
-	all, err := r.Data.GetFunctions(ctx)
+func (qr *queryResolver) Functions(ctx context.Context) ([]*models.Function, error) {
+	all, err := qr.Data.GetFunctions(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -24,7 +24,7 @@ func (r *queryResolver) Functions(ctx context.Context) ([]*models.Function, erro
 	return res, nil
 }
 
-func (r *queryResolver) FunctionRun(ctx context.Context, query models.FunctionRunQuery) (*models.FunctionRun, error) {
+func (qr *queryResolver) FunctionRun(ctx context.Context, query models.FunctionRunQuery) (*models.FunctionRun, error) {
 	if query.FunctionRunID == "" {
 		return nil, fmt.Errorf("function run id is required")
 	}
@@ -34,7 +34,7 @@ func (r *queryResolver) FunctionRun(ctx context.Context, query models.FunctionRu
 		return nil, fmt.Errorf("Invalid run ID: %w", err)
 	}
 
-	run, err := r.HistoryReader.GetRun(
+	run, err := qr.HistoryReader.GetRun(
 		ctx,
 		runID,
 		history_reader.GetRunOpts{},

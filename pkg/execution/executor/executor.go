@@ -32,6 +32,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/expressions"
+	"github.com/inngest/inngest/pkg/expressions/expragg"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/inngest/log"
 	"github.com/inngest/inngest/pkg/logger"
@@ -149,7 +150,7 @@ func WithPauseManager(pm state.PauseManager) ExecutorOpt {
 
 // WithExpressionAggregator sets the expression aggregator singleton to use
 // for matching events using our aggregate evaluator.
-func WithExpressionAggregator(agg expressions.Aggregator) ExecutorOpt {
+func WithExpressionAggregator(agg expragg.Aggregator) ExecutorOpt {
 	return func(e execution.Executor) error {
 		e.(*executor).exprAggregator = agg
 		return nil
@@ -296,7 +297,7 @@ type executor struct {
 
 	// exprAggregator is an expression aggregator used to parse and aggregate expressions
 	// using trees.
-	exprAggregator expressions.Aggregator
+	exprAggregator expragg.Aggregator
 
 	pm   state.PauseManager
 	smv2 sv2.RunService
@@ -532,6 +533,9 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 				scopeID = req.WorkspaceID
 			}
 
+			evaluated := limit.Evaluate(ctx, evtMap)
+			key := util.ConcurrencyKey(limit.Scope, scopeID, evaluated)
+
 			// Store the concurrency limit in the function.  By copying in the raw expression hash,
 			// we can update the concurrency limits for in-progress runs as new function versions
 			// are stored.
@@ -541,9 +545,10 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 			metadata.Config.CustomConcurrencyKeys = append(
 				metadata.Config.CustomConcurrencyKeys,
 				sv2.CustomConcurrency{
-					Key:   limit.Evaluate(ctx, scopeID, evtMap),
-					Hash:  limit.Hash,
-					Limit: limit.Limit,
+					Key:                       key,
+					Hash:                      limit.Hash,
+					Limit:                     limit.Limit,
+					UnhashedEvaluatedKeyValue: evaluated,
 				},
 			)
 		}
@@ -554,18 +559,21 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	//
 	var throttle *queue.Throttle
 	if req.Function.Throttle != nil {
-		throttleKey := queue.HashID(ctx, req.Function.ID.String())
+		unhashedThrottleKey := req.Function.ID.String()
+		throttleKey := queue.HashID(ctx, unhashedThrottleKey)
 		if req.Function.Throttle.Key != nil {
 			val, _, _ := expressions.Evaluate(ctx, *req.Function.Throttle.Key, map[string]any{
 				"event": evtMap,
 			})
-			throttleKey = throttleKey + "-" + queue.HashID(ctx, fmt.Sprintf("%v", val))
+			unhashedThrottleKey = fmt.Sprintf("%v", val)
+			throttleKey = throttleKey + "-" + queue.HashID(ctx, unhashedThrottleKey)
 		}
 		throttle = &queue.Throttle{
-			Key:    throttleKey,
-			Limit:  int(req.Function.Throttle.Limit),
-			Burst:  int(req.Function.Throttle.Burst),
-			Period: int(req.Function.Throttle.Period.Seconds()),
+			Key:                 throttleKey,
+			Limit:               int(req.Function.Throttle.Limit),
+			Burst:               int(req.Function.Throttle.Burst),
+			Period:              int(req.Function.Throttle.Period.Seconds()),
+			UnhashedThrottleKey: unhashedThrottleKey,
 		}
 	}
 
@@ -1465,13 +1473,8 @@ func (e *executor) handleAggregatePauses(ctx context.Context, evt event.TrackedE
 	)
 
 	for _, i := range evals {
-		found, ok := i.(*state.Pause)
-		if !ok || found == nil {
-			continue
-		}
-
 		// Copy pause into function
-		pause := *found
+		pause := *i
 		wg.Add(1)
 		go func() {
 			atomic.AddInt32(&res[0], 1)
@@ -1504,7 +1507,6 @@ func (e *executor) handlePause(
 	res *execution.HandlePauseResult,
 	l *slog.Logger,
 ) error {
-
 	// If this is a cancellation, ensure that we're not handling an event that
 	// was received before the run (due to eg. latency in a bad case).
 	if pause.Cancel && bytes.Compare(evtID[:], pause.Identifier.RunID[:]) <= 0 {
@@ -1827,13 +1829,11 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 					logger.StdlibLogger(ctx).Warn("missing pause timeout item", "shard", shard.Name, "pause", pause)
 				} else {
 					logger.StdlibLogger(ctx).Error("error dequeueing consumed pause job when resuming", "error", err)
-
 				}
 			}
 		}
 		return nil
 	}, 20*time.Second)
-
 	if err != nil {
 		return err
 	}
@@ -2677,7 +2677,7 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, i *runInstan
 	}
 
 	if opts.If != nil {
-		err = expressions.Validate(ctx, *opts.If)
+		err = expressions.Validate(ctx, expressions.DefaultRestrictiveValidationPolicy(), *opts.If)
 		if err != nil {
 			return state.WrapInStandardError(
 				err,
@@ -2945,16 +2945,19 @@ func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Func
 
 	// Don't bother if it's already there
 	if err == redis_state.ErrQueueItemExists {
+		span.SetAttributes(attribute.Bool(consts.OtelSysStepDelete, true))
 		return nil
 	}
 
 	// If function is paused, we do not schedule runs
 	if errors.Is(err, ErrFunctionSkipped) {
+		span.SetAttributes(attribute.Bool(consts.OtelSysStepDelete, true))
 		return nil
 	}
 
 	if err != nil {
 		span.SetStatus(codes.Error, err.Error())
+		span.SetAttributes(attribute.Bool(consts.OtelSysStepDelete, true))
 		return err
 	}
 
@@ -2969,8 +2972,6 @@ func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Func
 
 	if md != nil {
 		span.SetAttributes(attribute.String(consts.OtelAttrSDKRunID, md.ID.RunID.String()))
-	} else {
-		span.SetAttributes(attribute.Bool(consts.OtelSysStepDelete, true))
 	}
 
 	return nil
