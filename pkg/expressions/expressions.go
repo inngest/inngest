@@ -25,10 +25,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-const (
-	pkgName = "expressions.inngest"
-)
-
 var (
 	CacheExtendTime = time.Minute * 30
 	CacheTTL        = time.Minute * 30
