@@ -31,6 +31,9 @@ local customConcurrency       = tonumber(ARGV[7]) -- concurrency limit for the c
 local noCapacityScore         = tonumber(ARGV[8]) -- score if limit concurrency limit is hit
 local accountId               = ARGV[9]
 
+-- key queues v2
+local disableLeaseChecks = tonumber(ARGV[10])
+
 -- $include(check_concurrency.lua)
 -- $include(get_partition_item.lua)
 -- $include(get_fn_meta.lua)
@@ -62,48 +65,50 @@ local existingTime = existing.last -- store a ref to the last time we successful
 
 local capacity = acctConcurrency -- initialize as the default concurrency limit
 
-if acctConcurrency > 0 and #keyAcctConcurrency > 0 then
-    -- Check that there's capacity for this partition, based off of partition-level
-    -- concurrency keys.
-    local acctCap = check_concurrency(currentTime, keyAcctConcurrency, acctConcurrency)
-    if acctCap <= 0 then
-        requeue_partition(keyGlobalPartitionPtr, keyPartitionMap, existing, partitionID, noCapacityScore, currentTime)
-        update_account_queues(keyGlobalAccountPointer, keyAccountPartitions, partitionID, accountId, noCapacityScore)
-        return { -1 }
-    end
-    if acctCap <= capacity then
-        capacity = acctCap
-    end
-end
+if disableLeaseChecks ~= 1 then
+  if acctConcurrency > 0 and #keyAcctConcurrency > 0 then
+      -- Check that there's capacity for this partition, based off of partition-level
+      -- concurrency keys.
+      local acctCap = check_concurrency(currentTime, keyAcctConcurrency, acctConcurrency)
+      if acctCap <= 0 then
+          requeue_partition(keyGlobalPartitionPtr, keyPartitionMap, existing, partitionID, noCapacityScore, currentTime)
+          update_account_queues(keyGlobalAccountPointer, keyAccountPartitions, partitionID, accountId, noCapacityScore)
+          return { -1 }
+      end
+      if acctCap <= capacity then
+          capacity = acctCap
+      end
+  end
 
-if fnConcurrency > 0 and #keyFnConcurrency > 0 then
-    -- Check that there's capacity for this partition, based off of partition-level
-    -- concurrency keys.
-    local fnCap = check_concurrency(currentTime, keyFnConcurrency, fnConcurrency)
-    if fnCap <= 0 then
-        requeue_partition(keyGlobalPartitionPtr, keyPartitionMap, existing, partitionID, noCapacityScore, currentTime)
-        update_account_queues(keyGlobalAccountPointer, keyAccountPartitions, partitionID, accountId, noCapacityScore)
-        return { -2 }
-    end
-    if fnCap <= capacity then
-        capacity = fnCap
-    end
-end
+  if fnConcurrency > 0 and #keyFnConcurrency > 0 then
+      -- Check that there's capacity for this partition, based off of partition-level
+      -- concurrency keys.
+      local fnCap = check_concurrency(currentTime, keyFnConcurrency, fnConcurrency)
+      if fnCap <= 0 then
+          requeue_partition(keyGlobalPartitionPtr, keyPartitionMap, existing, partitionID, noCapacityScore, currentTime)
+          update_account_queues(keyGlobalAccountPointer, keyAccountPartitions, partitionID, accountId, noCapacityScore)
+          return { -2 }
+      end
+      if fnCap <= capacity then
+          capacity = fnCap
+      end
+  end
 
--- NOTE: This check will not be hit until we re-enable key queues.
--- This is only used for concurrency key queues, which are not enqueued right now.
-if customConcurrency > 0 and #keyCustomConcurrency > 0 then
-    -- Check that there's capacity for this partition, based off of custom
-    -- concurrency keys.
-    local customCap = check_concurrency(currentTime, keyCustomConcurrency, customConcurrency)
-    if customCap <= 0 then
-        requeue_partition(keyGlobalPartitionPtr, keyPartitionMap, existing, partitionID, noCapacityScore, currentTime)
-        update_account_queues(keyGlobalAccountPointer, keyAccountPartitions, partitionID, accountId, noCapacityScore)
-        return { -3 }
-    end
-    if customCap <= capacity then
-        capacity = customCap
-    end
+  -- NOTE: This check will not be hit until we re-enable key queues.
+  -- This is only used for concurrency key queues, which are not enqueued right now.
+  if customConcurrency > 0 and #keyCustomConcurrency > 0 then
+      -- Check that there's capacity for this partition, based off of custom
+      -- concurrency keys.
+      local customCap = check_concurrency(currentTime, keyCustomConcurrency, customConcurrency)
+      if customCap <= 0 then
+          requeue_partition(keyGlobalPartitionPtr, keyPartitionMap, existing, partitionID, noCapacityScore, currentTime)
+          update_account_queues(keyGlobalAccountPointer, keyAccountPartitions, partitionID, accountId, noCapacityScore)
+          return { -3 }
+      end
+      if customCap <= capacity then
+          capacity = customCap
+      end
+  end
 end
 
 existing.leaseID = leaseID

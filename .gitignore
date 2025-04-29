@@ -20,3 +20,5 @@ Thumbs.db
 .idea
 /tmp/
 !/tmp/nats/.gitkeep
+
+__debug_bin*

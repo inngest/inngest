@@ -45,6 +45,7 @@ require (
 	github.com/jinzhu/copier v0.3.5
 	github.com/jonboulle/clockwork v0.4.0
 	github.com/karlseguin/ccache/v2 v2.0.8
+	github.com/karlseguin/ccache/v3 v3.0.6
 	github.com/lib/pq v1.10.9
 	github.com/liushuangls/go-anthropic/v2 v2.12.2
 	github.com/mattn/go-isatty v0.0.20

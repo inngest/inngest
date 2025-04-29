@@ -17,7 +17,7 @@ import (
 	"google.golang.org/protobuf/proto"
 )
 
-func (a *connectApiRouter) start(w http.ResponseWriter, r *http.Request) {
+func (cr *connectApiRouter) start(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	connectionId, err := ulid.New(ulid.Now(), rand.Reader)
 	if err != nil {
@@ -31,7 +31,7 @@ func (a *connectApiRouter) start(w http.ResponseWriter, r *http.Request) {
 
 	hashedSigningKey := r.Header.Get("Authorization")
 	{
-		if hashedSigningKey == "" && !a.Dev {
+		if hashedSigningKey == "" && !cr.Dev {
 			_ = publicerr.WriteHTTP(w, publicerr.Errorf(401, "missing Authorization header"))
 			return
 		}
@@ -46,7 +46,7 @@ func (a *connectApiRouter) start(w http.ResponseWriter, r *http.Request) {
 
 	l = l.With("key", hashedSigningKey, "env", envOverride)
 
-	res, err := a.RequestAuther.AuthenticateRequest(ctx, hashedSigningKey, envOverride)
+	res, err := cr.RequestAuther.AuthenticateRequest(ctx, hashedSigningKey, envOverride)
 	if err != nil {
 		l.Error("could not authenticate connect start request", "err", err)
 
@@ -61,7 +61,7 @@ func (a *connectApiRouter) start(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	entitlements, err := a.EntitlementProvider.RetrieveConnectEntitlements(ctx, res)
+	entitlements, err := cr.EntitlementProvider.RetrieveConnectEntitlements(ctx, res)
 	if err != nil {
 		l.Error("could not check connection limit during start request", "err", err)
 
@@ -88,7 +88,7 @@ func (a *connectApiRouter) start(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	token, err := a.Signer.SignSessionToken(res.AccountID, res.EnvID, auth.DefaultExpiry, entitlements)
+	token, err := cr.Signer.SignSessionToken(res.AccountID, res.EnvID, auth.DefaultExpiry, entitlements)
 	if err != nil {
 		l.Error("could not sign connect session token", "err", err)
 
@@ -96,7 +96,7 @@ func (a *connectApiRouter) start(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	gatewayGroup, gatewayUrl, err := a.ConnectGatewayRetriever.RetrieveGateway(ctx, RetrieveGatewayOpts{
+	gatewayGroup, gatewayUrl, err := cr.ConnectGatewayRetriever.RetrieveGateway(ctx, RetrieveGatewayOpts{
 		AccountID:   res.AccountID,
 		EnvID:       res.EnvID,
 		Exclude:     reqBody.ExcludeGateways,
@@ -127,12 +127,12 @@ func (a *connectApiRouter) start(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(msg)
 }
 
-func (a *connectApiRouter) flushBuffer(w http.ResponseWriter, r *http.Request) {
+func (cr *connectApiRouter) flushBuffer(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	hashedSigningKey := r.Header.Get("Authorization")
 	{
-		if hashedSigningKey == "" && !a.Dev {
+		if hashedSigningKey == "" && !cr.Dev {
 			_ = publicerr.WriteHTTP(w, publicerr.Errorf(401, "missing Authorization header"))
 			return
 		}
@@ -145,7 +145,7 @@ func (a *connectApiRouter) flushBuffer(w http.ResponseWriter, r *http.Request) {
 
 	envOverride := r.Header.Get("X-Inngest-Env")
 
-	res, err := a.RequestAuther.AuthenticateRequest(ctx, hashedSigningKey, envOverride)
+	res, err := cr.RequestAuther.AuthenticateRequest(ctx, hashedSigningKey, envOverride)
 	if err != nil {
 		logger.StdlibLogger(ctx).Error("could not authenticate connect start request", "err", err, "key", hashedSigningKey, "env", envOverride)
 
@@ -183,7 +183,7 @@ func (a *connectApiRouter) flushBuffer(w http.ResponseWriter, r *http.Request) {
 
 	traceCtx := trace.SystemTracer().Propagator().Extract(ctx, systemTraceCtx)
 	// nolint:ineffassign,staticcheck
-	traceCtx, span := a.ConditionalTracer.NewSpan(traceCtx, "FlushMessage", res.AccountID, res.EnvID)
+	traceCtx, span := cr.ConditionalTracer.NewSpan(traceCtx, "FlushMessage", res.AccountID, res.EnvID)
 	defer span.End()
 
 	// Marshal response before notifying executor, marshaling should never fail
@@ -200,7 +200,7 @@ func (a *connectApiRouter) flushBuffer(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Reliable path: Buffer the response to be picked up by the executor
-	err = a.ConnectRequestStateManager.SaveResponse(ctx, res.EnvID, reqBody.RequestId, reqBody)
+	err = cr.ConnectRequestStateManager.SaveResponse(ctx, res.EnvID, reqBody.RequestId, reqBody)
 	if err != nil {
 		logger.StdlibLogger(ctx).Error("could not buffer response", "err", err)
 		span.RecordError(err)
@@ -211,7 +211,7 @@ func (a *connectApiRouter) flushBuffer(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Unreliable fast-track: Notify the executor via PubSub (best-effort, this may be dropped)
-	if err := a.ConnectResponseNotifier.NotifyExecutor(ctx, reqBody); err != nil {
+	if err := cr.ConnectResponseNotifier.NotifyExecutor(ctx, reqBody); err != nil {
 		logger.StdlibLogger(ctx).Error("could not notify executor to flush connect message", "err", err)
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "could not notify executor to flush connect sdk response")

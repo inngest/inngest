@@ -25,14 +25,14 @@ func TestMetricsRequestValid(t *testing.T) {
 		{
 			name: "missing name returns false",
 			req:  &MetricsRequest{},
-			err:  NoMetricsNameErr,
+			err:  ErrNoMetricsName,
 		},
 		{
 			name: "missing time range will returns false",
 			req: &MetricsRequest{
 				Name: "something",
 			},
-			err: NoMetricsTimeRangeErr,
+			err: ErrNoMetricsTimeRange,
 		},
 		{
 			name: "opposite time range (to < from) returns false",
@@ -41,7 +41,7 @@ func TestMetricsRequestValid(t *testing.T) {
 				From: time.Now().Add(-1 * time.Hour),
 				To:   time.Now().Add(-2 * time.Hour),
 			},
-			err: InvalidMetricsTimeRangeErr,
+			err: ErrInvalidMetricsTimeRange,
 		},
 	}
 

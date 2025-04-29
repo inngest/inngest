@@ -10,7 +10,6 @@ import (
 // ConcurrencyKey generates a concurrency key scoped appropriately.
 func ConcurrencyKey(scope enums.ConcurrencyScope, scopeID uuid.UUID, unhashed string) string {
 	return fmt.Sprintf("%s:%s:%s", ConcurrencyScopePrefix(scope), scopeID, XXHash(unhashed))
-
 }
 
 func ConcurrencyScopePrefix(scope enums.ConcurrencyScope) string {

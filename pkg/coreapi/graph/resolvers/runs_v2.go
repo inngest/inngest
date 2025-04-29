@@ -19,9 +19,9 @@ const (
 	maxRunItems     = 400
 )
 
-func (r *queryResolver) Runs(ctx context.Context, num int, cur *string, order []*models.RunsV2OrderBy, filter models.RunsFilterV2) (*models.RunsV2Connection, error) {
+func (qr *queryResolver) Runs(ctx context.Context, num int, cur *string, order []*models.RunsV2OrderBy, filter models.RunsFilterV2) (*models.RunsV2Connection, error) {
 	opts := toRunsQueryOpt(num, cur, order, filter)
-	runs, err := r.Data.GetTraceRuns(ctx, opts)
+	runs, err := qr.Data.GetTraceRuns(ctx, opts)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving runs: %w", err)
 	}
@@ -125,7 +125,7 @@ func (r *queryResolver) Runs(ctx context.Context, num int, cur *string, order []
 		})
 	}
 
-	evts, err := r.Data.GetEventsByInternalIDs(ctx, evtIDs)
+	evts, err := qr.Data.GetEventsByInternalIDs(ctx, evtIDs)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving events associated with runs: %w", err)
 	}
@@ -161,13 +161,13 @@ func (r *queryResolver) Runs(ctx context.Context, num int, cur *string, order []
 	}, nil
 }
 
-func (r *queryResolver) Run(ctx context.Context, runID string) (*models.FunctionRunV2, error) {
+func (qr *queryResolver) Run(ctx context.Context, runID string) (*models.FunctionRunV2, error) {
 	runid, err := ulid.Parse(runID)
 	if err != nil {
 		return nil, fmt.Errorf("error parsing runID: %w", err)
 	}
 
-	run, err := r.Data.GetTraceRun(ctx, cqrs.TraceRunIdentifier{RunID: runid})
+	run, err := qr.Data.GetTraceRun(ctx, cqrs.TraceRunIdentifier{RunID: runid})
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving run: %w", err)
 	}
@@ -237,13 +237,13 @@ func (r *queryResolver) Run(ctx context.Context, runID string) (*models.Function
 	return &res, nil
 }
 
-func (r *queryResolver) RunTraceSpanOutputByID(ctx context.Context, outputID string) (*models.RunTraceSpanOutput, error) {
+func (qr *queryResolver) RunTraceSpanOutputByID(ctx context.Context, outputID string) (*models.RunTraceSpanOutput, error) {
 	id := &cqrs.SpanIdentifier{}
 	if err := id.Decode(outputID); err != nil {
 		return nil, fmt.Errorf("error parsing span identifier: %w", err)
 	}
 
-	spanData, err := r.Data.GetSpanOutput(ctx, *id)
+	spanData, err := qr.Data.GetSpanOutput(ctx, *id)
 	if err != nil {
 		return nil, err
 	}
@@ -275,13 +275,13 @@ func (r *queryResolver) RunTraceSpanOutputByID(ctx context.Context, outputID str
 	return &resp, nil
 }
 
-func (r *queryResolver) RunTrigger(ctx context.Context, runID string) (*models.RunTraceTrigger, error) {
+func (qr *queryResolver) RunTrigger(ctx context.Context, runID string) (*models.RunTraceTrigger, error) {
 	runid, err := ulid.Parse(runID)
 	if err != nil {
 		return nil, fmt.Errorf("error parsing runID: %w", err)
 	}
 
-	run, err := r.Data.GetTraceRun(ctx, cqrs.TraceRunIdentifier{RunID: runid})
+	run, err := qr.Data.GetTraceRun(ctx, cqrs.TraceRunIdentifier{RunID: runid})
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving run: %w", err)
 	}
@@ -307,7 +307,7 @@ func (r *queryResolver) RunTrigger(ctx context.Context, runID string) (*models.R
 		}
 	}
 
-	events, err := r.Data.GetEventsByInternalIDs(ctx, evtIDs)
+	events, err := qr.Data.GetEventsByInternalIDs(ctx, evtIDs)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving events: %w", err)
 	}

@@ -10,11 +10,11 @@ import (
 	"net/http"
 )
 
-func (c *connectApiRouter) showWorkerGroup(w http.ResponseWriter, r *http.Request) {
+func (cr *connectApiRouter) showWorkerGroup(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	var envID uuid.UUID
-	switch c.Dev {
+	switch cr.Dev {
 	case true:
 		envID = consts.DevServerEnvID
 
@@ -42,7 +42,7 @@ func (c *connectApiRouter) showWorkerGroup(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	group, err := c.GroupManager.GetWorkerGroupByHash(ctx, envID, groupID)
+	group, err := cr.GroupManager.GetWorkerGroupByHash(ctx, envID, groupID)
 	if err != nil {
 		_ = publicerr.WriteHTTP(w, publicerr.Error{
 			Err:     err,
@@ -56,7 +56,7 @@ func (c *connectApiRouter) showWorkerGroup(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	conns, err := c.ConnectManager.GetConnectionsByGroupID(ctx, envID, groupID)
+	conns, err := cr.ConnectManager.GetConnectionsByGroupID(ctx, envID, groupID)
 	if err != nil {
 		_ = publicerr.WriteHTTP(w, publicerr.Wrap(
 			err,

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/alicebob/miniredis/v2"
@@ -111,6 +112,10 @@ func New(ctx context.Context, opts StartOpts) error {
 	}
 
 	return start(ctx, opts)
+}
+
+func enforceConnectLeaseExpiry(ctx context.Context, accountID uuid.UUID) bool {
+	return os.Getenv("INNGEST_CONNECT_DISABLE_ENFORCE_LEASE_EXPIRY") != "true"
 }
 
 func start(ctx context.Context, opts StartOpts) error {
@@ -284,12 +289,10 @@ func start(ctx context.Context, opts StartOpts) error {
 	agg := expressions.NewAggregator(ctx, 100, 100, sm.(expressions.EvaluableLoader), nil)
 
 	executorProxy, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectPubSubRedis, true, connectpubsub.RedisPubSubConnectorOpts{
-		Logger:       connectPubSubLogger.With("svc", "executor"),
-		Tracer:       conditionalTracer,
-		StateManager: connectionManager,
-		EnforceLeaseExpiry: func(ctx context.Context, accountID uuid.UUID) bool {
-			return true
-		},
+		Logger:             connectPubSubLogger.With("svc", "executor"),
+		Tracer:             conditionalTracer,
+		StateManager:       connectionManager,
+		EnforceLeaseExpiry: enforceConnectLeaseExpiry,
 	}))
 	if err != nil {
 		return fmt.Errorf("failed to create connect pubsub connector: %w", err)
@@ -438,12 +441,10 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	// ds.opts.Config.EventStream.Service.TopicName()
 	apiConnectProxy, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectPubSubRedis, false, connectpubsub.RedisPubSubConnectorOpts{
-		Logger:       connectPubSubLogger.With("svc", "api"),
-		Tracer:       conditionalTracer,
-		StateManager: connectionManager,
-		EnforceLeaseExpiry: func(ctx context.Context, accountID uuid.UUID) bool {
-			return true
-		},
+		Logger:             connectPubSubLogger.With("svc", "api"),
+		Tracer:             conditionalTracer,
+		StateManager:       connectionManager,
+		EnforceLeaseExpiry: enforceConnectLeaseExpiry,
 	}))
 	if err != nil {
 		return fmt.Errorf("failed to create connect pubsub connector: %w", err)
@@ -478,12 +479,10 @@ func start(ctx context.Context, opts StartOpts) error {
 	}
 
 	connectGatewayProxy, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectPubSubRedis, false, connectpubsub.RedisPubSubConnectorOpts{
-		Logger:       connectPubSubLogger.With("svc", "connect-gateway"),
-		Tracer:       conditionalTracer,
-		StateManager: connectionManager,
-		EnforceLeaseExpiry: func(ctx context.Context, accountID uuid.UUID) bool {
-			return true
-		},
+		Logger:             connectPubSubLogger.With("svc", "connect-gateway"),
+		Tracer:             conditionalTracer,
+		StateManager:       connectionManager,
+		EnforceLeaseExpiry: enforceConnectLeaseExpiry,
 	}))
 	if err != nil {
 		return fmt.Errorf("failed to create connect pubsub connector: %w", err)

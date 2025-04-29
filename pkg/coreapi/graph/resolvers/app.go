@@ -12,16 +12,16 @@ import (
 	"github.com/inngest/inngest/pkg/devserver/discovery"
 )
 
-func (a queryResolver) Apps(ctx context.Context, filter *models.AppsFilterV1) ([]*cqrs.App, error) {
+func (qr queryResolver) Apps(ctx context.Context, filter *models.AppsFilterV1) ([]*cqrs.App, error) {
 	cqrsFilter, err := models.FromAppsFilter(filter)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse filter: %w", err)
 	}
-	return a.Data.GetApps(ctx, consts.DevServerEnvID, cqrsFilter)
+	return qr.Data.GetApps(ctx, consts.DevServerEnvID, cqrsFilter)
 }
 
-func (a queryResolver) App(ctx context.Context, id uuid.UUID) (*cqrs.App, error) {
-	return a.Data.GetAppByID(ctx, id)
+func (qr queryResolver) App(ctx context.Context, id uuid.UUID) (*cqrs.App, error) {
+	return qr.Data.GetAppByID(ctx, id)
 }
 
 func (a appResolver) ID(ctx context.Context, obj *cqrs.App) (string, error) {

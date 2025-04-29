@@ -9,7 +9,6 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution/queue"
-	"github.com/inngest/inngest/pkg/execution/state"
 	statev1 "github.com/inngest/inngest/pkg/execution/state"
 	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/inngest"
@@ -123,7 +122,7 @@ type LifecycleListener interface {
 		statev1.GeneratorOpcode,
 		// Resp is the HTTP response
 		*http.Response,
-		*state.UserError,
+		*statev1.UserError,
 	)
 
 	// OnWaitForEvent is called when a wait for event step is scheduled.  The
@@ -133,7 +132,7 @@ type LifecycleListener interface {
 		statev2.Metadata,
 		queue.Item,
 		statev1.GeneratorOpcode,
-		state.Pause,
+		statev1.Pause,
 	)
 
 	// OnWaitForEventResumed is called when a function is resumed from waiting for
@@ -141,7 +140,7 @@ type LifecycleListener interface {
 	OnWaitForEventResumed(
 		context.Context,
 		statev2.Metadata,
-		state.Pause,
+		statev1.Pause,
 		ResumeRequest,
 	)
 
@@ -160,7 +159,7 @@ type LifecycleListener interface {
 	OnInvokeFunctionResumed(
 		context.Context,
 		statev2.Metadata,
-		state.Pause,
+		statev1.Pause,
 		ResumeRequest,
 	)
 
@@ -283,7 +282,7 @@ func (NoopLifecyceListener) OnStepGatewayRequestFinished(
 	statev1.GeneratorOpcode,
 	// Resp is the HTTP response
 	*http.Response,
-	*state.UserError,
+	*statev1.UserError,
 ) {
 }
 
@@ -292,7 +291,7 @@ func (NoopLifecyceListener) OnWaitForEvent(
 	statev2.Metadata,
 	queue.Item,
 	statev1.GeneratorOpcode,
-	state.Pause,
+	statev1.Pause,
 ) {
 }
 
@@ -301,7 +300,7 @@ func (NoopLifecyceListener) OnWaitForEvent(
 func (NoopLifecyceListener) OnWaitForEventResumed(
 	context.Context,
 	statev2.Metadata,
-	state.Pause,
+	statev1.Pause,
 	ResumeRequest,
 ) {
 }
@@ -322,7 +321,7 @@ func (NoopLifecyceListener) OnInvokeFunction(
 func (NoopLifecyceListener) OnInvokeFunctionResumed(
 	context.Context,
 	statev2.Metadata,
-	state.Pause,
+	statev1.Pause,
 	ResumeRequest,
 ) {
 }

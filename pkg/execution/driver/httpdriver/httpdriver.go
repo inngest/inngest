@@ -41,6 +41,10 @@ var (
 	defaultClient = Client(SecureDialerOpts{})
 )
 
+const (
+	AccountIDHeader = "account-id"
+)
+
 // Client returns a new HTTP transport.
 func Transport(opts SecureDialerOpts) *http.Transport {
 	t := &http.Transport{
@@ -125,6 +129,9 @@ func (e executor) Execute(ctx context.Context, sl sv2.StateLoader, s sv2.Metadat
 }
 
 type Request struct {
+	// AccountID is a used for feature flag purposes.
+	// Meant to be temporary for selectively enabling/disabling grpc requests to sdks
+	AccountID uuid.UUID
 	// WorkflowID is used for logging purposes, and is not used in the request
 	WorkflowID uuid.UUID
 	// RunID is used for logging purposes, and is not used in the request
@@ -295,6 +302,10 @@ func do(ctx context.Context, c util.HTTPDoer, r Request) (*Response, *httpstat.R
 		return nil, nil, fmt.Errorf("error creating request: %w", err)
 	}
 	req.Header.Add("Content-Type", "application/json")
+
+	if r.AccountID != uuid.Nil {
+		req.Header.Add(AccountIDHeader, r.AccountID.String())
+	}
 
 	// Always close the request after reading the body, ensuring the connection is not recycled.
 	req.Close = true

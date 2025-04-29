@@ -532,6 +532,9 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 				scopeID = req.WorkspaceID
 			}
 
+			evaluated := limit.Evaluate(ctx, evtMap)
+			key := util.ConcurrencyKey(limit.Scope, scopeID, evaluated)
+
 			// Store the concurrency limit in the function.  By copying in the raw expression hash,
 			// we can update the concurrency limits for in-progress runs as new function versions
 			// are stored.
@@ -541,9 +544,10 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 			metadata.Config.CustomConcurrencyKeys = append(
 				metadata.Config.CustomConcurrencyKeys,
 				sv2.CustomConcurrency{
-					Key:   limit.Evaluate(ctx, scopeID, evtMap),
-					Hash:  limit.Hash,
-					Limit: limit.Limit,
+					Key:                       key,
+					Hash:                      limit.Hash,
+					Limit:                     limit.Limit,
+					UnhashedEvaluatedKeyValue: evaluated,
 				},
 			)
 		}
@@ -554,18 +558,21 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	//
 	var throttle *queue.Throttle
 	if req.Function.Throttle != nil {
-		throttleKey := queue.HashID(ctx, req.Function.ID.String())
+		unhashedThrottleKey := req.Function.ID.String()
+		throttleKey := queue.HashID(ctx, unhashedThrottleKey)
 		if req.Function.Throttle.Key != nil {
 			val, _, _ := expressions.Evaluate(ctx, *req.Function.Throttle.Key, map[string]any{
 				"event": evtMap,
 			})
-			throttleKey = throttleKey + "-" + queue.HashID(ctx, fmt.Sprintf("%v", val))
+			unhashedThrottleKey = fmt.Sprintf("%v", val)
+			throttleKey = throttleKey + "-" + queue.HashID(ctx, unhashedThrottleKey)
 		}
 		throttle = &queue.Throttle{
-			Key:    throttleKey,
-			Limit:  int(req.Function.Throttle.Limit),
-			Burst:  int(req.Function.Throttle.Burst),
-			Period: int(req.Function.Throttle.Period.Seconds()),
+			Key:                 throttleKey,
+			Limit:               int(req.Function.Throttle.Limit),
+			Burst:               int(req.Function.Throttle.Burst),
+			Period:              int(req.Function.Throttle.Period.Seconds()),
+			UnhashedThrottleKey: unhashedThrottleKey,
 		}
 	}
 
@@ -2677,7 +2684,7 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, i *runInstan
 	}
 
 	if opts.If != nil {
-		err = expressions.Validate(ctx, *opts.If)
+		err = expressions.Validate(ctx, expressions.DefaultRestrictiveValidationPolicy(), *opts.If)
 		if err != nil {
 			return state.WrapInStandardError(
 				err,
@@ -2945,16 +2952,19 @@ func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Func
 
 	// Don't bother if it's already there
 	if err == redis_state.ErrQueueItemExists {
+		span.SetAttributes(attribute.Bool(consts.OtelSysStepDelete, true))
 		return nil
 	}
 
 	// If function is paused, we do not schedule runs
 	if errors.Is(err, ErrFunctionSkipped) {
+		span.SetAttributes(attribute.Bool(consts.OtelSysStepDelete, true))
 		return nil
 	}
 
 	if err != nil {
 		span.SetStatus(codes.Error, err.Error())
+		span.SetAttributes(attribute.Bool(consts.OtelSysStepDelete, true))
 		return err
 	}
 
@@ -2969,8 +2979,6 @@ func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Func
 
 	if md != nil {
 		span.SetAttributes(attribute.String(consts.OtelAttrSDKRunID, md.ID.RunID.String()))
-	} else {
-		span.SetAttributes(attribute.Bool(consts.OtelSysStepDelete, true))
 	}
 
 	return nil
