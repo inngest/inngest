@@ -6,6 +6,7 @@ import (
 
 	"github.com/google/cel-go/interpreter"
 	"github.com/inngest/inngest/pkg/dateutil"
+	"github.com/inngest/inngest/pkg/expressions/exprenv"
 )
 
 // timeDecorator returns a decorator for inspecting times used within an expression
@@ -15,7 +16,7 @@ import (
 func timeDecorator(act interpreter.PartialActivation) (*timeRefs, interpreter.InterpretableDecorator) {
 	// Create a new dispatcher with all functions added
 	dispatcher := interpreter.NewDispatcher()
-	overloads := celOverloads()
+	overloads := exprenv.CELOverloads()
 	_ = dispatcher.Add(overloads...)
 
 	tr := &timeRefs{}

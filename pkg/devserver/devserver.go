@@ -48,6 +48,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/expressions"
+	"github.com/inngest/inngest/pkg/expressions/expragg"
 	"github.com/inngest/inngest/pkg/history_drivers/memory_reader"
 	"github.com/inngest/inngest/pkg/history_drivers/memory_writer"
 	"github.com/inngest/inngest/pkg/logger"
@@ -286,7 +287,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	connectionManager := connstate.NewRedisConnectionStateManager(connectRc)
 
 	// Create a new expression aggregator, using Redis to load evaluables.
-	agg := expressions.NewAggregator(ctx, 100, 100, sm.(expressions.EvaluableLoader), nil)
+	agg := expragg.NewAggregator(ctx, 100, 100, sm.(expragg.EvaluableLoader), expressions.ExprEvaluator, nil, nil)
 
 	executorProxy, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectPubSubRedis, true, connectpubsub.RedisPubSubConnectorOpts{
 		Logger:             connectPubSubLogger.With("svc", "executor"),
@@ -311,7 +312,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	httpClient.(*http.Client).Transport = awsgateway.NewTransformTripper(httpClient.(*http.Client).Transport)
 	deploy.Client.Transport = awsgateway.NewTransformTripper(deploy.Client.Transport)
 
-	var drivers = []driver.Driver{}
+	drivers := []driver.Driver{}
 	for _, driverConfig := range opts.Config.Execution.Drivers {
 		d, err := driverConfig.NewDriver(registration.NewDriverOpts{
 			ConnectForwarder:  executorProxy,

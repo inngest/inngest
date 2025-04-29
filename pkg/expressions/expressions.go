@@ -20,12 +20,9 @@ import (
 
 	"github.com/google/cel-go/cel"
 	"github.com/inngest/expr"
+	"github.com/inngest/inngest/pkg/expressions/exprenv"
 	"github.com/karlseguin/ccache/v2"
 	"github.com/pkg/errors"
-)
-
-const (
-	pkgName = "expressions.inngest"
 )
 
 var (
@@ -43,7 +40,7 @@ var (
 
 func init() {
 	cache = ccache.New(ccache.Configure().MaxSize(CacheMaxSize))
-	if e, err := env(); err == nil {
+	if e, err := exprenv.Env(); err == nil {
 		exprCompiler = expr.NewCachingCompiler(e, cache)
 		treeParser = expr.NewTreeParser(exprCompiler)
 	}
@@ -100,7 +97,7 @@ type BooleanEvaluator interface {
 	FilteredAttributes(ctx context.Context, data *Data) *Data
 }
 
-func exprEvaluator(ctx context.Context, e expr.Evaluable, input map[string]any) (bool, error) {
+func ExprEvaluator(ctx context.Context, e expr.Evaluable, input map[string]any) (bool, error) {
 	eval, err := NewBooleanEvaluator(ctx, e.GetExpression())
 	if err != nil {
 		return false, err
@@ -145,7 +142,7 @@ func NewExpressionEvaluator(ctx context.Context, expression string) (Evaluator, 
 		if issues != nil {
 			return nil, NewCompileError(issues.Err())
 		}
-		e, err := env()
+		e, err := exprenv.Env()
 		if err != nil {
 			return nil, err
 		}
@@ -173,7 +170,7 @@ func cachedCompile(ctx context.Context, expression string) (*expressionEvaluator
 		return eval.Value().(*expressionEvaluator), nil
 	}
 
-	e, err := env()
+	e, err := exprenv.Env()
 	if err != nil {
 		return nil, err
 	}
@@ -254,7 +251,6 @@ func (e *expressionEvaluator) Evaluate(ctx context.Context, data *Data) (interfa
 	}
 
 	program, act, err := program(ctx, e.ast, e.env, data, true, e.attrs)
-
 	if err != nil {
 		return nil, nil, err
 	}
@@ -317,7 +313,6 @@ func (e *expressionEvaluator) parseAttributes(ctx context.Context) error {
 	}
 
 	attrs, err := parseUsedAttributes(ctx, e.ast)
-
 	if err != nil {
 		return err
 	}

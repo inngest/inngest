@@ -8,6 +8,7 @@ import (
 	"github.com/google/cel-go/cel"
 	celops "github.com/google/cel-go/common/operators"
 	"github.com/hashicorp/go-multierror"
+	"github.com/inngest/inngest/pkg/expressions/exprenv"
 	celexprpb "google.golang.org/genproto/googleapis/api/expr/v1alpha1"
 )
 
@@ -57,7 +58,7 @@ func validationErr(err error) error {
 // as calling Check on an AST is not thread safe.
 func Validate(_ context.Context, policy *ValidationPolicy, expression string) error {
 	// Compile the expression as new.
-	env, err := env()
+	env, err := exprenv.Env()
 	if err != nil {
 		return validationErr(err)
 	}
