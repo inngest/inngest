@@ -22,6 +22,7 @@ local partitionID = ARGV[1]
 local accountID   = ARGV[2]
 local leaseID     = ARGV[3]
 local nowMS       = tonumber(ARGV[4])
+local requeueAt   = tonumber(ARGV[5])
 
 -- $include(decode_ulid_time.lua)
 -- $include(get_partition_item.lua)
@@ -61,6 +62,11 @@ end
 -- Push back to next earliest backlog
 local earliestScore = tonumber(minScores[2])
 local updateTo = earliestScore/1000
+
+-- If we need to push back even further, override updateTo
+if requeueAt ~= 0 and requeueAt > updateTo then
+  updateTo = requeueAt
+end
 
 -- Push back shadow partition in global set
 update_pointer_score_to(partitionID, keyGlobalShadowPartitionSet, updateTo)

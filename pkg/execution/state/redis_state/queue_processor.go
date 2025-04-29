@@ -544,23 +544,6 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 		return fmt.Errorf("missing shadow partition leaseID")
 	}
 
-	// hand back lease so next scan iteration can process lease again
-	defer func() {
-		if leaseID == nil {
-			return
-		}
-
-		err = q.ShadowPartitionReturnLease(ctx, shadowPart, *leaseID)
-		if err != nil {
-			if errors.Is(err, ErrShadowPartitionAlreadyLeased) || errors.Is(err, ErrShadowPartitionLeaseNotFound) {
-				// contention
-				return
-			}
-
-			logger.StdlibLogger(ctx).Warn("failed to return lease", "err", err)
-		}
-	}()
-
 	extendLeaseCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -583,26 +566,64 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 		}
 	}()
 
-	// TODO:
-	//
-	// - retrieve countinuation counter
-	//
-	// loop:
-	// - extend lease for shadow partition
-	// - iterate through backlogs
-	//   + add item to function partition
-	//
-
-	// TODO Check if shadow partition cannot be processed (paused/refill disabled, etc.)
-	cannotProcessShadowPartition := false
-	if cannotProcessShadowPartition {
+	// Check if shadow partition cannot be processed (paused/refill disabled, etc.)
+	if shadowPart.PauseRefill {
 		q.removeShadowContinue(ctx, shadowPart, false)
+
+		forceRequeueAt := q.clock.Now().Add(ShadowPartitionRefillPausedRequeueExtension)
+		err = q.ShadowPartitionRequeue(ctx, shadowPart, *leaseID, &forceRequeueAt)
+		if err != nil {
+			return fmt.Errorf("could not requeue shadow partition: %w", err)
+		}
+
 		return nil
 	}
 
+	until := q.clock.Now()
+	limit := ShadowPartitionPeekMaxBacklogs
+	backlogs, err := q.ShadowPartitionPeek(ctx, shadowPart, until, limit)
+	if err != nil {
+		return fmt.Errorf("could not peek backlogs for shadow partition: %w", err)
+	}
+
+	// Sequentially refill backlogs
+	for _, backlog := range backlogs {
+		err := q.BacklogRefill(ctx, backlog, shadowPart)
+		if err != nil {
+			// TODO Handle capacity reached and exit
+			isCapacityReached := false
+			if isCapacityReached {
+				q.removeShadowContinue(ctx, shadowPart, false)
+
+				forceRequeueAt := q.clock.Now().Add(ShadowPartitionRefillCapacityReachedRequeueExtension)
+				err = q.ShadowPartitionRequeue(ctx, shadowPart, *leaseID, &forceRequeueAt)
+				if err != nil {
+					return fmt.Errorf("could not requeue shadow partition: %w", err)
+				}
+
+				return nil
+			}
+		}
+	}
+
 	hasMoreBacklogs := false
-	if hasMoreBacklogs {
-		q.addShadowContinue(ctx, shadowPart, continuationCount)
+	if !hasMoreBacklogs {
+		// No more backlogs right now, we can continue the scan loop until new items are added
+		q.removeShadowContinue(ctx, shadowPart, false)
+
+		err = q.ShadowPartitionRequeue(ctx, shadowPart, *leaseID, nil)
+		if err != nil {
+			return fmt.Errorf("could not requeue shadow partition: %w", err)
+		}
+	}
+
+	// More backlogs, we can add a continuation
+	q.addShadowContinue(ctx, shadowPart, continuationCount)
+
+	// Clear out current lease
+	err = q.ShadowPartitionRequeue(ctx, shadowPart, *leaseID, nil)
+	if err != nil {
+		return fmt.Errorf("could not requeue shadow partition: %w", err)
 	}
 
 	return nil
