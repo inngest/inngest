@@ -27,6 +27,7 @@ func TestBatchSizeLimit(t *testing.T) {
 	defer rc.Close()
 
 	bc := redis_state.NewBatchClient(rc, redis_state.QueueDefaultKey)
+	// make the size limit crazy small (10 bytes) for verification purposes
 	bm := NewRedisBatchManager(bc, nil, WithRedisBatchSizeLimit(10))
 
 	accountId := uuid.New()
