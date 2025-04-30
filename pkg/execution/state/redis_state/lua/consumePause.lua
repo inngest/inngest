@@ -17,6 +17,11 @@ local keyStepsPending = KEYS[4]
 local pauseDataKey = ARGV[1] -- used to set data in run state store
 local pauseDataVal = ARGV[2] -- data to set
 
+-- Return exactly the same response the first caller got
+if alreadyConsumed(pauseID+eventID) then
+  return previousResponse(pauseID+eventID)
+end
+
 if actionKey ~= nil and pauseDataKey ~= "" then
   -- idempotency check: only ever consume a pause once
   if redis.call("HEXISTS", actionKey, pauseDataKey) == 1 then
@@ -30,4 +35,8 @@ if actionKey ~= nil and pauseDataKey ~= "" then
   redis.call("SREM", keyStepsPending, pauseDataKey)
 end
 
-return redis.call("SCARD", keyStepsPending) > 0 and 1 or 0
+local resp = redis.call("SCARD", keyStepsPending) > 0 and 1 or 0
+
+redis.call("SETEX", idempotencySet, pauseID + eventID)
+
+return resp

@@ -428,7 +428,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	// this run ID.
 	runID := ulid.MustNew(ulid.Now(), rand.Reader)
 
-	key := idempotencyKey(req, runID)
+	key := idempotencyKey(req)
 
 	if req.Context == nil {
 		req.Context = map[string]any{}
@@ -593,7 +593,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		}
 	}
 
-	err := e.smv2.Create(ctx, newState)
+	newState, err := e.smv2.Create(ctx, newState, idempotencyKey())
 	switch err {
 	case nil:
 		// no-op, continue
@@ -608,7 +608,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	//
 	if req.BatchID == nil {
 		for _, c := range req.Function.Cancel {
-			pauseID := uuid.New()
+			pauseID, err := uuid.NewV7FromReader(runID)
 			expires := time.Now().Add(consts.CancelTimeout)
 			if c.Timeout != nil {
 				dur, err := str2duration.ParseDuration(*c.Timeout)
@@ -665,7 +665,9 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 			}
 			err = e.pm.SavePause(ctx, pause)
 			if err != nil {
-				return &metadata, fmt.Errorf("error saving pause: %w", err)
+				if !errors.Is(err, state.ErrPauseAlreadyExists) {
+					return &metadata, fmt.Errorf("error saving pause: %w", err)
+				}
 			}
 		}
 	}
@@ -907,7 +909,9 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	}
 
 	return util.CritT(ctx, "run step", func(ctx context.Context) (*state.DriverResponse, error) {
-		resp, err := e.run(ctx, &instance)
+
+		resp, err = e.run(ctx, &instance)
+
 		// Now we have a response, update the run instance.  We need to do this as request
 		// offloads must mutate the response directly.
 		instance.resp = resp
@@ -1231,6 +1235,15 @@ func correlationID(event event.Event) *string {
 // A nil response with an error indicates that an internal error occurred and the step
 // did not run.
 func (e *executor) run(ctx context.Context, i *runInstance) (*state.DriverResponse, error) {
+	// Check if we already completed this request before
+	resp, err := e.smv2.HasSavedResponse(id, stepID)
+	if err != nil {
+		return nil, fmt.Errorf("could not check for existing response")
+	}
+	if resp != nil {
+		return resp, nil
+	}
+
 	url, _ := i.f.URI()
 	for _, e := range e.lifecycles {
 		go e.OnStepStarted(context.WithoutCancel(ctx), i.md, i.item, i.edge, url.String())
@@ -1852,6 +1865,23 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 }
 
 func (e *executor) HandleGeneratorResponse(ctx context.Context, i *runInstance, resp *state.DriverResponse) error {
+	groups := opGroups(resp.Generator)
+
+	// TODO Immediately save step _if_ opcode is step, error
+	allGroups := groups.All()
+	for _, group := range allGroups {
+		for _, op := range group.Opcodes {
+			switch op.Op {
+			case enums.OpcodeStep, enums.OpcodeStepRun, enums.OpcodeStepError:
+				output, err := op.Output()
+				if err != nil {
+					// ...
+				}
+				e.smv2.SaveStep(ctx, id, stepID, []byte(output))
+			}
+		}
+	}
+
 	{
 		// The following code helps with parallelism and the V2 -> V3 executor changes
 		var update *sv2.MutableConfig
@@ -1907,15 +1937,13 @@ func (e *executor) HandleGeneratorResponse(ctx context.Context, i *runInstance, 
 		)
 	}
 
-	groups := opGroups(resp.Generator)
-
 	if stepCount > 1 && i.md.ShouldCoalesceParallelism(resp) {
 		if err := e.smv2.SavePending(ctx, i.md.ID, groups.IDs()); err != nil {
 			return fmt.Errorf("error saving pending steps: %w", err)
 		}
 	}
 
-	for _, group := range groups.All() {
+	for _, group := range allGroups {
 		if err := e.handleGeneratorGroup(ctx, i, group, resp); err != nil {
 			return err
 		}

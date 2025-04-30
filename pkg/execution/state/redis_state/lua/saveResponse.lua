@@ -17,10 +17,17 @@ local keyStepInputs = KEYS[4]
 local keyStepsPending = KEYS[5]
 
 local stepID = ARGV[1]
-local outputData = ARGV[2]
+local outputData = ARGV[2] # expected to be empty if temporary state already saved
+
+redis.call("SET", idempotencyResponse, firstCallResponse)
+
+
+if temporaryStateExists(queueItemID) then
+    outputData = redis.call("GET", temporaryState)
+end
 
 if redis.call("HEXISTS", keyStep, stepID) == 1 then
-  return -1
+  return redis.call("GET", idempotencyResponse, firstCallResponse)
 end
 
 -- If we're saving a response for a step that previously had input, remove the
@@ -37,4 +44,8 @@ redis.call("HSET", keyStep, stepID, outputData)
 redis.call("RPUSH", keyStack, stepID)
 
 redis.call("SREM", keyStepsPending, stepID)
-return redis.call("SCARD", keyStepsPending) > 0 and 1 or 0
+local firstCallResponse = redis.call("SCARD", keyStepsPending) > 0 and 1 or 0
+
+redis.call("SET", idempotencyResponse, firstCallResponse)
+
+return firstCallResponse
