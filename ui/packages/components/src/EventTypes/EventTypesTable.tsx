@@ -66,7 +66,7 @@ export function EventTypesTable({
   const archived = filteredStatus === 'true';
   const [cursor, setCursor] = useState<string | null>(null);
   const [searchInput, setSearchInput] = useState<string>('');
-  const [nameSearch, setNameSearch] = useState<string | null>(null);
+  const [nameSearch = null, setNameSearch, removeNameSearch] = useSearchParam('nameSearch');
   const [orderBy, setOrderBy] = useState<EventTypesOrderBy[]>([
     {
       field: EventTypesOrderByField.Name,
@@ -75,7 +75,11 @@ export function EventTypesTable({
   ]);
   const containerRef = useRef<HTMLDivElement>(null);
   const debouncedSearch = useDebounce(() => {
-    setNameSearch(searchInput);
+    if (searchInput === '') {
+      removeNameSearch();
+    } else {
+      setNameSearch(searchInput);
+    }
   }, 400);
 
   const onStatusFilterChange = useCallback(
