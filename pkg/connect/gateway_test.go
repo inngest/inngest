@@ -18,6 +18,7 @@ import (
 	"github.com/inngest/inngest/pkg/cqrs/sync"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/publicerr"
 	"github.com/inngest/inngest/pkg/sdk"
 	"github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/oklog/ulid/v2"
@@ -171,6 +172,106 @@ func TestLeaseRenewal(t *testing.T) {
 	require.WithinDuration(t, time.Now().Add(consts.ConnectWorkerRequestLeaseDuration), ulid.Time(parsed.Time()), 500*time.Millisecond)
 }
 
+func TestLeaseRenewalWithInvalidLeaseShouldNotClose(t *testing.T) {
+	params := testingParameters{
+		consecutiveMissesBeforeClose: 10,
+		heartbeatInterval:            1 * time.Second,
+	}
+	res := createTestingGateway(t, params)
+
+	handshake(t, res)
+
+	requestID := "test-req"
+
+	leaseID, err := res.svc.stateManager.LeaseRequest(context.Background(), res.envID, requestID, time.Second*5)
+	require.NoError(t, err)
+
+	expectedPayload := &connect.GatewayExecutorRequestData{
+		RequestId:      requestID,
+		AccountId:      res.accountID.String(),
+		EnvId:          res.envID.String(),
+		AppId:          res.appID.String(),
+		AppName:        res.appName,
+		FunctionId:     res.fnID.String(),
+		FunctionSlug:   res.fnSlug,
+		StepId:         ptr.String("step"),
+		RequestPayload: []byte("hello world"),
+		RunId:          res.runID.String(),
+		LeaseId:        leaseID.String(),
+	}
+
+	// Publish message to "PubSub"
+	_ = res.testConn.RouteExecutorRequest(context.Background(), res.svc.gatewayId, res.connID, expectedPayload)
+
+	// Expect message to be received by gateway and forwarded over WebSocket
+	msg := awaitNextMessage(t, res.ws, 2*time.Second)
+	require.Equal(t, connect.GatewayMessageType_GATEWAY_EXECUTOR_REQUEST, msg.Kind)
+
+	payload := &connect.GatewayExecutorRequestData{}
+	err = proto.Unmarshal(msg.Payload, payload)
+	require.NoError(t, err)
+
+	// Expect messages to match
+	require.True(t, proto.Equal(expectedPayload, payload))
+
+	sendWorkerExtendLeaseMessage(t, res, &connect.WorkerRequestExtendLeaseData{
+		RequestId:      payload.RequestId,
+		AccountId:      payload.AccountId,
+		EnvId:          payload.EnvId,
+		AppId:          payload.AppId,
+		FunctionSlug:   payload.FunctionSlug,
+		StepId:         payload.StepId,
+		SystemTraceCtx: payload.SystemTraceCtx,
+		UserTraceCtx:   payload.UserTraceCtx,
+		RunId:          payload.RunId,
+		LeaseId:        payload.LeaseId,
+	})
+
+	// Expect lease extension ack
+	msg = awaitNextMessage(t, res.ws, 2*time.Second)
+	require.Equal(t, connect.GatewayMessageType_WORKER_REQUEST_EXTEND_LEASE_ACK, msg.Kind)
+
+	ackPayload := connect.WorkerRequestExtendLeaseAckData{}
+	err = proto.Unmarshal(msg.Payload, &ackPayload)
+	require.NoError(t, err)
+
+	require.Equal(t, payload.RequestId, ackPayload.RequestId)
+	require.Equal(t, payload.AccountId, ackPayload.AccountId)
+	require.NotNil(t, ackPayload.NewLeaseId)
+
+	parsed, err := ulid.Parse(*ackPayload.NewLeaseId)
+	require.NoError(t, err)
+
+	require.WithinDuration(t, time.Now().Add(consts.ConnectWorkerRequestLeaseDuration), ulid.Time(parsed.Time()), 500*time.Millisecond)
+
+	sendWorkerExtendLeaseMessage(t, res, &connect.WorkerRequestExtendLeaseData{
+		RequestId:      payload.RequestId,
+		AccountId:      payload.AccountId,
+		EnvId:          payload.EnvId,
+		AppId:          payload.AppId,
+		FunctionSlug:   payload.FunctionSlug,
+		StepId:         payload.StepId,
+		SystemTraceCtx: payload.SystemTraceCtx,
+		UserTraceCtx:   payload.UserTraceCtx,
+		RunId:          payload.RunId,
+		LeaseId:        payload.LeaseId,
+	})
+
+	// Expect lease extension ack
+	msg = awaitNextMessage(t, res.ws, 2*time.Second)
+	require.Equal(t, connect.GatewayMessageType_WORKER_REQUEST_EXTEND_LEASE_ACK, msg.Kind)
+
+	nackPayload := connect.WorkerRequestExtendLeaseAckData{}
+	err = proto.Unmarshal(msg.Payload, &nackPayload)
+	require.NoError(t, err)
+
+	require.Equal(t, payload.RequestId, nackPayload.RequestId)
+	require.Equal(t, payload.AccountId, nackPayload.AccountId)
+	require.Nil(t, nackPayload.NewLeaseId)
+
+	exchangeHeartbeat(t, res.ws, 2*time.Second)
+}
+
 func TestCloseConnectionOnConsecutiveHeartbeatFail(t *testing.T) {
 	params := testingParameters{
 		consecutiveMissesBeforeClose: 5,
@@ -216,7 +317,7 @@ func TestWorkerHeartbeats(t *testing.T) {
 	<-time.After(1 * time.Second)
 
 	// Send first real heartbeat
-	sendWorkerHeartbeatMessage(t, res)
+	sendWorkerHeartbeatMessage(t, res.ws)
 
 	// Expect lifecycles to be set
 	res.lifecycles.Assert(t, testRecorderAssertion{
@@ -231,9 +332,48 @@ func TestWorkerHeartbeats(t *testing.T) {
 	require.WithinDuration(t, time.Now(), conn.LastHeartbeatAt.AsTime(), 500*time.Millisecond)
 }
 
+func TestSyncErrorPropagatesToUser(t *testing.T) {
+	res := createTestingGateway(t, testingParameters{
+		shouldFailSync: true,
+	})
+
+	res.lifecycles.Assert(t, testRecorderAssertion{})
+
+	msg := awaitNextMessage(t, res.ws, 2*time.Second)
+	require.Equal(t, connect.GatewayMessageType_GATEWAY_HELLO, msg.Kind)
+
+	sendWorkerConnectMessage(t, res)
+
+	msg = awaitNextMessage(t, res.ws, 2*time.Second)
+	require.Equal(t, connect.GatewayMessageType_SYNC_FAILED, msg.Kind)
+
+	syncErr := connect.SystemError{}
+	require.NoError(t, proto.Unmarshal(msg.Payload, &syncErr))
+
+	require.Equal(t, exampleSyncError.Code, syncErr.Code)
+	require.Equal(t, exampleSyncError.Message, syncErr.Message)
+
+	code, reason := awaitClosure(t, res.ws, 2*time.Second)
+	require.Equal(t, websocket.StatusPolicyViolation, code)
+	require.Equal(t, exampleSyncError.Code, reason)
+
+	res.lifecycles.Assert(t, testRecorderAssertion{
+		onConnectedCount:    1,
+		onSyncedCount:       0,
+		onReadyCount:        0,
+		onDisconnectedCount: 1,
+	})
+}
+
 type websocketDisconnected struct {
 	conn        *state.Connection
 	closeReason string
+}
+
+var exampleSyncError = publicerr.Error{
+	Code:    "code-test-err",
+	Message: "test err message",
+	Status:  http.StatusBadRequest,
 }
 
 type testRecorderLifecycles struct {
@@ -382,6 +522,7 @@ type testingParameters struct {
 	leaseDuration                time.Duration
 	extendLeaseInterval          time.Duration
 	consecutiveMissesBeforeClose int
+	shouldFailSync               bool
 }
 
 func createTestingGateway(t *testing.T, params ...testingParameters) testingResources {
@@ -436,11 +577,14 @@ func createTestingGateway(t *testing.T, params ...testingParameters) testingReso
 			_ = srv.Shutdown(ctx)
 		})
 
-		reply, err := json.Marshal(sync.Reply{
+		okReply, err := json.Marshal(sync.Reply{
 			OK:     true,
 			SyncID: &syncID,
 			AppID:  &appID,
 		})
+		require.NoError(t, err)
+
+		failReply, err := json.Marshal(exampleSyncError)
 		require.NoError(t, err)
 
 		// Emulate sync endpoint
@@ -450,8 +594,14 @@ func createTestingGateway(t *testing.T, params ...testingParameters) testingReso
 
 			l.Info("got register request", "headers", request.Header, "body", string(body))
 
+			if len(params) > 0 && params[0].shouldFailSync {
+				writer.WriteHeader(exampleSyncError.Status)
+				_, _ = writer.Write(failReply)
+				return
+			}
+
 			writer.WriteHeader(http.StatusOK)
-			_, _ = writer.Write(reply)
+			_, _ = writer.Write(okReply)
 		})
 
 		mux.HandleFunc("GET /ready", func(writer http.ResponseWriter, request *http.Request) {
@@ -663,6 +813,34 @@ func awaitNextMessage(t *testing.T, ws *websocket.Conn, timeout time.Duration) *
 	return &parsed
 }
 
+func awaitClosure(t *testing.T, ws *websocket.Conn, timeout time.Duration) (websocket.StatusCode, string) {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	if timeout > 0 {
+		ctx, cancel = context.WithTimeout(context.Background(), timeout)
+		defer cancel()
+	}
+
+	parsed := connect.ConnectMessage{}
+	err := wsproto.Read(ctx, ws, &parsed)
+
+	require.Error(t, err)
+	require.NotErrorIs(t, err, context.DeadlineExceeded)
+
+	cerr := websocket.CloseError{}
+	require.ErrorAs(t, err, &cerr)
+
+	return cerr.Code, cerr.Reason
+}
+
+func exchangeHeartbeat(t *testing.T, ws *websocket.Conn, timeout time.Duration) {
+	sendWorkerHeartbeatMessage(t, ws)
+
+	heartbeatAck := awaitNextMessage(t, ws, timeout)
+	require.Equal(t, connect.GatewayMessageType_GATEWAY_HEARTBEAT, heartbeatAck.Kind)
+}
+
 func handshake(t *testing.T, res testingResources) {
 	msg := awaitNextMessage(t, res.ws, 2*time.Second)
 	require.Equal(t, connect.GatewayMessageType_GATEWAY_HELLO, msg.Kind)
@@ -692,10 +870,10 @@ func sendWorkerConnectMessage(t *testing.T, res testingResources) {
 	require.NoError(t, err)
 }
 
-func sendWorkerHeartbeatMessage(t *testing.T, res testingResources) {
+func sendWorkerHeartbeatMessage(t *testing.T, ws *websocket.Conn) {
 	ctx := context.Background()
 
-	err := wsproto.Write(ctx, res.ws, &connect.ConnectMessage{
+	err := wsproto.Write(ctx, ws, &connect.ConnectMessage{
 		Kind: connect.GatewayMessageType_WORKER_HEARTBEAT,
 	})
 	require.NoError(t, err)
