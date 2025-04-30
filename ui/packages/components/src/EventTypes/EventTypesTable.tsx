@@ -7,6 +7,7 @@ import { Button } from '@inngest/components/Button/Button';
 import TableBlankState from '@inngest/components/EventTypes/TableBlankState';
 import { Search } from '@inngest/components/Forms/Search';
 import NewTable from '@inngest/components/Table/NewTable';
+import useDebounce from '@inngest/components/hooks/useDebounce';
 import {
   EventTypesOrderByDirection,
   EventTypesOrderByField,
@@ -20,8 +21,6 @@ import { type Row, type SortingState } from '@tanstack/react-table';
 import { useSearchParam } from '../hooks/useSearchParam';
 import EventTypesStatusFilter from './EventTypesStatusFilter';
 import { useColumns } from './columns';
-
-const refreshInterval = 5000;
 
 export function EventTypesTable({
   getEventTypes,
@@ -41,6 +40,7 @@ export function EventTypesTable({
     archived,
   }: {
     cursor: string | null;
+    nameSearch: string | null;
     archived: boolean;
     orderBy: EventTypesOrderBy[];
   }) => Promise<{ events: Omit<EventType, 'volume'>[]; pageInfo: PageInfo }>;
@@ -65,7 +65,8 @@ export function EventTypesTable({
   const [filteredStatus, setFilteredStatus, removeFilteredStatus] = useSearchParam('archived');
   const archived = filteredStatus === 'true';
   const [cursor, setCursor] = useState<string | null>(null);
-  const [page, setPage] = useState(1);
+  const [searchInput, setSearchInput] = useState<string>('');
+  const [nameSearch, setNameSearch] = useState<string | null>(null);
   const [orderBy, setOrderBy] = useState<EventTypesOrderBy[]>([
     {
       field: EventTypesOrderByField.Name,
@@ -73,6 +74,9 @@ export function EventTypesTable({
     },
   ]);
   const containerRef = useRef<HTMLDivElement>(null);
+  const debouncedSearch = useDebounce(() => {
+    setNameSearch(searchInput);
+  }, 400);
 
   const onStatusFilterChange = useCallback(
     (value: boolean) => {
@@ -81,9 +85,8 @@ export function EventTypesTable({
       } else {
         removeFilteredStatus(); // Remove query param when archived is false
       }
-      // Reset cursor and page when filter changes
+      // Reset cursor when filter changes
       setCursor(null);
-      setPage(1);
     },
     [setFilteredStatus, removeFilteredStatus]
   );
@@ -97,12 +100,11 @@ export function EventTypesTable({
     isFetching,
     isFetchingNextPage, // refetching
   } = useInfiniteQuery({
-    queryKey: ['event-types', { orderBy, cursor, archived }],
+    queryKey: ['event-types', { orderBy, cursor, archived, nameSearch }],
     queryFn: useCallback(() => {
-      return getEventTypes({ orderBy, cursor, archived });
-    }, [getEventTypes, orderBy, cursor, archived]),
+      return getEventTypes({ orderBy, cursor, archived, nameSearch });
+    }, [getEventTypes, orderBy, cursor, archived, nameSearch]),
     placeholderData: keepPreviousData,
-    refetchInterval: refreshInterval,
     getNextPageParam: (lastPage) => {
       if (!lastPage) {
         return undefined;
@@ -118,7 +120,6 @@ export function EventTypesTable({
       return getEventTypesVolume({ orderBy, cursor, archived });
     }, [getEventTypesVolume, orderBy, cursor, archived]),
     placeholderData: keepPreviousData,
-    refetchInterval: !cursor || page === 1 ? refreshInterval : 0,
   });
 
   const mergedData = useCallback(() => {
@@ -180,7 +181,6 @@ export function EventTypesTable({
       setOrderBy(orderBy);
       // Back to first page when we sort changes
       setCursor(null);
-      setPage(1);
     }
   }, [sorting, setOrderBy]);
 
@@ -208,9 +208,12 @@ export function EventTypesTable({
         <Search
           name="search"
           placeholder="Search by event type"
-          value={''}
+          value={searchInput}
           className="h-[30px] w-56 py-3"
-          onUpdate={(value) => {}}
+          onUpdate={(value) => {
+            setSearchInput(value);
+            debouncedSearch();
+          }}
         />
       </div>
       <div className="h-[calc(100%-58px)] overflow-y-auto" onScroll={onScroll} ref={containerRef}>

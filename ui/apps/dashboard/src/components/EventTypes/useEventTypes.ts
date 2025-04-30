@@ -6,9 +6,13 @@ import { useEnvironment } from '@/components/Environments/environment-context';
 import { graphql } from '@/gql';
 
 const query = graphql(`
-  query GetEventTypesV2($envID: ID!, $cursor: String, $archived: Boolean) {
+  query GetEventTypesV2($envID: ID!, $cursor: String, $archived: Boolean, $nameSearch: String) {
     environment: workspace(id: $envID) {
-      eventTypesV2(after: $cursor, first: 30, filter: { archived: $archived }) {
+      eventTypesV2(
+        after: $cursor
+        first: 30
+        filter: { archived: $archived, nameSearch: $nameSearch }
+      ) {
         edges {
           node {
             name
@@ -36,6 +40,7 @@ const query = graphql(`
 
 type QueryVariables = {
   archived: boolean;
+  nameSearch: string | null;
   cursor: string | null;
 };
 
@@ -43,7 +48,7 @@ export function useEventTypes() {
   const envID = useEnvironment().id;
   const client = useClient();
   return useCallback(
-    async ({ cursor, archived }: QueryVariables) => {
+    async ({ cursor, archived, nameSearch }: QueryVariables) => {
       const result = await client
         .query(
           query,
@@ -51,6 +56,7 @@ export function useEventTypes() {
             envID,
             archived,
             cursor,
+            nameSearch,
           },
           { requestPolicy: 'network-only' }
         )
