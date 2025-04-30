@@ -47,7 +47,8 @@ export function useColumns({
       },
       header: 'Event name',
       maxSize: 400,
-      enableSorting: true,
+      // TODO: Re-enable this when API supports sorting by event name
+      enableSorting: false,
       id: ensureColumnID('name'),
     }),
     columnHelper.accessor('functions', {
