@@ -40,10 +40,15 @@ import (
 )
 
 const (
-	PartitionSelectionMax          = int64(100)
-	PartitionPeekMax               = PartitionSelectionMax * 3
-	AccountPeekMax                 = int64(30)
-	ShadowPartitionPeekMaxBacklogs = int64(100)
+	PartitionSelectionMax                = int64(100)
+	PartitionPeekMax                     = PartitionSelectionMax * 3
+	AccountPeekMax                       = int64(30)
+	ShadowPartitionPeekMinBacklogs       = int64(10)
+	ShadowPartitionPeekMaxBacklogs       = int64(100)
+	AbsoluteShadowPartitionPeekMax int64 = 10 * ShadowPartitionPeekMaxBacklogs
+
+	// BacklogRefillHardLimit sets the maximum number of items that can be refilled in a single backlogRefill operation.
+	BacklogRefillHardLimit = int64(1000)
 )
 
 const (
@@ -235,6 +240,22 @@ func WithPeekSizeRange(min int64, max int64) QueueOpt {
 		}
 		q.peekMin = min
 		q.peekMax = max
+	}
+}
+
+func WithShadowPeekSizeRange(min int64, max int64) QueueOpt {
+	return func(q *queue) {
+		if max > AbsoluteShadowPartitionPeekMax {
+			max = AbsoluteShadowPartitionPeekMax
+		}
+		q.shadowPeekMin = min
+		q.shadowPeekMax = max
+	}
+}
+
+func WithBacklogRefillLimit(limit int64) QueueOpt {
+	return func(q *queue) {
+		q.backlogRefillLimit = limit
 	}
 }
 
@@ -525,8 +546,11 @@ func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 		apf: func(_ context.Context, _ uuid.UUID) uint {
 			return PriorityDefault
 		},
-		peekMin: DefaultQueuePeekMin,
-		peekMax: DefaultQueuePeekMax,
+		peekMin:            DefaultQueuePeekMin,
+		peekMax:            DefaultQueuePeekMax,
+		shadowPeekMin:      ShadowPartitionPeekMinBacklogs,
+		shadowPeekMax:      ShadowPartitionPeekMaxBacklogs,
+		backlogRefillLimit: BacklogRefillHardLimit,
 		runMode: QueueRunMode{
 			Sequential:    true,
 			Scavenger:     true,
@@ -751,6 +775,9 @@ type queue struct {
 	shadowContinueCooldown  map[string]time.Time
 	shadowContinuesLock     *sync.Mutex
 	shadowContinuationLimit uint
+	shadowPeekMin           int64
+	shadowPeekMax           int64
+	backlogRefillLimit      int64
 }
 
 type QueueRunMode struct {
@@ -2843,16 +2870,26 @@ func (q *queue) ShadowPartitionLease(ctx context.Context, sp *QueueShadowPartiti
 	}
 }
 
-func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueShadowPartition) error {
+func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueShadowPartition) (enums.QueueConstraint, int, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "BacklogRefill"), redis_telemetry.ScopeQueue)
 
 	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
-		return fmt.Errorf("unsupported queue shard kind for BacklogRefill: %s", q.primaryQueueShard.Kind)
+		return enums.QueueConstraintNotLimited, 0, fmt.Errorf("unsupported queue shard kind for BacklogRefill: %s", q.primaryQueueShard.Kind)
 	}
 
 	accountID := uuid.Nil
 	if sp.AccountID != nil {
 		accountID = *sp.AccountID
+	}
+
+	refillUntil := q.clock.Now().UnixMilli()
+
+	refillLimit := q.backlogRefillLimit
+	if refillLimit > BacklogRefillHardLimit {
+		refillLimit = BacklogRefillHardLimit
+	}
+	if refillLimit <= 0 {
+		refillLimit = BacklogRefillHardLimit
 	}
 
 	keys := []string{
@@ -2867,40 +2904,73 @@ func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueSha
 		b.BacklogID,
 		sp.PartitionID,
 		accountID,
+		refillUntil,
+		refillLimit,
 	})
 	if err != nil {
-		return fmt.Errorf("could not serialize args: %w", err)
+		return enums.QueueConstraintNotLimited, 0, fmt.Errorf("could not serialize args: %w", err)
 	}
 
-	status, err := scripts["queue/backlogRefill"].Exec(
+	res, err := scripts["queue/backlogRefill"].Exec(
 		redis_telemetry.WithScriptName(ctx, "backlogRefill"),
 		q.primaryQueueShard.RedisClient.unshardedRc,
 		keys,
 		args,
-	).AsInt64()
+	).ToAny()
 	if err != nil {
-		return fmt.Errorf("error refilling backlog: %w", err)
+		return enums.QueueConstraintNotLimited, 0, fmt.Errorf("error refilling backlog: %w", err)
 	}
+
+	statusCountTuple, ok := res.([]any)
+	if !ok || len(statusCountTuple) != 2 {
+		return enums.QueueConstraintNotLimited, 0, fmt.Errorf("expected return tuple to include status and refill count")
+	}
+
+	status, ok := statusCountTuple[0].(int64)
+	if !ok {
+		return enums.QueueConstraintNotLimited, 0, fmt.Errorf("missing status in status-count tuple")
+	}
+
+	refillCount, ok := statusCountTuple[1].(int64)
+	if !ok {
+		return enums.QueueConstraintNotLimited, 0, fmt.Errorf("missing refillCount in status-count tuple")
+	}
+
 	switch status {
 	case 0:
-		return nil
+		return enums.QueueConstraintNotLimited, int(refillCount), nil
+	case 1:
+		return enums.QueueConstraintAccountConcurrency, int(refillCount), nil
+	case 2:
+		return enums.QueueConstraintFunctionConcurrency, int(refillCount), nil
+	case 3:
+		return enums.QueueConstraintCustomConcurrencyKey1, int(refillCount), nil
+	case 4:
+		return enums.QueueConstraintCustomConcurrencyKey2, int(refillCount), nil
 	default:
-		return fmt.Errorf("unknown response refilling backlog: %v (%T)", status, status)
+		return enums.QueueConstraintNotLimited, 0, fmt.Errorf("unknown status refilling backlog: %v (%T)", status, status)
 	}
 }
 
-func (q *queue) ShadowPartitionPeek(ctx context.Context, sp *QueueShadowPartition, until time.Time, limit int64) ([]*QueueBacklog, error) {
+func (q *queue) ShadowPartitionPeek(ctx context.Context, sp *QueueShadowPartition, until time.Time, limit int64) ([]*QueueBacklog, int, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "ShadowPartitionPeek"), redis_telemetry.ScopeQueue)
 
 	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
-		return nil, fmt.Errorf("unsupported queue shard kind for partitionPeek: %s", q.primaryQueueShard.Kind)
+		return nil, 0, fmt.Errorf("unsupported queue shard kind for partitionPeek: %s", q.primaryQueueShard.Kind)
 	}
 
 	if limit > ShadowPartitionPeekMaxBacklogs {
-		return nil, ErrShadowPartitionPeekMaxExceedsLimits
+		return nil, 0, ErrShadowPartitionPeekMaxExceedsLimits
 	}
 	if limit <= 0 {
 		limit = ShadowPartitionPeekMaxBacklogs
+	}
+
+	if limit > q.shadowPeekMax {
+		limit = q.shadowPeekMax
+	}
+	if limit <= 0 {
+		limit = q.shadowPeekMin
 	}
 
 	ms := until.UnixMilli()
@@ -2910,7 +2980,7 @@ func (q *queue) ShadowPartitionPeek(ctx context.Context, sp *QueueShadowPartitio
 		limit,
 	})
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	rc := q.primaryQueueShard.RedisClient
@@ -2928,26 +2998,32 @@ func (q *queue) ShadowPartitionPeek(ctx context.Context, sp *QueueShadowPartitio
 	).ToAny()
 
 	if err != nil {
-		return nil, fmt.Errorf("error peeking shadow partition backlogs: %w", err)
+		return nil, 0, fmt.Errorf("error peeking shadow partition backlogs: %w", err)
 	}
 	returnedSet, ok := peekRet.([]any)
 	if !ok {
-		return nil, fmt.Errorf("unknown return type from shadowPartitionPeek: %T", peekRet)
+		return nil, 0, fmt.Errorf("unknown return type from shadowPartitionPeek: %T", peekRet)
 	}
 
+	var totalBacklogCount int64
 	var potentiallyMissingBacklogs, allBacklogIDs []any
-	if len(returnedSet) == 2 {
-		potentiallyMissingBacklogs, ok = returnedSet[0].([]any)
+	if len(returnedSet) == 3 {
+		totalBacklogCount, ok = returnedSet[0].(int64)
 		if !ok {
-			return nil, fmt.Errorf("unexpected first item in set returned from shadowPartitionPeek: %T", peekRet)
+			return nil, 0, fmt.Errorf("unexpected first item in set returned from shadowPartitionPeek: %T", returnedSet[0])
 		}
 
-		allBacklogIDs, ok = returnedSet[1].([]any)
+		potentiallyMissingBacklogs, ok = returnedSet[1].([]any)
 		if !ok {
-			return nil, fmt.Errorf("unexpected second item in set returned from shadowPartitionPeek: %T", peekRet)
+			return nil, 0, fmt.Errorf("unexpected second item in set returned from shadowPartitionPeek: %T", returnedSet[1])
+		}
+
+		allBacklogIDs, ok = returnedSet[2].([]any)
+		if !ok {
+			return nil, 0, fmt.Errorf("unexpected third item in set returned from shadowPartitionPeek: %T", returnedSet[2])
 		}
 	} else if len(returnedSet) != 0 {
-		return nil, fmt.Errorf("expected zero or two items in set returned by shadowPartitionPeek: %v", returnedSet)
+		return nil, 0, fmt.Errorf("expected zero or three items in set returned by shadowPartitionPeek: %v", returnedSet)
 	}
 
 	encoded := make([]any, 0)
@@ -2956,12 +3032,12 @@ func (q *queue) ShadowPartitionPeek(ctx context.Context, sp *QueueShadowPartitio
 		for idx, backlogID := range allBacklogIDs {
 			if potentiallyMissingBacklogs[idx] == nil {
 				if backlogID == nil {
-					return nil, fmt.Errorf("encountered nil partition key in pointer queue %q", shadowPartitionKey)
+					return nil, 0, fmt.Errorf("encountered nil partition key in pointer queue %q", shadowPartitionKey)
 				}
 
 				str, ok := backlogID.(string)
 				if !ok {
-					return nil, fmt.Errorf("encountered non-string partition key in pointer queue %q", shadowPartitionKey)
+					return nil, 0, fmt.Errorf("encountered non-string partition key in pointer queue %q", shadowPartitionKey)
 				}
 
 				missingBacklogs = append(missingBacklogs, str)
@@ -2993,7 +3069,7 @@ func (q *queue) ShadowPartitionPeek(ctx context.Context, sp *QueueShadowPartitio
 
 	})
 	if err != nil {
-		return nil, fmt.Errorf("error decoding backlogs: %w", err)
+		return nil, 0, fmt.Errorf("error decoding backlogs: %w", err)
 	}
 
 	if len(missingBacklogs) > 0 {
@@ -3006,7 +3082,7 @@ func (q *queue) ShadowPartitionPeek(ctx context.Context, sp *QueueShadowPartitio
 		}
 	}
 
-	return backlogs, nil
+	return backlogs, int(totalBacklogCount), nil
 }
 
 func (q *queue) ShadowPartitionExtendLease(ctx context.Context, sp *QueueShadowPartition, leaseID ulid.ULID, duration time.Duration) (*ulid.ULID, error) {

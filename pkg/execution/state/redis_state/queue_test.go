@@ -7027,6 +7027,8 @@ func TestQueueRefillBacklog(t *testing.T) {
 	require.NoError(t, err)
 	defer rc.Close()
 
+	clock := clockwork.NewFakeClock()
+
 	defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
 	kg := defaultShard.RedisClient.kg
 
@@ -7044,13 +7046,14 @@ func TestQueueRefillBacklog(t *testing.T) {
 		WithDisableSystemQueueLeaseChecks(func(ctx context.Context) bool {
 			return false
 		}),
+		WithClock(clock),
 	)
 	ctx := context.Background()
 
 	accountId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
 
 	// use future timestamp because scores will be bounded to the present
-	at := time.Now().Add(10 * time.Minute)
+	at := clock.Now().Add(1 * time.Minute)
 
 	require.Len(t, r.Keys(), 0)
 
@@ -7083,8 +7086,9 @@ func TestQueueRefillBacklog(t *testing.T) {
 	require.NotEmpty(t, shadowPartition.PartitionID)
 
 	t.Run("should find backlog with peek", func(t *testing.T) {
-		backlogs, err := q.ShadowPartitionPeek(ctx, &shadowPartition, at.Add(time.Minute), 10)
+		backlogs, totalCount, err := q.ShadowPartitionPeek(ctx, &shadowPartition, at.Add(time.Minute), 10)
 		require.NoError(t, err)
+		require.Equal(t, 1, totalCount)
 
 		require.Len(t, backlogs, 1)
 
@@ -7094,8 +7098,17 @@ func TestQueueRefillBacklog(t *testing.T) {
 	t.Run("should refill from backlog", func(t *testing.T) {
 		require.True(t, hasMember(t, r, kg.BacklogSet(expectedBacklogs[0].BacklogID), qi.ID))
 
-		err := q.BacklogRefill(ctx, &expectedBacklogs[0], &shadowPartition)
+		clock.Advance(10 * time.Minute)
+
+		count, err := rc.Do(ctx, rc.B().Zcount().Key(kg.BacklogSet(expectedBacklogs[0].BacklogID)).Min("-inf").Max(fmt.Sprintf("%d", clock.Now().UnixMilli())).Build()).ToInt64()
 		require.NoError(t, err)
+		require.Equal(t, 1, int(count))
+
+		status, refilled, err := q.BacklogRefill(ctx, &expectedBacklogs[0], &shadowPartition)
+		require.NoError(t, err)
+
+		require.Equal(t, 1, refilled)
+		require.Equal(t, enums.QueueConstraintNotLimited, status)
 
 		require.False(t, hasMember(t, r, kg.BacklogSet(expectedBacklogs[0].BacklogID), qi.ID))
 
