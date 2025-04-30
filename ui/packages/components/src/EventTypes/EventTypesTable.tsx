@@ -80,6 +80,8 @@ export function EventTypesTable({
     } else {
       setNameSearch(searchInput);
     }
+    // Reset cursor when filter changes
+    setCursor(null);
   }, 400);
 
   const onStatusFilterChange = useCallback(
@@ -110,7 +112,7 @@ export function EventTypesTable({
     }, [getEventTypes, orderBy, cursor, archived, nameSearch]),
     placeholderData: keepPreviousData,
     getNextPageParam: (lastPage) => {
-      if (!lastPage) {
+      if (!lastPage || !lastPage.pageInfo.hasNextPage) {
         return undefined;
       }
       return lastPage.pageInfo.endCursor;
@@ -151,9 +153,12 @@ export function EventTypesTable({
     }));
   }, [eventTypesData, volumeData]);
 
+  const data = mergedData();
+  const hasEventTypesData = data && data.length > 0;
+
   const onScroll: UIEventHandler<HTMLDivElement> = useCallback(
     (event) => {
-      if (mergedData && mergedData.length > 0 && hasNextPage && !isFetchingNextPage) {
+      if (hasEventTypesData && hasNextPage && !isFetchingNextPage) {
         const { scrollHeight, scrollTop, clientHeight } = event.target as HTMLDivElement;
 
         // Check if scrolled to the bottom
@@ -200,6 +205,8 @@ export function EventTypesTable({
     [containerRef.current]
   );
 
+  console.log(hasNextPage, hasEventTypesData, 'hasNextPage');
+
   return (
     <div className="bg-canvasBase text-basis no-scrollbar flex-1 overflow-hidden focus-visible:outline-none">
       <div className="bg-canvasBase sticky top-0 z-10 m-3 flex items-center gap-2">
@@ -230,7 +237,7 @@ export function EventTypesTable({
           blankState={<TableBlankState actions={emptyActions} />}
           onRowClick={(row) => router.push(pathCreator.eventType({ eventName: row.original.name }))}
         />
-        {!hasNextPage && mergedData.length > 1 && (
+        {!hasNextPage && hasEventTypesData && (
           <div className="flex flex-col items-center pt-8">
             <p className="text-muted">No additional event types found.</p>
             <Button
