@@ -1,8 +1,9 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type UIEventHandler } from 'react';
 import type { Route } from 'next';
 import { useRouter } from 'next/navigation';
+import { Button } from '@inngest/components/Button/Button';
 import TableBlankState from '@inngest/components/EventTypes/TableBlankState';
 import { Search } from '@inngest/components/Forms/Search';
 import NewTable from '@inngest/components/Table/NewTable';
@@ -13,7 +14,7 @@ import {
   type EventTypesOrderBy,
   type PageInfo,
 } from '@inngest/components/types/eventType';
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useInfiniteQuery, useQuery } from '@tanstack/react-query';
 import { type Row, type SortingState } from '@tanstack/react-table';
 
 import { useSearchParam } from '../hooks/useSearchParam';
@@ -71,6 +72,7 @@ export function EventTypesTable({
       direction: EventTypesOrderByDirection.Asc,
     },
   ]);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   const onStatusFilterChange = useCallback(
     (value: boolean) => {
@@ -89,16 +91,25 @@ export function EventTypesTable({
   const {
     isPending, // first load, no data
     error,
+    fetchNextPage,
+    hasNextPage,
     data: eventTypesData,
-    isFetching, // refetching
-    // TODO: implement infinite scrolling
-  } = useQuery({
+    isFetching,
+    isFetchingNextPage, // refetching
+  } = useInfiniteQuery({
     queryKey: ['event-types', { orderBy, cursor, archived }],
     queryFn: useCallback(() => {
       return getEventTypes({ orderBy, cursor, archived });
     }, [getEventTypes, orderBy, cursor, archived]),
     placeholderData: keepPreviousData,
-    refetchInterval: !cursor || page === 1 ? refreshInterval : 0,
+    refetchInterval: refreshInterval,
+    getNextPageParam: (lastPage) => {
+      if (!lastPage) {
+        return undefined;
+      }
+      return lastPage.pageInfo.endCursor;
+    },
+    initialPageParam: null,
   });
 
   const { data: volumeData, isPending: isVolumePending } = useQuery({
@@ -111,7 +122,14 @@ export function EventTypesTable({
   });
 
   const mergedData = useCallback(() => {
-    if (!eventTypesData?.events) return [];
+    if (!eventTypesData?.pages) {
+      return undefined;
+    }
+    if (eventTypesData.pages.length === 0) {
+      return [];
+    }
+
+    const allEvents = eventTypesData.pages.flatMap((page) => page.events);
 
     const volumeMap = new Map<string, EventType['volume']>();
 
@@ -119,7 +137,7 @@ export function EventTypesTable({
       volumeMap.set(event.name, event.volume);
     });
 
-    return eventTypesData.events.map((event) => ({
+    return allEvents.map((event) => ({
       ...event,
       volume: volumeMap.get(event.name) || {
         totalVolume: 0,
@@ -127,6 +145,23 @@ export function EventTypesTable({
       },
     }));
   }, [eventTypesData, volumeData]);
+
+  const onScroll: UIEventHandler<HTMLDivElement> = useCallback(
+    (event) => {
+      if (mergedData && mergedData.length > 0 && hasNextPage && !isFetchingNextPage) {
+        const { scrollHeight, scrollTop, clientHeight } = event.target as HTMLDivElement;
+
+        // Check if scrolled to the bottom
+        const reachedBottom = scrollHeight - scrollTop - clientHeight < 200;
+        console.log('reached', reachedBottom);
+        if (reachedBottom && !isFetching) {
+          console.log('fetching next page');
+          fetchNextPage();
+        }
+      }
+    },
+    [fetchNextPage, hasNextPage, isFetchingNextPage, mergedData]
+  );
 
   useEffect(() => {
     const sortEntry = sorting[0];
@@ -149,6 +184,18 @@ export function EventTypesTable({
     }
   }, [sorting, setOrderBy]);
 
+  const scrollToTop = useCallback(
+    (smooth = false) => {
+      if (containerRef.current) {
+        containerRef.current.scrollTo({
+          top: 0,
+          behavior: smooth ? 'smooth' : 'auto',
+        });
+      }
+    },
+    [containerRef.current]
+  );
+
   return (
     <div className="bg-canvasBase text-basis no-scrollbar flex-1 overflow-hidden focus-visible:outline-none">
       <div className="bg-canvasBase sticky top-0 z-10 m-3 flex items-center gap-2">
@@ -166,7 +213,7 @@ export function EventTypesTable({
           onUpdate={(value) => {}}
         />
       </div>
-      <div className="h-[calc(100%-58px)] overflow-y-auto">
+      <div className="h-[calc(100%-58px)] overflow-y-auto" onScroll={onScroll} ref={containerRef}>
         <NewTable
           columns={columns}
           data={mergedData() || []}
@@ -176,6 +223,17 @@ export function EventTypesTable({
           blankState={<TableBlankState actions={emptyActions} />}
           onRowClick={(row) => router.push(pathCreator.eventType({ eventName: row.original.name }))}
         />
+        {!hasNextPage && mergedData.length > 1 && (
+          <div className="flex flex-col items-center pt-8">
+            <p className="text-muted">No additional event types found.</p>
+            <Button
+              label="Back to top"
+              kind="primary"
+              appearance="ghost"
+              onClick={() => scrollToTop(true)}
+            />
+          </div>
+        )}
       </div>
     </div>
   );
