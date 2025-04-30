@@ -51,6 +51,7 @@ func NewAggregator(
 		evaluator: eval,
 		mapLock:   &sync.Mutex{},
 		locks:     map[string]*sync.Mutex{},
+		kv:        kv,
 	}
 }
 
