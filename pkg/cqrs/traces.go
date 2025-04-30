@@ -246,6 +246,9 @@ type TraceReader interface {
 	GetSpanOutput(ctx context.Context, id SpanIdentifier) (*SpanOutput, error)
 	// GetSpanStack retrieves the step stack for the specified span
 	GetSpanStack(ctx context.Context, id SpanIdentifier) ([]string, error)
+	// TODO move to dedicated entitlement interface once that is implemented properly
+	// for both oss & cloud
+	OtelTracesEnabled(ctx context.Context) (bool, error)
 }
 
 type GetTraceRunOpt struct {

@@ -49,6 +49,17 @@ func (a router) traces(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	ctx := context.Background()
+	enabled, err := a.opts.TraceReader.OtelTracesEnabled(ctx)
+	if err != nil {
+		respondError(w, r, http.StatusUnauthorized, "Error checking OTel traces entitlement")
+		return
+	}
+	if !enabled {
+		respondError(w, r, http.StatusUnauthorized, "OTel traces are not enabled for this account")
+		return
+	}
+
 	// Check that the trace ID is valid and accessible to the app.
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
