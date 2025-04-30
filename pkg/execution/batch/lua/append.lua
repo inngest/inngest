@@ -54,7 +54,7 @@ if len == 1 then
     resp = { status = "new", batchID = batchID, batchPointerKey = batchPointerKey }
 end
 
-local size = redis.call("MEMORY USAGE", batchKey)
+local size = redis.call("MEMORY", "USAGE", batchKey)
 -- if batch is full
 if len >= batchLimit or size >= batchSizeLimit then
   if not is_status_empty(batchMetadataKey) then
