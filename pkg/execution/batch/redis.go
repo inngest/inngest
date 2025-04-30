@@ -22,16 +22,38 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
-func NewRedisBatchManager(b *redis_state.BatchClient, q redis_state.QueueManager) BatchManager {
-	return redisBatchManager{
-		b: b,
-		q: q,
+const (
+	defaultBatchSizeLimit = 10 * 1024 * 1024 // 10MiB
+)
+
+type RedisBatchManagerOpt func(m *redisBatchManager)
+
+func WithBatchSizeLimit(l int) RedisBatchManagerOpt {
+	return func(m *redisBatchManager) {
+		m.sizeLimit = l
 	}
+}
+
+func NewRedisBatchManager(b *redis_state.BatchClient, q redis_state.QueueManager, opts ...RedisBatchManagerOpt) BatchManager {
+	manager := redisBatchManager{
+		b:         b,
+		q:         q,
+		sizeLimit: defaultBatchSizeLimit,
+	}
+
+	for _, apply := range opts {
+		apply(&manager)
+	}
+
+	return manager
 }
 
 type redisBatchManager struct {
 	b *redis_state.BatchClient
 	q redis_state.QueueManager
+
+	// sizeLimit is the size limit that a batch can have
+	sizeLimit int
 }
 
 func (b redisBatchManager) batchKey(ctx context.Context, evt event.Event, fn inngest.Function) (string, error) {
