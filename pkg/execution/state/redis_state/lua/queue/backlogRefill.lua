@@ -95,6 +95,7 @@ if capacity > 0 then
   -- Reverse the items to be added to the ready set
   local args = {}
   local remArgs = {}
+  -- advance by two as items is essentially a tuple of (item ID, score)[]
   for i = 1, #items, 2 do
     table.insert(args, items[i + 1]) -- score
     table.insert(args, items[i])     -- item
