@@ -188,9 +188,11 @@ func (q *queue) Run(ctx context.Context, f osqueue.RunFunc) error {
 		return q.executionScan(ctx, f)
 	})
 
-	eg.Go(func() error {
-		return q.shadowScan(ctx)
-	})
+	if q.runMode.ShadowPartition {
+		eg.Go(func() error {
+			return q.shadowScan(ctx)
+		})
+	}
 
 	return eg.Wait()
 }
@@ -265,9 +267,7 @@ LOOP:
 
 func (q *queue) shadowScan(ctx context.Context) error {
 	l := logger.StdlibLogger(ctx)
-	// channel for QueueShadowPartition
-	// TODO: replace with the QueueShadowParition struct once available
-	qspc := make(chan *int)
+	qspc := make(chan *QueueShadowPartition)
 
 	for i := int32(0); i < q.numShadowWorkers; i++ {
 		go q.shadowWorker(ctx, qspc)
@@ -283,9 +283,20 @@ func (q *queue) shadowScan(ctx context.Context) error {
 			return nil
 
 		case <-tick.Chan():
+			// If there are shadow continuations, process those immediately.
+			if err := q.scanShadowContinuations(ctx); err != nil {
+				return fmt.Errorf("error scanning shadow continuations: %w", err)
+			}
+
 			// - scan for shadow partitions
 			// - lease the partition
 			// - dump it into the channel for the workers to do their thing
+
+			parts := []QueueShadowPartition{}
+
+			for _, part := range parts {
+				qspc <- &part
+			}
 		}
 	}
 }
@@ -498,30 +509,124 @@ func (q *queue) worker(ctx context.Context, f osqueue.RunFunc) {
 // shadowWorker runs a blocking process that listens to item being pushed into the
 // shadow queue partition channel. This allows us to process an individual shadow partition.
 // TODO: replace channel type with QueueShadowPartition struct once available
-func (q *queue) shadowWorker(ctx context.Context, qspc chan *int) {
+func (q *queue) shadowWorker(ctx context.Context, qspc chan *QueueShadowPartition) {
 	for {
 		select {
 		case <-ctx.Done():
 			return
 
-		case <-qspc:
-			metrics.ActiveShadowScanerCount(ctx, 1, metrics.CounterOpt{PkgName: pkgName})
-
-			// TODO:
-			//
-			// - retrieve countinuation counter
-			//
-			// loop:
-			// - extend lease for shadow partition
-			// - iterate through backlogs
-			//   + add item to function partition
-			//
-
-			// TODO: probably good to wrap this in a closure with the shadow partition logic
-			// so it can just do a defer
-			metrics.ActiveShadowScanerCount(ctx, -1, metrics.CounterOpt{PkgName: pkgName})
+		case shadowPart := <-qspc:
+			err := q.processShadowPartition(ctx, shadowPart, 0)
+			if err != nil {
+				logger.StdlibLogger(ctx).Error("could not scan shadow partition", "err", err, "shadow_part", shadowPart)
+			}
 		}
 	}
+}
+
+func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueShadowPartition, continuationCount uint) error {
+	metrics.ActiveShadowScannerCount(ctx, 1, metrics.CounterOpt{PkgName: pkgName})
+	defer metrics.ActiveShadowScannerCount(ctx, -1, metrics.CounterOpt{PkgName: pkgName})
+
+	// acquire lease for shadow partition
+	leaseID, err := duration(ctx, q.primaryQueueShard.Name, "shadow_partition_lease", q.clock.Now(), func(ctx context.Context) (*ulid.ULID, error) {
+		leaseID, err := q.ShadowPartitionLease(ctx, shadowPart, ShadowPartitionLeaseDuration)
+		return leaseID, err
+	})
+	if err != nil {
+		if errors.Is(err, ErrShadowPartitionAlreadyLeased) {
+			// contention
+			return nil
+		}
+	}
+
+	if leaseID == nil {
+		return fmt.Errorf("missing shadow partition leaseID")
+	}
+
+	extendLeaseCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	// keep extending lease while we're processing
+	go func() {
+		for {
+			select {
+			case <-extendLeaseCtx.Done():
+				return
+			case <-time.Tick(ShadowPartitionLeaseDuration / 2):
+				leaseID, err = q.ShadowPartitionExtendLease(ctx, shadowPart, *leaseID, ShadowPartitionLeaseDuration)
+				if err != nil {
+					if errors.Is(err, ErrShadowPartitionAlreadyLeased) || errors.Is(err, ErrShadowPartitionLeaseNotFound) {
+						// contention
+						return
+					}
+					return
+				}
+			}
+		}
+	}()
+
+	// Check if shadow partition cannot be processed (paused/refill disabled, etc.)
+	if shadowPart.PauseRefill {
+		q.removeShadowContinue(ctx, shadowPart, false)
+
+		forceRequeueAt := q.clock.Now().Add(ShadowPartitionRefillPausedRequeueExtension)
+		err = q.ShadowPartitionRequeue(ctx, shadowPart, *leaseID, &forceRequeueAt)
+		if err != nil {
+			return fmt.Errorf("could not requeue shadow partition: %w", err)
+		}
+
+		return nil
+	}
+
+	until := q.clock.Now()
+	limit := ShadowPartitionPeekMaxBacklogs
+	backlogs, totalCount, err := q.ShadowPartitionPeek(ctx, shadowPart, until, limit)
+	if err != nil {
+		return fmt.Errorf("could not peek backlogs for shadow partition: %w", err)
+	}
+
+	// Sequentially refill backlogs
+	for _, backlog := range backlogs {
+		status, _, err := q.BacklogRefill(ctx, backlog, shadowPart)
+		if err != nil {
+			return fmt.Errorf("could not refill backlog: %w", err)
+		}
+
+		if status != enums.QueueConstraintNotLimited {
+			q.removeShadowContinue(ctx, shadowPart, false)
+
+			forceRequeueAt := q.clock.Now().Add(ShadowPartitionRefillCapacityReachedRequeueExtension)
+			err = q.ShadowPartitionRequeue(ctx, shadowPart, *leaseID, &forceRequeueAt)
+			if err != nil {
+				return fmt.Errorf("could not requeue shadow partition: %w", err)
+			}
+
+			return nil
+		}
+	}
+
+	hasMoreBacklogs := int(totalCount) > len(backlogs)
+	if !hasMoreBacklogs {
+		// No more backlogs right now, we can continue the scan loop until new items are added
+		q.removeShadowContinue(ctx, shadowPart, false)
+
+		err = q.ShadowPartitionRequeue(ctx, shadowPart, *leaseID, nil)
+		if err != nil {
+			return fmt.Errorf("could not requeue shadow partition: %w", err)
+		}
+	}
+
+	// More backlogs, we can add a continuation
+	q.addShadowContinue(ctx, shadowPart, continuationCount)
+
+	// Clear out current lease
+	err = q.ShadowPartitionRequeue(ctx, shadowPart, *leaseID, nil)
+	if err != nil {
+		return fmt.Errorf("could not requeue shadow partition: %w", err)
+	}
+
+	return nil
 }
 
 func (q *queue) scanPartition(ctx context.Context, partitionKey string, peekLimit int64, peekUntil time.Time, metricShardName string, accountId *uuid.UUID, reportPeekedPartitions *int64) error {
@@ -735,6 +840,41 @@ func (q *queue) scanContinuations(ctx context.Context) error {
 		})
 	}
 	q.continuesLock.Unlock()
+	return eg.Wait()
+}
+
+func (q *queue) scanShadowContinuations(ctx context.Context) error {
+	if !q.runMode.ShadowContinuations {
+		// continuations are not enabled.
+		return nil
+	}
+
+	// Have some chance of skipping continuations in this iteration.
+	if rand.Float64() <= consts.QueueContinuationSkipProbability {
+		return nil
+	}
+
+	eg := errgroup.Group{}
+
+	q.shadowContinuesLock.Lock()
+	defer q.shadowContinuesLock.Unlock()
+
+	// If we have continued partitions, process those immediately.
+	for _, c := range q.shadowContinues {
+		cont := c
+		eg.Go(func() error {
+			p := cont.shadowPart
+
+			if err := q.processShadowPartition(ctx, p, cont.count); err != nil {
+				if !errors.Is(err, context.Canceled) {
+					q.logger.Error().Err(err).Msg("error processing shadow partition")
+				}
+				return err
+			}
+
+			return nil
+		})
+	}
 	return eg.Wait()
 }
 
