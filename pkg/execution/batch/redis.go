@@ -28,7 +28,7 @@ const (
 
 type RedisBatchManagerOpt func(m *redisBatchManager)
 
-func WithBatchSizeLimit(l int) RedisBatchManagerOpt {
+func WithRedisBatchSizeLimit(l int) RedisBatchManagerOpt {
 	return func(m *redisBatchManager) {
 		m.sizeLimit = l
 	}
