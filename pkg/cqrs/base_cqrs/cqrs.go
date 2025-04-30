@@ -1584,7 +1584,7 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 
 // OTel traces are hard coded to true for dev server until we move
 // entitlements here.
-func (w wrapper) OtelTracesEnabled(ctx context.Context) (bool, error) {
+func (w wrapper) OtelTracesEnabled(ctx context.Context, accountID uuid.UUID) (bool, error) {
 	return true, nil
 }
 

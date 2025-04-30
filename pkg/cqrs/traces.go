@@ -248,7 +248,7 @@ type TraceReader interface {
 	GetSpanStack(ctx context.Context, id SpanIdentifier) ([]string, error)
 	// TODO move to dedicated entitlement interface once that is implemented properly
 	// for both oss & cloud
-	OtelTracesEnabled(ctx context.Context) (bool, error)
+	OtelTracesEnabled(ctx context.Context, accountID uuid.UUID) (bool, error)
 }
 
 type GetTraceRunOpt struct {
