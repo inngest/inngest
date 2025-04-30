@@ -64,7 +64,6 @@ export function EventTypesTable({
 
   const [filteredStatus, setFilteredStatus, removeFilteredStatus] = useSearchParam('archived');
   const archived = filteredStatus === 'true';
-  const [cursor, setCursor] = useState<string | null>(null);
   const [searchInput, setSearchInput] = useState<string>('');
   const [nameSearch = null, setNameSearch, removeNameSearch] = useSearchParam('nameSearch');
   const [orderBy, setOrderBy] = useState<EventTypesOrderBy[]>([
@@ -80,8 +79,6 @@ export function EventTypesTable({
     } else {
       setNameSearch(searchInput);
     }
-    // Reset cursor when filter changes
-    setCursor(null);
   }, 400);
 
   const onStatusFilterChange = useCallback(
@@ -91,8 +88,6 @@ export function EventTypesTable({
       } else {
         removeFilteredStatus(); // Remove query param when archived is false
       }
-      // Reset cursor when filter changes
-      setCursor(null);
     },
     [setFilteredStatus, removeFilteredStatus]
   );
@@ -106,10 +101,9 @@ export function EventTypesTable({
     isFetching,
     isFetchingNextPage, // refetching
   } = useInfiniteQuery({
-    queryKey: ['event-types', { orderBy, cursor, archived, nameSearch }],
-    queryFn: useCallback(() => {
-      return getEventTypes({ orderBy, cursor, archived, nameSearch });
-    }, [getEventTypes, orderBy, cursor, archived, nameSearch]),
+    queryKey: ['event-types', { orderBy, archived, nameSearch }],
+    queryFn: ({ pageParam }: { pageParam: string | null }) =>
+      getEventTypes({ orderBy, cursor: pageParam, archived, nameSearch }),
     placeholderData: keepPreviousData,
     getNextPageParam: (lastPage) => {
       if (!lastPage || !lastPage.pageInfo.hasNextPage) {
@@ -120,11 +114,14 @@ export function EventTypesTable({
     initialPageParam: null,
   });
 
+  const lastPageCursor = eventTypesData?.pages.at(-1)?.pageInfo.endCursor ?? null;
+
   const { data: volumeData, isPending: isVolumePending } = useQuery({
-    queryKey: ['event-types-volume', { orderBy, cursor, archived }],
-    queryFn: useCallback(() => {
-      return getEventTypesVolume({ orderBy, cursor, archived });
-    }, [getEventTypesVolume, orderBy, cursor, archived]),
+    queryKey: ['event-types-volume', { orderBy, archived, cursor: lastPageCursor }],
+    queryFn: () => {
+      return getEventTypesVolume({ orderBy, archived, cursor: lastPageCursor });
+    },
+    enabled: !!eventTypesData, // only run once we have event data
     placeholderData: keepPreviousData,
   });
 
@@ -188,8 +185,6 @@ export function EventTypesTable({
         },
       ];
       setOrderBy(orderBy);
-      // Back to first page when we sort changes
-      setCursor(null);
     }
   }, [sorting, setOrderBy]);
 
