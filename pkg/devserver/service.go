@@ -596,9 +596,13 @@ func (d *devserver) importRedisSnapshot(ctx context.Context) (imported bool, err
 
 		case "set":
 			vals := data.Value.([]interface{})
-			strValues := make([]string, len(vals))
-			for i, v := range vals {
-				strValues[i] = v.(string)
+			strValues := []string{}
+			for _, v := range vals {
+				if strVal, ok := v.(string); ok {
+					strValues = append(strValues, strVal)
+				} else {
+					l.Warn().Interface("value", v).Msgf("skipping non-string value in set for key %s", key)
+				}
 			}
 			saddCmd := rc.B().Sadd().Key(key).Member(strValues...).Build()
 			err = rc.Do(ctx, saddCmd).Error()
