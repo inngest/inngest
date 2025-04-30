@@ -15,6 +15,7 @@
   2 - Function concurrency limit reached
   3 - Custom concurrency key 1 limit reached
   4 - Custom concurrency key 2 limit reached
+  5 - Throttled
 ]]
 
 local keyBacklogSet                      = KEYS[1]
@@ -24,19 +25,45 @@ local keyGlobalAccountShadowPartitionSet = KEYS[4]
 local keyAccountShadowPartitionSet       = KEYS[5]
 local keyReadySet                        = KEYS[6]
 
+-- Constraint-related accounting keys
+local keyConcurrencyAccount      = KEYS[7]
+local keyConcurrencyFn  				 = KEYS[8] -- Account concurrency level
+local keyCustomConcurrencyKey1   = KEYS[9] -- When leasing an item we need to place the lease into this key.
+local keyCustomConcurrencyKey2   = KEYS[10] -- Optional for eg. for concurrency amongst steps
+
 local backlogID   = ARGV[1]
 local partitionID = ARGV[2]
 local accountID   = ARGV[3]
 local refillUntil = tonumber(ARGV[4])
 local refillLimit = tonumber(ARGV[5])
+local nowMS       = tonumber(ARGV[6])
 
+-- We check concurrency limits before refilling
+local concurrencyAcct 				= tonumber(ARGV[7])
+local concurrencyFn    				= tonumber(ARGV[8])
+local customConcurrencyKey1   = tonumber(ARGV[9])
+local customConcurrencyKey2   = tonumber(ARGV[10])
+
+-- We check throttle before refilling
+local throttleKey    = ARGV[11]
+local throttleLimit  = tonumber(ARGV[12])
+local throttleBurst  = tonumber(ARGV[13])
+local throttlePeriod = tonumber(ARGV[14])
+
+-- $include(check_concurrency.lua)
 -- $include(update_pointer_score.lua)
 -- $include(ends_with.lua)
 -- $include(update_account_queues.lua)
+-- $include(gcra.lua)
 
 -- Start with full capacity: max(number of items in the backlog, hard limit, e.g. 100)
+local capacity = 0
+
 local backlogCount = redis.call("ZCOUNT", keyBacklogSet, "-inf", refillUntil)
-local capacity = backlogCount
+if backlogCount ~= false and backlogCount ~= nil then
+  capacity = backlogCount
+end
+
 if backlogCount > refillLimit then
   capacity = refillLimit
 end
@@ -48,36 +75,58 @@ end
 -- Set initial status to success, progressively add more specific capacity constraints
 local status = 0
 
--- TODO Retrieve account capacity
-local remainingAccountCapacity = 100
-if remainingAccountCapacity < capacity then
-  -- Account concurrency imposes limits
-  capacity = remainingAccountCapacity
-  status = 1
+if capacity > 0 and throttleLimit > 0 then
+  local throttleResult = gcra(throttleKey, nowMS, throttlePeriod * 1000, throttleLimit, throttleBurst)
+  if throttleResult == false then
+    -- Throttled: Can't add more for this backlog!
+    capacity = 0
+    status = 5
+  end
 end
 
--- TODO Retrieve function capacity
-local remainingFunctionCapacity = 100
-if remainingFunctionCapacity < capacity then
-  -- Function concurrency imposes limits
-  capacity = remainingFunctionCapacity
-  status = 2
+if capacity > 0 and exists_without_ending(keyCustomConcurrencyKey2, ":-") == true and customConcurrencyKey2 > 0 then
+  local remainingCustomConcurrencyCapacityKey2 = check_concurrency(nowMS, keyCustomConcurrencyKey2, customConcurrencyKey2)
+  if remainingCustomConcurrencyCapacityKey2 < capacity then
+    -- Custom concurrency key 2 imposes limits
+    capacity = remainingCustomConcurrencyCapacityKey2
+    status = 4
+  end
 end
 
--- TODO Retrieve concurrency key 1 capacity
-local remainingCustomConcurrencyCapacityKey1 = 100
-if remainingCustomConcurrencyCapacityKey1 < capacity then
-  -- Custom concurrency key 1 imposes limits
-  capacity = remainingCustomConcurrencyCapacityKey1
-  status = 3
+if capacity > 0 and exists_without_ending(keyCustomConcurrencyKey1, ":-") == true and customConcurrencyKey1 > 0 then
+  local remainingCustomConcurrencyCapacityKey1 = check_concurrency(nowMS, keyCustomConcurrencyKey1, customConcurrencyKey1)
+  if remainingCustomConcurrencyCapacityKey1 < capacity then
+    -- Custom concurrency key 1 imposes limits
+    capacity = remainingCustomConcurrencyCapacityKey1
+    status = 3
+  end
 end
 
--- TODO Retrieve concurrency key 2 capacity
-local remainingCustomConcurrencyCapacityKey2 = 100
-if remainingCustomConcurrencyCapacityKey2 < capacity then
-  -- Custom concurrency key 2 imposes limits
-  capacity = remainingCustomConcurrencyCapacityKey2
-  status = 4
+if capacity > 0 and exists_without_ending(keyConcurrencyFn, ":-") == true and concurrencyFn > 0 then
+  local remainingFunctionCapacity = check_concurrency(nowMS, keyConcurrencyFn, concurrencyFn)
+  if remainingFunctionCapacity < capacity then
+    -- Function concurrency imposes limits
+    capacity = remainingFunctionCapacity
+    status = 2
+  end
+end
+
+if capacity > 0 and exists_without_ending(keyConcurrencyAccount, ":-") == true and concurrencyAcct > 0 then
+  local remainingAccountCapacity = check_concurrency(nowMS, keyConcurrencyAccount, concurrencyAcct)
+
+  if remainingAccountCapacity < capacity then
+    -- Account concurrency imposes limits
+    capacity = remainingAccountCapacity
+    status = 1
+  end
+end
+
+-- If we have capacity, reduce by ready but not yet picked up items to prevent over-filling
+if capacity > 0 then
+  local readyCount = redis.call("ZCARD", keyReadySet)
+  if readyCount ~= nil and readyCount ~= false then
+    capacity = capacity - readyCount
+  end
 end
 
 --

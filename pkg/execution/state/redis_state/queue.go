@@ -2882,7 +2882,8 @@ func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueSha
 		accountID = *sp.AccountID
 	}
 
-	refillUntil := q.clock.Now().UnixMilli()
+	nowMS := q.clock.Now().UnixMilli()
+	refillUntil := nowMS
 
 	refillLimit := q.backlogRefillLimit
 	if refillLimit > BacklogRefillHardLimit {
@@ -2892,6 +2893,37 @@ func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueSha
 		refillLimit = BacklogRefillHardLimit
 	}
 
+	keyConcurrencyFn := sp.inProgressKey(q.primaryQueueShard.RedisClient.kg)
+	keyConcurrencyAcct := sp.accountInProgressKey(q.primaryQueueShard.RedisClient.kg)
+
+	// TODO Retrieve both custom concurrency keys, the backlog only has its own
+	keyCustomConcurrency1 := q.primaryQueueShard.RedisClient.kg.Concurrency("", "")
+	customConcurrency1 := 0
+	keyCustomConcurrency2 := q.primaryQueueShard.RedisClient.kg.Concurrency("", "")
+	customConcurrency2 := 0
+
+	// TODO Since CustomConcurrencyKeys is a map, these won't be in order.
+	// TODO Should we revert to an array? How do we know if it's the first/second key reliably?
+	//for range sp.CustomConcurrencyKeys {
+	//	if keyCustomConcurrency1 == "" {
+	//		// TODO Set first key
+	//		continue
+	//	}
+	//
+	//	// TODO Set second key
+	//}
+
+	var (
+		throttleKey                                  string
+		throttleLimit, throttleBurst, throttlePeriod int
+	)
+	if sp.Throttle != nil {
+		throttleKey = sp.Throttle.Key
+		throttleLimit = sp.Throttle.Limit
+		throttleBurst = sp.Throttle.Burst
+		throttlePeriod = sp.Throttle.Period
+	}
+
 	keys := []string{
 		q.primaryQueueShard.RedisClient.kg.BacklogSet(b.BacklogID),
 		q.primaryQueueShard.RedisClient.kg.ShadowPartitionSet(sp.PartitionID),
@@ -2899,6 +2931,12 @@ func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueSha
 		q.primaryQueueShard.RedisClient.kg.GlobalAccountShadowPartitions(),
 		q.primaryQueueShard.RedisClient.kg.AccountShadowPartitions(accountID),
 		q.primaryQueueShard.RedisClient.kg.PartitionQueueSet(enums.PartitionTypeDefault, sp.PartitionID, ""),
+
+		// Constraint-related accounting keys
+		keyConcurrencyAcct,
+		keyConcurrencyFn,
+		keyCustomConcurrency1,
+		keyCustomConcurrency2,
 	}
 	args, err := StrSlice([]any{
 		b.BacklogID,
@@ -2906,6 +2944,15 @@ func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueSha
 		accountID,
 		refillUntil,
 		refillLimit,
+		nowMS,
+		sp.AccountConcurrency,
+		sp.FunctionConcurrency,
+		customConcurrency1,
+		customConcurrency2,
+		throttleKey,
+		throttleLimit,
+		throttleBurst,
+		throttlePeriod,
 	})
 	if err != nil {
 		return enums.QueueConstraintNotLimited, 0, fmt.Errorf("could not serialize args: %w", err)
@@ -2947,6 +2994,8 @@ func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueSha
 		return enums.QueueConstraintCustomConcurrencyKey1, int(refillCount), nil
 	case 4:
 		return enums.QueueConstraintCustomConcurrencyKey2, int(refillCount), nil
+	case 5:
+		return enums.QueueConstraintThrottle, int(refillCount), nil
 	default:
 		return enums.QueueConstraintNotLimited, 0, fmt.Errorf("unknown status refilling backlog: %v (%T)", status, status)
 	}
