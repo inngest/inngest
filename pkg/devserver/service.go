@@ -595,8 +595,11 @@ func (d *devserver) importRedisSnapshot(ctx context.Context) (imported bool, err
 			}
 
 		case "set":
-			strValues := data.Value.([]string)
-			// err = rc.SAdd(ctx, key, strValues...).Err()
+			vals := data.Value.([]interface{})
+			strValues := make([]string, len(vals))
+			for i, v := range vals {
+				strValues[i] = v.(string)
+			}
 			saddCmd := rc.B().Sadd().Key(key).Member(strValues...).Build()
 			err = rc.Do(ctx, saddCmd).Error()
 			if err != nil {
