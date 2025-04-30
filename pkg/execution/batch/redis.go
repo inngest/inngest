@@ -132,6 +132,7 @@ func (b redisBatchManager) Append(ctx context.Context, bi BatchItem, fn inngest.
 		b.b.KeyGenerator().QueuePrefix(ctx, bi.FunctionID),
 		enums.BatchStatusPending,
 		enums.BatchStatusStarted,
+		b.sizeLimit,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("error preparing batch: %w", err)
