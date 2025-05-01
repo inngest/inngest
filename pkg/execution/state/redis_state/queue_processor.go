@@ -588,6 +588,9 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 
 	// Sequentially refill backlogs
 	for _, backlog := range backlogs {
+		// TODO if backlog is for concurrency/throttle key and does not match the current shadow partition, move items to proper backlog
+		// TODO if shadow partition has more than one custom concurrency key, run slower refill
+
 		status, _, err := q.BacklogRefill(ctx, backlog, shadowPart)
 		if err != nil {
 			return fmt.Errorf("could not refill backlog: %w", err)

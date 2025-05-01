@@ -23,15 +23,13 @@ local keyAcctConcurrency          = KEYS[10]
 local concurrencyPointer      = KEYS[11]
 
 -- Key queues v2
-local keyBacklogSetA                     = KEYS[12]          -- backlog:sorted:<backlogID> - zset
-local keyBacklogSetB                     = KEYS[13]          -- backlog:sorted:<backlogID> - zset
-local keyBacklogSetC                     = KEYS[14]          -- backlog:sorted:<backlogID> - zset
-local keyBacklogMeta                     = KEYS[15]          -- backlogs - hash
-local keyGlobalShadowPartitionSet        = KEYS[16]          -- shadow:sorted
-local keyShadowPartitionSet              = KEYS[17]          -- shadow:sorted:<fnID|queueName> - zset
-local keyShadowPartitionMeta             = KEYS[18]          -- shadows
-local keyGlobalAccountShadowPartitionSet = KEYS[19]
-local keyAccountShadowPartitionSet       = KEYS[20]
+local keyBacklogSet                      = KEYS[12]          -- backlog:sorted:<backlogID> - zset
+local keyBacklogMeta                     = KEYS[13]          -- backlogs - hash
+local keyGlobalShadowPartitionSet        = KEYS[14]          -- shadow:sorted
+local keyShadowPartitionSet              = KEYS[15]          -- shadow:sorted:<fnID|queueName> - zset
+local keyShadowPartitionMeta             = KEYS[16]          -- shadows
+local keyGlobalAccountShadowPartitionSet = KEYS[17]
+local keyAccountShadowPartitionSet       = KEYS[18]
 
 local keyItemIndexA           = KEYS[21]          -- custom item index 1
 local keyItemIndexB           = KEYS[22]          -- custom item index 2
@@ -47,12 +45,8 @@ local accountID           = ARGV[7]
 -- Key queues v2
 local requeueToBacklog				= tonumber(ARGV[8])
 local shadowPartitionItem     = ARGV[9]
-local backlogItemA            = ARGV[10]
-local backlogItemB            = ARGV[11]
-local backlogItemC            = ARGV[12]
-local backlogIdA              = ARGV[13]
-local backlogIdB              = ARGV[14]
-local backlogIdC              = ARGV[15]
+local backlogItem             = ARGV[10]
+local backlogID               = ARGV[11]
 
 -- $include(get_queue_item.lua)
 -- $include(get_partition_item.lua)
@@ -115,9 +109,7 @@ if requeueToBacklog == 1 then
 	--
 	-- Requeue item to backlog queues again
 	--
-  requeue_to_backlog(keyBacklogSetA, backlogIdA, backlogItemA, partitionID, shadowPartitionItem, partitionItem, keyPartitionMap, keyBacklogMeta, keyGlobalShadowPartitionSet, keyShadowPartitionMeta, keyShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, queueScore, queueID, accountID)
-  requeue_to_backlog(keyBacklogSetB, backlogIdB, backlogItemB, partitionID, shadowPartitionItem, partitionItem, keyPartitionMap, keyBacklogMeta, keyGlobalShadowPartitionSet, keyShadowPartitionMeta, keyShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, queueScore, queueID, accountID)
-  requeue_to_backlog(keyBacklogSetC, backlogIdC, backlogItemC, partitionID, shadowPartitionItem, partitionItem, keyPartitionMap, keyBacklogMeta, keyGlobalShadowPartitionSet, keyShadowPartitionMeta, keyShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, queueScore, queueID, accountID)
+  requeue_to_backlog(keyBacklogSet, backlogID, backlogItem, partitionID, shadowPartitionItem, partitionItem, keyPartitionMap, keyBacklogMeta, keyGlobalShadowPartitionSet, keyShadowPartitionMeta, keyShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, queueScore, queueID, accountID)
 else
   --
   -- Enqueue item to partition queues again

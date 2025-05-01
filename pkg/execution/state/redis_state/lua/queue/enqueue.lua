@@ -15,15 +15,13 @@ local keyFnMetadata           	= KEYS[7]           -- fnMeta:$id - hash
 local keyPartition           	  = KEYS[8]           -- queue:sorted:$workflowID - zset
 
 -- Key queues v2
-local keyBacklogSetA                     = KEYS[9]          -- backlog:sorted:<backlogID> - zset
-local keyBacklogSetB                     = KEYS[10]          -- backlog:sorted:<backlogID> - zset
-local keyBacklogSetC                     = KEYS[11]          -- backlog:sorted:<backlogID> - zset
-local keyBacklogMeta                     = KEYS[12]          -- backlogs - hash
-local keyGlobalShadowPartitionSet        = KEYS[13]          -- shadow:sorted
-local keyShadowPartitionSet              = KEYS[14]          -- shadow:sorted:<fnID|queueName> - zset
-local keyShadowPartitionMeta             = KEYS[15]          -- shadows
-local keyGlobalAccountShadowPartitionSet = KEYS[16]
-local keyAccountShadowPartitionSet       = KEYS[17]
+local keyBacklogSet                      = KEYS[9]          -- backlog:sorted:<backlogID> - zset
+local keyBacklogMeta                     = KEYS[10]          -- backlogs - hash
+local keyGlobalShadowPartitionSet        = KEYS[11]          -- shadow:sorted
+local keyShadowPartitionSet              = KEYS[12]          -- shadow:sorted:<fnID|queueName> - zset
+local keyShadowPartitionMeta             = KEYS[13]          -- shadows
+local keyGlobalAccountShadowPartitionSet = KEYS[14]
+local keyAccountShadowPartitionSet       = KEYS[15]
 
 local keyItemIndexA           	= KEYS[18]          -- custom item index 1
 local keyItemIndexB           	= KEYS[19]          -- custom item index 2
@@ -42,12 +40,8 @@ local accountID           		= ARGV[9]
 -- Key queues v2
 local enqueueToBacklog				= tonumber(ARGV[10])
 local shadowPartitionItem     = ARGV[11]
-local backlogItemA            = ARGV[12]
-local backlogItemB            = ARGV[13]
-local backlogItemC            = ARGV[14]
-local backlogIdA              = ARGV[15]
-local backlogIdB              = ARGV[16]
-local backlogIdC              = ARGV[17]
+local backlogItem             = ARGV[12]
+local backlogID               = ARGV[13]
 
 -- $include(update_pointer_score.lua)
 -- $include(ends_with.lua)
@@ -68,11 +62,7 @@ if redis.call("HSETNX", queueKey, queueID, queueItem) == 0 then
 end
 
 if enqueueToBacklog == 1 then
-	-- the default function queue could be any of the three, usually the first but possibly the middle or last if a custom concurrency key is used
-
-	enqueue_to_backlog(keyBacklogSetA, backlogIdA, backlogItemA, partitionID, shadowPartitionItem, partitionItem, keyPartitionMap, keyBacklogMeta, keyGlobalShadowPartitionSet, keyShadowPartitionMeta, keyShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, queueScore, queueID, partitionTime, nowMS, accountID)
-	enqueue_to_backlog(keyBacklogSetB, backlogIdB, backlogItemB, partitionID, shadowPartitionItem, partitionItem, keyPartitionMap, keyBacklogMeta, keyGlobalShadowPartitionSet, keyShadowPartitionMeta, keyShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, queueScore, queueID, partitionTime, nowMS, accountID)
-	enqueue_to_backlog(keyBacklogSetC, backlogIdC, backlogItemC, partitionID, shadowPartitionItem, partitionItem, keyPartitionMap, keyBacklogMeta, keyGlobalShadowPartitionSet, keyShadowPartitionMeta, keyShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, queueScore, queueID, partitionTime, nowMS, accountID)
+	enqueue_to_backlog(keyBacklogSet, backlogID, backlogItem, partitionID, shadowPartitionItem, partitionItem, keyPartitionMap, keyBacklogMeta, keyGlobalShadowPartitionSet, keyShadowPartitionMeta, keyShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, queueScore, queueID, partitionTime, nowMS, accountID)
 else
   enqueue_to_partition(keyPartition, partitionID, partitionItem, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, queueScore, queueID, partitionTime, nowMS, accountID)
 end

@@ -964,22 +964,42 @@ func (qp QueuePartition) concurrencyKey(kg QueueKeyGenerator) string {
 	}
 }
 
-// concurrencyKey returns the key to the "active" ZSET for key queue v2 concurrency accounting.
-func (q QueueBacklog) activeKey(kg QueueKeyGenerator) string {
-	if q.ConcurrencyScope == nil || q.ConcurrencyScopeEntity == nil || q.ConcurrencyKey == nil || q.ConcurrencyKeyUnhashedValue == nil {
-		return kg.Concurrency("", "")
-	}
-
+func (b BacklogConcurrencyKey) concurrencyKey(kg QueueKeyGenerator) string {
 	// Concurrency accounting keys are made up of three parts:
 	// - The scope (account, environment, function) to apply the concurrency limit on
 	// - The entity (account ID, envID, or function ID) based on the scope
 	// - The dynamic key value (hashed evaluated expression)
-	return kg.Concurrency("custom", util.ConcurrencyKey(*q.ConcurrencyScope, *q.ConcurrencyScopeEntity, *q.ConcurrencyKeyUnhashedValue))
+	return kg.Concurrency("custom", util.ConcurrencyKey(b.ConcurrencyScope, b.ConcurrencyScopeEntity, b.ConcurrencyKeyUnhashedValue))
+}
+
+// concurrencyKey returns the key to the "active" ZSET for key queue v2 concurrency accounting.
+func (q QueueBacklog) concurrencyKey(kg QueueKeyGenerator, n int) string {
+	if n < 0 || n > len(q.ConcurrencyKeys) {
+		return kg.Concurrency("", "")
+	}
+
+	key := q.ConcurrencyKeys[n-1]
+	return key.concurrencyKey(kg)
 }
 
 // inProgressKey returns the key storing the in progress set for the shadow partition
 func (q QueueShadowPartition) inProgressKey(kg QueueKeyGenerator) string {
 	return kg.Concurrency("p", q.PartitionID)
+}
+
+func (q QueueShadowPartition) ConcurrencyKey(kg QueueKeyGenerator, b *QueueBacklog, n int) (string, int) {
+	if n < 0 || n > len(b.ConcurrencyKeys) {
+		return kg.Concurrency("", ""), 0
+	}
+
+	backlogKey := b.ConcurrencyKeys[n-1]
+
+	shadowPartitionKey, ok := q.CustomConcurrencyKeys[backlogKey.ConcurrencyKey]
+	if !ok {
+		return kg.Concurrency("", ""), 0
+	}
+
+	return backlogKey.concurrencyKey(kg), shadowPartitionKey.Limit
 }
 
 // accountInProgressKey returns the key storing the in progress set for the shadow partition's account
@@ -1269,16 +1289,11 @@ func (q *queue) EnqueueItem(ctx context.Context, shard QueueShard, i osqueue.Que
 		enqueueToBacklogs = q.allowKeyQueues(ctx, i.Data.Identifier.AccountID)
 	}
 
-	var backlogs []QueueBacklog
+	var backlog QueueBacklog
 	var shadowPartition QueueShadowPartition
 	if enqueueToBacklogs {
-		backlogs = q.ItemBacklogs(ctx, i)
+		backlog = q.ItemBacklog(ctx, i)
 		shadowPartition = q.ItemShadowPartition(ctx, i)
-	}
-
-	// Pad backlogs to 3
-	for i := len(backlogs); i < 3; i++ {
-		backlogs = append(backlogs, QueueBacklog{})
 	}
 
 	keys := []string{
@@ -1294,9 +1309,7 @@ func (q *queue) EnqueueItem(ctx context.Context, shard QueueShard, i osqueue.Que
 		defaultPartition.zsetKey(shard.RedisClient.kg),
 
 		// Key queues v2
-		shard.RedisClient.kg.BacklogSet(backlogs[0].BacklogID),
-		shard.RedisClient.kg.BacklogSet(backlogs[1].BacklogID),
-		shard.RedisClient.kg.BacklogSet(backlogs[2].BacklogID),
+		shard.RedisClient.kg.BacklogSet(backlog.BacklogID),
 		shard.RedisClient.kg.BacklogMeta(),
 		shard.RedisClient.kg.GlobalShadowPartitionSet(),
 		shard.RedisClient.kg.ShadowPartitionSet(shadowPartition.PartitionID),
@@ -1334,12 +1347,8 @@ func (q *queue) EnqueueItem(ctx context.Context, shard QueueShard, i osqueue.Que
 
 		enqueueToBacklogsVal,
 		shadowPartition,
-		backlogs[0],
-		backlogs[1],
-		backlogs[2],
-		backlogs[0].BacklogID,
-		backlogs[1].BacklogID,
-		backlogs[2].BacklogID,
+		backlog,
+		backlog.BacklogID,
 	})
 	if err != nil {
 		return i, err
@@ -2079,16 +2088,11 @@ func (q *queue) RequeueByJobID(ctx context.Context, queueShard QueueShard, jobID
 		enqueueToBacklogs = q.allowKeyQueues(ctx, i.Data.Identifier.AccountID)
 	}
 
-	var backlogs []QueueBacklog
+	var backlog QueueBacklog
 	var shadowPartition QueueShadowPartition
 	if enqueueToBacklogs {
-		backlogs = q.ItemBacklogs(ctx, i)
+		backlog = q.ItemBacklog(ctx, i)
 		shadowPartition = q.ItemShadowPartition(ctx, i)
-	}
-
-	// Pad backlogs to 3
-	for i := len(backlogs); i < 3; i++ {
-		backlogs = append(backlogs, QueueBacklog{})
 	}
 
 	keys := []string{
@@ -2100,9 +2104,7 @@ func (q *queue) RequeueByJobID(ctx context.Context, queueShard QueueShard, jobID
 
 		fnPartition.zsetKey(queueShard.RedisClient.kg),
 
-		queueShard.RedisClient.kg.BacklogSet(backlogs[0].BacklogID),
-		queueShard.RedisClient.kg.BacklogSet(backlogs[1].BacklogID),
-		queueShard.RedisClient.kg.BacklogSet(backlogs[2].BacklogID),
+		queueShard.RedisClient.kg.BacklogSet(backlog.BacklogID),
 		queueShard.RedisClient.kg.BacklogMeta(),
 		queueShard.RedisClient.kg.GlobalShadowPartitionSet(),
 		queueShard.RedisClient.kg.ShadowPartitionSet(shadowPartition.PartitionID),
@@ -2124,12 +2126,8 @@ func (q *queue) RequeueByJobID(ctx context.Context, queueShard QueueShard, jobID
 
 		requeueToBacklogsVal,
 		shadowPartition,
-		backlogs[0],
-		backlogs[1],
-		backlogs[2],
-		backlogs[0].BacklogID,
-		backlogs[1].BacklogID,
-		backlogs[2].BacklogID,
+		backlog,
+		backlog.BacklogID,
 	})
 	if err != nil {
 		return err
@@ -2287,32 +2285,22 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 		keyCustomConcurrency2 string
 	)
 
-	var backlogs []QueueBacklog
+	var backlog QueueBacklog
 	var shadowPartition QueueShadowPartition
 
 	enableKeyQueuesVal := "0"
 	enableKeyQueues := q.itemEnableKeyQueues(ctx, item)
 	if enableKeyQueues {
 		enableKeyQueuesVal = "1"
-		backlogs = q.ItemBacklogs(ctx, item)
+		backlog = q.ItemBacklog(ctx, item)
 		shadowPartition = q.ItemShadowPartition(ctx, item)
-
-		// Pad backlogs to 3
-		for i := len(backlogs); i < 3; i++ {
-			backlogs = append(backlogs, QueueBacklog{})
-		}
 
 		// accounting for key queues v2
 		keyConcurrencyFn = shadowPartition.inProgressKey(q.primaryQueueShard.RedisClient.kg)
 		keyConcurrencyAcct = shadowPartition.accountInProgressKey(q.primaryQueueShard.RedisClient.kg)
-		keyCustomConcurrency1 = backlogs[0].activeKey(q.primaryQueueShard.RedisClient.kg)
-		keyCustomConcurrency2 = backlogs[1].activeKey(q.primaryQueueShard.RedisClient.kg)
+		keyCustomConcurrency1 = backlog.concurrencyKey(q.primaryQueueShard.RedisClient.kg, 1)
+		keyCustomConcurrency2 = backlog.concurrencyKey(q.primaryQueueShard.RedisClient.kg, 2)
 	} else {
-		// Pad backlogs to 3
-		for i := len(backlogs); i < 3; i++ {
-			backlogs = append(backlogs, QueueBacklog{})
-		}
-
 		keyConcurrencyFn = fnPartition.concurrencyKey(q.primaryQueueShard.RedisClient.kg)
 		keyConcurrencyAcct = accountConcurrencyKey
 		keyCustomConcurrency1 = customConcurrencyKey1.concurrencyKey(q.primaryQueueShard.RedisClient.kg)
@@ -2453,28 +2441,18 @@ func (q *queue) ExtendLease(ctx context.Context, i osqueue.QueueItem, leaseID ul
 		keyCustomConcurrency2 string
 	)
 
-	var backlogs []QueueBacklog
+	var backlog QueueBacklog
 	var shadowPartition QueueShadowPartition
 	if q.itemEnableKeyQueues(ctx, i) {
-		backlogs = q.ItemBacklogs(ctx, i)
+		backlog = q.ItemBacklog(ctx, i)
 		shadowPartition = q.ItemShadowPartition(ctx, i)
-
-		// Pad backlogs to 3
-		for i := len(backlogs); i < 3; i++ {
-			backlogs = append(backlogs, QueueBacklog{})
-		}
 
 		// accounting for key queues v2
 		keyConcurrencyFn = shadowPartition.inProgressKey(q.primaryQueueShard.RedisClient.kg)
 		keyConcurrencyAcct = shadowPartition.accountInProgressKey(q.primaryQueueShard.RedisClient.kg)
-		keyCustomConcurrency1 = backlogs[0].activeKey(q.primaryQueueShard.RedisClient.kg)
-		keyCustomConcurrency2 = backlogs[1].activeKey(q.primaryQueueShard.RedisClient.kg)
+		keyCustomConcurrency1 = backlog.concurrencyKey(q.primaryQueueShard.RedisClient.kg, 1)
+		keyCustomConcurrency2 = backlog.concurrencyKey(q.primaryQueueShard.RedisClient.kg, 2)
 	} else {
-		// Pad backlogs to 3
-		for i := len(backlogs); i < 3; i++ {
-			backlogs = append(backlogs, QueueBacklog{})
-		}
-
 		keyConcurrencyFn = fnPartition.concurrencyKey(q.primaryQueueShard.RedisClient.kg)
 		keyConcurrencyAcct = accountConcurrencyKey
 		keyCustomConcurrency1 = customConcurrencyKey1.concurrencyKey(q.primaryQueueShard.RedisClient.kg)
@@ -2557,28 +2535,18 @@ func (q *queue) Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		keyCustomConcurrency2 string
 	)
 
-	var backlogs []QueueBacklog
+	var backlog QueueBacklog
 	var shadowPartition QueueShadowPartition
 	if enableAccountingForKeyQueues {
-		backlogs = q.ItemBacklogs(ctx, i)
+		backlog = q.ItemBacklog(ctx, i)
 		shadowPartition = q.ItemShadowPartition(ctx, i)
-
-		// Pad backlogs to 3
-		for i := len(backlogs); i < 3; i++ {
-			backlogs = append(backlogs, QueueBacklog{})
-		}
 
 		// accounting for key queues v2
 		keyConcurrencyFn = shadowPartition.inProgressKey(q.primaryQueueShard.RedisClient.kg)
 		keyConcurrencyAcct = shadowPartition.accountInProgressKey(q.primaryQueueShard.RedisClient.kg)
-		keyCustomConcurrency1 = backlogs[0].activeKey(q.primaryQueueShard.RedisClient.kg)
-		keyCustomConcurrency2 = backlogs[1].activeKey(q.primaryQueueShard.RedisClient.kg)
+		keyCustomConcurrency1 = backlog.concurrencyKey(q.primaryQueueShard.RedisClient.kg, 1)
+		keyCustomConcurrency2 = backlog.concurrencyKey(q.primaryQueueShard.RedisClient.kg, 2)
 	} else {
-		// Pad backlogs to 3
-		for i := len(backlogs); i < 3; i++ {
-			backlogs = append(backlogs, QueueBacklog{})
-		}
-
 		keyConcurrencyFn = fnPartition.concurrencyKey(queueShard.RedisClient.kg)
 		keyConcurrencyAcct = accountConcurrencyKey
 		keyCustomConcurrency1 = customConcurrencyKey1.concurrencyKey(queueShard.RedisClient.kg)
@@ -2685,32 +2653,22 @@ func (q *queue) Requeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		keyCustomConcurrency2 string
 	)
 
-	var backlogs []QueueBacklog
+	var backlog QueueBacklog
 	var shadowPartition QueueShadowPartition
 
 	requeueToBacklogsVal := "0"
 	enableKeyQueues := q.itemEnableKeyQueues(ctx, i)
 	if enableKeyQueues {
 		requeueToBacklogsVal = "1"
-		backlogs = q.ItemBacklogs(ctx, i)
+		backlog = q.ItemBacklog(ctx, i)
 		shadowPartition = q.ItemShadowPartition(ctx, i)
-
-		// Pad backlogs to 3
-		for i := len(backlogs); i < 3; i++ {
-			backlogs = append(backlogs, QueueBacklog{})
-		}
 
 		// accounting for key queues v2
 		keyConcurrencyFn = shadowPartition.inProgressKey(q.primaryQueueShard.RedisClient.kg)
 		keyConcurrencyAcct = shadowPartition.accountInProgressKey(q.primaryQueueShard.RedisClient.kg)
-		keyCustomConcurrency1 = backlogs[0].activeKey(q.primaryQueueShard.RedisClient.kg)
-		keyCustomConcurrency2 = backlogs[1].activeKey(q.primaryQueueShard.RedisClient.kg)
+		keyCustomConcurrency1 = backlog.concurrencyKey(q.primaryQueueShard.RedisClient.kg, 1)
+		keyCustomConcurrency2 = backlog.concurrencyKey(q.primaryQueueShard.RedisClient.kg, 2)
 	} else {
-		// Pad backlogs to 3
-		for i := len(backlogs); i < 3; i++ {
-			backlogs = append(backlogs, QueueBacklog{})
-		}
-
 		keyConcurrencyFn = fnPartition.concurrencyKey(queueShard.RedisClient.kg)
 		keyConcurrencyAcct = accountConcurrencyKey
 		keyCustomConcurrency1 = customConcurrencyKey1.concurrencyKey(queueShard.RedisClient.kg)
@@ -2734,9 +2692,7 @@ func (q *queue) Requeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		queueShard.RedisClient.kg.ConcurrencyIndex(),
 
 		// key queues v2
-		queueShard.RedisClient.kg.BacklogSet(backlogs[0].BacklogID),
-		queueShard.RedisClient.kg.BacklogSet(backlogs[1].BacklogID),
-		queueShard.RedisClient.kg.BacklogSet(backlogs[2].BacklogID),
+		queueShard.RedisClient.kg.BacklogSet(backlog.BacklogID),
 		queueShard.RedisClient.kg.BacklogMeta(),
 		queueShard.RedisClient.kg.GlobalShadowPartitionSet(),
 		queueShard.RedisClient.kg.ShadowPartitionSet(shadowPartition.PartitionID),
@@ -2762,12 +2718,8 @@ func (q *queue) Requeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 
 		requeueToBacklogsVal,
 		shadowPartition,
-		backlogs[0],
-		backlogs[1],
-		backlogs[2],
-		backlogs[0].BacklogID,
-		backlogs[1].BacklogID,
-		backlogs[2].BacklogID,
+		backlog,
+		backlog.BacklogID,
 	})
 	if err != nil {
 		return err
@@ -2896,22 +2848,8 @@ func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueSha
 	keyConcurrencyFn := sp.inProgressKey(q.primaryQueueShard.RedisClient.kg)
 	keyConcurrencyAcct := sp.accountInProgressKey(q.primaryQueueShard.RedisClient.kg)
 
-	// TODO Retrieve both custom concurrency keys, the backlog only has its own
-	keyCustomConcurrency1 := q.primaryQueueShard.RedisClient.kg.Concurrency("", "")
-	customConcurrency1 := 0
-	keyCustomConcurrency2 := q.primaryQueueShard.RedisClient.kg.Concurrency("", "")
-	customConcurrency2 := 0
-
-	// TODO Since CustomConcurrencyKeys is a map, these won't be in order.
-	// TODO Should we revert to an array? How do we know if it's the first/second key reliably?
-	//for range sp.CustomConcurrencyKeys {
-	//	if keyCustomConcurrency1 == "" {
-	//		// TODO Set first key
-	//		continue
-	//	}
-	//
-	//	// TODO Set second key
-	//}
+	keyCustomConcurrency1, customConcurrency1 := sp.ConcurrencyKey(q.primaryQueueShard.RedisClient.kg, b, 1)
+	keyCustomConcurrency2, customConcurrency2 := sp.ConcurrencyKey(q.primaryQueueShard.RedisClient.kg, b, 2)
 
 	var (
 		throttleKey                                  string

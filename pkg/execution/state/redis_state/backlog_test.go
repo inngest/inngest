@@ -54,15 +54,13 @@ func TestQueueItemBacklogs(t *testing.T) {
 	fnID, wsID, accID := uuid.New(), uuid.New(), uuid.New()
 
 	t.Run("basic item", func(t *testing.T) {
-		expected := []QueueBacklog{
+		expected := QueueBacklog{
 			// expect default backlog to be used
-			{
-				BacklogID:         fmt.Sprintf("default:%s", fnID),
-				ShadowPartitionID: fnID.String(),
-			},
+			BacklogID:         fmt.Sprintf("fn:%s", fnID),
+			ShadowPartitionID: fnID.String(),
 		}
 
-		backlogs := q.ItemBacklogs(ctx, osqueue.QueueItem{
+		backlog := q.ItemBacklog(ctx, osqueue.QueueItem{
 			ID:          "test",
 			FunctionID:  fnID,
 			WorkspaceID: wsID,
@@ -81,25 +79,24 @@ func TestQueueItemBacklogs(t *testing.T) {
 			QueueName: nil,
 		})
 
-		require.Equal(t, expected, backlogs)
+		require.Equal(t, expected, backlog)
 
 		// default backlog is not for a concurrency key, so the concurrency key should be empty (function-level concurrency accounting is handled for the shadow partition)
 		kg := queueKeyGenerator{queueDefaultKey: QueueDefaultKey}
-		require.Equal(t, kg.Concurrency("", ""), backlogs[0].activeKey(kg))
+		require.Equal(t, kg.Concurrency("", ""), backlog.concurrencyKey(kg, 1))
+		require.Equal(t, kg.Concurrency("", ""), backlog.concurrencyKey(kg, 2))
 	})
 
 	t.Run("system queue", func(t *testing.T) {
 		sysQueueName := osqueue.KindQueueMigrate
 
-		expected := []QueueBacklog{
+		expected := QueueBacklog{
 			// expect default backlog to be used
-			{
-				BacklogID:         fmt.Sprintf("system:%s", sysQueueName),
-				ShadowPartitionID: sysQueueName,
-			},
+			BacklogID:         fmt.Sprintf("system:%s", sysQueueName),
+			ShadowPartitionID: sysQueueName,
 		}
 
-		backlogs := q.ItemBacklogs(ctx, osqueue.QueueItem{
+		backlog := q.ItemBacklog(ctx, osqueue.QueueItem{
 			ID:          "test",
 			FunctionID:  fnID,
 			WorkspaceID: wsID,
@@ -118,28 +115,28 @@ func TestQueueItemBacklogs(t *testing.T) {
 			QueueName: &sysQueueName,
 		})
 
-		require.Equal(t, expected, backlogs)
+		require.Equal(t, expected, backlog)
 
 		// default backlog is not for a concurrency key, so the concurrency key should be empty (function-level concurrency accounting is handled for the shadow partition)
 		kg := queueKeyGenerator{queueDefaultKey: QueueDefaultKey}
-		require.Equal(t, kg.Concurrency("", ""), backlogs[0].activeKey(kg))
+		require.Equal(t, kg.Concurrency("", ""), backlog.concurrencyKey(kg, 1))
+		require.Equal(t, kg.Concurrency("", ""), backlog.concurrencyKey(kg, 2))
+
 	})
 
 	t.Run("throttle", func(t *testing.T) {
 		rawThrottleKey := fnID.String()
 		hashedThrottleKey := osqueue.HashID(ctx, rawThrottleKey)
 
-		expected := []QueueBacklog{
-			{
-				BacklogID:         fmt.Sprintf("throttle:%s:%s", fnID, hashedThrottleKey),
-				ShadowPartitionID: fnID.String(),
+		expected := QueueBacklog{
+			BacklogID:         fmt.Sprintf("throttle:%s:%s", fnID, hashedThrottleKey),
+			ShadowPartitionID: fnID.String(),
 
-				ThrottleKey:         &hashedThrottleKey,
-				ThrottleKeyRawValue: &rawThrottleKey,
-			},
+			ThrottleKey:         &hashedThrottleKey,
+			ThrottleKeyRawValue: &rawThrottleKey,
 		}
 
-		backlogs := q.ItemBacklogs(ctx, osqueue.QueueItem{
+		backlog := q.ItemBacklog(ctx, osqueue.QueueItem{
 			ID:          "test",
 			FunctionID:  fnID,
 			WorkspaceID: wsID,
@@ -164,28 +161,27 @@ func TestQueueItemBacklogs(t *testing.T) {
 			QueueName: nil,
 		})
 
-		require.Equal(t, expected, backlogs)
+		require.Equal(t, expected, backlog)
 
 		// default backlog is not for a concurrency key, so the concurrency key should be empty (function-level concurrency accounting is handled for the shadow partition)
 		kg := queueKeyGenerator{queueDefaultKey: QueueDefaultKey}
-		require.Equal(t, kg.Concurrency("", ""), backlogs[0].activeKey(kg))
+		require.Equal(t, kg.Concurrency("", ""), backlog.concurrencyKey(kg, 1))
+		require.Equal(t, kg.Concurrency("", ""), backlog.concurrencyKey(kg, 2))
 	})
 
 	t.Run("throttle with key", func(t *testing.T) {
 		rawThrottleKey := "customer1"
 		hashedThrottleKey := osqueue.HashID(ctx, rawThrottleKey)
 
-		expected := []QueueBacklog{
-			{
-				BacklogID:         fmt.Sprintf("throttle:%s:%s", fnID, hashedThrottleKey),
-				ShadowPartitionID: fnID.String(),
+		expected := QueueBacklog{
+			BacklogID:         fmt.Sprintf("throttle:%s:%s", fnID, hashedThrottleKey),
+			ShadowPartitionID: fnID.String(),
 
-				ThrottleKey:         &hashedThrottleKey,
-				ThrottleKeyRawValue: &rawThrottleKey,
-			},
+			ThrottleKey:         &hashedThrottleKey,
+			ThrottleKeyRawValue: &rawThrottleKey,
 		}
 
-		backlogs := q.ItemBacklogs(ctx, osqueue.QueueItem{
+		backlog := q.ItemBacklog(ctx, osqueue.QueueItem{
 			ID:          "test",
 			FunctionID:  fnID,
 			WorkspaceID: wsID,
@@ -210,26 +206,25 @@ func TestQueueItemBacklogs(t *testing.T) {
 			QueueName: nil,
 		})
 
-		require.Equal(t, expected, backlogs)
+		require.Equal(t, expected, backlog)
 
 		// default backlog is not for a concurrency key, so the concurrency key should be empty (function-llevel concurrency accounting is handled for the shadow partition)
 		kg := queueKeyGenerator{queueDefaultKey: QueueDefaultKey}
-		require.Equal(t, kg.Concurrency("", ""), backlogs[0].activeKey(kg))
+		require.Equal(t, kg.Concurrency("", ""), backlog.concurrencyKey(kg, 1))
+		require.Equal(t, kg.Concurrency("", ""), backlog.concurrencyKey(kg, 2))
 	})
 
 	t.Run("throttle on edge item", func(t *testing.T) {
 		rawThrottleKey := fnID.String()
 		hashedThrottleKey := osqueue.HashID(ctx, rawThrottleKey)
 
-		expected := []QueueBacklog{
+		expected := QueueBacklog{
 			// edge should go to default backlog if no concurrency keys are specified
-			{
-				BacklogID:         fmt.Sprintf("default:%s", fnID),
-				ShadowPartitionID: fnID.String(),
-			},
+			BacklogID:         fmt.Sprintf("default:%s", fnID),
+			ShadowPartitionID: fnID.String(),
 		}
 
-		backlogs := q.ItemBacklogs(ctx, osqueue.QueueItem{
+		backlog := q.ItemBacklog(ctx, osqueue.QueueItem{
 			ID:          "test",
 			FunctionID:  fnID,
 			WorkspaceID: wsID,
@@ -254,23 +249,22 @@ func TestQueueItemBacklogs(t *testing.T) {
 			QueueName: nil,
 		})
 
-		require.Equal(t, expected, backlogs)
+		require.Equal(t, expected, backlog)
 
 		// default backlog is not for a concurrency key, so the concurrency key should be empty (function-llevel concurrency accounting is handled for the shadow partition)
 		kg := queueKeyGenerator{queueDefaultKey: QueueDefaultKey}
-		require.Equal(t, kg.Concurrency("", ""), backlogs[0].activeKey(kg))
+		require.Equal(t, kg.Concurrency("", ""), backlog.concurrencyKey(kg, 1))
+		require.Equal(t, kg.Concurrency("", ""), backlog.concurrencyKey(kg, 2))
 	})
 
 	t.Run("function concurrency", func(t *testing.T) {
-		expected := []QueueBacklog{
+		expected := QueueBacklog{
 			// expect default backlog to be used
-			{
-				BacklogID:         fmt.Sprintf("default:%s", fnID),
-				ShadowPartitionID: fnID.String(),
-			},
+			BacklogID:         fmt.Sprintf("default:%s", fnID),
+			ShadowPartitionID: fnID.String(),
 		}
 
-		backlogs := q.ItemBacklogs(ctx, osqueue.QueueItem{
+		backlog := q.ItemBacklog(ctx, osqueue.QueueItem{
 			ID:          "test",
 			FunctionID:  fnID,
 			WorkspaceID: wsID,
@@ -289,23 +283,22 @@ func TestQueueItemBacklogs(t *testing.T) {
 			QueueName: nil,
 		})
 
-		require.Equal(t, expected, backlogs)
+		require.Equal(t, expected, backlog)
 
 		// default backlog is not for a concurrency key, so the concurrency key should be empty (function-llevel concurrency accounting is handled for the shadow partition)
 		kg := queueKeyGenerator{queueDefaultKey: QueueDefaultKey}
-		require.Equal(t, kg.Concurrency("", ""), backlogs[0].activeKey(kg))
+		require.Equal(t, kg.Concurrency("", ""), backlog.concurrencyKey(kg, 1))
+		require.Equal(t, kg.Concurrency("", ""), backlog.concurrencyKey(kg, 2))
 	})
 
 	t.Run("account concurrency", func(t *testing.T) {
-		expected := []QueueBacklog{
+		expected := QueueBacklog{
 			// expect default backlog to be used
-			{
-				BacklogID:         fmt.Sprintf("default:%s", fnID),
-				ShadowPartitionID: fnID.String(),
-			},
+			BacklogID:         fmt.Sprintf("default:%s", fnID),
+			ShadowPartitionID: fnID.String(),
 		}
 
-		backlogs := q.ItemBacklogs(ctx, osqueue.QueueItem{
+		backlog := q.ItemBacklog(ctx, osqueue.QueueItem{
 			ID:          "test",
 			FunctionID:  fnID,
 			WorkspaceID: wsID,
@@ -324,11 +317,12 @@ func TestQueueItemBacklogs(t *testing.T) {
 			QueueName: nil,
 		})
 
-		require.Equal(t, expected, backlogs)
+		require.Equal(t, expected, backlog)
 
 		// default backlog is not for a concurrency key, so the concurrency key should be empty (function-llevel concurrency accounting is handled for the shadow partition)
 		kg := queueKeyGenerator{queueDefaultKey: QueueDefaultKey}
-		require.Equal(t, kg.Concurrency("", ""), backlogs[0].activeKey(kg))
+		require.Equal(t, kg.Concurrency("", ""), backlog.concurrencyKey(kg, 1))
+		require.Equal(t, kg.Concurrency("", ""), backlog.concurrencyKey(kg, 2))
 	})
 
 	t.Run("custom concurrency", func(t *testing.T) {
@@ -348,15 +342,19 @@ func TestQueueItemBacklogs(t *testing.T) {
 				BacklogID:         fmt.Sprintf("conc:%s", fullKey),
 				ShadowPartitionID: fnID.String(),
 
-				ConcurrencyScope:            &scope,
-				ConcurrencyScopeEntity:      &entity,
-				ConcurrencyKey:              &hashedConcurrencyKeyExpr,
-				ConcurrencyKeyValue:         &checksum,
-				ConcurrencyKeyUnhashedValue: &unhashedValue,
+				ConcurrencyKeys: []BacklogConcurrencyKey{
+					{
+						ConcurrencyScope:            scope,
+						ConcurrencyScopeEntity:      entity,
+						ConcurrencyKey:              hashedConcurrencyKeyExpr,
+						ConcurrencyKeyValue:         checksum,
+						ConcurrencyKeyUnhashedValue: unhashedValue,
+					},
+				},
 			},
 		}
 
-		backlogs := q.ItemBacklogs(ctx, osqueue.QueueItem{
+		backlog := q.ItemBacklog(ctx, osqueue.QueueItem{
 			ID:          "test",
 			FunctionID:  fnID,
 			WorkspaceID: wsID,
@@ -382,10 +380,11 @@ func TestQueueItemBacklogs(t *testing.T) {
 			QueueName: nil,
 		})
 
-		require.Equal(t, expected, backlogs)
+		require.Equal(t, expected, backlog)
 
 		kg := queueKeyGenerator{queueDefaultKey: QueueDefaultKey}
-		require.Equal(t, kg.Concurrency("custom", util.ConcurrencyKey(scope, entity, unhashedValue)), backlogs[0].activeKey(kg))
+		require.Equal(t, kg.Concurrency("custom", util.ConcurrencyKey(scope, entity, unhashedValue)), backlog.concurrencyKey(kg, 1))
+		require.Equal(t, kg.Concurrency("", ""), backlog.concurrencyKey(kg, 2))
 	})
 
 	t.Run("concurrency + throttle start item", func(t *testing.T) {
@@ -403,27 +402,25 @@ func TestQueueItemBacklogs(t *testing.T) {
 			Limit: 123,
 		}.ParseKey()
 
-		expected := []QueueBacklog{
-			{
-				BacklogID:         fmt.Sprintf("throttle:%s:%s", fnID, hashedThrottleKey),
-				ShadowPartitionID: fnID.String(),
+		expected := QueueBacklog{
+			BacklogID:         fmt.Sprintf("conc:%s", fullKey),
+			ShadowPartitionID: fnID.String(),
 
-				ThrottleKey:         &hashedThrottleKey,
-				ThrottleKeyRawValue: &rawThrottleKey,
-			},
-			{
-				BacklogID:         fmt.Sprintf("conc:%s", fullKey),
-				ShadowPartitionID: fnID.String(),
+			ThrottleKey:         &hashedThrottleKey,
+			ThrottleKeyRawValue: &rawThrottleKey,
 
-				ConcurrencyScope:            &scope,
-				ConcurrencyScopeEntity:      &entity,
-				ConcurrencyKey:              &hashedConcurrencyKeyExpr,
-				ConcurrencyKeyValue:         &checksum,
-				ConcurrencyKeyUnhashedValue: &unhashedValue,
+			ConcurrencyKeys: []BacklogConcurrencyKey{
+				{
+					ConcurrencyScope:            scope,
+					ConcurrencyScopeEntity:      entity,
+					ConcurrencyKey:              hashedConcurrencyKeyExpr,
+					ConcurrencyKeyValue:         checksum,
+					ConcurrencyKeyUnhashedValue: unhashedValue,
+				},
 			},
 		}
 
-		backlogs := q.ItemBacklogs(ctx, osqueue.QueueItem{
+		backlog := q.ItemBacklog(ctx, osqueue.QueueItem{
 			ID:          "test",
 			FunctionID:  fnID,
 			WorkspaceID: wsID,
@@ -455,7 +452,7 @@ func TestQueueItemBacklogs(t *testing.T) {
 			QueueName: nil,
 		})
 
-		require.Equal(t, expected, backlogs)
+		require.Equal(t, expected, backlog)
 	})
 
 	t.Run("concurrency + throttle edge item", func(t *testing.T) {
@@ -473,20 +470,22 @@ func TestQueueItemBacklogs(t *testing.T) {
 			Limit: 123,
 		}.ParseKey()
 
-		expected := []QueueBacklog{
-			{
-				BacklogID:         fmt.Sprintf("conc:%s", fullKey),
-				ShadowPartitionID: fnID.String(),
+		expected := QueueBacklog{
+			BacklogID:         fmt.Sprintf("conc:%s", fullKey),
+			ShadowPartitionID: fnID.String(),
 
-				ConcurrencyScope:            &scope,
-				ConcurrencyKey:              &hashedConcurrencyKeyExpr,
-				ConcurrencyScopeEntity:      &entity,
-				ConcurrencyKeyValue:         &checksum,
-				ConcurrencyKeyUnhashedValue: &unhashedValue,
+			ConcurrencyKeys: []BacklogConcurrencyKey{
+				{
+					ConcurrencyScope:            scope,
+					ConcurrencyKey:              hashedConcurrencyKeyExpr,
+					ConcurrencyScopeEntity:      entity,
+					ConcurrencyKeyValue:         checksum,
+					ConcurrencyKeyUnhashedValue: unhashedValue,
+				},
 			},
 		}
 
-		backlogs := q.ItemBacklogs(ctx, osqueue.QueueItem{
+		backlog := q.ItemBacklog(ctx, osqueue.QueueItem{
 			ID:          "test",
 			FunctionID:  fnID,
 			WorkspaceID: wsID,
@@ -518,7 +517,7 @@ func TestQueueItemBacklogs(t *testing.T) {
 			QueueName: nil,
 		})
 
-		require.Equal(t, expected, backlogs)
+		require.Equal(t, expected, backlog)
 	})
 }
 
