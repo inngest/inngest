@@ -654,6 +654,7 @@ export type Entitlements = {
   metricsExport: EntitlementBool;
   metricsExportFreshness: EntitlementInt;
   metricsExportGranularity: EntitlementInt;
+  otelTraces: EntitlementBool;
   planID: Maybe<Scalars['UUID']>;
   runCount: EntitlementRunCount;
   stepCount: EntitlementStepCount;
@@ -779,6 +780,43 @@ export type EventType = {
   version: Scalars['String'];
 };
 
+export type EventTypeV2 = {
+  __typename?: 'EventTypeV2';
+  envID: Scalars['UUID'];
+  functions: FunctionsConnection;
+  name: Scalars['String'];
+  usage: Usage;
+};
+
+
+export type EventTypeV2FunctionsArgs = {
+  after: InputMaybe<Scalars['String']>;
+  first?: Scalars['Int'];
+};
+
+
+export type EventTypeV2UsageArgs = {
+  opts: InputMaybe<UsageInput>;
+};
+
+export type EventTypesConnection = {
+  __typename?: 'EventTypesConnection';
+  edges: Array<EventTypesEdge>;
+  pageInfo: PageInfo;
+  totalCount: Scalars['Int'];
+};
+
+export type EventTypesEdge = {
+  __typename?: 'EventTypesEdge';
+  cursor: Scalars['String'];
+  node: EventTypeV2;
+};
+
+export type EventTypesFilter = {
+  archived?: InputMaybe<Scalars['Boolean']>;
+  nameSearch?: InputMaybe<Scalars['String']>;
+};
+
 export type EventsBatchConfiguration = {
   __typename?: 'EventsBatchConfiguration';
   key: Maybe<Scalars['String']>;
@@ -803,6 +841,13 @@ export type FilterListInput = {
   events?: InputMaybe<Array<Scalars['String']>>;
   ips?: InputMaybe<Array<Scalars['IP']>>;
   type?: InputMaybe<Scalars['FilterType']>;
+};
+
+export type Function = {
+  __typename?: 'Function';
+  id: Scalars['UUID'];
+  name: Scalars['String'];
+  slug: Scalars['String'];
 };
 
 export type FunctionConfiguration = {
@@ -906,6 +951,24 @@ export type FunctionRunV2Edge = {
   __typename?: 'FunctionRunV2Edge';
   cursor: Scalars['String'];
   node: FunctionRunV2;
+};
+
+export type FunctionsConnection = {
+  __typename?: 'FunctionsConnection';
+  edges: Array<FunctionsEdge>;
+  pageInfo: PageInfo;
+  totalCount: Scalars['Int'];
+};
+
+export type FunctionsEdge = {
+  __typename?: 'FunctionsEdge';
+  cursor: Scalars['String'];
+  node: Function;
+};
+
+export type FunctionsFilter = {
+  archived?: InputMaybe<Scalars['Boolean']>;
+  eventName?: InputMaybe<Scalars['String']>;
 };
 
 export enum HistoryStepType {
@@ -2246,7 +2309,9 @@ export type Workspace = {
   event: Maybe<Event>;
   eventByNames: Array<EventType>;
   eventSearch: EventSearchConnection;
+  eventType: EventTypeV2;
   eventTypes: PaginatedEventTypes;
+  eventTypesV2: EventTypesConnection;
   events: PaginatedEvents;
   functionCount: Scalars['Int'];
   id: Scalars['ID'];
@@ -2312,6 +2377,18 @@ export type WorkspaceEventByNamesArgs = {
 export type WorkspaceEventSearchArgs = {
   after: InputMaybe<Scalars['String']>;
   filter: EventSearchFilter;
+  first?: Scalars['Int'];
+};
+
+
+export type WorkspaceEventTypeArgs = {
+  name: Scalars['String'];
+};
+
+
+export type WorkspaceEventTypesV2Args = {
+  after: InputMaybe<Scalars['String']>;
+  filter: EventTypesFilter;
   first?: Scalars['Int'];
 };
 

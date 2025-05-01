@@ -212,52 +212,50 @@ export const StepInfo = ({ selectedStep }: { selectedStep: StepInfoType }) => {
         </div>
       )}
 
-      <div className="min-h-full">
-        {trace.isUserland && trace.userlandSpan ? (
-          <UserlandAttrs userlandSpan={trace.userlandSpan} />
-        ) : (
-          <Tabs
-            defaultActive={result?.error ? 'error' : prettyInput ? 'input' : 'output'}
-            tabs={[
-              ...(prettyInput
-                ? [
-                    {
-                      label: 'Input',
-                      id: 'input',
-                      node: <IO title="Step Input" raw={prettyInput} />,
-                    },
-                  ]
-                : []),
-              ...(prettyOutput
-                ? [
-                    {
-                      label: 'Output',
-                      id: 'output',
-                      node: <IO title="Step Output" raw={prettyOutput} />,
-                    },
-                  ]
-                : []),
-              ...(result?.error
-                ? [
-                    {
-                      label: 'Error',
-                      id: 'error',
-                      node: (
-                        <IO
-                          title={`${result.error.name || 'Error'} ${
-                            result.error.message ? `: ${result.error.message}` : ''
-                          }`}
-                          raw={result.error.stack ?? ''}
-                          error={true}
-                        />
-                      ),
-                    },
-                  ]
-                : []),
-            ]}
-          />
-        )}
-      </div>
+      {trace.isUserland && trace.userlandSpan ? (
+        <UserlandAttrs userlandSpan={trace.userlandSpan} />
+      ) : (
+        <Tabs
+          defaultActive={result?.error ? 'error' : prettyInput ? 'input' : 'output'}
+          tabs={[
+            ...(prettyInput
+              ? [
+                  {
+                    label: 'Input',
+                    id: 'input',
+                    node: <IO title="Step Input" raw={prettyInput} />,
+                  },
+                ]
+              : []),
+            ...(prettyOutput
+              ? [
+                  {
+                    label: 'Output',
+                    id: 'output',
+                    node: <IO title="Step Output" raw={prettyOutput} />,
+                  },
+                ]
+              : []),
+            ...(result?.error
+              ? [
+                  {
+                    label: 'Error',
+                    id: 'error',
+                    node: (
+                      <IO
+                        title={`${result.error.name || 'Error'} ${
+                          result.error.message ? `: ${result.error.message}` : ''
+                        }`}
+                        raw={result.error.stack ?? ''}
+                        error={true}
+                      />
+                    ),
+                  },
+                ]
+              : []),
+          ]}
+        />
+      )}
     </div>
   );
 };
