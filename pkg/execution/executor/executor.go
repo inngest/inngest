@@ -2853,7 +2853,7 @@ func (e *executor) AppendAndScheduleBatch(ctx context.Context, fn inngest.Functi
 				"function_id": bi.FunctionID.String(),
 			},
 		})
-	case enums.BatchFull:
+	case enums.BatchFull, enums.BatchMaxSize:
 		// start execution immediately
 		batchID := ulid.MustParse(result.BatchID)
 		if err := e.RetrieveAndScheduleBatch(ctx, fn, batch.ScheduleBatchPayload{
