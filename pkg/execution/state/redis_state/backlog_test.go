@@ -129,7 +129,7 @@ func TestQueueItemBacklogs(t *testing.T) {
 		hashedThrottleKey := osqueue.HashID(ctx, rawThrottleKey)
 
 		expected := QueueBacklog{
-			BacklogID:         fmt.Sprintf("throttle:%s:%s", fnID, hashedThrottleKey),
+			BacklogID:         fmt.Sprintf("fn:%s:t<%s>", fnID, hashedThrottleKey),
 			ShadowPartitionID: fnID.String(),
 
 			ThrottleKey:         &hashedThrottleKey,
@@ -174,7 +174,7 @@ func TestQueueItemBacklogs(t *testing.T) {
 		hashedThrottleKey := osqueue.HashID(ctx, rawThrottleKey)
 
 		expected := QueueBacklog{
-			BacklogID:         fmt.Sprintf("throttle:%s:%s", fnID, hashedThrottleKey),
+			BacklogID:         fmt.Sprintf("fn:%s:t<%s>", fnID, hashedThrottleKey),
 			ShadowPartitionID: fnID.String(),
 
 			ThrottleKey:         &hashedThrottleKey,
@@ -220,7 +220,7 @@ func TestQueueItemBacklogs(t *testing.T) {
 
 		expected := QueueBacklog{
 			// edge should go to default backlog if no concurrency keys are specified
-			BacklogID:         fmt.Sprintf("default:%s", fnID),
+			BacklogID:         fmt.Sprintf("fn:%s", fnID),
 			ShadowPartitionID: fnID.String(),
 		}
 
@@ -260,7 +260,7 @@ func TestQueueItemBacklogs(t *testing.T) {
 	t.Run("function concurrency", func(t *testing.T) {
 		expected := QueueBacklog{
 			// expect default backlog to be used
-			BacklogID:         fmt.Sprintf("default:%s", fnID),
+			BacklogID:         fmt.Sprintf("fn:%s", fnID),
 			ShadowPartitionID: fnID.String(),
 		}
 
@@ -294,7 +294,7 @@ func TestQueueItemBacklogs(t *testing.T) {
 	t.Run("account concurrency", func(t *testing.T) {
 		expected := QueueBacklog{
 			// expect default backlog to be used
-			BacklogID:         fmt.Sprintf("default:%s", fnID),
+			BacklogID:         fmt.Sprintf("fn:%s", fnID),
 			ShadowPartitionID: fnID.String(),
 		}
 
@@ -337,19 +337,17 @@ func TestQueueItemBacklogs(t *testing.T) {
 			Limit: 123,
 		}.ParseKey()
 
-		expected := []QueueBacklog{
-			{
-				BacklogID:         fmt.Sprintf("conc:%s", fullKey),
-				ShadowPartitionID: fnID.String(),
+		expected := QueueBacklog{
+			BacklogID:         fmt.Sprintf("fn:%s:c1<%s>", fnID, util.XXHash(fullKey)),
+			ShadowPartitionID: fnID.String(),
 
-				ConcurrencyKeys: []BacklogConcurrencyKey{
-					{
-						ConcurrencyScope:            scope,
-						ConcurrencyScopeEntity:      entity,
-						ConcurrencyKey:              hashedConcurrencyKeyExpr,
-						ConcurrencyKeyValue:         checksum,
-						ConcurrencyKeyUnhashedValue: unhashedValue,
-					},
+			ConcurrencyKeys: []BacklogConcurrencyKey{
+				{
+					ConcurrencyScope:            scope,
+					ConcurrencyScopeEntity:      entity,
+					ConcurrencyKey:              hashedConcurrencyKeyExpr,
+					ConcurrencyKeyValue:         checksum,
+					ConcurrencyKeyUnhashedValue: unhashedValue,
 				},
 			},
 		}
@@ -403,7 +401,7 @@ func TestQueueItemBacklogs(t *testing.T) {
 		}.ParseKey()
 
 		expected := QueueBacklog{
-			BacklogID:         fmt.Sprintf("conc:%s", fullKey),
+			BacklogID:         fmt.Sprintf("fn:%s:t<%s>:c1<%s>", fnID, hashedThrottleKey, util.XXHash(fullKey)),
 			ShadowPartitionID: fnID.String(),
 
 			ThrottleKey:         &hashedThrottleKey,
@@ -471,7 +469,7 @@ func TestQueueItemBacklogs(t *testing.T) {
 		}.ParseKey()
 
 		expected := QueueBacklog{
-			BacklogID:         fmt.Sprintf("conc:%s", fullKey),
+			BacklogID:         fmt.Sprintf("fn:%s:c1<%s>", fnID, util.XXHash(fullKey)),
 			ShadowPartitionID: fnID.String(),
 
 			ConcurrencyKeys: []BacklogConcurrencyKey{
@@ -518,6 +516,90 @@ func TestQueueItemBacklogs(t *testing.T) {
 		})
 
 		require.Equal(t, expected, backlog)
+	})
+
+	t.Run("two custom concurrency keys", func(t *testing.T) {
+		hashedConcurrencyKeyExpr := hashConcurrencyKey("event.data.customerId")
+		unhashedValue := "customer1"
+		scope := enums.ConcurrencyScopeFn
+		entity := fnID
+		fullKey := util.ConcurrencyKey(scope, fnID, unhashedValue)
+		_, _, checksum, _ := state.CustomConcurrency{
+			Key:   fullKey,
+			Hash:  hashedConcurrencyKeyExpr,
+			Limit: 123,
+		}.ParseKey()
+
+		hashedConcurrencyKeyExpr2 := hashConcurrencyKey("event.data.orgID")
+		unhashedValue2 := "orgID"
+		scope2 := enums.ConcurrencyScopeEnv
+		entity2 := fnID
+		fullKey2 := util.ConcurrencyKey(scope2, fnID, unhashedValue2)
+		_, _, checksum2, _ := state.CustomConcurrency{
+			Key:   fullKey2,
+			Hash:  hashedConcurrencyKeyExpr2,
+			Limit: 123,
+		}.ParseKey()
+
+		expected := QueueBacklog{
+			BacklogID:         fmt.Sprintf("fn:%s:c1<%s>:c2<%s>", fnID, util.XXHash(fullKey), util.XXHash(fullKey2)),
+			ShadowPartitionID: fnID.String(),
+
+			ConcurrencyKeys: []BacklogConcurrencyKey{
+				{
+					ConcurrencyScope:            scope,
+					ConcurrencyScopeEntity:      entity,
+					ConcurrencyKey:              hashedConcurrencyKeyExpr,
+					ConcurrencyKeyValue:         checksum,
+					ConcurrencyKeyUnhashedValue: unhashedValue,
+				},
+				{
+					ConcurrencyScope:            scope2,
+					ConcurrencyScopeEntity:      entity2,
+					ConcurrencyKey:              hashedConcurrencyKeyExpr2,
+					ConcurrencyKeyValue:         checksum2,
+					ConcurrencyKeyUnhashedValue: unhashedValue2,
+				},
+			},
+		}
+
+		backlog := q.ItemBacklog(ctx, osqueue.QueueItem{
+			ID:          "test",
+			FunctionID:  fnID,
+			WorkspaceID: wsID,
+			Data: osqueue.Item{
+				WorkspaceID: wsID,
+				Kind:        osqueue.KindEdge,
+				Identifier: state.Identifier{
+					WorkflowID:  fnID,
+					AccountID:   accID,
+					WorkspaceID: wsID,
+				},
+				Throttle: nil,
+				CustomConcurrencyKeys: []state.CustomConcurrency{
+					{
+						Key:                       fullKey,
+						Hash:                      hashedConcurrencyKeyExpr,
+						Limit:                     123,
+						UnhashedEvaluatedKeyValue: unhashedValue,
+					},
+					{
+						Key:                       fullKey2,
+						Hash:                      hashedConcurrencyKeyExpr2,
+						Limit:                     123,
+						UnhashedEvaluatedKeyValue: unhashedValue2,
+					},
+				},
+				QueueName: nil,
+			},
+			QueueName: nil,
+		})
+
+		require.Equal(t, expected, backlog)
+
+		kg := queueKeyGenerator{queueDefaultKey: QueueDefaultKey}
+		require.Equal(t, kg.Concurrency("custom", util.ConcurrencyKey(scope, entity, unhashedValue)), backlog.concurrencyKey(kg, 1))
+		require.Equal(t, kg.Concurrency("custom", util.ConcurrencyKey(scope2, entity2, unhashedValue2)), backlog.concurrencyKey(kg, 2))
 	})
 }
 
