@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState, type UIEventHandler } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type UIEventHandler } from 'react';
 import type { Route } from 'next';
 import { useRouter } from 'next/navigation';
 import { Button } from '@inngest/components/Button/Button';
@@ -126,9 +126,7 @@ export function EventTypesTable({
     placeholderData: keepPreviousData,
   });
 
-  console.log(volumeData, 'volumeData');
-
-  const mergedData = useCallback(() => {
+  const mergedData = useMemo(() => {
     if (!eventTypesData?.pages) {
       return undefined;
     }
@@ -138,6 +136,7 @@ export function EventTypesTable({
 
     const allEvents = eventTypesData.pages.flatMap((page) => page.events);
 
+    // Build volume map only when data is ready
     const volumeMap = new Map();
     if (volumeData && !isVolumePending) {
       volumeData.events.forEach((event) => {
@@ -155,16 +154,16 @@ export function EventTypesTable({
     }));
   }, [eventTypesData, volumeData, isVolumePending]);
 
-  const data = mergedData();
-  console.log(data, 'data');
-  const hasEventTypesData = data && data.length > 0;
+  const hasEventTypesData = mergedData && mergedData.length > 0;
+
+  console.log(volumeData, mergedData, '1');
 
   useEffect(() => {
     const el = containerRef.current;
     if (el) {
       setIsScrollable(el.scrollHeight > el.clientHeight);
     }
-  }, [data]);
+  }, [mergedData]);
 
   const onScroll: UIEventHandler<HTMLDivElement> = useCallback(
     (event) => {
@@ -233,7 +232,7 @@ export function EventTypesTable({
       <div className="h-[calc(100%-58px)] overflow-y-auto" onScroll={onScroll} ref={containerRef}>
         <NewTable
           columns={columns}
-          data={mergedData() || []}
+          data={mergedData || []}
           isLoading={isPending}
           // TODO: Re-enable this when API supports sorting by event name
           // sorting={sorting}
