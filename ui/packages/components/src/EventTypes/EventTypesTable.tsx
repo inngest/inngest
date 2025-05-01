@@ -126,6 +126,8 @@ export function EventTypesTable({
     placeholderData: keepPreviousData,
   });
 
+  console.log(volumeData, 'volumeData');
+
   const mergedData = useCallback(() => {
     if (!eventTypesData?.pages) {
       return undefined;
@@ -152,6 +154,7 @@ export function EventTypesTable({
   }, [eventTypesData, volumeData]);
 
   const data = mergedData();
+  console.log(data, 'data');
   const hasEventTypesData = data && data.length > 0;
 
   useEffect(() => {
