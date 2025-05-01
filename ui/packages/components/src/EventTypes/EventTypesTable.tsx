@@ -64,9 +64,9 @@ export function EventTypesTable({
 
   const [filteredStatus, setFilteredStatus, removeFilteredStatus] = useSearchParam('archived');
   const archived = filteredStatus === 'true';
-  const [searchInput, setSearchInput] = useState<string>('');
   const [isScrollable, setIsScrollable] = useState(false);
   const [nameSearch = null, setNameSearch, removeNameSearch] = useSearchParam('nameSearch');
+  const [searchInput, setSearchInput] = useState<string>(nameSearch || '');
   const [orderBy, setOrderBy] = useState<EventTypesOrderBy[]>([
     {
       field: EventTypesOrderByField.Name,
@@ -236,7 +236,18 @@ export function EventTypesTable({
           // TODO: Re-enable this when API supports sorting by event name
           // sorting={sorting}
           // setSorting={setSorting}
-          blankState={<TableBlankState actions={emptyActions} />}
+          blankState={
+            <TableBlankState
+              actions={emptyActions}
+              title={
+                nameSearch
+                  ? `No results found for "${nameSearch}"`
+                  : archived
+                  ? 'No archived events found'
+                  : undefined
+              }
+            />
+          }
           onRowClick={(row) => router.push(pathCreator.eventType({ eventName: row.original.name }))}
         />
         {!hasNextPage && hasEventTypesData && isScrollable && (
