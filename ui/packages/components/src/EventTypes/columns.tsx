@@ -5,9 +5,10 @@ import { type EventType } from '@inngest/components/types/eventType';
 import { cn } from '@inngest/components/utils/classNames';
 import { createColumnHelper, type Row } from '@tanstack/react-table';
 
+import { Skeleton } from '../Skeleton';
 import type { EventTypesTable } from './EventTypesTable';
 
-const columnHelper = createColumnHelper<EventType>();
+const columnHelper = createColumnHelper<EventType & { isVolumePending?: boolean }>();
 
 const columnsIDs = ['name', 'functions', 'volume'] as const;
 export type ColumnID = (typeof columnsIDs)[number];
@@ -85,7 +86,10 @@ export function useColumns({
     columnHelper.accessor('volume', {
       cell: (info) => {
         const volume = info.getValue();
+        const row = info.row.original;
+        const isVolumePending = row.isVolumePending;
 
+        if (isVolumePending) return <Skeleton className="h-4 w-48" />;
         return (
           <div className="flex items-center">
             <div className="w-16">

@@ -138,11 +138,12 @@ export function EventTypesTable({
 
     const allEvents = eventTypesData.pages.flatMap((page) => page.events);
 
-    const volumeMap = new Map<string, EventType['volume']>();
-
-    volumeData?.events.forEach((event) => {
-      volumeMap.set(event.name, event.volume);
-    });
+    const volumeMap = new Map();
+    if (volumeData && !isVolumePending) {
+      volumeData.events.forEach((event) => {
+        volumeMap.set(event.name, event.volume);
+      });
+    }
 
     return allEvents.map((event) => ({
       ...event,
@@ -150,8 +151,9 @@ export function EventTypesTable({
         totalVolume: 0,
         dailyVolumeSlots: [],
       },
+      isVolumePending,
     }));
-  }, [eventTypesData, volumeData]);
+  }, [eventTypesData, volumeData, isVolumePending]);
 
   const data = mergedData();
   console.log(data, 'data');
