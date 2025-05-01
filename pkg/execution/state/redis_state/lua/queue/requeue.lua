@@ -31,8 +31,8 @@ local keyShadowPartitionMeta             = KEYS[16]          -- shadows
 local keyGlobalAccountShadowPartitionSet = KEYS[17]
 local keyAccountShadowPartitionSet       = KEYS[18]
 
-local keyItemIndexA           = KEYS[21]          -- custom item index 1
-local keyItemIndexB           = KEYS[22]          -- custom item index 2
+local keyItemIndexA           = KEYS[19]          -- custom item index 1
+local keyItemIndexB           = KEYS[20]          -- custom item index 2
 
 local queueItem           = ARGV[1]
 local queueID             = ARGV[2]           -- id
