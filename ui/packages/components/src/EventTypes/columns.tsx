@@ -89,7 +89,7 @@ export function useColumns({
         const row = info.row.original;
         const isVolumePending = row.isVolumePending;
 
-        if (isVolumePending) return <Skeleton className="h-4 w-48" />;
+        if (isVolumePending) return <Skeleton className="my-4 block h-3 w-48" />;
         return (
           <div className="flex items-center">
             <div className="w-16">

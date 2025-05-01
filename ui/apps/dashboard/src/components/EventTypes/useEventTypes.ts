@@ -104,7 +104,7 @@ const volumeQuery = graphql(`
         edges {
           node {
             name
-            usage(opts: { period: day, from: $startTime, to: $endTime }) {
+            usage(opts: { period: hour, from: $startTime, to: $endTime }) {
               total
               data {
                 count
