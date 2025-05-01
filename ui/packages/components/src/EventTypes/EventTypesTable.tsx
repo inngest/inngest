@@ -65,6 +65,7 @@ export function EventTypesTable({
   const [filteredStatus, setFilteredStatus, removeFilteredStatus] = useSearchParam('archived');
   const archived = filteredStatus === 'true';
   const [searchInput, setSearchInput] = useState<string>('');
+  const [isScrollable, setIsScrollable] = useState(false);
   const [nameSearch = null, setNameSearch, removeNameSearch] = useSearchParam('nameSearch');
   const [orderBy, setOrderBy] = useState<EventTypesOrderBy[]>([
     {
@@ -153,6 +154,13 @@ export function EventTypesTable({
   const data = mergedData();
   const hasEventTypesData = data && data.length > 0;
 
+  useEffect(() => {
+    const el = containerRef.current;
+    if (el) {
+      setIsScrollable(el.scrollHeight > el.clientHeight);
+    }
+  }, [data]);
+
   const onScroll: UIEventHandler<HTMLDivElement> = useCallback(
     (event) => {
       if (hasEventTypesData && hasNextPage && !isFetchingNextPage) {
@@ -160,9 +168,7 @@ export function EventTypesTable({
 
         // Check if scrolled to the bottom
         const reachedBottom = scrollHeight - scrollTop - clientHeight < 200;
-        console.log('reached', reachedBottom);
         if (reachedBottom && !isFetching) {
-          console.log('fetching next page');
           fetchNextPage();
         }
       }
@@ -200,8 +206,6 @@ export function EventTypesTable({
     [containerRef.current]
   );
 
-  console.log(hasNextPage, hasEventTypesData, 'hasNextPage');
-
   return (
     <div className="bg-canvasBase text-basis no-scrollbar flex-1 overflow-hidden focus-visible:outline-none">
       <div className="bg-canvasBase sticky top-0 z-10 m-3 flex items-center gap-2">
@@ -210,7 +214,6 @@ export function EventTypesTable({
           pathCreator={'/'}
           onStatusChange={onStatusFilterChange}
         />
-        {/* TODO: Wire search */}
         <Search
           name="search"
           placeholder="Search by event type"
@@ -227,14 +230,15 @@ export function EventTypesTable({
           columns={columns}
           data={mergedData() || []}
           isLoading={isPending}
-          sorting={sorting}
-          setSorting={setSorting}
+          // TODO: Re-enable this when API supports sorting by event name
+          // sorting={sorting}
+          // setSorting={setSorting}
           blankState={<TableBlankState actions={emptyActions} />}
           onRowClick={(row) => router.push(pathCreator.eventType({ eventName: row.original.name }))}
         />
-        {!hasNextPage && hasEventTypesData && (
+        {!hasNextPage && hasEventTypesData && isScrollable && (
           <div className="flex flex-col items-center pt-8">
-            <p className="text-muted">No additional event types found.</p>
+            <p className="text-muted text-sm">No additional event types found.</p>
             <Button
               label="Back to top"
               kind="primary"
