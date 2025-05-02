@@ -11,6 +11,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/inngest/inngest/pkg/api/apiv1/apiv1auth"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/run"
@@ -78,7 +79,7 @@ func (a router) traces(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rejectedSpans := a.convertOTLPAndSend(req)
+	rejectedSpans := a.convertOTLPAndSend(auth, req)
 
 	resp := &collecttrace.ExportTraceServiceResponse{}
 	if rejectedSpans > 0 {
@@ -124,7 +125,7 @@ func respondError(w http.ResponseWriter, r *http.Request, code int, msg string) 
 	_, _ = w.Write(data)
 }
 
-func (a router) convertOTLPAndSend(req *collecttrace.ExportTraceServiceRequest) (rejectedSpans int64) {
+func (a router) convertOTLPAndSend(auth apiv1auth.V1Auth, req *collecttrace.ExportTraceServiceRequest) (rejectedSpans int64) {
 	ctx := context.Background()
 
 	for _, rs := range req.ResourceSpans {
@@ -168,6 +169,16 @@ func (a router) convertOTLPAndSend(req *collecttrace.ExportTraceServiceRequest) 
 				attrs = append(attrs, attribute.KeyValue{
 					Key:   attribute.Key(consts.OtelAttrSDKRunID),
 					Value: attribute.StringValue(runID),
+				})
+
+				attrs = append(attrs, attribute.KeyValue{
+					Key:   attribute.Key(consts.OtelSysAccountID),
+					Value: attribute.StringValue(auth.AccountID().String()),
+				})
+
+				attrs = append(attrs, attribute.KeyValue{
+					Key:   attribute.Key(consts.OtelSysWorkspaceID),
+					Value: attribute.StringValue(auth.WorkspaceID().String()),
 				})
 
 				// Always mark the span as userland
