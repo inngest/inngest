@@ -237,9 +237,6 @@ DO UPDATE SET
 -- name: GetTraceRun :one
 SELECT * FROM trace_runs WHERE run_id = @run_id;
 
--- name: GetTraceRoot :one
-SELECT * FROM traces WHERE trace_id = @trace_id ORDER BY timestamp_unix_ms DESC, duration DESC LIMIT 1;
-
 -- name: GetTraceSpans :many
 SELECT * FROM traces WHERE trace_id = @trace_id AND run_id = @run_id ORDER BY timestamp_unix_ms DESC, duration DESC;
 

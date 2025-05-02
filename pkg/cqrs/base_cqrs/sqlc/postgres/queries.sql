@@ -239,9 +239,6 @@ ON CONFLICT (run_id) DO UPDATE SET
 -- name: GetTraceRun :one
 SELECT * FROM trace_runs WHERE run_id = sqlc.arg('run_id')::CHAR(26);
 
--- name: GetTraceRoot :one
-SELECT * FROM traces WHERE trace_id = sqlc.arg('trace_id') ORDER BY timestamp_unix_ms DESC, duration DESC LIMIT 1;
-
 -- name: GetTraceSpans :many
 SELECT * FROM traces WHERE trace_id = sqlc.arg('trace_id') AND run_id = sqlc.arg('run_id')::CHAR(26) ORDER BY timestamp_unix_ms DESC, duration DESC;
 

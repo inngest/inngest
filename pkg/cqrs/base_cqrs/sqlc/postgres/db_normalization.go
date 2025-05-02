@@ -682,14 +682,6 @@ func (q NormalizedQueries) InsertTraceRun(ctx context.Context, span sqlc_sqlite.
 	return q.db.InsertTraceRun(ctx, pgSpan)
 }
 
-func (q NormalizedQueries) GetTraceRoot(ctx context.Context, traceID string) (*sqlc_sqlite.Trace, error) {
-	root, err := q.db.GetTraceRoot(ctx, traceID)
-	if err != nil {
-		return nil, err
-	}
-	return root.ToSQLite()
-}
-
 func (q NormalizedQueries) GetTraceSpans(ctx context.Context, arg sqlc_sqlite.GetTraceSpansParams) ([]*sqlc_sqlite.Trace, error) {
 	pgArg := GetTraceSpansParams{
 		TraceID: arg.TraceID,

@@ -45,7 +45,6 @@ type Querier interface {
 	// Queue snapshots
 	//
 	GetQueueSnapshotChunks(ctx context.Context, snapshotID interface{}) ([]*GetQueueSnapshotChunksRow, error)
-	GetTraceRoot(ctx context.Context, traceID string) (*Trace, error)
 	GetTraceRun(ctx context.Context, runID ulid.ULID) (*TraceRun, error)
 	GetTraceSpanOutput(ctx context.Context, arg GetTraceSpanOutputParams) ([]*Trace, error)
 	GetTraceSpans(ctx context.Context, arg GetTraceSpansParams) ([]*Trace, error)

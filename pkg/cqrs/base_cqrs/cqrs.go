@@ -1349,62 +1349,6 @@ func (w wrapper) GetTraceRunsCount(ctx context.Context, opt cqrs.GetTraceRunOpt)
 	return len(res), nil
 }
 
-func (w wrapper) GetTraceRoot(ctx context.Context, id cqrs.TraceRunIdentifier) (*cqrs.Span, error) {
-	if id.TraceID == "" {
-		return nil, fmt.Errorf("traceID is required to retrieve root span")
-	}
-	if id.AccountID == uuid.Nil {
-		return nil, fmt.Errorf("accountID is required to retrieve root span")
-	}
-	if id.WorkspaceID == uuid.Nil {
-		return nil, fmt.Errorf("workspaceID is required to retrieve root span")
-	}
-
-	s, err := w.q.GetTraceRoot(ctx, id.TraceID)
-	if err != nil {
-		return nil, fmt.Errorf("error retrieving root span: %w", err)
-	}
-
-	if s == nil {
-		return nil, nil
-	}
-
-	root := &cqrs.Span{
-		Timestamp:    s.Timestamp,
-		TraceID:      string(s.TraceID),
-		SpanID:       string(s.SpanID),
-		SpanName:     s.SpanName,
-		SpanKind:     s.SpanKind,
-		ServiceName:  s.ServiceName,
-		ScopeName:    s.ScopeName,
-		ScopeVersion: s.ScopeVersion,
-		Duration:     time.Duration(s.Duration * int64(time.Millisecond)),
-		StatusCode:   s.StatusCode,
-		RunID:        &s.RunID,
-	}
-
-	if s.StatusMessage.Valid {
-		root.StatusMessage = &s.StatusMessage.String
-	}
-
-	if s.ParentSpanID.Valid {
-		root.ParentSpanID = &s.ParentSpanID.String
-	}
-	if s.TraceState.Valid {
-		root.TraceState = &s.TraceState.String
-	}
-
-	var resourceAttr, spanAttr map[string]string
-	if err := json.Unmarshal(s.ResourceAttributes, &resourceAttr); err == nil {
-		root.ResourceAttributes = resourceAttr
-	}
-	if err := json.Unmarshal(s.SpanAttributes, &spanAttr); err == nil {
-		root.SpanAttributes = spanAttr
-	}
-
-	return root, nil
-}
-
 func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*cqrs.TraceRun, error) {
 	// use evtIDs as post query filter
 	evtIDs := []string{}
