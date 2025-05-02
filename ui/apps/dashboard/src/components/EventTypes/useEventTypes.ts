@@ -87,48 +87,31 @@ export function useEventTypes() {
 }
 
 type VolumeQueryVariables = {
-  archived: boolean;
-  cursor: string | null;
+  eventName: string;
 };
 
 const volumeQuery = graphql(`
-  query GetEventTypesVolumeV2(
-    $envID: ID!
-    $cursor: String
-    $archived: Boolean
-    $startTime: Time!
-    $endTime: Time!
-  ) {
+  query GetEventTypeVolumeV2($envID: ID!, $eventName: String!, $startTime: Time!, $endTime: Time!) {
     environment: workspace(id: $envID) {
-      eventTypesV2(after: $cursor, first: 30, filter: { archived: $archived }) {
-        edges {
-          node {
-            name
-            usage(opts: { period: hour, from: $startTime, to: $endTime }) {
-              total
-              data {
-                count
-              }
-            }
+      eventType(name: $eventName) {
+        name
+        usage(opts: { period: hour, from: $startTime, to: $endTime }) {
+          total
+          data {
+            count
           }
-        }
-        pageInfo {
-          hasNextPage
-          endCursor
-          hasPreviousPage
-          startCursor
         }
       }
     }
   }
 `);
 
-export function useEventTypesVolume() {
+export function useEventTypeVolume() {
   const envID = useEnvironment().id;
   const client = useClient();
 
   return useCallback(
-    async ({ cursor, archived }: VolumeQueryVariables) => {
+    async ({ eventName }: VolumeQueryVariables) => {
       const startTime = getTimestampDaysAgo({ currentDate: new Date(), days: 1 }).toISOString();
       const endTime = new Date().toISOString();
       const result = await client
@@ -136,8 +119,7 @@ export function useEventTypesVolume() {
           volumeQuery,
           {
             envID,
-            archived,
-            cursor,
+            eventName,
             startTime,
             endTime,
           },
@@ -153,25 +135,18 @@ export function useEventTypesVolume() {
         throw new Error('no data returned');
       }
 
-      const eventTypes = result.data.environment.eventTypesV2.edges;
+      const eventType = result.data.environment.eventType;
 
-      const events = eventTypes.map(({ node }) => {
-        const dailyVolumeSlots = node.usage.data.map((slot) => ({
-          startCount: slot.count,
-        }));
-
-        return {
-          name: node.name,
-          volume: {
-            totalVolume: node.usage.total,
-            dailyVolumeSlots,
-          },
-        };
-      });
+      const dailyVolumeSlots = eventType.usage.data.map((slot) => ({
+        startCount: slot.count,
+      }));
 
       return {
-        events,
-        pageInfo: result.data.environment.eventTypesV2.pageInfo,
+        name: eventType.name,
+        volume: {
+          totalVolume: eventType.usage.total,
+          dailyVolumeSlots,
+        },
       };
     },
     [client, envID]

@@ -15,7 +15,7 @@ import {
   type EventTypesOrderBy,
   type PageInfo,
 } from '@inngest/components/types/eventType';
-import { keepPreviousData, useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useInfiniteQuery } from '@tanstack/react-query';
 import { type Row, type SortingState } from '@tanstack/react-table';
 
 import { useSearchParam } from '../hooks/useSearchParam';
@@ -24,7 +24,7 @@ import { useColumns } from './columns';
 
 export function EventTypesTable({
   getEventTypes,
-  getEventTypesVolume,
+  getEventTypeVolume,
   pathCreator,
   emptyActions,
   eventTypeActions,
@@ -44,17 +44,14 @@ export function EventTypesTable({
     archived: boolean;
     orderBy: EventTypesOrderBy[];
   }) => Promise<{ events: Omit<EventType, 'volume'>[]; pageInfo: PageInfo }>;
-  getEventTypesVolume: ({
-    cursor,
-    archived,
+  getEventTypeVolume: ({
+    eventName,
   }: {
-    cursor: string | null;
-    archived: boolean;
-    orderBy: EventTypesOrderBy[];
-  }) => Promise<{ events: Pick<EventType, 'volume' | 'name'>[]; pageInfo: PageInfo }>;
+    eventName: string;
+  }) => Promise<Pick<EventType, 'volume' | 'name'>>;
 }) {
   const router = useRouter();
-  const columns = useColumns({ pathCreator, eventTypeActions });
+  const columns = useColumns({ pathCreator, eventTypeActions, getEventTypeVolume });
   const [sorting, setSorting] = useState<SortingState>([
     {
       id: 'name',
@@ -115,48 +112,18 @@ export function EventTypesTable({
     initialPageParam: null,
   });
 
-  const lastPageCursor = eventTypesData?.pages.at(-1)?.pageInfo.endCursor ?? null;
-
-  const { data: volumeData, isPending: isVolumePending } = useQuery({
-    queryKey: ['event-types-volume', { orderBy, archived, cursor: lastPageCursor }],
-    queryFn: () => {
-      return getEventTypesVolume({ orderBy, archived, cursor: lastPageCursor });
-    },
-    enabled: !!eventTypesData, // only run once we have event data
-    placeholderData: keepPreviousData,
-  });
-
   const mergedData = useMemo(() => {
-    if (!eventTypesData?.pages) {
-      return undefined;
-    }
-    if (eventTypesData.pages.length === 0) {
-      return [];
-    }
-
-    const allEvents = eventTypesData.pages.flatMap((page) => page.events);
-
-    // Build volume map only when data is ready
-    const volumeMap = new Map();
-    if (volumeData && !isVolumePending) {
-      volumeData.events.forEach((event) => {
-        volumeMap.set(event.name, event.volume);
-      });
-    }
-
-    return allEvents.map((event) => ({
-      ...event,
-      volume: volumeMap.get(event.name) || {
-        totalVolume: 0,
-        dailyVolumeSlots: [],
-      },
-      isVolumePending,
-    }));
-  }, [eventTypesData, volumeData, isVolumePending]);
+    return (
+      eventTypesData?.pages.flatMap((page) =>
+        page.events.map((e) => ({
+          ...e,
+          volume: undefined,
+        }))
+      ) ?? []
+    );
+  }, [eventTypesData]);
 
   const hasEventTypesData = mergedData && mergedData.length > 0;
-
-  console.log(volumeData, mergedData, '1');
 
   useEffect(() => {
     const el = containerRef.current;

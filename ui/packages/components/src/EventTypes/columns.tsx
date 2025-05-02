@@ -7,8 +7,9 @@ import { createColumnHelper, type Row } from '@tanstack/react-table';
 
 import { Skeleton } from '../Skeleton';
 import type { EventTypesTable } from './EventTypesTable';
+import { useEventTypeVolume } from './useEventTypeVolume';
 
-const columnHelper = createColumnHelper<EventType & { isVolumePending?: boolean }>();
+const columnHelper = createColumnHelper<EventType>();
 
 const columnsIDs = ['name', 'functions', 'volume'] as const;
 export type ColumnID = (typeof columnsIDs)[number];
@@ -24,9 +25,11 @@ function ensureColumnID(id: ColumnID): ColumnID {
 export function useColumns({
   pathCreator,
   eventTypeActions,
+  getEventTypeVolume,
 }: {
   pathCreator: React.ComponentProps<typeof EventTypesTable>['pathCreator'];
   eventTypeActions: React.ComponentProps<typeof EventTypesTable>['eventTypeActions'];
+  getEventTypeVolume: React.ComponentProps<typeof EventTypesTable>['getEventTypeVolume'];
 }) {
   const columns = [
     columnHelper.accessor('name', {
@@ -85,21 +88,22 @@ export function useColumns({
     }),
     columnHelper.accessor('volume', {
       cell: (info) => {
-        const volume = info.getValue();
-        const row = info.row.original;
-        const isVolumePending = row.isVolumePending;
+        const name = info.row.original.name;
+        const { data, isLoading } = useEventTypeVolume(name, getEventTypeVolume);
 
-        if (isVolumePending) return <Skeleton className="my-4 block h-3 w-48" />;
+        if (isLoading) return <Skeleton className="my-4 block h-3 w-48" />;
+        if (!data || !data.volume) return <TextCell>—</TextCell>;
+
         return (
           <div className="flex items-center">
             <div className="w-16">
               <NumberCell
-                value={volume.totalVolume}
-                term={volume.totalVolume === 1 ? 'event' : 'events'}
+                value={data.volume.totalVolume}
+                term={data.volume.totalVolume === 1 ? 'event' : 'events'}
               />
             </div>
             <div className="hidden md:block">
-              <MiniStackedBarChart data={volume.dailyVolumeSlots} />
+              <MiniStackedBarChart data={data.volume.dailyVolumeSlots} />
             </div>
           </div>
         );
