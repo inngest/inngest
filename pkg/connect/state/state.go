@@ -6,7 +6,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/coder/websocket"
 	"github.com/inngest/inngest/pkg/backoff"
+	connecterrors "github.com/inngest/inngest/pkg/connect/errors"
 	"github.com/inngest/inngest/pkg/cqrs/sync"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/publicerr"
@@ -302,6 +304,13 @@ func (g *WorkerGroup) Sync(ctx context.Context, groupManager WorkerGroupManager,
 			// Wait for other sync to complete and retry
 			if perr.Code == syscode.CodeSyncAlreadyPending {
 				continue
+			}
+
+			// Propagate syncing errors to the user
+			return connecterrors.SocketError{
+				SysCode:    perr.Code,
+				Msg:        perr.Message,
+				StatusCode: websocket.StatusPolicyViolation,
 			}
 		}
 

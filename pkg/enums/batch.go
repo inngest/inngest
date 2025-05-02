@@ -11,4 +11,6 @@ const (
 	BatchNew
 	// BatchFull represents a full batch
 	BatchFull
+	// BatchNew indicates the batch has reached the size limit of a batch
+	BatchMaxSize
 )

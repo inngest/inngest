@@ -81,7 +81,7 @@ func (c EventBatchConfig) IsValid(ctx context.Context) error {
 
 	if c.Key != nil {
 		// Ensure the expression is valid if present.
-		if exprErr := expressions.Validate(ctx, *c.Key); exprErr != nil {
+		if exprErr := expressions.Validate(ctx, nil, *c.Key); exprErr != nil {
 			return syscode.Error{
 				Code:    syscode.CodeBatchKeyExpressionInvalid,
 				Message: fmt.Sprintf("batch key expression is invalid: %s", exprErr),

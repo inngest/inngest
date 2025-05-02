@@ -32,6 +32,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/expressions"
+	"github.com/inngest/inngest/pkg/expressions/expragg"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/inngest/log"
 	"github.com/inngest/inngest/pkg/logger"
@@ -149,7 +150,7 @@ func WithPauseManager(pm state.PauseManager) ExecutorOpt {
 
 // WithExpressionAggregator sets the expression aggregator singleton to use
 // for matching events using our aggregate evaluator.
-func WithExpressionAggregator(agg expressions.Aggregator) ExecutorOpt {
+func WithExpressionAggregator(agg expragg.Aggregator) ExecutorOpt {
 	return func(e execution.Executor) error {
 		e.(*executor).exprAggregator = agg
 		return nil
@@ -296,7 +297,7 @@ type executor struct {
 
 	// exprAggregator is an expression aggregator used to parse and aggregate expressions
 	// using trees.
-	exprAggregator expressions.Aggregator
+	exprAggregator expragg.Aggregator
 
 	pm   state.PauseManager
 	smv2 sv2.RunService
@@ -532,6 +533,9 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 				scopeID = req.WorkspaceID
 			}
 
+			evaluated := limit.Evaluate(ctx, evtMap)
+			key := util.ConcurrencyKey(limit.Scope, scopeID, evaluated)
+
 			// Store the concurrency limit in the function.  By copying in the raw expression hash,
 			// we can update the concurrency limits for in-progress runs as new function versions
 			// are stored.
@@ -541,9 +545,10 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 			metadata.Config.CustomConcurrencyKeys = append(
 				metadata.Config.CustomConcurrencyKeys,
 				sv2.CustomConcurrency{
-					Key:   limit.Evaluate(ctx, scopeID, evtMap),
-					Hash:  limit.Hash,
-					Limit: limit.Limit,
+					Key:                       key,
+					Hash:                      limit.Hash,
+					Limit:                     limit.Limit,
+					UnhashedEvaluatedKeyValue: evaluated,
 				},
 			)
 		}
@@ -554,18 +559,21 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	//
 	var throttle *queue.Throttle
 	if req.Function.Throttle != nil {
-		throttleKey := queue.HashID(ctx, req.Function.ID.String())
+		unhashedThrottleKey := req.Function.ID.String()
+		throttleKey := queue.HashID(ctx, unhashedThrottleKey)
 		if req.Function.Throttle.Key != nil {
 			val, _, _ := expressions.Evaluate(ctx, *req.Function.Throttle.Key, map[string]any{
 				"event": evtMap,
 			})
-			throttleKey = throttleKey + "-" + queue.HashID(ctx, fmt.Sprintf("%v", val))
+			unhashedThrottleKey = fmt.Sprintf("%v", val)
+			throttleKey = throttleKey + "-" + queue.HashID(ctx, unhashedThrottleKey)
 		}
 		throttle = &queue.Throttle{
-			Key:    throttleKey,
-			Limit:  int(req.Function.Throttle.Limit),
-			Burst:  int(req.Function.Throttle.Burst),
-			Period: int(req.Function.Throttle.Period.Seconds()),
+			Key:                 throttleKey,
+			Limit:               int(req.Function.Throttle.Limit),
+			Burst:               int(req.Function.Throttle.Burst),
+			Period:              int(req.Function.Throttle.Period.Seconds()),
+			UnhashedThrottleKey: unhashedThrottleKey,
 		}
 	}
 
@@ -1450,13 +1458,8 @@ func (e *executor) handleAggregatePauses(ctx context.Context, evt event.TrackedE
 	)
 
 	for _, i := range evals {
-		found, ok := i.(*state.Pause)
-		if !ok || found == nil {
-			continue
-		}
-
 		// Copy pause into function
-		pause := *found
+		pause := *i
 		wg.Add(1)
 		go func() {
 			atomic.AddInt32(&res[0], 1)
@@ -2656,7 +2659,7 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, i *runInstan
 	}
 
 	if opts.If != nil {
-		err = expressions.Validate(ctx, *opts.If)
+		err = expressions.Validate(ctx, expressions.DefaultRestrictiveValidationPolicy(), *opts.If)
 		if err != nil {
 			return state.WrapInStandardError(
 				err,
@@ -2834,7 +2837,7 @@ func (e *executor) AppendAndScheduleBatch(ctx context.Context, fn inngest.Functi
 				"function_id": bi.FunctionID.String(),
 			},
 		})
-	case enums.BatchFull:
+	case enums.BatchFull, enums.BatchMaxSize:
 		// start execution immediately
 		batchID := ulid.MustParse(result.BatchID)
 		if err := e.RetrieveAndScheduleBatch(ctx, fn, batch.ScheduleBatchPayload{

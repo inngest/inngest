@@ -95,6 +95,7 @@ func TestInvoke(t *testing.T) {
 			as.False(invoke.IsRoot)
 			as.Equal(rootSpanID, invoke.ParentSpanID)
 			as.Equal(models.StepOpInvoke.String(), invoke.StepOp)
+			as.Equal(models.RunTraceSpanStatusCompleted.String(), invoke.Status)
 
 			// output test
 			as.NotNil(invoke.OutputID)
@@ -234,6 +235,7 @@ func TestInvokeGroup(t *testing.T) {
 			as.Equal(2, len(invoke.ChildSpans))
 			as.Equal(models.StepOpInvoke.String(), invoke.StepOp)
 			as.NotNil(invoke.EndedAt)
+			as.Equal(models.RunTraceSpanStatusCompleted.String(), invoke.Status)
 
 			// output test
 			as.NotNil(invoke.OutputID)
@@ -333,6 +335,7 @@ func TestInvokeTimeout(t *testing.T) {
 			r.Equal(rootSpanID, invoke.ParentSpanID)
 			r.Equal(models.StepOpInvoke.String(), invoke.StepOp)
 			r.NotNil(invoke.EndedAt)
+			r.Equal(models.RunTraceSpanStatusFailed.String(), invoke.Status)
 
 			// output test
 			assert.NotNil(t, invoke.OutputID)

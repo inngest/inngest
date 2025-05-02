@@ -145,4 +145,6 @@ const (
 
 var (
 	ConnectWorkerRequestExtendLeaseInterval = ConnectWorkerRequestLeaseDuration / 4
+	QueueShadowContinuationCooldownPeriod   = QueueContinuationCooldownPeriod
+	QueueShadowContinuationMaxPartitions    = QueueContinuationMaxPartitions
 )

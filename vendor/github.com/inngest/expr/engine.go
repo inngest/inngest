@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/cespare/xxhash/v2"
+	"github.com/google/uuid"
 )
 
 type EngineType int
@@ -100,9 +101,14 @@ func (p ExpressionPart) Equals(n ExpressionPart) bool {
 }
 
 func (p ExpressionPart) ToStored() *StoredExpressionPart {
+	var id uuid.UUID
+	if p.Parsed != nil {
+		id = p.Parsed.EvaluableID
+	}
+
 	return &StoredExpressionPart{
+		EvaluableID: id,
 		GroupID:     p.GroupID,
-		Parsed:      p.Parsed,
 		PredicateID: p.Hash(),
 		Ident:       &p.Predicate.Ident,
 	}
@@ -111,8 +117,8 @@ func (p ExpressionPart) ToStored() *StoredExpressionPart {
 // StoredExpressionPart is a lightweight expression part which only stores
 // a hash of the predicate to reduce memory usage.
 type StoredExpressionPart struct {
+	EvaluableID uuid.UUID
 	GroupID     groupID
 	PredicateID uint64
-	Parsed      *ParsedExpression
 	Ident       *string
 }

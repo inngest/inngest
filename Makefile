@@ -7,6 +7,11 @@ dev:
 run:
 	TEST_MODE=true LOG_LEVEL=debug go run ./cmd/main.go dev --tick=50 --no-poll --no-discovery -v $(PARAMS)
 
+# Start with debug mode in Delve
+.PHONY: debug
+debug:
+	TEST_MODE=true LOG_LEVEL=debug dlv debug ./cmd/main.go --headless --listen=127.0.0.1:40000 --continue --accept-multiclient --log -- dev --tick=50 --no-poll --no-discovery -v $(PARAMS)
+
 xgo:
 	xgo -pkg cmd -ldflags="-s -w" -out build/inngest -targets "linux/arm64,linux/amd64,darwin/arm64,darwin/amd64" .
 
@@ -67,20 +72,6 @@ build:
 gql:
 	go run github.com/99designs/gqlgen --verbose --config ./pkg/coreapi/gqlgen.yml
 
-.PHONY: nats-js
-nats-js:
-	nats-server -js -sd ./tmp/nats -m 8222
-
-.PHONY: nats-stream
-nats-stream:
-	nats stream add \
-		--subjects=inngest.run.spans \
-		--description='Trace span delivery pipeline' \
-		--retention=limits \
-		--max-msg-size=10mb \
-		--max-age=7d \
-		--storage=file \
-		--replicas=1 \
-		--discard=old \
-		--defaults \
-		trace
+.PHONY: clean
+clean:
+	rm __debug_bin*
