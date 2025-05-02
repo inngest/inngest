@@ -11,7 +11,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/inngest/inngest/pkg/api/apiv1/apiv1auth"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/run"
@@ -79,7 +78,7 @@ func (a router) traces(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rejectedSpans := a.convertOTLPAndSend(auth, req)
+	rejectedSpans := a.convertOTLPAndSend(req)
 
 	resp := &collecttrace.ExportTraceServiceResponse{}
 	if rejectedSpans > 0 {
@@ -125,10 +124,8 @@ func respondError(w http.ResponseWriter, r *http.Request, code int, msg string) 
 	_, _ = w.Write(data)
 }
 
-func (a router) convertOTLPAndSend(auth apiv1auth.V1Auth, req *collecttrace.ExportTraceServiceRequest) (rejectedSpans int64) {
+func (a router) convertOTLPAndSend(req *collecttrace.ExportTraceServiceRequest) (rejectedSpans int64) {
 	ctx := context.Background()
-
-	rootQueries := make(map[string]*rootQuery)
 
 	for _, rs := range req.ResourceSpans {
 		res := convertResource(rs.Resource)
@@ -147,30 +144,11 @@ func (a router) convertOTLPAndSend(auth apiv1auth.V1Auth, req *collecttrace.Expo
 					continue
 				}
 
-				q, ok := rootQueries[string(s.SpanId)]
-				if !ok {
-					q = &rootQuery{}
-					rootQueries[string(s.SpanId)] = q
-				}
-
-				//
-				// Use sync.Once to ensure that the result is only set once
-				var skipSpan bool
-				q.once.Do(func() {
-					traceRoot, err := a.opts.TraceReader.GetTraceRoot(ctx, cqrs.TraceRunIdentifier{
-						AccountID:   auth.AccountID(),
-						WorkspaceID: auth.WorkspaceID(),
-						TraceID:     tp.TraceID.String(),
-					})
-					if err != nil {
-						rejectedSpans++
-						skipSpan = true
-						return
-					}
-					q.result = traceRoot
-				})
-
-				if skipSpan {
+				runID, err := getInngestRunID(s)
+				if err != nil {
+					// If we can't find the run ID, we can't create a span.
+					// So let's skip it.
+					rejectedSpans++
 					continue
 				}
 
@@ -186,21 +164,11 @@ func (a router) convertOTLPAndSend(auth apiv1auth.V1Auth, req *collecttrace.Expo
 
 				attrs := convertAttributes(s.Attributes)
 
-				// Add built-in inngest attributes to the span (run ID etc)
-				if q.result != nil && q.result.SpanAttributes != nil {
-					for k, v := range q.result.SpanAttributes {
-						if _, ok := copyableAttrs[k]; ok {
-							if _, ok := ignoredAttrs[k]; ok {
-								continue
-							}
-
-							attrs = append(attrs, attribute.KeyValue{
-								Key:   attribute.Key(k),
-								Value: attribute.StringValue(v),
-							})
-						}
-					}
-				}
+				// Add the run ID to attrs so we can query for it later
+				attrs = append(attrs, attribute.KeyValue{
+					Key:   attribute.Key(consts.OtelAttrSDKRunID),
+					Value: attribute.StringValue(runID),
+				})
 
 				// Always mark the span as userland
 				attrs = append(attrs, attribute.KeyValue{
@@ -278,6 +246,18 @@ func getInngestTraceparent(s *tracev1.Span) (*TraceParent, error) {
 	}
 
 	return nil, fmt.Errorf("no traceparent attribute found")
+}
+
+func getInngestRunID(s *tracev1.Span) (string, error) {
+	for _, kv := range s.Attributes {
+		if kv.Key == consts.OtelAttrSDKRunID {
+			// This is the traceparent attribute, so we can use it to get the
+			// trace ID and span ID
+			return kv.GetValue().GetStringValue(), nil
+		}
+	}
+
+	return "", fmt.Errorf("no run ID attribute found")
 }
 
 func convertAttributes(attrs []*commonv1.KeyValue) []attribute.KeyValue {
@@ -368,19 +348,4 @@ func traceStatusCode(code tracev1.Status_StatusCode) codes.Code {
 	default:
 		return codes.Unset
 	}
-}
-
-var ignoredAttrs = map[string]struct{}{
-	consts.OtelSysStepGroupID: {},
-}
-
-var copyableAttrs = map[string]struct{}{
-	consts.OtelSysAccountID:       {},
-	consts.OtelSysWorkspaceID:     {},
-	consts.OtelSysAppID:           {},
-	consts.OtelSysFunctionID:      {},
-	consts.OtelSysFunctionSlug:    {},
-	consts.OtelSysFunctionVersion: {},
-	consts.OtelAttrSDKRunID:       {},
-	consts.OtelSysStepGroupID:     {},
 }
