@@ -12,6 +12,7 @@ import (
 
 	"github.com/inngest/inngest/pkg/api/apiv1/apiv1auth"
 	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/run"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -142,6 +143,7 @@ func (a router) convertOTLPAndSend(auth apiv1auth.V1Auth, req *collecttrace.Expo
 				if err != nil {
 					// If we can't find the run ID, we can't create a span.
 					// So let's skip it.
+					logger.StdlibLogger(ctx).Error("error getting runID on span ingestion, skipping", "error", err)
 					rejectedSpans++
 					continue
 				}
@@ -157,6 +159,16 @@ func (a router) convertOTLPAndSend(auth apiv1auth.V1Auth, req *collecttrace.Expo
 				}
 
 				attrs := convertAttributes(s.Attributes)
+
+				if err := hasRequiredAttributes(s.Attributes, []string{
+					consts.OtelSysAppID,
+					consts.OtelAttrSDKRunID,
+					consts.OtelSysFunctionID,
+				}); err != nil {
+					logger.StdlibLogger(ctx).Error("missing required attributes, skipping ingestion", "error", err)
+					rejectedSpans++
+					continue
+				}
 
 				// Add the run ID to attrs so we can query for it later
 				attrs = append(attrs,
@@ -348,4 +360,25 @@ func traceStatusCode(code tracev1.Status_StatusCode) codes.Code {
 	default:
 		return codes.Unset
 	}
+}
+
+func hasRequiredAttributes(attrs []*commonv1.KeyValue, required []string) error {
+	attrMap := make(map[string]string)
+	for _, attr := range attrs {
+		if val := attr.GetValue().GetStringValue(); val != "" {
+			attrMap[attr.Key] = val
+		}
+	}
+
+	missing := []string{}
+	for _, req := range required {
+		if _, exists := attrMap[req]; !exists {
+			missing = append(missing, req)
+		}
+	}
+
+	if len(missing) > 0 {
+		return fmt.Errorf("missing attributes: %v", missing)
+	}
+	return nil
 }
