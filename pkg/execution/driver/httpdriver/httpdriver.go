@@ -29,6 +29,7 @@ import (
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
 	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/trace"
 )
 
 var (
@@ -100,6 +101,33 @@ func (e executor) Execute(ctx context.Context, sl sv2.StateLoader, s sv2.Metadat
 	}
 
 	headers := map[string]string{}
+
+	span := trace.SpanFromContext(ctx)
+	sc := span.SpanContext()
+
+	// Add some items to trace state to ensure that the SDK can parrot them
+	// back to us for userland spans.
+	//
+	// After a tracing refactor, this will no longer be required to send to
+	// SDKs because they will not need to parrot back any data.
+	ts, err := sc.TraceState().Insert("inngest@app", s.ID.Tenant.AppID.String())
+	if err != nil {
+		// Not a failure; only userland spans suffer, so log and ignore
+	}
+
+	ts, err = ts.Insert("inngest@fn", s.ID.FunctionID.String())
+	if err != nil {
+		// Not a failure; only userland spans suffer, so log and ignore
+	}
+
+	sc = trace.NewSpanContext(trace.SpanContextConfig{
+		TraceID:    sc.TraceID(),
+		SpanID:     sc.SpanID(),
+		TraceFlags: sc.TraceFlags(),
+		TraceState: ts,
+		Remote:     sc.IsRemote(),
+	})
+	ctx = trace.ContextWithSpanContext(ctx, sc)
 	itrace.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(headers))
 	if headers["traceparent"] != "" {
 		// The span ID will be incorrect here as lifecycles can not affec the
