@@ -113,11 +113,17 @@ func (e executor) Execute(ctx context.Context, sl sv2.StateLoader, s sv2.Metadat
 	ts, err := sc.TraceState().Insert("inngest@app", s.ID.Tenant.AppID.String())
 	if err != nil {
 		// Not a failure; only userland spans suffer, so log and ignore
+		log.From(ctx).Warn().
+			Str("run_id", s.ID.RunID.String()).
+			Msg("failed to add app ID to trace state")
 	}
 
 	ts, err = ts.Insert("inngest@fn", s.ID.FunctionID.String())
 	if err != nil {
 		// Not a failure; only userland spans suffer, so log and ignore
+		log.From(ctx).Warn().
+			Str("run_id", s.ID.RunID.String()).
+			Msg("failed to add function ID to trace state")
 	}
 
 	sc = trace.NewSpanContext(trace.SpanContextConfig{
