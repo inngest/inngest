@@ -39,7 +39,7 @@ type Block struct {
 	// ID is the block ID.  The timestamp encodes the timestamp of the latest
 	// pause in the block at the time of block creation.
 	ID ulid.ULID
-	// Index is the index for this block, eg. the workspac and event name.
+	// Index is the index for this block, eg. the workspace and event name.
 	Index Index
 	// Pauses is the slice of pauses in this block, in order of earliest -> latest.
 	Pauses []*state.Pause
