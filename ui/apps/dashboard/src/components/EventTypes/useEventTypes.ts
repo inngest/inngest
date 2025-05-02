@@ -1,20 +1,37 @@
 import { useCallback } from 'react';
+import { getTimestampDaysAgo } from '@inngest/components/utils/date';
 import { useClient } from 'urql';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { graphql } from '@/gql';
 
 const query = graphql(`
-  query GetNewEventTypes($envID: ID!) {
+  query GetEventTypesV2($envID: ID!, $cursor: String, $archived: Boolean, $nameSearch: String) {
     environment: workspace(id: $envID) {
-      events @paginated(perPage: 50) {
-        data {
-          name
-          functions: workflows {
-            id
-            slug
+      eventTypesV2(
+        after: $cursor
+        first: 30
+        filter: { archived: $archived, nameSearch: $nameSearch }
+      ) {
+        edges {
+          node {
             name
+            functions {
+              edges {
+                node {
+                  id
+                  slug
+                  name
+                }
+              }
+            }
           }
+        }
+        pageInfo {
+          hasNextPage
+          endCursor
+          hasPreviousPage
+          startCursor
         }
       }
     }
@@ -23,6 +40,7 @@ const query = graphql(`
 
 type QueryVariables = {
   archived: boolean;
+  nameSearch: string | null;
   cursor: string | null;
 };
 
@@ -30,7 +48,7 @@ export function useEventTypes() {
   const envID = useEnvironment().id;
   const client = useClient();
   return useCallback(
-    async ({ cursor, archived }: QueryVariables) => {
+    async ({ cursor, archived, nameSearch }: QueryVariables) => {
       const result = await client
         .query(
           query,
@@ -38,6 +56,7 @@ export function useEventTypes() {
             envID,
             archived,
             cursor,
+            nameSearch,
           },
           { requestPolicy: 'network-only' }
         )
@@ -51,24 +70,16 @@ export function useEventTypes() {
         throw new Error('no data returned');
       }
 
-      const eventTypesData = result.data.environment.events.data;
-      const events = eventTypesData.map((event) => {
-        return {
-          // TODO: fetch archived
-          archived: false,
-          ...event,
-        };
-      });
+      const eventTypesData = result.data.environment.eventTypesV2;
+      const events = eventTypesData.edges.map(({ node }) => ({
+        name: node.name,
+        functions: node.functions.edges.map((f) => f.node),
+        archived,
+      }));
 
       return {
-        events: events,
-        // TODO: add pagination to API
-        pageInfo: {
-          hasNextPage: false,
-          hasPreviousPage: false,
-          endCursor: null,
-          startCursor: null,
-        },
+        events,
+        pageInfo: eventTypesData.pageInfo,
       };
     },
     [client, envID]
@@ -76,21 +87,18 @@ export function useEventTypes() {
 }
 
 type VolumeQueryVariables = {
-  archived: boolean;
-  cursor: string | null;
+  eventName: string;
 };
 
 const volumeQuery = graphql(`
-  query GetNewEventTypesVolume($envID: ID!) {
+  query GetEventTypeVolumeV2($envID: ID!, $eventName: String!, $startTime: Time!, $endTime: Time!) {
     environment: workspace(id: $envID) {
-      events @paginated(perPage: 50) {
-        data {
-          name
-          dailyVolume: usage(opts: { period: "hour", range: "day" }) {
-            total
-            data {
-              count
-            }
+      eventType(name: $eventName) {
+        name
+        usage(opts: { period: hour, from: $startTime, to: $endTime }) {
+          total
+          data {
+            count
           }
         }
       }
@@ -98,19 +106,22 @@ const volumeQuery = graphql(`
   }
 `);
 
-export function useEventTypesVolume() {
+export function useEventTypeVolume() {
   const envID = useEnvironment().id;
   const client = useClient();
 
   return useCallback(
-    async ({ cursor, archived }: VolumeQueryVariables) => {
+    async ({ eventName }: VolumeQueryVariables) => {
+      const startTime = getTimestampDaysAgo({ currentDate: new Date(), days: 1 }).toISOString();
+      const endTime = new Date().toISOString();
       const result = await client
         .query(
           volumeQuery,
           {
             envID,
-            archived,
-            cursor,
+            eventName,
+            startTime,
+            endTime,
           },
           { requestPolicy: 'network-only' }
         )
@@ -124,29 +135,17 @@ export function useEventTypesVolume() {
         throw new Error('no data returned');
       }
 
-      const eventTypes = result.data.environment.events.data;
+      const eventType = result.data.environment.eventType;
 
-      const events = eventTypes.map((event) => {
-        const dailyVolumeSlots = event.dailyVolume.data.map((slot) => ({
-          startCount: slot.count,
-        }));
-
-        return {
-          name: event.name,
-          volume: {
-            totalVolume: event.dailyVolume.total,
-            dailyVolumeSlots: dailyVolumeSlots,
-          },
-        };
-      });
+      const dailyVolumeSlots = eventType.usage.data.map((slot) => ({
+        startCount: slot.count,
+      }));
 
       return {
-        events,
-        pageInfo: {
-          hasNextPage: false, // TODO: Update when pagination is supported
-          hasPreviousPage: false,
-          endCursor: null,
-          startCursor: null,
+        name: eventType.name,
+        volume: {
+          totalVolume: eventType.usage.total,
+          dailyVolumeSlots,
         },
       };
     },

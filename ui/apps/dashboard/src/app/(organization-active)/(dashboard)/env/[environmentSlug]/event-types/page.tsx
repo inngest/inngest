@@ -10,7 +10,7 @@ import { RiExternalLinkLine, RiRefreshLine } from '@remixicon/react';
 
 import { ActionsMenu } from '@/components/EventTypes/ActionsMenu';
 import { EventTypesInfo } from '@/components/EventTypes/EventTypesInfo';
-import { useEventTypes, useEventTypesVolume } from '@/components/EventTypes/useEventTypes';
+import { useEventTypeVolume, useEventTypes } from '@/components/EventTypes/useEventTypes';
 import SendEventButton from '@/components/Events/SendEventButton';
 import { pathCreator } from '@/utils/urls';
 
@@ -31,7 +31,7 @@ export default function EventTypesPage({
     };
   }, [envSlug]);
   const getEventTypes = useEventTypes();
-  const getEventTypesVolume = useEventTypesVolume();
+  const getEventTypeVolume = useEventTypeVolume();
 
   return (
     <>
@@ -48,7 +48,7 @@ export default function EventTypesPage({
       <EventTypesTable
         pathCreator={internalPathCreator}
         getEventTypes={getEventTypes}
-        getEventTypesVolume={getEventTypesVolume}
+        getEventTypeVolume={getEventTypeVolume}
         eventTypeActions={(props) => <ActionsMenu {...props} />}
         emptyActions={
           <>

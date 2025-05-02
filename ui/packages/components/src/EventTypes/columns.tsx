@@ -5,7 +5,9 @@ import { type EventType } from '@inngest/components/types/eventType';
 import { cn } from '@inngest/components/utils/classNames';
 import { createColumnHelper, type Row } from '@tanstack/react-table';
 
+import { Skeleton } from '../Skeleton';
 import type { EventTypesTable } from './EventTypesTable';
+import { useEventTypeVolume } from './useEventTypeVolume';
 
 const columnHelper = createColumnHelper<EventType>();
 
@@ -23,9 +25,11 @@ function ensureColumnID(id: ColumnID): ColumnID {
 export function useColumns({
   pathCreator,
   eventTypeActions,
+  getEventTypeVolume,
 }: {
   pathCreator: React.ComponentProps<typeof EventTypesTable>['pathCreator'];
   eventTypeActions: React.ComponentProps<typeof EventTypesTable>['eventTypeActions'];
+  getEventTypeVolume: React.ComponentProps<typeof EventTypesTable>['getEventTypeVolume'];
 }) {
   const columns = [
     columnHelper.accessor('name', {
@@ -47,7 +51,8 @@ export function useColumns({
       },
       header: 'Event name',
       maxSize: 400,
-      enableSorting: true,
+      // TODO: Re-enable this when API supports sorting by event name
+      enableSorting: false,
       id: ensureColumnID('name'),
     }),
     columnHelper.accessor('functions', {
@@ -83,18 +88,22 @@ export function useColumns({
     }),
     columnHelper.accessor('volume', {
       cell: (info) => {
-        const volume = info.getValue();
+        const name = info.row.original.name;
+        const { data, isLoading } = useEventTypeVolume(name, getEventTypeVolume);
+
+        if (isLoading) return <Skeleton className="my-4 block h-3 w-48" />;
+        if (!data || !data.volume) return <TextCell>—</TextCell>;
 
         return (
           <div className="flex items-center">
             <div className="w-16">
               <NumberCell
-                value={volume.totalVolume}
-                term={volume.totalVolume === 1 ? 'event' : 'events'}
+                value={data.volume.totalVolume}
+                term={data.volume.totalVolume === 1 ? 'event' : 'events'}
               />
             </div>
             <div className="hidden md:block">
-              <MiniStackedBarChart data={volume.dailyVolumeSlots} />
+              <MiniStackedBarChart data={data.volume.dailyVolumeSlots} />
             </div>
           </div>
         );
