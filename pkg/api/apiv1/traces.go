@@ -8,12 +8,10 @@ import (
 	"io"
 	"net/http"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/inngest/inngest/pkg/api/apiv1/apiv1auth"
 	"github.com/inngest/inngest/pkg/consts"
-	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/run"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -35,11 +33,6 @@ type TraceParent struct {
 }
 
 type TraceRoot struct{}
-
-type rootQuery struct {
-	once   sync.Once
-	result *cqrs.Span
-}
 
 func (a router) traces(w http.ResponseWriter, r *http.Request) {
 	// Auth the app
