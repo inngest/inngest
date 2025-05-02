@@ -138,7 +138,7 @@ func (a router) convertOTLPAndSend(auth apiv1auth.V1Auth, req *collecttrace.Expo
 					continue
 				}
 
-				runID, err := getInngestRunID(s)
+				_, err = getInngestRunID(s)
 				if err != nil {
 					// If we can't find the run ID, we can't create a span.
 					// So let's skip it.
@@ -159,20 +159,16 @@ func (a router) convertOTLPAndSend(auth apiv1auth.V1Auth, req *collecttrace.Expo
 				attrs := convertAttributes(s.Attributes)
 
 				// Add the run ID to attrs so we can query for it later
-				attrs = append(attrs, attribute.KeyValue{
-					Key:   attribute.Key(consts.OtelAttrSDKRunID),
-					Value: attribute.StringValue(runID),
-				})
-
-				attrs = append(attrs, attribute.KeyValue{
-					Key:   attribute.Key(consts.OtelSysAccountID),
-					Value: attribute.StringValue(auth.AccountID().String()),
-				})
-
-				attrs = append(attrs, attribute.KeyValue{
-					Key:   attribute.Key(consts.OtelSysWorkspaceID),
-					Value: attribute.StringValue(auth.WorkspaceID().String()),
-				})
+				attrs = append(attrs,
+					attribute.KeyValue{
+						Key:   attribute.Key(consts.OtelSysAccountID),
+						Value: attribute.StringValue(auth.AccountID().String()),
+					},
+					attribute.KeyValue{
+						Key:   attribute.Key(consts.OtelSysWorkspaceID),
+						Value: attribute.StringValue(auth.WorkspaceID().String()),
+					},
+				)
 
 				// Always mark the span as userland
 				attrs = append(attrs, attribute.KeyValue{
