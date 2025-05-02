@@ -4,7 +4,7 @@ export type EventType = {
   name: string;
   archived: boolean;
   functions: any[];
-  volume: {
+  volume?: {
     totalVolume: number;
     dailyVolumeSlots: {
       startCount: number;

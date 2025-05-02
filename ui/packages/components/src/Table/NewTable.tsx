@@ -123,8 +123,11 @@ export default function Table<T>({
                     {header.isPlaceholder ? null : (
                       <div
                         className={cn(
-                          header.column.getCanSort() &&
-                            'flex cursor-pointer select-none items-center gap-1'
+                          header.column.getCanSort()
+                            ? 'flex cursor-pointer select-none items-center gap-1'
+                            : header.column.getIsSorted()
+                            ? 'flex items-center gap-1'
+                            : ''
                         )}
                         onClick={header.column.getToggleSortingHandler()}
                       >
