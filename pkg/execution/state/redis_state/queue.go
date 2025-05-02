@@ -2939,6 +2939,58 @@ func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueSha
 	}
 }
 
+func (q *queue) BacklogPrepareNormalize(ctx context.Context, b *QueueBacklog, sp *QueueShadowPartition) error {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "BacklogPrepareNormalize"), redis_telemetry.ScopeQueue)
+
+	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
+		return fmt.Errorf("unsupported queue shard kind for BacklogPrepareNormalize: %s", q.primaryQueueShard.Kind)
+	}
+
+	accountID := uuid.Nil
+	if sp.AccountID != nil {
+		accountID = *sp.AccountID
+	}
+
+	keys := []string{
+		q.primaryQueueShard.RedisClient.kg.BacklogSet(b.BacklogID),
+		q.primaryQueueShard.RedisClient.kg.ShadowPartitionSet(sp.PartitionID),
+		q.primaryQueueShard.RedisClient.kg.GlobalShadowPartitionSet(),
+		q.primaryQueueShard.RedisClient.kg.GlobalAccountShadowPartitions(),
+		q.primaryQueueShard.RedisClient.kg.AccountShadowPartitions(accountID),
+
+		q.primaryQueueShard.RedisClient.kg.GlobalAccountNormalizeSet(),
+		q.primaryQueueShard.RedisClient.kg.AccountNormalizeSet(accountID),
+		q.primaryQueueShard.RedisClient.kg.PartitionNormalizeSet(sp.PartitionID),
+	}
+	args, err := StrSlice([]any{
+		b.BacklogID,
+		sp.PartitionID,
+		accountID,
+		// order normalize by timestamp
+		q.clock.Now().Unix(),
+	})
+	if err != nil {
+		return fmt.Errorf("could not serialize args: %w", err)
+	}
+
+	status, err := scripts["queue/backlogPrepareNormalize"].Exec(
+		redis_telemetry.WithScriptName(ctx, "backlogPrepareNormalize"),
+		q.primaryQueueShard.RedisClient.unshardedRc,
+		keys,
+		args,
+	).ToInt64()
+	if err != nil {
+		return fmt.Errorf("error preparing backlog normalization: %w", err)
+	}
+
+	switch status {
+	case 0:
+		return nil
+	default:
+		return fmt.Errorf("unknown status preparing backlog normalization: %v (%T)", status, status)
+	}
+}
+
 func (q *queue) ShadowPartitionPeek(ctx context.Context, sp *QueueShadowPartition, until time.Time, limit int64) ([]*QueueBacklog, int, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "ShadowPartitionPeek"), redis_telemetry.ScopeQueue)
 

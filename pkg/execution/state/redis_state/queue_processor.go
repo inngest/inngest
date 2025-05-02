@@ -588,11 +588,13 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 
 	// Sequentially refill backlogs
 	for _, backlog := range backlogs {
-		// TODO if backlog is for concurrency/throttle key and does not match the current shadow partition, move items to proper backlog
-
-		// May need to normalize
+		// May need to normalize - this will not happen for default backlogs
 		if backlog.isOutdated(shadowPart) {
-			// TODO Normalize
+			// Prepare normalization
+			err := q.BacklogPrepareNormalize(ctx, backlog, shadowPart)
+			if err != nil {
+				return fmt.Errorf("could not prepare backlog for normalization: %w", err)
+			}
 		}
 
 		status, _, err := q.BacklogRefill(ctx, backlog, shadowPart)

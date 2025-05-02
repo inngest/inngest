@@ -7117,6 +7117,90 @@ func TestQueueRefillBacklog(t *testing.T) {
 	})
 }
 
+func TestQueueBacklogPrepareNormalize(t *testing.T) {
+	r := miniredis.RunT(t)
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	clock := clockwork.NewFakeClock()
+
+	defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+	kg := defaultShard.RedisClient.kg
+
+	q := NewQueue(
+		defaultShard,
+		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+			return true
+		}),
+		WithAllowSystemKeyQueues(func(ctx context.Context) bool {
+			return true
+		}),
+		WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
+			return false
+		}),
+		WithDisableSystemQueueLeaseChecks(func(ctx context.Context) bool {
+			return false
+		}),
+		WithClock(clock),
+	)
+	ctx := context.Background()
+
+	accountId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
+
+	// use future timestamp because scores will be bounded to the present
+	at := clock.Now().Add(1 * time.Minute)
+
+	require.Len(t, r.Keys(), 0)
+
+	item := osqueue.QueueItem{
+		ID:          "test",
+		FunctionID:  fnID,
+		WorkspaceID: wsID,
+		Data: osqueue.Item{
+			WorkspaceID: wsID,
+			Kind:        osqueue.KindEdge,
+			Identifier: state.Identifier{
+				WorkflowID:  fnID,
+				AccountID:   accountId,
+				WorkspaceID: wsID,
+			},
+			QueueName:             nil,
+			Throttle:              nil,
+			CustomConcurrencyKeys: nil,
+		},
+		QueueName: nil,
+	}
+
+	_, err = q.EnqueueItem(ctx, defaultShard, item, at, osqueue.EnqueueOpts{})
+	require.NoError(t, err)
+
+	expectedBacklog := q.ItemBacklog(ctx, item)
+	require.NotEmpty(t, expectedBacklog.BacklogID)
+
+	shadowPartition := q.ItemShadowPartition(ctx, item)
+	require.NotEmpty(t, shadowPartition.PartitionID)
+
+	t.Run("should move backlog to normalization set", func(t *testing.T) {
+		err := q.BacklogPrepareNormalize(ctx, &expectedBacklog, &shadowPartition)
+		require.NoError(t, err)
+
+		require.True(t, hasMember(t, r, kg.GlobalAccountNormalizeSet(), accountId.String()))
+		require.True(t, hasMember(t, r, kg.AccountNormalizeSet(accountId), fnID.String()))
+		require.True(t, hasMember(t, r, kg.PartitionNormalizeSet(fnID.String()), expectedBacklog.BacklogID))
+
+		expectedTime := clock.Now().Unix()
+
+		require.Equal(t, expectedTime, int64(score(t, r, kg.GlobalAccountNormalizeSet(), accountId.String())))
+		require.Equal(t, expectedTime, int64(score(t, r, kg.AccountNormalizeSet(accountId), fnID.String())))
+		require.Equal(t, expectedTime, int64(score(t, r, kg.PartitionNormalizeSet(fnID.String()), expectedBacklog.BacklogID)))
+
+	})
+}
+
 func score(t *testing.T, r *miniredis.Miniredis, key string, member string) float64 {
 	require.True(t, r.Exists(key), r.Keys())
 
@@ -7133,6 +7217,8 @@ func hasMember(t *testing.T, r *miniredis.Miniredis, key string, member string) 
 
 	members, err := r.ZMembers(key)
 	require.NoError(t, err)
+
+	require.Contains(t, members, member, members)
 
 	for _, s := range members {
 		if s == member {
