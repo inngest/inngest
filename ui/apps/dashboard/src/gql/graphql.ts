@@ -53,7 +53,6 @@ export type Account = {
   billingEmail: Scalars['String'];
   createdAt: Scalars['Time'];
   datadogConnections: Array<DatadogConnectionStatus>;
-  datadogIntegrations: Array<DatadogIntegration>;
   datadogOrganizations: Array<DatadogOrganization>;
   entitlementUsage: EntitlementUsage;
   entitlements: Entitlements;
@@ -469,35 +468,6 @@ export type DatadogConnectionStatus = {
   lastSentAt: Maybe<Scalars['Time']>;
   orgID: Scalars['UUID'];
   orgName: Scalars['String'];
-};
-
-export type DatadogIntegration = {
-  __typename?: 'DatadogIntegration';
-  accountID: Scalars['UUID'];
-  apiKey: Scalars['String'];
-  apiKeyUpdatedAt: Scalars['Time'];
-  appKey: Scalars['String'];
-  appKeyUpdatedAt: Scalars['Time'];
-  createdAt: Scalars['Time'];
-  datadogSite: Scalars['String'];
-  envID: Scalars['UUID'];
-  error: Maybe<Scalars['String']>;
-  id: Scalars['UUID'];
-  lastSentAt: Maybe<Scalars['Time']>;
-  statusOk: Scalars['Boolean'];
-  updatedAt: Maybe<Scalars['Time']>;
-};
-
-export type DatadogIntegrationRemoveResponse = {
-  __typename?: 'DatadogIntegrationRemoveResponse';
-  removedIntegrationEnvID: Scalars['UUID'];
-  removedIntegrationID: Scalars['UUID'];
-};
-
-export type DatadogIntegrationSetupResponse = {
-  __typename?: 'DatadogIntegrationSetupResponse';
-  error: Maybe<Scalars['String']>;
-  integration: Maybe<DatadogIntegration>;
 };
 
 export type DatadogOrganization = {
@@ -1023,7 +993,6 @@ export type Mutation = {
   enableEnvironmentAutoArchive: Workspace;
   invokeFunction: Maybe<Scalars['Boolean']>;
   pauseFunction: Workflow;
-  removeDatadogIntegration: Maybe<DatadogIntegrationRemoveResponse>;
   removeDatadogOrganization: Scalars['UUID'];
   removeVercelApp: Maybe<RemoveVercelAppResponse>;
   rerun: Scalars['ULID'];
@@ -1032,7 +1001,6 @@ export type Mutation = {
   rotateSigningKey: SigningKey;
   setAccountEntitlement: Scalars['UUID'];
   setUpAccount: Maybe<SetUpAccountPayload>;
-  setupDatadogIntegration: Maybe<DatadogIntegrationSetupResponse>;
   syncNewApp: SyncResponse;
   unarchiveApp: App;
   unarchiveEnvironment: Workspace;
@@ -1220,11 +1188,6 @@ export type MutationPauseFunctionArgs = {
 };
 
 
-export type MutationRemoveDatadogIntegrationArgs = {
-  integrationID: Scalars['UUID'];
-};
-
-
 export type MutationRemoveDatadogOrganizationArgs = {
   organizationID: Scalars['UUID'];
 };
@@ -1263,15 +1226,6 @@ export type MutationSetAccountEntitlementArgs = {
   entitlementName: Scalars['String'];
   overrideStrategy: Scalars['String'];
   value: Scalars['Int'];
-};
-
-
-export type MutationSetupDatadogIntegrationArgs = {
-  apiKey: Scalars['String'];
-  appKey: Scalars['String'];
-  datadogSite: Scalars['String'];
-  envID: Scalars['UUID'];
-  testsOnlySkipApiKeyCheck: InputMaybe<Scalars['Boolean']>;
 };
 
 
@@ -2229,7 +2183,6 @@ export type Workspace = {
   archivedEvent: Maybe<ArchivedEvent>;
   cdcConnections: Array<CdcConnection>;
   createdAt: Scalars['Time'];
-  datadogIntegration: Maybe<DatadogIntegration>;
   event: Maybe<Event>;
   eventByNames: Array<EventType>;
   eventSearch: EventSearchConnection;
