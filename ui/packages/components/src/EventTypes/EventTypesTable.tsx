@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@inngest/components/Button/Button';
 import TableBlankState from '@inngest/components/EventTypes/TableBlankState';
 import { Search } from '@inngest/components/Forms/Search';
+import { ErrorCard } from '@inngest/components/RunDetailsV2/ErrorCard';
 import NewTable from '@inngest/components/Table/NewTable';
 import useDebounce from '@inngest/components/hooks/useDebounce';
 import {
@@ -82,9 +83,9 @@ export function EventTypesTable({
   const onStatusFilterChange = useCallback(
     (value: boolean) => {
       if (value) {
-        setFilteredStatus('true'); // Set query param when archived is true
+        setFilteredStatus('true');
       } else {
-        removeFilteredStatus(); // Remove query param when archived is false
+        removeFilteredStatus();
       }
     },
     [setFilteredStatus, removeFilteredStatus]
@@ -97,7 +98,8 @@ export function EventTypesTable({
     hasNextPage,
     data: eventTypesData,
     isFetching,
-    isFetchingNextPage, // refetching
+    refetch,
+    isFetchingNextPage,
   } = useInfiniteQuery({
     queryKey: ['event-types', { orderBy, archived, nameSearch }],
     queryFn: ({ pageParam }: { pageParam: string | null }) =>
@@ -176,6 +178,9 @@ export function EventTypesTable({
     },
     [containerRef.current]
   );
+  if (error) {
+    return <ErrorCard error={error} reset={() => refetch()} />;
+  }
 
   return (
     <div className="bg-canvasBase text-basis no-scrollbar flex-1 overflow-hidden focus-visible:outline-none">
@@ -218,7 +223,7 @@ export function EventTypesTable({
           }
           onRowClick={(row) => router.push(pathCreator.eventType({ eventName: row.original.name }))}
         />
-        {!hasNextPage && hasEventTypesData && isScrollable && (
+        {!hasNextPage && hasEventTypesData && isScrollable && !isFetchingNextPage && (
           <div className="flex flex-col items-center pt-8">
             <p className="text-muted text-sm">No additional event types found.</p>
             <Button
@@ -227,6 +232,11 @@ export function EventTypesTable({
               appearance="ghost"
               onClick={() => scrollToTop(true)}
             />
+          </div>
+        )}
+        {isFetchingNextPage && (
+          <div className="flex flex-col items-center">
+            <Button appearance="outlined" label="loading" loading={true} />
           </div>
         )}
       </div>

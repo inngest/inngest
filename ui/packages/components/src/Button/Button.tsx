@@ -137,7 +137,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         className={cn(
           buttonColors,
           buttonSizes,
-          'flex items-center justify-center whitespace-nowrap rounded-md disabled:cursor-not-allowed',
+          'relative flex items-center justify-center whitespace-nowrap rounded-md disabled:cursor-not-allowed',
           className
         )}
         type={type}
