@@ -973,12 +973,12 @@ func (b BacklogConcurrencyKey) concurrencyKey(kg QueueKeyGenerator) string {
 }
 
 // concurrencyKey returns the key to the "active" ZSET for key queue v2 concurrency accounting.
-func (q QueueBacklog) concurrencyKey(kg QueueKeyGenerator, n int) string {
-	if n < 0 || n > len(q.ConcurrencyKeys) {
+func (b QueueBacklog) concurrencyKey(kg QueueKeyGenerator, n int) string {
+	if n < 0 || n > len(b.ConcurrencyKeys) {
 		return kg.Concurrency("", "")
 	}
 
-	key := q.ConcurrencyKeys[n-1]
+	key := b.ConcurrencyKeys[n-1]
 	return key.concurrencyKey(kg)
 }
 
@@ -994,7 +994,7 @@ func (q QueueShadowPartition) ConcurrencyKey(kg QueueKeyGenerator, b *QueueBackl
 
 	backlogKey := b.ConcurrencyKeys[n-1]
 
-	shadowPartitionKey, ok := q.CustomConcurrencyKeys[backlogKey.ConcurrencyKey]
+	shadowPartitionKey, ok := q.CustomConcurrencyKeys[concurrencyKeyID(backlogKey.ConcurrencyScope, backlogKey.ConcurrencyKey)]
 	if !ok {
 		return kg.Concurrency("", ""), 0
 	}
@@ -2855,8 +2855,8 @@ func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueSha
 		throttleKey                                  string
 		throttleLimit, throttleBurst, throttlePeriod int
 	)
-	if sp.Throttle != nil {
-		throttleKey = sp.Throttle.Key
+	if sp.Throttle != nil && b.Throttle != nil {
+		throttleKey = b.Throttle.ThrottleKey
 		throttleLimit = sp.Throttle.Limit
 		throttleBurst = sp.Throttle.Burst
 		throttlePeriod = sp.Throttle.Period

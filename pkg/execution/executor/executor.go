@@ -561,19 +561,23 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	if req.Function.Throttle != nil {
 		unhashedThrottleKey := req.Function.ID.String()
 		throttleKey := queue.HashID(ctx, unhashedThrottleKey)
+		hashedThrottleExpr := ""
 		if req.Function.Throttle.Key != nil {
 			val, _, _ := expressions.Evaluate(ctx, *req.Function.Throttle.Key, map[string]any{
 				"event": evtMap,
 			})
 			unhashedThrottleKey = fmt.Sprintf("%v", val)
 			throttleKey = throttleKey + "-" + queue.HashID(ctx, unhashedThrottleKey)
+			hashedThrottleExpr = util.XXHash(*req.Function.Throttle.Key)
 		}
+
 		throttle = &queue.Throttle{
 			Key:                 throttleKey,
 			Limit:               int(req.Function.Throttle.Limit),
 			Burst:               int(req.Function.Throttle.Burst),
 			Period:              int(req.Function.Throttle.Period.Seconds()),
 			UnhashedThrottleKey: unhashedThrottleKey,
+			KeyExpressionHash:   hashedThrottleExpr,
 		}
 	}
 

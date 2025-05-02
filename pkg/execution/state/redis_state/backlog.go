@@ -17,6 +17,18 @@ type CustomConcurrencyLimit struct {
 	Limit int                    `json:"l"`
 }
 
+type ShadowPartitionThrottle struct {
+	// ThrottleKeyExpressionHash is the hashed throttle key expression, if set.
+	ThrottleKeyExpressionHash string `json:"tkh,omitempty"`
+
+	// Limit is the actual rate limit
+	Limit int `json:"l"`
+	// Burst is the busrsable capacity of the rate limit
+	Burst int `json:"b"`
+	// Period is the rate limit period, in seconds
+	Period int `json:"p"`
+}
+
 type QueueShadowPartition struct {
 	// PartitionID is the function ID or system queue name. The shadow partition
 	// ID is the same as the partition ID used across the queue.
@@ -46,7 +58,7 @@ type QueueShadowPartition struct {
 	CustomConcurrencyKeys map[string]CustomConcurrencyLimit `json:"cck,omitempty"`
 
 	// Throttle configuration, optionally specifying key. If no key is set, the throttle value will be the function ID.
-	Throttle *osqueue.Throttle `json:"t,omitempty"`
+	Throttle *ShadowPartitionThrottle `json:"t,omitempty"`
 
 	// Flag to pause refilling to the ready queue.
 	PauseRefill bool `json:"norefill,omitempty"`
@@ -76,6 +88,18 @@ type BacklogConcurrencyKey struct {
 	ConcurrencyKeyUnhashedValue string `json:"ckuv,omitempty"`
 }
 
+type BacklogThrottle struct {
+	// ThrottleKey is the hashed evaluated throttle key (e.g. hash("customer1")) or function ID (e.g. hash(fnID))
+	ThrottleKey string `json:"tk,omitempty"`
+
+	// ThrottleKeyRawValue is the unhashed evaluated throttle key (e.g. "customer1") or function ID.
+	// This may be truncated for long values and may only be used for observability and debugging.
+	ThrottleKeyRawValue string `json:"tkv,omitempty"`
+
+	// ThrottleKeyExpressionHash is the hashed throttle key expression, if set.
+	ThrottleKeyExpressionHash string `json:"tkh,omitempty"`
+}
+
 type QueueBacklog struct {
 	BacklogID         string `json:"id,omitempty"`
 	ShadowPartitionID string `json:"sid,omitempty"`
@@ -84,13 +108,7 @@ type QueueBacklog struct {
 	ConcurrencyKeys []BacklogConcurrencyKey `json:"ck,omitempty"`
 
 	// Set for backlogs containing start items only for a given throttle configuration
-
-	// ThrottleKey is the hashed evaluated throttle key (e.g. hash("customer1")) or function ID (e.g. hash(fnID))
-	ThrottleKey *string `json:"tk,omitempty"`
-
-	// ThrottleKeyRawValue is the unhashed evaluated throttle key (e.g. "customer1") or function ID.
-	// This may be truncated for long values and may only be used for observability and debugging.
-	ThrottleKeyRawValue *string `json:"tkv,omitempty"`
+	Throttle *BacklogThrottle
 }
 
 func (q *queue) ItemBacklog(ctx context.Context, i osqueue.QueueItem) QueueBacklog {
@@ -124,7 +142,11 @@ func (q *queue) ItemBacklog(ctx context.Context, i osqueue.QueueItem) QueueBackl
 	if i.Data.Throttle != nil && i.Data.Kind == osqueue.KindStart {
 		// This is always specified, even if no key was configured in the function definition.
 		// In that case, the Throttle Key is the hashed function ID. See Schedule() for more details.
-		b.ThrottleKey = &i.Data.Throttle.Key
+		b.Throttle = &BacklogThrottle{
+			ThrottleKey:               i.Data.Throttle.Key,
+			ThrottleKeyExpressionHash: i.Data.Throttle.KeyExpressionHash,
+		}
+
 		b.BacklogID += fmt.Sprintf(":t<%s>", i.Data.Throttle.Key)
 
 		if i.Data.Throttle.UnhashedThrottleKey != "" {
@@ -133,7 +155,7 @@ func (q *queue) ItemBacklog(ctx context.Context, i osqueue.QueueItem) QueueBackl
 			if len(unhashedKey) > 512 {
 				unhashedKey = unhashedKey[:512]
 			}
-			b.ThrottleKeyRawValue = &unhashedKey
+			b.Throttle.ThrottleKeyRawValue = unhashedKey
 		}
 	}
 
@@ -271,12 +293,22 @@ func (q *queue) ItemShadowPartition(ctx context.Context, i osqueue.QueueItem) Qu
 		for _, key := range ckeys {
 			scope, _, _, _ := key.ParseKey()
 
-			customConcurrencyKeyLimits[key.Hash] = CustomConcurrencyLimit{
+			customConcurrencyKeyLimits[concurrencyKeyID(scope, key.Hash)] = CustomConcurrencyLimit{
 				Scope: scope,
 				// Key is required to look up the respective limit when checking constraints for a given backlog.
 				Key:   key.Hash, // hash(event.data.customerId)
 				Limit: key.Limit,
 			}
+		}
+	}
+
+	var throttle *ShadowPartitionThrottle
+	if i.Data.Throttle != nil {
+		throttle = &ShadowPartitionThrottle{
+			ThrottleKeyExpressionHash: i.Data.Throttle.KeyExpressionHash,
+			Limit:                     i.Data.Throttle.Limit,
+			Burst:                     i.Data.Throttle.Burst,
+			Period:                    i.Data.Throttle.Period,
 		}
 	}
 
@@ -292,6 +324,60 @@ func (q *queue) ItemShadowPartition(ctx context.Context, i osqueue.QueueItem) Qu
 		FunctionConcurrency:   fnPartition.ConcurrencyLimit,
 		AccountConcurrency:    limits.AccountLimit,
 		CustomConcurrencyKeys: customConcurrencyKeyLimits,
-		Throttle:              i.Data.Throttle,
+		Throttle:              throttle,
 	}
+}
+
+func (b QueueBacklog) isDefault() bool {
+	return b.Throttle == nil && len(b.ConcurrencyKeys) == 0
+}
+
+func (b QueueBacklog) isOutdated(sp *QueueShadowPartition) bool {
+	// If this is the default backlog, don't normalize.
+	// If custom concurrency keys were added, previously-enqueued items
+	// in the default backlog do not have custom concurrency keys set.
+	if b.isDefault() {
+		return false
+	}
+
+	// Throttle removed - move items back to default backlog
+	if b.Throttle != nil && sp.Throttle == nil {
+		return true
+	}
+
+	// Throttle key changed - move from old throttle key backlogs to the new throttle key backlogs
+	if b.Throttle != nil && sp.Throttle != nil && b.Throttle.ThrottleKeyExpressionHash != sp.Throttle.ThrottleKeyExpressionHash {
+		return true
+	}
+
+	// Throttle key count does not match
+	if len(b.ConcurrencyKeys) != len(sp.CustomConcurrencyKeys) {
+		return true
+	}
+
+	// All concurrency keys on backlog must be found on partition
+	for _, key := range b.ConcurrencyKeys {
+		_, ok := sp.CustomConcurrencyKeys[concurrencyKeyID(key.ConcurrencyScope, key.ConcurrencyKey)]
+		if !ok {
+			return true
+		}
+	}
+
+	// We don't have to check that all keys on the shadow partition must be found on
+	// the backlog as we've compared the length, so the previous check will account for
+	// missing/different keys.
+
+	return false
+}
+
+func concurrencyKeyID(scope enums.ConcurrencyScope, hash string) string {
+	switch scope {
+	case enums.ConcurrencyScopeFn:
+		return fmt.Sprintf("f:%s", hash)
+	case enums.ConcurrencyScopeEnv:
+		return fmt.Sprintf("e:%s", hash)
+	case enums.ConcurrencyScopeAccount:
+		return fmt.Sprintf("a:%s", hash)
+	}
+	return ""
 }
