@@ -795,7 +795,7 @@ type QueueRunMode struct {
 	// Continuations enables continuations
 	Continuations bool
 
-	// PauseFluster determines whether pauses are flushed from hot storage
+	// PauseFlusher determines whether pauses are flushed from hot storage
 	// to blob store
 	PauseFlusher bool
 
