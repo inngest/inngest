@@ -1,4 +1,3 @@
-import { type Route } from 'next';
 import { useRouter } from 'next/navigation';
 import { Button } from '@inngest/components/Button';
 import { Pill } from '@inngest/components/Pill';

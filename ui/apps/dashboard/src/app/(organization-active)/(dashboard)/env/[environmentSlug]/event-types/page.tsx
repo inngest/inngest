@@ -22,7 +22,7 @@ export default function EventTypesPage({
   params: { environmentSlug: string };
 }) {
   const router = useRouter();
-  const eventSearchEnabled = useBooleanFlag('event-search');
+  const { value: eventSearchEnabled } = useBooleanFlag('event-search');
   const internalPathCreator = useMemo(() => {
     return {
       // The shared component library is environment-agnostic, so it needs a way to
