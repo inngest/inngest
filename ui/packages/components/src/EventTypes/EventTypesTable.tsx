@@ -146,7 +146,7 @@ export function EventTypesTable({
         }
       }
     },
-    [fetchNextPage, hasNextPage, isFetchingNextPage, mergedData]
+    [fetchNextPage, hasNextPage, isFetchingNextPage, hasEventTypesData]
   );
 
   useEffect(() => {
