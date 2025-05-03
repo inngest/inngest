@@ -19,9 +19,9 @@ export default function EventLayout({
   children,
   params: { environmentSlug: envSlug, eventName: eventSlug },
 }: EventLayoutProps) {
-  const eventsPath = `/env/${envSlug}/events`;
-  const logsPath = `/env/${envSlug}/events/${eventSlug}/logs`;
-  const eventPath = `/env/${envSlug}/events/${eventSlug}`;
+  const eventTypesPath = `/env/${envSlug}/event-types`;
+  const eventsPath = `/env/${envSlug}/event-types/${eventSlug}/events`;
+  const eventPath = `/env/${envSlug}/event-types/${eventSlug}`;
   const eventName = decodeURIComponent(eventSlug);
   const [showArchive, setShowArchive] = useState(false);
 
@@ -29,7 +29,7 @@ export default function EventLayout({
     <>
       <Header
         breadcrumb={[
-          { text: 'Events', href: eventsPath },
+          { text: 'Events', href: eventTypesPath },
           { text: eventName, href: eventPath },
         ]}
         tabs={[
@@ -39,8 +39,8 @@ export default function EventLayout({
             exactRouteMatch: true,
           },
           {
-            href: logsPath,
-            children: 'Logs',
+            href: eventsPath,
+            children: 'Events',
           },
         ]}
         action={
