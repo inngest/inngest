@@ -78,7 +78,7 @@ export function EventTypesTable({
     } else {
       setNameSearch(searchInput);
     }
-  }, 400);
+  }, 300);
 
   const onStatusFilterChange = useCallback(
     (value: boolean) => {
