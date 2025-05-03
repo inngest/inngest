@@ -91,7 +91,7 @@ export function useColumns({
         const name = info.row.original.name;
         const { data, isLoading } = useEventTypeVolume(name, getEventTypeVolume);
 
-        if (isLoading) return <Skeleton className="my-4 block h-3 w-48" />;
+        if (isLoading) return <Skeleton className="my-2 block h-3 w-48" />;
         if (!data || !data.volume) return <TextCell>—</TextCell>;
 
         return (
