@@ -50,10 +50,9 @@ export default function EventTypesPage({
         // Delete the tabs prop when we delete event search
         tabs={[
           {
-            children: 'All events',
-            href: `/env/${envSlug}/events`,
+            children: 'All event types',
+            href: pathCreator.eventTypes({ envSlug: envSlug }),
           },
-
           ...(eventSearchEnabled
             ? [
                 {

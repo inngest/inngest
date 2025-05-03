@@ -3,6 +3,7 @@ import { Pill } from '@inngest/components/Pill';
 
 import { EventTypesInfo } from '@/components/EventTypes/EventTypesInfo';
 import { ServerFeatureFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
+import { pathCreator } from '@/utils/urls';
 import { EventSearch } from './EventSearch';
 
 export default async function Page({
@@ -17,8 +18,8 @@ export default async function Page({
         infoIcon={<EventTypesInfo />}
         tabs={[
           {
-            children: 'All events',
-            href: `/env/${envSlug}/events`,
+            children: 'All event types',
+            href: pathCreator.eventTypes({ envSlug: envSlug }),
           },
           {
             children: (

@@ -29,7 +29,7 @@ export default function EventLayout({
     <>
       <Header
         breadcrumb={[
-          { text: 'Events', href: eventTypesPath },
+          { text: 'Event types', href: eventTypesPath },
           { text: eventName, href: eventPath },
         ]}
         tabs={[
