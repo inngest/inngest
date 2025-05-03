@@ -151,6 +151,7 @@ export function EventTypesTable({
 
   const onScroll: UIEventHandler<HTMLDivElement> = useCallback(
     (event) => {
+      console.log('onScroll', event, hasEventTypesData, hasNextPage, isFetchingNextPage);
       if (hasEventTypesData && hasNextPage && !isFetchingNextPage) {
         const { scrollHeight, scrollTop, clientHeight } = event.target as HTMLDivElement;
 
