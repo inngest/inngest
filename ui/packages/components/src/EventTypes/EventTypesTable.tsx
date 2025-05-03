@@ -156,17 +156,7 @@ export function EventTypesTable({
 
         // Check if scrolled to the bottom
         const reachedBottom = scrollHeight - scrollTop - clientHeight < 200;
-        console.log(
-          'onScrollInside',
-          event,
-          hasEventTypesData,
-          hasNextPage,
-          isFetchingNextPage,
-          reachedBottom,
-          isFetching
-        );
         if (reachedBottom && !isFetching) {
-          console.log('enter');
           fetchNextPage();
         }
       }
