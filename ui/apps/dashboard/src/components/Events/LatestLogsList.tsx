@@ -7,6 +7,7 @@ import { useQuery } from 'urql';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { graphql } from '@/gql';
+import { pathCreator } from '@/utils/urls';
 
 const GetLatestEventLogs = graphql(`
   query GetLatestEventLogs($name: String, $environmentID: ID!) {
@@ -55,8 +56,11 @@ export default function LatestLogsList({ environmentSlug, eventName }: LatestLog
         <Button
           appearance="outlined"
           kind="secondary"
-          href={`/env/${environmentSlug}/events/${encodeURIComponent(eventName)}/logs` as Route}
-          label="View all logs"
+          href={`${pathCreator.eventType({
+            envSlug: environmentSlug,
+            eventName: eventName,
+          })}/events`}
+          label="View all events"
         />
       </header>
 
@@ -91,9 +95,11 @@ export default function LatestLogsList({ environmentSlug, eventName }: LatestLog
                       key={e.id}
                       onClick={() =>
                         router.push(
-                          `/env/${environmentSlug}/events/${encodeURIComponent(eventName)}/logs/${
-                            e.id
-                          }`
+                          pathCreator.event({
+                            envSlug: environmentSlug,
+                            eventName: eventName,
+                            eventID: e.id,
+                          })
                         )
                       }
                     >
@@ -105,9 +111,7 @@ export default function LatestLogsList({ environmentSlug, eventName }: LatestLog
                         <IDCell>{e.id}</IDCell>
                       </td>
                       <td>
-                        <Pill appearance="outlined">
-                          {e.source?.name}
-                        </Pill>
+                        <Pill appearance="outlined">{e.source?.name}</Pill>
                       </td>
                     </tr>
                   ))

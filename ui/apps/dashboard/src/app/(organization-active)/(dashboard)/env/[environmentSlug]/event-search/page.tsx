@@ -1,4 +1,7 @@
-import { EventsHeader } from '@/components/Events/EventsHeader';
+import { Header } from '@inngest/components/Header/Header';
+import { Pill } from '@inngest/components/Pill';
+
+import { EventTypesInfo } from '@/components/EventTypes/EventTypesInfo';
 import { ServerFeatureFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
 import { EventSearch } from './EventSearch';
 
@@ -9,7 +12,27 @@ export default async function Page({
 }) {
   return (
     <ServerFeatureFlag flag="event-search">
-      <EventsHeader envSlug={envSlug} eventSearch={true} sendEvents={false} />
+      <Header
+        breadcrumb={[{ text: 'Event Types' }]}
+        infoIcon={<EventTypesInfo />}
+        tabs={[
+          {
+            children: 'All events',
+            href: `/env/${envSlug}/events`,
+          },
+          {
+            children: (
+              <div className="flex flex-row items-center gap-1">
+                <div>Event Search</div>
+                <Pill appearance="outlined" kind="warning">
+                  Experimental
+                </Pill>
+              </div>
+            ),
+            href: `/env/${envSlug}/event-search`,
+          },
+        ]}
+      />
       <div className="bg-canvasBase flex h-full w-full flex-col">
         <EventSearch />
       </div>
