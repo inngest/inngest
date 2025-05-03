@@ -72,12 +72,26 @@ export function EventTypesTable({
     },
   ]);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  const scrollToTop = useCallback(
+    (smooth = false) => {
+      if (containerRef.current) {
+        containerRef.current.scrollTo({
+          top: 0,
+          behavior: smooth ? 'smooth' : 'auto',
+        });
+      }
+    },
+    [containerRef.current]
+  );
+
   const debouncedSearch = useDebounce(() => {
     if (searchInput === '') {
       removeNameSearch();
     } else {
       setNameSearch(searchInput);
     }
+    scrollToTop();
   }, 300);
 
   const onStatusFilterChange = useCallback(
@@ -87,6 +101,7 @@ export function EventTypesTable({
       } else {
         removeFilteredStatus();
       }
+      scrollToTop();
     },
     [setFilteredStatus, removeFilteredStatus]
   );
@@ -167,17 +182,6 @@ export function EventTypesTable({
     }
   }, [sorting, setOrderBy]);
 
-  const scrollToTop = useCallback(
-    (smooth = false) => {
-      if (containerRef.current) {
-        containerRef.current.scrollTo({
-          top: 0,
-          behavior: smooth ? 'smooth' : 'auto',
-        });
-      }
-    },
-    [containerRef.current]
-  );
   if (error) {
     return <ErrorCard error={error} reset={() => refetch()} />;
   }
