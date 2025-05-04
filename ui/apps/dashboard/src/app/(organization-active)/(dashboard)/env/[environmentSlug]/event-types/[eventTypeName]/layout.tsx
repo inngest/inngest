@@ -11,13 +11,13 @@ type EventLayoutProps = {
   children: React.ReactNode;
   params: {
     environmentSlug: string;
-    eventName: string;
+    eventTypeName: string;
   };
 };
 
 export default function EventLayout({
   children,
-  params: { environmentSlug: envSlug, eventName: eventSlug },
+  params: { environmentSlug: envSlug, eventTypeName: eventSlug },
 }: EventLayoutProps) {
   const eventTypesPath = `/env/${envSlug}/event-types`;
   const eventsPath = `/env/${envSlug}/event-types/${eventSlug}/events`;
