@@ -152,12 +152,12 @@ export function EventTypesTable({
 
   const onScroll: UIEventHandler<HTMLDivElement> = useCallback(
     (event) => {
-      if (hasEventTypesData && hasNextPage && !isFetchingNextPage) {
+      if (hasEventTypesData && hasNextPage) {
         const { scrollHeight, scrollTop, clientHeight } = event.target as HTMLDivElement;
 
         // Check if scrolled to the bottom
         const reachedBottom = scrollHeight - scrollTop - clientHeight < 200;
-        if (reachedBottom && !isFetching) {
+        if (reachedBottom && !isFetching && !isFetchingNextPage) {
           fetchNextPage();
         }
       }
