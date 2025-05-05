@@ -8,11 +8,9 @@ import { InngestLogoSmallBW } from '@inngest/components/icons/logos/InngestLogoS
 import { RiContractLeftLine, RiContractRightLine } from '@remixicon/react';
 
 import { QuickSearch } from './QuickSearch/QuickSearch';
-import Search from './Search';
 
 type LogoProps = {
   collapsed: boolean;
-  enableQuickSearchV2: boolean;
   envSlug: string;
   envName: string;
   setCollapsed: (arg: boolean) => void;
@@ -55,13 +53,7 @@ const NavToggle = ({
   );
 };
 
-export default function Logo({
-  collapsed,
-  enableQuickSearchV2,
-  envSlug,
-  envName,
-  setCollapsed,
-}: LogoProps) {
+export default function Logo({ collapsed, envSlug, envName, setCollapsed }: LogoProps) {
   return (
     <div
       className={`${
@@ -80,10 +72,7 @@ export default function Logo({
             </NextLink>
           </>
         )}
-        {enableQuickSearchV2 && (
-          <QuickSearch collapsed={collapsed} envSlug={envSlug} envName={envName} />
-        )}
-        {!enableQuickSearchV2 && <Search collapsed={collapsed} />}
+        <QuickSearch collapsed={collapsed} envSlug={envSlug} envName={envName} />
       </div>
       <NavToggle collapsed={collapsed} setCollapsed={setCollapsed} />
     </div>
