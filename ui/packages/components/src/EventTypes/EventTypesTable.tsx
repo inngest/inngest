@@ -218,7 +218,7 @@ export function EventTypesTable({
         <NewTable
           columns={columns}
           data={mergedData || []}
-          isLoading={isPending || isSearching || isFetching}
+          isLoading={isPending || isSearching || (isFetching && !isFetchingNextPage)}
           // TODO: Re-enable this when API supports sorting by event name
           // sorting={sorting}
           // setSorting={setSorting}
