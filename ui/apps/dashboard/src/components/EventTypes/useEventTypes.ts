@@ -99,6 +99,7 @@ const volumeQuery = graphql(`
           total
           data {
             count
+            slot
           }
         }
       }
@@ -139,6 +140,7 @@ export function useEventTypeVolume() {
 
       const dailyVolumeSlots = eventType.usage.data.map((slot) => ({
         startCount: slot.count,
+        slot: slot.slot,
       }));
 
       return {
