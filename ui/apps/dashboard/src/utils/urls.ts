@@ -61,13 +61,15 @@ export const pathCreator = {
     eventName: string;
     eventID: string;
   }): Route {
-    return `/env/${envSlug}/events/${encodeURIComponent(eventName)}/logs/${eventID}` as Route;
-  },
-  events({ envSlug }: { envSlug: string }): Route {
-    return `/env/${envSlug}/events` as Route;
+    return `/env/${envSlug}/event-types/${encodeURIComponent(
+      eventName
+    )}/events/${eventID}` as Route;
   },
   eventType({ envSlug, eventName }: { envSlug: string; eventName: string }): Route {
-    return `/env/${envSlug}/events/${encodeURIComponent(eventName)}` as Route;
+    return `/env/${envSlug}/event-types/${encodeURIComponent(eventName)}` as Route;
+  },
+  eventTypes({ envSlug }: { envSlug: string }): Route {
+    return `/env/${envSlug}/event-types` as Route;
   },
   envs(): Route {
     return '/env' as Route;

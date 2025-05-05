@@ -15,7 +15,7 @@ import { useEventType } from '@/queries';
 type EventDashboardProps = {
   params: {
     environmentSlug: string;
-    eventName: string;
+    eventTypeName: string;
   };
 };
 
@@ -23,10 +23,10 @@ export const runtime = 'nodejs';
 
 export default function EventDashboard({ params }: EventDashboardProps) {
   const [{ data, fetching }] = useEventType({
-    name: decodeURIComponent(params.eventName),
+    name: decodeURIComponent(params.eventTypeName),
   });
 
-  const eventNameDecoded = decodeURIComponent(params.eventName);
+  const eventNameDecoded = decodeURIComponent(params.eventTypeName);
   const { eventType, dailyUsage } = data || {};
 
   return (

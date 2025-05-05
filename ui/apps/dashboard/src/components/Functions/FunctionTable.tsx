@@ -1,7 +1,6 @@
 'use client';
 
 import { useMemo } from 'react';
-import { type Route } from 'next';
 import MiniStackedBarChart from '@inngest/components/Chart/MiniStackedBarChart';
 import { Link } from '@inngest/components/Link';
 import { HorizontalPillList, Pill, PillContent } from '@inngest/components/Pill';
@@ -16,6 +15,7 @@ import {
 } from '@tanstack/react-table';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
+import { pathCreator } from '@/utils/urls';
 
 export type FunctionTableRow = {
   appName: string | null;
@@ -125,7 +125,7 @@ function createColumns(environmentSlug: string) {
             />
             <Link
               key="name"
-              href={`/env/${environmentSlug}/functions/${encodeURIComponent(slug)}` as Route}
+              href={pathCreator.function({ envSlug: environmentSlug, functionSlug: slug })}
               arrowOnHover
               className="w-full px-2 py-3 text-sm font-medium"
             >
@@ -148,9 +148,10 @@ function createColumns(environmentSlug: string) {
                   appearance="outlined"
                   href={
                     trigger.type === 'EVENT'
-                      ? (`/env/${environmentSlug}/events/${encodeURIComponent(
-                          trigger.value
-                        )}` as Route)
+                      ? pathCreator.eventType({
+                          envSlug: environmentSlug,
+                          eventName: trigger.value,
+                        })
                       : undefined
                   }
                   key={trigger.type + trigger.value}
@@ -175,7 +176,10 @@ function createColumns(environmentSlug: string) {
           <div className="flex items-center">
             <Pill
               appearance="outlined"
-              href={`/env/${environmentSlug}/apps/${encodeURIComponent(appExternalID)}` as Route}
+              href={pathCreator.app({
+                envSlug: environmentSlug,
+                externalAppID: appExternalID,
+              })}
             >
               <PillContent type="APP">{appExternalID}</PillContent>
             </Pill>

@@ -65,6 +65,7 @@ export function EventTypesTable({
   const [isScrollable, setIsScrollable] = useState(false);
   const [nameSearch = null, setNameSearch, removeNameSearch] = useSearchParam('nameSearch');
   const [searchInput, setSearchInput] = useState<string>(nameSearch || '');
+  const [isSearching, setIsSearching] = useState(false);
   const [orderBy, setOrderBy] = useState<EventTypesOrderBy[]>([
     {
       field: EventTypesOrderByField.Name,
@@ -72,13 +73,27 @@ export function EventTypesTable({
     },
   ]);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  const scrollToTop = useCallback(
+    (smooth = false) => {
+      if (containerRef.current) {
+        containerRef.current.scrollTo({
+          top: 0,
+          behavior: smooth ? 'smooth' : 'auto',
+        });
+      }
+    },
+    [containerRef.current]
+  );
+
   const debouncedSearch = useDebounce(() => {
     if (searchInput === '') {
       removeNameSearch();
     } else {
       setNameSearch(searchInput);
     }
-  }, 400);
+    scrollToTop();
+  }, 300);
 
   const onStatusFilterChange = useCallback(
     (value: boolean) => {
@@ -87,6 +102,7 @@ export function EventTypesTable({
       } else {
         removeFilteredStatus();
       }
+      scrollToTop();
     },
     [setFilteredStatus, removeFilteredStatus]
   );
@@ -136,17 +152,17 @@ export function EventTypesTable({
 
   const onScroll: UIEventHandler<HTMLDivElement> = useCallback(
     (event) => {
-      if (hasEventTypesData && hasNextPage && !isFetchingNextPage) {
+      if (hasEventTypesData && hasNextPage) {
         const { scrollHeight, scrollTop, clientHeight } = event.target as HTMLDivElement;
 
         // Check if scrolled to the bottom
         const reachedBottom = scrollHeight - scrollTop - clientHeight < 200;
-        if (reachedBottom && !isFetching) {
+        if (reachedBottom && !isFetching && !isFetchingNextPage) {
           fetchNextPage();
         }
       }
     },
-    [fetchNextPage, hasNextPage, isFetchingNextPage, mergedData]
+    [fetchNextPage, hasNextPage, isFetchingNextPage, hasEventTypesData, isFetching]
   );
 
   useEffect(() => {
@@ -167,17 +183,13 @@ export function EventTypesTable({
     }
   }, [sorting, setOrderBy]);
 
-  const scrollToTop = useCallback(
-    (smooth = false) => {
-      if (containerRef.current) {
-        containerRef.current.scrollTo({
-          top: 0,
-          behavior: smooth ? 'smooth' : 'auto',
-        });
-      }
-    },
-    [containerRef.current]
-  );
+  // Reset isSearching when fetching completes
+  useEffect(() => {
+    if (isSearching && !isFetching) {
+      setIsSearching(false);
+    }
+  }, [isFetching, isSearching]);
+
   if (error) {
     return <ErrorCard error={error} reset={() => refetch()} />;
   }
@@ -196,6 +208,7 @@ export function EventTypesTable({
           value={searchInput}
           className="h-[30px] w-56 py-3"
           onUpdate={(value) => {
+            setIsSearching(true);
             setSearchInput(value);
             debouncedSearch();
           }}
@@ -205,7 +218,7 @@ export function EventTypesTable({
         <NewTable
           columns={columns}
           data={mergedData || []}
-          isLoading={isPending}
+          isLoading={isPending || isSearching || (isFetching && !isFetchingNextPage)}
           // TODO: Re-enable this when API supports sorting by event name
           // sorting={sorting}
           // setSorting={setSorting}
