@@ -795,8 +795,7 @@ type QueueRunMode struct {
 	// Continuations enables continuations
 	Continuations bool
 
-	// PauseFlusher determines whether pauses are flushed from hot storage
-	// to blob store
+	// PauseFlusher enables flushing pauses from hot storage to blob store
 	PauseFlusher bool
 
 	// Shadow enables shadow partition processing

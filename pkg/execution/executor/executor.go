@@ -1764,6 +1764,8 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 				Str("workflow_id", pause.Identifier.FunctionID.String()).
 				Bool("timeout", pause.OnTimeout).
 				Bool("cancel", pause.Cancel).
+				Interface("consumed", consumeResult).
+				Err(err).
 				Msg("resuming from pause")
 		}
 
@@ -1772,7 +1774,10 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 			// consuming the pause to guarantee the event data is stored via the pause
 			// for the next run.  If the ConsumePause call comes after enqueue, the TCP
 			// conn may drop etc. and running the job may occur prior to saving state data.
-			jobID := fmt.Sprintf("%s-%s", md.IdempotencyKey(), pause.DataKey)
+			//
+			// NOTE: This has an "-event" prefix so that it does not conflict with the timeout
+			// job ID.
+			jobID := fmt.Sprintf("%s-%s-event", md.IdempotencyKey(), pause.DataKey)
 			err = e.queue.Enqueue(ctx, queue.Item{
 				JobID: &jobID,
 				// Add a new group ID for the child;  this will be a new step.
