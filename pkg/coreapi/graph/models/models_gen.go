@@ -189,6 +189,22 @@ type FunctionTrigger struct {
 	Value string               `json:"value"`
 }
 
+type FunctionsConnection struct {
+	Edges      []*FunctionsEdge `json:"edges"`
+	PageInfo   *cqrs.PageInfo   `json:"pageInfo"`
+	TotalCount int              `json:"totalCount"`
+}
+
+type FunctionsEdge struct {
+	Cursor string    `json:"cursor"`
+	Node   *Function `json:"node"`
+}
+
+type FunctionsFilter struct {
+	Archived  *bool   `json:"archived,omitempty"`
+	EventName *string `json:"eventName,omitempty"`
+}
+
 type InvokeStepInfo struct {
 	TriggeringEventID ulid.ULID  `json:"triggeringEventID"`
 	FunctionID        string     `json:"functionID"`
@@ -199,18 +215,6 @@ type InvokeStepInfo struct {
 }
 
 func (InvokeStepInfo) IsStepInfo() {}
-
-// The pagination information in a connection.
-type PageInfo struct {
-	// Indicates if there are any pages subsequent to the current page.
-	HasNextPage bool `json:"hasNextPage"`
-	// Indicates if there are any pages prior to the current page.
-	HasPreviousPage bool `json:"hasPreviousPage"`
-	// When paginating backward, the cursor to query the previous page.
-	StartCursor *string `json:"startCursor,omitempty"`
-	// When paginating forward, the cursor to query the next page.
-	EndCursor *string `json:"endCursor,omitempty"`
-}
 
 type RerunFromStepInput struct {
 	StepID string  `json:"stepID"`

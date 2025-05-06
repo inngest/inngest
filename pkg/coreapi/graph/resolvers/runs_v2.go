@@ -146,7 +146,7 @@ func (qr *queryResolver) Runs(ctx context.Context, num int, cur *string, order [
 	}
 	wg.Wait()
 
-	pageInfo := &models.PageInfo{
+	pageInfo := &cqrs.PageInfo{
 		HasNextPage: total == int(opts.Items),
 		StartCursor: scursor,
 		EndCursor:   ecursor,

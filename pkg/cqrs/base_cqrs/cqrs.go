@@ -1998,6 +1998,186 @@ func (w wrapper) GetWorkerConnections(ctx context.Context, opt cqrs.GetWorkerCon
 	return res, nil
 }
 
+func (w wrapper) EventTypes(
+	ctx context.Context,
+	opt cqrs.GetTraceRunOpt,
+) ([]*cqrs.TraceRun, error) {
+	// use evtIDs as post query filter
+	evtIDs := []string{}
+	expHandler, err := run.NewExpressionHandler(ctx,
+		run.WithExpressionHandlerBlob(opt.Filter.CEL, "\n"),
+	)
+	if err != nil {
+		return nil, err
+	}
+	if expHandler.HasEventFilters() {
+		evts, err := w.GetEventsByExpressions(ctx, expHandler.EventExprList)
+		if err != nil {
+			return nil, err
+		}
+		for _, e := range evts {
+			evtIDs = append(evtIDs, e.ID.String())
+		}
+	}
+
+	builder := newRunsQueryBuilder(ctx, opt)
+	filter := builder.filter
+	order := builder.order
+	reqcursor := builder.cursor
+	resCursorLayout := builder.cursorLayout
+
+	// read from database
+	// TODO:
+	// change this to a continuous loop with limits instead of just attempting to grab everything.
+	// might not matter though since this is primarily meant for local
+	// development
+	sql, args, err := sq.Dialect(w.dialect()).
+		From("trace_runs").
+		Select(
+			"app_id",
+			"function_id",
+			"trace_id",
+			"run_id",
+			"queued_at",
+			"started_at",
+			"ended_at",
+			"status",
+			"source_id",
+			"trigger_ids",
+			"output",
+			"batch_id",
+			"is_debounce",
+			"cron_schedule",
+			"has_ai",
+		).
+		Where(filter...).
+		Order(order...).
+		ToSQL()
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := w.db.QueryContext(ctx, sql, args...)
+	if err != nil {
+		return nil, err
+	}
+
+	res := []*cqrs.TraceRun{}
+	var count uint
+	for rows.Next() {
+		data := sqlc.TraceRun{}
+		err := rows.Scan(
+			&data.AppID,
+			&data.FunctionID,
+			&data.TraceID,
+			&data.RunID,
+			&data.QueuedAt,
+			&data.StartedAt,
+			&data.EndedAt,
+			&data.Status,
+			&data.SourceID,
+			&data.TriggerIds,
+			&data.Output,
+			&data.BatchID,
+			&data.IsDebounce,
+			&data.CronSchedule,
+			&data.HasAi,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		// filter out runs that doesn't have the event IDs
+		if len(evtIDs) > 0 && !data.HasEventIDs(evtIDs) {
+			continue
+		}
+
+		// the cursor target should be skipped
+		if reqcursor.ID == data.RunID.String() {
+			continue
+		}
+
+		if expHandler.HasOutputFilters() {
+			ok, err := expHandler.MatchOutputExpressions(ctx, data.Output)
+			if err != nil {
+				logger.StdlibLogger(ctx).Error("error inspecting run for output match",
+					"error", err,
+					"output", string(data.Output),
+					"acctID", data.AccountID,
+					"wsID", data.WorkspaceID,
+					"appID", data.AppID,
+					"wfID", data.FunctionID,
+					"runID", data.RunID,
+				)
+				continue
+			}
+			if !ok {
+				continue
+			}
+		}
+
+		// copy layout
+		pc := resCursorLayout
+		// construct the needed fields to generate a cursor representing this run
+		pc.ID = data.RunID.String()
+		for k := range pc.Cursors {
+			switch k {
+			case strings.ToLower(enums.TraceRunTimeQueuedAt.String()):
+				pc.Cursors[k] = cqrs.TraceCursor{Field: k, Value: data.QueuedAt}
+			case strings.ToLower(enums.TraceRunTimeStartedAt.String()):
+				pc.Cursors[k] = cqrs.TraceCursor{Field: k, Value: data.StartedAt}
+			case strings.ToLower(enums.TraceRunTimeEndedAt.String()):
+				pc.Cursors[k] = cqrs.TraceCursor{Field: k, Value: data.EndedAt}
+			default:
+				log.From(ctx).Warn().Str("field", k).Msg("unknown field registered as cursor")
+				delete(pc.Cursors, k)
+			}
+		}
+
+		cursor, err := pc.Encode()
+		if err != nil {
+			log.From(ctx).Error().Err(err).Interface("page_cursor", pc).Msg("error encoding cursor")
+		}
+		var cron *string
+		if data.CronSchedule.Valid {
+			cron = &data.CronSchedule.String
+		}
+		var batchID *ulid.ULID
+		isBatch := data.BatchID != nilULID
+		if isBatch {
+			batchID = &data.BatchID
+		}
+
+		res = append(res, &cqrs.TraceRun{
+			AppID:        data.AppID,
+			FunctionID:   data.FunctionID,
+			TraceID:      string(data.TraceID),
+			RunID:        data.RunID.String(),
+			QueuedAt:     time.UnixMilli(data.QueuedAt),
+			StartedAt:    time.UnixMilli(data.StartedAt),
+			EndedAt:      time.UnixMilli(data.EndedAt),
+			SourceID:     data.SourceID,
+			TriggerIDs:   data.EventIDs(),
+			Triggers:     [][]byte{},
+			Output:       data.Output,
+			Status:       enums.RunCodeToStatus(data.Status),
+			IsBatch:      isBatch,
+			BatchID:      batchID,
+			IsDebounce:   data.IsDebounce,
+			HasAI:        data.HasAi,
+			CronSchedule: cron,
+			Cursor:       cursor,
+		})
+		count++
+		// enough items, don't need to proceed anymore
+		if opt.Items > 0 && count >= opt.Items {
+			break
+		}
+	}
+
+	return res, nil
+}
+
 // copyWriter allows running duck-db specific functions as CQRS functions, copying CQRS types to DDB types
 // automatically.
 func copyWriter[

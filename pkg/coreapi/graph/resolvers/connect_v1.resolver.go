@@ -3,13 +3,14 @@ package resolvers
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/enums"
 	connpb "github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/oklog/ulid/v2"
-	"time"
 )
 
 const (
@@ -64,7 +65,7 @@ func (qr *queryResolver) WorkerConnections(ctx context.Context, first int, after
 		})
 	}
 
-	pageInfo := &models.PageInfo{
+	pageInfo := &cqrs.PageInfo{
 		HasNextPage: total == int(opts.Items),
 		StartCursor: scursor,
 		EndCursor:   ecursor,

@@ -119,3 +119,26 @@ models:
     model: github.com/inngest/inngest/pkg/gql_scalars.ULID
   UUID:
     model: github.com/inngest/inngest/pkg/gql_scalars.UUID
+  EventType:
+    model: github.com/inngest/inngest/pkg/cqrs.EventType
+    fields:
+      functions:
+        resolver: true
+      usage:
+        resolver: true
+  EventTypesConnection:
+    model: github.com/inngest/inngest/pkg/cqrs.EventTypesConnection
+  EventTypesEdge:
+    model: github.com/inngest/inngest/pkg/cqrs.EventTypesEdge
+  EventTypesFilter:
+    model: github.com/inngest/inngest/pkg/cqrs.EventTypesFilter
+  Period:
+    model: github.com/inngest/inngest/pkg/enums.Period
+  UsageInput:
+    model: github.com/inngest/inngest/pkg/usage.UsageInput
+  Usage:
+    model: github.com/inngest/inngest/pkg/usage.UsageResponse
+  UsageSlot:
+    model: github.com/inngest/inngest/pkg/usage.UsageSlot
+  PageInfo:
+    model: github.com/inngest/inngest/pkg/cqrs.PageInfo

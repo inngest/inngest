@@ -9,6 +9,7 @@ scalar Uint
 scalar ULID
 scalar UUID
 scalar Bytes
+scalar Period
 
 "The pagination information in a connection."
 type PageInfo {
@@ -578,4 +579,61 @@ enum AppMethod {
 
 input AppsFilterV1 {
   method: AppMethod
+}
+
+input EventTypesFilter {
+  archived: Boolean = false
+  nameSearch: String
+}
+
+type EventTypesConnection {
+  edges: [EventTypesEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type EventTypesEdge {
+  cursor: String!
+  node: EventType!
+}
+
+type EventType {
+  envID: UUID!
+  functions(
+    first: Int! = 40
+    after: String
+  ): FunctionsConnection!
+  name: String!
+  usage(opts: UsageInput): Usage!
+}
+
+input FunctionsFilter {
+  archived: Boolean = false
+  eventName: String
+}
+
+type FunctionsConnection {
+  edges: [FunctionsEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type FunctionsEdge {
+  cursor: String!
+  node: Function!
+}
+
+input UsageInput {
+  from: Time!
+  period: Period!
+  to: Time!
+}
+
+type Usage {
+  data: [UsageSlot!]!
+}
+
+type UsageSlot {
+  count: Int!
+  slot: Time!
 }
