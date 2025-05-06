@@ -170,6 +170,44 @@ func CloseSystemTracer(ctx context.Context) error {
 	return nil
 }
 
+// ContextWithUserlandState is used to set trace state for the current context,
+// used to set particular items in trace state so that the SDK can parrot them
+// back to us for userland spans.
+//
+// Even if returning an error, `ctx` will be returned as the passed context.
+//
+// After a tracing refactor, this will no longer be required to send to SDKs
+// because they will not need to parrot back any data. It is required now as
+// trace ingestion is not critical and so could be delayed, meaning ingestion
+// endpoints cannot reliably access previous spans as they are not guaranteed to
+// be written.
+func ContextWithUserlandState(ctx context.Context, appID string, functionID string) (context.Context, error) {
+	span := oteltrace.SpanFromContext(ctx)
+	sc := span.SpanContext()
+
+	ts, err := sc.TraceState().Insert("inngest@app", appID)
+	if err != nil {
+		return ctx, fmt.Errorf("failed to add app ID to trace state: %w", err)
+	}
+
+	ts, err = ts.Insert("inngest@fn", functionID)
+	if err != nil {
+		return ctx, fmt.Errorf("failed to add function ID to trace state: %w", err)
+	}
+
+	sc = oteltrace.NewSpanContext(oteltrace.SpanContextConfig{
+		TraceID:    sc.TraceID(),
+		SpanID:     sc.SpanID(),
+		TraceFlags: sc.TraceFlags(),
+		TraceState: ts,
+		Remote:     sc.IsRemote(),
+	})
+
+	newCtx := oteltrace.ContextWithSpanContext(ctx, sc)
+
+	return newCtx, nil
+}
+
 type tracer struct {
 	provider   *trace.TracerProvider
 	propagator propagation.TextMapPropagator

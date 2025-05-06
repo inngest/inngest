@@ -29,7 +29,6 @@ import (
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
 	"go.opentelemetry.io/otel/propagation"
-	"go.opentelemetry.io/otel/trace"
 )
 
 var (
@@ -100,40 +99,16 @@ func (e executor) Execute(ctx context.Context, sl sv2.StateLoader, s sv2.Metadat
 		return nil, err
 	}
 
+	ctx, err = itrace.ContextWithUserlandState(ctx, s.ID.Tenant.AppID.String(), s.ID.FunctionID.String())
+	if err != nil {
+		log.From(ctx).
+			Warn().
+			Str("run_id", s.ID.RunID.String()).
+			Err(err).
+			Msg("failed to userland data to trace state")
+	}
+
 	headers := map[string]string{}
-
-	span := trace.SpanFromContext(ctx)
-	sc := span.SpanContext()
-
-	// Add some items to trace state to ensure that the SDK can parrot them
-	// back to us for userland spans.
-	//
-	// After a tracing refactor, this will no longer be required to send to
-	// SDKs because they will not need to parrot back any data.
-	ts, err := sc.TraceState().Insert("inngest@app", s.ID.Tenant.AppID.String())
-	if err != nil {
-		// Not a failure; only userland spans suffer, so log and ignore
-		log.From(ctx).Warn().
-			Str("run_id", s.ID.RunID.String()).
-			Msg("failed to add app ID to trace state")
-	}
-
-	ts, err = ts.Insert("inngest@fn", s.ID.FunctionID.String())
-	if err != nil {
-		// Not a failure; only userland spans suffer, so log and ignore
-		log.From(ctx).Warn().
-			Str("run_id", s.ID.RunID.String()).
-			Msg("failed to add function ID to trace state")
-	}
-
-	sc = trace.NewSpanContext(trace.SpanContextConfig{
-		TraceID:    sc.TraceID(),
-		SpanID:     sc.SpanID(),
-		TraceFlags: sc.TraceFlags(),
-		TraceState: ts,
-		Remote:     sc.IsRemote(),
-	})
-	ctx = trace.ContextWithSpanContext(ctx, sc)
 	itrace.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(headers))
 	if headers["traceparent"] != "" {
 		// The span ID will be incorrect here as lifecycles can not affec the
