@@ -116,7 +116,7 @@ func (e executor) Execute(ctx context.Context, sl sv2.StateLoader, s sv2.Metadat
 				Warn().
 				Str("run_id", s.ID.RunID.String()).
 				Err(err).
-				Msg("failed to userland data to trace state")
+				Msg("failed to add userland data to trace state")
 		}
 	}
 
