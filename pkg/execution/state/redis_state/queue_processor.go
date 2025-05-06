@@ -721,9 +721,10 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog) error {
 	rc := q.primaryQueueShard.RedisClient
 
+	// TODO: do all these in a lua script to make it transactional
 	count := 10
 	for {
-		// TODO: lease the backlog
+		// TODO: extend the lease
 		cmd := rc.Client().B().Zrange().Key(rc.kg.BacklogSet(backlog.BacklogID)).Min("-inf").Max("+inf").Byscore().Limit(0, int64(count)).Withscores().Build()
 		vals, err := rc.Client().Do(ctx, cmd).AsStrSlice()
 		if err != nil {

@@ -177,6 +177,8 @@ type QueueKeyGenerator interface {
 	BacklogSet(backlogID string) string
 	// BacklogMeta returns the key to the hash storing serialized QueueBacklog objects by ID.
 	BacklogMeta() string
+	// BacklogNormalization returns the key to the lease for the backlog for normalization purposes
+	BacklogNormalization(backlogID string) string
 	// ShadowPartitionSet returns the key to the ZSET storing pointers (backlog IDs) for a given shadow partition.
 	ShadowPartitionSet(shadowPartitionID string) string
 	// ShadowPartitionMeta returns the key to the hash storing serialized QueueShadowPartition objects by ID.
@@ -351,6 +353,11 @@ func (u queueKeyGenerator) BacklogSet(backlogID string) string {
 // BacklogMeta returns the key to the hash storing serialized QueueBacklog objects by ID.
 func (u queueKeyGenerator) BacklogMeta() string {
 	return fmt.Sprintf("{%s}:backlogs", u.queueDefaultKey)
+}
+
+// BacklogNormalization returns the key for the lease of the backlog for normalization purposes
+func (u queueKeyGenerator) BacklogNormalization(backlogID string) string {
+	return fmt.Sprintf("{%s}:backlog:%s:lease", u.queueDefaultKey, backlogID)
 }
 
 // GlobalShadowPartitionSet returns the key to the global ZSET storing shadow partition pointers.
