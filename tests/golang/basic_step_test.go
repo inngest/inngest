@@ -62,11 +62,12 @@ func TestFunctionSteps(t *testing.T) {
 				panic("no event found")
 			}
 
-			step.Run(ctx, "after-wait1", func(ctx context.Context) (any, error) {
+			_, err = step.Run(ctx, "after-wait1", func(ctx context.Context) (any, error) {
 				fmt.Println("wait1 resolved", input.InputCtx.RunID)
 				atomic.AddInt32(&counter, 1)
 				return nil, nil
 			})
+			require.NoError(t, err)
 
 			// Wait for an event with an expression
 			_, err = step.WaitForEvent[any](ctx, "wait2", step.WaitForEventOpts{
