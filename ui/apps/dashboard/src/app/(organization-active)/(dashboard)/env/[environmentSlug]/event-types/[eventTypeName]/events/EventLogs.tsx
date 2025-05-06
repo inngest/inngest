@@ -3,6 +3,7 @@
 import { useState } from 'react';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
+import { pathCreator } from '@/utils/urls';
 import { EventLogsPage } from './EventLogsPage';
 
 type EventLogsProps = {
@@ -12,7 +13,7 @@ type EventLogsProps = {
 export default function EventLogs({ eventName }: EventLogsProps) {
   const [cursors, setCursors] = useState(['']);
   const environment = useEnvironment();
-  const pathPrefix = `/env/${environment.slug}/events/${encodeURIComponent(eventName)}/logs`;
+  const pathPrefix = `${pathCreator.eventType({ envSlug: environment.slug, eventName })}/events`;
 
   return (
     <ul role="list" className="divide-subtle h-full divide-y">

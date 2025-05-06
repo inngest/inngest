@@ -70,7 +70,7 @@ export default function Table<T>({
       isLoading
         ? columns.map((column) => ({
             ...column,
-            cell: () => <Skeleton className="my-4 block h-3" />,
+            cell: () => <Skeleton className="my-2 block h-3" />,
           }))
         : columns,
     [isLoading]

@@ -8,6 +8,7 @@ import { useMutation } from 'urql';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { graphql } from '@/gql';
+import { pathCreator } from '@/utils/urls';
 
 const ArchiveEvent = graphql(`
   mutation ArchiveEvent($environmentId: ID!, $name: String!) {
@@ -32,7 +33,7 @@ export default function ArchiveEventModal({ eventName, isOpen, onClose }: Archiv
   const handleSubmit = async () => {
     try {
       await archiveEvent({ name: eventName, environmentId: environment.id });
-      router.push(`/env/${environment.slug}/events`);
+      router.push(pathCreator.eventTypes({ envSlug: environment.slug }));
     } catch (error) {
       setError('Failed to archive event, please try again later.');
       console.error('error achiving event', eventName, error);
