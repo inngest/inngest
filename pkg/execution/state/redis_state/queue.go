@@ -808,6 +808,9 @@ type QueueRunMode struct {
 
 	// ShadowContinuations enables shadow continuations
 	ShadowContinuations bool
+
+	// NormalizePartition enables the processing of partitions for normalization
+	NormalizePartition bool
 }
 
 // continuation represents a partition continuation, forcung the queue to continue working

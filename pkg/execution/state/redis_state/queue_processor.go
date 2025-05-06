@@ -197,6 +197,12 @@ func (q *queue) Run(ctx context.Context, f osqueue.RunFunc) error {
 		})
 	}
 
+	if q.runMode.NormalizePartition {
+		eg.Go(func() error {
+			return q.backlogNormalizationScan(ctx)
+		})
+	}
+
 	return eg.Wait()
 }
 
@@ -300,6 +306,21 @@ func (q *queue) shadowScan(ctx context.Context) error {
 			for _, part := range parts {
 				qspc <- &part
 			}
+		}
+	}
+}
+
+func (q *queue) backlogNormalizationScan(ctx context.Context) error {
+	tick := q.clock.NewTicker(q.pollTick)
+
+	for {
+		select {
+		case <-ctx.Done():
+			tick.Stop()
+			return nil
+		case <-tick.Chan():
+			// TODO: do something here
+			continue
 		}
 	}
 }
@@ -1304,7 +1325,6 @@ func (q *queue) process(
 				Int64("ms", delay.Milliseconds()).
 				Msg("delaying job in memory")
 		}
-
 		n := q.clock.Now()
 
 		// Track the sojourn (concurrency) latency.
