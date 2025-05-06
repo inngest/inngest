@@ -27,7 +27,6 @@ import (
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
-	"go.opentelemetry.io/otel/propagation"
 )
 
 var (
@@ -98,12 +97,36 @@ func (e executor) Execute(ctx context.Context, sl sv2.StateLoader, s sv2.Metadat
 		return nil, err
 	}
 
+	headers := make(map[string]string)
+	if spanID, err := item.SpanID(); err != nil {
+		log.From(ctx).
+			Error().
+			Str("run_id", s.ID.RunID.String()).
+			Err(err).
+			Msg("error retrieving span ID")
+	} else {
+		headers, err = itrace.HeadersFromTraceState(
+			ctx,
+			spanID.String(),
+			s.ID.Tenant.AppID.String(),
+			s.ID.FunctionID.String(),
+		)
+		if err != nil {
+			log.From(ctx).
+				Warn().
+				Str("run_id", s.ID.RunID.String()).
+				Err(err).
+				Msg("failed to add userland data to trace state")
+		}
+	}
+
 	dr, _, err := DoRequest(ctx, e.Client, Request{
 		SigningKey: e.localSigningKey,
 		URL:        *uri,
 		Input:      input,
 		Edge:       edge,
 		Step:       step,
+		Headers:    headers,
 	})
 	return dr, err
 }
@@ -126,6 +149,9 @@ type Request struct {
 	Input      []byte
 	Edge       inngest.Edge
 	Step       inngest.Step
+
+	// Headers are additional headers to add to the request.
+	Headers map[string]string
 }
 
 // DoRequest executes the HTTP request with the given input.
@@ -295,8 +321,9 @@ func do(ctx context.Context, c util.HTTPDoer, r Request) (*Response, *httpstat.R
 		req.Header.Add("X-Inngest-Signature", r.Signature)
 	}
 
-	// Add `traceparent` and `tracestate` headers to the request from `ctx`
-	itrace.UserTracer().Propagator().Inject(ctx, propagation.HeaderCarrier(req.Header))
+	for k, v := range r.Headers {
+		req.Header.Add(k, v)
+	}
 
 	// Track HTTP stats, eg. TLS handshake timeouts, DNS lookups, etc.
 	tracking := &httpstat.Result{}
