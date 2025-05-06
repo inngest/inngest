@@ -274,6 +274,8 @@ LOOP:
 	return nil
 }
 
+// shadowScan iterates through the shadow partitions and attempt to add queue items
+// to the function partition for processing
 func (q *queue) shadowScan(ctx context.Context) error {
 	l := logger.StdlibLogger(ctx)
 	qspc := make(chan *QueueShadowPartition)
@@ -310,9 +312,11 @@ func (q *queue) shadowScan(ctx context.Context) error {
 	}
 }
 
+// backlogNormalizationScan iterates through a partition of backlogs and reenqueue
+// the items to the appropriate backlogs
 func (q *queue) backlogNormalizationScan(ctx context.Context) error {
 	l := logger.StdlibLogger(ctx)
-	nc := make(chan int)
+	nc := make(chan *QueueBacklog)
 
 	for i := int32(0); i < q.numBacklogNormalizationWorkers; i++ {
 		go q.backlogNormalizationWorker(ctx, nc)
@@ -327,8 +331,16 @@ func (q *queue) backlogNormalizationScan(ctx context.Context) error {
 			tick.Stop()
 			return nil
 		case <-tick.Chan():
-			// TODO: do something here
-			continue
+			// TODO: continuations?
+
+			// - scan for backlogs to be normalized
+			// - lease the backlog
+			// - dump it into the channel for the workers to do their thing
+
+			parts := []QueueBacklog{}
+			for _, part := range parts {
+				nc <- &part
+			}
 		}
 	}
 }
@@ -558,7 +570,7 @@ func (q *queue) shadowWorker(ctx context.Context, qspc chan *QueueShadowPartitio
 
 // backlogNormalizationWorker runs a blocking process that listens to item being pushed into the normalization partition. This allows us to process individual
 // backlogs that need to be normalized
-func (q *queue) backlogNormalizationWorker(ctx context.Context, nc chan int) {
+func (q *queue) backlogNormalizationWorker(ctx context.Context, nc chan *QueueBacklog) {
 	for {
 		select {
 		case <-ctx.Done():
