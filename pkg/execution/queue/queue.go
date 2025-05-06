@@ -50,6 +50,7 @@ type RunResult struct {
 type EnqueueOpts struct {
 	PassthroughJobId    bool
 	ForceQueueShardName string
+	Normalize           bool
 }
 
 type Producer interface {

@@ -1365,6 +1365,11 @@ func (q *queue) EnqueueItem(ctx context.Context, shard QueueShard, i osqueue.Que
 		enqueueToBacklogsVal = "1"
 	}
 
+	normalize := "0"
+	if opts.Normalize {
+		normalize = "1"
+	}
+
 	args, err := StrSlice([]any{
 		i,
 		i.ID,
@@ -1385,6 +1390,7 @@ func (q *queue) EnqueueItem(ctx context.Context, shard QueueShard, i osqueue.Que
 		shadowPartition,
 		backlog,
 		backlog.BacklogID,
+		normalize,
 	})
 	if err != nil {
 		return i, err
@@ -3044,40 +3050,6 @@ func (q *queue) BacklogPrepareNormalize(ctx context.Context, b *QueueBacklog, sp
 	default:
 		return 0, false, fmt.Errorf("unknown status preparing backlog normalization: %v (%T)", status, status)
 	}
-}
-
-func (q *queue) NormalizeBacklog(ctx context.Context, b *QueueBacklog, limit int) (*NormalizeBacklogResult, error) {
-	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "NormalizeBacklog"), redis_telemetry.ScopeQueue)
-
-	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
-		return nil, nil
-	}
-
-	keys := []string{
-		q.primaryQueueShard.RedisClient.kg.BacklogSet(b.BacklogID),
-	}
-
-	args, err := StrSlice([]any{
-		b.BacklogID,
-		limit,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	byt, err := scripts["queue/normalizeBacklog"].Exec(
-		redis_telemetry.WithScriptName(ctx, "normalizeBacklog"),
-		q.primaryQueueShard.RedisClient.unshardedRc,
-		keys,
-		args,
-	).AsBytes()
-
-	var res NormalizeBacklogResult
-	if err := json.Unmarshal(byt, &res); err != nil {
-		return nil, err
-	}
-
-	return &res, nil
 }
 
 func (q *queue) ShadowPartitionPeek(ctx context.Context, sp *QueueShadowPartition, until time.Time, limit int64) ([]*QueueBacklog, int, error) {

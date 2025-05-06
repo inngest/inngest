@@ -42,6 +42,7 @@ local enqueueToBacklog				= tonumber(ARGV[10])
 local shadowPartitionItem     = ARGV[11]
 local backlogItem             = ARGV[12]
 local backlogID               = ARGV[13]
+local normalize               = tonumber(ARGV[14]) -- signals if this is part of a normalization
 
 -- $include(update_pointer_score.lua)
 -- $include(ends_with.lua)
@@ -50,15 +51,17 @@ local backlogID               = ARGV[13]
 -- $include(enqueue_to_partition.lua)
 -- $include(ends_with.lua)
 
--- Check idempotency exists
-if redis.call("EXISTS", idempotencyKey) ~= 0 then
+if normalize == 0 then
+  -- Check idempotency exists
+  if redis.call("EXISTS", idempotencyKey) ~= 0 then
     return 1
-end
+  end
 
--- Make these a hash to save on memory usage
-if redis.call("HSETNX", queueKey, queueID, queueItem) == 0 then
+  -- Make these a hash to save on memory usage
+  if redis.call("HSETNX", queueKey, queueID, queueItem) == 0 then
     -- This already exists;  return an error.
     return 1
+  end
 end
 
 if enqueueToBacklog == 1 then

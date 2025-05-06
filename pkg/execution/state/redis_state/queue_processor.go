@@ -667,7 +667,7 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 			}
 
 			if !shouldNormalizeAsync {
-				err = q.normalizeBacklog(ctx, backlog, shadowPart)
+				err = q.normalizeBacklog(ctx, backlog)
 				if err != nil {
 					return fmt.Errorf("could not normalize backlog: %w", err)
 				}
@@ -718,14 +718,18 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 }
 
 // normalizeBacklog must be called with exclusive access to the shadow partition
+// NOTE: ideally this is one transaction in a lua script but enqueue_to_backlog is way too much work to
+// utilize
 func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog) error {
 	rc := q.primaryQueueShard.RedisClient
 
-	// TODO: do all these in a lua script to make it transactional
-	count := 10
+	l := logger.StdlibLogger(ctx).With("backlog", backlog)
+
+	// TODO: extend the lease
+
+	var processed int64
 	for {
-		// TODO: extend the lease
-		cmd := rc.Client().B().Zrange().Key(rc.kg.BacklogSet(backlog.BacklogID)).Min("-inf").Max("+inf").Byscore().Limit(0, int64(count)).Withscores().Build()
+		cmd := rc.Client().B().Zrange().Key(rc.kg.BacklogSet(backlog.BacklogID)).Min("-inf").Max("+inf").Byscore().Limit(0, q.backlogNormalizeLimit).Withscores().Build()
 		vals, err := rc.Client().Do(ctx, cmd).AsStrSlice()
 		if err != nil {
 			if rueidis.IsRedisNil(err) {
@@ -734,15 +738,16 @@ func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog) err
 			return fmt.Errorf("could not scan backlog: %w", err)
 		}
 
+		// Done
 		if len(vals) == 0 {
 			return nil
 		}
 
 		itemsToRemove := make([]string, 0)
-
+		// NOTE: the even idx in the list are the actual item IDs and the odd idx are the scores
 		for i := 0; i < len(vals); i += 2 {
 			itemID := vals[i]
-			itemScore, err := strconv.Atoi(vals[i+1])
+			ts, err := strconv.ParseInt(vals[i+1], 10, 64)
 			if err != nil {
 				return fmt.Errorf("could not parse item score: %w", err)
 			}
@@ -766,18 +771,21 @@ func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog) err
 
 			shard := q.primaryQueueShard
 
+			if _, err := q.EnqueueItem(ctx, shard, qi, time.UnixMilli(ts), osqueue.EnqueueOpts{
+				PassthroughJobId: true,
+				Normalize:        true,
+			}); err != nil {
+				return fmt.Errorf("could not re-enqueue backlog item: %w", err)
+			}
+
 			// TODO This should probably happen in a transaction with Enqueue
-			err = q.removeQueueItem(ctx, shard, rc.kg.BacklogSet(backlog.BacklogID), qi.ID)
-			if err != nil {
+			// NOTE: if there's a failure in this window before removing the item, we still want to make sure
+			// the item is enqueued first before removing it from the current backlog
+			if err := q.removeQueueItem(ctx, shard, rc.kg.BacklogSet(backlog.BacklogID), qi.ID); err != nil {
 				return fmt.Errorf("could not remove queue item: %w", err)
 			}
 
-			_, err = q.EnqueueItem(ctx, shard, qi, time.UnixMilli(int64(itemScore)), osqueue.EnqueueOpts{
-				PassthroughJobId: true,
-			})
-			if err != nil {
-				return fmt.Errorf("could not re-enqueue backlog item: %w", err)
-			}
+			processed += 1
 		}
 
 		if len(itemsToRemove) > 0 {
@@ -787,6 +795,11 @@ func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog) err
 				return fmt.Errorf("could not clean up dangling item pointers: %w", err)
 			}
 		}
+
+		l.Info("processed normalization for backlog",
+			"processed", processed,
+			"removed", itemsToRemove,
+		)
 	}
 }
 
