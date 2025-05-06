@@ -3,6 +3,7 @@ package pauses
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
 	"time"
 
 	"github.com/inngest/inngest/pkg/execution/queue"
@@ -20,7 +21,7 @@ func QueueFlushProcessor(q queue.Queue) BlockFlushEnqueuer {
 
 // InMemoryFlushProcessor runs block flushes in-process without enqueueng.
 func InMemoryFlushProcessor(f BlockFlusher) BlockFlushEnqueuer {
-	return flushInProcess{f: f}
+	return &flushInProcess{f: f}
 }
 
 type flushQueue struct {
@@ -41,9 +42,11 @@ func (f flushQueue) Enqueue(ctx context.Context, index Index) error {
 }
 
 type flushInProcess struct {
-	f BlockFlusher
+	counter int32
+	f       BlockFlusher
 }
 
-func (f flushInProcess) Enqueue(ctx context.Context, index Index) error {
+func (f *flushInProcess) Enqueue(ctx context.Context, index Index) error {
+	atomic.AddInt32(&f.counter, 1)
 	return f.f.FlushIndexBlock(ctx, index)
 }

@@ -360,7 +360,7 @@ func (b *blockstore) blockIDForTimestamp(ctx context.Context, idx Index, ts time
 	score := strconv.Itoa(int(ts.UnixMilli()))
 	ids, err := b.rc.Do(
 		ctx,
-		b.rc.B().Zrange().Key(b.blockIndexKey(idx)).Min("("+score).Max("+inf").Limit(0, 1).Build(),
+		b.rc.B().Zrange().Key(b.blockIndexKey(idx)).Min("("+score).Max("+inf").Byscore().Limit(0, 1).Build(),
 	).AsStrSlice()
 	if len(ids) == 1 {
 		id, err := ulid.Parse(ids[0])
