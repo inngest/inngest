@@ -155,6 +155,7 @@ if capacity > 0 then
   for i = 1, #items, 2 do
     if potentiallyMissingQueueItems[i] == false or potentiallyMissingQueueItems[i] == nil or potentiallyMissingQueueItems[i] == "" then
       table.insert(itemCleanupArgs, items[i])
+      table.insert(remArgs, items[i])  -- item for removal
       hasCleanup = true
       goto continue
     end

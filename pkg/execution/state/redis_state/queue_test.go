@@ -7288,8 +7288,6 @@ func hasMember(t *testing.T, r *miniredis.Miniredis, key string, member string) 
 	members, err := r.ZMembers(key)
 	require.NoError(t, err)
 
-	require.Contains(t, members, member, members)
-
 	for _, s := range members {
 		if s == member {
 			return true
