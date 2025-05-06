@@ -158,9 +158,8 @@ type mockBufferer struct {
 
 func (m *mockBufferer) Write(ctx context.Context, index Index, pauses ...*state.Pause) (int, error) {
 	// For testing purposes, we'll just append the pauses to our mock buffer
-	startLen := len(m.pauses)
 	m.pauses = append(m.pauses, pauses...)
-	return len(m.pauses) - startLen, nil
+	return len(m.pauses), nil
 }
 
 func (m *mockBufferer) PausesSince(ctx context.Context, index Index, since time.Time) (state.PauseIterator, error) {
@@ -183,7 +182,7 @@ func (m *mockBufferer) Delete(ctx context.Context, index Index, pause state.Paus
 			return nil
 		}
 	}
-	return fmt.Errorf("pause not found")
+	return ErrNotInBuffer
 }
 
 // mockPauseIterator implements the PauseIterator interface for testing

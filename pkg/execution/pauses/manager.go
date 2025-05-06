@@ -10,19 +10,25 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 )
 
+var BlockFlushQueueName = "block-flush"
+
 var defaultFlushDelay = 10 * time.Second
 
-// StateBufferer transforms a state.Manager into a state.Bufferer.
+// StateBufferer transforms a state.Manager into a state.Bufferer
 func StateBufferer(rsm state.Manager) Bufferer {
 	return &redisAdapter{rsm}
 }
 
 // NewManager returns a new pause writer, writing pauses to a Valkey/Redis/MemoryDB
 // compatible buffer
-func NewManager(buf Bufferer, bs BlockStore) *manager {
+//
+// Blocks are flushed from the buffer in background jobs enqueued to the given queue.
+// This prevents eg. executors and new-runs from retaining blocks in-memory.
+func NewManager(buf Bufferer, bs BlockStore, flusher BlockFlushEnqueuer) *manager {
 	return &manager{
 		buf:        buf,
 		bs:         bs,
+		flusher:    flusher,
 		flushDelay: defaultFlushDelay,
 	}
 }
@@ -30,6 +36,7 @@ func NewManager(buf Bufferer, bs BlockStore) *manager {
 type manager struct {
 	buf        Bufferer
 	bs         BlockStore
+	flusher    BlockFlushEnqueuer
 	flushDelay time.Duration
 }
 
@@ -100,13 +107,12 @@ func (m manager) Write(ctx context.Context, index Index, pauses ...*state.Pause)
 		return n, err
 	}
 
-	// If this is larger than the max buffer len, schedule a new block write.
+	// If this is larger than the max buffer len, schedule a new block write.  We only
+	// enqueue this job once per index ID, using queue singletons to handle these.
 	if m.bs != nil && n >= m.bs.BlockSize() {
-		go func() {
-			if err := m.FlushIndexBlock(ctx, index); err != nil {
-				logger.StdlibLogger(ctx).Error("error flushing block", "error", err, "index", index)
-			}
-		}()
+		if err := m.flusher.Enqueue(ctx, index); err != nil {
+			logger.StdlibLogger(ctx).Error("error attempting to flush block", "error", err)
+		}
 	}
 
 	return n, nil
