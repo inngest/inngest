@@ -49,7 +49,7 @@ const (
 
 	// BacklogNormalizeAsyncLimit determines the minimum number of items required in an outdated backlog
 	// to require an async normalize job. For small backlogs, the added QPS may not be worth it and we should normalize JIT.
-	BacklogNormalizeAsyncLimit = 10
+	BacklogNormalizeAsyncLimit = 100
 
 	// BacklogRefillHardLimit sets the maximum number of items that can be refilled in a single backlogRefill operation.
 	BacklogRefillHardLimit = int64(1000)
@@ -534,6 +534,10 @@ func WithDisableSystemQueueLeaseChecks(lc DisableSystemQueueLeaseChecks) QueueOp
 // larger amount of backlogs if there are a ton of backlog due to keys
 type QueueShadowPartitionProcessCount func(ctx context.Context, acctID uuid.UUID) int
 
+// BacklogNormalizeAsyncLimitCount determines how many items in a backlog that needs
+// to be exceeded before marking the backlog to be processed by the normalization workers
+type BacklogNormalizeAsyncLimitCount func(ctx context.Context) int
+
 func WithQueueShadowPartitionProcessCount(spc QueueShadowPartitionProcessCount) QueueOpt {
 	return func(q *queue) {
 		q.shadowPartitionProcessCount = spc
@@ -618,6 +622,7 @@ func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 		disableSystemQueueLeaseChecks: func(ctx context.Context) bool {
 			return false
 		},
+		backlogNormalizeAsyncLimit: func(ctx context.Context) int { return BacklogNormalizeAsyncLimit },
 		shadowPartitionProcessCount: func(ctx context.Context, acctID uuid.UUID) int {
 			return 5
 		},
@@ -680,6 +685,7 @@ type queue struct {
 	disableSystemQueueLeaseChecks DisableSystemQueueLeaseChecks
 	disableLeaseChecks            DisableLeaseChecks
 
+	backlogNormalizeAsyncLimit  BacklogNormalizeAsyncLimitCount
 	shadowPartitionProcessCount QueueShadowPartitionProcessCount
 
 	// idempotencyTTL is the default or static idempotency duration apply to jobs,
