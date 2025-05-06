@@ -97,26 +97,27 @@ func (e executor) Execute(ctx context.Context, sl sv2.StateLoader, s sv2.Metadat
 		return nil, err
 	}
 
-	spanID, err := item.SpanID()
-	if err != nil {
+	headers := make(map[string]string)
+	if spanID, err := item.SpanID(); err != nil {
 		log.From(ctx).
 			Error().
 			Str("run_id", s.ID.RunID.String()).
 			Err(err).
 			Msg("error retrieving span ID")
-	}
-	headers, err := itrace.HeadersFromTraceState(
-		ctx,
-		spanID.String(),
-		s.ID.Tenant.AppID.String(),
-		s.ID.FunctionID.String(),
-	)
-	if err != nil {
-		log.From(ctx).
-			Warn().
-			Str("run_id", s.ID.RunID.String()).
-			Err(err).
-			Msg("failed to userland data to trace state")
+	} else {
+		headers, err = itrace.HeadersFromTraceState(
+			ctx,
+			spanID.String(),
+			s.ID.Tenant.AppID.String(),
+			s.ID.FunctionID.String(),
+		)
+		if err != nil {
+			log.From(ctx).
+				Warn().
+				Str("run_id", s.ID.RunID.String()).
+				Err(err).
+				Msg("failed to userland data to trace state")
+		}
 	}
 
 	dr, _, err := DoRequest(ctx, e.Client, Request{
