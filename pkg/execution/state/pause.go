@@ -210,10 +210,10 @@ type Pause struct {
 	// If so, when the matching pause is returned after processing an event
 	// the function's status is set to cancelled, preventing any future work.
 	Cancel bool `json:"cancel,omitempty,omitzero"`
-	// Attempt stores the attempt for the current step, if this a pause caused
-	// via an async driver.  This lets the executor resume as-is with the current
-	// context, ensuring that we retry correctly.
-	Attempt int `json:"att,omitempty"`
+	// MaxAttempts is the maximum number of attempts we can retry.  This is
+	// included in the pause to allow the executor to set the correct maximum
+	// number of retries when enqueuing next steps.
+	MaxAttempts *int `json:"maxAtts,omitempty"`
 	// GroupID stores the group ID for this step and history, allowing us to correlate
 	// event receives with other history items.
 	GroupID string `json:"groupID"`
