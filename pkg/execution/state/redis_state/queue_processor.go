@@ -554,6 +554,8 @@ func (q *queue) worker(ctx context.Context, f osqueue.RunFunc) {
 // shadow queue partition channel. This allows us to process an individual shadow partition.
 // TODO: replace channel type with QueueShadowPartition struct once available
 func (q *queue) shadowWorker(ctx context.Context, qspc chan *QueueShadowPartition) {
+	l := logger.StdlibLogger(ctx)
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -562,7 +564,7 @@ func (q *queue) shadowWorker(ctx context.Context, qspc chan *QueueShadowPartitio
 		case shadowPart := <-qspc:
 			err := q.processShadowPartition(ctx, shadowPart, 0)
 			if err != nil {
-				logger.StdlibLogger(ctx).Error("could not scan shadow partition", "err", err, "shadow_part", shadowPart)
+				l.Error("could not scan shadow partition", "error", err, "shadow_part", shadowPart)
 			}
 		}
 	}
@@ -571,14 +573,18 @@ func (q *queue) shadowWorker(ctx context.Context, qspc chan *QueueShadowPartitio
 // backlogNormalizationWorker runs a blocking process that listens to item being pushed into the normalization partition. This allows us to process individual
 // backlogs that need to be normalized
 func (q *queue) backlogNormalizationWorker(ctx context.Context, nc chan *QueueBacklog) {
+	l := logger.StdlibLogger(ctx)
+
 	for {
 		select {
 		case <-ctx.Done():
 			return
 
-		case <-nc:
-			// TODO: handle normalization
-			continue
+		case backlog := <-nc:
+			err := q.normalizeBacklog(ctx, backlog)
+			if err != nil {
+				l.Error("could not normalize backlog", "error", err, "backlog", backlog)
+			}
 		}
 	}
 }
@@ -712,11 +718,12 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 }
 
 // normalizeBacklog must be called with exclusive access to the shadow partition
-func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, shadowPart *QueueShadowPartition) error {
+func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog) error {
 	rc := q.primaryQueueShard.RedisClient
 
 	count := 10
 	for {
+		// TODO: lease the backlog
 		cmd := rc.Client().B().Zrange().Key(rc.kg.BacklogSet(backlog.BacklogID)).Min("-inf").Max("+inf").Byscore().Limit(0, int64(count)).Withscores().Build()
 		vals, err := rc.Client().Do(ctx, cmd).AsStrSlice()
 		if err != nil {
