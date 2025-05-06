@@ -381,3 +381,10 @@ func concurrencyKeyID(scope enums.ConcurrencyScope, hash string) string {
 	}
 	return ""
 }
+
+// NormalizeBacklogResult represents the status of a backlog normalization operation
+type NormalizeBacklogResult struct {
+	Processed int  `json:"processed"`
+	Total     int  `json:"total"`
+	HasMore   bool `json:"has_more"`
+}

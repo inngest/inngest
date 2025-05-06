@@ -53,6 +53,9 @@ const (
 
 	// BacklogRefillHardLimit sets the maximum number of items that can be refilled in a single backlogRefill operation.
 	BacklogRefillHardLimit = int64(1000)
+
+	// BacklogNormalizeHardLimit sets the batch size of items to be reenqueued into the appropriate backlogs durign normalization
+	BacklogNormalizeHardLimit = int64(1000)
 )
 
 const (
@@ -115,6 +118,7 @@ const (
 	defaultNumWorkers                  = 100
 	defaultNumShadowWorkers            = 100
 	defaultBacklogNormalizationWorkers = 10
+	defaultBacklogNormalizeLimit       = int64(500)
 
 	defaultPollTick       = 10 * time.Millisecond
 	defaultIdempotencyTTL = 12 * time.Hour
@@ -259,9 +263,21 @@ func WithShadowPeekSizeRange(min int64, max int64) QueueOpt {
 	}
 }
 
+func WithBacklogNormalizeAsyncLimit(fn BacklogNormalizeAsyncLimitCount) QueueOpt {
+	return func(q *queue) {
+		q.backlogNormalizeAsyncLimit = fn
+	}
+}
+
 func WithBacklogRefillLimit(limit int64) QueueOpt {
 	return func(q *queue) {
 		q.backlogRefillLimit = limit
+	}
+}
+
+func WithBacklogNormalizationLimit(limit int64) QueueOpt {
+	return func(q *queue) {
+		q.backlogNormalizeLimit = limit
 	}
 }
 
@@ -556,11 +572,12 @@ func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 		apf: func(_ context.Context, _ uuid.UUID) uint {
 			return PriorityDefault
 		},
-		peekMin:            DefaultQueuePeekMin,
-		peekMax:            DefaultQueuePeekMax,
-		shadowPeekMin:      ShadowPartitionPeekMinBacklogs,
-		shadowPeekMax:      ShadowPartitionPeekMaxBacklogs,
-		backlogRefillLimit: BacklogRefillHardLimit,
+		peekMin:               DefaultQueuePeekMin,
+		peekMax:               DefaultQueuePeekMax,
+		shadowPeekMin:         ShadowPartitionPeekMinBacklogs,
+		shadowPeekMax:         ShadowPartitionPeekMaxBacklogs,
+		backlogRefillLimit:    BacklogRefillHardLimit,
+		backlogNormalizeLimit: defaultBacklogNormalizeLimit,
 		runMode: QueueRunMode{
 			Sequential:    true,
 			Scavenger:     true,
@@ -793,6 +810,7 @@ type queue struct {
 	shadowPeekMin           int64
 	shadowPeekMax           int64
 	backlogRefillLimit      int64
+	backlogNormalizeLimit   int64
 }
 
 type QueueRunMode struct {
@@ -3026,6 +3044,40 @@ func (q *queue) BacklogPrepareNormalize(ctx context.Context, b *QueueBacklog, sp
 	default:
 		return 0, false, fmt.Errorf("unknown status preparing backlog normalization: %v (%T)", status, status)
 	}
+}
+
+func (q *queue) NormalizeBacklog(ctx context.Context, b *QueueBacklog, limit int) (*NormalizeBacklogResult, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "NormalizeBacklog"), redis_telemetry.ScopeQueue)
+
+	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
+		return nil, nil
+	}
+
+	keys := []string{
+		q.primaryQueueShard.RedisClient.kg.BacklogSet(b.BacklogID),
+	}
+
+	args, err := StrSlice([]any{
+		b.BacklogID,
+		limit,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	byt, err := scripts["queue/normalizeBacklog"].Exec(
+		redis_telemetry.WithScriptName(ctx, "normalizeBacklog"),
+		q.primaryQueueShard.RedisClient.unshardedRc,
+		keys,
+		args,
+	).AsBytes()
+
+	var res NormalizeBacklogResult
+	if err := json.Unmarshal(byt, &res); err != nil {
+		return nil, err
+	}
+
+	return &res, nil
 }
 
 func (q *queue) ShadowPartitionPeek(ctx context.Context, sp *QueueShadowPartition, until time.Time, limit int64) ([]*QueueBacklog, int, error) {
