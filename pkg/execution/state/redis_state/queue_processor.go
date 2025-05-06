@@ -179,6 +179,10 @@ func (q *queue) Run(ctx context.Context, f osqueue.RunFunc) error {
 		go q.runScavenger(ctx)
 	}
 
+	if q.runMode.PauseFlusher {
+		go q.runPauseFlusher(ctx)
+	}
+
 	go q.runInstrumentation(ctx)
 
 	// start execution and shadow scan concurrently
@@ -355,6 +359,23 @@ func (q *queue) claimSequentialLease(ctx context.Context) {
 			q.seqLeaseLock.Unlock()
 		}
 	}
+}
+
+func (q *queue) runPauseFlusher(ctx context.Context) {
+	// TODO:
+	//
+	// configure lease
+	//
+	// - lock
+	// - set lease ID
+	// - unlock
+	//
+	// setup tick to attempt to configure lease
+	// or update lease if there's already one
+	//
+	// flush pauses to blob store on condition
+
+	panic("not implemented")
 }
 
 func (q *queue) runScavenger(ctx context.Context) {

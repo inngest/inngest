@@ -611,10 +611,11 @@ func (s *svc) pauses(ctx context.Context, evt event.TrackedEvent) error {
 
 	wsID := evt.GetWorkspaceID()
 	if ok, err := s.state.EventHasPauses(ctx, wsID, evt.GetEvent().Name); err == nil && !ok {
+		l.Debug().Msg("no pauses found for event")
 		return nil
 	}
 
-	l.Trace().Msg("pauses found; handling")
+	l.Debug().Msg("handling found pauses for event")
 
 	iter, err := s.state.PausesByEvent(ctx, wsID, evt.GetEvent().Name)
 	if err != nil {
@@ -622,6 +623,9 @@ func (s *svc) pauses(ctx context.Context, evt event.TrackedEvent) error {
 	}
 
 	_, err = s.executor.HandlePauses(ctx, iter, evt)
+	if err != nil {
+		l.Error().Err(err).Msg("error handling pauses")
+	}
 	return err
 }
 

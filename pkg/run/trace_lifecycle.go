@@ -1044,11 +1044,11 @@ func (l traceLifecycle) OnInvokeFunctionResumed(
 				WithSpanID(carrier.SpanID()),
 				WithSpanAttributes(
 					attribute.String(consts.OtelSysLifecycleID, "OnInvokeFunctionResumed"),
-					attribute.String(consts.OtelSysAccountID, pause.Identifier.AccountID.String()),
-					attribute.String(consts.OtelSysWorkspaceID, pause.Identifier.WorkspaceID.String()),
-					attribute.String(consts.OtelSysAppID, pause.Identifier.AppID.String()),
-					attribute.String(consts.OtelSysFunctionID, pause.Identifier.WorkflowID.String()),
-					attribute.Int(consts.OtelSysFunctionVersion, pause.Identifier.WorkflowVersion),
+					attribute.String(consts.OtelSysAccountID, md.ID.Tenant.AccountID.String()),
+					attribute.String(consts.OtelSysWorkspaceID, md.ID.Tenant.EnvID.String()),
+					attribute.String(consts.OtelSysAppID, md.ID.Tenant.AppID.String()),
+					attribute.String(consts.OtelSysFunctionID, md.ID.FunctionID.String()),
+					attribute.Int(consts.OtelSysFunctionVersion, md.Config.FunctionVersion),
 					attribute.String(consts.OtelAttrSDKRunID, pause.Identifier.RunID.String()),
 					attribute.Int(consts.OtelSysStepAttempt, 0),    // ?
 					attribute.Int(consts.OtelSysStepMaxAttempt, 1), // ?
@@ -1176,10 +1176,10 @@ func (l traceLifecycle) OnWaitForEventResumed(
 				WithSpanAttributes(
 					attribute.String(consts.OtelSysLifecycleID, "OnWaitForEventResumed"),
 					attribute.String(consts.OtelSysAccountID, pause.Identifier.AccountID.String()),
-					attribute.String(consts.OtelSysWorkspaceID, pause.Identifier.WorkspaceID.String()),
-					attribute.String(consts.OtelSysAppID, pause.Identifier.AppID.String()),
-					attribute.String(consts.OtelSysFunctionID, pause.Identifier.WorkflowID.String()),
-					attribute.Int(consts.OtelSysFunctionVersion, pause.Identifier.WorkflowVersion),
+					attribute.String(consts.OtelSysWorkspaceID, md.ID.Tenant.EnvID.String()),
+					attribute.String(consts.OtelSysAppID, md.ID.Tenant.AppID.String()),
+					attribute.String(consts.OtelSysFunctionID, md.ID.FunctionID.String()),
+					attribute.Int(consts.OtelSysFunctionVersion, md.Config.FunctionVersion),
 					attribute.String(consts.OtelAttrSDKRunID, pause.Identifier.RunID.String()),
 					attribute.Int(consts.OtelSysStepAttempt, 0),    // ?
 					attribute.Int(consts.OtelSysStepMaxAttempt, 1), // ?

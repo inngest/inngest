@@ -1137,6 +1137,9 @@ go.uber.org/multierr
 # gocloud.dev v0.40.0
 ## explicit; go 1.21.0
 gocloud.dev/aws
+gocloud.dev/blob
+gocloud.dev/blob/driver
+gocloud.dev/blob/memblob
 gocloud.dev/gcerrors
 gocloud.dev/gcp
 gocloud.dev/internal/escape

@@ -419,7 +419,6 @@ func checkSaveResponse_stack(t *testing.T, m state.Manager) {
 		}
 		_, err := m.SaveResponse(ctx, s.Identifier(), r.Step.ID, marshal(r.Output))
 		require.NoError(t, err)
-
 		// The stack should change
 		next, err := m.Load(ctx, s.Identifier().AccountID, s.Identifier().RunID)
 		require.NoError(t, err)
@@ -439,7 +438,6 @@ func checkSaveResponse_stack(t *testing.T, m state.Manager) {
 		require.Error(t, state.ErrDuplicateResponse, err)
 
 		next, err := m.Load(ctx, s.Identifier().AccountID, s.Identifier().RunID)
-		fmt.Println(next.Actions(), r.Step.ID)
 		require.NoError(t, err)
 
 		stack := next.Stack()
@@ -457,35 +455,55 @@ func checkSavePause(t *testing.T, m state.Manager) {
 
 	// Save a pause.
 	pause := state.Pause{
-		ID:         uuid.New(),
-		Identifier: s.Identifier(),
-		Outgoing:   inngest.TriggerName,
-		Incoming:   w.Steps[0].ID,
-		Expires:    state.Time(time.Now().Add(5 * time.Second)),
+		ID: pauseID(t),
+		Identifier: state.PauseIdentifier{
+			RunID:      s.Identifier().RunID,
+			FunctionID: s.Identifier().WorkflowID,
+			AccountID:  s.Identifier().AccountID,
+		},
+		Outgoing: inngest.TriggerName,
+		Incoming: w.Steps[0].ID,
+		Expires:  state.Time(time.Now().Add(5 * time.Second)),
 	}
-	err := m.SavePause(ctx, pause)
+	n, err := m.SavePause(ctx, pause)
 	require.NoError(t, err)
+	require.EqualValues(t, 1, n)
 
 	// XXX: Saving a pause with a past expiry is a noop.
+}
+
+func pauseID(t *testing.T) uuid.UUID {
+	id, err := uuid.NewV7()
+	require.NoError(t, err)
+	return id
 }
 
 func checkLeasePause(t *testing.T, m state.Manager) {
 	ctx := context.Background()
 	s := setup(t, m)
 
-	// Leasing a non-existent pause should error.
-	err := m.LeasePause(ctx, uuid.New())
-	assert.Equal(t, state.ErrPauseNotFound, err, "leasing a non-existent pause should return state.ErrPauseNotFound")
+	// Leasing a non-existent pause doesn't error;  pauses may be stored in block storage,
+	// so this should not check.
+	randomID := uuid.New()
+	err := m.LeasePause(ctx, randomID)
+	assert.Nil(t, err)
+	// But leasing again should fail, as we have the lease.
+	err = m.LeasePause(ctx, randomID)
+	assert.NotNil(t, err)
 
 	// Save a pause.
 	pause := state.Pause{
-		ID:         uuid.New(),
-		Identifier: s.Identifier(),
-		Outgoing:   inngest.TriggerName,
-		Incoming:   w.Steps[0].ID,
-		Expires:    state.Time(time.Now().Add(state.PauseLeaseDuration * 3).UTC()),
+		ID: pauseID(t),
+		Identifier: state.PauseIdentifier{
+			RunID:      s.Identifier().RunID,
+			FunctionID: s.Identifier().WorkflowID,
+			AccountID:  s.Identifier().AccountID,
+		},
+		Outgoing: inngest.TriggerName,
+		Incoming: w.Steps[0].ID,
+		Expires:  state.Time(time.Now().Add(state.PauseLeaseDuration * 3).UTC()),
 	}
-	err = m.SavePause(ctx, pause)
+	_, err = m.SavePause(ctx, pause)
 	require.NoError(t, err)
 
 	now := time.Now()
@@ -533,22 +551,6 @@ func checkLeasePause(t *testing.T, m state.Manager) {
 	// And again, once the lease is up, we should be able to lease the pause.
 	err = m.LeasePause(ctx, pause.ID)
 	require.NoError(t, err)
-
-	//
-	// Assert that leasing an expired pause fails.
-	//
-
-	pause = state.Pause{
-		ID:         uuid.New(),
-		Identifier: s.Identifier(),
-		Outgoing:   inngest.TriggerName,
-		Incoming:   w.Steps[0].ID,
-		Expires:    state.Time(time.Now().Add(10 * time.Millisecond)),
-	}
-	<-time.After(15 * time.Millisecond)
-	err = m.LeasePause(ctx, pause.ID)
-	require.NotNil(t, err, "Leasing an expired pause should fail")
-	require.Error(t, state.ErrPauseNotFound, err, "Leasing an expired pause should fail with ErrPauseNotFound")
 }
 
 func checkDeletePause(t *testing.T, m state.Manager) {
@@ -564,14 +566,18 @@ func checkDeletePause(t *testing.T, m state.Manager) {
 	pause := state.Pause{
 		ID:          uuid.New(),
 		WorkspaceID: s.Identifier().WorkspaceID,
-		Identifier:  s.Identifier(),
-		Outgoing:    inngest.TriggerName,
-		Incoming:    w.Steps[0].ID,
-		StepName:    w.Steps[0].Name,
-		Event:       &evt,
-		Expires:     state.Time(time.Now().Add(state.PauseLeaseDuration * 2).UTC().Truncate(time.Second)),
+		Identifier: state.PauseIdentifier{
+			RunID:      s.Identifier().RunID,
+			FunctionID: s.Identifier().WorkflowID,
+			AccountID:  s.Identifier().AccountID,
+		},
+		Outgoing: inngest.TriggerName,
+		Incoming: w.Steps[0].ID,
+		StepName: w.Steps[0].Name,
+		Event:    &evt,
+		Expires:  state.Time(time.Now().Add(state.PauseLeaseDuration * 2).UTC().Truncate(time.Second)),
 	}
-	err = m.SavePause(ctx, pause)
+	_, err = m.SavePause(ctx, pause)
 	require.NoError(t, err)
 
 	ok, err := m.EventHasPauses(ctx, s.Identifier().WorkspaceID, evt)
@@ -609,20 +615,20 @@ func checkConsumePause(t *testing.T, m state.Manager) {
 	ctx := context.Background()
 	s := setup(t, m)
 
-	// Consuming a non-existent pause should error.
-	_, err := m.ConsumePause(ctx, uuid.New(), nil)
-	require.Equal(t, state.ErrPauseNotFound, err, "Consuming a non-existent pause should return state.ErrPauseNotFound")
-
 	// Save a pause.
 	pause := state.Pause{
-		ID:         uuid.New(),
-		Identifier: s.Identifier(),
-		Outgoing:   inngest.TriggerName,
-		Incoming:   w.Steps[0].ID,
-		StepName:   w.Steps[0].Name,
-		Expires:    state.Time(time.Now().Add(state.PauseLeaseDuration * 2)),
+		ID: pauseID(t),
+		Identifier: state.PauseIdentifier{
+			RunID:      s.Identifier().RunID,
+			FunctionID: s.Identifier().WorkflowID,
+			AccountID:  s.Identifier().AccountID,
+		},
+		Outgoing: inngest.TriggerName,
+		Incoming: w.Steps[0].ID,
+		StepName: w.Steps[0].Name,
+		Expires:  state.Time(time.Now().Add(state.PauseLeaseDuration * 2)),
 	}
-	err = m.SavePause(ctx, pause)
+	_, err := m.SavePause(ctx, pause)
 	require.NoError(t, err)
 
 	t.Run("Consuming a pause works", func(t *testing.T) {
@@ -631,30 +637,10 @@ func checkConsumePause(t *testing.T, m state.Manager) {
 		// and without this there's a small but real chance of flakiness.
 		<-time.After(time.Millisecond)
 		// Consuming the pause should work.
-		_, err = m.ConsumePause(ctx, pause.ID, nil)
+		res, err := m.ConsumePause(ctx, pause, nil)
 		require.NoError(t, err)
+		require.True(t, res.DidConsume)
 	})
-
-	t.Run("Consuming a pause again fails", func(t *testing.T) {
-		_, err = m.ConsumePause(ctx, pause.ID, nil)
-		require.NotNil(t, err)
-		require.Error(t, state.ErrPauseNotFound, err)
-	})
-
-	//
-	// Assert that completing a leased pause fails.
-	//
-	pause = state.Pause{
-		ID:         uuid.New(),
-		Identifier: s.Identifier(),
-		Outgoing:   inngest.TriggerName,
-		Incoming:   w.Steps[0].ID,
-		Expires:    state.Time(time.Now().Add(10 * time.Millisecond)),
-	}
-	<-time.After(15 * time.Millisecond)
-	_, err = m.ConsumePause(ctx, pause.ID, nil)
-	require.NotNil(t, err, "Consuming an expired pause should error")
-	require.Error(t, state.ErrPauseNotFound, err)
 }
 
 func checkConsumePauseWithData(t *testing.T, m state.Manager) {
@@ -665,45 +651,25 @@ func checkConsumePauseWithData(t *testing.T, m state.Manager) {
 		"did this work?": true,
 	}
 
-	// Consuming a non-existent pause should error.
-	_, err := m.ConsumePause(ctx, uuid.New(), pauseData)
-	require.Equal(t, state.ErrPauseNotFound, err, "Consuming a non-existent pause should return state.ErrPauseNotFound")
-
 	// Save a pause.
 	pause := state.Pause{
-		ID:         uuid.New(),
-		Identifier: s.Identifier(),
-		Outgoing:   inngest.TriggerName,
-		Incoming:   w.Steps[0].ID,
-		Expires:    state.Time(time.Now().Add(state.PauseLeaseDuration * 2)),
-		DataKey:    "my-pause-data-stored-for-eternity",
+		ID: pauseID(t),
+		Identifier: state.PauseIdentifier{
+			RunID:      s.Identifier().RunID,
+			FunctionID: s.Identifier().WorkflowID,
+			AccountID:  s.Identifier().AccountID,
+		},
+		Outgoing: inngest.TriggerName,
+		Incoming: w.Steps[0].ID,
+		Expires:  state.Time(time.Now().Add(state.PauseLeaseDuration * 2)),
+		DataKey:  "my-pause-data-stored-for-eternity",
 	}
-	err = m.SavePause(ctx, pause)
+	_, err := m.SavePause(ctx, pause)
 	require.NoError(t, err)
 
 	// Consuming the pause should work.
-	_, err = m.ConsumePause(ctx, pause.ID, pauseData)
+	_, err = m.ConsumePause(ctx, pause, pauseData)
 	require.NoError(t, err)
-
-	_, err = m.ConsumePause(ctx, pause.ID, pauseData)
-	require.NotNil(t, err)
-	require.Error(t, state.ErrPauseNotFound, err)
-
-	//
-	// Assert that completing a leased pause fails.
-	//
-	pause = state.Pause{
-		ID:         uuid.New(),
-		Identifier: s.Identifier(),
-		Outgoing:   inngest.TriggerName,
-		Incoming:   w.Steps[0].ID,
-		Expires:    state.Time(time.Now().Add(10 * time.Millisecond)),
-		DataKey:    "my-pause-data-stored-for-eternity",
-	}
-	<-time.After(15 * time.Millisecond)
-	_, err = m.ConsumePause(ctx, pause.ID, pauseData)
-	require.NotNil(t, err, "Consuming an expired pause should error")
-	require.Error(t, state.ErrPauseNotFound, err)
 
 	// Load function state and assert we have the pause stored in state.
 	reloaded, err := m.Load(ctx, s.Identifier().AccountID, s.RunID())
@@ -720,18 +686,22 @@ func checkConsumePauseWithDataIndex(t *testing.T, m state.Manager) {
 
 		// Save a pause.
 		pause := state.Pause{
-			ID:         uuid.New(),
-			Identifier: s.Identifier(),
-			Outgoing:   inngest.TriggerName,
-			Incoming:   w.Steps[0].ID,
-			Expires:    state.Time(time.Now().Add(state.PauseLeaseDuration * 2)),
-			DataKey:    key,
+			ID: pauseID(t),
+			Identifier: state.PauseIdentifier{
+				RunID:      s.Identifier().RunID,
+				FunctionID: s.Identifier().WorkflowID,
+				AccountID:  s.Identifier().AccountID,
+			},
+			Outgoing: inngest.TriggerName,
+			Incoming: w.Steps[0].ID,
+			Expires:  state.Time(time.Now().Add(state.PauseLeaseDuration * 2)),
+			DataKey:  key,
 		}
-		err := m.SavePause(ctx, pause)
+		_, err := m.SavePause(ctx, pause)
 		require.NoError(t, err)
 
 		// Consuming the pause should work.
-		_, err = m.ConsumePause(ctx, pause.ID, nil)
+		_, err = m.ConsumePause(ctx, pause, nil)
 		require.NoError(t, err)
 
 		// Load function state and assert we have the pause stored in state.
@@ -756,20 +726,24 @@ func checkConsumePauseWithDataIndex(t *testing.T, m state.Manager) {
 
 		// Save a pause.
 		pause := state.Pause{
-			ID:         uuid.New(),
-			Identifier: s.Identifier(),
-			Outgoing:   inngest.TriggerName,
-			Incoming:   w.Steps[0].ID,
-			Expires:    state.Time(time.Now().Add(state.PauseLeaseDuration * 2)),
-			DataKey:    key,
+			ID: uuid.New(),
+			Identifier: state.PauseIdentifier{
+				RunID:      s.Identifier().RunID,
+				FunctionID: s.Identifier().WorkflowID,
+				AccountID:  s.Identifier().AccountID,
+			},
+			Outgoing: inngest.TriggerName,
+			Incoming: w.Steps[0].ID,
+			Expires:  state.Time(time.Now().Add(state.PauseLeaseDuration * 2)),
+			DataKey:  key,
 		}
-		err = m.SavePause(ctx, pause)
+		_, err = m.SavePause(ctx, pause)
 		require.NoError(t, err)
 
 		data := map[string]any{"allo": "guvna"}
 
 		// Consuming the pause should work.
-		_, err = m.ConsumePause(ctx, pause.ID, data)
+		_, err = m.ConsumePause(ctx, pause, data)
 		require.NoError(t, err)
 
 		// Load function state and assert we have the pause stored in state.
@@ -788,45 +762,33 @@ func checkConsumePauseWithEmptyData(t *testing.T, m state.Manager) {
 	ctx := context.Background()
 	s := setup(t, m)
 
-	// Consuming a non-existent pause should error.
-	_, err := m.ConsumePause(ctx, uuid.New(), nil)
-	require.Equal(t, state.ErrPauseNotFound, err, "Consuming a non-existent pause should return state.ErrPauseNotFound")
+	// NOTE: Consuming a pause not in the store is possible;  the pause may
+	// exist in a different datasotre (block storage), so we assume that the pause
+	// data written is valid.
+	res, err := m.ConsumePause(ctx, state.Pause{ID: uuid.New()}, nil)
+	require.Nil(t, err)
+	require.True(t, res.DidConsume, "got: %#v", res)
 
 	// Save a pause.
 	pause := state.Pause{
-		ID:         uuid.New(),
-		Identifier: s.Identifier(),
-		Outgoing:   inngest.TriggerName,
-		Incoming:   w.Steps[0].ID,
-		Expires:    state.Time(time.Now().Add(state.PauseLeaseDuration * 2)),
-		DataKey:    "my-pause-data-stored-for-eternity",
+		ID: pauseID(t),
+		Identifier: state.PauseIdentifier{
+			RunID:      s.Identifier().RunID,
+			FunctionID: s.Identifier().WorkflowID,
+			AccountID:  s.Identifier().AccountID,
+		},
+		Outgoing: inngest.TriggerName,
+		Incoming: w.Steps[0].ID,
+		Expires:  state.Time(time.Now().Add(state.PauseLeaseDuration * 2)),
+		DataKey:  "my-pause-data-stored-for-eternity",
 	}
-	err = m.SavePause(ctx, pause)
+	_, err = m.SavePause(ctx, pause)
 	require.NoError(t, err)
 
 	// Consuming the pause should work.
-	_, err = m.ConsumePause(ctx, pause.ID, nil)
+	res, err = m.ConsumePause(ctx, pause, nil)
 	require.NoError(t, err)
-
-	_, err = m.ConsumePause(ctx, pause.ID, nil)
-	require.NotNil(t, err)
-	require.Error(t, state.ErrPauseNotFound, err)
-
-	//
-	// Assert that completing a leased pause fails.
-	//
-	pause = state.Pause{
-		ID:         uuid.New(),
-		Identifier: s.Identifier(),
-		Outgoing:   inngest.TriggerName,
-		Incoming:   w.Steps[0].ID,
-		Expires:    state.Time(time.Now().Add(10 * time.Millisecond)),
-		DataKey:    "my-pause-data-stored-for-eternity",
-	}
-	<-time.After(15 * time.Millisecond)
-	_, err = m.ConsumePause(ctx, pause.ID, nil)
-	require.NotNil(t, err, "Consuming an expired pause should error")
-	require.Error(t, state.ErrPauseNotFound, err)
+	require.True(t, res.DidConsume)
 
 	// Load function state and assert we have the pause stored in state.
 	reloaded, err := m.Load(ctx, s.Identifier().AccountID, s.RunID())
@@ -842,43 +804,25 @@ func checkConsumePauseWithEmptyDataKey(t *testing.T, m state.Manager) {
 		"did this work?": true,
 	}
 
-	// Consuming a non-existent pause should error.
-	_, err := m.ConsumePause(ctx, uuid.New(), pauseData)
-	require.Equal(t, state.ErrPauseNotFound, err, "Consuming a non-existent pause should return state.ErrPauseNotFound")
-
 	// Save a pause.
 	pause := state.Pause{
-		ID:         uuid.New(),
-		Identifier: s.Identifier(),
-		Outgoing:   inngest.TriggerName,
-		Incoming:   w.Steps[0].ID,
-		Expires:    state.Time(time.Now().Add(state.PauseLeaseDuration * 2)),
+		ID: pauseID(t),
+		Identifier: state.PauseIdentifier{
+			RunID:      s.Identifier().RunID,
+			FunctionID: s.Identifier().WorkflowID,
+			AccountID:  s.Identifier().AccountID,
+		},
+		Outgoing: inngest.TriggerName,
+		Incoming: w.Steps[0].ID,
+		Expires:  state.Time(time.Now().Add(state.PauseLeaseDuration * 2)),
 	}
-	err = m.SavePause(ctx, pause)
+	_, err := m.SavePause(ctx, pause)
 	require.NoError(t, err)
 
 	// Consuming the pause should work.
-	_, err = m.ConsumePause(ctx, pause.ID, pauseData)
+	res, err := m.ConsumePause(ctx, pause, pauseData)
 	require.NoError(t, err)
-
-	_, err = m.ConsumePause(ctx, pause.ID, pauseData)
-	require.NotNil(t, err)
-	require.Error(t, state.ErrPauseNotFound, err)
-
-	//
-	// Assert that completing a leased pause fails.
-	//
-	pause = state.Pause{
-		ID:         uuid.New(),
-		Identifier: s.Identifier(),
-		Outgoing:   inngest.TriggerName,
-		Incoming:   w.Steps[0].ID,
-		Expires:    state.Time(time.Now().Add(10 * time.Millisecond)),
-	}
-	<-time.After(15 * time.Millisecond)
-	_, err = m.ConsumePause(ctx, pause.ID, pauseData)
-	require.NotNil(t, err, "Consuming an expired pause should error")
-	require.Error(t, state.ErrPauseNotFound, err)
+	require.True(t, res.DidConsume)
 
 	// Load function state and assert we have the pause stored in state.
 	reloaded, err := m.Load(ctx, s.Identifier().AccountID, s.RunID())
@@ -913,39 +857,51 @@ func checkPausesByEvent_single(t *testing.T, m state.Manager) {
 	pause := state.Pause{
 		ID:          uuid.New(),
 		WorkspaceID: wsA,
-		Identifier:  s.Identifier(),
-		Outgoing:    inngest.TriggerName,
-		Incoming:    w.Steps[0].ID,
-		Expires:     state.Time(time.Now().Add(state.PauseLeaseDuration * 2).Truncate(time.Millisecond).UTC()),
-		Event:       &evtA,
+		Identifier: state.PauseIdentifier{
+			RunID:      s.Identifier().RunID,
+			FunctionID: s.Identifier().WorkflowID,
+			AccountID:  s.Identifier().AccountID,
+		},
+		Outgoing: inngest.TriggerName,
+		Incoming: w.Steps[0].ID,
+		Expires:  state.Time(time.Now().Add(state.PauseLeaseDuration * 2).Truncate(time.Millisecond).UTC()),
+		Event:    &evtA,
 	}
-	err := m.SavePause(ctx, pause)
+	_, err := m.SavePause(ctx, pause)
 	require.NoError(t, err)
 
 	// Save an unrelated pause to another event in the same workspace
 	unusedA := state.Pause{
 		ID:          uuid.New(),
 		WorkspaceID: wsA,
-		Identifier:  s.Identifier(),
-		Outgoing:    inngest.TriggerName,
-		Incoming:    w.Steps[0].ID,
-		Expires:     state.Time(time.Now().Add(state.PauseLeaseDuration * 2).Truncate(time.Millisecond).UTC()),
-		Event:       &evtB,
+		Identifier: state.PauseIdentifier{
+			RunID:      s.Identifier().RunID,
+			FunctionID: s.Identifier().WorkflowID,
+			AccountID:  s.Identifier().AccountID,
+		},
+		Outgoing: inngest.TriggerName,
+		Incoming: w.Steps[0].ID,
+		Expires:  state.Time(time.Now().Add(state.PauseLeaseDuration * 2).Truncate(time.Millisecond).UTC()),
+		Event:    &evtB,
 	}
-	err = m.SavePause(ctx, unusedA)
+	_, err = m.SavePause(ctx, unusedA)
 	require.NoError(t, err)
 
 	// Save an unrelated pause to the same event in a different workspace
 	unusedB := state.Pause{
 		ID:          uuid.New(),
 		WorkspaceID: wsB,
-		Identifier:  s.Identifier(),
-		Outgoing:    inngest.TriggerName,
-		Incoming:    w.Steps[0].ID,
-		Expires:     state.Time(time.Now().Add(state.PauseLeaseDuration * 2).Truncate(time.Millisecond).UTC()),
-		Event:       &evtA,
+		Identifier: state.PauseIdentifier{
+			RunID:      s.Identifier().RunID,
+			FunctionID: s.Identifier().WorkflowID,
+			AccountID:  s.Identifier().AccountID,
+		},
+		Outgoing: inngest.TriggerName,
+		Incoming: w.Steps[0].ID,
+		Expires:  state.Time(time.Now().Add(state.PauseLeaseDuration * 2).Truncate(time.Millisecond).UTC()),
+		Event:    &evtA,
 	}
-	err = m.SavePause(ctx, unusedB)
+	_, err = m.SavePause(ctx, unusedB)
 	require.NoError(t, err)
 
 	exists, err := m.EventHasPauses(ctx, wsA, evtA)
@@ -975,28 +931,37 @@ func checkPausesByEvent_multi(t *testing.T, m state.Manager) {
 	pauses := []state.Pause{}
 	for i := 0; i <= 2000; i++ {
 		p := state.Pause{
-			ID:         uuid.New(),
-			Identifier: s.Identifier(),
-			Outgoing:   inngest.TriggerName,
-			Incoming:   w.Steps[0].ID,
-			Expires:    state.Time(time.Now().Add(time.Duration(i+1) * time.Minute).Truncate(time.Millisecond).UTC()),
-			Event:      &evtA,
+			ID: uuid.New(),
+			Identifier: state.PauseIdentifier{
+				RunID:      s.Identifier().RunID,
+				FunctionID: s.Identifier().WorkflowID,
+				AccountID:  s.Identifier().AccountID,
+			},
+			Outgoing: inngest.TriggerName,
+			Incoming: w.Steps[0].ID,
+			Expires:  state.Time(time.Now().Add(time.Duration(i+1) * time.Minute).Truncate(time.Millisecond).UTC()),
+			Event:    &evtA,
 		}
-		err := m.SavePause(ctx, p)
+		n, err := m.SavePause(ctx, p)
 		require.NoError(t, err)
+		require.EqualValues(t, i+1, n)
 		pauses = append(pauses, p)
 	}
 
 	// Save an unrelated pause to another event.
 	unused := state.Pause{
-		ID:         uuid.New(),
-		Identifier: s.Identifier(),
-		Outgoing:   "plz-dont",
-		Incoming:   w.Steps[0].ID,
-		Expires:    state.Time(time.Now().Add(state.PauseLeaseDuration * 2)),
-		Event:      &evtB,
+		ID: pauseID(t),
+		Identifier: state.PauseIdentifier{
+			RunID:      s.Identifier().RunID,
+			FunctionID: s.Identifier().WorkflowID,
+			AccountID:  s.Identifier().AccountID,
+		},
+		Outgoing: "plz-dont",
+		Incoming: w.Steps[0].ID,
+		Expires:  state.Time(time.Now().Add(state.PauseLeaseDuration * 2)),
+		Event:    &evtB,
 	}
-	err := m.SavePause(ctx, unused)
+	_, err := m.SavePause(ctx, unused)
 	require.NoError(t, err)
 
 	iter, err := m.PausesByEvent(ctx, uuid.UUID{}, evtA)
@@ -1051,14 +1016,18 @@ func checkPausesByEvent_concurrent(t *testing.T, m state.Manager) {
 	pauses := []state.Pause{}
 	for i := 0; i <= 2000; i++ {
 		p := state.Pause{
-			ID:         uuid.New(),
-			Identifier: s.Identifier(),
-			Outgoing:   inngest.TriggerName,
-			Incoming:   w.Steps[0].ID,
-			Expires:    state.Time(time.Now().Add(time.Duration(i+1) * time.Minute).Truncate(time.Millisecond).UTC()),
-			Event:      &evtA,
+			ID: uuid.New(),
+			Identifier: state.PauseIdentifier{
+				RunID:      s.Identifier().RunID,
+				FunctionID: s.Identifier().WorkflowID,
+				AccountID:  s.Identifier().AccountID,
+			},
+			Outgoing: inngest.TriggerName,
+			Incoming: w.Steps[0].ID,
+			Expires:  state.Time(time.Now().Add(time.Duration(i+1) * time.Minute).Truncate(time.Millisecond).UTC()),
+			Event:    &evtA,
 		}
-		err := m.SavePause(ctx, p)
+		_, err := m.SavePause(ctx, p)
 		require.NoError(t, err)
 		pauses = append(pauses, p)
 	}
@@ -1145,14 +1114,18 @@ func checkPausesByEvent_consumed(t *testing.T, m state.Manager) {
 	pauses := []state.Pause{}
 	for i := 0; i < 2; i++ {
 		p := state.Pause{
-			ID:         uuid.New(),
-			Identifier: s.Identifier(),
-			Outgoing:   inngest.TriggerName,
-			Incoming:   w.Steps[0].ID,
-			Expires:    state.Time(time.Now().Add(time.Duration(i+1) * time.Minute).Truncate(time.Millisecond).UTC()),
-			Event:      &evtA,
+			ID: uuid.New(),
+			Identifier: state.PauseIdentifier{
+				RunID:      s.Identifier().RunID,
+				FunctionID: s.Identifier().WorkflowID,
+				AccountID:  s.Identifier().AccountID,
+			},
+			Outgoing: inngest.TriggerName,
+			Incoming: w.Steps[0].ID,
+			Expires:  state.Time(time.Now().Add(time.Duration(i+1) * time.Minute).Truncate(time.Millisecond).UTC()),
+			Event:    &evtA,
 		}
-		err := m.SavePause(ctx, p)
+		_, err := m.SavePause(ctx, p)
 		require.NoError(t, err)
 		pauses = append(pauses, p)
 	}
@@ -1186,7 +1159,7 @@ func checkPausesByEvent_consumed(t *testing.T, m state.Manager) {
 
 	// Consume the first pause, and assert that it doesn't show up in
 	// an iterator.
-	_, err = m.ConsumePause(ctx, pauses[0].ID, nil)
+	_, err = m.ConsumePause(ctx, pauses[0], nil)
 	require.NoError(t, err)
 
 	iter, err = m.PausesByEvent(ctx, uuid.UUID{}, evtA)
@@ -1228,24 +1201,32 @@ func checkPausesByEvent_consumed(t *testing.T, m state.Manager) {
 		p1 := state.Pause{
 			ID:          uuid.New(),
 			WorkspaceID: wsID,
-			Identifier:  s.Identifier(),
-			Outgoing:    inngest.TriggerName,
-			Incoming:    w.Steps[0].ID,
-			Expires:     state.Time(time.Now().Add(time.Minute)),
-			Event:       &evtA,
+			Identifier: state.PauseIdentifier{
+				RunID:      s.Identifier().RunID,
+				FunctionID: s.Identifier().WorkflowID,
+				AccountID:  s.Identifier().AccountID,
+			},
+			Outgoing: inngest.TriggerName,
+			Incoming: w.Steps[0].ID,
+			Expires:  state.Time(time.Now().Add(time.Minute)),
+			Event:    &evtA,
 		}
 		p2 := state.Pause{
 			ID:          uuid.New(),
 			WorkspaceID: wsID,
-			Identifier:  s.Identifier(),
-			Outgoing:    inngest.TriggerName,
-			Incoming:    w.Steps[0].ID,
-			Expires:     state.Time(time.Now().Add(time.Minute).Truncate(time.Second).UTC()),
-			Event:       &evtA,
+			Identifier: state.PauseIdentifier{
+				RunID:      s.Identifier().RunID,
+				FunctionID: s.Identifier().WorkflowID,
+				AccountID:  s.Identifier().AccountID,
+			},
+			Outgoing: inngest.TriggerName,
+			Incoming: w.Steps[0].ID,
+			Expires:  state.Time(time.Now().Add(time.Minute).Truncate(time.Second).UTC()),
+			Event:    &evtA,
 		}
-		err := m.SavePause(ctx, p1)
+		_, err := m.SavePause(ctx, p1)
 		require.NoError(t, err)
-		err = m.SavePause(ctx, p2)
+		_, err = m.SavePause(ctx, p2)
 		require.NoError(t, err)
 
 		//
@@ -1263,7 +1244,7 @@ func checkPausesByEvent_consumed(t *testing.T, m state.Manager) {
 		// There should be two pauses.
 		require.Equal(t, 2, n)
 
-		_, err = m.ConsumePause(ctx, p1.ID, map[string]any{"ok": true})
+		_, err = m.ConsumePause(ctx, p1, map[string]any{"ok": true})
 		require.NoError(t, err)
 
 		//
@@ -1282,7 +1263,6 @@ func checkPausesByEvent_consumed(t *testing.T, m state.Manager) {
 
 		require.Equal(t, 1, n)
 	})
-
 }
 
 func checkPauseByID(t *testing.T, m state.Manager) {
@@ -1291,13 +1271,17 @@ func checkPauseByID(t *testing.T, m state.Manager) {
 
 	// Save a pause.
 	pause := state.Pause{
-		ID:         uuid.New(),
-		Identifier: s.Identifier(),
-		Outgoing:   inngest.TriggerName,
-		Incoming:   w.Steps[0].ID,
-		Expires:    state.Time(time.Now().Add(time.Second * 2).Truncate(time.Millisecond).UTC()),
+		ID: pauseID(t),
+		Identifier: state.PauseIdentifier{
+			RunID:      s.Identifier().RunID,
+			FunctionID: s.Identifier().WorkflowID,
+			AccountID:  s.Identifier().AccountID,
+		},
+		Outgoing: inngest.TriggerName,
+		Incoming: w.Steps[0].ID,
+		Expires:  state.Time(time.Now().Add(time.Second * 2).Truncate(time.Millisecond).UTC()),
 	}
-	err := m.SavePause(ctx, pause)
+	_, err := m.SavePause(ctx, pause)
 	require.NoError(t, err)
 
 	found, err := m.PauseByID(ctx, pause.ID)
@@ -1312,7 +1296,7 @@ func checkPauseByID(t *testing.T, m state.Manager) {
 	require.EqualValues(t, pause, *found)
 
 	// Consume.
-	_, err = m.ConsumePause(ctx, pause.ID, nil)
+	_, err = m.ConsumePause(ctx, pause, nil)
 	require.Nil(t, err, "Consuming an expired pause should work")
 
 	found, err = m.PauseByID(ctx, pause.ID)
@@ -1332,22 +1316,30 @@ func checkPausesByID(t *testing.T, m state.Manager) {
 
 	// Save a pause.
 	a := state.Pause{
-		ID:         uuid.New(),
-		Identifier: s.Identifier(),
-		Outgoing:   inngest.TriggerName,
-		Incoming:   w.Steps[0].ID,
-		Expires:    state.Time(time.Now().Add(time.Second * 2).Truncate(time.Millisecond).UTC()),
+		ID: pauseID(t),
+		Identifier: state.PauseIdentifier{
+			RunID:      s.Identifier().RunID,
+			FunctionID: s.Identifier().WorkflowID,
+			AccountID:  s.Identifier().AccountID,
+		},
+		Outgoing: inngest.TriggerName,
+		Incoming: w.Steps[0].ID,
+		Expires:  state.Time(time.Now().Add(time.Second * 2).Truncate(time.Millisecond).UTC()),
 	}
 	b := state.Pause{
-		ID:         uuid.New(),
-		Identifier: s.Identifier(),
-		Outgoing:   inngest.TriggerName,
-		Incoming:   w.Steps[0].ID,
-		Expires:    state.Time(time.Now().Add(time.Second * 2).Truncate(time.Millisecond).UTC()),
+		ID: pauseID(t),
+		Identifier: state.PauseIdentifier{
+			RunID:      s.Identifier().RunID,
+			FunctionID: s.Identifier().WorkflowID,
+			AccountID:  s.Identifier().AccountID,
+		},
+		Outgoing: inngest.TriggerName,
+		Incoming: w.Steps[0].ID,
+		Expires:  state.Time(time.Now().Add(time.Second * 2).Truncate(time.Millisecond).UTC()),
 	}
-	err := m.SavePause(ctx, a)
+	_, err := m.SavePause(ctx, a)
 	require.NoError(t, err)
-	err = m.SavePause(ctx, b)
+	_, err = m.SavePause(ctx, b)
 	require.NoError(t, err)
 
 	found, err := m.PausesByID(ctx, a.ID)
@@ -1362,8 +1354,8 @@ func checkPausesByID(t *testing.T, m state.Manager) {
 	require.Nil(t, err)
 	require.EqualValues(t, 2, len(found))
 
+	_, err = m.ConsumePause(ctx, a, nil)
 	// Consume.
-	_, err = m.ConsumePause(ctx, a.ID, nil)
 	require.Nil(t, err, "Consuming an expired pause should work")
 
 	found, err = m.PausesByID(ctx, a.ID)
