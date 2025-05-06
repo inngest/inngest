@@ -2,7 +2,6 @@ package pauses
 
 import (
 	"context"
-	"slices"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -30,6 +29,7 @@ func newDualIter(idx Index, bufferedIter state.PauseIterator, rdr BlockReader, b
 		bufferIter:      bufferedIter,
 		blockReader:     rdr,
 		unfetchedBlocks: blockIDs,
+		inflightBlocks:  map[ulid.ULID]struct{}{},
 		l:               &sync.Mutex{},
 	}
 }
@@ -62,7 +62,7 @@ type dualIter struct {
 
 	// inflightBlocks represents blocks that are currently being fetched from
 	// the backing store.
-	inflightBlocks []ulid.ULID
+	inflightBlocks map[ulid.ULID]struct{}
 
 	// pauses represents the current pauses that have been fetched from downloaded
 	// blocks.
@@ -203,7 +203,9 @@ func (d *dualIter) fetchNextBlocks() bool {
 	blockIDs := d.unfetchedBlocks[0:maxFetch]
 
 	// Move the blocks to in-flight.
-	d.inflightBlocks = append(d.inflightBlocks, blockIDs...)
+	for _, blockID := range blockIDs {
+		d.inflightBlocks[blockID] = struct{}{}
+	}
 
 	// And remove from unfetched
 	d.unfetchedBlocks = d.unfetchedBlocks[maxFetch:]
@@ -237,9 +239,7 @@ func (d *dualIter) fetchBlock(ctx context.Context, id ulid.ULID) {
 	d.l.Lock()
 	defer d.l.Unlock()
 	// Remove this from in-flight stuff.
-	d.inflightBlocks = slices.DeleteFunc(d.inflightBlocks, func(i ulid.ULID) bool {
-		return i == id
-	})
+	delete(d.inflightBlocks, id)
 	// And, of course, add our pauses so that we can iterate through them.
 	d.pauses = append(d.pauses, block.Pauses...)
 }
