@@ -7245,19 +7245,22 @@ func TestQueueBacklogPrepareNormalize(t *testing.T) {
 		QueueName: nil,
 	}
 
-	_, err = q.EnqueueItem(ctx, defaultShard, item, at, osqueue.EnqueueOpts{})
-	require.NoError(t, err)
-
-	expectedBacklog := q.ItemBacklog(ctx, item)
-	require.NotEmpty(t, expectedBacklog.BacklogID)
-
-	shadowPartition := q.ItemShadowPartition(ctx, item)
-	require.NotEmpty(t, shadowPartition.PartitionID)
-
 	t.Run("should move backlog to normalization set", func(t *testing.T) {
-		err := q.BacklogPrepareNormalize(ctx, &expectedBacklog, &shadowPartition)
+		r.FlushAll()
+
+		_, err = q.EnqueueItem(ctx, defaultShard, item, at, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 
+		expectedBacklog := q.ItemBacklog(ctx, item)
+		require.NotEmpty(t, expectedBacklog.BacklogID)
+
+		shadowPartition := q.ItemShadowPartition(ctx, item)
+		require.NotEmpty(t, shadowPartition.PartitionID)
+		backlogCount, shouldNormalizeAsync, err := q.BacklogPrepareNormalize(ctx, &expectedBacklog, &shadowPartition, 1)
+		require.NoError(t, err)
+
+		require.True(t, shouldNormalizeAsync)
+		require.Equal(t, 1, backlogCount)
 		require.True(t, hasMember(t, r, kg.GlobalAccountNormalizeSet(), accountId.String()))
 		require.True(t, hasMember(t, r, kg.AccountNormalizeSet(accountId), fnID.String()))
 		require.True(t, hasMember(t, r, kg.PartitionNormalizeSet(fnID.String()), expectedBacklog.BacklogID))
@@ -7267,7 +7270,27 @@ func TestQueueBacklogPrepareNormalize(t *testing.T) {
 		require.Equal(t, expectedTime, int64(score(t, r, kg.GlobalAccountNormalizeSet(), accountId.String())))
 		require.Equal(t, expectedTime, int64(score(t, r, kg.AccountNormalizeSet(accountId), fnID.String())))
 		require.Equal(t, expectedTime, int64(score(t, r, kg.PartitionNormalizeSet(fnID.String()), expectedBacklog.BacklogID)))
+	})
 
+	t.Run("should not move if below limit", func(t *testing.T) {
+		r.FlushAll()
+
+		_, err = q.EnqueueItem(ctx, defaultShard, item, at, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+
+		expectedBacklog := q.ItemBacklog(ctx, item)
+		require.NotEmpty(t, expectedBacklog.BacklogID)
+
+		shadowPartition := q.ItemShadowPartition(ctx, item)
+		require.NotEmpty(t, shadowPartition.PartitionID)
+		backlogCount, shouldNormalizeAsync, err := q.BacklogPrepareNormalize(ctx, &expectedBacklog, &shadowPartition, 5)
+		require.NoError(t, err)
+
+		require.False(t, shouldNormalizeAsync)
+		require.Equal(t, 1, backlogCount)
+		require.False(t, hasMember(t, r, kg.GlobalAccountNormalizeSet(), accountId.String()))
+		require.False(t, hasMember(t, r, kg.AccountNormalizeSet(accountId), fnID.String()))
+		require.False(t, hasMember(t, r, kg.PartitionNormalizeSet(fnID.String()), expectedBacklog.BacklogID))
 	})
 }
 

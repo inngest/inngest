@@ -594,19 +594,16 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 		// May need to normalize - this will not happen for default backlogs
 		if backlog.isOutdated(shadowPart) {
 			// Prepare normalization
-			err := q.BacklogPrepareNormalize(ctx, backlog, shadowPart)
+			_, shouldNormalizeAsync, err := q.BacklogPrepareNormalize(ctx, backlog, shadowPart, BacklogNormalizeAsyncLimit)
 			if err != nil {
 				return fmt.Errorf("could not prepare backlog for normalization: %w", err)
 			}
 
-			// TODO Move this into dedicated role
-			{
+			if !shouldNormalizeAsync {
 				err = q.normalizeBacklog(ctx, backlog, shadowPart)
 				if err != nil {
 					return fmt.Errorf("could not normalize backlog: %w", err)
 				}
-				// TODO Remove from normalize set
-
 			}
 
 			continue

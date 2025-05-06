@@ -47,6 +47,10 @@ const (
 	ShadowPartitionPeekMaxBacklogs       = int64(100)
 	AbsoluteShadowPartitionPeekMax int64 = 10 * ShadowPartitionPeekMaxBacklogs
 
+	// BacklogNormalizeAsyncLimit determines the minimum number of items required in an outdated backlog
+	// to require an async normalize job. For small backlogs, the added QPS may not be worth it and we should normalize JIT.
+	BacklogNormalizeAsyncLimit = 10
+
 	// BacklogRefillHardLimit sets the maximum number of items that can be refilled in a single backlogRefill operation.
 	BacklogRefillHardLimit = int64(1000)
 )
@@ -2940,11 +2944,11 @@ func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueSha
 	}
 }
 
-func (q *queue) BacklogPrepareNormalize(ctx context.Context, b *QueueBacklog, sp *QueueShadowPartition) error {
+func (q *queue) BacklogPrepareNormalize(ctx context.Context, b *QueueBacklog, sp *QueueShadowPartition, normalizeAsyncMinimum int) (int, bool, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "BacklogPrepareNormalize"), redis_telemetry.ScopeQueue)
 
 	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
-		return fmt.Errorf("unsupported queue shard kind for BacklogPrepareNormalize: %s", q.primaryQueueShard.Kind)
+		return 0, false, fmt.Errorf("unsupported queue shard kind for BacklogPrepareNormalize: %s", q.primaryQueueShard.Kind)
 	}
 
 	accountID := uuid.Nil
@@ -2969,26 +2973,44 @@ func (q *queue) BacklogPrepareNormalize(ctx context.Context, b *QueueBacklog, sp
 		accountID,
 		// order normalize by timestamp
 		q.clock.Now().Unix(),
+		normalizeAsyncMinimum,
 	})
 	if err != nil {
-		return fmt.Errorf("could not serialize args: %w", err)
+		return 0, false, fmt.Errorf("could not serialize args: %w", err)
 	}
 
-	status, err := scripts["queue/backlogPrepareNormalize"].Exec(
+	res, err := scripts["queue/backlogPrepareNormalize"].Exec(
 		redis_telemetry.WithScriptName(ctx, "backlogPrepareNormalize"),
 		q.primaryQueueShard.RedisClient.unshardedRc,
 		keys,
 		args,
-	).ToInt64()
+	).ToAny()
 	if err != nil {
-		return fmt.Errorf("error preparing backlog normalization: %w", err)
+		return 0, false, fmt.Errorf("error preparing backlog normalization: %w", err)
+	}
+
+	statusCountTuple, ok := res.([]any)
+	if !ok || len(statusCountTuple) != 2 {
+		return 0, false, fmt.Errorf("expected return tuple to include status and refill count")
+	}
+
+	status, ok := statusCountTuple[0].(int64)
+	if !ok {
+		return 0, false, fmt.Errorf("missing status in status-count tuple")
+	}
+
+	backlogCount, ok := statusCountTuple[1].(int64)
+	if !ok {
+		return 0, false, fmt.Errorf("missing refillCount in status-count tuple")
 	}
 
 	switch status {
-	case 0:
-		return nil
+	case 1:
+		return int(backlogCount), true, nil
+	case -1:
+		return int(backlogCount), false, nil
 	default:
-		return fmt.Errorf("unknown status preparing backlog normalization: %v (%T)", status, status)
+		return 0, false, fmt.Errorf("unknown status preparing backlog normalization: %v (%T)", status, status)
 	}
 }
 
