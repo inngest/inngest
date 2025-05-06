@@ -15,6 +15,8 @@ type BlockFlushEnqueuer interface {
 	Enqueue(ctx context.Context, index Index) error
 }
 
+// QueueFlushProcessor enqueues jobs to the given queue so that flushing happens in some
+// background process, handled outside of this package.
 func QueueFlushProcessor(q queue.Queue) BlockFlushEnqueuer {
 	return flushQueue{q}
 }
