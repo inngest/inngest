@@ -120,6 +120,7 @@ type BlockLeaser interface {
 	Revoke(ctx context.Context, index Index, leaseID ulid.ULID) (err error)
 }
 
+// BlockKeyGenerator generates keys for block metadata.
 type BlockKeyGenerator interface {
 	// GenerateKey generates a key for a given block ID.
 	BlockKey(idx Index, blockID ulid.ULID) string

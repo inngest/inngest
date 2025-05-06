@@ -1215,10 +1215,7 @@ func (q *queue) EnqueueItem(ctx context.Context, shard QueueShard, i osqueue.Que
 	if len(i.ID) == 0 {
 		i.SetID(ctx, ulid.MustNew(ulid.Now(), rnd).String())
 	} else {
-		id := i.ID
-		if opts.PassthroughJobId {
-			i.ID = id
-		} else {
+		if !opts.PassthroughJobId {
 			i.SetID(ctx, i.ID)
 		}
 	}
