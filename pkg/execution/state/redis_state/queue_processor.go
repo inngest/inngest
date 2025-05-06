@@ -2,11 +2,14 @@ package redis_state
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/redis/rueidis"
 	"math"
 	"math/rand"
 	"runtime/debug"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -595,6 +598,18 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 			if err != nil {
 				return fmt.Errorf("could not prepare backlog for normalization: %w", err)
 			}
+
+			// TODO Move this into dedicated role
+			{
+				err = q.normalizeBacklog(ctx, backlog, shadowPart)
+				if err != nil {
+					return fmt.Errorf("could not normalize backlog: %w", err)
+				}
+				// TODO Remove from normalize set
+
+			}
+
+			continue
 		}
 
 		status, _, err := q.BacklogRefill(ctx, backlog, shadowPart)
@@ -636,6 +651,77 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 	}
 
 	return nil
+}
+
+// normalizeBacklog must be called with exclusive access to the shadow partition
+func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, shadowPart *QueueShadowPartition) error {
+	rc := q.primaryQueueShard.RedisClient
+
+	count := 10
+	for {
+		cmd := rc.Client().B().Zrange().Key(rc.kg.BacklogSet(backlog.BacklogID)).Min("-inf").Max("+inf").Byscore().Limit(0, int64(count)).Withscores().Build()
+		vals, err := rc.Client().Do(ctx, cmd).AsStrSlice()
+		if err != nil {
+			if rueidis.IsRedisNil(err) {
+				return nil
+			}
+			return fmt.Errorf("could not scan backlog: %w", err)
+		}
+
+		if len(vals) == 0 {
+			return nil
+		}
+
+		itemsToRemove := make([]string, 0)
+
+		for i := 0; i < len(vals); i += 2 {
+			itemID := vals[i]
+			itemScore, err := strconv.Atoi(vals[i+1])
+			if err != nil {
+				return fmt.Errorf("could not parse item score: %w", err)
+			}
+
+			cmd := rc.Client().B().Hget().Key(rc.kg.QueueItem()).Field(itemID).Build()
+			itemStr, err := rc.Client().Do(ctx, cmd).ToString()
+			if err != nil {
+				return fmt.Errorf("could not get queue item: %w", err)
+			}
+
+			if itemStr == "" {
+				itemsToRemove = append(itemsToRemove, itemID)
+				continue
+			}
+
+			qi := osqueue.QueueItem{}
+			err = json.Unmarshal([]byte(itemStr), &qi)
+			if err != nil {
+				return fmt.Errorf("could not unmarshal item: %w", err)
+			}
+
+			shard := q.primaryQueueShard
+
+			// TODO This should probably happen in a transaction with Enqueue
+			err = q.removeQueueItem(ctx, shard, rc.kg.BacklogSet(backlog.BacklogID), qi.ID)
+			if err != nil {
+				return fmt.Errorf("could not remove queue item: %w", err)
+			}
+
+			_, err = q.EnqueueItem(ctx, shard, qi, time.UnixMilli(int64(itemScore)), osqueue.EnqueueOpts{
+				PassthroughJobId: true,
+			})
+			if err != nil {
+				return fmt.Errorf("could not re-enqueue backlog item: %w", err)
+			}
+		}
+
+		if len(itemsToRemove) > 0 {
+			cmd = rc.Client().B().Zrem().Key(rc.kg.BacklogSet(backlog.BacklogID)).Member(itemsToRemove...).Build()
+			err = rc.Client().Do(ctx, cmd).Error()
+			if err != nil {
+				return fmt.Errorf("could not clean up dangling item pointers: %w", err)
+			}
+		}
+	}
 }
 
 func (q *queue) scanPartition(ctx context.Context, partitionKey string, peekLimit int64, peekUntil time.Time, metricShardName string, accountId *uuid.UUID, reportPeekedPartitions *int64) error {

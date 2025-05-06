@@ -24,12 +24,13 @@ local keyGlobalShadowPartitionSet        = KEYS[3]
 local keyGlobalAccountShadowPartitionSet = KEYS[4]
 local keyAccountShadowPartitionSet       = KEYS[5]
 local keyReadySet                        = KEYS[6]
+local keyQueueItemHash                   = KEYS[7]
 
 -- Constraint-related accounting keys
-local keyConcurrencyAccount      = KEYS[7]
-local keyConcurrencyFn  				 = KEYS[8] -- Account concurrency level
-local keyCustomConcurrencyKey1   = KEYS[9] -- When leasing an item we need to place the lease into this key.
-local keyCustomConcurrencyKey2   = KEYS[10] -- Optional for eg. for concurrency amongst steps
+local keyConcurrencyAccount      = KEYS[8]
+local keyConcurrencyFn  				 = KEYS[9] -- Account concurrency level
+local keyCustomConcurrencyKey1   = KEYS[10] -- When leasing an item we need to place the lease into this key.
+local keyCustomConcurrencyKey2   = KEYS[11] -- Optional for eg. for concurrency amongst steps
 
 local backlogID   = ARGV[1]
 local partitionID = ARGV[2]
@@ -141,18 +142,36 @@ if capacity > 0 then
 
   local items = redis.call("ZRANGE", keyBacklogSet, "-inf", "+inf", "BYSCORE", "LIMIT", 0, capacity, "WITHSCORES")
 
+  local potentiallyMissingQueueItems = redis.call("HMGET", keyQueueItemHash, unpack(items))
+
   -- Reverse the items to be added to the ready set
   local args = {}
   local remArgs = {}
+
+  local itemCleanupArgs = {}
+  local hasCleanup = false
+
   -- advance by two as items is essentially a tuple of (item ID, score)[]
   for i = 1, #items, 2 do
+    if potentiallyMissingQueueItems[i] == false or potentiallyMissingQueueItems[i] == nil or potentiallyMissingQueueItems[i] == "" then
+      table.insert(itemCleanupArgs, items[i])
+      hasCleanup = true
+      goto continue
+    end
+
     table.insert(args, items[i + 1]) -- score
     table.insert(args, items[i])     -- item
     table.insert(remArgs, items[i])  -- item for removal
     refilled = refilled + 1
+
+    ::continue::
   end
   redis.call("ZADD", keyReadySet, unpack(args))
   redis.call("ZREM", keyBacklogSet, unpack(remArgs))
+
+  if hasCleanup == true then
+    redis.call("HDEL", keyQueueItemHash, unpack(itemCleanupArgs))
+  end
 end
 
 --

@@ -7115,6 +7115,76 @@ func TestQueueRefillBacklog(t *testing.T) {
 
 		kg.ShadowPartitionSet(shadowPartition.PartitionID)
 	})
+
+	t.Run("should clean up dangling pointers", func(t *testing.T) {
+		r.FlushAll()
+
+		item := osqueue.QueueItem{
+			ID:          "test",
+			FunctionID:  fnID,
+			WorkspaceID: wsID,
+			Data: osqueue.Item{
+				WorkspaceID: wsID,
+				Kind:        osqueue.KindEdge,
+				Identifier: state.Identifier{
+					WorkflowID:  fnID,
+					AccountID:   accountId,
+					WorkspaceID: wsID,
+				},
+				QueueName:             nil,
+				Throttle:              nil,
+				CustomConcurrencyKeys: nil,
+			},
+			QueueName: nil,
+		}
+
+		qi, err := q.EnqueueItem(ctx, defaultShard, item, at, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+
+		expectedBacklog := q.ItemBacklog(ctx, item)
+		require.NotEmpty(t, expectedBacklog.BacklogID)
+
+		_, err = r.ZAdd(kg.BacklogSet(expectedBacklog.BacklogID), float64(at.Unix()), "missing-1")
+		require.NoError(t, err)
+
+		_, err = r.ZAdd(kg.BacklogSet(expectedBacklog.BacklogID), float64(at.Unix()), "missing-2")
+		require.NoError(t, err)
+
+		_, err = r.ZAdd(kg.BacklogSet(expectedBacklog.BacklogID), float64(at.Unix()), "missing-3")
+		require.NoError(t, err)
+
+		shadowPartition := q.ItemShadowPartition(ctx, item)
+		require.NotEmpty(t, shadowPartition.PartitionID)
+
+		require.True(t, hasMember(t, r, kg.BacklogSet(expectedBacklog.BacklogID), qi.ID))
+		require.True(t, hasMember(t, r, kg.BacklogSet(expectedBacklog.BacklogID), "missing-1"))
+		require.True(t, hasMember(t, r, kg.BacklogSet(expectedBacklog.BacklogID), "missing-2"))
+		require.True(t, hasMember(t, r, kg.BacklogSet(expectedBacklog.BacklogID), "missing-3"))
+
+		clock.Advance(10 * time.Minute)
+		r.FastForward(10 * time.Minute)
+
+		count, err := rc.Do(ctx, rc.B().Zcount().Key(kg.BacklogSet(expectedBacklog.BacklogID)).Min("-inf").Max(fmt.Sprintf("%d", clock.Now().UnixMilli())).Build()).ToInt64()
+		require.NoError(t, err)
+		require.Equal(t, 4, int(count))
+
+		status, refilled, err := q.BacklogRefill(ctx, &expectedBacklog, &shadowPartition)
+		require.NoError(t, err)
+
+		require.Equal(t, 1, refilled)
+		require.Equal(t, enums.QueueConstraintNotLimited, status)
+
+		require.False(t, hasMember(t, r, kg.BacklogSet(expectedBacklog.BacklogID), qi.ID))
+
+		require.False(t, hasMember(t, r, kg.BacklogSet(expectedBacklog.BacklogID), "missing-1"))
+		require.False(t, hasMember(t, r, kg.BacklogSet(expectedBacklog.BacklogID), "missing-2"))
+		require.False(t, hasMember(t, r, kg.BacklogSet(expectedBacklog.BacklogID), "missing-3"))
+
+		require.True(t, hasMember(t, r, kg.PartitionQueueSet(enums.PartitionTypeDefault, fnID.String(), ""), qi.ID))
+		require.Equal(t, at.UnixMilli(), int64(score(t, r, kg.PartitionQueueSet(enums.PartitionTypeDefault, fnID.String(), ""), qi.ID)))
+
+		kg.ShadowPartitionSet(shadowPartition.PartitionID)
+	})
 }
 
 func TestQueueBacklogPrepareNormalize(t *testing.T) {

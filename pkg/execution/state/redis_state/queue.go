@@ -2869,6 +2869,7 @@ func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueSha
 		q.primaryQueueShard.RedisClient.kg.GlobalAccountShadowPartitions(),
 		q.primaryQueueShard.RedisClient.kg.AccountShadowPartitions(accountID),
 		q.primaryQueueShard.RedisClient.kg.PartitionQueueSet(enums.PartitionTypeDefault, sp.PartitionID, ""),
+		q.primaryQueueShard.RedisClient.kg.QueueItem(),
 
 		// Constraint-related accounting keys
 		keyConcurrencyAcct,
