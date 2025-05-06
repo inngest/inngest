@@ -112,11 +112,13 @@ const (
 	// times to edge enqueue times.
 	FunctionStartScoreBufferTime = 10 * time.Second
 
-	defaultNumWorkers       = 100
-	defaultNumShadowWorkers = 100
-	defaultPollTick         = 10 * time.Millisecond
-	defaultIdempotencyTTL   = 12 * time.Hour
-	defaultConcurrency      = 1000 // TODO: add function to override.
+	defaultNumWorkers                  = 100
+	defaultNumShadowWorkers            = 100
+	defaultBacklogNormalizationWorkers = 10
+
+	defaultPollTick       = 10 * time.Millisecond
+	defaultIdempotencyTTL = 12 * time.Hour
+	defaultConcurrency    = 1000 // TODO: add function to override.
 
 	NoConcurrencyLimit = -1
 )
@@ -562,17 +564,18 @@ func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 			Account:       true,
 			AccountWeight: 85,
 		},
-		numWorkers:               defaultNumWorkers,
-		numShadowWorkers:         defaultNumShadowWorkers,
-		wg:                       &sync.WaitGroup{},
-		seqLeaseLock:             &sync.RWMutex{},
-		scavengerLeaseLock:       &sync.RWMutex{},
-		instrumentationLeaseLock: &sync.RWMutex{},
-		pollTick:                 defaultPollTick,
-		idempotencyTTL:           defaultIdempotencyTTL,
-		queueKindMapping:         make(map[string]string),
-		logger:                   logger.From(ctx),
-		log:                      logger.StdlibLogger(ctx),
+		numWorkers:                     defaultNumWorkers,
+		numShadowWorkers:               defaultNumShadowWorkers,
+		numBacklogNormalizationWorkers: defaultBacklogNormalizationWorkers,
+		wg:                             &sync.WaitGroup{},
+		seqLeaseLock:                   &sync.RWMutex{},
+		scavengerLeaseLock:             &sync.RWMutex{},
+		instrumentationLeaseLock:       &sync.RWMutex{},
+		pollTick:                       defaultPollTick,
+		idempotencyTTL:                 defaultIdempotencyTTL,
+		queueKindMapping:               make(map[string]string),
+		logger:                         logger.From(ctx),
+		log:                            logger.StdlibLogger(ctx),
 		concurrencyLimitGetter: func(ctx context.Context, p QueuePartition) PartitionConcurrencyLimits {
 			def := defaultConcurrency
 			if p.ConcurrencyLimit > 0 {
@@ -697,6 +700,8 @@ type queue struct {
 	numWorkers int32
 	// numShadowWorkers stores the number of workers available to concurrently scan partitions
 	numShadowWorkers int32
+	// numBacklogNormalizationWorkers stores the maximum number of workers available to concurrenctly scan normalization partitions
+	numBacklogNormalizationWorkers int32
 	// peek min & max sets the range for partitions to peek for items
 	peekMin int64
 	peekMax int64

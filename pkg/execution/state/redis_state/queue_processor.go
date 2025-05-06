@@ -314,7 +314,7 @@ func (q *queue) backlogNormalizationScan(ctx context.Context) error {
 	l := logger.StdlibLogger(ctx)
 	nc := make(chan int)
 
-	for i := int32(0); i < q.numShadowWorkers; i++ {
+	for i := int32(0); i < q.numBacklogNormalizationWorkers; i++ {
 		go q.backlogNormalizationWorker(ctx, nc)
 	}
 
