@@ -14,9 +14,14 @@ var BlockFlushQueueName = "block-flush"
 
 var defaultFlushDelay = 10 * time.Second
 
-// StateBufferer transforms a state.Manager into a state.Bufferer
-func StateBufferer(rsm state.Manager) Bufferer {
-	return &redisAdapter{rsm}
+type ManagerOpt func(m Manager)
+
+func WithFlushDelay(delay time.Duration) ManagerOpt {
+	return func(m Manager) {
+		if mgr, ok := m.(*manager); ok {
+			mgr.flushDelay = delay
+		}
+	}
 }
 
 // NewManager returns a new pause writer, writing pauses to a Valkey/Redis/MemoryDB
@@ -24,13 +29,19 @@ func StateBufferer(rsm state.Manager) Bufferer {
 //
 // Blocks are flushed from the buffer in background jobs enqueued to the given queue.
 // This prevents eg. executors and new-runs from retaining blocks in-memory.
-func NewManager(buf Bufferer, bs BlockStore, flusher BlockFlushEnqueuer) *manager {
-	return &manager{
+func NewManager(buf Bufferer, bs BlockStore, flusher BlockFlushEnqueuer, opts ...ManagerOpt) Manager {
+	mgr := &manager{
 		buf:        buf,
 		bs:         bs,
 		flusher:    flusher,
 		flushDelay: defaultFlushDelay,
 	}
+
+	for _, o := range opts {
+		o(mgr)
+	}
+
+	return mgr
 }
 
 type manager struct {
@@ -38,6 +49,11 @@ type manager struct {
 	bs         BlockStore
 	flusher    BlockFlushEnqueuer
 	flushDelay time.Duration
+}
+
+// PauseTimestamp returns the created at timestamp for a pause.
+func (m manager) PauseTimestamp(ctx context.Context, index Index, pause state.Pause) (time.Time, error) {
+	return m.buf.PauseTimestamp(ctx, index, pause)
 }
 
 func (m manager) ConsumePause(ctx context.Context, pause state.Pause, data any) (state.ConsumePauseResult, error) {
@@ -145,7 +161,7 @@ func (m manager) PausesSince(ctx context.Context, index Index, since time.Time) 
 
 // Delete deletes a pause from from block storage or the buffer.
 func (m manager) Delete(ctx context.Context, index Index, pause state.Pause) error {
-	// XXX: Potential future optimization:  cache the last written block for an index
+	// Potential future optimization:  cache the last written block for an index
 	// in-memory so we can fast lookup here:
 	//
 	// if blockID.ts > pause.ts, skip deleting from the buffer as the pause is in a block.

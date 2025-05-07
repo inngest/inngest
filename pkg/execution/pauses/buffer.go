@@ -7,11 +7,16 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state"
 )
 
+// StateBufferer transforms a state.Manager into a state.Bufferer
+func StateBufferer(rsm state.PauseManager) Bufferer {
+	return &redisAdapter{rsm}
+}
+
 // redisAdapter transforms a state.Manager into a state.Buffer, changing the interfaces slightly
 // according to this package.
 type redisAdapter struct {
 	// rsm represents the redis state manager in redis_state.
-	rsm state.Manager
+	rsm state.PauseManager
 }
 
 // Write writes one or more pauses to the backing store.  Note that the index
