@@ -72,9 +72,28 @@ func CritT[T any](ctx context.Context, name string, f func(ctx context.Context) 
 		var cancel func()
 		ctx, cancel = context.WithTimeout(ctx, cr.maxDur)
 		defer cancel()
-	} else {
-		ctx = context.WithoutCancel(ctx)
+
+		doneCh := make(chan T)
+		errCh := make(chan error)
+
+		go func(ctx context.Context) {
+			res, err := f(ctx)
+			if err != nil {
+				errCh <- err
+			}
+			doneCh <- res
+		}(ctx)
+
+		// wait for one of the results to come back
+		select {
+		case resp = <-doneCh:
+		case err = <-errCh:
+		case <-ctx.Done():
+			err = ctx.Err()
+		}
+
+		return
 	}
 
-	return f(ctx)
+	return f(context.WithoutCancel(ctx))
 }
