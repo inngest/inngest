@@ -19,7 +19,7 @@ func (q *queue) iterateNormalizationPartition(ctx context.Context, bc chan *Queu
 	// TODO: handle account peek
 
 	// TODO: scan for backlogs to be normalized
-	partitionKey := q.primaryQueueShard.RedisClient.kg.GlobalNormalizeSet()
+	partitionKey := q.primaryQueueShard.RedisClient.kg.GlobalAccountNormalizeSet()
 
 	backlogs, err := duration(ctx, q.primaryQueueShard.Name, "normalize_peek", q.clock.Now(), func(ctx context.Context) ([]*QueueBacklog, error) {
 		return q.normalizePartitionPeek(ctx, partitionKey, NormalizePartitionPeekMax)
