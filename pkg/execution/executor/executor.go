@@ -916,7 +916,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			return resp, handleErr
 		}
 		return resp, err
-	})
+	}, util.WithMaxDuration(consts.MaxFunctionTimeout))
 }
 
 func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
