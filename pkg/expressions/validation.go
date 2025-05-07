@@ -47,20 +47,13 @@ func DefaultRestrictiveValidationPolicy() *ValidationPolicy {
 	}
 }
 
-func validationErr(err error) error {
-	if err == nil {
-		return fmt.Errorf("validation failed")
-	}
-	return fmt.Errorf("validation failed: %w", err)
-}
-
 // Validate calls parse and check on an ASTs using NON CACHING parsing.  This MUST be non-caching
 // as calling Check on an AST is not thread safe.
 func Validate(_ context.Context, policy *ValidationPolicy, expression string) error {
 	// Compile the expression as new.
 	env, err := exprenv.Env()
 	if err != nil {
-		return validationErr(err)
+		return err
 	}
 
 	ast, issues := env.Compile(expression)
@@ -75,7 +68,7 @@ func Validate(_ context.Context, policy *ValidationPolicy, expression string) er
 
 	if policy != nil {
 		if err = validateAST(policy, expr.GetExpr()); err != nil {
-			return validationErr(err)
+			return newValidationErr(err)
 		}
 	}
 

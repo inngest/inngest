@@ -454,18 +454,6 @@ type RunTraceSpan {
   isRoot: Boolean! # whether this span is the root span of the trace (shortcut for presence of rootspan)
   parentSpanID: String
   parentSpan: RunTraceSpan # the parent span of this span
-  isUserland: Boolean! # whether this span is a userland span
-  userlandSpan: UserlandSpan
-}
-
-type UserlandSpan {
-  spanName: String
-  spanKind: String
-  serviceName: String
-  resourceAttrs: Bytes
-  scopeName: String
-  scopeVersion: String
-  spanAttrs: Bytes
 }
 
 type RunTraceSpanOutput {
@@ -531,7 +519,7 @@ type ConnectV1WorkerConnection {
   instanceId: String!
   workerIp: String!
 
-  appName: String
+	appName: String
   appID: UUID
   app: App
 
@@ -549,7 +537,8 @@ type ConnectV1WorkerConnection {
   sdkVersion: String!
   sdkPlatform: String!
   syncId: UUID
-    @deprecated(reason: "buildId is deprecated. Use appVersion instead.")
+
+	@deprecated(reason: "buildId is deprecated. Use appVersion instead.")
   buildId: String
   appVersion: String
 
@@ -572,10 +561,10 @@ type ConnectV1WorkerConnectionEdge {
 }
 
 enum AppMethod {
-  SERVE
-  CONNECT
+	SERVE
+	CONNECT
 }
 
 input AppsFilterV1 {
-  method: AppMethod
+	method: AppMethod
 }

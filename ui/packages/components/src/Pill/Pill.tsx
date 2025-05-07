@@ -85,7 +85,7 @@ export function Pill({
   const tooltipText = extractText(children);
 
   const pillWrapper = href ? (
-    <NextLink href={href} className="flex">
+    <NextLink href={href} className="flex" onClick={(e) => e.stopPropagation()}>
       <span ref={pillRef} className={cn('rounded', classNames)}>
         {icon && iconSide === 'left' && icon}
         <span className="truncate">{children}</span>

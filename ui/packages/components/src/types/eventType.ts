@@ -8,6 +8,7 @@ export type EventType = {
     totalVolume: number;
     dailyVolumeSlots: {
       startCount: number;
+      slot: string;
     }[];
   };
 };

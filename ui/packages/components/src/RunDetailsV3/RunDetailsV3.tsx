@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { ErrorCard } from '../RunDetailsV2/ErrorCard';
 import type { Run as InitialRunData } from '../RunsPage/types';
 import { StatusCell } from '../Table/Cell';
+import { Trace as OldTrace } from '../TimelineV2';
 import { TriggerDetails } from '../TriggerDetails';
 import { DragDivider } from '../icons/DragDivider';
 import type { Result } from '../types/functionRun';
@@ -16,7 +17,6 @@ import { StepInfo } from './StepInfo';
 import { Tabs } from './Tabs';
 import { Timeline } from './Timeline';
 import { TopInfo } from './TopInfo';
-import type { Trace } from './Trace';
 import { Waiting } from './Waiting';
 import { useStepSelection } from './utils';
 
@@ -42,7 +42,7 @@ type Run = {
     slug: string;
   };
   id: string;
-  trace: React.ComponentProps<typeof Trace>['trace'];
+  trace: React.ComponentProps<typeof OldTrace>['trace'];
   hasAI: boolean;
 };
 
@@ -131,12 +131,8 @@ export const RunDetailsV3 = (props: Props) => {
 
   const run = runRes.data;
   if (run?.trace.endedAt && pollInterval) {
-    //
-    // Stop polling for ended runs, but still give it
-    // a few seconds for any lingering userland traces.
-    setTimeout(() => {
-      setPollInterval(undefined);
-    }, 6000);
+    // Stop polling since ended runs are immutable
+    setPollInterval(undefined);
   }
 
   // Do not show the error if queued and the error is no spans

@@ -103,12 +103,6 @@ func WithSpanID(sid trace.SpanID) SpanOpt {
 	}
 }
 
-func WithTraceID(tid trace.TraceID) SpanOpt {
-	return func(s *spanOpt) {
-		s.tid = &tid
-	}
-}
-
 func newSpanOpt(opts ...SpanOpt) *spanOpt {
 	s := &spanOpt{
 		kind:  trace.SpanKindUnspecified,
@@ -138,8 +132,6 @@ type spanOpt struct {
 	psid *trace.SpanID
 	// SpanID that needs to be overwritten
 	sid *trace.SpanID
-	// TraceID that needs to be overwritten
-	tid *trace.TraceID
 }
 
 func (so *spanOpt) Attributes() []attribute.KeyValue {
@@ -180,10 +172,6 @@ func (so *spanOpt) OverrideParentSpanID() bool {
 
 func (so *spanOpt) OverrideSpanID() bool {
 	return so.sid != nil
-}
-
-func (so *spanOpt) OverrideTraceID() bool {
-	return so.tid != nil
 }
 
 func (so *spanOpt) ParentSpanID() *trace.SpanID {
@@ -255,9 +243,6 @@ func NewSpan(ctx context.Context, opts ...SpanOpt) (context.Context, *Span) {
 			pid := so.ParentSpanID()
 			psc = psc.WithSpanID(*pid)
 		}
-	}
-	if so.OverrideTraceID() {
-		tid = *so.tid
 	}
 
 	sconf := trace.SpanContextConfig{
