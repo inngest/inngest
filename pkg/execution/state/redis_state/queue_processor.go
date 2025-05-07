@@ -725,51 +725,52 @@ func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog) err
 
 	// TODO: extend the lease
 
+	shard := q.primaryQueueShard
 	var processed int64
 	for {
-		cmd := rc.Client().B().Zrange().Key(rc.kg.BacklogSet(backlog.BacklogID)).Min("-inf").Max("+inf").Byscore().Limit(0, q.backlogNormalizeLimit).Withscores().Build()
-		vals, err := rc.Client().Do(ctx, cmd).AsStrSlice()
+		keys := []string{
+			rc.kg.BacklogSet(backlog.BacklogID),
+			rc.kg.QueueItem(),
+		}
+
+		args, err := StrSlice([]any{q.backlogNormalizeLimit})
 		if err != nil {
-			if rueidis.IsRedisNil(err) {
-				return nil
-			}
-			return fmt.Errorf("could not scan backlog: %w", err)
+			return err
+		}
+
+		byt, err := scripts["queue/backlogNormalizePeek"].Exec(
+			redis_telemetry.WithScriptName(ctx, "backlogNormalizePeek"),
+			rc.Client(),
+			keys,
+			args,
+		).AsBytes()
+		if err != nil {
+			return err
+		}
+
+		type result struct {
+			Total int64                `json:"total"`
+			IDs   []string             `json:"ids"`
+			Items []*osqueue.QueueItem `json:"items"`
+		}
+
+		var res result
+		if err := json.Unmarshal(byt, &res); err != nil {
+			return fmt.Errorf("error unmarshalling backlog normalize peek result: %w", err)
 		}
 
 		// Done
-		if len(vals) == 0 {
+		if len(res.Items) == 0 {
 			return nil
 		}
 
-		itemsToRemove := make([]string, 0)
-		// NOTE: the even idx in the list are the actual item IDs and the odd idx are the scores
-		for i := 0; i < len(vals); i += 2 {
-			itemID := vals[i]
-			ts, err := strconv.ParseInt(vals[i+1], 10, 64)
-			if err != nil {
-				return fmt.Errorf("could not parse item score: %w", err)
-			}
-
-			cmd := rc.Client().B().Hget().Key(rc.kg.QueueItem()).Field(itemID).Build()
-			itemStr, err := rc.Client().Do(ctx, cmd).ToString()
-			if err != nil {
-				return fmt.Errorf("could not get queue item: %w", err)
-			}
-
-			if itemStr == "" {
-				itemsToRemove = append(itemsToRemove, itemID)
+		for _, item := range res.Items {
+			// NOTE: do something here?
+			if item == nil {
 				continue
 			}
 
-			qi := osqueue.QueueItem{}
-			err = json.Unmarshal([]byte(itemStr), &qi)
-			if err != nil {
-				return fmt.Errorf("could not unmarshal item: %w", err)
-			}
-
-			shard := q.primaryQueueShard
-
-			if _, err := q.EnqueueItem(ctx, shard, qi, time.UnixMilli(ts), osqueue.EnqueueOpts{
+			if _, err := q.EnqueueItem(ctx, shard, item, time.UnixMilli(item.AtMS), osqueue.EnqueueOpts{
 				PassthroughJobId: true,
 				Normalize:        true,
 			}); err != nil {
@@ -785,6 +786,65 @@ func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog) err
 
 			processed += 1
 		}
+
+		// cmd := rc.Client().B().Zrange().Key(rc.kg.BacklogSet(backlog.BacklogID)).Min("-inf").Max("+inf").Byscore().Limit(0, q.backlogNormalizeLimit).Withscores().Build()
+		// vals, err := rc.Client().Do(ctx, cmd).AsStrSlice()
+		// if err != nil {
+		// 	if rueidis.IsRedisNil(err) {
+		// 		return nil
+		// 	}
+		// 	return fmt.Errorf("could not scan backlog: %w", err)
+		// }
+
+		// // Done
+		// if len(vals) == 0 {
+		// 	return nil
+		// }
+
+		itemsToRemove := make([]string, 0)
+		// NOTE: the even idx in the list are the actual item IDs and the odd idx are the scores
+		// for i := 0; i < len(vals); i += 2 {
+		// 	itemID := vals[i]
+		// 	ts, err := strconv.ParseInt(vals[i+1], 10, 64)
+		// 	if err != nil {
+		// 		return fmt.Errorf("could not parse item score: %w", err)
+		// 	}
+
+		// 	cmd := rc.Client().B().Hget().Key(rc.kg.QueueItem()).Field(itemID).Build()
+		// 	itemStr, err := rc.Client().Do(ctx, cmd).ToString()
+		// 	if err != nil {
+		// 		return fmt.Errorf("could not get queue item: %w", err)
+		// 	}
+
+		// 	if itemStr == "" {
+		// 		itemsToRemove = append(itemsToRemove, itemID)
+		// 		continue
+		// 	}
+
+		// 	qi := osqueue.QueueItem{}
+		// 	err = json.Unmarshal([]byte(itemStr), &qi)
+		// 	if err != nil {
+		// 		return fmt.Errorf("could not unmarshal item: %w", err)
+		// 	}
+
+		// 	shard := q.primaryQueueShard
+
+		// 	if _, err := q.EnqueueItem(ctx, shard, qi, time.UnixMilli(ts), osqueue.EnqueueOpts{
+		// 		PassthroughJobId: true,
+		// 		Normalize:        true,
+		// 	}); err != nil {
+		// 		return fmt.Errorf("could not re-enqueue backlog item: %w", err)
+		// 	}
+
+		// 	// TODO This should probably happen in a transaction with Enqueue
+		// 	// NOTE: if there's a failure in this window before removing the item, we still want to make sure
+		// 	// the item is enqueued first before removing it from the current backlog
+		// 	if err := q.removeQueueItem(ctx, shard, rc.kg.BacklogSet(backlog.BacklogID), qi.ID); err != nil {
+		// 		return fmt.Errorf("could not remove queue item: %w", err)
+		// 	}
+
+		// 	processed += 1
+		// }
 
 		if len(itemsToRemove) > 0 {
 			cmd = rc.Client().B().Zrem().Key(rc.kg.BacklogSet(backlog.BacklogID)).Member(itemsToRemove...).Build()
