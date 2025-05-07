@@ -22,7 +22,7 @@ export const FunctionList = ({ envSlug, archived }: FunctionListProps) => {
   const debouncedSearch = useDebounce(() => {
     setSearchParam(searchInput);
   }, 400);
-  const { error, isLoading, hasMore, loadMore, rows } = useRows({
+  const { error, isLoading, hasMore, loadMore, rows, isFirstLoad } = useRows({
     archived: !!archived,
     search: searchParam,
   });
@@ -31,7 +31,7 @@ export const FunctionList = ({ envSlug, archived }: FunctionListProps) => {
   }
 
   return (
-    <div className="bg-canvasBase divide-subtle flex min-h-0 flex-1 flex-col divide-y">
+    <div className="bg-canvasBase flex min-h-0 flex-1 flex-col">
       <div className="mx-4 my-1 flex h-10 flex-row items-center justify-start">
         <StatusMenu archived={!!archived} envSlug={envSlug} />
         {isSearchEnabled && (
@@ -49,9 +49,9 @@ export const FunctionList = ({ envSlug, archived }: FunctionListProps) => {
         )}
       </div>
 
-      <FunctionTable rows={rows} />
+      <FunctionTable rows={rows} isLoading={isFirstLoad} />
 
-      {hasMore !== false && (
+      {hasMore !== false && !isFirstLoad && (
         <div className="flex w-full justify-center py-2.5">
           <Button
             loading={isLoading}

@@ -11,6 +11,7 @@ type Output = {
   isLoading: boolean;
   loadMore: () => void;
   rows: FunctionTableRow[];
+  isFirstLoad: boolean;
 };
 
 export function useRows({ archived, search }: { archived: boolean; search: string }): Output {
@@ -34,6 +35,7 @@ export function useRows({ archived, search }: { archived: boolean; search: strin
       lastPage: 0,
       rows: [],
     });
+    setPage(1);
   }, [archived, search]);
 
   const functionsRes = useFunctionsPage({
@@ -95,5 +97,6 @@ export function useRows({ archived, search }: { archived: boolean; search: strin
     isLoading: functionsRes.isLoading,
     loadMore: () => setPage((prev) => prev + 1),
     rows: functionsData.rows,
+    isFirstLoad: page === 1 && functionsRes.isLoading,
   };
 }
