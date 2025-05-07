@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import { getTimestampDaysAgo } from '@inngest/components/utils/date';
+import { useQuery } from '@tanstack/react-query';
 import { useClient } from 'urql';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
@@ -153,4 +154,51 @@ export function useEventTypeVolume() {
     },
     [client, envID]
   );
+}
+
+const eventTypeQuery = graphql(`
+  query GetEventType($envID: ID!, $eventName: String!) {
+    environment: workspace(id: $envID) {
+      eventType(name: $eventName) {
+        name
+        name
+        functions {
+          edges {
+            node {
+              id
+              slug
+              name
+            }
+          }
+        }
+      }
+    }
+  }
+`);
+
+export function useEventType({ eventName }: { eventName: string }) {
+  const envID = useEnvironment().id;
+  const client = useClient();
+
+  return useQuery({
+    queryKey: ['event-type', envID, eventName],
+    queryFn: async () => {
+      const result = await client.query(eventTypeQuery, { envID, eventName }).toPromise();
+
+      if (result.error) {
+        throw result.error;
+      }
+
+      const eventType = result.data?.environment.eventType;
+
+      if (!eventType) {
+        return null;
+      }
+
+      return {
+        ...eventType,
+        functions: eventType.functions.edges.map(({ node }) => node),
+      };
+    },
+  });
 }
