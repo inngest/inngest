@@ -102,7 +102,7 @@ export function useColumns({
                 term={data.volume.totalVolume === 1 ? 'event' : 'events'}
               />
             </div>
-            <div className="hidden md:block">
+            <div className="hidden md:block [&_*]:cursor-pointer">
               <MiniStackedBarChart data={data.volume.dailyVolumeSlots} />
             </div>
           </div>
