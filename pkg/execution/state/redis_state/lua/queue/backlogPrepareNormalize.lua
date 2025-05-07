@@ -30,11 +30,9 @@ local normalizeAsyncMinimum = tonumber(ARGV[5])
 -- If there's a minimum number of backlog items required to normalize asynchronously,
 -- we do not need to move backlog pointers to the normalization ZSETs but can just normalize
 -- in the same shadow scanner loop iteration.
-if normalizeAsyncMinimum > 0 then
-  local backlogCount = redis.call("ZCARD", keyBacklogSet)
-  if backlogCount ~= false and backlogCount ~= nil and backlogCount < normalizeAsyncMinimum then
-    return { -1, backlogCount }
-  end
+local backlogCount = redis.call("ZCARD", keyBacklogSet)
+if normalizeAsyncMinimum > 0 and backlogCount ~= false and backlogCount ~= nil and backlogCount < normalizeAsyncMinimum then
+  return { -1, backlogCount }
 end
 
 

@@ -40,13 +40,20 @@ import (
 )
 
 const (
-	PartitionSelectionMax                = int64(100)
-	PartitionPeekMax                     = PartitionSelectionMax * 3
-	AccountPeekMax                       = int64(30)
+	PartitionSelectionMax = int64(100)
+	PartitionPeekMax      = PartitionSelectionMax * 3
+	AccountPeekMax        = int64(30)
+
+	ShadowPartitionAccountPeekMax        = int64(30)
+	ShadowPartitionPeekMax               = int64(300) // same as PartitionPeekMax for now
 	ShadowPartitionPeekMinBacklogs       = int64(10)
 	ShadowPartitionPeekMaxBacklogs       = int64(100)
 	AbsoluteShadowPartitionPeekMax int64 = 10 * ShadowPartitionPeekMaxBacklogs
 	NormalizePartitionPeekMax            = int64(100)
+	NormalizeAccountPeekMax              = int64(30)
+
+	// NormalizeShadowPartitionPeekMax determines how many shadow partitions will be peeked
+	NormalizeShadowPartitionPeekMax = int64(300) // same as ShadowPartitionPeekMax
 
 	// BacklogNormalizeAsyncLimit determines the minimum number of items required in an outdated backlog
 	// to require an async normalize job. For small backlogs, the added QPS may not be worth it and we should normalize JIT.
@@ -148,11 +155,13 @@ var (
 	ErrConfigAlreadyLeased           = fmt.Errorf("config scanner already leased")
 	ErrConfigLeaseExceedsLimits      = fmt.Errorf("config lease duration exceeds the maximum of %d seconds", int(ConfigLeaseMax.Seconds()))
 
-	ErrShadowPartitionAlreadyLeased        = fmt.Errorf("shadow partition already leased")
-	ErrShadowPartitionLeaseNotFound        = fmt.Errorf("shadow partition lease not found")
-	ErrShadowPartitionNotFound             = fmt.Errorf("shadow partition not found")
-	ErrShadowPartitionPaused               = fmt.Errorf("shadow partition refill is disabled")
-	ErrShadowPartitionPeekMaxExceedsLimits = fmt.Errorf("shadow partition peek exceeded the maximum limit of %d", ShadowPartitionPeekMaxBacklogs)
+	ErrShadowPartitionAlreadyLeased               = fmt.Errorf("shadow partition already leased")
+	ErrShadowPartitionLeaseNotFound               = fmt.Errorf("shadow partition lease not found")
+	ErrShadowPartitionNotFound                    = fmt.Errorf("shadow partition not found")
+	ErrShadowPartitionPaused                      = fmt.Errorf("shadow partition refill is disabled")
+	ErrShadowPartitionBacklogPeekMaxExceedsLimits = fmt.Errorf("shadow partition backlog peek exceeded the maximum limit of %d", ShadowPartitionPeekMaxBacklogs)
+	ErrShadowPartitionPeekMaxExceedsLimits        = fmt.Errorf("shadow partition peek exceeded the maximum limit of %d", ShadowPartitionPeekMax)
+	ErrShadowPartitionAccountPeekMaxExceedsLimits = fmt.Errorf("account peek with shadow partitions exceeded the maximum limit of %d", ShadowPartitionAccountPeekMax)
 
 	ErrPartitionConcurrencyLimit = fmt.Errorf("at partition concurrency limit")
 	ErrAccountConcurrencyLimit   = fmt.Errorf("at account concurrency limit")
@@ -3046,6 +3055,113 @@ func (q *queue) BacklogPrepareNormalize(ctx context.Context, b *QueueBacklog, sp
 	}
 }
 
+func (q *queue) peekGlobalShadowPartitionAccounts(ctx context.Context, until time.Time, limit int64) ([]uuid.UUID, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "peekGlobalShadowPartitionAccounts"), redis_telemetry.ScopeQueue)
+
+	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
+		return nil, fmt.Errorf("unsupported queue shard kind for peekGlobalShadowPartitionAccounts: %s", q.primaryQueueShard.Kind)
+	}
+
+	if limit > ShadowPartitionAccountPeekMax {
+		return nil, ErrShadowPartitionAccountPeekMaxExceedsLimits
+	}
+	if limit <= 0 {
+		limit = ShadowPartitionAccountPeekMax
+	}
+
+	ms := until.UnixMilli()
+
+	isSequential := 0
+
+	args, err := StrSlice([]any{
+		ms,
+		limit,
+		isSequential,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	peekRet, err := scripts["queue/accountPeek"].Exec(
+		redis_telemetry.WithScriptName(ctx, "accountPeek"),
+		q.primaryQueueShard.RedisClient.unshardedRc,
+		[]string{
+			q.primaryQueueShard.RedisClient.kg.GlobalAccountShadowPartitions(),
+		},
+		args,
+	).AsStrSlice()
+	if err != nil {
+		return nil, fmt.Errorf("error peeking accounts with shadow partitions: %w", err)
+	}
+
+	items := make([]uuid.UUID, len(peekRet))
+
+	for i, s := range peekRet {
+		parsed, err := uuid.Parse(s)
+		if err != nil {
+			return nil, fmt.Errorf("could not parse account id from global shadow partition accounts queue: %w", err)
+		}
+
+		items[i] = parsed
+	}
+
+	return items, nil
+}
+
+func (q *queue) peekGlobalNormalizeAccounts(ctx context.Context, until time.Time, limit int64) ([]uuid.UUID, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "peekGlobalNormalizeAccounts"), redis_telemetry.ScopeQueue)
+
+	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
+		return nil, fmt.Errorf("unsupported queue shard kind for peekGlobalNormalizeAccounts: %s", q.primaryQueueShard.Kind)
+	}
+
+	// TODO customize limits
+	if limit > ShadowPartitionAccountPeekMax {
+		return nil, ErrShadowPartitionAccountPeekMaxExceedsLimits
+	}
+	if limit <= 0 {
+		limit = ShadowPartitionAccountPeekMax
+	}
+
+	ms := until.UnixMilli()
+
+	isSequential := 0
+
+	args, err := StrSlice([]any{
+		ms,
+		limit,
+		isSequential,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	peekRet, err := scripts["queue/accountPeek"].Exec(
+		redis_telemetry.WithScriptName(ctx, "accountPeek"),
+		q.primaryQueueShard.RedisClient.unshardedRc,
+		[]string{
+			q.primaryQueueShard.RedisClient.kg.GlobalAccountNormalizeSet(),
+		},
+		args,
+	).AsStrSlice()
+	if err != nil {
+		return nil, fmt.Errorf("error peeking accounts with backlogs to normalize: %w", err)
+	}
+
+	items := make([]uuid.UUID, len(peekRet))
+
+	for i, s := range peekRet {
+		parsed, err := uuid.Parse(s)
+		if err != nil {
+			return nil, fmt.Errorf("could not parse account id from global normalize accounts queue: %w", err)
+		}
+
+		items[i] = parsed
+	}
+
+	return items, nil
+}
+
 func (q *queue) ShadowPartitionPeek(ctx context.Context, sp *QueueShadowPartition, until time.Time, limit int64) ([]*QueueBacklog, int, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "ShadowPartitionPeek"), redis_telemetry.ScopeQueue)
 
@@ -3054,7 +3170,7 @@ func (q *queue) ShadowPartitionPeek(ctx context.Context, sp *QueueShadowPartitio
 	}
 
 	if limit > ShadowPartitionPeekMaxBacklogs {
-		return nil, 0, ErrShadowPartitionPeekMaxExceedsLimits
+		return nil, 0, ErrShadowPartitionBacklogPeekMaxExceedsLimits
 	}
 	if limit <= 0 {
 		limit = ShadowPartitionPeekMaxBacklogs
@@ -3789,6 +3905,120 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 	}
 
 	return result, nil
+}
+
+// peekShadowPartitions returns pending shadow partitions within the global shadow partition pointer _or_ account shadow partition pointer ZSET.
+func (q *queue) peekShadowPartitions(ctx context.Context, partitionIndexKey string, peekLimit int64, until time.Time) ([]*QueueShadowPartition, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "peekShadowPartitions"), redis_telemetry.ScopeQueue)
+
+	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
+		return nil, fmt.Errorf("unsupported queue shard kind for peekShadowPartitions: %s", q.primaryQueueShard.Kind)
+	}
+
+	if peekLimit > ShadowPartitionPeekMax {
+		return nil, ErrShadowPartitionPeekMaxExceedsLimits
+	}
+	if peekLimit <= 0 {
+		peekLimit = ShadowPartitionPeekMax
+	}
+
+	ms := until.UnixMilli()
+
+	args, err := StrSlice([]any{
+		ms,
+		peekLimit,
+		0,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	peekRet, err := scripts["queue/partitionPeek"].Exec(
+		redis_telemetry.WithScriptName(ctx, "partitionPeek"),
+		q.primaryQueueShard.RedisClient.Client(),
+		[]string{
+			partitionIndexKey,
+			q.primaryQueueShard.RedisClient.kg.ShadowPartitionMeta(),
+		},
+		args,
+	).ToAny()
+	// NOTE: We use ToAny to force return a []any, allowing us to update the slice value with
+	// a JSON-decoded item without allocations
+	if err != nil {
+		return nil, fmt.Errorf("error peeking shadow partition items: %w", err)
+	}
+
+	returnedSet, ok := peekRet.([]any)
+	if !ok {
+		return nil, fmt.Errorf("unknown return type from peek shadow partitions: %T", peekRet)
+	}
+
+	var potentiallyMissingPartitions, allPartitionIds []any
+	if len(returnedSet) == 3 {
+		potentiallyMissingPartitions, ok = returnedSet[1].([]any)
+		if !ok {
+			return nil, fmt.Errorf("unexpected second item in set returned from partitionPeek: %T", peekRet)
+		}
+
+		allPartitionIds, ok = returnedSet[2].([]any)
+		if !ok {
+			return nil, fmt.Errorf("unexpected third item in set returned from partitionPeek: %T", peekRet)
+		}
+	} else if len(returnedSet) != 0 {
+		return nil, fmt.Errorf("expected zero or three items in set returned by partitionPeek: %v", returnedSet)
+	}
+
+	encoded := make([]any, 0)
+	missingPartitions := make([]string, 0)
+	if len(potentiallyMissingPartitions) > 0 {
+		for idx, partitionId := range allPartitionIds {
+			if potentiallyMissingPartitions[idx] == nil {
+				if partitionId == nil {
+					return nil, fmt.Errorf("encountered nil shadow partition key in pointer queue %q", partitionIndexKey)
+				}
+
+				str, ok := partitionId.(string)
+				if !ok {
+					return nil, fmt.Errorf("encountered non-string shadow partition key in pointer queue %q", partitionIndexKey)
+				}
+
+				missingPartitions = append(missingPartitions, str)
+			} else {
+				encoded = append(encoded, potentiallyMissingPartitions[idx])
+			}
+		}
+	}
+
+	// Use parallel decoding as per Peek
+	partitions, err := util.ParallelDecode(encoded, func(val any) (*QueueShadowPartition, error) {
+		if val == nil {
+			q.logger.Error().Interface("encoded", encoded).Interface("missing", missingPartitions).Str("key", partitionIndexKey).Msg("encountered nil partition item in pointer queue")
+			return nil, fmt.Errorf("encountered nil shadow partition item in pointer queue %q", partitionIndexKey)
+		}
+
+		str, ok := val.(string)
+		if !ok {
+			return nil, fmt.Errorf("unknown type in peek shadow partitions: %T", val)
+		}
+
+		item := &QueueShadowPartition{}
+
+		if err := json.Unmarshal(unsafe.Slice(unsafe.StringData(str), len(str)), item); err != nil {
+			return nil, fmt.Errorf("error reading shadow partition item: %w", err)
+		}
+
+		return item, nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("error decoding partitions: %w", err)
+	}
+
+	if len(missingPartitions) > 0 {
+		// TODO Clean up missing shadow partitions
+		logger.StdlibLogger(ctx).Warn("found missing shadow partitions", "missing", missingPartitions, "partitionKey", partitionIndexKey)
+	}
+
+	return partitions, nil
 }
 
 func (q *queue) accountPeek(ctx context.Context, sequential bool, until time.Time, limit int64) ([]uuid.UUID, error) {

@@ -2,14 +2,11 @@ package redis_state
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/redis/rueidis"
 	"math"
 	"math/rand"
 	"runtime/debug"
-	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -278,6 +275,70 @@ LOOP:
 	return nil
 }
 
+func (q *queue) scanShadowPartitions(ctx context.Context, until time.Time, qspc chan *QueueShadowPartition) error {
+	// If there are shadow continuations, process those immediately.
+	if err := q.scanShadowContinuations(ctx); err != nil {
+		return fmt.Errorf("error scanning shadow continuations: %w", err)
+	}
+
+	// TODO introduce weight probability to blend account/global scanning
+	shouldScanAccount := rand.Intn(100) <= 50
+	if shouldScanAccount {
+		peekedAccounts, err := q.peekGlobalShadowPartitionAccounts(ctx, until, ShadowPartitionAccountPeekMax)
+		if err != nil {
+			return fmt.Errorf("could not peek global shadow partition accounts: %w", err)
+		}
+
+		if len(peekedAccounts) == 0 {
+			return nil
+		}
+
+		// Reduce number of peeked partitions as we're processing multiple accounts in parallel
+		// Note: This is not optimal as some accounts may have fewer partitions than others and
+		// we're leaving capacity on the table. We'll need to find a better way to determine the
+		// optimal peek size in this case.
+		accountPartitionPeekMax := int64(math.Round(float64(ShadowPartitionPeekMax / int64(len(peekedAccounts)))))
+
+		// Scan and process account partitions in parallel
+		wg := sync.WaitGroup{}
+		for _, account := range peekedAccounts {
+			account := account
+
+			wg.Add(1)
+			go func(account uuid.UUID) {
+				defer wg.Done()
+				partitionKey := q.primaryQueueShard.RedisClient.kg.AccountShadowPartitions(account)
+
+				parts, err := q.peekShadowPartitions(ctx, partitionKey, accountPartitionPeekMax, until)
+				if err != nil {
+					q.logger.Error().Err(err).Msg("error processing account partitions")
+					return
+				}
+
+				for _, part := range parts {
+					qspc <- part
+				}
+			}(account)
+		}
+
+		wg.Wait()
+
+		return nil
+	}
+
+	kg := q.primaryQueueShard.RedisClient.kg
+	parts, err := q.peekShadowPartitions(ctx, kg.GlobalShadowPartitionSet(), ShadowPartitionPeekMax, until)
+	if err != nil {
+		return fmt.Errorf("could not peek global shadow partitions: %w", err)
+	}
+
+	for _, part := range parts {
+		qspc <- part
+	}
+
+	return nil
+}
+
 // shadowScan iterates through the shadow partitions and attempt to add queue items
 // to the function partition for processing
 func (q *queue) shadowScan(ctx context.Context) error {
@@ -298,19 +359,8 @@ func (q *queue) shadowScan(ctx context.Context) error {
 			return nil
 
 		case <-tick.Chan():
-			// If there are shadow continuations, process those immediately.
-			if err := q.scanShadowContinuations(ctx); err != nil {
-				return fmt.Errorf("error scanning shadow continuations: %w", err)
-			}
-
-			// - scan for shadow partitions
-			// - lease the partition
-			// - dump it into the channel for the workers to do their thing
-
-			parts := []QueueShadowPartition{}
-
-			for _, part := range parts {
-				qspc <- &part
+			if err := q.scanShadowPartitions(ctx, q.clock.Now(), qspc); err != nil {
+				return fmt.Errorf("could not scan shadow partitions: %w", err)
 			}
 		}
 	}
@@ -336,7 +386,9 @@ func (q *queue) backlogNormalizationScan(ctx context.Context) error {
 			return nil
 
 		case <-tick.Chan():
-			if err := q.iterateNormalizationPartition(ctx, bc); err != nil {
+			until := q.clock.Now()
+
+			if err := q.iterateNormalizationPartition(ctx, until, bc); err != nil {
 				// TODO: check errors
 
 				l.Error("error scanning global normalization partition", "error", err)
@@ -609,9 +661,6 @@ func (q *queue) backlogNormalizationWorker(ctx context.Context, nc chan *QueueBa
 }
 
 func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueShadowPartition, continuationCount uint) error {
-	metrics.ActiveShadowScannerCount(ctx, 1, metrics.CounterOpt{PkgName: pkgName})
-	defer metrics.ActiveShadowScannerCount(ctx, -1, metrics.CounterOpt{PkgName: pkgName})
-
 	// acquire lease for shadow partition
 	leaseID, err := duration(ctx, q.primaryQueueShard.Name, "shadow_partition_lease", q.clock.Now(), func(ctx context.Context) (*ulid.ULID, error) {
 		leaseID, err := q.ShadowPartitionLease(ctx, shadowPart, ShadowPartitionLeaseDuration)
@@ -627,6 +676,9 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 	if leaseID == nil {
 		return fmt.Errorf("missing shadow partition leaseID")
 	}
+
+	metrics.ActiveShadowScannerCount(ctx, 1, metrics.CounterOpt{PkgName: pkgName})
+	defer metrics.ActiveShadowScannerCount(ctx, -1, metrics.CounterOpt{PkgName: pkgName})
 
 	extendLeaseCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -734,152 +786,6 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 	}
 
 	return nil
-}
-
-// normalizeBacklog must be called with exclusive access to the shadow partition
-// NOTE: ideally this is one transaction in a lua script but enqueue_to_backlog is way too much work to
-// utilize
-func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog) error {
-	rc := q.primaryQueueShard.RedisClient
-
-	l := logger.StdlibLogger(ctx).With("backlog", backlog)
-
-	// TODO: extend the lease
-
-	shard := q.primaryQueueShard
-	var processed int64
-	for {
-		keys := []string{
-			rc.kg.BacklogSet(backlog.BacklogID),
-			rc.kg.QueueItem(),
-		}
-
-		args, err := StrSlice([]any{q.backlogNormalizeLimit})
-		if err != nil {
-			return err
-		}
-
-		byt, err := scripts["queue/backlogNormalizePeek"].Exec(
-			redis_telemetry.WithScriptName(ctx, "backlogNormalizePeek"),
-			rc.Client(),
-			keys,
-			args,
-		).AsBytes()
-		if err != nil {
-			return err
-		}
-
-		type result struct {
-			Total int64                `json:"total"`
-			IDs   []string             `json:"ids"`
-			Items []*osqueue.QueueItem `json:"items"`
-		}
-
-		var res result
-		if err := json.Unmarshal(byt, &res); err != nil {
-			return fmt.Errorf("error unmarshalling backlog normalize peek result: %w", err)
-		}
-
-		// Done
-		if len(res.Items) == 0 {
-			return nil
-		}
-
-		for _, item := range res.Items {
-			// NOTE: do something here?
-			if item == nil {
-				continue
-			}
-
-			if _, err := q.EnqueueItem(ctx, shard, item, time.UnixMilli(item.AtMS), osqueue.EnqueueOpts{
-				PassthroughJobId: true,
-				Normalize:        true,
-			}); err != nil {
-				return fmt.Errorf("could not re-enqueue backlog item: %w", err)
-			}
-
-			// TODO This should probably happen in a transaction with Enqueue
-			// NOTE: if there's a failure in this window before removing the item, we still want to make sure
-			// the item is enqueued first before removing it from the current backlog
-			if err := q.removeQueueItem(ctx, shard, rc.kg.BacklogSet(backlog.BacklogID), qi.ID); err != nil {
-				return fmt.Errorf("could not remove queue item: %w", err)
-			}
-
-			processed += 1
-		}
-
-		// cmd := rc.Client().B().Zrange().Key(rc.kg.BacklogSet(backlog.BacklogID)).Min("-inf").Max("+inf").Byscore().Limit(0, q.backlogNormalizeLimit).Withscores().Build()
-		// vals, err := rc.Client().Do(ctx, cmd).AsStrSlice()
-		// if err != nil {
-		// 	if rueidis.IsRedisNil(err) {
-		// 		return nil
-		// 	}
-		// 	return fmt.Errorf("could not scan backlog: %w", err)
-		// }
-
-		// // Done
-		// if len(vals) == 0 {
-		// 	return nil
-		// }
-
-		itemsToRemove := make([]string, 0)
-		// NOTE: the even idx in the list are the actual item IDs and the odd idx are the scores
-		// for i := 0; i < len(vals); i += 2 {
-		// 	itemID := vals[i]
-		// 	ts, err := strconv.ParseInt(vals[i+1], 10, 64)
-		// 	if err != nil {
-		// 		return fmt.Errorf("could not parse item score: %w", err)
-		// 	}
-
-		// 	cmd := rc.Client().B().Hget().Key(rc.kg.QueueItem()).Field(itemID).Build()
-		// 	itemStr, err := rc.Client().Do(ctx, cmd).ToString()
-		// 	if err != nil {
-		// 		return fmt.Errorf("could not get queue item: %w", err)
-		// 	}
-
-		// 	if itemStr == "" {
-		// 		itemsToRemove = append(itemsToRemove, itemID)
-		// 		continue
-		// 	}
-
-		// 	qi := osqueue.QueueItem{}
-		// 	err = json.Unmarshal([]byte(itemStr), &qi)
-		// 	if err != nil {
-		// 		return fmt.Errorf("could not unmarshal item: %w", err)
-		// 	}
-
-		// 	shard := q.primaryQueueShard
-
-		// 	if _, err := q.EnqueueItem(ctx, shard, qi, time.UnixMilli(ts), osqueue.EnqueueOpts{
-		// 		PassthroughJobId: true,
-		// 		Normalize:        true,
-		// 	}); err != nil {
-		// 		return fmt.Errorf("could not re-enqueue backlog item: %w", err)
-		// 	}
-
-		// 	// TODO This should probably happen in a transaction with Enqueue
-		// 	// NOTE: if there's a failure in this window before removing the item, we still want to make sure
-		// 	// the item is enqueued first before removing it from the current backlog
-		// 	if err := q.removeQueueItem(ctx, shard, rc.kg.BacklogSet(backlog.BacklogID), qi.ID); err != nil {
-		// 		return fmt.Errorf("could not remove queue item: %w", err)
-		// 	}
-
-		// 	processed += 1
-		// }
-
-		if len(itemsToRemove) > 0 {
-			cmd = rc.Client().B().Zrem().Key(rc.kg.BacklogSet(backlog.BacklogID)).Member(itemsToRemove...).Build()
-			err = rc.Client().Do(ctx, cmd).Error()
-			if err != nil {
-				return fmt.Errorf("could not clean up dangling item pointers: %w", err)
-			}
-		}
-
-		l.Info("processed normalization for backlog",
-			"processed", processed,
-			"removed", itemsToRemove,
-		)
-	}
 }
 
 func (q *queue) scanPartition(ctx context.Context, partitionKey string, peekLimit int64, peekUntil time.Time, metricShardName string, accountId *uuid.UUID, reportPeekedPartitions *int64) error {

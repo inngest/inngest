@@ -124,6 +124,7 @@ end
 
 -- If we have capacity, reduce by ready but not yet picked up items to prevent over-filling
 if capacity > 0 then
+  -- TODO Check if we need to create a key-specific ready queue
   local readyCount = redis.call("ZCARD", keyReadySet)
   if readyCount ~= nil and readyCount ~= false then
     capacity = capacity - readyCount
