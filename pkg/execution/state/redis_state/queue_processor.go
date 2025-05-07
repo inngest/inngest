@@ -1202,6 +1202,7 @@ func (q *queue) process(
 
 	longRunningJobStatusCtx, cancelLongRunningJobStatusCtx := context.WithCancel(ctx)
 	defer cancelLongRunningJobStatusCtx()
+	startedAt := q.clock.Now()
 	go func() {
 		longRunningJobStatusTick := q.clock.NewTicker(5 * time.Minute)
 		defer longRunningJobStatusTick.Stop()
@@ -1213,7 +1214,7 @@ func (q *queue) process(
 			case <-longRunningJobStatusTick.Chan():
 			}
 
-			logger.StdlibLogger(ctx).Debug("long running queue job tick", "item", qi)
+			logger.StdlibLogger(ctx).Debug("long running queue job tick", "item", qi, "dur", q.clock.Now().Sub(startedAt).String())
 		}
 	}()
 
