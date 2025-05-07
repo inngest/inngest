@@ -78,6 +78,7 @@ end
 local status = 0
 
 if capacity > 0 and throttleLimit > 0 then
+  -- TODO Implement and test this scenario
   local remainingThrottleCapacity = gcraCapacity(throttleKey, nowMS, throttlePeriod * 1000, throttleLimit, throttleBurst)
   if remainingThrottleCapacity < capacity then
     capacity = remainingThrottleCapacity
@@ -172,7 +173,8 @@ if capacity > 0 then
   redis.call("INCRBY", keyActiveCounter, refilled)
   redis.call("ZREM", keyBacklogSet, unpack(remArgs))
 
-  gcraUpdate(throttleKey, nowMS, throttlePeriod * 1000, throttleLimit, throttleBurst, refilled)
+  -- TODO Fix this
+  -- gcraUpdate(throttleKey, nowMS, throttlePeriod * 1000, throttleLimit, throttleBurst, refilled)
 
   if hasCleanup == true then
     redis.call("HDEL", keyQueueItemHash, unpack(itemCleanupArgs))
