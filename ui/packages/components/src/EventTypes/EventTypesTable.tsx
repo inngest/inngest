@@ -65,7 +65,6 @@ export function EventTypesTable({
   const [isScrollable, setIsScrollable] = useState(false);
   const [nameSearch = null, setNameSearch, removeNameSearch] = useSearchParam('nameSearch');
   const [searchInput, setSearchInput] = useState<string>(nameSearch || '');
-  const [isSearching, setIsSearching] = useState(false);
   const [orderBy, setOrderBy] = useState<EventTypesOrderBy[]>([
     {
       field: EventTypesOrderByField.Name,
@@ -183,13 +182,6 @@ export function EventTypesTable({
     }
   }, [sorting, setOrderBy]);
 
-  // Reset isSearching when fetching completes
-  useEffect(() => {
-    if (isSearching && !isFetching) {
-      setIsSearching(false);
-    }
-  }, [isFetching, isSearching]);
-
   if (error) {
     return <ErrorCard error={error} reset={() => refetch()} />;
   }
@@ -208,7 +200,6 @@ export function EventTypesTable({
           value={searchInput}
           className="h-[30px] w-56 py-3"
           onUpdate={(value) => {
-            setIsSearching(true);
             setSearchInput(value);
             debouncedSearch();
           }}
@@ -218,7 +209,7 @@ export function EventTypesTable({
         <NewTable
           columns={columns}
           data={mergedData || []}
-          isLoading={isPending || isSearching || (isFetching && !isFetchingNextPage)}
+          isLoading={isPending || (isFetching && !isFetchingNextPage)}
           // TODO: Re-enable this when API supports sorting by event name
           // sorting={sorting}
           // setSorting={setSorting}
