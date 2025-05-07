@@ -146,9 +146,9 @@ func (q *queue) leaseBacklogForNormalization(ctx context.Context, bl *QueueBackl
 		return fmt.Errorf("could not generate leaseID: %w", err)
 	}
 
-	// TODO Run script
+	_ = leaseID
 
-	bl.NormalizationLease = &leaseID
+	// TODO Run script
 
 	return fmt.Errorf("not implemented")
 }
@@ -165,13 +165,9 @@ func (q *queue) extendBacklogNormalizationLease(ctx context.Context, now time.Ti
 		return fmt.Errorf("could not generate newLeaseID: %w", err)
 	}
 
-	if bl.NormalizationLease == nil || ulid.Time(bl.NormalizationLease.Time()).Before(now) {
-		return errBacklogNormalizationLeaseExpired
-	}
+	_ = newLeaseID
 
 	// TODO Run script
-
-	bl.NormalizationLease = &newLeaseID
 
 	return nil
 }
