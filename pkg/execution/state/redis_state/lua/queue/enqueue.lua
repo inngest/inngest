@@ -22,9 +22,10 @@ local keyShadowPartitionSet              = KEYS[12]          -- shadow:sorted:<f
 local keyShadowPartitionMeta             = KEYS[13]          -- shadows
 local keyGlobalAccountShadowPartitionSet = KEYS[14]
 local keyAccountShadowPartitionSet       = KEYS[15]
+local keyNormalizeFromBacklogSet         = ARGV[16] -- signals if this is part of a normalization
 
-local keyItemIndexA           	= KEYS[16]          -- custom item index 1
-local keyItemIndexB           	= KEYS[17]          -- custom item index 2
+local keyItemIndexA           	= KEYS[17]          -- custom item index 1
+local keyItemIndexB           	= KEYS[18]          -- custom item index 2
 
 
 local queueItem           		= ARGV[1]           -- {id, lease id, attempt, max attempt, data, etc...}
@@ -42,7 +43,6 @@ local enqueueToBacklog				= tonumber(ARGV[10])
 local shadowPartitionItem     = ARGV[11]
 local backlogItem             = ARGV[12]
 local backlogID               = ARGV[13]
-local normalize               = tonumber(ARGV[14]) -- signals if this is part of a normalization
 
 -- $include(update_pointer_score.lua)
 -- $include(ends_with.lua)
@@ -51,7 +51,7 @@ local normalize               = tonumber(ARGV[14]) -- signals if this is part of
 -- $include(enqueue_to_partition.lua)
 -- $include(ends_with.lua)
 
-if normalize == 0 then
+if exists_without_ending(keyNormalizeFromBacklogSet, ":-") == true then
   -- Check idempotency exists
   if redis.call("EXISTS", idempotencyKey) ~= 0 then
     return 1
@@ -68,6 +68,11 @@ if enqueueToBacklog == 1 then
 	enqueue_to_backlog(keyBacklogSet, backlogID, backlogItem, partitionID, shadowPartitionItem, partitionItem, keyPartitionMap, keyBacklogMeta, keyGlobalShadowPartitionSet, keyShadowPartitionMeta, keyShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, queueScore, queueID, partitionTime, nowMS, accountID)
 else
   enqueue_to_partition(keyPartition, partitionID, partitionItem, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, queueScore, queueID, partitionTime, nowMS, accountID)
+end
+
+-- Normalization only: Remove from old backlog after enqueueing to new backlog
+if exists_without_ending(keyNormalizeFromBacklogSet, ":-") == true then
+  redis.call("ZREM", keyNormalizeFromBacklogSet, queueID)
 end
 
 if exists_without_ending(keyFnMetadata, ":fnMeta:-") == true then

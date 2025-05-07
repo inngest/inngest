@@ -1336,6 +1336,8 @@ func (q *queue) EnqueueItem(ctx context.Context, shard QueueShard, i osqueue.Que
 		shadowPartition = q.ItemShadowPartition(ctx, i)
 	}
 
+	keyNormalizeFromBacklogSet := shard.RedisClient.kg.BacklogSet(opts.NormalizeFromBacklogID)
+
 	keys := []string{
 		shard.RedisClient.kg.QueueItem(),            // Queue item
 		shard.RedisClient.kg.PartitionItem(),        // Partition item, map
@@ -1356,6 +1358,7 @@ func (q *queue) EnqueueItem(ctx context.Context, shard QueueShard, i osqueue.Que
 		shard.RedisClient.kg.ShadowPartitionMeta(),
 		shard.RedisClient.kg.GlobalAccountShadowPartitions(),
 		shard.RedisClient.kg.AccountShadowPartitions(i.Data.Identifier.AccountID), // will be empty for system queues
+		keyNormalizeFromBacklogSet,
 	}
 	// Append indexes
 	for _, idx := range q.itemIndexer(ctx, i, shard.RedisClient.kg) {
@@ -1367,11 +1370,6 @@ func (q *queue) EnqueueItem(ctx context.Context, shard QueueShard, i osqueue.Que
 	enqueueToBacklogsVal := "0"
 	if enqueueToBacklogs {
 		enqueueToBacklogsVal = "1"
-	}
-
-	normalize := "0"
-	if opts.Normalize {
-		normalize = "1"
 	}
 
 	args, err := StrSlice([]any{
@@ -1394,7 +1392,6 @@ func (q *queue) EnqueueItem(ctx context.Context, shard QueueShard, i osqueue.Que
 		shadowPartition,
 		backlog,
 		backlog.BacklogID,
-		normalize,
 	})
 	if err != nil {
 		return i, err

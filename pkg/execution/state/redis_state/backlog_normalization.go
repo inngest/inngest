@@ -167,17 +167,10 @@ func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog) err
 
 		for _, item := range res.Items {
 			if _, err := q.EnqueueItem(ctx, shard, *item, time.UnixMilli(item.AtMS), osqueue.EnqueueOpts{
-				PassthroughJobId: true,
-				Normalize:        true,
+				PassthroughJobId:       true,
+				NormalizeFromBacklogID: backlog.BacklogID,
 			}); err != nil {
 				return fmt.Errorf("could not re-enqueue backlog item: %w", err)
-			}
-
-			// TODO This should probably happen in a transaction with Enqueue
-			// NOTE: if there's a failure in this window before removing the item, we still want to make sure
-			// the item is enqueued first before removing it from the current backlog
-			if err := q.removeQueueItem(ctx, shard, rc.kg.BacklogSet(backlog.BacklogID), item.ID); err != nil {
-				return fmt.Errorf("could not remove queue item: %w", err)
 			}
 
 			processed += 1
