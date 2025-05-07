@@ -14,7 +14,7 @@ var (
 
 type critctx struct {
 	boundary time.Duration
-	maxDur   time.Duration
+	timeout  time.Duration
 }
 
 type CritOpt func(c *critctx)
@@ -25,9 +25,9 @@ func WithBoundaries(b time.Duration) CritOpt {
 	}
 }
 
-func WithMaxDuration(dur time.Duration) CritOpt {
+func WithTimeout(dur time.Duration) CritOpt {
 	return func(c *critctx) {
-		c.maxDur = dur
+		c.timeout = dur
 	}
 }
 
@@ -72,9 +72,9 @@ func CritT[T any](ctx context.Context, name string, f func(ctx context.Context) 
 		logger.StdlibLogger(ctx).Warn("context canceled before entering crit", "name", name)
 	}
 
-	if cr.maxDur > 0 {
+	if cr.timeout > 0 {
 		var cancel func()
-		ctx, cancel = context.WithTimeout(ctx, cr.maxDur)
+		ctx, cancel = context.WithTimeout(ctx, cr.timeout)
 		defer cancel()
 
 		doneCh := make(chan T)

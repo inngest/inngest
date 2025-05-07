@@ -112,7 +112,7 @@ func TestCrit(t *testing.T) {
 			<-time.After(1 * time.Second)
 			called = true
 			return nil
-		}, WithMaxDuration(2*time.Second))
+		}, WithTimeout(2*time.Second))
 
 		require.True(t, called)
 		require.NoError(t, err)
@@ -126,7 +126,7 @@ func TestCrit(t *testing.T) {
 			<-time.After(1 * time.Second)
 			called = true
 			return nil
-		}, WithMaxDuration(100*time.Millisecond))
+		}, WithTimeout(100*time.Millisecond))
 
 		require.False(t, called)
 		require.Equal(t, ErrCritContextDeadlineExceeded, err)
