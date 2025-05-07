@@ -100,6 +100,27 @@ type EventQuery struct {
 	EventID     string `json:"eventId"`
 }
 
+type EventV2 struct {
+	EnvID          uuid.UUID `json:"envID"`
+	ID             ulid.ULID `json:"id"`
+	IdempotencyKey *string   `json:"idempotencyKey,omitempty"`
+	Name           string    `json:"name"`
+	OccurredAt     time.Time `json:"occurredAt"`
+	ReceivedAt     time.Time `json:"receivedAt"`
+	Version        *string   `json:"version,omitempty"`
+}
+
+type EventsConnection struct {
+	Edges      []*EventsEdge `json:"edges"`
+	PageInfo   *PageInfo     `json:"pageInfo"`
+	TotalCount int           `json:"totalCount"`
+}
+
+type EventsEdge struct {
+	Node   *EventV2 `json:"node"`
+	Cursor string   `json:"cursor"`
+}
+
 type EventsQuery struct {
 	WorkspaceID string  `json:"workspaceId"`
 	LastEventID *string `json:"lastEventId,omitempty"`

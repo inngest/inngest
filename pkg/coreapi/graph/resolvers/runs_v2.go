@@ -15,8 +15,8 @@ import (
 )
 
 const (
-	defaultRunItems = 40
-	maxRunItems     = 400
+	defaultPageSize = 40
+	maxPageSize     = 400
 )
 
 func (qr *queryResolver) Runs(ctx context.Context, num int, cur *string, order []*models.RunsV2OrderBy, filter models.RunsFilterV2) (*models.RunsV2Connection, error) {
@@ -452,8 +452,8 @@ func toRunsQueryOpt(
 		until = *filter.Until
 	}
 
-	items := defaultRunItems
-	if num > 0 && num < maxRunItems {
+	items := defaultPageSize
+	if num > 0 && num < maxPageSize {
 		items = num
 	}
 

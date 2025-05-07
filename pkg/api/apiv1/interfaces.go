@@ -14,4 +14,9 @@ type EventReader interface {
 	WorkspaceEvents(ctx context.Context, workspaceID uuid.UUID, opts *cqrs.WorkspaceEventsOpts) ([]cqrs.Event, error)
 	// Find returns a specific event given an ID.
 	FindEvent(ctx context.Context, workspaceID uuid.UUID, id ulid.ULID) (*cqrs.Event, error)
+
+	GetEvents(
+		ctx context.Context,
+		opts cqrs.GetEventsOpts,
+	) ([]*cqrs.Event, error)
 }

@@ -630,6 +630,149 @@ func (w wrapper) GetEventsByExpressions(ctx context.Context, cel []string) ([]*c
 	return res, nil
 }
 
+type eventsCursor struct {
+	ID   string
+	Time time.Time
+}
+
+func (c *eventsCursor) Encode() (string, error) {
+	byt, err := json.Marshal(c)
+	if err != nil {
+		return "", fmt.Errorf("error marshalling cursor: %w", err)
+	}
+	return base64.StdEncoding.EncodeToString(byt), nil
+}
+
+func decodeEventQueryCursor(cursor string) (*eventsCursor, error) {
+	byt, err := base64.StdEncoding.DecodeString(cursor)
+	if err != nil {
+		return nil, fmt.Errorf("error decoding cursor: %w", err)
+	}
+
+	var c eventsCursor
+	if err := json.Unmarshal(byt, &c); err != nil {
+		return nil, fmt.Errorf("error unmarshalling cursor: %w", err)
+	}
+
+	return &c, nil
+}
+
+func (w wrapper) GetEvents(
+	ctx context.Context,
+	opts cqrs.GetEventsOpts,
+) ([]*cqrs.Event, error) {
+	err := opts.Validate()
+	if err != nil {
+		return nil, err
+	}
+
+	var cursor *eventsCursor
+	if opts.Cursor != nil {
+		cursor, err = decodeEventQueryCursor(*opts.Cursor)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	// NOTE: Currently, can only be sorted by received_at. We may want to
+	// support other sort columns in the future (e.g. event_ts).
+	orderColumn := "received_at"
+
+	// We need a tie-breaker column because the order column isn't unique. For
+	// example, 2 events may have been received at the same time.
+	orderTieBreakColumn := "internal_id"
+
+	until := time.Now()
+	if opts.Filter.Until != nil {
+		until = *opts.Filter.Until
+	}
+
+	filters := []sq.Expression{
+		sq.C(orderColumn).Gt(opts.Filter.From.String()),
+		sq.C(orderColumn).Lt(until.String()),
+	}
+
+	if len(opts.Filter.EventNames) > 0 {
+		filters = append(filters, sq.C("event_name").In(opts.Filter.EventNames))
+	}
+
+	if cursor != nil {
+		filters = append(filters, sq.Or(
+			sq.L(orderColumn).Lt(cursor.Time.String()),
+
+			// This filter is only needed to break ties in the order column.
+			// It's superfluous if there are no duplicates in the order column,
+			// but that can't be assumed.
+			sq.And(
+				sq.L(orderColumn).Eq(cursor.Time.String()),
+				sq.L(orderTieBreakColumn).Lt(cursor.ID),
+			),
+		))
+	}
+
+	sql, args, err := sq.Dialect(w.dialect()).
+		From("events").
+		Select(
+			"internal_id",
+			"workspace_id",
+			"received_at",
+			"event_id",
+			"event_name",
+			"event_v",
+			"event_ts",
+		).
+		Where(filters...).
+		Order(sq.C(orderColumn).Desc(), sq.C(orderTieBreakColumn).Asc()).
+		ToSQL()
+	if err != nil {
+		return nil, err
+	}
+
+	rows, err := w.db.QueryContext(ctx, sql, args...)
+	if err != nil {
+		return nil, err
+	}
+
+	evts := []*cqrs.Event{}
+	for rows.Next() {
+		evt := sqlc.Event{}
+		err := rows.Scan(
+			&evt.InternalID,
+			&evt.WorkspaceID,
+			&evt.ReceivedAt,
+			&evt.EventID,
+			&evt.EventName,
+			&evt.EventV,
+			&evt.EventTs,
+		)
+		if err != nil {
+			return nil, err
+		}
+
+		cursor := &eventsCursor{
+			ID:   evt.InternalID.String(),
+			Time: evt.ReceivedAt,
+		}
+		cursorStr, err := cursor.Encode()
+		if err != nil {
+			return nil, fmt.Errorf("error encoding cursor: %w", err)
+		}
+
+		evts = append(evts, &cqrs.Event{
+			Cursor:       cursorStr,
+			EventID:      evt.EventID,
+			EventName:    evt.EventName,
+			EventTS:      evt.EventTs.UnixMilli(),
+			EventVersion: evt.EventV.String,
+			ID:           evt.InternalID,
+			ReceivedAt:   evt.ReceivedAt,
+			WorkspaceID:  consts.DevServerEnvID,
+		})
+	}
+
+	return evts, nil
+}
+
 func (w wrapper) FindEvent(ctx context.Context, workspaceID uuid.UUID, internalID ulid.ULID) (*cqrs.Event, error) {
 	return w.GetEventByInternalID(ctx, internalID)
 }

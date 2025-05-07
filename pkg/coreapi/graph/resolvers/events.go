@@ -3,10 +3,12 @@ package resolvers
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"sort"
 	"time"
 
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
+	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -88,4 +90,75 @@ func (qr *queryResolver) Events(ctx context.Context, query models.EventsQuery) (
 	})
 
 	return events, nil
+}
+
+func (qr *queryResolver) EventsV2(
+	ctx context.Context,
+	first int,
+	after *string,
+	filter cqrs.EventsFilter,
+) (*models.EventsConnection, error) {
+	if first < 1 {
+		first = defaultPageSize
+	} else if first > maxPageSize {
+		return nil, fmt.Errorf("first must be less than %d", maxPageSize)
+	}
+
+	evts, err := qr.Data.GetEvents(
+		ctx,
+		cqrs.GetEventsOpts{
+			Cursor: after,
+			Filter: filter,
+			Limit:  first,
+		},
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	edges := make([]*models.EventsEdge, len(evts))
+	for i, evt := range evts {
+		var idempotencyKey *string
+		if evt.EventID != "" && evt.EventID != evt.ID.String() {
+			idempotencyKey = &evt.EventID
+		}
+
+		var version *string
+		if evt.EventVersion != "" {
+			version = &evt.EventVersion
+		}
+
+		edges[i] = &models.EventsEdge{
+			Cursor: evt.ID.String(),
+			Node: &models.EventV2{
+				EnvID:          evt.WorkspaceID,
+				ID:             evt.ID,
+				IdempotencyKey: idempotencyKey,
+				Name:           evt.EventName,
+				OccurredAt:     evt.ReceivedAt,
+				ReceivedAt:     evt.ReceivedAt,
+				Version:        version,
+			},
+		}
+	}
+
+	var (
+		startCursor *string
+		endCursor   *string
+	)
+	if len(evts) > 0 {
+		startCursor = &evts[0].Cursor
+		endCursor = &evts[len(evts)-1].Cursor
+	}
+
+	return &models.EventsConnection{
+		Edges: edges,
+		PageInfo: &models.PageInfo{
+			EndCursor:       endCursor,
+			HasNextPage:     len(evts) == first,
+			HasPreviousPage: startCursor != nil,
+			StartCursor:     startCursor,
+		},
+		TotalCount: len(evts),
+	}, nil
 }

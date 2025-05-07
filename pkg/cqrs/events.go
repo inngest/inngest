@@ -39,6 +39,9 @@ type Event struct {
 	EventUser    map[string]any `json:"user,omitempty"`
 	EventTS      int64          `json:"ts,omitempty"`
 	EventVersion string         `json:"v,omitempty"`
+
+	// Used for pagination.
+	Cursor string `json:"-"`
 }
 
 func (e Event) InternalID() ulid.ULID {
@@ -110,6 +113,28 @@ func (o *WorkspaceEventsOpts) Validate() error {
 	return nil
 }
 
+type GetEventsOpts struct {
+	Cursor *string
+	Filter EventsFilter
+	Limit  int
+}
+
+func (o *GetEventsOpts) Validate() error {
+	if o.Limit < 1 {
+		return fmt.Errorf("limit must be positive")
+	}
+	if o.Limit > MaxEvents {
+		return fmt.Errorf("limit must be less than %d", MaxEvents)
+	}
+	if o.Filter.From.IsZero() {
+		return fmt.Errorf("from must be set")
+	}
+	if o.Filter.Until != nil && o.Filter.Until.Before(o.Filter.From) {
+		return fmt.Errorf("until must be after from")
+	}
+	return nil
+}
+
 type EventReader interface {
 	GetEventByInternalID(ctx context.Context, internalID ulid.ULID) (*Event, error)
 	GetEventsByInternalIDs(ctx context.Context, ids []ulid.ULID) ([]*Event, error)
@@ -127,6 +152,7 @@ type EventReader interface {
 	WorkspaceEvents(ctx context.Context, workspaceID uuid.UUID, opts *WorkspaceEventsOpts) ([]Event, error)
 	// Find returns a specific event given an ID.
 	FindEvent(ctx context.Context, workspaceID uuid.UUID, id ulid.ULID) (*Event, error)
+	GetEvents(ctx context.Context, opts GetEventsOpts) ([]*Event, error)
 }
 
 type EventBatchOpt func(eb *EventBatch)
@@ -247,4 +273,11 @@ func (eb *EventBatch) EventIDs() []ulid.ULID {
 
 func (eb *EventBatch) IsMulti() bool {
 	return len(eb.Events) > 1
+}
+
+type EventsFilter struct {
+	EventNames []string   `json:"eventNames,omitempty"`
+	From       time.Time  `json:"from"`
+	Query      *string    `json:"query,omitempty"`
+	Until      *time.Time `json:"until,omitempty"`
 }

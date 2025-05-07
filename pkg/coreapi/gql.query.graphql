@@ -10,6 +10,12 @@ type Query {
   # Get all events sent
   events(query: EventsQuery!): [Event!]
 
+  eventsV2(
+    first: Int! = 40
+    after: String
+    filter: EventsFilter!
+  ): EventsConnection!
+
   # Get all functions registered
   functions: [Function!]
 
