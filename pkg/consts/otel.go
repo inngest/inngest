@@ -94,7 +94,6 @@ const (
 	OtelAttrSDKRunID       = "sdk.run.id"
 
 	// otel scopes
-	OtelScopeUserland  = "userland.inngest"
 	OtelScopeEvent     = "event.inngest"
 	OtelScopeBatch     = "batch.inngest"
 	OtelScopeDebounce  = "debounce.inngest"

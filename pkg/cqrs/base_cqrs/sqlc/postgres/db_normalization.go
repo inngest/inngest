@@ -4,11 +4,10 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"math"
-
 	"github.com/google/uuid"
 	sqlc_sqlite "github.com/inngest/inngest/pkg/cqrs/base_cqrs/sqlc/sqlite"
 	"github.com/oklog/ulid/v2"
+	"math"
 )
 
 func NewNormalized(db DBTX) sqlc_sqlite.Querier {

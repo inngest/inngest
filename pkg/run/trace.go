@@ -2,7 +2,6 @@ package run
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"sort"
 	"strconv"
@@ -245,12 +244,6 @@ func (tb *runTree) toRunSpan(ctx context.Context, s *cqrs.Span) (span *rpbv2.Run
 
 	// the rest are grouped executions
 	default:
-		// Allow userland spans to be constructed, but don't process them like
-		// steps
-		if s.IsUserland() {
-			break
-		}
-
 		// NOTE:
 		// check last item in group for op code
 		// due to how we wrap up function errors with the next step execution, first item might not hold the accurate op code
@@ -303,18 +296,6 @@ func (tb *runTree) toRunSpan(ctx context.Context, s *cqrs.Span) (span *rpbv2.Run
 					return nil, false, fmt.Errorf("error grouping executions: %w", err)
 				}
 			}
-		}
-	}
-
-	// If we have child spans that are userland, we need to add them to the
-	// tree
-	for _, child := range s.UserlandChildren() {
-		userlandSpan, userlandSkipped, err := tb.toRunSpan(ctx, child)
-		if err != nil {
-			return nil, false, err
-		}
-		if !userlandSkipped {
-			res.Children = append(res.Children, userlandSpan)
 		}
 	}
 
@@ -388,19 +369,6 @@ func (tb *runTree) constructSpan(ctx context.Context, s *cqrs.Span) (*rpbv2.RunS
 		}
 	}
 
-	status := rpbv2.SpanStatus_RUNNING
-	var userlandSpan rpbv2.UserlandSpan
-	if s.IsUserland() {
-		status = rpbv2.SpanStatus_COMPLETED
-		userlandSpan.SpanName = name
-		userlandSpan.SpanKind = s.SpanKind
-		userlandSpan.ServiceName = &s.ServiceName
-		userlandSpan.ScopeName = &s.ScopeName
-		userlandSpan.ScopeVersion = &s.ScopeVersion
-		userlandSpan.SpanAttrs, _ = json.Marshal(s.SpanAttributes)
-		userlandSpan.ResourceAttrs, _ = json.Marshal(s.ResourceAttributes)
-	}
-
 	var stepID *string
 	if attrStepID, ok := s.SpanAttributes[consts.OtelSysStepID]; ok && attrStepID != "" {
 		stepID = &attrStepID
@@ -416,14 +384,12 @@ func (tb *runTree) constructSpan(ctx context.Context, s *cqrs.Span) (*rpbv2.RunS
 		ParentSpanId: s.ParentSpanID,
 		SpanId:       s.SpanID,
 		Name:         name,
-		Status:       status,
+		Status:       rpbv2.SpanStatus_RUNNING,
 		QueuedAt:     timestamppb.New(queuedAt),
 		StartedAt:    timestamppb.New(s.Timestamp),
 		EndedAt:      timestamppb.New(endedAt),
 		DurationMs:   dur,
 		StepId:       stepID,
-		IsUserland:   s.IsUserland(),
-		UserlandSpan: &userlandSpan,
 	}, false
 }
 
