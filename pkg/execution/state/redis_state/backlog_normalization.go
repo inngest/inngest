@@ -14,6 +14,58 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 )
 
+// backlogNormalizationWorker runs a blocking process that listens to item being pushed into the normalization partition. This allows us to process individual
+// backlogs that need to be normalized
+func (q *queue) backlogNormalizationWorker(ctx context.Context, nc chan *QueueBacklog) {
+	l := logger.StdlibLogger(ctx)
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+
+		case backlog := <-nc:
+			err := q.normalizeBacklog(ctx, backlog)
+			if err != nil {
+				l.Error("could not normalize backlog", "error", err, "backlog", backlog)
+			}
+		}
+	}
+}
+
+// backlogNormalizationScan iterates through a partition of backlogs and reenqueue
+// the items to the appropriate backlogs
+func (q *queue) backlogNormalizationScan(ctx context.Context) error {
+	l := logger.StdlibLogger(ctx)
+	bc := make(chan *QueueBacklog)
+
+	for i := int32(0); i < q.numBacklogNormalizationWorkers; i++ {
+		go q.backlogNormalizationWorker(ctx, bc)
+	}
+
+	tick := q.clock.NewTicker(q.pollTick)
+	l.Debug("starting normalization scanner", "poll", q.pollTick.String())
+
+	for {
+		select {
+		case <-ctx.Done():
+			tick.Stop()
+			return nil
+
+		case <-tick.Chan():
+			until := q.clock.Now()
+
+			if err := q.iterateNormalizationPartition(ctx, until, bc); err != nil {
+				// TODO: check errors
+
+				l.Error("error scanning global normalization partition", "error", err)
+
+				// TODO: return if error is not acceptable
+			}
+		}
+	}
+}
+
 // iterateNormalizationPartition scans and iterate through the global normalization partition to process backlogs needing to be normalized
 func (q *queue) iterateNormalizationPartition(ctx context.Context, until time.Time, bc chan *QueueBacklog) error {
 	l := logger.StdlibLogger(ctx)

@@ -175,6 +175,8 @@ type QueueKeyGenerator interface {
 	GlobalShadowPartitionSet() string
 	// BacklogSet returns the key to the ZSET storing pointers (queue item IDs) for a given backlog.
 	BacklogSet(backlogID string) string
+	// ActiveCounter returns the key to the number of active queue items for a given backlog.
+	ActiveCounter(backlogID string) string
 	// BacklogMeta returns the key to the hash storing serialized QueueBacklog objects by ID.
 	BacklogMeta() string
 	// BacklogNormalizationLease returns the key to the lease for the backlog for normalization purposes
@@ -348,6 +350,16 @@ func (u queueKeyGenerator) BacklogSet(backlogID string) string {
 	}
 
 	return fmt.Sprintf("{%s}:backlog:sorted:%s", u.queueDefaultKey, backlogID)
+}
+
+// ActiveCounter returns the key to the number of active queue items for a given backlog.
+func (u queueKeyGenerator) ActiveCounter(backlogID string) string {
+	if backlogID == "" {
+		// this is a placeholder because passing an empty key into Lua will cause multi-slot key errors
+		return fmt.Sprintf("{%s}:active:-", u.queueDefaultKey)
+	}
+
+	return fmt.Sprintf("{%s}:active:%s", u.queueDefaultKey, backlogID)
 }
 
 // BacklogMeta returns the key to the hash storing serialized QueueBacklog objects by ID.

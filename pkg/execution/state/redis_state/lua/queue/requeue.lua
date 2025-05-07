@@ -31,8 +31,10 @@ local keyShadowPartitionMeta             = KEYS[16]          -- shadows
 local keyGlobalAccountShadowPartitionSet = KEYS[17]
 local keyAccountShadowPartitionSet       = KEYS[18]
 
-local keyItemIndexA           = KEYS[19]          -- custom item index 1
-local keyItemIndexB           = KEYS[20]          -- custom item index 2
+local keyActiveCounter         = KEYS[19]
+
+local keyItemIndexA           = KEYS[20]          -- custom item index 1
+local keyItemIndexB           = KEYS[21]          -- custom item index 2
 
 local queueItem           = ARGV[1]
 local queueID             = ARGV[2]           -- id
@@ -106,6 +108,13 @@ handleRequeueConcurrency(keyCustomConcurrencyKey2)
 redis.call("ZREM", keyAcctConcurrency, item.id)
 
 if requeueToBacklog == 1 then
+  -- When item is moved to the backlog, it's no longer active
+  -- This is only necessary with backlogs; if the item moves back to the partition,
+  -- it can be picked up again and is still "active" (hence we don't decrease in the "else" case)
+  if redis.call("EXISTS", keyActiveCounter) == 1 then
+    redis.call("DECR", keyActiveCounter)
+  end
+
 	--
 	-- Requeue item to backlog queues again
 	--

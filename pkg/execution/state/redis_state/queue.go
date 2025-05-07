@@ -843,6 +843,12 @@ type QueueRunMode struct {
 	// Shadow enables shadow partition processing
 	ShadowPartition bool
 
+	// AccountShadowPartition enables scanning of accounts for fair shadow partition processing
+	AccountShadowPartition bool
+
+	// AccountShadowPartitionWeight is the weight of processing accounts over global shadow partitions between 0 - 100 where 100 means only process accounts
+	AccountShadowPartitionWeight int
+
 	// ShadowContinuations enables shadow continuations
 	ShadowContinuations bool
 
@@ -2326,14 +2332,14 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 		keyCustomConcurrency2 string
 	)
 
-	var backlog QueueBacklog
+	backlog := q.ItemBacklog(ctx, item)
 	var shadowPartition QueueShadowPartition
+	keyActiveCounter := q.primaryQueueShard.RedisClient.kg.ActiveCounter(backlog.BacklogID)
 
 	enableKeyQueuesVal := "0"
 	enableKeyQueues := q.itemEnableKeyQueues(ctx, item)
 	if enableKeyQueues {
 		enableKeyQueuesVal = "1"
-		backlog = q.ItemBacklog(ctx, item)
 		shadowPartition = q.ItemShadowPartition(ctx, item)
 
 		// accounting for key queues v2
@@ -2371,6 +2377,8 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 		q.primaryQueueShard.RedisClient.kg.ThrottleKey(item.Data.Throttle),
 		// Finally, there are ALWAYS account-level concurrency keys.
 		keyConcurrencyAcct,
+
+		keyActiveCounter,
 	}
 
 	args, err := StrSlice([]any{
@@ -2418,11 +2426,11 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 	switch status {
 	case 0:
 		return &leaseID, nil
-	case 1:
+	case -1:
 		return nil, ErrQueueItemNotFound
-	case 2:
+	case -2:
 		return nil, ErrQueueItemAlreadyLeased
-	case 3:
+	case -3:
 		// This partition is reused for function partitions without keys, system partions,
 		// and potentially concurrency key partitions. Errors should be returned based on
 		// the partition type
@@ -2432,19 +2440,24 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 		}
 
 		return nil, newKeyError(ErrPartitionConcurrencyLimit, item.FunctionID.String())
-	case 4:
+	case -4:
 		return nil, newKeyError(ErrConcurrencyLimitCustomKey, customConcurrencyKey1.EvaluatedConcurrencyKey)
-	case 5:
+	case -5:
 		return nil, newKeyError(ErrConcurrencyLimitCustomKey, customConcurrencyKey2.EvaluatedConcurrencyKey)
-	case 6:
+	case -6:
 		return nil, newKeyError(ErrAccountConcurrencyLimit, item.Data.Identifier.AccountID.String())
-	case 7:
+	case -7:
 		if item.Data.Throttle == nil {
 			// This should never happen, as the throttle key is nil.
 			return nil, fmt.Errorf("lease attempted throttle with nil throttle config: %#v", item)
 		}
 		return nil, newKeyError(ErrQueueItemThrottled, item.Data.Throttle.Key)
 	default:
+		if status > 0 {
+			q.log.Warn("adjusted active counter", "key", keyActiveCounter, "item", item, "part", fnPartition)
+			return &leaseID, nil
+		}
+
 		return nil, fmt.Errorf("unknown response leasing item: %d", status)
 	}
 }
@@ -2576,10 +2589,12 @@ func (q *queue) Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		keyCustomConcurrency2 string
 	)
 
-	var backlog QueueBacklog
+	backlog := q.ItemBacklog(ctx, i)
+
+	keyActiveCounter := q.primaryQueueShard.RedisClient.kg.ActiveCounter(backlog.BacklogID)
+
 	var shadowPartition QueueShadowPartition
 	if enableAccountingForKeyQueues {
-		backlog = q.ItemBacklog(ctx, i)
 		shadowPartition = q.ItemShadowPartition(ctx, i)
 
 		// accounting for key queues v2
@@ -2610,6 +2625,8 @@ func (q *queue) Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		queueShard.RedisClient.kg.GlobalAccountIndex(),
 		queueShard.RedisClient.kg.AccountPartitionIndex(i.Data.Identifier.AccountID),
 		queueShard.RedisClient.kg.PartitionItem(),
+
+		keyActiveCounter,
 	}
 	// Append indexes
 	for _, idx := range q.itemIndexer(ctx, i, queueShard.RedisClient.kg) {
@@ -2694,14 +2711,15 @@ func (q *queue) Requeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		keyCustomConcurrency2 string
 	)
 
-	var backlog QueueBacklog
 	var shadowPartition QueueShadowPartition
+	backlog := q.ItemBacklog(ctx, i)
+
+	keyActiveCounter := q.primaryQueueShard.RedisClient.kg.ActiveCounter(backlog.BacklogID)
 
 	requeueToBacklogsVal := "0"
 	enableKeyQueues := q.itemEnableKeyQueues(ctx, i)
 	if enableKeyQueues {
 		requeueToBacklogsVal = "1"
-		backlog = q.ItemBacklog(ctx, i)
 		shadowPartition = q.ItemShadowPartition(ctx, i)
 
 		// accounting for key queues v2
@@ -2740,6 +2758,7 @@ func (q *queue) Requeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		queueShard.RedisClient.kg.ShadowPartitionMeta(),
 		queueShard.RedisClient.kg.GlobalAccountShadowPartitions(),
 		queueShard.RedisClient.kg.AccountShadowPartitions(i.Data.Identifier.AccountID), // empty for system partitions
+		keyActiveCounter,
 	}
 	// Append indexes
 	for _, idx := range q.itemIndexer(ctx, i, queueShard.RedisClient.kg) {
@@ -2917,6 +2936,7 @@ func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueSha
 		keyConcurrencyFn,
 		keyCustomConcurrency1,
 		keyCustomConcurrency2,
+		q.primaryQueueShard.RedisClient.kg.ActiveCounter(b.BacklogID),
 	}
 	args, err := StrSlice([]any{
 		b.BacklogID,

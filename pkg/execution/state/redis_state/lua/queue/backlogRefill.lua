@@ -31,6 +31,7 @@ local keyConcurrencyAccount      = KEYS[8]
 local keyConcurrencyFn  				 = KEYS[9] -- Account concurrency level
 local keyCustomConcurrencyKey1   = KEYS[10] -- When leasing an item we need to place the lease into this key.
 local keyCustomConcurrencyKey2   = KEYS[11] -- Optional for eg. for concurrency amongst steps
+local keyActiveCounter           = KEYS[12]
 
 local backlogID   = ARGV[1]
 local partitionID = ARGV[2]
@@ -77,10 +78,9 @@ end
 local status = 0
 
 if capacity > 0 and throttleLimit > 0 then
-  local throttleResult = gcra(throttleKey, nowMS, throttlePeriod * 1000, throttleLimit, throttleBurst)
-  if throttleResult == false then
-    -- Throttled: Can't add more for this backlog!
-    capacity = 0
+  local remainingThrottleCapacity = gcraCapacity(throttleKey, nowMS, throttlePeriod * 1000, throttleLimit, throttleBurst)
+  if remainingThrottleCapacity < capacity then
+    capacity = remainingThrottleCapacity
     status = 5
   end
 end
@@ -122,12 +122,11 @@ if capacity > 0 and exists_without_ending(keyConcurrencyAccount, ":-") == true a
   end
 end
 
--- If we have capacity, reduce by ready but not yet picked up items to prevent over-filling
+-- If we have capacity, reduce by active (ready + in progress count) to prevent over-filling
 if capacity > 0 then
-  -- TODO Check if we need to create a key-specific ready queue
-  local readyCount = redis.call("ZCARD", keyReadySet)
-  if readyCount ~= nil and readyCount ~= false then
-    capacity = capacity - readyCount
+  local activeCount = redis.call("GET", keyActiveCounter)
+  if activeCount ~= nil and activeCount ~= false then
+    capacity = capacity - activeCount
   end
 end
 
@@ -168,8 +167,12 @@ if capacity > 0 then
 
     ::continue::
   end
+
   redis.call("ZADD", keyReadySet, unpack(args))
+  redis.call("INCRBY", keyActiveCounter, refilled)
   redis.call("ZREM", keyBacklogSet, unpack(remArgs))
+
+  gcraUpdate(throttleKey, nowMS, throttlePeriod * 1000, throttleLimit, throttleBurst, refilled)
 
   if hasCleanup == true then
     redis.call("HDEL", keyQueueItemHash, unpack(itemCleanupArgs))

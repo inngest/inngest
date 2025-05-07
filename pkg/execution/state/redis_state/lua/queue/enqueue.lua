@@ -51,6 +51,7 @@ local backlogID               = ARGV[13]
 -- $include(enqueue_to_partition.lua)
 -- $include(ends_with.lua)
 
+-- Only skip idempotency checks if we're normalizing a backlog (we want to enqueue an existing item to a new backlog)
 if exists_without_ending(keyNormalizeFromBacklogSet, ":-") == true then
   -- Check idempotency exists
   if redis.call("EXISTS", idempotencyKey) ~= 0 then
