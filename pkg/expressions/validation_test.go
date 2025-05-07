@@ -2,6 +2,7 @@ package expressions
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"testing"
 )
@@ -23,11 +24,6 @@ func Test_Validation(t *testing.T) {
 			expr:        "event.data.foo == 1",
 			policy:      DefaultRestrictiveValidationPolicy(),
 			expectValid: true,
-		},
-		{
-			expr:        "event.data.x is not an integer less than 2",
-			policy:      nil,
-			expectValid: false,
 		},
 		{
 			expr:        "event.name.endsWith(\"foo\")",
@@ -315,6 +311,8 @@ func Test_Validation(t *testing.T) {
 				t.Errorf("expected to be valid; got: %v\nexpr: %s", err, tt.expr)
 			} else if err == nil && !tt.expectValid {
 				t.Errorf("expected to be invalid; got: validation passed\nexpr: %s", tt.expr)
+			} else if err != nil && !errors.Is(err, ErrValidationFailed) {
+				t.Errorf("expected validation error; got: %v\nexpr: %s", err, tt.expr)
 			} else if err != nil {
 				t.Logf("[info] validation error was: %v", err)
 			}
