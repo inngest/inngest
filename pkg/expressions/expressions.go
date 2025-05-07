@@ -15,7 +15,6 @@ package expressions
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/google/cel-go/cel"
@@ -318,29 +317,4 @@ func (e *expressionEvaluator) parseAttributes(ctx context.Context) error {
 	}
 	e.attrs = attrs
 	return nil
-}
-
-type CompileError struct {
-	Err error
-}
-
-func NewCompileError(err error) *CompileError {
-	return &CompileError{Err: err}
-}
-
-func (c *CompileError) Error() string {
-	return fmt.Sprintf("error compiling expression: %s", c.Err)
-}
-
-func (c *CompileError) Unwrap() error {
-	return c.Err
-}
-
-func (c *CompileError) Message() string {
-	return c.Err.Error()
-}
-
-func (c *CompileError) Is(tgt error) bool {
-	_, ok := tgt.(*CompileError)
-	return ok
 }
