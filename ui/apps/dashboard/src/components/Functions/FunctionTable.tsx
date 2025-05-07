@@ -167,13 +167,6 @@ function createColumns(environmentSlug: string) {
           return <Skeleton className="my-2 block h-3 w-32" />;
         }
 
-        if (!value)
-          return (
-            <TextCell>
-              <span className="text-light">—</span>
-            </TextCell>
-          );
-
         return (
           <div className="flex items-center">
             <div className="w-16">
@@ -181,11 +174,7 @@ function createColumns(environmentSlug: string) {
             </div>
 
             <div className="hidden lg:block [&_*]:cursor-pointer">
-              <MiniStackedBarChart
-                key="volume-chart"
-                className="shrink-0"
-                data={value?.slots || []}
-              />
+              <MiniStackedBarChart key="volume-chart" className="shrink-0" data={value.slots} />
             </div>
           </div>
         );
