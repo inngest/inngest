@@ -365,3 +365,21 @@ func IncrQueueShadowContinuationOpCounter(ctx context.Context, opts CounterOpt) 
 		Tags:        opts.Tags,
 	})
 }
+
+func IncrInboundEventExportedCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "inbound_event_exported_total",
+		Description: "Total number of inbound events exported",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrInboundEventExportDataLoss(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "inbound_event_export_data_loss_total",
+		Description: "Total number of inbound events loss detected",
+		Tags:        opts.Tags,
+	})
+}
