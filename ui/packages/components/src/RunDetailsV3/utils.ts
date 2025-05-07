@@ -14,14 +14,6 @@ export type SpanWidths = {
   running: number;
 };
 
-export type SpanTimes = {
-  ended: number | null;
-  max: number;
-  min: number;
-  queued: number;
-  started: number | null;
-};
-
 export const maybeBooleanToString = (value: boolean | null): string | null => {
   if (value === null) {
     return null;
@@ -29,7 +21,19 @@ export const maybeBooleanToString = (value: boolean | null): string | null => {
   return value ? 'True' : 'False';
 };
 
-export function createSpanWidths({ ended, max, min, queued, started }: SpanTimes): SpanWidths {
+export function createSpanWidths({
+  ended,
+  max,
+  min,
+  queued,
+  started,
+}: {
+  ended: number | null;
+  max: number;
+  min: number;
+  queued: number;
+  started: number | null;
+}) {
   let beforeWidth = queued - min;
   let queuedWidth = (started ?? max) - queued;
   let runningWidth = 0;

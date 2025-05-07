@@ -13,16 +13,6 @@ const traceDetailsFragment = graphql(`
     startedAt
     endedAt
     isRoot
-    isUserland
-    userlandSpan {
-      spanName
-      spanKind
-      serviceName
-      scopeName
-      scopeVersion
-      spanAttrs
-      resourceAttrs
-    }
     outputID
     stepID
     spanID

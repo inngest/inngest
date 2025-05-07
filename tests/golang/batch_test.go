@@ -81,6 +81,7 @@ func TestBatchEvents(t *testing.T) {
 
 		require.NotNil(t, run.Trace)
 		require.True(t, run.Trace.IsRoot)
+		require.Equal(t, 0, len(run.Trace.ChildSpans))
 		require.Equal(t, models.RunTraceSpanStatusCompleted.String(), run.Trace.Status)
 		// output test
 		require.NotNil(t, run.Trace.OutputID)

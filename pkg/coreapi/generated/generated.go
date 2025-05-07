@@ -331,7 +331,6 @@ type ComplexityRoot struct {
 		EndedAt       func(childComplexity int) int
 		FunctionID    func(childComplexity int) int
 		IsRoot        func(childComplexity int) int
-		IsUserland    func(childComplexity int) int
 		Name          func(childComplexity int) int
 		OutputID      func(childComplexity int) int
 		ParentSpan    func(childComplexity int) int
@@ -346,7 +345,6 @@ type ComplexityRoot struct {
 		StepInfo      func(childComplexity int) int
 		StepOp        func(childComplexity int) int
 		TraceID       func(childComplexity int) int
-		UserlandSpan  func(childComplexity int) int
 	}
 
 	RunTraceSpanOutput struct {
@@ -405,16 +403,6 @@ type ComplexityRoot struct {
 		Runs      func(childComplexity int) int
 		Trigger   func(childComplexity int) int
 		Type      func(childComplexity int) int
-	}
-
-	UserlandSpan struct {
-		ResourceAttrs func(childComplexity int) int
-		ScopeName     func(childComplexity int) int
-		ScopeVersion  func(childComplexity int) int
-		ServiceName   func(childComplexity int) int
-		SpanAttrs     func(childComplexity int) int
-		SpanKind      func(childComplexity int) int
-		SpanName      func(childComplexity int) int
 	}
 
 	WaitForEventStepInfo struct {
@@ -1985,13 +1973,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.RunTraceSpan.IsRoot(childComplexity), true
 
-	case "RunTraceSpan.isUserland":
-		if e.complexity.RunTraceSpan.IsUserland == nil {
-			break
-		}
-
-		return e.complexity.RunTraceSpan.IsUserland(childComplexity), true
-
 	case "RunTraceSpan.name":
 		if e.complexity.RunTraceSpan.Name == nil {
 			break
@@ -2089,13 +2070,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.RunTraceSpan.TraceID(childComplexity), true
-
-	case "RunTraceSpan.userlandSpan":
-		if e.complexity.RunTraceSpan.UserlandSpan == nil {
-			break
-		}
-
-		return e.complexity.RunTraceSpan.UserlandSpan(childComplexity), true
 
 	case "RunTraceSpanOutput.data":
 		if e.complexity.RunTraceSpanOutput.Data == nil {
@@ -2334,55 +2308,6 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.StreamItem.Type(childComplexity), true
-
-	case "UserlandSpan.resourceAttrs":
-		if e.complexity.UserlandSpan.ResourceAttrs == nil {
-			break
-		}
-
-		return e.complexity.UserlandSpan.ResourceAttrs(childComplexity), true
-
-	case "UserlandSpan.scopeName":
-		if e.complexity.UserlandSpan.ScopeName == nil {
-			break
-		}
-
-		return e.complexity.UserlandSpan.ScopeName(childComplexity), true
-
-	case "UserlandSpan.scopeVersion":
-		if e.complexity.UserlandSpan.ScopeVersion == nil {
-			break
-		}
-
-		return e.complexity.UserlandSpan.ScopeVersion(childComplexity), true
-
-	case "UserlandSpan.serviceName":
-		if e.complexity.UserlandSpan.ServiceName == nil {
-			break
-		}
-
-		return e.complexity.UserlandSpan.ServiceName(childComplexity), true
-
-	case "UserlandSpan.spanAttrs":
-		if e.complexity.UserlandSpan.SpanAttrs == nil {
-			break
-		}
-
-		return e.complexity.UserlandSpan.SpanAttrs(childComplexity), true
-
-	case "UserlandSpan.spanKind":
-		if e.complexity.UserlandSpan.SpanKind == nil {
-			break
-		}
-
-		return e.complexity.UserlandSpan.SpanKind(childComplexity), true
-
-	case "UserlandSpan.spanName":
-		if e.complexity.UserlandSpan.SpanName == nil {
-			break
-		}
-
-		return e.complexity.UserlandSpan.SpanName(childComplexity), true
 
 	case "WaitForEventStepInfo.eventName":
 		if e.complexity.WaitForEventStepInfo.EventName == nil {
@@ -3071,18 +2996,6 @@ type RunTraceSpan {
   isRoot: Boolean! # whether this span is the root span of the trace (shortcut for presence of rootspan)
   parentSpanID: String
   parentSpan: RunTraceSpan # the parent span of this span
-  isUserland: Boolean! # whether this span is a userland span
-  userlandSpan: UserlandSpan
-}
-
-type UserlandSpan {
-  spanName: String
-  spanKind: String
-  serviceName: String
-  resourceAttrs: Bytes
-  scopeName: String
-  scopeVersion: String
-  spanAttrs: Bytes
 }
 
 type RunTraceSpanOutput {
@@ -3148,7 +3061,7 @@ type ConnectV1WorkerConnection {
   instanceId: String!
   workerIp: String!
 
-  appName: String
+	appName: String
   appID: UUID
   app: App
 
@@ -3166,7 +3079,8 @@ type ConnectV1WorkerConnection {
   sdkVersion: String!
   sdkPlatform: String!
   syncId: UUID
-    @deprecated(reason: "buildId is deprecated. Use appVersion instead.")
+
+	@deprecated(reason: "buildId is deprecated. Use appVersion instead.")
   buildId: String
   appVersion: String
 
@@ -3189,12 +3103,12 @@ type ConnectV1WorkerConnectionEdge {
 }
 
 enum AppMethod {
-  SERVE
-  CONNECT
+	SERVE
+	CONNECT
 }
 
 input AppsFilterV1 {
-  method: AppMethod
+	method: AppMethod
 }
 `, BuiltIn: false},
 }
@@ -8558,10 +8472,6 @@ func (ec *executionContext) fieldContext_FunctionRunV2_trace(ctx context.Context
 				return ec.fieldContext_RunTraceSpan_parentSpanID(ctx, field)
 			case "parentSpan":
 				return ec.fieldContext_RunTraceSpan_parentSpan(ctx, field)
-			case "isUserland":
-				return ec.fieldContext_RunTraceSpan_isUserland(ctx, field)
-			case "userlandSpan":
-				return ec.fieldContext_RunTraceSpan_userlandSpan(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type RunTraceSpan", field.Name)
 		},
@@ -13642,10 +13552,6 @@ func (ec *executionContext) fieldContext_RunTraceSpan_childrenSpans(ctx context.
 				return ec.fieldContext_RunTraceSpan_parentSpanID(ctx, field)
 			case "parentSpan":
 				return ec.fieldContext_RunTraceSpan_parentSpan(ctx, field)
-			case "isUserland":
-				return ec.fieldContext_RunTraceSpan_isUserland(ctx, field)
-			case "userlandSpan":
-				return ec.fieldContext_RunTraceSpan_userlandSpan(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type RunTraceSpan", field.Name)
 		},
@@ -13939,113 +13845,8 @@ func (ec *executionContext) fieldContext_RunTraceSpan_parentSpan(ctx context.Con
 				return ec.fieldContext_RunTraceSpan_parentSpanID(ctx, field)
 			case "parentSpan":
 				return ec.fieldContext_RunTraceSpan_parentSpan(ctx, field)
-			case "isUserland":
-				return ec.fieldContext_RunTraceSpan_isUserland(ctx, field)
-			case "userlandSpan":
-				return ec.fieldContext_RunTraceSpan_userlandSpan(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type RunTraceSpan", field.Name)
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _RunTraceSpan_isUserland(ctx context.Context, field graphql.CollectedField, obj *models.RunTraceSpan) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_RunTraceSpan_isUserland(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.IsUserland, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		if !graphql.HasFieldError(ctx, fc) {
-			ec.Errorf(ctx, "must not be null")
-		}
-		return graphql.Null
-	}
-	res := resTmp.(bool)
-	fc.Result = res
-	return ec.marshalNBoolean2bool(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_RunTraceSpan_isUserland(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "RunTraceSpan",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type Boolean does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _RunTraceSpan_userlandSpan(ctx context.Context, field graphql.CollectedField, obj *models.RunTraceSpan) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_RunTraceSpan_userlandSpan(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.UserlandSpan, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*models.UserlandSpan)
-	fc.Result = res
-	return ec.marshalOUserlandSpan2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐUserlandSpan(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_RunTraceSpan_userlandSpan(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "RunTraceSpan",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			switch field.Name {
-			case "spanName":
-				return ec.fieldContext_UserlandSpan_spanName(ctx, field)
-			case "spanKind":
-				return ec.fieldContext_UserlandSpan_spanKind(ctx, field)
-			case "serviceName":
-				return ec.fieldContext_UserlandSpan_serviceName(ctx, field)
-			case "resourceAttrs":
-				return ec.fieldContext_UserlandSpan_resourceAttrs(ctx, field)
-			case "scopeName":
-				return ec.fieldContext_UserlandSpan_scopeName(ctx, field)
-			case "scopeVersion":
-				return ec.fieldContext_UserlandSpan_scopeVersion(ctx, field)
-			case "spanAttrs":
-				return ec.fieldContext_UserlandSpan_spanAttrs(ctx, field)
-			}
-			return nil, fmt.Errorf("no field named %q was found under type UserlandSpan", field.Name)
 		},
 	}
 	return fc, nil
@@ -15597,293 +15398,6 @@ func (ec *executionContext) fieldContext_StreamItem_inBatch(ctx context.Context,
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type Boolean does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _UserlandSpan_spanName(ctx context.Context, field graphql.CollectedField, obj *models.UserlandSpan) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_UserlandSpan_spanName(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.SpanName, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*string)
-	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_UserlandSpan_spanName(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "UserlandSpan",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _UserlandSpan_spanKind(ctx context.Context, field graphql.CollectedField, obj *models.UserlandSpan) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_UserlandSpan_spanKind(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.SpanKind, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*string)
-	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_UserlandSpan_spanKind(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "UserlandSpan",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _UserlandSpan_serviceName(ctx context.Context, field graphql.CollectedField, obj *models.UserlandSpan) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_UserlandSpan_serviceName(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.ServiceName, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*string)
-	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_UserlandSpan_serviceName(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "UserlandSpan",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _UserlandSpan_resourceAttrs(ctx context.Context, field graphql.CollectedField, obj *models.UserlandSpan) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_UserlandSpan_resourceAttrs(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.ResourceAttrs, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*string)
-	fc.Result = res
-	return ec.marshalOBytes2ᚖstring(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_UserlandSpan_resourceAttrs(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "UserlandSpan",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type Bytes does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _UserlandSpan_scopeName(ctx context.Context, field graphql.CollectedField, obj *models.UserlandSpan) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_UserlandSpan_scopeName(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.ScopeName, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*string)
-	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_UserlandSpan_scopeName(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "UserlandSpan",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _UserlandSpan_scopeVersion(ctx context.Context, field graphql.CollectedField, obj *models.UserlandSpan) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_UserlandSpan_scopeVersion(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.ScopeVersion, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*string)
-	fc.Result = res
-	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_UserlandSpan_scopeVersion(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "UserlandSpan",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type String does not have child fields")
-		},
-	}
-	return fc, nil
-}
-
-func (ec *executionContext) _UserlandSpan_spanAttrs(ctx context.Context, field graphql.CollectedField, obj *models.UserlandSpan) (ret graphql.Marshaler) {
-	fc, err := ec.fieldContext_UserlandSpan_spanAttrs(ctx, field)
-	if err != nil {
-		return graphql.Null
-	}
-	ctx = graphql.WithFieldContext(ctx, fc)
-	defer func() {
-		if r := recover(); r != nil {
-			ec.Error(ctx, ec.Recover(ctx, r))
-			ret = graphql.Null
-		}
-	}()
-	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
-		ctx = rctx // use context from middleware stack in children
-		return obj.SpanAttrs, nil
-	})
-	if err != nil {
-		ec.Error(ctx, err)
-		return graphql.Null
-	}
-	if resTmp == nil {
-		return graphql.Null
-	}
-	res := resTmp.(*string)
-	fc.Result = res
-	return ec.marshalOBytes2ᚖstring(ctx, field.Selections, res)
-}
-
-func (ec *executionContext) fieldContext_UserlandSpan_spanAttrs(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
-	fc = &graphql.FieldContext{
-		Object:     "UserlandSpan",
-		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
-		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type Bytes does not have child fields")
 		},
 	}
 	return fc, nil
@@ -20891,17 +20405,6 @@ func (ec *executionContext) _RunTraceSpan(ctx context.Context, sel ast.Selection
 
 			out.Values[i] = ec._RunTraceSpan_parentSpan(ctx, field, obj)
 
-		case "isUserland":
-
-			out.Values[i] = ec._RunTraceSpan_isUserland(ctx, field, obj)
-
-			if out.Values[i] == graphql.Null {
-				invalids++
-			}
-		case "userlandSpan":
-
-			out.Values[i] = ec._RunTraceSpan_userlandSpan(ctx, field, obj)
-
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -21277,55 +20780,6 @@ func (ec *executionContext) _StreamItem(ctx context.Context, sel ast.SelectionSe
 				return innerFunc(ctx)
 
 			})
-		default:
-			panic("unknown field " + strconv.Quote(field.Name))
-		}
-	}
-	out.Dispatch()
-	if invalids > 0 {
-		return graphql.Null
-	}
-	return out
-}
-
-var userlandSpanImplementors = []string{"UserlandSpan"}
-
-func (ec *executionContext) _UserlandSpan(ctx context.Context, sel ast.SelectionSet, obj *models.UserlandSpan) graphql.Marshaler {
-	fields := graphql.CollectFields(ec.OperationContext, sel, userlandSpanImplementors)
-	out := graphql.NewFieldSet(fields)
-	var invalids uint32
-	for i, field := range fields {
-		switch field.Name {
-		case "__typename":
-			out.Values[i] = graphql.MarshalString("UserlandSpan")
-		case "spanName":
-
-			out.Values[i] = ec._UserlandSpan_spanName(ctx, field, obj)
-
-		case "spanKind":
-
-			out.Values[i] = ec._UserlandSpan_spanKind(ctx, field, obj)
-
-		case "serviceName":
-
-			out.Values[i] = ec._UserlandSpan_serviceName(ctx, field, obj)
-
-		case "resourceAttrs":
-
-			out.Values[i] = ec._UserlandSpan_resourceAttrs(ctx, field, obj)
-
-		case "scopeName":
-
-			out.Values[i] = ec._UserlandSpan_scopeName(ctx, field, obj)
-
-		case "scopeVersion":
-
-			out.Values[i] = ec._UserlandSpan_scopeVersion(ctx, field, obj)
-
-		case "spanAttrs":
-
-			out.Values[i] = ec._UserlandSpan_spanAttrs(ctx, field, obj)
-
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -23783,13 +23237,6 @@ func (ec *executionContext) marshalOUUID2ᚖgithubᚗcomᚋgoogleᚋuuidᚐUUID(
 	}
 	res := types.MarshalUUID(*v)
 	return res
-}
-
-func (ec *executionContext) marshalOUserlandSpan2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐUserlandSpan(ctx context.Context, sel ast.SelectionSet, v *models.UserlandSpan) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	return ec._UserlandSpan(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOWorkspace2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐWorkspace(ctx context.Context, sel ast.SelectionSet, v *models.Workspace) graphql.Marshaler {

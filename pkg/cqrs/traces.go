@@ -50,40 +50,6 @@ type Span struct {
 	Children []*Span `json:"spans"`
 }
 
-// IsUserland checks if the span is a userland span, meaning it was created in
-// client-side code, outside of the Executor.
-func (s *Span) IsUserland() bool {
-	_, isUserland := s.SpanAttributes[consts.OtelScopeUserland]
-
-	return isUserland
-}
-
-// UserlandChildren returns any children of the span that are userland spans.
-// This is used to reconstruct the trace tree for userland spans.
-func (s *Span) UserlandChildren() []*Span {
-	// If we're already a userland span, return our children
-	if s.IsUserland() {
-		return s.Children
-	}
-
-	// If we're not a userland span, but our first child is, return its
-	// children.
-	//
-	// We do this because userland spans are always underneath an
-	// `"inngest.execution"` span created by an SDK. So in this case, we're
-	// checking that we have `Executor span -> inngest.exection span ->
-	// userland`.
-	//
-	// Critically, this means we're also completely ignoring the
-	// `"inngest.execution"` span itself, since we never want to display it to
-	// the user.
-	if len(s.Children) > 0 && s.Children[0].IsUserland() && len(s.Children[0].Children) > 0 {
-		return s.Children[0].Children
-	}
-
-	return nil
-}
-
 func (s *Span) GroupID() *string {
 	if groupID, ok := s.SpanAttributes[consts.OtelSysStepGroupID]; ok {
 		return &groupID
@@ -260,9 +226,6 @@ type TraceReader interface {
 	GetSpanOutput(ctx context.Context, id SpanIdentifier) (*SpanOutput, error)
 	// GetSpanStack retrieves the step stack for the specified span
 	GetSpanStack(ctx context.Context, id SpanIdentifier) ([]string, error)
-	// TODO move to dedicated entitlement interface once that is implemented properly
-	// for both oss & cloud
-	OtelTracesEnabled(ctx context.Context, accountID uuid.UUID) (bool, error)
 }
 
 type GetTraceRunOpt struct {
