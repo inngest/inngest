@@ -227,17 +227,21 @@ export function EventTypesTable({
           }
           onRowClick={(row) => router.push(pathCreator.eventType({ eventName: row.original.name }))}
         />
-        {!hasNextPage && hasEventTypesData && isScrollable && !isFetchingNextPage && (
-          <div className="flex flex-col items-center pt-8">
-            <p className="text-muted text-sm">No additional event types found.</p>
-            <Button
-              label="Back to top"
-              kind="primary"
-              appearance="ghost"
-              onClick={() => scrollToTop(true)}
-            />
-          </div>
-        )}
+        {!hasNextPage &&
+          hasEventTypesData &&
+          isScrollable &&
+          !isFetchingNextPage &&
+          !isFetching && (
+            <div className="flex flex-col items-center pt-8">
+              <p className="text-muted text-sm">No additional event types found.</p>
+              <Button
+                label="Back to top"
+                kind="primary"
+                appearance="ghost"
+                onClick={() => scrollToTop(true)}
+              />
+            </div>
+          )}
         {isFetchingNextPage && (
           <div className="flex flex-col items-center">
             <Button appearance="outlined" label="loading" loading={true} />

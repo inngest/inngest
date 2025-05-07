@@ -1,7 +1,6 @@
 'use client';
 
 import NextLink from 'next/link';
-import { Alert } from '@inngest/components/Alert';
 import { useEventTypeVolume } from '@inngest/components/EventTypes/useEventTypeVolume';
 import { FunctionsIcon } from '@inngest/components/icons/sections/Functions';
 import { RiArrowRightSLine } from '@remixicon/react';
@@ -13,7 +12,6 @@ import {
   useEventType,
 } from '@/components/EventTypes/useEventTypes';
 import LatestLogsList from '@/components/Events/LatestLogsList';
-import Overlay from '@/components/Overlay';
 
 type EventDashboardProps = {
   params: {
@@ -43,15 +41,6 @@ export default function EventDashboard({ params }: EventDashboardProps) {
 
   return (
     <div className="grid-cols-dashboard bg-canvasSubtle grid min-h-0 flex-1">
-      {!eventType && !isLoading && (
-        <Overlay>
-          <div className="mt-20 flex place-content-center">
-            <Alert severity="warning">
-              This event has not been received by the {params.environmentSlug} environment.
-            </Alert>
-          </div>
-        </Overlay>
-      )}
       <main className="col-span-3 overflow-y-auto">
         <SimpleBarChart
           title={<>Events volume</>}
