@@ -73,7 +73,7 @@ func TestCrit(t *testing.T) {
 			}
 			called = true
 			return nil
-		}, time.Second)
+		}, WithBoundaries(time.Second))
 
 		// Not called:  deadline too short.
 		require.False(t, called)
@@ -96,7 +96,7 @@ func TestCrit(t *testing.T) {
 			}
 			called = true
 			return nil
-		}, time.Millisecond)
+		}, WithBoundaries(time.Millisecond))
 
 		require.True(t, called)
 		require.Nil(t, err)
