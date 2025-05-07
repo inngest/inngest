@@ -51,7 +51,7 @@ export const FunctionList = ({ envSlug, archived }: FunctionListProps) => {
 
       <FunctionTable rows={rows} isLoading={isFirstLoad} />
 
-      {hasMore !== false && !isFirstLoad && (
+      {hasMore !== false && !isFirstLoad && rows.length > 0 && (
         <div className="flex w-full justify-center py-2.5">
           <Button
             loading={isLoading}

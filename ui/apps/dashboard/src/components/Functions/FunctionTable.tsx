@@ -49,7 +49,7 @@ export function FunctionTable({ rows = [], isLoading }: Props) {
         columns={columns}
         data={rows}
         isLoading={isLoading}
-        blankState={'No functions'}
+        blankState={rows.length === 0 ? 'No functions' : null}
         onRowClick={(row) =>
           router.push(pathCreator.function({ envSlug: env.slug, functionSlug: row.original.name }))
         }
@@ -152,9 +152,9 @@ function createColumns(environmentSlug: string) {
         }
 
         return (
-          <div className={'text-tertiary-intense flex items-center gap-1 px-2.5 text-sm'}>
-            {value}%
-          </div>
+          <TextCell>
+            <span className="text-tertiary-intense">{value}%</span>
+          </TextCell>
         );
       },
       header: 'Failure rate (24hr)',
