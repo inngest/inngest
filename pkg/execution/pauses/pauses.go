@@ -3,14 +3,40 @@ package pauses
 import (
 	"context"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/oklog/ulid/v2"
 )
 
 var ErrNotInBuffer = fmt.Errorf("pause not in buffer")
+
+// SkipFlushing returns whether we should skip flushing for any of the pauses
+// defined in the slice, or for given indexes.
+//
+// This allows us to keep specific pauses for a given index in the buffer.
+func SkipFlushing(index Index, pauses []*state.Pause) bool {
+	if index.EventName == "" {
+		// Signals aren't events, but are pauses:  these require O(1) lookups, so ignore
+		// flushing without events.
+		return true
+	}
+	if index.EventName == consts.FnFinishedName {
+		// If the index is for the FnFinishedName, treat this as an invoke and never
+		// flush this block for fast O(1) lookups.
+		return true
+	}
+
+	return slices.ContainsFunc(pauses, func(s *state.Pause) bool {
+		// NOTE: If this pause has a correlation ID, ignore the block flushing for this index.
+		// CorrelationIDs must NEVER be flushed, as we use the buffer for an O(1) lookup to
+		// retrieve pauses with low latency to resolve invokes and step.waitForCallback.
+		return s.InvokeCorrelationID != nil
+	})
+}
 
 // Index represents the index for a specific pause.  A pause is a signal
 // for a given workspace/event combination and expression;  its always bound
@@ -26,6 +52,16 @@ type Manager interface {
 	// Bufferer is the core interface used to interact with pauses;  as an end user
 	// of this package you need to only write and read pauses since a given date.
 	Bufferer
+
+	// PauseByID fetches a pause for a given ID.  It may return the pause from the buffer
+	// or from block storage, depending on the pause
+	PauseByID(ctx context.Context, envID uuid.UUID, pauseID uuid.UUID) (*state.Pause, error)
+
+	// Write writes one or more pauses to the backing store.  Note that the index
+	// for each pause must be the same.
+	//
+	// This returns the total number of pauses in the buffer.
+	Write(ctx context.Context, index Index, pauses ...*state.Pause) (int, error)
 
 	// ConsumePause consumes a pause.  This must be idempotent and first-write-wins:
 	// only one request to consume a pause can succeed, which requires locking pauses.
@@ -52,13 +88,20 @@ type Bufferer interface {
 	// This returns the total number of pauses in the buffer.
 	Write(ctx context.Context, index Index, pauses ...*state.Pause) (int, error)
 
+	// WriteFlushWatermark writes the given flush watermark for an index.  This allows us to resume
+	// flushing after a specific watermark.
+	WriteFlushWatermark(ctx context.Context, index Index, watermark FlushWatermark) error
+
+	// GetFlushWatermark returns the flush watermark for the given index, or nil if the index
+	// has not been flushed.
+	GetFlushWatermark(ctx context.Context, index Index) (*FlushWatermark, error)
+
 	// PausesSince loads pauses in the buffer for a given index, since a given time.
-	// If the time is ZeroTime, this must return all indexes in the buffer.
+	// If the time is ZeroTime, this must return all indexes in the buffer.  This time is
+	// inclusive, ie. it will include pauses created from the current since timestamp in
+	// seconds.
 	//
 	// Note that this does not return blocks, as this only reads from the BufferIndexer.
-	//
-	// NOTE: This is NOT INCLUSIVE of since, ie. the range is (since, now].  The order
-	// of iteration is NOT guaranteed.
 	PausesSince(ctx context.Context, index Index, since time.Time) (state.PauseIterator, error)
 
 	// Delete deletes a pause from the buffer, or returns ErrNotInBuffer if the pause is not in
@@ -70,6 +113,17 @@ type Bufferer interface {
 
 	// ConsumePause consumes a pause, writing the deleted status to the buffer.
 	ConsumePause(ctx context.Context, pause state.Pause, opts state.ConsumePauseOpts) (state.ConsumePauseResult, func() error, error)
+
+	// PauseByInvokeCorrelationID returns a given pause by the correlation ID.
+	//
+	// This must return expired invoke pauses that have not yet been consumed
+	// in order to properly handle timeouts.
+	//
+	// NOTE: The bufferer handles O1 lookups of correlation IDs -> pauses.
+	PauseByInvokeCorrelationID(ctx context.Context, workspaceID uuid.UUID, correlationID string) (*state.Pause, error)
+
+	// PauseBySignalID returns a given pause by the correlation ID.
+	// PauseBySignalID(ctx context.Context, wsID uuid.UUID, signalID string) (*state.Pause, error)
 }
 
 // BlockStore is an implementation that reads and writes blocks.
@@ -124,4 +178,24 @@ type BlockLeaser interface {
 type BlockKeyGenerator interface {
 	// GenerateKey generates a key for a given block ID.
 	BlockKey(idx Index, blockID ulid.ULID) string
+
+	// BlockFlushIndex is the key which holds index => {timestamp, pauseID} tuples, allowing
+	// us to pick up flushing from a given point.
+	//
+	// NOTE: This stores the last {timestamp, pauseID} flushed, so the next scan range from
+	// blocksSince should exclude this pauseID.
+	BlockFlushWatermark(idx Index) string
+}
+
+// FlushWatermark represents the last pause flushed.
+type FlushWatermark struct {
+	// Epoch is the unix epoch of the last pause flushed.
+	Epoch int64 `json:"ts"`
+	// PauseID is the pause ID of the last pause flushed.
+	PauseID uuid.UUID `json:"id"`
+}
+
+// Time returns the epoch of the of the flushed watermark.
+func (f FlushWatermark) Time() time.Time {
+	return time.Unix(f.Epoch, 0)
 }

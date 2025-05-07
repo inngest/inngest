@@ -1222,16 +1222,6 @@ func (m unshardedMgr) EventHasPauses(ctx context.Context, workspaceID uuid.UUID,
 	return pause.Client().Do(ctx, cmd).AsBool()
 }
 
-func (m unshardedMgr) PauseExists(ctx context.Context, pauseID uuid.UUID) error {
-	pauses := m.u.Pauses()
-	cmd := pauses.Client().B().Exists().Key(pauses.kg.Pause(ctx, pauseID)).Build()
-	exists, err := pauses.Client().Do(ctx, cmd).ToBool()
-	if err == rueidis.Nil || !exists {
-		return state.ErrPauseNotFound
-	}
-	return nil
-}
-
 func (m unshardedMgr) PauseByID(ctx context.Context, pauseID uuid.UUID) (*state.Pause, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "PauseByID"), redis_telemetry.ScopePauses)
 

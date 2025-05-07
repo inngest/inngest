@@ -444,8 +444,8 @@ func FindInvokedFunction(ctx context.Context, tracked event.TrackedEvent, fl cqr
 		return nil, nil
 	}
 
-	fns, err := fl.Functions(ctx)
 	if err != nil {
+		fns, err := fl.Functions(ctx)
 		return nil, err
 	}
 

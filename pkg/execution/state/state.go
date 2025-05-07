@@ -320,7 +320,6 @@ type State interface {
 type Manager interface {
 	StateLoader
 	Mutater
-	PauseManager
 }
 
 // FunctionNotifier is an optional interface that state stores can fulfil,

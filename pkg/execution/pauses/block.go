@@ -20,9 +20,8 @@ import (
 
 const (
 	// DefaultPausesPerBlock is the number of pauses to store in a single block.
-	// A pause equates to roughly ~0.75-1KB of data, so this is a good default
-	// of roughly 25mb blocks.
-	DefaultPausesPerBlock = 25_000
+	// A pause equates to roughly ~0.75-1KB of data, so this is a good default.
+	DefaultPausesPerBlock = 10_000
 
 	// DefaultCompactionLimit is the number of pauses that have to be deleted from
 	// a block to compact it.  This prevents us from rewriting pauses on every
@@ -172,7 +171,26 @@ func (b blockstore) FlushIndexBlock(ctx context.Context, index Index) error {
 }
 
 func (b blockstore) flushIndexBlock(ctx context.Context, index Index) error {
-	iter, err := b.buf.PausesSince(ctx, index, time.Time{})
+	if SkipFlushing(index, nil) {
+		// Don't bother.
+		return nil
+	}
+
+	// Firstly, we need to find the existing watermark for the current buffer.
+	// This lets us know where to read from, so that we can ignore any previous
+	// buffer flushes that may not have had corresponding deletes (as deletes)
+	// happen in goroutines best-effort.
+	wm, err := b.buf.GetFlushWatermark(ctx, index)
+	if err != nil {
+		return fmt.Errorf("error retrieving flush watermark: %w", err)
+	}
+	if wm == nil {
+		wm = &FlushWatermark{
+			Epoch: 0,
+		}
+	}
+
+	iter, err := b.buf.PausesSince(ctx, index, wm.Time())
 	if err != nil {
 		return fmt.Errorf("failed to load pauses from buffer: %w", err)
 	}
@@ -202,7 +220,10 @@ func (b blockstore) flushIndexBlock(ctx context.Context, index Index) error {
 		return fmt.Errorf("error iterating over buffered pauses: %w", iter.Error())
 	}
 
-	if n < b.blocksize {
+	// Trim any pauses that are nil.
+	block.Pauses = block.Pauses[:n]
+
+	if n < b.blocksize || SkipFlushing(index, block.Pauses) {
 		// We didn't find enough non-nil pauses to fill the block.  Log a warning
 		// and return.  This shouldn't happen, as we shouldn't return nil pauses
 		// from iterators often;  this only happens in a race where the iterator
@@ -210,9 +231,6 @@ func (b blockstore) flushIndexBlock(ctx context.Context, index Index) error {
 		// a race condition.
 		return nil
 	}
-
-	// Trim any pauses that are nil.
-	block.Pauses = block.Pauses[:n]
 
 	metadata, err := b.blockMetadata(ctx, index, block)
 	if err != nil {
@@ -241,14 +259,28 @@ func (b blockstore) flushIndexBlock(ctx context.Context, index Index) error {
 		return fmt.Errorf("failed to write block index: %w", err)
 	}
 
+	// Write the block watermark so that we pick up flushing from this
+	// last index.
+	err = b.buf.WriteFlushWatermark(ctx, index, metadata.Watermark())
+	if err != nil {
+		return fmt.Errorf("failed to write block flush watermark: %w", err)
+	}
+
 	// Remove len(block.Pauses) from the buffer, as they've been flushed.
-	if b.delete {
-		for _, p := range block.Pauses {
-			if err := b.buf.Delete(ctx, index, *p); err != nil {
-				logger.StdlibLogger(ctx).Warn("error deleting pause from buffer after flushing block", "error", err)
+	// NOTE: This can happen in the background as we pick flushing up from the
+	// previous watermark.
+	go func() {
+		if b.delete {
+			for _, p := range block.Pauses {
+				if err := b.buf.Delete(ctx, index, *p); err != nil {
+					logger.StdlibLogger(ctx).Warn("error deleting pause from buffer after flushing block", "error", err)
+				}
+				time.Sleep(5 * time.Millisecond)
 			}
 		}
-	}
+		// XXX: We should add an N% chance of loading all pauses from 0 -> wm.Epoch
+		// in case any deletions in a previous flush failed.
+	}()
 
 	return nil
 }
@@ -345,7 +377,6 @@ func (b blockstore) Delete(ctx context.Context, index Index, pause state.Pause) 
 // by removing pauses and rewriting blocks.
 func (b *blockstore) Compact(ctx context.Context, idx Index) {
 	// Implement the following:
-
 	// TODO: Lease compaction for the index.
 	// TODO: Read all block metadata for the index
 	// TODO: Read all blockDeleteKey entries for the index
@@ -458,11 +489,23 @@ type blockMetadata struct {
 
 	// UUIDranges represents the first and last UUID for the pauses in this block
 	// AT THE TIME OF BLOCK CREATION.
+	//
+	// Note that this is only useful for V7 UUIDs, and many pauses may be V4 UUIDs,
+	// which means this only stores the first and last pause ID.
 	UUIDranges [2]uuid.UUID `json:"ur"`
 
 	// Len is the current number of pauses in the block.  This decreases on compaction -
 	// only when a block is compacted and deletes are actually written to a block.
 	Len int `json:"len"`
+}
+
+func (b blockMetadata) Watermark() FlushWatermark {
+	return FlushWatermark{
+		// Timeranges are millisecond-granularity, but flush watermarks are second-
+		// level granularity.
+		Epoch:   b.Timeranges[1] / 1000,
+		PauseID: b.UUIDranges[1],
+	}
 }
 
 // blockID generates a deterministic ULID based off of this timestamp and

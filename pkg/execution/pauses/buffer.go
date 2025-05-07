@@ -2,16 +2,23 @@ package pauses
 
 import (
 	"context"
+	"fmt"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/execution/state"
 )
+
+// StateBufferer transforms a state.Manager into a state.Bufferer
+func StateBufferer(rsm state.PauseManager) Bufferer {
+	return &redisAdapter{rsm}
+}
 
 // redisAdapter transforms a state.Manager into a state.Buffer, changing the interfaces slightly
 // according to this package.
 type redisAdapter struct {
 	// rsm represents the redis state manager in redis_state.
-	rsm state.Manager
+	rsm state.PauseManager
 }
 
 // Write writes one or more pauses to the backing store.  Note that the index
@@ -42,12 +49,13 @@ func (r redisAdapter) PausesSince(ctx context.Context, index Index, since time.T
 // Delete deletes a pause from the buffer, or returns ErrNotInBuffer if the pause is not in
 // the buffer.
 func (r redisAdapter) Delete(ctx context.Context, index Index, pause state.Pause) error {
-	// Check if pause is in buffer;  if not, return ErrNotInBuffer so that we can default
-	// to deleting the pause from the backing store.
-	if r.rsm.PauseExists(ctx, pause.ID) == state.ErrPauseNotFound {
-		return ErrNotInBuffer
-	}
 	return r.rsm.DeletePause(ctx, pause)
+}
+
+// Delete deletes a pause from the buffer, or returns ErrNotInBuffer if the pause is not in
+// the buffer.
+func (r redisAdapter) PauseByID(ctx context.Context, envID, pauseID uuid.UUID) (*state.Pause, error) {
+	return r.rsm.PauseByID(ctx, pauseID)
 }
 
 // PauseTimestamp returns the created at timestamp for a pause.
@@ -58,4 +66,20 @@ func (r redisAdapter) PauseTimestamp(ctx context.Context, index Index, pause sta
 
 func (r redisAdapter) ConsumePause(ctx context.Context, pause state.Pause, opts state.ConsumePauseOpts) (state.ConsumePauseResult, func() error, error) {
 	return r.rsm.ConsumePause(ctx, pause, opts)
+}
+
+func (r redisAdapter) PauseByInvokeCorrelationID(ctx context.Context, workspaceID uuid.UUID, correlationID string) (*state.Pause, error) {
+	return r.rsm.PauseByInvokeCorrelationID(ctx, workspaceID, correlationID)
+}
+
+// WriteFlushWatermark writes the given flush watermark for an index.  This allows us to resume
+// flushing after a specific watermark.
+func (r redisAdapter) WriteFlushWatermark(ctx context.Context, index Index, watermark FlushWatermark) error {
+	return fmt.Errorf("not implemented")
+}
+
+// GetFlushWatermark returns the flush watermark for the given index, or nil if the index
+// has not been flushed.
+func (r redisAdapter) GetFlushWatermark(ctx context.Context, index Index) (*FlushWatermark, error) {
+	return nil, fmt.Errorf("not implemented")
 }

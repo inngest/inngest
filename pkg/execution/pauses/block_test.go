@@ -185,6 +185,10 @@ func (m *mockBufferer) Delete(ctx context.Context, index Index, pause state.Paus
 	return ErrNotInBuffer
 }
 
+func (m *mockBufferer) PauseByInvokeCorrelationID(ctx context.Context, workspaceID uuid.UUID, correlationID string) (*state.Pause, error) {
+	return nil, fmt.Errorf("not implemented in mock")
+}
+
 // mockPauseIterator implements the PauseIterator interface for testing
 type mockPauseIterator struct {
 	pauses []*state.Pause

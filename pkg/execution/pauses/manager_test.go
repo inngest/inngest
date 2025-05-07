@@ -59,7 +59,7 @@ func TestManagerFlushingWithLowLimit(t *testing.T) {
 	inProcessFlusher := InMemoryFlushProcessor(blockStore).(*flushInProcess)
 
 	// Create manager with our configured flusher and a short flush delay
-	manager := NewManager(mockBufferer, blockStore, inProcessFlusher)
+	manager := NewManager(mockBufferer, blockStore, inProcessFlusher).(*manager)
 	manager.flushDelay = 100 * time.Millisecond // Short delay for tests
 
 	// Create test index
