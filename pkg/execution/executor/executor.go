@@ -2666,14 +2666,29 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, i *runInstan
 	}
 
 	if opts.If != nil {
-		err = expressions.Validate(ctx, expressions.DefaultRestrictiveValidationPolicy(), *opts.If)
-		if err != nil {
-			return state.WrapInStandardError(
-				err,
-				"InvalidExpression",
-				"Wait for event expression is invalid",
-				err.Error(),
-			)
+		if err = expressions.Validate(ctx, expressions.DefaultRestrictiveValidationPolicy(), *opts.If); err != nil {
+			if errors.Is(err, expressions.ErrValidationFailed) {
+				logger.StdlibLogger(ctx).
+					With("err", err.Error()).
+					With("expression", *opts.If).
+					Warn("waitForEvent If expression failed validation")
+				// "just log a warning right now, then we can collect stats and do our own alerting a week in" - Tony, 2025-05-07
+				// intentionally not returning; continue handling this as before for now
+			} else if errors.Is(err, expressions.ErrCompileFailed) {
+				return state.WrapInStandardError(
+					err,
+					"InvalidExpression",
+					"Wait for event If expression failed to compile",
+					err.Error(),
+				)
+			} else {
+				return state.WrapInStandardError(
+					err,
+					"InvalidExpression",
+					"Wait for event If expression is invalid",
+					err.Error(),
+				)
+			}
 		}
 	}
 
