@@ -179,10 +179,6 @@ func (q *queue) Run(ctx context.Context, f osqueue.RunFunc) error {
 		go q.runScavenger(ctx)
 	}
 
-	if q.runMode.PauseFlusher {
-		go q.runPauseFlusher(ctx)
-	}
-
 	go q.runInstrumentation(ctx)
 
 	// start execution and shadow scan concurrently
@@ -359,23 +355,6 @@ func (q *queue) claimSequentialLease(ctx context.Context) {
 			q.seqLeaseLock.Unlock()
 		}
 	}
-}
-
-func (q *queue) runPauseFlusher(ctx context.Context) {
-	// TODO:
-	//
-	// configure lease
-	//
-	// - lock
-	// - set lease ID
-	// - unlock
-	//
-	// setup tick to attempt to configure lease
-	// or update lease if there's already one
-	//
-	// flush pauses to blob store on condition
-
-	panic("not implemented")
 }
 
 func (q *queue) runScavenger(ctx context.Context) {
@@ -712,7 +691,7 @@ func (q *queue) scan(ctx context.Context) error {
 
 	// Store the shard that we processed, allowing us to eventually pass this
 	// down to the job for stat tracking.
-	var metricShardName = "<global>" // default global name for metrics in this function
+	metricShardName := "<global>" // default global name for metrics in this function
 
 	peekUntil := q.clock.Now().Add(PartitionLookahead)
 
@@ -1709,7 +1688,6 @@ func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error 
 	leaseID, err := duration(ctx, p.queue.primaryQueueShard.Name, "lease", p.queue.clock.Now(), func(ctx context.Context) (*ulid.ULID, error) {
 		return p.queue.Lease(ctx, *item, QueueLeaseDuration, p.staticTime, p.denies)
 	})
-
 	// NOTE: If this loop ends in an error, we must _always_ release an item from the
 	// semaphore to free capacity.  This will happen automatically when the worker
 	// finishes processing a queue item on success.
