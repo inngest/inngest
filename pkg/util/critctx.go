@@ -68,5 +68,13 @@ func CritT[T any](ctx context.Context, name string, f func(ctx context.Context) 
 		logger.StdlibLogger(ctx).Warn("context canceled before entering crit", "name", name)
 	}
 
-	return f(context.WithoutCancel(ctx))
+	if cr.maxDur > 0 {
+		var cancel func()
+		ctx, cancel = context.WithTimeout(ctx, cr.maxDur)
+		defer cancel()
+	} else {
+		ctx = context.WithoutCancel(ctx)
+	}
+
+	return f(ctx)
 }

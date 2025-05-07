@@ -101,6 +101,24 @@ func TestCrit(t *testing.T) {
 		require.True(t, called)
 		require.Nil(t, err)
 
-		require.Contains(t, buf.String(), "critical section took longer than boundaries")
+		require.Contains(t, buf.String(), "critical section took longer than boundary")
+	})
+
+	t.Run("Returns context deadline error if execution exceeds expected duration", func(t *testing.T) {
+		ctx := context.Background()
+		var called bool
+
+		err := Crit(ctx, "long", func(ctx context.Context) error {
+			<-time.After(1 * time.Second)
+			if ctx.Err() != nil {
+				return ctx.Err()
+			}
+
+			called = true
+			return nil
+		}, WithMaxDuration(100*time.Millisecond))
+
+		require.False(t, called)
+		require.Equal(t, context.DeadlineExceeded, err)
 	})
 }
