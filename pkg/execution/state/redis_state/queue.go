@@ -3056,241 +3056,116 @@ func (q *queue) BacklogPrepareNormalize(ctx context.Context, b *QueueBacklog, sp
 }
 
 func (q *queue) peekGlobalShadowPartitionAccounts(ctx context.Context, until time.Time, limit int64) ([]uuid.UUID, error) {
-	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "peekGlobalShadowPartitionAccounts"), redis_telemetry.ScopeQueue)
-
 	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
 		return nil, fmt.Errorf("unsupported queue shard kind for peekGlobalShadowPartitionAccounts: %s", q.primaryQueueShard.Kind)
 	}
 
-	if limit > ShadowPartitionAccountPeekMax {
-		return nil, ErrShadowPartitionAccountPeekMaxExceedsLimits
-	}
-	if limit <= 0 {
-		limit = ShadowPartitionAccountPeekMax
-	}
+	rc := q.primaryQueueShard.RedisClient
 
-	ms := until.UnixMilli()
-
-	isSequential := 0
-
-	args, err := StrSlice([]any{
-		ms,
-		limit,
-		isSequential,
-	})
-	if err != nil {
-		return nil, err
+	p := peeker[QueueBacklog]{
+		q:      q,
+		opName: "peekGlobalShadowPartitionAccounts",
+		max:    ShadowPartitionAccountPeekMax,
 	}
 
-	peekRet, err := scripts["queue/accountPeek"].Exec(
-		redis_telemetry.WithScriptName(ctx, "accountPeek"),
-		q.primaryQueueShard.RedisClient.unshardedRc,
-		[]string{
-			q.primaryQueueShard.RedisClient.kg.GlobalAccountShadowPartitions(),
-		},
-		args,
-	).AsStrSlice()
-	if err != nil {
-		return nil, fmt.Errorf("error peeking accounts with shadow partitions: %w", err)
-	}
-
-	items := make([]uuid.UUID, len(peekRet))
-
-	for i, s := range peekRet {
-		parsed, err := uuid.Parse(s)
-		if err != nil {
-			return nil, fmt.Errorf("could not parse account id from global shadow partition accounts queue: %w", err)
-		}
-
-		items[i] = parsed
-	}
-
-	return items, nil
+	return p.peekUUIDPointer(ctx, rc.kg.GlobalAccountShadowPartitions(), true, until, limit)
 }
 
 func (q *queue) peekGlobalNormalizeAccounts(ctx context.Context, until time.Time, limit int64) ([]uuid.UUID, error) {
-	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "peekGlobalNormalizeAccounts"), redis_telemetry.ScopeQueue)
-
 	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
 		return nil, fmt.Errorf("unsupported queue shard kind for peekGlobalNormalizeAccounts: %s", q.primaryQueueShard.Kind)
 	}
 
-	// TODO customize limits
-	if limit > ShadowPartitionAccountPeekMax {
-		return nil, ErrShadowPartitionAccountPeekMaxExceedsLimits
-	}
-	if limit <= 0 {
-		limit = ShadowPartitionAccountPeekMax
-	}
+	rc := q.primaryQueueShard.RedisClient
 
-	ms := until.UnixMilli()
-
-	isSequential := 0
-
-	args, err := StrSlice([]any{
-		ms,
-		limit,
-		isSequential,
-	})
-	if err != nil {
-		return nil, err
+	p := peeker[QueueBacklog]{
+		q:      q,
+		opName: "peekGlobalNormalizeAccounts",
+		max:    NormalizeAccountPeekMax,
 	}
 
-	peekRet, err := scripts["queue/accountPeek"].Exec(
-		redis_telemetry.WithScriptName(ctx, "accountPeek"),
-		q.primaryQueueShard.RedisClient.unshardedRc,
-		[]string{
-			q.primaryQueueShard.RedisClient.kg.GlobalAccountNormalizeSet(),
-		},
-		args,
-	).AsStrSlice()
-	if err != nil {
-		return nil, fmt.Errorf("error peeking accounts with backlogs to normalize: %w", err)
-	}
-
-	items := make([]uuid.UUID, len(peekRet))
-
-	for i, s := range peekRet {
-		parsed, err := uuid.Parse(s)
-		if err != nil {
-			return nil, fmt.Errorf("could not parse account id from global normalize accounts queue: %w", err)
-		}
-
-		items[i] = parsed
-	}
-
-	return items, nil
+	return p.peekUUIDPointer(ctx, rc.kg.GlobalAccountNormalizeSet(), true, until, limit)
 }
 
 func (q *queue) ShadowPartitionPeek(ctx context.Context, sp *QueueShadowPartition, until time.Time, limit int64) ([]*QueueBacklog, int, error) {
-	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "ShadowPartitionPeek"), redis_telemetry.ScopeQueue)
-
 	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
-		return nil, 0, fmt.Errorf("unsupported queue shard kind for partitionPeek: %s", q.primaryQueueShard.Kind)
-	}
-
-	if limit > ShadowPartitionPeekMaxBacklogs {
-		return nil, 0, ErrShadowPartitionBacklogPeekMaxExceedsLimits
-	}
-	if limit <= 0 {
-		limit = ShadowPartitionPeekMaxBacklogs
-	}
-
-	if limit > q.shadowPeekMax {
-		limit = q.shadowPeekMax
-	}
-	if limit <= 0 {
-		limit = q.shadowPeekMin
-	}
-
-	ms := until.UnixMilli()
-
-	args, err := StrSlice([]any{
-		ms,
-		limit,
-	})
-	if err != nil {
-		return nil, 0, err
+		return nil, 0, fmt.Errorf("unsupported queue shard kind for ShadowPartitionPeek: %s", q.primaryQueueShard.Kind)
 	}
 
 	rc := q.primaryQueueShard.RedisClient
 
-	shadowPartitionKey := rc.kg.ShadowPartitionSet(sp.PartitionID)
+	shadowPartitionSet := rc.kg.ShadowPartitionSet(sp.PartitionID)
 
-	peekRet, err := scripts["queue/shadowPartitionPeek"].Exec(
-		redis_telemetry.WithScriptName(ctx, "shadowPartitionPeek"),
-		rc.Client(),
-		[]string{
-			shadowPartitionKey,
-			rc.kg.BacklogMeta(),
+	p := peeker[QueueBacklog]{
+		q:               q,
+		opName:          "ShadowPartitionPeek",
+		keyMetadataHash: q.primaryQueueShard.RedisClient.kg.BacklogMeta(),
+		max:             ShadowPartitionPeekMaxBacklogs,
+		maker: func() *QueueBacklog {
+			return &QueueBacklog{}
 		},
-		args,
-	).ToAny()
-	if err != nil {
-		return nil, 0, fmt.Errorf("error peeking shadow partition backlogs: %w", err)
-	}
-	returnedSet, ok := peekRet.([]any)
-	if !ok {
-		return nil, 0, fmt.Errorf("unknown return type from shadowPartitionPeek: %T", peekRet)
-	}
-
-	var totalBacklogCount int64
-	var potentiallyMissingBacklogs, allBacklogIDs []any
-	if len(returnedSet) == 3 {
-		totalBacklogCount, ok = returnedSet[0].(int64)
-		if !ok {
-			return nil, 0, fmt.Errorf("unexpected first item in set returned from shadowPartitionPeek: %T", returnedSet[0])
-		}
-
-		potentiallyMissingBacklogs, ok = returnedSet[1].([]any)
-		if !ok {
-			return nil, 0, fmt.Errorf("unexpected second item in set returned from shadowPartitionPeek: %T", returnedSet[1])
-		}
-
-		allBacklogIDs, ok = returnedSet[2].([]any)
-		if !ok {
-			return nil, 0, fmt.Errorf("unexpected third item in set returned from shadowPartitionPeek: %T", returnedSet[2])
-		}
-	} else if len(returnedSet) != 0 {
-		return nil, 0, fmt.Errorf("expected zero or three items in set returned by shadowPartitionPeek: %v", returnedSet)
-	}
-
-	encoded := make([]any, 0)
-	missingBacklogs := make([]string, 0)
-	if len(potentiallyMissingBacklogs) > 0 {
-		for idx, backlogID := range allBacklogIDs {
-			if potentiallyMissingBacklogs[idx] == nil {
-				if backlogID == nil {
-					return nil, 0, fmt.Errorf("encountered nil partition key in pointer queue %q", shadowPartitionKey)
-				}
-
-				str, ok := backlogID.(string)
-				if !ok {
-					return nil, 0, fmt.Errorf("encountered non-string partition key in pointer queue %q", shadowPartitionKey)
-				}
-
-				missingBacklogs = append(missingBacklogs, str)
-			} else {
-				encoded = append(encoded, potentiallyMissingBacklogs[idx])
+		handleMissingItems: func(pointers []string) error {
+			err := rc.Client().Do(ctx, rc.Client().B().Zrem().Key(shadowPartitionSet).Member(pointers...).Build()).Error()
+			if err != nil {
+				q.logger.Warn().
+					Interface("missing", pointers).
+					Interface("sp", sp).
+					Msg("failed to clean up dangling backlogs from shard partition")
 			}
-		}
+
+			return nil
+		},
 	}
 
-	// Use parallel decoding as per Peek
-	backlogs, err := util.ParallelDecode(encoded, func(val any) (*QueueBacklog, error) {
-		if val == nil {
-			q.logger.Error().Interface("encoded", encoded).Interface("missing", missingBacklogs).Str("key", shadowPartitionKey).Msg("encountered nil backlog item in pointer queue")
-			return nil, fmt.Errorf("encountered nil backlog item in pointer queue %q", shadowPartitionKey)
-		}
-
-		str, ok := val.(string)
-		if !ok {
-			return nil, fmt.Errorf("unknown type in shadow partition peek: %T", val)
-		}
-
-		item := &QueueBacklog{}
-
-		if err := json.Unmarshal(unsafe.Slice(unsafe.StringData(str), len(str)), item); err != nil {
-			return nil, fmt.Errorf("error reading backlog item: %w", err)
-		}
-
-		return item, nil
-	})
+	res, err := p.peek(ctx, shadowPartitionSet, true, until, limit)
 	if err != nil {
-		return nil, 0, fmt.Errorf("error decoding backlogs: %w", err)
-	}
-
-	if len(missingBacklogs) > 0 {
-		err := rc.Client().Do(ctx, rc.Client().B().Zrem().Key(rc.kg.ShadowPartitionSet(sp.PartitionID)).Member(missingBacklogs...).Build()).Error()
-		if err != nil {
-			q.logger.Warn().
-				Interface("missing", missingBacklogs).
-				Interface("sp", sp).
-				Msg("failed to clean up dangling backlogs from shard partition")
+		if errors.Is(err, ErrPeekerPeekExceedsMaxLimits) {
+			return nil, 0, ErrShadowPartitionBacklogPeekMaxExceedsLimits
 		}
+		return nil, 0, fmt.Errorf("could not peek shadow partition backlogs: %w", err)
 	}
 
-	return backlogs, int(totalBacklogCount), nil
+	return res.Items, res.TotalCount, nil
+}
+
+func (q *queue) BacklogNormalizePeek(ctx context.Context, b *QueueBacklog, limit int64) (*peekResult[osqueue.QueueItem], error) {
+	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
+		return nil, fmt.Errorf("unsupported queue shard kind for BacklogNormalizePeek: %s", q.primaryQueueShard.Kind)
+	}
+
+	rc := q.primaryQueueShard.RedisClient
+
+	backlogSet := rc.kg.BacklogSet(b.BacklogID)
+
+	p := peeker[osqueue.QueueItem]{
+		q:               q,
+		opName:          "BacklogNormalizePeek",
+		keyMetadataHash: q.primaryQueueShard.RedisClient.kg.QueueItem(),
+		max:             NormalizePartitionPeekMax,
+		maker: func() *osqueue.QueueItem {
+			return &osqueue.QueueItem{}
+		},
+		handleMissingItems: func(pointers []string) error {
+			err := rc.Client().Do(ctx, rc.Client().B().Zrem().Key(backlogSet).Member(pointers...).Build()).Error()
+			if err != nil {
+				q.logger.Warn().
+					Interface("missing", pointers).
+					Interface("backlog", b).
+					Msg("failed to clean up dangling queue items from backlog")
+			}
+
+			return nil
+		},
+		// faster option: load items regardless of zscore
+		ignoreUntil: true,
+	}
+
+	res, err := p.peek(ctx, backlogSet, false, q.clock.Now(), limit)
+	if err != nil {
+		return nil, fmt.Errorf("could not peek backlog items for normalization: %w", err)
+	}
+
+	return res, nil
 }
 
 func (q *queue) ShadowPartitionExtendLease(ctx context.Context, sp *QueueShadowPartition, leaseID ulid.ULID, duration time.Duration) (*ulid.ULID, error) {
@@ -3909,116 +3784,34 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 
 // peekShadowPartitions returns pending shadow partitions within the global shadow partition pointer _or_ account shadow partition pointer ZSET.
 func (q *queue) peekShadowPartitions(ctx context.Context, partitionIndexKey string, peekLimit int64, until time.Time) ([]*QueueShadowPartition, error) {
-	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "peekShadowPartitions"), redis_telemetry.ScopeQueue)
-
 	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
 		return nil, fmt.Errorf("unsupported queue shard kind for peekShadowPartitions: %s", q.primaryQueueShard.Kind)
 	}
 
-	if peekLimit > ShadowPartitionPeekMax {
-		return nil, ErrShadowPartitionPeekMaxExceedsLimits
-	}
-	if peekLimit <= 0 {
-		peekLimit = ShadowPartitionPeekMax
-	}
-
-	ms := until.UnixMilli()
-
-	args, err := StrSlice([]any{
-		ms,
-		peekLimit,
-		0,
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	peekRet, err := scripts["queue/partitionPeek"].Exec(
-		redis_telemetry.WithScriptName(ctx, "partitionPeek"),
-		q.primaryQueueShard.RedisClient.Client(),
-		[]string{
-			partitionIndexKey,
-			q.primaryQueueShard.RedisClient.kg.ShadowPartitionMeta(),
+	p := peeker[QueueShadowPartition]{
+		q:               q,
+		opName:          "peekShadowPartitions",
+		keyMetadataHash: q.primaryQueueShard.RedisClient.kg.ShadowPartitionMeta(),
+		max:             ShadowPartitionPeekMax,
+		maker: func() *QueueShadowPartition {
+			return &QueueShadowPartition{}
 		},
-		args,
-	).ToAny()
-	// NOTE: We use ToAny to force return a []any, allowing us to update the slice value with
-	// a JSON-decoded item without allocations
+		handleMissingItems: func(pointers []string) error {
+			logger.StdlibLogger(ctx).Warn("found missing shadow partitions", "missing", pointers, "partitionKey", partitionIndexKey)
+
+			return nil
+		},
+	}
+
+	res, err := p.peek(ctx, partitionIndexKey, true, until, peekLimit)
 	if err != nil {
-		return nil, fmt.Errorf("error peeking shadow partition items: %w", err)
+		if errors.Is(err, ErrPeekerPeekExceedsMaxLimits) {
+			return nil, ErrShadowPartitionPeekMaxExceedsLimits
+		}
+		return nil, fmt.Errorf("could not peek shadow partitions: %w", err)
 	}
 
-	returnedSet, ok := peekRet.([]any)
-	if !ok {
-		return nil, fmt.Errorf("unknown return type from peek shadow partitions: %T", peekRet)
-	}
-
-	var potentiallyMissingPartitions, allPartitionIds []any
-	if len(returnedSet) == 3 {
-		potentiallyMissingPartitions, ok = returnedSet[1].([]any)
-		if !ok {
-			return nil, fmt.Errorf("unexpected second item in set returned from partitionPeek: %T", peekRet)
-		}
-
-		allPartitionIds, ok = returnedSet[2].([]any)
-		if !ok {
-			return nil, fmt.Errorf("unexpected third item in set returned from partitionPeek: %T", peekRet)
-		}
-	} else if len(returnedSet) != 0 {
-		return nil, fmt.Errorf("expected zero or three items in set returned by partitionPeek: %v", returnedSet)
-	}
-
-	encoded := make([]any, 0)
-	missingPartitions := make([]string, 0)
-	if len(potentiallyMissingPartitions) > 0 {
-		for idx, partitionId := range allPartitionIds {
-			if potentiallyMissingPartitions[idx] == nil {
-				if partitionId == nil {
-					return nil, fmt.Errorf("encountered nil shadow partition key in pointer queue %q", partitionIndexKey)
-				}
-
-				str, ok := partitionId.(string)
-				if !ok {
-					return nil, fmt.Errorf("encountered non-string shadow partition key in pointer queue %q", partitionIndexKey)
-				}
-
-				missingPartitions = append(missingPartitions, str)
-			} else {
-				encoded = append(encoded, potentiallyMissingPartitions[idx])
-			}
-		}
-	}
-
-	// Use parallel decoding as per Peek
-	partitions, err := util.ParallelDecode(encoded, func(val any) (*QueueShadowPartition, error) {
-		if val == nil {
-			q.logger.Error().Interface("encoded", encoded).Interface("missing", missingPartitions).Str("key", partitionIndexKey).Msg("encountered nil partition item in pointer queue")
-			return nil, fmt.Errorf("encountered nil shadow partition item in pointer queue %q", partitionIndexKey)
-		}
-
-		str, ok := val.(string)
-		if !ok {
-			return nil, fmt.Errorf("unknown type in peek shadow partitions: %T", val)
-		}
-
-		item := &QueueShadowPartition{}
-
-		if err := json.Unmarshal(unsafe.Slice(unsafe.StringData(str), len(str)), item); err != nil {
-			return nil, fmt.Errorf("error reading shadow partition item: %w", err)
-		}
-
-		return item, nil
-	})
-	if err != nil {
-		return nil, fmt.Errorf("error decoding partitions: %w", err)
-	}
-
-	if len(missingPartitions) > 0 {
-		// TODO Clean up missing shadow partitions
-		logger.StdlibLogger(ctx).Warn("found missing shadow partitions", "missing", missingPartitions, "partitionKey", partitionIndexKey)
-	}
-
-	return partitions, nil
+	return res.Items, nil
 }
 
 func (q *queue) accountPeek(ctx context.Context, sequential bool, until time.Time, limit int64) ([]uuid.UUID, error) {

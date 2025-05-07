@@ -160,50 +160,12 @@ func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog) err
 	shard := q.primaryQueueShard
 	var processed int64
 	for {
-		keys := []string{
-			rc.kg.BacklogSet(backlog.BacklogID),
-			rc.kg.QueueItem(),
-		}
-
-		args, err := StrSlice([]any{q.backlogNormalizeLimit})
+		res, err := q.BacklogNormalizePeek(ctx, backlog, NormalizePartitionPeekMax)
 		if err != nil {
-			return err
+			return fmt.Errorf("could not peek backlog items for normalization: %w", err)
 		}
 
-		byt, err := scripts["queue/backlogNormalizePeek"].Exec(
-			redis_telemetry.WithScriptName(ctx, "backlogNormalizePeek"),
-			rc.Client(),
-			keys,
-			args,
-		).AsBytes()
-		if err != nil {
-			return err
-		}
-
-		type result struct {
-			Total int64                `json:"total"`
-			IDs   []string             `json:"ids"`
-			Items []*osqueue.QueueItem `json:"items"`
-		}
-
-		var res result
-		if err := json.Unmarshal(byt, &res); err != nil {
-			return fmt.Errorf("error unmarshalling backlog normalize peek result: %w", err)
-		}
-
-		// Done
-		if len(res.Items) == 0 {
-			return nil
-		}
-
-		itemsToRemove := make([]string, 0)
-		for i, item := range res.Items {
-			// NOTE: do something here?
-			if item == nil {
-				itemsToRemove = append(itemsToRemove, res.IDs[i])
-				continue
-			}
-
+		for _, item := range res.Items {
 			if _, err := q.EnqueueItem(ctx, shard, *item, time.UnixMilli(item.AtMS), osqueue.EnqueueOpts{
 				PassthroughJobId: true,
 				Normalize:        true,
@@ -221,17 +183,9 @@ func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog) err
 			processed += 1
 		}
 
-		if len(itemsToRemove) > 0 {
-			cmd := rc.Client().B().Zrem().Key(rc.kg.BacklogSet(backlog.BacklogID)).Member(itemsToRemove...).Build()
-			err = rc.Client().Do(ctx, cmd).Error()
-			if err != nil {
-				return fmt.Errorf("could not clean up dangling item pointers: %w", err)
-			}
-		}
-
 		l.Info("processed normalization for backlog",
 			"processed", processed,
-			"removed", itemsToRemove,
+			"removed", res.RemovedCount,
 		)
 	}
 }
