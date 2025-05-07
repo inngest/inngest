@@ -188,7 +188,7 @@ type QueueKeyGenerator interface {
 	// GlobalAccountShadowPartitions returns the key to the ZSET storing pointers (account IDs) for accounts with existing shadow partitions.
 	GlobalAccountShadowPartitions() string
 
-	GlobalAccountNormalizeSet() string
+	GlobalNormalizeSet() string
 	AccountNormalizeSet(accountID uuid.UUID) string
 	PartitionNormalizeSet(partitionID string) string
 
@@ -379,7 +379,7 @@ func (u queueKeyGenerator) GlobalAccountShadowPartitions() string {
 	return fmt.Sprintf("{%s}:accounts:shadows:sorted", u.queueDefaultKey)
 }
 
-func (u queueKeyGenerator) GlobalAccountNormalizeSet() string {
+func (u queueKeyGenerator) GlobalNormalizeSet() string {
 	return fmt.Sprintf("{%s}:normalize:sorted", u.queueDefaultKey)
 }
 

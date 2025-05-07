@@ -46,6 +46,7 @@ const (
 	ShadowPartitionPeekMinBacklogs       = int64(10)
 	ShadowPartitionPeekMaxBacklogs       = int64(100)
 	AbsoluteShadowPartitionPeekMax int64 = 10 * ShadowPartitionPeekMaxBacklogs
+	NormalizePartitionPeekMax            = int64(100)
 
 	// BacklogNormalizeAsyncLimit determines the minimum number of items required in an outdated backlog
 	// to require an async normalize job. For small backlogs, the added QPS may not be worth it and we should normalize JIT.

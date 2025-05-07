@@ -316,10 +316,10 @@ func (q *queue) shadowScan(ctx context.Context) error {
 // the items to the appropriate backlogs
 func (q *queue) backlogNormalizationScan(ctx context.Context) error {
 	l := logger.StdlibLogger(ctx)
-	nc := make(chan *QueueBacklog)
+	bc := make(chan *QueueBacklog)
 
 	for i := int32(0); i < q.numBacklogNormalizationWorkers; i++ {
-		go q.backlogNormalizationWorker(ctx, nc)
+		go q.backlogNormalizationWorker(ctx, bc)
 	}
 
 	tick := q.clock.NewTicker(q.pollTick)
@@ -330,16 +330,14 @@ func (q *queue) backlogNormalizationScan(ctx context.Context) error {
 		case <-ctx.Done():
 			tick.Stop()
 			return nil
+
 		case <-tick.Chan():
-			// TODO: continuations?
+			if err := q.iterateNormalizationPartition(ctx, bc); err != nil {
+				// TODO: check errors
 
-			// - scan for backlogs to be normalized
-			// - lease the backlog
-			// - dump it into the channel for the workers to do their thing
+				l.Error("error scanning global normalization partition", "error", err)
 
-			parts := []QueueBacklog{}
-			for _, part := range parts {
-				nc <- &part
+				// TODO: return if error is not acceptable
 			}
 		}
 	}
