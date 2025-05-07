@@ -8,6 +8,10 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 )
 
+var (
+	ErrCritContextDeadlineExceeded = fmt.Errorf("function cancelled due to execution duration exceeded specified time frame")
+)
+
 type critctx struct {
 	boundary time.Duration
 	maxDur   time.Duration
@@ -89,7 +93,7 @@ func CritT[T any](ctx context.Context, name string, f func(ctx context.Context) 
 		case resp = <-doneCh:
 		case err = <-errCh:
 		case <-ctx.Done():
-			err = ctx.Err()
+			err = ErrCritContextDeadlineExceeded
 		}
 
 		return

@@ -129,6 +129,6 @@ func TestCrit(t *testing.T) {
 		}, WithMaxDuration(100*time.Millisecond))
 
 		require.False(t, called)
-		require.Equal(t, context.DeadlineExceeded, err)
+		require.Equal(t, ErrCritContextDeadlineExceeded, err)
 	})
 }
