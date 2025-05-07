@@ -25,13 +25,13 @@ type EventDashboardProps = {
 export const runtime = 'nodejs';
 
 export default function EventDashboard({ params }: EventDashboardProps) {
+  const eventNameDecoded = decodeURIComponent(params.eventTypeName);
   const { data, isLoading: isLoadingVolume } = useEventTypeVolume(
-    decodeURIComponent(params.eventTypeName),
+    eventNameDecoded,
     getEventTypeVolume()
   );
-  const { data: eventType, isLoading } = useEventType({ eventName: params.eventTypeName });
+  const { data: eventType, isLoading } = useEventType({ eventName: eventNameDecoded });
 
-  const eventNameDecoded = decodeURIComponent(params.eventTypeName);
   const { volume } = data || {};
 
   const parsedVolumeData = volume?.dailyVolumeSlots.map((slot) => ({
