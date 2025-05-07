@@ -1769,7 +1769,12 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 				Msg("resuming from pause")
 		}
 
-		if consumeResult.DidConsume && !consumeResult.HasPendingSteps {
+		if !consumeResult.DidConsume {
+			// We don't need to do anything here.
+			return nil
+		}
+
+		if !consumeResult.HasPendingSteps {
 			// Schedule an execution from the pause's entrypoint.  We do this after
 			// consuming the pause to guarantee the event data is stored via the pause
 			// for the next run.  If the ConsumePause call comes after enqueue, the TCP
@@ -1794,6 +1799,17 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 			}, time.Now(), queue.EnqueueOpts{})
 			if err != nil && err != redis_state.ErrQueueItemExists {
 				return fmt.Errorf("error enqueueing after pause: %w", err)
+			}
+		}
+
+		// Only run lifecycles if we consumed the pause and enqueued next step.
+		if pause.IsInvoke() {
+			for _, e := range e.lifecycles {
+				go e.OnInvokeFunctionResumed(context.WithoutCancel(ctx), md, pause, r)
+			}
+		} else {
+			for _, e := range e.lifecycles {
+				go e.OnWaitForEventResumed(context.WithoutCancel(ctx), md, pause, r)
 			}
 		}
 
@@ -1826,16 +1842,6 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 	}, 20*time.Second)
 	if err != nil {
 		return err
-	}
-
-	if pause.IsInvoke() {
-		for _, e := range e.lifecycles {
-			go e.OnInvokeFunctionResumed(context.WithoutCancel(ctx), md, pause, r)
-		}
-	} else {
-		for _, e := range e.lifecycles {
-			go e.OnWaitForEventResumed(context.WithoutCancel(ctx), md, pause, r)
-		}
 	}
 
 	return nil
