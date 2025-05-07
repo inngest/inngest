@@ -1839,7 +1839,7 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 			}
 		}
 		return nil
-	}, 20*time.Second)
+	}, util.WithBoundaries(20*time.Second))
 	if err != nil {
 		return err
 	}
