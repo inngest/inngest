@@ -92,7 +92,6 @@ func (b *broker) Subscribe(ctx context.Context, topic string, run PerformFunc) e
 // an event is received.  It blocks until the given context is cancelled, and returns
 // a nil error when shutting down from a cancelled context.
 func (b *broker) SubscribeN(ctx context.Context, topic string, run PerformFunc, concurrency int64) error {
-
 	url := b.conf.TopicURL(topic, config.URLTypeSubscribe)
 
 	subs, err := b.mux.OpenSubscription(ctx, url)
@@ -128,7 +127,7 @@ func (b *broker) SubscribeN(ctx context.Context, topic string, run PerformFunc, 
 	// completed.
 	var unrecoverableErr error
 
-	for unrecoverableErr == nil {
+	for {
 		// We always have to check the context err, as semaphores can be acquired and return
 		// no error after the context is cancelled.  It only errors if we're blocking and waiting
 		// to acquire tokens.

@@ -70,7 +70,7 @@ export default function Table<T>({
       isLoading
         ? columns.map((column) => ({
             ...column,
-            cell: () => <Skeleton className="my-4 block h-3" />,
+            cell: () => <Skeleton className="my-2 block h-3" />,
           }))
         : columns,
     [isLoading]
@@ -123,8 +123,11 @@ export default function Table<T>({
                     {header.isPlaceholder ? null : (
                       <div
                         className={cn(
-                          header.column.getCanSort() &&
-                            'flex cursor-pointer select-none items-center gap-1'
+                          header.column.getCanSort()
+                            ? 'flex cursor-pointer select-none items-center gap-1'
+                            : header.column.getIsSorted()
+                            ? 'flex items-center gap-1'
+                            : ''
                         )}
                         onClick={header.column.getToggleSortingHandler()}
                       >

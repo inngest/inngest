@@ -8,16 +8,15 @@ import (
 	"strings"
 )
 
-const _QueueConstraintName = "AccountConcurrencyFunctionConcurrencyCustomConcurrencyKey1CustomConcurrencyKey2"
+const _QueueConstraintName = "NotLimitedAccountConcurrencyFunctionConcurrencyCustomConcurrencyKey1CustomConcurrencyKey2Throttle"
 
-var _QueueConstraintIndex = [...]uint8{0, 18, 37, 58, 79}
+var _QueueConstraintIndex = [...]uint8{0, 10, 28, 47, 68, 89, 97}
 
-const _QueueConstraintLowerName = "accountconcurrencyfunctionconcurrencycustomconcurrencykey1customconcurrencykey2"
+const _QueueConstraintLowerName = "notlimitedaccountconcurrencyfunctionconcurrencycustomconcurrencykey1customconcurrencykey2throttle"
 
 func (i QueueConstraint) String() string {
-	i -= 1
 	if i < 0 || i >= QueueConstraint(len(_QueueConstraintIndex)-1) {
-		return fmt.Sprintf("QueueConstraint(%d)", i+1)
+		return fmt.Sprintf("QueueConstraint(%d)", i)
 	}
 	return _QueueConstraintName[_QueueConstraintIndex[i]:_QueueConstraintIndex[i+1]]
 }
@@ -26,30 +25,38 @@ func (i QueueConstraint) String() string {
 // Re-run the stringer command to generate them again.
 func _QueueConstraintNoOp() {
 	var x [1]struct{}
+	_ = x[QueueConstraintNotLimited-(0)]
 	_ = x[QueueConstraintAccountConcurrency-(1)]
 	_ = x[QueueConstraintFunctionConcurrency-(2)]
 	_ = x[QueueConstraintCustomConcurrencyKey1-(3)]
 	_ = x[QueueConstraintCustomConcurrencyKey2-(4)]
+	_ = x[QueueConstraintThrottle-(5)]
 }
 
-var _QueueConstraintValues = []QueueConstraint{QueueConstraintAccountConcurrency, QueueConstraintFunctionConcurrency, QueueConstraintCustomConcurrencyKey1, QueueConstraintCustomConcurrencyKey2}
+var _QueueConstraintValues = []QueueConstraint{QueueConstraintNotLimited, QueueConstraintAccountConcurrency, QueueConstraintFunctionConcurrency, QueueConstraintCustomConcurrencyKey1, QueueConstraintCustomConcurrencyKey2, QueueConstraintThrottle}
 
 var _QueueConstraintNameToValueMap = map[string]QueueConstraint{
-	_QueueConstraintName[0:18]:       QueueConstraintAccountConcurrency,
-	_QueueConstraintLowerName[0:18]:  QueueConstraintAccountConcurrency,
-	_QueueConstraintName[18:37]:      QueueConstraintFunctionConcurrency,
-	_QueueConstraintLowerName[18:37]: QueueConstraintFunctionConcurrency,
-	_QueueConstraintName[37:58]:      QueueConstraintCustomConcurrencyKey1,
-	_QueueConstraintLowerName[37:58]: QueueConstraintCustomConcurrencyKey1,
-	_QueueConstraintName[58:79]:      QueueConstraintCustomConcurrencyKey2,
-	_QueueConstraintLowerName[58:79]: QueueConstraintCustomConcurrencyKey2,
+	_QueueConstraintName[0:10]:       QueueConstraintNotLimited,
+	_QueueConstraintLowerName[0:10]:  QueueConstraintNotLimited,
+	_QueueConstraintName[10:28]:      QueueConstraintAccountConcurrency,
+	_QueueConstraintLowerName[10:28]: QueueConstraintAccountConcurrency,
+	_QueueConstraintName[28:47]:      QueueConstraintFunctionConcurrency,
+	_QueueConstraintLowerName[28:47]: QueueConstraintFunctionConcurrency,
+	_QueueConstraintName[47:68]:      QueueConstraintCustomConcurrencyKey1,
+	_QueueConstraintLowerName[47:68]: QueueConstraintCustomConcurrencyKey1,
+	_QueueConstraintName[68:89]:      QueueConstraintCustomConcurrencyKey2,
+	_QueueConstraintLowerName[68:89]: QueueConstraintCustomConcurrencyKey2,
+	_QueueConstraintName[89:97]:      QueueConstraintThrottle,
+	_QueueConstraintLowerName[89:97]: QueueConstraintThrottle,
 }
 
 var _QueueConstraintNames = []string{
-	_QueueConstraintName[0:18],
-	_QueueConstraintName[18:37],
-	_QueueConstraintName[37:58],
-	_QueueConstraintName[58:79],
+	_QueueConstraintName[0:10],
+	_QueueConstraintName[10:28],
+	_QueueConstraintName[28:47],
+	_QueueConstraintName[47:68],
+	_QueueConstraintName[68:89],
+	_QueueConstraintName[89:97],
 }
 
 // QueueConstraintString retrieves an enum value from the enum constants string name.

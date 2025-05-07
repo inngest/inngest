@@ -5,13 +5,15 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@inngest/components/Button/Button';
 import { EventTypesTable } from '@inngest/components/EventTypes/EventTypesTable';
 import { Header } from '@inngest/components/Header/Header';
+import { Pill } from '@inngest/components/Pill';
 import { RefreshButton } from '@inngest/components/Refresh/RefreshButton';
 import { RiExternalLinkLine, RiRefreshLine } from '@remixicon/react';
 
 import { ActionsMenu } from '@/components/EventTypes/ActionsMenu';
 import { EventTypesInfo } from '@/components/EventTypes/EventTypesInfo';
-import { useEventTypes, useEventTypesVolume } from '@/components/EventTypes/useEventTypes';
+import { useEventTypeVolume, useEventTypes } from '@/components/EventTypes/useEventTypes';
 import SendEventButton from '@/components/Events/SendEventButton';
+import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import { pathCreator } from '@/utils/urls';
 
 export default function EventTypesPage({
@@ -20,6 +22,7 @@ export default function EventTypesPage({
   params: { environmentSlug: string };
 }) {
   const router = useRouter();
+  const { value: eventSearchEnabled } = useBooleanFlag('event-search');
   const internalPathCreator = useMemo(() => {
     return {
       // The shared component library is environment-agnostic, so it needs a way to
@@ -31,7 +34,7 @@ export default function EventTypesPage({
     };
   }, [envSlug]);
   const getEventTypes = useEventTypes();
-  const getEventTypesVolume = useEventTypesVolume();
+  const getEventTypeVolume = useEventTypeVolume();
 
   return (
     <>
@@ -44,11 +47,33 @@ export default function EventTypesPage({
             <SendEventButton />
           </div>
         }
+        // Delete the tabs prop when we delete event search
+        tabs={[
+          {
+            children: 'All event types',
+            href: pathCreator.eventTypes({ envSlug: envSlug }),
+          },
+          ...(eventSearchEnabled
+            ? [
+                {
+                  children: (
+                    <div className="flex flex-row items-center gap-1">
+                      <div>Event Search</div>
+                      <Pill appearance="outlined" kind="warning">
+                        Experimental
+                      </Pill>
+                    </div>
+                  ),
+                  href: `/env/${envSlug}/event-search`,
+                },
+              ]
+            : []),
+        ]}
       />
       <EventTypesTable
         pathCreator={internalPathCreator}
         getEventTypes={getEventTypes}
-        getEventTypesVolume={getEventTypesVolume}
+        getEventTypeVolume={getEventTypeVolume}
         eventTypeActions={(props) => <ActionsMenu {...props} />}
         emptyActions={
           <>

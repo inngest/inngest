@@ -128,9 +128,7 @@ const (
 	NoConcurrencyLimit = -1
 )
 
-var (
-	ShadowPartitionLeaseDuration = PartitionLeaseDuration
-)
+var ShadowPartitionLeaseDuration = PartitionLeaseDuration
 
 var (
 	ErrQueueItemExists               = fmt.Errorf("queue item already exists")
@@ -167,9 +165,7 @@ var (
 	ErrConcurrencyLimitCustomKey = fmt.Errorf("at concurrency limit")
 )
 
-var (
-	rnd *util.FrandRNG
-)
+var rnd *util.FrandRNG
 
 func init() {
 	// For weighted shuffles generate a new rand.
@@ -833,6 +829,9 @@ type QueueRunMode struct {
 	// Continuations enables continuations
 	Continuations bool
 
+	// PauseFlusher enables flushing pauses from hot storage to blob store
+	PauseFlusher bool
+
 	// Shadow enables shadow partition processing
 	ShadowPartition bool
 
@@ -1131,9 +1130,7 @@ func (qp QueuePartition) MarshalBinary() ([]byte, error) {
 // Note: For backwards compatibility, we may return a third partition for the function itself, in case two custom concurrency keys are used.
 // This will change with the implementation of throttling key queues.
 func (q *queue) ItemPartitions(ctx context.Context, shard QueueShard, i osqueue.QueueItem) (fnPartition, customConcurrencyKey1, customConcurrencyKey2 QueuePartition, accountConcurrencyLimit int) {
-	var (
-		ckeys = i.Data.GetConcurrencyKeys()
-	)
+	ckeys := i.Data.GetConcurrencyKeys()
 
 	queueName := i.QueueName
 
@@ -1275,10 +1272,7 @@ func (q *queue) EnqueueItem(ctx context.Context, shard QueueShard, i osqueue.Que
 	if len(i.ID) == 0 {
 		i.SetID(ctx, ulid.MustNew(ulid.Now(), rnd).String())
 	} else {
-		id := i.ID
-		if opts.PassthroughJobId {
-			i.ID = id
-		} else {
+		if !opts.PassthroughJobId {
 			i.SetID(ctx, i.ID)
 		}
 	}
@@ -2202,7 +2196,6 @@ func (q *queue) RequeueByJobID(ctx context.Context, queueShard QueueShard, jobID
 	default:
 		return fmt.Errorf("unknown requeue by id response: %d", status)
 	}
-
 }
 
 func (q *queue) itemEnableKeyQueues(ctx context.Context, item osqueue.QueueItem) bool {
@@ -3097,7 +3090,6 @@ func (q *queue) ShadowPartitionPeek(ctx context.Context, sp *QueueShadowPartitio
 		},
 		args,
 	).ToAny()
-
 	if err != nil {
 		return nil, 0, fmt.Errorf("error peeking shadow partition backlogs: %w", err)
 	}
@@ -3167,7 +3159,6 @@ func (q *queue) ShadowPartitionPeek(ctx context.Context, sp *QueueShadowPartitio
 		}
 
 		return item, nil
-
 	})
 	if err != nil {
 		return nil, 0, fmt.Errorf("error decoding backlogs: %w", err)
@@ -3391,7 +3382,6 @@ func (q *queue) PartitionLease(ctx context.Context, p *QueuePartition, duration 
 		p.AccountID.String(),
 		disableLeaseChecksVal,
 	})
-
 	if err != nil {
 		return nil, 0, err
 	}
@@ -3568,7 +3558,6 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 		},
 		args,
 	).ToAny()
-
 	// NOTE: We use ToAny to force return a []any, allowing us to update the slice value with
 	// a JSON-decoded item without allocations
 	if err != nil {
@@ -3647,7 +3636,6 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 			fnIDsMu.Unlock()
 		}
 		return item, nil
-
 	})
 	if err != nil {
 		return nil, fmt.Errorf("error decoding partitions: %w", err)
@@ -4282,7 +4270,6 @@ func (q *queue) Scavenge(ctx context.Context, limit int) (int, error) {
 //
 // If the sequential key is leased, this allows a worker to peek partitions sequentially.
 func (q *queue) ConfigLease(ctx context.Context, key string, duration time.Duration, existingLeaseID ...*ulid.ULID) (*ulid.ULID, error) {
-
 	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
 		return nil, fmt.Errorf("unsupported queue shard kind for ConfigLease: %s", q.primaryQueueShard.Kind)
 	}

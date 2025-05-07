@@ -18,9 +18,7 @@ import (
 
 type jobIDValType struct{}
 
-var (
-	jobCtxVal = jobIDValType{}
-)
+var jobCtxVal = jobIDValType{}
 
 // WithJobID returns a context that stores the given job ID inside.
 func WithJobID(ctx context.Context, jobID string) context.Context {
@@ -343,6 +341,15 @@ func (i *Item) UnmarshalJSON(b []byte) error {
 			return err
 		}
 		i.Payload = *p
+	case KindPauseBlockFlush:
+		if len(temp.Payload) == 0 {
+			return nil
+		}
+		p := &PayloadPauseBlockFlush{}
+		if err := json.Unmarshal(temp.Payload, p); err != nil {
+			return err
+		}
+		i.Payload = *p
 	}
 	return nil
 }
@@ -361,6 +368,10 @@ func GetEdge(i Item) (*PayloadEdge, error) {
 // the incoming step of the edge.
 type PayloadEdge struct {
 	Edge inngest.Edge `json:"edge"`
+}
+
+type PayloadPauseBlockFlush struct {
+	EventName string `json:"e"`
 }
 
 // PayloadPauseTimeout is the payload stored when enqueueing a pause timeout, eg.

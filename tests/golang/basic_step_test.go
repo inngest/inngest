@@ -39,14 +39,14 @@ func TestFunctionSteps(t *testing.T) {
 			runID = input.InputCtx.RunID
 
 			_, err := step.Run(ctx, "1", func(ctx context.Context) (any, error) {
-				fmt.Println("1")
 				atomic.AddInt32(&counter, 1)
+				fmt.Println("1", input.InputCtx.RunID)
 				return "hello 1", nil
 			})
 			require.NoError(t, err)
 
 			_, err = step.Run(ctx, "2", func(ctx context.Context) (string, error) {
-				fmt.Println("2")
+				fmt.Println("2", input.InputCtx.RunID)
 				atomic.AddInt32(&counter, 1)
 				return "test", nil
 			})
@@ -56,23 +56,30 @@ func TestFunctionSteps(t *testing.T) {
 
 			_, err = step.WaitForEvent[any](ctx, "wait1", step.WaitForEventOpts{
 				Event:   "api/new.event",
-				Timeout: time.Minute,
+				Timeout: 5 * time.Second,
 			})
 			if err == step.ErrEventNotReceived {
 				panic("no event found")
 			}
+
+			_, err = step.Run(ctx, "after-wait1", func(ctx context.Context) (any, error) {
+				fmt.Println("wait1 resolved", input.InputCtx.RunID)
+				atomic.AddInt32(&counter, 1)
+				return nil, nil
+			})
+			require.NoError(t, err)
 
 			// Wait for an event with an expression
 			_, err = step.WaitForEvent[any](ctx, "wait2", step.WaitForEventOpts{
 				Event:   "api/new.event",
 				If:      inngestgo.StrPtr(`async.data.ok == "yes" && async.data.id == event.data.id`),
-				Timeout: time.Minute,
+				Timeout: 5 * time.Second,
 			})
 			if err == step.ErrEventNotReceived {
 				panic("no event found")
 			}
 
-			fmt.Println("3")
+			fmt.Println("wait2 resolved")
 			atomic.AddInt32(&counter, 1)
 			return true, nil
 		},
@@ -149,8 +156,8 @@ func TestFunctionSteps(t *testing.T) {
 		<-time.After(time.Second)
 
 		require.Eventually(t, func() bool {
-			return atomic.LoadInt32(&counter) == 3
-		}, 15*time.Second, time.Second)
+			return atomic.LoadInt32(&counter) == 4
+		}, 15*time.Second, time.Second, "Didn't resolve step.waitForEvents: got %d instead of 4", atomic.LoadInt32(&counter))
 	})
 
 	t.Run("trace run should have appropriate data", func(t *testing.T) {
