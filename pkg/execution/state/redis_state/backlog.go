@@ -101,6 +101,8 @@ type BacklogThrottle struct {
 }
 
 type QueueBacklog struct {
+	NormalizationLease *ulid.ULID `json:"nl,omitempty"`
+
 	BacklogID         string `json:"id,omitempty"`
 	ShadowPartitionID string `json:"sid,omitempty"`
 

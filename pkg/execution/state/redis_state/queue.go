@@ -49,11 +49,9 @@ const (
 	ShadowPartitionPeekMinBacklogs       = int64(10)
 	ShadowPartitionPeekMaxBacklogs       = int64(100)
 	AbsoluteShadowPartitionPeekMax int64 = 10 * ShadowPartitionPeekMaxBacklogs
-	NormalizePartitionPeekMax            = int64(100)
 	NormalizeAccountPeekMax              = int64(30)
-
-	// NormalizeShadowPartitionPeekMax determines how many shadow partitions will be peeked
-	NormalizeShadowPartitionPeekMax = int64(300) // same as ShadowPartitionPeekMax
+	NormalizePartitionPeekMax            = int64(100)
+	NormalizeBacklogPeekMax              = int64(300) // same as ShadowPartitionPeekMax
 
 	// BacklogNormalizeAsyncLimit determines the minimum number of items required in an outdated backlog
 	// to require an async normalize job. For small backlogs, the added QPS may not be worth it and we should normalize JIT.
@@ -98,6 +96,9 @@ const (
 	PartitionPausedRequeueExtension           = 24 * time.Hour
 	PartitionLookahead                        = time.Second
 
+	ShadowPartitionLeaseDuration  = 4 * time.Second // same as PartitionLeaseDuration
+	BacklogNormalizeLeaseDuration = 4 * time.Second // same as PartitionLeaseDuration
+
 	ShadowPartitionRefillCapacityReachedRequeueExtension = 1 * time.Second
 	ShadowPartitionRefillPausedRequeueExtension          = 24 * time.Hour
 
@@ -134,8 +135,6 @@ const (
 
 	NoConcurrencyLimit = -1
 )
-
-var ShadowPartitionLeaseDuration = PartitionLeaseDuration
 
 var (
 	ErrQueueItemExists               = fmt.Errorf("queue item already exists")
@@ -3123,6 +3122,46 @@ func (q *queue) ShadowPartitionPeek(ctx context.Context, sp *QueueShadowPartitio
 	}
 
 	return res.Items, res.TotalCount, nil
+}
+
+func (q *queue) ShadowPartitionPeekNormalizeBacklogs(ctx context.Context, sp *QueueShadowPartition, limit int64) ([]*QueueBacklog, error) {
+	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
+		return nil, fmt.Errorf("unsupported queue shard kind for ShadowPartitionPeekNormalizeBacklogs: %s", q.primaryQueueShard.Kind)
+	}
+
+	rc := q.primaryQueueShard.RedisClient
+
+	partitionNormalizeSet := rc.kg.PartitionNormalizeSet(sp.PartitionID)
+
+	p := peeker[QueueBacklog]{
+		q:               q,
+		opName:          "ShadowPartitionPeekNormalizeBacklogs",
+		keyMetadataHash: q.primaryQueueShard.RedisClient.kg.BacklogMeta(),
+		max:             NormalizePartitionPeekMax,
+		maker: func() *QueueBacklog {
+			return &QueueBacklog{}
+		},
+		handleMissingItems: func(pointers []string) error {
+			err := rc.Client().Do(ctx, rc.Client().B().Zrem().Key(partitionNormalizeSet).Member(pointers...).Build()).Error()
+			if err != nil {
+				q.logger.Warn().
+					Interface("missing", pointers).
+					Interface("sp", sp).
+					Msg("failed to clean up dangling backlog pointers from shadow partition normalize set")
+			}
+
+			return nil
+		},
+		// faster option: load items regardless of zscore
+		ignoreUntil: true,
+	}
+
+	res, err := p.peek(ctx, partitionNormalizeSet, false, q.clock.Now(), limit)
+	if err != nil {
+		return nil, fmt.Errorf("could not peek backlogs for normalization: %w", err)
+	}
+
+	return res.Items, nil
 }
 
 func (q *queue) BacklogNormalizePeek(ctx context.Context, b *QueueBacklog, limit int64) (*peekResult[osqueue.QueueItem], error) {

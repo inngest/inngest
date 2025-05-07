@@ -2,17 +2,16 @@ package redis_state
 
 import (
 	"context"
-	"encoding/json"
+	"crypto/rand"
 	"fmt"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
+	"github.com/oklog/ulid/v2"
 	"golang.org/x/sync/errgroup"
 	"log/slog"
 	"math"
 	"time"
 
-	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/logger"
-	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 )
 
 // iterateNormalizationPartition scans and iterate through the global normalization partition to process backlogs needing to be normalized
@@ -40,11 +39,9 @@ func (q *queue) iterateNormalizationPartition(ctx context.Context, until time.Ti
 	// Scan and process account shadow partitions in parallel
 	eg := errgroup.Group{}
 	for _, account := range peekedAccounts {
-		account := account
+		partitionKey := q.primaryQueueShard.RedisClient.kg.AccountNormalizeSet(account)
 
 		eg.Go(func() error {
-			partitionKey := q.primaryQueueShard.RedisClient.kg.AccountNormalizeSet(account)
-
 			return q.iterateNormalizationShadowPartition(ctx, partitionKey, accountShadowPartitionPeekMax, until, bc, l)
 		})
 	}
@@ -66,14 +63,10 @@ func (q *queue) iterateNormalizationShadowPartition(ctx context.Context, shadowP
 		return fmt.Errorf("could not peek shadow partitions to normalize: %w", err)
 	}
 
-	kg := q.primaryQueueShard.RedisClient.kg
-
 	// For each partition, attempt to normalize backlogs
 	for _, partition := range shadowPartitions {
-		partitionKey := kg.PartitionNormalizeSet(partition.PartitionID)
-
 		backlogs, err := duration(ctx, q.primaryQueueShard.Name, "normalize_peek", until, func(ctx context.Context) ([]*QueueBacklog, error) {
-			return q.normalizePartitionPeek(ctx, partitionKey, NormalizePartitionPeekMax)
+			return q.ShadowPartitionPeekNormalizeBacklogs(ctx, partition, NormalizePartitionPeekMax)
 		})
 		if err != nil {
 			return err
@@ -94,65 +87,47 @@ func (q *queue) iterateNormalizationShadowPartition(ctx context.Context, shadowP
 	return nil
 }
 
-func (q *queue) normalizePartitionPeek(ctx context.Context, partitionKey string, limit int64) ([]*QueueBacklog, error) {
-	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "normalize_partition_peek"), redis_telemetry.ScopeQueue)
-
-	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
-		return nil, fmt.Errorf("unsupported queue shard kind for normalizePartitionPeek: %s", q.primaryQueueShard.Kind)
-	}
-
-	if limit <= 0 || limit > NormalizePartitionPeekMax {
-		limit = NormalizePartitionPeekMax
-	}
-
-	keys := []string{
-		partitionKey,
-		q.primaryQueueShard.RedisClient.kg.BacklogMeta(),
-	}
-
-	args, err := StrSlice([]any{
-		limit,
-	})
+func (q *queue) leaseBacklogForNormalization(ctx context.Context, bl *QueueBacklog) error {
+	leaseExpiry := q.clock.Now().Add(BacklogNormalizeLeaseDuration)
+	leaseID, err := ulid.New(ulid.Timestamp(leaseExpiry), rand.Reader)
 	if err != nil {
-		return nil, err
+		return fmt.Errorf("could not generate leaseID: %w", err)
 	}
 
-	byt, err := scripts["queue/normalizePartitionPeek"].Exec(
-		redis_telemetry.WithScriptName(ctx, "normalizePartitionPeek"),
-		q.primaryQueueShard.RedisClient.Client(),
-		keys,
-		args,
-	).AsBytes()
-	if err != nil {
-		return nil, err
-	}
+	// TODO Run script
 
-	type peekResult struct {
-		Count    int64           `json:"count"`
-		Backlogs []*QueueBacklog `json:"backlogs"`
-		IDs      []string        `json:"ids"`
-	}
+	bl.NormalizationLease = &leaseID
 
-	var res peekResult
-	if err := json.Unmarshal(byt, &res); err != nil {
-		return nil, fmt.Errorf("error parsing normalizePartitionPeek result: %w", err)
-	}
-
-	// TODO: do some clean up work
-
-	return res.Backlogs, nil
+	return fmt.Errorf("not implemented")
 }
 
-func (q *queue) leaseBacklogForNormalization(ctx context.Context, bl *QueueBacklog) error {
-	return fmt.Errorf("not implemented")
+var (
+	errBacklogNormalizationLeaseExpired     = fmt.Errorf("backlog normalization lease expired")
+	errBacklogAlreadyLeasedForNormalization = fmt.Errorf("backlog already leased for normalization")
+)
+
+func (q *queue) extendBacklogNormalizationLease(ctx context.Context, now time.Time, bl *QueueBacklog) error {
+	leaseExpiry := now.Add(BacklogNormalizeLeaseDuration)
+	newLeaseID, err := ulid.New(ulid.Timestamp(leaseExpiry), rand.Reader)
+	if err != nil {
+		return fmt.Errorf("could not generate newLeaseID: %w", err)
+	}
+
+	if bl.NormalizationLease == nil || ulid.Time(bl.NormalizationLease.Time()).Before(now) {
+		return errBacklogNormalizationLeaseExpired
+	}
+
+	// TODO Run script
+
+	bl.NormalizationLease = &newLeaseID
+
+	return nil
 }
 
 // normalizeBacklog must be called with exclusive access to the shadow partition
 // NOTE: ideally this is one transaction in a lua script but enqueue_to_backlog is way too much work to
 // utilize
 func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog) error {
-	rc := q.primaryQueueShard.RedisClient
-
 	l := logger.StdlibLogger(ctx).With("backlog", backlog)
 
 	// TODO: extend the lease

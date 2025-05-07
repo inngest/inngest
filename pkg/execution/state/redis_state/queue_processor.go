@@ -726,7 +726,8 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 	for _, backlog := range backlogs {
 		// May need to normalize - this will not happen for default backlogs
 		if backlog.isOutdated(shadowPart) {
-			// Prepare normalization
+			// Prepare normalization, this will just run once as the shadow scanner
+			// won't pick it up again after this.
 			_, shouldNormalizeAsync, err := q.BacklogPrepareNormalize(
 				ctx,
 				backlog,
@@ -737,6 +738,10 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 				return fmt.Errorf("could not prepare backlog for normalization: %w", err)
 			}
 
+			// If there are just a couple of items in the backlog, we can
+			// normalize right away, we have the guarantee that the backlog
+			// is not being normalized right now as it wouldn't be picked up
+			// by the shadow scanner otherwise.
 			if !shouldNormalizeAsync {
 				err = q.normalizeBacklog(ctx, backlog)
 				if err != nil {
@@ -752,7 +757,8 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 			return fmt.Errorf("could not refill backlog: %w", err)
 		}
 
-		if status != enums.QueueConstraintNotLimited {
+		// If backlog is limited by function or account-level concurrency, stop refilling
+		if status == enums.QueueConstraintAccountConcurrency || status == enums.QueueConstraintFunctionConcurrency {
 			q.removeShadowContinue(ctx, shadowPart, false)
 
 			forceRequeueAt := q.clock.Now().Add(ShadowPartitionRefillCapacityReachedRequeueExtension)
