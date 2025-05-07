@@ -1200,6 +1200,23 @@ func (q *queue) process(
 		}
 	}()
 
+	longRunningJobStatusCtx, cancelLongRunningJobStatusCtx := context.WithCancel(ctx)
+	defer cancelLongRunningJobStatusCtx()
+	go func() {
+		longRunningJobStatusTick := q.clock.NewTicker(5 * time.Minute)
+		defer longRunningJobStatusTick.Stop()
+
+		for {
+			select {
+			case <-longRunningJobStatusCtx.Done():
+				return
+			case <-longRunningJobStatusTick.Chan():
+			}
+
+			logger.StdlibLogger(ctx).Debug("long running queue job tick", "item", qi)
+		}
+	}()
+
 	// XXX: Add a max job time here, configurable.
 	jobCtx, jobCancel := context.WithCancel(context.WithoutCancel(ctx))
 	defer jobCancel()
