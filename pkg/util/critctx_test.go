@@ -73,7 +73,7 @@ func TestCrit(t *testing.T) {
 			}
 			called = true
 			return nil
-		}, time.Second)
+		}, WithBoundaries(time.Second))
 
 		// Not called:  deadline too short.
 		require.False(t, called)
@@ -96,11 +96,39 @@ func TestCrit(t *testing.T) {
 			}
 			called = true
 			return nil
-		}, time.Millisecond)
+		}, WithBoundaries(time.Millisecond))
 
 		require.True(t, called)
 		require.Nil(t, err)
 
-		require.Contains(t, buf.String(), "critical section took longer than boundaries")
+		require.Contains(t, buf.String(), "critical section took longer than boundary")
+	})
+
+	t.Run("It should get the proper result if within specified time frame", func(t *testing.T) {
+		ctx := context.Background()
+		var called bool
+
+		err := Crit(ctx, "long", func(ctx context.Context) error {
+			<-time.After(1 * time.Second)
+			called = true
+			return nil
+		}, WithTimeout(2*time.Second))
+
+		require.True(t, called)
+		require.NoError(t, err)
+	})
+
+	t.Run("It should return context deadline error if execution exceeds expected duration", func(t *testing.T) {
+		ctx := context.Background()
+		var called bool
+
+		err := Crit(ctx, "long", func(ctx context.Context) error {
+			<-time.After(1 * time.Second)
+			called = true
+			return nil
+		}, WithTimeout(100*time.Millisecond))
+
+		require.False(t, called)
+		require.Equal(t, ErrCritContextDeadlineExceeded, err)
 	})
 }
