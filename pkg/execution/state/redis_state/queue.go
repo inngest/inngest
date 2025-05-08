@@ -2882,7 +2882,7 @@ func (q *queue) ShadowPartitionLease(ctx context.Context, sp *QueueShadowPartiti
 	}
 }
 
-func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueShadowPartition) (enums.QueueConstraint, int, error) {
+func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueShadowPartition, refillUntil time.Time) (enums.QueueConstraint, int, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "BacklogRefill"), redis_telemetry.ScopeQueue)
 
 	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
@@ -2895,7 +2895,6 @@ func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueSha
 	}
 
 	nowMS := q.clock.Now().UnixMilli()
-	refillUntil := nowMS
 
 	refillLimit := q.backlogRefillLimit
 	if refillLimit > BacklogRefillHardLimit {
@@ -2942,7 +2941,7 @@ func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueSha
 		b.BacklogID,
 		sp.PartitionID,
 		accountID,
-		refillUntil,
+		refillUntil.UnixMilli(),
 		refillLimit,
 		nowMS,
 		sp.AccountConcurrency,
@@ -3103,7 +3102,7 @@ func (q *queue) peekGlobalNormalizeAccounts(ctx context.Context, until time.Time
 	return p.peekUUIDPointer(ctx, rc.kg.GlobalAccountNormalizeSet(), true, until, limit)
 }
 
-func (q *queue) ShadowPartitionPeek(ctx context.Context, sp *QueueShadowPartition, until time.Time, limit int64) ([]*QueueBacklog, int, error) {
+func (q *queue) ShadowPartitionPeek(ctx context.Context, sp *QueueShadowPartition, sequential bool, until time.Time, limit int64) ([]*QueueBacklog, int, error) {
 	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
 		return nil, 0, fmt.Errorf("unsupported queue shard kind for ShadowPartitionPeek: %s", q.primaryQueueShard.Kind)
 	}
@@ -3133,7 +3132,7 @@ func (q *queue) ShadowPartitionPeek(ctx context.Context, sp *QueueShadowPartitio
 		},
 	}
 
-	res, err := p.peek(ctx, shadowPartitionSet, true, until, limit)
+	res, err := p.peek(ctx, shadowPartitionSet, sequential, until, limit)
 	if err != nil {
 		if errors.Is(err, ErrPeekerPeekExceedsMaxLimits) {
 			return nil, 0, ErrShadowPartitionBacklogPeekMaxExceedsLimits

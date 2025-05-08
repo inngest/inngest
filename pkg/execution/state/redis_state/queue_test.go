@@ -7084,7 +7084,7 @@ func TestQueueRefillBacklog(t *testing.T) {
 	require.NotEmpty(t, shadowPartition.PartitionID)
 
 	t.Run("should find backlog with peek", func(t *testing.T) {
-		backlogs, totalCount, err := q.ShadowPartitionPeek(ctx, &shadowPartition, at.Add(time.Minute), 10)
+		backlogs, totalCount, err := q.ShadowPartitionPeek(ctx, &shadowPartition, true, at.Add(time.Minute), 10)
 		require.NoError(t, err)
 		require.Equal(t, 1, totalCount)
 
@@ -7102,7 +7102,7 @@ func TestQueueRefillBacklog(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, 1, int(count))
 
-		status, refilled, err := q.BacklogRefill(ctx, &expectedBacklog, &shadowPartition)
+		status, refilled, err := q.BacklogRefill(ctx, &expectedBacklog, &shadowPartition, clock.Now())
 		require.NoError(t, err)
 
 		require.Equal(t, 1, refilled)
@@ -7168,7 +7168,7 @@ func TestQueueRefillBacklog(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, 4, int(count))
 
-		status, refilled, err := q.BacklogRefill(ctx, &expectedBacklog, &shadowPartition)
+		status, refilled, err := q.BacklogRefill(ctx, &expectedBacklog, &shadowPartition, clock.Now())
 		require.NoError(t, err)
 
 		require.Equal(t, 1, refilled)

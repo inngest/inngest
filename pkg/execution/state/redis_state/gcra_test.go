@@ -11,7 +11,6 @@ import (
 )
 
 func TestGCRA(t *testing.T) {
-
 	runScript := func(t *testing.T, rc rueidis.Client, key string, now time.Time, period time.Duration, limit, burst, capacity int) int {
 		args, err := StrSlice([]any{
 			key,

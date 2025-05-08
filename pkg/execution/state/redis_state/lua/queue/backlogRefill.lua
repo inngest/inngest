@@ -33,12 +33,12 @@ local keyCustomConcurrencyKey1   = KEYS[10] -- When leasing an item we need to p
 local keyCustomConcurrencyKey2   = KEYS[11] -- Optional for eg. for concurrency amongst steps
 local keyActiveCounter           = KEYS[12]
 
-local backlogID   = ARGV[1]
-local partitionID = ARGV[2]
-local accountID   = ARGV[3]
-local refillUntil = tonumber(ARGV[4])
-local refillLimit = tonumber(ARGV[5])
-local nowMS       = tonumber(ARGV[6])
+local backlogID     = ARGV[1]
+local partitionID   = ARGV[2]
+local accountID     = ARGV[3]
+local refillUntilMS = tonumber(ARGV[4])
+local refillLimit   = tonumber(ARGV[5])
+local nowMS         = tonumber(ARGV[6])
 
 -- We check concurrency limits before refilling
 local concurrencyAcct 				= tonumber(ARGV[7])
@@ -61,7 +61,7 @@ local throttlePeriod = tonumber(ARGV[14])
 -- Start with full capacity: max(number of items in the backlog, hard limit, e.g. 100)
 local capacity = 0
 
-local backlogCount = redis.call("ZCOUNT", keyBacklogSet, "-inf", refillUntil)
+local backlogCount = redis.call("ZCOUNT", keyBacklogSet, "-inf", refillUntilMS)
 if backlogCount ~= false and backlogCount ~= nil then
   capacity = backlogCount
 end
@@ -141,7 +141,7 @@ local refilled = 0
 if capacity > 0 then
   -- Move item(s) out of backlog and into partition
 
-  local items = redis.call("ZRANGE", keyBacklogSet, "-inf", "+inf", "BYSCORE", "LIMIT", 0, capacity, "WITHSCORES")
+  local items = redis.call("ZRANGE", keyBacklogSet, "-inf", refillUntilMS, "BYSCORE", "LIMIT", 0, capacity, "WITHSCORES")
 
   local potentiallyMissingQueueItems = redis.call("HMGET", keyQueueItemHash, unpack(items))
 
