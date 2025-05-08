@@ -1,5 +1,5 @@
 -- performs gcra rate limiting for a given key.
--- 
+--
 -- Returns true on success, false if the key has been rate limited.
 local function gcra(key, now_ms, period_ms, limit, burst)
 	-- Calculate the basic variables for GCRA.
@@ -32,16 +32,14 @@ local function gcra(key, now_ms, period_ms, limit, burst)
 	return true
 end
 
-local function gcraUpdate(key, now_ms, period_ms, limit, burst, refilled)
-	-- Calculate the basic variables for GCRA.
-	local cost = refilled                            -- everything counts as a single rqeuest
+local function gcraUpdate(key, now_ms, period_ms, limit, burst, capacity)
+	-- calculate emission interval (tau) - time between each token
+	local emission = period_ms / limit
 
-	local emission  = period_ms / math.max(limit, 1)   -- how frequently we can admit new requests
-	local increment = emission * cost         -- this request's time delta
-	local variance  = period_ms * (math.max(burst, 1)) -- variance takes into account bursts
+	-- calculate total capacity in time units
+	local total_capacity_time = emission * (limit + burst)
 
-	-- fetch the theoretical arrival time for equally spaced requests
-	-- at exactly the rate limit
+	-- retrieve theoretical arrival time
 	local tat = redis.call("GET", key)
 	if not tat then
 		tat = now_ms
@@ -49,30 +47,22 @@ local function gcraUpdate(key, now_ms, period_ms, limit, burst, refilled)
 		tat = tonumber(tat)
 	end
 
-	local new_tat = math.max(tat, now_ms) + increment -- add the request's cost to the theoretical arrival time.
-	local allow_at_ms = new_tat - variance            -- handle bursts.
-	local diff_ms = now_ms - allow_at_ms
+	-- calculate next theoretical arrival time
+	local new_tat = tat + emission
 
-	if diff_ms < 0 then
-		return false
+	if capacity >= 0 then
+		redis.call("SET", key, new_tat, "EX", expiry)
 	end
-
-	local expiry = (period_ms / 1000)
-	redis.call("SET", key, new_tat, "EX", expiry)
-
-	return true
 end
 
 local function gcraCapacity(key, now_ms, period_ms, limit, burst)
-	-- Calculate the basic variables for GCRA.
-	local cost = 1                            -- everything counts as a single rqeuest
+	-- calculate emission interval (tau) - time between each token
+	local emission = period_ms / limit
 
-	local emission  = period_ms / math.max(limit, 1)   -- how frequently we can admit new requests
-	local increment = emission * cost         -- this request's time delta
-	local variance  = period_ms * (math.max(burst, 1)) -- variance takes into account bursts
+	-- calculate total capacity in time units
+	local total_capacity_time = emission * (limit + burst)
 
-	-- fetch the theoretical arrival time for equally spaced requests
-	-- at exactly the rate limit
+	-- retrieve theoretical arrival time
 	local tat = redis.call("GET", key)
 	if not tat then
 		tat = now_ms
@@ -80,18 +70,16 @@ local function gcraCapacity(key, now_ms, period_ms, limit, burst)
 		tat = tonumber(tat)
 	end
 
-	local new_tat = math.max(tat, now_ms) + increment -- add the request's cost to the theoretical arrival time.
-	local allow_at_ms = new_tat - variance            -- handle bursts.
-	local diff_ms = now_ms - allow_at_ms
 
-	if diff_ms < 0 then
-		return 0
-	end
+	-- calculate next theoretical arrival time
+	local new_tat = tat + emission
 
-	local expiry = (period_ms / 1000)
+	-- remaining capacity in time units
+	local time_capacity_remain = now_ms + total_capacity_time - new_tat
 
-  -- TODO How many requests can we add?
-  local capacity = 1
+	-- convert time capacity to token capacity
+	local capacity = math.floor(time_capacity_remain / emission)
 
-	return capacity
+	-- this could be negative, which means no capacity
+	return math.min(capacity, limit + burst)
 end

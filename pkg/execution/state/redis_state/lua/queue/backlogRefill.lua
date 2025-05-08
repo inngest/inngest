@@ -173,12 +173,15 @@ if capacity > 0 then
   redis.call("INCRBY", keyActiveCounter, refilled)
   redis.call("ZREM", keyBacklogSet, unpack(remArgs))
 
-  -- TODO Fix this
-  -- gcraUpdate(throttleKey, nowMS, throttlePeriod * 1000, throttleLimit, throttleBurst, refilled)
 
   if hasCleanup == true then
     redis.call("HDEL", keyQueueItemHash, unpack(itemCleanupArgs))
   end
+end
+
+-- update gcra theoretical arrival time
+if throttleLimit > 0 then
+  gcraUpdate(throttleKey, nowMS, throttlePeriod * 1000, throttleLimit, throttleBurst, capacity)
 end
 
 --
