@@ -28,7 +28,7 @@ export function useColumns() {
   const columns = [
     columnHelper.display({
       id: 'expander',
-      header: () => null,
+      header: undefined, // Needed to enable the iconOnly styles in the table
       size: 30,
       cell: ({ row }: { row: Row<Worker> }) => {
         return row.getCanExpand() ? (

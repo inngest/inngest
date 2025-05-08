@@ -11,6 +11,7 @@ type Output = {
   isLoading: boolean;
   loadMore: () => void;
   rows: FunctionTableRow[];
+  isFirstLoad: boolean;
 };
 
 export function useRows({ archived, search }: { archived: boolean; search: string }): Output {
@@ -34,6 +35,7 @@ export function useRows({ archived, search }: { archived: boolean; search: strin
       lastPage: 0,
       rows: [],
     });
+    setPage(1);
   }, [archived, search]);
 
   const functionsRes = useFunctionsPage({
@@ -89,11 +91,19 @@ export function useRows({ archived, search }: { archived: boolean; search: strin
     }
   }, [archived, client, env.id, functionsRes, functionsData.lastPage]);
 
+  const isFirstLoad = page === 1 && (functionsRes.isLoading || functionsData.rows.length === 0);
+
+  // Only consider data as loaded when we actually have rows or confirmed there's nothing to load
+  const effectivelyLoaded =
+    functionsData.rows.length > 0 ||
+    (functionsRes.data && !functionsRes.isLoading && functionsRes.data.functions.length === 0);
+
   return {
     error: functionsRes.error,
     hasMore: functionsRes.data?.page.hasNextPage,
     isLoading: functionsRes.isLoading,
     loadMore: () => setPage((prev) => prev + 1),
     rows: functionsData.rows,
+    isFirstLoad: isFirstLoad && !effectivelyLoaded,
   };
 }

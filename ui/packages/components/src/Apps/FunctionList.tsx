@@ -2,9 +2,9 @@ import { useRef } from 'react';
 import { type Route } from 'next';
 import { Link } from '@inngest/components/Link';
 import { HorizontalPillList, Pill, PillContent } from '@inngest/components/Pill';
-import { Table } from '@inngest/components/Table';
+import CompactPaginatedTable from '@inngest/components/Table/CompactPaginatedTable';
 import type { Function } from '@inngest/components/types/function';
-import { createColumnHelper, getCoreRowModel } from '@tanstack/react-table';
+import { createColumnHelper } from '@tanstack/react-table';
 
 type Fn = Pick<Function, 'name' | 'slug' | 'triggers'>;
 
@@ -27,21 +27,8 @@ export function FunctionList({ envSlug, functions, pathCreator }: Props) {
   });
 
   return (
-    <main
-      className="[&_thead_th]:bg-canvasSubtle border-subtle mb-8 min-h-0 overflow-y-auto rounded-md border [&>table]:border-b-0 [&_thead_th]:font-normal"
-      ref={tableContainerRef}
-    >
-      <Table
-        blankState={<p>No functions.</p>}
-        options={{
-          columns,
-          data: sortedFunctions,
-          getCoreRowModel: getCoreRowModel(),
-          enableSorting: false,
-        }}
-        tableContainerRef={tableContainerRef}
-        isVirtualized={false}
-      />
+    <main ref={tableContainerRef}>
+      <CompactPaginatedTable columns={columns} data={sortedFunctions} />
     </main>
   );
 }
@@ -85,6 +72,7 @@ function useColumns({
         );
       },
       header: 'Function',
+      enableSorting: false,
     }),
     columnHelper.accessor('triggers', {
       cell: (props) => {
@@ -111,6 +99,7 @@ function useColumns({
         );
       },
       header: () => <span>Triggers</span>,
+      enableSorting: false,
     }),
   ];
 }
