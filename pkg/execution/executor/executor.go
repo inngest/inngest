@@ -2703,10 +2703,7 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, i *runInstan
 		return fmt.Errorf("unable to parse wait for event expires: %w", err)
 	}
 
-	pauseID, err := inngest.DeterministicUUIDV7(i.md.ID.RunID.String() + gen.ID)
-	if err != nil {
-		return fmt.Errorf("could not generate deterministic pause ID: %w", err)
-	}
+	pauseID := inngest.DeterministicSha1UUID(i.md.ID.RunID.String() + gen.ID)
 
 	expr := opts.If
 	if expr != nil && strings.Contains(*expr, "event.") {
