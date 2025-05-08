@@ -34,7 +34,7 @@ end
 
 local function gcraUpdate(key, now_ms, period_ms, limit, burst, capacity)
   -- calculate emission interval (tau) - time between each token
-  local emission = period_ms / limit
+  local emission = period_ms / math.max(limit, 1)
 
   -- calculate total capacity in time units
   local total_capacity_time = emission * (limit + burst)
@@ -48,7 +48,7 @@ local function gcraUpdate(key, now_ms, period_ms, limit, burst, capacity)
   end
 
   -- calculate next theoretical arrival time
-  local new_tat = tat + emission
+  local new_tat = tat + (math.max(capacity, 1) * emission)
 
   if capacity >= 0 then
     local expiry = (period_ms / 1000)
@@ -58,7 +58,7 @@ end
 
 local function gcraCapacity(key, now_ms, period_ms, limit, burst)
   -- calculate emission interval (tau) - time between each token
-  local emission = period_ms / limit
+  local emission = period_ms / math.max(limit, 1)
 
   -- calculate total capacity in time units
   local total_capacity_time = emission * (limit + burst)
@@ -71,12 +71,8 @@ local function gcraCapacity(key, now_ms, period_ms, limit, burst)
     tat = tonumber(tat)
   end
 
-
-  -- calculate next theoretical arrival time
-  local new_tat = tat + emission
-
   -- remaining capacity in time units
-  local time_capacity_remain = now_ms + total_capacity_time - new_tat
+  local time_capacity_remain = now_ms + total_capacity_time - tat
 
   -- convert time capacity to token capacity
   local capacity = math.floor(time_capacity_remain / emission)
