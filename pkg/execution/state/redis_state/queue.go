@@ -3070,7 +3070,7 @@ func (q *queue) BacklogPrepareNormalize(ctx context.Context, b *QueueBacklog, sp
 	}
 }
 
-func (q *queue) peekGlobalShadowPartitionAccounts(ctx context.Context, until time.Time, limit int64) ([]uuid.UUID, error) {
+func (q *queue) peekGlobalShadowPartitionAccounts(ctx context.Context, sequential bool, until time.Time, limit int64) ([]uuid.UUID, error) {
 	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
 		return nil, fmt.Errorf("unsupported queue shard kind for peekGlobalShadowPartitionAccounts: %s", q.primaryQueueShard.Kind)
 	}
@@ -3083,7 +3083,7 @@ func (q *queue) peekGlobalShadowPartitionAccounts(ctx context.Context, until tim
 		max:    ShadowPartitionAccountPeekMax,
 	}
 
-	return p.peekUUIDPointer(ctx, rc.kg.GlobalAccountShadowPartitions(), true, until, limit)
+	return p.peekUUIDPointer(ctx, rc.kg.GlobalAccountShadowPartitions(), sequential, until, limit)
 }
 
 func (q *queue) peekGlobalNormalizeAccounts(ctx context.Context, until time.Time, limit int64) ([]uuid.UUID, error) {
@@ -3838,7 +3838,7 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 }
 
 // peekShadowPartitions returns pending shadow partitions within the global shadow partition pointer _or_ account shadow partition pointer ZSET.
-func (q *queue) peekShadowPartitions(ctx context.Context, partitionIndexKey string, peekLimit int64, until time.Time) ([]*QueueShadowPartition, error) {
+func (q *queue) peekShadowPartitions(ctx context.Context, partitionIndexKey string, sequential bool, peekLimit int64, until time.Time) ([]*QueueShadowPartition, error) {
 	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
 		return nil, fmt.Errorf("unsupported queue shard kind for peekShadowPartitions: %s", q.primaryQueueShard.Kind)
 	}
@@ -3858,7 +3858,7 @@ func (q *queue) peekShadowPartitions(ctx context.Context, partitionIndexKey stri
 		},
 	}
 
-	res, err := p.peek(ctx, partitionIndexKey, true, until, peekLimit)
+	res, err := p.peek(ctx, partitionIndexKey, sequential, until, peekLimit)
 	if err != nil {
 		if errors.Is(err, ErrPeekerPeekExceedsMaxLimits) {
 			return nil, ErrShadowPartitionPeekMaxExceedsLimits

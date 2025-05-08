@@ -110,7 +110,8 @@ func (q *queue) iterateNormalizationPartition(ctx context.Context, until time.Ti
 
 func (q *queue) iterateNormalizationShadowPartition(ctx context.Context, shadowPartitionIndexKey string, peekLimit int64, until time.Time, bc chan *QueueBacklog, l *slog.Logger) error {
 	// Find partitions in account or globally with backlogs to normalize
-	shadowPartitions, err := q.peekShadowPartitions(ctx, shadowPartitionIndexKey, peekLimit, until)
+	sequential := false
+	shadowPartitions, err := q.peekShadowPartitions(ctx, shadowPartitionIndexKey, sequential, peekLimit, until)
 	if err != nil {
 		return fmt.Errorf("could not peek shadow partitions to normalize: %w", err)
 	}

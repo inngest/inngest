@@ -219,7 +219,8 @@ func (q *queue) scanShadowPartitions(ctx context.Context, until time.Time, qspc 
 	// TODO introduce weight probability to blend account/global scanning
 	shouldScanAccount := q.runMode.AccountShadowPartition && rand.Intn(100) <= q.runMode.AccountShadowPartitionWeight
 	if shouldScanAccount {
-		peekedAccounts, err := q.peekGlobalShadowPartitionAccounts(ctx, until, ShadowPartitionAccountPeekMax)
+		sequential := false
+		peekedAccounts, err := q.peekGlobalShadowPartitionAccounts(ctx, sequential, until, ShadowPartitionAccountPeekMax)
 		if err != nil {
 			return fmt.Errorf("could not peek global shadow partition accounts: %w", err)
 		}
@@ -244,7 +245,7 @@ func (q *queue) scanShadowPartitions(ctx context.Context, until time.Time, qspc 
 				defer wg.Done()
 				partitionKey := q.primaryQueueShard.RedisClient.kg.AccountShadowPartitions(account)
 
-				parts, err := q.peekShadowPartitions(ctx, partitionKey, accountPartitionPeekMax, until)
+				parts, err := q.peekShadowPartitions(ctx, partitionKey, sequential, accountPartitionPeekMax, until)
 				if err != nil {
 					q.logger.Error().Err(err).Msg("error processing account partitions")
 					return
@@ -262,7 +263,8 @@ func (q *queue) scanShadowPartitions(ctx context.Context, until time.Time, qspc 
 	}
 
 	kg := q.primaryQueueShard.RedisClient.kg
-	parts, err := q.peekShadowPartitions(ctx, kg.GlobalShadowPartitionSet(), ShadowPartitionPeekMax, until)
+	sequential := false
+	parts, err := q.peekShadowPartitions(ctx, kg.GlobalShadowPartitionSet(), sequential, ShadowPartitionPeekMax, until)
 	if err != nil {
 		return fmt.Errorf("could not peek global shadow partitions: %w", err)
 	}
