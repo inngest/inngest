@@ -1,57 +1,113 @@
 import { useCallback } from 'react';
+import { useClient } from 'urql';
+
+import { useEnvironment } from '@/components/Environments/environment-context';
+import { graphql } from '@/gql';
+
+export const eventsQuery = graphql(`
+  query GetEventsV2(
+    $envID: ID!
+    $cursor: String
+    $startTime: Time!
+    $endTime: Time
+    $celQuery: String = null
+    $eventNames: [String!] = null
+  ) {
+    environment: workspace(id: $envID) {
+      eventsV2(
+        after: $cursor
+        filter: { from: $startTime, until: $endTime, query: $celQuery, eventNames: $eventNames }
+      ) {
+        edges {
+          node {
+            name
+            id
+            receivedAt
+            runs {
+              status
+              id
+              startedAt
+              endedAt
+              function {
+                name
+                slug
+              }
+            }
+          }
+        }
+        totalCount
+        pageInfo {
+          hasNextPage
+          endCursor
+          hasPreviousPage
+          startCursor
+        }
+      }
+    }
+  }
+`);
 
 type QueryVariables = {
-  eventName?: string[];
-  cursor?: string | null;
+  eventNames?: string[];
+  cursor: string | null;
   source?: string;
-  startTime?: string;
+  startTime: string;
+  endTime: string | null;
   celQuery?: string;
 };
-// TODO: Replace with real API
+
 export function useEvents() {
-  return useCallback(async ({ cursor, eventName, source, startTime, celQuery }: QueryVariables) => {
-    console.log(cursor, eventName, source, startTime, celQuery);
-    // Simulated delay to mimic real API behavior
-    await new Promise((resolve) => setTimeout(resolve, 500));
+  const envID = useEnvironment().id;
+  const client = useClient();
 
-    // Example mocked data
-    const events = [
-      {
-        id: '01JGPM6FYSRN9C0ZGJ7PXPVRGY',
-        receivedAt: new Date('2025-04-10T16:43:21.696Z'),
-        name: 'UserSignedUp',
-        runs: [
+  return useCallback(
+    async ({ cursor, endTime, source, eventNames, startTime, celQuery }: QueryVariables) => {
+      console.log(source);
+      const result = await client
+        .query(
+          eventsQuery,
           {
-            fnName: 'SendWelcomeEmail',
-            fnSlug: 'send-welcome-email',
-            status: 'COMPLETED',
-            id: 'id-1',
-            startedAt: new Date('2025-04-10T16:43:22.696Z'),
-            completedAt: new Date('2025-04-10T16:43:24.696Z'),
+            envID,
+            startTime,
+            endTime,
+            cursor,
+            celQuery,
+            eventNames,
           },
-          {
-            fnName: 'SendNewsletter',
-            fnSlug: 'send-newsletter',
-            status: 'CANCELLED',
-            id: 'id-2',
-            startedAt: new Date('2025-04-10T16:43:23.696Z'),
-            completedAt: new Date('2025-04-10T16:43:24.696Z'),
-          },
-        ],
-      },
-    ];
+          { requestPolicy: 'network-only' }
+        )
+        .toPromise();
 
-    return {
-      events,
-      pageInfo: {
-        hasNextPage: false,
-        hasPreviousPage: false,
-        endCursor: null,
-        startCursor: null,
-      },
-      totalCount: 1,
-    };
-  }, []);
+      if (result.error) {
+        throw new Error(result.error.message);
+      }
+
+      if (!result.data) {
+        throw new Error('no data returned');
+      }
+
+      const eventsData = result.data.environment.eventsV2;
+      const events = eventsData.edges.map(({ node }) => ({
+        ...node,
+        receivedAt: new Date(node.receivedAt),
+        runs: node.runs.map((run) => ({
+          fnName: run.function.name,
+          fnSlug: run.function.slug,
+          status: run.status,
+          id: run.id,
+          completedAt: run.endedAt ? new Date(run.endedAt) : undefined,
+          startedAt: run.startedAt ? new Date(run.startedAt) : undefined,
+        })),
+      }));
+
+      return {
+        events,
+        pageInfo: eventsData.pageInfo,
+        totalCount: eventsData.totalCount,
+      };
+    },
+    [client, envID]
+  );
 }
 
 // TODO: Replace with real API

@@ -8,7 +8,10 @@ import TableBlankState from '@inngest/components/EventTypes/TableBlankState';
 import { TimeFilter } from '@inngest/components/Filter/TimeFilter';
 import { Pill } from '@inngest/components/Pill';
 import NewTable from '@inngest/components/Table/NewTable';
-import { DEFAULT_TIME } from '@inngest/components/hooks/useCalculatedStartTime';
+import {
+  DEFAULT_TIME,
+  useCalculatedStartTime,
+} from '@inngest/components/hooks/useCalculatedStartTime';
 import { type Event, type PageInfo } from '@inngest/components/types/event';
 import { cn } from '@inngest/components/utils/classNames';
 import { durationToString, parseDuration } from '@inngest/components/utils/date';
@@ -50,15 +53,17 @@ export function EventsTable({
   };
   getEvents: ({
     cursor,
-    eventName,
+    eventNames,
     source,
     startTime,
+    endTime,
     celQuery,
   }: {
-    eventName?: string[];
-    cursor?: string | null;
+    eventNames?: string[];
+    cursor: string | null;
     source?: string;
-    startTime?: string;
+    startTime: string;
+    endTime: string | null;
     celQuery?: string;
   }) => Promise<{ events: Omit<Event, 'payload'>[]; pageInfo: PageInfo; totalCount: number }>;
   getEventDetails: ({ eventName }: { eventName: string }) => Promise<Omit<Event, 'payload'>>;
@@ -78,6 +83,9 @@ export function EventsTable({
   const source = undefined;
   const [expandedIDs, setExpandedIDs] = useState<string[]>([]);
 
+  /* The start date comes from either the absolute start time or the relative time */
+  const calculatedStartTime = useCalculatedStartTime({ lastDays, startTime });
+
   const {
     isPending, // first load, no data
     error,
@@ -85,10 +93,27 @@ export function EventsTable({
     isFetching, // refetching
     // TODO: implement infinite scrolling
   } = useQuery({
-    queryKey: ['events', { cursor, eventName: filteredEvent, source, startTime, celQuery: search }],
+    queryKey: [
+      'events',
+      {
+        cursor,
+        eventNames: filteredEvent,
+        source,
+        startTime: calculatedStartTime.toISOString(),
+        endTime: endTime ?? null,
+        celQuery: search,
+      },
+    ],
     queryFn: useCallback(() => {
-      return getEvents({ cursor, eventName: filteredEvent, source, startTime, celQuery: search });
-    }, [getEvents, cursor, filteredEvent, source, startTime, search]),
+      return getEvents({
+        cursor,
+        eventNames: filteredEvent,
+        source,
+        startTime: calculatedStartTime.toISOString(),
+        endTime: endTime ?? null,
+        celQuery: search,
+      });
+    }, [getEvents, cursor, filteredEvent, source, calculatedStartTime, endTime, search]),
     placeholderData: keepPreviousData,
     refetchInterval: !cursor ? refreshInterval : 0,
   });

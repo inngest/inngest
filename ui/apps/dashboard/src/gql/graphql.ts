@@ -53,7 +53,6 @@ export type Account = {
   billingEmail: Scalars['String'];
   createdAt: Scalars['Time'];
   datadogConnections: Array<DatadogConnectionStatus>;
-  datadogIntegrations: Array<DatadogIntegration>;
   datadogOrganizations: Array<DatadogOrganization>;
   entitlementUsage: EntitlementUsage;
   entitlements: Entitlements;
@@ -471,35 +470,6 @@ export type DatadogConnectionStatus = {
   orgName: Scalars['String'];
 };
 
-export type DatadogIntegration = {
-  __typename?: 'DatadogIntegration';
-  accountID: Scalars['UUID'];
-  apiKey: Scalars['String'];
-  apiKeyUpdatedAt: Scalars['Time'];
-  appKey: Scalars['String'];
-  appKeyUpdatedAt: Scalars['Time'];
-  createdAt: Scalars['Time'];
-  datadogSite: Scalars['String'];
-  envID: Scalars['UUID'];
-  error: Maybe<Scalars['String']>;
-  id: Scalars['UUID'];
-  lastSentAt: Maybe<Scalars['Time']>;
-  statusOk: Scalars['Boolean'];
-  updatedAt: Maybe<Scalars['Time']>;
-};
-
-export type DatadogIntegrationRemoveResponse = {
-  __typename?: 'DatadogIntegrationRemoveResponse';
-  removedIntegrationEnvID: Scalars['UUID'];
-  removedIntegrationID: Scalars['UUID'];
-};
-
-export type DatadogIntegrationSetupResponse = {
-  __typename?: 'DatadogIntegrationSetupResponse';
-  error: Maybe<Scalars['String']>;
-  integration: Maybe<DatadogIntegration>;
-};
-
 export type DatadogOrganization = {
   __typename?: 'DatadogOrganization';
   createdAt: Scalars['Time'];
@@ -687,7 +657,6 @@ export type EnvsFilter = {
 export type Event = {
   __typename?: 'Event';
   description: Maybe<Scalars['String']>;
-  events: Maybe<EventConnection>;
   firstSeen: Maybe<Scalars['Time']>;
   integrationName: Maybe<Scalars['String']>;
   name: Scalars['String'];
@@ -698,13 +667,6 @@ export type Event = {
   versions: Array<Maybe<EventType>>;
   workflows: Array<Workflow>;
   workspaceID: Maybe<Scalars['UUID']>;
-};
-
-
-export type EventEventsArgs = {
-  after: InputMaybe<Scalars['String']>;
-  filter: EventsFilter;
-  first?: Scalars['Int'];
 };
 
 
@@ -720,19 +682,6 @@ export type EventUsageArgs = {
 
 export type EventVersionsArgs = {
   versions: InputMaybe<Array<Scalars['String']>>;
-};
-
-export type EventConnection = {
-  __typename?: 'EventConnection';
-  edges: Maybe<Array<Maybe<EventEdge>>>;
-  pageInfo: PageInfo;
-  totalCount: Scalars['Int'];
-};
-
-export type EventEdge = {
-  __typename?: 'EventEdge';
-  cursor: Scalars['String'];
-  node: ArchivedEvent;
 };
 
 export type EventQuery = {
@@ -816,6 +765,19 @@ export type EventTypesFilter = {
   nameSearch?: InputMaybe<Scalars['String']>;
 };
 
+export type EventV2 = {
+  __typename?: 'EventV2';
+  envID: Scalars['UUID'];
+  id: Scalars['ULID'];
+  idempotencyKey: Maybe<Scalars['String']>;
+  name: Scalars['String'];
+  occurredAt: Scalars['Time'];
+  raw: Scalars['String'];
+  receivedAt: Scalars['Time'];
+  runs: Array<FunctionRunV2>;
+  version: Maybe<Scalars['String']>;
+};
+
 export type EventsBatchConfiguration = {
   __typename?: 'EventsBatchConfiguration';
   key: Maybe<Scalars['String']>;
@@ -825,8 +787,24 @@ export type EventsBatchConfiguration = {
   timeout: Scalars['String'];
 };
 
+export type EventsConnection = {
+  __typename?: 'EventsConnection';
+  edges: Array<EventsEdge>;
+  pageInfo: PageInfo;
+  totalCount: Scalars['Int'];
+};
+
+export type EventsEdge = {
+  __typename?: 'EventsEdge';
+  cursor: Scalars['String'];
+  node: EventV2;
+};
+
 export type EventsFilter = {
-  lowerTime: Scalars['Time'];
+  eventNames?: InputMaybe<Array<Scalars['String']>>;
+  from: Scalars['Time'];
+  query?: InputMaybe<Scalars['String']>;
+  until?: InputMaybe<Scalars['Time']>;
 };
 
 export type FilterList = {
@@ -1085,7 +1063,6 @@ export type Mutation = {
   enableEnvironmentAutoArchive: Workspace;
   invokeFunction: Maybe<Scalars['Boolean']>;
   pauseFunction: Workflow;
-  removeDatadogIntegration: Maybe<DatadogIntegrationRemoveResponse>;
   removeDatadogOrganization: Scalars['UUID'];
   removeVercelApp: Maybe<RemoveVercelAppResponse>;
   rerun: Scalars['ULID'];
@@ -1094,7 +1071,6 @@ export type Mutation = {
   rotateSigningKey: SigningKey;
   setAccountEntitlement: Scalars['UUID'];
   setUpAccount: Maybe<SetUpAccountPayload>;
-  setupDatadogIntegration: Maybe<DatadogIntegrationSetupResponse>;
   syncNewApp: SyncResponse;
   unarchiveApp: App;
   unarchiveEnvironment: Workspace;
@@ -1282,11 +1258,6 @@ export type MutationPauseFunctionArgs = {
 };
 
 
-export type MutationRemoveDatadogIntegrationArgs = {
-  integrationID: Scalars['UUID'];
-};
-
-
 export type MutationRemoveDatadogOrganizationArgs = {
   organizationID: Scalars['UUID'];
 };
@@ -1325,15 +1296,6 @@ export type MutationSetAccountEntitlementArgs = {
   entitlementName: Scalars['String'];
   overrideStrategy: Scalars['String'];
   value: Scalars['Int'];
-};
-
-
-export type MutationSetupDatadogIntegrationArgs = {
-  apiKey: Scalars['String'];
-  appKey: Scalars['String'];
-  datadogSite: Scalars['String'];
-  envID: Scalars['UUID'];
-  testsOnlySkipApiKeyCheck: InputMaybe<Scalars['Boolean']>;
 };
 
 
@@ -2291,7 +2253,6 @@ export type Workspace = {
   archivedEvent: Maybe<ArchivedEvent>;
   cdcConnections: Array<CdcConnection>;
   createdAt: Scalars['Time'];
-  datadogIntegration: Maybe<DatadogIntegration>;
   event: Maybe<Event>;
   eventByNames: Array<EventType>;
   eventSearch: EventSearchConnection;
@@ -2299,6 +2260,7 @@ export type Workspace = {
   eventTypes: PaginatedEventTypes;
   eventTypesV2: EventTypesConnection;
   events: PaginatedEvents;
+  eventsV2: EventsConnection;
   functionCount: Scalars['Int'];
   id: Scalars['ID'];
   ingestKey: IngestKey;
@@ -2381,6 +2343,13 @@ export type WorkspaceEventTypesV2Args = {
 
 export type WorkspaceEventsArgs = {
   prefix: InputMaybe<Scalars['String']>;
+};
+
+
+export type WorkspaceEventsV2Args = {
+  after: InputMaybe<Scalars['String']>;
+  filter: EventsFilter;
+  first?: Scalars['Int'];
 };
 
 
@@ -3118,6 +3087,18 @@ export type GetEventKeysQueryVariables = Exact<{
 
 export type GetEventKeysQuery = { __typename?: 'Query', environment: { __typename?: 'Workspace', eventKeys: Array<{ __typename?: 'IngestKey', name: null | string, value: string }> } };
 
+export type GetEventsV2QueryVariables = Exact<{
+  envID: Scalars['ID'];
+  cursor: InputMaybe<Scalars['String']>;
+  startTime: Scalars['Time'];
+  endTime: InputMaybe<Scalars['Time']>;
+  celQuery?: InputMaybe<Scalars['String']>;
+  eventNames?: InputMaybe<Array<Scalars['String']> | Scalars['String']>;
+}>;
+
+
+export type GetEventsV2Query = { __typename?: 'Query', environment: { __typename?: 'Workspace', eventsV2: { __typename?: 'EventsConnection', totalCount: number, edges: Array<{ __typename?: 'EventsEdge', node: { __typename?: 'EventV2', name: string, id: string, receivedAt: string, runs: Array<{ __typename?: 'FunctionRunV2', status: FunctionRunStatus, id: string, startedAt: string | null, endedAt: string | null, function: { __typename?: 'Workflow', name: string, slug: string } }> } }>, pageInfo: { __typename?: 'PageInfo', hasNextPage: boolean, endCursor: string | null, hasPreviousPage: boolean, startCursor: string | null } } } };
+
 export type CreateCancellationMutationVariables = Exact<{
   input: CreateCancellationInput;
 }>;
@@ -3591,6 +3572,7 @@ export const GetEventTypeDocument = {"kind":"Document","definitions":[{"kind":"O
 export const ArchiveEventDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"ArchiveEvent"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"environmentId"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"name"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"archiveEvent"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"workspaceID"},"value":{"kind":"Variable","name":{"kind":"Name","value":"environmentId"}}},{"kind":"Argument","name":{"kind":"Name","value":"name"},"value":{"kind":"Variable","name":{"kind":"Name","value":"name"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"name"}}]}}]}}]} as unknown as DocumentNode<ArchiveEventMutation, ArchiveEventMutationVariables>;
 export const GetLatestEventLogsDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetLatestEventLogs"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"name"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"environmentID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"events"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"query"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"name"},"value":{"kind":"Variable","name":{"kind":"Name","value":"name"}}},{"kind":"ObjectField","name":{"kind":"Name","value":"workspaceID"},"value":{"kind":"Variable","name":{"kind":"Name","value":"environmentID"}}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"data"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"recent"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"count"},"value":{"kind":"IntValue","value":"5"}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"receivedAt"}},{"kind":"Field","name":{"kind":"Name","value":"event"}},{"kind":"Field","name":{"kind":"Name","value":"source"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"name"}}]}}]}}]}}]}}]}}]} as unknown as DocumentNode<GetLatestEventLogsQuery, GetLatestEventLogsQueryVariables>;
 export const GetEventKeysDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetEventKeys"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"environmentID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","alias":{"kind":"Name","value":"environment"},"name":{"kind":"Name","value":"workspace"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"environmentID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","alias":{"kind":"Name","value":"eventKeys"},"name":{"kind":"Name","value":"ingestKeys"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","alias":{"kind":"Name","value":"value"},"name":{"kind":"Name","value":"presharedKey"}}]}}]}}]}}]} as unknown as DocumentNode<GetEventKeysQuery, GetEventKeysQueryVariables>;
+export const GetEventsV2Document = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetEventsV2"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"envID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"cursor"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"startTime"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Time"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"endTime"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Time"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"celQuery"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}},"defaultValue":{"kind":"NullValue"}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"eventNames"}},"type":{"kind":"ListType","type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},"defaultValue":{"kind":"NullValue"}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","alias":{"kind":"Name","value":"environment"},"name":{"kind":"Name","value":"workspace"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"envID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"eventsV2"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"after"},"value":{"kind":"Variable","name":{"kind":"Name","value":"cursor"}}},{"kind":"Argument","name":{"kind":"Name","value":"filter"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"from"},"value":{"kind":"Variable","name":{"kind":"Name","value":"startTime"}}},{"kind":"ObjectField","name":{"kind":"Name","value":"until"},"value":{"kind":"Variable","name":{"kind":"Name","value":"endTime"}}},{"kind":"ObjectField","name":{"kind":"Name","value":"query"},"value":{"kind":"Variable","name":{"kind":"Name","value":"celQuery"}}},{"kind":"ObjectField","name":{"kind":"Name","value":"eventNames"},"value":{"kind":"Variable","name":{"kind":"Name","value":"eventNames"}}}]}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"edges"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"node"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"receivedAt"}},{"kind":"Field","name":{"kind":"Name","value":"runs"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"status"}},{"kind":"Field","name":{"kind":"Name","value":"id"}},{"kind":"Field","name":{"kind":"Name","value":"startedAt"}},{"kind":"Field","name":{"kind":"Name","value":"endedAt"}},{"kind":"Field","name":{"kind":"Name","value":"function"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"name"}},{"kind":"Field","name":{"kind":"Name","value":"slug"}}]}}]}}]}}]}},{"kind":"Field","name":{"kind":"Name","value":"totalCount"}},{"kind":"Field","name":{"kind":"Name","value":"pageInfo"},"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"hasNextPage"}},{"kind":"Field","name":{"kind":"Name","value":"endCursor"}},{"kind":"Field","name":{"kind":"Name","value":"hasPreviousPage"}},{"kind":"Field","name":{"kind":"Name","value":"startCursor"}}]}}]}}]}}]}}]} as unknown as DocumentNode<GetEventsV2Query, GetEventsV2QueryVariables>;
 export const CreateCancellationDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"CreateCancellation"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"input"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"CreateCancellationInput"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"createCancellation"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"Variable","name":{"kind":"Name","value":"input"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<CreateCancellationMutation, CreateCancellationMutationVariables>;
 export const GetCancellationRunCountDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"query","name":{"kind":"Name","value":"GetCancellationRunCount"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"envID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"functionSlug"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"String"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"queuedAtMin"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Time"}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"queuedAtMax"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"Time"}}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","alias":{"kind":"Name","value":"environment"},"name":{"kind":"Name","value":"workspace"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"id"},"value":{"kind":"Variable","name":{"kind":"Name","value":"envID"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","alias":{"kind":"Name","value":"function"},"name":{"kind":"Name","value":"workflowBySlug"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"slug"},"value":{"kind":"Variable","name":{"kind":"Name","value":"functionSlug"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"cancellationRunCount"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"input"},"value":{"kind":"ObjectValue","fields":[{"kind":"ObjectField","name":{"kind":"Name","value":"queuedAtMin"},"value":{"kind":"Variable","name":{"kind":"Name","value":"queuedAtMin"}}},{"kind":"ObjectField","name":{"kind":"Name","value":"queuedAtMax"},"value":{"kind":"Variable","name":{"kind":"Name","value":"queuedAtMax"}}}]}}]}]}}]}}]}}]} as unknown as DocumentNode<GetCancellationRunCountQuery, GetCancellationRunCountQueryVariables>;
 export const PauseFunctionDocument = {"kind":"Document","definitions":[{"kind":"OperationDefinition","operation":"mutation","name":{"kind":"Name","value":"PauseFunction"},"variableDefinitions":[{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"fnID"}},"type":{"kind":"NonNullType","type":{"kind":"NamedType","name":{"kind":"Name","value":"ID"}}}},{"kind":"VariableDefinition","variable":{"kind":"Variable","name":{"kind":"Name","value":"cancelRunning"}},"type":{"kind":"NamedType","name":{"kind":"Name","value":"Boolean"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"pauseFunction"},"arguments":[{"kind":"Argument","name":{"kind":"Name","value":"fnID"},"value":{"kind":"Variable","name":{"kind":"Name","value":"fnID"}}},{"kind":"Argument","name":{"kind":"Name","value":"cancelRunning"},"value":{"kind":"Variable","name":{"kind":"Name","value":"cancelRunning"}}}],"selectionSet":{"kind":"SelectionSet","selections":[{"kind":"Field","name":{"kind":"Name","value":"id"}}]}}]}}]} as unknown as DocumentNode<PauseFunctionMutation, PauseFunctionMutationVariables>;
