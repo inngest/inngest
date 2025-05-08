@@ -33,53 +33,54 @@ local function gcra(key, now_ms, period_ms, limit, burst)
 end
 
 local function gcraUpdate(key, now_ms, period_ms, limit, burst, capacity)
-	-- calculate emission interval (tau) - time between each token
-	local emission = period_ms / limit
+  -- calculate emission interval (tau) - time between each token
+  local emission = period_ms / limit
 
-	-- calculate total capacity in time units
-	local total_capacity_time = emission * (limit + burst)
+  -- calculate total capacity in time units
+  local total_capacity_time = emission * (limit + burst)
 
-	-- retrieve theoretical arrival time
-	local tat = redis.call("GET", key)
-	if not tat then
-		tat = now_ms
-	else
-		tat = tonumber(tat)
-	end
+  -- retrieve theoretical arrival time
+  local tat = redis.call("GET", key)
+  if not tat then
+    tat = now_ms
+  else
+    tat = tonumber(tat)
+  end
 
-	-- calculate next theoretical arrival time
-	local new_tat = tat + emission
+  -- calculate next theoretical arrival time
+  local new_tat = tat + emission
 
-	if capacity >= 0 then
-		redis.call("SET", key, new_tat, "EX", expiry)
-	end
+  if capacity >= 0 then
+    local expiry = (period_ms / 1000)
+    redis.call("SET", key, new_tat, "EX", expiry)
+  end
 end
 
 local function gcraCapacity(key, now_ms, period_ms, limit, burst)
-	-- calculate emission interval (tau) - time between each token
-	local emission = period_ms / limit
+  -- calculate emission interval (tau) - time between each token
+  local emission = period_ms / limit
 
-	-- calculate total capacity in time units
-	local total_capacity_time = emission * (limit + burst)
+  -- calculate total capacity in time units
+  local total_capacity_time = emission * (limit + burst)
 
-	-- retrieve theoretical arrival time
-	local tat = redis.call("GET", key)
-	if not tat then
-		tat = now_ms
-	else
-		tat = tonumber(tat)
-	end
+  -- retrieve theoretical arrival time
+  local tat = redis.call("GET", key)
+  if not tat then
+    tat = now_ms
+  else
+    tat = tonumber(tat)
+  end
 
 
-	-- calculate next theoretical arrival time
-	local new_tat = tat + emission
+  -- calculate next theoretical arrival time
+  local new_tat = tat + emission
 
-	-- remaining capacity in time units
-	local time_capacity_remain = now_ms + total_capacity_time - new_tat
+  -- remaining capacity in time units
+  local time_capacity_remain = now_ms + total_capacity_time - new_tat
 
-	-- convert time capacity to token capacity
-	local capacity = math.floor(time_capacity_remain / emission)
+  -- convert time capacity to token capacity
+  local capacity = math.floor(time_capacity_remain / emission)
 
-	-- this could be negative, which means no capacity
-	return math.min(capacity, limit + burst)
+  -- this could be negative, which means no capacity
+  return math.min(capacity, limit + burst)
 end
