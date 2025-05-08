@@ -51,7 +51,7 @@ export function FunctionTable({ rows = [], isLoading }: Props) {
         isLoading={isLoading}
         blankState={rows.length === 0 ? 'No functions' : null}
         onRowClick={(row) =>
-          router.push(pathCreator.function({ envSlug: env.slug, functionSlug: row.original.name }))
+          router.push(pathCreator.function({ envSlug: env.slug, functionSlug: row.original.slug }))
         }
       />
     </main>
