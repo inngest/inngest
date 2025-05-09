@@ -1013,6 +1013,7 @@ func (q *queue) process(
 	// XXX: Add a max job time here, configurable.
 	jobCtx, jobCancel := context.WithCancel(context.WithoutCancel(ctx))
 	defer jobCancel()
+
 	// Add the job ID to the queue context.  This allows any logic that handles the run function
 	// to inspect job IDs, eg. for tracing or logging, without having to thread this down as
 	// arguments.
@@ -1021,6 +1022,22 @@ func (q *queue) process(
 	if qi.Data.GroupID != "" {
 		jobCtx = state.WithGroupID(jobCtx, qi.Data.GroupID)
 	}
+
+	startedAt := q.clock.Now()
+	go func() {
+		longRunningJobStatusTick := q.clock.NewTicker(5 * time.Minute)
+		defer longRunningJobStatusTick.Stop()
+
+		for {
+			select {
+			case <-jobCtx.Done():
+				return
+			case <-longRunningJobStatusTick.Chan():
+			}
+
+			logger.StdlibLogger(ctx).Debug("long running queue job tick", "item", qi, "dur", q.clock.Now().Sub(startedAt).String())
+		}
+	}()
 
 	go func() {
 		defer func() {
