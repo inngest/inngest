@@ -44,10 +44,6 @@ const (
 	PartitionPeekMax      = PartitionSelectionMax * 3
 	AccountPeekMax        = int64(30)
 
-	ShadowPartitionAccountPeekMax        = int64(30)
-	ShadowPartitionPeekMax               = int64(300) // same as PartitionPeekMax for now
-	ShadowPartitionPeekMinBacklogs       = int64(10)
-	ShadowPartitionPeekMaxBacklogs       = int64(100)
 	AbsoluteShadowPartitionPeekMax int64 = 10 * ShadowPartitionPeekMaxBacklogs
 	NormalizeAccountPeekMax              = int64(30)
 	NormalizePartitionPeekMax            = int64(100)
@@ -3837,38 +3833,6 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 	return result, nil
 }
 
-// peekShadowPartitions returns pending shadow partitions within the global shadow partition pointer _or_ account shadow partition pointer ZSET.
-func (q *queue) peekShadowPartitions(ctx context.Context, partitionIndexKey string, sequential bool, peekLimit int64, until time.Time) ([]*QueueShadowPartition, error) {
-	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
-		return nil, fmt.Errorf("unsupported queue shard kind for peekShadowPartitions: %s", q.primaryQueueShard.Kind)
-	}
-
-	p := peeker[QueueShadowPartition]{
-		q:               q,
-		opName:          "peekShadowPartitions",
-		keyMetadataHash: q.primaryQueueShard.RedisClient.kg.ShadowPartitionMeta(),
-		max:             ShadowPartitionPeekMax,
-		maker: func() *QueueShadowPartition {
-			return &QueueShadowPartition{}
-		},
-		handleMissingItems: func(pointers []string) error {
-			logger.StdlibLogger(ctx).Warn("found missing shadow partitions", "missing", pointers, "partitionKey", partitionIndexKey)
-
-			return nil
-		},
-	}
-
-	res, err := p.peek(ctx, partitionIndexKey, sequential, until, peekLimit)
-	if err != nil {
-		if errors.Is(err, ErrPeekerPeekExceedsMaxLimits) {
-			return nil, ErrShadowPartitionPeekMaxExceedsLimits
-		}
-		return nil, fmt.Errorf("could not peek shadow partitions: %w", err)
-	}
-
-	return res.Items, nil
-}
-
 func (q *queue) accountPeek(ctx context.Context, sequential bool, until time.Time, limit int64) ([]uuid.UUID, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "accountPeek"), redis_telemetry.ScopeQueue)
 
@@ -4553,74 +4517,6 @@ func (q *queue) removeContinue(ctx context.Context, p *QueuePartition, cooldown 
 		// only exist in the current replica.
 		q.continueCooldown[p.Queue()] = time.Now().Add(
 			consts.QueueContinuationCooldownPeriod,
-		)
-	}
-}
-
-// addShadowContinue is the equivalent of addContinue for shadow partitions
-func (q *queue) addShadowContinue(ctx context.Context, p *QueueShadowPartition, ctr uint) {
-	if !q.runMode.ShadowContinuations {
-		// shadow continuations are not enabled.
-		return
-	}
-
-	if ctr >= q.shadowContinuationLimit {
-		q.removeShadowContinue(ctx, p, true)
-		return
-	}
-
-	q.shadowContinuesLock.Lock()
-	defer q.shadowContinuesLock.Unlock()
-
-	// If this is the first shadow continuation, check if we're on a cooldown, or if we're
-	// beyond capacity.
-	if ctr == 1 {
-		if len(q.shadowContinues) > consts.QueueShadowContinuationMaxPartitions {
-			metrics.IncrQueueShadowContinuationOpCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"op": "max_capacity"}})
-			return
-		}
-		if t, ok := q.shadowContinueCooldown[p.PartitionID]; ok && t.After(time.Now()) {
-			metrics.IncrQueueShadowContinuationOpCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"op": "cooldown"}})
-			return
-		}
-
-		// Remove the shadow continuation cooldown.
-		delete(q.shadowContinueCooldown, p.PartitionID)
-	}
-
-	c, ok := q.shadowContinues[p.PartitionID]
-	if !ok || c.count < ctr {
-		// Update the continue count if it doesn't exist, or the current counter
-		// is higher.  This ensures that we always have the highest continuation
-		// count stored for queue processing.
-		q.shadowContinues[p.PartitionID] = shadowContinuation{shadowPart: p, count: ctr}
-		metrics.IncrQueueShadowContinuationOpCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"op": "added"}})
-	}
-}
-
-func (q *queue) removeShadowContinue(ctx context.Context, p *QueueShadowPartition, cooldown bool) {
-	if !q.runMode.ShadowContinuations {
-		// shadow continuations are not enabled.
-		return
-	}
-
-	// This is over the limit for continuing the shadow partition, so force it to be
-	// removed in every case.
-	q.shadowContinuesLock.Lock()
-	defer q.shadowContinuesLock.Unlock()
-
-	metrics.IncrQueueShadowContinuationOpCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"op": "removed"}})
-
-	delete(q.shadowContinues, p.PartitionID)
-
-	if cooldown {
-		// Add a cooldown, preventing this partition from being added as a continuation
-		// for a given period of time.
-		//
-		// Note that this isn't shared across replicas;  cooldowns
-		// only exist in the current replica.
-		q.shadowContinueCooldown[p.PartitionID] = time.Now().Add(
-			consts.QueueShadowContinuationCooldownPeriod,
 		)
 	}
 }
