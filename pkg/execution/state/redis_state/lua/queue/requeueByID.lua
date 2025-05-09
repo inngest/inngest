@@ -23,13 +23,11 @@ local keyAccountPartitions    = KEYS[5] -- accounts:$accountId:partition:sorted
 local keyPartitionFn    = KEYS[6] -- queue:sorted:$workflowID - zset
 
 -- Key queues v2
-local keyBacklogSetA              = KEYS[9]          -- backlog:sorted:<backlogID> - zset
-local keyBacklogSetB              = KEYS[10]          -- backlog:sorted:<backlogID> - zset
-local keyBacklogSetC              = KEYS[11]          -- backlog:sorted:<backlogID> - zset
-local keyBacklogMeta              = KEYS[12]          -- backlogs - hash
-local keyGlobalShadowPartitionSet = KEYS[13]          -- shadow:sorted
-local keyShadowPartitionSet       = KEYS[14]          -- shadow:sorted:<fnID|queueName> - zset
-local keyShadowPartitionMeta      = KEYS[15]          -- shadows
+local keyBacklogSet               = KEYS[7]          -- backlog:sorted:<backlogID> - zset
+local keyBacklogMeta              = KEYS[8]          -- backlogs - hash
+local keyGlobalShadowPartitionSet = KEYS[9]          -- shadow:sorted
+local keyShadowPartitionSet       = KEYS[10]          -- shadow:sorted:<fnID|queueName> - zset
+local keyShadowPartitionMeta      = KEYS[11]          -- shadows
 
 local jobID            = ARGV[1]           -- queue item ID
 local jobScore         = tonumber(ARGV[2]) -- enqueue at, in milliseconds
@@ -42,12 +40,8 @@ local accountID        = ARGV[6]
 local requeueToBacklog				= tonumber(ARGV[14])
 local shadowPartitionId       = ARGV[15]
 local shadowPartitionItem     = ARGV[16]
-local backlogItemA            = ARGV[17]
-local backlogItemB            = ARGV[18]
-local backlogItemC            = ARGV[19]
-local backlogIdA              = ARGV[20]
-local backlogIdB              = ARGV[21]
-local backlogIdC              = ARGV[22]
+local backlogItem             = ARGV[17]
+local backlogID               = ARGV[18]
 
 -- $include(decode_ulid_time.lua)
 -- $include(get_queue_item.lua)
@@ -78,9 +72,7 @@ if requeueToBacklog == 1 then
 	--
 	-- Requeue item to backlog queues again
 	--
-	requeue_to_backlog(keyBacklogSetA, backlogIdA, backlogItemA, partitionID, shadowPartitionItem, partitionItem, keyPartitionMap, keyBacklogMeta, keyGlobalShadowPartitionSet, keyShadowPartitionMeta, keyShadowPartitionSet, queueScore, queueID, partitionTime, nowMS, accountID)
-	requeue_to_backlog(keyBacklogSetB, backlogIdB, backlogItemB, partitionID, shadowPartitionItem, partitionItem, keyPartitionMap, keyBacklogMeta, keyGlobalShadowPartitionSet, keyShadowPartitionMeta, keyShadowPartitionSet, queueScore, queueID, partitionTime, nowMS, accountID)
-	requeue_to_backlog(keyBacklogSetC, backlogIdC, backlogItemC, partitionID, shadowPartitionItem, partitionItem, keyPartitionMap, keyBacklogMeta, keyGlobalShadowPartitionSet, keyShadowPartitionMeta, keyShadowPartitionSet, queueScore, queueID, partitionTime, nowMS, accountID)
+	requeue_to_backlog(keyBacklogSet, backlogID, backlogItem, partitionID, shadowPartitionItem, partitionItem, keyPartitionMap, keyBacklogMeta, keyGlobalShadowPartitionSet, keyShadowPartitionMeta, keyShadowPartitionSet, queueScore, queueID, partitionTime, nowMS, accountID)
 else
   -- Update and requeue all partitions
   requeue_to_partition(keyPartitionFn, partitionID, partitionItem, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, jobScore, jobID, nowMS, accountID)

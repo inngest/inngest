@@ -1,18 +1,19 @@
 --[[
 
 Output:
+  positive number: discrepancy in active counter
+
   0: Successfully leased item
-  1: Queue item not found
-  2: Queue item already leased
+  -1: Queue item not found
+  -2: Queue item already leased
 
-  3: First partition concurrency limit hit
-  4: Second partition concurrency limit hit
-  5: Third partition concurrency limit hit
+  -3: First partition concurrency limit hit
+  -4: Second partition concurrency limit hit
+  -5: Third partition concurrency limit hit
 
-  6: Account concurrency limit hit
+  -6: Account concurrency limit hit
 
-  7: Rate limited via throttling;  no capacity.
-
+  -7: Rate limited via throttling;  no capacity.
 ]]
 
 local keyQueueMap            	= KEYS[1]
@@ -29,6 +30,7 @@ local keyGlobalAccountPointer = KEYS[8] -- accounts:sorted - zset
 local keyAccountPartitions    = KEYS[9] -- accounts:$accountId:partition:sorted - zset
 local throttleKey             = KEYS[10] -- key used for throttling function run starts.
 local keyAcctConcurrency      = KEYS[11]
+local keyActiveCounter        = KEYS[12]
 
 local queueID      						= ARGV[1]
 local newLeaseKey  						= ARGV[2]
@@ -59,7 +61,7 @@ local disableLeaseChecks = tonumber(ARGV[10])
 -- was not found.
 local item = get_queue_item(keyQueueMap, queueID)
 if item == nil then
-    return 1
+    return -1
 end
 
 -- Grab the current time from the new lease key.
@@ -67,7 +69,7 @@ local nextTime = decode_ulid_time(newLeaseKey)
 -- check if the item is leased.
 if item.leaseID ~= nil and item.leaseID ~= cjson.null and decode_ulid_time(item.leaseID) > currentTime then
     -- This is already leased;  don't let this requester lease the item.
-    return 2
+    return -2
 end
 
 -- Track the earliest time this job was attempted in the queue.
@@ -82,7 +84,7 @@ if disableLeaseChecks ~= 1 then
 	if item.data ~= nil and item.data.throttle ~= nil then
 		local throttleResult = gcra(throttleKey, currentTime, item.data.throttle.p * 1000, item.data.throttle.l, item.data.throttle.b)
 		if throttleResult == false then
-			return 7
+			return -7
 		end
 	end
 
@@ -91,22 +93,22 @@ if disableLeaseChecks ~= 1 then
   -- once, and the capacity is kept in memory after leasing a partition)
   if customConcurrencyKey1 > 0 then
       if check_concurrency(currentTime, keyCustomConcurrencyKey1, customConcurrencyKey1) <= 0 then
-          return 4
+          return -4
       end
   end
   if customConcurrencyKey2 > 0 then
       if check_concurrency(currentTime, keyCustomConcurrencyKey2, customConcurrencyKey2) <= 0 then
-          return 5
+          return -5
       end
   end
   if concurrencyFn > 0 then
       if check_concurrency(currentTime, keyConcurrencyFn, concurrencyFn) <= 0 then
-          return 3
+          return -3
       end
   end
   if concurrencyAcct > 0 then
       if check_concurrency(currentTime, keyAcctConcurrency, concurrencyAcct) <= 0 then
-          return 6
+          return -6
       end
   end
 end
@@ -152,6 +154,34 @@ end
 
 if exists_without_ending(keyCustomConcurrencyKey2, ":-") == true then
   handleLease(keyCustomConcurrencyKey2, customConcurrencyKey2)
+end
+
+local expectedActive = 0
+if exists_without_ending(keyCustomConcurrencyKey1, ":-") == true and exists_without_ending(keyCustomConcurrencyKey2, ":-") == true then
+  -- both concurrency keys are set, compute the intersection of both keys
+  for _, _ in ipairs(redis.call("ZINTER", 2, keyCustomConcurrencyKey1, keyCustomConcurrencyKey2)) do
+    expectedActive = expectedActive + 1
+  end
+elseif exists_without_ending(keyCustomConcurrencyKey1, ":-") == true then
+  -- only first key is set
+  expectedActive = redis.call("ZCARD", keyCustomConcurrencyKey1)
+else
+  -- no key is set
+  expectedActive = redis.call("ZCARD", keyConcurrencyFn)
+end
+
+-- Set initial value for active counter
+local currentActive = redis.call("GET", keyActiveCounter)
+if currentActive == nil or currentActive == false then
+  -- key not set, provide initial value
+  redis.call("SET", keyActiveCounter, expectedActive)
+elseif currentActive ~= expectedActive then
+  -- discrepancy between current and expected value
+  redis.call("SET", keyActiveCounter, expectedActive)
+  return math.abs(currentActive - expectedActive)
+else
+  -- key exists, simply increment by one
+  redis.call("INCR", keyActiveCounter)
 end
 
 return 0

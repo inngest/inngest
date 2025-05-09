@@ -206,6 +206,8 @@ type Throttle struct {
 	// UnhashedThrottleKey is the raw value returned after evaluating the key expression, if configured.
 	// Otherwise, this is the function ID. In the case of evaluated keys, this may be large and should be truncated before usage.
 	UnhashedThrottleKey string `json:"-"`
+
+	KeyExpressionHash string `json:"-"`
 }
 
 // SpanID generates a spanID based on the combination the jobID and attempt

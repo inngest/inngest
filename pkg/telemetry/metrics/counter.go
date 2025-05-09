@@ -337,6 +337,24 @@ func IncrBacklogRefillLimitsCounter(ctx context.Context, opts CounterOpt) {
 	})
 }
 
+func IncrBacklogNormalizationScannedCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "backlog_normalization_scanned_total",
+		Description: "The total number of backlogs that were scanned for normalization",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrBacklogNormalizedItemCounter(ctx context.Context, value int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, value, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "backlog_normalized_item_total",
+		Description: "The total number of items that were normalized",
+		Tags:        opts.Tags,
+	})
+}
+
 // NOTE: this is a metric that's mainly used for observing migrations to key queues
 // it's not needed once the migration completes
 func IncrBacklogRequeuedCounter(ctx context.Context, opts CounterOpt) {

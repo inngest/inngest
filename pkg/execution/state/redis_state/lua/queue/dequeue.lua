@@ -23,8 +23,10 @@ local keyGlobalAccountPointer  = KEYS[10]           -- accounts:sorted - zset
 local keyAccountPartitions     = KEYS[11]           -- accounts:$accountId:partition:sorted - zset
 local keyPartitionMap          = KEYS[12]
 
-local keyItemIndexA            = KEYS[13]   -- custom item index 1
-local keyItemIndexB            = KEYS[14]  -- custom item index 2
+local keyActiveCounter         = KEYS[13]
+
+local keyItemIndexA            = KEYS[14]   -- custom item index 1
+local keyItemIndexB            = KEYS[15]  -- custom item index 2
 
 local queueID        = ARGV[1]
 local idempotencyTTL = tonumber(ARGV[2])
@@ -61,6 +63,10 @@ local function handleDequeueConcurrency(keyConcurrency)
 end
 
 handleDequeueConcurrency(keyConcurrencyFn)
+
+if redis.call("EXISTS", keyActiveCounter) == 1 then
+  redis.call("DECR", keyActiveCounter)
+end
 
 -- Get the earliest item in the partition concurrency set.  We may be dequeueing
 -- the only in-progress job and should remove this from the partition concurrency
