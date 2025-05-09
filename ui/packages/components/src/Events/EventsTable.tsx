@@ -1,12 +1,13 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState, type UIEventHandler } from 'react';
 import type { Route } from 'next';
 import dynamic from 'next/dynamic';
 import { Button } from '@inngest/components/Button';
 import TableBlankState from '@inngest/components/EventTypes/TableBlankState';
 import { TimeFilter } from '@inngest/components/Filter/TimeFilter';
 import { Pill } from '@inngest/components/Pill';
+import { ErrorCard } from '@inngest/components/RunDetailsV2/ErrorCard';
 import NewTable from '@inngest/components/Table/NewTable';
 import {
   DEFAULT_TIME,
@@ -16,7 +17,7 @@ import { type Event, type PageInfo } from '@inngest/components/types/event';
 import { cn } from '@inngest/components/utils/classNames';
 import { durationToString, parseDuration } from '@inngest/components/utils/date';
 import { RiArrowRightUpLine, RiSearchLine } from '@remixicon/react';
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery } from '@tanstack/react-query';
 
 import type { RangeChangeProps } from '../DatePicker/RangePicker';
 import EntityFilter from '../Filter/EntityFilter';
@@ -59,7 +60,7 @@ export function EventsTable({
     endTime,
     celQuery,
   }: {
-    eventNames?: string[];
+    eventNames: string[] | null;
     cursor: string | null;
     source?: string;
     startTime: string;
@@ -71,17 +72,17 @@ export function EventsTable({
   features: Pick<Features, 'history'>;
 }) {
   const columns = useColumns({ pathCreator });
-  const [cursor, setCursor] = useState<string | null>(null);
   const [showSearch, setShowSearch] = useState(false);
   const [lastDays] = useSearchParam('last');
   const [startTime] = useSearchParam('start');
   const [endTime] = useSearchParam('end');
   const batchUpdate = useBatchedSearchParams();
-  const [filteredEvent = [], setFilteredEvent, removeFilteredEvent] =
+  const [filteredEvent, setFilteredEvent, removeFilteredEvent] =
     useStringArraySearchParam('filterEvent');
   const [search, setSearch, removeSearch] = useSearchParam('search');
   const source = undefined;
   const [expandedIDs, setExpandedIDs] = useState<string[]>([]);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   /* The start date comes from either the absolute start time or the relative time */
   const calculatedStartTime = useCalculatedStartTime({ lastDays, startTime });
@@ -89,14 +90,16 @@ export function EventsTable({
   const {
     isPending, // first load, no data
     error,
+    fetchNextPage,
+    hasNextPage,
     data: eventsData,
-    isFetching, // refetching
-    // TODO: implement infinite scrolling
-  } = useQuery({
+    isFetching,
+    refetch,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
     queryKey: [
       'events',
       {
-        cursor,
         eventNames: filteredEvent,
         source,
         startTime: calculatedStartTime.toISOString(),
@@ -104,18 +107,27 @@ export function EventsTable({
         celQuery: search,
       },
     ],
-    queryFn: useCallback(() => {
-      return getEvents({
-        cursor,
-        eventNames: filteredEvent,
+    queryFn: ({ pageParam }: { pageParam: string | null }) =>
+      getEvents({
+        cursor: pageParam,
+        eventNames: filteredEvent ?? null,
         source,
         startTime: calculatedStartTime.toISOString(),
         endTime: endTime ?? null,
         celQuery: search,
-      });
-    }, [getEvents, cursor, filteredEvent, source, calculatedStartTime, endTime, search]),
-    placeholderData: keepPreviousData,
-    refetchInterval: !cursor ? refreshInterval : 0,
+      }),
+    getNextPageParam: (lastPage) => {
+      if (!lastPage || !lastPage.pageInfo.hasNextPage) {
+        return undefined;
+      }
+      return lastPage.pageInfo.endCursor;
+    },
+    initialPageParam: null,
+    select: (data) => ({
+      ...data,
+      events: data.pages.flatMap((page) => page.events),
+      totalCount: data.pages[data.pages.length - 1]?.totalCount ?? 0,
+    }),
   });
 
   const onSearchChange = useCallback(
@@ -126,7 +138,7 @@ export function EventsTable({
         removeSearch();
       }
     },
-    [setSearch]
+    [setSearch, removeSearch]
   );
 
   const onEventFilterChange = useCallback(
@@ -159,6 +171,27 @@ export function EventsTable({
     [batchUpdate]
   );
 
+  const hasEventsData = eventsData?.events && eventsData?.events.length > 0;
+
+  const onScroll: UIEventHandler<HTMLDivElement> = useCallback(
+    (event) => {
+      if (hasEventsData && hasNextPage) {
+        const { scrollHeight, scrollTop, clientHeight } = event.target as HTMLDivElement;
+
+        // Check if scrolled to the bottom
+        const reachedBottom = scrollHeight - scrollTop - clientHeight < 200;
+        if (reachedBottom && !isFetching && !isFetchingNextPage) {
+          fetchNextPage();
+        }
+      }
+    },
+    [fetchNextPage, hasNextPage, isFetchingNextPage, hasEventsData, isFetching]
+  );
+
+  if (error) {
+    return <ErrorCard error={error} reset={() => refetch()} />;
+  }
+
   return (
     <div className="bg-canvasBase text-basis no-scrollbar flex-1 overflow-hidden focus-visible:outline-none">
       <div className="bg-canvasBase sticky top-0 z-10">
@@ -168,7 +201,7 @@ export function EventsTable({
             <EntityFilter
               type="event"
               onFilterChange={onEventFilterChange}
-              selectedEntities={filteredEvent}
+              selectedEntities={filteredEvent ?? []}
               entities={[]}
             />
             <Button
@@ -238,11 +271,11 @@ export function EventsTable({
         )}
       </div>
 
-      <div className="h-[calc(100%-58px)] overflow-y-auto">
+      <div className="h-[calc(100%-58px)] overflow-y-auto" onScroll={onScroll} ref={containerRef}>
         <NewTable
           columns={columns}
           data={eventsData?.events || []}
-          isLoading={isPending}
+          isLoading={isPending || (isFetching && !isFetchingNextPage)}
           blankState={<TableBlankState actions={emptyActions} />}
           renderSubComponent={({ row }) => (
             <EventDetails
@@ -266,6 +299,11 @@ export function EventsTable({
             }
           }}
         />
+        {isFetchingNextPage && (
+          <div className="flex flex-col items-center">
+            <Button appearance="outlined" label="loading" loading={true} />
+          </div>
+        )}
       </div>
     </div>
   );

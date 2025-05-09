@@ -48,8 +48,8 @@ export const eventsQuery = graphql(`
   }
 `);
 
-type QueryVariables = {
-  eventNames?: string[];
+type EventsQueryVariables = {
+  eventNames: string[] | null;
   cursor: string | null;
   source?: string;
   startTime: string;
@@ -62,7 +62,7 @@ export function useEvents() {
   const client = useClient();
 
   return useCallback(
-    async ({ cursor, endTime, source, eventNames, startTime, celQuery }: QueryVariables) => {
+    async ({ cursor, endTime, source, eventNames, startTime, celQuery }: EventsQueryVariables) => {
       console.log(source);
       const result = await client
         .query(
