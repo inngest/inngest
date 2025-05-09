@@ -6,7 +6,13 @@
   backlogRefill will always attempt to move queue items from backlogs into ready queues up to
   hitting concurrency.
 
-  Returns a tuple of {status, items_refilled, total_items, capacity, refill}
+  Returns a tuple of {
+    status,               -- See status section below
+    items_refilled,       -- Number of items refilled to ready queue
+    total_items,          -- Total number of items in backlog before refilling
+    constraintCapacity,   -- Most limiting constraint capacity
+    refill                -- Number of items to refill (may include missing items)
+  }
 
   Status values:
 
@@ -58,14 +64,45 @@ local throttlePeriod = tonumber(ARGV[14])
 -- $include(update_account_queues.lua)
 -- $include(gcra.lua)
 
-local refill = 0
+-- Helper method to clean up backlog pointers
+local function cleanupBacklogPointer()
+  redis.call("ZREM", keyShadowPartitionSet, backlogID)
 
-local backlogCount = redis.call("ZCOUNT", keyBacklogSet, "-inf", refillUntilMS)
-if backlogCount ~= false and backlogCount ~= nil then
-  refill = backlogCount
+  -- If shadow partition has no more backlogs, update global/account pointers
+  if tonumber(redis.call("ZCARD", keyShadowPartitionSet)) == 0 then
+    redis.call("ZREM", keyGlobalShadowPartitionSet, partitionID)
+    redis.call("ZREM", keyAccountShadowPartitionSet, partitionID)
+
+    if tonumber(redis.call("ZCARD", keyAccountShadowPartitionSet)) == 0 then
+      redis.call("ZREM", keyGlobalAccountShadowPartitionSet, accountID)
+    end
+  end
 end
 
-if backlogCount > refillLimit then
+--
+-- Retrieve current backlog size
+--
+
+local backlogCount = redis.call("ZCOUNT", keyBacklogSet, "-inf", refillUntilMS)
+if backlogCount == false or backlogCount == nil then
+  backlogCount = 0
+end
+
+-- If backlog is empty, immediately clean up pointers and return
+if backlogCount == 0 then
+  cleanupBacklogPointer()
+  return { 0, 0, 0, 0, 0 }
+end
+
+--
+-- Calculate initial number of items to refill
+--
+
+-- Set items to refill to number of items in backlog
+local refill = backlogCount
+
+-- Limit items to refill to max refill limit if more items are in backlog
+if refill > refillLimit then
   refill = refillLimit
 end
 
@@ -73,14 +110,14 @@ end
 -- Check constraints and adjust capacity
 --
 
--- Initialize capacity as nil, which represents unlimited
+-- Initialize capacity as nil, which represents no constraint limits
 local constraintCapacity = nil
 
 -- Set initial status to success, progressively add more specific capacity constraints
 local status = 0
 
+-- Check throttle capacity
 if (constraintCapacity == nil or constraintCapacity > 0) and throttleLimit > 0 then
-  -- TODO Implement and test this scenario
   local remainingThrottleCapacity = gcraCapacity(throttleKey, nowMS, throttlePeriod * 1000, throttleLimit, throttleBurst)
   if constraintCapacity == nil or remainingThrottleCapacity < constraintCapacity then
     constraintCapacity = remainingThrottleCapacity
@@ -88,6 +125,7 @@ if (constraintCapacity == nil or constraintCapacity > 0) and throttleLimit > 0 t
   end
 end
 
+-- Check custom concurrency key 2 capacity
 if (constraintCapacity == nil or constraintCapacity > 0) and exists_without_ending(keyCustomConcurrencyKey2, ":-") == true and customConcurrencyKey2 > 0 then
   local remainingCustomConcurrencyCapacityKey2 = check_concurrency(nowMS, keyCustomConcurrencyKey2, customConcurrencyKey2)
   if constraintCapacity == nil or remainingCustomConcurrencyCapacityKey2 < constraintCapacity then
@@ -97,6 +135,7 @@ if (constraintCapacity == nil or constraintCapacity > 0) and exists_without_endi
   end
 end
 
+-- Check custom concurrency key 1 capacity
 if (constraintCapacity == nil or constraintCapacity > 0) and exists_without_ending(keyCustomConcurrencyKey1, ":-") == true and customConcurrencyKey1 > 0 then
   local remainingCustomConcurrencyCapacityKey1 = check_concurrency(nowMS, keyCustomConcurrencyKey1, customConcurrencyKey1)
   if constraintCapacity == nil or remainingCustomConcurrencyCapacityKey1 < constraintCapacity then
@@ -106,6 +145,7 @@ if (constraintCapacity == nil or constraintCapacity > 0) and exists_without_endi
   end
 end
 
+-- Check function concurrency capacity
 if (constraintCapacity == nil or constraintCapacity > 0) and exists_without_ending(keyConcurrencyFn, ":-") == true and concurrencyFn > 0 then
   local remainingFunctionCapacity = check_concurrency(nowMS, keyConcurrencyFn, concurrencyFn)
   if constraintCapacity == nil or remainingFunctionCapacity < constraintCapacity then
@@ -115,6 +155,7 @@ if (constraintCapacity == nil or constraintCapacity > 0) and exists_without_endi
   end
 end
 
+-- Check account concurrency capacity
 if (constraintCapacity == nil or constraintCapacity > 0) and exists_without_ending(keyConcurrencyAccount, ":-") == true and concurrencyAcct > 0 then
   local remainingAccountCapacity = check_concurrency(nowMS, keyConcurrencyAccount, concurrencyAcct)
 
@@ -125,21 +166,26 @@ if (constraintCapacity == nil or constraintCapacity > 0) and exists_without_endi
   end
 end
 
--- If we have limited capacity, reduce refill by active (ready + in progress count) to prevent over-filling
-if constraintCapacity ~= nil then
-  local activeCount = redis.call("GET", keyActiveCounter)
-  if activeCount ~= nil and activeCount ~= false then
-    refill = refill - activeCount
+-- If we have limited capacity, reduce refill by ready to prevent over-filling
+-- Put differently: Assume items in the ready queue are as good as running
+if constraintCapacity > 0 then
+  -- Note: This is _not_ the active count, but instead only counts items in the ready set!
+  local readyCount = redis.call("ZCARD", keyReadySet)
+  if readyCount ~= nil and readyCount ~= false then
+    -- If we have capacity constraints, we must subtract the number of items
+    -- in the ready queue from the number of items to refill, otherwise
+    -- we would ignore items not yet running but ready to start at any moment.
+    refill = refill - readyCount
   end
+end
 
-  -- If we are constrained, reduce refill to max allowed capacity
-  if constraintCapacity < refill then
-    -- Most limiting status will be kept
-    refill = constraintCapacity
-  else
-    -- Reset status as we're not limited
-    status = 0
-  end
+-- If we are constrained, reduce refill to max allowed capacity
+if constraintCapacity < refill then
+  -- Most limiting status will be kept
+  refill = constraintCapacity
+else
+  -- Reset status as we're not limited
+  status = 0
 end
 
 --
@@ -204,19 +250,9 @@ local minScores = redis.call("ZRANGE", keyBacklogSet, "-inf", "+inf", "BYSCORE",
 
 -- If backlog is empty, update dangling pointers in shadow partition
 if minScores == nil or minScores == false or minScores[2] == nil then
-  redis.call("ZREM", keyShadowPartitionSet, backlogID)
+  cleanupBacklogPointer()
 
-  -- If shadow partition has no more backlogs, update global/account pointers
-  if tonumber(redis.call("ZCARD", keyShadowPartitionSet)) == 0 then
-    redis.call("ZREM", keyGlobalShadowPartitionSet, partitionID)
-    redis.call("ZREM", keyAccountShadowPartitionSet, partitionID)
-
-    if tonumber(redis.call("ZCARD", keyAccountShadowPartitionSet)) == 0 then
-      redis.call("ZREM", keyGlobalAccountShadowPartitionSet, accountID)
-    end
-  end
-
-  return {status,refilled,backlogCount,constraintCapacity,refill}
+  return { status, refilled, backlogCount, constraintCapacity, refill }
 end
 
 local earliestScoreBacklog = tonumber(minScores[2])
@@ -238,4 +274,4 @@ if earliestScoreBacklog < earliestScoreShadowPartition then
   update_account_shadow_queues(keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, partitionID, accountID, updateTo)
 end
 
-return {status,refilled,backlogCount,constraintCapacity,refill}
+return { status, refilled, backlogCount, constraintCapacity, refill }
