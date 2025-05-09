@@ -36,9 +36,6 @@ local function gcraUpdate(key, now_ms, period_ms, limit, burst, capacity)
   -- calculate emission interval (tau) - time between each token
   local emission = period_ms / math.max(limit, 1)
 
-  -- calculate total capacity in time units
-  local total_capacity_time = emission * (limit + burst)
-
   -- retrieve theoretical arrival time
   local tat = redis.call("GET", key)
   if not tat then
