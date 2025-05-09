@@ -4,14 +4,21 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
-	osqueue "github.com/inngest/inngest/pkg/execution/queue"
-	"github.com/oklog/ulid/v2"
-	"golang.org/x/sync/errgroup"
 	"log/slog"
 	"math"
 	"time"
 
+	osqueue "github.com/inngest/inngest/pkg/execution/queue"
+	"github.com/oklog/ulid/v2"
+	"github.com/redis/rueidis"
+	"golang.org/x/sync/errgroup"
+
 	"github.com/inngest/inngest/pkg/logger"
+)
+
+var (
+	errBacklogNormalizationLeaseExpired     = fmt.Errorf("backlog normalization lease expired")
+	errBacklogAlreadyLeasedForNormalization = fmt.Errorf("backlog already leased for normalization")
 )
 
 // backlogNormalizationWorker runs a blocking process that listens to item being pushed into the normalization partition. This allows us to process individual
@@ -147,17 +154,29 @@ func (q *queue) leaseBacklogForNormalization(ctx context.Context, bl *QueueBackl
 		return fmt.Errorf("could not generate leaseID: %w", err)
 	}
 
-	_ = leaseID
+	shard := q.primaryQueueShard
 
-	// TODO Run script
+	rc := shard.RedisClient.Client()
+	cmd := rc.B().
+		Set().
+		Key(shard.RedisClient.kg.BacklogNormalizationLease(bl.BacklogID)).
+		Value(leaseID.String()).
+		Nx().
+		Get().
+		Exat(leaseExpiry).
+		Build()
 
-	return fmt.Errorf("not implemented")
+	_, err = rc.Do(ctx, cmd).ToString()
+	if err == rueidis.Nil {
+		// successfully leased since prior value was nil
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+
+	return errBacklogAlreadyLeasedForNormalization
 }
-
-var (
-	errBacklogNormalizationLeaseExpired     = fmt.Errorf("backlog normalization lease expired")
-	errBacklogAlreadyLeasedForNormalization = fmt.Errorf("backlog already leased for normalization")
-)
 
 func (q *queue) extendBacklogNormalizationLease(ctx context.Context, now time.Time, bl *QueueBacklog) error {
 	leaseExpiry := now.Add(BacklogNormalizeLeaseDuration)
@@ -166,10 +185,27 @@ func (q *queue) extendBacklogNormalizationLease(ctx context.Context, now time.Ti
 		return fmt.Errorf("could not generate newLeaseID: %w", err)
 	}
 
-	_ = newLeaseID
+	shard := q.primaryQueueShard
 
-	// TODO Run script
+	rc := shard.RedisClient.Client()
+	cmd := rc.B().
+		Set().
+		Key(shard.RedisClient.kg.BacklogNormalizationLease(bl.BacklogID)).
+		Value(newLeaseID.String()).
+		Xx().
+		Get().
+		Exat(leaseExpiry).
+		Build()
 
+	_, err = rc.Do(ctx, cmd).ToAny()
+	if err == rueidis.Nil {
+		return errBacklogNormalizationLeaseExpired
+	}
+	if err != nil {
+		return err
+	}
+
+	// successfully extended lease
 	return nil
 }
 
@@ -179,7 +215,30 @@ func (q *queue) extendBacklogNormalizationLease(ctx context.Context, now time.Ti
 func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog) error {
 	l := logger.StdlibLogger(ctx).With("backlog", backlog)
 
-	// TODO: extend the lease
+	// TODO: metrics
+
+	// extend the lease
+	extendLeaseCtx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	go func() {
+		for {
+			select {
+			case <-extendLeaseCtx.Done():
+				return
+			case <-time.Tick(BacklogNormalizeLeaseDuration / 2):
+				if err := q.extendBacklogNormalizationLease(ctx, q.clock.Now(), backlog); err != nil {
+					switch err {
+					// can't extend since it's already expired
+					case errBacklogNormalizationLeaseExpired:
+						return
+					}
+					l.Error("error extending backlog normalization lease", "error", err, "backlog", backlog)
+					return
+				}
+			}
+		}
+	}()
 
 	shard := q.primaryQueueShard
 	var processed int64

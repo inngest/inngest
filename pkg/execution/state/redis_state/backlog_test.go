@@ -3,6 +3,9 @@ package redis_state
 import (
 	"context"
 	"fmt"
+	"strconv"
+	"testing"
+
 	"github.com/alicebob/miniredis/v2"
 	"github.com/cespare/xxhash/v2"
 	"github.com/google/uuid"
@@ -13,8 +16,6 @@ import (
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/redis/rueidis"
 	"github.com/stretchr/testify/require"
-	"strconv"
-	"testing"
 )
 
 func TestQueueItemBacklogs(t *testing.T) {

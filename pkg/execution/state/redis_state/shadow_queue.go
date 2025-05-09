@@ -19,7 +19,6 @@ import (
 
 // shadowWorker runs a blocking process that listens to item being pushed into the
 // shadow queue partition channel. This allows us to process an individual shadow partition.
-// TODO: replace channel type with QueueShadowPartition struct once available
 func (q *queue) shadowWorker(ctx context.Context, qspc chan *QueueShadowPartition) {
 	l := logger.StdlibLogger(ctx)
 
