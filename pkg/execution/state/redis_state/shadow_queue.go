@@ -134,8 +134,11 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 			// is not being normalized right now as it wouldn't be picked up
 			// by the shadow scanner otherwise.
 			if !shouldNormalizeAsync {
-				err = q.normalizeBacklog(ctx, backlog)
-				if err != nil {
+				if err := q.leaseBacklogForNormalization(ctx, backlog); err != nil {
+					return err
+				}
+
+				if err := q.normalizeBacklog(ctx, backlog); err != nil {
 					return fmt.Errorf("could not normalize backlog: %w", err)
 				}
 			}
@@ -209,7 +212,7 @@ func (q *queue) scanShadowContinuations(ctx context.Context) error {
 
 			if err := q.processShadowPartition(ctx, p, cont.count); err != nil {
 				if !errors.Is(err, context.Canceled) {
-					q.logger.Error().Err(err).Msg("error processing shadow partition")
+					q.log.Error("error processing shadow partition", "error", err)
 				}
 				return err
 			}
