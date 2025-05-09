@@ -112,8 +112,6 @@ func (q *queue) iterateNormalizationPartition(ctx context.Context, until time.Ti
 		return fmt.Errorf("failed to scan and normalize backlogs for accounts: %w", err)
 	}
 
-	// TODO: counter metric for scanned backlogs in normalization partition
-
 	return nil
 }
 

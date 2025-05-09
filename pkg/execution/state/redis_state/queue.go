@@ -580,11 +580,16 @@ func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 		backlogRefillLimit:    BacklogRefillHardLimit,
 		backlogNormalizeLimit: defaultBacklogNormalizeLimit,
 		runMode: QueueRunMode{
-			Sequential:    true,
-			Scavenger:     true,
-			Partition:     true,
-			Account:       true,
-			AccountWeight: 85,
+			Sequential:                        true,
+			Scavenger:                         true,
+			Partition:                         true,
+			Account:                           true,
+			AccountWeight:                     85,
+			ShadowPartition:                   true,
+			AccountShadowPartition:            true,
+			AccountShadowPartitionWeight:      85,
+			NormalizePartition:                true,
+			ShadowContinuationSkipProbability: consts.QueueContinuationSkipProbability,
 		},
 		numWorkers:                     defaultNumWorkers,
 		numShadowWorkers:               defaultNumShadowWorkers,
@@ -847,6 +852,9 @@ type QueueRunMode struct {
 
 	// ShadowContinuations enables shadow continuations
 	ShadowContinuations bool
+
+	// ShadowContinuationSkipProbability represents the probability to skip continuations (defaults to 0.2)
+	ShadowContinuationSkipProbability float64
 
 	// NormalizePartition enables the processing of partitions for normalization
 	NormalizePartition bool
@@ -2878,11 +2886,19 @@ func (q *queue) ShadowPartitionLease(ctx context.Context, sp *QueueShadowPartiti
 	}
 }
 
-func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueShadowPartition, refillUntil time.Time) (enums.QueueConstraint, int, error) {
+type BacklogRefillResult struct {
+	Constraint        enums.QueueConstraint
+	Refilled          int
+	TotalBacklogCount int
+	Capacity          int
+	Refill            int
+}
+
+func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueShadowPartition, refillUntil time.Time) (*BacklogRefillResult, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "BacklogRefill"), redis_telemetry.ScopeQueue)
 
 	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
-		return enums.QueueConstraintNotLimited, 0, fmt.Errorf("unsupported queue shard kind for BacklogRefill: %s", q.primaryQueueShard.Kind)
+		return nil, fmt.Errorf("unsupported queue shard kind for BacklogRefill: %s", q.primaryQueueShard.Kind)
 	}
 
 	accountID := uuid.Nil
@@ -2950,7 +2966,7 @@ func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueSha
 		throttlePeriod,
 	})
 	if err != nil {
-		return enums.QueueConstraintNotLimited, 0, fmt.Errorf("could not serialize args: %w", err)
+		return nil, fmt.Errorf("could not serialize args: %w", err)
 	}
 
 	res, err := scripts["queue/backlogRefill"].Exec(
@@ -2960,39 +2976,90 @@ func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueSha
 		args,
 	).ToAny()
 	if err != nil {
-		return enums.QueueConstraintNotLimited, 0, fmt.Errorf("error refilling backlog: %w", err)
+		return nil, fmt.Errorf("error refilling backlog: %w", err)
 	}
 
-	statusCountTuple, ok := res.([]any)
-	if !ok || len(statusCountTuple) != 2 {
-		return enums.QueueConstraintNotLimited, 0, fmt.Errorf("expected return tuple to include status and refill count")
+	returnTuple, ok := res.([]any)
+	if !ok || len(returnTuple) != 5 {
+		return nil, fmt.Errorf("expected return tuple to include four items")
 	}
 
-	status, ok := statusCountTuple[0].(int64)
+	status, ok := returnTuple[0].(int64)
 	if !ok {
-		return enums.QueueConstraintNotLimited, 0, fmt.Errorf("missing status in status-count tuple")
+		return nil, fmt.Errorf("missing status in returned tuple")
 	}
 
-	refillCount, ok := statusCountTuple[1].(int64)
+	refillCount, ok := returnTuple[1].(int64)
 	if !ok {
-		return enums.QueueConstraintNotLimited, 0, fmt.Errorf("missing refillCount in status-count tuple")
+		return nil, fmt.Errorf("missing refillCount in returned tuple")
+	}
+
+	backlogCount, ok := returnTuple[2].(int64)
+	if !ok {
+		return nil, fmt.Errorf("missing backlogCount in returned tuple")
+	}
+
+	capacity, ok := returnTuple[3].(int64)
+	if !ok {
+		return nil, fmt.Errorf("missing capacity in returned tuple")
+	}
+
+	refill, ok := returnTuple[4].(int64)
+	if !ok {
+		return nil, fmt.Errorf("missing refill in returned tuple")
 	}
 
 	switch status {
 	case 0:
-		return enums.QueueConstraintNotLimited, int(refillCount), nil
+		return &BacklogRefillResult{
+			Constraint:        enums.QueueConstraintNotLimited,
+			Refilled:          int(refillCount),
+			TotalBacklogCount: int(backlogCount),
+			Capacity:          int(capacity),
+			Refill:            int(refill),
+		}, nil
 	case 1:
-		return enums.QueueConstraintAccountConcurrency, int(refillCount), nil
+		return &BacklogRefillResult{
+			Constraint:        enums.QueueConstraintAccountConcurrency,
+			Refilled:          int(refillCount),
+			TotalBacklogCount: int(backlogCount),
+			Capacity:          int(capacity),
+			Refill:            int(refill),
+		}, nil
 	case 2:
-		return enums.QueueConstraintFunctionConcurrency, int(refillCount), nil
+		return &BacklogRefillResult{
+			Constraint:        enums.QueueConstraintFunctionConcurrency,
+			Refilled:          int(refillCount),
+			TotalBacklogCount: int(backlogCount),
+			Capacity:          int(capacity),
+			Refill:            int(refill),
+		}, nil
 	case 3:
-		return enums.QueueConstraintCustomConcurrencyKey1, int(refillCount), nil
+		return &BacklogRefillResult{
+			Constraint:        enums.QueueConstraintCustomConcurrencyKey1,
+			Refilled:          int(refillCount),
+			TotalBacklogCount: int(backlogCount),
+			Capacity:          int(capacity),
+			Refill:            int(refill),
+		}, nil
 	case 4:
-		return enums.QueueConstraintCustomConcurrencyKey2, int(refillCount), nil
+		return &BacklogRefillResult{
+			Constraint:        enums.QueueConstraintCustomConcurrencyKey2,
+			Refilled:          int(refillCount),
+			TotalBacklogCount: int(backlogCount),
+			Capacity:          int(capacity),
+			Refill:            int(refill),
+		}, nil
 	case 5:
-		return enums.QueueConstraintThrottle, int(refillCount), nil
+		return &BacklogRefillResult{
+			Constraint:        enums.QueueConstraintThrottle,
+			Refilled:          int(refillCount),
+			TotalBacklogCount: int(backlogCount),
+			Capacity:          int(capacity),
+			Refill:            int(refill),
+		}, nil
 	default:
-		return enums.QueueConstraintNotLimited, 0, fmt.Errorf("unknown status refilling backlog: %v (%T)", status, status)
+		return nil, fmt.Errorf("unknown status refilling backlog: %v (%T)", status, status)
 	}
 }
 
