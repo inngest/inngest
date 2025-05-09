@@ -4,17 +4,19 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
+	"math/rand"
+	"sync"
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
+	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
 	"golang.org/x/sync/errgroup"
-	"math"
-	"math/rand"
-	"sync"
-	"time"
 )
 
 const (
@@ -109,8 +111,10 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 		return fmt.Errorf("could not peek backlogs for shadow partition: %w", err)
 	}
 
-	// Sequentially refill backlogs
-	for _, backlog := range backlogs {
+	// Refill backlogs in random order
+	for _, idx := range util.RandPerm(len(backlogs)) {
+		backlog := backlogs[idx]
+
 		// May need to normalize - this will not happen for default backlogs
 		if backlog.isOutdated(shadowPart) {
 			// Prepare normalization, this will just run once as the shadow scanner
