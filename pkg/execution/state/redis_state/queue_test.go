@@ -7294,6 +7294,129 @@ func TestQueueBacklogPrepareNormalize(t *testing.T) {
 	})
 }
 
+func TestBacklogNormalizationLease(t *testing.T) {
+	ctx := context.Background()
+
+	_, rc := initRedis(t)
+	defer rc.Close()
+
+	defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+	clock := clockwork.NewFakeClock()
+
+	enqueueToBacklog := false
+	q := NewQueue(
+		defaultShard,
+		WithClock(clock),
+		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+			return enqueueToBacklog
+		}),
+		WithAllowSystemKeyQueues(func(ctx context.Context) bool {
+			return enqueueToBacklog
+		}),
+		WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
+			return true
+		}),
+		WithDisableSystemQueueLeaseChecks(func(ctx context.Context) bool {
+			return true
+		}),
+	)
+
+	fnID, accountID, envID := uuid.New(), uuid.New(), uuid.New()
+	shadowPart := &QueueShadowPartition{
+		PartitionID: fnID.String(),
+		LeaseID:     nil,
+		FunctionID:  &fnID,
+		EnvID:       &envID,
+		AccountID:   &accountID,
+		PauseRefill: false,
+	}
+
+	backlog := &QueueBacklog{
+		BacklogID:         "yolo",
+		ShadowPartitionID: shadowPart.PartitionID,
+		Throttle: &BacklogThrottle{
+			ThrottleKey:               "something",
+			ThrottleKeyRawValue:       "somethingelse",
+			ThrottleKeyExpressionHash: "hash",
+		},
+	}
+
+	// should lease successfully
+	err := q.leaseBacklogForNormalization(ctx, backlog)
+	require.NoError(t, err)
+
+	// another attempt should fail
+	err = q.leaseBacklogForNormalization(ctx, backlog)
+	require.ErrorIs(t, err, errBacklogAlreadyLeasedForNormalization)
+}
+
+func TestExtendBacklogNormalizationLease(t *testing.T) {
+	ctx := context.Background()
+
+	r, rc := initRedis(t)
+	defer rc.Close()
+
+	defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+	clock := clockwork.NewFakeClock()
+
+	enqueueToBacklog := false
+	q := NewQueue(
+		defaultShard,
+		WithClock(clock),
+		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+			return enqueueToBacklog
+		}),
+		WithAllowSystemKeyQueues(func(ctx context.Context) bool {
+			return enqueueToBacklog
+		}),
+		WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
+			return true
+		}),
+		WithDisableSystemQueueLeaseChecks(func(ctx context.Context) bool {
+			return true
+		}),
+	)
+
+	fnID, accountID, envID := uuid.New(), uuid.New(), uuid.New()
+	shadowPart := &QueueShadowPartition{
+		PartitionID: fnID.String(),
+		LeaseID:     nil,
+		FunctionID:  &fnID,
+		EnvID:       &envID,
+		AccountID:   &accountID,
+		PauseRefill: false,
+	}
+
+	backlog := &QueueBacklog{
+		BacklogID:         "yolo",
+		ShadowPartitionID: shadowPart.PartitionID,
+		Throttle: &BacklogThrottle{
+			ThrottleKey:               "something",
+			ThrottleKeyRawValue:       "somethingelse",
+			ThrottleKeyExpressionHash: "hash",
+		},
+	}
+
+	// attempt to extend without a lease will fail
+	err := q.extendBacklogNormalizationLease(ctx, clock.Now(), backlog)
+	require.ErrorIs(t, err, errBacklogNormalizationLeaseExpired)
+
+	// lease the backlog first
+	err = q.leaseBacklogForNormalization(ctx, backlog)
+	require.NoError(t, err)
+
+	// should succeed
+	err = q.extendBacklogNormalizationLease(ctx, clock.Now(), backlog)
+	require.NoError(t, err)
+
+	clock.Advance(2 * BacklogNormalizeLeaseDuration)
+	r.FastForward(2 * BacklogNormalizeLeaseDuration)
+
+	// expect lease to be expired again
+	err = q.extendBacklogNormalizationLease(ctx, clock.Now(), backlog)
+	require.ErrorIs(t, err, errBacklogNormalizationLeaseExpired)
+}
+
 func score(t *testing.T, r *miniredis.Miniredis, key string, member string) float64 {
 	require.True(t, r.Exists(key), r.Keys())
 
@@ -7317,4 +7440,14 @@ func hasMember(t *testing.T, r *miniredis.Miniredis, key string, member string) 
 		}
 	}
 	return false
+}
+
+func initRedis(t *testing.T) (*miniredis.Miniredis, rueidis.Client) {
+	r := miniredis.RunT(t)
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	return r, rc
 }
