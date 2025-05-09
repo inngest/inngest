@@ -18,7 +18,6 @@ import (
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
-	"golang.org/x/sync/errgroup"
 )
 
 const (
@@ -30,7 +29,7 @@ const (
 
 // shadowWorker runs a blocking process that listens to item being pushed into the
 // shadow queue partition channel. This allows us to process an individual shadow partition.
-func (q *queue) shadowWorker(ctx context.Context, qspc chan *QueueShadowPartition) {
+func (q *queue) shadowWorker(ctx context.Context, qspc chan shadowPartitionChanMsg) {
 	l := logger.StdlibLogger(ctx)
 
 	for {
@@ -38,10 +37,10 @@ func (q *queue) shadowWorker(ctx context.Context, qspc chan *QueueShadowPartitio
 		case <-ctx.Done():
 			return
 
-		case shadowPart := <-qspc:
-			err := q.processShadowPartition(ctx, shadowPart, 0)
+		case msg := <-qspc:
+			err := q.processShadowPartition(ctx, msg.sp, msg.continuationCount)
 			if err != nil {
-				l.Error("could not scan shadow partition", "error", err, "shadow_part", shadowPart)
+				l.Error("could not scan shadow partition", "error", err, "shadow_part", msg.sp, "continuation_count", msg.continuationCount)
 			}
 		}
 	}
@@ -114,6 +113,7 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 	}
 
 	// Refill backlogs in random order
+	fullyProcessedBacklogs := 0
 	for _, idx := range util.RandPerm(len(backlogs)) {
 		backlog := backlogs[idx]
 
@@ -151,13 +151,13 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 			continue
 		}
 
-		status, _, err := q.BacklogRefill(ctx, backlog, shadowPart, refillUntil)
+		res, err := q.BacklogRefill(ctx, backlog, shadowPart, refillUntil)
 		if err != nil {
 			return fmt.Errorf("could not refill backlog: %w", err)
 		}
 
 		// If backlog is limited by function or account-level concurrency, stop refilling
-		if status == enums.QueueConstraintAccountConcurrency || status == enums.QueueConstraintFunctionConcurrency {
+		if res.Constraint == enums.QueueConstraintAccountConcurrency || res.Constraint == enums.QueueConstraintFunctionConcurrency {
 			q.removeShadowContinue(ctx, shadowPart, false)
 
 			forceRequeueAt := q.clock.Now().Add(ShadowPartitionRefillCapacityReachedRequeueExtension)
@@ -168,9 +168,14 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 
 			return nil
 		}
+
+		remainingItems := res.TotalBacklogCount - res.Refilled
+		if remainingItems == 0 {
+			fullyProcessedBacklogs++
+		}
 	}
 
-	hasMoreBacklogs := int(totalCount) > len(backlogs)
+	hasMoreBacklogs := totalCount > fullyProcessedBacklogs
 	if !hasMoreBacklogs {
 		// No more backlogs right now, we can continue the scan loop until new items are added
 		q.removeShadowContinue(ctx, shadowPart, false)
@@ -179,10 +184,12 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 		if err != nil {
 			return fmt.Errorf("could not requeue shadow partition: %w", err)
 		}
+
+		return nil
 	}
 
 	// More backlogs, we can add a continuation
-	q.addShadowContinue(ctx, shadowPart, continuationCount)
+	q.addShadowContinue(ctx, shadowPart, continuationCount+1)
 
 	// Clear out current lease
 	err = q.ShadowPartitionRequeue(ctx, shadowPart, *leaseID, nil)
@@ -193,45 +200,35 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 	return nil
 }
 
-func (q *queue) scanShadowContinuations(ctx context.Context) error {
-	if !q.runMode.ShadowContinuations {
-		// continuations are not enabled.
-		return nil
-	}
+type shadowPartitionChanMsg struct {
+	sp                *QueueShadowPartition
+	continuationCount uint
+}
 
-	// Have some chance of skipping continuations in this iteration.
-	if mrand.Float64() <= consts.QueueContinuationSkipProbability {
-		return nil
-	}
-
-	eg := errgroup.Group{}
-
+func (q *queue) scanShadowContinuations(ctx context.Context, qspc chan shadowPartitionChanMsg) error {
 	q.shadowContinuesLock.Lock()
 	defer q.shadowContinuesLock.Unlock()
 
 	// If we have continued partitions, process those immediately.
 	for _, c := range q.shadowContinues {
-		cont := c
-		eg.Go(func() error {
-			p := cont.shadowPart
-
-			if err := q.processShadowPartition(ctx, p, cont.count); err != nil {
-				if !errors.Is(err, context.Canceled) {
-					q.log.Error("error processing shadow partition", "error", err)
-				}
-				return err
-			}
-
-			return nil
-		})
+		qspc <- shadowPartitionChanMsg{
+			sp:                c.shadowPart,
+			continuationCount: c.count,
+		}
 	}
-	return eg.Wait()
+
+	return nil
 }
 
-func (q *queue) scanShadowPartitions(ctx context.Context, until time.Time, qspc chan *QueueShadowPartition) error {
-	// If there are shadow continuations, process those immediately.
-	if err := q.scanShadowContinuations(ctx); err != nil {
-		return fmt.Errorf("error scanning shadow continuations: %w", err)
+func (q *queue) scanShadowPartitions(ctx context.Context, until time.Time, qspc chan shadowPartitionChanMsg) error {
+	// check whether continuations are enabled and apply chance of skipping continuations in this iteration
+	if q.runMode.ShadowContinuations && mrand.Float64() > q.runMode.ShadowContinuationSkipProbability {
+		// If there are shadow continuations, process those immediately.
+		if err := q.scanShadowContinuations(ctx, qspc); err != nil {
+			return fmt.Errorf("error scanning shadow continuations: %w", err)
+		}
+
+		return nil
 	}
 
 	// TODO introduce weight probability to blend account/global scanning
@@ -270,7 +267,10 @@ func (q *queue) scanShadowPartitions(ctx context.Context, until time.Time, qspc 
 				}
 
 				for _, part := range parts {
-					qspc <- part
+					qspc <- shadowPartitionChanMsg{
+						sp:                part,
+						continuationCount: 0,
+					}
 				}
 			}(account)
 		}
@@ -288,7 +288,10 @@ func (q *queue) scanShadowPartitions(ctx context.Context, until time.Time, qspc 
 	}
 
 	for _, part := range parts {
-		qspc <- part
+		qspc <- shadowPartitionChanMsg{
+			sp:                part,
+			continuationCount: 0,
+		}
 	}
 
 	return nil
@@ -298,7 +301,7 @@ func (q *queue) scanShadowPartitions(ctx context.Context, until time.Time, qspc 
 // to the function partition for processing
 func (q *queue) shadowScan(ctx context.Context) error {
 	l := logger.StdlibLogger(ctx)
-	qspc := make(chan *QueueShadowPartition)
+	qspc := make(chan shadowPartitionChanMsg)
 
 	for i := int32(0); i < q.numShadowWorkers; i++ {
 		go q.shadowWorker(ctx, qspc)

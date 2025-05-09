@@ -6,7 +6,7 @@
   backlogRefill will always attempt to move queue items from backlogs into ready queues up to
   hitting concurrency.
 
-  Returns a tuple of {status, items_refilled}
+  Returns a tuple of {status, items_refilled, total_items, capacity, refill}
 
   Status values:
 
@@ -58,76 +58,87 @@ local throttlePeriod = tonumber(ARGV[14])
 -- $include(update_account_queues.lua)
 -- $include(gcra.lua)
 
--- Start with full capacity: max(number of items in the backlog, hard limit, e.g. 100)
-local capacity = 0
+local refill = 0
 
 local backlogCount = redis.call("ZCOUNT", keyBacklogSet, "-inf", refillUntilMS)
 if backlogCount ~= false and backlogCount ~= nil then
-  capacity = backlogCount
+  refill = backlogCount
 end
 
 if backlogCount > refillLimit then
-  capacity = refillLimit
+  refill = refillLimit
 end
 
 --
 -- Check constraints and adjust capacity
 --
 
+-- Initialize capacity as nil, which represents unlimited
+local constraintCapacity = nil
+
 -- Set initial status to success, progressively add more specific capacity constraints
 local status = 0
 
-if capacity > 0 and throttleLimit > 0 then
+if (constraintCapacity == nil or constraintCapacity > 0) and throttleLimit > 0 then
   -- TODO Implement and test this scenario
   local remainingThrottleCapacity = gcraCapacity(throttleKey, nowMS, throttlePeriod * 1000, throttleLimit, throttleBurst)
-  if remainingThrottleCapacity < capacity then
-    capacity = remainingThrottleCapacity
+  if constraintCapacity == nil or remainingThrottleCapacity < constraintCapacity then
+    constraintCapacity = remainingThrottleCapacity
     status = 5
   end
 end
 
-if capacity > 0 and exists_without_ending(keyCustomConcurrencyKey2, ":-") == true and customConcurrencyKey2 > 0 then
+if (constraintCapacity == nil or constraintCapacity > 0) and exists_without_ending(keyCustomConcurrencyKey2, ":-") == true and customConcurrencyKey2 > 0 then
   local remainingCustomConcurrencyCapacityKey2 = check_concurrency(nowMS, keyCustomConcurrencyKey2, customConcurrencyKey2)
-  if remainingCustomConcurrencyCapacityKey2 < capacity then
+  if constraintCapacity == nil or remainingCustomConcurrencyCapacityKey2 < constraintCapacity then
     -- Custom concurrency key 2 imposes limits
-    capacity = remainingCustomConcurrencyCapacityKey2
+    constraintCapacity = remainingCustomConcurrencyCapacityKey2
     status = 4
   end
 end
 
-if capacity > 0 and exists_without_ending(keyCustomConcurrencyKey1, ":-") == true and customConcurrencyKey1 > 0 then
+if (constraintCapacity == nil or constraintCapacity > 0) and exists_without_ending(keyCustomConcurrencyKey1, ":-") == true and customConcurrencyKey1 > 0 then
   local remainingCustomConcurrencyCapacityKey1 = check_concurrency(nowMS, keyCustomConcurrencyKey1, customConcurrencyKey1)
-  if remainingCustomConcurrencyCapacityKey1 < capacity then
+  if constraintCapacity == nil or remainingCustomConcurrencyCapacityKey1 < constraintCapacity then
     -- Custom concurrency key 1 imposes limits
-    capacity = remainingCustomConcurrencyCapacityKey1
+    constraintCapacity = remainingCustomConcurrencyCapacityKey1
     status = 3
   end
 end
 
-if capacity > 0 and exists_without_ending(keyConcurrencyFn, ":-") == true and concurrencyFn > 0 then
+if (constraintCapacity == nil or constraintCapacity > 0) and exists_without_ending(keyConcurrencyFn, ":-") == true and concurrencyFn > 0 then
   local remainingFunctionCapacity = check_concurrency(nowMS, keyConcurrencyFn, concurrencyFn)
-  if remainingFunctionCapacity < capacity then
+  if constraintCapacity == nil or remainingFunctionCapacity < constraintCapacity then
     -- Function concurrency imposes limits
-    capacity = remainingFunctionCapacity
+    constraintCapacity = remainingFunctionCapacity
     status = 2
   end
 end
 
-if capacity > 0 and exists_without_ending(keyConcurrencyAccount, ":-") == true and concurrencyAcct > 0 then
+if (constraintCapacity == nil or constraintCapacity > 0) and exists_without_ending(keyConcurrencyAccount, ":-") == true and concurrencyAcct > 0 then
   local remainingAccountCapacity = check_concurrency(nowMS, keyConcurrencyAccount, concurrencyAcct)
 
-  if remainingAccountCapacity < capacity then
+  if constraintCapacity == nil or remainingAccountCapacity < constraintCapacity then
     -- Account concurrency imposes limits
-    capacity = remainingAccountCapacity
+    constraintCapacity = remainingAccountCapacity
     status = 1
   end
 end
 
--- If we have capacity, reduce by active (ready + in progress count) to prevent over-filling
-if capacity > 0 then
+-- If we have limited capacity, reduce refill by active (ready + in progress count) to prevent over-filling
+if constraintCapacity ~= nil then
   local activeCount = redis.call("GET", keyActiveCounter)
   if activeCount ~= nil and activeCount ~= false then
-    capacity = capacity - activeCount
+    refill = refill - activeCount
+  end
+
+  -- If we are constrained, reduce refill to max allowed capacity
+  if constraintCapacity < refill then
+    -- Most limiting status will be kept
+    refill = constraintCapacity
+  else
+    -- Reset status as we're not limited
+    status = 0
   end
 end
 
@@ -138,10 +149,10 @@ end
 local refilled = 0
 
 -- Only attempt to refill if we have capacity
-if capacity > 0 then
+if refill > 0 then
   -- Move item(s) out of backlog and into partition
 
-  local items = redis.call("ZRANGE", keyBacklogSet, "-inf", refillUntilMS, "BYSCORE", "LIMIT", 0, capacity, "WITHSCORES")
+  local items = redis.call("ZRANGE", keyBacklogSet, "-inf", refillUntilMS, "BYSCORE", "LIMIT", 0, refill, "WITHSCORES")
 
   local potentiallyMissingQueueItems = redis.call("HMGET", keyQueueItemHash, unpack(items))
 
@@ -181,7 +192,7 @@ end
 
 -- update gcra theoretical arrival time
 if throttleLimit > 0 then
-  gcraUpdate(throttleKey, nowMS, throttlePeriod * 1000, throttleLimit, throttleBurst, capacity)
+  gcraUpdate(throttleKey, nowMS, throttlePeriod * 1000, throttleLimit, throttleBurst, refill)
 end
 
 --
@@ -205,7 +216,7 @@ if minScores == nil or minScores == false or minScores[2] == nil then
     end
   end
 
-  return {status,refilled}
+  return {status,refilled,backlogCount,constraintCapacity,refill}
 end
 
 local earliestScoreBacklog = tonumber(minScores[2])
@@ -227,4 +238,4 @@ if earliestScoreBacklog < earliestScoreShadowPartition then
   update_account_shadow_queues(keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, partitionID, accountID, updateTo)
 end
 
-return {status,refilled}
+return {status,refilled,backlogCount,constraintCapacity,refill}
