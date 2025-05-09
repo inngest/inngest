@@ -166,19 +166,6 @@ if (constraintCapacity == nil or constraintCapacity > 0) and exists_without_endi
   end
 end
 
--- If we have limited capacity, reduce refill by ready to prevent over-filling
--- Put differently: Assume items in the ready queue are as good as running
-if constraintCapacity > 0 then
-  -- Note: This is _not_ the active count, but instead only counts items in the ready set!
-  local readyCount = redis.call("ZCARD", keyReadySet)
-  if readyCount ~= nil and readyCount ~= false then
-    -- If we have capacity constraints, we must subtract the number of items
-    -- in the ready queue from the number of items to refill, otherwise
-    -- we would ignore items not yet running but ready to start at any moment.
-    refill = refill - readyCount
-  end
-end
-
 if constraintCapacity > 0 then
   -- Reset status as we're not limited
   status = 0
@@ -188,6 +175,20 @@ end
 if constraintCapacity < refill then
   -- Most limiting status will be kept
   refill = constraintCapacity
+end
+
+-- If we have limited capacity, reduce refill by ready to prevent over-filling
+-- Put differently: Assume items in the ready queue are as good as running
+if constraintCapacity > 0 then
+  -- Note: This is _not_ the active count, but instead only counts items in the ready set!
+  -- TODO: Using a ZCARD would be better _but_ this would include pre-key-queue sleeping items
+  local readyCount = redis.call("ZCOUNT", keyReadySet, "-inf", "+inf")
+  if readyCount ~= nil and readyCount ~= false and refill + readyCount > constraintCapacity then
+    -- If we have capacity constraints, we must subtract the number of items
+    -- in the ready queue from the number of items to refill, otherwise
+    -- we would ignore items not yet running but ready to start at any moment.
+    refill = refill - readyCount
+  end
 end
 
 --
