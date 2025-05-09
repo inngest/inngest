@@ -2610,9 +2610,9 @@ func (q *queue) Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		fnPartition.zsetKey(queueShard.RedisClient.kg),
 
 		keyConcurrencyFn,
-		keyConcurrencyAcct,
 		keyCustomConcurrency1,
 		keyCustomConcurrency2,
+		keyConcurrencyAcct,
 
 		queueShard.RedisClient.kg.Idempotency(i.ID),
 
