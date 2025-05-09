@@ -179,13 +179,15 @@ if constraintCapacity > 0 then
   end
 end
 
+if constraintCapacity > 0 then
+  -- Reset status as we're not limited
+  status = 0
+end
+
 -- If we are constrained, reduce refill to max allowed capacity
 if constraintCapacity < refill then
   -- Most limiting status will be kept
   refill = constraintCapacity
-else
-  -- Reset status as we're not limited
-  status = 0
 end
 
 --

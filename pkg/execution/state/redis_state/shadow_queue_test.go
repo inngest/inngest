@@ -786,3 +786,380 @@ func TestQueueShadowScannerContinuations(t *testing.T) {
 		q.shadowContinuesLock.Unlock()
 	})
 }
+
+func TestRefillConstraints(t *testing.T) {
+	fnID1, accountID1, envID1 := uuid.New(), uuid.New(), uuid.New()
+
+	type knobs struct {
+		maxRefill              int
+		danglingItemsInBacklog int
+
+		accountConcurrencyLimit  int
+		functionConcurrencyLimit int
+
+		throttle              *osqueue.Throttle
+		customConcurrencyKey1 *state.CustomConcurrency
+		customConcurrencyKey2 *state.CustomConcurrency
+		isStartItem           bool
+	}
+
+	type expected struct {
+		result BacklogRefillResult
+	}
+
+	type currentValues struct {
+		itemsInBacklog int
+
+		itemsInReadyQueue int
+
+		accountInProgress               int
+		functionInProgress              int
+		customConcurrencyKey1InProgress int
+		customConcurrencyKey2InProgress int
+
+		throttleCapacityUsed int
+	}
+
+	type tableTest struct {
+		name string
+
+		currentValues currentValues
+
+		knobs knobs
+
+		expected expected
+	}
+
+	ck1 := createConcurrencyKey(enums.ConcurrencyScopeFn, fnID1, "bruno", 5)
+	ck1.UnhashedEvaluatedKeyValue = "bruno"
+
+	ck2 := createConcurrencyKey(enums.ConcurrencyScopeEnv, envID1, "inngest", 10)
+	ck2.UnhashedEvaluatedKeyValue = "inngest"
+
+	tests := []tableTest{
+		{
+			name: "simple item",
+			currentValues: currentValues{
+				itemsInBacklog: 1,
+			},
+			knobs: knobs{
+				maxRefill:                1,
+				accountConcurrencyLimit:  20,
+				functionConcurrencyLimit: 10,
+			},
+			expected: expected{
+				result: BacklogRefillResult{
+					Constraint:        enums.QueueConstraintNotLimited,
+					TotalBacklogCount: 1,
+					Capacity:          10,
+					Refill:            1,
+					Refilled:          1,
+				},
+			},
+		},
+		// Function limits
+		{
+			name: "function limits disallow",
+			currentValues: currentValues{
+				itemsInBacklog:     40,
+				functionInProgress: 10,
+			},
+			knobs: knobs{
+				maxRefill:                50,
+				accountConcurrencyLimit:  20,
+				functionConcurrencyLimit: 10,
+			},
+			expected: expected{
+				result: BacklogRefillResult{
+					Constraint:        enums.QueueConstraintFunctionConcurrency,
+					TotalBacklogCount: 40,
+					Capacity:          0,
+					Refill:            0,
+					Refilled:          0,
+				},
+			},
+		},
+		{
+			name: "function limits allow",
+			currentValues: currentValues{
+				itemsInBacklog:     40,
+				functionInProgress: 9,
+			},
+			knobs: knobs{
+				maxRefill:                50,
+				accountConcurrencyLimit:  20,
+				functionConcurrencyLimit: 10,
+			},
+			expected: expected{
+				result: BacklogRefillResult{
+					Constraint:        enums.QueueConstraintNotLimited,
+					TotalBacklogCount: 40,
+					Capacity:          1,
+					Refill:            1,
+					Refilled:          1,
+				},
+			},
+		},
+		// Account limits
+		{
+			name: "account limits disallow",
+			currentValues: currentValues{
+				itemsInBacklog:    40,
+				accountInProgress: 20,
+			},
+			knobs: knobs{
+				maxRefill:                50,
+				accountConcurrencyLimit:  20,
+				functionConcurrencyLimit: 10,
+			},
+			expected: expected{
+				result: BacklogRefillResult{
+					Constraint:        enums.QueueConstraintAccountConcurrency,
+					TotalBacklogCount: 40,
+					Capacity:          0,
+					Refill:            0,
+					Refilled:          0,
+				},
+			},
+		},
+		{
+			name: "account limits allow",
+			currentValues: currentValues{
+				itemsInBacklog:    40,
+				accountInProgress: 19,
+			},
+			knobs: knobs{
+				maxRefill:                50,
+				accountConcurrencyLimit:  20,
+				functionConcurrencyLimit: 10,
+			},
+			expected: expected{
+				result: BacklogRefillResult{
+					Constraint:        enums.QueueConstraintNotLimited,
+					TotalBacklogCount: 40,
+					Capacity:          1,
+					Refill:            1,
+					Refilled:          1,
+				},
+			},
+		},
+		// Single custom concurrency key limits
+		{
+			name: "single custom concurrency key limits allow",
+			currentValues: currentValues{
+				itemsInBacklog:                  40,
+				accountInProgress:               20,
+				functionInProgress:              10,
+				customConcurrencyKey1InProgress: 5,
+			},
+			knobs: knobs{
+				maxRefill:                50,
+				accountConcurrencyLimit:  30,
+				functionConcurrencyLimit: 20,
+				customConcurrencyKey1:    &ck1,
+			},
+			expected: expected{
+				result: BacklogRefillResult{
+					Constraint:        enums.QueueConstraintNotLimited,
+					TotalBacklogCount: 40,
+					Capacity:          5,
+					Refill:            5,
+					Refilled:          5,
+				},
+			},
+		},
+		// Dual custom concurrency key limits
+		{
+			name: "dual custom concurrency key limits allow",
+			currentValues: currentValues{
+				itemsInBacklog:                  40,
+				accountInProgress:               20, // 20 out of 30
+				functionInProgress:              10, // 10 out of 20
+				customConcurrencyKey1InProgress: 2,  // 3 out of 5
+				customConcurrencyKey2InProgress: 8,  // 8 out of 10
+			},
+			knobs: knobs{
+				maxRefill:                50,
+				accountConcurrencyLimit:  30,
+				functionConcurrencyLimit: 20,
+				customConcurrencyKey1:    &ck1,
+				customConcurrencyKey2:    &ck2,
+			},
+			expected: expected{
+				result: BacklogRefillResult{
+					Constraint:        enums.QueueConstraintNotLimited,
+					TotalBacklogCount: 40,
+					Capacity:          2,
+					Refill:            2,
+					Refilled:          2,
+				},
+			},
+		},
+	}
+
+	for _, testCase := range tests {
+		t.Run(testCase.name, func(t *testing.T) {
+			r := miniredis.RunT(t)
+			rc, err := rueidis.NewClient(rueidis.ClientOption{
+				InitAddress:  []string{r.Addr()},
+				DisableCache: true,
+			})
+			require.NoError(t, err)
+			defer rc.Close()
+
+			ctx := context.Background()
+
+			defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+			kg := defaultShard.RedisClient.kg
+
+			clock := clockwork.NewFakeClock()
+
+			enqueueToBacklog := true
+			q := NewQueue(
+				defaultShard,
+				WithClock(clock),
+				WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+					return enqueueToBacklog
+				}),
+				WithAllowSystemKeyQueues(func(ctx context.Context) bool {
+					return enqueueToBacklog
+				}),
+				WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
+					return true
+				}),
+				WithDisableSystemQueueLeaseChecks(func(ctx context.Context) bool {
+					return true
+				}),
+				WithRunMode(QueueRunMode{
+					Sequential:                        true,
+					Scavenger:                         true,
+					Partition:                         true,
+					Account:                           true,
+					AccountWeight:                     85,
+					ShadowPartition:                   true,
+					AccountShadowPartition:            true,
+					AccountShadowPartitionWeight:      85,
+					ShadowContinuations:               true,
+					ShadowContinuationSkipProbability: 0,
+					NormalizePartition:                true,
+				}),
+				WithBacklogRefillLimit(int64(testCase.knobs.maxRefill)),
+				WithConcurrencyLimitGetter(func(ctx context.Context, p QueuePartition) PartitionConcurrencyLimits {
+					return PartitionConcurrencyLimits{
+						AccountLimit:   testCase.knobs.accountConcurrencyLimit,
+						FunctionLimit:  testCase.knobs.functionConcurrencyLimit,
+						CustomKeyLimit: 0,
+					}
+				}),
+				WithCustomConcurrencyKeyLimitRefresher(func(ctx context.Context, i osqueue.QueueItem) []state.CustomConcurrency {
+					return i.Data.GetConcurrencyKeys()
+				}),
+				WithSystemConcurrencyLimitGetter(func(ctx context.Context, p QueuePartition) SystemPartitionConcurrencyLimits {
+					return SystemPartitionConcurrencyLimits{
+						GlobalLimit:    789,
+						PartitionLimit: 678,
+					}
+				}),
+			)
+
+			addItem := func(id string, identifier state.Identifier, at time.Time) osqueue.QueueItem {
+				kind := osqueue.KindEdge
+				if testCase.knobs.isStartItem {
+					kind = osqueue.KindStart
+				}
+
+				var customConc []state.CustomConcurrency
+				if testCase.knobs.customConcurrencyKey1 != nil {
+					customConc = append(customConc, *testCase.knobs.customConcurrencyKey1)
+				}
+
+				if testCase.knobs.customConcurrencyKey2 != nil {
+					customConc = append(customConc, *testCase.knobs.customConcurrencyKey2)
+				}
+
+				item := osqueue.QueueItem{
+					ID:          id,
+					FunctionID:  identifier.WorkflowID,
+					WorkspaceID: identifier.WorkspaceID,
+					Data: osqueue.Item{
+						WorkspaceID:           identifier.WorkspaceID,
+						Kind:                  kind,
+						Identifier:            identifier,
+						QueueName:             nil,
+						Throttle:              testCase.knobs.throttle,
+						CustomConcurrencyKeys: customConc,
+					},
+					QueueName: nil,
+				}
+
+				qi, err := q.EnqueueItem(ctx, defaultShard, item, at, osqueue.EnqueueOpts{})
+				require.NoError(t, err)
+
+				return qi
+			}
+			at := clock.Now()
+
+			// Prepare backlog
+			qi1 := addItem("test0", state.Identifier{
+				AccountID:   accountID1,
+				WorkspaceID: envID1,
+				WorkflowID:  fnID1,
+			}, at)
+
+			if testCase.currentValues.itemsInBacklog > 1 {
+				for i := 1; i < testCase.currentValues.itemsInBacklog; i++ {
+					addItem(fmt.Sprintf("test%d", i), state.Identifier{
+						AccountID:   accountID1,
+						WorkspaceID: envID1,
+						WorkflowID:  fnID1,
+					}, at)
+				}
+			}
+
+			backlog := q.ItemBacklog(ctx, qi1)
+			shadowPart := q.ItemShadowPartition(ctx, qi1)
+
+			if testCase.knobs.danglingItemsInBacklog > 0 {
+				for i := 1; i <= testCase.knobs.danglingItemsInBacklog; i++ {
+					_, err = r.ZAdd(kg.BacklogSet(backlog.BacklogID), float64(at.UnixMilli()), fmt.Sprintf("dangling%d", i))
+					require.NoError(t, err)
+				}
+			}
+
+			for i := 1; i <= testCase.currentValues.accountInProgress; i++ {
+				_, err = r.ZAdd(kg.Concurrency("account", accountID1.String()), float64(at.UnixMilli()), fmt.Sprintf("item%d", i))
+				require.NoError(t, err)
+			}
+
+			for i := 1; i <= testCase.currentValues.functionInProgress; i++ {
+				_, err = r.ZAdd(kg.Concurrency("p", fnID1.String()), float64(at.UnixMilli()), fmt.Sprintf("item%d", i))
+				require.NoError(t, err)
+			}
+
+			for i := 1; i <= testCase.currentValues.customConcurrencyKey1InProgress; i++ {
+				key := testCase.knobs.customConcurrencyKey1
+				_, err = r.ZAdd(kg.Concurrency("custom", key.Key), float64(at.UnixMilli()), fmt.Sprintf("item%d", i))
+				require.NoError(t, err)
+			}
+
+			for i := 1; i <= testCase.currentValues.customConcurrencyKey2InProgress; i++ {
+				key := kg.Concurrency("custom", testCase.knobs.customConcurrencyKey2.Key)
+
+				_, err = r.ZAdd(key, float64(at.UnixMilli()), fmt.Sprintf("item%d", i))
+				require.NoError(t, err)
+			}
+
+			for i := 1; i <= testCase.currentValues.itemsInReadyQueue; i++ {
+				_, err = r.ZAdd(kg.PartitionQueueSet(enums.PartitionTypeDefault, fnID1.String(), ""), float64(at.UnixMilli()), fmt.Sprintf("item%d", i))
+				require.NoError(t, err)
+			}
+
+			refillUntil := at.Add(time.Minute)
+
+			res, err := q.BacklogRefill(ctx, &backlog, &shadowPart, refillUntil)
+			require.NoError(t, err)
+
+			require.Equal(t, testCase.expected.result, *res)
+		})
+	}
+}
