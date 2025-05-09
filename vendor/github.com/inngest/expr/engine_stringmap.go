@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strconv"
 	"sync"
+	"sync/atomic"
 
 	"github.com/cespare/xxhash/v2"
 	"github.com/google/cel-go/common/operators"
@@ -21,8 +22,10 @@ func newStringEqualityMatcher(concurrency int64) MatchingEngine {
 	}
 }
 
-type variableMap map[string][]*StoredExpressionPart
-type inequalityMap map[string]variableMap
+type (
+	variableMap   map[string][]*StoredExpressionPart
+	inequalityMap map[string]variableMap
+)
 
 // stringLookup represents a very dumb lookup for string equality matching within
 // expressions.
@@ -59,16 +62,11 @@ func (s stringLookup) Type() EngineType {
 	return EngineTypeStringHash
 }
 
-func (n *stringLookup) Match(ctx context.Context, input map[string]any) ([]*StoredExpressionPart, error) {
-	l := &sync.Mutex{}
-
-	matched := []*StoredExpressionPart{}
-
-	pool := newErrPool(errPoolOpts{concurrency: n.concurrency})
-
-	neqOptimized := false
+func (n *stringLookup) Match(ctx context.Context, input map[string]any, result *MatchResult) error {
+	neqOptimized := int32(0)
 
 	// First, handle equality matching.
+	pool := newErrPool(errPoolOpts{concurrency: n.concurrency})
 	for item := range n.vars {
 		path := item
 		pool.Go(func() error {
@@ -85,19 +83,17 @@ func (n *stringLookup) Match(ctx context.Context, input map[string]any) ([]*Stor
 				}
 			}
 
-			m, opt := n.equalitySearch(ctx, path, str)
+			opt := n.equalitySearch(ctx, path, str, result)
 
-			l.Lock()
-			matched = append(matched, m...)
 			if opt {
-				neqOptimized = true
+				// Set optimized to true in every case.
+				atomic.AddInt32(&neqOptimized, 1)
 			}
-			l.Unlock()
 			return nil
 		})
 	}
 	if err := pool.Wait(); err != nil {
-		return nil, err
+		return err
 	}
 
 	pool = newErrPool(errPoolOpts{concurrency: n.concurrency})
@@ -118,62 +114,49 @@ func (n *stringLookup) Match(ctx context.Context, input map[string]any) ([]*Stor
 				}
 			}
 
-			m := n.inequalitySearch(ctx, path, str, neqOptimized, matched)
+			n.inequalitySearch(ctx, path, str, atomic.LoadInt32(&neqOptimized) > 0, result)
 
-			l.Lock()
-			matched = append(matched, m...)
-			l.Unlock()
 			return nil
 		})
 	}
 
-	return matched, pool.Wait()
+	return pool.Wait()
 }
 
 // Search returns all ExpressionParts which match the given input, ignoring the variable name
 // entirely.
 //
 // Note that Search does not match inequality items.
-func (n *stringLookup) Search(ctx context.Context, variable string, input any) (matched []*StoredExpressionPart) {
+func (n *stringLookup) Search(ctx context.Context, variable string, input any, result *MatchResult) {
 	str, ok := input.(string)
 	if !ok {
-		return nil
+		return
 	}
-
-	matched, _ = n.equalitySearch(ctx, variable, str)
-	return matched
+	n.equalitySearch(ctx, variable, str, result)
 }
 
-func (n *stringLookup) equalitySearch(ctx context.Context, variable string, input string) (matched []*StoredExpressionPart, neqOptimized bool) {
+func (n *stringLookup) equalitySearch(ctx context.Context, variable string, input string, result *MatchResult) (neqOptimized bool) {
 	n.lock.RLock()
 	defer n.lock.RUnlock()
 
 	hashedInput := n.hash(input)
 
-	// Iterate through all matching values, and only take those expressions which match our
-	// current variable name.
-	filtered := make([]*StoredExpressionPart, len(n.equality[hashedInput]))
-	i := 0
 	for _, part := range n.equality[hashedInput] {
 		if part.Ident != nil && *part.Ident != variable {
 			// The variables don't match.
 			continue
 		}
-
 		if part.GroupID.Flag() != OptimizeNone {
 			neqOptimized = true
 		}
-
-		filtered[i] = part
-		i++
+		result.Add(part.EvaluableID, part.GroupID)
 	}
-	filtered = filtered[0:i]
 
-	return filtered, neqOptimized
+	return neqOptimized
 }
 
 // inequalitySearch performs lookups for != matches.
-func (n *stringLookup) inequalitySearch(ctx context.Context, variable string, input string, neqOptimized bool, currentMatches []*StoredExpressionPart) (matched []*StoredExpressionPart) {
+func (n *stringLookup) inequalitySearch(ctx context.Context, variable string, input string, neqOptimized bool, result *MatchResult) (matched []*StoredExpressionPart) {
 	if len(n.inequality[variable]) == 0 {
 		return nil
 	}
@@ -183,23 +166,6 @@ func (n *stringLookup) inequalitySearch(ctx context.Context, variable string, in
 
 	hashedInput := n.hash(input)
 
-	var found map[groupID]int8
-
-	if neqOptimized {
-		// If we're optimizing the "neq" value, we have a compound group which has both an == and != joined:
-		// `a == a && b != c`.
-		//
-		// In these cases, we'd naively return every StoredExpressionPart in the filter, as b != c - disregarding
-		// the `a == a` match.
-		//
-		// With optimizations, we check that there's the right number of string `==` matches in the group before
-		// evaluating !=, ensuring we keep allocations to a minimum.
-		found = map[groupID]int8{}
-		for _, match := range currentMatches {
-			found[match.GroupID]++
-		}
-	}
-
 	results := []*StoredExpressionPart{}
 	for value, exprs := range n.inequality[variable] {
 		if value == hashedInput {
@@ -207,16 +173,16 @@ func (n *stringLookup) inequalitySearch(ctx context.Context, variable string, in
 		}
 
 		if !neqOptimized {
-			results = append(results, exprs...)
+			result.AddExprs(exprs...)
 			continue
 		}
 
 		for _, expr := range exprs {
-			res, ok := found[expr.GroupID]
-			if !ok || res < int8(expr.GroupID.Flag()) {
+			res := result.GroupMatches(expr.EvaluableID, expr.GroupID)
+			if int8(res) < int8(expr.GroupID.Flag()) {
 				continue
 			}
-			results = append(results, expr)
+			result.AddExprs(expr)
 		}
 	}
 
