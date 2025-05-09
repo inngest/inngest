@@ -1029,8 +1029,6 @@ func (q *queue) process(
 		longRunningJobStatusTick := q.clock.NewTicker(5 * time.Minute)
 		defer longRunningJobStatusTick.Stop()
 
-		<-time.After(100 * time.Millisecond)
-
 		for {
 			select {
 			case <-jobCtx.Done():
@@ -1070,7 +1068,7 @@ func (q *queue) process(
 		if qi.EarliestPeekTime > 0 {
 			sojourn = n.Sub(time.UnixMilli(qi.EarliestPeekTime))
 		}
-		jobCtx = context.WithValue(jobCtx, sojournKey, sojourn)
+		doCtx := context.WithValue(jobCtx, sojournKey, sojourn)
 
 		// Track the latency on average globally.  Do this in a goroutine so that it doesn't
 		// at all delay the job during concurrenty locking contention.
@@ -1078,10 +1076,10 @@ func (q *queue) process(
 			qi.WallTimeMS = qi.AtMS // backcompat while WallTimeMS isn't valid.
 		}
 		latency := n.Sub(time.UnixMilli(qi.WallTimeMS)) - sojourn
-		jobCtx = context.WithValue(jobCtx, latencyKey, latency)
+		doCtx = context.WithValue(doCtx, latencyKey, latency)
 
 		// store started at and latency in ctx
-		jobCtx = context.WithValue(jobCtx, startedAtKey, n)
+		doCtx = context.WithValue(doCtx, startedAtKey, n)
 
 		go func() {
 			// Update the ewma
@@ -1114,7 +1112,7 @@ func (q *queue) process(
 		}
 
 		// Call the run func.
-		res, err := f(jobCtx, runInfo, qi.Data)
+		res, err := f(doCtx, runInfo, qi.Data)
 		extendLeaseTick.Stop()
 		if err != nil {
 			metrics.IncrQueueItemStatusCounter(ctx, metrics.CounterOpt{
