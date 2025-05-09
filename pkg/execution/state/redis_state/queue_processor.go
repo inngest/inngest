@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/logger"
 
 	"github.com/VividCortex/ewma"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
@@ -557,7 +558,7 @@ func (q *queue) scan(ctx context.Context) error {
 
 	// Store the shard that we processed, allowing us to eventually pass this
 	// down to the job for stat tracking.
-	var metricShardName = "<global>" // default global name for metrics in this function
+	metricShardName := "<global>" // default global name for metrics in this function
 
 	peekUntil := q.clock.Now().Add(PartitionLookahead)
 
@@ -1535,7 +1536,6 @@ func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error 
 	leaseID, err := duration(ctx, p.queue.primaryQueueShard.Name, "lease", p.queue.clock.Now(), func(ctx context.Context) (*ulid.ULID, error) {
 		return p.queue.Lease(ctx, *item, QueueLeaseDuration, p.staticTime, p.denies)
 	})
-
 	// NOTE: If this loop ends in an error, we must _always_ release an item from the
 	// semaphore to free capacity.  This will happen automatically when the worker
 	// finishes processing a queue item on success.
