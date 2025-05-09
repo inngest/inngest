@@ -91,7 +91,7 @@ func TestGCRA(t *testing.T) {
 		require.Equal(t, 0, runScript(t, rc, key, clock.Now(), period, limit, burst, 5))
 		require.Len(t, r.Keys(), 1)
 		require.True(t, r.Exists(key))
-		require.Equal(t, 0, runScript(t, rc, key, clock.Now(), period, limit, burst, 0))
+		require.Equal(t, 0, runScript(t, rc, key, clock.Now(), period, limit, burst, 2))
 
 		clock.Advance(2 * time.Hour)
 		r.FastForward(2 * time.Hour)
