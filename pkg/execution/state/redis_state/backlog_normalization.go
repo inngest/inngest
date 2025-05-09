@@ -8,7 +8,9 @@ import (
 	"math"
 	"time"
 
+	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 	"golang.org/x/sync/errgroup"
@@ -134,10 +136,20 @@ func (q *queue) iterateNormalizationShadowPartition(ctx context.Context, shadowP
 
 		for _, bl := range backlogs {
 			// lease the backlog
-			if err := q.leaseBacklogForNormalization(ctx, bl); err != nil {
+			if _, err := duration(ctx, q.primaryQueueShard.Name, "normalize_lease", q.clock.Now(), func(ctx context.Context) (any, error) {
+				err := q.leaseBacklogForNormalization(ctx, bl)
+				return nil, err
+			}); err != nil {
 				l.Error("error leasing backlog for normalization", "error", err, "backlog", bl)
 				continue
 			}
+
+			metrics.IncrBacklogNormalizationScannedCounter(ctx, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags: map[string]any{
+					"partition_id": partition.PartitionID,
+				},
+			})
 
 			// dump it into the channel for the workers to do their thing
 			bc <- bl
@@ -215,8 +227,6 @@ func (q *queue) extendBacklogNormalizationLease(ctx context.Context, now time.Ti
 func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog) error {
 	l := logger.StdlibLogger(ctx).With("backlog", backlog)
 
-	// TODO: metrics
-
 	// extend the lease
 	extendLeaseCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -263,5 +273,92 @@ func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog) err
 			"processed", processed,
 			"removed", res.RemovedCount,
 		)
+
+		metrics.IncrBacklogNormalizedItemCounter(ctx, processed, metrics.CounterOpt{
+			PkgName: pkgName,
+			Tags: map[string]any{
+				"partition_id": backlog.ShadowPartitionID,
+			},
+		})
 	}
+}
+
+func (q *queue) ShadowPartitionPeekNormalizeBacklogs(ctx context.Context, sp *QueueShadowPartition, limit int64) ([]*QueueBacklog, error) {
+	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
+		return nil, fmt.Errorf("unsupported queue shard kind for ShadowPartitionPeekNormalizeBacklogs: %s", q.primaryQueueShard.Kind)
+	}
+
+	rc := q.primaryQueueShard.RedisClient
+
+	partitionNormalizeSet := rc.kg.PartitionNormalizeSet(sp.PartitionID)
+
+	p := peeker[QueueBacklog]{
+		q:               q,
+		opName:          "ShadowPartitionPeekNormalizeBacklogs",
+		keyMetadataHash: q.primaryQueueShard.RedisClient.kg.BacklogMeta(),
+		max:             NormalizePartitionPeekMax,
+		maker: func() *QueueBacklog {
+			return &QueueBacklog{}
+		},
+		handleMissingItems: func(pointers []string) error {
+			err := rc.Client().Do(ctx, rc.Client().B().Zrem().Key(partitionNormalizeSet).Member(pointers...).Build()).Error()
+			if err != nil {
+				q.logger.Warn().
+					Interface("missing", pointers).
+					Interface("sp", sp).
+					Msg("failed to clean up dangling backlog pointers from shadow partition normalize set")
+			}
+
+			return nil
+		},
+		// faster option: load items regardless of zscore
+		ignoreUntil: true,
+	}
+
+	res, err := p.peek(ctx, partitionNormalizeSet, false, q.clock.Now(), limit)
+	if err != nil {
+		return nil, fmt.Errorf("could not peek backlogs for normalization: %w", err)
+	}
+
+	return res.Items, nil
+}
+
+func (q *queue) BacklogNormalizePeek(ctx context.Context, b *QueueBacklog, limit int64) (*peekResult[osqueue.QueueItem], error) {
+	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
+		return nil, fmt.Errorf("unsupported queue shard kind for BacklogNormalizePeek: %s", q.primaryQueueShard.Kind)
+	}
+
+	rc := q.primaryQueueShard.RedisClient
+
+	backlogSet := rc.kg.BacklogSet(b.BacklogID)
+
+	p := peeker[osqueue.QueueItem]{
+		q:               q,
+		opName:          "BacklogNormalizePeek",
+		keyMetadataHash: q.primaryQueueShard.RedisClient.kg.QueueItem(),
+		max:             NormalizePartitionPeekMax,
+		maker: func() *osqueue.QueueItem {
+			return &osqueue.QueueItem{}
+		},
+		handleMissingItems: func(pointers []string) error {
+			err := rc.Client().Do(ctx, rc.Client().B().Zrem().Key(backlogSet).Member(pointers...).Build()).Error()
+			if err != nil {
+				q.logger.Warn().
+					Interface("missing", pointers).
+					Interface("backlog", b).
+					Msg("failed to clean up dangling queue items from backlog")
+			}
+
+			return nil
+		},
+		// faster option: load items regardless of zscore
+		ignoreUntil: true,
+	}
+
+	res, err := p.peek(ctx, backlogSet, false, q.clock.Now(), limit)
+	if err != nil {
+		return nil, fmt.Errorf("could not peek backlog items for normalization: %w", err)
+	}
+
+	return res, nil
 }
