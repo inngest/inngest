@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"reflect"
 	"sync"
 	"sync/atomic"
@@ -60,7 +61,7 @@ type AggregateEvaluator[T Evaluable] interface {
 	Evaluate(ctx context.Context, data map[string]any) ([]T, int32, error)
 
 	// AggregateMatch returns all expression parts which are evaluable given the input data.
-	AggregateMatch(ctx context.Context, data map[string]any) ([]*StoredExpressionPart, error)
+	AggregateMatch(ctx context.Context, data map[string]any) ([]*uuid.UUID, error)
 
 	// Len returns the total number of aggregateable and constantly matched expressions
 	// stored in the evaluator.
@@ -88,6 +89,8 @@ type AggregateEvaluatorOpts[T Evaluable] struct {
 	Concurrency int64
 	// KV represents storage for evaluables.
 	KV KV[T]
+	// Log is a stdlib logger used for logging.  If nil, this will be slog.Default().
+	Log *slog.Logger
 }
 
 func NewAggregateEvaluator[T Evaluable](
@@ -95,6 +98,10 @@ func NewAggregateEvaluator[T Evaluable](
 ) AggregateEvaluator[T] {
 	if opts.Concurrency <= 0 {
 		opts.Concurrency = defaultConcurrency
+	}
+
+	if opts.Log == nil {
+		opts.Log = slog.Default()
 	}
 
 	// Create a new KV store.
@@ -111,19 +118,12 @@ func NewAggregateEvaluator[T Evaluable](
 					}
 				}()
 
-				// Create a new concrete zero type &T
 				val := reflect.New(reflect.TypeOf(t)).Interface()
 				err = json.Unmarshal(byt, val)
 				if err != nil {
 					return t, err
 				}
 
-				// If the generic kind is a ptr, we can return the type &T directly.
-				if reflect.TypeOf(t).Kind() == reflect.Ptr {
-					return val.(T), err
-				}
-
-				// Otherwise, deref.
 				return reflect.ValueOf(val).Elem().Interface().(T), err
 			},
 			FS: vfs.NewMem(),
@@ -152,12 +152,15 @@ func NewAggregateEvaluator[T Evaluable](
 		constants:   map[uuid.UUID]struct{}{},
 		mixed:       map[uuid.UUID]struct{}{},
 		concurrency: opts.Concurrency,
+		log:         opts.Log,
 	}
 }
 
 type aggregator[T Evaluable] struct {
 	eval   ExpressionEvaluator
 	parser TreeParser
+
+	log *slog.Logger
 
 	kv KV[T]
 
@@ -286,8 +289,8 @@ func (a *aggregator[T]) Evaluate(ctx context.Context, data map[string]any) ([]T,
 	mpool := newErrPool(errPoolOpts{concurrency: a.concurrency})
 
 	a.lock.RLock()
-	for _, expr := range matches {
-		eval, err := a.kv.Get(expr.EvaluableID)
+	for _, id := range matches {
+		eval, err := a.kv.Get(*id)
 		if err != nil {
 			continue
 		}
@@ -339,8 +342,8 @@ func (a *aggregator[T]) Evaluate(ctx context.Context, data map[string]any) ([]T,
 
 // AggregateMatch attempts to match incoming data to all PredicateTrees, resulting in a selection
 // of parts of an expression that have matched.
-func (a *aggregator[T]) AggregateMatch(ctx context.Context, data map[string]any) ([]*StoredExpressionPart, error) {
-	result := []*StoredExpressionPart{}
+func (a *aggregator[T]) AggregateMatch(ctx context.Context, data map[string]any) ([]*uuid.UUID, error) {
+	result := []*uuid.UUID{}
 
 	a.lock.RLock()
 	defer a.lock.RUnlock()
@@ -353,78 +356,46 @@ func (a *aggregator[T]) AggregateMatch(ctx context.Context, data map[string]any)
 	// Note that having a count >= the group ID value does not guarantee that the expression is valid.
 	//
 	// Note that we break this down per evaluable ID (UUID)
-	totalCounts := map[uuid.UUID]map[groupID]int{}
-	// Store all expression parts per group ID for returning.
-	found := map[uuid.UUID]map[groupID][]*StoredExpressionPart{}
+	found := NewMatchResult()
 
 	for _, engine := range a.engines {
 		// we explicitly ignore the deny path for now.
-		matched, err := engine.Match(ctx, data)
-		if err != nil {
+		if err := engine.Match(ctx, data, found); err != nil {
 			return nil, err
 		}
-
-		// Add all found items from the engine to the above list.
-		for _, eval := range matched {
-			idCount, idFound := totalCounts[eval.EvaluableID], found[eval.EvaluableID]
-
-			if idCount == nil {
-				idCount = map[groupID]int{}
-				idFound = map[groupID][]*StoredExpressionPart{}
-			}
-
-			idCount[eval.GroupID] += 1
-			if _, ok := idFound[eval.GroupID]; !ok {
-				idFound[eval.GroupID] = []*StoredExpressionPart{}
-			}
-			idFound[eval.GroupID] = append(idFound[eval.GroupID], eval)
-
-			// Update mapping
-			totalCounts[eval.EvaluableID] = idCount
-			found[eval.EvaluableID] = idFound
-		}
-
 	}
 
-	seen := map[uuid.UUID]struct{}{}
+	a.log.Debug("ran matching engines", "len_matched_no_filter", found.Len())
 
 	// Validate that groups meet the minimum size.
-	for evalID, counts := range totalCounts {
-		for groupID, matchingCount := range counts {
-
+	for evalID, groups := range found.Result {
+		for groupID, matchingCount := range groups {
 			requiredSize := int(groupID.Size()) // The total req size from the group ID
 
-			if matchingCount >= requiredSize {
-				for _, i := range found[evalID][groupID] {
-					if _, ok := seen[i.EvaluableID]; ok {
-						continue
-					}
-					seen[i.EvaluableID] = struct{}{}
-					result = append(result, i)
-				}
-				continue
+			// If this group isn't the required size, delete the group
+			// from our map
+			if matchingCount < requiredSize {
+				delete(groups, groupID)
 			}
 
-			// If this is a partial eval, always add it if there's a match for now.
+		}
+		// After iterating through each group, we now know:
+		//
+		// if len(groups) > 0, we have enough matches in this eval group for
+		// it to be a candidate.
+		hasMatchedGroups := len(groups) > 0
 
-			// The GroupID required more comparisons to equate to true than
-			// we had, so this could never evaluate to true.  Skip this.
-			//
-			// NOTE: We currently don't add items with OR predicates to the
-			// matching engine, so we cannot use group sizes if the expr part
-			// has an OR.
-			for _, i := range found[evalID][groupID] {
-				// if this is purely aggregateable, we're safe to rely on group IDs.
-				//
-				// So, we only need to care if this expression is mixed.  If it's mixed,
-				// we can ignore group IDs for the time being.
-				if _, ok := a.mixed[i.EvaluableID]; ok {
-					// this wasn't fully aggregatable so evaluate it.
-					result = append(result, i)
-				}
-			}
+		// NOTE: We currently don't add items with OR predicates to the
+		// matching engine, so we cannot use group sizes if the expr part
+		// has an OR.
+		_, isMixedOrs := a.mixed[evalID]
+
+		if hasMatchedGroups || isMixedOrs {
+			result = append(result, &evalID)
 		}
 	}
+
+	a.log.Debug("filtered invalid groups", "len_matched", len(result))
 
 	return result, nil
 }
