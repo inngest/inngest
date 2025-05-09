@@ -1029,6 +1029,8 @@ func (q *queue) process(
 		longRunningJobStatusTick := q.clock.NewTicker(5 * time.Minute)
 		defer longRunningJobStatusTick.Stop()
 
+		<-time.After(100 * time.Millisecond)
+
 		for {
 			select {
 			case <-jobCtx.Done():
