@@ -161,7 +161,6 @@ const eventTypeQuery = graphql(`
     environment: workspace(id: $envID) {
       eventType(name: $eventName) {
         name
-        name
         functions {
           edges {
             node {
