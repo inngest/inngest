@@ -111,37 +111,92 @@ export function useEvents() {
   );
 }
 
-// TODO: Replace with real API
+export const eventQuery = graphql(`
+  query GetEventV2($envID: ID!, $eventID: String!) {
+    environment: workspace(id: $envID) {
+      eventV2(id: $eventID) {
+        name
+        id
+        receivedAt
+        idempotencyKey
+        occurredAt
+        version
+        source
+      }
+    }
+  }
+`);
+
 export function useEventDetails() {
-  return useCallback(async ({ eventName }: { eventName: string }) => {
-    console.log(eventName);
-    await new Promise((resolve) => setTimeout(resolve, 500));
+  const envID = useEnvironment().id;
+  const client = useClient();
 
-    const event = {
-      id: '01JGPM6FYSRN9C0ZGJ7PXPVRGY',
-      receivedAt: new Date('2025-04-10T16:43:21.696Z'),
-      idempotencyKey: 'custom-payload-id',
-      name: 'UserSignedUp',
-      source: 'Default Inngest key',
-      timestamp: new Date(1745226902417),
-      version: '2022-12-16',
-    };
+  return useCallback(
+    async ({ eventID }: { eventID: string }) => {
+      const result = await client
+        .query(
+          eventQuery,
+          {
+            envID,
+            eventID,
+          },
+          { requestPolicy: 'network-only' }
+        )
+        .toPromise();
 
-    return event;
-  }, []);
+      if (result.error) {
+        throw new Error(result.error.message);
+      }
+
+      if (!result.data) {
+        throw new Error('no data returned');
+      }
+
+      const eventData = result.data.environment.eventV2;
+      return eventData;
+    },
+    [client, envID]
+  );
 }
 
+export const eventPayloadQuery = graphql(`
+  query GetEventPayload($envID: ID!, $eventID: String!) {
+    environment: workspace(id: $envID) {
+      eventV2(id: $eventID) {
+        raw
+      }
+    }
+  }
+`);
+
 export function useEventPayload() {
-  return useCallback(async ({ eventName }: { eventName: string }) => {
-    console.log(eventName);
-    await new Promise((resolve) => setTimeout(resolve, 500));
+  const envID = useEnvironment().id;
+  const client = useClient();
 
-    const event = {
-      name: 'UserSignedUp',
-      payload:
-        '{\n  "name": "signup.new",\n  "data": {\n    "account_id": "119f5971-9878-46bd-a18f-4fecd",\n    "method": "",\n    "plan_name": "Free Tier"\n  },\n  "id": "119f5971-9878-46bd-a18f-4f0680174ecd",\n  "ts": 1711051784369,\n  "v": "2021-05-11.01"\n}',
-    };
+  return useCallback(
+    async ({ eventID }: { eventID: string }) => {
+      const result = await client
+        .query(
+          eventPayloadQuery,
+          {
+            envID,
+            eventID,
+          },
+          { requestPolicy: 'network-only' }
+        )
+        .toPromise();
 
-    return event;
-  }, []);
+      if (result.error) {
+        throw new Error(result.error.message);
+      }
+
+      if (!result.data) {
+        throw new Error('no data returned');
+      }
+
+      const eventData = result.data.environment.eventV2;
+      return eventData;
+    },
+    [client, envID]
+  );
 }

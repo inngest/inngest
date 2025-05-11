@@ -43,17 +43,17 @@ export function EventDetails({
     error,
     data: eventDetailsData,
   } = useQuery({
-    queryKey: ['event-details', { eventName: row.original.name }],
+    queryKey: ['event-details', { eventID: row.original.id }],
     queryFn: useCallback(() => {
-      return getEventDetails({ eventName: row.original.name });
-    }, [getEventDetails, row.original.name]),
+      return getEventDetails({ eventID: row.original.id });
+    }, [getEventDetails, row.original.id]),
   });
 
   const { error: payloadError, data: eventPayloadData } = useQuery({
-    queryKey: ['event-payload', { eventName: row.original.name }],
+    queryKey: ['event-payload', { eventID: row.original.id }],
     queryFn: useCallback(() => {
-      return getEventPayload({ eventName: row.original.name });
-    }, [getEventPayload, row.original.name]),
+      return getEventPayload({ eventID: row.original.id });
+    }, [getEventPayload, row.original.id]),
   });
 
   const handleMouseDown = useCallback(() => {
@@ -110,7 +110,11 @@ export function EventDetails({
           </div>
           <div className="flex flex-row flex-wrap items-center justify-start gap-x-10 gap-y-4 px-4">
             <ElementWrapper label="Event ID">
-              {isPending ? <SkeletonElement /> : <IDElement>{eventDetailsData?.id}</IDElement>}
+              {isPending ? (
+                <SkeletonElement />
+              ) : (
+                <IDElement>{eventDetailsData?.id || '-'}</IDElement>
+              )}
             </ElementWrapper>
             <ElementWrapper label="Idempotency key">
               {isPending ? (

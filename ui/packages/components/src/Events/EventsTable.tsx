@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useRef, useState, type UIEventHandler } from 'react';
+import { useCallback, useEffect, useRef, useState, type UIEventHandler } from 'react';
 import type { Route } from 'next';
 import dynamic from 'next/dynamic';
 import { Button } from '@inngest/components/Button';
@@ -35,8 +35,6 @@ const CodeSearch = dynamic(() => import('@inngest/components/CodeSearch/CodeSear
   ssr: false,
 });
 
-const refreshInterval = 5000;
-
 export function EventsTable({
   getEvents,
   getEventDetails,
@@ -67,8 +65,8 @@ export function EventsTable({
     endTime: string | null;
     celQuery?: string;
   }) => Promise<{ events: Omit<Event, 'payload'>[]; pageInfo: PageInfo; totalCount: number }>;
-  getEventDetails: ({ eventName }: { eventName: string }) => Promise<Omit<Event, 'payload'>>;
-  getEventPayload: ({ eventName }: { eventName: string }) => Promise<Pick<Event, 'payload'>>;
+  getEventDetails: ({ eventID }: { eventID: string }) => Promise<Omit<Event, 'payload'>>;
+  getEventPayload: ({ eventID }: { eventID: string }) => Promise<Pick<Event, 'payload'>>;
   features: Pick<Features, 'history'>;
 }) {
   const columns = useColumns({ pathCreator });
@@ -83,9 +81,22 @@ export function EventsTable({
   const source = undefined;
   const [expandedIDs, setExpandedIDs] = useState<string[]>([]);
   const containerRef = useRef<HTMLDivElement>(null);
+  const [isScrollable, setIsScrollable] = useState(false);
 
   /* The start date comes from either the absolute start time or the relative time */
   const calculatedStartTime = useCalculatedStartTime({ lastDays, startTime });
+
+  const scrollToTop = useCallback(
+    (smooth = false) => {
+      if (containerRef.current) {
+        containerRef.current.scrollTo({
+          top: 0,
+          behavior: smooth ? 'smooth' : 'auto',
+        });
+      }
+    },
+    [containerRef.current]
+  );
 
   const {
     isPending, // first load, no data
@@ -170,6 +181,13 @@ export function EventsTable({
     },
     [batchUpdate]
   );
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (el) {
+      setIsScrollable(el.scrollHeight > el.clientHeight);
+    }
+  }, [eventsData]);
 
   const hasEventsData = eventsData?.events && eventsData?.events.length > 0;
 
@@ -299,6 +317,17 @@ export function EventsTable({
             }
           }}
         />
+        {!hasNextPage && hasEventsData && isScrollable && !isFetchingNextPage && !isFetching && (
+          <div className="flex flex-col items-center pt-8">
+            <p className="text-muted text-sm">No additional events found.</p>
+            <Button
+              label="Back to top"
+              kind="primary"
+              appearance="ghost"
+              onClick={() => scrollToTop(true)}
+            />
+          </div>
+        )}
         {isFetchingNextPage && (
           <div className="flex flex-col items-center">
             <Button appearance="outlined" label="loading" loading={true} />
