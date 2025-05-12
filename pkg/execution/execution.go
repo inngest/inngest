@@ -114,6 +114,14 @@ type Executor interface {
 	AppendAndScheduleBatch(ctx context.Context, fn inngest.Function, bi batch.BatchItem, opts *BatchExecOpts) error
 
 	RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Function, payload batch.ScheduleBatchPayload, opts *BatchExecOpts) error
+
+	// TODO
+	ReceiveSignal(ctx context.Context, workspaceID uuid.UUID, signalID string, data json.RawMessage) (*ReceiveSignalResult, error)
+}
+
+type ReceiveSignalResult struct {
+	Success bool
+	RunID   *ulid.ULID
 }
 
 // PublishFinishedEventOpts represents the options for publishing a finished event.

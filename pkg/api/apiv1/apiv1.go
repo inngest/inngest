@@ -102,6 +102,8 @@ func (a *router) setup() {
 
 			r.Use(headers.ContentTypeJsonResponse())
 
+			r.Post("/signals", a.receiveSignal)
+
 			r.Get("/events", a.getEvents)
 			r.Get("/events/{eventID}", a.getEvent)
 			r.Get("/events/{eventID}/runs", a.getEventRuns)
