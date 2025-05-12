@@ -74,7 +74,9 @@ func CritT[T any](ctx context.Context, name string, f func(ctx context.Context) 
 
 	if cr.timeout > 0 {
 		var cancel func()
-		ctx, cancel = context.WithTimeout(ctx, cr.timeout)
+		ctx, cancel = context.WithTimeout(
+			context.WithoutCancel(ctx), cr.timeout,
+		)
 		defer cancel()
 
 		doneCh := make(chan T)
