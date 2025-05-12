@@ -8,17 +8,19 @@
 local pauseKey    = KEYS[1]
 local pauseEvtKey = KEYS[2]
 local pauseInvokeKey = KEYS[3]
-local keyPauseAddIdx = KEYS[4]
-local keyPauseExpIdx = KEYS[5]
-local keyRunPauses   = KEYS[6]
-local keyPausesIdx   = KEYS[7]
+local pauseSignalKey = KEYS[4]
+local keyPauseAddIdx = KEYS[5]
+local keyPauseExpIdx = KEYS[6]
+local keyRunPauses   = KEYS[7]
+local keyPausesIdx   = KEYS[8]
 
 local pause          = ARGV[1]
 local pauseID        = ARGV[2]
 local event          = ARGV[3]
 local invokeCorrelationID = ARGV[4]
-local extendedExpiry = tonumber(ARGV[5])
-local nowUnixSeconds = tonumber(ARGV[6])
+local signalCorrelationID = ARGV[5]
+local extendedExpiry = tonumber(ARGV[6])
+local nowUnixSeconds = tonumber(ARGV[7])
 
 
 if redis.call("SETNX", pauseKey, pause) == 0 then
@@ -45,6 +47,10 @@ end
 
 if invokeCorrelationID ~= false and invokeCorrelationID ~= "" and invokeCorrelationID ~= nil then
 	redis.call("HSETNX", pauseInvokeKey, invokeCorrelationID, pauseID)
+end
+
+if signalCorrelationID ~= false and signalCorrelationID ~= "" and signalCorrelationID ~= nil then
+	redis.call("HSETNX", pauseSignalKey, signalCorrelationID, pauseID)
 end
 
 return redis.call("ZCARD", keyPauseAddIdx)

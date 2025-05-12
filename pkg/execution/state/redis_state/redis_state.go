@@ -794,9 +794,14 @@ func (m unshardedMgr) SavePause(ctx context.Context, p state.Pause) (int64, erro
 		evt = *p.Event
 	}
 
-	corrId := ""
+	invokeCorrId := ""
 	if p.InvokeCorrelationID != nil {
-		corrId = *p.InvokeCorrelationID
+		invokeCorrId = *p.InvokeCorrelationID
+	}
+
+	signalCorrId := ""
+	if p.SignalID != nil {
+		signalCorrId = *p.SignalID
 	}
 
 	extendedExpiry := time.Until(p.Expires.Time().Add(10 * time.Minute)).Seconds()
@@ -811,6 +816,7 @@ func (m unshardedMgr) SavePause(ctx context.Context, p state.Pause) (int64, erro
 		pause.kg.Pause(ctx, p.ID),
 		pause.kg.PauseEvent(ctx, p.WorkspaceID, evt),
 		global.kg.Invoke(ctx, p.WorkspaceID),
+		global.kg.Signal(ctx, p.WorkspaceID),
 		pause.kg.PauseIndex(ctx, "add", p.WorkspaceID, evt),
 		pause.kg.PauseIndex(ctx, "exp", p.WorkspaceID, evt),
 		pause.kg.RunPauses(ctx, p.Identifier.RunID),
@@ -821,7 +827,8 @@ func (m unshardedMgr) SavePause(ctx context.Context, p state.Pause) (int64, erro
 		string(packed),
 		p.ID.String(),
 		evt,
-		corrId,
+		invokeCorrId,
+		signalCorrId,
 		// Add at least 10 minutes to this pause, allowing us to process the
 		// pause by ID for 10 minutes past expiry.
 		int(extendedExpiry),
@@ -1159,6 +1166,27 @@ func (m unshardedMgr) PauseByInvokeCorrelationID(ctx context.Context, wsID uuid.
 	pauseIDstr, err := global.Client().Do(ctx, cmd).ToString()
 	if err == rueidis.Nil {
 		return nil, state.ErrInvokePauseNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	pauseID, err := uuid.Parse(pauseIDstr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse pauseID UUID: %w", err)
+	}
+	return m.PauseByID(ctx, pauseID)
+}
+
+func (m unshardedMgr) PauseBySignalID(ctx context.Context, wsID uuid.UUID, signalID string) (*state.Pause, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "PauseBySignalID"), redis_telemetry.ScopePauses)
+
+	global := m.u.Global()
+	key := global.kg.Signal(ctx, wsID)
+	cmd := global.Client().B().Hget().Key(key).Field(signalID).Build()
+	pauseIDstr, err := global.Client().Do(ctx, cmd).ToString()
+	if err == rueidis.Nil {
+		return nil, state.ErrSignalPauseNotFound
 	}
 	if err != nil {
 		return nil, err

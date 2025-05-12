@@ -80,6 +80,9 @@ type PauseGetter interface {
 	// This should not return consumed pauses.
 	PauseByInvokeCorrelationID(ctx context.Context, wsID uuid.UUID, correlationID string) (*Pause, error)
 
+	// PauseBySignalCorrelationID returns a given pause by the correlation ID.
+	PauseBySignalID(ctx context.Context, wsID uuid.UUID, signalID string) (*Pause, error)
+
 	// PauseCreatedAt returns the timestamp a pause was created, using the given
 	// workspace <> event Index.
 	PauseCreatedAt(ctx context.Context, workspaceID uuid.UUID, event string, pauseID uuid.UUID) (time.Time, error)
@@ -192,6 +195,8 @@ type Pause struct {
 	// This is used to be able to accurately reconstruct the entire invocation
 	// span.
 	InvokeTargetFnID *string `json:"itFnID,omitempty"`
+	// SignalID is the ID of the signal that is responsible for this pause.
+	SignalID *string `json:"signalID,omitempty"`
 	// OnTimeout indicates that this incoming edge should only be ran
 	// when the pause times out, if set to true.
 	OnTimeout bool `json:"onTimeout,omitempty,omitzero"`
