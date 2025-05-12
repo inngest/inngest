@@ -66,8 +66,8 @@ export function EventsTable({
     startTime: string;
     endTime: string | null;
     celQuery?: string;
-  }) => Promise<{ events: Omit<Event, 'payload'>[]; pageInfo: PageInfo; totalCount: number }>;
-  getEventDetails: ({ eventID }: { eventID: string }) => Promise<Omit<Event, 'payload'>>;
+  }) => Promise<{ events: Event[]; pageInfo: PageInfo; totalCount: number }>;
+  getEventDetails: ({ eventID }: { eventID: string }) => Promise<Event>;
   getEventPayload: ({ eventID }: { eventID: string }) => Promise<Pick<Event, 'payload'>>;
   getEventTypes: () => Promise<Required<Pick<EventType, 'name' | 'id'>>[]>;
   features: Pick<Features, 'history'>;

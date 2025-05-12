@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import NextLink from 'next/link';
 import { Time } from '@inngest/components/Time';
+import { usePrettyJson } from '@inngest/components/hooks/usePrettyJson';
 import { type Event } from '@inngest/components/types/event';
 import { RiArrowRightSLine } from '@remixicon/react';
 import { useQuery } from '@tanstack/react-query';
@@ -26,7 +27,7 @@ export function EventDetails({
   pathCreator,
   expandedRowActions,
 }: {
-  row: Row<Omit<Event, 'payload'>>;
+  row: Row<Event>;
   pathCreator: React.ComponentProps<typeof EventsTable>['pathCreator'];
   getEventDetails: React.ComponentProps<typeof EventsTable>['getEventDetails'];
   getEventPayload: React.ComponentProps<typeof EventsTable>['getEventPayload'];
@@ -100,6 +101,9 @@ export function EventDetails({
     console.log(error?.message || payloadError?.message);
   }
 
+  const prettyPayload =
+    usePrettyJson(eventPayloadData?.payload ?? '') || (eventPayloadData?.payload ?? '');
+
   return (
     <div ref={containerRef} className="flex flex-row">
       <div ref={leftColumnRef} className="flex flex-col gap-2" style={{ width: `${leftWidth}%` }}>
@@ -133,8 +137,8 @@ export function EventDetails({
             <ElementWrapper label="TS">
               {isPending ? (
                 <SkeletonElement />
-              ) : eventDetailsData?.timestamp ? (
-                <TimeElement date={new Date(eventDetailsData.timestamp)} />
+              ) : eventDetailsData?.occurredAt ? (
+                <TimeElement date={new Date(eventDetailsData.occurredAt)} />
               ) : (
                 <TextElement>-</TextElement>
               )}
@@ -147,12 +151,12 @@ export function EventDetails({
               )}
             </ElementWrapper>
           </div>
-          {eventPayloadData?.payload && (
+          {prettyPayload && (
             <div className="border-subtle border-t pl-px">
               <CodeBlock
                 header={{ title: 'Payload', ...(error && { status: 'error' }) }}
                 tab={{
-                  content: eventPayloadData?.payload,
+                  content: prettyPayload,
                 }}
                 allowFullScreen={true}
               />

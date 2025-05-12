@@ -1,12 +1,12 @@
 export type Event = {
   id: string;
   name: string;
-  payload: string;
+  payload?: string;
   receivedAt: Date;
   source?: string;
   version?: string;
   idempotencyKey?: string;
-  timestamp?: Date;
+  occurredAt?: Date;
   runs?: {
     fnName?: string;
     fnSlug?: string;

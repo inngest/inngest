@@ -112,7 +112,7 @@ export function useEvents() {
 }
 
 export const eventQuery = graphql(`
-  query GetEventV2($envID: ID!, $eventID: String!) {
+  query GetEventV2($envID: ID!, $eventID: ULID!) {
     environment: workspace(id: $envID) {
       eventV2(id: $eventID) {
         name
@@ -121,7 +121,6 @@ export const eventQuery = graphql(`
         idempotencyKey
         occurredAt
         version
-        source
       }
     }
   }
@@ -160,7 +159,7 @@ export function useEventDetails() {
 }
 
 export const eventPayloadQuery = graphql(`
-  query GetEventPayload($envID: ID!, $eventID: String!) {
+  query GetEventPayload($envID: ID!, $eventID: ULID!) {
     environment: workspace(id: $envID) {
       eventV2(id: $eventID) {
         raw
@@ -194,8 +193,8 @@ export function useEventPayload() {
         throw new Error('no data returned');
       }
 
-      const eventData = result.data.environment.eventV2;
-      return eventData;
+      const eventData = result.data.environment.eventV2.raw;
+      return { payload: eventData };
     },
     [client, envID]
   );
