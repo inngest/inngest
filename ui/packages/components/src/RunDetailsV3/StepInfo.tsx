@@ -213,6 +213,7 @@ export const StepInfo = ({ selectedStep }: { selectedStep: StepInfoType }) => {
         </div>
       )}
 
+      {/* @ts-ignore - temporarily until we get monorepo deployed */}
       {false ? null : (
         <Tabs
           defaultActive={result?.error ? 'error' : prettyInput ? 'input' : 'output'}
