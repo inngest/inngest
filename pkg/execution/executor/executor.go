@@ -2000,6 +2000,8 @@ func (e *executor) handleGenerator(ctx context.Context, i *runInstance, gen stat
 		return e.handleGeneratorAIGateway(ctx, i, gen, edge)
 	case enums.OpcodeGateway:
 		return e.handleGeneratorGateway(ctx, i, gen, edge)
+	case enums.OpcodeWaitForSignal:
+		return e.handleGeneratorWaitForSignal(ctx, i, gen, edge)
 	}
 
 	return fmt.Errorf("unknown opcode: %s", gen.Op)
@@ -2556,6 +2558,83 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, i *runInstance,
 	return err
 }
 
+// TODO Idempotency
+func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, i *runInstance, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
+	opts, err := gen.SignalOpts()
+	if err != nil {
+		return fmt.Errorf("unable to parse signal opts: %w", err)
+	}
+	if opts.Signal == "" {
+		return fmt.Errorf("signal name is empty")
+	}
+	expires, err := opts.Expires()
+	if err != nil {
+		return fmt.Errorf("unable to parse signal expires: %w", err)
+	}
+
+	pauseID := inngest.DeterministicSha1UUID(i.md.ID.RunID.String() + gen.ID)
+	opcode := gen.Op.String()
+	now := time.Now()
+
+	sid := run.NewSpanID(ctx)
+	carrier := itrace.NewTraceCarrier(
+		itrace.WithTraceCarrierTimestamp(now),
+		itrace.WithTraceCarrierSpanID(&sid),
+	)
+	itrace.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
+
+	_, err = e.pm.SavePause(ctx, state.Pause{
+		ID:          pauseID,
+		WorkspaceID: i.md.ID.Tenant.EnvID,
+		Identifier:  sv2.NewPauseIdentifier(i.md.ID),
+		GroupID:     i.item.GroupID,
+		Outgoing:    gen.ID,
+		Incoming:    edge.Edge.Incoming,
+		StepName:    gen.UserDefinedName(),
+		Opcode:      &opcode,
+		Expires:     state.Time(expires),
+		DataKey:     gen.ID,
+		SignalID:    &opts.Signal,
+		MaxAttempts: i.item.MaxAttempts,
+		Metadata: map[string]any{
+			consts.OtelPropagationKey: carrier,
+		},
+	})
+	if err == state.ErrPauseAlreadyExists {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+
+	// Enqueue a job that will timeout the pause.
+	jobID := fmt.Sprintf("%s-%s", i.md.IdempotencyKey(), gen.ID)
+	err = e.queue.Enqueue(ctx, queue.Item{
+		JobID:                 &jobID,
+		WorkspaceID:           i.md.ID.Tenant.EnvID,
+		GroupID:               i.item.GroupID,
+		Kind:                  queue.KindPause,
+		Identifier:            i.item.Identifier,
+		PriorityFactor:        i.item.PriorityFactor,
+		CustomConcurrencyKeys: i.item.CustomConcurrencyKeys,
+		MaxAttempts:           i.item.MaxAttempts,
+		Payload: queue.PayloadPauseTimeout{
+			PauseID:   pauseID,
+			OnTimeout: true,
+		},
+	}, expires, queue.EnqueueOpts{})
+	if err == redis_state.ErrQueueItemExists {
+		return nil
+	}
+
+	// TODO Lifecycles
+	// for _, e := range e.lifecycles {
+	// 	go e.OnInvokeFunction(context.WithoutCancel(ctx), i.md, i.item, gen, evt)
+	// }
+
+	return err
+}
+
 func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, i *runInstance, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
 	if e.handleSendingEvent == nil {
 		return fmt.Errorf("no handleSendingEvent function specified")
@@ -3011,6 +3090,69 @@ func (e *executor) validateStateSize(outputSize int, md sv2.Metadata) error {
 	}
 
 	return nil
+}
+
+func (e *executor) ReceiveSignal(ctx context.Context, workspaceID uuid.UUID, signalID string, data json.RawMessage) (res *execution.ReceiveSignalResult, err error) {
+	log := e.log
+	if log == nil {
+		log = logger.From(ctx)
+	}
+	l := log.With().Str("signal_id", signalID).Str("workspace_id", workspaceID.String()).Logger()
+
+	defer func() {
+		if err != nil {
+			l.Error().Err(err).Msg("error receiving signal")
+		} else {
+			l.Info().Msg("signal received")
+		}
+	}()
+
+	if workspaceID.String() == "" {
+		err = fmt.Errorf("workspace ID is empty")
+		return
+	}
+
+	if signalID == "" {
+		err = fmt.Errorf("signal ID is empty")
+		return
+	}
+
+	pause, err := e.pm.PauseBySignalID(ctx, workspaceID, signalID)
+	if err != nil {
+		err = fmt.Errorf("error getting pause by signal ID: %w", err)
+		return
+	}
+
+	if pause.Expires.Time().Before(time.Now()) {
+		l.Debug().Msg("encountered expired signal")
+
+		shouldDelete := pause.Expires.Time().Add(consts.PauseExpiredDeletionGracePeriod).Before(time.Now())
+		if shouldDelete {
+			l.Debug().Msg("deleting expired pause")
+			_ = e.pm.DeletePause(context.Background(), *pause)
+		}
+
+		return
+	}
+
+	// TODO Need to check pause.Cancel here?
+
+	log.Debug().Str("pause.DataKey", pause.DataKey).Msg("resuming pause from signal")
+
+	e.Resume(ctx, *pause, execution.ResumeRequest{
+		RunID:    &pause.Identifier.RunID,
+		StepName: pause.StepName,
+		With: map[string]any{
+			execution.StateDataKey: data,
+		},
+	})
+
+	res = &execution.ReceiveSignalResult{
+		Success: true,
+		RunID:   &pause.Identifier.RunID,
+	}
+
+	return
 }
 
 type execError struct {
