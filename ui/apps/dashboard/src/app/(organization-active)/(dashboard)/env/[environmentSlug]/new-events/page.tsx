@@ -76,20 +76,29 @@ export default function EventsPage({
             />
           </>
         }
-        expandedRowActions={(eventName) => (
-          <div className="flex items-center gap-2">
-            <Button
-              label="Go to event page"
-              href={pathCreator.eventType({ envSlug: envSlug, eventName: eventName })}
-              appearance="ghost"
-              size="small"
-              icon={<RiArrowRightUpLine />}
-              iconSide="left"
-            />
-            {/* TODO: Wire replay event */}
-            <Button label="Replay event" onClick={() => {}} appearance="outlined" size="small" />
-          </div>
-        )}
+        expandedRowActions={(eventName) => {
+          const isInternalEvent = Boolean(eventName?.startsWith('inngest/'));
+          return (
+            <div className="flex items-center gap-2">
+              <Button
+                label="Go to event page"
+                href={pathCreator.eventType({ envSlug: envSlug, eventName: eventName })}
+                appearance="ghost"
+                size="small"
+                icon={<RiArrowRightUpLine />}
+                iconSide="left"
+              />
+              {/* TODO: Wire replay event */}
+              <Button
+                label="Replay event"
+                onClick={() => {}}
+                appearance="outlined"
+                size="small"
+                disabled={isInternalEvent}
+              />
+            </div>
+          );
+        }}
       />
     </>
   );

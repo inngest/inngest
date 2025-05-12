@@ -3,6 +3,7 @@ import NextLink from 'next/link';
 import { Time } from '@inngest/components/Time';
 import { usePrettyJson } from '@inngest/components/hooks/usePrettyJson';
 import { type Event } from '@inngest/components/types/event';
+import { devServerURL, useDevServer } from '@inngest/components/utils/useDevServer';
 import { RiArrowRightSLine } from '@remixicon/react';
 import { useQuery } from '@tanstack/react-query';
 import { type Row } from '@tanstack/react-table';
@@ -38,6 +39,7 @@ export function EventDetails({
   const eventInfoRef = useRef<HTMLDivElement>(null);
   const [leftWidth, setLeftWidth] = useState(70);
   const [isDragging, setIsDragging] = useState(false);
+  const { isRunning, send } = useDevServer();
 
   const {
     isPending, // first load, no data
@@ -107,12 +109,12 @@ export function EventDetails({
   return (
     <div ref={containerRef} className="flex flex-row">
       <div ref={leftColumnRef} className="flex flex-col gap-2" style={{ width: `${leftWidth}%` }}>
-        <div ref={eventInfoRef} className="flex flex-col gap-3">
-          <div className="flex h-8 items-center justify-between gap-1 px-4">
+        <div ref={eventInfoRef} className="flex flex-col">
+          <div className="mb-3 flex h-8 items-center justify-between gap-1 px-4">
             <p className="text-muted text-sm">{row.original.name}</p>
             {expandedRowActions(row.original.name)}
           </div>
-          <div className="flex flex-row flex-wrap items-center justify-start gap-x-10 gap-y-4 px-4">
+          <div className="mb-3 flex flex-row flex-wrap items-center justify-start gap-x-10 gap-y-4 px-4">
             <ElementWrapper label="Event ID">
               {isPending ? (
                 <SkeletonElement />
@@ -159,6 +161,16 @@ export function EventDetails({
                   content: prettyPayload,
                 }}
                 allowFullScreen={true}
+                actions={[
+                  {
+                    label: 'Send to Dev Server',
+                    title: isRunning
+                      ? 'Send event payload to running Dev Server'
+                      : `Dev Server is not running at ${devServerURL}`,
+                    onClick: () => send(eventPayloadData?.payload || ''),
+                    disabled: !isRunning,
+                  },
+                ]}
               />
             </div>
           )}
