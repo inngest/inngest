@@ -77,7 +77,7 @@ export default function EventsPage({
           </>
         }
         expandedRowActions={(eventName) => {
-          const isInternalEvent = Boolean(eventName?.startsWith('inngest/'));
+          const isInternalEvent = Boolean(eventName.startsWith('inngest/'));
           return (
             <div className="flex items-center gap-2">
               <Button
