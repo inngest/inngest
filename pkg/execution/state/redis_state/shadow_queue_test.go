@@ -819,7 +819,7 @@ func TestRefillConstraints(t *testing.T) {
 		customConcurrencyKey1InProgress int
 		customConcurrencyKey2InProgress int
 
-		throttleCapacityUsed int
+		// throttleCapacityUsed int
 	}
 
 	type tableTest struct {
