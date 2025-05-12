@@ -4,8 +4,8 @@ export type Event = {
   payload?: string;
   receivedAt: Date;
   source?: string;
-  version?: string;
-  idempotencyKey?: string;
+  version?: string | null;
+  idempotencyKey?: string | null;
   occurredAt?: Date;
   runs?: {
     fnName?: string;

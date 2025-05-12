@@ -152,7 +152,11 @@ export function useEventDetails() {
       }
 
       const eventData = result.data.environment.eventV2;
-      return eventData;
+      return {
+        ...eventData,
+        receivedAt: new Date(eventData.receivedAt),
+        occurredAt: eventData.occurredAt ? new Date(eventData.occurredAt) : undefined,
+      };
     },
     [client, envID]
   );
