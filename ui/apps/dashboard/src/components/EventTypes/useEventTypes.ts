@@ -201,3 +201,44 @@ export function useEventType({ eventName }: { eventName: string }) {
     },
   });
 }
+
+export const allEventTypesQuery = graphql(`
+  query GetAllEventNames($envID: ID!) {
+    environment: workspace(id: $envID) {
+      eventTypesV2(first: 1000, filter: {}) {
+        edges {
+          node {
+            name
+          }
+        }
+      }
+    }
+  }
+`);
+
+export function useAllEventTypes() {
+  const envID = useEnvironment().id;
+  const client = useClient();
+
+  return useCallback(async () => {
+    const result = await client
+      .query(allEventTypesQuery, { envID }, { requestPolicy: 'network-only' })
+      .toPromise();
+
+    if (result.error) {
+      throw new Error(result.error.message);
+    }
+
+    if (!result.data) {
+      throw new Error('no data returned');
+    }
+
+    const eventsData = result.data.environment.eventTypesV2;
+    const events = eventsData.edges.map(({ node }) => ({
+      id: node.name,
+      name: node.name,
+    }));
+
+    return events;
+  }, [client, envID]);
+}

@@ -14,10 +14,11 @@ import {
   useCalculatedStartTime,
 } from '@inngest/components/hooks/useCalculatedStartTime';
 import { type Event, type PageInfo } from '@inngest/components/types/event';
+import { type EventType } from '@inngest/components/types/eventType';
 import { cn } from '@inngest/components/utils/classNames';
 import { durationToString, parseDuration } from '@inngest/components/utils/date';
 import { RiArrowRightUpLine, RiSearchLine } from '@remixicon/react';
-import { useInfiniteQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 
 import type { RangeChangeProps } from '../DatePicker/RangePicker';
 import EntityFilter from '../Filter/EntityFilter';
@@ -39,6 +40,7 @@ export function EventsTable({
   getEvents,
   getEventDetails,
   getEventPayload,
+  getEventTypes,
   pathCreator,
   emptyActions,
   expandedRowActions,
@@ -67,6 +69,7 @@ export function EventsTable({
   }) => Promise<{ events: Omit<Event, 'payload'>[]; pageInfo: PageInfo; totalCount: number }>;
   getEventDetails: ({ eventID }: { eventID: string }) => Promise<Omit<Event, 'payload'>>;
   getEventPayload: ({ eventID }: { eventID: string }) => Promise<Pick<Event, 'payload'>>;
+  getEventTypes: () => Promise<Required<Pick<EventType, 'name' | 'id'>>[]>;
   features: Pick<Features, 'history'>;
 }) {
   const columns = useColumns({ pathCreator });
@@ -139,6 +142,11 @@ export function EventsTable({
       events: data.pages.flatMap((page) => page.events),
       totalCount: data.pages[data.pages.length - 1]?.totalCount ?? 0,
     }),
+  });
+
+  const { data: eventTypesData } = useQuery({
+    queryKey: ['event-types'],
+    queryFn: () => getEventTypes(),
   });
 
   const onSearchChange = useCallback(
@@ -220,7 +228,7 @@ export function EventsTable({
               type="event"
               onFilterChange={onEventFilterChange}
               selectedEntities={filteredEvent ?? []}
-              entities={[]}
+              entities={eventTypesData ?? []}
             />
             <Button
               icon={<RiSearchLine />}

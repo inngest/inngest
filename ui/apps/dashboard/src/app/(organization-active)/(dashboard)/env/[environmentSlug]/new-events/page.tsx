@@ -8,6 +8,7 @@ import { Header } from '@inngest/components/Header/Header';
 import { RefreshButton } from '@inngest/components/Refresh/RefreshButton';
 import { RiArrowRightUpLine, RiExternalLinkLine, RiRefreshLine } from '@remixicon/react';
 
+import { useAllEventTypes } from '@/components/EventTypes/useEventTypes';
 import { EventInfo } from '@/components/Events/EventInfo';
 import SendEventButton from '@/components/Events/SendEventButton';
 import { useEventDetails, useEventPayload, useEvents } from '@/components/Events/useEvents';
@@ -33,6 +34,7 @@ export default function EventsPage({
   const getEvents = useEvents();
   const getEventDetails = useEventDetails();
   const getEventPayload = useEventPayload();
+  const getEventTypes = useAllEventTypes();
   const features = useAccountFeatures();
 
   return (
@@ -52,6 +54,7 @@ export default function EventsPage({
         getEvents={getEvents}
         getEventDetails={getEventDetails}
         getEventPayload={getEventPayload}
+        getEventTypes={getEventTypes}
         features={{
           history: features.data?.history ?? 7,
         }}
