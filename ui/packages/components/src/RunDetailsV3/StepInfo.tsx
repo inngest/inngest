@@ -152,6 +152,7 @@ export const StepInfo = ({ selectedStep }: { selectedStep: StepInfoType }) => {
           />
 
           <span className="text-basis text-sm font-normal">
+            {/* @ts-ignore - temporarily until we get monorepo deployed */}
             {trace.isUserland && 'OTel/'}
             {trace.name}
           </span>
@@ -212,9 +213,7 @@ export const StepInfo = ({ selectedStep }: { selectedStep: StepInfoType }) => {
         </div>
       )}
 
-      {trace.isUserland && trace.userlandSpan ? (
-        <UserlandAttrs userlandSpan={trace.userlandSpan} />
-      ) : (
+      {false ? null : (
         <Tabs
           defaultActive={result?.error ? 'error' : prettyInput ? 'input' : 'output'}
           tabs={[

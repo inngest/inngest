@@ -51,7 +51,9 @@ export function Span({ className, isInline, maxTime, minTime, span: trace }: Pro
         <div
           className={cn(
             'z-0 h-5 rounded-sm transition-shadow',
+            // @ts-ignore - temporarily until we get monorepo deployed
             trace.isUserland ? 'bg-quaternary-coolxSubtle' : getStatusBackgroundClass(trace.status),
+            // @ts-ignore - temporarily until we get monorepo deployed
             trace.isUserland ? 'border-quaternary-coolxSubtle' : getStatusBorderClass(trace.status)
           )}
           style={{ flexGrow: widths.running }}
