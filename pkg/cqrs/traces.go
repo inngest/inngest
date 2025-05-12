@@ -50,6 +50,24 @@ type Span struct {
 	Children []*Span `json:"spans"`
 }
 
+func (s *Span) IsUserland() bool {
+	_, isUserland := s.SpanAttributes[consts.OtelScopeUserland]
+
+	return isUserland
+}
+
+func (s *Span) UserlandChildren() []*Span {
+	if s.IsUserland() {
+		return s.Children
+	}
+
+	if len(s.Children) > 0 && s.Children[0].IsUserland() && len(s.Children[0].Children) > 0 {
+		return s.Children[0].Children
+	}
+
+	return nil
+}
+
 func (s *Span) GroupID() *string {
 	if groupID, ok := s.SpanAttributes[consts.OtelSysStepGroupID]; ok {
 		return &groupID
@@ -226,6 +244,9 @@ type TraceReader interface {
 	GetSpanOutput(ctx context.Context, id SpanIdentifier) (*SpanOutput, error)
 	// GetSpanStack retrieves the step stack for the specified span
 	GetSpanStack(ctx context.Context, id SpanIdentifier) ([]string, error)
+	// TODO move to dedicated entitlement interface once that is implemented properly
+	// for both oss & cloud
+	OtelTracesEnabled(ctx context.Context, accountID uuid.UUID) (bool, error)
 }
 
 type GetTraceRunOpt struct {

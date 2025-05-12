@@ -14,6 +14,16 @@ export type Trace = {
   stepOp?: string | null;
 };
 
+export type UserlandSpanType = {
+  spanName: string | null;
+  spanKind: string | null;
+  serviceName: string | null;
+  scopeName: string | null;
+  scopeVersion: string | null;
+  spanAttrs: string | null;
+  resourceAttrs: string | null;
+};
+
 export type StepInfoInvoke = {
   triggeringEventID: string;
   functionID: string;
