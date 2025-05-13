@@ -52,7 +52,8 @@ local backlogID               = ARGV[13]
 -- $include(ends_with.lua)
 
 -- Only skip idempotency checks if we're normalizing a backlog (we want to enqueue an existing item to a new backlog)
-if exists_without_ending(keyNormalizeFromBacklogSet, ":-") ~= true then
+local is_normalize = exists_without_ending(keyNormalizeFromBacklogSet, ":-")
+if not is_normalize then
   -- Check idempotency exists
   if redis.call("EXISTS", idempotencyKey) ~= 0 then
     return 1
@@ -72,7 +73,7 @@ else
 end
 
 -- Normalization only: Remove from old backlog after enqueueing to new backlog
-if exists_without_ending(keyNormalizeFromBacklogSet, ":-") == true then
+if is_normalize then
   redis.call("ZREM", keyNormalizeFromBacklogSet, queueID)
 end
 
