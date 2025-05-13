@@ -40,7 +40,7 @@ func (v v2) Create(ctx context.Context, s state.CreateState) (statev1.State, err
 	for n, evt := range s.Events {
 		data := map[string]any{}
 		if err := json.Unmarshal(evt, &data); err != nil {
-			return err
+			return nil, err
 		}
 		batchData[n] = data
 
