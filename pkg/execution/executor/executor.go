@@ -937,7 +937,7 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 		// Handle generator responses then return.
 		if serr := e.HandleGeneratorResponse(ctx, i, i.resp); serr != nil {
 			// If this is an error compiling async expressions, fail the function.
-			shouldFailEarly := errors.Is(serr, &expressions.CompileError{}) || errors.Is(serr, state.ErrStateOverflowed) || errors.Is(serr, state.ErrFunctionOverflowed)
+			shouldFailEarly := errors.Is(serr, &expressions.CompileError{}) || errors.Is(serr, state.ErrStateOverflowed) || errors.Is(serr, state.ErrFunctionOverflowed) || errors.Is(serr, state.ErrSignalConflict)
 
 			if shouldFailEarly {
 				var gracefulErr *state.WrappedStandardError
@@ -2602,6 +2602,14 @@ func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, i *runInsta
 	})
 	if err == state.ErrPauseAlreadyExists {
 		return nil
+	}
+	if err == state.ErrSignalConflict {
+		return state.WrapInStandardError(
+			err,
+			"Error",
+			"Signal conflict; signal wait already exists for another run",
+			"",
+		)
 	}
 	if err != nil {
 		return err

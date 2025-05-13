@@ -10,13 +10,15 @@ Output:
 local pauseKey      = KEYS[1]
 local pauseEventKey = KEYS[2]
 local pauseInvokeKey = KEYS[3]
-local keyPauseAddIdx = KEYS[4]
-local keyPauseExpIdx = KEYS[5]
-local keyRunPauses   = KEYS[6]
-local keyPausesIdx   = KEYS[7]
+local pauseSignalKey = KEYS[4]
+local keyPauseAddIdx = KEYS[5]
+local keyPauseExpIdx = KEYS[6]
+local keyRunPauses   = KEYS[7]
+local keyPausesIdx   = KEYS[8]
 
 local pauseID       = ARGV[1]
 local invokeCorrelationId = ARGV[2]
+local signalCorrelationId = ARGV[3]
 
 redis.call("HDEL", pauseEventKey, pauseID)
 redis.call("DEL", pauseKey)
@@ -28,6 +30,13 @@ redis.call("SREM", keyPausesIdx, pauseID)
 
 if invokeCorrelationId ~= false and invokeCorrelationId ~= "" and invokeCorrelationId ~= nil then
   redis.call("HDEL", pauseInvokeKey, invokeCorrelationId)
+end
+
+if signalCorrelationId ~= false and signalCorrelationId ~= "" and signalCorrelationId ~= nil then
+  -- Ensure we only remove the signal if it belongs to this pause
+  if redis.call("HGET", pauseSignalKey, signalCorrelationId) == pauseID then
+    redis.call("HDEL", pauseSignalKey, signalCorrelationId)
+  end
 end
 
 -- Add an index of when the pause was added.

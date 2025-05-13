@@ -845,6 +845,10 @@ func (m unshardedMgr) SavePause(ctx context.Context, p state.Pause) (int64, erro
 		args,
 	).AsInt64()
 	if err != nil {
+		if err.Error() == "signal already exists with different pause ID" {
+			return 0, state.ErrSignalConflict
+		}
+
 		return 0, fmt.Errorf("error finalizing: %w", err)
 	}
 
@@ -994,7 +998,9 @@ func (m unshardedMgr) DeletePauseByID(ctx context.Context, pauseID uuid.UUID) er
 		return m.DeletePause(ctx, *pause)
 	}
 
-	// This won't delete event keys nicely, but still gets the pause yeeted.
+	// This won't delete event keys, invoke correlations, or signals nicely,
+	// but still gets the pause yeeted. Critically, this means a dangling
+	// signal in the DB.
 	return m.DeletePause(ctx, state.Pause{
 		ID: pauseID,
 	})
@@ -1019,9 +1025,14 @@ func (m unshardedMgr) DeletePause(ctx context.Context, p state.Pause) error {
 		evt = *p.Event
 	}
 
-	corrId := ""
+	invokeCorrId := ""
 	if p.InvokeCorrelationID != nil && *p.InvokeCorrelationID != "" {
-		corrId = *p.InvokeCorrelationID
+		invokeCorrId = *p.InvokeCorrelationID
+	}
+
+	signalCorrId := ""
+	if p.SignalID != nil {
+		signalCorrId = *p.SignalID
 	}
 
 	pauseKey := pause.kg.Pause(ctx, p.ID)
@@ -1032,6 +1043,7 @@ func (m unshardedMgr) DeletePause(ctx context.Context, p state.Pause) error {
 		eventKey,
 		// Warning: We need to access global keys, which must be colocated on the same Redis cluster
 		global.kg.Invoke(ctx, p.WorkspaceID),
+		global.kg.Signal(ctx, p.WorkspaceID),
 		pause.kg.PauseIndex(ctx, "add", p.WorkspaceID, evt),
 		pause.kg.PauseIndex(ctx, "exp", p.WorkspaceID, evt),
 		runPausesKey,
@@ -1044,7 +1056,8 @@ func (m unshardedMgr) DeletePause(ctx context.Context, p state.Pause) error {
 		keys,
 		[]string{
 			p.ID.String(),
-			corrId,
+			invokeCorrId,
+			signalCorrId,
 		},
 	).AsInt64()
 	if err != nil {

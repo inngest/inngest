@@ -53,4 +53,19 @@ if signalCorrelationID ~= false and signalCorrelationID ~= "" and signalCorrelat
 	redis.call("HSETNX", pauseSignalKey, signalCorrelationID, pauseID)
 end
 
+if signalCorrelationID ~= false and signalCorrelationID ~= "" and signalCorrelationID ~= nil then
+	if redis.call("HSETNX", pauseSignalKey, signalCorrelationID, pauseID) == 0 then
+		-- The signal already exists! The rarer case now is that this is an
+		-- idempotent retry for saving a pause, so let's check if we're trying
+		-- to save this pause for the same run / step ID. If not, we need to
+		-- return an error to roll back all of these changes, as we're trying
+		-- to duplicate a signal.
+		local existing = redis.call("HGET", pauseSignalKey, signalCorrelationID)
+		if existing ~= pauseID then
+			return redis.error_reply("signal already exists with different pause ID")
+		end
+	end
+end
+
+
 return redis.call("ZCARD", keyPauseAddIdx)
