@@ -50,10 +50,6 @@ if invokeCorrelationID ~= false and invokeCorrelationID ~= "" and invokeCorrelat
 end
 
 if signalCorrelationID ~= false and signalCorrelationID ~= "" and signalCorrelationID ~= nil then
-	redis.call("HSETNX", pauseSignalKey, signalCorrelationID, pauseID)
-end
-
-if signalCorrelationID ~= false and signalCorrelationID ~= "" and signalCorrelationID ~= nil then
 	if redis.call("HSETNX", pauseSignalKey, signalCorrelationID, pauseID) == 0 then
 		-- The signal already exists! The rarer case now is that this is an
 		-- idempotent retry for saving a pause, so let's check if we're trying
