@@ -246,9 +246,18 @@ func (m shardedMgr) New(ctx context.Context, input state.Input) (state.State, er
 	//
 	{
 		st, err := m.idempotencyCheck(ctx, client, fnRunState.kg.Idempotency(ctx, isSharded, input.Identifier), input.Identifier)
-		if err != nil {
+		switch err {
+		// NOTE:
+		// This will happen as part of the transition of storing empty strings for idempotency
+		// key to ULID values.
+		// So if this error is returned, we should just continue with creating a new state, since
+		// it could mean that the state is not actually created.
+		case state.ErrInvalidIdentifier:
+			// no-op, continue
+		default:
 			return nil, err
 		}
+
 		// If a state already exists with the idempotency key, then we'll just return the state here.
 		if st != nil {
 			return st, err

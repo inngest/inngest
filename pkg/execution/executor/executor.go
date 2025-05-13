@@ -600,7 +600,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	st, err := e.smv2.Create(ctx, newState)
 	switch err {
 	case nil, state.ErrIdentifierExists:
-		// no-op, continue
+		// no-op: this is safe, continue
 	default:
 		return nil, fmt.Errorf("error creating run state: %w", err)
 	}
