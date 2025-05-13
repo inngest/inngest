@@ -59,16 +59,13 @@ export default function ResyncModal({
     url = overrideValue;
   }
 
-  // Focus the action button when the modal opens
   useEffect(() => {
-    // Always use a timeout to ensure the modal is fully rendered first
     const focusTimer = setTimeout(() => {
       if (isOpen && actionButtonRef.current) {
         actionButtonRef.current.focus();
       }
     }, 50);
 
-    // Clean up timer if component unmounts
     return () => clearTimeout(focusTimer);
   }, [isOpen]);
 
