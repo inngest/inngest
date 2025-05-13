@@ -3093,21 +3093,7 @@ func (e *executor) validateStateSize(outputSize int, md sv2.Metadata) error {
 }
 
 func (e *executor) ReceiveSignal(ctx context.Context, workspaceID uuid.UUID, signalID string, data json.RawMessage) (res *execution.ReceiveSignalResult, err error) {
-	log := e.log
-	if log == nil {
-		log = logger.From(ctx)
-	}
-	l := log.With().Str("signal_id", signalID).Str("workspace_id", workspaceID.String()).Logger()
-
-	defer func() {
-		if err != nil {
-			l.Error().Err(err).Msg("error receiving signal")
-		} else {
-			l.Info().Msg("signal received")
-		}
-	}()
-
-	if workspaceID.String() == "" {
+	if workspaceID == uuid.Nil {
 		err = fmt.Errorf("workspace ID is empty")
 		return
 	}
@@ -3117,9 +3103,29 @@ func (e *executor) ReceiveSignal(ctx context.Context, workspaceID uuid.UUID, sig
 		return
 	}
 
+	log := e.log
+	if log == nil {
+		log = logger.From(ctx)
+	}
+	l := log.With().Str("signal_id", signalID).Str("workspace_id", workspaceID.String()).Logger()
+	defer func() {
+		if err != nil {
+			l.Error().Err(err).Msg("error receiving signal")
+		} else {
+			l.Info().Msg("signal received")
+		}
+	}()
+
 	pause, err := e.pm.PauseBySignalID(ctx, workspaceID, signalID)
 	if err != nil {
 		err = fmt.Errorf("error getting pause by signal ID: %w", err)
+		return
+	}
+
+	res = &execution.ReceiveSignalResult{}
+
+	if pause == nil {
+		l.Debug().Msg("no pause found for signal")
 		return
 	}
 
@@ -3129,7 +3135,7 @@ func (e *executor) ReceiveSignal(ctx context.Context, workspaceID uuid.UUID, sig
 		shouldDelete := pause.Expires.Time().Add(consts.PauseExpiredDeletionGracePeriod).Before(time.Now())
 		if shouldDelete {
 			l.Debug().Msg("deleting expired pause")
-			_ = e.pm.DeletePause(context.Background(), *pause)
+			_ = e.pm.DeletePause(ctx, *pause)
 		}
 
 		return
@@ -3139,18 +3145,26 @@ func (e *executor) ReceiveSignal(ctx context.Context, workspaceID uuid.UUID, sig
 
 	log.Debug().Str("pause.DataKey", pause.DataKey).Msg("resuming pause from signal")
 
-	e.Resume(ctx, *pause, execution.ResumeRequest{
+	err = e.Resume(ctx, *pause, execution.ResumeRequest{
 		RunID:    &pause.Identifier.RunID,
 		StepName: pause.StepName,
 		With: map[string]any{
 			execution.StateDataKey: data,
 		},
 	})
+	if err != nil {
+		if errors.Is(err, state.ErrPauseLeased) ||
+			errors.Is(err, state.ErrPauseNotFound) ||
+			errors.Is(err, state.ErrRunNotFound) {
+			// Just return that we found nothing
+			err = nil
+		}
 
-	res = &execution.ReceiveSignalResult{
-		Success: true,
-		RunID:   &pause.Identifier.RunID,
+		return
 	}
+
+	res.MatchedSignal = true
+	res.RunID = &pause.Identifier.RunID
 
 	return
 }

@@ -120,8 +120,8 @@ type Executor interface {
 }
 
 type ReceiveSignalResult struct {
-	Success bool
-	RunID   *ulid.ULID
+	MatchedSignal bool
+	RunID         *ulid.ULID
 }
 
 // PublishFinishedEventOpts represents the options for publishing a finished event.

@@ -27,7 +27,6 @@ var (
 	// that doesn't exist within the backing state store.
 	ErrPauseNotFound       = fmt.Errorf("pause not found")
 	ErrInvokePauseNotFound = fmt.Errorf("invoke pause not found")
-	ErrSignalPauseNotFound = fmt.Errorf("signal pause not found")
 	ErrRunNotFound         = fmt.Errorf("run not found in state store")
 	// ErrPauseLeased is returned when attempting to lease a pause that is
 	// already leased by another event.

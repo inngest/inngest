@@ -1186,17 +1186,27 @@ func (m unshardedMgr) PauseBySignalID(ctx context.Context, wsID uuid.UUID, signa
 	cmd := global.Client().B().Hget().Key(key).Field(signalID).Build()
 	pauseIDstr, err := global.Client().Do(ctx, cmd).ToString()
 	if err == rueidis.Nil {
-		return nil, state.ErrSignalPauseNotFound
+		return nil, nil
 	}
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to get signalID: %w", err)
 	}
 
 	pauseID, err := uuid.Parse(pauseIDstr)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse pauseID UUID: %w", err)
 	}
-	return m.PauseByID(ctx, pauseID)
+
+	p, err := m.PauseByID(ctx, pauseID)
+	if err != nil {
+		if err == state.ErrPauseNotFound {
+			return nil, nil
+		}
+
+		return nil, fmt.Errorf("failed to get pause by ID: %w", err)
+	}
+
+	return p, nil
 }
 
 func (m unshardedMgr) PausesByID(ctx context.Context, ids ...uuid.UUID) ([]*state.Pause, error) {
