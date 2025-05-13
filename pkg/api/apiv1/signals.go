@@ -14,8 +14,7 @@ type ReceiveSignalRequest struct {
 }
 
 type ReceiveSignalResponse struct {
-	MatchedSignal bool   `json:"matched_signal"`
-	RunID         string `json:"run_id"`
+	RunID string `json:"run_id"`
 }
 
 func (a router) receiveSignal(w http.ResponseWriter, r *http.Request) {
@@ -45,8 +44,7 @@ func (a router) receiveSignal(w http.ResponseWriter, r *http.Request) {
 	}
 
 	res := ReceiveSignalResponse{
-		MatchedSignal: signalRes.MatchedSignal,
-		RunID:         signalRes.RunID.String(),
+		RunID: signalRes.RunID.String(),
 	}
 
 	_ = WriteResponse(w, res)
