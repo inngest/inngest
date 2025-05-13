@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@inngest/components/Button/Button';
 import { EventsTable } from '@inngest/components/Events/EventsTable';
+import { InternalEventsToggle } from '@inngest/components/Events/InternalEventsToggle';
 import { Header } from '@inngest/components/Header/Header';
 import { RefreshButton } from '@inngest/components/Refresh/RefreshButton';
 import { RiArrowRightUpLine, RiExternalLinkLine, RiRefreshLine } from '@remixicon/react';
@@ -46,6 +47,7 @@ export default function EventsPage({
           <div className="flex items-center gap-1.5">
             <RefreshButton />
             <SendEventButton />
+            <InternalEventsToggle />
           </div>
         }
       />

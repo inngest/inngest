@@ -24,6 +24,7 @@ import type { RangeChangeProps } from '../DatePicker/RangePicker';
 import EntityFilter from '../Filter/EntityFilter';
 import {
   useBatchedSearchParams,
+  useBooleanSearchParam,
   useSearchParam,
   useStringArraySearchParam,
 } from '../hooks/useSearchParam';
@@ -59,6 +60,7 @@ export function EventsTable({
     startTime,
     endTime,
     celQuery,
+    includeInternalEvents,
   }: {
     eventNames: string[] | null;
     cursor: string | null;
@@ -66,6 +68,7 @@ export function EventsTable({
     startTime: string;
     endTime: string | null;
     celQuery?: string;
+    includeInternalEvents?: boolean;
   }) => Promise<{ events: Event[]; pageInfo: PageInfo; totalCount: number }>;
   getEventDetails: ({ eventID }: { eventID: string }) => Promise<Event>;
   getEventPayload: ({ eventID }: { eventID: string }) => Promise<Pick<Event, 'payload'>>;
@@ -80,6 +83,7 @@ export function EventsTable({
   const batchUpdate = useBatchedSearchParams();
   const [filteredEvent, setFilteredEvent, removeFilteredEvent] =
     useStringArraySearchParam('filterEvent');
+  const [includeInternalEvents] = useBooleanSearchParam('includeInternal');
   const [search, setSearch, removeSearch] = useSearchParam('search');
   const source = undefined;
   const [expandedIDs, setExpandedIDs] = useState<string[]>([]);
@@ -119,6 +123,7 @@ export function EventsTable({
         startTime: calculatedStartTime.toISOString(),
         endTime: endTime ?? null,
         celQuery: search,
+        includeInternalEvents: includeInternalEvents ?? true,
       },
     ],
     queryFn: ({ pageParam }: { pageParam: string | null }) =>

@@ -55,6 +55,7 @@ type EventsQueryVariables = {
   startTime: string;
   endTime: string | null;
   celQuery?: string;
+  includeInternalEvents?: boolean;
 };
 
 export function useEvents() {
@@ -62,8 +63,17 @@ export function useEvents() {
   const client = useClient();
 
   return useCallback(
-    async ({ cursor, endTime, source, eventNames, startTime, celQuery }: EventsQueryVariables) => {
-      console.log(source);
+    async ({
+      cursor,
+      endTime,
+      source,
+      eventNames,
+      startTime,
+      celQuery,
+      includeInternalEvents,
+    }: EventsQueryVariables) => {
+      // TODO: use params when available in the API
+      console.log(source, includeInternalEvents);
       const result = await client
         .query(
           eventsQuery,
