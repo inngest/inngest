@@ -324,3 +324,6 @@ func TestQueueBacklogNormalization(t *testing.T) {
 	require.False(t, hasMember(t, r, kg.AccountNormalizeSet(accountId), fnID.String()))
 	require.False(t, hasMember(t, r, kg.PartitionNormalizeSet(fnID.String()), backlog.BacklogID))
 }
+
+// TODO
+// func TestBacklogNormalizationScanner(t *testing.T) {}
