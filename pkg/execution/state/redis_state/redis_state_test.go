@@ -66,14 +66,94 @@ func TestNewRunMetadata(t *testing.T) {
 	}
 }
 
-func TestStateHarness(t *testing.T) {
-	r := miniredis.RunT(t)
+func TestIdempotencyCheck(t *testing.T) {
+	ctx := context.Background()
 
-	rc, err := rueidis.NewClient(rueidis.ClientOption{
-		InitAddress:  []string{r.Addr()},
-		DisableCache: true,
+	r, rc := initRedis(t)
+	defer rc.Close()
+
+	unshardedClient := NewUnshardedClient(rc, StateDefaultKey, QueueDefaultKey)
+	shardedClient := NewShardedClient(ShardedClientOpts{
+		UnshardedClient:        unshardedClient,
+		FunctionRunStateClient: rc,
+		BatchClient:            rc,
+		StateDefaultKey:        StateDefaultKey,
+		QueueDefaultKey:        QueueDefaultKey,
+		FnRunIsSharded:         AlwaysShardOnRun,
 	})
-	require.NoError(t, err)
+
+	acctID, wsID, appID, fnID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+	runID := ulid.MustNew(ulid.Now(), rand.Reader)
+
+	runState := shardedClient.fnRunState
+	ftc, shared := runState.Client(ctx, acctID, runID)
+	require.True(t, shared)
+
+	mgr := shardedMgr{s: shardedClient}
+
+	t.Run("with idempotency key defined", func(t *testing.T) {
+		id := state.Identifier{
+			AccountID:   acctID,
+			WorkspaceID: wsID,
+			AppID:       appID,
+			WorkflowID:  fnID,
+			RunID:       runID,
+			Key:         "yolo",
+		}
+		key := runState.kg.Idempotency(ctx, shared, id)
+
+		t.Run("returns nil if no idempotency key is available", func(t *testing.T) {
+			r.FlushAll()
+
+			st, err := mgr.idempotencyCheck(ctx, ftc, key, id)
+			require.NoError(t, err)
+			require.Nil(t, st)
+		})
+
+		t.Run("returns state if idempotency is already there", func(t *testing.T) {
+			r.FlushAll()
+
+			created, err := mgr.New(ctx, state.Input{
+				Identifier:     id,
+				EventBatchData: []map[string]any{},
+				Steps:          []state.MemoizedStep{},
+				StepInputs:     []state.MemoizedStep{},
+				Context: map[string]any{
+					"hello": "world",
+				},
+			})
+			require.NoError(t, err)
+
+			st, err := mgr.idempotencyCheck(ctx, ftc, key, id)
+			require.NoError(t, err)
+
+			require.Equal(t, created, st)
+		})
+
+		t.Run("returns invalid identifier error if previous value is not a ULID", func(t *testing.T) {
+			r.FlushAll()
+			require.NoError(t, r.Set(key, ""))
+
+			st, err := mgr.idempotencyCheck(ctx, ftc, key, id)
+			require.Nil(t, st)
+			require.ErrorIs(t, err, state.ErrInvalidIdentifier)
+		})
+	})
+
+	// t.Run("with idempotency key not defined", func(t *testing.T) {
+	// 	id := state.Identifier{
+	// 		AccountID:   acctID,
+	// 		WorkspaceID: wsID,
+	// 		AppID:       appID,
+	// 		WorkflowID:  fnID,
+	// 		RunID:       runID,
+	// 	}
+	// })
+}
+
+func TestStateHarness(t *testing.T) {
+	r, rc := initRedis(t)
+	defer rc.Close()
 
 	unshardedClient := NewUnshardedClient(rc, StateDefaultKey, QueueDefaultKey)
 	shardedClient := NewShardedClient(ShardedClientOpts{
@@ -111,6 +191,7 @@ func TestScanIter(t *testing.T) {
 		DisableCache: true,
 	})
 	require.NoError(t, err)
+	defer r.Close()
 
 	entries := 50_000
 	key := "test-scan"
@@ -151,6 +232,7 @@ func TestBufIter(t *testing.T) {
 		DisableCache: true,
 	})
 	require.NoError(t, err)
+	defer r.Close()
 
 	entries := 10_000
 	key := "test-bufiter"
@@ -185,6 +267,7 @@ func BenchmarkNew(b *testing.B) {
 		DisableCache: true,
 	})
 	require.NoError(b, err)
+	defer rc.Close()
 
 	statePrefix := "state"
 	unshardedClient := NewUnshardedClient(rc, statePrefix, QueueDefaultKey)
