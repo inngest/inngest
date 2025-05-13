@@ -156,6 +156,18 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 			return fmt.Errorf("could not refill backlog: %w", err)
 		}
 
+		// instrumentation
+		{
+			metrics.IncrQueueBacklogRefilledCounter(ctx, int64(res.Refilled), metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags: map[string]any{
+					"partition_id": shadowPart.PartitionID,
+				},
+			})
+			// NOTE: custom method to instrument result - potentially handling high cardinality data
+			q.instrumentBacklogResult(ctx, res)
+		}
+
 		// If backlog is limited by function or account-level concurrency, stop refilling
 		if res.Constraint == enums.QueueConstraintAccountConcurrency || res.Constraint == enums.QueueConstraintFunctionConcurrency {
 			q.removeShadowContinue(ctx, shadowPart, false)

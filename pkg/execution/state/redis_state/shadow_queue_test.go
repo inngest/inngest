@@ -810,8 +810,7 @@ func TestRefillConstraints(t *testing.T) {
 	}
 
 	type currentValues struct {
-		itemsInBacklog int
-
+		itemsInBacklog    int
 		itemsInReadyQueue int
 
 		accountInProgress               int
@@ -822,23 +821,18 @@ func TestRefillConstraints(t *testing.T) {
 		// throttleCapacityUsed int
 	}
 
-	type tableTest struct {
-		name string
-
-		currentValues currentValues
-
-		knobs knobs
-
-		expected expected
-	}
-
 	ck1 := createConcurrencyKey(enums.ConcurrencyScopeFn, fnID1, "bruno", 5)
 	ck1.UnhashedEvaluatedKeyValue = "bruno"
 
 	ck2 := createConcurrencyKey(enums.ConcurrencyScopeEnv, envID1, "inngest", 10)
 	ck2.UnhashedEvaluatedKeyValue = "inngest"
 
-	tests := []tableTest{
+	tests := []struct {
+		name          string
+		currentValues currentValues
+		knobs         knobs
+		expected      expected
+	}{
 		{
 			name: "simple item",
 			currentValues: currentValues{

@@ -561,6 +561,9 @@ func WithQueueShadowPartitionProcessCount(spc QueueShadowPartitionProcessCount) 
 	}
 }
 
+// BacklogInstrumentor provides the function to be used for instrumenting backlog results
+type BacklogInstrumentor func(ctx context.Context, result *BacklogRefillResult)
+
 func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 	ctx := context.Background()
 
@@ -660,6 +663,8 @@ func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 		shadowContinuationLimit: consts.DefaultQueueContinueLimit,
 		shadowContinues:         map[string]shadowContinuation{},
 		shadowContinueCooldown:  map[string]time.Time{},
+		// instrumentation
+		instrumentBacklogResult: func(ctx context.Context, result *BacklogRefillResult) {},
 	}
 
 	// default to using primary queue client for shard selection
@@ -784,6 +789,9 @@ type queue struct {
 	// instrumentationLeaseLock ensures that there are no data races writing to or
 	// reading from instrumentationLeaseID
 	instrumentationLeaseLock *sync.RWMutex
+	// instrumentBacklogResult is a function to instrument the result of backlog operations.
+	// this could be used to provide customer instrumentation methods
+	instrumentBacklogResult BacklogInstrumentor
 
 	// scavengerLeaseID stores the lease ID if this queue is the scavenger processor.
 	// all runners attempt to claim this lease automatically.
