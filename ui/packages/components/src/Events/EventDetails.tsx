@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import NextLink from 'next/link';
+import { ErrorCard } from '@inngest/components/RunDetailsV2/ErrorCard';
 import { Time } from '@inngest/components/Time';
 import { usePrettyJson } from '@inngest/components/hooks/usePrettyJson';
 import { type Event } from '@inngest/components/types/event';
@@ -45,6 +46,7 @@ export function EventDetails({
     isPending, // first load, no data
     error,
     data: eventDetailsData,
+    refetch: refetchEventDetails,
   } = useQuery({
     queryKey: ['event-details', { eventID: row.original.id }],
     queryFn: useCallback(() => {
@@ -52,7 +54,11 @@ export function EventDetails({
     }, [getEventDetails, row.original.id]),
   });
 
-  const { error: payloadError, data: eventPayloadData } = useQuery({
+  const {
+    error: payloadError,
+    data: eventPayloadData,
+    refetch: refetchPayload,
+  } = useQuery({
     queryKey: ['event-payload', { eventID: row.original.id }],
     queryFn: useCallback(() => {
       return getEventPayload({ eventID: row.original.id });
@@ -98,9 +104,8 @@ export function EventDetails({
     };
   }, [isDragging, handleMouseMove, handleMouseUp]);
 
-  if (error || payloadError) {
-    // TODO: error handling
-    console.log(error?.message || payloadError?.message);
+  if (error) {
+    return <ErrorCard error={error} reset={() => refetchEventDetails()} />;
   }
 
   const prettyPayload =
@@ -156,7 +161,7 @@ export function EventDetails({
           {prettyPayload && (
             <div className="border-subtle border-t pl-px">
               <CodeBlock
-                header={{ title: 'Payload', ...(error && { status: 'error' }) }}
+                header={{ title: 'Payload' }}
                 tab={{
                   content: prettyPayload,
                 }}
@@ -174,6 +179,7 @@ export function EventDetails({
               />
             </div>
           )}
+          {payloadError && <ErrorCard error={payloadError} reset={() => refetchPayload()} />}
         </div>
       </div>
 

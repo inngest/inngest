@@ -9,6 +9,7 @@ type Props = {
 export function ErrorCard({ error, reset }: Props) {
   return (
     <Alert
+      className="text-sm"
       severity="error"
       button={
         reset && (
