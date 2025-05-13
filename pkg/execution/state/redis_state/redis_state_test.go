@@ -91,7 +91,7 @@ func TestIdempotencyCheck(t *testing.T) {
 
 	mgr := shardedMgr{s: shardedClient}
 
-	t.Run("with idempotency key defined", func(t *testing.T) {
+	t.Run("with idempotency key defined in identifier", func(t *testing.T) {
 		id := state.Identifier{
 			AccountID:   acctID,
 			WorkspaceID: wsID,
@@ -140,15 +140,50 @@ func TestIdempotencyCheck(t *testing.T) {
 		})
 	})
 
-	// t.Run("with idempotency key not defined", func(t *testing.T) {
-	// 	id := state.Identifier{
-	// 		AccountID:   acctID,
-	// 		WorkspaceID: wsID,
-	// 		AppID:       appID,
-	// 		WorkflowID:  fnID,
-	// 		RunID:       runID,
-	// 	}
-	// })
+	t.Run("with idempotency key not defined in identifier", func(t *testing.T) {
+		id := state.Identifier{
+			AccountID:   acctID,
+			WorkspaceID: wsID,
+			AppID:       appID,
+			WorkflowID:  fnID,
+			RunID:       runID,
+		}
+		key := runState.kg.Idempotency(ctx, shared, id)
+
+		t.Run("returns nil if no idempotency key is available", func(t *testing.T) {
+			r.FlushAll()
+
+			st, err := mgr.idempotencyCheck(ctx, ftc, key, id)
+			require.NoError(t, err)
+			require.Nil(t, st)
+		})
+
+		t.Run("returns nil if runID is different", func(t *testing.T) {
+			r.FlushAll()
+
+			_, err := mgr.New(ctx, state.Input{
+				Identifier:     id,
+				EventBatchData: []map[string]any{},
+			})
+			require.NoError(t, err)
+
+			diffID := id // copy
+			diffID.RunID = ulid.MustNew(ulid.Now(), rand.Reader)
+			diffKey := runState.kg.Idempotency(ctx, shared, diffID)
+			st, err := mgr.idempotencyCheck(ctx, ftc, diffKey, diffID)
+			require.NoError(t, err)
+			require.Nil(t, st)
+		})
+
+		t.Run("returns invalid identifier error if previous value is not a ULID", func(t *testing.T) {
+			r.FlushAll()
+			require.NoError(t, r.Set(key, ""))
+
+			st, err := mgr.idempotencyCheck(ctx, ftc, key, id)
+			require.Nil(t, st)
+			require.ErrorIs(t, err, state.ErrInvalidIdentifier)
+		})
+	})
 }
 
 func TestStateHarness(t *testing.T) {

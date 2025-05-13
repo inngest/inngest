@@ -245,7 +245,8 @@ func (m shardedMgr) New(ctx context.Context, input state.Input) (state.State, er
 	// In future/other metadata stores this is (or will be) transactional.
 	//
 	{
-		st, err := m.idempotencyCheck(ctx, client, fnRunState.kg.Idempotency(ctx, isSharded, input.Identifier), input.Identifier)
+		key := fnRunState.kg.Idempotency(ctx, isSharded, input.Identifier)
+		st, err := m.idempotencyCheck(ctx, client, key, input.Identifier)
 		switch err {
 		case nil: // no-op
 		// NOTE:
