@@ -261,7 +261,7 @@ func (m shardedMgr) New(ctx context.Context, input state.Input) (state.State, er
 
 		// If a state already exists with the idempotency key, then we'll just return the state here.
 		if st != nil {
-			return st, nil
+			return st, state.ErrIdentifierExists
 		}
 	}
 
