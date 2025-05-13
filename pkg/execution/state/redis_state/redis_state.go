@@ -243,14 +243,16 @@ func (m shardedMgr) New(ctx context.Context, input state.Input) (state.State, er
 	// atomicity to improve idempotency.
 	//
 	// In future/other metadata stores this is (or will be) transactional.
-	res := client.Do(ctx, func(c rueidis.Client) rueidis.Completed {
-		return c.B().Set().Key(
-			fnRunState.kg.Idempotency(ctx, isSharded, input.Identifier),
-		).Value("").Nx().Ex(consts.FunctionIdempotencyPeriod).Build()
-	})
-	set, err := res.AsBool()
-	if (err == nil || rueidis.IsRedisNil(err)) && !set {
-		return nil, state.ErrIdentifierExists
+	//
+	{
+		st, err := m.idempotencyCheck(ctx, client, fnRunState.kg.Idempotency(ctx, isSharded, input.Identifier), input.Identifier)
+		if err != nil {
+			return nil, err
+		}
+		// If a state already exists with the idempotency key, then we'll just return the state here.
+		if st != nil {
+			return st, err
+		}
 	}
 
 	// We marshal this ahead of creating a redis transaction as it's necessary
@@ -334,6 +336,36 @@ func (m shardedMgr) New(ctx context.Context, input state.Input) (state.State, er
 			make([]string, 0),
 		),
 		nil
+}
+
+// idempotencyCheck checks if the function state already exists, and return the existing state
+// if it does
+func (m shardedMgr) idempotencyCheck(ctx context.Context, rc RetriableClient, key string, id state.Identifier) (state.State, error) {
+	prev, err := rc.Do(ctx, func(c rueidis.Client) rueidis.Completed {
+		return c.B().
+			Set().
+			Key(key).
+			Value(id.RunID.String()).
+			Nx().
+			Get(). // retrieve the previous value if exists
+			Ex(consts.FunctionIdempotencyPeriod).
+			Build()
+	}).ToString()
+	if err == rueidis.Nil {
+		return nil, nil // no previous state exists, entirely new
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	// if there are existing values, the state might have already been created
+	runID, err := ulid.Parse(prev)
+	if err != nil {
+		// there already is a value but is not a valid ULID
+		return nil, state.ErrInvalidIdentifier
+	}
+
+	return m.Load(ctx, id.AccountID, runID)
 }
 
 func (m shardedMgr) UpdateMetadata(ctx context.Context, accountID uuid.UUID, runID ulid.ULID, md state.MetadataUpdate) error {

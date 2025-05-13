@@ -606,6 +606,10 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	}
 	// override the runID from the state if it doesn't match.
 	// this can happen on scheduling retries due to errors like networking, or abrupt failures
+	//
+	// TODO: update the code from here on to reference the `state` returned instead of using
+	// previous values to avoid weird mismatch issues.
+	// right now, the only mismatch should just be the runID
 	if metadata.ID.RunID != st.RunID() {
 		metadata.ID.RunID = st.RunID()
 	}
