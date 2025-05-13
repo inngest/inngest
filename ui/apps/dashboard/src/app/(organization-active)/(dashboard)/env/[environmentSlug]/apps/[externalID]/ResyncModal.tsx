@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Alert } from '@inngest/components/Alert';
 import { Button } from '@inngest/components/Button';
 import { Input } from '@inngest/components/Forms/Input';
@@ -53,10 +53,24 @@ export default function ResyncModal({
   const [isSyncing, setIsSyncing] = useState(false);
   const env = useEnvironment();
   const [, resyncApp] = useMutation(ResyncAppDocument);
+  const actionButtonRef = useRef<HTMLButtonElement>(null);
 
   if (isURLOverridden) {
     url = overrideValue;
   }
+
+  // Focus the action button when the modal opens
+  useEffect(() => {
+    // Always use a timeout to ensure the modal is fully rendered first
+    const focusTimer = setTimeout(() => {
+      if (isOpen && actionButtonRef.current) {
+        actionButtonRef.current.focus();
+      }
+    }, 50);
+
+    // Clean up timer if component unmounts
+    return () => clearTimeout(focusTimer);
+  }, [isOpen]);
 
   async function onSync() {
     setIsSyncing(true);
@@ -196,10 +210,12 @@ export default function ResyncModal({
         />
 
         <Button
+          ref={actionButtonRef}
           onClick={onSync}
           disabled={isSyncing || (!isURLOverridden && isConnect)}
           kind="primary"
           label={isConnect ? 'Migrate app' : 'Resync app'}
+          autoFocus
         />
       </Modal.Footer>
     </Modal>
