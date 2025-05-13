@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -28,6 +29,7 @@ import (
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
 	"go.opentelemetry.io/otel/propagation"
+	"go.opentelemetry.io/otel/trace"
 )
 
 var (
@@ -98,12 +100,64 @@ func (e executor) Execute(ctx context.Context, sl sv2.StateLoader, s sv2.Metadat
 		return nil, err
 	}
 
+	headers := map[string]string{}
+
+	span := trace.SpanFromContext(ctx)
+	sc := span.SpanContext()
+
+	// Add some items to trace state to ensure that the SDK can parrot them
+	// back to us for userland spans.
+	//
+	// After a tracing refactor, this will no longer be required to send to
+	// SDKs because they will not need to parrot back any data.
+	ts, err := sc.TraceState().Insert("inngest@app", s.ID.Tenant.AppID.String())
+	if err != nil {
+		// Not a failure; only userland spans suffer, so log and ignore
+		log.From(ctx).Warn().
+			Str("run_id", s.ID.RunID.String()).
+			Msg("failed to add app ID to trace state")
+	}
+
+	ts, err = ts.Insert("inngest@fn", s.ID.FunctionID.String())
+	if err != nil {
+		// Not a failure; only userland spans suffer, so log and ignore
+		log.From(ctx).Warn().
+			Str("run_id", s.ID.RunID.String()).
+			Msg("failed to add function ID to trace state")
+	}
+
+	sc = trace.NewSpanContext(trace.SpanContextConfig{
+		TraceID:    sc.TraceID(),
+		SpanID:     sc.SpanID(),
+		TraceFlags: sc.TraceFlags(),
+		TraceState: ts,
+		Remote:     sc.IsRemote(),
+	})
+	ctx = trace.ContextWithSpanContext(ctx, sc)
+	itrace.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(headers))
+	if headers["traceparent"] != "" {
+		// The span ID will be incorrect here as lifecycles can not affec the
+		// ctx. To patch, we manually set the span ID here to what we know it
+		// should be based on the item
+		parts := strings.Split(headers["traceparent"], "-")
+		if len(parts) == 4 {
+			spanID, err := item.SpanID()
+			if err != nil {
+				return nil, fmt.Errorf("error parsing span ID: %w", err)
+			}
+
+			parts[2] = spanID.String()
+			headers["traceparent"] = strings.Join(parts, "-")
+		}
+	}
+
 	dr, _, err := DoRequest(ctx, e.Client, Request{
 		SigningKey: e.localSigningKey,
 		URL:        *uri,
 		Input:      input,
 		Edge:       edge,
 		Step:       step,
+		Headers:    headers,
 	})
 	return dr, err
 }
@@ -126,6 +180,9 @@ type Request struct {
 	Input      []byte
 	Edge       inngest.Edge
 	Step       inngest.Step
+
+	// Headers are additional headers to add to the request.
+	Headers map[string]string
 }
 
 // DoRequest executes the HTTP request with the given input.
@@ -295,8 +352,9 @@ func do(ctx context.Context, c util.HTTPDoer, r Request) (*Response, *httpstat.R
 		req.Header.Add("X-Inngest-Signature", r.Signature)
 	}
 
-	// Add `traceparent` and `tracestate` headers to the request from `ctx`
-	itrace.UserTracer().Propagator().Inject(ctx, propagation.HeaderCarrier(req.Header))
+	for k, v := range r.Headers {
+		req.Header.Add(k, v)
+	}
 
 	// Track HTTP stats, eg. TLS handshake timeouts, DNS lookups, etc.
 	tracking := &httpstat.Result{}

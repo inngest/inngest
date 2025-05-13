@@ -44,6 +44,8 @@ type Opts struct {
 	Broadcaster realtime.Broadcaster
 	// RealtimeJWTSecret is the realtime JWT secret for the V1 API
 	RealtimeJWTSecret []byte
+	// TraceReader reads traces from a backing store.
+	TraceReader cqrs.TraceReader
 }
 
 // AddRoutes adds a new API handler to the given router.
@@ -118,6 +120,8 @@ func (a *router) setup() {
 			r.Delete("/cancellations/{id}", a.deleteCancellation)
 
 			r.Get("/prom/{env}", a.promScrape)
+
+			r.Post("/traces/userland", a.traces)
 		})
 	})
 }
