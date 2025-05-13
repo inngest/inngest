@@ -597,18 +597,24 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		}
 	}
 
-	err := e.smv2.Create(ctx, newState)
+	st, err := e.smv2.Create(ctx, newState)
 	switch err {
-	case nil:
+	case nil, state.ErrIdentifierExists:
 		// no-op, continue
-	case state.ErrIdentifierExists:
-		return nil, err
 	default:
 		return nil, fmt.Errorf("error creating run state: %w", err)
+	}
+	// override the runID from the state if it doesn't match.
+	// this can happen on scheduling retries due to errors like networking, or abrupt failures
+	if metadata.ID.RunID != st.RunID() {
+		metadata.ID.RunID = st.RunID()
 	}
 
 	//
 	// Create cancellation pauses immediately, only if this is a non-batch event.
+	//
+	// NOTE: on scheduling retries, this will result in duplicated pauses for cancellation.
+	// This won't be an issue since pause consumption is idempotent
 	//
 	if req.BatchID == nil {
 		for _, c := range req.Function.Cancel {
@@ -686,19 +692,11 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	queueKey := fmt.Sprintf("%s:%s", req.Function.ID, key)
 	maxAttempts := consts.MaxRetries + 1
 	item := queue.Item{
-		JobID:       &queueKey,
-		GroupID:     uuid.New().String(),
-		WorkspaceID: req.WorkspaceID,
-		Kind:        queue.KindStart,
-		Identifier: state.Identifier{
-			RunID:       runID,
-			WorkflowID:  req.Function.ID,
-			WorkspaceID: req.WorkspaceID,
-			AccountID:   req.AccountID,
-			AppID:       req.AppID,
-			EventID:     metadata.Config.EventID(),
-			EventIDs:    metadata.Config.EventIDs,
-		},
+		JobID:                 &queueKey,
+		GroupID:               uuid.New().String(),
+		WorkspaceID:           req.WorkspaceID,
+		Kind:                  queue.KindStart,
+		Identifier:            st.Identifier(),
 		CustomConcurrencyKeys: metadata.Config.CustomConcurrencyKeys,
 		PriorityFactor:        metadata.Config.PriorityFactor,
 		Attempt:               0,
