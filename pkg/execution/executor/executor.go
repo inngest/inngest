@@ -660,7 +660,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 			}
 
 			pause := state.Pause{
-				WorkspaceID:       req.WorkspaceID,
+				WorkspaceID:       st.Identifier().WorkspaceID,
 				Identifier:        sv2.NewPauseIdentifier(metadata.ID),
 				ID:                pauseID,
 				Expires:           state.Time(expires),
@@ -698,7 +698,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	item := queue.Item{
 		JobID:                 &queueKey,
 		GroupID:               uuid.New().String(),
-		WorkspaceID:           req.WorkspaceID,
+		WorkspaceID:           st.Identifier().WorkspaceID,
 		Kind:                  queue.KindStart,
 		Identifier:            st.Identifier(),
 		CustomConcurrencyKeys: metadata.Config.CustomConcurrencyKeys,
