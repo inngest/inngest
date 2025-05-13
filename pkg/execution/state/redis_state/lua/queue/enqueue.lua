@@ -53,17 +53,16 @@ local backlogID               = ARGV[13]
 
 -- Only skip idempotency checks if we're normalizing a backlog (we want to enqueue an existing item to a new backlog)
 local is_normalize = exists_without_ending(keyNormalizeFromBacklogSet, ":-")
-if not is_normalize then
-  -- Check idempotency exists
-  if redis.call("EXISTS", idempotencyKey) ~= 0 then
-    return 1
-  end
 
-  -- Make these a hash to save on memory usage
-  if redis.call("HSETNX", queueKey, queueID, queueItem) == 0 then
-    -- This already exists;  return an error.
-    return 1
-  end
+-- Check idempotency exists
+if redis.call("EXISTS", idempotencyKey) ~= 0 and not is_normalize then
+  return 1
+end
+
+-- Make these a hash to save on memory usage
+if redis.call("HSETNX", queueKey, queueID, queueItem) == 0 and not is_normalize then
+  -- This already exists;  return an error.
+  return 1
 end
 
 if enqueueToBacklog == 1 then
