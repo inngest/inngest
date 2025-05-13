@@ -2,6 +2,7 @@ package state
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -407,6 +408,11 @@ type Mutater interface {
 type MemoizedStep struct {
 	ID   string `json:"id"`
 	Data any    `json:"data"`
+}
+
+type SignalStepReturn struct {
+	Signal string          `json:"signal"`
+	Data   json.RawMessage `json:"data"`
 }
 
 // Input is the input for creating new state.  The required fields are Workflow,

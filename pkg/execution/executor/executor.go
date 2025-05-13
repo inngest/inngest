@@ -3151,13 +3151,16 @@ func (e *executor) ReceiveSignal(ctx context.Context, workspaceID uuid.UUID, sig
 
 	// TODO Need to check pause.Cancel here?
 
-	log.Debug().Str("pause.DataKey", pause.DataKey).Msg("resuming pause from signal")
+	l.Debug().Str("pause.DataKey", pause.DataKey).Msg("resuming pause from signal")
 
 	err = e.Resume(ctx, *pause, execution.ResumeRequest{
 		RunID:    &pause.Identifier.RunID,
 		StepName: pause.StepName,
 		With: map[string]any{
-			execution.StateDataKey: data,
+			execution.StateDataKey: state.SignalStepReturn{
+				Signal: signalID,
+				Data:   data,
+			},
 		},
 	})
 	if err != nil {
