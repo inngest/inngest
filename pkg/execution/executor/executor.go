@@ -622,7 +622,6 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	//
 	if req.BatchID == nil {
 		for _, c := range req.Function.Cancel {
-			pauseID := uuid.New()
 			expires := time.Now().Add(consts.CancelTimeout)
 			if c.Timeout != nil {
 				dur, err := str2duration.ParseDuration(*c.Timeout)
@@ -634,6 +633,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 
 			// The triggering event ID should be the first ID in the batch.
 			triggeringID := req.Events[0].GetInternalID().String()
+			idSrc := fmt.Sprintf("%s-%s", key, c.Event)
 
 			var expr *string
 			// Evaluate the expression.  This lets us inspect the expression's attributes
@@ -657,8 +657,11 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 					)
 				}
 				expr = &interpolated
+				idSrc = fmt.Sprintf("%s-%s", idSrc, interpolated)
 			}
 
+			// NOTE: making this deterministic so pause creation is also idempotent
+			pauseID := inngest.DeterministicSha1UUID(idSrc)
 			pause := state.Pause{
 				WorkspaceID:       st.Identifier().WorkspaceID,
 				Identifier:        sv2.NewPauseIdentifier(metadata.ID),
@@ -670,7 +673,9 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 				TriggeringEventID: &triggeringID,
 			}
 			_, err = e.pm.SavePause(ctx, pause)
-			if err != nil {
+			switch err {
+			case nil, state.ErrPauseAlreadyExists: // no-op
+			default:
 				return &metadata, fmt.Errorf("error saving pause: %w", err)
 			}
 		}
