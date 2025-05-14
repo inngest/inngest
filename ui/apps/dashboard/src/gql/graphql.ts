@@ -658,7 +658,6 @@ export type EnvsFilter = {
 export type Event = {
   __typename?: 'Event';
   description: Maybe<Scalars['String']>;
-  events: Maybe<EventConnection>;
   firstSeen: Maybe<Scalars['Time']>;
   integrationName: Maybe<Scalars['String']>;
   name: Scalars['String'];
@@ -669,13 +668,6 @@ export type Event = {
   versions: Array<Maybe<EventType>>;
   workflows: Array<Workflow>;
   workspaceID: Maybe<Scalars['UUID']>;
-};
-
-
-export type EventEventsArgs = {
-  after: InputMaybe<Scalars['String']>;
-  filter: EventsFilter;
-  first?: Scalars['Int'];
 };
 
 
@@ -691,19 +683,6 @@ export type EventUsageArgs = {
 
 export type EventVersionsArgs = {
   versions: InputMaybe<Array<Scalars['String']>>;
-};
-
-export type EventConnection = {
-  __typename?: 'EventConnection';
-  edges: Maybe<Array<Maybe<EventEdge>>>;
-  pageInfo: PageInfo;
-  totalCount: Scalars['Int'];
-};
-
-export type EventEdge = {
-  __typename?: 'EventEdge';
-  cursor: Scalars['String'];
-  node: ArchivedEvent;
 };
 
 export type EventQuery = {
@@ -787,6 +766,19 @@ export type EventTypesFilter = {
   nameSearch?: InputMaybe<Scalars['String']>;
 };
 
+export type EventV2 = {
+  __typename?: 'EventV2';
+  envID: Scalars['UUID'];
+  id: Scalars['ULID'];
+  idempotencyKey: Maybe<Scalars['String']>;
+  name: Scalars['String'];
+  occurredAt: Scalars['Time'];
+  raw: Scalars['String'];
+  receivedAt: Scalars['Time'];
+  runs: Array<FunctionRunV2>;
+  version: Maybe<Scalars['String']>;
+};
+
 export type EventsBatchConfiguration = {
   __typename?: 'EventsBatchConfiguration';
   key: Maybe<Scalars['String']>;
@@ -796,8 +788,25 @@ export type EventsBatchConfiguration = {
   timeout: Scalars['String'];
 };
 
+export type EventsConnection = {
+  __typename?: 'EventsConnection';
+  edges: Array<EventsEdge>;
+  pageInfo: PageInfo;
+  totalCount: Scalars['Int'];
+};
+
+export type EventsEdge = {
+  __typename?: 'EventsEdge';
+  cursor: Scalars['String'];
+  node: EventV2;
+};
+
 export type EventsFilter = {
-  lowerTime: Scalars['Time'];
+  eventNames?: InputMaybe<Array<Scalars['String']>>;
+  from: Scalars['Time'];
+  includeInternalEvents?: Scalars['Boolean'];
+  query?: InputMaybe<Scalars['String']>;
+  until?: InputMaybe<Scalars['Time']>;
 };
 
 export type FilterList = {
@@ -2265,7 +2274,9 @@ export type Workspace = {
   eventType: EventTypeV2;
   eventTypes: PaginatedEventTypes;
   eventTypesV2: EventTypesConnection;
+  eventV2: EventV2;
   events: PaginatedEvents;
+  eventsV2: EventsConnection;
   functionCount: Scalars['Int'];
   id: Scalars['ID'];
   ingestKey: IngestKey;
@@ -2346,8 +2357,20 @@ export type WorkspaceEventTypesV2Args = {
 };
 
 
+export type WorkspaceEventV2Args = {
+  id: Scalars['ULID'];
+};
+
+
 export type WorkspaceEventsArgs = {
   prefix: InputMaybe<Scalars['String']>;
+};
+
+
+export type WorkspaceEventsV2Args = {
+  after: InputMaybe<Scalars['String']>;
+  filter: EventsFilter;
+  first?: Scalars['Int'];
 };
 
 
