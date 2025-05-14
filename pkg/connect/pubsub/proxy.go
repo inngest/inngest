@@ -414,6 +414,14 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 	}
 
 	select {
+	case <-ctx.Done():
+		return nil, fmt.Errorf("parent context was closed unexpectedly")
+	// Handle maximum function timeout
+	case <-time.After(consts.MaxFunctionTimeout):
+		return nil, syscode.Error{
+			Code:    syscode.CodeRequestTooLong,
+			Message: "The worker took longer than the maximum request duration to respond to the request.",
+		}
 	// Await SDK response forwarded by gateway
 	// This may take a while: This waits until we receive the SDK response, and we allow for up to 2h in the serverless execution model
 	case <-waitForResponseCtx.Done():
