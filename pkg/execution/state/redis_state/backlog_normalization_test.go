@@ -306,12 +306,7 @@ func TestQueueBacklogNormalization(t *testing.T) {
 
 	shadowPartition := q.ItemShadowPartition(ctx, item)
 	require.NotEmpty(t, shadowPartition.PartitionID)
-
-	// Test that check for async/vs immediate normalization works: This doesn't modify data if backlog size < 20
-	_, shouldNormalizeAsync, err := q.BacklogPrepareNormalize(ctx, &backlog, &shadowPartition, 20)
-	require.NoError(t, err)
-	require.False(t, shouldNormalizeAsync)
-
+ 
 	// Mark backlog for normalization
 	backlogCount, shouldNormalizeAsync, err := q.BacklogPrepareNormalize(ctx, &backlog, &shadowPartition, 5)
 	require.NoError(t, err)

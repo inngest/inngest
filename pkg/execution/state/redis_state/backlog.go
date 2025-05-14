@@ -34,6 +34,12 @@ type QueueShadowPartition struct {
 	// ID is the same as the partition ID used across the queue.
 	PartitionID string `json:"id,omitempty"`
 
+	// FunctionVersion represents the current function version represented by this shadow partition.
+	// Whenever a newer function version is enqueued, the concurrency keys and limits in here will be adjusted
+	// accordingly as part of enqueue_to_backlog().
+	// System queues do not have function versions.
+	FunctionVersion int `json:"fv"`
+
 	// LeaseID represents a lease on this shadow partition.  If the LeaseID is not nil,
 	// this partition can be claimed by a shared-nothing refill worker to work on the
 	// backlogs within this shadow partition.
@@ -313,7 +319,8 @@ func (q *queue) ItemShadowPartition(ctx context.Context, i osqueue.QueueItem) Qu
 	}
 
 	return QueueShadowPartition{
-		PartitionID: i.FunctionID.String(),
+		PartitionID:     i.FunctionID.String(),
+		FunctionVersion: i.Data.Identifier.WorkflowVersion,
 
 		// Identifiers
 		FunctionID: &i.FunctionID,
