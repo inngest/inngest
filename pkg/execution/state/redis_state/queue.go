@@ -2450,7 +2450,6 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 		return nil, newKeyError(ErrQueueItemThrottled, item.Data.Throttle.Key)
 	default:
 		if status > 0 {
-			q.log.Warn("adjusted active counter", "key", keyActiveCounter, "item", item, "part", fnPartition)
 			return &leaseID, nil
 		}
 
