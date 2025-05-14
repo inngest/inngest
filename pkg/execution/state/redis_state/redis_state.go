@@ -260,7 +260,7 @@ func (m shardedMgr) New(ctx context.Context, input state.Input) (state.State, er
 		}
 
 		// If a state already exists with the idempotency key, override the input's runID and continue
-		if runID != nil {
+		if runID != nil && input.Identifier.RunID != *runID {
 			input.Identifier.RunID = *runID
 		}
 	}
@@ -334,23 +334,25 @@ func (m shardedMgr) New(ctx context.Context, input state.Input) (state.State, er
 	if err != nil {
 		return nil, fmt.Errorf("error storing run state in redis: %w", err)
 	}
-	// state already exists, so return the existing state
-	if status == 1 {
-		// st, err := m.Load(ctx, input.Identifier.AccountID, input.Identifier.RunID)
-		// if err != nil {
-		// 	return nil, err
-		// }
-		return nil, state.ErrIdentifierExists
+	switch status {
+	case 0: // new
+		return state.NewStateInstance(
+				input.Identifier,
+				metadata.Metadata(),
+				input.EventBatchData,
+				input.Steps,
+				make([]string, 0),
+			),
+			nil
+	case 1: // already exists
+		st, err := m.Load(ctx, input.Identifier.AccountID, input.Identifier.RunID)
+		if err != nil {
+			return nil, err
+		}
+		return st, state.ErrIdentifierExists
+	default:
+		return nil, fmt.Errorf("unknown status %d when attempting to create function state", status)
 	}
-
-	return state.NewStateInstance(
-			input.Identifier,
-			metadata.Metadata(),
-			input.EventBatchData,
-			input.Steps,
-			make([]string, 0),
-		),
-		nil
 }
 
 // idempotencyCheck checks if the function state already exists, and return the runID of the existing state
