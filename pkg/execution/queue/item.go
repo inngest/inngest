@@ -4,6 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/inngest/inngest/pkg/enums"
+	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
+	"github.com/inngest/inngest/pkg/expressions"
+	"github.com/inngest/inngest/pkg/util"
 	"strconv"
 	"time"
 
@@ -387,4 +391,76 @@ type PayloadPauseTimeout struct {
 func HashID(_ context.Context, id string) string {
 	ui := xxhash.Sum64String(id)
 	return strconv.FormatUint(ui, 36)
+}
+
+func GetThrottleConfig(ctx context.Context, fn inngest.Function, evtMap map[string]any) *Throttle {
+	if fn.Throttle == nil {
+		return nil
+	}
+
+	unhashedThrottleKey := fn.ID.String()
+	throttleKey := HashID(ctx, unhashedThrottleKey)
+	hashedThrottleExpr := ""
+	if fn.Throttle.Key != nil {
+		val, _, _ := expressions.Evaluate(ctx, *fn.Throttle.Key, map[string]any{
+			"event": evtMap,
+		})
+		unhashedThrottleKey = fmt.Sprintf("%v", val)
+		throttleKey = throttleKey + "-" + HashID(ctx, unhashedThrottleKey)
+		hashedThrottleExpr = util.XXHash(*fn.Throttle.Key)
+	}
+
+	return &Throttle{
+		Key:                 throttleKey,
+		Limit:               int(fn.Throttle.Limit),
+		Burst:               int(fn.Throttle.Burst),
+		Period:              int(fn.Throttle.Period.Seconds()),
+		UnhashedThrottleKey: unhashedThrottleKey,
+		KeyExpressionHash:   hashedThrottleExpr,
+	}
+}
+
+func GetCustomConcurrencyKeys(ctx context.Context, tenant sv2.Tenant, fn inngest.Function, evtMap map[string]any) []state.CustomConcurrency {
+	if fn.Concurrency == nil {
+		return nil
+	}
+
+	var keys []state.CustomConcurrency
+
+	// Ensure we evaluate concurrency keys when scheduling the function.
+	for _, limit := range fn.Concurrency.Limits {
+		if !limit.IsCustomLimit() {
+			continue
+		}
+
+		// Ensure we bind the limit to the correct scope.
+		scopeID := fn.ID
+		switch limit.Scope {
+		case enums.ConcurrencyScopeAccount:
+			scopeID = tenant.AccountID
+		case enums.ConcurrencyScopeEnv:
+			scopeID = tenant.EnvID
+		}
+
+		evaluated := limit.Evaluate(ctx, evtMap)
+		key := util.ConcurrencyKey(limit.Scope, scopeID, evaluated)
+
+		// Store the concurrency limit in the function.  By copying in the raw expression hash,
+		// we can update the concurrency limits for in-progress runs as new function versions
+		// are stored.
+		//
+		// The raw keys are stored in the function state so that we don't need to re-evaluate
+		// keys and input each time, as they're constant through the function run.
+		keys = append(
+			keys,
+			sv2.CustomConcurrency{
+				Key:                       key,
+				Hash:                      limit.Hash,
+				Limit:                     limit.Limit,
+				UnhashedEvaluatedKeyValue: evaluated,
+			},
+		)
+	}
+
+	return keys
 }

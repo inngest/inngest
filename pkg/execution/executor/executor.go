@@ -517,69 +517,13 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		mapped[n] = item.GetEvent().Map()
 	}
 
-	if req.Function.Concurrency != nil {
-		// Ensure we evaluate concurrency keys when scheduling the function.
-		for _, limit := range req.Function.Concurrency.Limits {
-			if !limit.IsCustomLimit() {
-				continue
-			}
-
-			// Ensure we bind the limit to the correct scope.
-			scopeID := req.Function.ID
-			switch limit.Scope {
-			case enums.ConcurrencyScopeAccount:
-				scopeID = req.AccountID
-			case enums.ConcurrencyScopeEnv:
-				scopeID = req.WorkspaceID
-			}
-
-			evaluated := limit.Evaluate(ctx, evtMap)
-			key := util.ConcurrencyKey(limit.Scope, scopeID, evaluated)
-
-			// Store the concurrency limit in the function.  By copying in the raw expression hash,
-			// we can update the concurrency limits for in-progress runs as new function versions
-			// are stored.
-			//
-			// The raw keys are stored in the function state so that we don't need to re-evaluate
-			// keys and input each time, as they're constant through the function run.
-			metadata.Config.CustomConcurrencyKeys = append(
-				metadata.Config.CustomConcurrencyKeys,
-				sv2.CustomConcurrency{
-					Key:                       key,
-					Hash:                      limit.Hash,
-					Limit:                     limit.Limit,
-					UnhashedEvaluatedKeyValue: evaluated,
-				},
-			)
-		}
-	}
+	// Evaluate concurrency keys to use initially
+	metadata.Config.CustomConcurrencyKeys = queue.GetCustomConcurrencyKeys(ctx, metadata.ID.Tenant, req.Function, evtMap)
 
 	//
 	// Create throttle information prior to creating state.  This is used in the queue.
 	//
-	var throttle *queue.Throttle
-	if req.Function.Throttle != nil {
-		unhashedThrottleKey := req.Function.ID.String()
-		throttleKey := queue.HashID(ctx, unhashedThrottleKey)
-		hashedThrottleExpr := ""
-		if req.Function.Throttle.Key != nil {
-			val, _, _ := expressions.Evaluate(ctx, *req.Function.Throttle.Key, map[string]any{
-				"event": evtMap,
-			})
-			unhashedThrottleKey = fmt.Sprintf("%v", val)
-			throttleKey = throttleKey + "-" + queue.HashID(ctx, unhashedThrottleKey)
-			hashedThrottleExpr = util.XXHash(*req.Function.Throttle.Key)
-		}
-
-		throttle = &queue.Throttle{
-			Key:                 throttleKey,
-			Limit:               int(req.Function.Throttle.Limit),
-			Burst:               int(req.Function.Throttle.Burst),
-			Period:              int(req.Function.Throttle.Period.Seconds()),
-			UnhashedThrottleKey: unhashedThrottleKey,
-			KeyExpressionHash:   hashedThrottleExpr,
-		}
-	}
+	throttle := queue.GetThrottleConfig(ctx, req.Function, evtMap)
 
 	//
 	// Create the run state.
