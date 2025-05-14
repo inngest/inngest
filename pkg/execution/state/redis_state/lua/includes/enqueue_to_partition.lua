@@ -93,6 +93,7 @@ local function enqueue_to_backlog(keyBacklogSet, backlogID, backlogItem, partiti
   if redis.call("HSETNX", keyShadowPartitionMeta, partitionID, shadowPartitionItem) == 0 then
     -- TODO We may want to move this, as JSON operations could slow down the script
     -- Update to current limits if exists, keep leaseID
+    -- TODO Should we add a version field to prevent updating to an "older" version?
     local existingPartitionItem = cjson.decode(redis.call("HGET", keyShadowPartitionMeta, partitionID))
     local latestPartitionItem = cjson.decode(shadowPartitionItem)
 
