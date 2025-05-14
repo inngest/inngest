@@ -279,6 +279,9 @@ func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp 
 			_ = existingThrottle
 			_ = sp // sp must be the new shadow partition version (updated during enqueue_to_partition)
 
+			item.Data.CustomConcurrencyKeys = q.normalizeItemCustomConcurrencyKeys(ctx, existingKeys, sp)
+			item.Data.Throttle = q.normalizeItemThrottle(ctx, existingThrottle, sp)
+
 			if _, err := q.EnqueueItem(ctx, shard, *item, time.UnixMilli(item.AtMS), osqueue.EnqueueOpts{
 				PassthroughJobId:       true,
 				NormalizeFromBacklogID: backlog.BacklogID,
