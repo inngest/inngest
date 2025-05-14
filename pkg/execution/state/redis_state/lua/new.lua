@@ -17,6 +17,11 @@ local metadata = ARGV[2]
 local steps = ARGV[3]
 local stepInputs = ARGV[4]
 
+-- state is already created
+if redis.call("EXISTS", eventsKey) == 1 then
+  return 1
+end
+
 -- Save all metadata
 local metadataJson = cjson.decode(metadata)
 for k, v in pairs(metadataJson) do
@@ -46,11 +51,7 @@ if stepInputs ~= nil and #stepInputs > 0 then
 end
 
 -- Save events
+redis.call("SETNX", eventsKey, events)
 redis.call("HINCRBY", metadataKey, "event_size", #events)
-
--- Signal that the state is already created
-if redis.call("SETNX", eventsKey, events) == 1 then
-  return 1
-end
 
 return 0
