@@ -53,6 +53,7 @@ export type Account = {
   billingEmail: Scalars['String'];
   createdAt: Scalars['Time'];
   datadogConnections: Array<DatadogConnectionStatus>;
+  datadogIntegrations: Array<DatadogIntegration>;
   datadogOrganizations: Array<DatadogOrganization>;
   entitlementUsage: EntitlementUsage;
   entitlements: Entitlements;
@@ -470,6 +471,35 @@ export type DatadogConnectionStatus = {
   orgName: Scalars['String'];
 };
 
+export type DatadogIntegration = {
+  __typename?: 'DatadogIntegration';
+  accountID: Scalars['UUID'];
+  apiKey: Scalars['String'];
+  apiKeyUpdatedAt: Scalars['Time'];
+  appKey: Scalars['String'];
+  appKeyUpdatedAt: Scalars['Time'];
+  createdAt: Scalars['Time'];
+  datadogSite: Scalars['String'];
+  envID: Scalars['UUID'];
+  error: Maybe<Scalars['String']>;
+  id: Scalars['UUID'];
+  lastSentAt: Maybe<Scalars['Time']>;
+  statusOk: Scalars['Boolean'];
+  updatedAt: Maybe<Scalars['Time']>;
+};
+
+export type DatadogIntegrationRemoveResponse = {
+  __typename?: 'DatadogIntegrationRemoveResponse';
+  removedIntegrationEnvID: Scalars['UUID'];
+  removedIntegrationID: Scalars['UUID'];
+};
+
+export type DatadogIntegrationSetupResponse = {
+  __typename?: 'DatadogIntegrationSetupResponse';
+  error: Maybe<Scalars['String']>;
+  integration: Maybe<DatadogIntegration>;
+};
+
 export type DatadogOrganization = {
   __typename?: 'DatadogOrganization';
   createdAt: Scalars['Time'];
@@ -624,7 +654,6 @@ export type Entitlements = {
   metricsExport: EntitlementBool;
   metricsExportFreshness: EntitlementInt;
   metricsExportGranularity: EntitlementInt;
-  otelTraces: EntitlementBool;
   planID: Maybe<Scalars['UUID']>;
   runCount: EntitlementRunCount;
   stepCount: EntitlementStepCount;
@@ -804,7 +833,6 @@ export type EventsEdge = {
 export type EventsFilter = {
   eventNames?: InputMaybe<Array<Scalars['String']>>;
   from: Scalars['Time'];
-  includeInternalEvents?: Scalars['Boolean'];
   query?: InputMaybe<Scalars['String']>;
   until?: InputMaybe<Scalars['Time']>;
 };
@@ -1065,6 +1093,7 @@ export type Mutation = {
   enableEnvironmentAutoArchive: Workspace;
   invokeFunction: Maybe<Scalars['Boolean']>;
   pauseFunction: Workflow;
+  removeDatadogIntegration: Maybe<DatadogIntegrationRemoveResponse>;
   removeDatadogOrganization: Scalars['UUID'];
   removeVercelApp: Maybe<RemoveVercelAppResponse>;
   rerun: Scalars['ULID'];
@@ -1073,6 +1102,7 @@ export type Mutation = {
   rotateSigningKey: SigningKey;
   setAccountEntitlement: Scalars['UUID'];
   setUpAccount: Maybe<SetUpAccountPayload>;
+  setupDatadogIntegration: Maybe<DatadogIntegrationSetupResponse>;
   syncNewApp: SyncResponse;
   unarchiveApp: App;
   unarchiveEnvironment: Workspace;
@@ -1260,6 +1290,11 @@ export type MutationPauseFunctionArgs = {
 };
 
 
+export type MutationRemoveDatadogIntegrationArgs = {
+  integrationID: Scalars['UUID'];
+};
+
+
 export type MutationRemoveDatadogOrganizationArgs = {
   organizationID: Scalars['UUID'];
 };
@@ -1298,6 +1333,15 @@ export type MutationSetAccountEntitlementArgs = {
   entitlementName: Scalars['String'];
   overrideStrategy: Scalars['String'];
   value: Scalars['Int'];
+};
+
+
+export type MutationSetupDatadogIntegrationArgs = {
+  apiKey: Scalars['String'];
+  appKey: Scalars['String'];
+  datadogSite: Scalars['String'];
+  envID: Scalars['UUID'];
+  testsOnlySkipApiKeyCheck: InputMaybe<Scalars['Boolean']>;
 };
 
 
@@ -1738,7 +1782,6 @@ export type RunTraceSpan = {
   endedAt: Maybe<Scalars['Time']>;
   functionID: Scalars['UUID'];
   isRoot: Scalars['Boolean'];
-  isUserland: Scalars['Boolean'];
   name: Scalars['String'];
   outputID: Maybe<Scalars['String']>;
   parentSpan: Maybe<RunTraceSpan>;
@@ -1753,7 +1796,6 @@ export type RunTraceSpan = {
   stepInfo: Maybe<StepInfo>;
   stepOp: Maybe<StepOp>;
   traceID: Scalars['String'];
-  userlandSpan: Maybe<UserlandSpan>;
   workspace: Workspace;
   workspaceID: Scalars['UUID'];
 };
@@ -2087,17 +2129,6 @@ export type User = {
   updatedAt: Scalars['Time'];
 };
 
-export type UserlandSpan = {
-  __typename?: 'UserlandSpan';
-  resourceAttrs: Maybe<Scalars['Bytes']>;
-  scopeName: Maybe<Scalars['String']>;
-  scopeVersion: Maybe<Scalars['String']>;
-  serviceName: Maybe<Scalars['String']>;
-  spanAttrs: Maybe<Scalars['Bytes']>;
-  spanKind: Maybe<Scalars['String']>;
-  spanName: Maybe<Scalars['String']>;
-};
-
 export type VercelApp = {
   __typename?: 'VercelApp';
   id: Scalars['UUID'];
@@ -2268,6 +2299,7 @@ export type Workspace = {
   archivedEvent: Maybe<ArchivedEvent>;
   cdcConnections: Array<CdcConnection>;
   createdAt: Scalars['Time'];
+  datadogIntegration: Maybe<DatadogIntegration>;
   event: Maybe<Event>;
   eventByNames: Array<EventType>;
   eventSearch: EventSearchConnection;
