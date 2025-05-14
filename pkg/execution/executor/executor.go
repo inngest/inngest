@@ -920,7 +920,11 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			return resp, handleErr
 		}
 		return resp, err
-	}, util.WithTimeout(consts.MaxFunctionTimeout))
+	},
+		// wait up to 2h and add a short delay to allow driver implementations to
+		// return a specific timeout error here
+		util.WithTimeout(consts.MaxFunctionTimeout+5*time.Second),
+	)
 }
 
 func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {

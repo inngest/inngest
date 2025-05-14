@@ -9,6 +9,7 @@ import (
 	"github.com/inngest/inngest/pkg/connect/routing"
 	"github.com/inngest/inngest/pkg/connect/state"
 	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/syscode"
 	"github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/inngest/inngest/pkg/util"
@@ -145,7 +146,7 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	l := i.logger.With(
+	l := logger.StdlibLogger(ctx).With(
 		"app_id", opts.AppID.String(),
 		"env_id", opts.EnvID.String(),
 		"account_id", opts.AccountID.String(),
@@ -414,6 +415,14 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 	}
 
 	select {
+	case <-ctx.Done():
+		return nil, fmt.Errorf("parent context was closed unexpectedly")
+	// Handle maximum function timeout
+	case <-time.After(consts.MaxFunctionTimeout):
+		return nil, syscode.Error{
+			Code:    syscode.CodeRequestTooLong,
+			Message: "The worker took longer than the maximum request duration to respond to the request.",
+		}
 	// Await SDK response forwarded by gateway
 	// This may take a while: This waits until we receive the SDK response, and we allow for up to 2h in the serverless execution model
 	case <-waitForResponseCtx.Done():
