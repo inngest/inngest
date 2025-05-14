@@ -256,6 +256,10 @@ func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog) err
 			return fmt.Errorf("could not peek backlog items for normalization: %w", err)
 		}
 
+		if res.TotalCount == 0 {
+			break
+		}
+
 		for _, item := range res.Items {
 			if _, err := q.EnqueueItem(ctx, shard, *item, time.UnixMilli(item.AtMS), osqueue.EnqueueOpts{
 				PassthroughJobId:       true,
@@ -279,6 +283,8 @@ func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog) err
 			},
 		})
 	}
+
+	return nil
 }
 
 func (q *queue) ShadowPartitionPeekNormalizeBacklogs(ctx context.Context, sp *QueueShadowPartition, limit int64) ([]*QueueBacklog, error) {
