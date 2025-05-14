@@ -43,7 +43,6 @@ export function InlineSpans({ className, minTime, maxTime, trace }: Props) {
 
   //
   // when a span has step (not userland) children then we construct the span from them
-  // @ts-ignore - temporarily until we get monorepo deployed
   const stepChildren = trace.childrenSpans?.filter((s) => !s.isUserland) || [];
   const spans = !trace.isRoot && stepChildren.length ? stepChildren : [];
 
@@ -86,14 +85,6 @@ export function InlineSpans({ className, minTime, maxTime, trace }: Props) {
       <TooltipContent>
         <div className="text-basis">
           <Times isDelayVisible={spans.length === 0} name={spanName} span={trace} />
-          {spans.map((span) => {
-            return (
-              <Fragment key={span.spanID}>
-                <hr className="my-2" />
-                <Times isDelayVisible={true} name={getSpanName(span.name)} span={span} />
-              </Fragment>
-            );
-          })}
         </div>
       </TooltipContent>
     </Tooltip>
