@@ -11,7 +11,6 @@ type Props = {
   latestSyncUrl: string;
   platform: string | null;
   appMethod: string;
-  onResyncClick: () => void;
 };
 
 export function ResyncButton({
@@ -20,14 +19,13 @@ export function ResyncButton({
   latestSyncUrl,
   platform,
   appMethod,
-  onResyncClick,
 }: Props) {
   const [isModalVisible, setIsModalVisible] = useState(false);
 
   return (
     <>
       <Button
-        onClick={onResyncClick}
+        onClick={() => setIsModalVisible(true)}
         disabled={disabled}
         appearance={appMethod === methodTypes.Connect ? 'outlined' : 'solid'}
         kind="primary"

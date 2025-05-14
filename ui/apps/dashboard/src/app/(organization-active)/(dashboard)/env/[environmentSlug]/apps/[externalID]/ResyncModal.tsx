@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { Alert } from '@inngest/components/Alert';
 import { Button } from '@inngest/components/Button';
 import { Input } from '@inngest/components/Forms/Input';
@@ -53,21 +53,10 @@ export default function ResyncModal({
   const [isSyncing, setIsSyncing] = useState(false);
   const env = useEnvironment();
   const [, resyncApp] = useMutation(ResyncAppDocument);
-  const actionButtonRef = useRef<HTMLButtonElement>(null);
 
   if (isURLOverridden) {
     url = overrideValue;
   }
-
-  useEffect(() => {
-    const focusTimer = setTimeout(() => {
-      if (isOpen && actionButtonRef.current) {
-        actionButtonRef.current.focus();
-      }
-    }, 50);
-
-    return () => clearTimeout(focusTimer);
-  }, [isOpen]);
 
   async function onSync() {
     setIsSyncing(true);
@@ -163,6 +152,7 @@ export default function ResyncModal({
               }}
               readOnly={!isURLOverridden}
               className={cn(!isURLOverridden && 'bg-disabled')}
+              tabIndex={-1}
             />
           </div>
           <div className="mb-6">
@@ -174,6 +164,7 @@ export default function ResyncModal({
                   setURLOverridden((prev) => !prev);
                 }}
                 id="override"
+                tabIndex={-1}
               />
               <SwitchLabel htmlFor="override">Override Input</SwitchLabel>
             </SwitchWrapper>
@@ -204,10 +195,10 @@ export default function ResyncModal({
           onClick={onClose}
           disabled={isSyncing}
           label="Cancel"
+          tabIndex={-1}
         />
 
         <Button
-          ref={actionButtonRef}
           onClick={onSync}
           disabled={isSyncing || (!isURLOverridden && isConnect)}
           kind="primary"

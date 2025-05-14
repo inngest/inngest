@@ -37,13 +37,11 @@ export const ActionsMenu = ({
         <Button kind="primary" appearance="outlined" size="medium" icon={<RiMore2Line />} raw />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        {showResync && (
-          <OptionalTooltip tooltip={disableResync ? 'App sync not available.' : undefined}>
-            <DropdownMenuItem disabled={disableResync} onSelect={showResync}>
-              <RiRefreshLine className="h-4 w-4" />
-              Resync app
-            </DropdownMenuItem>
-          </OptionalTooltip>
+        {!disableResync && (
+          <DropdownMenuItem disabled={disableResync} onSelect={showResync}>
+            <RiRefreshLine className="h-4 w-4" />
+            Resync app
+          </DropdownMenuItem>
         )}
         <OptionalTooltip
           tooltip={disableValidate ? 'No syncs. App health check not available.' : undefined}

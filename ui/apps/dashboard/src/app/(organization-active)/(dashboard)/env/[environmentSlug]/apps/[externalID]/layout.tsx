@@ -100,11 +100,7 @@ export default function Layout({ children, params: { externalID } }: Props) {
                 disableArchive={!res.data.latestSync?.url}
                 showValidate={() => setShowValidate(true)}
                 disableValidate={res.data.isParentArchived}
-                showResync={
-                  res.data.latestSync?.url && !res.data.isArchived
-                    ? () => setShowResync(true)
-                    : undefined
-                }
+                showResync={() => setShowResync(true)}
                 disableResync={res.data.isArchived}
               />
             )}
@@ -117,7 +113,6 @@ export default function Layout({ children, params: { externalID } }: Props) {
                 appMethod={res.data.method}
                 platform={res.data.latestSync.platform}
                 latestSyncUrl={res.data.latestSync.url}
-                onResyncClick={() => setShowResync(true)}
               />
             )}
           </div>
