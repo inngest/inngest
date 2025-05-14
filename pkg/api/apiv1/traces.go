@@ -139,15 +139,6 @@ func (a router) convertOTLPAndSend(auth apiv1auth.V1Auth, req *collecttrace.Expo
 					continue
 				}
 
-				_, err = getInngestRunID(s)
-				if err != nil {
-					// If we can't find the run ID, we can't create a span.
-					// So let's skip it.
-					logger.StdlibLogger(ctx).Error("error getting runID on span ingestion, skipping", "error", err)
-					rejectedSpans++
-					continue
-				}
-
 				opts := []run.SpanOpt{
 					run.WithTraceID(tp.TraceID),
 					run.WithSpanID(trace.SpanID(s.SpanId)),
@@ -258,18 +249,6 @@ func getInngestTraceparent(s *tracev1.Span) (*TraceParent, error) {
 	}
 
 	return nil, fmt.Errorf("no traceparent attribute found")
-}
-
-func getInngestRunID(s *tracev1.Span) (string, error) {
-	for _, kv := range s.Attributes {
-		if kv.Key == consts.OtelAttrSDKRunID {
-			// This is the traceparent attribute, so we can use it to get the
-			// trace ID and span ID
-			return kv.GetValue().GetStringValue(), nil
-		}
-	}
-
-	return "", fmt.Errorf("no run ID attribute found")
 }
 
 func convertAttributes(attrs []*commonv1.KeyValue) []attribute.KeyValue {

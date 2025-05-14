@@ -11,6 +11,7 @@ const (
 	OtelSpanSleep        = "sleep"
 	OtelSpanExecute      = "execute"
 	OtelSpanRerun        = "rerun"
+	OtelSpanReplay       = "replay"
 
 	// system attributes
 	OtelSysAccountID      = "sys.account.id"
@@ -102,6 +103,7 @@ const (
 	OtelScopeCron      = "cron.inngest"
 	OtelScopeInvoke    = "invoke.inngest"
 	OtelScopeRerun     = "rerun.inngest"
+	OtelScopeReplay    = "replay.inngest"
 	OtelScopeEnv       = "env.inngest"
 	OtelScopeApp       = "app.env.inngest"
 	OtelScopeFunction  = "function.app.env.inngest"
