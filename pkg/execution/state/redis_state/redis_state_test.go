@@ -105,9 +105,9 @@ func TestIdempotencyCheck(t *testing.T) {
 		t.Run("returns nil if no idempotency key is available", func(t *testing.T) {
 			r.FlushAll()
 
-			st, err := mgr.idempotencyCheck(ctx, ftc, key, id)
+			runID, err := mgr.idempotencyCheck(ctx, ftc, key, id)
 			require.NoError(t, err)
-			require.Nil(t, st)
+			require.Nil(t, runID)
 		})
 
 		t.Run("returns state if idempotency is already there", func(t *testing.T) {
@@ -124,18 +124,19 @@ func TestIdempotencyCheck(t *testing.T) {
 			})
 			require.NoError(t, err)
 
-			st, err := mgr.idempotencyCheck(ctx, ftc, key, id)
+			runID, err := mgr.idempotencyCheck(ctx, ftc, key, id)
 			require.NoError(t, err)
+			require.NotNil(t, runID)
 
-			require.Equal(t, created, st)
+			require.Equal(t, created.Identifier().RunID, *runID)
 		})
 
 		t.Run("returns invalid identifier error if previous value is not a ULID", func(t *testing.T) {
 			r.FlushAll()
 			require.NoError(t, r.Set(key, ""))
 
-			st, err := mgr.idempotencyCheck(ctx, ftc, key, id)
-			require.Nil(t, st)
+			runID, err := mgr.idempotencyCheck(ctx, ftc, key, id)
+			require.Nil(t, runID)
 			require.ErrorIs(t, err, state.ErrInvalidIdentifier)
 		})
 	})
@@ -170,17 +171,17 @@ func TestIdempotencyCheck(t *testing.T) {
 			diffID := id // copy
 			diffID.RunID = ulid.MustNew(ulid.Now(), rand.Reader)
 			diffKey := runState.kg.Idempotency(ctx, shared, diffID)
-			st, err := mgr.idempotencyCheck(ctx, ftc, diffKey, diffID)
+			runID, err := mgr.idempotencyCheck(ctx, ftc, diffKey, diffID)
 			require.NoError(t, err)
-			require.Nil(t, st)
+			require.Nil(t, runID)
 		})
 
 		t.Run("returns invalid identifier error if previous value is not a ULID", func(t *testing.T) {
 			r.FlushAll()
 			require.NoError(t, r.Set(key, ""))
 
-			st, err := mgr.idempotencyCheck(ctx, ftc, key, id)
-			require.Nil(t, st)
+			runID, err := mgr.idempotencyCheck(ctx, ftc, key, id)
+			require.Nil(t, runID)
 			require.ErrorIs(t, err, state.ErrInvalidIdentifier)
 		})
 	})

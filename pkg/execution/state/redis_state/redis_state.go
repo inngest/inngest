@@ -246,7 +246,7 @@ func (m shardedMgr) New(ctx context.Context, input state.Input) (state.State, er
 	//
 	{
 		key := fnRunState.kg.Idempotency(ctx, isSharded, input.Identifier)
-		st, err := m.idempotencyCheck(ctx, client, key, input.Identifier)
+		runID, err := m.idempotencyCheck(ctx, client, key, input.Identifier)
 		switch err {
 		case nil: // no-op
 		// NOTE:
@@ -259,9 +259,9 @@ func (m shardedMgr) New(ctx context.Context, input state.Input) (state.State, er
 			return nil, err
 		}
 
-		// If a state already exists with the idempotency key, then we'll just return the state here.
-		if st != nil {
-			return st, state.ErrIdentifierExists
+		// If a state already exists with the idempotency key, override the input's runID and continue
+		if runID != nil {
+			input.Identifier.RunID = *runID
 		}
 	}
 
@@ -334,7 +334,12 @@ func (m shardedMgr) New(ctx context.Context, input state.Input) (state.State, er
 	if err != nil {
 		return nil, fmt.Errorf("error storing run state in redis: %w", err)
 	}
+	// state already exists, so return the existing state
 	if status == 1 {
+		// st, err := m.Load(ctx, input.Identifier.AccountID, input.Identifier.RunID)
+		// if err != nil {
+		// 	return nil, err
+		// }
 		return nil, state.ErrIdentifierExists
 	}
 
@@ -348,9 +353,9 @@ func (m shardedMgr) New(ctx context.Context, input state.Input) (state.State, er
 		nil
 }
 
-// idempotencyCheck checks if the function state already exists, and return the existing state
+// idempotencyCheck checks if the function state already exists, and return the runID of the existing state
 // if it does
-func (m shardedMgr) idempotencyCheck(ctx context.Context, rc RetriableClient, key string, id state.Identifier) (state.State, error) {
+func (m shardedMgr) idempotencyCheck(ctx context.Context, rc RetriableClient, key string, id state.Identifier) (*ulid.ULID, error) {
 	prev, err := rc.Do(ctx, func(c rueidis.Client) rueidis.Completed {
 		return c.B().
 			Set().
@@ -375,7 +380,7 @@ func (m shardedMgr) idempotencyCheck(ctx context.Context, rc RetriableClient, ke
 		return nil, state.ErrInvalidIdentifier
 	}
 
-	return m.Load(ctx, id.AccountID, runID)
+	return &runID, nil
 }
 
 func (m shardedMgr) UpdateMetadata(ctx context.Context, accountID uuid.UUID, runID ulid.ULID, md state.MetadataUpdate) error {
