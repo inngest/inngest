@@ -617,9 +617,6 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	//
 	// Create cancellation pauses immediately, only if this is a non-batch event.
 	//
-	// NOTE: on scheduling retries, this will result in duplicated pauses for cancellation.
-	// This won't be an issue since pause consumption is idempotent
-	//
 	if req.BatchID == nil {
 		for _, c := range req.Function.Cancel {
 			expires := time.Now().Add(consts.CancelTimeout)
