@@ -85,14 +85,6 @@ export function InlineSpans({ className, minTime, maxTime, trace }: Props) {
       <TooltipContent>
         <div className="text-basis">
           <Times isDelayVisible={spans.length === 0} name={spanName} span={trace} />
-          {spans.map((span) => {
-            return (
-              <Fragment key={span.spanID}>
-                <hr className="my-2" />
-                <Times isDelayVisible={true} name={getSpanName(span.name)} span={span} />
-              </Fragment>
-            );
-          })}
         </div>
       </TooltipContent>
     </Tooltip>
