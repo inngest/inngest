@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -168,6 +169,64 @@ func CloseSystemTracer(ctx context.Context) error {
 		systemTracer.Shutdown(ctx)
 	}
 	return nil
+}
+
+// HeadersFromTraceState is used to set trace state headers from the current
+// context so that the SDK can parrot them back to us for userland spans.
+//
+// Even if returning an error, headers will be returned, albeit empty.
+//
+// After a tracing refactor, this will no longer be required to send to SDKs
+// because they will not need to parrot back any data. It is required now as
+// trace ingestion is not critical and so could be delayed, meaning ingestion
+// endpoints cannot reliably access previous spans as they are not guaranteed to
+// be written.
+func HeadersFromTraceState(
+	ctx context.Context,
+	// The span ID that should be used in the trace state, which is not
+	// necessarily the current span ID if context is managed elsewhere, e.g. if
+	// a span is created in a lifecycle.
+	spanID string,
+	appID string,
+	functionID string,
+) (map[string]string, error) {
+	headers := make(map[string]string)
+	span := oteltrace.SpanFromContext(ctx)
+	sc := span.SpanContext()
+
+	ts, err := sc.TraceState().Insert("inngest@app", appID)
+	if err != nil {
+		return headers, fmt.Errorf("failed to add app ID to trace state: %w", err)
+	}
+
+	ts, err = ts.Insert("inngest@fn", functionID)
+	if err != nil {
+		return headers, fmt.Errorf("failed to add function ID to trace state: %w", err)
+	}
+
+	sc = oteltrace.NewSpanContext(oteltrace.SpanContextConfig{
+		TraceID:    sc.TraceID(),
+		SpanID:     sc.SpanID(),
+		TraceFlags: sc.TraceFlags(),
+		TraceState: ts,
+		Remote:     sc.IsRemote(),
+	})
+
+	newCtx := oteltrace.ContextWithSpanContext(ctx, sc)
+	UserTracer().Propagator().Inject(newCtx, propagation.MapCarrier(headers))
+
+	if headers["traceparent"] != "" {
+		// The span ID will be incorrect here as lifecycles can not affec the
+		// ctx. To patch, we manually set the span ID here to what we know it
+		// should be based on the item
+		parts := strings.Split(headers["traceparent"], "-")
+		if len(parts) == 4 {
+			parts[2] = spanID
+			headers["traceparent"] = strings.Join(parts, "-")
+		}
+	}
+
+	return headers, nil
 }
 
 type tracer struct {
