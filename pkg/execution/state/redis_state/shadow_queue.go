@@ -143,7 +143,7 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 					return err
 				}
 
-				if err := q.normalizeBacklog(ctx, backlog); err != nil {
+				if err := q.normalizeBacklog(ctx, backlog, shadowPart); err != nil {
 					return fmt.Errorf("could not normalize backlog: %w", err)
 				}
 			}

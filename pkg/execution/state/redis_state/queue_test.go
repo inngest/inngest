@@ -6801,6 +6801,17 @@ func hasMember(t *testing.T, r *miniredis.Miniredis, key string, member string) 
 	return false
 }
 
+func zcard(t *testing.T, rc rueidis.Client, key string) int {
+	cmd := rc.B().Zcard().Key(key).Build()
+	num, err := rc.Do(context.Background(), cmd).ToInt64()
+	if rueidis.IsRedisNil(err) {
+		return 0
+	}
+	require.NoError(t, err)
+
+	return int(num)
+}
+
 func initRedis(t *testing.T) (*miniredis.Miniredis, rueidis.Client) {
 	r := miniredis.RunT(t)
 	rc, err := rueidis.NewClient(rueidis.ClientOption{
