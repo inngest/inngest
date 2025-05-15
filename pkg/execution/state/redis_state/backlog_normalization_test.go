@@ -2,6 +2,7 @@ package redis_state
 
 import (
 	"context"
+	"github.com/inngest/inngest/pkg/util"
 	"testing"
 	"time"
 
@@ -306,7 +307,7 @@ func TestQueueBacklogNormalization(t *testing.T) {
 
 	shadowPartition := q.ItemShadowPartition(ctx, item)
 	require.NotEmpty(t, shadowPartition.PartitionID)
- 
+
 	// Mark backlog for normalization
 	backlogCount, shouldNormalizeAsync, err := q.BacklogPrepareNormalize(ctx, &backlog, &shadowPartition, 5)
 	require.NoError(t, err)
@@ -325,6 +326,156 @@ func TestQueueBacklogNormalization(t *testing.T) {
 	require.False(t, hasMember(t, r, kg.GlobalAccountNormalizeSet(), accountId.String()))
 	require.False(t, hasMember(t, r, kg.AccountNormalizeSet(accountId), fnID.String()))
 	require.False(t, hasMember(t, r, kg.PartitionNormalizeSet(fnID.String()), backlog.BacklogID))
+}
+
+func TestQueueBacklogNormalizationWithRewrite(t *testing.T) {
+	// prep
+	r, rc := initRedis(t)
+	defer rc.Close()
+
+	clock := clockwork.NewFakeClock()
+
+	defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+	kg := defaultShard.RedisClient.kg
+
+	accountId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
+
+	hashedConcurrencyKeyExpr := hashConcurrencyKey("event.data.customerId")
+	unhashedValue := "customer1"
+	scope := enums.ConcurrencyScopeFn
+	entity := fnID
+	fullKey := util.ConcurrencyKey(scope, entity, unhashedValue)
+
+	customConc := []state.CustomConcurrency{
+		{
+			Key:                       fullKey,
+			Hash:                      hashedConcurrencyKeyExpr,
+			Limit:                     123,
+			UnhashedEvaluatedKeyValue: unhashedValue,
+		},
+	}
+
+	throttleKey := util.XXHash("customer1")
+	throttleKeyExpr := util.XXHash("event.data.customerId")
+
+	throttle := &osqueue.Throttle{
+		Key:                 throttleKey,
+		Limit:               100,
+		Burst:               10,
+		Period:              int(time.Hour.Seconds()),
+		UnhashedThrottleKey: unhashedValue,
+		KeyExpressionHash:   throttleKeyExpr,
+	}
+
+	q := NewQueue(
+		defaultShard,
+		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+			return true
+		}),
+		WithAllowSystemKeyQueues(func(ctx context.Context) bool {
+			return true
+		}),
+		WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
+			return false
+		}),
+		WithDisableSystemQueueLeaseChecks(func(ctx context.Context) bool {
+			return false
+		}),
+		WithNormalizeRefreshItemCustomConcurrencyKeys(func(ctx context.Context, item *osqueue.QueueItem, existingKeys []state.CustomConcurrency, shadowPartition *QueueShadowPartition) ([]state.CustomConcurrency, error) {
+			return customConc, nil
+		}),
+		WithNormalizeRefreshItemThrottle(func(ctx context.Context, item *osqueue.QueueItem, existingThrottle *osqueue.Throttle, shadowPartition *QueueShadowPartition) (*osqueue.Throttle, error) {
+			return throttle, nil
+		}),
+		WithClock(clock),
+	)
+	ctx := context.Background()
+
+	require.Len(t, r.Keys(), 0)
+
+	item := osqueue.QueueItem{
+		FunctionID:  fnID,
+		WorkspaceID: wsID,
+		Data: osqueue.Item{
+			WorkspaceID: wsID,
+			Kind:        osqueue.KindStart,
+			Identifier: state.Identifier{
+				WorkflowID:  fnID,
+				AccountID:   accountId,
+				WorkspaceID: wsID,
+			},
+			QueueName:             nil,
+			Throttle:              nil,
+			CustomConcurrencyKeys: nil,
+		},
+		QueueName: nil,
+	}
+
+	item2 := osqueue.QueueItem{
+		FunctionID:  fnID,
+		WorkspaceID: wsID,
+		Data: osqueue.Item{
+			WorkspaceID: wsID,
+			Kind:        osqueue.KindStart,
+			Identifier: state.Identifier{
+				WorkflowID:  fnID,
+				AccountID:   accountId,
+				WorkspaceID: wsID,
+			},
+			QueueName:             nil,
+			Throttle:              throttle,
+			CustomConcurrencyKeys: customConc,
+		},
+		QueueName: nil,
+	}
+
+	// Create backlog
+	for i := range 10 {
+		at := clock.Now().Add(time.Duration(i*100) * time.Millisecond)
+		_, err := q.EnqueueItem(ctx, defaultShard, item, at, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+	}
+
+	//
+	//   Test cases
+	//
+
+	// Verify backlog is created as expected
+	initialBacklog := q.ItemBacklog(ctx, item)
+	require.NotEmpty(t, initialBacklog.BacklogID)
+	require.Nil(t, initialBacklog.ConcurrencyKeys)
+	require.Nil(t, initialBacklog.Throttle)
+
+	targetBacklog := q.ItemBacklog(ctx, item2)
+	require.NotEmpty(t, targetBacklog.BacklogID)
+	require.NotNil(t, targetBacklog.ConcurrencyKeys)
+	require.NotNil(t, targetBacklog.Throttle)
+
+	shadowPartition := q.ItemShadowPartition(ctx, item)
+	require.NotEmpty(t, shadowPartition.PartitionID)
+
+	// Mark backlog for normalization
+	backlogCount, shouldNormalizeAsync, err := q.BacklogPrepareNormalize(ctx, &initialBacklog, &shadowPartition, 5)
+	require.NoError(t, err)
+	require.True(t, shouldNormalizeAsync)
+	require.Equal(t, 10, backlogCount)
+	require.Equal(t, 10, zcard(t, rc, kg.BacklogSet(initialBacklog.BacklogID)))
+	require.Equal(t, 0, zcard(t, rc, kg.BacklogSet(targetBacklog.BacklogID)))
+	require.True(t, hasMember(t, r, kg.GlobalAccountNormalizeSet(), accountId.String()))
+	require.True(t, hasMember(t, r, kg.AccountNormalizeSet(accountId), fnID.String()))
+	require.True(t, hasMember(t, r, kg.PartitionNormalizeSet(fnID.String()), initialBacklog.BacklogID))
+
+	// Verify normalization
+	require.NoError(t, q.leaseBacklogForNormalization(ctx, &initialBacklog)) // lease it first
+
+	require.NoError(t, q.normalizeBacklog(ctx, &initialBacklog, &shadowPartition))
+
+	require.Equal(t, 0, zcard(t, rc, kg.BacklogSet(initialBacklog.BacklogID)))
+	require.Equal(t, 10, zcard(t, rc, kg.BacklogSet(targetBacklog.BacklogID)))
+
+	require.False(t, hasMember(t, r, kg.GlobalAccountNormalizeSet(), accountId.String()))
+	require.False(t, hasMember(t, r, kg.AccountNormalizeSet(accountId), fnID.String()))
+	require.False(t, hasMember(t, r, kg.PartitionNormalizeSet(fnID.String()), initialBacklog.BacklogID))
 }
 
 func TestBacklogNormalizationScanner(t *testing.T) {
