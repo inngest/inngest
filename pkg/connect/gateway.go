@@ -425,22 +425,23 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 					closeErr := websocket.CloseError{}
 					if errors.As(err, &closeErr) {
 						// Empty reason (unexpected)
-						if closeErr.Code == websocket.StatusNoStatusRcvd && closeErr.Reason == "" {
+						if closeErr.Reason == "" {
 							return nil
 						}
 
 						// Force-closed during draining after timeout
 						if closeErr.Code == ErrDraining.StatusCode && closeErr.Reason == ErrDraining.SysCode {
+							setCloseReason(connectpb.WorkerDisconnectReason_GATEWAY_DRAINING.String())
 							return nil
 						}
-
-						ch.log.Debug("connection closed with code and reason", "code", closeErr.Code.String(), "reason", closeErr.Reason)
 
 						// Expected worker shutdown
 						if closeErr.Code == websocket.StatusNormalClosure && closeErr.Reason == connectpb.WorkerDisconnectReason_WORKER_SHUTDOWN.String() {
 							setCloseReason(connectpb.WorkerDisconnectReason_WORKER_SHUTDOWN.String())
 							return nil
 						}
+
+						ch.log.Debug("connection closed with code and reason", "code", closeErr.Code.String(), "reason", closeErr.Reason)
 
 						// If client connection closed unexpectedly, we should store the reason, if set.
 						// If the reason is set, it may have been an intentional close, so the connection
