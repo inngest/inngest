@@ -176,8 +176,8 @@ func (r *redisConnectionStateManager) SaveResponse(ctx context.Context, envID uu
 	if err != nil {
 		return fmt.Errorf("could not marshal response: %w", err)
 	}
-
-	responseExpiry := 30 * time.Second
+	
+	responseExpiry := 1 * time.Minute
 
 	cmd := r.client.
 		B().
