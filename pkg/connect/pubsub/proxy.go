@@ -281,6 +281,8 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 			}
 
 			if resp != nil {
+				span.AddEvent("ReplyReceivedPoll")
+
 				l.Debug("received response via polling")
 
 				reply = resp
