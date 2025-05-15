@@ -38,12 +38,7 @@ export default function EventsPage({
 
   const openModal = useCallback((eventName: string, payload: string) => {
     try {
-      const parsedPayload = JSON.parse(payload);
-      const data = Array.isArray(parsedPayload)
-        ? parsedPayload.map((item) => item.data)
-        : parsedPayload.data;
-
-      const parsedData = JSON.stringify(data);
+      const parsedData = JSON.stringify(JSON.parse(payload).data);
       setSelectedEvent({ name: eventName, data: parsedData });
       setIsModalVisible(true);
     } catch (error) {
