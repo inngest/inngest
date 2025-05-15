@@ -33,6 +33,7 @@ var (
 	ErrPauseLeased        = fmt.Errorf("pause already leased")
 	ErrPauseAlreadyExists = fmt.Errorf("pause already exists")
 	ErrIdentifierExists   = fmt.Errorf("identifier already exists")
+	ErrInvalidIdentifier  = fmt.Errorf("identifier is not a valid ULID")
 	ErrFunctionCancelled  = fmt.Errorf("function cancelled")
 	ErrFunctionComplete   = fmt.Errorf("function completed")
 	ErrFunctionFailed     = fmt.Errorf("function failed")

@@ -243,14 +243,26 @@ func (m shardedMgr) New(ctx context.Context, input state.Input) (state.State, er
 	// atomicity to improve idempotency.
 	//
 	// In future/other metadata stores this is (or will be) transactional.
-	res := client.Do(ctx, func(c rueidis.Client) rueidis.Completed {
-		return c.B().Set().Key(
-			fnRunState.kg.Idempotency(ctx, isSharded, input.Identifier),
-		).Value("").Nx().Ex(consts.FunctionIdempotencyPeriod).Build()
-	})
-	set, err := res.AsBool()
-	if (err == nil || rueidis.IsRedisNil(err)) && !set {
-		return nil, state.ErrIdentifierExists
+	//
+	{
+		key := fnRunState.kg.Idempotency(ctx, isSharded, input.Identifier)
+		runID, err := m.idempotencyCheck(ctx, client, key, input.Identifier)
+		switch err {
+		case nil: // no-op
+		// NOTE:
+		// This will happen as part of the transition of storing empty strings for idempotency
+		// key to ULID values.
+		// So if this error is returned, we should just continue with creating a new state, since
+		// it could mean that the state is not actually created.
+		case state.ErrInvalidIdentifier: // no-op
+		default:
+			return nil, err
+		}
+
+		// If a state already exists with the idempotency key, override the input's runID and continue
+		if runID != nil && input.Identifier.RunID != *runID {
+			input.Identifier.RunID = *runID
+		}
 	}
 
 	// We marshal this ahead of creating a redis transaction as it's necessary
@@ -322,18 +334,55 @@ func (m shardedMgr) New(ctx context.Context, input state.Input) (state.State, er
 	if err != nil {
 		return nil, fmt.Errorf("error storing run state in redis: %w", err)
 	}
-	if status == 1 {
-		return nil, state.ErrIdentifierExists
+	switch status {
+	case 0: // new
+		return state.NewStateInstance(
+				input.Identifier,
+				metadata.Metadata(),
+				input.EventBatchData,
+				input.Steps,
+				make([]string, 0),
+			),
+			nil
+	case 1: // already exists
+		st, err := m.Load(ctx, input.Identifier.AccountID, input.Identifier.RunID)
+		if err != nil {
+			return nil, err
+		}
+		return st, state.ErrIdentifierExists
+	default:
+		return nil, fmt.Errorf("unknown status %d when attempting to create function state", status)
+	}
+}
+
+// idempotencyCheck checks if the function state already exists, and return the runID of the existing state
+// if it does
+func (m shardedMgr) idempotencyCheck(ctx context.Context, rc RetriableClient, key string, id state.Identifier) (*ulid.ULID, error) {
+	prev, err := rc.Do(ctx, func(c rueidis.Client) rueidis.Completed {
+		return c.B().
+			Set().
+			Key(key).
+			Value(id.RunID.String()).
+			Nx().
+			Get(). // retrieve the previous value if exists
+			Ex(consts.FunctionIdempotencyPeriod).
+			Build()
+	}).ToString()
+	if err == rueidis.Nil {
+		return nil, nil // no previous state exists, entirely new
+	}
+	if err != nil {
+		return nil, err
 	}
 
-	return state.NewStateInstance(
-			input.Identifier,
-			metadata.Metadata(),
-			input.EventBatchData,
-			input.Steps,
-			make([]string, 0),
-		),
-		nil
+	// if there are existing values, the state might have already been created
+	runID, err := ulid.Parse(prev)
+	if err != nil {
+		// there already is a value but is not a valid ULID
+		return nil, state.ErrInvalidIdentifier
+	}
+
+	return &runID, nil
 }
 
 func (m shardedMgr) UpdateMetadata(ctx context.Context, accountID uuid.UUID, runID ulid.ULID, md state.MetadataUpdate) error {
