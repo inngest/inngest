@@ -2957,6 +2957,7 @@ func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Func
 	shouldDeleteBatch := err == nil ||
 		err == redis_state.ErrQueueItemExists ||
 		errors.Is(err, ErrFunctionSkipped) ||
+		errors.Is(err, ErrFunctionSkippedIdempotency) ||
 		errors.Is(err, state.ErrIdentifierExists)
 	if shouldDeleteBatch {
 		// TODO: check if all errors can be blindly returned
@@ -2966,13 +2967,10 @@ func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Func
 	}
 
 	// Don't bother if it's already there
-	if err == redis_state.ErrQueueItemExists {
-		span.SetAttributes(attribute.Bool(consts.OtelSysStepDelete, true))
-		return nil
-	}
-
 	// If function is paused, we do not schedule runs
-	if errors.Is(err, ErrFunctionSkipped) {
+	if err == redis_state.ErrQueueItemExists ||
+		errors.Is(err, ErrFunctionSkipped) ||
+		errors.Is(err, ErrFunctionSkippedIdempotency) {
 		span.SetAttributes(attribute.Bool(consts.OtelSysStepDelete, true))
 		return nil
 	}
