@@ -26,7 +26,7 @@ export const ActionsMenu = (row: Row<EventType>) => {
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button kind="secondary" appearance="ghost" size="small" icon={<RiMoreFill />} />
+          <Button kind="secondary" appearance="outlined" size="small" icon={<RiMoreFill />} />
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
           <OptionalTooltip tooltip={isArchived && 'Cannot send events. Environment is archived.'}>

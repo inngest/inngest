@@ -11,11 +11,10 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/logger"
-
-	"github.com/google/uuid"
 
 	"github.com/VividCortex/ewma"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
@@ -198,6 +197,12 @@ func (q *queue) Run(ctx context.Context, f osqueue.RunFunc) error {
 		})
 	}
 
+	if q.runMode.NormalizePartition {
+		eg.Go(func() error {
+			return q.backlogNormalizationScan(ctx)
+		})
+	}
+
 	return eg.Wait()
 }
 
@@ -267,42 +272,6 @@ LOOP:
 	q.wg.Wait()
 
 	return nil
-}
-
-func (q *queue) shadowScan(ctx context.Context) error {
-	l := logger.StdlibLogger(ctx)
-	qspc := make(chan *QueueShadowPartition)
-
-	for i := int32(0); i < q.numShadowWorkers; i++ {
-		go q.shadowWorker(ctx, qspc)
-	}
-
-	tick := q.clock.NewTicker(q.pollTick)
-	l.Debug("starting shadow scanner", "poll", q.pollTick.String())
-
-	for {
-		select {
-		case <-ctx.Done():
-			tick.Stop()
-			return nil
-
-		case <-tick.Chan():
-			// If there are shadow continuations, process those immediately.
-			if err := q.scanShadowContinuations(ctx); err != nil {
-				return fmt.Errorf("error scanning shadow continuations: %w", err)
-			}
-
-			// - scan for shadow partitions
-			// - lease the partition
-			// - dump it into the channel for the workers to do their thing
-
-			parts := []QueueShadowPartition{}
-
-			for _, part := range parts {
-				qspc <- &part
-			}
-		}
-	}
 }
 
 // claimSequentialLease is a process which continually runs while listening to the queue,
@@ -527,129 +496,6 @@ func (q *queue) worker(ctx context.Context, f osqueue.RunFunc) {
 	}
 }
 
-// shadowWorker runs a blocking process that listens to item being pushed into the
-// shadow queue partition channel. This allows us to process an individual shadow partition.
-// TODO: replace channel type with QueueShadowPartition struct once available
-func (q *queue) shadowWorker(ctx context.Context, qspc chan *QueueShadowPartition) {
-	for {
-		select {
-		case <-ctx.Done():
-			return
-
-		case shadowPart := <-qspc:
-			err := q.processShadowPartition(ctx, shadowPart, 0)
-			if err != nil {
-				logger.StdlibLogger(ctx).Error("could not scan shadow partition", "err", err, "shadow_part", shadowPart)
-			}
-		}
-	}
-}
-
-func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueShadowPartition, continuationCount uint) error {
-	metrics.ActiveShadowScannerCount(ctx, 1, metrics.CounterOpt{PkgName: pkgName})
-	defer metrics.ActiveShadowScannerCount(ctx, -1, metrics.CounterOpt{PkgName: pkgName})
-
-	// acquire lease for shadow partition
-	leaseID, err := duration(ctx, q.primaryQueueShard.Name, "shadow_partition_lease", q.clock.Now(), func(ctx context.Context) (*ulid.ULID, error) {
-		leaseID, err := q.ShadowPartitionLease(ctx, shadowPart, ShadowPartitionLeaseDuration)
-		return leaseID, err
-	})
-	if err != nil {
-		if errors.Is(err, ErrShadowPartitionAlreadyLeased) {
-			// contention
-			return nil
-		}
-	}
-
-	if leaseID == nil {
-		return fmt.Errorf("missing shadow partition leaseID")
-	}
-
-	extendLeaseCtx, cancel := context.WithCancel(ctx)
-	defer cancel()
-
-	// keep extending lease while we're processing
-	go func() {
-		for {
-			select {
-			case <-extendLeaseCtx.Done():
-				return
-			case <-time.Tick(ShadowPartitionLeaseDuration / 2):
-				leaseID, err = q.ShadowPartitionExtendLease(ctx, shadowPart, *leaseID, ShadowPartitionLeaseDuration)
-				if err != nil {
-					if errors.Is(err, ErrShadowPartitionAlreadyLeased) || errors.Is(err, ErrShadowPartitionLeaseNotFound) {
-						// contention
-						return
-					}
-					return
-				}
-			}
-		}
-	}()
-
-	// Check if shadow partition cannot be processed (paused/refill disabled, etc.)
-	if shadowPart.PauseRefill {
-		q.removeShadowContinue(ctx, shadowPart, false)
-
-		forceRequeueAt := q.clock.Now().Add(ShadowPartitionRefillPausedRequeueExtension)
-		err = q.ShadowPartitionRequeue(ctx, shadowPart, *leaseID, &forceRequeueAt)
-		if err != nil {
-			return fmt.Errorf("could not requeue shadow partition: %w", err)
-		}
-
-		return nil
-	}
-
-	until := q.clock.Now()
-	limit := ShadowPartitionPeekMaxBacklogs
-	backlogs, totalCount, err := q.ShadowPartitionPeek(ctx, shadowPart, until, limit)
-	if err != nil {
-		return fmt.Errorf("could not peek backlogs for shadow partition: %w", err)
-	}
-
-	// Sequentially refill backlogs
-	for _, backlog := range backlogs {
-		status, _, err := q.BacklogRefill(ctx, backlog, shadowPart)
-		if err != nil {
-			return fmt.Errorf("could not refill backlog: %w", err)
-		}
-
-		if status != enums.QueueConstraintNotLimited {
-			q.removeShadowContinue(ctx, shadowPart, false)
-
-			forceRequeueAt := q.clock.Now().Add(ShadowPartitionRefillCapacityReachedRequeueExtension)
-			err = q.ShadowPartitionRequeue(ctx, shadowPart, *leaseID, &forceRequeueAt)
-			if err != nil {
-				return fmt.Errorf("could not requeue shadow partition: %w", err)
-			}
-
-			return nil
-		}
-	}
-
-	hasMoreBacklogs := int(totalCount) > len(backlogs)
-	if !hasMoreBacklogs {
-		// No more backlogs right now, we can continue the scan loop until new items are added
-		q.removeShadowContinue(ctx, shadowPart, false)
-
-		err = q.ShadowPartitionRequeue(ctx, shadowPart, *leaseID, nil)
-		if err != nil {
-			return fmt.Errorf("could not requeue shadow partition: %w", err)
-		}
-	}
-
-	// More backlogs, we can add a continuation
-	q.addShadowContinue(ctx, shadowPart, continuationCount)
-
-	// Clear out current lease
-	err = q.ShadowPartitionRequeue(ctx, shadowPart, *leaseID, nil)
-	if err != nil {
-		return fmt.Errorf("could not requeue shadow partition: %w", err)
-	}
-
-	return nil
-}
-
 func (q *queue) scanPartition(ctx context.Context, partitionKey string, peekLimit int64, peekUntil time.Time, metricShardName string, accountId *uuid.UUID, reportPeekedPartitions *int64) error {
 	// Peek 1s into the future to pull jobs off ahead of time, minimizing 0 latency
 	partitions, err := durationWithTags(ctx, q.primaryQueueShard.Name, "partition_peek", q.clock.Now(), func(ctx context.Context) ([]*QueuePartition, error) {
@@ -712,7 +558,7 @@ func (q *queue) scan(ctx context.Context) error {
 
 	// Store the shard that we processed, allowing us to eventually pass this
 	// down to the job for stat tracking.
-	var metricShardName = "<global>" // default global name for metrics in this function
+	metricShardName := "<global>" // default global name for metrics in this function
 
 	peekUntil := q.clock.Now().Add(PartitionLookahead)
 
@@ -861,41 +707,6 @@ func (q *queue) scanContinuations(ctx context.Context) error {
 		})
 	}
 	q.continuesLock.Unlock()
-	return eg.Wait()
-}
-
-func (q *queue) scanShadowContinuations(ctx context.Context) error {
-	if !q.runMode.ShadowContinuations {
-		// continuations are not enabled.
-		return nil
-	}
-
-	// Have some chance of skipping continuations in this iteration.
-	if rand.Float64() <= consts.QueueContinuationSkipProbability {
-		return nil
-	}
-
-	eg := errgroup.Group{}
-
-	q.shadowContinuesLock.Lock()
-	defer q.shadowContinuesLock.Unlock()
-
-	// If we have continued partitions, process those immediately.
-	for _, c := range q.shadowContinues {
-		cont := c
-		eg.Go(func() error {
-			p := cont.shadowPart
-
-			if err := q.processShadowPartition(ctx, p, cont.count); err != nil {
-				if !errors.Is(err, context.Canceled) {
-					q.logger.Error().Err(err).Msg("error processing shadow partition")
-				}
-				return err
-			}
-
-			return nil
-		})
-	}
 	return eg.Wait()
 }
 
@@ -1203,6 +1014,7 @@ func (q *queue) process(
 	// XXX: Add a max job time here, configurable.
 	jobCtx, jobCancel := context.WithCancel(context.WithoutCancel(ctx))
 	defer jobCancel()
+
 	// Add the job ID to the queue context.  This allows any logic that handles the run function
 	// to inspect job IDs, eg. for tracing or logging, without having to thread this down as
 	// arguments.
@@ -1211,6 +1023,22 @@ func (q *queue) process(
 	if qi.Data.GroupID != "" {
 		jobCtx = state.WithGroupID(jobCtx, qi.Data.GroupID)
 	}
+
+	startedAt := q.clock.Now()
+	go func() {
+		longRunningJobStatusTick := q.clock.NewTicker(5 * time.Minute)
+		defer longRunningJobStatusTick.Stop()
+
+		for {
+			select {
+			case <-jobCtx.Done():
+				return
+			case <-longRunningJobStatusTick.Chan():
+			}
+
+			logger.StdlibLogger(ctx).Debug("long running queue job tick", "item", qi, "dur", q.clock.Now().Sub(startedAt).String())
+		}
+	}()
 
 	go func() {
 		defer func() {
@@ -1233,7 +1061,6 @@ func (q *queue) process(
 				Int64("ms", delay.Milliseconds()).
 				Msg("delaying job in memory")
 		}
-
 		n := q.clock.Now()
 
 		// Track the sojourn (concurrency) latency.
@@ -1241,7 +1068,7 @@ func (q *queue) process(
 		if qi.EarliestPeekTime > 0 {
 			sojourn = n.Sub(time.UnixMilli(qi.EarliestPeekTime))
 		}
-		jobCtx = context.WithValue(jobCtx, sojournKey, sojourn)
+		doCtx := context.WithValue(jobCtx, sojournKey, sojourn)
 
 		// Track the latency on average globally.  Do this in a goroutine so that it doesn't
 		// at all delay the job during concurrenty locking contention.
@@ -1249,10 +1076,10 @@ func (q *queue) process(
 			qi.WallTimeMS = qi.AtMS // backcompat while WallTimeMS isn't valid.
 		}
 		latency := n.Sub(time.UnixMilli(qi.WallTimeMS)) - sojourn
-		jobCtx = context.WithValue(jobCtx, latencyKey, latency)
+		doCtx = context.WithValue(doCtx, latencyKey, latency)
 
 		// store started at and latency in ctx
-		jobCtx = context.WithValue(jobCtx, startedAtKey, n)
+		doCtx = context.WithValue(doCtx, startedAtKey, n)
 
 		go func() {
 			// Update the ewma
@@ -1285,7 +1112,7 @@ func (q *queue) process(
 		}
 
 		// Call the run func.
-		res, err := f(jobCtx, runInfo, qi.Data)
+		res, err := f(doCtx, runInfo, qi.Data)
 		extendLeaseTick.Stop()
 		if err != nil {
 			metrics.IncrQueueItemStatusCounter(ctx, metrics.CounterOpt{
@@ -1709,7 +1536,6 @@ func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error 
 	leaseID, err := duration(ctx, p.queue.primaryQueueShard.Name, "lease", p.queue.clock.Now(), func(ctx context.Context) (*ulid.ULID, error) {
 		return p.queue.Lease(ctx, *item, QueueLeaseDuration, p.staticTime, p.denies)
 	})
-
 	// NOTE: If this loop ends in an error, we must _always_ release an item from the
 	// semaphore to free capacity.  This will happen automatically when the worker
 	// finishes processing a queue item on success.
@@ -1768,6 +1594,15 @@ func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error 
 			PkgName: pkgName,
 			Tags:    map[string]any{"status": "throttled", "queue_shard": p.queue.primaryQueueShard.Name},
 		})
+
+		if p.queue.itemEnableKeyQueues(ctx, *item) {
+			err := p.queue.Requeue(ctx, p.queue.primaryQueueShard, *item, time.UnixMilli(item.AtMS))
+			if err != nil {
+				p.queue.log.Error("could not requeue item to backlog after hitting limit", "item", *item, "cause", cause)
+				return fmt.Errorf("could not requeue to backlog: %w", err)
+			}
+		}
+
 		return nil
 	case ErrPartitionConcurrencyLimit, ErrAccountConcurrencyLimit, ErrSystemConcurrencyLimit:
 		p.isCustomKeyLimitOnly = false
@@ -1808,6 +1643,14 @@ func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error 
 			Tags:    map[string]any{"status": status, "queue_shard": p.queue.primaryQueueShard.Name},
 		})
 
+		if p.queue.itemEnableKeyQueues(ctx, *item) {
+			err := p.queue.Requeue(ctx, p.queue.primaryQueueShard, *item, time.UnixMilli(item.AtMS))
+			if err != nil {
+				p.queue.log.Error("could not requeue item to backlog after hitting limit", "item", *item, "cause", cause)
+				return fmt.Errorf("could not requeue to backlog: %w", err)
+			}
+		}
+
 		return fmt.Errorf("concurrency hit: %w", errProcessStopIterator)
 	case ErrConcurrencyLimitCustomKey:
 		p.ctrConcurrency++
@@ -1831,6 +1674,14 @@ func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error 
 			PkgName: pkgName,
 			Tags:    map[string]any{"status": "custom_key_concurrency_limit", "queue_shard": p.queue.primaryQueueShard.Name},
 		})
+
+		if p.queue.itemEnableKeyQueues(ctx, *item) {
+			err := p.queue.Requeue(ctx, p.queue.primaryQueueShard, *item, time.UnixMilli(item.AtMS))
+			if err != nil {
+				p.queue.log.Error("could not requeue item to backlog after hitting limit", "item", *item, "cause", cause)
+				return fmt.Errorf("could not requeue to backlog: %w", err)
+			}
+		}
 		return nil
 	case ErrQueueItemNotFound:
 		// This is an okay error.  Move to the next job item.

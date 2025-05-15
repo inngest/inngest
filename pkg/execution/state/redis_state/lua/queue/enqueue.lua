@@ -15,18 +15,17 @@ local keyFnMetadata           	= KEYS[7]           -- fnMeta:$id - hash
 local keyPartition           	  = KEYS[8]           -- queue:sorted:$workflowID - zset
 
 -- Key queues v2
-local keyBacklogSetA                     = KEYS[9]          -- backlog:sorted:<backlogID> - zset
-local keyBacklogSetB                     = KEYS[10]          -- backlog:sorted:<backlogID> - zset
-local keyBacklogSetC                     = KEYS[11]          -- backlog:sorted:<backlogID> - zset
-local keyBacklogMeta                     = KEYS[12]          -- backlogs - hash
-local keyGlobalShadowPartitionSet        = KEYS[13]          -- shadow:sorted
-local keyShadowPartitionSet              = KEYS[14]          -- shadow:sorted:<fnID|queueName> - zset
-local keyShadowPartitionMeta             = KEYS[15]          -- shadows
-local keyGlobalAccountShadowPartitionSet = KEYS[16]
-local keyAccountShadowPartitionSet       = KEYS[17]
+local keyBacklogSet                      = KEYS[9]          -- backlog:sorted:<backlogID> - zset
+local keyBacklogMeta                     = KEYS[10]          -- backlogs - hash
+local keyGlobalShadowPartitionSet        = KEYS[11]          -- shadow:sorted
+local keyShadowPartitionSet              = KEYS[12]          -- shadow:sorted:<fnID|queueName> - zset
+local keyShadowPartitionMeta             = KEYS[13]          -- shadows
+local keyGlobalAccountShadowPartitionSet = KEYS[14]
+local keyAccountShadowPartitionSet       = KEYS[15]
+local keyNormalizeFromBacklogSet         = ARGV[16] -- signals if this is part of a normalization
 
-local keyItemIndexA           	= KEYS[18]          -- custom item index 1
-local keyItemIndexB           	= KEYS[19]          -- custom item index 2
+local keyItemIndexA           	= KEYS[17]          -- custom item index 1
+local keyItemIndexB           	= KEYS[18]          -- custom item index 2
 
 
 local queueItem           		= ARGV[1]           -- {id, lease id, attempt, max attempt, data, etc...}
@@ -42,12 +41,8 @@ local accountID           		= ARGV[9]
 -- Key queues v2
 local enqueueToBacklog				= tonumber(ARGV[10])
 local shadowPartitionItem     = ARGV[11]
-local backlogItemA            = ARGV[12]
-local backlogItemB            = ARGV[13]
-local backlogItemC            = ARGV[14]
-local backlogIdA              = ARGV[15]
-local backlogIdB              = ARGV[16]
-local backlogIdC              = ARGV[17]
+local backlogItem             = ARGV[12]
+local backlogID               = ARGV[13]
 
 -- $include(update_pointer_score.lua)
 -- $include(ends_with.lua)
@@ -56,25 +51,29 @@ local backlogIdC              = ARGV[17]
 -- $include(enqueue_to_partition.lua)
 -- $include(ends_with.lua)
 
--- Check idempotency exists
-if redis.call("EXISTS", idempotencyKey) ~= 0 then
+-- Only skip idempotency checks if we're normalizing a backlog (we want to enqueue an existing item to a new backlog)
+if exists_without_ending(keyNormalizeFromBacklogSet, ":-") ~= true then
+  -- Check idempotency exists
+  if redis.call("EXISTS", idempotencyKey) ~= 0 then
     return 1
-end
+  end
 
--- Make these a hash to save on memory usage
-if redis.call("HSETNX", queueKey, queueID, queueItem) == 0 then
+  -- Make these a hash to save on memory usage
+  if redis.call("HSETNX", queueKey, queueID, queueItem) == 0 then
     -- This already exists;  return an error.
     return 1
+  end
 end
 
 if enqueueToBacklog == 1 then
-	-- the default function queue could be any of the three, usually the first but possibly the middle or last if a custom concurrency key is used
-
-	enqueue_to_backlog(keyBacklogSetA, backlogIdA, backlogItemA, partitionID, shadowPartitionItem, partitionItem, keyPartitionMap, keyBacklogMeta, keyGlobalShadowPartitionSet, keyShadowPartitionMeta, keyShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, queueScore, queueID, partitionTime, nowMS, accountID)
-	enqueue_to_backlog(keyBacklogSetB, backlogIdB, backlogItemB, partitionID, shadowPartitionItem, partitionItem, keyPartitionMap, keyBacklogMeta, keyGlobalShadowPartitionSet, keyShadowPartitionMeta, keyShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, queueScore, queueID, partitionTime, nowMS, accountID)
-	enqueue_to_backlog(keyBacklogSetC, backlogIdC, backlogItemC, partitionID, shadowPartitionItem, partitionItem, keyPartitionMap, keyBacklogMeta, keyGlobalShadowPartitionSet, keyShadowPartitionMeta, keyShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, queueScore, queueID, partitionTime, nowMS, accountID)
+	enqueue_to_backlog(keyBacklogSet, backlogID, backlogItem, partitionID, shadowPartitionItem, partitionItem, keyPartitionMap, keyBacklogMeta, keyGlobalShadowPartitionSet, keyShadowPartitionMeta, keyShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, queueScore, queueID, partitionTime, nowMS, accountID)
 else
   enqueue_to_partition(keyPartition, partitionID, partitionItem, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, queueScore, queueID, partitionTime, nowMS, accountID)
+end
+
+-- Normalization only: Remove from old backlog after enqueueing to new backlog
+if exists_without_ending(keyNormalizeFromBacklogSet, ":-") == true then
+  redis.call("ZREM", keyNormalizeFromBacklogSet, queueID)
 end
 
 if exists_without_ending(keyFnMetadata, ":fnMeta:-") == true then

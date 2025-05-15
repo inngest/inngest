@@ -5,26 +5,20 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '../Tooltip';
 import { cn } from '../utils/classNames';
 import { toMaybeDate } from '../utils/date';
 import { Span } from './Span';
-import { formatDuration, getSpanName } from './utils';
+import { type Trace } from './types';
+import { createSpanWidths, formatDuration, getSpanName } from './utils';
 
 type Props = {
   className?: string;
   maxTime: Date;
   minTime: Date;
-  name: string;
-  spans: (React.ComponentProps<typeof Span>['trace'] & { name: string })[];
-  widths: {
-    before: number;
-    queued: number;
-    running: number;
-    after: number;
-  };
+  trace: Trace;
 };
 
-export function InlineSpans({ className, minTime, maxTime, name, spans, widths }: Props) {
+export function InlineSpans({ className, minTime, maxTime, trace }: Props) {
   const [open, setOpen] = useState(false);
   const hoverTimeoutRef = useRef<NodeJS.Timeout>();
-  const spanName = getSpanName(name);
+  const spanName = getSpanName(trace.name);
 
   const handleMouseEnter = useCallback(() => {
     if (hoverTimeoutRef.current) {
@@ -38,6 +32,19 @@ export function InlineSpans({ className, minTime, maxTime, name, spans, widths }
       setOpen(false);
     }, 100);
   }, []);
+
+  const widths = createSpanWidths({
+    ended: toMaybeDate(trace.endedAt)?.getTime() ?? null,
+    max: maxTime.getTime(),
+    min: minTime.getTime(),
+    queued: new Date(trace.queuedAt).getTime(),
+    started: toMaybeDate(trace.startedAt)?.getTime() ?? null,
+  });
+
+  //
+  // when a span has step (not userland) children then we construct the span from them
+  const stepChildren = trace.childrenSpans?.filter((s) => !s.isUserland) || [];
+  const spans = !trace.isRoot && stepChildren.length ? stepChildren : [];
 
   return (
     <Tooltip open={open}>
@@ -55,32 +62,29 @@ export function InlineSpans({ className, minTime, maxTime, name, spans, widths }
           }}
         >
           <TooltipTrigger className="flex w-full flex-row">
-            {spans.map((item) => {
-              return (
-                <Span isInline key={item.spanID} maxTime={maxTime} minTime={minTime} trace={item} />
-              );
-            })}
+            {spans.length ? (
+              spans.map((span) => {
+                return (
+                  <Span
+                    isInline
+                    key={span.spanID}
+                    maxTime={maxTime}
+                    minTime={minTime}
+                    span={span}
+                  />
+                );
+              })
+            ) : (
+              <Span isInline key={trace.spanID} maxTime={maxTime} minTime={minTime} span={trace} />
+            )}
           </TooltipTrigger>
         </div>
 
-        <div className="bg-canvasMuted h-0" style={{ flexGrow: widths.after }}></div>
+        <div className="bg-canvasMuted h-0" style={{ flexGrow: widths.after }} />
       </div>
       <TooltipContent>
         <div className="text-basis">
-          {spans[0] && (
-            <Times isDelayVisible={spans.length === 1} name={spanName} span={spans[0]} />
-          )}
-
-          {spans.length > 1 &&
-            spans.map((span) => {
-              return (
-                <Fragment key={span.spanID}>
-                  <hr className="my-2" />
-                  <Times name={spanName} span={span} />
-                  {span.spanID}
-                </Fragment>
-              );
-            })}
+          <Times isDelayVisible={spans.length === 0} name={spanName} span={trace} />
         </div>
       </TooltipContent>
     </Tooltip>

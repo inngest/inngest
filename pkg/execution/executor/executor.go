@@ -561,19 +561,23 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	if req.Function.Throttle != nil {
 		unhashedThrottleKey := req.Function.ID.String()
 		throttleKey := queue.HashID(ctx, unhashedThrottleKey)
+		hashedThrottleExpr := ""
 		if req.Function.Throttle.Key != nil {
 			val, _, _ := expressions.Evaluate(ctx, *req.Function.Throttle.Key, map[string]any{
 				"event": evtMap,
 			})
 			unhashedThrottleKey = fmt.Sprintf("%v", val)
 			throttleKey = throttleKey + "-" + queue.HashID(ctx, unhashedThrottleKey)
+			hashedThrottleExpr = util.XXHash(*req.Function.Throttle.Key)
 		}
+
 		throttle = &queue.Throttle{
 			Key:                 throttleKey,
 			Limit:               int(req.Function.Throttle.Limit),
 			Burst:               int(req.Function.Throttle.Burst),
 			Period:              int(req.Function.Throttle.Period.Seconds()),
 			UnhashedThrottleKey: unhashedThrottleKey,
+			KeyExpressionHash:   hashedThrottleExpr,
 		}
 	}
 
@@ -916,7 +920,11 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			return resp, handleErr
 		}
 		return resp, err
-	}, util.WithTimeout(consts.MaxFunctionTimeout))
+	},
+		// wait up to 2h and add a short delay to allow driver implementations to
+		// return a specific timeout error here
+		util.WithTimeout(consts.MaxFunctionTimeout+5*time.Second),
+	)
 }
 
 func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {

@@ -238,6 +238,15 @@ func IncrConnectGatewayReceivedRouterPubSubMessageCounter(ctx context.Context, v
 	})
 }
 
+func IncrConnectRouterPubSubMessageSentCounter(ctx context.Context, value int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, value, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "connect_gateway.router.sent_pubsub_messages",
+		Description: "Total number of router PubSub messages sent by the connect router",
+		Tags:        opts.Tags,
+	})
+}
+
 func IncrConnectGatewayReceivedWorkerMessageCounter(ctx context.Context, value int64, opts CounterOpt) {
 	RecordCounterMetric(ctx, value, CounterOpt{
 		PkgName:     opts.PkgName,
@@ -333,6 +342,24 @@ func IncrBacklogRefillLimitsCounter(ctx context.Context, opts CounterOpt) {
 		PkgName:     opts.PkgName,
 		MetricName:  "backlog_refill_limit_total",
 		Description: "The total number of limtis hit when refilling a backlog",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrBacklogNormalizationScannedCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "backlog_normalization_scanned_total",
+		Description: "The total number of backlogs that were scanned for normalization",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrBacklogNormalizedItemCounter(ctx context.Context, value int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, value, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "backlog_normalized_item_total",
+		Description: "The total number of items that were normalized",
 		Tags:        opts.Tags,
 	})
 }

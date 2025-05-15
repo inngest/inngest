@@ -24,19 +24,21 @@ local keyGlobalShadowPartitionSet        = KEYS[3]
 local keyGlobalAccountShadowPartitionSet = KEYS[4]
 local keyAccountShadowPartitionSet       = KEYS[5]
 local keyReadySet                        = KEYS[6]
+local keyQueueItemHash                   = KEYS[7]
 
 -- Constraint-related accounting keys
-local keyConcurrencyAccount      = KEYS[7]
-local keyConcurrencyFn  				 = KEYS[8] -- Account concurrency level
-local keyCustomConcurrencyKey1   = KEYS[9] -- When leasing an item we need to place the lease into this key.
-local keyCustomConcurrencyKey2   = KEYS[10] -- Optional for eg. for concurrency amongst steps
+local keyConcurrencyAccount      = KEYS[8]
+local keyConcurrencyFn  				 = KEYS[9] -- Account concurrency level
+local keyCustomConcurrencyKey1   = KEYS[10] -- When leasing an item we need to place the lease into this key.
+local keyCustomConcurrencyKey2   = KEYS[11] -- Optional for eg. for concurrency amongst steps
+local keyActiveCounter           = KEYS[12]
 
-local backlogID   = ARGV[1]
-local partitionID = ARGV[2]
-local accountID   = ARGV[3]
-local refillUntil = tonumber(ARGV[4])
-local refillLimit = tonumber(ARGV[5])
-local nowMS       = tonumber(ARGV[6])
+local backlogID     = ARGV[1]
+local partitionID   = ARGV[2]
+local accountID     = ARGV[3]
+local refillUntilMS = tonumber(ARGV[4])
+local refillLimit   = tonumber(ARGV[5])
+local nowMS         = tonumber(ARGV[6])
 
 -- We check concurrency limits before refilling
 local concurrencyAcct 				= tonumber(ARGV[7])
@@ -59,7 +61,7 @@ local throttlePeriod = tonumber(ARGV[14])
 -- Start with full capacity: max(number of items in the backlog, hard limit, e.g. 100)
 local capacity = 0
 
-local backlogCount = redis.call("ZCOUNT", keyBacklogSet, "-inf", refillUntil)
+local backlogCount = redis.call("ZCOUNT", keyBacklogSet, "-inf", refillUntilMS)
 if backlogCount ~= false and backlogCount ~= nil then
   capacity = backlogCount
 end
@@ -76,10 +78,10 @@ end
 local status = 0
 
 if capacity > 0 and throttleLimit > 0 then
-  local throttleResult = gcra(throttleKey, nowMS, throttlePeriod * 1000, throttleLimit, throttleBurst)
-  if throttleResult == false then
-    -- Throttled: Can't add more for this backlog!
-    capacity = 0
+  -- TODO Implement and test this scenario
+  local remainingThrottleCapacity = gcraCapacity(throttleKey, nowMS, throttlePeriod * 1000, throttleLimit, throttleBurst)
+  if remainingThrottleCapacity < capacity then
+    capacity = remainingThrottleCapacity
     status = 5
   end
 end
@@ -121,11 +123,11 @@ if capacity > 0 and exists_without_ending(keyConcurrencyAccount, ":-") == true a
   end
 end
 
--- If we have capacity, reduce by ready but not yet picked up items to prevent over-filling
+-- If we have capacity, reduce by active (ready + in progress count) to prevent over-filling
 if capacity > 0 then
-  local readyCount = redis.call("ZCARD", keyReadySet)
-  if readyCount ~= nil and readyCount ~= false then
-    capacity = capacity - readyCount
+  local activeCount = redis.call("GET", keyActiveCounter)
+  if activeCount ~= nil and activeCount ~= false then
+    capacity = capacity - activeCount
   end
 end
 
@@ -139,20 +141,47 @@ local refilled = 0
 if capacity > 0 then
   -- Move item(s) out of backlog and into partition
 
-  local items = redis.call("ZRANGE", keyBacklogSet, "-inf", "+inf", "BYSCORE", "LIMIT", 0, capacity, "WITHSCORES")
+  local items = redis.call("ZRANGE", keyBacklogSet, "-inf", refillUntilMS, "BYSCORE", "LIMIT", 0, capacity, "WITHSCORES")
+
+  local potentiallyMissingQueueItems = redis.call("HMGET", keyQueueItemHash, unpack(items))
 
   -- Reverse the items to be added to the ready set
   local args = {}
   local remArgs = {}
+
+  local itemCleanupArgs = {}
+  local hasCleanup = false
+
   -- advance by two as items is essentially a tuple of (item ID, score)[]
   for i = 1, #items, 2 do
+    if potentiallyMissingQueueItems[i] == false or potentiallyMissingQueueItems[i] == nil or potentiallyMissingQueueItems[i] == "" then
+      table.insert(itemCleanupArgs, items[i])
+      table.insert(remArgs, items[i])  -- item for removal
+      hasCleanup = true
+      goto continue
+    end
+
     table.insert(args, items[i + 1]) -- score
     table.insert(args, items[i])     -- item
     table.insert(remArgs, items[i])  -- item for removal
     refilled = refilled + 1
+
+    ::continue::
   end
+
   redis.call("ZADD", keyReadySet, unpack(args))
+  redis.call("INCRBY", keyActiveCounter, refilled)
   redis.call("ZREM", keyBacklogSet, unpack(remArgs))
+
+
+  if hasCleanup == true then
+    redis.call("HDEL", keyQueueItemHash, unpack(itemCleanupArgs))
+  end
+end
+
+-- update gcra theoretical arrival time
+if throttleLimit > 0 then
+  gcraUpdate(throttleKey, nowMS, throttlePeriod * 1000, throttleLimit, throttleBurst, capacity)
 end
 
 --

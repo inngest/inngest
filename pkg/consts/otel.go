@@ -11,6 +11,7 @@ const (
 	OtelSpanSleep        = "sleep"
 	OtelSpanExecute      = "execute"
 	OtelSpanRerun        = "rerun"
+	OtelSpanReplay       = "replay"
 
 	// system attributes
 	OtelSysAccountID      = "sys.account.id"
@@ -94,6 +95,7 @@ const (
 	OtelAttrSDKRunID       = "sdk.run.id"
 
 	// otel scopes
+	OtelScopeUserland  = "userland.inngest"
 	OtelScopeEvent     = "event.inngest"
 	OtelScopeBatch     = "batch.inngest"
 	OtelScopeDebounce  = "debounce.inngest"
@@ -101,6 +103,7 @@ const (
 	OtelScopeCron      = "cron.inngest"
 	OtelScopeInvoke    = "invoke.inngest"
 	OtelScopeRerun     = "rerun.inngest"
+	OtelScopeReplay    = "replay.inngest"
 	OtelScopeEnv       = "env.inngest"
 	OtelScopeApp       = "app.env.inngest"
 	OtelScopeFunction  = "function.app.env.inngest"

@@ -34,10 +34,7 @@ func (n *nullLookup) Type() EngineType {
 	return EngineTypeNullMatch
 }
 
-func (n *nullLookup) Match(ctx context.Context, data map[string]any) (matched []*StoredExpressionPart, err error) {
-	l := &sync.Mutex{}
-	matched = []*StoredExpressionPart{}
-
+func (n *nullLookup) Match(ctx context.Context, data map[string]any, result *MatchResult) (err error) {
 	pool := newErrPool(errPoolOpts{concurrency: n.concurrency})
 
 	for item := range n.paths {
@@ -55,32 +52,26 @@ func (n *nullLookup) Match(ctx context.Context, data map[string]any) (matched []
 				res = []any{nil}
 			}
 
-			// This matches null, nil (as null), and any non-null items.
-			l.Lock()
-
 			// XXX: This engine hasn't been updated with denied items for !=.  It needs consideration
 			// in how to handle these cases appropriately.
-			found := n.Search(ctx, path, res[0])
-			matched = append(matched, found...)
-			l.Unlock()
+			n.Search(ctx, path, res[0], result)
 
 			return nil
 		})
 	}
 
-	return matched, pool.Wait()
+	return pool.Wait()
 }
 
-func (n *nullLookup) Search(ctx context.Context, variable string, input any) (matched []*StoredExpressionPart) {
+func (n *nullLookup) Search(ctx context.Context, variable string, input any, result *MatchResult) {
 	if input == nil {
 		// The input data is null, so the only items that can match are equality
 		// comparisons to null.
-		all := n.null[variable]
-		return all
+		result.AddExprs(n.null[variable]...)
+		return
 	}
 
-	all := n.not[variable]
-	return all
+	result.AddExprs(n.not[variable]...)
 }
 
 func (n *nullLookup) Add(ctx context.Context, p ExpressionPart) error {

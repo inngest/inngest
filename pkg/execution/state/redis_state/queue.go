@@ -40,15 +40,24 @@ import (
 )
 
 const (
-	PartitionSelectionMax                = int64(100)
-	PartitionPeekMax                     = PartitionSelectionMax * 3
-	AccountPeekMax                       = int64(30)
-	ShadowPartitionPeekMinBacklogs       = int64(10)
-	ShadowPartitionPeekMaxBacklogs       = int64(100)
+	PartitionSelectionMax = int64(100)
+	PartitionPeekMax      = PartitionSelectionMax * 3
+	AccountPeekMax        = int64(30)
+
 	AbsoluteShadowPartitionPeekMax int64 = 10 * ShadowPartitionPeekMaxBacklogs
+	NormalizeAccountPeekMax              = int64(30)
+	NormalizePartitionPeekMax            = int64(100)
+	NormalizeBacklogPeekMax              = int64(300) // same as ShadowPartitionPeekMax
+
+	// BacklogNormalizeAsyncLimit determines the minimum number of items required in an outdated backlog
+	// to require an async normalize job. For small backlogs, the added QPS may not be worth it and we should normalize JIT.
+	BacklogNormalizeAsyncLimit = 100
 
 	// BacklogRefillHardLimit sets the maximum number of items that can be refilled in a single backlogRefill operation.
 	BacklogRefillHardLimit = int64(1000)
+
+	// BacklogNormalizeHardLimit sets the batch size of items to be reenqueued into the appropriate backlogs durign normalization
+	BacklogNormalizeHardLimit = int64(1000)
 )
 
 const (
@@ -83,6 +92,9 @@ const (
 	PartitionPausedRequeueExtension           = 24 * time.Hour
 	PartitionLookahead                        = time.Second
 
+	ShadowPartitionLeaseDuration  = 4 * time.Second // same as PartitionLeaseDuration
+	BacklogNormalizeLeaseDuration = 4 * time.Second // same as PartitionLeaseDuration
+
 	ShadowPartitionRefillCapacityReachedRequeueExtension = 1 * time.Second
 	ShadowPartitionRefillPausedRequeueExtension          = 24 * time.Hour
 
@@ -108,16 +120,17 @@ const (
 	// times to edge enqueue times.
 	FunctionStartScoreBufferTime = 10 * time.Second
 
-	defaultNumWorkers       = 100
-	defaultNumShadowWorkers = 100
-	defaultPollTick         = 10 * time.Millisecond
-	defaultIdempotencyTTL   = 12 * time.Hour
-	defaultConcurrency      = 1000 // TODO: add function to override.
+	defaultNumWorkers                  = 100
+	defaultNumShadowWorkers            = 100
+	defaultBacklogNormalizationWorkers = 10
+	defaultBacklogNormalizeLimit       = int64(500)
+
+	defaultPollTick       = 10 * time.Millisecond
+	defaultIdempotencyTTL = 12 * time.Hour
+	defaultConcurrency    = 1000 // TODO: add function to override.
 
 	NoConcurrencyLimit = -1
 )
-
-var ShadowPartitionLeaseDuration = PartitionLeaseDuration
 
 var (
 	ErrQueueItemExists               = fmt.Errorf("queue item already exists")
@@ -137,11 +150,13 @@ var (
 	ErrConfigAlreadyLeased           = fmt.Errorf("config scanner already leased")
 	ErrConfigLeaseExceedsLimits      = fmt.Errorf("config lease duration exceeds the maximum of %d seconds", int(ConfigLeaseMax.Seconds()))
 
-	ErrShadowPartitionAlreadyLeased        = fmt.Errorf("shadow partition already leased")
-	ErrShadowPartitionLeaseNotFound        = fmt.Errorf("shadow partition lease not found")
-	ErrShadowPartitionNotFound             = fmt.Errorf("shadow partition not found")
-	ErrShadowPartitionPaused               = fmt.Errorf("shadow partition refill is disabled")
-	ErrShadowPartitionPeekMaxExceedsLimits = fmt.Errorf("shadow partition peek exceeded the maximum limit of %d", ShadowPartitionPeekMaxBacklogs)
+	ErrShadowPartitionAlreadyLeased               = fmt.Errorf("shadow partition already leased")
+	ErrShadowPartitionLeaseNotFound               = fmt.Errorf("shadow partition lease not found")
+	ErrShadowPartitionNotFound                    = fmt.Errorf("shadow partition not found")
+	ErrShadowPartitionPaused                      = fmt.Errorf("shadow partition refill is disabled")
+	ErrShadowPartitionBacklogPeekMaxExceedsLimits = fmt.Errorf("shadow partition backlog peek exceeded the maximum limit of %d", ShadowPartitionPeekMaxBacklogs)
+	ErrShadowPartitionPeekMaxExceedsLimits        = fmt.Errorf("shadow partition peek exceeded the maximum limit of %d", ShadowPartitionPeekMax)
+	ErrShadowPartitionAccountPeekMaxExceedsLimits = fmt.Errorf("account peek with shadow partitions exceeded the maximum limit of %d", ShadowPartitionAccountPeekMax)
 
 	ErrPartitionConcurrencyLimit = fmt.Errorf("at partition concurrency limit")
 	ErrAccountConcurrencyLimit   = fmt.Errorf("at account concurrency limit")
@@ -249,9 +264,21 @@ func WithShadowPeekSizeRange(min int64, max int64) QueueOpt {
 	}
 }
 
+func WithBacklogNormalizeAsyncLimit(fn BacklogNormalizeAsyncLimitCount) QueueOpt {
+	return func(q *queue) {
+		q.backlogNormalizeAsyncLimit = fn
+	}
+}
+
 func WithBacklogRefillLimit(limit int64) QueueOpt {
 	return func(q *queue) {
 		q.backlogRefillLimit = limit
+	}
+}
+
+func WithBacklogNormalizationLimit(limit int64) QueueOpt {
+	return func(q *queue) {
+		q.backlogNormalizeLimit = limit
 	}
 }
 
@@ -524,6 +551,10 @@ func WithDisableSystemQueueLeaseChecks(lc DisableSystemQueueLeaseChecks) QueueOp
 // larger amount of backlogs if there are a ton of backlog due to keys
 type QueueShadowPartitionProcessCount func(ctx context.Context, acctID uuid.UUID) int
 
+// BacklogNormalizeAsyncLimitCount determines how many items in a backlog that needs
+// to be exceeded before marking the backlog to be processed by the normalization workers
+type BacklogNormalizeAsyncLimitCount func(ctx context.Context) int
+
 func WithQueueShadowPartitionProcessCount(spc QueueShadowPartitionProcessCount) QueueOpt {
 	return func(q *queue) {
 		q.shadowPartitionProcessCount = spc
@@ -542,11 +573,12 @@ func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 		apf: func(_ context.Context, _ uuid.UUID) uint {
 			return PriorityDefault
 		},
-		peekMin:            DefaultQueuePeekMin,
-		peekMax:            DefaultQueuePeekMax,
-		shadowPeekMin:      ShadowPartitionPeekMinBacklogs,
-		shadowPeekMax:      ShadowPartitionPeekMaxBacklogs,
-		backlogRefillLimit: BacklogRefillHardLimit,
+		peekMin:               DefaultQueuePeekMin,
+		peekMax:               DefaultQueuePeekMax,
+		shadowPeekMin:         ShadowPartitionPeekMinBacklogs,
+		shadowPeekMax:         ShadowPartitionPeekMaxBacklogs,
+		backlogRefillLimit:    BacklogRefillHardLimit,
+		backlogNormalizeLimit: defaultBacklogNormalizeLimit,
 		runMode: QueueRunMode{
 			Sequential:    true,
 			Scavenger:     true,
@@ -554,17 +586,18 @@ func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 			Account:       true,
 			AccountWeight: 85,
 		},
-		numWorkers:               defaultNumWorkers,
-		numShadowWorkers:         defaultNumShadowWorkers,
-		wg:                       &sync.WaitGroup{},
-		seqLeaseLock:             &sync.RWMutex{},
-		scavengerLeaseLock:       &sync.RWMutex{},
-		instrumentationLeaseLock: &sync.RWMutex{},
-		pollTick:                 defaultPollTick,
-		idempotencyTTL:           defaultIdempotencyTTL,
-		queueKindMapping:         make(map[string]string),
-		logger:                   logger.From(ctx),
-		log:                      logger.StdlibLogger(ctx),
+		numWorkers:                     defaultNumWorkers,
+		numShadowWorkers:               defaultNumShadowWorkers,
+		numBacklogNormalizationWorkers: defaultBacklogNormalizationWorkers,
+		wg:                             &sync.WaitGroup{},
+		seqLeaseLock:                   &sync.RWMutex{},
+		scavengerLeaseLock:             &sync.RWMutex{},
+		instrumentationLeaseLock:       &sync.RWMutex{},
+		pollTick:                       defaultPollTick,
+		idempotencyTTL:                 defaultIdempotencyTTL,
+		queueKindMapping:               make(map[string]string),
+		logger:                         logger.From(ctx),
+		log:                            logger.StdlibLogger(ctx),
 		concurrencyLimitGetter: func(ctx context.Context, p QueuePartition) PartitionConcurrencyLimits {
 			def := defaultConcurrency
 			if p.ConcurrencyLimit > 0 {
@@ -607,6 +640,7 @@ func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 		disableSystemQueueLeaseChecks: func(ctx context.Context) bool {
 			return false
 		},
+		backlogNormalizeAsyncLimit: func(ctx context.Context) int { return BacklogNormalizeAsyncLimit },
 		shadowPartitionProcessCount: func(ctx context.Context, acctID uuid.UUID) int {
 			return 5
 		},
@@ -669,6 +703,7 @@ type queue struct {
 	disableSystemQueueLeaseChecks DisableSystemQueueLeaseChecks
 	disableLeaseChecks            DisableLeaseChecks
 
+	backlogNormalizeAsyncLimit  BacklogNormalizeAsyncLimitCount
 	shadowPartitionProcessCount QueueShadowPartitionProcessCount
 
 	// idempotencyTTL is the default or static idempotency duration apply to jobs,
@@ -689,6 +724,8 @@ type queue struct {
 	numWorkers int32
 	// numShadowWorkers stores the number of workers available to concurrently scan partitions
 	numShadowWorkers int32
+	// numBacklogNormalizationWorkers stores the maximum number of workers available to concurrenctly scan normalization partitions
+	numBacklogNormalizationWorkers int32
 	// peek min & max sets the range for partitions to peek for items
 	peekMin int64
 	peekMax int64
@@ -774,6 +811,7 @@ type queue struct {
 	shadowPeekMin           int64
 	shadowPeekMax           int64
 	backlogRefillLimit      int64
+	backlogNormalizeLimit   int64
 }
 
 type QueueRunMode struct {
@@ -801,8 +839,17 @@ type QueueRunMode struct {
 	// Shadow enables shadow partition processing
 	ShadowPartition bool
 
+	// AccountShadowPartition enables scanning of accounts for fair shadow partition processing
+	AccountShadowPartition bool
+
+	// AccountShadowPartitionWeight is the weight of processing accounts over global shadow partitions between 0 - 100 where 100 means only process accounts
+	AccountShadowPartitionWeight int
+
 	// ShadowContinuations enables shadow continuations
 	ShadowContinuations bool
+
+	// NormalizePartition enables the processing of partitions for normalization
+	NormalizePartition bool
 }
 
 // continuation represents a partition continuation, forcung the queue to continue working
@@ -963,22 +1010,42 @@ func (qp QueuePartition) concurrencyKey(kg QueueKeyGenerator) string {
 	}
 }
 
-// concurrencyKey returns the key to the "active" ZSET for key queue v2 concurrency accounting.
-func (q QueueBacklog) activeKey(kg QueueKeyGenerator) string {
-	if q.ConcurrencyScope == nil || q.ConcurrencyScopeEntity == nil || q.ConcurrencyKey == nil || q.ConcurrencyKeyUnhashedValue == nil {
-		return kg.Concurrency("", "")
-	}
-
+func (b BacklogConcurrencyKey) concurrencyKey(kg QueueKeyGenerator) string {
 	// Concurrency accounting keys are made up of three parts:
 	// - The scope (account, environment, function) to apply the concurrency limit on
 	// - The entity (account ID, envID, or function ID) based on the scope
 	// - The dynamic key value (hashed evaluated expression)
-	return kg.Concurrency("custom", util.ConcurrencyKey(*q.ConcurrencyScope, *q.ConcurrencyScopeEntity, *q.ConcurrencyKeyUnhashedValue))
+	return kg.Concurrency("custom", util.ConcurrencyKey(b.ConcurrencyScope, b.ConcurrencyScopeEntity, b.ConcurrencyKeyUnhashedValue))
+}
+
+// concurrencyKey returns the key to the "active" ZSET for key queue v2 concurrency accounting.
+func (b QueueBacklog) concurrencyKey(kg QueueKeyGenerator, n int) string {
+	if n < 0 || n > len(b.ConcurrencyKeys) {
+		return kg.Concurrency("", "")
+	}
+
+	key := b.ConcurrencyKeys[n-1]
+	return key.concurrencyKey(kg)
 }
 
 // inProgressKey returns the key storing the in progress set for the shadow partition
 func (q QueueShadowPartition) inProgressKey(kg QueueKeyGenerator) string {
 	return kg.Concurrency("p", q.PartitionID)
+}
+
+func (q QueueShadowPartition) ConcurrencyKey(kg QueueKeyGenerator, b *QueueBacklog, n int) (string, int) {
+	if n < 0 || n > len(b.ConcurrencyKeys) {
+		return kg.Concurrency("", ""), 0
+	}
+
+	backlogKey := b.ConcurrencyKeys[n-1]
+
+	shadowPartitionKey, ok := q.CustomConcurrencyKeys[concurrencyKeyID(backlogKey.ConcurrencyScope, backlogKey.ConcurrencyKey)]
+	if !ok {
+		return kg.Concurrency("", ""), 0
+	}
+
+	return backlogKey.concurrencyKey(kg), shadowPartitionKey.Limit
 }
 
 // accountInProgressKey returns the key storing the in progress set for the shadow partition's account
@@ -1263,17 +1330,14 @@ func (q *queue) EnqueueItem(ctx context.Context, shard QueueShard, i osqueue.Que
 		enqueueToBacklogs = q.allowKeyQueues(ctx, i.Data.Identifier.AccountID)
 	}
 
-	var backlogs []QueueBacklog
+	var backlog QueueBacklog
 	var shadowPartition QueueShadowPartition
 	if enqueueToBacklogs {
-		backlogs = q.ItemBacklogs(ctx, i)
+		backlog = q.ItemBacklog(ctx, i)
 		shadowPartition = q.ItemShadowPartition(ctx, i)
 	}
 
-	// Pad backlogs to 3
-	for i := len(backlogs); i < 3; i++ {
-		backlogs = append(backlogs, QueueBacklog{})
-	}
+	keyNormalizeFromBacklogSet := shard.RedisClient.kg.BacklogSet(opts.NormalizeFromBacklogID)
 
 	keys := []string{
 		shard.RedisClient.kg.QueueItem(),            // Queue item
@@ -1288,15 +1352,14 @@ func (q *queue) EnqueueItem(ctx context.Context, shard QueueShard, i osqueue.Que
 		defaultPartition.zsetKey(shard.RedisClient.kg),
 
 		// Key queues v2
-		shard.RedisClient.kg.BacklogSet(backlogs[0].BacklogID),
-		shard.RedisClient.kg.BacklogSet(backlogs[1].BacklogID),
-		shard.RedisClient.kg.BacklogSet(backlogs[2].BacklogID),
+		shard.RedisClient.kg.BacklogSet(backlog.BacklogID),
 		shard.RedisClient.kg.BacklogMeta(),
 		shard.RedisClient.kg.GlobalShadowPartitionSet(),
 		shard.RedisClient.kg.ShadowPartitionSet(shadowPartition.PartitionID),
 		shard.RedisClient.kg.ShadowPartitionMeta(),
 		shard.RedisClient.kg.GlobalAccountShadowPartitions(),
 		shard.RedisClient.kg.AccountShadowPartitions(i.Data.Identifier.AccountID), // will be empty for system queues
+		keyNormalizeFromBacklogSet,
 	}
 	// Append indexes
 	for _, idx := range q.itemIndexer(ctx, i, shard.RedisClient.kg) {
@@ -1328,12 +1391,8 @@ func (q *queue) EnqueueItem(ctx context.Context, shard QueueShard, i osqueue.Que
 
 		enqueueToBacklogsVal,
 		shadowPartition,
-		backlogs[0],
-		backlogs[1],
-		backlogs[2],
-		backlogs[0].BacklogID,
-		backlogs[1].BacklogID,
-		backlogs[2].BacklogID,
+		backlog,
+		backlog.BacklogID,
 	})
 	if err != nil {
 		return i, err
@@ -2073,16 +2132,11 @@ func (q *queue) RequeueByJobID(ctx context.Context, queueShard QueueShard, jobID
 		enqueueToBacklogs = q.allowKeyQueues(ctx, i.Data.Identifier.AccountID)
 	}
 
-	var backlogs []QueueBacklog
+	var backlog QueueBacklog
 	var shadowPartition QueueShadowPartition
 	if enqueueToBacklogs {
-		backlogs = q.ItemBacklogs(ctx, i)
+		backlog = q.ItemBacklog(ctx, i)
 		shadowPartition = q.ItemShadowPartition(ctx, i)
-	}
-
-	// Pad backlogs to 3
-	for i := len(backlogs); i < 3; i++ {
-		backlogs = append(backlogs, QueueBacklog{})
 	}
 
 	keys := []string{
@@ -2094,9 +2148,7 @@ func (q *queue) RequeueByJobID(ctx context.Context, queueShard QueueShard, jobID
 
 		fnPartition.zsetKey(queueShard.RedisClient.kg),
 
-		queueShard.RedisClient.kg.BacklogSet(backlogs[0].BacklogID),
-		queueShard.RedisClient.kg.BacklogSet(backlogs[1].BacklogID),
-		queueShard.RedisClient.kg.BacklogSet(backlogs[2].BacklogID),
+		queueShard.RedisClient.kg.BacklogSet(backlog.BacklogID),
 		queueShard.RedisClient.kg.BacklogMeta(),
 		queueShard.RedisClient.kg.GlobalShadowPartitionSet(),
 		queueShard.RedisClient.kg.ShadowPartitionSet(shadowPartition.PartitionID),
@@ -2118,12 +2170,8 @@ func (q *queue) RequeueByJobID(ctx context.Context, queueShard QueueShard, jobID
 
 		requeueToBacklogsVal,
 		shadowPartition,
-		backlogs[0],
-		backlogs[1],
-		backlogs[2],
-		backlogs[0].BacklogID,
-		backlogs[1].BacklogID,
-		backlogs[2].BacklogID,
+		backlog,
+		backlog.BacklogID,
 	})
 	if err != nil {
 		return err
@@ -2280,32 +2328,22 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 		keyCustomConcurrency2 string
 	)
 
-	var backlogs []QueueBacklog
+	backlog := q.ItemBacklog(ctx, item)
 	var shadowPartition QueueShadowPartition
+	keyActiveCounter := q.primaryQueueShard.RedisClient.kg.ActiveCounter(backlog.BacklogID)
 
 	enableKeyQueuesVal := "0"
 	enableKeyQueues := q.itemEnableKeyQueues(ctx, item)
 	if enableKeyQueues {
 		enableKeyQueuesVal = "1"
-		backlogs = q.ItemBacklogs(ctx, item)
 		shadowPartition = q.ItemShadowPartition(ctx, item)
-
-		// Pad backlogs to 3
-		for i := len(backlogs); i < 3; i++ {
-			backlogs = append(backlogs, QueueBacklog{})
-		}
 
 		// accounting for key queues v2
 		keyConcurrencyFn = shadowPartition.inProgressKey(q.primaryQueueShard.RedisClient.kg)
 		keyConcurrencyAcct = shadowPartition.accountInProgressKey(q.primaryQueueShard.RedisClient.kg)
-		keyCustomConcurrency1 = backlogs[0].activeKey(q.primaryQueueShard.RedisClient.kg)
-		keyCustomConcurrency2 = backlogs[1].activeKey(q.primaryQueueShard.RedisClient.kg)
+		keyCustomConcurrency1 = backlog.concurrencyKey(q.primaryQueueShard.RedisClient.kg, 1)
+		keyCustomConcurrency2 = backlog.concurrencyKey(q.primaryQueueShard.RedisClient.kg, 2)
 	} else {
-		// Pad backlogs to 3
-		for i := len(backlogs); i < 3; i++ {
-			backlogs = append(backlogs, QueueBacklog{})
-		}
-
 		keyConcurrencyFn = fnPartition.concurrencyKey(q.primaryQueueShard.RedisClient.kg)
 		keyConcurrencyAcct = accountConcurrencyKey
 		keyCustomConcurrency1 = customConcurrencyKey1.concurrencyKey(q.primaryQueueShard.RedisClient.kg)
@@ -2335,6 +2373,8 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 		q.primaryQueueShard.RedisClient.kg.ThrottleKey(item.Data.Throttle),
 		// Finally, there are ALWAYS account-level concurrency keys.
 		keyConcurrencyAcct,
+
+		keyActiveCounter,
 	}
 
 	args, err := StrSlice([]any{
@@ -2382,11 +2422,11 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 	switch status {
 	case 0:
 		return &leaseID, nil
-	case 1:
+	case -1:
 		return nil, ErrQueueItemNotFound
-	case 2:
+	case -2:
 		return nil, ErrQueueItemAlreadyLeased
-	case 3:
+	case -3:
 		// This partition is reused for function partitions without keys, system partions,
 		// and potentially concurrency key partitions. Errors should be returned based on
 		// the partition type
@@ -2396,19 +2436,23 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 		}
 
 		return nil, newKeyError(ErrPartitionConcurrencyLimit, item.FunctionID.String())
-	case 4:
+	case -4:
 		return nil, newKeyError(ErrConcurrencyLimitCustomKey, customConcurrencyKey1.EvaluatedConcurrencyKey)
-	case 5:
+	case -5:
 		return nil, newKeyError(ErrConcurrencyLimitCustomKey, customConcurrencyKey2.EvaluatedConcurrencyKey)
-	case 6:
+	case -6:
 		return nil, newKeyError(ErrAccountConcurrencyLimit, item.Data.Identifier.AccountID.String())
-	case 7:
+	case -7:
 		if item.Data.Throttle == nil {
 			// This should never happen, as the throttle key is nil.
 			return nil, fmt.Errorf("lease attempted throttle with nil throttle config: %#v", item)
 		}
 		return nil, newKeyError(ErrQueueItemThrottled, item.Data.Throttle.Key)
 	default:
+		if status > 0 {
+			return &leaseID, nil
+		}
+
 		return nil, fmt.Errorf("unknown response leasing item: %d", status)
 	}
 }
@@ -2446,28 +2490,18 @@ func (q *queue) ExtendLease(ctx context.Context, i osqueue.QueueItem, leaseID ul
 		keyCustomConcurrency2 string
 	)
 
-	var backlogs []QueueBacklog
+	var backlog QueueBacklog
 	var shadowPartition QueueShadowPartition
 	if q.itemEnableKeyQueues(ctx, i) {
-		backlogs = q.ItemBacklogs(ctx, i)
+		backlog = q.ItemBacklog(ctx, i)
 		shadowPartition = q.ItemShadowPartition(ctx, i)
-
-		// Pad backlogs to 3
-		for i := len(backlogs); i < 3; i++ {
-			backlogs = append(backlogs, QueueBacklog{})
-		}
 
 		// accounting for key queues v2
 		keyConcurrencyFn = shadowPartition.inProgressKey(q.primaryQueueShard.RedisClient.kg)
 		keyConcurrencyAcct = shadowPartition.accountInProgressKey(q.primaryQueueShard.RedisClient.kg)
-		keyCustomConcurrency1 = backlogs[0].activeKey(q.primaryQueueShard.RedisClient.kg)
-		keyCustomConcurrency2 = backlogs[1].activeKey(q.primaryQueueShard.RedisClient.kg)
+		keyCustomConcurrency1 = backlog.concurrencyKey(q.primaryQueueShard.RedisClient.kg, 1)
+		keyCustomConcurrency2 = backlog.concurrencyKey(q.primaryQueueShard.RedisClient.kg, 2)
 	} else {
-		// Pad backlogs to 3
-		for i := len(backlogs); i < 3; i++ {
-			backlogs = append(backlogs, QueueBacklog{})
-		}
-
 		keyConcurrencyFn = fnPartition.concurrencyKey(q.primaryQueueShard.RedisClient.kg)
 		keyConcurrencyAcct = accountConcurrencyKey
 		keyCustomConcurrency1 = customConcurrencyKey1.concurrencyKey(q.primaryQueueShard.RedisClient.kg)
@@ -2550,28 +2584,20 @@ func (q *queue) Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		keyCustomConcurrency2 string
 	)
 
-	var backlogs []QueueBacklog
+	backlog := q.ItemBacklog(ctx, i)
+
+	keyActiveCounter := q.primaryQueueShard.RedisClient.kg.ActiveCounter(backlog.BacklogID)
+
 	var shadowPartition QueueShadowPartition
 	if enableAccountingForKeyQueues {
-		backlogs = q.ItemBacklogs(ctx, i)
 		shadowPartition = q.ItemShadowPartition(ctx, i)
-
-		// Pad backlogs to 3
-		for i := len(backlogs); i < 3; i++ {
-			backlogs = append(backlogs, QueueBacklog{})
-		}
 
 		// accounting for key queues v2
 		keyConcurrencyFn = shadowPartition.inProgressKey(q.primaryQueueShard.RedisClient.kg)
 		keyConcurrencyAcct = shadowPartition.accountInProgressKey(q.primaryQueueShard.RedisClient.kg)
-		keyCustomConcurrency1 = backlogs[0].activeKey(q.primaryQueueShard.RedisClient.kg)
-		keyCustomConcurrency2 = backlogs[1].activeKey(q.primaryQueueShard.RedisClient.kg)
+		keyCustomConcurrency1 = backlog.concurrencyKey(q.primaryQueueShard.RedisClient.kg, 1)
+		keyCustomConcurrency2 = backlog.concurrencyKey(q.primaryQueueShard.RedisClient.kg, 2)
 	} else {
-		// Pad backlogs to 3
-		for i := len(backlogs); i < 3; i++ {
-			backlogs = append(backlogs, QueueBacklog{})
-		}
-
 		keyConcurrencyFn = fnPartition.concurrencyKey(queueShard.RedisClient.kg)
 		keyConcurrencyAcct = accountConcurrencyKey
 		keyCustomConcurrency1 = customConcurrencyKey1.concurrencyKey(queueShard.RedisClient.kg)
@@ -2583,9 +2609,9 @@ func (q *queue) Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		fnPartition.zsetKey(queueShard.RedisClient.kg),
 
 		keyConcurrencyFn,
-		keyConcurrencyAcct,
 		keyCustomConcurrency1,
 		keyCustomConcurrency2,
+		keyConcurrencyAcct,
 
 		queueShard.RedisClient.kg.Idempotency(i.ID),
 
@@ -2594,6 +2620,8 @@ func (q *queue) Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		queueShard.RedisClient.kg.GlobalAccountIndex(),
 		queueShard.RedisClient.kg.AccountPartitionIndex(i.Data.Identifier.AccountID),
 		queueShard.RedisClient.kg.PartitionItem(),
+
+		keyActiveCounter,
 	}
 	// Append indexes
 	for _, idx := range q.itemIndexer(ctx, i, queueShard.RedisClient.kg) {
@@ -2678,32 +2706,23 @@ func (q *queue) Requeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		keyCustomConcurrency2 string
 	)
 
-	var backlogs []QueueBacklog
 	var shadowPartition QueueShadowPartition
+	backlog := q.ItemBacklog(ctx, i)
+
+	keyActiveCounter := q.primaryQueueShard.RedisClient.kg.ActiveCounter(backlog.BacklogID)
 
 	requeueToBacklogsVal := "0"
 	enableKeyQueues := q.itemEnableKeyQueues(ctx, i)
 	if enableKeyQueues {
 		requeueToBacklogsVal = "1"
-		backlogs = q.ItemBacklogs(ctx, i)
 		shadowPartition = q.ItemShadowPartition(ctx, i)
-
-		// Pad backlogs to 3
-		for i := len(backlogs); i < 3; i++ {
-			backlogs = append(backlogs, QueueBacklog{})
-		}
 
 		// accounting for key queues v2
 		keyConcurrencyFn = shadowPartition.inProgressKey(q.primaryQueueShard.RedisClient.kg)
 		keyConcurrencyAcct = shadowPartition.accountInProgressKey(q.primaryQueueShard.RedisClient.kg)
-		keyCustomConcurrency1 = backlogs[0].activeKey(q.primaryQueueShard.RedisClient.kg)
-		keyCustomConcurrency2 = backlogs[1].activeKey(q.primaryQueueShard.RedisClient.kg)
+		keyCustomConcurrency1 = backlog.concurrencyKey(q.primaryQueueShard.RedisClient.kg, 1)
+		keyCustomConcurrency2 = backlog.concurrencyKey(q.primaryQueueShard.RedisClient.kg, 2)
 	} else {
-		// Pad backlogs to 3
-		for i := len(backlogs); i < 3; i++ {
-			backlogs = append(backlogs, QueueBacklog{})
-		}
-
 		keyConcurrencyFn = fnPartition.concurrencyKey(queueShard.RedisClient.kg)
 		keyConcurrencyAcct = accountConcurrencyKey
 		keyCustomConcurrency1 = customConcurrencyKey1.concurrencyKey(queueShard.RedisClient.kg)
@@ -2727,15 +2746,14 @@ func (q *queue) Requeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		queueShard.RedisClient.kg.ConcurrencyIndex(),
 
 		// key queues v2
-		queueShard.RedisClient.kg.BacklogSet(backlogs[0].BacklogID),
-		queueShard.RedisClient.kg.BacklogSet(backlogs[1].BacklogID),
-		queueShard.RedisClient.kg.BacklogSet(backlogs[2].BacklogID),
+		queueShard.RedisClient.kg.BacklogSet(backlog.BacklogID),
 		queueShard.RedisClient.kg.BacklogMeta(),
 		queueShard.RedisClient.kg.GlobalShadowPartitionSet(),
 		queueShard.RedisClient.kg.ShadowPartitionSet(shadowPartition.PartitionID),
 		queueShard.RedisClient.kg.ShadowPartitionMeta(),
 		queueShard.RedisClient.kg.GlobalAccountShadowPartitions(),
 		queueShard.RedisClient.kg.AccountShadowPartitions(i.Data.Identifier.AccountID), // empty for system partitions
+		keyActiveCounter,
 	}
 	// Append indexes
 	for _, idx := range q.itemIndexer(ctx, i, queueShard.RedisClient.kg) {
@@ -2755,12 +2773,8 @@ func (q *queue) Requeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 
 		requeueToBacklogsVal,
 		shadowPartition,
-		backlogs[0],
-		backlogs[1],
-		backlogs[2],
-		backlogs[0].BacklogID,
-		backlogs[1].BacklogID,
-		backlogs[2].BacklogID,
+		backlog,
+		backlog.BacklogID,
 	})
 	if err != nil {
 		return err
@@ -2863,7 +2877,7 @@ func (q *queue) ShadowPartitionLease(ctx context.Context, sp *QueueShadowPartiti
 	}
 }
 
-func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueShadowPartition) (enums.QueueConstraint, int, error) {
+func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueShadowPartition, refillUntil time.Time) (enums.QueueConstraint, int, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "BacklogRefill"), redis_telemetry.ScopeQueue)
 
 	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
@@ -2876,7 +2890,6 @@ func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueSha
 	}
 
 	nowMS := q.clock.Now().UnixMilli()
-	refillUntil := nowMS
 
 	refillLimit := q.backlogRefillLimit
 	if refillLimit > BacklogRefillHardLimit {
@@ -2889,29 +2902,15 @@ func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueSha
 	keyConcurrencyFn := sp.inProgressKey(q.primaryQueueShard.RedisClient.kg)
 	keyConcurrencyAcct := sp.accountInProgressKey(q.primaryQueueShard.RedisClient.kg)
 
-	// TODO Retrieve both custom concurrency keys, the backlog only has its own
-	keyCustomConcurrency1 := q.primaryQueueShard.RedisClient.kg.Concurrency("", "")
-	customConcurrency1 := 0
-	keyCustomConcurrency2 := q.primaryQueueShard.RedisClient.kg.Concurrency("", "")
-	customConcurrency2 := 0
-
-	// TODO Since CustomConcurrencyKeys is a map, these won't be in order.
-	// TODO Should we revert to an array? How do we know if it's the first/second key reliably?
-	//for range sp.CustomConcurrencyKeys {
-	//	if keyCustomConcurrency1 == "" {
-	//		// TODO Set first key
-	//		continue
-	//	}
-	//
-	//	// TODO Set second key
-	//}
+	keyCustomConcurrency1, customConcurrency1 := sp.ConcurrencyKey(q.primaryQueueShard.RedisClient.kg, b, 1)
+	keyCustomConcurrency2, customConcurrency2 := sp.ConcurrencyKey(q.primaryQueueShard.RedisClient.kg, b, 2)
 
 	var (
 		throttleKey                                  string
 		throttleLimit, throttleBurst, throttlePeriod int
 	)
-	if sp.Throttle != nil {
-		throttleKey = sp.Throttle.Key
+	if sp.Throttle != nil && b.Throttle != nil {
+		throttleKey = b.Throttle.ThrottleKey
 		throttleLimit = sp.Throttle.Limit
 		throttleBurst = sp.Throttle.Burst
 		throttlePeriod = sp.Throttle.Period
@@ -2924,18 +2923,20 @@ func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueSha
 		q.primaryQueueShard.RedisClient.kg.GlobalAccountShadowPartitions(),
 		q.primaryQueueShard.RedisClient.kg.AccountShadowPartitions(accountID),
 		q.primaryQueueShard.RedisClient.kg.PartitionQueueSet(enums.PartitionTypeDefault, sp.PartitionID, ""),
+		q.primaryQueueShard.RedisClient.kg.QueueItem(),
 
 		// Constraint-related accounting keys
 		keyConcurrencyAcct,
 		keyConcurrencyFn,
 		keyCustomConcurrency1,
 		keyCustomConcurrency2,
+		q.primaryQueueShard.RedisClient.kg.ActiveCounter(b.BacklogID),
 	}
 	args, err := StrSlice([]any{
 		b.BacklogID,
 		sp.PartitionID,
 		accountID,
-		refillUntil,
+		refillUntil.UnixMilli(),
 		refillLimit,
 		nowMS,
 		sp.AccountConcurrency,
@@ -2994,259 +2995,106 @@ func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueSha
 	}
 }
 
-func (q *queue) ShadowPartitionPeek(ctx context.Context, sp *QueueShadowPartition, until time.Time, limit int64) ([]*QueueBacklog, int, error) {
-	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "ShadowPartitionPeek"), redis_telemetry.ScopeQueue)
+func (q *queue) BacklogPrepareNormalize(ctx context.Context, b *QueueBacklog, sp *QueueShadowPartition, normalizeAsyncMinimum int) (int, bool, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "BacklogPrepareNormalize"), redis_telemetry.ScopeQueue)
 
 	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
-		return nil, 0, fmt.Errorf("unsupported queue shard kind for partitionPeek: %s", q.primaryQueueShard.Kind)
+		return 0, false, fmt.Errorf("unsupported queue shard kind for BacklogPrepareNormalize: %s", q.primaryQueueShard.Kind)
 	}
 
-	if limit > ShadowPartitionPeekMaxBacklogs {
-		return nil, 0, ErrShadowPartitionPeekMaxExceedsLimits
-	}
-	if limit <= 0 {
-		limit = ShadowPartitionPeekMaxBacklogs
+	accountID := uuid.Nil
+	if sp.AccountID != nil {
+		accountID = *sp.AccountID
 	}
 
-	if limit > q.shadowPeekMax {
-		limit = q.shadowPeekMax
-	}
-	if limit <= 0 {
-		limit = q.shadowPeekMin
-	}
+	keys := []string{
+		q.primaryQueueShard.RedisClient.kg.BacklogSet(b.BacklogID),
+		q.primaryQueueShard.RedisClient.kg.ShadowPartitionSet(sp.PartitionID),
+		q.primaryQueueShard.RedisClient.kg.GlobalShadowPartitionSet(),
+		q.primaryQueueShard.RedisClient.kg.GlobalAccountShadowPartitions(),
+		q.primaryQueueShard.RedisClient.kg.AccountShadowPartitions(accountID),
 
-	ms := until.UnixMilli()
-
+		q.primaryQueueShard.RedisClient.kg.GlobalAccountNormalizeSet(),
+		q.primaryQueueShard.RedisClient.kg.AccountNormalizeSet(accountID),
+		q.primaryQueueShard.RedisClient.kg.PartitionNormalizeSet(sp.PartitionID),
+	}
 	args, err := StrSlice([]any{
-		ms,
-		limit,
+		b.BacklogID,
+		sp.PartitionID,
+		accountID,
+		// order normalize by timestamp
+		q.clock.Now().Unix(),
+		normalizeAsyncMinimum,
 	})
 	if err != nil {
-		return nil, 0, err
+		return 0, false, fmt.Errorf("could not serialize args: %w", err)
+	}
+
+	res, err := scripts["queue/backlogPrepareNormalize"].Exec(
+		redis_telemetry.WithScriptName(ctx, "backlogPrepareNormalize"),
+		q.primaryQueueShard.RedisClient.unshardedRc,
+		keys,
+		args,
+	).ToAny()
+	if err != nil {
+		return 0, false, fmt.Errorf("error preparing backlog normalization: %w", err)
+	}
+
+	statusCountTuple, ok := res.([]any)
+	if !ok || len(statusCountTuple) != 2 {
+		return 0, false, fmt.Errorf("expected return tuple to include status and refill count")
+	}
+
+	status, ok := statusCountTuple[0].(int64)
+	if !ok {
+		return 0, false, fmt.Errorf("missing status in status-count tuple")
+	}
+
+	backlogCount, ok := statusCountTuple[1].(int64)
+	if !ok {
+		return 0, false, fmt.Errorf("missing refillCount in status-count tuple")
+	}
+
+	switch status {
+	case 1:
+		return int(backlogCount), true, nil
+	case -1:
+		return int(backlogCount), false, nil
+	default:
+		return 0, false, fmt.Errorf("unknown status preparing backlog normalization: %v (%T)", status, status)
+	}
+}
+
+func (q *queue) peekGlobalShadowPartitionAccounts(ctx context.Context, sequential bool, until time.Time, limit int64) ([]uuid.UUID, error) {
+	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
+		return nil, fmt.Errorf("unsupported queue shard kind for peekGlobalShadowPartitionAccounts: %s", q.primaryQueueShard.Kind)
 	}
 
 	rc := q.primaryQueueShard.RedisClient
 
-	shadowPartitionKey := rc.kg.ShadowPartitionSet(sp.PartitionID)
-
-	peekRet, err := scripts["queue/shadowPartitionPeek"].Exec(
-		redis_telemetry.WithScriptName(ctx, "shadowPartitionPeek"),
-		rc.Client(),
-		[]string{
-			shadowPartitionKey,
-			rc.kg.BacklogMeta(),
-		},
-		args,
-	).ToAny()
-	if err != nil {
-		return nil, 0, fmt.Errorf("error peeking shadow partition backlogs: %w", err)
-	}
-	returnedSet, ok := peekRet.([]any)
-	if !ok {
-		return nil, 0, fmt.Errorf("unknown return type from shadowPartitionPeek: %T", peekRet)
+	p := peeker[QueueBacklog]{
+		q:      q,
+		opName: "peekGlobalShadowPartitionAccounts",
+		max:    ShadowPartitionAccountPeekMax,
 	}
 
-	var totalBacklogCount int64
-	var potentiallyMissingBacklogs, allBacklogIDs []any
-	if len(returnedSet) == 3 {
-		totalBacklogCount, ok = returnedSet[0].(int64)
-		if !ok {
-			return nil, 0, fmt.Errorf("unexpected first item in set returned from shadowPartitionPeek: %T", returnedSet[0])
-		}
-
-		potentiallyMissingBacklogs, ok = returnedSet[1].([]any)
-		if !ok {
-			return nil, 0, fmt.Errorf("unexpected second item in set returned from shadowPartitionPeek: %T", returnedSet[1])
-		}
-
-		allBacklogIDs, ok = returnedSet[2].([]any)
-		if !ok {
-			return nil, 0, fmt.Errorf("unexpected third item in set returned from shadowPartitionPeek: %T", returnedSet[2])
-		}
-	} else if len(returnedSet) != 0 {
-		return nil, 0, fmt.Errorf("expected zero or three items in set returned by shadowPartitionPeek: %v", returnedSet)
-	}
-
-	encoded := make([]any, 0)
-	missingBacklogs := make([]string, 0)
-	if len(potentiallyMissingBacklogs) > 0 {
-		for idx, backlogID := range allBacklogIDs {
-			if potentiallyMissingBacklogs[idx] == nil {
-				if backlogID == nil {
-					return nil, 0, fmt.Errorf("encountered nil partition key in pointer queue %q", shadowPartitionKey)
-				}
-
-				str, ok := backlogID.(string)
-				if !ok {
-					return nil, 0, fmt.Errorf("encountered non-string partition key in pointer queue %q", shadowPartitionKey)
-				}
-
-				missingBacklogs = append(missingBacklogs, str)
-			} else {
-				encoded = append(encoded, potentiallyMissingBacklogs[idx])
-			}
-		}
-	}
-
-	// Use parallel decoding as per Peek
-	backlogs, err := util.ParallelDecode(encoded, func(val any) (*QueueBacklog, error) {
-		if val == nil {
-			q.logger.Error().Interface("encoded", encoded).Interface("missing", missingBacklogs).Str("key", shadowPartitionKey).Msg("encountered nil backlog item in pointer queue")
-			return nil, fmt.Errorf("encountered nil backlog item in pointer queue %q", shadowPartitionKey)
-		}
-
-		str, ok := val.(string)
-		if !ok {
-			return nil, fmt.Errorf("unknown type in shadow partition peek: %T", val)
-		}
-
-		item := &QueueBacklog{}
-
-		if err := json.Unmarshal(unsafe.Slice(unsafe.StringData(str), len(str)), item); err != nil {
-			return nil, fmt.Errorf("error reading backlog item: %w", err)
-		}
-
-		return item, nil
-	})
-	if err != nil {
-		return nil, 0, fmt.Errorf("error decoding backlogs: %w", err)
-	}
-
-	if len(missingBacklogs) > 0 {
-		err := rc.Client().Do(ctx, rc.Client().B().Zrem().Key(rc.kg.ShadowPartitionSet(sp.PartitionID)).Member(missingBacklogs...).Build()).Error()
-		if err != nil {
-			q.logger.Warn().
-				Interface("missing", missingBacklogs).
-				Interface("sp", sp).
-				Msg("failed to clean up dangling backlogs from shard partition")
-		}
-	}
-
-	return backlogs, int(totalBacklogCount), nil
+	return p.peekUUIDPointer(ctx, rc.kg.GlobalAccountShadowPartitions(), sequential, until, limit)
 }
 
-func (q *queue) ShadowPartitionExtendLease(ctx context.Context, sp *QueueShadowPartition, leaseID ulid.ULID, duration time.Duration) (*ulid.ULID, error) {
-	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "ShadowPartitionExtendLease"), redis_telemetry.ScopeQueue)
-
+func (q *queue) peekGlobalNormalizeAccounts(ctx context.Context, until time.Time, limit int64) ([]uuid.UUID, error) {
 	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
-		return nil, fmt.Errorf("unsupported queue shard kind for ShadowPartitionExtendLease: %s", q.primaryQueueShard.Kind)
+		return nil, fmt.Errorf("unsupported queue shard kind for peekGlobalNormalizeAccounts: %s", q.primaryQueueShard.Kind)
 	}
 
-	now := q.clock.Now()
-	leaseExpiry := now.Add(duration)
-	newLeaseID, err := ulid.New(ulid.Timestamp(leaseExpiry), rand.Reader)
-	if err != nil {
-		return nil, fmt.Errorf("could not generate new leaseID: %w", err)
+	rc := q.primaryQueueShard.RedisClient
+
+	p := peeker[QueueBacklog]{
+		q:      q,
+		opName: "peekGlobalNormalizeAccounts",
+		max:    NormalizeAccountPeekMax,
 	}
 
-	sp.LeaseID = &newLeaseID
-
-	accountID := uuid.Nil
-	if sp.AccountID != nil {
-		accountID = *sp.AccountID
-	}
-
-	keys := []string{
-		q.primaryQueueShard.RedisClient.kg.ShadowPartitionMeta(),
-		q.primaryQueueShard.RedisClient.kg.GlobalShadowPartitionSet(),
-		q.primaryQueueShard.RedisClient.kg.GlobalAccountShadowPartitions(),
-		q.primaryQueueShard.RedisClient.kg.AccountShadowPartitions(accountID),
-	}
-	args, err := StrSlice([]any{
-		sp.PartitionID,
-		accountID,
-		leaseID,
-		newLeaseID,
-		now.UnixMilli(),
-		leaseExpiry.Unix(),
-	})
-	if err != nil {
-		return nil, fmt.Errorf("could not serialize args: %w", err)
-	}
-
-	status, err := scripts["queue/shadowPartitionExtendLease"].Exec(
-		redis_telemetry.WithScriptName(ctx, "shadowPartitionExtendLease"),
-		q.primaryQueueShard.RedisClient.unshardedRc,
-		keys,
-		args,
-	).AsInt64()
-	if err != nil {
-		return nil, fmt.Errorf("error extending shadow partition lease: %w", err)
-	}
-	switch status {
-	case 0:
-		return &newLeaseID, nil
-	case -1:
-		return nil, ErrShadowPartitionNotFound
-	case -2:
-		return nil, ErrShadowPartitionLeaseNotFound
-	case -3:
-		return nil, ErrShadowPartitionAlreadyLeased
-	case -4:
-		return nil, ErrShadowPartitionPaused
-	default:
-		return nil, fmt.Errorf("unknown response extending shadow partition lease: %v (%T)", status, status)
-	}
-}
-
-func (q *queue) ShadowPartitionRequeue(ctx context.Context, sp *QueueShadowPartition, leaseID ulid.ULID, requeueAt *time.Time) error {
-	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "ShadowPartitionRequeue"), redis_telemetry.ScopeQueue)
-
-	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
-		return fmt.Errorf("unsupported queue shard kind for ShadowPartitionRequeue: %s", q.primaryQueueShard.Kind)
-	}
-
-	sp.LeaseID = nil
-
-	accountID := uuid.Nil
-	if sp.AccountID != nil {
-		accountID = *sp.AccountID
-	}
-
-	var requeueAtS int64
-	if requeueAt != nil {
-		requeueAtS = requeueAt.Unix()
-	}
-
-	keys := []string{
-		q.primaryQueueShard.RedisClient.kg.ShadowPartitionMeta(),
-		q.primaryQueueShard.RedisClient.kg.GlobalShadowPartitionSet(),
-		q.primaryQueueShard.RedisClient.kg.GlobalAccountShadowPartitions(),
-		q.primaryQueueShard.RedisClient.kg.AccountShadowPartitions(accountID),
-		q.primaryQueueShard.RedisClient.kg.ShadowPartitionSet(sp.PartitionID),
-	}
-	args, err := StrSlice([]any{
-		sp.PartitionID,
-		accountID,
-		leaseID,
-		q.clock.Now().UnixMilli(),
-		requeueAtS,
-	})
-	if err != nil {
-		return fmt.Errorf("could not serialize args: %w", err)
-	}
-
-	status, err := scripts["queue/shadowPartitionRequeue"].Exec(
-		redis_telemetry.WithScriptName(ctx, "shadowPartitionRequeue"),
-		q.primaryQueueShard.RedisClient.unshardedRc,
-		keys,
-		args,
-	).AsInt64()
-	if err != nil {
-		return fmt.Errorf("error returning shadow partition lease: %w", err)
-	}
-	switch status {
-	case 0:
-		return nil
-	case -1:
-		return ErrShadowPartitionNotFound
-	case -2:
-		return ErrShadowPartitionAlreadyLeased
-	case -3:
-		return ErrShadowPartitionLeaseNotFound
-	default:
-		return fmt.Errorf("unknown response returning shadow partition lease: %v (%T)", status, status)
-	}
+	return p.peekUUIDPointer(ctx, rc.kg.GlobalAccountNormalizeSet(), true, until, limit)
 }
 
 // PartitionLease leases a partition for a given workflow ID.  It returns the new lease ID.
@@ -4423,74 +4271,6 @@ func (q *queue) removeContinue(ctx context.Context, p *QueuePartition, cooldown 
 		// only exist in the current replica.
 		q.continueCooldown[p.Queue()] = time.Now().Add(
 			consts.QueueContinuationCooldownPeriod,
-		)
-	}
-}
-
-// addShadowContinue is the equivalent of addContinue for shadow partitions
-func (q *queue) addShadowContinue(ctx context.Context, p *QueueShadowPartition, ctr uint) {
-	if !q.runMode.ShadowContinuations {
-		// shadow continuations are not enabled.
-		return
-	}
-
-	if ctr >= q.shadowContinuationLimit {
-		q.removeShadowContinue(ctx, p, true)
-		return
-	}
-
-	q.shadowContinuesLock.Lock()
-	defer q.shadowContinuesLock.Unlock()
-
-	// If this is the first shadow continuation, check if we're on a cooldown, or if we're
-	// beyond capacity.
-	if ctr == 1 {
-		if len(q.shadowContinues) > consts.QueueShadowContinuationMaxPartitions {
-			metrics.IncrQueueShadowContinuationOpCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"op": "max_capacity"}})
-			return
-		}
-		if t, ok := q.shadowContinueCooldown[p.PartitionID]; ok && t.After(time.Now()) {
-			metrics.IncrQueueShadowContinuationOpCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"op": "cooldown"}})
-			return
-		}
-
-		// Remove the shadow continuation cooldown.
-		delete(q.shadowContinueCooldown, p.PartitionID)
-	}
-
-	c, ok := q.shadowContinues[p.PartitionID]
-	if !ok || c.count < ctr {
-		// Update the continue count if it doesn't exist, or the current counter
-		// is higher.  This ensures that we always have the highest continuation
-		// count stored for queue processing.
-		q.shadowContinues[p.PartitionID] = shadowContinuation{shadowPart: p, count: ctr}
-		metrics.IncrQueueShadowContinuationOpCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"op": "added"}})
-	}
-}
-
-func (q *queue) removeShadowContinue(ctx context.Context, p *QueueShadowPartition, cooldown bool) {
-	if !q.runMode.ShadowContinuations {
-		// shadow continuations are not enabled.
-		return
-	}
-
-	// This is over the limit for continuing the shadow partition, so force it to be
-	// removed in every case.
-	q.shadowContinuesLock.Lock()
-	defer q.shadowContinuesLock.Unlock()
-
-	metrics.IncrQueueShadowContinuationOpCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"op": "removed"}})
-
-	delete(q.shadowContinues, p.PartitionID)
-
-	if cooldown {
-		// Add a cooldown, preventing this partition from being added as a continuation
-		// for a given period of time.
-		//
-		// Note that this isn't shared across replicas;  cooldowns
-		// only exist in the current replica.
-		q.shadowContinueCooldown[p.PartitionID] = time.Now().Add(
-			consts.QueueShadowContinuationCooldownPeriod,
 		)
 	}
 }
