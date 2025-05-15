@@ -48,11 +48,7 @@ func isConnectionClosedErr(err error) bool {
 	}
 
 	closeErr := websocket.CloseError{}
-	if !errors.As(err, &closeErr) {
-		return false
-	}
-
-	return true
+	return !errors.As(err, &closeErr)
 }
 
 func (c *connectGatewaySvc) closeWithConnectError(ws *websocket.Conn, serr *connecterrors.SocketError) {
