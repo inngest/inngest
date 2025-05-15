@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"github.com/alicebob/miniredis/v2"
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
@@ -811,4 +812,104 @@ func TestUpsertConnection(t *testing.T) {
 		})
 	})
 
+}
+
+func TestGarbageCollectConnections(t *testing.T) {
+	t.Run("single unsynced app", func(t *testing.T) {
+		r := miniredis.RunT(t)
+
+		rc, err := rueidis.NewClient(rueidis.ClientOption{
+			InitAddress:  []string{r.Addr()},
+			DisableCache: true,
+		})
+		require.NoError(t, err)
+		defer rc.Close()
+
+		connManager := NewRedisConnectionStateManager(rc)
+
+		ctx := context.Background()
+
+		lastHeartbeat := time.Now().Add(-consts.ConnectGCThreshold)
+
+		accountId, envId := uuid.New(), uuid.New()
+		connId, gatewayId := ulid.MustNew(ulid.Now(), rand.Reader), ulid.MustNew(ulid.Now(), rand.Reader)
+
+		app1Version := "app-1-v.test"
+
+		connectionsByEnvKey := connManager.connectionHash(envId)
+		group1Id := "app-1-hash"
+
+		connectionsByGroup1Key := connManager.connIndexByGroup(envId, group1Id)
+
+		groupsByEnvKey := connManager.workerGroupHash(envId)
+
+		// No groups created
+		require.False(t, r.Exists(groupsByEnvKey))
+
+		// No connections upserted
+		require.False(t, r.Exists(connectionsByEnvKey))
+
+		// No indexes created
+		require.False(t, r.Exists(connectionsByGroup1Key))
+
+		group1 := &WorkerGroup{
+			AccountID:     accountId,
+			EnvID:         envId,
+			AppName:       "app-1",
+			AppVersion:    &app1Version,
+			SDKLang:       "go",
+			SDKVersion:    "v-test",
+			FunctionSlugs: []string{"fn-1", "fn-2"},
+			Hash:          group1Id,
+		}
+
+		attrs := &connect.SystemAttributes{
+			CpuCores: 10,
+			MemBytes: 1024 * 1024,
+			Os:       "testOS",
+		}
+
+		conn := &Connection{
+			AccountID:    accountId,
+			EnvID:        envId,
+			ConnectionId: connId,
+			WorkerIP:     "127.0.0.1",
+			Data: &connect.WorkerConnectRequestData{
+				ConnectionId: connId.String(),
+				InstanceId:   "my-worker",
+				Apps: []*connect.AppConfiguration{
+					{
+						AppName:    "app-1",
+						AppVersion: &app1Version,
+						Functions:  nil,
+					},
+				},
+				WorkerManualReadinessAck: false,
+				SystemAttributes:         attrs,
+				SdkVersion:               "v-test",
+				SdkLanguage:              "go",
+			},
+			Groups: map[string]*WorkerGroup{
+				group1Id: group1,
+			},
+			GatewayId: gatewayId,
+		}
+
+		t.Run("garbage collect should delete", func(t *testing.T) {
+			err = connManager.UpsertConnection(ctx, conn, connect.ConnectionStatus_READY, lastHeartbeat)
+			require.NoError(t, err)
+
+			deleted, err := connManager.GarbageCollectConnections(ctx)
+			require.NoError(t, err)
+			require.Equal(t, 1, deleted)
+
+			deleted, err = connManager.GarbageCollectConnections(ctx)
+			require.NoError(t, err)
+			require.Equal(t, 0, deleted)
+
+			connsByEnv, err := connManager.GetConnectionsByEnvID(ctx, envId)
+			require.NoError(t, err)
+			require.Len(t, connsByEnv, 0)
+		})
+	})
 }

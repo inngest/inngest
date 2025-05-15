@@ -138,6 +138,7 @@ const (
 
 	ConnectWorkerHeartbeatInterval  = 10 * time.Second
 	ConnectGatewayHeartbeatInterval = 5 * time.Second
+	ConnectGCThreshold              = 5 * time.Minute
 
 	ConnectWorkerRequestLeaseDuration = 20 * time.Second
 	ConnectWorkerRequestGracePeriod   = 5 * time.Second

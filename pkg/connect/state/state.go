@@ -44,6 +44,7 @@ type ConnectionManager interface {
 	GetConnectionsByGroupID(ctx context.Context, envID uuid.UUID, groupID string) ([]*connpb.ConnMetadata, error)
 	UpsertConnection(ctx context.Context, conn *Connection, status connpb.ConnectionStatus, lastHeartbeatAt time.Time) error
 	DeleteConnection(ctx context.Context, envID uuid.UUID, connId ulid.ULID) error
+	GarbageCollectConnections(ctx context.Context) error
 }
 
 type WorkerGroupManager interface {

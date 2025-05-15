@@ -10,6 +10,7 @@ import (
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/rs/zerolog"
 	"log/slog"
+	mathRand "math/rand"
 	"net/http"
 	"os"
 	"sync"
@@ -27,6 +28,7 @@ import (
 
 const (
 	GatewayInstrumentInterval = 20 * time.Second
+	GatewayGCInterval         = 30 * time.Minute
 )
 
 type gatewayOpt func(*connectGatewaySvc)
@@ -350,6 +352,24 @@ func (c *connectGatewaySvc) instrument(ctx context.Context) {
 	}
 }
 
+func (c *connectGatewaySvc) gc(ctx context.Context) {
+	for {
+		jitter := time.Minute * time.Duration(mathRand.Intn(30))
+		periodWithJitter := GatewayGCInterval + jitter
+
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(periodWithJitter):
+		}
+
+		err := c.stateManager.GarbageCollectConnections(ctx)
+		if err != nil {
+			logger.StdlibLogger(ctx).Error("failed to garbage collect", "err", err)
+		}
+	}
+}
+
 func (c *connectGatewaySvc) Run(ctx context.Context) error {
 	c.runCtx = ctx
 
@@ -417,6 +437,9 @@ func (c *connectGatewaySvc) Run(ctx context.Context) error {
 
 	// Periodically report metrics
 	go c.instrument(ctx)
+
+	// Periodically garbage collect old connections
+	go c.gc(ctx)
 
 	return eg.Wait()
 }
