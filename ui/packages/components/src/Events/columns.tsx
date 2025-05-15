@@ -7,7 +7,7 @@ import { createColumnHelper } from '@tanstack/react-table';
 import { StatusDot } from '../Status/StatusDot';
 import type { EventsTable } from './EventsTable';
 
-const columnHelper = createColumnHelper<Omit<Event, 'payload'>>();
+const columnHelper = createColumnHelper<Event>();
 
 const columnsIDs = ['name', 'runs', 'receivedAt'] as const;
 export type ColumnID = (typeof columnsIDs)[number];

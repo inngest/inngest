@@ -78,7 +78,9 @@ export function EventDetails({
     prettyPayload = usePrettyJson(
       JSON.stringify(
         batch.map((e) => {
-          return JSON.parse(e.payload);
+          if (e.payload) {
+            return JSON.parse(e.payload);
+          }
         })
       )
     );
