@@ -599,19 +599,16 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 
 	st, err := e.smv2.Create(ctx, newState)
 	switch err {
-	case nil, state.ErrIdentifierExists:
-		// no-op: this is safe, continue
+	case nil: // no-op
+	case state.ErrIdentifierExists:
+		// override metadata from the existing state
+		id := sv2.IDFromV1(st.Identifier())
+		metadata, err = e.smv2.LoadMetadata(ctx, id)
+		if err != nil {
+			return nil, err
+		}
 	default:
 		return nil, fmt.Errorf("error creating run state: %w", err)
-	}
-	// override the runID from the state if it doesn't match.
-	// this can happen on scheduling retries due to errors like networking, or abrupt failures
-	//
-	// TODO: update the code from here on to reference the `state` returned instead of using
-	// previous values to avoid weird mismatch issues.
-	// right now, the only mismatch should just be the runID
-	if metadata.ID.RunID != st.RunID() {
-		metadata.ID.RunID = st.RunID()
 	}
 
 	//
