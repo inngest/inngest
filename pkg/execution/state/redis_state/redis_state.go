@@ -375,6 +375,10 @@ func (m shardedMgr) idempotencyCheck(ctx context.Context, rc RetriableClient, ke
 		return nil, err
 	}
 
+	if prev == consts.FunctionIdempotencyTombstone {
+		return nil, state.ErrIdentifierTomestone
+	}
+
 	// if there are existing values, the state might have already been created
 	runID, err := ulid.Parse(prev)
 	if err != nil {
@@ -972,11 +976,11 @@ func (m shardedMgr) delete(ctx context.Context, callCtx context.Context, i state
 		key = fnRunState.kg.Idempotency(ctx, isSharded, i)
 	}
 
-	if err := r.Do(callCtx, func(client rueidis.Client) rueidis.Completed {
-		return client.B().Expire().Key(key).Seconds(int64(consts.FunctionIdempotencyPeriod.Seconds())).Build()
-	}).Error(); err != nil {
-		return false, err
-	}
+	_ = r.Do(callCtx, func(client rueidis.Client) rueidis.Completed {
+		// update the idempotency key to the tombstone value to indicate this run is done
+		// do scheduling knows to not need to continue attempting to do so
+		return client.B().Set().Key(key).Value(consts.FunctionIdempotencyTombstone).Xx().Get().Build()
+	}).Error()
 
 	// Clear all other data for a job.
 	keys := []string{

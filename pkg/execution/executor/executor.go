@@ -58,13 +58,14 @@ const (
 )
 
 var (
-	ErrRuntimeRegistered = fmt.Errorf("runtime is already registered")
-	ErrNoStateManager    = fmt.Errorf("no state manager provided")
-	ErrNoPauseManager    = fmt.Errorf("no pause manager provided")
-	ErrNoActionLoader    = fmt.Errorf("no action loader provided")
-	ErrNoRuntimeDriver   = fmt.Errorf("runtime driver for action not found")
-	ErrFunctionDebounced = fmt.Errorf("function debounced")
-	ErrFunctionSkipped   = fmt.Errorf("function skipped")
+	ErrRuntimeRegistered          = fmt.Errorf("runtime is already registered")
+	ErrNoStateManager             = fmt.Errorf("no state manager provided")
+	ErrNoPauseManager             = fmt.Errorf("no pause manager provided")
+	ErrNoActionLoader             = fmt.Errorf("no action loader provided")
+	ErrNoRuntimeDriver            = fmt.Errorf("runtime driver for action not found")
+	ErrFunctionDebounced          = fmt.Errorf("function debounced")
+	ErrFunctionSkipped            = fmt.Errorf("function skipped")
+	ErrFunctionSkippedIdempotency = fmt.Errorf("function skipped due to idempotency")
 
 	ErrFunctionEnded = fmt.Errorf("function already ended")
 
@@ -607,6 +608,8 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		if err != nil {
 			return nil, err
 		}
+	case state.ErrIdentifierTomestone:
+		return nil, ErrFunctionSkippedIdempotency
 	default:
 		return nil, fmt.Errorf("error creating run state: %w", err)
 	}
