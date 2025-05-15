@@ -31,13 +31,7 @@ func TestBacklogNormalizationLease(t *testing.T) {
 		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 			return enqueueToBacklog
 		}),
-		WithAllowSystemKeyQueues(func(ctx context.Context) bool {
-			return enqueueToBacklog
-		}),
 		WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-			return true
-		}),
-		WithDisableSystemQueueLeaseChecks(func(ctx context.Context) bool {
 			return true
 		}),
 	)
@@ -87,13 +81,7 @@ func TestExtendBacklogNormalizationLease(t *testing.T) {
 		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 			return enqueueToBacklog
 		}),
-		WithAllowSystemKeyQueues(func(ctx context.Context) bool {
-			return enqueueToBacklog
-		}),
 		WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-			return true
-		}),
-		WithDisableSystemQueueLeaseChecks(func(ctx context.Context) bool {
 			return true
 		}),
 	)
@@ -152,13 +140,7 @@ func TestQueueBacklogPrepareNormalize(t *testing.T) {
 		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 			return true
 		}),
-		WithAllowSystemKeyQueues(func(ctx context.Context) bool {
-			return true
-		}),
 		WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-			return false
-		}),
-		WithDisableSystemQueueLeaseChecks(func(ctx context.Context) bool {
 			return false
 		}),
 		WithClock(clock),
@@ -255,13 +237,7 @@ func TestQueueBacklogNormalization(t *testing.T) {
 		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 			return true
 		}),
-		WithAllowSystemKeyQueues(func(ctx context.Context) bool {
-			return true
-		}),
 		WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-			return false
-		}),
-		WithDisableSystemQueueLeaseChecks(func(ctx context.Context) bool {
 			return false
 		}),
 		WithClock(clock),
@@ -372,13 +348,7 @@ func TestQueueBacklogNormalizationWithRewrite(t *testing.T) {
 		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 			return true
 		}),
-		WithAllowSystemKeyQueues(func(ctx context.Context) bool {
-			return true
-		}),
 		WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-			return false
-		}),
-		WithDisableSystemQueueLeaseChecks(func(ctx context.Context) bool {
 			return false
 		}),
 		WithNormalizeRefreshItemCustomConcurrencyKeys(func(ctx context.Context, item *osqueue.QueueItem, existingKeys []state.CustomConcurrency, shadowPartition *QueueShadowPartition) ([]state.CustomConcurrency, error) {
@@ -492,13 +462,7 @@ func TestBacklogNormalizationScanner(t *testing.T) {
 		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 			return true
 		}),
-		WithAllowSystemKeyQueues(func(ctx context.Context) bool {
-			return true
-		}),
 		WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-			return false
-		}),
-		WithDisableSystemQueueLeaseChecks(func(ctx context.Context) bool {
 			return false
 		}),
 		WithClock(clock),

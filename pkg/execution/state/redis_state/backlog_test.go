@@ -84,8 +84,8 @@ func TestQueueItemBacklogs(t *testing.T) {
 
 		// default backlog is not for a concurrency key, so the concurrency key should be empty (function-level concurrency accounting is handled for the shadow partition)
 		kg := queueKeyGenerator{queueDefaultKey: QueueDefaultKey}
-		require.Equal(t, kg.Concurrency("", ""), backlog.concurrencyKey(kg, 1))
-		require.Equal(t, kg.Concurrency("", ""), backlog.concurrencyKey(kg, 2))
+		require.Equal(t, kg.Concurrency("", ""), backlog.customKeyInProgress(kg, 1))
+		require.Equal(t, kg.Concurrency("", ""), backlog.customKeyInProgress(kg, 2))
 	})
 
 	t.Run("system queue", func(t *testing.T) {
@@ -120,8 +120,8 @@ func TestQueueItemBacklogs(t *testing.T) {
 
 		// default backlog is not for a concurrency key, so the concurrency key should be empty (function-level concurrency accounting is handled for the shadow partition)
 		kg := queueKeyGenerator{queueDefaultKey: QueueDefaultKey}
-		require.Equal(t, kg.Concurrency("", ""), backlog.concurrencyKey(kg, 1))
-		require.Equal(t, kg.Concurrency("", ""), backlog.concurrencyKey(kg, 2))
+		require.Equal(t, kg.Concurrency("", ""), backlog.customKeyInProgress(kg, 1))
+		require.Equal(t, kg.Concurrency("", ""), backlog.customKeyInProgress(kg, 2))
 
 	})
 
@@ -171,8 +171,8 @@ func TestQueueItemBacklogs(t *testing.T) {
 
 		// default backlog is not for a concurrency key, so the concurrency key should be empty (function-level concurrency accounting is handled for the shadow partition)
 		kg := queueKeyGenerator{queueDefaultKey: QueueDefaultKey}
-		require.Equal(t, kg.Concurrency("", ""), backlog.concurrencyKey(kg, 1))
-		require.Equal(t, kg.Concurrency("", ""), backlog.concurrencyKey(kg, 2))
+		require.Equal(t, kg.Concurrency("", ""), backlog.customKeyInProgress(kg, 1))
+		require.Equal(t, kg.Concurrency("", ""), backlog.customKeyInProgress(kg, 2))
 	})
 
 	t.Run("throttle with key", func(t *testing.T) {
@@ -218,8 +218,8 @@ func TestQueueItemBacklogs(t *testing.T) {
 
 		// default backlog is not for a concurrency key, so the concurrency key should be empty (function-llevel concurrency accounting is handled for the shadow partition)
 		kg := queueKeyGenerator{queueDefaultKey: QueueDefaultKey}
-		require.Equal(t, kg.Concurrency("", ""), backlog.concurrencyKey(kg, 1))
-		require.Equal(t, kg.Concurrency("", ""), backlog.concurrencyKey(kg, 2))
+		require.Equal(t, kg.Concurrency("", ""), backlog.customKeyInProgress(kg, 1))
+		require.Equal(t, kg.Concurrency("", ""), backlog.customKeyInProgress(kg, 2))
 	})
 
 	t.Run("throttle on edge item", func(t *testing.T) {
@@ -261,8 +261,8 @@ func TestQueueItemBacklogs(t *testing.T) {
 
 		// default backlog is not for a concurrency key, so the concurrency key should be empty (function-llevel concurrency accounting is handled for the shadow partition)
 		kg := queueKeyGenerator{queueDefaultKey: QueueDefaultKey}
-		require.Equal(t, kg.Concurrency("", ""), backlog.concurrencyKey(kg, 1))
-		require.Equal(t, kg.Concurrency("", ""), backlog.concurrencyKey(kg, 2))
+		require.Equal(t, kg.Concurrency("", ""), backlog.customKeyInProgress(kg, 1))
+		require.Equal(t, kg.Concurrency("", ""), backlog.customKeyInProgress(kg, 2))
 	})
 
 	t.Run("function concurrency", func(t *testing.T) {
@@ -295,8 +295,8 @@ func TestQueueItemBacklogs(t *testing.T) {
 
 		// default backlog is not for a concurrency key, so the concurrency key should be empty (function-llevel concurrency accounting is handled for the shadow partition)
 		kg := queueKeyGenerator{queueDefaultKey: QueueDefaultKey}
-		require.Equal(t, kg.Concurrency("", ""), backlog.concurrencyKey(kg, 1))
-		require.Equal(t, kg.Concurrency("", ""), backlog.concurrencyKey(kg, 2))
+		require.Equal(t, kg.Concurrency("", ""), backlog.customKeyInProgress(kg, 1))
+		require.Equal(t, kg.Concurrency("", ""), backlog.customKeyInProgress(kg, 2))
 	})
 
 	t.Run("account concurrency", func(t *testing.T) {
@@ -329,8 +329,8 @@ func TestQueueItemBacklogs(t *testing.T) {
 
 		// default backlog is not for a concurrency key, so the concurrency key should be empty (function-llevel concurrency accounting is handled for the shadow partition)
 		kg := queueKeyGenerator{queueDefaultKey: QueueDefaultKey}
-		require.Equal(t, kg.Concurrency("", ""), backlog.concurrencyKey(kg, 1))
-		require.Equal(t, kg.Concurrency("", ""), backlog.concurrencyKey(kg, 2))
+		require.Equal(t, kg.Concurrency("", ""), backlog.customKeyInProgress(kg, 1))
+		require.Equal(t, kg.Concurrency("", ""), backlog.customKeyInProgress(kg, 2))
 	})
 
 	t.Run("custom concurrency", func(t *testing.T) {
@@ -389,8 +389,8 @@ func TestQueueItemBacklogs(t *testing.T) {
 		require.Equal(t, expected, backlog)
 
 		kg := queueKeyGenerator{queueDefaultKey: QueueDefaultKey}
-		require.Equal(t, kg.Concurrency("custom", util.ConcurrencyKey(scope, entity, unhashedValue)), backlog.concurrencyKey(kg, 1))
-		require.Equal(t, kg.Concurrency("", ""), backlog.concurrencyKey(kg, 2))
+		require.Equal(t, kg.Concurrency("custom", util.ConcurrencyKey(scope, entity, unhashedValue)), backlog.customKeyInProgress(kg, 1))
+		require.Equal(t, kg.Concurrency("", ""), backlog.customKeyInProgress(kg, 2))
 	})
 
 	t.Run("concurrency + throttle start item", func(t *testing.T) {
@@ -608,8 +608,8 @@ func TestQueueItemBacklogs(t *testing.T) {
 		require.Equal(t, expected, backlog)
 
 		kg := queueKeyGenerator{queueDefaultKey: QueueDefaultKey}
-		require.Equal(t, kg.Concurrency("custom", util.ConcurrencyKey(scope, entity, unhashedValue)), backlog.concurrencyKey(kg, 1))
-		require.Equal(t, kg.Concurrency("custom", util.ConcurrencyKey(scope2, entity2, unhashedValue2)), backlog.concurrencyKey(kg, 2))
+		require.Equal(t, kg.Concurrency("custom", util.ConcurrencyKey(scope, entity, unhashedValue)), backlog.customKeyInProgress(kg, 1))
+		require.Equal(t, kg.Concurrency("custom", util.ConcurrencyKey(scope2, entity2, unhashedValue2)), backlog.customKeyInProgress(kg, 2))
 	})
 }
 
@@ -801,8 +801,8 @@ func TestQueueItemShadowPartition(t *testing.T) {
 			SystemConcurrency:   0,
 			AccountConcurrency:  100,
 			FunctionConcurrency: 25,
-			CustomConcurrencyKeys: map[string]CustomConcurrencyLimit{
-				concurrencyKeyID(enums.ConcurrencyScopeFn, hashedConcurrencyKeyExpr): {
+			CustomConcurrencyKeys: []CustomConcurrencyLimit{
+				{
 					Scope: enums.ConcurrencyScopeFn,
 					Key:   hashedConcurrencyKeyExpr,
 					Limit: 23,
@@ -866,8 +866,8 @@ func TestQueueItemShadowPartition(t *testing.T) {
 			SystemConcurrency:   0,
 			AccountConcurrency:  100,
 			FunctionConcurrency: 25,
-			CustomConcurrencyKeys: map[string]CustomConcurrencyLimit{
-				concurrencyKeyID(enums.ConcurrencyScopeFn, hashedConcurrencyKeyExpr): {
+			CustomConcurrencyKeys: []CustomConcurrencyLimit{
+				{
 					Scope: enums.ConcurrencyScopeFn,
 					Key:   hashedConcurrencyKeyExpr,
 					Limit: 23,
@@ -935,8 +935,8 @@ func TestBacklogIsOutdated(t *testing.T) {
 		keyHash := util.XXHash("event.data.customerID")
 
 		shadowPart := &QueueShadowPartition{
-			CustomConcurrencyKeys: map[string]CustomConcurrencyLimit{
-				concurrencyKeyID(enums.ConcurrencyScopeFn, keyHash): {
+			CustomConcurrencyKeys: []CustomConcurrencyLimit{
+				{
 					Scope: enums.ConcurrencyScopeFn,
 					Key:   keyHash,
 					Limit: 10,
@@ -963,8 +963,8 @@ func TestBacklogIsOutdated(t *testing.T) {
 		keyHash := util.XXHash("event.data.customerID")
 
 		shadowPart := &QueueShadowPartition{
-			CustomConcurrencyKeys: map[string]CustomConcurrencyLimit{
-				concurrencyKeyID(enums.ConcurrencyScopeFn, keyHash): {
+			CustomConcurrencyKeys: []CustomConcurrencyLimit{
+				{
 					Scope: enums.ConcurrencyScopeFn,
 					Key:   keyHash,
 					Limit: 10,
@@ -981,8 +981,8 @@ func TestBacklogIsOutdated(t *testing.T) {
 		keyHashNew := util.XXHash("event.data.orgID")
 
 		shadowPart := &QueueShadowPartition{
-			CustomConcurrencyKeys: map[string]CustomConcurrencyLimit{
-				concurrencyKeyID(enums.ConcurrencyScopeFn, keyHashNew): {
+			CustomConcurrencyKeys: []CustomConcurrencyLimit{
+				{
 					Scope: enums.ConcurrencyScopeFn,
 					Key:   keyHashNew,
 					Limit: 10,

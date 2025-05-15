@@ -61,7 +61,7 @@ type QueueShadowPartition struct {
 
 	// Up to two custom concurrency keys on user-defined scopes, optionally specifying a key. The key is required
 	// on env or account level scopes.
-	CustomConcurrencyKeys map[string]CustomConcurrencyLimit `json:"cck,omitempty"`
+	CustomConcurrencyKeys []CustomConcurrencyLimit `json:"cck,omitempty"`
 
 	// Throttle configuration, optionally specifying key. If no key is set, the throttle value will be the function ID.
 	Throttle *ShadowPartitionThrottle `json:"t,omitempty"`
@@ -71,6 +71,79 @@ type QueueShadowPartition struct {
 
 	// Flag to pause enqueues to the shadow partition.
 	PauseEnqueue bool `json:"noenqueue,omitempty"`
+}
+
+// readyQueueKey returns the ZSET key to the ready queue
+func (q QueueShadowPartition) readyQueueKey(kg QueueKeyGenerator) string {
+	return kg.PartitionQueueSet(enums.PartitionTypeDefault, q.PartitionID, "")
+}
+
+// inProgressKey returns the key storing the in progress set for the shadow partition
+func (q QueueShadowPartition) inProgressKey(kg QueueKeyGenerator) string {
+	return kg.Concurrency("p", q.PartitionID)
+}
+
+// activeKey returns the key storing the active counter for the shadow partition
+func (q QueueShadowPartition) activeKey(kg QueueKeyGenerator) string {
+	return kg.ActiveCounter("p", q.PartitionID)
+}
+
+// CustomConcurrencyLimit returns concurrency limit for custom concurrency key in position n (0, if not set)
+func (q QueueShadowPartition) CustomConcurrencyLimit(n int) int {
+	if n < 0 || n > len(q.CustomConcurrencyKeys) {
+		return 0
+	}
+
+	key := q.CustomConcurrencyKeys[n-1]
+
+	return key.Limit
+}
+
+func (q QueueShadowPartition) CustomConcurrencyKey(kg QueueKeyGenerator, b *QueueBacklog, n int) (string, int) {
+	if n < 0 || n > len(b.ConcurrencyKeys) {
+		return kg.Concurrency("", ""), 0
+	}
+
+	backlogKey := b.ConcurrencyKeys[n-1]
+
+	for _, key := range q.CustomConcurrencyKeys {
+		if key.Scope == backlogKey.ConcurrencyScope && key.Key == backlogKey.ConcurrencyKey {
+			// Return concrete key with latest limit from shadow partition
+			return backlogKey.concurrencyKey(kg), key.Limit
+		}
+	}
+
+	return kg.Concurrency("", ""), 0
+}
+
+// accountInProgressKey returns the key storing the in progress set for the shadow partition's account
+func (q QueueShadowPartition) accountInProgressKey(kg QueueKeyGenerator) string {
+	// Do not track account concurrency for system queues
+	if q.SystemQueueName != nil {
+		return kg.Concurrency("", "")
+	}
+
+	// This should never be unset
+	if q.AccountID == nil {
+		return kg.Concurrency("account", "")
+	}
+
+	return kg.Concurrency("account", q.AccountID.String())
+}
+
+// accountActiveKey returns the key storing the active counter for the shadow partition's account
+func (q QueueShadowPartition) accountActiveKey(kg QueueKeyGenerator) string {
+	// Do not track account concurrency for system queues
+	if q.SystemQueueName != nil {
+		return kg.ActiveCounter("", "")
+	}
+
+	// This should never be unset
+	if q.AccountID == nil {
+		return kg.ActiveCounter("account", "")
+	}
+
+	return kg.ActiveCounter("account", q.AccountID.String())
 }
 
 // BacklogConcurrencyKey represents a custom concurrency key, which can be scoped to the function, environment, or account.
@@ -167,25 +240,6 @@ func (q *queue) ItemBacklog(ctx context.Context, i osqueue.QueueItem) QueueBackl
 
 	concurrencyKeys := i.Data.GetConcurrencyKeys()
 	if len(concurrencyKeys) > 0 {
-		// NOTE: This is an optimization that ensures we return *updated* concurrency keys
-		// for any recently published function configuration.  The embeddeed ckeys from the
-		// queue items above may be outdated.
-		if q.customConcurrencyLimitRefresher != nil {
-			// As an optimization, allow fetching updated concurrency limits if desired.
-			updated, _ := duration(ctx, q.primaryQueueShard.Name, "backlog_custom_concurrency_refresher", q.clock.Now(), func(ctx context.Context) ([]state.CustomConcurrency, error) {
-				return q.customConcurrencyLimitRefresher(ctx, i), nil
-			})
-			for _, update := range updated {
-				// This is quadratic, but concurrency keys are limited to 2 so it's
-				// okay.
-				for n, existing := range concurrencyKeys {
-					if existing.Key == update.Key {
-						concurrencyKeys[n].Limit = update.Limit
-					}
-				}
-			}
-		}
-
 		// Create custom concurrency key backlog
 		b.ConcurrencyKeys = make([]BacklogConcurrencyKey, len(concurrencyKeys))
 
@@ -291,20 +345,18 @@ func (q *queue) ItemShadowPartition(ctx context.Context, i osqueue.QueueItem) Qu
 		fnPartition.ConcurrencyLimit = limits.AccountLimit
 	}
 
-	var customConcurrencyKeyLimits map[string]CustomConcurrencyLimit
+	var customConcurrencyKeyLimits []CustomConcurrencyLimit
 	if len(ckeys) > 0 {
-		customConcurrencyKeyLimits = make(map[string]CustomConcurrencyLimit)
-
 		// Up to 2 concurrency keys.
 		for _, key := range ckeys {
 			scope, _, _, _ := key.ParseKey()
 
-			customConcurrencyKeyLimits[concurrencyKeyID(scope, key.Hash)] = CustomConcurrencyLimit{
+			customConcurrencyKeyLimits = append(customConcurrencyKeyLimits, CustomConcurrencyLimit{
 				Scope: scope,
 				// Key is required to look up the respective limit when checking constraints for a given backlog.
 				Key:   key.Hash, // hash(event.data.customerId)
 				Limit: key.Limit,
-			}
+			})
 		}
 	}
 
@@ -363,10 +415,12 @@ func (b QueueBacklog) isOutdated(sp *QueueShadowPartition) bool {
 	}
 
 	// All concurrency keys on backlog must be found on partition
-	for _, key := range b.ConcurrencyKeys {
-		_, ok := sp.CustomConcurrencyKeys[concurrencyKeyID(key.ConcurrencyScope, key.ConcurrencyKey)]
-		if !ok {
-			return true
+	// This is quadratic but each backlog and shadow partition can only have up to 2 keys, so it's bounded.
+	for _, backlogKey := range b.ConcurrencyKeys {
+		for _, shadowPartitionKey := range sp.CustomConcurrencyKeys {
+			if shadowPartitionKey.Scope == backlogKey.ConcurrencyScope && shadowPartitionKey.Key == backlogKey.ConcurrencyKey {
+				return true
+			}
 		}
 	}
 
@@ -377,14 +431,43 @@ func (b QueueBacklog) isOutdated(sp *QueueShadowPartition) bool {
 	return false
 }
 
-func concurrencyKeyID(scope enums.ConcurrencyScope, hash string) string {
-	switch scope {
-	case enums.ConcurrencyScopeFn:
-		return fmt.Sprintf("f:%s", hash)
-	case enums.ConcurrencyScopeEnv:
-		return fmt.Sprintf("e:%s", hash)
-	case enums.ConcurrencyScopeAccount:
-		return fmt.Sprintf("a:%s", hash)
+// customKeyInProgress returns the key to the "in progress" ZSET
+func (b QueueBacklog) customKeyInProgress(kg QueueKeyGenerator, n int) string {
+	if n < 0 || n > len(b.ConcurrencyKeys) {
+		return kg.Concurrency("", "")
 	}
-	return ""
+
+	key := b.ConcurrencyKeys[n-1]
+	return key.concurrencyKey(kg)
+}
+
+func (b BacklogConcurrencyKey) concurrencyKey(kg QueueKeyGenerator) string {
+	// Concurrency accounting keys are made up of three parts:
+	// - The scope (account, environment, function) to apply the concurrency limit on
+	// - The entity (account ID, envID, or function ID) based on the scope
+	// - The dynamic key value (hashed evaluated expression)
+	return kg.Concurrency("custom", util.ConcurrencyKey(b.ConcurrencyScope, b.ConcurrencyScopeEntity, b.ConcurrencyKeyUnhashedValue))
+}
+
+// customKeyActive returns the key to the active counter for the given custom concurrency key
+func (b QueueBacklog) customKeyActive(kg QueueKeyGenerator, n int) string {
+	if n < 0 || n > len(b.ConcurrencyKeys) {
+		return kg.ActiveCounter("", "")
+	}
+
+	key := b.ConcurrencyKeys[n-1]
+	return key.activeKey(kg)
+}
+
+func (b BacklogConcurrencyKey) activeKey(kg QueueKeyGenerator) string {
+	// Concurrency accounting keys are made up of three parts:
+	// - The scope (account, environment, function) to apply the concurrency limit on
+	// - The entity (account ID, envID, or function ID) based on the scope
+	// - The dynamic key value (hashed evaluated expression)
+	return kg.ActiveCounter("custom", util.ConcurrencyKey(b.ConcurrencyScope, b.ConcurrencyScopeEntity, b.ConcurrencyKeyUnhashedValue))
+}
+
+// activeKey returns backlog compound active key
+func (b QueueBacklog) activeKey(kg QueueKeyGenerator) string {
+	return kg.ActiveCounter("compound", b.BacklogID)
 }

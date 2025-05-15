@@ -10,45 +10,50 @@ Output:
 
 local queueKey                = KEYS[1] -- queue:item - hash: { $itemID: $item }
 local keyPartitionMap         = KEYS[2] -- partition:item - hash: { $workflowID: $partition }
-local keyGlobalPointer        = KEYS[3] -- partition:sorted - zset
-local keyGlobalAccountPointer = KEYS[4] -- accounts:sorted - zset
-local keyAccountPartitions    = KEYS[5] -- accounts:$accountID:partition:sorted
-local keyPartitionFn          = KEYS[6] -- queue:sorted:$workflowID - zset
--- We remove our queue item ID from each concurrency queue
-local keyConcurrencyFn            = KEYS[7] -- Account concurrency level
-local keyCustomConcurrencyKey1    = KEYS[8] -- When leasing an item we need to place the lease into this key
-local keyCustomConcurrencyKey2    = KEYS[9] -- Optional for eg. for concurrency amongst steps
-local keyAcctConcurrency          = KEYS[10]
--- We push pointers to partition concurrency items to the partition concurrency item
-local concurrencyPointer      = KEYS[11]
+local concurrencyPointer      = KEYS[3]
 
--- Key queues v2
-local keyBacklogSet                      = KEYS[12]          -- backlog:sorted:<backlogID> - zset
-local keyBacklogMeta                     = KEYS[13]          -- backlogs - hash
-local keyGlobalShadowPartitionSet        = KEYS[14]          -- shadow:sorted
-local keyShadowPartitionSet              = KEYS[15]          -- shadow:sorted:<fnID|queueName> - zset
-local keyShadowPartitionMeta             = KEYS[16]          -- shadows
-local keyGlobalAccountShadowPartitionSet = KEYS[17]
-local keyAccountShadowPartitionSet       = KEYS[18]
+local keyGlobalPointer        = KEYS[4] -- partition:sorted - zset
+local keyGlobalAccountPointer = KEYS[5] -- accounts:sorted - zset
+local keyAccountPartitions    = KEYS[6] -- accounts:$accountID:partition:sorted
 
-local keyActiveCounter         = KEYS[19]
+local keyReadyQueue           = KEYS[7] -- queue:sorted:$workflowID - zset
 
-local keyItemIndexA           = KEYS[20]          -- custom item index 1
-local keyItemIndexB           = KEYS[21]          -- custom item index 2
+local keyInProgressAccount                  = KEYS[8]
+local keyInProgressPartition                = KEYS[9]
+local keyInProgressCustomConcurrencyKey1    = KEYS[10]
+local keyInProgressCustomConcurrencyKey2    = KEYS[11]
 
-local queueItem           = ARGV[1]
-local queueID             = ARGV[2]           -- id
+local keyActiveAccount         = KEYS[12]
+local keyActivePartition       = KEYS[13]
+local keyActiveConcurrencyKey1 = KEYS[14]
+local keyActiveConcurrencyKey2 = KEYS[15]
+local keyActiveCompound        = KEYS[16]
+
+local keyBacklogSet                      = KEYS[17]          -- backlog:sorted:<backlogID> - zset
+local keyBacklogMeta                     = KEYS[18]          -- backlogs - hash
+local keyGlobalShadowPartitionSet        = KEYS[19]          -- shadow:sorted
+local keyShadowPartitionSet              = KEYS[20]          -- shadow:sorted:<fnID|queueName> - zset
+local keyShadowPartitionMeta             = KEYS[21]          -- shadows
+local keyGlobalAccountShadowPartitionSet = KEYS[22]
+local keyAccountShadowPartitionSet       = KEYS[23]
+
+local keyItemIndexA           = KEYS[24]          -- custom item index 1
+local keyItemIndexB           = KEYS[25]          -- custom item index 2
+
+local queueID             = ARGV[1]           -- id
+local queueItem           = ARGV[2]
 local queueScore          = tonumber(ARGV[3]) -- vesting time, in ms
-local nowMS               = tonumber(ARGV[4]) -- now in ms
-local partitionItem       = ARGV[5]
-local partitionID         = ARGV[6]
-local accountID           = ARGV[7]
+local accountID           = ARGV[4]
+local partitionID         = ARGV[5]
+local partitionItem       = ARGV[6]
+
+local nowMS               = tonumber(ARGV[7]) -- now in ms
 
 -- Key queues v2
 local requeueToBacklog				= tonumber(ARGV[8])
 local shadowPartitionItem     = ARGV[9]
-local backlogItem             = ARGV[10]
-local backlogID               = ARGV[11]
+local backlogID               = ARGV[10]
+local backlogItem             = ARGV[11]
 
 -- $include(get_queue_item.lua)
 -- $include(get_partition_item.lua)
@@ -78,7 +83,7 @@ end
 -- Concurrency
 --
 
-handleRequeueConcurrency(keyConcurrencyFn)
+handleRequeueConcurrency(keyInProgressPartition)
 
 -- Get the earliest item in the partition concurrency set.  We may be dequeueing
 -- the only in-progress job and should remove this from the partition concurrency
@@ -86,7 +91,7 @@ handleRequeueConcurrency(keyConcurrencyFn)
 --
 -- This ensures that scavengeres have updated pointer queues without the currently
 -- leased job, if exists.
-local concurrencyScores = redis.call("ZRANGE", keyConcurrencyFn, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")
+local concurrencyScores = redis.call("ZRANGE", keyInProgressPartition, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")
 if concurrencyScores == false then
   redis.call("ZREM", concurrencyPointer, partitionID)
 else
@@ -99,20 +104,42 @@ else
   end
 end
 
-handleRequeueConcurrency(keyCustomConcurrencyKey1)
-handleRequeueConcurrency(keyCustomConcurrencyKey2)
+handleRequeueConcurrency(keyInProgressCustomConcurrencyKey1)
+handleRequeueConcurrency(keyInProgressCustomConcurrencyKey2)
 
 -- Remove item from the account concurrency queue
 -- This does not have a scavenger queue, as it's purely an entitlement limitation. See extendLease
 -- and Lease for respective ZADD calls.
-redis.call("ZREM", keyAcctConcurrency, item.id)
+redis.call("ZREM", keyInProgressAccount, item.id)
 
 if requeueToBacklog == 1 then
-  -- When item is moved to the backlog, it's no longer active
-  -- This is only necessary with backlogs; if the item moves back to the partition,
-  -- it can be picked up again and is still "active" (hence we don't decrease in the "else" case)
-  if redis.call("EXISTS", keyActiveCounter) == 1 then
-    redis.call("DECR", keyActiveCounter)
+  -- Decrease active counters and clean up if necessary
+  if redis.call("DECR", keyActivePartition) <= 0 then
+    redis.call("DEL", keyActivePartition)
+  end
+
+  if exists_without_ending(keyActiveAccount, ":-") then
+    if redis.call("DECR", keyActiveAccount) <= 0 then
+      redis.call("DEL", keyActiveAccount)
+    end
+  }
+
+  if exists_without_ending(keyActiveCompound, ":-") then
+    if redis.call("DECR", keyActiveCompound) <= 0 then
+      redis.call("DEL", keyActiveCompound)
+    end
+  end
+
+  if exists_without_ending(keyActiveConcurrencyKey1, ":-") then
+    if redis.call("DECR", keyActiveConcurrencyKey1) <= 0 then
+      redis.call("DEL", keyActiveConcurrencyKey1)
+    end
+  end
+
+  if exists_without_ending(keyActiveConcurrencyKey2, ":-") then
+    if redis.call("DECR", keyActiveConcurrencyKey2) <= 0 then
+      redis.call("DEL", keyActiveConcurrencyKey2)
+    end
   end
 
 	--
@@ -123,7 +150,7 @@ else
   --
   -- Enqueue item to partition queues again
   --
-  requeue_to_partition(keyPartitionFn, partitionID, partitionItem, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, queueScore, queueID, nowMS, accountID)
+  requeue_to_partition(keyReadyQueue, partitionID, partitionItem, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, queueScore, queueID, nowMS, accountID)
 end
 
 -- Add optional indexes.

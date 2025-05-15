@@ -33,11 +33,11 @@ local keyReadySet                        = KEYS[6]
 local keyQueueItemHash                   = KEYS[7]
 
 -- Constraint-related accounting keys
-local keyConcurrencyAccount      = KEYS[8]
-local keyConcurrencyFn  				 = KEYS[9] -- Account concurrency level
-local keyCustomConcurrencyKey1   = KEYS[10] -- When leasing an item we need to place the lease into this key.
-local keyCustomConcurrencyKey2   = KEYS[11] -- Optional for eg. for concurrency amongst steps
-local keyActiveCounter           = KEYS[12]
+local keyActiveAccount           = KEYS[8]
+local keyActivePartition         = KEYS[9]
+local keyActiveConcurrencyKey1   = KEYS[10]
+local keyActiveConcurrencyKey2   = KEYS[11]
+local keyActiveCompound          = KEYS[12]
 
 local backlogID     = ARGV[1]
 local partitionID   = ARGV[2]
@@ -126,8 +126,8 @@ if (constraintCapacity == nil or constraintCapacity > 0) and throttleLimit > 0 t
 end
 
 -- Check custom concurrency key 2 capacity
-if (constraintCapacity == nil or constraintCapacity > 0) and exists_without_ending(keyCustomConcurrencyKey2, ":-") == true and customConcurrencyKey2 > 0 then
-  local remainingCustomConcurrencyCapacityKey2 = check_concurrency(nowMS, keyCustomConcurrencyKey2, customConcurrencyKey2)
+if (constraintCapacity == nil or constraintCapacity > 0) and exists_without_ending(keyActiveConcurrencyKey2, ":-") == true and customConcurrencyKey2 > 0 then
+  local remainingCustomConcurrencyCapacityKey2 = check_concurrency(nowMS, keyActiveConcurrencyKey2, customConcurrencyKey2)
   if constraintCapacity == nil or remainingCustomConcurrencyCapacityKey2 < constraintCapacity then
     -- Custom concurrency key 2 imposes limits
     constraintCapacity = remainingCustomConcurrencyCapacityKey2
@@ -136,8 +136,8 @@ if (constraintCapacity == nil or constraintCapacity > 0) and exists_without_endi
 end
 
 -- Check custom concurrency key 1 capacity
-if (constraintCapacity == nil or constraintCapacity > 0) and exists_without_ending(keyCustomConcurrencyKey1, ":-") == true and customConcurrencyKey1 > 0 then
-  local remainingCustomConcurrencyCapacityKey1 = check_concurrency(nowMS, keyCustomConcurrencyKey1, customConcurrencyKey1)
+if (constraintCapacity == nil or constraintCapacity > 0) and exists_without_ending(keyActiveConcurrencyKey1, ":-") == true and customConcurrencyKey1 > 0 then
+  local remainingCustomConcurrencyCapacityKey1 = check_concurrency(nowMS, keyActiveConcurrencyKey1, customConcurrencyKey1)
   if constraintCapacity == nil or remainingCustomConcurrencyCapacityKey1 < constraintCapacity then
     -- Custom concurrency key 1 imposes limits
     constraintCapacity = remainingCustomConcurrencyCapacityKey1
@@ -146,8 +146,8 @@ if (constraintCapacity == nil or constraintCapacity > 0) and exists_without_endi
 end
 
 -- Check function concurrency capacity
-if (constraintCapacity == nil or constraintCapacity > 0) and exists_without_ending(keyConcurrencyFn, ":-") == true and concurrencyFn > 0 then
-  local remainingFunctionCapacity = check_concurrency(nowMS, keyConcurrencyFn, concurrencyFn)
+if (constraintCapacity == nil or constraintCapacity > 0) and exists_without_ending(keyActivePartition, ":-") == true and concurrencyFn > 0 then
+  local remainingFunctionCapacity = check_concurrency(nowMS, keyActivePartition, concurrencyFn)
   if constraintCapacity == nil or remainingFunctionCapacity < constraintCapacity then
     -- Function concurrency imposes limits
     constraintCapacity = remainingFunctionCapacity
@@ -156,8 +156,8 @@ if (constraintCapacity == nil or constraintCapacity > 0) and exists_without_endi
 end
 
 -- Check account concurrency capacity
-if (constraintCapacity == nil or constraintCapacity > 0) and exists_without_ending(keyConcurrencyAccount, ":-") == true and concurrencyAcct > 0 then
-  local remainingAccountCapacity = check_concurrency(nowMS, keyConcurrencyAccount, concurrencyAcct)
+if (constraintCapacity == nil or constraintCapacity > 0) and exists_without_ending(keyActiveAccount, ":-") == true and concurrencyAcct > 0 then
+  local remainingAccountCapacity = check_concurrency(nowMS, keyActiveAccount, concurrencyAcct)
 
   if constraintCapacity == nil or remainingAccountCapacity < constraintCapacity then
     -- Account concurrency imposes limits
@@ -177,20 +177,6 @@ if constraintCapacity < refill then
   refill = constraintCapacity
 end
 
--- If we have limited capacity, reduce refill by ready to prevent over-filling
--- Put differently: Assume items in the ready queue are as good as running
-if constraintCapacity > 0 then
-  -- Note: This is _not_ the active count, but instead only counts items in the ready set!
-  -- TODO: Using a ZCARD would be better _but_ this would include pre-key-queue sleeping items
-  local readyCount = redis.call("ZCOUNT", keyReadySet, "-inf", "+inf")
-  if readyCount ~= nil and readyCount ~= false and refill + readyCount > constraintCapacity then
-    -- If we have capacity constraints, we must subtract the number of items
-    -- in the ready queue from the number of items to refill, otherwise
-    -- we would ignore items not yet running but ready to start at any moment.
-    refill = refill - readyCount
-  end
-end
-
 --
 -- Refill to match capacity
 --
@@ -201,42 +187,77 @@ local refilled = 0
 if refill > 0 then
   -- Move item(s) out of backlog and into partition
 
-  local items = redis.call("ZRANGE", keyBacklogSet, "-inf", refillUntilMS, "BYSCORE", "LIMIT", 0, refill, "WITHSCORES")
+  -- Peek item IDs and scores
+  local itemIDs = redis.call("ZRANGE", keyBacklogSet, "-inf", refillUntilMS, "BYSCORE", "LIMIT", 0, refill)
+  local itemScores = redis.call("ZMSCORE", keyBacklogSet, unpack(itemIDs))
 
-  local potentiallyMissingQueueItems = redis.call("HMGET", keyQueueItemHash, unpack(items))
+  -- Attempt to load item data
+  local potentiallyMissingQueueItems = redis.call("HMGET", keyQueueItemHash, unpack(itemIDs))
 
   -- Reverse the items to be added to the ready set
-  local args = {}
-  local remArgs = {}
+  local readyArgs = {}
+  local backlogRemArgs = {}
+  local itemUpdateArgs = {}
 
-  local itemCleanupArgs = {}
-  local hasCleanup = false
+  for i = 1, #itemIDs do
+    local itemID = itemIDs[i]
+    local itemScore = itemScores[i]
+    local itemData = potentiallyMissingQueueItems[i]
 
-  -- advance by two as items is essentially a tuple of (item ID, score)[]
-  for i = 1, #items, 2 do
-    if potentiallyMissingQueueItems[i] == false or potentiallyMissingQueueItems[i] == nil or potentiallyMissingQueueItems[i] == "" then
-      table.insert(itemCleanupArgs, items[i])
-      table.insert(remArgs, items[i])  -- item for removal
-      hasCleanup = true
+    -- If queue item does not exist in hash, delete from backlog
+    if itemData == false or itemData == nil or itemData == "" then
+      table.insert(remArgs, itemID)  -- remove from backlog
       goto continue
     end
 
-    table.insert(args, items[i + 1]) -- score
-    table.insert(args, items[i])     -- item
-    table.insert(remArgs, items[i])  -- item for removal
+    -- Insert new members into ready set
+    table.insert(readyArgs, itemScore)
+    table.insert(readyArgs, itemID)
+
+    -- Remove item from backlog
+    table.insert(backlogRemArgs, itemID)
+
+    -- Update queue item with refill data
+    local updatedData = cjson.decode(itemData)
+    updatedData.rf = backlogID
+    updatedData.rat = nowMS
+
+    table.insert(itemUpdateArgs, itemID)
+    table.insert(itemUpdateArgs, cjson.encode(updatedData)
+
+    -- Increment number of refilled items
     refilled = refilled + 1
 
     ::continue::
   end
 
+  -- "Refill" items to ready set
   redis.call("ZADD", keyReadySet, unpack(args))
-  redis.call("INCRBY", keyActiveCounter, refilled)
+
+  -- Increase active counters by number of refilled items
+  redis.call("INCRBY", keyActivePartition, refilled)
+
+  if exists_without_ending(keyActiveAccount, ":-") then
+    redis.call("INCRBY", keyActiveAccount, refilled)
+  }
+
+  if exists_without_ending(keyActiveCompound, ":-") then
+    redis.call("INCRBY", keyActiveCompound, refilled)
+  end
+
+  if exists_without_ending(keyActiveConcurrencyKey1, ":-") then
+    redis.call("INCRBY", keyActiveConcurrencyKey1, refilled)
+  end
+
+  if exists_without_ending(keyActiveConcurrencyKey2, ":-") then
+    redis.call("INCRBY", keyActiveConcurrencyKey2, refilled)
+  end
+
+  -- Remove refilled or missing items from backlog
   redis.call("ZREM", keyBacklogSet, unpack(remArgs))
 
-
-  if hasCleanup == true then
-    redis.call("HDEL", keyQueueItemHash, unpack(itemCleanupArgs))
-  end
+  -- Update queue items with refill data
+  redis.call("HSET", keyQueueItemHash, unpack(itemUpdateArgs)
 end
 
 -- update gcra theoretical arrival time

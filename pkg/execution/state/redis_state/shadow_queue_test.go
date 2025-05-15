@@ -38,13 +38,7 @@ func TestQueueRefillBacklog(t *testing.T) {
 		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 			return true
 		}),
-		WithAllowSystemKeyQueues(func(ctx context.Context) bool {
-			return true
-		}),
 		WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-			return false
-		}),
-		WithDisableSystemQueueLeaseChecks(func(ctx context.Context) bool {
 			return false
 		}),
 		WithClock(clock),
@@ -211,13 +205,7 @@ func TestQueueRefillBacklog(t *testing.T) {
 			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 				return enqueueToBacklog
 			}),
-			WithAllowSystemKeyQueues(func(ctx context.Context) bool {
-				return enqueueToBacklog
-			}),
 			WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-				return true
-			}),
-			WithDisableSystemQueueLeaseChecks(func(ctx context.Context) bool {
 				return true
 			}),
 			WithRunMode(QueueRunMode{
@@ -328,13 +316,7 @@ func TestQueueShadowPartitionLease(t *testing.T) {
 		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 			return enqueueToBacklog
 		}),
-		WithAllowSystemKeyQueues(func(ctx context.Context) bool {
-			return enqueueToBacklog
-		}),
 		WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-			return true
-		}),
-		WithDisableSystemQueueLeaseChecks(func(ctx context.Context) bool {
 			return true
 		}),
 	)
@@ -567,13 +549,7 @@ func TestQueueShadowScanner(t *testing.T) {
 		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 			return enqueueToBacklog
 		}),
-		WithAllowSystemKeyQueues(func(ctx context.Context) bool {
-			return enqueueToBacklog
-		}),
 		WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-			return true
-		}),
-		WithDisableSystemQueueLeaseChecks(func(ctx context.Context) bool {
 			return true
 		}),
 	)
@@ -640,13 +616,7 @@ func TestQueueShadowScannerContinuations(t *testing.T) {
 		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 			return enqueueToBacklog
 		}),
-		WithAllowSystemKeyQueues(func(ctx context.Context) bool {
-			return enqueueToBacklog
-		}),
 		WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-			return true
-		}),
-		WithDisableSystemQueueLeaseChecks(func(ctx context.Context) bool {
 			return true
 		}),
 		WithRunMode(QueueRunMode{
@@ -1186,13 +1156,7 @@ func TestRefillConstraints(t *testing.T) {
 				WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 					return enqueueToBacklog
 				}),
-				WithAllowSystemKeyQueues(func(ctx context.Context) bool {
-					return enqueueToBacklog
-				}),
 				WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-					return true
-				}),
-				WithDisableSystemQueueLeaseChecks(func(ctx context.Context) bool {
 					return true
 				}),
 				WithRunMode(QueueRunMode{
@@ -1368,13 +1332,7 @@ func TestShadowPartitionUpdate(t *testing.T) {
 		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 			return true
 		}),
-		WithAllowSystemKeyQueues(func(ctx context.Context) bool {
-			return true
-		}),
 		WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-			return false
-		}),
-		WithDisableSystemQueueLeaseChecks(func(ctx context.Context) bool {
 			return false
 		}),
 		WithClock(clock),

@@ -4691,13 +4691,7 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 				return true
 			}),
-			WithAllowSystemKeyQueues(func(ctx context.Context) bool {
-				return true
-			}),
 			WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-				return false
-			}),
-			WithDisableSystemQueueLeaseChecks(func(ctx context.Context) bool {
 				return false
 			}),
 		)
@@ -4870,13 +4864,7 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 				return true
 			}),
-			WithAllowSystemKeyQueues(func(ctx context.Context) bool {
-				return true
-			}),
 			WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-				return false
-			}),
-			WithDisableSystemQueueLeaseChecks(func(ctx context.Context) bool {
 				return false
 			}),
 			WithConcurrencyLimitGetter(func(ctx context.Context, p QueuePartition) PartitionConcurrencyLimits {
@@ -4984,13 +4972,7 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 				return true
 			}),
-			WithAllowSystemKeyQueues(func(ctx context.Context) bool {
-				return true
-			}),
 			WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-				return false
-			}),
-			WithDisableSystemQueueLeaseChecks(func(ctx context.Context) bool {
 				return false
 			}),
 			WithConcurrencyLimitGetter(func(ctx context.Context, p QueuePartition) PartitionConcurrencyLimits {
@@ -5110,13 +5092,7 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 				return true
 			}),
-			WithAllowSystemKeyQueues(func(ctx context.Context) bool {
-				return true
-			}),
 			WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-				return false
-			}),
-			WithDisableSystemQueueLeaseChecks(func(ctx context.Context) bool {
 				return false
 			}),
 		)
@@ -5194,13 +5170,7 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 				return enqueueToBacklog
 			}),
-			WithAllowSystemKeyQueues(func(ctx context.Context) bool {
-				return enqueueToBacklog
-			}),
 			WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-				return true
-			}),
-			WithDisableSystemQueueLeaseChecks(func(ctx context.Context) bool {
 				return true
 			}),
 		)
@@ -5264,9 +5234,9 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 			// key queue v2 accounting
 			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, shadowPartition.accountInProgressKey(kg), qi.ID)))
 			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, shadowPartition.inProgressKey(kg), qi.ID)))
-			require.Equal(t, kg.Concurrency("", ""), backlog.concurrencyKey(kg, 1))
-			require.Equal(t, kg.Concurrency("", ""), backlog.concurrencyKey(kg, 2))
-			require.False(t, r.Exists(backlog.concurrencyKey(kg, 1)))
+			require.Equal(t, kg.Concurrency("", ""), backlog.customKeyInProgress(kg, 1))
+			require.Equal(t, kg.Concurrency("", ""), backlog.customKeyInProgress(kg, 2))
+			require.False(t, r.Exists(backlog.customKeyInProgress(kg, 1)))
 
 			// expect classic partition concurrency to include item
 			// TODO Do we actually want to update previous accounting?
@@ -5294,13 +5264,7 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 				return enqueueToBacklog
 			}),
-			WithAllowSystemKeyQueues(func(ctx context.Context) bool {
-				return enqueueToBacklog
-			}),
 			WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-				return true
-			}),
-			WithDisableSystemQueueLeaseChecks(func(ctx context.Context) bool {
 				return true
 			}),
 			WithConcurrencyLimitGetter(func(ctx context.Context, p QueuePartition) PartitionConcurrencyLimits {
@@ -5398,10 +5362,10 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 			// key queue v2 accounting
 			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, shadowPartition.accountInProgressKey(kg), qi.ID)))
 			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, shadowPartition.inProgressKey(kg), qi.ID)))
-			require.Equal(t, kg.Concurrency("custom", util.ConcurrencyKey(scope, fnID, unhashedValue)), backlog.concurrencyKey(kg, 1))
-			require.True(t, r.Exists(backlog.concurrencyKey(kg, 1)))
-			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, backlog.concurrencyKey(kg, 1), qi.ID)))
-			require.Equal(t, backlog.concurrencyKey(kg, 1), custom1.concurrencyKey(kg))
+			require.Equal(t, kg.Concurrency("custom", util.ConcurrencyKey(scope, fnID, unhashedValue)), backlog.customKeyInProgress(kg, 1))
+			require.True(t, r.Exists(backlog.customKeyInProgress(kg, 1)))
+			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, backlog.customKeyInProgress(kg, 1), qi.ID)))
+			require.Equal(t, backlog.customKeyInProgress(kg, 1), custom1.concurrencyKey(kg))
 
 			// expect classic partition concurrency to include item
 			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, kg.Concurrency("account", accountId.String()), qi.ID)))
@@ -5428,13 +5392,7 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 				return enqueueToBacklog
 			}),
-			WithAllowSystemKeyQueues(func(ctx context.Context) bool {
-				return enqueueToBacklog
-			}),
 			WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-				return true
-			}),
-			WithDisableSystemQueueLeaseChecks(func(ctx context.Context) bool {
 				return true
 			}),
 			WithConcurrencyLimitGetter(func(ctx context.Context, p QueuePartition) PartitionConcurrencyLimits {
@@ -5545,14 +5503,14 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, shadowPartition.inProgressKey(kg), qi.ID)))
 
 			// first key
-			require.Equal(t, kg.Concurrency("custom", util.ConcurrencyKey(scope1, fnID, unhashedValue1)), backlog.concurrencyKey(kg, 1))
-			require.True(t, r.Exists(backlog.concurrencyKey(kg, 1)))
-			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, backlog.concurrencyKey(kg, 1), qi.ID)))
+			require.Equal(t, kg.Concurrency("custom", util.ConcurrencyKey(scope1, fnID, unhashedValue1)), backlog.customKeyInProgress(kg, 1))
+			require.True(t, r.Exists(backlog.customKeyInProgress(kg, 1)))
+			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, backlog.customKeyInProgress(kg, 1), qi.ID)))
 
 			// second key
-			require.Equal(t, kg.Concurrency("custom", util.ConcurrencyKey(scope2, wsID, unhashedValue2)), backlog.concurrencyKey(kg, 2))
-			require.True(t, r.Exists(backlog.concurrencyKey(kg, 2)))
-			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, backlog.concurrencyKey(kg, 2), qi.ID)))
+			require.Equal(t, kg.Concurrency("custom", util.ConcurrencyKey(scope2, wsID, unhashedValue2)), backlog.customKeyInProgress(kg, 2))
+			require.True(t, r.Exists(backlog.customKeyInProgress(kg, 2)))
+			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, backlog.customKeyInProgress(kg, 2), qi.ID)))
 
 			// expect classic partition concurrency to include item
 			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, kg.Concurrency("account", accountId.String()), qi.ID)))
@@ -5582,13 +5540,7 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 				return enqueueToBacklog
 			}),
-			WithAllowSystemKeyQueues(func(ctx context.Context) bool {
-				return enqueueToBacklog
-			}),
 			WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-				return true
-			}),
-			WithDisableSystemQueueLeaseChecks(func(ctx context.Context) bool {
 				return true
 			}),
 		)
@@ -5647,8 +5599,8 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 			// should not track account concurrency for system partition
 			require.True(t, r.Exists(shadowPartition.accountInProgressKey(kg)))
 			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, shadowPartition.inProgressKey(kg), qi.ID)))
-			require.Equal(t, kg.Concurrency("", ""), backlog.concurrencyKey(kg, 1))
-			require.False(t, r.Exists(backlog.concurrencyKey(kg, 1)))
+			require.Equal(t, kg.Concurrency("", ""), backlog.customKeyInProgress(kg, 1))
+			require.False(t, r.Exists(backlog.customKeyInProgress(kg, 1)))
 
 			// expect classic partition concurrency to include item
 			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, kg.Concurrency("account", sysQueueName), qi.ID)))
@@ -5677,13 +5629,7 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 				return enqueueToBacklog
 			}),
-			WithAllowSystemKeyQueues(func(ctx context.Context) bool {
-				return enqueueToBacklog
-			}),
 			WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-				return true
-			}),
-			WithDisableSystemQueueLeaseChecks(func(ctx context.Context) bool {
 				return true
 			}),
 		)
@@ -5752,8 +5698,8 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, shadowPartition.accountInProgressKey(kg), qi.ID)))
 
 			// no active set for default partition since this uses the in progress key
-			require.Equal(t, kg.Concurrency("", ""), backlog.concurrencyKey(kg, 1))
-			require.Equal(t, kg.Concurrency("", ""), backlog.concurrencyKey(kg, 2))
+			require.Equal(t, kg.Concurrency("", ""), backlog.customKeyInProgress(kg, 1))
+			require.Equal(t, kg.Concurrency("", ""), backlog.customKeyInProgress(kg, 2))
 
 			// expect old accounting to be updated
 			// TODO Do we actually want to update previous accounting?
@@ -5812,13 +5758,7 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 				return enqueueToBacklog
 			}),
-			WithAllowSystemKeyQueues(func(ctx context.Context) bool {
-				return enqueueToBacklog
-			}),
 			WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-				return true
-			}),
-			WithDisableSystemQueueLeaseChecks(func(ctx context.Context) bool {
 				return true
 			}),
 		)
@@ -5904,8 +5844,8 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, shadowPartition.accountInProgressKey(kg), qi.ID)))
 
 			// 1 active set for custom concurrency key
-			require.Equal(t, kg.Concurrency("custom", util.ConcurrencyKey(scope, fnID, unhashedValue)), backlog.concurrencyKey(kg, 1))
-			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, backlog.concurrencyKey(kg, 1), qi.ID)))
+			require.Equal(t, kg.Concurrency("custom", util.ConcurrencyKey(scope, fnID, unhashedValue)), backlog.customKeyInProgress(kg, 1))
+			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, backlog.customKeyInProgress(kg, 1), qi.ID)))
 
 			// expect old accounting to be updated
 			// TODO Do we actually want to update previous accounting?
@@ -5933,7 +5873,7 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 
 			require.False(t, hasMember(t, r, shadowPartition.inProgressKey(kg), qi.ID), remainingMembers)
 			require.False(t, hasMember(t, r, shadowPartition.accountInProgressKey(kg), qi.ID))
-			require.False(t, hasMember(t, r, backlog.concurrencyKey(kg, 1), qi.ID))
+			require.False(t, hasMember(t, r, backlog.customKeyInProgress(kg, 1), qi.ID))
 
 			// expect old accounting to be updated
 			// TODO Do we actually want to update previous accounting?
@@ -5965,13 +5905,7 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 				return enqueueToBacklog
 			}),
-			WithAllowSystemKeyQueues(func(ctx context.Context) bool {
-				return enqueueToBacklog
-			}),
 			WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-				return true
-			}),
-			WithDisableSystemQueueLeaseChecks(func(ctx context.Context) bool {
 				return true
 			}),
 		)
@@ -6074,11 +6008,11 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 			// 2 active set for custom concurrency keys
 
 			// first key
-			require.Equal(t, kg.Concurrency("custom", util.ConcurrencyKey(scope1, fnID, unhashedValue1)), backlog.concurrencyKey(kg, 1))
-			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, backlog.concurrencyKey(kg, 1), qi.ID)))
+			require.Equal(t, kg.Concurrency("custom", util.ConcurrencyKey(scope1, fnID, unhashedValue1)), backlog.customKeyInProgress(kg, 1))
+			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, backlog.customKeyInProgress(kg, 1), qi.ID)))
 
-			require.Equal(t, kg.Concurrency("custom", util.ConcurrencyKey(scope2, wsID, unhashedValue2)), backlog.concurrencyKey(kg, 2))
-			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, backlog.concurrencyKey(kg, 2), qi.ID)))
+			require.Equal(t, kg.Concurrency("custom", util.ConcurrencyKey(scope2, wsID, unhashedValue2)), backlog.customKeyInProgress(kg, 2))
+			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, backlog.customKeyInProgress(kg, 2), qi.ID)))
 
 			// expect old accounting to be updated
 			// TODO Do we actually want to update previous accounting?
@@ -6109,8 +6043,8 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 			require.False(t, hasMember(t, r, shadowPartition.inProgressKey(kg), qi.ID), remainingMembers)
 			require.False(t, hasMember(t, r, shadowPartition.accountInProgressKey(kg), qi.ID))
 
-			require.False(t, hasMember(t, r, backlog.concurrencyKey(kg, 1), qi.ID))
-			require.False(t, hasMember(t, r, backlog.concurrencyKey(kg, 2), qi.ID))
+			require.False(t, hasMember(t, r, backlog.customKeyInProgress(kg, 1), qi.ID))
+			require.False(t, hasMember(t, r, backlog.customKeyInProgress(kg, 2), qi.ID))
 
 			// expect old accounting to be updated
 			// TODO Do we actually want to update previous accounting?
@@ -6143,13 +6077,7 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 				return enqueueToBacklog
 			}),
-			WithAllowSystemKeyQueues(func(ctx context.Context) bool {
-				return enqueueToBacklog
-			}),
 			WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-				return true
-			}),
-			WithDisableSystemQueueLeaseChecks(func(ctx context.Context) bool {
 				return true
 			}),
 		)
@@ -6214,8 +6142,8 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 			require.True(t, r.Exists(shadowPartition.accountInProgressKey(kg)))
 
 			// no active set for default partition since this uses the in progress key
-			require.Equal(t, kg.Concurrency("", ""), backlog.concurrencyKey(kg, 1))
-			require.Equal(t, kg.Concurrency("", ""), backlog.concurrencyKey(kg, 2))
+			require.Equal(t, kg.Concurrency("", ""), backlog.customKeyInProgress(kg, 1))
+			require.Equal(t, kg.Concurrency("", ""), backlog.customKeyInProgress(kg, 2))
 
 			// expect old accounting to be updated
 			// TODO Do we actually want to update previous accounting?
@@ -6268,13 +6196,7 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 				return enqueueToBacklog
 			}),
-			WithAllowSystemKeyQueues(func(ctx context.Context) bool {
-				return enqueueToBacklog
-			}),
 			WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-				return true
-			}),
-			WithDisableSystemQueueLeaseChecks(func(ctx context.Context) bool {
 				return true
 			}),
 		)
@@ -6341,8 +6263,8 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, shadowPartition.accountInProgressKey(kg), qi.ID)))
 
 			// no active set for default partition since this uses the in progress key
-			require.Equal(t, kg.Concurrency("", ""), backlog.concurrencyKey(kg, 1))
-			require.Equal(t, kg.Concurrency("", ""), backlog.concurrencyKey(kg, 2))
+			require.Equal(t, kg.Concurrency("", ""), backlog.customKeyInProgress(kg, 1))
+			require.Equal(t, kg.Concurrency("", ""), backlog.customKeyInProgress(kg, 2))
 
 			// expect old accounting to be updated
 			// TODO Do we actually want to update previous accounting?
@@ -6389,13 +6311,7 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 				return enqueueToBacklog
 			}),
-			WithAllowSystemKeyQueues(func(ctx context.Context) bool {
-				return enqueueToBacklog
-			}),
 			WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-				return true
-			}),
-			WithDisableSystemQueueLeaseChecks(func(ctx context.Context) bool {
 				return true
 			}),
 		)
@@ -6474,8 +6390,8 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, shadowPartition.accountInProgressKey(kg), qi.ID)))
 
 			// 1 active set for custom concurrency key
-			require.Equal(t, kg.Concurrency("custom", util.ConcurrencyKey(scope, fnID, unhashedValue)), backlog.concurrencyKey(kg, 1))
-			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, backlog.concurrencyKey(kg, 1), qi.ID)))
+			require.Equal(t, kg.Concurrency("custom", util.ConcurrencyKey(scope, fnID, unhashedValue)), backlog.customKeyInProgress(kg, 1))
+			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, backlog.customKeyInProgress(kg, 1), qi.ID)))
 
 			// expect old accounting to be updated
 			// TODO Do we actually want to update previous accounting?
@@ -6493,7 +6409,7 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 			// expect key queue accounting to be updated
 			require.False(t, hasMember(t, r, shadowPartition.inProgressKey(kg), qi.ID))
 			require.False(t, hasMember(t, r, shadowPartition.accountInProgressKey(kg), qi.ID))
-			require.False(t, hasMember(t, r, backlog.concurrencyKey(kg, 1), qi.ID))
+			require.False(t, hasMember(t, r, backlog.customKeyInProgress(kg, 1), qi.ID))
 
 			// expect old accounting to be updated
 			// TODO Do we actually want to update previous accounting?
@@ -6525,13 +6441,7 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 				return enqueueToBacklog
 			}),
-			WithAllowSystemKeyQueues(func(ctx context.Context) bool {
-				return enqueueToBacklog
-			}),
 			WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-				return true
-			}),
-			WithDisableSystemQueueLeaseChecks(func(ctx context.Context) bool {
 				return true
 			}),
 		)
@@ -6621,11 +6531,11 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, shadowPartition.accountInProgressKey(kg), qi.ID)))
 
 			// 2 active set for custom concurrency keys
-			require.Equal(t, kg.Concurrency("custom", util.ConcurrencyKey(scope1, fnID, unhashedValue1)), backlog.concurrencyKey(kg, 1))
-			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, backlog.concurrencyKey(kg, 1), qi.ID)))
+			require.Equal(t, kg.Concurrency("custom", util.ConcurrencyKey(scope1, fnID, unhashedValue1)), backlog.customKeyInProgress(kg, 1))
+			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, backlog.customKeyInProgress(kg, 1), qi.ID)))
 
-			require.Equal(t, kg.Concurrency("custom", util.ConcurrencyKey(scope2, wsID, unhashedValue2)), backlog.concurrencyKey(kg, 2))
-			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, backlog.concurrencyKey(kg, 2), qi.ID)))
+			require.Equal(t, kg.Concurrency("custom", util.ConcurrencyKey(scope2, wsID, unhashedValue2)), backlog.customKeyInProgress(kg, 2))
+			require.Equal(t, leaseExpires.UnixMilli(), int64(score(t, r, backlog.customKeyInProgress(kg, 2), qi.ID)))
 
 			// expect old accounting to be updated
 			// TODO Do we actually want to update previous accounting?
@@ -6644,7 +6554,7 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 			// expect key queue accounting to be updated
 			require.False(t, hasMember(t, r, shadowPartition.inProgressKey(kg), qi.ID))
 			require.False(t, hasMember(t, r, shadowPartition.accountInProgressKey(kg), qi.ID))
-			require.False(t, hasMember(t, r, backlog.concurrencyKey(kg, 1), qi.ID))
+			require.False(t, hasMember(t, r, backlog.customKeyInProgress(kg, 1), qi.ID))
 
 			// expect old accounting to be updated
 			// TODO Do we actually want to update previous accounting?
@@ -6677,13 +6587,7 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 				return enqueueToBacklog
 			}),
-			WithAllowSystemKeyQueues(func(ctx context.Context) bool {
-				return enqueueToBacklog
-			}),
 			WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-				return true
-			}),
-			WithDisableSystemQueueLeaseChecks(func(ctx context.Context) bool {
 				return true
 			}),
 		)
@@ -6746,7 +6650,7 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 			require.True(t, r.Exists(shadowPartition.accountInProgressKey(kg)))
 
 			// no active set for default partition since this uses the in progress key
-			require.Equal(t, kg.Concurrency("", ""), backlog.concurrencyKey(kg, 1))
+			require.Equal(t, kg.Concurrency("", ""), backlog.customKeyInProgress(kg, 1))
 
 			// expect old accounting to be updated
 			// TODO Do we actually want to update previous accounting?

@@ -85,6 +85,10 @@ type QueueItem struct {
 	// the idempotency key immediately;  the same debounce key should become available
 	// for another debounced function run.
 	IdempotencyPeriod *time.Duration `json:"ip,omitempty"`
+
+	// Refilled from backlog ID, set if item was refilled from backlog. Removed during requeue to partition.
+	RefilledFrom string `json:"rf,omitempty"`
+	RefilledAt   int64  `json:"rat,omitempty"`
 }
 
 func (q *QueueItem) SetID(ctx context.Context, str string) {
