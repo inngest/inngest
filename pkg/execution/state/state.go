@@ -35,6 +35,7 @@ var (
 	ErrPauseAlreadyExists = fmt.Errorf("pause already exists")
 	ErrSignalConflict     = fmt.Errorf("signal wait already exists for another run")
 	ErrIdentifierExists   = fmt.Errorf("identifier already exists")
+	ErrInvalidIdentifier  = fmt.Errorf("identifier is not a valid ULID")
 	ErrFunctionCancelled  = fmt.Errorf("function cancelled")
 	ErrFunctionComplete   = fmt.Errorf("function completed")
 	ErrFunctionFailed     = fmt.Errorf("function failed")

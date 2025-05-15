@@ -18,7 +18,6 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
@@ -148,9 +147,6 @@ func ProxyRequest(ctx, traceCtx context.Context, forwarder pubsub.RequestForward
 }
 
 func do(ctx, traceCtx context.Context, forwarder pubsub.RequestForwarder, opts pubsub.ProxyOpts) (*httpdriver.Response, error) {
-	ctx, cancel := context.WithTimeout(ctx, consts.MaxFunctionTimeout)
-	defer cancel()
-
 	span := trace.SpanFromContext(traceCtx)
 
 	pre := time.Now()

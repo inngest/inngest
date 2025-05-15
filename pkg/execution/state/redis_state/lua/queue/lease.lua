@@ -156,32 +156,7 @@ if exists_without_ending(keyCustomConcurrencyKey2, ":-") == true then
   handleLease(keyCustomConcurrencyKey2, customConcurrencyKey2)
 end
 
-local expectedActive = 0
-if exists_without_ending(keyCustomConcurrencyKey1, ":-") == true and exists_without_ending(keyCustomConcurrencyKey2, ":-") == true then
-  -- both concurrency keys are set, compute the intersection of both keys
-  for _, _ in ipairs(redis.call("ZINTER", 2, keyCustomConcurrencyKey1, keyCustomConcurrencyKey2)) do
-    expectedActive = expectedActive + 1
-  end
-elseif exists_without_ending(keyCustomConcurrencyKey1, ":-") == true then
-  -- only first key is set
-  expectedActive = redis.call("ZCARD", keyCustomConcurrencyKey1)
-else
-  -- no key is set
-  expectedActive = redis.call("ZCARD", keyConcurrencyFn)
-end
-
--- Set initial value for active counter
-local currentActive = redis.call("GET", keyActiveCounter)
-if currentActive == nil or currentActive == false then
-  -- key not set, provide initial value
-  redis.call("SET", keyActiveCounter, expectedActive)
-elseif currentActive ~= expectedActive then
-  -- discrepancy between current and expected value
-  redis.call("SET", keyActiveCounter, expectedActive)
-  return math.abs(currentActive - expectedActive)
-else
-  -- key exists, simply increment by one
-  redis.call("INCR", keyActiveCounter)
-end
+-- Clean up active counter to reset it in a subsequent release
+redis.call("DEL", keyActiveCounter)
 
 return 0

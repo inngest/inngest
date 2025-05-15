@@ -597,12 +597,16 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		}
 	}
 
-	err := e.smv2.Create(ctx, newState)
+	st, err := e.smv2.Create(ctx, newState)
 	switch err {
-	case nil:
-		// no-op, continue
+	case nil: // no-op
 	case state.ErrIdentifierExists:
-		return nil, err
+		// override metadata from the existing state
+		id := sv2.IDFromV1(st.Identifier())
+		metadata, err = e.smv2.LoadMetadata(ctx, id)
+		if err != nil {
+			return nil, err
+		}
 	default:
 		return nil, fmt.Errorf("error creating run state: %w", err)
 	}
@@ -612,7 +616,6 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	//
 	if req.BatchID == nil {
 		for _, c := range req.Function.Cancel {
-			pauseID := uuid.New()
 			expires := time.Now().Add(consts.CancelTimeout)
 			if c.Timeout != nil {
 				dur, err := str2duration.ParseDuration(*c.Timeout)
@@ -624,6 +627,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 
 			// The triggering event ID should be the first ID in the batch.
 			triggeringID := req.Events[0].GetInternalID().String()
+			idSrc := fmt.Sprintf("%s-%s", key, c.Event)
 
 			var expr *string
 			// Evaluate the expression.  This lets us inspect the expression's attributes
@@ -647,10 +651,13 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 					)
 				}
 				expr = &interpolated
+				idSrc = fmt.Sprintf("%s-%s", idSrc, interpolated)
 			}
 
+			// NOTE: making this deterministic so pause creation is also idempotent
+			pauseID := inngest.DeterministicSha1UUID(idSrc)
 			pause := state.Pause{
-				WorkspaceID:       req.WorkspaceID,
+				WorkspaceID:       st.Identifier().WorkspaceID,
 				Identifier:        sv2.NewPauseIdentifier(metadata.ID),
 				ID:                pauseID,
 				Expires:           state.Time(expires),
@@ -660,7 +667,9 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 				TriggeringEventID: &triggeringID,
 			}
 			_, err = e.pm.SavePause(ctx, pause)
-			if err != nil {
+			switch err {
+			case nil, state.ErrPauseAlreadyExists: // no-op
+			default:
 				return &metadata, fmt.Errorf("error saving pause: %w", err)
 			}
 		}
@@ -686,19 +695,11 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	queueKey := fmt.Sprintf("%s:%s", req.Function.ID, key)
 	maxAttempts := consts.MaxRetries + 1
 	item := queue.Item{
-		JobID:       &queueKey,
-		GroupID:     uuid.New().String(),
-		WorkspaceID: req.WorkspaceID,
-		Kind:        queue.KindStart,
-		Identifier: state.Identifier{
-			RunID:       runID,
-			WorkflowID:  req.Function.ID,
-			WorkspaceID: req.WorkspaceID,
-			AccountID:   req.AccountID,
-			AppID:       req.AppID,
-			EventID:     metadata.Config.EventID(),
-			EventIDs:    metadata.Config.EventIDs,
-		},
+		JobID:                 &queueKey,
+		GroupID:               uuid.New().String(),
+		WorkspaceID:           st.Identifier().WorkspaceID,
+		Kind:                  queue.KindStart,
+		Identifier:            st.Identifier(),
 		CustomConcurrencyKeys: metadata.Config.CustomConcurrencyKeys,
 		PriorityFactor:        metadata.Config.PriorityFactor,
 		Attempt:               0,
@@ -920,7 +921,11 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			return resp, handleErr
 		}
 		return resp, err
-	}, util.WithTimeout(consts.MaxFunctionTimeout))
+	},
+		// wait up to 2h and add a short delay to allow driver implementations to
+		// return a specific timeout error here
+		util.WithTimeout(consts.MaxFunctionTimeout+5*time.Second),
+	)
 }
 
 func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
