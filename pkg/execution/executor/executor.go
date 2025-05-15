@@ -2617,7 +2617,7 @@ func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, i *runInsta
 		)
 	}
 	if err != nil {
-		return err
+		return fmt.Errorf("error saving pause when handling WaitForSignal opcode: %w", err)
 	}
 
 	// Enqueue a job that will timeout the pause.
