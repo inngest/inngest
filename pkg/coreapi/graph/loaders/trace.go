@@ -187,6 +187,9 @@ func convertRunTreeToGQLModel(pb *rpbv2.RunSpan) (*models.RunTraceSpan, error) {
 		case rpbv2.SpanStepOp_AI_GATEWAY:
 			op := models.StepOpAiGateway
 			stepOp = &op
+		case rpbv2.SpanStepOp_WAIT_FOR_SIGNAL:
+			op := models.StepOpWaitForSignal
+			stepOp = &op
 		}
 	}
 
@@ -273,6 +276,14 @@ func convertRunTreeToGQLModel(pb *rpbv2.RunSpan) (*models.RunTraceSpan, error) {
 				ReturnEventID:     returnEvtID,
 				RunID:             runID,
 				TimedOut:          invoke.TimedOut,
+			}
+		case *rpbv2.StepInfo_WaitForSignal:
+			wait := v.WaitForSignal
+
+			span.StepInfo = models.WaitForSignalStepInfo{
+				Signal:   wait.Signal,
+				Timeout:  wait.Timeout.AsTime(),
+				TimedOut: wait.TimedOut,
 			}
 		}
 	}

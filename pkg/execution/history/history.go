@@ -47,6 +47,8 @@ type History struct {
 	Type                 string // see enums.HistoryType
 	URL                  *string
 	WaitForEvent         *WaitForEvent
+	WaitForSignal        *WaitForSignal
+	WaitForSignalResult  *WaitForSignalResult
 	WaitResult           *WaitResult
 	WorkspaceID          uuid.UUID
 }
@@ -73,6 +75,15 @@ type WaitForEvent struct {
 type WaitResult struct {
 	EventID *ulid.ULID `json:"event_id"`
 	Timeout bool       `json:"timeout"`
+}
+
+type WaitForSignal struct {
+	Signal  string    `json:"signal"`
+	Timeout time.Time `json:"timeout"`
+}
+
+type WaitForSignalResult struct {
+	Timeout bool `json:"timeout"`
 }
 
 type InvokeFunction struct {

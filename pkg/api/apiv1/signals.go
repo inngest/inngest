@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/inngest/inngest/pkg/publicerr"
 )
 
@@ -27,7 +26,6 @@ func (a router) receiveSignal(w http.ResponseWriter, r *http.Request) {
 
 	data := ReceiveSignalRequest{}
 	if err := json.NewDecoder(r.Body).Decode(&data); err != nil {
-		spew.Dump(err.Error())
 		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 400, "Invalid signal data"))
 		return
 	}

@@ -10,7 +10,7 @@ export type Trace = {
   stepID?: string | null;
   startedAt: string | null;
   status: string;
-  stepInfo: StepInfoInvoke | StepInfoSleep | StepInfoWait | StepInfoRun | null;
+  stepInfo: StepInfoInvoke | StepInfoSleep | StepInfoWait | StepInfoRun | StepInfoSignal | null;
   stepOp?: string | null;
   userlandSpan: UserlandSpanType | null;
   isUserland: boolean;
@@ -51,6 +51,12 @@ export type StepInfoRun = {
   type: string | null;
 };
 
+export type StepInfoSignal = {
+  signal: string;
+  timeout: string;
+  timedOut: boolean | null;
+};
+
 export function isStepInfoRun(stepInfo: Trace['stepInfo']): stepInfo is StepInfoRun {
   if (!stepInfo) {
     return false;
@@ -81,4 +87,12 @@ export function isStepInfoWait(stepInfo: Trace['stepInfo']): stepInfo is StepInf
   }
 
   return 'foundEventID' in stepInfo;
+}
+
+export function isStepInfoSignal(stepInfo: Trace['stepInfo']): stepInfo is StepInfoSignal {
+  if (!stepInfo) {
+    return false;
+  }
+
+  return 'signal' in stepInfo;
 }

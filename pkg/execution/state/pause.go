@@ -267,6 +267,10 @@ func (p Pause) IsInvoke() bool {
 	return p.Opcode != nil && *p.Opcode == enums.OpcodeInvokeFunction.String()
 }
 
+func (p Pause) IsSignal() bool {
+	return p.Opcode != nil && *p.Opcode == enums.OpcodeWaitForSignal.String()
+}
+
 type ResumeData struct {
 	// If non-nil, RunID is the ID of the run that completed to cause this
 	// resume.

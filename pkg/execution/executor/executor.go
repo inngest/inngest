@@ -1816,6 +1816,10 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 			for _, e := range e.lifecycles {
 				go e.OnInvokeFunctionResumed(context.WithoutCancel(ctx), md, pause, r)
 			}
+		} else if pause.IsSignal() {
+			for _, e := range e.lifecycles {
+				go e.OnWaitForSignalResumed(context.WithoutCancel(ctx), md, pause, r)
+			}
 		} else {
 			for _, e := range e.lifecycles {
 				go e.OnWaitForEventResumed(context.WithoutCancel(ctx), md, pause, r)
@@ -2588,7 +2592,7 @@ func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, i *runInsta
 	)
 	itrace.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
 
-	_, err = e.pm.SavePause(ctx, state.Pause{
+	pause := state.Pause{
 		ID:          pauseID,
 		WorkspaceID: i.md.ID.Tenant.EnvID,
 		Identifier:  sv2.NewPauseIdentifier(i.md.ID),
@@ -2604,7 +2608,9 @@ func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, i *runInsta
 		Metadata: map[string]any{
 			consts.OtelPropagationKey: carrier,
 		},
-	})
+	}
+
+	_, err = e.pm.SavePause(ctx, pause)
 	if err == state.ErrPauseAlreadyExists {
 		return nil
 	}
@@ -2640,10 +2646,15 @@ func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, i *runInsta
 		return nil
 	}
 
-	// TODO Lifecycles
-	// for _, e := range e.lifecycles {
-	// 	go e.OnInvokeFunction(context.WithoutCancel(ctx), i.md, i.item, gen, evt)
-	// }
+	for _, e := range e.lifecycles {
+		go e.OnWaitForSignal(
+			context.WithoutCancel(ctx),
+			i.md,
+			i.item,
+			gen,
+			pause,
+		)
+	}
 
 	return err
 }

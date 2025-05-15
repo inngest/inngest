@@ -392,6 +392,7 @@ enum StepOp {
   SLEEP # sleep for a duration
   WAIT_FOR_EVENT # wait for an event
   AI_GATEWAY
+  WAIT_FOR_SIGNAL
 }
 
 union StepInfo =
@@ -399,6 +400,7 @@ union StepInfo =
   | SleepStepInfo
   | WaitForEventStepInfo
   | RunStepInfo
+  | WaitForSignalStepInfo
 
 type InvokeStepInfo {
   triggeringEventID: ULID!
@@ -418,6 +420,12 @@ type WaitForEventStepInfo {
   expression: String
   timeout: Time!
   foundEventID: ULID
+  timedOut: Boolean
+}
+
+type WaitForSignalStepInfo {
+  signal: String!
+  timeout: Time!
   timedOut: Boolean
 }
 
