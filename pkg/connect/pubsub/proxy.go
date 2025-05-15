@@ -134,6 +134,7 @@ type ProxyOpts struct {
 	EnvID     uuid.UUID
 	AppID     uuid.UUID
 	Data      *connectpb.GatewayExecutorRequestData
+	logger    *slog.Logger
 }
 
 // Proxy forwards a request to the executor and waits for a response.
@@ -146,7 +147,12 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	l := logger.StdlibLogger(ctx).With(
+	l := logger.StdlibLogger(ctx)
+	if opts.logger != nil {
+		l = opts.logger
+	}
+
+	l = l.With(
 		"app_id", opts.AppID.String(),
 		"env_id", opts.EnvID.String(),
 		"account_id", opts.AccountID.String(),
@@ -233,7 +239,7 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 					},
 				})
 			}, true, gatewayAckSubscribed)
-			if !gatewayAcked {
+			if ctx.Err() != nil && !gatewayAcked {
 				span.RecordError(fmt.Errorf("gateway ack not received in time"))
 				l.Warn("gateway did not ack request")
 			}
