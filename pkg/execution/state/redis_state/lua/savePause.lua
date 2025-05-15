@@ -58,7 +58,7 @@ if signalCorrelationID ~= false and signalCorrelationID ~= "" and signalCorrelat
 		-- to duplicate a signal.
 		local existing = redis.call("HGET", pauseSignalKey, signalCorrelationID)
 		if existing ~= pauseID then
-			return redis.error_reply("signal already exists with different pause ID")
+			return redis.error_reply("ErrSignalConflict")
 		end
 	end
 end

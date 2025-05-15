@@ -894,7 +894,7 @@ func (m unshardedMgr) SavePause(ctx context.Context, p state.Pause) (int64, erro
 		args,
 	).AsInt64()
 	if err != nil {
-		if err.Error() == "signal already exists with different pause ID" {
+		if err.Error() == "ErrSignalConflict" {
 			return 0, state.ErrSignalConflict
 		}
 
