@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import NextLink from 'next/link';
+import { ErrorCard } from '@inngest/components/RunDetailsV2/ErrorCard';
 import { Time } from '@inngest/components/Time';
+import { usePrettyJson } from '@inngest/components/hooks/usePrettyJson';
 import { type Event } from '@inngest/components/types/event';
+import { devServerURL, useDevServer } from '@inngest/components/utils/useDevServer';
 import { RiArrowRightSLine } from '@remixicon/react';
 import { useQuery } from '@tanstack/react-query';
 import { type Row } from '@tanstack/react-table';
@@ -26,7 +29,7 @@ export function EventDetails({
   pathCreator,
   expandedRowActions,
 }: {
-  row: Row<Omit<Event, 'payload'>>;
+  row: Row<Event>;
   pathCreator: React.ComponentProps<typeof EventsTable>['pathCreator'];
   getEventDetails: React.ComponentProps<typeof EventsTable>['getEventDetails'];
   getEventPayload: React.ComponentProps<typeof EventsTable>['getEventPayload'];
@@ -37,23 +40,29 @@ export function EventDetails({
   const eventInfoRef = useRef<HTMLDivElement>(null);
   const [leftWidth, setLeftWidth] = useState(70);
   const [isDragging, setIsDragging] = useState(false);
+  const { isRunning, send } = useDevServer();
 
   const {
     isPending, // first load, no data
     error,
     data: eventDetailsData,
+    refetch: refetchEventDetails,
   } = useQuery({
-    queryKey: ['event-details', { eventName: row.original.name }],
+    queryKey: ['event-details', { eventID: row.original.id }],
     queryFn: useCallback(() => {
-      return getEventDetails({ eventName: row.original.name });
-    }, [getEventDetails, row.original.name]),
+      return getEventDetails({ eventID: row.original.id });
+    }, [getEventDetails, row.original.id]),
   });
 
-  const { error: payloadError, data: eventPayloadData } = useQuery({
-    queryKey: ['event-payload', { eventName: row.original.name }],
+  const {
+    error: payloadError,
+    data: eventPayloadData,
+    refetch: refetchPayload,
+  } = useQuery({
+    queryKey: ['event-payload', { eventID: row.original.id }],
     queryFn: useCallback(() => {
-      return getEventPayload({ eventName: row.original.name });
-    }, [getEventPayload, row.original.name]),
+      return getEventPayload({ eventID: row.original.id });
+    }, [getEventPayload, row.original.id]),
   });
 
   const handleMouseDown = useCallback(() => {
@@ -95,22 +104,31 @@ export function EventDetails({
     };
   }, [isDragging, handleMouseMove, handleMouseUp]);
 
-  if (error || payloadError) {
-    // TODO: error handling
-    console.log(error?.message || payloadError?.message);
+  if (error) {
+    return <ErrorCard error={error} reset={() => refetchEventDetails()} />;
   }
+
+  const prettyPayload =
+    usePrettyJson(eventPayloadData?.payload ?? '') || (eventPayloadData?.payload ?? '');
 
   return (
     <div ref={containerRef} className="flex flex-row">
       <div ref={leftColumnRef} className="flex flex-col gap-2" style={{ width: `${leftWidth}%` }}>
-        <div ref={eventInfoRef} className="flex flex-col gap-3">
-          <div className="flex h-8 items-center justify-between gap-1 px-4">
+        <div ref={eventInfoRef} className="flex flex-col">
+          <div className="mb-3 flex h-8 items-center justify-between gap-1 px-4">
             <p className="text-muted text-sm">{row.original.name}</p>
-            {expandedRowActions(row.original.name)}
+            {expandedRowActions({
+              eventName: row.original.name,
+              payload: eventPayloadData?.payload,
+            })}
           </div>
-          <div className="flex flex-row flex-wrap items-center justify-start gap-x-10 gap-y-4 px-4">
+          <div className="mb-3 flex flex-row flex-wrap items-center justify-start gap-x-10 gap-y-4 px-4">
             <ElementWrapper label="Event ID">
-              {isPending ? <SkeletonElement /> : <IDElement>{eventDetailsData?.id}</IDElement>}
+              {isPending ? (
+                <SkeletonElement />
+              ) : (
+                <IDElement>{eventDetailsData?.id || '-'}</IDElement>
+              )}
             </ElementWrapper>
             <ElementWrapper label="Idempotency key">
               {isPending ? (
@@ -129,8 +147,8 @@ export function EventDetails({
             <ElementWrapper label="TS">
               {isPending ? (
                 <SkeletonElement />
-              ) : eventDetailsData?.timestamp ? (
-                <TimeElement date={new Date(eventDetailsData.timestamp)} />
+              ) : eventDetailsData?.occurredAt ? (
+                <TimeElement date={new Date(eventDetailsData.occurredAt)} />
               ) : (
                 <TextElement>-</TextElement>
               )}
@@ -143,17 +161,28 @@ export function EventDetails({
               )}
             </ElementWrapper>
           </div>
-          {eventPayloadData?.payload && (
+          {prettyPayload && (
             <div className="border-subtle border-t pl-px">
               <CodeBlock
-                header={{ title: 'Payload', ...(error && { status: 'error' }) }}
+                header={{ title: 'Payload' }}
                 tab={{
-                  content: eventPayloadData?.payload,
+                  content: prettyPayload,
                 }}
                 allowFullScreen={true}
+                actions={[
+                  {
+                    label: 'Send to Dev Server',
+                    title: isRunning
+                      ? 'Send event payload to running Dev Server'
+                      : `Dev Server is not running at ${devServerURL}`,
+                    onClick: () => send(eventPayloadData?.payload || ''),
+                    disabled: !isRunning,
+                  },
+                ]}
               />
             </div>
           )}
+          {payloadError && <ErrorCard error={payloadError} reset={() => refetchPayload()} />}
         </div>
       </div>
 
