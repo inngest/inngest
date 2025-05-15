@@ -1887,7 +1887,7 @@ func TestQueueLease(t *testing.T) {
 		require.NoError(t, err)
 
 		require.False(t, r.Exists("{queue}:queue:sorted:system-queue"))
-		require.True(t, r.Exists("{queue}:concurrency:account:system-queue"), r.Dump())
+		require.False(t, r.Exists("{queue}:concurrency:account:system-queue"), r.Dump()) // System queues should not have account concurrency set
 		require.True(t, r.Exists("{queue}:concurrency:p:system-queue"))
 
 		item = getQueueItem(t, r, item.ID)

@@ -2193,7 +2193,7 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 
 	refilledFromBacklog := item.RefilledFrom != ""
 
-	checkConstraints := !refilledFromBacklog || q.itemDisableLeaseChecks(ctx, item)
+	checkConstraints := !refilledFromBacklog || !q.itemDisableLeaseChecks(ctx, item)
 
 	if checkConstraints {
 		if item.Data.Throttle != nil && denies != nil && denies.denyThrottle(item.Data.Throttle.Key) {
@@ -2219,13 +2219,13 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 	if checkConstraints {
 		// Check to see if this key has already been denied in the lease iteration.
 		// If so, fail early.
-		if denies != nil && len(backlog.ConcurrencyKeys) > 0 && backlog.ConcurrencyKeys[0].ConcurrencyKeyValue != "" && denies.denyConcurrency(backlog.ConcurrencyKeys[0].ConcurrencyKeyValue) {
+		if denies != nil && len(backlog.ConcurrencyKeys) > 0 && denies.denyConcurrency(backlog.customConcurrencyKeyID(1)) {
 			return nil, ErrConcurrencyLimitCustomKey
 		}
 
 		// Check to see if this key has already been denied in the lease iteration.
 		// If so, fail early.
-		if denies != nil && len(backlog.ConcurrencyKeys) > 1 && backlog.ConcurrencyKeys[1].ConcurrencyKeyValue != "" && denies.denyConcurrency(backlog.ConcurrencyKeys[1].ConcurrencyKeyValue) {
+		if denies != nil && len(backlog.ConcurrencyKeys) > 1 && denies.denyConcurrency(backlog.customConcurrencyKeyID(2)) {
 			return nil, ErrConcurrencyLimitCustomKey
 		}
 	}
@@ -2267,6 +2267,11 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 		kg.ThrottleKey(item.Data.Throttle),
 	}
 
+	partConcurrency := partition.FunctionConcurrency
+	if partition.SystemQueueName != nil {
+		partConcurrency = partition.SystemConcurrency
+	}
+
 	args, err := StrSlice([]any{
 		item.ID,
 		partition.PartitionID,
@@ -2277,7 +2282,7 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 
 		// Concurrency limits
 		partition.AccountConcurrency,
-		partition.FunctionConcurrency,
+		partConcurrency,
 		partition.CustomConcurrencyLimit(1),
 		partition.CustomConcurrencyLimit(2),
 
@@ -2325,9 +2330,9 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 
 		return nil, newKeyError(ErrPartitionConcurrencyLimit, item.FunctionID.String())
 	case -4:
-		return nil, newKeyError(ErrConcurrencyLimitCustomKey, partition.CustomConcurrencyKeys[0].Key)
+		return nil, newKeyError(ErrConcurrencyLimitCustomKey, backlog.customConcurrencyKeyID(1))
 	case -5:
-		return nil, newKeyError(ErrConcurrencyLimitCustomKey, partition.CustomConcurrencyKeys[1].Key)
+		return nil, newKeyError(ErrConcurrencyLimitCustomKey, backlog.customConcurrencyKeyID(2))
 	case -6:
 		return nil, newKeyError(ErrAccountConcurrencyLimit, item.Data.Identifier.AccountID.String())
 	case -7:
@@ -2743,6 +2748,7 @@ func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueSha
 		b.customKeyActive(kg, 2), // custom key 2
 		b.activeKey(kg),          // compound key (active for this backlog)
 	}
+
 	args, err := StrSlice([]any{
 		b.BacklogID,
 		sp.PartitionID,

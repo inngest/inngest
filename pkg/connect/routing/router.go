@@ -268,6 +268,17 @@ func isHealthy(ctx context.Context, stateManager state.StateManager, envID uuid.
 		}
 	}
 
+	// If more than two consecutive heartbeats were missed, the connection is not healthy
+	connectionHeartbeatMissed := conn.LastHeartbeatAt.AsTime().Before(time.Now().Add(-2 * consts.ConnectWorkerHeartbeatInterval))
+	if connectionHeartbeatMissed {
+		log.Debug("last heartbeat is too old")
+
+		// Clean up outdated connection
+		return isHealthyRes{
+			shouldDeleteUnhealthyConnection: true,
+		}
+	}
+
 	if conn.Status != connectpb.ConnectionStatus_READY {
 		log.Debug("connection is not ready")
 
@@ -279,17 +290,6 @@ func isHealthy(ctx context.Context, stateManager state.StateManager, envID uuid.
 		}
 
 		return isHealthyRes{}
-	}
-
-	// If more than two consecutive heartbeats were missed, the connection is not healthy
-	connectionHeartbeatMissed := conn.LastHeartbeatAt.AsTime().Before(time.Now().Add(-2 * consts.ConnectWorkerHeartbeatInterval))
-	if connectionHeartbeatMissed {
-		log.Debug("last heartbeat is too old")
-
-		// Clean up outdated connection
-		return isHealthyRes{
-			shouldDeleteUnhealthyConnection: true,
-		}
 	}
 
 	groupHash, ok := conn.SyncedWorkerGroups[appID.String()]

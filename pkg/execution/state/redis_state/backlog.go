@@ -459,15 +459,28 @@ func (b QueueBacklog) customKeyActive(kg QueueKeyGenerator, n int) string {
 	return key.activeKey(kg)
 }
 
+func (b BacklogConcurrencyKey) combinedKey() string {
+	return util.ConcurrencyKey(b.ConcurrencyScope, b.ConcurrencyScopeEntity, b.ConcurrencyKeyUnhashedValue)
+}
+
 func (b BacklogConcurrencyKey) activeKey(kg QueueKeyGenerator) string {
 	// Concurrency accounting keys are made up of three parts:
 	// - The scope (account, environment, function) to apply the concurrency limit on
 	// - The entity (account ID, envID, or function ID) based on the scope
 	// - The dynamic key value (hashed evaluated expression)
-	return kg.ActiveCounter("custom", util.ConcurrencyKey(b.ConcurrencyScope, b.ConcurrencyScopeEntity, b.ConcurrencyKeyUnhashedValue))
+	return kg.ActiveCounter("custom", b.combinedKey())
 }
 
 // activeKey returns backlog compound active key
 func (b QueueBacklog) activeKey(kg QueueKeyGenerator) string {
 	return kg.ActiveCounter("compound", b.BacklogID)
+}
+
+func (b QueueBacklog) customConcurrencyKeyID(n int) string {
+	if n < 0 || n > len(b.ConcurrencyKeys) {
+		return ""
+	}
+
+	key := b.ConcurrencyKeys[n-1]
+	return key.combinedKey()
 }

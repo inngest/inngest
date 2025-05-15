@@ -104,13 +104,20 @@ else
   end
 end
 
-handleRequeueConcurrency(keyInProgressCustomConcurrencyKey1)
-handleRequeueConcurrency(keyInProgressCustomConcurrencyKey2)
+if exists_without_ending(keyInProgressCustomConcurrencyKey1, ":-") then
+  handleRequeueConcurrency(keyInProgressCustomConcurrencyKey1)
+end
 
--- Remove item from the account concurrency queue
--- This does not have a scavenger queue, as it's purely an entitlement limitation. See extendLease
--- and Lease for respective ZADD calls.
-redis.call("ZREM", keyInProgressAccount, item.id)
+if exists_without_ending(keyInProgressCustomConcurrencyKey2, ":-") then
+  handleRequeueConcurrency(keyInProgressCustomConcurrencyKey2)
+end
+
+if exists_without_ending(keyInProgressAccount, ":-") then
+  -- Remove item from the account concurrency queue
+  -- This does not have a scavenger queue, as it's purely an entitlement limitation. See extendLease
+  -- and Lease for respective ZADD calls.
+  redis.call("ZREM", keyInProgressAccount, item.id)
+end
 
 if requeueToBacklog == 1 then
   -- Decrease active counters and clean up if necessary
@@ -122,7 +129,7 @@ if requeueToBacklog == 1 then
     if redis.call("DECR", keyActiveAccount) <= 0 then
       redis.call("DEL", keyActiveAccount)
     end
-  }
+  end
 
   if exists_without_ending(keyActiveCompound, ":-") then
     if redis.call("DECR", keyActiveCompound) <= 0 then

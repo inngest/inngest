@@ -133,8 +133,10 @@ end
 -- and stored in functionConcurrencyKey.
 redis.call("ZREM", keyReadyQueue, item.id)
 
--- Always add this to acct level concurrency queues
-redis.call("ZADD", keyInProgressAccount, nextTime, item.id)
+if exists_without_ending(keyInProgressAccount, ":-") then
+  -- Always add this to acct level concurrency queues
+  redis.call("ZADD", keyInProgressAccount, nextTime, item.id)
+end
 
 -- Always add this to fn level concurrency queues for scavenging
 redis.call("ZADD", keyInProgressPartition, nextTime, item.id)
@@ -169,7 +171,7 @@ if refilledFromBacklog ~= 1 then
 
   if exists_without_ending(keyActiveAccount, ":-") then
     redis.call("INCR", keyActiveAccount)
-  }
+  end
 
   if exists_without_ending(keyActiveCompound, ":-") then
     redis.call("INCR", keyActiveCompound)

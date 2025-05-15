@@ -70,10 +70,6 @@ end
 
 handleDequeueConcurrency(keyInProgressPartition)
 
-if redis.call("EXISTS", keyActiveCounter) == 1 then
-  redis.call("DECR", keyActiveCounter)
-end
-
 -- Get the earliest item in the partition concurrency set.  We may be dequeueing
 -- the only in-progress job and should remove this from the partition concurrency
 -- pointers, if this exists.
@@ -117,12 +113,19 @@ if minScores ~= nil and minScores ~= false and #minScores ~= 0 then
   end
 end
 
-handleDequeueConcurrency(keyInProgressCustomConcurrencyKey1)
-handleDequeueConcurrency(keyInProgressCustomConcurrencyKey2)
+if exists_without_ending(keyInProgressCustomConcurrencyKey1, ":-") then
+  handleDequeueConcurrency(keyInProgressCustomConcurrencyKey1)
+end
 
--- This does not have a scavenger queue, as it's purely an entitlement limitation. See extendLease
--- and Lease for respective ZADD calls.
-redis.call("ZREM", keyInProgressAccount, item.id)
+if exists_without_ending(keyInProgressCustomConcurrencyKey2, ":-") then
+  handleDequeueConcurrency(keyInProgressCustomConcurrencyKey2)
+end
+
+if exists_without_ending(keyInProgressAccount, ":-") then
+  -- This does not have a scavenger queue, as it's purely an entitlement limitation. See extendLease
+  -- and Lease for respective ZADD calls.
+  redis.call("ZREM", keyInProgressAccount, item.id)
+end
 
 -- Decrease active counters and clean up if necessary
 if redis.call("DECR", keyActivePartition) <= 0 then
@@ -133,7 +136,7 @@ if exists_without_ending(keyActiveAccount, ":-") then
   if redis.call("DECR", keyActiveAccount) <= 0 then
     redis.call("DEL", keyActiveAccount)
   end
-}
+end
 
 if exists_without_ending(keyActiveCompound, ":-") then
   if redis.call("DECR", keyActiveCompound) <= 0 then
