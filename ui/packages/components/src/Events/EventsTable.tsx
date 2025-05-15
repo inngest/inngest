@@ -344,7 +344,7 @@ export function EventsTable({
           }}
         />
         {!hasNextPage && hasEventsData && isScrollable && !isFetchingNextPage && !isFetching && (
-          <div className="flex flex-col items-center pt-8">
+          <div className="flex flex-col items-center pb-4 pt-8">
             <p className="text-muted text-sm">No additional events found.</p>
             <Button
               label="Back to top"

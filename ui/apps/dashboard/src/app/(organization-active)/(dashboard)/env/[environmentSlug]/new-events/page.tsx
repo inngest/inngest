@@ -98,7 +98,7 @@ export default function EventsPage({
             <>
               <div className="flex items-center gap-2">
                 <Button
-                  label="Go to event page"
+                  label="Go to event type page"
                   href={pathCreator.eventType({ envSlug: envSlug, eventName: eventName })}
                   appearance="ghost"
                   size="small"
