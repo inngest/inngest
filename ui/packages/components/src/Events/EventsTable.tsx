@@ -49,7 +49,13 @@ export function EventsTable({
   features,
 }: {
   emptyActions: React.ReactNode;
-  expandedRowActions: (eventName: string) => React.ReactNode;
+  expandedRowActions: ({
+    eventName,
+    payload,
+  }: {
+    eventName: string;
+    payload?: string;
+  }) => React.ReactNode;
   pathCreator: {
     eventType: (params: { eventName: string }) => Route;
     runPopout: (params: { runID: string }) => Route;

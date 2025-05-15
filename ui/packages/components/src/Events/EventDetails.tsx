@@ -117,7 +117,10 @@ export function EventDetails({
         <div ref={eventInfoRef} className="flex flex-col">
           <div className="mb-3 flex h-8 items-center justify-between gap-1 px-4">
             <p className="text-muted text-sm">{row.original.name}</p>
-            {expandedRowActions(row.original.name)}
+            {expandedRowActions({
+              eventName: row.original.name,
+              payload: eventPayloadData?.payload,
+            })}
           </div>
           <div className="mb-3 flex flex-row flex-wrap items-center justify-start gap-x-10 gap-y-4 px-4">
             <ElementWrapper label="Event ID">

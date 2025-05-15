@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@inngest/components/Button/Button';
 import { EventsTable } from '@inngest/components/Events/EventsTable';
@@ -12,6 +12,7 @@ import { RiArrowRightUpLine, RiExternalLinkLine, RiRefreshLine } from '@remixico
 import { useAllEventTypes } from '@/components/EventTypes/useEventTypes';
 import { EventInfo } from '@/components/Events/EventInfo';
 import SendEventButton from '@/components/Events/SendEventButton';
+import { SendEventModal } from '@/components/Events/SendEventModal';
 import { useEventDetails, useEventPayload, useEvents } from '@/components/Events/useEvents';
 import { pathCreator } from '@/utils/urls';
 import { useAccountFeatures } from '@/utils/useAccountFeatures';
@@ -32,6 +33,19 @@ export default function EventsPage({
         pathCreator.runPopout({ envSlug: envSlug, runID: params.runID }),
     };
   }, [envSlug]);
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState<{ name: string; data: string } | null>(null);
+
+  const openModal = useCallback((eventName: string, payload: string) => {
+    try {
+      const parsedData = JSON.stringify(JSON.parse(payload).data);
+      setSelectedEvent({ name: eventName, data: parsedData });
+      setIsModalVisible(true);
+    } catch (error) {
+      console.error('Failed to parse event payload:', error);
+    }
+  }, []);
+
   const getEvents = useEvents();
   const getEventDetails = useEventDetails();
   const getEventPayload = useEventPayload();
@@ -78,30 +92,42 @@ export default function EventsPage({
             />
           </>
         }
-        expandedRowActions={(eventName) => {
+        expandedRowActions={({ eventName, payload }) => {
           const isInternalEvent = Boolean(eventName.startsWith('inngest/'));
           return (
-            <div className="flex items-center gap-2">
-              <Button
-                label="Go to event page"
-                href={pathCreator.eventType({ envSlug: envSlug, eventName: eventName })}
-                appearance="ghost"
-                size="small"
-                icon={<RiArrowRightUpLine />}
-                iconSide="left"
-              />
-              {/* TODO: Wire replay event */}
-              <Button
-                label="Replay event"
-                onClick={() => {}}
-                appearance="outlined"
-                size="small"
-                disabled={isInternalEvent}
-              />
-            </div>
+            <>
+              <div className="flex items-center gap-2">
+                <Button
+                  label="Go to event page"
+                  href={pathCreator.eventType({ envSlug: envSlug, eventName: eventName })}
+                  appearance="ghost"
+                  size="small"
+                  icon={<RiArrowRightUpLine />}
+                  iconSide="left"
+                />
+                <Button
+                  label="Replay event"
+                  onClick={() => payload && openModal(eventName, payload)}
+                  appearance="outlined"
+                  size="small"
+                  disabled={isInternalEvent || !payload}
+                />
+              </div>
+            </>
           );
         }}
       />
+      {selectedEvent && (
+        <SendEventModal
+          isOpen={isModalVisible}
+          eventName={selectedEvent.name}
+          onClose={() => {
+            setIsModalVisible(false);
+            setSelectedEvent(null);
+          }}
+          initialData={selectedEvent.data}
+        />
+      )}
     </>
   );
 }
