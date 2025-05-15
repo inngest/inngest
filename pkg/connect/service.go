@@ -363,10 +363,11 @@ func (c *connectGatewaySvc) gc(ctx context.Context) {
 		case <-time.After(periodWithJitter):
 		}
 
-		err := c.stateManager.GarbageCollectConnections(ctx)
+		deleted, err := c.stateManager.GarbageCollectConnections(ctx)
 		if err != nil {
 			logger.StdlibLogger(ctx).Error("failed to garbage collect", "err", err)
 		}
+		logger.StdlibLogger(ctx).Debug("garbage-collected connections", "deleted", deleted)
 	}
 }
 
