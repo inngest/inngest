@@ -980,9 +980,9 @@ func (m shardedMgr) delete(ctx context.Context, callCtx context.Context, i state
 
 	// Clear all other data for a job.
 	keys := []string{
-		fnRunState.kg.Actions(ctx, isSharded, i.WorkflowID, i.RunID),
-		fnRunState.kg.RunMetadata(ctx, isSharded, i.RunID),
 		fnRunState.kg.Events(ctx, isSharded, i.WorkflowID, i.RunID),
+		fnRunState.kg.RunMetadata(ctx, isSharded, i.RunID),
+		fnRunState.kg.Actions(ctx, isSharded, i.WorkflowID, i.RunID),
 		fnRunState.kg.Stack(ctx, isSharded, i.RunID),
 
 		// XXX: remove these in a state store refactor.
