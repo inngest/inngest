@@ -165,7 +165,7 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 				},
 			})
 			// NOTE: custom method to instrument result - potentially handling high cardinality data
-			q.instrumentBacklogResult(ctx, res)
+			q.instrumentBacklogResult(ctx, backlog, res)
 		}
 
 		// If backlog is limited by function or account-level concurrency, stop refilling

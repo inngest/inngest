@@ -562,7 +562,22 @@ func WithQueueShadowPartitionProcessCount(spc QueueShadowPartitionProcessCount) 
 }
 
 // BacklogInstrumentor provides the function to be used for instrumenting backlog results
-type BacklogInstrumentor func(ctx context.Context, result *BacklogRefillResult)
+type BacklogInstrumentor func(ctx context.Context, backlog *QueueBacklog, result *BacklogRefillResult)
+
+type NormalizeRefreshItemCustomConcurrencyKeysFn func(ctx context.Context, item *osqueue.QueueItem, existingKeys []state.CustomConcurrency, shadowPartition *QueueShadowPartition) ([]state.CustomConcurrency, error)
+type NormalizeRefreshItemThrottleFn func(ctx context.Context, item *osqueue.QueueItem, existingThrottle *osqueue.Throttle, shadowPartition *QueueShadowPartition) (*osqueue.Throttle, error)
+
+func WithNormalizeRefreshItemCustomConcurrencyKeys(fn NormalizeRefreshItemCustomConcurrencyKeysFn) QueueOpt {
+	return func(q *queue) {
+		q.normalizeRefreshItemCustomConcurrencyKeys = fn
+	}
+}
+
+func WithNormalizeRefreshItemThrottle(fn NormalizeRefreshItemThrottleFn) QueueOpt {
+	return func(q *queue) {
+		q.normalizeRefreshItemThrottle = fn
+	}
+}
 
 func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 	ctx := context.Background()
@@ -664,7 +679,13 @@ func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 		shadowContinues:         map[string]shadowContinuation{},
 		shadowContinueCooldown:  map[string]time.Time{},
 		// instrumentation
-		instrumentBacklogResult: func(ctx context.Context, result *BacklogRefillResult) {},
+		instrumentBacklogResult: func(ctx context.Context, backlog *QueueBacklog, result *BacklogRefillResult) {},
+		normalizeRefreshItemCustomConcurrencyKeys: func(ctx context.Context, item *osqueue.QueueItem, existingKeys []state.CustomConcurrency, shadowPartition *QueueShadowPartition) ([]state.CustomConcurrency, error) {
+			return existingKeys, nil
+		},
+		normalizeRefreshItemThrottle: func(ctx context.Context, item *osqueue.QueueItem, existingThrottle *osqueue.Throttle, shadowPartition *QueueShadowPartition) (*osqueue.Throttle, error) {
+			return existingThrottle, nil
+		},
 	}
 
 	// default to using primary queue client for shard selection
@@ -825,6 +846,9 @@ type queue struct {
 	shadowPeekMax           int64
 	backlogRefillLimit      int64
 	backlogNormalizeLimit   int64
+
+	normalizeRefreshItemCustomConcurrencyKeys NormalizeRefreshItemCustomConcurrencyKeysFn
+	normalizeRefreshItemThrottle              NormalizeRefreshItemThrottleFn
 }
 
 type QueueRunMode struct {

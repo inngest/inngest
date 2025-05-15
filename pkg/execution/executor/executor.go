@@ -518,12 +518,14 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	}
 
 	// Evaluate concurrency keys to use initially
-	metadata.Config.CustomConcurrencyKeys = queue.GetCustomConcurrencyKeys(ctx, metadata.ID.Tenant, req.Function, evtMap)
+	if req.Function.Concurrency != nil {
+		metadata.Config.CustomConcurrencyKeys = queue.GetCustomConcurrencyKeys(ctx, metadata.ID, req.Function.Concurrency.Limits, evtMap)
+	}
 
 	//
 	// Create throttle information prior to creating state.  This is used in the queue.
 	//
-	throttle := queue.GetThrottleConfig(ctx, req.Function, evtMap)
+	throttle := queue.GetThrottleConfig(ctx, req.Function.ID, req.Function.Throttle, evtMap)
 
 	//
 	// Create the run state.

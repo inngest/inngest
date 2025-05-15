@@ -3,6 +3,7 @@ package redis_state
 import (
 	"context"
 	"crypto/rand"
+	"errors"
 	"fmt"
 	"log/slog"
 	"math"
@@ -70,11 +71,7 @@ func (q *queue) backlogNormalizationScan(ctx context.Context) error {
 			until := q.clock.Now()
 
 			if err := q.iterateNormalizationPartition(ctx, until, bc); err != nil {
-				// TODO: check errors
-
-				l.Error("error scanning global normalization partition", "error", err)
-
-				// TODO: return if error is not acceptable
+				return fmt.Errorf("error scanning global normalization partition: %w", err)
 			}
 		}
 	}
@@ -139,12 +136,16 @@ func (q *queue) iterateNormalizationShadowPartition(ctx context.Context, shadowP
 
 		for _, bl := range backlogs {
 			// lease the backlog
-			if _, err := duration(ctx, q.primaryQueueShard.Name, "normalize_lease", q.clock.Now(), func(ctx context.Context) (any, error) {
+			_, err := duration(ctx, q.primaryQueueShard.Name, "normalize_lease", q.clock.Now(), func(ctx context.Context) (any, error) {
 				err := q.leaseBacklogForNormalization(ctx, bl)
 				return nil, err
-			}); err != nil {
-				l.Error("error leasing backlog for normalization", "error", err, "backlog", bl)
-				continue
+			})
+			if err != nil {
+				if errors.Is(err, errBacklogAlreadyLeasedForNormalization) {
+					continue
+				}
+
+				return fmt.Errorf("error leasing backlog for normalization: %w", err)
 			}
 
 			metrics.IncrBacklogNormalizationScannedCounter(ctx, metrics.CounterOpt{
@@ -272,15 +273,21 @@ func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp 
 			// We must modify the queue item to ensure q.ItemBacklog and q.ItemShadowPartition
 			// return the new values properly. Otherwise, we'd enqueue to the same backlog, not
 			// the desired new backlog.
-			// TODO Modify flow control embedded in queue item
 			existingThrottle := item.Data.Throttle
 			existingKeys := item.Data.GetConcurrencyKeys()
-			_ = existingKeys
-			_ = existingThrottle
-			_ = sp // sp must be the new shadow partition version (updated during enqueue_to_partition)
 
-			item.Data.CustomConcurrencyKeys = q.normalizeItemCustomConcurrencyKeys(ctx, existingKeys, sp)
-			item.Data.Throttle = q.normalizeItemThrottle(ctx, existingThrottle, sp)
+			refreshedCustomConcurrencyKeys, err := q.normalizeRefreshItemCustomConcurrencyKeys(ctx, item, existingKeys, sp)
+			if err != nil {
+				return fmt.Errorf("could not refresh custom concurrency keys for item: %w", err)
+			}
+			item.Data.CustomConcurrencyKeys = refreshedCustomConcurrencyKeys
+			item.Data.Identifier.CustomConcurrencyKeys = nil
+
+			refreshedThrottle, err := q.normalizeRefreshItemThrottle(ctx, item, existingThrottle, sp)
+			if err != nil {
+				return fmt.Errorf("could not refresh throttle for item: %w", err)
+			}
+			item.Data.Throttle = refreshedThrottle
 
 			if _, err := q.EnqueueItem(ctx, shard, *item, time.UnixMilli(item.AtMS), osqueue.EnqueueOpts{
 				PassthroughJobId:       true,

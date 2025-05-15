@@ -393,53 +393,53 @@ func HashID(_ context.Context, id string) string {
 	return strconv.FormatUint(ui, 36)
 }
 
-func GetThrottleConfig(ctx context.Context, fn inngest.Function, evtMap map[string]any) *Throttle {
-	if fn.Throttle == nil {
+func GetThrottleConfig(ctx context.Context, fnID uuid.UUID, throttle *inngest.Throttle, evtMap map[string]any) *Throttle {
+	if throttle == nil {
 		return nil
 	}
 
-	unhashedThrottleKey := fn.ID.String()
+	unhashedThrottleKey := fnID.String()
 	throttleKey := HashID(ctx, unhashedThrottleKey)
 	hashedThrottleExpr := ""
-	if fn.Throttle.Key != nil {
-		val, _, _ := expressions.Evaluate(ctx, *fn.Throttle.Key, map[string]any{
+	if throttle.Key != nil {
+		val, _, _ := expressions.Evaluate(ctx, *throttle.Key, map[string]any{
 			"event": evtMap,
 		})
 		unhashedThrottleKey = fmt.Sprintf("%v", val)
 		throttleKey = throttleKey + "-" + HashID(ctx, unhashedThrottleKey)
-		hashedThrottleExpr = util.XXHash(*fn.Throttle.Key)
+		hashedThrottleExpr = util.XXHash(*throttle.Key)
 	}
 
 	return &Throttle{
 		Key:                 throttleKey,
-		Limit:               int(fn.Throttle.Limit),
-		Burst:               int(fn.Throttle.Burst),
-		Period:              int(fn.Throttle.Period.Seconds()),
+		Limit:               int(throttle.Limit),
+		Burst:               int(throttle.Burst),
+		Period:              int(throttle.Period.Seconds()),
 		UnhashedThrottleKey: unhashedThrottleKey,
 		KeyExpressionHash:   hashedThrottleExpr,
 	}
 }
 
-func GetCustomConcurrencyKeys(ctx context.Context, tenant sv2.Tenant, fn inngest.Function, evtMap map[string]any) []state.CustomConcurrency {
-	if fn.Concurrency == nil {
+func GetCustomConcurrencyKeys(ctx context.Context, id sv2.ID, customConcurrency []inngest.Concurrency, evtMap map[string]any) []state.CustomConcurrency {
+	if len(customConcurrency) == 0 {
 		return nil
 	}
 
 	var keys []state.CustomConcurrency
 
 	// Ensure we evaluate concurrency keys when scheduling the function.
-	for _, limit := range fn.Concurrency.Limits {
+	for _, limit := range customConcurrency {
 		if !limit.IsCustomLimit() {
 			continue
 		}
 
 		// Ensure we bind the limit to the correct scope.
-		scopeID := fn.ID
+		scopeID := id.FunctionID
 		switch limit.Scope {
 		case enums.ConcurrencyScopeAccount:
-			scopeID = tenant.AccountID
+			scopeID = id.Tenant.AccountID
 		case enums.ConcurrencyScopeEnv:
-			scopeID = tenant.EnvID
+			scopeID = id.Tenant.EnvID
 		}
 
 		evaluated := limit.Evaluate(ctx, evtMap)
