@@ -1211,9 +1211,6 @@ func (tb *runTree) processWaitForSignal(ctx context.Context, span *cqrs.Span, mo
 			expired = &exp
 		}
 	}
-	if expired != nil {
-
-	}
 
 	// set wait details
 	mod.StepOp = &stepOp
