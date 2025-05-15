@@ -436,9 +436,19 @@ func TestProxyPolling(t *testing.T) {
 	})
 	require.NoError(t, err)
 
+	buffered, err := sm.GetResponse(ctx, envID, reqID)
+	require.NoError(t, err)
+	require.NotNil(t, buffered)
+
 	select {
 	case r := <-respCh:
 		require.Equal(t, connectpb.SDKResponseStatus_DONE, r.Status)
+
+		// expect buffered response to be deleted
+		buffered, err := sm.GetResponse(ctx, envID, reqID)
+		require.NoError(t, err)
+		require.Nil(t, buffered)
+
 	case <-time.After(10 * time.Second):
 		require.Fail(t, "no response received")
 	}

@@ -309,6 +309,8 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 			i.subscribe(waitForResponseCtx, i.channelAppRequestsReply(opts.Data.RequestId), func(msg string) {
 				span.AddEvent("ReplyReceived")
 
+				l.Debug("received response via pubsub")
+
 				err := proto.Unmarshal([]byte(msg), reply)
 				if err != nil {
 					// This should never happen
