@@ -12,12 +12,19 @@ export const eventsQuery = graphql(`
     $endTime: Time
     $celQuery: String = null
     $eventNames: [String!] = null
+    $includeInternalEvents: Boolean = true
   ) {
     environment: workspace(id: $envID) {
       eventsV2(
         first: 30
         after: $cursor
-        filter: { from: $startTime, until: $endTime, query: $celQuery, eventNames: $eventNames }
+        filter: {
+          from: $startTime
+          until: $endTime
+          query: $celQuery
+          eventNames: $eventNames
+          includeInternalEvents: $includeInternalEvents
+        }
       ) {
         edges {
           node {
@@ -73,7 +80,7 @@ export function useEvents() {
       includeInternalEvents,
     }: EventsQueryVariables) => {
       // TODO: use params when available in the API
-      console.log(source, includeInternalEvents);
+      console.log(source);
       const result = await client
         .query(
           eventsQuery,
@@ -84,6 +91,7 @@ export function useEvents() {
             cursor,
             celQuery,
             eventNames,
+            includeInternalEvents,
           },
           { requestPolicy: 'network-only' }
         )

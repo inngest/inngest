@@ -205,7 +205,7 @@ export function useEventType({ eventName }: { eventName: string }) {
 export const allEventTypesQuery = graphql(`
   query GetAllEventNames($envID: ID!) {
     environment: workspace(id: $envID) {
-      eventTypesV2(first: 1000, filter: {}) {
+      eventTypesV2(first: 40, filter: {}) {
         edges {
           node {
             name

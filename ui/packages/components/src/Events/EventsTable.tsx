@@ -141,6 +141,7 @@ export function EventsTable({
         startTime: calculatedStartTime.toISOString(),
         endTime: endTime ?? null,
         celQuery: search,
+        includeInternalEvents,
       }),
     getNextPageParam: (lastPage) => {
       if (!lastPage || !lastPage.pageInfo.hasNextPage) {
