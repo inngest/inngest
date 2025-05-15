@@ -757,6 +757,7 @@ func Initialize(ctx context.Context, opts InitOpts) (*sv2.Metadata, error) {
 	switch err {
 	case executor.ErrFunctionDebounced,
 		executor.ErrFunctionSkipped,
+		executor.ErrFunctionSkippedIdempotency,
 		state.ErrIdentifierExists:
 		return nil, nil
 	}

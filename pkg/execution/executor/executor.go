@@ -58,13 +58,14 @@ const (
 )
 
 var (
-	ErrRuntimeRegistered = fmt.Errorf("runtime is already registered")
-	ErrNoStateManager    = fmt.Errorf("no state manager provided")
-	ErrNoPauseManager    = fmt.Errorf("no pause manager provided")
-	ErrNoActionLoader    = fmt.Errorf("no action loader provided")
-	ErrNoRuntimeDriver   = fmt.Errorf("runtime driver for action not found")
-	ErrFunctionDebounced = fmt.Errorf("function debounced")
-	ErrFunctionSkipped   = fmt.Errorf("function skipped")
+	ErrRuntimeRegistered          = fmt.Errorf("runtime is already registered")
+	ErrNoStateManager             = fmt.Errorf("no state manager provided")
+	ErrNoPauseManager             = fmt.Errorf("no pause manager provided")
+	ErrNoActionLoader             = fmt.Errorf("no action loader provided")
+	ErrNoRuntimeDriver            = fmt.Errorf("runtime driver for action not found")
+	ErrFunctionDebounced          = fmt.Errorf("function debounced")
+	ErrFunctionSkipped            = fmt.Errorf("function skipped")
+	ErrFunctionSkippedIdempotency = fmt.Errorf("function skipped due to idempotency")
 
 	ErrFunctionEnded = fmt.Errorf("function already ended")
 
@@ -607,6 +608,8 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		if err != nil {
 			return nil, err
 		}
+	case state.ErrIdentifierTomestone:
+		return nil, ErrFunctionSkippedIdempotency
 	default:
 		return nil, fmt.Errorf("error creating run state: %w", err)
 	}
@@ -2954,6 +2957,7 @@ func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Func
 	shouldDeleteBatch := err == nil ||
 		err == redis_state.ErrQueueItemExists ||
 		errors.Is(err, ErrFunctionSkipped) ||
+		errors.Is(err, ErrFunctionSkippedIdempotency) ||
 		errors.Is(err, state.ErrIdentifierExists)
 	if shouldDeleteBatch {
 		// TODO: check if all errors can be blindly returned
@@ -2963,13 +2967,10 @@ func (e *executor) RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Func
 	}
 
 	// Don't bother if it's already there
-	if err == redis_state.ErrQueueItemExists {
-		span.SetAttributes(attribute.Bool(consts.OtelSysStepDelete, true))
-		return nil
-	}
-
 	// If function is paused, we do not schedule runs
-	if errors.Is(err, ErrFunctionSkipped) {
+	if err == redis_state.ErrQueueItemExists ||
+		errors.Is(err, ErrFunctionSkipped) ||
+		errors.Is(err, ErrFunctionSkippedIdempotency) {
 		span.SetAttributes(attribute.Bool(consts.OtelSysStepDelete, true))
 		return nil
 	}

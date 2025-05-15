@@ -80,6 +80,9 @@ const (
 	// FunctionIdempotencyPeriod determines how long a specific function remains idempotent
 	// when using idempotency keys.
 	FunctionIdempotencyPeriod = 24 * time.Hour
+	// FunctionIdempotencyTombstone indicates the run associated with this idempotency key
+	// has already finished
+	FunctionIdempotencyTombstone = "-"
 
 	DefaultBatchSizeLimit = 100
 	DefaultBatchTimeout   = 60 * time.Second
