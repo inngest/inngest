@@ -1460,11 +1460,7 @@ func (e *executor) handlePause(
 		cleanup := func(ctx context.Context) {
 			eg := errgroup.Group{}
 			eg.Go(func() error {
-				err := e.pm.DeletePause(context.Background(), *pause)
-				if err != nil {
-					l.Warn("error deleting pause", "error", err, "pause", pause)
-				}
-				return err
+				return e.pm.DeletePause(context.Background(), *pause)
 			})
 			eg.Go(func() error {
 				err := e.exprAggregator.RemovePause(ctx, pause)
