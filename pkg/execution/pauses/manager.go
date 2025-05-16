@@ -85,10 +85,9 @@ func (m manager) ConsumePause(ctx context.Context, pause state.Pause, opts state
 		*pause.Event,
 	}
 
-	// wrap the cleanup within another closure to add the logs
-	// seems kinda redundant
-	delete := func() error {
-		err := cleanup()
+	// override the cleanup with idx deletion
+	cleanup = func() error {
+		err := m.Delete(ctx, idx, pause)
 		if err != nil {
 			// We only log here if the delete fails. Consuming is idempotent and is the
 			// action that updates state.
@@ -102,7 +101,7 @@ func (m manager) ConsumePause(ctx context.Context, pause state.Pause, opts state
 		return err
 	}
 
-	return res, delete, nil
+	return res, cleanup, nil
 }
 
 // Write writes one or more pauses to the backing store.  Note that the index

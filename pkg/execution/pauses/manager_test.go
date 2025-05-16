@@ -164,10 +164,11 @@ func TestConsumePause(t *testing.T) {
 	}
 
 	// Test consuming a pause
-	result, _, err := manager.ConsumePause(ctx, pause, state.ConsumePauseOpts{
+	result, cleanup, err := manager.ConsumePause(ctx, pause, state.ConsumePauseOpts{
 		Data: "test-data",
 	})
 	require.NoError(t, err)
+	require.NoError(t, cleanup())
 	assert.Equal(t, true, result.DidConsume)
 	assert.True(t, mockBufferer.consumeCalled, "ConsumePause should be called on the buffer")
 	assert.True(t, mockBlockStore.deleteCalled, "Delete should be called on the blockstore")
