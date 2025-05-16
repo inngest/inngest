@@ -45,6 +45,7 @@ type ConnectionManager interface {
 	UpsertConnection(ctx context.Context, conn *Connection, status connpb.ConnectionStatus, lastHeartbeatAt time.Time) error
 	DeleteConnection(ctx context.Context, envID uuid.UUID, connId ulid.ULID) error
 	GarbageCollectConnections(ctx context.Context) (int, error)
+	GarbageCollectGateways(ctx context.Context) (int, error)
 }
 
 type WorkerGroupManager interface {
