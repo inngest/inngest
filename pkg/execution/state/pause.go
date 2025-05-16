@@ -2,6 +2,7 @@ package state
 
 import (
 	"context"
+	"fmt"
 	"regexp"
 	"time"
 
@@ -13,6 +14,10 @@ import (
 )
 
 var tsSuffix = regexp.MustCompile(`\s*&&\s*\(\s*async.ts\s+==\s*null\s*\|\|\s*async.ts\s*>\s*\d*\)\s*$`)
+
+var (
+	ErrConsumePauseKeyMissing = fmt.Errorf("no idempotency key provided for consuming pauses")
+)
 
 // PauseMutater manages creating, leasing, and consuming pauses from a backend implementation.
 type PauseMutater interface {

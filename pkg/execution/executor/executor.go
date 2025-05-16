@@ -1625,10 +1625,11 @@ func (e *executor) HandleInvokeFinish(ctx context.Context, evt event.TrackedEven
 	}
 
 	return e.Resume(ctx, *pause, execution.ResumeRequest{
-		With:     resumeData.With,
-		EventID:  &evtID,
-		RunID:    resumeData.RunID,
-		StepName: resumeData.StepName,
+		With:           resumeData.With,
+		EventID:        &evtID,
+		RunID:          resumeData.RunID,
+		StepName:       resumeData.StepName,
+		IdempotencyKey: evtID.String(),
 	})
 }
 
