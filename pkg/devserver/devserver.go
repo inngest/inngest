@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/inngest/inngest/pkg/cqrs"
 	"net/http"
 	"os"
 	"time"
@@ -266,6 +267,8 @@ func start(ctx context.Context, opts StartOpts) error {
 		}),
 		redis_state.WithShardSelector(shardSelector),
 		redis_state.WithQueueShardClients(queueShards),
+		redis_state.WithNormalizeRefreshItemCustomConcurrencyKeys(NormalizeConcurrencyKeys(smv2, dbcqrs)),
+		redis_state.WithNormalizeRefreshItemThrottle(NormalizeThrottle(smv2, dbcqrs)),
 	}
 	if opts.RetryInterval > 0 {
 		queueOpts = append(queueOpts, redis_state.WithBackoffFunc(
@@ -630,5 +633,81 @@ func getInvokeFailHandler(ctx context.Context, pb pubsub.Publisher, topic string
 		}
 
 		return eg.Wait()
+	}
+}
+
+func NormalizeConcurrencyKeys(smv2 sv2.StateLoader, dbcqrs cqrs.Manager) redis_state.NormalizeRefreshItemCustomConcurrencyKeysFn {
+	return func(ctx context.Context, item *queue.QueueItem, existingKeys []state.CustomConcurrency, shadowPartition *redis_state.QueueShadowPartition) ([]state.CustomConcurrency, error) {
+		id := sv2.IDFromV1(item.Data.Identifier)
+
+		workflow, err := dbcqrs.GetFunctionByInternalUUID(ctx, id.Tenant.EnvID, id.FunctionID)
+		if err != nil {
+			return nil, fmt.Errorf("could not find workflow: %w", err)
+		}
+		fn, err := workflow.InngestFunction()
+		if err != nil {
+			return nil, fmt.Errorf("could not convert workflow to inngest function: %w", err)
+		}
+
+		if fn.Concurrency == nil || len(fn.Concurrency.Limits) == 0 {
+			return nil, nil
+		}
+
+		events, err := smv2.LoadEvents(ctx, id)
+		if err != nil {
+			return nil, fmt.Errorf("could not load events: %w", err)
+		}
+
+		if len(events) == 0 {
+			return nil, nil
+		}
+
+		var evt0 event.Event
+
+		if err := json.Unmarshal(events[0], &evt0); err != nil {
+			return nil, fmt.Errorf("could not unmarshal event: %w", err)
+		}
+
+		evtMap := evt0.Map()
+
+		return queue.GetCustomConcurrencyKeys(ctx, id, fn.Concurrency.Limits, evtMap), nil
+	}
+}
+
+func NormalizeThrottle(smv2 sv2.StateLoader, dbcqrs cqrs.Manager) redis_state.NormalizeRefreshItemThrottleFn {
+	return func(ctx context.Context, item *queue.QueueItem, existingThrottle *queue.Throttle, shadowPartition *redis_state.QueueShadowPartition) (*queue.Throttle, error) {
+		id := sv2.IDFromV1(item.Data.Identifier)
+
+		workflow, err := dbcqrs.GetFunctionByInternalUUID(ctx, id.Tenant.EnvID, id.FunctionID)
+		if err != nil {
+			return nil, fmt.Errorf("could not find workflow: %w", err)
+		}
+		fn, err := workflow.InngestFunction()
+		if err != nil {
+			return nil, fmt.Errorf("could not convert workflow to inngest function: %w", err)
+		}
+
+		if fn.Throttle == nil {
+			return nil, nil
+		}
+
+		events, err := smv2.LoadEvents(ctx, id)
+		if err != nil {
+			return nil, fmt.Errorf("could not load events: %w", err)
+		}
+
+		if len(events) == 0 {
+			return nil, nil
+		}
+
+		var evt0 event.Event
+
+		if err := json.Unmarshal(events[0], &evt0); err != nil {
+			return nil, fmt.Errorf("could not unmarshal event: %w", err)
+		}
+
+		evtMap := evt0.Map()
+
+		return queue.GetThrottleConfig(ctx, id.FunctionID, fn.Throttle, evtMap), nil
 	}
 }

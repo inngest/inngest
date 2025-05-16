@@ -392,3 +392,12 @@ func IncrQueueShadowContinuationOpCounter(ctx context.Context, opts CounterOpt) 
 		Tags:        opts.Tags,
 	})
 }
+
+func IncrQueueBacklogRefilledCounter(ctx context.Context, incr int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, incr, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "queue_backlog_refilled_total",
+		Description: "The total number of items refilled from backlog",
+		Tags:        opts.Tags,
+	})
+}

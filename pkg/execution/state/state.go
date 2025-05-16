@@ -114,7 +114,8 @@ type CustomConcurrency struct {
 	// this concurrency key.
 	Limit int `json:"l"`
 
-	// UnhashedEvaluatedKeyValue stores the unhashed evaluated key value
+	// UnhashedEvaluatedKeyValue stores the unhashed evaluated key value.
+	// This is only set after Schedule() or backlog normalization.
 	UnhashedEvaluatedKeyValue string `json:"-"`
 }
 

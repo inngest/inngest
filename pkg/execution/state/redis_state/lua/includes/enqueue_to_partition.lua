@@ -91,15 +91,15 @@ local function enqueue_to_backlog(keyBacklogSet, backlogID, backlogItem, partiti
 
 	-- Store shadow partition if not exists
   if redis.call("HSETNX", keyShadowPartitionMeta, partitionID, shadowPartitionItem) == 0 then
-    -- TODO We may want to move this, as JSON operations could slow down the script
-    -- Update to current limits if exists, keep leaseID
-    -- local existingPartitionItem = cjson.decode(redis.call("HGET", keyShadowPartitionMeta, partitionID))
-    -- local latestPartitionItem = cjson.decode(shadowPartitionItem)
+    local existingPartitionItem = cjson.decode(redis.call("HGET", keyShadowPartitionMeta, partitionID))
+    local latestPartitionItem = cjson.decode(shadowPartitionItem)
+    if existingPartitionItem.fv == false or existingPartitionItem.fv == nil or existingPartitionItem.fv < latestPartitionItem.fv then
+      -- Update to current limits if exists, keep leaseID
+      -- transfer lease and use newest information otherwise
+      latestPartitionItem.leaseID = existingPartitionItem.leaseID
 
-    -- transfer lease and use newest information otherwise
-    -- latestPartitionItem.leaseID = existingPartitionItem.leaseID
-
-    -- redis.call("HSET", keyShadowPartitionMeta, partitionID, cjson.encode(latestPartitionItem))
+      redis.call("HSET", keyShadowPartitionMeta, partitionID, cjson.encode(latestPartitionItem))
+    end
   end
 
 	-- Update the backlog pointer in the shadow partition set if earlier or not exists

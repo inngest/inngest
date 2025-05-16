@@ -22,26 +22,12 @@ local keyAccountPartitions    = KEYS[5] -- accounts:$accountId:partition:sorted
 
 local keyPartitionFn    = KEYS[6] -- queue:sorted:$workflowID - zset
 
--- Key queues v2
-local keyBacklogSet               = KEYS[7]          -- backlog:sorted:<backlogID> - zset
-local keyBacklogMeta              = KEYS[8]          -- backlogs - hash
-local keyGlobalShadowPartitionSet = KEYS[9]          -- shadow:sorted
-local keyShadowPartitionSet       = KEYS[10]          -- shadow:sorted:<fnID|queueName> - zset
-local keyShadowPartitionMeta      = KEYS[11]          -- shadows
-
 local jobID            = ARGV[1]           -- queue item ID
 local jobScore         = tonumber(ARGV[2]) -- enqueue at, in milliseconds
 local nowMS            = tonumber(ARGV[3]) -- in ms
 local partitionItem    = ARGV[4]
 local partitionID      = ARGV[5]
 local accountID        = ARGV[6]
-
--- Key queues v2
-local requeueToBacklog				= tonumber(ARGV[14])
-local shadowPartitionId       = ARGV[15]
-local shadowPartitionItem     = ARGV[16]
-local backlogItem             = ARGV[17]
-local backlogID               = ARGV[18]
 
 -- $include(decode_ulid_time.lua)
 -- $include(get_queue_item.lua)
@@ -68,14 +54,6 @@ item.at = jobScore
 item.wt = jobScore
 redis.call("HSET", keyQueueHash, jobID, cjson.encode(item))
 
-if requeueToBacklog == 1 then
-	--
-	-- Requeue item to backlog queues again
-	--
-	requeue_to_backlog(keyBacklogSet, backlogID, backlogItem, partitionID, shadowPartitionItem, partitionItem, keyPartitionMap, keyBacklogMeta, keyGlobalShadowPartitionSet, keyShadowPartitionMeta, keyShadowPartitionSet, queueScore, queueID, partitionTime, nowMS, accountID)
-else
-  -- Update and requeue all partitions
-  requeue_to_partition(keyPartitionFn, partitionID, partitionItem, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, jobScore, jobID, nowMS, accountID)
-end
+requeue_to_partition(keyPartitionFn, partitionID, partitionItem, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, jobScore, jobID, nowMS, accountID)
 
 return 0
