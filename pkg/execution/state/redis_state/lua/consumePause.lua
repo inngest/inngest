@@ -18,14 +18,13 @@ local keyIdempotency = KEYS[5]
 local pauseDataKey = ARGV[1] -- used to set data in run state store
 local pauseDataVal = ARGV[2] -- data to set
 local pauseIdempotencyValue = ARGV[3] -- the idempotency key value
-local pauseIdempotencyUnix = tonumber(ARGV[4]) -- duration of the idempotency key
-
+local pauseIdempotencyUnix = tonumber(ARGV[4]) -- TTL of the idempotency key in unix timestamp
 
 
 if actionKey ~= nil and pauseDataKey ~= "" then
-  local check = redis.call("SET", keyIdempotency, pauseIdempotencyValue, "NX", "GET", "EXAT", pauseIdempotencyUnix)
+  local prev = redis.call("SET", keyIdempotency, pauseIdempotencyValue, "NX", "GET", "EXAT", pauseIdempotencyUnix)
 
-  if check == nil then
+  if not prev then
     -- idempotency check: only ever consume a pause once
     if redis.call("HEXISTS", actionKey, pauseDataKey) == 1 then
       return -1
@@ -36,7 +35,8 @@ if actionKey ~= nil and pauseDataKey ~= "" then
     redis.call("HINCRBY", keyMetadata, "step_count", 1)
     redis.call("HINCRBY", keyMetadata, "state_size", #pauseDataVal)
     redis.call("SREM", keyStepsPending, pauseDataKey)
-  elseif check ~= pauseIdempotencyValue then
+
+  elseif prev ~= pauseIdempotencyValue then
     return -1 -- someone else already consumed it
   end
 end
