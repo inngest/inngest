@@ -134,6 +134,7 @@ type ProxyOpts struct {
 	EnvID     uuid.UUID
 	AppID     uuid.UUID
 	Data      *connectpb.GatewayExecutorRequestData
+	logger    *slog.Logger
 }
 
 // Proxy forwards a request to the executor and waits for a response.
@@ -146,7 +147,12 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	l := logger.StdlibLogger(ctx).With(
+	l := logger.StdlibLogger(ctx)
+	if opts.logger != nil {
+		l = opts.logger
+	}
+
+	l = l.With(
 		"app_id", opts.AppID.String(),
 		"env_id", opts.EnvID.String(),
 		"account_id", opts.AccountID.String(),
@@ -233,7 +239,7 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 					},
 				})
 			}, true, gatewayAckSubscribed)
-			if !gatewayAcked {
+			if ctx.Err() != nil && !gatewayAcked {
 				span.RecordError(fmt.Errorf("gateway ack not received in time"))
 				l.Warn("gateway did not ack request")
 			}
@@ -281,6 +287,8 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 			}
 
 			if resp != nil {
+				span.AddEvent("ReplyReceivedPoll")
+
 				l.Debug("received response via polling")
 
 				reply = resp
@@ -288,6 +296,8 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 				cancelWaitForResponseCtx()
 				return
 			}
+
+			span.AddEvent("ReplyPollOk")
 		}
 	}()
 
@@ -300,6 +310,8 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 			// This may take a while: This waits until we receive the SDK response, and we allow for up to 2h in the serverless execution model
 			i.subscribe(waitForResponseCtx, i.channelAppRequestsReply(opts.Data.RequestId), func(msg string) {
 				span.AddEvent("ReplyReceived")
+
+				l.Debug("received response via pubsub")
 
 				err := proto.Unmarshal([]byte(msg), reply)
 				if err != nil {
@@ -380,6 +392,7 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 			}
 
 			l.Debug("request is still leased by worker")
+			span.AddEvent("RequestLeaseOk")
 		}
 	}()
 
@@ -455,6 +468,7 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 			l.Error("could not delete response", "err", err)
 		}
 
+		l.Debug("returning reply", "status", reply.Status)
 		return reply, nil
 	// If the worker terminates or otherwise fails to continue extending the lease,
 	// we must retry the step as soon as possible.

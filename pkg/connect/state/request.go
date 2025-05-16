@@ -177,7 +177,7 @@ func (r *redisConnectionStateManager) SaveResponse(ctx context.Context, envID uu
 		return fmt.Errorf("could not marshal response: %w", err)
 	}
 
-	responseExpiry := 30 * time.Second
+	responseExpiry := 1 * time.Minute
 
 	cmd := r.client.
 		B().
@@ -211,7 +211,7 @@ func (r *redisConnectionStateManager) GetResponse(ctx context.Context, envID uui
 
 	res, err := r.client.Do(ctx, cmd).ToString()
 	if err != nil && !rueidis.IsRedisNil(err) {
-		return nil, fmt.Errorf("could not buffer response: %w", err)
+		return nil, fmt.Errorf("could not fetch response: %w", err)
 	}
 
 	if rueidis.IsRedisNil(err) {
