@@ -1125,23 +1125,17 @@ func (m unshardedMgr) DeletePause(ctx context.Context, p state.Pause) error {
 	}
 }
 
-// ConsumePauseOpts are the options to be passed in for consuming a pause
-type ConsumePauseOpts struct {
-	IdempotencyKey string
-	Data           any
+func (m mgr) ConsumePause(ctx context.Context, pause state.Pause, opts state.ConsumePauseOpts) (state.ConsumePauseResult, error) {
+	return m.shardedMgr.consumePause(ctx, &pause, opts)
 }
 
-func (m mgr) ConsumePause(ctx context.Context, pause state.Pause, data any) (state.ConsumePauseResult, error) {
-	return m.shardedMgr.consumePause(ctx, &pause, data)
-}
-
-func (m shardedMgr) consumePause(ctx context.Context, p *state.Pause, data any) (state.ConsumePauseResult, error) {
+func (m shardedMgr) consumePause(ctx context.Context, p *state.Pause, opts state.ConsumePauseOpts) (state.ConsumePauseResult, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "consumePause"), redis_telemetry.ScopePauses)
 
 	fnRunState := m.s.FunctionRunState()
 	client, isSharded := fnRunState.Client(ctx, p.Identifier.AccountID, p.Identifier.RunID)
 
-	marshalledData, err := json.Marshal(data)
+	marshalledData, err := json.Marshal(opts.Data)
 	if err != nil {
 		return state.ConsumePauseResult{}, fmt.Errorf("cannot marshal data to store in state: %w", err)
 	}
@@ -1160,7 +1154,7 @@ func (m shardedMgr) consumePause(ctx context.Context, p *state.Pause, data any) 
 	args, err := StrSlice([]any{
 		p.DataKey,
 		string(marshalledData),
-		"idempotency key placeholder", // placeholder
+		opts.IdempotencyKey,
 		time.Now().Add(consts.FunctionIdempotencyPeriod),
 	})
 	if err != nil {

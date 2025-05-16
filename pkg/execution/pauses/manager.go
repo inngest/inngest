@@ -40,7 +40,7 @@ type manager struct {
 	flushDelay time.Duration
 }
 
-func (m manager) ConsumePause(ctx context.Context, pause state.Pause, data any) (state.ConsumePauseResult, error) {
+func (m manager) ConsumePause(ctx context.Context, pause state.Pause, opts state.ConsumePauseOpts) (state.ConsumePauseResult, error) {
 	if pause.Event == nil {
 		// A Pause must always have an event for this manager, else we cannot build the
 		// Index struct for deleting pauses.  It's also no longer possible to have pauses without
@@ -72,7 +72,7 @@ func (m manager) ConsumePause(ctx context.Context, pause state.Pause, data any) 
 	// a bit of thought to work around, so we’ll just go with double deletes for now,
 	// assuming this won’t happen a ton.  this can be improved later.
 
-	res, err := m.buf.ConsumePause(ctx, pause, data)
+	res, err := m.buf.ConsumePause(ctx, pause, opts)
 	// Is this an ErrDuplicateResponse?  If so, we've already consumed this pause,
 	// so delete it.  Similarly, if the error is nil we just consumed, so go ahead
 	// and delete the pause then continue

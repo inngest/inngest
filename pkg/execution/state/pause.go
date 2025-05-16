@@ -42,7 +42,7 @@ type PauseMutater interface {
 	//
 	// Any data passed when consuming a pause will be stored within function run state
 	// for future reference using the pause's DataKey.
-	ConsumePause(ctx context.Context, p Pause, data any) (ConsumePauseResult, error)
+	ConsumePause(ctx context.Context, p Pause, opts ConsumePauseOpts) (ConsumePauseResult, error)
 
 	// DeletePause permanently deletes a pause.
 	DeletePause(ctx context.Context, p Pause) error
@@ -86,6 +86,12 @@ type PauseGetter interface {
 	// PauseCreatedAt returns the timestamp a pause was created, using the given
 	// workspace <> event Index.
 	PauseCreatedAt(ctx context.Context, workspaceID uuid.UUID, event string, pauseID uuid.UUID) (time.Time, error)
+}
+
+// ConsumePauseOpts are the options to be passed in for consuming a pause
+type ConsumePauseOpts struct {
+	IdempotencyKey string
+	Data           any
 }
 
 type ConsumePauseResult struct {
