@@ -49,7 +49,6 @@ export default function FunctionLayout({
   const env = useEnvironment();
 
   const isBulkCancellationEnabled = useBooleanFlag('bulk-cancellation-ui');
-  const { value: traceAIEnabled, isReady: featureFlagReady } = useBooleanFlag('ai-traces');
 
   const fn = data?.workspace.workflow;
   const { isArchived = false, isPaused } = fn ?? {};
