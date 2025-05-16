@@ -50,6 +50,11 @@ func TestConnectionEstablished(t *testing.T) {
 	msg = awaitNextMessage(t, res.ws, 2*time.Second)
 	require.Equal(t, connect.GatewayMessageType_GATEWAY_CONNECTION_READY, msg.Kind)
 
+	conn, err := res.stateManager.GetConnection(context.Background(), res.envID, res.connID)
+	require.NoError(t, err)
+	require.NotNil(t, conn)
+	require.Equal(t, connect.ConnectionStatus_READY, conn.Status)
+
 	res.lifecycles.Assert(t, testRecorderAssertion{
 		onConnectedCount: 1,
 		onSyncedCount:    1,
@@ -362,6 +367,125 @@ func TestSyncErrorPropagatesToUser(t *testing.T) {
 		onSyncedCount:       0,
 		onReadyCount:        0,
 		onDisconnectedCount: 1,
+	})
+}
+
+func TestDraining(t *testing.T) {
+	params := testingParameters{
+		consecutiveMissesBeforeClose: 10,
+		heartbeatInterval:            1 * time.Second,
+	}
+	res := createTestingGateway(t, params)
+
+	handshake(t, res)
+
+	conn, err := res.stateManager.GetConnection(context.Background(), res.envID, res.connID)
+	require.NoError(t, err)
+	require.NotNil(t, conn)
+	require.Equal(t, connect.ConnectionStatus_READY, conn.Status)
+
+	require.Equal(t, uint64(1), res.svc.connectionCount.Count())
+
+	err = res.svc.DrainGateway()
+	require.NoError(t, err)
+
+	require.True(t, res.svc.IsDraining())
+	require.False(t, res.svc.IsDrained())
+
+	require.EventuallyWithT(t, func(t *assert.CollectT) {
+		conn, err = res.stateManager.GetConnection(context.Background(), res.envID, res.connID)
+		assert.NoError(t, err)
+		assert.NotNil(t, conn)
+		assert.Equal(t, connect.ConnectionStatus_DRAINING, conn.Status)
+	}, 5*time.Second, 100*time.Millisecond)
+
+	msg := awaitNextMessage(t, res.ws, 3*time.Second)
+	require.Equal(t, connect.GatewayMessageType_GATEWAY_CLOSING, msg.Kind)
+
+	require.Equal(t, uint64(1), res.svc.connectionCount.Count())
+
+	err = res.ws.Close(websocket.StatusNormalClosure, "")
+	require.NoError(t, err)
+
+	require.EventuallyWithT(t, func(t *assert.CollectT) {
+		assert.Equal(t, uint64(0), res.svc.connectionCount.Count())
+	}, 10*time.Second, time.Second)
+	require.True(t, res.svc.IsDrained())
+
+	require.EventuallyWithT(t, func(t *assert.CollectT) {
+		conn, err = res.stateManager.GetConnection(context.Background(), res.envID, res.connID)
+		assert.NoError(t, err)
+		assert.Nil(t, conn)
+	}, 2*time.Second, 100*time.Millisecond)
+
+	res.lifecycles.Assert(t, testRecorderAssertion{
+		onConnectedCount:          1,
+		onSyncedCount:             1,
+		onReadyCount:              1,
+		onHeartbeatCount:          0,
+		onStartDrainingCount:      1,
+		onStartDisconnectingCount: 1,
+		onDisconnectedCount:       1,
+	})
+}
+
+func TestDrainingWithForceDisconnect(t *testing.T) {
+	params := testingParameters{
+		consecutiveMissesBeforeClose: 10,
+		heartbeatInterval:            1 * time.Second,
+	}
+	res := createTestingGateway(t, params)
+
+	handshake(t, res)
+
+	conn, err := res.stateManager.GetConnection(context.Background(), res.envID, res.connID)
+	require.NoError(t, err)
+	require.NotNil(t, conn)
+	require.Equal(t, connect.ConnectionStatus_READY, conn.Status)
+
+	require.Equal(t, uint64(1), res.svc.connectionCount.Count())
+
+	err = res.svc.DrainGateway()
+	require.NoError(t, err)
+
+	require.True(t, res.svc.IsDraining())
+	require.False(t, res.svc.IsDrained())
+
+	require.EventuallyWithT(t, func(t *assert.CollectT) {
+		conn, err = res.stateManager.GetConnection(context.Background(), res.envID, res.connID)
+		assert.NoError(t, err)
+		assert.NotNil(t, conn)
+		assert.Equal(t, connect.ConnectionStatus_DRAINING, conn.Status)
+	}, 5*time.Second, 100*time.Millisecond)
+
+	msg := awaitNextMessage(t, res.ws, 3*time.Second)
+	require.Equal(t, connect.GatewayMessageType_GATEWAY_CLOSING, msg.Kind)
+
+	require.Equal(t, uint64(1), res.svc.connectionCount.Count())
+
+	status, reason := awaitClosure(t, res.ws, 10*time.Second)
+	require.Equal(t, websocket.StatusGoingAway, status)
+	require.Equal(t, ErrDraining.SysCode, reason)
+
+	require.EventuallyWithT(t, func(t *assert.CollectT) {
+		assert.Equal(t, uint64(0), res.svc.connectionCount.Count())
+	}, 10*time.Second, time.Second)
+	require.True(t, res.svc.IsDrained())
+
+	require.EventuallyWithT(t, func(t *assert.CollectT) {
+		conn, err = res.stateManager.GetConnection(context.Background(), res.envID, res.connID)
+		assert.NoError(t, err)
+		assert.Nil(t, conn)
+	}, 2*time.Second, 100*time.Millisecond)
+
+	res.lifecycles.Assert(t, testRecorderAssertion{
+		onConnectedCount:          1,
+		onSyncedCount:             1,
+		onReadyCount:              1,
+		onHeartbeatCount:          0,
+		onStartDrainingCount:      1,
+		onStartDisconnectingCount: 1,
+		onDisconnectedCount:       1,
 	})
 }
 
@@ -707,6 +831,9 @@ func createTestingGateway(t *testing.T, params ...testingParameters) testingReso
 		Subprotocols: []string{types.GatewaySubProtocol},
 	})
 	require.NoError(t, err)
+	t.Cleanup(func() {
+		_ = ws.CloseNow()
+	})
 
 	caps, err := json.Marshal(sdk.Capabilities{
 		InBandSync: sdk.InBandSyncV1,
@@ -849,6 +976,13 @@ func handshake(t *testing.T, res testingResources) {
 
 	msg = awaitNextMessage(t, res.ws, 5*time.Second)
 	require.Equal(t, connect.GatewayMessageType_GATEWAY_CONNECTION_READY, msg.Kind)
+
+	require.EventuallyWithT(t, func(t *assert.CollectT) {
+		conn, err := res.stateManager.GetConnection(context.Background(), res.envID, res.connID)
+		assert.NoError(t, err)
+		assert.NotNil(t, conn)
+		assert.Equal(t, connect.ConnectionStatus_READY, conn.Status)
+	}, 2*time.Second, 100*time.Millisecond)
 
 	res.lifecycles.Assert(t, testRecorderAssertion{
 		onConnectedCount: 1,
