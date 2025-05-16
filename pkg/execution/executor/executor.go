@@ -2655,8 +2655,8 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, i *runInst
 		CustomConcurrencyKeys: i.item.CustomConcurrencyKeys,
 		MaxAttempts:           i.item.MaxAttempts,
 		Payload: queue.PayloadPauseTimeout{
-			PauseID:   pauseID,
-			OnTimeout: true,
+			PauseID:       pauseID,
+			CorrelationID: &correlationID,
 		},
 	}, expires, queue.EnqueueOpts{})
 	if err == redis_state.ErrQueueItemExists {
@@ -2809,8 +2809,8 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, i *runInstan
 		PriorityFactor:        i.item.PriorityFactor,
 		CustomConcurrencyKeys: i.item.CustomConcurrencyKeys,
 		Payload: queue.PayloadPauseTimeout{
-			PauseID:   pauseID,
-			OnTimeout: true,
+			PauseID: pauseID,
+			Event:   pause.Event,
 		},
 	}, expires, queue.EnqueueOpts{})
 	if err == redis_state.ErrQueueItemExists {
