@@ -979,7 +979,7 @@ func (m shardedMgr) delete(ctx context.Context, callCtx context.Context, i state
 	_ = r.Do(callCtx, func(client rueidis.Client) rueidis.Completed {
 		// update the idempotency key to the tombstone value to indicate this run is done
 		// do scheduling knows to not need to continue attempting to do so
-		return client.B().Set().Key(key).Value(consts.FunctionIdempotencyTombstone).Xx().Get().Build()
+		return client.B().Set().Key(key).Value(consts.FunctionIdempotencyTombstone).Xx().Keepttl().Build()
 	}).Error()
 
 	// Clear all other data for a job.
