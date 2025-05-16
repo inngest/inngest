@@ -170,8 +170,8 @@ func (m *mockBufferer) PauseTimestamp(ctx context.Context, index Index, pause st
 	return time.Now(), nil
 }
 
-func (m *mockBufferer) ConsumePause(ctx context.Context, p state.Pause, opts state.ConsumePauseOpts) (state.ConsumePauseResult, error) {
-	return state.ConsumePauseResult{}, fmt.Errorf("not implemented")
+func (m *mockBufferer) ConsumePause(ctx context.Context, p state.Pause, opts state.ConsumePauseOpts) (state.ConsumePauseResult, func() error, error) {
+	return state.ConsumePauseResult{}, func() error { return nil }, fmt.Errorf("not implemented")
 }
 
 func (m *mockBufferer) Delete(ctx context.Context, index Index, pause state.Pause) error {

@@ -1137,7 +1137,7 @@ func (m mgr) ConsumePause(ctx context.Context, pause state.Pause, opts state.Con
 	cleanup := func() error {
 		err := m.DeletePause(ctx, pause)
 		if err != nil {
-			logger.StdlibLogger(ctx).Error("error deleting pause", "error", err, "pause", pause)
+			logger.StdlibLogger(ctx).Error("error deleting pause after consumption", "error", err, "pause", pause)
 		}
 		return err
 	}

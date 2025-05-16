@@ -40,12 +40,12 @@ type manager struct {
 	flushDelay time.Duration
 }
 
-func (m manager) ConsumePause(ctx context.Context, pause state.Pause, opts state.ConsumePauseOpts) (state.ConsumePauseResult, error) {
+func (m manager) ConsumePause(ctx context.Context, pause state.Pause, opts state.ConsumePauseOpts) (state.ConsumePauseResult, func() error, error) {
 	if pause.Event == nil {
 		// A Pause must always have an event for this manager, else we cannot build the
 		// Index struct for deleting pauses.  It's also no longer possible to have pauses without
 		// events, so this should never happen.
-		return state.ConsumePauseResult{}, fmt.Errorf("pause has no event")
+		return state.ConsumePauseResult{}, func() error { return nil }, fmt.Errorf("pause has no event")
 	}
 
 	// NOTE: There is a race condition when flushing blocks:  we may copy a pause
@@ -72,29 +72,37 @@ func (m manager) ConsumePause(ctx context.Context, pause state.Pause, opts state
 	// a bit of thought to work around, so we’ll just go with double deletes for now,
 	// assuming this won’t happen a ton.  this can be improved later.
 
-	res, err := m.buf.ConsumePause(ctx, pause, opts)
+	res, cleanup, err := m.buf.ConsumePause(ctx, pause, opts)
 	// Is this an ErrDuplicateResponse?  If so, we've already consumed this pause,
 	// so delete it.  Similarly, if the error is nil we just consumed, so go ahead
 	// and delete the pause then continue
 	if err != nil {
-		return res, err
+		return res, cleanup, err
 	}
 
 	idx := Index{
 		pause.WorkspaceID,
 		*pause.Event,
 	}
-	if err := m.Delete(ctx, idx, pause); err != nil {
-		// We only log here if the delete fails. Consuming is idempotent and is the
-		// action that updates state.
-		logger.StdlibLogger(ctx).Error(
-			"error deleting pause once consumed",
-			"error", err,
-			"pause", pause,
-			"index", idx,
-		)
+
+	// wrap the cleanup within another closure to add the logs
+	// seems kinda redundant
+	delete := func() error {
+		err := cleanup()
+		if err != nil {
+			// We only log here if the delete fails. Consuming is idempotent and is the
+			// action that updates state.
+			logger.StdlibLogger(ctx).Error(
+				"error deleting pause once consumed",
+				"error", err,
+				"pause", pause,
+				"index", idx,
+			)
+		}
+		return err
 	}
-	return res, nil
+
+	return res, delete, nil
 }
 
 // Write writes one or more pauses to the backing store.  Note that the index
