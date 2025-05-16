@@ -936,13 +936,13 @@ func (c *connectionHandler) establishConnection(ctx context.Context) (*state.Con
 
 	err := wsproto.Read(shorterContext, c.ws, &initialMessage)
 	if err != nil {
+		if ctx.Err() != nil {
+			return nil, &ErrDraining
+		}
+
 		if isConnectionClosedErr(err) {
 			c.log.Warn("connection was closed during handshake")
 			return nil, nil
-		}
-
-		if ctx.Err() != nil {
-			return nil, &ErrDraining
 		}
 
 		code := syscode.CodeConnectInternal

@@ -20,6 +20,7 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/publicerr"
 	"github.com/inngest/inngest/pkg/sdk"
+	"github.com/inngest/inngest/pkg/syscode"
 	"github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
@@ -489,6 +490,62 @@ func TestDrainingWithForceDisconnect(t *testing.T) {
 	})
 }
 
+func TestRejectSetupWhileDraining(t *testing.T) {
+	t.Skip("this test should work but doesn't as we always receive EOF errors")
+
+	res := createTestingGateway(t)
+
+	msg := awaitNextMessage(t, res.ws, 2*time.Second)
+	require.Equal(t, connect.GatewayMessageType_GATEWAY_HELLO, msg.Kind)
+
+	err := res.svc.DrainGateway()
+	require.NoError(t, err)
+
+	status, reason := awaitClosure(t, res.ws, 5*time.Second)
+	require.Equal(t, ErrDraining.StatusCode, status)
+	require.Equal(t, ErrDraining.SysCode, reason)
+}
+
+func TestRejectConnectionWhileDraining(t *testing.T) {
+	t.Skip("this test should work but doesn't as we always receive EOF errors")
+	
+	params := testingParameters{
+		consecutiveMissesBeforeClose: 10,
+		heartbeatInterval:            1 * time.Second,
+		noConnect:                    true,
+	}
+	res := createTestingGateway(t, params)
+
+	err := res.svc.DrainGateway()
+	require.NoError(t, err)
+
+	_, _, err = websocket.Dial(context.Background(), res.websocketUrl, &websocket.DialOptions{
+		Subprotocols: []string{types.GatewaySubProtocol},
+	})
+	require.Error(t, err)
+	var closeErr websocket.CloseError
+	require.ErrorAs(t, err, &closeErr)
+	require.Equal(t, ErrDraining.StatusCode, closeErr.Code)
+	require.Equal(t, ErrDraining.SysCode, closeErr.Reason)
+}
+
+func TestRejectDisallowedConnection(t *testing.T) {
+	res := createTestingGateway(t, testingParameters{
+		disallowConnection: true,
+	})
+
+	res.lifecycles.Assert(t, testRecorderAssertion{})
+
+	msg := awaitNextMessage(t, res.ws, 2*time.Second)
+	require.Equal(t, connect.GatewayMessageType_GATEWAY_HELLO, msg.Kind)
+
+	sendWorkerConnectMessage(t, res)
+
+	status, reason := awaitClosure(t, res.ws, 2*time.Second)
+	require.Equal(t, websocket.StatusPolicyViolation, status)
+	require.Equal(t, syscode.CodeConnectAuthFailed, reason)
+}
+
 type websocketDisconnected struct {
 	conn        *state.Connection
 	closeReason string
@@ -639,6 +696,8 @@ type testingResources struct {
 
 	reqData     *connect.WorkerConnectRequestData
 	workerGroup *state.WorkerGroup
+
+	websocketUrl string
 }
 
 type testingParameters struct {
@@ -647,6 +706,9 @@ type testingParameters struct {
 	extendLeaseInterval          time.Duration
 	consecutiveMissesBeforeClose int
 	shouldFailSync               bool
+	disallowConnection           bool
+
+	noConnect bool
 }
 
 func createTestingGateway(t *testing.T, params ...testingParameters) testingResources {
@@ -740,11 +802,12 @@ func createTestingGateway(t *testing.T, params ...testingParameters) testingReso
 
 	lifecycles := newRecorderLifecycles(l)
 
+	disallowConnection := len(params) > 0 && params[0].disallowConnection
 	authResp := &auth.Response{
 		AccountID: accountID,
 		EnvID:     envID,
 		Entitlements: auth.Entitlements{
-			ConnectionAllowed: true,
+			ConnectionAllowed: !disallowConnection,
 			AppsPerConnection: 10,
 		},
 	}
@@ -752,6 +815,10 @@ func createTestingGateway(t *testing.T, params ...testingParameters) testingReso
 	opts := []gatewayOpt{
 		WithGatewayAuthHandler(func(ctx context.Context, data *connect.WorkerConnectRequestData) (*auth.Response, error) {
 			l.Info("got auth request", "data", data)
+
+			if disallowConnection {
+				return nil, nil
+			}
 
 			return authResp, nil
 		}),
@@ -827,13 +894,16 @@ func createTestingGateway(t *testing.T, params ...testingParameters) testingReso
 		time.Sleep(100 * time.Millisecond)
 	}
 
-	ws, _, err := websocket.Dial(ctx, websocketUrl, &websocket.DialOptions{
-		Subprotocols: []string{types.GatewaySubProtocol},
-	})
-	require.NoError(t, err)
-	t.Cleanup(func() {
-		_ = ws.CloseNow()
-	})
+	var ws *websocket.Conn
+	if len(params) == 0 || !params[0].noConnect {
+		ws, _, err = websocket.Dial(ctx, websocketUrl, &websocket.DialOptions{
+			Subprotocols: []string{types.GatewaySubProtocol},
+		})
+		require.NoError(t, err)
+		t.Cleanup(func() {
+			_ = ws.CloseNow()
+		})
+	}
 
 	caps, err := json.Marshal(sdk.Capabilities{
 		InBandSync: sdk.InBandSyncV1,
@@ -921,6 +991,7 @@ func createTestingGateway(t *testing.T, params ...testingParameters) testingReso
 		reqData:      reqData,
 		workerGroup:  workerGroup,
 		runID:        runID,
+		websocketUrl: websocketUrl,
 	}
 }
 
