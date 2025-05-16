@@ -1125,15 +1125,14 @@ func (m unshardedMgr) DeletePause(ctx context.Context, p state.Pause) error {
 	}
 }
 
-func (m mgr) ConsumePause(ctx context.Context, pause state.Pause, data any) (state.ConsumePauseResult, error) {
-	result, err := m.shardedMgr.consumePause(ctx, &pause, data)
-	if err != nil {
-		return state.ConsumePauseResult{}, err
-	}
+// ConsumePauseOpts are the options to be passed in for consuming a pause
+type ConsumePauseOpts struct {
+	IdempotencyKey string
+	Data           any
+}
 
-	// The pause was now consumed, so let's clean up
-	err = m.unshardedMgr.DeletePause(ctx, pause)
-	return result, err
+func (m mgr) ConsumePause(ctx context.Context, pause state.Pause, data any) (state.ConsumePauseResult, error) {
+	return m.shardedMgr.consumePause(ctx, &pause, data)
 }
 
 func (m shardedMgr) consumePause(ctx context.Context, p *state.Pause, data any) (state.ConsumePauseResult, error) {
@@ -1155,11 +1154,14 @@ func (m shardedMgr) consumePause(ctx context.Context, p *state.Pause, data any) 
 			RunID:      p.Identifier.RunID,
 			WorkflowID: p.Identifier.FunctionID,
 		}),
+		fnRunState.kg.PauseConsumeKey(ctx, isSharded, p.Identifier.RunID, p.ID),
 	}
 
 	args, err := StrSlice([]any{
 		p.DataKey,
 		string(marshalledData),
+		"idempotency key placeholder", // placeholder
+		time.Now().Add(consts.FunctionIdempotencyPeriod),
 	})
 	if err != nil {
 		return state.ConsumePauseResult{}, err
