@@ -35,17 +35,17 @@ type v2 struct {
 }
 
 // Create creates new state in the store for the given run ID.
-func (v v2) Create(ctx context.Context, s state.CreateState) error {
+func (v v2) Create(ctx context.Context, s state.CreateState) (statev1.State, error) {
 	batchData := make([]map[string]any, len(s.Events))
 	for n, evt := range s.Events {
 		data := map[string]any{}
 		if err := json.Unmarshal(evt, &data); err != nil {
-			return err
+			return nil, err
 		}
 		batchData[n] = data
 
 	}
-	_, err := v.mgr.New(ctx, statev1.Input{
+	return v.mgr.New(ctx, statev1.Input{
 		Identifier: statev1.Identifier{
 			RunID:                 s.Metadata.ID.RunID,
 			WorkflowID:            s.Metadata.ID.FunctionID,
@@ -68,7 +68,6 @@ func (v v2) Create(ctx context.Context, s state.CreateState) error {
 		Steps:          s.Steps,
 		StepInputs:     s.StepInputs,
 	})
-	return err
 }
 
 // Delete deletes state, metadata, and - when pauses are included - associated pauses

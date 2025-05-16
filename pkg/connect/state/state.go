@@ -44,6 +44,8 @@ type ConnectionManager interface {
 	GetConnectionsByGroupID(ctx context.Context, envID uuid.UUID, groupID string) ([]*connpb.ConnMetadata, error)
 	UpsertConnection(ctx context.Context, conn *Connection, status connpb.ConnectionStatus, lastHeartbeatAt time.Time) error
 	DeleteConnection(ctx context.Context, envID uuid.UUID, connId ulid.ULID) error
+	GarbageCollectConnections(ctx context.Context) (int, error)
+	GarbageCollectGateways(ctx context.Context) (int, error)
 }
 
 type WorkerGroupManager interface {
@@ -149,9 +151,9 @@ const (
 )
 
 type Gateway struct {
-	Id              ulid.ULID     `json:"id"`
-	Status          GatewayStatus `json:"status"`
-	LastHeartbeatAt time.Time     `json:"last_heartbeat_at"`
+	Id                ulid.ULID     `json:"id"`
+	Status            GatewayStatus `json:"status"`
+	LastHeartbeatAtMS int64         `json:"last_heartbeat"`
 
 	Hostname string `json:"hostname"`
 }

@@ -362,6 +362,16 @@ export const TRACE_DETAILS_FRAGMENT = gql`
     startedAt
     endedAt
     isRoot
+    isUserland
+    userlandSpan {
+      spanName
+      spanKind
+      serviceName
+      scopeName
+      scopeVersion
+      spanAttrs
+      resourceAttrs
+    }
     outputID
     spanID
     stepID
@@ -389,6 +399,11 @@ export const TRACE_DETAILS_FRAGMENT = gql`
       ... on RunStepInfo {
         type
       }
+      ... on WaitForSignalStepInfo {
+        signal
+        timeout
+        timedOut
+      }
     }
   }
 `;
@@ -410,6 +425,12 @@ export const GET_RUN = gql`
           ...TraceDetails
           childrenSpans {
             ...TraceDetails
+            childrenSpans {
+              ...TraceDetails
+              childrenSpans {
+                ...TraceDetails
+              }
+            }
           }
         }
       }

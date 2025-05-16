@@ -111,6 +111,9 @@ func (s runStateKeyGenerator) Pending(ctx context.Context, isSharded bool, ident
 type GlobalKeyGenerator interface {
 	// Invoke returns the key used to store the correlation key associated with invoke functions
 	Invoke(ctx context.Context, wsID uuid.UUID) string
+	// Signal returns the key used to store the correlation key associated with
+	// signal functions
+	Signal(ctx context.Context, wsID uuid.UUID) string
 }
 
 type globalKeyGenerator struct {
@@ -119,6 +122,10 @@ type globalKeyGenerator struct {
 
 func (u globalKeyGenerator) Invoke(ctx context.Context, wsID uuid.UUID) string {
 	return fmt.Sprintf("{%s}:invoke:%s", u.stateDefaultKey, wsID)
+}
+
+func (u globalKeyGenerator) Signal(ctx context.Context, wsID uuid.UUID) string {
+	return fmt.Sprintf("{%s}:signal:%s", u.stateDefaultKey, wsID)
 }
 
 type QueueKeyGenerator interface {

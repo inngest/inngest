@@ -99,14 +99,15 @@ func (SpanStatus) EnumDescriptor() ([]byte, []int) {
 type SpanStepOp int32
 
 const (
-	SpanStepOp_RUN            SpanStepOp = 0
-	SpanStepOp_INVOKE         SpanStepOp = 1
-	SpanStepOp_SLEEP          SpanStepOp = 2
-	SpanStepOp_WAIT_FOR_EVENT SpanStepOp = 3
-	SpanStepOp_STEP           SpanStepOp = 4
-	SpanStepOp_STEP_ERROR     SpanStepOp = 5
-	SpanStepOp_NONE           SpanStepOp = 6
-	SpanStepOp_AI_GATEWAY     SpanStepOp = 7
+	SpanStepOp_RUN             SpanStepOp = 0
+	SpanStepOp_INVOKE          SpanStepOp = 1
+	SpanStepOp_SLEEP           SpanStepOp = 2
+	SpanStepOp_WAIT_FOR_EVENT  SpanStepOp = 3
+	SpanStepOp_STEP            SpanStepOp = 4
+	SpanStepOp_STEP_ERROR      SpanStepOp = 5
+	SpanStepOp_NONE            SpanStepOp = 6
+	SpanStepOp_AI_GATEWAY      SpanStepOp = 7
+	SpanStepOp_WAIT_FOR_SIGNAL SpanStepOp = 8
 )
 
 // Enum value maps for SpanStepOp.
@@ -120,16 +121,18 @@ var (
 		5: "STEP_ERROR",
 		6: "NONE",
 		7: "AI_GATEWAY",
+		8: "WAIT_FOR_SIGNAL",
 	}
 	SpanStepOp_value = map[string]int32{
-		"RUN":            0,
-		"INVOKE":         1,
-		"SLEEP":          2,
-		"WAIT_FOR_EVENT": 3,
-		"STEP":           4,
-		"STEP_ERROR":     5,
-		"NONE":           6,
-		"AI_GATEWAY":     7,
+		"RUN":             0,
+		"INVOKE":          1,
+		"SLEEP":           2,
+		"WAIT_FOR_EVENT":  3,
+		"STEP":            4,
+		"STEP_ERROR":      5,
+		"NONE":            6,
+		"AI_GATEWAY":      7,
+		"WAIT_FOR_SIGNAL": 8,
 	}
 )
 
@@ -183,6 +186,8 @@ type RunSpan struct {
 	StepInfo      *StepInfo              `protobuf:"bytes,19,opt,name=step_info,json=stepInfo,proto3,oneof" json:"step_info,omitempty"`
 	Children      []*RunSpan             `protobuf:"bytes,20,rep,name=children,proto3" json:"children,omitempty"`
 	StepId        *string                `protobuf:"bytes,21,opt,name=step_id,json=stepId,proto3,oneof" json:"step_id,omitempty"`
+	IsUserland    bool                   `protobuf:"varint,22,opt,name=is_userland,json=isUserland,proto3" json:"is_userland,omitempty"`
+	UserlandSpan  *UserlandSpan          `protobuf:"bytes,23,opt,name=userland_span,json=userlandSpan,proto3,oneof" json:"userland_span,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -364,6 +369,112 @@ func (x *RunSpan) GetStepId() string {
 	return ""
 }
 
+func (x *RunSpan) GetIsUserland() bool {
+	if x != nil {
+		return x.IsUserland
+	}
+	return false
+}
+
+func (x *RunSpan) GetUserlandSpan() *UserlandSpan {
+	if x != nil {
+		return x.UserlandSpan
+	}
+	return nil
+}
+
+type UserlandSpan struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	SpanName      string                 `protobuf:"bytes,1,opt,name=span_name,json=spanName,proto3" json:"span_name,omitempty"`
+	SpanKind      string                 `protobuf:"bytes,2,opt,name=span_kind,json=spanKind,proto3" json:"span_kind,omitempty"`
+	ServiceName   *string                `protobuf:"bytes,3,opt,name=service_name,json=serviceName,proto3,oneof" json:"service_name,omitempty"`
+	ScopeName     *string                `protobuf:"bytes,4,opt,name=scope_name,json=scopeName,proto3,oneof" json:"scope_name,omitempty"`
+	ScopeVersion  *string                `protobuf:"bytes,5,opt,name=scope_version,json=scopeVersion,proto3,oneof" json:"scope_version,omitempty"`
+	SpanAttrs     []byte                 `protobuf:"bytes,6,opt,name=span_attrs,json=spanAttrs,proto3,oneof" json:"span_attrs,omitempty"`
+	ResourceAttrs []byte                 `protobuf:"bytes,7,opt,name=resource_attrs,json=resourceAttrs,proto3,oneof" json:"resource_attrs,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UserlandSpan) Reset() {
+	*x = UserlandSpan{}
+	mi := &file_run_v2_run_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UserlandSpan) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UserlandSpan) ProtoMessage() {}
+
+func (x *UserlandSpan) ProtoReflect() protoreflect.Message {
+	mi := &file_run_v2_run_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UserlandSpan.ProtoReflect.Descriptor instead.
+func (*UserlandSpan) Descriptor() ([]byte, []int) {
+	return file_run_v2_run_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *UserlandSpan) GetSpanName() string {
+	if x != nil {
+		return x.SpanName
+	}
+	return ""
+}
+
+func (x *UserlandSpan) GetSpanKind() string {
+	if x != nil {
+		return x.SpanKind
+	}
+	return ""
+}
+
+func (x *UserlandSpan) GetServiceName() string {
+	if x != nil && x.ServiceName != nil {
+		return *x.ServiceName
+	}
+	return ""
+}
+
+func (x *UserlandSpan) GetScopeName() string {
+	if x != nil && x.ScopeName != nil {
+		return *x.ScopeName
+	}
+	return ""
+}
+
+func (x *UserlandSpan) GetScopeVersion() string {
+	if x != nil && x.ScopeVersion != nil {
+		return *x.ScopeVersion
+	}
+	return ""
+}
+
+func (x *UserlandSpan) GetSpanAttrs() []byte {
+	if x != nil {
+		return x.SpanAttrs
+	}
+	return nil
+}
+
+func (x *UserlandSpan) GetResourceAttrs() []byte {
+	if x != nil {
+		return x.ResourceAttrs
+	}
+	return nil
+}
+
 type StepInfo struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	// Types that are valid to be assigned to Info:
@@ -372,6 +483,7 @@ type StepInfo struct {
 	//	*StepInfo_Wait
 	//	*StepInfo_Invoke
 	//	*StepInfo_Run
+	//	*StepInfo_WaitForSignal
 	Info          isStepInfo_Info `protobuf_oneof:"info"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -379,7 +491,7 @@ type StepInfo struct {
 
 func (x *StepInfo) Reset() {
 	*x = StepInfo{}
-	mi := &file_run_v2_run_proto_msgTypes[1]
+	mi := &file_run_v2_run_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -391,7 +503,7 @@ func (x *StepInfo) String() string {
 func (*StepInfo) ProtoMessage() {}
 
 func (x *StepInfo) ProtoReflect() protoreflect.Message {
-	mi := &file_run_v2_run_proto_msgTypes[1]
+	mi := &file_run_v2_run_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -404,7 +516,7 @@ func (x *StepInfo) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StepInfo.ProtoReflect.Descriptor instead.
 func (*StepInfo) Descriptor() ([]byte, []int) {
-	return file_run_v2_run_proto_rawDescGZIP(), []int{1}
+	return file_run_v2_run_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *StepInfo) GetInfo() isStepInfo_Info {
@@ -450,6 +562,15 @@ func (x *StepInfo) GetRun() *StepInfoRun {
 	return nil
 }
 
+func (x *StepInfo) GetWaitForSignal() *StepInfoWaitForSignal {
+	if x != nil {
+		if x, ok := x.Info.(*StepInfo_WaitForSignal); ok {
+			return x.WaitForSignal
+		}
+	}
+	return nil
+}
+
 type isStepInfo_Info interface {
 	isStepInfo_Info()
 }
@@ -470,6 +591,10 @@ type StepInfo_Run struct {
 	Run *StepInfoRun `protobuf:"bytes,4,opt,name=run,proto3,oneof"`
 }
 
+type StepInfo_WaitForSignal struct {
+	WaitForSignal *StepInfoWaitForSignal `protobuf:"bytes,5,opt,name=wait_for_signal,json=waitForSignal,proto3,oneof"`
+}
+
 func (*StepInfo_Sleep) isStepInfo_Info() {}
 
 func (*StepInfo_Wait) isStepInfo_Info() {}
@@ -477,6 +602,8 @@ func (*StepInfo_Wait) isStepInfo_Info() {}
 func (*StepInfo_Invoke) isStepInfo_Info() {}
 
 func (*StepInfo_Run) isStepInfo_Info() {}
+
+func (*StepInfo_WaitForSignal) isStepInfo_Info() {}
 
 type StepInfoInvoke struct {
 	state             protoimpl.MessageState `protogen:"open.v1"`
@@ -492,7 +619,7 @@ type StepInfoInvoke struct {
 
 func (x *StepInfoInvoke) Reset() {
 	*x = StepInfoInvoke{}
-	mi := &file_run_v2_run_proto_msgTypes[2]
+	mi := &file_run_v2_run_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -504,7 +631,7 @@ func (x *StepInfoInvoke) String() string {
 func (*StepInfoInvoke) ProtoMessage() {}
 
 func (x *StepInfoInvoke) ProtoReflect() protoreflect.Message {
-	mi := &file_run_v2_run_proto_msgTypes[2]
+	mi := &file_run_v2_run_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -517,7 +644,7 @@ func (x *StepInfoInvoke) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StepInfoInvoke.ProtoReflect.Descriptor instead.
 func (*StepInfoInvoke) Descriptor() ([]byte, []int) {
-	return file_run_v2_run_proto_rawDescGZIP(), []int{2}
+	return file_run_v2_run_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *StepInfoInvoke) GetTriggeringEventId() string {
@@ -571,7 +698,7 @@ type StepInfoSleep struct {
 
 func (x *StepInfoSleep) Reset() {
 	*x = StepInfoSleep{}
-	mi := &file_run_v2_run_proto_msgTypes[3]
+	mi := &file_run_v2_run_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -583,7 +710,7 @@ func (x *StepInfoSleep) String() string {
 func (*StepInfoSleep) ProtoMessage() {}
 
 func (x *StepInfoSleep) ProtoReflect() protoreflect.Message {
-	mi := &file_run_v2_run_proto_msgTypes[3]
+	mi := &file_run_v2_run_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -596,7 +723,7 @@ func (x *StepInfoSleep) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StepInfoSleep.ProtoReflect.Descriptor instead.
 func (*StepInfoSleep) Descriptor() ([]byte, []int) {
-	return file_run_v2_run_proto_rawDescGZIP(), []int{3}
+	return file_run_v2_run_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *StepInfoSleep) GetSleepUntil() *timestamppb.Timestamp {
@@ -619,7 +746,7 @@ type StepInfoWaitForEvent struct {
 
 func (x *StepInfoWaitForEvent) Reset() {
 	*x = StepInfoWaitForEvent{}
-	mi := &file_run_v2_run_proto_msgTypes[4]
+	mi := &file_run_v2_run_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -631,7 +758,7 @@ func (x *StepInfoWaitForEvent) String() string {
 func (*StepInfoWaitForEvent) ProtoMessage() {}
 
 func (x *StepInfoWaitForEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_run_v2_run_proto_msgTypes[4]
+	mi := &file_run_v2_run_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -644,7 +771,7 @@ func (x *StepInfoWaitForEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StepInfoWaitForEvent.ProtoReflect.Descriptor instead.
 func (*StepInfoWaitForEvent) Descriptor() ([]byte, []int) {
-	return file_run_v2_run_proto_rawDescGZIP(), []int{4}
+	return file_run_v2_run_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *StepInfoWaitForEvent) GetEventName() string {
@@ -682,6 +809,66 @@ func (x *StepInfoWaitForEvent) GetTimedOut() bool {
 	return false
 }
 
+type StepInfoWaitForSignal struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Signal        string                 `protobuf:"bytes,1,opt,name=signal,proto3" json:"signal,omitempty"`
+	Timeout       *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=timeout,proto3" json:"timeout,omitempty"`
+	TimedOut      *bool                  `protobuf:"varint,3,opt,name=timed_out,json=timedOut,proto3,oneof" json:"timed_out,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StepInfoWaitForSignal) Reset() {
+	*x = StepInfoWaitForSignal{}
+	mi := &file_run_v2_run_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StepInfoWaitForSignal) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StepInfoWaitForSignal) ProtoMessage() {}
+
+func (x *StepInfoWaitForSignal) ProtoReflect() protoreflect.Message {
+	mi := &file_run_v2_run_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StepInfoWaitForSignal.ProtoReflect.Descriptor instead.
+func (*StepInfoWaitForSignal) Descriptor() ([]byte, []int) {
+	return file_run_v2_run_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *StepInfoWaitForSignal) GetSignal() string {
+	if x != nil {
+		return x.Signal
+	}
+	return ""
+}
+
+func (x *StepInfoWaitForSignal) GetTimeout() *timestamppb.Timestamp {
+	if x != nil {
+		return x.Timeout
+	}
+	return nil
+}
+
+func (x *StepInfoWaitForSignal) GetTimedOut() bool {
+	if x != nil && x.TimedOut != nil {
+		return *x.TimedOut
+	}
+	return false
+}
+
 type StepInfoRun struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Type          *string                `protobuf:"bytes,1,opt,name=type,proto3,oneof" json:"type,omitempty"`
@@ -691,7 +878,7 @@ type StepInfoRun struct {
 
 func (x *StepInfoRun) Reset() {
 	*x = StepInfoRun{}
-	mi := &file_run_v2_run_proto_msgTypes[5]
+	mi := &file_run_v2_run_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -703,7 +890,7 @@ func (x *StepInfoRun) String() string {
 func (*StepInfoRun) ProtoMessage() {}
 
 func (x *StepInfoRun) ProtoReflect() protoreflect.Message {
-	mi := &file_run_v2_run_proto_msgTypes[5]
+	mi := &file_run_v2_run_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -716,7 +903,7 @@ func (x *StepInfoRun) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StepInfoRun.ProtoReflect.Descriptor instead.
 func (*StepInfoRun) Descriptor() ([]byte, []int) {
-	return file_run_v2_run_proto_rawDescGZIP(), []int{5}
+	return file_run_v2_run_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *StepInfoRun) GetType() string {
@@ -736,7 +923,7 @@ type RunSpanOutput struct {
 
 func (x *RunSpanOutput) Reset() {
 	*x = RunSpanOutput{}
-	mi := &file_run_v2_run_proto_msgTypes[6]
+	mi := &file_run_v2_run_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -748,7 +935,7 @@ func (x *RunSpanOutput) String() string {
 func (*RunSpanOutput) ProtoMessage() {}
 
 func (x *RunSpanOutput) ProtoReflect() protoreflect.Message {
-	mi := &file_run_v2_run_proto_msgTypes[6]
+	mi := &file_run_v2_run_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -761,7 +948,7 @@ func (x *RunSpanOutput) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RunSpanOutput.ProtoReflect.Descriptor instead.
 func (*RunSpanOutput) Descriptor() ([]byte, []int) {
-	return file_run_v2_run_proto_rawDescGZIP(), []int{6}
+	return file_run_v2_run_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *RunSpanOutput) GetData() []byte {
@@ -789,7 +976,7 @@ type StepError struct {
 
 func (x *StepError) Reset() {
 	*x = StepError{}
-	mi := &file_run_v2_run_proto_msgTypes[7]
+	mi := &file_run_v2_run_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -801,7 +988,7 @@ func (x *StepError) String() string {
 func (*StepError) ProtoMessage() {}
 
 func (x *StepError) ProtoReflect() protoreflect.Message {
-	mi := &file_run_v2_run_proto_msgTypes[7]
+	mi := &file_run_v2_run_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -814,7 +1001,7 @@ func (x *StepError) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StepError.ProtoReflect.Descriptor instead.
 func (*StepError) Descriptor() ([]byte, []int) {
-	return file_run_v2_run_proto_rawDescGZIP(), []int{7}
+	return file_run_v2_run_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *StepError) GetMessage() string {
@@ -853,7 +1040,7 @@ type RunTrigger struct {
 
 func (x *RunTrigger) Reset() {
 	*x = RunTrigger{}
-	mi := &file_run_v2_run_proto_msgTypes[8]
+	mi := &file_run_v2_run_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -865,7 +1052,7 @@ func (x *RunTrigger) String() string {
 func (*RunTrigger) ProtoMessage() {}
 
 func (x *RunTrigger) ProtoReflect() protoreflect.Message {
-	mi := &file_run_v2_run_proto_msgTypes[8]
+	mi := &file_run_v2_run_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -878,7 +1065,7 @@ func (x *RunTrigger) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RunTrigger.ProtoReflect.Descriptor instead.
 func (*RunTrigger) Descriptor() ([]byte, []int) {
-	return file_run_v2_run_proto_rawDescGZIP(), []int{8}
+	return file_run_v2_run_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *RunTrigger) GetEventName() string {
@@ -934,7 +1121,7 @@ var File_run_v2_run_proto protoreflect.FileDescriptor
 
 const file_run_v2_run_proto_rawDesc = "" +
 	"\n" +
-	"\x10run/v2/run.proto\x12\x06run.v2\x1a\x1fgoogle/protobuf/timestamp.proto\"\xfa\x06\n" +
+	"\x10run/v2/run.proto\x12\x06run.v2\x1a\x1fgoogle/protobuf/timestamp.proto\"\xed\a\n" +
 	"\aRunSpan\x12\x1d\n" +
 	"\n" +
 	"account_id\x18\x01 \x01(\tR\taccountId\x12!\n" +
@@ -961,7 +1148,10 @@ const file_run_v2_run_proto_rawDesc = "" +
 	"\astep_op\x18\x12 \x01(\x0e2\x12.run.v2.SpanStepOpH\x04R\x06stepOp\x88\x01\x01\x122\n" +
 	"\tstep_info\x18\x13 \x01(\v2\x10.run.v2.StepInfoH\x05R\bstepInfo\x88\x01\x01\x12+\n" +
 	"\bchildren\x18\x14 \x03(\v2\x0f.run.v2.RunSpanR\bchildren\x12\x1c\n" +
-	"\astep_id\x18\x15 \x01(\tH\x06R\x06stepId\x88\x01\x01B\x11\n" +
+	"\astep_id\x18\x15 \x01(\tH\x06R\x06stepId\x88\x01\x01\x12\x1f\n" +
+	"\vis_userland\x18\x16 \x01(\bR\n" +
+	"isUserland\x12>\n" +
+	"\ruserland_span\x18\x17 \x01(\v2\x14.run.v2.UserlandSpanH\aR\fuserlandSpan\x88\x01\x01B\x11\n" +
 	"\x0f_parent_span_idB\r\n" +
 	"\v_started_atB\v\n" +
 	"\t_ended_atB\f\n" +
@@ -972,12 +1162,29 @@ const file_run_v2_run_proto_rawDesc = "" +
 	"\n" +
 	"_step_infoB\n" +
 	"\n" +
-	"\b_step_id\"\xd0\x01\n" +
+	"\b_step_idB\x10\n" +
+	"\x0e_userland_span\"\xe2\x02\n" +
+	"\fUserlandSpan\x12\x1b\n" +
+	"\tspan_name\x18\x01 \x01(\tR\bspanName\x12\x1b\n" +
+	"\tspan_kind\x18\x02 \x01(\tR\bspanKind\x12&\n" +
+	"\fservice_name\x18\x03 \x01(\tH\x00R\vserviceName\x88\x01\x01\x12\"\n" +
+	"\n" +
+	"scope_name\x18\x04 \x01(\tH\x01R\tscopeName\x88\x01\x01\x12(\n" +
+	"\rscope_version\x18\x05 \x01(\tH\x02R\fscopeVersion\x88\x01\x01\x12\"\n" +
+	"\n" +
+	"span_attrs\x18\x06 \x01(\fH\x03R\tspanAttrs\x88\x01\x01\x12*\n" +
+	"\x0eresource_attrs\x18\a \x01(\fH\x04R\rresourceAttrs\x88\x01\x01B\x0f\n" +
+	"\r_service_nameB\r\n" +
+	"\v_scope_nameB\x10\n" +
+	"\x0e_scope_versionB\r\n" +
+	"\v_span_attrsB\x11\n" +
+	"\x0f_resource_attrs\"\x99\x02\n" +
 	"\bStepInfo\x12-\n" +
 	"\x05sleep\x18\x01 \x01(\v2\x15.run.v2.StepInfoSleepH\x00R\x05sleep\x122\n" +
 	"\x04wait\x18\x02 \x01(\v2\x1c.run.v2.StepInfoWaitForEventH\x00R\x04wait\x120\n" +
 	"\x06invoke\x18\x03 \x01(\v2\x16.run.v2.StepInfoInvokeH\x00R\x06invoke\x12'\n" +
-	"\x03run\x18\x04 \x01(\v2\x13.run.v2.StepInfoRunH\x00R\x03runB\x06\n" +
+	"\x03run\x18\x04 \x01(\v2\x13.run.v2.StepInfoRunH\x00R\x03run\x12G\n" +
+	"\x0fwait_for_signal\x18\x05 \x01(\v2\x1d.run.v2.StepInfoWaitForSignalH\x00R\rwaitForSignalB\x06\n" +
 	"\x04info\"\xaf\x02\n" +
 	"\x0eStepInfoInvoke\x12.\n" +
 	"\x13triggering_event_id\x18\x01 \x01(\tR\x11triggeringEventId\x12\x1f\n" +
@@ -1005,6 +1212,12 @@ const file_run_v2_run_proto_rawDesc = "" +
 	"\ttimed_out\x18\x05 \x01(\bH\x02R\btimedOut\x88\x01\x01B\r\n" +
 	"\v_expressionB\x11\n" +
 	"\x0f_found_event_idB\f\n" +
+	"\n" +
+	"_timed_out\"\x95\x01\n" +
+	"\x15StepInfoWaitForSignal\x12\x16\n" +
+	"\x06signal\x18\x01 \x01(\tR\x06signal\x124\n" +
+	"\atimeout\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\atimeout\x12 \n" +
+	"\ttimed_out\x18\x03 \x01(\bH\x00R\btimedOut\x88\x01\x01B\f\n" +
 	"\n" +
 	"_timed_out\"/\n" +
 	"\vStepInfoRun\x12\x17\n" +
@@ -1047,7 +1260,7 @@ const file_run_v2_run_proto_rawDesc = "" +
 	"\tCOMPLETED\x10\xac\x02\x12\v\n" +
 	"\x06FAILED\x10\x90\x03\x12\x0e\n" +
 	"\tCANCELLED\x10\xf4\x03\x12\f\n" +
-	"\aSKIPPED\x10\xd8\x04*t\n" +
+	"\aSKIPPED\x10\xd8\x04*\x89\x01\n" +
 	"\n" +
 	"SpanStepOp\x12\a\n" +
 	"\x03RUN\x10\x00\x12\n" +
@@ -1060,7 +1273,8 @@ const file_run_v2_run_proto_rawDesc = "" +
 	"STEP_ERROR\x10\x05\x12\b\n" +
 	"\x04NONE\x10\x06\x12\x0e\n" +
 	"\n" +
-	"AI_GATEWAY\x10\aB3Z1github.com/inngest/inngest/proto/gen/run/v2;runv2b\x06proto3"
+	"AI_GATEWAY\x10\a\x12\x13\n" +
+	"\x0fWAIT_FOR_SIGNAL\x10\bB3Z1github.com/inngest/inngest/proto/gen/run/v2;runv2b\x06proto3"
 
 var (
 	file_run_v2_run_proto_rawDescOnce sync.Once
@@ -1075,43 +1289,48 @@ func file_run_v2_run_proto_rawDescGZIP() []byte {
 }
 
 var file_run_v2_run_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_run_v2_run_proto_msgTypes = make([]protoimpl.MessageInfo, 9)
+var file_run_v2_run_proto_msgTypes = make([]protoimpl.MessageInfo, 11)
 var file_run_v2_run_proto_goTypes = []any{
 	(SpanStatus)(0),               // 0: run.v2.SpanStatus
 	(SpanStepOp)(0),               // 1: run.v2.SpanStepOp
 	(*RunSpan)(nil),               // 2: run.v2.RunSpan
-	(*StepInfo)(nil),              // 3: run.v2.StepInfo
-	(*StepInfoInvoke)(nil),        // 4: run.v2.StepInfoInvoke
-	(*StepInfoSleep)(nil),         // 5: run.v2.StepInfoSleep
-	(*StepInfoWaitForEvent)(nil),  // 6: run.v2.StepInfoWaitForEvent
-	(*StepInfoRun)(nil),           // 7: run.v2.StepInfoRun
-	(*RunSpanOutput)(nil),         // 8: run.v2.RunSpanOutput
-	(*StepError)(nil),             // 9: run.v2.StepError
-	(*RunTrigger)(nil),            // 10: run.v2.RunTrigger
-	(*timestamppb.Timestamp)(nil), // 11: google.protobuf.Timestamp
+	(*UserlandSpan)(nil),          // 3: run.v2.UserlandSpan
+	(*StepInfo)(nil),              // 4: run.v2.StepInfo
+	(*StepInfoInvoke)(nil),        // 5: run.v2.StepInfoInvoke
+	(*StepInfoSleep)(nil),         // 6: run.v2.StepInfoSleep
+	(*StepInfoWaitForEvent)(nil),  // 7: run.v2.StepInfoWaitForEvent
+	(*StepInfoWaitForSignal)(nil), // 8: run.v2.StepInfoWaitForSignal
+	(*StepInfoRun)(nil),           // 9: run.v2.StepInfoRun
+	(*RunSpanOutput)(nil),         // 10: run.v2.RunSpanOutput
+	(*StepError)(nil),             // 11: run.v2.StepError
+	(*RunTrigger)(nil),            // 12: run.v2.RunTrigger
+	(*timestamppb.Timestamp)(nil), // 13: google.protobuf.Timestamp
 }
 var file_run_v2_run_proto_depIdxs = []int32{
 	0,  // 0: run.v2.RunSpan.status:type_name -> run.v2.SpanStatus
-	11, // 1: run.v2.RunSpan.queued_at:type_name -> google.protobuf.Timestamp
-	11, // 2: run.v2.RunSpan.started_at:type_name -> google.protobuf.Timestamp
-	11, // 3: run.v2.RunSpan.ended_at:type_name -> google.protobuf.Timestamp
+	13, // 1: run.v2.RunSpan.queued_at:type_name -> google.protobuf.Timestamp
+	13, // 2: run.v2.RunSpan.started_at:type_name -> google.protobuf.Timestamp
+	13, // 3: run.v2.RunSpan.ended_at:type_name -> google.protobuf.Timestamp
 	1,  // 4: run.v2.RunSpan.step_op:type_name -> run.v2.SpanStepOp
-	3,  // 5: run.v2.RunSpan.step_info:type_name -> run.v2.StepInfo
+	4,  // 5: run.v2.RunSpan.step_info:type_name -> run.v2.StepInfo
 	2,  // 6: run.v2.RunSpan.children:type_name -> run.v2.RunSpan
-	5,  // 7: run.v2.StepInfo.sleep:type_name -> run.v2.StepInfoSleep
-	6,  // 8: run.v2.StepInfo.wait:type_name -> run.v2.StepInfoWaitForEvent
-	4,  // 9: run.v2.StepInfo.invoke:type_name -> run.v2.StepInfoInvoke
-	7,  // 10: run.v2.StepInfo.run:type_name -> run.v2.StepInfoRun
-	11, // 11: run.v2.StepInfoInvoke.timeout:type_name -> google.protobuf.Timestamp
-	11, // 12: run.v2.StepInfoSleep.sleep_until:type_name -> google.protobuf.Timestamp
-	11, // 13: run.v2.StepInfoWaitForEvent.timeout:type_name -> google.protobuf.Timestamp
-	9,  // 14: run.v2.RunSpanOutput.error:type_name -> run.v2.StepError
-	11, // 15: run.v2.RunTrigger.timestamp:type_name -> google.protobuf.Timestamp
-	16, // [16:16] is the sub-list for method output_type
-	16, // [16:16] is the sub-list for method input_type
-	16, // [16:16] is the sub-list for extension type_name
-	16, // [16:16] is the sub-list for extension extendee
-	0,  // [0:16] is the sub-list for field type_name
+	3,  // 7: run.v2.RunSpan.userland_span:type_name -> run.v2.UserlandSpan
+	6,  // 8: run.v2.StepInfo.sleep:type_name -> run.v2.StepInfoSleep
+	7,  // 9: run.v2.StepInfo.wait:type_name -> run.v2.StepInfoWaitForEvent
+	5,  // 10: run.v2.StepInfo.invoke:type_name -> run.v2.StepInfoInvoke
+	9,  // 11: run.v2.StepInfo.run:type_name -> run.v2.StepInfoRun
+	8,  // 12: run.v2.StepInfo.wait_for_signal:type_name -> run.v2.StepInfoWaitForSignal
+	13, // 13: run.v2.StepInfoInvoke.timeout:type_name -> google.protobuf.Timestamp
+	13, // 14: run.v2.StepInfoSleep.sleep_until:type_name -> google.protobuf.Timestamp
+	13, // 15: run.v2.StepInfoWaitForEvent.timeout:type_name -> google.protobuf.Timestamp
+	13, // 16: run.v2.StepInfoWaitForSignal.timeout:type_name -> google.protobuf.Timestamp
+	11, // 17: run.v2.RunSpanOutput.error:type_name -> run.v2.StepError
+	13, // 18: run.v2.RunTrigger.timestamp:type_name -> google.protobuf.Timestamp
+	19, // [19:19] is the sub-list for method output_type
+	19, // [19:19] is the sub-list for method input_type
+	19, // [19:19] is the sub-list for extension type_name
+	19, // [19:19] is the sub-list for extension extendee
+	0,  // [0:19] is the sub-list for field type_name
 }
 
 func init() { file_run_v2_run_proto_init() }
@@ -1120,25 +1339,28 @@ func file_run_v2_run_proto_init() {
 		return
 	}
 	file_run_v2_run_proto_msgTypes[0].OneofWrappers = []any{}
-	file_run_v2_run_proto_msgTypes[1].OneofWrappers = []any{
+	file_run_v2_run_proto_msgTypes[1].OneofWrappers = []any{}
+	file_run_v2_run_proto_msgTypes[2].OneofWrappers = []any{
 		(*StepInfo_Sleep)(nil),
 		(*StepInfo_Wait)(nil),
 		(*StepInfo_Invoke)(nil),
 		(*StepInfo_Run)(nil),
+		(*StepInfo_WaitForSignal)(nil),
 	}
-	file_run_v2_run_proto_msgTypes[2].OneofWrappers = []any{}
-	file_run_v2_run_proto_msgTypes[4].OneofWrappers = []any{}
+	file_run_v2_run_proto_msgTypes[3].OneofWrappers = []any{}
 	file_run_v2_run_proto_msgTypes[5].OneofWrappers = []any{}
 	file_run_v2_run_proto_msgTypes[6].OneofWrappers = []any{}
 	file_run_v2_run_proto_msgTypes[7].OneofWrappers = []any{}
 	file_run_v2_run_proto_msgTypes[8].OneofWrappers = []any{}
+	file_run_v2_run_proto_msgTypes[9].OneofWrappers = []any{}
+	file_run_v2_run_proto_msgTypes[10].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_run_v2_run_proto_rawDesc), len(file_run_v2_run_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   9,
+			NumMessages:   11,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

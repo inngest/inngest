@@ -332,12 +332,14 @@ func isHealthy(ctx context.Context, stateManager state.StateManager, envID uuid.
 		}
 	}
 
-	log.Debug("retrieved gateway for connection", "conn_id", conn.Id, "gateway_id", gatewayId.String(), "status", gw.Status, "last_heartbeat_at", gw.LastHeartbeatAt)
+	gwLastHeartbeat := time.UnixMilli(gw.LastHeartbeatAtMS)
+
+	log.Debug("retrieved gateway for connection", "conn_id", conn.Id, "gateway_id", gatewayId.String(), "status", gw.Status, "last_heartbeat_at", gwLastHeartbeat)
 
 	gatewayIsActive := gw.Status == state.GatewayStatusActive
-	gatewayHeartbeatTimedOut := gw.LastHeartbeatAt.Before(time.Now().Add(-2 * consts.ConnectGatewayHeartbeatInterval))
+	gatewayHeartbeatTimedOut := gwLastHeartbeat.Before(time.Now().Add(-2 * consts.ConnectGatewayHeartbeatInterval))
 	if !gatewayIsActive || gatewayHeartbeatTimedOut {
-		log.Debug("gateway is unhealthy", "conn_id", conn.Id, "gateway_id", gatewayId.String(), "status", gw.Status, "last_heartbeat_at", gw.LastHeartbeatAt)
+		log.Debug("gateway is unhealthy", "conn_id", conn.Id, "gateway_id", gatewayId.String(), "status", gw.Status, "last_heartbeat_at", gwLastHeartbeat)
 
 		// Only drop gateway if it's no longer heart-beating, as an inactive gateway may be draining
 		if gatewayHeartbeatTimedOut {

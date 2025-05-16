@@ -392,6 +392,7 @@ enum StepOp {
   SLEEP # sleep for a duration
   WAIT_FOR_EVENT # wait for an event
   AI_GATEWAY
+  WAIT_FOR_SIGNAL
 }
 
 union StepInfo =
@@ -399,6 +400,7 @@ union StepInfo =
   | SleepStepInfo
   | WaitForEventStepInfo
   | RunStepInfo
+  | WaitForSignalStepInfo
 
 type InvokeStepInfo {
   triggeringEventID: ULID!
@@ -418,6 +420,12 @@ type WaitForEventStepInfo {
   expression: String
   timeout: Time!
   foundEventID: ULID
+  timedOut: Boolean
+}
+
+type WaitForSignalStepInfo {
+  signal: String!
+  timeout: Time!
   timedOut: Boolean
 }
 
@@ -454,6 +462,18 @@ type RunTraceSpan {
   isRoot: Boolean! # whether this span is the root span of the trace (shortcut for presence of rootspan)
   parentSpanID: String
   parentSpan: RunTraceSpan # the parent span of this span
+  isUserland: Boolean! # whether this span is a userland span
+  userlandSpan: UserlandSpan
+}
+
+type UserlandSpan {
+  spanName: String
+  spanKind: String
+  serviceName: String
+  resourceAttrs: Bytes
+  scopeName: String
+  scopeVersion: String
+  spanAttrs: Bytes
 }
 
 type RunTraceSpanOutput {
@@ -519,7 +539,7 @@ type ConnectV1WorkerConnection {
   instanceId: String!
   workerIp: String!
 
-	appName: String
+  appName: String
   appID: UUID
   app: App
 
@@ -537,8 +557,7 @@ type ConnectV1WorkerConnection {
   sdkVersion: String!
   sdkPlatform: String!
   syncId: UUID
-
-	@deprecated(reason: "buildId is deprecated. Use appVersion instead.")
+    @deprecated(reason: "buildId is deprecated. Use appVersion instead.")
   buildId: String
   appVersion: String
 
@@ -561,10 +580,10 @@ type ConnectV1WorkerConnectionEdge {
 }
 
 enum AppMethod {
-	SERVE
-	CONNECT
+  SERVE
+  CONNECT
 }
 
 input AppsFilterV1 {
-	method: AppMethod
+  method: AppMethod
 }

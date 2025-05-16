@@ -2,6 +2,7 @@ package state
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -30,17 +31,20 @@ var (
 	ErrRunNotFound         = fmt.Errorf("run not found in state store")
 	// ErrPauseLeased is returned when attempting to lease a pause that is
 	// already leased by another event.
-	ErrPauseLeased        = fmt.Errorf("pause already leased")
-	ErrPauseAlreadyExists = fmt.Errorf("pause already exists")
-	ErrIdentifierExists   = fmt.Errorf("identifier already exists")
-	ErrFunctionCancelled  = fmt.Errorf("function cancelled")
-	ErrFunctionComplete   = fmt.Errorf("function completed")
-	ErrFunctionFailed     = fmt.Errorf("function failed")
-	ErrFunctionOverflowed = fmt.Errorf("function has too many steps")
-	ErrDuplicateResponse  = fmt.Errorf("duplicate response")
-	ErrEventNotFound      = fmt.Errorf("event not found in state store")
-	ErrFunctionPaused     = fmt.Errorf("function is paused")
-	ErrStateOverflowed    = fmt.Errorf("state is too large")
+	ErrPauseLeased         = fmt.Errorf("pause already leased")
+	ErrPauseAlreadyExists  = fmt.Errorf("pause already exists")
+	ErrSignalConflict      = fmt.Errorf("signal wait already exists for another run")
+	ErrIdentifierExists    = fmt.Errorf("identifier already exists")
+	ErrIdentifierTomestone = fmt.Errorf("run for idempotency key is done")
+	ErrInvalidIdentifier   = fmt.Errorf("identifier is not a valid ULID")
+	ErrFunctionCancelled   = fmt.Errorf("function cancelled")
+	ErrFunctionComplete    = fmt.Errorf("function completed")
+	ErrFunctionFailed      = fmt.Errorf("function failed")
+	ErrFunctionOverflowed  = fmt.Errorf("function has too many steps")
+	ErrDuplicateResponse   = fmt.Errorf("duplicate response")
+	ErrEventNotFound       = fmt.Errorf("event not found in state store")
+	ErrFunctionPaused      = fmt.Errorf("function is paused")
+	ErrStateOverflowed     = fmt.Errorf("state is too large")
 )
 
 const (
@@ -406,6 +410,11 @@ type Mutater interface {
 type MemoizedStep struct {
 	ID   string `json:"id"`
 	Data any    `json:"data"`
+}
+
+type SignalStepReturn struct {
+	Signal string          `json:"signal"`
+	Data   json.RawMessage `json:"data"`
 }
 
 // Input is the input for creating new state.  The required fields are Workflow,

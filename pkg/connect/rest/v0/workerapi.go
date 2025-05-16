@@ -3,6 +3,8 @@ package connectv0
 import (
 	"crypto/rand"
 	"encoding/json"
+	"errors"
+	"github.com/inngest/inngest/pkg/connect/state"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/oklog/ulid/v2"
@@ -201,7 +203,7 @@ func (cr *connectApiRouter) flushBuffer(w http.ResponseWriter, r *http.Request) 
 
 	// Reliable path: Buffer the response to be picked up by the executor
 	err = cr.ConnectRequestStateManager.SaveResponse(ctx, res.EnvID, reqBody.RequestId, reqBody)
-	if err != nil {
+	if err != nil && !errors.Is(err, state.ErrResponseAlreadyBuffered) {
 		logger.StdlibLogger(ctx).Error("could not buffer response", "err", err)
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "could not buffer response")

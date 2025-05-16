@@ -8,7 +8,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/graph-gophers/dataloader"
-	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/run"
@@ -121,13 +120,25 @@ func (tr *traceReader) GetRunTrace(ctx context.Context, keys dataloader.Keys) []
 	return results
 }
 
-func convertRunTreeToGQLModel(pb *rpbv2.RunSpan) (*models.RunTraceSpan, error) {
-	// no need to show the function success span, if it's the only one and has no children
-	// meaning, there were no function level retries
-	if pb.GetName() == consts.OtelExecFnOk && pb.GetStatus() == rpbv2.SpanStatus_COMPLETED && len(pb.GetChildren()) < 1 {
-		return nil, ErrSkipSuccess
+func convertUserlandSpan(pb *rpbv2.UserlandSpan) *models.UserlandSpan {
+	if pb == nil {
+		return nil
 	}
+	spanAttrs := string(pb.SpanAttrs)
+	resourceAttrs := string(pb.ResourceAttrs)
 
+	return &models.UserlandSpan{
+		SpanName:      &pb.SpanName,
+		SpanKind:      &pb.SpanKind,
+		ServiceName:   pb.ServiceName,
+		ScopeName:     pb.ScopeName,
+		ScopeVersion:  pb.ScopeVersion,
+		SpanAttrs:     &spanAttrs,
+		ResourceAttrs: &resourceAttrs,
+	}
+}
+
+func convertRunTreeToGQLModel(pb *rpbv2.RunSpan) (*models.RunTraceSpan, error) {
 	var (
 		startedAt *time.Time
 		endedAt   *time.Time
@@ -176,11 +187,19 @@ func convertRunTreeToGQLModel(pb *rpbv2.RunSpan) (*models.RunTraceSpan, error) {
 		case rpbv2.SpanStepOp_AI_GATEWAY:
 			op := models.StepOpAiGateway
 			stepOp = &op
+		case rpbv2.SpanStepOp_WAIT_FOR_SIGNAL:
+			op := models.StepOpWaitForSignal
+			stepOp = &op
 		}
 	}
 
 	attempts := int(pb.GetAttempts())
 	duration := int(pb.GetDurationMs())
+
+	var userlandSpan *models.UserlandSpan
+	if pb.GetIsUserland() {
+		userlandSpan = convertUserlandSpan(pb.GetUserlandSpan())
+	}
 
 	span := &models.RunTraceSpan{
 		AppID:        uuid.MustParse(pb.GetAppId()),
@@ -190,6 +209,8 @@ func convertRunTreeToGQLModel(pb *rpbv2.RunSpan) (*models.RunTraceSpan, error) {
 		SpanID:       pb.GetSpanId(),
 		RunID:        ulid.MustParse(pb.GetRunId()),
 		IsRoot:       pb.GetIsRoot(),
+		IsUserland:   pb.GetIsUserland(),
+		UserlandSpan: userlandSpan,
 		Name:         pb.GetName(),
 		Status:       status,
 		Attempts:     &attempts,
@@ -256,6 +277,14 @@ func convertRunTreeToGQLModel(pb *rpbv2.RunSpan) (*models.RunTraceSpan, error) {
 				RunID:             runID,
 				TimedOut:          invoke.TimedOut,
 			}
+		case *rpbv2.StepInfo_WaitForSignal:
+			wait := v.WaitForSignal
+
+			span.StepInfo = models.WaitForSignalStepInfo{
+				Signal:   wait.Signal,
+				Timeout:  wait.Timeout.AsTime(),
+				TimedOut: wait.TimedOut,
+			}
 		}
 	}
 
@@ -265,14 +294,13 @@ func convertRunTreeToGQLModel(pb *rpbv2.RunSpan) (*models.RunTraceSpan, error) {
 
 		for _, cp := range pb.Children {
 			cspan, err := convertRunTreeToGQLModel(cp)
-			if err == ErrSkipSuccess {
-				continue
-			}
+
 			if err != nil {
 				return nil, err
 			}
 			span.ChildrenSpans = append(span.ChildrenSpans, cspan)
 		}
+
 	}
 
 	return span, nil

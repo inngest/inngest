@@ -17,11 +17,14 @@ import { usePrettyJson } from '../hooks/usePrettyJson';
 import { formatMilliseconds, toMaybeDate } from '../utils/date';
 import { IO } from './IO';
 import { Tabs } from './Tabs';
+import { UserlandAttrs } from './UserlandAttrs';
 import {
   isStepInfoInvoke,
+  isStepInfoSignal,
   isStepInfoSleep,
   isStepInfoWait,
   type StepInfoInvoke,
+  type StepInfoSignal,
   type StepInfoSleep,
   type StepInfoWait,
 } from './types';
@@ -94,6 +97,23 @@ const WaitInfo = ({ stepInfo }: { stepInfo: StepInfoWait }) => {
   );
 };
 
+const SignalInfo = ({ stepInfo }: { stepInfo: StepInfoSignal }) => {
+  const timeout = toMaybeDate(stepInfo.timeout);
+  return (
+    <>
+      <ElementWrapper label="Signal name">
+        <TextElement>{stepInfo.signal}</TextElement>
+      </ElementWrapper>
+      <ElementWrapper label="Timeout">
+        {timeout ? <TimeElement date={timeout} /> : <TextElement>-</TextElement>}
+      </ElementWrapper>
+      <ElementWrapper label="Timed out">
+        <TextElement>{maybeBooleanToString(stepInfo.timedOut)}</TextElement>
+      </ElementWrapper>
+    </>
+  );
+};
+
 const getStepKindInfo = (props: StepKindInfoProps): JSX.Element | null =>
   isStepInfoInvoke(props.stepInfo) ? (
     <InvokeInfo stepInfo={props.stepInfo} pathCreator={props.pathCreator} />
@@ -101,12 +121,13 @@ const getStepKindInfo = (props: StepKindInfoProps): JSX.Element | null =>
     <SleepInfo stepInfo={props.stepInfo} />
   ) : isStepInfoWait(props.stepInfo) ? (
     <WaitInfo stepInfo={props.stepInfo} />
+  ) : isStepInfoSignal(props.stepInfo) ? (
+    <SignalInfo stepInfo={props.stepInfo} />
   ) : null;
 
 export const StepInfo = ({ selectedStep }: { selectedStep: StepInfoType }) => {
   const [expanded, setExpanded] = useState(true);
   const [rerunModalOpen, setRerunModalOpen] = useState(false);
-
   const { runID, result, trace, pathCreator } = selectedStep;
 
   const delayText = formatMilliseconds(
@@ -151,7 +172,10 @@ export const StepInfo = ({ selectedStep }: { selectedStep: StepInfoType }) => {
             }`}
           />
 
-          <span className="text-basis text-sm font-normal">{trace.name}</span>
+          <span className="text-basis text-sm font-normal">
+            {trace.isUserland && 'OTel/'}
+            {trace.name}
+          </span>
         </div>
         {runID && trace.stepID && prettyInput && (
           <>
@@ -209,12 +233,20 @@ export const StepInfo = ({ selectedStep }: { selectedStep: StepInfoType }) => {
         </div>
       )}
 
-      <div className="">
+      {trace.isUserland && trace.userlandSpan ? (
+        <UserlandAttrs userlandSpan={trace.userlandSpan} />
+      ) : (
         <Tabs
           defaultActive={result?.error ? 'error' : prettyInput ? 'input' : 'output'}
           tabs={[
             ...(prettyInput
-              ? [{ label: 'Input', id: 'input', node: <IO title="Step Input" raw={prettyInput} /> }]
+              ? [
+                  {
+                    label: 'Input',
+                    id: 'input',
+                    node: <IO title="Step Input" raw={prettyInput} />,
+                  },
+                ]
               : []),
             ...(prettyOutput
               ? [
@@ -244,7 +276,7 @@ export const StepInfo = ({ selectedStep }: { selectedStep: StepInfoType }) => {
               : []),
           ]}
         />
-      </div>
+      )}
     </div>
   );
 };

@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/logger"
 
 	"github.com/VividCortex/ewma"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
@@ -557,7 +558,7 @@ func (q *queue) scan(ctx context.Context) error {
 
 	// Store the shard that we processed, allowing us to eventually pass this
 	// down to the job for stat tracking.
-	var metricShardName = "<global>" // default global name for metrics in this function
+	metricShardName := "<global>" // default global name for metrics in this function
 
 	peekUntil := q.clock.Now().Add(PartitionLookahead)
 
@@ -1013,6 +1014,7 @@ func (q *queue) process(
 	// XXX: Add a max job time here, configurable.
 	jobCtx, jobCancel := context.WithCancel(context.WithoutCancel(ctx))
 	defer jobCancel()
+
 	// Add the job ID to the queue context.  This allows any logic that handles the run function
 	// to inspect job IDs, eg. for tracing or logging, without having to thread this down as
 	// arguments.
@@ -1021,6 +1023,22 @@ func (q *queue) process(
 	if qi.Data.GroupID != "" {
 		jobCtx = state.WithGroupID(jobCtx, qi.Data.GroupID)
 	}
+
+	startedAt := q.clock.Now()
+	go func() {
+		longRunningJobStatusTick := q.clock.NewTicker(5 * time.Minute)
+		defer longRunningJobStatusTick.Stop()
+
+		for {
+			select {
+			case <-jobCtx.Done():
+				return
+			case <-longRunningJobStatusTick.Chan():
+			}
+
+			logger.StdlibLogger(ctx).Debug("long running queue job tick", "item", qi, "dur", q.clock.Now().Sub(startedAt).String())
+		}
+	}()
 
 	go func() {
 		defer func() {
@@ -1050,7 +1068,7 @@ func (q *queue) process(
 		if qi.EarliestPeekTime > 0 {
 			sojourn = n.Sub(time.UnixMilli(qi.EarliestPeekTime))
 		}
-		jobCtx = context.WithValue(jobCtx, sojournKey, sojourn)
+		doCtx := context.WithValue(jobCtx, sojournKey, sojourn)
 
 		// Track the latency on average globally.  Do this in a goroutine so that it doesn't
 		// at all delay the job during concurrenty locking contention.
@@ -1058,10 +1076,10 @@ func (q *queue) process(
 			qi.WallTimeMS = qi.AtMS // backcompat while WallTimeMS isn't valid.
 		}
 		latency := n.Sub(time.UnixMilli(qi.WallTimeMS)) - sojourn
-		jobCtx = context.WithValue(jobCtx, latencyKey, latency)
+		doCtx = context.WithValue(doCtx, latencyKey, latency)
 
 		// store started at and latency in ctx
-		jobCtx = context.WithValue(jobCtx, startedAtKey, n)
+		doCtx = context.WithValue(doCtx, startedAtKey, n)
 
 		go func() {
 			// Update the ewma
@@ -1094,7 +1112,7 @@ func (q *queue) process(
 		}
 
 		// Call the run func.
-		res, err := f(jobCtx, runInfo, qi.Data)
+		res, err := f(doCtx, runInfo, qi.Data)
 		extendLeaseTick.Stop()
 		if err != nil {
 			metrics.IncrQueueItemStatusCounter(ctx, metrics.CounterOpt{
@@ -1518,7 +1536,6 @@ func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error 
 	leaseID, err := duration(ctx, p.queue.primaryQueueShard.Name, "lease", p.queue.clock.Now(), func(ctx context.Context) (*ulid.ULID, error) {
 		return p.queue.Lease(ctx, *item, QueueLeaseDuration, p.staticTime, p.denies)
 	})
-
 	// NOTE: If this loop ends in an error, we must _always_ release an item from the
 	// semaphore to free capacity.  This will happen automatically when the worker
 	// finishes processing a queue item on success.
