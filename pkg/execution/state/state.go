@@ -2,6 +2,7 @@ package state
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -32,6 +33,7 @@ var (
 	// already leased by another event.
 	ErrPauseLeased         = fmt.Errorf("pause already leased")
 	ErrPauseAlreadyExists  = fmt.Errorf("pause already exists")
+	ErrSignalConflict      = fmt.Errorf("signal wait already exists for another run")
 	ErrIdentifierExists    = fmt.Errorf("identifier already exists")
 	ErrIdentifierTomestone = fmt.Errorf("run for idempotency key is done")
 	ErrInvalidIdentifier   = fmt.Errorf("identifier is not a valid ULID")
@@ -408,6 +410,11 @@ type Mutater interface {
 type MemoizedStep struct {
 	ID   string `json:"id"`
 	Data any    `json:"data"`
+}
+
+type SignalStepReturn struct {
+	Signal string          `json:"signal"`
+	Data   json.RawMessage `json:"data"`
 }
 
 // Input is the input for creating new state.  The required fields are Workflow,

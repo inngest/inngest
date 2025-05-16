@@ -71,6 +71,7 @@ enum SpanStepOp {
   STEP_ERROR = 5;
   NONE = 6;
   AI_GATEWAY = 7;
+  WAIT_FOR_SIGNAL = 8;
 }
 
 message StepInfo {
@@ -79,6 +80,7 @@ message StepInfo {
     StepInfoWaitForEvent wait = 2;
     StepInfoInvoke invoke = 3;
     StepInfoRun run = 4;
+    StepInfoWaitForSignal wait_for_signal = 5;
   }
 }
 
@@ -101,6 +103,12 @@ message StepInfoWaitForEvent {
   optional string expression = 3;
   optional string found_event_id = 4;
   optional bool timed_out = 5;
+}
+
+message StepInfoWaitForSignal {
+  string signal = 1;
+  google.protobuf.Timestamp timeout = 2;
+  optional bool timed_out = 3;
 }
 
 message StepInfoRun {

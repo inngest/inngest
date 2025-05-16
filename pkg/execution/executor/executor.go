@@ -945,7 +945,7 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 		// Handle generator responses then return.
 		if serr := e.HandleGeneratorResponse(ctx, i, i.resp); serr != nil {
 			// If this is an error compiling async expressions, fail the function.
-			shouldFailEarly := errors.Is(serr, &expressions.CompileError{}) || errors.Is(serr, state.ErrStateOverflowed) || errors.Is(serr, state.ErrFunctionOverflowed)
+			shouldFailEarly := errors.Is(serr, &expressions.CompileError{}) || errors.Is(serr, state.ErrStateOverflowed) || errors.Is(serr, state.ErrFunctionOverflowed) || errors.Is(serr, state.ErrSignalConflict)
 
 			if shouldFailEarly {
 				var gracefulErr *state.WrappedStandardError
@@ -1819,6 +1819,10 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 			for _, e := range e.lifecycles {
 				go e.OnInvokeFunctionResumed(context.WithoutCancel(ctx), md, pause, r)
 			}
+		} else if pause.IsSignal() {
+			for _, e := range e.lifecycles {
+				go e.OnWaitForSignalResumed(context.WithoutCancel(ctx), md, pause, r)
+			}
 		} else {
 			for _, e := range e.lifecycles {
 				go e.OnWaitForEventResumed(context.WithoutCancel(ctx), md, pause, r)
@@ -2008,6 +2012,8 @@ func (e *executor) handleGenerator(ctx context.Context, i *runInstance, gen stat
 		return e.handleGeneratorAIGateway(ctx, i, gen, edge)
 	case enums.OpcodeGateway:
 		return e.handleGeneratorGateway(ctx, i, gen, edge)
+	case enums.OpcodeWaitForSignal:
+		return e.handleGeneratorWaitForSignal(ctx, i, gen, edge)
 	}
 
 	return fmt.Errorf("unknown opcode: %s", gen.Op)
@@ -2564,6 +2570,98 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, i *runInstance,
 	return err
 }
 
+// TODO Idempotency
+func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, i *runInstance, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
+	opts, err := gen.SignalOpts()
+	if err != nil {
+		return fmt.Errorf("unable to parse signal opts: %w", err)
+	}
+	if opts.Signal == "" {
+		return fmt.Errorf("signal name is empty")
+	}
+	expires, err := opts.Expires()
+	if err != nil {
+		return fmt.Errorf("unable to parse signal expires: %w", err)
+	}
+
+	pauseID := inngest.DeterministicSha1UUID(i.md.ID.RunID.String() + gen.ID)
+	opcode := gen.Op.String()
+	now := time.Now()
+
+	sid := run.NewSpanID(ctx)
+	carrier := itrace.NewTraceCarrier(
+		itrace.WithTraceCarrierTimestamp(now),
+		itrace.WithTraceCarrierSpanID(&sid),
+	)
+	itrace.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
+
+	pause := state.Pause{
+		ID:          pauseID,
+		WorkspaceID: i.md.ID.Tenant.EnvID,
+		Identifier:  sv2.NewPauseIdentifier(i.md.ID),
+		GroupID:     i.item.GroupID,
+		Outgoing:    gen.ID,
+		Incoming:    edge.Edge.Incoming,
+		StepName:    gen.UserDefinedName(),
+		Opcode:      &opcode,
+		Expires:     state.Time(expires),
+		DataKey:     gen.ID,
+		SignalID:    &opts.Signal,
+		MaxAttempts: i.item.MaxAttempts,
+		Metadata: map[string]any{
+			consts.OtelPropagationKey: carrier,
+		},
+	}
+
+	_, err = e.pm.SavePause(ctx, pause)
+	if err == state.ErrPauseAlreadyExists {
+		return nil
+	}
+	if err == state.ErrSignalConflict {
+		return state.WrapInStandardError(
+			err,
+			"Error",
+			"Signal conflict; signal wait already exists for another run",
+			"",
+		)
+	}
+	if err != nil {
+		return fmt.Errorf("error saving pause when handling WaitForSignal opcode: %w", err)
+	}
+
+	// Enqueue a job that will timeout the pause.
+	jobID := fmt.Sprintf("%s-%s", i.md.IdempotencyKey(), gen.ID)
+	err = e.queue.Enqueue(ctx, queue.Item{
+		JobID:                 &jobID,
+		WorkspaceID:           i.md.ID.Tenant.EnvID,
+		GroupID:               i.item.GroupID,
+		Kind:                  queue.KindPause,
+		Identifier:            i.item.Identifier,
+		PriorityFactor:        i.item.PriorityFactor,
+		CustomConcurrencyKeys: i.item.CustomConcurrencyKeys,
+		MaxAttempts:           i.item.MaxAttempts,
+		Payload: queue.PayloadPauseTimeout{
+			PauseID:   pauseID,
+			OnTimeout: true,
+		},
+	}, expires, queue.EnqueueOpts{})
+	if err == redis_state.ErrQueueItemExists {
+		return nil
+	}
+
+	for _, e := range e.lifecycles {
+		go e.OnWaitForSignal(
+			context.WithoutCancel(ctx),
+			i.md,
+			i.item,
+			gen,
+			pause,
+		)
+	}
+
+	return err
+}
+
 func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, i *runInstance, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
 	if e.handleSendingEvent == nil {
 		return fmt.Errorf("no handleSendingEvent function specified")
@@ -3017,6 +3115,84 @@ func (e *executor) validateStateSize(outputSize int, md sv2.Metadata) error {
 	}
 
 	return nil
+}
+
+func (e *executor) ReceiveSignal(ctx context.Context, workspaceID uuid.UUID, signalID string, data json.RawMessage) (res *execution.ReceiveSignalResult, err error) {
+	if workspaceID == uuid.Nil {
+		err = fmt.Errorf("workspace ID is empty")
+		return
+	}
+
+	if signalID == "" {
+		err = fmt.Errorf("signal ID is empty")
+		return
+	}
+
+	log := e.log
+	if log == nil {
+		log = logger.From(ctx)
+	}
+	l := log.With().Str("signal_id", signalID).Str("workspace_id", workspaceID.String()).Logger()
+	defer func() {
+		if err != nil {
+			l.Error().Err(err).Msg("error receiving signal")
+		} else {
+			l.Info().Msg("signal received")
+		}
+	}()
+
+	pause, err := e.pm.PauseBySignalID(ctx, workspaceID, signalID)
+	if err != nil {
+		err = fmt.Errorf("error getting pause by signal ID: %w", err)
+		return
+	}
+
+	res = &execution.ReceiveSignalResult{}
+
+	if pause == nil {
+		l.Debug().Msg("no pause found for signal")
+		return
+	}
+
+	if pause.Expires.Time().Before(time.Now()) {
+		l.Debug().Msg("encountered expired signal")
+
+		shouldDelete := pause.Expires.Time().Add(consts.PauseExpiredDeletionGracePeriod).Before(time.Now())
+		if shouldDelete {
+			l.Debug().Msg("deleting expired pause")
+			_ = e.pm.DeletePause(ctx, *pause)
+		}
+
+		return
+	}
+
+	l.Debug().Str("pause.DataKey", pause.DataKey).Msg("resuming pause from signal")
+
+	err = e.Resume(ctx, *pause, execution.ResumeRequest{
+		RunID:    &pause.Identifier.RunID,
+		StepName: pause.StepName,
+		With: map[string]any{
+			execution.StateDataKey: state.SignalStepReturn{
+				Signal: signalID,
+				Data:   data,
+			},
+		},
+	})
+	if err != nil {
+		if errors.Is(err, state.ErrPauseLeased) ||
+			errors.Is(err, state.ErrPauseNotFound) ||
+			errors.Is(err, state.ErrRunNotFound) {
+			// Just return that we found nothing
+			err = nil
+		}
+
+		return
+	}
+
+	res.MatchedSignal = true
+	res.RunID = &pause.Identifier.RunID
+
+	return
 }
 
 type execError struct {

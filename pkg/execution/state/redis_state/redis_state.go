@@ -847,9 +847,14 @@ func (m unshardedMgr) SavePause(ctx context.Context, p state.Pause) (int64, erro
 		evt = *p.Event
 	}
 
-	corrId := ""
+	invokeCorrId := ""
 	if p.InvokeCorrelationID != nil {
-		corrId = *p.InvokeCorrelationID
+		invokeCorrId = *p.InvokeCorrelationID
+	}
+
+	signalCorrId := ""
+	if p.SignalID != nil {
+		signalCorrId = *p.SignalID
 	}
 
 	extendedExpiry := time.Until(p.Expires.Time().Add(10 * time.Minute)).Seconds()
@@ -864,6 +869,7 @@ func (m unshardedMgr) SavePause(ctx context.Context, p state.Pause) (int64, erro
 		pause.kg.Pause(ctx, p.ID),
 		pause.kg.PauseEvent(ctx, p.WorkspaceID, evt),
 		global.kg.Invoke(ctx, p.WorkspaceID),
+		global.kg.Signal(ctx, p.WorkspaceID),
 		pause.kg.PauseIndex(ctx, "add", p.WorkspaceID, evt),
 		pause.kg.PauseIndex(ctx, "exp", p.WorkspaceID, evt),
 		pause.kg.RunPauses(ctx, p.Identifier.RunID),
@@ -874,7 +880,8 @@ func (m unshardedMgr) SavePause(ctx context.Context, p state.Pause) (int64, erro
 		string(packed),
 		p.ID.String(),
 		evt,
-		corrId,
+		invokeCorrId,
+		signalCorrId,
 		// Add at least 10 minutes to this pause, allowing us to process the
 		// pause by ID for 10 minutes past expiry.
 		int(extendedExpiry),
@@ -891,6 +898,10 @@ func (m unshardedMgr) SavePause(ctx context.Context, p state.Pause) (int64, erro
 		args,
 	).AsInt64()
 	if err != nil {
+		if err.Error() == "ErrSignalConflict" {
+			return 0, state.ErrSignalConflict
+		}
+
 		return 0, fmt.Errorf("error finalizing: %w", err)
 	}
 
@@ -1040,7 +1051,9 @@ func (m unshardedMgr) DeletePauseByID(ctx context.Context, pauseID uuid.UUID) er
 		return m.DeletePause(ctx, *pause)
 	}
 
-	// This won't delete event keys nicely, but still gets the pause yeeted.
+	// This won't delete event keys, invoke correlations, or signals nicely,
+	// but still gets the pause yeeted. Critically, this means a dangling
+	// signal in the DB.
 	return m.DeletePause(ctx, state.Pause{
 		ID: pauseID,
 	})
@@ -1065,9 +1078,14 @@ func (m unshardedMgr) DeletePause(ctx context.Context, p state.Pause) error {
 		evt = *p.Event
 	}
 
-	corrId := ""
+	invokeCorrId := ""
 	if p.InvokeCorrelationID != nil && *p.InvokeCorrelationID != "" {
-		corrId = *p.InvokeCorrelationID
+		invokeCorrId = *p.InvokeCorrelationID
+	}
+
+	signalCorrId := ""
+	if p.SignalID != nil {
+		signalCorrId = *p.SignalID
 	}
 
 	pauseKey := pause.kg.Pause(ctx, p.ID)
@@ -1078,6 +1096,7 @@ func (m unshardedMgr) DeletePause(ctx context.Context, p state.Pause) error {
 		eventKey,
 		// Warning: We need to access global keys, which must be colocated on the same Redis cluster
 		global.kg.Invoke(ctx, p.WorkspaceID),
+		global.kg.Signal(ctx, p.WorkspaceID),
 		pause.kg.PauseIndex(ctx, "add", p.WorkspaceID, evt),
 		pause.kg.PauseIndex(ctx, "exp", p.WorkspaceID, evt),
 		runPausesKey,
@@ -1090,7 +1109,8 @@ func (m unshardedMgr) DeletePause(ctx context.Context, p state.Pause) error {
 		keys,
 		[]string{
 			p.ID.String(),
-			corrId,
+			invokeCorrId,
+			signalCorrId,
 		},
 	).AsInt64()
 	if err != nil {
@@ -1222,6 +1242,37 @@ func (m unshardedMgr) PauseByInvokeCorrelationID(ctx context.Context, wsID uuid.
 		return nil, fmt.Errorf("failed to parse pauseID UUID: %w", err)
 	}
 	return m.PauseByID(ctx, pauseID)
+}
+
+func (m unshardedMgr) PauseBySignalID(ctx context.Context, wsID uuid.UUID, signalID string) (*state.Pause, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "PauseBySignalID"), redis_telemetry.ScopePauses)
+
+	global := m.u.Global()
+	key := global.kg.Signal(ctx, wsID)
+	cmd := global.Client().B().Hget().Key(key).Field(signalID).Build()
+	pauseIDstr, err := global.Client().Do(ctx, cmd).ToString()
+	if err == rueidis.Nil {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get signalID: %w", err)
+	}
+
+	pauseID, err := uuid.Parse(pauseIDstr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse pauseID UUID: %w", err)
+	}
+
+	p, err := m.PauseByID(ctx, pauseID)
+	if err != nil {
+		if err == state.ErrPauseNotFound {
+			return nil, nil
+		}
+
+		return nil, fmt.Errorf("failed to get pause by ID: %w", err)
+	}
+
+	return p, nil
 }
 
 func (m unshardedMgr) PausesByID(ctx context.Context, ids ...uuid.UUID) ([]*state.Pause, error) {
