@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useCallback, useState } from 'react';
-import { usePathname } from 'next/navigation';
 import { Header } from '@inngest/components/Header/Header';
 import { InvokeModal } from '@inngest/components/InvokeButton';
 import { Pill } from '@inngest/components/Pill';
@@ -37,7 +36,6 @@ export default function FunctionLayout({
   children,
   params: { environmentSlug, slug },
 }: FunctionLayoutProps) {
-  const pathname = usePathname();
   const [invokOpen, setInvokeOpen] = useState(false);
   const [pauseOpen, setPauseOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
