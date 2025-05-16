@@ -296,6 +296,8 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 				cancelWaitForResponseCtx()
 				return
 			}
+
+			span.AddEvent("ReplyPollOk")
 		}
 	}()
 
@@ -390,6 +392,7 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 			}
 
 			l.Debug("request is still leased by worker")
+			span.AddEvent("RequestLeaseOk")
 		}
 	}()
 
@@ -465,6 +468,7 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 			l.Error("could not delete response", "err", err)
 		}
 
+		l.Debug("returning reply", "status", reply.Status)
 		return reply, nil
 	// If the worker terminates or otherwise fails to continue extending the lease,
 	// we must retry the step as soon as possible.
