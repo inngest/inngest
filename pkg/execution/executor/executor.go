@@ -1491,8 +1491,8 @@ func (e *executor) handlePause(
 			return nil
 		}
 
+		// NOTE: Make sure the event that created the pause isn't also the one resuming it
 		if pause.TriggeringEventID != nil && *pause.TriggeringEventID == evtID.String() {
-			// TODO: clean up?
 			return nil
 		}
 
