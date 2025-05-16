@@ -1445,10 +1445,7 @@ func TestQueueLease(t *testing.T) {
 				FunctionID: fnA,
 				Data: osqueue.Item{
 					CustomConcurrencyKeys: []state.CustomConcurrency{
-						{
-							Key:   ck.Key,
-							Limit: 1,
-						},
+						ck,
 					},
 				},
 			}, start, osqueue.EnqueueOpts{})
@@ -1458,10 +1455,7 @@ func TestQueueLease(t *testing.T) {
 				FunctionID: uuid.New(),
 				Data: osqueue.Item{
 					CustomConcurrencyKeys: []state.CustomConcurrency{
-						{
-							Key:   ck.Key,
-							Limit: 1,
-						},
+						ck,
 					},
 				},
 			}, start, osqueue.EnqueueOpts{})
@@ -1928,7 +1922,7 @@ func TestQueueLease(t *testing.T) {
 		require.Equal(t, QueuePartition{}, custom2)
 
 		require.Equal(t, "{queue}:queue:sorted:schedule-batch", fnPart.zsetKey(kg))
-		require.Equal(t, "{queue}:concurrency:p:00000000-0000-0000-0000-000000000000", fnPart.concurrencyKey(kg))
+		require.Equal(t, "{queue}:concurrency:p:schedule-batch", fnPart.concurrencyKey(kg))
 
 		item, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi, start, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
@@ -1947,11 +1941,11 @@ func TestQueueLease(t *testing.T) {
 		require.False(t, r.Exists("{queue}:queue:sorted:schedule-batch"))
 
 		// batching uses different rules for concurrency keys
+		require.True(t, r.Exists("{queue}:concurrency:p:schedule-batch"))
 		require.False(t, r.Exists("{queue}:concurrency:account:schedule-batch"), r.Dump())
-		require.False(t, r.Exists("{queue}:concurrency:p:schedule-batch"))
 
-		require.True(t, r.Exists("{queue}:concurrency:account:00000000-0000-0000-0000-000000000000"), r.Dump())
-		require.True(t, r.Exists("{queue}:concurrency:p:00000000-0000-0000-0000-000000000000"))
+		require.False(t, r.Exists("{queue}:concurrency:account:00000000-0000-0000-0000-000000000000"), r.Dump())
+		require.False(t, r.Exists("{queue}:concurrency:p:00000000-0000-0000-0000-000000000000"))
 
 		item = getQueueItem(t, r, item.ID)
 		require.NotNil(t, item.LeaseID)
@@ -4665,9 +4659,10 @@ func createConcurrencyKey(scope enums.ConcurrencyScope, scopeID uuid.UUID, value
 	hash := c.EvaluatedKey(context.Background(), scopeID, map[string]any{})
 
 	return state.CustomConcurrency{
-		Key:   hash,
-		Limit: limit,
-		Hash:  value,
+		Key:                       hash,
+		Limit:                     limit,
+		Hash:                      value,
+		UnhashedEvaluatedKeyValue: value,
 	}
 }
 
@@ -4931,8 +4926,8 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 			backlog := q.ItemBacklog(ctx, item)
 			require.NotEmpty(t, backlog.BacklogID)
 			require.Len(t, backlog.ConcurrencyKeys, 1)
-			require.NotNil(t, backlog.ConcurrencyKeys[0].ConcurrencyScope)
-			require.NotNil(t, backlog.ConcurrencyKeys[0].ConcurrencyKey)
+			require.NotNil(t, backlog.ConcurrencyKeys[0].Scope)
+			require.NotNil(t, backlog.ConcurrencyKeys[0].HashedKeyExpression)
 
 			shadowPartition := q.ItemShadowPartition(ctx, item)
 			require.NotEmpty(t, shadowPartition.PartitionID)
@@ -5049,10 +5044,10 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 
 			backlog := q.ItemBacklog(ctx, item)
 			require.Len(t, backlog.ConcurrencyKeys, 2)
-			require.NotNil(t, backlog.ConcurrencyKeys[0].ConcurrencyScope)
-			require.NotNil(t, backlog.ConcurrencyKeys[0].ConcurrencyKey)
-			require.NotNil(t, backlog.ConcurrencyKeys[1].ConcurrencyScope)
-			require.NotNil(t, backlog.ConcurrencyKeys[1].ConcurrencyKey)
+			require.NotNil(t, backlog.ConcurrencyKeys[0].Scope)
+			require.NotNil(t, backlog.ConcurrencyKeys[0].HashedKeyExpression)
+			require.NotNil(t, backlog.ConcurrencyKeys[1].Scope)
+			require.NotNil(t, backlog.ConcurrencyKeys[1].HashedKeyExpression)
 
 			marshaledBacklog1, err := json.Marshal(backlog)
 			require.NoError(t, err)
@@ -5823,9 +5818,9 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 
 			backlog := q.ItemBacklog(ctx, item)
 			require.NotEmpty(t, backlog.BacklogID)
-			require.NotNil(t, backlog.ConcurrencyKeys[0].ConcurrencyKey)
-			require.NotNil(t, backlog.ConcurrencyKeys[0].ConcurrencyScope)
-			require.NotNil(t, backlog.ConcurrencyKeys[0].ConcurrencyScopeEntity)
+			require.NotEmpty(t, backlog.ConcurrencyKeys[0].Scope)
+			require.NotEmpty(t, backlog.ConcurrencyKeys[0].HashedKeyExpression)
+			require.NotEmpty(t, backlog.ConcurrencyKeys[0].EntityID)
 
 			shadowPartition := q.ItemShadowPartition(ctx, item)
 			require.NotEmpty(t, shadowPartition.PartitionID)
@@ -5981,13 +5976,13 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 
 			backlog := q.ItemBacklog(ctx, item)
 			require.Len(t, backlog.ConcurrencyKeys, 2)
-			require.NotNil(t, backlog.ConcurrencyKeys[0].ConcurrencyKey)
-			require.NotNil(t, backlog.ConcurrencyKeys[0].ConcurrencyScope)
-			require.NotNil(t, backlog.ConcurrencyKeys[0].ConcurrencyScopeEntity)
+			require.NotEmpty(t, backlog.ConcurrencyKeys[0].HashedKeyExpression)
+			require.NotEmpty(t, backlog.ConcurrencyKeys[0].Scope)
+			require.NotEmpty(t, backlog.ConcurrencyKeys[0].EntityID)
 
-			require.NotNil(t, backlog.ConcurrencyKeys[1].ConcurrencyKey)
-			require.NotNil(t, backlog.ConcurrencyKeys[1].ConcurrencyScope)
-			require.NotNil(t, backlog.ConcurrencyKeys[1].ConcurrencyScopeEntity)
+			require.NotEmpty(t, backlog.ConcurrencyKeys[1].HashedKeyExpression)
+			require.NotEmpty(t, backlog.ConcurrencyKeys[1].Scope)
+			require.NotEmpty(t, backlog.ConcurrencyKeys[1].EntityID)
 
 			shadowPartition := q.ItemShadowPartition(ctx, item)
 			require.NotEmpty(t, shadowPartition.PartitionID)
@@ -6714,14 +6709,4 @@ func zcard(t *testing.T, rc rueidis.Client, key string) int {
 	require.NoError(t, err)
 
 	return int(num)
-}
-
-func initRedis(t *testing.T) (*miniredis.Miniredis, rueidis.Client) {
-	r := miniredis.RunT(t)
-	rc, err := rueidis.NewClient(rueidis.ClientOption{
-		InitAddress:  []string{r.Addr()},
-		DisableCache: true,
-	})
-	require.NoError(t, err)
-	return r, rc
 }

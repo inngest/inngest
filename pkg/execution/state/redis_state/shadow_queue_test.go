@@ -793,11 +793,9 @@ func TestRefillConstraints(t *testing.T) {
 	}
 
 	ck1 := createConcurrencyKey(enums.ConcurrencyScopeFn, fnID1, "bruno", 5)
-	ck1.UnhashedEvaluatedKeyValue = "bruno"
 
 	ck2 := createConcurrencyKey(enums.ConcurrencyScopeEnv, envID1, "inngest", 10)
-	ck2.UnhashedEvaluatedKeyValue = "inngest"
-
+ 
 	tests := []struct {
 		name          string
 		currentValues currentValues
