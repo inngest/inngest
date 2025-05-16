@@ -1457,6 +1457,25 @@ func (e *executor) handlePause(
 	}
 
 	return util.Crit(ctx, "handle pause", func(ctx context.Context) error {
+		cleanup := func(ctx context.Context) {
+			eg := errgroup.Group{}
+			eg.Go(func() error {
+				err := e.pm.DeletePause(context.Background(), *pause)
+				if err != nil {
+					l.Warn("error deleting pause", "error", err, "pause", pause)
+				}
+				return err
+			})
+			eg.Go(func() error {
+				err := e.exprAggregator.RemovePause(ctx, pause)
+				if err != nil {
+					l.Warn("error removing pause from aggregator", "error", err, "pause", pause)
+				}
+				return err
+			})
+			_ = eg.Wait()
+		}
+
 		// NOTE: Some pauses may be nil or expired, as the iterator may take
 		// time to process.  We handle that here and assume that the event
 		// did not occur in time.
@@ -1467,14 +1486,13 @@ func (e *executor) handlePause(
 			if shouldDelete {
 				// Consume this pause to remove it entirely
 				l.Debug("deleting expired pause")
-				_ = e.pm.DeletePause(context.Background(), *pause)
-				_ = e.exprAggregator.RemovePause(ctx, pause)
+				cleanup(ctx)
 			}
-
 			return nil
 		}
 
 		if pause.TriggeringEventID != nil && *pause.TriggeringEventID == evtID.String() {
+			// TODO: clean up?
 			return nil
 		}
 
@@ -1487,8 +1505,7 @@ func (e *executor) handlePause(
 			// bookkeeping is not implemented.
 			if exists, err := e.smv2.Exists(ctx, sv2.IDFromPause(*pause)); !exists && err == nil {
 				// This function has ended.  Delete the pause and continue
-				_ = e.pm.DeletePause(context.Background(), *pause)
-				_ = e.exprAggregator.RemovePause(ctx, pause)
+				cleanup(ctx)
 				return nil
 			}
 		}
@@ -1508,12 +1525,12 @@ func (e *executor) handlePause(
 				errors.Is(err, state.ErrFunctionFailed) ||
 				errors.Is(err, ErrFunctionEnded) {
 				// Safe to ignore.
-				_ = e.exprAggregator.RemovePause(ctx, pause)
+				cleanup(ctx)
 				return nil
 			}
 			if err != nil && strings.Contains(err.Error(), "no status stored in metadata") {
 				// Safe to ignore.
-				_ = e.exprAggregator.RemovePause(ctx, pause)
+				cleanup(ctx)
 				return nil
 			}
 
@@ -1525,7 +1542,7 @@ func (e *executor) handlePause(
 			_, err = e.pm.ConsumePause(context.Background(), *pause, nil)
 			if err == nil || err == state.ErrPauseLeased || err == state.ErrPauseNotFound {
 				atomic.AddInt32(&res[1], 1)
-				_ = e.exprAggregator.RemovePause(ctx, pause)
+				cleanup(ctx)
 				return nil
 			}
 			return fmt.Errorf("error consuming pause after cancel: %w", err)
@@ -1542,6 +1559,7 @@ func (e *executor) handlePause(
 		if errors.Is(err, state.ErrPauseLeased) ||
 			errors.Is(err, state.ErrPauseNotFound) ||
 			errors.Is(err, state.ErrRunNotFound) {
+			cleanup(ctx)
 			return nil
 		}
 		if err != nil {
@@ -1550,9 +1568,7 @@ func (e *executor) handlePause(
 
 		// Add to the counter.
 		atomic.AddInt32(&res[1], 1)
-		if err := e.exprAggregator.RemovePause(ctx, pause); err != nil {
-			l.Warn("error removing pause from aggregator", "error", err)
-		}
+		cleanup(ctx)
 		return nil
 	})
 }
