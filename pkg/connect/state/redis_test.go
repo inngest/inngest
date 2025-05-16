@@ -991,5 +991,6 @@ func TestGarbageCollectGateways(t *testing.T) {
 		gw, err = connManager.GetGateway(ctx, gwID)
 		require.Error(t, err)
 		require.ErrorIs(t, err, ErrGatewayNotFound)
+		require.Nil(t, gw)
 	})
 }
