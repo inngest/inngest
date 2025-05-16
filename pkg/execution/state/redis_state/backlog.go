@@ -12,9 +12,9 @@ import (
 )
 
 type CustomConcurrencyLimit struct {
-	Scope enums.ConcurrencyScope `json:"s"`
-	Key   string                 `json:"k"`
-	Limit int                    `json:"l"`
+	Scope               enums.ConcurrencyScope `json:"s"`
+	HashedKeyExpression string                 `json:"k"`
+	Limit               int                    `json:"l"`
 }
 
 type ShadowPartitionThrottle struct {
@@ -107,7 +107,7 @@ func (q QueueShadowPartition) CustomConcurrencyKey(kg QueueKeyGenerator, b *Queu
 	backlogKey := b.ConcurrencyKeys[n-1]
 
 	for _, key := range q.CustomConcurrencyKeys {
-		if key.Scope == backlogKey.ConcurrencyScope && key.Key == backlogKey.ConcurrencyKey {
+		if key.Scope == backlogKey.Scope && key.HashedKeyExpression == backlogKey.HashedKeyExpression {
 			// Return concrete key with latest limit from shadow partition
 			return backlogKey.concurrencyKey(kg), key.Limit
 		}
@@ -151,20 +151,23 @@ func (q QueueShadowPartition) accountActiveKey(kg QueueKeyGenerator) string {
 // Note: BacklogConcurrencyKey is only used for custom concurrency keys with a defined `key`.
 // In the case of configuring concurrency on the function scope without providing a `key`, the default backlog will be used.
 type BacklogConcurrencyKey struct {
-	ConcurrencyScope enums.ConcurrencyScope `json:"cs,omitempty"`
+	// CanonicalKeyID is the combined concurrency key (e.g. a:<account ID>:hash("customer1"))
+	CanonicalKeyID string `json:"kid"`
 
-	// ConcurrencyScopeEntity stores the accountID, envID, or fnID for the respective concurrency scope
-	ConcurrencyScopeEntity uuid.UUID `json:"cse,omitempty"`
+	Scope enums.ConcurrencyScope `json:"cs"`
 
-	// ConcurrencyKey is the hashed concurrency key expression (e.g. hash("event.data.customerId"))
-	ConcurrencyKey string `json:"ck,omitempty"`
+	// EntityID stores the accountID, envID, or fnID for the respective concurrency scope
+	EntityID uuid.UUID `json:"cse"`
 
-	// ConcurrencyKeyValue is the hashed evaluated key (e.g. hash("customer1"))
-	ConcurrencyKeyValue string `json:"ckv,omitempty"`
+	// HashedKeyExpression is the hashed concurrency key expression (e.g. hash("event.data.customerId"))
+	HashedKeyExpression string `json:"cke"`
 
-	// ConcurrencyKeyUnhashedValue is the unhashed evaluated key (e.g. "customer1")
+	// HashedValue is the hashed concurrency key value (e.g. hash("customer1"))
+	HashedValue string `json:"ckv"`
+
+	// UnhashedValue is the unhashed evaluated key (e.g. "customer1")
 	// This may be truncated for long values and may only be used for observability and debugging.
-	ConcurrencyKeyUnhashedValue string `json:"ckuv,omitempty"`
+	UnhashedValue string `json:"ckuv"`
 }
 
 type BacklogThrottle struct {
@@ -249,17 +252,19 @@ func (q *queue) ItemBacklog(ctx context.Context, i osqueue.QueueItem) QueueBackl
 			b.BacklogID += fmt.Sprintf(":c%d<%s>", i+1, util.XXHash(key.Key))
 
 			b.ConcurrencyKeys[i] = BacklogConcurrencyKey{
-				ConcurrencyScope: scope,
+				CanonicalKeyID: key.Key,
+
+				Scope: scope,
 
 				// Account ID, Env ID, or Function ID to apply to the concurrency key to
-				ConcurrencyScopeEntity: entityID,
+				EntityID: entityID,
 
 				// Hashed expression to identify which key this is in the shadow partition concurrency key list
-				ConcurrencyKey: key.Hash, // hash("event.data.customerID")
+				HashedKeyExpression: key.Hash, // hash("event.data.customerID")
 
 				// Evaluated hashed and unhashed values
-				ConcurrencyKeyValue:         checksum,                      // hash("customer1")
-				ConcurrencyKeyUnhashedValue: key.UnhashedEvaluatedKeyValue, // "customer1"
+				HashedValue:   checksum,                      // hash("customer1")
+				UnhashedValue: key.UnhashedEvaluatedKeyValue, // "customer1"
 			}
 		}
 	}
@@ -354,8 +359,8 @@ func (q *queue) ItemShadowPartition(ctx context.Context, i osqueue.QueueItem) Qu
 			customConcurrencyKeyLimits = append(customConcurrencyKeyLimits, CustomConcurrencyLimit{
 				Scope: scope,
 				// Key is required to look up the respective limit when checking constraints for a given backlog.
-				Key:   key.Hash, // hash(event.data.customerId)
-				Limit: key.Limit,
+				HashedKeyExpression: key.Hash, // hash("event.data.customerId")
+				Limit:               key.Limit,
 			})
 		}
 	}
@@ -417,10 +422,16 @@ func (b QueueBacklog) isOutdated(sp *QueueShadowPartition) bool {
 	// All concurrency keys on backlog must be found on partition
 	// This is quadratic but each backlog and shadow partition can only have up to 2 keys, so it's bounded.
 	for _, backlogKey := range b.ConcurrencyKeys {
+		hasKey := false
 		for _, shadowPartitionKey := range sp.CustomConcurrencyKeys {
-			if shadowPartitionKey.Scope == backlogKey.ConcurrencyScope && shadowPartitionKey.Key == backlogKey.ConcurrencyKey {
-				return true
+			if shadowPartitionKey.Scope == backlogKey.Scope && shadowPartitionKey.HashedKeyExpression == backlogKey.HashedKeyExpression {
+				hasKey = true
+				break
 			}
+		}
+
+		if !hasKey {
+			return true
 		}
 	}
 
@@ -446,7 +457,7 @@ func (b BacklogConcurrencyKey) concurrencyKey(kg QueueKeyGenerator) string {
 	// - The scope (account, environment, function) to apply the concurrency limit on
 	// - The entity (account ID, envID, or function ID) based on the scope
 	// - The dynamic key value (hashed evaluated expression)
-	return kg.Concurrency("custom", util.ConcurrencyKey(b.ConcurrencyScope, b.ConcurrencyScopeEntity, b.ConcurrencyKeyUnhashedValue))
+	return kg.Concurrency("custom", b.CanonicalKeyID)
 }
 
 // customKeyActive returns the key to the active counter for the given custom concurrency key
@@ -459,16 +470,12 @@ func (b QueueBacklog) customKeyActive(kg QueueKeyGenerator, n int) string {
 	return key.activeKey(kg)
 }
 
-func (b BacklogConcurrencyKey) combinedKey() string {
-	return util.ConcurrencyKey(b.ConcurrencyScope, b.ConcurrencyScopeEntity, b.ConcurrencyKeyUnhashedValue)
-}
-
 func (b BacklogConcurrencyKey) activeKey(kg QueueKeyGenerator) string {
 	// Concurrency accounting keys are made up of three parts:
 	// - The scope (account, environment, function) to apply the concurrency limit on
 	// - The entity (account ID, envID, or function ID) based on the scope
 	// - The dynamic key value (hashed evaluated expression)
-	return kg.ActiveCounter("custom", b.combinedKey())
+	return kg.ActiveCounter("custom", b.CanonicalKeyID)
 }
 
 // activeKey returns backlog compound active key
@@ -482,5 +489,5 @@ func (b QueueBacklog) customConcurrencyKeyID(n int) string {
 	}
 
 	key := b.ConcurrencyKeys[n-1]
-	return key.combinedKey()
+	return key.CanonicalKeyID
 }
