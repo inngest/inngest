@@ -1126,6 +1126,8 @@ func (m unshardedMgr) DeletePause(ctx context.Context, p state.Pause) error {
 }
 
 func (m mgr) ConsumePause(ctx context.Context, pause state.Pause, opts state.ConsumePauseOpts) (state.ConsumePauseResult, error) {
+	// NOTE: should this return an error if no idempotency key is provided?
+
 	return m.shardedMgr.consumePause(ctx, &pause, opts)
 }
 
@@ -1154,7 +1156,7 @@ func (m shardedMgr) consumePause(ctx context.Context, p *state.Pause, opts state
 	args, err := StrSlice([]any{
 		p.DataKey,
 		string(marshalledData),
-		opts.IdempotencyKey,
+		idempotencyKey,
 		time.Now().Add(consts.FunctionIdempotencyPeriod),
 	})
 	if err != nil {
