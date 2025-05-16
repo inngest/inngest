@@ -1035,12 +1035,6 @@ func (qp QueuePartition) concurrencyKey(kg QueueKeyGenerator) string {
 func (qp QueuePartition) fnConcurrencyKey(kg QueueKeyGenerator) string {
 	// Enable system partitions to use the queueName override instead of the fnId
 	if qp.IsSystem() {
-		if *qp.QueueName == osqueue.KindScheduleBatch {
-			// this is consistent with the concrete WithPartitionConcurrencyKeyGenerator in cloud previously
-			return kg.Concurrency("p", uuid.Nil.String())
-		}
-
-		// for other queues like pauses, this is consistent with the concrete WithPartitionConcurrencyKeyGenerator in cloud previously
 		return kg.Concurrency("p", qp.Queue())
 	}
 
@@ -1055,12 +1049,6 @@ func (qp QueuePartition) fnConcurrencyKey(kg QueueKeyGenerator) string {
 func (qp QueuePartition) acctConcurrencyKey(kg QueueKeyGenerator) string {
 	// Enable system partitions to use the queueName override instead of the accountId
 	if qp.IsSystem() {
-		if *qp.QueueName == osqueue.KindScheduleBatch {
-			// this is consistent with the concrete WithAccountConcurrencyKeyGenerator in cloud previously
-			return kg.Concurrency("account", uuid.Nil.String())
-		}
-
-		// for other queues like pauses, this is consistent with the concrete WithAccountConcurrencyKeyGenerator in cloud previously
 		return kg.Concurrency("account", qp.Queue())
 	}
 	if qp.AccountID == uuid.Nil {
