@@ -1107,13 +1107,8 @@ func (qp QueuePartition) MarshalBinary() ([]byte, error) {
 	return json.Marshal(qp)
 }
 
-// ItemPartitions returns up 3 item partitions for a given queue item, as well as the account concurrency limit.
-// Note: Currently, we only ever return 2 partitions (2x custom concurrency keys or function + custom concurrency key)
-// Note: For backwards compatibility, we may return a third partition for the function itself, in case two custom concurrency keys are used.
-// This will change with the implementation of throttling key queues.
-func (q *queue) ItemPartitions(ctx context.Context, shard QueueShard, i osqueue.QueueItem) (fnPartition, customConcurrencyKey1, customConcurrencyKey2 QueuePartition, accountConcurrencyLimit int) {
-	ckeys := i.Data.GetConcurrencyKeys()
-
+// ItemPartitions returns the partition for a given item.
+func (q *queue) ItemPartition(ctx context.Context, shard QueueShard, i osqueue.QueueItem) (QueuePartition, int) {
 	queueName := i.QueueName
 
 	// sanity check: both QueueNames should be set, but sometimes aren't
@@ -1139,13 +1134,45 @@ func (q *queue) ItemPartitions(ctx context.Context, shard QueueShard, i osqueue.
 		systemLimits := q.systemConcurrencyLimitGetter(ctx, systemPartition)
 		systemPartition.ConcurrencyLimit = systemLimits.PartitionLimit
 
-		fnPartition = systemPartition
-		accountConcurrencyLimit = systemLimits.GlobalLimit
-		return
+		return systemPartition, systemLimits.GlobalLimit
 	}
 
 	if i.FunctionID == uuid.Nil {
 		q.logger.Error().Interface("item", i).Msg("unexpected missing functionID in ItemPartitions()")
+	}
+
+	fnPartition := QueuePartition{
+		ID:            i.FunctionID.String(),
+		PartitionType: int(enums.PartitionTypeDefault), // Function partition
+		FunctionID:    &i.FunctionID,
+		AccountID:     i.Data.Identifier.AccountID,
+	}
+
+	limits, _ := duration(ctx, q.primaryQueueShard.Name, "partition_fn_concurrency_getter", q.clock.Now(), func(ctx context.Context) (PartitionConcurrencyLimits, error) {
+		// Get the function limit from the `concurrencyLimitGetter`.
+		return q.concurrencyLimitGetter(ctx, fnPartition), nil
+	})
+
+	// The concurrency limit for fns MUST be added for leasing.
+	fnPartition.ConcurrencyLimit = limits.FunctionLimit
+	if fnPartition.ConcurrencyLimit <= 0 {
+		// Use account-level limits, as there are no function level limits
+		fnPartition.ConcurrencyLimit = limits.AccountLimit
+	}
+
+	return fnPartition, limits.AccountLimit
+}
+
+// ItemPartitions returns up 3 item partitions for a given queue item, as well as the account concurrency limit.
+// Note: Currently, we only ever return 2 partitions (2x custom concurrency keys or function + custom concurrency key)
+// Note: For backwards compatibility, we may return a third partition for the function itself, in case two custom concurrency keys are used.
+// This will change with the implementation of throttling key queues.
+func (q *queue) ItemPartitions(ctx context.Context, shard QueueShard, i osqueue.QueueItem) (fnPartition, customConcurrencyKey1, customConcurrencyKey2 QueuePartition, accountConcurrencyLimit int) {
+	fnPartition, accountConcurrencyLimit = q.ItemPartition(ctx, shard, i)
+
+	ckeys := i.Data.GetConcurrencyKeys()
+	if len(ckeys) == 0 {
+		return
 	}
 
 	// Check if we have custom concurrency keys for the given function.  If so,
@@ -1173,71 +1200,47 @@ func (q *queue) ItemPartitions(ctx context.Context, shard QueueShard, i osqueue.
 		}
 	}
 
-	fnPartition = QueuePartition{
-		ID:            i.FunctionID.String(),
-		PartitionType: int(enums.PartitionTypeDefault), // Function partition
-		FunctionID:    &i.FunctionID,
-		AccountID:     i.Data.Identifier.AccountID,
-	}
+	// Up to 2 concurrency keys.
+	for j, key := range ckeys {
+		scope, id, checksum, _ := key.ParseKey()
 
-	limits, _ := duration(ctx, q.primaryQueueShard.Name, "partition_fn_concurrency_getter", q.clock.Now(), func(ctx context.Context) (PartitionConcurrencyLimits, error) {
-		// Get the function limit from the `concurrencyLimitGetter`.  If this returns
-		// a limit (> 0), create a new PartitionTypeDefault queue partition for the function.
-		return q.concurrencyLimitGetter(ctx, fnPartition), nil
-	})
+		// TODO: Is this supposed to stay? Then the comment below should change
+		// (if not, do we validate against this case from happening in cloud?)
+		if checksum == "" && key.Key != "" {
+			// For testing, use the key here.
+			checksum = key.Key
+		}
 
-	// The concurrency limit for fns MUST be added for leasing.
-	fnPartition.ConcurrencyLimit = limits.FunctionLimit
-	if fnPartition.ConcurrencyLimit <= 0 {
-		// Use account-level limits, as there are no function level limits
-		fnPartition.ConcurrencyLimit = limits.AccountLimit
-	}
+		partition := QueuePartition{
+			ID:               shard.RedisClient.kg.PartitionQueueSet(enums.PartitionTypeConcurrencyKey, id.String(), checksum),
+			PartitionType:    int(enums.PartitionTypeConcurrencyKey),
+			FunctionID:       &i.FunctionID,
+			AccountID:        i.Data.Identifier.AccountID,
+			ConcurrencyScope: int(scope),
 
-	accountConcurrencyLimit = limits.AccountLimit
+			EvaluatedConcurrencyKey:    key.Key,
+			UnevaluatedConcurrencyHash: key.Hash,
 
-	if len(ckeys) > 0 {
-		// Up to 2 concurrency keys.
-		for j, key := range ckeys {
-			scope, id, checksum, _ := key.ParseKey()
+			// Note: This uses the latest limit for the key queue,
+			// retrieved from customConcurrencyLimitRefresher
+			ConcurrencyLimit: key.Limit,
+		}
 
-			// TODO: Is this supposed to stay? Then the comment below should change
-			// (if not, do we validate against this case from happening in cloud?)
-			if checksum == "" && key.Key != "" {
-				// For testing, use the key here.
-				checksum = key.Key
-			}
+		switch scope {
+		case enums.ConcurrencyScopeFn:
+			partition.FunctionID = &i.FunctionID
+		case enums.ConcurrencyScopeEnv:
+			partition.EnvID = &i.WorkspaceID
+		case enums.ConcurrencyScopeAccount:
+			// AccountID comes from the concurrency key in this case
+			partition.AccountID = id
+		}
 
-			partition := QueuePartition{
-				ID:               shard.RedisClient.kg.PartitionQueueSet(enums.PartitionTypeConcurrencyKey, id.String(), checksum),
-				PartitionType:    int(enums.PartitionTypeConcurrencyKey),
-				FunctionID:       &i.FunctionID,
-				AccountID:        i.Data.Identifier.AccountID,
-				ConcurrencyScope: int(scope),
-
-				EvaluatedConcurrencyKey:    key.Key,
-				UnevaluatedConcurrencyHash: key.Hash,
-
-				// Note: This uses the latest limit for the key queue,
-				// retrieved from customConcurrencyLimitRefresher
-				ConcurrencyLimit: key.Limit,
-			}
-
-			switch scope {
-			case enums.ConcurrencyScopeFn:
-				partition.FunctionID = &i.FunctionID
-			case enums.ConcurrencyScopeEnv:
-				partition.EnvID = &i.WorkspaceID
-			case enums.ConcurrencyScopeAccount:
-				// AccountID comes from the concurrency key in this case
-				partition.AccountID = id
-			}
-
-			switch j {
-			case 0:
-				customConcurrencyKey1 = partition
-			case 1:
-				customConcurrencyKey2 = partition
-			}
+		switch j {
+		case 0:
+			customConcurrencyKey1 = partition
+		case 1:
+			customConcurrencyKey2 = partition
 		}
 	}
 
@@ -1288,8 +1291,7 @@ func (q *queue) EnqueueItem(ctx context.Context, shard QueueShard, i osqueue.Que
 		partitionTime = q.clock.Now()
 	}
 
-	// TODO Find a way so we don't have to run this when key queues are active
-	defaultPartition, _, _, _ := q.ItemPartitions(ctx, shard, i)
+	defaultPartition, _ := q.ItemPartition(ctx, shard, i)
 
 	isSystemPartition := defaultPartition.IsSystem()
 
@@ -2104,7 +2106,7 @@ func (q *queue) RequeueByJobID(ctx context.Context, queueShard QueueShard, jobID
 	// the queue item instead of just the partition passed via args.
 	//
 	// This is because a single queue item may be present in more than one queue.
-	fnPartition, _, _, _ := q.ItemPartitions(ctx, queueShard, i)
+	fnPartition, _ := q.ItemPartition(ctx, queueShard, i)
 
 	keys := []string{
 		queueShard.RedisClient.kg.QueueItem(),
@@ -2528,7 +2530,7 @@ func (q *queue) Requeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 	i.RefilledFrom = ""
 	i.RefilledAt = 0
 
-	fnPartition, _, _, _ := q.ItemPartitions(ctx, queueShard, i)
+	fnPartition, _ := q.ItemPartition(ctx, queueShard, i)
 	shadowPartition := q.ItemShadowPartition(ctx, i)
 	backlog := q.ItemBacklog(ctx, i)
 

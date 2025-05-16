@@ -827,6 +827,7 @@ func TestQueueSystemPartitions(t *testing.T) {
 		WithConcurrencyLimitGetter(func(ctx context.Context, p QueuePartition) PartitionConcurrencyLimits {
 			return PartitionConcurrencyLimits{5000, 5000, 5000}
 		}),
+		WithDisableLeaseChecksForSystemQueues(false),
 	)
 	ctx := context.Background()
 
