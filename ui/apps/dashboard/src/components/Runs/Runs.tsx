@@ -8,7 +8,7 @@ import {
   useSearchParam,
   useStringArraySearchParam,
 } from '@inngest/components/hooks/useSearchParam';
-import { useQuery } from 'urql';
+import { CombinedError, useQuery } from 'urql';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { useGetRun } from '@/components/RunDetails/useGetRun';
@@ -35,6 +35,12 @@ type EnvProps = {
 };
 
 type Props = (FnProps | EnvProps) & { traceAIEnabled?: boolean };
+
+const parseCelSearchError = (combinedError: CombinedError | undefined) => {
+  return combinedError?.graphQLErrors.find(
+    (error) => error.extensions.code == 'expression_invalid'
+  );
+};
 
 export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
   { functionSlug, scope, traceAIEnabled }: Props,
@@ -135,9 +141,9 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
     variables: commonQueryVars,
   });
 
-  if (firstPageRes.error || nextPageRes.error || countRes.error) {
-    throw firstPageRes.error || nextPageRes.error || countRes.error;
-  }
+  const searchError = parseCelSearchError(
+    firstPageRes.error || nextPageRes.error || countRes.error
+  );
 
   const firstPageRunsData = firstPageRes.data?.environment.runs.edges;
   const nextPageRunsData = nextPageRes.data?.environment.runs.edges;
@@ -234,6 +240,7 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
       scope={scope}
       totalCount={totalCount}
       traceAIEnabled={traceAIEnabled}
+      searchError={searchError}
     />
   );
 });
