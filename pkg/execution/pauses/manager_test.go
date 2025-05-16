@@ -164,7 +164,9 @@ func TestConsumePause(t *testing.T) {
 	}
 
 	// Test consuming a pause
-	result, err := manager.ConsumePause(ctx, pause, "test-data")
+	result, err := manager.ConsumePause(ctx, pause, state.ConsumePauseOpts{
+		Data: "test-data",
+	})
 	require.NoError(t, err)
 	assert.Equal(t, true, result.DidConsume)
 	assert.True(t, mockBufferer.consumeCalled, "ConsumePause should be called on the buffer")
@@ -199,7 +201,7 @@ type mockBuffererWithConsume struct {
 	consumeCalled bool
 }
 
-func (m *mockBuffererWithConsume) ConsumePause(ctx context.Context, pause state.Pause, data any) (state.ConsumePauseResult, error) {
+func (m *mockBuffererWithConsume) ConsumePause(ctx context.Context, pause state.Pause, opts state.ConsumePauseOpts) (state.ConsumePauseResult, error) {
 	m.consumeCalled = true
 	return state.ConsumePauseResult{DidConsume: true}, nil
 }
