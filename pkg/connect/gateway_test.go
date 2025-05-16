@@ -51,16 +51,16 @@ func TestConnectionEstablished(t *testing.T) {
 	msg = awaitNextMessage(t, res.ws, 2*time.Second)
 	require.Equal(t, connect.GatewayMessageType_GATEWAY_CONNECTION_READY, msg.Kind)
 
-	conn, err := res.stateManager.GetConnection(context.Background(), res.envID, res.connID)
-	require.NoError(t, err)
-	require.NotNil(t, conn)
-	require.Equal(t, connect.ConnectionStatus_READY, conn.Status)
-
 	res.lifecycles.Assert(t, testRecorderAssertion{
 		onConnectedCount: 1,
 		onSyncedCount:    1,
 		onReadyCount:     1,
 	})
+	
+	conn, err := res.stateManager.GetConnection(context.Background(), res.envID, res.connID)
+	require.NoError(t, err)
+	require.NotNil(t, conn)
+	require.Equal(t, connect.ConnectionStatus_READY, conn.Status)
 
 	require.Equal(t, res.connID, res.lifecycles.onReady[0].ConnectionId)
 	require.Equal(t, *res.workerGroup.AppID, *res.lifecycles.onReady[0].Groups[res.workerGroup.Hash].AppID)
@@ -508,7 +508,7 @@ func TestRejectSetupWhileDraining(t *testing.T) {
 
 func TestRejectConnectionWhileDraining(t *testing.T) {
 	t.Skip("this test should work but doesn't as we always receive EOF errors")
-	
+
 	params := testingParameters{
 		consecutiveMissesBeforeClose: 10,
 		heartbeatInterval:            1 * time.Second,
