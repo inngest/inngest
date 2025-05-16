@@ -1369,7 +1369,7 @@ func (e *executor) handlePausesAllNaively(ctx context.Context, iter state.PauseI
 
 			if err := e.handlePause(ctx, evt, evtID, pause, &res, l); err != nil {
 				goerr = errors.Join(goerr, err)
-				l.Error("error handling pause", "error", err)
+				l.Error("error handling pause", "error", err, "pause", pause)
 			}
 		}()
 
@@ -1433,7 +1433,7 @@ func (e *executor) handleAggregatePauses(ctx context.Context, evt event.TrackedE
 
 			if err := e.handlePause(ctx, evt, evtID, &pause, &res, l); err != nil {
 				goerr = errors.Join(goerr, err)
-				l.Error("error handling pause", "error", err)
+				l.Error("error handling pause", "error", err, "pause", pause)
 			}
 		}()
 	}
@@ -1463,11 +1463,7 @@ func (e *executor) handlePause(
 				return e.pm.DeletePause(context.Background(), *pause)
 			})
 			eg.Go(func() error {
-				err := e.exprAggregator.RemovePause(ctx, pause)
-				if err != nil {
-					l.Warn("error removing pause from aggregator", "error", err, "pause", pause)
-				}
-				return err
+				return e.exprAggregator.RemovePause(ctx, pause)
 			})
 			_ = eg.Wait()
 		}
@@ -1553,7 +1549,6 @@ func (e *executor) handlePause(
 		if errors.Is(err, state.ErrPauseLeased) ||
 			errors.Is(err, state.ErrPauseNotFound) ||
 			errors.Is(err, state.ErrRunNotFound) {
-			cleanup(ctx)
 			return nil
 		}
 		if err != nil {
@@ -1562,7 +1557,9 @@ func (e *executor) handlePause(
 
 		// Add to the counter.
 		atomic.AddInt32(&res[1], 1)
-		cleanup(ctx)
+		if err := e.exprAggregator.RemovePause(ctx, pause); err != nil {
+			l.Warn("error removing pause from aggregator", "error", err)
+		}
 		return nil
 	})
 }
@@ -1714,10 +1711,13 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 			// the timeout.  We can do this prior to leasing a pause as it's the
 			// only work that needs to happen
 			_, err = e.pm.ConsumePause(ctx, pause, nil)
-			if err == nil || err == state.ErrPauseNotFound {
-				return nil
+			switch err {
+			case nil, state.ErrPauseNotFound: // no-op
+			default:
+				return fmt.Errorf("error consuming pause via timeout: %w", err)
 			}
-			return fmt.Errorf("error consuming pause via timeout: %w", err)
+
+			return e.pm.DeletePause(ctx, pause)
 		}
 
 		consumeResult, err := e.pm.ConsumePause(ctx, pause, r.With)
@@ -1810,7 +1810,9 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 				}
 			}
 		}
-		return nil
+
+		// clean up pause
+		return e.pm.DeletePause(ctx, pause)
 	}, util.WithBoundaries(20*time.Second))
 	if err != nil {
 		return err
