@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 
@@ -1125,12 +1126,23 @@ func (m unshardedMgr) DeletePause(ctx context.Context, p state.Pause) error {
 	}
 }
 
-func (m mgr) ConsumePause(ctx context.Context, pause state.Pause, opts state.ConsumePauseOpts) (state.ConsumePauseResult, error) {
+func (m mgr) ConsumePause(ctx context.Context, pause state.Pause, opts state.ConsumePauseOpts) (state.ConsumePauseResult, func() error, error) {
 	if opts.IdempotencyKey == "" {
-		return state.ConsumePauseResult{}, state.ErrConsumePauseKeyMissing
+		return state.ConsumePauseResult{},
+			func() error { return nil },
+			state.ErrConsumePauseKeyMissing
 	}
 
-	return m.shardedMgr.consumePause(ctx, &pause, opts)
+	res, err := m.shardedMgr.consumePause(ctx, &pause, opts)
+	cleanup := func() error {
+		err := m.DeletePause(ctx, pause)
+		if err != nil {
+			logger.StdlibLogger(ctx).Error("error deleting pause", "error", err, "pause", pause)
+		}
+		return err
+	}
+
+	return res, cleanup, err
 }
 
 func (m shardedMgr) consumePause(ctx context.Context, p *state.Pause, opts state.ConsumePauseOpts) (state.ConsumePauseResult, error) {
