@@ -5090,6 +5090,7 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 			WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
 				return false
 			}),
+			WithEnqueueSystemPartitionsToBacklog(true),
 		)
 		ctx := context.Background()
 
@@ -5195,7 +5196,9 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 					Throttle:              nil,
 					CustomConcurrencyKeys: nil,
 				},
-				QueueName: nil,
+				QueueName:    nil,
+				RefilledFrom: "fake-backlog",
+				RefilledAt:   at.UnixMilli(),
 			}
 
 			fnPart, _, _, _ := q.ItemPartitions(ctx, defaultShard, item1)
@@ -5317,7 +5320,9 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 						},
 					},
 				},
-				QueueName: nil,
+				QueueName:    nil,
+				RefilledFrom: "fake-backlog",
+				RefilledAt:   at.UnixMilli(),
 			}
 
 			fnPart, custom1, custom2, _ := q.ItemPartitions(ctx, defaultShard, item)
@@ -5592,13 +5597,12 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 
 			// key queue v2 accounting
 			// should not track account concurrency for system partition
-			require.True(t, r.Exists(shadowPartition.accountInProgressKey(kg)))
+			require.False(t, r.Exists(shadowPartition.accountInProgressKey(kg)))
 			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, shadowPartition.inProgressKey(kg), qi.ID)))
 			require.Equal(t, kg.Concurrency("", ""), backlog.customKeyInProgress(kg, 1))
 			require.False(t, r.Exists(backlog.customKeyInProgress(kg, 1)))
 
 			// expect classic partition concurrency to include item
-			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, kg.Concurrency("account", sysQueueName), qi.ID)))
 			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, kg.Concurrency("p", sysQueueName), qi.ID)))
 			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, fnPart.concurrencyKey(kg), qi.ID)))
 		})

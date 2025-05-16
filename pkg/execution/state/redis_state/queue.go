@@ -521,6 +521,12 @@ func WithAllowKeyQueues(kq AllowKeyQueues) QueueOpt {
 	}
 }
 
+func WithEnqueueSystemPartitionsToBacklog(enqueueToBacklog bool) QueueOpt {
+	return func(q *queue) {
+		q.enqueueSystemQueuesToBacklog = enqueueToBacklog
+	}
+}
+
 // DisableLeaseChecks determines if existing lease checks on partition leasing and queue item
 // leasing should be disabled or not
 type DisableLeaseChecks func(ctx context.Context, acctID uuid.UUID) bool
@@ -711,7 +717,9 @@ type queue struct {
 	systemConcurrencyLimitGetter    SystemConcurrencyLimitGetter
 	customConcurrencyLimitRefresher QueueItemConcurrencyKeyLimitRefresher
 
-	allowKeyQueues     AllowKeyQueues
+	allowKeyQueues               AllowKeyQueues
+	enqueueSystemQueuesToBacklog bool
+
 	disableLeaseChecks DisableLeaseChecks
 
 	backlogNormalizeAsyncLimit  BacklogNormalizeAsyncLimitCount
@@ -1280,7 +1288,7 @@ func (q *queue) EnqueueItem(ctx context.Context, shard QueueShard, i osqueue.Que
 		q.logger.Warn().Interface("item", i).Msg("attempting to enqueue item to non-system partition without account ID")
 	}
 
-	enqueueToBacklogs := false
+	enqueueToBacklogs := isSystemPartition && q.enqueueSystemQueuesToBacklog
 	if !isSystemPartition && i.Data.Identifier.AccountID != uuid.Nil && q.allowKeyQueues != nil {
 		enqueueToBacklogs = q.allowKeyQueues(ctx, i.Data.Identifier.AccountID)
 	}
@@ -2142,7 +2150,7 @@ func (q *queue) RequeueByJobID(ctx context.Context, queueShard QueueShard, jobID
 func (q *queue) itemEnableKeyQueues(ctx context.Context, item osqueue.QueueItem) bool {
 	isSystem := item.QueueName != nil || item.Data.QueueName != nil
 	if isSystem {
-		return false
+		return q.enqueueSystemQueuesToBacklog
 	}
 
 	if item.Data.Identifier.AccountID != uuid.Nil && q.allowKeyQueues != nil {
