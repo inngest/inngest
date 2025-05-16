@@ -146,10 +146,10 @@ func TestProxyPubSubPath(t *testing.T) {
 	require.NoError(t, err)
 
 	err = sm.UpsertGateway(ctx, &state.Gateway{
-		Id:              gwID,
-		Status:          state.GatewayStatusActive,
-		LastHeartbeatAt: time.Now(),
-		Hostname:        "gw-host",
+		Id:                gwID,
+		Status:            state.GatewayStatusActive,
+		LastHeartbeatAtMS: time.Now().UnixMilli(),
+		Hostname:          "gw-host",
 	})
 	require.NoError(t, err)
 
@@ -356,10 +356,10 @@ func TestProxyPolling(t *testing.T) {
 	require.NoError(t, err)
 
 	err = sm.UpsertGateway(ctx, &state.Gateway{
-		Id:              gwID,
-		Status:          state.GatewayStatusActive,
-		LastHeartbeatAt: time.Now(),
-		Hostname:        "gw-host",
+		Id:                gwID,
+		Status:            state.GatewayStatusActive,
+		LastHeartbeatAtMS: time.Now().UnixMilli(),
+		Hostname:          "gw-host",
 	})
 	require.NoError(t, err)
 
@@ -576,10 +576,10 @@ func TestProxyLeaseExpiry(t *testing.T) {
 	require.NoError(t, err)
 
 	err = sm.UpsertGateway(ctx, &state.Gateway{
-		Id:              gwID,
-		Status:          state.GatewayStatusActive,
-		LastHeartbeatAt: time.Now(),
-		Hostname:        "gw-host",
+		Id:                gwID,
+		Status:            state.GatewayStatusActive,
+		LastHeartbeatAtMS: time.Now().UnixMilli(),
+		Hostname:          "gw-host",
 	})
 	require.NoError(t, err)
 

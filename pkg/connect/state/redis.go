@@ -498,7 +498,9 @@ func (r *redisConnectionStateManager) GarbageCollectGateways(ctx context.Context
 				return 0, fmt.Errorf("could not parse gateway data: %w", err)
 			}
 
-			gwHeartbeatMissed := gw.LastHeartbeatAt.Before(time.Now().Add(-consts.ConnectGCThreshold))
+			gwLastHeartbeat := time.UnixMilli(gw.LastHeartbeatAtMS)
+
+			gwHeartbeatMissed := gwLastHeartbeat.Before(time.Now().Add(-consts.ConnectGCThreshold))
 			if gwHeartbeatMissed {
 				err = r.DeleteGateway(ctx, gw.Id)
 				if err != nil {

@@ -450,10 +450,10 @@ func (c *connectGatewaySvc) updateGatewayState(status state.GatewayStatus) error
 	defer c.stateUpdateLock.Unlock()
 
 	err := c.stateManager.UpsertGateway(context.Background(), &state.Gateway{
-		Id:              c.gatewayId,
-		Status:          status,
-		LastHeartbeatAt: time.Now(),
-		Hostname:        c.hostname,
+		Id:                c.gatewayId,
+		Status:            status,
+		LastHeartbeatAtMS: time.Now().UnixMilli(),
+		Hostname:          c.hostname,
 	})
 	if err != nil {
 		c.logger.Error("failed to update gateway status in state", "status", status, "error", err)

@@ -932,10 +932,10 @@ func TestGarbageCollectGateways(t *testing.T) {
 		gwID := ulid.MustNew(ulid.Now(), rand.Reader)
 
 		expectedGw := &Gateway{
-			Id:              gwID,
-			Status:          GatewayStatusActive,
-			LastHeartbeatAt: time.Now().Truncate(time.Second),
-			Hostname:        "gw",
+			Id:                gwID,
+			Status:            GatewayStatusActive,
+			LastHeartbeatAtMS: time.Now().Truncate(time.Second).UnixMilli(),
+			Hostname:          "gw",
 		}
 
 		err = connManager.UpsertGateway(ctx, expectedGw)
@@ -971,10 +971,10 @@ func TestGarbageCollectGateways(t *testing.T) {
 		gwID := ulid.MustNew(ulid.Now(), rand.Reader)
 
 		expectedGw := &Gateway{
-			Id:              gwID,
-			Status:          GatewayStatusActive,
-			LastHeartbeatAt: time.Now().Add(-1 * time.Hour).Truncate(time.Second),
-			Hostname:        "old-gw",
+			Id:                gwID,
+			Status:            GatewayStatusActive,
+			LastHeartbeatAtMS: time.Now().Add(-1 * time.Hour).Truncate(time.Second).UnixMilli(),
+			Hostname:          "old-gw",
 		}
 
 		err = connManager.UpsertGateway(ctx, expectedGw)

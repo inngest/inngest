@@ -101,10 +101,10 @@ func setup(t *testing.T, stateMan state.StateManager, opts setupOpts, connsToCre
 	}
 
 	err := stateMan.UpsertGateway(context.Background(), &state.Gateway{
-		Id:              gatewayId,
-		Status:          state.GatewayStatusActive,
-		LastHeartbeatAt: lastHeartbeatAt,
-		Hostname:        "host-1",
+		Id:                gatewayId,
+		Status:            state.GatewayStatusActive,
+		LastHeartbeatAtMS: lastHeartbeatAt.UnixMilli(),
+		Hostname:          "host-1",
 	})
 	require.NoError(t, err)
 
