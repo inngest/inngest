@@ -16,9 +16,7 @@ import {
   TextElement,
   TimeElement,
 } from '../DetailsCard/Element';
-// NOTE - This component should be a shared component as part of the design system.
-// Until then, we re-use it from the RunDetailsV2 as these are part of the same parent UI.
-import { ErrorCard } from '../RunDetailsV2/ErrorCard';
+import { ErrorCard } from '../Error/ErrorCard';
 import { IconCloudArrowDown } from '../icons/CloudArrowDown';
 import { cn } from '../utils/classNames';
 import { devServerURL, useDevServer } from '../utils/useDevServer';

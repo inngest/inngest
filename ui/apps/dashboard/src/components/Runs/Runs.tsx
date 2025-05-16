@@ -233,7 +233,6 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
       functionIsPaused={pauseData?.environment.function?.isPaused ?? false}
       scope={scope}
       totalCount={totalCount}
-      traceAIEnabled={traceAIEnabled}
     />
   );
 });

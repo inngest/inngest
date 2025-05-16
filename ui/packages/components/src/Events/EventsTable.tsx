@@ -4,10 +4,10 @@ import { useCallback, useEffect, useRef, useState, type UIEventHandler } from 'r
 import type { Route } from 'next';
 import dynamic from 'next/dynamic';
 import { Button } from '@inngest/components/Button';
+import { ErrorCard } from '@inngest/components/Error/ErrorCard';
 import TableBlankState from '@inngest/components/EventTypes/TableBlankState';
 import { TimeFilter } from '@inngest/components/Filter/TimeFilter';
 import { Pill } from '@inngest/components/Pill';
-import { ErrorCard } from '@inngest/components/RunDetailsV2/ErrorCard';
 import NewTable from '@inngest/components/Table/NewTable';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip/Tooltip';
 import {
