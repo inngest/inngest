@@ -263,7 +263,9 @@ func (q *queue) ItemBacklog(ctx context.Context, i osqueue.QueueItem) QueueBackl
 				HashedKeyExpression: key.Hash, // hash("event.data.customerID")
 
 				// Evaluated hashed and unhashed values
-				HashedValue:   checksum,                      // hash("customer1")
+				HashedValue: checksum, // hash("customer1")
+
+				// Just for debugging purposes (only passed on Enqueue after Schedule or backlog normalization)
 				UnhashedValue: key.UnhashedEvaluatedKeyValue, // "customer1"
 			}
 		}
