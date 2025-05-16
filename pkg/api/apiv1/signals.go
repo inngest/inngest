@@ -1,10 +1,13 @@
 package apiv1
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 
+	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/publicerr"
+	"github.com/inngest/inngest/pkg/util"
 )
 
 type ReceiveSignalRequest struct {
@@ -30,7 +33,14 @@ func (a router) receiveSignal(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	signalRes, err := a.opts.Executor.ReceiveSignal(ctx, auth.WorkspaceID(), data.Signal, data.Data)
+	signalRes, err := util.WithRetry(
+		ctx,
+		"apiv1.receiveSignal",
+		func(ctx context.Context) (*execution.ReceiveSignalResult, error) {
+			return a.opts.Executor.ReceiveSignal(ctx, auth.WorkspaceID(), data.Signal, data.Data)
+		},
+		util.NewRetryConf(),
+	)
 	if err != nil {
 		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 500, "Failed to receive signal"))
 		return
