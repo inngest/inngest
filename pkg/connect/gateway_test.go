@@ -57,14 +57,14 @@ func TestConnectionEstablished(t *testing.T) {
 		onReadyCount:     1,
 	})
 	
+	require.Equal(t, res.connID, res.lifecycles.onReady[0].ConnectionId)
+	require.Equal(t, *res.workerGroup.AppID, *res.lifecycles.onReady[0].Groups[res.workerGroup.Hash].AppID)
+	require.Equal(t, res.workerGroup.FunctionSlugs, res.lifecycles.onReady[0].Groups[res.workerGroup.Hash].FunctionSlugs)
+
 	conn, err := res.stateManager.GetConnection(context.Background(), res.envID, res.connID)
 	require.NoError(t, err)
 	require.NotNil(t, conn)
 	require.Equal(t, connect.ConnectionStatus_READY, conn.Status)
-
-	require.Equal(t, res.connID, res.lifecycles.onReady[0].ConnectionId)
-	require.Equal(t, *res.workerGroup.AppID, *res.lifecycles.onReady[0].Groups[res.workerGroup.Hash].AppID)
-	require.Equal(t, res.workerGroup.FunctionSlugs, res.lifecycles.onReady[0].Groups[res.workerGroup.Hash].FunctionSlugs)
 }
 
 func TestExecutorMessageForwarding(t *testing.T) {
