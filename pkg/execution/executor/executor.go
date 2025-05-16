@@ -1496,6 +1496,10 @@ func (e *executor) handlePause(
 			return nil
 		}
 
+		// Ensure that we store the group ID for this pause, letting us properly track cancellation
+		// or continuation history
+		ctx = state.WithGroupID(ctx, pause.GroupID)
+
 		if pause.Cancel {
 			// This is a cancellation signal.  Check if the function
 			// has ended, and if so remove the pause.
@@ -1508,14 +1512,8 @@ func (e *executor) handlePause(
 				cleanup(ctx)
 				return nil
 			}
-		}
 
-		// Ensure that we store the group ID for this pause, letting us properly track cancellation
-		// or continuation history
-		ctx = state.WithGroupID(ctx, pause.GroupID)
-
-		// Cancelling a function can happen before a lease, as it's an atomic operation that will always happen.
-		if pause.Cancel {
+			// Cancelling a function can happen before a lease, as it's an atomic operation that will always happen.
 			err := e.Cancel(ctx, sv2.IDFromPause(*pause), execution.CancelRequest{
 				EventID:    &evtID,
 				Expression: pause.Expression,
