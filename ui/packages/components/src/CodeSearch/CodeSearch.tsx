@@ -188,7 +188,7 @@ export default function CodeSearch({
   const editorRef = useRef<MonacoEditorType>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const monacoRef = useRef<Monaco>();
-  const [hasValidationError, setHasValidationError] = useState(false);
+  const [editorValidationError, setEditorValidationError] = useState<ValidationError | null>(null);
   const validationTimerRef = useRef<NodeJS.Timeout>();
 
   const monaco = useMonaco();
@@ -326,10 +326,10 @@ export default function CodeSearch({
         endColumn: error.endColumn,
       };
       monacoRef.current.editor.setModelMarkers(model, 'owner', [marker]);
-      setHasValidationError(true);
+      setEditorValidationError(error);
     } else {
       monacoRef.current.editor.setModelMarkers(model, 'owner', []);
-      setHasValidationError(false);
+      setEditorValidationError(null);
     }
   };
 
@@ -344,7 +344,7 @@ export default function CodeSearch({
 
   const handleSearch = (editorContent?: string) => {
     const updatedContent = editorContent || content;
-    if (!hasValidationError) {
+    if (!editorValidationError) {
       // Remove empty lines and trim whitespace
       const processedContent = updatedContent
         .split('\n')
@@ -373,11 +373,13 @@ export default function CodeSearch({
     }, VALIDATION_DELAY);
   };
 
+  const expressionError = editorValidationError || searchError ;
+
   return (
     <>
-      {searchError && (
+      {expressionError && (
         <Alert severity="error" className="flex items-center justify-between text-sm">
-          {searchError.message}
+          {expressionError.message}
         </Alert>
       )}
       {monaco && (
