@@ -527,6 +527,12 @@ func WithEnqueueSystemPartitionsToBacklog(enqueueToBacklog bool) QueueOpt {
 	}
 }
 
+func WithDisableLeaseChecksForSystemQueues(disableChecks bool) QueueOpt {
+	return func(q *queue) {
+		q.disableLeaseChecksForSystemQueues = disableChecks
+	}
+}
+
 // DisableLeaseChecks determines if existing lease checks on partition leasing and queue item
 // leasing should be disabled or not
 type DisableLeaseChecks func(ctx context.Context, acctID uuid.UUID) bool
@@ -648,10 +654,12 @@ func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 		allowKeyQueues: func(ctx context.Context, acctID uuid.UUID) bool {
 			return false
 		},
+		enqueueSystemQueuesToBacklog: false,
 		disableLeaseChecks: func(ctx context.Context, acctID uuid.UUID) bool {
 			return false
 		},
-		backlogNormalizeAsyncLimit: func(ctx context.Context) int { return BacklogNormalizeAsyncLimit },
+		disableLeaseChecksForSystemQueues: true,
+		backlogNormalizeAsyncLimit:        func(ctx context.Context) int { return BacklogNormalizeAsyncLimit },
 		shadowPartitionProcessCount: func(ctx context.Context, acctID uuid.UUID) int {
 			return 5
 		},
@@ -720,7 +728,8 @@ type queue struct {
 	allowKeyQueues               AllowKeyQueues
 	enqueueSystemQueuesToBacklog bool
 
-	disableLeaseChecks DisableLeaseChecks
+	disableLeaseChecks                DisableLeaseChecks
+	disableLeaseChecksForSystemQueues bool
 
 	backlogNormalizeAsyncLimit  BacklogNormalizeAsyncLimitCount
 	shadowPartitionProcessCount QueueShadowPartitionProcessCount
@@ -2095,7 +2104,7 @@ func (q *queue) RequeueByJobID(ctx context.Context, queueShard QueueShard, jobID
 	// the queue item instead of just the partition passed via args.
 	//
 	// This is because a single queue item may be present in more than one queue.
-	fnPartition, customConcurrencyKey1, customConcurrencyKey2, _ := q.ItemPartitions(ctx, queueShard, i)
+	fnPartition, _, _, _ := q.ItemPartitions(ctx, queueShard, i)
 
 	keys := []string{
 		queueShard.RedisClient.kg.QueueItem(),
@@ -2130,8 +2139,6 @@ func (q *queue) RequeueByJobID(ctx context.Context, queueShard QueueShard, jobID
 			Err(err).
 			Interface("item", i).
 			Interface("fnPartition", fnPartition).
-			Interface("customConcurrencyKey1", customConcurrencyKey1).
-			Interface("customConcurrencyKey2", customConcurrencyKey2).
 			Msg("error requeueing queue item by JobID")
 		return fmt.Errorf("error requeueing item: %w", err)
 	}
@@ -2163,7 +2170,7 @@ func (q *queue) itemEnableKeyQueues(ctx context.Context, item osqueue.QueueItem)
 func (q *queue) itemDisableLeaseChecks(ctx context.Context, item osqueue.QueueItem) bool {
 	isSystem := item.QueueName != nil || item.Data.QueueName != nil
 	if isSystem {
-		return false
+		return q.disableLeaseChecksForSystemQueues
 	}
 
 	if item.Data.Identifier.AccountID != uuid.Nil && q.disableLeaseChecks != nil {
@@ -3009,7 +3016,7 @@ func (q *queue) PartitionLease(ctx context.Context, p *QueuePartition, duration 
 		fnMetaKey = *p.FunctionID
 	}
 
-	disableLeaseChecks := false
+	disableLeaseChecks := p.IsSystem() && q.disableLeaseChecksForSystemQueues
 	if !p.IsSystem() && q.disableLeaseChecks != nil && p.AccountID != uuid.Nil {
 		disableLeaseChecks = q.disableLeaseChecks(ctx, p.AccountID)
 	}
