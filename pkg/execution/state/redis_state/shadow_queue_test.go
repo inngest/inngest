@@ -781,13 +781,12 @@ func TestRefillConstraints(t *testing.T) {
 	}
 
 	type currentValues struct {
-		itemsInBacklog    int
-		itemsInReadyQueue int
+		itemsInBacklog int
 
-		accountInProgress               int
-		functionInProgress              int
-		customConcurrencyKey1InProgress int
-		customConcurrencyKey2InProgress int
+		accountActive               int
+		functionActive              int
+		customConcurrencyKey1Active int
+		customConcurrencyKey2Active int
 
 		// throttleCapacityUsed int
 	}
@@ -795,7 +794,7 @@ func TestRefillConstraints(t *testing.T) {
 	ck1 := createConcurrencyKey(enums.ConcurrencyScopeFn, fnID1, "bruno", 5)
 
 	ck2 := createConcurrencyKey(enums.ConcurrencyScopeEnv, envID1, "inngest", 10)
- 
+
 	tests := []struct {
 		name          string
 		currentValues currentValues
@@ -828,8 +827,8 @@ func TestRefillConstraints(t *testing.T) {
 		{
 			name: "function limits disallow",
 			currentValues: currentValues{
-				itemsInBacklog:     40,
-				functionInProgress: 10,
+				itemsInBacklog: 40,
+				functionActive: 10,
 			},
 			knobs: knobs{
 				maxRefill:                50,
@@ -851,8 +850,8 @@ func TestRefillConstraints(t *testing.T) {
 		{
 			name: "function limits disallow already exceeding",
 			currentValues: currentValues{
-				itemsInBacklog:     40,
-				functionInProgress: 30, // 30 running but only 10 allowed
+				itemsInBacklog: 40,
+				functionActive: 30, // 30 running but only 10 allowed
 			},
 			knobs: knobs{
 				maxRefill:                50,
@@ -874,8 +873,8 @@ func TestRefillConstraints(t *testing.T) {
 		{
 			name: "function limits allow",
 			currentValues: currentValues{
-				itemsInBacklog:     40,
-				functionInProgress: 9,
+				itemsInBacklog: 40,
+				functionActive: 9,
 			},
 			knobs: knobs{
 				maxRefill:                50,
@@ -898,8 +897,8 @@ func TestRefillConstraints(t *testing.T) {
 		{
 			name: "account limits disallow",
 			currentValues: currentValues{
-				itemsInBacklog:    40,
-				accountInProgress: 20,
+				itemsInBacklog: 40,
+				accountActive:  20,
 			},
 			knobs: knobs{
 				maxRefill:                50,
@@ -921,8 +920,8 @@ func TestRefillConstraints(t *testing.T) {
 		{
 			name: "account limits allow",
 			currentValues: currentValues{
-				itemsInBacklog:    40,
-				accountInProgress: 19,
+				itemsInBacklog: 40,
+				accountActive:  19,
 			},
 			knobs: knobs{
 				maxRefill:                50,
@@ -944,38 +943,37 @@ func TestRefillConstraints(t *testing.T) {
 		// Single custom concurrency key limits
 		{
 			name: "single custom concurrency key limits allow",
-			currentValues: currentValues{
-				itemsInBacklog:                  40,
-				accountInProgress:               20,
-				functionInProgress:              10,
-				customConcurrencyKey1InProgress: 1,
-				itemsInReadyQueue:               1,
-			},
 			knobs: knobs{
 				maxRefill:                50,
 				accountConcurrencyLimit:  30,
 				functionConcurrencyLimit: 20,
 				customConcurrencyKey1:    &ck1,
 			},
+			currentValues: currentValues{
+				itemsInBacklog:              40,
+				accountActive:               21,
+				functionActive:              11,
+				customConcurrencyKey1Active: 2,
+			},
 			expected: expected{
 				result: BacklogRefillResult{
 					Constraint:        enums.QueueConstraintNotLimited,
 					TotalBacklogCount: 40,
-					Capacity:          4,
+					Capacity:          3,
 					Refill:            3,
 					Refilled:          3,
 				},
 				itemsInBacklog:    37,
-				itemsInReadyQueue: 4,
+				itemsInReadyQueue: 3,
 			},
 		},
 		{
 			name: "single custom concurrency key limits disallow",
 			currentValues: currentValues{
-				itemsInBacklog:                  40,
-				accountInProgress:               20,
-				functionInProgress:              10,
-				customConcurrencyKey1InProgress: 5,
+				itemsInBacklog:              40,
+				accountActive:               20,
+				functionActive:              10,
+				customConcurrencyKey1Active: 5,
 			},
 			knobs: knobs{
 				maxRefill:                50,
@@ -999,11 +997,11 @@ func TestRefillConstraints(t *testing.T) {
 		{
 			name: "dual custom concurrency key limits allow",
 			currentValues: currentValues{
-				itemsInBacklog:                  40,
-				accountInProgress:               20, // 20 out of 30
-				functionInProgress:              10, // 10 out of 20
-				customConcurrencyKey1InProgress: 2,  // 2 out of 5
-				customConcurrencyKey2InProgress: 8,  // 8 out of 10
+				itemsInBacklog:              40,
+				accountActive:               20, // 20 out of 30
+				functionActive:              10, // 10 out of 20
+				customConcurrencyKey1Active: 2,  // 2 out of 5
+				customConcurrencyKey2Active: 8,  // 8 out of 10
 			},
 			knobs: knobs{
 				maxRefill:                50,
@@ -1027,11 +1025,11 @@ func TestRefillConstraints(t *testing.T) {
 		{
 			name: "dual custom concurrency key limits disallow",
 			currentValues: currentValues{
-				itemsInBacklog:                  40,
-				accountInProgress:               20, // 20 out of 30
-				functionInProgress:              10, // 10 out of 20
-				customConcurrencyKey1InProgress: 3,  // 3 out of 5
-				customConcurrencyKey2InProgress: 10, // 10 out of 10
+				itemsInBacklog:              40,
+				accountActive:               20, // 20 out of 30
+				functionActive:              10, // 10 out of 20
+				customConcurrencyKey1Active: 3,  // 3 out of 5
+				customConcurrencyKey2Active: 10, // 10 out of 10
 			},
 			knobs: knobs{
 				maxRefill:                50,
@@ -1061,21 +1059,20 @@ func TestRefillConstraints(t *testing.T) {
 				functionConcurrencyLimit: 20,
 			},
 			currentValues: currentValues{
-				itemsInBacklog:     40,
-				itemsInReadyQueue:  5,
-				accountInProgress:  20, // 20 out of 100
-				functionInProgress: 10, // 10 out of 20
+				itemsInBacklog: 40,
+				accountActive:  25, // 25 out of 100
+				functionActive: 15, // 15 out of 20
 			},
 			expected: expected{
 				result: BacklogRefillResult{
 					Constraint:        enums.QueueConstraintNotLimited,
-					TotalBacklogCount: 40, // would move 40
-					Capacity:          10, // but can only add 10, out of which 5 are already in ready queue
-					Refill:            5,  // so we limit to move 5 items
-					Refilled:          5,  // and move 5 items since none are dangling pointers
+					TotalBacklogCount: 40,
+					Capacity:          5,
+					Refill:            5,
+					Refilled:          5,
 				},
 				itemsInBacklog:    35,
-				itemsInReadyQueue: 10,
+				itemsInReadyQueue: 5,
 			},
 		},
 		{
@@ -1088,20 +1085,19 @@ func TestRefillConstraints(t *testing.T) {
 			currentValues: currentValues{
 				itemsInBacklog: 40,
 				// these items could be for any key, but we assume the ready queue will be cleared out asap
-				itemsInReadyQueue:  10,
-				accountInProgress:  20, // 20 out of 100
-				functionInProgress: 10, // 10 out of 20
+				accountActive:  30, // 30 out of 100
+				functionActive: 20, // 20 out of 20
 			},
 			expected: expected{
 				result: BacklogRefillResult{
-					Constraint:        enums.QueueConstraintNotLimited,
-					TotalBacklogCount: 40, // would move 40
-					Capacity:          10, // but can only add 10, out of which 10 are already in ready queue
-					Refill:            0,  // so we limit to move 5 items
-					Refilled:          0,  // and move 5 items since none are dangling pointers
+					Constraint:        enums.QueueConstraintFunctionConcurrency,
+					TotalBacklogCount: 40,
+					Capacity:          0,
+					Refill:            0,
+					Refilled:          0,
 				},
 				itemsInBacklog:    40,
-				itemsInReadyQueue: 10,
+				itemsInReadyQueue: 0,
 			},
 		},
 		{
@@ -1112,20 +1108,19 @@ func TestRefillConstraints(t *testing.T) {
 				functionConcurrencyLimit: 100,
 			},
 			currentValues: currentValues{
-				itemsInBacklog:    40,
-				itemsInReadyQueue: 5,
-				accountInProgress: 20, // 20 out of 100
+				itemsInBacklog: 40,
+				accountActive:  25, // 25 out of 100
 			},
 			expected: expected{
 				result: BacklogRefillResult{
 					Constraint:        enums.QueueConstraintNotLimited,
 					TotalBacklogCount: 40, // would move 40
-					Capacity:          80,
+					Capacity:          75,
 					Refill:            40,
 					Refilled:          40,
 				},
 				itemsInBacklog:    0,
-				itemsInReadyQueue: 45,
+				itemsInReadyQueue: 40,
 			},
 		},
 	}
@@ -1253,32 +1248,27 @@ func TestRefillConstraints(t *testing.T) {
 				}
 			}
 
-			for i := 1; i <= testCase.currentValues.accountInProgress; i++ {
-				_, err = r.ZAdd(kg.Concurrency("account", accountID1.String()), float64(at.UnixMilli()), fmt.Sprintf("item%d", i))
+			if testCase.currentValues.accountActive > 0 {
+				key := kg.ActiveCounter("account", accountID1.String())
+				_, err = r.Incr(key, testCase.currentValues.accountActive)
 				require.NoError(t, err)
 			}
 
-			for i := 1; i <= testCase.currentValues.functionInProgress; i++ {
-				_, err = r.ZAdd(kg.Concurrency("p", fnID1.String()), float64(at.UnixMilli()), fmt.Sprintf("item%d", i))
+			if testCase.currentValues.functionActive > 0 {
+				key := kg.ActiveCounter("p", fnID1.String())
+				_, err = r.Incr(key, testCase.currentValues.functionActive)
 				require.NoError(t, err)
 			}
 
-			for i := 1; i <= testCase.currentValues.customConcurrencyKey1InProgress; i++ {
-				key := testCase.knobs.customConcurrencyKey1
-				_, err = r.ZAdd(kg.Concurrency("custom", key.Key), float64(at.UnixMilli()), fmt.Sprintf("item%d", i))
+			if testCase.currentValues.customConcurrencyKey1Active > 0 {
+				key := kg.ActiveCounter("custom", testCase.knobs.customConcurrencyKey1.Key)
+				_, err = r.Incr(key, testCase.currentValues.customConcurrencyKey1Active)
 				require.NoError(t, err)
 			}
 
-			for i := 1; i <= testCase.currentValues.customConcurrencyKey2InProgress; i++ {
-				key := kg.Concurrency("custom", testCase.knobs.customConcurrencyKey2.Key)
-
-				_, err = r.ZAdd(key, float64(at.UnixMilli()), fmt.Sprintf("item%d", i))
-				require.NoError(t, err)
-			}
-
-			for i := 1; i <= testCase.currentValues.itemsInReadyQueue; i++ {
-				key := kg.PartitionQueueSet(enums.PartitionTypeDefault, fnID1.String(), "")
-				_, err = r.ZAdd(key, float64(at.UnixMilli()), fmt.Sprintf("item%d", i))
+			if testCase.currentValues.customConcurrencyKey2Active > 0 {
+				key := kg.ActiveCounter("custom", testCase.knobs.customConcurrencyKey2.Key)
+				_, err = r.Incr(key, testCase.currentValues.customConcurrencyKey2Active)
 				require.NoError(t, err)
 			}
 

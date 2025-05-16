@@ -2734,7 +2734,7 @@ func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueSha
 		kg.GlobalShadowPartitionSet(),
 		kg.GlobalAccountShadowPartitions(),
 		kg.AccountShadowPartitions(accountID),
-		kg.PartitionQueueSet(enums.PartitionTypeDefault, sp.PartitionID, ""),
+		sp.readyQueueKey(kg),
 		kg.QueueItem(),
 
 		// Constraint-related accounting keys
