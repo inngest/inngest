@@ -480,6 +480,44 @@ func (r *redisConnectionStateManager) GarbageCollectConnections(ctx context.Cont
 	return cleanedUp, nil
 }
 
+func (r *redisConnectionStateManager) GarbageCollectGateways(ctx context.Context) (int, error) {
+	var cleanedUp int
+	var hcursor uint64
+
+	for {
+		res, err := r.client.Do(ctx, r.client.B().Hscan().Key(r.gatewaysHashKey()).Cursor(hcursor).Count(100).Build()).AsScanEntry()
+		if err != nil {
+			return 0, fmt.Errorf("could not get gateways: %w", err)
+		}
+
+		for i := 0; i < len(res.Elements); i += 2 {
+			connData := res.Elements[i+1]
+
+			var gw Gateway
+			if err := json.Unmarshal([]byte(connData), &gw); err != nil {
+				return 0, fmt.Errorf("could not parse gateway data: %w", err)
+			}
+
+			gwHeartbeatMissed := gw.LastHeartbeatAt.Before(time.Now().Add(-consts.ConnectGCThreshold))
+			if gwHeartbeatMissed {
+				err = r.DeleteGateway(ctx, gw.Id)
+				if err != nil {
+					return 0, fmt.Errorf("could not delete gateway: %w", err)
+				}
+
+				cleanedUp++
+			}
+		}
+
+		if res.Cursor == 0 {
+			break
+		}
+		hcursor = res.Cursor
+	}
+
+	return cleanedUp, nil
+}
+
 func (r *redisConnectionStateManager) DeleteConnection(ctx context.Context, envID uuid.UUID, connID ulid.ULID) error {
 	existingConn, err := r.GetConnection(ctx, envID, connID)
 	if err != nil {

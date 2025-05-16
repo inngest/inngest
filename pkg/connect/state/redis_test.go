@@ -913,3 +913,83 @@ func TestGarbageCollectConnections(t *testing.T) {
 		})
 	})
 }
+
+func TestGarbageCollectGateways(t *testing.T) {
+	t.Run("should not clean up valid gateway", func(t *testing.T) {
+		r := miniredis.RunT(t)
+
+		rc, err := rueidis.NewClient(rueidis.ClientOption{
+			InitAddress:  []string{r.Addr()},
+			DisableCache: true,
+		})
+		require.NoError(t, err)
+		defer rc.Close()
+
+		connManager := NewRedisConnectionStateManager(rc)
+
+		ctx := context.Background()
+
+		gwID := ulid.MustNew(ulid.Now(), rand.Reader)
+
+		expectedGw := &Gateway{
+			Id:              gwID,
+			Status:          GatewayStatusActive,
+			LastHeartbeatAt: time.Now().Truncate(time.Second),
+			Hostname:        "gw",
+		}
+
+		err = connManager.UpsertGateway(ctx, expectedGw)
+		require.NoError(t, err)
+
+		gw, err := connManager.GetGateway(ctx, gwID)
+		require.NoError(t, err)
+		require.Equal(t, *expectedGw, *gw)
+
+		deleted, err := connManager.GarbageCollectGateways(ctx)
+		require.NoError(t, err)
+		require.Equal(t, 0, deleted)
+
+		gw, err = connManager.GetGateway(ctx, gwID)
+		require.NoError(t, err)
+		require.Equal(t, *expectedGw, *gw)
+	})
+
+	t.Run("should clean up expired gateway", func(t *testing.T) {
+		r := miniredis.RunT(t)
+
+		rc, err := rueidis.NewClient(rueidis.ClientOption{
+			InitAddress:  []string{r.Addr()},
+			DisableCache: true,
+		})
+		require.NoError(t, err)
+		defer rc.Close()
+
+		connManager := NewRedisConnectionStateManager(rc)
+
+		ctx := context.Background()
+
+		gwID := ulid.MustNew(ulid.Now(), rand.Reader)
+
+		expectedGw := &Gateway{
+			Id:              gwID,
+			Status:          GatewayStatusActive,
+			LastHeartbeatAt: time.Now().Add(-1 * time.Hour).Truncate(time.Second),
+			Hostname:        "old-gw",
+		}
+
+		err = connManager.UpsertGateway(ctx, expectedGw)
+		require.NoError(t, err)
+
+		gw, err := connManager.GetGateway(ctx, gwID)
+		require.NoError(t, err)
+		require.Equal(t, *expectedGw, *gw)
+
+		deleted, err := connManager.GarbageCollectGateways(ctx)
+		require.NoError(t, err)
+		require.Equal(t, 1, deleted)
+
+		gw, err = connManager.GetGateway(ctx, gwID)
+		require.Error(t, err)
+		require.ErrorIs(t, err, ErrGatewayNotFound)
+	})
+}
