@@ -65,6 +65,7 @@ type Props = {
   functionIsPaused?: boolean;
   scope: ViewScope;
   totalCount: number | undefined;
+  searchError?: Error;
 };
 
 export function RunsPage({
@@ -87,6 +88,7 @@ export function RunsPage({
   functionIsPaused,
   scope,
   totalCount,
+  searchError,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const columns = useScopedColumns(scope);
@@ -368,6 +370,7 @@ export function RunsPage({
               onSearch={onSearchChange}
               placeholder="event.data.userId == “1234” or output.count > 10"
               value={search}
+              searchError={searchError}
             />
           </>
         )}

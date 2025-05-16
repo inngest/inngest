@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { Alert } from '@inngest/components/Alert';
 import { Button } from '@inngest/components/Button';
 import {
   FONT,
@@ -175,10 +176,12 @@ export default function CodeSearch({
   onSearch,
   placeholder,
   value,
+  searchError,
 }: {
   onSearch: (content: string) => void;
   placeholder?: string;
   value?: string;
+  searchError?: Error;
 }) {
   const [content, setContent] = useState<string>(value || '');
   const [dark, setDark] = useState(isDark());
@@ -372,6 +375,11 @@ export default function CodeSearch({
 
   return (
     <>
+      {searchError && (
+        <Alert severity="error" className="flex items-center justify-between text-sm">
+          {searchError.message}
+        </Alert>
+      )}
       {monaco && (
         <div ref={wrapperRef} className="relative">
           {!content && (
