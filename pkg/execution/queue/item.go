@@ -380,8 +380,10 @@ type PayloadPauseBlockFlush struct {
 // This is always enqueued from any async match;  we must correctly decrement the
 // pending count in cases where the event is not received.
 type PayloadPauseTimeout struct {
-	PauseID   uuid.UUID `json:"pauseID"`
-	OnTimeout bool      `json:"onTimeout"`
+	PauseID       uuid.UUID `json:"pauseID"`
+	Event         *string   `json:"evt,omitempty"`
+	CorrelationID *string   `json:"cID,omitempty"`
+	SignalID      *string   `json:"sID,omitempty"`
 }
 
 func HashID(_ context.Context, id string) string {
