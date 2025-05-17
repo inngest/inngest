@@ -48,6 +48,9 @@ type RunStateKeyGenerator interface {
 	// Pending returns the key used to store the pending actions for a given
 	// run.
 	Pending(ctx context.Context, isSharded bool, identifier state.Identifier) string
+
+	// PauseConsumeKey is an idempotency key used for making sure pause consumptions are idempotent
+	PauseConsumeKey(ctx context.Context, isSharded bool, runID ulid.ULID, pauseID uuid.UUID) string
 }
 
 type runStateKeyGenerator struct {
@@ -106,6 +109,10 @@ func (s runStateKeyGenerator) ActionInputs(ctx context.Context, isSharded bool, 
 
 func (s runStateKeyGenerator) Pending(ctx context.Context, isSharded bool, identifier state.Identifier) string {
 	return fmt.Sprintf("{%s}:pending:%s:%s", s.Prefix(ctx, s.stateDefaultKey, isSharded, identifier.RunID), identifier.WorkflowID, identifier.RunID)
+}
+
+func (s runStateKeyGenerator) PauseConsumeKey(ctx context.Context, isSharded bool, runID ulid.ULID, pauseID uuid.UUID) string {
+	return fmt.Sprintf("{%s}:pause-key:%s", s.Prefix(ctx, s.stateDefaultKey, isSharded, runID), pauseID.String())
 }
 
 type GlobalKeyGenerator interface {

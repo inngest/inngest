@@ -35,7 +35,7 @@ type Manager interface {
 	//
 	// NOTE: This consumes a pause in the buffer, then calls m.Delete to ensure the pause is
 	// deleted from the backing block store.
-	ConsumePause(ctx context.Context, pause state.Pause, data any) (state.ConsumePauseResult, error)
+	ConsumePause(ctx context.Context, pause state.Pause, opts state.ConsumePauseOpts) (state.ConsumePauseResult, func() error, error)
 
 	// Delete deletes a pause from either the block index or the buffer, depending on
 	// where the pause is stored.
@@ -69,7 +69,7 @@ type Bufferer interface {
 	PauseTimestamp(ctx context.Context, index Index, pause state.Pause) (time.Time, error)
 
 	// ConsumePause consumes a pause, writing the deleted status to the buffer.
-	ConsumePause(ctx context.Context, pause state.Pause, data any) (state.ConsumePauseResult, error)
+	ConsumePause(ctx context.Context, pause state.Pause, opts state.ConsumePauseOpts) (state.ConsumePauseResult, func() error, error)
 }
 
 // BlockStore is an implementation that reads and writes blocks.
