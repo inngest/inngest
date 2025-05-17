@@ -232,7 +232,6 @@ func TestScanIter(t *testing.T) {
 	entries := 50_000
 	key := "test-scan"
 	for i := 0; i < entries; i++ {
-
 		cmd := r.B().Hset().Key(key).FieldValue().
 			FieldValue(strconv.Itoa(i), strconv.Itoa(i)).
 			Build()

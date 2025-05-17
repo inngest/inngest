@@ -9,16 +9,16 @@ Output:
 
 ]]
 
-local actionKey     = KEYS[1]
-local stackKey      = KEYS[2]
-local keyMetadata   = KEYS[3]
+local actionKey       = KEYS[1]
+local stackKey        = KEYS[2]
+local keyMetadata     = KEYS[3]
 local keyStepsPending = KEYS[4]
-local keyIdempotency = KEYS[5]
+local keyIdempotency  = KEYS[5]
 
-local pauseDataKey = ARGV[1] -- used to set data in run state store
-local pauseDataVal = ARGV[2] -- data to set
+local pauseDataKey          = ARGV[1] -- used to set data in run state store
+local pauseDataVal          = ARGV[2] -- data to set
 local pauseIdempotencyValue = ARGV[3] -- the idempotency key value
-local pauseIdempotencyUnix = tonumber(ARGV[4]) -- TTL of the idempotency key in unix timestamp
+local pauseIdempotencyUnix  = tonumber(ARGV[4]) -- TTL of the idempotency key in unix timestamp
 
 
 if actionKey ~= nil and pauseDataKey ~= "" then

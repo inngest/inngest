@@ -1186,6 +1186,7 @@ func (m shardedMgr) consumePause(ctx context.Context, p *state.Pause, opts state
 	if err != nil {
 		return state.ConsumePauseResult{}, fmt.Errorf("error consuming pause: %w", err)
 	}
+
 	switch status {
 	case -1:
 		// This could be an ErrDuplicateResponse;  we're attempting to consume a pause twice.
