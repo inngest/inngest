@@ -881,8 +881,7 @@ func checkConsumePauseIdempotency(t *testing.T, m state.Manager) {
 	_, err := m.SavePause(ctx, pause)
 	require.NoError(t, err)
 
-	key := "hello"
-
+	key := uuid.NewString()
 	// consuming the pause for the first time
 	res, _, err := m.ConsumePause(ctx, pause, state.ConsumePauseOpts{
 		IdempotencyKey: key,
@@ -893,7 +892,7 @@ func checkConsumePauseIdempotency(t *testing.T, m state.Manager) {
 
 	// consuming with another idempotency key will fail
 	res, _, err = m.ConsumePause(ctx, pause, state.ConsumePauseOpts{
-		IdempotencyKey: "world",
+		IdempotencyKey: uuid.NewString(),
 		Data:           pauseData,
 	})
 	require.NoError(t, err)
