@@ -4,9 +4,9 @@ import { useCallback, useEffect, useMemo, useRef, useState, type UIEventHandler 
 import type { Route } from 'next';
 import { useRouter } from 'next/navigation';
 import { Button } from '@inngest/components/Button/Button';
+import { ErrorCard } from '@inngest/components/Error/ErrorCard';
 import TableBlankState from '@inngest/components/EventTypes/TableBlankState';
 import { Search } from '@inngest/components/Forms/Search';
-import { ErrorCard } from '@inngest/components/RunDetailsV2/ErrorCard';
 import NewTable from '@inngest/components/Table/NewTable';
 import useDebounce from '@inngest/components/hooks/useDebounce';
 import {

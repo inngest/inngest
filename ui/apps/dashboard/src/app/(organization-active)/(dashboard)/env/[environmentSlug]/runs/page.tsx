@@ -3,19 +3,13 @@
 import { useRef } from 'react';
 import { Button } from '@inngest/components/Button';
 import { Header } from '@inngest/components/Header/Header';
-import { LegacyRunsToggle } from '@inngest/components/RunDetailsV3/LegacyRunsToggle';
-import { useLegacyTrace } from '@inngest/components/SharedContext/useLegacyTrace';
 import { RiRefreshLine } from '@remixicon/react';
 
-import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import { Runs } from '@/components/Runs';
 import type { RefreshRunsRef } from '@/components/Runs/Runs';
 
 export default function Page() {
   const ref = useRef<RefreshRunsRef>(null);
-  const { value: traceAIEnabled, isReady: featureFlagReady } = useBooleanFlag('ai-traces');
-
-  const { enabled: legacyTraceEnabled, ready: legacyTraceReady } = useLegacyTrace();
 
   return (
     <>
@@ -23,7 +17,6 @@ export default function Page() {
         breadcrumb={[{ text: 'Runs' }]}
         action={
           <div className="flex flex-row items-center justify-end gap-2">
-            <LegacyRunsToggle traceAIEnabled={featureFlagReady && traceAIEnabled} />
             <Button
               kind="primary"
               appearance="outlined"
@@ -35,13 +28,7 @@ export default function Page() {
           </div>
         }
       />
-      <Runs
-        scope="env"
-        ref={ref}
-        traceAIEnabled={
-          featureFlagReady && traceAIEnabled && legacyTraceReady && !legacyTraceEnabled
-        }
-      />
+      <Runs scope="env" ref={ref} />
     </>
   );
 }

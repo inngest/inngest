@@ -34,10 +34,10 @@ type EnvProps = {
   scope: 'env';
 };
 
-type Props = (FnProps | EnvProps) & { traceAIEnabled?: boolean };
+type Props = FnProps | EnvProps;
 
 export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
-  { functionSlug, scope, traceAIEnabled }: Props,
+  { functionSlug, scope }: Props,
   ref
 ) {
   const env = useEnvironment();
@@ -233,7 +233,6 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
       functionIsPaused={pauseData?.environment.function?.isPaused ?? false}
       scope={scope}
       totalCount={totalCount}
-      traceAIEnabled={traceAIEnabled}
     />
   );
 });

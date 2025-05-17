@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import NextLink from 'next/link';
-import { ErrorCard } from '@inngest/components/RunDetailsV2/ErrorCard';
+import { ErrorCard } from '@inngest/components/Error/ErrorCard';
 import { Time } from '@inngest/components/Time';
 import { usePrettyJson } from '@inngest/components/hooks/usePrettyJson';
 import { type Event } from '@inngest/components/types/event';
