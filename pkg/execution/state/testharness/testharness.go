@@ -92,6 +92,7 @@ func CheckState(t *testing.T, gen Generator) {
 		"ConsumePause/WithData/StackIndex": checkConsumePauseWithDataIndex,
 		"ConsumePause/WithEmptyData":       checkConsumePauseWithEmptyData,
 		"ConsumePause/WithEmptyDataKey":    checkConsumePauseWithEmptyDataKey,
+		"ConsumePauseIdempotency":          checkConsumePauseIdempotency,
 		"DeletePause":                      checkDeletePause,
 		"PausesByEvent/Empty":              checkPausesByEvent_empty,
 		"PausesByEvent/Single":             checkPausesByEvent_single,
@@ -856,6 +857,55 @@ func checkConsumePauseWithEmptyDataKey(t *testing.T, m state.Manager) {
 	reloaded, err := m.Load(ctx, s.Identifier().AccountID, s.RunID())
 	require.Nil(t, err)
 	require.Equal(t, 0, len(reloaded.Actions()), "Pause data was stored in the state store with no data key provided")
+}
+
+func checkConsumePauseIdempotency(t *testing.T, m state.Manager) {
+	ctx := context.Background()
+	s := setup(t, m)
+
+	pauseData := map[string]any{"yolo": "yala"}
+
+	// Save a pause.
+	pause := state.Pause{
+		ID: pauseID(t),
+		Identifier: state.PauseIdentifier{
+			RunID:      s.Identifier().RunID,
+			FunctionID: s.Identifier().WorkflowID,
+			AccountID:  s.Identifier().AccountID,
+		},
+		Outgoing: inngest.TriggerName,
+		Incoming: w.Steps[0].ID,
+		Expires:  state.Time(time.Now().Add(state.PauseLeaseDuration * 2)),
+		DataKey:  "foobar",
+	}
+	_, err := m.SavePause(ctx, pause)
+	require.NoError(t, err)
+
+	key := "hello"
+
+	// consuming the pause for the first time
+	res, _, err := m.ConsumePause(ctx, pause, state.ConsumePauseOpts{
+		IdempotencyKey: key,
+		Data:           pauseData,
+	})
+	require.NoError(t, err)
+	require.True(t, res.DidConsume)
+
+	// consuming with another idempotency key will fail
+	res, _, err = m.ConsumePause(ctx, pause, state.ConsumePauseOpts{
+		IdempotencyKey: "world",
+		Data:           pauseData,
+	})
+	require.NoError(t, err)
+	require.False(t, res.DidConsume)
+
+	// attempt to consume again with the same idempotency key should work
+	res, _, err = m.ConsumePause(ctx, pause, state.ConsumePauseOpts{
+		IdempotencyKey: key,
+		Data:           pauseData,
+	})
+	require.NoError(t, err)
+	require.True(t, res.DidConsume)
 }
 
 func checkPausesByEvent_empty(t *testing.T, m state.Manager) {
