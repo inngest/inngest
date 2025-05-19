@@ -2,6 +2,7 @@ package state
 
 import (
 	"context"
+	"fmt"
 	"regexp"
 	"time"
 
@@ -13,6 +14,10 @@ import (
 )
 
 var tsSuffix = regexp.MustCompile(`\s*&&\s*\(\s*async.ts\s+==\s*null\s*\|\|\s*async.ts\s*>\s*\d*\)\s*$`)
+
+var (
+	ErrConsumePauseKeyMissing = fmt.Errorf("no idempotency key provided for consuming pauses")
+)
 
 // PauseMutater manages creating, leasing, and consuming pauses from a backend implementation.
 type PauseMutater interface {
@@ -42,7 +47,7 @@ type PauseMutater interface {
 	//
 	// Any data passed when consuming a pause will be stored within function run state
 	// for future reference using the pause's DataKey.
-	ConsumePause(ctx context.Context, p Pause, data any) (ConsumePauseResult, error)
+	ConsumePause(ctx context.Context, p Pause, opts ConsumePauseOpts) (ConsumePauseResult, func() error, error)
 
 	// DeletePause permanently deletes a pause.
 	DeletePause(ctx context.Context, p Pause) error
@@ -86,6 +91,12 @@ type PauseGetter interface {
 	// PauseCreatedAt returns the timestamp a pause was created, using the given
 	// workspace <> event Index.
 	PauseCreatedAt(ctx context.Context, workspaceID uuid.UUID, event string, pauseID uuid.UUID) (time.Time, error)
+}
+
+// ConsumePauseOpts are the options to be passed in for consuming a pause
+type ConsumePauseOpts struct {
+	IdempotencyKey string
+	Data           any
 }
 
 type ConsumePauseResult struct {

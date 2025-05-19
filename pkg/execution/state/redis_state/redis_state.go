@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 
@@ -1125,24 +1126,32 @@ func (m unshardedMgr) DeletePause(ctx context.Context, p state.Pause) error {
 	}
 }
 
-func (m mgr) ConsumePause(ctx context.Context, pause state.Pause, data any) (state.ConsumePauseResult, error) {
-	result, err := m.shardedMgr.consumePause(ctx, &pause, data)
-	if err != nil {
-		return state.ConsumePauseResult{}, err
+func (m mgr) ConsumePause(ctx context.Context, pause state.Pause, opts state.ConsumePauseOpts) (state.ConsumePauseResult, func() error, error) {
+	if opts.IdempotencyKey == "" {
+		return state.ConsumePauseResult{},
+			func() error { return nil },
+			state.ErrConsumePauseKeyMissing
 	}
 
-	// The pause was now consumed, so let's clean up
-	err = m.unshardedMgr.DeletePause(ctx, pause)
-	return result, err
+	res, err := m.shardedMgr.consumePause(ctx, &pause, opts)
+	cleanup := func() error {
+		err := m.DeletePause(ctx, pause)
+		if err != nil {
+			logger.StdlibLogger(ctx).Error("error deleting pause after consumption", "error", err, "pause", pause)
+		}
+		return err
+	}
+
+	return res, cleanup, err
 }
 
-func (m shardedMgr) consumePause(ctx context.Context, p *state.Pause, data any) (state.ConsumePauseResult, error) {
+func (m shardedMgr) consumePause(ctx context.Context, p *state.Pause, opts state.ConsumePauseOpts) (state.ConsumePauseResult, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "consumePause"), redis_telemetry.ScopePauses)
 
 	fnRunState := m.s.FunctionRunState()
 	client, isSharded := fnRunState.Client(ctx, p.Identifier.AccountID, p.Identifier.RunID)
 
-	marshalledData, err := json.Marshal(data)
+	marshalledData, err := json.Marshal(opts.Data)
 	if err != nil {
 		return state.ConsumePauseResult{}, fmt.Errorf("cannot marshal data to store in state: %w", err)
 	}
@@ -1155,11 +1164,14 @@ func (m shardedMgr) consumePause(ctx context.Context, p *state.Pause, data any) 
 			RunID:      p.Identifier.RunID,
 			WorkflowID: p.Identifier.FunctionID,
 		}),
+		fnRunState.kg.PauseConsumeKey(ctx, isSharded, p.Identifier.RunID, p.ID),
 	}
 
 	args, err := StrSlice([]any{
 		p.DataKey,
 		string(marshalledData),
+		opts.IdempotencyKey,
+		time.Now().Add(consts.FunctionIdempotencyPeriod).Unix(),
 	})
 	if err != nil {
 		return state.ConsumePauseResult{}, err
@@ -1174,6 +1186,7 @@ func (m shardedMgr) consumePause(ctx context.Context, p *state.Pause, data any) 
 	if err != nil {
 		return state.ConsumePauseResult{}, fmt.Errorf("error consuming pause: %w", err)
 	}
+
 	switch status {
 	case -1:
 		// This could be an ErrDuplicateResponse;  we're attempting to consume a pause twice.

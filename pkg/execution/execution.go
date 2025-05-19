@@ -222,6 +222,9 @@ type ResumeRequest struct {
 	RunID     *ulid.ULID
 	StepName  string
 	IsTimeout bool
+
+	// IdempotencyKey is used to make sure pause consumption is idempotent
+	IdempotencyKey string
 }
 
 func (r *ResumeRequest) Error() string {

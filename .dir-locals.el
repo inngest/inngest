@@ -10,16 +10,4 @@
                              :mode "remote"
                              :request "attach"
                              :showLog "true")
-                            (go-test
-                             modes (go-mode go-ts-mode)
-                             command "dlv"
-                             command-args ("dap" "--listen" "127.0.0.1::autoport")
-                             command-cwd default-directory
-                             port :autoport
-                             :type "go"
-                             :mode "test"
-                             :request "launch"
-                             :showLog "true"
-                             :program "."
-                             :args [])
                             )))))

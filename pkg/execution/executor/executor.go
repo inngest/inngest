@@ -1369,7 +1369,7 @@ func (e *executor) handlePausesAllNaively(ctx context.Context, iter state.PauseI
 
 			if err := e.handlePause(ctx, evt, evtID, pause, &res, l); err != nil {
 				goerr = errors.Join(goerr, err)
-				l.Error("error handling pause", "error", err)
+				l.Error("error handling pause", "error", err, "pause", pause)
 			}
 		}()
 
@@ -1433,7 +1433,7 @@ func (e *executor) handleAggregatePauses(ctx context.Context, evt event.TrackedE
 
 			if err := e.handlePause(ctx, evt, evtID, &pause, &res, l); err != nil {
 				goerr = errors.Join(goerr, err)
-				l.Error("error handling pause", "error", err)
+				l.Error("error handling pause", "error", err, "pause", pause)
 			}
 		}()
 	}
@@ -1457,6 +1457,17 @@ func (e *executor) handlePause(
 	}
 
 	return util.Crit(ctx, "handle pause", func(ctx context.Context) error {
+		cleanup := func(ctx context.Context) {
+			eg := errgroup.Group{}
+			eg.Go(func() error {
+				return e.pm.DeletePause(context.Background(), *pause)
+			})
+			eg.Go(func() error {
+				return e.exprAggregator.RemovePause(ctx, pause)
+			})
+			_ = eg.Wait()
+		}
+
 		// NOTE: Some pauses may be nil or expired, as the iterator may take
 		// time to process.  We handle that here and assume that the event
 		// did not occur in time.
@@ -1467,16 +1478,19 @@ func (e *executor) handlePause(
 			if shouldDelete {
 				// Consume this pause to remove it entirely
 				l.Debug("deleting expired pause")
-				_ = e.pm.DeletePause(context.Background(), *pause)
-				_ = e.exprAggregator.RemovePause(ctx, pause)
+				cleanup(ctx)
 			}
-
 			return nil
 		}
 
+		// NOTE: Make sure the event that created the pause isn't also the one resuming it
 		if pause.TriggeringEventID != nil && *pause.TriggeringEventID == evtID.String() {
 			return nil
 		}
+
+		// Ensure that we store the group ID for this pause, letting us properly track cancellation
+		// or continuation history
+		ctx = state.WithGroupID(ctx, pause.GroupID)
 
 		if pause.Cancel {
 			// This is a cancellation signal.  Check if the function
@@ -1487,18 +1501,11 @@ func (e *executor) handlePause(
 			// bookkeeping is not implemented.
 			if exists, err := e.smv2.Exists(ctx, sv2.IDFromPause(*pause)); !exists && err == nil {
 				// This function has ended.  Delete the pause and continue
-				_ = e.pm.DeletePause(context.Background(), *pause)
-				_ = e.exprAggregator.RemovePause(ctx, pause)
+				cleanup(ctx)
 				return nil
 			}
-		}
 
-		// Ensure that we store the group ID for this pause, letting us properly track cancellation
-		// or continuation history
-		ctx = state.WithGroupID(ctx, pause.GroupID)
-
-		// Cancelling a function can happen before a lease, as it's an atomic operation that will always happen.
-		if pause.Cancel {
+			// Cancelling a function can happen before a lease, as it's an atomic operation that will always happen.
 			err := e.Cancel(ctx, sv2.IDFromPause(*pause), execution.CancelRequest{
 				EventID:    &evtID,
 				Expression: pause.Expression,
@@ -1508,12 +1515,12 @@ func (e *executor) handlePause(
 				errors.Is(err, state.ErrFunctionFailed) ||
 				errors.Is(err, ErrFunctionEnded) {
 				// Safe to ignore.
-				_ = e.exprAggregator.RemovePause(ctx, pause)
+				cleanup(ctx)
 				return nil
 			}
 			if err != nil && strings.Contains(err.Error(), "no status stored in metadata") {
 				// Safe to ignore.
-				_ = e.exprAggregator.RemovePause(ctx, pause)
+				cleanup(ctx)
 				return nil
 			}
 
@@ -1522,10 +1529,14 @@ func (e *executor) handlePause(
 			}
 
 			// Ensure we consume this pause, as this isn't handled by the higher-level cancel function.
-			_, err = e.pm.ConsumePause(context.Background(), *pause, nil)
+			// NOTE: cleanup closure is ignored here since there's already another one that will be called
+			_, _, err = e.pm.ConsumePause(context.Background(), *pause, state.ConsumePauseOpts{
+				IdempotencyKey: evtID.String(),
+				Data:           nil,
+			})
 			if err == nil || err == state.ErrPauseLeased || err == state.ErrPauseNotFound {
 				atomic.AddInt32(&res[1], 1)
-				_ = e.exprAggregator.RemovePause(ctx, pause)
+				cleanup(ctx)
 				return nil
 			}
 			return fmt.Errorf("error consuming pause after cancel: %w", err)
@@ -1534,10 +1545,11 @@ func (e *executor) handlePause(
 		resumeData := pause.GetResumeData(evt.GetEvent())
 
 		err := e.Resume(ctx, *pause, execution.ResumeRequest{
-			With:     resumeData.With,
-			EventID:  &evtID,
-			RunID:    resumeData.RunID,
-			StepName: resumeData.StepName,
+			With:           resumeData.With,
+			EventID:        &evtID,
+			RunID:          resumeData.RunID,
+			StepName:       resumeData.StepName,
+			IdempotencyKey: evtID.String(),
 		})
 		if errors.Is(err, state.ErrPauseLeased) ||
 			errors.Is(err, state.ErrPauseNotFound) ||
@@ -1614,10 +1626,11 @@ func (e *executor) HandleInvokeFinish(ctx context.Context, evt event.TrackedEven
 	}
 
 	return e.Resume(ctx, *pause, execution.ResumeRequest{
-		With:     resumeData.With,
-		EventID:  &evtID,
-		RunID:    resumeData.RunID,
-		StepName: resumeData.StepName,
+		With:           resumeData.With,
+		EventID:        &evtID,
+		RunID:          resumeData.RunID,
+		StepName:       resumeData.StepName,
+		IdempotencyKey: evtID.String(),
 	})
 }
 
@@ -1703,14 +1716,23 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 			// Delete this pause, as an event has occured which matches
 			// the timeout.  We can do this prior to leasing a pause as it's the
 			// only work that needs to happen
-			_, err = e.pm.ConsumePause(ctx, pause, nil)
-			if err == nil || err == state.ErrPauseNotFound {
-				return nil
+			_, cleanup, err := e.pm.ConsumePause(ctx, pause, state.ConsumePauseOpts{
+				IdempotencyKey: r.IdempotencyKey,
+				Data:           nil,
+			})
+			switch err {
+			case nil, state.ErrPauseNotFound: // no-op
+			default:
+				return fmt.Errorf("error consuming pause via timeout: %w", err)
 			}
-			return fmt.Errorf("error consuming pause via timeout: %w", err)
+
+			return cleanup()
 		}
 
-		consumeResult, err := e.pm.ConsumePause(ctx, pause, r.With)
+		consumeResult, cleanup, err := e.pm.ConsumePause(ctx, pause, state.ConsumePauseOpts{
+			IdempotencyKey: r.IdempotencyKey,
+			Data:           r.With,
+		})
 		if err != nil {
 			return fmt.Errorf("error consuming pause via event: %w", err)
 		}
@@ -1800,7 +1822,9 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 				}
 			}
 		}
-		return nil
+
+		// clean up pause
+		return cleanup()
 	}, util.WithBoundaries(20*time.Second))
 	if err != nil {
 		return err
