@@ -274,6 +274,8 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 	go func() {
 		for {
 			select {
+			case <-ctx.Done():
+				return
 			case <-waitForResponseCtx.Done():
 				return
 			// Poll every two seconds with a jitter of up to 3 seconds

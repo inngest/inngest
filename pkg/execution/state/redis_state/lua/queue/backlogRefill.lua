@@ -29,15 +29,20 @@ local keyShadowPartitionSet              = KEYS[2]
 local keyGlobalShadowPartitionSet        = KEYS[3]
 local keyGlobalAccountShadowPartitionSet = KEYS[4]
 local keyAccountShadowPartitionSet       = KEYS[5]
+
 local keyReadySet                        = KEYS[6]
-local keyQueueItemHash                   = KEYS[7]
+local keyGlobalPointer        	         = KEYS[7] -- partition:sorted - zset
+local keyGlobalAccountPointer 	         = KEYS[8] -- accounts:sorted - zset
+local keyAccountPartitions    	         = KEYS[9] -- accounts:$accountID:partition:sorted - zset
+
+local keyQueueItemHash                   = KEYS[10]
 
 -- Constraint-related accounting keys
-local keyActiveAccount           = KEYS[8]
-local keyActivePartition         = KEYS[9]
-local keyActiveConcurrencyKey1   = KEYS[10]
-local keyActiveConcurrencyKey2   = KEYS[11]
-local keyActiveCompound          = KEYS[12]
+local keyActiveAccount           = KEYS[11]
+local keyActivePartition         = KEYS[12]
+local keyActiveConcurrencyKey1   = KEYS[13]
+local keyActiveConcurrencyKey2   = KEYS[14]
+local keyActiveCompound          = KEYS[15]
 
 local backlogID     = ARGV[1]
 local partitionID   = ARGV[2]
@@ -215,28 +220,25 @@ if refill > 0 then
     -- If queue item does not exist in hash, delete from backlog
     if itemData == false or itemData == nil or itemData == "" then
       table.insert(backlogRemArgs, itemID)  -- remove from backlog
-      goto continue
+    else
+      -- Insert new members into ready set
+      table.insert(readyArgs, itemScore)
+      table.insert(readyArgs, itemID)
+
+      -- Remove item from backlog
+      table.insert(backlogRemArgs, itemID)
+
+      -- Update queue item with refill data
+      local updatedData = cjson.decode(itemData)
+      updatedData.rf = backlogID
+      updatedData.rat = nowMS
+
+      table.insert(itemUpdateArgs, itemID)
+      table.insert(itemUpdateArgs, cjson.encode(updatedData))
+
+      -- Increment number of refilled items
+      refilled = refilled + 1
     end
-
-    -- Insert new members into ready set
-    table.insert(readyArgs, itemScore)
-    table.insert(readyArgs, itemID)
-
-    -- Remove item from backlog
-    table.insert(backlogRemArgs, itemID)
-
-    -- Update queue item with refill data
-    local updatedData = cjson.decode(itemData)
-    updatedData.rf = backlogID
-    updatedData.rat = nowMS
-
-    table.insert(itemUpdateArgs, itemID)
-    table.insert(itemUpdateArgs, cjson.encode(updatedData))
-
-    -- Increment number of refilled items
-    refilled = refilled + 1
-
-    ::continue::
   end
 
   -- "Refill" items to ready set
@@ -271,6 +273,27 @@ end
 -- update gcra theoretical arrival time
 if throttleLimit > 0 then
   gcraUpdate(throttleKey, nowMS, throttlePeriod * 1000, throttleLimit, throttleBurst, refill)
+end
+
+--
+-- Adjust ready queue pointers
+--
+
+if refilled > 0 then
+  -- Get the minimum score for the queue.
+  local minScores = redis.call("ZRANGE", keyReadySet, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")
+  local earliestScore = tonumber(minScores[2])
+
+  -- Potentially update the queue of queues.
+  local currentScore = redis.call("ZSCORE", keyGlobalPointer, partitionID)
+  if currentScore == false or tonumber(currentScore) ~= earliestScore then
+    if nowMS == nil or nowMS == false then
+      local updateTo = earliestScore/1000
+
+      update_pointer_score_to(partitionID, keyGlobalPointer, updateTo)
+      update_account_queues(keyGlobalAccountPointer, keyAccountPartitions, partitionID, accountID, updateTo)
+    end
+  end
 end
 
 --
