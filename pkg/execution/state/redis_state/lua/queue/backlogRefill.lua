@@ -215,28 +215,25 @@ if refill > 0 then
     -- If queue item does not exist in hash, delete from backlog
     if itemData == false or itemData == nil or itemData == "" then
       table.insert(backlogRemArgs, itemID)  -- remove from backlog
-      goto continue
+    else
+      -- Insert new members into ready set
+      table.insert(readyArgs, itemScore)
+      table.insert(readyArgs, itemID)
+
+      -- Remove item from backlog
+      table.insert(backlogRemArgs, itemID)
+
+      -- Update queue item with refill data
+      local updatedData = cjson.decode(itemData)
+      updatedData.rf = backlogID
+      updatedData.rat = nowMS
+
+      table.insert(itemUpdateArgs, itemID)
+      table.insert(itemUpdateArgs, cjson.encode(updatedData))
+
+      -- Increment number of refilled items
+      refilled = refilled + 1
     end
-
-    -- Insert new members into ready set
-    table.insert(readyArgs, itemScore)
-    table.insert(readyArgs, itemID)
-
-    -- Remove item from backlog
-    table.insert(backlogRemArgs, itemID)
-
-    -- Update queue item with refill data
-    local updatedData = cjson.decode(itemData)
-    updatedData.rf = backlogID
-    updatedData.rat = nowMS
-
-    table.insert(itemUpdateArgs, itemID)
-    table.insert(itemUpdateArgs, cjson.encode(updatedData))
-
-    -- Increment number of refilled items
-    refilled = refilled + 1
-
-    ::continue::
   end
 
   -- "Refill" items to ready set
