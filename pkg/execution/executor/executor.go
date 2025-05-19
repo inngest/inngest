@@ -3139,8 +3139,9 @@ func (e *executor) ReceiveSignal(ctx context.Context, workspaceID uuid.UUID, sig
 	l.Debug().Str("pause.DataKey", pause.DataKey).Msg("resuming pause from signal")
 
 	err = e.Resume(ctx, *pause, execution.ResumeRequest{
-		RunID:    &pause.Identifier.RunID,
-		StepName: pause.StepName,
+		RunID:          &pause.Identifier.RunID,
+		StepName:       pause.StepName,
+		IdempotencyKey: signalID,
 		With: map[string]any{
 			execution.StateDataKey: state.SignalStepReturn{
 				Signal: signalID,
