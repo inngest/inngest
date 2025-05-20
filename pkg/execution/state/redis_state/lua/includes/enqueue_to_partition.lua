@@ -74,12 +74,6 @@ local function enqueue_to_partition(keyPartitionSet, partitionID, partitionItem,
 end
 
 local function enqueue_to_backlog(keyBacklogSet, backlogID, backlogItem, partitionID, shadowPartitionItem, partitionItem, keyPartitionMap, keyBacklogMeta, keyGlobalShadowPartitionSet, keyShadowPartitionMeta, keyShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, queueScore, queueID, partitionTime, nowMS, accountID)
-	if backlogID == "" then
-    -- This is a blank backlog, so don't even bother.  This allows us to pre-allocate
-    -- 3 backlogs per item, even if an item only needs a single backlog.
-    return
-  end
-
 	-- Push the queue item's ID to the given backlog set
 	redis.call("ZADD", keyBacklogSet, queueScore, queueID)
 

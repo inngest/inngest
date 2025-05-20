@@ -3331,10 +3331,18 @@ func TestQueuePartitionRequeue(t *testing.T) {
 	require.NoError(t, err)
 	defer rc.Close()
 
-	q := NewQueue(QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey)})
+	var enableKeyQueues bool
+	shard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey)}
+	q := NewQueue(
+		shard,
+		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+			return enableKeyQueues
+		}),
+	)
 	ctx := context.Background()
 	idA := uuid.New()
 	now := time.Now()
+	accountID := uuid.New()
 
 	t.Run("For default items without concurrency settings", func(t *testing.T) {
 		qi, err := q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{FunctionID: idA}, now, osqueue.EnqueueOpts{})
@@ -3529,6 +3537,101 @@ func TestQueuePartitionRequeue(t *testing.T) {
 			})
 		})
 	})
+
+	t.Run("does not clean up if backlog isn't empty", func(t *testing.T) {
+		r.FlushAll()
+
+		//
+		// Setup: Enqueue 2 items, one to backlog, one to ready queue
+		//
+
+		qi, err := q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{FunctionID: idA, Data: osqueue.Item{Identifier: state.Identifier{AccountID: accountID, WorkflowID: idA}}}, now, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+
+		fnReadyQueue := shard.RedisClient.kg.PartitionQueueSet(enums.PartitionTypeDefault, idA.String(), "")
+
+		require.True(t, r.Exists(fnReadyQueue))
+		require.True(t, r.Exists(shard.RedisClient.kg.GlobalPartitionIndex()))
+		require.True(t, r.Exists(shard.RedisClient.kg.AccountPartitionIndex(accountID)))
+		require.True(t, r.Exists(shard.RedisClient.kg.GlobalAccountIndex()))
+
+		enableKeyQueues = true
+		qi2, err := q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{
+			FunctionID: idA,
+			Data: osqueue.Item{
+				Kind: osqueue.KindEdge,
+				Identifier: state.Identifier{
+					WorkflowID: idA,
+					AccountID:  accountID,
+				},
+			},
+		}, now, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+		enableKeyQueues = false
+
+		backlog := q.ItemBacklog(ctx, qi2)
+		shadowPart := q.ItemShadowPartition(ctx, qi2)
+
+		require.True(t, r.Exists(shard.RedisClient.kg.BacklogSet(backlog.BacklogID)))
+		require.True(t, r.Exists(shard.RedisClient.kg.ShadowPartitionSet(backlog.ShadowPartitionID)))
+		require.Equal(t, 1, zcard(t, rc, fnReadyQueue))
+
+		p, _ := q.ItemPartition(ctx, shard, qi)
+		require.Equal(t, idA.String(), p.ID)
+		require.Equal(t, accountID, p.AccountID)
+
+		//
+		// Dequeue item from ready queue, only backlog remains
+		//
+
+		err = q.Dequeue(ctx, q.primaryQueueShard, qi)
+		require.NoError(t, err)
+
+		require.Equal(t, 0, zcard(t, rc, fnReadyQueue))
+		require.True(t, r.Exists(shard.RedisClient.kg.GlobalPartitionIndex()))
+		require.True(t, r.Exists(shard.RedisClient.kg.AccountPartitionIndex(accountID)))
+		require.True(t, r.Exists(shard.RedisClient.kg.GlobalAccountIndex()))
+
+		require.True(t, r.Exists(shard.RedisClient.kg.FnMetadata(*p.FunctionID)), r.Keys())
+
+		//
+		// PartitionRequeue should drop pointers but not partition metadata
+		//
+
+		err = q.PartitionRequeue(ctx, q.primaryQueueShard, &p, now.Add(time.Minute), false)
+		require.Equal(t, ErrPartitionGarbageCollected, err)
+
+		require.Equal(t, 0, zcard(t, rc, fnReadyQueue))
+		require.False(t, r.Exists(shard.RedisClient.kg.GlobalPartitionIndex()))
+		require.False(t, r.Exists(shard.RedisClient.kg.AccountPartitionIndex(accountID)))
+		require.False(t, r.Exists(shard.RedisClient.kg.GlobalAccountIndex()))
+
+		// ensure gc does not drop fn metadata
+		require.True(t, r.Exists(shard.RedisClient.kg.FnMetadata(*p.FunctionID)), r.Keys())
+		require.True(t, r.Exists(shard.RedisClient.kg.PartitionItem()))
+		keys, err := r.HKeys(shard.RedisClient.kg.PartitionItem())
+		require.NoError(t, err)
+		require.Contains(t, keys, p.FunctionID.String())
+
+		//
+		// Drop backlog and have PartitionRequeue clean up remaining data
+		//
+
+		// drop backlog
+		res, err := q.BacklogRefill(ctx, &backlog, &shadowPart, time.Now().Add(time.Minute))
+		require.NoError(t, err)
+		require.Equal(t, 1, res.Refilled)
+
+		err = q.Dequeue(ctx, shard, qi2)
+		require.NoError(t, err)
+
+		err = q.PartitionRequeue(ctx, shard, &p, now.Add(time.Minute), false)
+		require.Equal(t, ErrPartitionGarbageCollected, err)
+
+		require.False(t, r.Exists(shard.RedisClient.kg.FnMetadata(*p.FunctionID)))
+		require.False(t, r.Exists(shard.RedisClient.kg.PartitionItem()))
+	})
+
 }
 
 func TestQueueFunctionPause(t *testing.T) {
