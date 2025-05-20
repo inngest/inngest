@@ -2584,9 +2584,6 @@ func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, i *runInsta
 	}
 
 	_, err = e.pm.SavePause(ctx, pause)
-	if err == state.ErrPauseAlreadyExists {
-		return nil
-	}
 	if err == state.ErrSignalConflict {
 		return state.WrapInStandardError(
 			err,
@@ -2595,7 +2592,7 @@ func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, i *runInsta
 			"",
 		)
 	}
-	if err != nil {
+	if err != nil && !errors.Is(err, state.ErrPauseAlreadyExists) {
 		return fmt.Errorf("error saving pause when handling WaitForSignal opcode: %w", err)
 	}
 
@@ -2851,11 +2848,7 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, i *runInstan
 		},
 	}
 	_, err = e.pm.SavePause(ctx, pause)
-	if err != nil {
-		if err == state.ErrPauseAlreadyExists {
-			return nil
-		}
-
+	if err != nil && !errors.Is(err, state.ErrPauseAlreadyExists) {
 		return err
 	}
 
