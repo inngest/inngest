@@ -1820,6 +1820,8 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 				} else {
 					logger.StdlibLogger(ctx).Error("error dequeueing consumed pause job when resuming", "error", err)
 				}
+			} else {
+				fmt.Println("dequeued pause timeout item", queue.HashID(ctx, jobID))
 			}
 		}
 
