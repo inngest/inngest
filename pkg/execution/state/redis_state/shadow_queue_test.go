@@ -244,7 +244,115 @@ func TestQueueRefillBacklog(t *testing.T) {
 			}),
 		)
 
-		fnID1, accountID1, envID1 := uuid.New(), uuid.New(), uuid.New()
+		addItem := func(id string, identifier state.Identifier, at time.Time) osqueue.QueueItem {
+			item := osqueue.QueueItem{
+				ID:          id,
+				FunctionID:  identifier.WorkflowID,
+				WorkspaceID: identifier.WorkspaceID,
+				Data: osqueue.Item{
+					WorkspaceID:           identifier.WorkspaceID,
+					Kind:                  osqueue.KindEdge,
+					Identifier:            identifier,
+					QueueName:             nil,
+					Throttle:              nil,
+					CustomConcurrencyKeys: nil,
+				},
+				QueueName: nil,
+			}
+
+			qi, err := q.EnqueueItem(ctx, defaultShard, item, at, osqueue.EnqueueOpts{})
+			require.NoError(t, err)
+
+			return qi
+		}
+		at := clock.Now()
+
+		qi1 := addItem("test1", state.Identifier{
+			AccountID:   accountId,
+			WorkspaceID: wsID,
+			WorkflowID:  fnID,
+		}, at)
+
+		addItem("test2", state.Identifier{
+			AccountID:   accountId,
+			WorkspaceID: wsID,
+			WorkflowID:  fnID,
+		}, at)
+
+		backlog := q.ItemBacklog(ctx, qi1)
+		shadowPart := q.ItemShadowPartition(ctx, qi1)
+
+		refillUntil := at.Add(time.Minute)
+
+		res, err := q.BacklogRefill(ctx, &backlog, &shadowPart, refillUntil)
+		require.NoError(t, err)
+
+		require.Equal(t, 2, res.TotalBacklogCount)
+		require.Equal(t, 2, res.BacklogCountUntil)
+		require.Equal(t, 45, res.Capacity) // limit by function concurrency
+		require.Equal(t, 1, res.Refill)    // limited by max refill limit of 1
+		require.Equal(t, 1, res.Refilled)
+		require.Equal(t, enums.QueueConstraintNotLimited, res.Constraint)
+	})
+
+	t.Run("should not move future items but adjust pointers", func(t *testing.T) {
+		r := miniredis.RunT(t)
+		rc, err := rueidis.NewClient(rueidis.ClientOption{
+			InitAddress:  []string{r.Addr()},
+			DisableCache: true,
+		})
+		require.NoError(t, err)
+		defer rc.Close()
+
+		ctx := context.Background()
+
+		defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+
+		clock := clockwork.NewFakeClock()
+
+		enqueueToBacklog := true
+		q := NewQueue(
+			defaultShard,
+			WithClock(clock),
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+				return enqueueToBacklog
+			}),
+			WithEnqueueSystemPartitionsToBacklog(false),
+			WithDisableLeaseChecksForSystemQueues(false),
+			WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
+				return true
+			}),
+			WithRunMode(QueueRunMode{
+				Sequential:                        true,
+				Scavenger:                         true,
+				Partition:                         true,
+				Account:                           true,
+				AccountWeight:                     85,
+				ShadowPartition:                   true,
+				AccountShadowPartition:            true,
+				AccountShadowPartitionWeight:      85,
+				ShadowContinuations:               true,
+				ShadowContinuationSkipProbability: 0,
+				NormalizePartition:                true,
+			}),
+			WithBacklogRefillLimit(500),
+			WithConcurrencyLimitGetter(func(ctx context.Context, p QueuePartition) PartitionConcurrencyLimits {
+				return PartitionConcurrencyLimits{
+					AccountLimit:   123,
+					FunctionLimit:  45,
+					CustomKeyLimit: 0,
+				}
+			}),
+			WithCustomConcurrencyKeyLimitRefresher(func(ctx context.Context, i osqueue.QueueItem) []state.CustomConcurrency {
+				return i.Data.GetConcurrencyKeys()
+			}),
+			WithSystemConcurrencyLimitGetter(func(ctx context.Context, p QueuePartition) SystemPartitionConcurrencyLimits {
+				return SystemPartitionConcurrencyLimits{
+					GlobalLimit:    789,
+					PartitionLimit: 678,
+				}
+			}),
+		)
 
 		addItem := func(id string, identifier state.Identifier, at time.Time) osqueue.QueueItem {
 			item := osqueue.QueueItem{
@@ -270,19 +378,26 @@ func TestQueueRefillBacklog(t *testing.T) {
 		at := clock.Now()
 
 		qi1 := addItem("test1", state.Identifier{
-			AccountID:   accountID1,
-			WorkspaceID: envID1,
-			WorkflowID:  fnID1,
+			AccountID:   accountId,
+			WorkspaceID: wsID,
+			WorkflowID:  fnID,
 		}, at)
 
-		addItem("test2", state.Identifier{
-			AccountID:   accountID1,
-			WorkspaceID: envID1,
-			WorkflowID:  fnID1,
-		}, at)
+		futureAt := at.Add(34 * time.Minute) // random value
+		qi2 := addItem("test2", state.Identifier{
+			AccountID:   accountId,
+			WorkspaceID: wsID,
+			WorkflowID:  fnID,
+		}, futureAt)
 
 		backlog := q.ItemBacklog(ctx, qi1)
 		shadowPart := q.ItemShadowPartition(ctx, qi1)
+
+		require.Equal(t, at.UnixMilli(), int64(score(t, r, kg.BacklogSet(backlog.BacklogID), qi1.ID)))
+		require.Equal(t, at.Unix(), int64(score(t, r, kg.ShadowPartitionSet(shadowPart.PartitionID), backlog.BacklogID)))
+		require.Equal(t, at.Unix(), int64(score(t, r, kg.GlobalShadowPartitionSet(), shadowPart.PartitionID)))
+		require.Equal(t, at.Unix(), int64(score(t, r, kg.GlobalAccountShadowPartitions(), accountId.String())), r.Keys())
+		require.Equal(t, at.Unix(), int64(score(t, r, kg.AccountShadowPartitions(accountId), shadowPart.PartitionID)))
 
 		refillUntil := at.Add(time.Minute)
 
@@ -290,10 +405,36 @@ func TestQueueRefillBacklog(t *testing.T) {
 		require.NoError(t, err)
 
 		require.Equal(t, 2, res.TotalBacklogCount)
+		require.Equal(t, 1, res.BacklogCountUntil)
 		require.Equal(t, 45, res.Capacity) // limit by function concurrency
 		require.Equal(t, 1, res.Refill)
 		require.Equal(t, 1, res.Refilled)
 		require.Equal(t, enums.QueueConstraintNotLimited, res.Constraint)
+
+		require.Equal(t, futureAt.UnixMilli(), int64(score(t, r, kg.BacklogSet(backlog.BacklogID), qi2.ID)))
+		require.Equal(t, futureAt.Unix(), int64(score(t, r, kg.ShadowPartitionSet(shadowPart.PartitionID), backlog.BacklogID)))
+		require.Equal(t, futureAt.Unix(), int64(score(t, r, kg.GlobalShadowPartitionSet(), shadowPart.PartitionID)))
+		require.Equal(t, futureAt.Unix(), int64(score(t, r, kg.GlobalAccountShadowPartitions(), accountId.String())))
+		require.Equal(t, futureAt.Unix(), int64(score(t, r, kg.AccountShadowPartitions(accountId), shadowPart.PartitionID)))
+
+		toTheFuture := futureAt.Sub(at) + time.Minute
+		r.FastForward(toTheFuture)
+		clock.Advance(toTheFuture)
+
+		refillUntil = futureAt.Add(time.Minute)
+
+		res, err = q.BacklogRefill(ctx, &backlog, &shadowPart, refillUntil)
+		require.NoError(t, err)
+
+		require.Equal(t, 1, res.TotalBacklogCount)
+		require.Equal(t, 1, res.BacklogCountUntil)
+		require.Equal(t, 44, res.Capacity) // limit by function concurrency
+		require.Equal(t, 1, res.Refill)
+		require.Equal(t, 1, res.Refilled)
+		require.Equal(t, enums.QueueConstraintNotLimited, res.Constraint)
+
+		require.False(t, r.Exists(kg.BacklogSet(backlog.BacklogID)))
+		require.False(t, r.Exists(kg.ShadowPartitionSet(shadowPart.PartitionID)))
 	})
 }
 
