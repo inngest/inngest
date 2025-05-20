@@ -121,6 +121,10 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 	if err != nil {
 		return fmt.Errorf("could not peek backlogs for shadow partition: %w", err)
 	}
+	metrics.GaugeShadowPartitionSize(ctx, int64(totalCount), metrics.GaugeOpt{
+		PkgName: pkgName,
+		Tags:    map[string]any{"partition_id": shadowPart.PartitionID},
+	})
 
 	// Refill backlogs in random order
 	fullyProcessedBacklogs := 0
