@@ -245,6 +245,8 @@ type RunTraceSpan struct {
 	IsRoot        bool               `json:"isRoot"`
 	ParentSpanID  *string            `json:"parentSpanID,omitempty"`
 	ParentSpan    *RunTraceSpan      `json:"parentSpan,omitempty"`
+	IsUserland    bool               `json:"isUserland"`
+	UserlandSpan  *UserlandSpan      `json:"userlandSpan,omitempty"`
 }
 
 type RunTraceSpanOutput struct {
@@ -330,6 +332,16 @@ type UpdateAppInput struct {
 	URL string `json:"url"`
 }
 
+type UserlandSpan struct {
+	SpanName      *string `json:"spanName,omitempty"`
+	SpanKind      *string `json:"spanKind,omitempty"`
+	ServiceName   *string `json:"serviceName,omitempty"`
+	ResourceAttrs *string `json:"resourceAttrs,omitempty"`
+	ScopeName     *string `json:"scopeName,omitempty"`
+	ScopeVersion  *string `json:"scopeVersion,omitempty"`
+	SpanAttrs     *string `json:"spanAttrs,omitempty"`
+}
+
 type WaitForEventStepInfo struct {
 	EventName    string     `json:"eventName"`
 	Expression   *string    `json:"expression,omitempty"`
@@ -339,6 +351,14 @@ type WaitForEventStepInfo struct {
 }
 
 func (WaitForEventStepInfo) IsStepInfo() {}
+
+type WaitForSignalStepInfo struct {
+	Signal   string    `json:"signal"`
+	Timeout  time.Time `json:"timeout"`
+	TimedOut *bool     `json:"timedOut,omitempty"`
+}
+
+func (WaitForSignalStepInfo) IsStepInfo() {}
 
 type Workspace struct {
 	ID string `json:"id"`
@@ -928,11 +948,12 @@ func (e StepEventType) MarshalGQL(w io.Writer) {
 type StepOp string
 
 const (
-	StepOpInvoke       StepOp = "INVOKE"
-	StepOpRun          StepOp = "RUN"
-	StepOpSleep        StepOp = "SLEEP"
-	StepOpWaitForEvent StepOp = "WAIT_FOR_EVENT"
-	StepOpAiGateway    StepOp = "AI_GATEWAY"
+	StepOpInvoke        StepOp = "INVOKE"
+	StepOpRun           StepOp = "RUN"
+	StepOpSleep         StepOp = "SLEEP"
+	StepOpWaitForEvent  StepOp = "WAIT_FOR_EVENT"
+	StepOpAiGateway     StepOp = "AI_GATEWAY"
+	StepOpWaitForSignal StepOp = "WAIT_FOR_SIGNAL"
 )
 
 var AllStepOp = []StepOp{
@@ -941,11 +962,12 @@ var AllStepOp = []StepOp{
 	StepOpSleep,
 	StepOpWaitForEvent,
 	StepOpAiGateway,
+	StepOpWaitForSignal,
 }
 
 func (e StepOp) IsValid() bool {
 	switch e {
-	case StepOpInvoke, StepOpRun, StepOpSleep, StepOpWaitForEvent, StepOpAiGateway:
+	case StepOpInvoke, StepOpRun, StepOpSleep, StepOpWaitForEvent, StepOpAiGateway, StepOpWaitForSignal:
 		return true
 	}
 	return false

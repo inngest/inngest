@@ -10,6 +10,7 @@ import (
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/rs/zerolog"
 	"log/slog"
+	mathRand "math/rand"
 	"net/http"
 	"os"
 	"sync"
@@ -27,6 +28,7 @@ import (
 
 const (
 	GatewayInstrumentInterval = 20 * time.Second
+	GatewayGCInterval         = 30 * time.Minute
 )
 
 type gatewayOpt func(*connectGatewaySvc)
@@ -350,6 +352,36 @@ func (c *connectGatewaySvc) instrument(ctx context.Context) {
 	}
 }
 
+func (c *connectGatewaySvc) gc(ctx context.Context) {
+	for {
+		jitter := time.Minute * time.Duration(mathRand.Intn(30))
+		periodWithJitter := GatewayGCInterval + jitter
+
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(periodWithJitter):
+		}
+
+		{
+			deleted, err := c.stateManager.GarbageCollectConnections(ctx)
+			if err != nil {
+				logger.StdlibLogger(ctx).Error("failed to garbage collect connections", "err", err)
+			}
+			logger.StdlibLogger(ctx).Debug("garbage-collected connections", "deleted", deleted)
+		}
+
+		{
+			deleted, err := c.stateManager.GarbageCollectGateways(ctx)
+			if err != nil {
+				logger.StdlibLogger(ctx).Error("failed to garbage collect gateways", "err", err)
+			}
+			logger.StdlibLogger(ctx).Debug("garbage-collected gateways", "deleted", deleted)
+		}
+
+	}
+}
+
 func (c *connectGatewaySvc) Run(ctx context.Context) error {
 	c.runCtx = ctx
 
@@ -418,6 +450,9 @@ func (c *connectGatewaySvc) Run(ctx context.Context) error {
 	// Periodically report metrics
 	go c.instrument(ctx)
 
+	// Periodically garbage collect old connections
+	go c.gc(ctx)
+
 	return eg.Wait()
 }
 
@@ -426,10 +461,10 @@ func (c *connectGatewaySvc) updateGatewayState(status state.GatewayStatus) error
 	defer c.stateUpdateLock.Unlock()
 
 	err := c.stateManager.UpsertGateway(context.Background(), &state.Gateway{
-		Id:              c.gatewayId,
-		Status:          status,
-		LastHeartbeatAt: time.Now(),
-		Hostname:        c.hostname,
+		Id:                c.gatewayId,
+		Status:            status,
+		LastHeartbeatAtMS: time.Now().UnixMilli(),
+		Hostname:          c.hostname,
 	})
 	if err != nil {
 		c.logger.Error("failed to update gateway status in state", "status", status, "error", err)

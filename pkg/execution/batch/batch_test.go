@@ -3,6 +3,8 @@ package batch
 import (
 	"context"
 	"crypto/rand"
+	"testing"
+
 	"github.com/alicebob/miniredis/v2"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
@@ -12,8 +14,50 @@ import (
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
+
+func TestBatchSizeLimit(t *testing.T) {
+	r := miniredis.RunT(t)
+
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	bc := redis_state.NewBatchClient(rc, redis_state.QueueDefaultKey)
+	// make the size limit crazy small (10 bytes) for verification purposes
+	bm := NewRedisBatchManager(bc, nil, WithRedisBatchSizeLimit(10))
+
+	accountId := uuid.New()
+	fnId := uuid.New()
+
+	res, err := bm.Append(context.Background(), BatchItem{
+		AccountID:  accountId,
+		FunctionID: fnId,
+		EventID:    ulid.MustNew(ulid.Now(), rand.Reader),
+		Event: event.Event{
+			ID: "test-event",
+			Data: map[string]any{
+				"hello": "world",
+				"yolo":  "yoloyoloyoloyoloyoloyoloyoloyoloyoloyoloyoloyolo",
+			},
+		},
+		Version: 0,
+	}, inngest.Function{
+		ID: fnId,
+		EventBatch: &inngest.EventBatchConfig{
+			MaxSize: 10,
+			Timeout: "60s",
+		},
+	})
+
+	require.NoError(t, err)
+	require.NotEmpty(t, res.BatchID)
+	require.NotEmpty(t, res.BatchPointerKey)
+	require.Equal(t, enums.BatchMaxSize, res.Status)
+}
 
 func TestBatchCleanup(t *testing.T) {
 	r := miniredis.RunT(t)

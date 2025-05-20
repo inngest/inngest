@@ -1,12 +1,19 @@
 export type Event = {
   id: string;
   name: string;
-  payload: string;
+  payload?: string;
   receivedAt: Date;
-  functions?: {
-    name: string;
-    slug: string;
+  source?: string;
+  version?: string | null;
+  idempotencyKey?: string | null;
+  occurredAt?: Date;
+  runs?: {
+    fnName?: string;
+    fnSlug?: string;
+    id: string;
     status: string;
+    startedAt?: Date;
+    completedAt?: Date;
   }[];
 };
 

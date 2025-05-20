@@ -1,5 +1,11 @@
 import { InlineCode } from '@inngest/components/Code';
 import { Link, type LinkProps } from '@inngest/components/Link';
+import {
+  Pill,
+  PillContent,
+  type PillAppearance,
+  type PillContentProps,
+} from '@inngest/components/Pill';
 import { Skeleton } from '@inngest/components/Skeleton';
 import { Time } from '@inngest/components/Time';
 import { cn } from '@inngest/components/utils/classNames';
@@ -87,7 +93,11 @@ export function IDElement({ children }: React.PropsWithChildren) {
 }
 
 export function TextElement({ children }: React.PropsWithChildren) {
-  return <span className={cn(cellStyles, 'font-medium')}>{children}</span>;
+  return (
+    <span className={cn(cellStyles, 'max-w-full overflow-hidden text-wrap break-all font-medium')}>
+      {children}
+    </span>
+  );
 }
 
 export function TimeElement({ date }: { date: Date }) {
@@ -108,6 +118,18 @@ export function LinkElement({ children, href, ...props }: React.PropsWithChildre
 
 export function CodeElement({ value }: { value: string }) {
   return <InlineCode>{value}</InlineCode>;
+}
+
+export function PillElement({
+  children,
+  type,
+  appearance,
+}: PillContentProps & { appearance?: PillAppearance }) {
+  return (
+    <Pill appearance={appearance}>
+      <PillContent type={type}>{children}</PillContent>
+    </Pill>
+  );
 }
 
 export function SkeletonElement() {

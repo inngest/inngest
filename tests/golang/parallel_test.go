@@ -120,3 +120,120 @@ func TestParallelSteps(t *testing.T) {
 		}
 	})
 }
+
+func TestParallelCoalesce(t *testing.T) {
+	// Steps are only called once, regardless of whether they're inside or
+	// outside of a parallel group. This test:
+	// 1. Diverges into 3 parallel steps.
+	// 2. Converges into a single step.
+	// 3. Diverges again into 2 parallel steps.
+	// 4. Converges again into a single step.
+
+	r := require.New(t)
+	ctx := context.Background()
+	c := client.New(t)
+	ic, server, sync := NewSDKHandler(t, randomSuffix("app"))
+	defer server.Close()
+
+	eventName := randomSuffix("event")
+	var (
+		stepA1Counter      int32
+		stepA2Counter      int32
+		stepA3Counter      int32
+		stepBetweenCounter int32
+		stepB1Counter      int32
+		stepB2Counter      int32
+		stepAfterCounter   int32
+		runID              string
+	)
+	_, err := inngestgo.CreateFunction(
+		ic,
+		inngestgo.FunctionOpts{ID: "fn"},
+		inngestgo.EventTrigger(eventName, nil),
+		func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
+			if runID == "" {
+				runID = input.InputCtx.RunID
+			}
+
+			res := group.Parallel(ctx,
+				func(ctx context.Context) (any, error) {
+					return step.Run(ctx, "a1", func(ctx context.Context) (any, error) {
+						atomic.AddInt32(&stepA1Counter, 1)
+						<-time.After(100 * time.Millisecond)
+						return nil, nil
+					})
+				},
+				func(ctx context.Context) (any, error) {
+					return step.Run(ctx, "a2", func(ctx context.Context) (any, error) {
+						atomic.AddInt32(&stepA2Counter, 1)
+						<-time.After(100 * time.Millisecond)
+						return nil, nil
+					})
+				},
+				func(ctx context.Context) (any, error) {
+					return step.Run(ctx, "a3", func(ctx context.Context) (any, error) {
+						atomic.AddInt32(&stepA3Counter, 1)
+						<-time.After(100 * time.Millisecond)
+						return nil, nil
+					})
+				},
+			)
+			err := res.AnyError()
+			if err != nil {
+				return nil, err
+			}
+
+			_, err = step.Run(ctx, "between", func(ctx context.Context) (any, error) {
+				atomic.AddInt32(&stepBetweenCounter, 1)
+				time.Sleep(100 * time.Millisecond)
+				return nil, nil
+			})
+			if err != nil {
+				return nil, err
+			}
+
+			res = group.Parallel(ctx,
+				func(ctx context.Context) (any, error) {
+					return step.Run(ctx, "b1", func(ctx context.Context) (any, error) {
+						atomic.AddInt32(&stepB1Counter, 1)
+						<-time.After(100 * time.Millisecond)
+						return nil, nil
+					})
+				},
+				func(ctx context.Context) (any, error) {
+					return step.Run(ctx, "b2", func(ctx context.Context) (any, error) {
+						atomic.AddInt32(&stepB2Counter, 1)
+						<-time.After(100 * time.Millisecond)
+						return nil, nil
+					})
+				},
+			)
+			err = res.AnyError()
+			if err != nil {
+				return nil, err
+			}
+
+			_, err = step.Run(ctx, "after", func(ctx context.Context) (any, error) {
+				atomic.AddInt32(&stepAfterCounter, 1)
+				time.Sleep(100 * time.Millisecond)
+				return nil, nil
+			})
+			if err != nil {
+				return nil, err
+			}
+			return res, nil
+		},
+	)
+	r.NoError(err)
+	sync()
+
+	_, err = ic.Send(ctx, inngestgo.Event{Name: eventName})
+	r.NoError(err)
+
+	c.WaitForRunStatus(ctx, t, "COMPLETED", &runID)
+	r.Equal(int32(1), stepA1Counter)
+	r.Equal(int32(1), stepA2Counter)
+	r.Equal(int32(1), stepA3Counter)
+	r.Equal(int32(1), stepBetweenCounter)
+	r.Equal(int32(1), stepAfterCounter)
+}

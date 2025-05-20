@@ -8,11 +8,9 @@ import { InngestLogoSmallBW } from '@inngest/components/icons/logos/InngestLogoS
 import { RiContractLeftLine, RiContractRightLine } from '@remixicon/react';
 
 import { QuickSearch } from './QuickSearch/QuickSearch';
-import Search from './Search';
 
 type LogoProps = {
   collapsed: boolean;
-  enableQuickSearchV2: boolean;
   envSlug: string;
   envName: string;
   setCollapsed: (arg: boolean) => void;
@@ -55,20 +53,14 @@ const NavToggle = ({
   );
 };
 
-export default function Logo({
-  collapsed,
-  enableQuickSearchV2,
-  envSlug,
-  envName,
-  setCollapsed,
-}: LogoProps) {
+export default function Logo({ collapsed, envSlug, envName, setCollapsed }: LogoProps) {
   return (
     <div
       className={`${
         collapsed ? 'mx-auto' : 'mx-4'
       } mt-4 flex h-[28px] flex-row items-center justify-between`}
     >
-      <div className={`flex flex-row items-center justify-start ${collapsed ? '' : 'mr-3'} `}>
+      <div className={`flex flex-row items-center justify-start ${collapsed ? '' : 'mr-1'} `}>
         {collapsed ? (
           <div className="cursor-pointer group-hover:hidden">
             <InngestLogoSmallBW className="text-basis" />
@@ -80,10 +72,7 @@ export default function Logo({
             </NextLink>
           </>
         )}
-        {enableQuickSearchV2 && (
-          <QuickSearch collapsed={collapsed} envSlug={envSlug} envName={envName} />
-        )}
-        {!enableQuickSearchV2 && <Search collapsed={collapsed} />}
+        <QuickSearch collapsed={collapsed} envSlug={envSlug} envName={envName} />
       </div>
       <NavToggle collapsed={collapsed} setCollapsed={setCollapsed} />
     </div>

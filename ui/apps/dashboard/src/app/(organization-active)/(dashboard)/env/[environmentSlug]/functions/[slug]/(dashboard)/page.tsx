@@ -20,6 +20,7 @@ import FunctionConfiguration from '@/app/(organization-active)/(dashboard)/env/[
 import Block from '@/components/Block';
 import LoadingIcon from '@/icons/LoadingIcon';
 import { useFunction, useFunctionUsage } from '@/queries';
+import { pathCreator } from '@/utils/urls';
 import DashboardTimeRangeFilter, {
   defaultTimeRange,
   getTimeRangeByKey,
@@ -196,9 +197,10 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
                     trigger.eventName ? (
                       <NextLink
                         key={trigger.eventName}
-                        href={`/env/${params.environmentSlug}/events/${encodeURIComponent(
-                          trigger.eventName
-                        )}`}
+                        href={pathCreator.eventType({
+                          envSlug: params.environmentSlug,
+                          eventName: trigger.eventName,
+                        })}
                         className="border-subtle bg-canvasBase hover:bg-canvasMuted block rounded-md border p-4"
                       >
                         <div className="flex min-w-0 items-center">
@@ -244,9 +246,10 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
                         return (
                           <NextLink
                             key={cancellation.event}
-                            href={`/env/${params.environmentSlug}/events/${encodeURIComponent(
-                              cancellation.event
-                            )}`}
+                            href={pathCreator.eventType({
+                              envSlug: params.environmentSlug,
+                              eventName: cancellation.event,
+                            })}
                             className="border-subtle bg-canvasBase hover:bg-canvasMuted block rounded-md border p-4"
                           >
                             <div className="flex min-w-0 items-center">
@@ -291,9 +294,10 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
                 <Block title="Failure Handler">
                   <div className="space-y-3">
                     <NextLink
-                      href={`/env/${params.environmentSlug}/functions/${encodeURIComponent(
-                        function_.failureHandler.slug
-                      )}`}
+                      href={pathCreator.function({
+                        envSlug: params.environmentSlug,
+                        functionSlug: function_.failureHandler.slug,
+                      })}
                       className="border-subtle bg-canvasBase hover:bg-canvasMuted block rounded-md border p-4"
                     >
                       <div className="flex min-w-0 items-center">

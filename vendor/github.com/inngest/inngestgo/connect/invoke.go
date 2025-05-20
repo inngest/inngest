@@ -136,7 +136,15 @@ func (h *connectHandler) connectInvoke(ctx context.Context, preparedConn *connec
 	h.workerPool.inProgressLeases[body.RequestId] = body.LeaseId
 	h.workerPool.inProgressLeasesLock.Unlock()
 
+	defer func() {
+		h.workerPool.inProgressLeasesLock.Lock()
+		delete(h.workerPool.inProgressLeases, body.RequestId)
+		h.workerPool.inProgressLeasesLock.Unlock()
+	}()
+
 	extendLeaseCtx, cancelExtendLeaseCtx := context.WithCancel(ctx)
+	defer cancelExtendLeaseCtx()
+	
 	go func() {
 		for {
 			select {

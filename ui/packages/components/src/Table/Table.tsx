@@ -46,14 +46,14 @@ export function Table<T>({
 
   return (
     <table className="bg-canvasBase border-subtle w-full border-b text-sm">
-      <thead className="border-subtle sticky top-0 z-[3] border-b text-left">
+      <thead className="sticky top-0 z-[3] text-left">
         {table.getHeaderGroups().map((headerGroup) => (
           <tr key={headerGroup.id}>
             {headerGroup.headers.map((header) => (
               <th
                 className={cn(
                   cellStyles,
-                  'bg-canvasBase text-muted text-sm font-semibold',
+                  'bg-canvasSubtle text-muted text-xs font-medium',
                   header.column.getIsPinned() && 'sticky left-0 z-[4]',
                   header.column.getCanSort() && 'cursor-pointer'
                 )}
@@ -81,7 +81,7 @@ export function Table<T>({
           </tr>
         ))}
       </thead>
-      <tbody className="divide-subtle text-basis divide-y">
+      <tbody className="divide-light text-basis divide-y">
         {options.data.length < 1 && (
           <tr>
             <td className={cn(cellStyles, 'text-center')} colSpan={colSpanTotalSum}>
@@ -103,7 +103,7 @@ export function Table<T>({
               <tr
                 key={row.id}
                 {...(customRowProps ? customRowProps(row) : {})}
-                className="bg-canvasBase hover:bg-canvasSubtle/50"
+                className="bg-canvasBase hover:bg-canvasSubtle/40"
               >
                 {row.getVisibleCells().map((cell) => (
                   <td

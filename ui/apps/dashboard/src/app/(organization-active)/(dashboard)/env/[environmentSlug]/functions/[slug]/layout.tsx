@@ -1,11 +1,9 @@
 'use client';
 
 import React, { useCallback, useState } from 'react';
-import { usePathname } from 'next/navigation';
 import { Header } from '@inngest/components/Header/Header';
 import { InvokeModal } from '@inngest/components/InvokeButton';
 import { Pill } from '@inngest/components/Pill';
-import { LegacyRunsToggle } from '@inngest/components/RunDetailsV3/LegacyRunsToggle';
 import { RiPauseCircleLine } from '@remixicon/react';
 import { useMutation } from 'urql';
 
@@ -38,7 +36,6 @@ export default function FunctionLayout({
   children,
   params: { environmentSlug, slug },
 }: FunctionLayoutProps) {
-  const pathname = usePathname();
   const [invokOpen, setInvokeOpen] = useState(false);
   const [pauseOpen, setPauseOpen] = useState(false);
   const [cancelOpen, setCancelOpen] = useState(false);
@@ -50,7 +47,6 @@ export default function FunctionLayout({
   const env = useEnvironment();
 
   const isBulkCancellationEnabled = useBooleanFlag('bulk-cancellation-ui');
-  const { value: traceAIEnabled, isReady: featureFlagReady } = useBooleanFlag('ai-traces');
 
   const fn = data?.workspace.workflow;
   const { isArchived = false, isPaused } = fn ?? {};
@@ -130,9 +126,6 @@ export default function FunctionLayout({
         loading={fetching}
         action={
           <div className="flex flex-row items-center justify-end gap-2">
-            {pathname.endsWith('/runs') && (
-              <LegacyRunsToggle traceAIEnabled={featureFlagReady && traceAIEnabled} />
-            )}
             <ActionsMenu
               showCancel={() => setCancelOpen(true)}
               showInvoke={() => setInvokeOpen(true)}

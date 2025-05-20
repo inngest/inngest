@@ -41,10 +41,7 @@ func (n numbers) Type() EngineType {
 	return EngineTypeBTree
 }
 
-func (n *numbers) Match(ctx context.Context, input map[string]any) (matched []*StoredExpressionPart, err error) {
-	l := &sync.Mutex{}
-	matched = []*StoredExpressionPart{}
-
+func (n *numbers) Match(ctx context.Context, input map[string]any, result *MatchResult) (err error) {
 	pool := newErrPool(errPoolOpts{concurrency: n.concurrency})
 
 	for item := range n.paths {
@@ -61,40 +58,19 @@ func (n *numbers) Match(ctx context.Context, input map[string]any) (matched []*S
 				return nil
 			}
 
-			var val float64
-			switch v := res[0].(type) {
-			case int:
-				val = float64(v)
-			case int64:
-				val = float64(v)
-			case float64:
-				val = v
-			default:
-				return nil
-			}
-
 			// This matches null, nil (as null), and any non-null items.
-			l.Lock()
-			found := n.Search(ctx, path, val)
-			matched = append(matched, found...)
-			l.Unlock()
+			n.Search(ctx, path, res[0], result)
 
 			return nil
 		})
 	}
 
-	return matched, pool.Wait()
+	return pool.Wait()
 }
 
 // Search returns all ExpressionParts which match the given input, ignoring the variable name
 // entirely.
-func (n *numbers) Search(ctx context.Context, variable string, input any) (matched []*StoredExpressionPart) {
-	n.lock.RLock()
-	defer n.lock.RUnlock()
-
-	// initialize matched
-	matched = []*StoredExpressionPart{}
-
+func (n *numbers) Search(ctx context.Context, variable string, input any, result *MatchResult) {
 	var val float64
 
 	switch v := input.(type) {
@@ -105,7 +81,7 @@ func (n *numbers) Search(ctx context.Context, variable string, input any) (match
 	case float64:
 		val = v
 	default:
-		return nil
+		return
 	}
 
 	// First, find exact matches.
@@ -115,8 +91,9 @@ func (n *numbers) Search(ctx context.Context, variable string, input any) (match
 			if m.Ident != nil && *m.Ident != variable {
 				continue
 			}
-			// This is a candidatre.
-			matched = append(matched, m)
+
+			// This is a candidate.
+			result.AddExprs(m)
 		}
 	}
 
@@ -131,8 +108,8 @@ func (n *numbers) Search(ctx context.Context, variable string, input any) (match
 			if m.Ident != nil && *m.Ident != variable {
 				continue
 			}
-			// This is a candidatre.
-			matched = append(matched, m)
+			// This is a candidate.
+			result.AddExprs(m)
 		}
 		return true
 	})
@@ -148,13 +125,11 @@ func (n *numbers) Search(ctx context.Context, variable string, input any) (match
 			if m.Ident != nil && *m.Ident != variable {
 				continue
 			}
-			// This is a candidatre.
-			matched = append(matched, m)
+			// This is a candidate.
+			result.AddExprs(m)
 		}
 		return true
 	})
-
-	return matched
 }
 
 func (n *numbers) Add(ctx context.Context, p ExpressionPart) error {

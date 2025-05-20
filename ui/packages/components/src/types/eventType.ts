@@ -1,13 +1,13 @@
-import type React from 'react';
-
 export type EventType = {
+  id?: string;
   name: string;
   archived: boolean;
   functions: any[];
-  volume: {
+  volume?: {
     totalVolume: number;
     dailyVolumeSlots: {
       startCount: number;
+      slot: string;
     }[];
   };
 };

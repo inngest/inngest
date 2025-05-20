@@ -291,7 +291,8 @@ func (s *svc) handlePauseTimeout(ctx context.Context, item queue.Item) error {
 	}
 
 	r := execution.ResumeRequest{
-		IsTimeout: true,
+		IsTimeout:      true,
+		IdempotencyKey: *item.JobID,
 	}
 
 	// If the pause timeout is for an invocation, store an error to cause the
@@ -400,7 +401,7 @@ func (s *svc) handleDebounce(ctx context.Context, item queue.Item) error {
 			)
 			defer span.End()
 
-			_, err = s.exec.Schedule(ctx, execution.ScheduleRequest{
+			md, err := s.exec.Schedule(ctx, execution.ScheduleRequest{
 				Function:         f,
 				AccountID:        di.AccountID,
 				WorkspaceID:      di.WorkspaceID,
@@ -410,8 +411,14 @@ func (s *svc) handleDebounce(ctx context.Context, item queue.Item) error {
 				FunctionPausedAt: di.FunctionPausedAt,
 			})
 			if err != nil {
+				span.SetAttributes(attribute.Bool(consts.OtelSysStepDelete, true))
 				return err
 			}
+
+			if md != nil {
+				span.SetAttributes(attribute.String(consts.OtelAttrSDKRunID, md.ID.RunID.String()))
+			}
+
 			_ = s.debouncer.DeleteDebounceItem(ctx, d.DebounceID, *di, d.AccountID)
 		}
 	}

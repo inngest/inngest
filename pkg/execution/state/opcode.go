@@ -242,6 +242,51 @@ func (g GeneratorOpcode) SleepDuration() (time.Duration, error) {
 	return str2duration.ParseDuration(opts.Duration)
 }
 
+func (g GeneratorOpcode) SignalOpts() (*SignalOpts, error) {
+	opts := &SignalOpts{}
+	if err := opts.UnmarshalAny(g.Opts); err != nil {
+		return nil, err
+	}
+	return opts, nil
+}
+
+type SignalOpts struct {
+	Signal  string `json:"signal"`
+	Timeout string `json:"timeout"`
+}
+
+func (s *SignalOpts) UnmarshalAny(a any) error {
+	opts := SignalOpts{}
+	var mappedByt []byte
+	switch typ := a.(type) {
+	case []byte:
+		mappedByt = typ
+	default:
+		byt, err := json.Marshal(a)
+		if err != nil {
+			return err
+		}
+		mappedByt = byt
+	}
+	if err := json.Unmarshal(mappedByt, &opts); err != nil {
+		return err
+	}
+	*s = opts
+	return nil
+}
+
+func (s SignalOpts) Expires() (time.Time, error) {
+	if s.Timeout == "" {
+		return time.Now().AddDate(1, 0, 0), nil
+	}
+
+	dur, err := str2duration.ParseDuration(s.Timeout)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return time.Now().Add(dur), nil
+}
+
 func (g GeneratorOpcode) InvokeFunctionOpts() (*InvokeFunctionOpts, error) {
 	opts := &InvokeFunctionOpts{}
 	if err := opts.UnmarshalAny(g.Opts); err != nil {

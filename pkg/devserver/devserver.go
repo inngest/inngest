@@ -4,7 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/inngest/inngest/pkg/cqrs"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/alicebob/miniredis/v2"
@@ -47,6 +49,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/expressions"
+	"github.com/inngest/inngest/pkg/expressions/expragg"
 	"github.com/inngest/inngest/pkg/history_drivers/memory_reader"
 	"github.com/inngest/inngest/pkg/history_drivers/memory_writer"
 	"github.com/inngest/inngest/pkg/logger"
@@ -112,6 +115,10 @@ func New(ctx context.Context, opts StartOpts) error {
 	}
 
 	return start(ctx, opts)
+}
+
+func enforceConnectLeaseExpiry(ctx context.Context, accountID uuid.UUID) bool {
+	return os.Getenv("INNGEST_CONNECT_DISABLE_ENFORCE_LEASE_EXPIRY") != "true"
 }
 
 func start(ctx context.Context, opts StartOpts) error {
@@ -261,6 +268,8 @@ func start(ctx context.Context, opts StartOpts) error {
 		}),
 		redis_state.WithShardSelector(shardSelector),
 		redis_state.WithQueueShardClients(queueShards),
+		redis_state.WithNormalizeRefreshItemCustomConcurrencyKeys(NormalizeConcurrencyKeys(smv2, dbcqrs)),
+		redis_state.WithNormalizeRefreshItemThrottle(NormalizeThrottle(smv2, dbcqrs)),
 	}
 	if opts.RetryInterval > 0 {
 		queueOpts = append(queueOpts, redis_state.WithBackoffFunc(
@@ -282,15 +291,13 @@ func start(ctx context.Context, opts StartOpts) error {
 	connectionManager := connstate.NewRedisConnectionStateManager(connectRc)
 
 	// Create a new expression aggregator, using Redis to load evaluables.
-	agg := expressions.NewAggregator(ctx, 100, 100, sm.(expressions.EvaluableLoader), nil)
+	agg := expragg.NewAggregator(ctx, 100, 100, sm.(expragg.EvaluableLoader), expressions.ExprEvaluator, nil, nil)
 
 	executorProxy, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectPubSubRedis, true, connectpubsub.RedisPubSubConnectorOpts{
-		Logger:       connectPubSubLogger.With("svc", "executor"),
-		Tracer:       conditionalTracer,
-		StateManager: connectionManager,
-		EnforceLeaseExpiry: func(ctx context.Context, accountID uuid.UUID) bool {
-			return true
-		},
+		Logger:             connectPubSubLogger.With("svc", "executor"),
+		Tracer:             conditionalTracer,
+		StateManager:       connectionManager,
+		EnforceLeaseExpiry: enforceConnectLeaseExpiry,
 	}))
 	if err != nil {
 		return fmt.Errorf("failed to create connect pubsub connector: %w", err)
@@ -309,7 +316,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	httpClient.(*http.Client).Transport = awsgateway.NewTransformTripper(httpClient.(*http.Client).Transport)
 	deploy.Client.Transport = awsgateway.NewTransformTripper(deploy.Client.Transport)
 
-	var drivers = []driver.Driver{}
+	drivers := []driver.Driver{}
 	for _, driverConfig := range opts.Config.Execution.Drivers {
 		d, err := driverConfig.NewDriver(registration.NewDriverOpts{
 			ConnectForwarder:  executorProxy,
@@ -434,17 +441,16 @@ func start(ctx context.Context, opts StartOpts) error {
 			QueueShardSelector: shardSelector,
 			Broadcaster:        broadcaster,
 			RealtimeJWTSecret:  consts.DevServerRealtimeJWTSecret,
+			TraceReader:        ds.Data,
 		})
 	})
 
 	// ds.opts.Config.EventStream.Service.TopicName()
 	apiConnectProxy, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectPubSubRedis, false, connectpubsub.RedisPubSubConnectorOpts{
-		Logger:       connectPubSubLogger.With("svc", "api"),
-		Tracer:       conditionalTracer,
-		StateManager: connectionManager,
-		EnforceLeaseExpiry: func(ctx context.Context, accountID uuid.UUID) bool {
-			return true
-		},
+		Logger:             connectPubSubLogger.With("svc", "api"),
+		Tracer:             conditionalTracer,
+		StateManager:       connectionManager,
+		EnforceLeaseExpiry: enforceConnectLeaseExpiry,
 	}))
 	if err != nil {
 		return fmt.Errorf("failed to create connect pubsub connector: %w", err)
@@ -479,12 +485,10 @@ func start(ctx context.Context, opts StartOpts) error {
 	}
 
 	connectGatewayProxy, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectPubSubRedis, false, connectpubsub.RedisPubSubConnectorOpts{
-		Logger:       connectPubSubLogger.With("svc", "connect-gateway"),
-		Tracer:       conditionalTracer,
-		StateManager: connectionManager,
-		EnforceLeaseExpiry: func(ctx context.Context, accountID uuid.UUID) bool {
-			return true
-		},
+		Logger:             connectPubSubLogger.With("svc", "connect-gateway"),
+		Tracer:             conditionalTracer,
+		StateManager:       connectionManager,
+		EnforceLeaseExpiry: enforceConnectLeaseExpiry,
 	}))
 	if err != nil {
 		return fmt.Errorf("failed to create connect pubsub connector: %w", err)
@@ -631,5 +635,81 @@ func getInvokeFailHandler(ctx context.Context, pb pubsub.Publisher, topic string
 		}
 
 		return eg.Wait()
+	}
+}
+
+func NormalizeConcurrencyKeys(smv2 sv2.StateLoader, dbcqrs cqrs.Manager) redis_state.NormalizeRefreshItemCustomConcurrencyKeysFn {
+	return func(ctx context.Context, item *queue.QueueItem, existingKeys []state.CustomConcurrency, shadowPartition *redis_state.QueueShadowPartition) ([]state.CustomConcurrency, error) {
+		id := sv2.IDFromV1(item.Data.Identifier)
+
+		workflow, err := dbcqrs.GetFunctionByInternalUUID(ctx, id.Tenant.EnvID, id.FunctionID)
+		if err != nil {
+			return nil, fmt.Errorf("could not find workflow: %w", err)
+		}
+		fn, err := workflow.InngestFunction()
+		if err != nil {
+			return nil, fmt.Errorf("could not convert workflow to inngest function: %w", err)
+		}
+
+		if fn.Concurrency == nil || len(fn.Concurrency.Limits) == 0 {
+			return nil, nil
+		}
+
+		events, err := smv2.LoadEvents(ctx, id)
+		if err != nil {
+			return nil, fmt.Errorf("could not load events: %w", err)
+		}
+
+		if len(events) == 0 {
+			return nil, nil
+		}
+
+		var evt0 event.Event
+
+		if err := json.Unmarshal(events[0], &evt0); err != nil {
+			return nil, fmt.Errorf("could not unmarshal event: %w", err)
+		}
+
+		evtMap := evt0.Map()
+
+		return queue.GetCustomConcurrencyKeys(ctx, id, fn.Concurrency.Limits, evtMap), nil
+	}
+}
+
+func NormalizeThrottle(smv2 sv2.StateLoader, dbcqrs cqrs.Manager) redis_state.NormalizeRefreshItemThrottleFn {
+	return func(ctx context.Context, item *queue.QueueItem, existingThrottle *queue.Throttle, shadowPartition *redis_state.QueueShadowPartition) (*queue.Throttle, error) {
+		id := sv2.IDFromV1(item.Data.Identifier)
+
+		workflow, err := dbcqrs.GetFunctionByInternalUUID(ctx, id.Tenant.EnvID, id.FunctionID)
+		if err != nil {
+			return nil, fmt.Errorf("could not find workflow: %w", err)
+		}
+		fn, err := workflow.InngestFunction()
+		if err != nil {
+			return nil, fmt.Errorf("could not convert workflow to inngest function: %w", err)
+		}
+
+		if fn.Throttle == nil {
+			return nil, nil
+		}
+
+		events, err := smv2.LoadEvents(ctx, id)
+		if err != nil {
+			return nil, fmt.Errorf("could not load events: %w", err)
+		}
+
+		if len(events) == 0 {
+			return nil, nil
+		}
+
+		var evt0 event.Event
+
+		if err := json.Unmarshal(events[0], &evt0); err != nil {
+			return nil, fmt.Errorf("could not unmarshal event: %w", err)
+		}
+
+		evtMap := evt0.Map()
+
+		return queue.GetThrottleConfig(ctx, id.FunctionID, fn.Throttle, evtMap), nil
 	}
 }

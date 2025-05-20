@@ -3,20 +3,19 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
-import { ErrorCard } from '../RunDetailsV2/ErrorCard';
+import { ErrorCard } from '../Error/ErrorCard';
 import type { Run as InitialRunData } from '../RunsPage/types';
 import { StatusCell } from '../Table/Cell';
-import { Trace as OldTrace } from '../TimelineV2';
 import { TriggerDetails } from '../TriggerDetails';
 import { DragDivider } from '../icons/DragDivider';
 import type { Result } from '../types/functionRun';
 import { nullishToLazy } from '../utils/lazyLoad';
-import { LegacyRunsToggle } from './LegacyRunsToggle';
 import { RunInfo } from './RunInfo';
 import { StepInfo } from './StepInfo';
 import { Tabs } from './Tabs';
 import { Timeline } from './Timeline';
 import { TopInfo } from './TopInfo';
+import type { Trace } from './Trace';
 import { Waiting } from './Waiting';
 import { useStepSelection } from './utils';
 
@@ -42,7 +41,7 @@ type Run = {
     slug: string;
   };
   id: string;
-  trace: React.ComponentProps<typeof OldTrace>['trace'];
+  trace: React.ComponentProps<typeof Trace>['trace'];
   hasAI: boolean;
 };
 
@@ -131,8 +130,12 @@ export const RunDetailsV3 = (props: Props) => {
 
   const run = runRes.data;
   if (run?.trace.endedAt && pollInterval) {
-    // Stop polling since ended runs are immutable
-    setPollInterval(undefined);
+    //
+    // Stop polling for ended runs, but still give it
+    // a few seconds for any lingering userland traces.
+    setTimeout(() => {
+      setPollInterval(undefined);
+    }, 6000);
   }
 
   // Do not show the error if queued and the error is no spans
@@ -149,7 +152,6 @@ export const RunDetailsV3 = (props: Props) => {
             <p className="text-basis text-2xl font-medium">{run.fn.name}</p>
             <p className="text-subtle font-mono">{runID}</p>
           </div>
-          <LegacyRunsToggle traceAIEnabled={true} />
         </div>
       )}
       <div ref={containerRef} className="flex flex-row">

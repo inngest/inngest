@@ -107,7 +107,7 @@ func (a devapi) UI(w http.ResponseWriter, r *http.Request) {
 	// If there's a trailing slash, redirect to non-trailing slashes.
 	if strings.HasSuffix(r.URL.Path, "/") && r.URL.Path != "/" {
 		r.URL.Path = strings.TrimSuffix(r.URL.Path, "/")
-		http.Redirect(w, r, r.URL.String(), 303)
+		http.Redirect(w, r, r.URL.String(), http.StatusSeeOther)
 		return
 	}
 

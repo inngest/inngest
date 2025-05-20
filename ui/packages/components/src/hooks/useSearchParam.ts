@@ -62,7 +62,9 @@ export const useBatchedSearchParams = () => {
   );
 };
 
-export function useBooleanSearchParam(name: string): [boolean | undefined, SetParam<boolean>] {
+export function useBooleanSearchParam(
+  name: string
+): [boolean | undefined, SetParam<boolean>, () => void] {
   const pathname = usePathname();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -77,12 +79,19 @@ export function useBooleanSearchParam(name: string): [boolean | undefined, SetPa
     [name, pathname, router, searchParams]
   );
 
+  const remove = useCallback(() => {
+    const params = new URLSearchParams(searchParams);
+    params.delete(name);
+
+    router.replace((pathname + (params.toString() ? '?' + params.toString() : '')) as Route);
+  }, [name, pathname, router, searchParams]);
+
   let value = undefined;
   if (searchParams.has(name)) {
     value = searchParams.get(name) === 'true';
   }
 
-  return [value, upsert];
+  return [value, upsert, remove];
 }
 
 export function useStringArraySearchParam(

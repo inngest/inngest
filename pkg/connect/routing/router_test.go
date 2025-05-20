@@ -101,10 +101,10 @@ func setup(t *testing.T, stateMan state.StateManager, opts setupOpts, connsToCre
 	}
 
 	err := stateMan.UpsertGateway(context.Background(), &state.Gateway{
-		Id:              gatewayId,
-		Status:          state.GatewayStatusActive,
-		LastHeartbeatAt: lastHeartbeatAt,
-		Hostname:        "host-1",
+		Id:                gatewayId,
+		Status:            state.GatewayStatusActive,
+		LastHeartbeatAtMS: lastHeartbeatAt.UnixMilli(),
+		Hostname:          "host-1",
 	})
 	require.NoError(t, err)
 
@@ -234,6 +234,7 @@ func TestFullConnectRouting(t *testing.T) {
 			newTestConn(connectpb.ConnectionStatus_DISCONNECTING, time.Now()),
 			newTestConn(connectpb.ConnectionStatus_DISCONNECTED, time.Now()),
 			newTestConn(connectpb.ConnectionStatus_READY, time.Now()),
+			newTestConn(connectpb.ConnectionStatus_DRAINING, time.Now().Add(-time.Minute)),
 		)
 
 		conn, err := getSuitableConnection(context.Background(), rnd, stateMan, setupRes.envId, setupRes.appId, setupRes.fnSlug, log)

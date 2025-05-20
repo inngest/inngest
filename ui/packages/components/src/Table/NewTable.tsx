@@ -70,7 +70,7 @@ export default function Table<T>({
       isLoading
         ? columns.map((column) => ({
             ...column,
-            cell: () => <Skeleton className="my-4 block h-3" />,
+            cell: () => <Skeleton className="my-2 block h-3" />,
           }))
         : columns,
     [isLoading]
@@ -89,7 +89,7 @@ export default function Table<T>({
 
   const tableStyles = 'w-full';
   const tableHeadStyles = 'bg-canvasSubtle sticky top-0 z-[2]';
-  const tableColumnStyles = 'px-6';
+  const tableColumnStyles = 'px-4';
   const expandedRowSideBorder =
     'before:bg-surfaceMuted relative before:absolute before:bottom-0 before:left-0 before:top-0 before:w-0.5';
 
@@ -123,8 +123,11 @@ export default function Table<T>({
                     {header.isPlaceholder ? null : (
                       <div
                         className={cn(
-                          header.column.getCanSort() &&
-                            'flex cursor-pointer select-none items-center gap-1'
+                          header.column.getCanSort()
+                            ? 'flex cursor-pointer select-none items-center gap-1'
+                            : header.column.getIsSorted()
+                            ? 'flex items-center gap-1'
+                            : ''
                         )}
                         onClick={header.column.getToggleSortingHandler()}
                       >
@@ -145,7 +148,7 @@ export default function Table<T>({
           {isEmpty && (
             <tr>
               <td
-                className="text-muted h-12 text-center text-sm font-normal"
+                className="text-muted h-[42px] text-center text-sm font-normal"
                 colSpan={table.getVisibleFlatColumns().length}
               >
                 {blankState}
@@ -158,8 +161,8 @@ export default function Table<T>({
                 <tr
                   className={cn(
                     hasId(row.original) && expandedIDs.includes(row.original.id)
-                      ? 'h-12'
-                      : 'border-light h-12 border-b',
+                      ? 'h-[42px]'
+                      : 'border-light h-[42px] border-b',
                     onRowClick ? 'hover:bg-canvasSubtle/40 cursor-pointer' : ''
                   )}
                   onClick={() => {

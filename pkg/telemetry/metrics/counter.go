@@ -1,6 +1,8 @@
 package metrics
 
-import "context"
+import (
+	"context"
+)
 
 func IncrQueuePartitionLeasedCounter(ctx context.Context, opts CounterOpt) {
 	RecordCounterMetric(ctx, 1, CounterOpt{
@@ -236,6 +238,15 @@ func IncrConnectGatewayReceivedRouterPubSubMessageCounter(ctx context.Context, v
 	})
 }
 
+func IncrConnectRouterPubSubMessageSentCounter(ctx context.Context, value int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, value, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "connect_gateway.router.sent_pubsub_messages",
+		Description: "Total number of router PubSub messages sent by the connect router",
+		Tags:        opts.Tags,
+	})
+}
+
 func IncrConnectGatewayReceivedWorkerMessageCounter(ctx context.Context, value int64, opts CounterOpt) {
 	RecordCounterMetric(ctx, value, CounterOpt{
 		PkgName:     opts.PkgName,
@@ -304,6 +315,89 @@ func IncrQueueDebounceOperationCounter(ctx context.Context, opts CounterOpt) {
 		PkgName:     opts.PkgName,
 		MetricName:  "queue_debounce_operation",
 		Description: "The total number of debounce operations",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrBacklogProcessedCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "backlog_processed_total",
+		Description: "The total number of backlogs processed",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrBacklogRefilledCounter(ctx context.Context, value int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, value, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "backlog_refilled_total",
+		Description: "The total number of backlog items that were added to the function partition",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrBacklogRefillLimitsCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "backlog_refill_limit_total",
+		Description: "The total number of limtis hit when refilling a backlog",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrBacklogNormalizationScannedCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "backlog_normalization_scanned_total",
+		Description: "The total number of backlogs that were scanned for normalization",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrBacklogNormalizedItemCounter(ctx context.Context, value int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, value, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "backlog_normalized_item_total",
+		Description: "The total number of items that were normalized",
+		Tags:        opts.Tags,
+	})
+}
+
+// NOTE: this is a metric that's mainly used for observing migrations to key queues
+// it's not needed once the migration completes
+func IncrBacklogRequeuedCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "backlog_requeued_total",
+		Description: "The total number of queue items that were requeued into backlogs from fn partition",
+		Tags:        opts.Tags,
+	})
+}
+
+func ActiveShadowScannerCount(ctx context.Context, incr int64, opts CounterOpt) {
+	RecordUpDownCounterMetric(ctx, incr, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "active_shadow_scanner_count",
+		Description: "The number of active shadow scaners",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrQueueShadowContinuationOpCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "queue_shadow_continuation_op",
+		Description: "The total number of queue continuation ops",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrQueueBacklogRefilledCounter(ctx context.Context, incr int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, incr, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "queue_backlog_refilled_total",
+		Description: "The total number of items refilled from backlog",
 		Tags:        opts.Tags,
 	})
 }

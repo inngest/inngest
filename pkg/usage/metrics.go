@@ -6,9 +6,9 @@ import (
 )
 
 var (
-	NoMetricsNameErr           = fmt.Errorf("metrics' name must be specified")
-	NoMetricsTimeRangeErr      = fmt.Errorf("metrics' time range (from/to - ISO8601 format) must be specified")
-	InvalidMetricsTimeRangeErr = fmt.Errorf("invalid time range for metrics")
+	ErrNoMetricsName      = fmt.Errorf("metrics' name must be specified")
+	ErrNoMetricsTimeRange = fmt.Errorf("metrics' time range (from/to - ISO8601 format) must be specified")
+	ErrInvalidMetricsTimeRange = fmt.Errorf("invalid time range for metrics")
 )
 
 // MetricsRequest represents a client request for metrics based on time range
@@ -20,15 +20,15 @@ type MetricsRequest struct {
 
 func (mr MetricsRequest) Valid() error {
 	if mr.Name == "" {
-		return NoMetricsNameErr
+		return ErrNoMetricsName
 	}
 
 	if mr.From.IsZero() || mr.To.IsZero() {
-		return NoMetricsTimeRangeErr
+		return ErrNoMetricsTimeRange
 	}
 
 	if mr.To.Sub(mr.From) < 0 {
-		return InvalidMetricsTimeRangeErr
+		return ErrInvalidMetricsTimeRange
 	}
 
 	return nil

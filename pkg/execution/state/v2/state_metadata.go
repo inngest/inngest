@@ -9,7 +9,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/event"
-	"github.com/inngest/inngest/pkg/execution/state"
 	statev1 "github.com/inngest/inngest/pkg/execution/state"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/inngest/inngest/pkg/tracing/meta"
@@ -47,6 +46,43 @@ func IDFromV1(id statev1.Identifier) ID {
 	}
 }
 
+func V1FromMetadata(md Metadata) statev1.Identifier {
+	return statev1.Identifier{
+		RunID:                 md.ID.RunID,
+		WorkflowID:            md.ID.FunctionID,
+		WorkflowVersion:       md.Config.FunctionVersion,
+		WorkspaceID:           md.ID.Tenant.EnvID,
+		AccountID:             md.ID.Tenant.AccountID,
+		EventID:               md.Config.EventID(),
+		EventIDs:              md.Config.EventIDs,
+		BatchID:               md.Config.BatchID,
+		CustomConcurrencyKeys: md.Config.CustomConcurrencyKeys,
+		PriorityFactor:        md.Config.PriorityFactor,
+		OriginalRunID:         md.Config.OriginalRunID,
+	}
+}
+
+// NewPauseIdentifier crease a PauseIdentifier from an ID
+func NewPauseIdentifier(id ID) statev1.PauseIdentifier {
+	return statev1.PauseIdentifier{
+		RunID:      id.RunID,
+		FunctionID: id.FunctionID,
+		AccountID:  id.Tenant.AccountID,
+	}
+}
+
+// IDFromPause creates an ID from a pause.
+func IDFromPause(p statev1.Pause) ID {
+	return ID{
+		RunID:      p.Identifier.RunID,
+		FunctionID: p.Identifier.FunctionID,
+		Tenant: Tenant{
+			AccountID: p.Identifier.AccountID,
+			EnvID:     p.WorkspaceID,
+		},
+	}
+}
+
 // Metadata represets metadata for the run state.
 type Metadata struct {
 	ID      ID
@@ -56,7 +92,7 @@ type Metadata struct {
 	Stack []string
 }
 
-func (m Metadata) ShouldCoalesceParallelism(resp *state.DriverResponse) bool {
+func (m Metadata) ShouldCoalesceParallelism(resp *statev1.DriverResponse) bool {
 	reqVersion := m.Config.RequestVersion
 	if reqVersion == -1 {
 		reqVersion = resp.RequestVersion

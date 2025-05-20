@@ -9,6 +9,7 @@ import (
 	"github.com/inngest/inngest/pkg/connect/routing"
 	"github.com/inngest/inngest/pkg/connect/state"
 	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/syscode"
 	"github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/inngest/inngest/pkg/util"
@@ -133,6 +134,7 @@ type ProxyOpts struct {
 	EnvID     uuid.UUID
 	AppID     uuid.UUID
 	Data      *connectpb.GatewayExecutorRequestData
+	logger    *slog.Logger
 }
 
 // Proxy forwards a request to the executor and waits for a response.
@@ -145,7 +147,13 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	l := i.logger.With(
+	l := logger.StdlibLogger(ctx)
+	if opts.logger != nil {
+		l = opts.logger
+	}
+
+	l = l.With(
+		"scope", "connect_proxy",
 		"app_id", opts.AppID.String(),
 		"env_id", opts.EnvID.String(),
 		"account_id", opts.AccountID.String(),
@@ -232,7 +240,7 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 					},
 				})
 			}, true, gatewayAckSubscribed)
-			if !gatewayAcked {
+			if ctx.Err() != nil && !gatewayAcked {
 				span.RecordError(fmt.Errorf("gateway ack not received in time"))
 				l.Warn("gateway did not ack request")
 			}
@@ -266,6 +274,8 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 	go func() {
 		for {
 			select {
+			case <-ctx.Done():
+				return
 			case <-waitForResponseCtx.Done():
 				return
 			// Poll every two seconds with a jitter of up to 3 seconds
@@ -280,6 +290,8 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 			}
 
 			if resp != nil {
+				span.AddEvent("ReplyReceivedPoll")
+
 				l.Debug("received response via polling")
 
 				reply = resp
@@ -287,6 +299,8 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 				cancelWaitForResponseCtx()
 				return
 			}
+
+			span.AddEvent("ReplyPollOk")
 		}
 	}()
 
@@ -299,6 +313,8 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 			// This may take a while: This waits until we receive the SDK response, and we allow for up to 2h in the serverless execution model
 			i.subscribe(waitForResponseCtx, i.channelAppRequestsReply(opts.Data.RequestId), func(msg string) {
 				span.AddEvent("ReplyReceived")
+
+				l.Debug("received response via pubsub")
 
 				err := proto.Unmarshal([]byte(msg), reply)
 				if err != nil {
@@ -347,7 +363,7 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 			case <-leaseCtx.Done():
 				return
 			// Verify lease did not expire
-			case <-time.After(consts.ConnectWorkerRequestExtendLeaseInterval / 2):
+			case <-time.After(consts.ConnectWorkerRequestExtendLeaseInterval):
 			}
 
 			leased, err := i.stateManager.IsRequestLeased(ctx, opts.EnvID, opts.Data.RequestId)
@@ -360,7 +376,6 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 			if !leased {
 				// Selectively enable lease enforcement to create gradual rollout for existing connect users
 				if i.enforceLeaseExpiry != nil && !i.enforceLeaseExpiry(ctx, opts.AccountID) {
-					l.Warn("lease expired but enforcement flag disabled")
 					continue
 				}
 
@@ -380,6 +395,7 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 			}
 
 			l.Debug("request is still leased by worker")
+			span.AddEvent("RequestLeaseOk")
 		}
 	}()
 
@@ -412,9 +428,21 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 		}
 
 		l.Debug("forwarded executor request to gateway", "gateway_id", route.GatewayID, "conn_id", route.ConnectionID)
+
+		metrics.IncrConnectRouterPubSubMessageSentCounter(ctx, 1, metrics.CounterOpt{
+			PkgName: pkgName,
+		})
 	}
 
 	select {
+	case <-ctx.Done():
+		return nil, fmt.Errorf("parent context was closed unexpectedly")
+	// Handle maximum function timeout
+	case <-time.After(consts.MaxFunctionTimeout):
+		return nil, syscode.Error{
+			Code:    syscode.CodeRequestTooLong,
+			Message: "The worker took longer than the maximum request duration to respond to the request.",
+		}
 	// Await SDK response forwarded by gateway
 	// This may take a while: This waits until we receive the SDK response, and we allow for up to 2h in the serverless execution model
 	case <-waitForResponseCtx.Done():
@@ -443,6 +471,7 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 			l.Error("could not delete response", "err", err)
 		}
 
+		l.Debug("returning reply", "status", reply.Status)
 		return reply, nil
 	// If the worker terminates or otherwise fails to continue extending the lease,
 	// we must retry the step as soon as possible.

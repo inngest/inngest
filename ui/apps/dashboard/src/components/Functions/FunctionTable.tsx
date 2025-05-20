@@ -1,21 +1,18 @@
 'use client';
 
 import { useMemo } from 'react';
-import { type Route } from 'next';
+import { useRouter } from 'next/navigation';
 import MiniStackedBarChart from '@inngest/components/Chart/MiniStackedBarChart';
-import { Link } from '@inngest/components/Link';
 import { HorizontalPillList, Pill, PillContent } from '@inngest/components/Pill';
 import { Skeleton } from '@inngest/components/Skeleton/Skeleton';
+import { NumberCell, TextCell } from '@inngest/components/Table';
+import NewTable from '@inngest/components/Table/NewTable';
 import { type Trigger } from '@inngest/components/types/trigger';
 import { cn } from '@inngest/components/utils/classNames';
-import {
-  createColumnHelper,
-  flexRender,
-  getCoreRowModel,
-  useReactTable,
-} from '@tanstack/react-table';
+import { createColumnHelper } from '@tanstack/react-table';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
+import { pathCreator } from '@/utils/urls';
 
 export type FunctionTableRow = {
   appName: string | null;
@@ -35,70 +32,29 @@ export type FunctionTableRow = {
 
 type Props = {
   rows: FunctionTableRow[] | undefined;
+  isLoading?: boolean;
 };
 
-export function FunctionTable({ rows = [] }: Props) {
+export function FunctionTable({ rows = [], isLoading }: Props) {
   const env = useEnvironment();
+  const router = useRouter();
 
   const columns = useMemo(() => {
     return createColumns(env.slug);
   }, [env.slug]);
 
-  const table = useReactTable({
-    data: rows,
-    columns,
-    getCoreRowModel: getCoreRowModel(),
-    getRowId: (row) => row.slug,
-  });
-
   return (
     <main className="bg-canvasBase flex min-h-0 flex-col overflow-y-auto">
-      <table className="border-subtle border-b">
-        <thead className="shadow-subtle sticky top-0 z-10 shadow-[0_1px_0]">
-          {table.getHeaderGroups().map((headerGroup) => (
-            <tr key={headerGroup.id} className="h-12">
-              {headerGroup.headers.map((header, index) => (
-                <th
-                  key={header.id}
-                  className={cn(
-                    'text-muted w-fit whitespace-nowrap px-4 text-left text-sm font-semibold ',
-                    index === columns.length - 1 && 'w-0'
-                  )}
-                >
-                  {header.isPlaceholder
-                    ? null
-                    : flexRender(header.column.columnDef.header, header.getContext())}
-                </th>
-              ))}
-            </tr>
-          ))}
-        </thead>
-        <tbody className="divide-subtle divide-y">
-          {table.getRowModel().rows.map((row) => (
-            <tr key={row.id} className="hover:bg-canvasSubtle/50">
-              {row.getVisibleCells().map((cell, index) => (
-                <td
-                  key={cell.id}
-                  className={cn('whitespace-nowrap', index === columns.length - 1 && 'pr-4')}
-                >
-                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-
-      {rows.length === 0 && <div className="text-subtle p-3 text-center text-sm">No functions</div>}
+      <NewTable
+        columns={columns}
+        data={rows}
+        isLoading={isLoading}
+        blankState={rows.length === 0 ? 'No functions' : null}
+        onRowClick={(row) =>
+          router.push(pathCreator.function({ envSlug: env.slug, functionSlug: row.original.slug }))
+        }
+      />
     </main>
-  );
-}
-
-function Shimmer({ className }: { className?: string }) {
-  return (
-    <div className={`flex ${className}`}>
-      <Skeleton className="block h-5 w-full" />
-    </div>
   );
 }
 
@@ -109,13 +65,13 @@ function createColumns(environmentSlug: string) {
     columnHelper.accessor('name', {
       cell: (info) => {
         const name = info.getValue();
-        const { isPaused, isArchived, slug } = info.row.original;
+        const { isPaused, isArchived } = info.row.original;
 
         return (
-          <div className="flex items-center pl-4">
+          <div className="flex items-center gap-2">
             <div
               className={cn(
-                'h-2.5 w-2.5 rounded-full',
+                'mx-1 h-2.5 w-2.5 shrink-0 rounded-full',
                 isArchived
                   ? 'bg-surfaceMuted'
                   : isPaused
@@ -123,14 +79,7 @@ function createColumns(environmentSlug: string) {
                   : 'bg-primary-moderate'
               )}
             />
-            <Link
-              key="name"
-              href={`/env/${environmentSlug}/functions/${encodeURIComponent(slug)}` as Route}
-              arrowOnHover
-              className="w-full px-2 py-3 text-sm font-medium"
-            >
-              {name}
-            </Link>
+            <TextCell>{name}</TextCell>
           </div>
         );
       },
@@ -148,9 +97,10 @@ function createColumns(environmentSlug: string) {
                   appearance="outlined"
                   href={
                     trigger.type === 'EVENT'
-                      ? (`/env/${environmentSlug}/events/${encodeURIComponent(
-                          trigger.value
-                        )}` as Route)
+                      ? pathCreator.eventType({
+                          envSlug: environmentSlug,
+                          eventName: trigger.value,
+                        })
                       : undefined
                   }
                   key={trigger.type + trigger.value}
@@ -175,7 +125,10 @@ function createColumns(environmentSlug: string) {
           <div className="flex items-center">
             <Pill
               appearance="outlined"
-              href={`/env/${environmentSlug}/apps/${encodeURIComponent(appExternalID)}` as Route}
+              href={pathCreator.app({
+                envSlug: environmentSlug,
+                externalAppID: appExternalID,
+              })}
             >
               <PillContent type="APP">{appExternalID}</PillContent>
             </Pill>
@@ -188,17 +141,20 @@ function createColumns(environmentSlug: string) {
       cell: (info) => {
         const value = info.getValue();
         if (value === undefined) {
-          return <Shimmer className="px-2.5" />;
+          return <Skeleton className="my-2 block h-3 w-32" />;
         }
-
         if (value === 0) {
-          return <div className="text-light px-2.5 text-sm">-</div>;
+          return (
+            <TextCell>
+              <span className="text-light">—</span>
+            </TextCell>
+          );
         }
 
         return (
-          <div className={'text-tertiary-intense flex items-center gap-1 px-2.5 text-sm'}>
-            {value}%
-          </div>
+          <TextCell>
+            <span className="text-tertiary-intense">{value}%</span>
+          </TextCell>
         );
       },
       header: 'Failure rate (24hr)',
@@ -206,25 +162,20 @@ function createColumns(environmentSlug: string) {
     columnHelper.accessor('usage', {
       cell: (info) => {
         const value = info.getValue();
+
         if (value === undefined) {
-          return <Shimmer className="px-2.5" />;
+          return <Skeleton className="my-2 block h-3 w-32" />;
         }
 
         return (
-          <div className="flex min-w-[212px] items-center justify-end gap-2">
-            <span
-              key="volume-count"
-              className="text-subtle overflow-hidden whitespace-nowrap text-xs"
-            >
-              <div className="flex items-center gap-1 align-middle text-sm">
-                {value.total.toLocaleString(undefined, {
-                  notation: 'compact',
-                  compactDisplay: 'short',
-                })}
-              </div>
-            </span>
+          <div className="flex items-center">
+            <div className="w-16">
+              <NumberCell value={value.total} term={value.total === 1 ? 'function' : 'functions'} />
+            </div>
 
-            <MiniStackedBarChart key="volume-chart" className="shrink-0" data={value.slots} />
+            <div className="hidden lg:block [&_*]:cursor-pointer">
+              <MiniStackedBarChart key="volume-chart" className="shrink-0" data={value.slots} />
+            </div>
           </div>
         );
       },

@@ -80,6 +80,9 @@ const (
 	// FunctionIdempotencyPeriod determines how long a specific function remains idempotent
 	// when using idempotency keys.
 	FunctionIdempotencyPeriod = 24 * time.Hour
+	// FunctionIdempotencyTombstone indicates the run associated with this idempotency key
+	// has already finished
+	FunctionIdempotencyTombstone = "-"
 
 	DefaultBatchSizeLimit = 100
 	DefaultBatchTimeout   = 60 * time.Second
@@ -138,6 +141,7 @@ const (
 
 	ConnectWorkerHeartbeatInterval  = 10 * time.Second
 	ConnectGatewayHeartbeatInterval = 5 * time.Second
+	ConnectGCThreshold              = 5 * time.Minute
 
 	ConnectWorkerRequestLeaseDuration = 20 * time.Second
 	ConnectWorkerRequestGracePeriod   = 5 * time.Second
@@ -145,4 +149,6 @@ const (
 
 var (
 	ConnectWorkerRequestExtendLeaseInterval = ConnectWorkerRequestLeaseDuration / 4
+	QueueShadowContinuationCooldownPeriod   = QueueContinuationCooldownPeriod
+	QueueShadowContinuationMaxPartitions    = QueueContinuationMaxPartitions
 )

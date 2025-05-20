@@ -1,16 +1,18 @@
 package consts
 
 const (
-	OtelSpanEvent        = "event"
-	OtelSpanCron         = "cron"
-	OtelSpanBatch        = "batch"
-	OtelSpanDebounce     = "debounce"
-	OtelSpanTrigger      = "trigger"
-	OtelSpanInvoke       = "invoke"
-	OtelSpanWaitForEvent = "wait"
-	OtelSpanSleep        = "sleep"
-	OtelSpanExecute      = "execute"
-	OtelSpanRerun        = "rerun"
+	OtelSpanEvent         = "event"
+	OtelSpanCron          = "cron"
+	OtelSpanBatch         = "batch"
+	OtelSpanDebounce      = "debounce"
+	OtelSpanTrigger       = "trigger"
+	OtelSpanInvoke        = "invoke"
+	OtelSpanWaitForEvent  = "wait"
+	OtelSpanWaitForSignal = "wait.signal"
+	OtelSpanSleep         = "sleep"
+	OtelSpanExecute       = "execute"
+	OtelSpanRerun         = "rerun"
+	OtelSpanReplay        = "replay"
 
 	// system attributes
 	OtelSysAccountID      = "sys.account.id"
@@ -66,11 +68,12 @@ const (
 
 	OtelSysStepSleepEndAt = "sys.step.sleep.end"
 
-	OtelSysStepWaitExpires        = "sys.step.wait.expires"
-	OtelSysStepWaitExpired        = "sys.step.wait.expired"
 	OtelSysStepWaitEventName      = "sys.step.wait.event"
+	OtelSysStepWaitExpired        = "sys.step.wait.expired"
+	OtelSysStepWaitExpires        = "sys.step.wait.expires"
 	OtelSysStepWaitExpression     = "sys.step.wait.expr"
 	OtelSysStepWaitMatchedEventID = "sys.step.wait.matched.event.id"
+	OtelSysStepWaitSignalName     = "sys.step.wait.signal"
 
 	OtelSysStepInvokeExpires           = "sys.step.invoke.expires"
 	OtelSysStepInvokeTargetFnID        = "sys.step.invoke.fn.id"
@@ -94,6 +97,7 @@ const (
 	OtelAttrSDKRunID       = "sdk.run.id"
 
 	// otel scopes
+	OtelScopeUserland  = "userland.inngest"
 	OtelScopeEvent     = "event.inngest"
 	OtelScopeBatch     = "batch.inngest"
 	OtelScopeDebounce  = "debounce.inngest"
@@ -101,6 +105,7 @@ const (
 	OtelScopeCron      = "cron.inngest"
 	OtelScopeInvoke    = "invoke.inngest"
 	OtelScopeRerun     = "rerun.inngest"
+	OtelScopeReplay    = "replay.inngest"
 	OtelScopeEnv       = "env.inngest"
 	OtelScopeApp       = "app.env.inngest"
 	OtelScopeFunction  = "function.app.env.inngest"

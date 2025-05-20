@@ -32,8 +32,8 @@
             gomodifytags
             gore
             gotools
-            protoc-gen-go
             goreleaser
+            delve
 
             # Lua
             lua
@@ -55,9 +55,6 @@
             buf
             protoc-gen-go
             protoc-gen-connect-go
-            natscli
-            nats-server
-            nats-top
           ];
         };
       });

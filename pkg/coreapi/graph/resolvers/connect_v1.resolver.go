@@ -35,9 +35,9 @@ func (r *connectV1workerConnectionResolver) TotalCount(ctx context.Context, obj 
 	return count, nil
 }
 
-func (r *queryResolver) WorkerConnections(ctx context.Context, first int, after *string, orderBy []*models.ConnectV1WorkerConnectionsOrderBy, filter models.ConnectV1WorkerConnectionsFilter) (*models.WorkerConnectionsConnection, error) {
+func (qr *queryResolver) WorkerConnections(ctx context.Context, first int, after *string, orderBy []*models.ConnectV1WorkerConnectionsOrderBy, filter models.ConnectV1WorkerConnectionsFilter) (*models.WorkerConnectionsConnection, error) {
 	opts := toWorkerConnectionsQueryOpt(first, after, orderBy, filter)
-	workerConns, err := r.Data.GetWorkerConnections(ctx, opts)
+	workerConns, err := qr.Data.GetWorkerConnections(ctx, opts)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving worker connections: %w", err)
 	}
@@ -140,8 +140,8 @@ func connToNode(conn *cqrs.WorkerConnection) *models.ConnectV1WorkerConnection {
 	return node
 }
 
-func (r *queryResolver) WorkerConnection(ctx context.Context, connectionID ulid.ULID) (*models.ConnectV1WorkerConnection, error) {
-	conn, err := r.Data.GetWorkerConnection(ctx, cqrs.WorkerConnectionIdentifier{
+func (qr *queryResolver) WorkerConnection(ctx context.Context, connectionID ulid.ULID) (*models.ConnectV1WorkerConnection, error) {
+	conn, err := qr.Data.GetWorkerConnection(ctx, cqrs.WorkerConnectionIdentifier{
 		AccountID:    consts.DevServerAccountID,
 		WorkspaceID:  consts.DevServerEnvID,
 		ConnectionID: connectionID,

@@ -2,7 +2,9 @@ package state
 
 import (
 	"context"
+	"fmt"
 	"regexp"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
@@ -13,13 +15,20 @@ import (
 
 var tsSuffix = regexp.MustCompile(`\s*&&\s*\(\s*async.ts\s+==\s*null\s*\|\|\s*async.ts\s*>\s*\d*\)\s*$`)
 
+var (
+	ErrConsumePauseKeyMissing = fmt.Errorf("no idempotency key provided for consuming pauses")
+)
+
 // PauseMutater manages creating, leasing, and consuming pauses from a backend implementation.
 type PauseMutater interface {
 	// SavePause indicates that the traversal of an edge is paused until some future time.
 	//
-	// The runner which coordinates workflow executions is responsible for managing paused
-	// DAG executions.
-	SavePause(ctx context.Context, p Pause) error
+	// This returns the number of pauses in the current pause.Index.
+	SavePause(ctx context.Context, p Pause) (int64, error)
+
+	// PauseExists returns a nil error if a pause exists, or a state.ErrPauseNotFound error if
+	// a pause does not exist.
+	PauseExists(ctx context.Context, id uuid.UUID) error
 
 	// LeasePause allows us to lease the pause until the next step is enqueued, at which point
 	// we can 'consume' the pause to remove it.
@@ -38,10 +47,13 @@ type PauseMutater interface {
 	//
 	// Any data passed when consuming a pause will be stored within function run state
 	// for future reference using the pause's DataKey.
-	ConsumePause(ctx context.Context, id uuid.UUID, data any) (ConsumePauseResult, error)
+	ConsumePause(ctx context.Context, p Pause, opts ConsumePauseOpts) (ConsumePauseResult, func() error, error)
 
 	// DeletePause permanently deletes a pause.
 	DeletePause(ctx context.Context, p Pause) error
+
+	// DeletePauseByID removes a puse by its ID.
+	DeletePauseByID(ctx context.Context, pauseID uuid.UUID) error
 }
 
 // PauseGetter allows a runner to return all existing pauses by event or by outgoing ID.  This
@@ -50,15 +62,10 @@ type PauseGetter interface {
 	// PausesByEvent returns all pauses for a given event, in a given workspace.
 	PausesByEvent(ctx context.Context, workspaceID uuid.UUID, eventName string) (PauseIterator, error)
 
+	PausesByEventSince(ctx context.Context, workspaceID uuid.UUID, event string, since time.Time) (PauseIterator, error)
+
 	// EventHasPauses returns whether the event has pauses stored.
 	EventHasPauses(ctx context.Context, workspaceID uuid.UUID, eventName string) (bool, error)
-
-	// PauseByStep returns a specific pause for a given workflow run, from a given step.
-	//
-	// This is required when continuing a step function from an async step, ie. one that
-	// has deferred results which must be continued by resuming the specific pause set
-	// up for the given step ID.
-	PauseByStep(ctx context.Context, i Identifier, actionID string) (*Pause, error)
 
 	// PauseByID returns a given pause by pause ID.  This must return expired pauses
 	// that have not yet been consumed in order to properly handle timeouts.
@@ -77,6 +84,19 @@ type PauseGetter interface {
 	//
 	// This should not return consumed pauses.
 	PauseByInvokeCorrelationID(ctx context.Context, wsID uuid.UUID, correlationID string) (*Pause, error)
+
+	// PauseBySignalCorrelationID returns a given pause by the correlation ID.
+	PauseBySignalID(ctx context.Context, wsID uuid.UUID, signalID string) (*Pause, error)
+
+	// PauseCreatedAt returns the timestamp a pause was created, using the given
+	// workspace <> event Index.
+	PauseCreatedAt(ctx context.Context, workspaceID uuid.UUID, event string, pauseID uuid.UUID) (time.Time, error)
+}
+
+// ConsumePauseOpts are the options to be passed in for consuming a pause
+type ConsumePauseOpts struct {
+	IdempotencyKey string
+	Data           any
 }
 
 type ConsumePauseResult struct {
@@ -122,16 +142,36 @@ type PauseManager interface {
 	PauseGetter
 }
 
+// PauseIdentifier is a minimal identifier for a pause.  This exists and is used instead of
+// eg. state.ID or state.Identifier for historical reasons:  pauses were added before state.ID
+// existed, and this implements all things backcompat with the bare minimum fields needed for
+// pauses and state to work.
+type PauseIdentifier struct {
+	// RunID is the ID of the run.
+	RunID ulid.ULID `json:"runID"`
+	// FunctionID tracks the internal ID of the function, and is used when saving
+	// step responses.
+	FunctionID uuid.UUID `json:"wID"`
+	// AccountID represents the account ID for this run
+	AccountID uuid.UUID `json:"aID"`
+	// NOTE:
+	// - Workspace ID is in the pause.
+	// - App ID is not necessary to load fn state in the identifier.
+}
+
 // Pause allows steps of a function to be paused until some condition in the future.
 //
 // It pauses a specific workflow run via an Identifier, at a specific step in
 // the function as specified by Target.
 type Pause struct {
+	// ID is a pause ID.  This should be a V7 UUID (incl. timestamp).
 	ID uuid.UUID `json:"id"`
 	// WorkspaceID scopes the pause to a specific workspace.
 	WorkspaceID uuid.UUID `json:"wsID"`
 	// Identifier is the specific workflow run to resume.  This is required.
-	Identifier Identifier `json:"identifier"`
+	// This includes the minimum number of fields required to reload function
+	// state.
+	Identifier PauseIdentifier `json:"identifier"`
 	// Outgoing is the parent step for the pause.
 	Outgoing string `json:"outgoing"`
 	// Incoming is the step to run after the pause completes.
@@ -156,25 +196,21 @@ type Pause struct {
 	Expires Time `json:"expires"`
 	// Event is an optional event that can resume the pause automatically,
 	// often paired with an expression.
-	Event *string `json:"event"`
+	Event *string `json:"event,omitempty"`
 	// Expression is an optional expression that must match for the pause
 	// to be resumed.
-	Expression *string `json:"expression"`
-	// ExpressionData _optionally_ stores only the data that we need to evaluate
-	// the expression from the event.  This allows us to load pauses from the
-	// state store without round trips to fetch the entire function state.  If
-	// this is empty and the pause contains an expression, function state will
-	// be loaded from the store.
-	ExpressionData map[string]any `json:"data"`
+	Expression *string `json:"expression,omitempty"`
 	// InvokeCorrelationID is the correlation ID for the invoke pause.
 	InvokeCorrelationID *string `json:"icID,omitempty"`
 	// InvokeTargetFnID is the target function ID for the invoke pause.
 	// This is used to be able to accurately reconstruct the entire invocation
 	// span.
 	InvokeTargetFnID *string `json:"itFnID,omitempty"`
+	// SignalID is the ID of the signal that is responsible for this pause.
+	SignalID *string `json:"signalID,omitempty"`
 	// OnTimeout indicates that this incoming edge should only be ran
 	// when the pause times out, if set to true.
-	OnTimeout bool `json:"onTimeout"`
+	OnTimeout bool `json:"onTimeout,omitempty,omitzero"`
 	// DataKey is the name of the step to use when adding data to the function
 	// run's state after consuming this step.
 	//
@@ -183,17 +219,13 @@ type Pause struct {
 	//
 	// If DataKey is empty and data is provided when consuming a pause, no
 	// data will be saved in the function state.
-	DataKey string `json:"dataKey,omitempty"`
+	DataKey string `json:"dataKey,omitempty,omitzero"`
 	// Cancellation indicates whether this pause exists as a cancellation
 	// clause for a function.
 	//
 	// If so, when the matching pause is returned after processing an event
 	// the function's status is set to cancelled, preventing any future work.
-	Cancel bool `json:"cancel,omitempty"`
-	// Attempt stores the attempt for the current step, if this a pause caused
-	// via an async driver.  This lets the executor resume as-is with the current
-	// context, ensuring that we retry correctly.
-	Attempt int `json:"att,omitempty"`
+	Cancel bool `json:"cancel,omitempty,omitzero"`
 	// MaxAttempts is the maximum number of attempts we can retry.  This is
 	// included in the pause to allow the executor to set the correct maximum
 	// number of retries when enqueuing next steps.
@@ -244,6 +276,10 @@ func (p Pause) Edge() inngest.Edge {
 
 func (p Pause) IsInvoke() bool {
 	return p.Opcode != nil && *p.Opcode == enums.OpcodeInvokeFunction.String()
+}
+
+func (p Pause) IsSignal() bool {
+	return p.Opcode != nil && *p.Opcode == enums.OpcodeWaitForSignal.String()
 }
 
 type ResumeData struct {

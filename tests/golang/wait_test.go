@@ -376,7 +376,7 @@ func TestWaitInvalidExpressionSyntaxError(t *testing.T) {
 	r.NoError(err)
 	run := c.WaitForRunStatus(ctx, t, "FAILED", &runID)
 	assert.Equal(t,
-		`{"error":{"error":"InvalidExpression: Wait for event expression is invalid","name":"InvalidExpression","message":"Wait for event expression is invalid","stack":"error validating expression: error compiling expression: ERROR: \u003cinput\u003e:1:21: Syntax error: token recognition error at: '= '\n | event.data.userId === async.data.userId\n | ....................^"}}`,
+		`{"error":{"error":"InvalidExpression: Wait for event If expression failed to compile","name":"InvalidExpression","message":"Wait for event If expression failed to compile","stack":"error compiling expression: ERROR: \u003cinput\u003e:1:21: Syntax error: token recognition error at: '= '\n | event.data.userId === async.data.userId\n | ....................^"}}`,
 		run.Output,
 	)
 }

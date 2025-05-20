@@ -140,9 +140,19 @@ func (e *kafkaSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadO
 	for _, sp := range spans {
 		wg.Add(1)
 
+		// TODO: skip publishing if delete tag is set
+		// for _, attr := range sp.Attributes() {
+		// 	// don't bother sending to Kafka if it's gonna be deleted anyways
+		// 	if attr.Key == consts.OtelSysStepDelete && attr.Value.AsBool() {
+		// 		wg.Done()
+		// 		continue
+		// 	}
+		// }
+
 		span, err := SpanToProto(ctx, sp)
 		if err != nil {
 			l.Error("error converting span to proto", "err", err)
+			wg.Done()
 			continue
 		}
 
@@ -167,8 +177,20 @@ func (e *kafkaSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadO
 		case "workflow_id", "wf_id", "function_id", "fn_id":
 			rec.Key = []byte(id.GetFunctionId())
 		case "run_id":
-			if id.GetRunId() != "" {
+			switch {
+			case id.GetRunId() != "":
 				rec.Key = []byte(id.GetRunId())
+			case id.GetFunctionId() != "":
+				l.Warn("missing run_id, falling back to function_id", "span", sp)
+				rec.Key = []byte(id.GetFunctionId())
+			case id.GetEnvId() != "":
+				l.Warn("missing run_id, falling back to env_id", "span", sp)
+				rec.Key = []byte(id.GetEnvId())
+			case id.GetAccountId() != "":
+				l.Warn("missing run_id, falling back to acct_id", "span", sp)
+				rec.Key = []byte(id.GetAccountId())
+			default:
+				l.Error("missing run_id, no other identifier to fallback to", "span", sp)
 			}
 		}
 

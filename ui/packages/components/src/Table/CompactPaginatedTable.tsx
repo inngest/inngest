@@ -18,10 +18,10 @@ type TableProps<T> = {
   sorting?: SortingState;
   setSorting?: OnChangeFn<SortingState>;
   isLoading?: boolean;
-  renderSubComponent: (props: { row: Row<T> }) => React.ReactElement;
-  enableExpanding: boolean;
+  renderSubComponent?: (props: { row: Row<T> }) => React.ReactElement;
+  enableExpanding?: boolean;
   columns: ColumnDef<T, any>[];
-  getRowCanExpand: (row: Row<T>) => boolean;
+  getRowCanExpand?: (row: Row<T>) => boolean;
   footer?: React.ReactElement;
 };
 
@@ -81,7 +81,7 @@ export default function CompactPaginatedTable<T>({
 
   const tableStyles = 'w-full';
   const tableHeadStyles = 'bg-canvasSubtle';
-  const tableColumnStyles = 'pr-4';
+  const tableColumnStyles = 'px-4';
   const expandedRowSideBorder =
     'before:bg-surfaceMuted relative before:absolute before:bottom-0 before:left-0 before:top-0 before:w-0.5';
 
@@ -105,8 +105,11 @@ export default function CompactPaginatedTable<T>({
                   {header.isPlaceholder ? null : (
                     <div
                       className={cn(
-                        header.column.getCanSort() &&
-                          'flex cursor-pointer select-none items-center gap-1'
+                        header.column.getCanSort()
+                          ? 'flex cursor-pointer select-none items-center gap-1'
+                          : header.column.getIsSorted()
+                          ? 'flex items-center gap-1'
+                          : ''
                       )}
                       onClick={header.column.getToggleSortingHandler()}
                     >
@@ -142,6 +145,7 @@ export default function CompactPaginatedTable<T>({
                   }
                 >
                   {row.getVisibleCells().map((cell, i) => {
+                    const isIconOnlyColumn = cell.column.columnDef.header === undefined;
                     return (
                       <td
                         key={cell.id}
@@ -151,7 +155,7 @@ export default function CompactPaginatedTable<T>({
                         }}
                         className={cn(
                           i === 0 && row.getIsExpanded() ? expandedRowSideBorder : '',
-                          tableColumnStyles
+                          isIconOnlyColumn ? 'pr-4' : tableColumnStyles
                         )}
                       >
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
@@ -159,7 +163,7 @@ export default function CompactPaginatedTable<T>({
                     );
                   })}
                 </tr>
-                {row.getIsExpanded() && !isLoading && (
+                {renderSubComponent && row.getIsExpanded() && !isLoading && (
                   <tr className="border-subtle border-b last:border-b-0">
                     <td
                       colSpan={row.getVisibleCells().length}

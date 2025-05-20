@@ -56,17 +56,17 @@ func (e *Event) ToSQLite() (*sqlc.Event, error) {
 	}, nil
 }
 
-func (b *EventBatch) ToSQLite() (*sqlc.EventBatch, error) {
+func (eb *EventBatch) ToSQLite() (*sqlc.EventBatch, error) {
 	return &sqlc.EventBatch{
-		ID:          b.ID,
-		AccountID:   b.AccountID,
-		WorkspaceID: b.WorkspaceID,
-		AppID:       b.AppID,
-		WorkflowID:  b.WorkflowID,
-		RunID:       b.RunID,
-		StartedAt:   b.StartedAt,
-		ExecutedAt:  b.ExecutedAt,
-		EventIds:    b.EventIds,
+		ID:          eb.ID,
+		AccountID:   eb.AccountID,
+		WorkspaceID: eb.WorkspaceID,
+		AppID:       eb.AppID,
+		WorkflowID:  eb.WorkflowID,
+		RunID:       eb.RunID,
+		StartedAt:   eb.StartedAt,
+		ExecutedAt:  eb.ExecutedAt,
+		EventIds:    eb.EventIds,
 	}, nil
 }
 

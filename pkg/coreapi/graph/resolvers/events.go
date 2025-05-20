@@ -10,10 +10,10 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
-func (r *queryResolver) Event(ctx context.Context, query models.EventQuery) (*models.Event, error) {
+func (qr *queryResolver) Event(ctx context.Context, query models.EventQuery) (*models.Event, error) {
 	id, _ := ulid.Parse(query.EventID)
 
-	evt, err := r.Data.GetEventByInternalID(ctx, id)
+	evt, err := qr.Data.GetEventByInternalID(ctx, id)
 	if err != nil {
 		return nil, err
 	}
@@ -46,8 +46,8 @@ func (r *queryResolver) Event(ctx context.Context, query models.EventQuery) (*mo
 // TODO Use a dataloader to retrieve events and fetch individual fields in
 // individual resolvers; we shouldn't be mapping any of the fields in this
 // query.
-func (r *queryResolver) Events(ctx context.Context, query models.EventsQuery) ([]*models.Event, error) {
-	evts, err := r.Runner.Events(ctx, "")
+func (qr *queryResolver) Events(ctx context.Context, query models.EventsQuery) ([]*models.Event, error) {
+	evts, err := qr.Runner.Events(ctx, "")
 	if err != nil {
 		return nil, err
 	}

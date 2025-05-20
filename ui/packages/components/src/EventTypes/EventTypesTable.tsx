@@ -1,11 +1,14 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type UIEventHandler } from 'react';
 import type { Route } from 'next';
 import { useRouter } from 'next/navigation';
+import { Button } from '@inngest/components/Button/Button';
+import { ErrorCard } from '@inngest/components/Error/ErrorCard';
 import TableBlankState from '@inngest/components/EventTypes/TableBlankState';
 import { Search } from '@inngest/components/Forms/Search';
 import NewTable from '@inngest/components/Table/NewTable';
+import useDebounce from '@inngest/components/hooks/useDebounce';
 import {
   EventTypesOrderByDirection,
   EventTypesOrderByField,
@@ -13,18 +16,16 @@ import {
   type EventTypesOrderBy,
   type PageInfo,
 } from '@inngest/components/types/eventType';
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { keepPreviousData, useInfiniteQuery } from '@tanstack/react-query';
 import { type Row, type SortingState } from '@tanstack/react-table';
 
 import { useSearchParam } from '../hooks/useSearchParam';
 import EventTypesStatusFilter from './EventTypesStatusFilter';
 import { useColumns } from './columns';
 
-const refreshInterval = 5000;
-
 export function EventTypesTable({
   getEventTypes,
-  getEventTypesVolume,
+  getEventTypeVolume,
   pathCreator,
   emptyActions,
   eventTypeActions,
@@ -40,20 +41,18 @@ export function EventTypesTable({
     archived,
   }: {
     cursor: string | null;
+    nameSearch: string | null;
     archived: boolean;
     orderBy: EventTypesOrderBy[];
   }) => Promise<{ events: Omit<EventType, 'volume'>[]; pageInfo: PageInfo }>;
-  getEventTypesVolume: ({
-    cursor,
-    archived,
+  getEventTypeVolume: ({
+    eventName,
   }: {
-    cursor: string | null;
-    archived: boolean;
-    orderBy: EventTypesOrderBy[];
-  }) => Promise<{ events: Pick<EventType, 'volume' | 'name'>[]; pageInfo: PageInfo }>;
+    eventName: string;
+  }) => Promise<Pick<EventType, 'volume' | 'name'>>;
 }) {
   const router = useRouter();
-  const columns = useColumns({ pathCreator, eventTypeActions });
+  const columns = useColumns({ pathCreator, eventTypeActions, getEventTypeVolume });
   const [sorting, setSorting] = useState<SortingState>([
     {
       id: 'name',
@@ -63,25 +62,46 @@ export function EventTypesTable({
 
   const [filteredStatus, setFilteredStatus, removeFilteredStatus] = useSearchParam('archived');
   const archived = filteredStatus === 'true';
-  const [cursor, setCursor] = useState<string | null>(null);
-  const [page, setPage] = useState(1);
+  const [isScrollable, setIsScrollable] = useState(false);
+  const [nameSearch = null, setNameSearch, removeNameSearch] = useSearchParam('nameSearch');
+  const [searchInput, setSearchInput] = useState<string>(nameSearch || '');
   const [orderBy, setOrderBy] = useState<EventTypesOrderBy[]>([
     {
       field: EventTypesOrderByField.Name,
       direction: EventTypesOrderByDirection.Asc,
     },
   ]);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  const scrollToTop = useCallback(
+    (smooth = false) => {
+      if (containerRef.current) {
+        containerRef.current.scrollTo({
+          top: 0,
+          behavior: smooth ? 'smooth' : 'auto',
+        });
+      }
+    },
+    [containerRef.current]
+  );
+
+  const debouncedSearch = useDebounce(() => {
+    if (searchInput === '') {
+      removeNameSearch();
+    } else {
+      setNameSearch(searchInput);
+    }
+    scrollToTop();
+  }, 300);
 
   const onStatusFilterChange = useCallback(
     (value: boolean) => {
       if (value) {
-        setFilteredStatus('true'); // Set query param when archived is true
+        setFilteredStatus('true');
       } else {
-        removeFilteredStatus(); // Remove query param when archived is false
+        removeFilteredStatus();
       }
-      // Reset cursor and page when filter changes
-      setCursor(null);
-      setPage(1);
+      scrollToTop();
     },
     [setFilteredStatus, removeFilteredStatus]
   );
@@ -89,44 +109,60 @@ export function EventTypesTable({
   const {
     isPending, // first load, no data
     error,
+    fetchNextPage,
+    hasNextPage,
     data: eventTypesData,
-    isFetching, // refetching
-    // TODO: implement infinite scrolling
-  } = useQuery({
-    queryKey: ['event-types', { orderBy, cursor, archived }],
-    queryFn: useCallback(() => {
-      return getEventTypes({ orderBy, cursor, archived });
-    }, [getEventTypes, orderBy, cursor, archived]),
+    isFetching,
+    refetch,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
+    queryKey: ['event-types', { orderBy, archived, nameSearch }],
+    queryFn: ({ pageParam }: { pageParam: string | null }) =>
+      getEventTypes({ orderBy, cursor: pageParam, archived, nameSearch }),
     placeholderData: keepPreviousData,
-    refetchInterval: !cursor || page === 1 ? refreshInterval : 0,
+    getNextPageParam: (lastPage) => {
+      if (!lastPage || !lastPage.pageInfo.hasNextPage) {
+        return undefined;
+      }
+      return lastPage.pageInfo.endCursor;
+    },
+    initialPageParam: null,
   });
 
-  const { data: volumeData, isPending: isVolumePending } = useQuery({
-    queryKey: ['event-types-volume', { orderBy, cursor, archived }],
-    queryFn: useCallback(() => {
-      return getEventTypesVolume({ orderBy, cursor, archived });
-    }, [getEventTypesVolume, orderBy, cursor, archived]),
-    placeholderData: keepPreviousData,
-    refetchInterval: !cursor || page === 1 ? refreshInterval : 0,
-  });
+  const mergedData = useMemo(() => {
+    return (
+      eventTypesData?.pages.flatMap((page) =>
+        page.events.map((e) => ({
+          ...e,
+          volume: undefined,
+        }))
+      ) ?? []
+    );
+  }, [eventTypesData]);
 
-  const mergedData = useCallback(() => {
-    if (!eventTypesData?.events) return [];
+  const hasEventTypesData = mergedData && mergedData.length > 0;
 
-    const volumeMap = new Map<string, EventType['volume']>();
+  useEffect(() => {
+    const el = containerRef.current;
+    if (el) {
+      setIsScrollable(el.scrollHeight > el.clientHeight);
+    }
+  }, [mergedData]);
 
-    volumeData?.events.forEach((event) => {
-      volumeMap.set(event.name, event.volume);
-    });
+  const onScroll: UIEventHandler<HTMLDivElement> = useCallback(
+    (event) => {
+      if (hasEventTypesData && hasNextPage) {
+        const { scrollHeight, scrollTop, clientHeight } = event.target as HTMLDivElement;
 
-    return eventTypesData.events.map((event) => ({
-      ...event,
-      volume: volumeMap.get(event.name) || {
-        totalVolume: 0,
-        dailyVolumeSlots: [],
-      },
-    }));
-  }, [eventTypesData, volumeData]);
+        // Check if scrolled to the bottom
+        const reachedBottom = scrollHeight - scrollTop - clientHeight < 200;
+        if (reachedBottom && !isFetching && !isFetchingNextPage) {
+          fetchNextPage();
+        }
+      }
+    },
+    [fetchNextPage, hasNextPage, isFetchingNextPage, hasEventTypesData, isFetching]
+  );
 
   useEffect(() => {
     const sortEntry = sorting[0];
@@ -143,11 +179,12 @@ export function EventTypesTable({
         },
       ];
       setOrderBy(orderBy);
-      // Back to first page when we sort changes
-      setCursor(null);
-      setPage(1);
     }
   }, [sorting, setOrderBy]);
+
+  if (error) {
+    return <ErrorCard error={error} reset={() => refetch()} />;
+  }
 
   return (
     <div className="bg-canvasBase text-basis no-scrollbar flex-1 overflow-hidden focus-visible:outline-none">
@@ -157,25 +194,59 @@ export function EventTypesTable({
           pathCreator={'/'}
           onStatusChange={onStatusFilterChange}
         />
-        {/* TODO: Wire search */}
         <Search
           name="search"
           placeholder="Search by event type"
-          value={''}
+          value={searchInput}
           className="h-[30px] w-56 py-3"
-          onUpdate={(value) => {}}
+          onUpdate={(value) => {
+            setSearchInput(value);
+            debouncedSearch();
+          }}
         />
       </div>
-      <div className="h-[calc(100%-58px)] overflow-y-auto">
+      <div className="h-[calc(100%-58px)] overflow-y-auto" onScroll={onScroll} ref={containerRef}>
         <NewTable
           columns={columns}
-          data={mergedData() || []}
-          isLoading={isPending}
-          sorting={sorting}
-          setSorting={setSorting}
-          blankState={<TableBlankState actions={emptyActions} />}
+          data={mergedData || []}
+          isLoading={isPending || (isFetching && !isFetchingNextPage)}
+          // TODO: Re-enable this when API supports sorting by event name
+          // sorting={sorting}
+          // setSorting={setSorting}
+          blankState={
+            <TableBlankState
+              actions={emptyActions}
+              title={
+                nameSearch
+                  ? `No results found for "${nameSearch}"`
+                  : archived
+                  ? 'No archived events found'
+                  : undefined
+              }
+            />
+          }
           onRowClick={(row) => router.push(pathCreator.eventType({ eventName: row.original.name }))}
         />
+        {!hasNextPage &&
+          hasEventTypesData &&
+          isScrollable &&
+          !isFetchingNextPage &&
+          !isFetching && (
+            <div className="flex flex-col items-center pb-4 pt-8">
+              <p className="text-muted text-sm">No additional event types found.</p>
+              <Button
+                label="Back to top"
+                kind="primary"
+                appearance="ghost"
+                onClick={() => scrollToTop(true)}
+              />
+            </div>
+          )}
+        {isFetchingNextPage && (
+          <div className="flex flex-col items-center">
+            <Button appearance="outlined" label="loading" loading={true} />
+          </div>
+        )}
       </div>
     </div>
   );

@@ -1,28 +1,30 @@
 -- [[
 --
 -- Output:
---   0: Successfully saved pause
---   1: Pause already exists
+--   [1..N]: Successfully saved pause;  returns # of pauses in AddIdx
+--   -1: Pause already exists
 -- ]]
 
 local pauseKey    = KEYS[1]
 local pauseEvtKey = KEYS[2]
 local pauseInvokeKey = KEYS[3]
-local keyPauseAddIdx = KEYS[4]
-local keyPauseExpIdx = KEYS[5]
-local keyRunPauses   = KEYS[6]
-local keyPausesIdx   = KEYS[7]
+local pauseSignalKey = KEYS[4]
+local keyPauseAddIdx = KEYS[5]
+local keyPauseExpIdx = KEYS[6]
+local keyRunPauses   = KEYS[7]
+local keyPausesIdx   = KEYS[8]
 
 local pause          = ARGV[1]
 local pauseID        = ARGV[2]
 local event          = ARGV[3]
 local invokeCorrelationID = ARGV[4]
-local extendedExpiry = tonumber(ARGV[5])
-local nowUnixSeconds = tonumber(ARGV[6])
+local signalCorrelationID = ARGV[5]
+local extendedExpiry = tonumber(ARGV[6])
+local nowUnixSeconds = tonumber(ARGV[7])
 
 
 if redis.call("SETNX", pauseKey, pause) == 0 then
-	return 1
+	return -1
 end
 
 -- Populate global index
@@ -47,4 +49,19 @@ if invokeCorrelationID ~= false and invokeCorrelationID ~= "" and invokeCorrelat
 	redis.call("HSETNX", pauseInvokeKey, invokeCorrelationID, pauseID)
 end
 
-return 0
+if signalCorrelationID ~= false and signalCorrelationID ~= "" and signalCorrelationID ~= nil then
+	if redis.call("HSETNX", pauseSignalKey, signalCorrelationID, pauseID) == 0 then
+		-- The signal already exists! The rarer case now is that this is an
+		-- idempotent retry for saving a pause, so let's check if we're trying
+		-- to save this pause for the same run / step ID. If not, we need to
+		-- return an error to roll back all of these changes, as we're trying
+		-- to duplicate a signal.
+		local existing = redis.call("HGET", pauseSignalKey, signalCorrelationID)
+		if existing ~= pauseID then
+			return redis.error_reply("ErrSignalConflict")
+		end
+	end
+end
+
+
+return redis.call("ZCARD", keyPauseAddIdx)

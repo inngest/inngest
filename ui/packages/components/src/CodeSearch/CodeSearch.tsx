@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { Alert } from '@inngest/components/Alert';
 import { Button } from '@inngest/components/Button';
 import {
   FONT,
@@ -175,17 +176,19 @@ export default function CodeSearch({
   onSearch,
   placeholder,
   value,
+  searchError,
 }: {
   onSearch: (content: string) => void;
   placeholder?: string;
   value?: string;
+  searchError?: Error;
 }) {
   const [content, setContent] = useState<string>(value || '');
   const [dark, setDark] = useState(isDark());
   const editorRef = useRef<MonacoEditorType>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
   const monacoRef = useRef<Monaco>();
-  const [hasValidationError, setHasValidationError] = useState(false);
+  const [editorValidationError, setEditorValidationError] = useState<ValidationError | null>(null);
   const validationTimerRef = useRef<NodeJS.Timeout>();
 
   const monaco = useMonaco();
@@ -323,10 +326,10 @@ export default function CodeSearch({
         endColumn: error.endColumn,
       };
       monacoRef.current.editor.setModelMarkers(model, 'owner', [marker]);
-      setHasValidationError(true);
+      setEditorValidationError(error);
     } else {
       monacoRef.current.editor.setModelMarkers(model, 'owner', []);
-      setHasValidationError(false);
+      setEditorValidationError(null);
     }
   };
 
@@ -341,7 +344,7 @@ export default function CodeSearch({
 
   const handleSearch = (editorContent?: string) => {
     const updatedContent = editorContent || content;
-    if (!hasValidationError) {
+    if (!editorValidationError) {
       // Remove empty lines and trim whitespace
       const processedContent = updatedContent
         .split('\n')
@@ -370,8 +373,15 @@ export default function CodeSearch({
     }, VALIDATION_DELAY);
   };
 
+  const expressionError = editorValidationError || searchError;
+
   return (
     <>
+      {expressionError && (
+        <Alert severity="error" className="flex items-center justify-between text-sm">
+          {expressionError.message}
+        </Alert>
+      )}
       {monaco && (
         <div ref={wrapperRef} className="relative">
           {!content && (

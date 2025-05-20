@@ -3,21 +3,25 @@ package httpdriver
 import (
 	"context"
 	"fmt"
-	"math/rand/v2"
 	"net"
+	"sync"
 	"time"
 
 	"github.com/inngest/inngest/pkg/execution/driver/httpdriver/dnscache"
 	"github.com/inngest/inngest/pkg/logger"
 )
 
-const (
-	dnsCacheRefreshInterval = 5 * time.Minute
+var (
+	privateIPBlocks []*net.IPNet
+	nat64blocks     []*net.IPNet
+	cachedResolver  dnscache.DNSResolver
+	once            sync.Once
 )
 
-var privateIPBlocks []*net.IPNet
-var nat64blocks []*net.IPNet
-var cachedResolver *dnscache.Resolver
+const (
+	dnsCacheRefreshInterval = 5 * time.Second
+	dnsLookupTimeout        = 5 * time.Second
+)
 
 func init() {
 	for _, cidr := range []string{
@@ -50,26 +54,6 @@ func init() {
 		}
 		nat64blocks = append(nat64blocks, block)
 	}
-
-	// Resolver for caching DNS lookups.
-	cachedResolver = &dnscache.Resolver{}
-	go func() {
-		defer func() {
-			if r := recover(); r != nil {
-				logger.StdlibLogger(context.Background()).
-					Error("panic in resolver refresh", "error", r)
-			}
-		}()
-
-		t := time.NewTicker(dnsCacheRefreshInterval)
-		defer t.Stop()
-		for range t.C {
-			// Remove entries that haven't been used since the last refresh.
-			removeUnused := true
-
-			cachedResolver.Refresh(removeUnused)
-		}
-	}()
 }
 
 type SecureDialerOpts struct {
@@ -84,12 +68,25 @@ type SecureDialerOpts struct {
 	dial DialFunc
 }
 
+func initResolver() dnscache.DNSResolver {
+	once.Do(func() {
+		cachedResolver = dnscache.New(
+			dnscache.WithCacheRefreshInterval(dnsCacheRefreshInterval),
+			dnscache.WithLookupTimeout(dnsLookupTimeout),
+		)
+	})
+	return cachedResolver
+}
+
 type DialFunc = func(ctx context.Context, network, addr string) (net.Conn, error)
 
 func SecureDialer(o SecureDialerOpts) DialFunc {
-	if o.dial == nil {
-		// Always use the default dialer.  Only allow overrides in testing.
-		o.dial = Dialer.DialContext
+	// make sure to initialize it if absent
+	resolver := initResolver()
+
+	dial := resolver.Dialer()
+	if o.dial != nil {
+		dial = o.dial
 	}
 
 	return func(ctx context.Context, network, addr string) (net.Conn, error) {
@@ -100,7 +97,7 @@ func SecureDialer(o SecureDialerOpts) DialFunc {
 		// "[fe80::1%lo0]:53".
 		//
 		// We always want to ensure we translate the domains to IP addresses.
-		host, port, err := net.SplitHostPort(addr)
+		host, _, err := net.SplitHostPort(addr)
 		if err != nil {
 			return nil, err
 		}
@@ -110,7 +107,7 @@ func SecureDialer(o SecureDialerOpts) DialFunc {
 		}
 
 		// Ensure that the current hostname is not a domain name.
-		ips, err := cachedResolver.LookupHost(ctx, host)
+		ips, err := resolver.Lookup(ctx, host)
 		if err != nil {
 			return nil, err
 		}
@@ -123,33 +120,15 @@ func SecureDialer(o SecureDialerOpts) DialFunc {
 		}
 
 		for _, ip := range ips {
-			if !o.AllowPrivate && isPrivateHost(ip) {
+			if !o.AllowPrivate && isPrivateHost(ip.String()) {
 				return nil, fmt.Errorf("Unable to make request to %s at IP %s: private IP range", addr, ip)
 			}
-			if !o.AllowNAT64 && isNat64(ip) {
+			if !o.AllowNAT64 && isNat64(ip.String()) {
 				return nil, fmt.Errorf("Unable to make request to %s at IP %s: NAT64 address", addr, ip)
 			}
 		}
 
-		// Randomize the order of the IPs. The purpose is to evenly distribute
-		// load across the IPs.
-		rand.Shuffle(len(ips), func(i, j int) {
-			ips[i], ips[j] = ips[j], ips[i]
-		})
-
-		// Try each IP until we get a connection.
-		var conn net.Conn
-		for _, ip := range ips {
-			// We need to give the dialer an IP address. Otherwise, it will do
-			// DNS lookup that doesn't use the cached resolver.
-			addr := net.JoinHostPort(ip, port)
-
-			conn, err = o.dial(ctx, network, addr)
-			if err == nil {
-				break
-			}
-		}
-		return conn, err
+		return dial(ctx, network, addr)
 	}
 }
 

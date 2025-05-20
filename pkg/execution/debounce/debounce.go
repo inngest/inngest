@@ -7,14 +7,16 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/inngest/inngest/pkg/enums"
-	"github.com/inngest/inngest/pkg/telemetry/metrics"
-	"github.com/jonboulle/clockwork"
 	"io/fs"
 	"regexp"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
+	"github.com/jonboulle/clockwork"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/event"
@@ -643,6 +645,8 @@ func (d debouncer) debounce(ctx context.Context, di DebounceItem, fn inngest.Fun
 }
 
 func (d debouncer) queueItem(ctx context.Context, di DebounceItem, debounceID ulid.ULID) queue.Item {
+	maxAttempts := consts.MaxRetries + 1
+
 	jobID := debounceID.String()
 	payload := di.QueuePayload()
 	payload.DebounceID = debounceID
@@ -655,8 +659,9 @@ func (d debouncer) queueItem(ctx context.Context, di DebounceItem, debounceID ul
 			AppID:       di.AppID,
 			WorkflowID:  di.FunctionID,
 		},
-		Kind:    queue.KindDebounce,
-		Payload: payload,
+		Kind:        queue.KindDebounce,
+		Payload:     payload,
+		MaxAttempts: &maxAttempts,
 	}
 }
 
