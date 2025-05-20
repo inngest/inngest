@@ -189,13 +189,25 @@ func start(ctx context.Context, opts StartOpts) error {
 	// Create a new broadcaster which lets us broadcast realtime messages.
 	broadcaster := realtime.NewInProcessBroadcaster()
 
+	runMode := redis_state.QueueRunMode{
+		Sequential:    true,
+		Scavenger:     true,
+		Partition:     true,
+		Continuations: true,
+	}
+	enableKeyQueues := os.Getenv("EXPERIMENTAL_KEY_QUEUES_ENABLE") == "true"
+
+	if enableKeyQueues {
+		runMode.ShadowPartition = true
+		runMode.ShadowContinuations = true
+		runMode.ShadowContinuationSkipProbability = consts.QueueContinuationSkipProbability
+		runMode.AccountShadowPartition = true
+		runMode.AccountShadowPartitionWeight = 80
+		runMode.NormalizePartition = true
+	}
+
 	queueOpts := []redis_state.QueueOpt{
-		redis_state.WithRunMode(redis_state.QueueRunMode{
-			Sequential:    true,
-			Scavenger:     true,
-			Partition:     true,
-			Continuations: true,
-		}),
+		redis_state.WithRunMode(runMode),
 		redis_state.WithIdempotencyTTL(time.Hour),
 		redis_state.WithNumWorkers(int32(opts.QueueWorkers)),
 		redis_state.WithPollTick(opts.Tick),
@@ -267,8 +279,19 @@ func start(ctx context.Context, opts StartOpts) error {
 		}),
 		redis_state.WithShardSelector(shardSelector),
 		redis_state.WithQueueShardClients(queueShards),
+
+		// Key queues
 		redis_state.WithNormalizeRefreshItemCustomConcurrencyKeys(NormalizeConcurrencyKeys(smv2, dbcqrs)),
 		redis_state.WithNormalizeRefreshItemThrottle(NormalizeThrottle(smv2, dbcqrs)),
+		redis_state.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+			return enableKeyQueues
+		}),
+		redis_state.WithEnqueueSystemPartitionsToBacklog(false),
+		redis_state.WithDisableLeaseChecksForSystemQueues(false),
+		redis_state.WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
+			return false
+		}),
+		redis_state.WithBacklogRefillLimit(10),
 	}
 	if opts.RetryInterval > 0 {
 		queueOpts = append(queueOpts, redis_state.WithBackoffFunc(

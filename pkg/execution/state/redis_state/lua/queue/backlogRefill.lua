@@ -286,13 +286,11 @@ if refilled > 0 then
 
   -- Potentially update the queue of queues.
   local currentScore = redis.call("ZSCORE", keyGlobalPointer, partitionID)
-  if currentScore == false or tonumber(currentScore) ~= earliestScore then
-    if nowMS == nil or nowMS == false then
-      local updateTo = earliestScore/1000
+  if currentScore == false or tonumber(currentScore) > earliestScore then
+    local updateTo = earliestScore/1000
 
-      update_pointer_score_to(partitionID, keyGlobalPointer, updateTo)
-      update_account_queues(keyGlobalAccountPointer, keyAccountPartitions, partitionID, accountID, updateTo)
-    end
+    update_pointer_score_to(partitionID, keyGlobalPointer, updateTo)
+    update_account_queues(keyGlobalAccountPointer, keyAccountPartitions, partitionID, accountID, updateTo)
   end
 end
 

@@ -652,7 +652,7 @@ func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 			return item.Data.GetConcurrencyKeys()
 		},
 		allowKeyQueues: func(ctx context.Context, acctID uuid.UUID) bool {
-			return true
+			return false
 		},
 		enqueueSystemQueuesToBacklog: false,
 		disableLeaseChecks: func(ctx context.Context, acctID uuid.UUID) bool {

@@ -110,6 +110,10 @@ func TestQueueRefillBacklog(t *testing.T) {
 		require.True(t, hasMember(t, r, kg.PartitionQueueSet(enums.PartitionTypeDefault, fnID.String(), ""), qi.ID))
 		require.Equal(t, at.UnixMilli(), int64(score(t, r, kg.PartitionQueueSet(enums.PartitionTypeDefault, fnID.String(), ""), qi.ID)))
 
+		require.Equal(t, at.Unix(), int64(score(t, r, kg.GlobalPartitionIndex(), fnID.String())))
+		require.Equal(t, at.Unix(), int64(score(t, r, kg.GlobalAccountIndex(), accountId.String())))
+		require.Equal(t, at.Unix(), int64(score(t, r, kg.AccountPartitionIndex(accountId), fnID.String())))
+
 		kg.ShadowPartitionSet(shadowPartition.PartitionID)
 	})
 
