@@ -83,7 +83,7 @@ if backlogCountTotal == 0 then
   -- update backlog pointers
   updateBacklogPointer(keyGlobalShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, keyShadowPartitionSet, keyBacklogSet, accountID, partitionID, backlogID)
 
-  return { 0, 0, 0, 0, 0 }
+  return { 0, 0, 0, backlogCountTotal, 0, 0 }
 end
 
 local backlogCountUntil = redis.call("ZCOUNT", keyBacklogSet, "-inf", refillUntilMS)
@@ -95,7 +95,7 @@ if backlogCountUntil == 0 then
   -- update backlog pointers
   updateBacklogPointer(keyGlobalShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, keyShadowPartitionSet, keyBacklogSet, accountID, partitionID, backlogID)
 
-  return { 0, 0, 0, 0, 0 }
+  return { 0, 0, backlogCountUntil, backlogCountTotal, 0, 0 }
 end
 
 --
