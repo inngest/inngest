@@ -158,12 +158,16 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 
 		// instrumentation
 		{
-			metrics.IncrQueueBacklogRefilledCounter(ctx, int64(res.Refilled), metrics.CounterOpt{
+			opts := metrics.CounterOpt{
 				PkgName: pkgName,
 				Tags: map[string]any{
 					"partition_id": shadowPart.PartitionID,
 				},
-			})
+			}
+
+			metrics.IncrBacklogProcessedCounter(ctx, opts)
+			metrics.IncrQueueBacklogRefilledCounter(ctx, int64(res.Refilled), opts)
+
 			// NOTE: custom method to instrument result - potentially handling high cardinality data
 			q.instrumentBacklogResult(ctx, backlog, res)
 		}
