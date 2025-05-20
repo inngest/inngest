@@ -312,6 +312,13 @@ func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp 
 		})
 	}
 
+	metrics.IncrBacklogNormalizedCounter(ctx, metrics.CounterOpt{
+		PkgName: pkgName,
+		Tags: map[string]any{
+			"partition_id": backlog.ShadowPartitionID,
+		},
+	})
+
 	return nil
 }
 

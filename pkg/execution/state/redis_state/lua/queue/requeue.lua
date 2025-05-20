@@ -5,7 +5,7 @@ Re-enqueus a queue item within its queue, removing any lease.
 Output:
   0: Successfully re-enqueued item
   1: Queue item not found
-
+  2: Successfully re-queued to backlog -- TODO: this should be a temporary status
 ]]
 
 local queueKey                = KEYS[1] -- queue:item - hash: { $itemID: $item }
@@ -113,10 +113,10 @@ if exists_without_ending(keyInProgressCustomConcurrencyKey2, ":-") then
 end
 
 if exists_without_ending(keyInProgressAccount, ":-") then
-  -- Remove item from the account concurrency queue
-  -- This does not have a scavenger queue, as it's purely an entitlement limitation. See extendLease
-  -- and Lease for respective ZADD calls.
-  redis.call("ZREM", keyInProgressAccount, item.id)
+    -- Remove item from the account concurrency queue
+    -- This does not have a scavenger queue, as it's purely an entitlement limitation. See extendLease
+    -- and Lease for respective ZADD calls.
+    redis.call("ZREM", keyInProgressAccount, item.id)
 end
 
 if requeueToBacklog == 1 then

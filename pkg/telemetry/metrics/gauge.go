@@ -102,15 +102,6 @@ func GaugeConnectDrainingGateway(ctx context.Context, value int64, opts GaugeOpt
 	})
 }
 
-func GaugeActiveShadowScanners(ctx context.Context, value int64, opts GaugeOpt) {
-	RecordGaugeMetric(ctx, value, GaugeOpt{
-		PkgName:     opts.PkgName,
-		MetricName:  "shadow_scanners_active",
-		Description: "The number of shadow scanners that are active",
-		Tags:        opts.Tags,
-	})
-}
-
 func GaugeShadowPartitionSize(ctx context.Context, value int64, opts GaugeOpt) {
 	RecordGaugeMetric(ctx, value, GaugeOpt{
 		PkgName:     opts.PkgName,

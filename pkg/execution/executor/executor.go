@@ -2540,7 +2540,6 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, i *runInstance,
 	return err
 }
 
-// TODO Idempotency
 func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, i *runInstance, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
 	opts, err := gen.SignalOpts()
 	if err != nil {

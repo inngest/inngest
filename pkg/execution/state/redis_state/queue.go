@@ -2623,6 +2623,16 @@ func (q *queue) Requeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 	}
 	switch status {
 	case 0:
+		switch requeueToBacklogsVal {
+		case "1":
+			metrics.IncrBacklogRequeuedCounter(ctx, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags: map[string]any{
+					"partition_id": i.FunctionID.String(),
+				},
+			})
+		}
+
 		return nil
 	case 1:
 		// This should only ever happen if a run is cancelled and all queue items
