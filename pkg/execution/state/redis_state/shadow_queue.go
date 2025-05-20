@@ -151,7 +151,16 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 			continue
 		}
 
-		res, err := q.BacklogRefill(ctx, backlog, shadowPart, refillUntil)
+		res, err := durationWithTags(
+			ctx,
+			q.primaryQueueShard.Name,
+			"backlog_process_duration",
+			q.clock.Now(),
+			func(ctx context.Context) (*BacklogRefillResult, error) {
+				return q.BacklogRefill(ctx, backlog, shadowPart, refillUntil)
+			},
+			map[string]any{"partition_id": shadowPart.PartitionID},
+		)
 		if err != nil {
 			return fmt.Errorf("could not refill backlog: %w", err)
 		}

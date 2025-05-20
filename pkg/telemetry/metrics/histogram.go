@@ -229,17 +229,6 @@ func HistogramHTTPServerProcessingDuration(ctx context.Context, dur int64, opts 
 	})
 }
 
-func HistogramBacklogProcessDuration(ctx context.Context, dur int64, opts HistogramOpt) {
-	RecordIntHistogramMetric(ctx, dur, HistogramOpt{
-		PkgName:     opts.PkgName,
-		MetricName:  "backlog_process_duration",
-		Description: "Distribution of the backlog processing duration",
-		Tags:        opts.Tags,
-		Unit:        "ms",
-		Boundaries:  DefaultBoundaries,
-	})
-}
-
 func HistogramShadowPartitionProcessDuration(ctx context.Context, dur int64, opts HistogramOpt) {
 	RecordIntHistogramMetric(ctx, dur, HistogramOpt{
 		PkgName:     opts.PkgName,
