@@ -5,7 +5,7 @@ Re-enqueus a queue item within its queue, removing any lease.
 Output:
   0: Successfully re-enqueued item
   1: Queue item not found
-
+  2: Successfully re-queued to backlog -- TODO: this should be a temporary status
 ]]
 
 local queueKey                = KEYS[1] -- queue:item - hash: { $itemID: $item }
@@ -113,11 +113,13 @@ if exists_without_ending(keyInProgressCustomConcurrencyKey2, ":-") then
 end
 
 if exists_without_ending(keyInProgressAccount, ":-") then
-  -- Remove item from the account concurrency queue
-  -- This does not have a scavenger queue, as it's purely an entitlement limitation. See extendLease
-  -- and Lease for respective ZADD calls.
-  redis.call("ZREM", keyInProgressAccount, item.id)
+    -- Remove item from the account concurrency queue
+    -- This does not have a scavenger queue, as it's purely an entitlement limitation. See extendLease
+    -- and Lease for respective ZADD calls.
+    redis.call("ZREM", keyInProgressAccount, item.id)
 end
+
+local status = 0
 
 if requeueToBacklog == 1 then
   -- Decrease active counters and clean up if necessary
@@ -153,6 +155,8 @@ if requeueToBacklog == 1 then
 	-- Requeue item to backlog queues again
 	--
   requeue_to_backlog(keyBacklogSet, backlogID, backlogItem, partitionID, shadowPartitionItem, partitionItem, keyPartitionMap, keyBacklogMeta, keyGlobalShadowPartitionSet, keyShadowPartitionMeta, keyShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, queueScore, queueID, accountID)
+
+  status = 2
 else
   --
   -- Enqueue item to partition queues again
@@ -168,4 +172,4 @@ if keyItemIndexB ~= "" and keyItemIndexB ~= false and keyItemIndexB ~= nil then
     redis.call("ZADD", keyItemIndexB, queueScore, queueID)
 end
 
-return 0
+return status
