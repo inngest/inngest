@@ -38,7 +38,17 @@ func (q *queue) shadowWorker(ctx context.Context, qspc chan shadowPartitionChanM
 			return
 
 		case msg := <-qspc:
-			err := q.processShadowPartition(ctx, msg.sp, msg.continuationCount)
+			_, err := durationWithTags(
+				ctx,
+				q.primaryQueueShard.Name,
+				"shadow_partition_process_duration",
+				q.clock.Now(),
+				func(ctx context.Context) (any, error) {
+					err := q.processShadowPartition(ctx, msg.sp, msg.continuationCount)
+					return nil, err
+				},
+				map[string]any{"partition_id": msg.sp.PartitionID},
+			)
 			if err != nil {
 				l.Error("could not scan shadow partition", "error", err, "shadow_part", msg.sp, "continuation_count", msg.continuationCount)
 			}

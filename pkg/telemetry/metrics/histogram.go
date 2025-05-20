@@ -228,14 +228,3 @@ func HistogramHTTPServerProcessingDuration(ctx context.Context, dur int64, opts 
 		},
 	})
 }
-
-func HistogramShadowPartitionProcessDuration(ctx context.Context, dur int64, opts HistogramOpt) {
-	RecordIntHistogramMetric(ctx, dur, HistogramOpt{
-		PkgName:     opts.PkgName,
-		MetricName:  "shadow_partition_process_duration",
-		Description: "Distribution of the shadow partition processing duration",
-		Tags:        opts.Tags,
-		Unit:        "ms",
-		Boundaries:  DefaultBoundaries,
-	})
-}
