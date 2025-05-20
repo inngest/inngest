@@ -119,8 +119,6 @@ if exists_without_ending(keyInProgressAccount, ":-") then
     redis.call("ZREM", keyInProgressAccount, item.id)
 end
 
-local status = 0
-
 if requeueToBacklog == 1 then
   -- Decrease active counters and clean up if necessary
   if redis.call("DECR", keyActivePartition) <= 0 then
@@ -155,8 +153,6 @@ if requeueToBacklog == 1 then
 	-- Requeue item to backlog queues again
 	--
   requeue_to_backlog(keyBacklogSet, backlogID, backlogItem, partitionID, shadowPartitionItem, partitionItem, keyPartitionMap, keyBacklogMeta, keyGlobalShadowPartitionSet, keyShadowPartitionMeta, keyShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, queueScore, queueID, accountID)
-
-  status = 2
 else
   --
   -- Enqueue item to partition queues again
@@ -172,4 +168,4 @@ if keyItemIndexB ~= "" and keyItemIndexB ~= false and keyItemIndexB ~= nil then
     redis.call("ZADD", keyItemIndexB, queueScore, queueID)
 end
 
-return status
+return 0
