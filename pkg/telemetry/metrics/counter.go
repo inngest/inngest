@@ -410,3 +410,12 @@ func IncrQueueBacklogRefilledCounter(ctx context.Context, incr int64, opts Count
 		Tags:        opts.Tags,
 	})
 }
+
+func IncrQueueBacklogRefillConstraintCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "queue_backlog_refill_contrainted_total",
+		Description: "The total number of times backlog was constrainted when attempt to refill",
+		Tags:        opts.Tags,
+	})
+}

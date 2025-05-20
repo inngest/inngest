@@ -191,6 +191,18 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 			metrics.IncrBacklogProcessedCounter(ctx, opts)
 			metrics.IncrQueueBacklogRefilledCounter(ctx, int64(res.Refilled), opts)
 
+			switch res.Constraint {
+			case enums.QueueConstraintNotLimited: // no-op
+			default:
+				metrics.IncrQueueBacklogRefillConstraintCounter(ctx, metrics.CounterOpt{
+					PkgName: pkgName,
+					Tags: map[string]any{
+						"partition_id": shadowPart.PartitionID,
+						"constraint":   res.Constraint.String(),
+					},
+				})
+			}
+
 			// NOTE: custom method to instrument result - potentially handling high cardinality data
 			q.instrumentBacklogResult(ctx, backlog, res)
 		}
