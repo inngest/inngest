@@ -2437,11 +2437,16 @@ func (q *queue) Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		kg.PartitionItem(),
 		kg.ConcurrencyIndex(),
 
+		partition.readyQueueKey(kg),
 		kg.GlobalPartitionIndex(),
 		kg.GlobalAccountIndex(),
 		kg.AccountPartitionIndex(i.Data.Identifier.AccountID),
 
-		partition.readyQueueKey(kg),
+		kg.BacklogSet(backlog.BacklogID),
+		kg.ShadowPartitionSet(partition.PartitionID),
+		kg.GlobalShadowPartitionSet(),
+		kg.GlobalAccountShadowPartitions(),
+		kg.AccountShadowPartitions(i.Data.Identifier.AccountID),
 
 		// In progress keys
 		partition.accountInProgressKey(kg),
@@ -2473,6 +2478,7 @@ func (q *queue) Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 	args, err := StrSlice([]any{
 		i.ID,
 		partition.PartitionID,
+		backlog.BacklogID,
 		i.Data.Identifier.AccountID.String(),
 
 		int(idempotency.Seconds()),

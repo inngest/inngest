@@ -11,33 +11,38 @@ local keyPartitionMap          = KEYS[2]
 
 local concurrencyPointer       = KEYS[3]
 
-local keyGlobalPointer         = KEYS[4]
-local keyGlobalAccountPointer  = KEYS[5]           -- accounts:sorted - zset
-local keyAccountPartitions     = KEYS[6]           -- accounts:$accountID:partition:sorted - zset
+local keyReadyQueue            = KEYS[4]  -- queue:sorted:$workflowID - zset
+local keyGlobalPointer         = KEYS[5]
+local keyGlobalAccountPointer  = KEYS[6]           -- accounts:sorted - zset
+local keyAccountPartitions     = KEYS[7]           -- accounts:$accountID:partition:sorted - zset
 
--- remove items from all outsanding queues it may be in
-local keyReadyQueue  = KEYS[7]  -- queue:sorted:$workflowID - zset
+local keyBacklogSet                      = KEYS[8]
+local keyShadowPartitionSet              = KEYS[9]
+local keyGlobalShadowPartitionSet        = KEYS[10]
+local keyGlobalAccountShadowPartitionSet = KEYS[11]
+local keyAccountShadowPartitionSet       = KEYS[12]
 
-local keyInProgressAccount                  = KEYS[8]
-local keyInProgressPartition                = KEYS[9] -- Account concurrency level
-local keyInProgressCustomConcurrencyKey1    = KEYS[10] -- When leasing an item we need to place the lease into this key.
-local keyInProgressCustomConcurrencyKey2    = KEYS[11] -- Optional for eg. for concurrency amongst steps
+local keyInProgressAccount                  = KEYS[13]
+local keyInProgressPartition                = KEYS[14] -- Account concurrency level
+local keyInProgressCustomConcurrencyKey1    = KEYS[15] -- When leasing an item we need to place the lease into this key.
+local keyInProgressCustomConcurrencyKey2    = KEYS[16] -- Optional for eg. for concurrency amongst steps
 
-local keyActiveAccount         = KEYS[12]
-local keyActivePartition       = KEYS[13]
-local keyActiveConcurrencyKey1 = KEYS[14]
-local keyActiveConcurrencyKey2 = KEYS[15]
-local keyActiveCompound        = KEYS[16]
+local keyActiveAccount         = KEYS[17]
+local keyActivePartition       = KEYS[18]
+local keyActiveConcurrencyKey1 = KEYS[19]
+local keyActiveConcurrencyKey2 = KEYS[20]
+local keyActiveCompound        = KEYS[21]
 
-local keyIdempotency           = KEYS[17]
+local keyIdempotency           = KEYS[22]
 
-local keyItemIndexA            = KEYS[18]   -- custom item index 1
-local keyItemIndexB            = KEYS[19]  -- custom item index 2
+local keyItemIndexA            = KEYS[23]   -- custom item index 1
+local keyItemIndexB            = KEYS[24]  -- custom item index 2
 
 local queueID        = ARGV[1]
 local partitionID    = ARGV[2]
-local accountID      = ARGV[3]
-local idempotencyTTL = tonumber(ARGV[4])
+local backlogID      = ARGV[3]
+local accountID      = ARGV[4]
+local idempotencyTTL = tonumber(ARGV[5])
 
 -- $include(get_queue_item.lua)
 -- $include(get_partition_item.lua)
@@ -162,6 +167,51 @@ if keyItemIndexA ~= "" and keyItemIndexA ~= false and keyItemIndexA ~= nil then
 end
 if keyItemIndexB ~= "" and keyItemIndexB ~= false and keyItemIndexB ~= nil then
 	redis.call("ZREM", keyItemIndexB, queueID)
+end
+
+-- If item is in backlog, remove
+local backlogScore = tonumber(redis.call("ZSCORE", keyBacklogSet, queueID))
+if backlogScore ~= nil and backlogScore ~= false and backlogScore > 0 then
+  redis.call("ZREM", keyBacklogSet, queueID)
+
+  -- Retrieve the earliest item score in the backlog
+  local minScores = redis.call("ZRANGE", keyBacklogSet, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")
+
+  -- If backlog is empty, update dangling pointers in shadow partition
+  if minScores == nil or minScores == false or minScores[2] == nil then
+    redis.call("ZREM", keyShadowPartitionSet, backlogID)
+
+    -- If shadow partition has no more backlogs, update global/account pointers
+    if tonumber(redis.call("ZCARD", keyShadowPartitionSet)) == 0 then
+      redis.call("ZREM", keyGlobalShadowPartitionSet, partitionID)
+      redis.call("ZREM", keyAccountShadowPartitionSet, partitionID)
+
+      if tonumber(redis.call("ZCARD", keyAccountShadowPartitionSet)) == 0 then
+        redis.call("ZREM", keyGlobalAccountShadowPartitionSet, accountID)
+      end
+    end
+
+    return 0
+  end
+
+  local earliestScoreBacklog = tonumber(minScores[2])
+  local updateTo = earliestScoreBacklog/1000
+
+  -- If backlog has more items, update pointer in shadow partition
+  update_pointer_score_to(backlogID, keyShadowPartitionSet, updateTo)
+
+  -- In case the backlog is the new earliest item in the shadow partition,
+  -- update pointers to shadow partition in global indexes
+  local minScores = redis.call("ZRANGE", keyShadowPartitionSet, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")
+  local earliestScoreShadowPartition = tonumber(minScores[2])
+
+  if earliestScoreBacklog < earliestScoreShadowPartition then
+    -- Push back shadow partition in global set
+    update_pointer_score_to(partitionID, keyGlobalShadowPartitionSet, updateTo)
+
+    -- Push back shadow partition in account set + potentially push back account in global accounts set
+    update_account_shadow_queues(keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, partitionID, accountID, updateTo)
+  end
 end
 
 return 0

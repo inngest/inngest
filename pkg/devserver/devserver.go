@@ -199,10 +199,10 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	if enableKeyQueues {
 		runMode.ShadowPartition = true
-		runMode.ShadowContinuations = true
-		runMode.ShadowContinuationSkipProbability = consts.QueueContinuationSkipProbability
 		runMode.AccountShadowPartition = true
 		runMode.AccountShadowPartitionWeight = 80
+		runMode.ShadowContinuations = true
+		runMode.ShadowContinuationSkipProbability = consts.QueueContinuationSkipProbability
 		runMode.NormalizePartition = true
 	}
 
@@ -279,6 +279,13 @@ func start(ctx context.Context, opts StartOpts) error {
 		}),
 		redis_state.WithShardSelector(shardSelector),
 		redis_state.WithQueueShardClients(queueShards),
+		redis_state.WithKindToQueueMapping(map[string]string{
+			queue.KindPause:           queue.KindPause,
+			queue.KindDebounce:        queue.KindDebounce,
+			queue.KindQueueMigrate:    queue.KindQueueMigrate,
+			queue.KindPauseBlockFlush: queue.KindPauseBlockFlush,
+			queue.KindScheduleBatch:   queue.KindScheduleBatch,
+		}),
 
 		// Key queues
 		redis_state.WithNormalizeRefreshItemCustomConcurrencyKeys(NormalizeConcurrencyKeys(smv2, dbcqrs)),

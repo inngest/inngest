@@ -209,7 +209,10 @@ if refill > 0 then
 
   -- Reverse the items to be added to the ready set
   local readyArgs = {}
+
   local backlogRemArgs = {}
+  local hasRemove = false
+
   local itemUpdateArgs = {}
 
   for i = 1, #itemIDs do
@@ -220,6 +223,7 @@ if refill > 0 then
     -- If queue item does not exist in hash, delete from backlog
     if itemData == false or itemData == nil or itemData == "" then
       table.insert(backlogRemArgs, itemID)  -- remove from backlog
+      hasRemove = true
     else
       -- Insert new members into ready set
       table.insert(readyArgs, itemScore)
@@ -227,6 +231,7 @@ if refill > 0 then
 
       -- Remove item from backlog
       table.insert(backlogRemArgs, itemID)
+      hasRemove = true
 
       -- Update queue item with refill data
       local updatedData = cjson.decode(itemData)
@@ -241,33 +246,37 @@ if refill > 0 then
     end
   end
 
-  -- "Refill" items to ready set
-  redis.call("ZADD", keyReadySet, unpack(readyArgs))
+  if refilled > 0 then
+    -- "Refill" items to ready set
+    redis.call("ZADD", keyReadySet, unpack(readyArgs))
 
-  -- Increase active counters by number of refilled items
-  redis.call("INCRBY", keyActivePartition, refilled)
+    -- Increase active counters by number of refilled items
+    redis.call("INCRBY", keyActivePartition, refilled)
 
-  if exists_without_ending(keyActiveAccount, ":-") then
-    redis.call("INCRBY", keyActiveAccount, refilled)
+    if exists_without_ending(keyActiveAccount, ":-") then
+      redis.call("INCRBY", keyActiveAccount, refilled)
+    end
+
+    if exists_without_ending(keyActiveCompound, ":-") then
+      redis.call("INCRBY", keyActiveCompound, refilled)
+    end
+
+    if exists_without_ending(keyActiveConcurrencyKey1, ":-") then
+      redis.call("INCRBY", keyActiveConcurrencyKey1, refilled)
+    end
+
+    if exists_without_ending(keyActiveConcurrencyKey2, ":-") then
+      redis.call("INCRBY", keyActiveConcurrencyKey2, refilled)
+    end
+
+    -- Update queue items with refill data
+    redis.call("HSET", keyQueueItemHash, unpack(itemUpdateArgs))
   end
 
-  if exists_without_ending(keyActiveCompound, ":-") then
-    redis.call("INCRBY", keyActiveCompound, refilled)
+  if hasRemove then
+    -- Remove refilled or missing items from backlog
+    redis.call("ZREM", keyBacklogSet, unpack(backlogRemArgs))
   end
-
-  if exists_without_ending(keyActiveConcurrencyKey1, ":-") then
-    redis.call("INCRBY", keyActiveConcurrencyKey1, refilled)
-  end
-
-  if exists_without_ending(keyActiveConcurrencyKey2, ":-") then
-    redis.call("INCRBY", keyActiveConcurrencyKey2, refilled)
-  end
-
-  -- Remove refilled or missing items from backlog
-  redis.call("ZREM", keyBacklogSet, unpack(backlogRemArgs))
-
-  -- Update queue items with refill data
-  redis.call("HSET", keyQueueItemHash, unpack(itemUpdateArgs))
 end
 
 -- update gcra theoretical arrival time
