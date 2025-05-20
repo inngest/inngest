@@ -329,7 +329,7 @@ func (q *queue) shadowScan(ctx context.Context) error {
 			return nil
 
 		case <-tick.Chan():
-			if err := q.scanShadowPartitions(ctx, q.clock.Now(), qspc); err != nil {
+			if err := q.scanShadowPartitions(ctx, q.clock.Now().Add(PartitionLookahead), qspc); err != nil {
 				return fmt.Errorf("could not scan shadow partitions: %w", err)
 			}
 		}
