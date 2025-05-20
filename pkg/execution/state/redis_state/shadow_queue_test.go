@@ -413,6 +413,7 @@ func TestQueueRefillBacklog(t *testing.T) {
 
 		require.Equal(t, futureAt.UnixMilli(), int64(score(t, r, kg.BacklogSet(backlog.BacklogID), qi2.ID)))
 		require.Equal(t, futureAt.Unix(), int64(score(t, r, kg.ShadowPartitionSet(shadowPart.PartitionID), backlog.BacklogID)))
+		require.NotEqual(t, at.Unix(), int64(score(t, r, kg.GlobalShadowPartitionSet(), shadowPart.PartitionID)))
 		require.Equal(t, futureAt.Unix(), int64(score(t, r, kg.GlobalShadowPartitionSet(), shadowPart.PartitionID)))
 		require.Equal(t, futureAt.Unix(), int64(score(t, r, kg.GlobalAccountShadowPartitions(), accountId.String())))
 		require.Equal(t, futureAt.Unix(), int64(score(t, r, kg.AccountShadowPartitions(accountId), shadowPart.PartitionID)))
@@ -552,7 +553,7 @@ func TestQueueShadowPartitionLease(t *testing.T) {
 
 		// Simulate next backlog item in shadow partition
 		nextBacklogAt := clock.Now().Add(3 * time.Hour)
-		_, err := r.ZAdd(kg.ShadowPartitionSet(shadowPart.PartitionID), float64(nextBacklogAt.UnixMilli()), "backlog-test")
+		_, err := r.ZAdd(kg.ShadowPartitionSet(shadowPart.PartitionID), float64(nextBacklogAt.Unix()), "backlog-test")
 		require.NoError(t, err)
 
 		err = q.ShadowPartitionRequeue(ctx, shadowPart, *leaseID, nil)
@@ -606,7 +607,7 @@ func TestQueueShadowPartitionLease(t *testing.T) {
 
 		// Simulate next backlog item in shadow partition
 		nextBacklogAt := clock.Now().Add(15 * time.Minute)
-		_, err := r.ZAdd(kg.ShadowPartitionSet(shadowPart.PartitionID), float64(nextBacklogAt.UnixMilli()), "backlog-test")
+		_, err := r.ZAdd(kg.ShadowPartitionSet(shadowPart.PartitionID), float64(nextBacklogAt.Unix()), "backlog-test")
 		require.NoError(t, err)
 
 		now := clock.Now()
@@ -642,7 +643,7 @@ func TestQueueShadowPartitionLease(t *testing.T) {
 
 		// Simulate next backlog item in shadow partition
 		nextBacklogAt := clock.Now().Add(48 * time.Minute)
-		_, err := r.ZAdd(kg.ShadowPartitionSet(shadowPart.PartitionID), float64(nextBacklogAt.UnixMilli()), "backlog-test")
+		_, err := r.ZAdd(kg.ShadowPartitionSet(shadowPart.PartitionID), float64(nextBacklogAt.Unix()), "backlog-test")
 		require.NoError(t, err)
 
 		now := clock.Now()

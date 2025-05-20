@@ -193,22 +193,20 @@ local function requeue_to_backlog(keyBacklogSet, backlogID, backlogItem, partiti
 	redis.call("HSETNX", keyShadowPartitionMeta, partitionID, shadowPartitionItem)
 
 	-- Get the minimum score for the queue.
-	local minScores = redis.call("ZRANGE", keyBacklogSet, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")
-	local earliestScore = tonumber(minScores[2])
-	local updateTo = earliestScore / 1000
+	local earliestScore = get_converted_earliest_pointer_score(keyBacklogSet)
 
 	-- Update the backlog pointer in the shadow partition set if earlier or not exists
 	local currentScore = redis.call("ZSCORE", keyShadowPartitionSet, backlogID)
 	if currentScore == false or tonumber(currentScore) > earliestScore then
-		update_pointer_score_to(backlogID, keyShadowPartitionSet, updateTo)
+		update_pointer_score_to(backlogID, keyShadowPartitionSet, earliestScore)
 	end
 
 	-- Update the shadow partition pointer in the global shadow partition set if earlier or not exists
 	local currentScore = redis.call("ZSCORE", keyGlobalShadowPartitionSet, partitionID)
 	if currentScore == false or tonumber(currentScore) > earliestScore then
-		update_pointer_score_to(partitionID, keyGlobalShadowPartitionSet, updateTo)
+		update_pointer_score_to(partitionID, keyGlobalShadowPartitionSet, earliestScore)
 
     -- Also update account-based shadow partition index
-    update_account_shadow_queues(keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, partitionID, accountID, updateTo)
+    update_account_shadow_queues(keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, partitionID, accountID, earliestScore)
 	end
 end

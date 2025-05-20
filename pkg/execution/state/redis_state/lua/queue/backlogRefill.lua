@@ -290,16 +290,14 @@ end
 
 if refilled > 0 then
   -- Get the minimum score for the queue.
-  local minScores = redis.call("ZRANGE", keyReadySet, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")
-  local earliestScore = tonumber(minScores[2])
-
-  -- Potentially update the queue of queues.
-  local currentScore = redis.call("ZSCORE", keyGlobalPointer, partitionID)
-  if currentScore == false or tonumber(currentScore) > earliestScore then
-    local updateTo = earliestScore/1000
-
-    update_pointer_score_to(partitionID, keyGlobalPointer, updateTo)
-    update_account_queues(keyGlobalAccountPointer, keyAccountPartitions, partitionID, accountID, updateTo)
+  local earliestScore = get_converted_earliest_pointer_score(keyReadySet)
+  if earliestScore > 0 then
+    -- Potentially update the queue of queues.
+    local currentScore = redis.call("ZSCORE", keyGlobalPointer, partitionID)
+    if currentScore == false or tonumber(currentScore) > earliestScore then
+      update_pointer_score_to(partitionID, keyGlobalPointer, earliestScore)
+      update_account_queues(keyGlobalAccountPointer, keyAccountPartitions, partitionID, accountID, earliestScore)
+    end
   end
 end
 

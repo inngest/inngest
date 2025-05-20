@@ -45,10 +45,10 @@ existing.leaseID = nil
 redis.call("HSET", keyShadowPartitionHash, partitionID, cjson.encode(existing))
 
 -- Get earliest backlog score in shadow partition
-local minScores = redis.call("ZRANGE", keyShadowPartitionSet, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")
+local minScore = get_earliest_pointer_score(keyShadowPartitionSet)
 
 -- No more backlogs, remove dangling pointers
-if minScores == nil or minScores == false or minScores[2] == nil then
+if minScore == 0 then
   redis.call("ZREM", keyGlobalShadowPartitionSet, partitionID)
   redis.call("ZREM", keyAccountShadowPartitionSet, partitionID)
 
@@ -60,8 +60,7 @@ if minScores == nil or minScores == false or minScores[2] == nil then
 end
 
 -- Push back to next earliest backlog
-local earliestScore = tonumber(minScores[2])
-local updateTo = earliestScore/1000
+local updateTo = minScore
 
 -- If we need to push back even further, override updateTo
 if requeueAt ~= 0 and requeueAt > updateTo then
