@@ -355,6 +355,15 @@ func IncrBacklogNormalizationScannedCounter(ctx context.Context, opts CounterOpt
 	})
 }
 
+func IncrBacklogNormalizedCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "backlog_normalized_total",
+		Description: "The total number of backlogs normalized",
+		Tags:        opts.Tags,
+	})
+}
+
 func IncrBacklogNormalizedItemCounter(ctx context.Context, value int64, opts CounterOpt) {
 	RecordCounterMetric(ctx, value, CounterOpt{
 		PkgName:     opts.PkgName,
