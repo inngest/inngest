@@ -9,7 +9,8 @@
   Returns a tuple of {
     status,               -- See status section below
     items_refilled,       -- Number of items refilled to ready queue
-    total_items,          -- Total number of items in backlog before refilling
+    items_until,          -- Number of items within provided time range in backlog before refilling
+    items_total,          -- Total number of items in backlog before refilling
     constraintCapacity,   -- Most limiting constraint capacity
     refill                -- Number of items to refill (may include missing items)
   }
@@ -69,32 +70,70 @@ local throttlePeriod = tonumber(ARGV[14])
 -- $include(gcra.lua)
 
 -- Helper method to clean up backlog pointers
-local function cleanupBacklogPointer()
-  redis.call("ZREM", keyShadowPartitionSet, backlogID)
+local function updateBacklogPointer()
+  -- Retrieve the earliest item score in the backlog
+  local minScores = redis.call("ZRANGE", keyBacklogSet, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")
 
-  -- If shadow partition has no more backlogs, update global/account pointers
-  if tonumber(redis.call("ZCARD", keyShadowPartitionSet)) == 0 then
-    redis.call("ZREM", keyGlobalShadowPartitionSet, partitionID)
-    redis.call("ZREM", keyAccountShadowPartitionSet, partitionID)
+  -- If backlog is empty, update dangling pointers in shadow partition
+  if minScores == nil or minScores == false or minScores[2] == nil then
+    redis.call("ZREM", keyShadowPartitionSet, backlogID)
 
-    if tonumber(redis.call("ZCARD", keyAccountShadowPartitionSet)) == 0 then
-      redis.call("ZREM", keyGlobalAccountShadowPartitionSet, accountID)
+    -- If shadow partition has no more backlogs, update global/account pointers
+    if tonumber(redis.call("ZCARD", keyShadowPartitionSet)) == 0 then
+      redis.call("ZREM", keyGlobalShadowPartitionSet, partitionID)
+      redis.call("ZREM", keyAccountShadowPartitionSet, partitionID)
+
+      if tonumber(redis.call("ZCARD", keyAccountShadowPartitionSet)) == 0 then
+        redis.call("ZREM", keyGlobalAccountShadowPartitionSet, accountID)
+      end
     end
+
+    return
   end
+
+  local earliestScoreBacklog = tonumber(minScores[2])
+  local updateTo = earliestScoreBacklog/1000
+
+  -- If backlog has more items, update pointer in shadow partition
+  update_pointer_score_to(backlogID, keyShadowPartitionSet, updateTo)
+
+  -- In case the backlog is the new earliest item in the shadow partition,
+  -- update pointers to shadow partition in global indexes
+  local minScores = redis.call("ZRANGE", keyShadowPartitionSet, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")
+  local earliestScoreShadowPartition = tonumber(minScores[2])
+
+  if earliestScoreBacklog < earliestScoreShadowPartition then
+    -- Push back shadow partition in global set
+    update_pointer_score_to(partitionID, keyGlobalShadowPartitionSet, updateTo)
+
+    -- Push back shadow partition in account set + potentially push back account in global accounts set
+    update_account_shadow_queues(keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, partitionID, accountID, updateTo)
+  end
+
+  redis.call("ZREM", keyShadowPartitionSet, backlogID)
 end
 
 --
 -- Retrieve current backlog size
 --
 
-local backlogCount = redis.call("ZCOUNT", keyBacklogSet, "-inf", refillUntilMS)
-if backlogCount == false or backlogCount == nil then
-  backlogCount = 0
+local backlogCountTotal = redis.call("ZCARD", keyBacklogSet)
+if backlogCountTotal == false or backlogCountTotal == nil then
+  backlogCountTotal = 0
 end
 
--- If backlog is empty, immediately clean up pointers and return
-if backlogCount == 0 then
-  cleanupBacklogPointer()
+if backlogCountTotal == 0 then
+  updateBacklogPointer()
+  return { 0, 0, 0, 0, 0 }
+end
+
+local backlogCountUntil = redis.call("ZCOUNT", keyBacklogSet, "-inf", refillUntilMS)
+if backlogCountUntil == false or backlogCountUntil == nil then
+  backlogCountUntil = 0
+end
+
+if backlogCountUntil == 0 then
+  updateBacklogPointer()
   return { 0, 0, 0, 0, 0 }
 end
 
@@ -103,7 +142,7 @@ end
 --
 
 -- Set items to refill to number of items in backlog
-local refill = backlogCount
+local refill = backlogCountUntil
 
 -- Limit items to refill to max refill limit if more items are in backlog
 if refill > refillLimit then
@@ -307,33 +346,6 @@ end
 -- Adjust pointer scores for shadow scanning, potentially clean up
 --
 
--- Retrieve the earliest item score in the backlog
-local minScores = redis.call("ZRANGE", keyBacklogSet, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")
+updateBacklogPointer()
 
--- If backlog is empty, update dangling pointers in shadow partition
-if minScores == nil or minScores == false or minScores[2] == nil then
-  cleanupBacklogPointer()
-
-  return { status, refilled, backlogCount, constraintCapacity, refill }
-end
-
-local earliestScoreBacklog = tonumber(minScores[2])
-local updateTo = earliestScoreBacklog/1000
-
--- If backlog has more items, update pointer in shadow partition
-update_pointer_score_to(backlogID, keyShadowPartitionSet, updateTo)
-
--- In case the backlog is the new earliest item in the shadow partition,
--- update pointers to shadow partition in global indexes
-local minScores = redis.call("ZRANGE", keyShadowPartitionSet, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")
-local earliestScoreShadowPartition = tonumber(minScores[2])
-
-if earliestScoreBacklog < earliestScoreShadowPartition then
-  -- Push back shadow partition in global set
-  update_pointer_score_to(partitionID, keyGlobalShadowPartitionSet, updateTo)
-
-  -- Push back shadow partition in account set + potentially push back account in global accounts set
-  update_account_shadow_queues(keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, partitionID, accountID, updateTo)
-end
-
-return { status, refilled, backlogCount, constraintCapacity, refill }
+return { status, refilled, backlogCountUntil, backlogCountTotal, constraintCapacity, refill }

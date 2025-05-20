@@ -579,10 +579,7 @@ func createInmemoryRedis(ctx context.Context, tick time.Duration) (rueidis.Clien
 
 	// If tick is lower than the default, tick every 50ms.  This lets us save
 	// CPU for standard dev-server testing.
-	poll := tick
-	if tick < DefaultTickDuration {
-		poll = time.Millisecond * 50
-	}
+	poll := DefaultTickDuration
 
 	go func() {
 		for range time.Tick(poll) {

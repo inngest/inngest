@@ -104,8 +104,8 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 	limit := ShadowPartitionPeekMaxBacklogs
 	refillUntil := q.clock.Now().Truncate(time.Second).Add(PartitionLookahead)
 
-	// Default to sequential but pick a random backlog every once in a while
-	sequential := mrand.Intn(100) <= 80
+	// Pick a random backlog offset every time
+	sequential := false
 
 	backlogs, totalCount, err := q.ShadowPartitionPeek(ctx, shadowPart, sequential, refillUntil, limit)
 	if err != nil {
@@ -155,6 +155,8 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 		if err != nil {
 			return fmt.Errorf("could not refill backlog: %w", err)
 		}
+
+		fmt.Println("refilled", res.Refilled, "of total items", res.TotalBacklogCount, "items from backlog", backlog.BacklogID, "of part", shadowPart.PartitionID)
 
 		// instrumentation
 		{

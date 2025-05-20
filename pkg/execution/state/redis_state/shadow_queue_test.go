@@ -819,6 +819,7 @@ func TestRefillConstraints(t *testing.T) {
 				result: BacklogRefillResult{
 					Constraint:        enums.QueueConstraintNotLimited,
 					TotalBacklogCount: 1,
+					BacklogCountUntil: 1,
 					Capacity:          10,
 					Refill:            1,
 					Refilled:          1,
@@ -843,6 +844,7 @@ func TestRefillConstraints(t *testing.T) {
 				result: BacklogRefillResult{
 					Constraint:        enums.QueueConstraintFunctionConcurrency,
 					TotalBacklogCount: 40,
+					BacklogCountUntil: 40,
 					Capacity:          0,
 					Refill:            0,
 					Refilled:          0,
@@ -866,6 +868,7 @@ func TestRefillConstraints(t *testing.T) {
 				result: BacklogRefillResult{
 					Constraint:        enums.QueueConstraintFunctionConcurrency,
 					TotalBacklogCount: 40,
+					BacklogCountUntil: 40,
 					Capacity:          -20,
 					Refill:            -20,
 					Refilled:          0,
@@ -889,6 +892,7 @@ func TestRefillConstraints(t *testing.T) {
 				result: BacklogRefillResult{
 					Constraint:        enums.QueueConstraintNotLimited,
 					TotalBacklogCount: 40,
+					BacklogCountUntil: 40,
 					Capacity:          1,
 					Refill:            1,
 					Refilled:          1,
@@ -913,6 +917,7 @@ func TestRefillConstraints(t *testing.T) {
 				result: BacklogRefillResult{
 					Constraint:        enums.QueueConstraintAccountConcurrency,
 					TotalBacklogCount: 40,
+					BacklogCountUntil: 40,
 					Capacity:          0,
 					Refill:            0,
 					Refilled:          0,
@@ -936,6 +941,7 @@ func TestRefillConstraints(t *testing.T) {
 				result: BacklogRefillResult{
 					Constraint:        enums.QueueConstraintNotLimited,
 					TotalBacklogCount: 40,
+					BacklogCountUntil: 40,
 					Capacity:          1,
 					Refill:            1,
 					Refilled:          1,
@@ -963,6 +969,7 @@ func TestRefillConstraints(t *testing.T) {
 				result: BacklogRefillResult{
 					Constraint:        enums.QueueConstraintNotLimited,
 					TotalBacklogCount: 40,
+					BacklogCountUntil: 40,
 					Capacity:          3,
 					Refill:            3,
 					Refilled:          3,
@@ -989,6 +996,7 @@ func TestRefillConstraints(t *testing.T) {
 				result: BacklogRefillResult{
 					Constraint:        enums.QueueConstraintCustomConcurrencyKey1,
 					TotalBacklogCount: 40,
+					BacklogCountUntil: 40,
 					Capacity:          0,
 					Refill:            0,
 					Refilled:          0,
@@ -1018,6 +1026,7 @@ func TestRefillConstraints(t *testing.T) {
 				result: BacklogRefillResult{
 					Constraint:        enums.QueueConstraintNotLimited,
 					TotalBacklogCount: 40,
+					BacklogCountUntil: 40,
 					Capacity:          2,
 					Refill:            2,
 					Refilled:          2,
@@ -1046,6 +1055,7 @@ func TestRefillConstraints(t *testing.T) {
 				result: BacklogRefillResult{
 					Constraint:        enums.QueueConstraintCustomConcurrencyKey2,
 					TotalBacklogCount: 40,
+					BacklogCountUntil: 40,
 					Capacity:          0,
 					Refill:            0,
 					Refilled:          0,
@@ -1071,6 +1081,7 @@ func TestRefillConstraints(t *testing.T) {
 				result: BacklogRefillResult{
 					Constraint:        enums.QueueConstraintNotLimited,
 					TotalBacklogCount: 40,
+					BacklogCountUntil: 40,
 					Capacity:          5,
 					Refill:            5,
 					Refilled:          5,
@@ -1096,6 +1107,7 @@ func TestRefillConstraints(t *testing.T) {
 				result: BacklogRefillResult{
 					Constraint:        enums.QueueConstraintFunctionConcurrency,
 					TotalBacklogCount: 40,
+					BacklogCountUntil: 40,
 					Capacity:          0,
 					Refill:            0,
 					Refilled:          0,
@@ -1119,6 +1131,7 @@ func TestRefillConstraints(t *testing.T) {
 				result: BacklogRefillResult{
 					Constraint:        enums.QueueConstraintNotLimited,
 					TotalBacklogCount: 40, // would move 40
+					BacklogCountUntil: 40,
 					Capacity:          75,
 					Refill:            40,
 					Refilled:          40,

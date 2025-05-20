@@ -2852,6 +2852,8 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, i *runInstan
 		return err
 	}
 
+	fmt.Println("saved pause in handleGeneratorWaitForEvent")
+
 	// SDK-based event coordination is called both when an event is received
 	// OR on timeout, depending on which happens first.  Both routes consume
 	// the pause so this race will conclude by calling the function once, as only
