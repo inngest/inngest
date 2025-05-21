@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import NextLink from 'next/link';
 import { ErrorCard } from '@inngest/components/RunDetailsV2/ErrorCard';
+import { Skeleton } from '@inngest/components/Skeleton';
 import { Time } from '@inngest/components/Time';
 import { usePrettyJson } from '@inngest/components/hooks/usePrettyJson';
 import { type Event } from '@inngest/components/types/event';
@@ -30,15 +31,17 @@ export function EventDetails({
   eventID,
   getEventDetails,
   getEventPayload,
+  getEventRuns,
   pathCreator,
   expandedRowActions,
   standalone,
 }: {
-  initialData: Pick<Event, 'name' | 'runs'>;
+  initialData?: Pick<Event, 'name' | 'runs'>;
   eventID: string;
   pathCreator: React.ComponentProps<typeof EventsTable>['pathCreator'];
   getEventDetails: React.ComponentProps<typeof EventsTable>['getEventDetails'];
   getEventPayload: React.ComponentProps<typeof EventsTable>['getEventPayload'];
+  getEventRuns?: ({ eventID }: { eventID: string }) => Promise<Pick<Event, 'runs' | 'name'>>;
   expandedRowActions: React.ComponentProps<typeof EventsTable>['expandedRowActions'];
   standalone: boolean;
 }) {
@@ -70,6 +73,22 @@ export function EventDetails({
     queryFn: useCallback(() => {
       return getEventPayload({ eventID: eventID });
     }, [getEventPayload, eventID]),
+  });
+
+  const {
+    isPending: isPendingRuns,
+    error: runsError,
+    data: eventRunsData,
+    refetch: refetchRuns,
+  } = useQuery({
+    queryKey: ['event-runs', { eventID: eventID }],
+    queryFn: useCallback(() => {
+      if (!getEventRuns) {
+        return Promise.reject(new Error('getEventRuns is not defined'));
+      }
+      return getEventRuns({ eventID });
+    }, [getEventRuns, eventID]),
+    enabled: !!getEventRuns,
   });
 
   const handleMouseDown = useCallback(() => {
@@ -118,12 +137,19 @@ export function EventDetails({
   const prettyPayload =
     usePrettyJson(eventPayloadData?.payload ?? '') || (eventPayloadData?.payload ?? '');
 
+  const eventName = initialData?.name || eventDetailsData?.name;
+  const eventRuns = initialData?.runs || eventRunsData?.runs;
+
   return (
     <>
-      {standalone && initialData && (
+      {standalone && (
         <div className="flex flex-row items-start justify-between px-4 pb-4 pt-8">
           <div className="flex flex-col gap-1">
-            <p className="text-basis text-2xl font-medium">{initialData.name}</p>
+            {(isPending || isPendingRuns) && !eventName ? (
+              <Skeleton className="block h-8 w-64" />
+            ) : (
+              <p className="text-basis text-2xl font-medium">{eventName}</p>
+            )}
             <p className="text-subtle font-mono">{eventID}</p>
           </div>
         </div>
@@ -137,7 +163,7 @@ export function EventDetails({
           <div ref={eventInfoRef} className="flex flex-col">
             <div className="mb-3 flex h-8 items-center justify-between gap-1 px-4">
               <div className="flex items-center gap-2">
-                <p className="text-muted text-sm">{initialData.name}</p>
+                <p className="text-muted text-sm">{eventName}</p>
                 {!standalone && (
                   <Link
                     size="medium"
@@ -147,7 +173,7 @@ export function EventDetails({
                 )}
               </div>
               {expandedRowActions({
-                eventName: initialData.name,
+                eventName: eventName,
                 payload: eventPayloadData?.payload,
               })}
             </div>
@@ -233,9 +259,13 @@ export function EventDetails({
         >
           <div className="px-4 py-2">
             <p className="text-muted mb-4 text-xs font-medium uppercase">Functions Triggered</p>
-            {initialData?.runs?.length ? (
+            {runsError ? (
+              <ErrorCard error={runsError} reset={() => refetchRuns()} />
+            ) : isPendingRuns ? (
+              <Skeleton className="block h-12 w-full p-1.5" />
+            ) : eventRuns?.length ? (
               <ul className="divide-light divide-y [&>*:not(:first-child)]:pt-[6px] [&>*:not(:last-child)]:pb-[6px]">
-                {initialData.runs.map((run) => (
+                {eventRuns.map((run) => (
                   <li key={run.fnSlug}>
                     <NextLink
                       href={pathCreator.runPopout({ runID: run.id })}

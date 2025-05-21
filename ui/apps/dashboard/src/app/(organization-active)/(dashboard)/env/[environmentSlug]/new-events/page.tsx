@@ -95,24 +95,27 @@ export default function EventsPage({
           </>
         }
         expandedRowActions={({ eventName, payload }) => {
-          const isInternalEvent = Boolean(eventName.startsWith('inngest/'));
+          const isInternalEvent = Boolean(eventName?.startsWith('inngest/'));
           return (
             <>
               <div className="flex items-center gap-2">
                 <Button
                   label="Go to event type page"
-                  href={pathCreator.eventType({ envSlug: envSlug, eventName: eventName })}
+                  href={
+                    eventName ? pathCreator.eventType({ envSlug: envSlug, eventName }) : undefined
+                  }
                   appearance="ghost"
                   size="small"
                   icon={<RiArrowRightUpLine />}
                   iconSide="left"
+                  disabled={!eventName}
                 />
                 <Button
                   label="Replay event"
-                  onClick={() => payload && openModal(eventName, payload)}
+                  onClick={() => eventName && payload && openModal(eventName, payload)}
                   appearance="outlined"
                   size="small"
-                  disabled={isInternalEvent || !payload}
+                  disabled={!eventName || isInternalEvent || !payload}
                 />
               </div>
             </>

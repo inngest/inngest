@@ -6,7 +6,7 @@ import { EventDetails } from '@inngest/components/Events/EventDetails';
 import { RiArrowRightUpLine } from '@remixicon/react';
 
 import { SendEventModal } from '@/components/Events/SendEventModal';
-import { useEventDetails, useEventPayload } from '@/components/Events/useEvents';
+import { useEventDetails, useEventPayload, useEventRuns } from '@/components/Events/useEvents';
 import { pathCreator } from '@/utils/urls';
 
 type Props = {
@@ -38,6 +38,7 @@ export default function Page({ params }: Props) {
 
   const getEventDetails = useEventDetails();
   const getEventPayload = useEventPayload();
+  const getEventRuns = useEventRuns();
 
   const openModal = useCallback((eventName: string, payload: string) => {
     try {
@@ -52,32 +53,34 @@ export default function Page({ params }: Props) {
   return (
     <>
       <EventDetails
-        //   TODO: fetch name and runs
-        initialData={{ name: 'name' }}
         pathCreator={internalPathCreator}
         eventID={eventID}
         standalone
         getEventDetails={getEventDetails}
         getEventPayload={getEventPayload}
+        getEventRuns={getEventRuns}
         expandedRowActions={({ eventName, payload }) => {
-          const isInternalEvent = Boolean(eventName.startsWith('inngest/'));
+          const isInternalEvent = eventName?.startsWith('inngest/');
           return (
             <>
               <div className="flex items-center gap-2">
                 <Button
                   label="Go to event type page"
-                  href={pathCreator.eventType({ envSlug: envSlug, eventName: eventName })}
+                  href={
+                    eventName ? pathCreator.eventType({ envSlug: envSlug, eventName }) : undefined
+                  }
                   appearance="ghost"
                   size="small"
                   icon={<RiArrowRightUpLine />}
                   iconSide="left"
+                  disabled={!eventName}
                 />
                 <Button
                   label="Replay event"
-                  onClick={() => payload && openModal(eventName, payload)}
+                  onClick={() => eventName && payload && openModal(eventName, payload)}
                   appearance="outlined"
                   size="small"
-                  disabled={isInternalEvent || !payload}
+                  disabled={!eventName || isInternalEvent || !payload}
                 />
               </div>
             </>

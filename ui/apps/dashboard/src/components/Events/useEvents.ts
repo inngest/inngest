@@ -224,3 +224,65 @@ export function useEventPayload() {
     [client, envID]
   );
 }
+
+const eventRunsQuery = graphql(`
+  query GetEventV2Runs($envID: ID!, $eventID: ULID!) {
+    environment: workspace(id: $envID) {
+      eventV2(id: $eventID) {
+        name
+        runs {
+          status
+          id
+          startedAt
+          endedAt
+          function {
+            name
+            slug
+          }
+        }
+      }
+    }
+  }
+`);
+
+export function useEventRuns() {
+  const envID = useEnvironment().id;
+  const client = useClient();
+
+  return useCallback(
+    async ({ eventID }: { eventID: string }) => {
+      const result = await client
+        .query(
+          eventRunsQuery,
+          {
+            envID,
+            eventID,
+          },
+          { requestPolicy: 'network-only' }
+        )
+        .toPromise();
+
+      if (result.error) {
+        throw new Error(result.error.message);
+      }
+
+      if (!result.data) {
+        throw new Error('no data returned');
+      }
+
+      const eventData = result.data.environment.eventV2;
+      return {
+        ...eventData,
+        runs: eventData.runs.map((run) => ({
+          fnName: run.function.name,
+          fnSlug: run.function.slug,
+          status: run.status,
+          id: run.id,
+          completedAt: run.endedAt ? new Date(run.endedAt) : undefined,
+          startedAt: run.startedAt ? new Date(run.startedAt) : undefined,
+        })),
+      };
+    },
+    [client, envID]
+  );
+}

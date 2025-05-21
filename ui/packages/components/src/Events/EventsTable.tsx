@@ -54,7 +54,7 @@ export function EventsTable({
     eventName,
     payload,
   }: {
-    eventName: string;
+    eventName?: string;
     payload?: string;
   }) => React.ReactNode;
   pathCreator: {
