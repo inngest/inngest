@@ -170,7 +170,7 @@ export function EventDetails({
                 {isPending ? (
                   <SkeletonElement />
                 ) : (
-                  <PillElement>{eventDetailsData?.source || 'N/A'}</PillElement>
+                  <PillElement>{eventDetailsData?.source?.name || 'N/A'}</PillElement>
                 )}
               </ElementWrapper>
               <ElementWrapper label="TS">

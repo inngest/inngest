@@ -3,7 +3,9 @@ export type Event = {
   name: string;
   payload?: string;
   receivedAt: Date;
-  source?: string;
+  source?: {
+    name?: string | null;
+  } | null;
   version?: string | null;
   idempotencyKey?: string | null;
   occurredAt?: Date;

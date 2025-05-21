@@ -139,6 +139,9 @@ export const eventQuery = graphql(`
         idempotencyKey
         occurredAt
         version
+        source {
+          name
+        }
       }
     }
   }
