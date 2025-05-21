@@ -49,10 +49,8 @@ func (f *fakeLifecycle) OnFunctionScheduled(
 	f.evtIDs = append(f.evtIDs, evt[0].GetInternalID())
 }
 
-func createInmemoryRedis(ctx context.Context) (*miniredis.Miniredis, rueidis.Client, error) {
-
-	r := miniredis.NewMiniRedis()
-	_ = r.Start()
+func createInmemoryRedis(t *testing.T) (*miniredis.Miniredis, rueidis.Client, error) {
+	r := miniredis.RunT(t)
 	rc, err := rueidis.NewClient(rueidis.ClientOption{
 		InitAddress:  []string{r.Addr()},
 		DisableCache: true,
@@ -86,11 +84,13 @@ func TestScheduleRaceCondition(t *testing.T) {
 	dbcqrs := base_cqrs.NewCQRS(db, dbDriver)
 	loader := dbcqrs.(state.FunctionLoader)
 
-	stateRedis, shardedRc, err := createInmemoryRedis(ctx)
+	_, shardedRc, err := createInmemoryRedis(t)
 	require.NoError(t, err)
+	defer shardedRc.Close()
 
-	queueRedis, unshardedRc, err := createInmemoryRedis(ctx)
+	_, unshardedRc, err := createInmemoryRedis(t)
 	require.NoError(t, err)
+	defer unshardedRc.Close()
 
 	unshardedClient := redis_state.NewUnshardedClient(unshardedRc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
 	shardedClient := redis_state.NewShardedClient(redis_state.ShardedClientOpts{
@@ -152,16 +152,6 @@ func TestScheduleRaceCondition(t *testing.T) {
 		FunctionVersion: 0,
 		Name:            "",
 		Slug:            "",
-		Priority:        nil,
-		Timeouts:        nil,
-		Concurrency:     nil,
-		Debounce:        nil,
-		Triggers:        nil,
-		EventBatch:      nil,
-		RateLimit:       nil,
-		Throttle:        nil,
-		Cancel:          nil,
-		Steps:           nil,
 	}
 
 	now := time.Now()
@@ -232,13 +222,6 @@ func TestScheduleRaceCondition(t *testing.T) {
 	for _, d := range successMetaIDs {
 		require.Equal(t, testLifecycle.runIDs[0], d)
 	}
-
-	fmt.Println("state redis:")
-	fmt.Println(stateRedis.Dump())
-
-	fmt.Println("queue redis:")
-	fmt.Println(queueRedis.Dump())
-
 }
 
 func TestScheduleRaceConditionWithExistingIdempotencyKey(t *testing.T) {
@@ -254,11 +237,13 @@ func TestScheduleRaceConditionWithExistingIdempotencyKey(t *testing.T) {
 	dbcqrs := base_cqrs.NewCQRS(db, dbDriver)
 	loader := dbcqrs.(state.FunctionLoader)
 
-	stateRedis, shardedRc, err := createInmemoryRedis(ctx)
+	stateRedis, shardedRc, err := createInmemoryRedis(t)
 	require.NoError(t, err)
+	defer shardedRc.Close()
 
-	queueRedis, unshardedRc, err := createInmemoryRedis(ctx)
+	_, unshardedRc, err := createInmemoryRedis(t)
 	require.NoError(t, err)
+	defer unshardedRc.Close()
 
 	unshardedClient := redis_state.NewUnshardedClient(unshardedRc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
 	shardedClient := redis_state.NewShardedClient(redis_state.ShardedClientOpts{
@@ -320,16 +305,6 @@ func TestScheduleRaceConditionWithExistingIdempotencyKey(t *testing.T) {
 		FunctionVersion: 0,
 		Name:            "",
 		Slug:            "",
-		Priority:        nil,
-		Timeouts:        nil,
-		Concurrency:     nil,
-		Debounce:        nil,
-		Triggers:        nil,
-		EventBatch:      nil,
-		RateLimit:       nil,
-		Throttle:        nil,
-		Cancel:          nil,
-		Steps:           nil,
 	}
 
 	now := time.Now()
@@ -395,16 +370,6 @@ func TestScheduleRaceConditionWithExistingIdempotencyKey(t *testing.T) {
 
 	wg.Wait()
 
-	fmt.Println("fake run ID: ", fakeRunID.String())
-	fmt.Println("lifecycle run ID: ", testLifecycle.runIDs[0].String())
-	fmt.Println("success run ID: ", successMetaIDs[0].String())
-
-	fmt.Println("state redis:")
-	fmt.Println(stateRedis.Dump())
-
-	fmt.Println("queue redis:")
-	fmt.Println(queueRedis.Dump())
-
 	require.Equal(t, 1, int(successCount))
 	require.Equal(t, iterations-1, int(errCount))
 
@@ -421,5 +386,4 @@ func TestScheduleRaceConditionWithExistingIdempotencyKey(t *testing.T) {
 	}
 
 	require.Equal(t, fakeRunID, testLifecycle.runIDs[0])
-
 }
