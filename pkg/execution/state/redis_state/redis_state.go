@@ -877,6 +877,11 @@ func (m unshardedMgr) SavePause(ctx context.Context, p state.Pause) (int64, erro
 		pause.kg.GlobalPauseIndex(ctx),
 	}
 
+	supersedeSignalOnConflict := "0"
+	if p.SupersedeSignalOnConflict != nil && *p.SupersedeSignalOnConflict {
+		supersedeSignalOnConflict = "1"
+	}
+
 	args, err := StrSlice([]any{
 		string(packed),
 		p.ID.String(),
@@ -887,6 +892,7 @@ func (m unshardedMgr) SavePause(ctx context.Context, p state.Pause) (int64, erro
 		// pause by ID for 10 minutes past expiry.
 		int(extendedExpiry),
 		nowUnixSeconds,
+		supersedeSignalOnConflict,
 	})
 	if err != nil {
 		return 0, err
