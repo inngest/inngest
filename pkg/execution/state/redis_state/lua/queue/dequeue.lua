@@ -27,22 +27,25 @@ local keyInProgressPartition                = KEYS[14] -- Account concurrency le
 local keyInProgressCustomConcurrencyKey1    = KEYS[15] -- When leasing an item we need to place the lease into this key.
 local keyInProgressCustomConcurrencyKey2    = KEYS[16] -- Optional for eg. for concurrency amongst steps
 
-local keyActiveAccount         = KEYS[17]
-local keyActivePartition       = KEYS[18]
-local keyActiveConcurrencyKey1 = KEYS[19]
-local keyActiveConcurrencyKey2 = KEYS[20]
-local keyActiveCompound        = KEYS[21]
+local keyActiveAccount             = KEYS[17]
+local keyActivePartition           = KEYS[18]
+local keyActiveConcurrencyKey1     = KEYS[19]
+local keyActiveConcurrencyKey2     = KEYS[20]
+local keyActiveCompound            = KEYS[21]
+local keyActiveRun                 = KEYS[22]
+local keyIndexActivePartitionRuns  = KEYS[23]
 
-local keyIdempotency           = KEYS[22]
+local keyIdempotency           = KEYS[24]
 
-local keyItemIndexA            = KEYS[23]   -- custom item index 1
-local keyItemIndexB            = KEYS[24]  -- custom item index 2
+local keyItemIndexA            = KEYS[25]   -- custom item index 1
+local keyItemIndexB            = KEYS[26]  -- custom item index 2
 
 local queueID        = ARGV[1]
 local partitionID    = ARGV[2]
 local backlogID      = ARGV[3]
 local accountID      = ARGV[4]
-local idempotencyTTL = tonumber(ARGV[5])
+local runID          = ARGV[5]
+local idempotencyTTL = tonumber(ARGV[6])
 
 -- $include(get_queue_item.lua)
 -- $include(get_partition_item.lua)
@@ -159,6 +162,18 @@ end
 if exists_without_ending(keyActiveConcurrencyKey2, ":-") then
   if redis.call("DECR", keyActiveConcurrencyKey2) <= 0 then
     redis.call("DEL", keyActiveConcurrencyKey2)
+  end
+end
+
+if exists_without_ending(keyActiveRun, ":-") then
+  -- increase number of active items in the run
+  if redis.call("DECR", keyActiveRun) <= 0 then
+    redis.call("DEL", keyActiveRun)
+
+    -- update set of active function runs
+    if exists_without_ending(keyIndexActivePartitionRuns, ":-") then
+      redis.call("SREM", keyIndexActivePartitionRuns, runID)
+    end
   end
 end
 

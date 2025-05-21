@@ -23,37 +23,40 @@ local keyInProgressPartition                = KEYS[9]
 local keyInProgressCustomConcurrencyKey1    = KEYS[10]
 local keyInProgressCustomConcurrencyKey2    = KEYS[11]
 
-local keyActiveAccount         = KEYS[12]
-local keyActivePartition       = KEYS[13]
-local keyActiveConcurrencyKey1 = KEYS[14]
-local keyActiveConcurrencyKey2 = KEYS[15]
-local keyActiveCompound        = KEYS[16]
+local keyActiveAccount             = KEYS[12]
+local keyActivePartition           = KEYS[13]
+local keyActiveConcurrencyKey1     = KEYS[14]
+local keyActiveConcurrencyKey2     = KEYS[15]
+local keyActiveCompound            = KEYS[16]
+local keyActiveRun                 = KEYS[17]
+local keyIndexActivePartitionRuns  = KEYS[18]
 
-local keyBacklogSet                      = KEYS[17]          -- backlog:sorted:<backlogID> - zset
-local keyBacklogMeta                     = KEYS[18]          -- backlogs - hash
-local keyGlobalShadowPartitionSet        = KEYS[19]          -- shadow:sorted
-local keyShadowPartitionSet              = KEYS[20]          -- shadow:sorted:<fnID|queueName> - zset
-local keyShadowPartitionMeta             = KEYS[21]          -- shadows
-local keyGlobalAccountShadowPartitionSet = KEYS[22]
-local keyAccountShadowPartitionSet       = KEYS[23]
+local keyBacklogSet                      = KEYS[19]          -- backlog:sorted:<backlogID> - zset
+local keyBacklogMeta                     = KEYS[20]          -- backlogs - hash
+local keyGlobalShadowPartitionSet        = KEYS[21]          -- shadow:sorted
+local keyShadowPartitionSet              = KEYS[22]          -- shadow:sorted:<fnID|queueName> - zset
+local keyShadowPartitionMeta             = KEYS[23]          -- shadows
+local keyGlobalAccountShadowPartitionSet = KEYS[24]
+local keyAccountShadowPartitionSet       = KEYS[25]
 
-local keyItemIndexA           = KEYS[24]          -- custom item index 1
-local keyItemIndexB           = KEYS[25]          -- custom item index 2
+local keyItemIndexA           = KEYS[26]          -- custom item index 1
+local keyItemIndexB           = KEYS[27]          -- custom item index 2
 
 local queueID             = ARGV[1]           -- id
 local queueItem           = ARGV[2]
 local queueScore          = tonumber(ARGV[3]) -- vesting time, in ms
 local accountID           = ARGV[4]
-local partitionID         = ARGV[5]
-local partitionItem       = ARGV[6]
+local runID               = ARGV[5]
+local partitionID         = ARGV[6]
+local partitionItem       = ARGV[7]
 
-local nowMS               = tonumber(ARGV[7]) -- now in ms
+local nowMS               = tonumber(ARGV[8]) -- now in ms
 
 -- Key queues v2
-local requeueToBacklog				= tonumber(ARGV[8])
-local shadowPartitionItem     = ARGV[9]
-local backlogID               = ARGV[10]
-local backlogItem             = ARGV[11]
+local requeueToBacklog				= tonumber(ARGV[9])
+local shadowPartitionItem     = ARGV[10]
+local backlogID               = ARGV[11]
+local backlogItem             = ARGV[12]
 
 -- $include(get_queue_item.lua)
 -- $include(get_partition_item.lua)
@@ -146,6 +149,18 @@ if requeueToBacklog == 1 then
   if exists_without_ending(keyActiveConcurrencyKey2, ":-") then
     if redis.call("DECR", keyActiveConcurrencyKey2) <= 0 then
       redis.call("DEL", keyActiveConcurrencyKey2)
+    end
+  end
+
+  if exists_without_ending(keyActiveRun, ":-") then
+    -- increase number of active items in the run
+    if redis.call("DECR", keyActiveRun) <= 0 then
+      redis.call("DEL", keyActiveRun)
+
+      -- update set of active function runs
+      if exists_without_ending(keyIndexActivePartitionRuns, ":-") then
+        redis.call("SREM", keyIndexActivePartitionRuns, runID)
+      end
     end
   end
 

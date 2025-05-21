@@ -2473,7 +2473,18 @@ func TestQueueDequeue(t *testing.T) {
 
 		start := time.Now()
 
-		item, err := q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{}, start, osqueue.EnqueueOpts{})
+		fnID := uuid.New()
+		runID := ulid.MustNew(ulid.Now(), rand.Reader)
+
+		item, err := q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{
+			FunctionID: fnID,
+			Data: osqueue.Item{
+				Identifier: state.Identifier{
+					RunID:      runID,
+					WorkflowID: fnID,
+				},
+			},
+		}, start, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 
 		p := QueuePartition{FunctionID: &item.FunctionID}
@@ -2511,6 +2522,14 @@ func TestQueueDequeue(t *testing.T) {
 			count, err := q.InProgress(ctx, "p", p.FunctionID.String())
 			require.NoError(t, err)
 			require.EqualValues(t, 0, count)
+		})
+
+		t.Run("run indexes are updated", func(t *testing.T) {
+			kg := q.primaryQueueShard.RedisClient.kg
+			// Run indexes should be updated
+
+			require.False(t, r.Exists(kg.ActiveCounter("run", runID.String())))
+			require.False(t, r.Exists(kg.ActivePartitionRunsIndex(fnID.String())))
 		})
 
 		t.Run("It should work if the item is not leased (eg. deletions)", func(t *testing.T) {
@@ -2636,7 +2655,18 @@ func TestQueueRequeue(t *testing.T) {
 	t.Run("Re-enqueuing a leased item should succeed", func(t *testing.T) {
 		now := time.Now()
 
-		item, err := q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{}, now, osqueue.EnqueueOpts{})
+		fnID := uuid.New()
+		runID := ulid.MustNew(ulid.Now(), rand.Reader)
+
+		item, err := q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{
+			FunctionID: fnID,
+			Data: osqueue.Item{
+				Identifier: state.Identifier{
+					RunID:      runID,
+					WorkflowID: fnID,
+				},
+			},
+		}, now, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 
 		_, err = q.Lease(ctx, item, time.Second, time.Now(), nil)
@@ -2670,8 +2700,29 @@ func TestQueueRequeue(t *testing.T) {
 			requirePartitionScoreEquals(t, r, pi.FunctionID, next)
 		})
 
+		t.Run("run indexes are not updated on requeue to partition", func(t *testing.T) {
+			kg := q.primaryQueueShard.RedisClient.kg
+
+			runActiveCount, err := r.Get(kg.ActiveCounter("run", runID.String()))
+			require.NoError(t, err)
+
+			require.Equal(t, "1", runActiveCount)
+
+			isMember, err := r.SIsMember(kg.ActivePartitionRunsIndex(fnID.String()), runID.String())
+			require.NoError(t, err)
+			require.True(t, isMember)
+		})
+
 		t.Run("It should not update the partition's earliest time, if later", func(t *testing.T) {
-			_, err := q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{}, now, osqueue.EnqueueOpts{})
+			_, err := q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{
+				FunctionID: fnID,
+				Data: osqueue.Item{
+					Identifier: state.Identifier{
+						RunID:      runID,
+						WorkflowID: fnID,
+					},
+				},
+			}, now, osqueue.EnqueueOpts{})
 			require.NoError(t, err)
 
 			requirePartitionScoreEquals(t, r, pi.FunctionID, now)
@@ -5765,6 +5816,8 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 
 		accountId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
 
+		runID := ulid.MustNew(ulid.Now(), rand.Reader)
+
 		// use future timestamp because scores will be bounded to the present
 		at := time.Now().Add(10 * time.Minute)
 
@@ -5782,6 +5835,7 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 						WorkflowID:  fnID,
 						AccountID:   accountId,
 						WorkspaceID: wsID,
+						RunID:       runID,
 					},
 					QueueName:             nil,
 					Throttle:              nil,
@@ -5835,6 +5889,15 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 			require.True(t, hasMember(t, r, kg.Concurrency("account", accountId.String()), qi.ID))
 			require.True(t, hasMember(t, r, kg.Concurrency("p", fnPart.Queue()), qi.ID))
 
+			runActiveCount, err := r.Get(kg.ActiveCounter("run", runID.String()))
+			require.NoError(t, err)
+
+			require.Equal(t, "1", runActiveCount)
+
+			isMember, err := r.SIsMember(kg.ActivePartitionRunsIndex(fnID.String()), runID.String())
+			require.NoError(t, err)
+			require.True(t, isMember)
+
 			requeueFor := at.Add(30 * time.Minute).Truncate(time.Minute)
 
 			require.False(t, r.Exists(kg.GlobalAccountShadowPartitions()))
@@ -5856,6 +5919,9 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 
 			require.False(t, hasMember(t, r, shadowPartition.inProgressKey(kg), qi.ID), remainingMembers)
 			require.False(t, hasMember(t, r, shadowPartition.accountInProgressKey(kg), qi.ID))
+
+			require.False(t, r.Exists(kg.ActiveCounter("run", runID.String())))
+			require.False(t, r.Exists(kg.ActivePartitionRunsIndex(fnID.String())))
 
 			// expect old accounting to be updated
 			// TODO Do we actually want to update previous accounting?
@@ -6303,6 +6369,131 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 			// item must not be in classic backlog
 			require.False(t, hasMember(t, r, fnPart.zsetKey(kg), qi.ID))
 		})
+	})
+
+	t.Run("don't update run indexes if another queue item is active", func(t *testing.T) {
+		r := miniredis.RunT(t)
+		rc, err := rueidis.NewClient(rueidis.ClientOption{
+			InitAddress:  []string{r.Addr()},
+			DisableCache: true,
+		})
+		require.NoError(t, err)
+		defer rc.Close()
+
+		defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+		kg := defaultShard.RedisClient.kg
+
+		enqueueToBacklog := false
+		q := NewQueue(
+			defaultShard,
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+				return enqueueToBacklog
+			}),
+			WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
+				return true
+			}),
+		)
+		ctx := context.Background()
+
+		accountId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
+
+		runID := ulid.MustNew(ulid.Now(), rand.Reader)
+
+		// use future timestamp because scores will be bounded to the present
+		at := time.Now().Add(10 * time.Minute)
+
+		require.Len(t, r.Keys(), 0)
+
+		item := osqueue.QueueItem{
+			ID:          "test",
+			FunctionID:  fnID,
+			WorkspaceID: wsID,
+			Data: osqueue.Item{
+				WorkspaceID: wsID,
+				Kind:        osqueue.KindEdge,
+				Identifier: state.Identifier{
+					WorkflowID:  fnID,
+					AccountID:   accountId,
+					WorkspaceID: wsID,
+					RunID:       runID,
+				},
+				QueueName:             nil,
+				Throttle:              nil,
+				CustomConcurrencyKeys: nil,
+			},
+			QueueName: nil,
+		}
+
+		//
+		// Add two queue items to in progress
+		//
+
+		// directly enqueue to partition
+		enqueueToBacklog = false
+		qi, err := q.EnqueueItem(ctx, defaultShard, item, at, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+
+		item.ID = ""
+		qi2, err := q.EnqueueItem(ctx, defaultShard, item, at, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+
+		enqueueToBacklog = true
+
+		// put item in progress, this is tested separately
+		now := q.clock.Now()
+		leaseDur := 5 * time.Second
+		leaseID, err := q.Lease(ctx, qi, leaseDur, now, nil)
+		require.NoError(t, err)
+		require.NotNil(t, leaseID)
+
+		leaseID, err = q.Lease(ctx, qi2, leaseDur, now, nil)
+		require.NoError(t, err)
+		require.NotNil(t, leaseID)
+
+		backlog := q.ItemBacklog(ctx, item)
+		require.NotEmpty(t, backlog.BacklogID)
+
+		shadowPartition := q.ItemShadowPartition(ctx, item)
+		require.NotEmpty(t, shadowPartition.PartitionID)
+		require.Len(t, shadowPartition.CustomConcurrencyKeys, 0)
+
+		runActiveCount, err := r.Get(kg.ActiveCounter("run", runID.String()))
+		require.NoError(t, err)
+
+		require.Equal(t, "2", runActiveCount)
+
+		isMember, err := r.SIsMember(kg.ActivePartitionRunsIndex(fnID.String()), runID.String())
+		require.NoError(t, err)
+		require.True(t, isMember)
+
+		//
+		// Requeue first active item, expect active run items to be updated (decreased by 1)
+		// but run still has another active item
+		//
+
+		requeueFor := at.Add(30 * time.Minute).Truncate(time.Minute)
+
+		err = q.Requeue(ctx, defaultShard, qi, requeueFor)
+		require.NoError(t, err)
+
+		runActiveCount, err = r.Get(kg.ActiveCounter("run", runID.String()))
+		require.NoError(t, err)
+
+		require.Equal(t, "1", runActiveCount)
+
+		isMember, err = r.SIsMember(kg.ActivePartitionRunsIndex(fnID.String()), runID.String())
+		require.NoError(t, err)
+		require.True(t, isMember)
+
+		//
+		// Requeue final active item, expect indexes to be cleared out
+		//
+
+		err = q.Requeue(ctx, defaultShard, qi, requeueFor.Add(time.Hour))
+		require.NoError(t, err)
+
+		require.False(t, r.Exists(kg.ActiveCounter("run", runID.String())))
+		require.False(t, r.Exists(kg.ActivePartitionRunsIndex(fnID.String())))
 	})
 }
 

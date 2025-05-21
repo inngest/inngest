@@ -204,6 +204,8 @@ type QueueKeyGenerator interface {
 	// GlobalAccountShadowPartitions returns the key to the ZSET storing pointers (account IDs) for accounts with existing shadow partitions.
 	GlobalAccountShadowPartitions() string
 
+	// ActiveRunCounter returns the key to the number of active queue items for a given run ID.
+	ActiveRunCounter(runID ulid.ULID) string
 	// ActivePartitionRunsIndex returns a key to the index SET for tracking active runs for a given partition.
 	ActivePartitionRunsIndex(partitionID string) string
 
@@ -380,6 +382,19 @@ func (u queueKeyGenerator) ActiveCounter(scope string, scopeID string) string {
 	}
 
 	return fmt.Sprintf("{%s}:active:%s:%s", u.queueDefaultKey, scope, scopeID)
+}
+
+func isEmptyULID(id ulid.ULID) bool {
+	return id == [16]byte{}
+}
+
+func (u queueKeyGenerator) ActiveRunCounter(runID ulid.ULID) string {
+	if isEmptyULID(runID) {
+		// this is a placeholder because passing an empty key into Lua will cause multi-slot key errors
+		return u.ActiveCounter("run", "")
+	}
+
+	return u.ActiveCounter("run", runID.String())
 }
 
 func (u queueKeyGenerator) ActivePartitionRunsIndex(partitionID string) string {

@@ -2250,12 +2250,6 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 		checkConstraintsVal = "1"
 	}
 
-	runActive := kg.ActiveCounter("run", "")
-	var emptyUlid [16]byte
-	if item.Data.Identifier.RunID != emptyUlid {
-		runActive = kg.ActiveCounter("run", item.Data.Identifier.RunID.String())
-	}
-
 	keys := []string{
 		kg.QueueItem(),
 		kg.ConcurrencyIndex(),
@@ -2274,7 +2268,7 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 		backlog.customKeyActive(kg, 2),
 		backlog.customKeyActive(kg, 1),
 		backlog.activeKey(kg),
-		runActive,
+		kg.ActiveRunCounter(item.Data.Identifier.RunID),
 		kg.ActivePartitionRunsIndex(partition.PartitionID),
 
 		kg.ThrottleKey(item.Data.Throttle),
@@ -2469,6 +2463,8 @@ func (q *queue) Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		backlog.customKeyActive(kg, 1),
 		backlog.customKeyActive(kg, 2),
 		backlog.activeKey(kg),
+		kg.ActiveRunCounter(i.Data.Identifier.RunID),
+		kg.ActivePartitionRunsIndex(partition.PartitionID),
 
 		kg.Idempotency(i.ID),
 	}
@@ -2489,6 +2485,7 @@ func (q *queue) Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		partition.PartitionID,
 		backlog.BacklogID,
 		i.Data.Identifier.AccountID.String(),
+		i.Data.Identifier.RunID.String(),
 
 		int(idempotency.Seconds()),
 	})
@@ -2577,6 +2574,8 @@ func (q *queue) Requeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		backlog.customKeyActive(kg, 1),
 		backlog.customKeyActive(kg, 2),
 		backlog.activeKey(kg),
+		kg.ActiveRunCounter(i.Data.Identifier.RunID),
+		kg.ActivePartitionRunsIndex(shadowPartition.PartitionID),
 
 		// key queues v2
 		kg.BacklogSet(backlog.BacklogID),
@@ -2600,6 +2599,7 @@ func (q *queue) Requeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		at.UnixMilli(),
 
 		i.Data.Identifier.AccountID.String(),
+		i.Data.Identifier.RunID.String(),
 		fnPartition.ID,
 		fnPartition,
 
