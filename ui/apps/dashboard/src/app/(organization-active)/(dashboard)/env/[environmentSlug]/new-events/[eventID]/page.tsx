@@ -7,6 +7,7 @@ import { RiArrowRightUpLine } from '@remixicon/react';
 
 import { SendEventModal } from '@/components/Events/SendEventModal';
 import { useEventDetails, useEventPayload, useEventRuns } from '@/components/Events/useEvents';
+import { createInternalPathCreator } from '@/components/Events/utils';
 import { pathCreator } from '@/utils/urls';
 
 type Props = {
@@ -23,18 +24,7 @@ export default function Page({ params }: Props) {
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<{ name: string; data: string } | null>(null);
 
-  const internalPathCreator = useMemo(() => {
-    return {
-      // The shared component library is environment-agnostic, so it needs a way to
-      // generate URLs without knowing about environments
-      eventType: (params: { eventName: string }) =>
-        pathCreator.eventType({ envSlug: envSlug, eventName: params.eventName }),
-      runPopout: (params: { runID: string }) =>
-        pathCreator.runPopout({ envSlug: envSlug, runID: params.runID }),
-      eventPopout: (params: { eventID: string }) =>
-        pathCreator.eventPopout({ envSlug: envSlug, eventID: params.eventID }),
-    };
-  }, [envSlug]);
+  const internalPathCreator = useMemo(() => createInternalPathCreator(envSlug), [envSlug]);
 
   const getEventDetails = useEventDetails();
   const getEventPayload = useEventPayload();

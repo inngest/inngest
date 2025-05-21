@@ -14,6 +14,7 @@ import { EventInfo } from '@/components/Events/EventInfo';
 import SendEventButton from '@/components/Events/SendEventButton';
 import { SendEventModal } from '@/components/Events/SendEventModal';
 import { useEventDetails, useEventPayload, useEvents } from '@/components/Events/useEvents';
+import { createInternalPathCreator } from '@/components/Events/utils';
 import { pathCreator } from '@/utils/urls';
 import { useAccountFeatures } from '@/utils/useAccountFeatures';
 
@@ -23,18 +24,8 @@ export default function EventsPage({
   params: { environmentSlug: string };
 }) {
   const router = useRouter();
-  const internalPathCreator = useMemo(() => {
-    return {
-      // The shared component library is environment-agnostic, so it needs a way to
-      // generate URLs without knowing about environments
-      eventType: (params: { eventName: string }) =>
-        pathCreator.eventType({ envSlug: envSlug, eventName: params.eventName }),
-      runPopout: (params: { runID: string }) =>
-        pathCreator.runPopout({ envSlug: envSlug, runID: params.runID }),
-      eventPopout: (params: { eventID: string }) =>
-        pathCreator.eventPopout({ envSlug: envSlug, eventID: params.eventID }),
-    };
-  }, [envSlug]);
+  const internalPathCreator = useMemo(() => createInternalPathCreator(envSlug), [envSlug]);
+
   const [isModalVisible, setIsModalVisible] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<{ name: string; data: string } | null>(null);
 
