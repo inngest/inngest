@@ -7,16 +7,16 @@ import { EventsTable } from '@inngest/components/Events/EventsTable';
 import { InternalEventsToggle } from '@inngest/components/Events/InternalEventsToggle';
 import { Header } from '@inngest/components/Header/Header';
 import { RefreshButton } from '@inngest/components/Refresh/RefreshButton';
-import { RiArrowRightUpLine, RiExternalLinkLine, RiRefreshLine } from '@remixicon/react';
+import { RiExternalLinkLine, RiRefreshLine } from '@remixicon/react';
 
 import { useAllEventTypes } from '@/components/EventTypes/useEventTypes';
 import { EventInfo } from '@/components/Events/EventInfo';
+import { ExpandedRowActions } from '@/components/Events/ExpandedRowActions';
 import SendEventButton from '@/components/Events/SendEventButton';
 import { SendEventModal } from '@/components/Events/SendEventModal';
 import { useEventDetails, useEventPayload, useEvents } from '@/components/Events/useEvents';
 import { useReplayModal } from '@/components/Events/useReplayModal';
 import { createInternalPathCreator } from '@/components/Events/utils';
-import { pathCreator } from '@/utils/urls';
 import { useAccountFeatures } from '@/utils/useAccountFeatures';
 
 export default function EventsPage({
@@ -74,33 +74,14 @@ export default function EventsPage({
             />
           </>
         }
-        expandedRowActions={({ eventName, payload }) => {
-          const isInternalEvent = Boolean(eventName?.startsWith('inngest/'));
-          return (
-            <>
-              <div className="flex items-center gap-2">
-                <Button
-                  label="Go to event type page"
-                  href={
-                    eventName ? pathCreator.eventType({ envSlug: envSlug, eventName }) : undefined
-                  }
-                  appearance="ghost"
-                  size="small"
-                  icon={<RiArrowRightUpLine />}
-                  iconSide="left"
-                  disabled={!eventName}
-                />
-                <Button
-                  label="Replay event"
-                  onClick={() => eventName && payload && openModal(eventName, payload)}
-                  appearance="outlined"
-                  size="small"
-                  disabled={!eventName || isInternalEvent || !payload}
-                />
-              </div>
-            </>
-          );
-        }}
+        expandedRowActions={({ eventName, payload }) => (
+          <ExpandedRowActions
+            eventName={eventName}
+            payload={payload}
+            onReplay={openModal}
+            envSlug={envSlug}
+          />
+        )}
       />
       {selectedEvent && (
         <SendEventModal

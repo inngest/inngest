@@ -1,15 +1,13 @@
 'use client';
 
 import { useMemo } from 'react';
-import { Button } from '@inngest/components/Button/Button';
 import { EventDetails } from '@inngest/components/Events/EventDetails';
-import { RiArrowRightUpLine } from '@remixicon/react';
 
+import { ExpandedRowActions } from '@/components/Events/ExpandedRowActions';
 import { SendEventModal } from '@/components/Events/SendEventModal';
 import { useEventDetails, useEventPayload, useEventRuns } from '@/components/Events/useEvents';
 import { useReplayModal } from '@/components/Events/useReplayModal';
 import { createInternalPathCreator } from '@/components/Events/utils';
-import { pathCreator } from '@/utils/urls';
 
 type Props = {
   params: {
@@ -39,33 +37,14 @@ export default function Page({ params }: Props) {
         getEventDetails={getEventDetails}
         getEventPayload={getEventPayload}
         getEventRuns={getEventRuns}
-        expandedRowActions={({ eventName, payload }) => {
-          const isInternalEvent = eventName?.startsWith('inngest/');
-          return (
-            <>
-              <div className="flex items-center gap-2">
-                <Button
-                  label="Go to event type page"
-                  href={
-                    eventName ? pathCreator.eventType({ envSlug: envSlug, eventName }) : undefined
-                  }
-                  appearance="ghost"
-                  size="small"
-                  icon={<RiArrowRightUpLine />}
-                  iconSide="left"
-                  disabled={!eventName}
-                />
-                <Button
-                  label="Replay event"
-                  onClick={() => eventName && payload && openModal(eventName, payload)}
-                  appearance="outlined"
-                  size="small"
-                  disabled={!eventName || isInternalEvent || !payload}
-                />
-              </div>
-            </>
-          );
-        }}
+        expandedRowActions={({ eventName, payload }) => (
+          <ExpandedRowActions
+            eventName={eventName}
+            payload={payload}
+            onReplay={openModal}
+            envSlug={envSlug}
+          />
+        )}
       />
       {selectedEvent && (
         <SendEventModal
