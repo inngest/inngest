@@ -204,6 +204,11 @@ type QueueKeyGenerator interface {
 	// GlobalAccountShadowPartitions returns the key to the ZSET storing pointers (account IDs) for accounts with existing shadow partitions.
 	GlobalAccountShadowPartitions() string
 
+	// ActiveRunCounter returns the key to the number of active queue items for a given run ID.
+	ActiveRunCounter(runID ulid.ULID) string
+	// ActivePartitionRunsIndex returns a key to the index SET for tracking active runs for a given partition.
+	ActivePartitionRunsIndex(partitionID string) string
+
 	GlobalAccountNormalizeSet() string
 	AccountNormalizeSet(accountID uuid.UUID) string
 	PartitionNormalizeSet(partitionID string) string
@@ -235,7 +240,6 @@ type QueueKeyGenerator interface {
 	ThrottleKey(t *osqueue.Throttle) string
 	// RunIndex returns the index for storing job IDs associated with run IDs.
 	RunIndex(runID ulid.ULID) string
-
 	// FnMetadata returns the key for a function's metadata.
 	// This is a JSON object; see queue.FnMetadata.
 	FnMetadata(fnID uuid.UUID) string
@@ -245,6 +249,10 @@ type QueueKeyGenerator interface {
 	// ConcurrencyFnEWMA returns the key storing the amount of times of concurrency hits, used for
 	// calculating the EWMA value for the function
 	ConcurrencyFnEWMA(fnID uuid.UUID) string
+
+	// QueuePrefix returns the hash prefix used in the queue.
+	// This is likely going to be a redis specific requirement.
+	QueuePrefix() string
 
 	//
 	// ***************** Deprecated *****************
@@ -376,6 +384,28 @@ func (u queueKeyGenerator) ActiveCounter(scope string, scopeID string) string {
 	return fmt.Sprintf("{%s}:active:%s:%s", u.queueDefaultKey, scope, scopeID)
 }
 
+func isEmptyULID(id ulid.ULID) bool {
+	return id == [16]byte{}
+}
+
+func (u queueKeyGenerator) ActiveRunCounter(runID ulid.ULID) string {
+	if isEmptyULID(runID) {
+		// this is a placeholder because passing an empty key into Lua will cause multi-slot key errors
+		return u.ActiveCounter("run", "")
+	}
+
+	return u.ActiveCounter("run", runID.String())
+}
+
+func (u queueKeyGenerator) ActivePartitionRunsIndex(partitionID string) string {
+	if partitionID == "" {
+		// this is a placeholder because passing an empty key into Lua will cause multi-slot key errors
+		return fmt.Sprintf("{%s}:active-idx:runs:-", u.queueDefaultKey)
+	}
+
+	return fmt.Sprintf("{%s}:active-idx:runs:%s", u.queueDefaultKey, partitionID)
+}
+
 // BacklogMeta returns the key to the hash storing serialized QueueBacklog objects by ID.
 func (u queueKeyGenerator) BacklogMeta() string {
 	return fmt.Sprintf("{%s}:backlogs", u.queueDefaultKey)
@@ -424,6 +454,10 @@ func (u queueKeyGenerator) PartitionNormalizeSet(partitionID string) string {
 
 	return fmt.Sprintf("{%s}:normalize:partition:%s:sorted", u.queueDefaultKey, partitionID)
 
+}
+
+func (u queueKeyGenerator) QueuePrefix() string {
+	return fmt.Sprintf("{%s}", u.queueDefaultKey)
 }
 
 // ShadowPartitionSet returns the key to the ZSET storing pointers (backlog IDs) for a given shadow partition.

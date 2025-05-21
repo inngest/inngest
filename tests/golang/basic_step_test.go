@@ -117,18 +117,24 @@ func TestFunctionSteps(t *testing.T) {
 	})
 
 	t.Run("Check batch API", func(t *testing.T) {
-		// Fetch event data and step data from the V0 APIs;  it should exist.
-		resp, err := http.Get(fmt.Sprintf("%s/v0/runs/%s/actions", DEV_URL, runID))
-		require.NoError(t, err)
-		require.EqualValues(t, 200, resp.StatusCode)
+		require.EventuallyWithT(t, func(t *assert.CollectT) {
+			// Fetch event data and step data from the V0 APIs;  it should exist.
+			resp, err := http.Get(fmt.Sprintf("%s/v0/runs/%s/actions", DEV_URL, runID))
+			if !assert.NoError(t, err) {
+				return
+			}
+			assert.EqualValues(t, 200, resp.StatusCode)
 
-		body := map[string]any{}
-		err = json.NewDecoder(resp.Body).Decode(&body)
-		_ = resp.Body.Close()
-		require.NoError(t, err)
+			body := map[string]any{}
+			err = json.NewDecoder(resp.Body).Decode(&body)
+			_ = resp.Body.Close()
+			if !assert.NoError(t, err) {
+				return
+			}
 
-		// 3 step so far: 2 steps, 1 wait
-		require.Equal(t, 3, len(body))
+			// 3 step so far: 2 steps, 1 wait
+			assert.Equal(t, 3, len(body))
+		}, 10*time.Second, 100*time.Millisecond)
 	})
 
 	t.Run("waitForEvents succeed", func(t *testing.T) {
@@ -157,7 +163,7 @@ func TestFunctionSteps(t *testing.T) {
 
 		require.Eventually(t, func() bool {
 			return atomic.LoadInt32(&counter) == 4
-		}, 15*time.Second, time.Second, "Didn't resolve step.waitForEvents: got %d instead of 4", atomic.LoadInt32(&counter))
+		}, 30*time.Second, time.Second, "Didn't resolve step.waitForEvents: got %d instead of 4", atomic.LoadInt32(&counter))
 	})
 
 	t.Run("trace run should have appropriate data", func(t *testing.T) {

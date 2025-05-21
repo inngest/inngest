@@ -28,29 +28,33 @@ local keyInProgressCustomConcurrencyKey1 = KEYS[6]
 local keyInProgressCustomConcurrencyKey2 = KEYS[7]
 
 -- Active counters for constraint capacity accounting
-local keyActiveAccount         = KEYS[8]
-local keyActivePartition       = KEYS[9]
-local keyActiveConcurrencyKey1 = KEYS[10]
-local keyActiveConcurrencyKey2 = KEYS[11]
-local keyActiveCompound        = KEYS[12]
+local keyActiveAccount             = KEYS[8]
+local keyActivePartition           = KEYS[9]
+local keyActiveConcurrencyKey1     = KEYS[10]
+local keyActiveConcurrencyKey2     = KEYS[11]
+local keyActiveCompound            = KEYS[12]
+local keyActiveRun                 = KEYS[13]
+local keyIndexActivePartitionRuns  = KEYS[14]
 
-local throttleKey             = KEYS[13]
+local throttleKey             = KEYS[15]
 
 local queueID      						= ARGV[1]
 local partitionID 					  = ARGV[2]
 local accountId       				= ARGV[3]
-local newLeaseID  						= ARGV[4]
-local currentTime  						= tonumber(ARGV[5]) -- in ms
+local runID                   = ARGV[4]
+local newLeaseID  						= ARGV[5]
+
+local currentTime  						= tonumber(ARGV[6]) -- in ms
 
 -- We check concurrency limits when leasing queue items.
-local concurrencyAcct 				= tonumber(ARGV[6])
-local concurrencyPartition    = tonumber(ARGV[7])
-local customConcurrencyKey1   = tonumber(ARGV[8])
-local customConcurrencyKey2   = tonumber(ARGV[9])
+local concurrencyAcct 				= tonumber(ARGV[7])
+local concurrencyPartition    = tonumber(ARGV[8])
+local customConcurrencyKey1   = tonumber(ARGV[9])
+local customConcurrencyKey2   = tonumber(ARGV[10])
 
 -- key queues v2
-local checkConstraints    = tonumber(ARGV[10])
-local refilledFromBacklog = tonumber(ARGV[11])
+local checkConstraints    = tonumber(ARGV[11])
+local refilledFromBacklog = tonumber(ARGV[12])
 
 -- Use our custom Go preprocessor to inject the file from ./includes/
 -- $include(decode_ulid_time.lua)
@@ -183,6 +187,16 @@ if refilledFromBacklog ~= 1 then
 
   if exists_without_ending(keyActiveConcurrencyKey2, ":-") then
     redis.call("INCR", keyActiveConcurrencyKey2)
+  end
+
+  if exists_without_ending(keyActiveRun, ":-") then
+    -- increase number of active items in the run
+    redis.call("INCR", keyActiveRun)
+
+    -- update set of active function runs
+    if exists_without_ending(keyIndexActivePartitionRuns, ":-") then
+      redis.call("SADD", keyIndexActivePartitionRuns, runID)
+    end
   end
 end
 

@@ -74,12 +74,6 @@ local function enqueue_to_partition(keyPartitionSet, partitionID, partitionItem,
 end
 
 local function enqueue_to_backlog(keyBacklogSet, backlogID, backlogItem, partitionID, shadowPartitionItem, partitionItem, keyPartitionMap, keyBacklogMeta, keyGlobalShadowPartitionSet, keyShadowPartitionMeta, keyShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, queueScore, queueID, partitionTime, nowMS, accountID)
-	if backlogID == "" then
-    -- This is a blank backlog, so don't even bother.  This allows us to pre-allocate
-    -- 3 backlogs per item, even if an item only needs a single backlog.
-    return
-  end
-
 	-- Push the queue item's ID to the given backlog set
 	redis.call("ZADD", keyBacklogSet, queueScore, queueID)
 
@@ -199,22 +193,20 @@ local function requeue_to_backlog(keyBacklogSet, backlogID, backlogItem, partiti
 	redis.call("HSETNX", keyShadowPartitionMeta, partitionID, shadowPartitionItem)
 
 	-- Get the minimum score for the queue.
-	local minScores = redis.call("ZRANGE", keyBacklogSet, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")
-	local earliestScore = tonumber(minScores[2])
-	local updateTo = earliestScore / 1000
+	local earliestScore = get_converted_earliest_pointer_score(keyBacklogSet)
 
 	-- Update the backlog pointer in the shadow partition set if earlier or not exists
 	local currentScore = redis.call("ZSCORE", keyShadowPartitionSet, backlogID)
 	if currentScore == false or tonumber(currentScore) > earliestScore then
-		update_pointer_score_to(backlogID, keyShadowPartitionSet, updateTo)
+		update_pointer_score_to(backlogID, keyShadowPartitionSet, earliestScore)
 	end
 
 	-- Update the shadow partition pointer in the global shadow partition set if earlier or not exists
 	local currentScore = redis.call("ZSCORE", keyGlobalShadowPartitionSet, partitionID)
 	if currentScore == false or tonumber(currentScore) > earliestScore then
-		update_pointer_score_to(partitionID, keyGlobalShadowPartitionSet, updateTo)
+		update_pointer_score_to(partitionID, keyGlobalShadowPartitionSet, earliestScore)
 
     -- Also update account-based shadow partition index
-    update_account_shadow_queues(keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, partitionID, accountID, updateTo)
+    update_account_shadow_queues(keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, partitionID, accountID, earliestScore)
 	end
 end

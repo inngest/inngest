@@ -114,8 +114,8 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 	limit := ShadowPartitionPeekMaxBacklogs
 	refillUntil := q.clock.Now().Truncate(time.Second).Add(PartitionLookahead)
 
-	// Default to sequential but pick a random backlog every once in a while
-	sequential := mrand.Intn(100) <= 80
+	// Pick a random backlog offset every time
+	sequential := false
 
 	backlogs, totalCount, err := q.ShadowPartitionPeek(ctx, shadowPart, sequential, refillUntil, limit)
 	if err != nil {
@@ -368,7 +368,7 @@ func (q *queue) shadowScan(ctx context.Context) error {
 			return nil
 
 		case <-tick.Chan():
-			if err := q.scanShadowPartitions(ctx, q.clock.Now(), qspc); err != nil {
+			if err := q.scanShadowPartitions(ctx, q.clock.Now().Add(PartitionLookahead), qspc); err != nil {
 				return fmt.Errorf("could not scan shadow partitions: %w", err)
 			}
 		}
