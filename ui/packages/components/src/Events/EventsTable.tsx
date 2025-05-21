@@ -47,6 +47,7 @@ export function EventsTable({
   emptyActions,
   expandedRowActions,
   features,
+  standalone = false,
 }: {
   emptyActions: React.ReactNode;
   expandedRowActions: ({
@@ -59,6 +60,7 @@ export function EventsTable({
   pathCreator: {
     eventType: (params: { eventName: string }) => Route;
     runPopout: (params: { runID: string }) => Route;
+    eventPopout: (params: { eventID: string }) => Route;
   };
   getEvents: ({
     cursor,
@@ -81,6 +83,7 @@ export function EventsTable({
   getEventPayload: ({ eventID }: { eventID: string }) => Promise<Pick<Event, 'payload'>>;
   getEventTypes: () => Promise<Required<Pick<EventType, 'name' | 'id'>>[]>;
   features: Pick<Features, 'history'>;
+  standalone?: boolean;
 }) {
   const columns = useColumns({ pathCreator });
   const [showSearch, setShowSearch] = useState(false);
@@ -322,15 +325,21 @@ export function EventsTable({
           data={eventsData?.events || []}
           isLoading={isPending || (isFetching && !isFetchingNextPage)}
           blankState={<TableBlankState actions={emptyActions} />}
-          renderSubComponent={({ row }) => (
-            <EventDetails
-              pathCreator={pathCreator}
-              row={row}
-              getEventDetails={getEventDetails}
-              getEventPayload={getEventPayload}
-              expandedRowActions={expandedRowActions}
-            />
-          )}
+          renderSubComponent={({ row }) => {
+            const { id, name, runs } = row.original;
+            const initialData: Pick<Event, 'name' | 'runs'> = { name, runs };
+            return (
+              <EventDetails
+                pathCreator={pathCreator}
+                initialData={initialData}
+                getEventDetails={getEventDetails}
+                getEventPayload={getEventPayload}
+                expandedRowActions={expandedRowActions}
+                standalone={standalone}
+                eventID={id}
+              />
+            );
+          }}
           expandedIDs={expandedIDs}
           onRowClick={(row) => {
             if (expandedIDs.includes(row.original.id)) {

@@ -1,28 +1,28 @@
 'use client';
 
 import { useCallback, useMemo, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { Button } from '@inngest/components/Button/Button';
-import { EventsTable } from '@inngest/components/Events/EventsTable';
-import { InternalEventsToggle } from '@inngest/components/Events/InternalEventsToggle';
-import { Header } from '@inngest/components/Header/Header';
-import { RefreshButton } from '@inngest/components/Refresh/RefreshButton';
-import { RiArrowRightUpLine, RiExternalLinkLine, RiRefreshLine } from '@remixicon/react';
+import { EventDetails } from '@inngest/components/Events/EventDetails';
+import { RiArrowRightUpLine } from '@remixicon/react';
 
-import { useAllEventTypes } from '@/components/EventTypes/useEventTypes';
-import { EventInfo } from '@/components/Events/EventInfo';
-import SendEventButton from '@/components/Events/SendEventButton';
 import { SendEventModal } from '@/components/Events/SendEventModal';
-import { useEventDetails, useEventPayload, useEvents } from '@/components/Events/useEvents';
+import { useEventDetails, useEventPayload } from '@/components/Events/useEvents';
 import { pathCreator } from '@/utils/urls';
-import { useAccountFeatures } from '@/utils/useAccountFeatures';
 
-export default function EventsPage({
-  params: { environmentSlug: envSlug },
-}: {
-  params: { environmentSlug: string };
-}) {
-  const router = useRouter();
+type Props = {
+  params: {
+    eventID: string;
+    environmentSlug: string;
+  };
+};
+
+export default function Page({ params }: Props) {
+  const eventID = decodeURIComponent(params.eventID);
+  const envSlug = params.environmentSlug;
+
+  const [isModalVisible, setIsModalVisible] = useState(false);
+  const [selectedEvent, setSelectedEvent] = useState<{ name: string; data: string } | null>(null);
+
   const internalPathCreator = useMemo(() => {
     return {
       // The shared component library is environment-agnostic, so it needs a way to
@@ -35,8 +35,9 @@ export default function EventsPage({
         pathCreator.eventPopout({ envSlug: envSlug, eventID: params.eventID }),
     };
   }, [envSlug]);
-  const [isModalVisible, setIsModalVisible] = useState(false);
-  const [selectedEvent, setSelectedEvent] = useState<{ name: string; data: string } | null>(null);
+
+  const getEventDetails = useEventDetails();
+  const getEventPayload = useEventPayload();
 
   const openModal = useCallback((eventName: string, payload: string) => {
     try {
@@ -48,52 +49,16 @@ export default function EventsPage({
     }
   }, []);
 
-  const getEvents = useEvents();
-  const getEventDetails = useEventDetails();
-  const getEventPayload = useEventPayload();
-  const getEventTypes = useAllEventTypes();
-  const features = useAccountFeatures();
-
   return (
     <>
-      <Header
-        breadcrumb={[{ text: 'Events' }]}
-        infoIcon={<EventInfo />}
-        action={
-          <div className="flex items-center gap-1.5">
-            <RefreshButton />
-            <SendEventButton />
-            <InternalEventsToggle />
-          </div>
-        }
-      />
-      <EventsTable
+      <EventDetails
+        //   TODO: fetch name and runs
+        initialData={{ name: 'name' }}
         pathCreator={internalPathCreator}
-        getEvents={getEvents}
+        eventID={eventID}
+        standalone
         getEventDetails={getEventDetails}
         getEventPayload={getEventPayload}
-        getEventTypes={getEventTypes}
-        features={{
-          history: features.data?.history ?? 7,
-        }}
-        emptyActions={
-          <>
-            <Button
-              appearance="outlined"
-              label="Refresh"
-              onClick={() => router.refresh()}
-              icon={<RiRefreshLine />}
-              iconSide="left"
-            />
-            <Button
-              label="Go to docs"
-              href="https://www.inngest.com/docs/events"
-              target="_blank"
-              icon={<RiExternalLinkLine />}
-              iconSide="left"
-            />
-          </>
-        }
         expandedRowActions={({ eventName, payload }) => {
           const isInternalEvent = Boolean(eventName.startsWith('inngest/'));
           return (
