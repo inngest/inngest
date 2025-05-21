@@ -2,6 +2,7 @@ package redis_state
 
 import (
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"github.com/alicebob/miniredis/v2"
@@ -47,6 +48,8 @@ func TestQueueRefillBacklog(t *testing.T) {
 
 	accountId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
 
+	runID := ulid.MustNew(ulid.Timestamp(clock.Now()), rand.Reader)
+
 	// use future timestamp because scores will be bounded to the present
 	at := clock.Now().Add(1 * time.Minute)
 
@@ -63,6 +66,7 @@ func TestQueueRefillBacklog(t *testing.T) {
 				WorkflowID:  fnID,
 				AccountID:   accountId,
 				WorkspaceID: wsID,
+				RunID:       runID,
 			},
 			QueueName:             nil,
 			Throttle:              nil,
@@ -114,7 +118,17 @@ func TestQueueRefillBacklog(t *testing.T) {
 		require.Equal(t, at.Unix(), int64(score(t, r, kg.GlobalAccountIndex(), accountId.String())))
 		require.Equal(t, at.Unix(), int64(score(t, r, kg.AccountPartitionIndex(accountId), fnID.String())))
 
-		kg.ShadowPartitionSet(shadowPartition.PartitionID)
+		// Run indexes should be updated
+		{
+			runActiveCount, err := r.Get(kg.ActiveCounter("run", runID.String()))
+			require.NoError(t, err)
+
+			require.Equal(t, "1", runActiveCount)
+
+			isMember, err := r.SIsMember(kg.ActivePartitionRunsIndex(fnID.String()), runID.String())
+			require.NoError(t, err)
+			require.True(t, isMember)
+		}
 	})
 
 	t.Run("should clean up dangling pointers", func(t *testing.T) {

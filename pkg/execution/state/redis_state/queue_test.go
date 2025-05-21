@@ -1208,15 +1208,25 @@ func TestQueueLease(t *testing.T) {
 	start := time.Now().Truncate(time.Second)
 
 	t.Run("It leases an item", func(t *testing.T) {
-		item, err := q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{}, start, osqueue.EnqueueOpts{})
+		fnID := uuid.New()
+		runID := ulid.MustNew(ulid.Now(), rand.Reader)
+
+		item, err := q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{
+			FunctionID: fnID,
+			Data: osqueue.Item{
+				Identifier: state.Identifier{
+					RunID:      runID,
+					WorkflowID: fnID,
+				},
+			},
+		}, start, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 
 		item = getQueueItem(t, r, item.ID)
 		require.Nil(t, item.LeaseID)
 
-		nilUUID := uuid.UUID{}
 		p := QueuePartition{
-			FunctionID: &nilUUID,
+			FunctionID: &fnID,
 		} // Default workflow ID etc
 
 		t.Run("It should exist in the pending partition queue", func(t *testing.T) {
@@ -1241,9 +1251,24 @@ func TestQueueLease(t *testing.T) {
 		})
 
 		t.Run("It should add the item to the function's in-progress concurrency queue", func(t *testing.T) {
-			count, err := q.InProgress(ctx, "p", uuid.UUID{}.String())
+			count, err := q.InProgress(ctx, "p", fnID.String())
 			require.NoError(t, err)
 			require.EqualValues(t, 1, count, r.Dump())
+		})
+
+		t.Run("run indexes are updated", func(t *testing.T) {
+			kg := q.primaryQueueShard.RedisClient.kg
+			// Run indexes should be updated
+			{
+				runActiveCount, err := r.Get(kg.ActiveCounter("run", runID.String()))
+				require.NoError(t, err)
+
+				require.Equal(t, "1", runActiveCount)
+
+				isMember, err := r.SIsMember(kg.ActivePartitionRunsIndex(fnID.String()), runID.String())
+				require.NoError(t, err)
+				require.True(t, isMember)
+			}
 		})
 
 		t.Run("Scavenge queue is updated", func(t *testing.T) {

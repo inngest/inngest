@@ -2250,6 +2250,12 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 		checkConstraintsVal = "1"
 	}
 
+	runActive := kg.ActiveCounter("run", "")
+	var emptyUlid [16]byte
+	if item.Data.Identifier.RunID != emptyUlid {
+		runActive = kg.ActiveCounter("run", item.Data.Identifier.RunID.String())
+	}
+
 	keys := []string{
 		kg.QueueItem(),
 		kg.ConcurrencyIndex(),
@@ -2268,6 +2274,8 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 		backlog.customKeyActive(kg, 2),
 		backlog.customKeyActive(kg, 1),
 		backlog.activeKey(kg),
+		runActive,
+		kg.ActivePartitionRunsIndex(partition.PartitionID),
 
 		kg.ThrottleKey(item.Data.Throttle),
 	}
@@ -2281,6 +2289,7 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 		item.ID,
 		partition.PartitionID,
 		item.Data.Identifier.AccountID,
+		item.Data.Identifier.RunID.String(),
 
 		leaseID.String(),
 		now.UnixMilli(),
@@ -2783,6 +2792,8 @@ func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueSha
 		throttleLimit,
 		throttleBurst,
 		throttlePeriod,
+
+		kg.QueuePrefix(),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("could not serialize args: %w", err)

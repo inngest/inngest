@@ -64,6 +64,8 @@ local throttleLimit  = tonumber(ARGV[12])
 local throttleBurst  = tonumber(ARGV[13])
 local throttlePeriod = tonumber(ARGV[14])
 
+local keyPrefix = ARGV[15]
+
 -- $include(update_pointer_score.lua)
 -- $include(ends_with.lua)
 -- $include(update_account_queues.lua)
@@ -217,7 +219,7 @@ if refill > 0 then
 
   for i = 1, #itemIDs do
     local itemID = itemIDs[i]
-    local itemScore = itemScores[i]
+    local itemScore = tonumber(itemScores[i])
     local itemData = potentiallyMissingQueueItems[i]
 
     -- If queue item does not exist in hash, delete from backlog
@@ -237,6 +239,22 @@ if refill > 0 then
       local updatedData = cjson.decode(itemData)
       updatedData.rf = backlogID
       updatedData.rat = nowMS
+
+      if updatedData.data ~= nil and updatedData.data.identifier ~= nil and updatedData.data.identifier.runID ~= nil then
+        -- add item to active in run
+        local runID = updatedData.data.identifier.runID
+        local keyActiveRun = string.format("%s:active:run:%s", keyPrefix, runID)
+        local updateTo = itemScore / 1000
+
+        -- increase number of active items in run
+        redis.call("INCR", keyActiveRun)
+
+        -- if the newly-added item is earlier than existing items in the run, adjust pointer scores in the function
+        -- see QueueKeyGenerator#ActivePartitionRunsIndex for reference
+        local keyIndexActivePartitionRuns = string.format("%s:active-idx:runs:%s", keyPrefix, partitionID)
+
+        redis.call("SADD", keyIndexActivePartitionRuns, runID)
+      end
 
       table.insert(itemUpdateArgs, itemID)
       table.insert(itemUpdateArgs, cjson.encode(updatedData))
