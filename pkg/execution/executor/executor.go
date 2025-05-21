@@ -2576,7 +2576,7 @@ func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, i *runInsta
 		Expires:                   state.Time(expires),
 		DataKey:                   gen.ID,
 		SignalID:                  &opts.Signal,
-		SupersedeSignalOnConflict: &opts.SupersedeOnConflict,
+		OverwriteSignalOnConflict: opts.OverwriteOnConflict,
 		MaxAttempts:               i.item.MaxAttempts,
 		Metadata: map[string]any{
 			consts.OtelPropagationKey: carrier,

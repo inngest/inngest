@@ -878,7 +878,7 @@ func (m unshardedMgr) SavePause(ctx context.Context, p state.Pause) (int64, erro
 	}
 
 	supersedeSignalOnConflict := "0"
-	if p.SupersedeSignalOnConflict != nil && *p.SupersedeSignalOnConflict {
+	if p.OverwriteSignalOnConflict {
 		supersedeSignalOnConflict = "1"
 	}
 
