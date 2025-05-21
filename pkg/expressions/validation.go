@@ -163,6 +163,7 @@ func logicFnNames() []string {
 		celops.Index,
 		celops.OptIndex,
 		celops.OptSelect,
+		celops.In,
 	}
 }
 
