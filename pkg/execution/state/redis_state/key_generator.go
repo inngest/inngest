@@ -48,6 +48,9 @@ type RunStateKeyGenerator interface {
 	// Pending returns the key used to store the pending actions for a given
 	// run.
 	Pending(ctx context.Context, isSharded bool, identifier state.Identifier) string
+
+	// PauseConsumeKey is an idempotency key used for making sure pause consumptions are idempotent
+	PauseConsumeKey(ctx context.Context, isSharded bool, runID ulid.ULID, pauseID uuid.UUID) string
 }
 
 type runStateKeyGenerator struct {
@@ -108,9 +111,16 @@ func (s runStateKeyGenerator) Pending(ctx context.Context, isSharded bool, ident
 	return fmt.Sprintf("{%s}:pending:%s:%s", s.Prefix(ctx, s.stateDefaultKey, isSharded, identifier.RunID), identifier.WorkflowID, identifier.RunID)
 }
 
+func (s runStateKeyGenerator) PauseConsumeKey(ctx context.Context, isSharded bool, runID ulid.ULID, pauseID uuid.UUID) string {
+	return fmt.Sprintf("{%s}:pause-key:%s", s.Prefix(ctx, s.stateDefaultKey, isSharded, runID), pauseID.String())
+}
+
 type GlobalKeyGenerator interface {
 	// Invoke returns the key used to store the correlation key associated with invoke functions
 	Invoke(ctx context.Context, wsID uuid.UUID) string
+	// Signal returns the key used to store the correlation key associated with
+	// signal functions
+	Signal(ctx context.Context, wsID uuid.UUID) string
 }
 
 type globalKeyGenerator struct {
@@ -119,6 +129,10 @@ type globalKeyGenerator struct {
 
 func (u globalKeyGenerator) Invoke(ctx context.Context, wsID uuid.UUID) string {
 	return fmt.Sprintf("{%s}:invoke:%s", u.stateDefaultKey, wsID)
+}
+
+func (u globalKeyGenerator) Signal(ctx context.Context, wsID uuid.UUID) string {
+	return fmt.Sprintf("{%s}:signal:%s", u.stateDefaultKey, wsID)
 }
 
 type QueueKeyGenerator interface {
@@ -175,8 +189,8 @@ type QueueKeyGenerator interface {
 	GlobalShadowPartitionSet() string
 	// BacklogSet returns the key to the ZSET storing pointers (queue item IDs) for a given backlog.
 	BacklogSet(backlogID string) string
-	// ActiveCounter returns the key to the number of active queue items for a given backlog.
-	ActiveCounter(backlogID string) string
+	// ActiveCounter returns the key to the number of active queue items for a given scope and ID.
+	ActiveCounter(scope string, scopeID string) string
 	// BacklogMeta returns the key to the hash storing serialized QueueBacklog objects by ID.
 	BacklogMeta() string
 	// BacklogNormalizationLease returns the key to the lease for the backlog for normalization purposes
@@ -189,6 +203,11 @@ type QueueKeyGenerator interface {
 	AccountShadowPartitions(accountID uuid.UUID) string
 	// GlobalAccountShadowPartitions returns the key to the ZSET storing pointers (account IDs) for accounts with existing shadow partitions.
 	GlobalAccountShadowPartitions() string
+
+	// ActiveRunCounter returns the key to the number of active queue items for a given run ID.
+	ActiveRunCounter(runID ulid.ULID) string
+	// ActivePartitionRunsIndex returns a key to the index SET for tracking active runs for a given partition.
+	ActivePartitionRunsIndex(partitionID string) string
 
 	GlobalAccountNormalizeSet() string
 	AccountNormalizeSet(accountID uuid.UUID) string
@@ -221,7 +240,6 @@ type QueueKeyGenerator interface {
 	ThrottleKey(t *osqueue.Throttle) string
 	// RunIndex returns the index for storing job IDs associated with run IDs.
 	RunIndex(runID ulid.ULID) string
-
 	// FnMetadata returns the key for a function's metadata.
 	// This is a JSON object; see queue.FnMetadata.
 	FnMetadata(fnID uuid.UUID) string
@@ -231,6 +249,10 @@ type QueueKeyGenerator interface {
 	// ConcurrencyFnEWMA returns the key storing the amount of times of concurrency hits, used for
 	// calculating the EWMA value for the function
 	ConcurrencyFnEWMA(fnID uuid.UUID) string
+
+	// QueuePrefix returns the hash prefix used in the queue.
+	// This is likely going to be a redis specific requirement.
+	QueuePrefix() string
 
 	//
 	// ***************** Deprecated *****************
@@ -353,13 +375,35 @@ func (u queueKeyGenerator) BacklogSet(backlogID string) string {
 }
 
 // ActiveCounter returns the key to the number of active queue items for a given backlog.
-func (u queueKeyGenerator) ActiveCounter(backlogID string) string {
-	if backlogID == "" {
+func (u queueKeyGenerator) ActiveCounter(scope string, scopeID string) string {
+	if scope == "" || scopeID == "" {
 		// this is a placeholder because passing an empty key into Lua will cause multi-slot key errors
 		return fmt.Sprintf("{%s}:active:-", u.queueDefaultKey)
 	}
 
-	return fmt.Sprintf("{%s}:active:%s", u.queueDefaultKey, backlogID)
+	return fmt.Sprintf("{%s}:active:%s:%s", u.queueDefaultKey, scope, scopeID)
+}
+
+func isEmptyULID(id ulid.ULID) bool {
+	return id == [16]byte{}
+}
+
+func (u queueKeyGenerator) ActiveRunCounter(runID ulid.ULID) string {
+	if isEmptyULID(runID) {
+		// this is a placeholder because passing an empty key into Lua will cause multi-slot key errors
+		return u.ActiveCounter("run", "")
+	}
+
+	return u.ActiveCounter("run", runID.String())
+}
+
+func (u queueKeyGenerator) ActivePartitionRunsIndex(partitionID string) string {
+	if partitionID == "" {
+		// this is a placeholder because passing an empty key into Lua will cause multi-slot key errors
+		return fmt.Sprintf("{%s}:active-idx:runs:-", u.queueDefaultKey)
+	}
+
+	return fmt.Sprintf("{%s}:active-idx:runs:%s", u.queueDefaultKey, partitionID)
 }
 
 // BacklogMeta returns the key to the hash storing serialized QueueBacklog objects by ID.
@@ -410,6 +454,10 @@ func (u queueKeyGenerator) PartitionNormalizeSet(partitionID string) string {
 
 	return fmt.Sprintf("{%s}:normalize:partition:%s:sorted", u.queueDefaultKey, partitionID)
 
+}
+
+func (u queueKeyGenerator) QueuePrefix() string {
+	return fmt.Sprintf("{%s}", u.queueDefaultKey)
 }
 
 // ShadowPartitionSet returns the key to the ZSET storing pointers (backlog IDs) for a given shadow partition.

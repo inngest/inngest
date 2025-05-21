@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/inngest/inngest/pkg/cqrs"
 	"net/http"
 	"os"
 	"time"
@@ -188,13 +189,25 @@ func start(ctx context.Context, opts StartOpts) error {
 	// Create a new broadcaster which lets us broadcast realtime messages.
 	broadcaster := realtime.NewInProcessBroadcaster()
 
+	runMode := redis_state.QueueRunMode{
+		Sequential:    true,
+		Scavenger:     true,
+		Partition:     true,
+		Continuations: true,
+	}
+	enableKeyQueues := os.Getenv("EXPERIMENTAL_KEY_QUEUES_ENABLE") == "true"
+
+	if enableKeyQueues {
+		runMode.ShadowPartition = true
+		runMode.AccountShadowPartition = true
+		runMode.AccountShadowPartitionWeight = 80
+		runMode.ShadowContinuations = true
+		runMode.ShadowContinuationSkipProbability = consts.QueueContinuationSkipProbability
+		runMode.NormalizePartition = true
+	}
+
 	queueOpts := []redis_state.QueueOpt{
-		redis_state.WithRunMode(redis_state.QueueRunMode{
-			Sequential:    true,
-			Scavenger:     true,
-			Partition:     true,
-			Continuations: true,
-		}),
+		redis_state.WithRunMode(runMode),
 		redis_state.WithIdempotencyTTL(time.Hour),
 		redis_state.WithNumWorkers(int32(opts.QueueWorkers)),
 		redis_state.WithPollTick(opts.Tick),
@@ -266,6 +279,26 @@ func start(ctx context.Context, opts StartOpts) error {
 		}),
 		redis_state.WithShardSelector(shardSelector),
 		redis_state.WithQueueShardClients(queueShards),
+		//redis_state.WithKindToQueueMapping(map[string]string{
+		//	queue.KindPause:           queue.KindPause,
+		//	queue.KindDebounce:        queue.KindDebounce,
+		//	queue.KindQueueMigrate:    queue.KindQueueMigrate,
+		//	queue.KindPauseBlockFlush: queue.KindPauseBlockFlush,
+		//	queue.KindScheduleBatch:   queue.KindScheduleBatch,
+		//}),
+
+		// Key queues
+		redis_state.WithNormalizeRefreshItemCustomConcurrencyKeys(NormalizeConcurrencyKeys(smv2, dbcqrs)),
+		redis_state.WithNormalizeRefreshItemThrottle(NormalizeThrottle(smv2, dbcqrs)),
+		redis_state.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+			return enableKeyQueues
+		}),
+		redis_state.WithEnqueueSystemPartitionsToBacklog(false),
+		redis_state.WithDisableLeaseChecksForSystemQueues(false),
+		redis_state.WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
+			return false
+		}),
+		redis_state.WithBacklogRefillLimit(10),
 	}
 	if opts.RetryInterval > 0 {
 		queueOpts = append(queueOpts, redis_state.WithBackoffFunc(
@@ -546,10 +579,7 @@ func createInmemoryRedis(ctx context.Context, tick time.Duration) (rueidis.Clien
 
 	// If tick is lower than the default, tick every 50ms.  This lets us save
 	// CPU for standard dev-server testing.
-	poll := time.Second
-	if tick < DefaultTickDuration {
-		poll = time.Millisecond * 50
-	}
+	poll := DefaultTickDuration
 
 	go func() {
 		for range time.Tick(poll) {
@@ -630,5 +660,81 @@ func getInvokeFailHandler(ctx context.Context, pb pubsub.Publisher, topic string
 		}
 
 		return eg.Wait()
+	}
+}
+
+func NormalizeConcurrencyKeys(smv2 sv2.StateLoader, dbcqrs cqrs.Manager) redis_state.NormalizeRefreshItemCustomConcurrencyKeysFn {
+	return func(ctx context.Context, item *queue.QueueItem, existingKeys []state.CustomConcurrency, shadowPartition *redis_state.QueueShadowPartition) ([]state.CustomConcurrency, error) {
+		id := sv2.IDFromV1(item.Data.Identifier)
+
+		workflow, err := dbcqrs.GetFunctionByInternalUUID(ctx, id.Tenant.EnvID, id.FunctionID)
+		if err != nil {
+			return nil, fmt.Errorf("could not find workflow: %w", err)
+		}
+		fn, err := workflow.InngestFunction()
+		if err != nil {
+			return nil, fmt.Errorf("could not convert workflow to inngest function: %w", err)
+		}
+
+		if fn.Concurrency == nil || len(fn.Concurrency.Limits) == 0 {
+			return nil, nil
+		}
+
+		events, err := smv2.LoadEvents(ctx, id)
+		if err != nil {
+			return nil, fmt.Errorf("could not load events: %w", err)
+		}
+
+		if len(events) == 0 {
+			return nil, nil
+		}
+
+		var evt0 event.Event
+
+		if err := json.Unmarshal(events[0], &evt0); err != nil {
+			return nil, fmt.Errorf("could not unmarshal event: %w", err)
+		}
+
+		evtMap := evt0.Map()
+
+		return queue.GetCustomConcurrencyKeys(ctx, id, fn.Concurrency.Limits, evtMap), nil
+	}
+}
+
+func NormalizeThrottle(smv2 sv2.StateLoader, dbcqrs cqrs.Manager) redis_state.NormalizeRefreshItemThrottleFn {
+	return func(ctx context.Context, item *queue.QueueItem, existingThrottle *queue.Throttle, shadowPartition *redis_state.QueueShadowPartition) (*queue.Throttle, error) {
+		id := sv2.IDFromV1(item.Data.Identifier)
+
+		workflow, err := dbcqrs.GetFunctionByInternalUUID(ctx, id.Tenant.EnvID, id.FunctionID)
+		if err != nil {
+			return nil, fmt.Errorf("could not find workflow: %w", err)
+		}
+		fn, err := workflow.InngestFunction()
+		if err != nil {
+			return nil, fmt.Errorf("could not convert workflow to inngest function: %w", err)
+		}
+
+		if fn.Throttle == nil {
+			return nil, nil
+		}
+
+		events, err := smv2.LoadEvents(ctx, id)
+		if err != nil {
+			return nil, fmt.Errorf("could not load events: %w", err)
+		}
+
+		if len(events) == 0 {
+			return nil, nil
+		}
+
+		var evt0 event.Event
+
+		if err := json.Unmarshal(events[0], &evt0); err != nil {
+			return nil, fmt.Errorf("could not unmarshal event: %w", err)
+		}
+
+		evtMap := evt0.Map()
+
+		return queue.GetThrottleConfig(ctx, id.FunctionID, fn.Throttle, evtMap), nil
 	}
 }

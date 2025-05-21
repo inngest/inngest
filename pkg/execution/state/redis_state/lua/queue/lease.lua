@@ -17,35 +17,44 @@ Output:
 ]]
 
 local keyQueueMap            	= KEYS[1]
-local keyPartitionFn          = KEYS[2]           -- queue:sorted:$workflowID - zset
+local concurrencyPointer      = KEYS[2]
 
--- We push our queue item ID into each concurrency queue
-local keyConcurrencyFn  				= KEYS[3] -- Account concurrency level
-local keyCustomConcurrencyKey1  = KEYS[4] -- When leasing an item we need to place the lease into this key.
-local keyCustomConcurrencyKey2  = KEYS[5] -- Optional for eg. for concurrency amongst steps
--- We push pointers to partition concurrency items to the partition concurrency item
-local concurrencyPointer      = KEYS[6]
-local keyGlobalPointer        = KEYS[7]
-local keyGlobalAccountPointer = KEYS[8] -- accounts:sorted - zset
-local keyAccountPartitions    = KEYS[9] -- accounts:$accountId:partition:sorted - zset
-local throttleKey             = KEYS[10] -- key used for throttling function run starts.
-local keyAcctConcurrency      = KEYS[11]
-local keyActiveCounter        = KEYS[12]
+local keyReadyQueue           = KEYS[3]           -- queue:sorted:$workflowID - zset
+
+-- In progress ZSETs for concurrency accounting
+local keyInProgressAccount               = KEYS[4]
+local keyInProgressPartition  				   = KEYS[5]
+local keyInProgressCustomConcurrencyKey1 = KEYS[6]
+local keyInProgressCustomConcurrencyKey2 = KEYS[7]
+
+-- Active counters for constraint capacity accounting
+local keyActiveAccount             = KEYS[8]
+local keyActivePartition           = KEYS[9]
+local keyActiveConcurrencyKey1     = KEYS[10]
+local keyActiveConcurrencyKey2     = KEYS[11]
+local keyActiveCompound            = KEYS[12]
+local keyActiveRun                 = KEYS[13]
+local keyIndexActivePartitionRuns  = KEYS[14]
+
+local throttleKey             = KEYS[15]
 
 local queueID      						= ARGV[1]
-local newLeaseKey  						= ARGV[2]
-local currentTime  						= tonumber(ARGV[3]) -- in ms
-local partitionID 					  = ARGV[4]
+local partitionID 					  = ARGV[2]
+local accountId       				= ARGV[3]
+local runID                   = ARGV[4]
+local newLeaseID  						= ARGV[5]
+
+local currentTime  						= tonumber(ARGV[6]) -- in ms
+
 -- We check concurrency limits when leasing queue items.
-local concurrencyFn    				= tonumber(ARGV[5])
-local customConcurrencyKey1   = tonumber(ARGV[6])
-local customConcurrencyKey2   = tonumber(ARGV[7])
--- And we always check against account concurrency limits
-local concurrencyAcct 				= tonumber(ARGV[8])
-local accountId       				= ARGV[9]
+local concurrencyAcct 				= tonumber(ARGV[7])
+local concurrencyPartition    = tonumber(ARGV[8])
+local customConcurrencyKey1   = tonumber(ARGV[9])
+local customConcurrencyKey2   = tonumber(ARGV[10])
 
 -- key queues v2
-local disableLeaseChecks = tonumber(ARGV[10])
+local checkConstraints    = tonumber(ARGV[11])
+local refilledFromBacklog = tonumber(ARGV[12])
 
 -- Use our custom Go preprocessor to inject the file from ./includes/
 -- $include(decode_ulid_time.lua)
@@ -65,7 +74,7 @@ if item == nil then
 end
 
 -- Grab the current time from the new lease key.
-local nextTime = decode_ulid_time(newLeaseKey)
+local nextTime = decode_ulid_time(newLeaseID)
 -- check if the item is leased.
 if item.leaseID ~= nil and item.leaseID ~= cjson.null and decode_ulid_time(item.leaseID) > currentTime then
     -- This is already leased;  don't let this requester lease the item.
@@ -75,7 +84,7 @@ end
 -- Track the earliest time this job was attempted in the queue.
 item = set_item_peek_time(keyQueueMap, queueID, item, currentTime)
 
-if disableLeaseChecks ~= 1 then
+if checkConstraints then
 	-- Track throttling/rate limiting IF the queue item has throttling info set.  This allows
 	-- us to target specific queue items with rate limiting individually.
 	--
@@ -92,29 +101,29 @@ if disableLeaseChecks ~= 1 then
   -- leasing the partition and do not need to be checked again (only one worker can run a partition at
   -- once, and the capacity is kept in memory after leasing a partition)
   if customConcurrencyKey1 > 0 then
-      if check_concurrency(currentTime, keyCustomConcurrencyKey1, customConcurrencyKey1) <= 0 then
+      if check_concurrency(currentTime, keyInProgressCustomConcurrencyKey1, customConcurrencyKey1) <= 0 then
           return -4
       end
   end
   if customConcurrencyKey2 > 0 then
-      if check_concurrency(currentTime, keyCustomConcurrencyKey2, customConcurrencyKey2) <= 0 then
+      if check_concurrency(currentTime, keyInProgressCustomConcurrencyKey2, customConcurrencyKey2) <= 0 then
           return -5
       end
   end
-  if concurrencyFn > 0 then
-      if check_concurrency(currentTime, keyConcurrencyFn, concurrencyFn) <= 0 then
+  if concurrencyPartition > 0 then
+      if check_concurrency(currentTime, keyInProgressPartition, concurrencyPartition) <= 0 then
           return -3
       end
   end
   if concurrencyAcct > 0 then
-      if check_concurrency(currentTime, keyAcctConcurrency, concurrencyAcct) <= 0 then
+      if check_concurrency(currentTime, keyInProgressAccount, concurrencyAcct) <= 0 then
           return -6
       end
   end
 end
 
 -- Update the item's lease key.
-item.leaseID = newLeaseKey
+item.leaseID = newLeaseID
 redis.call("HSET", keyQueueMap, queueID, cjson.encode(item))
 
 local function handleLease(keyConcurrency, concurrencyLimit)
@@ -126,18 +135,20 @@ end
 
 -- Remove the item from our sorted index, as this is no longer on the queue; it's in-progress
 -- and stored in functionConcurrencyKey.
-redis.call("ZREM", keyPartitionFn, item.id)
+redis.call("ZREM", keyReadyQueue, item.id)
 
--- Always add this to acct level concurrency queues
-redis.call("ZADD", keyAcctConcurrency, nextTime, item.id)
+if exists_without_ending(keyInProgressAccount, ":-") then
+  -- Always add this to acct level concurrency queues
+  redis.call("ZADD", keyInProgressAccount, nextTime, item.id)
+end
 
 -- Always add this to fn level concurrency queues for scavenging
-redis.call("ZADD", keyConcurrencyFn, nextTime, item.id)
+redis.call("ZADD", keyInProgressPartition, nextTime, item.id)
 
 -- For every queue that we lease from, ensure that it exists in the scavenger pointer queue
 -- so that expired leases can be re-processed.  We want to take the earliest time from the
 -- concurrency queue such that we get a previously lost job if possible.
-local inProgressScores = redis.call("ZRANGE", keyConcurrencyFn, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")
+local inProgressScores = redis.call("ZRANGE", keyInProgressPartition, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")
 if inProgressScores ~= false then
   local earliestLease = tonumber(inProgressScores[2])
   -- Add the earliest time to the pointer queue for in-progress, allowing us to scavenge
@@ -148,15 +159,45 @@ if inProgressScores ~= false then
   redis.call("ZADD", concurrencyPointer, earliestLease, partitionID)
 end
 
-if exists_without_ending(keyCustomConcurrencyKey1, ":-") == true then
-  handleLease(keyCustomConcurrencyKey1, customConcurrencyKey1)
+if exists_without_ending(keyInProgressCustomConcurrencyKey1, ":-") == true then
+  handleLease(keyInProgressCustomConcurrencyKey1, customConcurrencyKey1)
 end
 
-if exists_without_ending(keyCustomConcurrencyKey2, ":-") == true then
-  handleLease(keyCustomConcurrencyKey2, customConcurrencyKey2)
+if exists_without_ending(keyInProgressCustomConcurrencyKey2, ":-") == true then
+  handleLease(keyInProgressCustomConcurrencyKey2, customConcurrencyKey2)
 end
 
--- Clean up active counter to reset it in a subsequent release
-redis.call("DEL", keyActiveCounter)
+-- If item was not refilled from backlog, we must increase active counters during lease
+-- to account used capacity for future backlog refills
+if refilledFromBacklog ~= 1 then
+  -- Increase active counters by 1
+  redis.call("INCR", keyActivePartition)
+
+  if exists_without_ending(keyActiveAccount, ":-") then
+    redis.call("INCR", keyActiveAccount)
+  end
+
+  if exists_without_ending(keyActiveCompound, ":-") then
+    redis.call("INCR", keyActiveCompound)
+  end
+
+  if exists_without_ending(keyActiveConcurrencyKey1, ":-") then
+    redis.call("INCR", keyActiveConcurrencyKey1)
+  end
+
+  if exists_without_ending(keyActiveConcurrencyKey2, ":-") then
+    redis.call("INCR", keyActiveConcurrencyKey2)
+  end
+
+  if exists_without_ending(keyActiveRun, ":-") then
+    -- increase number of active items in the run
+    redis.call("INCR", keyActiveRun)
+
+    -- update set of active function runs
+    if exists_without_ending(keyIndexActivePartitionRuns, ":-") then
+      redis.call("SADD", keyIndexActivePartitionRuns, runID)
+    end
+  end
+end
 
 return 0

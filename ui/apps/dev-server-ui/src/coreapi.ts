@@ -399,6 +399,11 @@ export const TRACE_DETAILS_FRAGMENT = gql`
       ... on RunStepInfo {
         type
       }
+      ... on WaitForSignalStepInfo {
+        signal
+        timeout
+        timedOut
+      }
     }
   }
 `;

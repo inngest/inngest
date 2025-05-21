@@ -3,14 +3,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
-import { ErrorCard } from '../RunDetailsV2/ErrorCard';
+import { ErrorCard } from '../Error/ErrorCard';
 import type { Run as InitialRunData } from '../RunsPage/types';
 import { StatusCell } from '../Table/Cell';
 import { TriggerDetails } from '../TriggerDetails';
 import { DragDivider } from '../icons/DragDivider';
 import type { Result } from '../types/functionRun';
 import { nullishToLazy } from '../utils/lazyLoad';
-import { LegacyRunsToggle } from './LegacyRunsToggle';
 import { RunInfo } from './RunInfo';
 import { StepInfo } from './StepInfo';
 import { Tabs } from './Tabs';
@@ -153,7 +152,6 @@ export const RunDetailsV3 = (props: Props) => {
             <p className="text-basis text-2xl font-medium">{run.fn.name}</p>
             <p className="text-subtle font-mono">{runID}</p>
           </div>
-          <LegacyRunsToggle traceAIEnabled={true} />
         </div>
       )}
       <div ref={containerRef} className="flex flex-row">

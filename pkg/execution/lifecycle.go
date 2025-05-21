@@ -163,6 +163,25 @@ type LifecycleListener interface {
 		ResumeRequest,
 	)
 
+	// OnWaitForSignal is called when a wait for signal step is scheduled. The
+	// statev1.GeneratorOpcode contains the wait for signal details.
+	OnWaitForSignal(
+		context.Context,
+		statev2.Metadata,
+		queue.Item,
+		statev1.GeneratorOpcode,
+		statev1.Pause,
+	)
+
+	// OnWaitForSignalResumed is called when a function is resumed from waiting
+	// for a signal.
+	OnWaitForSignalResumed(
+		context.Context,
+		statev2.Metadata,
+		statev1.Pause,
+		ResumeRequest,
+	)
+
 	// OnSleep is called when a sleep step is scheduled.  The
 	// statev1.GeneratorOpcode contains the sleep details.
 	OnSleep(
@@ -319,6 +338,27 @@ func (NoopLifecyceListener) OnInvokeFunction(
 // invoke function step. This happens when the invoked function has
 // completed or the step timed out whilst waiting.
 func (NoopLifecyceListener) OnInvokeFunctionResumed(
+	context.Context,
+	statev2.Metadata,
+	statev1.Pause,
+	ResumeRequest,
+) {
+}
+
+// OnWaitForSignal is called when a wait for signal step is scheduled. The
+// statev1.GeneratorOpcode contains the wait for signal details.
+func (NoopLifecyceListener) OnWaitForSignal(
+	context.Context,
+	statev2.Metadata,
+	queue.Item,
+	statev1.GeneratorOpcode,
+	statev1.Pause,
+) {
+}
+
+// OnWaitForSignalResumed is called when a function is resumed from waiting for
+// a signal.
+func (NoopLifecyceListener) OnWaitForSignalResumed(
 	context.Context,
 	statev2.Metadata,
 	statev1.Pause,

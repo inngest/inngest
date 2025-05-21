@@ -1,16 +1,17 @@
 package redis_state
 
 import (
-	"context"
-	"github.com/alicebob/miniredis/v2"
+	"testing"
+	"time"
+
+	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/jonboulle/clockwork"
 	"github.com/redis/rueidis"
 	"github.com/stretchr/testify/require"
-	"testing"
-	"time"
 )
 
-func TestGCRA(t *testing.T) {
+func TestLuaGCRA(t *testing.T) {
 	runScript := func(t *testing.T, rc rueidis.Client, key string, now time.Time, period time.Duration, limit, burst, capacity int) int {
 		args, err := StrSlice([]any{
 			key,
@@ -22,7 +23,7 @@ func TestGCRA(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		statusOrCapacity, err := scripts["queue/gcraTest"].Exec(context.Background(), rc, []string{}, args).ToInt64()
+		statusOrCapacity, err := scripts["test/gcra_capacity"].Exec(t.Context(), rc, []string{}, args).ToInt64()
 		require.NoError(t, err)
 
 		switch statusOrCapacity {
@@ -35,12 +36,8 @@ func TestGCRA(t *testing.T) {
 
 	t.Run("should reduce throttle capacity", func(t *testing.T) {
 		clock := clockwork.NewFakeClock()
-		r := miniredis.RunT(t)
-		rc, err := rueidis.NewClient(rueidis.ClientOption{
-			InitAddress:  []string{r.Addr()},
-			DisableCache: true,
-		})
-		require.NoError(t, err)
+
+		r, rc := initRedis(t)
 		defer rc.Close()
 
 		key := "test"
@@ -69,12 +66,7 @@ func TestGCRA(t *testing.T) {
 
 	t.Run("should prevent overflowing", func(t *testing.T) {
 		clock := clockwork.NewFakeClock()
-		r := miniredis.RunT(t)
-		rc, err := rueidis.NewClient(rueidis.ClientOption{
-			InitAddress:  []string{r.Addr()},
-			DisableCache: true,
-		})
-		require.NoError(t, err)
+		r, rc := initRedis(t)
 		defer rc.Close()
 
 		key := "test"
@@ -235,12 +227,7 @@ func TestGCRA(t *testing.T) {
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
 			clock := clockwork.NewFakeClock()
-			r := miniredis.RunT(t)
-			rc, err := rueidis.NewClient(rueidis.ClientOption{
-				InitAddress:  []string{r.Addr()},
-				DisableCache: true,
-			})
-			require.NoError(t, err)
+			_, rc := initRedis(t)
 			defer rc.Close()
 
 			key := "test"
@@ -260,4 +247,41 @@ func TestGCRA(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestLuaEndsWith(t *testing.T) {
+	runScript := func(t *testing.T, rc rueidis.Client, key string) bool {
+		val, err := scripts["test/ends_with"].Exec(
+			t.Context(),
+			rc,
+			[]string{key},
+			[]string{},
+		).AsInt64()
+		require.NoError(t, err)
+
+		switch val {
+		case 1:
+			return true
+		default:
+			return false
+		}
+	}
+
+	_, rc := initRedis(t)
+	defer rc.Close()
+
+	defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+	kg := defaultShard.RedisClient.kg
+
+	t.Run("with empty string", func(t *testing.T) {
+		key := kg.BacklogSet("")
+		require.Contains(t, key, ":-")
+		require.False(t, runScript(t, rc, key))
+	})
+
+	t.Run("with non empty string", func(t *testing.T) {
+		key := kg.BacklogSet("hello")
+		require.NotContains(t, key, ":-")
+		require.True(t, runScript(t, rc, key))
+	})
 }

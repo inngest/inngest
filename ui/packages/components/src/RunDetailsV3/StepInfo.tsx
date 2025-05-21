@@ -20,9 +20,11 @@ import { Tabs } from './Tabs';
 import { UserlandAttrs } from './UserlandAttrs';
 import {
   isStepInfoInvoke,
+  isStepInfoSignal,
   isStepInfoSleep,
   isStepInfoWait,
   type StepInfoInvoke,
+  type StepInfoSignal,
   type StepInfoSleep,
   type StepInfoWait,
 } from './types';
@@ -95,6 +97,23 @@ const WaitInfo = ({ stepInfo }: { stepInfo: StepInfoWait }) => {
   );
 };
 
+const SignalInfo = ({ stepInfo }: { stepInfo: StepInfoSignal }) => {
+  const timeout = toMaybeDate(stepInfo.timeout);
+  return (
+    <>
+      <ElementWrapper label="Signal name">
+        <TextElement>{stepInfo.signal}</TextElement>
+      </ElementWrapper>
+      <ElementWrapper label="Timeout">
+        {timeout ? <TimeElement date={timeout} /> : <TextElement>-</TextElement>}
+      </ElementWrapper>
+      <ElementWrapper label="Timed out">
+        <TextElement>{maybeBooleanToString(stepInfo.timedOut)}</TextElement>
+      </ElementWrapper>
+    </>
+  );
+};
+
 const getStepKindInfo = (props: StepKindInfoProps): JSX.Element | null =>
   isStepInfoInvoke(props.stepInfo) ? (
     <InvokeInfo stepInfo={props.stepInfo} pathCreator={props.pathCreator} />
@@ -102,6 +121,8 @@ const getStepKindInfo = (props: StepKindInfoProps): JSX.Element | null =>
     <SleepInfo stepInfo={props.stepInfo} />
   ) : isStepInfoWait(props.stepInfo) ? (
     <WaitInfo stepInfo={props.stepInfo} />
+  ) : isStepInfoSignal(props.stepInfo) ? (
+    <SignalInfo stepInfo={props.stepInfo} />
   ) : null;
 
 export const StepInfo = ({ selectedStep }: { selectedStep: StepInfoType }) => {

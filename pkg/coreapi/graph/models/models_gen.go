@@ -352,6 +352,14 @@ type WaitForEventStepInfo struct {
 
 func (WaitForEventStepInfo) IsStepInfo() {}
 
+type WaitForSignalStepInfo struct {
+	Signal   string    `json:"signal"`
+	Timeout  time.Time `json:"timeout"`
+	TimedOut *bool     `json:"timedOut,omitempty"`
+}
+
+func (WaitForSignalStepInfo) IsStepInfo() {}
+
 type Workspace struct {
 	ID string `json:"id"`
 }
@@ -940,11 +948,12 @@ func (e StepEventType) MarshalGQL(w io.Writer) {
 type StepOp string
 
 const (
-	StepOpInvoke       StepOp = "INVOKE"
-	StepOpRun          StepOp = "RUN"
-	StepOpSleep        StepOp = "SLEEP"
-	StepOpWaitForEvent StepOp = "WAIT_FOR_EVENT"
-	StepOpAiGateway    StepOp = "AI_GATEWAY"
+	StepOpInvoke        StepOp = "INVOKE"
+	StepOpRun           StepOp = "RUN"
+	StepOpSleep         StepOp = "SLEEP"
+	StepOpWaitForEvent  StepOp = "WAIT_FOR_EVENT"
+	StepOpAiGateway     StepOp = "AI_GATEWAY"
+	StepOpWaitForSignal StepOp = "WAIT_FOR_SIGNAL"
 )
 
 var AllStepOp = []StepOp{
@@ -953,11 +962,12 @@ var AllStepOp = []StepOp{
 	StepOpSleep,
 	StepOpWaitForEvent,
 	StepOpAiGateway,
+	StepOpWaitForSignal,
 }
 
 func (e StepOp) IsValid() bool {
 	switch e {
-	case StepOpInvoke, StepOpRun, StepOpSleep, StepOpWaitForEvent, StepOpAiGateway:
+	case StepOpInvoke, StepOpRun, StepOpSleep, StepOpWaitForEvent, StepOpAiGateway, StepOpWaitForSignal:
 		return true
 	}
 	return false
