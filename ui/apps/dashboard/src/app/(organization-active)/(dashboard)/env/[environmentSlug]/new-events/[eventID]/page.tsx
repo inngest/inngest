@@ -1,12 +1,13 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { Button } from '@inngest/components/Button/Button';
 import { EventDetails } from '@inngest/components/Events/EventDetails';
 import { RiArrowRightUpLine } from '@remixicon/react';
 
 import { SendEventModal } from '@/components/Events/SendEventModal';
 import { useEventDetails, useEventPayload, useEventRuns } from '@/components/Events/useEvents';
+import { useReplayModal } from '@/components/Events/useReplayModal';
 import { createInternalPathCreator } from '@/components/Events/utils';
 import { pathCreator } from '@/utils/urls';
 
@@ -21,24 +22,13 @@ export default function Page({ params }: Props) {
   const eventID = decodeURIComponent(params.eventID);
   const envSlug = params.environmentSlug;
 
-  const [isModalVisible, setIsModalVisible] = useState(false);
-  const [selectedEvent, setSelectedEvent] = useState<{ name: string; data: string } | null>(null);
+  const { isModalVisible, selectedEvent, openModal, closeModal } = useReplayModal();
 
   const internalPathCreator = useMemo(() => createInternalPathCreator(envSlug), [envSlug]);
 
   const getEventDetails = useEventDetails();
   const getEventPayload = useEventPayload();
   const getEventRuns = useEventRuns();
-
-  const openModal = useCallback((eventName: string, payload: string) => {
-    try {
-      const parsedData = JSON.stringify(JSON.parse(payload).data);
-      setSelectedEvent({ name: eventName, data: parsedData });
-      setIsModalVisible(true);
-    } catch (error) {
-      console.error('Failed to parse event payload:', error);
-    }
-  }, []);
 
   return (
     <>
@@ -81,10 +71,7 @@ export default function Page({ params }: Props) {
         <SendEventModal
           isOpen={isModalVisible}
           eventName={selectedEvent.name}
-          onClose={() => {
-            setIsModalVisible(false);
-            setSelectedEvent(null);
-          }}
+          onClose={closeModal}
           initialData={selectedEvent.data}
         />
       )}

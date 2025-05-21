@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@inngest/components/Button/Button';
 import { EventsTable } from '@inngest/components/Events/EventsTable';
@@ -14,6 +14,7 @@ import { EventInfo } from '@/components/Events/EventInfo';
 import SendEventButton from '@/components/Events/SendEventButton';
 import { SendEventModal } from '@/components/Events/SendEventModal';
 import { useEventDetails, useEventPayload, useEvents } from '@/components/Events/useEvents';
+import { useReplayModal } from '@/components/Events/useReplayModal';
 import { createInternalPathCreator } from '@/components/Events/utils';
 import { pathCreator } from '@/utils/urls';
 import { useAccountFeatures } from '@/utils/useAccountFeatures';
@@ -25,19 +26,7 @@ export default function EventsPage({
 }) {
   const router = useRouter();
   const internalPathCreator = useMemo(() => createInternalPathCreator(envSlug), [envSlug]);
-
-  const [isModalVisible, setIsModalVisible] = useState(false);
-  const [selectedEvent, setSelectedEvent] = useState<{ name: string; data: string } | null>(null);
-
-  const openModal = useCallback((eventName: string, payload: string) => {
-    try {
-      const parsedData = JSON.stringify(JSON.parse(payload).data);
-      setSelectedEvent({ name: eventName, data: parsedData });
-      setIsModalVisible(true);
-    } catch (error) {
-      console.error('Failed to parse event payload:', error);
-    }
-  }, []);
+  const { isModalVisible, selectedEvent, openModal, closeModal } = useReplayModal();
 
   const getEvents = useEvents();
   const getEventDetails = useEventDetails();
@@ -117,10 +106,7 @@ export default function EventsPage({
         <SendEventModal
           isOpen={isModalVisible}
           eventName={selectedEvent.name}
-          onClose={() => {
-            setIsModalVisible(false);
-            setSelectedEvent(null);
-          }}
+          onClose={closeModal}
           initialData={selectedEvent.data}
         />
       )}
