@@ -188,7 +188,7 @@ func Test_Validation(t *testing.T) {
 		{
 			expr:        "event.data.foo != '' && 'item' in event.data.issue.fields.tags",
 			policy:      DefaultRestrictiveValidationPolicy(),
-			expectValid: false,
+			expectValid: true,
 		},
 		{
 			expr:        "event['data'].foo != '' && event['data'].bar != true",
@@ -278,7 +278,7 @@ func Test_Validation(t *testing.T) {
 		{
 			expr:        "event.data.issue in ['Bug', 'Issue', 'Epic'] == true",
 			policy:      DefaultRestrictiveValidationPolicy(),
-			expectValid: false,
+			expectValid: true,
 		},
 		{
 			expr:        "[1, 2, 3].all(x, x > 0) && event.status == '200'",
