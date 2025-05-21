@@ -210,7 +210,7 @@ type Pause struct {
 	SignalID *string `json:"signalID,omitempty"`
 	// SupersedeSignalOnConflict indicates whether we should supersede the
 	// signal if a wait already exists for the signal ID.
-	SupersedeSignalOnConflict *bool `json:"supersedeSignalOnConflict,omitempty,omitzero"`
+	SupersedeSignalOnConflict *bool `json:"-"`
 	// OnTimeout indicates that this incoming edge should only be ran
 	// when the pause times out, if set to true.
 	OnTimeout bool `json:"onTimeout,omitempty,omitzero"`
