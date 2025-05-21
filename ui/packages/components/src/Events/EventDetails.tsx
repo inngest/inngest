@@ -261,7 +261,7 @@ export function EventDetails({
             <p className="text-muted mb-4 text-xs font-medium uppercase">Functions Triggered</p>
             {runsError ? (
               <ErrorCard error={runsError} reset={() => refetchRuns()} />
-            ) : isPendingRuns ? (
+            ) : isPendingRuns && !eventRuns ? (
               <Skeleton className="block h-12 w-full p-1.5" />
             ) : eventRuns?.length ? (
               <ul className="divide-light divide-y [&>*:not(:first-child)]:pt-[6px] [&>*:not(:last-child)]:pb-[6px]">
