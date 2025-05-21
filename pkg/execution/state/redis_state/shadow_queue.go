@@ -156,8 +156,6 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 			return fmt.Errorf("could not refill backlog: %w", err)
 		}
 
-		fmt.Println("refilled", res.Refilled, "of total items", res.TotalBacklogCount, "items from backlog", backlog.BacklogID, "of part", shadowPart.PartitionID)
-
 		// instrumentation
 		{
 			metrics.IncrQueueBacklogRefilledCounter(ctx, int64(res.Refilled), metrics.CounterOpt{

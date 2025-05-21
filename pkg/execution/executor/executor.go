@@ -1820,8 +1820,6 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 				} else {
 					logger.StdlibLogger(ctx).Error("error dequeueing consumed pause job when resuming", "error", err)
 				}
-			} else {
-				fmt.Println("dequeued pause timeout item", queue.HashID(ctx, jobID))
 			}
 		}
 
@@ -2853,8 +2851,6 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, i *runInstan
 	if err != nil && !errors.Is(err, state.ErrPauseAlreadyExists) {
 		return err
 	}
-
-	fmt.Println("saved pause in handleGeneratorWaitForEvent")
 
 	// SDK-based event coordination is called both when an event is received
 	// OR on timeout, depending on which happens first.  Both routes consume

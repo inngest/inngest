@@ -1311,12 +1311,6 @@ func (q *queue) EnqueueItem(ctx context.Context, shard QueueShard, i osqueue.Que
 		shadowPartition = q.ItemShadowPartition(ctx, i)
 	}
 
-	qn := "n/a"
-	if i.QueueName != nil {
-		qn = *i.QueueName
-	}
-	fmt.Println("enqueue", i.Data.Kind, "item", i.ID, "with queue name", qn, "to backlog:", enqueueToBacklogs, "backlog", backlog.BacklogID, "part", shadowPartition.PartitionID, "issystem", isSystemPartition)
-
 	keys := []string{
 		kg.QueueItem(),            // Queue item
 		kg.PartitionItem(),        // Partition item, map
@@ -2325,12 +2319,6 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 
 	switch status {
 	case 0:
-		qn := "n/a"
-		if partition.SystemQueueName != nil {
-			qn = *partition.SystemQueueName
-		}
-		fmt.Println("leased item", item.ID, "of kind", item.Data.Kind, "of backlog", backlog.BacklogID, "of part", partition.PartitionID, "with queue name", qn)
-
 		return &leaseID, nil
 	case -1:
 		return nil, ErrQueueItemNotFound
@@ -3327,11 +3315,6 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 	}
 
 	if len(missingPartitions) > 0 {
-		partitionIDs, err := client.Do(ctx, client.B().Hkeys().Key(kg.PartitionItem()).Build()).AsStrSlice()
-		if err == nil {
-			fmt.Println(partitionIDs)
-		}
-
 		if accountId == nil {
 			return nil, fmt.Errorf("encountered missing partitions in partition pointer queue %q", partitionKey)
 		}
