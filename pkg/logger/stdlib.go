@@ -16,11 +16,19 @@ var (
 
 type stdlibKey struct{}
 
+type handler int
+
+const (
+	JSONHandler handler = iota
+	TextHandler
+)
+
 type LoggerOpt func(o *loggerOpts)
 
 type loggerOpts struct {
-	writer io.Writer
-	level  slog.Level
+	writer  io.Writer
+	level   slog.Level
+	handler handler
 }
 
 func WithLoggerLevel(lvl string) LoggerOpt {
@@ -35,19 +43,34 @@ func WithLoggerWriter(w io.Writer) LoggerOpt {
 	}
 }
 
+func WithHandler(h handler) LoggerOpt {
+	return func(o *loggerOpts) {
+		o.handler = h
+	}
+}
+
 func newLogger(opts ...LoggerOpt) *slog.Logger {
 	o := &loggerOpts{
-		level:  StdlibLevel("LOG_LEVEL"),
-		writer: os.Stderr,
+		level:   StdlibLevel(level("LOG_LEVEL")),
+		writer:  os.Stderr,
+		handler: JSONHandler,
 	}
 
 	for _, apply := range opts {
 		apply(o)
 	}
 
-	return slog.New(slog.NewJSONHandler(o.writer, &slog.HandlerOptions{
+	hopts := slog.HandlerOptions{
 		Level: o.level,
-	}))
+	}
+
+	switch o.handler {
+	case TextHandler:
+		return slog.New(slog.NewTextHandler(o.writer, &hopts))
+
+	default:
+		return slog.New(slog.NewJSONHandler(o.writer, &hopts))
+	}
 }
 
 // StdlibLoggger returns the stdlib logger in context, or a new logger
