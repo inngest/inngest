@@ -40,6 +40,8 @@ if existing == nil then
     return 1
 end
 
+existing.leaseID = nil
+
 -- If there are no items in the workflow queue, we can safely remove the
 -- partition.
 if tonumber(redis.call("ZCARD", keyPartitionZset)) == 0 and tonumber(redis.call("ZCARD", partitionConcurrencyKey)) == 0 then
@@ -65,6 +67,9 @@ if tonumber(redis.call("ZCARD", keyPartitionZset)) == 0 and tonumber(redis.call(
         redis.call("ZREM", keyGlobalAccountPointer, accountID)
       end
     end
+
+    -- update partition with removed lease ID
+    redis.call("HSET", partitionKey, partitionID, cjson.encode(existing))
 
     return 2
 end
@@ -95,7 +100,6 @@ end
 
 
 existing.at = atS
-existing.leaseID = nil
 redis.call("HSET", partitionKey, partitionID, cjson.encode(existing))
 update_pointer_score_to(partitionID, keyGlobalPartitionPtr, atS)
 update_account_queues(keyGlobalAccountPointer, keyAccountPartitions, partitionID, accountID, atS)

@@ -308,7 +308,7 @@ end
 
 if refilled > 0 then
   -- Get the minimum score for the queue.
-  local earliestScore = get_converted_earliest_pointer_score(keyReadySet, false)
+  local earliestScore = get_converted_earliest_pointer_score(keyReadySet)
   if earliestScore > 0 then
     -- Potentially update the queue of queues.
     local currentScore = redis.call("ZSCORE", keyGlobalPointer, partitionID)

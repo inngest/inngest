@@ -183,7 +183,7 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 		if err != nil {
 			return fmt.Errorf("could not refill backlog: %w", err)
 		}
-		fmt.Printf("\t\t%s: Total: %d, Until: %d, Capacity: %d, Refilled: %d\n", backlog.BacklogID, res.TotalBacklogCount, res.BacklogCountUntil, res.Capacity, res.Refilled)
+		fmt.Printf("\t\t%s %s: Total: %d, Until: %d, Capacity: %d, Refilled: %d\n", time.Now().Format(time.StampMilli), backlog.BacklogID, res.TotalBacklogCount, res.BacklogCountUntil, res.Capacity, res.Refilled)
 
 		// instrumentation
 		{
