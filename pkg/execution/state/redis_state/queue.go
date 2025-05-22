@@ -1263,14 +1263,16 @@ func (q *queue) EnqueueItem(ctx context.Context, shard QueueShard, i osqueue.Que
 		}
 	}
 
+	now := q.clock.Now()
+
 	// XXX: If the length of ID >= max, error.
 	if i.WallTimeMS == 0 {
 		i.WallTimeMS = at.UnixMilli()
 	}
 
-	if at.Before(q.clock.Now()) {
+	if at.Before(now) {
 		// Normalize to now to minimize latency.
-		i.WallTimeMS = q.clock.Now().UnixMilli()
+		i.WallTimeMS = now.UnixMilli()
 	}
 
 	// Add the At timestamp, if not included.
@@ -1283,12 +1285,15 @@ func (q *queue) EnqueueItem(ctx context.Context, shard QueueShard, i osqueue.Que
 	}
 
 	partitionTime := at
-	if at.Before(q.clock.Now()) {
+	if at.Before(now) {
 		// We don't want to enqueue partitions (pointers to fns) before now.
 		// Doing so allows users to stay at the front of the queue for
 		// leases.
 		partitionTime = q.clock.Now()
 	}
+
+	i.EnqueuedAt = now.UnixMilli()
+	i.DelayMS = at.UnixMilli() - i.EnqueuedAt
 
 	defaultPartition, _ := q.ItemPartition(ctx, shard, i)
 
@@ -1349,16 +1354,15 @@ func (q *queue) EnqueueItem(ctx context.Context, shard QueueShard, i osqueue.Que
 		enqueueToBacklogsVal = "1"
 	}
 
-	fmt.Printf("- %s: Enqueue %s (%s), Time: %s (Partition Time: %s), Partition: %s, Backlog: %t\n", time.Now().Format(time.StampMilli), i.ID, i.Data.Kind, at.Format(time.StampMilli), partitionTime.Format(time.StampMilli), shadowPartition.PartitionID, enqueueToBacklogs)
-
-	ceilPartitionTime := int(math.Ceil(float64(partitionTime.Unix())))
+	ceilPartitionTime := roundUpPartitionTime(partitionTime, now)
+	fmt.Printf("- %s: Enqueue %s (%s), Time: %s (Partition Time: %s), Partition: %s, Backlog: %t\n", time.Now().Format(time.StampMilli), i.ID, i.Data.Kind, at.Format(time.StampMilli), time.Unix(int64(ceilPartitionTime), 0).Format(time.StampMilli), shadowPartition.PartitionID, enqueueToBacklogs)
 
 	args, err := StrSlice([]any{
 		i,
 		i.ID,
 		at.UnixMilli(),
 		ceilPartitionTime,
-		q.clock.Now().UnixMilli(),
+		now.UnixMilli(),
 		FnMetadata{
 			// enqueue.lua only writes function metadata if it doesn't already exist.
 			// if it doesn't exist, and we're enqueuing something, this implies the fn is not currently paused.
@@ -1399,6 +1403,19 @@ func (q *queue) EnqueueItem(ctx context.Context, shard QueueShard, i osqueue.Que
 	default:
 		return i, fmt.Errorf("unknown response enqueueing item: %v (%T)", status, status)
 	}
+}
+
+func roundUpPartitionTime(t time.Time, now time.Time) int64 {
+	// only apply the round up for future items. Otherwise, we would apply a penalty on items
+	// that should run asap of up to a second.
+	if t.Before(now.Add(time.Second)) {
+		return t.Unix()
+	}
+
+	if t.Nanosecond() > 0 {
+		return t.Add(time.Second).Truncate(time.Second).Unix()
+	}
+	return t.Unix()
 }
 
 // RunJobs returns a list of jobs that are due to run for a given run ID.
@@ -2305,7 +2322,10 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 		return nil, err
 	}
 
-	fmt.Printf("- %s: Lease %s (%s), Partition: %s, Check: %t, Refilled: %t\n", time.Now().Format(time.StampMilli), item.ID, item.Data.Kind, partition.PartitionID, checkConstraints, refilledFromBacklog)
+	leaseDelay := now.Sub(time.UnixMilli(item.EnqueuedAt)).String()
+	refillDelay := now.Sub(time.UnixMilli(item.RefilledAt)).String()
+	itemDelay := (time.Duration(item.DelayMS) * time.Millisecond).String()
+	fmt.Printf("- %s: Lease %s (%s), Partition: %s, Check: %t, Refilled: %t, Lease Delay: %s, Refill Delay: %s, Item Delay: %s\n", time.Now().Format(time.StampMilli), item.ID, item.Data.Kind, partition.PartitionID, checkConstraints, refilledFromBacklog, leaseDelay, refillDelay, itemDelay)
 
 	q.logger.Trace().Interface("item", item).
 		Interface("partition", partition).

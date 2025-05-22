@@ -244,7 +244,7 @@ if refill > 0 then
         -- add item to active in run
         local runID = updatedData.data.identifier.runID
         local keyActiveRun = string.format("%s:active:run:%s", keyPrefix, runID)
-        local updateTo = itemScore / 1000
+        local updateTo = math.floor(itemScore / 1000)
 
         -- increase number of active items in run
         redis.call("INCR", keyActiveRun)
@@ -308,7 +308,7 @@ end
 
 if refilled > 0 then
   -- Get the minimum score for the queue.
-  local earliestScore = get_converted_earliest_pointer_score(keyReadySet)
+  local earliestScore = get_converted_earliest_pointer_score(keyReadySet, false)
   if earliestScore > 0 then
     -- Potentially update the queue of queues.
     local currentScore = redis.call("ZSCORE", keyGlobalPointer, partitionID)

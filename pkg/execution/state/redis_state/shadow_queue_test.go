@@ -1715,7 +1715,7 @@ func TestShadowPartitionPointerTimings(t *testing.T) {
 			return qi
 		}
 
-		now := clock.Now()
+		now := clock.Now().Truncate(time.Second)
 
 		numItems := 20
 		items := make([]osqueue.QueueItem, numItems)

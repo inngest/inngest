@@ -89,6 +89,9 @@ type QueueItem struct {
 	// Refilled from backlog ID, set if item was refilled from backlog. Removed during requeue to partition.
 	RefilledFrom string `json:"rf,omitempty"`
 	RefilledAt   int64  `json:"rat,omitempty"`
+
+	EnqueuedAt int64 `json:"eat"`
+	DelayMS    int64 `json:"dms"`
 }
 
 func (q *QueueItem) SetID(ctx context.Context, str string) {

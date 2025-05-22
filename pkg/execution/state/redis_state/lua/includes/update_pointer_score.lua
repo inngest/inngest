@@ -11,11 +11,16 @@ end
 -- get_converted_earliest_pointer_score returns a high-precision queue's earliest job as a score for pointer queues.
 -- Note: This operation converts high-precision item scores to lower-precision pointer scores. DO NOT USE FOR FUNCTION QUEUES.
 -- This returns 0 if there are no scores available.
-local function get_converted_earliest_pointer_score(keyQueueSet)
+local function get_converted_earliest_pointer_score(keyQueueSet, roundUp)
     local earliestScore = redis.call("ZRANGE", keyQueueSet, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")
     if earliestScore == nil or earliestScore == false or earliestScore[2] == nil then
         return 0
     end
+
+    if roundUp == true then
+      return math.ceil(tonumber(earliestScore[2]) / 1000)
+    end
+
     -- queues are ordered by ms precision, whereas pointers are second precision.
     -- earliest is a table containing {item, score}
     return math.floor(tonumber(earliestScore[2]) / 1000)
