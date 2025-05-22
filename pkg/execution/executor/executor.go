@@ -2564,6 +2564,12 @@ func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, i *runInsta
 	)
 	itrace.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
 
+	// Default to failing if there's a conflict
+	shouldOverwriteSignalOnConflict := false
+	if opts.OnConflict == "replace" {
+		shouldOverwriteSignalOnConflict = true
+	}
+
 	pause := state.Pause{
 		ID:                        pauseID,
 		WorkspaceID:               i.md.ID.Tenant.EnvID,
@@ -2576,7 +2582,7 @@ func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, i *runInsta
 		Expires:                   state.Time(expires),
 		DataKey:                   gen.ID,
 		SignalID:                  &opts.Signal,
-		OverwriteSignalOnConflict: opts.OverwriteOnConflict,
+		OverwriteSignalOnConflict: shouldOverwriteSignalOnConflict,
 		MaxAttempts:               i.item.MaxAttempts,
 		Metadata: map[string]any{
 			consts.OtelPropagationKey: carrier,

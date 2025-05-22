@@ -208,9 +208,9 @@ func (g GeneratorOpcode) SignalOpts() (*SignalOpts, error) {
 }
 
 type SignalOpts struct {
-	Signal              string `json:"signal"`
-	Timeout             string `json:"timeout"`
-	OverwriteOnConflict bool   `json:"overwrite"`
+	Signal     string `json:"signal"`
+	Timeout    string `json:"timeout"`
+	OnConflict string `json:"conflict"`
 }
 
 func (s *SignalOpts) UnmarshalAny(a any) error {
