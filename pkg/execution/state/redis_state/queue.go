@@ -3671,14 +3671,18 @@ func (q *queue) PartitionRequeue(ctx context.Context, shard QueueShard, p *Queue
 		return fmt.Errorf("error requeueing partition: %w", err)
 	}
 
-	fmt.Printf("- %s: PartitionRequeue, Partition: %s, At: %s, Status: %d, Lease ID: %s\n", time.Now().Format(time.StampMilli), p.Queue(), at.Format(time.StampMilli), status, p.LeaseID.String())
+	leaseID := "n/a"
+	if p.LeaseID != nil {
+		leaseID = p.LeaseID.String()
+	}
+	fmt.Printf("- %s: PartitionRequeue, Partition: %s, At: %s, Status: %d, Lease ID: %s\n", time.Now().Format(time.StampMilli), p.Queue(), at.Format(time.StampMilli), status, leaseID)
 
 	switch status {
 	case 0:
 		return nil
 	case 1:
 		return ErrPartitionNotFound
-	case 2:
+	case 2, 3:
 		return ErrPartitionGarbageCollected
 	default:
 		return fmt.Errorf("unknown response requeueing item: %d", status)
