@@ -65,6 +65,9 @@ export const pathCreator = {
       eventName
     )}/events/${eventID}` as Route;
   },
+  eventPopout({ envSlug, eventID }: { envSlug: string; eventID: string }): Route {
+    return `/env/${envSlug}/new-events/${eventID}` as Route;
+  },
   eventType({ envSlug, eventName }: { envSlug: string; eventName: string }): Route {
     return `/env/${envSlug}/event-types/${encodeURIComponent(eventName)}` as Route;
   },
