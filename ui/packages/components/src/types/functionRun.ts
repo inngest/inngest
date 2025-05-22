@@ -8,6 +8,7 @@ export const functionRunStatuses = [
   'COMPLETED',
   'CANCELLED',
   'SKIPPED',
+  'WAITING',
 ] as const;
 const FunctionRunEndedStatuses = ['CANCELLED', 'COMPLETED', 'FAILED'] as const;
 export type FunctionRunStatus = (typeof functionRunStatuses)[number];

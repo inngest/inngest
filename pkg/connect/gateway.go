@@ -55,12 +55,16 @@ func (c *connectGatewaySvc) closeWithConnectError(ws *websocket.Conn, serr *conn
 	// reason must be limited to 125 bytes and should not be dynamic,
 	// so we restrict it to the known syscodes to prevent unintentional overflows
 	err := ws.Close(serr.StatusCode, serr.SysCode)
-	if errors.Is(err, context.DeadlineExceeded) {
-		return
-	}
+	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			return
+		}
 
-	if isConnectionClosedErr(err) {
-		c.logger.Error("could not close WebSocket connection", "err", err, "serr", serr)
+		if isConnectionClosedErr(err) {
+			return
+		}
+
+		c.logger.Debug("could not close WebSocket connection", "err", err, "serr", serr)
 	}
 }
 
@@ -421,22 +425,23 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 					closeErr := websocket.CloseError{}
 					if errors.As(err, &closeErr) {
 						// Empty reason (unexpected)
-						if closeErr.Code == websocket.StatusNoStatusRcvd && closeErr.Reason == "" {
+						if closeErr.Reason == "" {
 							return nil
 						}
 
 						// Force-closed during draining after timeout
 						if closeErr.Code == ErrDraining.StatusCode && closeErr.Reason == ErrDraining.SysCode {
+							setCloseReason(connectpb.WorkerDisconnectReason_GATEWAY_DRAINING.String())
 							return nil
 						}
-
-						ch.log.Debug("connection closed with code and reason", "code", closeErr.Code.String(), "reason", closeErr.Reason)
 
 						// Expected worker shutdown
 						if closeErr.Code == websocket.StatusNormalClosure && closeErr.Reason == connectpb.WorkerDisconnectReason_WORKER_SHUTDOWN.String() {
 							setCloseReason(connectpb.WorkerDisconnectReason_WORKER_SHUTDOWN.String())
 							return nil
 						}
+
+						ch.log.Debug("connection closed with code and reason", "code", closeErr.Code.String(), "reason", closeErr.Reason)
 
 						// If client connection closed unexpectedly, we should store the reason, if set.
 						// If the reason is set, it may have been an intentional close, so the connection
@@ -931,13 +936,13 @@ func (c *connectionHandler) establishConnection(ctx context.Context) (*state.Con
 
 	err := wsproto.Read(shorterContext, c.ws, &initialMessage)
 	if err != nil {
+		if ctx.Err() != nil {
+			return nil, &ErrDraining
+		}
+
 		if isConnectionClosedErr(err) {
 			c.log.Warn("connection was closed during handshake")
 			return nil, nil
-		}
-
-		if ctx.Err() != nil {
-			return nil, &ErrDraining
 		}
 
 		code := syscode.CodeConnectInternal
@@ -1145,7 +1150,7 @@ func (c *connectionHandler) handleSdkReply(ctx context.Context, msg *connectpb.C
 
 	// Persist response in buffer, which is polled by executor.
 	err := c.svc.stateManager.SaveResponse(ctx, c.conn.EnvID, data.RequestId, data)
-	if err != nil {
+	if err != nil && !errors.Is(err, state.ErrResponseAlreadyBuffered) {
 		return fmt.Errorf("could not save response: %w", err)
 	}
 

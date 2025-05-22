@@ -425,6 +425,12 @@ type ComplexityRoot struct {
 		Timeout      func(childComplexity int) int
 	}
 
+	WaitForSignalStepInfo struct {
+		Signal   func(childComplexity int) int
+		TimedOut func(childComplexity int) int
+		Timeout  func(childComplexity int) int
+	}
+
 	Workspace struct {
 		ID func(childComplexity int) int
 	}
@@ -2419,6 +2425,27 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.WaitForEventStepInfo.Timeout(childComplexity), true
 
+	case "WaitForSignalStepInfo.signal":
+		if e.complexity.WaitForSignalStepInfo.Signal == nil {
+			break
+		}
+
+		return e.complexity.WaitForSignalStepInfo.Signal(childComplexity), true
+
+	case "WaitForSignalStepInfo.timedOut":
+		if e.complexity.WaitForSignalStepInfo.TimedOut == nil {
+			break
+		}
+
+		return e.complexity.WaitForSignalStepInfo.TimedOut(childComplexity), true
+
+	case "WaitForSignalStepInfo.timeout":
+		if e.complexity.WaitForSignalStepInfo.Timeout == nil {
+			break
+		}
+
+		return e.complexity.WaitForSignalStepInfo.Timeout(childComplexity), true
+
 	case "Workspace.id":
 		if e.complexity.Workspace.ID == nil {
 			break
@@ -3009,6 +3036,7 @@ enum StepOp {
   SLEEP # sleep for a duration
   WAIT_FOR_EVENT # wait for an event
   AI_GATEWAY
+  WAIT_FOR_SIGNAL
 }
 
 union StepInfo =
@@ -3016,6 +3044,7 @@ union StepInfo =
   | SleepStepInfo
   | WaitForEventStepInfo
   | RunStepInfo
+  | WaitForSignalStepInfo
 
 type InvokeStepInfo {
   triggeringEventID: ULID!
@@ -3035,6 +3064,12 @@ type WaitForEventStepInfo {
   expression: String
   timeout: Time!
   foundEventID: ULID
+  timedOut: Boolean
+}
+
+type WaitForSignalStepInfo {
+  signal: String!
+  timeout: Time!
   timedOut: Boolean
 }
 
@@ -16100,6 +16135,135 @@ func (ec *executionContext) fieldContext_WaitForEventStepInfo_timedOut(ctx conte
 	return fc, nil
 }
 
+func (ec *executionContext) _WaitForSignalStepInfo_signal(ctx context.Context, field graphql.CollectedField, obj *models.WaitForSignalStepInfo) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_WaitForSignalStepInfo_signal(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Signal, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_WaitForSignalStepInfo_signal(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "WaitForSignalStepInfo",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _WaitForSignalStepInfo_timeout(ctx context.Context, field graphql.CollectedField, obj *models.WaitForSignalStepInfo) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_WaitForSignalStepInfo_timeout(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Timeout, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(time.Time)
+	fc.Result = res
+	return ec.marshalNTime2timeᚐTime(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_WaitForSignalStepInfo_timeout(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "WaitForSignalStepInfo",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Time does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _WaitForSignalStepInfo_timedOut(ctx context.Context, field graphql.CollectedField, obj *models.WaitForSignalStepInfo) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_WaitForSignalStepInfo_timedOut(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.TimedOut, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*bool)
+	fc.Result = res
+	return ec.marshalOBoolean2ᚖbool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_WaitForSignalStepInfo_timedOut(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "WaitForSignalStepInfo",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Workspace_id(ctx context.Context, field graphql.CollectedField, obj *models.Workspace) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Workspace_id(ctx, field)
 	if err != nil {
@@ -18572,6 +18736,13 @@ func (ec *executionContext) _StepInfo(ctx context.Context, sel ast.SelectionSet,
 			return graphql.Null
 		}
 		return ec._RunStepInfo(ctx, sel, obj)
+	case models.WaitForSignalStepInfo:
+		return ec._WaitForSignalStepInfo(ctx, sel, &obj)
+	case *models.WaitForSignalStepInfo:
+		if obj == nil {
+			return graphql.Null
+		}
+		return ec._WaitForSignalStepInfo(ctx, sel, obj)
 	default:
 		panic(fmt.Errorf("unexpected type %T", obj))
 	}
@@ -21372,6 +21543,45 @@ func (ec *executionContext) _WaitForEventStepInfo(ctx context.Context, sel ast.S
 		case "timedOut":
 
 			out.Values[i] = ec._WaitForEventStepInfo_timedOut(ctx, field, obj)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var waitForSignalStepInfoImplementors = []string{"WaitForSignalStepInfo", "StepInfo"}
+
+func (ec *executionContext) _WaitForSignalStepInfo(ctx context.Context, sel ast.SelectionSet, obj *models.WaitForSignalStepInfo) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, waitForSignalStepInfoImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("WaitForSignalStepInfo")
+		case "signal":
+
+			out.Values[i] = ec._WaitForSignalStepInfo_signal(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "timeout":
+
+			out.Values[i] = ec._WaitForSignalStepInfo_timeout(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "timedOut":
+
+			out.Values[i] = ec._WaitForSignalStepInfo_timedOut(ctx, field, obj)
 
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))

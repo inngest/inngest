@@ -164,8 +164,11 @@ func TestConsumePause(t *testing.T) {
 	}
 
 	// Test consuming a pause
-	result, err := manager.ConsumePause(ctx, pause, "test-data")
+	result, cleanup, err := manager.ConsumePause(ctx, pause, state.ConsumePauseOpts{
+		Data: "test-data",
+	})
 	require.NoError(t, err)
+	require.NoError(t, cleanup())
 	assert.Equal(t, true, result.DidConsume)
 	assert.True(t, mockBufferer.consumeCalled, "ConsumePause should be called on the buffer")
 	assert.True(t, mockBlockStore.deleteCalled, "Delete should be called on the blockstore")
@@ -199,9 +202,9 @@ type mockBuffererWithConsume struct {
 	consumeCalled bool
 }
 
-func (m *mockBuffererWithConsume) ConsumePause(ctx context.Context, pause state.Pause, data any) (state.ConsumePauseResult, error) {
+func (m *mockBuffererWithConsume) ConsumePause(ctx context.Context, pause state.Pause, opts state.ConsumePauseOpts) (state.ConsumePauseResult, func() error, error) {
 	m.consumeCalled = true
-	return state.ConsumePauseResult{DidConsume: true}, nil
+	return state.ConsumePauseResult{DidConsume: true}, func() error { return nil }, nil
 }
 
 type mockBlockStore struct {

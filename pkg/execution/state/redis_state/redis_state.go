@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 
@@ -373,6 +374,10 @@ func (m shardedMgr) idempotencyCheck(ctx context.Context, rc RetriableClient, ke
 	}
 	if err != nil {
 		return nil, err
+	}
+
+	if prev == consts.FunctionIdempotencyTombstone {
+		return nil, state.ErrIdentifierTomestone
 	}
 
 	// if there are existing values, the state might have already been created
@@ -843,9 +848,14 @@ func (m unshardedMgr) SavePause(ctx context.Context, p state.Pause) (int64, erro
 		evt = *p.Event
 	}
 
-	corrId := ""
+	invokeCorrId := ""
 	if p.InvokeCorrelationID != nil {
-		corrId = *p.InvokeCorrelationID
+		invokeCorrId = *p.InvokeCorrelationID
+	}
+
+	signalCorrId := ""
+	if p.SignalID != nil {
+		signalCorrId = *p.SignalID
 	}
 
 	extendedExpiry := time.Until(p.Expires.Time().Add(10 * time.Minute)).Seconds()
@@ -860,6 +870,7 @@ func (m unshardedMgr) SavePause(ctx context.Context, p state.Pause) (int64, erro
 		pause.kg.Pause(ctx, p.ID),
 		pause.kg.PauseEvent(ctx, p.WorkspaceID, evt),
 		global.kg.Invoke(ctx, p.WorkspaceID),
+		global.kg.Signal(ctx, p.WorkspaceID),
 		pause.kg.PauseIndex(ctx, "add", p.WorkspaceID, evt),
 		pause.kg.PauseIndex(ctx, "exp", p.WorkspaceID, evt),
 		pause.kg.RunPauses(ctx, p.Identifier.RunID),
@@ -870,7 +881,8 @@ func (m unshardedMgr) SavePause(ctx context.Context, p state.Pause) (int64, erro
 		string(packed),
 		p.ID.String(),
 		evt,
-		corrId,
+		invokeCorrId,
+		signalCorrId,
 		// Add at least 10 minutes to this pause, allowing us to process the
 		// pause by ID for 10 minutes past expiry.
 		int(extendedExpiry),
@@ -887,6 +899,10 @@ func (m unshardedMgr) SavePause(ctx context.Context, p state.Pause) (int64, erro
 		args,
 	).AsInt64()
 	if err != nil {
+		if err.Error() == "ErrSignalConflict" {
+			return 0, state.ErrSignalConflict
+		}
+
 		return 0, fmt.Errorf("error finalizing: %w", err)
 	}
 
@@ -972,17 +988,17 @@ func (m shardedMgr) delete(ctx context.Context, callCtx context.Context, i state
 		key = fnRunState.kg.Idempotency(ctx, isSharded, i)
 	}
 
-	if err := r.Do(callCtx, func(client rueidis.Client) rueidis.Completed {
-		return client.B().Expire().Key(key).Seconds(int64(consts.FunctionIdempotencyPeriod.Seconds())).Build()
-	}).Error(); err != nil {
-		return false, err
-	}
+	_ = r.Do(callCtx, func(client rueidis.Client) rueidis.Completed {
+		// update the idempotency key to the tombstone value to indicate this run is done
+		// do scheduling knows to not need to continue attempting to do so
+		return client.B().Set().Key(key).Value(consts.FunctionIdempotencyTombstone).Xx().Keepttl().Build()
+	}).Error()
 
 	// Clear all other data for a job.
 	keys := []string{
-		fnRunState.kg.Actions(ctx, isSharded, i.WorkflowID, i.RunID),
-		fnRunState.kg.RunMetadata(ctx, isSharded, i.RunID),
 		fnRunState.kg.Events(ctx, isSharded, i.WorkflowID, i.RunID),
+		fnRunState.kg.RunMetadata(ctx, isSharded, i.RunID),
+		fnRunState.kg.Actions(ctx, isSharded, i.WorkflowID, i.RunID),
 		fnRunState.kg.Stack(ctx, isSharded, i.RunID),
 
 		// XXX: remove these in a state store refactor.
@@ -1036,7 +1052,9 @@ func (m unshardedMgr) DeletePauseByID(ctx context.Context, pauseID uuid.UUID) er
 		return m.DeletePause(ctx, *pause)
 	}
 
-	// This won't delete event keys nicely, but still gets the pause yeeted.
+	// This won't delete event keys, invoke correlations, or signals nicely,
+	// but still gets the pause yeeted. Critically, this means a dangling
+	// signal in the DB.
 	return m.DeletePause(ctx, state.Pause{
 		ID: pauseID,
 	})
@@ -1061,9 +1079,14 @@ func (m unshardedMgr) DeletePause(ctx context.Context, p state.Pause) error {
 		evt = *p.Event
 	}
 
-	corrId := ""
+	invokeCorrId := ""
 	if p.InvokeCorrelationID != nil && *p.InvokeCorrelationID != "" {
-		corrId = *p.InvokeCorrelationID
+		invokeCorrId = *p.InvokeCorrelationID
+	}
+
+	signalCorrId := ""
+	if p.SignalID != nil {
+		signalCorrId = *p.SignalID
 	}
 
 	pauseKey := pause.kg.Pause(ctx, p.ID)
@@ -1074,6 +1097,7 @@ func (m unshardedMgr) DeletePause(ctx context.Context, p state.Pause) error {
 		eventKey,
 		// Warning: We need to access global keys, which must be colocated on the same Redis cluster
 		global.kg.Invoke(ctx, p.WorkspaceID),
+		global.kg.Signal(ctx, p.WorkspaceID),
 		pause.kg.PauseIndex(ctx, "add", p.WorkspaceID, evt),
 		pause.kg.PauseIndex(ctx, "exp", p.WorkspaceID, evt),
 		runPausesKey,
@@ -1086,7 +1110,8 @@ func (m unshardedMgr) DeletePause(ctx context.Context, p state.Pause) error {
 		keys,
 		[]string{
 			p.ID.String(),
-			corrId,
+			invokeCorrId,
+			signalCorrId,
 		},
 	).AsInt64()
 	if err != nil {
@@ -1101,24 +1126,32 @@ func (m unshardedMgr) DeletePause(ctx context.Context, p state.Pause) error {
 	}
 }
 
-func (m mgr) ConsumePause(ctx context.Context, pause state.Pause, data any) (state.ConsumePauseResult, error) {
-	result, err := m.shardedMgr.consumePause(ctx, &pause, data)
-	if err != nil {
-		return state.ConsumePauseResult{}, err
+func (m mgr) ConsumePause(ctx context.Context, pause state.Pause, opts state.ConsumePauseOpts) (state.ConsumePauseResult, func() error, error) {
+	if opts.IdempotencyKey == "" {
+		return state.ConsumePauseResult{},
+			func() error { return nil },
+			state.ErrConsumePauseKeyMissing
 	}
 
-	// The pause was now consumed, so let's clean up
-	err = m.unshardedMgr.DeletePause(ctx, pause)
-	return result, err
+	res, err := m.shardedMgr.consumePause(ctx, &pause, opts)
+	cleanup := func() error {
+		err := m.DeletePause(ctx, pause)
+		if err != nil {
+			logger.StdlibLogger(ctx).Error("error deleting pause after consumption", "error", err, "pause", pause)
+		}
+		return err
+	}
+
+	return res, cleanup, err
 }
 
-func (m shardedMgr) consumePause(ctx context.Context, p *state.Pause, data any) (state.ConsumePauseResult, error) {
+func (m shardedMgr) consumePause(ctx context.Context, p *state.Pause, opts state.ConsumePauseOpts) (state.ConsumePauseResult, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "consumePause"), redis_telemetry.ScopePauses)
 
 	fnRunState := m.s.FunctionRunState()
 	client, isSharded := fnRunState.Client(ctx, p.Identifier.AccountID, p.Identifier.RunID)
 
-	marshalledData, err := json.Marshal(data)
+	marshalledData, err := json.Marshal(opts.Data)
 	if err != nil {
 		return state.ConsumePauseResult{}, fmt.Errorf("cannot marshal data to store in state: %w", err)
 	}
@@ -1131,11 +1164,14 @@ func (m shardedMgr) consumePause(ctx context.Context, p *state.Pause, data any) 
 			RunID:      p.Identifier.RunID,
 			WorkflowID: p.Identifier.FunctionID,
 		}),
+		fnRunState.kg.PauseConsumeKey(ctx, isSharded, p.Identifier.RunID, p.ID),
 	}
 
 	args, err := StrSlice([]any{
 		p.DataKey,
 		string(marshalledData),
+		opts.IdempotencyKey,
+		time.Now().Add(consts.FunctionIdempotencyPeriod).Unix(),
 	})
 	if err != nil {
 		return state.ConsumePauseResult{}, err
@@ -1150,6 +1186,7 @@ func (m shardedMgr) consumePause(ctx context.Context, p *state.Pause, data any) 
 	if err != nil {
 		return state.ConsumePauseResult{}, fmt.Errorf("error consuming pause: %w", err)
 	}
+
 	switch status {
 	case -1:
 		// This could be an ErrDuplicateResponse;  we're attempting to consume a pause twice.
@@ -1218,6 +1255,37 @@ func (m unshardedMgr) PauseByInvokeCorrelationID(ctx context.Context, wsID uuid.
 		return nil, fmt.Errorf("failed to parse pauseID UUID: %w", err)
 	}
 	return m.PauseByID(ctx, pauseID)
+}
+
+func (m unshardedMgr) PauseBySignalID(ctx context.Context, wsID uuid.UUID, signalID string) (*state.Pause, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "PauseBySignalID"), redis_telemetry.ScopePauses)
+
+	global := m.u.Global()
+	key := global.kg.Signal(ctx, wsID)
+	cmd := global.Client().B().Hget().Key(key).Field(signalID).Build()
+	pauseIDstr, err := global.Client().Do(ctx, cmd).ToString()
+	if err == rueidis.Nil {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("failed to get signalID: %w", err)
+	}
+
+	pauseID, err := uuid.Parse(pauseIDstr)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse pauseID UUID: %w", err)
+	}
+
+	p, err := m.PauseByID(ctx, pauseID)
+	if err != nil {
+		if err == state.ErrPauseNotFound {
+			return nil, nil
+		}
+
+		return nil, fmt.Errorf("failed to get pause by ID: %w", err)
+	}
+
+	return p, nil
 }
 
 func (m unshardedMgr) PausesByID(ctx context.Context, ids ...uuid.UUID) ([]*state.Pause, error) {

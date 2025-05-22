@@ -2,6 +2,7 @@ package state
 
 import (
 	"context"
+	"fmt"
 	"regexp"
 	"time"
 
@@ -13,6 +14,10 @@ import (
 )
 
 var tsSuffix = regexp.MustCompile(`\s*&&\s*\(\s*async.ts\s+==\s*null\s*\|\|\s*async.ts\s*>\s*\d*\)\s*$`)
+
+var (
+	ErrConsumePauseKeyMissing = fmt.Errorf("no idempotency key provided for consuming pauses")
+)
 
 // PauseMutater manages creating, leasing, and consuming pauses from a backend implementation.
 type PauseMutater interface {
@@ -42,7 +47,7 @@ type PauseMutater interface {
 	//
 	// Any data passed when consuming a pause will be stored within function run state
 	// for future reference using the pause's DataKey.
-	ConsumePause(ctx context.Context, p Pause, data any) (ConsumePauseResult, error)
+	ConsumePause(ctx context.Context, p Pause, opts ConsumePauseOpts) (ConsumePauseResult, func() error, error)
 
 	// DeletePause permanently deletes a pause.
 	DeletePause(ctx context.Context, p Pause) error
@@ -80,9 +85,18 @@ type PauseGetter interface {
 	// This should not return consumed pauses.
 	PauseByInvokeCorrelationID(ctx context.Context, wsID uuid.UUID, correlationID string) (*Pause, error)
 
+	// PauseBySignalCorrelationID returns a given pause by the correlation ID.
+	PauseBySignalID(ctx context.Context, wsID uuid.UUID, signalID string) (*Pause, error)
+
 	// PauseCreatedAt returns the timestamp a pause was created, using the given
 	// workspace <> event Index.
 	PauseCreatedAt(ctx context.Context, workspaceID uuid.UUID, event string, pauseID uuid.UUID) (time.Time, error)
+}
+
+// ConsumePauseOpts are the options to be passed in for consuming a pause
+type ConsumePauseOpts struct {
+	IdempotencyKey string
+	Data           any
 }
 
 type ConsumePauseResult struct {
@@ -192,6 +206,8 @@ type Pause struct {
 	// This is used to be able to accurately reconstruct the entire invocation
 	// span.
 	InvokeTargetFnID *string `json:"itFnID,omitempty"`
+	// SignalID is the ID of the signal that is responsible for this pause.
+	SignalID *string `json:"signalID,omitempty"`
 	// OnTimeout indicates that this incoming edge should only be ran
 	// when the pause times out, if set to true.
 	OnTimeout bool `json:"onTimeout,omitempty,omitzero"`
@@ -260,6 +276,10 @@ func (p Pause) Edge() inngest.Edge {
 
 func (p Pause) IsInvoke() bool {
 	return p.Opcode != nil && *p.Opcode == enums.OpcodeInvokeFunction.String()
+}
+
+func (p Pause) IsSignal() bool {
+	return p.Opcode != nil && *p.Opcode == enums.OpcodeWaitForSignal.String()
 }
 
 type ResumeData struct {

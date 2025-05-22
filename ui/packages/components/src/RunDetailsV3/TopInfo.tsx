@@ -13,8 +13,8 @@ import {
   TextElement,
   TimeElement,
 } from '../DetailsCard/NewElement';
+import { ErrorCard } from '../Error/ErrorCard';
 import { InvokeModal } from '../InvokeButton';
-import { ErrorCard } from '../RunDetailsV2/ErrorCard';
 import { useInvokeRun } from '../SharedContext/useInvokeRun';
 import { usePrettyJson } from '../hooks/usePrettyJson';
 import { IconCloudArrowDown } from '../icons/CloudArrowDown';

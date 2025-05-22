@@ -2,13 +2,13 @@
 
 ## Development
 
-Start the CLI using the `dev` command, for example:
+In the root directory of this repository, start the CLI using the `dev` command. For example:
 
 ```sh
 go run ./cmd/main.go dev -u http://localhost:3000/api/inngest
 ```
 
-Then run the UI in dev mode. This will run Next.js and GraphQL codegen concurrently:
+Then in this directory, run the UI in dev mode. This will run Next.js and GraphQL codegen concurrently:
 
 ```sh
 pnpm dev

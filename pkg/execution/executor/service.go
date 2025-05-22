@@ -291,7 +291,8 @@ func (s *svc) handlePauseTimeout(ctx context.Context, item queue.Item) error {
 	}
 
 	r := execution.ResumeRequest{
-		IsTimeout: true,
+		IsTimeout:      true,
+		IdempotencyKey: *item.JobID,
 	}
 
 	// If the pause timeout is for an invocation, store an error to cause the
