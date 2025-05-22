@@ -44,6 +44,9 @@ end
 -- Always reset lease ID so next caller can lease partition
 existing.leaseID = nil
 
+-- update partition with removed lease ID
+redis.call("HSET", partitionKey, partitionID, cjson.encode(existing))
+
 -- If there are no items in the workflow queue, we can safely remove the
 -- partition.
 if tonumber(redis.call("ZCARD", keyPartitionZset)) == 0 and tonumber(redis.call("ZCARD", partitionConcurrencyKey)) == 0 then
@@ -58,9 +61,6 @@ if tonumber(redis.call("ZCARD", keyPartitionZset)) == 0 and tonumber(redis.call(
         redis.call("ZREM", keyGlobalAccountPointer, accountID)
       end
     end
-
-    -- update partition with removed lease ID
-    redis.call("HSET", partitionKey, partitionID, cjson.encode(existing))
 
     -- Only drop partition information if no more backlogs exist for the partition
     if tonumber(redis.call("ZCARD", keyShadowPartitionSet)) == 0 then
