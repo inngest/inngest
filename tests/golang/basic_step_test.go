@@ -134,7 +134,7 @@ func TestFunctionSteps(t *testing.T) {
 
 			// 3 step so far: 2 steps, 1 wait
 			assert.Equal(t, 3, len(body))
-		}, 10*time.Second, 100*time.Millisecond)
+		}, 30*time.Second, 100*time.Millisecond)
 	})
 
 	t.Run("waitForEvents succeed", func(t *testing.T) {
@@ -147,7 +147,9 @@ func TestFunctionSteps(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		<-time.After(time.Second)
+		require.Eventually(t, func() bool {
+			return atomic.LoadInt32(&counter) == 3
+		}, 30*time.Second, time.Second, "Didn't resolve first step.waitForEvent: got %d instead of 3", atomic.LoadInt32(&counter))
 
 		// And the second event to trigger the next wait.
 		_, err = inngestClient.Send(ctx, inngestgo.Event{

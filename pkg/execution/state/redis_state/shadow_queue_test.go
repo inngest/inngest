@@ -1628,3 +1628,258 @@ func TestShadowPartitionUpdate(t *testing.T) {
 	require.Equal(t, updatedShadowPart, savedPart)
 	require.Equal(t, 2, savedPart.FunctionVersion)
 }
+
+func TestShadowPartitionPointerTimings(t *testing.T) {
+	t.Run("multiple spaced out items", func(t *testing.T) {
+		r := miniredis.RunT(t)
+		rc, err := rueidis.NewClient(rueidis.ClientOption{
+			InitAddress:  []string{r.Addr()},
+			DisableCache: true,
+		})
+		require.NoError(t, err)
+		defer rc.Close()
+
+		ctx := context.Background()
+
+		defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+
+		clock := clockwork.NewFakeClock()
+
+		accountID, wsID, fnID := uuid.New(), uuid.New(), uuid.New()
+
+		kg := defaultShard.RedisClient.kg
+
+		enqueueToBacklog := true
+		q := NewQueue(
+			defaultShard,
+			WithClock(clock),
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+				return enqueueToBacklog
+			}),
+			WithEnqueueSystemPartitionsToBacklog(false),
+			WithDisableLeaseChecksForSystemQueues(false),
+			WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
+				return true
+			}),
+			WithRunMode(QueueRunMode{
+				Sequential:                        true,
+				Scavenger:                         true,
+				Partition:                         true,
+				Account:                           true,
+				AccountWeight:                     85,
+				ShadowPartition:                   true,
+				AccountShadowPartition:            true,
+				AccountShadowPartitionWeight:      85,
+				ShadowContinuations:               true,
+				ShadowContinuationSkipProbability: 0,
+				NormalizePartition:                true,
+			}),
+			WithBacklogRefillLimit(500),
+			WithConcurrencyLimitGetter(func(ctx context.Context, p QueuePartition) PartitionConcurrencyLimits {
+				return PartitionConcurrencyLimits{
+					AccountLimit:   123,
+					FunctionLimit:  45,
+					CustomKeyLimit: 0,
+				}
+			}),
+			WithCustomConcurrencyKeyLimitRefresher(func(ctx context.Context, i osqueue.QueueItem) []state.CustomConcurrency {
+				return i.Data.GetConcurrencyKeys()
+			}),
+			WithSystemConcurrencyLimitGetter(func(ctx context.Context, p QueuePartition) SystemPartitionConcurrencyLimits {
+				return SystemPartitionConcurrencyLimits{
+					GlobalLimit:    789,
+					PartitionLimit: 678,
+				}
+			}),
+		)
+
+		addItem := func(id string, identifier state.Identifier, at time.Time) osqueue.QueueItem {
+			item := osqueue.QueueItem{
+				ID:          id,
+				FunctionID:  identifier.WorkflowID,
+				WorkspaceID: identifier.WorkspaceID,
+				Data: osqueue.Item{
+					WorkspaceID:           identifier.WorkspaceID,
+					Kind:                  osqueue.KindEdge,
+					Identifier:            identifier,
+					QueueName:             nil,
+					Throttle:              nil,
+					CustomConcurrencyKeys: nil,
+				},
+				QueueName: nil,
+			}
+
+			qi, err := q.EnqueueItem(ctx, defaultShard, item, at, osqueue.EnqueueOpts{})
+			require.NoError(t, err)
+
+			return qi
+		}
+
+		now := clock.Now()
+
+		numItems := 20
+		items := make([]osqueue.QueueItem, numItems)
+		for i := 1; i <= numItems; i++ {
+			items[i-1] = addItem(fmt.Sprintf("item%d", i), state.Identifier{
+				AccountID:   accountID,
+				WorkspaceID: wsID,
+				WorkflowID:  fnID,
+			}, now.Add(time.Duration(i)*time.Second))
+		}
+
+		backlog := q.ItemBacklog(ctx, items[0])
+		shadowPart := q.ItemShadowPartition(ctx, items[0])
+
+		// Pointer should be earliest item
+		require.Equal(t, now.Add(time.Second).UnixMilli(), int64(score(t, r, kg.BacklogSet(backlog.BacklogID), items[0].ID)))
+		require.Equal(t, now.Add(time.Second).Unix(), int64(score(t, r, kg.ShadowPartitionSet(shadowPart.PartitionID), backlog.BacklogID)))
+		require.Equal(t, now.Add(time.Second).Unix(), int64(score(t, r, kg.GlobalShadowPartitionSet(), shadowPart.PartitionID)))
+		require.Equal(t, now.Add(time.Second).Unix(), int64(score(t, r, kg.AccountShadowPartitions(accountID), shadowPart.PartitionID)))
+		require.Equal(t, now.Add(time.Second).Unix(), int64(score(t, r, kg.GlobalAccountShadowPartitions(), accountID.String())))
+
+		until := now.Add(PartitionLookahead)
+		peeked, totalUntil, err := q.ShadowPartitionPeek(ctx, &shadowPart, false, until, 100)
+		require.NoError(t, err)
+
+		require.Equal(t, 1, totalUntil)
+		require.Len(t, peeked, 1)
+		require.Equal(t, backlog, *peeked[0])
+
+		for i := 0; i < numItems; i++ {
+			itemAt := now.Add(time.Duration(i+1) * time.Second)
+			refillUntil := itemAt
+			res, err := q.BacklogRefill(ctx, &backlog, &shadowPart, refillUntil)
+			require.NoError(t, err)
+
+			require.Equal(t, numItems-i, res.TotalBacklogCount)
+			require.Equal(t, 1, res.BacklogCountUntil)
+			require.Equal(t, 1, res.Refill)
+			require.Equal(t, 1, res.Refilled)
+
+			if i == numItems-1 {
+				break
+			}
+
+			// Pointer should be next earliest time
+			nextItemAt := now.Add(time.Duration(i+2) * time.Second)
+			require.Equal(t, nextItemAt.UnixMilli(), int64(score(t, r, kg.BacklogSet(backlog.BacklogID), items[i+1].ID)))
+			require.Equal(t, nextItemAt.Unix(), int64(score(t, r, kg.ShadowPartitionSet(shadowPart.PartitionID), backlog.BacklogID)))
+			require.Equal(t, nextItemAt.Unix(), int64(score(t, r, kg.GlobalShadowPartitionSet(), shadowPart.PartitionID)))
+			require.Equal(t, nextItemAt.Unix(), int64(score(t, r, kg.AccountShadowPartitions(accountID), shadowPart.PartitionID)))
+			require.Equal(t, nextItemAt.Unix(), int64(score(t, r, kg.GlobalAccountShadowPartitions(), accountID.String())))
+		}
+
+		require.False(t, r.Exists(kg.BacklogSet(backlog.BacklogID)))
+		require.False(t, r.Exists(kg.ShadowPartitionSet(shadowPart.PartitionID)))
+	})
+
+	t.Run("sleep should work", func(t *testing.T) {
+		r := miniredis.RunT(t)
+		rc, err := rueidis.NewClient(rueidis.ClientOption{
+			InitAddress:  []string{r.Addr()},
+			DisableCache: true,
+		})
+		require.NoError(t, err)
+		defer rc.Close()
+
+		ctx := context.Background()
+
+		defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+
+		clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Second))
+
+		accountID, wsID, fnID := uuid.New(), uuid.New(), uuid.New()
+
+		kg := defaultShard.RedisClient.kg
+
+		enqueueToBacklog := true
+		q := NewQueue(
+			defaultShard,
+			WithClock(clock),
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+				return enqueueToBacklog
+			}),
+			WithEnqueueSystemPartitionsToBacklog(false),
+			WithDisableLeaseChecksForSystemQueues(false),
+			WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
+				return true
+			}),
+			WithRunMode(QueueRunMode{
+				Sequential:                        true,
+				Scavenger:                         true,
+				Partition:                         true,
+				Account:                           true,
+				AccountWeight:                     85,
+				ShadowPartition:                   true,
+				AccountShadowPartition:            true,
+				AccountShadowPartitionWeight:      85,
+				ShadowContinuations:               true,
+				ShadowContinuationSkipProbability: 0,
+				NormalizePartition:                true,
+			}),
+			WithBacklogRefillLimit(500),
+			WithConcurrencyLimitGetter(func(ctx context.Context, p QueuePartition) PartitionConcurrencyLimits {
+				return PartitionConcurrencyLimits{
+					AccountLimit:   123,
+					FunctionLimit:  45,
+					CustomKeyLimit: 0,
+				}
+			}),
+			WithCustomConcurrencyKeyLimitRefresher(func(ctx context.Context, i osqueue.QueueItem) []state.CustomConcurrency {
+				return i.Data.GetConcurrencyKeys()
+			}),
+			WithSystemConcurrencyLimitGetter(func(ctx context.Context, p QueuePartition) SystemPartitionConcurrencyLimits {
+				return SystemPartitionConcurrencyLimits{
+					GlobalLimit:    789,
+					PartitionLimit: 678,
+				}
+			}),
+		)
+
+		now := clock.Now()
+
+		item := osqueue.QueueItem{
+			FunctionID:  fnID,
+			WorkspaceID: wsID,
+			Data: osqueue.Item{
+				WorkspaceID: wsID,
+				Kind:        osqueue.KindEdge,
+				Identifier: state.Identifier{
+					WorkflowID:  fnID,
+					AccountID:   accountID,
+					WorkspaceID: wsID,
+				},
+				QueueName: nil,
+			},
+			QueueName: nil,
+		}
+
+		sleepUntil := now.Add(2 * time.Second)
+		qi, err := q.EnqueueItem(ctx, defaultShard, item, sleepUntil, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+
+		backlog := q.ItemBacklog(ctx, qi)
+		shadowPart := q.ItemShadowPartition(ctx, qi)
+
+		require.Equal(t, sleepUntil.UnixMilli(), int64(score(t, r, kg.BacklogSet(backlog.BacklogID), qi.ID)))
+		require.Equal(t, sleepUntil.Unix(), int64(score(t, r, kg.ShadowPartitionSet(shadowPart.PartitionID), backlog.BacklogID)))
+		require.Equal(t, sleepUntil.Unix(), int64(score(t, r, kg.GlobalShadowPartitionSet(), shadowPart.PartitionID)))
+		require.Equal(t, sleepUntil.Unix(), int64(score(t, r, kg.AccountShadowPartitions(accountID), shadowPart.PartitionID)))
+		require.Equal(t, sleepUntil.Unix(), int64(score(t, r, kg.GlobalAccountShadowPartitions(), accountID.String())))
+
+		until := now.Add(time.Second)
+		peeked, totalUntil, err := q.ShadowPartitionPeek(ctx, &shadowPart, false, until, 100)
+		require.NoError(t, err)
+
+		require.Equal(t, 0, totalUntil)
+		require.Len(t, peeked, 0)
+
+		until = now.Add(2 * time.Second)
+		peeked, totalUntil, err = q.ShadowPartitionPeek(ctx, &shadowPart, false, until, 100)
+		require.NoError(t, err)
+
+		require.Equal(t, 1, totalUntil)
+		require.Len(t, peeked, 1)
+		require.Equal(t, backlog, *peeked[0])
+	})
+}

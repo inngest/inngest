@@ -1349,11 +1349,15 @@ func (q *queue) EnqueueItem(ctx context.Context, shard QueueShard, i osqueue.Que
 		enqueueToBacklogsVal = "1"
 	}
 
+	fmt.Printf("- %s: Enqueue %s (%s), Time: %s (Partition Time: %s), Partition: %s, Backlog: %t\n", time.Now().Format(time.StampMilli), i.ID, i.Data.Kind, at.Format(time.StampMilli), partitionTime.Format(time.StampMilli), shadowPartition.PartitionID, enqueueToBacklogs)
+
+	ceilPartitionTime := int(math.Ceil(float64(partitionTime.Unix())))
+
 	args, err := StrSlice([]any{
 		i,
 		i.ID,
 		at.UnixMilli(),
-		partitionTime.Unix(),
+		ceilPartitionTime,
 		q.clock.Now().UnixMilli(),
 		FnMetadata{
 			// enqueue.lua only writes function metadata if it doesn't already exist.
@@ -2301,6 +2305,8 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 		return nil, err
 	}
 
+	fmt.Printf("- %s: Lease %s (%s), Partition: %s, Check: %t, Refilled: %t\n", time.Now().Format(time.StampMilli), item.ID, item.Data.Kind, partition.PartitionID, checkConstraints, refilledFromBacklog)
+
 	q.logger.Trace().Interface("item", item).
 		Interface("partition", partition).
 		Interface("backlog", backlog).
@@ -2492,6 +2498,8 @@ func (q *queue) Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		return err
 	}
 
+	fmt.Printf("- %s: Dequeue %s (%s), Partition: %s\n", time.Now().Format(time.StampMilli), i.ID, i.Data.Kind, partition.PartitionID)
+
 	q.logger.Trace().Interface("partition", partition).Interface("item", i).Msg("dequeueing queue item")
 
 	status, err := scripts["queue/dequeue"].Exec(
@@ -2612,6 +2620,8 @@ func (q *queue) Requeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 	if err != nil {
 		return err
 	}
+
+	fmt.Printf("- %s: Requeue %s (%s), Time: %s, Partition: %s, Backlog: %s\n", time.Now().Format(time.StampMilli), i.ID, i.Data.Kind, at.Format(time.StampMilli), shadowPartition.PartitionID, requeueToBacklogsVal)
 
 	q.logger.Trace().
 		Interface("partition", fnPartition).

@@ -38,7 +38,7 @@ func (q *queue) shadowWorker(ctx context.Context, qspc chan shadowPartitionChanM
 			return
 
 		case msg := <-qspc:
-			fmt.Println(time.Now().Format(time.RFC3339), "-", "shadow worker job")
+			fmt.Println(time.Now().Format(time.StampMilli), "-", "shadow worker job")
 
 			_, err := durationWithTags(
 				ctx,
@@ -114,7 +114,9 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 	}
 
 	limit := ShadowPartitionPeekMaxBacklogs
-	refillUntil := q.clock.Now().Truncate(time.Second).Add(PartitionLookahead)
+
+	// Scan a little further into the future
+	refillUntil := q.clock.Now().Truncate(time.Second).Add(2 * PartitionLookahead)
 
 	// Pick a random backlog offset every time
 	sequential := false
@@ -127,7 +129,7 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 		PkgName: pkgName,
 		Tags:    map[string]any{"partition_id": shadowPart.PartitionID},
 	})
-	fmt.Printf("    Backlogs: %d\n", len(backlogs))
+	fmt.Printf("\tShadow %s: Backlogs (until %s): %d\n", shadowPart.PartitionID, refillUntil.Format(time.StampMilli), len(backlogs))
 
 	// Refill backlogs in random order
 	fullyProcessedBacklogs := 0
@@ -181,7 +183,7 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 		if err != nil {
 			return fmt.Errorf("could not refill backlog: %w", err)
 		}
-		fmt.Printf("    Capacity: %d, Refilled: %d\n", res.Capacity, res.Refilled)
+		fmt.Printf("\t\t%s: Total: %d, Until: %d, Capacity: %d, Refilled: %d\n", backlog.BacklogID, res.TotalBacklogCount, res.BacklogCountUntil, res.Capacity, res.Refilled)
 
 		// instrumentation
 		{
@@ -372,9 +374,13 @@ func (q *queue) shadowScan(ctx context.Context) error {
 			return nil
 
 		case <-tick.Chan():
-			if err := q.scanShadowPartitions(ctx, q.clock.Now().Add(PartitionLookahead), qspc); err != nil {
+			// Scan a little further into the future
+			now := q.clock.Now()
+			scanUntil := now.Truncate(time.Second).Add(2 * PartitionLookahead)
+			if err := q.scanShadowPartitions(ctx, scanUntil, qspc); err != nil {
 				return fmt.Errorf("could not scan shadow partitions: %w", err)
 			}
+			// fmt.Printf("scan loop (start: %s, until: %s) took %s\n", now.Format(time.StampMilli), scanUntil.Format(time.StampMilli), q.clock.Now().Sub(now).String())
 		}
 	}
 }
@@ -409,10 +415,10 @@ func (q *queue) peekShadowPartitions(ctx context.Context, partitionIndexKey stri
 	}
 
 	if res.TotalCount > 0 {
-		timestamp := time.Now().Format(time.RFC3339)
+		timestamp := time.Now().Format(time.StampMilli)
 
 		for _, p := range res.Items {
-			fmt.Printf("  %s - partition: %s\n", timestamp, p.PartitionID)
+			fmt.Printf("  %s - peeked shadow partition (until %s): %s\n", timestamp, until.Format(time.StampMilli), p.PartitionID)
 		}
 	}
 
