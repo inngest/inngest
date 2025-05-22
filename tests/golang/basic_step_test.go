@@ -40,13 +40,13 @@ func TestFunctionSteps(t *testing.T) {
 
 			_, err := step.Run(ctx, "1", func(ctx context.Context) (any, error) {
 				atomic.AddInt32(&counter, 1)
-				fmt.Println("1", input.InputCtx.RunID)
+				fmt.Println(time.Now().Format(time.RFC3339), "1", "-", input.InputCtx.RunID)
 				return "hello 1", nil
 			})
 			require.NoError(t, err)
 
 			_, err = step.Run(ctx, "2", func(ctx context.Context) (string, error) {
-				fmt.Println("2", input.InputCtx.RunID)
+				fmt.Println(time.Now().Format(time.RFC3339), "2", "-", input.InputCtx.RunID)
 				atomic.AddInt32(&counter, 1)
 				return "test", nil
 			})
@@ -63,7 +63,7 @@ func TestFunctionSteps(t *testing.T) {
 			}
 
 			_, err = step.Run(ctx, "after-wait1", func(ctx context.Context) (any, error) {
-				fmt.Println("wait1 resolved", input.InputCtx.RunID)
+				fmt.Println(time.Now().Format(time.RFC3339), "wait1 resolved", "-", input.InputCtx.RunID)
 				atomic.AddInt32(&counter, 1)
 				return nil, nil
 			})
@@ -79,7 +79,7 @@ func TestFunctionSteps(t *testing.T) {
 				panic("no event found")
 			}
 
-			fmt.Println("wait2 resolved")
+			fmt.Println(time.Now().Format(time.RFC3339), "wait2 resolved", "-")
 			atomic.AddInt32(&counter, 1)
 			return true, nil
 		},

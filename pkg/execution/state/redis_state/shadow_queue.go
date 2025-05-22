@@ -38,6 +38,8 @@ func (q *queue) shadowWorker(ctx context.Context, qspc chan shadowPartitionChanM
 			return
 
 		case msg := <-qspc:
+			fmt.Println(time.Now().Format(time.RFC3339), "-", "shadow worker job")
+
 			_, err := durationWithTags(
 				ctx,
 				q.primaryQueueShard.Name,

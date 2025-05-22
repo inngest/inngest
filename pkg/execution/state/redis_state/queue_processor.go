@@ -476,6 +476,8 @@ func (q *queue) worker(ctx context.Context, f osqueue.RunFunc) {
 		case <-q.quit:
 			return
 		case i := <-q.workers:
+			fmt.Println(time.Now().Format(time.RFC3339), "-", "worker job")
+
 			// Create a new context which isn't cancelled by the parent, when quit.
 			// XXX: When jobs can have their own cancellation signals, move this into
 			// process itself.
