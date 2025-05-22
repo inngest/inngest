@@ -4,6 +4,10 @@ import (
 	"context"
 	"crypto/rand"
 	"fmt"
+	"sync"
+	"testing"
+	"time"
+
 	"github.com/alicebob/miniredis/v2"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
@@ -11,28 +15,34 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
+	"github.com/inngest/inngest/pkg/execution/executor"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 	"github.com/stretchr/testify/require"
-	"sync"
-	"testing"
-	"time"
 )
+
+type hookData struct {
+	runID ulid.ULID
+}
+
+func newFakeLifecycle(c chan *hookData) execution.LifecycleListener {
+	return &fakeLifecycle{
+		work: c,
+	}
+}
 
 type fakeLifecycle struct {
 	execution.NoopLifecyceListener
 
-	lock         sync.Mutex
-	scheduledCtr int64
-	runIDs       []ulid.ULID
-	evtIDs       []ulid.ULID
+	work chan *hookData
 }
 
 func (f *fakeLifecycle) OnFunctionScheduled(
@@ -41,12 +51,7 @@ func (f *fakeLifecycle) OnFunctionScheduled(
 	qi queue.Item,
 	evt []event.TrackedEvent,
 ) {
-	f.lock.Lock()
-	defer f.lock.Unlock()
-
-	f.scheduledCtr += 1
-	f.runIDs = append(f.runIDs, md.ID.RunID)
-	f.evtIDs = append(f.evtIDs, evt[0].GetInternalID())
+	f.work <- &hookData{runID: md.ID.RunID}
 }
 
 func createInmemoryRedis(t *testing.T) (*miniredis.Miniredis, rueidis.Client, error) {
@@ -72,12 +77,12 @@ func createInmemoryRedis(t *testing.T) (*miniredis.Miniredis, rueidis.Client, er
 }
 
 func TestScheduleRaceCondition(t *testing.T) {
-	var testLifecycle = &fakeLifecycle{}
+	ctx := context.Background()
+	_ = trace.UserTracer()
+	work := make(chan *hookData)
 
 	db, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{InMemory: true})
 	require.NoError(t, err)
-
-	ctx := context.Background()
 
 	// Initialize the devserver
 	dbDriver := "sqlite"
@@ -129,18 +134,16 @@ func TestScheduleRaceCondition(t *testing.T) {
 
 	rq := redis_state.NewQueue(queueShard, queueOpts...)
 
-	exec, err := NewExecutor(
-		WithStateManager(smv2),
-		WithPauseManager(sm),
-		WithQueue(rq),
-		WithLogger(logger.From(ctx)),
-		WithFunctionLoader(loader),
-		WithLifecycleListeners(
-			testLifecycle,
-		),
-		WithAssignedQueueShard(queueShard),
-		WithShardSelector(shardSelector),
-		WithTraceReader(dbcqrs),
+	exec, err := executor.NewExecutor(
+		executor.WithStateManager(smv2),
+		executor.WithPauseManager(sm),
+		executor.WithQueue(rq),
+		executor.WithLogger(logger.From(ctx)),
+		executor.WithFunctionLoader(loader),
+		executor.WithLifecycleListeners(newFakeLifecycle(work)),
+		executor.WithAssignedQueueShard(queueShard),
+		executor.WithShardSelector(shardSelector),
+		executor.WithTraceReader(dbcqrs),
 	)
 	require.NoError(t, err)
 
@@ -162,75 +165,91 @@ func TestScheduleRaceCondition(t *testing.T) {
 
 	wg := sync.WaitGroup{}
 
-	var runnerLock sync.Mutex
-	var successCount, errCount int64
-	var successMetaIDs []ulid.ULID
-	var successEventIDs []ulid.ULID
+	var (
+		runnerLock             sync.Mutex
+		successCount, errCount int64
+		successMetaIDs         []ulid.ULID
+		successEventIDs        []ulid.ULID
 
-	runner := func() {
-		defer wg.Done()
+		// variables for capturing lifecycle hook
+		scheduledCnt int
+		hookRunIDs   []ulid.ULID
+	)
 
-		evtID := ulid.MustNew(ulid.Timestamp(at), rand.Reader)
+	iterations := 100
+	go func() {
+		for range iterations {
+			wg.Add(1)
 
-		evt := event.NewOSSTrackedEvent(event.Event{
-			Name: "cron-resumed",
-			ID:   evtID.String(),
-		}, event.SeededIDFromString("", 0))
-		md, err := exec.Schedule(ctx, execution.ScheduleRequest{
-			Function:       fn,
-			At:             &at,
-			AccountID:      accountID,
-			WorkspaceID:    wsID,
-			AppID:          appID,
-			Events:         []event.TrackedEvent{evt},
-			IdempotencyKey: &key,
-		})
+			go func() {
+				defer wg.Done()
 
-		runnerLock.Lock()
-		defer runnerLock.Unlock()
+				evtID := ulid.MustNew(ulid.Timestamp(at), rand.Reader)
 
-		if err != nil {
-			errCount++
-			return
+				evt := event.NewOSSTrackedEvent(event.Event{
+					Name: "cron-resumed",
+					ID:   evtID.String(),
+				}, event.SeededIDFromString("", 0))
+				md, err := exec.Schedule(ctx, execution.ScheduleRequest{
+					Function:       fn,
+					At:             &at,
+					AccountID:      accountID,
+					WorkspaceID:    wsID,
+					AppID:          appID,
+					Events:         []event.TrackedEvent{evt},
+					IdempotencyKey: &key,
+				})
+
+				runnerLock.Lock()
+				defer runnerLock.Unlock()
+
+				if err != nil {
+					errCount++
+					return
+				}
+
+				successCount++
+				successMetaIDs = append(successMetaIDs, md.ID.RunID)
+				successEventIDs = append(successEventIDs, evtID)
+			}()
 		}
 
-		successCount++
-		successMetaIDs = append(successMetaIDs, md.ID.RunID)
-		successEventIDs = append(successEventIDs, evtID)
+		wg.Wait()
+
+		// NOTE: close the channel after a bit of time
+		// so there's enough room for the lifecycle hooks to execute
+		// otherwise there'll be a data race
+		<-time.After(2 * time.Second)
+		close(work)
+	}()
+
+	for hook := range work {
+		scheduledCnt++
+		hookRunIDs = append(hookRunIDs, hook.runID)
 	}
-
-	iterations := 1000
-	for range iterations {
-		wg.Add(1)
-
-		go runner()
-	}
-
-	wg.Wait()
 
 	require.Equal(t, 1, int(successCount))
 	require.Equal(t, iterations-1, int(errCount))
 
 	require.Len(t, successMetaIDs, 1)
 
-	require.Equal(t, 1, int(testLifecycle.scheduledCtr))
-	require.Len(t, testLifecycle.runIDs, 1)
+	require.Equal(t, 1, scheduledCnt)
+	require.Len(t, hookRunIDs, 1)
 
 	// This is expected: One could reach the state creation earlier, BUT: the run ID must diverge
 	// require.Equal(t, testLifecycle.evtIDs[0], successEventIDs[0])
 
-	for _, d := range successMetaIDs {
-		require.Equal(t, testLifecycle.runIDs[0], d)
-	}
+	require.Equal(t, hookRunIDs[0], successMetaIDs[0])
 }
 
 func TestScheduleRaceConditionWithExistingIdempotencyKey(t *testing.T) {
-	var testLifecycle = &fakeLifecycle{}
+	_ = trace.UserTracer()
+	ctx := context.Background()
+
+	work := make(chan *hookData)
 
 	db, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{InMemory: true})
 	require.NoError(t, err)
-
-	ctx := context.Background()
 
 	// Initialize the devserver
 	dbDriver := "sqlite"
@@ -282,22 +301,20 @@ func TestScheduleRaceConditionWithExistingIdempotencyKey(t *testing.T) {
 
 	rq := redis_state.NewQueue(queueShard, queueOpts...)
 
-	exec, err := NewExecutor(
-		WithStateManager(smv2),
-		WithPauseManager(sm),
-		WithQueue(rq),
-		WithLogger(logger.From(ctx)),
-		WithFunctionLoader(loader),
-		WithLifecycleListeners(
-			testLifecycle,
-		),
-		WithAssignedQueueShard(queueShard),
-		WithShardSelector(shardSelector),
-		WithTraceReader(dbcqrs),
+	exec, err := executor.NewExecutor(
+		executor.WithStateManager(smv2),
+		executor.WithPauseManager(sm),
+		executor.WithQueue(rq),
+		executor.WithLogger(logger.From(ctx)),
+		executor.WithFunctionLoader(loader),
+		executor.WithLifecycleListeners(newFakeLifecycle(work)),
+		executor.WithAssignedQueueShard(queueShard),
+		executor.WithShardSelector(shardSelector),
+		executor.WithTraceReader(dbcqrs),
 	)
 	require.NoError(t, err)
 
-	fnID, accountID, wsID, appID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+	accountID, wsID, appID, fnID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
 
 	fn := inngest.Function{
 		ConfigVersion:   0,
@@ -308,18 +325,22 @@ func TestScheduleRaceConditionWithExistingIdempotencyKey(t *testing.T) {
 	}
 
 	now := time.Now()
-
 	at := now
 
 	key := "same-idempotency-key"
 
+	var (
+		runnerLock             sync.Mutex
+		successCount, errCount int64
+		successMetaIDs         []ulid.ULID
+		successEventIDs        []ulid.ULID
+
+		// variables for capturing lifecycle hook
+		scheduledCnt int
+		hookRunIDs   []ulid.ULID
+	)
+
 	wg := sync.WaitGroup{}
-
-	var runnerLock sync.Mutex
-	var successCount, errCount int64
-	var successMetaIDs []ulid.ULID
-	var successEventIDs []ulid.ULID
-
 	fakeRunID := ulid.MustNew(ulid.Timestamp(now.Add(-16*time.Hour)), rand.Reader)
 
 	// Simulate an existing request
@@ -329,61 +350,67 @@ func TestScheduleRaceConditionWithExistingIdempotencyKey(t *testing.T) {
 		AccountID:  accountID,
 	}), fakeRunID.String()))
 
-	runner := func() {
-		defer wg.Done()
+	iterations := 10
+	go func() {
+		for range iterations {
+			wg.Add(1)
 
-		evtID := ulid.MustNew(ulid.Timestamp(at), rand.Reader)
+			go func() {
+				defer wg.Done()
 
-		evt := event.NewOSSTrackedEvent(event.Event{
-			Name: "cron-resumed",
-			ID:   evtID.String(),
-		}, event.SeededIDFromString("", 0))
-		md, err := exec.Schedule(ctx, execution.ScheduleRequest{
-			Function:       fn,
-			At:             &at,
-			AccountID:      accountID,
-			WorkspaceID:    wsID,
-			AppID:          appID,
-			Events:         []event.TrackedEvent{evt},
-			IdempotencyKey: &key,
-		})
+				evtID := ulid.MustNew(ulid.Timestamp(at), rand.Reader)
 
-		runnerLock.Lock()
-		defer runnerLock.Unlock()
+				evt := event.NewOSSTrackedEvent(event.Event{
+					Name: "cron-resumed",
+					ID:   evtID.String(),
+				}, event.SeededIDFromString("", 0))
 
-		if err != nil {
-			errCount++
-			return
+				md, err := exec.Schedule(ctx, execution.ScheduleRequest{
+					Function:       fn,
+					At:             &at,
+					AccountID:      accountID,
+					WorkspaceID:    wsID,
+					AppID:          appID,
+					Events:         []event.TrackedEvent{evt},
+					IdempotencyKey: &key,
+				})
+
+				runnerLock.Lock()
+				defer runnerLock.Unlock()
+
+				if err != nil {
+					errCount++
+					return
+				}
+
+				successCount++
+				successMetaIDs = append(successMetaIDs, md.ID.RunID)
+				successEventIDs = append(successEventIDs, evtID)
+			}()
 		}
 
-		successCount++
-		successMetaIDs = append(successMetaIDs, md.ID.RunID)
-		successEventIDs = append(successEventIDs, evtID)
+		wg.Wait()
+
+		// NOTE: close the channel after a bit of time
+		// so there's enough room for the lifecycle hooks to execute
+		// otherwise there'll be a data race
+		<-time.After(2 * time.Second)
+		close(work)
+	}()
+
+	for hook := range work {
+		scheduledCnt++
+		hookRunIDs = append(hookRunIDs, hook.runID)
 	}
 
-	iterations := 2
-	for range iterations {
-		wg.Add(1)
-
-		go runner()
-	}
-
-	wg.Wait()
+	// NOTE: event IDs being different is expected
 
 	require.Equal(t, 1, int(successCount))
 	require.Equal(t, iterations-1, int(errCount))
-
 	require.Len(t, successMetaIDs, 1)
 
-	require.Equal(t, 1, int(testLifecycle.scheduledCtr))
-	require.Len(t, testLifecycle.runIDs, 1)
-
-	// This is expected: One could reach the state creation earlier, BUT: the run ID must diverge
-	// require.Equal(t, testLifecycle.evtIDs[0], successEventIDs[0])
-
-	for _, d := range successMetaIDs {
-		require.Equal(t, testLifecycle.runIDs[0], d)
-	}
-
-	require.Equal(t, fakeRunID, testLifecycle.runIDs[0])
+	require.Equal(t, 1, scheduledCnt)
+	require.Len(t, hookRunIDs, 1)
+	require.Equal(t, hookRunIDs[0], successMetaIDs[0])
+	require.Equal(t, fakeRunID, hookRunIDs[0])
 }
