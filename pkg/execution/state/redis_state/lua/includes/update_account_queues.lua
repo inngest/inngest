@@ -24,7 +24,7 @@ local function update_account_shadow_queues(keyGlobalAccountShadowPartitionSet, 
     update_pointer_score_to(partitionID, keyAccountShadowPartitionSet, score)
 
     -- Upsert global accounts to _earliest_ score
-    local earliestPartitionScoreInAccount = get_earliest_pointer_score(keyAccountShadowPartitionSet)
+    local earliestPartitionScoreInAccount = get_earliest_score(keyAccountShadowPartitionSet)
     update_pointer_score_to(accountID, keyGlobalAccountShadowPartitionSet, earliestPartitionScoreInAccount)
   end
 end

@@ -20,7 +20,7 @@ local partitionID = ARGV[1]
 local accountID   = ARGV[2]
 local leaseID     = ARGV[3]
 local nowMS       = tonumber(ARGV[4])
-local leaseExpiry = tonumber(ARGV[5]) -- in seconds, as partition score
+local leaseExpiry = tonumber(ARGV[5]) -- in milliseconds
 
 -- $include(decode_ulid_time.lua)
 -- $include(get_partition_item.lua)

@@ -350,7 +350,8 @@ func (q *queue) ShadowPartitionPeekNormalizeBacklogs(ctx context.Context, sp *Qu
 			return nil
 		},
 		// faster option: load items regardless of zscore
-		ignoreUntil: true,
+		ignoreUntil:            true,
+		isMillisecondPrecision: true,
 	}
 
 	res, err := p.peek(ctx, partitionNormalizeSet, false, q.clock.Now(), limit)
@@ -390,7 +391,8 @@ func (q *queue) BacklogNormalizePeek(ctx context.Context, b *QueueBacklog, limit
 			return nil
 		},
 		// faster option: load items regardless of zscore
-		ignoreUntil: true,
+		ignoreUntil:            true,
+		isMillisecondPrecision: true,
 	}
 
 	res, err := p.peek(ctx, backlogSet, false, q.clock.Now(), limit)

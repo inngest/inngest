@@ -98,17 +98,17 @@ local function enqueue_to_backlog(keyBacklogSet, backlogID, backlogItem, partiti
 
 	-- Update the backlog pointer in the shadow partition set if earlier or not exists
 	local currentScore = redis.call("ZSCORE", keyShadowPartitionSet, backlogID)
-	if currentScore == false or tonumber(currentScore) > partitionTime then
-		update_pointer_score_to(backlogID, keyShadowPartitionSet, partitionTime)
+	if currentScore == false or tonumber(currentScore) > queueScore then
+		update_pointer_score_to(backlogID, keyShadowPartitionSet, queueScore)
 	end
 
 	-- Update the shadow partition pointer in the global shadow partition set if earlier or not exists
 	local currentScore = redis.call("ZSCORE", keyGlobalShadowPartitionSet, partitionID)
-	if currentScore == false or tonumber(currentScore) > partitionTime then
-		update_pointer_score_to(partitionID, keyGlobalShadowPartitionSet, partitionTime)
+	if currentScore == false or tonumber(currentScore) > queueScore then
+		update_pointer_score_to(partitionID, keyGlobalShadowPartitionSet, queueScore)
 
     -- Also update account-based shadow partition index
-    update_account_shadow_queues(keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, partitionID, accountID, partitionTime)
+    update_account_shadow_queues(keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, partitionID, accountID, queueScore)
 	end
 end
 
@@ -192,10 +192,8 @@ local function requeue_to_backlog(keyBacklogSet, backlogID, backlogItem, partiti
   -- TODO Update current limits if exists, keep leaseID
 	redis.call("HSETNX", keyShadowPartitionMeta, partitionID, shadowPartitionItem)
 
-  local isFuture = queueScore > (nowMS + 1000)
-
-	-- Get the minimum score for the queue.
-	local earliestScore = get_converted_earliest_pointer_score(keyBacklogSet, isFuture)
+  -- Get the minimum score for the queue.
+	local earliestScore = get_earliest_score(keyBacklogSet)
 
 	-- Update the backlog pointer in the shadow partition set if earlier or not exists
 	local currentScore = redis.call("ZSCORE", keyShadowPartitionSet, backlogID)

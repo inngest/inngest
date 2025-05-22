@@ -21,6 +21,8 @@ type peeker[T any] struct {
 	// if the score exceeds the until value (usually the current time).
 	ignoreUntil bool
 
+	isMillisecondPrecision bool
+
 	handleMissingItems func(pointers []string) error
 	maker              func() *T
 	keyMetadataHash    string
@@ -66,12 +68,18 @@ func (p *peeker[T]) peek(ctx context.Context, keyOrderedPointerSet string, seque
 		script = "peekOrderedSetUntil"
 		ms := until.UnixMilli()
 
+		untilTime := until.Unix()
+		if p.isMillisecondPrecision {
+			untilTime = until.UnixMilli()
+		}
+
 		isSequential := 0
 		if sequential {
 			isSequential = 1
 		}
 
 		rawArgs = []any{
+			untilTime,
 			ms,
 			limit,
 			isSequential,
@@ -197,12 +205,18 @@ func (p *peeker[T]) peekPointer(ctx context.Context, keyOrderedPointerSet string
 
 	ms := until.UnixMilli()
 
+	untilTime := until.Unix()
+	if p.isMillisecondPrecision {
+		untilTime = until.UnixMilli()
+	}
+
 	isSequential := 0
 	if sequential {
 		isSequential = 1
 	}
 
 	args, err := StrSlice([]any{
+		untilTime,
 		ms,
 		limit,
 		isSequential,

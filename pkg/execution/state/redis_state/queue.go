@@ -1354,14 +1354,13 @@ func (q *queue) EnqueueItem(ctx context.Context, shard QueueShard, i osqueue.Que
 		enqueueToBacklogsVal = "1"
 	}
 
-	ceilPartitionTime := roundUpPartitionTime(partitionTime, now)
-	fmt.Printf("- %s: Enqueue %s (%s), Time: %s (Partition Time: %s), Partition: %s, Backlog: %t\n", time.Now().Format(time.StampMilli), i.ID, i.Data.Kind, at.Format(time.StampMilli), time.Unix(int64(ceilPartitionTime), 0).Format(time.StampMilli), shadowPartition.PartitionID, enqueueToBacklogs)
+	fmt.Printf("- %s: Enqueue %s (%s), Time: %s (Partition Time: %s), Partition: %s, Backlog: %t\n", time.Now().Format(time.StampMilli), i.ID, i.Data.Kind, at.Format(time.StampMilli), partitionTime.Format(time.StampMilli), shadowPartition.PartitionID, enqueueToBacklogs)
 
 	args, err := StrSlice([]any{
 		i,
 		i.ID,
 		at.UnixMilli(),
-		ceilPartitionTime,
+		partitionTime.Unix(),
 		now.UnixMilli(),
 		FnMetadata{
 			// enqueue.lua only writes function metadata if it doesn't already exist.
@@ -1403,19 +1402,6 @@ func (q *queue) EnqueueItem(ctx context.Context, shard QueueShard, i osqueue.Que
 	default:
 		return i, fmt.Errorf("unknown response enqueueing item: %v (%T)", status, status)
 	}
-}
-
-func roundUpPartitionTime(t time.Time, now time.Time) int64 {
-	// only apply the round up for future items. Otherwise, we would apply a penalty on items
-	// that should run asap of up to a second.
-	if t.Before(now.Add(time.Second)) {
-		return t.Unix()
-	}
-
-	if t.Nanosecond() > 0 {
-		return t.Add(time.Second).Truncate(time.Second).Unix()
-	}
-	return t.Unix()
 }
 
 // RunJobs returns a list of jobs that are due to run for a given run ID.
@@ -2719,7 +2705,7 @@ func (q *queue) ShadowPartitionLease(ctx context.Context, sp *QueueShadowPartiti
 		accountID,
 		leaseID,
 		now.UnixMilli(),
-		leaseExpiry.Unix(),
+		leaseExpiry.UnixMilli(),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("could not serialize args: %w", err)
@@ -2945,7 +2931,7 @@ func (q *queue) BacklogPrepareNormalize(ctx context.Context, b *QueueBacklog, sp
 		sp.PartitionID,
 		accountID,
 		// order normalize by timestamp
-		q.clock.Now().Unix(),
+		q.clock.Now().UnixMilli(),
 		normalizeAsyncMinimum,
 	})
 	if err != nil {
@@ -2995,9 +2981,10 @@ func (q *queue) peekGlobalShadowPartitionAccounts(ctx context.Context, sequentia
 	rc := q.primaryQueueShard.RedisClient
 
 	p := peeker[QueueBacklog]{
-		q:      q,
-		opName: "peekGlobalShadowPartitionAccounts",
-		max:    ShadowPartitionAccountPeekMax,
+		q:                      q,
+		opName:                 "peekGlobalShadowPartitionAccounts",
+		max:                    ShadowPartitionAccountPeekMax,
+		isMillisecondPrecision: true,
 	}
 
 	return p.peekUUIDPointer(ctx, rc.kg.GlobalAccountShadowPartitions(), sequential, until, limit)
@@ -3011,9 +2998,10 @@ func (q *queue) peekGlobalNormalizeAccounts(ctx context.Context, until time.Time
 	rc := q.primaryQueueShard.RedisClient
 
 	p := peeker[QueueBacklog]{
-		q:      q,
-		opName: "peekGlobalNormalizeAccounts",
-		max:    NormalizeAccountPeekMax,
+		q:                      q,
+		opName:                 "peekGlobalNormalizeAccounts",
+		max:                    NormalizeAccountPeekMax,
+		isMillisecondPrecision: true,
 	}
 
 	return p.peekUUIDPointer(ctx, rc.kg.GlobalAccountNormalizeSet(), true, until, limit)

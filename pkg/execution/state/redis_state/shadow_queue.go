@@ -404,6 +404,7 @@ func (q *queue) peekShadowPartitions(ctx context.Context, partitionIndexKey stri
 
 			return nil
 		},
+		isMillisecondPrecision: true,
 	}
 
 	res, err := p.peek(ctx, partitionIndexKey, sequential, until, peekLimit)
@@ -521,6 +522,7 @@ func (q *queue) ShadowPartitionPeek(ctx context.Context, sp *QueueShadowPartitio
 
 			return nil
 		},
+		isMillisecondPrecision: true,
 	}
 
 	res, err := p.peek(ctx, shadowPartitionSet, sequential, until, limit)
@@ -567,7 +569,7 @@ func (q *queue) ShadowPartitionExtendLease(ctx context.Context, sp *QueueShadowP
 		leaseID,
 		newLeaseID,
 		now.UnixMilli(),
-		leaseExpiry.Unix(),
+		leaseExpiry.UnixMilli(),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("could not serialize args: %w", err)
@@ -612,9 +614,9 @@ func (q *queue) ShadowPartitionRequeue(ctx context.Context, sp *QueueShadowParti
 		accountID = *sp.AccountID
 	}
 
-	var requeueAtS int64
+	var requeueAtMS int64
 	if requeueAt != nil {
-		requeueAtS = requeueAt.Unix()
+		requeueAtMS = requeueAt.UnixMilli()
 	}
 
 	keys := []string{
@@ -629,7 +631,7 @@ func (q *queue) ShadowPartitionRequeue(ctx context.Context, sp *QueueShadowParti
 		accountID,
 		leaseID,
 		q.clock.Now().UnixMilli(),
-		requeueAtS,
+		requeueAtMS,
 	})
 	if err != nil {
 		return fmt.Errorf("could not serialize args: %w", err)
