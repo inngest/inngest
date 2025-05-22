@@ -35,6 +35,34 @@ const (
 	LevelEmergency = slog.Level(12)
 )
 
+type Logger interface {
+	//
+	// Methods from slog.Logger
+	//
+	Debug(msg string, args ...any)
+	DebugContext(ctx context.Context, msg string, args ...any)
+	Info(msg string, args ...any)
+	InfoContext(ctx context.Context, msg string, args ...any)
+	Warn(msg string, args ...any)
+	WarnContext(ctx context.Context, msg string, args ...any)
+	Error(msg string, args ...any)
+	ErrorContext(ctx context.Context, msg string, args ...any)
+	Log(ctx context.Context, level slog.Level, msg string, args ...any)
+	LogAttrs(ctx context.Context, level slog.Level, msg string, args ...slog.Attr)
+	Handler() slog.Handler
+	With(args ...any) Logger
+
+	//
+	// Methods added in wrapper
+	//
+	Trace(msg string, args ...any)
+	TraceContext(ctx context.Context, msg string, args ...any)
+	Notice(msg string, args ...any)
+	NoticeContext(ctx context.Context, msg string, args ...any)
+	Emergency(msg string, args ...any)
+	EmergencyContext(ctx context.Context, msg string, args ...any)
+}
+
 type LoggerOpt func(o *loggerOpts)
 
 type loggerOpts struct {
@@ -61,7 +89,7 @@ func WithHandler(h handler) LoggerOpt {
 	}
 }
 
-func newLogger(opts ...LoggerOpt) *slog.Logger {
+func newLogger(opts ...LoggerOpt) Logger {
 	o := &loggerOpts{
 		level:   StdlibLevel(level("LOG_LEVEL")),
 		writer:  os.Stderr,
@@ -78,33 +106,37 @@ func newLogger(opts ...LoggerOpt) *slog.Logger {
 
 	switch o.handler {
 	case TextHandler:
-		return slog.New(slog.NewTextHandler(o.writer, &hopts))
+		return &logger{
+			Logger: slog.New(slog.NewTextHandler(o.writer, &hopts)),
+		}
 
 	default:
-		return slog.New(slog.NewJSONHandler(o.writer, &hopts))
+		return &logger{
+			Logger: slog.New(slog.NewJSONHandler(o.writer, &hopts)),
+		}
 	}
 }
 
 // StdlibLoggger returns the stdlib logger in context, or a new logger
 // if none stored.
-func StdlibLogger(ctx context.Context, opts ...LoggerOpt) *slog.Logger {
-	logger := ctx.Value(stdlibCtxKey)
-	if logger == nil {
+func StdlibLogger(ctx context.Context, opts ...LoggerOpt) Logger {
+	l := ctx.Value(stdlibCtxKey)
+	if l == nil {
 		return newLogger(opts...)
 	}
-	return logger.(*slog.Logger)
+	return &logger{Logger: l.(*slog.Logger)}
 }
 
-func VoidLogger() *slog.Logger {
+func VoidLogger() Logger {
 	return newLogger(WithLoggerWriter(io.Discard))
 }
 
-func StdlibLoggerWithCustomVarName(ctx context.Context, varName string) *slog.Logger {
-	logger := ctx.Value(stdlibCtxKey)
-	if logger == nil {
+func StdlibLoggerWithCustomVarName(ctx context.Context, varName string) Logger {
+	l := ctx.Value(stdlibCtxKey)
+	if l == nil {
 		return newLogger(WithLoggerLevel(level(varName)))
 	}
-	return logger.(*slog.Logger)
+	return &logger{Logger: l.(*slog.Logger)}
 }
 
 func WithStdlib(ctx context.Context, logger *slog.Logger) context.Context {
@@ -139,26 +171,31 @@ type logger struct {
 	*slog.Logger
 }
 
-func (l *logger) Trace(msg string, attrs ...any) {
-	l.Logger.Log(context.Background(), LevelTrace, msg, attrs...)
+func (l *logger) With(args ...any) Logger {
+	l.Logger = l.Logger.With(args...)
+	return l
 }
 
-func (l *logger) TraceContext(ctx context.Context, msg string, attrs ...any) {
-	l.Logger.Log(ctx, LevelTrace, msg, attrs...)
+func (l *logger) Trace(msg string, args ...any) {
+	l.Logger.Log(context.Background(), LevelTrace, msg, args...)
 }
 
-func (l *logger) Notice(msg string, attrs ...any) {
-	l.Logger.Log(context.Background(), LevelNotice, msg, attrs...)
+func (l *logger) TraceContext(ctx context.Context, msg string, args ...any) {
+	l.Logger.Log(ctx, LevelTrace, msg, args...)
 }
 
-func (l *logger) NoticeContext(ctx context.Context, msg string, attrs ...any) {
-	l.Logger.Log(ctx, LevelNotice, msg, attrs...)
+func (l *logger) Notice(msg string, args ...any) {
+	l.Logger.Log(context.Background(), LevelNotice, msg, args...)
 }
 
-func (l *logger) Emergency(msg string, attrs ...any) {
-	l.Logger.Log(context.Background(), LevelEmergency, msg, attrs...)
+func (l *logger) NoticeContext(ctx context.Context, msg string, args ...any) {
+	l.Logger.Log(ctx, LevelNotice, msg, args...)
 }
 
-func (l *logger) EmergencyContext(ctx context.Context, msg string, attrs ...any) {
-	l.Logger.Log(ctx, LevelEmergency, msg, attrs...)
+func (l *logger) Emergency(msg string, args ...any) {
+	l.Logger.Log(context.Background(), LevelEmergency, msg, args...)
+}
+
+func (l *logger) EmergencyContext(ctx context.Context, msg string, args ...any) {
+	l.Logger.Log(ctx, LevelEmergency, msg, args...)
 }
