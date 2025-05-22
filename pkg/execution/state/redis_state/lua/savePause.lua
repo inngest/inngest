@@ -21,6 +21,7 @@ local invokeCorrelationID = ARGV[4]
 local signalCorrelationID = ARGV[5]
 local extendedExpiry = tonumber(ARGV[6])
 local nowUnixSeconds = tonumber(ARGV[7])
+local canReplaceSignal = ARGV[8] == "1"
 
 
 if redis.call("SETNX", pauseKey, pause) == 0 then
@@ -50,15 +51,25 @@ if invokeCorrelationID ~= false and invokeCorrelationID ~= "" and invokeCorrelat
 end
 
 if signalCorrelationID ~= false and signalCorrelationID ~= "" and signalCorrelationID ~= nil then
-	if redis.call("HSETNX", pauseSignalKey, signalCorrelationID, pauseID) == 0 then
-		-- The signal already exists! The rarer case now is that this is an
-		-- idempotent retry for saving a pause, so let's check if we're trying
-		-- to save this pause for the same run / step ID. If not, we need to
-		-- return an error to roll back all of these changes, as we're trying
-		-- to duplicate a signal.
-		local existing = redis.call("HGET", pauseSignalKey, signalCorrelationID)
-		if existing ~= pauseID then
-			return redis.error_reply("ErrSignalConflict")
+	if canReplaceSignal then
+		-- Note that this may be overwriting an existing signal wait, which is
+		-- intentional. When running this transaction, we could be part of an
+		-- idempotent retry or be overwriting an existing signal wait with
+		-- this one. In the latter case, it is expected that the previous
+		-- signal wait will be left to reach its timeout. We also leave the
+		-- pause behind, as it may also be in a different block.
+		redis.call("HSET", pauseSignalKey, signalCorrelationID, pauseID)
+	else
+		if redis.call("HSETNX", pauseSignalKey, signalCorrelationID, pauseID) == 0 then
+			-- The signal already exists! The rarer case now is that this is
+			-- an idempotent retry for saving a pause, so let's check if
+			-- we're trying to save this pause for the same run / step ID. If
+			-- not, we need to return an error to roll back all of these
+			-- changes, as we're trying to duplicate a signal.
+			local existing = redis.call("HGET", pauseSignalKey, signalCorrelationID)
+			if existing ~= pauseID then
+				return redis.error_reply("ErrSignalConflict")
+			end
 		end
 	end
 end
