@@ -9,8 +9,6 @@ import (
 )
 
 var (
-	DefaultStdlibLevel = slog.LevelInfo
-
 	stdlibCtxKey = stdlibKey{}
 )
 
@@ -21,6 +19,20 @@ type handler int
 const (
 	JSONHandler handler = iota
 	TextHandler
+)
+
+// NOTE: reference
+// https://go.dev/src/log/slog/example_custom_levels_test.go
+const (
+	DefaultStdlibLevel = slog.LevelInfo
+
+	LevelTrace     = slog.Level(-8)
+	LevelDebug     = slog.LevelDebug
+	LevelInfo      = slog.LevelInfo
+	LevelNotice    = slog.Level(2)
+	LevelWarning   = slog.LevelWarn
+	LevelError     = slog.LevelError
+	LevelEmergency = slog.Level(12)
 )
 
 type LoggerOpt func(o *loggerOpts)
@@ -102,21 +114,51 @@ func WithStdlib(ctx context.Context, logger *slog.Logger) context.Context {
 func StdlibLevel(levelVarName string) slog.Level {
 	switch strings.ToLower(levelVarName) {
 	case "trace":
-		return slog.LevelDebug
+		return LevelTrace
 	case "debug":
-		return slog.LevelDebug
+		return LevelDebug
 	case "info":
-		return slog.LevelInfo
+		return LevelInfo
 	case "warn":
-		return slog.LevelWarn
+		return LevelWarning
 	case "error":
-		return slog.LevelError
+		return LevelError
+	case "emergency":
+		return LevelEmergency
 	default:
 		return DefaultStdlibLevel
-
 	}
 }
 
 func level(levelVarName string) string {
 	return os.Getenv(levelVarName)
+}
+
+// logger is a wrapper over slog with additional levels
+type logger struct {
+	*slog.Logger
+}
+
+func (l *logger) Trace(msg string, attrs ...any) {
+	l.Logger.Log(context.Background(), LevelTrace, msg, attrs...)
+}
+
+func (l *logger) TraceContext(ctx context.Context, msg string, attrs ...any) {
+	l.Logger.Log(ctx, LevelTrace, msg, attrs...)
+}
+
+func (l *logger) Notice(msg string, attrs ...any) {
+	l.Logger.Log(context.Background(), LevelNotice, msg, attrs...)
+}
+
+func (l *logger) NoticeContext(ctx context.Context, msg string, attrs ...any) {
+	l.Logger.Log(ctx, LevelNotice, msg, attrs...)
+}
+
+func (l *logger) Emergency(msg string, attrs ...any) {
+	l.Logger.Log(context.Background(), LevelEmergency, msg, attrs...)
+}
+
+func (l *logger) EmergencyContext(ctx context.Context, msg string, attrs ...any) {
+	l.Logger.Log(ctx, LevelEmergency, msg, attrs...)
 }
