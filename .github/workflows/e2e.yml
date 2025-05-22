@@ -75,7 +75,7 @@ jobs:
           echo "Ran dev server"
           sleep 5
           curl http://127.0.0.1:8288/dev > /dev/null 2> /dev/null
-          go test ./Tests/golang -v -count=1
+          go test ./tests/golang -v -count=1
         env:
           API_URL: http://127.0.0.1:8288
           INNGEST_EVENT_KEY: test
