@@ -162,7 +162,7 @@ export default function Table<T>({
                   className={cn(
                     hasId(row.original) && expandedIDs.includes(row.original.id)
                       ? 'h-[42px]'
-                      : 'border-light h-[42px] border-b',
+                      : 'border-light box-border h-[42px] border-b',
                     onRowClick ? 'hover:bg-canvasSubtle/40 cursor-pointer' : ''
                   )}
                   onClick={() => {
@@ -182,7 +182,12 @@ export default function Table<T>({
                           width: cell.column.getSize(),
                           maxWidth: cell.column.getSize(),
                         }}
-                        className={cn(isIconOnlyColumn ? '' : tableColumnStyles)}
+                        className={cn(
+                          i === 0 && hasId(row.original) && expandedIDs.includes(row.original.id)
+                            ? expandedRowSideBorder
+                            : '',
+                          isIconOnlyColumn ? '' : tableColumnStyles
+                        )}
                       >
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
                       </td>
