@@ -2,6 +2,7 @@ package logger
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log/slog"
 	"os"
@@ -19,6 +20,7 @@ type handler int
 const (
 	JSONHandler handler = iota
 	TextHandler
+	DevHandler
 )
 
 // NOTE: reference
@@ -106,6 +108,11 @@ func newLogger(opts ...LoggerOpt) Logger {
 	}
 
 	switch o.handler {
+	case DevHandler:
+		return &logger{
+			Logger: slog.New(newDevHandler(o.writer, &hopts)),
+		}
+
 	case TextHandler:
 		return &logger{
 			Logger: slog.New(slog.NewTextHandler(o.writer, &hopts)),
@@ -125,7 +132,7 @@ func StdlibLogger(ctx context.Context, opts ...LoggerOpt) Logger {
 	if l == nil {
 		return newLogger(opts...)
 	}
-	return &logger{Logger: l.(*slog.Logger)}
+	return l.(Logger)
 }
 
 func VoidLogger() Logger {
@@ -137,11 +144,11 @@ func StdlibLoggerWithCustomVarName(ctx context.Context, varName string) Logger {
 	if l == nil {
 		return newLogger(WithLoggerLevel(StdlibLevel(level(varName))))
 	}
-	return &logger{Logger: l.(*slog.Logger)}
+	return l.(Logger)
 }
 
-func WithStdlib(ctx context.Context, logger *slog.Logger) context.Context {
-	return context.WithValue(ctx, stdlibCtxKey, logger)
+func WithStdlib(ctx context.Context, l Logger) context.Context {
+	return context.WithValue(ctx, stdlibCtxKey, l)
 }
 
 func StdlibLevel(levelVarName string) slog.Level {
@@ -203,4 +210,32 @@ func (l *logger) EmergencyContext(ctx context.Context, msg string, args ...any) 
 
 func (l *logger) SLog() *slog.Logger {
 	return l.Logger
+}
+
+// newDevHandler constructs a dev handler to be used
+func newDevHandler(w io.Writer, opts *slog.HandlerOptions) *devHandler {
+	return &devHandler{
+		writer: w,
+	}
+}
+
+// devHandler is used for development purposes and also provide nicer log output for the dev server
+type devHandler struct {
+	writer io.Writer
+}
+
+func (d *devHandler) Enabled(ctx context.Context, lvl slog.Level) bool {
+	return false
+}
+
+func (d *devHandler) Handle(ctx context.Context, rec slog.Record) error {
+	return fmt.Errorf("not implemented")
+}
+
+func (d *devHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
+	return d
+}
+
+func (d *devHandler) WithGroup(name string) slog.Handler {
+	return d
 }

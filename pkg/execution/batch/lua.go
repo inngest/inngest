@@ -3,11 +3,11 @@ package batch
 import (
 	"embed"
 	"fmt"
-	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"io/fs"
 	"regexp"
 	"strings"
 
+	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/redis/rueidis"
 )
 
