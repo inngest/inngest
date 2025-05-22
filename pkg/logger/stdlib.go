@@ -16,28 +16,58 @@ var (
 
 type stdlibKey struct{}
 
+type LoggerOpt func(o *loggerOpts)
+
+type loggerOpts struct {
+	writer io.Writer
+	level  slog.Level
+}
+
+func WithLoggerLevel(lvl string) LoggerOpt {
+	return func(o *loggerOpts) {
+		o.level = StdlibLevel(lvl)
+	}
+}
+
+func WithLoggerWriter(w io.Writer) LoggerOpt {
+	return func(o *loggerOpts) {
+		o.writer = w
+	}
+}
+
+func newLogger(opts ...LoggerOpt) *slog.Logger {
+	o := &loggerOpts{
+		level:  StdlibLevel("LOG_LEVEL"),
+		writer: os.Stderr,
+	}
+
+	for _, apply := range opts {
+		apply(o)
+	}
+
+	return slog.New(slog.NewJSONHandler(o.writer, &slog.HandlerOptions{
+		Level: o.level,
+	}))
+}
+
 // StdlibLoggger returns the stdlib logger in context, or a new logger
 // if none stored.
-func StdlibLogger(ctx context.Context) *slog.Logger {
+func StdlibLogger(ctx context.Context, opts ...LoggerOpt) *slog.Logger {
 	logger := ctx.Value(stdlibCtxKey)
 	if logger == nil {
-		return slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
-			Level: StdlibLevel("LOG_LEVEL"),
-		}))
+		return newLogger(opts...)
 	}
 	return logger.(*slog.Logger)
 }
 
 func VoidLogger() *slog.Logger {
-	return slog.New(slog.NewJSONHandler(io.Discard, &slog.HandlerOptions{}))
+	return newLogger(WithLoggerWriter(io.Discard))
 }
 
 func StdlibLoggerWithCustomVarName(ctx context.Context, varName string) *slog.Logger {
 	logger := ctx.Value(stdlibCtxKey)
 	if logger == nil {
-		return slog.New(slog.NewJSONHandler(os.Stderr, &slog.HandlerOptions{
-			Level: StdlibLevel(varName),
-		}))
+		return newLogger(WithLoggerLevel(level(varName)))
 	}
 	return logger.(*slog.Logger)
 }
@@ -47,7 +77,7 @@ func WithStdlib(ctx context.Context, logger *slog.Logger) context.Context {
 }
 
 func StdlibLevel(levelVarName string) slog.Level {
-	switch strings.ToLower(Level(levelVarName)) {
+	switch strings.ToLower(levelVarName) {
 	case "trace":
 		return slog.LevelDebug
 	case "debug":
@@ -64,6 +94,6 @@ func StdlibLevel(levelVarName string) slog.Level {
 	}
 }
 
-func Level(levelVarName string) string {
+func level(levelVarName string) string {
 	return os.Getenv(levelVarName)
 }
