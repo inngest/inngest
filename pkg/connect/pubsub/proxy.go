@@ -16,7 +16,6 @@ import (
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/syscode"
-	"github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/inngest/inngest/pkg/util"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -25,7 +24,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
-	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
+	"github.com/inngest/inngest/pkg/telemetry/trace"
+
 	connectpb "github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
@@ -215,7 +215,7 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 
 	{
 
-		userTraceCtx, err := itrace.HeadersFromTraceState(
+		userTraceCtx, err := trace.HeadersFromTraceState(
 			ctx,
 			opts.SpanID,
 			opts.AppID.String(),
