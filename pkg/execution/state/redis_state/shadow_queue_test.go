@@ -832,6 +832,9 @@ func TestQueueShadowScannerContinuations(t *testing.T) {
 		WorkflowID:  fnID2,
 	}, at)
 
+	// we leave some room for multiple partitions as scanShadowPartitions will
+	// call both scan continuations and the regular scanner, so the first item
+	// is expected to be the continuation, followed by the actual scan run
 	qspc := make(chan shadowPartitionChanMsg, 10)
 
 	sp1 := q.ItemShadowPartition(ctx, item1)
