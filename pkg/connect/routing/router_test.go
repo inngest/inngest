@@ -5,21 +5,22 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
+	"os"
+	"testing"
+	"time"
+
 	"github.com/alicebob/miniredis/v2"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/connect/auth"
 	"github.com/inngest/inngest/pkg/connect/state"
 	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/sdk"
 	"github.com/inngest/inngest/pkg/util"
 	connectpb "github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 	"github.com/stretchr/testify/require"
-	"log/slog"
-	"os"
-	"testing"
-	"time"
 )
 
 // For weighted shuffles generate a new rand.
@@ -208,7 +209,11 @@ func setup(t *testing.T, stateMan state.StateManager, opts setupOpts, connsToCre
 
 func TestFullConnectRouting(t *testing.T) {
 
-	log := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	log := logger.StdlibLogger(context.Background(),
+		logger.WithHandler(logger.TextHandler),
+		logger.WithLoggerWriter(os.Stdout),
+		logger.WithLoggerLevel(logger.LevelDebug),
+	)
 
 	t.Run("single healthy connection should receive requests", func(t *testing.T) {
 		stateMan, cleanup := setupRedis(t)
@@ -356,7 +361,11 @@ func TestFullConnectRouting(t *testing.T) {
 }
 
 func TestIsHealthy(t *testing.T) {
-	log := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	log := logger.StdlibLogger(context.Background(),
+		logger.WithHandler(logger.TextHandler),
+		logger.WithLoggerWriter(os.Stdout),
+		logger.WithLoggerLevel(logger.LevelDebug),
+	)
 
 	stateMan, cleanup := setupRedis(t)
 	defer cleanup()

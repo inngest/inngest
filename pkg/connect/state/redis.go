@@ -11,7 +11,6 @@ import (
 	"github.com/oklog/ulid/v2"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"io/fs"
-	"log/slog"
 	"regexp"
 	"slices"
 	"strings"
@@ -93,7 +92,7 @@ func readRedisScripts(path string, entries []fs.DirEntry) {
 type redisConnectionStateManager struct {
 	c      clockwork.Clock
 	client rueidis.Client
-	logger *slog.Logger
+	logger logger.Logger
 }
 
 type RedisStateManagerOpt struct {

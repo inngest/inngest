@@ -61,6 +61,7 @@ type Logger interface {
 	NoticeContext(ctx context.Context, msg string, args ...any)
 	Emergency(msg string, args ...any)
 	EmergencyContext(ctx context.Context, msg string, args ...any)
+	SLog() *slog.Logger
 }
 
 type LoggerOpt func(o *loggerOpts)
@@ -71,9 +72,9 @@ type loggerOpts struct {
 	handler handler
 }
 
-func WithLoggerLevel(lvl string) LoggerOpt {
+func WithLoggerLevel(lvl slog.Level) LoggerOpt {
 	return func(o *loggerOpts) {
-		o.level = StdlibLevel(lvl)
+		o.level = lvl
 	}
 }
 
@@ -134,7 +135,7 @@ func VoidLogger() Logger {
 func StdlibLoggerWithCustomVarName(ctx context.Context, varName string) Logger {
 	l := ctx.Value(stdlibCtxKey)
 	if l == nil {
-		return newLogger(WithLoggerLevel(level(varName)))
+		return newLogger(WithLoggerLevel(StdlibLevel(level(varName))))
 	}
 	return &logger{Logger: l.(*slog.Logger)}
 }
@@ -198,4 +199,8 @@ func (l *logger) Emergency(msg string, args ...any) {
 
 func (l *logger) EmergencyContext(ctx context.Context, msg string, args ...any) {
 	l.Logger.Log(ctx, LevelEmergency, msg, args...)
+}
+
+func (l *logger) SLog() *slog.Logger {
+	return l.Logger
 }

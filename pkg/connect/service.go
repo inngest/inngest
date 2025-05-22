@@ -5,11 +5,6 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
-	"github.com/inngest/inngest/pkg/connect/auth"
-	"github.com/inngest/inngest/pkg/consts"
-	"github.com/inngest/inngest/pkg/telemetry/metrics"
-	"github.com/rs/zerolog"
-	"log/slog"
 	mathRand "math/rand"
 	"net/http"
 	"os"
@@ -19,10 +14,14 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/connect/auth"
 	"github.com/inngest/inngest/pkg/connect/pubsub"
 	"github.com/inngest/inngest/pkg/connect/state"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/oklog/ulid/v2"
+	"github.com/rs/zerolog"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -71,7 +70,7 @@ type connectGatewaySvc struct {
 	gatewayId ulid.ULID
 	dev       bool
 
-	logger    *slog.Logger
+	logger    logger.Logger
 	devlogger *zerolog.Logger
 
 	runCtx context.Context

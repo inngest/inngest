@@ -3,11 +3,11 @@ package dnscache
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"math/rand/v2"
 	"net"
 	"time"
 
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/karlseguin/ccache/v3"
 	// "golang.org/x/sync/singleflight"
 )
@@ -79,7 +79,7 @@ func WithLookupTimeout(t time.Duration) ResolverOpts {
 	}
 }
 
-func WithLogger(l *slog.Logger) ResolverOpts {
+func WithLogger(l logger.Logger) ResolverOpts {
 	return func(r *resolver) {
 		r.l = l
 	}
@@ -102,7 +102,7 @@ type resolver struct {
 	dialer Dialer
 
 	// l is an optional logger
-	l *slog.Logger
+	l logger.Logger
 }
 
 func (r *resolver) Dialer() Dialer {
