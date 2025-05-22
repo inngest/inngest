@@ -26,6 +26,7 @@ require (
 	github.com/eko/gocache/lib/v4 v4.1.5
 	github.com/eko/gocache/store/freecache/v4 v4.2.1
 	github.com/eko/gocache/store/rueidis/v4 v4.1.5
+	github.com/fatih/color v1.13.0
 	github.com/fatih/structs v1.1.0
 	github.com/go-chi/chi/v5 v5.0.10
 	github.com/go-chi/cors v1.2.1
@@ -169,6 +170,7 @@ require (
 	github.com/kr/text v0.2.0 // indirect
 	github.com/lucasb-eyer/go-colorful v1.2.0 // indirect
 	github.com/magiconair/properties v1.8.5 // indirect
+	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-runewidth v0.0.13 // indirect
 	github.com/matttproud/golang_protobuf_extensions/v2 v2.0.0 // indirect
 	github.com/mitchellh/mapstructure v1.5.0 // indirect
