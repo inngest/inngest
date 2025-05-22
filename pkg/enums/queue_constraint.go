@@ -1,4 +1,4 @@
-//go:generate go run github.com/dmarkham/enumer -trimprefix=QueueConstraint -type=QueueConstraint -json -text
+//go:generate go run github.com/dmarkham/enumer -trimprefix=QueueConstraint -type=QueueConstraint -transform=snake -json -text
 
 package enums
 

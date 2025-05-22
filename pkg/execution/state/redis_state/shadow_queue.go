@@ -38,7 +38,17 @@ func (q *queue) shadowWorker(ctx context.Context, qspc chan shadowPartitionChanM
 			return
 
 		case msg := <-qspc:
-			err := q.processShadowPartition(ctx, msg.sp, msg.continuationCount)
+			_, err := durationWithTags(
+				ctx,
+				q.primaryQueueShard.Name,
+				"shadow_partition_process_duration",
+				q.clock.Now(),
+				func(ctx context.Context) (any, error) {
+					err := q.processShadowPartition(ctx, msg.sp, msg.continuationCount)
+					return nil, err
+				},
+				map[string]any{"partition_id": msg.sp.PartitionID},
+			)
 			if err != nil {
 				l.Error("could not scan shadow partition", "error", err, "shadow_part", msg.sp, "continuation_count", msg.continuationCount)
 			}
@@ -104,13 +114,17 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 	limit := ShadowPartitionPeekMaxBacklogs
 	refillUntil := q.clock.Now().Truncate(time.Second).Add(PartitionLookahead)
 
-	// Default to sequential but pick a random backlog every once in a while
-	sequential := mrand.Intn(100) <= 80
+	// Pick a random backlog offset every time
+	sequential := false
 
 	backlogs, totalCount, err := q.ShadowPartitionPeek(ctx, shadowPart, sequential, refillUntil, limit)
 	if err != nil {
 		return fmt.Errorf("could not peek backlogs for shadow partition: %w", err)
 	}
+	metrics.GaugeShadowPartitionSize(ctx, int64(totalCount), metrics.GaugeOpt{
+		PkgName: pkgName,
+		Tags:    map[string]any{"partition_id": shadowPart.PartitionID},
+	})
 
 	// Refill backlogs in random order
 	fullyProcessedBacklogs := 0
@@ -151,19 +165,44 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 			continue
 		}
 
-		res, err := q.BacklogRefill(ctx, backlog, shadowPart, refillUntil)
+		res, err := durationWithTags(
+			ctx,
+			q.primaryQueueShard.Name,
+			"backlog_process_duration",
+			q.clock.Now(),
+			func(ctx context.Context) (*BacklogRefillResult, error) {
+				return q.BacklogRefill(ctx, backlog, shadowPart, refillUntil)
+			},
+			map[string]any{"partition_id": shadowPart.PartitionID},
+		)
 		if err != nil {
 			return fmt.Errorf("could not refill backlog: %w", err)
 		}
 
 		// instrumentation
 		{
-			metrics.IncrQueueBacklogRefilledCounter(ctx, int64(res.Refilled), metrics.CounterOpt{
+			opts := metrics.CounterOpt{
 				PkgName: pkgName,
 				Tags: map[string]any{
 					"partition_id": shadowPart.PartitionID,
 				},
-			})
+			}
+
+			metrics.IncrBacklogProcessedCounter(ctx, opts)
+			metrics.IncrQueueBacklogRefilledCounter(ctx, int64(res.Refilled), opts)
+
+			switch res.Constraint {
+			case enums.QueueConstraintNotLimited: // no-op
+			default:
+				metrics.IncrQueueBacklogRefillConstraintCounter(ctx, metrics.CounterOpt{
+					PkgName: pkgName,
+					Tags: map[string]any{
+						"partition_id": shadowPart.PartitionID,
+						"constraint":   res.Constraint.String(),
+					},
+				})
+			}
+
 			// NOTE: custom method to instrument result - potentially handling high cardinality data
 			q.instrumentBacklogResult(ctx, backlog, res)
 		}
@@ -329,7 +368,7 @@ func (q *queue) shadowScan(ctx context.Context) error {
 			return nil
 
 		case <-tick.Chan():
-			if err := q.scanShadowPartitions(ctx, q.clock.Now(), qspc); err != nil {
+			if err := q.scanShadowPartitions(ctx, q.clock.Now().Add(PartitionLookahead), qspc); err != nil {
 				return fmt.Errorf("could not scan shadow partitions: %w", err)
 			}
 		}

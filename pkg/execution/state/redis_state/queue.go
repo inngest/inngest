@@ -2268,6 +2268,8 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 		backlog.customKeyActive(kg, 2),
 		backlog.customKeyActive(kg, 1),
 		backlog.activeKey(kg),
+		kg.ActiveRunCounter(item.Data.Identifier.RunID),
+		kg.ActivePartitionRunsIndex(partition.PartitionID),
 
 		kg.ThrottleKey(item.Data.Throttle),
 	}
@@ -2281,6 +2283,7 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 		item.ID,
 		partition.PartitionID,
 		item.Data.Identifier.AccountID,
+		item.Data.Identifier.RunID.String(),
 
 		leaseID.String(),
 		now.UnixMilli(),
@@ -2437,11 +2440,16 @@ func (q *queue) Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		kg.PartitionItem(),
 		kg.ConcurrencyIndex(),
 
+		partition.readyQueueKey(kg),
 		kg.GlobalPartitionIndex(),
 		kg.GlobalAccountIndex(),
 		kg.AccountPartitionIndex(i.Data.Identifier.AccountID),
 
-		partition.readyQueueKey(kg),
+		kg.BacklogSet(backlog.BacklogID),
+		kg.ShadowPartitionSet(partition.PartitionID),
+		kg.GlobalShadowPartitionSet(),
+		kg.GlobalAccountShadowPartitions(),
+		kg.AccountShadowPartitions(i.Data.Identifier.AccountID),
 
 		// In progress keys
 		partition.accountInProgressKey(kg),
@@ -2455,6 +2463,8 @@ func (q *queue) Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		backlog.customKeyActive(kg, 1),
 		backlog.customKeyActive(kg, 2),
 		backlog.activeKey(kg),
+		kg.ActiveRunCounter(i.Data.Identifier.RunID),
+		kg.ActivePartitionRunsIndex(partition.PartitionID),
 
 		kg.Idempotency(i.ID),
 	}
@@ -2473,7 +2483,9 @@ func (q *queue) Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 	args, err := StrSlice([]any{
 		i.ID,
 		partition.PartitionID,
+		backlog.BacklogID,
 		i.Data.Identifier.AccountID.String(),
+		i.Data.Identifier.RunID.String(),
 
 		int(idempotency.Seconds()),
 	})
@@ -2562,6 +2574,8 @@ func (q *queue) Requeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		backlog.customKeyActive(kg, 1),
 		backlog.customKeyActive(kg, 2),
 		backlog.activeKey(kg),
+		kg.ActiveRunCounter(i.Data.Identifier.RunID),
+		kg.ActivePartitionRunsIndex(shadowPartition.PartitionID),
 
 		// key queues v2
 		kg.BacklogSet(backlog.BacklogID),
@@ -2585,6 +2599,7 @@ func (q *queue) Requeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		at.UnixMilli(),
 
 		i.Data.Identifier.AccountID.String(),
+		i.Data.Identifier.RunID.String(),
 		fnPartition.ID,
 		fnPartition,
 
@@ -2623,6 +2638,16 @@ func (q *queue) Requeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 	}
 	switch status {
 	case 0:
+		switch requeueToBacklogsVal {
+		case "1":
+			metrics.IncrBacklogRequeuedCounter(ctx, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags: map[string]any{
+					"partition_id": i.FunctionID.String(),
+				},
+			})
+		}
+
 		return nil
 	case 1:
 		// This should only ever happen if a run is cancelled and all queue items
@@ -2698,6 +2723,7 @@ type BacklogRefillResult struct {
 	Constraint        enums.QueueConstraint
 	Refilled          int
 	TotalBacklogCount int
+	BacklogCountUntil int
 	Capacity          int
 	Refill            int
 }
@@ -2776,6 +2802,8 @@ func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueSha
 		throttleLimit,
 		throttleBurst,
 		throttlePeriod,
+
+		kg.QueuePrefix(),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("could not serialize args: %w", err)
@@ -2792,8 +2820,8 @@ func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueSha
 	}
 
 	returnTuple, ok := res.([]any)
-	if !ok || len(returnTuple) != 5 {
-		return nil, fmt.Errorf("expected return tuple to include four items")
+	if !ok || len(returnTuple) != 6 {
+		return nil, fmt.Errorf("expected return tuple to include 6 items")
 	}
 
 	status, ok := returnTuple[0].(int64)
@@ -2806,70 +2834,52 @@ func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueSha
 		return nil, fmt.Errorf("missing refillCount in returned tuple")
 	}
 
-	backlogCount, ok := returnTuple[2].(int64)
+	backlogCountUntil, ok := returnTuple[2].(int64)
 	if !ok {
 		return nil, fmt.Errorf("missing backlogCount in returned tuple")
 	}
 
-	capacity, ok := returnTuple[3].(int64)
+	backlogCountTotal, ok := returnTuple[3].(int64)
+	if !ok {
+		return nil, fmt.Errorf("missing backlogCount in returned tuple")
+	}
+
+	capacity, ok := returnTuple[4].(int64)
 	if !ok {
 		return nil, fmt.Errorf("missing capacity in returned tuple")
 	}
 
-	refill, ok := returnTuple[4].(int64)
+	refill, ok := returnTuple[5].(int64)
 	if !ok {
 		return nil, fmt.Errorf("missing refill in returned tuple")
 	}
 
+	refillResult := &BacklogRefillResult{
+		Refilled:          int(refillCount),
+		TotalBacklogCount: int(backlogCountTotal),
+		BacklogCountUntil: int(backlogCountUntil),
+		Capacity:          int(capacity),
+		Refill:            int(refill),
+	}
+
 	switch status {
 	case 0:
-		return &BacklogRefillResult{
-			Constraint:        enums.QueueConstraintNotLimited,
-			Refilled:          int(refillCount),
-			TotalBacklogCount: int(backlogCount),
-			Capacity:          int(capacity),
-			Refill:            int(refill),
-		}, nil
+		return refillResult, nil
 	case 1:
-		return &BacklogRefillResult{
-			Constraint:        enums.QueueConstraintAccountConcurrency,
-			Refilled:          int(refillCount),
-			TotalBacklogCount: int(backlogCount),
-			Capacity:          int(capacity),
-			Refill:            int(refill),
-		}, nil
+		refillResult.Constraint = enums.QueueConstraintAccountConcurrency
+		return refillResult, nil
 	case 2:
-		return &BacklogRefillResult{
-			Constraint:        enums.QueueConstraintFunctionConcurrency,
-			Refilled:          int(refillCount),
-			TotalBacklogCount: int(backlogCount),
-			Capacity:          int(capacity),
-			Refill:            int(refill),
-		}, nil
+		refillResult.Constraint = enums.QueueConstraintFunctionConcurrency
+		return refillResult, nil
 	case 3:
-		return &BacklogRefillResult{
-			Constraint:        enums.QueueConstraintCustomConcurrencyKey1,
-			Refilled:          int(refillCount),
-			TotalBacklogCount: int(backlogCount),
-			Capacity:          int(capacity),
-			Refill:            int(refill),
-		}, nil
+		refillResult.Constraint = enums.QueueConstraintCustomConcurrencyKey1
+		return refillResult, nil
 	case 4:
-		return &BacklogRefillResult{
-			Constraint:        enums.QueueConstraintCustomConcurrencyKey2,
-			Refilled:          int(refillCount),
-			TotalBacklogCount: int(backlogCount),
-			Capacity:          int(capacity),
-			Refill:            int(refill),
-		}, nil
+		refillResult.Constraint = enums.QueueConstraintCustomConcurrencyKey2
+		return refillResult, nil
 	case 5:
-		return &BacklogRefillResult{
-			Constraint:        enums.QueueConstraintThrottle,
-			Refilled:          int(refillCount),
-			TotalBacklogCount: int(backlogCount),
-			Capacity:          int(capacity),
-			Refill:            int(refill),
-		}, nil
+		refillResult.Constraint = enums.QueueConstraintThrottle
+		return refillResult, nil
 	default:
 		return nil, fmt.Errorf("unknown status refilling backlog: %v (%T)", status, status)
 	}
@@ -3203,6 +3213,10 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 		return nil, fmt.Errorf("unsupported queue shard kind for partitionPeek: %s", q.primaryQueueShard.Kind)
 	}
 
+	shard := q.primaryQueueShard
+	client := shard.RedisClient.Client()
+	kg := shard.RedisClient.kg
+
 	if limit > PartitionPeekMax {
 		return nil, ErrPartitionPeekMaxExceedsLimits
 	}
@@ -3231,10 +3245,10 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 
 	peekRet, err := scripts["queue/partitionPeek"].Exec(
 		redis_telemetry.WithScriptName(ctx, "partitionPeek"),
-		q.primaryQueueShard.RedisClient.Client(),
+		client,
 		[]string{
 			partitionKey,
-			q.primaryQueueShard.RedisClient.kg.PartitionItem(),
+			kg.PartitionItem(),
 		},
 		args,
 	).ToAny()
@@ -3344,10 +3358,10 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 		keys := make([]string, len(fnIDs))
 		n := 0
 		for k := range fnIDs {
-			keys[n] = q.primaryQueueShard.RedisClient.kg.FnMetadata(k)
+			keys[n] = kg.FnMetadata(k)
 			n++
 		}
-		vals, err := q.primaryQueueShard.RedisClient.unshardedRc.Do(ctx, q.primaryQueueShard.RedisClient.unshardedRc.B().Mget().Key(keys...).Build()).ToAny()
+		vals, err := client.Do(ctx, client.B().Mget().Key(keys...).Build()).ToAny()
 		if err == nil {
 			// If this is an error, just ignore the error and continue.  The executor should gracefully handle
 			// accidental attempts at paused functions, as we cannot do this optimization for account or env-level
@@ -3394,7 +3408,7 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 		if item.FunctionID != nil {
 			if paused := fnIDs[*item.FunctionID]; paused {
 				// Function is pulled up when it is unpaused, so we can push it back for a long time (see SetFunctionPaused)
-				err := q.PartitionRequeue(ctx, q.primaryQueueShard, item, q.clock.Now().Truncate(time.Second).Add(PartitionPausedRequeueExtension), true)
+				err := q.PartitionRequeue(ctx, shard, item, q.clock.Now().Truncate(time.Second).Add(PartitionPausedRequeueExtension), true)
 				if err != nil && !errors.Is(err, ErrPartitionGarbageCollected) {
 					q.logger.Error().Interface("partition", item).Err(err).Msg("failed to push back paused partition")
 				} else {
@@ -3580,13 +3594,11 @@ func checkList(check string, exact, prefixes map[string]*struct{}) bool {
 func (q *queue) PartitionRequeue(ctx context.Context, shard QueueShard, p *QueuePartition, at time.Time, forceAt bool) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "PartitionRequeue"), redis_telemetry.ScopeQueue)
 
-	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
-		return fmt.Errorf("unsupported queue shard kind for PartitionRequeue: %s", q.primaryQueueShard.Kind)
-	}
-
 	if shard.Kind != string(enums.QueueShardKindRedis) {
 		return fmt.Errorf("unsupported queue shard kind for PartitionRequeue: %s", shard.Kind)
 	}
+
+	kg := shard.RedisClient.kg
 
 	functionId := uuid.Nil
 	if p.FunctionID != nil {
@@ -3594,23 +3606,26 @@ func (q *queue) PartitionRequeue(ctx context.Context, shard QueueShard, p *Queue
 	}
 
 	keys := []string{
-		shard.RedisClient.kg.PartitionItem(),
-		shard.RedisClient.kg.GlobalPartitionIndex(),
-		shard.RedisClient.kg.GlobalAccountIndex(),
+		kg.PartitionItem(),
+		kg.GlobalPartitionIndex(),
+		kg.GlobalAccountIndex(),
 		// NOTE: Old partitions will _not_ have an account ID until the next enqueue on the new code.
 		// Until this, we may not use account queues at all, as we cannot properly clean up
 		// here without knowing the Account ID
-		shard.RedisClient.kg.AccountPartitionIndex(p.AccountID),
+		kg.AccountPartitionIndex(p.AccountID),
 
 		// NOTE: Partition metadata was replaced with function metadata and is being phased out
 		// We clean up all remaining partition metadata on completely empty partitions here
 		// and are adding function metadata on enqueue to migrate to the new system
-		shard.RedisClient.kg.PartitionMeta(p.Queue()),
-		shard.RedisClient.kg.FnMetadata(functionId),
+		kg.PartitionMeta(p.Queue()),
+		kg.FnMetadata(functionId),
 
-		p.zsetKey(shard.RedisClient.kg), // Partition ZSET itself
-		p.concurrencyKey(shard.RedisClient.kg),
-		shard.RedisClient.kg.QueueItem(),
+		p.zsetKey(kg), // Partition ZSET itself
+		p.concurrencyKey(kg),
+		kg.QueueItem(),
+
+		// Backlogs in shadow partition
+		kg.ShadowPartitionSet(p.ID),
 	}
 	force := 0
 	if forceAt {

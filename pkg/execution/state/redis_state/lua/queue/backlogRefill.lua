@@ -9,7 +9,8 @@
   Returns a tuple of {
     status,               -- See status section below
     items_refilled,       -- Number of items refilled to ready queue
-    total_items,          -- Total number of items in backlog before refilling
+    items_until,          -- Number of items within provided time range in backlog before refilling
+    items_total,          -- Total number of items in backlog before refilling
     constraintCapacity,   -- Most limiting constraint capacity
     refill                -- Number of items to refill (may include missing items)
   }
@@ -63,39 +64,40 @@ local throttleLimit  = tonumber(ARGV[12])
 local throttleBurst  = tonumber(ARGV[13])
 local throttlePeriod = tonumber(ARGV[14])
 
+local keyPrefix = ARGV[15]
+
 -- $include(update_pointer_score.lua)
 -- $include(ends_with.lua)
 -- $include(update_account_queues.lua)
 -- $include(gcra.lua)
-
--- Helper method to clean up backlog pointers
-local function cleanupBacklogPointer()
-  redis.call("ZREM", keyShadowPartitionSet, backlogID)
-
-  -- If shadow partition has no more backlogs, update global/account pointers
-  if tonumber(redis.call("ZCARD", keyShadowPartitionSet)) == 0 then
-    redis.call("ZREM", keyGlobalShadowPartitionSet, partitionID)
-    redis.call("ZREM", keyAccountShadowPartitionSet, partitionID)
-
-    if tonumber(redis.call("ZCARD", keyAccountShadowPartitionSet)) == 0 then
-      redis.call("ZREM", keyGlobalAccountShadowPartitionSet, accountID)
-    end
-  end
-end
+-- $include(update_backlog_pointer.lua)
 
 --
 -- Retrieve current backlog size
 --
 
-local backlogCount = redis.call("ZCOUNT", keyBacklogSet, "-inf", refillUntilMS)
-if backlogCount == false or backlogCount == nil then
-  backlogCount = 0
+local backlogCountTotal = redis.call("ZCARD", keyBacklogSet)
+if backlogCountTotal == false or backlogCountTotal == nil then
+  backlogCountTotal = 0
 end
 
--- If backlog is empty, immediately clean up pointers and return
-if backlogCount == 0 then
-  cleanupBacklogPointer()
-  return { 0, 0, 0, 0, 0 }
+if backlogCountTotal == 0 then
+  -- update backlog pointers
+  updateBacklogPointer(keyGlobalShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, keyShadowPartitionSet, keyBacklogSet, accountID, partitionID, backlogID)
+
+  return { 0, 0, 0, backlogCountTotal, 0, 0 }
+end
+
+local backlogCountUntil = redis.call("ZCOUNT", keyBacklogSet, "-inf", refillUntilMS)
+if backlogCountUntil == false or backlogCountUntil == nil then
+  backlogCountUntil = 0
+end
+
+if backlogCountUntil == 0 then
+  -- update backlog pointers
+  updateBacklogPointer(keyGlobalShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, keyShadowPartitionSet, keyBacklogSet, accountID, partitionID, backlogID)
+
+  return { 0, 0, backlogCountUntil, backlogCountTotal, 0, 0 }
 end
 
 --
@@ -103,7 +105,7 @@ end
 --
 
 -- Set items to refill to number of items in backlog
-local refill = backlogCount
+local refill = backlogCountUntil
 
 -- Limit items to refill to max refill limit if more items are in backlog
 if refill > refillLimit then
@@ -209,17 +211,21 @@ if refill > 0 then
 
   -- Reverse the items to be added to the ready set
   local readyArgs = {}
+
   local backlogRemArgs = {}
+  local hasRemove = false
+
   local itemUpdateArgs = {}
 
   for i = 1, #itemIDs do
     local itemID = itemIDs[i]
-    local itemScore = itemScores[i]
+    local itemScore = tonumber(itemScores[i])
     local itemData = potentiallyMissingQueueItems[i]
 
     -- If queue item does not exist in hash, delete from backlog
     if itemData == false or itemData == nil or itemData == "" then
       table.insert(backlogRemArgs, itemID)  -- remove from backlog
+      hasRemove = true
     else
       -- Insert new members into ready set
       table.insert(readyArgs, itemScore)
@@ -227,11 +233,28 @@ if refill > 0 then
 
       -- Remove item from backlog
       table.insert(backlogRemArgs, itemID)
+      hasRemove = true
 
       -- Update queue item with refill data
       local updatedData = cjson.decode(itemData)
       updatedData.rf = backlogID
       updatedData.rat = nowMS
+
+      if updatedData.data ~= nil and updatedData.data.identifier ~= nil and updatedData.data.identifier.runID ~= nil then
+        -- add item to active in run
+        local runID = updatedData.data.identifier.runID
+        local keyActiveRun = string.format("%s:active:run:%s", keyPrefix, runID)
+        local updateTo = itemScore / 1000
+
+        -- increase number of active items in run
+        redis.call("INCR", keyActiveRun)
+
+        -- if the newly-added item is earlier than existing items in the run, adjust pointer scores in the function
+        -- see QueueKeyGenerator#ActivePartitionRunsIndex for reference
+        local keyIndexActivePartitionRuns = string.format("%s:active-idx:runs:%s", keyPrefix, partitionID)
+
+        redis.call("SADD", keyIndexActivePartitionRuns, runID)
+      end
 
       table.insert(itemUpdateArgs, itemID)
       table.insert(itemUpdateArgs, cjson.encode(updatedData))
@@ -241,33 +264,37 @@ if refill > 0 then
     end
   end
 
-  -- "Refill" items to ready set
-  redis.call("ZADD", keyReadySet, unpack(readyArgs))
+  if refilled > 0 then
+    -- "Refill" items to ready set
+    redis.call("ZADD", keyReadySet, unpack(readyArgs))
 
-  -- Increase active counters by number of refilled items
-  redis.call("INCRBY", keyActivePartition, refilled)
+    -- Increase active counters by number of refilled items
+    redis.call("INCRBY", keyActivePartition, refilled)
 
-  if exists_without_ending(keyActiveAccount, ":-") then
-    redis.call("INCRBY", keyActiveAccount, refilled)
+    if exists_without_ending(keyActiveAccount, ":-") then
+      redis.call("INCRBY", keyActiveAccount, refilled)
+    end
+
+    if exists_without_ending(keyActiveCompound, ":-") then
+      redis.call("INCRBY", keyActiveCompound, refilled)
+    end
+
+    if exists_without_ending(keyActiveConcurrencyKey1, ":-") then
+      redis.call("INCRBY", keyActiveConcurrencyKey1, refilled)
+    end
+
+    if exists_without_ending(keyActiveConcurrencyKey2, ":-") then
+      redis.call("INCRBY", keyActiveConcurrencyKey2, refilled)
+    end
+
+    -- Update queue items with refill data
+    redis.call("HSET", keyQueueItemHash, unpack(itemUpdateArgs))
   end
 
-  if exists_without_ending(keyActiveCompound, ":-") then
-    redis.call("INCRBY", keyActiveCompound, refilled)
+  if hasRemove then
+    -- Remove refilled or missing items from backlog
+    redis.call("ZREM", keyBacklogSet, unpack(backlogRemArgs))
   end
-
-  if exists_without_ending(keyActiveConcurrencyKey1, ":-") then
-    redis.call("INCRBY", keyActiveConcurrencyKey1, refilled)
-  end
-
-  if exists_without_ending(keyActiveConcurrencyKey2, ":-") then
-    redis.call("INCRBY", keyActiveConcurrencyKey2, refilled)
-  end
-
-  -- Remove refilled or missing items from backlog
-  redis.call("ZREM", keyBacklogSet, unpack(backlogRemArgs))
-
-  -- Update queue items with refill data
-  redis.call("HSET", keyQueueItemHash, unpack(itemUpdateArgs))
 end
 
 -- update gcra theoretical arrival time
@@ -281,17 +308,13 @@ end
 
 if refilled > 0 then
   -- Get the minimum score for the queue.
-  local minScores = redis.call("ZRANGE", keyReadySet, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")
-  local earliestScore = tonumber(minScores[2])
-
-  -- Potentially update the queue of queues.
-  local currentScore = redis.call("ZSCORE", keyGlobalPointer, partitionID)
-  if currentScore == false or tonumber(currentScore) ~= earliestScore then
-    if nowMS == nil or nowMS == false then
-      local updateTo = earliestScore/1000
-
-      update_pointer_score_to(partitionID, keyGlobalPointer, updateTo)
-      update_account_queues(keyGlobalAccountPointer, keyAccountPartitions, partitionID, accountID, updateTo)
+  local earliestScore = get_converted_earliest_pointer_score(keyReadySet)
+  if earliestScore > 0 then
+    -- Potentially update the queue of queues.
+    local currentScore = redis.call("ZSCORE", keyGlobalPointer, partitionID)
+    if currentScore == false or tonumber(currentScore) > earliestScore then
+      update_pointer_score_to(partitionID, keyGlobalPointer, earliestScore)
+      update_account_queues(keyGlobalAccountPointer, keyAccountPartitions, partitionID, accountID, earliestScore)
     end
   end
 end
@@ -300,33 +323,6 @@ end
 -- Adjust pointer scores for shadow scanning, potentially clean up
 --
 
--- Retrieve the earliest item score in the backlog
-local minScores = redis.call("ZRANGE", keyBacklogSet, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")
+updateBacklogPointer(keyGlobalShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, keyShadowPartitionSet, keyBacklogSet, accountID, partitionID, backlogID)
 
--- If backlog is empty, update dangling pointers in shadow partition
-if minScores == nil or minScores == false or minScores[2] == nil then
-  cleanupBacklogPointer()
-
-  return { status, refilled, backlogCount, constraintCapacity, refill }
-end
-
-local earliestScoreBacklog = tonumber(minScores[2])
-local updateTo = earliestScoreBacklog/1000
-
--- If backlog has more items, update pointer in shadow partition
-update_pointer_score_to(backlogID, keyShadowPartitionSet, updateTo)
-
--- In case the backlog is the new earliest item in the shadow partition,
--- update pointers to shadow partition in global indexes
-local minScores = redis.call("ZRANGE", keyShadowPartitionSet, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")
-local earliestScoreShadowPartition = tonumber(minScores[2])
-
-if earliestScoreBacklog < earliestScoreShadowPartition then
-  -- Push back shadow partition in global set
-  update_pointer_score_to(partitionID, keyGlobalShadowPartitionSet, updateTo)
-
-  -- Push back shadow partition in account set + potentially push back account in global accounts set
-  update_account_shadow_queues(keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, partitionID, accountID, updateTo)
-end
-
-return { status, refilled, backlogCount, constraintCapacity, refill }
+return { status, refilled, backlogCountUntil, backlogCountTotal, constraintCapacity, refill }

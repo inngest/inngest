@@ -570,18 +570,25 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 
 	st, err := e.smv2.Create(ctx, newState)
 	switch err {
-	case nil: // no-op
-	case state.ErrIdentifierExists:
-		// override metadata from the existing state
+	case nil, state.ErrIdentifierExists: // no-op
+	case state.ErrIdentifierTomestone:
+		return nil, ErrFunctionSkippedIdempotency
+	default:
+		return nil, fmt.Errorf("error creating run state: %w", err)
+	}
+	if st == nil {
+		return nil, fmt.Errorf("missing state after create: %w", err)
+	}
+
+	// NOTE: if the runID mismatches, it means there's already a state available
+	// and we need to override the one we already have to make sure we're using
+	// the correct metedata values
+	if metadata.ID.RunID != st.Identifier().RunID {
 		id := sv2.IDFromV1(st.Identifier())
 		metadata, err = e.smv2.LoadMetadata(ctx, id)
 		if err != nil {
 			return nil, err
 		}
-	case state.ErrIdentifierTomestone:
-		return nil, ErrFunctionSkippedIdempotency
-	default:
-		return nil, fmt.Errorf("error creating run state: %w", err)
 	}
 
 	//
@@ -2763,7 +2770,6 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, i *runInstance,
 	return err
 }
 
-// TODO Idempotency
 func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, i *runInstance, gen state.GeneratorOpcode, edge queue.PayloadEdge) error {
 	opts, err := gen.SignalOpts()
 	if err != nil {
@@ -2807,9 +2813,6 @@ func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, i *runInsta
 	}
 
 	_, err = e.pm.SavePause(ctx, pause)
-	if err == state.ErrPauseAlreadyExists {
-		return nil
-	}
 	if err == state.ErrSignalConflict {
 		return state.WrapInStandardError(
 			err,
@@ -2818,7 +2821,7 @@ func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, i *runInsta
 			"",
 		)
 	}
-	if err != nil {
+	if err != nil && !errors.Is(err, state.ErrPauseAlreadyExists) {
 		return fmt.Errorf("error saving pause when handling WaitForSignal opcode: %w", err)
 	}
 
@@ -3079,11 +3082,7 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, i *runInstan
 		},
 	}
 	_, err = e.pm.SavePause(ctx, pause)
-	if err != nil {
-		if err == state.ErrPauseAlreadyExists {
-			return nil
-		}
-
+	if err != nil && !errors.Is(err, state.ErrPauseAlreadyExists) {
 		return err
 	}
 
