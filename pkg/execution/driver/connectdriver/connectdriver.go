@@ -11,6 +11,7 @@ import (
 
 	"github.com/inngest/inngest/pkg/connect/pubsub"
 	"github.com/inngest/inngest/pkg/execution/driver/httpdriver"
+	"github.com/inngest/inngest/pkg/inngest/log"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
@@ -135,12 +136,24 @@ func ProxyRequest(ctx, traceCtx context.Context, forwarder pubsub.RequestForward
 		attribute.String("step_id", requestToForward.GetStepId()),
 	)
 
-	resp, err := do(ctx, traceCtx, forwarder, pubsub.ProxyOpts{
+	opts := pubsub.ProxyOpts{
 		AccountID: id.Tenant.AccountID,
 		EnvID:     id.Tenant.EnvID,
 		AppID:     id.Tenant.AppID,
 		Data:      &requestToForward,
-	})
+	}
+
+	if spanID, err := item.SpanID(); err != nil {
+		log.From(ctx).
+			Error().
+			Str("run_id", id.RunID.String()).
+			Err(err).
+			Msg("error retrieving span ID")
+	} else {
+		opts.SpanID = spanID.String()
+	}
+
+	resp, err := do(ctx, traceCtx, forwarder, opts)
 	if err != nil {
 		return nil, err
 	}
