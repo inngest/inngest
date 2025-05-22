@@ -3104,6 +3104,9 @@ func (q *queue) PartitionLease(ctx context.Context, p *QueuePartition, duration 
 	if err != nil {
 		return nil, 0, err
 	}
+
+	fmt.Printf("- %s: PartitionLease, Partition: %s\n", time.Now().Format(time.StampMilli), p.Queue())
+
 	result, err := scripts["queue/partitionLease"].Exec(
 		redis_telemetry.WithScriptName(ctx, "partitionLease"),
 		shard.RedisClient.unshardedRc,
@@ -3666,6 +3669,9 @@ func (q *queue) PartitionRequeue(ctx context.Context, shard QueueShard, p *Queue
 		force,
 		p.AccountID.String(),
 	})
+
+	fmt.Printf("- %s: PartitionRequeue, Partition: %s, At: %s\n", time.Now().Format(time.StampMilli), p.Queue(), at.Format(time.StampMilli))
+
 	if err != nil {
 		return err
 	}
