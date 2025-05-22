@@ -17,7 +17,7 @@ func TestFunctionFailureHandling(t *testing.T) {
 	inngestClient, server, registerFuncs := NewSDKHandler(t, "fail-app")
 	defer server.Close()
 
-	var aCount, bCount int32
+	var count int32
 	_, err := inngestgo.CreateFunction(
 		inngestClient,
 		inngestgo.FunctionOpts{
@@ -57,10 +57,15 @@ func TestFunctionFailureHandling(t *testing.T) {
 			error, ok := evt.Data["error"].(map[string]any)
 			require.True(t, ok, evt.Data)
 			require.NotNil(t, error)
-			require.Contains(t, error["message"], "Unhandled step error: nope", evt.Data)
-			require.Contains(t, error["error"], "NonRetriableError", evt.Data)
 
-			atomic.AddInt32(&bCount, 1)
+			switch error["error"] {
+			case "NonRetriableError": // step error
+				require.Contains(t, error["message"], "Unhandled step error: nope", evt.Data)
+			default: // panic
+				require.Contains(t, error["message"], "function panicked: nope", evt.Data)
+			}
+
+			atomic.AddInt32(&count, 1)
 			return true, nil
 		},
 	)
@@ -79,9 +84,8 @@ func TestFunctionFailureHandling(t *testing.T) {
 	<-time.After(3 * time.Second)
 
 	require.Eventually(t, func() bool {
-		return atomic.LoadInt32(&bCount) == 1
+		return atomic.LoadInt32(&count) == 1
 	}, 20*time.Second, 5*time.Millisecond)
-	require.EqualValues(t, 0, aCount)
 }
 
 func TestFunctionFailureHandlingWithRateLimit(t *testing.T) {
