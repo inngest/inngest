@@ -127,6 +127,7 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 		PkgName: pkgName,
 		Tags:    map[string]any{"partition_id": shadowPart.PartitionID},
 	})
+	fmt.Printf("    Backlogs: %d\n", len(backlogs))
 
 	// Refill backlogs in random order
 	fullyProcessedBacklogs := 0
@@ -180,6 +181,7 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 		if err != nil {
 			return fmt.Errorf("could not refill backlog: %w", err)
 		}
+		fmt.Printf("    Capacity: %d, Refilled: %d\n", res.Capacity, res.Refilled)
 
 		// instrumentation
 		{
@@ -404,6 +406,14 @@ func (q *queue) peekShadowPartitions(ctx context.Context, partitionIndexKey stri
 			return nil, ErrShadowPartitionPeekMaxExceedsLimits
 		}
 		return nil, fmt.Errorf("could not peek shadow partitions: %w", err)
+	}
+
+	if res.TotalCount > 0 {
+		timestamp := time.Now().Format(time.RFC3339)
+
+		for _, p := range res.Items {
+			fmt.Printf("  %s - partition: %s\n", timestamp, p.PartitionID)
+		}
 	}
 
 	return res.Items, nil
