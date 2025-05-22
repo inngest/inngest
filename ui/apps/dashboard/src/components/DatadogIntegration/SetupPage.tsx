@@ -14,10 +14,8 @@ import { useMutation, useQuery } from 'urql';
 import { graphql } from '@/gql';
 import type { DatadogConnectionStatus } from '@/gql/graphql';
 
-{
-  /* TODO(cdzombak): update link once Marketplace listing is live */
-}
-export const ddMarketplaceHref = 'https://app.datadoghq.com/marketplace';
+export const ddIntegrationHref =
+  'https://app.datadoghq.com/organization-settings/api-keys?filter=Inngest';
 
 export const GetDatadogSetupDataDocument = graphql(`
   query GetDatadogSetupData {
@@ -285,7 +283,7 @@ export default function SetupPage({}) {
               appearance="outlined"
               kind="primary"
               label="Add Organization"
-              href={ddMarketplaceHref}
+              href={ddIntegrationHref}
               className="mr-2"
             />
           )}
@@ -310,7 +308,7 @@ export default function SetupPage({}) {
               appearance="solid"
               kind="primary"
               label="Connect to Datadog"
-              href={ddMarketplaceHref}
+              href={ddIntegrationHref}
               className="text-sm"
             />
           </div>
