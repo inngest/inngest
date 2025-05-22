@@ -832,7 +832,7 @@ func TestQueueShadowScannerContinuations(t *testing.T) {
 		WorkflowID:  fnID2,
 	}, at)
 
-	qspc := make(chan shadowPartitionChanMsg, 1)
+	qspc := make(chan shadowPartitionChanMsg, 10)
 
 	sp1 := q.ItemShadowPartition(ctx, item1)
 	sp2 := q.ItemShadowPartition(ctx, item2)
