@@ -98,4 +98,4 @@ jobs:
           go-version: "1.24"
 
       - name: Run execution tests
-        run: go test ./tests/execution -v -count=1
+        run: go test ./tests/execution/... -v -count=1
