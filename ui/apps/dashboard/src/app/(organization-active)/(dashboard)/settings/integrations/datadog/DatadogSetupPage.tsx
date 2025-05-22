@@ -1,8 +1,6 @@
 import type { ReactNode } from 'react';
-import { Link } from '@inngest/components/Link';
 import { IconDatadog } from '@inngest/components/icons/platforms/Datadog';
 
-import { getBooleanFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
 import IntegrationNotEnabledMessage from '@/components/Integration/IntegrationNotEnabledMessage';
 import MetricsExportEntitlementBanner from '@/components/Integration/MetricsExportEntitlementsBanner';
 import { MetricsEntitlements } from '@/components/PrometheusIntegration/data';
@@ -23,8 +21,7 @@ export default async function DatadogSetupPage({
   content,
 }: Props) {
   const metricsEntitlements = await MetricsEntitlements();
-  const featureFlagEnabled = await getBooleanFlag('datadog-integration', { defaultValue: false });
-  const featureAvailable = featureFlagEnabled && metricsEntitlements.metricsExport.enabled;
+  const featureAvailable = metricsEntitlements.metricsExport.enabled;
 
   if (showSubtitleDocsLink && !subtitle) {
     throw new Error('programming error: without a subtitle, docs link will not be shown');
@@ -43,11 +40,11 @@ export default async function DatadogSetupPage({
         <div className="text-muted mb-6 w-full text-base font-normal">
           {subtitle}
           {/* TODO(cdzombak): Link to Datadog docs, once we've written them */}
-          {showSubtitleDocsLink && (
-            <Link target="_blank" size="medium" href="https://www.inngest.com/docs/">
-              Read documentation
-            </Link>
-          )}
+          {/*{showSubtitleDocsLink && (*/}
+          {/*  <Link target="_blank" size="medium" href="https://www.inngest.com/docs/">*/}
+          {/*    Read documentation*/}
+          {/*  </Link>*/}
+          {/*)}*/}
         </div>
       )}
 
