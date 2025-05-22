@@ -193,7 +193,7 @@ local function requeue_to_backlog(keyBacklogSet, backlogID, backlogItem, partiti
 	redis.call("HSETNX", keyShadowPartitionMeta, partitionID, shadowPartitionItem)
 
   -- Get the minimum score for the queue.
-	local earliestScore = get_earliest_score(keyBacklogSet)
+  local earliestScore = get_earliest_score(keyBacklogSet)
 
 	-- Update the backlog pointer in the shadow partition set if earlier or not exists
 	local currentScore = redis.call("ZSCORE", keyShadowPartitionSet, backlogID)
