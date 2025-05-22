@@ -14,17 +14,21 @@ import { useQuery } from '@tanstack/react-query';
 
 import { CodeBlock } from '../CodeBlock';
 import {
-  ElementWrapper,
   IDElement,
+  LazyElementWrapper,
   PillElement,
-  SkeletonElement,
   TextElement,
   TimeElement,
 } from '../DetailsCard/NewElement';
 import { Link } from '../Link';
 import { StatusDot } from '../Status/StatusDot';
 import { DragDivider } from '../icons/DragDivider';
+import { loadingSentinel, type Lazy } from '../utils/lazyLoad';
 import type { EventsTable } from './EventsTable';
+
+function toLazy<T>(data: T | undefined, isPending: boolean): Lazy<T | undefined> {
+  return isPending ? loadingSentinel : data;
+}
 
 export function EventDetails({
   initialData,
@@ -178,43 +182,40 @@ export function EventDetails({
               })}
             </div>
             <div className="mb-3 flex flex-row flex-wrap items-center justify-start gap-x-10 gap-y-4 px-4">
-              <ElementWrapper label="Event ID">
-                {isPending ? (
-                  <SkeletonElement />
-                ) : (
-                  <IDElement>{eventDetailsData?.id || '-'}</IDElement>
-                )}
-              </ElementWrapper>
-              <ElementWrapper label="Idempotency key">
-                {isPending ? (
-                  <SkeletonElement />
-                ) : (
-                  <TextElement>{eventDetailsData?.idempotencyKey || '-'}</TextElement>
-                )}
-              </ElementWrapper>
-              <ElementWrapper label="Source">
-                {isPending ? (
-                  <SkeletonElement />
-                ) : (
-                  <PillElement>{eventDetailsData?.source?.name || 'N/A'}</PillElement>
-                )}
-              </ElementWrapper>
-              <ElementWrapper label="TS">
-                {isPending ? (
-                  <SkeletonElement />
-                ) : eventDetailsData?.occurredAt ? (
-                  <TimeElement date={new Date(eventDetailsData.occurredAt)} />
-                ) : (
-                  <TextElement>-</TextElement>
-                )}
-              </ElementWrapper>
-              <ElementWrapper label="Version">
-                {isPending ? (
-                  <SkeletonElement />
-                ) : (
-                  <TextElement>{eventDetailsData?.version || '-'}</TextElement>
-                )}
-              </ElementWrapper>
+              <LazyElementWrapper
+                label="Event ID"
+                lazy={toLazy(eventDetailsData?.id, isPending)}
+                className="min-w-56"
+              >
+                {(id) => <IDElement>{id || '-'}</IDElement>}
+              </LazyElementWrapper>
+              <LazyElementWrapper
+                label="Idempotency key"
+                lazy={toLazy(eventDetailsData?.idempotencyKey, isPending)}
+              >
+                {(idempotencyKey) => <TextElement>{idempotencyKey || '-'}</TextElement>}
+              </LazyElementWrapper>
+              <LazyElementWrapper
+                label="Source"
+                lazy={toLazy(eventDetailsData?.source?.name, isPending)}
+              >
+                {(name) => <PillElement>{name || 'N/A'}</PillElement>}
+              </LazyElementWrapper>
+              <LazyElementWrapper label="TS" lazy={toLazy(eventDetailsData?.occurredAt, isPending)}>
+                {(occurredAt) =>
+                  occurredAt ? (
+                    <TimeElement date={new Date(occurredAt)} />
+                  ) : (
+                    <TextElement>-</TextElement>
+                  )
+                }
+              </LazyElementWrapper>
+              <LazyElementWrapper
+                label="Version"
+                lazy={toLazy(eventDetailsData?.version, isPending)}
+              >
+                {(version) => <TextElement>{version || '-'}</TextElement>}
+              </LazyElementWrapper>
             </div>
             {prettyPayload && (
               <div className="border-subtle border-t pl-px">
