@@ -1293,7 +1293,6 @@ func (q *queue) EnqueueItem(ctx context.Context, shard QueueShard, i osqueue.Que
 	}
 
 	i.EnqueuedAt = now.UnixMilli()
-	i.DelayMS = at.UnixMilli() - i.EnqueuedAt
 
 	defaultPartition, _ := q.ItemPartition(ctx, shard, i)
 
@@ -2310,7 +2309,8 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 
 	leaseDelay := now.Sub(time.UnixMilli(item.EnqueuedAt)).String()
 	refillDelay := now.Sub(time.UnixMilli(item.RefilledAt)).String()
-	itemDelay := (time.Duration(item.DelayMS) * time.Millisecond).String()
+	delayMS := item.AtMS - item.EnqueuedAt
+	itemDelay := (time.Duration(delayMS) * time.Millisecond).String()
 	fmt.Printf("- %s: Lease %s (%s), Partition: %s, Check: %t, Refilled: %t, Lease Delay: %s, Refill Delay: %s, Item Delay: %s\n", time.Now().Format(time.StampMilli), item.ID, item.Data.Kind, partition.PartitionID, checkConstraints, refilledFromBacklog, leaseDelay, refillDelay, itemDelay)
 
 	q.logger.Trace().Interface("item", item).

@@ -90,8 +90,9 @@ type QueueItem struct {
 	RefilledFrom string `json:"rf,omitempty"`
 	RefilledAt   int64  `json:"rat,omitempty"`
 
+	// EnqueuedAt tracks the unix timestamp of enqueueing the queue item (to the backlog or directly to
+	// the partition). This is not the same as AtMS for items scheduled in the future or past.
 	EnqueuedAt int64 `json:"eat"`
-	DelayMS    int64 `json:"dms"`
 }
 
 func (q *QueueItem) SetID(ctx context.Context, str string) {
