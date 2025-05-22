@@ -405,6 +405,7 @@ func navigateAST(nav expr, parent *Node, vars LiftedArgs, rand RandomReader) ([]
 			child.normalize()
 			result = append(result, child)
 			hasMacros = true
+
 		case celast.LiteralKind:
 			// This is a literal. Do nothing, as this is always true.
 		case celast.IdentKind:
@@ -414,14 +415,15 @@ func navigateAST(nav expr, parent *Node, vars LiftedArgs, rand RandomReader) ([]
 			// what we're trying to parse, by taking the LHS and RHS of each opeartor then bringing
 			// this up into a tree.
 
-			fn := item.ast.AsCall().FunctionName()
+			call := item.ast.AsCall()
+			fn := call.FunctionName()
 
 			// Firstly, if this is a logical not, everything within this branch is negated:
 			// !(a == b).  This flips the negated field, ie !(foo == bar) becomes foo != bar,
 			// whereas !(!(foo == bar)) stays the same.
 			if fn == operators.LogicalNot {
 				// Immediately navigate into this single expression.
-				astChild := item.ast.AsCall().Args()[0]
+				astChild := call.Args()[0]
 				stack = append(stack, expr{
 					ast:     astChild,
 					negated: !item.negated,
@@ -457,7 +459,7 @@ func navigateAST(nav expr, parent *Node, vars LiftedArgs, rand RandomReader) ([]
 
 			// For each &&, create a new child node in the .And field of the current
 			// high-level AST.
-			if item.ast.AsCall().FunctionName() == operators.LogicalAnd {
+			if fn == operators.LogicalAnd {
 				stack = append(stack, peek(item, operators.LogicalAnd)...)
 				continue
 			}
@@ -747,6 +749,17 @@ func callToPredicate(item celast.Expr, negated bool, vars LiftedArgs) *Predicate
 			// Switch the operators to ensure evaluation of predicates is correct and consistent.
 			fn = normalize(fn)
 		}
+
+	case operators.In:
+		// If this is an "in" check, we're checking the equality of a single item amongst an array.
+		// This is the same as oeprators.Equals, but with a varying number of checks.
+		switch literal.(type) {
+		case string, int64, float64:
+			// Allowed
+		default:
+			return nil
+		}
+
 	default:
 		return nil
 	}

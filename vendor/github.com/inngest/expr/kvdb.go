@@ -65,7 +65,9 @@ func (p *EvalKV[T]) Get(evalID uuid.UUID) (T, error) {
 	if err != nil {
 		return response, err
 	}
-	defer closer.Close()
+	defer func() {
+		_ = closer.Close()
+	}()
 	return p.opts.Unmarshal(byt)
 }
 

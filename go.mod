@@ -37,7 +37,7 @@ require (
 	github.com/gowebpki/jcs v1.0.0
 	github.com/graph-gophers/dataloader v5.0.0+incompatible
 	github.com/hashicorp/go-multierror v1.1.1
-	github.com/inngest/expr v0.0.0-20250509191721-c3e4aff53538
+	github.com/inngest/expr v0.0.0-20250521221349-ef1dab5028e5
 	github.com/inngest/go-httpstat v0.0.0-20250321152849-8f5b26507651
 	github.com/inngest/inngestgo v0.11.3-0.20250429191110-4664557d870a
 	github.com/jackc/pgx/v5 v5.5.4

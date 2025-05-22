@@ -634,28 +634,30 @@ func (a *aggregator[T]) iterGroup(ctx context.Context, node *Node, parsed *Parse
 func engineType(p Predicate) EngineType {
 	// switch on type of literal AND operator type.  int64/float64 literals require
 	// btrees, texts require ARTs, and so on.
-	switch p.Literal.(type) {
+	switch v := p.Literal.(type) {
 	case int, int64, float64:
-		if p.Operator == operators.NotEquals {
-			// StringHash is only used for matching on equality.
+		if p.Operator == operators.NotEquals || p.Operator == operators.In {
 			return EngineTypeNone
 		}
 		// return EngineTypeNone
 		return EngineTypeBTree
 	case string:
-		if p.Operator == operators.Equals || p.Operator == operators.NotEquals {
+		if len(v) == 0 {
+			return EngineTypeNone
+		}
+		// NOTE: operators.In acts as operators.Equals, but iterates over the given
+		// array to check each item.
+		if p.Operator == operators.In || p.Operator == operators.Equals || p.Operator == operators.NotEquals {
 			// StringHash is only used for matching on in/equality.
 			return EngineTypeStringHash
 		}
 	case nil:
-		// Only allow this if we're not comparing two idents.
+		// Only allow this if we're not comparing two idents.each element of the array and
 		if p.LiteralIdent != nil {
 			return EngineTypeNone
 		}
 		return EngineTypeNullMatch
 	}
-	// case int64, float64:
-	// 	return EngineTypeBTree
 
 	return EngineTypeNone
 }
@@ -732,27 +734,6 @@ func isAggregateable(n *Node) bool {
 		return false
 	}
 
-	switch v := n.Predicate.Literal.(type) {
-	case string:
-		if len(v) == 0 {
-			return false
-		}
-		if n.Predicate.Operator == operators.NotEquals {
-			// NOTE: NotEquals is _not_ supported.  This requires selecting all leaf nodes _except_
-			// a given leaf, iterating over a tree.  We may as well execute every expressiona s the difference
-			// is negligible.
-			return false
-		}
-		// Right now, we only support equality checking.
-		// TODO: Add GT(e)/LT(e) matching with tree iteration.
-		return n.Predicate.Operator == operators.Equals
-	case int, int64, float64:
-		return true
-	case nil:
-		// This is null, which is supported and a simple lookup to check
-		// if the event's key in question is present and is not nil.
-		return true
-	default:
-		return false
-	}
+	// If the engine type is none... this is non-aggregateable
+	return engineType(*n.Predicate) != EngineTypeNone
 }
