@@ -41,6 +41,7 @@ if existing == nil then
     return 1
 end
 
+-- Always reset lease ID so next caller can lease partition
 existing.leaseID = nil
 
 -- If there are no items in the workflow queue, we can safely remove the
