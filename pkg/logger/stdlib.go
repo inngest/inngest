@@ -180,8 +180,14 @@ type logger struct {
 }
 
 func (l *logger) With(args ...any) Logger {
-	l.Logger = l.Logger.With(args...)
-	return l
+	if len(args) == 0 {
+		return l
+	}
+
+	log := l.Logger.With(args...)
+	return &logger{
+		Logger: log,
+	}
 }
 
 func (l *logger) Trace(msg string, args ...any) {
@@ -214,18 +220,26 @@ func (l *logger) SLog() *slog.Logger {
 
 // newDevHandler constructs a dev handler to be used
 func newDevHandler(w io.Writer, opts *slog.HandlerOptions) *devHandler {
+	if opts == nil {
+		opts = &slog.HandlerOptions{
+			Level: LevelInfo,
+		}
+	}
+
 	return &devHandler{
 		writer: w,
+		opts:   opts,
 	}
 }
 
 // devHandler is used for development purposes and also provide nicer log output for the dev server
 type devHandler struct {
 	writer io.Writer
+	opts   *slog.HandlerOptions
 }
 
 func (d *devHandler) Enabled(ctx context.Context, lvl slog.Level) bool {
-	return false
+	return d.opts.Level != nil && lvl >= d.opts.Level.Level()
 }
 
 func (d *devHandler) Handle(ctx context.Context, rec slog.Record) error {
