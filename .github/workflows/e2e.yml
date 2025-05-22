@@ -9,6 +9,9 @@ on:
     paths-ignore:
       - "ui/**"
 
+permissions:
+  contents: read
+
 jobs:
   ts:
     name: TS SDK Tests
