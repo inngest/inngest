@@ -284,8 +284,6 @@ func (q *queue) scanShadowPartitions(ctx context.Context, until time.Time, qspc 
 		if err := q.scanShadowContinuations(ctx, qspc); err != nil {
 			return fmt.Errorf("error scanning shadow continuations: %w", err)
 		}
-
-		return nil
 	}
 
 	// TODO introduce weight probability to blend account/global scanning
