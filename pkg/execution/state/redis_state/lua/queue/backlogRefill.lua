@@ -244,7 +244,6 @@ if refill > 0 then
         -- add item to active in run
         local runID = updatedData.data.identifier.runID
         local keyActiveRun = string.format("%s:active:run:%s", keyPrefix, runID)
-        local updateTo = math.floor(itemScore / 1000)
 
         -- increase number of active items in run
         redis.call("INCR", keyActiveRun)
