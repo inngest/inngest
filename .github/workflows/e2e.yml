@@ -18,6 +18,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest]
+        experimentalKeyQueues: [false, true]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -55,12 +56,14 @@ jobs:
           API_URL: http://127.0.0.1:8288
           SDK_URL: http://127.0.0.1:3000/api/inngest
           TEST_MODE: true
+          EXPERIMENTAL_KEY_QUEUES_ENABLE: "${{ matrix.experimentalKeyQueues }}"
 
   golang:
     name: Go SDK Tests
     strategy:
       matrix:
         os: [ubuntu-latest]
+        experimentalKeyQueues: [ false, true ]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -85,13 +88,14 @@ jobs:
           INNGEST_SIGNING_KEY: 7468697320697320612074657374206b6579
           INNGEST_DEV: http://127.0.0.1:8288
           TEST_MODE: true
-
+          EXPERIMENTAL_KEY_QUEUES_ENABLE: "${{ matrix.experimentalKeyQueues }}"
 
   execution:
     name: Execution Tests
     strategy:
       matrix:
         os: [ubuntu-latest]
+        experimentalKeyQueues: [ false, true ]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -102,3 +106,5 @@ jobs:
 
       - name: Run execution tests
         run: go test ./tests/execution/... -v -count=1
+        env:
+          EXPERIMENTAL_KEY_QUEUES_ENABLE: "${{ matrix.experimentalKeyQueues }}"
