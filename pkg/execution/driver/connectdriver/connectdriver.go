@@ -5,6 +5,10 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"net/http"
+	"net/url"
+	"time"
+
 	"github.com/inngest/inngest/pkg/connect/pubsub"
 	"github.com/inngest/inngest/pkg/execution/driver/httpdriver"
 	"github.com/inngest/inngest/pkg/logger"
@@ -14,9 +18,6 @@ import (
 	"github.com/oklog/ulid/v2"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
-	"net/http"
-	"net/url"
-	"time"
 
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/queue"
@@ -114,6 +115,7 @@ func ProxyRequest(ctx, traceCtx context.Context, forwarder pubsub.RequestForward
 		// TODO Find out if we can supply this in a better way. We still use the URL concept a lot,
 		// even though this has no meaning in connect.
 		FunctionSlug:   r.URL.Query().Get("fnId"),
+		FunctionId:     id.FunctionID.String(),
 		RequestPayload: r.Input,
 		AppId:          id.Tenant.AppID.String(),
 		EnvId:          id.Tenant.EnvID.String(),
