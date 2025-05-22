@@ -190,6 +190,7 @@ func TestQueueRefillBacklog(t *testing.T) {
 		require.Equal(t, enums.QueueConstraintNotLimited, res.Constraint)
 
 		require.False(t, hasMember(t, r, kg.BacklogSet(expectedBacklog.BacklogID), qi.ID))
+		require.False(t, r.Exists(kg.BacklogMeta()))
 
 		require.False(t, hasMember(t, r, kg.BacklogSet(expectedBacklog.BacklogID), "missing-1"))
 		require.False(t, hasMember(t, r, kg.BacklogSet(expectedBacklog.BacklogID), "missing-2"))
@@ -603,10 +604,7 @@ func TestQueueShadowPartitionLease(t *testing.T) {
 		err = q.ShadowPartitionRequeue(ctx, shadowPart, *leaseID, nil)
 		require.NoError(t, err)
 
-		leasedPart := QueueShadowPartition{}
-		require.NoError(t, json.Unmarshal([]byte(r.HGet(kg.ShadowPartitionMeta(), shadowPart.PartitionID)), &leasedPart))
-
-		require.Nil(t, leasedPart.LeaseID)
+		require.False(t, r.Exists(kg.ShadowPartitionMeta()))
 
 		// Expect pointers to be cleaned up
 		require.False(t, r.Exists(kg.GlobalShadowPartitionSet()))

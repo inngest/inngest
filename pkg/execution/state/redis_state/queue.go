@@ -2780,6 +2780,7 @@ func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueSha
 
 	keys := []string{
 		kg.BacklogSet(b.BacklogID),
+		kg.BacklogMeta(),
 		kg.ShadowPartitionSet(sp.PartitionID),
 		kg.GlobalShadowPartitionSet(),
 		kg.GlobalAccountShadowPartitions(),

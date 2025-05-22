@@ -49,6 +49,9 @@ local minScore = get_earliest_score(keyShadowPartitionSet)
 
 -- No more backlogs, remove dangling pointers
 if minScore == 0 then
+  -- Clean up metadata
+  redis.call("HDEL", keyShadowPartitionHash, partitionID)
+
   redis.call("ZREM", keyGlobalShadowPartitionSet, partitionID)
   redis.call("ZREM", keyAccountShadowPartitionSet, partitionID)
 

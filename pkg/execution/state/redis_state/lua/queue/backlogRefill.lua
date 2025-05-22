@@ -26,24 +26,25 @@
 ]]
 
 local keyBacklogSet                      = KEYS[1]
-local keyShadowPartitionSet              = KEYS[2]
-local keyGlobalShadowPartitionSet        = KEYS[3]
-local keyGlobalAccountShadowPartitionSet = KEYS[4]
-local keyAccountShadowPartitionSet       = KEYS[5]
+local keyBacklogMeta                     = KEYS[2]
+local keyShadowPartitionSet              = KEYS[3]
+local keyGlobalShadowPartitionSet        = KEYS[4]
+local keyGlobalAccountShadowPartitionSet = KEYS[5]
+local keyAccountShadowPartitionSet       = KEYS[6]
 
-local keyReadySet                        = KEYS[6]
-local keyGlobalPointer        	         = KEYS[7] -- partition:sorted - zset
-local keyGlobalAccountPointer 	         = KEYS[8] -- accounts:sorted - zset
-local keyAccountPartitions    	         = KEYS[9] -- accounts:$accountID:partition:sorted - zset
+local keyReadySet                        = KEYS[7]
+local keyGlobalPointer        	         = KEYS[8] -- partition:sorted - zset
+local keyGlobalAccountPointer 	         = KEYS[9] -- accounts:sorted - zset
+local keyAccountPartitions    	         = KEYS[10] -- accounts:$accountID:partition:sorted - zset
 
-local keyQueueItemHash                   = KEYS[10]
+local keyQueueItemHash                   = KEYS[11]
 
 -- Constraint-related accounting keys
-local keyActiveAccount           = KEYS[11]
-local keyActivePartition         = KEYS[12]
-local keyActiveConcurrencyKey1   = KEYS[13]
-local keyActiveConcurrencyKey2   = KEYS[14]
-local keyActiveCompound          = KEYS[15]
+local keyActiveAccount           = KEYS[12]
+local keyActivePartition         = KEYS[13]
+local keyActiveConcurrencyKey1   = KEYS[14]
+local keyActiveConcurrencyKey2   = KEYS[15]
+local keyActiveCompound          = KEYS[16]
 
 local backlogID     = ARGV[1]
 local partitionID   = ARGV[2]
@@ -82,6 +83,9 @@ if backlogCountTotal == false or backlogCountTotal == nil then
 end
 
 if backlogCountTotal == 0 then
+  -- Clean up metadata if the backlog is empty
+  redis.call("HDEL", keyBacklogMeta, backlogID)
+
   -- update backlog pointers
   updateBacklogPointer(keyGlobalShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, keyShadowPartitionSet, keyBacklogSet, accountID, partitionID, backlogID)
 
@@ -321,6 +325,11 @@ end
 --
 -- Adjust pointer scores for shadow scanning, potentially clean up
 --
+
+-- Clean up backlog meta if we refilled the last item (or dropped all dangling item pointers)
+if tonumber(redis.call("ZCARD", keyBacklogSet)) == 0 then
+  redis.call("HDEL", keyBacklogMeta, backlogID)
+end
 
 updateBacklogPointer(keyGlobalShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, keyShadowPartitionSet, keyBacklogSet, accountID, partitionID, backlogID)
 
