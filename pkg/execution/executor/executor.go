@@ -546,18 +546,25 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 
 	st, err := e.smv2.Create(ctx, newState)
 	switch err {
-	case nil: // no-op
-	case state.ErrIdentifierExists:
-		// override metadata from the existing state
+	case nil, state.ErrIdentifierExists: // no-op
+	case state.ErrIdentifierTomestone:
+		return nil, ErrFunctionSkippedIdempotency
+	default:
+		return nil, fmt.Errorf("error creating run state: %w", err)
+	}
+	if st == nil {
+		return nil, fmt.Errorf("missing state after create: %w", err)
+	}
+
+	// NOTE: if the runID mismatches, it means there's already a state available
+	// and we need to override the one we already have to make sure we're using
+	// the correct metedata values
+	if metadata.ID.RunID != st.Identifier().RunID {
 		id := sv2.IDFromV1(st.Identifier())
 		metadata, err = e.smv2.LoadMetadata(ctx, id)
 		if err != nil {
 			return nil, err
 		}
-	case state.ErrIdentifierTomestone:
-		return nil, ErrFunctionSkippedIdempotency
-	default:
-		return nil, fmt.Errorf("error creating run state: %w", err)
 	}
 
 	//
