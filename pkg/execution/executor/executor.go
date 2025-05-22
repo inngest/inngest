@@ -2572,25 +2572,25 @@ func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, i *runInsta
 	itrace.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
 
 	// Default to failing if there's a conflict
-	shouldOverwriteSignalOnConflict := false
+	shouldReplaceSignalOnConflict := false
 	if opts.OnConflict == "replace" {
-		shouldOverwriteSignalOnConflict = true
+		shouldReplaceSignalOnConflict = true
 	}
 
 	pause := state.Pause{
-		ID:                        pauseID,
-		WorkspaceID:               i.md.ID.Tenant.EnvID,
-		Identifier:                sv2.NewPauseIdentifier(i.md.ID),
-		GroupID:                   i.item.GroupID,
-		Outgoing:                  gen.ID,
-		Incoming:                  edge.Edge.Incoming,
-		StepName:                  gen.UserDefinedName(),
-		Opcode:                    &opcode,
-		Expires:                   state.Time(expires),
-		DataKey:                   gen.ID,
-		SignalID:                  &opts.Signal,
-		OverwriteSignalOnConflict: shouldOverwriteSignalOnConflict,
-		MaxAttempts:               i.item.MaxAttempts,
+		ID:                      pauseID,
+		WorkspaceID:             i.md.ID.Tenant.EnvID,
+		Identifier:              sv2.NewPauseIdentifier(i.md.ID),
+		GroupID:                 i.item.GroupID,
+		Outgoing:                gen.ID,
+		Incoming:                edge.Edge.Incoming,
+		StepName:                gen.UserDefinedName(),
+		Opcode:                  &opcode,
+		Expires:                 state.Time(expires),
+		DataKey:                 gen.ID,
+		SignalID:                &opts.Signal,
+		ReplaceSignalOnConflict: shouldReplaceSignalOnConflict,
+		MaxAttempts:             i.item.MaxAttempts,
 		Metadata: map[string]any{
 			consts.OtelPropagationKey: carrier,
 		},

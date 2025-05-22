@@ -208,9 +208,9 @@ type Pause struct {
 	InvokeTargetFnID *string `json:"itFnID,omitempty"`
 	// SignalID is the ID of the signal that is responsible for this pause.
 	SignalID *string `json:"signalID,omitempty"`
-	// OverwriteSignalOnConflict indicates whether we should supersede the
+	// ReplaceSignalOnConflict indicates whether we should supersede the
 	// signal if a wait already exists for the signal ID.
-	OverwriteSignalOnConflict bool `json:"-"`
+	ReplaceSignalOnConflict bool `json:"-"`
 	// OnTimeout indicates that this incoming edge should only be ran
 	// when the pause times out, if set to true.
 	OnTimeout bool `json:"onTimeout,omitempty,omitzero"`

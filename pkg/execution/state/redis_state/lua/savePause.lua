@@ -21,7 +21,7 @@ local invokeCorrelationID = ARGV[4]
 local signalCorrelationID = ARGV[5]
 local extendedExpiry = tonumber(ARGV[6])
 local nowUnixSeconds = tonumber(ARGV[7])
-local canSupersedeSignal = ARGV[8] == "1"
+local canReplaceSignal = ARGV[8] == "1"
 
 
 if redis.call("SETNX", pauseKey, pause) == 0 then
@@ -51,7 +51,7 @@ if invokeCorrelationID ~= false and invokeCorrelationID ~= "" and invokeCorrelat
 end
 
 if signalCorrelationID ~= false and signalCorrelationID ~= "" and signalCorrelationID ~= nil then
-	if canSupersedeSignal then
+	if canReplaceSignal then
 		-- Note that this may be overwriting an existing signal wait, which is
 		-- intentional. When running this transaction, we could be part of an
 		-- idempotent retry or be overwriting an existing signal wait with
