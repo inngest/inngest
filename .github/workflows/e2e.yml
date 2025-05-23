@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   ts:
-    name: "TS SDK Tests / OS: (${{ matrix.os }}), key-queues: ${{ matrix.experimentalKeyQueues }}"
+    name: "TS SDK / OS: (${{ matrix.os }}), key-queues: ${{ matrix.experimentalKeyQueues }}"
     strategy:
       fail-fast: false
       matrix:
@@ -60,7 +60,7 @@ jobs:
           EXPERIMENTAL_KEY_QUEUES_ENABLE: "${{ matrix.experimentalKeyQueues }}"
 
   golang:
-    name: "Go SDK Tests / OS: (${{ matrix.os }}), key-queues: ${{ matrix.experimentalKeyQueues }}"
+    name: "Go SDK / OS: (${{ matrix.os }}), key-queues: ${{ matrix.experimentalKeyQueues }}"
     strategy:
       fail-fast: false
       matrix:
@@ -93,7 +93,7 @@ jobs:
           EXPERIMENTAL_KEY_QUEUES_ENABLE: "${{ matrix.experimentalKeyQueues }}"
 
   execution:
-    name: "Execution Tests / OS: (${{ matrix.os }}), key-queues: ${{ matrix.experimentalKeyQueues }}"
+    name: "Execution / OS: (${{ matrix.os }}), key-queues: ${{ matrix.experimentalKeyQueues }}"
     strategy:
       fail-fast: false
       matrix:
