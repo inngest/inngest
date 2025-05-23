@@ -30,7 +30,6 @@ func SingletonKey(ctx context.Context, id uuid.UUID, c inngest.Singleton, evt ma
 		return "", ErrEvaluatingSingletonExpression
 	}
 	if v, ok := res.(bool); ok && !v {
-		// XXX: Not entirely sure what to do in this case for now...
 		return "", ErrNotASingleton
 	}
 

@@ -535,15 +535,16 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	if req.Function.Singleton != nil {
 		singletonKey, err := singleton.SingletonKey(ctx, req.Function.ID, *req.Function.Singleton, data)
 
-		if err == singleton.ErrNotASingleton {
-			// XXX: Figure out what to do in this case...
-		}
-
-		if err != nil {
+		switch {
+		case err == nil:
+			singletonConfig = &queue.Singleton{Key: singletonKey}
+			// XXX: Maybe we should soft check if the singleton key exists here and
+			// return an error here without creating state.
+		case errors.Is(err, singleton.ErrNotASingleton):
+			// We ignore it, and we run the function normally not as a singleton
+		default:
 			return nil, err
 		}
-
-		singletonConfig = &queue.Singleton{Key: singletonKey}
 	}
 
 	//
