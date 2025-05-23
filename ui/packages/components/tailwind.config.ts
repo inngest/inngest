@@ -130,6 +130,7 @@ export default {
         btnDangerHover: 'rgb(var(--color-background-btn-dangerHover) / <alpha-value>)',
         btnDangerPressed: 'rgb(var(--color-background-btn-dangerPressed) / <alpha-value>)',
         btnDangerDisabled: 'rgb(var(--color-background-btn-dangerDisabled) / <alpha-value>)',
+        tableHeader: 'rgb(var(--color-background-tableHeader) / <alpha-value>)',
       },
       textColor: {
         basis: 'rgb(var(--color-foreground-base) / <alpha-value>)',
