@@ -213,6 +213,7 @@ export default function Stream() {
       cursor: 'pointer',
     },
     onClick: (e: React.MouseEvent<HTMLElement>) => {
+      // copy this? except clicking row might prevent clicking other buttons
       const firstRunID =
         row.original.runs && row.original.runs?.length > 0 ? row.original.runs[0]?.id : undefined;
       handleOpenSlideOver({
