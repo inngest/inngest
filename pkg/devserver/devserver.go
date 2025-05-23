@@ -373,7 +373,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		),
 		executor.WithExpressionAggregator(agg),
 		executor.WithQueue(rq),
-		executor.WithLogger(logger.From(ctx)),
+		executor.WithLogger(logger.StdlibLogger(ctx)),
 		executor.WithFunctionLoader(loader),
 		executor.WithRealtimePublisher(broadcaster),
 		executor.WithLifecycleListeners(
