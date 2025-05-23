@@ -1353,8 +1353,6 @@ func (q *queue) EnqueueItem(ctx context.Context, shard QueueShard, i osqueue.Que
 		enqueueToBacklogsVal = "1"
 	}
 
-	fmt.Printf("- %s: Enqueue %s (%s), Time: %s (Partition Time: %s), Partition: %s, Backlog: %t\n", time.Now().Format(time.StampMilli), i.ID, i.Data.Kind, at.Format(time.StampMilli), partitionTime.Format(time.StampMilli), shadowPartition.PartitionID, enqueueToBacklogs)
-
 	args, err := StrSlice([]any{
 		i,
 		i.ID,
@@ -1382,7 +1380,14 @@ func (q *queue) EnqueueItem(ctx context.Context, shard QueueShard, i osqueue.Que
 		return i, err
 	}
 
-	q.logger.Trace().Interface("item", i).Interface("fnPartition", defaultPartition).Interface("keys", keys).Interface("args", args).Msg("enqueueing item")
+	q.log.Trace("enqueue item",
+		"id", i.ID,
+		"kind", i.Data.Kind,
+		"time", at.Format(time.StampMilli),
+		"partition_time", partitionTime.Format(time.StampMilli),
+		"partition", shadowPartition.PartitionID,
+		"backlog", enqueueToBacklogs,
+	)
 
 	status, err := scripts["queue/enqueue"].Exec(
 		redis_telemetry.WithScriptName(ctx, "enqueue"),
@@ -1800,7 +1805,7 @@ func (q *queue) Migrate(ctx context.Context, sourceShardName string, fnID uuid.U
 			return err
 		}
 		if err := q.removeQueueItem(ctx, shard, partitionKey, qi.ID); err != nil {
-			logger.StdlibLogger(ctx).Error("error cleaning up queue item after migration", "error", err)
+			q.log.Error("error cleaning up queue item after migration", "error", err)
 		}
 
 		atomic.AddInt64(&processed, 1)
@@ -2307,19 +2312,19 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 		return nil, err
 	}
 
-	leaseDelay := now.Sub(time.UnixMilli(item.EnqueuedAt)).String()
-	refillDelay := now.Sub(time.UnixMilli(item.RefilledAt)).String()
 	delayMS := item.AtMS - item.EnqueuedAt
-	itemDelay := (time.Duration(delayMS) * time.Millisecond).String()
-	fmt.Printf("- %s: Lease %s (%s), Partition: %s, Check: %t, Refilled: %t, Lease Delay: %s, Refill Delay: %s, Item Delay: %s\n", time.Now().Format(time.StampMilli), item.ID, item.Data.Kind, partition.PartitionID, checkConstraints, refilledFromBacklog, leaseDelay, refillDelay, itemDelay)
 
-	q.logger.Trace().Interface("item", item).
-		Interface("partition", partition).
-		Interface("backlog", backlog).
-		Interface("keys", keys).
-		Interface("args", args).
-		Str("leaseID", leaseID.String()).
-		Msg("leasing item")
+	q.log.Trace("leasing item",
+		"id", item.ID,
+		"kind", item.Data.Kind,
+		"lease_id", leaseID.String(),
+		"partition_id", partition.PartitionID,
+		"item_delay", (time.Duration(delayMS) * time.Millisecond).String(),
+		"refill_delay", now.Sub(time.UnixMilli(item.RefilledAt)).String(),
+		"lease_delay", now.Sub(time.UnixMilli(item.EnqueuedAt)).String(),
+		"refilled", refilledFromBacklog,
+		"check", checkConstraints,
+	)
 
 	status, err := scripts["queue/lease"].Exec(
 		redis_telemetry.WithScriptName(ctx, "lease"),
@@ -2504,9 +2509,11 @@ func (q *queue) Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		return err
 	}
 
-	fmt.Printf("- %s: Dequeue %s (%s), Partition: %s\n", time.Now().Format(time.StampMilli), i.ID, i.Data.Kind, partition.PartitionID)
-
-	q.logger.Trace().Interface("partition", partition).Interface("item", i).Msg("dequeueing queue item")
+	q.log.Trace("dequeueing item",
+		"id", i.ID,
+		"kind", i.Data.Kind,
+		"partition_id", partition.PartitionID,
+	)
 
 	status, err := scripts["queue/dequeue"].Exec(
 		redis_telemetry.WithScriptName(ctx, "dequeue"),
@@ -2627,13 +2634,13 @@ func (q *queue) Requeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		return err
 	}
 
-	fmt.Printf("- %s: Requeue %s (%s), Time: %s, Partition: %s, Backlog: %s\n", time.Now().Format(time.StampMilli), i.ID, i.Data.Kind, at.Format(time.StampMilli), shadowPartition.PartitionID, requeueToBacklogsVal)
-
-	q.logger.Trace().
-		Interface("partition", fnPartition).
-		Interface("shadow", shadowPartition).
-		Interface("item", i).
-		Msg("requeueing queue item")
+	q.log.Trace("requeueing queue item",
+		"id", i.ID,
+		"kind", i.Data.Kind,
+		"time", at.Format(time.StampMilli),
+		"partition_id", shadowPartition.PartitionID,
+		"backlog", requeueToBacklogsVal,
+	)
 
 	status, err := scripts["queue/requeue"].Exec(
 		redis_telemetry.WithScriptName(ctx, "requeue"),
@@ -3107,7 +3114,12 @@ func (q *queue) PartitionLease(ctx context.Context, p *QueuePartition, duration 
 		return nil, 0, fmt.Errorf("unknown partition lease result: %v", result)
 	}
 
-	fmt.Printf("- %s: PartitionLease, Partition: %s, Status: %d, Expires: %s, Lease ID: %s\n", time.Now().Format(time.StampMilli), p.Queue(), result[0], leaseExpires.Format(time.StampMilli), leaseID.String())
+	q.log.Trace("leased partition",
+		"partition", p.Queue(),
+		"lease_id", leaseID.String(),
+		"status", result[0],
+		"expires", leaseExpires.Format(time.StampMilli),
+	)
 
 	switch result[0] {
 	case -1:
@@ -3676,7 +3688,13 @@ func (q *queue) PartitionRequeue(ctx context.Context, shard QueueShard, p *Queue
 	if p.LeaseID != nil {
 		leaseID = p.LeaseID.String()
 	}
-	fmt.Printf("- %s: PartitionRequeue, Partition: %s, At: %s, Status: %d, Lease ID: %s\n", time.Now().Format(time.StampMilli), p.Queue(), at.Format(time.StampMilli), status, leaseID)
+
+	q.log.Trace("requeued partition",
+		"partition", p.Queue(),
+		"status", status,
+		"lease_id", leaseID,
+		"at", at.Format(time.StampMilli),
+	)
 
 	switch status {
 	case 0:

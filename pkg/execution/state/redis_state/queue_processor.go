@@ -476,8 +476,6 @@ func (q *queue) worker(ctx context.Context, f osqueue.RunFunc) {
 		case <-q.quit:
 			return
 		case i := <-q.workers:
-			fmt.Println(time.Now().Format(time.RFC3339), "-", "worker job")
-
 			// Create a new context which isn't cancelled by the parent, when quit.
 			// XXX: When jobs can have their own cancellation signals, move this into
 			// process itself.
@@ -493,7 +491,7 @@ func (q *queue) worker(ctx context.Context, f osqueue.RunFunc) {
 			// We handle the error individually within process, requeueing
 			// the item into the queue.  Here, the worker can continue as
 			// usual to process the next item.
-			q.logger.Error().Err(err).Msg("error processing queue item")
+			q.log.Error("error processing queue item", "error", err, "item", i)
 		}
 	}
 }
@@ -514,10 +512,11 @@ func (q *queue) scanPartition(ctx context.Context, partitionKey string, peekLimi
 	}
 
 	if len(partitions) > 0 {
-		fmt.Printf("- %s scanPartition: Partition Key: %s, Peek Until: %s, Partitions: %d\n", time.Now().Format(time.StampMilli), partitionKey, peekUntil.Format(time.StampMilli), len(partitions))
-		for _, partition := range partitions {
-			fmt.Printf("- Partition: %s\n", partition.ID)
-		}
+		q.log.Trace("processing partitions",
+			"partition_key", partitionKey,
+			"peek_until", peekUntil.Format(time.StampMilli),
+			"partition", len(partitions),
+		)
 	}
 
 	eg := errgroup.Group{}
@@ -699,7 +698,7 @@ func (q *queue) scanContinuations(ctx context.Context) error {
 				return nil
 			}
 
-			fmt.Printf("- %s: Continuing partition %s, Count: %d\n", time.Now().Format(time.StampMilli), p.ID, c.count)
+			q.log.Trace("continue partition processing", "partition_id", p.ID, "count", c.count)
 
 			if err := q.processPartition(ctx, p, cont.count, false); err != nil {
 				if err == ErrPartitionNotFound || err == ErrPartitionGarbageCollected {
