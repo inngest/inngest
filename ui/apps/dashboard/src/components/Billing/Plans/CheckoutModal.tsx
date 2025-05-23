@@ -4,12 +4,20 @@ import { useState } from 'react';
 import { Alert } from '@inngest/components/Alert';
 import { Button } from '@inngest/components/Button';
 import { Modal } from '@inngest/components/Modal/Modal';
+import { resolveColor } from '@inngest/components/utils/colors';
+import { isDark } from '@inngest/components/utils/theme';
 import { Elements, PaymentElement, useElements, useStripe } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
+import resolveConfig from 'tailwindcss/resolveConfig';
 import { useMutation } from 'urql';
 
 import { graphql } from '@/gql';
 import { type StripeSubscriptionItemsInput } from '@/gql/graphql';
+import tailwindConfig from '../../../../tailwind.config';
+
+const {
+  theme: { colors, textColor, backgroundColor, placeholderColor },
+} = resolveConfig(tailwindConfig);
 
 export type CheckoutItem = {
   /* Inngest plan id */
@@ -45,6 +53,17 @@ export default function CheckoutModal({ items, onCancel, onSuccess }: CheckoutMo
             mode: 'subscription',
             amount: amount,
             currency: 'usd',
+            appearance: {
+              variables: {
+                colorText: resolveColor(textColor.basis, isDark()),
+                colorPrimary: resolveColor(colors.primary.moderate, isDark()),
+                colorBackground: resolveColor(backgroundColor.canvasBase, isDark()),
+                colorTextSecondary: resolveColor(textColor.subtle, isDark()),
+                colorDanger: resolveColor(textColor.error, isDark()),
+                colorWarning: resolveColor(textColor.warning, isDark()),
+                colorTextPlaceholder: resolveColor(placeholderColor.disabled, isDark()),
+              },
+            },
           }}
         >
           <CheckoutForm items={items} onSuccess={onSuccess} />
@@ -132,20 +151,26 @@ function CheckoutForm({ items, onSuccess }: { items: CheckoutItem[]; onSuccess: 
       <div className="mb-2 min-h-[290px]">
         <PaymentElement />
       </div>
-      <Alert severity="info" className="text-sm">
-        <p>Subscriptions are billed on the 1st of each month.</p>
-        <ul className="list-inside list-disc">
-          <li>
-            When upgrading, you will be charged a prorated amount for the remaining days of the
-            month based on the new plan.
-          </li>
-          <li>
-            If you switch from one paid plan to another, you will be credited for any unused time
-            from your previous plan, calculated on a prorated basis.
-          </li>
-          <li>Additional usage is calculated and billed at the end of the month.</li>
-        </ul>
-      </Alert>
+      {Boolean(error) ? (
+        <Alert severity="error" className="text-sm">
+          {error}
+        </Alert>
+      ) : (
+        <Alert severity="info" className="text-sm">
+          <p>Subscriptions are billed on the 1st of each month.</p>
+          <ul className="list-inside list-disc">
+            <li>
+              When upgrading, you will be charged a prorated amount for the remaining days of the
+              month based on the new plan.
+            </li>
+            <li>
+              If you switch from one paid plan to another, you will be credited for any unused time
+              from your previous plan, calculated on a prorated basis.
+            </li>
+            <li>Additional usage is calculated and billed at the end of the month.</li>
+          </ul>
+        </Alert>
+      )}
       <div className="mt-6 flex flex-row justify-end">
         <Button
           type="submit"
@@ -155,11 +180,6 @@ function CheckoutForm({ items, onSuccess }: { items: CheckoutItem[]; onSuccess: 
           label="Complete Upgrade"
         />
       </div>
-      {Boolean(error) && (
-        <Alert severity="error" className="text-sm">
-          {error}
-        </Alert>
-      )}
     </form>
   );
 }

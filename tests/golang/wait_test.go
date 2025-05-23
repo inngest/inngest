@@ -26,16 +26,17 @@ func TestWait(t *testing.T) {
 	c := client.New(t)
 
 	appID := "TestWait" + ulid.MustNew(ulid.Now(), nil).String()
-	h, server, registerFuncs := NewSDKHandler(t, appID)
+	inngestClient, server, registerFuncs := NewSDKHandler(t, appID)
 	defer server.Close()
 
 	// This function will invoke the other function
 	runID := ""
 	evtName := "wait-event"
 	waitEvtName := "resume"
-	fn := inngestgo.CreateFunction(
+	_, err := inngestgo.CreateFunction(
+		inngestClient,
 		inngestgo.FunctionOpts{
-			Name: "main-fn",
+			ID: "main-fn",
 		},
 		inngestgo.EventTrigger(evtName, nil),
 		func(ctx context.Context, input inngestgo.Input[DebounceEvent]) (any, error) {
@@ -54,12 +55,11 @@ func TestWait(t *testing.T) {
 			return "DONE", nil
 		},
 	)
-
-	h.Register(fn)
+	require.NoError(t, err)
 	registerFuncs()
 
 	// Trigger the main function
-	_, err := inngestgo.Send(ctx, &event.Event{Name: evtName})
+	_, err = inngestClient.Send(ctx, &event.Event{Name: evtName})
 	r.NoError(err)
 
 	t.Run("in progress wait", func(t *testing.T) {
@@ -98,7 +98,7 @@ func TestWait(t *testing.T) {
 
 	<-time.After(10 * time.Second)
 	// Trigger the main function
-	_, err = inngestgo.Send(ctx, &event.Event{Name: waitEvtName})
+	_, err = inngestClient.Send(ctx, &event.Event{Name: waitEvtName})
 	r.NoError(err)
 
 	t.Run("trace run should have appropriate data", func(t *testing.T) {
@@ -150,7 +150,7 @@ func TestWaitGroup(t *testing.T) {
 	c := client.New(t)
 
 	appID := "TestWaitGroup" + ulid.MustNew(ulid.Now(), nil).String()
-	h, server, registerFuncs := NewSDKHandler(t, appID)
+	inngestClient, server, registerFuncs := NewSDKHandler(t, appID)
 	defer server.Close()
 
 	var started int32
@@ -159,9 +159,10 @@ func TestWaitGroup(t *testing.T) {
 	evtName := "wait-group"
 	waitEvtName := "resume-group"
 
-	fn := inngestgo.CreateFunction(
+	_, err := inngestgo.CreateFunction(
+		inngestClient,
 		inngestgo.FunctionOpts{
-			Name: "main-fn",
+			ID: "main-fn",
 		},
 		inngestgo.EventTrigger(evtName, nil),
 		func(ctx context.Context, input inngestgo.Input[DebounceEvent]) (any, error) {
@@ -185,12 +186,11 @@ func TestWaitGroup(t *testing.T) {
 			return "DONE", nil
 		},
 	)
-
-	h.Register(fn)
+	require.NoError(t, err)
 	registerFuncs()
 
 	// Trigger the main function
-	_, err := inngestgo.Send(ctx, &event.Event{Name: evtName})
+	_, err = inngestClient.Send(ctx, &event.Event{Name: evtName})
 	r.NoError(err)
 
 	t.Run("in progress wait", func(t *testing.T) {
@@ -222,7 +222,7 @@ func TestWaitGroup(t *testing.T) {
 
 			execOutput := c.RunSpanOutput(ctx, *exec.OutputID)
 			assert.NotNil(t, execOutput)
-			c.ExpectSpanErrorOutput(t, "", "initial error", execOutput)
+			c.ExpectSpanErrorOutput(t, "initial error", "", execOutput)
 		})
 
 		// Wait for the WaitForEvent to appear in history
@@ -244,7 +244,7 @@ func TestWaitGroup(t *testing.T) {
 	})
 
 	// Trigger the main function
-	_, err = inngestgo.Send(ctx, &event.Event{Name: waitEvtName})
+	_, err = inngestClient.Send(ctx, &event.Event{Name: waitEvtName})
 	r.NoError(err)
 
 	t.Run("trace run should have appropriate data", func(t *testing.T) {
@@ -297,15 +297,16 @@ func TestWaitInvalidExpression(t *testing.T) {
 	c := client.New(t)
 
 	appID := "TestWaitInvalidExpression" + ulid.MustNew(ulid.Now(), nil).String()
-	h, server, registerFuncs := NewSDKHandler(t, appID)
+	inngestClient, server, registerFuncs := NewSDKHandler(t, appID)
 	defer server.Close()
 
 	// This function will invoke the other function
 	runID := ""
 	evtName := "my-event"
-	fn := inngestgo.CreateFunction(
+	_, err := inngestgo.CreateFunction(
+		inngestClient,
 		inngestgo.FunctionOpts{
-			Name: "main-fn",
+			ID: "main-fn",
 		},
 		inngestgo.EventTrigger(evtName, nil),
 		func(ctx context.Context, input inngestgo.Input[DebounceEvent]) (any, error) {
@@ -324,12 +325,11 @@ func TestWaitInvalidExpression(t *testing.T) {
 			return nil, nil
 		},
 	)
-
-	h.Register(fn)
+	require.NoError(t, err)
 	registerFuncs()
 
 	// Trigger the main function and successfully invoke the other function
-	_, err := inngestgo.Send(ctx, &event.Event{Name: evtName})
+	_, err = inngestClient.Send(ctx, &event.Event{Name: evtName})
 	r.NoError(err)
 	c.WaitForRunStatus(ctx, t, "FAILED", &runID)
 }
@@ -340,15 +340,16 @@ func TestWaitInvalidExpressionSyntaxError(t *testing.T) {
 	c := client.New(t)
 
 	appID := "TestWaitInvalidExpression" + ulid.MustNew(ulid.Now(), nil).String()
-	h, server, registerFuncs := NewSDKHandler(t, appID)
+	inngestClient, server, registerFuncs := NewSDKHandler(t, appID)
 	defer server.Close()
 
 	// This function will invoke the other function
 	runID := ""
 	evtName := "my-event"
-	fn := inngestgo.CreateFunction(
+	_, err := inngestgo.CreateFunction(
+		inngestClient,
 		inngestgo.FunctionOpts{
-			Name: "main-fn",
+			ID: "main-fn",
 		},
 		inngestgo.EventTrigger(evtName, nil),
 		func(ctx context.Context, input inngestgo.Input[DebounceEvent]) (any, error) {
@@ -367,16 +368,15 @@ func TestWaitInvalidExpressionSyntaxError(t *testing.T) {
 			return nil, nil
 		},
 	)
-
-	h.Register(fn)
+	r.NoError(err)
 	registerFuncs()
 
 	// Trigger the main function and successfully invoke the other function
-	_, err := inngestgo.Send(ctx, &event.Event{Name: evtName})
+	_, err = inngestClient.Send(ctx, &event.Event{Name: evtName})
 	r.NoError(err)
 	run := c.WaitForRunStatus(ctx, t, "FAILED", &runID)
 	assert.Equal(t,
-		`{"error":{"error":"InvalidExpression: Wait for event expression is invalid","name":"InvalidExpression","message":"Wait for event expression is invalid","stack":"error validating expression: error compiling expression: ERROR: \u003cinput\u003e:1:21: Syntax error: token recognition error at: '= '\n | event.data.userId === async.data.userId\n | ....................^"}}`,
+		`{"error":{"error":"InvalidExpression: Wait for event If expression failed to compile","name":"InvalidExpression","message":"Wait for event If expression failed to compile","stack":"error compiling expression: ERROR: \u003cinput\u003e:1:21: Syntax error: token recognition error at: '= '\n | event.data.userId === async.data.userId\n | ....................^"}}`,
 		run.Output,
 	)
 }
@@ -393,7 +393,7 @@ func TestManyWaitInvalidExpressions(t *testing.T) {
 	r := require.New(t)
 
 	appID := ulid.MustNew(ulid.Now(), nil).String()
-	h, server, registerFuncs := NewSDKHandler(t, appID)
+	inngestClient, server, registerFuncs := NewSDKHandler(t, appID)
 	defer server.Close()
 
 	type eventData struct {
@@ -403,14 +403,15 @@ func TestManyWaitInvalidExpressions(t *testing.T) {
 	var counter int32
 	var done bool
 	evtName := "my-event"
-	fn := inngestgo.CreateFunction(
+	_, err := inngestgo.CreateFunction(
+		inngestClient,
 		inngestgo.FunctionOpts{
-			Name: "main-fn",
+			ID: "main-fn",
 		},
 		inngestgo.EventTrigger(evtName, nil),
 		func(
 			ctx context.Context,
-			input inngestgo.Input[inngestgo.GenericEvent[eventData, any]],
+			input inngestgo.Input[eventData],
 		) (any, error) {
 			atomic.AddInt32(&counter, 1)
 
@@ -433,8 +434,7 @@ func TestManyWaitInvalidExpressions(t *testing.T) {
 			return nil, nil
 		},
 	)
-
-	h.Register(fn)
+	r.NoError(err)
 	registerFuncs()
 
 	// Trigger enough function runs to cause us to use the "aggregate pauses"
@@ -446,7 +446,7 @@ func TestManyWaitInvalidExpressions(t *testing.T) {
 			Name: evtName,
 		})
 	}
-	_, err := inngestgo.SendMany(ctx, badEvents)
+	_, err = inngestClient.SendMany(ctx, badEvents)
 	r.NoError(err)
 	r.EventuallyWithT(func(ct *assert.CollectT) {
 		a := assert.New(ct)
@@ -454,7 +454,7 @@ func TestManyWaitInvalidExpressions(t *testing.T) {
 	}, 20*time.Second, 100*time.Millisecond)
 
 	// Trigger a function run with a valid expression that should match.
-	_, err = inngestgo.Send(ctx, &event.Event{
+	_, err = inngestClient.Send(ctx, &event.Event{
 		Data: map[string]any{"bad": false},
 		Name: evtName,
 	})
@@ -468,7 +468,7 @@ func TestManyWaitInvalidExpressions(t *testing.T) {
 	<-time.After(time.Second)
 
 	// Send an event that should match the valid expression.
-	_, err = inngestgo.Send(ctx, &event.Event{
+	_, err = inngestClient.Send(ctx, &event.Event{
 		Data: map[string]any{"name": "Alice"},
 		Name: "match-event",
 	})

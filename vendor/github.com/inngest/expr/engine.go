@@ -2,8 +2,10 @@ package expr
 
 import (
 	"context"
+	"sync"
 
 	"github.com/cespare/xxhash/v2"
+	"github.com/google/uuid"
 )
 
 type EngineType int
@@ -16,6 +18,58 @@ const (
 	EngineTypeBTree
 	// EngineTypeART
 )
+
+func NewMatchResult() *MatchResult {
+	return &MatchResult{
+		Result: map[uuid.UUID]map[groupID]int{},
+		Lock:   &sync.Mutex{},
+	}
+}
+
+// MatchResult is a map of evaluable IDs to the groups found, and the number of elements
+// found matching that group.
+type MatchResult struct {
+	Result map[uuid.UUID]map[groupID]int
+	Lock   *sync.Mutex
+}
+
+func (m *MatchResult) Len() int {
+	m.Lock.Lock()
+	defer m.Lock.Unlock()
+	return len(m.Result)
+}
+
+// AddExprs increments the matched counter for the given eval's group ID
+func (m *MatchResult) Add(evalID uuid.UUID, gID groupID) {
+	m.Lock.Lock()
+	defer m.Lock.Unlock()
+	if _, ok := m.Result[evalID]; !ok {
+		m.Result[evalID] = map[groupID]int{}
+	}
+	m.Result[evalID][gID]++
+}
+
+// AddExprs increments the matched counter for each stored expression part.
+func (m *MatchResult) AddExprs(exprs ...*StoredExpressionPart) {
+	m.Lock.Lock()
+	defer m.Lock.Unlock()
+	for _, expr := range exprs {
+		if _, ok := m.Result[expr.EvaluableID]; !ok {
+			m.Result[expr.EvaluableID] = map[groupID]int{}
+		}
+		m.Result[expr.EvaluableID][expr.GroupID]++
+	}
+}
+
+// GroupMatches returns the total lenght of all matches for a given eval's group ID.
+func (m *MatchResult) GroupMatches(evalID uuid.UUID, gID groupID) int {
+	m.Lock.Lock()
+	defer m.Lock.Unlock()
+	if _, ok := m.Result[evalID]; !ok {
+		return 0
+	}
+	return m.Result[evalID][gID]
+}
 
 // MatchingEngine represents an engine (such as a b-tree, radix trie, or
 // simple hash map) which matches a predicate over many expressions.
@@ -30,7 +84,9 @@ type MatchingEngine interface {
 	// expression parts received.  Some may return false positives, but
 	// each MatchingEngine should NEVER omit ExpressionParts which match
 	// the given input.
-	Match(ctx context.Context, input map[string]any) (matched []*StoredExpressionPart, err error)
+	//
+	// Note that the MatchResult is mutated on input.
+	Match(ctx context.Context, input map[string]any, result *MatchResult) (err error)
 
 	// Add adds a new expression part to the matching engine for future matches.
 	Add(ctx context.Context, p ExpressionPart) error
@@ -45,8 +101,8 @@ type MatchingEngine interface {
 	// granularity of expression parts received.  Some may return false positives by
 	// ignoring the variable name.  Note that each MatchingEngine should NEVER
 	// omit ExpressionParts which match the given input;  false positives are okay,
+	Search(ctx context.Context, variable string, input any, result *MatchResult)
 	// but not returning valid matches must be impossible.
-	Search(ctx context.Context, variable string, input any) (matched []*StoredExpressionPart)
 }
 
 // Leaf represents the leaf within a tree.  This stores all expressions
@@ -100,9 +156,14 @@ func (p ExpressionPart) Equals(n ExpressionPart) bool {
 }
 
 func (p ExpressionPart) ToStored() *StoredExpressionPart {
+	var id uuid.UUID
+	if p.Parsed != nil {
+		id = p.Parsed.EvaluableID
+	}
+
 	return &StoredExpressionPart{
+		EvaluableID: id,
 		GroupID:     p.GroupID,
-		Parsed:      p.Parsed,
 		PredicateID: p.Hash(),
 		Ident:       &p.Predicate.Ident,
 	}
@@ -111,8 +172,8 @@ func (p ExpressionPart) ToStored() *StoredExpressionPart {
 // StoredExpressionPart is a lightweight expression part which only stores
 // a hash of the predicate to reduce memory usage.
 type StoredExpressionPart struct {
+	EvaluableID uuid.UUID
 	GroupID     groupID
 	PredicateID uint64
-	Parsed      *ParsedExpression
 	Ident       *string
 }

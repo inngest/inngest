@@ -15,10 +15,11 @@ import (
 	"github.com/inngest/inngest/pkg/headers"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 )
 
-func NewCmdDev() *cobra.Command {
+func NewCmdDev(rootCmd *cobra.Command) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:     "dev",
 		Short:   "Run the Inngest Dev Server for local development.",
@@ -26,16 +27,52 @@ func NewCmdDev() *cobra.Command {
 		Run:     doDev,
 	}
 
-	cmd.Flags().String("config", "", "Path to an Inngest configuration file")
-	cmd.Flags().BoolP("help", "h", false, "Output this help information")
-	cmd.Flags().String("host", "", "host to run the API on")
-	cmd.Flags().StringP("port", "p", "8288", "port to run the API on")
-	cmd.Flags().StringSliceP("sdk-url", "u", []string{}, "SDK URLs to load functions from")
-	cmd.Flags().Bool("no-discovery", false, "Disable app auto-discovery")
-	cmd.Flags().Bool("no-poll", false, "Disable polling of apps for updates")
-	cmd.Flags().Int("poll-interval", devserver.DefaultPollInterval, "Interval in seconds between polling for updates to apps")
-	cmd.Flags().Int("retry-interval", 0, "Retry interval in seconds for linear backoff when retrying functions - must be 1 or above")
-	cmd.Flags().Int("tick", 150, "The interval (in milliseconds) at which the executor checks for new work, during local development")
+	groups := []FlagGroup{}
+
+	baseFlags := pflag.NewFlagSet("base", pflag.ExitOnError)
+	baseFlags.StringSliceP("sdk-url", "u", []string{}, "App serve URLs to sync (ex. http://localhost:3000/api/inngest)")
+	baseFlags.Bool("no-discovery", false, "Disable app auto-discovery")
+	baseFlags.Bool("no-poll", false, "Disable polling of apps for updates")
+	baseFlags.String("config", "", "Path to an Inngest configuration file")
+	baseFlags.String("host", "", "Inngest server host")
+	baseFlags.StringP("port", "p", "8288", "Inngest server port")
+	baseFlags.BoolP("help", "h", false, "Output this help information")
+	cmd.Flags().AddFlagSet(baseFlags)
+	groups = append(groups, FlagGroup{name: "Flags:", fs: baseFlags})
+
+	advancedFlags := pflag.NewFlagSet("advanced", pflag.ExitOnError)
+	advancedFlags.Int("poll-interval", devserver.DefaultPollInterval, "Interval in seconds between polling for updates to apps")
+	advancedFlags.Int("retry-interval", 0, "Retry interval in seconds for linear backoff when retrying functions - must be 1 or above")
+	advancedFlags.Int("queue-workers", devserver.DefaultQueueWorkers, "Number of executor workers to execute steps from the queue")
+	advancedFlags.Int("tick", devserver.DefaultTick, "The interval (in milliseconds) at which the executor polls the queue")
+	advancedFlags.Int("connect-gateway-port", devserver.DefaultConnectGatewayPort, "Port to expose connect gateway endpoint")
+
+	cmd.Flags().AddFlagSet(advancedFlags)
+	groups = append(groups, FlagGroup{name: "Advanced Flags:", fs: advancedFlags})
+
+	groups = append(groups, FlagGroup{name: "Global Flags:", fs: rootCmd.PersistentFlags()})
+
+	cmd.SetUsageFunc(func(c *cobra.Command) error {
+		fmt.Printf("%s\n  %s\n\n%s\n%s\n\n",
+			"Usage:",
+			"inngest dev [flags]",
+			"Examples:",
+			cmd.Example,
+		)
+
+		for _, group := range groups {
+			usage := group.fs.FlagUsages()
+
+			help := ""
+			if group.name != "" {
+				help = help + group.name + "\n"
+			}
+			help = help + usage
+			fmt.Println(help)
+		}
+
+		return nil
+	})
 
 	return cmd
 }
@@ -73,10 +110,12 @@ func doDev(cmd *cobra.Command, args []string) {
 		os.Exit(1)
 	}
 	conf.EventAPI.Port = port
+	conf.CoreAPI.Port = port
 
 	host := viper.GetString("host")
 	if host != "" {
 		conf.EventAPI.Addr = host
+		conf.CoreAPI.Addr = host
 	}
 
 	urls := viper.GetStringSlice("sdk-url")
@@ -86,11 +125,14 @@ func doDev(cmd *cobra.Command, args []string) {
 	noPoll := viper.GetBool("no-poll")
 	pollInterval := viper.GetInt("poll-interval")
 	retryInterval := viper.GetInt("retry-interval")
+	queueWorkers := viper.GetInt("queue-workers")
 	tick := viper.GetInt("tick")
+	connectGatewayPort := viper.GetInt("connect-gateway-port")
 
+	traceEndpoint := fmt.Sprintf("localhost:%d", port)
 	if err := itrace.NewUserTracer(ctx, itrace.TracerOpts{
 		ServiceName:   "tracing",
-		TraceEndpoint: "localhost:8288",
+		TraceEndpoint: traceEndpoint,
 		TraceURLPath:  "/dev/traces",
 		Type:          itrace.TracerTypeOTLPHTTP,
 	}); err != nil {
@@ -101,16 +143,32 @@ func doDev(cmd *cobra.Command, args []string) {
 		_ = itrace.CloseUserTracer(ctx)
 	}()
 
+	if err := itrace.NewSystemTracer(ctx, itrace.TracerOpts{
+		ServiceName:   "tracing-system",
+		TraceEndpoint: traceEndpoint,
+		TraceURLPath:  "/dev/traces/system",
+		Type:          itrace.TracerTypeOTLPHTTP,
+	}); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	defer func() {
+		_ = itrace.CloseSystemTracer(ctx)
+	}()
+
 	conf.ServerKind = headers.ServerKindDev
 
 	opts := devserver.StartOpts{
-		Autodiscover:  !noDiscovery,
-		Config:        *conf,
-		Poll:          !noPoll,
-		PollInterval:  pollInterval,
-		RetryInterval: retryInterval,
-		Tick:          time.Duration(tick) * time.Millisecond,
-		URLs:          urls,
+		Autodiscover:       !noDiscovery,
+		Config:             *conf,
+		Poll:               !noPoll,
+		PollInterval:       pollInterval,
+		RetryInterval:      retryInterval,
+		QueueWorkers:       queueWorkers,
+		Tick:               time.Duration(tick) * time.Millisecond,
+		URLs:               urls,
+		ConnectGatewayPort: connectGatewayPort,
+		ConnectGatewayHost: conf.CoreAPI.Addr,
 	}
 
 	err = devserver.New(ctx, opts)

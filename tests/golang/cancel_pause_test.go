@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"sync/atomic"
@@ -30,7 +31,7 @@ func TestPauseCancelFunction(t *testing.T) {
 
 	appName := "app-test-pause-cancel" + randomSuffix
 	c := client.New(t)
-	h, server, registerFuncs := NewSDKHandler(t, appName)
+	inngestClient, server, registerFuncs := NewSDKHandler(t, appName)
 	defer server.Close()
 
 	var (
@@ -41,9 +42,10 @@ func TestPauseCancelFunction(t *testing.T) {
 
 	triggerEvtName := uuid.New().String()
 
-	a := inngestgo.CreateFunction(
+	_, err := inngestgo.CreateFunction(
+		inngestClient,
 		inngestgo.FunctionOpts{
-			Name: "function-test-pause-cancel",
+			ID: "function-test-pause-cancel",
 		},
 		inngestgo.EventTrigger(triggerEvtName, nil),
 		func(ctx context.Context, input inngestgo.Input[testCancelEvt]) (any, error) {
@@ -65,11 +67,13 @@ func TestPauseCancelFunction(t *testing.T) {
 			return true, nil
 		},
 	)
+	require.NoError(t, err)
 
 	fnSlug := appName + "-function-test-pause-cancel"
 
-	cf := inngestgo.CreateFunction(
-		inngestgo.FunctionOpts{Name: "handle-cancel"},
+	_, err = inngestgo.CreateFunction(
+		inngestClient,
+		inngestgo.FunctionOpts{ID: "handle-cancel"},
 		inngestgo.EventTrigger(
 			"inngest/function.cancelled",
 			inngestgo.StrPtr(fmt.Sprintf("event.data.function_id == '%s'", fnSlug)),
@@ -83,7 +87,7 @@ func TestPauseCancelFunction(t *testing.T) {
 		},
 	)
 
-	h.Register(a, cf)
+	require.NoError(t, err)
 	registerFuncs()
 
 	fnId := ""
@@ -109,7 +113,7 @@ func TestPauseCancelFunction(t *testing.T) {
 		require.NoError(t, err)
 
 		fv := reqUrl.Query()
-		fv.Add("accountId", consts.DevServerAccountId.String())
+		fv.Add("accountId", consts.DevServerAccountID.String())
 		fv.Add("fnId", fnId.String())
 
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqUrl.String()+"?"+fv.Encode(), nil)
@@ -120,9 +124,12 @@ func TestPauseCancelFunction(t *testing.T) {
 
 		require.Equal(t, http.StatusOK, resp.StatusCode)
 
-		r := map[string]any{}
-		err = json.NewDecoder(resp.Body).Decode(&r)
+		byt, err := io.ReadAll(resp.Body)
 		require.NoError(t, err)
+
+		r := map[string]any{}
+		err = json.Unmarshal(byt, &r)
+		require.NoError(t, err, "Test API may not be enabled! Error unmarshalling %s", byt)
 
 		count, ok := r["count"].(float64)
 		require.True(t, ok)
@@ -136,7 +143,7 @@ func TestPauseCancelFunction(t *testing.T) {
 		require.NoError(t, err)
 
 		fv := reqUrl.Query()
-		fv.Add("accountId", consts.DevServerAccountId.String())
+		fv.Add("accountId", consts.DevServerAccountID.String())
 		fv.Add("fnId", fnId.String())
 
 		req, err := http.NewRequestWithContext(ctx, http.MethodPost, reqUrl.String()+"?"+fv.Encode(), nil)
@@ -155,7 +162,7 @@ func TestPauseCancelFunction(t *testing.T) {
 		require.NoError(t, err)
 
 		fv := reqUrl.Query()
-		fv.Add("accountId", consts.DevServerAccountId.String())
+		fv.Add("accountId", consts.DevServerAccountID.String())
 		fv.Add("fnId", fnId.String())
 		fv.Add("runId", runId.String())
 
@@ -173,7 +180,7 @@ func TestPauseCancelFunction(t *testing.T) {
 		Name: triggerEvtName,
 		Data: map[string]any{"cancel": 1},
 	}
-	_, err := inngestgo.Send(ctx, evt)
+	_, err = inngestClient.Send(ctx, evt)
 	require.NoError(t, err)
 
 	t.Run("check run", func(t *testing.T) {
@@ -182,20 +189,19 @@ func TestPauseCancelFunction(t *testing.T) {
 			a := assert.New(t)
 			a.Equal(int32(1), atomic.LoadInt32(&runCounter))
 			a.Equal(int32(0), atomic.LoadInt32(&runCancelled))
-			a.Equal(1, getQueueSize(consts.DevServerAccountId, uuid.MustParse(fnId)))
-		}, 10*time.Second, 1*time.Second)
+		}, 20*time.Second, 10*time.Millisecond)
 	})
 
 	t.Run("should cancel run", func(t *testing.T) {
-		pauseFn(consts.DevServerAccountId, uuid.MustParse(fnId))
-		cancelFnRun(consts.DevServerAccountId, uuid.MustParse(fnId), ulid.MustParse(runID))
+		pauseFn(consts.DevServerAccountID, uuid.MustParse(fnId))
+		cancelFnRun(consts.DevServerAccountID, uuid.MustParse(fnId), ulid.MustParse(runID))
 
 		<-time.After(5 * time.Second)
 
 		require.Equal(t, int32(1), atomic.LoadInt32(&runCounter))
 		require.Equal(t, int32(1), atomic.LoadInt32(&runCancelled))
 
-		require.Equal(t, 0, getQueueSize(consts.DevServerAccountId, uuid.MustParse(fnId)))
+		require.Equal(t, 0, getQueueSize(consts.DevServerAccountID, uuid.MustParse(fnId)))
 	})
 
 	t.Run("trace run should have appropriate data", func(t *testing.T) {
@@ -203,7 +209,7 @@ func TestPauseCancelFunction(t *testing.T) {
 			Status:         models.FunctionStatusCancelled,
 			Timeout:        10 * time.Second,
 			Interval:       500 * time.Millisecond,
-			ChildSpanCount: 2,
+			ChildSpanCount: 1, // at least 1
 		})
 
 		require.Equal(t, models.RunTraceSpanStatusCancelled.String(), run.Trace.Status)

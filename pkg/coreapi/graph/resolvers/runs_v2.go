@@ -7,7 +7,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/99designs/gqlgen/graphql"
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/enums"
@@ -20,9 +19,9 @@ const (
 	maxRunItems     = 400
 )
 
-func (r *queryResolver) Runs(ctx context.Context, num int, cur *string, order []*models.RunsV2OrderBy, filter models.RunsFilterV2) (*models.RunsV2Connection, error) {
+func (qr *queryResolver) Runs(ctx context.Context, num int, cur *string, order []*models.RunsV2OrderBy, filter models.RunsFilterV2) (*models.RunsV2Connection, error) {
 	opts := toRunsQueryOpt(num, cur, order, filter)
-	runs, err := r.Data.GetTraceRuns(ctx, opts)
+	runs, err := qr.Data.GetTraceRuns(ctx, opts)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving runs: %w", err)
 	}
@@ -67,6 +66,11 @@ func (r *queryResolver) Runs(ctx context.Context, num int, cur *string, order []
 		if len(r.Output) > 0 {
 			s := string(r.Output)
 			output = &s
+		}
+
+		// If this run ID is the same as the starting cursor, do not include it.
+		if scursor != nil && r.RunID == *scursor {
+			continue
 		}
 
 		runID := ulid.MustParse(r.RunID)
@@ -121,7 +125,7 @@ func (r *queryResolver) Runs(ctx context.Context, num int, cur *string, order []
 		})
 	}
 
-	evts, err := r.Data.GetEventsByInternalIDs(ctx, evtIDs)
+	evts, err := qr.Data.GetEventsByInternalIDs(ctx, evtIDs)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving events associated with runs: %w", err)
 	}
@@ -151,16 +155,19 @@ func (r *queryResolver) Runs(ctx context.Context, num int, cur *string, order []
 	return &models.RunsV2Connection{
 		Edges:    edges,
 		PageInfo: pageInfo,
+		After:    cur,
+		Filter:   filter,
+		OrderBy:  order,
 	}, nil
 }
 
-func (r *queryResolver) Run(ctx context.Context, runID string) (*models.FunctionRunV2, error) {
+func (qr *queryResolver) Run(ctx context.Context, runID string) (*models.FunctionRunV2, error) {
 	runid, err := ulid.Parse(runID)
 	if err != nil {
 		return nil, fmt.Errorf("error parsing runID: %w", err)
 	}
 
-	run, err := r.Data.GetTraceRun(ctx, cqrs.TraceRunIdentifier{RunID: runid})
+	run, err := qr.Data.GetTraceRun(ctx, cqrs.TraceRunIdentifier{RunID: runid})
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving run: %w", err)
 	}
@@ -224,18 +231,19 @@ func (r *queryResolver) Run(ctx context.Context, runID string) (*models.Function
 		BatchCreatedAt: batchTS,
 		CronSchedule:   run.CronSchedule,
 		Output:         output,
+		HasAi:          run.HasAI,
 	}
 
 	return &res, nil
 }
 
-func (r *queryResolver) RunTraceSpanOutputByID(ctx context.Context, outputID string) (*models.RunTraceSpanOutput, error) {
+func (qr *queryResolver) RunTraceSpanOutputByID(ctx context.Context, outputID string) (*models.RunTraceSpanOutput, error) {
 	id := &cqrs.SpanIdentifier{}
 	if err := id.Decode(outputID); err != nil {
 		return nil, fmt.Errorf("error parsing span identifier: %w", err)
 	}
 
-	spanData, err := r.Data.GetSpanOutput(ctx, *id)
+	spanData, err := qr.Data.GetSpanOutput(ctx, *id)
 	if err != nil {
 		return nil, err
 	}
@@ -267,13 +275,13 @@ func (r *queryResolver) RunTraceSpanOutputByID(ctx context.Context, outputID str
 	return &resp, nil
 }
 
-func (r *queryResolver) RunTrigger(ctx context.Context, runID string) (*models.RunTraceTrigger, error) {
+func (qr *queryResolver) RunTrigger(ctx context.Context, runID string) (*models.RunTraceTrigger, error) {
 	runid, err := ulid.Parse(runID)
 	if err != nil {
 		return nil, fmt.Errorf("error parsing runID: %w", err)
 	}
 
-	run, err := r.Data.GetTraceRun(ctx, cqrs.TraceRunIdentifier{RunID: runid})
+	run, err := qr.Data.GetTraceRun(ctx, cqrs.TraceRunIdentifier{RunID: runid})
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving run: %w", err)
 	}
@@ -299,7 +307,7 @@ func (r *queryResolver) RunTrigger(ctx context.Context, runID string) (*models.R
 		}
 	}
 
-	events, err := r.Data.GetEventsByInternalIDs(ctx, evtIDs)
+	events, err := qr.Data.GetEventsByInternalIDs(ctx, evtIDs)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving events: %w", err)
 	}
@@ -353,22 +361,7 @@ func (r *queryResolver) RunTrigger(ctx context.Context, runID string) (*models.R
 }
 
 func (r *runsV2ConnResolver) TotalCount(ctx context.Context, obj *models.RunsV2Connection) (int, error) {
-	cursor, ok := graphql.GetFieldContext(ctx).Parent.Args["after"].(*string)
-	if !ok {
-		return 0, fmt.Errorf("failed to access cursor")
-	}
-
-	orderBy, ok := graphql.GetFieldContext(ctx).Parent.Args["orderBy"].([]*models.RunsV2OrderBy)
-	if !ok {
-		return 0, fmt.Errorf("failed to retrieve order")
-	}
-
-	filter, ok := graphql.GetFieldContext(ctx).Parent.Args["filter"].(models.RunsFilterV2)
-	if !ok {
-		return 0, fmt.Errorf("failed to access query filter")
-	}
-
-	opts := toRunsQueryOpt(0, cursor, orderBy, filter)
+	opts := toRunsQueryOpt(0, obj.After, obj.OrderBy, obj.Filter)
 	count, err := r.Data.GetTraceRunsCount(ctx, opts)
 	if err != nil {
 		return 0, fmt.Errorf("error retrieving count for runs: %w", err)

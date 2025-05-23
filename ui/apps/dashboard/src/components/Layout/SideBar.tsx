@@ -58,7 +58,12 @@ export default function SideBar({
          }  sticky z-[51] shrink-0 overflow-visible border-r`}
       ref={navRef}
     >
-      <Logo collapsed={collapsed} setCollapsed={setCollapsed} />
+      <Logo
+        collapsed={collapsed}
+        envSlug={activeEnv?.slug ?? 'production'}
+        envName={activeEnv?.name ?? 'Production'}
+        setCollapsed={setCollapsed}
+      />
       <div className="flex grow flex-col justify-between">
         <Navigation collapsed={collapsed} activeEnv={activeEnv} />
 

@@ -9,29 +9,51 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/inngest/inngest/pkg/event"
-	"github.com/inngest/inngest/pkg/expressions"
-
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
+	"github.com/inngest/inngest/pkg/expressions"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/inngest/log"
 	"github.com/oklog/ulid/v2"
 )
 
-func NewRedisBatchManager(b *redis_state.BatchClient, q redis_state.QueueManager) BatchManager {
-	return redisBatchManager{
-		b: b,
-		q: q,
+const (
+	defaultBatchSizeLimit = 10 * 1024 * 1024 // 10MiB
+)
+
+type RedisBatchManagerOpt func(m *redisBatchManager)
+
+func WithRedisBatchSizeLimit(l int) RedisBatchManagerOpt {
+	return func(m *redisBatchManager) {
+		m.sizeLimit = l
 	}
+}
+
+func NewRedisBatchManager(b *redis_state.BatchClient, q redis_state.QueueManager, opts ...RedisBatchManagerOpt) BatchManager {
+	manager := redisBatchManager{
+		b:         b,
+		q:         q,
+		sizeLimit: defaultBatchSizeLimit,
+	}
+
+	for _, apply := range opts {
+		apply(&manager)
+	}
+
+	return manager
 }
 
 type redisBatchManager struct {
 	b *redis_state.BatchClient
 	q redis_state.QueueManager
+
+	// sizeLimit is the size limit that a batch can have
+	sizeLimit int
 }
 
 func (b redisBatchManager) batchKey(ctx context.Context, evt event.Event, fn inngest.Function) (string, error) {
@@ -110,6 +132,7 @@ func (b redisBatchManager) Append(ctx context.Context, bi BatchItem, fn inngest.
 		b.b.KeyGenerator().QueuePrefix(ctx, bi.FunctionID),
 		enums.BatchStatusPending,
 		enums.BatchStatusStarted,
+		b.sizeLimit,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("error preparing batch: %w", err)
@@ -199,7 +222,7 @@ func (b redisBatchManager) StartExecution(ctx context.Context, functionId uuid.U
 // ScheduleExecution enqueues a job to run the batch job after the specified duration.
 func (b redisBatchManager) ScheduleExecution(ctx context.Context, opts ScheduleBatchOpts) error {
 	jobID := opts.JobID()
-	maxAttempts := 20
+	maxAttempts := consts.MaxRetries + 1
 
 	queueName := queue.KindScheduleBatch
 	err := b.q.Enqueue(ctx, queue.Item{

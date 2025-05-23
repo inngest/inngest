@@ -12,6 +12,7 @@ import { RiArchive2Line, RiFirstAidKitLine, RiMore2Line } from '@remixicon/react
 
 export type AppActions = {
   isArchived: boolean;
+  showUnarchive?: boolean;
   showArchive: () => void;
   showValidate: () => void;
   disableArchive?: boolean;
@@ -19,6 +20,7 @@ export type AppActions = {
 };
 
 export const ActionsMenu = ({
+  showUnarchive = true,
   isArchived,
   showArchive,
   showValidate,
@@ -28,25 +30,32 @@ export const ActionsMenu = ({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button kind="primary" appearance="outlined" size="medium" icon={<RiMore2Line />} />
+        <Button kind="primary" appearance="outlined" size="medium" icon={<RiMore2Line />} raw />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem disabled={disableValidate} onSelect={showValidate}>
-          <OptionalTooltip tooltip={disableValidate && 'No syncs. App health check not available.'}>
+        <OptionalTooltip
+          tooltip={disableValidate ? 'No syncs. App health check not available.' : undefined}
+        >
+          <DropdownMenuItem disabled={disableValidate} onSelect={showValidate}>
             <RiFirstAidKitLine className="h-4 w-4" />
             Check app health
-          </OptionalTooltip>
-        </DropdownMenuItem>
-
-        {!isArchived && (
-          <DropdownMenuItem disabled={disableArchive} onSelect={showArchive} className="text-error">
-            <OptionalTooltip
-              tooltip={disableArchive && 'Parent app is archived. Archive action not available.'}
+          </DropdownMenuItem>
+        </OptionalTooltip>
+        {(!isArchived || showUnarchive) && (
+          <OptionalTooltip
+            tooltip={
+              disableArchive ? 'Parent app is archived. Archive action not available.' : undefined
+            }
+          >
+            <DropdownMenuItem
+              disabled={disableArchive}
+              onSelect={showArchive}
+              className="text-error"
             >
               <RiArchive2Line className="h-4 w-4" />
-              Archive app
-            </OptionalTooltip>
-          </DropdownMenuItem>
+              {isArchived ? 'Unarchive app' : 'Archive app'}
+            </DropdownMenuItem>
+          </OptionalTooltip>
         )}
       </DropdownMenuContent>
     </DropdownMenu>

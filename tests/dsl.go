@@ -80,10 +80,12 @@ func (t *Test) Func(f func() error) func() {
 func (t *Test) Send(evt inngestgo.Event) func() {
 	return func() {
 		url := eventURL.String()
-		client := inngestgo.NewClient(inngestgo.ClientOpts{
+		client, err := inngestgo.NewClient(inngestgo.ClientOpts{
+			AppID:    "test",
 			EventKey: &eventKey,
 			EventURL: &url,
 		})
+		require.NoError(t.test, err)
 		id, err := client.Send(context.Background(), evt)
 		require.NoError(t.test, err)
 		t.lastEventID = &id

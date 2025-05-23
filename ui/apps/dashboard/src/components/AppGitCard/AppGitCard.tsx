@@ -1,5 +1,5 @@
 import type { Route } from 'next';
-import { AppDetailsCard, CardItem } from '@inngest/components/Apps/AppDetailsCard';
+import AppDetailsCard from '@inngest/components/Apps/AppDetailsCard';
 import { Link } from '@inngest/components/Link';
 
 type Props = {
@@ -23,7 +23,7 @@ export function AppGitCard({ className, sync }: Props) {
   if (commitHash) {
     if (repoURL) {
       commitHashValue = (
-        <Link href={`${repoURL}/commit/${commitHash}` as Route} target="_blank" size="medium">
+        <Link href={`${repoURL}/commit/${commitHash}` as Route} target="_blank" size="small">
           <span className="truncate">{commitHash.substring(0, 7)}</span>
         </Link>
       );
@@ -38,7 +38,7 @@ export function AppGitCard({ className, sync }: Props) {
   if (commitRef) {
     if (repoURL) {
       commitRefValue = (
-        <Link href={`${repoURL}/tree/${commitRef}` as Route} target="_blank" size="medium">
+        <Link href={`${repoURL}/tree/${commitRef}` as Route} target="_blank" size="small">
           <span className="truncate">{commitRef}</span>
         </Link>
       );
@@ -52,7 +52,7 @@ export function AppGitCard({ className, sync }: Props) {
   let repositoryValue;
   if (repoURL) {
     repositoryValue = (
-      <Link href={repoURL as Route} target="_blank" size="medium">
+      <Link href={repoURL as Route} target="_blank" size="small">
         <span className="truncate">{repoURL}</span>
       </Link>
     );
@@ -63,15 +63,19 @@ export function AppGitCard({ className, sync }: Props) {
   return (
     <AppDetailsCard className={className} title="Commit information">
       {/* Row 1 */}
-      <CardItem className="col-span-4" detail={commitMessage} term="Commit message" />
+      <AppDetailsCard.Item className="col-span-4" detail={commitMessage} term="Commit message" />
 
       {/* Row 2 */}
-      <CardItem className="truncate" detail={commitAuthor} term="Commit author" />
-      <CardItem className="truncate" detail={commitRefValue} term="Commit ref" />
-      <CardItem className="truncate" detail={commitHashValue} term="Commit hash" />
+      <AppDetailsCard.Item className="truncate" detail={commitAuthor} term="Commit author" />
+      <AppDetailsCard.Item className="truncate" detail={commitRefValue} term="Commit ref" />
+      <AppDetailsCard.Item className="truncate" detail={commitHashValue} term="Commit hash" />
 
       {/* Row 3 */}
-      <CardItem className="col-span-4 truncate" detail={repositoryValue} term="Repository" />
+      <AppDetailsCard.Item
+        className="col-span-4 truncate"
+        detail={repositoryValue}
+        term="Repository"
+      />
     </AppDetailsCard>
   );
 }

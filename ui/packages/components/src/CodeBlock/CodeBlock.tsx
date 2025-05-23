@@ -13,10 +13,11 @@ import { IconWrapText } from '@inngest/components/icons/WrapText';
 import { cn } from '@inngest/components/utils/classNames';
 import { FONT, LINE_HEIGHT, createColors, createRules } from '@inngest/components/utils/monaco';
 import Editor, { useMonaco } from '@monaco-editor/react';
-import { RiDownload2Line } from '@remixicon/react';
+import { RiCollapseDiagonalLine, RiDownload2Line, RiExpandDiagonalLine } from '@remixicon/react';
 import { type editor } from 'monaco-editor';
 import { useLocalStorage } from 'react-use';
 
+import { Fullscreen } from '../Fullscreen/Fullscreen';
 import { isDark } from '../utils/theme';
 
 const MAX_HEIGHT = 280; // Equivalent to 10 lines + padding
@@ -46,11 +47,23 @@ interface CodeBlockProps {
   };
   actions?: CodeBlockAction[];
   minLines?: number;
+  allowFullScreen?: boolean;
+  resize?: boolean;
+  alwaysFullHeight?: boolean;
 }
 
-export function CodeBlock({ header, tab, actions = [], minLines = 0 }: CodeBlockProps) {
+export function CodeBlock({
+  header,
+  tab,
+  actions = [],
+  minLines = 0,
+  allowFullScreen = false,
+  resize = false,
+  alwaysFullHeight = false,
+}: CodeBlockProps) {
   const [dark, setDark] = useState(isDark());
   const [editorHeight, setEditorHeight] = useState(0);
+  const [fullScreen, setFullScreen] = useState(false);
   const editorRef = useRef<MonacoEditorType>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
 
@@ -83,10 +96,10 @@ export function CodeBlock({ header, tab, actions = [], minLines = 0 }: CodeBlock
   }, [monaco, dark]);
 
   useEffect(() => {
-    if (editorRef.current) {
+    if (editorRef.current && !alwaysFullHeight) {
       updateEditorLayout(editorRef.current);
     }
-  }, [isWordWrap, isFullHeight]);
+  }, [isWordWrap, isFullHeight, fullScreen, resize, alwaysFullHeight]);
 
   function getTextWidth(text: string, font: string) {
     const canvas = document.createElement('canvas');
@@ -190,7 +203,7 @@ export function CodeBlock({ header, tab, actions = [], minLines = 0 }: CodeBlock
         }
       }
 
-      if (totalLinesThatFit > MAX_LINES && !isFullHeight) {
+      if (totalLinesThatFit > MAX_LINES && !isFullHeight && !alwaysFullHeight) {
         editor.layout({ height: MAX_HEIGHT, width: containerWidthWithLineNumbers });
         setEditorHeight(MAX_HEIGHT);
       } else {
@@ -237,142 +250,160 @@ export function CodeBlock({ header, tab, actions = [], minLines = 0 }: CodeBlock
   return (
     <>
       {monaco && (
-        <>
-          <div className={cn('bg-canvasBase border-subtle border-b')}>
-            <div
-              className={cn(
-                'flex items-center justify-between border-l-4 border-l-transparent',
-                header?.status === 'error' && 'border-l-status-failed',
-                header?.status === 'success' && 'border-l-status-completed'
-              )}
-            >
-              <p
+        <Fullscreen fullScreen={fullScreen}>
+          <div className={cn('relative', fullScreen && 'bg-canvasBase fixed inset-0 z-[52]')}>
+            <div className={cn('bg-canvasBase border-subtle border-b')}>
+              <div
                 className={cn(
-                  header?.status === 'error' ? 'text-status-failedText' : 'text-subtle',
-                  ' px-5 py-2.5 text-sm',
-                  'max-h-24 text-ellipsis break-words' // Handle long titles
+                  'flex items-center justify-between border-l-4 border-l-transparent',
+                  header?.status === 'error' && 'border-l-status-failed',
+                  header?.status === 'success' && 'border-l-status-completed'
                 )}
               >
-                {header?.title}
-              </p>
-              {!isOutputTooLarge && (
-                <div className="mr-4 flex items-center gap-2 py-2">
-                  {actions.map(({ label, title, icon, onClick, disabled }, idx) => (
-                    <Button
-                      key={idx}
-                      icon={icon}
-                      onClick={onClick}
+                <p
+                  className={cn(
+                    header?.status === 'error' ? 'text-status-failedText' : 'text-subtle',
+                    ' px-5 py-2.5 text-sm',
+                    'max-h-24 text-ellipsis break-words' // Handle long titles
+                  )}
+                >
+                  {header?.title}
+                </p>
+                {!isOutputTooLarge && (
+                  <div className="mr-4 flex items-center gap-2 py-2">
+                    {actions.map(({ label, title, icon, onClick, disabled }, idx) => (
+                      <Button
+                        key={idx}
+                        icon={icon}
+                        onClick={onClick}
+                        size="small"
+                        aria-label={label}
+                        title={title ?? label}
+                        label={label}
+                        disabled={disabled}
+                        appearance="outlined"
+                        kind="secondary"
+                      />
+                    ))}
+                    <CopyButton
                       size="small"
-                      aria-label={label}
-                      title={title ?? label}
-                      label={label}
-                      disabled={disabled}
+                      code={content}
+                      isCopying={isCopying}
+                      handleCopyClick={handleCopyClick}
+                      appearance="outlined"
+                    />
+                    <Button
+                      icon={isWordWrap ? <IconOverflowText /> : <IconWrapText />}
+                      onClick={handleWrapText}
+                      size="small"
+                      aria-label={isWordWrap ? 'Do not wrap text' : 'Wrap text'}
+                      title={isWordWrap ? 'Do not wrap text' : 'Wrap text'}
+                      tooltip={isWordWrap ? 'Do not wrap text' : 'Wrap text'}
                       appearance="outlined"
                       kind="secondary"
                     />
-                  ))}
-                  <CopyButton
-                    size="small"
-                    code={content}
-                    isCopying={isCopying}
-                    handleCopyClick={handleCopyClick}
-                    appearance="outlined"
-                  />
-                  <Button
-                    icon={isWordWrap ? <IconOverflowText /> : <IconWrapText />}
-                    onClick={handleWrapText}
-                    size="small"
-                    aria-label={isWordWrap ? 'Do not wrap text' : 'Wrap text'}
-                    title={isWordWrap ? 'Do not wrap text' : 'Wrap text'}
-                    tooltip={isWordWrap ? 'Do not wrap text' : 'Wrap text'}
-                    appearance="outlined"
-                    kind="secondary"
-                  />
-                  <Button
-                    onClick={handleFullHeight}
-                    size="small"
-                    icon={isFullHeight ? <IconShrinkText /> : <IconExpandText />}
-                    aria-label={isFullHeight ? 'Shrink text' : 'Expand text'}
-                    title={isFullHeight ? 'Shrink text' : 'Expand text'}
-                    tooltip={isFullHeight ? 'Shrink text' : 'Expand text'}
-                    appearance="outlined"
-                    kind="secondary"
-                  />
-                </div>
+                    {!alwaysFullHeight && (
+                      <Button
+                        onClick={handleFullHeight}
+                        size="small"
+                        icon={isFullHeight ? <IconShrinkText /> : <IconExpandText />}
+                        aria-label={isFullHeight ? 'Shrink text' : 'Expand text'}
+                        title={isFullHeight ? 'Shrink text' : 'Expand text'}
+                        tooltip={isFullHeight ? 'Shrink text' : 'Expand text'}
+                        appearance="outlined"
+                        kind="secondary"
+                      />
+                    )}
+                    {allowFullScreen && (
+                      <Button
+                        onClick={() => setFullScreen(!fullScreen)}
+                        size="small"
+                        icon={fullScreen ? <RiCollapseDiagonalLine /> : <RiExpandDiagonalLine />}
+                        aria-label="Full screen"
+                        title="Full screen"
+                        tooltip="Full screen"
+                        appearance="outlined"
+                        kind="secondary"
+                      />
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+            <div
+              ref={wrapperRef}
+              className={cn('relative', (alwaysFullHeight || fullScreen) && 'h-screen')}
+            >
+              {isOutputTooLarge ? (
+                <>
+                  <Alert severity="warning">Output size is too large to render {`( > 1MB )`}</Alert>
+                  <div className="flex h-24 items-center justify-center	">
+                    <Button
+                      label="Download Raw"
+                      icon={<RiDownload2Line />}
+                      onClick={() => downloadJson({ content: content })}
+                      appearance="outlined"
+                      kind="secondary"
+                    />
+                  </div>
+                </>
+              ) : (
+                <Editor
+                  className={cn('relative', (alwaysFullHeight || fullScreen) && 'h-full')}
+                  height={alwaysFullHeight || fullScreen ? '100%' : editorHeight}
+                  defaultLanguage={language}
+                  value={content}
+                  theme="inngest-theme"
+                  options={{
+                    // Need to set automaticLayout to true to avoid a resizing bug
+                    // (code block never narrows). This is combined with the
+                    // `absolute` class and explicit height prop
+                    automaticLayout: true,
+
+                    extraEditorClassName: '!w-full',
+                    readOnly: readOnly,
+                    minimap: {
+                      enabled: false,
+                    },
+                    lineNumbers: 'on',
+                    contextmenu: false,
+                    scrollBeyondLastLine: alwaysFullHeight ? true : false,
+                    fontFamily: FONT.font,
+                    fontSize: FONT.size,
+                    fontWeight: 'light',
+                    lineHeight: LINE_HEIGHT,
+                    renderLineHighlight: 'none',
+                    renderWhitespace: 'none',
+                    guides: {
+                      indentation: false,
+                      highlightActiveBracketPair: false,
+                      highlightActiveIndentation: false,
+                    },
+                    scrollbar: {
+                      verticalScrollbarSize: 10,
+                      alwaysConsumeMouseWheel: false,
+                    },
+                    padding: {
+                      top: 10,
+                      bottom: 10,
+                    },
+                    wordWrap: isWordWrap ? 'on' : 'off',
+                  }}
+                  onMount={(editor) => {
+                    handleEditorDidMount(editor);
+                    !alwaysFullHeight && updateEditorLayout(editor);
+                  }}
+                  onChange={(value) => {
+                    if (value !== undefined) {
+                      handleChange && handleChange(value);
+                      !alwaysFullHeight && updateEditorLayout(editorRef.current);
+                    }
+                  }}
+                />
               )}
             </div>
           </div>
-          {/* Content */}
-          <div ref={wrapperRef}>
-            {isOutputTooLarge ? (
-              <>
-                <Alert severity="warning">Output size is too large to render {`( > 1MB )`}</Alert>
-                <div className="flex h-24 items-center justify-center	">
-                  <Button
-                    label="Download Raw"
-                    icon={<RiDownload2Line />}
-                    onClick={() => downloadJson({ content: content })}
-                    appearance="outlined"
-                    kind="secondary"
-                  />
-                </div>
-              </>
-            ) : (
-              <Editor
-                className="absolute"
-                height={editorHeight}
-                defaultLanguage={language}
-                value={content}
-                theme="inngest-theme"
-                options={{
-                  // Need to set automaticLayout to true to avoid a resizing bug
-                  // (code block never narrows). This is combined with the
-                  // `absolute` class and explicit height prop
-                  automaticLayout: true,
-
-                  extraEditorClassName: '!w-full',
-                  readOnly: readOnly,
-                  minimap: {
-                    enabled: false,
-                  },
-                  lineNumbers: 'on',
-                  contextmenu: false,
-                  scrollBeyondLastLine: false,
-                  fontFamily: FONT.font,
-                  fontSize: FONT.size,
-                  fontWeight: 'light',
-                  lineHeight: LINE_HEIGHT,
-                  renderLineHighlight: 'none',
-                  renderWhitespace: 'none',
-                  guides: {
-                    indentation: false,
-                    highlightActiveBracketPair: false,
-                    highlightActiveIndentation: false,
-                  },
-                  scrollbar: {
-                    verticalScrollbarSize: 10,
-                    alwaysConsumeMouseWheel: false,
-                  },
-                  padding: {
-                    top: 10,
-                    bottom: 10,
-                  },
-                  wordWrap: isWordWrap ? 'on' : 'off',
-                }}
-                onMount={(editor) => {
-                  handleEditorDidMount(editor);
-                  updateEditorLayout(editor);
-                }}
-                onChange={(value) => {
-                  if (value !== undefined) {
-                    handleChange && handleChange(value);
-                    updateEditorLayout(editorRef.current);
-                  }
-                }}
-              />
-            )}
-          </div>
-        </>
+        </Fullscreen>
       )}
     </>
   );

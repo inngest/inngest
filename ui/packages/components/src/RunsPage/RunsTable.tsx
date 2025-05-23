@@ -88,9 +88,9 @@ export default function RunsTable({
     },
   });
 
-  const tableStyles = 'w-full border-b border-subtle';
-  const tableHeadStyles = 'shadow-subtle shadow-[0_1px_0] sticky top-0 bg-canvasBase z-[1]';
-  const tableBodyStyles = 'divide-y divide-subtle';
+  const tableStyles = 'w-full';
+  const tableHeadStyles = 'bg-canvasSubtle sticky top-0 z-[2]';
+  const tableBodyStyles = 'divide-y divide-light';
   const tableColumnStyles = 'px-4';
 
   const isEmpty = data.length < 1 && !isLoading;
@@ -99,11 +99,11 @@ export default function RunsTable({
     <table className={cn(tableStyles, isEmpty && 'border-b-0')}>
       <thead className={tableHeadStyles}>
         {table.getHeaderGroups().map((headerGroup) => (
-          <tr key={headerGroup.id} className="h-12">
+          <tr key={headerGroup.id} className="h-9">
             {headerGroup.headers.map((header) => (
               <th
                 key={header.id}
-                className={cn(tableColumnStyles, 'text-muted text-left text-sm font-semibold')}
+                className={cn(tableColumnStyles, 'text-muted text-left text-xs font-medium')}
               >
                 {header.isPlaceholder ? null : (
                   <div
@@ -141,7 +141,7 @@ export default function RunsTable({
             <Fragment key={row.original.id}>
               <tr
                 key={row.original.id}
-                className="hover:bg-canvasSubtle/50 h-12 cursor-pointer"
+                className="hover:bg-canvasSubtle/40 h-[42px] cursor-pointer"
                 onClick={() => {
                   if (expandedRunIDs.includes(row.original.id)) {
                     setExpandedRunIDs((prev) => {

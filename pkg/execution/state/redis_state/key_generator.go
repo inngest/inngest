@@ -21,15 +21,15 @@ type RunStateKeyGenerator interface {
 
 	// Event returns the key used to store the specific event for the
 	// given workflow run.
-	Event(ctx context.Context, isSharded bool, identifier state.Identifier) string
+	Event(ctx context.Context, isSharded bool, fnID uuid.UUID, runID ulid.ULID) string
 
 	// Events returns the key used to store the specific batch for the
 	// given workflow run.
-	Events(ctx context.Context, isSharded bool, identifier state.Identifier) string
+	Events(ctx context.Context, isSharded bool, fnID uuid.UUID, runID ulid.ULID) string
 
 	// Actions returns the key used to store the action response map used
 	// for given workflow run - ie. the results for individual steps.
-	Actions(ctx context.Context, isSharded bool, identifier state.Identifier) string
+	Actions(ctx context.Context, isSharded bool, fnID uuid.UUID, runID ulid.ULID) string
 
 	// Errors returns the key used to store the error hash map used
 	// for given workflow run.
@@ -44,6 +44,13 @@ type RunStateKeyGenerator interface {
 	// ActionInputs returns the key used to store the action inputs for a given
 	// run.
 	ActionInputs(ctx context.Context, isSharded bool, identifier state.Identifier) string
+
+	// Pending returns the key used to store the pending actions for a given
+	// run.
+	Pending(ctx context.Context, isSharded bool, identifier state.Identifier) string
+
+	// PauseConsumeKey is an idempotency key used for making sure pause consumptions are idempotent
+	PauseConsumeKey(ctx context.Context, isSharded bool, runID ulid.ULID, pauseID uuid.UUID) string
 }
 
 type runStateKeyGenerator struct {
@@ -72,16 +79,16 @@ func (s runStateKeyGenerator) RunMetadata(ctx context.Context, isSharded bool, r
 	return fmt.Sprintf("{%s}:metadata:%s", s.Prefix(ctx, s.stateDefaultKey, isSharded, runID), runID)
 }
 
-func (s runStateKeyGenerator) Event(ctx context.Context, isSharded bool, identifier state.Identifier) string {
-	return fmt.Sprintf("{%s}:events:%s:%s", s.Prefix(ctx, s.stateDefaultKey, isSharded, identifier.RunID), identifier.WorkflowID, identifier.RunID)
+func (s runStateKeyGenerator) Event(ctx context.Context, isSharded bool, fnID uuid.UUID, runID ulid.ULID) string {
+	return fmt.Sprintf("{%s}:events:%s:%s", s.Prefix(ctx, s.stateDefaultKey, isSharded, runID), fnID, runID)
 }
 
-func (s runStateKeyGenerator) Events(ctx context.Context, isSharded bool, identifier state.Identifier) string {
-	return fmt.Sprintf("{%s}:bulk-events:%s:%s", s.Prefix(ctx, s.stateDefaultKey, isSharded, identifier.RunID), identifier.WorkflowID, identifier.RunID)
+func (s runStateKeyGenerator) Events(ctx context.Context, isSharded bool, fnID uuid.UUID, runID ulid.ULID) string {
+	return fmt.Sprintf("{%s}:bulk-events:%s:%s", s.Prefix(ctx, s.stateDefaultKey, isSharded, runID), fnID, runID)
 }
 
-func (s runStateKeyGenerator) Actions(ctx context.Context, isSharded bool, identifier state.Identifier) string {
-	return fmt.Sprintf("{%s}:actions:%s:%s", s.Prefix(ctx, s.stateDefaultKey, isSharded, identifier.RunID), identifier.WorkflowID, identifier.RunID)
+func (s runStateKeyGenerator) Actions(ctx context.Context, isSharded bool, fnID uuid.UUID, runID ulid.ULID) string {
+	return fmt.Sprintf("{%s}:actions:%s:%s", s.Prefix(ctx, s.stateDefaultKey, isSharded, runID), fnID, runID)
 }
 
 func (s runStateKeyGenerator) Errors(ctx context.Context, isSharded bool, identifier state.Identifier) string {
@@ -100,9 +107,20 @@ func (s runStateKeyGenerator) ActionInputs(ctx context.Context, isSharded bool, 
 	return fmt.Sprintf("{%s}:inputs:%s:%s", s.Prefix(ctx, s.stateDefaultKey, isSharded, identifier.RunID), identifier.WorkflowID, identifier.RunID)
 }
 
+func (s runStateKeyGenerator) Pending(ctx context.Context, isSharded bool, identifier state.Identifier) string {
+	return fmt.Sprintf("{%s}:pending:%s:%s", s.Prefix(ctx, s.stateDefaultKey, isSharded, identifier.RunID), identifier.WorkflowID, identifier.RunID)
+}
+
+func (s runStateKeyGenerator) PauseConsumeKey(ctx context.Context, isSharded bool, runID ulid.ULID, pauseID uuid.UUID) string {
+	return fmt.Sprintf("{%s}:pause-key:%s", s.Prefix(ctx, s.stateDefaultKey, isSharded, runID), pauseID.String())
+}
+
 type GlobalKeyGenerator interface {
 	// Invoke returns the key used to store the correlation key associated with invoke functions
 	Invoke(ctx context.Context, wsID uuid.UUID) string
+	// Signal returns the key used to store the correlation key associated with
+	// signal functions
+	Signal(ctx context.Context, wsID uuid.UUID) string
 }
 
 type globalKeyGenerator struct {
@@ -111,6 +129,10 @@ type globalKeyGenerator struct {
 
 func (u globalKeyGenerator) Invoke(ctx context.Context, wsID uuid.UUID) string {
 	return fmt.Sprintf("{%s}:invoke:%s", u.stateDefaultKey, wsID)
+}
+
+func (u globalKeyGenerator) Signal(ctx context.Context, wsID uuid.UUID) string {
+	return fmt.Sprintf("{%s}:signal:%s", u.stateDefaultKey, wsID)
 }
 
 type QueueKeyGenerator interface {
@@ -160,6 +182,38 @@ type QueueKeyGenerator interface {
 	PartitionQueueSet(pType enums.PartitionType, scopeID, xxhash string) string
 
 	//
+	// Backlog keys
+	//
+
+	// GlobalShadowPartitionSet returns the key to the global ZSET storing shadow partition pointers.
+	GlobalShadowPartitionSet() string
+	// BacklogSet returns the key to the ZSET storing pointers (queue item IDs) for a given backlog.
+	BacklogSet(backlogID string) string
+	// ActiveCounter returns the key to the number of active queue items for a given scope and ID.
+	ActiveCounter(scope string, scopeID string) string
+	// BacklogMeta returns the key to the hash storing serialized QueueBacklog objects by ID.
+	BacklogMeta() string
+	// BacklogNormalizationLease returns the key to the lease for the backlog for normalization purposes
+	BacklogNormalizationLease(backlogID string) string
+	// ShadowPartitionSet returns the key to the ZSET storing pointers (backlog IDs) for a given shadow partition.
+	ShadowPartitionSet(shadowPartitionID string) string
+	// ShadowPartitionMeta returns the key to the hash storing serialized QueueShadowPartition objects by ID.
+	ShadowPartitionMeta() string
+	// AccountShadowPartitions returns the key to the ZSET storing pointers (shadow partition IDs) for a given account.
+	AccountShadowPartitions(accountID uuid.UUID) string
+	// GlobalAccountShadowPartitions returns the key to the ZSET storing pointers (account IDs) for accounts with existing shadow partitions.
+	GlobalAccountShadowPartitions() string
+
+	// ActiveRunCounter returns the key to the number of active queue items for a given run ID.
+	ActiveRunCounter(runID ulid.ULID) string
+	// ActivePartitionRunsIndex returns a key to the index SET for tracking active runs for a given partition.
+	ActivePartitionRunsIndex(partitionID string) string
+
+	GlobalAccountNormalizeSet() string
+	AccountNormalizeSet(accountID uuid.UUID) string
+	PartitionNormalizeSet(partitionID string) string
+
+	//
 	// Queue metadata keys
 	//
 
@@ -186,7 +240,6 @@ type QueueKeyGenerator interface {
 	ThrottleKey(t *osqueue.Throttle) string
 	// RunIndex returns the index for storing job IDs associated with run IDs.
 	RunIndex(runID ulid.ULID) string
-
 	// FnMetadata returns the key for a function's metadata.
 	// This is a JSON object; see queue.FnMetadata.
 	FnMetadata(fnID uuid.UUID) string
@@ -197,9 +250,9 @@ type QueueKeyGenerator interface {
 	// calculating the EWMA value for the function
 	ConcurrencyFnEWMA(fnID uuid.UUID) string
 
-	// GuaranteedCapacityMap is a key to a hashmap of guaranteed capacities available.  The values of this
-	// key are JSON-encoded GuaranteedCapacity items.
-	GuaranteedCapacityMap() string
+	// QueuePrefix returns the hash prefix used in the queue.
+	// This is likely going to be a redis specific requirement.
+	QueuePrefix() string
 
 	//
 	// ***************** Deprecated *****************
@@ -217,10 +270,6 @@ type QueueKeyGenerator interface {
 type queueKeyGenerator struct {
 	queueDefaultKey string
 	queueItemKeyGenerator
-}
-
-func (u queueKeyGenerator) GuaranteedCapacityMap() string {
-	return fmt.Sprintf("{%s}:queue:guaranteed-capacity", u.queueDefaultKey)
 }
 
 func (u queueKeyGenerator) QueueIndex(id string) string {
@@ -315,6 +364,112 @@ func (u queueKeyGenerator) PartitionQueueSet(pType enums.PartitionType, scopeID,
 	}
 }
 
+// BacklogSet returns the key to the ZSET storing pointers (queue item IDs) for a given backlog.
+func (u queueKeyGenerator) BacklogSet(backlogID string) string {
+	if backlogID == "" {
+		// this is a placeholder because passing an empty key into Lua will cause multi-slot key errors
+		return fmt.Sprintf("{%s}:backlog:sorted:-", u.queueDefaultKey)
+	}
+
+	return fmt.Sprintf("{%s}:backlog:sorted:%s", u.queueDefaultKey, backlogID)
+}
+
+// ActiveCounter returns the key to the number of active queue items for a given backlog.
+func (u queueKeyGenerator) ActiveCounter(scope string, scopeID string) string {
+	if scope == "" || scopeID == "" {
+		// this is a placeholder because passing an empty key into Lua will cause multi-slot key errors
+		return fmt.Sprintf("{%s}:active:-", u.queueDefaultKey)
+	}
+
+	return fmt.Sprintf("{%s}:active:%s:%s", u.queueDefaultKey, scope, scopeID)
+}
+
+func isEmptyULID(id ulid.ULID) bool {
+	return id == [16]byte{}
+}
+
+func (u queueKeyGenerator) ActiveRunCounter(runID ulid.ULID) string {
+	if isEmptyULID(runID) {
+		// this is a placeholder because passing an empty key into Lua will cause multi-slot key errors
+		return u.ActiveCounter("run", "")
+	}
+
+	return u.ActiveCounter("run", runID.String())
+}
+
+func (u queueKeyGenerator) ActivePartitionRunsIndex(partitionID string) string {
+	if partitionID == "" {
+		// this is a placeholder because passing an empty key into Lua will cause multi-slot key errors
+		return fmt.Sprintf("{%s}:active-idx:runs:-", u.queueDefaultKey)
+	}
+
+	return fmt.Sprintf("{%s}:active-idx:runs:%s", u.queueDefaultKey, partitionID)
+}
+
+// BacklogMeta returns the key to the hash storing serialized QueueBacklog objects by ID.
+func (u queueKeyGenerator) BacklogMeta() string {
+	return fmt.Sprintf("{%s}:backlogs", u.queueDefaultKey)
+}
+
+// BacklogNormalizationLease returns the key for the lease of the backlog for normalization purposes
+func (u queueKeyGenerator) BacklogNormalizationLease(backlogID string) string {
+	return fmt.Sprintf("{%s}:backlog:%s:lease", u.queueDefaultKey, backlogID)
+}
+
+// GlobalShadowPartitionSet returns the key to the global ZSET storing shadow partition pointers.
+func (u queueKeyGenerator) GlobalShadowPartitionSet() string {
+	return fmt.Sprintf("{%s}:shadow:sorted", u.queueDefaultKey)
+}
+
+func (u queueKeyGenerator) AccountShadowPartitions(accountID uuid.UUID) string {
+	if accountID == uuid.Nil {
+		// this is a placeholder because passing an empty key into Lua will cause multi-slot key errors
+		return fmt.Sprintf("{%s}:accounts:shadows:sorted:-", u.queueDefaultKey)
+	}
+
+	return fmt.Sprintf("{%s}:accounts:%s:shadows:sorted", u.queueDefaultKey, accountID)
+
+}
+
+func (u queueKeyGenerator) GlobalAccountShadowPartitions() string {
+	return fmt.Sprintf("{%s}:accounts:shadows:sorted", u.queueDefaultKey)
+}
+
+func (u queueKeyGenerator) GlobalAccountNormalizeSet() string {
+	return fmt.Sprintf("{%s}:normalize:sorted", u.queueDefaultKey)
+}
+
+func (u queueKeyGenerator) AccountNormalizeSet(accountID uuid.UUID) string {
+	if accountID == uuid.Nil {
+		return fmt.Sprintf("{%s}:normalize:-", u.queueDefaultKey)
+	}
+
+	return fmt.Sprintf("{%s}:normalize:accounts:%s:sorted", u.queueDefaultKey, accountID.String())
+}
+
+func (u queueKeyGenerator) PartitionNormalizeSet(partitionID string) string {
+	if partitionID == "" {
+		return fmt.Sprintf("{%s}:normalize:-", u.queueDefaultKey)
+	}
+
+	return fmt.Sprintf("{%s}:normalize:partition:%s:sorted", u.queueDefaultKey, partitionID)
+
+}
+
+func (u queueKeyGenerator) QueuePrefix() string {
+	return fmt.Sprintf("{%s}", u.queueDefaultKey)
+}
+
+// ShadowPartitionSet returns the key to the ZSET storing pointers (backlog IDs) for a given shadow partition.
+func (u queueKeyGenerator) ShadowPartitionSet(shadowPartitionID string) string {
+	return fmt.Sprintf("{%s}:shadow:sorted:%s", u.queueDefaultKey, shadowPartitionID)
+}
+
+// ShadowPartitionMeta returns the key to the hash storing serialized QueueShadowPartition objects by ID.
+func (u queueKeyGenerator) ShadowPartitionMeta() string {
+	return fmt.Sprintf("{%s}:shadows", u.queueDefaultKey)
+}
+
 func (u queueKeyGenerator) FnMetadata(fnID uuid.UUID) string {
 	if fnID == uuid.Nil {
 		// None supplied; this means ignore.
@@ -385,6 +540,9 @@ type DebounceKeyGenerator interface {
 	DebouncePointer(ctx context.Context, fnID uuid.UUID, key string) string
 	// Debounce returns the key for storing debounce-related data given a debounce ID.
 	Debounce(ctx context.Context) string
+	// DebounceMigrating returns the key for storing the in-progress debounce migration flag to prevent
+	// migrations and timeout execution from racing. This is a hash.
+	DebounceMigrating(ctx context.Context) string
 }
 
 type debounceKeyGenerator struct {
@@ -404,9 +562,18 @@ func (u debounceKeyGenerator) Debounce(ctx context.Context) string {
 	return fmt.Sprintf("{%s}:debounce-hash", u.queueDefaultKey)
 }
 
+// DebounceMigrating returns the key for storing the in-progress debounce migration flag to prevent
+// migrations and timeout execution from racing. This is a hash.
+func (u debounceKeyGenerator) DebounceMigrating(ctx context.Context) string {
+	return fmt.Sprintf("{%s}:debounce-migrating", u.queueDefaultKey)
+}
+
 type PauseKeyGenerator interface {
 	// Pause returns the key used to store an individual pause from its ID.
 	Pause(ctx context.Context, pauseID uuid.UUID) string
+
+	// GlobalPauseIndex returns the key used to index all pauses.
+	GlobalPauseIndex(ctx context.Context) string
 
 	// RunPauses stores pause IDs for each run as a zset
 	RunPauses(ctx context.Context, runID ulid.ULID) string
@@ -416,13 +583,6 @@ type PauseKeyGenerator interface {
 	// This is stored independently as we may store more than one copy of a pause
 	// for easy iteration.
 	PauseLease(ctx context.Context, pauseId uuid.UUID) string
-
-	// PauseStep returns the prefix of the key used within PauseStep.  This lets us
-	// iterate through all pauses for a given identifier
-	PauseStepPrefix(context.Context, state.Identifier) string
-
-	// PauseStep returns the key used to store a pause ID by the run ID and step ID.
-	PauseStep(context.Context, state.Identifier, string) string
 
 	// PauseEvent returns the key used to store data for loading pauses by events.
 	PauseEvent(ctx context.Context, workspaceId uuid.UUID, event string) string
@@ -443,21 +603,16 @@ func (u pauseKeyGenerator) Pause(ctx context.Context, pauseID uuid.UUID) string 
 	return fmt.Sprintf("{%s}:pauses:%s", u.stateDefaultKey, pauseID.String())
 }
 
+func (u pauseKeyGenerator) GlobalPauseIndex(ctx context.Context) string {
+	return fmt.Sprintf("{%s}:pauses-idx", u.stateDefaultKey)
+}
+
 func (u pauseKeyGenerator) RunPauses(ctx context.Context, runID ulid.ULID) string {
 	return fmt.Sprintf("{%s}:pr:%s", u.stateDefaultKey, runID)
 }
 
 func (u pauseKeyGenerator) PauseLease(ctx context.Context, pauseID uuid.UUID) string {
 	return fmt.Sprintf("{%s}:pause-lease:%s", u.stateDefaultKey, pauseID.String())
-}
-
-func (u pauseKeyGenerator) PauseStepPrefix(ctx context.Context, identifier state.Identifier) string {
-	return fmt.Sprintf("{%s}:pause-steps:%s", u.stateDefaultKey, identifier.RunID)
-}
-
-func (u pauseKeyGenerator) PauseStep(ctx context.Context, identifier state.Identifier, stepId string) string {
-	prefix := u.PauseStepPrefix(ctx, identifier)
-	return fmt.Sprintf("%s-%s", prefix, stepId)
 }
 
 func (u pauseKeyGenerator) PauseEvent(ctx context.Context, workspaceID uuid.UUID, s string) string {

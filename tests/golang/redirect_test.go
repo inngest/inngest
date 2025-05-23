@@ -2,8 +2,6 @@ package golang
 
 import (
 	"context"
-	"fmt"
-	"log/slog"
 	"net/http"
 	"net/url"
 	"os"
@@ -23,7 +21,7 @@ func TestRedirect(t *testing.T) {
 
 	_ = os.Setenv("INNGEST_DEV", DEV_URL)
 
-	h, server, _ := NewSDKHandler(t, "my-app")
+	inngestClient, server, _ := NewSDKHandler(t, "my-app")
 	defer server.Close()
 
 	// Create a server that 303 redirects to the SDK server
@@ -41,16 +39,13 @@ func TestRedirect(t *testing.T) {
 	// URL
 	u, err := url.Parse(redirectServer.URL())
 	r.NoError(err)
-	h.SetOptions(inngestgo.HandlerOpts{
-		Logger:      slog.Default(),
-		RegisterURL: inngestgo.StrPtr(fmt.Sprintf("%s/fn/register", DEV_URL)),
-		URL:         u,
-	})
+	inngestClient.SetURL(u)
 
 	var runID string
-	a := inngestgo.CreateFunction(
+	_, err = inngestgo.CreateFunction(
+		inngestClient,
 		inngestgo.FunctionOpts{
-			Name:    "my-fn",
+			ID:      "my-fn",
 			Retries: inngestgo.IntPtr(0),
 		},
 		inngestgo.EventTrigger("my-event", nil),
@@ -59,11 +54,11 @@ func TestRedirect(t *testing.T) {
 			return nil, nil
 		},
 	)
-	h.Register(a)
+	r.NoError(err)
 
 	req, err := http.NewRequest(http.MethodPut, redirectServer.URL(), nil)
 	r.NoError(err)
-	resp, err := httpdriver.DefaultClient.Do(req)
+	resp, err := httpdriver.Client(httpdriver.SecureDialerOpts{AllowPrivate: true}).Do(req)
 	r.NoError(err)
 	r.Equal(200, resp.StatusCode)
 
@@ -74,7 +69,7 @@ func TestRedirect(t *testing.T) {
 		Name: "my-event",
 		Data: map[string]any{"foo": 1},
 	}
-	_, err = inngestgo.Send(ctx, evt)
+	_, err = inngestClient.Send(ctx, evt)
 	require.NoError(t, err)
 
 	r.Eventually(func() bool {

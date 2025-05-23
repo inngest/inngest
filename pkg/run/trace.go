@@ -2,6 +2,7 @@ package run
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"sort"
 	"strconv"
@@ -244,6 +245,12 @@ func (tb *runTree) toRunSpan(ctx context.Context, s *cqrs.Span) (span *rpbv2.Run
 
 	// the rest are grouped executions
 	default:
+		// Allow userland spans to be constructed, but don't process them like
+		// steps
+		if s.IsUserland() {
+			break
+		}
+
 		// NOTE:
 		// check last item in group for op code
 		// due to how we wrap up function errors with the next step execution, first item might not hold the accurate op code
@@ -289,6 +296,14 @@ func (tb *runTree) toRunSpan(ctx context.Context, s *cqrs.Span) (span *rpbv2.Run
 				}
 				return nil, false, fmt.Errorf("error grouping AI gateway: %w", err)
 			}
+		case enums.OpcodeWaitForSignal:
+			if err := tb.processWaitForSignalGroup(ctx, s, res); err != nil {
+				if err == ErrRedundantExecSpan {
+					return nil, true, nil // no-op
+				}
+
+				return nil, false, fmt.Errorf("error grouping waitForSignal: %w", err)
+			}
 		default:
 			// execution spans
 			if s.ScopeName == consts.OtelScopeExecution {
@@ -296,6 +311,18 @@ func (tb *runTree) toRunSpan(ctx context.Context, s *cqrs.Span) (span *rpbv2.Run
 					return nil, false, fmt.Errorf("error grouping executions: %w", err)
 				}
 			}
+		}
+	}
+
+	// If we have child spans that are userland, we need to add them to the
+	// tree
+	for _, child := range s.UserlandChildren() {
+		userlandSpan, userlandSkipped, err := tb.toRunSpan(ctx, child)
+		if err != nil {
+			return nil, false, err
+		}
+		if !userlandSkipped {
+			res.Children = append(res.Children, userlandSpan)
 		}
 	}
 
@@ -369,6 +396,19 @@ func (tb *runTree) constructSpan(ctx context.Context, s *cqrs.Span) (*rpbv2.RunS
 		}
 	}
 
+	status := rpbv2.SpanStatus_RUNNING
+	var userlandSpan rpbv2.UserlandSpan
+	if s.IsUserland() {
+		status = rpbv2.SpanStatus_COMPLETED
+		userlandSpan.SpanName = name
+		userlandSpan.SpanKind = s.SpanKind
+		userlandSpan.ServiceName = &s.ServiceName
+		userlandSpan.ScopeName = &s.ScopeName
+		userlandSpan.ScopeVersion = &s.ScopeVersion
+		userlandSpan.SpanAttrs, _ = json.Marshal(s.SpanAttributes)
+		userlandSpan.ResourceAttrs, _ = json.Marshal(s.ResourceAttributes)
+	}
+
 	var stepID *string
 	if attrStepID, ok := s.SpanAttributes[consts.OtelSysStepID]; ok && attrStepID != "" {
 		stepID = &attrStepID
@@ -384,12 +424,14 @@ func (tb *runTree) constructSpan(ctx context.Context, s *cqrs.Span) (*rpbv2.RunS
 		ParentSpanId: s.ParentSpanID,
 		SpanId:       s.SpanID,
 		Name:         name,
-		Status:       rpbv2.SpanStatus_RUNNING,
+		Status:       status,
 		QueuedAt:     timestamppb.New(queuedAt),
 		StartedAt:    timestamppb.New(s.Timestamp),
 		EndedAt:      timestamppb.New(endedAt),
 		DurationMs:   dur,
 		StepId:       stepID,
+		IsUserland:   s.IsUserland(),
+		UserlandSpan: &userlandSpan,
 	}, false
 }
 
@@ -738,7 +780,7 @@ func (tb *runTree) processWaitForEventGroup(ctx context.Context, span *cqrs.Span
 	// if the total number of children span end up with just one, it means
 	// redundant spans has been excluded, so it's basically the same span
 	// as the parent. We can discard it in this case
-	if len(mod.Children) == 1 && mod.StepOp.String() == mod.Children[0].StepOp.String() {
+	if len(mod.Children) == 1 && mod.StepOp != nil && mod.StepOp.String() == mod.Children[0].StepOp.String() {
 		mod.Children = nil
 	}
 
@@ -1046,6 +1088,163 @@ func (tb *runTree) processInvoke(ctx context.Context, span *cqrs.Span, mod *rpbv
 		}
 		mod.OutputId = &id
 	}
+
+	return nil
+}
+
+func (tb *runTree) processWaitForSignalGroup(ctx context.Context, span *cqrs.Span, mod *rpbv2.RunSpan) error {
+	group, err := tb.findGroup(span)
+	if err != nil {
+		return err
+	}
+
+	if len(group) == 1 {
+		return tb.processWaitForSignal(ctx, span, mod)
+	}
+
+	stepOp := rpbv2.SpanStepOp_WAIT_FOR_SIGNAL
+	mod.StepOp = &stepOp
+
+	var i int
+	// if there are more than one, that means this is not the first attempt to execute
+	for _, peer := range group {
+		if i == 0 {
+			mod.StartedAt = timestamppb.New(peer.Timestamp)
+		}
+
+		opcode := peer.StepOpCode()
+		if opcode == enums.OpcodeWaitForSignal && peer.ScopeName == consts.OtelScopeExecution {
+			// ignore this span since it's not needed
+			tb.markProcessed(peer)
+			continue
+		}
+
+		nested, skipped := tb.constructSpan(ctx, peer)
+		if skipped {
+			continue
+		}
+
+		status := toProtoStatus(peer)
+		if status == rpbv2.SpanStatus_RUNNING {
+			nested.EndedAt = nil
+		}
+
+		outputID, err := tb.outputID(nested)
+		if err != nil {
+			return err
+		}
+
+		nested.Status = status
+		nested.OutputId = &outputID
+
+		// process wait span
+		if peer.StepOpCode() == enums.OpcodeWaitForSignal {
+			err = tb.processWaitForSignal(ctx, peer, nested)
+			switch err {
+			case nil: // no-op
+			case ErrRedundantExecSpan:
+				tb.markProcessed(peer)
+				continue
+			default:
+				return err
+			}
+
+			// update group
+			mod.Name = nested.Name
+			mod.OutputId = nested.OutputId
+			mod.StepInfo = nested.StepInfo
+			mod.EndedAt = nested.EndedAt
+			mod.Status = nested.Status
+
+			if mod.EndedAt != nil {
+				dur := mod.EndedAt.AsTime().Sub(mod.StartedAt.AsTime())
+				mod.DurationMs = int64(dur / time.Millisecond)
+			}
+		}
+		nested.Name = fmt.Sprintf("Attempt %d", i)
+		mod.Children = append(mod.Children, nested)
+		tb.markProcessed(peer)
+		i++
+	}
+
+	// if the total number of children span end up with just one, it means
+	// redundant spans has been excluded, so it's basically the same span
+	// as the parent. We can discard it in this case
+	if len(mod.Children) == 1 && mod.StepOp != nil && mod.StepOp.String() == mod.Children[0].StepOp.String() {
+		mod.Children = nil
+	}
+
+	return nil
+}
+
+func (tb *runTree) processWaitForSignal(ctx context.Context, span *cqrs.Span, mod *rpbv2.RunSpan) error {
+	defer tb.markProcessed(span)
+
+	if span.ScopeName == consts.OtelScopeExecution {
+		// ignore this span type for sleep
+		return ErrRedundantExecSpan
+	}
+
+	stepOp := rpbv2.SpanStepOp_WAIT_FOR_SIGNAL
+	status := rpbv2.SpanStatus_WAITING
+	dur := span.DurationMS()
+	endedAt := span.Timestamp.Add(time.Duration(dur * int64(time.Millisecond)))
+	var (
+		signal  string
+		timeout time.Time
+		expired *bool
+	)
+	if v, ok := span.SpanAttributes[consts.OtelSysStepWaitSignalName]; ok {
+		signal = v
+	}
+	if v, ok := span.SpanAttributes[consts.OtelSysStepWaitExpires]; ok {
+		if ts, err := strconv.ParseInt(v, 10, 64); err == nil {
+			timeout = time.UnixMilli(ts)
+		}
+	}
+	// Always present at the end, representing whether we did expire or we
+	// found a match
+	if v, ok := span.SpanAttributes[consts.OtelSysStepWaitExpired]; ok {
+		if exp, err := strconv.ParseBool(v); err == nil {
+			status = rpbv2.SpanStatus_COMPLETED
+			mod.EndedAt = timestamppb.New(endedAt)
+			expired = &exp
+		}
+	}
+
+	// set wait details
+	mod.StepOp = &stepOp
+	mod.Name = *span.StepDisplayName()
+	mod.DurationMs = dur
+	mod.Status = status
+	mod.StepInfo = &rpbv2.StepInfo{
+		Info: &rpbv2.StepInfo_WaitForSignal{
+			WaitForSignal: &rpbv2.StepInfoWaitForSignal{
+				Signal:   signal,
+				Timeout:  timestamppb.New(timeout),
+				TimedOut: expired,
+			},
+		},
+	}
+
+	// output
+	var outputID *string
+	if mod.Status == rpbv2.SpanStatus_COMPLETED {
+		ident := &cqrs.SpanIdentifier{
+			AccountID:   tb.acctID,
+			WorkspaceID: tb.wsID,
+			AppID:       tb.appID,
+			FunctionID:  tb.fnID,
+			TraceID:     span.TraceID,
+			SpanID:      span.SpanID,
+		}
+		id, err := ident.Encode()
+		if err != nil {
+			return err
+		}
+		outputID = &id
+	}
+	mod.OutputId = outputID
 
 	return nil
 }

@@ -3,6 +3,7 @@ package cqrs
 import (
 	"context"
 	"database/sql"
+	"github.com/inngest/inngest/pkg/enums"
 	"time"
 
 	"github.com/google/uuid"
@@ -21,7 +22,8 @@ type App struct {
 	CreatedAt   time.Time
 	DeletedAt   time.Time
 	Url         string
-	IsConnect   sql.NullBool
+	Method      string
+	AppVersion  string
 }
 
 type AppManager interface {
@@ -31,7 +33,7 @@ type AppManager interface {
 
 type AppReader interface {
 	// GetApps returns apps that have not been deleted.
-	GetApps(ctx context.Context, envID uuid.UUID) ([]*App, error)
+	GetApps(ctx context.Context, envID uuid.UUID, filter *FilterAppParam) ([]*App, error)
 	// GetAppByChecksum returns an app by checksum.
 	GetAppByChecksum(ctx context.Context, envID uuid.UUID, checksum string) (*App, error)
 	// GetAppByURL returns an app by URL
@@ -67,7 +69,8 @@ type UpsertAppParams struct {
 	Error       sql.NullString
 	Checksum    string
 	Url         string
-	IsConnect   sql.NullBool
+	Method      string
+	AppVersion  string
 }
 
 type UpdateAppErrorParams struct {
@@ -78,4 +81,8 @@ type UpdateAppErrorParams struct {
 type UpdateAppURLParams struct {
 	ID  uuid.UUID
 	Url string
+}
+
+type FilterAppParam struct {
+	Method *enums.AppMethod
 }

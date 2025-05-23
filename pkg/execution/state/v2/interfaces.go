@@ -35,7 +35,7 @@ type RunService interface {
 	StateLoader
 
 	// Create creates new state in the store for the given run ID.
-	Create(ctx context.Context, s CreateState) error
+	Create(ctx context.Context, s CreateState) (state.State, error)
 	// Delete deletes state, metadata, and - when pauses are included - associated pauses
 	// for the run from the store.  Nothing referencing the run should exist in the state
 	// store after.
@@ -46,7 +46,9 @@ type RunService interface {
 	// version after communicating with the SDK.
 	UpdateMetadata(ctx context.Context, id ID, config MutableConfig) error
 	// SaveStep saves step output for the given run ID and step ID.
-	SaveStep(ctx context.Context, id ID, stepID string, data []byte) error
+	SaveStep(ctx context.Context, id ID, stepID string, data []byte) (hasPending bool, err error)
+	// SavePending saves pending step IDs for the given run ID.
+	SavePending(ctx context.Context, id ID, pending []string) error
 }
 
 // Staeloader defines an interface for loading the entire run state from the state store.

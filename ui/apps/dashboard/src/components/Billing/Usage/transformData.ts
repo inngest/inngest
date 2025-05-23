@@ -7,7 +7,7 @@ import { type TimeSeries } from '@/gql/graphql';
 import tailwindConfig from '../../../../tailwind.config';
 
 const {
-  theme: { textColor, colors, borderColor },
+  theme: { textColor, colors, borderColor, backgroundColor },
 } = resolveConfig(tailwindConfig);
 
 type ChartPoint = {
@@ -94,6 +94,9 @@ export function createChartOptions(
     tooltip: {
       trigger: 'axis',
       axisPointer: { type: 'shadow' },
+      backgroundColor: resolveColor(backgroundColor.canvasBase, dark),
+      borderColor: resolveColor(borderColor.subtle, dark),
+      textStyle: { color: resolveColor(textColor.basis, dark) },
     },
     legend: {
       type: 'scroll',

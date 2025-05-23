@@ -10,19 +10,22 @@ import type { RefreshRunsRef } from '@/components/Runs/Runs';
 
 export default function Page() {
   const ref = useRef<RefreshRunsRef>(null);
+
   return (
     <>
       <Header
         breadcrumb={[{ text: 'Runs' }]}
         action={
-          <Button
-            kind="primary"
-            appearance="outlined"
-            label="Refresh runs"
-            icon={<RiRefreshLine />}
-            iconSide="left"
-            onClick={() => ref.current?.refresh()}
-          />
+          <div className="flex flex-row items-center justify-end gap-2">
+            <Button
+              kind="primary"
+              appearance="outlined"
+              label="Refresh runs"
+              icon={<RiRefreshLine />}
+              iconSide="left"
+              onClick={() => ref.current?.refresh()}
+            />
+          </div>
         }
       />
       <Runs scope="env" ref={ref} />

@@ -47,7 +47,12 @@ export default function SignInPage({ searchParams }: SignInPageProps) {
                 : searchParams.error}
             </p>
             <p className="mt-2">
-              <Alert.Link severity="error" href="/support" className="underline">
+              <Alert.Link
+                size="medium"
+                severity="error"
+                href="/support"
+                className="inline underline"
+              >
                 Contact support
               </Alert.Link>{' '}
               if this problem persists.

@@ -1,18 +1,27 @@
 import type { Route } from 'next';
 import NextLink from 'next/link';
+import { redirect } from 'next/navigation';
 import { Button } from '@inngest/components/Button/index';
 import { Link } from '@inngest/components/Link/Link';
 import { IconVercel } from '@inngest/components/icons/platforms/Vercel';
 import { RiArrowRightSLine, RiExternalLinkLine } from '@remixicon/react';
 
-import { vercelIntegration } from '../data';
+import { pathCreator } from '@/utils/urls';
+import { getVercelIntegration } from '../data';
 import VercelProjects from './projects';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 
 export default async function VercelIntegrationPage() {
-  const integrations = await vercelIntegration();
+  const integration = await getVercelIntegration();
+  if (!integration) {
+    console.error('Failed to load Vercel integration');
+    return redirect(pathCreator.vercelSetup());
+  }
+  if (integration instanceof Error) {
+    throw integration;
+  }
 
   return (
     <div className="mx-auto mt-6 flex w-[800px] flex-col p-8">
@@ -54,7 +63,7 @@ export default async function VercelIntegrationPage() {
           />
         </div>
       </div>
-      <VercelProjects integration={integrations} />
+      <VercelProjects integration={integration} />
     </div>
   );
 }

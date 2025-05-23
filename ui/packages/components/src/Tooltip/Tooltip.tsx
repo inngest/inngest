@@ -15,18 +15,20 @@ const TooltipContent = React.forwardRef<
   React.ElementRef<typeof TooltipPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof TooltipPrimitive.Content>
 >(({ className, sideOffset = 4, ...props }, ref) => (
-  <TooltipPrimitive.Content
-    ref={ref}
-    sideOffset={sideOffset}
-    className={cn(
-      'animate-slide-down-and-fade bg-canvasBase text-basis shadow-tooltip z-50 max-w-xs rounded-md px-2 py-1 text-sm shadow-md',
-      className
-    )}
-    {...props}
-  >
-    {props.children}
-    <TooltipPrimitive.Arrow className="fill-tooltipArrow" />
-  </TooltipPrimitive.Content>
+  <TooltipPrimitive.Portal>
+    <TooltipPrimitive.Content
+      ref={ref}
+      sideOffset={sideOffset}
+      className={cn(
+        'animate-slide-down-and-fade bg-canvasBase text-basis shadow-tooltip z-[52] max-w-xs rounded-md px-2 py-1 text-sm shadow-md',
+        className
+      )}
+      {...props}
+    >
+      {props.children}
+      <TooltipPrimitive.Arrow className="fill-tooltipArrow" />
+    </TooltipPrimitive.Content>
+  </TooltipPrimitive.Portal>
 ));
 
 const TooltipArrow = TooltipPrimitive.Arrow;

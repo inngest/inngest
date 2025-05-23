@@ -97,3 +97,42 @@ func ToFunctionRunStatus(s enums.RunStatus) (FunctionRunStatus, error) {
 		return FunctionRunStatusRunning, fmt.Errorf("unknown run status: %d", s)
 	}
 }
+
+func FromAppMethod(method AppMethod) (enums.AppMethod, error) {
+	switch method {
+	case AppMethodConnect:
+		return enums.AppMethodConnect, nil
+	case AppMethodServe:
+		return enums.AppMethodServe, nil
+	default:
+		return enums.AppMethodServe, fmt.Errorf("unknown connection type: %s", method.String())
+	}
+}
+
+func FromAppsFilter(in *AppsFilterV1) (*cqrs.FilterAppParam, error) {
+	if in == nil {
+		return nil, nil
+	}
+
+	filter := &cqrs.FilterAppParam{}
+	if in.Method != nil {
+		connType, err := FromAppMethod(*in.Method)
+		if err != nil {
+			return nil, err
+		}
+		filter.Method = &connType
+	}
+
+	return filter, nil
+}
+
+func ToAppMethod(method enums.AppMethod) AppMethod {
+	switch method {
+	case enums.AppMethodServe:
+		return AppMethodServe
+	case enums.AppMethodConnect:
+		return AppMethodConnect
+	default:
+		return AppMethodServe
+	}
+}

@@ -4,6 +4,7 @@ import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
 const query = graphql(`
   query UnattachedSync($syncID: ID!) {
     sync: deploy(id: $syncID) {
+      appVersion
       commitAuthor
       commitHash
       commitMessage

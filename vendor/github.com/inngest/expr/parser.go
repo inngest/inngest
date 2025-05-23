@@ -405,6 +405,7 @@ func navigateAST(nav expr, parent *Node, vars LiftedArgs, rand RandomReader) ([]
 			child.normalize()
 			result = append(result, child)
 			hasMacros = true
+
 		case celast.LiteralKind:
 			// This is a literal. Do nothing, as this is always true.
 		case celast.IdentKind:
@@ -414,14 +415,15 @@ func navigateAST(nav expr, parent *Node, vars LiftedArgs, rand RandomReader) ([]
 			// what we're trying to parse, by taking the LHS and RHS of each opeartor then bringing
 			// this up into a tree.
 
-			fn := item.ast.AsCall().FunctionName()
+			call := item.ast.AsCall()
+			fn := call.FunctionName()
 
 			// Firstly, if this is a logical not, everything within this branch is negated:
 			// !(a == b).  This flips the negated field, ie !(foo == bar) becomes foo != bar,
 			// whereas !(!(foo == bar)) stays the same.
 			if fn == operators.LogicalNot {
 				// Immediately navigate into this single expression.
-				astChild := item.ast.AsCall().Args()[0]
+				astChild := call.Args()[0]
 				stack = append(stack, expr{
 					ast:     astChild,
 					negated: !item.negated,
@@ -457,7 +459,7 @@ func navigateAST(nav expr, parent *Node, vars LiftedArgs, rand RandomReader) ([]
 
 			// For each &&, create a new child node in the .And field of the current
 			// high-level AST.
-			if item.ast.AsCall().FunctionName() == operators.LogicalAnd {
+			if fn == operators.LogicalAnd {
 				stack = append(stack, peek(item, operators.LogicalAnd)...)
 				continue
 			}
@@ -492,6 +494,37 @@ func navigateAST(nav expr, parent *Node, vars LiftedArgs, rand RandomReader) ([]
 		total += 1
 	}
 
+	// For each AND, check to see if we have more than one string part, and check to see
+	// whether we have a "!=" and an "==" chained together.  If so, this lets us optimize
+	// != checks so that we only return the aggregate match if the other "==" also matches.
+	//
+	// This is necessary:  != returns basically every expression part, which is hugely costly
+	// in terms of allocation.  We want to avoid that if poss.
+	var (
+		stringEq     uint8
+		hasStringNeq bool
+	)
+	for _, item := range parent.Ands {
+		if item.Predicate == nil {
+			continue
+		}
+		if _, ok := item.Predicate.Literal.(string); !ok {
+			continue
+		}
+		if item.Predicate.Operator == operators.Equals {
+			stringEq++
+		}
+		if item.Predicate.Operator == operators.NotEquals {
+			hasStringNeq = true
+		}
+	}
+
+	flag := byte(OptimizeNone)
+	if stringEq > 0 && hasStringNeq {
+		// The flag is the number of string equality checks in the == group.
+		flag = byte(stringEq)
+	}
+
 	// Create a new group ID which tracks the number of expressions that must match
 	// within this group in order for the group to pass.
 	//
@@ -500,7 +533,7 @@ func navigateAST(nav expr, parent *Node, vars LiftedArgs, rand RandomReader) ([]
 	// When checking an incoming event, we match the event against each node's
 	// ident/variable.  Using the group ID, we can see if we've matched N necessary
 	// items from the same identifier.  If so, the evaluation is true.
-	parent.GroupID = newGroupIDWithReader(uint16(total), rand)
+	parent.GroupID = newGroupIDWithReader(uint16(total), flag, rand)
 
 	// For each sub-group, add the same group IDs to children if there's no nesting.
 	//
@@ -716,6 +749,17 @@ func callToPredicate(item celast.Expr, negated bool, vars LiftedArgs) *Predicate
 			// Switch the operators to ensure evaluation of predicates is correct and consistent.
 			fn = normalize(fn)
 		}
+
+	case operators.In:
+		// If this is an "in" check, we're checking the equality of a single item amongst an array.
+		// This is the same as oeprators.Equals, but with a varying number of checks.
+		switch literal.(type) {
+		case string, int64, float64:
+			// Allowed
+		default:
+			return nil
+		}
+
 	default:
 		return nil
 	}

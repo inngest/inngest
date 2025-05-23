@@ -92,6 +92,8 @@ sql:
               import: "github.com/oklog/ulid/v2"
               package: "ulid"
               type: "ULID"
+          - column: "function_runs.workspace_id"
+            go_type: "github.com/google/uuid.UUID"
 
           - column: "traces.run_id"
             go_type:
@@ -234,6 +236,8 @@ sql:
               import: "github.com/oklog/ulid/v2"
               package: "ulid"
               type: "ULID"
+          - column: "function_runs.workspace_id"
+            go_type: "github.com/google/uuid.UUID"
 
           - column: "traces.run_id"
             go_type:

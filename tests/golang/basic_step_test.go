@@ -23,7 +23,7 @@ func TestFunctionSteps(t *testing.T) {
 	ctx := context.Background()
 
 	c := client.New(t)
-	h, server, registerFuncs := NewSDKHandler(t, "my-app")
+	inngestClient, server, registerFuncs := NewSDKHandler(t, "my-app")
 	defer server.Close()
 
 	var (
@@ -31,21 +31,22 @@ func TestFunctionSteps(t *testing.T) {
 		runID   string
 	)
 
-	a := inngestgo.CreateFunction(
-		inngestgo.FunctionOpts{Name: "test sdk"},
+	_, err := inngestgo.CreateFunction(
+		inngestClient,
+		inngestgo.FunctionOpts{ID: "test-sdk"},
 		inngestgo.EventTrigger("test/sdk-steps", nil),
 		func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
 			runID = input.InputCtx.RunID
 
 			_, err := step.Run(ctx, "1", func(ctx context.Context) (any, error) {
-				fmt.Println("1")
 				atomic.AddInt32(&counter, 1)
+				fmt.Println("1", input.InputCtx.RunID)
 				return "hello 1", nil
 			})
 			require.NoError(t, err)
 
 			_, err = step.Run(ctx, "2", func(ctx context.Context) (string, error) {
-				fmt.Println("2")
+				fmt.Println("2", input.InputCtx.RunID)
 				atomic.AddInt32(&counter, 1)
 				return "test", nil
 			})
@@ -55,28 +56,35 @@ func TestFunctionSteps(t *testing.T) {
 
 			_, err = step.WaitForEvent[any](ctx, "wait1", step.WaitForEventOpts{
 				Event:   "api/new.event",
-				Timeout: time.Minute,
+				Timeout: 5 * time.Second,
 			})
 			if err == step.ErrEventNotReceived {
 				panic("no event found")
 			}
+
+			_, err = step.Run(ctx, "after-wait1", func(ctx context.Context) (any, error) {
+				fmt.Println("wait1 resolved", input.InputCtx.RunID)
+				atomic.AddInt32(&counter, 1)
+				return nil, nil
+			})
+			require.NoError(t, err)
 
 			// Wait for an event with an expression
 			_, err = step.WaitForEvent[any](ctx, "wait2", step.WaitForEventOpts{
 				Event:   "api/new.event",
 				If:      inngestgo.StrPtr(`async.data.ok == "yes" && async.data.id == event.data.id`),
-				Timeout: time.Minute,
+				Timeout: 5 * time.Second,
 			})
 			if err == step.ErrEventNotReceived {
 				panic("no event found")
 			}
 
-			fmt.Println("3")
+			fmt.Println("wait2 resolved")
 			atomic.AddInt32(&counter, 1)
 			return true, nil
 		},
 	)
-	h.Register(a)
+	require.NoError(t, err)
 	registerFuncs()
 
 	evt := inngestgo.Event{
@@ -86,7 +94,7 @@ func TestFunctionSteps(t *testing.T) {
 			"id":   "1",
 		},
 	}
-	_, err := inngestgo.Send(ctx, evt)
+	_, err = inngestClient.Send(ctx, evt)
 	require.NoError(t, err)
 
 	<-time.After(3 * time.Second)
@@ -109,23 +117,29 @@ func TestFunctionSteps(t *testing.T) {
 	})
 
 	t.Run("Check batch API", func(t *testing.T) {
-		// Fetch event data and step data from the V0 APIs;  it should exist.
-		resp, err := http.Get(fmt.Sprintf("%s/v0/runs/%s/actions", DEV_URL, runID))
-		require.NoError(t, err)
-		require.EqualValues(t, 200, resp.StatusCode)
+		require.EventuallyWithT(t, func(t *assert.CollectT) {
+			// Fetch event data and step data from the V0 APIs;  it should exist.
+			resp, err := http.Get(fmt.Sprintf("%s/v0/runs/%s/actions", DEV_URL, runID))
+			if !assert.NoError(t, err) {
+				return
+			}
+			assert.EqualValues(t, 200, resp.StatusCode)
 
-		body := map[string]any{}
-		err = json.NewDecoder(resp.Body).Decode(&body)
-		_ = resp.Body.Close()
-		require.NoError(t, err)
+			body := map[string]any{}
+			err = json.NewDecoder(resp.Body).Decode(&body)
+			_ = resp.Body.Close()
+			if !assert.NoError(t, err) {
+				return
+			}
 
-		// 3 step so far: 2 steps, 1 wait
-		require.Equal(t, 3, len(body))
+			// 3 step so far: 2 steps, 1 wait
+			assert.Equal(t, 3, len(body))
+		}, 10*time.Second, 100*time.Millisecond)
 	})
 
 	t.Run("waitForEvents succeed", func(t *testing.T) {
 		// Send the first event to trigger the wait.
-		_, err = inngestgo.Send(ctx, inngestgo.Event{
+		_, err = inngestClient.Send(ctx, inngestgo.Event{
 			Name: "api/new.event",
 			Data: map[string]any{
 				"test": true,
@@ -136,7 +150,7 @@ func TestFunctionSteps(t *testing.T) {
 		<-time.After(time.Second)
 
 		// And the second event to trigger the next wait.
-		_, err = inngestgo.Send(ctx, inngestgo.Event{
+		_, err = inngestClient.Send(ctx, inngestgo.Event{
 			Name: "api/new.event",
 			Data: map[string]any{
 				"ok": "yes",
@@ -148,8 +162,8 @@ func TestFunctionSteps(t *testing.T) {
 		<-time.After(time.Second)
 
 		require.Eventually(t, func() bool {
-			return atomic.LoadInt32(&counter) == 3
-		}, 15*time.Second, time.Second)
+			return atomic.LoadInt32(&counter) == 4
+		}, 30*time.Second, time.Second, "Didn't resolve step.waitForEvents: got %d instead of 4", atomic.LoadInt32(&counter))
 	})
 
 	t.Run("trace run should have appropriate data", func(t *testing.T) {

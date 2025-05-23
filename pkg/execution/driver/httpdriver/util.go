@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/util"
 	"golang.org/x/mod/semver"
 )
 
@@ -25,19 +26,21 @@ const (
 )
 
 var (
-	ErrUnableToReach        = fmt.Errorf("Unable to reach SDK URL")
-	ErrBodyTooLarge         = fmt.Errorf("http response size is greater than the limit")
-	ErrServerClosed         = fmt.Errorf("Your server closed the request before finishing.")
-	ErrConnectionReset      = fmt.Errorf("Your server reset the request connection.")
-	ErrUnexpectedEnd        = fmt.Errorf("Invalid response from SDK server: Unexpected EOF ending response")
-	ErrInvalidEmptyResponse = fmt.Errorf("Error performing request to SDK URL")
+	ErrUnableToReach       = fmt.Errorf("Unable to reach SDK URL")
+	ErrDenied              = fmt.Errorf("Your server blocked the connection") // "connection timed out"
+	ErrServerClosed        = fmt.Errorf("Your server closed the request before finishing.")
+	ErrConnectionReset     = fmt.Errorf("Your server reset the connection while we were sending the request.")
+	ErrUnexpectedEnd       = fmt.Errorf("Your server reset the connection while we were reading the reply: Unexpected ending response")
+	ErrInvalidResponse     = fmt.Errorf("Error performing request to SDK URL")
+	ErrBodyTooLarge        = fmt.Errorf("http response size is greater than the limit")
+	ErrTLSHandshakeTimeout = fmt.Errorf("Your server didn't complete the TLS handshake in time")
 )
 
 // ExecuteRequest executes an HTTP request.  This returns the HTTP response, the body (limited by
 // our max step size), the duration for the request, and any connection errors.
 //
 // NOTE: This does NOT handle HTTP errors, and instead only handles system errors.
-func ExecuteRequest(ctx context.Context, c HTTPDoer, req *http.Request) (*http.Response, []byte, time.Duration, error) {
+func ExecuteRequest(ctx context.Context, c util.HTTPDoer, req *http.Request) (*http.Response, []byte, time.Duration, error) {
 	pre := time.Now()
 	resp, err := c.Do(req)
 	dur := time.Since(pre)
@@ -61,33 +64,49 @@ func ExecuteRequest(ctx context.Context, c HTTPDoer, req *http.Request) (*http.R
 		return resp, nil, dur, ErrUnableToReach
 	}
 
-	if err != nil && !errors.Is(err, io.EOF) {
-		if urlErr, ok := err.(*url.Error); ok && urlErr.Err == context.DeadlineExceeded {
-			// This timed out.
-			return resp, nil, dur, context.DeadlineExceeded
-		}
-		if errors.Is(err, syscall.EPIPE) {
-			return resp, nil, dur, ErrServerClosed
-		}
-		if errors.Is(err, syscall.ECONNRESET) {
-			return resp, nil, dur, ErrConnectionReset
-		}
-		// Unexpected EOFs are valid and returned from servers when chunked encoding may
-		// be invalid.  Handle any other error by returning immediately.
-		if !errors.Is(err, io.ErrUnexpectedEOF) {
-			return resp, nil, dur, ErrInvalidEmptyResponse
-		}
-		// If we get an unexpected EOF and the response is nil, error immediately.
-		if errors.Is(err, io.ErrUnexpectedEOF) && resp == nil {
-			return resp, nil, dur, ErrUnexpectedEnd
-		}
-	}
-
 	if len(byt) > consts.MaxSDKResponseBodySize {
 		return resp, byt, dur, ErrBodyTooLarge
 	}
 
-	return resp, byt, dur, nil
+	// parse errors into common responses
+	err = CommonHTTPErrors(err)
+
+	return resp, byt, dur, err
+}
+
+func CommonHTTPErrors(err error) error {
+	if err == nil {
+		return nil
+	}
+	if errors.Is(err, io.EOF) {
+		return err
+	}
+
+	{
+		// timeouts
+		if urlErr, ok := err.(*url.Error); ok && urlErr.Err == context.DeadlineExceeded {
+			// This timed out.
+			return context.DeadlineExceeded
+		}
+		if errors.Is(err, context.DeadlineExceeded) {
+			// timed out
+			return context.DeadlineExceeded
+		}
+	}
+
+	if errors.Is(err, syscall.EPIPE) {
+		return ErrServerClosed
+	}
+	if errors.Is(err, syscall.ECONNRESET) {
+		return ErrConnectionReset
+	}
+	// If we get an unexpected EOF and the response is nil, error immediately.
+	if errors.Is(err, io.ErrUnexpectedEOF) {
+		return ErrUnexpectedEnd
+	}
+
+	// use the error as-is, wrapped with a prefix for users.
+	return fmt.Errorf("%s: %w", ErrInvalidResponse, err)
 }
 
 // Sign signs the body with a private key, ensuring that HTTP handlers can verify
@@ -103,7 +122,7 @@ func Sign(ctx context.Context, key, body []byte) string {
 	_, _ = mac.Write(body)
 	// Write the timestamp as a unix timestamp to the hmac to prevent
 	// timing attacks.
-	_, _ = mac.Write([]byte(fmt.Sprintf("%d", now)))
+	_, _ = fmt.Fprintf(mac, "%d", now)
 
 	sig := hex.EncodeToString(mac.Sum(nil))
 	return fmt.Sprintf("t=%d&s=%s", now, sig)

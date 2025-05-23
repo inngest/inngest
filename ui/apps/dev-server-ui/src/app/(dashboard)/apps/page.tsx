@@ -2,23 +2,28 @@
 
 import { useMemo } from 'react';
 import { AppCard } from '@inngest/components/Apps/AppCard';
+import { Button } from '@inngest/components/Button/Button';
 import { InlineCode } from '@inngest/components/Code';
 import { Header } from '@inngest/components/Header/Header';
 import { Info } from '@inngest/components/Info/Info';
 import { Link } from '@inngest/components/Link';
 import { Pill } from '@inngest/components/Pill/Pill';
+import WorkerCounter from '@inngest/components/Workers/ConnectedWorkersDescription';
 import { IconSpinner } from '@inngest/components/icons/Spinner';
+import { transformFramework, transformLanguage } from '@inngest/components/utils/appsParser';
 import { RiExternalLinkLine, RiInformationLine } from '@remixicon/react';
 
 import AddAppButton from '@/components/App/AddAppButton';
 import AppActions from '@/components/App/AppActions';
 import getAppCardContent from '@/components/App/AppCardContent';
 import AppFAQ from '@/components/App/AppFAQ';
+import { useGetWorkerCount } from '@/hooks/useGetWorkerCount';
 import { useInfoQuery } from '@/store/devApi';
-import { useGetAppsQuery } from '@/store/generated';
+import { AppMethod, useGetAppsQuery } from '@/store/generated';
 
 export default function AppList() {
   const { data } = useGetAppsQuery(undefined, { pollingInterval: 1500 });
+  const getWorkerCount = useGetWorkerCount();
   const apps = data?.apps || [];
 
   const syncedApps = apps.filter((app) => app.connected === true);
@@ -26,15 +31,19 @@ export default function AppList() {
 
   const memoizedAppCards = useMemo(() => {
     return apps.map((app) => {
-      const { appKind, status, footerHeader, footerContent } = getAppCardContent({ app });
+      const { appKind, status, footerHeaderTitle, footerHeaderSecondaryCTA, footerContent } =
+        getAppCardContent({ app });
 
       return (
         <AppCard key={app?.id} kind={appKind}>
           <AppCard.Content
+            url={app.method === AppMethod.Connect ? `/apps/app?id=${app.id}` : undefined}
             app={{
               ...app,
+              framework: transformFramework(app.framework),
+              sdkLanguage: transformLanguage(app.sdkLanguage),
+              url: app.method === AppMethod.Connect ? '' : app.url,
               name: !app.name ? 'Syncing...' : !app.connected ? `Syncing to ${app.name}` : app.name,
-              syncMethod: 'SERVERLESS',
             }}
             pill={
               status || app.autodiscovered ? (
@@ -52,9 +61,26 @@ export default function AppList() {
                 </>
               ) : null
             }
-            actions={!app.autodiscovered ? <AppActions id={app.id} name={app.name} /> : null}
+            actions={
+              <div className="items-top flex gap-2">
+                {app.method === AppMethod.Connect && (
+                  <Button
+                    appearance="outlined"
+                    label="View details"
+                    href={`/apps/app?id=${app.id}`}
+                  />
+                )}
+                {!app.autodiscovered && <AppActions id={app.id} name={app.name} />}
+              </div>
+            }
+            workerCounter={<WorkerCounter appID={app.id} getWorkerCount={getWorkerCount} />}
           />
-          <AppCard.Footer kind={appKind} header={footerHeader} content={footerContent} />
+          <AppCard.Footer
+            kind={appKind}
+            headerTitle={footerHeaderTitle}
+            headerSecondaryCTA={footerHeaderSecondaryCTA}
+            content={footerContent}
+          />
         </AppCard>
       );
     });
@@ -87,9 +113,9 @@ export default function AppList() {
         }
       />
 
-      <div className="mx-auto my-12 w-4/5 max-w-7xl">
+      <div className="mx-auto w-full max-w-4xl px-6 pb-4 pt-16">
         <h2 className="mb-1 text-xl">Synced Apps</h2>
-        <p className="text-muted text-sm">
+        <p className="text-subtle text-sm">
           Apps can be synced manually with the CLI's <InlineCode>-u</InlineCode> flag, a config
           file, the button below, or via auto-discovery.{' '}
           <Link
@@ -139,7 +165,7 @@ export default function AppList() {
         )}
 
         <div className="my-6 flex w-full flex-col gap-10">{memoizedAppCards}</div>
-        <AppFAQ />
+        <AppFAQ openByDefault={numberOfSyncedApps === 0} />
       </div>
     </div>
   );

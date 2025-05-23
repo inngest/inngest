@@ -9,6 +9,9 @@ on:
     paths-ignore:
       - "ui/**"
 
+permissions:
+  contents: read
+
 jobs:
   ts:
     name: TS SDK Tests
@@ -21,10 +24,10 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.22"
+          go-version: "1.24"
       - uses: actions/setup-node@v4
         with:
-          node-version: "18"
+          node-version: "20"
       - name: Install pnpm
         uses: pnpm/action-setup@v4
         with:
@@ -37,7 +40,7 @@ jobs:
       - name: Run E2E tests
         run: |
           cd ./tests/js
-          pnpm install
+          pnpm install --frozen-lockfile
           pnpm dev &
           sleep 5
           cd ../../
@@ -51,7 +54,8 @@ jobs:
           INNGEST_SIGNING_KEY: test
           API_URL: http://127.0.0.1:8288
           SDK_URL: http://127.0.0.1:3000/api/inngest
-          ENABLE_TEST_API: true
+          TEST_MODE: true
+
   golang:
     name: Go SDK Tests
     strategy:
@@ -63,7 +67,7 @@ jobs:
       - name: Set up Go
         uses: actions/setup-go@v5
         with:
-          go-version: "1.22"
+          go-version: "1.24"
       - name: Build dev server
         run: |
           go build -o ./inngest-bin ./cmd/main.go
@@ -77,7 +81,24 @@ jobs:
           go test ./tests/golang -v -count=1
         env:
           API_URL: http://127.0.0.1:8288
-          INNGEST_SIGNING_KEY: test
+          INNGEST_EVENT_KEY: test
           INNGEST_SIGNING_KEY: 7468697320697320612074657374206b6579
           INNGEST_DEV: http://127.0.0.1:8288
-          ENABLE_TEST_API: true
+          TEST_MODE: true
+
+
+  execution:
+    name: Execution Tests
+    strategy:
+      matrix:
+        os: [ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.24"
+
+      - name: Run execution tests
+        run: go test ./tests/execution/... -v -count=1

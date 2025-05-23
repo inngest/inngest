@@ -57,13 +57,14 @@ func TestStepInfer(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	h, server, registerFuncs := NewSDKHandler(t, "infer-test")
+	inngestClient, server, registerFuncs := NewSDKHandler(t, "infer-test")
 	defer server.Close()
 
 	var ctr int32
 
-	a := inngestgo.CreateFunction(
-		inngestgo.FunctionOpts{Name: "test infer"},
+	_, err := inngestgo.CreateFunction(
+		inngestClient,
+		inngestgo.FunctionOpts{ID: "test-infer"},
 		inngestgo.EventTrigger("test/sdk-infer", nil),
 		func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
 			out, err := step.Infer[openai.ChatCompletionRequest, openai.ChatCompletionResponse](ctx, "infer", step.InferOpts[openai.ChatCompletionRequest]{
@@ -90,7 +91,7 @@ func TestStepInfer(t *testing.T) {
 			return out.Choices[0].Message.Content, err
 		},
 	)
-	h.Register(a)
+	require.NoError(t, err)
 	registerFuncs()
 
 	evt := inngestgo.Event{
@@ -100,7 +101,7 @@ func TestStepInfer(t *testing.T) {
 			"id":   "1",
 		},
 	}
-	_, err := inngestgo.Send(ctx, evt)
+	_, err = inngestClient.Send(ctx, evt)
 	require.NoError(t, err)
 
 	require.Eventually(t, func() bool { return atomic.LoadInt32(&ctr) == 1 }, 5*time.Second, 50*time.Millisecond)

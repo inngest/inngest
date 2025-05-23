@@ -11,7 +11,8 @@ CREATE TABLE apps (
 	created_at TIMESTAMP NOT NULL,
 	archived_at TIMESTAMP,
 	url VARCHAR NOT NULL,
-    is_connect BOOLEAN
+    method VARCHAR NOT NULL DEFAULT 'serve',
+    app_version VARCHAR
 );
 
 CREATE TABLE events (
@@ -48,7 +49,8 @@ CREATE TABLE function_runs (
 	event_id CHAR(26) NOT NULL,
 	batch_id CHAR(26),
 	original_run_id CHAR(26),
-	cron VARCHAR
+	cron VARCHAR,
+	workspace_id UUID
 );
 
 CREATE TABLE function_finishes (
@@ -155,9 +157,10 @@ CREATE TABLE worker_connections (
     account_id CHAR(36) NOT NULL,
     workspace_id CHAR(36) NOT NULL,
 
+    app_name VARCHAR NOT NULL,
     app_id CHAR(36),
 
-    id CHAR(26) PRIMARY KEY,
+    id CHAR(26) NOT NULL,
     gateway_id CHAR(26) NOT NULL,
     instance_id VARCHAR NOT NULL,
     status INT NOT NULL,
@@ -176,10 +179,12 @@ CREATE TABLE worker_connections (
     sdk_version VARCHAR NOT NULL,
     sdk_platform VARCHAR NOT NULL,
     sync_id CHAR(36),
-    build_id VARCHAR,
+    app_version VARCHAR,
     function_count INT NOT NULL,
 
     cpu_cores INT NOT NULL,
     mem_bytes INT NOT NULL,
-    os VARCHAR NOT NULL
+    os VARCHAR NOT NULL,
+
+    PRIMARY KEY(id, app_name)
 );

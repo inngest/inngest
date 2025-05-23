@@ -3,8 +3,8 @@
 import { useCallback, useMemo, useRef, useState, type UIEventHandler } from 'react';
 import dynamic from 'next/dynamic';
 import { Button } from '@inngest/components/Button';
-import StatusFilter from '@inngest/components/Filter/StatusFilter';
 import TimeFieldFilter from '@inngest/components/Filter/TimeFieldFilter';
+import { TimeFilter } from '@inngest/components/Filter/TimeFilter';
 import { Pill } from '@inngest/components/Pill';
 import { SelectGroup, type Option } from '@inngest/components/Select/Select';
 import { TableFilter } from '@inngest/components/Table';
@@ -23,7 +23,7 @@ import { useLocalStorage } from 'react-use';
 
 import type { RangeChangeProps } from '../DatePicker/RangePicker';
 import EntityFilter from '../Filter/EntityFilter';
-import { RunDetailsV2 } from '../RunDetailsV2';
+import { RunDetailsV3 } from '../RunDetailsV3/RunDetailsV3';
 import {
   useBatchedSearchParams,
   useSearchParam,
@@ -32,7 +32,7 @@ import {
   useValidatedSearchParam,
 } from '../hooks/useSearchParam';
 import type { Features } from '../types/features';
-import { TimeFilter } from './TimeFilter';
+import RunsStatusFilter from './RunsStatusFilter';
 import { isColumnID, useScopedColumns, type ColumnID } from './columns';
 import type { Run, ViewScope } from './types';
 
@@ -46,39 +46,33 @@ const CodeSearch = dynamic(() => import('@inngest/components/CodeSearch/CodeSear
 });
 
 type Props = {
-  cancelRun: React.ComponentProps<typeof RunDetailsV2>['cancelRun'];
   data: Run[];
   defaultVisibleColumns?: ColumnID[];
   features: Pick<Features, 'history'>;
-  getRun: React.ComponentProps<typeof RunDetailsV2>['getRun'];
-  getTraceResult: React.ComponentProps<typeof RunDetailsV2>['getResult'];
-  getTrigger: React.ComponentProps<typeof RunDetailsV2>['getTrigger'];
+  getRun: React.ComponentProps<typeof RunDetailsV3>['getRun'];
+  getTraceResult: React.ComponentProps<typeof RunDetailsV3>['getResult'];
+  getTrigger: React.ComponentProps<typeof RunDetailsV3>['getTrigger'];
   hasMore: boolean;
   isLoadingInitial: boolean;
   isLoadingMore: boolean;
   onRefresh?: () => void;
   onScroll: UIEventHandler<HTMLDivElement>;
   onScrollToTop: () => void;
-  pathCreator: React.ComponentProps<typeof RunDetailsV2>['pathCreator'];
+  pathCreator: React.ComponentProps<typeof RunDetailsV3>['pathCreator'];
   pollInterval?: number;
-  rerun: React.ComponentProps<typeof RunDetailsV2>['rerun'];
-  rerunFromStep: React.ComponentProps<typeof RunDetailsV2>['rerunFromStep'];
   apps?: Option[];
   functions?: Option[];
   functionIsPaused?: boolean;
   scope: ViewScope;
   totalCount: number | undefined;
-  stepAIEnabled?: boolean;
+  searchError?: Error;
 };
 
 export function RunsPage({
-  cancelRun,
   defaultVisibleColumns,
   getRun,
   getTraceResult,
   getTrigger,
-  rerun,
-  rerunFromStep,
   data,
   features,
   hasMore,
@@ -94,7 +88,7 @@ export function RunsPage({
   functionIsPaused,
   scope,
   totalCount,
-  stepAIEnabled = false,
+  searchError,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const columns = useScopedColumns(scope);
@@ -240,25 +234,21 @@ export function RunsPage({
   const renderSubComponent = useCallback(
     (rowData: Run) => {
       return (
-        <div className="border-subtle border-l-4 pb-6">
-          <RunDetailsV2
-            cancelRun={cancelRun}
+        <div className={`border-subtle `}>
+          <RunDetailsV3
             getResult={getTraceResult}
             getRun={getRun}
             initialRunData={rowData}
             getTrigger={getTrigger}
             pathCreator={pathCreator}
             pollInterval={pollInterval}
-            rerun={rerun}
-            rerunFromStep={rerunFromStep}
             runID={rowData.id}
             standalone={false}
-            stepAIEnabled={stepAIEnabled}
           />
         </div>
       );
     },
-    [cancelRun, getRun, getTraceResult, getTrigger, pathCreator, pollInterval, rerun]
+    [getRun, getTraceResult, getTrigger, pathCreator, pollInterval]
   );
 
   const options = useMemo(() => {
@@ -292,6 +282,7 @@ export function RunsPage({
                 onTimeFieldChange={onTimeFieldChange}
               />
               <TimeFilter
+                className="rounded-l-none border-l-0"
                 daysAgoMax={features.history}
                 onDaysChange={onDaysChange}
                 defaultValue={
@@ -313,7 +304,7 @@ export function RunsPage({
                 }
               />
             </SelectGroup>
-            <StatusFilter
+            <RunsStatusFilter
               selectedStatuses={filteredStatus}
               onStatusesChange={onStatusFilterChange}
               functionIsPaused={functionIsPaused}
@@ -379,12 +370,17 @@ export function RunsPage({
               onSearch={onSearchChange}
               placeholder="event.data.userId == “1234” or output.count > 10"
               value={search}
+              searchError={searchError}
             />
           </>
         )}
       </div>
 
-      <div className="h-[calc(100%-58px)] overflow-y-auto" onScroll={onScroll} ref={containerRef}>
+      <div
+        className="h-[calc(100%-58px)] overflow-y-auto pb-2"
+        onScroll={onScroll}
+        ref={containerRef}
+      >
         <RunsTable
           data={data}
           isLoading={isLoadingInitial}

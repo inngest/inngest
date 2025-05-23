@@ -20,7 +20,7 @@ type FnRunTestEvtData struct {
 	Success bool `json:"success"`
 	Index   int  `json:"idx"`
 }
-type FnRunTestEvt inngestgo.GenericEvent[FnRunTestEvtData, any]
+type FnRunTestEvt inngestgo.GenericEvent[FnRunTestEvtData]
 
 func TestFunctionRunList(t *testing.T) {
 	ctx := context.Background()
@@ -32,27 +32,30 @@ func TestFunctionRunList(t *testing.T) {
 	failedEventName := fmt.Sprintf("%s/failed", appName)
 
 	c := client.New(t)
-	h, server, registerFuncs := NewSDKHandler(t, appName)
+	inngestClient, server, registerFuncs := NewSDKHandler(t, appName)
 	defer server.Close()
 
 	var (
 		ok     int32
 		failed int32
 	)
-	fn1 := inngestgo.CreateFunction(
+	_, err := inngestgo.CreateFunction(
+		inngestClient,
 		inngestgo.FunctionOpts{
-			Name: "fn-run-ok",
+			ID: "fn-run-ok",
 		},
 		inngestgo.EventTrigger(okEventName, nil),
-		func(ctx context.Context, input inngestgo.Input[FnRunTestEvt]) (any, error) {
+		func(ctx context.Context, input inngestgo.Input[FnRunTestEvtData]) (any, error) {
 			atomic.AddInt32(&ok, 1)
 			return map[string]any{"num": input.Event.Data.Index * 2}, nil
 		},
 	)
-
-	fn2 := inngestgo.CreateFunction(
+	require.NoError(t, err)
+	_, err = inngestgo.CreateFunction(
+		inngestClient,
 		inngestgo.FunctionOpts{
-			Name: "fn-run-err", Retries: inngestgo.IntPtr(0),
+			ID:      "fn-run-err",
+			Retries: inngestgo.IntPtr(0),
 		},
 		inngestgo.EventTrigger(failedEventName, nil),
 		func(ctx context.Context, input inngestgo.Input[FnRunTestEvt]) (any, error) {
@@ -60,8 +63,7 @@ func TestFunctionRunList(t *testing.T) {
 			return nil, fmt.Errorf("fail")
 		},
 	)
-
-	h.Register(fn1, fn2)
+	require.NoError(t, err)
 	registerFuncs()
 
 	start := time.Now()
@@ -75,7 +77,7 @@ func TestFunctionRunList(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		for i := 0; i < successTotal; i++ {
-			_, _ = inngestgo.Send(ctx, inngestgo.Event{Name: okEventName, Data: map[string]any{"success": true, "idx": i}})
+			_, _ = inngestClient.Send(ctx, inngestgo.Event{Name: okEventName, Data: map[string]any{"success": true, "idx": i}})
 		}
 	}()
 
@@ -83,7 +85,7 @@ func TestFunctionRunList(t *testing.T) {
 	go func() {
 		defer wg.Done()
 		for i := 0; i < failureTotal; i++ {
-			_, _ = inngestgo.Send(ctx, inngestgo.Event{Name: failedEventName, Data: map[string]any{"success": false, "idx": i}})
+			_, _ = inngestClient.Send(ctx, inngestgo.Event{Name: failedEventName, Data: map[string]any{"success": false, "idx": i}})
 		}
 	}()
 
@@ -249,10 +251,10 @@ func TestFunctionRunList(t *testing.T) {
 				Cursor: *pageInfo.EndCursor,
 			})
 
-			remain := failureTotal - items
-			assert.Equal(t, remain, len(edges))
+			remain := failureTotal - items // we should paginate and remove the 2 previous from the total.
 			assert.False(t, pageInfo.HasNextPage)
 			assert.Equal(t, failureTotal, total)
+			assert.Equal(t, remain, len(edges), "Got %#v and page info %#v", edges, pageInfo)
 		}, 10*time.Second, 2*time.Second)
 	})
 

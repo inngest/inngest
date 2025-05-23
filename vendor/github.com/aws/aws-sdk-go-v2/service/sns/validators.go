@@ -230,6 +230,26 @@ func (m *validateOpDeleteTopic) HandleInitialize(ctx context.Context, in middlew
 	return next.HandleInitialize(ctx, in)
 }
 
+type validateOpGetDataProtectionPolicy struct {
+}
+
+func (*validateOpGetDataProtectionPolicy) ID() string {
+	return "OperationInputValidation"
+}
+
+func (m *validateOpGetDataProtectionPolicy) HandleInitialize(ctx context.Context, in middleware.InitializeInput, next middleware.InitializeHandler) (
+	out middleware.InitializeOutput, metadata middleware.Metadata, err error,
+) {
+	input, ok := in.Parameters.(*GetDataProtectionPolicyInput)
+	if !ok {
+		return out, metadata, fmt.Errorf("unknown input parameters type %T", in.Parameters)
+	}
+	if err := validateOpGetDataProtectionPolicyInput(input); err != nil {
+		return out, metadata, err
+	}
+	return next.HandleInitialize(ctx, in)
+}
+
 type validateOpGetEndpointAttributes struct {
 }
 
@@ -425,6 +445,26 @@ func (m *validateOpPublish) HandleInitialize(ctx context.Context, in middleware.
 		return out, metadata, fmt.Errorf("unknown input parameters type %T", in.Parameters)
 	}
 	if err := validateOpPublishInput(input); err != nil {
+		return out, metadata, err
+	}
+	return next.HandleInitialize(ctx, in)
+}
+
+type validateOpPutDataProtectionPolicy struct {
+}
+
+func (*validateOpPutDataProtectionPolicy) ID() string {
+	return "OperationInputValidation"
+}
+
+func (m *validateOpPutDataProtectionPolicy) HandleInitialize(ctx context.Context, in middleware.InitializeInput, next middleware.InitializeHandler) (
+	out middleware.InitializeOutput, metadata middleware.Metadata, err error,
+) {
+	input, ok := in.Parameters.(*PutDataProtectionPolicyInput)
+	if !ok {
+		return out, metadata, fmt.Errorf("unknown input parameters type %T", in.Parameters)
+	}
+	if err := validateOpPutDataProtectionPolicyInput(input); err != nil {
 		return out, metadata, err
 	}
 	return next.HandleInitialize(ctx, in)
@@ -694,6 +734,10 @@ func addOpDeleteTopicValidationMiddleware(stack *middleware.Stack) error {
 	return stack.Initialize.Add(&validateOpDeleteTopic{}, middleware.After)
 }
 
+func addOpGetDataProtectionPolicyValidationMiddleware(stack *middleware.Stack) error {
+	return stack.Initialize.Add(&validateOpGetDataProtectionPolicy{}, middleware.After)
+}
+
 func addOpGetEndpointAttributesValidationMiddleware(stack *middleware.Stack) error {
 	return stack.Initialize.Add(&validateOpGetEndpointAttributes{}, middleware.After)
 }
@@ -732,6 +776,10 @@ func addOpPublishBatchValidationMiddleware(stack *middleware.Stack) error {
 
 func addOpPublishValidationMiddleware(stack *middleware.Stack) error {
 	return stack.Initialize.Add(&validateOpPublish{}, middleware.After)
+}
+
+func addOpPutDataProtectionPolicyValidationMiddleware(stack *middleware.Stack) error {
+	return stack.Initialize.Add(&validateOpPutDataProtectionPolicy{}, middleware.After)
 }
 
 func addOpRemovePermissionValidationMiddleware(stack *middleware.Stack) error {
@@ -1077,6 +1125,21 @@ func validateOpDeleteTopicInput(v *DeleteTopicInput) error {
 	}
 }
 
+func validateOpGetDataProtectionPolicyInput(v *GetDataProtectionPolicyInput) error {
+	if v == nil {
+		return nil
+	}
+	invalidParams := smithy.InvalidParamsError{Context: "GetDataProtectionPolicyInput"}
+	if v.ResourceArn == nil {
+		invalidParams.Add(smithy.NewErrParamRequired("ResourceArn"))
+	}
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	} else {
+		return nil
+	}
+}
+
 func validateOpGetEndpointAttributesInput(v *GetEndpointAttributesInput) error {
 	if v == nil {
 		return nil
@@ -1231,6 +1294,24 @@ func validateOpPublishInput(v *PublishInput) error {
 		if err := validateMessageAttributeMap(v.MessageAttributes); err != nil {
 			invalidParams.AddNested("MessageAttributes", err.(smithy.InvalidParamsError))
 		}
+	}
+	if invalidParams.Len() > 0 {
+		return invalidParams
+	} else {
+		return nil
+	}
+}
+
+func validateOpPutDataProtectionPolicyInput(v *PutDataProtectionPolicyInput) error {
+	if v == nil {
+		return nil
+	}
+	invalidParams := smithy.InvalidParamsError{Context: "PutDataProtectionPolicyInput"}
+	if v.ResourceArn == nil {
+		invalidParams.Add(smithy.NewErrParamRequired("ResourceArn"))
+	}
+	if v.DataProtectionPolicy == nil {
+		invalidParams.Add(smithy.NewErrParamRequired("DataProtectionPolicy"))
 	}
 	if invalidParams.Len() > 0 {
 		return invalidParams

@@ -3,10 +3,9 @@ package connect
 import (
 	"context"
 	"crypto/rand"
+	"errors"
 	"fmt"
-	"github.com/inngest/inngest/pkg/connect/auth"
-	"github.com/inngest/inngest/pkg/telemetry/metrics"
-	"log/slog"
+	mathRand "math/rand"
 	"net/http"
 	"os"
 	"sync"
@@ -15,26 +14,23 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/connect/auth"
 	"github.com/inngest/inngest/pkg/connect/pubsub"
 	"github.com/inngest/inngest/pkg/connect/state"
-	"github.com/inngest/inngest/pkg/cqrs"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/oklog/ulid/v2"
+	"github.com/rs/zerolog"
 	"golang.org/x/sync/errgroup"
 )
 
 const (
-	GatewayHeartbeatInterval  = 5 * time.Second
 	GatewayInstrumentInterval = 20 * time.Second
-	WorkerHeartbeatInterval   = 10 * time.Second
+	GatewayGCInterval         = 30 * time.Minute
 )
 
 type gatewayOpt func(*connectGatewaySvc)
-
-type ConnectAppLoader interface {
-	// GetAppByName returns an app by name
-	GetAppByName(ctx context.Context, envID uuid.UUID, name string) (*cqrs.App, error)
-}
 
 type connectionCounter struct {
 	count  uint64
@@ -59,6 +55,10 @@ func (c *connectionCounter) Wait() {
 	c.waiter.Wait()
 }
 
+type ConnectEntitlementRetriever interface {
+	AppsPerConnection(ctx context.Context, accountId uuid.UUID) (int, error)
+}
+
 type connectGatewaySvc struct {
 	gatewayPublicPort int
 
@@ -70,15 +70,20 @@ type connectGatewaySvc struct {
 	gatewayId ulid.ULID
 	dev       bool
 
-	logger *slog.Logger
+	logger    logger.Logger
+	devlogger *zerolog.Logger
 
 	runCtx context.Context
 
 	auther       auth.Handler
 	stateManager state.StateManager
 	receiver     pubsub.RequestReceiver
-	appLoader    ConnectAppLoader
 	apiBaseUrl   string
+
+	consecutiveWorkerHeartbeatMissesBeforeConnectionClose int
+	workerHeartbeatInterval                               time.Duration
+	workerRequestExtendLeaseInterval                      time.Duration
+	workerRequestLeaseDuration                            time.Duration
 
 	hostname string
 
@@ -134,12 +139,6 @@ func WithRequestReceiver(r pubsub.RequestReceiver) gatewayOpt {
 	}
 }
 
-func WithAppLoader(l ConnectAppLoader) gatewayOpt {
-	return func(svc *connectGatewaySvc) {
-		svc.appLoader = l
-	}
-}
-
 func WithLifeCycles(lifecycles []ConnectGatewayLifecycleListener) gatewayOpt {
 	return func(svc *connectGatewaySvc) {
 		svc.lifecycles = lifecycles
@@ -176,12 +175,41 @@ func WithGroupName(groupName string) gatewayOpt {
 	}
 }
 
+func WithWorkerHeartbeatInterval(interval time.Duration) gatewayOpt {
+	return func(svc *connectGatewaySvc) {
+		svc.workerHeartbeatInterval = interval
+	}
+}
+
+func WithWorkerExtendLeaseInterval(interval time.Duration) gatewayOpt {
+	return func(svc *connectGatewaySvc) {
+		svc.workerRequestExtendLeaseInterval = interval
+	}
+}
+
+func WithWorkerRequestLeaseDuration(duration time.Duration) gatewayOpt {
+	return func(svc *connectGatewaySvc) {
+		svc.workerRequestLeaseDuration = duration
+	}
+}
+
+func WithConsecutiveWorkerHeartbeatMissesBeforeConnectionClose(misses int) gatewayOpt {
+	return func(svc *connectGatewaySvc) {
+		svc.consecutiveWorkerHeartbeatMissesBeforeConnectionClose = misses
+	}
+}
+
 func NewConnectGatewayService(opts ...gatewayOpt) *connectGatewaySvc {
 	gateway := &connectGatewaySvc{
 		gatewayId:         ulid.MustNew(ulid.Now(), rand.Reader),
 		lifecycles:        []ConnectGatewayLifecycleListener{},
 		drainListener:     newDrainListener(),
 		gatewayPublicPort: 8080,
+
+		workerHeartbeatInterval:                               consts.ConnectWorkerHeartbeatInterval,
+		workerRequestExtendLeaseInterval:                      consts.ConnectWorkerRequestExtendLeaseInterval,
+		workerRequestLeaseDuration:                            consts.ConnectWorkerRequestLeaseDuration,
+		consecutiveWorkerHeartbeatMissesBeforeConnectionClose: 5,
 	}
 
 	for _, opt := range opts {
@@ -229,6 +257,15 @@ func (c *connectGatewaySvc) Name() string {
 func (c *connectGatewaySvc) Pre(ctx context.Context) error {
 	// Set up gateway-specific logger with info for correlations
 	c.logger = logger.StdlibLogger(ctx).With("gateway_id", c.gatewayId)
+	if c.dev {
+		// Initialize prettier logger for dev server
+		c.devlogger = logger.From(ctx)
+
+		// Hide verbose connect gateway logs in dev server by default
+		if os.Getenv("CONNECT_GATEWAY_FULL_LOGS") != "true" {
+			c.logger = logger.VoidLogger()
+		}
+	}
 
 	hostname, err := os.Hostname()
 	if err != nil {
@@ -244,7 +281,7 @@ func (c *connectGatewaySvc) Pre(ctx context.Context) error {
 }
 
 func (c *connectGatewaySvc) heartbeat(ctx context.Context) {
-	heartbeatTicker := time.NewTicker(GatewayHeartbeatInterval)
+	heartbeatTicker := time.NewTicker(consts.ConnectGatewayHeartbeatInterval)
 	defer heartbeatTicker.Stop()
 	for {
 		select {
@@ -293,24 +330,54 @@ func (c *connectGatewaySvc) instrument(ctx context.Context) {
 		})
 
 		if c.isDraining {
-			metrics.GaugeConnectDrainingGateway(ctx, 1, metrics.CounterOpt{
+			metrics.GaugeConnectDrainingGateway(ctx, 1, metrics.GaugeOpt{
 				PkgName: pkgName,
 				Tags:    additionalTags,
 			})
-			metrics.GaugeConnectActiveGateway(ctx, 0, metrics.CounterOpt{
+			metrics.GaugeConnectActiveGateway(ctx, 0, metrics.GaugeOpt{
 				PkgName: pkgName,
 				Tags:    additionalTags,
 			})
 		} else {
-			metrics.GaugeConnectActiveGateway(ctx, 1, metrics.CounterOpt{
+			metrics.GaugeConnectActiveGateway(ctx, 1, metrics.GaugeOpt{
 				PkgName: pkgName,
 				Tags:    additionalTags,
 			})
-			metrics.GaugeConnectDrainingGateway(ctx, 0, metrics.CounterOpt{
+			metrics.GaugeConnectDrainingGateway(ctx, 0, metrics.GaugeOpt{
 				PkgName: pkgName,
 				Tags:    additionalTags,
 			})
 		}
+	}
+}
+
+func (c *connectGatewaySvc) gc(ctx context.Context) {
+	for {
+		jitter := time.Minute * time.Duration(mathRand.Intn(30))
+		periodWithJitter := GatewayGCInterval + jitter
+
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(periodWithJitter):
+		}
+
+		{
+			deleted, err := c.stateManager.GarbageCollectConnections(ctx)
+			if err != nil {
+				logger.StdlibLogger(ctx).Error("failed to garbage collect connections", "err", err)
+			}
+			logger.StdlibLogger(ctx).Debug("garbage-collected connections", "deleted", deleted)
+		}
+
+		{
+			deleted, err := c.stateManager.GarbageCollectGateways(ctx)
+			if err != nil {
+				logger.StdlibLogger(ctx).Error("failed to garbage collect gateways", "err", err)
+			}
+			logger.StdlibLogger(ctx).Debug("garbage-collected gateways", "deleted", deleted)
+		}
+
 	}
 }
 
@@ -335,15 +402,21 @@ func (c *connectGatewaySvc) Run(ctx context.Context) error {
 
 		c.logger.Info("waiting for connections to drain")
 		c.connectionCount.Wait()
+
 		c.logger.Info("shutting down gateway api")
 		_ = server.Shutdown(ctx)
 	}()
 
-	eg, ctx := errgroup.WithContext(ctx)
+	eg := errgroup.Group{}
 
 	eg.Go(func() error {
 		c.logger.Info(fmt.Sprintf("starting gateway api at %s", addr))
-		return server.ListenAndServe()
+		err := server.ListenAndServe()
+		if errors.Is(err, http.ErrServerClosed) {
+			return nil
+		}
+
+		return err
 	})
 
 	eg.Go(func() error {
@@ -351,9 +424,14 @@ func (c *connectGatewaySvc) Run(ctx context.Context) error {
 		// Start listening for messages, this will block until the context is cancelled
 		err := c.receiver.Wait(ctx)
 		if err != nil {
+			if ctx.Err() != nil {
+				return nil
+			}
 			// TODO Should we retry? Exit here? This will interrupt existing connections!
 			return fmt.Errorf("could not listen for pubsub messages: %w", err)
 		}
+
+		c.logger.Debug("receiver wait finished")
 
 		return nil
 	})
@@ -371,6 +449,9 @@ func (c *connectGatewaySvc) Run(ctx context.Context) error {
 	// Periodically report metrics
 	go c.instrument(ctx)
 
+	// Periodically garbage collect old connections
+	go c.gc(ctx)
+
 	return eg.Wait()
 }
 
@@ -379,10 +460,10 @@ func (c *connectGatewaySvc) updateGatewayState(status state.GatewayStatus) error
 	defer c.stateUpdateLock.Unlock()
 
 	err := c.stateManager.UpsertGateway(context.Background(), &state.Gateway{
-		Id:              c.gatewayId,
-		Status:          status,
-		LastHeartbeatAt: time.Now(),
-		Hostname:        c.hostname,
+		Id:                c.gatewayId,
+		Status:            status,
+		LastHeartbeatAtMS: time.Now().UnixMilli(),
+		Hostname:          c.hostname,
 	})
 	if err != nil {
 		c.logger.Error("failed to update gateway status in state", "status", status, "error", err)

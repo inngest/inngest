@@ -1,4 +1,4 @@
-package v0
+package connectv0
 
 import (
 	"encoding/json"
@@ -10,13 +10,13 @@ import (
 	"net/http"
 )
 
-func (c *router) showWorkerGroup(w http.ResponseWriter, r *http.Request) {
+func (cr *connectApiRouter) showWorkerGroup(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	var envID uuid.UUID
-	switch c.Dev {
+	switch cr.Dev {
 	case true:
-		envID = consts.DevServerEnvId
+		envID = consts.DevServerEnvID
 
 	case false:
 		// Expect UUID
@@ -42,7 +42,7 @@ func (c *router) showWorkerGroup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	group, err := c.GroupManager.GetWorkerGroupByHash(ctx, envID, groupID)
+	group, err := cr.GroupManager.GetWorkerGroupByHash(ctx, envID, groupID)
 	if err != nil {
 		_ = publicerr.WriteHTTP(w, publicerr.Error{
 			Err:     err,
@@ -56,7 +56,7 @@ func (c *router) showWorkerGroup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	conns, err := c.ConnectManager.GetConnectionsByGroupID(ctx, envID, groupID)
+	conns, err := cr.ConnectManager.GetConnectionsByGroupID(ctx, envID, groupID)
 	if err != nil {
 		_ = publicerr.WriteHTTP(w, publicerr.Wrap(
 			err,

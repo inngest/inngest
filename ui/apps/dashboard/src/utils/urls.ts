@@ -2,6 +2,7 @@ import type { Route } from 'next';
 
 export const WEBSITE_PRICING_URL = 'https://www.inngest.com/pricing';
 export const WEBSITE_CONTACT_URL = 'https://www.inngest.com/contact';
+export const DISCORD_URL = 'https://www.inngest.com/discord';
 
 export const DOCS_URLS = {
   SERVE: 'https://www.inngest.com/docs/sdk/serve',
@@ -51,11 +52,27 @@ export const pathCreator = {
   createApp({ envSlug }: { envSlug: string }): Route {
     return `/env/${envSlug}/apps/sync-new` as Route;
   },
-  events({ envSlug }: { envSlug: string }): Route {
-    return `/env/${envSlug}/events` as Route;
+  event({
+    envSlug,
+    eventName,
+    eventID,
+  }: {
+    envSlug: string;
+    eventName: string;
+    eventID: string;
+  }): Route {
+    return `/env/${envSlug}/event-types/${encodeURIComponent(
+      eventName
+    )}/events/${eventID}` as Route;
+  },
+  eventPopout({ envSlug, eventID }: { envSlug: string; eventID: string }): Route {
+    return `/env/${envSlug}/new-events/${eventID}` as Route;
   },
   eventType({ envSlug, eventName }: { envSlug: string; eventName: string }): Route {
-    return `/env/${envSlug}/events/${encodeURIComponent(eventName)}` as Route;
+    return `/env/${envSlug}/event-types/${encodeURIComponent(eventName)}` as Route;
+  },
+  eventTypes({ envSlug }: { envSlug: string }): Route {
+    return `/env/${envSlug}/event-types` as Route;
   },
   envs(): Route {
     return '/env' as Route;
@@ -75,19 +92,8 @@ export const pathCreator = {
   }): Route {
     return `/env/${envSlug}/functions/${encodeURIComponent(functionSlug)}/cancellations` as Route;
   },
-  oldRuns({ envSlug, functionSlug }: { envSlug: string; functionSlug: string }): Route {
-    return `/env/${envSlug}/functions/${encodeURIComponent(functionSlug)}/logs` as Route;
-  },
-  oldRun({
-    envSlug,
-    functionSlug,
-    runID,
-  }: {
-    envSlug: string;
-    functionSlug: string;
-    runID: string;
-  }): Route {
-    return `/env/${envSlug}/functions/${encodeURIComponent(functionSlug)}/logs/${runID}` as Route;
+  integrations(): Route {
+    return `/settings/integrations` as Route;
   },
   keys({ envSlug }: { envSlug: string }): Route {
     return `/env/${envSlug}/manage/keys` as Route;
@@ -117,6 +123,9 @@ export const pathCreator = {
   runs({ envSlug }: { envSlug: string }): Route {
     return `/env/${envSlug}/runs` as Route;
   },
+  signingKeys({ envSlug }: { envSlug: string }): Route {
+    return `/env/${envSlug}/manage/signing-key` as Route;
+  },
   support({ ref }: { ref?: string } = {}): Route {
     return `/support${ref ? `?ref=${ref}` : ''}` as Route;
   },
@@ -125,5 +134,11 @@ export const pathCreator = {
   },
   vercel(): Route {
     return `/settings/integrations/vercel` as Route;
+  },
+  vercelSetup(): Route {
+    return `/settings/integrations/vercel/connect` as Route;
+  },
+  neon(): Route {
+    return `/settings/integrations/neon` as Route;
   },
 };

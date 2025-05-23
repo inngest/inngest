@@ -22,6 +22,7 @@ Before being able to run the app for the first time, you need to follow the step
    `corepack enable; corepack prepare`
 3. Install dependencies by running `pnpm install`
 4. Link local project to our `ui` Vercel project by running `pnpm vercel link -p ui --yes`
+   - Make sure the command prints out `Linked to inngest/ui` and not a `ui` project in your personal scope
 5. Download environment variables by running `pnpm env:pull`
 
 ## Developing

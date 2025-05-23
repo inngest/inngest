@@ -1,6 +1,5 @@
 'use client';
 
-import { useCallback } from 'react';
 import { ContentCard } from '@inngest/components/ContentCard';
 import { RunStatusIcon } from '@inngest/components/FunctionRunStatusIcons';
 import { MetadataGrid } from '@inngest/components/Metadata';
@@ -58,12 +57,6 @@ export function RunDetails(props: Props) {
   } = props;
 
   const runID = run?.id;
-  const cancelRun = useCallback(async () => {
-    if (!props.cancelRun || !runID) {
-      return;
-    }
-    await props.cancelRun(runID);
-  }, [props.cancelRun, runID]);
 
   const firstTrigger = (func?.triggers && func.triggers[0]) ?? null;
   const cron = firstTrigger && firstTrigger.type === 'CRON';
@@ -82,9 +75,7 @@ export function RunDetails(props: Props) {
       button={
         !loading && (
           <div className="flex gap-2">
-            {cancelRun && (
-              <CancelRunButton disabled={Boolean(run?.endedAt)} hasIcon onClick={cancelRun} />
-            )}
+            {runID && <CancelRunButton disabled={Boolean(run?.endedAt)} hasIcon runID={runID} />}
             {rerun && <RerunButton onClick={rerun} />}
           </div>
         )
@@ -95,8 +86,12 @@ export function RunDetails(props: Props) {
       badge={
         cron ? (
           <div className="py-2">
-            <Pill kind="warning" appearance="outlined">
-              <RiTimeLine className="h-4 w-4" />
+            <Pill
+              kind="warning"
+              appearance="outlined"
+              icon={<RiTimeLine className="h-4 w-4" />}
+              iconSide="left"
+            >
               {firstTrigger.value}
             </Pill>
           </div>

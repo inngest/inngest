@@ -10,6 +10,7 @@ import (
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/execution/realtime/streamingtypes"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 	"github.com/stretchr/testify/assert"
@@ -59,10 +60,10 @@ func TestRedisBroadcaster(t *testing.T) {
 	})
 
 	// Create two messages with two separate topics.
-	msg1 := NewMessage(MessageKindRun, "output")
-	msg1.RunID = ulid.MustNew(ulid.Now(), rand.Reader)
-	msg2 := NewMessage(MessageKindRun, "output")
-	msg2.RunID = ulid.MustNew(ulid.Now(), rand.Reader)
+	msg1 := streamingtypes.NewMessage(streamingtypes.MessageKindRun, "output")
+	msg1.Channel = ulid.MustNew(ulid.Now(), rand.Reader).String()
+	msg2 := streamingtypes.NewMessage(streamingtypes.MessageKindRun, "output")
+	msg2.Channel = ulid.MustNew(ulid.Now(), rand.Reader).String()
 
 	t.Run("publishing on b1 broadcasts on b2 subscriber", func(t *testing.T) {
 		// Subscribing on msg1 and msg2 works, which tests multiplexing of many
@@ -75,6 +76,9 @@ func TestRedisBroadcaster(t *testing.T) {
 		require.NoError(t, err)
 		err = b2.Subscribe(ctx, s2, msg2.Topics())
 		require.NoError(t, err)
+
+		// Wait a short delay to ensure all subscriptions have been set up in Redis
+		<-time.After(100 * time.Millisecond)
 
 		// and publishing on b1 should also broadcast a message to the s2
 		// subscriber via b2.

@@ -24,14 +24,33 @@ type RunInfo struct {
 	SojournDelay   time.Duration
 	Priority       uint
 	QueueShardName string
-
-	GuaranteedCapacityKey string
+	// ContinueCount represents the total number of continues that the queue has processed
+	// via RunFunc returning true.  This allows us to prevent unbounded sequential processing
+	// on the same function by limiting the number of continues possible within a given chain.
+	ContinueCount uint
 }
 
-type RunFunc func(context.Context, RunInfo, Item) error
+// RunFunc represents a function called to process each item in the queue.  This may be
+// called in parallel.
+//
+// RunFunc returns a boolean representing whether the Item enqueued more work within the
+// same function run.  If set to true, the queue may choose to continue processing the
+// partition to improve inter-step latency.
+//
+// If the RunFunc returns an error, the Item will be nacked and retried depending on the
+// Item's retry policy.
+type RunFunc func(context.Context, RunInfo, Item) (RunResult, error)
+
+type RunResult struct {
+	// ScheduledImmediateJob indicates whether this run function scheduled another job
+	// in the same partition for immediate consumption.
+	ScheduledImmediateJob bool
+}
 
 type EnqueueOpts struct {
-	PassthroughJobId bool
+	PassthroughJobId       bool
+	ForceQueueShardName    string
+	NormalizeFromBacklogID string
 }
 
 type Producer interface {
@@ -64,7 +83,11 @@ type Migrator interface {
 	SetFunctionMigrate(ctx context.Context, sourceShard string, fnID uuid.UUID, migrate bool) error
 	// Migration does a peek operation like the normal peek, but ignores leases and other conditions a normal peek cares about.
 	// The sore goal is to grab things and migrate them to somewhere else
-	Migrate(ctx context.Context, shard string, fnID uuid.UUID, limit int64, handler QueueMigrationHandler) (int64, error)
+	Migrate(ctx context.Context, shard string, fnID uuid.UUID, limit int64, concurrency int, handler QueueMigrationHandler) (int64, error)
+}
+
+type QueueDirectAccess interface {
+	RemoveQueueItem(ctx context.Context, shard string, partitionKey string, itemID string) error
 }
 
 // QuitError is an error that, when returned, quits the queue.  This always retries
@@ -93,6 +116,14 @@ type RetryAtSpecifier interface {
 
 func RetryAtError(err error, at *time.Time) error {
 	return retryAtError{cause: err, at: at}
+}
+
+func AsRetryAtError(err error) *retryAtError {
+	at := retryAtError{}
+	if errors.As(err, &at) {
+		return &at
+	}
+	return nil
 }
 
 type retryAtError struct {
@@ -223,4 +254,7 @@ type MigratePayload struct {
 	// DisableFnPause is a flag to disable the function pausing during migration
 	// if it's considered okay to do so
 	DisableFnPause bool
+
+	// Concurrency optionally specifies the concurrency for running the migrate handler over each batch of queue items.
+	Concurrency int
 }

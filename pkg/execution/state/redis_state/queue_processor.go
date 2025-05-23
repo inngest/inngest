@@ -11,9 +11,10 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/inngest/inngest/pkg/enums"
-
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/logger"
 
 	"github.com/VividCortex/ewma"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
@@ -120,11 +121,24 @@ func (q *queue) Enqueue(ctx context.Context, item osqueue.Item, at time.Time, op
 	}
 
 	shard := q.primaryQueueShard
-	if q.shardSelector != nil {
+	switch {
+	// If the caller wants us to enqueue the job to a specific queue shard, use that.
+	case opts.ForceQueueShardName != "":
+		foundShard, ok := q.queueShardClients[opts.ForceQueueShardName]
+		if !ok {
+			return fmt.Errorf("tried to force invalid queue shard %q", opts.ForceQueueShardName)
+		}
+
+		shard = foundShard
+	// Otherwise, invoke the shard selector, if configured.
+	case q.shardSelector != nil:
+		// QueueName should be consistently specified on both levels. This safeguard ensures
+		// we'll check for both places, just in case.
 		qn := qi.Data.QueueName
 		if qn == nil {
 			qn = qi.QueueName
 		}
+
 		selected, err := q.shardSelector(ctx, qi.Data.Identifier.AccountID, qn)
 		if err != nil {
 			q.logger.Error().Err(err).Interface("qi", qi).Msg("error selecting shard")
@@ -156,15 +170,6 @@ func (q *queue) Enqueue(ctx context.Context, item osqueue.Item, at time.Time, op
 }
 
 func (q *queue) Run(ctx context.Context, f osqueue.RunFunc) error {
-
-	for i := int32(0); i < q.numWorkers; i++ {
-		go q.worker(ctx, f)
-	}
-
-	if q.runMode.GuaranteedCapacity {
-		go q.claimUnleasedGuaranteedCapacity(ctx, q.guaranteedCapacityScanTickTime, q.guaranteedCapacityLeaseTickTime)
-	}
-
 	if q.runMode.Sequential {
 		go q.claimSequentialLease(ctx)
 	}
@@ -173,7 +178,38 @@ func (q *queue) Run(ctx context.Context, f osqueue.RunFunc) error {
 		go q.runScavenger(ctx)
 	}
 
+	if q.runMode.PauseFlusher {
+		go q.runPauseFlusher(ctx)
+	}
+
 	go q.runInstrumentation(ctx)
+
+	// start execution and shadow scan concurrently
+	eg := errgroup.Group{}
+
+	eg.Go(func() error {
+		return q.executionScan(ctx, f)
+	})
+
+	if q.runMode.ShadowPartition {
+		eg.Go(func() error {
+			return q.shadowScan(ctx)
+		})
+	}
+
+	if q.runMode.NormalizePartition {
+		eg.Go(func() error {
+			return q.backlogNormalizationScan(ctx)
+		})
+	}
+
+	return eg.Wait()
+}
+
+func (q *queue) executionScan(ctx context.Context, f osqueue.RunFunc) error {
+	for i := int32(0); i < q.numWorkers; i++ {
+		go q.worker(ctx, f)
+	}
 
 	if !q.runMode.Partition && !q.runMode.Account {
 		return fmt.Errorf("need to specify either partition, account, or both in queue run mode")
@@ -184,6 +220,8 @@ func (q *queue) Run(ctx context.Context, f osqueue.RunFunc) error {
 	q.logger.Debug().
 		Str("poll", q.pollTick.String()).
 		Msg("starting queue worker")
+
+	backoff := time.Millisecond * 250
 
 LOOP:
 	for {
@@ -209,12 +247,23 @@ LOOP:
 			}
 
 			if err := q.scan(ctx); err != nil {
+				if errors.Is(err, context.DeadlineExceeded) {
+					q.logger.Warn().Msg("deadline exceeded scanning partition pointers")
+					<-time.After(backoff)
+
+					// Backoff doubles up to 3 seconds.
+					backoff = time.Duration(math.Min(float64(backoff*2), float64(time.Second*5)))
+					continue
+				}
+
 				// On scan errors, halt the worker entirely.
 				if !errors.Is(err, context.Canceled) {
 					q.logger.Error().Err(err).Msg("error scanning partition pointers")
 				}
 				break LOOP
 			}
+
+			backoff = time.Millisecond * 250
 		}
 	}
 
@@ -279,6 +328,23 @@ func (q *queue) claimSequentialLease(ctx context.Context) {
 			q.seqLeaseLock.Unlock()
 		}
 	}
+}
+
+func (q *queue) runPauseFlusher(ctx context.Context) {
+	// TODO:
+	//
+	// configure lease
+	//
+	// - lock
+	// - set lease ID
+	// - unlock
+	//
+	// setup tick to attempt to configure lease
+	// or update lease if there's already one
+	//
+	// flush pauses to blob store on condition
+
+	panic("not implemented")
 }
 
 func (q *queue) runScavenger(ctx context.Context) {
@@ -414,7 +480,7 @@ func (q *queue) worker(ctx context.Context, f osqueue.RunFunc) {
 			// XXX: When jobs can have their own cancellation signals, move this into
 			// process itself.
 			processCtx, cancel := context.WithCancel(context.Background())
-			err := q.process(processCtx, i.P, i.I, i.G, f)
+			err := q.process(processCtx, i.P, i.PCtr, i.I, f)
 			q.sem.Release(1)
 			metrics.WorkerQueueCapacityCounter(ctx, -1, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name}})
 			cancel()
@@ -430,9 +496,8 @@ func (q *queue) worker(ctx context.Context, f osqueue.RunFunc) {
 	}
 }
 
-func (q *queue) scanPartition(ctx context.Context, partitionKey string, peekLimit int64, peekUntil time.Time, guaranteedCapacity *GuaranteedCapacity, metricShardName string, accountId *uuid.UUID, reportPeekedPartitions *int64) error {
+func (q *queue) scanPartition(ctx context.Context, partitionKey string, peekLimit int64, peekUntil time.Time, metricShardName string, accountId *uuid.UUID, reportPeekedPartitions *int64) error {
 	// Peek 1s into the future to pull jobs off ahead of time, minimizing 0 latency
-
 	partitions, err := durationWithTags(ctx, q.primaryQueueShard.Name, "partition_peek", q.clock.Now(), func(ctx context.Context) ([]*QueuePartition, error) {
 		return q.partitionPeek(ctx, partitionKey, q.isSequential(), peekUntil, peekLimit, accountId)
 	}, map[string]any{
@@ -457,7 +522,7 @@ func (q *queue) scanPartition(ctx context.Context, partitionKey string, peekLimi
 				metrics.IncrQueueScanNoCapacityCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"shard": metricShardName, "queue_shard": q.primaryQueueShard.Name}})
 				return nil
 			}
-			if err := q.processPartition(ctx, &p, guaranteedCapacity, false); err != nil {
+			if err := q.processPartition(ctx, &p, 0, false); err != nil {
 				if err == ErrPartitionNotFound || err == ErrPartitionGarbageCollected {
 					// Another worker grabbed the partition, or the partition was deleted
 					// during the scan by an another worker.
@@ -486,60 +551,16 @@ func (q *queue) scan(ctx context.Context) error {
 		return nil
 	}
 
+	// If there are continuations, process those immediately.
+	if err := q.scanContinuations(ctx); err != nil {
+		return fmt.Errorf("error scanning continuations: %w", err)
+	}
+
 	// Store the shard that we processed, allowing us to eventually pass this
 	// down to the job for stat tracking.
-	var (
-		guaranteedCapacity *GuaranteedCapacity
-		metricShardName    = "<global>" // default global name for metrics in this function
-	)
+	metricShardName := "<global>" // default global name for metrics in this function
 
 	peekUntil := q.clock.Now().Add(PartitionLookahead)
-
-	// If this worker has leased accounts, those take priority 95% of the time.  There's a 5% chance that the
-	// worker still works on the global queue.
-	existingLeases := q.getAccountLeases()
-	if len(existingLeases) > 0 {
-		// Pick a random guaranteed capacity if we leased multiple
-		i := rand.Intn(len(existingLeases))
-		guaranteedCapacity = &existingLeases[i].GuaranteedCapacity
-
-		metrics.IncrQueueScanCounter(ctx,
-			metrics.CounterOpt{
-				PkgName: pkgName,
-				Tags: map[string]any{
-					"kind":        "guaranteed_capacity",
-					"account_id":  guaranteedCapacity.AccountID.String(),
-					"queue_shard": q.primaryQueueShard.Name,
-				},
-			},
-		)
-
-		// Backwards-compatible metrics names
-		metricShardName = "<guaranteed-capacity>:" + guaranteedCapacity.Key()
-
-		// When account is leased, process it
-		partitionKey := q.primaryQueueShard.RedisClient.kg.AccountPartitionIndex(guaranteedCapacity.AccountID)
-		var actualScannedPartitions int64
-
-		err := q.scanPartition(ctx, partitionKey, PartitionPeekMax, peekUntil, guaranteedCapacity, metricShardName, &guaranteedCapacity.AccountID, &actualScannedPartitions)
-		if err != nil {
-			return err
-		}
-
-		metrics.IncrQueuePartitionScannedCounter(ctx,
-			actualScannedPartitions,
-			metrics.CounterOpt{
-				PkgName: pkgName,
-				Tags: map[string]any{
-					"kind":        "guaranteed_capacity",
-					"queue_shard": q.primaryQueueShard.Name,
-				},
-			},
-		)
-
-		return nil
-
-	}
 
 	processAccount := false
 	if q.runMode.Account && (!q.runMode.Partition || rand.Intn(100) <= q.runMode.AccountWeight) {
@@ -586,7 +607,7 @@ func (q *queue) scan(ctx context.Context) error {
 				defer wg.Done()
 				partitionKey := q.primaryQueueShard.RedisClient.kg.AccountPartitionIndex(account)
 
-				if err := q.scanPartition(ctx, partitionKey, accountPartitionPeekMax, peekUntil, nil, metricShardName, &account, &actualScannedPartitions); err != nil {
+				if err := q.scanPartition(ctx, partitionKey, accountPartitionPeekMax, peekUntil, metricShardName, &account, &actualScannedPartitions); err != nil {
 					q.logger.Error().Err(err).Msg("error processing account partitions")
 				}
 			}(account)
@@ -622,9 +643,9 @@ func (q *queue) scan(ctx context.Context) error {
 	partitionKey := q.primaryQueueShard.RedisClient.kg.GlobalPartitionIndex()
 
 	var actualScannedPartitions int64
-	err := q.scanPartition(ctx, partitionKey, PartitionPeekMax, peekUntil, nil, metricShardName, nil, &actualScannedPartitions)
+	err := q.scanPartition(ctx, partitionKey, PartitionPeekMax, peekUntil, metricShardName, nil, &actualScannedPartitions)
 	if err != nil {
-		return err
+		return fmt.Errorf("error scanning partition: %w", err)
 	}
 
 	metrics.IncrQueuePartitionScannedCounter(ctx,
@@ -641,9 +662,64 @@ func (q *queue) scan(ctx context.Context) error {
 	return nil
 }
 
-// NOTE: Shard is only passed as a reference if the partition was peeked from
-// a shard.  It exists for accounting and tracking purposes only, eg. to report shard metrics.
-func (q *queue) processPartition(ctx context.Context, p *QueuePartition, guaranteedCapacity *GuaranteedCapacity, randomOffset bool) error {
+func (q *queue) scanContinuations(ctx context.Context) error {
+	if !q.runMode.Continuations {
+		// continuations are not enabled.
+		return nil
+	}
+
+	// Have some chance of skipping continuations in this iteration.
+	if rand.Float64() <= consts.QueueContinuationSkipProbability {
+		return nil
+	}
+
+	eg := errgroup.Group{}
+	// If we have continued partitions, process those immediately.
+	q.continuesLock.Lock()
+	for _, c := range q.continues {
+		cont := c
+		eg.Go(func() error {
+			p := cont.partition
+			if q.capacity() == 0 {
+				// no longer any available workers for partition, so we can skip
+				// work
+				metrics.IncrQueueScanNoCapacityCounter(ctx, metrics.CounterOpt{PkgName: pkgName})
+				return nil
+			}
+			if p.PartitionType != int(enums.PartitionTypeDefault) {
+				return nil
+			}
+
+			if err := q.processPartition(ctx, p, cont.count, false); err != nil {
+				if err == ErrPartitionNotFound || err == ErrPartitionGarbageCollected {
+					return nil
+				}
+				if errors.Unwrap(err) != context.Canceled {
+					q.logger.Error().Err(err).Msg("error processing partition")
+				}
+				return err
+			}
+
+			metrics.IncrQueuePartitionProcessedCounter(ctx, metrics.CounterOpt{
+				PkgName: pkgName,
+			})
+			return nil
+		})
+	}
+	q.continuesLock.Unlock()
+	return eg.Wait()
+}
+
+// processPartition processes a given partition, peeking jobs from the partition to run.
+//
+// It accepts a uint continuationCount which represents the number of times that the partition
+// has been continued;  this occurs when a job enqueues another job to the same partition and
+// hints that we have more work to do, which lowers inter-step latency on job-per-step execution
+// models.
+//
+// randomOffset allows us to peek jobs out-of-order, and occurs when we hit concurrency key issues
+// such that we can attempt to work on other jobs not blocked by heading concurrency key issues.
+func (q *queue) processPartition(ctx context.Context, p *QueuePartition, continuationCount uint, randomOffset bool) error {
 	// Attempt to lease items.  This checks partition-level concurrency limits
 	//
 	// For optimization, because this is the only thread that can be leasing
@@ -706,15 +782,31 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, guarant
 	}
 	if errors.Is(err, ErrPartitionAlreadyLeased) {
 		metrics.IncrQueuePartitionLeaseContentionCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name}})
+		// If this is a continuation, remove it from the continuation counter.
+		// This prevents us from keeping partitions as continuations forever until
+		// we hit the max limit.
+		q.removeContinue(ctx, p, false)
 		return nil
 	}
-	if errors.Is(err, ErrPartitionNotFound) {
+	if errors.Is(err, ErrPartitionNotFound) || errors.Is(err, ErrPartitionGarbageCollected) {
 		// Another worker must have processed this partition between
 		// this worker's peek and process.  Increase partition
 		// contention metric and continue.  This is unsolvable.
+
+		// If this is a continuation, remove it from the continuation counter.
+		// This prevents us from keeping partitions as continuations forever until
+		// we hit the max limit.
+		q.removeContinue(ctx, p, false)
+
 		metrics.IncrPartitionGoneCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name}})
 		return nil
 	}
+	if errors.Is(err, ErrPartitionPaused) {
+		// Don't return an error and remove continuations;  this isn't workable.
+		q.removeContinue(ctx, p, false)
+		return nil
+	}
+
 	if err != nil {
 		return fmt.Errorf("error leasing partition: %w", err)
 	}
@@ -723,7 +815,10 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, guarant
 	defer func() {
 		metrics.HistogramProcessPartitionDuration(ctx, q.clock.Since(begin).Milliseconds(), metrics.HistogramOpt{
 			PkgName: pkgName,
-			Tags:    map[string]any{"queue_shard": q.primaryQueueShard.Name},
+			Tags: map[string]any{
+				"queue_shard":     q.primaryQueueShard.Name,
+				"is_continuation": continuationCount > 0,
+			},
 		})
 	}()
 
@@ -756,10 +851,23 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, guarant
 	if err != nil {
 		return err
 	}
-	metrics.HistogramQueuePeekSize(ctx, int64(len(queue)), metrics.HistogramOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name}})
+
+	metrics.HistogramQueuePeekSize(ctx, int64(len(queue)), metrics.HistogramOpt{
+		PkgName: pkgName,
+		Tags: map[string]any{
+			"queue_shard":     q.primaryQueueShard.Name,
+			"is_continuation": continuationCount > 0,
+		},
+	})
 
 	// Record the number of partitions we're leasing.
-	metrics.IncrQueuePartitionLeasedCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name}})
+	metrics.IncrQueuePartitionLeasedCounter(ctx, metrics.CounterOpt{
+		PkgName: pkgName,
+		Tags: map[string]any{
+			"queue_shard":     q.primaryQueueShard.Name,
+			"is_continuation": continuationCount > 0,
+		},
+	})
 
 	// parallel all queue names with internal mappings for now.
 	// XXX: Allow parallel partitions for all functions except for fns opting into FIFO
@@ -770,13 +878,13 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, guarant
 	parallel := parallelFn || parallelAccount || isSystemFn
 
 	iter := processor{
-		partition:          p,
-		items:              queue,
-		guaranteedCapacity: guaranteedCapacity,
-		queue:              q,
-		denies:             newLeaseDenyList(),
-		staticTime:         q.clock.Now(),
-		parallel:           parallel,
+		partition:            p,
+		items:                queue,
+		partitionContinueCtr: continuationCount,
+		queue:                q,
+		denies:               newLeaseDenyList(),
+		staticTime:           q.clock.Now(),
+		parallel:             parallel,
 	}
 
 	if processErr := iter.iterate(ctx); processErr != nil {
@@ -802,7 +910,7 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, guarant
 			log.From(ctx).Warn().Err(err).Msg("error requeuieng partition for random peek")
 		}
 
-		return q.processPartition(ctx, p, guaranteedCapacity, true)
+		return q.processPartition(ctx, p, continuationCount, true)
 	}
 
 	// If we've hit concurrency issues OR we've only hit rate limit issues, re-enqueue the partition
@@ -843,7 +951,13 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, guarant
 	return nil
 }
 
-func (q *queue) process(ctx context.Context, p QueuePartition, qi osqueue.QueueItem, s *GuaranteedCapacity, f osqueue.RunFunc) error {
+func (q *queue) process(
+	ctx context.Context,
+	p QueuePartition,
+	continuationCtr uint, // the number of times the partition has been continued
+	qi osqueue.QueueItem,
+	f osqueue.RunFunc,
+) error {
 	var err error
 	leaseID := qi.LeaseID
 
@@ -877,11 +991,12 @@ func (q *queue) process(ctx context.Context, p QueuePartition, qi osqueue.QueueI
 						Str("partition_id", p.ID).
 						Msg("cannot extend lease since lease ID is nil")
 					// Don't extend lease since one doesn't exist
+					errCh <- fmt.Errorf("cannot extend lease since lease ID is nil")
 					return
 				}
-				leaseID, err = q.ExtendLease(ctx, qi, *leaseID, QueueLeaseDuration)
-				if err != nil && err != ErrQueueItemNotFound && errors.Unwrap(err) != context.Canceled {
-					// XXX: Increase counter here.
+				// Once a job has started, use a BG context to always renew.
+				leaseID, err = q.ExtendLease(context.Background(), qi, *leaseID, QueueLeaseDuration)
+				if err != nil && err != ErrQueueItemNotFound {
 					q.logger.Error().
 						Err(err).
 						Str("account_id", p.AccountID.String()).
@@ -897,8 +1012,9 @@ func (q *queue) process(ctx context.Context, p QueuePartition, qi osqueue.QueueI
 	}()
 
 	// XXX: Add a max job time here, configurable.
-	jobCtx, jobCancel := context.WithCancel(ctx)
+	jobCtx, jobCancel := context.WithCancel(context.WithoutCancel(ctx))
 	defer jobCancel()
+
 	// Add the job ID to the queue context.  This allows any logic that handles the run function
 	// to inspect job IDs, eg. for tracing or logging, without having to thread this down as
 	// arguments.
@@ -907,6 +1023,22 @@ func (q *queue) process(ctx context.Context, p QueuePartition, qi osqueue.QueueI
 	if qi.Data.GroupID != "" {
 		jobCtx = state.WithGroupID(jobCtx, qi.Data.GroupID)
 	}
+
+	startedAt := q.clock.Now()
+	go func() {
+		longRunningJobStatusTick := q.clock.NewTicker(5 * time.Minute)
+		defer longRunningJobStatusTick.Stop()
+
+		for {
+			select {
+			case <-jobCtx.Done():
+				return
+			case <-longRunningJobStatusTick.Chan():
+			}
+
+			logger.StdlibLogger(ctx).Debug("long running queue job tick", "item", qi, "dur", q.clock.Now().Sub(startedAt).String())
+		}
+	}()
 
 	go func() {
 		defer func() {
@@ -929,7 +1061,6 @@ func (q *queue) process(ctx context.Context, p QueuePartition, qi osqueue.QueueI
 				Int64("ms", delay.Milliseconds()).
 				Msg("delaying job in memory")
 		}
-
 		n := q.clock.Now()
 
 		// Track the sojourn (concurrency) latency.
@@ -937,7 +1068,7 @@ func (q *queue) process(ctx context.Context, p QueuePartition, qi osqueue.QueueI
 		if qi.EarliestPeekTime > 0 {
 			sojourn = n.Sub(time.UnixMilli(qi.EarliestPeekTime))
 		}
-		jobCtx = context.WithValue(jobCtx, sojournKey, sojourn)
+		doCtx := context.WithValue(jobCtx, sojournKey, sojourn)
 
 		// Track the latency on average globally.  Do this in a goroutine so that it doesn't
 		// at all delay the job during concurrenty locking contention.
@@ -945,10 +1076,10 @@ func (q *queue) process(ctx context.Context, p QueuePartition, qi osqueue.QueueI
 			qi.WallTimeMS = qi.AtMS // backcompat while WallTimeMS isn't valid.
 		}
 		latency := n.Sub(time.UnixMilli(qi.WallTimeMS)) - sojourn
-		jobCtx = context.WithValue(jobCtx, latencyKey, latency)
+		doCtx = context.WithValue(doCtx, latencyKey, latency)
 
 		// store started at and latency in ctx
-		jobCtx = context.WithValue(jobCtx, startedAtKey, n)
+		doCtx = context.WithValue(doCtx, startedAtKey, n)
 
 		go func() {
 			// Update the ewma
@@ -977,16 +1108,11 @@ func (q *queue) process(ctx context.Context, p QueuePartition, qi osqueue.QueueI
 			SojournDelay:   sojourn,
 			Priority:       q.ppf(ctx, p),
 			QueueShardName: q.primaryQueueShard.Name,
-		}
-		if s != nil {
-			runInfo.GuaranteedCapacityKey = s.Name
-			if runInfo.GuaranteedCapacityKey == "" {
-				runInfo.GuaranteedCapacityKey = s.Key()
-			}
+			ContinueCount:  continuationCtr,
 		}
 
 		// Call the run func.
-		err := f(jobCtx, runInfo, qi.Data)
+		res, err := f(doCtx, runInfo, qi.Data)
 		extendLeaseTick.Stop()
 		if err != nil {
 			metrics.IncrQueueItemStatusCounter(ctx, metrics.CounterOpt{
@@ -1000,6 +1126,12 @@ func (q *queue) process(ctx context.Context, p QueuePartition, qi osqueue.QueueI
 			PkgName: pkgName,
 			Tags:    map[string]any{"status": "completed", "queue_shard": q.primaryQueueShard.Name},
 		})
+
+		if res.ScheduledImmediateJob {
+			// Add the partition to be continued again.  Note that if we've already
+			// continued beyond the limit this is a noop.
+			q.addContinue(ctx, &p, continuationCtr+1)
+		}
 
 		// Closing this channel prevents the goroutine which extends lease from leaking,
 		// and dequeues the job
@@ -1015,18 +1147,9 @@ func (q *queue) process(ctx context.Context, p QueuePartition, qi osqueue.QueueI
 			at := q.backoffFunc(qi.Data.Attempt)
 
 			// Attempt to find any RetryAtSpecifier in the error tree.
-			unwrapped := err
-			for unwrapped != nil {
-				// If the error contains a NextRetryAt method, use that to indicate
-				// when we should retry.
-				if specifier, ok := unwrapped.(osqueue.RetryAtSpecifier); ok {
-					next := specifier.NextRetryAt()
-					if next != nil {
-						at = *next
-					}
-					break
-				}
-				unwrapped = errors.Unwrap(unwrapped)
+			if specifier := osqueue.AsRetryAtError(err); specifier != nil {
+				next := specifier.NextRetryAt()
+				at = *next
 			}
 
 			if !osqueue.IsAlwaysRetryable(err) {
@@ -1146,7 +1269,7 @@ func (q *queue) peekSizeRandom(_ context.Context, _ *QueuePartition) int64 {
 	return size
 }
 
-//nolint:golint,unused // this code remains to be enabled on demand
+//nolint:unused // this code remains to be enabled on demand
 func (q *queue) ewmaPeekSize(ctx context.Context, p *QueuePartition) int64 {
 	if p.FunctionID == nil {
 		return q.peekMin
@@ -1286,9 +1409,12 @@ func (t *trackingSemaphore) Release(n int64) {
 }
 
 type processor struct {
-	partition          *QueuePartition
-	items              []*osqueue.QueueItem
-	guaranteedCapacity *GuaranteedCapacity
+	partition *QueuePartition
+	items     []*osqueue.QueueItem
+	// partitionContinueCtr is the number of times the partition has currently been
+	// continued already in the chain.  we must record this such that a partition isn't
+	// forced indefinitely.
+	partitionContinueCtr uint
 
 	// queue is the queue that owns this processor.
 	queue *queue
@@ -1410,7 +1536,6 @@ func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error 
 	leaseID, err := duration(ctx, p.queue.primaryQueueShard.Name, "lease", p.queue.clock.Now(), func(ctx context.Context) (*ulid.ULID, error) {
 		return p.queue.Lease(ctx, *item, QueueLeaseDuration, p.staticTime, p.denies)
 	})
-
 	// NOTE: If this loop ends in an error, we must _always_ release an item from the
 	// semaphore to free capacity.  This will happen automatically when the worker
 	// finishes processing a queue item on success.
@@ -1469,6 +1594,15 @@ func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error 
 			PkgName: pkgName,
 			Tags:    map[string]any{"status": "throttled", "queue_shard": p.queue.primaryQueueShard.Name},
 		})
+
+		if p.queue.itemEnableKeyQueues(ctx, *item) {
+			err := p.queue.Requeue(ctx, p.queue.primaryQueueShard, *item, time.UnixMilli(item.AtMS))
+			if err != nil {
+				p.queue.log.Error("could not requeue item to backlog after hitting limit", "item", *item, "cause", cause)
+				return fmt.Errorf("could not requeue to backlog: %w", err)
+			}
+		}
+
 		return nil
 	case ErrPartitionConcurrencyLimit, ErrAccountConcurrencyLimit, ErrSystemConcurrencyLimit:
 		p.isCustomKeyLimitOnly = false
@@ -1509,6 +1643,14 @@ func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error 
 			Tags:    map[string]any{"status": status, "queue_shard": p.queue.primaryQueueShard.Name},
 		})
 
+		if p.queue.itemEnableKeyQueues(ctx, *item) {
+			err := p.queue.Requeue(ctx, p.queue.primaryQueueShard, *item, time.UnixMilli(item.AtMS))
+			if err != nil {
+				p.queue.log.Error("could not requeue item to backlog after hitting limit", "item", *item, "cause", cause)
+				return fmt.Errorf("could not requeue to backlog: %w", err)
+			}
+		}
+
 		return fmt.Errorf("concurrency hit: %w", errProcessStopIterator)
 	case ErrConcurrencyLimitCustomKey:
 		p.ctrConcurrency++
@@ -1532,6 +1674,14 @@ func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error 
 			PkgName: pkgName,
 			Tags:    map[string]any{"status": "custom_key_concurrency_limit", "queue_shard": p.queue.primaryQueueShard.Name},
 		})
+
+		if p.queue.itemEnableKeyQueues(ctx, *item) {
+			err := p.queue.Requeue(ctx, p.queue.primaryQueueShard, *item, time.UnixMilli(item.AtMS))
+			if err != nil {
+				p.queue.log.Error("could not requeue item to backlog after hitting limit", "item", *item, "cause", cause)
+				return fmt.Errorf("could not requeue to backlog: %w", err)
+			}
+		}
 		return nil
 	case ErrQueueItemNotFound:
 		// This is an okay error.  Move to the next job item.
@@ -1552,7 +1702,7 @@ func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error 
 	}
 
 	// Handle other errors.
-	if err != nil {
+	if err != nil || leaseID == nil {
 		p.err = fmt.Errorf("error leasing in process: %w", err)
 		metrics.IncrQueueItemProcessedCounter(ctx, metrics.CounterOpt{
 			PkgName: pkgName,
@@ -1572,7 +1722,7 @@ func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error 
 		PkgName: pkgName,
 		Tags:    map[string]any{"status": "success", "queue_shard": p.queue.primaryQueueShard.Name},
 	})
-	p.queue.workers <- processItem{P: *p.partition, I: *item, G: p.guaranteedCapacity}
+	p.queue.workers <- processItem{P: *p.partition, I: *item, PCtr: p.partitionContinueCtr}
 	return nil
 }
 

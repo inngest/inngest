@@ -18,7 +18,7 @@ export const Search = forwardRef<HTMLInputElement, SearchProps>(
     }
     return (
       <div className="relative">
-        <RiSearchLine className="text-muted absolute bottom-0 left-2 top-0 my-auto h-4 w-4" />
+        <RiSearchLine className="text-light absolute bottom-0 left-2 top-0 my-auto h-4 w-4" />
         <Input
           ref={ref}
           type="search"

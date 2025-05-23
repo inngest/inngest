@@ -8,14 +8,19 @@ option go_package = "github.com/inngest/inngest/proto/gen/connect/v1;connect";
 enum GatewayMessageType {
   GATEWAY_HELLO = 0;
   WORKER_CONNECT = 1;
+  SYNC_FAILED = 14;
   GATEWAY_CONNECTION_READY = 2;
   GATEWAY_EXECUTOR_REQUEST = 3;
   WORKER_READY = 4;
   WORKER_REQUEST_ACK = 5;
+  WORKER_REQUEST_EXTEND_LEASE = 12;
+  WORKER_REQUEST_EXTEND_LEASE_ACK = 13;
   WORKER_REPLY = 6;
-  WORKER_PAUSE = 7;
-  WORKER_HEARTBEAT = 8;
-  GATEWAY_CLOSING = 9;
+  WORKER_REPLY_ACK = 7;
+  WORKER_PAUSE = 8;
+  WORKER_HEARTBEAT = 9;
+  GATEWAY_HEARTBEAT = 10;
+  GATEWAY_CLOSING = 11;
 }
 
 message ConnectMessage {
@@ -23,20 +28,10 @@ message ConnectMessage {
 	bytes payload = 2;
 }
 
-message SessionIdentifier {
-	string instance_id = 1;
-	string connection_id = 2;
-	optional string build_id = 4;
-}
-
-message SessionDetails {
-	SessionIdentifier session_id = 1;
-	bytes function_hash = 3;
-}
-
-message ConfigDetails {
-	bytes capabilities = 1;
-	bytes functions = 2;
+message AppConfiguration {
+	string app_name = 1;
+	optional string app_version = 2;
+	bytes functions = 4;
 }
 
 message AuthData {
@@ -45,40 +40,88 @@ message AuthData {
 }
 
 message WorkerConnectRequestData {
-	SessionIdentifier session_id = 1;
-	AuthData auth_data = 2;
-	string app_name = 3;
-	ConfigDetails config = 4;
-	bool worker_manual_readiness_ack = 5;
+	string connection_id = 1;
+	string instance_id = 2;
 
-	SystemAttributes system_attributes = 6;
-	optional string environment = 7;
-	string framework = 8;
-	optional string platform = 9;
-	string sdk_version = 10;
-	string sdk_language = 11;
+	AuthData auth_data = 3;
 
-	google.protobuf.Timestamp started_at = 12;
+	bytes capabilities = 4;
+	repeated AppConfiguration apps = 5;
+
+	bool worker_manual_readiness_ack = 6;
+
+	SystemAttributes system_attributes = 7;
+	optional string environment = 8;
+	string framework = 9;
+	optional string platform = 10;
+	string sdk_version = 11;
+	string sdk_language = 12;
+
+	google.protobuf.Timestamp started_at = 13;
 }
 
-message GatewaySyncRequestData {
-	optional string deploy_id = 1;
+message GatewayConnectionReadyData {
+	string heartbeat_interval = 1;
+	string extend_lease_interval = 2;
 }
 
 message GatewayExecutorRequestData {
 	string request_id = 1;
-	string env_id = 2;
-	string app_id = 3;
-	string function_slug = 4;
-	optional string step_id = 5;
-	bytes request_payload = 6;
+
+	string account_id = 2;
+	string env_id = 3;
+
+	string app_id = 4;
+	string app_name = 5;
+
+	string function_id = 6;
+	string function_slug = 7;
+
+	optional string step_id = 8;
+	bytes request_payload = 9;
+
+	bytes system_trace_ctx = 10;
+	bytes user_trace_ctx = 11;
+
+	string run_id = 12;
+
+	string lease_id = 13;
 }
 
 message WorkerRequestAckData {
 	string request_id = 1;
-	string app_id = 2;
-	string function_slug = 3;
-	optional string step_id = 4;
+	string account_id = 2;
+	string env_id = 3;
+	string app_id = 4;
+	string function_slug = 5;
+	optional string step_id = 6;
+	bytes system_trace_ctx = 7;
+	bytes user_trace_ctx = 8;
+	string run_id = 9;
+}
+
+message WorkerRequestExtendLeaseData {
+	string request_id = 1;
+	string account_id = 2;
+	string env_id = 3;
+	string app_id = 4;
+	string function_slug = 5;
+	optional string step_id = 6;
+	bytes system_trace_ctx = 7;
+	bytes user_trace_ctx = 8;
+	string run_id = 9;
+
+	string lease_id = 10;
+}
+
+message WorkerRequestExtendLeaseAckData {
+	string request_id = 1;
+	string account_id = 2;
+	string env_id = 3;
+	string app_id = 4;
+	string function_slug = 5;
+
+	optional string new_lease_id = 6;
 }
 
 enum SDKResponseStatus {
@@ -89,11 +132,22 @@ enum SDKResponseStatus {
 
 message SDKResponse {
 	string request_id = 1;
-	SDKResponseStatus status = 2;
-	bytes body = 3;
-	bool no_retry = 4;
-	optional string retry_after = 5;
-	string sdk_version = 6;
+	string account_id = 2;
+	string env_id = 3;
+	string app_id = 4;
+	SDKResponseStatus status = 5;
+	bytes body = 6;
+	bool no_retry = 7;
+	optional string retry_after = 8;
+	string sdk_version = 9;
+	uint32 request_version = 10;
+	bytes system_trace_ctx = 11;
+	bytes user_trace_ctx = 12;
+	string run_id = 13;
+}
+
+message WorkerReplyAckData {
+	string request_id = 1;
 }
 
 enum ConnectionStatus {
@@ -109,12 +163,13 @@ message ConnMetadata {
 	string id = 1;
 	string gateway_id = 2;
 	string instance_id = 3;
-	string group_id = 4;
-	ConnectionStatus status = 5;
-	google.protobuf.Timestamp last_heartbeat_at = 6;
-	string language = 7;
-	string version = 8;
-	SystemAttributes attributes = 9;
+	map<string,string> all_worker_groups = 4;
+	map<string,string> synced_worker_groups = 5;
+	ConnectionStatus status = 6;
+	google.protobuf.Timestamp last_heartbeat_at = 7;
+	string sdk_language = 8;
+	string sdk_version = 9;
+	SystemAttributes attributes = 10;
 }
 
 message SystemAttributes {
@@ -126,23 +181,45 @@ message SystemAttributes {
 message ConnGroup {
 	string env_id = 1;
 	string app_id = 2;
-	string hash = 3;
-	repeated ConnMetadata conns = 4;
-	optional string sync_id = 5;
-	optional string build_id = 6;
+	string app_name = 3;
+	string hash = 4;
+	repeated ConnMetadata conns = 5;
+	optional string sync_id = 6;
+	optional string app_version = 7;
 }
 
 enum WorkerDisconnectReason {
 	WORKER_SHUTDOWN = 0;
+	UNEXPECTED = 1;
+	GATEWAY_DRAINING = 2;
+	CONSECUTIVE_HEARTBEATS_MISSED = 3;
+	MESSAGE_TOO_LARGE = 4;
 }
 
 message StartResponse {
-	string gateway_endpoint = 1;
-	string gateway_group = 2;
-	string session_token = 3;
-	string sync_token = 4;
+	string connection_id = 1;
+	string gateway_endpoint = 2;
+	string gateway_group = 3;
+	string session_token = 4;
+	string sync_token = 5;
 }
 
 message StartRequest {
 	repeated string exclude_gateways = 1;
+}
+
+message FlushResponse {
+	string request_id = 1;
+}
+
+message PubSubAckMessage {
+	google.protobuf.Timestamp ts = 1;
+	optional bool nack = 2;
+	optional SystemError nack_reason = 3;
+}
+
+message SystemError {
+	string code = 1;
+	optional bytes data = 2;
+	string message = 3;
 }

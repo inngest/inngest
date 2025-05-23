@@ -13,10 +13,14 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
-// WorkerConnection represents a worker connection at a point in time
+// WorkerConnection represents a worker connection at a point in time, for a single app.
+// If a connection serves multiple apps, we will create multiple one connection update per app.
 type WorkerConnection struct {
 	AccountID   uuid.UUID `json:"account_id"`
 	WorkspaceID uuid.UUID `json:"workspace_id"`
+
+	// This is always set, even if the app is not synced yet.
+	AppName string `json:"app_name"`
 
 	// This is optional and only set when connection is ready
 	AppID *uuid.UUID `json:"app_id"`
@@ -45,7 +49,7 @@ type WorkerConnection struct {
 	SDKVersion    string     `json:"sdk_version"`
 	SDKPlatform   string     `json:"sdk_platform"`
 	SyncID        *uuid.UUID `json:"sync_id,omitempty"`
-	BuildId       *string    `json:"build_id,omitempty"`
+	AppVersion    *string    `json:"app_version,omitempty"`
 	FunctionCount int        `json:"function_count"`
 
 	// System attributes

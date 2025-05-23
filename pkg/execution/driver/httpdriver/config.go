@@ -25,6 +25,7 @@ func (Config) DriverName() string { return "http" }
 func (c Config) NewDriver(opts ...registration.NewDriverOpts) (driver.Driver, error) {
 	var skey []byte
 	requireLocalSigningKey := false
+	client := defaultClient
 	if len(opts) > 0 {
 		if opts[0].LocalSigningKey != nil {
 			skey = []byte(*opts[0].LocalSigningKey)
@@ -33,10 +34,14 @@ func (c Config) NewDriver(opts ...registration.NewDriverOpts) (driver.Driver, er
 		if opts[0].RequireLocalSigningKey {
 			requireLocalSigningKey = true
 		}
+
+		if opts[0].HTTPClient != nil {
+			client = opts[0].HTTPClient
+		}
 	}
 
 	return &executor{
-		Client:                 DefaultClient,
+		Client:                 client,
 		localSigningKey:        skey,
 		requireLocalSigningKey: requireLocalSigningKey,
 	}, nil

@@ -1,6 +1,8 @@
 import {
+  differenceInDays,
   differenceInMilliseconds,
   format,
+  formatDistanceStrict,
   formatDistanceToNow,
   isAfter,
   isBefore,
@@ -11,10 +13,13 @@ import {
   type Duration,
   type DurationUnit,
 } from 'date-fns';
+import { formatInTimeZone } from 'date-fns-tz';
 
 export type { Duration as DurationType };
 export {
   differenceInMilliseconds,
+  differenceInDays,
+  formatDistanceStrict,
   formatDistanceToNow,
   isBefore,
   isAfter,
@@ -22,6 +27,7 @@ export {
   lightFormat,
   sub,
   format,
+  formatInTimeZone,
 };
 
 export const DURATION_STRING_REGEX = /^[1-9]\d*[smMhdwy]$/;
@@ -62,12 +68,27 @@ export function shortDate(date: Date): string {
   }).format(date);
 }
 
+// 2:30pm or 14:30 (12-hour or 24-hour format)
+export function minuteTime(d: Date): string {
+  return new Intl.DateTimeFormat(undefined, {
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(d);
+}
+
 const second = 1000;
 const minute = 60 * second;
 const hour = 60 * minute;
+const day = 24 * hour;
 
 export function formatMilliseconds(durationInMs: number) {
-  if (durationInMs >= hour) {
+  if (durationInMs >= day) {
+    const days = Math.floor(durationInMs / day);
+    durationInMs %= day;
+
+    const hours = Math.floor(durationInMs / hour);
+    return `${days}d ${hours}h`;
+  } else if (durationInMs >= hour) {
     const hours = Math.floor(durationInMs / hour);
     durationInMs %= hour;
 
@@ -118,7 +139,7 @@ export function formatTimeString({
   return format(date, formatString);
 }
 
-export function relativeTime(d: Date): string {
+export function relativeTime(d: Date | string): string {
   return formatDistanceToNow(d, { addSuffix: true });
 }
 

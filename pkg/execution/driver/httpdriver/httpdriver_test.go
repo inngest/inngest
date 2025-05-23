@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
@@ -50,7 +51,8 @@ func TestRedirect(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	res, err := do(context.Background(), DefaultClient, Request{URL: parseURL(ts.URL), Input: input})
+	client := Client(SecureDialerOpts{AllowPrivate: true})
+	res, _, err := do(context.Background(), client, Request{URL: parseURL(ts.URL), Input: input})
 	require.NoError(t, err)
 	require.Equal(t, 200, res.StatusCode)
 	require.Equal(t, []byte("ok"), res.Body)
@@ -71,7 +73,8 @@ func TestRetryAfter(t *testing.T) {
 		}))
 		defer ts.Close()
 
-		res, err := do(context.Background(), DefaultClient, Request{URL: parseURL(ts.URL), Input: input})
+		client := Client(SecureDialerOpts{AllowPrivate: true})
+		res, _, err := do(context.Background(), client, Request{URL: parseURL(ts.URL), Input: input})
 		require.NoError(t, err)
 		require.Equal(t, 500, res.StatusCode)
 		require.Equal(t, []byte(`{"error":true}`), res.Body)
@@ -201,11 +204,38 @@ func TestStreamResponseTooLarge(t *testing.T) {
 
 	defer ts.Close()
 	u, _ := url.Parse(ts.URL)
-	r, err := do(context.Background(), nil, Request{
+	client := Client(SecureDialerOpts{AllowPrivate: true})
+	r, _, err := do(context.Background(), client, Request{
 		URL: *u,
 	})
 	require.NotNil(t, r)
 	require.NotNil(t, r.SysErr)
 	require.Equal(t, r.SysErr.Code, syscode.CodeOutputTooLarge)
+	require.NotNil(t, err)
+}
+
+func TestTiming(t *testing.T) {
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Delay the read by 1 second.
+		<-time.After(time.Second)
+		_, _ = io.ReadAll(r.Body)
+		r.Body.Close()
+		w.WriteHeader(200)
+	}))
+
+	defer ts.Close()
+	u, _ := url.Parse(ts.URL)
+	client := Client(SecureDialerOpts{AllowPrivate: true})
+	r, result, err := do(context.Background(), client, Request{
+		URL:   *u,
+		Input: []byte("test"),
+	})
+
+	require.NotNil(t, r)
 	require.Nil(t, err)
+
+	require.Equal(t, strings.ReplaceAll(ts.URL, "http://", ""), result.ConnectedTo.String())
+	require.True(t, result.StartTransfer > time.Second)
+	require.True(t, result.ServerProcessing > time.Second)
+	require.True(t, result.Total(time.Time{}) > time.Second)
 }

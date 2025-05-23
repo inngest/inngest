@@ -67,6 +67,17 @@ func (g OpcodeGroups) All() []OpcodeGroup {
 	return []OpcodeGroup{g.PriorityGroup, g.OtherGroup}
 }
 
+// IDs returns a list of all step IDs from opcodes in all groups.
+func (g OpcodeGroups) IDs() []string {
+	ids := []string{}
+	for _, group := range g.All() {
+		for _, op := range group.Opcodes {
+			ids = append(ids, op.ID)
+		}
+	}
+	return ids
+}
+
 func CreateInvokeFailedEvent(ctx context.Context, opts execution.InvokeFailHandlerOpts) event.Event {
 	now := time.Now()
 	data := map[string]interface{}{

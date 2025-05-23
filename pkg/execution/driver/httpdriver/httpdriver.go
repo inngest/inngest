@@ -11,28 +11,42 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/go-httpstat"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
+	headerspkg "github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/inngest/log"
 	"github.com/inngest/inngest/pkg/syscode"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
+	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
-	"go.opentelemetry.io/otel/propagation"
 )
 
 var (
-	dialer = &net.Dialer{KeepAlive: 15 * time.Second}
+	Dialer = &net.Dialer{KeepAlive: 15 * time.Second}
 
-	DefaultTransport = &http.Transport{
-		DialContext:           dialer.DialContext,
+	ErrEmptyResponse = fmt.Errorf("no response data")
+	ErrNoRetryAfter  = fmt.Errorf("no retry after present")
+	ErrNotSDK        = syscode.Error{Code: syscode.CodeNotSDK}
+
+	defaultClient = Client(SecureDialerOpts{})
+)
+
+const (
+	AccountIDHeader = "account-id"
+)
+
+// Client returns a new HTTP transport.
+func Transport(opts SecureDialerOpts) *http.Transport {
+	t := &http.Transport{
+		DialContext:           SecureDialer(opts),
 		ForceAttemptHTTP2:     true,
 		MaxIdleConns:          5,
 		IdleConnTimeout:       2 * time.Second,
@@ -44,24 +58,21 @@ var (
 		// jobs.
 		ResponseHeaderTimeout: consts.MaxFunctionTimeout,
 	}
-	DefaultClient = &http.Client{
+
+	return t
+}
+
+// Client returns a new HTTP client.
+func Client(opts SecureDialerOpts) util.HTTPDoer {
+	return util.HTTPDoer(&http.Client{
 		Timeout:       consts.MaxFunctionTimeout,
 		CheckRedirect: CheckRedirect,
-		Transport:     DefaultTransport,
-	}
-
-	DefaultExecutor = &executor{Client: DefaultClient}
-
-	ErrEmptyResponse = fmt.Errorf("no response data")
-	ErrNoRetryAfter  = fmt.Errorf("no retry after present")
-)
-
-type HTTPDoer interface {
-	Do(req *http.Request) (*http.Response, error)
+		Transport:     Transport(opts),
+	})
 }
 
 type executor struct {
-	Client                 *http.Client
+	Client                 util.HTTPDoer
 	localSigningKey        []byte
 	requireLocalSigningKey bool
 }
@@ -86,16 +97,44 @@ func (e executor) Execute(ctx context.Context, sl sv2.StateLoader, s sv2.Metadat
 		return nil, err
 	}
 
-	return DoRequest(ctx, e.Client, Request{
+	headers := make(map[string]string)
+	if spanID, err := item.SpanID(); err != nil {
+		log.From(ctx).
+			Error().
+			Str("run_id", s.ID.RunID.String()).
+			Err(err).
+			Msg("error retrieving span ID")
+	} else {
+		headers, err = itrace.HeadersFromTraceState(
+			ctx,
+			spanID.String(),
+			s.ID.Tenant.AppID.String(),
+			s.ID.FunctionID.String(),
+		)
+		if err != nil {
+			log.From(ctx).
+				Warn().
+				Str("run_id", s.ID.RunID.String()).
+				Err(err).
+				Msg("failed to add userland data to trace state")
+		}
+	}
+
+	dr, _, err := DoRequest(ctx, e.Client, Request{
 		SigningKey: e.localSigningKey,
 		URL:        *uri,
 		Input:      input,
 		Edge:       edge,
 		Step:       step,
+		Headers:    headers,
 	})
+	return dr, err
 }
 
 type Request struct {
+	// AccountID is a used for feature flag purposes.
+	// Meant to be temporary for selectively enabling/disabling grpc requests to sdks
+	AccountID uuid.UUID
 	// WorkflowID is used for logging purposes, and is not used in the request
 	WorkflowID uuid.UUID
 	// RunID is used for logging purposes, and is not used in the request
@@ -110,16 +149,19 @@ type Request struct {
 	Input      []byte
 	Edge       inngest.Edge
 	Step       inngest.Step
+
+	// Headers are additional headers to add to the request.
+	Headers map[string]string
 }
 
 // DoRequest executes the HTTP request with the given input.
-func DoRequest(ctx context.Context, c HTTPDoer, r Request) (*state.DriverResponse, error) {
+func DoRequest(ctx context.Context, c util.HTTPDoer, r Request) (*state.DriverResponse, *httpstat.Result, error) {
 	if c == nil {
-		c = DefaultClient
+		c = defaultClient
 	}
 
 	if r.URL.Scheme != "http" && r.URL.Scheme != "https" {
-		return nil, fmt.Errorf("Unable to use HTTP executor for non-HTTP runtime")
+		return nil, nil, fmt.Errorf("Unable to use HTTP executor for non-HTTP runtime")
 	}
 
 	// If we have a generator step name, ensure we add the step ID parameter
@@ -132,12 +174,13 @@ func DoRequest(ctx context.Context, c HTTPDoer, r Request) (*state.DriverRespons
 		r.URL.RawQuery = values.Encode()
 	}
 
-	resp, err := do(ctx, c, r)
+	resp, tracking, err := do(ctx, c, r)
 	if err != nil {
-		return nil, err
+		return nil, tracking, err
 	}
 
-	return HandleHttpResponse(ctx, r, resp)
+	dr, err := HandleHttpResponse(ctx, r, resp)
+	return dr, tracking, err
 }
 
 func HandleHttpResponse(ctx context.Context, r Request, resp *Response) (*state.DriverResponse, error) {
@@ -176,6 +219,9 @@ func HandleHttpResponse(ctx context.Context, r Request, resp *Response) (*state.
 			dr.SetError(resp.SysErr)
 		}
 
+		if !resp.IsSDK {
+			dr.SetError(ErrNotSDK)
+		}
 		return dr, nil
 	}
 
@@ -230,12 +276,25 @@ func HandleHttpResponse(ctx context.Context, r Request, resp *Response) (*state.
 		dr.SetError(err)
 	}
 
+	// If there's a RetryAt, ensure we wrap the status code correctly.
+	if resp.RetryAt != nil {
+		err = queue.RetryAtError(err, resp.RetryAt)
+		dr.SetError(err)
+	}
+
+	if resp.StatusCode >= 200 && resp.StatusCode < 300 && !resp.IsSDK {
+		// If we got a successful response but it wasn't from the SDK, then we
+		// need to fail the attempt. Otherwise, we may incorrectly mark the
+		// function run as "completed".
+		dr.SetError(ErrNotSDK)
+	}
+
 	return dr, err
 }
 
-func do(ctx context.Context, c HTTPDoer, r Request) (*Response, error) {
+func do(ctx context.Context, c util.HTTPDoer, r Request) (*Response, *httpstat.Result, error) {
 	if c == nil {
-		c = DefaultClient
+		c = defaultClient
 	}
 
 	ctx, cancel := context.WithTimeout(ctx, consts.MaxFunctionTimeout)
@@ -243,9 +302,13 @@ func do(ctx context.Context, c HTTPDoer, r Request) (*Response, error) {
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, r.URL.String(), bytes.NewBuffer(r.Input))
 	if err != nil {
-		return nil, fmt.Errorf("error creating request: %w", err)
+		return nil, nil, fmt.Errorf("error creating request: %w", err)
 	}
 	req.Header.Add("Content-Type", "application/json")
+
+	if r.AccountID != uuid.Nil {
+		req.Header.Add(AccountIDHeader, r.AccountID.String())
+	}
 
 	// Always close the request after reading the body, ensuring the connection is not recycled.
 	req.Close = true
@@ -258,10 +321,17 @@ func do(ctx context.Context, c HTTPDoer, r Request) (*Response, error) {
 		req.Header.Add("X-Inngest-Signature", r.Signature)
 	}
 
-	// Add `traceparent` and `tracestate` headers to the request from `ctx`
-	itrace.UserTracer().Propagator().Inject(ctx, propagation.HeaderCarrier(req.Header))
+	for k, v := range r.Headers {
+		req.Header.Add(k, v)
+	}
 
+	// Track HTTP stats, eg. TLS handshake timeouts, DNS lookups, etc.
+	tracking := &httpstat.Result{}
+	req = req.WithContext(httpstat.WithHTTPStat(req.Context(), tracking))
+
+	// Perform the request.
 	resp, byt, dur, err := ExecuteRequest(ctx, c, req)
+	tracking.End(time.Now())
 
 	// Handle no response errors.
 	if errors.Is(err, ErrUnableToReach) {
@@ -272,20 +342,19 @@ func do(ctx context.Context, c HTTPDoer, r Request) (*Response, error) {
 			Interface("edge	", r.Edge).
 			Int64("req_dur_ms", dur.Milliseconds()).
 			Msg("EOF writing request to SDK")
-		return nil, err
+		return nil, tracking, err
 	}
 	if err != nil && len(byt) == 0 {
-		return nil, err
+		return nil, tracking, err
 	}
 
 	var sysErr *syscode.Error
 	if errors.Is(err, ErrBodyTooLarge) {
-		// In this case, strangely, the actual reported error should be nil.  This
-		// has something to do with the DriverResponse.Err we return and should be
-		// refactored.
-		err = nil
-
 		sysErr = &syscode.Error{Code: syscode.CodeOutputTooLarge}
+		//
+		// downstream executor code expects system error codes here for traces
+		// and history to work properly
+		err = sysErr
 
 		// Override the output so the user sees the syserrV in the UI rather
 		// than a JSON parsing error
@@ -293,7 +362,6 @@ func do(ctx context.Context, c HTTPDoer, r Request) (*Response, error) {
 	}
 
 	if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
-		err = nil
 		log.From(ctx).
 			Error().
 			Err(err).
@@ -315,14 +383,11 @@ func do(ctx context.Context, c HTTPDoer, r Request) (*Response, error) {
 		noRetry    bool
 		retryAtStr *string
 		retryAt    *time.Time
-		headers    = map[string]string{}
 	)
 
 	body = byt
 	statusCode = resp.StatusCode
-	for k, v := range resp.Header {
-		headers[strings.ToLower(k)] = v[0]
-	}
+	headers := resp.Header
 
 	// Check if this was a streaming response.  If so, extract headers sent
 	// from _after_ the response started within the payload.
@@ -338,7 +403,7 @@ func do(ctx context.Context, c HTTPDoer, r Request) (*Response, error) {
 	if resp.StatusCode == 201 && sysErr == nil {
 		stream, err := ParseStream(byt)
 		if err != nil {
-			return nil, fmt.Errorf("error parsing stream: %w", err)
+			return nil, tracking, fmt.Errorf("error parsing stream: %w", err)
 		} else {
 			// These are all contained within a single wrapper.
 			body = stream.Body
@@ -346,7 +411,7 @@ func do(ctx context.Context, c HTTPDoer, r Request) (*Response, error) {
 
 			// Upsert headers from the stream.
 			for k, v := range stream.Headers {
-				headers[k] = v
+				headers.Set(k, v)
 			}
 		}
 	}
@@ -360,10 +425,10 @@ func do(ctx context.Context, c HTTPDoer, r Request) (*Response, error) {
 	}
 
 	// Check the retry status from the headers and versions.
-	noRetry = !ShouldRetry(statusCode, headers[headerNoRetry], headers[headerSDK])
+	noRetry = !ShouldRetry(statusCode, headers.Get(headerNoRetry), headers.Get(headerSDK))
 
 	// Extract the retry at header if it hasn't been set explicitly in streaming.
-	if after := headers["retry-after"]; retryAtStr == nil && after != "" {
+	if after := headers.Get("retry-after"); after != "" {
 		retryAtStr = &after
 	}
 	if retryAtStr != nil {
@@ -372,16 +437,8 @@ func do(ctx context.Context, c HTTPDoer, r Request) (*Response, error) {
 		}
 	}
 
-	isSDK := false
-	for k := range resp.Header {
-		if strings.HasPrefix(strings.ToLower(k), "x-inngest-") {
-			isSDK = true
-			break
-		}
-	}
-
 	// Get the request version
-	rv, _ := strconv.Atoi(headers[headerRequestVersion])
+	rv, _ := strconv.Atoi(headers.Get(headerRequestVersion))
 	return &Response{
 		Body:           body,
 		StatusCode:     statusCode,
@@ -389,11 +446,11 @@ func do(ctx context.Context, c HTTPDoer, r Request) (*Response, error) {
 		RetryAt:        retryAt,
 		NoRetry:        noRetry,
 		RequestVersion: rv,
-		IsSDK:          isSDK,
-		Sdk:            headers[headerSDK],
-		Header:         resp.Header,
+		IsSDK:          headerspkg.IsSDK(headers),
+		Sdk:            headers.Get(headerSDK),
+		Header:         headers,
 		SysErr:         sysErr,
-	}, err
+	}, tracking, err
 
 }
 

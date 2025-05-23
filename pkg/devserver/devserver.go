@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"os"
 	"time"
 
 	"github.com/alicebob/miniredis/v2"
@@ -22,11 +24,12 @@ import (
 	"github.com/inngest/inngest/pkg/connect"
 	"github.com/inngest/inngest/pkg/connect/auth"
 	"github.com/inngest/inngest/pkg/connect/lifecycles"
-	pubsub2 "github.com/inngest/inngest/pkg/connect/pubsub"
+	connectpubsub "github.com/inngest/inngest/pkg/connect/pubsub"
 	connectv0 "github.com/inngest/inngest/pkg/connect/rest/v0"
 	connstate "github.com/inngest/inngest/pkg/connect/state"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/coreapi"
+	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/cqrs/base_cqrs"
 	"github.com/inngest/inngest/pkg/deploy"
 	"github.com/inngest/inngest/pkg/enums"
@@ -46,6 +49,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/expressions"
+	"github.com/inngest/inngest/pkg/expressions/expragg"
 	"github.com/inngest/inngest/pkg/history_drivers/memory_reader"
 	"github.com/inngest/inngest/pkg/history_drivers/memory_writer"
 	"github.com/inngest/inngest/pkg/logger"
@@ -61,9 +65,11 @@ import (
 )
 
 const (
-	DefaultTick         = 150
-	DefaultTickDuration = time.Millisecond * DefaultTick
-	DefaultPollInterval = 5
+	DefaultTick               = 150
+	DefaultTickDuration       = time.Millisecond * DefaultTick
+	DefaultPollInterval       = 5
+	DefaultQueueWorkers       = 100
+	DefaultConnectGatewayPort = 8289
 )
 
 // StartOpts configures the dev server
@@ -76,6 +82,7 @@ type StartOpts struct {
 	PollInterval  int           `json:"poll_interval"`
 	Tick          time.Duration `json:"tick"`
 	RetryInterval int           `json:"retry_interval"`
+	QueueWorkers  int           `json:"queue_workers"`
 
 	// SigningKey is used to decide that the server should sign requests and
 	// validate responses where applicable, modelling cloud behaviour.
@@ -90,6 +97,9 @@ type StartOpts struct {
 	// the server will still boot but core actions such as syncing, runs, and
 	// ingesting events will not work.
 	RequireKeys bool `json:"require_keys"`
+
+	ConnectGatewayPort int    `json:"connectGatewayPort"`
+	ConnectGatewayHost string `json:"connectGatewayHost"`
 }
 
 // Create and start a new dev server.  The dev server is used during (surprise surprise)
@@ -103,14 +113,11 @@ func New(ctx context.Context, opts StartOpts) error {
 		opts.Config.Execution.LogOutput = true
 	}
 
-	// NOTE: looks deprecated?
-	// Before running the development service, ensure that we change the http
-	// driver in development to use our AWS Gateway http client, attempting to
-	// automatically transform dev requests to lambda invocations.
-	httpdriver.DefaultExecutor.Client.Transport = awsgateway.NewTransformTripper(httpdriver.DefaultExecutor.Client.Transport)
-	deploy.Client.Transport = awsgateway.NewTransformTripper(deploy.Client.Transport)
-
 	return start(ctx, opts)
+}
+
+func enforceConnectLeaseExpiry(ctx context.Context, accountID uuid.UUID) bool {
+	return os.Getenv("INNGEST_CONNECT_DISABLE_ENFORCE_LEASE_EXPIRY") != "true"
 }
 
 func start(ctx context.Context, opts StartOpts) error {
@@ -182,14 +189,27 @@ func start(ctx context.Context, opts StartOpts) error {
 	// Create a new broadcaster which lets us broadcast realtime messages.
 	broadcaster := realtime.NewInProcessBroadcaster()
 
+	runMode := redis_state.QueueRunMode{
+		Sequential:    true,
+		Scavenger:     true,
+		Partition:     true,
+		Continuations: true,
+	}
+	enableKeyQueues := os.Getenv("EXPERIMENTAL_KEY_QUEUES_ENABLE") == "true"
+
+	if enableKeyQueues {
+		runMode.ShadowPartition = true
+		runMode.AccountShadowPartition = true
+		runMode.AccountShadowPartitionWeight = 80
+		runMode.ShadowContinuations = true
+		runMode.ShadowContinuationSkipProbability = consts.QueueContinuationSkipProbability
+		runMode.NormalizePartition = true
+	}
+
 	queueOpts := []redis_state.QueueOpt{
-		redis_state.WithRunMode(redis_state.QueueRunMode{
-			Sequential: true,
-			Scavenger:  true,
-			Partition:  true,
-		}),
+		redis_state.WithRunMode(runMode),
 		redis_state.WithIdempotencyTTL(time.Hour),
-		redis_state.WithNumWorkers(100),
+		redis_state.WithNumWorkers(int32(opts.QueueWorkers)),
 		redis_state.WithPollTick(opts.Tick),
 		redis_state.WithCustomConcurrencyKeyLimitRefresher(func(ctx context.Context, i queue.QueueItem) []state.CustomConcurrency {
 			keys := i.Data.GetConcurrencyKeys()
@@ -259,6 +279,26 @@ func start(ctx context.Context, opts StartOpts) error {
 		}),
 		redis_state.WithShardSelector(shardSelector),
 		redis_state.WithQueueShardClients(queueShards),
+		//redis_state.WithKindToQueueMapping(map[string]string{
+		//	queue.KindPause:           queue.KindPause,
+		//	queue.KindDebounce:        queue.KindDebounce,
+		//	queue.KindQueueMigrate:    queue.KindQueueMigrate,
+		//	queue.KindPauseBlockFlush: queue.KindPauseBlockFlush,
+		//	queue.KindScheduleBatch:   queue.KindScheduleBatch,
+		//}),
+
+		// Key queues
+		redis_state.WithNormalizeRefreshItemCustomConcurrencyKeys(NormalizeConcurrencyKeys(smv2, dbcqrs)),
+		redis_state.WithNormalizeRefreshItemThrottle(NormalizeThrottle(smv2, dbcqrs)),
+		redis_state.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+			return enableKeyQueues
+		}),
+		redis_state.WithEnqueueSystemPartitionsToBacklog(false),
+		redis_state.WithDisableLeaseChecksForSystemQueues(false),
+		redis_state.WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
+			return false
+		}),
+		redis_state.WithBacklogRefillLimit(10),
 	}
 	if opts.RetryInterval > 0 {
 		queueOpts = append(queueOpts, redis_state.WithBackoffFunc(
@@ -272,21 +312,45 @@ func start(ctx context.Context, opts StartOpts) error {
 	batcher := batch.NewRedisBatchManager(shardedClient.Batch(), rq)
 	debouncer := debounce.NewRedisDebouncer(unshardedClient.Debounce(), queueShard, rq)
 
+	conditionalTracer := itrace.NewConditionalTracer(itrace.ConnectTracer(), itrace.AlwaysTrace)
+
 	connectPubSubRedis := createConnectPubSubRedis()
-	gatewayProxy, err := pubsub2.NewConnector(ctx, pubsub2.WithRedis(connectPubSubRedis, logger.StdlibLoggerWithCustomVarName(ctx, "CONNECT_PUBSUB_LOG_LEVEL"), true))
-	if err != nil {
-		return fmt.Errorf("failed to create connect pubsub connector: %w", err)
-	}
+	connectPubSubLogger := logger.StdlibLoggerWithCustomVarName(ctx, "CONNECT_PUBSUB_LOG_LEVEL")
 
 	connectionManager := connstate.NewRedisConnectionStateManager(connectRc)
 
 	// Create a new expression aggregator, using Redis to load evaluables.
-	agg := expressions.NewAggregator(ctx, 100, 100, sm.(expressions.EvaluableLoader), nil)
+	agg := expragg.NewAggregator(ctx, 100, 100, sm.(expragg.EvaluableLoader), expressions.ExprEvaluator, nil, nil)
 
-	var drivers = []driver.Driver{}
+	executorProxy, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectPubSubRedis, true, connectpubsub.RedisPubSubConnectorOpts{
+		Logger:             connectPubSubLogger.With("svc", "executor"),
+		Tracer:             conditionalTracer,
+		StateManager:       connectionManager,
+		EnforceLeaseExpiry: enforceConnectLeaseExpiry,
+	}))
+	if err != nil {
+		return fmt.Errorf("failed to create connect pubsub connector: %w", err)
+	}
+
+	// Before running the development service, ensure that we change the http
+	// driver in development to use our AWS Gateway http client, attempting to
+	// automatically transform dev requests to lambda invocations.
+	//
+	// We also make sure to allow local requests.
+	httpClient := httpdriver.Client(httpdriver.SecureDialerOpts{
+		AllowHostDocker: true, // In local dev, this is OK
+		AllowPrivate:    true, // In local dev, this is OK
+		AllowNAT64:      true, // In local dev, this is OK
+	})
+	httpClient.(*http.Client).Transport = awsgateway.NewTransformTripper(httpClient.(*http.Client).Transport)
+	deploy.Client.Transport = awsgateway.NewTransformTripper(deploy.Client.Transport)
+
+	drivers := []driver.Driver{}
 	for _, driverConfig := range opts.Config.Execution.Drivers {
 		d, err := driverConfig.NewDriver(registration.NewDriverOpts{
-			ConnectForwarder: gatewayProxy,
+			ConnectForwarder:  executorProxy,
+			ConditionalTracer: conditionalTracer,
+			HTTPClient:        httpClient,
 		})
 		if err != nil {
 			return err
@@ -301,6 +365,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	hmw := memory_writer.NewWriter(ctx, memory_writer.WriterOptions{DumpToFile: false})
 
 	exec, err := executor.NewExecutor(
+		executor.WithHTTPClient(httpClient),
 		executor.WithStateManager(smv2),
 		executor.WithPauseManager(sm),
 		executor.WithRuntimeDrivers(
@@ -404,10 +469,20 @@ func start(ctx context.Context, opts StartOpts) error {
 			QueueShardSelector: shardSelector,
 			Broadcaster:        broadcaster,
 			RealtimeJWTSecret:  consts.DevServerRealtimeJWTSecret,
+			TraceReader:        ds.Data,
 		})
 	})
 
 	// ds.opts.Config.EventStream.Service.TopicName()
+	apiConnectProxy, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectPubSubRedis, false, connectpubsub.RedisPubSubConnectorOpts{
+		Logger:             connectPubSubLogger.With("svc", "api"),
+		Tracer:             conditionalTracer,
+		StateManager:       connectionManager,
+		EnforceLeaseExpiry: enforceConnectLeaseExpiry,
+	}))
+	if err != nil {
+		return fmt.Errorf("failed to create connect pubsub connector: %w", err)
+	}
 
 	core, err := coreapi.NewCoreApi(coreapi.Options{
 		Data:          ds.Data,
@@ -421,32 +496,44 @@ func start(ctx context.Context, opts StartOpts) error {
 		Executor:      ds.Executor,
 		HistoryReader: memory_reader.NewReader(),
 		ConnectOpts: connectv0.Opts{
-			GroupManager:            connectionManager,
-			ConnectManager:          connectionManager,
-			Signer:                  auth.NewJWTSessionTokenSigner(consts.DevServerConnectJwtSecret),
-			RequestAuther:           ds,
-			ConnectGatewayRetriever: ds,
-			Dev:                     true,
+			GroupManager:               connectionManager,
+			ConnectManager:             connectionManager,
+			ConnectResponseNotifier:    apiConnectProxy,
+			ConnectRequestStateManager: connectionManager,
+			Signer:                     auth.NewJWTSessionTokenSigner(consts.DevServerConnectJwtSecret),
+			RequestAuther:              ds,
+			ConnectGatewayRetriever:    ds,
+			Dev:                        true,
+			EntitlementProvider:        ds,
+			ConditionalTracer:          conditionalTracer,
 		},
 	})
 	if err != nil {
 		return err
 	}
 
+	connectGatewayProxy, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectPubSubRedis, false, connectpubsub.RedisPubSubConnectorOpts{
+		Logger:             connectPubSubLogger.With("svc", "connect-gateway"),
+		Tracer:             conditionalTracer,
+		StateManager:       connectionManager,
+		EnforceLeaseExpiry: enforceConnectLeaseExpiry,
+	}))
+	if err != nil {
+		return fmt.Errorf("failed to create connect pubsub connector: %w", err)
+	}
+
 	connGateway := connect.NewConnectGatewayService(
 		connect.WithConnectionStateManager(connectionManager),
-		connect.WithRequestReceiver(gatewayProxy),
+		connect.WithRequestReceiver(connectGatewayProxy),
 		connect.WithGatewayAuthHandler(auth.NewJWTAuthHandler(consts.DevServerConnectJwtSecret)),
-		connect.WithAppLoader(dbcqrs),
 		connect.WithDev(),
-		connect.WithGatewayPublicPort(8289),
-		connect.WithApiBaseUrl(fmt.Sprintf("http://127.0.0.1:%d", opts.Config.EventAPI.Port)),
+		connect.WithGatewayPublicPort(opts.ConnectGatewayPort),
+		connect.WithApiBaseUrl(fmt.Sprintf("http://%s:%d", opts.Config.CoreAPI.Addr, opts.Config.CoreAPI.Port)),
 		connect.WithLifeCycles(
 			[]connect.ConnectGatewayLifecycleListener{
 				lifecycles.NewHistoryLifecycle(dbcqrs),
 			}),
 	)
-	connRouter := connect.NewConnectMessageRouterService(connectionManager, gatewayProxy)
 
 	// Create a new data API directly in the devserver.  This allows us to inject
 	// the data API into the dev server port, providing a single router for the dev
@@ -476,9 +563,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		LocalEventKeys: opts.EventKeys,
 	})
 
-	svcs := []service.Service{ds, runner, executorSvc, ds.Apiservice}
-	svcs = append(svcs, connGateway, connRouter)
-	return service.StartAll(ctx, svcs...)
+	return service.StartAll(ctx, ds, runner, executorSvc, ds.Apiservice, connGateway)
 }
 
 func createInmemoryRedis(ctx context.Context, tick time.Duration) (rueidis.Client, error) {
@@ -494,10 +579,7 @@ func createInmemoryRedis(ctx context.Context, tick time.Duration) (rueidis.Clien
 
 	// If tick is lower than the default, tick every 50ms.  This lets us save
 	// CPU for standard dev-server testing.
-	poll := time.Second
-	if tick < DefaultTickDuration {
-		poll = time.Millisecond * 50
-	}
+	poll := DefaultTickDuration
 
 	go func() {
 		for range time.Tick(poll) {
@@ -518,7 +600,7 @@ func createConnectPubSubRedis() rueidis.ClientOption {
 
 func getSendingEventHandler(ctx context.Context, pb pubsub.Publisher, topic string) execution.HandleSendingEvent {
 	return func(ctx context.Context, evt event.Event, item queue.Item) error {
-		trackedEvent := event.NewOSSTrackedEvent(evt)
+		trackedEvent := event.NewOSSTrackedEvent(evt, nil)
 		byt, err := json.Marshal(trackedEvent)
 		if err != nil {
 			return fmt.Errorf("error marshalling invocation event: %w", err)
@@ -554,7 +636,7 @@ func getInvokeFailHandler(ctx context.Context, pb pubsub.Publisher, topic string
 		for _, e := range evts {
 			evt := e
 			eg.Go(func() error {
-				trackedEvent := event.NewOSSTrackedEvent(evt)
+				trackedEvent := event.NewOSSTrackedEvent(evt, nil)
 				byt, err := json.Marshal(trackedEvent)
 				if err != nil {
 					return fmt.Errorf("error marshalling function finished event: %w", err)
@@ -578,5 +660,81 @@ func getInvokeFailHandler(ctx context.Context, pb pubsub.Publisher, topic string
 		}
 
 		return eg.Wait()
+	}
+}
+
+func NormalizeConcurrencyKeys(smv2 sv2.StateLoader, dbcqrs cqrs.Manager) redis_state.NormalizeRefreshItemCustomConcurrencyKeysFn {
+	return func(ctx context.Context, item *queue.QueueItem, existingKeys []state.CustomConcurrency, shadowPartition *redis_state.QueueShadowPartition) ([]state.CustomConcurrency, error) {
+		id := sv2.IDFromV1(item.Data.Identifier)
+
+		workflow, err := dbcqrs.GetFunctionByInternalUUID(ctx, id.Tenant.EnvID, id.FunctionID)
+		if err != nil {
+			return nil, fmt.Errorf("could not find workflow: %w", err)
+		}
+		fn, err := workflow.InngestFunction()
+		if err != nil {
+			return nil, fmt.Errorf("could not convert workflow to inngest function: %w", err)
+		}
+
+		if fn.Concurrency == nil || len(fn.Concurrency.Limits) == 0 {
+			return nil, nil
+		}
+
+		events, err := smv2.LoadEvents(ctx, id)
+		if err != nil {
+			return nil, fmt.Errorf("could not load events: %w", err)
+		}
+
+		if len(events) == 0 {
+			return nil, nil
+		}
+
+		var evt0 event.Event
+
+		if err := json.Unmarshal(events[0], &evt0); err != nil {
+			return nil, fmt.Errorf("could not unmarshal event: %w", err)
+		}
+
+		evtMap := evt0.Map()
+
+		return queue.GetCustomConcurrencyKeys(ctx, id, fn.Concurrency.Limits, evtMap), nil
+	}
+}
+
+func NormalizeThrottle(smv2 sv2.StateLoader, dbcqrs cqrs.Manager) redis_state.NormalizeRefreshItemThrottleFn {
+	return func(ctx context.Context, item *queue.QueueItem, existingThrottle *queue.Throttle, shadowPartition *redis_state.QueueShadowPartition) (*queue.Throttle, error) {
+		id := sv2.IDFromV1(item.Data.Identifier)
+
+		workflow, err := dbcqrs.GetFunctionByInternalUUID(ctx, id.Tenant.EnvID, id.FunctionID)
+		if err != nil {
+			return nil, fmt.Errorf("could not find workflow: %w", err)
+		}
+		fn, err := workflow.InngestFunction()
+		if err != nil {
+			return nil, fmt.Errorf("could not convert workflow to inngest function: %w", err)
+		}
+
+		if fn.Throttle == nil {
+			return nil, nil
+		}
+
+		events, err := smv2.LoadEvents(ctx, id)
+		if err != nil {
+			return nil, fmt.Errorf("could not load events: %w", err)
+		}
+
+		if len(events) == 0 {
+			return nil, nil
+		}
+
+		var evt0 event.Event
+
+		if err := json.Unmarshal(events[0], &evt0); err != nil {
+			return nil, fmt.Errorf("could not unmarshal event: %w", err)
+		}
+
+		evtMap := evt0.Map()
+
+		return queue.GetThrottleConfig(ctx, id.FunctionID, fn.Throttle, evtMap), nil
 	}
 }

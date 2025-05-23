@@ -3,7 +3,6 @@ package resolvers
 import (
 	"context"
 	"fmt"
-	"github.com/99designs/gqlgen/graphql"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/pkg/cqrs"
@@ -26,23 +25,8 @@ func (r *connectV1workerConnectionConnResolver) App(ctx context.Context, obj *mo
 	return r.Data.GetAppByID(ctx, *obj.AppID)
 }
 
-func (r *connectV1workerConnectionResolver) TotalCount(ctx context.Context, obj *models.ConnectV1WorkerConnectionsConnection) (int, error) {
-	cursor, ok := graphql.GetFieldContext(ctx).Parent.Args["after"].(*string)
-	if !ok {
-		return 0, fmt.Errorf("failed to access cursor")
-	}
-
-	orderBy, ok := graphql.GetFieldContext(ctx).Parent.Args["orderBy"].([]*models.ConnectV1WorkerConnectionsOrderBy)
-	if !ok {
-		return 0, fmt.Errorf("failed to retrieve order")
-	}
-
-	filter, ok := graphql.GetFieldContext(ctx).Parent.Args["filter"].(models.ConnectV1WorkerConnectionsFilter)
-	if !ok {
-		return 0, fmt.Errorf("failed to access query filter")
-	}
-
-	opts := toWorkerConnectionsQueryOpt(0, cursor, orderBy, filter)
+func (r *connectV1workerConnectionResolver) TotalCount(ctx context.Context, obj *models.WorkerConnectionsConnection) (int, error) {
+	opts := toWorkerConnectionsQueryOpt(0, obj.After, obj.OrderBy, obj.Filter)
 	count, err := r.Data.GetWorkerConnectionsCount(ctx, opts)
 	if err != nil {
 		return 0, fmt.Errorf("error retrieving count for worker connections: %w", err)
@@ -51,9 +35,9 @@ func (r *connectV1workerConnectionResolver) TotalCount(ctx context.Context, obj 
 	return count, nil
 }
 
-func (r *queryResolver) WorkerConnections(ctx context.Context, first int, after *string, orderBy []*models.ConnectV1WorkerConnectionsOrderBy, filter models.ConnectV1WorkerConnectionsFilter) (*models.ConnectV1WorkerConnectionsConnection, error) {
+func (qr *queryResolver) WorkerConnections(ctx context.Context, first int, after *string, orderBy []*models.ConnectV1WorkerConnectionsOrderBy, filter models.ConnectV1WorkerConnectionsFilter) (*models.WorkerConnectionsConnection, error) {
 	opts := toWorkerConnectionsQueryOpt(first, after, orderBy, filter)
-	workerConns, err := r.Data.GetWorkerConnections(ctx, opts)
+	workerConns, err := qr.Data.GetWorkerConnections(ctx, opts)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving worker connections: %w", err)
 	}
@@ -86,9 +70,12 @@ func (r *queryResolver) WorkerConnections(ctx context.Context, first int, after 
 		EndCursor:   ecursor,
 	}
 
-	return &models.ConnectV1WorkerConnectionsConnection{
+	return &models.WorkerConnectionsConnection{
 		Edges:    edges,
 		PageInfo: pageInfo,
+		After:    after,
+		Filter:   filter,
+		OrderBy:  orderBy,
 	}, nil
 }
 
@@ -120,7 +107,8 @@ func connToNode(conn *cqrs.WorkerConnection) *models.ConnectV1WorkerConnection {
 	}
 
 	node := &models.ConnectV1WorkerConnection{
-		AppID: conn.AppID,
+		AppName: &conn.AppName,
+		AppID:   conn.AppID,
 
 		ID:         conn.Id,
 		GatewayID:  conn.GatewayId,
@@ -134,12 +122,14 @@ func connToNode(conn *cqrs.WorkerConnection) *models.ConnectV1WorkerConnection {
 
 		DisconnectReason: conn.DisconnectReason,
 
-		GroupHash:     conn.GroupHash,
-		SdkLang:       conn.SDKLang,
-		SdkVersion:    conn.SDKVersion,
-		SdkPlatform:   conn.SDKPlatform,
-		SyncID:        conn.SyncID,
-		BuildID:       conn.BuildId,
+		GroupHash:   conn.GroupHash,
+		SdkLang:     conn.SDKLang,
+		SdkVersion:  conn.SDKVersion,
+		SdkPlatform: conn.SDKPlatform,
+		SyncID:      conn.SyncID,
+		BuildID:     conn.AppVersion,
+		AppVersion:  conn.AppVersion,
+
 		FunctionCount: conn.FunctionCount,
 
 		CPUCores: int(conn.CpuCores),
@@ -150,10 +140,10 @@ func connToNode(conn *cqrs.WorkerConnection) *models.ConnectV1WorkerConnection {
 	return node
 }
 
-func (r *queryResolver) WorkerConnection(ctx context.Context, connectionID ulid.ULID) (*models.ConnectV1WorkerConnection, error) {
-	conn, err := r.Data.GetWorkerConnection(ctx, cqrs.WorkerConnectionIdentifier{
-		AccountID:    consts.DevServerAccountId,
-		WorkspaceID:  consts.DevServerEnvId,
+func (qr *queryResolver) WorkerConnection(ctx context.Context, connectionID ulid.ULID) (*models.ConnectV1WorkerConnection, error) {
+	conn, err := qr.Data.GetWorkerConnection(ctx, cqrs.WorkerConnectionIdentifier{
+		AccountID:    consts.DevServerAccountID,
+		WorkspaceID:  consts.DevServerEnvID,
 		ConnectionID: connectionID,
 	})
 	if err != nil {
@@ -235,6 +225,11 @@ func toWorkerConnectionsQueryOpt(
 		cursor = *cur
 	}
 
+	from := time.Time{}
+	if filter.From != nil {
+		from = *filter.From
+	}
+
 	until := time.Now()
 	if filter.Until != nil {
 		until = *filter.Until
@@ -247,11 +242,11 @@ func toWorkerConnectionsQueryOpt(
 
 	return cqrs.GetWorkerConnectionOpt{
 		Filter: cqrs.GetWorkerConnectionFilter{
-			AccountID:   consts.DevServerAccountId,
-			WorkspaceID: consts.DevServerEnvId,
+			AccountID:   consts.DevServerAccountID,
+			WorkspaceID: consts.DevServerEnvID,
 			AppID:       filter.AppIDs,
 			TimeField:   tsfield,
-			From:        filter.From,
+			From:        from,
 			Until:       until,
 			Status:      statuses,
 		},

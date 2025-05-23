@@ -5,42 +5,58 @@ Re-enqueus a queue item within its queue, removing any lease.
 Output:
   0: Successfully re-enqueued item
   1: Queue item not found
-
+  2: Successfully re-queued to backlog -- TODO: this should be a temporary status
 ]]
 
 local queueKey                = KEYS[1] -- queue:item - hash: { $itemID: $item }
 local keyPartitionMap         = KEYS[2] -- partition:item - hash: { $workflowID: $partition }
-local keyGlobalPointer        = KEYS[3] -- partition:sorted - zset
-local keyGlobalAccountPointer = KEYS[4] -- accounts:sorted - zset
-local keyAccountPartitions    = KEYS[5] -- accounts:$accountId:partition:sorted
-local keyPartitionA           = KEYS[6] -- queue:sorted:$workflowID - zset
-local keyPartitionB           = KEYS[7] -- e.g. sorted:c|t:$workflowID - zset
-local keyPartitionC           = KEYS[8] -- e.g. sorted:c|t:$workflowID - zset
--- We remove our queue item ID from each concurrency queue
-local keyConcurrencyA    = KEYS[9] -- Account concurrency level
-local keyConcurrencyB    = KEYS[10] -- When leasing an item we need to place the lease into this key
-local keyConcurrencyC    = KEYS[11] -- Optional for eg. for concurrency amongst steps
-local keyAcctConcurrency = KEYS[12]
--- We push pointers to partition concurrency items to the partition concurrency item
-local concurrencyPointer      = KEYS[13]
-local keyItemIndexA           = KEYS[14]          -- custom item index 1
-local keyItemIndexB           = KEYS[15]          -- custom item index 2
+local concurrencyPointer      = KEYS[3]
 
-local queueItem           = ARGV[1]
-local queueID             = ARGV[2]           -- id
+local keyGlobalPointer        = KEYS[4] -- partition:sorted - zset
+local keyGlobalAccountPointer = KEYS[5] -- accounts:sorted - zset
+local keyAccountPartitions    = KEYS[6] -- accounts:$accountID:partition:sorted
+
+local keyReadyQueue           = KEYS[7] -- queue:sorted:$workflowID - zset
+
+local keyInProgressAccount                  = KEYS[8]
+local keyInProgressPartition                = KEYS[9]
+local keyInProgressCustomConcurrencyKey1    = KEYS[10]
+local keyInProgressCustomConcurrencyKey2    = KEYS[11]
+
+local keyActiveAccount             = KEYS[12]
+local keyActivePartition           = KEYS[13]
+local keyActiveConcurrencyKey1     = KEYS[14]
+local keyActiveConcurrencyKey2     = KEYS[15]
+local keyActiveCompound            = KEYS[16]
+local keyActiveRun                 = KEYS[17]
+local keyIndexActivePartitionRuns  = KEYS[18]
+
+local keyBacklogSet                      = KEYS[19]          -- backlog:sorted:<backlogID> - zset
+local keyBacklogMeta                     = KEYS[20]          -- backlogs - hash
+local keyGlobalShadowPartitionSet        = KEYS[21]          -- shadow:sorted
+local keyShadowPartitionSet              = KEYS[22]          -- shadow:sorted:<fnID|queueName> - zset
+local keyShadowPartitionMeta             = KEYS[23]          -- shadows
+local keyGlobalAccountShadowPartitionSet = KEYS[24]
+local keyAccountShadowPartitionSet       = KEYS[25]
+
+local keyItemIndexA           = KEYS[26]          -- custom item index 1
+local keyItemIndexB           = KEYS[27]          -- custom item index 2
+
+local queueID             = ARGV[1]           -- id
+local queueItem           = ARGV[2]
 local queueScore          = tonumber(ARGV[3]) -- vesting time, in ms
-local nowMS               = tonumber(ARGV[4]) -- now in ms
-local partitionItemA      = ARGV[5]
-local partitionItemB      = ARGV[6]
-local partitionItemC      = ARGV[7]
-local partitionIdA        = ARGV[8]
-local partitionIdB        = ARGV[9]
-local partitionIdC        = ARGV[10]
-local accountId           = ARGV[11]
-local legacyPartitionName = ARGV[12]
-local partitionTypeA = tonumber(ARGV[13])
-local partitionTypeB = tonumber(ARGV[14])
-local partitionTypeC = tonumber(ARGV[15])
+local accountID           = ARGV[4]
+local runID               = ARGV[5]
+local partitionID         = ARGV[6]
+local partitionItem       = ARGV[7]
+
+local nowMS               = tonumber(ARGV[8]) -- now in ms
+
+-- Key queues v2
+local requeueToBacklog				= tonumber(ARGV[9])
+local shadowPartitionItem     = ARGV[10]
+local backlogID               = ARGV[11]
+local backlogItem             = ARGV[12]
 
 -- $include(get_queue_item.lua)
 -- $include(get_partition_item.lua)
@@ -62,59 +78,102 @@ redis.call("HSET", queueKey, queueID, queueItem)
 -- index/scavenger queue is updated to the next earliest item.
 -- This is the first half of requeueing: Removing the in-progress item, which must be followed up
 -- by enqueueing back to the partition queues
-local function handleRequeueConcurrency(keyConcurrency, partitionID, partitionType)
+local function handleRequeueConcurrency(keyConcurrency)
 	redis.call("ZREM", keyConcurrency, item.id) -- Remove from in-progress queue
-
-	if partitionType ~= 0 then
-		-- If this is not a default partition, we don't need to update the concurrency pointer (used by scavenger)
-		return
-	end
-
-	-- Backwards compatibility: For default partitions, use the partition ID (function ID) as the pointer
-	local pointerMember = keyConcurrency
-	if partitionType == 0 then
-		pointerMember = partitionID
-	end
-
-	-- Get the earliest item in the partition concurrency set.  We may be dequeueing
-	-- the only in-progress job and should remove this from the partition concurrency
-	-- pointers, if this exists.
-	--
-	-- This ensures that scavengeres have updated pointer queues without the currently
-	-- leased job, if exists.
-	local concurrencyScores = redis.call("ZRANGE", keyConcurrency, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")
-	if concurrencyScores == false then
-		redis.call("ZREM", concurrencyPointer, pointerMember)
-	else
-		local earliestLease = tonumber(concurrencyScores[2])
-		if earliestLease == nil then
-			redis.call("ZREM", concurrencyPointer, pointerMember)
-		else
-			-- Ensure that we update the score with the earliest lease
-			redis.call("ZADD", concurrencyPointer, earliestLease, pointerMember)
-		end
-	end
 end
 
 --
 -- Concurrency
 --
 
-handleRequeueConcurrency(keyConcurrencyA, partitionIdA, partitionTypeA)
-handleRequeueConcurrency(keyConcurrencyB, partitionIdB, partitionTypeB)
-handleRequeueConcurrency(keyConcurrencyC, partitionIdC, partitionTypeC)
+handleRequeueConcurrency(keyInProgressPartition)
 
--- Remove item from the account concurrency queue
--- This does not have a scavenger queue, as it's purely an entitlement limitation. See extendLease
--- and Lease for respective ZADD calls.
-redis.call("ZREM", keyAcctConcurrency, item.id)
-
+-- Get the earliest item in the partition concurrency set.  We may be dequeueing
+-- the only in-progress job and should remove this from the partition concurrency
+-- pointers, if this exists.
 --
--- Enqueue item to partition queues again
--- 
-requeue_to_partition(keyPartitionA, partitionIdA, partitionItemA, partitionTypeA, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, queueScore, queueID, nowMS, accountId)
-requeue_to_partition(keyPartitionB, partitionIdB, partitionItemB, partitionTypeB, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, queueScore, queueID, nowMS, accountId)
-requeue_to_partition(keyPartitionC, partitionIdC, partitionItemC, partitionTypeC, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, queueScore, queueID, nowMS, accountId)
+-- This ensures that scavengeres have updated pointer queues without the currently
+-- leased job, if exists.
+local concurrencyScores = redis.call("ZRANGE", keyInProgressPartition, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")
+if concurrencyScores == false then
+  redis.call("ZREM", concurrencyPointer, partitionID)
+else
+  local earliestLease = tonumber(concurrencyScores[2])
+  if earliestLease == nil then
+    redis.call("ZREM", concurrencyPointer, partitionID)
+  else
+    -- Ensure that we update the score with the earliest lease
+    redis.call("ZADD", concurrencyPointer, earliestLease, partitionID)
+  end
+end
+
+if exists_without_ending(keyInProgressCustomConcurrencyKey1, ":-") then
+  handleRequeueConcurrency(keyInProgressCustomConcurrencyKey1)
+end
+
+if exists_without_ending(keyInProgressCustomConcurrencyKey2, ":-") then
+  handleRequeueConcurrency(keyInProgressCustomConcurrencyKey2)
+end
+
+if exists_without_ending(keyInProgressAccount, ":-") then
+    -- Remove item from the account concurrency queue
+    -- This does not have a scavenger queue, as it's purely an entitlement limitation. See extendLease
+    -- and Lease for respective ZADD calls.
+    redis.call("ZREM", keyInProgressAccount, item.id)
+end
+
+if requeueToBacklog == 1 then
+  -- Decrease active counters and clean up if necessary
+  if redis.call("DECR", keyActivePartition) <= 0 then
+    redis.call("DEL", keyActivePartition)
+  end
+
+  if exists_without_ending(keyActiveAccount, ":-") then
+    if redis.call("DECR", keyActiveAccount) <= 0 then
+      redis.call("DEL", keyActiveAccount)
+    end
+  end
+
+  if exists_without_ending(keyActiveCompound, ":-") then
+    if redis.call("DECR", keyActiveCompound) <= 0 then
+      redis.call("DEL", keyActiveCompound)
+    end
+  end
+
+  if exists_without_ending(keyActiveConcurrencyKey1, ":-") then
+    if redis.call("DECR", keyActiveConcurrencyKey1) <= 0 then
+      redis.call("DEL", keyActiveConcurrencyKey1)
+    end
+  end
+
+  if exists_without_ending(keyActiveConcurrencyKey2, ":-") then
+    if redis.call("DECR", keyActiveConcurrencyKey2) <= 0 then
+      redis.call("DEL", keyActiveConcurrencyKey2)
+    end
+  end
+
+  if exists_without_ending(keyActiveRun, ":-") then
+    -- increase number of active items in the run
+    if redis.call("DECR", keyActiveRun) <= 0 then
+      redis.call("DEL", keyActiveRun)
+
+      -- update set of active function runs
+      if exists_without_ending(keyIndexActivePartitionRuns, ":-") then
+        redis.call("SREM", keyIndexActivePartitionRuns, runID)
+      end
+    end
+  end
+
+	--
+	-- Requeue item to backlog queues again
+	--
+  requeue_to_backlog(keyBacklogSet, backlogID, backlogItem, partitionID, shadowPartitionItem, partitionItem, keyPartitionMap, keyBacklogMeta, keyGlobalShadowPartitionSet, keyShadowPartitionMeta, keyShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, queueScore, queueID, accountID)
+else
+  --
+  -- Enqueue item to partition queues again
+  --
+  requeue_to_partition(keyReadyQueue, partitionID, partitionItem, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, queueScore, queueID, nowMS, accountID)
+end
 
 -- Add optional indexes.
 if keyItemIndexA ~= "" and keyItemIndexA ~= false and keyItemIndexA ~= nil then

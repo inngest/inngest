@@ -34,7 +34,7 @@ func Infer[InputT any, OutputT any](
 	op := mgr.NewOp(enums.OpcodeAIGateway, id, nil)
 	hashedID := op.MustHash()
 
-	if val, ok := mgr.Step(op); ok {
+	if val, ok := mgr.Step(ctx, op); ok {
 		// This step has already ran as we have state for it. Unmarshal the JSON into type T
 		unwrapped := response{}
 		if err := json.Unmarshal(val, &unwrapped); err == nil {

@@ -66,14 +66,130 @@ func TestNewRunMetadata(t *testing.T) {
 	}
 }
 
-func TestStateHarness(t *testing.T) {
-	r := miniredis.RunT(t)
+func TestIdempotencyCheck(t *testing.T) {
+	ctx := context.Background()
 
-	rc, err := rueidis.NewClient(rueidis.ClientOption{
-		InitAddress:  []string{r.Addr()},
-		DisableCache: true,
+	r, rc := initRedis(t)
+	defer rc.Close()
+
+	unshardedClient := NewUnshardedClient(rc, StateDefaultKey, QueueDefaultKey)
+	shardedClient := NewShardedClient(ShardedClientOpts{
+		UnshardedClient:        unshardedClient,
+		FunctionRunStateClient: rc,
+		BatchClient:            rc,
+		StateDefaultKey:        StateDefaultKey,
+		QueueDefaultKey:        QueueDefaultKey,
+		FnRunIsSharded:         AlwaysShardOnRun,
 	})
-	require.NoError(t, err)
+
+	acctID, wsID, appID, fnID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
+	runID := ulid.MustNew(ulid.Now(), rand.Reader)
+
+	runState := shardedClient.fnRunState
+	ftc, shared := runState.Client(ctx, acctID, runID)
+	require.True(t, shared)
+
+	mgr := shardedMgr{s: shardedClient}
+
+	t.Run("with idempotency key defined in identifier", func(t *testing.T) {
+		id := state.Identifier{
+			AccountID:   acctID,
+			WorkspaceID: wsID,
+			AppID:       appID,
+			WorkflowID:  fnID,
+			RunID:       runID,
+			Key:         "yolo",
+		}
+		key := runState.kg.Idempotency(ctx, shared, id)
+
+		t.Run("returns nil if no idempotency key is available", func(t *testing.T) {
+			r.FlushAll()
+
+			runID, err := mgr.idempotencyCheck(ctx, ftc, key, id)
+			require.NoError(t, err)
+			require.Nil(t, runID)
+		})
+
+		t.Run("returns state if idempotency is already there", func(t *testing.T) {
+			r.FlushAll()
+
+			created, err := mgr.New(ctx, state.Input{
+				Identifier:     id,
+				EventBatchData: []map[string]any{},
+				Steps:          []state.MemoizedStep{},
+				StepInputs:     []state.MemoizedStep{},
+				Context: map[string]any{
+					"hello": "world",
+				},
+			})
+			require.NoError(t, err)
+
+			runID, err := mgr.idempotencyCheck(ctx, ftc, key, id)
+			require.NoError(t, err)
+			require.NotNil(t, runID)
+
+			require.Equal(t, created.Identifier().RunID, *runID)
+		})
+
+		t.Run("returns invalid identifier error if previous value is not a ULID", func(t *testing.T) {
+			r.FlushAll()
+			require.NoError(t, r.Set(key, ""))
+
+			runID, err := mgr.idempotencyCheck(ctx, ftc, key, id)
+			require.Nil(t, runID)
+			require.ErrorIs(t, err, state.ErrInvalidIdentifier)
+		})
+	})
+
+	t.Run("with idempotency key not defined in identifier", func(t *testing.T) {
+		id := state.Identifier{
+			AccountID:   acctID,
+			WorkspaceID: wsID,
+			AppID:       appID,
+			WorkflowID:  fnID,
+			RunID:       runID,
+		}
+		key := runState.kg.Idempotency(ctx, shared, id)
+
+		t.Run("returns nil if no idempotency key is available", func(t *testing.T) {
+			r.FlushAll()
+
+			st, err := mgr.idempotencyCheck(ctx, ftc, key, id)
+			require.NoError(t, err)
+			require.Nil(t, st)
+		})
+
+		t.Run("returns nil if runID is different", func(t *testing.T) {
+			r.FlushAll()
+
+			_, err := mgr.New(ctx, state.Input{
+				Identifier:     id,
+				EventBatchData: []map[string]any{},
+			})
+			require.NoError(t, err)
+
+			diffID := id // copy
+			diffID.RunID = ulid.MustNew(ulid.Now(), rand.Reader)
+			diffKey := runState.kg.Idempotency(ctx, shared, diffID)
+			runID, err := mgr.idempotencyCheck(ctx, ftc, diffKey, diffID)
+			require.NoError(t, err)
+			require.Nil(t, runID)
+		})
+
+		t.Run("returns invalid identifier error if previous value is not a ULID", func(t *testing.T) {
+			r.FlushAll()
+			require.NoError(t, r.Set(key, ""))
+
+			runID, err := mgr.idempotencyCheck(ctx, ftc, key, id)
+			require.Nil(t, runID)
+			require.ErrorIs(t, err, state.ErrInvalidIdentifier)
+		})
+	})
+}
+
+func TestStateHarness(t *testing.T) {
+	r, rc := initRedis(t)
+	defer rc.Close()
 
 	unshardedClient := NewUnshardedClient(rc, StateDefaultKey, QueueDefaultKey)
 	shardedClient := NewShardedClient(ShardedClientOpts{
@@ -111,11 +227,11 @@ func TestScanIter(t *testing.T) {
 		DisableCache: true,
 	})
 	require.NoError(t, err)
+	defer r.Close()
 
 	entries := 50_000
 	key := "test-scan"
 	for i := 0; i < entries; i++ {
-
 		cmd := r.B().Hset().Key(key).FieldValue().
 			FieldValue(strconv.Itoa(i), strconv.Itoa(i)).
 			Build()
@@ -151,6 +267,7 @@ func TestBufIter(t *testing.T) {
 		DisableCache: true,
 	})
 	require.NoError(t, err)
+	defer r.Close()
 
 	entries := 10_000
 	key := "test-bufiter"
@@ -185,6 +302,7 @@ func BenchmarkNew(b *testing.B) {
 		DisableCache: true,
 	})
 	require.NoError(b, err)
+	defer rc.Close()
 
 	statePrefix := "state"
 	unshardedClient := NewUnshardedClient(rc, statePrefix, QueueDefaultKey)

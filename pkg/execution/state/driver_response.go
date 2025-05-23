@@ -33,7 +33,7 @@ type UserError struct {
 	NoRetry bool `json:"noRetry,omitempty"`
 
 	// Cause allows nested errors to be passed back to the SDK.
-	Cause *UserError `json:"cause,omitempty"`
+	Cause json.RawMessage `json:"cause,omitempty"`
 }
 
 // DriverResponse is returned after a driver executes an action.  This represents any
@@ -329,6 +329,9 @@ type StandardError struct {
 	Name    string `json:"name"`
 	Message string `json:"message"`
 	Stack   string `json:"stack,omitempty"`
+
+	// Cause allows nested errors to be passed back to the SDK.
+	Cause json.RawMessage `json:"cause,omitempty"`
 }
 
 func (s StandardError) String() string {
@@ -400,6 +403,12 @@ func (r *DriverResponse) StandardError() StandardError {
 				case "stack":
 					ret.Stack = val
 				}
+			}
+		}
+
+		if cause, ok := processed["cause"]; ok {
+			if causeByt, err := json.Marshal(cause); err == nil {
+				ret.Cause = json.RawMessage(causeByt)
 			}
 		}
 	}

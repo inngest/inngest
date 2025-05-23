@@ -13,6 +13,14 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
+type spanEvtType int
+
+const (
+	spanEvtTypeUnknown spanEvtType = iota
+	spanEvtTypeEvent
+	spanEvtTypeOutput
+)
+
 func SpanToProto(ctx context.Context, sp trace.ReadOnlySpan) (*runv2.Span, error) {
 	ts := sp.StartTime()
 	dur := sp.EndTime().Sub(ts)

@@ -2,8 +2,6 @@ package consts
 
 import (
 	"time"
-
-	"github.com/google/uuid"
 )
 
 const (
@@ -48,7 +46,7 @@ const (
 
 	// MaxRetries represents the maximum number of retries for a particular function or step
 	// possible.
-	MaxRetries = 30
+	MaxRetries = 20
 
 	// MaxRetryDuration is the furthest a retry can be scheduled.  If retries are scheduled further
 	// than now plus this duration, the retry duration will automatically be lowered to this value.
@@ -82,6 +80,9 @@ const (
 	// FunctionIdempotencyPeriod determines how long a specific function remains idempotent
 	// when using idempotency keys.
 	FunctionIdempotencyPeriod = 24 * time.Hour
+	// FunctionIdempotencyTombstone indicates the run associated with this idempotency key
+	// has already finished
+	FunctionIdempotencyTombstone = "-"
 
 	DefaultBatchSizeLimit = 100
 	DefaultBatchTimeout   = 60 * time.Second
@@ -98,12 +99,6 @@ const (
 	// CancelTimeout is the maximum time a cancellation can exist
 	CancelTimeout = time.Hour * 24 * 365
 
-	// SourceEdgeRetries represents the number of times we'll retry running a source edge.
-	// Each edge gets their own set of retries in our execution engine, embedded directly
-	// in the job.  The retry count is taken from function config for every step _but_
-	// initialization.
-	SourceEdgeRetries = 20
-
 	RequestVersionUnknown = -1
 
 	// PriorityFactorMin is the minimum priority factor for any function run, in seconds.
@@ -115,36 +110,45 @@ const (
 	// in which priority factors are taken into account.
 	FutureAtLimit = 2 * time.Second
 
-	// StartDefaultPersistenceInterval is the default interval at which the
-	// queue will be snapshotted and persisted to disk.
-	StartDefaultPersistenceInterval = time.Second * 60
-	// StartMaxQueueChunkSize is the default maximum size of a queue chunk.
-	// This is set to be comfortably within the 1GB limit of SQLite.
-	StartMaxQueueChunkSize = 1024 * 1024 * 800 // 800MB
-	// StartMaxQueueSnapshots is the maximum number of snapshots we keep.
-	StartMaxQueueSnapshots = 5
+	DefaultQueueContinueLimit = uint(5)
 
-	DefaultInngestConfigDir = ".inngest"
-	SQLiteDbFileName        = "main.db"
-	// DevServerHistoryFile is the file where the history is stored.
-	//
-	// @deprecated Used in the in-memory writer when persiting, though this
-	// should not be actively used any more.
-	DevServerHistoryFile = "dev_history.json"
-
-	PauseExpiredDeletionGracePeriod = time.Second * 10
+	PauseExpiredDeletionGracePeriod = time.Minute * 5
 
 	DefaultQueueShardName = "default"
 
 	// Minimum number of pauses before using the aggregate pause handler.
 	AggregatePauseThreshold = 50
+
+	// QueueContinuationCooldownPeriod is the cooldown period for a continuations, eg.
+	// how long we wait after a partition has continued the maximum times.
+	// This prevents partitions from greedily acquiring resources in each scan loop.
+	QueueContinuationCooldownPeriod = time.Second * 10
+	// QueueContinuationMaxPartitions represents the total capacity for partitions
+	// that can be continued.
+	QueueContinuationMaxPartitions = 50
+	// QueueContinuationSkipProbability is the probability of skipping a continuation
+	// scan loop.
+	QueueContinuationSkipProbability = 0.2
+
+	//
+	// Streaming
+	//
+	MaxStreamingMessageSizeBytes = 1024 * 512 // 512KB
+	StreamingChunkSize           = 1024       // 1KB
+	MaxStreamingChunks           = 1000       // Allow up to 1000 chunks per stream
+
+	RedisBlockingPoolSize = 10
+
+	ConnectWorkerHeartbeatInterval  = 10 * time.Second
+	ConnectGatewayHeartbeatInterval = 5 * time.Second
+	ConnectGCThreshold              = 5 * time.Minute
+
+	ConnectWorkerRequestLeaseDuration = 20 * time.Second
+	ConnectWorkerRequestGracePeriod   = 5 * time.Second
 )
 
 var (
-	// DevServerAccountId is the fixed account ID used internally in the dev server.
-	DevServerAccountId = uuid.MustParse("00000000-0000-4000-a000-000000000000")
-	DevServerEnvId     = uuid.MustParse("00000000-0000-4000-b000-000000000000")
-
-	DevServerConnectJwtSecret  = []byte("this-does-not-need-to-be-secret")
-	DevServerRealtimeJWTSecret = []byte("dev-mode-is-not-secret")
+	ConnectWorkerRequestExtendLeaseInterval = ConnectWorkerRequestLeaseDuration / 4
+	QueueShadowContinuationCooldownPeriod   = QueueContinuationCooldownPeriod
+	QueueShadowContinuationMaxPartitions    = QueueContinuationMaxPartitions
 )

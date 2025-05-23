@@ -15,7 +15,7 @@ import (
 func TestThrottle(t *testing.T) {
 
 	t.Run("Basic throttling with a single limit", func(t *testing.T) {
-		h, server, registerFuncs := NewSDKHandler(t, "concurrency")
+		inngestClient, server, registerFuncs := NewSDKHandler(t, "concurrency")
 		defer server.Close()
 
 		trigger := "test/timeouts-start"
@@ -26,16 +26,17 @@ func TestThrottle(t *testing.T) {
 		runs := map[string]struct{}{}
 		startTimes := []time.Time{}
 
-		a := inngestgo.CreateFunction(
+		_, err := inngestgo.CreateFunction(
+			inngestClient,
 			inngestgo.FunctionOpts{
-				Name: "throttle test",
+				ID: "throttle-test",
 				Throttle: &inngestgo.Throttle{
 					Limit:  1,
 					Period: throttlePeriod,
 				},
 			},
 			inngestgo.EventTrigger(trigger, nil),
-			func(ctx context.Context, input inngestgo.Input[inngestgo.GenericEvent[any, any]]) (any, error) {
+			func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
 				fmt.Println(time.Now().Format(time.RFC3339))
 				if _, ok := runs[input.InputCtx.RunID]; !ok {
 					startTimes = append(startTimes, time.Now())
@@ -44,8 +45,7 @@ func TestThrottle(t *testing.T) {
 				return true, nil
 			},
 		)
-
-		h.Register(a)
+		require.NoError(t, err)
 		registerFuncs()
 
 		var events []any
@@ -55,7 +55,7 @@ func TestThrottle(t *testing.T) {
 				Data: map[string]any{"test": true},
 			})
 		}
-		_, err := inngestgo.SendMany(context.Background(), events)
+		_, err = inngestClient.SendMany(context.Background(), events)
 		require.NoError(t, err)
 
 		// Wait for all functions to run
@@ -89,7 +89,7 @@ func TestThrottle(t *testing.T) {
 	})
 
 	t.Run("Throttling with keys separates values", func(t *testing.T) {
-		h, server, registerFuncs := NewSDKHandler(t, "concurrency")
+		inngestClient, server, registerFuncs := NewSDKHandler(t, "concurrency")
 		defer server.Close()
 
 		trigger := "test/timeouts-start-key"
@@ -98,9 +98,10 @@ func TestThrottle(t *testing.T) {
 			total int32
 		)
 
-		a := inngestgo.CreateFunction(
+		_, err := inngestgo.CreateFunction(
+			inngestClient,
 			inngestgo.FunctionOpts{
-				Name: "throttle test with keys",
+				ID: "throttle-test-with-keys",
 				Throttle: &inngestgo.Throttle{
 					Key:    inngestgo.StrPtr("event.data.id"),
 					Limit:  1,
@@ -108,7 +109,7 @@ func TestThrottle(t *testing.T) {
 				},
 			},
 			inngestgo.EventTrigger(trigger, nil),
-			func(ctx context.Context, input inngestgo.Input[inngestgo.GenericEvent[any, any]]) (any, error) {
+			func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
 				// Add two steps to ensure steps aren't throttled.
 				_, _ = step.Run(ctx, "b", func(ctx context.Context) (any, error) {
 					return nil, nil
@@ -121,13 +122,12 @@ func TestThrottle(t *testing.T) {
 				return true, nil
 			},
 		)
-
-		h.Register(a)
+		require.NoError(t, err)
 		registerFuncs()
 
 		for i := 0; i < 3; i++ {
 			go func(i int) {
-				_, err := inngestgo.Send(context.Background(), inngestgo.Event{
+				_, err = inngestClient.Send(context.Background(), inngestgo.Event{
 					Name: trigger,
 					Data: map[string]any{"id": i},
 				})

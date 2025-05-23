@@ -20,12 +20,9 @@ import { toMaybeDate } from '@inngest/components/utils/date';
 import { useInfiniteQuery } from '@tanstack/react-query';
 
 import SendEventButton from '@/components/Event/SendEventButton';
-import { useCancelRun } from '@/hooks/useCancelRun';
 import { useGetRun } from '@/hooks/useGetRun';
 import { useGetTraceResult } from '@/hooks/useGetTraceResult';
 import { useGetTrigger } from '@/hooks/useGetTrigger';
-import { useRerun } from '@/hooks/useRerun';
-import { useRerunFromStep } from '@/hooks/useRerunFromStep';
 import { client } from '@/store/baseApi';
 import {
   CountRunsDocument,
@@ -131,9 +128,6 @@ export default function Page() {
     return out;
   }, [data?.pages]);
 
-  const cancelRun = useCancelRun();
-  const rerun = useRerun();
-  const rerunFromStep = useRerunFromStep();
   const getTraceResult = useGetTraceResult();
   const getTrigger = useGetTrigger();
   const getRun = useGetRun();
@@ -181,7 +175,6 @@ export default function Page() {
       />
       <RunsPage
         apps={appsRes.data?.apps || []}
-        cancelRun={cancelRun}
         data={runs ?? []}
         defaultVisibleColumns={['status', 'id', 'trigger', 'function', 'queuedAt', 'endedAt']}
         features={{
@@ -196,13 +189,10 @@ export default function Page() {
         onRefresh={fetchNextPage}
         getTraceResult={getTraceResult}
         getTrigger={getTrigger}
-        rerun={rerun}
-        rerunFromStep={rerunFromStep}
         pathCreator={pathCreator}
         pollInterval={pollInterval}
         scope="env"
         totalCount={totalCount}
-        stepAIEnabled={true}
       />
     </>
   );

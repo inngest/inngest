@@ -1,6 +1,6 @@
 -- name: UpsertApp :one
-INSERT INTO apps (id, name, sdk_language, sdk_version, framework, metadata, status, error, checksum, url, is_connect)
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+INSERT INTO apps (id, name, sdk_language, sdk_version, framework, metadata, status, error, checksum, url, method, app_version)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
 ON CONFLICT(id) DO UPDATE SET
     name = excluded.name,
     sdk_language = excluded.sdk_language,
@@ -11,7 +11,8 @@ ON CONFLICT(id) DO UPDATE SET
     error = excluded.error,
     checksum = excluded.checksum,
     archived_at = NULL,
-    is_connect = excluded.is_connect
+    "method" = excluded.method,
+    app_version = excluded.app_version
 RETURNING *;
 
 -- name: GetApp :one
@@ -284,12 +285,13 @@ WHERE snapshot_id NOT IN (
 
 -- name: InsertWorkerConnection :exec
 INSERT INTO worker_connections (
-    account_id, workspace_id, app_id, id, gateway_id, instance_id, status, worker_ip, connected_at, last_heartbeat_at, disconnected_at,
-    recorded_at, inserted_at, disconnect_reason, group_hash, sdk_lang, sdk_version, sdk_platform, sync_id, build_id, function_count, cpu_cores, mem_bytes, os
+    account_id, workspace_id, app_name, app_id, id, gateway_id, instance_id, status, worker_ip, connected_at, last_heartbeat_at, disconnected_at,
+    recorded_at, inserted_at, disconnect_reason, group_hash, sdk_lang, sdk_version, sdk_platform, sync_id, app_version, function_count, cpu_cores, mem_bytes, os
 )
 VALUES (
         sqlc.arg('account_id'),
         sqlc.arg('workspace_id'),
+        sqlc.arg('app_name'),
         sqlc.arg('app_id'),
         sqlc.arg('id'),
         sqlc.arg('gateway_id'),
@@ -307,16 +309,17 @@ VALUES (
         sqlc.arg('sdk_version'),
         sqlc.arg('sdk_platform'),
         sqlc.arg('sync_id'),
-        sqlc.arg('build_id'),
+        sqlc.arg('app_version'),
         sqlc.arg('function_count'),
         sqlc.arg('cpu_cores'),
         sqlc.arg('mem_bytes'),
         sqlc.arg('os')
         )
-    ON CONFLICT(id)
+    ON CONFLICT(id, app_name)
 DO UPDATE SET
     account_id = excluded.account_id,
            workspace_id = excluded.workspace_id,
+           app_name = excluded.app_name,
            app_id = excluded.app_id,
 
            id = excluded.id,
@@ -338,7 +341,7 @@ DO UPDATE SET
            sdk_version = excluded.sdk_version,
            sdk_platform = excluded.sdk_platform,
            sync_id = excluded.sync_id,
-           build_id = excluded.build_id,
+           app_version = excluded.app_version,
            function_count = excluded.function_count,
 
            cpu_cores = excluded.cpu_cores,

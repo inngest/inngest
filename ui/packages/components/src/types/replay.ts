@@ -1,5 +1,3 @@
-import durationPlugin from 'dayjs/plugin/duration';
-
 const replayStatuses = ['CREATED', 'ENDED'] as const;
 export type ReplayStatus = (typeof replayStatuses)[number];
 
@@ -8,6 +6,6 @@ export type Replay = {
   status: ReplayStatus;
   createdAt: Date;
   endedAt?: Date;
-  duration?: durationPlugin.Duration;
+  duration?: number;
   runsCount: number;
 };

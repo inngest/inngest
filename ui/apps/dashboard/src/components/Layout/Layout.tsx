@@ -10,7 +10,6 @@ import type { Environment } from '@/utils/environments';
 import SideBar from './SideBar';
 
 type LayoutProps = {
-  envSlug?: string;
   activeEnv?: Environment;
   children: ReactNode;
 };
@@ -21,7 +20,7 @@ export default async function Layout({ activeEnv, children }: LayoutProps) {
 
   return (
     <div className="fixed z-50 flex h-screen w-full flex-row justify-start overflow-y-scroll overscroll-y-none">
-      <SideBar collapsed={collapsed} activeEnv={activeEnv} profile={profile} />
+      <SideBar activeEnv={activeEnv} collapsed={collapsed} profile={profile} />
 
       <div className="flex w-full flex-col overflow-x-scroll">
         <IncidentBanner />

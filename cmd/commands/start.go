@@ -34,12 +34,9 @@ func NewCmdStart(rootCmd *cobra.Command) *cobra.Command {
 	baseFlags := pflag.NewFlagSet("base", pflag.ExitOnError)
 	baseFlags.String("config", "", "Path to an Inngest configuration file")
 	baseFlags.BoolP("help", "h", false, "Output this help information")
-	baseFlags.String("host", "", "Server hostname")
-	baseFlags.StringP("port", "p", "8288", "Server port")
-	baseFlags.Int("poll-interval", 0, "Enable app sync polling at a specific interval in seconds. (default disabled)")
-	baseFlags.Int("retry-interval", 0, "Retry interval in seconds for linear backoff. Minimum: 1.")
-	baseFlags.StringSliceP("sdk-url", "u", []string{}, "SDK URLs to load functions from")
-	baseFlags.Int("tick", devserver.DefaultTick, "Interval, in milliseconds, of which to check for new work.")
+	baseFlags.String("host", "", "Inngest server hostname")
+	baseFlags.StringP("port", "p", "8288", "Inngest server port")
+	baseFlags.StringSliceP("sdk-url", "u", []string{}, "App serve URLs to sync (ex. http://localhost:3000/api/inngest)")
 	baseFlags.String("signing-key", "", "Signing key used to sign and validate data between the server and apps.")
 	baseFlags.StringSlice("event-key", []string{}, "Event key(s) that will be used by apps to send events to the server.")
 	cmd.Flags().AddFlagSet(baseFlags)
@@ -52,8 +49,17 @@ func NewCmdStart(rootCmd *cobra.Command) *cobra.Command {
 	cmd.Flags().AddFlagSet(persistenceFlags)
 	groups = append(groups, FlagGroup{name: "Persistence Flags:", fs: persistenceFlags})
 
+	advancedFlags := pflag.NewFlagSet("advanced", pflag.ExitOnError)
+	advancedFlags.Int("poll-interval", 0, "Interval in seconds between polling for updates to apps")
+	advancedFlags.Int("retry-interval", 0, "Retry interval in seconds for linear backoff when retrying functions - must be 1 or above")
+	advancedFlags.Int("queue-workers", devserver.DefaultQueueWorkers, "Number of executor workers to execute steps from the queue")
+	advancedFlags.Int("tick", devserver.DefaultTick, "The interval (in milliseconds) at which the executor polls the queue")
+	advancedFlags.Int("connect-gateway-port", devserver.DefaultConnectGatewayPort, "Port to expose connect gateway endpoint")
+	cmd.Flags().AddFlagSet(advancedFlags)
+	groups = append(groups, FlagGroup{name: "Advanced Flags:", fs: advancedFlags})
+
 	// Also add global flags
-	groups = append(groups, FlagGroup{name: "Group Flags:", fs: rootCmd.PersistentFlags()})
+	groups = append(groups, FlagGroup{name: "Global Flags:", fs: rootCmd.PersistentFlags()})
 
 	cmd.SetUsageFunc(func(c *cobra.Command) error {
 		fmt.Printf("%s\n  %s\n\n%s\n%s\n\n",
@@ -100,15 +106,18 @@ func doStart(cmd *cobra.Command, args []string) {
 		os.Exit(1)
 	}
 	conf.EventAPI.Port = port
+	conf.CoreAPI.Port = port
 
 	host := viper.GetString("host")
 	if host != "" {
 		conf.EventAPI.Addr = host
+		conf.CoreAPI.Addr = host
 	}
 
+	traceEndpoint := fmt.Sprintf("localhost:%d", port)
 	if err := itrace.NewUserTracer(ctx, itrace.TracerOpts{
 		ServiceName:   "tracing",
-		TraceEndpoint: "localhost:8288",
+		TraceEndpoint: traceEndpoint,
 		TraceURLPath:  "/dev/traces",
 		Type:          itrace.TracerTypeOTLPHTTP,
 	}); err != nil {
@@ -119,22 +128,37 @@ func doStart(cmd *cobra.Command, args []string) {
 		_ = itrace.CloseUserTracer(ctx)
 	}()
 
+	if err := itrace.NewSystemTracer(ctx, itrace.TracerOpts{
+		ServiceName:   "tracing-system",
+		TraceEndpoint: traceEndpoint,
+		TraceURLPath:  "/dev/traces/system",
+		Type:          itrace.TracerTypeOTLPHTTP,
+	}); err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	defer func() {
+		_ = itrace.CloseSystemTracer(ctx)
+	}()
+
 	tick := viper.GetInt("tick")
 	if tick < 1 {
 		tick = devserver.DefaultTick
 	}
 
 	opts := lite.StartOpts{
-		Config:        *conf,
-		PollInterval:  viper.GetInt("poll-interval"),
-		RedisURI:      viper.GetString("redis-uri"),
-		PostgresURI:   viper.GetString("postgres-uri"),
-		RetryInterval: viper.GetInt("retry-interval"),
-		Tick:          time.Duration(tick) * time.Millisecond,
-		URLs:          viper.GetStringSlice("sdk-url"),
-		SQLiteDir:     viper.GetString("sqlite-dir"),
-		SigningKey:    viper.GetString("signing-key"),
-		EventKey:      viper.GetStringSlice("event-key"),
+		Config:             *conf,
+		PollInterval:       viper.GetInt("poll-interval"),
+		RedisURI:           viper.GetString("redis-uri"),
+		PostgresURI:        viper.GetString("postgres-uri"),
+		RetryInterval:      viper.GetInt("retry-interval"),
+		QueueWorkers:       viper.GetInt("queue-workers"),
+		Tick:               time.Duration(tick) * time.Millisecond,
+		URLs:               viper.GetStringSlice("sdk-url"),
+		SQLiteDir:          viper.GetString("sqlite-dir"),
+		SigningKey:         viper.GetString("signing-key"),
+		EventKey:           viper.GetStringSlice("event-key"),
+		ConnectGatewayPort: viper.GetInt("connect-gateway-port"),
 	}
 
 	err = lite.New(ctx, opts)

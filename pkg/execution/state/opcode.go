@@ -10,6 +10,7 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/util/aigateway"
+	"github.com/inngest/inngest/pkg/util/gateway"
 	"github.com/xhit/go-str2duration/v2"
 )
 
@@ -198,6 +199,52 @@ func (g GeneratorOpcode) SleepDuration() (time.Duration, error) {
 	return str2duration.ParseDuration(opts.Duration)
 }
 
+func (g GeneratorOpcode) SignalOpts() (*SignalOpts, error) {
+	opts := &SignalOpts{}
+	if err := opts.UnmarshalAny(g.Opts); err != nil {
+		return nil, err
+	}
+	return opts, nil
+}
+
+type SignalOpts struct {
+	Signal     string `json:"signal"`
+	Timeout    string `json:"timeout"`
+	OnConflict string `json:"conflict"`
+}
+
+func (s *SignalOpts) UnmarshalAny(a any) error {
+	opts := SignalOpts{}
+	var mappedByt []byte
+	switch typ := a.(type) {
+	case []byte:
+		mappedByt = typ
+	default:
+		byt, err := json.Marshal(a)
+		if err != nil {
+			return err
+		}
+		mappedByt = byt
+	}
+	if err := json.Unmarshal(mappedByt, &opts); err != nil {
+		return err
+	}
+	*s = opts
+	return nil
+}
+
+func (s SignalOpts) Expires() (time.Time, error) {
+	if s.Timeout == "" {
+		return time.Now().AddDate(1, 0, 0), nil
+	}
+
+	dur, err := str2duration.ParseDuration(s.Timeout)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return time.Now().Add(dur), nil
+}
+
 func (g GeneratorOpcode) InvokeFunctionOpts() (*InvokeFunctionOpts, error) {
 	opts := &InvokeFunctionOpts{}
 	if err := opts.UnmarshalAny(g.Opts); err != nil {
@@ -337,6 +384,31 @@ func (w WaitForEventOpts) Expires() (time.Time, error) {
 		return time.Time{}, err
 	}
 	return time.Now().Add(dur), nil
+}
+
+// GatewayOpts returns the gateway options within the driver.
+func (g *GeneratorOpcode) GatewayOpts() (gateway.Request, error) {
+	req := gateway.Request{}
+
+	// Ensure we unmarshal g.Opts  into the request options.
+	// This contains Inngest-related and auth-related options
+	// that do not go in the API request body we make to the provider
+	var optByt []byte
+	switch typ := g.Opts.(type) {
+	case []byte:
+		optByt = typ
+	default:
+		var err error
+		optByt, err = json.Marshal(g.Opts)
+		if err != nil {
+			return gateway.Request{}, err
+		}
+	}
+	if err := json.Unmarshal(optByt, &req); err != nil {
+		return gateway.Request{}, err
+	}
+
+	return req, nil
 }
 
 // AIGatewayOpts returns the AI gateway options within the driver.

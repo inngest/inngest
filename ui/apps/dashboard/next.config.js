@@ -69,6 +69,16 @@ const nextConfig = {
         destination: '/settings/organization',
         permanent: false,
       },
+      {
+        source: '/env/:slug/events/:name/logs/:rest*',
+        destination: '/env/:slug/event-types/:name/events/:rest*',
+        permanent: false,
+      },
+      {
+        source: '/env/:slug/events/:path*',
+        destination: '/env/:slug/event-types/:path*',
+        permanent: false,
+      },
       // Legacy signing key locations
       {
         source: '/secrets',

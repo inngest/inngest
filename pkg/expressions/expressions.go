@@ -15,17 +15,13 @@ package expressions
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/google/cel-go/cel"
 	"github.com/inngest/expr"
+	"github.com/inngest/inngest/pkg/expressions/exprenv"
 	"github.com/karlseguin/ccache/v2"
 	"github.com/pkg/errors"
-)
-
-const (
-	pkgName = "expressions.inngest"
 )
 
 var (
@@ -43,7 +39,7 @@ var (
 
 func init() {
 	cache = ccache.New(ccache.Configure().MaxSize(CacheMaxSize))
-	if e, err := env(); err == nil {
+	if e, err := exprenv.Env(); err == nil {
 		exprCompiler = expr.NewCachingCompiler(e, cache)
 		treeParser = expr.NewTreeParser(exprCompiler)
 	}
@@ -100,7 +96,7 @@ type BooleanEvaluator interface {
 	FilteredAttributes(ctx context.Context, data *Data) *Data
 }
 
-func exprEvaluator(ctx context.Context, e expr.Evaluable, input map[string]any) (bool, error) {
+func ExprEvaluator(ctx context.Context, e expr.Evaluable, input map[string]any) (bool, error) {
 	eval, err := NewBooleanEvaluator(ctx, e.GetExpression())
 	if err != nil {
 		return false, err
@@ -145,7 +141,7 @@ func NewExpressionEvaluator(ctx context.Context, expression string) (Evaluator, 
 		if issues != nil {
 			return nil, NewCompileError(issues.Err())
 		}
-		e, err := env()
+		e, err := exprenv.Env()
 		if err != nil {
 			return nil, err
 		}
@@ -173,7 +169,7 @@ func cachedCompile(ctx context.Context, expression string) (*expressionEvaluator
 		return eval.Value().(*expressionEvaluator), nil
 	}
 
-	e, err := env()
+	e, err := exprenv.Env()
 	if err != nil {
 		return nil, err
 	}
@@ -237,20 +233,6 @@ type expressionEvaluator struct {
 	attrs *UsedAttributes
 }
 
-// Validate calls parse and check on an ASTs using NON CACHING parsing.  This MUST be non-caching
-// as calling Check on an AST is not thread safe.
-func Validate(ctx context.Context, expression string) error {
-	// Compile the expression as new.
-	env, err := env()
-	if err != nil {
-		return err
-	}
-	if _, issues := env.Compile(expression); issues != nil {
-		return fmt.Errorf("error validating expression: %w", NewCompileError(issues.Err()))
-	}
-	return nil
-}
-
 // Evaluate compiles an expression string against a set of variables, returning whether the
 // expression evaluates to true, the next earliest time to re-test the evaluation (if dates are
 // compared), and any errors.
@@ -268,7 +250,6 @@ func (e *expressionEvaluator) Evaluate(ctx context.Context, data *Data) (interfa
 	}
 
 	program, act, err := program(ctx, e.ast, e.env, data, true, e.attrs)
-
 	if err != nil {
 		return nil, nil, err
 	}
@@ -331,35 +312,9 @@ func (e *expressionEvaluator) parseAttributes(ctx context.Context) error {
 	}
 
 	attrs, err := parseUsedAttributes(ctx, e.ast)
-
 	if err != nil {
 		return err
 	}
 	e.attrs = attrs
 	return nil
-}
-
-type CompileError struct {
-	Err error
-}
-
-func NewCompileError(err error) *CompileError {
-	return &CompileError{Err: err}
-}
-
-func (c *CompileError) Error() string {
-	return fmt.Sprintf("error compiling expression: %s", c.Err)
-}
-
-func (c *CompileError) Unwrap() error {
-	return c.Err
-}
-
-func (c *CompileError) Message() string {
-	return c.Err.Error()
-}
-
-func (c *CompileError) Is(tgt error) bool {
-	_, ok := tgt.(*CompileError)
-	return ok
 }

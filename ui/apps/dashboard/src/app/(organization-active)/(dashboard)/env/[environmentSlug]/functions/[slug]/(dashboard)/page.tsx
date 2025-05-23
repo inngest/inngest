@@ -11,16 +11,16 @@ import { useSearchParam } from '@inngest/components/hooks/useSearchParam';
 import { EventsIcon } from '@inngest/components/icons/sections/Events';
 import { FunctionsIcon } from '@inngest/components/icons/sections/Functions';
 import { cn } from '@inngest/components/utils/classNames';
+import { relativeTime } from '@inngest/components/utils/date';
 import { RiArrowRightSLine, RiTimeLine } from '@remixicon/react';
 import { ErrorBoundary } from '@sentry/nextjs';
-import { titleCase } from 'title-case';
 
+import type { TimeRange } from '@/types/TimeRangeFilter';
 import FunctionConfiguration from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/functions/[slug]/(dashboard)/FunctionConfiguration';
-import type { TimeRange } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/functions/[slug]/logs/TimeRangeFilter';
 import Block from '@/components/Block';
 import LoadingIcon from '@/icons/LoadingIcon';
 import { useFunction, useFunctionUsage } from '@/queries';
-import { relativeTime } from '@/utils/date';
+import { pathCreator } from '@/utils/urls';
 import DashboardTimeRangeFilter, {
   defaultTimeRange,
   getTimeRangeByKey,
@@ -124,7 +124,7 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
                 <span
                   className={cn(
                     'text-xl font-medium',
-                    (usageMetrics?.totalRuns ?? 0) > 0 && 'text-error'
+                    failureRate === '0.00' ? 'text-subtle' : 'text-error'
                   )}
                 >{`${failureRate}%`}</span>
               </div>
@@ -155,7 +155,7 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
               <div className="flex items-center justify-center">
                 <div className="rounded-md p-4">
                   <h2>Something went wrong!</h2>
-                  <div className="bg-canvasBase my-6 overflow-scroll rounded-md p-2">
+                  <div className="bg-canvasBase my-6 overflow-auto rounded-md p-2">
                     {error.toString()}
                   </div>
                   <Button
@@ -197,9 +197,10 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
                     trigger.eventName ? (
                       <NextLink
                         key={trigger.eventName}
-                        href={`/env/${params.environmentSlug}/events/${encodeURIComponent(
-                          trigger.eventName
-                        )}`}
+                        href={pathCreator.eventType({
+                          envSlug: params.environmentSlug,
+                          eventName: trigger.eventName,
+                        })}
                         className="border-subtle bg-canvasBase hover:bg-canvasMuted block rounded-md border p-4"
                       >
                         <div className="flex min-w-0 items-center">
@@ -245,9 +246,10 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
                         return (
                           <NextLink
                             key={cancellation.event}
-                            href={`/env/${params.environmentSlug}/events/${encodeURIComponent(
-                              cancellation.event
-                            )}`}
+                            href={pathCreator.eventType({
+                              envSlug: params.environmentSlug,
+                              eventName: cancellation.event,
+                            })}
                             className="border-subtle bg-canvasBase hover:bg-canvasMuted block rounded-md border p-4"
                           >
                             <div className="flex min-w-0 items-center">
@@ -292,9 +294,10 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
                 <Block title="Failure Handler">
                   <div className="space-y-3">
                     <NextLink
-                      href={`/env/${params.environmentSlug}/functions/${encodeURIComponent(
-                        function_.failureHandler.slug
-                      )}`}
+                      href={pathCreator.function({
+                        envSlug: params.environmentSlug,
+                        functionSlug: function_.failureHandler.slug,
+                      })}
                       className="border-subtle bg-canvasBase hover:bg-canvasMuted block rounded-md border p-4"
                     >
                       <div className="flex min-w-0 items-center">
@@ -351,10 +354,10 @@ function ScheduleTrigger({ schedule, condition }: ScheduleTriggerProps) {
             )}
             {nextRun && (
               <div className="flex gap-1">
-                <dt className="text-subtle">Next Run</dt>
+                <dt className="text-subtle">Next run</dt>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <dd className="truncate ">{titleCase(relativeTime(nextRun))}</dd>
+                    <dd className="truncate">{relativeTime(nextRun)}</dd>
                   </TooltipTrigger>
                   <TooltipContent className="font-mono text-xs">
                     {nextRun.toISOString()}

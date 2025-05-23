@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"runtime/debug"
 	"sync"
 	"time"
 
@@ -267,7 +268,7 @@ func (s *svc) InitializeCrons(ctx context.Context) error {
 					ID:        time.Now().UTC().Format(time.RFC3339),
 					Name:      event.FnCronName,
 					Timestamp: time.Now().UnixMilli(),
-				})
+				}, nil)
 
 				byt, err := json.Marshal(trackedEvent)
 				if err == nil {
@@ -511,6 +512,7 @@ func (s *svc) functions(ctx context.Context, tracked event.TrackedEvent) error {
 		}
 	}()
 
+	// Look up all functions have a trigger that matches the event name, including wildcards.
 	fns, err := s.data.FunctionsByTrigger(ctx, evt.Name)
 	if err != nil {
 		return fmt.Errorf("error loading functions by trigger: %w", err)
@@ -532,12 +534,23 @@ func (s *svc) functions(ctx context.Context, tracked event.TrackedEvent) error {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+
+			defer func() {
+				if r := recover(); r != nil {
+					logger.From(ctx).Error().
+						Str("error", fmt.Sprintf("%v", r)).
+						Str("function", copied.Name).
+						Str("stack", string(debug.Stack())).
+						Msg("panic initializing function")
+				}
+			}()
+
 			for _, t := range copied.Triggers {
-				if t.EventTrigger == nil || t.Event != evt.Name {
-					// This isn't triggered by an event, so we skip this trigger entirely.
+				if t.EventTrigger == nil {
 					continue
 				}
 
+				// Evaluate all expressions for matching triggers
 				if t.Expression != nil {
 					// Execute expressions here, ensuring that each function is only triggered
 					// under the correct conditions.
@@ -598,10 +611,11 @@ func (s *svc) pauses(ctx context.Context, evt event.TrackedEvent) error {
 
 	wsID := evt.GetWorkspaceID()
 	if ok, err := s.state.EventHasPauses(ctx, wsID, evt.GetEvent().Name); err == nil && !ok {
+		l.Debug().Msg("no pauses found for event")
 		return nil
 	}
 
-	l.Trace().Msg("pauses found; handling")
+	l.Debug().Msg("handling found pauses for event")
 
 	iter, err := s.state.PausesByEvent(ctx, wsID, evt.GetEvent().Name)
 	if err != nil {
@@ -609,6 +623,9 @@ func (s *svc) pauses(ctx context.Context, evt event.TrackedEvent) error {
 	}
 
 	_, err = s.executor.HandlePauses(ctx, iter, evt)
+	if err != nil {
+		l.Error().Err(err).Msg("error handling pauses")
+	}
 	return err
 }
 
@@ -635,7 +652,7 @@ func (s *svc) initialize(ctx context.Context, fn inngest.Function, evt event.Tra
 			FunctionVersion: fn.FunctionVersion,
 			EventID:         evt.GetInternalID(),
 			Event:           evt.GetEvent(),
-			AccountID:       consts.DevServerAccountId,
+			AccountID:       consts.DevServerAccountID,
 		}
 
 		if err := s.executor.AppendAndScheduleBatch(ctx, fn, bi, nil); err != nil {
@@ -734,12 +751,13 @@ func Initialize(ctx context.Context, opts InitOpts) (*sv2.Metadata, error) {
 		Function:       fn,
 		Events:         []event.TrackedEvent{tracked},
 		IdempotencyKey: &idempotencyKey,
-		AccountID:      consts.DevServerAccountId,
+		AccountID:      consts.DevServerAccountID,
 	})
 
 	switch err {
 	case executor.ErrFunctionDebounced,
 		executor.ErrFunctionSkipped,
+		executor.ErrFunctionSkippedIdempotency,
 		state.ErrIdentifierExists:
 		return nil, nil
 	}

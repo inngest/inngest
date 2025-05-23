@@ -31,6 +31,7 @@ export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   keys?: string[];
   prefetch?: boolean;
   scroll?: boolean;
+  raw?: boolean;
 }
 
 type LinkWrapperProps = {
@@ -95,6 +96,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       target,
       prefetch = false,
       scroll = true,
+      raw = false,
       ...props
     }: ButtonProps,
     ref
@@ -129,23 +131,31 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       </>
     );
 
+    const buttonElement = (
+      <button
+        ref={ref}
+        className={cn(
+          buttonColors,
+          buttonSizes,
+          'relative flex items-center justify-center whitespace-nowrap rounded-md disabled:cursor-not-allowed',
+          className
+        )}
+        type={type}
+        disabled={disabled}
+        {...props}
+      >
+        {children}
+      </button>
+    );
+
+    if (raw) {
+      return buttonElement;
+    }
+
     return (
       <TooltipWrapper tooltip={tooltip}>
         <LinkWrapper href={href} target={target} prefetch={prefetch} scroll={scroll}>
-          <button
-            ref={ref}
-            className={cn(
-              buttonColors,
-              buttonSizes,
-              'flex items-center justify-center whitespace-nowrap rounded-md disabled:cursor-not-allowed',
-              className
-            )}
-            type={type}
-            disabled={disabled}
-            {...props}
-          >
-            {children}
-          </button>
+          {buttonElement}
         </LinkWrapper>
       </TooltipWrapper>
     );

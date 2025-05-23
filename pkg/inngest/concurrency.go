@@ -134,7 +134,13 @@ func (c Concurrency) Validate(ctx context.Context) error {
 }
 
 // Key returns the concurrency key
-func (c Concurrency) Evaluate(ctx context.Context, scopeID uuid.UUID, input map[string]any) string {
+func (c Concurrency) EvaluatedKey(ctx context.Context, scopeID uuid.UUID, input map[string]any) string {
+	evaluated := c.Evaluate(ctx, input)
+	return util.ConcurrencyKey(c.Scope, scopeID, evaluated)
+}
+
+// Evaluate evaluates the custom concurrency key, without hashing.
+func (c Concurrency) Evaluate(ctx context.Context, input map[string]any) string {
 	evaluated := ""
 	if c.Key != nil {
 		// The input data is always wrapped in an event variable, for event.data.foo
@@ -146,7 +152,8 @@ func (c Concurrency) Evaluate(ctx context.Context, scopeID uuid.UUID, input map[
 			evaluated = fmt.Sprintf("%v", v)
 		}
 	}
-	return util.ConcurrencyKey(c.Scope, scopeID, evaluated)
+
+	return evaluated
 }
 
 func (c Concurrency) Prefix() string {

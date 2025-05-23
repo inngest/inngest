@@ -68,7 +68,7 @@ func Execute() {
 	}
 
 	// Register Top Level Commands
-	rootCmd.AddCommand(NewCmdDev())
+	rootCmd.AddCommand(NewCmdDev(rootCmd))
 	rootCmd.AddCommand(NewCmdVersion())
 	rootCmd.AddCommand(NewCmdStart(rootCmd))
 

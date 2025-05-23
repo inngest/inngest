@@ -44,6 +44,8 @@ type Opts struct {
 	Broadcaster realtime.Broadcaster
 	// RealtimeJWTSecret is the realtime JWT secret for the V1 API
 	RealtimeJWTSecret []byte
+	// TraceReader reads traces from a backing store.
+	TraceReader cqrs.TraceReader
 }
 
 // AddRoutes adds a new API handler to the given router.
@@ -60,10 +62,7 @@ func AddRoutes(r chi.Router, o Opts) http.Handler {
 		Router: r,
 		API:    impl,
 	}
-	// Add the auth middleware, if specified.
-	if o.AuthMiddleware != nil {
-		instance.Use(o.AuthMiddleware)
-	}
+
 	instance.setup()
 	return instance
 }
@@ -95,11 +94,17 @@ func (a *router) setup() {
 		}
 
 		r.Group(func(r chi.Router) {
+			if a.opts.AuthMiddleware != nil {
+				r.Use(a.opts.AuthMiddleware)
+			}
+
 			if a.opts.CachingMiddleware != nil {
 				r.Use(a.opts.CachingMiddleware.Middleware)
 			}
 
 			r.Use(headers.ContentTypeJsonResponse())
+
+			r.Post("/signals", a.receiveSignal)
 
 			r.Get("/events", a.getEvents)
 			r.Get("/events/{eventID}", a.getEvent)
@@ -113,6 +118,10 @@ func (a *router) setup() {
 			r.Post("/cancellations", a.createCancellation)
 			r.Get("/cancellations", a.getCancellations)
 			r.Delete("/cancellations/{id}", a.deleteCancellation)
+
+			r.Get("/prom/{env}", a.promScrape)
+
+			r.Post("/traces/userland", a.traces)
 		})
 	})
 }

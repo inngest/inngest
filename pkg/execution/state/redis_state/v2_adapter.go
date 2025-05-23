@@ -3,12 +3,15 @@ package redis_state
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"time"
 
 	statev1 "github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/v2"
+	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/util"
 )
 
 func MustRunServiceV2(m statev1.Manager) state.RunService {
@@ -32,17 +35,17 @@ type v2 struct {
 }
 
 // Create creates new state in the store for the given run ID.
-func (v v2) Create(ctx context.Context, s state.CreateState) error {
+func (v v2) Create(ctx context.Context, s state.CreateState) (statev1.State, error) {
 	batchData := make([]map[string]any, len(s.Events))
 	for n, evt := range s.Events {
 		data := map[string]any{}
 		if err := json.Unmarshal(evt, &data); err != nil {
-			return err
+			return nil, err
 		}
 		batchData[n] = data
 
 	}
-	_, err := v.mgr.New(ctx, statev1.Input{
+	return v.mgr.New(ctx, statev1.Input{
 		Identifier: statev1.Identifier{
 			RunID:                 s.Metadata.ID.RunID,
 			WorkflowID:            s.Metadata.ID.FunctionID,
@@ -65,7 +68,6 @@ func (v v2) Create(ctx context.Context, s state.CreateState) error {
 		Steps:          s.Steps,
 		StepInputs:     s.StepInputs,
 	})
-	return err
 }
 
 // Delete deletes state, metadata, and - when pauses are included - associated pauses
@@ -183,20 +185,91 @@ func (v v2) LoadMetadata(ctx context.Context, id state.ID) (state.Metadata, erro
 // Update updates configuration on the state, eg. setting the execution
 // version after communicating with the SDK.
 func (v v2) UpdateMetadata(ctx context.Context, id state.ID, mutation state.MutableConfig) error {
-	return v.mgr.UpdateMetadata(ctx, id.Tenant.AccountID, id.RunID, statev1.MetadataUpdate{
-		DisableImmediateExecution: mutation.ForceStepPlan,
-		RequestVersion:            mutation.RequestVersion,
-		StartedAt:                 mutation.StartedAt,
-		HasAI:                     mutation.HasAI,
-	})
+	_, err := util.WithRetry(
+		ctx,
+		"state.UpdateMetadata",
+		func(ctx context.Context) (bool, error) {
+			err := v.mgr.UpdateMetadata(ctx, id.Tenant.AccountID, id.RunID, statev1.MetadataUpdate{
+				DisableImmediateExecution: mutation.ForceStepPlan,
+				RequestVersion:            mutation.RequestVersion,
+				StartedAt:                 mutation.StartedAt,
+				HasAI:                     mutation.HasAI,
+			})
+
+			return false, err
+		},
+		util.NewRetryConf(),
+	)
+
+	return err
 }
 
 // SaveStep saves step output for the given run ID and step ID.
-func (v v2) SaveStep(ctx context.Context, id state.ID, stepID string, data []byte) error {
+func (v v2) SaveStep(ctx context.Context, id state.ID, stepID string, data []byte) (bool, error) {
 	v1id := statev1.Identifier{
 		RunID:      id.RunID,
 		WorkflowID: id.FunctionID,
 		AccountID:  id.Tenant.AccountID,
 	}
-	return v.mgr.SaveResponse(ctx, v1id, stepID, string(data))
+
+	attempt := 0
+	hasPending, err := util.WithRetry(
+		ctx,
+		"state.SaveStep",
+		func(ctx context.Context) (bool, error) {
+			attempt++
+			return v.mgr.SaveResponse(ctx, v1id, stepID, string(data))
+		},
+		util.NewRetryConf(
+			util.WithRetryConfRetryableErrors(v.retryableError),
+		),
+	)
+
+	if errors.Is(err, statev1.ErrDuplicateResponse) && attempt > 1 {
+		// Swallow the error. Since the 2nd attempt has a "duplicate response"
+		// (i.e. already exists in Redis), we can assume that the first attempt
+		// successfully updated Redis despite the retry. This can happen if we
+		// get a context timeout in Go code but Redis actually completed the
+		// operation.
+		logger.StdlibLogger(ctx).Warn(
+			"swallowing duplicate response",
+			"attempt", attempt,
+			"run_id", id.RunID,
+			"step_id", stepID,
+		)
+		return false, nil
+	}
+
+	return hasPending, err
+}
+
+// SavePending saves pending step IDs for the given run ID.
+func (v v2) SavePending(ctx context.Context, id state.ID, pending []string) error {
+	v1id := statev1.Identifier{
+		RunID:      id.RunID,
+		WorkflowID: id.FunctionID,
+		AccountID:  id.Tenant.AccountID,
+	}
+
+	_, err := util.WithRetry(
+		ctx,
+		"state.SavePending",
+		func(ctx context.Context) (bool, error) {
+			err := v.mgr.SavePending(ctx, v1id, pending)
+			return false, err
+		},
+		util.NewRetryConf(),
+	)
+
+	return err
+}
+
+// determine what errors are retriable
+func (v v2) retryableError(err error) bool {
+	switch {
+	case errors.Is(err, statev1.ErrDuplicateResponse):
+		return false
+	}
+
+	return true
 }

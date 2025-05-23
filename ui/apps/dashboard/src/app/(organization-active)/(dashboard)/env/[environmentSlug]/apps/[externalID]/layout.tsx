@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { Alert } from '@inngest/components/Alert';
 import { Header } from '@inngest/components/Header/Header';
-import { Skeleton } from '@inngest/components/Skeleton/Skeleton';
 import type { CombinedError } from 'urql';
 
 import { ActionsMenu } from '@/components/Apps/ActionsMenu';
@@ -58,7 +57,7 @@ export default function Layout({ children, params: { externalID } }: Props) {
         <ValidateModal
           isOpen={showValidate}
           onClose={() => setShowValidate(false)}
-          url={res.data.latestSync.url}
+          initialURL={res.data.latestSync.url}
         />
       )}
       {res.data && (
@@ -78,10 +77,12 @@ export default function Layout({ children, params: { externalID } }: Props) {
           },
           ...(pathname.endsWith('/syncs') ? [{ text: 'All syncs' }] : []),
         ]}
+        loading={res.isLoading}
         action={
           <div className="flex flex-row items-center justify-end gap-x-1">
             {res.data && (
               <ActionsMenu
+                showUnarchive={false}
                 isArchived={res.data.isArchived}
                 showArchive={() => setShowArchive(true)}
                 disableArchive={!res.data.latestSync?.url}
@@ -95,7 +96,7 @@ export default function Layout({ children, params: { externalID } }: Props) {
             {res.data?.latestSync?.url && !res.data.isArchived && (
               <ResyncButton
                 appExternalID={externalAppID}
-                disabled={res.data.isArchived}
+                appMethod={res.data.method}
                 platform={res.data.latestSync.platform}
                 latestSyncUrl={res.data.latestSync.url}
               />
@@ -105,11 +106,9 @@ export default function Layout({ children, params: { externalID } }: Props) {
       />
       <div className="bg-canvasBase no-scrollbar mx-auto flex h-full w-full flex-col overflow-y-auto">
         <div className="bg-canvasBase h-full overflow-hidden">
-          {res.isLoading ? (
-            <Skeleton className="h-36 w-full" />
-          ) : res.error ? (
+          {res.error ? (
             <Error error={res.error as CombinedError} externalID={externalAppID} />
-          ) : !res.data.id ? (
+          ) : !res.data?.id && !res.isLoading ? (
             <NotFound externalID={externalAppID} />
           ) : (
             children

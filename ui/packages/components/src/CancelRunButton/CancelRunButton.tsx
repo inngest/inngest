@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Button } from '@inngest/components/Button';
 import { IconStatusCancelled } from '@inngest/components/icons/status/Cancelled';
 
+import { useCancelRun } from '../SharedContext/useCancelRun';
 import { CancelRunModal } from './CancelRunModal';
 
 type Props = {
@@ -12,14 +13,15 @@ type Props = {
    */
   hasIcon?: boolean;
 
-  onClick: () => Promise<unknown>;
+  runID: string;
 };
 
-export function CancelRunButton({ disabled, hasIcon = false, onClick }: Props) {
+export function CancelRunButton({ disabled, hasIcon = false, runID }: Props) {
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const { cancelRun } = useCancelRun();
 
   async function onConfirm() {
-    await onClick();
+    await cancelRun({ runID });
     setIsModalOpen(false);
   }
 

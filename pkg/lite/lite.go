@@ -4,7 +4,19 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/url"
+	"os"
 	"time"
+
+	"github.com/inngest/inngest/pkg/connect"
+	"github.com/inngest/inngest/pkg/connect/auth"
+	"github.com/inngest/inngest/pkg/connect/lifecycles"
+	connectpubsub "github.com/inngest/inngest/pkg/connect/pubsub"
+	connectv0 "github.com/inngest/inngest/pkg/connect/rest/v0"
+	connstate "github.com/inngest/inngest/pkg/connect/state"
+	"github.com/inngest/inngest/pkg/expressions/expragg"
+	"github.com/inngest/inngest/pkg/util/awsgateway"
 
 	"github.com/inngest/inngest/pkg/enums"
 
@@ -23,7 +35,6 @@ import (
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/coreapi"
 	"github.com/inngest/inngest/pkg/cqrs/base_cqrs"
-	"github.com/inngest/inngest/pkg/deploy"
 	"github.com/inngest/inngest/pkg/devserver"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
@@ -46,7 +57,6 @@ import (
 	"github.com/inngest/inngest/pkg/run"
 	"github.com/inngest/inngest/pkg/service"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
-	"github.com/inngest/inngest/pkg/util/awsgateway"
 	"github.com/redis/rueidis"
 	"go.opentelemetry.io/otel/propagation"
 	"golang.org/x/sync/errgroup"
@@ -64,6 +74,7 @@ type StartOpts struct {
 	URLs          []string      `json:"urls"`
 	Tick          time.Duration `json:"tick"`
 	RetryInterval int           `json:"retry_interval"`
+	QueueWorkers  int           `json:"queue_workers"`
 
 	// SigningKey is used to decide that the server should sign requests and
 	// validate responses where applicable, modelling cloud behaviour.
@@ -73,6 +84,8 @@ type StartOpts struct {
 	// EventKey is used to authorize incoming events, ensuring they match the
 	// given key.
 	EventKey []string `json:"event_key"`
+
+	ConnectGatewayPort int `json:"connect-gateway-port"`
 }
 
 // Create and start a new dev server.  The dev server is used during (surprise surprise)
@@ -91,13 +104,6 @@ func New(ctx context.Context, opts StartOpts) error {
 	if opts.SigningKey != "" {
 		opts.Config.ServerKind = headers.ServerKindCloud
 	}
-
-	// NOTE: looks deprecated?
-	// Before running the development service, ensure that we change the http
-	// driver in development to use our AWS Gateway http client, attempting to
-	// automatically transform dev requests to lambda invocations.
-	httpdriver.DefaultExecutor.Client.Transport = awsgateway.NewTransformTripper(httpdriver.DefaultExecutor.Client.Transport)
-	deploy.Client.Transport = awsgateway.NewTransformTripper(deploy.Client.Transport)
 
 	return start(ctx, opts)
 }
@@ -150,6 +156,16 @@ func start(ctx context.Context, opts StartOpts) error {
 		QueueDefaultKey:        redis_state.QueueDefaultKey,
 	})
 
+	connectRcOpt, err := connectToOrCreateRedisOption(opts.RedisURI)
+	if err != nil {
+		return err
+	}
+
+	connectRc, err := rueidis.NewClient(connectRcOpt)
+	if err != nil {
+		return err
+	}
+
 	var sm state.Manager
 	t := runner.NewTracker()
 	sm, err = redis_state.New(
@@ -174,7 +190,7 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	queueOpts := []redis_state.QueueOpt{
 		redis_state.WithIdempotencyTTL(time.Hour),
-		redis_state.WithNumWorkers(100),
+		redis_state.WithNumWorkers(int32(opts.QueueWorkers)),
 		redis_state.WithPollTick(tick),
 		redis_state.WithCustomConcurrencyKeyLimitRefresher(func(ctx context.Context, i queue.QueueItem) []state.CustomConcurrency {
 			keys := i.Data.GetConcurrencyKeys()
@@ -238,6 +254,8 @@ func start(ctx context.Context, opts StartOpts) error {
 			}),
 		redis_state.WithShardSelector(shardSelector),
 		redis_state.WithQueueShardClients(queueShards),
+		redis_state.WithNormalizeRefreshItemCustomConcurrencyKeys(devserver.NormalizeConcurrencyKeys(smv2, dbcqrs)),
+		redis_state.WithNormalizeRefreshItemThrottle(devserver.NormalizeThrottle(smv2, dbcqrs)),
 	}
 
 	rq := redis_state.NewQueue(queueShard, queueOpts...)
@@ -248,18 +266,44 @@ func start(ctx context.Context, opts StartOpts) error {
 	debouncer := debounce.NewRedisDebouncer(unshardedClient.Debounce(), queueShard, rq)
 
 	// Create a new expression aggregator, using Redis to load evaluables.
-	agg := expressions.NewAggregator(ctx, 100, 100, sm.(expressions.EvaluableLoader), nil)
+	agg := expragg.NewAggregator(ctx, 100, 100, sm.(expragg.EvaluableLoader), expressions.ExprEvaluator, nil, nil)
+
+	conditionalTracer := itrace.NewConditionalTracer(itrace.ConnectTracer(), itrace.AlwaysTrace)
+
+	connectionManager := connstate.NewRedisConnectionStateManager(connectRc)
 
 	var sk *string
 	if opts.SigningKey != "" {
 		sk = &opts.SigningKey
 	}
 
-	var drivers = []driver.Driver{}
+	connectPubSubLogger := logger.StdlibLoggerWithCustomVarName(ctx, "CONNECT_PUBSUB_LOG_LEVEL")
+
+	executorProxy, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectRcOpt, true, connectpubsub.RedisPubSubConnectorOpts{
+		Logger:             connectPubSubLogger.With("svc", "executor"),
+		Tracer:             conditionalTracer,
+		StateManager:       connectionManager,
+		EnforceLeaseExpiry: enforceConnectLeaseExpiry,
+	}))
+	if err != nil {
+		return fmt.Errorf("failed to create connect pubsub connector: %w", err)
+	}
+
+	httpClient := httpdriver.Client(httpdriver.SecureDialerOpts{
+		AllowHostDocker: true, // In self-hosted mode, this is OK
+		AllowPrivate:    true, // In self-hosted mode, this is OK
+		AllowNAT64:      true, // In self-hosted mode, this is OK
+	})
+	httpClient.(*http.Client).Transport = awsgateway.NewTransformTripper(httpClient.(*http.Client).Transport)
+
+	drivers := []driver.Driver{}
 	for _, driverConfig := range opts.Config.Execution.Drivers {
 		d, err := driverConfig.NewDriver(registration.NewDriverOpts{
 			RequireLocalSigningKey: true,
 			LocalSigningKey:        sk,
+			ConnectForwarder:       executorProxy,
+			ConditionalTracer:      conditionalTracer,
+			HTTPClient:             httpClient,
 		})
 		if err != nil {
 			return err
@@ -272,6 +316,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	}
 
 	exec, err := executor.NewExecutor(
+		executor.WithHTTPClient(httpClient),
 		executor.WithStateManager(smv2),
 		executor.WithPauseManager(sm),
 		executor.WithRuntimeDrivers(
@@ -353,17 +398,24 @@ func start(ctx context.Context, opts StartOpts) error {
 		// manage snapshotting
 		persistenceInterval = nil
 
-		logger.From(ctx).Info().Msgf("using external Redis %s; disabling in-memory persistence and snapshotting", opts.RedisURI)
+		// Mask Redis URI credentials before logging
+		loggedURI := ""
+		if u, err := url.Parse(opts.RedisURI); err == nil {
+			loggedURI = " " + u.Redacted()
+		}
+		logger.From(ctx).Info().Msgf("using external Redis%s; disabling in-memory persistence and snapshotting", loggedURI)
 	}
 
 	dsOpts := devserver.StartOpts{
-		Config:      opts.Config,
-		RootDir:     opts.RootDir,
-		URLs:        opts.URLs,
-		Tick:        tick,
-		SigningKey:  sk,
-		EventKeys:   opts.EventKey,
-		RequireKeys: true,
+		Config:             opts.Config,
+		RootDir:            opts.RootDir,
+		URLs:               opts.URLs,
+		Tick:               tick,
+		SigningKey:         sk,
+		EventKeys:          opts.EventKey,
+		RequireKeys:        true,
+		ConnectGatewayPort: opts.ConnectGatewayPort,
+		ConnectGatewayHost: opts.Config.CoreAPI.Addr,
 	}
 
 	if opts.PollInterval > 0 {
@@ -401,6 +453,16 @@ func start(ctx context.Context, opts StartOpts) error {
 		})
 	})
 
+	apiConnectProxy, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectRcOpt, false, connectpubsub.RedisPubSubConnectorOpts{
+		Logger:             connectPubSubLogger.With("svc", "api"),
+		Tracer:             conditionalTracer,
+		StateManager:       connectionManager,
+		EnforceLeaseExpiry: enforceConnectLeaseExpiry,
+	}))
+	if err != nil {
+		return fmt.Errorf("failed to create connect pubsub connector: %w", err)
+	}
+
 	core, err := coreapi.NewCoreApi(coreapi.Options{
 		Data:            ds.Data,
 		Config:          ds.Opts.Config,
@@ -414,10 +476,44 @@ func start(ctx context.Context, opts StartOpts) error {
 		HistoryReader:   hr,
 		LocalSigningKey: opts.SigningKey,
 		RequireKeys:     true,
+		ConnectOpts: connectv0.Opts{
+			GroupManager:               connectionManager,
+			ConnectManager:             connectionManager,
+			ConnectResponseNotifier:    apiConnectProxy,
+			ConnectRequestStateManager: connectionManager,
+			Signer:                     auth.NewJWTSessionTokenSigner(consts.DevServerConnectJwtSecret),
+			RequestAuther:              ds,
+			ConnectGatewayRetriever:    ds,
+			EntitlementProvider:        ds,
+			ConditionalTracer:          conditionalTracer,
+		},
 	})
 	if err != nil {
 		return err
 	}
+
+	gatewayRequestReceiver, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectRcOpt, false, connectpubsub.RedisPubSubConnectorOpts{
+		Logger:             connectPubSubLogger.With("svc", "connect-gateway"),
+		Tracer:             conditionalTracer,
+		StateManager:       connectionManager,
+		EnforceLeaseExpiry: enforceConnectLeaseExpiry,
+	}))
+	if err != nil {
+		return fmt.Errorf("failed to create connect pubsub connector: %w", err)
+	}
+
+	connGateway := connect.NewConnectGatewayService(
+		connect.WithConnectionStateManager(connectionManager),
+		connect.WithRequestReceiver(gatewayRequestReceiver),
+		connect.WithGatewayAuthHandler(auth.NewJWTAuthHandler(consts.DevServerConnectJwtSecret)),
+		connect.WithDev(),
+		connect.WithGatewayPublicPort(opts.ConnectGatewayPort),
+		connect.WithApiBaseUrl(fmt.Sprintf("http://%s:%d", opts.Config.CoreAPI.Addr, opts.Config.CoreAPI.Port)),
+		connect.WithLifeCycles(
+			[]connect.ConnectGatewayLifecycleListener{
+				lifecycles.NewHistoryLifecycle(dbcqrs),
+			}),
+	)
 
 	// Create a new data API directly in the devserver.  This allows us to inject
 	// the data API into the dev server port, providing a single router for the dev
@@ -436,22 +532,14 @@ func start(ctx context.Context, opts StartOpts) error {
 		RequireKeys:    true,
 	})
 
-	return service.StartAll(ctx, ds, runner, executorSvc, ds.Apiservice)
+	return service.StartAll(ctx, ds, runner, executorSvc, ds.Apiservice, connGateway)
 }
 
 func connectToOrCreateRedis(redisURI string) (rueidis.Client, error) {
-	if redisURI == "" {
-		return createInmemoryRedisConnection()
-	}
-
-	opt, err := rueidis.ParseURL(redisURI)
+	opt, err := connectToOrCreateRedisOption(redisURI)
 	if err != nil {
-		return nil, fmt.Errorf("error parsing redis uri: %w", err)
+		return nil, fmt.Errorf("could not create redis options: %w", err)
 	}
-
-	// Set default overrides
-	opt.DisableCache = true
-	opt.BlockingPoolSize = 1
 
 	rc, err := rueidis.NewClient(opt)
 	if err != nil {
@@ -461,14 +549,31 @@ func connectToOrCreateRedis(redisURI string) (rueidis.Client, error) {
 	return rc, nil
 }
 
-// createInMemoryRedisConnection creates a new connection to the in-memory Redis
+func connectToOrCreateRedisOption(redisURI string) (rueidis.ClientOption, error) {
+	if redisURI == "" {
+		return createInmemoryRedisConnectionOpt()
+	}
+
+	opt, err := rueidis.ParseURL(redisURI)
+	if err != nil {
+		return rueidis.ClientOption{}, fmt.Errorf("error parsing redis uri: %w", err)
+	}
+
+	// Set default overrides
+	opt.DisableCache = true
+	opt.BlockingPoolSize = consts.RedisBlockingPoolSize
+
+	return opt, nil
+}
+
+// createInmemoryRedisConnectionOpt creates the options for a new connection to the in-memory Redis
 // server. If the server is not yet running, it will start one.
-func createInmemoryRedisConnection() (rueidis.Client, error) {
+func createInmemoryRedisConnectionOpt() (rueidis.ClientOption, error) {
 	if redisSingleton == nil {
 		redisSingleton = miniredis.NewMiniRedis()
 		err := redisSingleton.Start()
 		if err != nil {
-			return nil, fmt.Errorf("error starting in-memory redis: %w", err)
+			return rueidis.ClientOption{}, fmt.Errorf("error starting in-memory redis: %w", err)
 		}
 
 		poll := time.Second
@@ -479,22 +584,17 @@ func createInmemoryRedisConnection() (rueidis.Client, error) {
 		}()
 	}
 
-	rc, err := rueidis.NewClient(rueidis.ClientOption{
+	return rueidis.ClientOption{
 		InitAddress:       []string{redisSingleton.Addr()},
 		DisableCache:      true,
-		BlockingPoolSize:  1,
+		BlockingPoolSize:  consts.RedisBlockingPoolSize,
 		ForceSingleClient: true,
-	})
-	if err != nil {
-		return nil, fmt.Errorf("error creating in-memory redis client: %w", err)
-	}
-
-	return rc, nil
+	}, nil
 }
 
 func getSendingEventHandler(pb pubsub.Publisher, topic string) execution.HandleSendingEvent {
 	return func(ctx context.Context, evt event.Event, item queue.Item) error {
-		trackedEvent := event.NewOSSTrackedEvent(evt)
+		trackedEvent := event.NewOSSTrackedEvent(evt, nil)
 		byt, err := json.Marshal(trackedEvent)
 		if err != nil {
 			return fmt.Errorf("error marshalling invocation event: %w", err)
@@ -530,7 +630,7 @@ func getInvokeFailHandler(ctx context.Context, pb pubsub.Publisher, topic string
 		for _, e := range evts {
 			evt := e
 			eg.Go(func() error {
-				trackedEvent := event.NewOSSTrackedEvent(evt)
+				trackedEvent := event.NewOSSTrackedEvent(evt, nil)
 				byt, err := json.Marshal(trackedEvent)
 				if err != nil {
 					return fmt.Errorf("error marshalling function finished event: %w", err)
@@ -555,4 +655,8 @@ func getInvokeFailHandler(ctx context.Context, pb pubsub.Publisher, topic string
 
 		return eg.Wait()
 	}
+}
+
+func enforceConnectLeaseExpiry(ctx context.Context, accountID uuid.UUID) bool {
+	return os.Getenv("INNGEST_CONNECT_DISABLE_ENFORCE_LEASE_EXPIRY") != "true"
 }
