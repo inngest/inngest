@@ -6,6 +6,8 @@ import (
 	"log/slog"
 	"os"
 	"strings"
+
+	"github.com/lmittmann/tint"
 )
 
 var (
@@ -117,7 +119,34 @@ func newLogger(opts ...LoggerOpt) Logger {
 	switch o.handler {
 	case DevHandler:
 		return &logger{
-			Logger: slog.New(newDevHandler(o.writer, &hopts)),
+			Logger: slog.New(tint.NewHandler(o.writer, &tint.Options{
+				Level:      o.level,
+				TimeFormat: "[15:05:05.000]", // millisecond
+				ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
+					if a.Key == slog.LevelKey && len(groups) == 0 {
+						lvl, ok := a.Value.Any().(slog.Level)
+						if ok {
+							// ref:
+							// https://en.wikipedia.org/wiki/ANSI_escape_code#8-bit
+							//
+							// keep default color for warn and error
+							switch lvl {
+							case LevelTrace:
+								return tint.Attr(13, slog.String(a.Key, "TRC"))
+							case LevelDebug:
+								return tint.Attr(3, slog.String(a.Key, "DBG"))
+							case LevelInfo:
+								return tint.Attr(14, slog.String(a.Key, "INF"))
+							case LevelNotice:
+								return tint.Attr(10, slog.String(a.Key, "NTC"))
+							case LevelEmergency:
+								return tint.Attr(9, slog.String(a.Key, "EMR"))
+							}
+						}
+					}
+					return a
+				},
+			})),
 		}
 
 	case TextHandler:
