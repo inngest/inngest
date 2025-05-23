@@ -3103,7 +3103,9 @@ func (e *executor) ReceiveSignal(ctx context.Context, workspaceID uuid.UUID, sig
 	if log == nil {
 		log = logger.StdlibLogger(ctx)
 	}
-	l := log.With("signal_id", signalID, "workspace_id", workspaceID.String())
+	sanitizedSignalID := strings.ReplaceAll(signalID, "\n", "")
+	sanitizedSignalID = strings.ReplaceAll(sanitizedSignalID, "\r", "")
+	l := log.With("signal_id", sanitizedSignalID, "workspace_id", workspaceID.String())
 	defer func() {
 		if err != nil {
 			l.Error("error receiving signal", "error", err)
