@@ -16,6 +16,7 @@ jobs:
   ts:
     name: TS SDK Tests
     strategy:
+      fail-fast: falae
       matrix:
         os: [ubuntu-latest]
         experimentalKeyQueues: [false, true]
@@ -61,6 +62,7 @@ jobs:
   golang:
     name: Go SDK Tests
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest]
         experimentalKeyQueues: [ false, true ]
@@ -93,6 +95,7 @@ jobs:
   execution:
     name: Execution Tests
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest]
         experimentalKeyQueues: [ false, true ]

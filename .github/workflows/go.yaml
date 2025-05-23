@@ -29,6 +29,7 @@ jobs:
 
   test-linux-race:
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest]
         experimentalKeyQueues: [ false, true ]
