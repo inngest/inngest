@@ -11,7 +11,7 @@ on:
 
 jobs:
   golangci:
-    name: lint
+    name: Lint
     strategy:
       matrix:
         os: [ubuntu-latest]
@@ -34,6 +34,7 @@ jobs:
         os: [ubuntu-latest]
         experimentalKeyQueues: [ false, true ]
     runs-on: ${{ matrix.os }}
+    name: "Test / OS: ${{ matrix.os }}, key-queues: ${{ matrix.experimentalKeyQueues }}"
     steps:
       - uses: actions/checkout@v4
       - name: Set up Go
