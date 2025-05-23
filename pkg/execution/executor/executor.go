@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log/slog"
 	"strconv"
 	"strings"
 	"sync"
@@ -1455,7 +1454,7 @@ func (e *executor) handlePause(
 	evtID ulid.ULID,
 	pause *state.Pause,
 	res *execution.HandlePauseResult,
-	l *slog.Logger,
+	l logger.Logger,
 ) error {
 	// If this is a cancellation, ensure that we're not handling an event that
 	// was received before the run (due to eg. latency in a bad case).

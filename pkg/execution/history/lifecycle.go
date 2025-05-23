@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -24,9 +23,9 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
-func NewLifecycleListener(l *slog.Logger, d ...Driver) execution.LifecycleListener {
+func NewLifecycleListener(l logger.Logger, d ...Driver) execution.LifecycleListener {
 	if l == nil {
-		l = slog.Default()
+		l = logger.StdlibLogger(context.Background())
 	}
 	return lifecycle{
 		log:     l,
@@ -35,7 +34,7 @@ func NewLifecycleListener(l *slog.Logger, d ...Driver) execution.LifecycleListen
 }
 
 type lifecycle struct {
-	log     *slog.Logger
+	log     logger.Logger
 	drivers []Driver
 }
 

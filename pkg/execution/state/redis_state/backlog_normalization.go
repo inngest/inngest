@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
-	"log/slog"
 	"math"
 	"time"
 
@@ -117,7 +116,7 @@ func (q *queue) iterateNormalizationPartition(ctx context.Context, until time.Ti
 	return nil
 }
 
-func (q *queue) iterateNormalizationShadowPartition(ctx context.Context, shadowPartitionIndexKey string, peekLimit int64, until time.Time, bc chan normalizeWorkerChanMsg, l *slog.Logger) error {
+func (q *queue) iterateNormalizationShadowPartition(ctx context.Context, shadowPartitionIndexKey string, peekLimit int64, until time.Time, bc chan normalizeWorkerChanMsg, l logger.Logger) error {
 	// Find partitions in account or globally with backlogs to normalize
 	sequential := false
 	shadowPartitions, err := q.peekShadowPartitions(ctx, shadowPartitionIndexKey, sequential, peekLimit, until)

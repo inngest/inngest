@@ -5,6 +5,14 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net"
+	"net/http"
+	"os"
+	gosync "sync"
+	"testing"
+	"time"
+
 	"github.com/alicebob/miniredis/v2"
 	"github.com/aws/smithy-go/ptr"
 	"github.com/coder/websocket"
@@ -28,14 +36,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
-	"io"
-	"log/slog"
-	"net"
-	"net/http"
-	"os"
-	gosync "sync"
-	"testing"
-	"time"
 )
 
 func TestConnectionEstablished(t *testing.T) {
@@ -56,7 +56,7 @@ func TestConnectionEstablished(t *testing.T) {
 		onSyncedCount:    1,
 		onReadyCount:     1,
 	})
-	
+
 	require.Equal(t, res.connID, res.lifecycles.onReady[0].ConnectionId)
 	require.Equal(t, *res.workerGroup.AppID, *res.lifecycles.onReady[0].Groups[res.workerGroup.Hash].AppID)
 	require.Equal(t, res.workerGroup.FunctionSlugs, res.lifecycles.onReady[0].Groups[res.workerGroup.Hash].FunctionSlugs)
@@ -558,7 +558,7 @@ var exampleSyncError = publicerr.Error{
 }
 
 type testRecorderLifecycles struct {
-	logger *slog.Logger
+	logger logger.Logger
 
 	lock gosync.Mutex
 
@@ -652,7 +652,7 @@ func (r *testRecorderLifecycles) OnDisconnected(ctx context.Context, conn *state
 	r.onDisconnected = append(r.onDisconnected, websocketDisconnected{conn, closeReason})
 }
 
-func newRecorderLifecycles(logger *slog.Logger) *testRecorderLifecycles {
+func newRecorderLifecycles(logger logger.Logger) *testRecorderLifecycles {
 	r := &testRecorderLifecycles{
 		logger: logger,
 	}
@@ -712,7 +712,11 @@ type testingParameters struct {
 }
 
 func createTestingGateway(t *testing.T, params ...testingParameters) testingResources {
-	l := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	l := logger.StdlibLogger(context.Background(),
+		logger.WithHandler(logger.TextHandler),
+		logger.WithLoggerWriter(os.Stdout),
+		logger.WithLoggerLevel(logger.LevelDebug),
+	)
 
 	envID, accountID := uuid.New(), uuid.New()
 	syncID, appID, fnID := uuid.New(), uuid.New(), uuid.New()

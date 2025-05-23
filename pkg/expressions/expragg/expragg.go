@@ -3,7 +3,6 @@ package expragg
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"sync"
 	"time"
 
@@ -32,7 +31,7 @@ func NewAggregator(
 	loader EvaluableLoader,
 	eval expr.ExpressionEvaluator,
 	kv expr.KV[*state.Pause],
-	log *slog.Logger,
+	log logger.Logger,
 ) Aggregator {
 	// use the package's singleton caching parser to create a new tree parser.
 	// this uses lifted expression parsing with caching for speed.
@@ -100,7 +99,7 @@ type Aggregator interface {
 }
 
 type aggregator struct {
-	log *slog.Logger
+	log logger.Logger
 
 	records *ccache.Cache
 

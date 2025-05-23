@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log/slog"
 	"math"
 	mrand "math/rand"
 	"strconv"
@@ -382,7 +381,7 @@ func WithLogger(l *zerolog.Logger) QueueOpt {
 	}
 }
 
-func WithLog(l *slog.Logger) QueueOpt {
+func WithLog(l logger.Logger) QueueOpt {
 	return func(q *queue) {
 		q.log = l
 	}
@@ -776,7 +775,7 @@ type queue struct {
 	disableFifoForFunctions map[string]struct{}
 	disableFifoForAccounts  map[string]struct{}
 	logger                  *zerolog.Logger
-	log                     *slog.Logger
+	log                     logger.Logger
 
 	// itemIndexer returns indexes for a given queue item.
 	itemIndexer QueueItemIndexer

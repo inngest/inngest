@@ -6,30 +6,27 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log/slog"
 	mathRand "math/rand"
 	"sync"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/connect/routing"
 	"github.com/inngest/inngest/pkg/connect/state"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/syscode"
-	"github.com/inngest/inngest/pkg/util"
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/codes"
-	"go.opentelemetry.io/otel/propagation"
-	"google.golang.org/protobuf/types/known/timestamppb"
-
-	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/telemetry/trace"
-
+	"github.com/inngest/inngest/pkg/util"
 	connectpb "github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/propagation"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 const (
@@ -97,7 +94,7 @@ type redisPubSubConnector struct {
 	subscribers     map[string]map[string]chan string
 	subscribersLock sync.RWMutex
 
-	logger *slog.Logger
+	logger logger.Logger
 	tracer trace.ConditionalTracer
 
 	stateManager state.StateManager
@@ -109,7 +106,7 @@ type redisPubSubConnector struct {
 }
 
 type RedisPubSubConnectorOpts struct {
-	Logger             *slog.Logger
+	Logger             logger.Logger
 	Tracer             trace.ConditionalTracer
 	StateManager       state.StateManager
 	EnforceLeaseExpiry EnforceLeaseExpiryFunc
@@ -137,7 +134,7 @@ type ProxyOpts struct {
 	AppID     uuid.UUID
 	SpanID    string
 	Data      *connectpb.GatewayExecutorRequestData
-	logger    *slog.Logger
+	logger    logger.Logger
 }
 
 // Proxy forwards a request to the executor and waits for a response.
