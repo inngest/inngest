@@ -187,9 +187,11 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 		q.log.Trace("processed backlogs",
 			"backlog", backlog.BacklogID,
 			"total", res.TotalBacklogCount,
-			"capacity", res.Capacity,
-			"refilled", res.Refilled,
 			"until", res.BacklogCountUntil,
+			"constrained", res.Constraint,
+			"capacity", res.Capacity,
+			"refill", res.Refill,
+			"refilled", res.Refilled,
 		)
 
 		// instrumentation

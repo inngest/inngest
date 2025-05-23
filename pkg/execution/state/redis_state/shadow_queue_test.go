@@ -949,12 +949,22 @@ func TestRefillConstraints(t *testing.T) {
 		customConcurrencyKey1Active int
 		customConcurrencyKey2Active int
 
-		// throttleCapacityUsed int
+		throttleUsageWithinPeriod int
 	}
 
 	ck1 := createConcurrencyKey(enums.ConcurrencyScopeFn, fnID1, "bruno", 5)
 
 	ck2 := createConcurrencyKey(enums.ConcurrencyScopeEnv, envID1, "inngest", 10)
+
+	throttleKey := "bruno"
+	throttle := &osqueue.Throttle{
+		Key:                 util.XXHash(throttleKey),
+		Limit:               100,
+		Burst:               10,
+		Period:              int((10 * time.Hour).Seconds()),
+		KeyExpressionHash:   util.XXHash("event.data.userID"),
+		UnhashedThrottleKey: throttleKey,
+	}
 
 	tests := []struct {
 		name          string
@@ -1026,8 +1036,8 @@ func TestRefillConstraints(t *testing.T) {
 					Constraint:        enums.QueueConstraintFunctionConcurrency,
 					TotalBacklogCount: 40,
 					BacklogCountUntil: 40,
-					Capacity:          -20,
-					Refill:            -20,
+					Capacity:          0, // would be -20 but can't go negative
+					Refill:            0,
 					Refilled:          0,
 				},
 				itemsInBacklog:    40,
@@ -1297,6 +1307,54 @@ func TestRefillConstraints(t *testing.T) {
 				itemsInReadyQueue: 40,
 			},
 		},
+		// Throttle allow
+		{
+			name: "throttle allow",
+			currentValues: currentValues{
+				itemsInBacklog:            10,
+				throttleUsageWithinPeriod: 20,
+			},
+			knobs: knobs{
+				throttle:    throttle,
+				isStartItem: true,
+			},
+			expected: expected{
+				itemsInBacklog:    0,
+				itemsInReadyQueue: 10,
+				result: BacklogRefillResult{
+					Constraint:        enums.QueueConstraintNotLimited,
+					TotalBacklogCount: 10,
+					BacklogCountUntil: 10,
+					Capacity:          90,
+					Refill:            10,
+					Refilled:          10,
+				},
+			},
+		},
+		// Throttle deny
+		{
+			name: "throttle deny",
+			currentValues: currentValues{
+				itemsInBacklog:            10,
+				throttleUsageWithinPeriod: 110,
+			},
+			knobs: knobs{
+				throttle:    throttle,
+				isStartItem: true,
+			},
+			expected: expected{
+				itemsInBacklog:    10,
+				itemsInReadyQueue: 0,
+				result: BacklogRefillResult{
+					Constraint:        enums.QueueConstraintThrottle,
+					TotalBacklogCount: 10,
+					BacklogCountUntil: 10,
+					Capacity:          0,
+					Refill:            0,
+					Refilled:          0,
+				},
+			},
+		},
 	}
 
 	for _, testCase := range tests {
@@ -1444,6 +1502,43 @@ func TestRefillConstraints(t *testing.T) {
 				key := kg.ActiveCounter("custom", testCase.knobs.customConcurrencyKey2.Key)
 				_, err = r.Incr(key, testCase.currentValues.customConcurrencyKey2Active)
 				require.NoError(t, err)
+			}
+
+			testThrottle := testCase.knobs.throttle
+			if testThrottle != nil {
+				runGCRAScript := func(t *testing.T, rc rueidis.Client, key string, now time.Time, period time.Duration, limit, burst, capacity int) int {
+					args, err := StrSlice([]any{
+						key,
+						now.UnixMilli(),
+						limit,
+						burst,
+						period.Milliseconds(),
+						capacity,
+					})
+					require.NoError(t, err)
+
+					statusOrCapacity, err := scripts["test/gcra_capacity"].Exec(t.Context(), rc, []string{}, args).ToInt64()
+					require.NoError(t, err)
+
+					switch statusOrCapacity {
+					case -1:
+						return 0
+					default:
+						return int(statusOrCapacity)
+					}
+				}
+
+				// Reduce throttle capacity
+				runGCRAScript(
+					t,
+					rc,
+					testThrottle.Key,
+					at,
+					time.Duration(testThrottle.Period)*time.Second,
+					testThrottle.Limit,
+					testThrottle.Burst,
+					testCase.currentValues.throttleUsageWithinPeriod,
+				)
 			}
 
 			refillUntil := at.Add(time.Minute)
