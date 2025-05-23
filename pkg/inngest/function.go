@@ -87,6 +87,12 @@ type Function struct {
 	// Cancel specifies cancellation signals for the function
 	Cancel []Cancel `json:"cancel,omitempty"`
 
+	// Singleton ensures that only one instance of the function runs at a time for a given key.
+	// If another invocation is received while an instance is running, the behavior depends on
+	// the onConflict value: "ignore" will drop the new invocation, "replace" will cancel the
+	// running instance and start the new one.
+	Singleton *Singleton `json:"singleton,omitempty"`
+
 	// Actions represents the actions to take for this function.  If empty, this assumes
 	// that we have a single action specified in the current directory using
 	Steps []Step `json:"steps,omitempty"`
@@ -490,4 +496,17 @@ func RandomID() (string, error) {
 	}
 	petname.NonDeterministicMode()
 	return fmt.Sprintf("%s-%s", petname.Generate(2, "-"), hex.EncodeToString(byt)), nil
+}
+
+type Singleton struct {
+	// Key is an optional string used to scope singleton execution based on event data.
+	// For example, to ensure only one function runs at a time per user, you can set the key to
+	// "{{ event.user.id }}". This guarantees that only one instance runs for each unique key.
+	Key *string `json:"key,omitempty"`
+
+	// OnConflict determines what to do when a new invocation is received while another instance is running.
+	// Allowed values are:
+	// - "ignore": the new invocation is dropped.
+	// - "replace": the running instance is cancelled and the new invocation is started.
+	Conflict string `json:"conflict,omitempty"`
 }

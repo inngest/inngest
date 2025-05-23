@@ -27,6 +27,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/driver/httpdriver"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/realtime"
+	"github.com/inngest/inngest/pkg/execution/singleton"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
@@ -526,6 +527,26 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	throttle := queue.GetThrottleConfig(ctx, req.Function.ID, req.Function.Throttle, evtMap)
 
 	//
+	// Create singleton information.
+	//
+	var singletonConfig *queue.Singleton = nil
+	data := req.Events[0].GetEvent().Map()
+
+	if req.Function.Singleton != nil {
+		singletonKey, err := singleton.SingletonKey(ctx, req.Function.ID, *req.Function.Singleton, data)
+
+		if err == singleton.ErrNotASingleton {
+			// XXX: Figure out what to do in this case...
+		}
+
+		if err != nil {
+			return nil, err
+		}
+
+		singletonConfig = &queue.Singleton{Key: singletonKey}
+	}
+
+	//
 	// Create the run state.
 	//
 
@@ -660,7 +681,8 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		Payload: queue.PayloadEdge{
 			Edge: inngest.SourceEdge,
 		},
-		Throttle: throttle,
+		Throttle:  throttle,
+		Singleton: singletonConfig,
 	}
 	err = e.queue.Enqueue(ctx, item, at, queue.EnqueueOpts{})
 	if err == redis_state.ErrQueueItemExists {

@@ -137,6 +137,7 @@ var (
 	ErrQueueItemLeaseMismatch        = fmt.Errorf("item lease does not match")
 	ErrQueueItemNotLeased            = fmt.Errorf("queue item is not leased")
 	ErrQueuePeekMaxExceedsLimits     = fmt.Errorf("peek exceeded the maximum limit of %d", AbsoluteQueuePeekMax)
+	ErrQueueItemSingletonExists      = fmt.Errorf("singleton item already exists")
 	ErrPriorityTooLow                = fmt.Errorf("priority is too low")
 	ErrPriorityTooHigh               = fmt.Errorf("priority is too high")
 	ErrPartitionNotFound             = fmt.Errorf("partition not found")
@@ -1310,6 +1311,9 @@ func (q *queue) EnqueueItem(ctx context.Context, shard QueueShard, i osqueue.Que
 		shadowPartition = q.ItemShadowPartition(ctx, i)
 	}
 
+	// Log singleton key
+	q.logger.Debug().Interface("item", i).Str("singleton", kg.SingletonKey(i.Data.Singleton)).Msg("enqueueing item with singleton key")
+
 	keys := []string{
 		kg.QueueItem(),            // Queue item
 		kg.PartitionItem(),        // Partition item, map
@@ -1336,6 +1340,10 @@ func (q *queue) EnqueueItem(ctx context.Context, shard QueueShard, i osqueue.Que
 		kg.PartitionNormalizeSet(shadowPartition.PartitionID),
 		kg.AccountNormalizeSet(i.Data.Identifier.AccountID),
 		kg.GlobalAccountNormalizeSet(),
+
+		// Singletons
+		kg.SingletonRunKey(i.Data.Identifier.RunID.String()),
+		kg.SingletonKey(i.Data.Singleton),
 	}
 	// Append indexes
 	for _, idx := range q.itemIndexer(ctx, i, shard.RedisClient.kg) {
@@ -1364,6 +1372,7 @@ func (q *queue) EnqueueItem(ctx context.Context, shard QueueShard, i osqueue.Que
 		defaultPartition,
 		defaultPartition.ID,
 		i.Data.Identifier.AccountID.String(),
+		i.Data.Identifier.RunID.String(),
 
 		enqueueToBacklogsVal,
 		shadowPartition,
@@ -1399,6 +1408,8 @@ func (q *queue) EnqueueItem(ctx context.Context, shard QueueShard, i osqueue.Que
 		return i, nil
 	case 1:
 		return i, ErrQueueItemExists
+	case 2:
+		return i, ErrQueueItemSingletonExists
 	default:
 		return i, fmt.Errorf("unknown response enqueueing item: %v (%T)", status, status)
 	}
@@ -2473,6 +2484,10 @@ func (q *queue) Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 	partition := q.ItemShadowPartition(ctx, i)
 	backlog := q.ItemBacklog(ctx, i)
 
+	// Log singleton key
+	if kg.SingletonKey(i.Data.Singleton) != "" {
+		q.logger.Debug().Interface("item", i).Str("singleton", kg.SingletonKey(i.Data.Singleton)).Msg("dequeuing item with singleton key")
+	}
 	keys := []string{
 		kg.QueueItem(),
 		kg.PartitionItem(),
@@ -2505,6 +2520,9 @@ func (q *queue) Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		kg.ActivePartitionRunsIndex(partition.PartitionID),
 
 		kg.Idempotency(i.ID),
+
+		// Singleton
+		kg.SingletonRunKey(i.Data.Identifier.RunID.String()),
 	}
 	// Append indexes
 	for _, idx := range q.itemIndexer(ctx, i, queueShard.RedisClient.kg) {
