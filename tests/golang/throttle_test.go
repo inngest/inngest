@@ -13,80 +13,115 @@ import (
 )
 
 func TestThrottle(t *testing.T) {
+	basic := []struct {
+		name   string
+		limit  uint
+		burst  uint
+		period time.Duration
+		minGap time.Duration
+		maxGap time.Duration
+	}{
+		{
+			name:   "single limit",
+			limit:  1,
+			period: 5 * time.Second,
+			minGap: 4 * time.Second,
+			maxGap: 7 * time.Second,
+		},
+		{
+			name:   "multiple",
+			limit:  2,
+			period: 5 * time.Second,
+			maxGap: 3500 * time.Millisecond, // 3.5s
+		},
+		{
+			name:   "single with burst",
+			limit:  1,
+			burst:  1,
+			period: 5 * time.Second,
+			maxGap: 7 * time.Second,
+		},
+		{
+			name:   "multiple with burst",
+			limit:  2,
+			burst:  1,
+			period: 5 * time.Second,
+			maxGap: 3500 * time.Millisecond,
+		},
+	}
 
-	t.Run("Basic throttling with a single limit", func(t *testing.T) {
-		inngestClient, server, registerFuncs := NewSDKHandler(t, "concurrency")
-		defer server.Close()
+	for _, test := range basic {
+		t.Run(fmt.Sprintf("Basic throttling - %s", test.name), func(t *testing.T) {
+			inngestClient, server, registerFuncs := NewSDKHandler(t, fmt.Sprintf("throttle %s", test.name))
+			defer server.Close()
 
-		trigger := "test/timeouts-start"
+			trigger := "test/timeouts-start"
 
-		funcs := 5
-		throttlePeriod := 5 * time.Second
+			funcs := 5
+			runs := map[string]struct{}{}
+			startTimes := []time.Time{}
 
-		runs := map[string]struct{}{}
-		startTimes := []time.Time{}
-
-		_, err := inngestgo.CreateFunction(
-			inngestClient,
-			inngestgo.FunctionOpts{
-				ID: "throttle-test",
-				Throttle: &inngestgo.Throttle{
-					Limit:  1,
-					Period: throttlePeriod,
+			_, err := inngestgo.CreateFunction(
+				inngestClient,
+				inngestgo.FunctionOpts{
+					ID: "throttle-test",
+					Throttle: &inngestgo.Throttle{
+						Limit:  test.limit,
+						Period: test.period,
+						Burst:  test.burst,
+					},
 				},
-			},
-			inngestgo.EventTrigger(trigger, nil),
-			func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
-				fmt.Println(time.Now().Format(time.StampMilli))
-				if _, ok := runs[input.InputCtx.RunID]; !ok {
-					startTimes = append(startTimes, time.Now())
-					runs[input.InputCtx.RunID] = struct{}{}
-				}
-				return true, nil
-			},
-		)
-		require.NoError(t, err)
-		registerFuncs()
+				inngestgo.EventTrigger(trigger, nil),
+				func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
+					fmt.Println(time.Now().Format(time.StampMilli))
+					if _, ok := runs[input.InputCtx.RunID]; !ok {
+						startTimes = append(startTimes, time.Now())
+						runs[input.InputCtx.RunID] = struct{}{}
+					}
+					return true, nil
+				},
+			)
+			require.NoError(t, err)
+			registerFuncs()
 
-		var events []any
-		for i := 0; i < funcs; i++ {
-			events = append(events, inngestgo.Event{
-				Name: trigger,
-				Data: map[string]any{"test": true},
-			})
-		}
-		_, err = inngestClient.SendMany(context.Background(), events)
-		require.NoError(t, err)
-
-		// Wait for all functions to run
-		require.Eventually(t,
-			func() bool {
-				return len(startTimes) == funcs
-			},
-
-			// Add a little extra time to ensure all functions have run
-			time.Duration(funcs+1)*throttlePeriod,
-
-			time.Second,
-		)
-
-		for i := 0; i < funcs; i++ {
-			fmt.Println(startTimes[i].Format(time.RFC3339))
-			if i == 0 {
-				continue
+			var events []any
+			for i := 0; i < funcs; i++ {
+				events = append(events, inngestgo.Event{
+					Name: trigger,
+					Data: map[string]any{"test": true},
+				})
 			}
+			_, err = inngestClient.SendMany(context.Background(), events)
+			require.NoError(t, err)
 
-			sincePreviousStart := startTimes[i].Sub(startTimes[i-1])
+			// Wait for all functions to run
+			require.Eventually(t,
+				func() bool {
+					return len(startTimes) == funcs
+				},
+				// Add a little extra time to ensure all functions have run
+				time.Duration(funcs+1)*test.period,
+				time.Second,
+			)
 
-			// Sometimes runs start a little before the throttle period, but
-			// shouldn't be more than 1 second before
-			require.GreaterOrEqual(t, sincePreviousStart, throttlePeriod-1*time.Second)
+			for i := 0; i < funcs; i++ {
+				fmt.Println(startTimes[i].Format(time.RFC3339))
+				if i == 0 {
+					continue
+				}
 
-			// Sometimes runs start a little after the throttle period. This
-			// fudge factor can be increased if we see it fail in CI
-			require.LessOrEqual(t, sincePreviousStart, throttlePeriod+2*time.Second)
-		}
-	})
+				sincePreviousStart := startTimes[i].Sub(startTimes[i-1])
+
+				// Sometimes runs start a little before the throttle period, but
+				// shouldn't be more than 1 second before
+				require.GreaterOrEqual(t, sincePreviousStart, test.minGap)
+
+				// Sometimes runs start a little after the throttle period. This
+				// fudge factor can be increased if we see it fail in CI
+				require.LessOrEqual(t, sincePreviousStart, test.maxGap)
+			}
+		})
+	}
 
 	t.Run("Throttling with keys separates values", func(t *testing.T) {
 		inngestClient, server, registerFuncs := NewSDKHandler(t, "concurrency")
