@@ -49,6 +49,7 @@ require (
 	github.com/karlseguin/ccache/v3 v3.0.6
 	github.com/lib/pq v1.10.9
 	github.com/liushuangls/go-anthropic/v2 v2.12.2
+	github.com/lmittmann/tint v1.1.0
 	github.com/mattn/go-isatty v0.0.20
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/nats-io/nats.go v1.37.0
