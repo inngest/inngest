@@ -487,7 +487,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	core, err := coreapi.NewCoreApi(coreapi.Options{
 		Data:          ds.Data,
 		Config:        ds.Opts.Config,
-		Logger:        logger.From(ctx),
+		Logger:        logger.StdlibLogger(ctx),
 		Runner:        ds.Runner,
 		Tracker:       ds.Tracker,
 		State:         ds.State,
