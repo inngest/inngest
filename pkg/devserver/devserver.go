@@ -430,6 +430,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		executor.WithServiceExecutor(exec),
 		executor.WithServiceBatcher(batcher),
 		executor.WithServiceDebouncer(debouncer),
+		executor.WithServiceLogger(l),
 	)
 
 	runner := runner.NewService(
