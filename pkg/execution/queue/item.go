@@ -191,7 +191,7 @@ type Item struct {
 	// attempting to lease the item from the queue.
 	Throttle *Throttle `json:"throttle,omitempty"`
 	// Singleton represents a singleton key for the queue item, which is used to
-	// not not allow multiple start items to be scheduled at the same time.
+	// not allow multiple start items to be scheduled at the same time.
 	Singleton *Singleton `json:"singleton,omitempty"`
 	// CustomConcurrencyKeys stores custom concurrency keys for this function run.  This
 	// allows us to use custom concurrency keys for each job when processing steps for

@@ -539,7 +539,8 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		case err == nil:
 			singletonConfig = &queue.Singleton{Key: singletonKey}
 			// XXX: Maybe we should soft check if the singleton key exists here and
-			// return an error here without creating state.
+			// return an error here without creating state; But maybe we need it for history
+			// and showing that the function was skipped.
 		case errors.Is(err, singleton.ErrNotASingleton):
 			// We ignore it, and we run the function normally not as a singleton
 		default:

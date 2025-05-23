@@ -242,7 +242,7 @@ type QueueKeyGenerator interface {
 	RunIndex(runID ulid.ULID) string
 	// SingletonKey returns the singleton key for a given queue item.
 	SingletonKey(s *osqueue.Singleton) string
-	// SingletonRunKey returns the singleton run id key for a given queue item.
+	// SingletonRunKey returns the singleton run id key that stores the singleton key for a given run.
 	SingletonRunKey(r string) string
 
 	// FnMetadata returns the key for a function's metadata.

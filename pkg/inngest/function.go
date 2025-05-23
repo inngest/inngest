@@ -503,4 +503,6 @@ type Singleton struct {
 	// For example, to ensure only one function runs at a time per user, you can set the key to
 	// "{{ event.user.id }}". This guarantees that only one instance runs for each unique key.
 	Key *string `json:"key,omitempty"`
+
+	// TODO: Add the operational mode for the singleton.  This will be either "ignore" or "cancel".
 }
