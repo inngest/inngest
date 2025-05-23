@@ -33,7 +33,6 @@ import (
 	"github.com/jonboulle/clockwork"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
-	"github.com/rs/zerolog"
 	"golang.org/x/sync/semaphore"
 	"gonum.org/v1/gonum/stat/sampleuv"
 )
@@ -375,13 +374,7 @@ func WithDisableFifoForAccounts(mapping map[string]struct{}) QueueOpt {
 	}
 }
 
-func WithLogger(l *zerolog.Logger) QueueOpt {
-	return func(q *queue) {
-		q.logger = l
-	}
-}
-
-func WithLog(l logger.Logger) QueueOpt {
+func WithLogger(l logger.Logger) QueueOpt {
 	return func(q *queue) {
 		q.log = l
 	}
@@ -618,7 +611,6 @@ func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 		pollTick:                       defaultPollTick,
 		idempotencyTTL:                 defaultIdempotencyTTL,
 		queueKindMapping:               make(map[string]string),
-		logger:                         logger.From(ctx),
 		log:                            logger.StdlibLogger(ctx),
 		concurrencyLimitGetter: func(ctx context.Context, p QueuePartition) PartitionConcurrencyLimits {
 			def := defaultConcurrency
@@ -774,7 +766,6 @@ type queue struct {
 	queueKindMapping        map[string]string
 	disableFifoForFunctions map[string]struct{}
 	disableFifoForAccounts  map[string]struct{}
-	logger                  *zerolog.Logger
 	log                     logger.Logger
 
 	// itemIndexer returns indexes for a given queue item.
@@ -1113,12 +1104,16 @@ func (q *queue) ItemPartition(ctx context.Context, shard QueueShard, i osqueue.Q
 	// sanity check: both QueueNames should be set, but sometimes aren't
 	if queueName == nil && i.QueueName != nil {
 		queueName = i.QueueName
-		q.logger.Warn().Interface("item", i).Msg("encountered queue item with inconsistent custom queue name, should have both i.QueueName and i.Data.QueueName set")
+		q.log.Warn("encountered queue item with inconsistent custom queue name, should have both i.QueueName and i.Data.QueueName set",
+			"item", i,
+		)
 	}
 
 	// sanity check: queueName values must match
 	if i.Data.QueueName != nil && i.QueueName != nil && *i.Data.QueueName != *i.QueueName {
-		q.logger.Error().Interface("item", i).Msg("encountered queue item with inconsistent custom queue names, should have matching values for i.QueueName and i.Data.QueueName")
+		q.log.Warn("encountered queue item with inconsistent custom queue names, should have matching values for i.QueueName and i.Data.QueueName",
+			"item", i,
+		)
 	}
 
 	// The only case when we manually set a queueName is for system partitions
@@ -1137,7 +1132,7 @@ func (q *queue) ItemPartition(ctx context.Context, shard QueueShard, i osqueue.Q
 	}
 
 	if i.FunctionID == uuid.Nil {
-		q.logger.Error().Interface("item", i).Msg("unexpected missing functionID in ItemPartitions()")
+		q.log.Error("unexpected missing functionID in ItemPartitions()", "item", i)
 	}
 
 	fnPartition := QueuePartition{
@@ -1299,7 +1294,7 @@ func (q *queue) EnqueueItem(ctx context.Context, shard QueueShard, i osqueue.Que
 	isSystemPartition := defaultPartition.IsSystem()
 
 	if i.Data.Identifier.AccountID == uuid.Nil && !isSystemPartition {
-		q.logger.Warn().Interface("item", i).Msg("attempting to enqueue item to non-system partition without account ID")
+		q.log.Warn("attempting to enqueue item to non-system partition without account ID", "item", i)
 	}
 
 	enqueueToBacklogs := isSystemPartition && q.enqueueSystemQueuesToBacklog
@@ -2037,7 +2032,7 @@ func (q *queue) peek(ctx context.Context, shard QueueShard, opts peekOpts) ([]*o
 	}
 
 	if len(missingQueueItems) > 0 {
-		logger.StdlibLogger(ctx).Warn("encountered missing queue items in partition queue",
+		q.log.Warn("encountered missing queue items in partition queue",
 			"key", opts.PartitionKey,
 			"items", missingQueueItems,
 		)
@@ -2058,7 +2053,7 @@ func (q *queue) peek(ctx context.Context, shard QueueShard, opts peekOpts) ([]*o
 	now := q.clock.Now()
 	return util.ParallelDecode(items, func(val any) (*osqueue.QueueItem, error) {
 		if val == nil {
-			q.logger.Error().Str("partition", opts.PartitionKey).Msg("nil item value in peek response")
+			q.log.Error("nil item value in peek response", "partition", opts.PartitionKey)
 			return nil, nil
 		}
 
@@ -2146,12 +2141,11 @@ func (q *queue) RequeueByJobID(ctx context.Context, queueShard QueueShard, jobID
 		args,
 	).AsInt64()
 	if err != nil {
-		q.logger.
-			Error().
-			Err(err).
-			Interface("item", i).
-			Interface("fnPartition", fnPartition).
-			Msg("error requeueing queue item by JobID")
+		q.log.Error("error requeueing queue item by JobID",
+			"error", err,
+			"item", i,
+			"fnPartition", fnPartition,
+		)
 		return fmt.Errorf("error requeueing item: %w", err)
 	}
 	switch status {
@@ -2649,13 +2643,12 @@ func (q *queue) Requeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		args,
 	).AsInt64()
 	if err != nil {
-		q.logger.
-			Error().
-			Err(err).
-			Interface("item", i).
-			Interface("partition", fnPartition).
-			Interface("shadow", shadowPartition).
-			Msg("error requeueing queue item")
+		q.log.Error("error requeueing queue item",
+			"error", err,
+			"item", i,
+			"partition", fnPartition,
+			"shadow", shadowPartition,
+		)
 		return fmt.Errorf("error requeueing item: %w", err)
 	}
 	switch status {
@@ -3184,7 +3177,10 @@ func (q *queue) cleanupNilPartitionInAccount(ctx context.Context, accountId uuid
 	}
 
 	// Log because this should only happen as long as we run old code
-	q.logger.Warn().Interface("partition", partitionKey).Str("account_id", accountId.String()).Msg("removing account partitions pointer to missing partition")
+	q.log.Warn("removing account partitions pointer to missing partition",
+		"partition", partitionKey,
+		"account_id", accountId.String(),
+	)
 
 	cmd := q.primaryQueueShard.RedisClient.Client().B().Zrem().Key(q.primaryQueueShard.RedisClient.kg.AccountPartitionIndex(accountId)).Member(partitionKey).Build()
 	if err := q.primaryQueueShard.RedisClient.Client().Do(ctx, cmd).Error(); err != nil {
@@ -3211,7 +3207,7 @@ func (q *queue) cleanupEmptyAccount(ctx context.Context, accountId uuid.UUID) er
 	}
 
 	if accountId == uuid.Nil {
-		q.logger.Warn().Msg("attempted to clean up empty account pointer with nil account ID")
+		q.log.Warn("attempted to clean up empty account pointer with nil account ID")
 		return nil
 	}
 
@@ -3232,7 +3228,7 @@ func (q *queue) cleanupEmptyAccount(ctx context.Context, accountId uuid.UUID) er
 
 	if status == 1 {
 		// Log because this should only happen as long as we run old code
-		q.logger.Warn().Str("account_id", accountId.String()).Msg("removed empty account pointer")
+		q.log.Warn("removed empty account pointer", "account_id", accountId.String())
 	}
 
 	return nil
@@ -3341,7 +3337,11 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 	// Use parallel decoding as per Peek
 	partitions, err := util.ParallelDecode(encoded, func(val any) (*QueuePartition, error) {
 		if val == nil {
-			q.logger.Error().Interface("encoded", encoded).Interface("missing", missingPartitions).Str("key", partitionKey).Msg("encountered nil partition item in pointer queue")
+			q.log.Error("encountered nil partition item in pointer queue",
+				"encoded", encoded,
+				"missing", missingPartitions,
+				"key", partitionKey,
+			)
 			return nil, fmt.Errorf("encountered nil partition item in pointer queue %q", partitionKey)
 		}
 
@@ -3443,9 +3443,9 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 				// Function is pulled up when it is unpaused, so we can push it back for a long time (see SetFunctionPaused)
 				err := q.PartitionRequeue(ctx, shard, item, q.clock.Now().Truncate(time.Second).Add(PartitionPausedRequeueExtension), true)
 				if err != nil && !errors.Is(err, ErrPartitionGarbageCollected) {
-					q.logger.Error().Interface("partition", item).Err(err).Msg("failed to push back paused partition")
+					q.log.Error("failed to push back paused partition", "error", err, "partition", item)
 				} else {
-					q.logger.Trace().Interface("partition", item.Queue()).Msg("pushed back paused partition")
+					q.log.Trace("pushed back paused partition", "partition", item.Queue())
 				}
 
 				ignored++
@@ -3798,7 +3798,7 @@ func (q *queue) Instrument(ctx context.Context) error {
 				cntCmd := r.B().Zcount().Key(queueKey).Min("-inf").Max("+inf").Build()
 				count, err := q.primaryQueueShard.RedisClient.unshardedRc.Do(ctx, cntCmd).AsInt64()
 				if err != nil {
-					q.logger.Warn().Err(err).Str("pkey", pkey).Str("context", "instrumentation").Msg("error checking partition count")
+					q.log.Warn("error checking partition count", "pkey", pkey, "context", "instrumentation")
 					return
 				}
 
@@ -3954,12 +3954,11 @@ func (q *queue) Scavenge(ctx context.Context, limit int) (int, error) {
 		for i, item := range jobs {
 			itemID := itemIDs[i]
 			if item == "" {
-				q.logger.
-					Error().
-					Str("index_partition", partition).
-					Str("concurrency_queue_key", queueKey).
-					Str("item_id", itemID).
-					Msg("missing queue item in concurrency queue")
+				q.log.Error("missing queue item in concurrency queue",
+					"index_partition", partition,
+					"concurrency_queue_key", queueKey,
+					"item_id", itemID,
+				)
 
 				// Drop item reference to prevent spinning on this item
 				err := client.Do(ctx, client.B().Zrem().Key(queueKey).Member(itemID).Build()).Error()

@@ -13,7 +13,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
-	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 	"github.com/inngest/inngest/pkg/util"
@@ -325,7 +324,7 @@ func (q *queue) scanShadowPartitions(ctx context.Context, until time.Time, qspc 
 
 				parts, err := q.peekShadowPartitions(ctx, partitionKey, sequential, accountPartitionPeekMax, until)
 				if err != nil {
-					q.logger.Error().Err(err).Msg("error processing account partitions")
+					q.log.Error("error processing account partitions", "error", err)
 					return
 				}
 
@@ -363,7 +362,6 @@ func (q *queue) scanShadowPartitions(ctx context.Context, until time.Time, qspc 
 // shadowScan iterates through the shadow partitions and attempt to add queue items
 // to the function partition for processing
 func (q *queue) shadowScan(ctx context.Context) error {
-	l := logger.StdlibLogger(ctx)
 	qspc := make(chan shadowPartitionChanMsg)
 
 	for i := int32(0); i < q.numShadowWorkers; i++ {
@@ -371,7 +369,7 @@ func (q *queue) shadowScan(ctx context.Context) error {
 	}
 
 	tick := q.clock.NewTicker(q.pollTick)
-	l.Debug("starting shadow scanner", "poll", q.pollTick.String())
+	q.log.Debug("starting shadow scanner", "poll", q.pollTick.String())
 
 	for {
 		select {
@@ -411,7 +409,7 @@ func (q *queue) peekShadowPartitions(ctx context.Context, partitionIndexKey stri
 			return &QueueShadowPartition{}
 		},
 		handleMissingItems: func(pointers []string) error {
-			logger.StdlibLogger(ctx).Warn("found missing shadow partitions", "missing", pointers, "partitionKey", partitionIndexKey)
+			q.log.Warn("found missing shadow partitions", "missing", pointers, "partitionKey", partitionIndexKey)
 
 			return nil
 		},
@@ -523,10 +521,10 @@ func (q *queue) ShadowPartitionPeek(ctx context.Context, sp *QueueShadowPartitio
 		handleMissingItems: func(pointers []string) error {
 			err := rc.Client().Do(ctx, rc.Client().B().Zrem().Key(shadowPartitionSet).Member(pointers...).Build()).Error()
 			if err != nil {
-				q.logger.Warn().
-					Interface("missing", pointers).
-					Interface("sp", sp).
-					Msg("failed to clean up dangling backlogs from shard partition")
+				q.log.Warn("failed to clean up dangling backlogs from shard partition",
+					"missing", pointers,
+					"sp", sp,
+				)
 			}
 
 			return nil

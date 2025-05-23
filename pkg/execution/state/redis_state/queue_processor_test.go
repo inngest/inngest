@@ -19,7 +19,6 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
-	"github.com/rs/zerolog"
 	"github.com/stretchr/testify/require"
 )
 
@@ -161,7 +160,7 @@ func TestQueueRunBasic(t *testing.T) {
 	var handled int32
 	go func() {
 		_ = q.Run(ctx, func(ctx context.Context, _ osqueue.RunInfo, item osqueue.Item) (osqueue.RunResult, error) {
-			logger.From(ctx).Debug().Interface("item", item).Msg("received item")
+			logger.StdlibLogger(ctx).Debug("received item", "item", item)
 			atomic.AddInt32(&handled, 1)
 			id := osqueue.JobIDFromContext(ctx)
 			require.NotEmpty(t, id, "No job ID was passed via context")
@@ -228,7 +227,7 @@ func TestQueueRunRetry(t *testing.T) {
 	var counter int32
 	go func() {
 		_ = q.Run(ctx, func(ctx context.Context, _ osqueue.RunInfo, item osqueue.Item) (osqueue.RunResult, error) {
-			logger.From(ctx).Debug().Interface("item", item).Msg("received item")
+			logger.StdlibLogger(ctx).Debug("received item", "item", item)
 			atomic.AddInt32(&counter, 1)
 			if atomic.LoadInt32(&counter) == 1 {
 				return osqueue.RunResult{}, fmt.Errorf("retry this step once")
@@ -268,7 +267,7 @@ func TestQueueRunExtended(t *testing.T) {
 	jobCompleteMax := int32(12_500) // ms
 	delayMax := int32(15_000)       // ms
 
-	l := logger.From(context.Background()).Level(zerolog.InfoLevel)
+	l := logger.StdlibLogger(context.Background(), logger.WithLoggerLevel(logger.LevelInfo))
 	r := miniredis.RunT(t)
 
 	rc, err := rueidis.NewClient(rueidis.ClientOption{
@@ -283,7 +282,7 @@ func TestQueueRunExtended(t *testing.T) {
 		// We can't add more than 8128 goroutines when detecting race conditions,
 		// so lower the number of workers.
 		WithNumWorkers(200),
-		WithLogger(&l),
+		WithLogger(l),
 	)
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -310,7 +309,7 @@ func TestQueueRunExtended(t *testing.T) {
 					// We can't add more than 8128 goroutines when detecting race conditions,
 					// so lower the number of workers.
 					WithNumWorkers(200),
-					WithLogger(&l),
+					WithLogger(l),
 				)
 
 				go func() {

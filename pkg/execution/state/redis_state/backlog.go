@@ -3,6 +3,7 @@ package redis_state
 import (
 	"context"
 	"fmt"
+
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
@@ -199,12 +200,12 @@ func (q *queue) ItemBacklog(ctx context.Context, i osqueue.QueueItem) QueueBackl
 	// sanity check: both QueueNames should be set, but sometimes aren't
 	if queueName == nil && i.QueueName != nil {
 		queueName = i.QueueName
-		q.logger.Warn().Interface("item", i).Msg("backlogs encountered queue item with inconsistent custom queue name, should have both i.QueueName and i.Data.QueueName set")
+		q.log.Warn("backlogs encountered queue item with inconsistent custom queue name, should have both i.QueueName and i.Data.QueueName set", "item", i)
 	}
 
 	// sanity check: queueName values must match
 	if i.Data.QueueName != nil && i.QueueName != nil && *i.Data.QueueName != *i.QueueName {
-		q.logger.Error().Interface("item", i).Msg("backlogs encountered queue item with inconsistent custom queue names, should have matching values for i.QueueName and i.Data.QueueName")
+		q.log.Error("backlogs encountered queue item with inconsistent custom queue names, should have matching values for i.QueueName and i.Data.QueueName", "item", i)
 	}
 
 	if queueName != nil {
@@ -284,12 +285,12 @@ func (q *queue) ItemShadowPartition(ctx context.Context, i osqueue.QueueItem) Qu
 	// sanity check: both QueueNames should be set, but sometimes aren't
 	if queueName == nil && i.QueueName != nil {
 		queueName = i.QueueName
-		q.logger.Warn().Interface("item", i).Msg("shadow partitions encountered queue item with inconsistent custom queue name, should have both i.QueueName and i.Data.QueueName set")
+		q.log.Warn("shadow partitions encountered queue item with inconsistent custom queue name, should have both i.QueueName and i.Data.QueueName set", "item", i)
 	}
 
 	// sanity check: queueName values must match
 	if i.Data.QueueName != nil && i.QueueName != nil && *i.Data.QueueName != *i.QueueName {
-		q.logger.Error().Interface("item", i).Msg("shadow partitions encountered queue item with inconsistent custom queue names, should have matching values for i.QueueName and i.Data.QueueName")
+		q.log.Error("shadow partitions encountered queue item with inconsistent custom queue names, should have matching values for i.QueueName and i.Data.QueueName", "item", i)
 	}
 
 	// The only case when we manually set a queueName is for system partitions
@@ -312,7 +313,7 @@ func (q *queue) ItemShadowPartition(ctx context.Context, i osqueue.QueueItem) Qu
 	}
 
 	if i.FunctionID == uuid.Nil {
-		q.logger.Error().Interface("item", i).Msg("unexpected missing functionID in ItemPartitions()")
+		q.log.Error("unexpected missing functionID in ItemPartitions()", "item", i)
 	}
 
 	// NOTE: This is an optimization that ensures we return *updated* concurrency keys
