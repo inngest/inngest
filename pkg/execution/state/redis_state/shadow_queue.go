@@ -125,11 +125,11 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 		Tags:    map[string]any{"partition_id": shadowPart.PartitionID},
 	})
 
-	q.log.Trace("processing backlogs",
-		"partition_id", shadowPart.PartitionID,
-		"until", refillUntil.Format(time.StampMilli),
-		"backlogs", len(backlogs),
-	)
+	// q.log.Trace("processing backlogs",
+	// 	"partition_id", shadowPart.PartitionID,
+	// 	"until", refillUntil.Format(time.StampMilli),
+	// 	"backlogs", len(backlogs),
+	// )
 
 	// Refill backlogs in random order
 	fullyProcessedBacklogs := 0
@@ -184,7 +184,7 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 			return fmt.Errorf("could not refill backlog: %w", err)
 		}
 
-		q.log.Trace("processed backlogs",
+		q.log.Trace("processed backlog",
 			"backlog", backlog.BacklogID,
 			"total", res.TotalBacklogCount,
 			"until", res.BacklogCountUntil,
@@ -192,6 +192,7 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 			"capacity", res.Capacity,
 			"refill", res.Refill,
 			"refilled", res.Refilled,
+			"throttle", shadowPart.Throttle,
 		)
 
 		// instrumentation
@@ -299,21 +300,18 @@ type shadowPartitionChanMsg struct {
 func (q QueueBacklog) requeueBackOff(now time.Time, constraint enums.QueueConstraint, partition *QueueShadowPartition) time.Time {
 	max := now.Add(10 * time.Second)
 
-	if constraint == enums.QueueConstraintCustomConcurrencyKey1 || constraint == enums.QueueConstraintCustomConcurrencyKey2 {
-		if partition.Throttle != nil {
+	switch constraint {
+	case enums.QueueConstraintThrottle:
+		if partition.Throttle == nil {
 			return now.Add(PartitionThrottleLimitRequeueExtension)
 		}
 
 		next := now.Add(PartitionThrottleLimitRequeueExtension + time.Duration(q.SuccessiveThrottleConstrained)*time.Second)
-		if next.After(max) {
-			next = max
-		}
-
 		return next
-	}
 
-	if constraint == enums.QueueConstraintThrottle {
-		next := now.Add(PartitionConcurrencyLimitRequeueExtension + time.Duration(q.SuccessiveThrottleConstrained)*time.Second)
+	case enums.QueueConstraintCustomConcurrencyKey1, enums.QueueConstraintCustomConcurrencyKey2:
+		next := now.Add(PartitionConcurrencyLimitRequeueExtension + time.Duration(q.SuccessiveCustomConcurrencyConstrained)*time.Second)
+
 		if next.After(max) {
 			next = max
 		}

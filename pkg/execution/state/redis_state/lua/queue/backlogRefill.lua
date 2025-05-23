@@ -307,7 +307,7 @@ end
 
 -- update gcra theoretical arrival time
 if throttleLimit > 0 then
-  gcraUpdate(throttleKey, nowMS, throttlePeriod * 1000, throttleLimit, throttleBurst, refill)
+  gcraUpdate(throttleKey, nowMS, throttlePeriod * 1000, throttleLimit, throttleBurst, refilled)
 end
 
 --

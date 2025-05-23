@@ -37,7 +37,7 @@ func TestThrottle(t *testing.T) {
 			},
 			inngestgo.EventTrigger(trigger, nil),
 			func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
-				fmt.Println(time.Now().Format(time.RFC3339))
+				fmt.Println(time.Now().Format(time.StampMilli))
 				if _, ok := runs[input.InputCtx.RunID]; !ok {
 					startTimes = append(startTimes, time.Now())
 					runs[input.InputCtx.RunID] = struct{}{}
@@ -65,7 +65,7 @@ func TestThrottle(t *testing.T) {
 			},
 
 			// Add a little extra time to ensure all functions have run
-			time.Duration(funcs+1)*5*time.Second,
+			time.Duration(funcs+1)*throttlePeriod,
 
 			time.Second,
 		)
