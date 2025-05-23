@@ -440,11 +440,11 @@ func (q *queue) shadowScan(ctx context.Context) error {
 				return fmt.Errorf("could not scan shadow partitions: %w", err)
 			}
 
-			q.log.Trace("scan loop",
-				"start", now.Format(time.StampMilli),
-				"until", scanUntil.Format(time.StampMilli),
-				"dur", q.clock.Now().Sub(now).String(),
-			)
+			// q.log.Trace("scan loop",
+			// 	"start", now.Format(time.StampMilli),
+			// 	"until", scanUntil.Format(time.StampMilli),
+			// 	"dur", q.clock.Now().Sub(now).String(),
+			// )
 		}
 	}
 }
