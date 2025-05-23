@@ -31,8 +31,8 @@ export function useColumns({
         const receivedAt = info.getValue();
         return <TimeCell date={receivedAt} />;
       },
+      size: 200,
       header: 'Received at',
-      maxSize: 400,
       enableSorting: false,
       id: ensureColumnID('receivedAt'),
     }),
@@ -41,8 +41,8 @@ export function useColumns({
         const name = info.getValue();
         return <TextCell>{name}</TextCell>;
       },
+      size: 300,
       header: 'Event name',
-      maxSize: 400,
       enableSorting: false,
       id: ensureColumnID('name'),
     }),
@@ -82,6 +82,7 @@ export function useColumns({
           />
         );
       },
+      size: 500,
       header: 'Functions triggered',
       enableSorting: false,
       id: ensureColumnID('runs'),
