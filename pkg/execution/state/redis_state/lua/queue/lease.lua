@@ -84,7 +84,7 @@ end
 -- Track the earliest time this job was attempted in the queue.
 item = set_item_peek_time(keyQueueMap, queueID, item, currentTime)
 
-if checkConstraints then
+if checkConstraints == 1 then
 	-- Track throttling/rate limiting IF the queue item has throttling info set.  This allows
 	-- us to target specific queue items with rate limiting individually.
 	--
