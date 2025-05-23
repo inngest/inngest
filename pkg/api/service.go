@@ -88,7 +88,7 @@ func (a *apiServer) Pre(ctx context.Context) error {
 
 	api, err := NewAPI(Options{
 		Config:         a.config,
-		Logger:         logger.StdlibLogger(ctx, logger.WithHandler(logger.DevHandler)),
+		Logger:         a.log,
 		EventHandler:   a.handleEvent,
 		LocalEventKeys: a.localEventKeys,
 		RequireKeys:    a.requireKeys,
