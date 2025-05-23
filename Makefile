@@ -5,7 +5,7 @@ dev:
 # specifically for tests
 .PHONY: run
 run:
-	TEST_MODE=true LOG_LEVEL=debug LOG_HANDLER=dev go run ./cmd/main.go dev --tick=50 --no-poll --no-discovery -v $(PARAMS)
+	TEST_MODE=true LOG_LEVEL=trace LOG_HANDLER=dev go run ./cmd/main.go dev --tick=50 --no-poll --no-discovery -v $(PARAMS)
 
 # Start with debug mode in Delve
 .PHONY: debug
