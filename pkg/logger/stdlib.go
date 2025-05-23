@@ -121,7 +121,7 @@ func newLogger(opts ...LoggerOpt) Logger {
 		return &logger{
 			Logger: slog.New(tint.NewHandler(o.writer, &tint.Options{
 				Level:      o.level,
-				TimeFormat: "[15:05:05.000]", // millisecond
+				TimeFormat: "[15:04:05.000]", // millisecond
 				ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
 					if a.Key == slog.LevelKey && len(groups) == 0 {
 						lvl, ok := a.Value.Any().(slog.Level)

@@ -2308,6 +2308,16 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 
 	delayMS := item.AtMS - item.EnqueuedAt
 
+	status, err := scripts["queue/lease"].Exec(
+		redis_telemetry.WithScriptName(ctx, "lease"),
+		q.primaryQueueShard.RedisClient.unshardedRc,
+		keys,
+		args,
+	).ToInt64()
+	if err != nil {
+		return nil, fmt.Errorf("error leasing queue item: %w", err)
+	}
+
 	q.log.Trace("leasing item",
 		"id", item.ID,
 		"kind", item.Data.Kind,
@@ -2318,17 +2328,8 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 		"lease_delay", now.Sub(time.UnixMilli(item.EnqueuedAt)).String(),
 		"refilled", refilledFromBacklog,
 		"check", checkConstraints,
+		"status", status,
 	)
-
-	status, err := scripts["queue/lease"].Exec(
-		redis_telemetry.WithScriptName(ctx, "lease"),
-		q.primaryQueueShard.RedisClient.unshardedRc,
-		keys,
-		args,
-	).ToInt64()
-	if err != nil {
-		return nil, fmt.Errorf("error leasing queue item: %w", err)
-	}
 
 	switch status {
 	case 0:
