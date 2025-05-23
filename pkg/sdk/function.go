@@ -57,6 +57,9 @@ type SDKFunction struct {
 	// Cancel specifies cancellation signals for the function
 	Cancel []inngest.Cancel `json:"cancel,omitempty"`
 
+	// Singleton represents a lock to ensure that only one instance of the function
+	// runs at a time for a given key. Additional runs will either be ignored or replace
+	// the current one, depending on the mode.
 	Singleton *inngest.Singleton `json:"singleton,omitempty"`
 
 	Steps map[string]SDKStep `json:"steps"`

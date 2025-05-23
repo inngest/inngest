@@ -503,10 +503,4 @@ type Singleton struct {
 	// For example, to ensure only one function runs at a time per user, you can set the key to
 	// "{{ event.user.id }}". This guarantees that only one instance runs for each unique key.
 	Key *string `json:"key,omitempty"`
-
-	// OnConflict determines what to do when a new invocation is received while another instance is running.
-	// Allowed values are:
-	// - "ignore": the new invocation is dropped.
-	// - "replace": the running instance is cancelled and the new invocation is started.
-	Conflict string `json:"conflict,omitempty"`
 }
