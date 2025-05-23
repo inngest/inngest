@@ -16,7 +16,7 @@ jobs:
   ts:
     name: "TS SDK Tests / OS: (${{ matrix.os }}), key-queues: ${{ matrix.experimentalKeyQueues }}"
     strategy:
-      fail-fast: falae
+      fail-fast: false
       matrix:
         os: [ubuntu-latest]
         experimentalKeyQueues: [false, true]
