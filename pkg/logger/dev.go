@@ -21,18 +21,14 @@ func newDevHandler(w io.Writer, opts *slog.HandlerOptions) *devHandler {
 
 	return &devHandler{
 		Handler: slog.NewJSONHandler(w, opts),
-		writer:  w,
-		opts:    opts,
+		l:       log.New(w, "", 0),
 	}
 }
 
 // devHandler is used for development purposes and also provide nicer log output for the dev server
 type devHandler struct {
 	slog.Handler
-
-	writer io.Writer
-	opts   *slog.HandlerOptions
-	l      *log.Logger
+	l *log.Logger
 }
 
 func (d *devHandler) Handle(ctx context.Context, rec slog.Record) error {
@@ -40,9 +36,9 @@ func (d *devHandler) Handle(ctx context.Context, rec slog.Record) error {
 
 	switch rec.Level {
 	case LevelTrace:
-		lvl = color.CyanString("TRACE")
+		lvl = color.MagentaString("TRACE")
 	case LevelDebug:
-		lvl = color.GreenString("DEBUG")
+		lvl = color.CyanString("DEBUG")
 	case LevelInfo:
 		lvl = color.BlueString("INFO")
 	case LevelWarning:
@@ -64,13 +60,16 @@ func (d *devHandler) Handle(ctx context.Context, rec slog.Record) error {
 }
 
 func (d *devHandler) attrToStr(rec slog.Record) string {
-	var builder strings.Builder
-	_, _ = builder.WriteString(" ")
+	var idx int
+	pairs := make([]string, rec.NumAttrs())
 
 	rec.Attrs(func(a slog.Attr) bool {
-		_, _ = builder.WriteString(fmt.Sprintf("%s=%+v", a.Key, a.Value.Any()))
+		key := color.GreenString(a.Key)
+
+		pairs[idx] = fmt.Sprintf("%s=%+v", key, a.Value.Any())
+		idx++
 		return true
 	})
 
-	return builder.String()
+	return strings.Join(pairs, " ")
 }

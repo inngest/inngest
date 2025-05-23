@@ -92,10 +92,18 @@ func WithHandler(h handler) LoggerOpt {
 }
 
 func newLogger(opts ...LoggerOpt) Logger {
+	handler := JSONHandler
+	switch strings.ToLower(os.Getenv("LOG_HANDLER")) {
+	case "dev":
+		handler = DevHandler
+	case "txt", "text":
+		handler = TextHandler
+	}
+
 	o := &loggerOpts{
 		level:   StdlibLevel(level("LOG_LEVEL")),
 		writer:  os.Stderr,
-		handler: JSONHandler,
+		handler: handler,
 	}
 
 	for _, apply := range opts {
