@@ -114,6 +114,22 @@ func newLogger(opts ...LoggerOpt) Logger {
 
 	hopts := slog.HandlerOptions{
 		Level: o.level,
+		ReplaceAttr: func(groups []string, attr slog.Attr) slog.Attr {
+			if attr.Key == slog.LevelKey && len(groups) == 0 {
+				if lvl, ok := attr.Value.Any().(slog.Level); ok {
+					// annotate additional levels properly
+					switch lvl {
+					case LevelTrace:
+						return slog.String(attr.Key, "TRACE")
+					case LevelNotice:
+						return slog.String(attr.Key, "NOTICE")
+					case LevelEmergency:
+						return slog.String(attr.Key, "EMERGENCY")
+					}
+				}
+			}
+			return attr
+		},
 	}
 
 	switch o.handler {
