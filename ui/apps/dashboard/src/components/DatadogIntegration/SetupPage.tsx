@@ -15,7 +15,7 @@ import { graphql } from '@/gql';
 import type { DatadogConnectionStatus } from '@/gql/graphql';
 
 export const ddIntegrationHref =
-  'https://app.datadoghq.com/organization-settings/api-keys?filter=Inngest';
+  'https://app.datadoghq.com/integrations/inngest';
 
 export const GetDatadogSetupDataDocument = graphql(`
   query GetDatadogSetupData {
