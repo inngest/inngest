@@ -3,9 +3,9 @@ package tracing
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	sqlc "github.com/inngest/inngest/pkg/cqrs/base_cqrs/sqlc/sqlite"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
@@ -46,12 +46,30 @@ func (tp *TracerProvider) getTracer(md *statev2.Metadata, qi *queue.Item) trace.
 	return tracer
 }
 
+type DroppableSpan struct {
+	span trace.Span
+	Ref  *meta.SpanReference
+}
+
+func (d *DroppableSpan) Drop() {
+	d.span.SetAttributes(attribute.Bool(meta.AttributeDropSpan, true))
+	// Send span but we don't care if it makes it or not, as we're dropping
+	// anyway
+	d.span.End()
+}
+
+// TODO Sync send span; might wait for flush channel
+func (d *DroppableSpan) Send() error {
+	d.span.End()
+	return nil
+}
+
 type CreateSpanOptions struct {
 	Carriers    []map[string]any
-	FollowsFrom *meta.SpanMetadata
+	FollowsFrom *meta.SpanReference
 	Location    string
 	Metadata    *statev2.Metadata
-	Parent      *meta.SpanMetadata
+	Parent      *meta.SpanReference
 	QueueItem   *queue.Item
 	SpanOptions []trace.SpanStartOption
 }
@@ -59,11 +77,18 @@ type CreateSpanOptions struct {
 func (tp *TracerProvider) CreateSpan(
 	name string,
 	opts *CreateSpanOptions,
-) *meta.SpanMetadata {
-	span, spanMetadata := tp.CreateDroppableSpan(name, opts)
-	span.End()
+) (*meta.SpanReference, error) {
+	ds, err := tp.CreateDroppableSpan(name, opts)
+	if err != nil {
+		return nil, fmt.Errorf("failed to CreateSpan: %w", err)
+	}
 
-	return spanMetadata
+	err = ds.Send()
+	if err != nil {
+		return nil, fmt.Errorf("failed to send span during creation: %w", err)
+	}
+
+	return ds.Ref, nil
 }
 
 // CreateDroppableSpan creates a span that can be dropped and relies on us
@@ -71,7 +96,7 @@ func (tp *TracerProvider) CreateSpan(
 func (tp *TracerProvider) CreateDroppableSpan(
 	name string,
 	opts *CreateSpanOptions,
-) (trace.Span, *meta.SpanMetadata) {
+) (*DroppableSpan, error) {
 	ctx := context.Background()
 	if opts.Parent != nil {
 		carrier := propagation.MapCarrier{
@@ -100,37 +125,41 @@ func (tp *TracerProvider) CreateDroppableSpan(
 	carrier := propagation.MapCarrier{}
 	defaultPropagator.Inject(ctx, carrier)
 
-	spanMetadata := &meta.SpanMetadata{
+	spanRef := &meta.SpanReference{
 		TraceParent: carrier["traceparent"],
 		TraceState:  carrier["tracestate"],
 	}
 
 	// Only spans with parents can be dynamic? Hm.
 	if opts.Parent != nil {
-		spanMetadata.DynamicSpanTraceParent = opts.Parent.TraceParent
-		spanMetadata.DynamicSpanTraceState = opts.Parent.TraceState
-		spanMetadata.DynamicSpanID = span.SpanContext().SpanID().String()
+		spanRef.DynamicSpanTraceParent = opts.Parent.TraceParent
+		spanRef.DynamicSpanTraceState = opts.Parent.TraceState
+		spanRef.DynamicSpanID = span.SpanContext().SpanID().String()
 	}
 
 	span.SetAttributes(
-		attribute.String(meta.AttributeDynamicSpanID, spanMetadata.DynamicSpanID),
+		attribute.String(meta.AttributeDynamicSpanID, spanRef.DynamicSpanID),
 	)
 
 	if len(opts.Carriers) > 0 {
 		// TODO err
-		byt, _ := json.Marshal(spanMetadata)
+		byt, err := json.Marshal(spanRef)
+		if err != nil {
+			return nil, fmt.Errorf("failed to marshal span metadata when injecting to carriers: %w", err)
+		}
 
 		for _, carrier := range opts.Carriers {
 			carrier[meta.PropagationKey] = string(byt)
 		}
 	}
 
-	spew.Dump("tracing.CreateSpan", name, opts.Location, spanMetadata)
-
-	return span, spanMetadata
+	return &DroppableSpan{
+		span: span,
+		Ref:  spanRef,
+	}, nil
 }
 
-type ExtendSpanOptions struct {
+type UpdateSpanOptions struct {
 	Carrier     map[string]string
 	EndTime     time.Time
 	Location    string
@@ -138,18 +167,20 @@ type ExtendSpanOptions struct {
 	QueueItem   *queue.Item
 	SpanOptions []trace.SpanStartOption
 	Status      codes.Code
-	TargetSpan  *meta.SpanMetadata
+	TargetSpan  *meta.SpanReference
 }
 
 // Returns nothing, as the span is only extended and no further context is given
-func (tp *TracerProvider) ExtendSpan(
-	opts *ExtendSpanOptions,
-) {
-	spew.Dump("tracing.ExtendSpan", opts.TargetSpan)
+func (tp *TracerProvider) UpdateSpan(
+	opts *UpdateSpanOptions,
+) error {
+	if opts.TargetSpan == nil {
+		return fmt.Errorf("no target span")
+	}
 
-	if opts.TargetSpan == nil || opts.TargetSpan.DynamicSpanID == "" {
+	if opts.TargetSpan.DynamicSpanID == "" {
 		// Oof. Not good.
-		panic("no target span")
+		return fmt.Errorf("target span is not dynamic; has no DynamicSpanID")
 	}
 
 	carrier := propagation.MapCarrier{
@@ -167,4 +198,5 @@ func (tp *TracerProvider) ExtendSpan(
 	)
 
 	span.End()
+	return nil
 }

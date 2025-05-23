@@ -17,12 +17,6 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-// DropSpan marks the span to be dropped.
-func DropSpan(span trace.Span) {
-	span.SetAttributes(attribute.Bool(meta.AttributeDropSpan, true))
-	span.End()
-}
-
 func WithFunctionAttrs(f *inngest.Function) trace.SpanStartEventOption {
 	url, err := f.URI()
 	if err != nil {
@@ -35,10 +29,28 @@ func WithFunctionAttrs(f *inngest.Function) trace.SpanStartEventOption {
 	)
 }
 
-func WithResumeAttrs(r *execution.ResumeRequest) trace.SpanStartEventOption {
+func WithResumeAttrs(p *state.Pause, r *execution.ResumeRequest) trace.SpanStartEventOption {
 	attrs := []attribute.KeyValue{}
 
-	// TODO
+	if r != nil {
+		if r.With != nil {
+			if marshalledData, err := json.Marshal(r.With); err == nil {
+				attrs = append(attrs,
+					attribute.String(meta.AttributeStepOutput, string(marshalledData)),
+				)
+			}
+		}
+	}
+
+	if p != nil {
+		if p.IsInvoke() {
+			// TODO
+		} else if p.IsWaitForEvent() {
+			// TODO
+		} else if p.IsSignal() {
+			// TODO
+		}
+	}
 
 	return trace.WithAttributes(attrs...)
 }
@@ -63,10 +75,20 @@ func WithDriverResponseAttrs(resp *state.DriverResponse) trace.SpanStartEventOpt
 		attribute.Int(meta.AttributeResponseOutputSize, resp.OutputSize),
 	)
 
+	// If we have a single op to process, also add any generator data to the
+	// span
+	if op := resp.TraceVisibleStepExecution(); op != nil {
+		attrs = append(attrs, withGeneratorAttrs(op)...)
+	}
+
 	return trace.WithAttributes(attrs...)
 }
 
 func WithGeneratorAttrs(op *state.GeneratorOpcode) trace.SpanStartEventOption {
+	return trace.WithAttributes(withGeneratorAttrs(op)...)
+}
+
+func withGeneratorAttrs(op *state.GeneratorOpcode) []attribute.KeyValue {
 	// Generic attributes for all steps
 	attrs := []attribute.KeyValue{
 		attribute.String(meta.AttributeStepID, op.ID),
@@ -118,19 +140,26 @@ func WithGeneratorAttrs(op *state.GeneratorOpcode) trace.SpanStartEventOption {
 			}
 		}
 
-	case enums.OpcodeStep, enums.OpcodeStepRun:
+	case enums.OpcodeStep, enums.OpcodeStepRun, enums.OpcodeStepError:
 		{
+			// Output (success or error)
+			if output, err := op.Output(); err == nil {
+				attrs = append(attrs,
+					attribute.String(meta.AttributeStepOutput, output),
+				)
+			}
 
-		}
-
-	case enums.OpcodeStepError:
-		{
-
+			// Run type (sub-types of step.run)
+			if typ := op.RunType(); typ != "" {
+				attrs = append(attrs,
+					attribute.String(meta.AttributeStepRunType, typ),
+				)
+			}
 		}
 
 	case enums.OpcodeStepPlanned:
 		{
-
+			// TODO
 		}
 
 	case enums.OpcodeWaitForEvent:
@@ -155,10 +184,10 @@ func WithGeneratorAttrs(op *state.GeneratorOpcode) trace.SpanStartEventOption {
 		}
 	}
 
-	return trace.WithAttributes(attrs...)
+	return attrs
 }
 
-func SpanFromQueueItem(i *queue.Item) *meta.SpanMetadata {
+func SpanRefFromQueueItem(i *queue.Item) *meta.SpanReference {
 	spew.Dump("tracing.SpanFromQueueItem")
 	if i == nil || i.Metadata == nil {
 		spew.Dump("tracing.SpanFromQueueItem", "no metadata")
@@ -167,7 +196,7 @@ func SpanFromQueueItem(i *queue.Item) *meta.SpanMetadata {
 
 	if carrier, ok := i.Metadata[meta.PropagationKey]; ok {
 		spew.Dump("tracing.SpanFromQueueItem", "found carrier", carrier)
-		var out meta.SpanMetadata
+		var out meta.SpanReference
 		if err := json.Unmarshal([]byte(carrier.(string)), &out); err == nil {
 			return &out
 		}
@@ -180,7 +209,7 @@ func SpanFromQueueItem(i *queue.Item) *meta.SpanMetadata {
 	return nil
 }
 
-func SpanFromPause(p *state.Pause) *meta.SpanMetadata {
+func SpanRefFromPause(p *state.Pause) *meta.SpanReference {
 	spew.Dump("tracing.SpanFromPause")
 	if p == nil || p.Metadata == nil {
 		spew.Dump("tracing.SpanFromPause", "no metadata")
@@ -189,7 +218,7 @@ func SpanFromPause(p *state.Pause) *meta.SpanMetadata {
 
 	if carrier, ok := p.Metadata[meta.PropagationKey]; ok {
 		spew.Dump("tracing.SpanFromPause", "found carrier", carrier)
-		var out meta.SpanMetadata
+		var out meta.SpanReference
 		if err := json.Unmarshal([]byte(carrier.(string)), &out); err == nil {
 			return &out
 		}
@@ -209,7 +238,7 @@ func SpanFromPause(p *state.Pause) *meta.SpanMetadata {
 //
 // A single exception is maybe the very first execution, but also with that we
 // shoud have the run span inside the queue item's metadata.
-func RunSpanFromMetadata(md *statev2.Metadata) *meta.SpanMetadata {
+func RunSpanRefFromMetadata(md *statev2.Metadata) *meta.SpanReference {
 	if md == nil {
 		return nil
 	}
@@ -217,7 +246,7 @@ func RunSpanFromMetadata(md *statev2.Metadata) *meta.SpanMetadata {
 	return md.Config.NewFunctionTrace()
 }
 
-func spanContextFromMetadata(m *meta.SpanMetadata) trace.SpanContext {
+func spanContextFromMetadata(m *meta.SpanReference) trace.SpanContext {
 	if m == nil {
 		return trace.SpanContext{}
 	}

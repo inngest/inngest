@@ -511,15 +511,18 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	}
 
 	// Always the root span.
-	config.NewSetFunctionTrace(
-		e.tracerProvider.CreateSpan(
-			meta.SpanNameRun,
-			&tracing.CreateSpanOptions{
-				Location: "executor.Schedule",
-				Metadata: &metadata,
-			},
-		),
+	runSpanRef, err := e.tracerProvider.CreateSpan(
+		meta.SpanNameRun,
+		&tracing.CreateSpanOptions{
+			Location: "executor.Schedule",
+			Metadata: &metadata,
+		},
 	)
+	if err != nil {
+		return nil, fmt.Errorf("error creating run span: %w", err)
+	}
+
+	config.NewSetFunctionTrace(runSpanRef)
 
 	// If this is paused, immediately end just before creating state.
 	isPaused := req.FunctionPausedAt != nil && req.FunctionPausedAt.Before(time.Now())
@@ -731,13 +734,16 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		// tCtx, _ := e.tracerProvider.NewTracer(ctx, md, &item)
 		// e.tracerProvider.UpdateSpanEnd(tCtx, time.Now(),
 		// []attribute.KeyValue{})
-		e.tracerProvider.ExtendSpan(&tracing.ExtendSpanOptions{
+		err := e.tracerProvider.UpdateSpan(&tracing.UpdateSpanOptions{
 			EndTime:    time.Now(),
 			Location:   "executor.Execute",
 			QueueItem:  &item,
 			Status:     codes.Ok,
-			TargetSpan: tracing.SpanFromQueueItem(&item),
+			TargetSpan: tracing.SpanRefFromQueueItem(&item),
 		})
+		if err != nil {
+			return nil, fmt.Errorf("error updating sleep resume span: %w", err)
+		}
 
 		hasPendingSteps, err := e.smv2.SaveStep(ctx, sv2.ID{
 			RunID:      id.RunID,
@@ -900,41 +906,47 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	}
 
 	// Set the parent span for this execution.
-	var execParent *meta.SpanMetadata
+	var execParent *meta.SpanReference
 	if isFirstExecution {
 		// If this is the first ever attempt, we haven't created a step yet. If
 		// this is not the first attempt, the step span is created when it is
 		// enqueued, so we don't need to create one here.
-		execParent = e.tracerProvider.CreateSpan(
+		execParent, err = e.tracerProvider.CreateSpan(
 			meta.SpanNameStepDiscovery,
 			&tracing.CreateSpanOptions{
 				Location:  "executor.Execute",
-				Parent:    tracing.RunSpanFromMetadata(&md),
+				Parent:    tracing.RunSpanRefFromMetadata(&md),
 				Metadata:  &md,
 				QueueItem: &item,
 			},
 		)
+		if err != nil {
+			return nil, fmt.Errorf("error creating initial step span: %w", err)
+		}
 
 	} else if isSleepResume {
 		// If we're resuming a sleep here, we're also starting a new discovery
 		// step here.
-		execParent = e.tracerProvider.CreateSpan(
+		execParent, err = e.tracerProvider.CreateSpan(
 			meta.SpanNameStepDiscovery,
 			&tracing.CreateSpanOptions{
-				FollowsFrom: tracing.SpanFromQueueItem(&item),
+				FollowsFrom: tracing.SpanRefFromQueueItem(&item),
 				Location:    "executor.Execute",
 				Metadata:    &md,
-				Parent:      tracing.RunSpanFromMetadata(&md),
+				Parent:      tracing.RunSpanRefFromMetadata(&md),
 				QueueItem:   &item,
 			},
 		)
+		if err != nil {
+			return nil, fmt.Errorf("error creating discovery step span after sleep resume: %w", err)
+		}
 	} else {
 		// If we're here, we assume that the step span has already been
 		// created, so add it here.
-		execParent = tracing.SpanFromQueueItem(&item)
+		execParent = tracing.SpanRefFromQueueItem(&item)
 	}
 
-	execSpan := e.tracerProvider.CreateSpan(
+	execSpan, err := e.tracerProvider.CreateSpan(
 		meta.SpanNameExecution,
 		&tracing.CreateSpanOptions{
 			Location:  "executor.Execute",
@@ -946,6 +958,9 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			},
 		},
 	)
+	if err != nil {
+		return nil, fmt.Errorf("error creating execution span: %w", err)
+	}
 
 	return util.CritT(ctx, "run step", func(ctx context.Context) (*state.DriverResponse, error) {
 		resp, err := e.run(ctx, &instance)
@@ -954,8 +969,8 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		if err != nil {
 			status = codes.Error
 		}
-		e.tracerProvider.ExtendSpan(
-			&tracing.ExtendSpanOptions{
+		e.tracerProvider.UpdateSpan(
+			&tracing.UpdateSpanOptions{
 				EndTime:    time.Now(),
 				Location:   "executor.Execute",
 				Metadata:   &md,
@@ -1831,14 +1846,14 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 		if r.IsTimeout {
 			status = codes.Error // TODO Our own codes pls; this is not an error
 		}
-		pauseSpan := tracing.SpanFromPause(&pause)
-		e.tracerProvider.ExtendSpan(&tracing.ExtendSpanOptions{
+		pauseSpan := tracing.SpanRefFromPause(&pause)
+		e.tracerProvider.UpdateSpan(&tracing.UpdateSpanOptions{
 			EndTime:    time.Now(),
 			Location:   "executor.Resume",
 			Status:     status,
 			TargetSpan: pauseSpan,
 			SpanOptions: []trace.SpanStartOption{
-				tracing.WithResumeAttrs(&r),
+				tracing.WithResumeAttrs(&pause, &r),
 			},
 		})
 
@@ -1910,29 +1925,32 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 				Metadata: make(map[string]any),
 			}
 
-			nextStepSpan, _ := e.tracerProvider.CreateDroppableSpan(
+			nextStepSpan, err := e.tracerProvider.CreateDroppableSpan(
 				meta.SpanNameStepDiscovery,
 				&tracing.CreateSpanOptions{
 					Carriers:    []map[string]any{nextItem.Metadata},
 					FollowsFrom: pauseSpan,
 					Location:    "executor.Resume",
 					Metadata:    &md,
-					Parent:      tracing.RunSpanFromMetadata(&md),
+					Parent:      tracing.RunSpanRefFromMetadata(&md),
 					QueueItem:   &nextItem,
 				},
 			)
+			if err != nil {
+				return fmt.Errorf("error creating span for next step after resume: %w", err)
+			}
 
 			err = e.queue.Enqueue(ctx, nextItem, time.Now(), queue.EnqueueOpts{})
 			if err != nil {
 				if err == redis_state.ErrQueueItemExists {
-					tracing.DropSpan(nextStepSpan)
+					nextStepSpan.Drop()
 				} else {
-					nextStepSpan.End()
+					nextStepSpan.Send()
 					return fmt.Errorf("error enqueueing after pause: %w", err)
 				}
 			}
 
-			nextStepSpan.End()
+			nextStepSpan.Send()
 		}
 
 		// Only run lifecycles if we consumed the pause and enqueued next step.
@@ -2188,30 +2206,33 @@ func (e *executor) handleGeneratorStep(ctx context.Context, i *runInstance, gen 
 	}
 
 	if !hasPendingSteps {
-		span, _ := e.tracerProvider.CreateDroppableSpan(
+		span, err := e.tracerProvider.CreateDroppableSpan(
 			meta.SpanNameStepDiscovery,
 			&tracing.CreateSpanOptions{
 				Carriers:    []map[string]any{nextItem.Metadata},
-				FollowsFrom: tracing.SpanFromQueueItem(&i.item),
+				FollowsFrom: tracing.SpanRefFromQueueItem(&i.item),
 				Location:    "executor.handleGeneratorStep",
 				Metadata:    &i.md,
-				Parent:      tracing.RunSpanFromMetadata(&i.md),
+				Parent:      tracing.RunSpanRefFromMetadata(&i.md),
 				QueueItem:   &nextItem,
 			},
 		)
+		if err != nil {
+			return fmt.Errorf("error creating span for next step after Step: %w", err)
+		}
 
 		err = e.queue.Enqueue(ctx, nextItem, now, queue.EnqueueOpts{})
 		if err == redis_state.ErrQueueItemExists {
-			tracing.DropSpan(span)
+			span.Drop()
 			return nil
 		}
 		if err != nil {
 			logger.StdlibLogger(ctx).Error("error scheduling step queue item", "error", err)
-			tracing.DropSpan(span)
+			span.Drop()
 			return err
 		}
 
-		span.End()
+		span.Send()
 	}
 
 	for _, l := range e.lifecycles {
@@ -2326,25 +2347,28 @@ func (e *executor) handleStepError(ctx context.Context, i *runInstance, gen stat
 	}
 
 	if !hasPendingSteps {
-		span, _ := e.tracerProvider.CreateDroppableSpan(
+		span, err := e.tracerProvider.CreateDroppableSpan(
 			meta.SpanNameStepDiscovery,
 			&tracing.CreateSpanOptions{
 				Carriers:    []map[string]any{nextItem.Metadata},
-				FollowsFrom: tracing.SpanFromQueueItem(&i.item),
+				FollowsFrom: tracing.SpanRefFromQueueItem(&i.item),
 				Location:    "executor.handleStepError",
 				Metadata:    &i.md,
 				QueueItem:   &nextItem,
-				Parent:      tracing.RunSpanFromMetadata(&i.md),
+				Parent:      tracing.RunSpanRefFromMetadata(&i.md),
 			},
 		)
+		if err != nil {
+			return fmt.Errorf("error creating span for next step after StepError: %w", err)
+		}
 
 		err = e.queue.Enqueue(ctx, nextItem, now, queue.EnqueueOpts{})
 		if err == redis_state.ErrQueueItemExists {
-			tracing.DropSpan(span)
+			span.Drop()
 			return nil
 		}
 
-		span.End()
+		span.Send()
 	}
 
 	for _, l := range e.lifecycles {
@@ -2396,28 +2420,31 @@ func (e *executor) handleGeneratorStepPlanned(ctx context.Context, i *runInstanc
 		Metadata: make(map[string]any),
 	}
 
-	span, _ := e.tracerProvider.CreateDroppableSpan(
+	span, err := e.tracerProvider.CreateDroppableSpan(
 		meta.SpanNameStep,
 		&tracing.CreateSpanOptions{
 			Carriers:    []map[string]any{nextItem.Metadata},
-			FollowsFrom: tracing.SpanFromQueueItem(&i.item),
+			FollowsFrom: tracing.SpanRefFromQueueItem(&i.item),
 			Location:    "executor.handleGeneratorStepPlanned",
 			Metadata:    &i.md,
 			QueueItem:   &nextItem,
-			Parent:      tracing.RunSpanFromMetadata(&i.md),
+			Parent:      tracing.RunSpanRefFromMetadata(&i.md),
 			SpanOptions: []trace.SpanStartOption{
 				tracing.WithGeneratorAttrs(&gen),
 			},
 		},
 	)
+	if err != nil {
+		return fmt.Errorf("error creating span for next step after StepPlanned: %w", err)
+	}
 
-	err := e.queue.Enqueue(ctx, nextItem, now, queue.EnqueueOpts{})
+	err = e.queue.Enqueue(ctx, nextItem, now, queue.EnqueueOpts{})
 	if err == redis_state.ErrQueueItemExists {
-		tracing.DropSpan(span)
+		span.Drop()
 		return nil
 	}
 
-	span.End()
+	span.Send()
 
 	for _, l := range e.lifecycles {
 		go l.OnStepScheduled(ctx, i.md, nextItem, &gen.Name)
@@ -2464,31 +2491,34 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, i *runInstance, gen
 		Metadata:              make(map[string]any),
 	}
 
-	span, _ := e.tracerProvider.CreateDroppableSpan(
+	span, err := e.tracerProvider.CreateDroppableSpan(
 		meta.SpanNameStep,
 		&tracing.CreateSpanOptions{
 			Carriers:    []map[string]any{nextItem.Metadata},
-			FollowsFrom: tracing.SpanFromQueueItem(&i.item),
+			FollowsFrom: tracing.SpanRefFromQueueItem(&i.item),
 			Location:    "executor.handleGeneratorSleep",
 			Metadata:    &i.md,
 			QueueItem:   &nextItem,
-			Parent:      tracing.RunSpanFromMetadata(&i.md),
+			Parent:      tracing.RunSpanRefFromMetadata(&i.md),
 			SpanOptions: []trace.SpanStartOption{
 				tracing.WithGeneratorAttrs(&gen),
 			},
 		},
 	)
+	if err != nil {
+		return fmt.Errorf("error creating span for next step after Sleep: %w", err)
+	}
 
 	spew.Dump("metadata after thing", nextItem.Metadata)
 
 	// TODO Should this also include a parent step span? It will never have attempts.
 	err = e.queue.Enqueue(ctx, nextItem, until, queue.EnqueueOpts{})
 	if err == redis_state.ErrQueueItemExists {
-		tracing.DropSpan(span)
+		span.Drop()
 		return nil
 	}
 
-	span.End()
+	span.Send()
 
 	for _, e := range e.lifecycles {
 		go e.OnSleep(context.WithoutCancel(ctx), i.md, i.item, gen, until)
@@ -3115,25 +3145,28 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, i *runInstan
 		Metadata: make(map[string]any),
 	}
 
-	span, _ := e.tracerProvider.CreateDroppableSpan(
+	span, err := e.tracerProvider.CreateDroppableSpan(
 		meta.SpanNameStep,
 		&tracing.CreateSpanOptions{
 			Carriers:    []map[string]any{pause.Metadata, i.item.Metadata},
-			FollowsFrom: tracing.SpanFromQueueItem(&i.item),
+			FollowsFrom: tracing.SpanRefFromQueueItem(&i.item),
 			Location:    "executor.handleGeneratorWaitForEvent",
 			Metadata:    &i.md,
 			QueueItem:   &nextItem,
-			Parent:      tracing.RunSpanFromMetadata(&i.md),
+			Parent:      tracing.RunSpanRefFromMetadata(&i.md),
 			SpanOptions: []trace.SpanStartOption{
 				tracing.WithGeneratorAttrs(&gen),
 			},
 		},
 	)
+	if err != nil {
+		return fmt.Errorf("error creating span for next step after WaitForEvent: %w", err)
+	}
 
 	_, err = e.pm.SavePause(ctx, pause)
 	if err != nil {
 		if err == state.ErrPauseAlreadyExists {
-			tracing.DropSpan(span)
+			span.Drop()
 			return nil
 		}
 
@@ -3142,11 +3175,11 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, i *runInstan
 	// TODO Is this fine to leave? No attempts.
 	err = e.queue.Enqueue(ctx, nextItem, expires, queue.EnqueueOpts{})
 	if err == redis_state.ErrQueueItemExists {
-		tracing.DropSpan(span)
+		span.Drop()
 		return nil
 	}
 
-	span.End()
+	span.Send()
 
 	for _, e := range e.lifecycles {
 		go e.OnWaitForEvent(context.WithoutCancel(ctx), i.md, i.item, gen, pause)

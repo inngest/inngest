@@ -346,7 +346,7 @@ func (c *Config) FunctionTrace() *itrace.TraceCarrier {
 	return nil
 }
 
-func (c *Config) NewSetFunctionTrace(carrier *meta.SpanMetadata) {
+func (c *Config) NewSetFunctionTrace(carrier *meta.SpanReference) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -354,7 +354,7 @@ func (c *Config) NewSetFunctionTrace(carrier *meta.SpanMetadata) {
 	c.Context[meta.PropagationKey] = *carrier
 }
 
-func (c *Config) NewFunctionTrace() *meta.SpanMetadata {
+func (c *Config) NewFunctionTrace() *meta.SpanReference {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 
@@ -364,7 +364,7 @@ func (c *Config) NewFunctionTrace() *meta.SpanMetadata {
 
 	if raw, ok := c.Context[meta.PropagationKey]; ok {
 		if data, err := json.Marshal(raw); err == nil {
-			var meta meta.SpanMetadata
+			var meta meta.SpanReference
 			if err := json.Unmarshal(data, &meta); err == nil {
 				return &meta
 			}

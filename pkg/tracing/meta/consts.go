@@ -41,6 +41,14 @@ const (
 	AttributeStepAttempt     = "_inngest.step.attempt"      // _s.a
 	AttributeStepMaxAttempts = "_inngest.step.max_attempts" // _s.m
 	AttributeCodeLocation    = "_inngest.code.location"     // _s.loc
+	// AttributeStepOutput is the data that has been returned from the step, in
+	// its wrapped form for the SDK. This data may not be stored with the span
+	// when it hits a store, and instead may be removed to be stored
+	// separately.
+	AttributeStepOutput = "_inngest.step.output" // _s.out
+
+	// Run attributes
+	AttributeStepRunType = "_inngest.step.run.type" // _s.r.type
 
 	// Invoke attributes
 	AttributeStepInvokeExpiry         = "_inngest.step.invoke_function.expiry"           // _s.if.exp
@@ -51,9 +59,11 @@ const (
 	AttributeStepSleepDuration = "_inngest.step.sleep.duration" // _s.sleep
 
 	// WaitForEvent attributes
-	AttributeStepWaitForEventExpiry = "_inngest.step.wait_for_event.expiry" // _s.w.exp
-	AttributeStepWaitForEventIf     = "_inngest.step.wait_for_event.if"     // _s.w.if
-	AttributeStepWaitForEventName   = "_inngest.step.wait_for_event.name"   // _s.w.name
+	AttributeStepWaitForEventExpiry    = "_inngest.step.wait_for_event.expiry"     // _s.w.exp
+	AttributeStepWaitForEventIf        = "_inngest.step.wait_for_event.if"         // _s.w.if
+	AttributeStepWaitForEventName      = "_inngest.step.wait_for_event.name"       // _s.w.name
+	AttributeStepWaitForEventExpired   = "_inngest.step.wait_for_event.expired"    // _s.w.expired
+	AttributeStepWaitForEventMatchedID = "_inngest.step.wait_for_event.matched_id" // _s.w.mid
 
 	// HTTP (serve) attributes
 	AttributeRequestURL         = "_inngest.request.uri"          // _req.u
