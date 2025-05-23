@@ -216,7 +216,7 @@ func HeadersFromTraceState(
 	UserTracer().Propagator().Inject(newCtx, propagation.MapCarrier(headers))
 
 	if headers["traceparent"] != "" {
-		// The span ID will be incorrect here as lifecycles can not affec the
+		// The span ID will be incorrect here as lifecycles can not affect the
 		// ctx. To patch, we manually set the span ID here to what we know it
 		// should be based on the item
 		parts := strings.Split(headers["traceparent"], "-")

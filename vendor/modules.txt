@@ -644,8 +644,8 @@ github.com/hashicorp/hcl/json/token
 # github.com/inconshreveable/mousetrap v1.1.0
 ## explicit; go 1.18
 github.com/inconshreveable/mousetrap
-# github.com/inngest/expr v0.0.0-20250509191721-c3e4aff53538
-## explicit; go 1.23.2
+# github.com/inngest/expr v0.0.0-20250521221349-ef1dab5028e5
+## explicit; go 1.24
 github.com/inngest/expr
 # github.com/inngest/go-httpstat v0.0.0-20250321152849-8f5b26507651
 ## explicit; go 1.23.2
@@ -741,6 +741,9 @@ github.com/lib/pq/scram
 # github.com/liushuangls/go-anthropic/v2 v2.12.2
 ## explicit; go 1.21
 github.com/liushuangls/go-anthropic/v2
+# github.com/lmittmann/tint v1.1.0
+## explicit; go 1.21
+github.com/lmittmann/tint
 # github.com/lucasb-eyer/go-colorful v1.2.0
 ## explicit; go 1.12
 github.com/lucasb-eyer/go-colorful

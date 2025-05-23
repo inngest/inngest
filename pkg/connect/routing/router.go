@@ -5,9 +5,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/connect/state"
 	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/inngest/inngest/pkg/util"
@@ -16,9 +20,6 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/propagation"
 	"gonum.org/v1/gonum/stat/sampleuv"
-	"log/slog"
-	"slices"
-	"time"
 )
 
 const (
@@ -32,7 +33,7 @@ type RouteResult struct {
 	ConnectionID ulid.ULID
 }
 
-func GetRoute(ctx context.Context, stateMgr state.StateManager, rnd *util.FrandRNG, tracer trace.ConditionalTracer, log *slog.Logger, data *connectpb.GatewayExecutorRequestData) (*RouteResult, error) {
+func GetRoute(ctx context.Context, stateMgr state.StateManager, rnd *util.FrandRNG, tracer trace.ConditionalTracer, log logger.Logger, data *connectpb.GatewayExecutorRequestData) (*RouteResult, error) {
 	appID, err := uuid.Parse(data.AppId)
 	if err != nil {
 		return nil, fmt.Errorf("could not parse app ID: %w", err)
@@ -109,7 +110,7 @@ type connWithGroup struct {
 	group *state.WorkerGroup
 }
 
-func getSuitableConnection(ctx context.Context, rnd *util.FrandRNG, stateMgr state.StateManager, envID uuid.UUID, appID uuid.UUID, fnSlug string, log *slog.Logger) (*connectpb.ConnMetadata, error) {
+func getSuitableConnection(ctx context.Context, rnd *util.FrandRNG, stateMgr state.StateManager, envID uuid.UUID, appID uuid.UUID, fnSlug string, log logger.Logger) (*connectpb.ConnMetadata, error) {
 	conns, err := stateMgr.GetConnectionsByAppID(ctx, envID, appID)
 	if err != nil {
 		return nil, fmt.Errorf("could not get connections by app ID: %w", err)
@@ -150,7 +151,7 @@ func getSuitableConnection(ctx context.Context, rnd *util.FrandRNG, stateMgr sta
 	return pickConnection(healthy, rnd)
 }
 
-func cleanupUnhealthyGateway(stateManager state.StateManager, conn *connectpb.ConnMetadata, log *slog.Logger) {
+func cleanupUnhealthyGateway(stateManager state.StateManager, conn *connectpb.ConnMetadata, log logger.Logger) {
 	gatewayId, err := ulid.Parse(conn.GatewayId)
 	if err != nil {
 		log.Error("could not clean up unhealthy gateway, invalid gateway ID", "gateway_id", conn.GatewayId, "err", err)
@@ -164,7 +165,7 @@ func cleanupUnhealthyGateway(stateManager state.StateManager, conn *connectpb.Co
 	}
 }
 
-func cleanupUnhealthyConnection(stateManager state.StateManager, envID uuid.UUID, conn *connectpb.ConnMetadata, log *slog.Logger) {
+func cleanupUnhealthyConnection(stateManager state.StateManager, envID uuid.UUID, conn *connectpb.ConnMetadata, log logger.Logger) {
 	connId, err := ulid.Parse(conn.Id)
 	if err != nil {
 		log.Error("could not clean up inactive connection, invalid connection ID", "conn_id", conn.Id, "err", err)
@@ -255,7 +256,7 @@ type isHealthyRes struct {
 	workerGroup                     *state.WorkerGroup
 }
 
-func isHealthy(ctx context.Context, stateManager state.StateManager, envID uuid.UUID, appID uuid.UUID, fnSlug string, conn *connectpb.ConnMetadata, log *slog.Logger) isHealthyRes {
+func isHealthy(ctx context.Context, stateManager state.StateManager, envID uuid.UUID, appID uuid.UUID, fnSlug string, conn *connectpb.ConnMetadata, log logger.Logger) isHealthyRes {
 	log.Debug("evaluating connection", "conn_id", conn.Id, "status", conn.Status, "last_heartbeat_at", conn.LastHeartbeatAt.AsTime())
 
 	gatewayId, err := ulid.Parse(conn.GatewayId)

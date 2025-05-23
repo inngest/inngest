@@ -4,11 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/google/uuid"
-	connecterrors "github.com/inngest/inngest/pkg/connect/errors"
-	"github.com/inngest/inngest/pkg/consts"
 	"io"
-	"log/slog"
 	"net"
 	"net/http"
 	"strings"
@@ -16,11 +12,15 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/connect/auth"
+	connecterrors "github.com/inngest/inngest/pkg/connect/errors"
 	"github.com/inngest/inngest/pkg/connect/pubsub"
 	"github.com/inngest/inngest/pkg/connect/state"
 	"github.com/inngest/inngest/pkg/connect/types"
 	"github.com/inngest/inngest/pkg/connect/wsproto"
+	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/syscode"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	connectpb "github.com/inngest/inngest/proto/gen/connect/v1"
@@ -75,7 +75,7 @@ type connectionHandler struct {
 	ws   *websocket.Conn
 
 	updateLock sync.Mutex
-	log        *slog.Logger
+	log        logger.Logger
 
 	remoteAddr string
 

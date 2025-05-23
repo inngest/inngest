@@ -5,12 +5,17 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
+	"os"
+	"testing"
+	"time"
+
 	"github.com/alicebob/miniredis/v2"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/connect/auth"
 	"github.com/inngest/inngest/pkg/connect/state"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/inngest"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/sdk"
 	"github.com/inngest/inngest/pkg/syscode"
 	"github.com/inngest/inngest/pkg/telemetry/trace"
@@ -18,10 +23,6 @@ import (
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 	"github.com/stretchr/testify/require"
-	"log/slog"
-	"os"
-	"testing"
-	"time"
 )
 
 func TestProxyPubSubPath(t *testing.T) {
@@ -33,7 +34,11 @@ func TestProxyPubSubPath(t *testing.T) {
 	require.NoError(t, err)
 	defer rc.Close()
 
-	l := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	l := logger.StdlibLogger(context.Background(),
+		logger.WithHandler(logger.TextHandler),
+		logger.WithLoggerWriter(os.Stdout),
+		logger.WithLoggerLevel(logger.LevelDebug),
+	)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -73,7 +78,7 @@ func TestProxyPubSubPath(t *testing.T) {
 				},
 			},
 			Steps: map[string]sdk.SDKStep{
-				"step": sdk.SDKStep{
+				"step": {
 					ID:   "step",
 					Name: fnName,
 					Runtime: map[string]any{
@@ -243,7 +248,11 @@ func TestProxyPolling(t *testing.T) {
 	require.NoError(t, err)
 	defer rc.Close()
 
-	l := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	l := logger.StdlibLogger(context.Background(),
+		logger.WithHandler(logger.TextHandler),
+		logger.WithLoggerWriter(os.Stdout),
+		logger.WithLoggerLevel(logger.LevelDebug),
+	)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
@@ -463,7 +472,11 @@ func TestProxyLeaseExpiry(t *testing.T) {
 	require.NoError(t, err)
 	defer rc.Close()
 
-	l := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug}))
+	l := logger.StdlibLogger(context.Background(),
+		logger.WithHandler(logger.TextHandler),
+		logger.WithLoggerWriter(os.Stdout),
+		logger.WithLoggerLevel(logger.LevelDebug),
+	)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()

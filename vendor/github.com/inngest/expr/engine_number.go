@@ -135,7 +135,7 @@ func (n *numbers) Search(ctx context.Context, variable string, input any, result
 func (n *numbers) Add(ctx context.Context, p ExpressionPart) error {
 	// If this is not equals, ignore.
 	if p.Predicate.Operator == operators.NotEquals {
-		return fmt.Errorf("Number engine does not support !=")
+		return fmt.Errorf("number engine does not support !=")
 	}
 
 	// Add the number to the btree.
@@ -185,7 +185,7 @@ func (n *numbers) Add(ctx context.Context, p ExpressionPart) error {
 func (n *numbers) Remove(ctx context.Context, p ExpressionPart) error {
 	// If this is not equals, ignore.
 	if p.Predicate.Operator == operators.NotEquals {
-		return fmt.Errorf("Number engine does not support !=")
+		return fmt.Errorf("number engine does not support !=")
 	}
 
 	// Add the number to the btree.

@@ -138,7 +138,6 @@ type Props = {
 
 export default function IntegrationsList({ integrations }: Props) {
   const { value: supabaseIntegration } = useBooleanFlag('supabase-integration');
-  const { value: ddIntegration } = useBooleanFlag('datadog-integration');
 
   const getIntegrationData = (slug: string) =>
     integrations.find((integration) => integration.slug === slug);
@@ -149,7 +148,6 @@ export default function IntegrationsList({ integrations }: Props) {
       <div className="grid w-[800px] grid-cols-2 gap-6">
         {INTEGRATIONS.map((i: Integration, n) => {
           if (i.title === 'Supabase' && !supabaseIntegration) return;
-          if (i.title === 'Datadog' && !ddIntegration) return;
 
           const integrationData = getIntegrationData(i.slug);
           const isEnabled = Boolean(integrationData?.enabled);

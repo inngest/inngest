@@ -39,6 +39,7 @@ export default function Monitor({
           collapsed={collapsed}
           text="Events"
           icon={<EventLogsIcon className="h-[18px] w-[18px]" />}
+          beta
         />
       </ClientFeatureFlag>
     </div>

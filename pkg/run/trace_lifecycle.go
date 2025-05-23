@@ -3,7 +3,6 @@ package run
 import (
 	"context"
 	"encoding/json"
-	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -17,6 +16,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/inngest"
+	"github.com/inngest/inngest/pkg/logger"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/inngest/inngest/pkg/util/aigateway"
 	"github.com/oklog/ulid/v2"
@@ -26,9 +26,9 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-func NewTraceLifecycleListener(l *slog.Logger) execution.LifecycleListener {
+func NewTraceLifecycleListener(l logger.Logger) execution.LifecycleListener {
 	if l == nil {
-		l = slog.Default()
+		l = logger.StdlibLogger(context.Background())
 	}
 
 	return traceLifecycle{
@@ -39,7 +39,7 @@ func NewTraceLifecycleListener(l *slog.Logger) execution.LifecycleListener {
 type traceLifecycle struct {
 	execution.NoopLifecyceListener
 
-	log *slog.Logger
+	log logger.Logger
 }
 
 func (l traceLifecycle) OnFunctionScheduled(ctx context.Context, md statev2.Metadata, item queue.Item, evts []event.TrackedEvent) {

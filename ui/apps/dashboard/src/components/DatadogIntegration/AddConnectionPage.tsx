@@ -14,7 +14,7 @@ import EnvSelectMenu from '@/components/Environments/EnvSelectMenu';
 import { graphql } from '@/gql';
 import { useEnvironments } from '@/queries';
 import type { Environment } from '@/utils/environments';
-import { GetDatadogSetupDataDocument, ddMarketplaceHref } from './SetupPage';
+import { GetDatadogSetupDataDocument, ddIntegrationHref } from './SetupPage';
 
 const EnableDatadogConnectionDocument = graphql(`
   mutation EnableDatadogConnection($organizationID: UUID!, $envID: UUID!) {
@@ -122,7 +122,7 @@ export default function AddConnectionPage({}) {
             </p>
             <p>
               To connect a new Datadog organization, please{' '}
-              <Link href={ddMarketplaceHref} className="underline">
+              <Link href={ddIntegrationHref} className="underline">
                 navigate to the Inngest integration from your Datadog organization
               </Link>{' '}
               and start the connection process from there.
