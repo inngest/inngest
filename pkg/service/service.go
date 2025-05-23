@@ -184,9 +184,11 @@ func pre(ctx context.Context, s Service) error {
 // parent context is cancelled.  If the parent context is cancelled, we wait
 // up to 30 seconds
 func run(ctx context.Context, stop func(), s Service) error {
+	l := logger.StdlibLogger(ctx).With("service", s.Name())
+
 	runErr := make(chan error)
 	go func() {
-		logger.From(ctx).Info().Msg("service starting")
+		l.Info("service starting")
 		err := s.Run(ctx)
 		// Communicate this error to the outer select.
 		runErr <- err
@@ -198,7 +200,7 @@ func run(ctx context.Context, stop func(), s Service) error {
 		if err != nil {
 			return err
 		}
-		logger.From(ctx).Info().Interface("signal", ctx.Err()).Msg("service finished")
+		l.Info("service finished", "signal", ctx.Err())
 	case <-ctx.Done():
 		// We received a cancellation signal.  Allow Run to continue for up
 		// to RunTimoeut period before quitting and cleaning up.
@@ -210,10 +212,10 @@ func run(ctx context.Context, stop func(), s Service) error {
 		defer cleanup()
 
 		timeout := runTimeout(s)
-		logger.From(ctx).Info().
-			Interface("signal", ctx.Err()).
-			Float64("seconds", timeout.Seconds()).
-			Msg("signal received, service stopping")
+		l.Info("signal received, service stopping",
+			"signal", ctx.Err(),
+			"seconds", timeout.Seconds(),
+		)
 
 		select {
 		case <-repeat.Done():
@@ -229,9 +231,10 @@ func run(ctx context.Context, stop func(), s Service) error {
 }
 
 func stop(ctx context.Context, s Service) error {
+	l := logger.StdlibLogger(ctx).With("service", s.Name())
 	stopCh := make(chan error)
 	go func() {
-		logger.From(ctx).Info().Msg("service cleaning up")
+		l.Info("service cleaning up")
 		// Create a new context that's not cancelled.
 		if err := s.Stop(context.Background()); err != nil && err != context.Canceled {
 			stopCh <- err

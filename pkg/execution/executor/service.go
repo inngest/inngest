@@ -175,7 +175,7 @@ func (s *svc) getFinishHandler(ctx context.Context) (func(context.Context, sv2.I
 }
 
 func (s *svc) Run(ctx context.Context) error {
-	logger.From(ctx).Info().Msg("subscribing to function queue")
+	logger.StdlibLogger(ctx).Info("subscribing to function queue")
 	return s.queue.Run(ctx, func(ctx context.Context, info queue.RunInfo, item queue.Item) (queue.RunResult, error) {
 		// Don't stop the service on errors.
 		s.wg.Add(1)
@@ -270,7 +270,7 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) (bool, error
 }
 
 func (s *svc) handlePauseTimeout(ctx context.Context, item queue.Item) error {
-	l := logger.From(ctx).With().Str("run_id", item.Identifier.RunID.String()).Logger()
+	l := logger.StdlibLogger(ctx).With("run_id", item.Identifier.RunID.String())
 
 	pauseTimeout, ok := item.Payload.(queue.PayloadPauseTimeout)
 	if !ok {
@@ -280,7 +280,7 @@ func (s *svc) handlePauseTimeout(ctx context.Context, item queue.Item) error {
 	pause, err := s.state.PauseByID(ctx, pauseTimeout.PauseID)
 	if err == state.ErrPauseNotFound {
 		// This pause has been consumed.
-		l.Debug().Interface("pause", pauseTimeout).Msg("consumed pause timeout ignored")
+		l.Debug("consumed pause timeout ignored", "pause", pauseTimeout)
 		return nil
 	}
 	if err != nil {

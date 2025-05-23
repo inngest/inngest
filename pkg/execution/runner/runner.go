@@ -156,7 +156,7 @@ func (s svc) Name() string {
 func (s *svc) Pre(ctx context.Context) error {
 	var err error
 
-	logger.From(ctx).Info().Str("backend", s.config.Queue.Service.Backend).Msg("starting event stream")
+	logger.StdlibLogger(ctx).Info("starting event stream", "backend", s.config.Queue.Service.Backend)
 	s.pubsub, err = pubsub.NewPublishSubscriber(ctx, s.config.EventStream.Service)
 	if err != nil {
 		return err
@@ -195,10 +195,8 @@ func (s *svc) Run(ctx context.Context) error {
 		return err
 	}
 
-	l := logger.From(ctx)
-	l.Info().
-		Str("topic", s.config.EventStream.Service.TopicName()).
-		Msg("subscribing to events")
+	l := logger.StdlibLogger(ctx)
+	l.Info("subscribing to events", "topic", s.config.EventStream.Service.TopicName())
 	err := s.pubsub.Subscribe(ctx, s.config.EventStream.Service.TopicName(), s.handleMessage)
 	if err != nil {
 		return err
@@ -219,6 +217,8 @@ func (s *svc) Stop(ctx context.Context) error {
 }
 
 func (s *svc) InitializeCrons(ctx context.Context) error {
+	l := logger.StdlibLogger(ctx)
+
 	// If a previous cron manager exists, cancel it.
 	if s.cronmanager != nil {
 		s.cronmanager.Stop()
@@ -282,15 +282,15 @@ func (s *svc) InitializeCrons(ctx context.Context) error {
 						},
 					)
 					if err != nil {
-						logger.From(ctx).Error().Err(err).Msg("error publishing cron event")
+						l.Error("error publishing cron event", "error", err)
 					}
 				} else {
-					logger.From(ctx).Error().Err(err).Msg("error marshaling cron event")
+					l.Error("error marshaling cron event", "error", err)
 				}
 
 				err = s.initialize(ctx, fn, trackedEvent)
 				if err != nil {
-					logger.From(ctx).Error().Err(err).Msg("error initializing scheduled function")
+					l.Error("error initializing scheduled function", "error", err)
 				}
 			})
 			if err != nil {
@@ -374,14 +374,15 @@ func (s *svc) handleMessage(ctx context.Context, m pubsub.Message) error {
 		return err
 	}
 
-	l := logger.From(ctx).With().
-		Str("event", tracked.GetEvent().Name).
-		Str("id", tracked.GetEvent().ID).
-		Str("internal_id", tracked.GetInternalID().String()).
-		Logger()
-	ctx = logger.With(ctx, l)
+	l := logger.StdlibLogger(ctx).With(
+		"event", tracked.GetEvent().Name,
+		"id", tracked.GetEvent().ID,
+		"internal_id", tracked.GetInternalID().String(),
+	)
 
-	l.Info().Msg("received message")
+	ctx = logger.WithStdlib(ctx, l)
+
+	l.Info("received message")
 
 	var errs error
 	wg := &sync.WaitGroup{}
@@ -391,7 +392,7 @@ func (s *svc) handleMessage(ctx context.Context, m pubsub.Message) error {
 	go func() {
 		defer wg.Done()
 		if err := s.functions(ctx, tracked); err != nil {
-			l.Error().Err(err).Msg("error scheduling functions")
+			l.Error("error scheduling functions", "error", err)
 			errs = multierror.Append(errs, err)
 		}
 	}()
@@ -405,11 +406,11 @@ func (s *svc) handleMessage(ctx context.Context, m pubsub.Message) error {
 			defer wg.Done()
 			if err := s.invokes(ctx, tracked); err != nil {
 				if err == state.ErrInvokePauseNotFound || err == state.ErrPauseNotFound {
-					l.Warn().Err(err).Msg("can't find paused function to resume after invoke")
+					l.Warn("can't find paused function to resume after invoke", "error", err)
 					return
 				}
 
-				l.Error().Err(err).Msg("error resuming function after invoke")
+				l.Error("error resuming function after invoke", "error", err)
 				errs = multierror.Append(errs, err)
 			}
 		}()
@@ -419,7 +420,7 @@ func (s *svc) handleMessage(ctx context.Context, m pubsub.Message) error {
 	go func() {
 		defer wg.Done()
 		if err := s.pauses(ctx, tracked); err != nil {
-			l.Error().Err(err).Msg("error consuming pauses")
+			l.Error("error consuming pauses", "error", err)
 			errs = multierror.Append(errs, err)
 		}
 	}()
@@ -467,6 +468,7 @@ func FindInvokedFunction(ctx context.Context, tracked event.TrackedEvent, fl cqr
 // functions triggers all functions from the given event.
 func (s *svc) functions(ctx context.Context, tracked event.TrackedEvent) error {
 	evt := tracked.GetEvent()
+	l := logger.StdlibLogger(ctx)
 
 	// Don't use an errgroup here as we want all errors together, vs the first
 	// non-nil error.
@@ -503,10 +505,10 @@ func (s *svc) functions(ctx context.Context, tracked event.TrackedEvent) error {
 			// want multiple matching triggers to run the function more than once.
 			err := s.initialize(ctx, *fn, tracked)
 			if err != nil {
-				logger.From(ctx).Error().
-					Err(err).
-					Str("function", fn.Name).
-					Msg("error invoking fn")
+				l.Error("error invoking fn",
+					"error", err,
+					"function", fn.Name,
+				)
 				errs = multierror.Append(errs, err)
 			}
 		}
@@ -521,7 +523,7 @@ func (s *svc) functions(ctx context.Context, tracked event.TrackedEvent) error {
 		return nil
 	}
 
-	logger.From(ctx).Debug().Int("len", len(fns)).Msg("scheduling functions")
+	l.Debug("scheduling functions", "len", len(fns))
 
 	// Do this once instead of many times when evaluating expressions.
 	evtMap := evt.Map()
@@ -537,11 +539,11 @@ func (s *svc) functions(ctx context.Context, tracked event.TrackedEvent) error {
 
 			defer func() {
 				if r := recover(); r != nil {
-					logger.From(ctx).Error().
-						Str("error", fmt.Sprintf("%v", r)).
-						Str("function", copied.Name).
-						Str("stack", string(debug.Stack())).
-						Msg("panic initializing function")
+					l.Error("panic initializing function",
+						"error", fmt.Sprintf("%v", r),
+						"functions", copied.Name,
+						"stack", string(debug.Stack()),
+					)
 				}
 			}()
 
@@ -571,10 +573,10 @@ func (s *svc) functions(ctx context.Context, tracked event.TrackedEvent) error {
 				// want multiple matching triggers to run the function more than once.
 				err := s.initialize(ctx, copied, tracked)
 				if err != nil {
-					logger.From(ctx).Error().
-						Err(err).
-						Str("function", copied.Name).
-						Msg("error initializing fn")
+					l.Error("error initializing fn",
+						"error", err,
+						"function", copied.Name,
+					)
 					errs = multierror.Append(errs, err)
 				}
 				return
@@ -588,34 +590,34 @@ func (s *svc) functions(ctx context.Context, tracked event.TrackedEvent) error {
 
 // invokes looks for a pause with the same correlation ID and triggers it
 func (s *svc) invokes(ctx context.Context, evt event.TrackedEvent) error {
-	l := logger.From(ctx).With().
-		Str("event", evt.GetEvent().Name).
-		Str("id", evt.GetEvent().ID).
-		Str("internal_id", evt.GetInternalID().String()).
-		Logger()
+	l := logger.StdlibLogger(ctx).With(
+		"event", evt.GetEvent().Name,
+		"id", evt.GetEvent().ID,
+		"internal_id", evt.GetInternalID().String(),
+	)
 
-	l.Trace().Msg("querying for invoke pauses")
+	l.Trace("querying for invoke pauses")
 
 	return s.executor.HandleInvokeFinish(ctx, evt)
 }
 
 // pauses searches for and triggers all pauses from this event.
 func (s *svc) pauses(ctx context.Context, evt event.TrackedEvent) error {
-	l := logger.From(ctx).With().
-		Str("event", evt.GetEvent().Name).
-		Str("id", evt.GetEvent().ID).
-		Str("internal_id", evt.GetInternalID().String()).
-		Logger()
+	l := logger.StdlibLogger(ctx).With(
+		"event", evt.GetEvent().Name,
+		"id", evt.GetEvent().ID,
+		"internal_id", evt.GetInternalID().String(),
+	)
 
-	l.Trace().Msg("querying for pauses")
+	l.Trace("querying for pauses")
 
 	wsID := evt.GetWorkspaceID()
 	if ok, err := s.state.EventHasPauses(ctx, wsID, evt.GetEvent().Name); err == nil && !ok {
-		l.Debug().Msg("no pauses found for event")
+		l.Debug("no pauses found for event")
 		return nil
 	}
 
-	l.Debug().Msg("handling found pauses for event")
+	l.Debug("handling found pauses for event")
 
 	iter, err := s.state.PausesByEvent(ctx, wsID, evt.GetEvent().Name)
 	if err != nil {
@@ -624,15 +626,16 @@ func (s *svc) pauses(ctx context.Context, evt event.TrackedEvent) error {
 
 	_, err = s.executor.HandlePauses(ctx, iter, evt)
 	if err != nil {
-		l.Error().Err(err).Msg("error handling pauses")
+		l.Error("error handling pauses", "error", err)
 	}
 	return err
 }
 
 func (s *svc) initialize(ctx context.Context, fn inngest.Function, evt event.TrackedEvent) error {
-	l := logger.From(ctx).With().
-		Str("function", fn.Name).
-		Str("function_id", fn.ID.String()).Logger()
+	l := logger.StdlibLogger(ctx).With(
+		"function", fn.Name,
+		"function_id", fn.ID.String(),
+	)
 
 	var appID uuid.UUID
 	wsID := evt.GetWorkspaceID()
@@ -683,7 +686,7 @@ func (s *svc) initialize(ctx context.Context, fn inngest.Function, evt event.Tra
 							"message": "invoked function is rate limited",
 						},
 					}); err != nil {
-						l.Error().Err(err).Msg("error handling invoke rate limit")
+						l.Error("error handling invoke rate limit", "error", err)
 					}
 				}
 				// Do nothing.
@@ -696,7 +699,7 @@ func (s *svc) initialize(ctx context.Context, fn inngest.Function, evt event.Tra
 		}
 	}
 
-	l.Info().Msg("initializing fn")
+	l.Info("initializing fn")
 	_, err := Initialize(ctx, InitOpts{
 		appID: appID,
 		fn:    fn,

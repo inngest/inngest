@@ -363,25 +363,25 @@ func (d *devserver) pollSDKs(ctx context.Context) {
 func (d *devserver) HandleEvent(ctx context.Context, e *event.Event, seed *event.SeededID) (string, error) {
 	// ctx is the request context, so we need to re-add
 	// the caller here.
-	l := logger.From(ctx).With().Str("caller", d.Name()).Logger()
-	ctx = logger.With(ctx, l)
+	l := logger.StdlibLogger(ctx).With("caller", d.Name())
+	ctx = logger.WithStdlib(ctx, l)
 
-	l.Debug().Str("event", e.Name).Msg("handling event")
+	l.Debug("handling event", "event", e.Name)
 
 	trackedEvent := event.NewOSSTrackedEvent(*e, seed)
 
 	byt, err := json.Marshal(trackedEvent)
 	if err != nil {
-		l.Error().Err(err).Msg("error unmarshalling event as JSON")
+		l.Error("error unmarshalling event as JSON", "error", err)
 		return "", err
 	}
 
-	l.Info().
-		Str("event_name", trackedEvent.GetEvent().Name).
-		Str("internal_id", trackedEvent.GetInternalID().String()).
-		Str("external_id", trackedEvent.GetEvent().ID).
-		Interface("event", trackedEvent.GetEvent()).
-		Msg("publishing event")
+	l.Info("publishing event",
+		"event_name", trackedEvent.GetEvent().Name,
+		"internal_id", trackedEvent.GetInternalID().String(),
+		"external_id", trackedEvent.GetEvent().ID,
+		"event", trackedEvent.GetEvent(),
+	)
 
 	carrier := itrace.NewTraceCarrier()
 	itrace.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
