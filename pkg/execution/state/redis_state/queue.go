@@ -1312,9 +1312,6 @@ func (q *queue) EnqueueItem(ctx context.Context, shard QueueShard, i osqueue.Que
 		shadowPartition = q.ItemShadowPartition(ctx, i)
 	}
 
-	// Log singleton key
-	q.logger.Debug().Interface("item", i).Str("singleton", kg.SingletonKey(i.Data.Singleton)).Msg("enqueueing item with singleton key")
-
 	keys := []string{
 		kg.QueueItem(),            // Queue item
 		kg.PartitionItem(),        // Partition item, map
@@ -1386,7 +1383,7 @@ func (q *queue) EnqueueItem(ctx context.Context, shard QueueShard, i osqueue.Que
 		return i, err
 	}
 
-	q.logger.Info().Interface("item", i).Interface("fnPartition", defaultPartition).Interface("keys", keys).Interface("args", args).Msg("enqueueing item")
+	q.logger.Trace().Interface("item", i).Interface("fnPartition", defaultPartition).Interface("keys", keys).Interface("args", args).Msg("enqueueing item")
 
 	status, err := scripts["queue/enqueue"].Exec(
 		redis_telemetry.WithScriptName(ctx, "enqueue"),
@@ -2446,10 +2443,6 @@ func (q *queue) Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 	partition := q.ItemShadowPartition(ctx, i)
 	backlog := q.ItemBacklog(ctx, i)
 
-	// Log singleton key
-	if kg.SingletonKey(i.Data.Singleton) != "" {
-		q.logger.Debug().Interface("item", i).Str("singleton", kg.SingletonKey(i.Data.Singleton)).Msg("dequeuing item with singleton key")
-	}
 	keys := []string{
 		kg.QueueItem(),
 		kg.PartitionItem(),
