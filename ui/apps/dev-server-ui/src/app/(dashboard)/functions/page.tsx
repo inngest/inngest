@@ -17,6 +17,7 @@ import {
   getCoreRowModel,
   getFilteredRowModel,
   getSortedRowModel,
+  type Row,
   type SortingState,
 } from '@tanstack/react-table';
 import { toast } from 'sonner';
@@ -27,6 +28,7 @@ import {
   useGetFunctionsQuery,
   useInvokeFunctionMutation,
   type Function,
+  type StreamItem,
 } from '@/store/generated';
 
 const columnHelper = createColumnHelper<Function>();
@@ -87,8 +89,8 @@ const columns = [
       const doesFunctionAcceptPayload = useMemo(() => {
         return Boolean(
           props.row?.original?.triggers?.some(
-            (trigger) => trigger.type === FunctionTriggerTypes.Event
-          )
+            (trigger) => trigger.type === FunctionTriggerTypes.Event,
+          ),
         );
       }, [props.row.original.triggers]);
 
@@ -144,7 +146,7 @@ export default function FunctionList() {
 
   const tableData = useMemo(
     () => (isFetching ? Array(8).fill({}) : functions),
-    [isFetching, functions]
+    [isFetching, functions],
   );
 
   const tableColumns = useMemo(
@@ -155,8 +157,42 @@ export default function FunctionList() {
             cell: () => <Skeleton className="my-[0.3rem] h-5" />,
           }))
         : columns,
-    [isFetching, functions]
+    [isFetching, functions],
   );
+
+  console.log({ tableData });
+
+  const router = useRouter();
+
+  function handleOpenSlideOver({
+    e,
+    functionSlug,
+  }: {
+    e: React.MouseEvent<HTMLElement>;
+    functionSlug: string;
+  }) {
+    if (e.target instanceof HTMLElement) {
+      const params = new URLSearchParams({ slug: functionSlug });
+      const url = `/functions/config?${params.toString()}`;
+      router.push(url);
+    }
+  }
+
+  const customRowProps = (row: Row<StreamItem>) => ({
+    style: {
+      verticalAlign: row.original.runs && row.original.runs.length > 1 ? 'top' : 'middle',
+      cursor: 'pointer',
+    },
+    onClick: (e: React.MouseEvent<HTMLElement>) => {
+      // copy this? except clicking row might prevent clicking other buttons
+      // row.original.slug
+      console.log(e.target);
+      handleOpenSlideOver({
+        e,
+        functionSlug: row.original.slug,
+      });
+    },
+  });
 
   return (
     <div className="flex min-h-0 min-w-0 flex-col">
@@ -185,7 +221,6 @@ export default function FunctionList() {
           />
         }
       />
-
       <main className="min-h-0 overflow-y-auto" ref={tableContainerRef}>
         <Table
           options={{
@@ -208,6 +243,7 @@ export default function FunctionList() {
             getFilteredRowModel: getFilteredRowModel(),
             onGlobalFilterChange: setGlobalFilter,
           }}
+          customRowProps={customRowProps}
           tableContainerRef={tableContainerRef}
           blankState={
             <BlankSlate
