@@ -222,12 +222,37 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 			q.instrumentBacklogResult(ctx, backlog, res)
 		}
 
+		var forceRequeueShadowPartitionAt time.Time
+		var forceRequeueBacklogAt time.Time
+
 		// If backlog is limited by function or account-level concurrency, stop refilling
-		if res.Constraint == enums.QueueConstraintAccountConcurrency || res.Constraint == enums.QueueConstraintFunctionConcurrency {
+		isConcurrencyLimited := res.Constraint == enums.QueueConstraintAccountConcurrency ||
+			res.Constraint == enums.QueueConstraintFunctionConcurrency
+		if isConcurrencyLimited {
+			forceRequeueShadowPartitionAt = q.clock.Now().Add(PartitionConcurrencyLimitRequeueExtension)
+		}
+
+		// If backlog is concurrency limited by custom key, requeue just this backlog in the future
+		if res.Constraint == enums.QueueConstraintCustomConcurrencyKey1 || res.Constraint == enums.QueueConstraintCustomConcurrencyKey2 {
+			forceRequeueBacklogAt = backlog.requeueBackOff(q.clock.Now(), res.Constraint, shadowPart)
+		}
+
+		// If backlog is throttled, requeue just this backlog in the future
+		if res.Constraint == enums.QueueConstraintThrottle {
+			forceRequeueBacklogAt = backlog.requeueBackOff(q.clock.Now(), res.Constraint, shadowPart)
+		}
+
+		if !forceRequeueBacklogAt.IsZero() {
+			err = q.BacklogRequeue(ctx, backlog, shadowPart, forceRequeueBacklogAt)
+			if err != nil && !errors.Is(err, ErrBacklogNotFound) {
+				return fmt.Errorf("could not requeue shadow partition: %w", err)
+			}
+		}
+
+		if !forceRequeueShadowPartitionAt.IsZero() {
 			q.removeShadowContinue(ctx, shadowPart, false)
 
-			forceRequeueAt := q.clock.Now().Add(ShadowPartitionRefillCapacityReachedRequeueExtension)
-			err = q.ShadowPartitionRequeue(ctx, shadowPart, *leaseID, &forceRequeueAt)
+			err = q.ShadowPartitionRequeue(ctx, shadowPart, *leaseID, &forceRequeueShadowPartitionAt)
 			if err != nil {
 				return fmt.Errorf("could not requeue shadow partition: %w", err)
 			}
@@ -269,6 +294,34 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 type shadowPartitionChanMsg struct {
 	sp                *QueueShadowPartition
 	continuationCount uint
+}
+
+func (q QueueBacklog) requeueBackOff(now time.Time, constraint enums.QueueConstraint, partition *QueueShadowPartition) time.Time {
+	max := now.Add(10 * time.Second)
+
+	if constraint == enums.QueueConstraintCustomConcurrencyKey1 || constraint == enums.QueueConstraintCustomConcurrencyKey2 {
+		if partition.Throttle != nil {
+			return now.Add(PartitionThrottleLimitRequeueExtension)
+		}
+
+		next := now.Add(PartitionThrottleLimitRequeueExtension + time.Duration(q.SuccessiveThrottleConstrained)*time.Second)
+		if next.After(max) {
+			next = max
+		}
+
+		return next
+	}
+
+	if constraint == enums.QueueConstraintThrottle {
+		next := now.Add(PartitionConcurrencyLimitRequeueExtension + time.Duration(q.SuccessiveThrottleConstrained)*time.Second)
+		if next.After(max) {
+			next = max
+		}
+
+		return next
+	}
+
+	return max
 }
 
 func (q *queue) scanShadowContinuations(ctx context.Context, qspc chan shadowPartitionChanMsg) error {
@@ -624,8 +677,10 @@ func (q *queue) ShadowPartitionRequeue(ctx context.Context, sp *QueueShadowParti
 	}
 
 	var requeueAtMS int64
+	var requeueAtStr string
 	if requeueAt != nil {
 		requeueAtMS = requeueAt.UnixMilli()
+		requeueAtStr = requeueAt.Format(time.StampMilli)
 	}
 
 	keys := []string{
@@ -655,6 +710,13 @@ func (q *queue) ShadowPartitionRequeue(ctx context.Context, sp *QueueShadowParti
 	if err != nil {
 		return fmt.Errorf("error returning shadow partition lease: %w", err)
 	}
+
+	q.log.Trace("requeued shadow partition",
+		"id", sp.PartitionID,
+		"time", requeueAtStr,
+		"status", status,
+	)
+
 	switch status {
 	case 0:
 		return nil

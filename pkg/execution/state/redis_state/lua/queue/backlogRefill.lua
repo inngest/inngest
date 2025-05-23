@@ -334,6 +334,36 @@ end
 -- Clean up backlog meta if we refilled the last item (or dropped all dangling item pointers)
 if tonumber(redis.call("ZCARD", keyBacklogSet)) == 0 then
   redis.call("HDEL", keyBacklogMeta, backlogID)
+else
+  local existing = cjson.decode(redis.call("HGET", keyBacklogMeta, backlogID))
+
+  -- If not constrained, reset counters
+  if status == 0 then
+    existing.stc = 0
+    existing.sccc = 0
+  end
+
+  -- If custom concurrency limits hit, increase counter
+  if status == 3 or status == 4 then
+    local previousSuccessiveCustomConcurrencyConstrained = existing.sccc
+    if previousSuccessiveCustomConcurrencyConstrained == false or previousSuccessiveCustomConcurrencyConstrained == nil then
+      previousSuccessiveCustomConcurrencyConstrained = 0
+    end
+
+    existing.sccc = previousSuccessiveCustomConcurrencyConstrained + 1
+  end
+
+  -- If throttled, increase counter
+  if status == 5 then
+    local previousSuccessiveThrottleConstrained = existing.stc
+    if previousSuccessiveThrottleConstrained == false or previousSuccessiveThrottleConstrained == nil then
+      previousSuccessiveThrottleConstrained = 0
+    end
+
+    existing.stc = previousSuccessiveThrottleConstrained + 1
+  end
+
+  redis.call("HSET", keyBacklogMeta, backlogID, cjson.encode(existing))
 end
 
 updateBacklogPointer(keyGlobalShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, keyShadowPartitionSet, keyBacklogSet, accountID, partitionID, backlogID)

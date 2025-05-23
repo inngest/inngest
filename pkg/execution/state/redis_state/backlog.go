@@ -192,6 +192,9 @@ type QueueBacklog struct {
 
 	// Set for backlogs containing start items only for a given throttle configuration
 	Throttle *BacklogThrottle
+
+	SuccessiveThrottleConstrained          int `json:"stc,omitzero"`
+	SuccessiveCustomConcurrencyConstrained int `json:"sccc,omitzero"`
 }
 
 func (q *queue) ItemBacklog(ctx context.Context, i osqueue.QueueItem) QueueBacklog {

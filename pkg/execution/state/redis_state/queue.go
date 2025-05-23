@@ -151,6 +151,7 @@ var (
 	ErrShadowPartitionAlreadyLeased               = fmt.Errorf("shadow partition already leased")
 	ErrShadowPartitionLeaseNotFound               = fmt.Errorf("shadow partition lease not found")
 	ErrShadowPartitionNotFound                    = fmt.Errorf("shadow partition not found")
+	ErrBacklogNotFound                            = fmt.Errorf("backlog not found")
 	ErrShadowPartitionPaused                      = fmt.Errorf("shadow partition refill is disabled")
 	ErrShadowPartitionBacklogPeekMaxExceedsLimits = fmt.Errorf("shadow partition backlog peek exceeded the maximum limit of %d", ShadowPartitionPeekMaxBacklogs)
 	ErrShadowPartitionPeekMaxExceedsLimits        = fmt.Errorf("shadow partition peek exceeded the maximum limit of %d", ShadowPartitionPeekMax)
@@ -2899,6 +2900,69 @@ func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueSha
 		return refillResult, nil
 	default:
 		return nil, fmt.Errorf("unknown status refilling backlog: %v (%T)", status, status)
+	}
+}
+
+func (q *queue) BacklogRequeue(ctx context.Context, backlog *QueueBacklog, sp *QueueShadowPartition, requeueAt time.Time) error {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "BacklogRequeue"), redis_telemetry.ScopeQueue)
+
+	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
+		return fmt.Errorf("unsupported queue shard kind for BacklogRequeue: %s", q.primaryQueueShard.Kind)
+	}
+
+	kg := q.primaryQueueShard.RedisClient.kg
+
+	accountID := uuid.Nil
+	if sp.AccountID != nil {
+		accountID = *sp.AccountID
+	}
+
+	keys := []string{
+		kg.ShadowPartitionMeta(),
+		kg.BacklogMeta(),
+
+		kg.GlobalShadowPartitionSet(),
+		kg.GlobalAccountShadowPartitions(),
+		kg.AccountShadowPartitions(accountID),
+		kg.ShadowPartitionSet(sp.PartitionID),
+		kg.BacklogSet(backlog.BacklogID),
+	}
+	args, err := StrSlice([]any{
+		accountID,
+		sp.PartitionID,
+		backlog.BacklogID,
+		requeueAt.UnixMilli(),
+	})
+	if err != nil {
+		return fmt.Errorf("could not serialize args: %w", err)
+	}
+
+	status, err := scripts["queue/backlogRequeue"].Exec(
+		redis_telemetry.WithScriptName(ctx, "backlogRequeue"),
+		q.primaryQueueShard.RedisClient.unshardedRc,
+		keys,
+		args,
+	).AsInt64()
+	if err != nil {
+		return fmt.Errorf("could not requeue backlog: %w", err)
+	}
+
+	q.log.Trace("requeued backlog",
+		"id", backlog.BacklogID,
+		"partition", sp.PartitionID,
+		"time", requeueAt.Format(time.StampMilli),
+		"successive_throttle", backlog.SuccessiveThrottleConstrained,
+		"successive_concurrency", backlog.SuccessiveCustomConcurrencyConstrained,
+		"status", status,
+	)
+
+	switch status {
+	case 0, 1:
+		return nil
+	case -1:
+		return ErrBacklogNotFound
+	default:
+		return fmt.Errorf("unknown response requeueing backlog: %v (%T)", status, status)
 	}
 }
 
