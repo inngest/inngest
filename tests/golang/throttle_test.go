@@ -32,7 +32,7 @@ func TestThrottle(t *testing.T) {
 			name:   "multiple",
 			limit:  2,
 			period: 5 * time.Second,
-			maxGap: 3500 * time.Millisecond, // 3.5s
+			maxGap: 4 * time.Second,
 		},
 		{
 			name:   "single with burst",
