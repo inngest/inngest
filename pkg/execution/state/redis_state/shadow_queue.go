@@ -297,31 +297,6 @@ type shadowPartitionChanMsg struct {
 	continuationCount uint
 }
 
-func (q QueueBacklog) requeueBackOff(now time.Time, constraint enums.QueueConstraint, partition *QueueShadowPartition) time.Time {
-	max := now.Add(10 * time.Second)
-
-	switch constraint {
-	case enums.QueueConstraintThrottle:
-		if partition.Throttle == nil {
-			return now.Add(PartitionThrottleLimitRequeueExtension)
-		}
-
-		next := now.Add(PartitionThrottleLimitRequeueExtension + time.Duration(q.SuccessiveThrottleConstrained)*time.Second)
-		return next
-
-	case enums.QueueConstraintCustomConcurrencyKey1, enums.QueueConstraintCustomConcurrencyKey2:
-		next := now.Add(PartitionConcurrencyLimitRequeueExtension + time.Duration(q.SuccessiveCustomConcurrencyConstrained)*time.Second)
-
-		if next.After(max) {
-			next = max
-		}
-
-		return next
-	}
-
-	return max
-}
-
 func (q *queue) scanShadowContinuations(ctx context.Context, qspc chan shadowPartitionChanMsg) error {
 	q.shadowContinuesLock.Lock()
 	defer q.shadowContinuesLock.Unlock()
