@@ -109,6 +109,9 @@ func New(ctx context.Context, opts StartOpts) error {
 }
 
 func start(ctx context.Context, opts StartOpts) error {
+	l := logger.StdlibLogger(ctx)
+	ctx = logger.WithStdlib(ctx, l)
+
 	db, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{
 		InMemory:    false,
 		PostgresURI: opts.PostgresURI,
@@ -324,7 +327,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		),
 		executor.WithExpressionAggregator(agg),
 		executor.WithQueue(rq),
-		executor.WithLogger(logger.StdlibLogger(ctx)),
+		executor.WithLogger(l),
 		executor.WithFunctionLoader(loader),
 		executor.WithLifecycleListeners(
 			history.NewLifecycleListener(
@@ -388,6 +391,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		runner.WithRateLimiter(rl),
 		runner.WithBatchManager(batcher),
 		runner.WithPublisher(pb),
+		runner.WithLogger(l),
 	)
 
 	// The devserver embeds the event API.
@@ -530,6 +534,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		},
 		LocalEventKeys: opts.EventKey,
 		RequireKeys:    true,
+		Logger:         l,
 	})
 
 	return service.StartAll(ctx, ds, runner, executorSvc, ds.Apiservice, connGateway)

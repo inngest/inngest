@@ -114,8 +114,14 @@ func WithPublisher(p pubsub.Publisher) func(s *svc) {
 	}
 }
 
+func WithLogger(l logger.Logger) func(s *svc) {
+	return func(s *svc) {
+		s.log = l
+	}
+}
+
 func NewService(c config.Config, opts ...Opt) Runner {
-	svc := &svc{config: c}
+	svc := &svc{config: c, log: logger.StdlibLogger(context.Background())}
 	for _, o := range opts {
 		o(svc)
 	}
@@ -147,6 +153,8 @@ type svc struct {
 	em          *event.Manager
 
 	tracker *Tracker
+
+	log logger.Logger
 }
 
 func (s svc) Name() string {
@@ -156,7 +164,7 @@ func (s svc) Name() string {
 func (s *svc) Pre(ctx context.Context) error {
 	var err error
 
-	logger.StdlibLogger(ctx).Info("starting event stream", "backend", s.config.Queue.Service.Backend)
+	s.log.Info("starting event stream", "backend", s.config.Queue.Service.Backend)
 	s.pubsub, err = pubsub.NewPublishSubscriber(ctx, s.config.EventStream.Service)
 	if err != nil {
 		return err
@@ -195,8 +203,7 @@ func (s *svc) Run(ctx context.Context) error {
 		return err
 	}
 
-	l := logger.StdlibLogger(ctx)
-	l.Info("subscribing to events", "topic", s.config.EventStream.Service.TopicName())
+	s.log.Info("subscribing to events", "topic", s.config.EventStream.Service.TopicName())
 	err := s.pubsub.Subscribe(ctx, s.config.EventStream.Service.TopicName(), s.handleMessage)
 	if err != nil {
 		return err
@@ -217,8 +224,6 @@ func (s *svc) Stop(ctx context.Context) error {
 }
 
 func (s *svc) InitializeCrons(ctx context.Context) error {
-	l := logger.StdlibLogger(ctx)
-
 	// If a previous cron manager exists, cancel it.
 	if s.cronmanager != nil {
 		s.cronmanager.Stop()
@@ -282,15 +287,15 @@ func (s *svc) InitializeCrons(ctx context.Context) error {
 						},
 					)
 					if err != nil {
-						l.Error("error publishing cron event", "error", err)
+						s.log.Error("error publishing cron event", "error", err)
 					}
 				} else {
-					l.Error("error marshaling cron event", "error", err)
+					s.log.Error("error marshaling cron event", "error", err)
 				}
 
 				err = s.initialize(ctx, fn, trackedEvent)
 				if err != nil {
-					l.Error("error initializing scheduled function", "error", err)
+					s.log.Error("error initializing scheduled function", "error", err)
 				}
 			})
 			if err != nil {
@@ -374,7 +379,7 @@ func (s *svc) handleMessage(ctx context.Context, m pubsub.Message) error {
 		return err
 	}
 
-	l := logger.StdlibLogger(ctx).With(
+	l := s.log.With(
 		"event", tracked.GetEvent().Name,
 		"id", tracked.GetEvent().ID,
 		"internal_id", tracked.GetInternalID().String(),
@@ -468,7 +473,6 @@ func FindInvokedFunction(ctx context.Context, tracked event.TrackedEvent, fl cqr
 // functions triggers all functions from the given event.
 func (s *svc) functions(ctx context.Context, tracked event.TrackedEvent) error {
 	evt := tracked.GetEvent()
-	l := logger.StdlibLogger(ctx)
 
 	// Don't use an errgroup here as we want all errors together, vs the first
 	// non-nil error.
@@ -505,7 +509,7 @@ func (s *svc) functions(ctx context.Context, tracked event.TrackedEvent) error {
 			// want multiple matching triggers to run the function more than once.
 			err := s.initialize(ctx, *fn, tracked)
 			if err != nil {
-				l.Error("error invoking fn",
+				s.log.Error("error invoking fn",
 					"error", err,
 					"function", fn.Name,
 				)
@@ -523,7 +527,7 @@ func (s *svc) functions(ctx context.Context, tracked event.TrackedEvent) error {
 		return nil
 	}
 
-	l.Debug("scheduling functions", "len", len(fns))
+	s.log.Debug("scheduling functions", "len", len(fns))
 
 	// Do this once instead of many times when evaluating expressions.
 	evtMap := evt.Map()
@@ -539,7 +543,7 @@ func (s *svc) functions(ctx context.Context, tracked event.TrackedEvent) error {
 
 			defer func() {
 				if r := recover(); r != nil {
-					l.Error("panic initializing function",
+					s.log.Error("panic initializing function",
 						"error", fmt.Sprintf("%v", r),
 						"functions", copied.Name,
 						"stack", string(debug.Stack()),
@@ -573,7 +577,7 @@ func (s *svc) functions(ctx context.Context, tracked event.TrackedEvent) error {
 				// want multiple matching triggers to run the function more than once.
 				err := s.initialize(ctx, copied, tracked)
 				if err != nil {
-					l.Error("error initializing fn",
+					s.log.Error("error initializing fn",
 						"error", err,
 						"function", copied.Name,
 					)

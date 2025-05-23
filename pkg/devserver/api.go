@@ -156,7 +156,7 @@ func (a devapi) Register(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	ctx := r.Context()
 
-	logger.StdlibLogger(ctx).Debug("received register request")
+	a.devserver.log.Debug("received register request")
 
 	expectedServerKind := r.Header.Get(headers.HeaderKeyExpectedServerKind)
 	if expectedServerKind != "" && expectedServerKind != a.devserver.Opts.Config.GetServerKind() {

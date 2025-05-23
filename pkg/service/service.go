@@ -127,8 +127,8 @@ func StartAll(ctx context.Context, all ...Service) (err error) {
 // It blocks until an interrupt/kill signal, or the Run() command errors. We
 // automatically call Stop() when terminating the Service.
 func Start(ctx context.Context, s Service) (err error) {
-	l := logger.From(ctx).With().Str("caller", s.Name()).Logger()
-	ctx = logger.With(ctx, l)
+	l := logger.StdlibLogger(ctx).With("caller", s.Name())
+	ctx = logger.WithStdlib(ctx, l)
 
 	ctx, cleanup := signal.NotifyContext(ctx, os.Interrupt, syscall.SIGTERM, syscall.SIGINT, syscall.SIGQUIT)
 	defer cleanup()
@@ -140,7 +140,7 @@ func Start(ctx context.Context, s Service) (err error) {
 
 	defer func() {
 		if r := recover(); r != nil {
-			l.Error().Interface("recover", r).Msg("service panicked")
+			l.Error("service panicked", "recover", r)
 		}
 	}()
 
@@ -149,11 +149,11 @@ func Start(ctx context.Context, s Service) (err error) {
 	}
 
 	if runErr := run(ctx, cleanup, s); runErr != nil && runErr != context.Canceled {
-		logger.From(ctx).Error().Err(runErr).Msg("service run errored")
+		l.Error("service run errored", "error", runErr)
 		err = errors.Join(err, runErr)
 	}
 	if stopErr := stop(ctx, s); stopErr != nil {
-		logger.From(ctx).Error().Err(stopErr).Msg("service cleanup errored")
+		l.Error("service cleanup errored", "error", stopErr)
 		err = errors.Join(err, stopErr)
 	}
 

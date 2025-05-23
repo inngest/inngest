@@ -45,6 +45,8 @@ type APIServiceOptions struct {
 	// the server will still boot but core actions such as syncing, runs, and
 	// ingesting events will not work.
 	RequireKeys bool
+
+	Logger logger.Logger
 }
 
 func NewService(opts APIServiceOptions) service.Service {
@@ -53,6 +55,7 @@ func NewService(opts APIServiceOptions) service.Service {
 		mounts:         opts.Mounts,
 		localEventKeys: opts.LocalEventKeys,
 		requireKeys:    opts.RequireKeys,
+		log:            opts.Logger,
 	}
 }
 
@@ -73,6 +76,7 @@ type apiServer struct {
 	// the server will still boot but core actions such as syncing, runs, and
 	// ingesting events will not work.
 	requireKeys bool
+	log         logger.Logger
 }
 
 func (a *apiServer) Name() string {
@@ -125,7 +129,7 @@ func (a *apiServer) handleEvent(
 ) (string, error) {
 	// ctx is the request context, so we need to re-add
 	// the caller here.
-	l := logger.StdlibLogger(ctx).With("caller", "api")
+	l := a.log.With("caller", "api")
 	ctx = logger.WithStdlib(ctx, l)
 	span := trace.SpanFromContext(ctx)
 
