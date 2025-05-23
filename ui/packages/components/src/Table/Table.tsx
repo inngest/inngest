@@ -53,7 +53,7 @@ export function Table<T>({
               <th
                 className={cn(
                   cellStyles,
-                  'bg-canvasSubtle text-muted text-xs font-medium',
+                  'bg-tableHeader text-muted text-xs font-medium',
                   header.column.getIsPinned() && 'sticky left-0 z-[4]',
                   header.column.getCanSort() && 'cursor-pointer'
                 )}
@@ -103,7 +103,7 @@ export function Table<T>({
               <tr
                 key={row.id}
                 {...(customRowProps ? customRowProps(row) : {})}
-                className="bg-canvasBase hover:bg-canvasSubtle/40"
+                className="bg-canvasBase hover:bg-canvasSubtle"
               >
                 {row.getVisibleCells().map((cell) => (
                   <td
