@@ -132,7 +132,7 @@ export function Table<T>({
             <tr
               key={row.id}
               {...(customRowProps ? customRowProps(row) : {})}
-              className="bg-canvaseBase hover:bg-canvasSubtle/50"
+              className="bg-canvaseBase hover:bg-canvasSubtle"
             >
               {row.getVisibleCells().map((cell) => (
                 <td
