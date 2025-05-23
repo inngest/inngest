@@ -24,7 +24,7 @@ export function EmptyOnboardingCard() {
       }
       actions={
         <Button
-          label="Take me to onboarding"
+          label="Get started"
           onClick={() =>
             router.push(
               pathCreator.onboardingSteps({
