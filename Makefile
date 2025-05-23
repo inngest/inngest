@@ -10,7 +10,7 @@ run:
 # Start with debug mode in Delve
 .PHONY: debug
 debug:
-	TEST_MODE=true LOG_LEVEL=debug dlv debug ./cmd/main.go --headless --listen=127.0.0.1:40000 --continue --accept-multiclient --log -- dev --tick=50 --no-poll --no-discovery -v $(PARAMS)
+	TEST_MODE=true LOG_LEVEL=trace LOG_HANDLER=dev dlv debug ./cmd/main.go --headless --listen=127.0.0.1:40000 --continue --accept-multiclient --log -- dev --tick=50 --no-poll --no-discovery -v $(PARAMS)
 
 xgo:
 	xgo -pkg cmd -ldflags="-s -w" -out build/inngest -targets "linux/arm64,linux/amd64,darwin/arm64,darwin/amd64" .
