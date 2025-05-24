@@ -6,9 +6,16 @@ type Props = PropsWithChildren<{
   accentColor?: string;
   accentPosition?: 'left' | 'top';
   className?: string;
+  contentClassName?: string;
 }>;
 
-export function Card({ accentColor, accentPosition = 'top', children, className }: Props) {
+export function Card({
+  accentColor,
+  accentPosition = 'top',
+  children,
+  className,
+  contentClassName,
+}: Props) {
   // Need some dynamic classes to properly handle the accent's existence and
   // position
   let accentClass = undefined;
@@ -33,7 +40,13 @@ export function Card({ accentColor, accentPosition = 'top', children, className 
   return (
     <div className={cn('bg-canvasBase w-full overflow-hidden rounded-md', wrapperClass, className)}>
       {accentColor && <div className={cn('p-0.5', accentClass, accentColor)} />}
-      <div className={cn('border-subtle w-full grow overflow-hidden border', contentClass)}>
+      <div
+        className={cn(
+          'border-subtle w-full grow overflow-hidden border',
+          contentClass,
+          contentClassName
+        )}
+      >
         {children}
       </div>
     </div>
