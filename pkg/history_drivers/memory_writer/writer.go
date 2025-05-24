@@ -11,7 +11,7 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/history"
 	"github.com/inngest/inngest/pkg/history_drivers/memory_store"
-	"github.com/inngest/inngest/pkg/inngest/log"
+	"github.com/inngest/inngest/pkg/logger"
 )
 
 type WriterOptions struct {
@@ -19,16 +19,17 @@ type WriterOptions struct {
 }
 
 func NewWriter(ctx context.Context, opts WriterOptions) history.Driver {
+	l := logger.StdlibLogger(ctx).With("caller", "memory writer")
+
 	w := &writer{
 		store:   memory_store.Singleton,
 		options: opts,
+		log:     l,
 	}
 
 	if !opts.DumpToFile || len(memory_store.Singleton.Data) > 0 {
 		return w
 	}
-
-	l := log.From(ctx).With().Str("caller", "memory_writer").Logger()
 
 	// read data from file and populate memory_store.Singleton
 	file, err := os.ReadFile(fmt.Sprintf("%s/%s", consts.DefaultInngestConfigDir, consts.DevServerHistoryFile))
@@ -36,16 +37,16 @@ func NewWriter(ctx context.Context, opts WriterOptions) history.Driver {
 		if os.IsNotExist(err) {
 			return w
 		}
-		l.Error().Err(err).Msg("failed to read history file")
+		l.Error("failed to read history file", "error", err)
 	}
 
 	err = json.Unmarshal(file, &memory_store.Singleton.Data)
 	if err != nil {
-		l.Error().Err(err).Msg("failed to unmarshal history file")
+		l.Error("failed to unmarshal history file", "error", err)
 	}
 
 	humanSize := fmt.Sprintf("%.2fKB", float64(len(file))/1024)
-	l.Info().Str("size", humanSize).Msg("imported history snapshot")
+	l.Info("imported history snapshot", "size", humanSize)
 
 	return w
 }
@@ -53,6 +54,7 @@ func NewWriter(ctx context.Context, opts WriterOptions) history.Driver {
 type writer struct {
 	store   *memory_store.RunStore
 	options WriterOptions
+	log     logger.Logger
 }
 
 func (w *writer) Close(ctx context.Context) error {
@@ -63,22 +65,20 @@ func (w *writer) Close(ctx context.Context) error {
 	w.store.Mu.Lock()
 	// never unlock
 
-	l := log.From(ctx).With().Str("caller", "memory_writer").Logger()
-
 	b, err := json.Marshal(w.store.Data)
 	if err != nil {
-		l.Error().Err(err).Msg("error marshalling history data for export")
+		w.log.Error("error marshalling history data for export", "error", err)
 		return err
 	}
 
 	err = os.WriteFile(fmt.Sprintf("%s/%s", consts.DefaultInngestConfigDir, consts.DevServerHistoryFile), b, 0600)
 	if err != nil {
-		l.Error().Err(err).Msg("error writing history data to file")
+		w.log.Error("error writing history data to file", "error", err)
 		return err
 	}
 
 	humanSize := fmt.Sprintf("%.2fKB", float64(len(b))/1024)
-	l.Info().Str("size", humanSize).Msg("exported history snapshot")
+	w.log.Error("exported history snapshot", "size", humanSize)
 
 	return nil
 }
@@ -125,8 +125,7 @@ func (w *writer) writeWorkflowEnd(
 	case enums.HistoryTypeFunctionFailed.String():
 		status = enums.RunStatusFailed
 	default:
-		log.From(ctx).Error().Str("type", item.Type).
-			Msg("unknown history type")
+		w.log.Error("unknown history type", "type", item.Type)
 	}
 
 	run := w.store.Data[item.RunID]
@@ -163,8 +162,7 @@ func (w *writer) writeWorkflowStart(
 	case enums.HistoryTypeFunctionStarted.String():
 		status = enums.RunStatusRunning
 	default:
-		log.From(ctx).Error().Str("type", item.Type).
-			Msg("unknown history type")
+		w.log.Error("unknown history type", "type", item.Type)
 	}
 
 	run.Run.StartedAt = time.UnixMilli(int64(item.RunID.Time()))

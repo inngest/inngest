@@ -23,7 +23,6 @@ import (
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/inngest"
-	"github.com/inngest/inngest/pkg/inngest/log"
 	"github.com/inngest/inngest/pkg/inngest/version"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/publicerr"
@@ -359,6 +358,7 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 
 func (a devapi) OTLPTrace(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	l := a.devserver.log
 
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
@@ -378,7 +378,7 @@ func (a devapi) OTLPTrace(w http.ResponseWriter, r *http.Request) {
 	case "application/json":
 		encoder = &ptrace.JSONUnmarshaler{}
 	default:
-		log.From(ctx).Error().Str("content-type", cnt).Msg("unknown content type for traces")
+		l.Error("unknown content type for traces", "content-type", cnt)
 		err = fmt.Errorf("unable to handle unknown content type for traces: %s", cnt)
 		_ = publicerr.WriteHTTP(w, publicerr.Error{
 			Status:  400,
@@ -399,7 +399,7 @@ func (a devapi) OTLPTrace(w http.ResponseWriter, r *http.Request) {
 		})
 		return
 	}
-	log.From(ctx).Trace().Int("len", traces.SpanCount()).Msg("recording otel trace spans")
+	l.Trace("recording otel trace spans", "len", traces.SpanCount())
 
 	handler := newSpanIngestionHandler(a.devserver.Data)
 
@@ -408,7 +408,7 @@ func (a devapi) OTLPTrace(w http.ResponseWriter, r *http.Request) {
 
 		rattr, err := convertMap(rs.Resource().Attributes().AsRaw())
 		if err != nil {
-			log.From(ctx).Warn().Err(err).Interface("resource", rs.Resource().Attributes().AsRaw()).Msg("error parsing resource attributes")
+			l.Warn("error parsing resource attributes", "error", err, "resource", rs.Resource().Attributes().AsRaw())
 		}
 
 		var serviceName string
@@ -428,8 +428,7 @@ func (a devapi) OTLPTrace(w http.ResponseWriter, r *http.Request) {
 				dur := span.EndTimestamp().AsTime().Sub(span.StartTimestamp().AsTime())
 				sattr, err := convertMap(span.Attributes().AsRaw())
 				if err != nil {
-					log.From(ctx).Warn().Err(err).Interface("span attr", span.Attributes().AsRaw()).Msg("error parsing span attributes")
-
+					l.Warn("error parsing span attributes", "error", err, "span_attr", span.Attributes().AsRaw())
 				}
 
 				if val, ok := sattr[consts.OtelSysFunctionHasAI]; ok {
@@ -443,7 +442,7 @@ func (a devapi) OTLPTrace(w http.ResponseWriter, r *http.Request) {
 					evt := span.Events().At(ei)
 					attr, err := convertMap(evt.Attributes().AsRaw())
 					if err != nil {
-						log.From(ctx).Error().Err(err).Interface("span event", evt.Attributes().AsRaw()).Msg("error parsing span event")
+						l.Error("error parsing span event", "error", err, "span_event", evt.Attributes().AsRaw())
 						continue
 					}
 
@@ -459,7 +458,7 @@ func (a devapi) OTLPTrace(w http.ResponseWriter, r *http.Request) {
 					link := span.Links().At(li)
 					attr, err := convertMap(link.Attributes().AsRaw())
 					if err != nil {
-						log.From(ctx).Error().Err(err).Interface("span link", link.Attributes().AsRaw()).Msg("error parsing span link")
+						l.Error("error parsing span link", "error", err, "span_link", link.Attributes().AsRaw())
 					}
 
 					links = append(links, cqrs.SpanLink{
@@ -513,15 +512,15 @@ func (a devapi) OTLPTrace(w http.ResponseWriter, r *http.Request) {
 
 	for _, s := range handler.Spans() {
 		if err := a.devserver.Data.InsertSpan(ctx, s); err != nil {
-			log.From(ctx).Error().Err(err).Interface("span", *s).Msg("error inserting span")
+			l.Error("error inserting span", "error", err, "span", *s)
 		}
 	}
 
 	for _, r := range handler.TraceRuns() {
-		// log.From(ctx).Debug().Interface("run", r).Msg("trace run")
+		// l.Debug("trace run", "run", r)
 		r.HasAI = hasAI
 		if err := a.devserver.Data.InsertTraceRun(ctx, r); err != nil {
-			log.From(ctx).Error().Err(err).Interface("trace run", r).Msg("error inserting trace run")
+			l.Error("error inserting trace run", "error", err, "trace_run", r)
 		}
 	}
 }
