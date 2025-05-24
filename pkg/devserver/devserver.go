@@ -395,7 +395,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		),
 		executor.WithStepLimits(func(id sv2.ID) int {
 			if override, hasOverride := stepLimitOverrides[id.FunctionID.String()]; hasOverride {
-				logger.From(ctx).Warn().Msgf("Using step limit override of %d for %q\n", override, id.FunctionID)
+				l.Warn("using step limit override", "override", override, "fn_id", id.FunctionID)
 				return override
 			}
 
@@ -403,7 +403,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		}),
 		executor.WithStateSizeLimits(func(id sv2.ID) int {
 			if override, hasOverride := stateSizeLimitOverrides[id.FunctionID.String()]; hasOverride {
-				logger.From(ctx).Warn().Msgf("Using state size limit override of %d for %q\n", override, id.FunctionID)
+				l.Warn("using state size limit override", "override", override, "fn_id", id.FunctionID)
 				return override
 			}
 

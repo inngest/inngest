@@ -7,7 +7,6 @@ import (
 	"github.com/inngest/inngest/pkg/api/tel"
 	"github.com/inngest/inngest/pkg/cli"
 	"github.com/inngest/inngest/pkg/inngest/version"
-	"github.com/inngest/inngest/pkg/logger"
 	isatty "github.com/mattn/go-isatty"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
@@ -37,7 +36,6 @@ func Execute() {
 			} else {
 				viper.Set(ViperLogLevelKey, "info")
 			}
-			logger.SetLevel(viper.GetString(ViperLogLevelKey))
 
 			m := tel.NewMetadata(cmd.Context())
 			m.SetCobraCmd(cmd)

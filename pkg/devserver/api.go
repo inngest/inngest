@@ -54,8 +54,8 @@ func NewDevAPI(d *devserver) chi.Router {
 func (a *devapi) addRoutes() {
 	a.Use(func(next http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
-			l := logger.From(r.Context()).With().Str("caller", a.devserver.Name()).Logger()
-			r = r.WithContext(logger.With(r.Context(), l))
+			l := a.devserver.log.With("caller", a.devserver.Name())
+			r = r.WithContext(logger.WithStdlib(r.Context(), l))
 			next.ServeHTTP(w, r)
 		}
 		return http.HandlerFunc(fn)
@@ -155,7 +155,8 @@ func (a devapi) Register(w http.ResponseWriter, r *http.Request) {
 	defer r.Body.Close()
 	ctx := r.Context()
 
-	a.devserver.log.Debug("received register request")
+	l := a.devserver.log
+	l.Debug("received register request")
 
 	expectedServerKind := r.Header.Get(headers.HeaderKeyExpectedServerKind)
 	if expectedServerKind != "" && expectedServerKind != a.devserver.Opts.Config.GetServerKind() {
@@ -168,21 +169,21 @@ func (a devapi) Register(w http.ResponseWriter, r *http.Request) {
 
 	req, err := sdk.FromReadCloser(r.Body, sdk.FromReadCloserOpts{})
 	if err != nil {
-		logger.From(ctx).Warn().Msgf("Invalid request:\n%s", err)
+		l.Warn("Invalid request", "error", err)
 		a.err(ctx, w, 400, fmt.Errorf("Invalid request: %w", err))
 		return
 	}
 
 	reply, err := a.register(ctx, req)
 	if err != nil {
-		logger.From(ctx).Warn().Msgf("Error registering functions:\n%s", err)
+		l.Warn("error registering functions", "error", err)
 		_ = publicerr.WriteHTTP(w, err)
 		return
 	}
 
 	// Re-initialize our cron manager.
 	if err := a.devserver.Runner.InitializeCrons(ctx); err != nil {
-		logger.From(ctx).Warn().Msgf("Error initializing crons:\n%s", err)
+		l.Warn("error initializing crons", "error", err)
 		a.err(ctx, w, 400, err)
 		return
 	}
@@ -201,6 +202,8 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 	if err != nil {
 		return nil, publicerr.Wrap(err, 400, "Invalid request")
 	}
+
+	l := a.devserver.log
 
 	// TODO Retrieve same syncID for connect, if r.IdempotencyKey is the same
 	syncID := uuid.New()
@@ -276,7 +279,7 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 		_, _ = tx.UpsertApp(ctx, appParams)
 		err = tx.Commit(ctx)
 		if err != nil {
-			logger.From(ctx).Error().Err(err).Msg("error registering functions")
+			l.Error("error registering functions", "error", err)
 		}
 	}()
 
@@ -598,7 +601,6 @@ func (a devapi) RemoveStateSizeLimit(w http.ResponseWriter, r *http.Request) {
 func (a devapi) err(ctx context.Context, w http.ResponseWriter, status int, err error) {
 	w.WriteHeader(status)
 	_ = json.NewEncoder(w).Encode(map[string]string{"error": err.Error()})
-	logger.From(ctx).Error().Msg(err.Error())
 }
 
 type InfoResponse struct {

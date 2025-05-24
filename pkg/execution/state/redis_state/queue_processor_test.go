@@ -548,7 +548,7 @@ func TestQueueAllowList(t *testing.T) {
 	var handledAllow, handledOther int32
 	go func() {
 		_ = q.Run(ctx, func(ctx context.Context, _ osqueue.RunInfo, item osqueue.Item) (osqueue.RunResult, error) {
-			logger.From(ctx).Debug().Interface("item", item).Msg("received item")
+			logger.StdlibLogger(ctx).Debug("received item", "item", item)
 			if item.QueueName != nil && *item.QueueName == allowedQueueName {
 				atomic.AddInt32(&handledAllow, 1)
 			} else {
@@ -662,7 +662,7 @@ func TestQueueDenyList(t *testing.T) {
 	var handledDeny, handledOther int32
 	go func() {
 		_ = q.Run(ctx, func(ctx context.Context, _ osqueue.RunInfo, item osqueue.Item) (osqueue.RunResult, error) {
-			logger.From(ctx).Debug().Interface("item", item).Msg("received item")
+			logger.StdlibLogger(ctx).Debug("received item", "item", item)
 			if item.QueueName != nil && *item.QueueName == deniedQueueName {
 				atomic.AddInt32(&handledDeny, 1)
 			} else {
@@ -818,7 +818,7 @@ func TestQueueRunAccount(t *testing.T) {
 	var handled int32
 	go func() {
 		_ = q.Run(ctx, func(ctx context.Context, _ osqueue.RunInfo, item osqueue.Item) (osqueue.RunResult, error) {
-			logger.From(ctx).Debug().Interface("item", item).Msg("received item")
+			logger.StdlibLogger(ctx).Debug("received item", "item", item)
 			atomic.AddInt32(&handled, 1)
 			id := osqueue.JobIDFromContext(ctx)
 			require.NotEmpty(t, id, "No job ID was passed via context")
