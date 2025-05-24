@@ -11,7 +11,7 @@ on:
 
 jobs:
   golangci:
-    name: lint
+    name: Lint
     strategy:
       matrix:
         os: [ubuntu-latest]
@@ -29,9 +29,12 @@ jobs:
 
   test-linux-race:
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest]
+        experimentalKeyQueues: [ false, true ]
     runs-on: ${{ matrix.os }}
+    name: "Test / OS: ${{ matrix.os }}, key-queues: ${{ matrix.experimentalKeyQueues }}"
     steps:
       - uses: actions/checkout@v4
       - name: Set up Go
@@ -42,3 +45,4 @@ jobs:
         run: go test -v $(find . -iname "*_test.go" | xargs -I {} dirname {} | uniq | grep -v "./tests") -race -count=1
         env:
           TEST_MODE: true
+          EXPERIMENTAL_KEY_QUEUES_ENABLE: "${{ matrix.experimentalKeyQueues }}"

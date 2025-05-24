@@ -175,9 +175,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			// This is deferred so we always update the semaphore
 			defer c.connectionCount.Done()
 			ch.log.Debug("Closing WebSocket connection", "reason", closeReason)
-			if c.devlogger != nil {
-				c.devlogger.Info().Msg("worker disconnected")
-			}
+			c.logger.Trace("worker disconnected")
 
 			closed = true
 
@@ -567,9 +565,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 
 		{
 			ch.log.Debug("connection is ready")
-			if c.devlogger != nil {
-				c.devlogger.Info().Strs("app_names", conn.AppNames()).Msg("worker connected")
-			}
+			c.logger.Trace("worker connected", "app_names", conn.AppNames())
 
 			successTags := map[string]any{
 				"success": true,

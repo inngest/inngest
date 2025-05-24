@@ -222,6 +222,31 @@ func TestLuaGCRA(t *testing.T) {
 				},
 			},
 		},
+		{
+			name:   "with short limit",
+			period: 5 * time.Second,
+			limit:  1,
+			actions: []action{
+				{
+					delay:           0,
+					capacityBefore:  1,
+					consumeCapacity: 0,
+					capacityAfter:   1,
+				},
+				{
+					delay:           time.Second,
+					capacityBefore:  1,
+					consumeCapacity: 1,
+					capacityAfter:   0,
+				},
+				{
+					delay:           5 * time.Second,
+					capacityBefore:  1,
+					consumeCapacity: 0,
+					capacityAfter:   1,
+				},
+			},
+		},
 	}
 
 	for _, test := range tests {

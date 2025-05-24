@@ -4861,8 +4861,12 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 		defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
 		kg := defaultShard.RedisClient.kg
 
+		clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Second))
+		now := clock.Now()
+
 		q := NewQueue(
 			defaultShard,
+			WithClock(clock),
 			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 				return true
 			}),
@@ -4875,7 +4879,7 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 		accountId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
 
 		// use future timestamp because scores will be bounded to the present
-		at := time.Now().Add(10 * time.Minute)
+		at := now.Add(10 * time.Minute)
 
 		t.Run("should enqueue simple item to backlog", func(t *testing.T) {
 			require.Len(t, r.Keys(), 0)
@@ -4924,12 +4928,12 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 			require.Equal(t, string(marshaledBacklog), r.HGet(kg.BacklogMeta(), backlog.BacklogID))
 			require.Equal(t, string(marshaledShadowPartition), r.HGet(kg.ShadowPartitionMeta(), shadowPartition.PartitionID))
 
-			require.Equal(t, at.UnixMilli()/1000, int64(score(t, r, kg.ShadowPartitionSet(shadowPartition.PartitionID), backlog.BacklogID)))
-			require.Equal(t, at.UnixMilli()/1000, int64(score(t, r, kg.GlobalShadowPartitionSet(), shadowPartition.PartitionID)))
+			require.Equal(t, at.UnixMilli(), int64(score(t, r, kg.ShadowPartitionSet(shadowPartition.PartitionID), backlog.BacklogID)))
+			require.Equal(t, at.UnixMilli(), int64(score(t, r, kg.GlobalShadowPartitionSet(), shadowPartition.PartitionID)))
 			require.Equal(t, at.UnixMilli(), int64(score(t, r, kg.BacklogSet(backlog.BacklogID), qi.ID)))
 
-			require.Equal(t, at.UnixMilli()/1000, int64(score(t, r, kg.GlobalAccountShadowPartitions(), accountId.String())))
-			require.Equal(t, at.UnixMilli()/1000, int64(score(t, r, kg.AccountShadowPartitions(accountId), shadowPartition.PartitionID)))
+			require.Equal(t, at.UnixMilli(), int64(score(t, r, kg.GlobalAccountShadowPartitions(), accountId.String())))
+			require.Equal(t, at.UnixMilli(), int64(score(t, r, kg.AccountShadowPartitions(accountId), shadowPartition.PartitionID)))
 
 		})
 
@@ -4965,10 +4969,10 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 			require.NotEmpty(t, shadowPartition.PartitionID)
 
 			// pointers should keep earlier score
-			require.Equal(t, at.UnixMilli()/1000, int64(score(t, r, kg.ShadowPartitionSet(shadowPartition.PartitionID), backlog.BacklogID)))
-			require.Equal(t, at.UnixMilli()/1000, int64(score(t, r, kg.GlobalShadowPartitionSet(), shadowPartition.PartitionID)))
-			require.Equal(t, at.UnixMilli()/1000, int64(score(t, r, kg.GlobalAccountShadowPartitions(), accountId.String())))
-			require.Equal(t, at.UnixMilli()/1000, int64(score(t, r, kg.AccountShadowPartitions(accountId), shadowPartition.PartitionID)))
+			require.Equal(t, at.UnixMilli(), int64(score(t, r, kg.ShadowPartitionSet(shadowPartition.PartitionID), backlog.BacklogID)))
+			require.Equal(t, at.UnixMilli(), int64(score(t, r, kg.GlobalShadowPartitionSet(), shadowPartition.PartitionID)))
+			require.Equal(t, at.UnixMilli(), int64(score(t, r, kg.GlobalAccountShadowPartitions(), accountId.String())))
+			require.Equal(t, at.UnixMilli(), int64(score(t, r, kg.AccountShadowPartitions(accountId), shadowPartition.PartitionID)))
 
 			// item in backlog should have new score
 			require.Equal(t, newScore.UnixMilli(), int64(score(t, r, kg.BacklogSet(backlog.BacklogID), qi.ID)))
@@ -5007,15 +5011,15 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 
 			// pointers should take on earlier score
 			{
-				expected := newScore.UnixMilli() / 1000
+				expected := newScore.UnixMilli()
 				actual := int64(score(t, r, kg.ShadowPartitionSet(shadowPartition.PartitionID), backlog.BacklogID))
 
-				require.Equal(t, expected, actual, time.Unix(expected, 0).String(), time.Unix(actual, 0).String())
+				require.Equal(t, expected, actual, time.UnixMilli(expected).String(), time.UnixMilli(actual).String())
 			}
-			require.Equal(t, newScore.UnixMilli()/1000, int64(score(t, r, kg.GlobalShadowPartitionSet(), shadowPartition.PartitionID)))
+			require.Equal(t, newScore.UnixMilli(), int64(score(t, r, kg.GlobalShadowPartitionSet(), shadowPartition.PartitionID)))
 
-			require.Equal(t, newScore.UnixMilli()/1000, int64(score(t, r, kg.GlobalAccountShadowPartitions(), accountId.String())))
-			require.Equal(t, newScore.UnixMilli()/1000, int64(score(t, r, kg.AccountShadowPartitions(accountId), shadowPartition.PartitionID)))
+			require.Equal(t, newScore.UnixMilli(), int64(score(t, r, kg.GlobalAccountShadowPartitions(), accountId.String())))
+			require.Equal(t, newScore.UnixMilli(), int64(score(t, r, kg.AccountShadowPartitions(accountId), shadowPartition.PartitionID)))
 
 			// item in backlog should have new score
 			require.Equal(t, newScore.UnixMilli(), int64(score(t, r, kg.BacklogSet(backlog.BacklogID), qi.ID)))
@@ -5034,8 +5038,12 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 		defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
 		kg := defaultShard.RedisClient.kg
 
+		clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Second))
+		now := clock.Now()
+
 		q := NewQueue(
 			defaultShard,
+			WithClock(clock),
 			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 				return true
 			}),
@@ -5064,7 +5072,7 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 		accountId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
 
 		// use future timestamp because scores will be bounded to the present
-		at := time.Now().Add(10 * time.Minute)
+		at := now.Add(10 * time.Minute)
 
 		t.Run("should enqueue item to backlog", func(t *testing.T) {
 			require.Len(t, r.Keys(), 0)
@@ -5121,12 +5129,12 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 			require.True(t, r.Exists(kg.GlobalAccountShadowPartitions()))
 			require.True(t, r.Exists(kg.AccountShadowPartitions(accountId)))
 
-			require.Equal(t, at.UnixMilli()/1000, int64(score(t, r, kg.ShadowPartitionSet(shadowPartition.PartitionID), backlog.BacklogID)))
-			require.Equal(t, at.UnixMilli()/1000, int64(score(t, r, kg.GlobalShadowPartitionSet(), shadowPartition.PartitionID)))
+			require.Equal(t, at.UnixMilli(), int64(score(t, r, kg.ShadowPartitionSet(shadowPartition.PartitionID), backlog.BacklogID)))
+			require.Equal(t, at.UnixMilli(), int64(score(t, r, kg.GlobalShadowPartitionSet(), shadowPartition.PartitionID)))
 			require.Equal(t, at.UnixMilli(), int64(score(t, r, kg.BacklogSet(backlog.BacklogID), qi.ID)))
 
-			require.Equal(t, at.UnixMilli()/1000, int64(score(t, r, kg.GlobalAccountShadowPartitions(), accountId.String())))
-			require.Equal(t, at.UnixMilli()/1000, int64(score(t, r, kg.AccountShadowPartitions(accountId), shadowPartition.PartitionID)))
+			require.Equal(t, at.UnixMilli(), int64(score(t, r, kg.GlobalAccountShadowPartitions(), accountId.String())))
+			require.Equal(t, at.UnixMilli(), int64(score(t, r, kg.AccountShadowPartitions(accountId), shadowPartition.PartitionID)))
 		})
 	})
 
@@ -5142,8 +5150,12 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 		defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
 		kg := defaultShard.RedisClient.kg
 
+		clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Second))
+		now := clock.Now()
+
 		q := NewQueue(
 			defaultShard,
+			WithClock(clock),
 			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 				return true
 			}),
@@ -5172,7 +5184,7 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 		accountId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
 
 		// use future timestamp because scores will be bounded to the present
-		at := time.Now().Add(10 * time.Minute)
+		at := now.Add(10 * time.Minute)
 
 		t.Run("should enqueue item to backlog", func(t *testing.T) {
 			require.Len(t, r.Keys(), 0)
@@ -5243,8 +5255,8 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 			require.True(t, r.Exists(kg.GlobalShadowPartitionSet()))
 			require.Equal(t, string(marshaledBacklog1), r.HGet(kg.BacklogMeta(), backlog.BacklogID))
 
-			require.Equal(t, at.UnixMilli()/1000, int64(score(t, r, kg.ShadowPartitionSet(shadowPartition.PartitionID), backlog.BacklogID)))
-			require.Equal(t, at.UnixMilli()/1000, int64(score(t, r, kg.GlobalShadowPartitionSet(), shadowPartition.PartitionID)))
+			require.Equal(t, at.UnixMilli(), int64(score(t, r, kg.ShadowPartitionSet(shadowPartition.PartitionID), backlog.BacklogID)))
+			require.Equal(t, at.UnixMilli(), int64(score(t, r, kg.GlobalShadowPartitionSet(), shadowPartition.PartitionID)))
 			require.Equal(t, at.UnixMilli(), int64(score(t, r, kg.BacklogSet(backlog.BacklogID), qi.ID)))
 
 		})
@@ -5262,8 +5274,12 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 		defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
 		kg := defaultShard.RedisClient.kg
 
+		clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Second))
+		now := clock.Now()
+
 		q := NewQueue(
 			defaultShard,
+			WithClock(clock),
 			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 				return true
 			}),
@@ -5275,7 +5291,7 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 		ctx := context.Background()
 
 		// use future timestamp because scores will be bounded to the present
-		at := time.Now().Add(10 * time.Minute)
+		at := now.Add(10 * time.Minute)
 
 		sysQueueName := osqueue.KindQueueMigrate
 
@@ -5320,8 +5336,8 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 			require.Equal(t, string(marshaledBacklog), r.HGet(kg.BacklogMeta(), backlog.BacklogID))
 			require.Equal(t, string(marshaledShadowPartition), r.HGet(kg.ShadowPartitionMeta(), shadowPartition.PartitionID))
 
-			require.Equal(t, at.UnixMilli()/1000, int64(score(t, r, kg.ShadowPartitionSet(shadowPartition.PartitionID), backlog.BacklogID)))
-			require.Equal(t, at.UnixMilli()/1000, int64(score(t, r, kg.GlobalShadowPartitionSet(), shadowPartition.PartitionID)))
+			require.Equal(t, at.UnixMilli(), int64(score(t, r, kg.ShadowPartitionSet(shadowPartition.PartitionID), backlog.BacklogID)))
+			require.Equal(t, at.UnixMilli(), int64(score(t, r, kg.GlobalShadowPartitionSet(), shadowPartition.PartitionID)))
 			require.Equal(t, at.UnixMilli(), int64(score(t, r, kg.BacklogSet(backlog.BacklogID), qi.ID)))
 		})
 	})
@@ -5340,9 +5356,13 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 		defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
 		kg := defaultShard.RedisClient.kg
 
+		clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Second))
+		now := clock.Now()
+
 		enqueueToBacklog := false
 		q := NewQueue(
 			defaultShard,
+			WithClock(clock),
 			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 				return enqueueToBacklog
 			}),
@@ -5355,7 +5375,7 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 		accountId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
 
 		// use future timestamp because scores will be bounded to the present
-		at := time.Now().Add(10 * time.Minute).Truncate(time.Minute)
+		at := now.Add(10 * time.Minute).Truncate(time.Minute)
 
 		t.Run("should lease item", func(t *testing.T) {
 			require.Len(t, r.Keys(), 0)
@@ -5436,9 +5456,13 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 		defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
 		kg := defaultShard.RedisClient.kg
 
+		clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Second))
+		now := clock.Now()
+
 		enqueueToBacklog := false
 		q := NewQueue(
 			defaultShard,
+			WithClock(clock),
 			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 				return enqueueToBacklog
 			}),
@@ -5467,7 +5491,7 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 		accountId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
 
 		// use future timestamp because scores will be bounded to the present
-		at := time.Now().Add(10 * time.Minute).Truncate(time.Minute)
+		at := now.Add(10 * time.Minute).Truncate(time.Minute)
 
 		t.Run("should enqueue item to backlog", func(t *testing.T) {
 			require.Len(t, r.Keys(), 0)
@@ -5566,9 +5590,13 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 		defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
 		kg := defaultShard.RedisClient.kg
 
+		clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Second))
+		now := clock.Now()
+
 		enqueueToBacklog := false
 		q := NewQueue(
 			defaultShard,
+			WithClock(clock),
 			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 				return enqueueToBacklog
 			}),
@@ -5597,7 +5625,7 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 		accountId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
 
 		// use future timestamp because scores will be bounded to the present
-		at := time.Now().Add(10 * time.Minute)
+		at := now.Add(10 * time.Minute)
 
 		t.Run("should enqueue item to backlog", func(t *testing.T) {
 			require.Len(t, r.Keys(), 0)
@@ -5714,9 +5742,13 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 		defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
 		kg := defaultShard.RedisClient.kg
 
+		clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Second))
+		now := clock.Now()
+
 		enqueueToBacklog := false
 		q := NewQueue(
 			defaultShard,
+			WithClock(clock),
 			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 				return enqueueToBacklog
 			}),
@@ -5727,7 +5759,7 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 		ctx := context.Background()
 
 		// use future timestamp because scores will be bounded to the present
-		at := time.Now().Add(10 * time.Minute).Truncate(time.Minute)
+		at := now.Add(10 * time.Minute).Truncate(time.Minute)
 
 		t.Run("should lease item", func(t *testing.T) {
 			require.Len(t, r.Keys(), 0)
@@ -5802,9 +5834,13 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 		defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
 		kg := defaultShard.RedisClient.kg
 
+		clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Second))
+		now := clock.Now()
+
 		enqueueToBacklog := false
 		q := NewQueue(
 			defaultShard,
+			WithClock(clock),
 			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 				return enqueueToBacklog
 			}),
@@ -5819,7 +5855,7 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 		runID := ulid.MustNew(ulid.Now(), rand.Reader)
 
 		// use future timestamp because scores will be bounded to the present
-		at := time.Now().Add(10 * time.Minute)
+		at := now.Add(10 * time.Minute)
 
 		t.Run("should requeue item to backlog", func(t *testing.T) {
 			require.Len(t, r.Keys(), 0)
@@ -5911,8 +5947,8 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 			require.True(t, r.Exists(kg.GlobalAccountShadowPartitions()))
 			require.True(t, r.Exists(kg.AccountShadowPartitions(accountId)))
 
-			require.Equal(t, requeueFor.UnixMilli()/1000, int64(score(t, r, kg.GlobalAccountShadowPartitions(), accountId.String())))
-			require.Equal(t, requeueFor.UnixMilli()/1000, int64(score(t, r, kg.AccountShadowPartitions(accountId), shadowPartition.PartitionID)))
+			require.Equal(t, requeueFor.UnixMilli(), int64(score(t, r, kg.GlobalAccountShadowPartitions(), accountId.String())))
+			require.Equal(t, requeueFor.UnixMilli(), int64(score(t, r, kg.AccountShadowPartitions(accountId), shadowPartition.PartitionID)))
 
 			// expect key queue accounting to be updated
 			remainingMembers, _ := r.ZMembers(shadowPartition.inProgressKey(kg))
@@ -5946,9 +5982,13 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 		defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
 		kg := defaultShard.RedisClient.kg
 
+		clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Second))
+		now := clock.Now()
+
 		enqueueToBacklog := false
 		q := NewQueue(
 			defaultShard,
+			WithClock(clock),
 			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 				return enqueueToBacklog
 			}),
@@ -5961,7 +6001,7 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 		accountId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
 
 		// use future timestamp because scores will be bounded to the present
-		at := time.Now().Add(10 * time.Minute)
+		at := now.Add(10 * time.Minute)
 
 		t.Run("should requeue item to backlog", func(t *testing.T) {
 			require.Len(t, r.Keys(), 0)
@@ -6013,7 +6053,7 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 			leaseID, err := q.Lease(ctx, qi, leaseDur, now, nil)
 			require.NoError(t, err)
 			require.NotNil(t, leaseID)
-			require.Equal(t, leaseExpires, ulid.Time(leaseID.Time()), time.Now())
+			require.Equal(t, leaseExpires, ulid.Time(leaseID.Time()), now)
 
 			backlog := q.ItemBacklog(ctx, item)
 			require.NotEmpty(t, backlog.BacklogID)
@@ -6093,9 +6133,13 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 		defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
 		kg := defaultShard.RedisClient.kg
 
+		clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Second))
+		now := clock.Now()
+
 		enqueueToBacklog := false
 		q := NewQueue(
 			defaultShard,
+			WithClock(clock),
 			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 				return enqueueToBacklog
 			}),
@@ -6108,7 +6152,7 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 		accountId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
 
 		// use future timestamp because scores will be bounded to the present
-		at := time.Now().Add(10 * time.Minute)
+		at := now.Add(10 * time.Minute)
 
 		t.Run("should requeue item to backlog", func(t *testing.T) {
 			require.Len(t, r.Keys(), 0)
@@ -6171,7 +6215,7 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 			leaseID, err := q.Lease(ctx, qi, leaseDur, now, nil)
 			require.NoError(t, err)
 			require.NotNil(t, leaseID)
-			require.Equal(t, leaseExpires, ulid.Time(leaseID.Time()), time.Now())
+			require.Equal(t, leaseExpires, ulid.Time(leaseID.Time()), now)
 
 			backlog := q.ItemBacklog(ctx, item)
 			require.Len(t, backlog.ConcurrencyKeys, 2)
@@ -6265,9 +6309,13 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 		defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
 		kg := defaultShard.RedisClient.kg
 
+		clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Second))
+		now := clock.Now()
+
 		enqueueToBacklog := false
 		q := NewQueue(
 			defaultShard,
+			WithClock(clock),
 			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 				return enqueueToBacklog
 			}),
@@ -6279,7 +6327,7 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 		ctx := context.Background()
 
 		// use future timestamp because scores will be bounded to the present
-		at := time.Now().Add(10 * time.Minute)
+		at := now.Add(10 * time.Minute)
 
 		sysQueueName := osqueue.KindQueueMigrate
 
@@ -6383,9 +6431,13 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 		defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
 		kg := defaultShard.RedisClient.kg
 
+		clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Second))
+		now := clock.Now()
+
 		enqueueToBacklog := false
 		q := NewQueue(
 			defaultShard,
+			WithClock(clock),
 			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 				return enqueueToBacklog
 			}),
@@ -6400,7 +6452,7 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 		runID := ulid.MustNew(ulid.Now(), rand.Reader)
 
 		// use future timestamp because scores will be bounded to the present
-		at := time.Now().Add(10 * time.Minute)
+		at := now.Add(10 * time.Minute)
 
 		require.Len(t, r.Keys(), 0)
 
@@ -6440,7 +6492,6 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 		enqueueToBacklog = true
 
 		// put item in progress, this is tested separately
-		now := q.clock.Now()
 		leaseDur := 5 * time.Second
 		leaseID, err := q.Lease(ctx, qi, leaseDur, now, nil)
 		require.NoError(t, err)

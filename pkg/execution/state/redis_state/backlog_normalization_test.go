@@ -193,7 +193,7 @@ func TestQueueBacklogPrepareNormalize(t *testing.T) {
 		require.True(t, hasMember(t, r, kg.AccountNormalizeSet(accountId), fnID.String()))
 		require.True(t, hasMember(t, r, kg.PartitionNormalizeSet(fnID.String()), expectedBacklog.BacklogID))
 
-		expectedTime := clock.Now().Unix()
+		expectedTime := clock.Now().UnixMilli()
 
 		require.Equal(t, expectedTime, int64(score(t, r, kg.GlobalAccountNormalizeSet(), accountId.String())))
 		require.Equal(t, expectedTime, int64(score(t, r, kg.AccountNormalizeSet(accountId), fnID.String())))

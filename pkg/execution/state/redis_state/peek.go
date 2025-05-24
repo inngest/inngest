@@ -21,6 +21,8 @@ type peeker[T any] struct {
 	// if the score exceeds the until value (usually the current time).
 	ignoreUntil bool
 
+	isMillisecondPrecision bool
+
 	handleMissingItems func(pointers []string) error
 	maker              func() *T
 	keyMetadataHash    string
@@ -66,12 +68,18 @@ func (p *peeker[T]) peek(ctx context.Context, keyOrderedPointerSet string, seque
 		script = "peekOrderedSetUntil"
 		ms := until.UnixMilli()
 
+		untilTime := until.Unix()
+		if p.isMillisecondPrecision {
+			untilTime = until.UnixMilli()
+		}
+
 		isSequential := 0
 		if sequential {
 			isSequential = 1
 		}
 
 		rawArgs = []any{
+			untilTime,
 			ms,
 			limit,
 			isSequential,
@@ -147,7 +155,11 @@ func (p *peeker[T]) peek(ctx context.Context, keyOrderedPointerSet string, seque
 	// Use parallel decoding as per Peek
 	items, err := util.ParallelDecode(encoded, func(val any) (*T, error) {
 		if val == nil {
-			p.q.logger.Error().Interface("encoded", encoded).Interface("missing", missingItems).Str("key", keyOrderedPointerSet).Msg("encountered nil item in pointer queue")
+			p.q.log.Error("encountered nil item in pointer queue",
+				"encoded", encoded,
+				"missing", missingItems,
+				"key", keyOrderedPointerSet,
+			)
 			return nil, fmt.Errorf("encountered nil item in pointer queue")
 		}
 
@@ -197,12 +209,18 @@ func (p *peeker[T]) peekPointer(ctx context.Context, keyOrderedPointerSet string
 
 	ms := until.UnixMilli()
 
+	untilTime := until.Unix()
+	if p.isMillisecondPrecision {
+		untilTime = until.UnixMilli()
+	}
+
 	isSequential := 0
 	if sequential {
 		isSequential = 1
 	}
 
 	args, err := StrSlice([]any{
+		untilTime,
 		ms,
 		limit,
 		isSequential,

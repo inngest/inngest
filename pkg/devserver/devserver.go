@@ -121,6 +121,9 @@ func enforceConnectLeaseExpiry(ctx context.Context, accountID uuid.UUID) bool {
 }
 
 func start(ctx context.Context, opts StartOpts) error {
+	l := logger.StdlibLogger(ctx, logger.WithHandler(logger.DevHandler))
+	ctx = logger.WithStdlib(ctx, l)
+
 	db, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{InMemory: true})
 	if err != nil {
 		return err
@@ -245,6 +248,7 @@ func start(ctx context.Context, opts StartOpts) error {
 
 			return keys
 		}),
+		redis_state.WithLogger(l),
 		redis_state.WithConcurrencyLimitGetter(func(ctx context.Context, p redis_state.QueuePartition) redis_state.PartitionConcurrencyLimits {
 			// In the dev server, there are never account limits.
 			limits := redis_state.PartitionConcurrencyLimits{
@@ -294,9 +298,9 @@ func start(ctx context.Context, opts StartOpts) error {
 			return enableKeyQueues
 		}),
 		redis_state.WithEnqueueSystemPartitionsToBacklog(false),
-		redis_state.WithDisableLeaseChecksForSystemQueues(false),
+		redis_state.WithDisableLeaseChecksForSystemQueues(enableKeyQueues),
 		redis_state.WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-			return false
+			return enableKeyQueues
 		}),
 		redis_state.WithBacklogRefillLimit(10),
 	}
@@ -373,7 +377,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		),
 		executor.WithExpressionAggregator(agg),
 		executor.WithQueue(rq),
-		executor.WithLogger(logger.From(ctx)),
+		executor.WithLogger(l),
 		executor.WithFunctionLoader(loader),
 		executor.WithRealtimePublisher(broadcaster),
 		executor.WithLifecycleListeners(
@@ -426,6 +430,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		executor.WithServiceExecutor(exec),
 		executor.WithServiceBatcher(batcher),
 		executor.WithServiceDebouncer(debouncer),
+		executor.WithServiceLogger(l),
 	)
 
 	runner := runner.NewService(
@@ -440,6 +445,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		runner.WithRateLimiter(rl),
 		runner.WithBatchManager(batcher),
 		runner.WithPublisher(pb),
+		runner.WithLogger(l),
 	)
 
 	// The devserver embeds the event API.
@@ -487,7 +493,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	core, err := coreapi.NewCoreApi(coreapi.Options{
 		Data:          ds.Data,
 		Config:        ds.Opts.Config,
-		Logger:        logger.From(ctx),
+		Logger:        l,
 		Runner:        ds.Runner,
 		Tracker:       ds.Tracker,
 		State:         ds.State,
@@ -561,6 +567,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		Config:         ds.Opts.Config,
 		Mounts:         mounts,
 		LocalEventKeys: opts.EventKeys,
+		Logger:         l,
 	})
 
 	return service.StartAll(ctx, ds, runner, executorSvc, ds.Apiservice, connGateway)

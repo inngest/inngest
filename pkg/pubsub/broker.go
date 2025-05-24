@@ -8,7 +8,6 @@ import (
 	"sync"
 
 	"github.com/inngest/inngest/pkg/config"
-	"github.com/inngest/inngest/pkg/inngest/log"
 	"github.com/inngest/inngest/pkg/logger"
 	"gocloud.dev/pubsub"
 	_ "gocloud.dev/pubsub/awssnssqs"
@@ -32,6 +31,7 @@ func NewPublishSubscriber(ctx context.Context, c config.MessagingService) (Publi
 		topics: map[string]*pubsub.Topic{},
 		tl:     &sync.RWMutex{},
 		mux:    pubsub.DefaultURLMux(),
+		log:    logger.StdlibLogger(ctx),
 	}
 	return b, nil
 }
@@ -48,6 +48,8 @@ type broker struct {
 	// to.  This handles processing topic URLs (mem://, redis://) with the correct
 	// driver.
 	mux *pubsub.URLMux
+
+	log logger.Logger
 }
 
 // Publish publishes an event on the given topic.  It does not check that a subscriber exists
@@ -73,7 +75,7 @@ func (b *broker) Publish(ctx context.Context, topic string, m Message) error {
 		},
 	}
 
-	log.From(ctx).Debug().Interface("event", m.Name).Str("topic", topic).Msg("publishing event")
+	b.log.Debug("publishing event", "event", m.Name, "topic", topic)
 
 	if err = t.Send(ctx, wrapped); err != nil {
 		return fmt.Errorf("error publishing event: %w", err)

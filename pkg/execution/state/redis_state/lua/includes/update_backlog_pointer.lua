@@ -1,6 +1,6 @@
 local function updateBacklogPointer(keyGlobalShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, keyShadowPartitionSet, keyBacklogSet, accountID, partitionID, backlogID)
-  -- Retrieve the earliest item score in the backlog
-  local earliestBacklogScore = get_converted_earliest_pointer_score(keyBacklogSet)
+  -- Retrieve the earliest item score in the backlog in milliseconds
+  local earliestBacklogScore = get_earliest_score(keyBacklogSet)
 
   -- If backlog is empty, update dangling pointers in shadow partition
   if earliestBacklogScore == 0 then
@@ -24,7 +24,7 @@ local function updateBacklogPointer(keyGlobalShadowPartitionSet, keyGlobalAccoun
 
   -- In case the backlog is the new earliest item in the shadow partition,
   -- update pointers to shadow partition in global indexes
-  local earliestShadowPartitionScore = get_earliest_pointer_score(keyShadowPartitionSet)
+  local earliestShadowPartitionScore = get_earliest_score(keyShadowPartitionSet)
 
   -- Push back shadow partition in global set
   update_pointer_score_to(partitionID, keyGlobalShadowPartitionSet, earliestShadowPartitionScore)

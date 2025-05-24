@@ -177,9 +177,10 @@ func (t *Throttle) UnmarshalJSON(in []byte) error {
 	if t.Limit == 0 {
 		t.Limit = 1
 	}
-	if t.Burst == 0 {
-		t.Burst = 1
-	}
+	// NOTE: why is there a min 1?
+	// if t.Burst == 0 {
+	// 	t.Burst = 1
+	// }
 	return err
 }
 

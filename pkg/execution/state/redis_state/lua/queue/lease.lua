@@ -84,13 +84,14 @@ end
 -- Track the earliest time this job was attempted in the queue.
 item = set_item_peek_time(keyQueueMap, queueID, item, currentTime)
 
-if checkConstraints then
+-- NOTE: we can probably skip this entire section if item comes from backlog?
+if checkConstraints == 1 then
 	-- Track throttling/rate limiting IF the queue item has throttling info set.  This allows
 	-- us to target specific queue items with rate limiting individually.
 	--
 	-- We handle this before concurrency as it's typically not used, and it's faster to handle than concurrency,
 	-- with o(1) operations vs o(log(n)).
-	if item.data ~= nil and item.data.throttle ~= nil then
+	if item.data ~= nil and item.data.throttle ~= nil and refilledFromBacklog == 0 then
 		local throttleResult = gcra(throttleKey, currentTime, item.data.throttle.p * 1000, item.data.throttle.l, item.data.throttle.b)
 		if throttleResult == false then
 			return -7

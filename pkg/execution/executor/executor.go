@@ -42,7 +42,6 @@ import (
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/inngest/inngest/pkg/util/gateway"
 	"github.com/oklog/ulid/v2"
-	"github.com/rs/zerolog"
 	"github.com/xhit/go-str2duration/v2"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -164,7 +163,7 @@ func WithFunctionLoader(l state.FunctionLoader) ExecutorOpt {
 	}
 }
 
-func WithLogger(l *zerolog.Logger) ExecutorOpt {
+func WithLogger(l logger.Logger) ExecutorOpt {
 	return func(e execution.Executor) error {
 		e.(*executor).log = l
 		return nil
@@ -293,7 +292,7 @@ func WithRealtimePublisher(b realtime.Publisher) ExecutorOpt {
 
 // executor represents a built-in executor for running workflows.
 type executor struct {
-	log *zerolog.Logger
+	log logger.Logger
 
 	// exprAggregator is an expression aggregator used to parse and aggregate expressions
 	// using trees.
@@ -1580,9 +1579,9 @@ func (e *executor) HandleInvokeFinish(ctx context.Context, evt event.TrackedEven
 
 	log := e.log
 	if log == nil {
-		log = logger.From(ctx)
+		log = logger.StdlibLogger(ctx)
 	}
-	l := log.With().Str("event_id", evtID.String()).Logger()
+	l := log.With("event_id", evtID.String())
 
 	correlationID := evt.GetEvent().CorrelationID()
 	if correlationID == "" {
@@ -1597,12 +1596,12 @@ func (e *executor) HandleInvokeFinish(ctx context.Context, evt event.TrackedEven
 	}
 
 	if pause.Expires.Time().Before(time.Now()) {
-		l.Debug().Msg("encountered expired pause")
+		l.Debug("encountered expired pause")
 
 		shouldDelete := pause.Expires.Time().Add(consts.PauseExpiredDeletionGracePeriod).Before(time.Now())
 		if shouldDelete {
 			// Consume this pause to remove it entirely
-			l.Debug().Msg("deleting expired pause")
+			l.Debug("deleting expired pause")
 			_ = e.pm.DeletePause(context.Background(), *pause)
 		}
 
@@ -1625,10 +1624,7 @@ func (e *executor) HandleInvokeFinish(ctx context.Context, evt event.TrackedEven
 
 	resumeData := pause.GetResumeData(evt.GetEvent())
 	if e.log != nil {
-		e.log.
-			Debug().
-			Str("pause.DataKey", pause.DataKey).
-			Msg("resuming pause from invoke")
+		e.log.Debug("resuming pause from invoke", "pause.DataKey", pause.DataKey)
 	}
 
 	return e.Resume(ctx, *pause, execution.ResumeRequest{
@@ -1744,15 +1740,15 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 		}
 
 		if e.log != nil {
-			e.log.Debug().
-				Str("pause_id", pause.ID.String()).
-				Str("run_id", pause.Identifier.RunID.String()).
-				Str("workflow_id", pause.Identifier.FunctionID.String()).
-				Bool("timeout", pause.OnTimeout).
-				Bool("cancel", pause.Cancel).
-				Interface("consumed", consumeResult).
-				Err(err).
-				Msg("resuming from pause")
+			e.log.Debug("resuming from pause",
+				"error", err,
+				"pause_id", pause.ID.String(),
+				"run_id", pause.Identifier.RunID.String(),
+				"workflow_id", pause.Identifier.FunctionID.String(),
+				"timeout", pause.OnTimeout,
+				"cancel", pause.Cancel,
+				"consumed", consumeResult,
+			)
 		}
 
 		if !consumeResult.DidConsume {
@@ -1918,7 +1914,7 @@ func (e *executor) handleGeneratorGroup(ctx context.Context, i *runInstance, gro
 		if op == nil {
 			// This is clearly an error.
 			if e.log != nil {
-				e.log.Error().Err(fmt.Errorf("nil generator returned")).Msg("error handling generator")
+				e.log.Error("error handling generator", "error", "nil generator returned")
 			}
 			continue
 		}
@@ -1931,7 +1927,7 @@ func (e *executor) handleGeneratorGroup(ctx context.Context, i *runInstance, gro
 		eg.Go(func() error {
 			defer func() {
 				if r := recover(); r != nil {
-					logger.StdlibLogger(ctx).Error(
+					e.log.Error(
 						"panic in handleGenerator",
 						"error", r,
 					)
@@ -3105,14 +3101,16 @@ func (e *executor) ReceiveSignal(ctx context.Context, workspaceID uuid.UUID, sig
 
 	log := e.log
 	if log == nil {
-		log = logger.From(ctx)
+		log = logger.StdlibLogger(ctx)
 	}
-	l := log.With().Str("signal_id", signalID).Str("workspace_id", workspaceID.String()).Logger()
+	sanitizedSignalID := strings.ReplaceAll(signalID, "\n", "")
+	sanitizedSignalID = strings.ReplaceAll(sanitizedSignalID, "\r", "")
+	l := log.With("signal_id", sanitizedSignalID, "workspace_id", workspaceID.String())
 	defer func() {
 		if err != nil {
-			l.Error().Err(err).Msg("error receiving signal")
+			l.Error("error receiving signal", "error", err)
 		} else {
-			l.Info().Msg("signal received")
+			l.Info("signal received")
 		}
 	}()
 
@@ -3125,23 +3123,23 @@ func (e *executor) ReceiveSignal(ctx context.Context, workspaceID uuid.UUID, sig
 	res = &execution.ReceiveSignalResult{}
 
 	if pause == nil {
-		l.Debug().Msg("no pause found for signal")
+		l.Debug("no pause found for signal")
 		return
 	}
 
 	if pause.Expires.Time().Before(time.Now()) {
-		l.Debug().Msg("encountered expired signal")
+		l.Debug("encountered expired signal")
 
 		shouldDelete := pause.Expires.Time().Add(consts.PauseExpiredDeletionGracePeriod).Before(time.Now())
 		if shouldDelete {
-			l.Debug().Msg("deleting expired pause")
+			l.Debug("deleting expired pause")
 			_ = e.pm.DeletePause(ctx, *pause)
 		}
 
 		return
 	}
 
-	l.Debug().Str("pause.DataKey", pause.DataKey).Msg("resuming pause from signal")
+	l.Debug("resuming pause from signal", "pause.DataKey", pause.DataKey)
 
 	err = e.Resume(ctx, *pause, execution.ResumeRequest{
 		RunID:          &pause.Identifier.RunID,

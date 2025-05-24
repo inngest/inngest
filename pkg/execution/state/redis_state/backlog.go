@@ -3,10 +3,13 @@ package redis_state
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
 )
@@ -191,6 +194,9 @@ type QueueBacklog struct {
 
 	// Set for backlogs containing start items only for a given throttle configuration
 	Throttle *BacklogThrottle
+
+	SuccessiveThrottleConstrained          int `json:"stc,omitzero"`
+	SuccessiveCustomConcurrencyConstrained int `json:"sccc,omitzero"`
 }
 
 func (q *queue) ItemBacklog(ctx context.Context, i osqueue.QueueItem) QueueBacklog {
@@ -199,12 +205,12 @@ func (q *queue) ItemBacklog(ctx context.Context, i osqueue.QueueItem) QueueBackl
 	// sanity check: both QueueNames should be set, but sometimes aren't
 	if queueName == nil && i.QueueName != nil {
 		queueName = i.QueueName
-		q.logger.Warn().Interface("item", i).Msg("backlogs encountered queue item with inconsistent custom queue name, should have both i.QueueName and i.Data.QueueName set")
+		q.log.Warn("backlogs encountered queue item with inconsistent custom queue name, should have both i.QueueName and i.Data.QueueName set", "item", i)
 	}
 
 	// sanity check: queueName values must match
 	if i.Data.QueueName != nil && i.QueueName != nil && *i.Data.QueueName != *i.QueueName {
-		q.logger.Error().Interface("item", i).Msg("backlogs encountered queue item with inconsistent custom queue names, should have matching values for i.QueueName and i.Data.QueueName")
+		q.log.Error("backlogs encountered queue item with inconsistent custom queue names, should have matching values for i.QueueName and i.Data.QueueName", "item", i)
 	}
 
 	if queueName != nil {
@@ -284,12 +290,12 @@ func (q *queue) ItemShadowPartition(ctx context.Context, i osqueue.QueueItem) Qu
 	// sanity check: both QueueNames should be set, but sometimes aren't
 	if queueName == nil && i.QueueName != nil {
 		queueName = i.QueueName
-		q.logger.Warn().Interface("item", i).Msg("shadow partitions encountered queue item with inconsistent custom queue name, should have both i.QueueName and i.Data.QueueName set")
+		q.log.Warn("shadow partitions encountered queue item with inconsistent custom queue name, should have both i.QueueName and i.Data.QueueName set", "item", i)
 	}
 
 	// sanity check: queueName values must match
 	if i.Data.QueueName != nil && i.QueueName != nil && *i.Data.QueueName != *i.QueueName {
-		q.logger.Error().Interface("item", i).Msg("shadow partitions encountered queue item with inconsistent custom queue names, should have matching values for i.QueueName and i.Data.QueueName")
+		q.log.Error("shadow partitions encountered queue item with inconsistent custom queue names, should have matching values for i.QueueName and i.Data.QueueName", "item", i)
 	}
 
 	// The only case when we manually set a queueName is for system partitions
@@ -312,7 +318,7 @@ func (q *queue) ItemShadowPartition(ctx context.Context, i osqueue.QueueItem) Qu
 	}
 
 	if i.FunctionID == uuid.Nil {
-		q.logger.Error().Interface("item", i).Msg("unexpected missing functionID in ItemPartitions()")
+		q.log.Error("unexpected missing functionID in ItemPartitions()", "item", i)
 	}
 
 	// NOTE: This is an optimization that ensures we return *updated* concurrency keys
@@ -492,4 +498,331 @@ func (b QueueBacklog) customConcurrencyKeyID(n int) string {
 
 	key := b.ConcurrencyKeys[n-1]
 	return key.CanonicalKeyID
+}
+
+func (b QueueBacklog) requeueBackOff(now time.Time, constraint enums.QueueConstraint, partition *QueueShadowPartition) time.Time {
+	max := now.Add(10 * time.Second)
+
+	switch constraint {
+	case enums.QueueConstraintThrottle:
+		if partition.Throttle == nil {
+			return now.Add(PartitionThrottleLimitRequeueExtension)
+		}
+
+		return now.Add(PartitionThrottleLimitRequeueExtension + time.Duration(b.SuccessiveThrottleConstrained)*time.Second)
+
+	case enums.QueueConstraintCustomConcurrencyKey1, enums.QueueConstraintCustomConcurrencyKey2:
+		next := now.Add(PartitionConcurrencyLimitRequeueExtension + time.Duration(b.SuccessiveCustomConcurrencyConstrained)*time.Second)
+
+		if next.After(max) {
+			next = max
+		}
+
+		return next
+	}
+
+	return max
+}
+
+type BacklogRefillResult struct {
+	Constraint        enums.QueueConstraint
+	Refilled          int
+	TotalBacklogCount int
+	BacklogCountUntil int
+	Capacity          int
+	Refill            int
+}
+
+func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueShadowPartition, refillUntil time.Time) (*BacklogRefillResult, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "BacklogRefill"), redis_telemetry.ScopeQueue)
+
+	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
+		return nil, fmt.Errorf("unsupported queue shard kind for BacklogRefill: %s", q.primaryQueueShard.Kind)
+	}
+
+	kg := q.primaryQueueShard.RedisClient.kg
+
+	accountID := uuid.Nil
+	if sp.AccountID != nil {
+		accountID = *sp.AccountID
+	}
+
+	nowMS := q.clock.Now().UnixMilli()
+
+	refillLimit := q.backlogRefillLimit
+	if refillLimit > BacklogRefillHardLimit {
+		refillLimit = BacklogRefillHardLimit
+	}
+	if refillLimit <= 0 {
+		refillLimit = BacklogRefillHardLimit
+	}
+
+	var (
+		throttleKey                                  string
+		throttleLimit, throttleBurst, throttlePeriod int
+	)
+	if sp.Throttle != nil && b.Throttle != nil {
+		throttleKey = b.Throttle.ThrottleKey
+		throttleLimit = sp.Throttle.Limit
+		throttleBurst = sp.Throttle.Burst
+		throttlePeriod = sp.Throttle.Period
+	}
+
+	keys := []string{
+		kg.BacklogSet(b.BacklogID),
+		kg.BacklogMeta(),
+		kg.ShadowPartitionSet(sp.PartitionID),
+		kg.GlobalShadowPartitionSet(),
+		kg.GlobalAccountShadowPartitions(),
+		kg.AccountShadowPartitions(accountID),
+
+		sp.readyQueueKey(kg),
+		kg.GlobalPartitionIndex(),
+		kg.GlobalAccountIndex(),
+		kg.AccountPartitionIndex(accountID),
+
+		kg.QueueItem(),
+
+		// Constraint-related accounting keys
+		sp.accountActiveKey(kg),  // account active
+		sp.activeKey(kg),         // partition active
+		b.customKeyActive(kg, 1), // custom key 1
+		b.customKeyActive(kg, 2), // custom key 2
+		b.activeKey(kg),          // compound key (active for this backlog)
+	}
+
+	args, err := StrSlice([]any{
+		b.BacklogID,
+		sp.PartitionID,
+		accountID,
+		refillUntil.UnixMilli(),
+		refillLimit,
+		nowMS,
+
+		sp.AccountConcurrency,
+		sp.FunctionConcurrency,
+		sp.CustomConcurrencyLimit(1),
+		sp.CustomConcurrencyLimit(2),
+
+		throttleKey,
+		throttleLimit,
+		throttleBurst,
+		throttlePeriod,
+
+		kg.QueuePrefix(),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("could not serialize args: %w", err)
+	}
+
+	res, err := scripts["queue/backlogRefill"].Exec(
+		redis_telemetry.WithScriptName(ctx, "backlogRefill"),
+		q.primaryQueueShard.RedisClient.unshardedRc,
+		keys,
+		args,
+	).ToAny()
+	if err != nil {
+		return nil, fmt.Errorf("error refilling backlog: %w", err)
+	}
+
+	returnTuple, ok := res.([]any)
+	if !ok || len(returnTuple) != 6 {
+		return nil, fmt.Errorf("expected return tuple to include 6 items")
+	}
+
+	status, ok := returnTuple[0].(int64)
+	if !ok {
+		return nil, fmt.Errorf("missing status in returned tuple")
+	}
+
+	refillCount, ok := returnTuple[1].(int64)
+	if !ok {
+		return nil, fmt.Errorf("missing refillCount in returned tuple")
+	}
+
+	backlogCountUntil, ok := returnTuple[2].(int64)
+	if !ok {
+		return nil, fmt.Errorf("missing backlogCount in returned tuple")
+	}
+
+	backlogCountTotal, ok := returnTuple[3].(int64)
+	if !ok {
+		return nil, fmt.Errorf("missing backlogCount in returned tuple")
+	}
+
+	capacity, ok := returnTuple[4].(int64)
+	if !ok {
+		return nil, fmt.Errorf("missing capacity in returned tuple")
+	}
+
+	refill, ok := returnTuple[5].(int64)
+	if !ok {
+		return nil, fmt.Errorf("missing refill in returned tuple")
+	}
+
+	refillResult := &BacklogRefillResult{
+		Refilled:          int(refillCount),
+		TotalBacklogCount: int(backlogCountTotal),
+		BacklogCountUntil: int(backlogCountUntil),
+		Capacity:          int(capacity),
+		Refill:            int(refill),
+	}
+
+	switch status {
+	case 0:
+		return refillResult, nil
+	case 1:
+		refillResult.Constraint = enums.QueueConstraintAccountConcurrency
+		return refillResult, nil
+	case 2:
+		refillResult.Constraint = enums.QueueConstraintFunctionConcurrency
+		return refillResult, nil
+	case 3:
+		refillResult.Constraint = enums.QueueConstraintCustomConcurrencyKey1
+		return refillResult, nil
+	case 4:
+		refillResult.Constraint = enums.QueueConstraintCustomConcurrencyKey2
+		return refillResult, nil
+	case 5:
+		refillResult.Constraint = enums.QueueConstraintThrottle
+		return refillResult, nil
+	default:
+		return nil, fmt.Errorf("unknown status refilling backlog: %v (%T)", status, status)
+	}
+}
+
+func (q *queue) BacklogRequeue(ctx context.Context, backlog *QueueBacklog, sp *QueueShadowPartition, requeueAt time.Time) error {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "BacklogRequeue"), redis_telemetry.ScopeQueue)
+
+	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
+		return fmt.Errorf("unsupported queue shard kind for BacklogRequeue: %s", q.primaryQueueShard.Kind)
+	}
+
+	kg := q.primaryQueueShard.RedisClient.kg
+
+	accountID := uuid.Nil
+	if sp.AccountID != nil {
+		accountID = *sp.AccountID
+	}
+
+	keys := []string{
+		kg.ShadowPartitionMeta(),
+		kg.BacklogMeta(),
+
+		kg.GlobalShadowPartitionSet(),
+		kg.GlobalAccountShadowPartitions(),
+		kg.AccountShadowPartitions(accountID),
+		kg.ShadowPartitionSet(sp.PartitionID),
+		kg.BacklogSet(backlog.BacklogID),
+	}
+	args, err := StrSlice([]any{
+		accountID,
+		sp.PartitionID,
+		backlog.BacklogID,
+		requeueAt.UnixMilli(),
+	})
+	if err != nil {
+		return fmt.Errorf("could not serialize args: %w", err)
+	}
+
+	status, err := scripts["queue/backlogRequeue"].Exec(
+		redis_telemetry.WithScriptName(ctx, "backlogRequeue"),
+		q.primaryQueueShard.RedisClient.unshardedRc,
+		keys,
+		args,
+	).AsInt64()
+	if err != nil {
+		return fmt.Errorf("could not requeue backlog: %w", err)
+	}
+
+	q.log.Trace("requeued backlog",
+		"id", backlog.BacklogID,
+		"partition", sp.PartitionID,
+		"time", requeueAt.Format(time.StampMilli),
+		"successive_throttle", backlog.SuccessiveThrottleConstrained,
+		"successive_concurrency", backlog.SuccessiveCustomConcurrencyConstrained,
+		"status", status,
+	)
+
+	switch status {
+	case 0, 1:
+		return nil
+	case -1:
+		return ErrBacklogNotFound
+	default:
+		return fmt.Errorf("unknown response requeueing backlog: %v (%T)", status, status)
+	}
+}
+
+func (q *queue) BacklogPrepareNormalize(ctx context.Context, b *QueueBacklog, sp *QueueShadowPartition, normalizeAsyncMinimum int) (int, bool, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "BacklogPrepareNormalize"), redis_telemetry.ScopeQueue)
+
+	shard := q.primaryQueueShard
+
+	if shard.Kind != string(enums.QueueShardKindRedis) {
+		return 0, false, fmt.Errorf("unsupported queue shard kind for BacklogPrepareNormalize: %s", shard.Kind)
+	}
+	kg := shard.RedisClient.kg
+
+	accountID := uuid.Nil
+	if sp.AccountID != nil {
+		accountID = *sp.AccountID
+	}
+
+	keys := []string{
+		kg.BacklogSet(b.BacklogID),
+		kg.ShadowPartitionSet(sp.PartitionID),
+		kg.GlobalShadowPartitionSet(),
+		kg.GlobalAccountShadowPartitions(),
+		kg.AccountShadowPartitions(accountID),
+
+		kg.GlobalAccountNormalizeSet(),
+		kg.AccountNormalizeSet(accountID),
+		kg.PartitionNormalizeSet(sp.PartitionID),
+	}
+	args, err := StrSlice([]any{
+		b.BacklogID,
+		sp.PartitionID,
+		accountID,
+		// order normalize by timestamp
+		q.clock.Now().UnixMilli(),
+		normalizeAsyncMinimum,
+	})
+	if err != nil {
+		return 0, false, fmt.Errorf("could not serialize args: %w", err)
+	}
+
+	res, err := scripts["queue/backlogPrepareNormalize"].Exec(
+		redis_telemetry.WithScriptName(ctx, "backlogPrepareNormalize"),
+		shard.RedisClient.unshardedRc,
+		keys,
+		args,
+	).ToAny()
+	if err != nil {
+		return 0, false, fmt.Errorf("error preparing backlog normalization: %w", err)
+	}
+
+	statusCountTuple, ok := res.([]any)
+	if !ok || len(statusCountTuple) != 2 {
+		return 0, false, fmt.Errorf("expected return tuple to include status and refill count")
+	}
+
+	status, ok := statusCountTuple[0].(int64)
+	if !ok {
+		return 0, false, fmt.Errorf("missing status in status-count tuple")
+	}
+
+	backlogCount, ok := statusCountTuple[1].(int64)
+	if !ok {
+		return 0, false, fmt.Errorf("missing refillCount in status-count tuple")
+	}
+
+	switch status {
+	case 1:
+		return int(backlogCount), true, nil
+	case -1:
+		return int(backlogCount), false, nil
+	default:
+		return 0, false, fmt.Errorf("unknown status preparing backlog normalization: %v (%T)", status, status)
+	}
 }

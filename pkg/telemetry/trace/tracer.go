@@ -9,13 +9,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/inngest/inngest/pkg/logger"
-	oteltrace "go.opentelemetry.io/otel/trace"
-
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/inngest/log"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/exporters"
-	"github.com/rs/zerolog"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/jaeger"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
@@ -26,6 +23,7 @@ import (
 	"go.opentelemetry.io/otel/sdk/resource"
 	"go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.20.0"
+	oteltrace "go.opentelemetry.io/otel/trace"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 )
@@ -331,7 +329,7 @@ func newJaegerTraceProvider(ctx context.Context, opts TracerOpts) (Tracer, error
 // IOTraceProvider is expected to be used for debugging purposes and not for production usage
 func newIOTraceProvider(ctx context.Context, opts TracerOpts) (Tracer, error) {
 	exp, err := stdouttrace.New(
-		stdouttrace.WithWriter(log.New(zerolog.TraceLevel)),
+		stdouttrace.WithWriter(os.Stderr),
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error settings up stdout trace exporter: %w", err)
