@@ -7051,6 +7051,85 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 	})
 }
 
+func TestQueueEnqueueItemSingleton(t *testing.T) {
+	r := miniredis.RunT(t)
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	q := NewQueue(QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName})
+	ctx := context.Background()
+
+	start := time.Now().Truncate(time.Second)
+
+	t.Run("It enqueues an item only once until the last item in a function run is dequeued", func(t *testing.T) {
+		key := "example"
+		runId := ulid.MustNew(ulid.Now(), rand.Reader)
+		qi1 := osqueue.QueueItem{
+			Data: osqueue.Item{
+				Kind: osqueue.KindStart,
+				Identifier: state.Identifier{
+					RunID: runId,
+				},
+				Singleton: &osqueue.Singleton{
+					Key: key,
+				},
+			},
+		}
+
+		qi2 := osqueue.QueueItem{
+			Data: osqueue.Item{
+				Kind: osqueue.KindEdge,
+				Identifier: state.Identifier{
+					RunID: runId,
+				},
+			},
+		}
+
+		item1, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi1, start, osqueue.EnqueueOpts{})
+
+		require.NoError(t, err)
+		require.NotEqual(t, qi1.ID, item1.ID)
+		found := getQueueItem(t, r, item1.ID)
+		require.Equal(t, item1, found)
+
+		// Ensure we can't enqueue a start item again having the same singleton key
+		_, err = q.EnqueueItem(ctx, q.primaryQueueShard, qi1, start, osqueue.EnqueueOpts{})
+		require.Equal(t, ErrQueueItemSingletonExists, err)
+
+		// Ensure we can enqueue other queue items
+		item2, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi2, start, osqueue.EnqueueOpts{})
+
+		require.NoError(t, err)
+		require.NotEqual(t, qi2.ID, item2.ID)
+		found2 := getQueueItem(t, r, item2.ID)
+		require.Equal(t, item2, found2)
+
+		// Dequeue the first item
+		err = q.Dequeue(ctx, q.primaryQueueShard, item1)
+		require.NoError(t, err)
+
+		// Enqueuing a start item should still not be possible
+		_, err = q.EnqueueItem(ctx, q.primaryQueueShard, qi1, start, osqueue.EnqueueOpts{})
+		require.Equal(t, ErrQueueItemSingletonExists, err)
+
+		// Dequeue the last item
+		err = q.Dequeue(ctx, q.primaryQueueShard, item2)
+		require.NoError(t, err)
+
+		// Ensure we can enqueue a new start item with the singleton key after the last dequeue.
+		item1, err = q.EnqueueItem(ctx, q.primaryQueueShard, qi1, start, osqueue.EnqueueOpts{})
+
+		require.NoError(t, err)
+		require.NotEqual(t, qi1.ID, item1.ID)
+		newQueueItem := getQueueItem(t, r, item1.ID)
+		require.NotEqual(t, found.ID, newQueueItem.ID)
+	})
+}
+
 func score(t *testing.T, r *miniredis.Miniredis, key string, member string) float64 {
 	require.True(t, r.Exists(key), r.Keys())
 

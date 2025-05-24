@@ -27,6 +27,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/driver/httpdriver"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/realtime"
+	"github.com/inngest/inngest/pkg/execution/singleton"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
@@ -527,6 +528,28 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	throttle := queue.GetThrottleConfig(ctx, req.Function.ID, req.Function.Throttle, evtMap)
 
 	//
+	// Create singleton information.
+	//
+	var singletonConfig *queue.Singleton = nil
+	data := req.Events[0].GetEvent().Map()
+
+	if req.Function.Singleton != nil {
+		singletonKey, err := singleton.SingletonKey(ctx, req.Function.ID, *req.Function.Singleton, data)
+
+		switch {
+		case err == nil:
+			singletonConfig = &queue.Singleton{Key: singletonKey}
+			// XXX: Maybe we should soft check if the singleton key exists here and
+			// return an error here without creating state; But maybe we need it for history
+			// and showing that the function was skipped.
+		case errors.Is(err, singleton.ErrNotASingleton):
+			// We ignore it, and we run the function normally not as a singleton
+		default:
+			return nil, err
+		}
+	}
+
+	//
 	// Create the run state.
 	//
 
@@ -661,7 +684,8 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		Payload: queue.PayloadEdge{
 			Edge: inngest.SourceEdge,
 		},
-		Throttle: throttle,
+		Throttle:  throttle,
+		Singleton: singletonConfig,
 	}
 	err = e.queue.Enqueue(ctx, item, at, queue.EnqueueOpts{})
 	if err == redis_state.ErrQueueItemExists {
