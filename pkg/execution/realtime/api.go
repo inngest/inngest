@@ -257,8 +257,8 @@ func (a *api) publishStream(w http.ResponseWriter, r *http.Request) {
 		a.opts.Broadcaster.Publish(ctx, msg)
 	}(msg)
 
-	// Read the body in chunks, up to  chui
-	for i := 0; i < consts.MaxStreamingChunks; i++ {
+	// Read the body in chunks, up to X size.
+	for range consts.MaxStreamingChunks {
 		buf := make([]byte, consts.StreamingChunkSize)
 		n, err := r.Body.Read(buf)
 
@@ -304,6 +304,10 @@ func (a *api) getStreamMessage(r *http.Request) (Message, error) {
 	}
 	if runID := r.URL.Query().Get("run_id"); runID != "" {
 		msg.RunID, _ = ulid.Parse(runID)
+	}
+	if metadata := r.URL.Query().Get("metadata"); metadata != "" {
+		// Don't bother to JSON deocde, just pass this straight through.
+		msg.Metadata = json.RawMessage(metadata)
 	}
 
 	return msg, nil
