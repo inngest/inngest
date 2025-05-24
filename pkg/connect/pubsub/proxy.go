@@ -142,7 +142,11 @@ type ProxyOpts struct {
 // If the gateway does not ack the message within a 10-second timeout, an error is returned.
 // If no response is received before the context is canceled, an error is returned.
 func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*connectpb.SDKResponse, error) {
-	<-i.setup
+	select {
+	case <-i.setup:
+	case <-time.After(10 * time.Second):
+		return nil, fmt.Errorf("expected setup to be completed within 10s")
+	}
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -255,7 +259,12 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 				l.Warn("gateway did not ack request")
 			}
 		}()
-		<-gatewayAckSubscribed
+
+		select {
+		case <-gatewayAckSubscribed:
+		case <-time.After(5 * time.Second):
+			return nil, fmt.Errorf("did not subscribe to gateway ack within 5s")
+		}
 	}
 
 	// Receive worker acknowledgement for o11y (this is not a reliable channel - do not depend on it for the critical path)
@@ -272,7 +281,12 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 				})
 			}, true, workerAckSubscribed)
 		}()
-		<-workerAckSubscribed
+
+		select {
+		case <-workerAckSubscribed:
+		case <-time.After(5 * time.Second):
+			return nil, fmt.Errorf("did not subscribe to worker ack within 5s")
+		}
 	}
 
 	// Await SDK response forwarded by gateway
@@ -339,7 +353,12 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 				cancelWaitForResponseCtx()
 			}, true, replySubscribed)
 		}()
-		<-replySubscribed
+
+		select {
+		case <-replySubscribed:
+		case <-time.After(5 * time.Second):
+			return nil, fmt.Errorf("did not subscribe to reply within 5s")
+		}
 	}
 
 	// Attempt to lease the request. If the request is still running on a worker,
