@@ -94,8 +94,10 @@ func WithHandler(h handler) LoggerOpt {
 }
 
 func newLogger(opts ...LoggerOpt) Logger {
-	handler := JSONHandler
+	handler := DevHandler
 	switch strings.ToLower(os.Getenv("LOG_HANDLER")) {
+	case "json":
+		handler = JSONHandler
 	case "dev":
 		handler = DevHandler
 	case "txt", "text":

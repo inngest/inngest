@@ -13,20 +13,18 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
-	"github.com/inngest/inngest/pkg/telemetry/metrics"
-	"github.com/jonboulle/clockwork"
-
-	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/inngest/inngest/pkg/expressions"
 	"github.com/inngest/inngest/pkg/inngest"
-	"github.com/inngest/inngest/pkg/inngest/log"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
+	"github.com/jonboulle/clockwork"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 	"github.com/xhit/go-str2duration/v2"
@@ -920,10 +918,10 @@ func (d debouncer) updateDebounce(ctx context.Context, di DebounceItem, fn innge
 			now.Add(actualTTL).Add(buffer).Add(time.Second),
 		)
 		if err == redis_state.ErrQueueItemAlreadyLeased {
-			log.From(ctx).Warn().
-				Str("err", err.Error()).
-				Int64("ttl", out).
-				Msg(ErrDebounceInProgress.Error())
+			logger.StdlibLogger(ctx).Warn(ErrDebounceInProgress.Error(),
+				"error", err,
+				"ttl", out,
+			)
 			// This is in progress.
 			return ErrDebounceInProgress
 		}
@@ -950,10 +948,10 @@ func (d debouncer) debounceKey(ctx context.Context, evt event.TrackedEvent, fn i
 
 	out, _, err := expressions.Evaluate(ctx, *fn.Debounce.Key, map[string]any{"event": evt.GetEvent().Map()})
 	if err != nil {
-		log.From(ctx).Error().Err(err).
-			Str("expression", *fn.Debounce.Key).
-			Interface("event", evt.GetEvent().Map()).
-			Msg("error evaluating debounce expression")
+		logger.StdlibLogger(ctx).Error("error evaluating debounce expression",
+			"expression", *fn.Debounce.Key,
+			"event", evt.GetEvent().Map(),
+		)
 		return "<invalid>", nil
 	}
 	if str, ok := out.(string); ok {

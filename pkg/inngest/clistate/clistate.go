@@ -11,7 +11,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/inngest/client"
-	"github.com/inngest/inngest/pkg/inngest/log"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/mitchellh/go-homedir"
 	"github.com/spf13/viper"
 )
@@ -209,7 +209,7 @@ func RequireState(ctx context.Context) *State {
 	}
 
 	if err != nil {
-		log.From(ctx).Fatal().Msgf("error reading state: %s", err.Error())
+		logger.StdlibLogger(ctx).Error("error reading state", "err", err.Error())
 	}
 
 	return state

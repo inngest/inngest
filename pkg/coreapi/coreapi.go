@@ -249,9 +249,7 @@ func (a CoreAPI) CancelRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	logger.From(ctx).Info().
-		Str("run_id", runID.String()).
-		Msg("cancelling function")
+	a.log.Info("cancelling function", "run_id", runID.String())
 
 	if err := apiutil.CancelRun(ctx, a.state, consts.DevServerAccountID, *runID); err != nil {
 		_ = publicerr.WriteHTTP(w, err)

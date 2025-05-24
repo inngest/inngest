@@ -3,7 +3,6 @@ package localconfig
 import (
 	"context"
 	"errors"
-	"fmt"
 	"log"
 	"os"
 	"path/filepath"
@@ -35,7 +34,7 @@ func InitStartConfig(ctx context.Context, cmd *cobra.Command) error {
 }
 
 func loadConfigFile(ctx context.Context, cmd *cobra.Command) {
-	l := logger.From(ctx).With().Logger()
+	l := logger.StdlibLogger(ctx)
 
 	// Automatially bind environment variables
 	viper.SetEnvPrefix("INNGEST")
@@ -52,7 +51,7 @@ func loadConfigFile(ctx context.Context, cmd *cobra.Command) {
 		viper.SetConfigName("inngest")
 
 		if cwd, err := os.Getwd(); err != nil {
-			l.Warn().Err(err).Msg("error getting current directory")
+			l.Warn("error getting current directory", "error", err)
 		} else {
 			// Walk up the directory tree looking for a config file
 			dir := cwd
@@ -69,7 +68,7 @@ func loadConfigFile(ctx context.Context, cmd *cobra.Command) {
 		}
 
 		if homeDir, err := os.UserHomeDir(); err != nil {
-			l.Warn().Err(err).Msg("error getting home directory")
+			l.Warn("error getting home directory", "error", err)
 		} else {
 			// Fallback to ~/.config/inngest
 			viper.AddConfigPath(filepath.Join(homeDir, ".config", "inngest"))
@@ -82,7 +81,7 @@ func loadConfigFile(ctx context.Context, cmd *cobra.Command) {
 			log.Fatalf("Error reading config file: %v", err)
 		}
 	} else {
-		l.Info().Msg(fmt.Sprintf("Using config %s", viper.ConfigFileUsed()))
+		l.Info("using config", "file", viper.ConfigFileUsed())
 	}
 }
 

@@ -107,7 +107,7 @@ func CreateInvokeFailedEvent(ctx context.Context, opts execution.InvokeFailHandl
 		Data:      data,
 	}
 
-	logger.From(ctx).Debug().Interface("event", evt).Msg("function finished event")
+	logger.StdlibLogger(ctx).Debug("function finished event", "event", evt)
 
 	return evt
 }

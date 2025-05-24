@@ -411,13 +411,13 @@ func (d *devserver) exportRedisSnapshot(ctx context.Context) (err error) {
 	var (
 		snapshotID cqrs.SnapshotID
 		snapshot   = make(map[string]cqrs.SnapshotValue)
-		l          = logger.From(ctx).With().Str("caller", d.Name()).Logger()
+		l          = d.log.With("caller", d.Name())
 	)
 
 	d.log.Info("exporting Redis snapshot")
 	defer func() {
 		if err != nil {
-			l.Error().Err(err).Msg("error exporting Redis snapshot")
+			l.Error("error exporting Redis snapshot", "error", err)
 		}
 
 		jsonData, _ := json.Marshal(snapshot)
@@ -715,15 +715,16 @@ func upsertErroredApp(
 	appURL string,
 	pingError error,
 ) {
+	l := logger.StdlibLogger(ctx)
 	tx, err := mgr.WithTx(ctx)
 	if err != nil {
-		logger.From(ctx).Error().Err(err).Msg("error creating transaction")
+		l.Error("error creating transaction", "error", err)
 		return
 	}
 
 	rollback := func(ctx context.Context) {
 		if err := tx.Rollback(ctx); err != nil {
-			logger.From(ctx).Error().Err(err).Msg("error rolling back transaction")
+			l.Error("error rolling back transaction", "error", err)
 		}
 	}
 
@@ -740,13 +741,13 @@ func upsertErroredApp(
 			Url: appURL,
 		})
 		if err != nil {
-			logger.From(ctx).Error().Err(err).Msg("error inserting app")
+			l.Error("error inserting app", "error", err)
 			rollback(ctx)
 			return
 		}
 
 		if err = tx.Commit(ctx); err != nil {
-			logger.From(ctx).Error().Err(err).Msg("error inserting app")
+			l.Error("error inserting app", "error", err)
 			rollback(ctx)
 			return
 		}
@@ -755,7 +756,7 @@ func upsertErroredApp(
 	}
 
 	if err != nil {
-		logger.From(ctx).Error().Err(err).Msg("error getting app")
+		l.Error("error getting app", "error", err)
 		rollback(ctx)
 		return
 	}
@@ -767,13 +768,13 @@ func upsertErroredApp(
 		},
 	})
 	if err != nil {
-		logger.From(ctx).Error().Err(err).Msg("error updating app")
+		l.Error("error updating app", "error", err)
 		rollback(ctx)
 		return
 	}
 
 	if err = tx.Commit(ctx); err != nil {
-		logger.From(ctx).Error().Err(err).Msg("error updating app")
+		l.Error("error updating app", "error", err)
 		rollback(ctx)
 		return
 	}
