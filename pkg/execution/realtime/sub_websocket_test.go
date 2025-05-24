@@ -196,6 +196,7 @@ func TestWebsocketPostStreamingMessage(t *testing.T) {
 		byt, err := io.ReadAll(read)
 		require.NoError(t, err)
 		require.NotEmpty(t, byt)
+		resp.Body.Close()
 
 		require.Eventually(
 			t,
