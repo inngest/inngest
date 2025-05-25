@@ -43,6 +43,7 @@ export function EventsTable({
   getEventDetails,
   getEventPayload,
   getEventTypes,
+  eventNames,
   pathCreator,
   emptyActions,
   expandedRowActions,
@@ -82,6 +83,7 @@ export function EventsTable({
   getEventDetails: ({ eventID }: { eventID: string }) => Promise<Event>;
   getEventPayload: ({ eventID }: { eventID: string }) => Promise<Pick<Event, 'payload'>>;
   getEventTypes: () => Promise<Required<Pick<EventType, 'name' | 'id'>>[]>;
+  eventNames?: string[];
   features: Pick<Features, 'history'>;
   standalone?: boolean;
 }) {
@@ -128,7 +130,7 @@ export function EventsTable({
     queryKey: [
       'events',
       {
-        eventNames: filteredEvent,
+        eventNames: filteredEvent || eventNames || null,
         source,
         startTime: calculatedStartTime.toISOString(),
         endTime: endTime ?? null,
@@ -139,7 +141,7 @@ export function EventsTable({
     queryFn: ({ pageParam }: { pageParam: string | null }) =>
       getEvents({
         cursor: pageParam,
-        eventNames: filteredEvent ?? null,
+        eventNames: filteredEvent ?? eventNames ?? null,
         source,
         startTime: calculatedStartTime.toISOString(),
         endTime: endTime ?? null,
