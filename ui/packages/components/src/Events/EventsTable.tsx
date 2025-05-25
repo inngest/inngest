@@ -159,11 +159,23 @@ export function EventsTable({
       totalCount: data.pages[data.pages.length - 1]?.totalCount ?? 0,
     }),
   });
+  /* TODO: Find out what to do with the event types filter, since it will affect performance */
 
-  const { data: eventTypesData } = useQuery({
-    queryKey: ['event-types'],
-    queryFn: () => getEventTypes(),
-  });
+  // const { data: eventTypesData } = useQuery({
+  //   queryKey: ['event-types'],
+  //   queryFn: () => getEventTypes(),
+  // });
+
+  // const onEventFilterChange = useCallback(
+  //   (value: string[]) => {
+  //     if (value.length > 0) {
+  //       setFilteredEvent(value);
+  //     } else {
+  //       removeFilteredEvent();
+  //     }
+  //   },
+  //   [removeFilteredEvent, setFilteredEvent]
+  // );
 
   const onSearchChange = useCallback(
     (value: string) => {
@@ -174,17 +186,6 @@ export function EventsTable({
       }
     },
     [setSearch, removeSearch]
-  );
-
-  const onEventFilterChange = useCallback(
-    (value: string[]) => {
-      if (value.length > 0) {
-        setFilteredEvent(value);
-      } else {
-        removeFilteredEvent();
-      }
-    },
-    [removeFilteredEvent, setFilteredEvent]
   );
 
   const onDaysChange = useCallback(
@@ -239,13 +240,12 @@ export function EventsTable({
       <div className="bg-canvasBase sticky top-0 z-10">
         <div className="m-3 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            {/* TODO: Wire entity */}
-            <EntityFilter
+            {/* <EntityFilter
               type="event"
               onFilterChange={onEventFilterChange}
               selectedEntities={filteredEvent ?? []}
               entities={eventTypesData ?? []}
-            />
+            /> */}
             <Tooltip>
               <TooltipTrigger asChild>
                 <Button
