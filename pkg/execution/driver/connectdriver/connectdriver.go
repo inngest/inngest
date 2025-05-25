@@ -77,6 +77,9 @@ func (e executor) Execute(ctx context.Context, sl sv2.StateLoader, s sv2.Metadat
 	defer func() {
 		metrics.HistogramConnectExecutorEndToEndDuration(ctx, time.Since(start).Milliseconds(), metrics.HistogramOpt{
 			PkgName: pkgName,
+			Tags: map[string]any{
+				"account_id": s.ID.Tenant.AccountID.String(),
+			},
 		})
 	}()
 
