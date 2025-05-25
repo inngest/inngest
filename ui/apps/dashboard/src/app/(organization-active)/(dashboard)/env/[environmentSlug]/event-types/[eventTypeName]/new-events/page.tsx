@@ -11,6 +11,7 @@ export default function Page({
       <EventsPage
         environmentSlug={envSlug}
         eventTypeNames={[decodedEventTypeName]}
+        singleEventTypePage
         showHeader={false}
       />
     </>

@@ -22,8 +22,10 @@ function ensureColumnID(id: ColumnID): ColumnID {
 
 export function useColumns({
   pathCreator,
+  singleEventTypePage,
 }: {
   pathCreator: React.ComponentProps<typeof EventsTable>['pathCreator'];
+  singleEventTypePage: React.ComponentProps<typeof EventsTable>['singleEventTypePage'];
 }) {
   const columns = [
     columnHelper.accessor('receivedAt', {
@@ -36,16 +38,20 @@ export function useColumns({
       enableSorting: false,
       id: ensureColumnID('receivedAt'),
     }),
-    columnHelper.accessor('name', {
-      cell: (info) => {
-        const name = info.getValue();
-        return <TextCell>{name}</TextCell>;
-      },
-      size: 300,
-      header: 'Event name',
-      enableSorting: false,
-      id: ensureColumnID('name'),
-    }),
+    ...(!singleEventTypePage
+      ? [
+          columnHelper.accessor('name', {
+            cell: (info) => {
+              const name = info.getValue();
+              return <TextCell>{name}</TextCell>;
+            },
+            size: 300,
+            header: 'Event name',
+            enableSorting: false,
+            id: ensureColumnID('name'),
+          }),
+        ]
+      : []),
     columnHelper.accessor('runs', {
       cell: (info) => {
         const runs = info.getValue();

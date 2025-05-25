@@ -44,6 +44,7 @@ export function EventsTable({
   getEventPayload,
   getEventTypes,
   eventNames,
+  singleEventTypePage,
   pathCreator,
   emptyActions,
   expandedRowActions,
@@ -84,10 +85,11 @@ export function EventsTable({
   getEventPayload: ({ eventID }: { eventID: string }) => Promise<Pick<Event, 'payload'>>;
   getEventTypes: () => Promise<Required<Pick<EventType, 'name' | 'id'>>[]>;
   eventNames?: string[];
+  singleEventTypePage?: boolean;
   features: Pick<Features, 'history'>;
   standalone?: boolean;
 }) {
-  const columns = useColumns({ pathCreator });
+  const columns = useColumns({ pathCreator, singleEventTypePage });
   const [showSearch, setShowSearch] = useState(false);
   const [lastDays] = useSearchParam('last');
   const [startTime] = useSearchParam('start');

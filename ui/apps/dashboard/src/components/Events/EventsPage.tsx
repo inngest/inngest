@@ -23,10 +23,12 @@ export default function EventsPage({
   environmentSlug: envSlug,
   eventTypeNames,
   showHeader = true,
+  singleEventTypePage = false,
 }: {
   environmentSlug: string;
   eventTypeNames?: string[];
   showHeader?: boolean;
+  singleEventTypePage?: boolean;
 }) {
   const router = useRouter();
   const internalPathCreator = useMemo(() => createInternalPathCreator(envSlug), [envSlug]);
@@ -60,6 +62,7 @@ export default function EventsPage({
         getEventPayload={getEventPayload}
         getEventTypes={getEventTypes}
         eventNames={eventTypeNames}
+        singleEventTypePage={singleEventTypePage}
         features={{
           history: features.data?.history ?? 7,
         }}
