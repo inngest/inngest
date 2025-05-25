@@ -9,6 +9,7 @@ export const EventTypesInfo = () => (
     </TooltipTrigger>
     <TooltipContent
       side="right"
+      hasArrow={false}
       sideOffset={2}
       className="border-muted text-muted mt-6 flex flex-col rounded-md border p-0 text-sm"
     >

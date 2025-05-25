@@ -8,6 +8,7 @@ export const EventInfo = () => (
       <RiQuestionLine className="text-subtle h-[18px] w-[18px]" />
     </TooltipTrigger>
     <TooltipContent
+      hasArrow={false}
       side="right"
       sideOffset={2}
       className="border-muted text-muted mt-6 flex flex-col rounded-md border p-0 text-sm"

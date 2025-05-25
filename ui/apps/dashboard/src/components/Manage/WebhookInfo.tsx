@@ -10,6 +10,7 @@ export const WebhookInfo = () => (
     <TooltipContent
       side="right"
       sideOffset={2}
+      hasArrow={false}
       className="border-muted text-muted mt-6 flex flex-col rounded-md border p-0 text-sm"
     >
       <div className="border-subtle border-b px-4 py-2 ">Sources for events for developers.</div>
