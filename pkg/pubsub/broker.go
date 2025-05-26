@@ -155,7 +155,7 @@ func (b *broker) SubscribeN(ctx context.Context, topic string, run PerformFunc, 
 
 			m := &Message{}
 			if err := m.Decode(msg.Body); err != nil {
-				logger.From(ctx).Error().Err(err).Msg("error decoding pubsub message")
+				logger.StdlibLogger(ctx).Error("error decoding pubsub message", "error", err)
 
 				if msg.Nackable() {
 					msg.Nack()

@@ -6,12 +6,14 @@ import (
 
 	"github.com/inngest/inngest/pkg/api/tel"
 	"github.com/inngest/inngest/pkg/cli"
-	"github.com/inngest/inngest/pkg/inngest/log"
 	"github.com/inngest/inngest/pkg/inngest/version"
-	"github.com/inngest/inngest/pkg/logger"
 	isatty "github.com/mattn/go-isatty"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
+)
+
+const (
+	ViperLogLevelKey = "log.level"
 )
 
 func Execute() {
@@ -28,13 +30,12 @@ func Execute() {
 		},
 		PersistentPreRun: func(cmd *cobra.Command, args []string) {
 			if viper.IsSet("log-level") {
-				viper.Set(log.ViperLogLevelKey, viper.GetString("log-level"))
+				viper.Set(ViperLogLevelKey, viper.GetString("log-level"))
 			} else if viper.GetBool("verbose") {
-				viper.Set(log.ViperLogLevelKey, "debug")
+				viper.Set(ViperLogLevelKey, "debug")
 			} else {
-				viper.Set(log.ViperLogLevelKey, log.DefaultLevel.String())
+				viper.Set(ViperLogLevelKey, "info")
 			}
-			logger.SetLevel(viper.GetString(log.ViperLogLevelKey))
 
 			m := tel.NewMetadata(cmd.Context())
 			m.SetCobraCmd(cmd)

@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/inngest/inngest/pkg/consts"
-	"github.com/inngest/inngest/pkg/inngest/log"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/exporters"
 	"go.opentelemetry.io/otel"
@@ -250,8 +249,7 @@ func (t *tracer) Shutdown(ctx context.Context) func() {
 
 func (t *tracer) Export(span trace.ReadOnlySpan) error {
 	if t.processor == nil {
-		ctx := context.Background()
-		log.From(ctx).Trace().Msg("no exporter available to export custom spans")
+		logger.StdlibLogger(context.Background()).Trace("no exporter available to export custom spans")
 		return nil
 	}
 

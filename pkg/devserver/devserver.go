@@ -121,7 +121,7 @@ func enforceConnectLeaseExpiry(ctx context.Context, accountID uuid.UUID) bool {
 }
 
 func start(ctx context.Context, opts StartOpts) error {
-	l := logger.StdlibLogger(ctx, logger.WithHandler(logger.DevHandler))
+	l := logger.StdlibLogger(ctx)
 	ctx = logger.WithStdlib(ctx, l)
 
 	db, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{InMemory: true})
@@ -313,7 +313,7 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	rl := ratelimit.New(ctx, unshardedRc, "{ratelimit}:")
 
-	batcher := batch.NewRedisBatchManager(shardedClient.Batch(), rq)
+	batcher := batch.NewRedisBatchManager(shardedClient.Batch(), rq, batch.WithLogger(l))
 	debouncer := debounce.NewRedisDebouncer(unshardedClient.Debounce(), queueShard, rq)
 
 	conditionalTracer := itrace.NewConditionalTracer(itrace.ConnectTracer(), itrace.AlwaysTrace)
@@ -395,7 +395,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		),
 		executor.WithStepLimits(func(id sv2.ID) int {
 			if override, hasOverride := stepLimitOverrides[id.FunctionID.String()]; hasOverride {
-				logger.From(ctx).Warn().Msgf("Using step limit override of %d for %q\n", override, id.FunctionID)
+				l.Warn("using step limit override", "override", override, "fn_id", id.FunctionID)
 				return override
 			}
 
@@ -403,7 +403,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		}),
 		executor.WithStateSizeLimits(func(id sv2.ID) int {
 			if override, hasOverride := stateSizeLimitOverrides[id.FunctionID.String()]; hasOverride {
-				logger.From(ctx).Warn().Msgf("Using state size limit override of %d for %q\n", override, id.FunctionID)
+				l.Warn("using state size limit override", "override", override, "fn_id", id.FunctionID)
 				return override
 			}
 

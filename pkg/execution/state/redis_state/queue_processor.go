@@ -17,7 +17,7 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
-	"github.com/inngest/inngest/pkg/inngest/log"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 	"github.com/oklog/ulid/v2"
@@ -904,7 +904,7 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, continu
 
 	if q.usePeekEWMA {
 		if err := q.setPeekEWMA(ctx, p.FunctionID, int64(iter.ctrConcurrency+iter.ctrRateLimit)); err != nil {
-			log.From(ctx).Warn().Err(err).Msg("error recording concurrency limit for EWMA")
+			q.log.Warn("error recording concurrency limit for EWMA", "error", err)
 		}
 	}
 
@@ -915,7 +915,7 @@ func (q *queue) processPartition(ctx context.Context, p *QueuePartition, continu
 		// Note: we must requeue the partition to remove the lease.
 		err := q.PartitionRequeue(ctx, q.primaryQueueShard, p, q.clock.Now().Truncate(time.Second).Add(PartitionConcurrencyLimitRequeueExtension), true)
 		if err != nil {
-			log.From(ctx).Warn().Err(err).Msg("error requeuieng partition for random peek")
+			q.log.Warn("error requeuieng partition for random peek", "error", err)
 		}
 
 		return q.processPartition(ctx, p, continuationCount, true)
@@ -997,12 +997,12 @@ func (q *queue) process(
 					return
 				}
 				if leaseID == nil {
-					log.From(ctx).Error().
-						Str("account_id", p.AccountID.String()).
-						Str("qi", qi.ID).
-						Str("fn_id", qi.FunctionID.String()).
-						Str("partition_id", p.ID).
-						Msg("cannot extend lease since lease ID is nil")
+					q.log.Error("cannot extend lease since lease ID is nil",
+						"account_id", p.AccountID.String(),
+						"qi", qi.ID,
+						"fn_id", qi.FunctionID.String(),
+						"partition_id", p.ID,
+					)
 					// Don't extend lease since one doesn't exist
 					errCh <- fmt.Errorf("cannot extend lease since lease ID is nil")
 					return
@@ -1474,7 +1474,7 @@ func (p *processor) iterate(ctx context.Context) error {
 	for _, i := range p.items {
 		if i == nil {
 			// THIS SHOULD NEVER HAPPEN. Skip gracefully and log error
-			log.From(ctx).Error().Msg("nil queue item in partition")
+			logger.StdlibLogger(ctx).Error("nil queue item in partition")
 			continue
 		}
 

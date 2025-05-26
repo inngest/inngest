@@ -33,7 +33,6 @@ import (
 	"github.com/inngest/inngest/pkg/expressions"
 	"github.com/inngest/inngest/pkg/expressions/expragg"
 	"github.com/inngest/inngest/pkg/inngest"
-	"github.com/inngest/inngest/pkg/inngest/log"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/run"
 	"github.com/inngest/inngest/pkg/syscode"
@@ -366,7 +365,7 @@ func (e *executor) CloseLifecycleListeners(ctx context.Context) {
 	}
 
 	if err := eg.Wait(); err != nil {
-		log.From(ctx).Error().Err(err).Msg("error closing lifecycle listeners")
+		e.log.Error("error closing lifecycle listeners", "error", err)
 	}
 }
 
@@ -838,7 +837,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 				ForceStepPlan:  md.Config.ForceStepPlan,
 				RequestVersion: md.Config.RequestVersion,
 			}); err != nil {
-				log.From(ctx).Error().Err(err).Msg("error updating metadata on function start")
+				e.log.Error("error updating metadata on function start", "error", err)
 			}
 
 			for _, e := range e.lifecycles {
@@ -1280,14 +1279,14 @@ func (e *executor) HandlePauses(ctx context.Context, iter state.PauseIterator, e
 	if iter.Count() > consts.AggregatePauseThreshold {
 		aggRes, err := e.handleAggregatePauses(ctx, evt)
 		if err != nil {
-			log.From(ctx).Error().Err(err).Msg("error handling aggregate pauses")
+			e.log.Error("error handling aggregate pauses", "error", err)
 		}
 		return aggRes, err
 	}
 
 	res, err := e.handlePausesAllNaively(ctx, iter, evt)
 	if err != nil {
-		log.From(ctx).Error().Err(err).Msg("error handling naive pauses")
+		e.log.Error("error handling naive pauses", "error", err)
 	}
 	return res, nil
 }
@@ -1300,7 +1299,7 @@ func (e *executor) handlePausesAllNaively(ctx context.Context, iter state.PauseI
 		return res, fmt.Errorf("no queue or state manager specified")
 	}
 
-	log := logger.StdlibLogger(ctx).With("event_id", evt.GetInternalID().String())
+	log := e.log.With("event_id", evt.GetInternalID().String())
 
 	var (
 		goerr error
@@ -1396,7 +1395,7 @@ func (e *executor) handleAggregatePauses(ctx context.Context, evt event.TrackedE
 		return execution.HandlePauseResult{}, fmt.Errorf("no expression evaluator found")
 	}
 
-	log := logger.StdlibLogger(ctx).With(
+	log := e.log.With(
 		"event_id", evt.GetInternalID().String(),
 		"workspace_id", evt.GetWorkspaceID(),
 		"event", evt.GetEvent().Name,
@@ -1576,12 +1575,7 @@ func (e *executor) handlePause(
 
 func (e *executor) HandleInvokeFinish(ctx context.Context, evt event.TrackedEvent) error {
 	evtID := evt.GetInternalID()
-
-	log := e.log
-	if log == nil {
-		log = logger.StdlibLogger(ctx)
-	}
-	l := log.With("event_id", evtID.String())
+	l := e.log.With("event_id", evtID.String())
 
 	correlationID := evt.GetEvent().CorrelationID()
 	if correlationID == "" {
@@ -1623,9 +1617,7 @@ func (e *executor) HandleInvokeFinish(ctx context.Context, evt event.TrackedEven
 	}
 
 	resumeData := pause.GetResumeData(evt.GetEvent())
-	if e.log != nil {
-		e.log.Debug("resuming pause from invoke", "pause.DataKey", pause.DataKey)
-	}
+	l.Debug("resuming pause from invoke", "pause.DataKey", pause.DataKey)
 
 	return e.Resume(ctx, *pause, execution.ResumeRequest{
 		With:           resumeData.With,
@@ -1638,7 +1630,7 @@ func (e *executor) HandleInvokeFinish(ctx context.Context, evt event.TrackedEven
 
 // Cancel cancels an in-progress function.
 func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequest) error {
-	l := logger.StdlibLogger(ctx).With(
+	l := e.log.With(
 		"run_id", id.RunID.String(),
 		"workflow_id", id.FunctionID.String(),
 	)
@@ -1739,17 +1731,15 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 			return fmt.Errorf("error consuming pause via event: %w", err)
 		}
 
-		if e.log != nil {
-			e.log.Debug("resuming from pause",
-				"error", err,
-				"pause_id", pause.ID.String(),
-				"run_id", pause.Identifier.RunID.String(),
-				"workflow_id", pause.Identifier.FunctionID.String(),
-				"timeout", pause.OnTimeout,
-				"cancel", pause.Cancel,
-				"consumed", consumeResult,
-			)
-		}
+		e.log.Debug("resuming from pause",
+			"error", err,
+			"pause_id", pause.ID.String(),
+			"run_id", pause.Identifier.RunID.String(),
+			"workflow_id", pause.Identifier.FunctionID.String(),
+			"timeout", pause.OnTimeout,
+			"cancel", pause.Cancel,
+			"consumed", consumeResult,
+		)
 
 		if !consumeResult.DidConsume {
 			// We don't need to do anything here.
@@ -3099,13 +3089,9 @@ func (e *executor) ReceiveSignal(ctx context.Context, workspaceID uuid.UUID, sig
 		return
 	}
 
-	log := e.log
-	if log == nil {
-		log = logger.StdlibLogger(ctx)
-	}
 	sanitizedSignalID := strings.ReplaceAll(signalID, "\n", "")
 	sanitizedSignalID = strings.ReplaceAll(sanitizedSignalID, "\r", "")
-	l := log.With("signal_id", sanitizedSignalID, "workspace_id", workspaceID.String())
+	l := e.log.With("signal_id", sanitizedSignalID, "workspace_id", workspaceID.String())
 	defer func() {
 		if err != nil {
 			l.Error("error receiving signal", "error", err)
