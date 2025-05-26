@@ -339,6 +339,14 @@ func (f Function) Validate(ctx context.Context) error {
 				Message: "Batching and debouncing are mutually exclusive",
 			})
 		}
+
+		if f.Singleton != nil {
+			err = multierror.Append(err, syscode.Error{
+				Code: syscode.CodeComboUnsupported,
+				Message: "Batching and singletons are mutually exclusive",
+			})
+		}
+
 	}
 
 	for _, step := range f.Steps {
