@@ -63,9 +63,7 @@ func NewService(opts StartOpts, runner runner.Runner, data cqrs.Manager, pb pubs
 		redisClient:             rc,
 		historyWriter:           hw,
 		singleNodeServiceOpts:   snso,
-		log: logger.StdlibLogger(context.Background(),
-			logger.WithHandler(logger.DevHandler),
-		),
+		log:                     logger.StdlibLogger(context.Background()),
 	}
 }
 

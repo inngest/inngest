@@ -121,7 +121,7 @@ func enforceConnectLeaseExpiry(ctx context.Context, accountID uuid.UUID) bool {
 }
 
 func start(ctx context.Context, opts StartOpts) error {
-	l := logger.StdlibLogger(ctx, logger.WithHandler(logger.DevHandler))
+	l := logger.StdlibLogger(ctx)
 	ctx = logger.WithStdlib(ctx, l)
 
 	db, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{InMemory: true})
