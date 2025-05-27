@@ -2307,8 +2307,6 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 		return nil, err
 	}
 
-	delayMS := item.AtMS - item.EnqueuedAt
-
 	status, err := scripts["queue/lease"].Exec(
 		redis_telemetry.WithScriptName(ctx, "lease"),
 		q.primaryQueueShard.RedisClient.unshardedRc,
@@ -2319,14 +2317,24 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 		return nil, fmt.Errorf("error leasing queue item: %w", err)
 	}
 
+	leaseDelay := now.Sub(time.UnixMilli(item.EnqueuedAt))
+	metrics.HistogramQueueOperationDelay(ctx, leaseDelay, metrics.HistogramOpt{PkgName: pkgName, Tags: map[string]any{"op": "lease"}})
+
+	refillDelay := now.Sub(time.UnixMilli(item.RefilledAt))
+	metrics.HistogramQueueOperationDelay(ctx, refillDelay, metrics.HistogramOpt{PkgName: pkgName, Tags: map[string]any{"op": "refill"}})
+
+	delayMS := item.AtMS - item.EnqueuedAt
+	itemDelay := time.Duration(delayMS) * time.Millisecond
+	metrics.HistogramQueueOperationDelay(ctx, itemDelay, metrics.HistogramOpt{PkgName: pkgName, Tags: map[string]any{"op": "item"}})
+
 	q.log.Trace("leasing item",
 		"id", item.ID,
 		"kind", item.Data.Kind,
 		"lease_id", leaseID.String(),
 		"partition_id", partition.PartitionID,
-		"item_delay", (time.Duration(delayMS) * time.Millisecond).String(),
-		"refill_delay", now.Sub(time.UnixMilli(item.RefilledAt)).String(),
-		"lease_delay", now.Sub(time.UnixMilli(item.EnqueuedAt)).String(),
+		"item_delay", itemDelay.String(),
+		"refill_delay", refillDelay.String(),
+		"lease_delay", leaseDelay.String(),
 		"refilled", refilledFromBacklog,
 		"check", checkConstraints,
 		"status", status,
