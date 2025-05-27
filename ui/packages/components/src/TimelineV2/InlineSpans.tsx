@@ -59,7 +59,7 @@ export function InlineSpans({ className, minTime, maxTime, name, spans, widths }
         </div>
       </TooltipTrigger>
       <TooltipContent>
-        <div className="text-basis">
+        <div>
           {spans[0] && <Times isDelayVisible={spans.length === 1} name={name} span={spans[0]} />}
 
           {spans.length > 1 &&

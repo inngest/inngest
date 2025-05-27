@@ -83,7 +83,7 @@ export function InlineSpans({ className, minTime, maxTime, trace }: Props) {
         <div className="bg-canvasMuted h-0" style={{ flexGrow: widths.after }} />
       </div>
       <TooltipContent>
-        <div className="text-basis">
+        <div>
           <Times isDelayVisible={spans.length === 0} name={spanName} span={trace} />
         </div>
       </TooltipContent>

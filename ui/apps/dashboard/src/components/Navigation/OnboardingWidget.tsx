@@ -84,7 +84,7 @@ export default function OnboardingWidget({
                       }}
                     />
                   </TooltipTrigger>
-                  <TooltipContent side="right" className="dark max-w-40">
+                  <TooltipContent side="right" className="max-w-40">
                     <p>{onboardingWidgetContent.tooltip.close}</p>
                   </TooltipContent>
                 </Tooltip>
