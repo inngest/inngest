@@ -342,7 +342,7 @@ func (f Function) Validate(ctx context.Context) error {
 
 		if f.Singleton != nil {
 			err = multierror.Append(err, syscode.Error{
-				Code: syscode.CodeComboUnsupported,
+				Code:    syscode.CodeComboUnsupported,
 				Message: "Batching and singletons are mutually exclusive",
 			})
 		}
@@ -512,5 +512,7 @@ type Singleton struct {
 	// "{{ event.user.id }}". This guarantees that only one instance runs for each unique key.
 	Key *string `json:"key,omitempty"`
 
-	// TODO: Add the operational mode for the singleton.  This will be either "ignore" or "cancel".
+	// Mode determines how to handle a new run when another singleton instance is already active.
+	// Use Ignore to skip the new run, or Cancel to stop the current instance and run the new one.
+	//Mode enums.SingletonMode `json:"mode"`
 }

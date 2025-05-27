@@ -191,4 +191,8 @@ type Singleton struct {
 	// a key like "event.user.id". This ensures that only one instance of the
 	// function runs at a time for each unique user.
 	Key *string `json:"key,omitempty"`
+
+	// Mode determines how to handle a new run when another singleton instance is already active.
+	// Use Ignore to skip the new run, or Cancel to stop the current instance and run the new one.
+	//Mode enums.SingletonMode `json:"mode"`
 }
