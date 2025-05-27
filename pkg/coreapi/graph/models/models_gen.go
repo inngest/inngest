@@ -169,6 +169,11 @@ type FunctionEvent struct {
 
 func (FunctionEvent) IsFunctionRunEvent() {}
 
+type FunctionQuery struct {
+	WorkspaceID  string `json:"workspaceId"`
+	FunctionSlug string `json:"functionSlug"`
+}
+
 type FunctionRun struct {
 	ID                string                       `json:"id"`
 	FunctionID        string                       `json:"functionID"`
