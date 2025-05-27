@@ -9,9 +9,9 @@ type SettingsLayoutProps = {
 export default async function SettingsLayout({ children }: SettingsLayoutProps) {
   return (
     <Layout>
-      <div className="flex-col">
+      <div className="h-full flex-col">
         <SettingsHeader />
-        <div className="no-scrollbar overflow-y-scroll px-6">{children}</div>
+        <div className="no-scrollbar h-full overflow-y-scroll px-6">{children}</div>
         <Toaster />
       </div>
     </Layout>

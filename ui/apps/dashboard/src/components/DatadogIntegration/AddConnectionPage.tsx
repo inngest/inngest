@@ -102,7 +102,12 @@ export default function AddConnectionPage({}) {
   }
 
   return (
-    <Card accentColor={cardAccentColor} accentPosition="left" className="w-full">
+    <Card
+      accentColor={cardAccentColor}
+      accentPosition="left"
+      className="h-full overflow-visible"
+      contentClassName="overflow-visible"
+    >
       <Card.Header>
         <div className="text-basis mb-1 text-sm">Choose an environment to connect to Datadog:</div>
         <EnvSelectMenu onSelect={onEnvSelect} className="mb-2" />
