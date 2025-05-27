@@ -106,11 +106,11 @@ function Times({
     <>
       <p className="mb-2 font-bold">{name}</p>
       <div className="flex gap-16">
-        <ElementWrapper className="w-fit" label="Duration">
+        <ElementWrapper className="text-light w-fit" label="Duration">
           {duration > 0 ? formatMilliseconds(duration) : '-'}
         </ElementWrapper>
 
-        <ElementWrapper className="w-fit" label="Delay">
+        <ElementWrapper className="text-light w-fit" label="Delay">
           {isDelayVisible && delay > 0 ? formatMilliseconds(delay) : '-'}
         </ElementWrapper>
       </div>

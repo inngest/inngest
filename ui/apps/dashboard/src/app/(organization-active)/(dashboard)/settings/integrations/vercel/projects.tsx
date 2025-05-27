@@ -93,7 +93,7 @@ export default function VercelProjects({ integration }: { integration: VercelInt
                       {p.isEnabled ? 'enabled' : 'disabled'}
                     </Pill>
                   </div>
-                  <div className="mt-4 flex flex-row items-center justify-start">
+                  <div className="mt-4 flex flex-row items-center justify-start gap-1">
                     <div className="text-basis text-xl font-medium">{p.name}</div>
                     {p.deploymentProtection !== VercelDeploymentProtection.Disabled && (
                       <Info
