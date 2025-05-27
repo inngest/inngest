@@ -250,6 +250,11 @@ export enum FunctionEventType {
   Started = 'STARTED'
 }
 
+export type FunctionQuery = {
+  functionSlug: Scalars['String'];
+  workspaceId?: Scalars['ID'];
+};
+
 export type FunctionRun = {
   __typename?: 'FunctionRun';
   batchCreatedAt: Maybe<Scalars['Time']>;
@@ -457,6 +462,7 @@ export type Query = {
   apps: Array<App>;
   event: Maybe<Event>;
   events: Maybe<Array<Event>>;
+  functionBySlug: Maybe<Function>;
   functionRun: Maybe<FunctionRun>;
   functions: Maybe<Array<Function>>;
   run: Maybe<FunctionRunV2>;
@@ -486,6 +492,11 @@ export type QueryEventArgs = {
 
 export type QueryEventsArgs = {
   query: EventsQuery;
+};
+
+
+export type QueryFunctionBySlugArgs = {
+  query: FunctionQuery;
 };
 
 
