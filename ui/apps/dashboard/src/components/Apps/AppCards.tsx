@@ -6,6 +6,7 @@ import { AppCard } from '@inngest/components/Apps/AppCard';
 import { Button } from '@inngest/components/Button/Button';
 import { Pill } from '@inngest/components/Pill/Pill';
 import WorkerCounter from '@inngest/components/Workers/ConnectedWorkersDescription';
+import { methodTypes } from '@inngest/components/types/app';
 
 import { ArchiveModal } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/apps/[externalID]/ArchiveModal';
 import { ValidateModal } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/apps/[externalID]/ValidateButton/ValidateModal';
@@ -78,7 +79,7 @@ export default function AppCards({ apps, envSlug }: { apps: FlattenedApp[]; envS
                       showArchive={() => handleShowModal(app, 'archive')}
                       disableArchive={!app.url}
                       showValidate={() => handleShowModal(app, 'validate')}
-                      disableValidate={app.isParentArchived}
+                      disableValidate={app.isParentArchived || app.method === methodTypes.Connect}
                     />
                   </div>
                 }
