@@ -1,21 +1,21 @@
 import type { ReactNode } from 'react';
 import { RiQuestionLine } from '@remixicon/react';
 
-import { Tooltip, TooltipContent, TooltipTrigger } from '../Tooltip';
+import { Popover, PopoverContent, PopoverTrigger } from '../Popover';
 
 export const Info = ({ text, action }: { text: string; action: ReactNode }) => (
-  <Tooltip>
-    <TooltipTrigger>
+  <Popover>
+    <PopoverTrigger>
       <RiQuestionLine className="text-subtle h-[18px] w-[18px]" />
-    </TooltipTrigger>
-    <TooltipContent
+    </PopoverTrigger>
+    <PopoverContent
       side="right"
-      sideOffset={2}
-      className="border-subtle text-subtle mt-6 flex flex-col rounded-md border p-0 text-sm leading-tight"
+      align="start"
+      className="text-subtle flex max-w-xs flex-col text-sm leading-tight"
     >
-      <div className="border-subtle text-subtle border-b p-3 text-sm leading-tight">{text}</div>
+      <div className="border-subtle border-b px-4 py-2 text-sm leading-tight">{text}</div>
 
-      <div className="p-3">{action}</div>
-    </TooltipContent>
-  </Tooltip>
+      <div className="px-4 py-2">{action}</div>
+    </PopoverContent>
+  </Popover>
 );
