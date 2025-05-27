@@ -80,9 +80,8 @@ if exists_without_ending(singletonKey, ":singleton:-") then
   end
 
   -- Set the singleton key to the item ID
-  -- TODO: Remove the expiration when dequeuing the item removes the singleton key
-  redis.call("SETEX", singletonRunKey, 120, singletonKey)
-  redis.call("SETEX", singletonKey, 120, runID)
+  redis.call("SET", singletonRunKey, singletonKey)
+  redis.call("SET", singletonKey, runID)
 end
 
 if enqueueToBacklog == 1 then
