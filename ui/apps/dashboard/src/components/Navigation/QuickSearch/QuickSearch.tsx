@@ -49,12 +49,7 @@ export function QuickSearch({ collapsed, envSlug, envName }: Props) {
             />
           </TooltipTrigger>
 
-          <TooltipContent
-            className="border-muted text-muted mt-1 w-32 rounded border text-xs"
-            hasArrow={false}
-            side="bottom"
-            sideOffset={2}
-          >
+          <TooltipContent className="w-32 rounded text-xs" side="bottom" sideOffset={2}>
             You can also use <span className="font-bold">⌘ K</span> or{' '}
             <span className="font-bold">Ctrl K</span> to search
           </TooltipContent>

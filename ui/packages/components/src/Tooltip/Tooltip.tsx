@@ -25,13 +25,13 @@ const TooltipContent = React.forwardRef<
       ref={ref}
       sideOffset={sideOffset}
       className={cn(
-        'animate-slide-down-and-fade bg-canvasBase text-basis shadow-tooltip z-[52] max-w-xs rounded-md px-2 py-1 text-sm shadow-md',
+        'animate-slide-down-and-fade bg-contrast text-onContrast z-[52] max-w-xs rounded-md px-2 py-1 text-sm',
         className
       )}
       {...props}
     >
       {props.children}
-      {hasArrow && <TooltipPrimitive.Arrow className="fill-tooltipArrow" />}
+      {hasArrow && <TooltipPrimitive.Arrow className="fill-contrast" />}
     </TooltipPrimitive.Content>
   </TooltipPrimitive.Portal>
 ));

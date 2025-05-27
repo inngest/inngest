@@ -83,11 +83,11 @@ export function NumberCell({ value, term }: { value: number; term?: string }) {
       </TooltipTrigger>
       <TooltipContent
         sideOffset={5}
-        className="text-muted flex items-baseline gap-0.5 p-2 text-xs"
+        className="flex items-baseline gap-0.5 p-2 text-xs"
         side="right"
       >
-        <span className="text-basis text-sm font-medium">{Intl.NumberFormat().format(value)}</span>
-        {term && <span className="text-subtle text-[11px]">{term}</span>}
+        <span className="text-sm font-medium">{Intl.NumberFormat().format(value)}</span>
+        {term && <span className="text-[11px]">{term}</span>}
       </TooltipContent>
     </Tooltip>
   );
