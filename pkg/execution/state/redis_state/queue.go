@@ -2318,14 +2318,32 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 	}
 
 	leaseDelay := now.Sub(time.UnixMilli(item.EnqueuedAt))
-	metrics.HistogramQueueOperationDelay(ctx, leaseDelay, metrics.HistogramOpt{PkgName: pkgName, Tags: map[string]any{"op": "lease"}})
+	metrics.HistogramQueueOperationDelay(ctx, leaseDelay, metrics.HistogramOpt{
+		PkgName: pkgName,
+		Tags: map[string]any{
+			"queue_shard": q.primaryQueueShard.Name,
+			"op":          "lease",
+		}},
+	)
 
 	refillDelay := now.Sub(time.UnixMilli(item.RefilledAt))
-	metrics.HistogramQueueOperationDelay(ctx, refillDelay, metrics.HistogramOpt{PkgName: pkgName, Tags: map[string]any{"op": "refill"}})
+	metrics.HistogramQueueOperationDelay(ctx, refillDelay, metrics.HistogramOpt{
+		PkgName: pkgName,
+		Tags: map[string]any{
+			"queue_shard": q.primaryQueueShard.Name,
+			"op":          "refill",
+		}},
+	)
 
 	delayMS := item.AtMS - item.EnqueuedAt
 	itemDelay := time.Duration(delayMS) * time.Millisecond
-	metrics.HistogramQueueOperationDelay(ctx, itemDelay, metrics.HistogramOpt{PkgName: pkgName, Tags: map[string]any{"op": "item"}})
+	metrics.HistogramQueueOperationDelay(ctx, itemDelay, metrics.HistogramOpt{
+		PkgName: pkgName,
+		Tags: map[string]any{
+			"queue_shard": q.primaryQueueShard.Name,
+			"op":          "item",
+		}},
+	)
 
 	q.log.Trace("leasing item",
 		"id", item.ID,
