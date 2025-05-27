@@ -221,6 +221,12 @@ func WithDebouncer(d debounce.Debouncer) ExecutorOpt {
 	}
 }
 
+func WithSingletonManager(sn singleton.Singleton) ExecutorOpt {
+	return func(e execution.Executor) error {
+		e.(*executor).singletonMgr = sn
+		return nil
+	}
+}
 func WithBatcher(b batch.BatchManager) ExecutorOpt {
 	return func(e execution.Executor) error {
 		e.(*executor).batcher = b
@@ -304,6 +310,7 @@ type executor struct {
 	queue               queue.Queue
 	debouncer           debounce.Debouncer
 	batcher             batch.BatchManager
+	singletonMgr        singleton.Singleton
 	fl                  state.FunctionLoader
 	evalFactory         func(ctx context.Context, expr string) (expressions.Evaluator, error)
 	runtimeDrivers      map[string]driver.Driver
@@ -501,14 +508,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	// If this is paused, immediately end just before creating state.
 	isPaused := req.FunctionPausedAt != nil && req.FunctionPausedAt.Before(time.Now())
 	if isPaused {
-		for _, e := range e.lifecycles {
-			go e.OnFunctionSkipped(context.WithoutCancel(ctx), metadata, execution.SkipState{
-				CronSchedule: req.Events[0].GetEvent().CronSchedule(),
-				Reason:       enums.SkipReasonFunctionPaused,
-				Events:       evts,
-			})
-		}
-		return nil, ErrFunctionSkipped
+		return e.handleFunctionSkipped(ctx, req, metadata, evts, enums.SkipReasonFunctionPaused)
 	}
 
 	mapped := make([]map[string]any, len(req.Events))
@@ -527,19 +527,33 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	throttle := queue.GetThrottleConfig(ctx, req.Function.ID, req.Function.Throttle, evtMap)
 
 	//
-	// Create singleton information.
+	// Create singleton information and try to handle it prior to creating state.
 	//
 	var singletonConfig *queue.Singleton = nil
 	data := req.Events[0].GetEvent().Map()
 
 	if req.Function.Singleton != nil {
 		singletonKey, err := singleton.SingletonKey(ctx, req.Function.ID, *req.Function.Singleton, data)
-
 		switch {
 		case err == nil:
+			// Attempt to early handle function singletons, function runs could still fail
+			// to enqueue later on when it atomically tries to acquire a function mutex.
+			alreadyRunning, err := e.singletonMgr.Singleton(ctx, singletonKey, *req.Function.Singleton)
+
+			if err != nil {
+				return nil, err
+			}
+
+			if alreadyRunning {
+				// TODO: Handle cancellation mode
+
+				// Immediately end before creating state
+				return e.handleFunctionSkipped(ctx, req, metadata, evts, enums.SkipReasonSingleton)
+			}
+
 			singletonConfig = &queue.Singleton{Key: singletonKey}
 		case errors.Is(err, singleton.ErrNotASingleton):
-			// We no-op , and we run the function normally not as a singleton
+			// We no-op, and we run the function normally not as a singleton
 		default:
 			return nil, err
 		}
@@ -697,16 +711,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 			)
 		}
 
-		// DRY into a function
-		for _, e := range e.lifecycles {
-			go e.OnFunctionSkipped(context.WithoutCancel(ctx), metadata, execution.SkipState{
-				CronSchedule: req.Events[0].GetEvent().CronSchedule(),
-				Reason:       enums.SkipReasonSingleton,
-				Events:       evts,
-			})
-		}
-
-		return nil, ErrFunctionSkipped
+		return e.handleFunctionSkipped(ctx, req, metadata, evts, enums.SkipReasonSingleton)
 	}
 	if err != nil {
 		return nil, fmt.Errorf("error enqueueing source edge '%v': %w", queueKey, err)
@@ -717,6 +722,17 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	}
 
 	return &metadata, nil
+}
+
+func (e *executor) handleFunctionSkipped(ctx context.Context, req execution.ScheduleRequest, metadata sv2.Metadata, evts []json.RawMessage, reason enums.SkipReason) (*sv2.Metadata, error) {
+	for _, e := range e.lifecycles {
+		go e.OnFunctionSkipped(context.WithoutCancel(ctx), metadata, execution.SkipState{
+			CronSchedule: req.Events[0].GetEvent().CronSchedule(),
+			Reason:       reason,
+			Events:       evts,
+		})
+	}
+	return nil, ErrFunctionSkipped
 }
 
 type runInstance struct {

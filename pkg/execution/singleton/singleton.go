@@ -3,6 +3,7 @@ package singleton
 import (
 	"context"
 	"fmt"
+	"log"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/expressions"
@@ -14,6 +15,10 @@ var (
 	ErrEvaluatingSingletonExpression = fmt.Errorf("singleton expression evaluation failed")
 	ErrNotASingleton                 = fmt.Errorf("singleton expression resolved to false")
 )
+
+type Singleton interface {
+	Singleton(ctx context.Context, key string, c inngest.Singleton) (bool, error)
+}
 
 // SingletonKey returns the singleton key given a function ID, singleton config,
 // and incoming event data.
@@ -39,4 +44,12 @@ func SingletonKey(ctx context.Context, id uuid.UUID, c inngest.Singleton, evt ma
 func hash(res any, id uuid.UUID) string {
 	sum := util.XXHash(res)
 	return fmt.Sprintf("%s-%s", id, sum)
+}
+
+func singleton(ctx context.Context, store SingletonStore, key string, s inngest.Singleton) (bool, error) {
+	result, err := store.Exists(ctx, key)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return result, err
 }
