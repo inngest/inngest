@@ -690,6 +690,27 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	if err == redis_state.ErrQueueItemExists {
 		return nil, state.ErrIdentifierExists
 	}
+	if err == redis_state.ErrQueueItemSingletonExists {
+		_, delErr := e.smv2.Delete(ctx, sv2.IDFromV1(st.Identifier()))
+
+		if delErr != nil {
+			logger.StdlibLogger(ctx).Error(
+				"error deleting function state",
+				"error", err,
+			)
+		}
+
+		// DRY into a function
+		for _, e := range e.lifecycles {
+			go e.OnFunctionSkipped(context.WithoutCancel(ctx), metadata, execution.SkipState{
+				CronSchedule: req.Events[0].GetEvent().CronSchedule(),
+				Reason:       enums.SkipReasonSingleton,
+				Events:       evts,
+			})
+		}
+
+		return nil, ErrFunctionSkipped
+	}
 	if err != nil {
 		return nil, fmt.Errorf("error enqueueing source edge '%v': %w", queueKey, err)
 	}
