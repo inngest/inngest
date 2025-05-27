@@ -121,6 +121,59 @@ export const FUNCTIONS = gql`
   }
 `;
 
+export const FUNCTION = gql`
+  query GetFunction($functionSlug: String!) {
+    functionBySlug(query: { functionSlug: $functionSlug }) {
+      name
+      id
+      concurrency
+      config
+      configuration {
+        cancellations {
+          event
+          timeout
+          condition
+        }
+        retries {
+          value
+          isDefault
+        }
+        priority
+        eventsBatch {
+          maxSize
+          timeout
+          key
+        }
+        concurrency {
+          scope
+          limit {
+            value
+            isPlanLimit
+          }
+          key
+        }
+        rateLimit {
+          limit
+          period
+          key
+        }
+        debounce {
+          period
+          key
+        }
+        throttle {
+          burst
+          key
+          limit
+          period
+        }
+      }
+      slug
+      url
+    }
+  }
+`;
+
 export const APPS = gql`
   query GetApps {
     apps {
