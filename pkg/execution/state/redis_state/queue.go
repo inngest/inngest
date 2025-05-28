@@ -92,6 +92,7 @@ const (
 
 	ShadowPartitionLeaseDuration  = 4 * time.Second // same as PartitionLeaseDuration
 	BacklogNormalizeLeaseDuration = 4 * time.Second // same as PartitionLeaseDuration
+	CancellationLeaseDuration     = 4 * time.Second
 
 	ShadowPartitionRefillCapacityReachedRequeueExtension = 1 * time.Second
 	ShadowPartitionRefillPausedRequeueExtension          = 24 * time.Hour

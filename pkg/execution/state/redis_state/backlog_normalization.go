@@ -129,8 +129,7 @@ func (q *queue) iterateNormalizationShadowPartition(ctx context.Context, shadowP
 		for _, bl := range backlogs {
 			// lease the backlog
 			_, err := duration(ctx, q.primaryQueueShard.Name, "normalize_lease", q.clock.Now(), func(ctx context.Context) (any, error) {
-				err := q.leaseBacklogForNormalization(ctx, bl)
-				return nil, err
+				return nil, q.leaseBacklogForNormalization(ctx, bl)
 			})
 			if err != nil {
 				if errors.Is(err, errBacklogAlreadyLeasedForNormalization) {
@@ -162,7 +161,7 @@ func (q *queue) leaseBacklogForNormalization(ctx context.Context, bl *QueueBackl
 	leaseExpiry := q.clock.Now().Add(BacklogNormalizeLeaseDuration)
 	leaseID, err := ulid.New(ulid.Timestamp(leaseExpiry), rand.Reader)
 	if err != nil {
-		return fmt.Errorf("could not generate leaseID: %w", err)
+		return fmt.Errorf("could not generate leaseID for backlog normalization: %w", err)
 	}
 
 	shard := q.primaryQueueShard

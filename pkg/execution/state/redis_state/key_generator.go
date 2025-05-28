@@ -207,6 +207,7 @@ type QueueKeyGenerator interface {
 	CancellationPartitionSet() string
 	// CancellationPartitionMeta returns the key to the hash storing serialized QueueCancellation objects by ID
 	CancellationPartitionMeta() string
+	CancellationLease(cancelID string) string
 
 	// ActiveRunCounter returns the key to the number of active queue items for a given run ID.
 	ActiveRunCounter(runID ulid.ULID) string
@@ -488,6 +489,10 @@ func (u queueKeyGenerator) CancellationPartitionSet() string {
 
 func (u queueKeyGenerator) CancellationPartitionMeta() string {
 	return fmt.Sprintf("{%s}:cancellation", u.queueDefaultKey)
+}
+
+func (u queueKeyGenerator) CancellationLease(cancelID string) string {
+	return fmt.Sprintf("{%s}:cancellation:%s:lease", u.queueDefaultKey, cancelID)
 }
 
 type BatchKeyGenerator interface {
