@@ -54,7 +54,7 @@ func TestQueueItemBacklogs(t *testing.T) {
 
 	fnID, wsID, accID := uuid.New(), uuid.New(), uuid.New()
 
-	t.Run("basic item", func(t *testing.T) {
+	t.Run("basic edge item", func(t *testing.T) {
 		expected := QueueBacklog{
 			// expect default backlog to be used
 			BacklogID:         fmt.Sprintf("fn:%s", fnID),
@@ -68,6 +68,40 @@ func TestQueueItemBacklogs(t *testing.T) {
 			Data: osqueue.Item{
 				WorkspaceID: wsID,
 				Kind:        osqueue.KindEdge,
+				Identifier: state.Identifier{
+					WorkflowID:  fnID,
+					AccountID:   accID,
+					WorkspaceID: wsID,
+				},
+				Throttle:              nil,
+				CustomConcurrencyKeys: nil,
+				QueueName:             nil,
+			},
+			QueueName: nil,
+		})
+
+		require.Equal(t, expected, backlog)
+
+		// default backlog is not for a concurrency key, so the concurrency key should be empty (function-level concurrency accounting is handled for the shadow partition)
+		kg := queueKeyGenerator{queueDefaultKey: QueueDefaultKey}
+		require.Equal(t, kg.Concurrency("", ""), backlog.customKeyInProgress(kg, 1))
+		require.Equal(t, kg.Concurrency("", ""), backlog.customKeyInProgress(kg, 2))
+	})
+
+	t.Run("basic start item", func(t *testing.T) {
+		expected := QueueBacklog{
+			BacklogID:         fmt.Sprintf("fn:%s:start", fnID),
+			Start:             true,
+			ShadowPartitionID: fnID.String(),
+		}
+
+		backlog := q.ItemBacklog(ctx, osqueue.QueueItem{
+			ID:          "test",
+			FunctionID:  fnID,
+			WorkspaceID: wsID,
+			Data: osqueue.Item{
+				WorkspaceID: wsID,
+				Kind:        osqueue.KindStart,
 				Identifier: state.Identifier{
 					WorkflowID:  fnID,
 					AccountID:   accID,
@@ -131,7 +165,8 @@ func TestQueueItemBacklogs(t *testing.T) {
 		hashedThrottleKey := osqueue.HashID(ctx, rawThrottleKey)
 
 		expected := QueueBacklog{
-			BacklogID:         fmt.Sprintf("fn:%s:t<%s>", fnID, hashedThrottleKey),
+			BacklogID:         fmt.Sprintf("fn:%s:start:t<%s>", fnID, hashedThrottleKey),
+			Start:             true,
 			ShadowPartitionID: fnID.String(),
 
 			Throttle: &BacklogThrottle{
@@ -180,7 +215,8 @@ func TestQueueItemBacklogs(t *testing.T) {
 		hashedThrottleKey := osqueue.HashID(ctx, rawThrottleKey)
 
 		expected := QueueBacklog{
-			BacklogID:         fmt.Sprintf("fn:%s:t<%s>", fnID, hashedThrottleKey),
+			BacklogID:         fmt.Sprintf("fn:%s:start:t<%s>", fnID, hashedThrottleKey),
+			Start:             true,
 			ShadowPartitionID: fnID.String(),
 
 			Throttle: &BacklogThrottle{
@@ -410,7 +446,8 @@ func TestQueueItemBacklogs(t *testing.T) {
 		}.ParseKey()
 
 		expected := QueueBacklog{
-			BacklogID:         fmt.Sprintf("fn:%s:t<%s>:c1<%s>", fnID, hashedThrottleKey, util.XXHash(fullKey)),
+			BacklogID:         fmt.Sprintf("fn:%s:start:t<%s>:c1<%s>", fnID, hashedThrottleKey, util.XXHash(fullKey)),
+			Start:             true,
 			ShadowPartitionID: fnID.String(),
 
 			Throttle: &BacklogThrottle{

@@ -15,6 +15,7 @@ import (
 )
 
 type CustomConcurrencyLimit struct {
+	Mode                enums.ConcurrencyMode  `json:"m"`
 	Scope               enums.ConcurrencyScope `json:"s"`
 	HashedKeyExpression string                 `json:"k"`
 	Limit               int                    `json:"l"`
@@ -59,8 +60,14 @@ type QueueShadowPartition struct {
 	// AccountConcurrency represents the global account concurrency limit. This is unset on system queues.
 	AccountConcurrency int `json:"ac,omitempty"`
 
+	// AccountRunConcurrency represents the global account run concurrency limit (how many active runs per account). This is unset on system queues.
+	AccountRunConcurrency int `json:"arc,omitempty"`
+
 	// FunctionConcurrency represents the function concurrency limit.
 	FunctionConcurrency int `json:"fc,omitempty"`
+
+	// FunctionRunConcurrency represents the function run concurrency limit (how many active runs allowed per function).
+	FunctionRunConcurrency int `json:"frc,omitempty"`
 
 	// Up to two custom concurrency keys on user-defined scopes, optionally specifying a key. The key is required
 	// on env or account level scopes.
@@ -171,6 +178,9 @@ type BacklogConcurrencyKey struct {
 	// UnhashedValue is the unhashed evaluated key (e.g. "customer1")
 	// This may be truncated for long values and may only be used for observability and debugging.
 	UnhashedValue string `json:"ckuv"`
+
+	// ConcurrencyMode represents the concurrency mode.
+	ConcurrencyMode enums.ConcurrencyMode `json:"mode"`
 }
 
 type BacklogThrottle struct {
@@ -188,6 +198,9 @@ type BacklogThrottle struct {
 type QueueBacklog struct {
 	BacklogID         string `json:"id,omitempty"`
 	ShadowPartitionID string `json:"sid,omitempty"`
+
+	// Start marks backlogs representing items with KindStart.
+	Start bool `json:"start,omitempty"`
 
 	// Set for backlogs representing custom concurrency keys
 	ConcurrencyKeys []BacklogConcurrencyKey `json:"ck,omitempty"`
@@ -224,10 +237,18 @@ func (q *queue) ItemBacklog(ctx context.Context, i osqueue.QueueItem) QueueBackl
 	b := QueueBacklog{
 		BacklogID:         fmt.Sprintf("fn:%s", i.FunctionID),
 		ShadowPartitionID: i.FunctionID.String(),
+
+		// Start items should be moved into their own backlog. This is useful for
+		// function run concurrency: To determine how many new runs can start, we can
+		// calculate the remaining run capacity and refill as many items from the start backlog.
+		Start: i.Data.Kind == osqueue.KindStart,
+	}
+	if b.Start {
+		b.BacklogID += ":start"
 	}
 
 	// Enqueue start items to throttle backlog if throttle is configured
-	if i.Data.Throttle != nil && i.Data.Kind == osqueue.KindStart {
+	if i.Data.Throttle != nil && b.Start {
 		// This is always specified, even if no key was configured in the function definition.
 		// In that case, the Throttle Key is the hashed function ID. See Schedule() for more details.
 		b.Throttle = &BacklogThrottle{
@@ -365,6 +386,7 @@ func (q *queue) ItemShadowPartition(ctx context.Context, i osqueue.QueueItem) Qu
 			scope, _, _, _ := key.ParseKey()
 
 			customConcurrencyKeyLimits = append(customConcurrencyKeyLimits, CustomConcurrencyLimit{
+				Mode:  enums.ConcurrencyModeStep, // TODO Support run concurrency
 				Scope: scope,
 				// Key is required to look up the respective limit when checking constraints for a given backlog.
 				HashedKeyExpression: key.Hash, // hash("event.data.customerId")
@@ -393,10 +415,14 @@ func (q *queue) ItemShadowPartition(ctx context.Context, i osqueue.QueueItem) Qu
 		AccountID:  &i.Data.Identifier.AccountID,
 
 		// Currently configured limits
-		FunctionConcurrency:   fnPartition.ConcurrencyLimit,
 		AccountConcurrency:    limits.AccountLimit,
+		FunctionConcurrency:   fnPartition.ConcurrencyLimit,
 		CustomConcurrencyKeys: customConcurrencyKeyLimits,
 		Throttle:              throttle,
+
+		// TODO Support run concurrency
+		AccountRunConcurrency:  0,
+		FunctionRunConcurrency: 0,
 	}
 }
 
@@ -432,7 +458,7 @@ func (b QueueBacklog) isOutdated(sp *QueueShadowPartition) bool {
 	for _, backlogKey := range b.ConcurrencyKeys {
 		hasKey := false
 		for _, shadowPartitionKey := range sp.CustomConcurrencyKeys {
-			if shadowPartitionKey.Scope == backlogKey.Scope && shadowPartitionKey.HashedKeyExpression == backlogKey.HashedKeyExpression {
+			if shadowPartitionKey.Mode == backlogKey.ConcurrencyMode && shadowPartitionKey.Scope == backlogKey.Scope && shadowPartitionKey.HashedKeyExpression == backlogKey.HashedKeyExpression {
 				hasKey = true
 				break
 			}
