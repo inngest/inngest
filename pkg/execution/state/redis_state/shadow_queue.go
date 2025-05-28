@@ -24,6 +24,7 @@ const (
 	ShadowPartitionPeekMax         = int64(300) // same as PartitionPeekMax for now
 	ShadowPartitionPeekMinBacklogs = int64(10)
 	ShadowPartitionPeekMaxBacklogs = int64(100)
+	CancellationPartitionPeekMax   = int64(1000)
 )
 
 // shadowWorker runs a blocking process that listens to item being pushed into the

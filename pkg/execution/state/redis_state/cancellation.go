@@ -2,6 +2,7 @@ package redis_state
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -54,10 +55,64 @@ func (q *queue) cancellationWorker(ctx context.Context, cc chan cancellationChan
 
 func (q *queue) iterateCancellationPartition(ctx context.Context, until time.Time, cc chan cancellationChanMsg) error {
 	// TODO: implement scanning
+	sequential := false
+	key := ""
+	cancellations, err := q.peekCancellationPartitions(ctx, key, sequential, CancellationPartitionPeekMax, until)
+	if err != nil {
+		return fmt.Errorf("error peeking cancellation partitions: %w", err)
+	}
+
+	for _, c := range cancellations {
+		// TODO: lease the item to reduce contention
+
+		cc <- cancellationChanMsg{
+			item: c,
+		}
+	}
+
 	return nil
 }
 
+func (q *queue) peekCancellationPartitions(ctx context.Context, partitionIndexKey string, sequential bool, peekLimit int64, until time.Time) ([]*QueueCancellation, error) {
+	if q.isQueueShardKindAllowed(q.primaryQueueShard.Kind) {
+		return nil, fmt.Errorf("unsupported queue shard kind for peekCancellationPartition: %s", q.primaryQueueShard.Kind)
+	}
+
+	p := peeker[QueueCancellation]{
+		q:               q,
+		opName:          "peekCancellation",
+		keyMetadataHash: "", // TODO: replace this key
+		max:             CancellationPartitionPeekMax,
+		maker: func() *QueueCancellation {
+			return &QueueCancellation{}
+		},
+		handleMissingItems: func(pointers []string) error {
+			q.log.Warn("found missing cancellation partitions", "missing", pointers, "partitionKey", partitionIndexKey)
+			return nil
+		},
+		isMillisecondPrecision: true,
+	}
+
+	res, err := p.peek(ctx, partitionIndexKey, sequential, until, peekLimit)
+	if err != nil {
+		if errors.Is(err, ErrPeekerPeekExceedsMaxLimits) {
+			return nil, ErrCancellationPartitionPeekMaxExceedsLimits
+		}
+		return nil, fmt.Errorf("could not peek cancellation partition: %w", err)
+	}
+
+	if res.TotalCount > 0 {
+		for _, item := range res.Items {
+			q.log.Trace("peeked cancellation partition", "id", item.ID, "type", item.Type.String())
+		}
+	}
+
+	return res.Items, nil
+}
+
 func (q *queue) processCancellation(ctx context.Context, qc *QueueCancellation) error {
+	// TODO: extend lease
+
 	// TODO: implement handling of cancellation
 	switch qc.Type {
 	case enums.CancellationTypeBacklog:
