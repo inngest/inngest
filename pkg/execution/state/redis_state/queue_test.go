@@ -1208,7 +1208,7 @@ func TestQueueLease(t *testing.T) {
 	start := time.Now().Truncate(time.Second)
 
 	t.Run("It leases an item", func(t *testing.T) {
-		fnID := uuid.New()
+		fnID, accountID := uuid.New(), uuid.New()
 		runID := ulid.MustNew(ulid.Now(), rand.Reader)
 
 		item, err := q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{
@@ -1217,6 +1217,7 @@ func TestQueueLease(t *testing.T) {
 				Identifier: state.Identifier{
 					RunID:      runID,
 					WorkflowID: fnID,
+					AccountID:  accountID,
 				},
 			},
 		}, start, osqueue.EnqueueOpts{})
@@ -1226,7 +1227,9 @@ func TestQueueLease(t *testing.T) {
 		require.Nil(t, item.LeaseID)
 
 		p := QueuePartition{
+			ID:         fnID.String(),
 			FunctionID: &fnID,
+			AccountID:  accountID,
 		} // Default workflow ID etc
 
 		t.Run("It should exist in the pending partition queue", func(t *testing.T) {
@@ -1268,6 +1271,10 @@ func TestQueueLease(t *testing.T) {
 				isMember, err := r.SIsMember(kg.ActivePartitionRunsIndex(fnID.String()), runID.String())
 				require.NoError(t, err)
 				require.True(t, isMember)
+
+				activeRunCounterAccount, err := r.Get(kg.ActiveRunsCounter("account", accountID.String()))
+				require.NoError(t, err)
+				require.Equal(t, "1", activeRunCounterAccount)
 			}
 		})
 
