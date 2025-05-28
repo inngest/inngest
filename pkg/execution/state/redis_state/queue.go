@@ -239,13 +239,13 @@ func WithNumWorkers(n int32) QueueOpt {
 	}
 }
 
-func WithShadowNumWorkers(n int32) QueueOpt {
+func WithNumShadowWorkers(n int32) QueueOpt {
 	return func(q *queue) {
 		q.numShadowWorkers = n
 	}
 }
 
-func WithBacklogNormalizationWorkers(n int32) QueueOpt {
+func WithNumBacklogNormalizationWorkers(n int32) QueueOpt {
 	return func(q *queue) {
 		q.numBacklogNormalizationWorkers = n
 	}
