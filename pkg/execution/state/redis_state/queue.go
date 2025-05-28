@@ -120,7 +120,8 @@ const (
 
 	defaultNumWorkers                  = 100
 	defaultNumShadowWorkers            = 100
-	defaultBacklogNormalizationWorkers = 10
+	defaultBacklogNormalizationWorkers = 20
+	defaultCancellationWorkers         = 20
 	defaultBacklogNormalizeLimit       = int64(500)
 
 	defaultPollTick       = 10 * time.Millisecond
@@ -241,6 +242,18 @@ func WithNumWorkers(n int32) QueueOpt {
 func WithShadowNumWorkers(n int32) QueueOpt {
 	return func(q *queue) {
 		q.numShadowWorkers = n
+	}
+}
+
+func WithBacklogNormalizationWorkers(n int32) QueueOpt {
+	return func(q *queue) {
+		q.numBacklogNormalizationWorkers = n
+	}
+}
+
+func WithCancellationWorkers(n int32) QueueOpt {
+	return func(q *queue) {
+		q.numCancellationWorkers = n
 	}
 }
 
@@ -613,6 +626,7 @@ func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 		numWorkers:                     defaultNumWorkers,
 		numShadowWorkers:               defaultNumShadowWorkers,
 		numBacklogNormalizationWorkers: defaultBacklogNormalizationWorkers,
+		numCancellationWorkers:         defaultCancellationWorkers,
 		wg:                             &sync.WaitGroup{},
 		seqLeaseLock:                   &sync.RWMutex{},
 		scavengerLeaseLock:             &sync.RWMutex{},
@@ -756,6 +770,8 @@ type queue struct {
 	numShadowWorkers int32
 	// numBacklogNormalizationWorkers stores the maximum number of workers available to concurrenctly scan normalization partitions
 	numBacklogNormalizationWorkers int32
+	// numCancellationWorkers stores the maximum number of workers available to concurrencyly cancel items
+	numCancellationWorkers int32
 	// peek min & max sets the range for partitions to peek for items
 	peekMin int64
 	peekMax int64
