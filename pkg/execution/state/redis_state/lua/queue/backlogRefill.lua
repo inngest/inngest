@@ -72,6 +72,8 @@ local throttlePeriod = tonumber(ARGV[14])
 
 local keyPrefix = ARGV[15]
 
+local drainActiveCounters = tonumber(ARGV[16])
+
 -- $include(update_pointer_score.lua)
 -- $include(ends_with.lua)
 -- $include(update_account_queues.lua)
@@ -254,7 +256,7 @@ if refill > 0 then
       updatedData.rf = backlogID
       updatedData.rat = nowMS
 
-      if updatedData.data ~= nil and updatedData.data.identifier ~= nil and updatedData.data.identifier.runID ~= nil then
+      if drainActiveCounters ~= 1 and updatedData.data ~= nil and updatedData.data.identifier ~= nil and updatedData.data.identifier.runID ~= nil then
         -- add item to active in run
         local runID = updatedData.data.identifier.runID
         local keyActiveRun = string.format("%s:active:run:%s", keyPrefix, runID)
@@ -293,23 +295,25 @@ if refill > 0 then
     -- "Refill" items to ready set
     redis.call("ZADD", keyReadySet, unpack(readyArgs))
 
-    -- Increase active counters by number of refilled items
-    redis.call("INCRBY", keyActivePartition, refilled)
+    if drainActiveCounters ~= 1 then
+      -- Increase active counters by number of refilled items
+      redis.call("INCRBY", keyActivePartition, refilled)
 
-    if exists_without_ending(keyActiveAccount, ":-") then
-      redis.call("INCRBY", keyActiveAccount, refilled)
-    end
+      if exists_without_ending(keyActiveAccount, ":-") then
+        redis.call("INCRBY", keyActiveAccount, refilled)
+      end
 
-    if exists_without_ending(keyActiveCompound, ":-") then
-      redis.call("INCRBY", keyActiveCompound, refilled)
-    end
+      if exists_without_ending(keyActiveCompound, ":-") then
+        redis.call("INCRBY", keyActiveCompound, refilled)
+      end
 
-    if exists_without_ending(keyActiveConcurrencyKey1, ":-") then
-      redis.call("INCRBY", keyActiveConcurrencyKey1, refilled)
-    end
+      if exists_without_ending(keyActiveConcurrencyKey1, ":-") then
+        redis.call("INCRBY", keyActiveConcurrencyKey1, refilled)
+      end
 
-    if exists_without_ending(keyActiveConcurrencyKey2, ":-") then
-      redis.call("INCRBY", keyActiveConcurrencyKey2, refilled)
+      if exists_without_ending(keyActiveConcurrencyKey2, ":-") then
+        redis.call("INCRBY", keyActiveConcurrencyKey2, refilled)
+      end
     end
 
     -- Update queue items with refill data

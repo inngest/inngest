@@ -508,6 +508,10 @@ type AllowSystemKeyQueues func(ctx context.Context) bool
 // AllowKeyQueues determines if key queues should be enabled for the account
 type AllowKeyQueues func(ctx context.Context, acctID uuid.UUID) bool
 
+// DrainActiveCounters determines if active counters should be drained for the account
+// This can also be called for system queues, where account ID will be a zero UUID.
+type DrainActiveCounters func(ctx context.Context, acctID uuid.UUID) bool
+
 func WithAllowKeyQueues(kq AllowKeyQueues) QueueOpt {
 	return func(q *queue) {
 		q.allowKeyQueues = kq
@@ -646,6 +650,9 @@ func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 		allowKeyQueues: func(ctx context.Context, acctID uuid.UUID) bool {
 			return false
 		},
+		drainActiveCounters: func(ctx context.Context, acctID uuid.UUID) bool {
+			return false
+		},
 		enqueueSystemQueuesToBacklog: false,
 		disableLeaseChecks: func(ctx context.Context, acctID uuid.UUID) bool {
 			return false
@@ -719,6 +726,7 @@ type queue struct {
 
 	allowKeyQueues               AllowKeyQueues
 	enqueueSystemQueuesToBacklog bool
+	drainActiveCounters          DrainActiveCounters
 
 	disableLeaseChecks                DisableLeaseChecks
 	disableLeaseChecksForSystemQueues bool
@@ -2289,6 +2297,11 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 		partConcurrency = partition.Concurrency.SystemConcurrency
 	}
 
+	drainActiveCountersVal := "0"
+	if q.drainActiveCounters(ctx, item.Data.Identifier.AccountID) {
+		drainActiveCountersVal = "1"
+	}
+
 	args, err := StrSlice([]any{
 		item.ID,
 		partition.PartitionID,
@@ -2307,6 +2320,7 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 		// Key queues v2
 		checkConstraintsVal,
 		refilledFromBacklogVal,
+		drainActiveCountersVal,
 	})
 	if err != nil {
 		return nil, err

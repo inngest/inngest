@@ -666,6 +666,11 @@ func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueSha
 		b.customKeyActiveRuns(kg, 2),                // Counter for active runs with custom concurrency key 2
 	}
 
+	drainActiveCountersVal := "0"
+	if q.drainActiveCounters(ctx, accountID) {
+		drainActiveCountersVal = "1"
+	}
+
 	args, err := StrSlice([]any{
 		b.BacklogID,
 		sp.PartitionID,
@@ -685,6 +690,7 @@ func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueSha
 		throttlePeriod,
 
 		kg.QueuePrefix(),
+		drainActiveCountersVal,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("could not serialize args: %w", err)

@@ -59,6 +59,7 @@ local customConcurrencyKey2   = tonumber(ARGV[10])
 -- key queues v2
 local checkConstraints    = tonumber(ARGV[11])
 local refilledFromBacklog = tonumber(ARGV[12])
+local drainActiveCounters = tonumber(ARGV[13])
 
 -- Use our custom Go preprocessor to inject the file from ./includes/
 -- $include(decode_ulid_time.lua)
@@ -174,7 +175,7 @@ end
 
 -- If item was not refilled from backlog, we must increase active counters during lease
 -- to account used capacity for future backlog refills
-if refilledFromBacklog ~= 1 then
+if refilledFromBacklog ~= 1 and drainActiveCounters ~= 1 then
   -- Increase active counters by 1
   redis.call("INCR", keyActivePartition)
 
