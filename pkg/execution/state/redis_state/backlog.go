@@ -33,6 +33,27 @@ type ShadowPartitionThrottle struct {
 	Period int `json:"p"`
 }
 
+type ShadowPartitionConcurrency struct {
+	// SystemConcurrency represents the concurrency limit to apply to system queues. Unset on regular function partitions.
+	SystemConcurrency int `json:"sc,omitempty"`
+
+	// AccountConcurrency represents the global account concurrency limit. This is unset on system queues.
+	AccountConcurrency int `json:"ac,omitempty"`
+
+	// FunctionConcurrency represents the function concurrency limit.
+	FunctionConcurrency int `json:"fc,omitempty"`
+
+	// AccountRunConcurrency represents the global account run concurrency limit (how many active runs per account). This is unset on system queues.
+	AccountRunConcurrency int `json:"arc,omitempty"`
+
+	// FunctionRunConcurrency represents the function run concurrency limit (how many active runs allowed per function).
+	FunctionRunConcurrency int `json:"frc,omitempty"`
+
+	// Up to two custom concurrency keys on user-defined scopes, optionally specifying a key. The key is required
+	// on env or account level scopes.
+	CustomConcurrencyKeys []CustomConcurrencyLimit `json:"cck,omitempty"`
+}
+
 type QueueShadowPartition struct {
 	// PartitionID is the function ID or system queue name. The shadow partition
 	// ID is the same as the partition ID used across the queue.
@@ -54,24 +75,7 @@ type QueueShadowPartition struct {
 	AccountID       *uuid.UUID `json:"aid,omitempty"`
 	SystemQueueName *string    `json:"queueName,omitempty"`
 
-	// SystemConcurrency represents the concurrency limit to apply to system queues. Unset on regular function partitions.
-	SystemConcurrency int `json:"sc,omitempty"`
-
-	// AccountConcurrency represents the global account concurrency limit. This is unset on system queues.
-	AccountConcurrency int `json:"ac,omitempty"`
-
-	// AccountRunConcurrency represents the global account run concurrency limit (how many active runs per account). This is unset on system queues.
-	AccountRunConcurrency int `json:"arc,omitempty"`
-
-	// FunctionConcurrency represents the function concurrency limit.
-	FunctionConcurrency int `json:"fc,omitempty"`
-
-	// FunctionRunConcurrency represents the function run concurrency limit (how many active runs allowed per function).
-	FunctionRunConcurrency int `json:"frc,omitempty"`
-
-	// Up to two custom concurrency keys on user-defined scopes, optionally specifying a key. The key is required
-	// on env or account level scopes.
-	CustomConcurrencyKeys []CustomConcurrencyLimit `json:"cck,omitempty"`
+	Concurrency ShadowPartitionConcurrency `json:"c,omitempty,omitzero"`
 
 	// Throttle configuration, optionally specifying key. If no key is set, the throttle value will be the function ID.
 	Throttle *ShadowPartitionThrottle `json:"t,omitempty"`
@@ -100,11 +104,11 @@ func (q QueueShadowPartition) activeKey(kg QueueKeyGenerator) string {
 
 // CustomConcurrencyLimit returns concurrency limit for custom concurrency key in position n (0, if not set)
 func (q QueueShadowPartition) CustomConcurrencyLimit(n int) int {
-	if n < 0 || n > len(q.CustomConcurrencyKeys) {
+	if n < 0 || n > len(q.Concurrency.CustomConcurrencyKeys) {
 		return 0
 	}
 
-	key := q.CustomConcurrencyKeys[n-1]
+	key := q.Concurrency.CustomConcurrencyKeys[n-1]
 
 	return key.Limit
 }
@@ -116,7 +120,7 @@ func (q QueueShadowPartition) CustomConcurrencyKey(kg QueueKeyGenerator, b *Queu
 
 	backlogKey := b.ConcurrencyKeys[n-1]
 
-	for _, key := range q.CustomConcurrencyKeys {
+	for _, key := range q.Concurrency.CustomConcurrencyKeys {
 		if key.Scope == backlogKey.Scope && key.HashedKeyExpression == backlogKey.HashedKeyExpression {
 			// Return concrete key with latest limit from shadow partition
 			return backlogKey.concurrencyKey(kg), key.Limit
@@ -332,9 +336,11 @@ func (q *queue) ItemShadowPartition(ctx context.Context, i osqueue.QueueItem) Qu
 		systemPartition.ConcurrencyLimit = systemLimits.PartitionLimit
 
 		return QueueShadowPartition{
-			PartitionID:       *queueName,
-			SystemQueueName:   queueName,
-			SystemConcurrency: systemLimits.PartitionLimit,
+			PartitionID:     *queueName,
+			SystemQueueName: queueName,
+			Concurrency: ShadowPartitionConcurrency{
+				SystemConcurrency: systemLimits.PartitionLimit,
+			},
 		}
 	}
 
@@ -415,14 +421,16 @@ func (q *queue) ItemShadowPartition(ctx context.Context, i osqueue.QueueItem) Qu
 		AccountID:  &i.Data.Identifier.AccountID,
 
 		// Currently configured limits
-		AccountConcurrency:    limits.AccountLimit,
-		FunctionConcurrency:   fnPartition.ConcurrencyLimit,
-		CustomConcurrencyKeys: customConcurrencyKeyLimits,
-		Throttle:              throttle,
+		Concurrency: ShadowPartitionConcurrency{
+			AccountConcurrency:    limits.AccountLimit,
+			FunctionConcurrency:   fnPartition.ConcurrencyLimit,
+			CustomConcurrencyKeys: customConcurrencyKeyLimits,
 
-		// TODO Support run concurrency
-		AccountRunConcurrency:  0,
-		FunctionRunConcurrency: 0,
+			// TODO Support run concurrency
+			AccountRunConcurrency:  0,
+			FunctionRunConcurrency: 0,
+		},
+		Throttle: throttle,
 	}
 }
 
@@ -449,7 +457,7 @@ func (b QueueBacklog) isOutdated(sp *QueueShadowPartition) bool {
 	}
 
 	// Throttle key count does not match
-	if len(b.ConcurrencyKeys) != len(sp.CustomConcurrencyKeys) {
+	if len(b.ConcurrencyKeys) != len(sp.Concurrency.CustomConcurrencyKeys) {
 		return true
 	}
 
@@ -457,7 +465,7 @@ func (b QueueBacklog) isOutdated(sp *QueueShadowPartition) bool {
 	// This is quadratic but each backlog and shadow partition can only have up to 2 keys, so it's bounded.
 	for _, backlogKey := range b.ConcurrencyKeys {
 		hasKey := false
-		for _, shadowPartitionKey := range sp.CustomConcurrencyKeys {
+		for _, shadowPartitionKey := range sp.Concurrency.CustomConcurrencyKeys {
 			if shadowPartitionKey.Mode == backlogKey.ConcurrencyMode && shadowPartitionKey.Scope == backlogKey.Scope && shadowPartitionKey.HashedKeyExpression == backlogKey.HashedKeyExpression {
 				hasKey = true
 				break
@@ -625,8 +633,8 @@ func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueSha
 		refillLimit,
 		nowMS,
 
-		sp.AccountConcurrency,
-		sp.FunctionConcurrency,
+		sp.Concurrency.AccountConcurrency,
+		sp.Concurrency.FunctionConcurrency,
 		sp.CustomConcurrencyLimit(1),
 		sp.CustomConcurrencyLimit(2),
 

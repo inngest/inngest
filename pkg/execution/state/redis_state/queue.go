@@ -2279,9 +2279,9 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 		kg.ThrottleKey(item.Data.Throttle),
 	}
 
-	partConcurrency := partition.FunctionConcurrency
+	partConcurrency := partition.Concurrency.FunctionConcurrency
 	if partition.SystemQueueName != nil {
-		partConcurrency = partition.SystemConcurrency
+		partConcurrency = partition.Concurrency.SystemConcurrency
 	}
 
 	args, err := StrSlice([]any{
@@ -2294,7 +2294,7 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 		now.UnixMilli(),
 
 		// Concurrency limits
-		partition.AccountConcurrency,
+		partition.Concurrency.AccountConcurrency,
 		partConcurrency,
 		partition.CustomConcurrencyLimit(1),
 		partition.CustomConcurrencyLimit(2),

@@ -693,18 +693,20 @@ func TestQueueItemShadowPartition(t *testing.T) {
 
 	t.Run("basic item", func(t *testing.T) {
 		expected := QueueShadowPartition{
-			PartitionID:           fnID.String(),
-			FunctionID:            &fnID,
-			EnvID:                 &wsID,
-			AccountID:             &accID,
-			SystemQueueName:       nil,
-			SystemConcurrency:     0,
-			AccountConcurrency:    100,
-			FunctionConcurrency:   25,
-			CustomConcurrencyKeys: nil,
-			Throttle:              nil,
-			PauseRefill:           false,
-			PauseEnqueue:          false,
+			PartitionID:     fnID.String(),
+			FunctionID:      &fnID,
+			EnvID:           &wsID,
+			AccountID:       &accID,
+			SystemQueueName: nil,
+			Concurrency: ShadowPartitionConcurrency{
+				SystemConcurrency:     0,
+				AccountConcurrency:    100,
+				FunctionConcurrency:   25,
+				CustomConcurrencyKeys: nil,
+			},
+			Throttle:     nil,
+			PauseRefill:  false,
+			PauseEnqueue: false,
 		}
 
 		shadowPart := q.ItemShadowPartition(ctx, osqueue.QueueItem{
@@ -737,18 +739,20 @@ func TestQueueItemShadowPartition(t *testing.T) {
 		sysQueueName := osqueue.KindQueueMigrate
 
 		expected := QueueShadowPartition{
-			PartitionID:           sysQueueName,
-			FunctionID:            nil,
-			EnvID:                 nil,
-			AccountID:             nil,
-			SystemQueueName:       &sysQueueName,
-			SystemConcurrency:     250,
-			AccountConcurrency:    0,
-			FunctionConcurrency:   0,
-			CustomConcurrencyKeys: nil,
-			Throttle:              nil,
-			PauseRefill:           false,
-			PauseEnqueue:          false,
+			PartitionID:     sysQueueName,
+			FunctionID:      nil,
+			EnvID:           nil,
+			AccountID:       nil,
+			SystemQueueName: &sysQueueName,
+			Concurrency: ShadowPartitionConcurrency{
+				SystemConcurrency:     250,
+				AccountConcurrency:    0,
+				FunctionConcurrency:   0,
+				CustomConcurrencyKeys: nil,
+			},
+			Throttle:     nil,
+			PauseRefill:  false,
+			PauseEnqueue: false,
 		}
 
 		shadowPart := q.ItemShadowPartition(ctx, osqueue.QueueItem{
@@ -778,15 +782,17 @@ func TestQueueItemShadowPartition(t *testing.T) {
 		hashedThrottleKey := osqueue.HashID(ctx, rawThrottleKey)
 
 		expected := QueueShadowPartition{
-			PartitionID:           fnID.String(),
-			FunctionID:            &fnID,
-			EnvID:                 &wsID,
-			AccountID:             &accID,
-			SystemQueueName:       nil,
-			SystemConcurrency:     0,
-			AccountConcurrency:    100,
-			FunctionConcurrency:   25,
-			CustomConcurrencyKeys: nil,
+			PartitionID:     fnID.String(),
+			FunctionID:      &fnID,
+			EnvID:           &wsID,
+			AccountID:       &accID,
+			SystemQueueName: nil,
+			Concurrency: ShadowPartitionConcurrency{
+				SystemConcurrency:     0,
+				AccountConcurrency:    100,
+				FunctionConcurrency:   25,
+				CustomConcurrencyKeys: nil,
+			},
 			Throttle: &ShadowPartitionThrottle{
 				ThrottleKeyExpressionHash: hashedThrottleKeyExpr,
 				Limit:                     70,
@@ -835,19 +841,21 @@ func TestQueueItemShadowPartition(t *testing.T) {
 		fullKey := util.ConcurrencyKey(enums.ConcurrencyScopeFn, fnID, unhashedValue)
 
 		expected := QueueShadowPartition{
-			PartitionID:         fnID.String(),
-			FunctionID:          &fnID,
-			EnvID:               &wsID,
-			AccountID:           &accID,
-			SystemQueueName:     nil,
-			SystemConcurrency:   0,
-			AccountConcurrency:  100,
-			FunctionConcurrency: 25,
-			CustomConcurrencyKeys: []CustomConcurrencyLimit{
-				{
-					Scope:               enums.ConcurrencyScopeFn,
-					HashedKeyExpression: hashedConcurrencyKeyExpr,
-					Limit:               23,
+			PartitionID:     fnID.String(),
+			FunctionID:      &fnID,
+			EnvID:           &wsID,
+			AccountID:       &accID,
+			SystemQueueName: nil,
+			Concurrency: ShadowPartitionConcurrency{
+				SystemConcurrency:   0,
+				AccountConcurrency:  100,
+				FunctionConcurrency: 25,
+				CustomConcurrencyKeys: []CustomConcurrencyLimit{
+					{
+						Scope:               enums.ConcurrencyScopeFn,
+						HashedKeyExpression: hashedConcurrencyKeyExpr,
+						Limit:               23,
+					},
 				},
 			},
 			Throttle:     nil,
@@ -900,19 +908,21 @@ func TestQueueItemShadowPartition(t *testing.T) {
 		fullKey := util.ConcurrencyKey(enums.ConcurrencyScopeFn, fnID, unhashedValue)
 
 		expected := QueueShadowPartition{
-			PartitionID:         fnID.String(),
-			FunctionID:          &fnID,
-			EnvID:               &wsID,
-			AccountID:           &accID,
-			SystemQueueName:     nil,
-			SystemConcurrency:   0,
-			AccountConcurrency:  100,
-			FunctionConcurrency: 25,
-			CustomConcurrencyKeys: []CustomConcurrencyLimit{
-				{
-					Scope:               enums.ConcurrencyScopeFn,
-					HashedKeyExpression: hashedConcurrencyKeyExpr,
-					Limit:               23,
+			PartitionID:     fnID.String(),
+			FunctionID:      &fnID,
+			EnvID:           &wsID,
+			AccountID:       &accID,
+			SystemQueueName: nil,
+			Concurrency: ShadowPartitionConcurrency{
+				SystemConcurrency:   0,
+				AccountConcurrency:  100,
+				FunctionConcurrency: 25,
+				CustomConcurrencyKeys: []CustomConcurrencyLimit{
+					{
+						Scope:               enums.ConcurrencyScopeFn,
+						HashedKeyExpression: hashedConcurrencyKeyExpr,
+						Limit:               23,
+					},
 				},
 			},
 			Throttle: &ShadowPartitionThrottle{
@@ -977,11 +987,13 @@ func TestBacklogIsOutdated(t *testing.T) {
 		keyHash := util.XXHash("event.data.customerID")
 
 		shadowPart := &QueueShadowPartition{
-			CustomConcurrencyKeys: []CustomConcurrencyLimit{
-				{
-					Scope:               enums.ConcurrencyScopeFn,
-					HashedKeyExpression: keyHash,
-					Limit:               10,
+			Concurrency: ShadowPartitionConcurrency{
+				CustomConcurrencyKeys: []CustomConcurrencyLimit{
+					{
+						Scope:               enums.ConcurrencyScopeFn,
+						HashedKeyExpression: keyHash,
+						Limit:               10,
+					},
 				},
 			},
 		}
@@ -1006,11 +1018,13 @@ func TestBacklogIsOutdated(t *testing.T) {
 		keyHash := util.XXHash("event.data.customerID")
 
 		shadowPart := &QueueShadowPartition{
-			CustomConcurrencyKeys: []CustomConcurrencyLimit{
-				{
-					Scope:               enums.ConcurrencyScopeFn,
-					HashedKeyExpression: keyHash,
-					Limit:               10,
+			Concurrency: ShadowPartitionConcurrency{
+				CustomConcurrencyKeys: []CustomConcurrencyLimit{
+					{
+						Scope:               enums.ConcurrencyScopeFn,
+						HashedKeyExpression: keyHash,
+						Limit:               10,
+					},
 				},
 			},
 		}
@@ -1024,11 +1038,13 @@ func TestBacklogIsOutdated(t *testing.T) {
 		keyHashNew := util.XXHash("event.data.orgID")
 
 		shadowPart := &QueueShadowPartition{
-			CustomConcurrencyKeys: []CustomConcurrencyLimit{
-				{
-					Scope:               enums.ConcurrencyScopeFn,
-					HashedKeyExpression: keyHashNew,
-					Limit:               10,
+			Concurrency: ShadowPartitionConcurrency{
+				CustomConcurrencyKeys: []CustomConcurrencyLimit{
+					{
+						Scope:               enums.ConcurrencyScopeFn,
+						HashedKeyExpression: keyHashNew,
+						Limit:               10,
+					},
 				},
 			},
 		}
@@ -1051,7 +1067,9 @@ func TestBacklogIsOutdated(t *testing.T) {
 		keyHashOld := util.XXHash("event.data.customerID")
 
 		shadowPart := &QueueShadowPartition{
-			CustomConcurrencyKeys: nil,
+			Concurrency: ShadowPartitionConcurrency{
+				CustomConcurrencyKeys: nil,
+			},
 		}
 		backlog := &QueueBacklog{
 			ConcurrencyKeys: []BacklogConcurrencyKey{
