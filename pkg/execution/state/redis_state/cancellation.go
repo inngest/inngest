@@ -56,8 +56,13 @@ func (q *queue) cancellationWorker(ctx context.Context, cc chan cancellationChan
 func (q *queue) iterateCancellationPartition(ctx context.Context, until time.Time, cc chan cancellationChanMsg) error {
 	// TODO: implement scanning
 	sequential := false
-	key := ""
-	cancellations, err := q.peekCancellationPartitions(ctx, key, sequential, CancellationPartitionPeekMax, until)
+	cancellations, err := q.peekCancellationPartitions(
+		ctx,
+		q.primaryQueueShard.RedisClient.kg.CancellationPartitionSet(),
+		sequential,
+		CancellationPartitionPeekMax,
+		until,
+	)
 	if err != nil {
 		return fmt.Errorf("error peeking cancellation partitions: %w", err)
 	}
