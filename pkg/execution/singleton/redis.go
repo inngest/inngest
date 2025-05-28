@@ -8,18 +8,18 @@ import (
 )
 
 func New(ctx context.Context, r *redis_state.QueueClient) Singleton {
-	return &rueidisStore{r: r}
+	return &redisStore{r: r}
 }
 
-type rueidisStore struct {
+type redisStore struct {
 	r *redis_state.QueueClient
 }
 
-func (r *rueidisStore) Singleton(ctx context.Context, key string, s inngest.Singleton) (bool, error) {
+func (r *redisStore) Singleton(ctx context.Context, key string, s inngest.Singleton) (bool, error) {
 	return singleton(ctx, r, key, s)
 }
 
-func (r *rueidisStore) Exists(ctx context.Context, key string) (bool, error) {
+func (r *redisStore) Exists(ctx context.Context, key string) (bool, error) {
 	key = r.r.KeyGenerator().SingletonKey(&queue.Singleton{Key: key})
 
 	client := r.r.Client()
