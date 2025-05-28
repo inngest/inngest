@@ -10,4 +10,7 @@ const (
 
 	CancellationTypeEvent
 	CancellationTypeManual
+
+	CancellationTypeRun
+	CancellationTypeBacklog
 )
