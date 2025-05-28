@@ -81,7 +81,7 @@ func (q *queue) peekCancellationPartitions(ctx context.Context, partitionIndexKe
 	p := peeker[QueueCancellation]{
 		q:               q,
 		opName:          "peekCancellation",
-		keyMetadataHash: "", // TODO: replace this key
+		keyMetadataHash: q.primaryQueueShard.RedisClient.kg.CancellationPartitionMeta(),
 		max:             CancellationPartitionPeekMax,
 		maker: func() *QueueCancellation {
 			return &QueueCancellation{}
