@@ -699,22 +699,24 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		Singleton: singletonConfig,
 	}
 	err = e.queue.Enqueue(ctx, item, at, queue.EnqueueOpts{})
-	if err == redis_state.ErrQueueItemExists {
-		return nil, state.ErrIdentifierExists
-	}
-	if err == redis_state.ErrQueueItemSingletonExists {
-		_, delErr := e.smv2.Delete(ctx, sv2.IDFromV1(st.Identifier()))
 
-		if delErr != nil {
+	switch err {
+	case nil:
+		// no-op
+	case redis_state.ErrQueueItemExists:
+		return nil, state.ErrIdentifierExists
+
+	case redis_state.ErrQueueItemSingletonExists:
+		_, err := e.smv2.Delete(ctx, sv2.IDFromV1(st.Identifier()))
+		if err != nil {
 			logger.StdlibLogger(ctx).Error(
 				"error deleting function state",
 				"error", err,
 			)
 		}
-
 		return e.handleFunctionSkipped(ctx, req, metadata, evts, enums.SkipReasonSingleton)
-	}
-	if err != nil {
+
+	default:
 		return nil, fmt.Errorf("error enqueueing source edge '%v': %w", queueKey, err)
 	}
 
