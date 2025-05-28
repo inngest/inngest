@@ -2700,17 +2700,11 @@ func TestQueueRequeue(t *testing.T) {
 			requirePartitionScoreEquals(t, r, pi.FunctionID, next)
 		})
 
-		t.Run("run indexes are not updated on requeue to partition", func(t *testing.T) {
+		t.Run("run indexes are updated on requeue to partition", func(t *testing.T) {
 			kg := q.primaryQueueShard.RedisClient.kg
 
-			runActiveCount, err := r.Get(kg.ActiveCounter("run", runID.String()))
-			require.NoError(t, err)
-
-			require.Equal(t, "1", runActiveCount)
-
-			isMember, err := r.SIsMember(kg.ActivePartitionRunsIndex(fnID.String()), runID.String())
-			require.NoError(t, err)
-			require.True(t, isMember)
+			require.False(t, r.Exists(kg.ActivePartitionRunsIndex(item.FunctionID.String())))
+			require.False(t, r.Exists(kg.ActiveCounter("run", runID.String())))
 		})
 
 		t.Run("It should not update the partition's earliest time, if later", func(t *testing.T) {

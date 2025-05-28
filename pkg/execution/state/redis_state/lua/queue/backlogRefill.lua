@@ -46,6 +46,11 @@ local keyActiveConcurrencyKey1   = KEYS[14]
 local keyActiveConcurrencyKey2   = KEYS[15]
 local keyActiveCompound          = KEYS[16]
 
+local keyActiveRunsAccount                = KEYS[17]
+local keyIndexActivePartitionRuns         = KEYS[18]
+local keyActiveRunsCustomConcurrencyKey1  = KEYS[19]
+local keyActiveRunsCustomConcurrencyKey2  = KEYS[20]
+
 local backlogID     = ARGV[1]
 local partitionID   = ARGV[2]
 local accountID     = ARGV[3]
@@ -136,7 +141,7 @@ local function check_active_capacity(now_ms, keyActiveCounter, limit)
 end
 
 -- Check throttle capacity
-if (constraintCapacity == nil or constraintCapacity > 0) and throttleLimit > 0 then
+if (constraintCapacity == nil or constraintCapacity > 0) and throttlePeriod > 0 and throttleLimit > 0 then
   local remainingThrottleCapacity = gcraCapacity(throttleKey, nowMS, throttlePeriod * 1000, throttleLimit, throttleBurst)
   if constraintCapacity == nil or remainingThrottleCapacity < constraintCapacity then
     constraintCapacity = remainingThrottleCapacity
@@ -255,13 +260,25 @@ if refill > 0 then
         local keyActiveRun = string.format("%s:active:run:%s", keyPrefix, runID)
 
         -- increase number of active items in run
-        redis.call("INCR", keyActiveRun)
+        if redis.call("INCR", keyActiveRun) == 1 then
+          -- if the first item in a run was moved to the ready queue, mark the run as active
+          -- and increment counters
+          if exists_without_ending(keyIndexActivePartitionRuns, ":-") then
+            redis.call("SADD", keyIndexActivePartitionRuns, runID)
+          end
 
-        -- if the newly-added item is earlier than existing items in the run, adjust pointer scores in the function
-        -- see QueueKeyGenerator#ActivePartitionRunsIndex for reference
-        local keyIndexActivePartitionRuns = string.format("%s:active-idx:runs:%s", keyPrefix, partitionID)
+          if exists_without_ending(keyActiveRunsAccount, ":-") then
+            redis.call("INCR", keyActiveRunsAccount)
+          end
 
-        redis.call("SADD", keyIndexActivePartitionRuns, runID)
+          if exists_without_ending(keyActiveRunsCustomConcurrencyKey1, ":-") then
+            redis.call("INCR", keyActiveRunsCustomConcurrencyKey1)
+          end
+
+          if exists_without_ending(keyActiveRunsCustomConcurrencyKey2, ":-") then
+            redis.call("INCR", keyActiveRunsCustomConcurrencyKey2)
+          end
+        end
       end
 
       table.insert(itemUpdateArgs, itemID)
@@ -306,7 +323,7 @@ if refill > 0 then
 end
 
 -- update gcra theoretical arrival time
-if throttleLimit > 0 then
+if throttleLimit > 0 and throttlePeriod > 0 then
   gcraUpdate(throttleKey, nowMS, throttlePeriod * 1000, throttleLimit, throttleBurst, refilled)
 end
 

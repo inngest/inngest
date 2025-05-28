@@ -2273,8 +2273,13 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 		backlog.customKeyActive(kg, 2),
 		backlog.customKeyActive(kg, 1),
 		backlog.activeKey(kg),
-		kg.ActiveRunCounter(item.Data.Identifier.RunID),
-		kg.ActivePartitionRunsIndex(partition.PartitionID),
+
+		// Active run counters
+		kg.RunActiveCounter(item.Data.Identifier.RunID),    // Counter for active items in run
+		partition.accountActiveRunKey(kg),                  // Counter for active runs in account
+		kg.ActivePartitionRunsIndex(partition.PartitionID), // Set index for active runs in partition
+		backlog.customKeyActiveRuns(kg, 1),                 // Counter for active runs with custom concurrency key 1
+		backlog.customKeyActiveRuns(kg, 2),                 // Counter for active runs with custom concurrency key 2
 
 		kg.ThrottleKey(item.Data.Throttle),
 	}
@@ -2501,8 +2506,13 @@ func (q *queue) Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		backlog.customKeyActive(kg, 1),
 		backlog.customKeyActive(kg, 2),
 		backlog.activeKey(kg),
-		kg.ActiveRunCounter(i.Data.Identifier.RunID),
-		kg.ActivePartitionRunsIndex(partition.PartitionID),
+
+		// Active run counters
+		kg.RunActiveCounter(i.Data.Identifier.RunID),       // Counter for active items in run
+		partition.accountActiveRunKey(kg),                  // Counter for active runs in account
+		kg.ActivePartitionRunsIndex(partition.PartitionID), // Set index for active runs in partition
+		backlog.customKeyActiveRuns(kg, 1),                 // Counter for active runs with custom concurrency key 1
+		backlog.customKeyActiveRuns(kg, 2),                 // Counter for active runs with custom concurrency key 2
 
 		kg.Idempotency(i.ID),
 	}
@@ -2616,8 +2626,13 @@ func (q *queue) Requeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		backlog.customKeyActive(kg, 1),
 		backlog.customKeyActive(kg, 2),
 		backlog.activeKey(kg),
-		kg.ActiveRunCounter(i.Data.Identifier.RunID),
-		kg.ActivePartitionRunsIndex(shadowPartition.PartitionID),
+
+		// Active run counters
+		kg.RunActiveCounter(i.Data.Identifier.RunID),             // Counter for active items in run
+		shadowPartition.accountActiveRunKey(kg),                  // Counter for active runs in account
+		kg.ActivePartitionRunsIndex(shadowPartition.PartitionID), // Set index for active runs in partition
+		backlog.customKeyActiveRuns(kg, 1),                       // Counter for active runs with custom concurrency key 1
+		backlog.customKeyActiveRuns(kg, 2),                       // Counter for active runs with custom concurrency key 2
 
 		// key queues v2
 		kg.BacklogSet(backlog.BacklogID),

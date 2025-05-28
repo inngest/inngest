@@ -32,13 +32,17 @@ local keyActivePartition           = KEYS[18]
 local keyActiveConcurrencyKey1     = KEYS[19]
 local keyActiveConcurrencyKey2     = KEYS[20]
 local keyActiveCompound            = KEYS[21]
-local keyActiveRun                 = KEYS[22]
-local keyIndexActivePartitionRuns  = KEYS[23]
 
-local keyIdempotency           = KEYS[24]
+local keyActiveRun                        = KEYS[22]
+local keyActiveRunsAccount                = KEYS[23]
+local keyIndexActivePartitionRuns         = KEYS[24]
+local keyActiveRunsCustomConcurrencyKey1  = KEYS[25]
+local keyActiveRunsCustomConcurrencyKey2  = KEYS[26]
 
-local keyItemIndexA            = KEYS[25]   -- custom item index 1
-local keyItemIndexB            = KEYS[26]  -- custom item index 2
+local keyIdempotency           = KEYS[27]
+
+local keyItemIndexA            = KEYS[28]   -- custom item index 1
+local keyItemIndexB            = KEYS[29]  -- custom item index 2
 
 local queueID        = ARGV[1]
 local partitionID    = ARGV[2]
@@ -173,6 +177,24 @@ if exists_without_ending(keyActiveRun, ":-") then
     -- update set of active function runs
     if exists_without_ending(keyIndexActivePartitionRuns, ":-") then
       redis.call("SREM", keyIndexActivePartitionRuns, runID)
+    end
+
+    if exists_without_ending(keyActiveRunsAccount, ":-") then
+      if redis.call("DECR", keyActiveRunsAccount) <= 0 then
+        redis.call("DEL", keyActiveRunsAccount)
+      end
+    end
+
+    if exists_without_ending(keyActiveRunsCustomConcurrencyKey1, ":-") then
+      if redis.call("DECR", keyActiveRunsCustomConcurrencyKey1) <= 0 then
+        redis.call("DEL", keyActiveRunsCustomConcurrencyKey1)
+      end
+    end
+
+    if exists_without_ending(keyActiveRunsCustomConcurrencyKey2, ":-") then
+      if redis.call("DECR", keyActiveRunsCustomConcurrencyKey2) <= 0 then
+        redis.call("DEL", keyActiveRunsCustomConcurrencyKey2)
+      end
     end
   end
 end

@@ -28,19 +28,23 @@ local keyActivePartition           = KEYS[13]
 local keyActiveConcurrencyKey1     = KEYS[14]
 local keyActiveConcurrencyKey2     = KEYS[15]
 local keyActiveCompound            = KEYS[16]
-local keyActiveRun                 = KEYS[17]
-local keyIndexActivePartitionRuns  = KEYS[18]
 
-local keyBacklogSet                      = KEYS[19]          -- backlog:sorted:<backlogID> - zset
-local keyBacklogMeta                     = KEYS[20]          -- backlogs - hash
-local keyGlobalShadowPartitionSet        = KEYS[21]          -- shadow:sorted
-local keyShadowPartitionSet              = KEYS[22]          -- shadow:sorted:<fnID|queueName> - zset
-local keyShadowPartitionMeta             = KEYS[23]          -- shadows
-local keyGlobalAccountShadowPartitionSet = KEYS[24]
-local keyAccountShadowPartitionSet       = KEYS[25]
+local keyActiveRun                        = KEYS[17]
+local keyActiveRunsAccount                = KEYS[18]
+local keyIndexActivePartitionRuns         = KEYS[19]
+local keyActiveRunsCustomConcurrencyKey1  = KEYS[20]
+local keyActiveRunsCustomConcurrencyKey2  = KEYS[21]
 
-local keyItemIndexA           = KEYS[26]          -- custom item index 1
-local keyItemIndexB           = KEYS[27]          -- custom item index 2
+local keyBacklogSet                      = KEYS[22]          -- backlog:sorted:<backlogID> - zset
+local keyBacklogMeta                     = KEYS[23]          -- backlogs - hash
+local keyGlobalShadowPartitionSet        = KEYS[24]          -- shadow:sorted
+local keyShadowPartitionSet              = KEYS[25]          -- shadow:sorted:<fnID|queueName> - zset
+local keyShadowPartitionMeta             = KEYS[26]          -- shadows
+local keyGlobalAccountShadowPartitionSet = KEYS[27]
+local keyAccountShadowPartitionSet       = KEYS[28]
+
+local keyItemIndexA           = KEYS[29]          -- custom item index 1
+local keyItemIndexB           = KEYS[30]          -- custom item index 2
 
 local queueID             = ARGV[1]           -- id
 local queueItem           = ARGV[2]
@@ -122,48 +126,66 @@ if exists_without_ending(keyInProgressAccount, ":-") then
     redis.call("ZREM", keyInProgressAccount, item.id)
 end
 
-if requeueToBacklog == 1 then
-  -- Decrease active counters and clean up if necessary
-  if redis.call("DECR", keyActivePartition) <= 0 then
-    redis.call("DEL", keyActivePartition)
-  end
+-- Decrease active counters and clean up if necessary
+if redis.call("DECR", keyActivePartition) <= 0 then
+  redis.call("DEL", keyActivePartition)
+end
 
-  if exists_without_ending(keyActiveAccount, ":-") then
-    if redis.call("DECR", keyActiveAccount) <= 0 then
-      redis.call("DEL", keyActiveAccount)
+if exists_without_ending(keyActiveAccount, ":-") then
+  if redis.call("DECR", keyActiveAccount) <= 0 then
+    redis.call("DEL", keyActiveAccount)
+  end
+end
+
+if exists_without_ending(keyActiveCompound, ":-") then
+  if redis.call("DECR", keyActiveCompound) <= 0 then
+    redis.call("DEL", keyActiveCompound)
+  end
+end
+
+if exists_without_ending(keyActiveConcurrencyKey1, ":-") then
+  if redis.call("DECR", keyActiveConcurrencyKey1) <= 0 then
+    redis.call("DEL", keyActiveConcurrencyKey1)
+  end
+end
+
+if exists_without_ending(keyActiveConcurrencyKey2, ":-") then
+  if redis.call("DECR", keyActiveConcurrencyKey2) <= 0 then
+    redis.call("DEL", keyActiveConcurrencyKey2)
+  end
+end
+
+if exists_without_ending(keyActiveRun, ":-") then
+  -- increase number of active items in the run
+  if redis.call("DECR", keyActiveRun) <= 0 then
+    redis.call("DEL", keyActiveRun)
+
+    -- update set of active function runs
+    if exists_without_ending(keyIndexActivePartitionRuns, ":-") then
+      redis.call("SREM", keyIndexActivePartitionRuns, runID)
     end
-  end
 
-  if exists_without_ending(keyActiveCompound, ":-") then
-    if redis.call("DECR", keyActiveCompound) <= 0 then
-      redis.call("DEL", keyActiveCompound)
+    if exists_without_ending(keyActiveRunsAccount, ":-") then
+      if redis.call("DECR", keyActiveRunsAccount) <= 0 then
+        redis.call("DEL", keyActiveRunsAccount)
+      end
     end
-  end
 
-  if exists_without_ending(keyActiveConcurrencyKey1, ":-") then
-    if redis.call("DECR", keyActiveConcurrencyKey1) <= 0 then
-      redis.call("DEL", keyActiveConcurrencyKey1)
+    if exists_without_ending(keyActiveRunsCustomConcurrencyKey1, ":-") then
+      if redis.call("DECR", keyActiveRunsCustomConcurrencyKey1) <= 0 then
+        redis.call("DEL", keyActiveRunsCustomConcurrencyKey1)
+      end
     end
-  end
 
-  if exists_without_ending(keyActiveConcurrencyKey2, ":-") then
-    if redis.call("DECR", keyActiveConcurrencyKey2) <= 0 then
-      redis.call("DEL", keyActiveConcurrencyKey2)
-    end
-  end
-
-  if exists_without_ending(keyActiveRun, ":-") then
-    -- increase number of active items in the run
-    if redis.call("DECR", keyActiveRun) <= 0 then
-      redis.call("DEL", keyActiveRun)
-
-      -- update set of active function runs
-      if exists_without_ending(keyIndexActivePartitionRuns, ":-") then
-        redis.call("SREM", keyIndexActivePartitionRuns, runID)
+    if exists_without_ending(keyActiveRunsCustomConcurrencyKey2, ":-") then
+      if redis.call("DECR", keyActiveRunsCustomConcurrencyKey2) <= 0 then
+        redis.call("DEL", keyActiveRunsCustomConcurrencyKey2)
       end
     end
   end
+end
 
+if requeueToBacklog == 1 then
 	--
 	-- Requeue item to backlog queues again
 	--

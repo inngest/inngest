@@ -160,6 +160,20 @@ func (q QueueShadowPartition) accountActiveKey(kg QueueKeyGenerator) string {
 	return kg.ActiveCounter("account", q.AccountID.String())
 }
 
+func (q QueueShadowPartition) accountActiveRunKey(kg QueueKeyGenerator) string {
+	// Do not track account run concurrency for system queues
+	if q.SystemQueueName != nil {
+		return kg.ActiveRunsCounter("", "")
+	}
+
+	// This should never be unset
+	if q.AccountID == nil {
+		return kg.ActiveRunsCounter("account", "")
+	}
+
+	return kg.ActiveRunsCounter("account", q.AccountID.String())
+}
+
 // BacklogConcurrencyKey represents a custom concurrency key, which can be scoped to the function, environment, or account.
 //
 // Note: BacklogConcurrencyKey is only used for custom concurrency keys with a defined `key`.
@@ -216,6 +230,12 @@ type QueueBacklog struct {
 	SuccessiveCustomConcurrencyConstrained int `json:"sccc,omitzero"`
 }
 
+// ItemBacklog creates a backlog for the given item. The returned backlog may represent current _or_ past
+// configurations, in case the queue item has existed for some time and the function was updated in the meantime.
+//
+// For the sake of consistency and cleanup, ItemBacklog *must* always return the same configuration,
+// over the complete lifecycle of a queue item. To this end, the function exclusively retrieves data
+// from the queue item, has no side effects, and does not make any calls to external data stores.
 func (q *queue) ItemBacklog(ctx context.Context, i osqueue.QueueItem) QueueBacklog {
 	queueName := i.QueueName
 
@@ -512,12 +532,26 @@ func (b QueueBacklog) customKeyActive(kg QueueKeyGenerator, n int) string {
 	return key.activeKey(kg)
 }
 
+// customKeyActiveRuns returns the key to the active runs counter for the given custom concurrency key
+func (b QueueBacklog) customKeyActiveRuns(kg QueueKeyGenerator, n int) string {
+	if n < 0 || n > len(b.ConcurrencyKeys) {
+		return kg.ActiveRunsCounter("", "")
+	}
+
+	key := b.ConcurrencyKeys[n-1]
+	return key.activeRunsKey(kg)
+}
+
 func (b BacklogConcurrencyKey) activeKey(kg QueueKeyGenerator) string {
 	// Concurrency accounting keys are made up of three parts:
 	// - The scope (account, environment, function) to apply the concurrency limit on
 	// - The entity (account ID, envID, or function ID) based on the scope
 	// - The dynamic key value (hashed evaluated expression)
 	return kg.ActiveCounter("custom", b.CanonicalKeyID)
+}
+
+func (b BacklogConcurrencyKey) activeRunsKey(kg QueueKeyGenerator) string {
+	return kg.ActiveRunsCounter("custom", b.CanonicalKeyID)
 }
 
 // activeKey returns backlog compound active key
@@ -623,6 +657,13 @@ func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueSha
 		b.customKeyActive(kg, 1), // custom key 1
 		b.customKeyActive(kg, 2), // custom key 2
 		b.activeKey(kg),          // compound key (active for this backlog)
+
+		// Active run counters
+		// kg.RunActiveCounter(i.Data.Identifier.RunID), -> dynamically constructed in script for each item
+		sp.accountActiveRunKey(kg),                  // Counter for active runs in account
+		kg.ActivePartitionRunsIndex(sp.PartitionID), // Set index for active runs in partition
+		b.customKeyActiveRuns(kg, 1),                // Counter for active runs with custom concurrency key 1
+		b.customKeyActiveRuns(kg, 2),                // Counter for active runs with custom concurrency key 2
 	}
 
 	args, err := StrSlice([]any{

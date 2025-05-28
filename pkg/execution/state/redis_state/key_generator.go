@@ -191,6 +191,8 @@ type QueueKeyGenerator interface {
 	BacklogSet(backlogID string) string
 	// ActiveCounter returns the key to the number of active queue items for a given scope and ID.
 	ActiveCounter(scope string, scopeID string) string
+	// ActiveRunsCounter returns the key to the number of active runs for a given scope and ID.
+	ActiveRunsCounter(scope string, scopeID string) string
 	// BacklogMeta returns the key to the hash storing serialized QueueBacklog objects by ID.
 	BacklogMeta() string
 	// BacklogNormalizationLease returns the key to the lease for the backlog for normalization purposes
@@ -204,8 +206,8 @@ type QueueKeyGenerator interface {
 	// GlobalAccountShadowPartitions returns the key to the ZSET storing pointers (account IDs) for accounts with existing shadow partitions.
 	GlobalAccountShadowPartitions() string
 
-	// ActiveRunCounter returns the key to the number of active queue items for a given run ID.
-	ActiveRunCounter(runID ulid.ULID) string
+	// RunActiveCounter returns the key to the number of active queue items for a given run ID.
+	RunActiveCounter(runID ulid.ULID) string
 	// ActivePartitionRunsIndex returns a key to the index SET for tracking active runs for a given partition.
 	ActivePartitionRunsIndex(partitionID string) string
 
@@ -388,7 +390,17 @@ func isEmptyULID(id ulid.ULID) bool {
 	return id == [16]byte{}
 }
 
-func (u queueKeyGenerator) ActiveRunCounter(runID ulid.ULID) string {
+// ActiveRunsCounter returns the key to the number of active runs for a given backlog.
+func (u queueKeyGenerator) ActiveRunsCounter(scope string, scopeID string) string {
+	if scope == "" || scopeID == "" {
+		// this is a placeholder because passing an empty key into Lua will cause multi-slot key errors
+		return fmt.Sprintf("{%s}:active-runs:-", u.queueDefaultKey)
+	}
+
+	return fmt.Sprintf("{%s}:active-runs:%s:%s", u.queueDefaultKey, scope, scopeID)
+}
+
+func (u queueKeyGenerator) RunActiveCounter(runID ulid.ULID) string {
 	if isEmptyULID(runID) {
 		// this is a placeholder because passing an empty key into Lua will cause multi-slot key errors
 		return u.ActiveCounter("run", "")
