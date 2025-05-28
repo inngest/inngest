@@ -8,11 +8,11 @@ import (
 	"strings"
 )
 
-const _CancellationTypeName = "noneeventmanualrunbacklog"
+const _CancellationTypeName = "runbacklog"
 
-var _CancellationTypeIndex = [...]uint8{0, 4, 9, 15, 18, 25}
+var _CancellationTypeIndex = [...]uint8{0, 3, 10}
 
-const _CancellationTypeLowerName = "noneeventmanualrunbacklog"
+const _CancellationTypeLowerName = "runbacklog"
 
 func (i CancellationType) String() string {
 	if i < 0 || i >= CancellationType(len(_CancellationTypeIndex)-1) {
@@ -25,34 +25,22 @@ func (i CancellationType) String() string {
 // Re-run the stringer command to generate them again.
 func _CancellationTypeNoOp() {
 	var x [1]struct{}
-	_ = x[CancellationTypeNone-(0)]
-	_ = x[CancellationTypeEvent-(1)]
-	_ = x[CancellationTypeManual-(2)]
-	_ = x[CancellationTypeRun-(3)]
-	_ = x[CancellationTypeBacklog-(4)]
+	_ = x[CancellationTypeRun-(0)]
+	_ = x[CancellationTypeBacklog-(1)]
 }
 
-var _CancellationTypeValues = []CancellationType{CancellationTypeNone, CancellationTypeEvent, CancellationTypeManual, CancellationTypeRun, CancellationTypeBacklog}
+var _CancellationTypeValues = []CancellationType{CancellationTypeRun, CancellationTypeBacklog}
 
 var _CancellationTypeNameToValueMap = map[string]CancellationType{
-	_CancellationTypeName[0:4]:        CancellationTypeNone,
-	_CancellationTypeLowerName[0:4]:   CancellationTypeNone,
-	_CancellationTypeName[4:9]:        CancellationTypeEvent,
-	_CancellationTypeLowerName[4:9]:   CancellationTypeEvent,
-	_CancellationTypeName[9:15]:       CancellationTypeManual,
-	_CancellationTypeLowerName[9:15]:  CancellationTypeManual,
-	_CancellationTypeName[15:18]:      CancellationTypeRun,
-	_CancellationTypeLowerName[15:18]: CancellationTypeRun,
-	_CancellationTypeName[18:25]:      CancellationTypeBacklog,
-	_CancellationTypeLowerName[18:25]: CancellationTypeBacklog,
+	_CancellationTypeName[0:3]:       CancellationTypeRun,
+	_CancellationTypeLowerName[0:3]:  CancellationTypeRun,
+	_CancellationTypeName[3:10]:      CancellationTypeBacklog,
+	_CancellationTypeLowerName[3:10]: CancellationTypeBacklog,
 }
 
 var _CancellationTypeNames = []string{
-	_CancellationTypeName[0:4],
-	_CancellationTypeName[4:9],
-	_CancellationTypeName[9:15],
-	_CancellationTypeName[15:18],
-	_CancellationTypeName[18:25],
+	_CancellationTypeName[0:3],
+	_CancellationTypeName[3:10],
 }
 
 // CancellationTypeString retrieves an enum value from the enum constants string name.
