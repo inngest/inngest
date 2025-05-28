@@ -104,7 +104,7 @@ export function Pill({
       {isTruncated ? (
         <Tooltip delayDuration={0}>
           <TooltipTrigger asChild>{pillWrapper}</TooltipTrigger>
-          <TooltipContent sideOffset={5} className="text-muted p-2 text-xs" side="bottom">
+          <TooltipContent sideOffset={5} className="p-2 text-xs" side="bottom">
             {tooltipText}
           </TooltipContent>
         </Tooltip>
