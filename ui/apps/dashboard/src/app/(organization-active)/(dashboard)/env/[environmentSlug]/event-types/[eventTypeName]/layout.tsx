@@ -2,10 +2,13 @@
 
 import { useState } from 'react';
 import { Header } from '@inngest/components/Header/Header';
+import { Pill } from '@inngest/components/Pill/Pill';
 
 import { ActionsMenu } from '@/components/Events/ActionsMenu';
 import ArchiveEventModal from '@/components/Events/ArchiveEventModal';
 import SendEventButton from '@/components/Events/SendEventButton';
+import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
+import { pathCreator } from '@/utils/urls';
 
 type EventLayoutProps = {
   children: React.ReactNode;
@@ -19,22 +22,22 @@ export default function EventLayout({
   children,
   params: { environmentSlug: envSlug, eventTypeName: eventSlug },
 }: EventLayoutProps) {
-  const eventTypesPath = `/env/${envSlug}/event-types`;
   const eventsPath = `/env/${envSlug}/event-types/${eventSlug}/events`;
-  const eventPath = `/env/${envSlug}/event-types/${eventSlug}`;
   const eventName = decodeURIComponent(eventSlug);
   const [showArchive, setShowArchive] = useState(false);
+
+  const isNewEventsEnabled = useBooleanFlag('events-pages');
 
   return (
     <>
       <Header
         breadcrumb={[
-          { text: 'Event types', href: eventTypesPath },
-          { text: eventName, href: eventPath },
+          { text: 'Event types', href: pathCreator.eventTypes({ envSlug }) },
+          { text: eventName, href: pathCreator.eventType({ envSlug, eventName }) },
         ]}
         tabs={[
           {
-            href: eventPath,
+            href: pathCreator.eventType({ envSlug, eventName }),
             children: 'Dashboard',
             exactRouteMatch: true,
           },
@@ -42,6 +45,19 @@ export default function EventLayout({
             href: eventsPath,
             children: 'Events',
           },
+          ...(isNewEventsEnabled.isReady && isNewEventsEnabled.value
+            ? [
+                {
+                  children: (
+                    <div className="m-0 flex flex-row items-center justify-start space-x-1 p-0">
+                      <div>Events</div>
+                      <Pill kind="primary">Beta</Pill>
+                    </div>
+                  ),
+                  href: pathCreator.eventTypeEvents({ envSlug, eventName }),
+                },
+              ]
+            : []),
         ]}
         action={
           <div className="flex flex-row items-center justify-end gap-x-1">

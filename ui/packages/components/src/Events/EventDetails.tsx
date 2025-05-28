@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import NextLink from 'next/link';
-import { Skeleton } from '@inngest/components/Skeleton';
 import { ErrorCard } from '@inngest/components/Error/ErrorCard';
+import { Skeleton } from '@inngest/components/Skeleton';
 import { Time } from '@inngest/components/Time';
 import { usePrettyJson } from '@inngest/components/hooks/usePrettyJson';
 import { type Event } from '@inngest/components/types/event';
@@ -167,7 +167,7 @@ export function EventDetails({
           <div ref={eventInfoRef} className="flex flex-col">
             <div className="mb-3 flex h-8 items-center justify-between gap-1 px-4">
               <div className="flex items-center gap-2">
-                <p className="text-muted text-sm">{eventName}</p>
+                <p className="text-basis text-base">{eventName}</p>
                 {!standalone && (
                   <Link
                     size="medium"
