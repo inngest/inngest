@@ -201,6 +201,12 @@ func (q *queue) Run(ctx context.Context, f osqueue.RunFunc) error {
 		})
 	}
 
+	if q.runMode.Cancellation {
+		eg.Go(func() error {
+			return q.cancellationScan(ctx)
+		})
+	}
+
 	return eg.Wait()
 }
 
