@@ -53,8 +53,8 @@ function createComponents(
 
 //
 // brute force find or create a customer in plain to work around
-// upsert issues in the API when user's change or re-use email addresses
-// across org
+// upsert issues in the API when users change or re-use email addresses
+// across orgs
 export const getCustomerId = async (email: string, name?: string) => {
   const existing = await client.getCustomerByEmail({
     email,
