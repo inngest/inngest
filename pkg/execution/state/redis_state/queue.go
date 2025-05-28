@@ -124,6 +124,7 @@ const (
 	defaultBacklogNormalizeLimit       = int64(500)
 
 	defaultPollTick       = 10 * time.Millisecond
+	defaultCancelPollTick = 500 * time.Millisecond
 	defaultIdempotencyTTL = 12 * time.Hour
 	defaultConcurrency    = 1000 // TODO: add function to override.
 
@@ -298,6 +299,12 @@ func WithPeekEWMALength(l int) QueueOpt {
 func WithPollTick(t time.Duration) QueueOpt {
 	return func(q *queue) {
 		q.pollTick = t
+	}
+}
+
+func WithCancelPollTick(t time.Duration) QueueOpt {
+	return func(q *queue) {
+		q.cancelPollTick = t
 	}
 }
 
@@ -601,6 +608,7 @@ func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 			AccountShadowPartitionWeight:      85,
 			NormalizePartition:                true,
 			ShadowContinuationSkipProbability: consts.QueueContinuationSkipProbability,
+			Cancellation:                      true,
 		},
 		numWorkers:                     defaultNumWorkers,
 		numShadowWorkers:               defaultNumShadowWorkers,
@@ -610,6 +618,7 @@ func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 		scavengerLeaseLock:             &sync.RWMutex{},
 		instrumentationLeaseLock:       &sync.RWMutex{},
 		pollTick:                       defaultPollTick,
+		cancelPollTick:                 defaultCancelPollTick,
 		idempotencyTTL:                 defaultIdempotencyTTL,
 		queueKindMapping:               make(map[string]string),
 		log:                            logger.StdlibLogger(ctx),
@@ -733,7 +742,8 @@ type queue struct {
 	// remain idempotent.
 	idempotencyTTLFunc func(context.Context, osqueue.QueueItem) time.Duration
 	// pollTick is the interval between each scan for jobs.
-	pollTick time.Duration
+	pollTick       time.Duration
+	cancelPollTick time.Duration
 	// quit is a channel that any method can send on to trigger termination
 	// of the Run loop.  This typically accepts an error, but a nil error
 	// will still quit the runner.
@@ -878,6 +888,9 @@ type QueueRunMode struct {
 
 	// NormalizePartition enables the processing of partitions for normalization
 	NormalizePartition bool
+
+	// Cancellation enables the a scan loop for handling item cancellations
+	Cancellation bool
 }
 
 // continuation represents a partition continuation, forcung the queue to continue working
