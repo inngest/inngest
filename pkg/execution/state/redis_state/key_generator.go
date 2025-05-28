@@ -203,6 +203,10 @@ type QueueKeyGenerator interface {
 	AccountShadowPartitions(accountID uuid.UUID) string
 	// GlobalAccountShadowPartitions returns the key to the ZSET storing pointers (account IDs) for accounts with existing shadow partitions.
 	GlobalAccountShadowPartitions() string
+	// CancellationPartitionSet returns the key to the global ZSET storing cancellation partition pointers
+	CancellationPartitionSet() string
+	// CancellationPartitionMeta returns the key to the hash storing serialized QueueCancellation objects by ID
+	CancellationPartitionMeta() string
 
 	// ActiveRunCounter returns the key to the number of active queue items for a given run ID.
 	ActiveRunCounter(runID ulid.ULID) string
@@ -476,6 +480,14 @@ func (u queueKeyGenerator) FnMetadata(fnID uuid.UUID) string {
 		return fmt.Sprintf("{%s}:fnMeta:-", u.queueDefaultKey)
 	}
 	return fmt.Sprintf("{%s}:fnMeta:%s", u.queueDefaultKey, fnID)
+}
+
+func (u queueKeyGenerator) CancellationPartitionSet() string {
+	return fmt.Sprintf("{%s}:cancellation:sorted", u.queueDefaultKey)
+}
+
+func (u queueKeyGenerator) CancellationPartitionMeta() string {
+	return fmt.Sprintf("{%s}:cancellation", u.queueDefaultKey)
 }
 
 type BatchKeyGenerator interface {
