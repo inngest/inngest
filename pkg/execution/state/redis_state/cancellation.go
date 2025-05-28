@@ -32,7 +32,6 @@ func (q *queue) cancellationScan(ctx context.Context) error {
 			until := q.clock.Now().Add(2 * time.Second)
 			if err := q.iterateCancellationPartition(ctx, until, cc); err != nil {
 				return fmt.Errorf("error scanning cancellation partition")
-				// TODO: scan cancellation partitions
 			}
 		}
 	}
@@ -54,7 +53,7 @@ func (q *queue) cancellationWorker(ctx context.Context, cc chan cancellationChan
 }
 
 func (q *queue) iterateCancellationPartition(ctx context.Context, until time.Time, cc chan cancellationChanMsg) error {
-	// TODO: implement iteration
+	// TODO: implement scanning
 	return nil
 }
 
@@ -68,7 +67,7 @@ func (q *queue) processCancellation(ctx context.Context, qc *QueueCancellation) 
 	default:
 	}
 
-	return fmt.Errorf("not implemented")
+	return nil
 }
 
 // QueueCancellation represents an object that needs to be cancelled by the queue
