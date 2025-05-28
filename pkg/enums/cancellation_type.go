@@ -1,4 +1,4 @@
-//go:generate go run github.com/dmarkham/enumer -trimprefix=CancellationType -type=CancellationType -json -text
+//go:generate go run github.com/dmarkham/enumer -trimprefix=CancellationType -type=CancellationType -json -text -transform=snake
 
 package enums
 
