@@ -17,6 +17,7 @@ import (
 	"github.com/gosimple/slug"
 	multierror "github.com/hashicorp/go-multierror"
 	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/expressions"
 	"github.com/inngest/inngest/pkg/syscode"
 	"github.com/xhit/go-str2duration/v2"
@@ -514,5 +515,5 @@ type Singleton struct {
 
 	// Mode determines how to handle a new run when another singleton instance is already active.
 	// Use Ignore to skip the new run, or Cancel to stop the current instance and run the new one.
-	//Mode enums.SingletonMode `json:"mode"`
+	Mode enums.SingletonMode `json:"mode"`
 }

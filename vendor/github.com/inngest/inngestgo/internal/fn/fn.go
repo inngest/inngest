@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/inngest/inngest/pkg/inngest"
+	"github.com/inngest/inngest/pkg/enums"
 )
 
 // ServableFunction defines a function which can be called by a handler's Serve method.
@@ -194,5 +195,5 @@ type Singleton struct {
 
 	// Mode determines how to handle a new run when another singleton instance is already active.
 	// Use Ignore to skip the new run, or Cancel to stop the current instance and run the new one.
-	//Mode enums.SingletonMode `json:"mode"`
+	Mode enums.SingletonMode `json:"mode"`
 }

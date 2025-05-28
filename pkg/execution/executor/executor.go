@@ -529,10 +529,11 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	//
 	// Create singleton information and try to handle it prior to creating state.
 	//
-	var singletonConfig *queue.Singleton = nil
+	var singletonConfig *queue.Singleton
 	data := req.Events[0].GetEvent().Map()
 
-	if req.Function.Singleton != nil {
+	// Ignores Cancel mode for now
+	if req.Function.Singleton != nil && req.Function.Singleton.Mode == enums.SingletonModeIgnore {
 		singletonKey, err := singleton.SingletonKey(ctx, req.Function.ID, *req.Function.Singleton, data)
 		switch {
 		case err == nil:

@@ -233,7 +233,7 @@ type Singleton struct {
 
 	// Mode defines the behavior when a new singleton run is queued while another is active.
 	// It determines whether to ignore the new run or cancel the current one and replace it.
-	//Mode enums.SingletonMode `json:"m"`
+	Mode enums.SingletonMode `json:"m"`
 }
 
 // SpanID generates a spanID based on the combination the jobID and attempt
