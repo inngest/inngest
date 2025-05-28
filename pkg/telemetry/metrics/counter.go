@@ -373,6 +373,15 @@ func IncrBacklogNormalizedItemCounter(ctx context.Context, value int64, opts Cou
 	})
 }
 
+func IncrCancellationScannedCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "cancellation_scanned_total",
+		Description: "The total number of cancellations that were scanned for processing",
+		Tags:        opts.Tags,
+	})
+}
+
 // NOTE: this is a metric that's mainly used for observing migrations to key queues
 // it's not needed once the migration completes
 func IncrBacklogRequeuedCounter(ctx context.Context, opts CounterOpt) {

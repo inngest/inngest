@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 )
@@ -87,7 +88,7 @@ func (q *queue) iterateCancellationPartition(ctx context.Context, until time.Tim
 			return fmt.Errorf("error leasing cancellation: %w", err)
 		}
 
-		// TODO: metrics - scanned counter
+		metrics.IncrCancellationScannedCounter(ctx, metrics.CounterOpt{PkgName: pkgName})
 
 		cc <- cancellationChanMsg{
 			item: qc,
