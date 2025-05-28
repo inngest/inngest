@@ -533,7 +533,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	data := req.Events[0].GetEvent().Map()
 
 	// Ignores Cancel mode for now
-	if req.Function.Singleton != nil && req.Function.Singleton.Mode == enums.SingletonModeIgnore {
+	if req.Function.Singleton != nil && req.Function.Singleton.Mode == enums.SingletonModeSkip {
 		singletonKey, err := singleton.SingletonKey(ctx, req.Function.ID, *req.Function.Singleton, data)
 		switch {
 		case err == nil:

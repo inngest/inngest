@@ -232,7 +232,7 @@ type Singleton struct {
 	Key string `json:"k"`
 
 	// Mode defines the behavior when a new singleton run is queued while another is active.
-	// It determines whether to ignore the new run or cancel the current one and replace it.
+	// It determines whether to skip the new run or cancel the current one and replace it.
 	Mode enums.SingletonMode `json:"m"`
 }
 

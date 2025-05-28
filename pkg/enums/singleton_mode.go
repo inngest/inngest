@@ -5,8 +5,8 @@ package enums
 type SingletonMode int
 
 const (
-	// SingletonModeIgnore skips the new run if another singleton instance is already in progress.
-	SingletonModeIgnore SingletonMode = iota
+	// SingletonModeSkip skips the new run if another singleton instance is already in progress.
+	SingletonModeSkip SingletonMode = iota
 
 	// SingletonModeCancel cancels the currently running singleton instance and starts the new one.
 	SingletonModeCancel

@@ -61,7 +61,7 @@ type FunctionOpts struct {
 	BatchEvents *inngest.EventBatchConfig
 	// Singleton represents a mechanism to ensure that only one instance of a function
 	// runs at a time for a given key. Additional invocations with the same key will either
-	// be ignored or cause the current instance to be canceled and replaced, depending on
+	// be skipped or cause the current instance to be canceled and replaced, depending on
 	// the specified mode.
 	Singleton *Singleton
 }
@@ -194,6 +194,6 @@ type Singleton struct {
 	Key *string `json:"key,omitempty"`
 
 	// Mode determines how to handle a new run when another singleton instance is already active.
-	// Use Ignore to skip the new run, or Cancel to stop the current instance and run the new one.
+	// Use `skip` to skip the new run, or `cancel` to stop the current instance and run the new one.
 	Mode enums.SingletonMode `json:"mode"`
 }

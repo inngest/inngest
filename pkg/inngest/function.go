@@ -90,7 +90,7 @@ type Function struct {
 
 	// Singleton ensures that only one instance of the function runs at a time for a given key.
 	// If another invocation is received while an instance is running, the behavior depends on
-	// the onConflict value: "ignore" will drop the new invocation, "replace" will cancel the
+	// the mode property: `skip` will drop the new invocation, `cancel` will cancel the
 	// running instance and start the new one.
 	Singleton *Singleton `json:"singleton,omitempty"`
 
@@ -514,6 +514,6 @@ type Singleton struct {
 	Key *string `json:"key,omitempty"`
 
 	// Mode determines how to handle a new run when another singleton instance is already active.
-	// Use Ignore to skip the new run, or Cancel to stop the current instance and run the new one.
+	// Use `skip` to skip the new run, or `cancel` to stop the current instance and run the new one.
 	Mode enums.SingletonMode `json:"mode"`
 }
