@@ -594,6 +594,14 @@ func WithNormalizeRefreshItemThrottle(fn NormalizeRefreshItemThrottleFn) QueueOp
 	}
 }
 
+type CancellationHandler func(ctx context.Context, qc *QueueCancellation) error
+
+func WithCancellationHandler(c CancellationHandler) QueueOpt {
+	return func(q *queue) {
+		q.canceller = c
+	}
+}
+
 func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 	ctx := context.Background()
 
@@ -699,6 +707,7 @@ func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 		normalizeRefreshItemThrottle: func(ctx context.Context, item *osqueue.QueueItem, existingThrottle *osqueue.Throttle, shadowPartition *QueueShadowPartition) (*osqueue.Throttle, error) {
 			return existingThrottle, nil
 		},
+		canceller: func(ctx context.Context, qc *QueueCancellation) error { return nil },
 	}
 
 	// default to using primary queue client for shard selection
@@ -865,6 +874,8 @@ type queue struct {
 
 	normalizeRefreshItemCustomConcurrencyKeys NormalizeRefreshItemCustomConcurrencyKeysFn
 	normalizeRefreshItemThrottle              NormalizeRefreshItemThrottleFn
+
+	cancellationHandler CancellationHandler
 }
 
 type QueueRunMode struct {

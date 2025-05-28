@@ -24,12 +24,12 @@ const (
 )
 
 type ID struct {
-	RunID      ulid.ULID
-	FunctionID uuid.UUID
+	RunID      ulid.ULID `json:"runID"`
+	FunctionID uuid.UUID `json:"fnID"`
 	// Tenant provides tennat information for the run ID.  This is embedded into
 	// the identifier as additional fields that may be used in various
 	// implementations, but should not be used to reference specific run IDs.
-	Tenant Tenant
+	Tenant Tenant `json:"tenant"`
 }
 
 // IDFromV1 returns v2.ID from a statev1.Identifier
@@ -110,9 +110,9 @@ func (m Metadata) IdempotencyKey() string {
 
 // Tenant represents tenant information for the run.
 type Tenant struct {
-	AppID     uuid.UUID
-	EnvID     uuid.UUID
-	AccountID uuid.UUID
+	AppID     uuid.UUID `json:"appID"`
+	EnvID     uuid.UUID `json:"envID"`
+	AccountID uuid.UUID `json:"acctID"`
 }
 
 func InitConfig(c *Config) *Config {

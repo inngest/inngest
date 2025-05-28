@@ -202,16 +202,16 @@ type ScheduleRequestFromStep struct {
 // CancelRequest stores information about the incoming cancellation request within
 // history.
 type CancelRequest struct {
-	EventID        *ulid.ULID
-	Expression     *string
-	UserID         *uuid.UUID
-	CancellationID *ulid.ULID
+	EventID        *ulid.ULID `json:"evtID,omitempty"`
+	Expression     *string    `json:"expr,omitempty"`
+	UserID         *uuid.UUID `json:"userID,omitempty"`
+	CancellationID *ulid.ULID `json:"cancellationID,omitempty"`
 
 	// ForceLifecycleHook is used to force the OnFunctionCancelled lifecycle
 	// hook to run even if the function is already finalized. This is useful
 	// when a user wants to cancel a "false stuck" function run (i.e. it isn't
 	// in the state store but the history store thinks it's running)
-	ForceLifecycleHook bool
+	ForceLifecycleHook bool `json:"forceLifecycleHook"`
 }
 
 type ResumeRequest struct {

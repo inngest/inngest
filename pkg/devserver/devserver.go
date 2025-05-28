@@ -59,6 +59,7 @@ import (
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/inngest/inngest/pkg/testapi"
 	"github.com/inngest/inngest/pkg/util/awsgateway"
+	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 	"go.opentelemetry.io/otel/propagation"
 	"golang.org/x/sync/errgroup"
@@ -303,6 +304,17 @@ func start(ctx context.Context, opts StartOpts) error {
 			return enableKeyQueues
 		}),
 		redis_state.WithBacklogRefillLimit(10),
+		redis_state.WithCancellationHandler(func(ctx context.Context, qc *redis_state.QueueCancellation) error {
+			switch qc.Type {
+			case enums.CancellationTypeRun:
+				// TODO:
+				// - delete state
+				// - let queue clean up queue
+			default:
+				// no-op, executor only know what to do with runs and nothing else
+			}
+			return nil
+		}),
 	}
 	if opts.RetryInterval > 0 {
 		queueOpts = append(queueOpts, redis_state.WithBackoffFunc(

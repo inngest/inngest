@@ -162,9 +162,8 @@ func (q *queue) processCancellation(ctx context.Context, qc *QueueCancellation) 
 
 	// TODO: implement handling of cancellation
 	switch qc.Type {
-	case enums.CancellationTypeBacklog:
 	case enums.CancellationTypeRun:
-		// no-op, don't know what to do with these options
+	case enums.CancellationTypeBacklog:
 	default:
 	}
 
@@ -232,18 +231,20 @@ func (q *queue) extendCancellationLease(ctx context.Context, now time.Time, qc *
 // QueueCancellation represents an object that needs to be cancelled by the queue
 type QueueCancellation struct {
 	// CancelID is the identifier for this cancellation job
-	CancelID string
+	CancelID string `json:"id"`
 	// TargetID represents the identifier of the target that needs to be cancelled.
 	// This should be used with coordination of the `Type` attribute.
 	//
 	// e.g. Types
 	// - run -> runID
 	// - backlog -> backlogID
-	TargetID string `json:"id"`
+	TargetID string `json:"tid"`
 	// Type indicates what type of cancellation is this for
 	Type enums.CancellationType `json:"t"`
 	// ReferenceID is the reference or source that initiated this cancellation
-	ReferenceID string `json:"ref"`
+	ReferenceID string `json:"ref,omitempty"`
 	// Cause shows how this cancellation was initiated
 	Cause enums.CancellationCause `json:"cause"`
+	// Payload holds additional metadata related to the queue cancellation
+	Payload any `json:"payload"`
 }
