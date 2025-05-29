@@ -96,3 +96,7 @@ func NewJWT(ctx context.Context, secret []byte, accountID, envID uuid.UUID, topi
 	}
 	return signed, nil
 }
+
+func NewPublishJWT(ctx context.Context, secret []byte, accountID, envID uuid.UUID) (string, error) {
+	panic("not implemented")
+}

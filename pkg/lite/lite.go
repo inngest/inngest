@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"net/url"
 	"os"
 	"time"
@@ -41,7 +40,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/batch"
 	"github.com/inngest/inngest/pkg/execution/debounce"
 	"github.com/inngest/inngest/pkg/execution/driver"
-	"github.com/inngest/inngest/pkg/execution/driver/httpdriver"
+	"github.com/inngest/inngest/pkg/execution/exechttp"
 	"github.com/inngest/inngest/pkg/execution/executor"
 	"github.com/inngest/inngest/pkg/execution/history"
 	"github.com/inngest/inngest/pkg/execution/queue"
@@ -289,12 +288,12 @@ func start(ctx context.Context, opts StartOpts) error {
 		return fmt.Errorf("failed to create connect pubsub connector: %w", err)
 	}
 
-	httpClient := httpdriver.Client(httpdriver.SecureDialerOpts{
+	httpClient := exechttp.Client(exechttp.SecureDialerOpts{
 		AllowHostDocker: true, // In self-hosted mode, this is OK
 		AllowPrivate:    true, // In self-hosted mode, this is OK
 		AllowNAT64:      true, // In self-hosted mode, this is OK
 	})
-	httpClient.(*http.Client).Transport = awsgateway.NewTransformTripper(httpClient.(*http.Client).Transport)
+	httpClient.Client.Transport = awsgateway.NewTransformTripper(httpClient.Client.Transport)
 
 	drivers := []driver.Driver{}
 	for _, driverConfig := range opts.Config.Execution.Drivers {

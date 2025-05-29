@@ -24,7 +24,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/cancellation"
 	"github.com/inngest/inngest/pkg/execution/debounce"
 	"github.com/inngest/inngest/pkg/execution/driver"
-	"github.com/inngest/inngest/pkg/execution/driver/httpdriver"
+	"github.com/inngest/inngest/pkg/execution/exechttp"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/realtime"
 	"github.com/inngest/inngest/pkg/execution/state"
@@ -101,7 +101,7 @@ func NewExecutor(opts ...ExecutorOpt) (execution.Executor, error) {
 
 	if m.httpClient == nil {
 		// Default to the secure client.
-		m.httpClient = httpdriver.Client(httpdriver.SecureDialerOpts{})
+		m.httpClient = exechttp.Client(exechttp.SecureDialerOpts{})
 	}
 
 	return m, nil
@@ -110,7 +110,7 @@ func NewExecutor(opts ...ExecutorOpt) (execution.Executor, error) {
 // ExecutorOpt modifies the built-in executor on creation.
 type ExecutorOpt func(m execution.Executor) error
 
-func WithHTTPClient(c util.HTTPDoer) ExecutorOpt {
+func WithHTTPClient(c exechttp.RequestExecutor) ExecutorOpt {
 	return func(e execution.Executor) error {
 		e.(*executor).httpClient = c
 		return nil
@@ -284,11 +284,27 @@ func WithTraceReader(m cqrs.TraceReader) ExecutorOpt {
 	}
 }
 
+// WithRealtimePublisher configures a new publisher in the executor.  This publishes
+// directly to the backing implementaiton.
 func WithRealtimePublisher(b realtime.Publisher) ExecutorOpt {
 	return func(e execution.Executor) error {
 		e.(*executor).rtpub = b
 		return nil
 	}
+}
+
+// WithRealtimeAPIPublisher adds JWT configuration which allows publishing of data to the
+// realtime API, without connecting to the backing realtime service directly.
+func WithRealtimeConfig(config ExecutorRealtimeConfig) ExecutorOpt {
+	return func(e execution.Executor) error {
+		e.(*executor).rtconfig = config
+		return nil
+	}
+}
+
+type ExecutorRealtimeConfig struct {
+	Secret     []byte
+	PublishURL string
 }
 
 // executor represents a built-in executor for running workflows.
@@ -312,13 +328,14 @@ type executor struct {
 	invokeFailHandler   execution.InvokeFailHandler
 	handleSendingEvent  execution.HandleSendingEvent
 	cancellationChecker cancellation.Checker
-	httpClient          util.HTTPDoer
+	httpClient          exechttp.RequestExecutor
 
 	lifecycles []execution.LifecycleListener
 
 	// rtpub represents teh realtime publisher used to broadcast notifications
 	// on run execution.
-	rtpub realtime.Publisher
+	rtpub    realtime.Publisher
+	rtconfig ExecutorRealtimeConfig
 
 	// steplimit finds step limits for a given run.
 	steplimit func(sv2.ID) int
@@ -686,7 +703,7 @@ type runInstance struct {
 	item       queue.Item
 	edge       inngest.Edge
 	resp       *state.DriverResponse
-	httpClient util.HTTPDoer
+	httpClient exechttp.RequestExecutor
 	stackIndex int
 }
 
@@ -2280,14 +2297,14 @@ func (e *executor) handleGeneratorGateway(ctx context.Context, i *runInstance, g
 		return fmt.Errorf("error parsing gateway step: %w", err)
 	}
 
-	req, err := input.HTTPRequest()
+	req, err := input.SerializableRequest()
 	if err != nil {
 		return fmt.Errorf("error creating gateway request: %w", err)
 	}
 
 	var output []byte
 
-	hr, body, _, err := httpdriver.ExecuteRequest(ctx, i.httpClient, req)
+	resp, err := i.httpClient.DoRequest(ctx, req)
 	if err != nil {
 		// Request failed entirely. Create an error.
 		userLandErr := state.UserError{
@@ -2300,7 +2317,7 @@ func (e *executor) handleGeneratorGateway(ctx context.Context, i *runInstance, g
 			i.resp.SetError(err)
 
 			for _, e := range e.lifecycles {
-				go e.OnStepGatewayRequestFinished(context.WithoutCancel(ctx), i.md, i.item, i.edge, gen, hr, &userLandErr)
+				go e.OnStepGatewayRequestFinished(context.WithoutCancel(ctx), i.md, i.item, i.edge, gen, nil, &userLandErr)
 			}
 
 			// This will retry, as it hits the queue directly.
@@ -2313,20 +2330,20 @@ func (e *executor) handleGeneratorGateway(ctx context.Context, i *runInstance, g
 		})
 
 		for _, e := range e.lifecycles {
-			go e.OnStepGatewayRequestFinished(context.WithoutCancel(ctx), i.md, i.item, i.edge, gen, hr, &userLandErr)
+			go e.OnStepGatewayRequestFinished(context.WithoutCancel(ctx), i.md, i.item, i.edge, gen, nil, &userLandErr)
 		}
 	} else {
 		headers := make(map[string]string)
-		for k, v := range hr.Header {
+		for k, v := range resp.Header {
 			headers[k] = strings.Join(v, ",")
 		}
 
 		output, err = json.Marshal(map[string]gateway.Response{
 			execution.StateDataKey: {
-				URL:        req.URL.String(),
+				URL:        req.URL,
 				Headers:    headers,
-				Body:       string(body),
-				StatusCode: hr.StatusCode,
+				Body:       string(resp.Body),
+				StatusCode: resp.StatusCode,
 			},
 		})
 		if err != nil {
@@ -2338,7 +2355,7 @@ func (e *executor) handleGeneratorGateway(ctx context.Context, i *runInstance, g
 			// OnStepFinished handles step success and step errors/failures.  It is
 			// currently the responsibility of the lifecycle manager to handle the differing
 			// step statuses when a step finishes.
-			go e.OnStepGatewayRequestFinished(context.WithoutCancel(ctx), i.md, i.item, i.edge, gen, hr, nil)
+			go e.OnStepGatewayRequestFinished(context.WithoutCancel(ctx), i.md, i.item, i.edge, gen, nil, nil)
 		}
 	}
 
@@ -2398,43 +2415,66 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, i *runInstance,
 	// then generate an aigateway.ParsedInferenceRequest to store in the history store.
 	// This happens automatically within trace_lifecycle.go.
 
-	req, err := input.HTTPRequest()
+	req, err := input.SerializableRequest()
 	if err != nil {
 		return fmt.Errorf("error creating ai gateway request: %w", err)
 	}
 
-	hr, output, _, err := httpdriver.ExecuteRequest(ctx, i.httpClient, req)
-	failure := err != nil || (hr != nil && hr.StatusCode > 299)
+	// If the opcode contains streaming data, we should fetch a JWT with perms
+	// for us to stream then add streaming data to the serializable request.
+	//
+	// Without this, publishing will not work.
+	if input.Publish.Channel != "" && e.rtconfig.PublishURL != "" {
+		token, err := realtime.NewPublishJWT(
+			ctx,
+			e.rtconfig.Secret,
+			i.item.Identifier.AccountID,
+			i.item.WorkspaceID,
+		)
+		if err != nil {
+			// XXX: We should be able to attach warnings to runs;  in this case, we couldn't create
+			// a JWT to publish data.  However, the step should still execute without realtime publishing,
+			// and the UI should show a warning for this run.
+			_ = err
+		}
+		if token != "" {
+			req.Publish = exechttp.RequestPublishOpts{
+				Channel:    input.Publish.Channel,
+				Topic:      input.Publish.Topic,
+				Token:      token,
+				RequestID:  gen.ID,
+				PublishURL: e.rtconfig.PublishURL,
+			}
+		}
+	}
+
+	resp, err := i.httpClient.DoRequest(ctx, req)
+	failure := err != nil || (resp != nil && resp.StatusCode > 299)
 
 	// Update the driver response appropriately for the trace lifecycles.
-	if hr != nil {
-		i.resp.StatusCode = hr.StatusCode
-		hr.ContentLength = int64(len(output))
+	if resp == nil {
+		resp = &exechttp.Response{}
 	}
+
+	i.resp.StatusCode = resp.StatusCode
 
 	// Handle errors individually, here.
 	if failure {
-		if len(output) == 0 {
+		if len(resp.Body) == 0 {
 			// Add some output for the response.
-			output = []byte(`{"error":"Error making AI request"}`)
+			resp.Body = []byte(`{"error":"Error making AI request"}`)
 		}
 
 		if err == nil {
-			if hr != nil {
-				err = fmt.Errorf("unsuccessful status code: %d", hr.StatusCode)
-			} else {
-				// TODO: We should write a better error. This is a quick fix to
-				// stop panics.
-				err = errors.New("missing response")
-			}
+			err = fmt.Errorf("unsuccessful status code: %d", resp.StatusCode)
 		}
 
 		// Ensure the opcode is treated as an error when calling OnStepFinish.
 		userLandErr := state.UserError{
 			Name:    "AIGatewayError",
 			Message: fmt.Sprintf("Error making AI request: %s", err),
-			Data:    output, // For golang's multiple returns.
-			Stack:   string(output),
+			Data:    resp.Body, // For golang's multiple returns.
+			Stack:   string(resp.Body),
 		}
 		i.resp.UpdateOpcodeError(&gen, userLandErr)
 
@@ -2449,7 +2489,7 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, i *runInstance,
 				// OnStepFinished handles step success and step errors/failures.  It is
 				// currently the responsibility of the lifecycle manager to handle the differing
 				// step statuses when a step finishes.
-				go e.OnStepGatewayRequestFinished(context.WithoutCancel(ctx), i.md, i.item, i.edge, gen, hr, &userLandErr)
+				go e.OnStepGatewayRequestFinished(context.WithoutCancel(ctx), i.md, i.item, i.edge, gen, nil, &userLandErr)
 			}
 
 			// This will retry, as it hits the queue directly.
@@ -2462,7 +2502,7 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, i *runInstance,
 		// The actual error should be wrapped with an "error" so that it respects the
 		// error wrapping of step errors.
 		userLandErrByt, _ := json.Marshal(userLandErr)
-		output, _ = json.Marshal(map[string]json.RawMessage{
+		resp.Body, _ = json.Marshal(map[string]json.RawMessage{
 			execution.StateErrorKey: userLandErrByt,
 		})
 
@@ -2470,7 +2510,7 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, i *runInstance,
 			// OnStepFinished handles step success and step errors/failures.  It is
 			// currently the responsibility of the lifecycle manager to handle the differing
 			// step statuses when a step finishes.
-			go e.OnStepGatewayRequestFinished(context.WithoutCancel(ctx), i.md, i.item, i.edge, gen, hr, &userLandErr)
+			go e.OnStepGatewayRequestFinished(context.WithoutCancel(ctx), i.md, i.item, i.edge, gen, nil, &userLandErr)
 		}
 	} else {
 		// The response output is actually now the result of this AI call. We need
@@ -2479,24 +2519,24 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, i *runInstance,
 		// Also note that the output is always wrapped within "data", allowing us
 		// to differentiate between success and failure in the SDK in the single
 		// opcode map.
-		output, err = json.Marshal(map[string]json.RawMessage{
-			execution.StateDataKey: output,
+		resp.Body, err = json.Marshal(map[string]json.RawMessage{
+			execution.StateDataKey: resp.Body,
 		})
 		if err != nil {
 			return fmt.Errorf("error wrapping ai result in map: %w", err)
 		}
 
-		i.resp.UpdateOpcodeOutput(&gen, output)
+		i.resp.UpdateOpcodeOutput(&gen, resp.Body)
 		for _, e := range e.lifecycles {
 			// OnStepFinished handles step success and step errors/failures.  It is
 			// currently the responsibility of the lifecycle manager to handle the differing
 			// step statuses when a step finishes.
-			go e.OnStepGatewayRequestFinished(context.WithoutCancel(ctx), i.md, i.item, i.edge, gen, hr, nil)
+			go e.OnStepGatewayRequestFinished(context.WithoutCancel(ctx), i.md, i.item, i.edge, gen, nil, nil)
 		}
 	}
 
 	// Save the output as the step result.
-	hasPendingSteps, err := e.smv2.SaveStep(ctx, i.md.ID, gen.ID, output)
+	hasPendingSteps, err := e.smv2.SaveStep(ctx, i.md.ID, gen.ID, resp.Body)
 	if err != nil {
 		return err
 	}

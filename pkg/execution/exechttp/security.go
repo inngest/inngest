@@ -1,4 +1,4 @@
-package httpdriver
+package exechttp
 
 import (
 	"context"
@@ -56,6 +56,7 @@ func init() {
 	}
 }
 
+// SecureDialerOpts represent options for the dial function used in HTTP clients.
 type SecureDialerOpts struct {
 	AllowHostDocker bool
 	AllowPrivate    bool
@@ -63,22 +64,11 @@ type SecureDialerOpts struct {
 
 	// log is used in testing.
 	log bool
+
 	// dial is a function used to actually dial, allowed to override in testing
 	// for success.
 	dial DialFunc
 }
-
-func initResolver() dnscache.DNSResolver {
-	once.Do(func() {
-		cachedResolver = dnscache.New(
-			dnscache.WithCacheRefreshInterval(dnsCacheRefreshInterval),
-			dnscache.WithLookupTimeout(dnsLookupTimeout),
-		)
-	})
-	return cachedResolver
-}
-
-type DialFunc = func(ctx context.Context, network, addr string) (net.Conn, error)
 
 func SecureDialer(o SecureDialerOpts) DialFunc {
 	// make sure to initialize it if absent
@@ -130,6 +120,16 @@ func SecureDialer(o SecureDialerOpts) DialFunc {
 
 		return dial(ctx, network, addr)
 	}
+}
+
+func initResolver() dnscache.DNSResolver {
+	once.Do(func() {
+		cachedResolver = dnscache.New(
+			dnscache.WithCacheRefreshInterval(dnsCacheRefreshInterval),
+			dnscache.WithLookupTimeout(dnsLookupTimeout),
+		)
+	})
+	return cachedResolver
 }
 
 func isDockerHost(host string) bool {
