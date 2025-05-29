@@ -7154,7 +7154,7 @@ func TestQueueActiveCounters(t *testing.T) {
 			return enqueueToBacklog
 		}),
 		WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-			return true
+			return false
 		}),
 		WithDisableLeaseChecksForSystemQueues(false),
 		WithKeyQueuesDrainActiveCounters(func(ctx context.Context, acctID uuid.UUID) bool {
@@ -7524,6 +7524,8 @@ func TestQueueActiveCounters(t *testing.T) {
 			require.Equal(t, 0, intVal(kg.ActiveRunsCounter("account", accountID.String())))
 			require.Equal(t, 0, intVal(kg.RunActiveCounter(runIDA)))
 			require.Equal(t, 0, intVal(kg.RunActiveCounter(runIDB)))
+			require.Equal(t, 0, intVal(kg.ActiveCounter("p", fnID.String())))
+			require.Equal(t, 0, intVal(kg.ActiveCounter("account", accountID.String())))
 
 			require.Empty(t, iA1.RefilledFrom)
 			require.Zero(t, iA1.RefilledAt)
@@ -7542,6 +7544,8 @@ func TestQueueActiveCounters(t *testing.T) {
 			require.Equal(t, 2, intVal(kg.ActiveRunsCounter("account", accountID.String())))
 			require.Equal(t, 2, intVal(kg.RunActiveCounter(runIDA)))
 			require.Equal(t, 2, intVal(kg.RunActiveCounter(runIDB)))
+			require.Equal(t, 4, intVal(kg.ActiveCounter("p", fnID.String())))
+			require.Equal(t, 4, intVal(kg.ActiveCounter("account", accountID.String())))
 
 			//
 			// Process A1
@@ -7561,6 +7565,8 @@ func TestQueueActiveCounters(t *testing.T) {
 			require.Equal(t, 2, intVal(kg.ActiveRunsCounter("account", accountID.String())))
 			require.Equal(t, 2, intVal(kg.RunActiveCounter(runIDA)))
 			require.Equal(t, 2, intVal(kg.RunActiveCounter(runIDB)))
+			require.Equal(t, 4, intVal(kg.ActiveCounter("p", fnID.String())))
+			require.Equal(t, 4, intVal(kg.ActiveCounter("account", accountID.String())))
 
 			// requeue to backlog
 			requeueAt := clock.Now().Add(time.Minute)
@@ -7571,6 +7577,8 @@ func TestQueueActiveCounters(t *testing.T) {
 			require.Equal(t, 2, intVal(kg.ActiveRunsCounter("account", accountID.String())))
 			require.Equal(t, 1, intVal(kg.RunActiveCounter(runIDA)))
 			require.Equal(t, 2, intVal(kg.RunActiveCounter(runIDB)))
+			require.Equal(t, 3, intVal(kg.ActiveCounter("p", fnID.String())))
+			require.Equal(t, 3, intVal(kg.ActiveCounter("account", accountID.String())))
 
 			//
 			// Process A2
@@ -7588,6 +7596,8 @@ func TestQueueActiveCounters(t *testing.T) {
 			require.Equal(t, 2, intVal(kg.ActiveRunsCounter("account", accountID.String())))
 			require.Equal(t, 1, intVal(kg.RunActiveCounter(runIDA)))
 			require.Equal(t, 2, intVal(kg.RunActiveCounter(runIDB)))
+			require.Equal(t, 3, intVal(kg.ActiveCounter("p", fnID.String())))
+			require.Equal(t, 3, intVal(kg.ActiveCounter("account", accountID.String())))
 
 			// requeue to backlog
 			requeueAt = clock.Now().Add(time.Minute)
@@ -7598,6 +7608,8 @@ func TestQueueActiveCounters(t *testing.T) {
 			require.Equal(t, 1, intVal(kg.ActiveRunsCounter("account", accountID.String())))
 			require.Equal(t, 0, intVal(kg.RunActiveCounter(runIDA)))
 			require.Equal(t, 2, intVal(kg.RunActiveCounter(runIDB)))
+			require.Equal(t, 2, intVal(kg.ActiveCounter("p", fnID.String())))
+			require.Equal(t, 2, intVal(kg.ActiveCounter("account", accountID.String())))
 
 			//
 			// Process B1
@@ -7613,6 +7625,8 @@ func TestQueueActiveCounters(t *testing.T) {
 			require.Equal(t, 1, intVal(kg.ActiveRunsCounter("account", accountID.String())))
 			require.Equal(t, 0, intVal(kg.RunActiveCounter(runIDA)))
 			require.Equal(t, 1, intVal(kg.RunActiveCounter(runIDB)))
+			require.Equal(t, 1, intVal(kg.ActiveCounter("p", fnID.String())))
+			require.Equal(t, 1, intVal(kg.ActiveCounter("account", accountID.String())))
 
 			//
 			// Process B2
@@ -7628,6 +7642,9 @@ func TestQueueActiveCounters(t *testing.T) {
 			require.Equal(t, 0, intVal(kg.ActiveRunsCounter("account", accountID.String())))
 			require.Equal(t, 0, intVal(kg.RunActiveCounter(runIDA)))
 			require.Equal(t, 0, intVal(kg.RunActiveCounter(runIDB)))
+			require.Equal(t, 0, intVal(kg.ActiveCounter("p", fnID.String())))
+			require.Equal(t, 0, intVal(kg.ActiveCounter("account", accountID.String())))
+
 		})
 
 	})
