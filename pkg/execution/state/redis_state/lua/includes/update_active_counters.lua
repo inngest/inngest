@@ -51,24 +51,26 @@ local function decreaseActiveCounters(keyActivePartition, keyActiveAccount, keyA
 end
 
 local function increaseActiveRunCounters(keyActiveRun, keyIndexActivePartitionRuns, keyActiveRunsAccount, keyActiveRunsCustomConcurrencyKey1, keyActiveRunsCustomConcurrencyKey2, runID)
-  -- increase number of active items in run
-  if redis.call("INCR", keyActiveRun) == 1 then
-    -- if the first item in a run was moved to the ready queue, mark the run as active
-    -- and increment counters
-    if exists_without_ending(keyIndexActivePartitionRuns, ":-") then
-      redis.call("SADD", keyIndexActivePartitionRuns, runID)
-    end
+  if exists_without_ending(keyActiveRun, ":-") then
+    -- increase number of active items in run
+    if redis.call("INCR", keyActiveRun) == 1 then
+      -- if the first item in a run was moved to the ready queue, mark the run as active
+      -- and increment counters
+      if exists_without_ending(keyIndexActivePartitionRuns, ":-") then
+        redis.call("SADD", keyIndexActivePartitionRuns, runID)
+      end
 
-    if exists_without_ending(keyActiveRunsAccount, ":-") then
-      redis.call("INCR", keyActiveRunsAccount)
-    end
+      if exists_without_ending(keyActiveRunsAccount, ":-") then
+        redis.call("INCR", keyActiveRunsAccount)
+      end
 
-    if exists_without_ending(keyActiveRunsCustomConcurrencyKey1, ":-") then
-      redis.call("INCR", keyActiveRunsCustomConcurrencyKey1)
-    end
+      if exists_without_ending(keyActiveRunsCustomConcurrencyKey1, ":-") then
+        redis.call("INCR", keyActiveRunsCustomConcurrencyKey1)
+      end
 
-    if exists_without_ending(keyActiveRunsCustomConcurrencyKey2, ":-") then
-      redis.call("INCR", keyActiveRunsCustomConcurrencyKey2)
+      if exists_without_ending(keyActiveRunsCustomConcurrencyKey2, ":-") then
+        redis.call("INCR", keyActiveRunsCustomConcurrencyKey2)
+      end
     end
   end
 end
