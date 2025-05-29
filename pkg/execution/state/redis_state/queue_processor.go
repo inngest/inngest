@@ -1255,6 +1255,9 @@ func (q *queue) capacity() int64 {
 // 2. configured min, max of peek size range
 // 3. worker capacity
 func (q *queue) peekSize(ctx context.Context, p *QueuePartition) int64 {
+	if peekSize, ok := q.peekSizeForFunctions[p.ID]; ok {
+		return peekSize
+	}
 	if q.usePeekEWMA {
 		return q.ewmaPeekSize(ctx, p)
 	}
