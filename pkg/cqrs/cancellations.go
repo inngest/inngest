@@ -64,4 +64,8 @@ type Cancellation struct {
 	// - bulk run -> none
 	// - backlog -> backlogID
 	TargetID string `json:"target_id,omitempty"`
+
+	// QueueName represents a specific queue name if known before hand.
+	// NOTE: This is used mainly for cancelling items in system queues, and generally shouldn't be exposed to users
+	QueueName *string `json:"queue_name"`
 }
