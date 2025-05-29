@@ -204,6 +204,8 @@ func (s *svc) Run(ctx context.Context) error {
 			err = s.handleDebounce(ctx, item)
 		case queue.KindScheduleBatch:
 			err = s.handleScheduledBatch(ctx, item)
+		case queue.KindCancel:
+			err = s.handleCancel(ctx, item)
 		case queue.KindQueueMigrate:
 			// NOOP:
 			// this kind don't work in the Dev server
@@ -431,6 +433,15 @@ func (s *svc) handleDebounce(ctx context.Context, item queue.Item) error {
 	}
 
 	return nil
+}
+
+func (s *svc) handleCancel(ctx context.Context, item queue.Item) error {
+	c := cqrs.Cancellation{}
+	if err := json.Unmarshal(item.Payload.(json.RawMessage), &c); err != nil {
+		return fmt.Errorf("error unmarshalling cancellation payload: %w", err)
+	}
+
+	return fmt.Errorf("not implemented")
 }
 
 func (s *svc) findFunctionByID(ctx context.Context, fnID uuid.UUID) (*inngest.Function, error) {
