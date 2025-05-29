@@ -7231,6 +7231,8 @@ func TestQueueActiveCounters(t *testing.T) {
 			require.Equal(t, 0, scard(kg.ActivePartitionRunsIndex(shadowPart.PartitionID)))
 			require.Equal(t, 0, intVal(kg.ActiveRunsCounter("account", accountID.String())))
 			require.Equal(t, 0, intVal(kg.RunActiveCounter(runID)))
+			require.Equal(t, 0, intVal(kg.ActiveCounter("p", fnID.String())))
+			require.Equal(t, 0, intVal(kg.ActiveCounter("account", accountID.String())))
 
 			require.Empty(t, i.RefilledFrom)
 			require.Zero(t, i.RefilledAt)
@@ -7244,6 +7246,8 @@ func TestQueueActiveCounters(t *testing.T) {
 			require.Equal(t, 1, scard(kg.ActivePartitionRunsIndex(shadowPart.PartitionID)))
 			require.Equal(t, 1, intVal(kg.ActiveRunsCounter("account", accountID.String())))
 			require.Equal(t, 1, intVal(kg.RunActiveCounter(runID)))
+			require.Equal(t, 1, intVal(kg.ActiveCounter("p", fnID.String())))
+			require.Equal(t, 1, intVal(kg.ActiveCounter("account", accountID.String())))
 
 			currentItemStr := r.HGet(kg.QueueItem(), i.ID)
 			require.NoError(t, json.Unmarshal([]byte(currentItemStr), &i))
@@ -7258,6 +7262,8 @@ func TestQueueActiveCounters(t *testing.T) {
 			require.Equal(t, 1, scard(kg.ActivePartitionRunsIndex(shadowPart.PartitionID)))
 			require.Equal(t, 1, intVal(kg.ActiveRunsCounter("account", accountID.String())))
 			require.Equal(t, 1, intVal(kg.RunActiveCounter(runID)))
+			require.Equal(t, 1, intVal(kg.ActiveCounter("p", fnID.String())))
+			require.Equal(t, 1, intVal(kg.ActiveCounter("account", accountID.String())))
 
 			// requeue to backlog
 			requeueAt := clock.Now().Add(time.Minute)
@@ -7267,6 +7273,8 @@ func TestQueueActiveCounters(t *testing.T) {
 			require.Equal(t, 0, scard(kg.ActivePartitionRunsIndex(shadowPart.PartitionID)))
 			require.Equal(t, 0, intVal(kg.ActiveRunsCounter("account", accountID.String())))
 			require.Equal(t, 0, intVal(kg.RunActiveCounter(runID)))
+			require.Equal(t, 0, intVal(kg.ActiveCounter("p", fnID.String())))
+			require.Equal(t, 0, intVal(kg.ActiveCounter("account", accountID.String())))
 		})
 
 		t.Run("from backlog, dequeue", func(t *testing.T) {
@@ -7285,6 +7293,8 @@ func TestQueueActiveCounters(t *testing.T) {
 			require.Equal(t, 0, scard(kg.ActivePartitionRunsIndex(shadowPart.PartitionID)))
 			require.Equal(t, 0, intVal(kg.ActiveRunsCounter("account", accountID.String())))
 			require.Equal(t, 0, intVal(kg.RunActiveCounter(runID)))
+			require.Equal(t, 0, intVal(kg.ActiveCounter("p", fnID.String())))
+			require.Equal(t, 0, intVal(kg.ActiveCounter("account", accountID.String())))
 
 			require.Empty(t, i.RefilledFrom)
 			require.Zero(t, i.RefilledAt)
@@ -7298,6 +7308,8 @@ func TestQueueActiveCounters(t *testing.T) {
 			require.Equal(t, 1, scard(kg.ActivePartitionRunsIndex(shadowPart.PartitionID)))
 			require.Equal(t, 1, intVal(kg.ActiveRunsCounter("account", accountID.String())))
 			require.Equal(t, 1, intVal(kg.RunActiveCounter(runID)))
+			require.Equal(t, 1, intVal(kg.ActiveCounter("p", fnID.String())))
+			require.Equal(t, 1, intVal(kg.ActiveCounter("account", accountID.String())))
 
 			currentItemStr := r.HGet(kg.QueueItem(), i.ID)
 			require.NoError(t, json.Unmarshal([]byte(currentItemStr), &i))
@@ -7312,6 +7324,8 @@ func TestQueueActiveCounters(t *testing.T) {
 			require.Equal(t, 1, scard(kg.ActivePartitionRunsIndex(shadowPart.PartitionID)))
 			require.Equal(t, 1, intVal(kg.ActiveRunsCounter("account", accountID.String())))
 			require.Equal(t, 1, intVal(kg.RunActiveCounter(runID)))
+			require.Equal(t, 1, intVal(kg.ActiveCounter("p", fnID.String())))
+			require.Equal(t, 1, intVal(kg.ActiveCounter("account", accountID.String())))
 
 			// dequeue
 			require.NoError(t, q.Dequeue(ctx, defaultShard, i))
@@ -7319,6 +7333,8 @@ func TestQueueActiveCounters(t *testing.T) {
 			require.Equal(t, 0, scard(kg.ActivePartitionRunsIndex(shadowPart.PartitionID)))
 			require.Equal(t, 0, intVal(kg.ActiveRunsCounter("account", accountID.String())))
 			require.Equal(t, 0, intVal(kg.RunActiveCounter(runID)))
+			require.Equal(t, 0, intVal(kg.ActiveCounter("p", fnID.String())))
+			require.Equal(t, 0, intVal(kg.ActiveCounter("account", accountID.String())))
 		})
 
 		t.Run("from ready queue, requeue", func(t *testing.T) {
@@ -7334,6 +7350,8 @@ func TestQueueActiveCounters(t *testing.T) {
 			require.Equal(t, 0, scard(kg.ActivePartitionRunsIndex(shadowPart.PartitionID)))
 			require.Equal(t, 0, intVal(kg.ActiveRunsCounter("account", accountID.String())))
 			require.Equal(t, 0, intVal(kg.RunActiveCounter(runID)))
+			require.Equal(t, 0, intVal(kg.ActiveCounter("p", fnID.String())))
+			require.Equal(t, 0, intVal(kg.ActiveCounter("account", accountID.String())))
 
 			// lease
 			leaseID, err := q.Lease(ctx, i, 10*time.Second, clock.Now(), nil)
@@ -7343,6 +7361,8 @@ func TestQueueActiveCounters(t *testing.T) {
 			require.Equal(t, 1, scard(kg.ActivePartitionRunsIndex(shadowPart.PartitionID)))
 			require.Equal(t, 1, intVal(kg.ActiveRunsCounter("account", accountID.String())))
 			require.Equal(t, 1, intVal(kg.RunActiveCounter(runID)))
+			require.Equal(t, 1, intVal(kg.ActiveCounter("p", fnID.String())))
+			require.Equal(t, 1, intVal(kg.ActiveCounter("account", accountID.String())))
 
 			// requeue to ready partition
 			requeueAt := clock.Now().Add(time.Minute)
@@ -7352,6 +7372,8 @@ func TestQueueActiveCounters(t *testing.T) {
 			require.Equal(t, 0, scard(kg.ActivePartitionRunsIndex(shadowPart.PartitionID)))
 			require.Equal(t, 0, intVal(kg.ActiveRunsCounter("account", accountID.String())))
 			require.Equal(t, 0, intVal(kg.RunActiveCounter(runID)))
+			require.Equal(t, 0, intVal(kg.ActiveCounter("p", fnID.String())))
+			require.Equal(t, 0, intVal(kg.ActiveCounter("account", accountID.String())))
 		})
 
 		t.Run("from ready queue, dequeue", func(t *testing.T) {
@@ -7367,6 +7389,8 @@ func TestQueueActiveCounters(t *testing.T) {
 			require.Equal(t, 0, scard(kg.ActivePartitionRunsIndex(shadowPart.PartitionID)))
 			require.Equal(t, 0, intVal(kg.ActiveRunsCounter("account", accountID.String())))
 			require.Equal(t, 0, intVal(kg.RunActiveCounter(runID)))
+			require.Equal(t, 0, intVal(kg.ActiveCounter("p", fnID.String())))
+			require.Equal(t, 0, intVal(kg.ActiveCounter("account", accountID.String())))
 
 			// lease
 			leaseID, err := q.Lease(ctx, i, 10*time.Second, clock.Now(), nil)
@@ -7376,6 +7400,8 @@ func TestQueueActiveCounters(t *testing.T) {
 			require.Equal(t, 1, scard(kg.ActivePartitionRunsIndex(shadowPart.PartitionID)))
 			require.Equal(t, 1, intVal(kg.ActiveRunsCounter("account", accountID.String())))
 			require.Equal(t, 1, intVal(kg.RunActiveCounter(runID)))
+			require.Equal(t, 1, intVal(kg.ActiveCounter("p", fnID.String())))
+			require.Equal(t, 1, intVal(kg.ActiveCounter("account", accountID.String())))
 
 			// dequeue
 			require.NoError(t, q.Dequeue(ctx, defaultShard, i))
@@ -7383,6 +7409,8 @@ func TestQueueActiveCounters(t *testing.T) {
 			require.Equal(t, 0, scard(kg.ActivePartitionRunsIndex(shadowPart.PartitionID)))
 			require.Equal(t, 0, intVal(kg.ActiveRunsCounter("account", accountID.String())))
 			require.Equal(t, 0, intVal(kg.RunActiveCounter(runID)))
+			require.Equal(t, 0, intVal(kg.ActiveCounter("p", fnID.String())))
+			require.Equal(t, 0, intVal(kg.ActiveCounter("account", accountID.String())))
 		})
 	})
 
