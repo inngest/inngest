@@ -162,7 +162,7 @@ func (e ExtendedClient) DoRequest(ctx context.Context, r SerializableRequest) (*
 	// Read 1 extra byte above the max so that we can check if the response is too large
 	byt, err := io.ReadAll(body)
 	if err != nil {
-		return nil, fmt.Errorf("error reading response body: %w", err)
+		return nil, ErrUnexpectedEnd
 	}
 
 	out := &Response{
