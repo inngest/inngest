@@ -258,3 +258,14 @@ type MigratePayload struct {
 	// Concurrency optionally specifies the concurrency for running the migrate handler over each batch of queue items.
 	Concurrency int
 }
+
+// QueueItemIterator provides the interface to iterate through a list of queue items
+type QueueItemIterator interface {
+	// Next advances the iterator, and should be called prior to value retrieval
+	Next(ctx context.Context) bool
+	// Val returns the current queue item from the iterator
+	Val(ctx context.Context) *QueueItem
+	// Error returns the error during an iteration.
+	// This can be used to check on errors when `Next` returns false.
+	Error() error
+}
