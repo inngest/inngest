@@ -449,11 +449,16 @@ func (s *svc) handleCancel(ctx context.Context, item queue.Item) error {
 		return fmt.Errorf("error unmarshalling cancellation payload: %w", err)
 	}
 
+	l := s.log.With(
+		"kind", c.Kind.String(),
+		"cancellation", c,
+	)
+
 	switch c.Kind {
 	case enums.CancellationKindRun:
 		runID, err := ulid.Parse(c.TargetID)
 		if err != nil {
-			s.log.Error("invalid runID provided for cancellation", "error", err, "item", item, "cancellation", c)
+			l.Error("invalid runID provided for cancellation", "error", err)
 			return fmt.Errorf("error parsing runID provided: %w", err)
 		}
 
@@ -483,17 +488,18 @@ func (s *svc) handleCancel(ctx context.Context, item queue.Item) error {
 				return fmt.Errorf("error on retrieving queue item for cancellation: %w", err)
 			}
 
-			st, err := s.state.Load(ctx, c.AccountID, qi.Data.Identifier.RunID)
-			if err != nil {
-				return fmt.Errorf("error loading state for cancellation: %w", err)
-			}
-
 			if c.If != nil {
+				st, err := s.state.Load(ctx, c.AccountID, qi.Data.Identifier.RunID)
+				if err != nil {
+					l.Error("error loading state for cancellation", "error", err, "queue_item", qi)
+					return fmt.Errorf("error loading state for cancellation: %w", err)
+				}
+
 				event := st.Event()
 				ok, _, err := expressions.EvaluateBoolean(ctx, *c.If, map[string]any{"event": event})
 				if err != nil {
 					// NOTE: log but don't exit here, since we want to conitnue
-					s.log.Error("error evaluating cancellation expression", "error", err, "queue_item", qi, "cancellation", c)
+					l.Error("error evaluating cancellation expression", "error", err, "queue_item", qi)
 					continue
 				}
 
@@ -523,17 +529,18 @@ func (s *svc) handleCancel(ctx context.Context, item queue.Item) error {
 
 			// Check if it's a run
 			if qi.Data.Identifier.RunID != nilULID {
-				st, err := s.state.Load(ctx, c.AccountID, qi.Data.Identifier.RunID)
-				if err != nil {
-					return fmt.Errorf("error loading state for cancellation: %w", err)
-				}
-
 				if c.If != nil {
+					st, err := s.state.Load(ctx, c.AccountID, qi.Data.Identifier.RunID)
+					if err != nil {
+						l.Error("error loading state for cancellation", "error", err, "queue_item", qi)
+						return fmt.Errorf("error loading state for cancellation: %w", err)
+					}
+
 					event := st.Event()
 					ok, _, err := expressions.EvaluateBoolean(ctx, *c.If, map[string]any{"event": event})
 					if err != nil {
 						// NOTE: log but don't exit here, since we want to conitnue
-						s.log.Error("error evaluating cancellation expression", "error", err, "queue_item", qi, "cancellation", c)
+						l.Error("error evaluating cancellation expression", "error", err, "queue_item", qi)
 						continue
 					}
 
