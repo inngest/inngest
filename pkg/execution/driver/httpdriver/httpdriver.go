@@ -403,7 +403,7 @@ func do(ctx context.Context, c exechttp.RequestExecutor, r Request) (*Response, 
 	return &Response{
 		Body:           body,
 		StatusCode:     statusCode,
-		Duration:       resp.StatResult.Total(time.Now()),
+		Duration:       resp.StatResult.Total,
 		RetryAt:        retryAt,
 		NoRetry:        noRetry,
 		RequestVersion: rv,
