@@ -210,10 +210,23 @@ func (q *queue) RunningCount(ctx context.Context, workflowID uuid.UUID) (int64, 
 	return count, nil
 }
 
-func (q *queue) ItemsByFunction(ctx context.Context, workspaceID uuid.UUID, workflowID uuid.UUID, from time.Time, until time.Time) iter.Seq2[osqueue.QueueItem, error] {
-	return nil
+func (q *queue) ItemsByFunction(ctx context.Context, acctID, workspaceID, workflowID uuid.UUID, from time.Time, until time.Time) iter.Seq2[osqueue.QueueItem, error] {
+	for {
+		// TODO: peek function partition
+		if q.allowKeyQueues(ctx, acctID) {
+			// TODO: peek backlogs
+		}
+		// TODO: continue on iteration until it reaches the end
+	}
 }
 
-func (q *queue) ItemsByBacklog(ctx context.Context, backlogID string, from time.Time, until time.Time) iter.Seq2[osqueue.QueueItem, error] {
-	return nil
+func (q *queue) ItemsByBacklog(ctx context.Context, acctID uuid.UUID, backlogID string, from time.Time, until time.Time) iter.Seq2[osqueue.QueueItem, error] {
+	if !q.allowKeyQueues(ctx, acctID) {
+		return nil
+	}
+
+	for {
+		// TODO: peek items for backlog
+		// TODO: continue on peek until it reaches end
+	}
 }

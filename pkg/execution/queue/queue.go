@@ -225,10 +225,12 @@ type JobQueueReader interface {
 	RunJobs(ctx context.Context, queueShardName string, workspaceID uuid.UUID, workflowID uuid.UUID, runID ulid.ULID, limit, offset int64) ([]JobResponse, error)
 
 	// ItemsByFunction returns a queue item iterator for a function within a specific time range
-	ItemsByFunction(ctx context.Context, workspaceID uuid.UUID, workflowID uuid.UUID, from time.Time, until time.Time) iter.Seq2[QueueItem, error]
+	// TODO: remove the acctID param since this is only needed for the key queue feature flag
+	ItemsByFunction(ctx context.Context, acctID uuid.UUID, workspaceID uuid.UUID, workflowID uuid.UUID, from time.Time, until time.Time) iter.Seq2[QueueItem, error]
 
 	// ItemsByBacklog returns a queue item iterator for a backlog within a specific time range
-	ItemsByBacklog(ctx context.Context, backlogID string, from time.Time, until time.Time) iter.Seq2[QueueItem, error]
+	// TODO: remove the acctID param since this is only needed for the key queue feature flag
+	ItemsByBacklog(ctx context.Context, acctID uuid.UUID, backlogID string, from time.Time, until time.Time) iter.Seq2[QueueItem, error]
 }
 
 // MigratePayload stores the information to be used when migrating a queue shard to another one
