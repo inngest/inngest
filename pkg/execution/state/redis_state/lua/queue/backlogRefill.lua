@@ -194,11 +194,11 @@ if (constraintCapacity == nil or constraintCapacity > 0) and exists_without_endi
 end
 
 -- prevent negative constraint capacity
-if constraintCapacity == nil or constraintCapacity < 0 then
+if constraintCapacity ~= nil and constraintCapacity < 0 then
   constraintCapacity = 0
 end
 
-if constraintCapacity > 0 then
+if constraintCapacity == nil or constraintCapacity > 0 then
   -- Reset status as we're not limited
   status = 0
 end
