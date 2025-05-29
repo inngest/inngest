@@ -25,6 +25,7 @@ import (
 	"github.com/inngest/inngest/pkg/run"
 	"github.com/inngest/inngest/pkg/service"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
+	"github.com/oklog/ulid/v2"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/propagation"
 	"golang.org/x/sync/errgroup"
@@ -439,6 +440,36 @@ func (s *svc) handleCancel(ctx context.Context, item queue.Item) error {
 	c := cqrs.Cancellation{}
 	if err := json.Unmarshal(item.Payload.(json.RawMessage), &c); err != nil {
 		return fmt.Errorf("error unmarshalling cancellation payload: %w", err)
+	}
+
+	switch c.Kind {
+	case enums.CancellationKindRun:
+		runID, err := ulid.Parse(c.TargetID)
+		if err != nil {
+			s.log.Error("invalid runID provided for cancellation", "error", err, "item", item, "cancellation", c)
+			return fmt.Errorf("error parsing runID provided: %w", err)
+		}
+
+		id := sv2.ID{
+			RunID:      runID,
+			FunctionID: c.WorkspaceID,
+			Tenant: sv2.Tenant{
+				AccountID: c.AccountID,
+				EnvID:     c.WorkspaceID,
+				AppID:     c.AppID,
+			},
+		}
+
+		return s.exec.Cancel(ctx, id, execution.CancelRequest{
+			CancellationID: &c.ID,
+		})
+	case enums.CancellationKindBulkRun:
+		// TODO:
+		// retrieve queue items within the time range - iterator
+	case enums.CancellationKindBacklog:
+		// TODO:
+		// retrieve queue items in the backlog - iterator
+		// cancel each item if it that's a run
 	}
 
 	return fmt.Errorf("not implemented")
