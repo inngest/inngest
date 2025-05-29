@@ -2231,7 +2231,7 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 
 	kg := q.primaryQueueShard.RedisClient.kg
 
-	refilledFromBacklog := item.RefilledFrom != ""
+	refilledFromBacklog := q.itemEnableKeyQueues(ctx, item) && item.RefilledFrom != ""
 
 	checkConstraints := !refilledFromBacklog || !q.itemDisableLeaseChecks(ctx, item)
 

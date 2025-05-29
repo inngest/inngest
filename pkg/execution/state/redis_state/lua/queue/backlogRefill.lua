@@ -73,6 +73,7 @@ local throttlePeriod = tonumber(ARGV[14])
 local keyPrefix = ARGV[15]
 
 local drainActiveCounters = tonumber(ARGV[16])
+local checkCapacity = tonumber(ARGV[17])
 
 -- $include(update_pointer_score.lua)
 -- $include(ends_with.lua)
@@ -143,59 +144,64 @@ local function check_active_capacity(now_ms, keyActiveCounter, limit)
 	return tonumber(limit)
 end
 
--- Check throttle capacity
-if (constraintCapacity == nil or constraintCapacity > 0) and throttlePeriod > 0 and throttleLimit > 0 then
-  local remainingThrottleCapacity = gcraCapacity(throttleKey, nowMS, throttlePeriod * 1000, throttleLimit, throttleBurst)
-  if constraintCapacity == nil or remainingThrottleCapacity < constraintCapacity then
-    constraintCapacity = remainingThrottleCapacity
-    status = 5
+if checkCapacity == 1 then
+  -- Check throttle capacity
+  if (constraintCapacity == nil or constraintCapacity > 0) and throttlePeriod > 0 and throttleLimit > 0 then
+    local remainingThrottleCapacity = gcraCapacity(throttleKey, nowMS, throttlePeriod * 1000, throttleLimit, throttleBurst)
+    if constraintCapacity == nil or remainingThrottleCapacity < constraintCapacity then
+      constraintCapacity = remainingThrottleCapacity
+      status = 5
+    end
   end
-end
 
--- Check custom concurrency key 2 capacity
-if (constraintCapacity == nil or constraintCapacity > 0) and exists_without_ending(keyActiveConcurrencyKey2, ":-") == true and customConcurrencyKey2 > 0 then
-  local remainingCustomConcurrencyCapacityKey2 = check_active_capacity(nowMS, keyActiveConcurrencyKey2, customConcurrencyKey2)
-  if constraintCapacity == nil or remainingCustomConcurrencyCapacityKey2 < constraintCapacity then
-    -- Custom concurrency key 2 imposes limits
-    constraintCapacity = remainingCustomConcurrencyCapacityKey2
-    status = 4
+  -- Check custom concurrency key 2 capacity
+  if (constraintCapacity == nil or constraintCapacity > 0) and exists_without_ending(keyActiveConcurrencyKey2, ":-") == true and customConcurrencyKey2 > 0 then
+    local remainingCustomConcurrencyCapacityKey2 = check_active_capacity(nowMS, keyActiveConcurrencyKey2, customConcurrencyKey2)
+    if constraintCapacity == nil or remainingCustomConcurrencyCapacityKey2 < constraintCapacity then
+      -- Custom concurrency key 2 imposes limits
+      constraintCapacity = remainingCustomConcurrencyCapacityKey2
+      status = 4
+    end
   end
-end
 
--- Check custom concurrency key 1 capacity
-if (constraintCapacity == nil or constraintCapacity > 0) and exists_without_ending(keyActiveConcurrencyKey1, ":-") == true and customConcurrencyKey1 > 0 then
-  local remainingCustomConcurrencyCapacityKey1 = check_active_capacity(nowMS, keyActiveConcurrencyKey1, customConcurrencyKey1)
-  if constraintCapacity == nil or remainingCustomConcurrencyCapacityKey1 < constraintCapacity then
-    -- Custom concurrency key 1 imposes limits
-    constraintCapacity = remainingCustomConcurrencyCapacityKey1
-    status = 3
+  -- Check custom concurrency key 1 capacity
+  if (constraintCapacity == nil or constraintCapacity > 0) and exists_without_ending(keyActiveConcurrencyKey1, ":-") == true and customConcurrencyKey1 > 0 then
+    local remainingCustomConcurrencyCapacityKey1 = check_active_capacity(nowMS, keyActiveConcurrencyKey1, customConcurrencyKey1)
+    if constraintCapacity == nil or remainingCustomConcurrencyCapacityKey1 < constraintCapacity then
+      -- Custom concurrency key 1 imposes limits
+      constraintCapacity = remainingCustomConcurrencyCapacityKey1
+      status = 3
+    end
   end
-end
 
--- Check function concurrency capacity
-if (constraintCapacity == nil or constraintCapacity > 0) and exists_without_ending(keyActivePartition, ":-") == true and concurrencyFn > 0 then
-  local remainingFunctionCapacity = check_active_capacity(nowMS, keyActivePartition, concurrencyFn)
-  if constraintCapacity == nil or remainingFunctionCapacity < constraintCapacity then
-    -- Function concurrency imposes limits
-    constraintCapacity = remainingFunctionCapacity
-    status = 2
+  -- Check function concurrency capacity
+  if (constraintCapacity == nil or constraintCapacity > 0) and exists_without_ending(keyActivePartition, ":-") == true and concurrencyFn > 0 then
+    local remainingFunctionCapacity = check_active_capacity(nowMS, keyActivePartition, concurrencyFn)
+    if constraintCapacity == nil or remainingFunctionCapacity < constraintCapacity then
+      -- Function concurrency imposes limits
+      constraintCapacity = remainingFunctionCapacity
+      status = 2
+    end
   end
-end
 
--- Check account concurrency capacity
-if (constraintCapacity == nil or constraintCapacity > 0) and exists_without_ending(keyActiveAccount, ":-") == true and concurrencyAcct > 0 then
-  local remainingAccountCapacity = check_active_capacity(nowMS, keyActiveAccount, concurrencyAcct)
+  -- Check account concurrency capacity
+  if (constraintCapacity == nil or constraintCapacity > 0) and exists_without_ending(keyActiveAccount, ":-") == true and concurrencyAcct > 0 then
+    local remainingAccountCapacity = check_active_capacity(nowMS, keyActiveAccount, concurrencyAcct)
 
-  if constraintCapacity == nil or remainingAccountCapacity < constraintCapacity then
-    -- Account concurrency imposes limits
-    constraintCapacity = remainingAccountCapacity
-    status = 1
+    if constraintCapacity == nil or remainingAccountCapacity < constraintCapacity then
+      -- Account concurrency imposes limits
+      constraintCapacity = remainingAccountCapacity
+      status = 1
+    end
   end
-end
 
--- prevent negative constraint capacity
-if constraintCapacity ~= nil and constraintCapacity < 0 then
-  constraintCapacity = 0
+  -- prevent negative constraint capacity
+  if constraintCapacity ~= nil and constraintCapacity < 0 then
+    constraintCapacity = 0
+  end
+else
+  -- Refill as many items as possible
+  constraintCapacity = refill
 end
 
 if constraintCapacity == nil or constraintCapacity > 0 then
