@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/config"
@@ -18,6 +19,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/debounce"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
@@ -29,6 +31,10 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/propagation"
 	"golang.org/x/sync/errgroup"
+)
+
+var (
+	nilULID = ulid.ULID{}
 )
 
 type Opt func(s *svc)
@@ -464,15 +470,68 @@ func (s *svc) handleCancel(ctx context.Context, item queue.Item) error {
 			CancellationID: &c.ID,
 		})
 	case enums.CancellationKindBulkRun:
-		// TODO:
-		// retrieve queue items within the time range - iterator
+		var from time.Time
+		if c.StartedAfter != nil {
+			from = *c.StartedAfter
+		}
+
+		// Iterate over queue items
+		for qi, err := range s.queue.FindItemsForFunction(ctx, c.WorkspaceID, c.FunctionID, from, c.StartedBefore) {
+			// NOTE: should this be returned here?
+			if err != nil {
+				return fmt.Errorf("error on retrieving queue item for cancellation: %w", err)
+			}
+
+			_, err := s.state.Load(ctx, c.AccountID, qi.Data.Identifier.RunID)
+			if err != nil {
+				return fmt.Errorf("error loading state for cancellation: %w", err)
+			}
+
+			if c.If != nil {
+				// TODO: evaluate expression
+			}
+
+			if err := s.exec.Cancel(ctx, sv2.IDFromV1(qi.Data.Identifier), execution.CancelRequest{
+				CancellationID: &c.ID,
+			}); err != nil {
+				return err
+			}
+		}
 	case enums.CancellationKindBacklog:
-		// TODO:
-		// retrieve queue items in the backlog - iterator
-		// cancel each item if it that's a run
+		var from time.Time
+		if c.StartedAfter != nil {
+			from = *c.StartedAfter
+		}
+
+		// iterate over queue items
+		for qi, err := range s.queue.FindItemsForBacklog(ctx, c.TargetID, from, c.StartedBefore) {
+			if err != nil {
+				return fmt.Errorf("error on retrieving queue item for cancellation: %w", err)
+			}
+
+			// Check if it's a run
+			if qi.Data.Identifier.RunID != nilULID {
+				if err := s.exec.Cancel(ctx, sv2.IDFromV1(qi.Data.Identifier), execution.CancelRequest{
+					CancellationID: &c.ID,
+				}); err != nil {
+					return err
+				}
+
+				continue
+			}
+
+			// dequeue the item
+			if q, ok := s.queue.(redis_state.QueueManager); ok {
+				// TODO: find the shard
+				shard := redis_state.QueueShard{}
+				if err := q.Dequeue(ctx, shard, qi); err != nil {
+					return err
+				}
+			}
+		}
 	}
 
-	return fmt.Errorf("not implemented")
+	return nil
 }
 
 func (s *svc) findFunctionByID(ctx context.Context, fnID uuid.UUID) (*inngest.Function, error) {
