@@ -671,6 +671,11 @@ func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueSha
 		drainActiveCountersVal = "1"
 	}
 
+	checkCapacityVal := "1"
+	if !q.allowKeyQueues(ctx, accountID) {
+		checkCapacityVal = "0"
+	}
+
 	args, err := StrSlice([]any{
 		b.BacklogID,
 		sp.PartitionID,
@@ -691,6 +696,7 @@ func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueSha
 
 		kg.QueuePrefix(),
 		drainActiveCountersVal,
+		checkCapacityVal,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("could not serialize args: %w", err)
