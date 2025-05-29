@@ -88,7 +88,7 @@ export default function Table<T>({
   });
 
   const tableStyles = 'w-full';
-  const tableHeadStyles = 'bg-canvasSubtle sticky top-0 z-[2]';
+  const tableHeadStyles = 'bg-tableHeader sticky top-0 z-[2]';
   const tableColumnStyles = 'px-4';
   const expandedRowSideBorder =
     'before:bg-surfaceMuted relative before:absolute before:bottom-0 before:left-0 before:top-0 before:w-0.5';
@@ -162,8 +162,8 @@ export default function Table<T>({
                   className={cn(
                     hasId(row.original) && expandedIDs.includes(row.original.id)
                       ? 'h-[42px]'
-                      : 'border-light h-[42px] border-b',
-                    onRowClick ? 'hover:bg-canvasSubtle/40 cursor-pointer' : ''
+                      : 'border-light box-border h-[42px] border-b',
+                    onRowClick ? 'hover:bg-canvasSubtle cursor-pointer' : ''
                   )}
                   onClick={() => {
                     const modalsContainer = document.getElementById('modals');
@@ -182,7 +182,12 @@ export default function Table<T>({
                           width: cell.column.getSize(),
                           maxWidth: cell.column.getSize(),
                         }}
-                        className={cn(isIconOnlyColumn ? '' : tableColumnStyles)}
+                        className={cn(
+                          i === 0 && hasId(row.original) && expandedIDs.includes(row.original.id)
+                            ? expandedRowSideBorder
+                            : '',
+                          isIconOnlyColumn ? '' : tableColumnStyles
+                        )}
                       >
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
                       </td>

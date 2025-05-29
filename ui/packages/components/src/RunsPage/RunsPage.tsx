@@ -274,7 +274,7 @@ export function RunsPage({
   return (
     <main className="bg-canvasBase text-basis no-scrollbar flex-1 overflow-hidden focus-visible:outline-none">
       <div className="bg-canvasBase sticky top-0 z-10 flex flex-col">
-        <div className="border-subtle flex h-[58px] items-center justify-between gap-2 border-b px-3">
+        <div className="flex h-[58px] items-center justify-between gap-2 px-3">
           <div className="flex items-center gap-2">
             <SelectGroup>
               <TimeFieldFilter

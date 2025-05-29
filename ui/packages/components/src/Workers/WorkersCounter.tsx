@@ -35,29 +35,28 @@ export default function WorkersCounter({ counts, className }: Props) {
             })}
         </div>
       </TooltipTrigger>
-      <TooltipContent
-        side="bottom"
-        sideOffset={0}
-        align="start"
-        className="border-subtle flex flex-col gap-1 rounded-md border p-2 pr-3 text-xs"
-      >
-        {groupedWorkerStatuses
-          .filter((status) => counts[status] !== null)
-          .map((status) => (
-            <div key={status} className="flex items-center gap-1">
-              <div
-                className={cn(
-                  'h-[10px] w-[10px] rounded-full border',
-                  getStatusBackgroundClass(status),
-                  getStatusBorderClass(status)
-                )}
-              />
-              <div className="flex w-full items-center justify-between gap-3">
-                <div className="text-muted lowercase first-letter:capitalize">{status} workers</div>
-                {counts[status] || 0}
+      <TooltipContent side="bottom" sideOffset={0} align="start" className="p-2 pr-3 text-xs">
+        <div className="flex flex-col gap-1">
+          {groupedWorkerStatuses
+            .filter((status) => counts[status] !== null)
+            .map((status) => (
+              <div key={status} className="flex items-center gap-1">
+                <div
+                  className={cn(
+                    'h-[10px] w-[10px] rounded-full border',
+                    getStatusBackgroundClass(status),
+                    getStatusBorderClass(status)
+                  )}
+                />
+                <div className="flex w-full items-center justify-between gap-3">
+                  <div className="text-light lowercase first-letter:capitalize">
+                    {status} workers
+                  </div>
+                  {counts[status] || 0}
+                </div>
               </div>
-            </div>
-          ))}
+            ))}
+        </div>
       </TooltipContent>
     </Tooltip>
   );

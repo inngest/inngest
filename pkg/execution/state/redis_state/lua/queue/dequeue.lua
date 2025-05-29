@@ -40,9 +40,10 @@ local keyActiveRunsCustomConcurrencyKey1  = KEYS[25]
 local keyActiveRunsCustomConcurrencyKey2  = KEYS[26]
 
 local keyIdempotency           = KEYS[27]
+local singletonRunKey          = KEYS[28]
 
-local keyItemIndexA            = KEYS[28]   -- custom item index 1
-local keyItemIndexB            = KEYS[29]  -- custom item index 2
+local keyItemIndexA            = KEYS[29]   -- custom item index 1
+local keyItemIndexB            = KEYS[30]  -- custom item index 2
 
 local queueID        = ARGV[1]
 local partitionID    = ARGV[2]
@@ -214,6 +215,21 @@ if backlogScore ~= nil and backlogScore ~= false and backlogScore > 0 then
 
   -- update backlog pointers
   updateBacklogPointer(keyGlobalShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, keyShadowPartitionSet, keyBacklogSet, accountID, partitionID, backlogID)
+end
+
+
+-- Remove singleton lock
+local singletonKey = redis.call("GET", singletonRunKey)
+
+if singletonKey ~= nil and singletonKey ~= false and keyItemIndexA ~= "" and keyItemIndexA ~= false and keyItemIndexA ~= nil then
+  local queueItemsCount = redis.call("ZCOUNT", keyItemIndexA, "-inf", "+inf")
+  local singletonRunID = redis.call("GET", singletonKey)
+
+  if tonumber(queueItemsCount) == 0 and singletonRunID == runID then
+    -- We just dequeued the last step
+    redis.call("DEL", singletonKey)
+    redis.call("DEL", singletonRunKey)
+  end
 end
 
 return 0

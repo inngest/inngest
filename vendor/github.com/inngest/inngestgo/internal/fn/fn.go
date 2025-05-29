@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/inngest/inngest/pkg/inngest"
+	"github.com/inngest/inngest/pkg/enums"
 )
 
 // ServableFunction defines a function which can be called by a handler's Serve method.
@@ -58,6 +59,11 @@ type FunctionOpts struct {
 	RateLimit *RateLimit
 	// BatchEvents represents batching
 	BatchEvents *inngest.EventBatchConfig
+	// Singleton represents a mechanism to ensure that only one instance of a function
+	// runs at a time for a given key. Additional invocations with the same key will either
+	// be skipped or cause the current instance to be canceled and replaced, depending on
+	// the specified mode.
+	Singleton *Singleton
 }
 
 func (f FunctionOpts) Validate() error {
@@ -177,4 +183,17 @@ func (t Timeouts) Convert() *inngest.Timeouts {
 		Start:  start,
 		Finish: finish,
 	}
+}
+
+// Singleton represents a singleton function.
+type Singleton struct {
+	// Key is an optional string used to scope the singleton based on event data.
+	// For example, to singleton incoming notifications per user, you could use
+	// a key like "event.user.id". This ensures that only one instance of the
+	// function runs at a time for each unique user.
+	Key *string `json:"key,omitempty"`
+
+	// Mode determines how to handle a new run when another singleton instance is already active.
+	// Use `skip` to skip the new run, or `cancel` to stop the current instance and run the new one.
+	Mode enums.SingletonMode `json:"mode"`
 }

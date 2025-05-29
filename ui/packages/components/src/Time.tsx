@@ -17,6 +17,7 @@ type Props = {
   className?: string;
   format?: 'relative';
   value: Date | string;
+  copyable?: boolean;
 };
 
 function formatDate(date: Date) {
@@ -27,7 +28,7 @@ function formatUTCDate(date: Date) {
   return formatInTimeZone(date, 'UTC', 'dd MMM yyyy, HH:mm:ss');
 }
 
-export function Time({ className, format, value }: Props) {
+export function Time({ className, format, value, copyable = true }: Props) {
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
     toast.success('Copied to clipboard');
@@ -50,35 +51,34 @@ export function Time({ className, format, value }: Props) {
         <time
           suppressHydrationWarning={true}
           className={cn(
-            'hover:bg-canvasSubtle group flex items-center gap-1 whitespace-nowrap pr-4 hover:pr-0',
+            'group flex items-center gap-1 whitespace-nowrap',
+            copyable && 'hover:bg-canvasSubtle  cursor-pointer pr-4 hover:pr-0',
             className
           )}
           dateTime={date.toISOString()}
           onClick={(e) => {
+            if (!copyable) return;
             e.stopPropagation();
             e.preventDefault();
             copyToClipboard(date.toISOString());
           }}
         >
           {dateString}
-          <RiFileCopyLine className="text-subtle hidden h-3 w-3 group-hover:block" />
+          {copyable && <RiFileCopyLine className="text-subtle hidden h-3 w-3 group-hover:block" />}
         </time>
       </TooltipTrigger>
-      <TooltipContent side="bottom" className="w-60 max-w-60 px-0">
-        <div className="text-subtle border-subtle border-b px-3 py-2 text-xs">
-          Click to copy ISO timestamp
-        </div>
-        <div className="mb-[6px] ml-3 mr-4 mt-3 flex items-center justify-between gap-2 text-sm">
-          <div className="text-muted flex items-center gap-1">
+      <TooltipContent side="right" className="w-64 max-w-64 px-0">
+        <div className="mb-[6px] ml-3 mr-4 mt-1.5 flex items-center justify-between gap-2 text-sm">
+          <div className="text-light flex items-center gap-1">
             <RiTimeLine className="h-[14px] w-[14px]" /> UTC
           </div>
-          <time className="text-subtle">{utcTimeString}</time>
+          <time className="text-onContrast">{utcTimeString}</time>
         </div>
-        <div className="mb-[6px] ml-3 mr-4 mt-3 flex items-center justify-between gap-5 text-sm">
-          <div className="text-muted flex items-center gap-1">
+        <div className="mb-[6px] ml-3 mr-4 flex items-center justify-between gap-5 text-sm">
+          <div className="text-light flex items-center gap-1">
             <RiUserSmileLine className="h-[14px] w-[14px]" /> Local
           </div>
-          <time className="text-subtle">{localTimeString}</time>
+          <time className="text-onContrast">{localTimeString}</time>
         </div>
       </TooltipContent>
     </Tooltip>

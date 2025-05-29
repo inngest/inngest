@@ -27,6 +27,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/driver/httpdriver"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/realtime"
+	"github.com/inngest/inngest/pkg/execution/singleton"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
@@ -220,6 +221,12 @@ func WithDebouncer(d debounce.Debouncer) ExecutorOpt {
 	}
 }
 
+func WithSingletonManager(sn singleton.Singleton) ExecutorOpt {
+	return func(e execution.Executor) error {
+		e.(*executor).singletonMgr = sn
+		return nil
+	}
+}
 func WithBatcher(b batch.BatchManager) ExecutorOpt {
 	return func(e execution.Executor) error {
 		e.(*executor).batcher = b
@@ -303,6 +310,7 @@ type executor struct {
 	queue               queue.Queue
 	debouncer           debounce.Debouncer
 	batcher             batch.BatchManager
+	singletonMgr        singleton.Singleton
 	fl                  state.FunctionLoader
 	evalFactory         func(ctx context.Context, expr string) (expressions.Evaluator, error)
 	runtimeDrivers      map[string]driver.Driver
@@ -500,14 +508,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	// If this is paused, immediately end just before creating state.
 	isPaused := req.FunctionPausedAt != nil && req.FunctionPausedAt.Before(time.Now())
 	if isPaused {
-		for _, e := range e.lifecycles {
-			go e.OnFunctionSkipped(context.WithoutCancel(ctx), metadata, execution.SkipState{
-				CronSchedule: req.Events[0].GetEvent().CronSchedule(),
-				Reason:       enums.SkipReasonFunctionPaused,
-				Events:       evts,
-			})
-		}
-		return nil, ErrFunctionSkipped
+		return e.handleFunctionSkipped(ctx, req, metadata, evts, enums.SkipReasonFunctionPaused)
 	}
 
 	mapped := make([]map[string]any, len(req.Events))
@@ -524,6 +525,40 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	// Create throttle information prior to creating state.  This is used in the queue.
 	//
 	throttle := queue.GetThrottleConfig(ctx, req.Function.ID, req.Function.Throttle, evtMap)
+
+	//
+	// Create singleton information and try to handle it prior to creating state.
+	//
+	var singletonConfig *queue.Singleton
+	data := req.Events[0].GetEvent().Map()
+
+	// Ignores Cancel mode for now
+	if req.Function.Singleton != nil && req.Function.Singleton.Mode == enums.SingletonModeSkip {
+		singletonKey, err := singleton.SingletonKey(ctx, req.Function.ID, *req.Function.Singleton, data)
+		switch {
+		case err == nil:
+			// Attempt to early handle function singletons, function runs could still fail
+			// to enqueue later on when it atomically tries to acquire a function mutex.
+			alreadyRunning, err := e.singletonMgr.Singleton(ctx, singletonKey, *req.Function.Singleton)
+
+			if err != nil {
+				return nil, err
+			}
+
+			if alreadyRunning {
+				// TODO: Handle cancellation mode
+
+				// Immediately end before creating state
+				return e.handleFunctionSkipped(ctx, req, metadata, evts, enums.SkipReasonSingleton)
+			}
+
+			singletonConfig = &queue.Singleton{Key: singletonKey}
+		case errors.Is(err, singleton.ErrNotASingleton):
+			// We no-op, and we run the function normally not as a singleton
+		default:
+			return nil, err
+		}
+	}
 
 	//
 	// Create the run state.
@@ -660,13 +695,28 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		Payload: queue.PayloadEdge{
 			Edge: inngest.SourceEdge,
 		},
-		Throttle: throttle,
+		Throttle:  throttle,
+		Singleton: singletonConfig,
 	}
 	err = e.queue.Enqueue(ctx, item, at, queue.EnqueueOpts{})
-	if err == redis_state.ErrQueueItemExists {
+
+	switch err {
+	case nil:
+		// no-op
+	case redis_state.ErrQueueItemExists:
 		return nil, state.ErrIdentifierExists
-	}
-	if err != nil {
+
+	case redis_state.ErrQueueItemSingletonExists:
+		_, err := e.smv2.Delete(ctx, sv2.IDFromV1(st.Identifier()))
+		if err != nil {
+			logger.StdlibLogger(ctx).Error(
+				"error deleting function state",
+				"error", err,
+			)
+		}
+		return e.handleFunctionSkipped(ctx, req, metadata, evts, enums.SkipReasonSingleton)
+
+	default:
 		return nil, fmt.Errorf("error enqueueing source edge '%v': %w", queueKey, err)
 	}
 
@@ -675,6 +725,17 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	}
 
 	return &metadata, nil
+}
+
+func (e *executor) handleFunctionSkipped(ctx context.Context, req execution.ScheduleRequest, metadata sv2.Metadata, evts []json.RawMessage, reason enums.SkipReason) (*sv2.Metadata, error) {
+	for _, e := range e.lifecycles {
+		go e.OnFunctionSkipped(context.WithoutCancel(ctx), metadata, execution.SkipState{
+			CronSchedule: req.Events[0].GetEvent().CronSchedule(),
+			Reason:       reason,
+			Events:       evts,
+		})
+	}
+	return nil, ErrFunctionSkipped
 }
 
 type runInstance struct {

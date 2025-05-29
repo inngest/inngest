@@ -89,7 +89,7 @@ export default function RunsTable({
   });
 
   const tableStyles = 'w-full';
-  const tableHeadStyles = 'bg-canvasSubtle sticky top-0 z-[2]';
+  const tableHeadStyles = 'bg-tableHeader sticky top-0 z-[2]';
   const tableBodyStyles = 'divide-y divide-light';
   const tableColumnStyles = 'px-4';
 
@@ -141,7 +141,7 @@ export default function RunsTable({
             <Fragment key={row.original.id}>
               <tr
                 key={row.original.id}
-                className="hover:bg-canvasSubtle/40 h-[42px] cursor-pointer"
+                className="hover:bg-canvasSubtle h-[42px] cursor-pointer"
                 onClick={() => {
                   if (expandedRunIDs.includes(row.original.id)) {
                     setExpandedRunIDs((prev) => {
