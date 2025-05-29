@@ -70,6 +70,7 @@ local drainActiveCounters = tonumber(ARGV[13])
 -- $include(gcra.lua)
 -- $include(ends_with.lua)
 -- $include(update_account_queues.lua)
+-- $include(update_active_counters.lua)
 
 -- first, get the queue item.  we must do this and bail early if the queue item
 -- was not found.
@@ -176,47 +177,8 @@ end
 -- If item was not refilled from backlog, we must increase active counters during lease
 -- to account used capacity for future backlog refills
 if refilledFromBacklog ~= 1 and drainActiveCounters ~= 1 then
-  -- Increase active counters by 1
-  redis.call("INCR", keyActivePartition)
-
-  if exists_without_ending(keyActiveAccount, ":-") then
-    redis.call("INCR", keyActiveAccount)
-  end
-
-  if exists_without_ending(keyActiveCompound, ":-") then
-    redis.call("INCR", keyActiveCompound)
-  end
-
-  if exists_without_ending(keyActiveConcurrencyKey1, ":-") then
-    redis.call("INCR", keyActiveConcurrencyKey1)
-  end
-
-  if exists_without_ending(keyActiveConcurrencyKey2, ":-") then
-    redis.call("INCR", keyActiveConcurrencyKey2)
-  end
-
-  if exists_without_ending(keyActiveRun, ":-") then
-    -- increase number of active items in run
-    if redis.call("INCR", keyActiveRun) == 1 then
-      -- if the first item in a run was moved to the ready queue, mark the run as active
-      -- and increment counters
-      if exists_without_ending(keyIndexActivePartitionRuns, ":-") then
-        redis.call("SADD", keyIndexActivePartitionRuns, runID)
-      end
-
-      if exists_without_ending(keyActiveRunsAccount, ":-") then
-        redis.call("INCR", keyActiveRunsAccount)
-      end
-
-      if exists_without_ending(keyActiveRunsCustomConcurrencyKey1, ":-") then
-        redis.call("INCR", keyActiveRunsCustomConcurrencyKey1)
-      end
-
-      if exists_without_ending(keyActiveRunsCustomConcurrencyKey2, ":-") then
-        redis.call("INCR", keyActiveRunsCustomConcurrencyKey2)
-      end
-    end
-  end
+  increaseActiveCounters(keyActivePartition, keyActiveAccount, keyActiveCompound, keyActiveConcurrencyKey1, keyActiveConcurrencyKey2, 1)
+  increaseActiveRunCounters(keyActiveRun, keyIndexActivePartitionRuns, keyActiveRunsAccount, keyActiveRunsCustomConcurrencyKey1, keyActiveRunsCustomConcurrencyKey2, runID)
 end
 
 return 0

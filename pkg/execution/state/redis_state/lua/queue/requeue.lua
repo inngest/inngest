@@ -68,6 +68,7 @@ local backlogItem             = ARGV[12]
 -- $include(ends_with.lua)
 -- $include(update_account_queues.lua)
 -- $include(enqueue_to_partition.lua)
+-- $include(update_active_counters.lua)
 
 local item = get_queue_item(queueKey, queueID)
 if item == nil then
@@ -126,64 +127,9 @@ if exists_without_ending(keyInProgressAccount, ":-") then
     redis.call("ZREM", keyInProgressAccount, item.id)
 end
 
--- Decrease active counters and clean up if necessary
-if redis.call("DECR", keyActivePartition) <= 0 then
-  redis.call("DEL", keyActivePartition)
-end
-
-if exists_without_ending(keyActiveAccount, ":-") then
-  if redis.call("DECR", keyActiveAccount) <= 0 then
-    redis.call("DEL", keyActiveAccount)
-  end
-end
-
-if exists_without_ending(keyActiveCompound, ":-") then
-  if redis.call("DECR", keyActiveCompound) <= 0 then
-    redis.call("DEL", keyActiveCompound)
-  end
-end
-
-if exists_without_ending(keyActiveConcurrencyKey1, ":-") then
-  if redis.call("DECR", keyActiveConcurrencyKey1) <= 0 then
-    redis.call("DEL", keyActiveConcurrencyKey1)
-  end
-end
-
-if exists_without_ending(keyActiveConcurrencyKey2, ":-") then
-  if redis.call("DECR", keyActiveConcurrencyKey2) <= 0 then
-    redis.call("DEL", keyActiveConcurrencyKey2)
-  end
-end
-
-if exists_without_ending(keyActiveRun, ":-") then
-  -- increase number of active items in the run
-  if redis.call("DECR", keyActiveRun) <= 0 then
-    redis.call("DEL", keyActiveRun)
-
-    -- update set of active function runs
-    if exists_without_ending(keyIndexActivePartitionRuns, ":-") then
-      redis.call("SREM", keyIndexActivePartitionRuns, runID)
-    end
-
-    if exists_without_ending(keyActiveRunsAccount, ":-") then
-      if redis.call("DECR", keyActiveRunsAccount) <= 0 then
-        redis.call("DEL", keyActiveRunsAccount)
-      end
-    end
-
-    if exists_without_ending(keyActiveRunsCustomConcurrencyKey1, ":-") then
-      if redis.call("DECR", keyActiveRunsCustomConcurrencyKey1) <= 0 then
-        redis.call("DEL", keyActiveRunsCustomConcurrencyKey1)
-      end
-    end
-
-    if exists_without_ending(keyActiveRunsCustomConcurrencyKey2, ":-") then
-      if redis.call("DECR", keyActiveRunsCustomConcurrencyKey2) <= 0 then
-        redis.call("DEL", keyActiveRunsCustomConcurrencyKey2)
-      end
-    end
-  end
-end
+-- Decrease active counters
+decreaseActiveCounters(keyActivePartition, keyActiveAccount, keyActiveCompound, keyActiveConcurrencyKey1, keyActiveConcurrencyKey2)
+decreaseActiveRunCounters(keyActiveRun, keyIndexActivePartitionRuns, keyActiveRunsAccount, keyActiveRunsCustomConcurrencyKey1, keyActiveRunsCustomConcurrencyKey2, runID)
 
 if requeueToBacklog == 1 then
 	--

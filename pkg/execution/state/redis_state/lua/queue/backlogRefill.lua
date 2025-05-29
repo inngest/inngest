@@ -79,6 +79,7 @@ local drainActiveCounters = tonumber(ARGV[16])
 -- $include(update_account_queues.lua)
 -- $include(gcra.lua)
 -- $include(update_backlog_pointer.lua)
+-- $include(update_active_counters.lua)
 
 --
 -- Retrieve current backlog size
@@ -261,26 +262,7 @@ if refill > 0 then
         local runID = updatedData.data.identifier.runID
         local keyActiveRun = string.format("%s:active:run:%s", keyPrefix, runID)
 
-        -- increase number of active items in run
-        if redis.call("INCR", keyActiveRun) == 1 then
-          -- if the first item in a run was moved to the ready queue, mark the run as active
-          -- and increment counters
-          if exists_without_ending(keyIndexActivePartitionRuns, ":-") then
-            redis.call("SADD", keyIndexActivePartitionRuns, runID)
-          end
-
-          if exists_without_ending(keyActiveRunsAccount, ":-") then
-            redis.call("INCR", keyActiveRunsAccount)
-          end
-
-          if exists_without_ending(keyActiveRunsCustomConcurrencyKey1, ":-") then
-            redis.call("INCR", keyActiveRunsCustomConcurrencyKey1)
-          end
-
-          if exists_without_ending(keyActiveRunsCustomConcurrencyKey2, ":-") then
-            redis.call("INCR", keyActiveRunsCustomConcurrencyKey2)
-          end
-        end
+        increaseActiveRunCounters(keyActiveRun, keyIndexActivePartitionRuns, keyActiveRunsAccount, keyActiveRunsCustomConcurrencyKey1, keyActiveRunsCustomConcurrencyKey2, runID)
       end
 
       table.insert(itemUpdateArgs, itemID)
@@ -296,24 +278,7 @@ if refill > 0 then
     redis.call("ZADD", keyReadySet, unpack(readyArgs))
 
     if drainActiveCounters ~= 1 then
-      -- Increase active counters by number of refilled items
-      redis.call("INCRBY", keyActivePartition, refilled)
-
-      if exists_without_ending(keyActiveAccount, ":-") then
-        redis.call("INCRBY", keyActiveAccount, refilled)
-      end
-
-      if exists_without_ending(keyActiveCompound, ":-") then
-        redis.call("INCRBY", keyActiveCompound, refilled)
-      end
-
-      if exists_without_ending(keyActiveConcurrencyKey1, ":-") then
-        redis.call("INCRBY", keyActiveConcurrencyKey1, refilled)
-      end
-
-      if exists_without_ending(keyActiveConcurrencyKey2, ":-") then
-        redis.call("INCRBY", keyActiveConcurrencyKey2, refilled)
-      end
+      increaseActiveCounters(keyActivePartition, keyActiveAccount, keyActiveCompound, keyActiveConcurrencyKey1, keyActiveConcurrencyKey2, refilled)
     end
 
     -- Update queue items with refill data
