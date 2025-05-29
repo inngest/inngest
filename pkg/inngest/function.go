@@ -17,6 +17,7 @@ import (
 	"github.com/gosimple/slug"
 	multierror "github.com/hashicorp/go-multierror"
 	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/expressions"
 	"github.com/inngest/inngest/pkg/syscode"
 	"github.com/xhit/go-str2duration/v2"
@@ -86,6 +87,12 @@ type Function struct {
 
 	// Cancel specifies cancellation signals for the function
 	Cancel []Cancel `json:"cancel,omitempty"`
+
+	// Singleton ensures that only one instance of the function runs at a time for a given key.
+	// If another invocation is received while an instance is running, the behavior depends on
+	// the mode property: `skip` will drop the new invocation, `cancel` will cancel the
+	// running instance and start the new one.
+	Singleton *Singleton `json:"singleton,omitempty"`
 
 	// Actions represents the actions to take for this function.  If empty, this assumes
 	// that we have a single action specified in the current directory using
@@ -177,9 +184,10 @@ func (t *Throttle) UnmarshalJSON(in []byte) error {
 	if t.Limit == 0 {
 		t.Limit = 1
 	}
-	if t.Burst == 0 {
-		t.Burst = 1
-	}
+	// NOTE: why is there a min 1?
+	// if t.Burst == 0 {
+	// 	t.Burst = 1
+	// }
 	return err
 }
 
@@ -332,6 +340,14 @@ func (f Function) Validate(ctx context.Context) error {
 				Message: "Batching and debouncing are mutually exclusive",
 			})
 		}
+
+		if f.Singleton != nil {
+			err = multierror.Append(err, syscode.Error{
+				Code:    syscode.CodeComboUnsupported,
+				Message: "Batching and singletons are mutually exclusive",
+			})
+		}
+
 	}
 
 	for _, step := range f.Steps {
@@ -489,4 +505,15 @@ func RandomID() (string, error) {
 	}
 	petname.NonDeterministicMode()
 	return fmt.Sprintf("%s-%s", petname.Generate(2, "-"), hex.EncodeToString(byt)), nil
+}
+
+type Singleton struct {
+	// Key is an optional string used to scope singleton execution based on event data.
+	// For example, to ensure only one function runs at a time per user, you can set the key to
+	// "{{ event.user.id }}". This guarantees that only one instance runs for each unique key.
+	Key *string `json:"key,omitempty"`
+
+	// Mode determines how to handle a new run when another singleton instance is already active.
+	// Use `skip` to skip the new run, or `cancel` to stop the current instance and run the new one.
+	Mode enums.SingletonMode `json:"mode"`
 }

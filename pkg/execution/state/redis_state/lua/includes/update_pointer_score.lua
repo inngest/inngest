@@ -34,3 +34,13 @@ local function get_earliest_pointer_score(keyPointerQueueSet)
     -- earliest is a table containing {item, score}
     return tonumber(earliestScore[2])
 end
+
+-- get_earliest_score returns the earliest score in a given set.
+local function get_earliest_score(keyQueueSet)
+    local earliestScore = redis.call("ZRANGE", keyQueueSet, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")
+    if earliestScore == nil or earliestScore == false or earliestScore[2] == nil then
+        return 0
+    end
+    -- earliest is a table containing {item, score}
+    return tonumber(earliestScore[2])
+end

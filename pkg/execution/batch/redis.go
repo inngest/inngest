@@ -18,7 +18,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/inngest/inngest/pkg/expressions"
 	"github.com/inngest/inngest/pkg/inngest"
-	"github.com/inngest/inngest/pkg/inngest/log"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -34,11 +34,18 @@ func WithRedisBatchSizeLimit(l int) RedisBatchManagerOpt {
 	}
 }
 
+func WithLogger(l logger.Logger) RedisBatchManagerOpt {
+	return func(m *redisBatchManager) {
+		m.log = l
+	}
+}
+
 func NewRedisBatchManager(b *redis_state.BatchClient, q redis_state.QueueManager, opts ...RedisBatchManagerOpt) BatchManager {
 	manager := redisBatchManager{
 		b:         b,
 		q:         q,
 		sizeLimit: defaultBatchSizeLimit,
+		log:       logger.StdlibLogger(context.Background()),
 	}
 
 	for _, apply := range opts {
@@ -54,6 +61,7 @@ type redisBatchManager struct {
 
 	// sizeLimit is the size limit that a batch can have
 	sizeLimit int
+	log       logger.Logger
 }
 
 func (b redisBatchManager) batchKey(ctx context.Context, evt event.Event, fn inngest.Function) (string, error) {
@@ -63,10 +71,11 @@ func (b redisBatchManager) batchKey(ctx context.Context, evt event.Event, fn inn
 
 	out, _, err := expressions.Evaluate(ctx, *fn.EventBatch.Key, map[string]any{"event": evt.Map()})
 	if err != nil {
-		log.From(ctx).Error().Err(err).
-			Str("expression", *fn.EventBatch.Key).
-			Interface("event", evt.Map()).
-			Msg("error evaluating batch key expression")
+		b.log.Error("error evaluating batch key expression",
+			"error", err,
+			"expression", *fn.EventBatch.Key,
+			"event", evt.Map(),
+		)
 		return fn.ID.String(), fmt.Errorf("invalid expression: %w", err)
 	}
 	if str, ok := out.(string); ok {
@@ -244,10 +253,7 @@ func (b redisBatchManager) ScheduleExecution(ctx context.Context, opts ScheduleB
 		QueueName:   &queueName,
 	}, opts.At, queue.EnqueueOpts{})
 	if err == redis_state.ErrQueueItemExists {
-		log.From(ctx).
-			Debug().
-			Interface("job_id", jobID).
-			Msg("queue item already exists for scheduled batch")
+		b.log.Debug("queue item already exists for scheduled batch", "job_id", jobID)
 		return nil
 	}
 	if err != nil {

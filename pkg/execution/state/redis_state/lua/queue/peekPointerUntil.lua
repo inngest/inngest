@@ -4,11 +4,10 @@ peekPointerUntil returns pointer IDs from the given ordered pointer ZSET in orde
 
 local keyOrderedPointerSet = KEYS[1]
 
-local peekUntilMS  = tonumber(ARGV[1])
-local limit        = tonumber(ARGV[2])
-local sequential   = tonumber(ARGV[3])
-
-local peekUntil    = math.ceil(peekUntilMS / 1000)
+local peekUntil    = tonumber(ARGV[1])
+local peekUntilMS  = tonumber(ARGV[2])
+local limit        = tonumber(ARGV[3])
+local sequential   = tonumber(ARGV[4])
 
 local count = redis.call("ZCOUNT", keyOrderedPointerSet, "-inf", peekUntil)
 local offset = 0

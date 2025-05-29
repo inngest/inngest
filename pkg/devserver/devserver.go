@@ -44,6 +44,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/ratelimit"
 	"github.com/inngest/inngest/pkg/execution/realtime"
 	"github.com/inngest/inngest/pkg/execution/runner"
+	"github.com/inngest/inngest/pkg/execution/singleton"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
@@ -120,6 +121,9 @@ func enforceConnectLeaseExpiry(ctx context.Context, accountID uuid.UUID) bool {
 }
 
 func start(ctx context.Context, opts StartOpts) error {
+	l := logger.StdlibLogger(ctx)
+	ctx = logger.WithStdlib(ctx, l)
+
 	db, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{InMemory: true})
 	if err != nil {
 		return err
@@ -244,6 +248,7 @@ func start(ctx context.Context, opts StartOpts) error {
 
 			return keys
 		}),
+		redis_state.WithLogger(l),
 		redis_state.WithConcurrencyLimitGetter(func(ctx context.Context, p redis_state.QueuePartition) redis_state.PartitionConcurrencyLimits {
 			// In the dev server, there are never account limits.
 			limits := redis_state.PartitionConcurrencyLimits{
@@ -293,9 +298,9 @@ func start(ctx context.Context, opts StartOpts) error {
 			return enableKeyQueues
 		}),
 		redis_state.WithEnqueueSystemPartitionsToBacklog(false),
-		redis_state.WithDisableLeaseChecksForSystemQueues(false),
+		redis_state.WithDisableLeaseChecksForSystemQueues(enableKeyQueues),
 		redis_state.WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-			return false
+			return enableKeyQueues
 		}),
 		redis_state.WithBacklogRefillLimit(10),
 	}
@@ -308,8 +313,10 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	rl := ratelimit.New(ctx, unshardedRc, "{ratelimit}:")
 
-	batcher := batch.NewRedisBatchManager(shardedClient.Batch(), rq)
+	batcher := batch.NewRedisBatchManager(shardedClient.Batch(), rq, batch.WithLogger(l))
 	debouncer := debounce.NewRedisDebouncer(unshardedClient.Debounce(), queueShard, rq)
+
+	sn := singleton.New(ctx, queueShard.RedisClient)
 
 	conditionalTracer := itrace.NewConditionalTracer(itrace.ConnectTracer(), itrace.AlwaysTrace)
 
@@ -378,7 +385,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		),
 		executor.WithExpressionAggregator(agg),
 		executor.WithQueue(rq),
-		executor.WithLogger(logger.From(ctx)),
+		executor.WithLogger(l),
 		executor.WithFunctionLoader(loader),
 		executor.WithRealtimePublisher(broadcaster),
 		executor.WithLifecycleListeners(
@@ -396,7 +403,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		),
 		executor.WithStepLimits(func(id sv2.ID) int {
 			if override, hasOverride := stepLimitOverrides[id.FunctionID.String()]; hasOverride {
-				logger.From(ctx).Warn().Msgf("Using step limit override of %d for %q\n", override, id.FunctionID)
+				l.Warn("using step limit override", "override", override, "fn_id", id.FunctionID)
 				return override
 			}
 
@@ -404,7 +411,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		}),
 		executor.WithStateSizeLimits(func(id sv2.ID) int {
 			if override, hasOverride := stateSizeLimitOverrides[id.FunctionID.String()]; hasOverride {
-				logger.From(ctx).Warn().Msgf("Using state size limit override of %d for %q\n", override, id.FunctionID)
+				l.Warn("using state size limit override", "override", override, "fn_id", id.FunctionID)
 				return override
 			}
 
@@ -413,6 +420,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		executor.WithInvokeFailHandler(getInvokeFailHandler(ctx, pb, opts.Config.EventStream.Service.Concrete.TopicName())),
 		executor.WithSendingEventHandler(getSendingEventHandler(ctx, pb, opts.Config.EventStream.Service.Concrete.TopicName())),
 		executor.WithDebouncer(debouncer),
+		executor.WithSingletonManager(sn),
 		executor.WithBatcher(batcher),
 		executor.WithAssignedQueueShard(queueShard),
 		executor.WithShardSelector(shardSelector),
@@ -435,6 +443,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		executor.WithServiceExecutor(exec),
 		executor.WithServiceBatcher(batcher),
 		executor.WithServiceDebouncer(debouncer),
+		executor.WithServiceLogger(l),
 	)
 
 	runner := runner.NewService(
@@ -449,6 +458,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		runner.WithRateLimiter(rl),
 		runner.WithBatchManager(batcher),
 		runner.WithPublisher(pb),
+		runner.WithLogger(l),
 	)
 
 	// The devserver embeds the event API.
@@ -496,7 +506,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	core, err := coreapi.NewCoreApi(coreapi.Options{
 		Data:          ds.Data,
 		Config:        ds.Opts.Config,
-		Logger:        logger.From(ctx),
+		Logger:        l,
 		Runner:        ds.Runner,
 		Tracker:       ds.Tracker,
 		State:         ds.State,
@@ -570,6 +580,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		Config:         ds.Opts.Config,
 		Mounts:         mounts,
 		LocalEventKeys: opts.EventKeys,
+		Logger:         l,
 	})
 
 	return service.StartAll(ctx, ds, runner, executorSvc, ds.Apiservice, connGateway)

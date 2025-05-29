@@ -8,17 +8,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/inngest/inngest/pkg/connect"
-	"github.com/inngest/inngest/pkg/connect/auth"
-	"github.com/inngest/inngest/pkg/connect/lifecycles"
-	connectpubsub "github.com/inngest/inngest/pkg/connect/pubsub"
-	connectv0 "github.com/inngest/inngest/pkg/connect/rest/v0"
-	connstate "github.com/inngest/inngest/pkg/connect/state"
-	"github.com/inngest/inngest/pkg/expressions/expragg"
-	"github.com/inngest/inngest/pkg/util/awsgateway"
-
-	"github.com/inngest/inngest/pkg/enums"
-
 	"github.com/alicebob/miniredis/v2"
 	"github.com/coocood/freecache"
 	"github.com/eko/gocache/lib/v4/cache"
@@ -31,10 +20,17 @@ import (
 	"github.com/inngest/inngest/pkg/config"
 	_ "github.com/inngest/inngest/pkg/config/defaults"
 	"github.com/inngest/inngest/pkg/config/registration"
+	"github.com/inngest/inngest/pkg/connect"
+	"github.com/inngest/inngest/pkg/connect/auth"
+	"github.com/inngest/inngest/pkg/connect/lifecycles"
+	connectpubsub "github.com/inngest/inngest/pkg/connect/pubsub"
+	connectv0 "github.com/inngest/inngest/pkg/connect/rest/v0"
+	connstate "github.com/inngest/inngest/pkg/connect/state"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/coreapi"
 	"github.com/inngest/inngest/pkg/cqrs/base_cqrs"
 	"github.com/inngest/inngest/pkg/devserver"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/batch"
@@ -50,12 +46,14 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/expressions"
+	"github.com/inngest/inngest/pkg/expressions/expragg"
 	"github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/pubsub"
 	"github.com/inngest/inngest/pkg/run"
 	"github.com/inngest/inngest/pkg/service"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
+	"github.com/inngest/inngest/pkg/util/awsgateway"
 	"github.com/redis/rueidis"
 	"go.opentelemetry.io/otel/propagation"
 	"golang.org/x/sync/errgroup"
@@ -108,6 +106,9 @@ func New(ctx context.Context, opts StartOpts) error {
 }
 
 func start(ctx context.Context, opts StartOpts) error {
+	l := logger.StdlibLogger(ctx)
+	ctx = logger.WithStdlib(ctx, l)
+
 	db, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{
 		InMemory:    false,
 		PostgresURI: opts.PostgresURI,
@@ -261,7 +262,7 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	rl := ratelimit.New(ctx, unshardedRc, "{ratelimit}:")
 
-	batcher := batch.NewRedisBatchManager(shardedClient.Batch(), rq)
+	batcher := batch.NewRedisBatchManager(shardedClient.Batch(), rq, batch.WithLogger(l))
 	debouncer := debounce.NewRedisDebouncer(unshardedClient.Debounce(), queueShard, rq)
 
 	// Create a new expression aggregator, using Redis to load evaluables.
@@ -323,7 +324,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		),
 		executor.WithExpressionAggregator(agg),
 		executor.WithQueue(rq),
-		executor.WithLogger(logger.From(ctx)),
+		executor.WithLogger(l),
 		executor.WithFunctionLoader(loader),
 		executor.WithLifecycleListeners(
 			history.NewLifecycleListener(
@@ -339,7 +340,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		),
 		executor.WithStepLimits(func(id sv2.ID) int {
 			if override, hasOverride := stepLimitOverrides[id.FunctionID.String()]; hasOverride {
-				logger.From(ctx).Warn().Msgf("Using step limit override of %d for %q\n", override, id.FunctionID)
+				l.Warn("using step limit override", "override", override, "fn_id", id.FunctionID)
 				return override
 			}
 
@@ -347,7 +348,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		}),
 		executor.WithStateSizeLimits(func(id sv2.ID) int {
 			if override, hasOverride := stateSizeLimitOverrides[id.FunctionID.String()]; hasOverride {
-				logger.From(ctx).Warn().Msgf("Using state size limit override of %d for %q\n", override, id.FunctionID)
+				l.Warn("using state size limit override", "override", override, "fn_id", id.FunctionID)
 				return override
 			}
 
@@ -373,6 +374,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		executor.WithServiceExecutor(exec),
 		executor.WithServiceBatcher(batcher),
 		executor.WithServiceDebouncer(debouncer),
+		executor.WithServiceLogger(l),
 	)
 
 	runner := runner.NewService(
@@ -387,6 +389,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		runner.WithRateLimiter(rl),
 		runner.WithBatchManager(batcher),
 		runner.WithPublisher(pb),
+		runner.WithLogger(l),
 	)
 
 	// The devserver embeds the event API.
@@ -402,7 +405,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		if u, err := url.Parse(opts.RedisURI); err == nil {
 			loggedURI = " " + u.Redacted()
 		}
-		logger.From(ctx).Info().Msgf("using external Redis%s; disabling in-memory persistence and snapshotting", loggedURI)
+		l.Info("using external redis, disabling in-memory persistence and snapshotting", "url", loggedURI)
 	}
 
 	dsOpts := devserver.StartOpts{
@@ -465,7 +468,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	core, err := coreapi.NewCoreApi(coreapi.Options{
 		Data:            ds.Data,
 		Config:          ds.Opts.Config,
-		Logger:          logger.From(ctx),
+		Logger:          logger.StdlibLogger(ctx),
 		Runner:          ds.Runner,
 		Tracker:         ds.Tracker,
 		State:           ds.State,
@@ -529,6 +532,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		},
 		LocalEventKeys: opts.EventKey,
 		RequireKeys:    true,
+		Logger:         l,
 	})
 
 	return service.StartAll(ctx, ds, runner, executorSvc, ds.Apiservice, connGateway)

@@ -33,9 +33,7 @@ export const ActionsMenu = ({
         <Button kind="primary" appearance="outlined" size="medium" icon={<RiMore2Line />} raw />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <OptionalTooltip
-          tooltip={disableValidate ? 'No syncs. App health check not available.' : undefined}
-        >
+        <OptionalTooltip tooltip={disableValidate ? 'App health check not available.' : undefined}>
           <DropdownMenuItem disabled={disableValidate} onSelect={showValidate}>
             <RiFirstAidKitLine className="h-4 w-4" />
             Check app health

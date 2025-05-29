@@ -74,8 +74,14 @@ func WithServiceBatcher(b batch.BatchManager) func(s *svc) {
 	}
 }
 
+func WithServiceLogger(l logger.Logger) func(s *svc) {
+	return func(s *svc) {
+		s.log = l
+	}
+}
+
 func NewService(c config.Config, opts ...Opt) service.Service {
-	svc := &svc{config: c}
+	svc := &svc{config: c, log: logger.StdlibLogger(context.Background())}
 	for _, o := range opts {
 		o(svc)
 	}
@@ -94,6 +100,7 @@ type svc struct {
 	exec      execution.Executor
 	debouncer debounce.Debouncer
 	batcher   batch.BatchManager
+	log       logger.Logger
 
 	wg sync.WaitGroup
 
@@ -175,7 +182,7 @@ func (s *svc) getFinishHandler(ctx context.Context) (func(context.Context, sv2.I
 }
 
 func (s *svc) Run(ctx context.Context) error {
-	logger.From(ctx).Info().Msg("subscribing to function queue")
+	s.log.Info("subscribing to function queue")
 	return s.queue.Run(ctx, func(ctx context.Context, info queue.RunInfo, item queue.Item) (queue.RunResult, error) {
 		// Don't stop the service on errors.
 		s.wg.Add(1)
@@ -205,7 +212,7 @@ func (s *svc) Run(ctx context.Context) error {
 		}
 
 		if err != nil {
-			logger.StdlibLogger(ctx).Error("error handling queue item", "error", err)
+			s.log.Error("error handling queue item", "error", err)
 		}
 
 		return queue.RunResult{
@@ -270,7 +277,7 @@ func (s *svc) handleQueueItem(ctx context.Context, item queue.Item) (bool, error
 }
 
 func (s *svc) handlePauseTimeout(ctx context.Context, item queue.Item) error {
-	l := logger.From(ctx).With().Str("run_id", item.Identifier.RunID.String()).Logger()
+	l := s.log.With("run_id", item.Identifier.RunID.String())
 
 	pauseTimeout, ok := item.Payload.(queue.PayloadPauseTimeout)
 	if !ok {
@@ -280,7 +287,7 @@ func (s *svc) handlePauseTimeout(ctx context.Context, item queue.Item) error {
 	pause, err := s.state.PauseByID(ctx, pauseTimeout.PauseID)
 	if err == state.ErrPauseNotFound {
 		// This pause has been consumed.
-		l.Debug().Interface("pause", pauseTimeout).Msg("consumed pause timeout ignored")
+		l.Debug("consumed pause timeout ignored", "pause", pauseTimeout)
 		return nil
 	}
 	if err != nil {
@@ -364,7 +371,7 @@ func (s *svc) handleDebounce(ctx context.Context, item queue.Item) error {
 			if err != nil {
 				if errors.Is(err, debounce.ErrDebounceNotFound) {
 					// This is expected after migrating items to a new primary cluster
-					logger.StdlibLogger(ctx).Info("debounce not found during timeout job, skipping",
+					s.log.Info("debounce not found during timeout job, skipping",
 						"fn_id", d.FunctionID.String(),
 						"debounce_id", d.DebounceID.String(),
 					)
@@ -379,7 +386,7 @@ func (s *svc) handleDebounce(ctx context.Context, item queue.Item) error {
 					// This should rarely happen, but it's possible for another Debounce() that will migrate an existing debounce to come in
 					// at the same time as we're starting the timeout. GetDebounceItem() does not perform an atomic swap, so
 					// the debounce may already be gone as soon as we reach StartExecution().
-					logger.StdlibLogger(ctx).Warn("debounce raced by a migration, skipping",
+					s.log.Warn("debounce raced by a migration, skipping",
 						"fn_id", d.FunctionID.String(),
 						"debounce_id", d.DebounceID.String(),
 					)

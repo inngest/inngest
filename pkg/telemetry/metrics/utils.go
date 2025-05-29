@@ -6,7 +6,7 @@ import (
 	"reflect"
 	"sync"
 
-	"github.com/inngest/inngest/pkg/inngest/log"
+	"github.com/inngest/inngest/pkg/logger"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
@@ -83,13 +83,13 @@ type CounterOpt struct {
 func RecordCounterMetric(ctx context.Context, incr int64, opts CounterOpt) {
 	attrs := []attribute.KeyValue{}
 	if opts.Tags != nil {
-		attrs = append(attrs, parseAttributes(opts.Tags)...)
+		attrs = append(attrs, parseAttributes(ctx, opts.Tags)...)
 	}
 
 	metricName := fmt.Sprintf("%s_%s", prefix, opts.MetricName)
 	c, err := registry.getCounter(ctx, opts)
 	if err != nil {
-		log.From(ctx).Error().Err(err).Str("metric_name", metricName).Msg("error accessing counter metric")
+		logger.StdlibLogger(ctx).Error("error accessing counter metric", "error", err, "metric_name", metricName)
 		return
 	}
 
@@ -99,13 +99,13 @@ func RecordCounterMetric(ctx context.Context, incr int64, opts CounterOpt) {
 func RecordUpDownCounterMetric(ctx context.Context, val int64, opts CounterOpt) {
 	attrs := []attribute.KeyValue{}
 	if opts.Tags != nil {
-		attrs = append(attrs, parseAttributes(opts.Tags)...)
+		attrs = append(attrs, parseAttributes(ctx, opts.Tags)...)
 	}
 
 	metricName := fmt.Sprintf("%s_%s", prefix, opts.MetricName)
 	c, err := registry.getUpDownCounter(ctx, opts)
 	if err != nil {
-		log.From(ctx).Error().Err(err).Str("metric_name", metricName).Msg("error accessing counter metric")
+		logger.StdlibLogger(ctx).Error("error accessing counter metric", "error", err, "metric_name", metricName)
 		return
 	}
 
@@ -171,20 +171,20 @@ func RegisterAsyncGauge(ctx context.Context, opts GaugeOpt) {
 	metricName := fmt.Sprintf("%s_%s", prefix, opts.MetricName)
 	_, err := registry.setAsyncGauge(ctx, opts)
 	if err != nil {
-		log.From(ctx).Error().Err(err).Str("metric_name", metricName).Msg("error setting async gauge")
+		logger.StdlibLogger(ctx).Error("error setting async gauge", "error", err, "metric_name", metricName)
 	}
 }
 
 func RecordGaugeMetric(ctx context.Context, val int64, opts GaugeOpt) {
 	attrs := []attribute.KeyValue{}
 	if opts.Tags != nil {
-		attrs = append(attrs, parseAttributes(opts.Tags)...)
+		attrs = append(attrs, parseAttributes(ctx, opts.Tags)...)
 	}
 
 	metricName := fmt.Sprintf("%s_%s", prefix, opts.MetricName)
 	c, err := registry.getGauge(ctx, opts)
 	if err != nil {
-		log.From(ctx).Error().Err(err).Str("metric_name", metricName).Msg("error accessing counter metric")
+		logger.StdlibLogger(ctx).Error("error accessing counter metric", "error", err, "metric_name", metricName)
 		return
 	}
 
@@ -231,13 +231,13 @@ func RecordIntHistogramMetric(ctx context.Context, value int64, opts HistogramOp
 	metricName := fmt.Sprintf("%s_%s", prefix, opts.MetricName)
 	h, err := registry.getHistogram(ctx, opts)
 	if err != nil {
-		log.From(ctx).Error().Err(err).Str("metric_name", metricName).Msg("error accessing histogram metric")
+		logger.StdlibLogger(ctx).Error("error accessing histogram metric", "error", err, "metric_name", metricName)
 		return
 	}
 
 	attrs := []attribute.KeyValue{}
 	if opts.Tags != nil {
-		attrs = append(attrs, parseAttributes(opts.Tags)...)
+		attrs = append(attrs, parseAttributes(ctx, opts.Tags)...)
 	}
 	h.Record(ctx, value, metric.WithAttributes(attrs...))
 }
@@ -336,7 +336,7 @@ func (r *metricsRegistry) setAsyncGauge(ctx context.Context, opts GaugeOpt) (met
 			}
 			attrs := []attribute.KeyValue{}
 			if opts.Tags != nil {
-				attrs = append(attrs, parseAttributes(opts.Tags)...)
+				attrs = append(attrs, parseAttributes(ctx, opts.Tags)...)
 			}
 			o.Observe(value, metric.WithAttributes(attrs...))
 			return nil
@@ -397,7 +397,7 @@ func (r *metricsRegistry) getHistogram(ctx context.Context, opts HistogramOpt) (
 }
 
 // parseAttributes parses the attribute map into otel compatible attributes
-func parseAttributes(attrs map[string]any) []attribute.KeyValue {
+func parseAttributes(ctx context.Context, attrs map[string]any) []attribute.KeyValue {
 	result := make([]attribute.KeyValue, 0)
 
 	for k, v := range attrs {
@@ -433,11 +433,10 @@ func parseAttributes(attrs map[string]any) []attribute.KeyValue {
 		case reflect.Bool:
 			attr.Value = attribute.BoolValue(v.(bool))
 		default:
-			log.From(context.Background()).
-				Warn().
-				Str("kind", t.Kind().String()).
-				Interface("value", v).
-				Msg("unsupported type of value used for metrics attribute")
+			logger.StdlibLogger(ctx).Warn("unsupported type of value used for metrics attribute",
+				"kind", t.Kind().String(),
+				"value", v,
+			)
 			continue
 		}
 

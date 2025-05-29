@@ -22,7 +22,7 @@ import (
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	headerspkg "github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/inngest"
-	"github.com/inngest/inngest/pkg/inngest/log"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/syscode"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/oklog/ulid/v2"
@@ -55,6 +55,8 @@ func (e executor) RuntimeType() string {
 }
 
 func (e executor) Execute(ctx context.Context, sl sv2.StateLoader, s sv2.Metadata, item queue.Item, edge inngest.Edge, step inngest.Step, idx, attempt int) (*state.DriverResponse, error) {
+	l := logger.StdlibLogger(ctx)
+
 	if e.requireLocalSigningKey && len(e.localSigningKey) == 0 {
 		return nil, fmt.Errorf("server requires that a signing key is set to run functions")
 	}
@@ -71,11 +73,7 @@ func (e executor) Execute(ctx context.Context, sl sv2.StateLoader, s sv2.Metadat
 
 	headers := make(map[string]string)
 	if spanID, err := item.SpanID(); err != nil {
-		log.From(ctx).
-			Error().
-			Str("run_id", s.ID.RunID.String()).
-			Err(err).
-			Msg("error retrieving span ID")
+		l.Error("error retrieving span ID", "error", err, "run_id", s.ID.RunID.String())
 	} else {
 		headers, err = itrace.HeadersFromTraceState(
 			ctx,
@@ -84,11 +82,10 @@ func (e executor) Execute(ctx context.Context, sl sv2.StateLoader, s sv2.Metadat
 			s.ID.FunctionID.String(),
 		)
 		if err != nil {
-			log.From(ctx).
-				Warn().
-				Str("run_id", s.ID.RunID.String()).
-				Err(err).
-				Msg("failed to add userland data to trace state")
+			l.Warn("failed to add userland data to trace state",
+				"error", err,
+				"run_id", s.ID.RunID.String(),
+			)
 		}
 	}
 
@@ -156,6 +153,8 @@ func executeDriverRequest(ctx context.Context, c exechttp.RequestExecutor, r Req
 }
 
 func HandleHttpResponse(ctx context.Context, r Request, resp *Response) (*state.DriverResponse, error) {
+	l := logger.StdlibLogger(ctx)
+
 	var err error
 	if resp.StatusCode == 206 {
 		// This is a generator-based function returning opcodes.
@@ -215,11 +214,11 @@ func HandleHttpResponse(ctx context.Context, r Request, resp *Response) (*state.
 	}
 
 	if dr.Err == nil && resp.StatusCode == 200 && !resp.IsSDK {
-		log.From(ctx).Info().
-			Interface("headers", resp.Header).
-			Str("run_id", r.RunID.String()).
-			Str("url", r.URL.String()).
-			Msg("response did not come from an Inngest SDK")
+		l.Info("response did not come from an Inngest SDK",
+			"headers", resp.Header,
+			"run_id", r.RunID.String(),
+			"url", r.URL.String(),
+		)
 		// TODO: Call dr.SetError and set dr.Output. We aren't doing that yet
 		// because we want to observe logs first
 	}
@@ -265,6 +264,8 @@ func HandleHttpResponse(ctx context.Context, r Request, resp *Response) (*state.
 }
 
 func do(ctx context.Context, c exechttp.RequestExecutor, r Request) (*Response, *httpstat.Result, error) {
+	l := logger.StdlibLogger(ctx)
+
 	if c == nil {
 		c = defaultClient
 	}
@@ -298,14 +299,14 @@ func do(ctx context.Context, c exechttp.RequestExecutor, r Request) (*Response, 
 	resp, err := c.DoRequest(ctx, req)
 
 	// Handle no response errors.
-	if errors.Is(err, exechttp.ErrUnableToReach) {
-		log.From(ctx).
-			Warn().
-			Str("url", r.URL.String()).
-			Interface("step", r.Step).
-			Interface("edge	", r.Edge).
-			Msg("unable to reach SDK")
-		return nil, nil, err
+	if errors.Is(err, ErrUnableToReach) {
+		l.Warn("EOF writing request to SDK",
+			"url", r.URL.String(),
+			"step", r.Step,
+			"edge	", r.Edge,
+			"req_dur_ms", dur.Milliseconds(),
+		)
+		return nil, tracking, err
 	}
 	if resp == nil {
 		return nil, nil, err
@@ -325,14 +326,13 @@ func do(ctx context.Context, c exechttp.RequestExecutor, r Request) (*Response, 
 	}
 
 	if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
-		log.From(ctx).
-			Error().
-			Err(err).
-			Str("url", r.URL.String()).
-			Interface("headers", resp.Header).
-			Interface("step", r.Step).
-			Interface("edge	", r.Edge).
-			Msg("http eof reading response")
+		l.Error("http eof reading response",
+			"error", err,
+			"url", r.URL.String(),
+			"headers", resp.Header,
+			"step", r.Step,
+			"edge	", r.Edge,
+		)
 	}
 
 	// These variables are extracted from streaming and non-streaming responses separately.
@@ -380,9 +380,10 @@ func do(ctx context.Context, c exechttp.RequestExecutor, r Request) (*Response, 
 
 	if statusCode == 0 {
 		// Unreachable
-		log.From(ctx).Error().Err(err).
-			Str("run_id", r.RunID.String()).
-			Msg("status code is 0")
+		l.Error("status code is 0",
+			"error", err,
+			"run_id", r.RunID.String(),
+		)
 	}
 
 	// Check the retry status from the headers and versions.

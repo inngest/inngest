@@ -13,7 +13,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
-	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 	"github.com/inngest/inngest/pkg/util"
@@ -30,8 +29,6 @@ const (
 // shadowWorker runs a blocking process that listens to item being pushed into the
 // shadow queue partition channel. This allows us to process an individual shadow partition.
 func (q *queue) shadowWorker(ctx context.Context, qspc chan shadowPartitionChanMsg) {
-	l := logger.StdlibLogger(ctx)
-
 	for {
 		select {
 		case <-ctx.Done():
@@ -50,7 +47,7 @@ func (q *queue) shadowWorker(ctx context.Context, qspc chan shadowPartitionChanM
 				map[string]any{"partition_id": msg.sp.PartitionID},
 			)
 			if err != nil {
-				l.Error("could not scan shadow partition", "error", err, "shadow_part", msg.sp, "continuation_count", msg.continuationCount)
+				q.log.Error("could not scan shadow partition", "error", err, "shadow_part", msg.sp, "continuation_count", msg.continuationCount)
 			}
 		}
 	}
@@ -112,7 +109,9 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 	}
 
 	limit := ShadowPartitionPeekMaxBacklogs
-	refillUntil := q.clock.Now().Truncate(time.Second).Add(PartitionLookahead)
+
+	// Scan a little further into the future
+	refillUntil := q.clock.Now().Truncate(time.Second).Add(2 * PartitionLookahead)
 
 	// Pick a random backlog offset every time
 	sequential := false
@@ -125,6 +124,12 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 		PkgName: pkgName,
 		Tags:    map[string]any{"partition_id": shadowPart.PartitionID},
 	})
+
+	// q.log.Trace("processing backlogs",
+	// 	"partition_id", shadowPart.PartitionID,
+	// 	"until", refillUntil.Format(time.StampMilli),
+	// 	"backlogs", len(backlogs),
+	// )
 
 	// Refill backlogs in random order
 	fullyProcessedBacklogs := 0
@@ -179,6 +184,17 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 			return fmt.Errorf("could not refill backlog: %w", err)
 		}
 
+		q.log.Trace("processed backlog",
+			"backlog", backlog.BacklogID,
+			"total", res.TotalBacklogCount,
+			"until", res.BacklogCountUntil,
+			"constrained", res.Constraint,
+			"capacity", res.Capacity,
+			"refill", res.Refill,
+			"refilled", res.Refilled,
+			"throttle", shadowPart.Throttle,
+		)
+
 		// instrumentation
 		{
 			opts := metrics.CounterOpt{
@@ -207,12 +223,37 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 			q.instrumentBacklogResult(ctx, backlog, res)
 		}
 
+		var forceRequeueShadowPartitionAt time.Time
+		var forceRequeueBacklogAt time.Time
+
 		// If backlog is limited by function or account-level concurrency, stop refilling
-		if res.Constraint == enums.QueueConstraintAccountConcurrency || res.Constraint == enums.QueueConstraintFunctionConcurrency {
+		isConcurrencyLimited := res.Constraint == enums.QueueConstraintAccountConcurrency ||
+			res.Constraint == enums.QueueConstraintFunctionConcurrency
+		if isConcurrencyLimited {
+			forceRequeueShadowPartitionAt = q.clock.Now().Add(PartitionConcurrencyLimitRequeueExtension)
+		}
+
+		// If backlog is concurrency limited by custom key, requeue just this backlog in the future
+		if res.Constraint == enums.QueueConstraintCustomConcurrencyKey1 || res.Constraint == enums.QueueConstraintCustomConcurrencyKey2 {
+			forceRequeueBacklogAt = backlog.requeueBackOff(q.clock.Now(), res.Constraint, shadowPart)
+		}
+
+		// If backlog is throttled, requeue just this backlog in the future
+		if res.Constraint == enums.QueueConstraintThrottle {
+			forceRequeueBacklogAt = backlog.requeueBackOff(q.clock.Now(), res.Constraint, shadowPart)
+		}
+
+		if !forceRequeueBacklogAt.IsZero() {
+			err = q.BacklogRequeue(ctx, backlog, shadowPart, forceRequeueBacklogAt)
+			if err != nil && !errors.Is(err, ErrBacklogNotFound) {
+				return fmt.Errorf("could not requeue shadow partition: %w", err)
+			}
+		}
+
+		if !forceRequeueShadowPartitionAt.IsZero() {
 			q.removeShadowContinue(ctx, shadowPart, false)
 
-			forceRequeueAt := q.clock.Now().Add(ShadowPartitionRefillCapacityReachedRequeueExtension)
-			err = q.ShadowPartitionRequeue(ctx, shadowPart, *leaseID, &forceRequeueAt)
+			err = q.ShadowPartitionRequeue(ctx, shadowPart, *leaseID, &forceRequeueShadowPartitionAt)
 			if err != nil {
 				return fmt.Errorf("could not requeue shadow partition: %w", err)
 			}
@@ -278,8 +319,6 @@ func (q *queue) scanShadowPartitions(ctx context.Context, until time.Time, qspc 
 		if err := q.scanShadowContinuations(ctx, qspc); err != nil {
 			return fmt.Errorf("error scanning shadow continuations: %w", err)
 		}
-
-		return nil
 	}
 
 	// TODO introduce weight probability to blend account/global scanning
@@ -313,7 +352,7 @@ func (q *queue) scanShadowPartitions(ctx context.Context, until time.Time, qspc 
 
 				parts, err := q.peekShadowPartitions(ctx, partitionKey, sequential, accountPartitionPeekMax, until)
 				if err != nil {
-					q.logger.Error().Err(err).Msg("error processing account partitions")
+					q.log.Error("error processing account partitions", "error", err)
 					return
 				}
 
@@ -351,7 +390,6 @@ func (q *queue) scanShadowPartitions(ctx context.Context, until time.Time, qspc 
 // shadowScan iterates through the shadow partitions and attempt to add queue items
 // to the function partition for processing
 func (q *queue) shadowScan(ctx context.Context) error {
-	l := logger.StdlibLogger(ctx)
 	qspc := make(chan shadowPartitionChanMsg)
 
 	for i := int32(0); i < q.numShadowWorkers; i++ {
@@ -359,7 +397,7 @@ func (q *queue) shadowScan(ctx context.Context) error {
 	}
 
 	tick := q.clock.NewTicker(q.pollTick)
-	l.Debug("starting shadow scanner", "poll", q.pollTick.String())
+	q.log.Debug("starting shadow scanner", "poll", q.pollTick.String())
 
 	for {
 		select {
@@ -368,9 +406,18 @@ func (q *queue) shadowScan(ctx context.Context) error {
 			return nil
 
 		case <-tick.Chan():
-			if err := q.scanShadowPartitions(ctx, q.clock.Now().Add(PartitionLookahead), qspc); err != nil {
+			// Scan a little further into the future
+			now := q.clock.Now()
+			scanUntil := now.Truncate(time.Second).Add(2 * PartitionLookahead)
+			if err := q.scanShadowPartitions(ctx, scanUntil, qspc); err != nil {
 				return fmt.Errorf("could not scan shadow partitions: %w", err)
 			}
+
+			// q.log.Trace("scan loop",
+			// 	"start", now.Format(time.StampMilli),
+			// 	"until", scanUntil.Format(time.StampMilli),
+			// 	"dur", q.clock.Now().Sub(now).String(),
+			// )
 		}
 	}
 }
@@ -390,10 +437,11 @@ func (q *queue) peekShadowPartitions(ctx context.Context, partitionIndexKey stri
 			return &QueueShadowPartition{}
 		},
 		handleMissingItems: func(pointers []string) error {
-			logger.StdlibLogger(ctx).Warn("found missing shadow partitions", "missing", pointers, "partitionKey", partitionIndexKey)
+			q.log.Warn("found missing shadow partitions", "missing", pointers, "partitionKey", partitionIndexKey)
 
 			return nil
 		},
+		isMillisecondPrecision: true,
 	}
 
 	res, err := p.peek(ctx, partitionIndexKey, sequential, until, peekLimit)
@@ -402,6 +450,12 @@ func (q *queue) peekShadowPartitions(ctx context.Context, partitionIndexKey stri
 			return nil, ErrShadowPartitionPeekMaxExceedsLimits
 		}
 		return nil, fmt.Errorf("could not peek shadow partitions: %w", err)
+	}
+
+	if res.TotalCount > 0 {
+		for _, p := range res.Items {
+			q.log.Trace("peeked shadow partition", "partition_id", p.PartitionID, "until", until.Format(time.StampMilli))
+		}
 	}
 
 	return res.Items, nil
@@ -495,14 +549,15 @@ func (q *queue) ShadowPartitionPeek(ctx context.Context, sp *QueueShadowPartitio
 		handleMissingItems: func(pointers []string) error {
 			err := rc.Client().Do(ctx, rc.Client().B().Zrem().Key(shadowPartitionSet).Member(pointers...).Build()).Error()
 			if err != nil {
-				q.logger.Warn().
-					Interface("missing", pointers).
-					Interface("sp", sp).
-					Msg("failed to clean up dangling backlogs from shard partition")
+				q.log.Warn("failed to clean up dangling backlogs from shard partition",
+					"missing", pointers,
+					"sp", sp,
+				)
 			}
 
 			return nil
 		},
+		isMillisecondPrecision: true,
 	}
 
 	res, err := p.peek(ctx, shadowPartitionSet, sequential, until, limit)
@@ -549,7 +604,7 @@ func (q *queue) ShadowPartitionExtendLease(ctx context.Context, sp *QueueShadowP
 		leaseID,
 		newLeaseID,
 		now.UnixMilli(),
-		leaseExpiry.Unix(),
+		leaseExpiry.UnixMilli(),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("could not serialize args: %w", err)
@@ -594,9 +649,11 @@ func (q *queue) ShadowPartitionRequeue(ctx context.Context, sp *QueueShadowParti
 		accountID = *sp.AccountID
 	}
 
-	var requeueAtS int64
+	var requeueAtMS int64
+	var requeueAtStr string
 	if requeueAt != nil {
-		requeueAtS = requeueAt.Unix()
+		requeueAtMS = requeueAt.UnixMilli()
+		requeueAtStr = requeueAt.Format(time.StampMilli)
 	}
 
 	keys := []string{
@@ -611,7 +668,7 @@ func (q *queue) ShadowPartitionRequeue(ctx context.Context, sp *QueueShadowParti
 		accountID,
 		leaseID,
 		q.clock.Now().UnixMilli(),
-		requeueAtS,
+		requeueAtMS,
 	})
 	if err != nil {
 		return fmt.Errorf("could not serialize args: %w", err)
@@ -626,6 +683,13 @@ func (q *queue) ShadowPartitionRequeue(ctx context.Context, sp *QueueShadowParti
 	if err != nil {
 		return fmt.Errorf("error returning shadow partition lease: %w", err)
 	}
+
+	q.log.Trace("requeued shadow partition",
+		"id", sp.PartitionID,
+		"time", requeueAtStr,
+		"status", status,
+	)
+
 	switch status {
 	case 0:
 		return nil

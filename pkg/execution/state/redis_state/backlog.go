@@ -3,15 +3,19 @@ package redis_state
 import (
 	"context"
 	"fmt"
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
 )
 
 type CustomConcurrencyLimit struct {
+	Mode                enums.ConcurrencyMode  `json:"m"`
 	Scope               enums.ConcurrencyScope `json:"s"`
 	HashedKeyExpression string                 `json:"k"`
 	Limit               int                    `json:"l"`
@@ -27,6 +31,27 @@ type ShadowPartitionThrottle struct {
 	Burst int `json:"b"`
 	// Period is the rate limit period, in seconds
 	Period int `json:"p"`
+}
+
+type ShadowPartitionConcurrency struct {
+	// SystemConcurrency represents the concurrency limit to apply to system queues. Unset on regular function partitions.
+	SystemConcurrency int `json:"sc,omitempty"`
+
+	// AccountConcurrency represents the global account concurrency limit. This is unset on system queues.
+	AccountConcurrency int `json:"ac,omitempty"`
+
+	// FunctionConcurrency represents the function concurrency limit.
+	FunctionConcurrency int `json:"fc,omitempty"`
+
+	// AccountRunConcurrency represents the global account run concurrency limit (how many active runs per account). This is unset on system queues.
+	AccountRunConcurrency int `json:"arc,omitempty"`
+
+	// FunctionRunConcurrency represents the function run concurrency limit (how many active runs allowed per function).
+	FunctionRunConcurrency int `json:"frc,omitempty"`
+
+	// Up to two custom concurrency keys on user-defined scopes, optionally specifying a key. The key is required
+	// on env or account level scopes.
+	CustomConcurrencyKeys []CustomConcurrencyLimit `json:"cck,omitempty"`
 }
 
 type QueueShadowPartition struct {
@@ -50,18 +75,7 @@ type QueueShadowPartition struct {
 	AccountID       *uuid.UUID `json:"aid,omitempty"`
 	SystemQueueName *string    `json:"queueName,omitempty"`
 
-	// SystemConcurrency represents the concurrency limit to apply to system queues. Unset on regular function partitions.
-	SystemConcurrency int `json:"sc,omitempty"`
-
-	// AccountConcurrency represents the global account concurrency limit. This is unset on system queues.
-	AccountConcurrency int `json:"ac,omitempty"`
-
-	// FunctionConcurrency represents the function concurrency limit.
-	FunctionConcurrency int `json:"fc,omitempty"`
-
-	// Up to two custom concurrency keys on user-defined scopes, optionally specifying a key. The key is required
-	// on env or account level scopes.
-	CustomConcurrencyKeys []CustomConcurrencyLimit `json:"cck,omitempty"`
+	Concurrency ShadowPartitionConcurrency `json:"c,omitempty,omitzero"`
 
 	// Throttle configuration, optionally specifying key. If no key is set, the throttle value will be the function ID.
 	Throttle *ShadowPartitionThrottle `json:"t,omitempty"`
@@ -90,11 +104,11 @@ func (q QueueShadowPartition) activeKey(kg QueueKeyGenerator) string {
 
 // CustomConcurrencyLimit returns concurrency limit for custom concurrency key in position n (0, if not set)
 func (q QueueShadowPartition) CustomConcurrencyLimit(n int) int {
-	if n < 0 || n > len(q.CustomConcurrencyKeys) {
+	if n < 0 || n > len(q.Concurrency.CustomConcurrencyKeys) {
 		return 0
 	}
 
-	key := q.CustomConcurrencyKeys[n-1]
+	key := q.Concurrency.CustomConcurrencyKeys[n-1]
 
 	return key.Limit
 }
@@ -106,7 +120,7 @@ func (q QueueShadowPartition) CustomConcurrencyKey(kg QueueKeyGenerator, b *Queu
 
 	backlogKey := b.ConcurrencyKeys[n-1]
 
-	for _, key := range q.CustomConcurrencyKeys {
+	for _, key := range q.Concurrency.CustomConcurrencyKeys {
 		if key.Scope == backlogKey.Scope && key.HashedKeyExpression == backlogKey.HashedKeyExpression {
 			// Return concrete key with latest limit from shadow partition
 			return backlogKey.concurrencyKey(kg), key.Limit
@@ -146,6 +160,20 @@ func (q QueueShadowPartition) accountActiveKey(kg QueueKeyGenerator) string {
 	return kg.ActiveCounter("account", q.AccountID.String())
 }
 
+func (q QueueShadowPartition) accountActiveRunKey(kg QueueKeyGenerator) string {
+	// Do not track account run concurrency for system queues
+	if q.SystemQueueName != nil {
+		return kg.ActiveRunsCounter("", "")
+	}
+
+	// This should never be unset
+	if q.AccountID == nil {
+		return kg.ActiveRunsCounter("account", "")
+	}
+
+	return kg.ActiveRunsCounter("account", q.AccountID.String())
+}
+
 // BacklogConcurrencyKey represents a custom concurrency key, which can be scoped to the function, environment, or account.
 //
 // Note: BacklogConcurrencyKey is only used for custom concurrency keys with a defined `key`.
@@ -168,6 +196,9 @@ type BacklogConcurrencyKey struct {
 	// UnhashedValue is the unhashed evaluated key (e.g. "customer1")
 	// This may be truncated for long values and may only be used for observability and debugging.
 	UnhashedValue string `json:"ckuv"`
+
+	// ConcurrencyMode represents the concurrency mode.
+	ConcurrencyMode enums.ConcurrencyMode `json:"mode"`
 }
 
 type BacklogThrottle struct {
@@ -186,25 +217,37 @@ type QueueBacklog struct {
 	BacklogID         string `json:"id,omitempty"`
 	ShadowPartitionID string `json:"sid,omitempty"`
 
+	// Start marks backlogs representing items with KindStart.
+	Start bool `json:"start,omitempty"`
+
 	// Set for backlogs representing custom concurrency keys
 	ConcurrencyKeys []BacklogConcurrencyKey `json:"ck,omitempty"`
 
 	// Set for backlogs containing start items only for a given throttle configuration
 	Throttle *BacklogThrottle
+
+	SuccessiveThrottleConstrained          int `json:"stc,omitzero"`
+	SuccessiveCustomConcurrencyConstrained int `json:"sccc,omitzero"`
 }
 
+// ItemBacklog creates a backlog for the given item. The returned backlog may represent current _or_ past
+// configurations, in case the queue item has existed for some time and the function was updated in the meantime.
+//
+// For the sake of consistency and cleanup, ItemBacklog *must* always return the same configuration,
+// over the complete lifecycle of a queue item. To this end, the function exclusively retrieves data
+// from the queue item, has no side effects, and does not make any calls to external data stores.
 func (q *queue) ItemBacklog(ctx context.Context, i osqueue.QueueItem) QueueBacklog {
 	queueName := i.QueueName
 
 	// sanity check: both QueueNames should be set, but sometimes aren't
 	if queueName == nil && i.QueueName != nil {
 		queueName = i.QueueName
-		q.logger.Warn().Interface("item", i).Msg("backlogs encountered queue item with inconsistent custom queue name, should have both i.QueueName and i.Data.QueueName set")
+		q.log.Warn("backlogs encountered queue item with inconsistent custom queue name, should have both i.QueueName and i.Data.QueueName set", "item", i)
 	}
 
 	// sanity check: queueName values must match
 	if i.Data.QueueName != nil && i.QueueName != nil && *i.Data.QueueName != *i.QueueName {
-		q.logger.Error().Interface("item", i).Msg("backlogs encountered queue item with inconsistent custom queue names, should have matching values for i.QueueName and i.Data.QueueName")
+		q.log.Error("backlogs encountered queue item with inconsistent custom queue names, should have matching values for i.QueueName and i.Data.QueueName", "item", i)
 	}
 
 	if queueName != nil {
@@ -218,10 +261,18 @@ func (q *queue) ItemBacklog(ctx context.Context, i osqueue.QueueItem) QueueBackl
 	b := QueueBacklog{
 		BacklogID:         fmt.Sprintf("fn:%s", i.FunctionID),
 		ShadowPartitionID: i.FunctionID.String(),
+
+		// Start items should be moved into their own backlog. This is useful for
+		// function run concurrency: To determine how many new runs can start, we can
+		// calculate the remaining run capacity and refill as many items from the start backlog.
+		Start: i.Data.Kind == osqueue.KindStart,
+	}
+	if b.Start {
+		b.BacklogID += ":start"
 	}
 
 	// Enqueue start items to throttle backlog if throttle is configured
-	if i.Data.Throttle != nil && i.Data.Kind == osqueue.KindStart {
+	if i.Data.Throttle != nil && b.Start {
 		// This is always specified, even if no key was configured in the function definition.
 		// In that case, the Throttle Key is the hashed function ID. See Schedule() for more details.
 		b.Throttle = &BacklogThrottle{
@@ -284,12 +335,12 @@ func (q *queue) ItemShadowPartition(ctx context.Context, i osqueue.QueueItem) Qu
 	// sanity check: both QueueNames should be set, but sometimes aren't
 	if queueName == nil && i.QueueName != nil {
 		queueName = i.QueueName
-		q.logger.Warn().Interface("item", i).Msg("shadow partitions encountered queue item with inconsistent custom queue name, should have both i.QueueName and i.Data.QueueName set")
+		q.log.Warn("shadow partitions encountered queue item with inconsistent custom queue name, should have both i.QueueName and i.Data.QueueName set", "item", i)
 	}
 
 	// sanity check: queueName values must match
 	if i.Data.QueueName != nil && i.QueueName != nil && *i.Data.QueueName != *i.QueueName {
-		q.logger.Error().Interface("item", i).Msg("shadow partitions encountered queue item with inconsistent custom queue names, should have matching values for i.QueueName and i.Data.QueueName")
+		q.log.Error("shadow partitions encountered queue item with inconsistent custom queue names, should have matching values for i.QueueName and i.Data.QueueName", "item", i)
 	}
 
 	// The only case when we manually set a queueName is for system partitions
@@ -305,14 +356,16 @@ func (q *queue) ItemShadowPartition(ctx context.Context, i osqueue.QueueItem) Qu
 		systemPartition.ConcurrencyLimit = systemLimits.PartitionLimit
 
 		return QueueShadowPartition{
-			PartitionID:       *queueName,
-			SystemQueueName:   queueName,
-			SystemConcurrency: systemLimits.PartitionLimit,
+			PartitionID:     *queueName,
+			SystemQueueName: queueName,
+			Concurrency: ShadowPartitionConcurrency{
+				SystemConcurrency: systemLimits.PartitionLimit,
+			},
 		}
 	}
 
 	if i.FunctionID == uuid.Nil {
-		q.logger.Error().Interface("item", i).Msg("unexpected missing functionID in ItemPartitions()")
+		q.log.Error("unexpected missing functionID in ItemPartitions()", "item", i)
 	}
 
 	// NOTE: This is an optimization that ensures we return *updated* concurrency keys
@@ -359,6 +412,7 @@ func (q *queue) ItemShadowPartition(ctx context.Context, i osqueue.QueueItem) Qu
 			scope, _, _, _ := key.ParseKey()
 
 			customConcurrencyKeyLimits = append(customConcurrencyKeyLimits, CustomConcurrencyLimit{
+				Mode:  enums.ConcurrencyModeStep, // TODO Support run concurrency
 				Scope: scope,
 				// Key is required to look up the respective limit when checking constraints for a given backlog.
 				HashedKeyExpression: key.Hash, // hash("event.data.customerId")
@@ -387,10 +441,16 @@ func (q *queue) ItemShadowPartition(ctx context.Context, i osqueue.QueueItem) Qu
 		AccountID:  &i.Data.Identifier.AccountID,
 
 		// Currently configured limits
-		FunctionConcurrency:   fnPartition.ConcurrencyLimit,
-		AccountConcurrency:    limits.AccountLimit,
-		CustomConcurrencyKeys: customConcurrencyKeyLimits,
-		Throttle:              throttle,
+		Concurrency: ShadowPartitionConcurrency{
+			AccountConcurrency:    limits.AccountLimit,
+			FunctionConcurrency:   fnPartition.ConcurrencyLimit,
+			CustomConcurrencyKeys: customConcurrencyKeyLimits,
+
+			// TODO Support run concurrency
+			AccountRunConcurrency:  0,
+			FunctionRunConcurrency: 0,
+		},
+		Throttle: throttle,
 	}
 }
 
@@ -417,7 +477,7 @@ func (b QueueBacklog) isOutdated(sp *QueueShadowPartition) bool {
 	}
 
 	// Throttle key count does not match
-	if len(b.ConcurrencyKeys) != len(sp.CustomConcurrencyKeys) {
+	if len(b.ConcurrencyKeys) != len(sp.Concurrency.CustomConcurrencyKeys) {
 		return true
 	}
 
@@ -425,8 +485,8 @@ func (b QueueBacklog) isOutdated(sp *QueueShadowPartition) bool {
 	// This is quadratic but each backlog and shadow partition can only have up to 2 keys, so it's bounded.
 	for _, backlogKey := range b.ConcurrencyKeys {
 		hasKey := false
-		for _, shadowPartitionKey := range sp.CustomConcurrencyKeys {
-			if shadowPartitionKey.Scope == backlogKey.Scope && shadowPartitionKey.HashedKeyExpression == backlogKey.HashedKeyExpression {
+		for _, shadowPartitionKey := range sp.Concurrency.CustomConcurrencyKeys {
+			if shadowPartitionKey.Mode == backlogKey.ConcurrencyMode && shadowPartitionKey.Scope == backlogKey.Scope && shadowPartitionKey.HashedKeyExpression == backlogKey.HashedKeyExpression {
 				hasKey = true
 				break
 			}
@@ -472,12 +532,26 @@ func (b QueueBacklog) customKeyActive(kg QueueKeyGenerator, n int) string {
 	return key.activeKey(kg)
 }
 
+// customKeyActiveRuns returns the key to the active runs counter for the given custom concurrency key
+func (b QueueBacklog) customKeyActiveRuns(kg QueueKeyGenerator, n int) string {
+	if n < 0 || n > len(b.ConcurrencyKeys) {
+		return kg.ActiveRunsCounter("", "")
+	}
+
+	key := b.ConcurrencyKeys[n-1]
+	return key.activeRunsKey(kg)
+}
+
 func (b BacklogConcurrencyKey) activeKey(kg QueueKeyGenerator) string {
 	// Concurrency accounting keys are made up of three parts:
 	// - The scope (account, environment, function) to apply the concurrency limit on
 	// - The entity (account ID, envID, or function ID) based on the scope
 	// - The dynamic key value (hashed evaluated expression)
 	return kg.ActiveCounter("custom", b.CanonicalKeyID)
+}
+
+func (b BacklogConcurrencyKey) activeRunsKey(kg QueueKeyGenerator) string {
+	return kg.ActiveRunsCounter("custom", b.CanonicalKeyID)
 }
 
 // activeKey returns backlog compound active key
@@ -492,4 +566,344 @@ func (b QueueBacklog) customConcurrencyKeyID(n int) string {
 
 	key := b.ConcurrencyKeys[n-1]
 	return key.CanonicalKeyID
+}
+
+func (b QueueBacklog) requeueBackOff(now time.Time, constraint enums.QueueConstraint, partition *QueueShadowPartition) time.Time {
+	max := now.Add(10 * time.Second)
+
+	switch constraint {
+	case enums.QueueConstraintThrottle:
+		if partition.Throttle == nil {
+			return now.Add(PartitionThrottleLimitRequeueExtension)
+		}
+
+		return now.Add(PartitionThrottleLimitRequeueExtension + time.Duration(b.SuccessiveThrottleConstrained)*time.Second)
+
+	case enums.QueueConstraintCustomConcurrencyKey1, enums.QueueConstraintCustomConcurrencyKey2:
+		next := now.Add(PartitionConcurrencyLimitRequeueExtension + time.Duration(b.SuccessiveCustomConcurrencyConstrained)*time.Second)
+
+		if next.After(max) {
+			next = max
+		}
+
+		return next
+	}
+
+	return max
+}
+
+type BacklogRefillResult struct {
+	Constraint        enums.QueueConstraint
+	Refilled          int
+	TotalBacklogCount int
+	BacklogCountUntil int
+	Capacity          int
+	Refill            int
+}
+
+func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueShadowPartition, refillUntil time.Time) (*BacklogRefillResult, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "BacklogRefill"), redis_telemetry.ScopeQueue)
+
+	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
+		return nil, fmt.Errorf("unsupported queue shard kind for BacklogRefill: %s", q.primaryQueueShard.Kind)
+	}
+
+	kg := q.primaryQueueShard.RedisClient.kg
+
+	accountID := uuid.Nil
+	if sp.AccountID != nil {
+		accountID = *sp.AccountID
+	}
+
+	nowMS := q.clock.Now().UnixMilli()
+
+	refillLimit := q.backlogRefillLimit
+	if refillLimit > BacklogRefillHardLimit {
+		refillLimit = BacklogRefillHardLimit
+	}
+	if refillLimit <= 0 {
+		refillLimit = BacklogRefillHardLimit
+	}
+
+	var (
+		throttleKey                                  string
+		throttleLimit, throttleBurst, throttlePeriod int
+	)
+	if sp.Throttle != nil && b.Throttle != nil {
+		throttleKey = b.Throttle.ThrottleKey
+		throttleLimit = sp.Throttle.Limit
+		throttleBurst = sp.Throttle.Burst
+		throttlePeriod = sp.Throttle.Period
+	}
+
+	keys := []string{
+		kg.BacklogSet(b.BacklogID),
+		kg.BacklogMeta(),
+		kg.ShadowPartitionSet(sp.PartitionID),
+		kg.GlobalShadowPartitionSet(),
+		kg.GlobalAccountShadowPartitions(),
+		kg.AccountShadowPartitions(accountID),
+
+		sp.readyQueueKey(kg),
+		kg.GlobalPartitionIndex(),
+		kg.GlobalAccountIndex(),
+		kg.AccountPartitionIndex(accountID),
+
+		kg.QueueItem(),
+
+		// Constraint-related accounting keys
+		sp.accountActiveKey(kg),  // account active
+		sp.activeKey(kg),         // partition active
+		b.customKeyActive(kg, 1), // custom key 1
+		b.customKeyActive(kg, 2), // custom key 2
+		b.activeKey(kg),          // compound key (active for this backlog)
+
+		// Active run counters
+		// kg.RunActiveCounter(i.Data.Identifier.RunID), -> dynamically constructed in script for each item
+		sp.accountActiveRunKey(kg),                  // Counter for active runs in account
+		kg.ActivePartitionRunsIndex(sp.PartitionID), // Set index for active runs in partition
+		b.customKeyActiveRuns(kg, 1),                // Counter for active runs with custom concurrency key 1
+		b.customKeyActiveRuns(kg, 2),                // Counter for active runs with custom concurrency key 2
+	}
+
+	drainActiveCountersVal := "0"
+	if q.drainActiveCounters(ctx, accountID) {
+		drainActiveCountersVal = "1"
+	}
+
+	args, err := StrSlice([]any{
+		b.BacklogID,
+		sp.PartitionID,
+		accountID,
+		refillUntil.UnixMilli(),
+		refillLimit,
+		nowMS,
+
+		sp.Concurrency.AccountConcurrency,
+		sp.Concurrency.FunctionConcurrency,
+		sp.CustomConcurrencyLimit(1),
+		sp.CustomConcurrencyLimit(2),
+
+		throttleKey,
+		throttleLimit,
+		throttleBurst,
+		throttlePeriod,
+
+		kg.QueuePrefix(),
+		drainActiveCountersVal,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("could not serialize args: %w", err)
+	}
+
+	res, err := scripts["queue/backlogRefill"].Exec(
+		redis_telemetry.WithScriptName(ctx, "backlogRefill"),
+		q.primaryQueueShard.RedisClient.unshardedRc,
+		keys,
+		args,
+	).ToAny()
+	if err != nil {
+		return nil, fmt.Errorf("error refilling backlog: %w", err)
+	}
+
+	returnTuple, ok := res.([]any)
+	if !ok || len(returnTuple) != 6 {
+		return nil, fmt.Errorf("expected return tuple to include 6 items")
+	}
+
+	status, ok := returnTuple[0].(int64)
+	if !ok {
+		return nil, fmt.Errorf("missing status in returned tuple")
+	}
+
+	refillCount, ok := returnTuple[1].(int64)
+	if !ok {
+		return nil, fmt.Errorf("missing refillCount in returned tuple")
+	}
+
+	backlogCountUntil, ok := returnTuple[2].(int64)
+	if !ok {
+		return nil, fmt.Errorf("missing backlogCount in returned tuple")
+	}
+
+	backlogCountTotal, ok := returnTuple[3].(int64)
+	if !ok {
+		return nil, fmt.Errorf("missing backlogCount in returned tuple")
+	}
+
+	capacity, ok := returnTuple[4].(int64)
+	if !ok {
+		return nil, fmt.Errorf("missing capacity in returned tuple")
+	}
+
+	refill, ok := returnTuple[5].(int64)
+	if !ok {
+		return nil, fmt.Errorf("missing refill in returned tuple")
+	}
+
+	refillResult := &BacklogRefillResult{
+		Refilled:          int(refillCount),
+		TotalBacklogCount: int(backlogCountTotal),
+		BacklogCountUntil: int(backlogCountUntil),
+		Capacity:          int(capacity),
+		Refill:            int(refill),
+	}
+
+	switch status {
+	case 0:
+		return refillResult, nil
+	case 1:
+		refillResult.Constraint = enums.QueueConstraintAccountConcurrency
+		return refillResult, nil
+	case 2:
+		refillResult.Constraint = enums.QueueConstraintFunctionConcurrency
+		return refillResult, nil
+	case 3:
+		refillResult.Constraint = enums.QueueConstraintCustomConcurrencyKey1
+		return refillResult, nil
+	case 4:
+		refillResult.Constraint = enums.QueueConstraintCustomConcurrencyKey2
+		return refillResult, nil
+	case 5:
+		refillResult.Constraint = enums.QueueConstraintThrottle
+		return refillResult, nil
+	default:
+		return nil, fmt.Errorf("unknown status refilling backlog: %v (%T)", status, status)
+	}
+}
+
+func (q *queue) BacklogRequeue(ctx context.Context, backlog *QueueBacklog, sp *QueueShadowPartition, requeueAt time.Time) error {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "BacklogRequeue"), redis_telemetry.ScopeQueue)
+
+	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
+		return fmt.Errorf("unsupported queue shard kind for BacklogRequeue: %s", q.primaryQueueShard.Kind)
+	}
+
+	kg := q.primaryQueueShard.RedisClient.kg
+
+	accountID := uuid.Nil
+	if sp.AccountID != nil {
+		accountID = *sp.AccountID
+	}
+
+	keys := []string{
+		kg.ShadowPartitionMeta(),
+		kg.BacklogMeta(),
+
+		kg.GlobalShadowPartitionSet(),
+		kg.GlobalAccountShadowPartitions(),
+		kg.AccountShadowPartitions(accountID),
+		kg.ShadowPartitionSet(sp.PartitionID),
+		kg.BacklogSet(backlog.BacklogID),
+	}
+	args, err := StrSlice([]any{
+		accountID,
+		sp.PartitionID,
+		backlog.BacklogID,
+		requeueAt.UnixMilli(),
+	})
+	if err != nil {
+		return fmt.Errorf("could not serialize args: %w", err)
+	}
+
+	status, err := scripts["queue/backlogRequeue"].Exec(
+		redis_telemetry.WithScriptName(ctx, "backlogRequeue"),
+		q.primaryQueueShard.RedisClient.unshardedRc,
+		keys,
+		args,
+	).AsInt64()
+	if err != nil {
+		return fmt.Errorf("could not requeue backlog: %w", err)
+	}
+
+	q.log.Trace("requeued backlog",
+		"id", backlog.BacklogID,
+		"partition", sp.PartitionID,
+		"time", requeueAt.Format(time.StampMilli),
+		"successive_throttle", backlog.SuccessiveThrottleConstrained,
+		"successive_concurrency", backlog.SuccessiveCustomConcurrencyConstrained,
+		"status", status,
+	)
+
+	switch status {
+	case 0, 1:
+		return nil
+	case -1:
+		return ErrBacklogNotFound
+	default:
+		return fmt.Errorf("unknown response requeueing backlog: %v (%T)", status, status)
+	}
+}
+
+func (q *queue) BacklogPrepareNormalize(ctx context.Context, b *QueueBacklog, sp *QueueShadowPartition, normalizeAsyncMinimum int) (int, bool, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "BacklogPrepareNormalize"), redis_telemetry.ScopeQueue)
+
+	shard := q.primaryQueueShard
+
+	if shard.Kind != string(enums.QueueShardKindRedis) {
+		return 0, false, fmt.Errorf("unsupported queue shard kind for BacklogPrepareNormalize: %s", shard.Kind)
+	}
+	kg := shard.RedisClient.kg
+
+	accountID := uuid.Nil
+	if sp.AccountID != nil {
+		accountID = *sp.AccountID
+	}
+
+	keys := []string{
+		kg.BacklogSet(b.BacklogID),
+		kg.ShadowPartitionSet(sp.PartitionID),
+		kg.GlobalShadowPartitionSet(),
+		kg.GlobalAccountShadowPartitions(),
+		kg.AccountShadowPartitions(accountID),
+
+		kg.GlobalAccountNormalizeSet(),
+		kg.AccountNormalizeSet(accountID),
+		kg.PartitionNormalizeSet(sp.PartitionID),
+	}
+	args, err := StrSlice([]any{
+		b.BacklogID,
+		sp.PartitionID,
+		accountID,
+		// order normalize by timestamp
+		q.clock.Now().UnixMilli(),
+		normalizeAsyncMinimum,
+	})
+	if err != nil {
+		return 0, false, fmt.Errorf("could not serialize args: %w", err)
+	}
+
+	res, err := scripts["queue/backlogPrepareNormalize"].Exec(
+		redis_telemetry.WithScriptName(ctx, "backlogPrepareNormalize"),
+		shard.RedisClient.unshardedRc,
+		keys,
+		args,
+	).ToAny()
+	if err != nil {
+		return 0, false, fmt.Errorf("error preparing backlog normalization: %w", err)
+	}
+
+	statusCountTuple, ok := res.([]any)
+	if !ok || len(statusCountTuple) != 2 {
+		return 0, false, fmt.Errorf("expected return tuple to include status and refill count")
+	}
+
+	status, ok := statusCountTuple[0].(int64)
+	if !ok {
+		return 0, false, fmt.Errorf("missing status in status-count tuple")
+	}
+
+	backlogCount, ok := statusCountTuple[1].(int64)
+	if !ok {
+		return 0, false, fmt.Errorf("missing refillCount in status-count tuple")
+	}
+
+	switch status {
+	case 1:
+		return int(backlogCount), true, nil
+	case -1:
+		return int(backlogCount), false, nil
+	default:
+		return 0, false, fmt.Errorf("unknown status preparing backlog normalization: %v (%T)", status, status)
+	}
 }

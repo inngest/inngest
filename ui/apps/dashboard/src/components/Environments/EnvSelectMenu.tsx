@@ -71,8 +71,8 @@ export default function EnvSelectMenu({ onSelect, className }: EnvSelectMenuProp
             </Listbox.Button>
 
             <Listbox.Options
-              className="bg-canvasBase border-subtle overflow-y-truncate absolute
-              left-0.5 top-9 z-50 w-[250px] divide-none rounded border shadow focus:outline-none"
+              className="bg-canvasBase border-subtle absolute left-0.5 top-9
+              z-50 max-h-96 w-[250px] divide-none overflow-y-auto rounded border shadow focus:outline-none"
             >
               {defaultEnvironment !== null && (
                 <EnvItem env={defaultEnvironment} key={defaultEnvironment.id} />

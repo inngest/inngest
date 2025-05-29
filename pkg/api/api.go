@@ -16,9 +16,9 @@ import (
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/eventstream"
 	"github.com/inngest/inngest/pkg/headers"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/publicerr"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
-	"github.com/rs/zerolog"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/sync/errgroup"
@@ -30,7 +30,7 @@ type Options struct {
 	Config config.Config
 
 	EventHandler EventHandler
-	Logger       *zerolog.Logger
+	Logger       logger.Logger
 
 	// LocalEventKeys are the keys used to send events to the local event API
 	// from an app. If this is set, only keys that match one of these values
@@ -45,13 +45,13 @@ type Options struct {
 }
 
 func NewAPI(o Options) (chi.Router, error) {
-	logger := o.Logger.With().Str("caller", "api").Logger()
+	logger := o.Logger.With("caller", "api")
 
 	api := &API{
 		Router:         chi.NewMux(),
 		config:         o.Config,
 		handler:        o.EventHandler,
-		log:            &logger,
+		log:            logger,
 		localEventKeys: o.LocalEventKeys,
 		requireKeys:    o.RequireKeys,
 	}
@@ -80,7 +80,7 @@ type API struct {
 	config config.Config
 
 	handler EventHandler
-	log     *zerolog.Logger
+	log     logger.Logger
 
 	server *http.Server
 
@@ -104,7 +104,7 @@ func (a *API) Start(ctx context.Context) error {
 		Addr:    fmt.Sprintf("%s:%d", a.config.EventAPI.Addr, a.config.EventAPI.Port),
 		Handler: a.Router,
 	}
-	a.log.Info().Str("addr", a.server.Addr).Msg("starting server")
+	a.log.Info("starting server", "addr", a.server.Addr)
 
 	lerrChan := make(chan error)
 	go func() {
@@ -113,7 +113,7 @@ func (a *API) Start(ctx context.Context) error {
 
 	select {
 	case <-ctx.Done():
-		a.log.Info().Msg("shutting down server")
+		a.log.Info("shutting down server")
 		return a.server.Shutdown(ctx)
 	case err := <-lerrChan:
 		return err
@@ -129,7 +129,7 @@ func (a API) Stop(ctx context.Context) error {
 }
 
 func (a API) HealthCheck(w http.ResponseWriter, r *http.Request) {
-	a.log.Trace().Msg("healthcheck")
+	a.log.Trace("healthcheck")
 	w.Header().Add("Content-Type", "application/json")
 	a.writeResponse(w, apiResponse{
 		StatusCode: http.StatusOK,
@@ -143,7 +143,7 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 
 	// If self hosting and keys are not defined, error.
 	if a.requireKeys && len(a.localEventKeys) == 0 {
-		a.log.Error().Msg("rejecting event; event keys are required to process events securely")
+		a.log.Error("rejecting event; event keys are required to process events securely")
 		w.Header().Add("Content-Type", "application/json")
 		a.writeResponse(w, apiResponse{
 			StatusCode: http.StatusServiceUnavailable,
@@ -154,7 +154,7 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 
 	key := chi.URLParam(r, "key")
 	if key == "" {
-		a.log.Error().Msg("rejecting event; event key is required")
+		a.log.Error("rejecting event; event key is required")
 		w.Header().Add("Content-Type", "application/json")
 		a.writeResponse(w, apiResponse{
 			StatusCode: http.StatusUnauthorized,
@@ -174,7 +174,7 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if !found {
-			a.log.Error().Msg("rejecting event; event key not recognized")
+			a.log.Error("rejecting event; event key not recognized")
 			w.Header().Add("Content-Type", "application/json")
 			a.writeResponse(w, apiResponse{
 				StatusCode: http.StatusUnauthorized,
@@ -266,7 +266,7 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 			)
 			id, err := a.handler(ctx, &evt, seed)
 			if err != nil {
-				a.log.Error().Str("event", evt.Name).Err(err).Msg("error handling event")
+				a.log.Error("error handling event", "error", err, "event", evt.Name)
 				return err
 			}
 			idChan <- struct {

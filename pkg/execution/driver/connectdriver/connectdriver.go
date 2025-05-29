@@ -10,22 +10,20 @@ import (
 	"time"
 
 	"github.com/inngest/inngest/pkg/connect/pubsub"
+	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/driver/httpdriver"
-	"github.com/inngest/inngest/pkg/inngest/log"
+	"github.com/inngest/inngest/pkg/execution/queue"
+	"github.com/inngest/inngest/pkg/execution/state"
+	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
+	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/syscode"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/oklog/ulid/v2"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
-
-	"github.com/inngest/inngest/pkg/execution/driver"
-	"github.com/inngest/inngest/pkg/execution/queue"
-	"github.com/inngest/inngest/pkg/execution/state"
-	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
-	"github.com/inngest/inngest/pkg/inngest"
-	"github.com/inngest/inngest/pkg/syscode"
 )
 
 const (
@@ -102,13 +100,15 @@ func (e executor) Execute(ctx context.Context, sl sv2.StateLoader, s sv2.Metadat
 
 // ProxyRequest proxies the request to the SDK over a long-lived connection with the given input.
 func ProxyRequest(ctx, traceCtx context.Context, forwarder pubsub.RequestForwarder, id sv2.ID, item queue.Item, r httpdriver.Request) (*state.DriverResponse, error) {
+	l := logger.StdlibLogger(ctx)
+
 	var requestID string
 	if item.JobID != nil {
 		// Use the stable queue item ID
 		requestID = *item.JobID
 	} else {
 		// This should never happen, handle it gracefully
-		logger.StdlibLogger(ctx).Warn("queue item missing jobID", "item", item, "id", id)
+		l.Warn("queue item missing jobID", "item", item, "id", id)
 		requestID = ulid.MustNew(ulid.Now(), rand.Reader).String()
 	}
 
@@ -144,11 +144,10 @@ func ProxyRequest(ctx, traceCtx context.Context, forwarder pubsub.RequestForward
 	}
 
 	if spanID, err := item.SpanID(); err != nil {
-		log.From(ctx).
-			Error().
-			Str("run_id", id.RunID.String()).
-			Err(err).
-			Msg("error retrieving span ID")
+		l.Error("error retrieving span ID",
+			"error", err,
+			"run_id", id.RunID.String(),
+		)
 	} else {
 		opts.SpanID = spanID.String()
 	}

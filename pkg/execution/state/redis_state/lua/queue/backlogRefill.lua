@@ -26,24 +26,30 @@
 ]]
 
 local keyBacklogSet                      = KEYS[1]
-local keyShadowPartitionSet              = KEYS[2]
-local keyGlobalShadowPartitionSet        = KEYS[3]
-local keyGlobalAccountShadowPartitionSet = KEYS[4]
-local keyAccountShadowPartitionSet       = KEYS[5]
+local keyBacklogMeta                     = KEYS[2]
+local keyShadowPartitionSet              = KEYS[3]
+local keyGlobalShadowPartitionSet        = KEYS[4]
+local keyGlobalAccountShadowPartitionSet = KEYS[5]
+local keyAccountShadowPartitionSet       = KEYS[6]
 
-local keyReadySet                        = KEYS[6]
-local keyGlobalPointer        	         = KEYS[7] -- partition:sorted - zset
-local keyGlobalAccountPointer 	         = KEYS[8] -- accounts:sorted - zset
-local keyAccountPartitions    	         = KEYS[9] -- accounts:$accountID:partition:sorted - zset
+local keyReadySet                        = KEYS[7]
+local keyGlobalPointer        	         = KEYS[8] -- partition:sorted - zset
+local keyGlobalAccountPointer 	         = KEYS[9] -- accounts:sorted - zset
+local keyAccountPartitions    	         = KEYS[10] -- accounts:$accountID:partition:sorted - zset
 
-local keyQueueItemHash                   = KEYS[10]
+local keyQueueItemHash                   = KEYS[11]
 
 -- Constraint-related accounting keys
-local keyActiveAccount           = KEYS[11]
-local keyActivePartition         = KEYS[12]
-local keyActiveConcurrencyKey1   = KEYS[13]
-local keyActiveConcurrencyKey2   = KEYS[14]
-local keyActiveCompound          = KEYS[15]
+local keyActiveAccount           = KEYS[12]
+local keyActivePartition         = KEYS[13]
+local keyActiveConcurrencyKey1   = KEYS[14]
+local keyActiveConcurrencyKey2   = KEYS[15]
+local keyActiveCompound          = KEYS[16]
+
+local keyActiveRunsAccount                = KEYS[17]
+local keyIndexActivePartitionRuns         = KEYS[18]
+local keyActiveRunsCustomConcurrencyKey1  = KEYS[19]
+local keyActiveRunsCustomConcurrencyKey2  = KEYS[20]
 
 local backlogID     = ARGV[1]
 local partitionID   = ARGV[2]
@@ -66,11 +72,14 @@ local throttlePeriod = tonumber(ARGV[14])
 
 local keyPrefix = ARGV[15]
 
+local drainActiveCounters = tonumber(ARGV[16])
+
 -- $include(update_pointer_score.lua)
 -- $include(ends_with.lua)
 -- $include(update_account_queues.lua)
 -- $include(gcra.lua)
 -- $include(update_backlog_pointer.lua)
+-- $include(update_active_counters.lua)
 
 --
 -- Retrieve current backlog size
@@ -82,6 +91,9 @@ if backlogCountTotal == false or backlogCountTotal == nil then
 end
 
 if backlogCountTotal == 0 then
+  -- Clean up metadata if the backlog is empty
+  redis.call("HDEL", keyBacklogMeta, backlogID)
+
   -- update backlog pointers
   updateBacklogPointer(keyGlobalShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, keyShadowPartitionSet, keyBacklogSet, accountID, partitionID, backlogID)
 
@@ -132,7 +144,7 @@ local function check_active_capacity(now_ms, keyActiveCounter, limit)
 end
 
 -- Check throttle capacity
-if (constraintCapacity == nil or constraintCapacity > 0) and throttleLimit > 0 then
+if (constraintCapacity == nil or constraintCapacity > 0) and throttlePeriod > 0 and throttleLimit > 0 then
   local remainingThrottleCapacity = gcraCapacity(throttleKey, nowMS, throttlePeriod * 1000, throttleLimit, throttleBurst)
   if constraintCapacity == nil or remainingThrottleCapacity < constraintCapacity then
     constraintCapacity = remainingThrottleCapacity
@@ -179,6 +191,11 @@ if (constraintCapacity == nil or constraintCapacity > 0) and exists_without_endi
     constraintCapacity = remainingAccountCapacity
     status = 1
   end
+end
+
+-- prevent negative constraint capacity
+if constraintCapacity < 0 then
+  constraintCapacity = 0
 end
 
 if constraintCapacity > 0 then
@@ -240,20 +257,12 @@ if refill > 0 then
       updatedData.rf = backlogID
       updatedData.rat = nowMS
 
-      if updatedData.data ~= nil and updatedData.data.identifier ~= nil and updatedData.data.identifier.runID ~= nil then
+      if drainActiveCounters ~= 1 and updatedData.data ~= nil and updatedData.data.identifier ~= nil and updatedData.data.identifier.runID ~= nil then
         -- add item to active in run
         local runID = updatedData.data.identifier.runID
         local keyActiveRun = string.format("%s:active:run:%s", keyPrefix, runID)
-        local updateTo = itemScore / 1000
 
-        -- increase number of active items in run
-        redis.call("INCR", keyActiveRun)
-
-        -- if the newly-added item is earlier than existing items in the run, adjust pointer scores in the function
-        -- see QueueKeyGenerator#ActivePartitionRunsIndex for reference
-        local keyIndexActivePartitionRuns = string.format("%s:active-idx:runs:%s", keyPrefix, partitionID)
-
-        redis.call("SADD", keyIndexActivePartitionRuns, runID)
+        increaseActiveRunCounters(keyActiveRun, keyIndexActivePartitionRuns, keyActiveRunsAccount, keyActiveRunsCustomConcurrencyKey1, keyActiveRunsCustomConcurrencyKey2, runID)
       end
 
       table.insert(itemUpdateArgs, itemID)
@@ -268,23 +277,8 @@ if refill > 0 then
     -- "Refill" items to ready set
     redis.call("ZADD", keyReadySet, unpack(readyArgs))
 
-    -- Increase active counters by number of refilled items
-    redis.call("INCRBY", keyActivePartition, refilled)
-
-    if exists_without_ending(keyActiveAccount, ":-") then
-      redis.call("INCRBY", keyActiveAccount, refilled)
-    end
-
-    if exists_without_ending(keyActiveCompound, ":-") then
-      redis.call("INCRBY", keyActiveCompound, refilled)
-    end
-
-    if exists_without_ending(keyActiveConcurrencyKey1, ":-") then
-      redis.call("INCRBY", keyActiveConcurrencyKey1, refilled)
-    end
-
-    if exists_without_ending(keyActiveConcurrencyKey2, ":-") then
-      redis.call("INCRBY", keyActiveConcurrencyKey2, refilled)
+    if drainActiveCounters ~= 1 then
+      increaseActiveCounters(keyActivePartition, keyActiveAccount, keyActiveCompound, keyActiveConcurrencyKey1, keyActiveConcurrencyKey2, refilled)
     end
 
     -- Update queue items with refill data
@@ -298,8 +292,8 @@ if refill > 0 then
 end
 
 -- update gcra theoretical arrival time
-if throttleLimit > 0 then
-  gcraUpdate(throttleKey, nowMS, throttlePeriod * 1000, throttleLimit, throttleBurst, refill)
+if throttleLimit > 0 and throttlePeriod > 0 then
+  gcraUpdate(throttleKey, nowMS, throttlePeriod * 1000, throttleLimit, throttleBurst, refilled)
 end
 
 --
@@ -322,6 +316,41 @@ end
 --
 -- Adjust pointer scores for shadow scanning, potentially clean up
 --
+
+-- Clean up backlog meta if we refilled the last item (or dropped all dangling item pointers)
+if tonumber(redis.call("ZCARD", keyBacklogSet)) == 0 then
+  redis.call("HDEL", keyBacklogMeta, backlogID)
+else
+  local existing = cjson.decode(redis.call("HGET", keyBacklogMeta, backlogID))
+
+  -- If not constrained, reset counters
+  if status == 0 then
+    existing.stc = 0
+    existing.sccc = 0
+  end
+
+  -- If custom concurrency limits hit, increase counter
+  if status == 3 or status == 4 then
+    local previousSuccessiveCustomConcurrencyConstrained = existing.sccc
+    if previousSuccessiveCustomConcurrencyConstrained == false or previousSuccessiveCustomConcurrencyConstrained == nil then
+      previousSuccessiveCustomConcurrencyConstrained = 0
+    end
+
+    existing.sccc = previousSuccessiveCustomConcurrencyConstrained + 1
+  end
+
+  -- If throttled, increase counter
+  if status == 5 then
+    local previousSuccessiveThrottleConstrained = existing.stc
+    if previousSuccessiveThrottleConstrained == false or previousSuccessiveThrottleConstrained == nil then
+      previousSuccessiveThrottleConstrained = 0
+    end
+
+    existing.stc = previousSuccessiveThrottleConstrained + 1
+  end
+
+  redis.call("HSET", keyBacklogMeta, backlogID, cjson.encode(existing))
+end
 
 updateBacklogPointer(keyGlobalShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, keyShadowPartitionSet, keyBacklogSet, accountID, partitionID, backlogID)
 

@@ -1,14 +1,18 @@
 package metrics
 
 import (
-	"github.com/google/uuid"
+	"context"
 	"testing"
+
+	"github.com/google/uuid"
 
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel/attribute"
 )
 
 func TestParseAttributes(t *testing.T) {
+	ctx := context.Background()
+
 	tests := []struct {
 		name     string
 		attrs    map[string]any
@@ -51,7 +55,7 @@ func TestParseAttributes(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			result := parseAttributes(test.attrs)
+			result := parseAttributes(ctx, test.attrs)
 			require.ElementsMatch(t, test.expected, result)
 		})
 	}

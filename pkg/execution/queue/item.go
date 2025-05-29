@@ -4,12 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
+	"time"
+
 	"github.com/inngest/inngest/pkg/enums"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/expressions"
 	"github.com/inngest/inngest/pkg/util"
-	"strconv"
-	"time"
 
 	"github.com/cespare/xxhash/v2"
 	"github.com/google/uuid"
@@ -89,6 +90,10 @@ type QueueItem struct {
 	// Refilled from backlog ID, set if item was refilled from backlog. Removed during requeue to partition.
 	RefilledFrom string `json:"rf,omitempty"`
 	RefilledAt   int64  `json:"rat,omitempty"`
+
+	// EnqueuedAt tracks the unix timestamp of enqueueing the queue item (to the backlog or directly to
+	// the partition). This is not the same as AtMS for items scheduled in the future or past.
+	EnqueuedAt int64 `json:"eat"`
 }
 
 func (q *QueueItem) SetID(ctx context.Context, str string) {
@@ -185,6 +190,9 @@ type Item struct {
 	// Throttle represents GCRA rate limiting for the queue item, which is applied when
 	// attempting to lease the item from the queue.
 	Throttle *Throttle `json:"throttle,omitempty"`
+	// Singleton represents a singleton key for the queue item, which is used to
+	// not allow multiple start items to be scheduled at the same time.
+	Singleton *Singleton `json:"singleton,omitempty"`
 	// CustomConcurrencyKeys stores custom concurrency keys for this function run.  This
 	// allows us to use custom concurrency keys for each job when processing steps for
 	// the function, with cached expression results.
@@ -216,6 +224,16 @@ type Throttle struct {
 	UnhashedThrottleKey string `json:"-"`
 
 	KeyExpressionHash string `json:"-"`
+}
+
+type Singleton struct {
+	// Key is the unique singleton key that's used to group queue items when
+	// processing singleton items.
+	Key string `json:"k"`
+
+	// Mode defines the behavior when a new singleton run is queued while another is active.
+	// It determines whether to skip the new run or cancel the current one and replace it.
+	Mode enums.SingletonMode `json:"m"`
 }
 
 // SpanID generates a spanID based on the combination the jobID and attempt
@@ -299,6 +317,7 @@ func (i *Item) UnmarshalJSON(b []byte) error {
 		QueueName             *string                   `json:"qn,omitempty"`
 		RunInfo               *RunInfo                  `json:"runinfo,omitempty"`
 		Throttle              *Throttle                 `json:"throttle"`
+		Singleton             *Singleton                `json:"singleton"`
 		CustomConcurrencyKeys []state.CustomConcurrency `json:"cck,omitempty"`
 		PriorityFactor        *int64                    `json:"pf,omitempty"`
 	}
@@ -316,6 +335,7 @@ func (i *Item) UnmarshalJSON(b []byte) error {
 	i.MaxAttempts = temp.MaxAttempts
 	i.Metadata = temp.Metadata
 	i.Throttle = temp.Throttle
+	i.Singleton = temp.Singleton
 	i.RunInfo = temp.RunInfo
 	i.CustomConcurrencyKeys = temp.CustomConcurrencyKeys
 	i.PriorityFactor = temp.PriorityFactor
