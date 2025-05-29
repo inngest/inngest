@@ -77,7 +77,7 @@ end
 
 local function decreaseActiveRunCounters(keyActiveRun, keyIndexActivePartitionRuns, keyActiveRunsAccount, keyActiveRunsCustomConcurrencyKey1, keyActiveRunsCustomConcurrencyKey2, runID)
   if exists_without_ending(keyActiveRun, ":-") then
-    -- increase number of active items in the run
+    -- decrease number of active items in the run
     if redis.call("DECR", keyActiveRun) <= 0 then
       redis.call("DEL", keyActiveRun)
 
