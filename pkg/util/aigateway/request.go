@@ -42,6 +42,9 @@ type Request struct {
 	Body json.RawMessage `json:"body"`
 	// PublishOpts configures optional publishing to realtime.
 	Publish PublishOpts `json:"publish,omitzero"`
+
+	// StepID is added when returning a Request from an opcode.
+	StepID string `json:"-"`
 }
 
 // PublishOpts specifies the optional channel and topic if the response is to
@@ -67,6 +70,11 @@ func (r Request) SerializableRequest() (exechttp.SerializableRequest, error) {
 		URL:    r.URL,
 		Body:   r.Body,
 		Header: http.Header{},
+		Publish: exechttp.RequestPublishOpts{
+			Channel:   r.Publish.Channel,
+			Topic:     r.Publish.Topic,
+			RequestID: r.StepID,
+		},
 	}
 
 	// Always sending JSON.

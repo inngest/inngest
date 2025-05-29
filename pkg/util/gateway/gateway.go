@@ -21,6 +21,9 @@ type Request struct {
 	Method string `json:"method,omitempty"`
 	// PublishOpts configures optional publishing to realtime.
 	Publish PublishOpts `json:"publish,omitzero"`
+
+	// StepID is added from the opcode as a reference.
+	StepID string `json:"-"`
 }
 
 // PublishOpts specifies the optional channel and topic if the response is to
@@ -53,6 +56,12 @@ func (r Request) SerializableRequest() (exechttp.SerializableRequest, error) {
 	// Overwrite any headers if custom headers are added to opts.
 	for header, val := range r.Headers {
 		req.Header.Add(header, val)
+	}
+
+	req.Publish = exechttp.RequestPublishOpts{
+		Channel:   r.Publish.Channel,
+		Topic:     r.Publish.Topic,
+		RequestID: r.StepID,
 	}
 
 	return req, nil

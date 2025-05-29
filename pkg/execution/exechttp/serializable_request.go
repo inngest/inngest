@@ -108,7 +108,7 @@ type RequestPublishOpts struct {
 }
 
 func (r RequestPublishOpts) ShouldPublish() bool {
-	return r.Channel != "" && r.Topic != "" && r.Token != ""
+	return r.Channel != "" && r.Topic != "" && r.Token != "" && r.PublishURL != ""
 }
 
 // Bytes returns a reader for the marshaled serialized request without escaping special characters

@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -106,6 +107,7 @@ func TestWebsocketPostStreamingMessage(t *testing.T) {
 	var (
 		counter  int32
 		contents = [][]byte{}
+		l        sync.Mutex
 	)
 
 	go func() {
@@ -113,7 +115,9 @@ func TestWebsocketPostStreamingMessage(t *testing.T) {
 			_, resp, err := c.Read(context.TODO())
 			require.NoError(t, err)
 			atomic.AddInt32(&counter, 1)
+			l.Lock()
 			contents = append(contents, resp)
+			l.Unlock()
 			fmt.Println("received", string(resp))
 		}
 	}()
@@ -136,6 +140,9 @@ func TestWebsocketPostStreamingMessage(t *testing.T) {
 			3*time.Second,
 			time.Millisecond,
 		)
+
+		l.Lock()
+		defer l.Unlock()
 
 		// Assert that the first msg is a stream start, the last is a stream end,
 		// and we have our stream content in the middle.
@@ -163,7 +170,9 @@ func TestWebsocketPostStreamingMessage(t *testing.T) {
 
 	t.Run("TeeStreamReaderToAPI", func(t *testing.T) {
 		counter = 0
+		l.Lock()
 		contents = [][]byte{}
+		l.Unlock()
 
 		// Create a single server which will respond with content, eg. server-sent-events.
 		og := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -205,6 +214,8 @@ func TestWebsocketPostStreamingMessage(t *testing.T) {
 			time.Millisecond,
 		)
 
+		l.Lock()
+		defer l.Unlock()
 		// Assert that we had 7 messages:  stream start, 5 events, and stream end.
 		require.EqualValues(t, 7, len(contents))
 

@@ -146,7 +146,14 @@ func (e ExtendedClient) DoRequest(ctx context.Context, r SerializableRequest) (*
 			body = rdr
 		}
 		if err != nil {
-			logger.StdlibLogger(ctx).Warn("error teeing request to publish endpoint", "error", err, "url", r.URL, "response_status", resp.StatusCode)
+			logger.StdlibLogger(ctx).Warn(
+				"error teeing request to publish endpoint",
+				"error", err,
+				"url", r.URL,
+				"channel", r.Publish.Channel,
+				"topic", r.Publish.Topic,
+				"response_status", resp.StatusCode,
+			)
 		}
 	}
 
@@ -205,7 +212,7 @@ func CheckRedirect(req *http.Request, via []*http.Request) (err error) {
 	}
 
 	if len(via) > MaxRedirects {
-		return fmt.Errorf("stopped after 10 redirects")
+		return fmt.Errorf("stopped after %d redirects", MaxRedirects)
 	}
 
 	if via[0].Body != nil && via[0].GetBody != nil {

@@ -2302,6 +2302,12 @@ func (e *executor) handleGeneratorGateway(ctx context.Context, i *runInstance, g
 		return fmt.Errorf("error creating gateway request: %w", err)
 	}
 
+	// If the opcode contains streaming data, we should fetch a JWT with perms
+	// for us to stream then add streaming data to the serializable request.
+	//
+	// Without this, publishing will not work.
+	e.addRequestPublishOpts(ctx, i, &req)
+
 	var output []byte
 
 	resp, err := i.httpClient.DoRequest(ctx, req)
@@ -2424,29 +2430,7 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, i *runInstance,
 	// for us to stream then add streaming data to the serializable request.
 	//
 	// Without this, publishing will not work.
-	if input.Publish.Channel != "" && e.rtconfig.PublishURL != "" {
-		token, err := realtime.NewPublishJWT(
-			ctx,
-			e.rtconfig.Secret,
-			i.item.Identifier.AccountID,
-			i.item.WorkspaceID,
-		)
-		if err != nil {
-			// XXX: We should be able to attach warnings to runs;  in this case, we couldn't create
-			// a JWT to publish data.  However, the step should still execute without realtime publishing,
-			// and the UI should show a warning for this run.
-			_ = err
-		}
-		if token != "" {
-			req.Publish = exechttp.RequestPublishOpts{
-				Channel:    input.Publish.Channel,
-				Topic:      input.Publish.Topic,
-				Token:      token,
-				RequestID:  gen.ID,
-				PublishURL: e.rtconfig.PublishURL,
-			}
-		}
-	}
+	e.addRequestPublishOpts(ctx, i, &req)
 
 	resp, err := i.httpClient.DoRequest(ctx, req)
 	failure := err != nil || (resp != nil && resp.StatusCode > 299)
@@ -3248,4 +3232,27 @@ func extractTraceCtx(ctx context.Context, md sv2.Metadata) context.Context {
 	}
 
 	return ctx
+}
+
+// addRequestPublishOpts generates a new JWT to publish gateway requests in realtime.
+func (e *executor) addRequestPublishOpts(ctx context.Context, i *runInstance, sr *exechttp.SerializableRequest) {
+	if e.rtconfig.PublishURL == "" {
+		return
+	}
+
+	token, err := realtime.NewPublishJWT(
+		ctx,
+		e.rtconfig.Secret,
+		i.item.Identifier.AccountID,
+		i.item.WorkspaceID,
+	)
+	if err != nil {
+		// XXX: We should be able to attach warnings to runs;  in this case, we couldn't create
+		// a JWT to publish data.  However, the step should still execute without realtime publishing,
+		// and the UI should show a warning for this run.
+		return
+	}
+
+	sr.Publish.Token = token
+	sr.Publish.PublishURL = e.rtconfig.PublishURL
 }

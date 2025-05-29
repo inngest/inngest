@@ -11,6 +11,7 @@ import (
 	"github.com/coder/websocket"
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/inngest/inngest/pkg/api/apiv1/apiv1auth"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/execution/realtime/streamingtypes"
@@ -68,11 +69,9 @@ func (a *api) setup() {
 	a.Group(func(r chi.Router) {
 		r.Use(middleware.Recoverer)
 
-		// This can ONLY use the AuthMiddleware as we MUST use a signing key for
-		// authentication for publishing to streams.
-		if a.opts.AuthMiddleware != nil {
-			r.Use(a.opts.AuthMiddleware)
-		}
+		// Note that we use use realtime auth middleware and check for publishing claims manually.
+		// This also allows us to use the original auth middleware and use signing keys for publishing.
+		r.Use(realtimeAuthMW(a.opts.JWTSecret, a.opts.AuthMiddleware))
 
 		r.Post("/realtime/publish", a.PostPublish)
 	})
@@ -179,7 +178,37 @@ func (a *api) PostPublish(w http.ResponseWriter, r *http.Request) {
 	// Allow publishing of arbitrary data using the environment signing
 	// key as the auth token.
 	//
-	// This is only usable within an Inngest function.
+	// This is only usable:
+	// - Within an Inngest function
+	// - Or if the JWT given has "publish" permissions via specific claims in the JWT.
+
+	// If we have authed using JWT claims, ensure it has the publish claim.  This publishing JWT
+	claims, err := realtimeAuth(r.Context())
+	if err == nil && !claims.Publish {
+		// We have claims, but not for publishing. Error out.
+		_ = publicerr.WriteHTTP(w, publicerr.Wrapf(err, 401, "Not authenticated"))
+		return
+	}
+	if claims == nil {
+		// We have no claims, so attempt to auth using API keys.
+		auth, err := a.opts.AuthFinder(r.Context())
+		if err != nil {
+			_ = publicerr.WriteHTTP(w, publicerr.Wrapf(err, 401, "Not authenticated"))
+			return
+		}
+
+		// In  this case, we've authed using signing keys.  Create a set of JWT claims and assign
+		// this to the request so that we can use standard claims when publishing streams.  This
+		// gives us a single place to load account IDs and envs for the current request.
+		claims = &JWTClaims{
+			RegisteredClaims: jwt.RegisteredClaims{
+				Subject: auth.AccountID().String(),
+			},
+			Env:     auth.WorkspaceID(),
+			Publish: true,
+		}
+		r = r.WithContext(context.WithValue(r.Context(), claimsKey, claims))
+	}
 
 	// NOTE: If the content type is of "text/stream", this creates a new
 	// stream to buffer messages to subscribers in 1KB chunks
@@ -291,15 +320,15 @@ func (a *api) publishStream(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *api) getStreamMessage(r *http.Request) (Message, error) {
-	auth, err := a.opts.AuthFinder(r.Context())
-	if err != nil {
+	auth, err := realtimeAuth(r.Context())
+	if err != nil || auth == nil || !auth.Publish {
 		return Message{}, err
 	}
 
 	msg := Message{
 		Channel:   r.URL.Query().Get("channel"),
 		Topic:     r.URL.Query().Get("topic"),
-		EnvID:     auth.WorkspaceID(),
+		EnvID:     auth.Env,
 		CreatedAt: time.Now(),
 	}
 	if runID := r.URL.Query().Get("run_id"); runID != "" {
