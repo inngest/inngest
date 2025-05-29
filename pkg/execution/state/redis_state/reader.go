@@ -210,10 +210,10 @@ func (q *queue) RunningCount(ctx context.Context, workflowID uuid.UUID) (int64, 
 	return count, nil
 }
 
-func (q *queue) FindItemsForFunction(ctx context.Context, workspaceID uuid.UUID, workflowID uuid.UUID, from time.Time, until time.Time) iter.Seq2[osqueue.QueueItem, error] {
+func (q *queue) ItemsByFunction(ctx context.Context, workspaceID uuid.UUID, workflowID uuid.UUID, from time.Time, until time.Time) iter.Seq2[osqueue.QueueItem, error] {
 	return nil
 }
 
-func (q *queue) FindItemsForBacklog(ctx context.Context, backlogID string, from time.Time, until time.Time) iter.Seq2[osqueue.QueueItem, error] {
+func (q *queue) ItemsByBacklog(ctx context.Context, backlogID string, from time.Time, until time.Time) iter.Seq2[osqueue.QueueItem, error] {
 	return nil
 }

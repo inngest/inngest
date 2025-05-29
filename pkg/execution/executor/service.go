@@ -482,7 +482,7 @@ func (s *svc) handleCancel(ctx context.Context, item queue.Item) error {
 		}
 
 		// Iterate over queue items
-		for qi, err := range s.queue.FindItemsForFunction(ctx, c.WorkspaceID, c.FunctionID, from, c.StartedBefore) {
+		for qi, err := range s.queue.ItemsByFunction(ctx, c.WorkspaceID, c.FunctionID, from, c.StartedBefore) {
 			// NOTE: should this be returned here?
 			if err != nil {
 				return fmt.Errorf("error on retrieving queue item for cancellation: %w", err)
@@ -522,7 +522,7 @@ func (s *svc) handleCancel(ctx context.Context, item queue.Item) error {
 		}
 
 		// iterate over queue items
-		for qi, err := range s.queue.FindItemsForBacklog(ctx, c.TargetID, from, c.StartedBefore) {
+		for qi, err := range s.queue.ItemsByBacklog(ctx, c.TargetID, from, c.StartedBefore) {
 			if err != nil {
 				return fmt.Errorf("error on retrieving queue item for cancellation: %w", err)
 			}
