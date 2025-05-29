@@ -4,6 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/testapi"
+	"io"
+	"net/http"
+	"net/url"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -480,4 +485,133 @@ func TestManyWaitInvalidExpressions(t *testing.T) {
 		a := assert.New(ct)
 		a.True(done)
 	}, 5*time.Second, 100*time.Millisecond)
+}
+
+func TestWaitForEvent_Timeout(t *testing.T) {
+	ctx := context.Background()
+	r := require.New(t)
+	c := client.New(t)
+
+	appID := "TestWaitTimeout" + ulid.MustNew(ulid.Now(), nil).String()
+	inngestClient, server, registerFuncs := NewSDKHandler(t, appID)
+	defer server.Close()
+
+	// This function will invoke the other function
+	runID := ""
+	evtName := "wait-event-timeout"
+	waitEvtName := "resume-but-dont-actually-cuz-lol-timeouts"
+	_, err := inngestgo.CreateFunction(
+		inngestClient,
+		inngestgo.FunctionOpts{
+			ID: "main-fn",
+		},
+		inngestgo.EventTrigger(evtName, nil),
+		func(ctx context.Context, input inngestgo.Input[DebounceEvent]) (any, error) {
+			runID = input.InputCtx.RunID
+
+			_, _ = step.WaitForEvent[any](
+				ctx,
+				"wait",
+				step.WaitForEventOpts{
+					Name:    "dummy",
+					Event:   waitEvtName,
+					Timeout: 5 * time.Second,
+				},
+			)
+
+			return "DONE", nil
+		},
+	)
+	require.NoError(t, err)
+	registerFuncs()
+
+	fnId := ""
+	require.Eventually(t, func() bool {
+		functions, err := c.Functions(ctx)
+		if err != nil {
+			return false
+		}
+		for _, function := range functions {
+			if function.App.ExternalID != appID {
+				continue
+			}
+
+			fnId = function.ID
+			return true
+		}
+		return false
+	}, 10*time.Second, 250*time.Millisecond)
+
+	getActiveCounters := func(accountId uuid.UUID, fnId uuid.UUID) testapi.TestActiveCounters {
+		reqUrl, err := url.Parse(c.APIHost + "/test/queue/active-counter")
+		require.NoError(t, err)
+
+		fv := reqUrl.Query()
+		fv.Add("accountId", consts.DevServerAccountID.String())
+		fv.Add("fnId", fnId.String())
+
+		req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqUrl.String()+"?"+fv.Encode(), nil)
+		require.NoError(t, err)
+
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+
+		byt, err := io.ReadAll(resp.Body)
+		require.NoError(t, err)
+
+		r := testapi.TestActiveCounters{}
+		err = json.Unmarshal(byt, &r)
+		require.NoError(t, err, "Test API may not be enabled! Error unmarshalling %s", byt)
+
+		return r
+	}
+
+	// Trigger the main function
+	_, err = inngestClient.Send(ctx, &event.Event{Name: evtName})
+	r.NoError(err)
+
+	run := c.WaitForRunTraces(ctx, t, &runID, client.WaitForRunTracesOptions{
+		Status:         models.FunctionStatusRunning,
+		ChildSpanCount: 1,
+	})
+
+	require.Equal(t, models.RunTraceSpanStatusRunning.String(), run.Trace.Status)
+	require.Nil(t, run.Trace.OutputID)
+
+	rootSpanID := run.Trace.SpanID
+
+	time.Sleep(5 * time.Second)
+
+	t.Run("on timeout", func(t *testing.T) {
+		span := run.Trace.ChildSpans[0]
+		assert.Equal(t, "dummy", span.Name)
+		assert.Equal(t, 0, span.Attempts)
+		assert.Equal(t, rootSpanID, span.ParentSpanID)
+		assert.False(t, span.IsRoot)
+		assert.Equal(t, 0, len(span.ChildSpans)) // NOTE: should have no child
+		assert.Equal(t, models.RunTraceSpanStatusWaiting.String(), span.Status)
+		assert.Equal(t, models.StepOpWaitForEvent.String(), span.StepOp)
+		assert.Nil(t, span.EndedAt)
+		assert.Nil(t, span.OutputID)
+
+		var stepInfo models.WaitForEventStepInfo
+		byt, err := json.Marshal(span.StepInfo)
+		assert.NoError(t, err)
+		assert.NoError(t, json.Unmarshal(byt, &stepInfo))
+
+		assert.Equal(t, waitEvtName, stepInfo.EventName)
+		assert.Nil(t, stepInfo.TimedOut)
+		assert.Nil(t, stepInfo.FoundEventID)
+		counters := getActiveCounters(consts.DevServerAccountID, uuid.MustParse(fnId))
+
+		require.Equal(t, testapi.TestActiveCounters{
+			ActiveAccount:      0,
+			ActiveFunction:     0,
+			ActiveRunsAccount:  0,
+			ActiveRunsFunction: 0,
+		}, counters)
+
+	})
 }

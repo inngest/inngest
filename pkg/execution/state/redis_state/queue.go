@@ -2517,6 +2517,7 @@ func (q *queue) Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 	keys := []string{
 		kg.QueueItem(),
 		kg.PartitionItem(),
+
 		kg.ConcurrencyIndex(),
 
 		partition.readyQueueKey(kg),
