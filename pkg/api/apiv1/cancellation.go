@@ -140,6 +140,7 @@ func (a API) CreateCancellation(ctx context.Context, opts CreateCancellationBody
 		StartedAfter:  opts.StartedAfter,
 		StartedBefore: opts.StartedBefore,
 		If:            opts.If,
+		Kind:          enums.CancellationKindBulkRun,
 		Type:          enums.CancellationTypeAPI,
 	}
 	if err := a.opts.CancellationReadWriter.CreateCancellation(ctx, cancel); err != nil {
