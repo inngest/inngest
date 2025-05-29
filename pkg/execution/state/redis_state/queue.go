@@ -370,6 +370,12 @@ func WithDisableFifoForFunctions(mapping map[string]struct{}) QueueOpt {
 	}
 }
 
+func WithPeekSizeForFunction(mapping map[string]int64) QueueOpt {
+	return func(q *queue) {
+		q.peekSizeForFunctions = mapping
+	}
+}
+
 func WithDisableFifoForAccounts(mapping map[string]struct{}) QueueOpt {
 	return func(q *queue) {
 		q.disableFifoForAccounts = mapping
@@ -623,6 +629,7 @@ func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 		pollTick:                       defaultPollTick,
 		idempotencyTTL:                 defaultIdempotencyTTL,
 		queueKindMapping:               make(map[string]string),
+		peekSizeForFunctions:           make(map[string]int64),
 		log:                            logger.StdlibLogger(ctx),
 		concurrencyLimitGetter: func(ctx context.Context, p QueuePartition) PartitionConcurrencyLimits {
 			def := defaultConcurrency
@@ -782,6 +789,7 @@ type queue struct {
 	queueKindMapping        map[string]string
 	disableFifoForFunctions map[string]struct{}
 	disableFifoForAccounts  map[string]struct{}
+	peekSizeForFunctions    map[string]int64
 	log                     logger.Logger
 
 	// itemIndexer returns indexes for a given queue item.
