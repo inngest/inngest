@@ -88,11 +88,22 @@ func WithServiceLogger(l logger.Logger) func(s *svc) {
 	}
 }
 
+func WithServiceShardSelector(sl redis_state.ShardSelector) func(s *svc) {
+	return func(s *svc) {
+		s.findShard = sl
+	}
+}
+
 func NewService(c config.Config, opts ...Opt) service.Service {
 	svc := &svc{config: c, log: logger.StdlibLogger(context.Background())}
 	for _, o := range opts {
 		o(svc)
 	}
+	// don't proceed if shard selector is not set
+	if svc.shardSelect == nil {
+		panic("shard selector need to be provided for executor service")
+	}
+
 	return svc
 }
 
@@ -113,7 +124,8 @@ type svc struct {
 
 	wg sync.WaitGroup
 
-	opts []ExecutorOpt
+	opts      []ExecutorOpt
+	findShard redis_state.ShardSelector
 }
 
 func (s *svc) Name() string {
@@ -533,6 +545,11 @@ func (s *svc) handleCancel(ctx context.Context, item queue.Item) error {
 			from = *c.StartedAfter
 		}
 
+		shard, err := s.findShard(ctx, c.AccountID, c.QueueName)
+		if err != nil {
+			return fmt.Errorf("error selecting shard for cancellation: %w")
+		}
+
 		// iterate over queue items
 		for qi, err := range s.queue.ItemsByBacklog(ctx, c.AccountID, c.TargetID, from, c.StartedBefore) {
 			if err != nil {
@@ -573,8 +590,6 @@ func (s *svc) handleCancel(ctx context.Context, item queue.Item) error {
 
 			// dequeue the item
 			if q, ok := s.queue.(redis_state.QueueManager); ok {
-				// TODO: find the shard
-				shard := redis_state.QueueShard{}
 				if err := q.Dequeue(ctx, shard, qi); err != nil {
 					return err
 				}
