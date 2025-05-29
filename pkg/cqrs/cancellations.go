@@ -58,6 +58,10 @@ type Cancellation struct {
 	Kind enums.CancellationKind `json:"kind"`
 	// Type represents the type of the cancellation
 	Type enums.CancellationType `json:"cause"`
-	// XXX (tonyhb): We can eventually add a  "kind" field: an enum allowing
-	// you to cancel only the backlog of unstarted functions or every function.
+	// TargetID presents the ID of the target that needs to be cancelled
+	// e.g.
+	// - run -> runID
+	// - bulk run -> none
+	// - backlog -> backlogID
+	TargetID string `json:"target_id,omitempty"`
 }
