@@ -89,7 +89,7 @@ func (e executor) Execute(ctx context.Context, sl sv2.StateLoader, s sv2.Metadat
 		}
 	}
 
-	dr, _, err := executeDriverRequest(ctx, e.Client, Request{
+	dr, _, err := ExecuteDriverRequest(ctx, e.Client, Request{
 		SigningKey: e.localSigningKey,
 		URL:        *uri,
 		Input:      input,
@@ -123,8 +123,8 @@ type Request struct {
 	Headers map[string]string
 }
 
-// executeDriverRequest executes the HTTP request with the given input.
-func executeDriverRequest(ctx context.Context, c exechttp.RequestExecutor, r Request) (*state.DriverResponse, *httpstat.Result, error) {
+// ExecuteDriverRequest executes the HTTP request with the given input.
+func ExecuteDriverRequest(ctx context.Context, c exechttp.RequestExecutor, r Request) (*state.DriverResponse, *httpstat.Result, error) {
 	if c == nil {
 		c = defaultClient
 	}
