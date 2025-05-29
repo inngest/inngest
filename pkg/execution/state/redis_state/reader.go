@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"iter"
 	"sync/atomic"
 	"time"
 
@@ -207,4 +208,12 @@ func (q *queue) RunningCount(ctx context.Context, workflowID uuid.UUID) (int64, 
 	// TODO Support other storage backends
 
 	return count, nil
+}
+
+func (q *queue) FindItemsForFunction(ctx context.Context, workspaceID uuid.UUID, workflowID uuid.UUID, from time.Time, until time.Time) iter.Seq2[osqueue.QueueItem, error] {
+	return nil
+}
+
+func (q *queue) FindItemsForBacklog(ctx context.Context, backlogID string, from time.Time, until time.Time) iter.Seq2[osqueue.QueueItem, error] {
+	return nil
 }

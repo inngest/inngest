@@ -3,6 +3,7 @@ package queue
 import (
 	"context"
 	"errors"
+	"iter"
 	"time"
 
 	"github.com/google/uuid"
@@ -211,34 +212,23 @@ type JobResponse struct {
 type JobQueueReader interface {
 	// OutstandingJobCount returns the number of jobs in progress
 	// or scheduled for a given run.
-	OutstandingJobCount(
-		ctx context.Context,
-		workspaceID uuid.UUID,
-		workflowID uuid.UUID,
-		runID ulid.ULID,
-	) (int, error)
+	OutstandingJobCount(ctx context.Context, envID uuid.UUID, fnID uuid.UUID, runID ulid.ULID) (int, error)
 
 	// RunningCount returns the number of running (in-progress) jobs for a given function
 	RunningCount(ctx context.Context, workflowID uuid.UUID) (int64, error)
 
 	// StatusCount returns the total number of items in the function
 	// status queue.
-	StatusCount(
-		ctx context.Context,
-		workflowID uuid.UUID,
-		status string,
-	) (int64, error)
+	StatusCount(ctx context.Context, workflowID uuid.UUID, status string) (int64, error)
 
 	// RunJobs reads items in the queue for a specific run.
-	RunJobs(
-		ctx context.Context,
-		queueShardName string,
-		workspaceID uuid.UUID,
-		workflowID uuid.UUID,
-		runID ulid.ULID,
-		limit,
-		offset int64,
-	) ([]JobResponse, error)
+	RunJobs(ctx context.Context, queueShardName string, workspaceID uuid.UUID, workflowID uuid.UUID, runID ulid.ULID, limit, offset int64) ([]JobResponse, error)
+
+	// FindItemsForFunction returns a queue item iterator for a function within a specific time range
+	FindItemsForFunction(ctx context.Context, workspaceID uuid.UUID, workflowID uuid.UUID, from time.Time, until time.Time) iter.Seq2[QueueItem, error]
+
+	// FindItemsForBacklog returns a queue item iterator for a backlog within a specific time range
+	FindItemsForBacklog(ctx context.Context, backlogID string, from time.Time, until time.Time) iter.Seq2[QueueItem, error]
 }
 
 // MigratePayload stores the information to be used when migrating a queue shard to another one
@@ -257,15 +247,4 @@ type MigratePayload struct {
 
 	// Concurrency optionally specifies the concurrency for running the migrate handler over each batch of queue items.
 	Concurrency int
-}
-
-// QueueItemIterator provides the interface to iterate through a list of queue items
-type QueueItemIterator interface {
-	// Next advances the iterator, and should be called prior to value retrieval
-	Next(ctx context.Context) bool
-	// Val returns the current queue item from the iterator
-	Val(ctx context.Context) *QueueItem
-	// Error returns the error during an iteration.
-	// This can be used to check on errors when `Next` returns false.
-	Error() error
 }
