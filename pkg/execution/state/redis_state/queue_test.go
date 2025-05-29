@@ -1208,7 +1208,7 @@ func TestQueueLease(t *testing.T) {
 	start := time.Now().Truncate(time.Second)
 
 	t.Run("It leases an item", func(t *testing.T) {
-		fnID := uuid.New()
+		fnID, accountID := uuid.New(), uuid.New()
 		runID := ulid.MustNew(ulid.Now(), rand.Reader)
 
 		item, err := q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{
@@ -1217,6 +1217,7 @@ func TestQueueLease(t *testing.T) {
 				Identifier: state.Identifier{
 					RunID:      runID,
 					WorkflowID: fnID,
+					AccountID:  accountID,
 				},
 			},
 		}, start, osqueue.EnqueueOpts{})
@@ -1226,7 +1227,9 @@ func TestQueueLease(t *testing.T) {
 		require.Nil(t, item.LeaseID)
 
 		p := QueuePartition{
+			ID:         fnID.String(),
 			FunctionID: &fnID,
+			AccountID:  accountID,
 		} // Default workflow ID etc
 
 		t.Run("It should exist in the pending partition queue", func(t *testing.T) {
@@ -1268,6 +1271,10 @@ func TestQueueLease(t *testing.T) {
 				isMember, err := r.SIsMember(kg.ActivePartitionRunsIndex(fnID.String()), runID.String())
 				require.NoError(t, err)
 				require.True(t, isMember)
+
+				activeRunCounterAccount, err := r.Get(kg.ActiveRunsCounter("account", accountID.String()))
+				require.NoError(t, err)
+				require.Equal(t, "1", activeRunCounterAccount)
 			}
 		})
 
@@ -2700,17 +2707,11 @@ func TestQueueRequeue(t *testing.T) {
 			requirePartitionScoreEquals(t, r, pi.FunctionID, next)
 		})
 
-		t.Run("run indexes are not updated on requeue to partition", func(t *testing.T) {
+		t.Run("run indexes are updated on requeue to partition", func(t *testing.T) {
 			kg := q.primaryQueueShard.RedisClient.kg
 
-			runActiveCount, err := r.Get(kg.ActiveCounter("run", runID.String()))
-			require.NoError(t, err)
-
-			require.Equal(t, "1", runActiveCount)
-
-			isMember, err := r.SIsMember(kg.ActivePartitionRunsIndex(fnID.String()), runID.String())
-			require.NoError(t, err)
-			require.True(t, isMember)
+			require.False(t, r.Exists(kg.ActivePartitionRunsIndex(item.FunctionID.String())))
+			require.False(t, r.Exists(kg.ActiveCounter("run", runID.String())))
 		})
 
 		t.Run("It should not update the partition's earliest time, if later", func(t *testing.T) {
@@ -5119,7 +5120,7 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 
 			shadowPartition := q.ItemShadowPartition(ctx, item)
 			require.NotEmpty(t, shadowPartition.PartitionID)
-			require.Len(t, shadowPartition.CustomConcurrencyKeys, 1)
+			require.Len(t, shadowPartition.Concurrency.CustomConcurrencyKeys, 1)
 
 			require.True(t, r.Exists(kg.BacklogMeta()), r.Keys())
 			require.True(t, r.Exists(kg.BacklogSet(backlog.BacklogID)))
@@ -5246,7 +5247,7 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 
 			shadowPartition := q.ItemShadowPartition(ctx, item)
 			require.NotEmpty(t, shadowPartition.PartitionID)
-			require.Len(t, shadowPartition.CustomConcurrencyKeys, 2)
+			require.Len(t, shadowPartition.Concurrency.CustomConcurrencyKeys, 2)
 
 			require.True(t, r.Exists(kg.BacklogMeta()), r.Keys())
 			require.True(t, r.Exists(kg.BacklogSet(backlog.BacklogID)))
@@ -5561,7 +5562,7 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 
 			shadowPartition := q.ItemShadowPartition(ctx, item)
 			require.NotEmpty(t, shadowPartition.PartitionID)
-			require.Len(t, shadowPartition.CustomConcurrencyKeys, 1)
+			require.Len(t, shadowPartition.Concurrency.CustomConcurrencyKeys, 1)
 
 			// key queue v2 accounting
 			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, shadowPartition.accountInProgressKey(kg), qi.ID)))
@@ -5704,7 +5705,7 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 
 			shadowPartition := q.ItemShadowPartition(ctx, item)
 			require.NotEmpty(t, shadowPartition.PartitionID)
-			require.Len(t, shadowPartition.CustomConcurrencyKeys, 2)
+			require.Len(t, shadowPartition.Concurrency.CustomConcurrencyKeys, 2)
 
 			// key queue v2 accounting
 			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, shadowPartition.accountInProgressKey(kg), qi.ID)))
@@ -5899,7 +5900,7 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 
 			shadowPartition := q.ItemShadowPartition(ctx, item)
 			require.NotEmpty(t, shadowPartition.PartitionID)
-			require.Len(t, shadowPartition.CustomConcurrencyKeys, 0)
+			require.Len(t, shadowPartition.Concurrency.CustomConcurrencyKeys, 0)
 
 			fnPart, custom1, custom2, _ := q.ItemPartitions(ctx, defaultShard, item)
 			require.NotEmpty(t, fnPart.ID)
@@ -6063,7 +6064,7 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 
 			shadowPartition := q.ItemShadowPartition(ctx, item)
 			require.NotEmpty(t, shadowPartition.PartitionID)
-			require.Len(t, shadowPartition.CustomConcurrencyKeys, 1)
+			require.Len(t, shadowPartition.Concurrency.CustomConcurrencyKeys, 1)
 
 			fnPart, custom1, custom2, _ := q.ItemPartitions(ctx, defaultShard, item)
 			require.NotEmpty(t, custom1.ID)
@@ -6229,7 +6230,7 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 
 			shadowPartition := q.ItemShadowPartition(ctx, item)
 			require.NotEmpty(t, shadowPartition.PartitionID)
-			require.Len(t, shadowPartition.CustomConcurrencyKeys, 2)
+			require.Len(t, shadowPartition.Concurrency.CustomConcurrencyKeys, 2)
 
 			fnPart, custom1, custom2, _ := q.ItemPartitions(ctx, defaultShard, item)
 			require.NotEmpty(t, custom1.ID)
@@ -6365,7 +6366,7 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 
 			shadowPartition := q.ItemShadowPartition(ctx, item)
 			require.NotEmpty(t, shadowPartition.PartitionID)
-			require.Len(t, shadowPartition.CustomConcurrencyKeys, 0)
+			require.Len(t, shadowPartition.Concurrency.CustomConcurrencyKeys, 0)
 
 			fnPart, custom1, custom2, _ := q.ItemPartitions(ctx, defaultShard, item)
 			require.NotEmpty(t, fnPart.ID)
@@ -6506,7 +6507,7 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 
 		shadowPartition := q.ItemShadowPartition(ctx, item)
 		require.NotEmpty(t, shadowPartition.PartitionID)
-		require.Len(t, shadowPartition.CustomConcurrencyKeys, 0)
+		require.Len(t, shadowPartition.Concurrency.CustomConcurrencyKeys, 0)
 
 		runActiveCount, err := r.Get(kg.ActiveCounter("run", runID.String()))
 		require.NoError(t, err)
@@ -6619,7 +6620,7 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 
 			shadowPartition := q.ItemShadowPartition(ctx, item)
 			require.NotEmpty(t, shadowPartition.PartitionID)
-			require.Len(t, shadowPartition.CustomConcurrencyKeys, 0)
+			require.Len(t, shadowPartition.Concurrency.CustomConcurrencyKeys, 0)
 
 			fnPart, custom1, custom2, _ := q.ItemPartitions(ctx, defaultShard, item)
 			require.NotEmpty(t, fnPart.ID)
@@ -6746,7 +6747,7 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 
 			shadowPartition := q.ItemShadowPartition(ctx, item)
 			require.NotEmpty(t, shadowPartition.PartitionID)
-			require.Len(t, shadowPartition.CustomConcurrencyKeys, 1)
+			require.Len(t, shadowPartition.Concurrency.CustomConcurrencyKeys, 1)
 
 			fnPart, custom1, custom2, _ := q.ItemPartitions(ctx, defaultShard, item)
 			require.NotEmpty(t, fnPart.ID)
@@ -6887,7 +6888,7 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 
 			shadowPartition := q.ItemShadowPartition(ctx, item)
 			require.NotEmpty(t, shadowPartition.PartitionID)
-			require.Len(t, shadowPartition.CustomConcurrencyKeys, 2)
+			require.Len(t, shadowPartition.Concurrency.CustomConcurrencyKeys, 2)
 
 			fnPart, custom1, custom2, _ := q.ItemPartitions(ctx, defaultShard, item)
 			require.NotEmpty(t, fnPart.ID)
@@ -7003,7 +7004,7 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 
 			shadowPartition := q.ItemShadowPartition(ctx, item)
 			require.NotEmpty(t, shadowPartition.PartitionID)
-			require.Len(t, shadowPartition.CustomConcurrencyKeys, 0)
+			require.Len(t, shadowPartition.Concurrency.CustomConcurrencyKeys, 0)
 
 			fnPart, custom1, custom2, _ := q.ItemPartitions(ctx, defaultShard, item)
 			require.NotEmpty(t, fnPart.ID)

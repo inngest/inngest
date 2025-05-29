@@ -516,7 +516,8 @@ func TestQueueShadowPartitionLease(t *testing.T) {
 		require.Equal(t, expectedLeaseExpiry.UnixMilli(), leaseTime.UnixMilli())
 
 		leasedPart := QueueShadowPartition{}
-		require.NoError(t, json.Unmarshal([]byte(r.HGet(kg.ShadowPartitionMeta(), shadowPart.PartitionID)), &leasedPart))
+		metaStr := r.HGet(kg.ShadowPartitionMeta(), shadowPart.PartitionID)
+		require.NoError(t, json.Unmarshal([]byte(metaStr), &leasedPart))
 
 		require.NotNil(t, leasedPart.LeaseID)
 		require.Equal(t, *leaseID, *leasedPart.LeaseID)
@@ -1680,7 +1681,7 @@ func TestShadowPartitionUpdate(t *testing.T) {
 	}
 
 	updatedShadowPart := q.ItemShadowPartition(ctx, item2)
-	require.Len(t, updatedShadowPart.CustomConcurrencyKeys, 1)
+	require.Len(t, updatedShadowPart.Concurrency.CustomConcurrencyKeys, 1)
 	require.Equal(t, 2, updatedShadowPart.FunctionVersion)
 
 	_, err = q.EnqueueItem(ctx, defaultShard, item2, at.Add(time.Minute), osqueue.EnqueueOpts{})

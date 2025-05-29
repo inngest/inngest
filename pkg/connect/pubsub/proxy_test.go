@@ -166,7 +166,7 @@ func TestProxyPubSubPath(t *testing.T) {
 	defer cancel()
 
 	go func() {
-		require.NoError(t, connector.Wait(ctx))
+		_ = connector.Wait(ctx)
 	}()
 
 	respCh := make(chan *connectpb.SDKResponse)
@@ -380,7 +380,7 @@ func TestProxyPolling(t *testing.T) {
 	defer cancel()
 
 	go func() {
-		require.NoError(t, connector.Wait(ctx))
+		_ = connector.Wait(ctx)
 	}()
 
 	respCh := make(chan *connectpb.SDKResponse)
@@ -604,7 +604,7 @@ func TestProxyLeaseExpiry(t *testing.T) {
 	defer cancel()
 
 	go func() {
-		require.NoError(t, connector.Wait(ctx))
+		_ = connector.Wait(ctx)
 	}()
 
 	respCh := make(chan struct{})

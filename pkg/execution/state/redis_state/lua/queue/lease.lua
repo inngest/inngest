@@ -33,10 +33,14 @@ local keyActivePartition           = KEYS[9]
 local keyActiveConcurrencyKey1     = KEYS[10]
 local keyActiveConcurrencyKey2     = KEYS[11]
 local keyActiveCompound            = KEYS[12]
-local keyActiveRun                 = KEYS[13]
-local keyIndexActivePartitionRuns  = KEYS[14]
 
-local throttleKey             = KEYS[15]
+local keyActiveRun                        = KEYS[13]
+local keyActiveRunsAccount                = KEYS[14]
+local keyIndexActivePartitionRuns         = KEYS[15]
+local keyActiveRunsCustomConcurrencyKey1  = KEYS[16]
+local keyActiveRunsCustomConcurrencyKey2  = KEYS[17]
+
+local throttleKey             = KEYS[18]
 
 local queueID      						= ARGV[1]
 local partitionID 					  = ARGV[2]
@@ -55,6 +59,7 @@ local customConcurrencyKey2   = tonumber(ARGV[10])
 -- key queues v2
 local checkConstraints    = tonumber(ARGV[11])
 local refilledFromBacklog = tonumber(ARGV[12])
+local drainActiveCounters = tonumber(ARGV[13])
 
 -- Use our custom Go preprocessor to inject the file from ./includes/
 -- $include(decode_ulid_time.lua)
@@ -65,6 +70,7 @@ local refilledFromBacklog = tonumber(ARGV[12])
 -- $include(gcra.lua)
 -- $include(ends_with.lua)
 -- $include(update_account_queues.lua)
+-- $include(update_active_counters.lua)
 
 -- first, get the queue item.  we must do this and bail early if the queue item
 -- was not found.
@@ -91,7 +97,7 @@ if checkConstraints == 1 then
 	--
 	-- We handle this before concurrency as it's typically not used, and it's faster to handle than concurrency,
 	-- with o(1) operations vs o(log(n)).
-	if item.data ~= nil and item.data.throttle ~= nil and refilledFromBacklog == 0 then
+	if item.data ~= nil and item.data.throttle ~= nil and item.data.throttle.p > 0 and refilledFromBacklog == 0 then
 		local throttleResult = gcra(throttleKey, currentTime, item.data.throttle.p * 1000, item.data.throttle.l, item.data.throttle.b)
 		if throttleResult == false then
 			return -7
@@ -170,35 +176,9 @@ end
 
 -- If item was not refilled from backlog, we must increase active counters during lease
 -- to account used capacity for future backlog refills
-if refilledFromBacklog ~= 1 then
-  -- Increase active counters by 1
-  redis.call("INCR", keyActivePartition)
-
-  if exists_without_ending(keyActiveAccount, ":-") then
-    redis.call("INCR", keyActiveAccount)
-  end
-
-  if exists_without_ending(keyActiveCompound, ":-") then
-    redis.call("INCR", keyActiveCompound)
-  end
-
-  if exists_without_ending(keyActiveConcurrencyKey1, ":-") then
-    redis.call("INCR", keyActiveConcurrencyKey1)
-  end
-
-  if exists_without_ending(keyActiveConcurrencyKey2, ":-") then
-    redis.call("INCR", keyActiveConcurrencyKey2)
-  end
-
-  if exists_without_ending(keyActiveRun, ":-") then
-    -- increase number of active items in the run
-    redis.call("INCR", keyActiveRun)
-
-    -- update set of active function runs
-    if exists_without_ending(keyIndexActivePartitionRuns, ":-") then
-      redis.call("SADD", keyIndexActivePartitionRuns, runID)
-    end
-  end
+if refilledFromBacklog ~= 1 and drainActiveCounters ~= 1 then
+  increaseActiveCounters(keyActivePartition, keyActiveAccount, keyActiveCompound, keyActiveConcurrencyKey1, keyActiveConcurrencyKey2, 1)
+  increaseActiveRunCounters(keyActiveRun, keyIndexActivePartitionRuns, keyActiveRunsAccount, keyActiveRunsCustomConcurrencyKey1, keyActiveRunsCustomConcurrencyKey2, runID)
 end
 
 return 0

@@ -32,15 +32,18 @@ local keyActivePartition           = KEYS[18]
 local keyActiveConcurrencyKey1     = KEYS[19]
 local keyActiveConcurrencyKey2     = KEYS[20]
 local keyActiveCompound            = KEYS[21]
-local keyActiveRun                 = KEYS[22]
-local keyIndexActivePartitionRuns  = KEYS[23]
 
-local keyIdempotency           = KEYS[24]
+local keyActiveRun                        = KEYS[22]
+local keyActiveRunsAccount                = KEYS[23]
+local keyIndexActivePartitionRuns         = KEYS[24]
+local keyActiveRunsCustomConcurrencyKey1  = KEYS[25]
+local keyActiveRunsCustomConcurrencyKey2  = KEYS[26]
 
-local singletonRunKey          = KEYS[25]
+local keyIdempotency           = KEYS[27]
+local singletonRunKey          = KEYS[28]
 
-local keyItemIndexA            = KEYS[26]   -- custom item index 1
-local keyItemIndexB            = KEYS[27]  -- custom item index 2
+local keyItemIndexA            = KEYS[29]   -- custom item index 1
+local keyItemIndexB            = KEYS[30]  -- custom item index 2
 
 local queueID        = ARGV[1]
 local partitionID    = ARGV[2]
@@ -55,6 +58,7 @@ local idempotencyTTL = tonumber(ARGV[6])
 -- $include(ends_with.lua)
 -- $include(update_account_queues.lua)
 -- $include(update_backlog_pointer.lua)
+-- $include(update_active_counters.lua)
 
 --
 -- Fetch this item to see if it was in progress prior to deleting.
@@ -138,46 +142,9 @@ if exists_without_ending(keyInProgressAccount, ":-") then
   redis.call("ZREM", keyInProgressAccount, item.id)
 end
 
--- Decrease active counters and clean up if necessary
-if redis.call("DECR", keyActivePartition) <= 0 then
-  redis.call("DEL", keyActivePartition)
-end
-
-if exists_without_ending(keyActiveAccount, ":-") then
-  if redis.call("DECR", keyActiveAccount) <= 0 then
-    redis.call("DEL", keyActiveAccount)
-  end
-end
-
-if exists_without_ending(keyActiveCompound, ":-") then
-  if redis.call("DECR", keyActiveCompound) <= 0 then
-    redis.call("DEL", keyActiveCompound)
-  end
-end
-
-if exists_without_ending(keyActiveConcurrencyKey1, ":-") then
-  if redis.call("DECR", keyActiveConcurrencyKey1) <= 0 then
-    redis.call("DEL", keyActiveConcurrencyKey1)
-  end
-end
-
-if exists_without_ending(keyActiveConcurrencyKey2, ":-") then
-  if redis.call("DECR", keyActiveConcurrencyKey2) <= 0 then
-    redis.call("DEL", keyActiveConcurrencyKey2)
-  end
-end
-
-if exists_without_ending(keyActiveRun, ":-") then
-  -- increase number of active items in the run
-  if redis.call("DECR", keyActiveRun) <= 0 then
-    redis.call("DEL", keyActiveRun)
-
-    -- update set of active function runs
-    if exists_without_ending(keyIndexActivePartitionRuns, ":-") then
-      redis.call("SREM", keyIndexActivePartitionRuns, runID)
-    end
-  end
-end
+-- Decrease active counters
+decreaseActiveCounters(keyActivePartition, keyActiveAccount, keyActiveCompound, keyActiveConcurrencyKey1, keyActiveConcurrencyKey2)
+decreaseActiveRunCounters(keyActiveRun, keyIndexActivePartitionRuns, keyActiveRunsAccount, keyActiveRunsCustomConcurrencyKey1, keyActiveRunsCustomConcurrencyKey2, runID)
 
 -- Add optional indexes.
 if keyItemIndexA ~= "" and keyItemIndexA ~= false and keyItemIndexA ~= nil then
