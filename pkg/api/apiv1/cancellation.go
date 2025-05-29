@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/expressions"
 
 	"github.com/go-chi/chi/v5"
@@ -131,12 +132,15 @@ func (a API) CreateCancellation(ctx context.Context, opts CreateCancellationBody
 	cancel := cqrs.Cancellation{
 		CreatedAt:     time.Now(),
 		ID:            ulid.MustNew(ulid.Now(), rand.Reader),
+		AccountID:     auth.AccountID(),
 		WorkspaceID:   auth.WorkspaceID(),
+		AppID:         fn.AppID,
 		FunctionID:    fn.ID,
 		FunctionSlug:  fn.Slug,
 		StartedAfter:  opts.StartedAfter,
 		StartedBefore: opts.StartedBefore,
 		If:            opts.If,
+		Type:          enums.CancellationTypeAPI,
 	}
 	if err := a.opts.CancellationReadWriter.CreateCancellation(ctx, cancel); err != nil {
 		var compileError *expressions.CompileError

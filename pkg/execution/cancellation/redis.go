@@ -7,7 +7,11 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
+	"github.com/inngest/inngest/pkg/execution/queue"
+	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 )
@@ -19,11 +23,11 @@ var (
 )
 
 // NewRedisWriter writes cancellations to Redis.
-func NewRedisWriter(r rueidis.Client, prefix string) cqrs.CancellationWriter {
+func NewRedisWriter(r rueidis.Client, q redis_state.QueueManager, prefix string) cqrs.CancellationWriter {
 	if prefix == "" {
 		prefix = DefaultPrefix
 	}
-	return redisReadWriter{r, prefix}
+	return redisReadWriter{r: r, q: q, prefix: prefix}
 }
 
 // NewRedisReader loads cancellations from Redis.
@@ -31,11 +35,12 @@ func NewRedisReader(r rueidis.Client, prefix string) Reader {
 	if prefix == "" {
 		prefix = DefaultPrefix
 	}
-	return redisReadWriter{r, prefix}
+	return redisReadWriter{r: r, q: nil, prefix: prefix}
 }
 
 type redisReadWriter struct {
 	r      rueidis.Client
+	q      redis_state.QueueManager
 	prefix string
 }
 
@@ -66,7 +71,34 @@ func (r redisReadWriter) CreateCancellation(ctx context.Context, c cqrs.Cancella
 	// For now, though, we're adding cancellations to a hashmap of each given workspace/
 	// function combination.
 	cmd := r.r.B().Hset().Key(key).FieldValue().FieldValue(c.ID.String(), string(byt)).Build()
-	return r.r.Do(ctx, cmd).Error()
+	if err := r.r.Do(ctx, cmd).Error(); err != nil {
+		return err
+	}
+
+	// Enqueue to system queue for eager cancellation
+	queueName := queue.KindCancel
+	maxAttempts := consts.MaxRetries + 1
+	jobID := c.ID.String()
+	err = r.q.Enqueue(ctx, queue.Item{
+		JobID:       &jobID,
+		GroupID:     uuid.New().String(),
+		WorkspaceID: c.WorkspaceID,
+		Kind:        queue.KindCancel,
+		Identifier: state.Identifier{
+			AccountID:   c.AccountID,
+			WorkspaceID: c.WorkspaceID,
+			AppID:       c.AppID,
+			WorkflowID:  c.FunctionID,
+			Key:         fmt.Sprintf("cancel:%s", c.ID),
+		},
+		MaxAttempts: &maxAttempts,
+		Payload:     c,
+		QueueName:   &queueName,
+	}, time.Now(), queue.EnqueueOpts{})
+	if err == redis_state.ErrQueueItemExists {
+		return nil
+	}
+	return err
 }
 
 func (r redisReadWriter) DeleteCancellation(ctx context.Context, c cqrs.Cancellation) error {
