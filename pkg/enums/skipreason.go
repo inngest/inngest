@@ -10,4 +10,8 @@ const (
 
 	// SkipReasonFunctionPaused indicates that the function was paused.
 	SkipReasonFunctionPaused
+
+	// SkipReasonSingleton indicates that the run was skipped because another
+	// run of the same singleton function was already in progress.
+	SkipReasonSingleton
 )

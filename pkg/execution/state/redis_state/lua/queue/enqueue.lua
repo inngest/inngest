@@ -28,8 +28,11 @@ local keyPartitionNormalizeSet           = KEYS[17]
 local keyAccountNormalizeSet             = KEYS[18]
 local keyGlobalNormalizeSet              = KEYS[19]
 
-local keyItemIndexA           	= KEYS[20]          -- custom item index 1
-local keyItemIndexB           	= KEYS[21]          -- custom item index 2
+local singletonRunKey           	  = KEYS[20]
+local singletonKey           	  = KEYS[21]
+
+local keyItemIndexA           	= KEYS[22]          -- custom item index 1
+local keyItemIndexB           	= KEYS[23]          -- custom item index 2
 
 local queueItem           		= ARGV[1]           -- {id, lease id, attempt, max attempt, data, etc...}
 local queueID             		= ARGV[2]           -- id
@@ -40,13 +43,14 @@ local fnMetadata          		= ARGV[6]          -- function meta: {paused}
 local partitionItem      		  = ARGV[7]
 local partitionID        		  = ARGV[8]
 local accountID           		= ARGV[9]
+local runID                     = ARGV[10]
 
 -- Key queues v2
-local enqueueToBacklog				= tonumber(ARGV[10])
-local shadowPartitionItem     = ARGV[11]
-local backlogItem             = ARGV[12]
-local backlogID               = ARGV[13]
-local normalizeFromBacklogID  = ARGV[14]
+local enqueueToBacklog				= tonumber(ARGV[11])
+local shadowPartitionItem     = ARGV[12]
+local backlogItem             = ARGV[13]
+local backlogID               = ARGV[14]
+local normalizeFromBacklogID  = ARGV[15]
 
 -- $include(update_pointer_score.lua)
 -- $include(ends_with.lua)
@@ -67,6 +71,17 @@ end
 if redis.call("HSETNX", queueKey, queueID, queueItem) == 0 and not is_normalize then
   -- This already exists;  return an error.
   return 1
+end
+
+-- Check if the item is a singleton and if an existing item already exists
+if exists_without_ending(singletonKey, ":singleton:-") then 
+  if redis.call("EXISTS", singletonKey) ~= 0 then
+    return 2
+  end
+
+  -- Set the singleton key to the item ID
+  redis.call("SET", singletonRunKey, singletonKey)
+  redis.call("SET", singletonKey, runID)
 end
 
 if enqueueToBacklog == 1 then

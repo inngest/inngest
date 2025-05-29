@@ -240,6 +240,11 @@ type QueueKeyGenerator interface {
 	ThrottleKey(t *osqueue.Throttle) string
 	// RunIndex returns the index for storing job IDs associated with run IDs.
 	RunIndex(runID ulid.ULID) string
+	// SingletonKey returns the singleton key for a given queue item.
+	SingletonKey(s *osqueue.Singleton) string
+	// SingletonRunKey returns the singleton run id key that stores the singleton key for a given run.
+	SingletonRunKey(r string) string
+
 	// FnMetadata returns the key for a function's metadata.
 	// This is a JSON object; see queue.FnMetadata.
 	FnMetadata(fnID uuid.UUID) string
@@ -293,6 +298,18 @@ func (u queueKeyGenerator) ThrottleKey(t *osqueue.Throttle) string {
 		return fmt.Sprintf("{%s}:throttle:-", u.queueDefaultKey)
 	}
 	return fmt.Sprintf("{%s}:throttle:%s", u.queueDefaultKey, t.Key)
+}
+
+func (u queueKeyGenerator) SingletonKey(s *osqueue.Singleton) string {
+	if s == nil || s.Key == "" {
+		return fmt.Sprintf("{%s}:singleton:-", u.queueDefaultKey)
+	}
+
+	return fmt.Sprintf("{%s}:singleton:%s", u.queueDefaultKey, s.Key)
+}
+
+func (u queueKeyGenerator) SingletonRunKey(runID string) string {
+	return fmt.Sprintf("{%s}:singleton-run:%s", u.queueDefaultKey, runID)
 }
 
 func (u queueKeyGenerator) PartitionMeta(id string) string {
