@@ -543,6 +543,12 @@ func WithDisableLeaseChecks(lc DisableLeaseChecks) QueueOpt {
 	}
 }
 
+func WithKeyQueuesDrainActiveCounters(fn DrainActiveCounters) QueueOpt {
+	return func(q *queue) {
+		q.drainActiveCounters = fn
+	}
+}
+
 // QueueShadowPartitionProcessCount determines how many times the shadow scanner
 // continue to process a shadow partition's backlog.
 // This helps with reducing churn on leases for the shadow partition and allow handling
