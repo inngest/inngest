@@ -21,6 +21,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
+	"github.com/inngest/inngest/pkg/expressions"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/pubsub"
@@ -488,7 +489,17 @@ func (s *svc) handleCancel(ctx context.Context, item queue.Item) error {
 			}
 
 			if c.If != nil {
-				// TODO: evaluate expression
+				ok, _, err := expressions.EvaluateBoolean(ctx, *c.If, map[string]any{"event", event})
+				if err != nil {
+					// NOTE: log but don't exit here, since we want to conitnue
+					s.log.Error("error evaluating cancellation expression", "error", err, "queue_item", qi, "cancellation", c)
+					continue
+				}
+
+				// this queue item shouldn't be cancelled
+				if !ok {
+					continue
+				}
 			}
 
 			if err := s.exec.Cancel(ctx, sv2.IDFromV1(qi.Data.Identifier), execution.CancelRequest{
@@ -511,6 +522,20 @@ func (s *svc) handleCancel(ctx context.Context, item queue.Item) error {
 
 			// Check if it's a run
 			if qi.Data.Identifier.RunID != nilULID {
+				if c.If != nil {
+					ok, _, err := expressions.EvaluateBoolean(ctx, *c.If, map[string]any{"event", event})
+					if err != nil {
+						// NOTE: log but don't exit here, since we want to conitnue
+						s.log.Error("error evaluating cancellation expression", "error", err, "queue_item", qi, "cancellation", c)
+						continue
+					}
+
+					// this queue item shouldn't be cancelled
+					if !ok {
+						continue
+					}
+				}
+
 				if err := s.exec.Cancel(ctx, sv2.IDFromV1(qi.Data.Identifier), execution.CancelRequest{
 					CancellationID: &c.ID,
 				}); err != nil {
