@@ -8,11 +8,11 @@ import (
 	"strings"
 )
 
-const _CancellationKindName = "runbacklog"
+const _CancellationKindName = "runbulk_runbacklog"
 
-var _CancellationKindIndex = [...]uint8{0, 3, 10}
+var _CancellationKindIndex = [...]uint8{0, 3, 11, 18}
 
-const _CancellationKindLowerName = "runbacklog"
+const _CancellationKindLowerName = "runbulk_runbacklog"
 
 func (i CancellationKind) String() string {
 	if i < 0 || i >= CancellationKind(len(_CancellationKindIndex)-1) {
@@ -26,21 +26,25 @@ func (i CancellationKind) String() string {
 func _CancellationKindNoOp() {
 	var x [1]struct{}
 	_ = x[CancellationKindRun-(0)]
-	_ = x[CancellationKindBacklog-(1)]
+	_ = x[CancellationKindBulkRun-(1)]
+	_ = x[CancellationKindBacklog-(2)]
 }
 
-var _CancellationKindValues = []CancellationKind{CancellationKindRun, CancellationKindBacklog}
+var _CancellationKindValues = []CancellationKind{CancellationKindRun, CancellationKindBulkRun, CancellationKindBacklog}
 
 var _CancellationKindNameToValueMap = map[string]CancellationKind{
-	_CancellationKindName[0:3]:       CancellationKindRun,
-	_CancellationKindLowerName[0:3]:  CancellationKindRun,
-	_CancellationKindName[3:10]:      CancellationKindBacklog,
-	_CancellationKindLowerName[3:10]: CancellationKindBacklog,
+	_CancellationKindName[0:3]:        CancellationKindRun,
+	_CancellationKindLowerName[0:3]:   CancellationKindRun,
+	_CancellationKindName[3:11]:       CancellationKindBulkRun,
+	_CancellationKindLowerName[3:11]:  CancellationKindBulkRun,
+	_CancellationKindName[11:18]:      CancellationKindBacklog,
+	_CancellationKindLowerName[11:18]: CancellationKindBacklog,
 }
 
 var _CancellationKindNames = []string{
 	_CancellationKindName[0:3],
-	_CancellationKindName[3:10],
+	_CancellationKindName[3:11],
+	_CancellationKindName[11:18],
 }
 
 // CancellationKindString retrieves an enum value from the enum constants string name.
