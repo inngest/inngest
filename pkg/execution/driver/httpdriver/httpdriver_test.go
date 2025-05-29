@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -236,8 +237,8 @@ func TestTiming(t *testing.T) {
 	require.NotNil(t, r, "got nil response")
 	require.Nil(t, err)
 
-	require.Equal(t, strings.ReplaceAll(ts.URL, "http://", ""), result.ConnectedTo.String())
 	require.True(t, result.StartTransfer > time.Second)
 	require.True(t, result.ServerProcessing > time.Second)
-	require.True(t, result.Total(time.Time{}) > time.Second)
+	require.True(t, result.Total > time.Second)
+	require.Equal(t, strings.ReplaceAll(ts.URL, "http://", ""), fmt.Sprintf("%s:%d", result.ConnectedTo.IP, result.ConnectedTo.Port))
 }
