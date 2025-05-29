@@ -204,7 +204,7 @@ if constraintCapacity == nil or constraintCapacity > 0 then
 end
 
 -- If we are constrained, reduce refill to max allowed capacity
-if constraintCapacity < refill then
+if constraintCapacity ~= nil and constraintCapacity < refill then
   -- Most limiting status will be kept
   refill = constraintCapacity
 end
