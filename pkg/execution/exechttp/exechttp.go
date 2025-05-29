@@ -139,7 +139,9 @@ func (e ExtendedClient) DoRequest(ctx context.Context, r SerializableRequest) (*
 			Topic:   r.Publish.Topic,
 			Token:   r.Publish.Token,
 			Metadata: map[string]any{
-				"request_id": r.Publish.RequestID,
+				"url":          req.URL,
+				"content-type": resp.Header.Get("content-type"),
+				"request_id":   r.Publish.RequestID,
 			},
 		})
 		if err == nil {
