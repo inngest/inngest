@@ -299,14 +299,13 @@ func do(ctx context.Context, c exechttp.RequestExecutor, r Request) (*Response, 
 	resp, err := c.DoRequest(ctx, req)
 
 	// Handle no response errors.
-	if errors.Is(err, ErrUnableToReach) {
+	if errors.Is(err, exechttp.ErrUnableToReach) {
 		l.Warn("EOF writing request to SDK",
 			"url", r.URL.String(),
 			"step", r.Step,
 			"edge	", r.Edge,
-			"req_dur_ms", dur.Milliseconds(),
 		)
-		return nil, tracking, err
+		return nil, nil, err
 	}
 	if resp == nil {
 		return nil, nil, err
