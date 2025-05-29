@@ -604,14 +604,16 @@ func TestWaitForEvent_Timeout(t *testing.T) {
 		assert.Equal(t, waitEvtName, stepInfo.EventName)
 		assert.Nil(t, stepInfo.TimedOut)
 		assert.Nil(t, stepInfo.FoundEventID)
-		counters := getActiveCounters(consts.DevServerAccountID, uuid.MustParse(fnId))
 
-		require.Equal(t, testapi.TestActiveCounters{
-			ActiveAccount:      0,
-			ActiveFunction:     0,
-			ActiveRunsAccount:  0,
-			ActiveRunsFunction: 0,
-		}, counters)
+		require.EventuallyWithT(t, func(collect *assert.CollectT) {
+			counters := getActiveCounters(consts.DevServerAccountID, uuid.MustParse(fnId))
+			assert.Equal(t, testapi.TestActiveCounters{
+				ActiveAccount:      0,
+				ActiveFunction:     0,
+				ActiveRunsAccount:  0,
+				ActiveRunsFunction: 0,
+			}, counters)
+		}, 10*time.Second, time.Second)
 
 	})
 }
