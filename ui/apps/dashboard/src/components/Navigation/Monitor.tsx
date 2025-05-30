@@ -4,7 +4,6 @@ import { MetricsIcon } from '@inngest/components/icons/sections/Metrics';
 import { RunsIcon } from '@inngest/components/icons/sections/Runs';
 
 import type { Environment as EnvType } from '@/utils/environments';
-import { ClientFeatureFlag } from '../FeatureFlags/ClientFeatureFlag';
 import { getNavRoute } from './Navigation';
 
 export default function Monitor({
@@ -33,15 +32,13 @@ export default function Monitor({
         text="Runs"
         icon={<RunsIcon className="h-[18px] w-[18px]" />}
       />
-      <ClientFeatureFlag flag="events-pages">
-        <MenuItem
-          href={getNavRoute(activeEnv, 'new-events')}
-          collapsed={collapsed}
-          text="Events"
-          icon={<EventLogsIcon className="h-[18px] w-[18px]" />}
-          beta
-        />
-      </ClientFeatureFlag>
+      <MenuItem
+        href={getNavRoute(activeEnv, 'events')}
+        collapsed={collapsed}
+        text="Events"
+        icon={<EventLogsIcon className="h-[18px] w-[18px]" />}
+        beta
+      />
     </div>
   );
 }

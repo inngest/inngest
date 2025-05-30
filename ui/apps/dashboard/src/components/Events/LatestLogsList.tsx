@@ -94,9 +94,8 @@ export default function LatestLogsList({ environmentSlug, eventName }: LatestLog
                       key={e.id}
                       onClick={() =>
                         router.push(
-                          pathCreator.event({
+                          pathCreator.eventPopout({
                             envSlug: environmentSlug,
-                            eventName: eventName,
                             eventID: e.id,
                           })
                         )
