@@ -419,3 +419,12 @@ func IncrQueueShadowPartitionGoneCounter(ctx context.Context, opts CounterOpt) {
 		Tags:        opts.Tags,
 	})
 }
+
+func IncrQueuePeekLeaseContentionCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "queue_peek_lease_contention",
+		Description: "Total number of leased queue items peeked for a partition",
+		Tags:        opts.Tags,
+	})
+}
