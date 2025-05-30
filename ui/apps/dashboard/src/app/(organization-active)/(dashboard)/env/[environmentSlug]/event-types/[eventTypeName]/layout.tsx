@@ -6,7 +6,6 @@ import { Header } from '@inngest/components/Header/Header';
 import { ActionsMenu } from '@/components/Events/ActionsMenu';
 import ArchiveEventModal from '@/components/Events/ArchiveEventModal';
 import SendEventButton from '@/components/Events/SendEventButton';
-import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import { pathCreator } from '@/utils/urls';
 
 type EventLayoutProps = {
@@ -21,12 +20,8 @@ export default function EventLayout({
   children,
   params: { environmentSlug: envSlug, eventTypeName: eventSlug },
 }: EventLayoutProps) {
-  // TODO: Remove this once we release new events
-  const eventsPath = `/env/${envSlug}/event-types/${eventSlug}/old-events`;
   const eventName = decodeURIComponent(eventSlug);
   const [showArchive, setShowArchive] = useState(false);
-
-  const isNewEventsEnabled = useBooleanFlag('events-pages');
 
   return (
     <>
@@ -41,19 +36,10 @@ export default function EventLayout({
             children: 'Dashboard',
             exactRouteMatch: true,
           },
-          ...(isNewEventsEnabled.isReady && isNewEventsEnabled.value
-            ? [
-                {
-                  children: 'Events',
-                  href: pathCreator.eventTypeEvents({ envSlug, eventName }),
-                },
-              ]
-            : [
-                {
-                  href: eventsPath,
-                  children: 'Events',
-                },
-              ]),
+          {
+            children: 'Events',
+            href: pathCreator.eventTypeEvents({ envSlug, eventName }),
+          },
         ]}
         action={
           <div className="flex flex-row items-center justify-end gap-x-1">
