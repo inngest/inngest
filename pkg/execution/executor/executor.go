@@ -549,7 +549,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 				// TODO: Handle cancellation mode
 
 				// Immediately end before creating state
-				return e.handleFunctionSkipped(ctx, req, metadata, evts, enums.SkipReasonSingleton)
+				return nil, ErrFunctionSkipped
 			}
 
 			singletonConfig = &queue.Singleton{Key: singletonKey}
@@ -714,7 +714,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 				"error", err,
 			)
 		}
-		return e.handleFunctionSkipped(ctx, req, metadata, evts, enums.SkipReasonSingleton)
+		return nil, ErrFunctionSkipped
 
 	default:
 		return nil, fmt.Errorf("error enqueueing source edge '%v': %w", queueKey, err)
