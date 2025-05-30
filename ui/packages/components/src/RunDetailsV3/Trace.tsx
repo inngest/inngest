@@ -1,17 +1,14 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import type { Route } from 'next';
 import { RiArrowRightSLine } from '@remixicon/react';
 
-import type { Result } from '../types/functionRun';
-import { toMaybeDate } from '../utils/date';
 import { InlineSpans } from './InlineSpans';
 import { TimelineHeader } from './TimelineHeader';
 import { type Trace } from './types';
-import { FINAL_SPAN_NAME, createSpanWidths, getSpanName, useStepSelection } from './utils';
+import { FINAL_SPAN_NAME, getSpanName, useStepSelection } from './utils';
 
 type Props = {
   depth: number;
-  getResult: (outputID: string) => Promise<Result>;
   minTime: Date;
   maxTime: Date;
   pathCreator: {
@@ -21,18 +18,9 @@ type Props = {
   runID: string;
 };
 
-export function Trace({ depth, getResult, maxTime, minTime, pathCreator, trace, runID }: Props) {
+export function Trace({ depth, maxTime, minTime, pathCreator, trace, runID }: Props) {
   const [expanded, setExpanded] = useState(true);
-  const [result, setResult] = useState<Result>();
   const { selectStep, selectedStep } = useStepSelection(runID);
-
-  useEffect(() => {
-    if (expanded && !result && trace.outputID) {
-      getResult(trace.outputID).then((data) => {
-        setResult(data);
-      });
-    }
-  }, [expanded, result]);
 
   //
   // Don't show single finalization step for successful runs
@@ -56,7 +44,7 @@ export function Trace({ depth, getResult, maxTime, minTime, pathCreator, trace, 
             ? 'bg-secondary-3xSubtle'
             : 'hover:bg-canvasSubtle'
         } `}
-        onClick={() => selectStep({ trace, runID, result, pathCreator })}
+        onClick={() => selectStep({ trace, runID, pathCreator })}
       >
         <div
           className="flex w-[30%] flex-row items-center justify-start gap-1 overflow-hidden"
@@ -100,7 +88,6 @@ export function Trace({ depth, getResult, maxTime, minTime, pathCreator, trace, 
               <Trace
                 key={`${child.name}-${i}`}
                 depth={depth + 1}
-                getResult={getResult}
                 maxTime={maxTime}
                 minTime={minTime}
                 pathCreator={pathCreator}

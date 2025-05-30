@@ -5,7 +5,6 @@ import { isLazyDone, type Lazy } from '../utils/lazyLoad';
 import { Trace } from './Trace';
 
 type Props = {
-  getResult: React.ComponentProps<typeof Trace>['getResult'];
   pathCreator: {
     runPopout: (params: { runID: string }) => Route;
   };
@@ -13,7 +12,7 @@ type Props = {
   trace: Lazy<React.ComponentProps<typeof Trace>['trace']>;
 };
 
-export const Timeline = ({ getResult, pathCreator, runID, trace }: Props) => {
+export const Timeline = ({ pathCreator, runID, trace }: Props) => {
   if (!isLazyDone(trace)) {
     // TODO: Properly handle loading state
     return null;
@@ -26,7 +25,6 @@ export const Timeline = ({ getResult, pathCreator, runID, trace }: Props) => {
     <div className={`w-full pb-4 pr-8`}>
       <Trace
         depth={0}
-        getResult={getResult}
         maxTime={maxTime}
         minTime={minTime}
         pathCreator={pathCreator}

@@ -181,12 +181,7 @@ export const RunDetailsV3 = (props: Props) => {
                 node: waiting ? (
                   <Waiting />
                 ) : run ? (
-                  <Timeline
-                    getResult={getResult}
-                    pathCreator={pathCreator}
-                    runID={runID}
-                    trace={run?.trace}
-                  />
+                  <Timeline pathCreator={pathCreator} runID={runID} trace={run?.trace} />
                 ) : null,
               },
             ]}
@@ -212,7 +207,11 @@ export const RunDetailsV3 = (props: Props) => {
           style={{ width: `${100 - leftWidth}%`, height: standalone ? '85vh' : height }}
         >
           {selectedStep && !selectedStep.trace.isRoot ? (
-            <StepInfo selectedStep={selectedStep} />
+            <StepInfo
+              selectedStep={selectedStep}
+              getResult={getResult}
+              pollInterval={pollInterval}
+            />
           ) : (
             <TopInfo
               slug={run?.fn.slug}

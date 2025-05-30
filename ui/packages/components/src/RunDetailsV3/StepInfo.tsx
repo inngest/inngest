@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@inngest/components/Button';
 import { RiArrowRightSLine } from '@remixicon/react';
 
@@ -14,6 +14,7 @@ import {
 import { RerunModal } from '../Rerun/RerunModal';
 import { Time } from '../Time';
 import { usePrettyJson } from '../hooks/usePrettyJson';
+import type { Result } from '../types/functionRun';
 import { formatMilliseconds, toMaybeDate } from '../utils/date';
 import { IO } from './IO';
 import { Tabs } from './Tabs';
@@ -125,10 +126,40 @@ const getStepKindInfo = (props: StepKindInfoProps): JSX.Element | null =>
     <SignalInfo stepInfo={props.stepInfo} />
   ) : null;
 
-export const StepInfo = ({ selectedStep }: { selectedStep: StepInfoType }) => {
+export const StepInfo = ({
+  selectedStep,
+  getResult,
+  pollInterval,
+}: {
+  selectedStep: StepInfoType;
+  getResult: (outputID: string) => Promise<Result>;
+  pollInterval?: number;
+}) => {
   const [expanded, setExpanded] = useState(true);
   const [rerunModalOpen, setRerunModalOpen] = useState(false);
-  const { runID, result, trace, pathCreator } = selectedStep;
+  const { runID, trace, pathCreator } = selectedStep;
+  const [result, setResult] = useState<Result>();
+
+  useEffect(() => {
+    let intervalId: ReturnType<typeof setInterval> | undefined;
+    //
+    // fetch once on load
+    trace.outputID && getResult(trace.outputID).then(setResult);
+
+    //
+    // while the run is polling, continue polling for output
+    if (pollInterval) {
+      intervalId = setInterval(() => {
+        trace.outputID && getResult(trace.outputID).then(setResult);
+      }, pollInterval);
+    }
+
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
+  }, [getResult, trace.outputID, pollInterval, setResult]);
 
   const delayText = formatMilliseconds(
     (toMaybeDate(trace.startedAt) ?? new Date()).getTime() - new Date(trace.queuedAt).getTime()
