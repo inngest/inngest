@@ -1477,7 +1477,7 @@ func (p *processor) iterate(ctx context.Context) error {
 	for _, i := range p.items {
 		if i == nil {
 			// THIS SHOULD NEVER HAPPEN. Skip gracefully and log error
-			logger.StdlibLogger(ctx).Error("nil queue item in partition")
+			logger.StdlibLogger(ctx).Error("nil queue item in partition", "partition", p.partition)
 			continue
 		}
 
@@ -1521,6 +1521,8 @@ func (p *processor) iterate(ctx context.Context) error {
 }
 
 func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error {
+	l := p.queue.log.With("partition", p.partition)
+
 	// TODO: Create an in-memory mapping of rate limit keys that have been hit,
 	//       and don't bother to process if the queue item has a limited key.  This
 	//       lessens work done in the queue, as we can `continue` immediately.
@@ -1614,7 +1616,7 @@ func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error 
 		if p.queue.itemEnableKeyQueues(ctx, *item) {
 			err := p.queue.Requeue(ctx, p.queue.primaryQueueShard, *item, time.UnixMilli(item.AtMS))
 			if err != nil {
-				p.queue.log.Error("could not requeue item to backlog after hitting limit", "item", *item, "cause", cause)
+				l.Error("could not requeue item to backlog after hitting limit", "error", err, "item", *item, "cause", cause)
 				return fmt.Errorf("could not requeue to backlog: %w", err)
 			}
 		}
@@ -1662,7 +1664,7 @@ func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error 
 		if p.queue.itemEnableKeyQueues(ctx, *item) {
 			err := p.queue.Requeue(ctx, p.queue.primaryQueueShard, *item, time.UnixMilli(item.AtMS))
 			if err != nil {
-				p.queue.log.Error("could not requeue item to backlog after hitting limit", "item", *item, "cause", cause)
+				l.Error("could not requeue item to backlog after hitting limit", "error", err, "item", *item, "cause", cause)
 				return fmt.Errorf("could not requeue to backlog: %w", err)
 			}
 		}
@@ -1694,7 +1696,7 @@ func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error 
 		if p.queue.itemEnableKeyQueues(ctx, *item) {
 			err := p.queue.Requeue(ctx, p.queue.primaryQueueShard, *item, time.UnixMilli(item.AtMS))
 			if err != nil {
-				p.queue.log.Error("could not requeue item to backlog after hitting limit", "item", *item, "cause", cause)
+				l.Error("could not requeue item to backlog after hitting limit", "error", err, "item", *item, "cause", cause)
 				return fmt.Errorf("could not requeue to backlog: %w", err)
 			}
 		}
