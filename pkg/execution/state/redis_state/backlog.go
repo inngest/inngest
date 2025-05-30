@@ -78,7 +78,7 @@ type QueueShadowPartition struct {
 	Concurrency ShadowPartitionConcurrency `json:"c,omitempty,omitzero"`
 
 	// Throttle configuration, optionally specifying key. If no key is set, the throttle value will be the function ID.
-	Throttle *ShadowPartitionThrottle `json:"t,omitempty"`
+	Throttle *ShadowPartitionThrottle `json:"t,omitempty,omitzero"`
 
 	// Flag to pause refilling to the ready queue.
 	PauseRefill bool `json:"norefill,omitempty"`
@@ -224,7 +224,7 @@ type QueueBacklog struct {
 	ConcurrencyKeys []BacklogConcurrencyKey `json:"ck,omitempty"`
 
 	// Set for backlogs containing start items only for a given throttle configuration
-	Throttle *BacklogThrottle
+	Throttle *BacklogThrottle `json:"t,omitempty"`
 
 	SuccessiveThrottleConstrained          int `json:"stc,omitzero"`
 	SuccessiveCustomConcurrencyConstrained int `json:"sccc,omitzero"`
