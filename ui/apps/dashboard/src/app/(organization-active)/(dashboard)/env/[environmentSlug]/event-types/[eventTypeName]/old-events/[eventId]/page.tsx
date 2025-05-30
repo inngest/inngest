@@ -1,7 +1,7 @@
 import { notFound } from 'next/navigation';
 import { Time } from '@inngest/components/Time';
 
-import SkippedFunctionCard from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/event-types/[eventTypeName]/events/[eventId]/SkippedFunctionCard';
+import SkippedFunctionCard from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/event-types/[eventTypeName]/old-events/[eventId]/SkippedFunctionCard';
 import { graphql } from '@/gql';
 import graphqlAPI from '@/queries/graphqlAPI';
 import { getEnvironment } from '@/queries/server-only/getEnvironment';

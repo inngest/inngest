@@ -22,7 +22,8 @@ export default function EventLayout({
   children,
   params: { environmentSlug: envSlug, eventTypeName: eventSlug },
 }: EventLayoutProps) {
-  const eventsPath = `/env/${envSlug}/event-types/${eventSlug}/events`;
+  // TODO: Remove this once we release new events
+  const eventsPath = `/env/${envSlug}/event-types/${eventSlug}/old-events`;
   const eventName = decodeURIComponent(eventSlug);
   const [showArchive, setShowArchive] = useState(false);
 
@@ -41,23 +42,24 @@ export default function EventLayout({
             children: 'Dashboard',
             exactRouteMatch: true,
           },
-          {
-            href: eventsPath,
-            children: 'Events',
-          },
           ...(isNewEventsEnabled.isReady && isNewEventsEnabled.value
             ? [
                 {
                   children: (
                     <div className="m-0 flex flex-row items-center justify-start space-x-1 p-0">
                       <div>Events</div>
-                      <Pill kind="primary">Beta</Pill>
+                      <Pill kind="primary">New</Pill>
                     </div>
                   ),
                   href: pathCreator.eventTypeEvents({ envSlug, eventName }),
                 },
               ]
-            : []),
+            : [
+                {
+                  href: eventsPath,
+                  children: 'Events',
+                },
+              ]),
         ]}
         action={
           <div className="flex flex-row items-center justify-end gap-x-1">
