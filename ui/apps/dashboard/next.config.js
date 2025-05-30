@@ -71,7 +71,7 @@ const nextConfig = {
       },
       {
         source: '/env/:slug/events/:name/logs/:rest*',
-        destination: '/env/:slug/event-types/:name/events/:rest*',
+        destination: '/env/:slug/event-types/:name/events',
         permanent: false,
       },
       // Legacy signing key locations
