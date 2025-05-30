@@ -60,8 +60,8 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 		return leaseID, err
 	})
 	if err != nil {
+		q.removeShadowContinue(ctx, shadowPart, false)
 		if errors.Is(err, ErrShadowPartitionAlreadyLeased) {
-			q.removeShadowContinue(ctx, shadowPart, false)
 			metrics.IncrQueueShadowPartitionLeaseContentionCounter(ctx, metrics.CounterOpt{
 				PkgName: pkgName,
 				Tags: map[string]any{
@@ -72,7 +72,6 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 			return nil
 		}
 		if errors.Is(err, ErrShadowPartitionNotFound) {
-			q.removeShadowContinue(ctx, shadowPart, false)
 			metrics.IncrQueueShadowPartitionGoneCounter(ctx, metrics.CounterOpt{
 				PkgName: pkgName,
 				Tags: map[string]any{
@@ -83,7 +82,6 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 			return nil
 		}
 		if errors.Is(err, ErrShadowPartitionPaused) {
-			q.removeShadowContinue(ctx, shadowPart, false)
 			return nil
 		}
 		return fmt.Errorf("error leasing shadow partition: %w", err)
