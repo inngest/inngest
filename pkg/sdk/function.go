@@ -57,6 +57,11 @@ type SDKFunction struct {
 	// Cancel specifies cancellation signals for the function
 	Cancel []inngest.Cancel `json:"cancel,omitempty"`
 
+	// Singleton represents a lock to ensure that only one instance of the function
+	// runs at a time for a given key. Additional runs will either be skipped or replace
+	// the current one, depending on the mode.
+	Singleton *inngest.Singleton `json:"singleton,omitempty"`
+
 	Steps map[string]SDKStep `json:"steps"`
 }
 
@@ -72,6 +77,7 @@ func (s SDKFunction) Function() (*inngest.Function, error) {
 		Cancel:      s.Cancel,
 		Debounce:    s.Debounce,
 		Timeouts:    s.Timeouts,
+		Singleton:   s.Singleton,
 	}
 	// Ensure we set the slug here if s.ID is nil.  This defaults to using
 	// the slugged version of the function name.

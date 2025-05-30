@@ -1,6 +1,9 @@
 package metrics
 
-import "context"
+import (
+	"context"
+	"time"
+)
 
 var (
 	// in milliseconds
@@ -80,6 +83,16 @@ func HistogramQueuePeekEWMA(ctx context.Context, value int64, opts HistogramOpt)
 		Description: "Distribution of the EWMA values for peeks",
 		Tags:        opts.Tags,
 		Boundaries:  peekSizeBoundaries,
+	})
+}
+
+func HistogramQueueOperationDelay(ctx context.Context, delay time.Duration, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, delay.Milliseconds(), HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "queue_operation_delay",
+		Description: "Distribution of queue item operation delays",
+		Tags:        opts.Tags,
+		Boundaries:  DefaultBoundaries,
 	})
 }
 

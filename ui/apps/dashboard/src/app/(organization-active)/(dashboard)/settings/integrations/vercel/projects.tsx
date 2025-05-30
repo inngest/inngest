@@ -3,11 +3,11 @@
 import { useState } from 'react';
 import { Button } from '@inngest/components/Button';
 import { Card } from '@inngest/components/Card/Card';
+import { Info } from '@inngest/components/Info/Info';
 import { Link } from '@inngest/components/Link/Link';
 import { Pill } from '@inngest/components/Pill';
 import { Select } from '@inngest/components/Select/Select';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip/Tooltip';
-import { RiInformationLine, RiRefreshLine } from '@remixicon/react';
+import { RiRefreshLine } from '@remixicon/react';
 
 import { VercelDeploymentProtection, type VercelIntegration } from '@/gql/graphql';
 
@@ -93,33 +93,30 @@ export default function VercelProjects({ integration }: { integration: VercelInt
                       {p.isEnabled ? 'enabled' : 'disabled'}
                     </Pill>
                   </div>
-                  <div className="mt-4 flex flex-row items-center justify-start">
+                  <div className="mt-4 flex flex-row items-center justify-start gap-1">
                     <div className="text-basis text-xl font-medium">{p.name}</div>
                     {p.deploymentProtection !== VercelDeploymentProtection.Disabled && (
-                      <Tooltip>
-                        <TooltipTrigger>
-                          <RiInformationLine className="text-accent-subtle ml-2 h-4 w-4 cursor-pointer" />
-                        </TooltipTrigger>
-                        <TooltipContent className="rounded p-0">
-                          <div className="border-subtle border">
-                            <div className="text-basis px-4 pt-2 text-sm font-medium">
+                      <Info
+                        text={
+                          <>
+                            <div className="text-sm font-medium">
                               Deployment protection is enabled
                             </div>
-                            <div className="text-muted my-2 px-4 text-sm font-normal">
+                            <div className="mt-2 text-sm font-normal">
                               Inngest may not be able to communicate with your application by
                               default.
                             </div>
-                            <div className="bg-disabled w-full px-4 py-2">
-                              <Link
-                                target="_blank"
-                                href="https://www.inngest.com/docs/deploy/vercel#bypassing-deployment-protection"
-                              >
-                                Learn more
-                              </Link>
-                            </div>
-                          </div>
-                        </TooltipContent>
-                      </Tooltip>
+                          </>
+                        }
+                        action={
+                          <Link
+                            target="_blank"
+                            href="https://www.inngest.com/docs/deploy/vercel#bypassing-deployment-protection"
+                          >
+                            Learn more
+                          </Link>
+                        }
+                      />
                     )}
                   </div>
                   <div className="text-muted mt-2 text-base font-normal leading-snug">

@@ -159,13 +159,13 @@ func TestQueueRefillBacklog(t *testing.T) {
 		expectedBacklog := q.ItemBacklog(ctx, item)
 		require.NotEmpty(t, expectedBacklog.BacklogID)
 
-		_, err = r.ZAdd(kg.BacklogSet(expectedBacklog.BacklogID), float64(at.Unix()), "missing-1")
+		_, err = r.ZAdd(kg.BacklogSet(expectedBacklog.BacklogID), float64(at.UnixMilli()), "missing-1")
 		require.NoError(t, err)
 
-		_, err = r.ZAdd(kg.BacklogSet(expectedBacklog.BacklogID), float64(at.Unix()), "missing-2")
+		_, err = r.ZAdd(kg.BacklogSet(expectedBacklog.BacklogID), float64(at.UnixMilli()), "missing-2")
 		require.NoError(t, err)
 
-		_, err = r.ZAdd(kg.BacklogSet(expectedBacklog.BacklogID), float64(at.Unix()), "missing-3")
+		_, err = r.ZAdd(kg.BacklogSet(expectedBacklog.BacklogID), float64(at.UnixMilli()), "missing-3")
 		require.NoError(t, err)
 
 		shadowPartition := q.ItemShadowPartition(ctx, item)
@@ -190,6 +190,7 @@ func TestQueueRefillBacklog(t *testing.T) {
 		require.Equal(t, enums.QueueConstraintNotLimited, res.Constraint)
 
 		require.False(t, hasMember(t, r, kg.BacklogSet(expectedBacklog.BacklogID), qi.ID))
+		require.False(t, r.Exists(kg.BacklogMeta()))
 
 		require.False(t, hasMember(t, r, kg.BacklogSet(expectedBacklog.BacklogID), "missing-1"))
 		require.False(t, hasMember(t, r, kg.BacklogSet(expectedBacklog.BacklogID), "missing-2"))
@@ -408,10 +409,10 @@ func TestQueueRefillBacklog(t *testing.T) {
 		shadowPart := q.ItemShadowPartition(ctx, qi1)
 
 		require.Equal(t, at.UnixMilli(), int64(score(t, r, kg.BacklogSet(backlog.BacklogID), qi1.ID)))
-		require.Equal(t, at.Unix(), int64(score(t, r, kg.ShadowPartitionSet(shadowPart.PartitionID), backlog.BacklogID)))
-		require.Equal(t, at.Unix(), int64(score(t, r, kg.GlobalShadowPartitionSet(), shadowPart.PartitionID)))
-		require.Equal(t, at.Unix(), int64(score(t, r, kg.GlobalAccountShadowPartitions(), accountId.String())), r.Keys())
-		require.Equal(t, at.Unix(), int64(score(t, r, kg.AccountShadowPartitions(accountId), shadowPart.PartitionID)))
+		require.Equal(t, at.UnixMilli(), int64(score(t, r, kg.ShadowPartitionSet(shadowPart.PartitionID), backlog.BacklogID)))
+		require.Equal(t, at.UnixMilli(), int64(score(t, r, kg.GlobalShadowPartitionSet(), shadowPart.PartitionID)))
+		require.Equal(t, at.UnixMilli(), int64(score(t, r, kg.GlobalAccountShadowPartitions(), accountId.String())), r.Keys())
+		require.Equal(t, at.UnixMilli(), int64(score(t, r, kg.AccountShadowPartitions(accountId), shadowPart.PartitionID)))
 
 		refillUntil := at.Add(time.Minute)
 
@@ -426,11 +427,11 @@ func TestQueueRefillBacklog(t *testing.T) {
 		require.Equal(t, enums.QueueConstraintNotLimited, res.Constraint)
 
 		require.Equal(t, futureAt.UnixMilli(), int64(score(t, r, kg.BacklogSet(backlog.BacklogID), qi2.ID)))
-		require.Equal(t, futureAt.Unix(), int64(score(t, r, kg.ShadowPartitionSet(shadowPart.PartitionID), backlog.BacklogID)))
-		require.NotEqual(t, at.Unix(), int64(score(t, r, kg.GlobalShadowPartitionSet(), shadowPart.PartitionID)))
-		require.Equal(t, futureAt.Unix(), int64(score(t, r, kg.GlobalShadowPartitionSet(), shadowPart.PartitionID)))
-		require.Equal(t, futureAt.Unix(), int64(score(t, r, kg.GlobalAccountShadowPartitions(), accountId.String())))
-		require.Equal(t, futureAt.Unix(), int64(score(t, r, kg.AccountShadowPartitions(accountId), shadowPart.PartitionID)))
+		require.Equal(t, futureAt.UnixMilli(), int64(score(t, r, kg.ShadowPartitionSet(shadowPart.PartitionID), backlog.BacklogID)))
+		require.NotEqual(t, at.UnixMilli(), int64(score(t, r, kg.GlobalShadowPartitionSet(), shadowPart.PartitionID)))
+		require.Equal(t, futureAt.UnixMilli(), int64(score(t, r, kg.GlobalShadowPartitionSet(), shadowPart.PartitionID)))
+		require.Equal(t, futureAt.UnixMilli(), int64(score(t, r, kg.GlobalAccountShadowPartitions(), accountId.String())))
+		require.Equal(t, futureAt.UnixMilli(), int64(score(t, r, kg.AccountShadowPartitions(accountId), shadowPart.PartitionID)))
 
 		toTheFuture := futureAt.Sub(at) + time.Minute
 		r.FastForward(toTheFuture)
@@ -515,15 +516,16 @@ func TestQueueShadowPartitionLease(t *testing.T) {
 		require.Equal(t, expectedLeaseExpiry.UnixMilli(), leaseTime.UnixMilli())
 
 		leasedPart := QueueShadowPartition{}
-		require.NoError(t, json.Unmarshal([]byte(r.HGet(kg.ShadowPartitionMeta(), shadowPart.PartitionID)), &leasedPart))
+		metaStr := r.HGet(kg.ShadowPartitionMeta(), shadowPart.PartitionID)
+		require.NoError(t, json.Unmarshal([]byte(metaStr), &leasedPart))
 
 		require.NotNil(t, leasedPart.LeaseID)
 		require.Equal(t, *leaseID, *leasedPart.LeaseID)
 
 		// Expect shadow partition to be pushed back
-		require.Equal(t, expectedLeaseExpiry.Unix(), int64(score(t, r, kg.GlobalShadowPartitionSet(), shadowPart.PartitionID)))
-		require.Equal(t, expectedLeaseExpiry.Unix(), int64(score(t, r, kg.AccountShadowPartitions(accountID), shadowPart.PartitionID)))
-		require.Equal(t, expectedLeaseExpiry.Unix(), int64(score(t, r, kg.GlobalAccountShadowPartitions(), accountID.String())))
+		require.Equal(t, expectedLeaseExpiry.UnixMilli(), int64(score(t, r, kg.GlobalShadowPartitionSet(), shadowPart.PartitionID)))
+		require.Equal(t, expectedLeaseExpiry.UnixMilli(), int64(score(t, r, kg.AccountShadowPartitions(accountID), shadowPart.PartitionID)))
+		require.Equal(t, expectedLeaseExpiry.UnixMilli(), int64(score(t, r, kg.GlobalAccountShadowPartitions(), accountID.String())))
 	})
 
 	t.Run("should not be able to lease again", func(t *testing.T) {
@@ -555,9 +557,9 @@ func TestQueueShadowPartitionLease(t *testing.T) {
 		require.Equal(t, *leaseID, *leasedPart.LeaseID)
 
 		// Expect shadow partition to be pushed back
-		require.Equal(t, expectedLeaseExpiry.Unix(), int64(score(t, r, kg.GlobalShadowPartitionSet(), shadowPart.PartitionID)))
-		require.Equal(t, expectedLeaseExpiry.Unix(), int64(score(t, r, kg.AccountShadowPartitions(accountID), shadowPart.PartitionID)))
-		require.Equal(t, expectedLeaseExpiry.Unix(), int64(score(t, r, kg.GlobalAccountShadowPartitions(), accountID.String())))
+		require.Equal(t, expectedLeaseExpiry.UnixMilli(), int64(score(t, r, kg.GlobalShadowPartitionSet(), shadowPart.PartitionID)))
+		require.Equal(t, expectedLeaseExpiry.UnixMilli(), int64(score(t, r, kg.AccountShadowPartitions(accountID), shadowPart.PartitionID)))
+		require.Equal(t, expectedLeaseExpiry.UnixMilli(), int64(score(t, r, kg.GlobalAccountShadowPartitions(), accountID.String())))
 	})
 
 	t.Run("return lease should work", func(t *testing.T) {
@@ -567,7 +569,7 @@ func TestQueueShadowPartitionLease(t *testing.T) {
 
 		// Simulate next backlog item in shadow partition
 		nextBacklogAt := clock.Now().Add(3 * time.Hour)
-		_, err := r.ZAdd(kg.ShadowPartitionSet(shadowPart.PartitionID), float64(nextBacklogAt.Unix()), "backlog-test")
+		_, err := r.ZAdd(kg.ShadowPartitionSet(shadowPart.PartitionID), float64(nextBacklogAt.UnixMilli()), "backlog-test")
 		require.NoError(t, err)
 
 		err = q.ShadowPartitionRequeue(ctx, shadowPart, *leaseID, nil)
@@ -579,9 +581,9 @@ func TestQueueShadowPartitionLease(t *testing.T) {
 		require.Nil(t, leasedPart.LeaseID)
 
 		// Expect shadow partition to be pushed back
-		require.Equal(t, nextBacklogAt.Unix(), int64(score(t, r, kg.GlobalShadowPartitionSet(), shadowPart.PartitionID)))
-		require.Equal(t, nextBacklogAt.Unix(), int64(score(t, r, kg.AccountShadowPartitions(accountID), shadowPart.PartitionID)))
-		require.Equal(t, nextBacklogAt.Unix(), int64(score(t, r, kg.GlobalAccountShadowPartitions(), accountID.String())))
+		require.Equal(t, nextBacklogAt.UnixMilli(), int64(score(t, r, kg.GlobalShadowPartitionSet(), shadowPart.PartitionID)))
+		require.Equal(t, nextBacklogAt.UnixMilli(), int64(score(t, r, kg.AccountShadowPartitions(accountID), shadowPart.PartitionID)))
+		require.Equal(t, nextBacklogAt.UnixMilli(), int64(score(t, r, kg.GlobalAccountShadowPartitions(), accountID.String())))
 	})
 
 	t.Run("shadow partition requeue should clean dangling pointers", func(t *testing.T) {
@@ -596,17 +598,14 @@ func TestQueueShadowPartitionLease(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, leaseID)
 
-		require.Equal(t, expectedLeaseExpiry.Unix(), int64(score(t, r, kg.GlobalShadowPartitionSet(), shadowPart.PartitionID)))
-		require.Equal(t, expectedLeaseExpiry.Unix(), int64(score(t, r, kg.AccountShadowPartitions(accountID), shadowPart.PartitionID)))
-		require.Equal(t, expectedLeaseExpiry.Unix(), int64(score(t, r, kg.GlobalAccountShadowPartitions(), accountID.String())))
+		require.Equal(t, expectedLeaseExpiry.UnixMilli(), int64(score(t, r, kg.GlobalShadowPartitionSet(), shadowPart.PartitionID)))
+		require.Equal(t, expectedLeaseExpiry.UnixMilli(), int64(score(t, r, kg.AccountShadowPartitions(accountID), shadowPart.PartitionID)))
+		require.Equal(t, expectedLeaseExpiry.UnixMilli(), int64(score(t, r, kg.GlobalAccountShadowPartitions(), accountID.String())))
 
 		err = q.ShadowPartitionRequeue(ctx, shadowPart, *leaseID, nil)
 		require.NoError(t, err)
 
-		leasedPart := QueueShadowPartition{}
-		require.NoError(t, json.Unmarshal([]byte(r.HGet(kg.ShadowPartitionMeta(), shadowPart.PartitionID)), &leasedPart))
-
-		require.Nil(t, leasedPart.LeaseID)
+		require.False(t, r.Exists(kg.ShadowPartitionMeta()))
 
 		// Expect pointers to be cleaned up
 		require.False(t, r.Exists(kg.GlobalShadowPartitionSet()))
@@ -621,7 +620,7 @@ func TestQueueShadowPartitionLease(t *testing.T) {
 
 		// Simulate next backlog item in shadow partition
 		nextBacklogAt := clock.Now().Add(15 * time.Minute)
-		_, err := r.ZAdd(kg.ShadowPartitionSet(shadowPart.PartitionID), float64(nextBacklogAt.Unix()), "backlog-test")
+		_, err := r.ZAdd(kg.ShadowPartitionSet(shadowPart.PartitionID), float64(nextBacklogAt.UnixMilli()), "backlog-test")
 		require.NoError(t, err)
 
 		now := clock.Now()
@@ -631,9 +630,9 @@ func TestQueueShadowPartitionLease(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, leaseID)
 
-		require.Equal(t, expectedLeaseExpiry.Unix(), int64(score(t, r, kg.GlobalShadowPartitionSet(), shadowPart.PartitionID)))
-		require.Equal(t, expectedLeaseExpiry.Unix(), int64(score(t, r, kg.AccountShadowPartitions(accountID), shadowPart.PartitionID)))
-		require.Equal(t, expectedLeaseExpiry.Unix(), int64(score(t, r, kg.GlobalAccountShadowPartitions(), accountID.String())))
+		require.Equal(t, expectedLeaseExpiry.UnixMilli(), int64(score(t, r, kg.GlobalShadowPartitionSet(), shadowPart.PartitionID)))
+		require.Equal(t, expectedLeaseExpiry.UnixMilli(), int64(score(t, r, kg.AccountShadowPartitions(accountID), shadowPart.PartitionID)))
+		require.Equal(t, expectedLeaseExpiry.UnixMilli(), int64(score(t, r, kg.GlobalAccountShadowPartitions(), accountID.String())))
 
 		forceRequeueAt := time.Now().Add(32 * time.Minute)
 		err = q.ShadowPartitionRequeue(ctx, shadowPart, *leaseID, &forceRequeueAt)
@@ -645,9 +644,9 @@ func TestQueueShadowPartitionLease(t *testing.T) {
 		require.Nil(t, leasedPart.LeaseID)
 
 		// Expect pointers to be aligned with forced time
-		require.Equal(t, forceRequeueAt.Unix(), int64(score(t, r, kg.GlobalShadowPartitionSet(), shadowPart.PartitionID)))
-		require.Equal(t, forceRequeueAt.Unix(), int64(score(t, r, kg.AccountShadowPartitions(accountID), shadowPart.PartitionID)))
-		require.Equal(t, forceRequeueAt.Unix(), int64(score(t, r, kg.GlobalAccountShadowPartitions(), accountID.String())))
+		require.Equal(t, forceRequeueAt.UnixMilli(), int64(score(t, r, kg.GlobalShadowPartitionSet(), shadowPart.PartitionID)))
+		require.Equal(t, forceRequeueAt.UnixMilli(), int64(score(t, r, kg.AccountShadowPartitions(accountID), shadowPart.PartitionID)))
+		require.Equal(t, forceRequeueAt.UnixMilli(), int64(score(t, r, kg.GlobalAccountShadowPartitions(), accountID.String())))
 	})
 
 	t.Run("forcing requeue should be ignored if earliest backlog is later", func(t *testing.T) {
@@ -657,7 +656,7 @@ func TestQueueShadowPartitionLease(t *testing.T) {
 
 		// Simulate next backlog item in shadow partition
 		nextBacklogAt := clock.Now().Add(48 * time.Minute)
-		_, err := r.ZAdd(kg.ShadowPartitionSet(shadowPart.PartitionID), float64(nextBacklogAt.Unix()), "backlog-test")
+		_, err := r.ZAdd(kg.ShadowPartitionSet(shadowPart.PartitionID), float64(nextBacklogAt.UnixMilli()), "backlog-test")
 		require.NoError(t, err)
 
 		now := clock.Now()
@@ -667,9 +666,9 @@ func TestQueueShadowPartitionLease(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, leaseID)
 
-		require.Equal(t, expectedLeaseExpiry.Unix(), int64(score(t, r, kg.GlobalShadowPartitionSet(), shadowPart.PartitionID)))
-		require.Equal(t, expectedLeaseExpiry.Unix(), int64(score(t, r, kg.AccountShadowPartitions(accountID), shadowPart.PartitionID)))
-		require.Equal(t, expectedLeaseExpiry.Unix(), int64(score(t, r, kg.GlobalAccountShadowPartitions(), accountID.String())))
+		require.Equal(t, expectedLeaseExpiry.UnixMilli(), int64(score(t, r, kg.GlobalShadowPartitionSet(), shadowPart.PartitionID)))
+		require.Equal(t, expectedLeaseExpiry.UnixMilli(), int64(score(t, r, kg.AccountShadowPartitions(accountID), shadowPart.PartitionID)))
+		require.Equal(t, expectedLeaseExpiry.UnixMilli(), int64(score(t, r, kg.GlobalAccountShadowPartitions(), accountID.String())))
 
 		forceRequeueAt := time.Now().Add(32 * time.Minute)
 		err = q.ShadowPartitionRequeue(ctx, shadowPart, *leaseID, &forceRequeueAt)
@@ -681,9 +680,9 @@ func TestQueueShadowPartitionLease(t *testing.T) {
 		require.Nil(t, leasedPart.LeaseID)
 
 		// Expect pointers to be aligned with next backlog item
-		require.Equal(t, nextBacklogAt.Unix(), int64(score(t, r, kg.GlobalShadowPartitionSet(), shadowPart.PartitionID)))
-		require.Equal(t, nextBacklogAt.Unix(), int64(score(t, r, kg.AccountShadowPartitions(accountID), shadowPart.PartitionID)))
-		require.Equal(t, nextBacklogAt.Unix(), int64(score(t, r, kg.GlobalAccountShadowPartitions(), accountID.String())))
+		require.Equal(t, nextBacklogAt.UnixMilli(), int64(score(t, r, kg.GlobalShadowPartitionSet(), shadowPart.PartitionID)))
+		require.Equal(t, nextBacklogAt.UnixMilli(), int64(score(t, r, kg.AccountShadowPartitions(accountID), shadowPart.PartitionID)))
+		require.Equal(t, nextBacklogAt.UnixMilli(), int64(score(t, r, kg.GlobalAccountShadowPartitions(), accountID.String())))
 	})
 }
 
@@ -832,7 +831,10 @@ func TestQueueShadowScannerContinuations(t *testing.T) {
 		WorkflowID:  fnID2,
 	}, at)
 
-	qspc := make(chan shadowPartitionChanMsg, 1)
+	// we leave some room for multiple partitions as scanShadowPartitions will
+	// call both scan continuations and the regular scanner, so the first item
+	// is expected to be the continuation, followed by the actual scan run
+	qspc := make(chan shadowPartitionChanMsg, 10)
 
 	sp1 := q.ItemShadowPartition(ctx, item1)
 	sp2 := q.ItemShadowPartition(ctx, item2)
@@ -948,12 +950,22 @@ func TestRefillConstraints(t *testing.T) {
 		customConcurrencyKey1Active int
 		customConcurrencyKey2Active int
 
-		// throttleCapacityUsed int
+		throttleUsageWithinPeriod int
 	}
 
 	ck1 := createConcurrencyKey(enums.ConcurrencyScopeFn, fnID1, "bruno", 5)
 
 	ck2 := createConcurrencyKey(enums.ConcurrencyScopeEnv, envID1, "inngest", 10)
+
+	throttleKey := "bruno"
+	throttle := &osqueue.Throttle{
+		Key:                 util.XXHash(throttleKey),
+		Limit:               100,
+		Burst:               10,
+		Period:              int((10 * time.Hour).Seconds()),
+		KeyExpressionHash:   util.XXHash("event.data.userID"),
+		UnhashedThrottleKey: throttleKey,
+	}
 
 	tests := []struct {
 		name          string
@@ -1025,8 +1037,8 @@ func TestRefillConstraints(t *testing.T) {
 					Constraint:        enums.QueueConstraintFunctionConcurrency,
 					TotalBacklogCount: 40,
 					BacklogCountUntil: 40,
-					Capacity:          -20,
-					Refill:            -20,
+					Capacity:          0, // would be -20 but can't go negative
+					Refill:            0,
 					Refilled:          0,
 				},
 				itemsInBacklog:    40,
@@ -1296,6 +1308,54 @@ func TestRefillConstraints(t *testing.T) {
 				itemsInReadyQueue: 40,
 			},
 		},
+		// Throttle allow
+		{
+			name: "throttle allow",
+			currentValues: currentValues{
+				itemsInBacklog:            10,
+				throttleUsageWithinPeriod: 20,
+			},
+			knobs: knobs{
+				throttle:    throttle,
+				isStartItem: true,
+			},
+			expected: expected{
+				itemsInBacklog:    0,
+				itemsInReadyQueue: 10,
+				result: BacklogRefillResult{
+					Constraint:        enums.QueueConstraintNotLimited,
+					TotalBacklogCount: 10,
+					BacklogCountUntil: 10,
+					Capacity:          90,
+					Refill:            10,
+					Refilled:          10,
+				},
+			},
+		},
+		// Throttle deny
+		{
+			name: "throttle deny",
+			currentValues: currentValues{
+				itemsInBacklog:            10,
+				throttleUsageWithinPeriod: 110,
+			},
+			knobs: knobs{
+				throttle:    throttle,
+				isStartItem: true,
+			},
+			expected: expected{
+				itemsInBacklog:    10,
+				itemsInReadyQueue: 0,
+				result: BacklogRefillResult{
+					Constraint:        enums.QueueConstraintThrottle,
+					TotalBacklogCount: 10,
+					BacklogCountUntil: 10,
+					Capacity:          0,
+					Refill:            0,
+					Refilled:          0,
+				},
+			},
+		},
 	}
 
 	for _, testCase := range tests {
@@ -1445,6 +1505,43 @@ func TestRefillConstraints(t *testing.T) {
 				require.NoError(t, err)
 			}
 
+			testThrottle := testCase.knobs.throttle
+			if testThrottle != nil {
+				runGCRAScript := func(t *testing.T, rc rueidis.Client, key string, now time.Time, period time.Duration, limit, burst, capacity int) int {
+					args, err := StrSlice([]any{
+						key,
+						now.UnixMilli(),
+						limit,
+						burst,
+						period.Milliseconds(),
+						capacity,
+					})
+					require.NoError(t, err)
+
+					statusOrCapacity, err := scripts["test/gcra_capacity"].Exec(t.Context(), rc, []string{}, args).ToInt64()
+					require.NoError(t, err)
+
+					switch statusOrCapacity {
+					case -1:
+						return 0
+					default:
+						return int(statusOrCapacity)
+					}
+				}
+
+				// Reduce throttle capacity
+				runGCRAScript(
+					t,
+					rc,
+					testThrottle.Key,
+					at,
+					time.Duration(testThrottle.Period)*time.Second,
+					testThrottle.Limit,
+					testThrottle.Burst,
+					testCase.currentValues.throttleUsageWithinPeriod,
+				)
+			}
+
 			refillUntil := at.Add(time.Minute)
 
 			logKeyValues := func() {
@@ -1584,7 +1681,7 @@ func TestShadowPartitionUpdate(t *testing.T) {
 	}
 
 	updatedShadowPart := q.ItemShadowPartition(ctx, item2)
-	require.Len(t, updatedShadowPart.CustomConcurrencyKeys, 1)
+	require.Len(t, updatedShadowPart.Concurrency.CustomConcurrencyKeys, 1)
 	require.Equal(t, 2, updatedShadowPart.FunctionVersion)
 
 	_, err = q.EnqueueItem(ctx, defaultShard, item2, at.Add(time.Minute), osqueue.EnqueueOpts{})
@@ -1627,4 +1724,259 @@ func TestShadowPartitionUpdate(t *testing.T) {
 
 	require.Equal(t, updatedShadowPart, savedPart)
 	require.Equal(t, 2, savedPart.FunctionVersion)
+}
+
+func TestShadowPartitionPointerTimings(t *testing.T) {
+	t.Run("multiple spaced out items", func(t *testing.T) {
+		r := miniredis.RunT(t)
+		rc, err := rueidis.NewClient(rueidis.ClientOption{
+			InitAddress:  []string{r.Addr()},
+			DisableCache: true,
+		})
+		require.NoError(t, err)
+		defer rc.Close()
+
+		ctx := context.Background()
+
+		defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+
+		clock := clockwork.NewFakeClock()
+
+		accountID, wsID, fnID := uuid.New(), uuid.New(), uuid.New()
+
+		kg := defaultShard.RedisClient.kg
+
+		enqueueToBacklog := true
+		q := NewQueue(
+			defaultShard,
+			WithClock(clock),
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+				return enqueueToBacklog
+			}),
+			WithEnqueueSystemPartitionsToBacklog(false),
+			WithDisableLeaseChecksForSystemQueues(false),
+			WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
+				return true
+			}),
+			WithRunMode(QueueRunMode{
+				Sequential:                        true,
+				Scavenger:                         true,
+				Partition:                         true,
+				Account:                           true,
+				AccountWeight:                     85,
+				ShadowPartition:                   true,
+				AccountShadowPartition:            true,
+				AccountShadowPartitionWeight:      85,
+				ShadowContinuations:               true,
+				ShadowContinuationSkipProbability: 0,
+				NormalizePartition:                true,
+			}),
+			WithBacklogRefillLimit(500),
+			WithConcurrencyLimitGetter(func(ctx context.Context, p QueuePartition) PartitionConcurrencyLimits {
+				return PartitionConcurrencyLimits{
+					AccountLimit:   123,
+					FunctionLimit:  45,
+					CustomKeyLimit: 0,
+				}
+			}),
+			WithCustomConcurrencyKeyLimitRefresher(func(ctx context.Context, i osqueue.QueueItem) []state.CustomConcurrency {
+				return i.Data.GetConcurrencyKeys()
+			}),
+			WithSystemConcurrencyLimitGetter(func(ctx context.Context, p QueuePartition) SystemPartitionConcurrencyLimits {
+				return SystemPartitionConcurrencyLimits{
+					GlobalLimit:    789,
+					PartitionLimit: 678,
+				}
+			}),
+		)
+
+		addItem := func(id string, identifier state.Identifier, at time.Time) osqueue.QueueItem {
+			item := osqueue.QueueItem{
+				ID:          id,
+				FunctionID:  identifier.WorkflowID,
+				WorkspaceID: identifier.WorkspaceID,
+				Data: osqueue.Item{
+					WorkspaceID:           identifier.WorkspaceID,
+					Kind:                  osqueue.KindEdge,
+					Identifier:            identifier,
+					QueueName:             nil,
+					Throttle:              nil,
+					CustomConcurrencyKeys: nil,
+				},
+				QueueName: nil,
+			}
+
+			qi, err := q.EnqueueItem(ctx, defaultShard, item, at, osqueue.EnqueueOpts{})
+			require.NoError(t, err)
+
+			return qi
+		}
+
+		now := clock.Now().Truncate(time.Second)
+
+		numItems := 20
+		items := make([]osqueue.QueueItem, numItems)
+		for i := 1; i <= numItems; i++ {
+			items[i-1] = addItem(fmt.Sprintf("item%d", i), state.Identifier{
+				AccountID:   accountID,
+				WorkspaceID: wsID,
+				WorkflowID:  fnID,
+			}, now.Add(time.Duration(i)*time.Second))
+		}
+
+		backlog := q.ItemBacklog(ctx, items[0])
+		shadowPart := q.ItemShadowPartition(ctx, items[0])
+
+		// Pointer should be earliest item
+		require.Equal(t, now.Add(time.Second).UnixMilli(), int64(score(t, r, kg.BacklogSet(backlog.BacklogID), items[0].ID)))
+		require.Equal(t, now.Add(time.Second).UnixMilli(), int64(score(t, r, kg.ShadowPartitionSet(shadowPart.PartitionID), backlog.BacklogID)))
+		require.Equal(t, now.Add(time.Second).UnixMilli(), int64(score(t, r, kg.GlobalShadowPartitionSet(), shadowPart.PartitionID)))
+		require.Equal(t, now.Add(time.Second).UnixMilli(), int64(score(t, r, kg.AccountShadowPartitions(accountID), shadowPart.PartitionID)))
+		require.Equal(t, now.Add(time.Second).UnixMilli(), int64(score(t, r, kg.GlobalAccountShadowPartitions(), accountID.String())))
+
+		until := now.Add(PartitionLookahead)
+		peeked, totalUntil, err := q.ShadowPartitionPeek(ctx, &shadowPart, false, until, 100)
+		require.NoError(t, err)
+
+		require.Equal(t, 1, totalUntil)
+		require.Len(t, peeked, 1)
+		require.Equal(t, backlog, *peeked[0])
+
+		for i := 0; i < numItems; i++ {
+			itemAt := now.Add(time.Duration(i+1) * time.Second)
+			refillUntil := itemAt
+			res, err := q.BacklogRefill(ctx, &backlog, &shadowPart, refillUntil)
+			require.NoError(t, err)
+
+			require.Equal(t, numItems-i, res.TotalBacklogCount)
+			require.Equal(t, 1, res.BacklogCountUntil)
+			require.Equal(t, 1, res.Refill)
+			require.Equal(t, 1, res.Refilled)
+
+			if i == numItems-1 {
+				break
+			}
+
+			// Pointer should be next earliest time
+			nextItemAt := now.Add(time.Duration(i+2) * time.Second)
+			require.Equal(t, nextItemAt.UnixMilli(), int64(score(t, r, kg.BacklogSet(backlog.BacklogID), items[i+1].ID)))
+			require.Equal(t, nextItemAt.UnixMilli(), int64(score(t, r, kg.ShadowPartitionSet(shadowPart.PartitionID), backlog.BacklogID)))
+			require.Equal(t, nextItemAt.UnixMilli(), int64(score(t, r, kg.GlobalShadowPartitionSet(), shadowPart.PartitionID)))
+			require.Equal(t, nextItemAt.UnixMilli(), int64(score(t, r, kg.AccountShadowPartitions(accountID), shadowPart.PartitionID)))
+			require.Equal(t, nextItemAt.UnixMilli(), int64(score(t, r, kg.GlobalAccountShadowPartitions(), accountID.String())))
+		}
+
+		require.False(t, r.Exists(kg.BacklogSet(backlog.BacklogID)))
+		require.False(t, r.Exists(kg.ShadowPartitionSet(shadowPart.PartitionID)))
+	})
+
+	t.Run("sleep should work", func(t *testing.T) {
+		r := miniredis.RunT(t)
+		rc, err := rueidis.NewClient(rueidis.ClientOption{
+			InitAddress:  []string{r.Addr()},
+			DisableCache: true,
+		})
+		require.NoError(t, err)
+		defer rc.Close()
+
+		ctx := context.Background()
+
+		defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+
+		clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Second))
+
+		accountID, wsID, fnID := uuid.New(), uuid.New(), uuid.New()
+
+		kg := defaultShard.RedisClient.kg
+
+		enqueueToBacklog := true
+		q := NewQueue(
+			defaultShard,
+			WithClock(clock),
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+				return enqueueToBacklog
+			}),
+			WithEnqueueSystemPartitionsToBacklog(false),
+			WithDisableLeaseChecksForSystemQueues(false),
+			WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
+				return true
+			}),
+			WithRunMode(QueueRunMode{
+				Sequential:                        true,
+				Scavenger:                         true,
+				Partition:                         true,
+				Account:                           true,
+				AccountWeight:                     85,
+				ShadowPartition:                   true,
+				AccountShadowPartition:            true,
+				AccountShadowPartitionWeight:      85,
+				ShadowContinuations:               true,
+				ShadowContinuationSkipProbability: 0,
+				NormalizePartition:                true,
+			}),
+			WithBacklogRefillLimit(500),
+			WithConcurrencyLimitGetter(func(ctx context.Context, p QueuePartition) PartitionConcurrencyLimits {
+				return PartitionConcurrencyLimits{
+					AccountLimit:   123,
+					FunctionLimit:  45,
+					CustomKeyLimit: 0,
+				}
+			}),
+			WithCustomConcurrencyKeyLimitRefresher(func(ctx context.Context, i osqueue.QueueItem) []state.CustomConcurrency {
+				return i.Data.GetConcurrencyKeys()
+			}),
+			WithSystemConcurrencyLimitGetter(func(ctx context.Context, p QueuePartition) SystemPartitionConcurrencyLimits {
+				return SystemPartitionConcurrencyLimits{
+					GlobalLimit:    789,
+					PartitionLimit: 678,
+				}
+			}),
+		)
+
+		now := clock.Now()
+
+		item := osqueue.QueueItem{
+			FunctionID:  fnID,
+			WorkspaceID: wsID,
+			Data: osqueue.Item{
+				WorkspaceID: wsID,
+				Kind:        osqueue.KindEdge,
+				Identifier: state.Identifier{
+					WorkflowID:  fnID,
+					AccountID:   accountID,
+					WorkspaceID: wsID,
+				},
+				QueueName: nil,
+			},
+			QueueName: nil,
+		}
+
+		sleepUntil := now.Add(2 * time.Second)
+		qi, err := q.EnqueueItem(ctx, defaultShard, item, sleepUntil, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+
+		backlog := q.ItemBacklog(ctx, qi)
+		shadowPart := q.ItemShadowPartition(ctx, qi)
+
+		require.Equal(t, sleepUntil.UnixMilli(), int64(score(t, r, kg.BacklogSet(backlog.BacklogID), qi.ID)))
+		require.Equal(t, sleepUntil.UnixMilli(), int64(score(t, r, kg.ShadowPartitionSet(shadowPart.PartitionID), backlog.BacklogID)))
+		require.Equal(t, sleepUntil.UnixMilli(), int64(score(t, r, kg.GlobalShadowPartitionSet(), shadowPart.PartitionID)))
+		require.Equal(t, sleepUntil.UnixMilli(), int64(score(t, r, kg.AccountShadowPartitions(accountID), shadowPart.PartitionID)))
+		require.Equal(t, sleepUntil.UnixMilli(), int64(score(t, r, kg.GlobalAccountShadowPartitions(), accountID.String())))
+
+		until := now.Add(time.Second)
+		peeked, totalUntil, err := q.ShadowPartitionPeek(ctx, &shadowPart, false, until, 100)
+		require.NoError(t, err)
+
+		require.Equal(t, 0, totalUntil)
+		require.Len(t, peeked, 0)
+
+		until = now.Add(2 * time.Second)
+		peeked, totalUntil, err = q.ShadowPartitionPeek(ctx, &shadowPart, false, until, 100)
+		require.NoError(t, err)
+
+		require.Equal(t, 1, totalUntil)
+		require.Len(t, peeked, 1)
+		require.Equal(t, backlog, *peeked[0])
+	})
 }

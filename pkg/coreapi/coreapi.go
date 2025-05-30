@@ -29,14 +29,13 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/publicerr"
 	"github.com/oklog/ulid/v2"
-	"github.com/rs/zerolog"
 )
 
 type Options struct {
 	Data cqrs.Manager
 
 	Config        config.Config
-	Logger        *zerolog.Logger
+	Logger        logger.Logger
 	Runner        runner.Runner
 	Tracker       *runner.Tracker
 	State         state.Manager
@@ -58,7 +57,7 @@ type Options struct {
 }
 
 func NewCoreApi(o Options) (*CoreAPI, error) {
-	logger := o.Logger.With().Str("caller", "coreapi").Logger()
+	logger := o.Logger.With("caller", "coreapi")
 
 	if o.HistoryReader == nil {
 		return nil, fmt.Errorf("history reader is required")
@@ -67,7 +66,7 @@ func NewCoreApi(o Options) (*CoreAPI, error) {
 	a := &CoreAPI{
 		data:    o.Data,
 		config:  o.Config,
-		log:     &logger,
+		log:     logger,
 		Router:  chi.NewMux(),
 		runner:  o.Runner,
 		tracker: o.Tracker,
@@ -120,7 +119,7 @@ type CoreAPI struct {
 	chi.Router
 	data    cqrs.Manager
 	config  config.Config
-	log     *zerolog.Logger
+	log     logger.Logger
 	server  *http.Server
 	state   state.Manager
 	runner  runner.Runner
@@ -133,7 +132,7 @@ func (a *CoreAPI) Start(ctx context.Context) error {
 		Handler: a.Router,
 	}
 
-	a.log.Info().Str("addr", a.server.Addr).Msg("starting server")
+	a.log.Info("starting server", "addr", a.server.Addr)
 	return a.server.ListenAndServe()
 }
 
@@ -250,9 +249,7 @@ func (a CoreAPI) CancelRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	logger.From(ctx).Info().
-		Str("run_id", runID.String()).
-		Msg("cancelling function")
+	a.log.Info("cancelling function", "run_id", runID.String())
 
 	if err := apiutil.CancelRun(ctx, a.state, consts.DevServerAccountID, *runID); err != nil {
 		_ = publicerr.WriteHTTP(w, err)

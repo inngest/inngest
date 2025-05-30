@@ -191,6 +191,8 @@ type QueueKeyGenerator interface {
 	BacklogSet(backlogID string) string
 	// ActiveCounter returns the key to the number of active queue items for a given scope and ID.
 	ActiveCounter(scope string, scopeID string) string
+	// ActiveRunsCounter returns the key to the number of active runs for a given scope and ID.
+	ActiveRunsCounter(scope string, scopeID string) string
 	// BacklogMeta returns the key to the hash storing serialized QueueBacklog objects by ID.
 	BacklogMeta() string
 	// BacklogNormalizationLease returns the key to the lease for the backlog for normalization purposes
@@ -204,8 +206,8 @@ type QueueKeyGenerator interface {
 	// GlobalAccountShadowPartitions returns the key to the ZSET storing pointers (account IDs) for accounts with existing shadow partitions.
 	GlobalAccountShadowPartitions() string
 
-	// ActiveRunCounter returns the key to the number of active queue items for a given run ID.
-	ActiveRunCounter(runID ulid.ULID) string
+	// RunActiveCounter returns the key to the number of active queue items for a given run ID.
+	RunActiveCounter(runID ulid.ULID) string
 	// ActivePartitionRunsIndex returns a key to the index SET for tracking active runs for a given partition.
 	ActivePartitionRunsIndex(partitionID string) string
 
@@ -240,6 +242,11 @@ type QueueKeyGenerator interface {
 	ThrottleKey(t *osqueue.Throttle) string
 	// RunIndex returns the index for storing job IDs associated with run IDs.
 	RunIndex(runID ulid.ULID) string
+	// SingletonKey returns the singleton key for a given queue item.
+	SingletonKey(s *osqueue.Singleton) string
+	// SingletonRunKey returns the singleton run id key that stores the singleton key for a given run.
+	SingletonRunKey(r string) string
+
 	// FnMetadata returns the key for a function's metadata.
 	// This is a JSON object; see queue.FnMetadata.
 	FnMetadata(fnID uuid.UUID) string
@@ -293,6 +300,18 @@ func (u queueKeyGenerator) ThrottleKey(t *osqueue.Throttle) string {
 		return fmt.Sprintf("{%s}:throttle:-", u.queueDefaultKey)
 	}
 	return fmt.Sprintf("{%s}:throttle:%s", u.queueDefaultKey, t.Key)
+}
+
+func (u queueKeyGenerator) SingletonKey(s *osqueue.Singleton) string {
+	if s == nil || s.Key == "" {
+		return fmt.Sprintf("{%s}:singleton:-", u.queueDefaultKey)
+	}
+
+	return fmt.Sprintf("{%s}:singleton:%s", u.queueDefaultKey, s.Key)
+}
+
+func (u queueKeyGenerator) SingletonRunKey(runID string) string {
+	return fmt.Sprintf("{%s}:singleton-run:%s", u.queueDefaultKey, runID)
 }
 
 func (u queueKeyGenerator) PartitionMeta(id string) string {
@@ -378,17 +397,27 @@ func (u queueKeyGenerator) BacklogSet(backlogID string) string {
 func (u queueKeyGenerator) ActiveCounter(scope string, scopeID string) string {
 	if scope == "" || scopeID == "" {
 		// this is a placeholder because passing an empty key into Lua will cause multi-slot key errors
-		return fmt.Sprintf("{%s}:active:-", u.queueDefaultKey)
+		return fmt.Sprintf("{%s}:v1:active:-", u.queueDefaultKey)
 	}
 
-	return fmt.Sprintf("{%s}:active:%s:%s", u.queueDefaultKey, scope, scopeID)
+	return fmt.Sprintf("{%s}:v1:active:%s:%s", u.queueDefaultKey, scope, scopeID)
 }
 
 func isEmptyULID(id ulid.ULID) bool {
 	return id == [16]byte{}
 }
 
-func (u queueKeyGenerator) ActiveRunCounter(runID ulid.ULID) string {
+// ActiveRunsCounter returns the key to the number of active runs for a given backlog.
+func (u queueKeyGenerator) ActiveRunsCounter(scope string, scopeID string) string {
+	if scope == "" || scopeID == "" {
+		// this is a placeholder because passing an empty key into Lua will cause multi-slot key errors
+		return fmt.Sprintf("{%s}:v1:active-runs:-", u.queueDefaultKey)
+	}
+
+	return fmt.Sprintf("{%s}:v1:active-runs:%s:%s", u.queueDefaultKey, scope, scopeID)
+}
+
+func (u queueKeyGenerator) RunActiveCounter(runID ulid.ULID) string {
 	if isEmptyULID(runID) {
 		// this is a placeholder because passing an empty key into Lua will cause multi-slot key errors
 		return u.ActiveCounter("run", "")
@@ -400,10 +429,10 @@ func (u queueKeyGenerator) ActiveRunCounter(runID ulid.ULID) string {
 func (u queueKeyGenerator) ActivePartitionRunsIndex(partitionID string) string {
 	if partitionID == "" {
 		// this is a placeholder because passing an empty key into Lua will cause multi-slot key errors
-		return fmt.Sprintf("{%s}:active-idx:runs:-", u.queueDefaultKey)
+		return fmt.Sprintf("{%s}:v1:active-idx:runs:-", u.queueDefaultKey)
 	}
 
-	return fmt.Sprintf("{%s}:active-idx:runs:%s", u.queueDefaultKey, partitionID)
+	return fmt.Sprintf("{%s}:v1:active-idx:runs:%s", u.queueDefaultKey, partitionID)
 }
 
 // BacklogMeta returns the key to the hash storing serialized QueueBacklog objects by ID.

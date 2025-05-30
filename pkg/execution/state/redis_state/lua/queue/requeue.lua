@@ -28,19 +28,23 @@ local keyActivePartition           = KEYS[13]
 local keyActiveConcurrencyKey1     = KEYS[14]
 local keyActiveConcurrencyKey2     = KEYS[15]
 local keyActiveCompound            = KEYS[16]
-local keyActiveRun                 = KEYS[17]
-local keyIndexActivePartitionRuns  = KEYS[18]
 
-local keyBacklogSet                      = KEYS[19]          -- backlog:sorted:<backlogID> - zset
-local keyBacklogMeta                     = KEYS[20]          -- backlogs - hash
-local keyGlobalShadowPartitionSet        = KEYS[21]          -- shadow:sorted
-local keyShadowPartitionSet              = KEYS[22]          -- shadow:sorted:<fnID|queueName> - zset
-local keyShadowPartitionMeta             = KEYS[23]          -- shadows
-local keyGlobalAccountShadowPartitionSet = KEYS[24]
-local keyAccountShadowPartitionSet       = KEYS[25]
+local keyActiveRun                        = KEYS[17]
+local keyActiveRunsAccount                = KEYS[18]
+local keyIndexActivePartitionRuns         = KEYS[19]
+local keyActiveRunsCustomConcurrencyKey1  = KEYS[20]
+local keyActiveRunsCustomConcurrencyKey2  = KEYS[21]
 
-local keyItemIndexA           = KEYS[26]          -- custom item index 1
-local keyItemIndexB           = KEYS[27]          -- custom item index 2
+local keyBacklogSet                      = KEYS[22]          -- backlog:sorted:<backlogID> - zset
+local keyBacklogMeta                     = KEYS[23]          -- backlogs - hash
+local keyGlobalShadowPartitionSet        = KEYS[24]          -- shadow:sorted
+local keyShadowPartitionSet              = KEYS[25]          -- shadow:sorted:<fnID|queueName> - zset
+local keyShadowPartitionMeta             = KEYS[26]          -- shadows
+local keyGlobalAccountShadowPartitionSet = KEYS[27]
+local keyAccountShadowPartitionSet       = KEYS[28]
+
+local keyItemIndexA           = KEYS[29]          -- custom item index 1
+local keyItemIndexB           = KEYS[30]          -- custom item index 2
 
 local queueID             = ARGV[1]           -- id
 local queueItem           = ARGV[2]
@@ -64,6 +68,7 @@ local backlogItem             = ARGV[12]
 -- $include(ends_with.lua)
 -- $include(update_account_queues.lua)
 -- $include(enqueue_to_partition.lua)
+-- $include(update_active_counters.lua)
 
 local item = get_queue_item(queueKey, queueID)
 if item == nil then
@@ -122,48 +127,11 @@ if exists_without_ending(keyInProgressAccount, ":-") then
     redis.call("ZREM", keyInProgressAccount, item.id)
 end
 
+-- Decrease active counters
+decreaseActiveCounters(keyActivePartition, keyActiveAccount, keyActiveCompound, keyActiveConcurrencyKey1, keyActiveConcurrencyKey2)
+decreaseActiveRunCounters(keyActiveRun, keyIndexActivePartitionRuns, keyActiveRunsAccount, keyActiveRunsCustomConcurrencyKey1, keyActiveRunsCustomConcurrencyKey2, runID)
+
 if requeueToBacklog == 1 then
-  -- Decrease active counters and clean up if necessary
-  if redis.call("DECR", keyActivePartition) <= 0 then
-    redis.call("DEL", keyActivePartition)
-  end
-
-  if exists_without_ending(keyActiveAccount, ":-") then
-    if redis.call("DECR", keyActiveAccount) <= 0 then
-      redis.call("DEL", keyActiveAccount)
-    end
-  end
-
-  if exists_without_ending(keyActiveCompound, ":-") then
-    if redis.call("DECR", keyActiveCompound) <= 0 then
-      redis.call("DEL", keyActiveCompound)
-    end
-  end
-
-  if exists_without_ending(keyActiveConcurrencyKey1, ":-") then
-    if redis.call("DECR", keyActiveConcurrencyKey1) <= 0 then
-      redis.call("DEL", keyActiveConcurrencyKey1)
-    end
-  end
-
-  if exists_without_ending(keyActiveConcurrencyKey2, ":-") then
-    if redis.call("DECR", keyActiveConcurrencyKey2) <= 0 then
-      redis.call("DEL", keyActiveConcurrencyKey2)
-    end
-  end
-
-  if exists_without_ending(keyActiveRun, ":-") then
-    -- increase number of active items in the run
-    if redis.call("DECR", keyActiveRun) <= 0 then
-      redis.call("DEL", keyActiveRun)
-
-      -- update set of active function runs
-      if exists_without_ending(keyIndexActivePartitionRuns, ":-") then
-        redis.call("SREM", keyIndexActivePartitionRuns, runID)
-      end
-    end
-  end
-
 	--
 	-- Requeue item to backlog queues again
 	--

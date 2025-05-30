@@ -57,7 +57,6 @@ require (
 	github.com/pquerna/cachecontrol v0.2.0
 	github.com/redis/rueidis v1.0.51
 	github.com/robfig/cron/v3 v3.0.1
-	github.com/rs/zerolog v1.26.1
 	github.com/sashabaranov/go-openai v1.35.6
 	github.com/shirou/gopsutil v3.21.11+incompatible
 	github.com/spf13/cobra v1.8.1
@@ -89,7 +88,6 @@ require (
 	gocloud.dev/pubsub/natspubsub v0.25.0
 	golang.org/x/mod v0.21.0
 	golang.org/x/sync v0.12.0
-	golang.org/x/term v0.30.0
 	gonum.org/v1/gonum v0.12.0
 	google.golang.org/genproto/googleapis/api v0.0.0-20241021214115-324edc3d5d38
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20241021214115-324edc3d5d38

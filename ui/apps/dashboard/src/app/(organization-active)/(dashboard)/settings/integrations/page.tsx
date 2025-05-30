@@ -22,6 +22,7 @@ export default async function IntegrationsPage() {
       allIntegrations = [
         {
           enabled: true,
+          isMarketplace: integration.isMarketplace,
           projects: integration.projects,
           slug: 'vercel',
         },

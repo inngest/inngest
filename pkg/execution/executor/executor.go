@@ -28,13 +28,13 @@ import (
 	"github.com/inngest/inngest/pkg/execution/driver/httpdriver"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/realtime"
+	"github.com/inngest/inngest/pkg/execution/singleton"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/expressions"
 	"github.com/inngest/inngest/pkg/expressions/expragg"
 	"github.com/inngest/inngest/pkg/inngest"
-	"github.com/inngest/inngest/pkg/inngest/log"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/run"
 	"github.com/inngest/inngest/pkg/syscode"
@@ -45,7 +45,6 @@ import (
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/inngest/inngest/pkg/util/gateway"
 	"github.com/oklog/ulid/v2"
-	"github.com/rs/zerolog"
 	"github.com/xhit/go-str2duration/v2"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
@@ -167,7 +166,7 @@ func WithFunctionLoader(l state.FunctionLoader) ExecutorOpt {
 	}
 }
 
-func WithLogger(l *zerolog.Logger) ExecutorOpt {
+func WithLogger(l logger.Logger) ExecutorOpt {
 	return func(e execution.Executor) error {
 		e.(*executor).log = l
 		return nil
@@ -225,6 +224,12 @@ func WithDebouncer(d debounce.Debouncer) ExecutorOpt {
 	}
 }
 
+func WithSingletonManager(sn singleton.Singleton) ExecutorOpt {
+	return func(e execution.Executor) error {
+		e.(*executor).singletonMgr = sn
+		return nil
+	}
+}
 func WithBatcher(b batch.BatchManager) ExecutorOpt {
 	return func(e execution.Executor) error {
 		e.(*executor).batcher = b
@@ -303,7 +308,7 @@ func WithRealtimePublisher(b realtime.Publisher) ExecutorOpt {
 
 // executor represents a built-in executor for running workflows.
 type executor struct {
-	log *zerolog.Logger
+	log logger.Logger
 
 	// exprAggregator is an expression aggregator used to parse and aggregate expressions
 	// using trees.
@@ -315,6 +320,7 @@ type executor struct {
 	queue               queue.Queue
 	debouncer           debounce.Debouncer
 	batcher             batch.BatchManager
+	singletonMgr        singleton.Singleton
 	fl                  state.FunctionLoader
 	evalFactory         func(ctx context.Context, expr string) (expressions.Evaluator, error)
 	runtimeDrivers      map[string]driver.Driver
@@ -378,7 +384,7 @@ func (e *executor) CloseLifecycleListeners(ctx context.Context) {
 	}
 
 	if err := eg.Wait(); err != nil {
-		log.From(ctx).Error().Err(err).Msg("error closing lifecycle listeners")
+		e.log.Error("error closing lifecycle listeners", "error", err)
 	}
 }
 
@@ -527,16 +533,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	// If this is paused, immediately end just before creating state.
 	isPaused := req.FunctionPausedAt != nil && req.FunctionPausedAt.Before(time.Now())
 	if isPaused {
-		// TODO Add run span marked as skipped.
-
-		for _, e := range e.lifecycles {
-			go e.OnFunctionSkipped(context.WithoutCancel(ctx), metadata, execution.SkipState{
-				CronSchedule: req.Events[0].GetEvent().CronSchedule(),
-				Reason:       enums.SkipReasonFunctionPaused,
-				Events:       evts,
-			})
-		}
-		return nil, ErrFunctionSkipped
+		return e.handleFunctionSkipped(ctx, req, metadata, evts, enums.SkipReasonFunctionPaused)
 	}
 
 	mapped := make([]map[string]any, len(req.Events))
@@ -553,6 +550,40 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	// Create throttle information prior to creating state.  This is used in the queue.
 	//
 	throttle := queue.GetThrottleConfig(ctx, req.Function.ID, req.Function.Throttle, evtMap)
+
+	//
+	// Create singleton information and try to handle it prior to creating state.
+	//
+	var singletonConfig *queue.Singleton
+	data := req.Events[0].GetEvent().Map()
+
+	// Ignores Cancel mode for now
+	if req.Function.Singleton != nil && req.Function.Singleton.Mode == enums.SingletonModeSkip {
+		singletonKey, err := singleton.SingletonKey(ctx, req.Function.ID, *req.Function.Singleton, data)
+		switch {
+		case err == nil:
+			// Attempt to early handle function singletons, function runs could still fail
+			// to enqueue later on when it atomically tries to acquire a function mutex.
+			alreadyRunning, err := e.singletonMgr.Singleton(ctx, singletonKey, *req.Function.Singleton)
+
+			if err != nil {
+				return nil, err
+			}
+
+			if alreadyRunning {
+				// TODO: Handle cancellation mode
+
+				// Immediately end before creating state
+				return e.handleFunctionSkipped(ctx, req, metadata, evts, enums.SkipReasonSingleton)
+			}
+
+			singletonConfig = &queue.Singleton{Key: singletonKey}
+		case errors.Is(err, singleton.ErrNotASingleton):
+			// We no-op, and we run the function normally not as a singleton
+		default:
+			return nil, err
+		}
+	}
 
 	//
 	// Create the run state.
@@ -689,15 +720,30 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		Payload: queue.PayloadEdge{
 			Edge: inngest.SourceEdge,
 		},
-		Throttle: throttle,
-		Metadata: map[string]any{},
+		Throttle:  throttle,
+		Metadata:  map[string]any{},
+		Singleton: singletonConfig,
 	}
 
 	err = e.queue.Enqueue(ctx, item, at, queue.EnqueueOpts{})
-	if err == redis_state.ErrQueueItemExists {
+
+	switch err {
+	case nil:
+		// no-op
+	case redis_state.ErrQueueItemExists:
 		return nil, state.ErrIdentifierExists
-	}
-	if err != nil {
+
+	case redis_state.ErrQueueItemSingletonExists:
+		_, err := e.smv2.Delete(ctx, sv2.IDFromV1(st.Identifier()))
+		if err != nil {
+			logger.StdlibLogger(ctx).Error(
+				"error deleting function state",
+				"error", err,
+			)
+		}
+		return e.handleFunctionSkipped(ctx, req, metadata, evts, enums.SkipReasonSingleton)
+
+	default:
 		return nil, fmt.Errorf("error enqueueing source edge '%v': %w", queueKey, err)
 	}
 
@@ -706,6 +752,17 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	}
 
 	return &metadata, nil
+}
+
+func (e *executor) handleFunctionSkipped(ctx context.Context, req execution.ScheduleRequest, metadata sv2.Metadata, evts []json.RawMessage, reason enums.SkipReason) (*sv2.Metadata, error) {
+	for _, e := range e.lifecycles {
+		go e.OnFunctionSkipped(context.WithoutCancel(ctx), metadata, execution.SkipState{
+			CronSchedule: req.Events[0].GetEvent().CronSchedule(),
+			Reason:       reason,
+			Events:       evts,
+		})
+	}
+	return nil, ErrFunctionSkipped
 }
 
 type runInstance struct {
@@ -886,7 +943,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 				ForceStepPlan:  md.Config.ForceStepPlan,
 				RequestVersion: md.Config.RequestVersion,
 			}); err != nil {
-				log.From(ctx).Error().Err(err).Msg("error updating metadata on function start")
+				e.log.Error("error updating metadata on function start", "error", err)
 			}
 
 			for _, e := range e.lifecycles {
@@ -1405,14 +1462,14 @@ func (e *executor) HandlePauses(ctx context.Context, iter state.PauseIterator, e
 	if iter.Count() > consts.AggregatePauseThreshold {
 		aggRes, err := e.handleAggregatePauses(ctx, evt)
 		if err != nil {
-			log.From(ctx).Error().Err(err).Msg("error handling aggregate pauses")
+			e.log.Error("error handling aggregate pauses", "error", err)
 		}
 		return aggRes, err
 	}
 
 	res, err := e.handlePausesAllNaively(ctx, iter, evt)
 	if err != nil {
-		log.From(ctx).Error().Err(err).Msg("error handling naive pauses")
+		e.log.Error("error handling naive pauses", "error", err)
 	}
 	return res, nil
 }
@@ -1425,7 +1482,7 @@ func (e *executor) handlePausesAllNaively(ctx context.Context, iter state.PauseI
 		return res, fmt.Errorf("no queue or state manager specified")
 	}
 
-	log := logger.StdlibLogger(ctx).With("event_id", evt.GetInternalID().String())
+	log := e.log.With("event_id", evt.GetInternalID().String())
 
 	var (
 		goerr error
@@ -1521,7 +1578,7 @@ func (e *executor) handleAggregatePauses(ctx context.Context, evt event.TrackedE
 		return execution.HandlePauseResult{}, fmt.Errorf("no expression evaluator found")
 	}
 
-	log := logger.StdlibLogger(ctx).With(
+	log := e.log.With(
 		"event_id", evt.GetInternalID().String(),
 		"workspace_id", evt.GetWorkspaceID(),
 		"event", evt.GetEvent().Name,
@@ -1701,12 +1758,7 @@ func (e *executor) handlePause(
 
 func (e *executor) HandleInvokeFinish(ctx context.Context, evt event.TrackedEvent) error {
 	evtID := evt.GetInternalID()
-
-	log := e.log
-	if log == nil {
-		log = logger.From(ctx)
-	}
-	l := log.With().Str("event_id", evtID.String()).Logger()
+	l := e.log.With("event_id", evtID.String())
 
 	correlationID := evt.GetEvent().CorrelationID()
 	if correlationID == "" {
@@ -1721,12 +1773,12 @@ func (e *executor) HandleInvokeFinish(ctx context.Context, evt event.TrackedEven
 	}
 
 	if pause.Expires.Time().Before(time.Now()) {
-		l.Debug().Msg("encountered expired pause")
+		l.Debug("encountered expired pause")
 
 		shouldDelete := pause.Expires.Time().Add(consts.PauseExpiredDeletionGracePeriod).Before(time.Now())
 		if shouldDelete {
 			// Consume this pause to remove it entirely
-			l.Debug().Msg("deleting expired pause")
+			l.Debug("deleting expired pause")
 			_ = e.pm.DeletePause(context.Background(), *pause)
 		}
 
@@ -1748,12 +1800,7 @@ func (e *executor) HandleInvokeFinish(ctx context.Context, evt event.TrackedEven
 	}
 
 	resumeData := pause.GetResumeData(evt.GetEvent())
-	if e.log != nil {
-		e.log.
-			Debug().
-			Str("pause.DataKey", pause.DataKey).
-			Msg("resuming pause from invoke")
-	}
+	l.Debug("resuming pause from invoke", "pause.DataKey", pause.DataKey)
 
 	return e.Resume(ctx, *pause, execution.ResumeRequest{
 		With:           resumeData.With,
@@ -1766,7 +1813,7 @@ func (e *executor) HandleInvokeFinish(ctx context.Context, evt event.TrackedEven
 
 // Cancel cancels an in-progress function.
 func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequest) error {
-	l := logger.StdlibLogger(ctx).With(
+	l := e.log.With(
 		"run_id", id.RunID.String(),
 		"workflow_id", id.FunctionID.String(),
 	)
@@ -1882,17 +1929,15 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 			return fmt.Errorf("error consuming pause via event: %w", err)
 		}
 
-		if e.log != nil {
-			e.log.Debug().
-				Str("pause_id", pause.ID.String()).
-				Str("run_id", pause.Identifier.RunID.String()).
-				Str("workflow_id", pause.Identifier.FunctionID.String()).
-				Bool("timeout", pause.OnTimeout).
-				Bool("cancel", pause.Cancel).
-				Interface("consumed", consumeResult).
-				Err(err).
-				Msg("resuming from pause")
-		}
+		e.log.Debug("resuming from pause",
+			"error", err,
+			"pause_id", pause.ID.String(),
+			"run_id", pause.Identifier.RunID.String(),
+			"workflow_id", pause.Identifier.FunctionID.String(),
+			"timeout", pause.OnTimeout,
+			"cancel", pause.Cancel,
+			"consumed", consumeResult,
+		)
 
 		if !consumeResult.DidConsume {
 			// We don't need to do anything here.
@@ -1968,6 +2013,11 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 			}
 		}
 
+		// The timeout job is running on the queue and will Dequeue() itself. No need to continue.
+		if r.IsTimeout {
+			return cleanup()
+		}
+
 		// And dequeue the timeout job to remove unneeded work from the queue, etc.
 		if q, ok := e.queue.(redis_state.QueueManager); ok {
 			// timeout jobs are enqueued to the workflow partition (see handleGeneratorWaitForEvent)
@@ -1982,7 +2032,8 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 				ID:         queue.HashID(ctx, jobID),
 				FunctionID: md.ID.FunctionID,
 				Data: queue.Item{
-					Kind: queue.KindPause,
+					Kind:       queue.KindPause,
+					Identifier: sv2.V1FromMetadata(md),
 				},
 			})
 			if err != nil {
@@ -2083,7 +2134,7 @@ func (e *executor) handleGeneratorGroup(ctx context.Context, i *runInstance, gro
 		if op == nil {
 			// This is clearly an error.
 			if e.log != nil {
-				e.log.Error().Err(fmt.Errorf("nil generator returned")).Msg("error handling generator")
+				e.log.Error("error handling generator", "error", "nil generator returned")
 			}
 			continue
 		}
@@ -2096,7 +2147,7 @@ func (e *executor) handleGeneratorGroup(ctx context.Context, i *runInstance, gro
 		eg.Go(func() error {
 			defer func() {
 				if r := recover(); r != nil {
-					logger.StdlibLogger(ctx).Error(
+					e.log.Error(
 						"panic in handleGenerator",
 						"error", r,
 					)
@@ -3394,16 +3445,14 @@ func (e *executor) ReceiveSignal(ctx context.Context, workspaceID uuid.UUID, sig
 		return
 	}
 
-	log := e.log
-	if log == nil {
-		log = logger.From(ctx)
-	}
-	l := log.With().Str("signal_id", signalID).Str("workspace_id", workspaceID.String()).Logger()
+	sanitizedSignalID := strings.ReplaceAll(signalID, "\n", "")
+	sanitizedSignalID = strings.ReplaceAll(sanitizedSignalID, "\r", "")
+	l := e.log.With("signal_id", sanitizedSignalID, "workspace_id", workspaceID.String())
 	defer func() {
 		if err != nil {
-			l.Error().Err(err).Msg("error receiving signal")
+			l.Error("error receiving signal", "error", err)
 		} else {
-			l.Info().Msg("signal received")
+			l.Info("signal received")
 		}
 	}()
 
@@ -3416,23 +3465,23 @@ func (e *executor) ReceiveSignal(ctx context.Context, workspaceID uuid.UUID, sig
 	res = &execution.ReceiveSignalResult{}
 
 	if pause == nil {
-		l.Debug().Msg("no pause found for signal")
+		l.Debug("no pause found for signal")
 		return
 	}
 
 	if pause.Expires.Time().Before(time.Now()) {
-		l.Debug().Msg("encountered expired signal")
+		l.Debug("encountered expired signal")
 
 		shouldDelete := pause.Expires.Time().Add(consts.PauseExpiredDeletionGracePeriod).Before(time.Now())
 		if shouldDelete {
-			l.Debug().Msg("deleting expired pause")
+			l.Debug("deleting expired pause")
 			_ = e.pm.DeletePause(ctx, *pause)
 		}
 
 		return
 	}
 
-	l.Debug().Str("pause.DataKey", pause.DataKey).Msg("resuming pause from signal")
+	l.Debug("resuming pause from signal", "pause.DataKey", pause.DataKey)
 
 	err = e.Resume(ctx, *pause, execution.ResumeRequest{
 		RunID:          &pause.Identifier.RunID,

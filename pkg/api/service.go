@@ -45,6 +45,8 @@ type APIServiceOptions struct {
 	// the server will still boot but core actions such as syncing, runs, and
 	// ingesting events will not work.
 	RequireKeys bool
+
+	Logger logger.Logger
 }
 
 func NewService(opts APIServiceOptions) service.Service {
@@ -53,6 +55,7 @@ func NewService(opts APIServiceOptions) service.Service {
 		mounts:         opts.Mounts,
 		localEventKeys: opts.LocalEventKeys,
 		requireKeys:    opts.RequireKeys,
+		log:            opts.Logger,
 	}
 }
 
@@ -73,6 +76,7 @@ type apiServer struct {
 	// the server will still boot but core actions such as syncing, runs, and
 	// ingesting events will not work.
 	requireKeys bool
+	log         logger.Logger
 }
 
 func (a *apiServer) Name() string {
@@ -84,7 +88,7 @@ func (a *apiServer) Pre(ctx context.Context) error {
 
 	api, err := NewAPI(Options{
 		Config:         a.config,
-		Logger:         logger.From(ctx),
+		Logger:         a.log,
 		EventHandler:   a.handleEvent,
 		LocalEventKeys: a.localEventKeys,
 		RequireKeys:    a.requireKeys,
@@ -125,11 +129,11 @@ func (a *apiServer) handleEvent(
 ) (string, error) {
 	// ctx is the request context, so we need to re-add
 	// the caller here.
-	l := logger.From(ctx).With().Str("caller", "api").Logger()
-	ctx = logger.With(ctx, l)
+	l := a.log.With("caller", "api")
+	ctx = logger.WithStdlib(ctx, l)
 	span := trace.SpanFromContext(ctx)
 
-	l.Debug().Str("event", e.Name).Msg("handling event")
+	l.Debug("handling event", "event", e.Name)
 
 	trackedEvent := event.NewOSSTrackedEvent(
 		*e,
@@ -138,17 +142,17 @@ func (a *apiServer) handleEvent(
 
 	byt, err := json.Marshal(trackedEvent)
 	if err != nil {
-		l.Error().Err(err).Msg("error unmarshalling event as JSON")
+		l.Error("error unmarshalling event as JSON", "error", err)
 		span.SetStatus(codes.Error, "error parsing event as JSON")
 		return "", err
 	}
 
-	l.Info().
-		Str("event_name", trackedEvent.GetEvent().Name).
-		Str("internal_id", trackedEvent.GetInternalID().String()).
-		Str("external_id", trackedEvent.GetEvent().ID).
-		Interface("event", trackedEvent.GetEvent()).
-		Msg("publishing event")
+	l.Info("publishing event",
+		"event_name", trackedEvent.GetEvent().Name,
+		"internal_id", trackedEvent.GetInternalID().String(),
+		"external_id", trackedEvent.GetEvent().ID,
+		"event", trackedEvent.GetEvent(),
+	)
 
 	carrier := itrace.NewTraceCarrier()
 	itrace.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))

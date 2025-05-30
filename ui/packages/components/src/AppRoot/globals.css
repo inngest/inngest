@@ -74,6 +74,7 @@ input[type='number'] {
     /* Carbon Colors */
     --color-carbon-0: 254 254 254;
     --color-carbon-50: 246 246 246;
+    --color-carbon-75: 240 240 240;
     --color-carbon-100: 226 226 226;
     --color-carbon-200: 204 204 204;
     --color-carbon-300: 176 176 176;
@@ -187,6 +188,7 @@ input[type='number'] {
     --color-background-btn-dangerHover: var(--color-ruby-800);
     --color-background-btn-dangerPressed: var(--color-ruby-900);
     --color-background-btn-dangerDisabled: var(--color-ruby-300);
+    --color-background-tableHeader: var(--color-carbon-75);
 
     --color-border-light: var(--color-carbon-50);
     --color-border-subtle: var(--color-carbon-100);
@@ -294,7 +296,7 @@ input[type='number'] {
     --color-background-warningContrast: var(--color-honey-100);
     --color-background-info: var(--color-breeze-900);
     --color-background-infoContrast: var(--color-breeze-100);
-    --color-background-codeEditor: var(--color-carbon-900);
+    --color-background-codeEditor: var(--color-carbon-950);
     --color-background-btn-primary: var(--color-matcha-600);
     --color-background-btn-primaryHover: var(--color-matcha-700);
     --color-background-btn-primaryPressed: var(--color-matcha-900);
@@ -303,6 +305,7 @@ input[type='number'] {
     --color-background-btn-dangerHover: var(--color-ruby-800);
     --color-background-btn-dangerPressed: var(--color-ruby-900);
     --color-background-btn-dangerDisabled: var(--color-ruby-300);
+    --color-background-tableHeader: var(--color-carbon-900);
 
     --color-border-light: var(--color-carbon-950);
     --color-border-subtle: var(--color-carbon-800);

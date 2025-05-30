@@ -94,8 +94,10 @@ func WithHandler(h handler) LoggerOpt {
 }
 
 func newLogger(opts ...LoggerOpt) Logger {
-	handler := JSONHandler
+	handler := DevHandler
 	switch strings.ToLower(os.Getenv("LOG_HANDLER")) {
+	case "json":
+		handler = JSONHandler
 	case "dev":
 		handler = DevHandler
 	case "txt", "text":
@@ -114,6 +116,22 @@ func newLogger(opts ...LoggerOpt) Logger {
 
 	hopts := slog.HandlerOptions{
 		Level: o.level,
+		ReplaceAttr: func(groups []string, attr slog.Attr) slog.Attr {
+			if attr.Key == slog.LevelKey && len(groups) == 0 {
+				if lvl, ok := attr.Value.Any().(slog.Level); ok {
+					// annotate additional levels properly
+					switch lvl {
+					case LevelTrace:
+						return slog.String(attr.Key, "TRACE")
+					case LevelNotice:
+						return slog.String(attr.Key, "NOTICE")
+					case LevelEmergency:
+						return slog.String(attr.Key, "EMERGENCY")
+					}
+				}
+			}
+			return attr
+		},
 	}
 
 	switch o.handler {
@@ -121,7 +139,7 @@ func newLogger(opts ...LoggerOpt) Logger {
 		return &logger{
 			Logger: slog.New(tint.NewHandler(o.writer, &tint.Options{
 				Level:      o.level,
-				TimeFormat: "[15:05:05.000]", // millisecond
+				TimeFormat: "[15:04:05.000]", // millisecond
 				ReplaceAttr: func(groups []string, a slog.Attr) slog.Attr {
 					if a.Key == slog.LevelKey && len(groups) == 0 {
 						lvl, ok := a.Value.Any().(slog.Level)

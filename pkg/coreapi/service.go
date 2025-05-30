@@ -42,7 +42,7 @@ func (s *svc) Pre(ctx context.Context) (err error) {
 	// TODO - Configure API with correct ports, etc., set up routes
 	s.api, err = NewCoreApi(Options{
 		Config: s.config,
-		Logger: logger.From(ctx),
+		Logger: logger.StdlibLogger(ctx),
 		Runner: s.runner,
 	})
 

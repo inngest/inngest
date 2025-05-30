@@ -26,7 +26,6 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/history"
 	"github.com/inngest/inngest/pkg/execution/state"
-	"github.com/inngest/inngest/pkg/inngest/log"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/run"
 	"github.com/inngest/inngest/pkg/tracing/meta"
@@ -1326,6 +1325,8 @@ type runsQueryBuilder struct {
 }
 
 func newRunsQueryBuilder(ctx context.Context, opt cqrs.GetTraceRunOpt) *runsQueryBuilder {
+	l := logger.StdlibLogger(ctx)
+
 	// filters
 	filter := []sq.Expression{}
 	if len(opt.Filter.AppID) > 0 {
@@ -1362,7 +1363,7 @@ func newRunsQueryBuilder(ctx context.Context, opt cqrs.GetTraceRunOpt) *runsQuer
 	reqcursor := &cqrs.TracePageCursor{}
 	if opt.Cursor != "" {
 		if err := reqcursor.Decode(opt.Cursor); err != nil {
-			log.From(ctx).Error().Err(err).Str("cursor", opt.Cursor).Msg("error decoding function run cursor")
+			l.Error("error decoding function run cursor", "error", err, "cursor", opt.Cursor)
 		}
 	}
 
@@ -1405,7 +1406,7 @@ func newRunsQueryBuilder(ctx context.Context, opt cqrs.GetTraceRunOpt) *runsQuer
 			case enums.TraceRunOrderDesc:
 				o = sq.C(field).Desc()
 			default:
-				log.From(ctx).Error().Str("field", field).Str("direction", d.String()).Msg("invalid direction specified for sorting")
+				l.Error("invalid direction specified for sorting", "field", field, "direction", d.String())
 				continue
 			}
 
@@ -1461,6 +1462,8 @@ func (w wrapper) GetTraceRunsCount(ctx context.Context, opt cqrs.GetTraceRunOpt)
 }
 
 func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*cqrs.TraceRun, error) {
+	l := logger.StdlibLogger(ctx)
+
 	// use evtIDs as post query filter
 	evtIDs := []string{}
 	expHandler, err := run.NewExpressionHandler(ctx,
@@ -1559,7 +1562,7 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 		if expHandler.HasOutputFilters() {
 			ok, err := expHandler.MatchOutputExpressions(ctx, data.Output)
 			if err != nil {
-				logger.StdlibLogger(ctx).Error("error inspecting run for output match",
+				l.Error("error inspecting run for output match",
 					"error", err,
 					"output", string(data.Output),
 					"acctID", data.AccountID,
@@ -1588,14 +1591,14 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 			case strings.ToLower(enums.TraceRunTimeEndedAt.String()):
 				pc.Cursors[k] = cqrs.TraceCursor{Field: k, Value: data.EndedAt}
 			default:
-				log.From(ctx).Warn().Str("field", k).Msg("unknown field registered as cursor")
+				l.Warn("unknown field registered as cursor", "field", k)
 				delete(pc.Cursors, k)
 			}
 		}
 
 		cursor, err := pc.Encode()
 		if err != nil {
-			log.From(ctx).Error().Err(err).Interface("page_cursor", pc).Msg("error encoding cursor")
+			l.Error("error encoding cursor", "error", err, "page_cursor", pc)
 		}
 		var cron *string
 		if data.CronSchedule.Valid {
@@ -1793,6 +1796,8 @@ type workerConnectionsQueryBuilder struct {
 }
 
 func newWorkerConnectionsQueryBuilder(ctx context.Context, opt cqrs.GetWorkerConnectionOpt) *workerConnectionsQueryBuilder {
+	l := logger.StdlibLogger(ctx)
+
 	// filters
 	filter := []sq.Expression{}
 	if len(opt.Filter.AppID) > 0 {
@@ -1822,7 +1827,7 @@ func newWorkerConnectionsQueryBuilder(ctx context.Context, opt cqrs.GetWorkerCon
 	reqcursor := &cqrs.WorkerConnectionPageCursor{}
 	if opt.Cursor != "" {
 		if err := reqcursor.Decode(opt.Cursor); err != nil {
-			log.From(ctx).Error().Err(err).Str("cursor", opt.Cursor).Msg("error decoding worker connection history cursor")
+			l.Error("error decoding worker connection history cursor", "error", err, "cursor", opt.Cursor)
 		}
 	}
 
@@ -1865,7 +1870,7 @@ func newWorkerConnectionsQueryBuilder(ctx context.Context, opt cqrs.GetWorkerCon
 			case enums.WorkerConnectionSortOrderDesc:
 				o = sq.C(field).Desc()
 			default:
-				log.From(ctx).Error().Str("field", field).Str("direction", d.String()).Msg("invalid direction specified for sorting")
+				l.Error("invalid direction specified for sorting", "field", field, "direction", d.String())
 				continue
 			}
 
@@ -1921,6 +1926,8 @@ func (w wrapper) GetWorkerConnectionsCount(ctx context.Context, opt cqrs.GetWork
 }
 
 func (w wrapper) GetWorkerConnections(ctx context.Context, opt cqrs.GetWorkerConnectionOpt) ([]*cqrs.WorkerConnection, error) {
+	l := logger.StdlibLogger(ctx)
+
 	builder := newWorkerConnectionsQueryBuilder(ctx, opt)
 	filter := builder.filter
 	order := builder.order
@@ -2035,14 +2042,14 @@ func (w wrapper) GetWorkerConnections(ctx context.Context, opt cqrs.GetWorkerCon
 			case strings.ToLower(enums.WorkerConnectionTimeFieldDisconnectedAt.String()):
 				pc.Cursors[k] = cqrs.WorkerConnectionCursor{Field: k, Value: data.DisconnectedAt.Int64}
 			default:
-				log.From(ctx).Warn().Str("field", k).Msg("unknown field registered as cursor")
+				l.Warn("unknown field registered as cursor", "field", k)
 				delete(pc.Cursors, k)
 			}
 		}
 
 		cursor, err := pc.Encode()
 		if err != nil {
-			log.From(ctx).Error().Err(err).Interface("page_cursor", pc).Msg("error encoding cursor")
+			l.Error("error encoding cursor", "error", err, "page_cursor", pc)
 		}
 
 		connectedAt := time.UnixMilli(data.ConnectedAt)

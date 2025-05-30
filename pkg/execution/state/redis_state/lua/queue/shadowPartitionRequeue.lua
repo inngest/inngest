@@ -22,7 +22,7 @@ local partitionID = ARGV[1]
 local accountID   = ARGV[2]
 local leaseID     = ARGV[3]
 local nowMS       = tonumber(ARGV[4])
-local requeueAt   = tonumber(ARGV[5])
+local requeueAtMS = tonumber(ARGV[5])
 
 -- $include(decode_ulid_time.lua)
 -- $include(get_partition_item.lua)
@@ -45,10 +45,13 @@ existing.leaseID = nil
 redis.call("HSET", keyShadowPartitionHash, partitionID, cjson.encode(existing))
 
 -- Get earliest backlog score in shadow partition
-local minScore = get_earliest_pointer_score(keyShadowPartitionSet)
+local minScore = get_earliest_score(keyShadowPartitionSet)
 
 -- No more backlogs, remove dangling pointers
 if minScore == 0 then
+  -- Clean up metadata
+  redis.call("HDEL", keyShadowPartitionHash, partitionID)
+
   redis.call("ZREM", keyGlobalShadowPartitionSet, partitionID)
   redis.call("ZREM", keyAccountShadowPartitionSet, partitionID)
 
@@ -63,8 +66,8 @@ end
 local updateTo = minScore
 
 -- If we need to push back even further, override updateTo
-if requeueAt ~= 0 and requeueAt > updateTo then
-  updateTo = requeueAt
+if requeueAtMS ~= 0 and requeueAtMS > updateTo then
+  updateTo = requeueAtMS
 end
 
 -- Push back shadow partition in global set
