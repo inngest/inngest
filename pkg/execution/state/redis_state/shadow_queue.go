@@ -64,6 +64,7 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 			// contention
 			return nil
 		}
+		return fmt.Errorf("error leasing shadow partition: %w", err)
 	}
 
 	if leaseID == nil {
