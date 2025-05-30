@@ -2,7 +2,6 @@
 
 import { useState } from 'react';
 import { Header } from '@inngest/components/Header/Header';
-import { Pill } from '@inngest/components/Pill/Pill';
 
 import { ActionsMenu } from '@/components/Events/ActionsMenu';
 import ArchiveEventModal from '@/components/Events/ArchiveEventModal';
@@ -45,12 +44,7 @@ export default function EventLayout({
           ...(isNewEventsEnabled.isReady && isNewEventsEnabled.value
             ? [
                 {
-                  children: (
-                    <div className="m-0 flex flex-row items-center justify-start space-x-1 p-0">
-                      <div>Events</div>
-                      <Pill kind="primary">New</Pill>
-                    </div>
-                  ),
+                  children: 'Events',
                   href: pathCreator.eventTypeEvents({ envSlug, eventName }),
                 },
               ]
