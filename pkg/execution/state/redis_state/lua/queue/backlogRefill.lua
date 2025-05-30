@@ -266,7 +266,7 @@ if refill > 0 then
       if drainActiveCounters ~= 1 and updatedData.data ~= nil and updatedData.data.identifier ~= nil and updatedData.data.identifier.runID ~= nil then
         -- add item to active in run
         local runID = updatedData.data.identifier.runID
-        local keyActiveRun = string.format("%s:active:run:%s", keyPrefix, runID)
+        local keyActiveRun = string.format("%s:v1:active:run:%s", keyPrefix, runID)
 
         increaseActiveRunCounters(keyActiveRun, keyIndexActivePartitionRuns, keyActiveRunsAccount, keyActiveRunsCustomConcurrencyKey1, keyActiveRunsCustomConcurrencyKey2, runID)
       end

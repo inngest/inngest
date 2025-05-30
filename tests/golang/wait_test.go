@@ -4,14 +4,15 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/google/uuid"
-	"github.com/inngest/inngest/pkg/testapi"
 	"io"
 	"net/http"
 	"net/url"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/testapi"
 
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/assert"
@@ -613,7 +614,6 @@ func TestWaitForEvent_Timeout(t *testing.T) {
 				ActiveRunsAccount:  0,
 				ActiveRunsFunction: 0,
 			}, counters)
-		}, 10*time.Second, time.Second)
-
+		}, 15*time.Second, 25*time.Millisecond)
 	})
 }
