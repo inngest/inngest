@@ -3,7 +3,6 @@ package models
 import (
 	"context"
 	"fmt"
-
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/logger"
@@ -40,15 +39,18 @@ func MakeFunction(f *cqrs.Function) (*Function, error) {
 		concurrency = fn.Concurrency.PartitionConcurrency()
 	}
 
+	config := ToFunctionConfiguration(fn, UnknownPlanConcurrencyLimit)
+
 	return &Function{
-		AppID:       f.AppID.String(),
-		ID:          f.ID.String(),
-		Name:        f.Name,
-		Slug:        f.Slug,
-		Config:      string(f.Config),
-		Concurrency: concurrency,
-		Triggers:    triggers,
-		URL:         fn.Steps[0].URI,
+		AppID:         f.AppID.String(),
+		ID:            f.ID.String(),
+		Name:          f.Name,
+		Slug:          f.Slug,
+		Config:        string(f.Config),
+		Configuration: config,
+		Concurrency:   concurrency,
+		Triggers:      triggers,
+		URL:           fn.Steps[0].URI,
 	}, nil
 }
 
