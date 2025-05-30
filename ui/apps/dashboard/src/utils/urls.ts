@@ -52,20 +52,6 @@ export const pathCreator = {
   createApp({ envSlug }: { envSlug: string }): Route {
     return `/env/${envSlug}/apps/sync-new` as Route;
   },
-  // TODO: use eventPopout instead once we release new events
-  event({
-    envSlug,
-    eventName,
-    eventID,
-  }: {
-    envSlug: string;
-    eventName: string;
-    eventID: string;
-  }): Route {
-    return `/env/${envSlug}/event-types/${encodeURIComponent(
-      eventName
-    )}/events/${eventID}` as Route;
-  },
   eventPopout({ envSlug, eventID }: { envSlug: string; eventID: string }): Route {
     return `/env/${envSlug}/events/${eventID}` as Route;
   },
