@@ -153,28 +153,28 @@ func (p *peeker[T]) peek(ctx context.Context, keyOrderedPointerSet string, seque
 	}
 
 	// Use parallel decoding as per Peek
-	items, err := util.ParallelDecode(encoded, func(val any) (*T, error) {
+	items, err := util.ParallelDecode(encoded, func(val any) (*T, bool, error) {
 		if val == nil {
 			p.q.log.Error("encountered nil item in pointer queue",
 				"encoded", encoded,
 				"missing", missingItems,
 				"key", keyOrderedPointerSet,
 			)
-			return nil, fmt.Errorf("encountered nil item in pointer queue")
+			return nil, false, fmt.Errorf("encountered nil item in pointer queue")
 		}
 
 		str, ok := val.(string)
 		if !ok {
-			return nil, fmt.Errorf("unknown type in peekOrderedPointerSet: %T", val)
+			return nil, false, fmt.Errorf("unknown type in peekOrderedPointerSet: %T", val)
 		}
 
 		item := p.maker()
 
 		if err := json.Unmarshal(unsafe.Slice(unsafe.StringData(str), len(str)), item); err != nil {
-			return nil, fmt.Errorf("error reading item: %w", err)
+			return nil, false, fmt.Errorf("error reading item: %w", err)
 		}
 
-		return item, nil
+		return item, false, nil
 	})
 	if err != nil {
 		return nil, fmt.Errorf("error decoding items: %w", err)

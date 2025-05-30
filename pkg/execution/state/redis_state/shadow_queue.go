@@ -344,7 +344,6 @@ func (q *queue) scanShadowPartitions(ctx context.Context, until time.Time, qspc 
 		}
 	}
 
-	// TODO introduce weight probability to blend account/global scanning
 	shouldScanAccount := q.runMode.AccountShadowPartition && mrand.Intn(100) <= q.runMode.AccountShadowPartitionWeight
 	if shouldScanAccount {
 		sequential := false

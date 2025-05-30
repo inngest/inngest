@@ -1816,6 +1816,7 @@ func (q *queue) Migrate(ctx context.Context, sourceShardName string, fnID uuid.U
 
 	items, err := q.peek(ctx, shard, peekOpts{
 		PartitionKey: partitionKey,
+		PartitionID:  fnID.String(),
 		Limit:        limit,
 		Until:        time.Time{},
 	})
@@ -1946,6 +1947,7 @@ func (q *queue) Peek(ctx context.Context, partition *QueuePartition, until time.
 			Limit:        limit,
 			Until:        until,
 			PartitionKey: partitionKey,
+			PartitionID:  partition.ID,
 		},
 	)
 }
@@ -1977,12 +1979,14 @@ func (q *queue) PeekRandom(ctx context.Context, partition *QueuePartition, until
 			Limit:        limit,
 			Until:        until,
 			PartitionKey: partitionKey,
+			PartitionID:  partition.ID,
 			Random:       true,
 		},
 	)
 }
 
 type peekOpts struct {
+	PartitionID  string
 	PartitionKey string
 	Random       bool
 	Until        time.Time
@@ -2046,7 +2050,8 @@ func (q *queue) peek(ctx context.Context, shard QueueShard, opts peekOpts) ([]*o
 	items := make([]any, 0, len(allQueueItemIds))
 	missingQueueItems := make([]string, 0, len(allQueueItemIds))
 	for idx, itemId := range allQueueItemIds {
-		if potentiallyMissingItems[idx] == nil {
+		item := potentiallyMissingItems[idx]
+		if item == nil {
 			if itemId == nil {
 				return nil, fmt.Errorf("encountered nil queue item key in partition queue %q", opts.PartitionKey)
 			}
@@ -2058,7 +2063,7 @@ func (q *queue) peek(ctx context.Context, shard QueueShard, opts peekOpts) ([]*o
 
 			missingQueueItems = append(missingQueueItems, str)
 		} else {
-			items = append(items, potentiallyMissingItems[idx])
+			items = append(items, item)
 		}
 	}
 
@@ -2081,33 +2086,40 @@ func (q *queue) peek(ctx context.Context, shard QueueShard, opts peekOpts) ([]*o
 		}
 	}
 
-	now := q.clock.Now()
-	return util.ParallelDecode(items, func(val any) (*osqueue.QueueItem, error) {
+	return util.ParallelDecode(items, func(val any) (*osqueue.QueueItem, bool, error) {
 		if val == nil {
 			q.log.Error("nil item value in peek response", "partition", opts.PartitionKey)
-			return nil, nil
+			return nil, true, nil
 		}
 
 		str, ok := val.(string)
 		if !ok {
-			return nil, fmt.Errorf("non-string value in peek response: %T", val)
+			return nil, false, fmt.Errorf("non-string value in peek response: %T", val)
 		}
 
 		if str == "" {
-			return nil, fmt.Errorf("received empty string in decode queue item from peek")
+			return nil, false, fmt.Errorf("received empty string in decode queue item from peek")
 		}
 
 		qi := &osqueue.QueueItem{}
 		if err := json.Unmarshal(unsafe.Slice(unsafe.StringData(str), len(str)), qi); err != nil {
-			return nil, fmt.Errorf("error unmarshalling peeked queue item: %w", err)
+			return nil, false, fmt.Errorf("error unmarshalling peeked queue item: %w", err)
 		}
+
+		now := q.clock.Now()
 		if qi.IsLeased(now) {
+			metrics.IncrQueuePeekLeaseContentionCounter(ctx, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags:    map[string]any{"partition_id": opts.PartitionID, "queue_shard": shard.Name},
+			})
+
 			// Leased item, don't return.
-			return nil, nil
+			return nil, true, nil
 		}
+
 		// The nested osqueue.Item never has an ID set;  always re-set it
 		qi.Data.JobID = &qi.ID
-		return qi, nil
+		return qi, false, nil
 	})
 }
 
@@ -3179,25 +3191,25 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 	migrateIDs := map[uuid.UUID]bool{}
 
 	// Use parallel decoding as per Peek
-	partitions, err := util.ParallelDecode(encoded, func(val any) (*QueuePartition, error) {
+	partitions, err := util.ParallelDecode(encoded, func(val any) (*QueuePartition, bool, error) {
 		if val == nil {
 			q.log.Error("encountered nil partition item in pointer queue",
 				"encoded", encoded,
 				"missing", missingPartitions,
 				"key", partitionKey,
 			)
-			return nil, fmt.Errorf("encountered nil partition item in pointer queue %q", partitionKey)
+			return nil, false, fmt.Errorf("encountered nil partition item in pointer queue %q", partitionKey)
 		}
 
 		str, ok := val.(string)
 		if !ok {
-			return nil, fmt.Errorf("unknown type in partition peek: %T", val)
+			return nil, false, fmt.Errorf("unknown type in partition peek: %T", val)
 		}
 
 		item := &QueuePartition{}
 
 		if err := json.Unmarshal(unsafe.Slice(unsafe.StringData(str), len(str)), item); err != nil {
-			return nil, fmt.Errorf("error reading partition item: %w", err)
+			return nil, false, fmt.Errorf("error reading partition item: %w", err)
 		}
 		// Track the fn ID for partitions seen.  This allows us to do fast lookups of paused functions
 		// to prevent peeking/working on these items as an optimization.
@@ -3206,7 +3218,7 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 			fnIDs[*item.FunctionID] = false // default not paused
 			fnIDsMu.Unlock()
 		}
-		return item, nil
+		return item, false, nil
 	})
 	if err != nil {
 		return nil, fmt.Errorf("error decoding partitions: %w", err)
@@ -3248,14 +3260,14 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 				return nil, fmt.Errorf("unknown return type from mget fnMeta: %T", vals)
 			}
 
-			_, _ = util.ParallelDecode(vals, func(i any) (any, error) {
+			_, _ = util.ParallelDecode(vals, func(i any) (any, bool, error) {
 				str, ok := i.(string)
 				if !ok {
-					return nil, fmt.Errorf("unknown fnMeta type in partition peek: %T", i)
+					return nil, false, fmt.Errorf("unknown fnMeta type in partition peek: %T", i)
 				}
 				fnMeta := &FnMetadata{}
 				if err := json.Unmarshal(unsafe.Slice(unsafe.StringData(str), len(str)), fnMeta); err != nil {
-					return nil, fmt.Errorf("could not unmarshal fnMeta: %w", err)
+					return nil, false, fmt.Errorf("could not unmarshal fnMeta: %w", err)
 				}
 
 				fnIDsMu.Lock()
@@ -3265,7 +3277,7 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 				}
 				fnIDsMu.Unlock()
 
-				return nil, nil
+				return nil, true, nil
 			})
 		}
 	}

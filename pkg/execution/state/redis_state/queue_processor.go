@@ -183,7 +183,7 @@ func (q *queue) Run(ctx context.Context, f osqueue.RunFunc) error {
 	go q.runInstrumentation(ctx)
 
 	// start execution and shadow scan concurrently
-	eg := errgroup.Group{}
+	eg, ctx := errgroup.WithContext(ctx)
 
 	eg.Go(func() error {
 		return q.executionScan(ctx, f)
