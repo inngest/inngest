@@ -144,6 +144,10 @@ type Message struct {
 	Kind MessageKind `json:"kind"`
 	// Data represents the data in the message.
 	Data json.RawMessage `json:"data"`
+	// Metadata is optional data regarding the message contents.  This is used
+	// specifically to store the content-type and other data around streamed
+	// HTTP gateway responses.
+	Metadata json.RawMessage `json:"metadata,omitempty"`
 	// CreatedAt is the time that this message was created.
 	CreatedAt time.Time `json:"created_at"`
 
@@ -237,7 +241,7 @@ func (m Message) Topics() []Topic {
 	}
 
 	// Default to topic kinds of Run
-	return []Topic{Topic{
+	return []Topic{{
 		Kind:    TopicKindRun,
 		Name:    m.Topic,
 		Channel: m.Channel,
