@@ -130,7 +130,7 @@ type Function {
   name: String!
   slug: String!
   config: String!
-  configuration: FunctionConfiguration
+  configuration: FunctionConfiguration!
   concurrency: Int!
   triggers: [FunctionTrigger!]
   url: String!
@@ -172,7 +172,7 @@ type FunctionEvent {
 }
 
 type FunctionConfiguration {
-  cancellations: [CancellationConfiguration!]
+  cancellations: [CancellationConfiguration!]!
   retries: RetryConfiguration!
   priority: String
   eventsBatch: EventsBatchConfiguration
