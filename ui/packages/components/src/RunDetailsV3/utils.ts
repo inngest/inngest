@@ -73,7 +73,6 @@ export type PathCreator = {
 export type StepInfoType = {
   trace: Trace;
   runID: string;
-  result?: Result;
   pathCreator: PathCreator;
 };
 

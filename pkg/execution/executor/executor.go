@@ -1867,6 +1867,11 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 			}
 		}
 
+		// The timeout job is running on the queue and will Dequeue() itself. No need to continue.
+		if r.IsTimeout {
+			return cleanup()
+		}
+
 		// And dequeue the timeout job to remove unneeded work from the queue, etc.
 		if q, ok := e.queue.(redis_state.QueueManager); ok {
 			// timeout jobs are enqueued to the workflow partition (see handleGeneratorWaitForEvent)
@@ -1881,7 +1886,8 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 				ID:         queue.HashID(ctx, jobID),
 				FunctionID: md.ID.FunctionID,
 				Data: queue.Item{
-					Kind: queue.KindPause,
+					Kind:       queue.KindPause,
+					Identifier: sv2.V1FromMetadata(md),
 				},
 			})
 			if err != nil {

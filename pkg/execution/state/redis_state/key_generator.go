@@ -397,10 +397,10 @@ func (u queueKeyGenerator) BacklogSet(backlogID string) string {
 func (u queueKeyGenerator) ActiveCounter(scope string, scopeID string) string {
 	if scope == "" || scopeID == "" {
 		// this is a placeholder because passing an empty key into Lua will cause multi-slot key errors
-		return fmt.Sprintf("{%s}:active:-", u.queueDefaultKey)
+		return fmt.Sprintf("{%s}:v1:active:-", u.queueDefaultKey)
 	}
 
-	return fmt.Sprintf("{%s}:active:%s:%s", u.queueDefaultKey, scope, scopeID)
+	return fmt.Sprintf("{%s}:v1:active:%s:%s", u.queueDefaultKey, scope, scopeID)
 }
 
 func isEmptyULID(id ulid.ULID) bool {
@@ -411,10 +411,10 @@ func isEmptyULID(id ulid.ULID) bool {
 func (u queueKeyGenerator) ActiveRunsCounter(scope string, scopeID string) string {
 	if scope == "" || scopeID == "" {
 		// this is a placeholder because passing an empty key into Lua will cause multi-slot key errors
-		return fmt.Sprintf("{%s}:active-runs:-", u.queueDefaultKey)
+		return fmt.Sprintf("{%s}:v1:active-runs:-", u.queueDefaultKey)
 	}
 
-	return fmt.Sprintf("{%s}:active-runs:%s:%s", u.queueDefaultKey, scope, scopeID)
+	return fmt.Sprintf("{%s}:v1:active-runs:%s:%s", u.queueDefaultKey, scope, scopeID)
 }
 
 func (u queueKeyGenerator) RunActiveCounter(runID ulid.ULID) string {
@@ -429,10 +429,10 @@ func (u queueKeyGenerator) RunActiveCounter(runID ulid.ULID) string {
 func (u queueKeyGenerator) ActivePartitionRunsIndex(partitionID string) string {
 	if partitionID == "" {
 		// this is a placeholder because passing an empty key into Lua will cause multi-slot key errors
-		return fmt.Sprintf("{%s}:active-idx:runs:-", u.queueDefaultKey)
+		return fmt.Sprintf("{%s}:v1:active-idx:runs:-", u.queueDefaultKey)
 	}
 
-	return fmt.Sprintf("{%s}:active-idx:runs:%s", u.queueDefaultKey, partitionID)
+	return fmt.Sprintf("{%s}:v1:active-idx:runs:%s", u.queueDefaultKey, partitionID)
 }
 
 // BacklogMeta returns the key to the hash storing serialized QueueBacklog objects by ID.

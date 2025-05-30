@@ -60,18 +60,39 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 		return leaseID, err
 	})
 	if err != nil {
+		q.removeShadowContinue(ctx, shadowPart, false)
 		if errors.Is(err, ErrShadowPartitionAlreadyLeased) {
-			// contention
+			metrics.IncrQueueShadowPartitionLeaseContentionCounter(ctx, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags: map[string]any{
+					"queue_shard":  q.primaryQueueShard.Name,
+					"partition_id": shadowPart.PartitionID,
+				},
+			})
 			return nil
 		}
+		if errors.Is(err, ErrShadowPartitionNotFound) {
+			metrics.IncrQueueShadowPartitionGoneCounter(ctx, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags: map[string]any{
+					"queue_shard":  q.primaryQueueShard.Name,
+					"partition_id": shadowPart.PartitionID,
+				},
+			})
+			return nil
+		}
+		if errors.Is(err, ErrShadowPartitionPaused) {
+			return nil
+		}
+		return fmt.Errorf("error leasing shadow partition: %w", err)
 	}
 
 	if leaseID == nil {
 		return fmt.Errorf("missing shadow partition leaseID")
 	}
 
-	metrics.ActiveShadowScannerCount(ctx, 1, metrics.CounterOpt{PkgName: pkgName})
-	defer metrics.ActiveShadowScannerCount(ctx, -1, metrics.CounterOpt{PkgName: pkgName})
+	metrics.ActiveShadowScannerCount(ctx, 1, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name}})
+	defer metrics.ActiveShadowScannerCount(ctx, -1, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name}})
 
 	extendLeaseCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -200,6 +221,7 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 			opts := metrics.CounterOpt{
 				PkgName: pkgName,
 				Tags: map[string]any{
+					"queue_shard":  q.primaryQueueShard.Name,
 					"partition_id": shadowPart.PartitionID,
 				},
 			}
@@ -213,6 +235,7 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 				metrics.IncrQueueBacklogRefillConstraintCounter(ctx, metrics.CounterOpt{
 					PkgName: pkgName,
 					Tags: map[string]any{
+						"queue_shard":  q.primaryQueueShard.Name,
 						"partition_id": shadowPart.PartitionID,
 						"constraint":   res.Constraint.String(),
 					},
@@ -480,11 +503,11 @@ func (q *queue) addShadowContinue(ctx context.Context, p *QueueShadowPartition, 
 	// beyond capacity.
 	if ctr == 1 {
 		if len(q.shadowContinues) > consts.QueueShadowContinuationMaxPartitions {
-			metrics.IncrQueueShadowContinuationOpCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"op": "max_capacity"}})
+			metrics.IncrQueueShadowContinuationOpCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name, "op": "max_capacity"}})
 			return
 		}
 		if t, ok := q.shadowContinueCooldown[p.PartitionID]; ok && t.After(time.Now()) {
-			metrics.IncrQueueShadowContinuationOpCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"op": "cooldown"}})
+			metrics.IncrQueueShadowContinuationOpCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name, "op": "cooldown"}})
 			return
 		}
 
@@ -498,7 +521,7 @@ func (q *queue) addShadowContinue(ctx context.Context, p *QueueShadowPartition, 
 		// is higher.  This ensures that we always have the highest continuation
 		// count stored for queue processing.
 		q.shadowContinues[p.PartitionID] = shadowContinuation{shadowPart: p, count: ctr}
-		metrics.IncrQueueShadowContinuationOpCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"op": "added"}})
+		metrics.IncrQueueShadowContinuationOpCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name, "op": "added"}})
 	}
 }
 
@@ -513,7 +536,7 @@ func (q *queue) removeShadowContinue(ctx context.Context, p *QueueShadowPartitio
 	q.shadowContinuesLock.Lock()
 	defer q.shadowContinuesLock.Unlock()
 
-	metrics.IncrQueueShadowContinuationOpCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"op": "removed"}})
+	metrics.IncrQueueShadowContinuationOpCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name, "op": "removed"}})
 
 	delete(q.shadowContinues, p.PartitionID)
 
