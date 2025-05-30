@@ -279,6 +279,7 @@ func mergeWithDefaultFunction(overlay *inngest.Function) *inngest.Function {
 
 func mergeWithDefaultFunctionConfiguration(overlay *FunctionConfiguration) *FunctionConfiguration {
 	base := &FunctionConfiguration{
+		Cancellations: []*CancellationConfiguration{},
 		Retries: &RetryConfiguration{
 			Value:     4,
 			IsDefault: boolPtr(true),

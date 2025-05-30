@@ -140,7 +140,7 @@ type Function struct {
 	Name          string                 `json:"name"`
 	Slug          string                 `json:"slug"`
 	Config        string                 `json:"config"`
-	Configuration *FunctionConfiguration `json:"configuration,omitempty"`
+	Configuration *FunctionConfiguration `json:"configuration"`
 	Concurrency   int                    `json:"concurrency"`
 	Triggers      []*FunctionTrigger     `json:"triggers,omitempty"`
 	URL           string                 `json:"url"`
@@ -149,7 +149,7 @@ type Function struct {
 }
 
 type FunctionConfiguration struct {
-	Cancellations []*CancellationConfiguration `json:"cancellations,omitempty"`
+	Cancellations []*CancellationConfiguration `json:"cancellations"`
 	Retries       *RetryConfiguration          `json:"retries"`
 	Priority      *string                      `json:"priority,omitempty"`
 	EventsBatch   *EventsBatchConfiguration    `json:"eventsBatch,omitempty"`

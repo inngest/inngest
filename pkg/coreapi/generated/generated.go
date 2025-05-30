@@ -3071,7 +3071,7 @@ type Function {
   name: String!
   slug: String!
   config: String!
-  configuration: FunctionConfiguration # configuration is here?
+  configuration: FunctionConfiguration!
   concurrency: Int!
   triggers: [FunctionTrigger!]
   url: String!
@@ -3113,7 +3113,7 @@ type FunctionEvent {
 }
 
 type FunctionConfiguration {
-  cancellations: [CancellationConfiguration!]
+  cancellations: [CancellationConfiguration!]!
   retries: RetryConfiguration!
   priority: String
   eventsBatch: EventsBatchConfiguration
@@ -7315,11 +7315,14 @@ func (ec *executionContext) _Function_configuration(ctx context.Context, field g
 		return graphql.Null
 	}
 	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
 		return graphql.Null
 	}
 	res := resTmp.(*models.FunctionConfiguration)
 	fc.Result = res
-	return ec.marshalOFunctionConfiguration2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐFunctionConfiguration(ctx, field.Selections, res)
+	return ec.marshalNFunctionConfiguration2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐFunctionConfiguration(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_Function_configuration(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -7629,11 +7632,14 @@ func (ec *executionContext) _FunctionConfiguration_cancellations(ctx context.Con
 		return graphql.Null
 	}
 	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
 		return graphql.Null
 	}
 	res := resTmp.([]*models.CancellationConfiguration)
 	fc.Result = res
-	return ec.marshalOCancellationConfiguration2ᚕᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐCancellationConfigurationᚄ(ctx, field.Selections, res)
+	return ec.marshalNCancellationConfiguration2ᚕᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐCancellationConfigurationᚄ(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_FunctionConfiguration_cancellations(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -21491,6 +21497,9 @@ func (ec *executionContext) _Function(ctx context.Context, sel ast.SelectionSet,
 
 			out.Values[i] = ec._Function_configuration(ctx, field, obj)
 
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&invalids, 1)
+			}
 		case "concurrency":
 
 			out.Values[i] = ec._Function_concurrency(ctx, field, obj)
@@ -21561,6 +21570,9 @@ func (ec *executionContext) _FunctionConfiguration(ctx context.Context, sel ast.
 
 			out.Values[i] = ec._FunctionConfiguration_cancellations(ctx, field, obj)
 
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
 		case "retries":
 
 			out.Values[i] = ec._FunctionConfiguration_retries(ctx, field, obj)
@@ -24344,6 +24356,50 @@ func (ec *executionContext) marshalNBytes2ᚕstringᚄ(ctx context.Context, sel 
 	return ret
 }
 
+func (ec *executionContext) marshalNCancellationConfiguration2ᚕᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐCancellationConfigurationᚄ(ctx context.Context, sel ast.SelectionSet, v []*models.CancellationConfiguration) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNCancellationConfiguration2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐCancellationConfiguration(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
 func (ec *executionContext) marshalNCancellationConfiguration2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐCancellationConfiguration(ctx context.Context, sel ast.SelectionSet, v *models.CancellationConfiguration) graphql.Marshaler {
 	if v == nil {
 		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
@@ -24688,6 +24744,16 @@ func (ec *executionContext) marshalNFunction2ᚖgithubᚗcomᚋinngestᚋinngest
 		return graphql.Null
 	}
 	return ec._Function(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNFunctionConfiguration2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐFunctionConfiguration(ctx context.Context, sel ast.SelectionSet, v *models.FunctionConfiguration) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._FunctionConfiguration(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalNFunctionQuery2githubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐFunctionQuery(ctx context.Context, v interface{}) (models.FunctionQuery, error) {
@@ -25597,53 +25663,6 @@ func (ec *executionContext) marshalOBytes2ᚖstring(ctx context.Context, sel ast
 	return res
 }
 
-func (ec *executionContext) marshalOCancellationConfiguration2ᚕᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐCancellationConfigurationᚄ(ctx context.Context, sel ast.SelectionSet, v []*models.CancellationConfiguration) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	ret := make(graphql.Array, len(v))
-	var wg sync.WaitGroup
-	isLen1 := len(v) == 1
-	if !isLen1 {
-		wg.Add(len(v))
-	}
-	for i := range v {
-		i := i
-		fc := &graphql.FieldContext{
-			Index:  &i,
-			Result: &v[i],
-		}
-		ctx := graphql.WithFieldContext(ctx, fc)
-		f := func(i int) {
-			defer func() {
-				if r := recover(); r != nil {
-					ec.Error(ctx, ec.Recover(ctx, r))
-					ret = nil
-				}
-			}()
-			if !isLen1 {
-				defer wg.Done()
-			}
-			ret[i] = ec.marshalNCancellationConfiguration2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐCancellationConfiguration(ctx, sel, v[i])
-		}
-		if isLen1 {
-			f(i)
-		} else {
-			go f(i)
-		}
-
-	}
-	wg.Wait()
-
-	for _, e := range ret {
-		if e == graphql.Null {
-			return graphql.Null
-		}
-	}
-
-	return ret
-}
-
 func (ec *executionContext) unmarshalOConnectV1ConnectionStatus2ᚕgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐConnectV1ConnectionStatusᚄ(ctx context.Context, v interface{}) ([]models.ConnectV1ConnectionStatus, error) {
 	if v == nil {
 		return nil, nil
@@ -25870,13 +25889,6 @@ func (ec *executionContext) marshalOFunction2ᚖgithubᚗcomᚋinngestᚋinngest
 		return graphql.Null
 	}
 	return ec._Function(ctx, sel, v)
-}
-
-func (ec *executionContext) marshalOFunctionConfiguration2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐFunctionConfiguration(ctx context.Context, sel ast.SelectionSet, v *models.FunctionConfiguration) graphql.Marshaler {
-	if v == nil {
-		return graphql.Null
-	}
-	return ec._FunctionConfiguration(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalOFunctionEventType2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐFunctionEventType(ctx context.Context, v interface{}) (*models.FunctionEventType, error) {
