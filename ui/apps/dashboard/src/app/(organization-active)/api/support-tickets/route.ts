@@ -51,6 +51,42 @@ function createComponents(
   ];
 }
 
+//
+// brute force find or create a customer in plain to work around
+// upsert issues in the API when users change or re-use email addresses
+// across orgs
+const getCustomerId = async (email: string, name?: string) => {
+  const existing = await client.getCustomerByEmail({
+    email,
+  });
+
+  if (existing.data?.id) {
+    return existing.data.id;
+  }
+
+  const upserted = await client.upsertCustomer({
+    identifier: {
+      emailAddress: email,
+    },
+    onCreate: {
+      fullName: name || email,
+      email: {
+        email: email,
+        isVerified: true,
+      },
+    },
+    onUpdate: {
+      fullName: { value: name || email },
+      email: {
+        email: email,
+        isVerified: true,
+      },
+    },
+  });
+
+  return upserted.data?.customer.id;
+};
+
 export async function POST(req: Request) {
   const { userId } = auth();
   if (!userId) {
@@ -60,9 +96,7 @@ export async function POST(req: Request) {
   // In production validation of the request body might be necessary.
   const body = (await req.json()) as RequestBody;
 
-  console.log(body);
-
-  const upsertCustomerRes = await client.upsertCustomer({
+  const upsertedCustomer = await client.upsertCustomer({
     identifier: {
       emailAddress: body.user.email,
     },
@@ -84,18 +118,15 @@ export async function POST(req: Request) {
     },
   });
 
-  if (upsertCustomerRes.error) {
-    console.error(JSON.stringify(upsertCustomerRes.error));
-    return NextResponse.json({ error: upsertCustomerRes.error.message }, { status: 500 });
-  }
-
-  console.log(`Customer upserted ${upsertCustomerRes.data.customer.id}`);
+  const customerId = upsertedCustomer.data?.customer.id
+    ? upsertedCustomer.data.customer.id
+    : await getCustomerId(body.user.email, body.user.name);
 
   const thread: CreateThreadInput = {
     title: ticketTypeTitles[body.ticket.type],
     components: createComponents(body.ticket),
     customerIdentifier: {
-      customerId: upsertCustomerRes.data.customer.id,
+      customerId,
     },
     labelTypeIds: [labelTypeIDs[body.ticket.type]],
   };
@@ -114,8 +145,6 @@ export async function POST(req: Request) {
     console.error(JSON.stringify(threadRes.error));
     return NextResponse.json({ error: threadRes.error.message }, { status: 500 });
   }
-
-  console.log(`Thread created ${threadRes.data.id}`);
 
   return NextResponse.json(
     {
