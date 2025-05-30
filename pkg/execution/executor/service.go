@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/config"
@@ -18,16 +19,23 @@ import (
 	"github.com/inngest/inngest/pkg/execution/debounce"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
+	"github.com/inngest/inngest/pkg/expressions"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/pubsub"
 	"github.com/inngest/inngest/pkg/run"
 	"github.com/inngest/inngest/pkg/service"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
+	"github.com/oklog/ulid/v2"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/propagation"
 	"golang.org/x/sync/errgroup"
+)
+
+var (
+	nilULID = ulid.ULID{}
 )
 
 type Opt func(s *svc)
@@ -204,6 +212,8 @@ func (s *svc) Run(ctx context.Context) error {
 			err = s.handleDebounce(ctx, item)
 		case queue.KindScheduleBatch:
 			err = s.handleScheduledBatch(ctx, item)
+		case queue.KindCancel:
+			err = s.handleCancel(ctx, item)
 		case queue.KindQueueMigrate:
 			// NOOP:
 			// this kind don't work in the Dev server
@@ -427,6 +437,136 @@ func (s *svc) handleDebounce(ctx context.Context, item queue.Item) error {
 			}
 
 			_ = s.debouncer.DeleteDebounceItem(ctx, d.DebounceID, *di, d.AccountID)
+		}
+	}
+
+	return nil
+}
+
+func (s *svc) handleCancel(ctx context.Context, item queue.Item) error {
+	c := cqrs.Cancellation{}
+	if err := json.Unmarshal(item.Payload.(json.RawMessage), &c); err != nil {
+		return fmt.Errorf("error unmarshalling cancellation payload: %w", err)
+	}
+
+	l := s.log.With(
+		"kind", c.Kind.String(),
+		"cancellation", c,
+	)
+
+	switch c.Kind {
+	case enums.CancellationKindRun:
+		runID, err := ulid.Parse(c.TargetID)
+		if err != nil {
+			l.Error("invalid runID provided for cancellation", "error", err)
+			return fmt.Errorf("error parsing runID provided: %w", err)
+		}
+
+		id := sv2.ID{
+			RunID:      runID,
+			FunctionID: c.WorkspaceID,
+			Tenant: sv2.Tenant{
+				AccountID: c.AccountID,
+				EnvID:     c.WorkspaceID,
+				AppID:     c.AppID,
+			},
+		}
+
+		return s.exec.Cancel(ctx, id, execution.CancelRequest{
+			CancellationID: &c.ID,
+		})
+	case enums.CancellationKindBulkRun:
+		var from time.Time
+		if c.StartedAfter != nil {
+			from = *c.StartedAfter
+		}
+
+		// Iterate over queue items
+		for qi, err := range s.queue.ItemsByFunction(ctx, c.AccountID, c.WorkspaceID, c.FunctionID, from, c.StartedBefore) {
+			// NOTE: should this be returned here?
+			if err != nil {
+				return fmt.Errorf("error on retrieving queue item for cancellation: %w", err)
+			}
+
+			if c.If != nil {
+				st, err := s.state.Load(ctx, c.AccountID, qi.Data.Identifier.RunID)
+				if err != nil {
+					l.Error("error loading state for cancellation", "error", err, "queue_item", qi)
+					return fmt.Errorf("error loading state for cancellation: %w", err)
+				}
+
+				event := st.Event()
+				ok, _, err := expressions.EvaluateBoolean(ctx, *c.If, map[string]any{"event": event})
+				if err != nil {
+					// NOTE: log but don't exit here, since we want to conitnue
+					l.Error("error evaluating cancellation expression", "error", err, "queue_item", qi)
+					continue
+				}
+
+				// this queue item shouldn't be cancelled
+				if !ok {
+					continue
+				}
+			}
+
+			if err := s.exec.Cancel(ctx, sv2.IDFromV1(qi.Data.Identifier), execution.CancelRequest{
+				CancellationID: &c.ID,
+			}); err != nil {
+				return err
+			}
+		}
+	case enums.CancellationKindBacklog:
+		var from time.Time
+		if c.StartedAfter != nil {
+			from = *c.StartedAfter
+		}
+
+		// iterate over queue items
+		for qi, err := range s.queue.ItemsByBacklog(ctx, c.AccountID, c.TargetID, from, c.StartedBefore) {
+			if err != nil {
+				return fmt.Errorf("error on retrieving queue item for cancellation: %w", err)
+			}
+
+			// Check if it's a run
+			if qi.Data.Identifier.RunID != nilULID {
+				if c.If != nil {
+					st, err := s.state.Load(ctx, c.AccountID, qi.Data.Identifier.RunID)
+					if err != nil {
+						l.Error("error loading state for cancellation", "error", err, "queue_item", qi)
+						return fmt.Errorf("error loading state for cancellation: %w", err)
+					}
+
+					event := st.Event()
+					ok, _, err := expressions.EvaluateBoolean(ctx, *c.If, map[string]any{"event": event})
+					if err != nil {
+						// NOTE: log but don't exit here, since we want to conitnue
+						l.Error("error evaluating cancellation expression", "error", err, "queue_item", qi)
+						continue
+					}
+
+					// this queue item shouldn't be cancelled
+					if !ok {
+						continue
+					}
+				}
+
+				if err := s.exec.Cancel(ctx, sv2.IDFromV1(qi.Data.Identifier), execution.CancelRequest{
+					CancellationID: &c.ID,
+				}); err != nil {
+					return err
+				}
+
+				continue
+			}
+
+			// dequeue the item
+			if q, ok := s.queue.(redis_state.QueueManager); ok {
+				// TODO: find the shard
+				shard := redis_state.QueueShard{}
+				if err := q.Dequeue(ctx, shard, qi); err != nil {
+					return err
+				}
+			}
 		}
 	}
 
