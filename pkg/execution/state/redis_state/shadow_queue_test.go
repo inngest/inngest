@@ -765,6 +765,7 @@ func TestQueueShadowScannerContinuations(t *testing.T) {
 	ctx := context.Background()
 
 	defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+	kg := defaultShard.RedisClient.kg
 
 	clock := clockwork.NewFakeClock()
 
@@ -907,6 +908,117 @@ func TestQueueShadowScannerContinuations(t *testing.T) {
 		require.Equal(t, uint(2), cont.count)
 		require.Equal(t, sp1, *cont.shadowPart)
 		q.shadowContinuesLock.Unlock()
+
+		// Process and refill again, final item in backlog
+		err = q.processShadowPartition(ctx, &sp1, 1)
+		require.NoError(t, err)
+
+		// Expect continuation to be cleared out
+		q.shadowContinuesLock.Lock()
+		_, ok = q.shadowContinues[sp1.PartitionID]
+		require.False(t, ok)
+		q.shadowContinuesLock.Unlock()
+	})
+
+	t.Run("should remove continuation on missing shadow partition", func(t *testing.T) {
+		r.FlushAll()
+
+		q.shadowContinuesLock.Lock()
+		clear(q.shadowContinues)
+		clear(q.shadowContinueCooldown)
+		q.shadowContinuesLock.Unlock()
+
+		q.backlogRefillLimit = 1
+
+		addItem("test1", state.Identifier{
+			AccountID:   accountID1,
+			WorkspaceID: envID1,
+			WorkflowID:  fnID1,
+		}, at)
+
+		addItem("test2", state.Identifier{
+			AccountID:   accountID1,
+			WorkspaceID: envID1,
+			WorkflowID:  fnID1,
+		}, at)
+
+		addItem("test3", state.Identifier{
+			AccountID:   accountID2,
+			WorkspaceID: envID2,
+			WorkflowID:  fnID2,
+		}, at)
+
+		// Process and refill once
+		err := q.processShadowPartition(ctx, &sp1, 1)
+		require.NoError(t, err)
+
+		// Expect continuation to be set
+		q.shadowContinuesLock.Lock()
+		cont, ok := q.shadowContinues[sp1.PartitionID]
+		require.True(t, ok)
+		require.Equal(t, uint(2), cont.count)
+		require.Equal(t, sp1, *cont.shadowPart)
+		q.shadowContinuesLock.Unlock()
+
+		// Drop shadow partition
+		r.HDel(kg.ShadowPartitionMeta(), sp1.PartitionID)
+
+		// Process and refill again, final item in backlog
+		err = q.processShadowPartition(ctx, &sp1, 1)
+		require.NoError(t, err)
+
+		// Expect continuation to be cleared out
+		q.shadowContinuesLock.Lock()
+		_, ok = q.shadowContinues[sp1.PartitionID]
+		require.False(t, ok)
+		q.shadowContinuesLock.Unlock()
+	})
+
+	t.Run("should remove continuation on leased shadow partition", func(t *testing.T) {
+		r.FlushAll()
+
+		q.shadowContinuesLock.Lock()
+		clear(q.shadowContinues)
+		clear(q.shadowContinueCooldown)
+		q.shadowContinuesLock.Unlock()
+
+		q.backlogRefillLimit = 1
+
+		addItem("test1", state.Identifier{
+			AccountID:   accountID1,
+			WorkspaceID: envID1,
+			WorkflowID:  fnID1,
+		}, at)
+
+		addItem("test2", state.Identifier{
+			AccountID:   accountID1,
+			WorkspaceID: envID1,
+			WorkflowID:  fnID1,
+		}, at)
+
+		addItem("test3", state.Identifier{
+			AccountID:   accountID2,
+			WorkspaceID: envID2,
+			WorkflowID:  fnID2,
+		}, at)
+
+		// Process and refill once
+		err := q.processShadowPartition(ctx, &sp1, 1)
+		require.NoError(t, err)
+
+		// Expect continuation to be set
+		q.shadowContinuesLock.Lock()
+		cont, ok := q.shadowContinues[sp1.PartitionID]
+		require.True(t, ok)
+		require.Equal(t, uint(2), cont.count)
+		require.Equal(t, sp1, *cont.shadowPart)
+		q.shadowContinuesLock.Unlock()
+
+		// Simulate another process leasing the shadow partition
+		spCopy := sp1
+		leaseID, err := q.ShadowPartitionLease(ctx, &spCopy, 3*time.Minute)
+		require.NoError(t, err)
+		require.NotNil(t, leaseID)
 
 		// Process and refill again, final item in backlog
 		err = q.processShadowPartition(ctx, &sp1, 1)
