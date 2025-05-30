@@ -328,24 +328,6 @@ func IncrBacklogProcessedCounter(ctx context.Context, opts CounterOpt) {
 	})
 }
 
-func IncrBacklogRefilledCounter(ctx context.Context, value int64, opts CounterOpt) {
-	RecordCounterMetric(ctx, value, CounterOpt{
-		PkgName:     opts.PkgName,
-		MetricName:  "backlog_refilled_total",
-		Description: "The total number of backlog items that were added to the function partition",
-		Tags:        opts.Tags,
-	})
-}
-
-func IncrBacklogRefillLimitsCounter(ctx context.Context, opts CounterOpt) {
-	RecordCounterMetric(ctx, 1, CounterOpt{
-		PkgName:     opts.PkgName,
-		MetricName:  "backlog_refill_limit_total",
-		Description: "The total number of limtis hit when refilling a backlog",
-		Tags:        opts.Tags,
-	})
-}
-
 func IncrBacklogNormalizationScannedCounter(ctx context.Context, opts CounterOpt) {
 	RecordCounterMetric(ctx, 1, CounterOpt{
 		PkgName:     opts.PkgName,
@@ -416,6 +398,24 @@ func IncrQueueBacklogRefillConstraintCounter(ctx context.Context, opts CounterOp
 		PkgName:     opts.PkgName,
 		MetricName:  "queue_backlog_refill_contrainted_total",
 		Description: "The total number of times backlog was constrainted when attempt to refill",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrQueueShadowPartitionLeaseContentionCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "queue_shadow_partition_lease_contention_total",
+		Description: "The total number of times shadow partition lease has contention",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrQueueShadowPartitionGoneCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "queue_shadow_partition_gone_total",
+		Description: "The total number of times shadow worker didn't find a partition",
 		Tags:        opts.Tags,
 	})
 }
