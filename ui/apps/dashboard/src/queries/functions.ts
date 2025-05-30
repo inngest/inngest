@@ -214,6 +214,10 @@ const GetFunctionDocument = graphql(`
             limit
             period
           }
+          singleton {
+            key
+            mode
+          }
         }
       }
     }
