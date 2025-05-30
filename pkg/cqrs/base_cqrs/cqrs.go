@@ -92,6 +92,13 @@ func (w wrapper) LoadFunction(ctx context.Context, envID, fnID uuid.UUID) (*stat
 		return nil, err
 	}
 
+	app, err := w.GetAppByID(ctx, fn.AppID)
+	if err != nil {
+		return nil, err
+	}
+	// Append the app name as the user facing "app id"
+	def.AppID = app.Name
+
 	return &state.ExecutorFunction{
 		Function: def,
 		Paused:   false, // dev server does not support pausing
