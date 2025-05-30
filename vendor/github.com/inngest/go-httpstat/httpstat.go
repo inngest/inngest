@@ -27,14 +27,17 @@ type Result struct {
 	// DNS and connection Info
 	IsIPv6      bool
 	Addresses   []net.IPAddr
-	ConnectedTo net.Addr
+	ConnectedTo ConnectedTo
 
 	// The followings are timeline of request
 	NameLookup    time.Duration
 	Connect       time.Duration
 	Pretransfer   time.Duration
 	StartTransfer time.Duration
-	total         time.Duration
+	Total         time.Duration
+
+	// HostID is an optional host ID that made this request.
+	HostID string
 
 	t5 time.Time // need to be provided from outside
 
@@ -56,6 +59,12 @@ type Result struct {
 	isReused bool
 }
 
+type ConnectedTo struct {
+	IP   string
+	Port int
+	Zone string
+}
+
 func (r *Result) durations() map[string]time.Duration {
 	return map[string]time.Duration{
 		"DNSLookup":        r.DNSLookup,
@@ -68,7 +77,7 @@ func (r *Result) durations() map[string]time.Duration {
 		"Connect":       r.Connect,
 		"Pretransfer":   r.Connect,
 		"StartTransfer": r.StartTransfer,
-		"Total":         r.total,
+		"Total":         r.Total,
 	}
 }
 
@@ -87,7 +96,7 @@ func (r *Result) Format(s fmt.State, verb rune) {
 			fmt.Fprintf(&buf, "Server processing: %4d ms\n",
 				int(r.ServerProcessing/time.Millisecond))
 
-			if r.total > 0 {
+			if r.Total > 0 {
 				fmt.Fprintf(&buf, "Content transfer:  %4d ms\n\n",
 					int(r.contentTransfer/time.Millisecond))
 			} else {
@@ -103,9 +112,9 @@ func (r *Result) Format(s fmt.State, verb rune) {
 			fmt.Fprintf(&buf, "Start Transfer: %4d ms\n",
 				int(r.StartTransfer/time.Millisecond))
 
-			if r.total > 0 {
+			if r.Total > 0 {
 				fmt.Fprintf(&buf, "Total:          %4d ms\n",
-					int(r.total/time.Millisecond))
+					int(r.Total/time.Millisecond))
 			} else {
 				fmt.Fprintf(&buf, "Total:          %4s ms\n", "-")
 			}

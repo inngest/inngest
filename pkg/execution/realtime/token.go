@@ -20,6 +20,8 @@ type JWTClaims struct {
 	jwt.RegisteredClaims
 	Env    uuid.UUID `json:"env"`
 	Topics []Topic   `json:"topics"`
+	// Publish specifies whether this JWT has publishing capabilities.
+	Publish bool `json:"publish"`
 }
 
 func (j JWTClaims) AccountID() uuid.UUID {
@@ -35,7 +37,7 @@ func ValidateJWT(ctx context.Context, secret []byte, token string) (*JWTClaims, 
 	_, err := jwt.ParseWithClaims(
 		token,
 		claims,
-		func(token *jwt.Token) (interface{}, error) {
+		func(token *jwt.Token) (any, error) {
 			// Here, we could check if the token contains the signing key and
 			// verify whether the signing key is valid in order to auth the token,
 			// letting people use signing keys instead of pre-signed tokens.
@@ -89,6 +91,34 @@ func NewJWT(ctx context.Context, secret []byte, accountID, envID uuid.UUID, topi
 		},
 		Env:    envID,
 		Topics: topics,
+	})
+	signed, err := t.SignedString(secret)
+	if err != nil {
+		return "", fmt.Errorf("could not sign session token: %w", err)
+	}
+	return signed, nil
+}
+
+// NewPublishJWT creates a new JWT with publishing permissions, allowing authorization to the
+// publish endpoint.
+func NewPublishJWT(ctx context.Context, secret []byte, accountID, envID uuid.UUID) (string, error) {
+	now := time.Now()
+
+	id, err := ulid.New(ulid.Now(), rand.Reader)
+	if err != nil {
+		return "", fmt.Errorf("could not generate session token ID: %w", err)
+	}
+	t := jwt.NewWithClaims(jwt.SigningMethodHS256, JWTClaims{
+		RegisteredClaims: jwt.RegisteredClaims{
+			Issuer:    Issuer,
+			Subject:   accountID.String(),
+			ExpiresAt: jwt.NewNumericDate(now.Add(DefaultExpiry)),
+			IssuedAt:  jwt.NewNumericDate(now),
+			ID:        id.String(),
+		},
+		Env: envID,
+		// This must be true to publish.
+		Publish: true,
 	})
 	signed, err := t.SignedString(secret)
 	if err != nil {

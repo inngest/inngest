@@ -4,10 +4,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -96,63 +98,134 @@ func TestWebsocketPostStreamingMessage(t *testing.T) {
 
 	<-time.After(time.Second)
 
-	// Attempt to publish stream data to the websocket
-	data := "test please"
-
-	resp, err := http.Post(
-		s.URL+"/realtime/publish?channel=user:123&topic=ai",
-		"text/stream",
-		strings.NewReader(data),
-	)
-	require.NoError(t, err)
-	require.Equal(t, resp.StatusCode, 200)
-
 	//
 	// Track all messages received by the websocket.  This is a streaming
 	// request, so we should receive 3 messages: stream start, the stream chunk,
 	// and stream end.
 	//
 
-	contents := [][]byte{}
-	var counter int32
+	var (
+		counter  int32
+		contents = [][]byte{}
+		l        sync.Mutex
+	)
+
 	go func() {
 		for {
 			_, resp, err := c.Read(context.TODO())
 			require.NoError(t, err)
-			contents = append(contents, resp)
 			atomic.AddInt32(&counter, 1)
+			l.Lock()
+			contents = append(contents, resp)
+			l.Unlock()
+			fmt.Println("received", string(resp))
 		}
 	}()
 
-	require.Eventually(
-		t,
-		func() bool { return atomic.LoadInt32(&counter) == 3 },
-		3*time.Second,
-		time.Millisecond,
-	)
+	t.Run("manual publish", func(t *testing.T) {
+		// Attempt to publish stream data to the websocket
+		data := "test please"
 
-	// Assert that the first msg is a stream start, the last is a stream end,
-	// and we have our stream content in the middle.
-	var start, end Message
-	err = json.Unmarshal(contents[0], &start)
-	require.NoError(t, err)
-	err = json.Unmarshal(contents[2], &end)
-	require.NoError(t, err)
+		resp, err := http.Post(
+			s.URL+"/realtime/publish?channel=user:123&topic=ai",
+			"text/stream",
+			strings.NewReader(data),
+		)
+		require.NoError(t, err)
+		require.Equal(t, resp.StatusCode, 200)
 
-	var streamID string
-	err = json.Unmarshal(start.Data, &streamID)
-	require.NoError(t, err)
+		require.Eventually(
+			t,
+			func() bool { return atomic.LoadInt32(&counter) == 3 },
+			3*time.Second,
+			time.Millisecond,
+		)
 
-	require.EqualValues(t, streamingtypes.MessageKindDataStreamStart, start.Kind)
-	require.EqualValues(t, streamingtypes.MessageKindDataStreamEnd, end.Kind)
+		l.Lock()
+		defer l.Unlock()
 
-	byt, _ := json.Marshal(Chunk{
-		Kind:     string(streamingtypes.MessageKindDataStreamChunk),
-		StreamID: streamID,
-		Data:     data,
+		// Assert that the first msg is a stream start, the last is a stream end,
+		// and we have our stream content in the middle.
+		var start, end Message
+		err = json.Unmarshal(contents[0], &start)
+		require.NoError(t, err)
+		err = json.Unmarshal(contents[2], &end)
+		require.NoError(t, err)
+
+		var streamID string
+		err = json.Unmarshal(start.Data, &streamID)
+		require.NoError(t, err)
+
+		require.EqualValues(t, streamingtypes.MessageKindDataStreamStart, start.Kind)
+		require.EqualValues(t, streamingtypes.MessageKindDataStreamEnd, end.Kind)
+
+		byt, _ := json.Marshal(Chunk{
+			Kind:     string(streamingtypes.MessageKindDataStreamChunk),
+			StreamID: streamID,
+			Data:     data,
+		})
+
+		require.EqualValues(t, byt, contents[1])
 	})
 
-	require.EqualValues(t, byt, contents[1])
+	t.Run("TeeStreamReaderToAPI", func(t *testing.T) {
+		counter = 0
+		l.Lock()
+		contents = [][]byte{}
+		l.Unlock()
+
+		// Create a single server which will respond with content, eg. server-sent-events.
+		og := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.Header().Set("Content-Type", "text/event-stream")
+			w.Header().Set("Cache-Control", "no-cache")
+			w.Header().Set("Connection", "keep-alive")
+
+			// Simulate sending events (you can replace this with real data)
+			for i := range 5 {
+				fmt.Fprintf(w, "data: %s\n\n", fmt.Sprintf("Event %d", i))
+				time.Sleep(2 * time.Second)
+				w.(http.Flusher).Flush()
+			}
+		}))
+
+		// Create a new request which hits our test server, then tees this into
+		// the stream.
+		resp, err := http.Get(og.URL)
+		require.NoError(t, err)
+		read, err := TeeStreamReaderToAPI(resp.Body, s.URL+"/realtime/publish", TeeStreamOptions{
+			Channel: "user:123",
+			Topic:   "ai",
+			Token:   "test-token",
+			Metadata: map[string]any{
+				"content-type": "text/event-stream",
+			},
+		},
+		)
+		require.NoError(t, err)
+		byt, err := io.ReadAll(read)
+		require.NoError(t, err)
+		require.NotEmpty(t, byt)
+		resp.Body.Close()
+
+		require.Eventually(
+			t,
+			func() bool { return atomic.LoadInt32(&counter) == 7 },
+			3*time.Second,
+			time.Millisecond,
+		)
+
+		l.Lock()
+		defer l.Unlock()
+		// Assert that we had 7 messages:  stream start, 5 events, and stream end.
+		require.EqualValues(t, 7, len(contents))
+
+		// SSE
+		require.Contains(t, string(contents[1]), "data: Event 0")
+		require.Contains(t, string(contents[2]), "data: Event 1")
+		require.Contains(t, string(contents[3]), "data: Event 2")
+		require.Contains(t, string(contents[4]), "data: Event 3")
+		require.Contains(t, string(contents[5]), "data: Event 4")
+	})
 }
 
 func readMessageWithin(t *testing.T, c *websocket.Conn, dur time.Duration) *Message {
