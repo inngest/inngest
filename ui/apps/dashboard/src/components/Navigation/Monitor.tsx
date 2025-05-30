@@ -35,7 +35,7 @@ export default function Monitor({
       />
       <ClientFeatureFlag flag="events-pages">
         <MenuItem
-          href={getNavRoute(activeEnv, 'new-events')}
+          href={getNavRoute(activeEnv, 'events')}
           collapsed={collapsed}
           text="Events"
           icon={<EventLogsIcon className="h-[18px] w-[18px]" />}
