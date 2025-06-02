@@ -24,6 +24,8 @@ type TestAPI struct {
 	Queue              queue.Queue
 	Executor           execution.Executor
 	StateManager       statev2.RunService
+
+	ResetAll func()
 }
 
 type Options struct {
@@ -31,6 +33,7 @@ type Options struct {
 	Queue              queue.Queue
 	Executor           execution.Executor
 	StateManager       statev2.RunService
+	ResetAll           func()
 }
 
 func ShouldEnable() bool {
@@ -44,6 +47,7 @@ func New(o Options) http.Handler {
 		Queue:              o.Queue,
 		Executor:           o.Executor,
 		StateManager:       o.StateManager,
+		ResetAll:           o.ResetAll,
 	}
 
 	test.Get("/", func(writer http.ResponseWriter, request *http.Request) {
@@ -58,7 +62,14 @@ func New(o Options) http.Handler {
 
 	test.Get("/queue/active-counter", test.GetQueueActiveCounter)
 
+	test.Post("/reset", test.Reset)
+
 	return test
+}
+
+func (t *TestAPI) Reset(w http.ResponseWriter, r *http.Request) {
+	t.ResetAll()
+	_, _ = w.Write([]byte("ok"))
 }
 
 func (t *TestAPI) GetQueueSize(w http.ResponseWriter, r *http.Request) {
