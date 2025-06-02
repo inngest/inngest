@@ -55,6 +55,32 @@ export type AppsFilterV1 = {
   method?: InputMaybe<AppMethod>;
 };
 
+export type CancellationConfiguration = {
+  __typename?: 'CancellationConfiguration';
+  condition: Maybe<Scalars['String']>;
+  event: Scalars['String'];
+  timeout: Maybe<Scalars['String']>;
+};
+
+export type ConcurrencyConfiguration = {
+  __typename?: 'ConcurrencyConfiguration';
+  key: Maybe<Scalars['String']>;
+  limit: ConcurrencyLimitConfiguration;
+  scope: ConcurrencyScope;
+};
+
+export type ConcurrencyLimitConfiguration = {
+  __typename?: 'ConcurrencyLimitConfiguration';
+  isPlanLimit: Maybe<Scalars['Boolean']>;
+  value: Scalars['Int'];
+};
+
+export enum ConcurrencyScope {
+  Account = 'ACCOUNT',
+  Environment = 'ENVIRONMENT',
+  Function = 'FUNCTION'
+}
+
 export enum ConnectV1ConnectionStatus {
   Connected = 'CONNECTED',
   Disconnected = 'DISCONNECTED',
@@ -132,6 +158,12 @@ export type CreateAppInput = {
   url: Scalars['String'];
 };
 
+export type DebounceConfiguration = {
+  __typename?: 'DebounceConfiguration';
+  key: Maybe<Scalars['String']>;
+  period: Scalars['String'];
+};
+
 export type Event = {
   __typename?: 'Event';
   createdAt: Maybe<Scalars['Time']>;
@@ -162,6 +194,15 @@ export enum EventStatus {
   Running = 'RUNNING'
 }
 
+export type EventsBatchConfiguration = {
+  __typename?: 'EventsBatchConfiguration';
+  key: Maybe<Scalars['String']>;
+  /** The maximum number of events a batch can have. */
+  maxSize: Scalars['Int'];
+  /** How long to wait before running the function with the batch. */
+  timeout: Scalars['String'];
+};
+
 export type EventsQuery = {
   lastEventId?: InputMaybe<Scalars['ID']>;
   workspaceId?: Scalars['ID'];
@@ -173,11 +214,24 @@ export type Function = {
   appID: Scalars['String'];
   concurrency: Scalars['Int'];
   config: Scalars['String'];
+  configuration: Maybe<FunctionConfiguration>;
   id: Scalars['String'];
   name: Scalars['String'];
   slug: Scalars['String'];
   triggers: Maybe<Array<FunctionTrigger>>;
   url: Scalars['String'];
+};
+
+export type FunctionConfiguration = {
+  __typename?: 'FunctionConfiguration';
+  cancellations: Maybe<Array<CancellationConfiguration>>;
+  concurrency: Array<ConcurrencyConfiguration>;
+  debounce: Maybe<DebounceConfiguration>;
+  eventsBatch: Maybe<EventsBatchConfiguration>;
+  priority: Maybe<Scalars['String']>;
+  rateLimit: Maybe<RateLimitConfiguration>;
+  retries: RetryConfiguration;
+  throttle: Maybe<ThrottleConfiguration>;
 };
 
 export type FunctionEvent = {
@@ -195,6 +249,11 @@ export enum FunctionEventType {
   Failed = 'FAILED',
   Started = 'STARTED'
 }
+
+export type FunctionQuery = {
+  functionSlug: Scalars['String'];
+  workspaceId?: Scalars['ID'];
+};
 
 export type FunctionRun = {
   __typename?: 'FunctionRun';
@@ -403,6 +462,7 @@ export type Query = {
   apps: Array<App>;
   event: Maybe<Event>;
   events: Maybe<Array<Event>>;
+  functionBySlug: Maybe<Function>;
   functionRun: Maybe<FunctionRun>;
   functions: Maybe<Array<Function>>;
   run: Maybe<FunctionRunV2>;
@@ -432,6 +492,11 @@ export type QueryEventArgs = {
 
 export type QueryEventsArgs = {
   query: EventsQuery;
+};
+
+
+export type QueryFunctionBySlugArgs = {
+  query: FunctionQuery;
 };
 
 
@@ -480,9 +545,22 @@ export type QueryWorkerConnectionsArgs = {
   orderBy: Array<ConnectV1WorkerConnectionsOrderBy>;
 };
 
+export type RateLimitConfiguration = {
+  __typename?: 'RateLimitConfiguration';
+  key: Maybe<Scalars['String']>;
+  limit: Scalars['Int'];
+  period: Scalars['String'];
+};
+
 export type RerunFromStepInput = {
   input?: InputMaybe<Scalars['Bytes']>;
   stepID: Scalars['String'];
+};
+
+export type RetryConfiguration = {
+  __typename?: 'RetryConfiguration';
+  isDefault: Maybe<Scalars['Boolean']>;
+  value: Scalars['Int'];
 };
 
 export type RunHistoryCancel = {
@@ -720,6 +798,14 @@ export enum StreamType {
   Cron = 'CRON',
   Event = 'EVENT'
 }
+
+export type ThrottleConfiguration = {
+  __typename?: 'ThrottleConfiguration';
+  burst: Scalars['Int'];
+  key: Maybe<Scalars['String']>;
+  limit: Scalars['Int'];
+  period: Scalars['String'];
+};
 
 export type UpdateAppInput = {
   id: Scalars['String'];
