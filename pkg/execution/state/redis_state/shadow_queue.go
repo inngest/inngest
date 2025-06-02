@@ -291,6 +291,13 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 		}
 	}
 
+	metrics.IncrQueueShadowPartitionProcessedCounter(ctx, metrics.CounterOpt{
+		PkgName: pkgName,
+		Tags: map[string]any{
+			"queue_shard": q.primaryQueueShard.Name,
+		},
+	})
+
 	hasMoreBacklogs := totalCount > fullyProcessedBacklogs
 	if !hasMoreBacklogs {
 		// No more backlogs right now, we can continue the scan loop until new items are added
@@ -348,7 +355,12 @@ func (q *queue) scanShadowContinuations(ctx context.Context) error {
 				return err
 			}
 
-			metrics.IncrQueueShadowPartitionProcessedCounter(ctx, metrics.CounterOpt{PkgName: pkgName})
+			metrics.IncrQueueShadowPartitionProcessedCounter(ctx, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags: map[string]any{
+					"queue_shard": q.primaryQueueShard.Name,
+				},
+			})
 			return nil
 		})
 	}
