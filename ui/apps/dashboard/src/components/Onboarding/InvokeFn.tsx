@@ -202,7 +202,7 @@ export default function InvokeFn() {
               />
               <Button
                 appearance="outlined"
-                label="Skip; go to dashboard"
+                label="Skip to dashboard"
                 onClick={() => {
                   updateCompletedSteps(currentStepName, {
                     metadata: {
