@@ -214,7 +214,7 @@ export type Function = {
   appID: Scalars['String'];
   concurrency: Scalars['Int'];
   config: Scalars['String'];
-  configuration: Maybe<FunctionConfiguration>;
+  configuration: FunctionConfiguration;
   id: Scalars['String'];
   name: Scalars['String'];
   slug: Scalars['String'];
@@ -224,7 +224,7 @@ export type Function = {
 
 export type FunctionConfiguration = {
   __typename?: 'FunctionConfiguration';
-  cancellations: Maybe<Array<CancellationConfiguration>>;
+  cancellations: Array<CancellationConfiguration>;
   concurrency: Array<ConcurrencyConfiguration>;
   debounce: Maybe<DebounceConfiguration>;
   eventsBatch: Maybe<EventsBatchConfiguration>;
