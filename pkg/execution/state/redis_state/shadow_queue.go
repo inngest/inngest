@@ -25,6 +25,8 @@ const (
 	ShadowPartitionPeekMax         = int64(300) // same as PartitionPeekMax for now
 	ShadowPartitionPeekMinBacklogs = int64(10)
 	ShadowPartitionPeekMaxBacklogs = int64(100)
+
+	ShadowPartitionRequeueExtendedDuration = 5 * time.Second
 )
 
 // shadowWorker runs a blocking process that listens to item being pushed into the
@@ -315,7 +317,8 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 	q.addShadowContinue(ctx, shadowPart, continuationCount+1)
 
 	// Clear out current lease
-	err = q.ShadowPartitionRequeue(ctx, shadowPart, *leaseID, nil)
+	requeueAt := q.clock.Now().Add(ShadowPartitionRequeueExtendedDuration)
+	err = q.ShadowPartitionRequeue(ctx, shadowPart, *leaseID, &requeueAt)
 	if err != nil {
 		return fmt.Errorf("could not requeue shadow partition: %w", err)
 	}
