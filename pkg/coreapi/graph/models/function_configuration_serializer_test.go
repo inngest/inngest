@@ -235,16 +235,10 @@ func TestToFunctionConfiguration(t *testing.T) {
 			if err != nil {
 				t.Errorf("Invalid function configuration for test %v: %v", tt.name, err)
 			}
-			//if got := ToFunctionConfiguration(tt.args.fn, tt.args.planConcurrencyLimit); !reflect.DeepEqual(got, tt.expected) {
-			//	gotJson, _ := json.MarshalIndent(got, "", "  ")
-			//	wantJson, _ := json.MarshalIndent(tt.expected, "", "  ")
-			//	t.Errorf("ToFunctionConfiguration() = \n%s, expected \n%s", gotJson, wantJson)
-			//}
-			got := ToFunctionConfiguration(tt.fn, tt.planConcurrencyLimit)
-			gotJson, _ := json.MarshalIndent(got, "", "  ")
-			wantJson, _ := json.MarshalIndent(tt.expected, "", "  ")
-			if !reflect.DeepEqual(gotJson, wantJson) {
-				t.Errorf("ToFunctionConfiguration() = \n%s, expected \n%s", gotJson, wantJson)
+			if got := ToFunctionConfiguration(tt.fn, tt.planConcurrencyLimit); !reflect.DeepEqual(got, tt.expected) {
+				gotJson, _ := json.MarshalIndent(got, "", "  ")
+				expectedJson, _ := json.MarshalIndent(tt.expected, "", "  ")
+				t.Errorf("ToFunctionConfiguration() = \n%s, expected \n%s", gotJson, expectedJson)
 			}
 		})
 	}
