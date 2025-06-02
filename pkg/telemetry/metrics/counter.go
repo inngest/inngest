@@ -420,6 +420,15 @@ func IncrQueueShadowPartitionGoneCounter(ctx context.Context, opts CounterOpt) {
 	})
 }
 
+func IncrQueueShadowPartitionProcessedCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "queue_shadow_partition_processed_total",
+		Description: "The total number of shadow partition processed",
+		Tags:        opts.Tags,
+	})
+}
+
 func IncrQueuePeekLeaseContentionCounter(ctx context.Context, opts CounterOpt) {
 	RecordCounterMetric(ctx, 1, CounterOpt{
 		PkgName:     opts.PkgName,

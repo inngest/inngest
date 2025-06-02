@@ -858,13 +858,12 @@ func TestQueueShadowScannerContinuations(t *testing.T) {
 
 		fmt.Println("waiting for message")
 
-		select {
-		case msg := <-qspc:
-			require.Equal(t, sp1, *msg.sp)
-			require.Equal(t, uint(1), msg.continuationCount)
-		default:
-			require.Fail(t, "expected message to be added")
-		}
+		// check that it's scanned and gone
+		q.shadowContinuesLock.Lock()
+		defer q.shadowContinuesLock.Unlock()
+
+		_, ok = q.shadowContinues[sp1.PartitionID]
+		require.False(t, ok)
 	})
 
 	t.Run("should increase continuations when more items are available", func(t *testing.T) {

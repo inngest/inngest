@@ -17,6 +17,7 @@ import (
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
+	"golang.org/x/sync/errgroup"
 )
 
 const (
@@ -24,6 +25,8 @@ const (
 	ShadowPartitionPeekMax         = int64(300) // same as PartitionPeekMax for now
 	ShadowPartitionPeekMinBacklogs = int64(10)
 	ShadowPartitionPeekMaxBacklogs = int64(100)
+
+	ShadowPartitionRequeueExtendedDuration = 5 * time.Second
 )
 
 // shadowWorker runs a blocking process that listens to item being pushed into the
@@ -290,6 +293,13 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 		}
 	}
 
+	metrics.IncrQueueShadowPartitionProcessedCounter(ctx, metrics.CounterOpt{
+		PkgName: pkgName,
+		Tags: map[string]any{
+			"queue_shard": q.primaryQueueShard.Name,
+		},
+	})
+
 	hasMoreBacklogs := totalCount > fullyProcessedBacklogs
 	if !hasMoreBacklogs {
 		// No more backlogs right now, we can continue the scan loop until new items are added
@@ -307,7 +317,8 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 	q.addShadowContinue(ctx, shadowPart, continuationCount+1)
 
 	// Clear out current lease
-	err = q.ShadowPartitionRequeue(ctx, shadowPart, *leaseID, nil)
+	requeueAt := q.clock.Now().Add(ShadowPartitionRequeueExtendedDuration)
+	err = q.ShadowPartitionRequeue(ctx, shadowPart, *leaseID, &requeueAt)
 	if err != nil {
 		return fmt.Errorf("could not requeue shadow partition: %w", err)
 	}
@@ -320,28 +331,50 @@ type shadowPartitionChanMsg struct {
 	continuationCount uint
 }
 
-func (q *queue) scanShadowContinuations(ctx context.Context, qspc chan shadowPartitionChanMsg) error {
-	q.shadowContinuesLock.Lock()
-	defer q.shadowContinuesLock.Unlock()
-
-	// If we have continued partitions, process those immediately.
-	for _, c := range q.shadowContinues {
-		qspc <- shadowPartitionChanMsg{
-			sp:                c.shadowPart,
-			continuationCount: c.count,
-		}
+func (q *queue) scanShadowContinuations(ctx context.Context) error {
+	if !q.runMode.ShadowContinuations {
+		return nil
 	}
 
-	return nil
+	if mrand.Float64() <= q.runMode.ShadowContinuationSkipProbability {
+		return nil
+	}
+
+	eg := errgroup.Group{}
+	q.shadowContinuesLock.Lock()
+	for _, c := range q.shadowContinues {
+		cont := c
+		eg.Go(func() error {
+			sp := cont.shadowPart
+
+			if err := q.processShadowPartition(ctx, sp, c.count+1); err != nil {
+				if err == ErrShadowPartitionLeaseNotFound {
+					q.removeShadowContinue(ctx, sp, false)
+					return nil
+				}
+				if !errors.Is(err, context.Canceled) {
+					q.log.Error("error processing shadow partition", "error", err, "continue", true)
+				}
+				return err
+			}
+
+			metrics.IncrQueueShadowPartitionProcessedCounter(ctx, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags: map[string]any{
+					"queue_shard": q.primaryQueueShard.Name,
+				},
+			})
+			return nil
+		})
+	}
+	q.shadowContinuesLock.Unlock()
+	return eg.Wait()
 }
 
 func (q *queue) scanShadowPartitions(ctx context.Context, until time.Time, qspc chan shadowPartitionChanMsg) error {
 	// check whether continuations are enabled and apply chance of skipping continuations in this iteration
-	if q.runMode.ShadowContinuations && mrand.Float64() > q.runMode.ShadowContinuationSkipProbability {
-		// If there are shadow continuations, process those immediately.
-		if err := q.scanShadowContinuations(ctx, qspc); err != nil {
-			return fmt.Errorf("error scanning shadow continuations: %w", err)
-		}
+	if err := q.scanShadowContinuations(ctx); err != nil {
+		return fmt.Errorf("error scanning shadow continuations: %w", err)
 	}
 
 	shouldScanAccount := q.runMode.AccountShadowPartition && mrand.Intn(100) <= q.runMode.AccountShadowPartitionWeight
