@@ -58,6 +58,8 @@ func New(o Options) http.Handler {
 
 	test.Get("/queue/active-counter", test.GetQueueActiveCounter)
 
+	test.Delete("/queue/reset-account-counters", test.ClearQueueActiveCounter)
+
 	return test
 }
 
@@ -276,4 +278,37 @@ func (t *TestAPI) CancelFunctionRun(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(200)
 	_, _ = w.Write([]byte("OK"))
+}
+
+func (t *TestAPI) ClearQueueActiveCounter(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+	accountId := r.FormValue("accountId")
+
+	parsedAccountId, err := uuid.Parse(accountId)
+	if err != nil {
+		logger.StdlibLogger(ctx).Error("failed to parse account ID", "err", err)
+		w.WriteHeader(400)
+		_, _ = w.Write([]byte("Invalid accountId"))
+		return
+	}
+
+	shard, err := t.QueueShardSelector(ctx, parsedAccountId, nil)
+	if err != nil {
+		logger.StdlibLogger(ctx).Error("failed to select queue shard", "err", err)
+		w.WriteHeader(500)
+		_, _ = w.Write([]byte("Internal server error"))
+		return
+	}
+
+	rc := shard.RedisClient.Client()
+
+	if _, err := rc.Do(ctx, rc.B().Flushdb().Build()).ToString(); err != nil {
+		logger.StdlibLogger(ctx).Error("failed to flush redis", "err", err)
+		w.WriteHeader(500)
+		_, _ = w.Write([]byte("Internal server error"))
+		return
+	}
+
+	w.WriteHeader(200)
+	_, _ = w.Write([]byte("Counters reset successfully"))
 }

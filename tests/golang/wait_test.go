@@ -488,6 +488,23 @@ func TestManyWaitInvalidExpressions(t *testing.T) {
 	}, 5*time.Second, 100*time.Millisecond)
 }
 
+func resetAccountCounters(t *testing.T, ctx context.Context, c *client.Client, accountId uuid.UUID) {
+	reqUrl, err := url.Parse(c.APIHost + "/test/queue/reset-account-counters")
+	require.NoError(t, err)
+
+	q := reqUrl.Query()
+	q.Add("accountId", accountId.String())
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodDelete, reqUrl.String()+"?"+q.Encode(), nil)
+	require.NoError(t, err)
+
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	require.Equal(t, http.StatusOK, resp.StatusCode)
+}
+
 func TestWaitForEvent_Timeout(t *testing.T) {
 	ctx := context.Background()
 	r := require.New(t)
@@ -569,6 +586,8 @@ func TestWaitForEvent_Timeout(t *testing.T) {
 		return r
 	}
 
+	resetAccountCounters(t, ctx, c, consts.DevServerAccountID)
+
 	// Trigger the main function
 	_, err = inngestClient.Send(ctx, &event.Event{Name: evtName})
 	r.NoError(err)
@@ -608,7 +627,7 @@ func TestWaitForEvent_Timeout(t *testing.T) {
 
 		require.EventuallyWithT(t, func(collect *assert.CollectT) {
 			counters := getActiveCounters(consts.DevServerAccountID, uuid.MustParse(fnId))
-			assert.Equal(t, testapi.TestActiveCounters{
+			assert.Equal(collect, testapi.TestActiveCounters{
 				ActiveAccount:      0,
 				ActiveFunction:     0,
 				ActiveRunsAccount:  0,
