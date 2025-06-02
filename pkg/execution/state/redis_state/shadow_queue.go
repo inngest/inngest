@@ -17,6 +17,7 @@ import (
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
+	"golang.org/x/sync/errgroup"
 )
 
 const (
@@ -321,18 +322,34 @@ type shadowPartitionChanMsg struct {
 }
 
 func (q *queue) scanShadowContinuations(ctx context.Context, qspc chan shadowPartitionChanMsg) error {
-	q.shadowContinuesLock.Lock()
-	defer q.shadowContinuesLock.Unlock()
-
-	// If we have continued partitions, process those immediately.
-	for _, c := range q.shadowContinues {
-		qspc <- shadowPartitionChanMsg{
-			sp:                c.shadowPart,
-			continuationCount: c.count,
-		}
+	if !q.runMode.ShadowContinuations {
+		return nil
 	}
 
-	return nil
+	eg := errgroup.Group{}
+	q.shadowContinuesLock.Lock()
+	for _, c := range q.shadowContinues {
+		cont := c
+		eg.Go(func() error {
+			sp := cont.shadowPart
+
+			if err := q.processShadowPartition(ctx, sp, c.count+1); err != nil {
+				if err == ErrShadowPartitionLeaseNotFound {
+					q.removeShadowContinue(ctx, sp, false)
+					return nil
+				}
+				if !errors.Is(err, context.Canceled) {
+					q.log.Error("error processing shadow partition", "error", err, "continue", true)
+				}
+				return err
+			}
+
+			metrics.IncrQueueShadowPartitionProcessedCounter(ctx, metrics.CounterOpt{PkgName: pkgName})
+			return nil
+		})
+	}
+	q.shadowContinuesLock.Unlock()
+	return eg.Wait()
 }
 
 func (q *queue) scanShadowPartitions(ctx context.Context, until time.Time, qspc chan shadowPartitionChanMsg) error {
