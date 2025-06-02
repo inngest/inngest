@@ -321,8 +321,12 @@ type shadowPartitionChanMsg struct {
 	continuationCount uint
 }
 
-func (q *queue) scanShadowContinuations(ctx context.Context, qspc chan shadowPartitionChanMsg) error {
+func (q *queue) scanShadowContinuations(ctx context.Context) error {
 	if !q.runMode.ShadowContinuations {
+		return nil
+	}
+
+	if mrand.Float64() <= q.runMode.ShadowContinuationSkipProbability {
 		return nil
 	}
 
@@ -354,11 +358,8 @@ func (q *queue) scanShadowContinuations(ctx context.Context, qspc chan shadowPar
 
 func (q *queue) scanShadowPartitions(ctx context.Context, until time.Time, qspc chan shadowPartitionChanMsg) error {
 	// check whether continuations are enabled and apply chance of skipping continuations in this iteration
-	if q.runMode.ShadowContinuations && mrand.Float64() > q.runMode.ShadowContinuationSkipProbability {
-		// If there are shadow continuations, process those immediately.
-		if err := q.scanShadowContinuations(ctx, qspc); err != nil {
-			return fmt.Errorf("error scanning shadow continuations: %w", err)
-		}
+	if err := q.scanShadowContinuations(ctx); err != nil {
+		return fmt.Errorf("error scanning shadow continuations: %w", err)
 	}
 
 	shouldScanAccount := q.runMode.AccountShadowPartition && mrand.Intn(100) <= q.runMode.AccountShadowPartitionWeight
