@@ -1608,6 +1608,15 @@ func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error 
 				l.Error("could not requeue item to backlog after hitting limit", "error", err, "item", *item, "key", key)
 				return fmt.Errorf("could not requeue to backlog: %w", err)
 			}
+
+			metrics.IncrRequeueExistingToBacklogCounter(ctx, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags: map[string]any{
+					"queue_shard":  p.queue.primaryQueueShard.Name,
+					"partition_id": item.FunctionID.String(),
+					"status":       "throttled",
+				},
+			})
 		}
 
 		return nil
@@ -1656,6 +1665,15 @@ func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error 
 				l.Error("could not requeue item to backlog after hitting limit", "error", err, "item", *item, "key", key)
 				return fmt.Errorf("could not requeue to backlog: %w", err)
 			}
+
+			metrics.IncrRequeueExistingToBacklogCounter(ctx, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags: map[string]any{
+					"queue_shard":  p.queue.primaryQueueShard.Name,
+					"partition_id": item.FunctionID.String(),
+					"status":       status,
+				},
+			})
 		}
 
 		return fmt.Errorf("concurrency hit: %w", errProcessStopIterator)
@@ -1688,6 +1706,15 @@ func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error 
 				l.Error("could not requeue item to backlog after hitting limit", "error", err, "item", *item, "key", key)
 				return fmt.Errorf("could not requeue to backlog: %w", err)
 			}
+
+			metrics.IncrRequeueExistingToBacklogCounter(ctx, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags: map[string]any{
+					"queue_shard":  p.queue.primaryQueueShard.Name,
+					"partition_id": item.FunctionID.String(),
+					"status":       "custom_key_concurrency_limit",
+				},
+			})
 		}
 		return nil
 	case ErrQueueItemNotFound:
