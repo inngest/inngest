@@ -16,6 +16,22 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+const (
+	NormalizeAccountPeekMax   = int64(30)
+	NormalizePartitionPeekMax = int64(100)
+	NormalizeBacklogPeekMax   = int64(300) // same as ShadowPartitionPeekMax
+
+	// BacklogNormalizeAsyncLimit determines the minimum number of items required in an outdated backlog
+	// to require an async normalize job. For small backlogs, the added QPS may not be worth it and we should normalize JIT.
+	BacklogNormalizeAsyncLimit = 100
+
+	// BacklogRefillHardLimit sets the maximum number of items that can be refilled in a single backlogRefill operation.
+	BacklogRefillHardLimit = int64(1000)
+
+	// BacklogNormalizeHardLimit sets the batch size of items to be reenqueued into the appropriate backlogs durign normalization
+	BacklogNormalizeHardLimit = int64(1000)
+)
+
 var (
 	errBacklogNormalizationLeaseExpired     = fmt.Errorf("backlog normalization lease expired")
 	errBacklogAlreadyLeasedForNormalization = fmt.Errorf("backlog already leased for normalization")
