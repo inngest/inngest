@@ -3,7 +3,6 @@ package golang
 import (
 	"context"
 	"fmt"
-	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"net/http"
 	"net/url"
 	"sync/atomic"
