@@ -2,7 +2,6 @@ package redis_state
 
 import (
 	"context"
-	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -41,21 +40,6 @@ const (
 	PartitionSelectionMax = int64(100)
 	PartitionPeekMax      = PartitionSelectionMax * 3
 	AccountPeekMax        = int64(30)
-
-	AbsoluteShadowPartitionPeekMax int64 = 10 * ShadowPartitionPeekMaxBacklogs
-	NormalizeAccountPeekMax              = int64(30)
-	NormalizePartitionPeekMax            = int64(100)
-	NormalizeBacklogPeekMax              = int64(300) // same as ShadowPartitionPeekMax
-
-	// BacklogNormalizeAsyncLimit determines the minimum number of items required in an outdated backlog
-	// to require an async normalize job. For small backlogs, the added QPS may not be worth it and we should normalize JIT.
-	BacklogNormalizeAsyncLimit = 100
-
-	// BacklogRefillHardLimit sets the maximum number of items that can be refilled in a single backlogRefill operation.
-	BacklogRefillHardLimit = int64(1000)
-
-	// BacklogNormalizeHardLimit sets the batch size of items to be reenqueued into the appropriate backlogs durign normalization
-	BacklogNormalizeHardLimit = int64(1000)
 )
 
 const (
@@ -86,7 +70,7 @@ const (
 	// NOTE: This is the maximum latency introduced into concurrnecy limited partitions in the
 	//       worst case.
 	PartitionConcurrencyLimitRequeueExtension = 5 * time.Second
-	PartitionThrottleLimitRequeueExtension    = 1 * time.Second
+	PartitionThrottleLimitRequeueExtension    = 2 * time.Second
 	PartitionPausedRequeueExtension           = 24 * time.Hour
 	PartitionLookahead                        = time.Second
 
@@ -148,15 +132,6 @@ var (
 	ErrPartitionPaused               = fmt.Errorf("partition is paused")
 	ErrConfigAlreadyLeased           = fmt.Errorf("config scanner already leased")
 	ErrConfigLeaseExceedsLimits      = fmt.Errorf("config lease duration exceeds the maximum of %d seconds", int(ConfigLeaseMax.Seconds()))
-
-	ErrShadowPartitionAlreadyLeased               = fmt.Errorf("shadow partition already leased")
-	ErrShadowPartitionLeaseNotFound               = fmt.Errorf("shadow partition lease not found")
-	ErrShadowPartitionNotFound                    = fmt.Errorf("shadow partition not found")
-	ErrBacklogNotFound                            = fmt.Errorf("backlog not found")
-	ErrShadowPartitionPaused                      = fmt.Errorf("shadow partition refill is disabled")
-	ErrShadowPartitionBacklogPeekMaxExceedsLimits = fmt.Errorf("shadow partition backlog peek exceeded the maximum limit of %d", ShadowPartitionPeekMaxBacklogs)
-	ErrShadowPartitionPeekMaxExceedsLimits        = fmt.Errorf("shadow partition peek exceeded the maximum limit of %d", ShadowPartitionPeekMax)
-	ErrShadowPartitionAccountPeekMaxExceedsLimits = fmt.Errorf("account peek with shadow partitions exceeded the maximum limit of %d", ShadowPartitionAccountPeekMax)
 
 	ErrPartitionConcurrencyLimit = fmt.Errorf("at partition concurrency limit")
 	ErrAccountConcurrencyLimit   = fmt.Errorf("at account concurrency limit")
@@ -2767,84 +2742,6 @@ func (q *queue) Requeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 	default:
 		return fmt.Errorf("unknown response requeueing item: %v (%T)", status, status)
 	}
-}
-
-func (q *queue) ShadowPartitionLease(ctx context.Context, sp *QueueShadowPartition, duration time.Duration) (*ulid.ULID, error) {
-	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "ShadowPartitionLease"), redis_telemetry.ScopeQueue)
-
-	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
-		return nil, fmt.Errorf("unsupported queue shard kind for ShadowPartitionLease: %s", q.primaryQueueShard.Kind)
-	}
-
-	now := q.clock.Now()
-	leaseExpiry := now.Add(duration)
-	leaseID, err := ulid.New(ulid.Timestamp(leaseExpiry), rand.Reader)
-	if err != nil {
-		return nil, fmt.Errorf("could not generate leaseID: %w", err)
-	}
-
-	sp.LeaseID = &leaseID
-
-	accountID := uuid.Nil
-	if sp.AccountID != nil {
-		accountID = *sp.AccountID
-	}
-
-	keys := []string{
-		q.primaryQueueShard.RedisClient.kg.ShadowPartitionMeta(),
-		q.primaryQueueShard.RedisClient.kg.GlobalShadowPartitionSet(),
-		q.primaryQueueShard.RedisClient.kg.GlobalAccountShadowPartitions(),
-		q.primaryQueueShard.RedisClient.kg.AccountShadowPartitions(accountID),
-	}
-	args, err := StrSlice([]any{
-		sp.PartitionID,
-		accountID,
-		leaseID,
-		now.UnixMilli(),
-		leaseExpiry.UnixMilli(),
-	})
-	if err != nil {
-		return nil, fmt.Errorf("could not serialize args: %w", err)
-	}
-
-	status, err := scripts["queue/shadowPartitionLease"].Exec(
-		redis_telemetry.WithScriptName(ctx, "shadowPartitionLease"),
-		q.primaryQueueShard.RedisClient.unshardedRc,
-		keys,
-		args,
-	).AsInt64()
-	if err != nil {
-		return nil, fmt.Errorf("error leasing shadow partition: %w", err)
-	}
-	switch status {
-	case 0:
-		return &leaseID, nil
-	case -1:
-		return nil, ErrShadowPartitionNotFound
-	case -2:
-		return nil, ErrShadowPartitionAlreadyLeased
-	case -3:
-		return nil, ErrShadowPartitionPaused
-	default:
-		return nil, fmt.Errorf("unknown response leasing shadow partition: %v (%T)", status, status)
-	}
-}
-
-func (q *queue) peekGlobalShadowPartitionAccounts(ctx context.Context, sequential bool, until time.Time, limit int64) ([]uuid.UUID, error) {
-	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
-		return nil, fmt.Errorf("unsupported queue shard kind for peekGlobalShadowPartitionAccounts: %s", q.primaryQueueShard.Kind)
-	}
-
-	rc := q.primaryQueueShard.RedisClient
-
-	p := peeker[QueueBacklog]{
-		q:                      q,
-		opName:                 "peekGlobalShadowPartitionAccounts",
-		max:                    ShadowPartitionAccountPeekMax,
-		isMillisecondPrecision: true,
-	}
-
-	return p.peekUUIDPointer(ctx, rc.kg.GlobalAccountShadowPartitions(), sequential, until, limit)
 }
 
 func (q *queue) peekGlobalNormalizeAccounts(ctx context.Context, until time.Time, limit int64) ([]uuid.UUID, error) {
