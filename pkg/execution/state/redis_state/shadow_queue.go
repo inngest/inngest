@@ -848,3 +848,50 @@ func (q *queue) peekGlobalShadowPartitionAccounts(ctx context.Context, sequentia
 
 	return p.peekUUIDPointer(ctx, rc.kg.GlobalAccountShadowPartitions(), sequential, until, limit)
 }
+
+func newShadowContinuation() *shadowCont {
+	return &shadowCont{
+		continues: map[string]shadowContinuation{},
+		cooldown:  map[string]time.Time{},
+		limit:     0,
+	}
+}
+
+// shadowCont represents the continuation for shadow partitions
+type shadowCont struct {
+	sync.Mutex
+
+	continues map[string]shadowContinuation
+	cooldown  map[string]time.Time
+	limit     uint
+}
+
+func (sc *shadowCont) Add() {}
+
+func (sc *shadowCont) Remove(id string, cooldown bool) {
+	sc.Lock()
+	defer sc.Unlock()
+
+	delete(sc.continues, id)
+
+	if cooldown {
+		// Add a cooldown, preventing this partition from being added as a continuation
+		// for a given period of time.
+		//
+		// Note that this isn't shared across replicas;  cooldowns
+		// only exist in the current replica.
+		sc.cooldown[id] = time.Now().Add(consts.QueueShadowContinuationCooldownPeriod)
+	}
+}
+
+func (sc *shadowCont) Continuations() {}
+
+func (sc *shadowCont) IsWithinLimit(ctr uint) bool {
+	return ctr >= sc.limit
+}
+
+// shadowContinuation is the equivalent of continuation for shadow partitions
+type shadowContinuation struct {
+	shadowPart *QueueShadowPartition
+	count      uint
+}

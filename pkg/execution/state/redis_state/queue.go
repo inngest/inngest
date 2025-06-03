@@ -425,7 +425,9 @@ func WithQueueContinuationLimit(limit uint) QueueOpt {
 // sequential steps cause hints in the queue to continue executing the same shadow partition.
 func WithQueueShadowContinuationLimit(limit uint) QueueOpt {
 	return func(q *queue) {
-		q.shadowContinuationLimit = limit
+		if q.shadowContinues != nil {
+			q.shadowContinues.limit = limit
+		}
 	}
 }
 
@@ -651,17 +653,14 @@ func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 		shadowPartitionProcessCount: func(ctx context.Context, acctID uuid.UUID) int {
 			return 5
 		},
-		itemIndexer:             QueueItemIndexerFunc,
-		backoffFunc:             backoff.DefaultBackoff,
-		clock:                   clockwork.NewRealClock(),
-		continuesLock:           &sync.Mutex{},
-		continues:               map[string]continuation{},
-		continueCooldown:        map[string]time.Time{},
-		continuationLimit:       consts.DefaultQueueContinueLimit,
-		shadowContinuesLock:     &sync.Mutex{},
-		shadowContinuationLimit: consts.DefaultQueueContinueLimit,
-		shadowContinues:         map[string]shadowContinuation{},
-		shadowContinueCooldown:  map[string]time.Time{},
+		itemIndexer:       QueueItemIndexerFunc,
+		backoffFunc:       backoff.DefaultBackoff,
+		clock:             clockwork.NewRealClock(),
+		continuesLock:     &sync.Mutex{},
+		continues:         map[string]continuation{},
+		continueCooldown:  map[string]time.Time{},
+		continuationLimit: consts.DefaultQueueContinueLimit,
+		shadowContinues:   newShadowContinuation(),
 		// instrumentation
 		instrumentBacklogResult: func(ctx context.Context, backlog *QueueBacklog, result *BacklogRefillResult) {},
 		normalizeRefreshItemCustomConcurrencyKeys: func(ctx context.Context, item *osqueue.QueueItem, existingKeys []state.CustomConcurrency, shadowPartition *QueueShadowPartition) ([]state.CustomConcurrency, error) {
@@ -824,14 +823,11 @@ type queue struct {
 	continuesLock     *sync.Mutex
 	continuationLimit uint
 
-	shadowContinues         map[string]shadowContinuation
-	shadowContinueCooldown  map[string]time.Time
-	shadowContinuesLock     *sync.Mutex
-	shadowContinuationLimit uint
-	shadowPeekMin           int64
-	shadowPeekMax           int64
-	backlogRefillLimit      int64
-	backlogNormalizeLimit   int64
+	shadowContinues       *shadowCont
+	shadowPeekMin         int64
+	shadowPeekMax         int64
+	backlogRefillLimit    int64
+	backlogNormalizeLimit int64
 
 	normalizeRefreshItemCustomConcurrencyKeys NormalizeRefreshItemCustomConcurrencyKeysFn
 	normalizeRefreshItemThrottle              NormalizeRefreshItemThrottleFn
@@ -884,12 +880,6 @@ type continuation struct {
 	partition *QueuePartition
 	// count is stored and incremented each time the partition is enqueued.
 	count uint
-}
-
-// shadowContinuation is the equivalent of continuation for shadow partitions
-type shadowContinuation struct {
-	shadowPart *QueueShadowPartition
-	count      uint
 }
 
 // processItem references the queue partition and queue item to be processed by a worker.
