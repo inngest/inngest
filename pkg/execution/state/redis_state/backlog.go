@@ -14,6 +14,10 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
+var (
+	ErrBacklogNotFound = fmt.Errorf("backlog not found")
+)
+
 type CustomConcurrencyLimit struct {
 	Mode                enums.ConcurrencyMode  `json:"m"`
 	Scope               enums.ConcurrencyScope `json:"s"`
