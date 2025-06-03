@@ -23,8 +23,11 @@ export default async function FunctionDashboardPage() {
   }
 
   return (
-    <div>
-      <FunctionConfiguration configuration={data.functionBySlug.configuration} />
+    <div className="grid" style={{ gridTemplateColumns: '1fr 1fr 1fr 432px' }}>
+      <div style={{ gridColumn: 'span 3 / span 3' }}></div>
+      <div>
+        <FunctionConfiguration configuration={data.functionBySlug.configuration} />
+      </div>
     </div>
   );
 }
