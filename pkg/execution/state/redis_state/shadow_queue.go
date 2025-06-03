@@ -144,7 +144,7 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 	limit := ShadowPartitionPeekMaxBacklogs
 
 	// Scan a little further into the future
-	refillUntil := q.clock.Now().Truncate(time.Second).Add(2 * PartitionLookahead)
+	refillUntil := q.clock.Now().Truncate(time.Millisecond).Add(2 * PartitionLookahead)
 
 	// Pick a random backlog offset every time
 	sequential := false
