@@ -120,12 +120,11 @@ func TestQueueRefillBacklog(t *testing.T) {
 
 		// Run indexes should be updated
 		{
-			runActiveCount, err := r.Get(kg.ActiveCounter("run", runID.String()))
+			itemIsMember, err := r.SIsMember(kg.ActiveSet("run", runID.String()), qi.ID)
 			require.NoError(t, err)
+			require.True(t, itemIsMember)
 
-			require.Equal(t, "1", runActiveCount)
-
-			isMember, err := r.SIsMember(kg.ActivePartitionRunsIndex(fnID.String()), runID.String())
+			isMember, err := r.SIsMember(kg.ActiveRunsSet("p", fnID.String()), runID.String())
 			require.NoError(t, err)
 			require.True(t, isMember)
 		}
@@ -1593,27 +1592,35 @@ func TestRefillConstraints(t *testing.T) {
 			}
 
 			if testCase.currentValues.accountActive > 0 {
-				key := kg.ActiveCounter("account", accountID1.String())
-				_, err = r.Incr(key, testCase.currentValues.accountActive)
-				require.NoError(t, err)
+				for i := 1; i <= testCase.currentValues.accountActive; i++ {
+					key := kg.ActiveSet("account", accountID1.String())
+					_, err = r.SAdd(key, fmt.Sprintf("item%d", i))
+					require.NoError(t, err)
+				}
 			}
 
 			if testCase.currentValues.functionActive > 0 {
-				key := kg.ActiveCounter("p", fnID1.String())
-				_, err = r.Incr(key, testCase.currentValues.functionActive)
-				require.NoError(t, err)
+				for i := 1; i <= testCase.currentValues.functionActive; i++ {
+					key := kg.ActiveSet("p", fnID1.String())
+					_, err = r.SAdd(key, fmt.Sprintf("item%d", i))
+					require.NoError(t, err)
+				}
 			}
 
 			if testCase.currentValues.customConcurrencyKey1Active > 0 {
-				key := kg.ActiveCounter("custom", testCase.knobs.customConcurrencyKey1.Key)
-				_, err = r.Incr(key, testCase.currentValues.customConcurrencyKey1Active)
-				require.NoError(t, err)
+				for i := 1; i <= testCase.currentValues.customConcurrencyKey1Active; i++ {
+					key := kg.ActiveSet("custom", testCase.knobs.customConcurrencyKey1.Key)
+					_, err = r.SAdd(key, fmt.Sprintf("item%d", i))
+					require.NoError(t, err)
+				}
 			}
 
 			if testCase.currentValues.customConcurrencyKey2Active > 0 {
-				key := kg.ActiveCounter("custom", testCase.knobs.customConcurrencyKey2.Key)
-				_, err = r.Incr(key, testCase.currentValues.customConcurrencyKey2Active)
-				require.NoError(t, err)
+				for i := 1; i <= testCase.currentValues.customConcurrencyKey2Active; i++ {
+					key := kg.ActiveSet("custom", testCase.knobs.customConcurrencyKey2.Key)
+					_, err = r.SAdd(key, fmt.Sprintf("item%d", i))
+					require.NoError(t, err)
+				}
 			}
 
 			testThrottle := testCase.knobs.throttle

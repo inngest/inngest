@@ -1263,18 +1263,17 @@ func TestQueueLease(t *testing.T) {
 			kg := q.primaryQueueShard.RedisClient.kg
 			// Run indexes should be updated
 			{
-				runActiveCount, err := r.Get(kg.ActiveCounter("run", runID.String()))
+				itemIsMember, err := r.SIsMember(kg.ActiveSet("run", runID.String()), item.ID)
 				require.NoError(t, err)
+				require.True(t, itemIsMember)
 
-				require.Equal(t, "1", runActiveCount)
-
-				isMember, err := r.SIsMember(kg.ActivePartitionRunsIndex(fnID.String()), runID.String())
+				isMember, err := r.SIsMember(kg.ActiveRunsSet("p", fnID.String()), runID.String())
 				require.NoError(t, err)
 				require.True(t, isMember)
 
-				activeRunCounterAccount, err := r.Get(kg.ActiveRunsCounter("account", accountID.String()))
+				accountIsMember, err := r.SIsMember(kg.ActiveRunsSet("account", accountID.String()), runID.String())
 				require.NoError(t, err)
-				require.Equal(t, "1", activeRunCounterAccount)
+				require.True(t, accountIsMember)
 			}
 		})
 
@@ -2535,8 +2534,8 @@ func TestQueueDequeue(t *testing.T) {
 			kg := q.primaryQueueShard.RedisClient.kg
 			// Run indexes should be updated
 
-			require.False(t, r.Exists(kg.ActiveCounter("run", runID.String())))
-			require.False(t, r.Exists(kg.ActivePartitionRunsIndex(fnID.String())))
+			require.False(t, r.Exists(kg.ActiveSet("run", runID.String())))
+			require.False(t, r.Exists(kg.ActiveRunsSet("p", fnID.String())))
 		})
 
 		t.Run("It should work if the item is not leased (eg. deletions)", func(t *testing.T) {
@@ -2710,8 +2709,8 @@ func TestQueueRequeue(t *testing.T) {
 		t.Run("run indexes are updated on requeue to partition", func(t *testing.T) {
 			kg := q.primaryQueueShard.RedisClient.kg
 
-			require.False(t, r.Exists(kg.ActivePartitionRunsIndex(item.FunctionID.String())))
-			require.False(t, r.Exists(kg.ActiveCounter("run", runID.String())))
+			require.False(t, r.Exists(kg.ActiveRunsSet("p", item.FunctionID.String())))
+			require.False(t, r.Exists(kg.ActiveSet("run", runID.String())))
 		})
 
 		t.Run("It should not update the partition's earliest time, if later", func(t *testing.T) {
@@ -5926,12 +5925,11 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 			require.True(t, hasMember(t, r, kg.Concurrency("account", accountId.String()), qi.ID))
 			require.True(t, hasMember(t, r, kg.Concurrency("p", fnPart.Queue()), qi.ID))
 
-			runActiveCount, err := r.Get(kg.ActiveCounter("run", runID.String()))
+			itemIsMember, err := r.SIsMember(kg.ActiveSet("run", runID.String()), qi.ID)
 			require.NoError(t, err)
+			require.True(t, itemIsMember)
 
-			require.Equal(t, "1", runActiveCount)
-
-			isMember, err := r.SIsMember(kg.ActivePartitionRunsIndex(fnID.String()), runID.String())
+			isMember, err := r.SIsMember(kg.ActiveRunsSet("p", fnID.String()), runID.String())
 			require.NoError(t, err)
 			require.True(t, isMember)
 
@@ -5957,8 +5955,8 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 			require.False(t, hasMember(t, r, shadowPartition.inProgressKey(kg), qi.ID), remainingMembers)
 			require.False(t, hasMember(t, r, shadowPartition.accountInProgressKey(kg), qi.ID))
 
-			require.False(t, r.Exists(kg.ActiveCounter("run", runID.String())))
-			require.False(t, r.Exists(kg.ActivePartitionRunsIndex(fnID.String())))
+			require.False(t, r.Exists(kg.ActiveSet("run", runID.String())))
+			require.False(t, r.Exists(kg.ActiveRunsSet("p", fnID.String())))
 
 			// expect old accounting to be updated
 			// TODO Do we actually want to update previous accounting?
@@ -6509,12 +6507,15 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 		require.NotEmpty(t, shadowPartition.PartitionID)
 		require.Len(t, shadowPartition.Concurrency.CustomConcurrencyKeys, 0)
 
-		runActiveCount, err := r.Get(kg.ActiveCounter("run", runID.String()))
+		itemIsMember, err := r.SIsMember(kg.ActiveSet("run", runID.String()), qi.ID)
 		require.NoError(t, err)
+		require.True(t, itemIsMember)
 
-		require.Equal(t, "2", runActiveCount)
+		itemIsMember, err = r.SIsMember(kg.ActiveSet("run", runID.String()), qi2.ID)
+		require.NoError(t, err)
+		require.True(t, itemIsMember)
 
-		isMember, err := r.SIsMember(kg.ActivePartitionRunsIndex(fnID.String()), runID.String())
+		isMember, err := r.SIsMember(kg.ActiveRunsSet("p", fnID.String()), runID.String())
 		require.NoError(t, err)
 		require.True(t, isMember)
 
@@ -6528,12 +6529,15 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 		err = q.Requeue(ctx, defaultShard, qi, requeueFor)
 		require.NoError(t, err)
 
-		runActiveCount, err = r.Get(kg.ActiveCounter("run", runID.String()))
+		itemIsMember, err = r.SIsMember(kg.ActiveSet("run", runID.String()), qi.ID)
 		require.NoError(t, err)
+		require.False(t, itemIsMember)
 
-		require.Equal(t, "1", runActiveCount)
+		itemIsMember, err = r.SIsMember(kg.ActiveSet("run", runID.String()), qi2.ID)
+		require.NoError(t, err)
+		require.True(t, itemIsMember)
 
-		isMember, err = r.SIsMember(kg.ActivePartitionRunsIndex(fnID.String()), runID.String())
+		isMember, err = r.SIsMember(kg.ActiveRunsSet("p", fnID.String()), runID.String())
 		require.NoError(t, err)
 		require.True(t, isMember)
 
@@ -6541,11 +6545,12 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 		// Requeue final active item, expect indexes to be cleared out
 		//
 
-		err = q.Requeue(ctx, defaultShard, qi, requeueFor.Add(time.Hour))
+		err = q.Requeue(ctx, defaultShard, qi2, requeueFor.Add(time.Hour))
 		require.NoError(t, err)
 
-		require.False(t, r.Exists(kg.ActiveCounter("run", runID.String())))
-		require.False(t, r.Exists(kg.ActivePartitionRunsIndex(fnID.String())))
+		runSetExists := r.Exists(kg.ActiveSet("run", runID.String()))
+		require.False(t, runSetExists)
+		require.False(t, r.Exists(kg.ActiveRunsSet("p", fnID.String())))
 	})
 }
 
@@ -7144,7 +7149,6 @@ func TestQueueActiveCounters(t *testing.T) {
 	kg := defaultShard.RedisClient.kg
 
 	enqueueToBacklog := false
-	drainCounters := false
 
 	clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Minute))
 	q := NewQueue(
@@ -7157,25 +7161,8 @@ func TestQueueActiveCounters(t *testing.T) {
 			return false
 		}),
 		WithDisableLeaseChecksForSystemQueues(false),
-		WithKeyQueuesDrainActiveCounters(func(ctx context.Context, acctID uuid.UUID) bool {
-			return drainCounters
-		}),
 	)
 	ctx := context.Background()
-
-	intVal := func(key string) int {
-		if !r.Exists(key) {
-			return 0
-		}
-
-		val, err := r.Get(key)
-		require.NoError(t, err)
-
-		num, err := strconv.Atoi(val)
-		require.NoError(t, err)
-
-		return num
-	}
 
 	scard := func(key string) int {
 		if !r.Exists(key) {
@@ -7228,11 +7215,11 @@ func TestQueueActiveCounters(t *testing.T) {
 
 			refillUntil := at.Add(time.Minute)
 
-			require.Equal(t, 0, scard(kg.ActivePartitionRunsIndex(shadowPart.PartitionID)))
-			require.Equal(t, 0, intVal(kg.ActiveRunsCounter("account", accountID.String())))
-			require.Equal(t, 0, intVal(kg.RunActiveCounter(runID)))
-			require.Equal(t, 0, intVal(kg.ActiveCounter("p", fnID.String())))
-			require.Equal(t, 0, intVal(kg.ActiveCounter("account", accountID.String())))
+			require.Equal(t, 0, scard(kg.ActiveRunsSet("p", shadowPart.PartitionID)))
+			require.Equal(t, 0, scard(kg.ActiveRunsSet("account", accountID.String())))
+			require.Equal(t, 0, scard(kg.RunActiveSet(runID)))
+			require.Equal(t, 0, scard(kg.ActiveSet("p", fnID.String())))
+			require.Equal(t, 0, scard(kg.ActiveSet("account", accountID.String())))
 
 			require.Empty(t, i.RefilledFrom)
 			require.Zero(t, i.RefilledAt)
@@ -7243,11 +7230,11 @@ func TestQueueActiveCounters(t *testing.T) {
 
 			require.Equal(t, 1, res.Refilled)
 
-			require.Equal(t, 1, scard(kg.ActivePartitionRunsIndex(shadowPart.PartitionID)))
-			require.Equal(t, 1, intVal(kg.ActiveRunsCounter("account", accountID.String())))
-			require.Equal(t, 1, intVal(kg.RunActiveCounter(runID)))
-			require.Equal(t, 1, intVal(kg.ActiveCounter("p", fnID.String())))
-			require.Equal(t, 1, intVal(kg.ActiveCounter("account", accountID.String())))
+			require.Equal(t, 1, scard(kg.ActiveRunsSet("p", shadowPart.PartitionID)))
+			require.Equal(t, 1, scard(kg.ActiveRunsSet("account", accountID.String())))
+			require.Equal(t, 1, scard(kg.RunActiveSet(runID)))
+			require.Equal(t, 1, scard(kg.ActiveSet("p", fnID.String())))
+			require.Equal(t, 1, scard(kg.ActiveSet("account", accountID.String())))
 
 			currentItemStr := r.HGet(kg.QueueItem(), i.ID)
 			require.NoError(t, json.Unmarshal([]byte(currentItemStr), &i))
@@ -7259,22 +7246,22 @@ func TestQueueActiveCounters(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, leaseID)
 
-			require.Equal(t, 1, scard(kg.ActivePartitionRunsIndex(shadowPart.PartitionID)))
-			require.Equal(t, 1, intVal(kg.ActiveRunsCounter("account", accountID.String())))
-			require.Equal(t, 1, intVal(kg.RunActiveCounter(runID)))
-			require.Equal(t, 1, intVal(kg.ActiveCounter("p", fnID.String())))
-			require.Equal(t, 1, intVal(kg.ActiveCounter("account", accountID.String())))
+			require.Equal(t, 1, scard(kg.ActiveRunsSet("p", shadowPart.PartitionID)))
+			require.Equal(t, 1, scard(kg.ActiveRunsSet("account", accountID.String())))
+			require.Equal(t, 1, scard(kg.RunActiveSet(runID)))
+			require.Equal(t, 1, scard(kg.ActiveSet("p", fnID.String())))
+			require.Equal(t, 1, scard(kg.ActiveSet("account", accountID.String())))
 
 			// requeue to backlog
 			requeueAt := clock.Now().Add(time.Minute)
 			enqueueToBacklog = true
 			require.NoError(t, q.Requeue(ctx, defaultShard, i, requeueAt))
 
-			require.Equal(t, 0, scard(kg.ActivePartitionRunsIndex(shadowPart.PartitionID)))
-			require.Equal(t, 0, intVal(kg.ActiveRunsCounter("account", accountID.String())))
-			require.Equal(t, 0, intVal(kg.RunActiveCounter(runID)))
-			require.Equal(t, 0, intVal(kg.ActiveCounter("p", fnID.String())))
-			require.Equal(t, 0, intVal(kg.ActiveCounter("account", accountID.String())))
+			require.Equal(t, 0, scard(kg.ActiveRunsSet("p", shadowPart.PartitionID)))
+			require.Equal(t, 0, scard(kg.ActiveRunsSet("account", accountID.String())))
+			require.Equal(t, 0, scard(kg.RunActiveSet(runID)))
+			require.Equal(t, 0, scard(kg.ActiveSet("p", fnID.String())))
+			require.Equal(t, 0, scard(kg.ActiveSet("account", accountID.String())))
 		})
 
 		t.Run("from backlog, dequeue", func(t *testing.T) {
@@ -7290,11 +7277,11 @@ func TestQueueActiveCounters(t *testing.T) {
 
 			refillUntil := at.Add(time.Minute)
 
-			require.Equal(t, 0, scard(kg.ActivePartitionRunsIndex(shadowPart.PartitionID)))
-			require.Equal(t, 0, intVal(kg.ActiveRunsCounter("account", accountID.String())))
-			require.Equal(t, 0, intVal(kg.RunActiveCounter(runID)))
-			require.Equal(t, 0, intVal(kg.ActiveCounter("p", fnID.String())))
-			require.Equal(t, 0, intVal(kg.ActiveCounter("account", accountID.String())))
+			require.Equal(t, 0, scard(kg.ActiveRunsSet("p", shadowPart.PartitionID)))
+			require.Equal(t, 0, scard(kg.ActiveRunsSet("account", accountID.String())))
+			require.Equal(t, 0, scard(kg.RunActiveSet(runID)))
+			require.Equal(t, 0, scard(kg.ActiveSet("p", fnID.String())))
+			require.Equal(t, 0, scard(kg.ActiveSet("account", accountID.String())))
 
 			require.Empty(t, i.RefilledFrom)
 			require.Zero(t, i.RefilledAt)
@@ -7305,11 +7292,11 @@ func TestQueueActiveCounters(t *testing.T) {
 
 			require.Equal(t, 1, res.Refilled)
 
-			require.Equal(t, 1, scard(kg.ActivePartitionRunsIndex(shadowPart.PartitionID)))
-			require.Equal(t, 1, intVal(kg.ActiveRunsCounter("account", accountID.String())))
-			require.Equal(t, 1, intVal(kg.RunActiveCounter(runID)))
-			require.Equal(t, 1, intVal(kg.ActiveCounter("p", fnID.String())))
-			require.Equal(t, 1, intVal(kg.ActiveCounter("account", accountID.String())))
+			require.Equal(t, 1, scard(kg.ActiveRunsSet("p", shadowPart.PartitionID)))
+			require.Equal(t, 1, scard(kg.ActiveRunsSet("account", accountID.String())))
+			require.Equal(t, 1, scard(kg.RunActiveSet(runID)))
+			require.Equal(t, 1, scard(kg.ActiveSet("p", fnID.String())))
+			require.Equal(t, 1, scard(kg.ActiveSet("account", accountID.String())))
 
 			currentItemStr := r.HGet(kg.QueueItem(), i.ID)
 			require.NoError(t, json.Unmarshal([]byte(currentItemStr), &i))
@@ -7321,20 +7308,20 @@ func TestQueueActiveCounters(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, leaseID)
 
-			require.Equal(t, 1, scard(kg.ActivePartitionRunsIndex(shadowPart.PartitionID)))
-			require.Equal(t, 1, intVal(kg.ActiveRunsCounter("account", accountID.String())))
-			require.Equal(t, 1, intVal(kg.RunActiveCounter(runID)))
-			require.Equal(t, 1, intVal(kg.ActiveCounter("p", fnID.String())))
-			require.Equal(t, 1, intVal(kg.ActiveCounter("account", accountID.String())))
+			require.Equal(t, 1, scard(kg.ActiveRunsSet("p", shadowPart.PartitionID)))
+			require.Equal(t, 1, scard(kg.ActiveRunsSet("account", accountID.String())))
+			require.Equal(t, 1, scard(kg.RunActiveSet(runID)))
+			require.Equal(t, 1, scard(kg.ActiveSet("p", fnID.String())))
+			require.Equal(t, 1, scard(kg.ActiveSet("account", accountID.String())))
 
 			// dequeue
 			require.NoError(t, q.Dequeue(ctx, defaultShard, i))
 
-			require.Equal(t, 0, scard(kg.ActivePartitionRunsIndex(shadowPart.PartitionID)))
-			require.Equal(t, 0, intVal(kg.ActiveRunsCounter("account", accountID.String())))
-			require.Equal(t, 0, intVal(kg.RunActiveCounter(runID)))
-			require.Equal(t, 0, intVal(kg.ActiveCounter("p", fnID.String())))
-			require.Equal(t, 0, intVal(kg.ActiveCounter("account", accountID.String())))
+			require.Equal(t, 0, scard(kg.ActiveRunsSet("p", shadowPart.PartitionID)))
+			require.Equal(t, 0, scard(kg.ActiveRunsSet("account", accountID.String())))
+			require.Equal(t, 0, scard(kg.RunActiveSet(runID)))
+			require.Equal(t, 0, scard(kg.ActiveSet("p", fnID.String())))
+			require.Equal(t, 0, scard(kg.ActiveSet("account", accountID.String())))
 		})
 
 		t.Run("from ready queue, requeue", func(t *testing.T) {
@@ -7347,33 +7334,33 @@ func TestQueueActiveCounters(t *testing.T) {
 
 			shadowPart := q.ItemShadowPartition(ctx, item)
 
-			require.Equal(t, 0, scard(kg.ActivePartitionRunsIndex(shadowPart.PartitionID)))
-			require.Equal(t, 0, intVal(kg.ActiveRunsCounter("account", accountID.String())))
-			require.Equal(t, 0, intVal(kg.RunActiveCounter(runID)))
-			require.Equal(t, 0, intVal(kg.ActiveCounter("p", fnID.String())))
-			require.Equal(t, 0, intVal(kg.ActiveCounter("account", accountID.String())))
+			require.Equal(t, 0, scard(kg.ActiveRunsSet("p", shadowPart.PartitionID)))
+			require.Equal(t, 0, scard(kg.ActiveRunsSet("account", accountID.String())))
+			require.Equal(t, 0, scard(kg.RunActiveSet(runID)))
+			require.Equal(t, 0, scard(kg.ActiveSet("p", fnID.String())))
+			require.Equal(t, 0, scard(kg.ActiveSet("account", accountID.String())))
 
 			// lease
 			leaseID, err := q.Lease(ctx, i, 10*time.Second, clock.Now(), nil)
 			require.NoError(t, err)
 			require.NotNil(t, leaseID)
 
-			require.Equal(t, 1, scard(kg.ActivePartitionRunsIndex(shadowPart.PartitionID)))
-			require.Equal(t, 1, intVal(kg.ActiveRunsCounter("account", accountID.String())))
-			require.Equal(t, 1, intVal(kg.RunActiveCounter(runID)))
-			require.Equal(t, 1, intVal(kg.ActiveCounter("p", fnID.String())))
-			require.Equal(t, 1, intVal(kg.ActiveCounter("account", accountID.String())))
+			require.Equal(t, 1, scard(kg.ActiveRunsSet("p", shadowPart.PartitionID)))
+			require.Equal(t, 1, scard(kg.ActiveRunsSet("account", accountID.String())))
+			require.Equal(t, 1, scard(kg.RunActiveSet(runID)))
+			require.Equal(t, 1, scard(kg.ActiveSet("p", fnID.String())))
+			require.Equal(t, 1, scard(kg.ActiveSet("account", accountID.String())))
 
 			// requeue to ready partition
 			requeueAt := clock.Now().Add(time.Minute)
 			enqueueToBacklog = false
 			require.NoError(t, q.Requeue(ctx, defaultShard, i, requeueAt))
 
-			require.Equal(t, 0, scard(kg.ActivePartitionRunsIndex(shadowPart.PartitionID)))
-			require.Equal(t, 0, intVal(kg.ActiveRunsCounter("account", accountID.String())))
-			require.Equal(t, 0, intVal(kg.RunActiveCounter(runID)))
-			require.Equal(t, 0, intVal(kg.ActiveCounter("p", fnID.String())))
-			require.Equal(t, 0, intVal(kg.ActiveCounter("account", accountID.String())))
+			require.Equal(t, 0, scard(kg.ActiveRunsSet("p", shadowPart.PartitionID)))
+			require.Equal(t, 0, scard(kg.ActiveRunsSet("account", accountID.String())))
+			require.Equal(t, 0, scard(kg.RunActiveSet(runID)))
+			require.Equal(t, 0, scard(kg.ActiveSet("p", fnID.String())))
+			require.Equal(t, 0, scard(kg.ActiveSet("account", accountID.String())))
 		})
 
 		t.Run("from ready queue, dequeue", func(t *testing.T) {
@@ -7386,31 +7373,31 @@ func TestQueueActiveCounters(t *testing.T) {
 
 			shadowPart := q.ItemShadowPartition(ctx, item)
 
-			require.Equal(t, 0, scard(kg.ActivePartitionRunsIndex(shadowPart.PartitionID)))
-			require.Equal(t, 0, intVal(kg.ActiveRunsCounter("account", accountID.String())))
-			require.Equal(t, 0, intVal(kg.RunActiveCounter(runID)))
-			require.Equal(t, 0, intVal(kg.ActiveCounter("p", fnID.String())))
-			require.Equal(t, 0, intVal(kg.ActiveCounter("account", accountID.String())))
+			require.Equal(t, 0, scard(kg.ActiveRunsSet("p", shadowPart.PartitionID)))
+			require.Equal(t, 0, scard(kg.ActiveRunsSet("account", accountID.String())))
+			require.Equal(t, 0, scard(kg.RunActiveSet(runID)))
+			require.Equal(t, 0, scard(kg.ActiveSet("p", fnID.String())))
+			require.Equal(t, 0, scard(kg.ActiveSet("account", accountID.String())))
 
 			// lease
 			leaseID, err := q.Lease(ctx, i, 10*time.Second, clock.Now(), nil)
 			require.NoError(t, err)
 			require.NotNil(t, leaseID)
 
-			require.Equal(t, 1, scard(kg.ActivePartitionRunsIndex(shadowPart.PartitionID)))
-			require.Equal(t, 1, intVal(kg.ActiveRunsCounter("account", accountID.String())))
-			require.Equal(t, 1, intVal(kg.RunActiveCounter(runID)))
-			require.Equal(t, 1, intVal(kg.ActiveCounter("p", fnID.String())))
-			require.Equal(t, 1, intVal(kg.ActiveCounter("account", accountID.String())))
+			require.Equal(t, 1, scard(kg.ActiveRunsSet("p", shadowPart.PartitionID)))
+			require.Equal(t, 1, scard(kg.ActiveRunsSet("account", accountID.String())))
+			require.Equal(t, 1, scard(kg.RunActiveSet(runID)))
+			require.Equal(t, 1, scard(kg.ActiveSet("p", fnID.String())))
+			require.Equal(t, 1, scard(kg.ActiveSet("account", accountID.String())))
 
 			// dequeue
 			require.NoError(t, q.Dequeue(ctx, defaultShard, i))
 
-			require.Equal(t, 0, scard(kg.ActivePartitionRunsIndex(shadowPart.PartitionID)))
-			require.Equal(t, 0, intVal(kg.ActiveRunsCounter("account", accountID.String())))
-			require.Equal(t, 0, intVal(kg.RunActiveCounter(runID)))
-			require.Equal(t, 0, intVal(kg.ActiveCounter("p", fnID.String())))
-			require.Equal(t, 0, intVal(kg.ActiveCounter("account", accountID.String())))
+			require.Equal(t, 0, scard(kg.ActiveRunsSet("p", shadowPart.PartitionID)))
+			require.Equal(t, 0, scard(kg.ActiveRunsSet("account", accountID.String())))
+			require.Equal(t, 0, scard(kg.RunActiveSet(runID)))
+			require.Equal(t, 0, scard(kg.ActiveSet("p", fnID.String())))
+			require.Equal(t, 0, scard(kg.ActiveSet("account", accountID.String())))
 		})
 	})
 
@@ -7520,12 +7507,12 @@ func TestQueueActiveCounters(t *testing.T) {
 
 			refillUntil := at.Add(time.Minute)
 
-			require.Equal(t, 0, scard(kg.ActivePartitionRunsIndex(shadowPart.PartitionID)))
-			require.Equal(t, 0, intVal(kg.ActiveRunsCounter("account", accountID.String())))
-			require.Equal(t, 0, intVal(kg.RunActiveCounter(runIDA)))
-			require.Equal(t, 0, intVal(kg.RunActiveCounter(runIDB)))
-			require.Equal(t, 0, intVal(kg.ActiveCounter("p", fnID.String())))
-			require.Equal(t, 0, intVal(kg.ActiveCounter("account", accountID.String())))
+			require.Equal(t, 0, scard(kg.ActiveRunsSet("p", shadowPart.PartitionID)))
+			require.Equal(t, 0, scard(kg.ActiveRunsSet("account", accountID.String())))
+			require.Equal(t, 0, scard(kg.RunActiveSet(runIDA)))
+			require.Equal(t, 0, scard(kg.RunActiveSet(runIDB)))
+			require.Equal(t, 0, scard(kg.ActiveSet("p", fnID.String())))
+			require.Equal(t, 0, scard(kg.ActiveSet("account", accountID.String())))
 
 			require.Empty(t, iA1.RefilledFrom)
 			require.Zero(t, iA1.RefilledAt)
@@ -7540,12 +7527,12 @@ func TestQueueActiveCounters(t *testing.T) {
 
 			require.Equal(t, 4, res.Refilled)
 
-			require.Equal(t, 2, scard(kg.ActivePartitionRunsIndex(shadowPart.PartitionID)))
-			require.Equal(t, 2, intVal(kg.ActiveRunsCounter("account", accountID.String())))
-			require.Equal(t, 2, intVal(kg.RunActiveCounter(runIDA)))
-			require.Equal(t, 2, intVal(kg.RunActiveCounter(runIDB)))
-			require.Equal(t, 4, intVal(kg.ActiveCounter("p", fnID.String())))
-			require.Equal(t, 4, intVal(kg.ActiveCounter("account", accountID.String())))
+			require.Equal(t, 2, scard(kg.ActiveRunsSet("p", shadowPart.PartitionID)))
+			require.Equal(t, 2, scard(kg.ActiveRunsSet("account", accountID.String())))
+			require.Equal(t, 2, scard(kg.RunActiveSet(runIDA)))
+			require.Equal(t, 2, scard(kg.RunActiveSet(runIDB)))
+			require.Equal(t, 4, scard(kg.ActiveSet("p", fnID.String())))
+			require.Equal(t, 4, scard(kg.ActiveSet("account", accountID.String())))
 
 			//
 			// Process A1
@@ -7561,24 +7548,24 @@ func TestQueueActiveCounters(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, leaseID)
 
-			require.Equal(t, 2, scard(kg.ActivePartitionRunsIndex(shadowPart.PartitionID)))
-			require.Equal(t, 2, intVal(kg.ActiveRunsCounter("account", accountID.String())))
-			require.Equal(t, 2, intVal(kg.RunActiveCounter(runIDA)))
-			require.Equal(t, 2, intVal(kg.RunActiveCounter(runIDB)))
-			require.Equal(t, 4, intVal(kg.ActiveCounter("p", fnID.String())))
-			require.Equal(t, 4, intVal(kg.ActiveCounter("account", accountID.String())))
+			require.Equal(t, 2, scard(kg.ActiveRunsSet("p", shadowPart.PartitionID)))
+			require.Equal(t, 2, scard(kg.ActiveRunsSet("account", accountID.String())))
+			require.Equal(t, 2, scard(kg.RunActiveSet(runIDA)))
+			require.Equal(t, 2, scard(kg.RunActiveSet(runIDB)))
+			require.Equal(t, 4, scard(kg.ActiveSet("p", fnID.String())))
+			require.Equal(t, 4, scard(kg.ActiveSet("account", accountID.String())))
 
 			// requeue to backlog
 			requeueAt := clock.Now().Add(time.Minute)
 			enqueueToBacklog = true
 			require.NoError(t, q.Requeue(ctx, defaultShard, iA1, requeueAt))
 
-			require.Equal(t, 2, scard(kg.ActivePartitionRunsIndex(shadowPart.PartitionID)))
-			require.Equal(t, 2, intVal(kg.ActiveRunsCounter("account", accountID.String())))
-			require.Equal(t, 1, intVal(kg.RunActiveCounter(runIDA)))
-			require.Equal(t, 2, intVal(kg.RunActiveCounter(runIDB)))
-			require.Equal(t, 3, intVal(kg.ActiveCounter("p", fnID.String())))
-			require.Equal(t, 3, intVal(kg.ActiveCounter("account", accountID.String())))
+			require.Equal(t, 2, scard(kg.ActiveRunsSet("p", shadowPart.PartitionID)))
+			require.Equal(t, 2, scard(kg.ActiveRunsSet("account", accountID.String())))
+			require.Equal(t, 1, scard(kg.RunActiveSet(runIDA)))
+			require.Equal(t, 2, scard(kg.RunActiveSet(runIDB)))
+			require.Equal(t, 3, scard(kg.ActiveSet("p", fnID.String())))
+			require.Equal(t, 3, scard(kg.ActiveSet("account", accountID.String())))
 
 			//
 			// Process A2
@@ -7592,24 +7579,24 @@ func TestQueueActiveCounters(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, leaseID)
 
-			require.Equal(t, 2, scard(kg.ActivePartitionRunsIndex(shadowPart.PartitionID)))
-			require.Equal(t, 2, intVal(kg.ActiveRunsCounter("account", accountID.String())))
-			require.Equal(t, 1, intVal(kg.RunActiveCounter(runIDA)))
-			require.Equal(t, 2, intVal(kg.RunActiveCounter(runIDB)))
-			require.Equal(t, 3, intVal(kg.ActiveCounter("p", fnID.String())))
-			require.Equal(t, 3, intVal(kg.ActiveCounter("account", accountID.String())))
+			require.Equal(t, 2, scard(kg.ActiveRunsSet("p", shadowPart.PartitionID)))
+			require.Equal(t, 2, scard(kg.ActiveRunsSet("account", accountID.String())))
+			require.Equal(t, 1, scard(kg.RunActiveSet(runIDA)))
+			require.Equal(t, 2, scard(kg.RunActiveSet(runIDB)))
+			require.Equal(t, 3, scard(kg.ActiveSet("p", fnID.String())))
+			require.Equal(t, 3, scard(kg.ActiveSet("account", accountID.String())))
 
 			// requeue to backlog
 			requeueAt = clock.Now().Add(time.Minute)
 			enqueueToBacklog = true
 			require.NoError(t, q.Requeue(ctx, defaultShard, iA2, requeueAt))
 
-			require.Equal(t, 1, scard(kg.ActivePartitionRunsIndex(shadowPart.PartitionID)))
-			require.Equal(t, 1, intVal(kg.ActiveRunsCounter("account", accountID.String())))
-			require.Equal(t, 0, intVal(kg.RunActiveCounter(runIDA)))
-			require.Equal(t, 2, intVal(kg.RunActiveCounter(runIDB)))
-			require.Equal(t, 2, intVal(kg.ActiveCounter("p", fnID.String())))
-			require.Equal(t, 2, intVal(kg.ActiveCounter("account", accountID.String())))
+			require.Equal(t, 1, scard(kg.ActiveRunsSet("p", shadowPart.PartitionID)))
+			require.Equal(t, 1, scard(kg.ActiveRunsSet("account", accountID.String())))
+			require.Equal(t, 0, scard(kg.RunActiveSet(runIDA)))
+			require.Equal(t, 2, scard(kg.RunActiveSet(runIDB)))
+			require.Equal(t, 2, scard(kg.ActiveSet("p", fnID.String())))
+			require.Equal(t, 2, scard(kg.ActiveSet("account", accountID.String())))
 
 			//
 			// Process B1
@@ -7621,12 +7608,12 @@ func TestQueueActiveCounters(t *testing.T) {
 			require.NoError(t, err)
 			require.NoError(t, q.Requeue(ctx, defaultShard, iB1, requeueAt))
 
-			require.Equal(t, 1, scard(kg.ActivePartitionRunsIndex(shadowPart.PartitionID)))
-			require.Equal(t, 1, intVal(kg.ActiveRunsCounter("account", accountID.String())))
-			require.Equal(t, 0, intVal(kg.RunActiveCounter(runIDA)))
-			require.Equal(t, 1, intVal(kg.RunActiveCounter(runIDB)))
-			require.Equal(t, 1, intVal(kg.ActiveCounter("p", fnID.String())))
-			require.Equal(t, 1, intVal(kg.ActiveCounter("account", accountID.String())))
+			require.Equal(t, 1, scard(kg.ActiveRunsSet("p", shadowPart.PartitionID)))
+			require.Equal(t, 1, scard(kg.ActiveRunsSet("account", accountID.String())))
+			require.Equal(t, 0, scard(kg.RunActiveSet(runIDA)))
+			require.Equal(t, 1, scard(kg.RunActiveSet(runIDB)))
+			require.Equal(t, 1, scard(kg.ActiveSet("p", fnID.String())))
+			require.Equal(t, 1, scard(kg.ActiveSet("account", accountID.String())))
 
 			//
 			// Process B2
@@ -7638,16 +7625,224 @@ func TestQueueActiveCounters(t *testing.T) {
 			require.NoError(t, err)
 			require.NoError(t, q.Requeue(ctx, defaultShard, iB2, requeueAt))
 
-			require.Equal(t, 0, scard(kg.ActivePartitionRunsIndex(shadowPart.PartitionID)))
-			require.Equal(t, 0, intVal(kg.ActiveRunsCounter("account", accountID.String())))
-			require.Equal(t, 0, intVal(kg.RunActiveCounter(runIDA)))
-			require.Equal(t, 0, intVal(kg.RunActiveCounter(runIDB)))
-			require.Equal(t, 0, intVal(kg.ActiveCounter("p", fnID.String())))
-			require.Equal(t, 0, intVal(kg.ActiveCounter("account", accountID.String())))
+			require.Equal(t, 0, scard(kg.ActiveRunsSet("p", shadowPart.PartitionID)))
+			require.Equal(t, 0, scard(kg.ActiveRunsSet("account", accountID.String())))
+			require.Equal(t, 0, scard(kg.RunActiveSet(runIDA)))
+			require.Equal(t, 0, scard(kg.RunActiveSet(runIDB)))
+			require.Equal(t, 0, scard(kg.ActiveSet("p", fnID.String())))
+			require.Equal(t, 0, scard(kg.ActiveSet("account", accountID.String())))
 
 		})
 
 	})
+}
+
+func TestQueueGarbageCollectOldActiveKeys(t *testing.T) {
+	r := miniredis.RunT(t)
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+	kg := defaultShard.RedisClient.kg
+
+	enqueueToBacklog := false
+
+	clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Minute))
+	q := NewQueue(
+		defaultShard,
+		WithClock(clock),
+		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+			return enqueueToBacklog
+		}),
+		WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
+			return false
+		}),
+		WithDisableLeaseChecksForSystemQueues(false),
+	)
+	ctx := context.Background()
+
+	accountID, fnID, envID := uuid.New(), uuid.New(), uuid.New()
+
+	runID := ulid.MustNew(ulid.Timestamp(clock.Now()), rand.Reader)
+
+	t.Run("with custom concurrency keys", func(t *testing.T) {
+		ck1 := createConcurrencyKey(enums.ConcurrencyScopeFn, fnID, "test", 1)
+		ck2 := createConcurrencyKey(enums.ConcurrencyScopeAccount, accountID, "test2", 1)
+
+		item := osqueue.QueueItem{
+			ID:          "test",
+			FunctionID:  fnID,
+			WorkspaceID: envID,
+			Data: osqueue.Item{
+				WorkspaceID: envID,
+				Kind:        osqueue.KindEdge,
+				Identifier: state.Identifier{
+					WorkflowID:  fnID,
+					AccountID:   accountID,
+					WorkspaceID: envID,
+					RunID:       runID,
+				},
+				QueueName: nil,
+				Throttle:  nil,
+				CustomConcurrencyKeys: []state.CustomConcurrency{
+					ck1,
+					ck2,
+				},
+			},
+			QueueName: nil,
+		}
+
+		backlog := q.ItemBacklog(ctx, item)
+		shadowPartition := q.ItemShadowPartition(ctx, item)
+
+		keys := q.activeKeysToGarbageCollect(item, shadowPartition, backlog, kg)
+
+		ck1Hash := util.XXHash(ck1.Key)
+		ck2Hash := util.XXHash(ck2.Key)
+
+		require.Equal(t, []string{
+			// v1
+			fmt.Sprintf("{queue}:v1:active:account:%s", accountID.String()),
+			fmt.Sprintf("{queue}:v1:active:p:%s", fnID.String()),
+			fmt.Sprintf("{queue}:v1:active:custom:%s", ck1.Key),
+			fmt.Sprintf("{queue}:v1:active:custom:%s", ck2.Key),
+			fmt.Sprintf("{queue}:v1:active:compound:fn:%s:c1<%s>:c2<%s>", fnID.String(), ck1Hash, ck2Hash),
+			fmt.Sprintf("{queue}:v1:active:run:%s", runID.String()),
+			fmt.Sprintf("{queue}:v1:active-runs:account:%s", accountID.String()),
+			fmt.Sprintf("{queue}:v1:active-idx:runs:p:%s", fnID.String()),
+			fmt.Sprintf("{queue}:v1:active-runs:custom:%s", ck1.Key),
+			fmt.Sprintf("{queue}:v1:active-runs:custom:%s", ck2.Key),
+
+			// v0
+			fmt.Sprintf("{queue}:active:account:%s", accountID.String()),
+			fmt.Sprintf("{queue}:active:p:%s", fnID.String()),
+			fmt.Sprintf("{queue}:active:custom:%s", ck1.Key),
+			fmt.Sprintf("{queue}:active:custom:%s", ck2.Key),
+			fmt.Sprintf("{queue}:active:compound:fn:%s:c1<%s>:c2<%s>", fnID.String(), ck1Hash, ck2Hash),
+			fmt.Sprintf("{queue}:active:run:%s", runID.String()),
+			fmt.Sprintf("{queue}:active-runs:account:%s", accountID.String()),
+			fmt.Sprintf("{queue}:active-idx:runs:p:%s", fnID.String()),
+			fmt.Sprintf("{queue}:active-runs:custom:%s", ck1.Key),
+			fmt.Sprintf("{queue}:active-runs:custom:%s", ck2.Key),
+		}, keys)
+	})
+
+	t.Run("test with single custom concurrency", func(t *testing.T) {
+		ck1 := createConcurrencyKey(enums.ConcurrencyScopeFn, fnID, "test", 1)
+
+		item := osqueue.QueueItem{
+			ID:          "test",
+			FunctionID:  fnID,
+			WorkspaceID: envID,
+			Data: osqueue.Item{
+				WorkspaceID: envID,
+				Kind:        osqueue.KindEdge,
+				Identifier: state.Identifier{
+					WorkflowID:  fnID,
+					AccountID:   accountID,
+					WorkspaceID: envID,
+					RunID:       runID,
+				},
+				QueueName: nil,
+				Throttle:  nil,
+				CustomConcurrencyKeys: []state.CustomConcurrency{
+					ck1,
+				},
+			},
+			QueueName: nil,
+		}
+
+		backlog := q.ItemBacklog(ctx, item)
+		shadowPartition := q.ItemShadowPartition(ctx, item)
+
+		keys := q.activeKeysToGarbageCollect(item, shadowPartition, backlog, kg)
+
+		ck1Hash := util.XXHash(ck1.Key)
+
+		require.Equal(t, []string{
+			// v1
+			fmt.Sprintf("{queue}:v1:active:account:%s", accountID.String()),
+			fmt.Sprintf("{queue}:v1:active:p:%s", fnID.String()),
+			fmt.Sprintf("{queue}:v1:active:custom:%s", ck1.Key),
+			"{queue}:v1:active:-",
+			fmt.Sprintf("{queue}:v1:active:compound:fn:%s:c1<%s>", fnID.String(), ck1Hash),
+			fmt.Sprintf("{queue}:v1:active:run:%s", runID.String()),
+			fmt.Sprintf("{queue}:v1:active-runs:account:%s", accountID.String()),
+			fmt.Sprintf("{queue}:v1:active-idx:runs:p:%s", fnID.String()),
+			fmt.Sprintf("{queue}:v1:active-runs:custom:%s", ck1.Key),
+			"{queue}:v1:active-runs:-",
+
+			// v0
+			fmt.Sprintf("{queue}:active:account:%s", accountID.String()),
+			fmt.Sprintf("{queue}:active:p:%s", fnID.String()),
+			fmt.Sprintf("{queue}:active:custom:%s", ck1.Key),
+			"{queue}:active:-",
+			fmt.Sprintf("{queue}:active:compound:fn:%s:c1<%s>", fnID.String(), ck1Hash),
+			fmt.Sprintf("{queue}:active:run:%s", runID.String()),
+			fmt.Sprintf("{queue}:active-runs:account:%s", accountID.String()),
+			fmt.Sprintf("{queue}:active-idx:runs:p:%s", fnID.String()),
+			fmt.Sprintf("{queue}:active-runs:custom:%s", ck1.Key),
+			"{queue}:active-runs:-",
+		}, keys)
+	})
+
+	t.Run("test without custom concurrency", func(t *testing.T) {
+		item := osqueue.QueueItem{
+			ID:          "test",
+			FunctionID:  fnID,
+			WorkspaceID: envID,
+			Data: osqueue.Item{
+				WorkspaceID: envID,
+				Kind:        osqueue.KindEdge,
+				Identifier: state.Identifier{
+					WorkflowID:  fnID,
+					AccountID:   accountID,
+					WorkspaceID: envID,
+					RunID:       runID,
+				},
+				QueueName:             nil,
+				Throttle:              nil,
+				CustomConcurrencyKeys: []state.CustomConcurrency{},
+			},
+			QueueName: nil,
+		}
+
+		backlog := q.ItemBacklog(ctx, item)
+		shadowPartition := q.ItemShadowPartition(ctx, item)
+
+		keys := q.activeKeysToGarbageCollect(item, shadowPartition, backlog, kg)
+
+		require.Equal(t, []string{
+			// v1
+			fmt.Sprintf("{queue}:v1:active:account:%s", accountID.String()),
+			fmt.Sprintf("{queue}:v1:active:p:%s", fnID.String()),
+			"{queue}:v1:active:-",
+			"{queue}:v1:active:-",
+			fmt.Sprintf("{queue}:v1:active:compound:fn:%s", fnID.String()),
+			fmt.Sprintf("{queue}:v1:active:run:%s", runID.String()),
+			fmt.Sprintf("{queue}:v1:active-runs:account:%s", accountID.String()),
+			fmt.Sprintf("{queue}:v1:active-idx:runs:p:%s", fnID.String()),
+			"{queue}:v1:active-runs:-",
+			"{queue}:v1:active-runs:-",
+
+			// v0
+			fmt.Sprintf("{queue}:active:account:%s", accountID.String()),
+			fmt.Sprintf("{queue}:active:p:%s", fnID.String()),
+			"{queue}:active:-",
+			"{queue}:active:-",
+			fmt.Sprintf("{queue}:active:compound:fn:%s", fnID.String()),
+			fmt.Sprintf("{queue}:active:run:%s", runID.String()),
+			fmt.Sprintf("{queue}:active-runs:account:%s", accountID.String()),
+			fmt.Sprintf("{queue}:active-idx:runs:p:%s", fnID.String()),
+			"{queue}:active-runs:-",
+			"{queue}:active-runs:-",
+		}, keys)
+	})
+
 }
 
 func score(t *testing.T, r *miniredis.Miniredis, key string, member string) float64 {
