@@ -7768,25 +7768,25 @@ func TestQueueGarbageCollectOldActiveKeys(t *testing.T) {
 			fmt.Sprintf("{queue}:v1:active:account:%s", accountID.String()),
 			fmt.Sprintf("{queue}:v1:active:p:%s", fnID.String()),
 			fmt.Sprintf("{queue}:v1:active:custom:%s", ck1.Key),
-			fmt.Sprintf("{queue}:v1:active:-"),
+			"{queue}:v1:active:-",
 			fmt.Sprintf("{queue}:v1:active:compound:fn:%s:c1<%s>", fnID.String(), ck1Hash),
 			fmt.Sprintf("{queue}:v1:active:run:%s", runID.String()),
 			fmt.Sprintf("{queue}:v1:active-runs:account:%s", accountID.String()),
 			fmt.Sprintf("{queue}:v1:active-idx:runs:p:%s", fnID.String()),
 			fmt.Sprintf("{queue}:v1:active-runs:custom:%s", ck1.Key),
-			fmt.Sprintf("{queue}:v1:active-runs:-"),
+			"{queue}:v1:active-runs:-",
 
 			// v0
 			fmt.Sprintf("{queue}:active:account:%s", accountID.String()),
 			fmt.Sprintf("{queue}:active:p:%s", fnID.String()),
 			fmt.Sprintf("{queue}:active:custom:%s", ck1.Key),
-			fmt.Sprintf("{queue}:active:-"),
+			"{queue}:active:-",
 			fmt.Sprintf("{queue}:active:compound:fn:%s:c1<%s>", fnID.String(), ck1Hash),
 			fmt.Sprintf("{queue}:active:run:%s", runID.String()),
 			fmt.Sprintf("{queue}:active-runs:account:%s", accountID.String()),
 			fmt.Sprintf("{queue}:active-idx:runs:p:%s", fnID.String()),
 			fmt.Sprintf("{queue}:active-runs:custom:%s", ck1.Key),
-			fmt.Sprintf("{queue}:active-runs:-"),
+			"{queue}:active-runs:-",
 		}, keys)
 	})
 
@@ -7820,26 +7820,26 @@ func TestQueueGarbageCollectOldActiveKeys(t *testing.T) {
 			// v1
 			fmt.Sprintf("{queue}:v1:active:account:%s", accountID.String()),
 			fmt.Sprintf("{queue}:v1:active:p:%s", fnID.String()),
-			fmt.Sprintf("{queue}:v1:active:-"),
-			fmt.Sprintf("{queue}:v1:active:-"),
+			"{queue}:v1:active:-",
+			"{queue}:v1:active:-",
 			fmt.Sprintf("{queue}:v1:active:compound:fn:%s", fnID.String()),
 			fmt.Sprintf("{queue}:v1:active:run:%s", runID.String()),
 			fmt.Sprintf("{queue}:v1:active-runs:account:%s", accountID.String()),
 			fmt.Sprintf("{queue}:v1:active-idx:runs:p:%s", fnID.String()),
-			fmt.Sprintf("{queue}:v1:active-runs:-"),
-			fmt.Sprintf("{queue}:v1:active-runs:-"),
+			"{queue}:v1:active-runs:-",
+			"{queue}:v1:active-runs:-",
 
 			// v0
 			fmt.Sprintf("{queue}:active:account:%s", accountID.String()),
 			fmt.Sprintf("{queue}:active:p:%s", fnID.String()),
-			fmt.Sprintf("{queue}:active:-"),
-			fmt.Sprintf("{queue}:active:-"),
+			"{queue}:active:-",
+			"{queue}:active:-",
 			fmt.Sprintf("{queue}:active:compound:fn:%s", fnID.String()),
 			fmt.Sprintf("{queue}:active:run:%s", runID.String()),
 			fmt.Sprintf("{queue}:active-runs:account:%s", accountID.String()),
 			fmt.Sprintf("{queue}:active-idx:runs:p:%s", fnID.String()),
-			fmt.Sprintf("{queue}:active-runs:-"),
-			fmt.Sprintf("{queue}:active-runs:-"),
+			"{queue}:active-runs:-",
+			"{queue}:active-runs:-",
 		}, keys)
 	})
 
