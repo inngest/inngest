@@ -157,6 +157,7 @@ type FunctionConfiguration struct {
 	RateLimit     *RateLimitConfiguration      `json:"rateLimit,omitempty"`
 	Debounce      *DebounceConfiguration       `json:"debounce,omitempty"`
 	Throttle      *ThrottleConfiguration       `json:"throttle,omitempty"`
+	Singleton     *SingletonConfiguration      `json:"singleton,omitempty"`
 }
 
 type FunctionEvent struct {
@@ -336,6 +337,11 @@ type RunsFilterV2 struct {
 type RunsV2OrderBy struct {
 	Field     RunsV2OrderByField   `json:"field"`
 	Direction RunsOrderByDirection `json:"direction"`
+}
+
+type SingletonConfiguration struct {
+	Mode SingletonMode `json:"mode"`
+	Key  *string       `json:"key,omitempty"`
 }
 
 type SleepStepInfo struct {
@@ -1001,6 +1007,47 @@ func (e *RunsV2OrderByField) UnmarshalGQL(v interface{}) error {
 }
 
 func (e RunsV2OrderByField) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+type SingletonMode string
+
+const (
+	SingletonModeSkip   SingletonMode = "SKIP"
+	SingletonModeCancel SingletonMode = "CANCEL"
+)
+
+var AllSingletonMode = []SingletonMode{
+	SingletonModeSkip,
+	SingletonModeCancel,
+}
+
+func (e SingletonMode) IsValid() bool {
+	switch e {
+	case SingletonModeSkip, SingletonModeCancel:
+		return true
+	}
+	return false
+}
+
+func (e SingletonMode) String() string {
+	return string(e)
+}
+
+func (e *SingletonMode) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = SingletonMode(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid SingletonMode", str)
+	}
+	return nil
+}
+
+func (e SingletonMode) MarshalGQL(w io.Writer) {
 	fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
