@@ -158,12 +158,6 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 		Tags:    map[string]any{"partition_id": shadowPart.PartitionID},
 	})
 
-	// q.log.Trace("processing backlogs",
-	// 	"partition_id", shadowPart.PartitionID,
-	// 	"until", refillUntil.Format(time.StampMilli),
-	// 	"backlogs", len(backlogs),
-	// )
-
 	// Refill backlogs in random order
 	fullyProcessedBacklogs := 0
 	for _, idx := range util.RandPerm(len(backlogs)) {
