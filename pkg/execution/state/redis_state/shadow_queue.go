@@ -255,20 +255,17 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 		var forceRequeueShadowPartitionAt time.Time
 		var forceRequeueBacklogAt time.Time
 
+		switch res.Constraint {
 		// If backlog is limited by function or account-level concurrency, stop refilling
-		isConcurrencyLimited := res.Constraint == enums.QueueConstraintAccountConcurrency ||
-			res.Constraint == enums.QueueConstraintFunctionConcurrency
-		if isConcurrencyLimited {
+		case enums.QueueConstraintAccountConcurrency, enums.QueueConstraintFunctionConcurrency:
 			forceRequeueShadowPartitionAt = q.clock.Now().Add(PartitionConcurrencyLimitRequeueExtension)
-		}
 
 		// If backlog is concurrency limited by custom key, requeue just this backlog in the future
-		if res.Constraint == enums.QueueConstraintCustomConcurrencyKey1 || res.Constraint == enums.QueueConstraintCustomConcurrencyKey2 {
+		case enums.QueueConstraintCustomConcurrencyKey1, enums.QueueConstraintCustomConcurrencyKey2:
 			forceRequeueBacklogAt = backlog.requeueBackOff(q.clock.Now(), res.Constraint, shadowPart)
-		}
 
 		// If backlog is throttled, requeue just this backlog in the future
-		if res.Constraint == enums.QueueConstraintThrottle {
+		case enums.QueueConstraintThrottle:
 			forceRequeueBacklogAt = backlog.requeueBackOff(q.clock.Now(), res.Constraint, shadowPart)
 		}
 
