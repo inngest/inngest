@@ -45,21 +45,23 @@ local function addToActiveRunSets(keyActiveRun, keyActiveRunsPartition, keyActiv
     redis.call("SADD", keyActiveRun, itemID)
 
     -- if the first item in a run was moved to the ready queue, mark the run as active
-    -- and increment counters
-    if exists_without_ending(keyActiveRunsPartition, ":-") then
-      redis.call("SADD", keyActiveRunsPartition, runID)
-    end
+    -- Note: While SADD is idempotent, we can reduce operations on Redis if we do a single SCARD first
+    if tonumber(redis.call("SCARD", keyActiveRun)) == 1 then
+      if exists_without_ending(keyActiveRunsPartition, ":-") then
+        redis.call("SADD", keyActiveRunsPartition, runID)
+      end
 
-    if exists_without_ending(keyActiveRunsAccount, ":-") then
-      redis.call("SADD", keyActiveRunsAccount, runID)
-    end
+      if exists_without_ending(keyActiveRunsAccount, ":-") then
+        redis.call("SADD", keyActiveRunsAccount, runID)
+      end
 
-    if exists_without_ending(keyActiveRunsCustomConcurrencyKey1, ":-") then
-      redis.call("SADD", keyActiveRunsCustomConcurrencyKey1, runID)
-    end
+      if exists_without_ending(keyActiveRunsCustomConcurrencyKey1, ":-") then
+        redis.call("SADD", keyActiveRunsCustomConcurrencyKey1, runID)
+      end
 
-    if exists_without_ending(keyActiveRunsCustomConcurrencyKey2, ":-") then
-      redis.call("SADD", keyActiveRunsCustomConcurrencyKey2, runID)
+      if exists_without_ending(keyActiveRunsCustomConcurrencyKey2, ":-") then
+        redis.call("SADD", keyActiveRunsCustomConcurrencyKey2, runID)
+      end
     end
   end
 end
@@ -68,20 +70,23 @@ local function removeFromActiveRunSets(keyActiveRun, keyActiveRunsPartition, key
   if exists_without_ending(keyActiveRun, ":-") then
     redis.call("SREM", keyActiveRun, itemID)
 
-    if exists_without_ending(keyActiveRunsPartition, ":-") then
-      redis.call("SREM", keyActiveRunsPartition, runID)
-    end
+    -- if the last item was removed, remove the run from active
+    if tonumber(redis.call("SCARD", keyActiveRun)) == 0 then
+      if exists_without_ending(keyActiveRunsPartition, ":-") then
+        redis.call("SREM", keyActiveRunsPartition, runID)
+      end
 
-    if exists_without_ending(keyActiveRunsAccount, ":-") then
-      redis.call("SREM", keyActiveRunsAccount, runID)
-    end
+      if exists_without_ending(keyActiveRunsAccount, ":-") then
+        redis.call("SREM", keyActiveRunsAccount, runID)
+      end
 
-    if exists_without_ending(keyActiveRunsCustomConcurrencyKey1, ":-") then
-      redis.call("SREM", keyActiveRunsCustomConcurrencyKey1, runID)
-    end
+      if exists_without_ending(keyActiveRunsCustomConcurrencyKey1, ":-") then
+        redis.call("SREM", keyActiveRunsCustomConcurrencyKey1, runID)
+      end
 
-    if exists_without_ending(keyActiveRunsCustomConcurrencyKey2, ":-") then
-      redis.call("SREM", keyActiveRunsCustomConcurrencyKey2, runID)
+      if exists_without_ending(keyActiveRunsCustomConcurrencyKey2, ":-") then
+        redis.call("SREM", keyActiveRunsCustomConcurrencyKey2, runID)
+      end
     end
   end
 end

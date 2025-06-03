@@ -1263,18 +1263,17 @@ func TestQueueLease(t *testing.T) {
 			kg := q.primaryQueueShard.RedisClient.kg
 			// Run indexes should be updated
 			{
-				runActiveCount, err := r.Get(kg.ActiveSet("run", runID.String()))
+				itemIsMember, err := r.SIsMember(kg.ActiveSet("run", runID.String()), item.ID)
 				require.NoError(t, err)
-
-				require.Equal(t, "1", runActiveCount)
+				require.True(t, itemIsMember)
 
 				isMember, err := r.SIsMember(kg.ActiveRunsSet("p", fnID.String()), runID.String())
 				require.NoError(t, err)
 				require.True(t, isMember)
 
-				activeRunCounterAccount, err := r.Get(kg.ActiveRunsSet("account", accountID.String()))
+				accountIsMember, err := r.SIsMember(kg.ActiveRunsSet("account", accountID.String()), runID.String())
 				require.NoError(t, err)
-				require.Equal(t, "1", activeRunCounterAccount)
+				require.True(t, accountIsMember)
 			}
 		})
 
@@ -5926,10 +5925,9 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 			require.True(t, hasMember(t, r, kg.Concurrency("account", accountId.String()), qi.ID))
 			require.True(t, hasMember(t, r, kg.Concurrency("p", fnPart.Queue()), qi.ID))
 
-			runActiveCount, err := r.Get(kg.ActiveSet("run", runID.String()))
+			itemIsMember, err := r.SIsMember(kg.ActiveSet("run", runID.String()), qi.ID)
 			require.NoError(t, err)
-
-			require.Equal(t, "1", runActiveCount)
+			require.True(t, itemIsMember)
 
 			isMember, err := r.SIsMember(kg.ActiveRunsSet("p", fnID.String()), runID.String())
 			require.NoError(t, err)
@@ -6509,10 +6507,13 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 		require.NotEmpty(t, shadowPartition.PartitionID)
 		require.Len(t, shadowPartition.Concurrency.CustomConcurrencyKeys, 0)
 
-		runActiveCount, err := r.Get(kg.ActiveSet("run", runID.String()))
+		itemIsMember, err := r.SIsMember(kg.ActiveSet("run", runID.String()), qi.ID)
 		require.NoError(t, err)
+		require.True(t, itemIsMember)
 
-		require.Equal(t, "2", runActiveCount)
+		itemIsMember, err = r.SIsMember(kg.ActiveSet("run", runID.String()), qi2.ID)
+		require.NoError(t, err)
+		require.True(t, itemIsMember)
 
 		isMember, err := r.SIsMember(kg.ActiveRunsSet("p", fnID.String()), runID.String())
 		require.NoError(t, err)
@@ -6528,10 +6529,13 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 		err = q.Requeue(ctx, defaultShard, qi, requeueFor)
 		require.NoError(t, err)
 
-		runActiveCount, err = r.Get(kg.ActiveSet("run", runID.String()))
+		itemIsMember, err = r.SIsMember(kg.ActiveSet("run", runID.String()), qi.ID)
 		require.NoError(t, err)
+		require.False(t, itemIsMember)
 
-		require.Equal(t, "1", runActiveCount)
+		itemIsMember, err = r.SIsMember(kg.ActiveSet("run", runID.String()), qi2.ID)
+		require.NoError(t, err)
+		require.True(t, itemIsMember)
 
 		isMember, err = r.SIsMember(kg.ActiveRunsSet("p", fnID.String()), runID.String())
 		require.NoError(t, err)
@@ -6541,10 +6545,11 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 		// Requeue final active item, expect indexes to be cleared out
 		//
 
-		err = q.Requeue(ctx, defaultShard, qi, requeueFor.Add(time.Hour))
+		err = q.Requeue(ctx, defaultShard, qi2, requeueFor.Add(time.Hour))
 		require.NoError(t, err)
 
-		require.False(t, r.Exists(kg.ActiveSet("run", runID.String())))
+		runSetExists := r.Exists(kg.ActiveSet("run", runID.String()))
+		require.False(t, runSetExists)
 		require.False(t, r.Exists(kg.ActiveRunsSet("p", fnID.String())))
 	})
 }
@@ -7144,7 +7149,7 @@ func TestQueueActiveCounters(t *testing.T) {
 	kg := defaultShard.RedisClient.kg
 
 	enqueueToBacklog := false
- 
+
 	clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Minute))
 	q := NewQueue(
 		defaultShard,

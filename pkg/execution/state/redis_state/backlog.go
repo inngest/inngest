@@ -145,7 +145,7 @@ func (q QueueShadowPartition) accountInProgressKey(kg QueueKeyGenerator) string 
 	return kg.Concurrency("account", q.AccountID.String())
 }
 
-// accountActiveKey returns the key storing the active counter for the shadow partition's account
+// accountActiveKey returns the key storing the active set for the shadow partition's account
 func (q QueueShadowPartition) accountActiveKey(kg QueueKeyGenerator) string {
 	// Do not track account concurrency for system queues
 	if q.SystemQueueName != nil {
@@ -526,7 +526,7 @@ func (b BacklogConcurrencyKey) concurrencyKey(kg QueueKeyGenerator) string {
 	return kg.Concurrency("custom", b.CanonicalKeyID)
 }
 
-// customKeyActive returns the key to the active counter for the given custom concurrency key
+// customKeyActive returns the key to the active set for the given custom concurrency key
 func (b QueueBacklog) customKeyActive(kg QueueKeyGenerator, n int) string {
 	if n < 0 || n > len(b.ConcurrencyKeys) {
 		return kg.ActiveSet("", "")
