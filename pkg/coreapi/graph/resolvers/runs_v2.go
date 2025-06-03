@@ -162,6 +162,7 @@ func (qr *queryResolver) Runs(ctx context.Context, num int, cur *string, order [
 }
 
 func (qr *queryResolver) Run(ctx context.Context, runID string) (*models.FunctionRunV2, error) {
+	fmt.Println("\nRun")
 	runid, err := ulid.Parse(runID)
 	if err != nil {
 		return nil, fmt.Errorf("error parsing runID: %w", err)

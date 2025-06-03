@@ -3,10 +3,12 @@ package run
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"strings"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
@@ -259,6 +261,7 @@ func (l traceLifecycle) OnFunctionFinished(
 	evts []json.RawMessage,
 	resp statev1.DriverResponse,
 ) {
+	fmt.Println("\nOnFunctionFinished")
 	// reassign here to make sure we have the right traceID and such
 	ctx = l.extractTraceCtx(ctx, md, true)
 
@@ -346,6 +349,7 @@ func (l traceLifecycle) OnFunctionFinished(
 	if resp.Output != nil {
 		output = resp.Output
 	}
+	spew.Dump(output)
 	span.SetFnOutput(output)
 }
 

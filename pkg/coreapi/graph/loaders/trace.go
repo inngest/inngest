@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/google/uuid"
 	"github.com/graph-gophers/dataloader"
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
@@ -44,6 +45,8 @@ func (tr *traceReader) GetRunTrace(ctx context.Context, keys dataloader.Keys) []
 		results[i] = &dataloader.Result{}
 
 		req, ok := key.Raw().(*TraceRequestKey)
+		fmt.Println(ok)
+		spew.Dump(req)
 		if !ok {
 			results[i].Error = fmt.Errorf("unexpected type %T", key.Raw())
 			continue
@@ -116,6 +119,7 @@ func (tr *traceReader) GetRunTrace(ctx context.Context, keys dataloader.Keys) []
 	}
 
 	wg.Wait()
+	spew.Dump(results)
 
 	return results
 }

@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/aws/smithy-go/ptr"
+	"github.com/davecgh/go-spew/spew"
 	sq "github.com/doug-martin/goqu/v9"
 	_ "github.com/doug-martin/goqu/v9/dialect/postgres"
 	_ "github.com/doug-martin/goqu/v9/dialect/sqlite3"
@@ -1053,11 +1054,13 @@ func (w wrapper) FindOrBuildTraceRun(ctx context.Context, opts cqrs.FindOrCreate
 }
 
 func (w wrapper) GetTraceRun(ctx context.Context, id cqrs.TraceRunIdentifier) (*cqrs.TraceRun, error) {
+	fmt.Println("\nGetTraceRun")
 
 	run, err := w.q.GetTraceRun(ctx, id.RunID)
 	if err != nil {
 		return nil, err
 	}
+	spew.Dump(run.Output)
 
 	start := time.UnixMilli(run.StartedAt)
 	end := time.UnixMilli(run.EndedAt)

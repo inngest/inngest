@@ -27,6 +27,7 @@ func (r *functionRunV2Resolver) Function(ctx context.Context, fn *models.Functio
 }
 
 func (r *functionRunV2Resolver) Trace(ctx context.Context, fn *models.FunctionRunV2) (*models.RunTraceSpan, error) {
+	fmt.Println("\nTrace")
 	// TODO: handle the case when it's Scheduled
 	// there's no run so it should return empty but not error
 
