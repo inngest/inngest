@@ -515,10 +515,6 @@ type AllowSystemKeyQueues func(ctx context.Context) bool
 // AllowKeyQueues determines if key queues should be enabled for the account
 type AllowKeyQueues func(ctx context.Context, acctID uuid.UUID) bool
 
-// DrainActiveCounters determines if active counters should be drained for the account
-// This can also be called for system queues, where account ID will be a zero UUID.
-type DrainActiveCounters func(ctx context.Context, acctID uuid.UUID) bool
-
 func WithAllowKeyQueues(kq AllowKeyQueues) QueueOpt {
 	return func(q *queue) {
 		q.allowKeyQueues = kq
@@ -546,12 +542,6 @@ type DisableSystemQueueLeaseChecks func(ctx context.Context) bool
 func WithDisableLeaseChecks(lc DisableLeaseChecks) QueueOpt {
 	return func(q *queue) {
 		q.disableLeaseChecks = lc
-	}
-}
-
-func WithKeyQueuesDrainActiveCounters(fn DrainActiveCounters) QueueOpt {
-	return func(q *queue) {
-		q.drainActiveCounters = fn
 	}
 }
 
@@ -664,9 +654,6 @@ func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 		allowKeyQueues: func(ctx context.Context, acctID uuid.UUID) bool {
 			return false
 		},
-		drainActiveCounters: func(ctx context.Context, acctID uuid.UUID) bool {
-			return false
-		},
 		enqueueSystemQueuesToBacklog: false,
 		disableLeaseChecks: func(ctx context.Context, acctID uuid.UUID) bool {
 			return false
@@ -740,7 +727,6 @@ type queue struct {
 
 	allowKeyQueues               AllowKeyQueues
 	enqueueSystemQueuesToBacklog bool
-	drainActiveCounters          DrainActiveCounters
 
 	disableLeaseChecks                DisableLeaseChecks
 	disableLeaseChecksForSystemQueues bool
@@ -2243,7 +2229,9 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 
 	kg := q.primaryQueueShard.RedisClient.kg
 
-	refilledFromBacklog := q.itemEnableKeyQueues(ctx, item) && item.RefilledFrom != ""
+	enableKeyQueues := q.itemEnableKeyQueues(ctx, item)
+
+	refilledFromBacklog := enableKeyQueues && item.RefilledFrom != ""
 
 	checkConstraints := !refilledFromBacklog || !q.itemDisableLeaseChecks(ctx, item)
 
@@ -2309,19 +2297,19 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 		backlog.customKeyInProgress(kg, 1),
 		backlog.customKeyInProgress(kg, 2),
 
-		// Active counters (ready + in progress)
+		// Active set keys (ready + in progress)
 		partition.accountActiveKey(kg),
 		partition.activeKey(kg),
-		backlog.customKeyActive(kg, 2),
 		backlog.customKeyActive(kg, 1),
+		backlog.customKeyActive(kg, 2),
 		backlog.activeKey(kg),
 
-		// Active run counters
-		kg.RunActiveCounter(item.Data.Identifier.RunID),    // Counter for active items in run
-		partition.accountActiveRunKey(kg),                  // Counter for active runs in account
-		kg.ActivePartitionRunsIndex(partition.PartitionID), // Set index for active runs in partition
-		backlog.customKeyActiveRuns(kg, 1),                 // Counter for active runs with custom concurrency key 1
-		backlog.customKeyActiveRuns(kg, 2),                 // Counter for active runs with custom concurrency key 2
+		// Active run sets
+		kg.RunActiveSet(item.Data.Identifier.RunID), // Set for active items in run
+		partition.accountActiveRunKey(kg),           // Set for active runs in account
+		partition.activeRunKey(kg),                  // Set for active runs in partition
+		backlog.customKeyActiveRuns(kg, 1),          // Set for active runs with custom concurrency key 1
+		backlog.customKeyActiveRuns(kg, 2),          // Set for active runs with custom concurrency key 2
 
 		kg.ThrottleKey(item.Data.Throttle),
 	}
@@ -2329,11 +2317,6 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 	partConcurrency := partition.Concurrency.FunctionConcurrency
 	if partition.SystemQueueName != nil {
 		partConcurrency = partition.Concurrency.SystemConcurrency
-	}
-
-	drainActiveCountersVal := "0"
-	if q.drainActiveCounters(ctx, item.Data.Identifier.AccountID) {
-		drainActiveCountersVal = "1"
 	}
 
 	args, err := StrSlice([]any{
@@ -2354,7 +2337,6 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 		// Key queues v2
 		checkConstraintsVal,
 		refilledFromBacklogVal,
-		drainActiveCountersVal,
 	})
 	if err != nil {
 		return nil, err
@@ -2549,19 +2531,19 @@ func (q *queue) Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		backlog.customKeyInProgress(kg, 1),
 		backlog.customKeyInProgress(kg, 2),
 
-		// Active keys
+		// Active set keys
 		partition.accountActiveKey(kg),
 		partition.activeKey(kg),
 		backlog.customKeyActive(kg, 1),
 		backlog.customKeyActive(kg, 2),
 		backlog.activeKey(kg),
 
-		// Active run counters
-		kg.RunActiveCounter(i.Data.Identifier.RunID),       // Counter for active items in run
-		partition.accountActiveRunKey(kg),                  // Counter for active runs in account
-		kg.ActivePartitionRunsIndex(partition.PartitionID), // Set index for active runs in partition
-		backlog.customKeyActiveRuns(kg, 1),                 // Counter for active runs with custom concurrency key 1
-		backlog.customKeyActiveRuns(kg, 2),                 // Counter for active runs with custom concurrency key 2
+		// Active run sets
+		kg.RunActiveSet(i.Data.Identifier.RunID), // Set for active items in run
+		partition.accountActiveRunKey(kg),        // Set for active runs in account
+		partition.activeRunKey(kg),               // Set for active runs in partition
+		backlog.customKeyActiveRuns(kg, 1),       // Set for active runs with custom concurrency key 1
+		backlog.customKeyActiveRuns(kg, 2),       // Set for active runs with custom concurrency key 2
 
 		kg.Idempotency(i.ID),
 
@@ -2672,19 +2654,19 @@ func (q *queue) Requeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		backlog.customKeyInProgress(kg, 1),
 		backlog.customKeyInProgress(kg, 2),
 
-		// Active (counter) keys
+		// Active set keys
 		shadowPartition.accountActiveKey(kg),
 		shadowPartition.activeKey(kg),
 		backlog.customKeyActive(kg, 1),
 		backlog.customKeyActive(kg, 2),
 		backlog.activeKey(kg),
 
-		// Active run counters
-		kg.RunActiveCounter(i.Data.Identifier.RunID),             // Counter for active items in run
-		shadowPartition.accountActiveRunKey(kg),                  // Counter for active runs in account
-		kg.ActivePartitionRunsIndex(shadowPartition.PartitionID), // Set index for active runs in partition
-		backlog.customKeyActiveRuns(kg, 1),                       // Counter for active runs with custom concurrency key 1
-		backlog.customKeyActiveRuns(kg, 2),                       // Counter for active runs with custom concurrency key 2
+		// Active run sets
+		kg.RunActiveSet(i.Data.Identifier.RunID), // Set for active items in run
+		shadowPartition.accountActiveRunKey(kg),  // Set for active runs in account
+		shadowPartition.activeRunKey(kg),         // Set for active runs in partition
+		backlog.customKeyActiveRuns(kg, 1),       // Set for active runs with custom concurrency key 1
+		backlog.customKeyActiveRuns(kg, 2),       // Set for active runs with custom concurrency key 2
 
 		// key queues v2
 		kg.BacklogSet(backlog.BacklogID),

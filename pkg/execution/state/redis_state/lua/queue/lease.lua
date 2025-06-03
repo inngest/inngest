@@ -1,8 +1,6 @@
 --[[
 
 Output:
-  positive number: discrepancy in active counter
-
   0: Successfully leased item
   -1: Queue item not found
   -2: Queue item already leased
@@ -27,7 +25,7 @@ local keyInProgressPartition  				   = KEYS[5]
 local keyInProgressCustomConcurrencyKey1 = KEYS[6]
 local keyInProgressCustomConcurrencyKey2 = KEYS[7]
 
--- Active counters for constraint capacity accounting
+-- Active sets for constraint capacity accounting
 local keyActiveAccount             = KEYS[8]
 local keyActivePartition           = KEYS[9]
 local keyActiveConcurrencyKey1     = KEYS[10]
@@ -36,7 +34,7 @@ local keyActiveCompound            = KEYS[12]
 
 local keyActiveRun                        = KEYS[13]
 local keyActiveRunsAccount                = KEYS[14]
-local keyIndexActivePartitionRuns         = KEYS[15]
+local keyActiveRunsPartition              = KEYS[15]
 local keyActiveRunsCustomConcurrencyKey1  = KEYS[16]
 local keyActiveRunsCustomConcurrencyKey2  = KEYS[17]
 
@@ -59,7 +57,6 @@ local customConcurrencyKey2   = tonumber(ARGV[10])
 -- key queues v2
 local checkConstraints    = tonumber(ARGV[11])
 local refilledFromBacklog = tonumber(ARGV[12])
-local drainActiveCounters = tonumber(ARGV[13])
 
 -- Use our custom Go preprocessor to inject the file from ./includes/
 -- $include(decode_ulid_time.lua)
@@ -70,7 +67,7 @@ local drainActiveCounters = tonumber(ARGV[13])
 -- $include(gcra.lua)
 -- $include(ends_with.lua)
 -- $include(update_account_queues.lua)
--- $include(update_active_counters.lua)
+-- $include(update_active_sets.lua)
 
 -- first, get the queue item.  we must do this and bail early if the queue item
 -- was not found.
@@ -174,11 +171,11 @@ if exists_without_ending(keyInProgressCustomConcurrencyKey2, ":-") == true then
   handleLease(keyInProgressCustomConcurrencyKey2, customConcurrencyKey2)
 end
 
--- If item was not refilled from backlog, we must increase active counters during lease
+-- If item was not refilled from backlog, we must update active sets during lease
 -- to account used capacity for future backlog refills
-if refilledFromBacklog ~= 1 and drainActiveCounters ~= 1 then
-  increaseActiveCounters(keyActivePartition, keyActiveAccount, keyActiveCompound, keyActiveConcurrencyKey1, keyActiveConcurrencyKey2, 1)
-  increaseActiveRunCounters(keyActiveRun, keyIndexActivePartitionRuns, keyActiveRunsAccount, keyActiveRunsCustomConcurrencyKey1, keyActiveRunsCustomConcurrencyKey2, runID)
+if refilledFromBacklog ~= 1 then
+  addToActiveSets(keyActivePartition, keyActiveAccount, keyActiveCompound, keyActiveConcurrencyKey1, keyActiveConcurrencyKey2, {item.id})
+  addToActiveRunSets(keyActiveRun, keyActiveRunsPartition, keyActiveRunsAccount, keyActiveRunsCustomConcurrencyKey1, keyActiveRunsCustomConcurrencyKey2, runID, item.id)
 end
 
 return 0

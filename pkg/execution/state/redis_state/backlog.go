@@ -97,9 +97,9 @@ func (q QueueShadowPartition) inProgressKey(kg QueueKeyGenerator) string {
 	return kg.Concurrency("p", q.PartitionID)
 }
 
-// activeKey returns the key storing the active counter for the shadow partition
+// activeKey returns the key storing the active set for the shadow partition
 func (q QueueShadowPartition) activeKey(kg QueueKeyGenerator) string {
-	return kg.ActiveCounter("p", q.PartitionID)
+	return kg.ActiveSet("p", q.PartitionID)
 }
 
 // CustomConcurrencyLimit returns concurrency limit for custom concurrency key in position n (0, if not set)
@@ -149,29 +149,33 @@ func (q QueueShadowPartition) accountInProgressKey(kg QueueKeyGenerator) string 
 func (q QueueShadowPartition) accountActiveKey(kg QueueKeyGenerator) string {
 	// Do not track account concurrency for system queues
 	if q.SystemQueueName != nil {
-		return kg.ActiveCounter("", "")
+		return kg.ActiveSet("", "")
 	}
 
 	// This should never be unset
 	if q.AccountID == nil {
-		return kg.ActiveCounter("account", "")
+		return kg.ActiveSet("account", "")
 	}
 
-	return kg.ActiveCounter("account", q.AccountID.String())
+	return kg.ActiveSet("account", q.AccountID.String())
 }
 
 func (q QueueShadowPartition) accountActiveRunKey(kg QueueKeyGenerator) string {
 	// Do not track account run concurrency for system queues
 	if q.SystemQueueName != nil {
-		return kg.ActiveRunsCounter("", "")
+		return kg.ActiveRunsSet("", "")
 	}
 
 	// This should never be unset
 	if q.AccountID == nil {
-		return kg.ActiveRunsCounter("account", "")
+		return kg.ActiveRunsSet("account", "")
 	}
 
-	return kg.ActiveRunsCounter("account", q.AccountID.String())
+	return kg.ActiveRunsSet("account", q.AccountID.String())
+}
+
+func (q QueueShadowPartition) activeRunKey(kg QueueKeyGenerator) string {
+	return kg.ActiveRunsSet("p", q.PartitionID)
 }
 
 // BacklogConcurrencyKey represents a custom concurrency key, which can be scoped to the function, environment, or account.
@@ -525,7 +529,7 @@ func (b BacklogConcurrencyKey) concurrencyKey(kg QueueKeyGenerator) string {
 // customKeyActive returns the key to the active counter for the given custom concurrency key
 func (b QueueBacklog) customKeyActive(kg QueueKeyGenerator, n int) string {
 	if n < 0 || n > len(b.ConcurrencyKeys) {
-		return kg.ActiveCounter("", "")
+		return kg.ActiveSet("", "")
 	}
 
 	key := b.ConcurrencyKeys[n-1]
@@ -535,7 +539,7 @@ func (b QueueBacklog) customKeyActive(kg QueueKeyGenerator, n int) string {
 // customKeyActiveRuns returns the key to the active runs counter for the given custom concurrency key
 func (b QueueBacklog) customKeyActiveRuns(kg QueueKeyGenerator, n int) string {
 	if n < 0 || n > len(b.ConcurrencyKeys) {
-		return kg.ActiveRunsCounter("", "")
+		return kg.ActiveRunsSet("", "")
 	}
 
 	key := b.ConcurrencyKeys[n-1]
@@ -547,16 +551,16 @@ func (b BacklogConcurrencyKey) activeKey(kg QueueKeyGenerator) string {
 	// - The scope (account, environment, function) to apply the concurrency limit on
 	// - The entity (account ID, envID, or function ID) based on the scope
 	// - The dynamic key value (hashed evaluated expression)
-	return kg.ActiveCounter("custom", b.CanonicalKeyID)
+	return kg.ActiveSet("custom", b.CanonicalKeyID)
 }
 
 func (b BacklogConcurrencyKey) activeRunsKey(kg QueueKeyGenerator) string {
-	return kg.ActiveRunsCounter("custom", b.CanonicalKeyID)
+	return kg.ActiveRunsSet("custom", b.CanonicalKeyID)
 }
 
 // activeKey returns backlog compound active key
 func (b QueueBacklog) activeKey(kg QueueKeyGenerator) string {
-	return kg.ActiveCounter("compound", b.BacklogID)
+	return kg.ActiveSet("compound", b.BacklogID)
 }
 
 func (b QueueBacklog) customConcurrencyKeyID(n int) string {
@@ -658,22 +662,18 @@ func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueSha
 		b.customKeyActive(kg, 2), // custom key 2
 		b.activeKey(kg),          // compound key (active for this backlog)
 
-		// Active run counters
-		// kg.RunActiveCounter(i.Data.Identifier.RunID), -> dynamically constructed in script for each item
-		sp.accountActiveRunKey(kg),                  // Counter for active runs in account
-		kg.ActivePartitionRunsIndex(sp.PartitionID), // Set index for active runs in partition
-		b.customKeyActiveRuns(kg, 1),                // Counter for active runs with custom concurrency key 1
-		b.customKeyActiveRuns(kg, 2),                // Counter for active runs with custom concurrency key 2
+		// Active run sets
+		// kg.RunActiveSet(i.Data.Identifier.RunID), -> dynamically constructed in script for each item
+		sp.accountActiveRunKey(kg),   // Set for active runs in account
+		sp.activeRunKey(kg),          // Set for active runs in partition
+		b.customKeyActiveRuns(kg, 1), // Set for active runs with custom concurrency key 1
+		b.customKeyActiveRuns(kg, 2), // Set for active runs with custom concurrency key 2
 	}
 
-	drainActiveCountersVal := "0"
-	if q.drainActiveCounters(ctx, accountID) {
-		drainActiveCountersVal = "1"
-	}
-
-	checkCapacityVal := "1"
-	if !q.allowKeyQueues(ctx, accountID) {
-		checkCapacityVal = "0"
+	enableKeyQueuesVal := "0"
+	// Don't check constraints if key queues have been disabled for this function (refill as quickly as possible)
+	if q.allowKeyQueues(ctx, accountID) {
+		enableKeyQueuesVal = "1"
 	}
 
 	args, err := StrSlice([]any{
@@ -695,8 +695,7 @@ func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueSha
 		throttlePeriod,
 
 		kg.QueuePrefix(),
-		drainActiveCountersVal,
-		checkCapacityVal,
+		enableKeyQueuesVal,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("could not serialize args: %w", err)

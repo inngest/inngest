@@ -157,7 +157,7 @@ func (t *TestAPI) GetQueueActiveCounter(w http.ResponseWriter, r *http.Request) 
 
 	rc := shard.RedisClient.Client()
 
-	activeAccount, err := rc.Do(ctx, rc.B().Get().Key(shard.RedisClient.KeyGenerator().ActiveCounter("account", parsedAccountId.String())).Build()).AsInt64()
+	activeAccount, err := rc.Do(ctx, rc.B().Get().Key(shard.RedisClient.KeyGenerator().ActiveSet("account", parsedAccountId.String())).Build()).AsInt64()
 	if err != nil && !rueidis.IsRedisNil(err) {
 		logger.StdlibLogger(ctx).Error("failed to retrieve active count for account", "err", err)
 		w.WriteHeader(500)
@@ -165,7 +165,7 @@ func (t *TestAPI) GetQueueActiveCounter(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	activePartition, err := rc.Do(ctx, rc.B().Get().Key(shard.RedisClient.KeyGenerator().ActiveCounter("p", parsedFnId.String())).Build()).AsInt64()
+	activePartition, err := rc.Do(ctx, rc.B().Get().Key(shard.RedisClient.KeyGenerator().ActiveSet("p", parsedFnId.String())).Build()).AsInt64()
 	if err != nil && !rueidis.IsRedisNil(err) {
 		logger.StdlibLogger(ctx).Error("failed to retrieve active count for function", "err", err)
 		w.WriteHeader(500)
@@ -173,7 +173,7 @@ func (t *TestAPI) GetQueueActiveCounter(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	activeRunsAccount, err := rc.Do(ctx, rc.B().Get().Key(shard.RedisClient.KeyGenerator().ActiveRunsCounter("account", parsedAccountId.String())).Build()).AsInt64()
+	activeRunsAccount, err := rc.Do(ctx, rc.B().Get().Key(shard.RedisClient.KeyGenerator().ActiveRunsSet("account", parsedAccountId.String())).Build()).AsInt64()
 	if err != nil && !rueidis.IsRedisNil(err) {
 		logger.StdlibLogger(ctx).Error("failed to retrieve active run count for account", "err", err)
 		w.WriteHeader(500)

@@ -3,6 +3,7 @@ package golang
 import (
 	"context"
 	"fmt"
+	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"net/http"
 	"net/url"
 	"sync/atomic"
@@ -117,5 +118,14 @@ func TestFunctionStepLimit(t *testing.T) {
 		run := c.Run(ctx, lastRunId)
 		assert.Equal(t, "FAILED", run.Status)
 		assert.Equal(t, "{\"error\":{\"error\":\"function has too many steps\",\"name\":\"InngestErrFunctionOverflowed\",\"message\":\"The function run exceeded the step limit of 1 steps.\"}}", run.Output)
+
+		runTraces := c.WaitForRunTraces(ctx, t, &lastRunId, client.WaitForRunTracesOptions{
+			Status: models.FunctionStatusFailed,
+		})
+		output := c.RunSpanOutput(ctx, *runTraces.Trace.OutputID)
+
+		require.NotNil(t, output.Data)
+
+		require.Equal(t, "{\"error\":{\"error\":\"function has too many steps\",\"name\":\"InngestErrFunctionOverflowed\",\"message\":\"The function run exceeded the step limit of 1 steps.\"}}", output)
 	})
 }
