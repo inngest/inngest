@@ -366,6 +366,15 @@ func IncrBacklogRequeuedCounter(ctx context.Context, opts CounterOpt) {
 	})
 }
 
+func IncrRequeueExistingToBacklogCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "backlog_requeue_existing_total",
+		Description: "The total number of existing queue items that were requeued into backlogs from fn partition after hitting constraints",
+		Tags:        opts.Tags,
+	})
+}
+
 func ActiveShadowScannerCount(ctx context.Context, incr int64, opts CounterOpt) {
 	RecordUpDownCounterMetric(ctx, incr, CounterOpt{
 		PkgName:     opts.PkgName,
