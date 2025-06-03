@@ -228,6 +228,22 @@ func TestToFunctionConfiguration(t *testing.T) {
 				},
 			}),
 		},
+		{
+			name: "singleton",
+			fn: mergeWithDefaultFunction(&inngest.Function{
+				Singleton: &inngest.Singleton{
+					Mode: enums.SingletonModeSkip,
+					Key:  util.StrPtr("event.data.id == 2"),
+				},
+			}),
+			planConcurrencyLimit: UnknownPlanConcurrencyLimit,
+			expected: mergeWithDefaultFunctionConfiguration(&FunctionConfiguration{
+				Singleton: &SingletonConfiguration{
+					Mode: SingletonModeSkip,
+					Key:  util.StrPtr("event.data.id == 2"),
+				},
+			}),
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
