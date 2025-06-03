@@ -60,6 +60,14 @@ func ToFunctionConfiguration(fn *inngest.Function, planConcurrencyLimit int) *Fu
 		}
 	}
 
+	var singleton *SingletonConfiguration
+	if fn.Singleton != nil {
+		singleton = &SingletonConfiguration{
+			Key:  fn.Singleton.Key,
+			Mode: mapSingletonMode(fn.Singleton.Mode),
+		}
+	}
+
 	return &FunctionConfiguration{
 		Cancellations: mapCancellations(fn.Cancel),
 		Retries: &RetryConfiguration{
@@ -72,6 +80,7 @@ func ToFunctionConfiguration(fn *inngest.Function, planConcurrencyLimit int) *Fu
 		RateLimit:   mapRateLimit(fn.RateLimit),
 		Debounce:    mapDebounce(fn.Debounce),
 		Throttle:    throttle,
+		Singleton:   singleton,
 	}
 }
 
@@ -130,6 +139,19 @@ func mapScope(internalEnum enums.ConcurrencyScope) ConcurrencyScope {
 		return gqlEnum
 	}
 	return ConcurrencyScopeFunction
+}
+
+func mapSingletonMode(internalEnum enums.SingletonMode) SingletonMode {
+	var enumMapping = map[enums.SingletonMode]SingletonMode{
+		enums.SingletonModeSkip: SingletonModeSkip,
+		//enums.SingletonModeCancel: SingletonModeCancel,
+	}
+
+	if gqlEnum, ok := enumMapping[internalEnum]; ok {
+		return gqlEnum
+	}
+
+	return SingletonModeSkip
 }
 
 func boolPtr(b bool) *bool {

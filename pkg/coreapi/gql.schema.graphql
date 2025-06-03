@@ -180,6 +180,7 @@ type FunctionConfiguration {
   rateLimit: RateLimitConfiguration
   debounce: DebounceConfiguration
   throttle: ThrottleConfiguration
+  singleton: SingletonConfiguration
 }
 
 type CancellationConfiguration {
@@ -236,6 +237,16 @@ type ThrottleConfiguration {
   key: String
   limit: Int!
   period: String!
+}
+
+type SingletonConfiguration {
+  mode: SingletonMode!
+  key: String
+}
+
+enum SingletonMode {
+  SKIP
+  CANCEL
 }
 
 enum StepEventType {

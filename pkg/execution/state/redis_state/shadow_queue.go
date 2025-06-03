@@ -21,12 +21,24 @@ import (
 )
 
 const (
+	AbsoluteShadowPartitionPeekMax int64 = 10 * ShadowPartitionPeekMaxBacklogs
+
 	ShadowPartitionAccountPeekMax  = int64(30)
 	ShadowPartitionPeekMax         = int64(300) // same as PartitionPeekMax for now
 	ShadowPartitionPeekMinBacklogs = int64(10)
 	ShadowPartitionPeekMaxBacklogs = int64(100)
 
 	ShadowPartitionRequeueExtendedDuration = 5 * time.Second
+)
+
+var (
+	ErrShadowPartitionAlreadyLeased               = fmt.Errorf("shadow partition already leased")
+	ErrShadowPartitionLeaseNotFound               = fmt.Errorf("shadow partition lease not found")
+	ErrShadowPartitionNotFound                    = fmt.Errorf("shadow partition not found")
+	ErrShadowPartitionPaused                      = fmt.Errorf("shadow partition refill is disabled")
+	ErrShadowPartitionBacklogPeekMaxExceedsLimits = fmt.Errorf("shadow partition backlog peek exceeded the maximum limit of %d", ShadowPartitionPeekMaxBacklogs)
+	ErrShadowPartitionPeekMaxExceedsLimits        = fmt.Errorf("shadow partition peek exceeded the maximum limit of %d", ShadowPartitionPeekMax)
+	ErrShadowPartitionAccountPeekMaxExceedsLimits = fmt.Errorf("account peek with shadow partitions exceeded the maximum limit of %d", ShadowPartitionAccountPeekMax)
 )
 
 // shadowWorker runs a blocking process that listens to item being pushed into the
@@ -70,6 +82,7 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 				Tags: map[string]any{
 					"queue_shard":  q.primaryQueueShard.Name,
 					"partition_id": shadowPart.PartitionID,
+					"action":       "lease",
 				},
 			})
 			return nil
@@ -110,6 +123,14 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 				leaseID, err = q.ShadowPartitionExtendLease(ctx, shadowPart, *leaseID, ShadowPartitionLeaseDuration)
 				if err != nil {
 					if errors.Is(err, ErrShadowPartitionAlreadyLeased) || errors.Is(err, ErrShadowPartitionLeaseNotFound) {
+						metrics.IncrQueueShadowPartitionLeaseContentionCounter(ctx, metrics.CounterOpt{
+							PkgName: pkgName,
+							Tags: map[string]any{
+								"queue_shard":  q.primaryQueueShard.Name,
+								"partition_id": shadowPart.PartitionID,
+								"action":       "extend_lease",
+							},
+						})
 						// contention
 						return
 					}
@@ -135,7 +156,7 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 	limit := ShadowPartitionPeekMaxBacklogs
 
 	// Scan a little further into the future
-	refillUntil := q.clock.Now().Truncate(time.Second).Add(2 * PartitionLookahead)
+	refillUntil := q.clock.Now().Truncate(time.Millisecond).Add(2 * PartitionLookahead)
 
 	// Pick a random backlog offset every time
 	sequential := false
@@ -148,12 +169,6 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 		PkgName: pkgName,
 		Tags:    map[string]any{"partition_id": shadowPart.PartitionID},
 	})
-
-	// q.log.Trace("processing backlogs",
-	// 	"partition_id", shadowPart.PartitionID,
-	// 	"until", refillUntil.Format(time.StampMilli),
-	// 	"backlogs", len(backlogs),
-	// )
 
 	// Refill backlogs in random order
 	fullyProcessedBacklogs := 0
@@ -252,20 +267,17 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 		var forceRequeueShadowPartitionAt time.Time
 		var forceRequeueBacklogAt time.Time
 
+		switch res.Constraint {
 		// If backlog is limited by function or account-level concurrency, stop refilling
-		isConcurrencyLimited := res.Constraint == enums.QueueConstraintAccountConcurrency ||
-			res.Constraint == enums.QueueConstraintFunctionConcurrency
-		if isConcurrencyLimited {
+		case enums.QueueConstraintAccountConcurrency, enums.QueueConstraintFunctionConcurrency:
 			forceRequeueShadowPartitionAt = q.clock.Now().Add(PartitionConcurrencyLimitRequeueExtension)
-		}
 
 		// If backlog is concurrency limited by custom key, requeue just this backlog in the future
-		if res.Constraint == enums.QueueConstraintCustomConcurrencyKey1 || res.Constraint == enums.QueueConstraintCustomConcurrencyKey2 {
+		case enums.QueueConstraintCustomConcurrencyKey1, enums.QueueConstraintCustomConcurrencyKey2:
 			forceRequeueBacklogAt = backlog.requeueBackOff(q.clock.Now(), res.Constraint, shadowPart)
-		}
 
 		// If backlog is throttled, requeue just this backlog in the future
-		if res.Constraint == enums.QueueConstraintThrottle {
+		case enums.QueueConstraintThrottle:
 			forceRequeueBacklogAt = backlog.requeueBackOff(q.clock.Now(), res.Constraint, shadowPart)
 		}
 
@@ -757,4 +769,82 @@ func (q *queue) ShadowPartitionRequeue(ctx context.Context, sp *QueueShadowParti
 	default:
 		return fmt.Errorf("unknown response returning shadow partition lease: %v (%T)", status, status)
 	}
+}
+
+func (q *queue) ShadowPartitionLease(ctx context.Context, sp *QueueShadowPartition, duration time.Duration) (*ulid.ULID, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "ShadowPartitionLease"), redis_telemetry.ScopeQueue)
+
+	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
+		return nil, fmt.Errorf("unsupported queue shard kind for ShadowPartitionLease: %s", q.primaryQueueShard.Kind)
+	}
+
+	now := q.clock.Now()
+	leaseExpiry := now.Add(duration)
+	leaseID, err := ulid.New(ulid.Timestamp(leaseExpiry), rand.Reader)
+	if err != nil {
+		return nil, fmt.Errorf("could not generate leaseID: %w", err)
+	}
+
+	sp.LeaseID = &leaseID
+
+	accountID := uuid.Nil
+	if sp.AccountID != nil {
+		accountID = *sp.AccountID
+	}
+
+	keys := []string{
+		q.primaryQueueShard.RedisClient.kg.ShadowPartitionMeta(),
+		q.primaryQueueShard.RedisClient.kg.GlobalShadowPartitionSet(),
+		q.primaryQueueShard.RedisClient.kg.GlobalAccountShadowPartitions(),
+		q.primaryQueueShard.RedisClient.kg.AccountShadowPartitions(accountID),
+	}
+	args, err := StrSlice([]any{
+		sp.PartitionID,
+		accountID,
+		leaseID,
+		now.UnixMilli(),
+		leaseExpiry.UnixMilli(),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("could not serialize args: %w", err)
+	}
+
+	status, err := scripts["queue/shadowPartitionLease"].Exec(
+		redis_telemetry.WithScriptName(ctx, "shadowPartitionLease"),
+		q.primaryQueueShard.RedisClient.unshardedRc,
+		keys,
+		args,
+	).AsInt64()
+	if err != nil {
+		return nil, fmt.Errorf("error leasing shadow partition: %w", err)
+	}
+	switch status {
+	case 0:
+		return &leaseID, nil
+	case -1:
+		return nil, ErrShadowPartitionNotFound
+	case -2:
+		return nil, ErrShadowPartitionAlreadyLeased
+	case -3:
+		return nil, ErrShadowPartitionPaused
+	default:
+		return nil, fmt.Errorf("unknown response leasing shadow partition: %v (%T)", status, status)
+	}
+}
+
+func (q *queue) peekGlobalShadowPartitionAccounts(ctx context.Context, sequential bool, until time.Time, limit int64) ([]uuid.UUID, error) {
+	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
+		return nil, fmt.Errorf("unsupported queue shard kind for peekGlobalShadowPartitionAccounts: %s", q.primaryQueueShard.Kind)
+	}
+
+	rc := q.primaryQueueShard.RedisClient
+
+	p := peeker[QueueBacklog]{
+		q:                      q,
+		opName:                 "peekGlobalShadowPartitionAccounts",
+		max:                    ShadowPartitionAccountPeekMax,
+		isMillisecondPrecision: true,
+	}
+
+	return p.peekUUIDPointer(ctx, rc.kg.GlobalAccountShadowPartitions(), sequential, until, limit)
 }
