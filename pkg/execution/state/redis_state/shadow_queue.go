@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"iter"
 	"math"
 	mrand "math/rand"
 	"sync"
@@ -353,8 +354,7 @@ func (q *queue) scanShadowContinuations(ctx context.Context) error {
 	}
 
 	eg := errgroup.Group{}
-	q.shadowContinuesLock.Lock()
-	for _, c := range q.shadowContinues {
+	for c := range q.shadowContinues.Continuations() {
 		cont := c
 		eg.Go(func() error {
 			sp := cont.shadowPart
@@ -379,7 +379,6 @@ func (q *queue) scanShadowContinuations(ctx context.Context) error {
 			return nil
 		})
 	}
-	q.shadowContinuesLock.Unlock()
 	return eg.Wait()
 }
 
@@ -535,38 +534,12 @@ func (q *queue) addShadowContinue(ctx context.Context, p *QueueShadowPartition, 
 		return
 	}
 
-	if ctr >= q.shadowContinuationLimit {
+	if !q.shadowContinues.IsWithinLimit(ctr) {
 		q.removeShadowContinue(ctx, p, true)
 		return
 	}
 
-	q.shadowContinuesLock.Lock()
-	defer q.shadowContinuesLock.Unlock()
-
-	// If this is the first shadow continuation, check if we're on a cooldown, or if we're
-	// beyond capacity.
-	if ctr == 1 {
-		if len(q.shadowContinues) > consts.QueueShadowContinuationMaxPartitions {
-			metrics.IncrQueueShadowContinuationOpCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name, "op": "max_capacity"}})
-			return
-		}
-		if t, ok := q.shadowContinueCooldown[p.PartitionID]; ok && t.After(time.Now()) {
-			metrics.IncrQueueShadowContinuationOpCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name, "op": "cooldown"}})
-			return
-		}
-
-		// Remove the shadow continuation cooldown.
-		delete(q.shadowContinueCooldown, p.PartitionID)
-	}
-
-	c, ok := q.shadowContinues[p.PartitionID]
-	if !ok || c.count < ctr {
-		// Update the continue count if it doesn't exist, or the current counter
-		// is higher.  This ensures that we always have the highest continuation
-		// count stored for queue processing.
-		q.shadowContinues[p.PartitionID] = shadowContinuation{shadowPart: p, count: ctr}
-		metrics.IncrQueueShadowContinuationOpCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name, "op": "added"}})
-	}
+	q.shadowContinues.Add(ctx, p, ctr)
 }
 
 func (q *queue) removeShadowContinue(ctx context.Context, p *QueueShadowPartition, cooldown bool) {
@@ -574,26 +547,7 @@ func (q *queue) removeShadowContinue(ctx context.Context, p *QueueShadowPartitio
 		// shadow continuations are not enabled.
 		return
 	}
-
-	// This is over the limit for continuing the shadow partition, so force it to be
-	// removed in every case.
-	q.shadowContinuesLock.Lock()
-	defer q.shadowContinuesLock.Unlock()
-
-	metrics.IncrQueueShadowContinuationOpCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name, "op": "removed"}})
-
-	delete(q.shadowContinues, p.PartitionID)
-
-	if cooldown {
-		// Add a cooldown, preventing this partition from being added as a continuation
-		// for a given period of time.
-		//
-		// Note that this isn't shared across replicas;  cooldowns
-		// only exist in the current replica.
-		q.shadowContinueCooldown[p.PartitionID] = time.Now().Add(
-			consts.QueueShadowContinuationCooldownPeriod,
-		)
-	}
+	q.shadowContinues.Remove(ctx, p, cooldown)
 }
 
 func (q *queue) ShadowPartitionPeek(ctx context.Context, sp *QueueShadowPartition, sequential bool, until time.Time, limit int64) ([]*QueueBacklog, int, error) {
@@ -849,11 +803,12 @@ func (q *queue) peekGlobalShadowPartitionAccounts(ctx context.Context, sequentia
 	return p.peekUUIDPointer(ctx, rc.kg.GlobalAccountShadowPartitions(), sequential, until, limit)
 }
 
-func newShadowContinuation() *shadowCont {
+func newShadowContinuation(shardName string) *shadowCont {
 	return &shadowCont{
 		continues: map[string]shadowContinuation{},
 		cooldown:  map[string]time.Time{},
 		limit:     0,
+		shardName: shardName,
 	}
 }
 
@@ -864,15 +819,40 @@ type shadowCont struct {
 	continues map[string]shadowContinuation
 	cooldown  map[string]time.Time
 	limit     uint
+
+	shardName string
 }
 
-func (sc *shadowCont) Add() {}
-
-func (sc *shadowCont) Remove(id string, cooldown bool) {
+func (sc *shadowCont) Add(ctx context.Context, p *QueueShadowPartition, ctr uint) {
 	sc.Lock()
 	defer sc.Unlock()
 
-	delete(sc.continues, id)
+	if ctr == 1 {
+		if len(sc.continues) > consts.QueueShadowContinuationMaxPartitions {
+			metrics.IncrQueueShadowContinuationOpCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": sc.shardName, "op": "max_capacity"}})
+			return
+		}
+
+		if t, ok := sc.cooldown[p.PartitionID]; ok && t.After(time.Now()) {
+			metrics.IncrQueueShadowContinuationOpCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": sc.shardName, "op": "cooldown"}})
+			return
+		}
+
+		delete(sc.cooldown, p.PartitionID)
+	}
+
+	c, ok := sc.continues[p.PartitionID]
+	if !ok || c.count < ctr {
+		sc.continues[p.PartitionID] = shadowContinuation{shadowPart: p, count: ctr}
+		metrics.IncrQueueShadowContinuationOpCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": sc.shardName, "op": "added"}})
+	}
+}
+
+func (sc *shadowCont) Remove(ctx context.Context, p *QueueShadowPartition, cooldown bool) {
+	sc.Lock()
+	defer sc.Unlock()
+
+	delete(sc.continues, p.PartitionID)
 
 	if cooldown {
 		// Add a cooldown, preventing this partition from being added as a continuation
@@ -880,11 +860,36 @@ func (sc *shadowCont) Remove(id string, cooldown bool) {
 		//
 		// Note that this isn't shared across replicas;  cooldowns
 		// only exist in the current replica.
-		sc.cooldown[id] = time.Now().Add(consts.QueueShadowContinuationCooldownPeriod)
+		sc.cooldown[p.PartitionID] = time.Now().Add(consts.QueueShadowContinuationCooldownPeriod)
+		metrics.IncrQueueShadowContinuationOpCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": sc.shardName, "op": "removed"}})
 	}
 }
 
-func (sc *shadowCont) Continuations() {}
+func (sc *shadowCont) Continuations() iter.Seq[shadowContinuation] {
+	cont := []shadowContinuation{}
+
+	sc.Lock()
+	for _, c := range sc.continues {
+		cont = append(cont, c)
+	}
+	sc.Unlock()
+
+	return func(yield func(shadowContinuation) bool) {
+		for _, c := range cont {
+			if !yield(c) {
+				return
+			}
+		}
+	}
+}
+
+func (sc *shadowCont) Has(p *QueueShadowPartition) bool {
+	sc.Lock()
+	defer sc.Unlock()
+
+	_, ok := sc.continues[p.PartitionID]
+	return ok
+}
 
 func (sc *shadowCont) IsWithinLimit(ctr uint) bool {
 	return ctr >= sc.limit

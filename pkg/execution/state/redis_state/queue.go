@@ -660,7 +660,7 @@ func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 		continues:         map[string]continuation{},
 		continueCooldown:  map[string]time.Time{},
 		continuationLimit: consts.DefaultQueueContinueLimit,
-		shadowContinues:   newShadowContinuation(),
+		shadowContinues:   newShadowContinuation(primaryQueueShard.Name),
 		// instrumentation
 		instrumentBacklogResult: func(ctx context.Context, backlog *QueueBacklog, result *BacklogRefillResult) {},
 		normalizeRefreshItemCustomConcurrencyKeys: func(ctx context.Context, item *osqueue.QueueItem, existingKeys []state.CustomConcurrency, shadowPartition *QueueShadowPartition) ([]state.CustomConcurrency, error) {
