@@ -70,6 +70,7 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 				Tags: map[string]any{
 					"queue_shard":  q.primaryQueueShard.Name,
 					"partition_id": shadowPart.PartitionID,
+					"action":       "lease",
 				},
 			})
 			return nil
@@ -110,6 +111,14 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 				leaseID, err = q.ShadowPartitionExtendLease(ctx, shadowPart, *leaseID, ShadowPartitionLeaseDuration)
 				if err != nil {
 					if errors.Is(err, ErrShadowPartitionAlreadyLeased) || errors.Is(err, ErrShadowPartitionLeaseNotFound) {
+						metrics.IncrQueueShadowPartitionLeaseContentionCounter(ctx, metrics.CounterOpt{
+							PkgName: pkgName,
+							Tags: map[string]any{
+								"queue_shard":  q.primaryQueueShard.Name,
+								"partition_id": shadowPart.PartitionID,
+								"action":       "extend_lease",
+							},
+						})
 						// contention
 						return
 					}
