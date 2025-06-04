@@ -94,8 +94,20 @@ func WithServiceShardSelector(sl redis_state.ShardSelector) func(s *svc) {
 	}
 }
 
+func WithServiceEnableKeyQueues(kq func(ctx context.Context, acctID uuid.UUID) bool) func(*svc) {
+	return func(s *svc) {
+		s.allowKeyQueues = kq
+	}
+}
+
 func NewService(c config.Config, opts ...Opt) service.Service {
-	svc := &svc{config: c, log: logger.StdlibLogger(context.Background())}
+	svc := &svc{
+		config: c,
+		log:    logger.StdlibLogger(context.Background()),
+		allowKeyQueues: func(ctx context.Context, acctID uuid.UUID) bool {
+			return false
+		},
+	}
 	for _, o := range opts {
 		o(svc)
 	}
@@ -126,6 +138,8 @@ type svc struct {
 
 	opts      []ExecutorOpt
 	findShard redis_state.ShardSelector
+
+	allowKeyQueues func(ctx context.Context, acctID uuid.UUID) bool
 }
 
 func (s *svc) Name() string {
@@ -518,7 +532,11 @@ func (s *svc) handleCancel(ctx context.Context, item queue.Item) error {
 			return fmt.Errorf("error selecting shard for cancellation: %w", err)
 		}
 
-		items, err := qm.ItemsByFunction(ctx, shard, c.FunctionID, from, c.StartedBefore)
+		items, err := qm.ItemsByFunction(ctx, shard, c.FunctionID, from, c.StartedBefore,
+			redis_state.WithQueueItemIteratorAllowKeyQueues(func() bool {
+				return s.allowKeyQueues(ctx, c.AccountID)
+			}),
+		)
 		if err != nil {
 			return fmt.Errorf("error retrieving partition items: %w", err)
 		}
@@ -574,7 +592,11 @@ func (s *svc) handleCancel(ctx context.Context, item queue.Item) error {
 			return fmt.Errorf("error selecting shard for cancellation: %w", err)
 		}
 
-		items, err := qm.ItemsByBacklog(ctx, shard, c.TargetID, from, c.StartedBefore)
+		items, err := qm.ItemsByBacklog(ctx, shard, c.TargetID, from, c.StartedBefore,
+			redis_state.WithQueueItemIteratorAllowKeyQueues(func() bool {
+				return s.allowKeyQueues(ctx, c.AccountID)
+			}),
+		)
 		if err != nil {
 			return fmt.Errorf("error retrieving backlog iterator: %w", err)
 		}
