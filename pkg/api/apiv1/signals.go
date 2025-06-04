@@ -36,8 +36,8 @@ func (a router) receiveSignal(w http.ResponseWriter, r *http.Request) {
 	signalRes, err := util.WithRetry(
 		ctx,
 		"apiv1.receiveSignal",
-		func(ctx context.Context) (*execution.ReceiveSignalResult, error) {
-			return a.opts.Executor.ReceiveSignal(ctx, auth.WorkspaceID(), data.Signal, data.Data)
+		func(ctx context.Context) (*execution.ResumeSignalResult, error) {
+			return a.opts.Executor.ResumeSignal(ctx, auth.WorkspaceID(), data.Signal, data.Data)
 		},
 		util.NewRetryConf(),
 	)

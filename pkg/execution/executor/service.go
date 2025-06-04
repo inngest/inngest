@@ -284,31 +284,24 @@ func (s *svc) handlePauseTimeout(ctx context.Context, item queue.Item) error {
 		return fmt.Errorf("unable to get pause timeout from queue item: %T", item.Payload)
 	}
 
-	pause, err := s.state.PauseByID(ctx, pauseTimeout.PauseID)
-	if err == state.ErrPauseNotFound {
-		// This pause has been consumed.
-		l.Debug("consumed pause timeout ignored", "pause", pauseTimeout)
-		return nil
-	}
-	if err != nil {
-		return err
-	}
-	if pause == nil {
-		return nil
-	}
-
 	r := execution.ResumeRequest{
 		IsTimeout:      true,
+		PauseID:        pauseTimeout.PauseID,
 		IdempotencyKey: *item.JobID,
+		Attempts:       &pauseTimeout.MaxAttempts,
 	}
 
 	// If the pause timeout is for an invocation, store an error to cause the
 	// step to fail.
-	if pause.Opcode != nil && *pause.Opcode == enums.OpcodeInvokeFunction.String() {
+	if pauseTimeout.Opcode == enums.OpcodeInvokeFunction {
 		r.SetInvokeTimeoutError()
 	}
 
-	return s.exec.Resume(ctx, *pause, r)
+	id := sv2.IDFromV1(item.Identifier)
+
+	l.Debug("resuming timed out step")
+
+	return s.exec.ResumePauseTimeout(ctx, id, pauseTimeout.StepID, r)
 }
 
 // handleScheduledBatch checks for

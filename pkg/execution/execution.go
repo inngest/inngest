@@ -87,6 +87,14 @@ type Executor interface {
 		edge inngest.Edge,
 	) (*state.DriverResponse, error)
 
+	// Resume resumes an in-progress function run from the given waitForEvent pause.
+	Resume(ctx context.Context, p state.Pause, r ResumeRequest) error
+	// ResumePauseTimeout is an optimization over Resume which handles timeout cases for any paused
+	// steps, eg. step.waitForEvent, step.waitForSignal and step.invoke.
+	ResumePauseTimeout(ctx context.Context, id sv2.ID, stepID string, r ResumeRequest) error
+	// ResumeSignal handles resuming a signal, delegating to Resume() to resume the underlying pause.
+	ResumeSignal(ctx context.Context, workspaceID uuid.UUID, signalID string, data json.RawMessage) (*ResumeSignalResult, error)
+
 	// HandlePauses handles pauses loaded from an incoming event.  This delegates to Cancel and
 	// Resume where necessary, depending on pauses that have been loaded and matched.
 	HandlePauses(ctx context.Context, iter state.PauseIterator, event event.TrackedEvent) (HandlePauseResult, error)
@@ -95,8 +103,6 @@ type Executor interface {
 	HandleInvokeFinish(ctx context.Context, event event.TrackedEvent) error
 	// Cancel cancels an in-progress function run, preventing any enqueued or future steps from running.
 	Cancel(ctx context.Context, id sv2.ID, r CancelRequest) error
-	// Resume resumes an in-progress function run from the given waitForEvent pause.
-	Resume(ctx context.Context, p state.Pause, r ResumeRequest) error
 
 	// AddLifecycleListener adds a lifecycle listener to run on hooks.  This must
 	// always add to a list of listeners vs replace listeners.
@@ -114,12 +120,9 @@ type Executor interface {
 	AppendAndScheduleBatch(ctx context.Context, fn inngest.Function, bi batch.BatchItem, opts *BatchExecOpts) error
 
 	RetrieveAndScheduleBatch(ctx context.Context, fn inngest.Function, payload batch.ScheduleBatchPayload, opts *BatchExecOpts) error
-
-	// TODO
-	ReceiveSignal(ctx context.Context, workspaceID uuid.UUID, signalID string, data json.RawMessage) (*ReceiveSignalResult, error)
 }
 
-type ReceiveSignalResult struct {
+type ResumeSignalResult struct {
 	MatchedSignal bool
 	RunID         *ulid.ULID
 }
@@ -215,16 +218,30 @@ type CancelRequest struct {
 }
 
 type ResumeRequest struct {
-	With    any
+	// With is the step data we're resuming with
+	With any
+	// EventID is the ID of the event that matched, if this ResumeRequest
+	// originated from a waitForEvent pause.
 	EventID *ulid.ULID
+	// EventName is the event name of the event that matched, if this ResumeRequest
+	// originated from a waitForEvent pause.
+	EventName string
 	// RunID is the ID of the run that causes this resume, used for invoking
 	// functions directly.
-	RunID     *ulid.ULID
-	StepName  string
+	RunID *ulid.ULID
+	// StepName is the human step name used for o11y.
+	StepName string
+	// IsTimeout indicates if this Resume is a timeout.  Note that timeouts
+	// should be resumed with StepTimeout.
 	IsTimeout bool
-
 	// IdempotencyKey is used to make sure pause consumption is idempotent
 	IdempotencyKey string
+	// PauseID is the ID of the pause that we're resuming.  This is provided
+	// so that ResumePauseTimeout can execute and clean up pauses without actually
+	// loading pauses itself.
+	PauseID uuid.UUID
+	// Attempts is the number of attempts that the function run is scheduled with.
+	Attempts *int
 }
 
 func (r *ResumeRequest) Error() string {

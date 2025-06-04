@@ -208,6 +208,13 @@ type Item struct {
 	PriorityFactor *int64 `json:"pf,omitempty"`
 }
 
+func (i Item) GetMaxAttempts() int {
+	if i.MaxAttempts == nil {
+		return consts.DefaultRetryCount
+	}
+	return *i.MaxAttempts
+}
+
 type Throttle struct {
 	// Key is the unique throttling key that's used to group queue items when
 	// processing rate limiting/throttling.
@@ -290,13 +297,6 @@ func (i Item) GetPriorityFactor() int64 {
 		}
 	}
 	return 0
-}
-
-func (i Item) GetMaxAttempts() int {
-	if i.MaxAttempts == nil {
-		return consts.DefaultRetryCount
-	}
-	return *i.MaxAttempts
 }
 
 // IsStepKind determines if the item is considered a step
@@ -408,8 +408,10 @@ type PayloadPauseBlockFlush struct {
 // This is always enqueued from any async match;  we must correctly decrement the
 // pending count in cases where the event is not received.
 type PayloadPauseTimeout struct {
-	PauseID   uuid.UUID `json:"pauseID"`
-	OnTimeout bool      `json:"onTimeout"`
+	PauseID uuid.UUID `json:"pauseID"`
+	// Opcode differentiates the type of timeout, eg. waitForEvent, waitForSignal
+	// or invoke.
+	Opcode enums.Opcode `json:"op"`
 	// Event is required such that we can load the pause by ID.  This is an empty
 	// string for signals and invokes.
 	Event string `json:"e,omitempty"`
@@ -417,6 +419,9 @@ type PayloadPauseTimeout struct {
 	// that will be timing out.  This lets us consume the timeout idempotently without
 	// loading the pause.
 	StepID string `json:"sID"`
+	// MaxAttempts stores the max number of attempts that the run was started with.  This
+	// is required when enqueueing the next step job once the timeout resumes.
+	MaxAttempts int `json:"atts"`
 }
 
 func HashID(_ context.Context, id string) string {
