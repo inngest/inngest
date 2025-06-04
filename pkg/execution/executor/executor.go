@@ -227,6 +227,7 @@ func WithSingletonManager(sn singleton.Singleton) ExecutorOpt {
 		return nil
 	}
 }
+
 func WithBatcher(b batch.BatchManager) ExecutorOpt {
 	return func(e execution.Executor) error {
 		e.(*executor).batcher = b
@@ -540,7 +541,6 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 			// Attempt to early handle function singletons, function runs could still fail
 			// to enqueue later on when it atomically tries to acquire a function mutex.
 			alreadyRunning, err := e.singletonMgr.Singleton(ctx, singletonKey, *req.Function.Singleton)
-
 			if err != nil {
 				return nil, err
 			}
@@ -2675,6 +2675,7 @@ func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, i *runInsta
 		Payload: queue.PayloadPauseTimeout{
 			PauseID:   pauseID,
 			OnTimeout: true,
+			StepID:    gen.ID,
 		},
 	}, expires, queue.EnqueueOpts{})
 	if err == redis_state.ErrQueueItemExists {
@@ -2787,6 +2788,7 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, i *runInst
 		Payload: queue.PayloadPauseTimeout{
 			PauseID:   pauseID,
 			OnTimeout: true,
+			StepID:    gen.ID,
 		},
 	}, expires, queue.EnqueueOpts{})
 	if err == redis_state.ErrQueueItemExists {
@@ -2937,6 +2939,8 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, i *runInstan
 		Payload: queue.PayloadPauseTimeout{
 			PauseID:   pauseID,
 			OnTimeout: true,
+			Event:     opts.Event,
+			StepID:    gen.ID,
 		},
 	}, expires, queue.EnqueueOpts{})
 	if err == redis_state.ErrQueueItemExists {

@@ -410,6 +410,13 @@ type PayloadPauseBlockFlush struct {
 type PayloadPauseTimeout struct {
 	PauseID   uuid.UUID `json:"pauseID"`
 	OnTimeout bool      `json:"onTimeout"`
+	// Event is required such that we can load the pause by ID.  This is an empty
+	// string for signals and invokes.
+	Event string `json:"e,omitempty"`
+	// StepID is the ID of the step (the hashed opcode, and the key for step state)
+	// that will be timing out.  This lets us consume the timeout idempotently without
+	// loading the pause.
+	StepID string `json:"sID"`
 }
 
 func HashID(_ context.Context, id string) string {
