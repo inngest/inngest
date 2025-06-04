@@ -265,6 +265,8 @@ type TraceReader interface {
 	// TODO move to dedicated entitlement interface once that is implemented properly
 	// for both oss & cloud
 	OtelTracesEnabled(ctx context.Context, accountID uuid.UUID) (bool, error)
+	// GetEventRuns returns the runs that were triggered by an event.
+	GetEventRuns(ctx context.Context, eventID ulid.ULID, accountID uuid.UUID, workspaceID uuid.UUID) ([]*FunctionRun, error)
 }
 
 type GetTraceRunOpt struct {
