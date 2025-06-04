@@ -518,11 +518,17 @@ func (s *svc) handleCancel(ctx context.Context, item queue.Item) error {
 			return fmt.Errorf("error selecting shard for cancellation: %w", err)
 		}
 
+		items, err := qm.ItemsByFunction(ctx, shard, c.FunctionID, from, c.StartedBefore)
+		if err != nil {
+			return fmt.Errorf("error retrieving partition items: %w", err)
+		}
+
 		// Iterate over queue items
-		for qi, err := range qm.ItemsByFunction(ctx, shard, c.FunctionID, from, c.StartedBefore) {
-			// NOTE: should this be returned here?
-			if err != nil {
-				return fmt.Errorf("error on retrieving queue item for cancellation: %w", err)
+		for qi := range items {
+			if qi == nil {
+				// NOTE: this shouldn't happen but is fine to ignore.
+				l.Warn("nil queue item in partition item iterator")
+				continue
 			}
 
 			if c.If != nil {
@@ -568,10 +574,17 @@ func (s *svc) handleCancel(ctx context.Context, item queue.Item) error {
 			return fmt.Errorf("error selecting shard for cancellation: %w", err)
 		}
 
+		items, err := qm.ItemsByBacklog(ctx, shard, c.TargetID, from, c.StartedBefore)
+		if err != nil {
+			return fmt.Errorf("error retrieving backlog iterator: %w", err)
+		}
+
 		// iterate over queue items
-		for qi, err := range qm.ItemsByBacklog(ctx, shard, c.TargetID, from, c.StartedBefore) {
-			if err != nil {
-				return fmt.Errorf("error on retrieving queue item for cancellation: %w", err)
+		for qi := range items {
+			if qi == nil {
+				// NOTE: this shouldn't happen, but also is fine to ignore
+				l.Warn("nil queue item in backlog item iterator")
+				continue
 			}
 
 			// Check if it's a run
@@ -607,7 +620,7 @@ func (s *svc) handleCancel(ctx context.Context, item queue.Item) error {
 			}
 
 			// dequeue the item
-			if err := qm.Dequeue(ctx, shard, qi); err != nil {
+			if err := qm.Dequeue(ctx, shard, *qi); err != nil {
 				return err
 			}
 		}
