@@ -161,12 +161,10 @@ type QueueManager interface {
 	RequeueByJobID(ctx context.Context, queueShard QueueShard, jobID string, at time.Time) error
 
 	// ItemsByFunction returns a queue item iterator for a function within a specific time range
-	// TODO: remove the acctID param since this is only needed for the key queue feature flag
-	ItemsByFunction(ctx context.Context, queueShard QueueShard, workflowID uuid.UUID, from time.Time, until time.Time) (iter.Seq[*osqueue.QueueItem], error)
+	ItemsByFunction(ctx context.Context, queueShard QueueShard, workflowID uuid.UUID, from time.Time, until time.Time, opts ...QueueIteratorOpt) (iter.Seq[*osqueue.QueueItem], error)
 
 	// ItemsByBacklog returns a queue item iterator for a backlog within a specific time range
-	// TODO: remove the acctID param since this is only needed for the key queue feature flag
-	ItemsByBacklog(ctx context.Context, queueShard QueueShard, backlogID string, from time.Time, until time.Time) (iter.Seq[*osqueue.QueueItem], error)
+	ItemsByBacklog(ctx context.Context, queueShard QueueShard, backlogID string, from time.Time, until time.Time, opts ...QueueIteratorOpt) (iter.Seq[*osqueue.QueueItem], error)
 }
 
 // PartitionPriorityFinder returns the priority for a given queue partition.

@@ -211,7 +211,19 @@ func (q *queue) RunningCount(ctx context.Context, workflowID uuid.UUID) (int64, 
 	return count, nil
 }
 
-func (q *queue) ItemsByFunction(ctx context.Context, shard QueueShard, workflowID uuid.UUID, from time.Time, until time.Time) (iter.Seq[*osqueue.QueueItem], error) {
+func (q *queue) ItemsByFunction(ctx context.Context, shard QueueShard, workflowID uuid.UUID, from time.Time, until time.Time, opts ...QueueIteratorOpt) (iter.Seq[*osqueue.QueueItem], error) {
+	opt := queueIterOpt{}
+	for _, apply := range opts {
+		apply(&opt)
+	}
+
+	l := q.log.With(
+		"method", "ItemsByFunction",
+		"workflowID", workflowID.String(),
+		"from", from,
+		"until", until,
+	)
+
 	// retrieve partition by ID
 	hash := shard.RedisClient.kg.PartitionItem()
 	rc := shard.RedisClient.Client()
@@ -229,25 +241,144 @@ func (q *queue) ItemsByFunction(ctx context.Context, shard QueueShard, workflowI
 
 	return func(yield func(*osqueue.QueueItem) bool) {
 		for {
-			// TODO: peek function partition
+			var processed, skipped int
 
-			// if q.allowKeyQueues(ctx, acctID) {
-			// 	// TODO: peek backlogs
-			// }
-			// TODO: continue on iteration until it reaches the end
+			// peek function partition
+			// TODO: we need a way to peek from a score and not just -inf
+			items, err := q.Peek(ctx, &pt, until, AbsoluteQueuePeekMax)
+			if err != nil {
+				l.Error("error peeking items for iterator", "error", err)
+				return
+			}
+
+			for _, qi := range items {
+				// skip this if the item's expected time is not within the provided time range
+				at := time.UnixMilli(qi.AtMS)
+				if at.Before(from) || at.After(until) {
+					skipped++
+					continue
+				}
+
+				if !yield(qi) {
+					return
+				}
+				processed++
+			}
+
+			// didn't process anything, exit loop
+			if processed == 0 {
+				break
+			}
+		}
+
+		if opt.allowKeyQueues() {
+			var spt QueueShadowPartition
+			// TODO: load shadow partition
+
+			l = l.With("shadow_partition", spt)
+
+			for {
+				var processed, skipped int
+
+				// TODO: maybe provide a different limit?
+				backlogs, _, err := q.ShadowPartitionPeek(ctx, &spt, true, until, q.peekMax)
+				if err != nil {
+					l.Error("error peeking backlogs for partition", "error", err)
+					return
+				}
+
+				for _, backlog := range backlogs {
+					items, _, err := q.backlogPeek(ctx, backlog, from, until, q.peekMax)
+					if err != nil {
+						l.Error("error retrieving queue items from backlog", "error", err)
+						return
+					}
+
+					for _, qi := range items {
+						at := time.UnixMilli(qi.AtMS)
+						if at.Before(from) || at.After(until) {
+							skipped++
+							continue
+						}
+
+						if !yield(qi) {
+							return
+						}
+						processed++
+					}
+				}
+
+				// didn't process anything, meaning there's nothing left to do
+				// exit loop
+				if processed == 0 {
+					return
+				}
+			}
 		}
 	}, nil
 }
 
-func (q *queue) ItemsByBacklog(ctx context.Context, shard QueueShard, backlogID string, from time.Time, until time.Time) (iter.Seq[*osqueue.QueueItem], error) {
-	// if !q.allowKeyQueues(ctx, acctID) {
-	// 	return nil
-	// }
+func (q *queue) ItemsByBacklog(ctx context.Context, shard QueueShard, backlogID string, from time.Time, until time.Time, opts ...QueueIteratorOpt) (iter.Seq[*osqueue.QueueItem], error) {
+	opt := queueIterOpt{}
+	for _, apply := range opts {
+		apply(&opt)
+	}
+
+	l := q.log.With(
+		"method", "ItemsByBacklog",
+		"backlogID", backlogID,
+		"from", from,
+		"until", until,
+	)
+
+	// return early if key queues are not enabled
+	if !opt.allowKeyQueues() {
+		return nil, nil
+	}
+
+	hash := shard.RedisClient.kg.BacklogMeta()
+	rc := shard.RedisClient.Client()
+
+	cmd := rc.B().Hget().Key(hash).Field(backlogID).Build()
+	byt, err := rc.Do(ctx, cmd).AsBytes()
+	if err != nil {
+		return nil, fmt.Errorf("error retrieving backlog: %w", err)
+	}
+
+	var backlog QueueBacklog
+	if err := json.Unmarshal(byt, &backlog); err != nil {
+		return nil, fmt.Errorf("error unmarshalling backlog: %w", err)
+	}
 
 	return func(yield func(*osqueue.QueueItem) bool) {
 		for {
-			// TODO: peek items for backlog
-			// TODO: continue on peek until it reaches end
+			var processed, skipped int
+
+			// peek items for backlog
+			items, _, err := q.backlogPeek(ctx, &backlog, from, until, q.peekMax)
+			if err != nil {
+				l.Error("error retrieving queue items from backlog", "error", err)
+				return
+			}
+
+			for _, qi := range items {
+				at := time.UnixMilli(qi.AtMS)
+				if at.Before(from) || at.After(until) {
+					skipped++
+					continue
+				}
+
+				if !yield(qi) {
+					return
+				}
+				processed++
+			}
+
+			// didn't process anything, meaning there's nothing left to do
+			// exit loop
+			if processed == 0 {
+				return
+			}
 		}
 	}, nil
 }
