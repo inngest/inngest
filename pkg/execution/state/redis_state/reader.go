@@ -211,29 +211,43 @@ func (q *queue) RunningCount(ctx context.Context, workflowID uuid.UUID) (int64, 
 	return count, nil
 }
 
-func (q *queue) ItemsByFunction(ctx context.Context, shard QueueShard, workflowID uuid.UUID, from time.Time, until time.Time) iter.Seq2[osqueue.QueueItem, error] {
+func (q *queue) ItemsByFunction(ctx context.Context, shard QueueShard, workflowID uuid.UUID, from time.Time, until time.Time) (iter.Seq[*osqueue.QueueItem], error) {
 	// retrieve partition by ID
+	hash := shard.RedisClient.kg.PartitionItem()
+	rc := shard.RedisClient.Client()
 
-	return func(yield func(osqueue.QueueItem, error) bool) {
+	cmd := rc.B().Hget().Key(hash).Field(workflowID.String()).Build()
+	byt, err := rc.Do(ctx, cmd).AsBytes()
+	if err != nil {
+		return nil, fmt.Errorf("error retrieving partition: %w", err)
+	}
+
+	var pt QueuePartition
+	if err := json.Unmarshal(byt, &pt); err != nil {
+		return nil, fmt.Errorf("error unmarshalling queue partition: %w", err)
+	}
+
+	return func(yield func(*osqueue.QueueItem) bool) {
 		for {
 			// TODO: peek function partition
+
 			// if q.allowKeyQueues(ctx, acctID) {
 			// 	// TODO: peek backlogs
 			// }
 			// TODO: continue on iteration until it reaches the end
 		}
-	}
+	}, nil
 }
 
-func (q *queue) ItemsByBacklog(ctx context.Context, shard QueueShard, backlogID string, from time.Time, until time.Time) iter.Seq2[osqueue.QueueItem, error] {
+func (q *queue) ItemsByBacklog(ctx context.Context, shard QueueShard, backlogID string, from time.Time, until time.Time) (iter.Seq[*osqueue.QueueItem], error) {
 	// if !q.allowKeyQueues(ctx, acctID) {
 	// 	return nil
 	// }
 
-	return func(yield func(osqueue.QueueItem, error) bool) {
+	return func(yield func(*osqueue.QueueItem) bool) {
 		for {
 			// TODO: peek items for backlog
 			// TODO: continue on peek until it reaches end
 		}
-	}
+	}, nil
 }
