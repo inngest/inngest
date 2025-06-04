@@ -100,7 +100,7 @@ func NewService(c config.Config, opts ...Opt) service.Service {
 		o(svc)
 	}
 	// don't proceed if shard selector is not set
-	if svc.shardSelect == nil {
+	if svc.findShard == nil {
 		panic("shard selector need to be provided for executor service")
 	}
 
@@ -467,6 +467,9 @@ func (s *svc) handleDebounce(ctx context.Context, item queue.Item) error {
 	return nil
 }
 
+// handleCancel handles eager bulk cancellation
+//
+// TODO: halt work if a user decides to cancel this cancellation
 func (s *svc) handleCancel(ctx context.Context, item queue.Item) error {
 	c := cqrs.Cancellation{}
 	if err := json.Unmarshal(item.Payload.(json.RawMessage), &c); err != nil {
@@ -505,8 +508,18 @@ func (s *svc) handleCancel(ctx context.Context, item queue.Item) error {
 			from = *c.StartedAfter
 		}
 
+		qm, ok := s.queue.(redis_state.QueueManager)
+		if !ok {
+			return fmt.Errorf("expected queue manager for cancellation")
+		}
+
+		shard, err := s.findShard(ctx, c.AccountID, c.QueueName)
+		if err != nil {
+			return fmt.Errorf("error selecting shard for cancellation: %w", err)
+		}
+
 		// Iterate over queue items
-		for qi, err := range s.queue.ItemsByFunction(ctx, c.AccountID, c.WorkspaceID, c.FunctionID, from, c.StartedBefore) {
+		for qi, err := range qm.ItemsByFunction(ctx, shard, c.FunctionID, from, c.StartedBefore) {
 			// NOTE: should this be returned here?
 			if err != nil {
 				return fmt.Errorf("error on retrieving queue item for cancellation: %w", err)
@@ -545,13 +558,18 @@ func (s *svc) handleCancel(ctx context.Context, item queue.Item) error {
 			from = *c.StartedAfter
 		}
 
+		qm, ok := s.queue.(redis_state.QueueManager)
+		if !ok {
+			return fmt.Errorf("expected queue manager for cancellation")
+		}
+
 		shard, err := s.findShard(ctx, c.AccountID, c.QueueName)
 		if err != nil {
-			return fmt.Errorf("error selecting shard for cancellation: %w")
+			return fmt.Errorf("error selecting shard for cancellation: %w", err)
 		}
 
 		// iterate over queue items
-		for qi, err := range s.queue.ItemsByBacklog(ctx, c.AccountID, c.TargetID, from, c.StartedBefore) {
+		for qi, err := range qm.ItemsByBacklog(ctx, shard, c.TargetID, from, c.StartedBefore) {
 			if err != nil {
 				return fmt.Errorf("error on retrieving queue item for cancellation: %w", err)
 			}
@@ -589,10 +607,8 @@ func (s *svc) handleCancel(ctx context.Context, item queue.Item) error {
 			}
 
 			// dequeue the item
-			if q, ok := s.queue.(redis_state.QueueManager); ok {
-				if err := q.Dequeue(ctx, shard, qi); err != nil {
-					return err
-				}
+			if err := qm.Dequeue(ctx, shard, qi); err != nil {
+				return err
 			}
 		}
 	}
