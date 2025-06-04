@@ -16,6 +16,11 @@ import (
 )
 
 var (
+	// NOTE: there's no logic behind this number, it's just a random pick for now
+	ThrottleBackoffMultiplierThreshold = 15 * time.Second
+)
+
+var (
 	ErrBacklogNotFound = fmt.Errorf("backlog not found")
 )
 
@@ -591,8 +596,8 @@ func (b QueueBacklog) requeueBackOff(now time.Time, constraint enums.QueueConstr
 		period := time.Duration(partition.Throttle.Period * int(time.Second))
 		// NOTE: for short periods, we want to increase the frequency of the checks to make sure we admit the items in the right timing
 		// and it's not too late
-		if period < 30*time.Second {
-			multiplier /= 3
+		if period < ThrottleBackoffMultiplierThreshold {
+			multiplier /= 4
 		} else {
 			multiplier /= 2
 		}
