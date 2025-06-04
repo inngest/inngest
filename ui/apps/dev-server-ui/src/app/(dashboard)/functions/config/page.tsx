@@ -22,11 +22,17 @@ export default async function FunctionDashboardPage() {
     return null;
   }
 
+  console.log({ data });
+
   return (
     <div className="grid" style={{ gridTemplateColumns: '1fr 1fr 1fr 432px' }}>
       <div style={{ gridColumn: 'span 3 / span 3' }}></div>
       <div>
-        <FunctionConfiguration configuration={data.functionBySlug.configuration} />
+        <FunctionConfiguration
+          inngestFunction={data.functionBySlug}
+          triggers={data.functionBySlug.triggers}
+          configuration={data.functionBySlug.configuration}
+        />
       </div>
     </div>
   );

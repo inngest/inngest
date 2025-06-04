@@ -125,7 +125,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	l := logger.StdlibLogger(ctx)
 	ctx = logger.WithStdlib(ctx, l)
 
-	db, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{InMemory: true})
+	db, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{InMemory: false})
 	if err != nil {
 		return err
 	}

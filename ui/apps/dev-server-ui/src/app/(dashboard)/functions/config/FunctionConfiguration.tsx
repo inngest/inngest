@@ -1,13 +1,40 @@
+import { useMemo } from 'react';
+import { useRouter } from 'next/navigation';
+import { Button } from '@inngest/components/Button';
+import { Header } from '@inngest/components/Header/Header';
+import { InvokeButton } from '@inngest/components/InvokeButton';
 import { MetadataGrid, type MetadataItemProps } from '@inngest/components/Metadata';
+import { AppsIcon } from '@inngest/components/icons/sections/Apps';
+import { EventsIcon } from '@inngest/components/icons/sections/Events';
+import { RiArrowRightUpLine, RiTimeLine } from '@remixicon/react';
+import { toast } from 'sonner';
 
-import { type FunctionConfiguration } from '@/store/generated';
+import {
+  FunctionTriggerTypes,
+  useInvokeFunctionMutation,
+  type Function,
+  type FunctionConfiguration,
+} from '@/store/generated';
 import Block from './Block';
 
 type FunctionConfigurationProps = {
+  inngestFunction: Function;
+  triggers: any;
   configuration: FunctionConfiguration;
 };
 
-export default function FunctionConfiguration({ configuration }: FunctionConfigurationProps) {
+export default function FunctionConfiguration({
+  inngestFunction,
+  triggers,
+  configuration,
+}: FunctionConfigurationProps) {
+  const router = useRouter();
+  const doesFunctionAcceptPayload = useMemo(() => {
+    return Boolean(triggers?.some((trigger) => trigger.type === FunctionTriggerTypes.Event));
+  }, [triggers]);
+
+  const [invokeFunction] = useInvokeFunctionMutation();
+
   const miscellaneousItems: MetadataItemProps[] = [
     {
       size: 'large',
@@ -122,68 +149,181 @@ export default function FunctionConfiguration({ configuration }: FunctionConfigu
   }
 
   return (
-    <Block title="Configuration">
-      <MetadataGrid columns={2} metadataItems={miscellaneousItems} />
-      {eventBatchItems && (
-        <>
-          <h3 className="pb-2 pt-6 text-sm font-medium">Events Batch</h3>
-          <MetadataGrid columns={2} metadataItems={eventBatchItems} />
-        </>
-      )}
-      <h3 className="pb-2 pt-6 text-sm font-medium">Concurrency</h3>
-      <div className="space-y-3">
-        {configuration.concurrency.map((concurrencyItem, index) => {
-          const items: MetadataItemProps[] = [
-            {
-              label: 'Scope',
-              title: concurrencyItem.scope,
-              value: (
-                <div className="lowercase first-letter:capitalize">{concurrencyItem.scope}</div>
-              ),
-            },
-            {
-              label: 'Limit',
-              value: `${concurrencyItem.limit.value}`,
-              ...(concurrencyItem.limit.isPlanLimit && {
-                badge: {
-                  label: 'Plan Limit',
-                  description:
-                    'If not configured, the limit is set to the maximum value allowed within your plan.',
-                },
-              }),
-              tooltip: 'The maximum number of concurrently running steps.',
-            },
-          ];
+    <div className="flex flex-col">
+      <Header
+        breadcrumb={[{ text: inngestFunction.name }]}
+        action={
+          <div className="flex flex-row items-center justify-end gap-2">
+            <InvokeButton
+              disabled={false}
+              doesFunctionAcceptPayload={doesFunctionAcceptPayload}
+              btnAction={async ({ data, user }) => {
+                await invokeFunction({
+                  data,
+                  functionSlug: inngestFunction.slug,
+                  user,
+                });
+                toast.success('Function invoked');
+                router.push('/runs');
+              }}
+            />
+          </div>
+        }
+      />
+      <div
+        style={{
+          padding: 16,
+          flexDirection: 'column',
+          justifyContent: 'flex-start',
+          alignItems: 'flex-start',
+          display: 'inline-flex',
+        }}
+      >
+        {/* do we want 'var(--textColor-light, #9B9B9B)'*/}
+        {/* letter spacing */}
+        <div
+          className="pb-3 text-xs uppercase tracking-wide text-gray-400"
+          style={{
+            justifyContent: 'center',
+            display: 'flex',
+            flexDirection: 'column',
+            wordWrap: 'break-word',
+          }}
+        >
+          Overview
+        </div>
+        <div className="flex flex-col space-y-6 self-stretch ">
+          <div>
+            {/* do we want font weight 450 specifically? */}
+            <span className="text-sm font-medium">App</span>
+            {/*border-gray-200 (#E5E7EB) would be close to #E2E2E2.*/}
+            <div className="flex items-center gap-2 self-stretch rounded border border-gray-200 p-2">
+              {/*bg-gray-100 (#F3F4F6) would be close to #F6F6F6.*/}
+              {/*bg-[#F6F6F6]*/}
+              <div className="flex h-9 w-9 items-center justify-center gap-2 rounded bg-gray-100 p-2">
+                {/*width: 1.125rem → w-[1.125rem] (18px, no default utility for this size)*/}
+                {/*height: 1.125rem → h-[1.125rem] (18px, no default utility for this size)*/}
+                {/*flex-shrink: 0 → shrink-0*/}
+                {/*aspect-ratio: 1/1 → aspect-square*/}
 
-          if (concurrencyItem.key) {
-            items.push({
-              label: 'Key',
-              value: concurrencyItem.key,
-              type: 'code',
-              size: 'large',
-            });
-          }
-          return <MetadataGrid key={index} columns={2} metadataItems={items} />;
-        })}
+                {/*Note: 1.125rem = 18px, which doesn't have a default Tailwind utility (the scale goes from w-4 = 16px to w-5 = 20px), so we use the arbitrary value syntax with square brackets.*/}
+                <AppsIcon className="h-5 w-5" />
+              </div>
+              <div className="flex grow flex-col items-start justify-center gap-1 self-stretch">
+                <div>{inngestFunction.app.name}</div>
+                {/*{inngestFunction.app.latestSync ? (*/}
+                {/*  <div>{inngestFunction.app.latestSync}</div>*/}
+                {/*) : (*/}
+                {/*  <></>*/}
+                {/*)}*/}
+                {/*{function_.current?.deploy?.createdAt && (*/}
+                {/*  <Time*/}
+                {/*    className="text-subtle text-xs"*/}
+                {/*    format="relative"*/}
+                {/*    value={new Date(function_.current.deploy.createdAt)}*/}
+                {/*  />*/}
+                {/*)}*/}
+              </div>
+              <div className="self-end">
+                <Button
+                  label="Go to apps"
+                  href="/apps"
+                  appearance="ghost"
+                  icon={<RiArrowRightUpLine />}
+                  iconSide="right"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <span className="text-sm font-medium">Triggers</span>
+            {inngestFunction.triggers.map((trigger) => (
+              <div className="flex items-center gap-2 self-stretch rounded border border-gray-200 p-2">
+                {/*bg-gray-100 (#F3F4F6) would be close to #F6F6F6.*/}
+                {/*bg-[#F6F6F6]*/}
+                <div className="flex h-9 w-9 items-center justify-center gap-2 rounded bg-gray-100 p-2">
+                  {/*width: 1.125rem → w-[1.125rem] (18px, no default utility for this size)*/}
+                  {/*height: 1.125rem → h-[1.125rem] (18px, no default utility for this size)*/}
+                  {/*flex-shrink: 0 → shrink-0*/}
+                  {/*aspect-ratio: 1/1 → aspect-square*/}
+
+                  {/*Note: 1.125rem = 18px, which doesn't have a default Tailwind utility (the scale goes from w-4 = 16px to w-5 = 20px), so we use the arbitrary value syntax with square brackets.*/}
+                  {trigger.type == 'EVENT' && <EventsIcon className="h-5 w-5" />}
+                  {trigger.type == 'CRON' && <RiTimeLine className="h-5 w-5" />}
+                </div>
+                <div className="flex grow flex-col items-start justify-center gap-1 self-stretch">
+                  <div>{trigger.value}</div>
+                  {trigger.type == 'EVENT' && <div>{trigger.condition}</div>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
-      {rateLimitItems && (
-        <>
-          <h3 className="pb-2 pt-6 text-sm font-medium">Rate Limit</h3>
-          <MetadataGrid columns={2} metadataItems={rateLimitItems} />
-        </>
-      )}
-      {debounceItems && (
-        <>
-          <h3 className="pb-2 pt-6 text-sm font-medium">Debounce</h3>
-          <MetadataGrid columns={2} metadataItems={debounceItems} />
-        </>
-      )}
-      {throttleItems && (
-        <>
-          <h3 className="pb-2 pt-6 text-sm font-medium">Throttle</h3>
-          <MetadataGrid columns={2} metadataItems={throttleItems} />
-        </>
-      )}
-    </Block>
+      <Block title="Configuration">
+        <MetadataGrid columns={2} metadataItems={miscellaneousItems} />
+        {eventBatchItems && (
+          <>
+            <h3 className="pb-2 pt-6 text-sm font-medium">Events Batch</h3>
+            <MetadataGrid columns={2} metadataItems={eventBatchItems} />
+          </>
+        )}
+        <h3 className="pb-2 pt-6 text-sm font-medium">Concurrency</h3>
+        <div className="space-y-3">
+          {configuration.concurrency.map((concurrencyItem, index) => {
+            const items: MetadataItemProps[] = [
+              {
+                label: 'Scope',
+                title: concurrencyItem.scope,
+                value: (
+                  <div className="lowercase first-letter:capitalize">{concurrencyItem.scope}</div>
+                ),
+              },
+              {
+                label: 'Limit',
+                value: `${concurrencyItem.limit.value}`,
+                ...(concurrencyItem.limit.isPlanLimit && {
+                  badge: {
+                    label: 'Plan Limit',
+                    description:
+                      'If not configured, the limit is set to the maximum value allowed within your plan.',
+                  },
+                }),
+                tooltip: 'The maximum number of concurrently running steps.',
+              },
+            ];
+
+            if (concurrencyItem.key) {
+              items.push({
+                label: 'Key',
+                value: concurrencyItem.key,
+                type: 'code',
+                size: 'large',
+              });
+            }
+            return <MetadataGrid key={index} columns={2} metadataItems={items} />;
+          })}
+        </div>
+        {rateLimitItems && (
+          <>
+            <h3 className="pb-2 pt-6 text-sm font-medium">Rate Limit</h3>
+            <MetadataGrid columns={2} metadataItems={rateLimitItems} />
+          </>
+        )}
+        {debounceItems && (
+          <>
+            <h3 className="pb-2 pt-6 text-sm font-medium">Debounce</h3>
+            <MetadataGrid columns={2} metadataItems={debounceItems} />
+          </>
+        )}
+        {throttleItems && (
+          <>
+            <h3 className="pb-2 pt-6 text-sm font-medium">Throttle</h3>
+            <MetadataGrid columns={2} metadataItems={throttleItems} />
+          </>
+        )}
+      </Block>
+    </div>
   );
 }
