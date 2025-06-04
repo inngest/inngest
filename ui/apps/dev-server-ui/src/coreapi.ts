@@ -169,6 +169,14 @@ export const FUNCTION = gql`
         }
       }
       slug
+      triggers {
+        type
+        value
+        condition
+      }
+      app {
+        name
+      }
       url
     }
   }
