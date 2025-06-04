@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
-	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/tests/client"
 	"github.com/inngest/inngestgo"
 	"github.com/inngest/inngestgo/step"
@@ -38,7 +37,7 @@ func TestBatchEvents(t *testing.T) {
 
 	_, err := inngestgo.CreateFunction(
 		inngestClient,
-		inngestgo.FunctionOpts{ID: "batch-test", BatchEvents: &inngest.EventBatchConfig{MaxSize: 5, Timeout: "5s"}},
+		inngestgo.FunctionOpts{ID: "batch-test", BatchEvents: &inngestgo.FnBatchEvents{MaxSize: 5, Timeout: 5 * time.Second}},
 		inngestgo.EventTrigger("test/batch", nil),
 		func(ctx context.Context, input inngestgo.Input[BatchEvent]) (any, error) {
 			if runID == "" {
@@ -121,9 +120,9 @@ func TestBatchInvoke(t *testing.T) {
 		inngestgo.FunctionOpts{
 			ID:   "batcher",
 			Name: "test batching",
-			BatchEvents: &inngest.EventBatchConfig{
+			BatchEvents: &inngestgo.FnBatchEvents{
 				MaxSize: 3,
-				Timeout: "5s",
+				Timeout: 5 * time.Second,
 			},
 		},
 		inngestgo.EventTrigger("batchinvoke/batch", nil),
@@ -211,7 +210,7 @@ func TestBatchEventsWithKeys(t *testing.T) {
 
 	_, err := inngestgo.CreateFunction(
 		inngestClient,
-		inngestgo.FunctionOpts{ID: "batch-test", Name: "batch test", BatchEvents: &inngest.EventBatchConfig{MaxSize: 3, Timeout: "5s", Key: &batchKey}},
+		inngestgo.FunctionOpts{ID: "batch-test", Name: "batch test", BatchEvents: &inngestgo.FnBatchEvents{MaxSize: 3, Timeout: 5 * time.Second, Key: &batchKey}},
 		inngestgo.EventTrigger("test/notification.send", nil),
 		func(ctx context.Context, input inngestgo.Input[BatchEventDataWithUserId]) (any, error) {
 			mut.Lock()

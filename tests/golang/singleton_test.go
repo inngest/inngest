@@ -31,7 +31,7 @@ func TestSingletonFunction(t *testing.T) {
 		inngestClient,
 		inngestgo.FunctionOpts{
 			ID:        "fn-singleton",
-			Singleton: &inngestgo.Singleton{Key: inngestgo.StrPtr("event.data.user.id")},
+			Singleton: &inngestgo.FnSingleton{Key: inngestgo.StrPtr("event.data.user.id")},
 		},
 		inngestgo.EventTrigger(trigger, nil),
 		func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
@@ -95,7 +95,7 @@ func TestSingletonFunctionWithKeyResolvingToFalse(t *testing.T) {
 		inngestClient,
 		inngestgo.FunctionOpts{
 			ID:        "fn-singleton",
-			Singleton: &inngestgo.Singleton{Key: inngestgo.StrPtr("event.data.decision")},
+			Singleton: &inngestgo.FnSingleton{Key: inngestgo.StrPtr("event.data.decision")},
 		},
 		inngestgo.EventTrigger(trigger, nil),
 		func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
