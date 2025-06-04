@@ -97,7 +97,7 @@ export function Trace({ depth, maxTime, minTime, pathCreator, trace, runID }: Pr
           </div>
 
           <div className="border-light/80 flex w-[70%] flex-row border-l-2">
-            <InlineSpans maxTime={maxTime} minTime={minTime} trace={trace} />
+            <InlineSpans maxTime={maxTime} minTime={minTime} trace={trace} depth={depth} />
           </div>
         </div>
         {expanded && hasChildren && (
