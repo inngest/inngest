@@ -170,26 +170,10 @@ export default function FunctionConfiguration({
           </div>
         }
       />
-      <div
-        style={{
-          padding: 16,
-          flexDirection: 'column',
-          justifyContent: 'flex-start',
-          alignItems: 'flex-start',
-          display: 'inline-flex',
-        }}
-      >
+      <div className="inline-flex flex-col items-start justify-start px-4 pb-6 pt-4">
         {/* do we want 'var(--textColor-light, #9B9B9B)'*/}
         {/* letter spacing */}
-        <div
-          className="pb-3 text-xs uppercase tracking-wide text-gray-400"
-          style={{
-            justifyContent: 'center',
-            display: 'flex',
-            flexDirection: 'column',
-            wordWrap: 'break-word',
-          }}
-        >
+        <div className="flex flex-col justify-center break-words pb-3 text-xs uppercase tracking-wide text-gray-400">
           Overview
         </div>
         <div className="flex flex-col space-y-6 self-stretch ">
@@ -239,7 +223,10 @@ export default function FunctionConfiguration({
           <div>
             <span className="text-sm font-medium">Triggers</span>
             {inngestFunction.triggers.map((trigger) => (
-              <div className="flex items-center gap-2 self-stretch rounded border border-gray-200 p-2">
+              <div
+                key={trigger.value}
+                className="flex items-center gap-2 self-stretch rounded border border-gray-200 p-2"
+              >
                 {/*bg-gray-100 (#F3F4F6) would be close to #F6F6F6.*/}
                 {/*bg-[#F6F6F6]*/}
                 <div className="flex h-9 w-9 items-center justify-center gap-2 rounded bg-gray-100 p-2">
@@ -254,7 +241,12 @@ export default function FunctionConfiguration({
                 </div>
                 <div className="flex grow flex-col items-start justify-center gap-1 self-stretch">
                   <div>{trigger.value}</div>
-                  {trigger.type == 'EVENT' && <div>{trigger.condition}</div>}
+                  {trigger.type == 'EVENT' && trigger.condition && (
+                    <div className="text-xs">
+                      <code>if: {trigger.condition}</code>
+                      {/*handle overflow and pop up*/}
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
