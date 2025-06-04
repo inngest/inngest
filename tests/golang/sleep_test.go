@@ -4,14 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/inngest/inngest/pkg/inngest"
-	"github.com/inngest/inngest/pkg/logger"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/tests/client"
 	"github.com/inngest/inngestgo"
 	"github.com/inngest/inngestgo/step"
@@ -178,7 +177,7 @@ func TestSleepFudging(t *testing.T) {
 		inngestClient,
 		inngestgo.FunctionOpts{
 			ID: "test-sleep-fudge",
-			Concurrency: []inngest.Concurrency{
+			Concurrency: []inngestgo.ConfigStepConcurrency{
 				{
 					Limit: 1,
 				},

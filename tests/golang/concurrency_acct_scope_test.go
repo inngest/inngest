@@ -10,7 +10,6 @@ import (
 
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
-	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngestgo"
 	"github.com/stretchr/testify/require"
 )
@@ -47,7 +46,7 @@ func TestConcurrency_ScopeAccount(t *testing.T) {
 		inngestClient,
 		inngestgo.FunctionOpts{
 			ID: "acct-concurrency",
-			Concurrency: []inngest.Concurrency{
+			Concurrency: []inngestgo.ConfigStepConcurrency{
 				{
 					Limit: 1,
 					Scope: enums.ConcurrencyScopeAccount,
@@ -63,7 +62,7 @@ func TestConcurrency_ScopeAccount(t *testing.T) {
 		inngestClient,
 		inngestgo.FunctionOpts{
 			ID: "acct-concurrency-v2",
-			Concurrency: []inngest.Concurrency{
+			Concurrency: []inngestgo.ConfigStepConcurrency{
 				{
 					Limit: 1,
 					Scope: enums.ConcurrencyScopeAccount,
