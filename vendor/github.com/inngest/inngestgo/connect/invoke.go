@@ -144,7 +144,7 @@ func (h *connectHandler) connectInvoke(ctx context.Context, preparedConn *connec
 
 	extendLeaseCtx, cancelExtendLeaseCtx := context.WithCancel(ctx)
 	defer cancelExtendLeaseCtx()
-	
+
 	go func() {
 		for {
 			select {
@@ -216,7 +216,7 @@ func (h *connectHandler) connectInvoke(ctx context.Context, preparedConn *connec
 	// 	     return err
 	// 	}
 	if sdkerrors.IsStepError(err) {
-		err = fmt.Errorf("Unhandled step error: %s", err)
+		err = fmt.Errorf("unhandled step error: %s", err)
 		noRetry = true
 	}
 
