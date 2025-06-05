@@ -2363,13 +2363,15 @@ func (e *executor) handleGeneratorStep(ctx context.Context, i *runInstance, gen 
 		}
 
 		err = e.queue.Enqueue(ctx, nextItem, now, queue.EnqueueOpts{})
-		if err == redis_state.ErrQueueItemExists {
-			span.Drop()
-			return nil
-		}
 		if err != nil {
-			logger.StdlibLogger(ctx).Error("error scheduling step queue item", "error", err)
 			span.Drop()
+
+			if err == redis_state.ErrQueueItemExists {
+				return nil
+			}
+
+			logger.StdlibLogger(ctx).Error("error scheduling step queue item", "error", err)
+
 			return err
 		}
 
