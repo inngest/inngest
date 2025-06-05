@@ -1104,6 +1104,23 @@ func TestBacklogIsOutdated(t *testing.T) {
 		require.Equal(t, enums.QueueNormalizeReasonThrottleKeyChanged, backlog.isOutdated(shadowPart))
 	})
 
+	t.Run("same throttle key should not mark as outdated", func(t *testing.T) {
+		keyHash := util.XXHash("event.data.orgID")
+
+		shadowPart := &QueueShadowPartition{
+			Throttle: &ShadowPartitionThrottle{
+				ThrottleKeyExpressionHash: keyHash,
+			},
+		}
+		backlog := &QueueBacklog{
+			Throttle: &BacklogThrottle{
+				ThrottleKeyExpressionHash: keyHash,
+			},
+		}
+
+		require.Equal(t, enums.QueueNormalizeReasonUnchanged, backlog.isOutdated(shadowPart))
+	})
+
 	t.Run("removing throttle key should mark as outdated", func(t *testing.T) {
 		keyHashOld := util.XXHash("event.data.customerID")
 
