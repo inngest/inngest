@@ -5,20 +5,23 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
+	"testing"
+	"time"
+
 	"github.com/alicebob/miniredis/v2"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/util"
+	"github.com/inngest/inngestgo"
 	"github.com/jonboulle/clockwork"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"testing"
-	"time"
 )
 
 func TestQueueRefillBacklog(t *testing.T) {
@@ -1707,12 +1710,7 @@ func TestRefillConstraints(t *testing.T) {
 }
 
 func TestShadowPartitionUpdate(t *testing.T) {
-	r := miniredis.RunT(t)
-	rc, err := rueidis.NewClient(rueidis.ClientOption{
-		InitAddress:  []string{r.Addr()},
-		DisableCache: true,
-	})
-	require.NoError(t, err)
+	r, rc := initRedis(t)
 	defer rc.Close()
 
 	clock := clockwork.NewFakeClock()
@@ -1734,131 +1732,220 @@ func TestShadowPartitionUpdate(t *testing.T) {
 
 	accountId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
 
-	// use future timestamp because scores will be bounded to the present
-	at := clock.Now().Add(1 * time.Minute)
-
-	require.Len(t, r.Keys(), 0)
-
-	//
-	// Create initial shadow partition
-	//
-
-	item1 := osqueue.QueueItem{
-		ID:          "test",
-		FunctionID:  fnID,
-		WorkspaceID: wsID,
-		Data: osqueue.Item{
-			WorkspaceID: wsID,
-			Kind:        osqueue.KindEdge,
-			Identifier: state.Identifier{
-				WorkflowID:      fnID,
-				AccountID:       accountId,
-				WorkspaceID:     wsID,
-				WorkflowVersion: 1,
-			},
-			QueueName:             nil,
-			Throttle:              nil,
-			CustomConcurrencyKeys: nil,
-		},
-		QueueName: nil,
+	type itemConf struct {
+		kind            string // osqueue.Kind, default to edge
+		throttle        *osqueue.Throttle
+		concurrencyKeys []state.CustomConcurrency
 	}
 
-	_, err = q.EnqueueItem(ctx, defaultShard, item1, at, osqueue.EnqueueOpts{})
-	require.NoError(t, err)
-
-	expectedBacklog := q.ItemBacklog(ctx, item1)
-	require.NotEmpty(t, expectedBacklog.BacklogID)
-
-	initialShadowPart := q.ItemShadowPartition(ctx, item1)
-	require.NotEmpty(t, initialShadowPart.PartitionID)
-
-	savedPart := QueueShadowPartition{}
-	require.NoError(t, json.Unmarshal([]byte(r.HGet(kg.ShadowPartitionMeta(), initialShadowPart.PartitionID)), &savedPart))
-
-	require.Equal(t, initialShadowPart, savedPart)
-	require.Equal(t, 1, savedPart.FunctionVersion)
-
-	//
-	// Test update case
-	//
-
-	hashedConcurrencyKeyExpr := hashConcurrencyKey("event.data.customerId")
-	unhashedValue := "customer1"
-	scope := enums.ConcurrencyScopeFn
-	entity := fnID
-	fullKey := util.ConcurrencyKey(scope, entity, unhashedValue)
-
-	item2 := osqueue.QueueItem{
-		ID:          "test2",
-		FunctionID:  fnID,
-		WorkspaceID: wsID,
-		Data: osqueue.Item{
-			WorkspaceID: wsID,
-			Kind:        osqueue.KindEdge,
-			Identifier: state.Identifier{
-				WorkflowID:      fnID,
-				AccountID:       accountId,
-				WorkspaceID:     wsID,
-				WorkflowVersion: 2,
-			},
-			QueueName: nil,
-			Throttle:  nil,
-			CustomConcurrencyKeys: []state.CustomConcurrency{
-				{
-					Key:                       fullKey,
-					Hash:                      hashedConcurrencyKeyExpr,
-					Limit:                     123,
-					UnhashedEvaluatedKeyValue: unhashedValue,
+	// test cases
+	tests := []struct {
+		name  string
+		conf1 itemConf
+		conf2 itemConf
+	}{
+		{
+			name: "none to concurrency",
+			conf2: itemConf{
+				concurrencyKeys: []state.CustomConcurrency{
+					{
+						Key:                       util.ConcurrencyKey(enums.ConcurrencyScopeFn, fnID, "customer1"),
+						Hash:                      hashConcurrencyKey("event.data.customerId"),
+						Limit:                     123,
+						UnhashedEvaluatedKeyValue: "customer1",
+					},
 				},
 			},
 		},
-		QueueName: nil,
-	}
-
-	updatedShadowPart := q.ItemShadowPartition(ctx, item2)
-	require.Len(t, updatedShadowPart.Concurrency.CustomConcurrencyKeys, 1)
-	require.Equal(t, 2, updatedShadowPart.FunctionVersion)
-
-	_, err = q.EnqueueItem(ctx, defaultShard, item2, at.Add(time.Minute), osqueue.EnqueueOpts{})
-	require.NoError(t, err)
-
-	savedPart = QueueShadowPartition{}
-	require.NoError(t, json.Unmarshal([]byte(r.HGet(kg.ShadowPartitionMeta(), initialShadowPart.PartitionID)), &savedPart))
-
-	require.Equal(t, updatedShadowPart, savedPart)
-
-	//
-	// Ensure shadow partition is not reverted to old version
-	//
-
-	item3 := osqueue.QueueItem{
-		ID:          "test3",
-		FunctionID:  fnID,
-		WorkspaceID: wsID,
-		Data: osqueue.Item{
-			WorkspaceID: wsID,
-			Kind:        osqueue.KindEdge,
-			Identifier: state.Identifier{
-				WorkflowID:      fnID,
-				AccountID:       accountId,
-				WorkspaceID:     wsID,
-				WorkflowVersion: 1,
+		{
+			name:  "none to throttle",
+			conf1: itemConf{kind: osqueue.KindStart},
+			conf2: itemConf{
+				kind: osqueue.KindStart,
+				throttle: osqueue.GetThrottleConfig(
+					ctx,
+					fnID,
+					&inngest.Throttle{
+						Limit:  10,
+						Period: 30 * time.Second,
+						Burst:  2,
+						Key:    util.StrPtr("event.data.customerId"),
+					},
+					inngestgo.Event{
+						Name: "hello/world",
+						Data: map[string]any{"customerId": 100},
+					}.Map(),
+				),
 			},
-			QueueName:             nil,
-			Throttle:              nil,
-			CustomConcurrencyKeys: nil,
 		},
-		QueueName: nil,
+		{
+			name: "change throttle",
+			conf1: itemConf{
+				kind: osqueue.KindStart,
+				throttle: osqueue.GetThrottleConfig(
+					ctx,
+					fnID,
+					&inngest.Throttle{
+						Limit:  10,
+						Period: 30 * time.Second,
+						Burst:  2,
+						Key:    util.StrPtr("event.data.customerId"),
+					},
+					inngestgo.Event{
+						Name: "hello/world",
+						Data: map[string]any{"customerId": 100},
+					}.Map(),
+				),
+			},
+			conf2: itemConf{
+				kind: osqueue.KindStart,
+				throttle: osqueue.GetThrottleConfig(
+					ctx,
+					fnID,
+					&inngest.Throttle{
+						Limit:  10,
+						Period: 30 * time.Second,
+						Burst:  2,
+						Key:    util.StrPtr("event.data.userId"),
+					},
+					inngestgo.Event{
+						Name: "hello/world",
+						Data: map[string]any{"userId": 100},
+					}.Map(),
+				),
+			},
+		},
 	}
 
-	_, err = q.EnqueueItem(ctx, defaultShard, item3, at.Add(2*time.Minute), osqueue.EnqueueOpts{})
-	require.NoError(t, err)
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			r.FlushAll()
+			require.Len(t, r.Keys(), 0)
 
-	savedPart = QueueShadowPartition{}
-	require.NoError(t, json.Unmarshal([]byte(r.HGet(kg.ShadowPartitionMeta(), initialShadowPart.PartitionID)), &savedPart))
+			fmt.Printf("Throttle: %#v\n", tc.conf2.throttle)
 
-	require.Equal(t, updatedShadowPart, savedPart)
-	require.Equal(t, 2, savedPart.FunctionVersion)
+			// use future timestamp because scores will be bounded to the present
+			at := clock.Now().Add(1 * time.Minute)
+
+			//
+			// Create initial shadow partition
+			//
+			kind1 := osqueue.KindEdge
+			if tc.conf1.kind != "" {
+				kind1 = tc.conf1.kind
+			}
+
+			item1 := osqueue.QueueItem{
+				ID:          "test",
+				FunctionID:  fnID,
+				WorkspaceID: wsID,
+				Data: osqueue.Item{
+					WorkspaceID: wsID,
+					Kind:        kind1,
+					Identifier: state.Identifier{
+						WorkflowID:      fnID,
+						AccountID:       accountId,
+						WorkspaceID:     wsID,
+						WorkflowVersion: 1,
+					},
+					Throttle:              tc.conf1.throttle,
+					CustomConcurrencyKeys: tc.conf1.concurrencyKeys,
+				},
+			}
+
+			_, err := q.EnqueueItem(ctx, defaultShard, item1, at, osqueue.EnqueueOpts{})
+			require.NoError(t, err)
+
+			backlog1 := q.ItemBacklog(ctx, item1)
+			require.NotEmpty(t, backlog1.BacklogID)
+			if tc.conf1.throttle != nil {
+				require.NotNil(t, backlog1.Throttle)
+			}
+
+			initialShadowPart := q.ItemShadowPartition(ctx, item1)
+			require.NotEmpty(t, initialShadowPart.PartitionID)
+
+			savedPart := QueueShadowPartition{}
+			require.NoError(t, json.Unmarshal([]byte(r.HGet(kg.ShadowPartitionMeta(), initialShadowPart.PartitionID)), &savedPart))
+			require.Equal(t, initialShadowPart, savedPart)
+			require.Equal(t, 1, savedPart.FunctionVersion)
+
+			//
+			// Test update case
+			//
+			kind2 := osqueue.KindEdge
+			if tc.conf2.throttle != nil {
+				kind2 = tc.conf2.kind
+			}
+
+			item2 := osqueue.QueueItem{
+				ID:          "test2",
+				FunctionID:  fnID,
+				WorkspaceID: wsID,
+				Data: osqueue.Item{
+					WorkspaceID: wsID,
+					Kind:        kind2,
+					Identifier: state.Identifier{
+						WorkflowID:      fnID,
+						AccountID:       accountId,
+						WorkspaceID:     wsID,
+						WorkflowVersion: 2,
+					},
+					Throttle:              tc.conf2.throttle,
+					CustomConcurrencyKeys: tc.conf2.concurrencyKeys,
+				},
+			}
+
+			updatedShadowPart := q.ItemShadowPartition(ctx, item2)
+			require.Len(t, updatedShadowPart.Concurrency.CustomConcurrencyKeys, len(tc.conf2.concurrencyKeys))
+			require.Equal(t, 2, updatedShadowPart.FunctionVersion)
+
+			_, err = q.EnqueueItem(ctx, defaultShard, item2, at.Add(time.Minute), osqueue.EnqueueOpts{})
+			require.NoError(t, err)
+
+			backlog2 := q.ItemBacklog(ctx, item2)
+			require.NotEmpty(t, backlog2.BacklogID)
+			require.NotEqual(t, backlog1, backlog2)
+			if tc.conf2.throttle != nil {
+				require.NotNil(t, backlog2.Throttle)
+			}
+
+			savedPart = QueueShadowPartition{}
+			require.NoError(t, json.Unmarshal([]byte(r.HGet(kg.ShadowPartitionMeta(), initialShadowPart.PartitionID)), &savedPart))
+			require.Equal(t, updatedShadowPart, savedPart)
+
+			//
+			// Ensure shadow partition is not reverted to old version
+			//
+
+			item3 := osqueue.QueueItem{
+				ID:          "test3",
+				FunctionID:  fnID,
+				WorkspaceID: wsID,
+				Data: osqueue.Item{
+					WorkspaceID: wsID,
+					Kind:        kind1,
+					Identifier: state.Identifier{
+						WorkflowID:      fnID,
+						AccountID:       accountId,
+						WorkspaceID:     wsID,
+						WorkflowVersion: 1,
+					},
+					Throttle:              tc.conf1.throttle,
+					CustomConcurrencyKeys: tc.conf1.concurrencyKeys,
+				},
+			}
+
+			_, err = q.EnqueueItem(ctx, defaultShard, item3, at.Add(2*time.Minute), osqueue.EnqueueOpts{})
+			require.NoError(t, err)
+
+			savedPart = QueueShadowPartition{}
+			require.NoError(t, json.Unmarshal([]byte(r.HGet(kg.ShadowPartitionMeta(), initialShadowPart.PartitionID)), &savedPart))
+
+			require.Equal(t, updatedShadowPart, savedPart)
+			require.Equal(t, 2, savedPart.FunctionVersion)
+		})
+	}
 }
 
 func TestShadowPartitionPointerTimings(t *testing.T) {
