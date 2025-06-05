@@ -176,7 +176,10 @@ func (m manager) Write(ctx context.Context, index Index, pauses ...*state.Pause)
 	return n, nil
 }
 
-func (m manager) PauseByID(ctx context.Context, envID, pauseID uuid.UUID) (*state.Pause, error) {
+func (m manager) PauseByID(ctx context.Context, index Index, pauseID uuid.UUID) (*state.Pause, error) {
+	// NOTE: This is only used to look up pauses when they time out.  As of this PR, timeout jobs
+	// embed each pause, prevent the need to do lookups.
+	//
 	// First, attempt to load this pause from the buffer.  Some pauses will definitely be here:
 	//
 	// - There aren't enough to flush to blocks, or we havent flushed yet.
@@ -184,8 +187,27 @@ func (m manager) PauseByID(ctx context.Context, envID, pauseID uuid.UUID) (*stat
 	//   lookups to resolve these quickly
 	//
 	// If the pause isn't in the buffer, we check if the [env, event] index has been flushed before,
-	// and if so we attempt to load from the buffer.
-	return nil, fmt.Errorf("not implemented")
+	// and if so we attempt to load from the blobstore.
+	//
+	//
+	// # Loading from blobstores
+	//
+	// Loading pauses from the blobstore is hard. Pauses have V4 UUIDs as IDs:  they are random.
+	// This means there's no way of knowing which block/blob a pause belongs to without an index
+	// lookup of [pause ID] -> "created at".
+
+	pause, err := m.buf.PauseByID(ctx, index, pauseID)
+	if pause != nil && err == nil {
+		return pause, err
+	}
+
+	if m.bs != nil {
+		// We couldn't load from the buffer, so fall back.
+		return m.bs.PauseByID(ctx, index, pauseID)
+	}
+
+	// without a block store we should fall back to returning the error from the buffer.
+	return nil, err
 }
 
 // PausesSince loads pauses in the bfufer for a given index, since a given time.

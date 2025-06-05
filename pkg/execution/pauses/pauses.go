@@ -64,7 +64,7 @@ type Manager interface {
 
 	// PauseByID fetches a pause for a given ID.  It may return the pause from the buffer
 	// or from block storage, depending on the pause
-	PauseByID(ctx context.Context, envID uuid.UUID, pauseID uuid.UUID) (*state.Pause, error)
+	PauseByID(ctx context.Context, index Index, pauseID uuid.UUID) (*state.Pause, error)
 
 	// Write writes one or more pauses to the backing store.  Note that the index
 	// for each pause must be the same.
@@ -131,6 +131,10 @@ type Bufferer interface {
 	// ConsumePause consumes a pause, writing the deleted status to the buffer.
 	ConsumePause(ctx context.Context, pause state.Pause, opts state.ConsumePauseOpts) (state.ConsumePauseResult, func() error, error)
 
+	// PauseByID fetches a pause for a given ID.  It may return the pause from the buffer
+	// or from block storage, depending on the pause
+	PauseByID(ctx context.Context, index Index, pauseID uuid.UUID) (*state.Pause, error)
+
 	// PauseByInvokeCorrelationID returns a given pause by the correlation ID.
 	//
 	// This must return expired invoke pauses that have not yet been consumed
@@ -179,6 +183,9 @@ type BlockReader interface {
 
 	// ReadBlock reads a single block given an index and block ID.
 	ReadBlock(ctx context.Context, index Index, blockID ulid.ULID) (*Block, error)
+
+	// PauseByID returns a pause by a given ID.  Note that an index is required.
+	PauseByID(ctx context.Context, index Index, pauseID uuid.UUID) (*state.Pause, error)
 }
 
 // BlockLeaser manages leases when flushing blocks.  This is a separate interface

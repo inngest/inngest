@@ -54,7 +54,7 @@ func (r redisAdapter) Delete(ctx context.Context, index Index, pause state.Pause
 
 // Delete deletes a pause from the buffer, or returns ErrNotInBuffer if the pause is not in
 // the buffer.
-func (r redisAdapter) PauseByID(ctx context.Context, envID, pauseID uuid.UUID) (*state.Pause, error) {
+func (r redisAdapter) PauseByID(ctx context.Context, index Index, pauseID uuid.UUID) (*state.Pause, error) {
 	return r.rsm.PauseByID(ctx, pauseID)
 }
 

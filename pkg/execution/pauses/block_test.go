@@ -153,7 +153,7 @@ func TestBlockFlusher(t *testing.T) {
 
 	// Verify that the pauses are not in the buffer
 	mockBufferer.mu.RLock()
-	pausesLen := len(mockBufferer.pauses)
+	pausesLen = len(mockBufferer.pauses)
 	mockBufferer.mu.RUnlock()
 	require.Equal(t, 0, pausesLen, "pauses should be removed from buffer after flushing")
 }

@@ -373,6 +373,11 @@ func (b blockstore) Delete(ctx context.Context, index Index, pause state.Pause) 
 	return nil
 }
 
+func (b *blockstore) PauseByID(ctx context.Context, index Index, pauseID uuid.UUID) (*state.Pause, error) {
+	// TODO: Check if the index has an empty event.  If so, look up the pause ID -> block ID map.
+	return nil, fmt.Errorf("not implemented")
+}
+
 // Compact reads all indexed deletes from block for an index, then compacts any blocks over a given threshold
 // by removing pauses and rewriting blocks.
 func (b *blockstore) Compact(ctx context.Context, idx Index) {
