@@ -126,6 +126,9 @@ export const FUNCTION = gql`
     functionBySlug(query: { functionSlug: $functionSlug }) {
       name
       id
+      failureHandler {
+        slug
+      }
       concurrency
       config
       configuration {

@@ -1,4 +1,5 @@
 import { useMemo } from 'react';
+import NextLink from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@inngest/components/Button';
 import { Header } from '@inngest/components/Header/Header';
@@ -6,7 +7,8 @@ import { InvokeButton } from '@inngest/components/InvokeButton';
 import { MetadataGrid, type MetadataItemProps } from '@inngest/components/Metadata';
 import { AppsIcon } from '@inngest/components/icons/sections/Apps';
 import { EventsIcon } from '@inngest/components/icons/sections/Events';
-import { RiArrowRightUpLine, RiTimeLine } from '@remixicon/react';
+import { FunctionsIcon } from '@inngest/components/icons/sections/Functions';
+import { RiArrowRightSLine, RiArrowRightUpLine, RiTimeLine } from '@remixicon/react';
 import { toast } from 'sonner';
 
 import {
@@ -251,6 +253,63 @@ export default function FunctionConfiguration({
               </div>
             ))}
           </div>
+        </div>
+      </div>
+      <div className="inline-flex flex-col items-start justify-start px-4 pb-6 pt-4">
+        <div className="flex flex-col justify-center break-words pb-3 text-xs uppercase tracking-wide text-gray-400">
+          Execution Configurations
+        </div>
+        <div className="flex flex-col space-y-6 self-stretch ">
+          {/* should this one be even if it's not set, educational? */}
+          {inngestFunction.failureHandler && (
+            <div>
+              <span className="text-sm font-medium">Failure Handler</span>
+              <NextLink
+                // link does not work yet, return to once we have finalized link structure
+                href={`/functions/config?slug=${inngestFunction.failureHandler.slug}`}
+                className="border-subtle bg-canvasBase hover:bg-canvasMuted block rounded-md border border-gray-200 "
+              >
+                <div className="flex items-center gap-2 self-stretch rounded p-2">
+                  <div className="flex h-9 w-9 items-center justify-center gap-2 rounded bg-gray-100 p-2">
+                    <FunctionsIcon className="h-5 w-5" />
+                  </div>
+                  <div className="flex grow flex-col items-start justify-center gap-1 self-stretch">
+                    <div>{inngestFunction.failureHandler.slug}</div>
+                  </div>
+                  <RiArrowRightSLine className="h-5" />
+                </div>
+              </NextLink>
+            </div>
+          )}
+          {inngestFunction.configuration.cancellations && (
+            <div>
+              <span className="text-sm font-medium">Cancellations</span>
+              {inngestFunction.configuration.cancellations.map((cancelOn) => {
+                // link to event in cloud
+                return (
+                  // className="border-subtle bg-canvasBase hover:bg-canvasMuted block rounded-md border border-gray-200 "
+                  <div className="border-subtle flex items-center gap-2 self-stretch rounded border border-gray-200 p-2">
+                    <div className="flex h-9 w-9 items-center justify-center gap-2 rounded bg-gray-100 p-2">
+                      <EventsIcon className="h-5 w-5" />
+                    </div>
+                    <div className="flex grow flex-col items-start justify-center gap-1 self-stretch">
+                      <div>{cancelOn.event}</div>
+                      {cancelOn.condition && (
+                        <div className="text-xs">
+                          <code>if: {cancelOn.condition}</code>
+                          {/*handle overflow and pop up*/}
+                        </div>
+                      )}
+                      {cancelOn.timeout && (
+                        <div className="text-subtle text-xs">Timeout {cancelOn.timeout}</div>
+                      )}
+                    </div>
+                    {/*<RiArrowRightSLine className="h-5" />*/}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
       <Block title="Configuration">
