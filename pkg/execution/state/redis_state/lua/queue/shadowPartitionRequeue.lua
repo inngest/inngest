@@ -7,9 +7,6 @@
   Return values:
   0 - Extended shadow partition lease or cleaned up partition with no backlogs
   -1 - Shadow partition not found
-  -2 - Shadow partition already leased
-  -3 - Shadow partition paused
-
 ]]
 
 local keyShadowPartitionHash             = KEYS[1]
