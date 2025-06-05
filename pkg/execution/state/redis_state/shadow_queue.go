@@ -134,10 +134,7 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 				if err != nil {
 					jobCancel()
 
-					if errors.Is(err, ErrShadowPartitionNotFound) {
-						return
-					}
-
+					// lease contention
 					if errors.Is(err, ErrShadowPartitionAlreadyLeased) || errors.Is(err, ErrShadowPartitionLeaseNotFound) {
 						metrics.IncrQueueShadowPartitionLeaseContentionCounter(ctx, metrics.CounterOpt{
 							PkgName: pkgName,
@@ -147,8 +144,6 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 								"action":       "extend_lease",
 							},
 						})
-						// contention
-						return
 					}
 
 					return
