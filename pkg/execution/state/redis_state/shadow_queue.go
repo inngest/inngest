@@ -191,161 +191,30 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 		Tags:    map[string]any{"partition_id": shadowPart.PartitionID},
 	})
 
-	// optional push back time for partition requeue
-	var partitionRequeueAt *time.Time
-
 	// Refill backlogs in random order
 	fullyProcessedBacklogs := 0
 	for _, idx := range util.RandPerm(len(backlogs)) {
 		backlog := backlogs[idx]
 
-		// May need to normalize - this will not happen for default backlogs
-		if backlog.isOutdated(shadowPart) {
-			// Prepare normalization, this will just run once as the shadow scanner
-			// won't pick it up again after this.
-			_, shouldNormalizeAsync, err := q.BacklogPrepareNormalize(
-				ctx,
-				backlog,
-				shadowPart,
-				q.backlogNormalizeAsyncLimit(ctx),
-			)
-			if err != nil {
-				return fmt.Errorf("could not prepare backlog for normalization: %w", err)
-			}
+		res, fullyProcessed, err := q.processShadowPartitionBacklog(ctx, shadowPart, backlog, refillUntil)
+		if err != nil {
+			return fmt.Errorf("could not process backlog: %w", err)
+		}
 
-			// If there are just a couple of items in the backlog, we can
-			// normalize right away, we have the guarantee that the backlog
-			// is not being normalized right now as it wouldn't be picked up
-			// by the shadow scanner otherwise.
-			if !shouldNormalizeAsync {
-				if _, err := duration(ctx, q.primaryQueueShard.Name, "normalize_lease", q.clock.Now(), func(ctx context.Context) (any, error) {
-					err := q.leaseBacklogForNormalization(ctx, backlog)
-					return nil, err
-				}); err != nil {
-					if errors.Is(err, errBacklogAlreadyLeasedForNormalization) {
-						continue
-					}
-
-					return err
-				}
-
-				if err := q.normalizeBacklog(ctx, backlog, shadowPart); err != nil {
-					return fmt.Errorf("could not normalize backlog: %w", err)
-				}
-			}
-
+		if res == nil {
 			continue
 		}
 
-		res, err := durationWithTags(
-			ctx,
-			q.primaryQueueShard.Name,
-			"backlog_process_duration",
-			q.clock.Now(),
-			func(ctx context.Context) (*BacklogRefillResult, error) {
-				return q.BacklogRefill(ctx, backlog, shadowPart, refillUntil)
-			},
-			map[string]any{"partition_id": shadowPart.PartitionID},
-		)
-		if err != nil {
-			return fmt.Errorf("could not refill backlog: %w", err)
+		if fullyProcessed {
+			fullyProcessedBacklogs++
 		}
 
-		q.log.Trace("processed backlog",
-			"backlog", backlog.BacklogID,
-			"total", res.TotalBacklogCount,
-			"until", res.BacklogCountUntil,
-			"constrained", res.Constraint,
-			"capacity", res.Capacity,
-			"refill", res.Refill,
-			"refilled", res.Refilled,
-			"throttle", shadowPart.Throttle,
-		)
-
-		// instrumentation
-		{
-			opts := metrics.CounterOpt{
-				PkgName: pkgName,
-				Tags: map[string]any{
-					"queue_shard":  q.primaryQueueShard.Name,
-					"partition_id": shadowPart.PartitionID,
-				},
-			}
-
-			metrics.IncrBacklogProcessedCounter(ctx, opts)
-			metrics.IncrQueueBacklogRefilledCounter(ctx, int64(res.Refilled), opts)
-
-			switch res.Constraint {
-			case enums.QueueConstraintNotLimited: // no-op
-				// add a requeue time to push back the scan
-				if partitionRequeueAt == nil {
-					at := q.clock.Now().Add(ShadowPartitionRequeueExtendedDuration)
-					partitionRequeueAt = &at
-				}
-
-			default:
-				// NOTE:
-				// we don't want to add an extended amount of time for requeue when there are
-				// contraint hits, so we make sure to check more often in order to admit items
-				// into processing
-				metrics.IncrQueueBacklogRefillConstraintCounter(ctx, metrics.CounterOpt{
-					PkgName: pkgName,
-					Tags: map[string]any{
-						"queue_shard":  q.primaryQueueShard.Name,
-						"partition_id": shadowPart.PartitionID,
-						"constraint":   res.Constraint.String(),
-					},
-				})
-
-				q.lifecycles.OnBacklogRefillConstraintHit(ctx, shadowPart, backlog, res)
-			}
-
-			// NOTE: custom method to instrument result - potentially handling high cardinality data
-			q.lifecycles.OnBacklogRefilled(ctx, shadowPart, backlog, res)
-
-			// Invoke previous constraint lifecycles to update UI
-			switch res.Constraint {
-			case enums.QueueConstraintAccountConcurrency:
-				if shadowPart.AccountID != nil {
-					q.lifecycles.OnAccountConcurrencyLimitReached(ctx, *shadowPart.AccountID, shadowPart.EnvID)
-				}
-			case enums.QueueConstraintFunctionConcurrency:
-				if shadowPart.FunctionID != nil {
-					q.lifecycles.OnFnConcurrencyLimitReached(ctx, *shadowPart.FunctionID)
-				}
-			case enums.QueueConstraintCustomConcurrencyKey1:
-				if len(backlog.ConcurrencyKeys) > 0 {
-					q.lifecycles.OnCustomKeyConcurrencyLimitReached(ctx, backlog.ConcurrencyKeys[0].CanonicalKeyID)
-				}
-			case enums.QueueConstraintCustomConcurrencyKey2:
-				if len(backlog.ConcurrencyKeys) > 1 {
-					q.lifecycles.OnCustomKeyConcurrencyLimitReached(ctx, backlog.ConcurrencyKeys[1].CanonicalKeyID)
-				}
-			default:
-			}
-		}
-
+		// If backlog is limited by function or account-level concurrency, stop refilling
 		var forceRequeueShadowPartitionAt time.Time
-		var forceRequeueBacklogAt time.Time
 
 		switch res.Constraint {
-		// If backlog is limited by function or account-level concurrency, stop refilling
 		case enums.QueueConstraintAccountConcurrency, enums.QueueConstraintFunctionConcurrency:
 			forceRequeueShadowPartitionAt = q.clock.Now().Add(PartitionConcurrencyLimitRequeueExtension)
-
-		// If backlog is concurrency limited by custom key, requeue just this backlog in the future
-		case enums.QueueConstraintCustomConcurrencyKey1, enums.QueueConstraintCustomConcurrencyKey2:
-			forceRequeueBacklogAt = backlog.requeueBackOff(q.clock.Now(), res.Constraint, shadowPart)
-
-		// If backlog is throttled, requeue just this backlog in the future
-		case enums.QueueConstraintThrottle:
-			forceRequeueBacklogAt = backlog.requeueBackOff(q.clock.Now(), res.Constraint, shadowPart)
-		}
-
-		if !forceRequeueBacklogAt.IsZero() {
-			if err := q.BacklogRequeue(ctx, backlog, shadowPart, forceRequeueBacklogAt); err != nil && !errors.Is(err, ErrBacklogNotFound) {
-				return fmt.Errorf("could not requeue shadow partition: %w", err)
-			}
 		}
 
 		if !forceRequeueShadowPartitionAt.IsZero() {
@@ -377,11 +246,6 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 			}
 
 			return nil
-		}
-
-		remainingItems := res.TotalBacklogCount - res.Refilled
-		if remainingItems == 0 {
-			fullyProcessedBacklogs++
 		}
 	}
 
@@ -430,7 +294,8 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 	q.addShadowContinue(ctx, shadowPart, continuationCount+1)
 
 	// Clear out current lease
-	err = q.ShadowPartitionRequeue(ctx, shadowPart, *leaseID, partitionRequeueAt)
+	partitionRequeueAt := q.clock.Now().Add(ShadowPartitionRequeueExtendedDuration)
+	err = q.ShadowPartitionRequeue(ctx, shadowPart, *leaseID, &partitionRequeueAt)
 
 	var action string
 	switch err {
@@ -457,6 +322,150 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 	}
 
 	return nil
+}
+
+func (q *queue) processShadowPartitionBacklog(ctx context.Context, shadowPart *QueueShadowPartition, backlog *QueueBacklog, refillUntil time.Time) (*BacklogRefillResult, bool, error) {
+	// May need to normalize - this will not happen for default backlogs
+	if backlog.isOutdated(shadowPart) {
+		// Prepare normalization, this will just run once as the shadow scanner
+		// won't pick it up again after this.
+		_, shouldNormalizeAsync, err := q.BacklogPrepareNormalize(
+			ctx,
+			backlog,
+			shadowPart,
+			q.backlogNormalizeAsyncLimit(ctx),
+		)
+		if err != nil {
+			return nil, false, fmt.Errorf("could not prepare backlog for normalization: %w", err)
+		}
+
+		// If there are just a couple of items in the backlog, we can
+		// normalize right away, we have the guarantee that the backlog
+		// is not being normalized right now as it wouldn't be picked up
+		// by the shadow scanner otherwise.
+		if !shouldNormalizeAsync {
+			if _, err := duration(ctx, q.primaryQueueShard.Name, "normalize_lease", q.clock.Now(), func(ctx context.Context) (any, error) {
+				err := q.leaseBacklogForNormalization(ctx, backlog)
+				return nil, err
+			}); err != nil {
+				if errors.Is(err, errBacklogAlreadyLeasedForNormalization) {
+					return nil, false, nil
+				}
+
+				return nil, false, fmt.Errorf("could not lease backlog: %w", err)
+			}
+
+			if err := q.normalizeBacklog(ctx, backlog, shadowPart); err != nil {
+				return nil, false, fmt.Errorf("could not normalize backlog: %w", err)
+			}
+		}
+
+		return nil, false, nil
+	}
+
+	res, err := durationWithTags(
+		ctx,
+		q.primaryQueueShard.Name,
+		"backlog_process_duration",
+		q.clock.Now(),
+		func(ctx context.Context) (*BacklogRefillResult, error) {
+			return q.BacklogRefill(ctx, backlog, shadowPart, refillUntil)
+		},
+		map[string]any{"partition_id": shadowPart.PartitionID},
+	)
+	if err != nil {
+		return nil, false, fmt.Errorf("could not refill backlog: %w", err)
+	}
+
+	q.log.Trace("processed backlog",
+		"backlog", backlog.BacklogID,
+		"total", res.TotalBacklogCount,
+		"until", res.BacklogCountUntil,
+		"constrained", res.Constraint,
+		"capacity", res.Capacity,
+		"refill", res.Refill,
+		"refilled", res.Refilled,
+		"throttle", shadowPart.Throttle,
+	)
+
+	// instrumentation
+	{
+		opts := metrics.CounterOpt{
+			PkgName: pkgName,
+			Tags: map[string]any{
+				"queue_shard":  q.primaryQueueShard.Name,
+				"partition_id": shadowPart.PartitionID,
+			},
+		}
+
+		metrics.IncrBacklogProcessedCounter(ctx, opts)
+		metrics.IncrQueueBacklogRefilledCounter(ctx, int64(res.Refilled), opts)
+
+		switch res.Constraint {
+		case enums.QueueConstraintNotLimited: // no-op
+		default:
+			// NOTE:
+			// we don't want to add an extended amount of time for requeue when there are
+			// contraint hits, so we make sure to check more often in order to admit items
+			// into processing
+			metrics.IncrQueueBacklogRefillConstraintCounter(ctx, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags: map[string]any{
+					"queue_shard":  q.primaryQueueShard.Name,
+					"partition_id": shadowPart.PartitionID,
+					"constraint":   res.Constraint.String(),
+				},
+			})
+
+			q.lifecycles.OnBacklogRefillConstraintHit(ctx, shadowPart, backlog, res)
+		}
+
+		// NOTE: custom method to instrument result - potentially handling high cardinality data
+		q.lifecycles.OnBacklogRefilled(ctx, shadowPart, backlog, res)
+
+		// Invoke previous constraint lifecycles to update UI
+		switch res.Constraint {
+		case enums.QueueConstraintAccountConcurrency:
+			if shadowPart.AccountID != nil {
+				q.lifecycles.OnAccountConcurrencyLimitReached(ctx, *shadowPart.AccountID, shadowPart.EnvID)
+			}
+		case enums.QueueConstraintFunctionConcurrency:
+			if shadowPart.FunctionID != nil {
+				q.lifecycles.OnFnConcurrencyLimitReached(ctx, *shadowPart.FunctionID)
+			}
+		case enums.QueueConstraintCustomConcurrencyKey1:
+			if len(backlog.ConcurrencyKeys) > 0 {
+				q.lifecycles.OnCustomKeyConcurrencyLimitReached(ctx, backlog.ConcurrencyKeys[0].CanonicalKeyID)
+			}
+		case enums.QueueConstraintCustomConcurrencyKey2:
+			if len(backlog.ConcurrencyKeys) > 1 {
+				q.lifecycles.OnCustomKeyConcurrencyLimitReached(ctx, backlog.ConcurrencyKeys[1].CanonicalKeyID)
+			}
+		default:
+		}
+	}
+
+	var forceRequeueBacklogAt time.Time
+
+	switch res.Constraint {
+	// If backlog is concurrency limited by custom key, requeue just this backlog in the future
+	case enums.QueueConstraintCustomConcurrencyKey1, enums.QueueConstraintCustomConcurrencyKey2:
+		forceRequeueBacklogAt = backlog.requeueBackOff(q.clock.Now(), res.Constraint, shadowPart)
+
+	// If backlog is throttled, requeue just this backlog in the future
+	case enums.QueueConstraintThrottle:
+		forceRequeueBacklogAt = backlog.requeueBackOff(q.clock.Now(), res.Constraint, shadowPart)
+	}
+
+	if !forceRequeueBacklogAt.IsZero() {
+		if err := q.BacklogRequeue(ctx, backlog, shadowPart, forceRequeueBacklogAt); err != nil && !errors.Is(err, ErrBacklogNotFound) {
+			return nil, false, fmt.Errorf("could not requeue backlog: %w", err)
+		}
+	}
+
+	remainingItems := res.TotalBacklogCount - res.Refilled
+	fullyProcessedBacklog := remainingItems == 0
+	return res, fullyProcessedBacklog, nil
 }
 
 type shadowPartitionChanMsg struct {

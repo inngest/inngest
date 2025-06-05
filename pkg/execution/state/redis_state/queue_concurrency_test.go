@@ -60,12 +60,7 @@ func TestQueuePartitionConcurrency(t *testing.T) {
 	}
 
 	// Create a new lifecycle listener.  This should be invoked each time we hit limits.
-	ll := testLifecycleListener{
-		lock:            &sync.Mutex{},
-		fnConcurrency:   map[uuid.UUID]int{},
-		acctConcurrency: map[uuid.UUID]int{},
-		ckConcurrency:   map[string]int{},
-	}
+	ll := newTestLifecycleListener()
 
 	q := NewQueue(
 		QueueShard{RedisClient: NewQueueClient(rc, QueueDefaultKey), Kind: string(enums.QueueShardKindRedis), Name: consts.DefaultQueueShardName},
@@ -153,6 +148,15 @@ type testLifecycleListener struct {
 	fnConcurrency   map[uuid.UUID]int
 	acctConcurrency map[uuid.UUID]int
 	ckConcurrency   map[string]int
+}
+
+func newTestLifecycleListener() testLifecycleListener {
+	return testLifecycleListener{
+		lock:            &sync.Mutex{},
+		fnConcurrency:   map[uuid.UUID]int{},
+		acctConcurrency: map[uuid.UUID]int{},
+		ckConcurrency:   map[string]int{},
+	}
 }
 
 func (t testLifecycleListener) OnFnConcurrencyLimitReached(_ context.Context, fnID uuid.UUID) {
