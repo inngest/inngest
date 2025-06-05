@@ -132,8 +132,9 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 
 				newLeaseID, err := q.ShadowPartitionExtendLease(ctx, shadowPart, *leaseID, ShadowPartitionLeaseDuration)
 				if err != nil {
+					jobCancel()
+
 					if errors.Is(err, ErrShadowPartitionNotFound) {
-						jobCancel()
 						return
 					}
 
@@ -147,10 +148,9 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 							},
 						})
 						// contention
-						jobCancel()
 						return
 					}
-					
+
 					return
 				}
 
