@@ -572,7 +572,7 @@ func TestQueueShadowPartitionLease(t *testing.T) {
 		_, err := r.ZAdd(kg.ShadowPartitionSet(shadowPart.PartitionID), float64(nextBacklogAt.UnixMilli()), "backlog-test")
 		require.NoError(t, err)
 
-		err = q.ShadowPartitionRequeue(ctx, shadowPart, *leaseID, nil)
+		err = q.ShadowPartitionRequeue(ctx, shadowPart, nil)
 		require.NoError(t, err)
 
 		leasedPart := QueueShadowPartition{}
@@ -602,7 +602,7 @@ func TestQueueShadowPartitionLease(t *testing.T) {
 		require.Equal(t, expectedLeaseExpiry.UnixMilli(), int64(score(t, r, kg.AccountShadowPartitions(accountID), shadowPart.PartitionID)))
 		require.Equal(t, expectedLeaseExpiry.UnixMilli(), int64(score(t, r, kg.GlobalAccountShadowPartitions(), accountID.String())))
 
-		err = q.ShadowPartitionRequeue(ctx, shadowPart, *leaseID, nil)
+		err = q.ShadowPartitionRequeue(ctx, shadowPart, nil)
 		require.NoError(t, err)
 
 		require.False(t, r.Exists(kg.ShadowPartitionMeta()))
@@ -635,7 +635,7 @@ func TestQueueShadowPartitionLease(t *testing.T) {
 		require.Equal(t, expectedLeaseExpiry.UnixMilli(), int64(score(t, r, kg.GlobalAccountShadowPartitions(), accountID.String())))
 
 		forceRequeueAt := time.Now().Add(32 * time.Minute)
-		err = q.ShadowPartitionRequeue(ctx, shadowPart, *leaseID, &forceRequeueAt)
+		err = q.ShadowPartitionRequeue(ctx, shadowPart, &forceRequeueAt)
 		require.NoError(t, err)
 
 		leasedPart := QueueShadowPartition{}
@@ -671,7 +671,7 @@ func TestQueueShadowPartitionLease(t *testing.T) {
 		require.Equal(t, expectedLeaseExpiry.UnixMilli(), int64(score(t, r, kg.GlobalAccountShadowPartitions(), accountID.String())))
 
 		forceRequeueAt := time.Now().Add(32 * time.Minute)
-		err = q.ShadowPartitionRequeue(ctx, shadowPart, *leaseID, &forceRequeueAt)
+		err = q.ShadowPartitionRequeue(ctx, shadowPart, &forceRequeueAt)
 		require.NoError(t, err)
 
 		leasedPart := QueueShadowPartition{}
