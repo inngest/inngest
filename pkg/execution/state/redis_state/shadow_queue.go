@@ -57,6 +57,9 @@ func (q *queue) shadowWorker(ctx context.Context, qspc chan shadowPartitionChanM
 				q.clock.Now(),
 				func(ctx context.Context) (any, error) {
 					err := q.processShadowPartition(ctx, msg.sp, msg.continuationCount)
+					if errors.Is(err, context.Canceled) {
+						return nil, nil
+					}
 					return nil, err
 				},
 				map[string]any{"partition_id": msg.sp.PartitionID},
@@ -113,6 +116,9 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 	extendLeaseCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
+	ctx, jobCancel := context.WithCancel(context.WithoutCancel(ctx))
+	defer jobCancel()
+
 	// keep extending lease while we're processing
 	go func() {
 		for {
@@ -120,8 +126,15 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 			case <-extendLeaseCtx.Done():
 				return
 			case <-time.Tick(ShadowPartitionLeaseDuration / 2):
-				leaseID, err = q.ShadowPartitionExtendLease(ctx, shadowPart, *leaseID, ShadowPartitionLeaseDuration)
+				if leaseID == nil {
+					return
+				}
+
+				newLeaseID, err := q.ShadowPartitionExtendLease(ctx, shadowPart, *leaseID, ShadowPartitionLeaseDuration)
 				if err != nil {
+					jobCancel()
+
+					// lease contention
 					if errors.Is(err, ErrShadowPartitionAlreadyLeased) || errors.Is(err, ErrShadowPartitionLeaseNotFound) {
 						metrics.IncrQueueShadowPartitionLeaseContentionCounter(ctx, metrics.CounterOpt{
 							PkgName: pkgName,
@@ -131,11 +144,17 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 								"action":       "extend_lease",
 							},
 						})
-						// contention
-						return
 					}
+
 					return
 				}
+
+				if newLeaseID == nil {
+					jobCancel()
+					return
+				}
+
+				leaseID = newLeaseID
 			}
 		}
 	}()
@@ -145,33 +164,14 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 		q.removeShadowContinue(ctx, shadowPart, false)
 
 		forceRequeueAt := q.clock.Now().Add(ShadowPartitionRefillPausedRequeueExtension)
-		err = q.ShadowPartitionRequeue(ctx, shadowPart, *leaseID, &forceRequeueAt)
+		err = q.ShadowPartitionRequeue(ctx, shadowPart, &forceRequeueAt)
 
-		var action string
 		switch err {
-		case nil: // no-op
-		case ErrShadowPartitionAlreadyLeased:
-			action = "already_leased"
-		case ErrShadowPartitionNotFound:
-			action = "not_found"
-		case ErrShadowPartitionLeaseNotFound:
-			action = "lease_not_found"
+		case nil, ErrShadowPartitionNotFound:
+			return nil
 		default:
 			return fmt.Errorf("could not requeue shadow partition: %w", err)
 		}
-
-		if action != "" {
-			metrics.IncrQueueShadowPartitionLeaseContentionCounter(ctx, metrics.CounterOpt{
-				PkgName: pkgName,
-				Tags: map[string]any{
-					"queue_shard":  q.primaryQueueShard.Name,
-					"partition_id": shadowPart.PartitionID,
-					"action":       action,
-				},
-			})
-		}
-
-		return nil
 	}
 
 	limit := ShadowPartitionPeekMaxBacklogs
@@ -197,6 +197,11 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 	// Refill backlogs in random order
 	fullyProcessedBacklogs := 0
 	for _, idx := range util.RandPerm(len(backlogs)) {
+		// If cancelled, return early
+		if errors.Is(ctx.Err(), context.Canceled) {
+			return nil
+		}
+
 		backlog := backlogs[idx]
 
 		// May need to normalize - this will not happen for default backlogs
@@ -327,33 +332,15 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 
 		if !forceRequeueShadowPartitionAt.IsZero() {
 			q.removeShadowContinue(ctx, shadowPart, false)
-			err = q.ShadowPartitionRequeue(ctx, shadowPart, *leaseID, &forceRequeueShadowPartitionAt)
+			err = q.ShadowPartitionRequeue(ctx, shadowPart, &forceRequeueShadowPartitionAt)
 
-			var action string
 			switch err {
-			case nil: // no-op
-			case ErrShadowPartitionAlreadyLeased:
-				action = "already_leased"
-			case ErrShadowPartitionNotFound:
-				action = "not_found"
-			case ErrShadowPartitionLeaseNotFound:
-				action = "lease_not_found"
+			case nil, ErrShadowPartitionNotFound:
+				return nil
 			default:
 				return fmt.Errorf("could not requeue shadow partition: %w", err)
 			}
 
-			if action != "" {
-				metrics.IncrQueueShadowPartitionLeaseContentionCounter(ctx, metrics.CounterOpt{
-					PkgName: pkgName,
-					Tags: map[string]any{
-						"queue_shard":  q.primaryQueueShard.Name,
-						"partition_id": shadowPart.PartitionID,
-						"action":       action,
-					},
-				})
-			}
-
-			return nil
 		}
 
 		remainingItems := res.TotalBacklogCount - res.Refilled
@@ -374,66 +361,27 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 		// No more backlogs right now, we can continue the scan loop until new items are added
 		q.removeShadowContinue(ctx, shadowPart, false)
 
-		err = q.ShadowPartitionRequeue(ctx, shadowPart, *leaseID, nil)
+		err = q.ShadowPartitionRequeue(ctx, shadowPart, nil)
 
-		var action string
 		switch err {
-		case nil: // no-op
-		case ErrShadowPartitionAlreadyLeased:
-			action = "already_leased"
-		case ErrShadowPartitionNotFound:
-			action = "not_found"
-		case ErrShadowPartitionLeaseNotFound:
-			action = "lease_not_found"
+		case nil, ErrShadowPartitionNotFound: // no-op
+			return nil
 		default:
 			return fmt.Errorf("could not requeue shadow partition: %w", err)
 		}
-
-		if action != "" {
-			metrics.IncrQueueShadowPartitionLeaseContentionCounter(ctx, metrics.CounterOpt{
-				PkgName: pkgName,
-				Tags: map[string]any{
-					"queue_shard":  q.primaryQueueShard.Name,
-					"partition_id": shadowPart.PartitionID,
-					"action":       action,
-				},
-			})
-		}
-
-		return nil
 	}
 
 	// More backlogs, we can add a continuation
 	q.addShadowContinue(ctx, shadowPart, continuationCount+1)
 
 	// Clear out current lease
-	err = q.ShadowPartitionRequeue(ctx, shadowPart, *leaseID, partitionRequeueAt)
-
-	var action string
+	err = q.ShadowPartitionRequeue(ctx, shadowPart, partitionRequeueAt)
 	switch err {
-	case nil: // no-op
-	case ErrShadowPartitionAlreadyLeased:
-		action = "already_leased"
-	case ErrShadowPartitionNotFound:
-		action = "not_found"
-	case ErrShadowPartitionLeaseNotFound:
-		action = "lease_not_found"
+	case nil, ErrShadowPartitionNotFound:
+		return nil
 	default:
 		return fmt.Errorf("could not requeue shadow partition: %w", err)
 	}
-
-	if action != "" {
-		metrics.IncrQueueShadowPartitionLeaseContentionCounter(ctx, metrics.CounterOpt{
-			PkgName: pkgName,
-			Tags: map[string]any{
-				"queue_shard":  q.primaryQueueShard.Name,
-				"partition_id": shadowPart.PartitionID,
-				"action":       action,
-			},
-		})
-	}
-
-	return nil
 }
 
 type shadowPartitionChanMsg struct {
@@ -464,6 +412,9 @@ func (q *queue) scanShadowContinuations(ctx context.Context) error {
 				q.clock.Now(),
 				func(ctx context.Context) (any, error) {
 					err := q.processShadowPartition(ctx, sp, cont.count)
+					if errors.Is(err, context.Canceled) {
+						return nil, nil
+					}
 					return nil, err
 				},
 				map[string]any{"partition_id": sp.PartitionID},
@@ -808,14 +759,12 @@ func (q *queue) ShadowPartitionExtendLease(ctx context.Context, sp *QueueShadowP
 		return nil, ErrShadowPartitionLeaseNotFound
 	case -3:
 		return nil, ErrShadowPartitionAlreadyLeased
-	case -4:
-		return nil, ErrShadowPartitionPaused
 	default:
 		return nil, fmt.Errorf("unknown response extending shadow partition lease: %v (%T)", status, status)
 	}
 }
 
-func (q *queue) ShadowPartitionRequeue(ctx context.Context, sp *QueueShadowPartition, leaseID ulid.ULID, requeueAt *time.Time) error {
+func (q *queue) ShadowPartitionRequeue(ctx context.Context, sp *QueueShadowPartition, requeueAt *time.Time) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "ShadowPartitionRequeue"), redis_telemetry.ScopeQueue)
 
 	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
@@ -846,7 +795,6 @@ func (q *queue) ShadowPartitionRequeue(ctx context.Context, sp *QueueShadowParti
 	args, err := StrSlice([]any{
 		sp.PartitionID,
 		accountID,
-		leaseID,
 		q.clock.Now().UnixMilli(),
 		requeueAtMS,
 	})
@@ -874,11 +822,16 @@ func (q *queue) ShadowPartitionRequeue(ctx context.Context, sp *QueueShadowParti
 	case 0:
 		return nil
 	case -1:
+		metrics.IncrQueueShadowPartitionLeaseContentionCounter(ctx, metrics.CounterOpt{
+			PkgName: pkgName,
+			Tags: map[string]any{
+				"queue_shard":  q.primaryQueueShard.Name,
+				"partition_id": sp.PartitionID,
+				"action":       "not_found",
+			},
+		})
+
 		return ErrShadowPartitionNotFound
-	case -2:
-		return ErrShadowPartitionAlreadyLeased
-	case -3:
-		return ErrShadowPartitionLeaseNotFound
 	default:
 		return fmt.Errorf("unknown response returning shadow partition lease: %v (%T)", status, status)
 	}
