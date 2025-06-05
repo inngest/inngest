@@ -1,9 +1,19 @@
-export const runtime = 'nodejs';
+import EventsPage from '@/components/Events/EventsPage';
 
-export default function EventLogsPage() {
+export default function Page({
+  params: { environmentSlug: envSlug, eventTypeName },
+}: {
+  params: { environmentSlug: string; eventTypeName: string };
+}) {
+  const decodedEventTypeName = decodeURIComponent(eventTypeName);
   return (
-    <div className="flex h-full w-full items-center justify-center">
-      <h2 className="text-sm font-semibold">Select an event on the left</h2>
-    </div>
+    <>
+      <EventsPage
+        environmentSlug={envSlug}
+        eventTypeNames={[decodedEventTypeName]}
+        singleEventTypePage
+        showHeader={false}
+      />
+    </>
   );
 }
