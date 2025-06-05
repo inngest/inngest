@@ -192,8 +192,8 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 	})
 
 	// Refill backlogs in random order
-	fullyProcessedBacklogs := 0
-	var wasConstrained bool
+	fullyProcessedBacklogs := 0 // Number of fully processed backlogs
+	var wasConstrained bool     // Whether we encountered constraints affecting the shadow partition
 	for _, idx := range util.RandPerm(len(backlogs)) {
 		// If cancelled, return early
 		if errors.Is(ctx.Err(), context.Canceled) {
@@ -207,17 +207,37 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 			return fmt.Errorf("could not process backlog: %w", err)
 		}
 
+		// If we did not refill, continue on to next backlog
 		if res == nil {
 			continue
 		}
 
+		// If we fully refilled, track and continue
 		if fullyProcessed {
 			fullyProcessedBacklogs++
+			continue
 		}
 
-		if res.Constraint != enums.QueueConstraintNotLimited {
+		// If we hit a constraint affecting the entire shadow partition, stop processing other backlogs
+		// and requeue the partition early, as we cannot refill items from other backlogs right now.
+		switch res.Constraint {
+		case enums.QueueConstraintNotLimited:
+			continue
+		case enums.QueueConstraintAccountConcurrency, enums.QueueConstraintFunctionConcurrency:
+			// No more backlogs right now, we can continue the scan loop until new items are added
+			q.removeShadowContinue(ctx, shadowPart, false)
+
+			forceRequeueShadowPartitionAt := q.clock.Now().Add(PartitionConcurrencyLimitRequeueExtension)
+
+			err = q.ShadowPartitionRequeue(ctx, shadowPart, &forceRequeueShadowPartitionAt)
+			switch err {
+			case nil, ErrShadowPartitionNotFound: // no-op
+				return nil
+			default:
+				return fmt.Errorf("could not requeue shadow partition: %w", err)
+			}
+		default:
 			wasConstrained = true
-			break
 		}
 	}
 
@@ -243,18 +263,15 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 		}
 	}
 
-	// More backlogs to process, decide on when we want to requeue 
-	var partitionRequeueAt *time.Time // if constrained, immediately process again
-	if !wasConstrained {
+	if wasConstrained {
+		// Ran into constraint - remove existing continuation 
+		q.removeShadowContinue(ctx, shadowPart, false)
+	} else {
 		// Not constrained so we can add a continuation
 		q.addShadowContinue(ctx, shadowPart, continuationCount+1)
-
-		// Wait a bit longer to pick up again
-		requeueAt := q.clock.Now().Add(ShadowPartitionRequeueExtendedDuration)
-		partitionRequeueAt = &requeueAt
 	}
 
-	err = q.ShadowPartitionRequeue(ctx, shadowPart, partitionRequeueAt)
+	err = q.ShadowPartitionRequeue(ctx, shadowPart, nil)
 	switch err {
 	case nil, ErrShadowPartitionNotFound:
 		return nil
