@@ -60,12 +60,7 @@ func TestQueuePartitionConcurrency(t *testing.T) {
 	}
 
 	// Create a new lifecycle listener.  This should be invoked each time we hit limits.
-	ll := testLifecycleListener{
-		lock:            &sync.Mutex{},
-		fnConcurrency:   map[uuid.UUID]int{},
-		acctConcurrency: map[uuid.UUID]int{},
-		ckConcurrency:   map[string]int{},
-	}
+	ll := newTestLifecycleListener()
 
 	q := NewQueue(
 		QueueShard{RedisClient: NewQueueClient(rc, QueueDefaultKey), Kind: string(enums.QueueShardKindRedis), Name: consts.DefaultQueueShardName},
@@ -155,6 +150,15 @@ type testLifecycleListener struct {
 	ckConcurrency   map[string]int
 }
 
+func newTestLifecycleListener() testLifecycleListener {
+	return testLifecycleListener{
+		lock:            &sync.Mutex{},
+		fnConcurrency:   map[uuid.UUID]int{},
+		acctConcurrency: map[uuid.UUID]int{},
+		ckConcurrency:   map[string]int{},
+	}
+}
+
 func (t testLifecycleListener) OnFnConcurrencyLimitReached(_ context.Context, fnID uuid.UUID) {
 	t.lock.Lock()
 	defer t.lock.Unlock()
@@ -181,4 +185,12 @@ func (t testLifecycleListener) OnCustomKeyConcurrencyLimitReached(_ context.Cont
 
 	i := t.ckConcurrency[key]
 	t.ckConcurrency[key] = i + 1
+}
+
+func (t testLifecycleListener) OnBacklogRefillConstraintHit(ctx context.Context, p *QueueShadowPartition, b *QueueBacklog, res *BacklogRefillResult) {
+	// no-op
+}
+
+func (t testLifecycleListener) OnBacklogRefilled(ctx context.Context, p *QueueShadowPartition, b *QueueBacklog, res *BacklogRefillResult) {
+	// no-op
 }
