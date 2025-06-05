@@ -146,8 +146,29 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 
 		forceRequeueAt := q.clock.Now().Add(ShadowPartitionRefillPausedRequeueExtension)
 		err = q.ShadowPartitionRequeue(ctx, shadowPart, *leaseID, &forceRequeueAt)
-		if err != nil {
+
+		var action string
+		switch err {
+		case nil: // no-op
+		case ErrShadowPartitionAlreadyLeased:
+			action = "already_leased"
+		case ErrShadowPartitionNotFound:
+			action = "not_found"
+		case ErrShadowPartitionLeaseNotFound:
+			action = "lease_not_found"
+		default:
 			return fmt.Errorf("could not requeue shadow partition: %w", err)
+		}
+
+		if action != "" {
+			metrics.IncrQueueShadowPartitionLeaseContentionCounter(ctx, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags: map[string]any{
+					"queue_shard":  q.primaryQueueShard.Name,
+					"partition_id": shadowPart.PartitionID,
+					"action":       action,
+				},
+			})
 		}
 
 		return nil
@@ -306,8 +327,30 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 
 		if !forceRequeueShadowPartitionAt.IsZero() {
 			q.removeShadowContinue(ctx, shadowPart, false)
-			if err := q.ShadowPartitionRequeue(ctx, shadowPart, *leaseID, &forceRequeueShadowPartitionAt); err != nil {
+			err = q.ShadowPartitionRequeue(ctx, shadowPart, *leaseID, &forceRequeueShadowPartitionAt)
+
+			var action string
+			switch err {
+			case nil: // no-op
+			case ErrShadowPartitionAlreadyLeased:
+				action = "already_leased"
+			case ErrShadowPartitionNotFound:
+				action = "not_found"
+			case ErrShadowPartitionLeaseNotFound:
+				action = "lease_not_found"
+			default:
 				return fmt.Errorf("could not requeue shadow partition: %w", err)
+			}
+
+			if action != "" {
+				metrics.IncrQueueShadowPartitionLeaseContentionCounter(ctx, metrics.CounterOpt{
+					PkgName: pkgName,
+					Tags: map[string]any{
+						"queue_shard":  q.primaryQueueShard.Name,
+						"partition_id": shadowPart.PartitionID,
+						"action":       action,
+					},
+				})
 			}
 
 			return nil
@@ -332,8 +375,29 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 		q.removeShadowContinue(ctx, shadowPart, false)
 
 		err = q.ShadowPartitionRequeue(ctx, shadowPart, *leaseID, nil)
-		if err != nil {
+
+		var action string
+		switch err {
+		case nil: // no-op
+		case ErrShadowPartitionAlreadyLeased:
+			action = "already_leased"
+		case ErrShadowPartitionNotFound:
+			action = "not_found"
+		case ErrShadowPartitionLeaseNotFound:
+			action = "lease_not_found"
+		default:
 			return fmt.Errorf("could not requeue shadow partition: %w", err)
+		}
+
+		if action != "" {
+			metrics.IncrQueueShadowPartitionLeaseContentionCounter(ctx, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags: map[string]any{
+					"queue_shard":  q.primaryQueueShard.Name,
+					"partition_id": shadowPart.PartitionID,
+					"action":       action,
+				},
+			})
 		}
 
 		return nil
@@ -344,8 +408,29 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 
 	// Clear out current lease
 	err = q.ShadowPartitionRequeue(ctx, shadowPart, *leaseID, partitionRequeueAt)
-	if err != nil {
+
+	var action string
+	switch err {
+	case nil: // no-op
+	case ErrShadowPartitionAlreadyLeased:
+		action = "already_leased"
+	case ErrShadowPartitionNotFound:
+		action = "not_found"
+	case ErrShadowPartitionLeaseNotFound:
+		action = "lease_not_found"
+	default:
 		return fmt.Errorf("could not requeue shadow partition: %w", err)
+	}
+
+	if action != "" {
+		metrics.IncrQueueShadowPartitionLeaseContentionCounter(ctx, metrics.CounterOpt{
+			PkgName: pkgName,
+			Tags: map[string]any{
+				"queue_shard":  q.primaryQueueShard.Name,
+				"partition_id": shadowPart.PartitionID,
+				"action":       action,
+			},
+		})
 	}
 
 	return nil
@@ -474,6 +559,7 @@ func (q *queue) scanShadowPartitions(ctx context.Context, until time.Time, qspc 
 // shadowScan iterates through the shadow partitions and attempt to add queue items
 // to the function partition for processing
 func (q *queue) shadowScan(ctx context.Context) error {
+	l := q.log.With("method", "shadowScan")
 	qspc := make(chan shadowPartitionChanMsg)
 
 	for i := int32(0); i < q.numShadowWorkers; i++ {
@@ -481,7 +567,9 @@ func (q *queue) shadowScan(ctx context.Context) error {
 	}
 
 	tick := q.clock.NewTicker(q.pollTick)
-	q.log.Debug("starting shadow scanner", "poll", q.pollTick.String())
+	l.Debug("starting shadow scanner", "poll", q.pollTick.String())
+
+	backoff := 200 * time.Millisecond
 
 	for {
 		select {
@@ -494,8 +582,22 @@ func (q *queue) shadowScan(ctx context.Context) error {
 			now := q.clock.Now()
 			scanUntil := now.Truncate(time.Second).Add(2 * PartitionLookahead)
 			if err := q.scanShadowPartitions(ctx, scanUntil, qspc); err != nil {
-				return fmt.Errorf("could not scan shadow partitions: %w", err)
+				if errors.Is(err, context.DeadlineExceeded) {
+					l.Warn("deadline exceeded scanning shadow partitions")
+					<-time.After(backoff)
+
+					// Backoff doubles up to 5 seconds
+					backoff = time.Duration(math.Min(float64(backoff*2), float64(5*time.Second)))
+					continue
+				}
+
+				if !errors.Is(err, context.Canceled) {
+					l.Error("error scanning shadow partitions", "error", err)
+				}
+				return fmt.Errorf("error scanning shadow partitions: %w", err)
 			}
+
+			backoff = 200 * time.Millisecond
 		}
 	}
 }
