@@ -215,6 +215,7 @@ export type Function = {
   concurrency: Scalars['Int'];
   config: Scalars['String'];
   configuration: FunctionConfiguration;
+  failureHandler: Maybe<Function>;
   id: Scalars['String'];
   name: Scalars['String'];
   slug: Scalars['String'];
