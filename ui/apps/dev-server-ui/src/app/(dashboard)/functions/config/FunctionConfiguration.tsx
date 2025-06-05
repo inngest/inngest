@@ -388,14 +388,14 @@ export default function FunctionConfiguration({
               </table>
             </div>
           )}
-          {inngestFunction.configuration.rateLimit && (
+          {inngestFunction.configuration.debounce && (
             <div className="overflow-hidden rounded border border-gray-300 ">
               <table className="w-full border-collapse">
                 <thead>
                   <tr className="h-8 bg-gray-100 bg-gray-50">
                     <td className="text-basis px-2 text-sm font-medium" colSpan={2}>
                       <div className="flex items-center gap-2">
-                        Rate limit
+                        Debounce
                         <RiInformationLine className="h-5 w-5" />
                       </div>
                     </td>
@@ -404,21 +404,75 @@ export default function FunctionConfiguration({
                 <tbody>
                   {/*can't apply px-2 to tr*/}
                   <tr className="h-8 border-b border-gray-200">
-                    <td className="text-muted px-2 text-sm">Limit</td>
-                    <td className="text-basis px-2 text-right text-sm">
-                      {inngestFunction.configuration.rateLimit.limit.toString()}
-                    </td>
-                  </tr>
-                  <tr className="h-8 border-b border-gray-200">
                     <td className="text-muted px-2 text-sm">Period</td>
                     <td className="text-basis px-2 text-right text-sm">
-                      {inngestFunction.configuration.rateLimit.period}
+                      {inngestFunction.configuration.debounce.period}
                     </td>
                   </tr>
                   <tr className="h-8 border-b border-gray-200">
                     <td className="text-muted px-2 text-sm">Key</td>
                     <td className="text-basis px-2 text-right text-sm">
-                      <code>{inngestFunction.configuration.rateLimit.key}</code>
+                      <code>{inngestFunction.configuration.debounce.key}</code>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          )}
+          {inngestFunction.configuration.priority && (
+            <div className="overflow-hidden rounded border border-gray-300 ">
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr className="h-8 bg-gray-100 bg-gray-50">
+                    <td className="text-basis px-2 text-sm font-medium" colSpan={2}>
+                      <div className="flex items-center gap-2">
+                        Priority
+                        <RiInformationLine className="h-5 w-5" />
+                      </div>
+                    </td>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr className="h-8 border-b border-gray-200">
+                    <td className="text-muted px-2 text-sm">Run</td>
+                    <td className="text-basis px-2 text-right text-sm">
+                      <code>{inngestFunction.configuration.priority}</code>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          )}
+          {inngestFunction.configuration.eventsBatch && (
+            <div className="overflow-hidden rounded border border-gray-300 ">
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr className="h-8 bg-gray-100 bg-gray-50">
+                    <td className="text-basis px-2 text-sm font-medium" colSpan={2}>
+                      <div className="flex items-center gap-2">
+                        Batching
+                        <RiInformationLine className="h-5 w-5" />
+                      </div>
+                    </td>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr className="h-8 border-b border-gray-200">
+                    <td className="text-muted px-2 text-sm">Max size</td>
+                    <td className="text-basis px-2 text-right text-sm">
+                      <code>{inngestFunction.configuration.eventsBatch.maxSize.toString()}</code>
+                    </td>
+                  </tr>
+                  <tr className="h-8 border-b border-gray-200">
+                    <td className="text-muted px-2 text-sm">Timeout</td>
+                    <td className="text-basis px-2 text-right text-sm">
+                      <code>{inngestFunction.configuration.eventsBatch.timeout}</code>
+                    </td>
+                  </tr>
+                  <tr className="h-8 border-b border-gray-200">
+                    <td className="text-muted px-2 text-sm">Key</td>
+                    <td className="text-basis px-2 text-right text-sm">
+                      <code>{inngestFunction.configuration.eventsBatch.key}</code>
                     </td>
                   </tr>
                 </tbody>
