@@ -189,6 +189,22 @@ func (m *mockBufferer) PauseByInvokeCorrelationID(ctx context.Context, workspace
 	return nil, fmt.Errorf("not implemented in mock")
 }
 
+func (m *mockBufferer) PauseBySignalID(ctx context.Context, workspaceID uuid.UUID, signalID string) (*state.Pause, error) {
+	return nil, fmt.Errorf("not implemented in mock")
+}
+
+func (m *mockBufferer) WriteFlushWatermark(ctx context.Context, index Index, watermark FlushWatermark) error {
+	return nil
+}
+
+func (m *mockBufferer) GetFlushWatermark(ctx context.Context, index Index) (*FlushWatermark, error) {
+	return nil, nil
+}
+
+func (m *mockBufferer) IndexExists(ctx context.Context, i Index) (bool, error) {
+	return len(m.pauses) > 0, nil
+}
+
 // mockPauseIterator implements the PauseIterator interface for testing
 type mockPauseIterator struct {
 	pauses []*state.Pause
