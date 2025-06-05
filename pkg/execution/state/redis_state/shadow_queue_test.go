@@ -1822,8 +1822,6 @@ func TestShadowPartitionUpdate(t *testing.T) {
 			r.FlushAll()
 			require.Len(t, r.Keys(), 0)
 
-			fmt.Printf("Throttle: %#v\n", tc.conf2.throttle)
-
 			// use future timestamp because scores will be bounded to the present
 			at := clock.Now().Add(1 * time.Minute)
 
@@ -1858,6 +1856,9 @@ func TestShadowPartitionUpdate(t *testing.T) {
 
 			backlog1 := q.ItemBacklog(ctx, item1)
 			require.NotEmpty(t, backlog1.BacklogID)
+			if len(tc.conf1.concurrencyKeys) > 0 {
+				require.Len(t, backlog1.ConcurrencyKeys, len(tc.conf1.concurrencyKeys))
+			}
 			if tc.conf1.throttle != nil {
 				require.NotNil(t, backlog1.Throttle)
 			}
@@ -1906,6 +1907,9 @@ func TestShadowPartitionUpdate(t *testing.T) {
 			backlog2 := q.ItemBacklog(ctx, item2)
 			require.NotEmpty(t, backlog2.BacklogID)
 			require.NotEqual(t, backlog1, backlog2)
+			if len(tc.conf2.concurrencyKeys) > 0 {
+				require.Len(t, backlog2.ConcurrencyKeys, len(tc.conf2.concurrencyKeys))
+			}
 			if tc.conf2.throttle != nil {
 				require.NotNil(t, backlog2.Throttle)
 			}
