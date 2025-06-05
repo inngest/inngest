@@ -288,6 +288,11 @@ func (q *queue) processShadowPartitionBacklog(ctx context.Context, shadowPart *Q
 
 	// May need to normalize - this will not happen for default backlogs
 	if reason := backlog.isOutdated(shadowPart); enableKeyQueues && reason != enums.QueueNormalizeReasonUnchanged {
+		q.log.Trace("outdated backlog",
+			"backlog", backlog.BacklogID,
+			"reason", reason,
+		)
+
 		metrics.IncrQueueOutdatedBacklogCounter(ctx, metrics.CounterOpt{
 			PkgName: pkgName,
 			Tags: map[string]any{
@@ -314,6 +319,11 @@ func (q *queue) processShadowPartitionBacklog(ctx context.Context, shadowPart *Q
 		// is not being normalized right now as it wouldn't be picked up
 		// by the shadow scanner otherwise.
 		if !shouldNormalizeAsync {
+			q.log.Trace("normalizing backlog immediately",
+				"backlog", backlog.BacklogID,
+				"reason", reason,
+			)
+
 			if _, err := duration(ctx, q.primaryQueueShard.Name, "normalize_lease", q.clock.Now(), func(ctx context.Context) (any, error) {
 				err := q.leaseBacklogForNormalization(ctx, backlog)
 				return nil, err
@@ -355,7 +365,8 @@ func (q *queue) processShadowPartitionBacklog(ctx context.Context, shadowPart *Q
 		"capacity", res.Capacity,
 		"refill", res.Refill,
 		"refilled", res.Refilled,
-		"throttle", shadowPart.Throttle,
+		"throttle_conf", shadowPart.Throttle,
+		"backlog_throttle", backlog.Throttle,
 	)
 
 	// instrumentation

@@ -314,12 +314,16 @@ func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp 
 			}
 			item.Data.Throttle = refreshedThrottle
 
+			q.log.Trace("retrieved refreshed throttle", "item", item, "refreshed_throttle", refreshedThrottle, "existing_throttle", existingThrottle, "sp", sp, "backlog", backlog)
+
 			if _, err := q.EnqueueItem(ctx, shard, *item, time.UnixMilli(item.AtMS), osqueue.EnqueueOpts{
 				PassthroughJobId:       true,
 				NormalizeFromBacklogID: backlog.BacklogID,
 			}); err != nil {
 				return fmt.Errorf("could not re-enqueue backlog item: %w", err)
 			}
+
+			// TODO Remove item pointer from old backlog (only pointer, do not drop item from hash)
 
 			processed += 1
 		}
@@ -345,6 +349,13 @@ func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp 
 			"partition_id": backlog.ShadowPartitionID,
 		},
 	})
+
+	err := q.BacklogFinishNormalize(ctx, backlog, sp)
+	if err != nil {
+		return fmt.Errorf("could not finish normalization: %w", err)
+	}
+
+	q.log.Trace("normalized backlog", "backlog", backlog.BacklogID, "partition", sp.PartitionID)
 
 	return nil
 }
