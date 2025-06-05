@@ -296,10 +296,33 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 						"constraint":   res.Constraint.String(),
 					},
 				})
+
+				q.lifecycles.OnBacklogRefillConstraintHit(ctx, shadowPart, backlog, res)
 			}
 
 			// NOTE: custom method to instrument result - potentially handling high cardinality data
-			q.instrumentBacklogResult(ctx, backlog, res)
+			q.lifecycles.OnBacklogRefilled(ctx, shadowPart, backlog, res)
+
+			// Invoke previous constraint lifecycles to update UI
+			switch res.Constraint {
+			case enums.QueueConstraintAccountConcurrency:
+				if shadowPart.AccountID != nil {
+					q.lifecycles.OnAccountConcurrencyLimitReached(ctx, *shadowPart.AccountID, shadowPart.EnvID)
+				}
+			case enums.QueueConstraintFunctionConcurrency:
+				if shadowPart.FunctionID != nil {
+					q.lifecycles.OnFnConcurrencyLimitReached(ctx, *shadowPart.FunctionID)
+				}
+			case enums.QueueConstraintCustomConcurrencyKey1:
+				if len(backlog.ConcurrencyKeys) > 0 {
+					q.lifecycles.OnCustomKeyConcurrencyLimitReached(ctx, backlog.ConcurrencyKeys[0].CanonicalKeyID)
+				}
+			case enums.QueueConstraintCustomConcurrencyKey2:
+				if len(backlog.ConcurrencyKeys) > 1 {
+					q.lifecycles.OnCustomKeyConcurrencyLimitReached(ctx, backlog.ConcurrencyKeys[1].CanonicalKeyID)
+				}
+			default:
+			}
 		}
 
 		var forceRequeueShadowPartitionAt time.Time
