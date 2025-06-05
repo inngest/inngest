@@ -3,6 +3,7 @@ package golang
 import (
 	"context"
 	"fmt"
+	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"net/http"
 	"net/url"
 	"sync/atomic"
@@ -117,5 +118,18 @@ func TestFunctionStateSizeLimit(t *testing.T) {
 		run := c.Run(ctx, lastRunId)
 		assert.Equal(t, "FAILED", run.Status)
 		assert.Equal(t, "{\"error\":{\"error\":\"InngestErrStateOverflowed: The function run exceeded the state size limit of 1 bytes.\",\"name\":\"InngestErrStateOverflowed\",\"message\":\"The function run exceeded the state size limit of 1 bytes.\"}}", run.Output)
+
+		runTrace := c.WaitForRunTraces(ctx, t, &lastRunId, client.WaitForRunTracesOptions{
+			Status: models.FunctionStatusFailed,
+		})
+		output := c.RunSpanOutput(ctx, *runTrace.Trace.OutputID)
+		assert.NotNil(t, runTrace.Trace.OutputID)
+
+		assert.NotNil(t, output.Error)
+
+		childOutput := c.RunSpanOutput(ctx, *runTrace.Trace.ChildSpans[0].OutputID)
+		assert.NotNil(t, childOutput.Error)
+
+		assert.NotNil(t, output.Error)
 	})
 }
