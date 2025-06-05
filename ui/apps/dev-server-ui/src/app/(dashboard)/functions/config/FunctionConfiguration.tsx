@@ -346,6 +346,87 @@ export default function FunctionConfiguration({
           </div>
         </div>
       </div>
+      <div className="inline-flex flex-col items-start justify-start px-4 pb-6 pt-4">
+        <div className="flex flex-col justify-center break-words pb-3 text-xs uppercase tracking-wide text-gray-400">
+          Scheduling Configurations
+        </div>
+        <div className="flex flex-col space-y-6 self-stretch ">
+          {inngestFunction.configuration.rateLimit && (
+            <div className="overflow-hidden rounded border border-gray-300 ">
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr className="h-8 bg-gray-100 bg-gray-50">
+                    <td className="text-basis px-2 text-sm font-medium" colSpan={2}>
+                      <div className="flex items-center gap-2">
+                        Rate limit
+                        <RiInformationLine className="h-5 w-5" />
+                      </div>
+                    </td>
+                  </tr>
+                </thead>
+                <tbody>
+                  {/*can't apply px-2 to tr*/}
+                  <tr className="h-8 border-b border-gray-200">
+                    <td className="text-muted px-2 text-sm">Limit</td>
+                    <td className="text-basis px-2 text-right text-sm">
+                      {inngestFunction.configuration.rateLimit.limit.toString()}
+                    </td>
+                  </tr>
+                  <tr className="h-8 border-b border-gray-200">
+                    <td className="text-muted px-2 text-sm">Period</td>
+                    <td className="text-basis px-2 text-right text-sm">
+                      {inngestFunction.configuration.rateLimit.period}
+                    </td>
+                  </tr>
+                  <tr className="h-8 border-b border-gray-200">
+                    <td className="text-muted px-2 text-sm">Key</td>
+                    <td className="text-basis px-2 text-right text-sm">
+                      <code>{inngestFunction.configuration.rateLimit.key}</code>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          )}
+          {inngestFunction.configuration.rateLimit && (
+            <div className="overflow-hidden rounded border border-gray-300 ">
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr className="h-8 bg-gray-100 bg-gray-50">
+                    <td className="text-basis px-2 text-sm font-medium" colSpan={2}>
+                      <div className="flex items-center gap-2">
+                        Rate limit
+                        <RiInformationLine className="h-5 w-5" />
+                      </div>
+                    </td>
+                  </tr>
+                </thead>
+                <tbody>
+                  {/*can't apply px-2 to tr*/}
+                  <tr className="h-8 border-b border-gray-200">
+                    <td className="text-muted px-2 text-sm">Limit</td>
+                    <td className="text-basis px-2 text-right text-sm">
+                      {inngestFunction.configuration.rateLimit.limit.toString()}
+                    </td>
+                  </tr>
+                  <tr className="h-8 border-b border-gray-200">
+                    <td className="text-muted px-2 text-sm">Period</td>
+                    <td className="text-basis px-2 text-right text-sm">
+                      {inngestFunction.configuration.rateLimit.period}
+                    </td>
+                  </tr>
+                  <tr className="h-8 border-b border-gray-200">
+                    <td className="text-muted px-2 text-sm">Key</td>
+                    <td className="text-basis px-2 text-right text-sm">
+                      <code>{inngestFunction.configuration.rateLimit.key}</code>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
       <Block title="Configuration">
         <MetadataGrid columns={2} metadataItems={miscellaneousItems} />
         {eventBatchItems && (
