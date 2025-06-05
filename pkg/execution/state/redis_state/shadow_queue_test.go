@@ -2216,9 +2216,12 @@ func TestConstraintLifecycleReporting(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, res)
 	require.Equal(t, enums.QueueConstraintNotLimited, res.Constraint)
+
+	testLifecycles.lock.Lock()
 	require.Equal(t, 0, testLifecycles.acctConcurrency[accountID1])
 	assert.Equal(t, 0, testLifecycles.fnConcurrency[fnID1])
 	assert.Equal(t, 0, testLifecycles.fnConcurrency[fnID2])
+	testLifecycles.lock.Unlock()
 
 	_ = addItem("test2", state.Identifier{
 		AccountID:   accountID1,
@@ -2231,9 +2234,11 @@ func TestConstraintLifecycleReporting(t *testing.T) {
 	require.NotNil(t, res)
 	require.Equal(t, enums.QueueConstraintFunctionConcurrency, res.Constraint)
 	require.EventuallyWithT(t, func(t *assert.CollectT) {
+		testLifecycles.lock.Lock()
 		assert.Equal(t, 0, testLifecycles.acctConcurrency[accountID1])
 		assert.Equal(t, 1, testLifecycles.fnConcurrency[fnID1])
 		assert.Equal(t, 0, testLifecycles.fnConcurrency[fnID2])
+		testLifecycles.lock.Unlock()
 	}, 1*time.Second, 100*time.Millisecond)
 
 	itemB1 := addItem("test3", state.Identifier{
@@ -2251,8 +2256,10 @@ func TestConstraintLifecycleReporting(t *testing.T) {
 	require.NotNil(t, res)
 	require.Equal(t, enums.QueueConstraintAccountConcurrency, res.Constraint)
 	require.EventuallyWithT(t, func(t *assert.CollectT) {
+		testLifecycles.lock.Lock()
 		assert.Equal(t, 1, testLifecycles.acctConcurrency[accountID1])
 		assert.Equal(t, 1, testLifecycles.fnConcurrency[fnID1])
 		assert.Equal(t, 0, testLifecycles.fnConcurrency[fnID2])
+		testLifecycles.lock.Unlock()
 	}, 1*time.Second, 100*time.Millisecond)
 }
