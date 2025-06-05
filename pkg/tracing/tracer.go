@@ -39,6 +39,7 @@ func (tp *TracerProvider) getTracer(md *statev2.Metadata, qi *queue.Item) trace.
 
 	otelTP := sdktrace.NewTracerProvider(
 		sdktrace.WithSpanProcessor(newExecutionProcessor(md, qi, base)),
+		// sdktrace.WithIDGenerator(), // Deterministic span IDs for idempotency pls
 	)
 
 	tracer := otelTP.Tracer("inngest", trace.WithInstrumentationVersion(version.Print()))
