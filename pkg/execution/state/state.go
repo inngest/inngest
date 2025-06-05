@@ -42,9 +42,13 @@ var (
 	ErrFunctionFailed      = fmt.Errorf("function failed")
 	ErrFunctionOverflowed  = fmt.Errorf("function has too many steps")
 	ErrDuplicateResponse   = fmt.Errorf("duplicate response")
-	ErrEventNotFound       = fmt.Errorf("event not found in state store")
-	ErrFunctionPaused      = fmt.Errorf("function is paused")
-	ErrStateOverflowed     = fmt.Errorf("state is too large")
+	// ErrIdempotentResponse is used when saving a step's result, and indicates that the step
+	// already had the exact data in the state store.  This allows higher level code to save
+	// the same step data multiple times relying on this error for idempotency checking.
+	ErrIdempotentResponse = fmt.Errorf("idempotent response")
+	ErrEventNotFound      = fmt.Errorf("event not found in state store")
+	ErrFunctionPaused     = fmt.Errorf("function is paused")
+	ErrStateOverflowed    = fmt.Errorf("state is too large")
 )
 
 const (

@@ -765,25 +765,32 @@ func (m shardedMgr) SaveResponse(ctx context.Context, i state.Identifier, stepID
 	}
 	args := []string{stepID, marshalledOuptut}
 
-	index, err := retriableScripts["saveResponse"].Exec(
+	indexes, err := retriableScripts["saveResponse"].Exec(
 		redis_telemetry.WithScriptName(ctx, "saveResponse"),
 		r,
 		keys,
 		args,
-	).AsInt64()
-	if err != nil {
-		return false, fmt.Errorf("error saving response: %w", err)
+	).AsIntSlice()
+	if err != nil || len(indexes) == 0 {
+		return false, fmt.Errorf("error saving response: %w (response: %v)", err, indexes)
 	}
-	switch index {
+	switch indexes[0] {
 	case -1:
 		// This is a duplicate response, so we don't need to do anything.
 		return false, state.ErrDuplicateResponse
+	case -2:
+		// This step was already saved with the current data.  Return an idempotent request, and check
+		// the second response to see whether we have steps remaining.
+		if len(indexes) == 1 {
+			return false, state.ErrIdempotentResponse
+		}
+		return indexes[1] == 1, state.ErrIdempotentResponse
 	case 0:
 		return false, nil
 	case 1:
 		return true, nil
 	default:
-		return false, fmt.Errorf("unknown response saving response: %d", index)
+		return false, fmt.Errorf("unknown response saving response: %d", indexes[0])
 	}
 }
 

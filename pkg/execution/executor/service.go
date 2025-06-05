@@ -211,8 +211,8 @@ func (s *svc) Run(ctx context.Context) error {
 			err = fmt.Errorf("unknown payload type: %T", item.Payload)
 		}
 
-		if err != nil {
-			s.log.Error("error handling queue item", "error", err)
+		if err != nil && err.Error() != "NonRetriableError" {
+			s.log.Error("error handling queue item", "error", err, "item", item)
 		}
 
 		return queue.RunResult{
@@ -284,19 +284,6 @@ func (s *svc) handlePauseTimeout(ctx context.Context, item queue.Item) error {
 		return fmt.Errorf("unable to get pause timeout from queue item: %T", item.Payload)
 	}
 
-	pause, err := s.state.PauseByID(ctx, pauseTimeout.PauseID)
-	if err == state.ErrPauseNotFound {
-		// This pause has been consumed.
-		l.Debug("consumed pause timeout ignored", "pause", pauseTimeout)
-		return nil
-	}
-	if err != nil {
-		return err
-	}
-	if pause == nil {
-		return nil
-	}
-
 	r := execution.ResumeRequest{
 		IsTimeout:      true,
 		IdempotencyKey: *item.JobID,
@@ -304,11 +291,13 @@ func (s *svc) handlePauseTimeout(ctx context.Context, item queue.Item) error {
 
 	// If the pause timeout is for an invocation, store an error to cause the
 	// step to fail.
-	if pause.Opcode != nil && *pause.Opcode == enums.OpcodeInvokeFunction.String() {
+	if pauseTimeout.Pause.GetOpcode() == enums.OpcodeInvokeFunction {
 		r.SetInvokeTimeoutError()
 	}
 
-	return s.exec.Resume(ctx, *pause, r)
+	l.Debug("resuming timed out step")
+
+	return s.exec.ResumePauseTimeout(ctx, pauseTimeout.Pause, r)
 }
 
 // handleScheduledBatch checks for
