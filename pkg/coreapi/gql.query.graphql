@@ -10,6 +10,8 @@ type Query {
   # Get all events sent
   events(query: EventsQuery!): [Event!]
 
+  functionBySlug(query: FunctionQuery!): Function
+
   # Get all functions registered
   functions: [Function!]
 
@@ -50,6 +52,11 @@ input EventQuery {
 input EventsQuery {
   workspaceId: ID! = "local"
   lastEventId: ID
+}
+
+input FunctionQuery {
+  workspaceId: ID! = "local"
+  functionSlug: String!
 }
 
 input FunctionRunQuery {

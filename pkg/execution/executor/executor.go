@@ -230,6 +230,7 @@ func WithSingletonManager(sn singleton.Singleton) ExecutorOpt {
 		return nil
 	}
 }
+
 func WithBatcher(b batch.BatchManager) ExecutorOpt {
 	return func(e execution.Executor) error {
 		e.(*executor).batcher = b
@@ -565,7 +566,6 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 			// Attempt to early handle function singletons, function runs could still fail
 			// to enqueue later on when it atomically tries to acquire a function mutex.
 			alreadyRunning, err := e.singletonMgr.Singleton(ctx, singletonKey, *req.Function.Singleton)
-
 			if err != nil {
 				return nil, err
 			}
@@ -574,7 +574,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 				// TODO: Handle cancellation mode
 
 				// Immediately end before creating state
-				return e.handleFunctionSkipped(ctx, req, metadata, evts, enums.SkipReasonSingleton)
+				return nil, ErrFunctionSkipped
 			}
 
 			singletonConfig = &queue.Singleton{Key: singletonKey}
@@ -741,7 +741,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 				"error", err,
 			)
 		}
-		return e.handleFunctionSkipped(ctx, req, metadata, evts, enums.SkipReasonSingleton)
+		return nil, ErrFunctionSkipped
 
 	default:
 		return nil, fmt.Errorf("error enqueueing source edge '%v': %w", queueKey, err)
@@ -1140,8 +1140,6 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 		// In this case, for non-retryable errors, we ignore and fail the function;
 		// only OpcodeStepError causes try/catch to be handled and us to continue
 		// on error.
-		//
-		// TODO: Improve this.
 
 		// TODO: Refactor state input
 		if err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), e.assignedQueueShard, *i.resp); err != nil {
@@ -1280,8 +1278,6 @@ func (e *executor) finalize(ctx context.Context, md sv2.Metadata, evts []json.Ra
 			}
 		}
 	}
-
-	// TODO: Load all pauses for the function and remove, also.
 
 	if e.finishHandler == nil {
 		return nil
@@ -1734,6 +1730,7 @@ func (e *executor) handlePause(
 		err := e.Resume(ctx, *pause, execution.ResumeRequest{
 			With:           resumeData.With,
 			EventID:        &evtID,
+			EventName:      evt.GetEvent().Name,
 			RunID:          resumeData.RunID,
 			StepName:       resumeData.StepName,
 			IdempotencyKey: evtID.String(),
@@ -1805,6 +1802,7 @@ func (e *executor) HandleInvokeFinish(ctx context.Context, evt event.TrackedEven
 	return e.Resume(ctx, *pause, execution.ResumeRequest{
 		With:           resumeData.With,
 		EventID:        &evtID,
+		EventName:      evt.GetEvent().Name,
 		RunID:          resumeData.RunID,
 		StepName:       resumeData.StepName,
 		IdempotencyKey: evtID.String(),
@@ -1851,6 +1849,97 @@ func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequ
 	}
 	for _, e := range e.lifecycles {
 		go e.OnFunctionCancelled(context.WithoutCancel(ctx), md, r, evts)
+	}
+
+	return nil
+}
+
+// ResumePauseTimeout times out a step.  This is used to reusme a pause from timeout when:
+//
+// - A waitForEvent step doesn't receive its event before the timeout
+// - A waitForSignal step doesn't receive its signal before the timeout
+// - An invoked function doesnt finish before the timeout
+//
+// Resume can also resume as a timeout.  This is a separate method so that we can resume
+// the timeout without loading and leasing pauses, relying on state store atomicity to instead
+// resume and cancel a pause.
+func (e *executor) ResumePauseTimeout(ctx context.Context, pause state.Pause, r execution.ResumeRequest) error {
+	// (tonyhb): this could be refactored to not require a pause, and instead only require the fields
+	// necessary for timeouts.  This will save space in the queue.  This requires a refactor of the
+	// trace lifecycles, whihc also require pauses.
+	id := sv2.IDFromPause(pause)
+	md, err := e.smv2.LoadMetadata(ctx, id)
+	if err == state.ErrRunNotFound {
+		return err
+	}
+	if err != nil {
+		return fmt.Errorf("error loading metadata to resume from pause: %w", err)
+	}
+
+	data, err := json.Marshal(r.With)
+	if err != nil {
+		return fmt.Errorf("error marshalling timeout step data: %w", err)
+	}
+
+	e.log.Debug("resuming from timeout ", "identifier", id)
+
+	pending, err := e.smv2.SaveStep(ctx, id, pause.DataKey, data)
+	if errors.Is(err, state.ErrDuplicateResponse) {
+		// cannot resume as the pause has already been resumed and consumed.
+		return nil
+	}
+	if err != nil && !errors.Is(err, state.ErrIdempotentResponse) {
+		// This is a non-idempotent error, so there was a legitimate error saving the response.
+		e.log.Error("error saving timeout step", "error", err, "identifier", id)
+		return err
+	}
+
+	if !pending {
+		// If there are no parallel steps ongoing, we must enqueue the next SDK ping to continue on with
+		// execution.
+		jobID := fmt.Sprintf("%s-%s-timeout", md.IdempotencyKey(), pause.DataKey)
+
+		err = e.queue.Enqueue(ctx, queue.Item{
+			JobID: &jobID,
+			// Add a new group ID for the child;  this will be a new step.
+			GroupID:               uuid.New().String(),
+			WorkspaceID:           id.Tenant.EnvID,
+			Kind:                  queue.KindEdge,
+			Identifier:            sv2.V1FromMetadata(md),
+			PriorityFactor:        md.Config.PriorityFactor,
+			CustomConcurrencyKeys: md.Config.CustomConcurrencyKeys,
+			MaxAttempts:           pause.MaxAttempts,
+			Payload: queue.PayloadEdge{
+				Edge: inngest.Edge{
+					Outgoing: pause.DataKey,
+					Incoming: "step",
+				},
+			},
+		}, time.Now(), queue.EnqueueOpts{})
+		if err != nil && err != redis_state.ErrQueueItemExists {
+			return fmt.Errorf("error enqueueing after pause: %w", err)
+		}
+	}
+
+	// Only run lifecycles if we consumed the pause and enqueued next step.
+	switch pause.GetOpcode() {
+	case enums.OpcodeInvokeFunction:
+		for _, e := range e.lifecycles {
+			go e.OnInvokeFunctionResumed(context.WithoutCancel(ctx), md, pause, r)
+		}
+	case enums.OpcodeWaitForSignal:
+		for _, e := range e.lifecycles {
+			go e.OnWaitForSignalResumed(context.WithoutCancel(ctx), md, pause, r)
+		}
+	case enums.OpcodeWaitForEvent:
+		for _, e := range e.lifecycles {
+			go e.OnWaitForEventResumed(context.WithoutCancel(ctx), md, pause, r)
+		}
+	}
+
+	// And delete the OG pause.
+	if err := e.pm.DeletePauseByID(ctx, pause.ID); err != nil {
+		return fmt.Errorf("deleting pause by ID: %w", err)
 	}
 
 	return nil
@@ -1999,15 +2088,16 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 		}
 
 		// Only run lifecycles if we consumed the pause and enqueued next step.
-		if pause.IsInvoke() {
+		switch pause.GetOpcode() {
+		case enums.OpcodeInvokeFunction:
 			for _, e := range e.lifecycles {
 				go e.OnInvokeFunctionResumed(context.WithoutCancel(ctx), md, pause, r)
 			}
-		} else if pause.IsSignal() {
+		case enums.OpcodeWaitForSignal:
 			for _, e := range e.lifecycles {
 				go e.OnWaitForSignalResumed(context.WithoutCancel(ctx), md, pause, r)
 			}
-		} else {
+		case enums.OpcodeWaitForEvent:
 			for _, e := range e.lifecycles {
 				go e.OnWaitForEventResumed(context.WithoutCancel(ctx), md, pause, r)
 			}
@@ -2924,8 +3014,8 @@ func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, i *runInsta
 		CustomConcurrencyKeys: i.item.CustomConcurrencyKeys,
 		MaxAttempts:           i.item.MaxAttempts,
 		Payload: queue.PayloadPauseTimeout{
-			PauseID:   pauseID,
-			OnTimeout: true,
+			PauseID: pauseID,
+			Pause:   pause,
 		},
 	}, expires, queue.EnqueueOpts{})
 	if err == redis_state.ErrQueueItemExists {
@@ -2994,7 +3084,7 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, i *runInst
 		SourceFnVersion: i.item.Identifier.WorkflowVersion,
 	})
 
-	_, err = e.pm.SavePause(ctx, state.Pause{
+	pause := state.Pause{
 		ID:                  pauseID,
 		WorkspaceID:         i.md.ID.Tenant.EnvID,
 		Identifier:          sv2.NewPauseIdentifier(i.md.ID),
@@ -3014,7 +3104,8 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, i *runInst
 		Metadata: map[string]any{
 			consts.OtelPropagationKey: carrier,
 		},
-	})
+	}
+	_, err = e.pm.SavePause(ctx, pause)
 	if err == state.ErrPauseAlreadyExists {
 		return nil
 	}
@@ -3036,8 +3127,8 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, i *runInst
 		CustomConcurrencyKeys: i.item.CustomConcurrencyKeys,
 		MaxAttempts:           i.item.MaxAttempts,
 		Payload: queue.PayloadPauseTimeout{
-			PauseID:   pauseID,
-			OnTimeout: true,
+			PauseID: pauseID,
+			Pause:   pause,
 		},
 	}, expires, queue.EnqueueOpts{})
 	if err == redis_state.ErrQueueItemExists {
@@ -3190,8 +3281,8 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, i *runInstan
 		PriorityFactor:        i.item.PriorityFactor,
 		CustomConcurrencyKeys: i.item.CustomConcurrencyKeys,
 		Payload: queue.PayloadPauseTimeout{
-			PauseID:   pauseID,
-			OnTimeout: true,
+			PauseID: pauseID,
+			Pause:   pause,
 		},
 		Metadata: make(map[string]any),
 	}
@@ -3434,7 +3525,7 @@ func (e *executor) validateStateSize(outputSize int, md sv2.Metadata) error {
 	return nil
 }
 
-func (e *executor) ReceiveSignal(ctx context.Context, workspaceID uuid.UUID, signalID string, data json.RawMessage) (res *execution.ReceiveSignalResult, err error) {
+func (e *executor) ResumeSignal(ctx context.Context, workspaceID uuid.UUID, signalID string, data json.RawMessage) (res *execution.ResumeSignalResult, err error) {
 	if workspaceID == uuid.Nil {
 		err = fmt.Errorf("workspace ID is empty")
 		return
@@ -3462,7 +3553,7 @@ func (e *executor) ReceiveSignal(ctx context.Context, workspaceID uuid.UUID, sig
 		return
 	}
 
-	res = &execution.ReceiveSignalResult{}
+	res = &execution.ResumeSignalResult{}
 
 	if pause == nil {
 		l.Debug("no pause found for signal")

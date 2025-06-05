@@ -208,6 +208,13 @@ type Item struct {
 	PriorityFactor *int64 `json:"pf,omitempty"`
 }
 
+func (i Item) GetMaxAttempts() int {
+	if i.MaxAttempts == nil {
+		return consts.DefaultRetryCount
+	}
+	return *i.MaxAttempts
+}
+
 type Throttle struct {
 	// Key is the unique throttling key that's used to group queue items when
 	// processing rate limiting/throttling.
@@ -290,13 +297,6 @@ func (i Item) GetPriorityFactor() int64 {
 		}
 	}
 	return 0
-}
-
-func (i Item) GetMaxAttempts() int {
-	if i.MaxAttempts == nil {
-		return consts.DefaultRetryCount
-	}
-	return *i.MaxAttempts
 }
 
 // IsStepKind determines if the item is considered a step
@@ -408,8 +408,13 @@ type PayloadPauseBlockFlush struct {
 // This is always enqueued from any async match;  we must correctly decrement the
 // pending count in cases where the event is not received.
 type PayloadPauseTimeout struct {
-	PauseID   uuid.UUID `json:"pauseID"`
-	OnTimeout bool      `json:"onTimeout"`
+	// PauseID is the ID of the pause that the timeout job will resume.  This has
+	// existed since the beginning of Inngest, and is included for backcompat for
+	// future jobs.
+	PauseID uuid.UUID `json:"pauseID"`
+	// Pause is the full pause struct for the timeout job.  Note that the identifier
+	// should not exist in the pause, as it already exists in the queue item.
+	Pause state.Pause `json:"pause"`
 }
 
 func HashID(_ context.Context, id string) string {

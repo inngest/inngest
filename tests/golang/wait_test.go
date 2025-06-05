@@ -493,6 +493,24 @@ func TestWaitForEvent_Timeout(t *testing.T) {
 	r := require.New(t)
 	c := client.New(t)
 
+	resetAll := func() {
+		reqUrl, err := url.Parse(c.APIHost + "/test/reset")
+		require.NoError(t, err)
+
+		req, err := http.NewRequestWithContext(ctx, http.MethodPost, reqUrl.String(), nil)
+		require.NoError(t, err)
+
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+
+		require.Equal(t, http.StatusOK, resp.StatusCode)
+
+		_, err = io.ReadAll(resp.Body)
+		require.NoError(t, err)
+	}
+
+	resetAll()
+
 	appID := "TestWaitTimeout" + ulid.MustNew(ulid.Now(), nil).String()
 	inngestClient, server, registerFuncs := NewSDKHandler(t, appID)
 	defer server.Close()
@@ -543,8 +561,8 @@ func TestWaitForEvent_Timeout(t *testing.T) {
 		return false
 	}, 10*time.Second, 250*time.Millisecond)
 
-	getActiveCounters := func(accountId uuid.UUID, fnId uuid.UUID) testapi.TestActiveCounters {
-		reqUrl, err := url.Parse(c.APIHost + "/test/queue/active-counter")
+	getActiveCount := func(accountId uuid.UUID, fnId uuid.UUID) testapi.TestActiveSets {
+		reqUrl, err := url.Parse(c.APIHost + "/test/queue/active-count")
 		require.NoError(t, err)
 
 		fv := reqUrl.Query()
@@ -562,7 +580,7 @@ func TestWaitForEvent_Timeout(t *testing.T) {
 		byt, err := io.ReadAll(resp.Body)
 		require.NoError(t, err)
 
-		r := testapi.TestActiveCounters{}
+		r := testapi.TestActiveSets{}
 		err = json.Unmarshal(byt, &r)
 		require.NoError(t, err, "Test API may not be enabled! Error unmarshalling %s", byt)
 
@@ -607,13 +625,13 @@ func TestWaitForEvent_Timeout(t *testing.T) {
 		assert.Nil(t, stepInfo.FoundEventID)
 
 		require.EventuallyWithT(t, func(collect *assert.CollectT) {
-			counters := getActiveCounters(consts.DevServerAccountID, uuid.MustParse(fnId))
-			assert.Equal(t, testapi.TestActiveCounters{
+			count := getActiveCount(consts.DevServerAccountID, uuid.MustParse(fnId))
+			assert.Equal(collect, testapi.TestActiveSets{
 				ActiveAccount:      0,
 				ActiveFunction:     0,
 				ActiveRunsAccount:  0,
 				ActiveRunsFunction: 0,
-			}, counters)
+			}, count)
 		}, 15*time.Second, 25*time.Millisecond)
 	})
 }

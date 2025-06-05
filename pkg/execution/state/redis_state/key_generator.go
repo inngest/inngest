@@ -189,10 +189,10 @@ type QueueKeyGenerator interface {
 	GlobalShadowPartitionSet() string
 	// BacklogSet returns the key to the ZSET storing pointers (queue item IDs) for a given backlog.
 	BacklogSet(backlogID string) string
-	// ActiveCounter returns the key to the number of active queue items for a given scope and ID.
-	ActiveCounter(scope string, scopeID string) string
-	// ActiveRunsCounter returns the key to the number of active runs for a given scope and ID.
-	ActiveRunsCounter(scope string, scopeID string) string
+	// ActiveSet returns the key to the set of active queue items for a given scope and ID.
+	ActiveSet(scope string, scopeID string) string
+	// ActiveRunsSet returns the key to the set of active runs for a given scope and ID.
+	ActiveRunsSet(scope string, scopeID string) string
 	// BacklogMeta returns the key to the hash storing serialized QueueBacklog objects by ID.
 	BacklogMeta() string
 	// BacklogNormalizationLease returns the key to the lease for the backlog for normalization purposes
@@ -206,10 +206,8 @@ type QueueKeyGenerator interface {
 	// GlobalAccountShadowPartitions returns the key to the ZSET storing pointers (account IDs) for accounts with existing shadow partitions.
 	GlobalAccountShadowPartitions() string
 
-	// RunActiveCounter returns the key to the number of active queue items for a given run ID.
-	RunActiveCounter(runID ulid.ULID) string
-	// ActivePartitionRunsIndex returns a key to the index SET for tracking active runs for a given partition.
-	ActivePartitionRunsIndex(partitionID string) string
+	// RunActiveSet returns the key to the set of active queue items for a given run ID.
+	RunActiveSet(runID ulid.ULID) string
 
 	GlobalAccountNormalizeSet() string
 	AccountNormalizeSet(accountID uuid.UUID) string
@@ -393,46 +391,37 @@ func (u queueKeyGenerator) BacklogSet(backlogID string) string {
 	return fmt.Sprintf("{%s}:backlog:sorted:%s", u.queueDefaultKey, backlogID)
 }
 
-// ActiveCounter returns the key to the number of active queue items for a given backlog.
-func (u queueKeyGenerator) ActiveCounter(scope string, scopeID string) string {
+// ActiveSet returns the key to the number of active queue items for a given backlog.
+func (u queueKeyGenerator) ActiveSet(scope string, scopeID string) string {
 	if scope == "" || scopeID == "" {
 		// this is a placeholder because passing an empty key into Lua will cause multi-slot key errors
-		return fmt.Sprintf("{%s}:v1:active:-", u.queueDefaultKey)
+		return fmt.Sprintf("{%s}:v2:active:-", u.queueDefaultKey)
 	}
 
-	return fmt.Sprintf("{%s}:v1:active:%s:%s", u.queueDefaultKey, scope, scopeID)
+	return fmt.Sprintf("{%s}:v2:active:%s:%s", u.queueDefaultKey, scope, scopeID)
 }
 
 func isEmptyULID(id ulid.ULID) bool {
 	return id == [16]byte{}
 }
 
-// ActiveRunsCounter returns the key to the number of active runs for a given backlog.
-func (u queueKeyGenerator) ActiveRunsCounter(scope string, scopeID string) string {
-	if scope == "" || scopeID == "" {
-		// this is a placeholder because passing an empty key into Lua will cause multi-slot key errors
-		return fmt.Sprintf("{%s}:v1:active-runs:-", u.queueDefaultKey)
-	}
-
-	return fmt.Sprintf("{%s}:v1:active-runs:%s:%s", u.queueDefaultKey, scope, scopeID)
-}
-
-func (u queueKeyGenerator) RunActiveCounter(runID ulid.ULID) string {
+func (u queueKeyGenerator) RunActiveSet(runID ulid.ULID) string {
 	if isEmptyULID(runID) {
 		// this is a placeholder because passing an empty key into Lua will cause multi-slot key errors
-		return u.ActiveCounter("run", "")
+		return u.ActiveSet("run", "")
 	}
 
-	return u.ActiveCounter("run", runID.String())
+	return u.ActiveSet("run", runID.String())
 }
 
-func (u queueKeyGenerator) ActivePartitionRunsIndex(partitionID string) string {
-	if partitionID == "" {
+// ActiveRunsSet returns the key to the number of active runs for a given backlog.
+func (u queueKeyGenerator) ActiveRunsSet(scope string, scopeID string) string {
+	if scope == "" || scopeID == "" {
 		// this is a placeholder because passing an empty key into Lua will cause multi-slot key errors
-		return fmt.Sprintf("{%s}:v1:active-idx:runs:-", u.queueDefaultKey)
+		return fmt.Sprintf("{%s}:v2:active-runs:-", u.queueDefaultKey)
 	}
 
-	return fmt.Sprintf("{%s}:v1:active-idx:runs:%s", u.queueDefaultKey, partitionID)
+	return fmt.Sprintf("{%s}:v2:active-runs:%s:%s", u.queueDefaultKey, scope, scopeID)
 }
 
 // BacklogMeta returns the key to the hash storing serialized QueueBacklog objects by ID.

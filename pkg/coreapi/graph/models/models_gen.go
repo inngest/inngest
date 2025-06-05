@@ -32,6 +32,23 @@ type AppsFilterV1 struct {
 	Method *AppMethod `json:"method,omitempty"`
 }
 
+type CancellationConfiguration struct {
+	Event     string  `json:"event"`
+	Timeout   *string `json:"timeout,omitempty"`
+	Condition *string `json:"condition,omitempty"`
+}
+
+type ConcurrencyConfiguration struct {
+	Scope ConcurrencyScope               `json:"scope"`
+	Limit *ConcurrencyLimitConfiguration `json:"limit"`
+	Key   *string                        `json:"key,omitempty"`
+}
+
+type ConcurrencyLimitConfiguration struct {
+	Value       int   `json:"value"`
+	IsPlanLimit *bool `json:"isPlanLimit,omitempty"`
+}
+
 type ConnectV1WorkerConnection struct {
 	ID               ulid.ULID                 `json:"id"`
 	GatewayID        ulid.ULID                 `json:"gatewayId"`
@@ -80,6 +97,11 @@ type CreateAppInput struct {
 	URL string `json:"url"`
 }
 
+type DebounceConfiguration struct {
+	Period string  `json:"period"`
+	Key    *string `json:"key,omitempty"`
+}
+
 type Event struct {
 	ID           ulid.ULID      `json:"id"`
 	ExternalID   *string        `json:"externalID,omitempty"`
@@ -100,21 +122,42 @@ type EventQuery struct {
 	EventID     string `json:"eventId"`
 }
 
+type EventsBatchConfiguration struct {
+	// The maximum number of events a batch can have.
+	MaxSize int `json:"maxSize"`
+	// How long to wait before running the function with the batch.
+	Timeout string  `json:"timeout"`
+	Key     *string `json:"key,omitempty"`
+}
+
 type EventsQuery struct {
 	WorkspaceID string  `json:"workspaceId"`
 	LastEventID *string `json:"lastEventId,omitempty"`
 }
 
 type Function struct {
-	ID          string             `json:"id"`
-	Name        string             `json:"name"`
-	Slug        string             `json:"slug"`
-	Config      string             `json:"config"`
-	Concurrency int                `json:"concurrency"`
-	Triggers    []*FunctionTrigger `json:"triggers,omitempty"`
-	URL         string             `json:"url"`
-	AppID       string             `json:"appID"`
-	App         *cqrs.App          `json:"app"`
+	ID            string                 `json:"id"`
+	Name          string                 `json:"name"`
+	Slug          string                 `json:"slug"`
+	Config        string                 `json:"config"`
+	Configuration *FunctionConfiguration `json:"configuration"`
+	Concurrency   int                    `json:"concurrency"`
+	Triggers      []*FunctionTrigger     `json:"triggers,omitempty"`
+	URL           string                 `json:"url"`
+	AppID         string                 `json:"appID"`
+	App           *cqrs.App              `json:"app"`
+}
+
+type FunctionConfiguration struct {
+	Cancellations []*CancellationConfiguration `json:"cancellations"`
+	Retries       *RetryConfiguration          `json:"retries"`
+	Priority      *string                      `json:"priority,omitempty"`
+	EventsBatch   *EventsBatchConfiguration    `json:"eventsBatch,omitempty"`
+	Concurrency   []*ConcurrencyConfiguration  `json:"concurrency"`
+	RateLimit     *RateLimitConfiguration      `json:"rateLimit,omitempty"`
+	Debounce      *DebounceConfiguration       `json:"debounce,omitempty"`
+	Throttle      *ThrottleConfiguration       `json:"throttle,omitempty"`
+	Singleton     *SingletonConfiguration      `json:"singleton,omitempty"`
 }
 
 type FunctionEvent struct {
@@ -126,6 +169,11 @@ type FunctionEvent struct {
 }
 
 func (FunctionEvent) IsFunctionRunEvent() {}
+
+type FunctionQuery struct {
+	WorkspaceID  string `json:"workspaceId"`
+	FunctionSlug string `json:"functionSlug"`
+}
 
 type FunctionRun struct {
 	ID                string                       `json:"id"`
@@ -212,9 +260,20 @@ type PageInfo struct {
 	EndCursor *string `json:"endCursor,omitempty"`
 }
 
+type RateLimitConfiguration struct {
+	Limit  int     `json:"limit"`
+	Period string  `json:"period"`
+	Key    *string `json:"key,omitempty"`
+}
+
 type RerunFromStepInput struct {
 	StepID string  `json:"stepID"`
 	Input  *string `json:"input,omitempty"`
+}
+
+type RetryConfiguration struct {
+	Value     int   `json:"value"`
+	IsDefault *bool `json:"isDefault,omitempty"`
 }
 
 type RunStepInfo struct {
@@ -280,6 +339,11 @@ type RunsV2OrderBy struct {
 	Direction RunsOrderByDirection `json:"direction"`
 }
 
+type SingletonConfiguration struct {
+	Mode SingletonMode `json:"mode"`
+	Key  *string       `json:"key,omitempty"`
+}
+
 type SleepStepInfo struct {
 	SleepUntil time.Time `json:"sleepUntil"`
 }
@@ -325,6 +389,13 @@ type StreamQuery struct {
 	Before                *string `json:"before,omitempty"`
 	Limit                 int     `json:"limit"`
 	IncludeInternalEvents *bool   `json:"includeInternalEvents,omitempty"`
+}
+
+type ThrottleConfiguration struct {
+	Burst  int     `json:"burst"`
+	Key    *string `json:"key,omitempty"`
+	Limit  int     `json:"limit"`
+	Period string  `json:"period"`
 }
 
 type UpdateAppInput struct {
@@ -402,6 +473,49 @@ func (e *AppMethod) UnmarshalGQL(v interface{}) error {
 }
 
 func (e AppMethod) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+type ConcurrencyScope string
+
+const (
+	ConcurrencyScopeAccount     ConcurrencyScope = "ACCOUNT"
+	ConcurrencyScopeEnvironment ConcurrencyScope = "ENVIRONMENT"
+	ConcurrencyScopeFunction    ConcurrencyScope = "FUNCTION"
+)
+
+var AllConcurrencyScope = []ConcurrencyScope{
+	ConcurrencyScopeAccount,
+	ConcurrencyScopeEnvironment,
+	ConcurrencyScopeFunction,
+}
+
+func (e ConcurrencyScope) IsValid() bool {
+	switch e {
+	case ConcurrencyScopeAccount, ConcurrencyScopeEnvironment, ConcurrencyScopeFunction:
+		return true
+	}
+	return false
+}
+
+func (e ConcurrencyScope) String() string {
+	return string(e)
+}
+
+func (e *ConcurrencyScope) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = ConcurrencyScope(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid ConcurrencyScope", str)
+	}
+	return nil
+}
+
+func (e ConcurrencyScope) MarshalGQL(w io.Writer) {
 	fmt.Fprint(w, strconv.Quote(e.String()))
 }
 
@@ -893,6 +1007,47 @@ func (e *RunsV2OrderByField) UnmarshalGQL(v interface{}) error {
 }
 
 func (e RunsV2OrderByField) MarshalGQL(w io.Writer) {
+	fmt.Fprint(w, strconv.Quote(e.String()))
+}
+
+type SingletonMode string
+
+const (
+	SingletonModeSkip   SingletonMode = "SKIP"
+	SingletonModeCancel SingletonMode = "CANCEL"
+)
+
+var AllSingletonMode = []SingletonMode{
+	SingletonModeSkip,
+	SingletonModeCancel,
+}
+
+func (e SingletonMode) IsValid() bool {
+	switch e {
+	case SingletonModeSkip, SingletonModeCancel:
+		return true
+	}
+	return false
+}
+
+func (e SingletonMode) String() string {
+	return string(e)
+}
+
+func (e *SingletonMode) UnmarshalGQL(v interface{}) error {
+	str, ok := v.(string)
+	if !ok {
+		return fmt.Errorf("enums must be strings")
+	}
+
+	*e = SingletonMode(str)
+	if !e.IsValid() {
+		return fmt.Errorf("%s is not a valid SingletonMode", str)
+	}
+	return nil
+}
+
+func (e SingletonMode) MarshalGQL(w io.Writer) {
 	fmt.Fprint(w, strconv.Quote(e.String()))
 }
 

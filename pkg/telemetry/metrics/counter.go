@@ -366,6 +366,15 @@ func IncrBacklogRequeuedCounter(ctx context.Context, opts CounterOpt) {
 	})
 }
 
+func IncrRequeueExistingToBacklogCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "backlog_requeue_existing_total",
+		Description: "The total number of existing queue items that were requeued into backlogs from fn partition after hitting constraints",
+		Tags:        opts.Tags,
+	})
+}
+
 func ActiveShadowScannerCount(ctx context.Context, incr int64, opts CounterOpt) {
 	RecordUpDownCounterMetric(ctx, incr, CounterOpt{
 		PkgName:     opts.PkgName,
@@ -416,6 +425,24 @@ func IncrQueueShadowPartitionGoneCounter(ctx context.Context, opts CounterOpt) {
 		PkgName:     opts.PkgName,
 		MetricName:  "queue_shadow_partition_gone_total",
 		Description: "The total number of times shadow worker didn't find a partition",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrQueueShadowPartitionProcessedCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "queue_shadow_partition_processed_total",
+		Description: "The total number of shadow partition processed",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrQueuePeekLeaseContentionCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "queue_peek_lease_contention",
+		Description: "Total number of leased queue items peeked for a partition",
 		Tags:        opts.Tags,
 	})
 }

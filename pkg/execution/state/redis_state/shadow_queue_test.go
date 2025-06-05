@@ -120,12 +120,11 @@ func TestQueueRefillBacklog(t *testing.T) {
 
 		// Run indexes should be updated
 		{
-			runActiveCount, err := r.Get(kg.ActiveCounter("run", runID.String()))
+			itemIsMember, err := r.SIsMember(kg.ActiveSet("run", runID.String()), qi.ID)
 			require.NoError(t, err)
+			require.True(t, itemIsMember)
 
-			require.Equal(t, "1", runActiveCount)
-
-			isMember, err := r.SIsMember(kg.ActivePartitionRunsIndex(fnID.String()), runID.String())
+			isMember, err := r.SIsMember(kg.ActiveRunsSet("p", fnID.String()), runID.String())
 			require.NoError(t, err)
 			require.True(t, isMember)
 		}
@@ -765,6 +764,7 @@ func TestQueueShadowScannerContinuations(t *testing.T) {
 	ctx := context.Background()
 
 	defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+	kg := defaultShard.RedisClient.kg
 
 	clock := clockwork.NewFakeClock()
 
@@ -857,13 +857,12 @@ func TestQueueShadowScannerContinuations(t *testing.T) {
 
 		fmt.Println("waiting for message")
 
-		select {
-		case msg := <-qspc:
-			require.Equal(t, sp1, *msg.sp)
-			require.Equal(t, uint(1), msg.continuationCount)
-		default:
-			require.Fail(t, "expected message to be added")
-		}
+		// check that it's scanned and gone
+		q.shadowContinuesLock.Lock()
+		defer q.shadowContinuesLock.Unlock()
+
+		_, ok = q.shadowContinues[sp1.PartitionID]
+		require.False(t, ok)
 	})
 
 	t.Run("should increase continuations when more items are available", func(t *testing.T) {
@@ -907,6 +906,117 @@ func TestQueueShadowScannerContinuations(t *testing.T) {
 		require.Equal(t, uint(2), cont.count)
 		require.Equal(t, sp1, *cont.shadowPart)
 		q.shadowContinuesLock.Unlock()
+
+		// Process and refill again, final item in backlog
+		err = q.processShadowPartition(ctx, &sp1, 1)
+		require.NoError(t, err)
+
+		// Expect continuation to be cleared out
+		q.shadowContinuesLock.Lock()
+		_, ok = q.shadowContinues[sp1.PartitionID]
+		require.False(t, ok)
+		q.shadowContinuesLock.Unlock()
+	})
+
+	t.Run("should remove continuation on missing shadow partition", func(t *testing.T) {
+		r.FlushAll()
+
+		q.shadowContinuesLock.Lock()
+		clear(q.shadowContinues)
+		clear(q.shadowContinueCooldown)
+		q.shadowContinuesLock.Unlock()
+
+		q.backlogRefillLimit = 1
+
+		addItem("test1", state.Identifier{
+			AccountID:   accountID1,
+			WorkspaceID: envID1,
+			WorkflowID:  fnID1,
+		}, at)
+
+		addItem("test2", state.Identifier{
+			AccountID:   accountID1,
+			WorkspaceID: envID1,
+			WorkflowID:  fnID1,
+		}, at)
+
+		addItem("test3", state.Identifier{
+			AccountID:   accountID2,
+			WorkspaceID: envID2,
+			WorkflowID:  fnID2,
+		}, at)
+
+		// Process and refill once
+		err := q.processShadowPartition(ctx, &sp1, 1)
+		require.NoError(t, err)
+
+		// Expect continuation to be set
+		q.shadowContinuesLock.Lock()
+		cont, ok := q.shadowContinues[sp1.PartitionID]
+		require.True(t, ok)
+		require.Equal(t, uint(2), cont.count)
+		require.Equal(t, sp1, *cont.shadowPart)
+		q.shadowContinuesLock.Unlock()
+
+		// Drop shadow partition
+		r.HDel(kg.ShadowPartitionMeta(), sp1.PartitionID)
+
+		// Process and refill again, final item in backlog
+		err = q.processShadowPartition(ctx, &sp1, 1)
+		require.NoError(t, err)
+
+		// Expect continuation to be cleared out
+		q.shadowContinuesLock.Lock()
+		_, ok = q.shadowContinues[sp1.PartitionID]
+		require.False(t, ok)
+		q.shadowContinuesLock.Unlock()
+	})
+
+	t.Run("should remove continuation on leased shadow partition", func(t *testing.T) {
+		r.FlushAll()
+
+		q.shadowContinuesLock.Lock()
+		clear(q.shadowContinues)
+		clear(q.shadowContinueCooldown)
+		q.shadowContinuesLock.Unlock()
+
+		q.backlogRefillLimit = 1
+
+		addItem("test1", state.Identifier{
+			AccountID:   accountID1,
+			WorkspaceID: envID1,
+			WorkflowID:  fnID1,
+		}, at)
+
+		addItem("test2", state.Identifier{
+			AccountID:   accountID1,
+			WorkspaceID: envID1,
+			WorkflowID:  fnID1,
+		}, at)
+
+		addItem("test3", state.Identifier{
+			AccountID:   accountID2,
+			WorkspaceID: envID2,
+			WorkflowID:  fnID2,
+		}, at)
+
+		// Process and refill once
+		err := q.processShadowPartition(ctx, &sp1, 1)
+		require.NoError(t, err)
+
+		// Expect continuation to be set
+		q.shadowContinuesLock.Lock()
+		cont, ok := q.shadowContinues[sp1.PartitionID]
+		require.True(t, ok)
+		require.Equal(t, uint(2), cont.count)
+		require.Equal(t, sp1, *cont.shadowPart)
+		q.shadowContinuesLock.Unlock()
+
+		// Simulate another process leasing the shadow partition
+		spCopy := sp1
+		leaseID, err := q.ShadowPartitionLease(ctx, &spCopy, 3*time.Minute)
+		require.NoError(t, err)
+		require.NotNil(t, leaseID)
 
 		// Process and refill again, final item in backlog
 		err = q.processShadowPartition(ctx, &sp1, 1)
@@ -1482,27 +1592,35 @@ func TestRefillConstraints(t *testing.T) {
 			}
 
 			if testCase.currentValues.accountActive > 0 {
-				key := kg.ActiveCounter("account", accountID1.String())
-				_, err = r.Incr(key, testCase.currentValues.accountActive)
-				require.NoError(t, err)
+				for i := 1; i <= testCase.currentValues.accountActive; i++ {
+					key := kg.ActiveSet("account", accountID1.String())
+					_, err = r.SAdd(key, fmt.Sprintf("item%d", i))
+					require.NoError(t, err)
+				}
 			}
 
 			if testCase.currentValues.functionActive > 0 {
-				key := kg.ActiveCounter("p", fnID1.String())
-				_, err = r.Incr(key, testCase.currentValues.functionActive)
-				require.NoError(t, err)
+				for i := 1; i <= testCase.currentValues.functionActive; i++ {
+					key := kg.ActiveSet("p", fnID1.String())
+					_, err = r.SAdd(key, fmt.Sprintf("item%d", i))
+					require.NoError(t, err)
+				}
 			}
 
 			if testCase.currentValues.customConcurrencyKey1Active > 0 {
-				key := kg.ActiveCounter("custom", testCase.knobs.customConcurrencyKey1.Key)
-				_, err = r.Incr(key, testCase.currentValues.customConcurrencyKey1Active)
-				require.NoError(t, err)
+				for i := 1; i <= testCase.currentValues.customConcurrencyKey1Active; i++ {
+					key := kg.ActiveSet("custom", testCase.knobs.customConcurrencyKey1.Key)
+					_, err = r.SAdd(key, fmt.Sprintf("item%d", i))
+					require.NoError(t, err)
+				}
 			}
 
 			if testCase.currentValues.customConcurrencyKey2Active > 0 {
-				key := kg.ActiveCounter("custom", testCase.knobs.customConcurrencyKey2.Key)
-				_, err = r.Incr(key, testCase.currentValues.customConcurrencyKey2Active)
-				require.NoError(t, err)
+				for i := 1; i <= testCase.currentValues.customConcurrencyKey2Active; i++ {
+					key := kg.ActiveSet("custom", testCase.knobs.customConcurrencyKey2.Key)
+					_, err = r.SAdd(key, fmt.Sprintf("item%d", i))
+					require.NoError(t, err)
+				}
 			}
 
 			testThrottle := testCase.knobs.throttle
@@ -1842,7 +1960,7 @@ func TestShadowPartitionPointerTimings(t *testing.T) {
 		require.Len(t, peeked, 1)
 		require.Equal(t, backlog, *peeked[0])
 
-		for i := 0; i < numItems; i++ {
+		for i := range numItems {
 			itemAt := now.Add(time.Duration(i+1) * time.Second)
 			refillUntil := itemAt
 			res, err := q.BacklogRefill(ctx, &backlog, &shadowPart, refillUntil)

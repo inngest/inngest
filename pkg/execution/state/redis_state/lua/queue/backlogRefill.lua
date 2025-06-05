@@ -47,7 +47,7 @@ local keyActiveConcurrencyKey2   = KEYS[15]
 local keyActiveCompound          = KEYS[16]
 
 local keyActiveRunsAccount                = KEYS[17]
-local keyIndexActivePartitionRuns         = KEYS[18]
+local keyActiveRunsPartition              = KEYS[18]
 local keyActiveRunsCustomConcurrencyKey1  = KEYS[19]
 local keyActiveRunsCustomConcurrencyKey2  = KEYS[20]
 
@@ -72,15 +72,14 @@ local throttlePeriod = tonumber(ARGV[14])
 
 local keyPrefix = ARGV[15]
 
-local drainActiveCounters = tonumber(ARGV[16])
-local checkCapacity = tonumber(ARGV[17])
+local enableKeyQueues = tonumber(ARGV[16])
 
 -- $include(update_pointer_score.lua)
 -- $include(ends_with.lua)
 -- $include(update_account_queues.lua)
 -- $include(gcra.lua)
 -- $include(update_backlog_pointer.lua)
--- $include(update_active_counters.lua)
+-- $include(update_active_sets.lua)
 
 --
 -- Retrieve current backlog size
@@ -135,8 +134,8 @@ local constraintCapacity = nil
 -- Set initial status to success, progressively add more specific capacity constraints
 local status = 0
 
-local function check_active_capacity(now_ms, keyActiveCounter, limit)
-	local count = redis.call("GET", keyActiveCounter)
+local function check_active_capacity(now_ms, keyActiveSet, limit)
+	local count = redis.call("SCARD", keyActiveSet)
 	if count ~= false and count ~= nil then
     return tonumber(limit) - tonumber(count)
   end
@@ -144,7 +143,7 @@ local function check_active_capacity(now_ms, keyActiveCounter, limit)
 	return tonumber(limit)
 end
 
-if checkCapacity == 1 then
+if enableKeyQueues == 1 then
   -- Check throttle capacity
   if (constraintCapacity == nil or constraintCapacity > 0) and throttlePeriod > 0 and throttleLimit > 0 then
     local remainingThrottleCapacity = gcraCapacity(throttleKey, nowMS, throttlePeriod * 1000, throttleLimit, throttleBurst)
@@ -234,6 +233,7 @@ if refill > 0 then
 
   -- Reverse the items to be added to the ready set
   local readyArgs = {}
+  local markActiveItemIDs = {}
 
   local backlogRemArgs = {}
   local hasRemove = false
@@ -263,16 +263,18 @@ if refill > 0 then
       updatedData.rf = backlogID
       updatedData.rat = nowMS
 
-      if drainActiveCounters ~= 1 and updatedData.data ~= nil and updatedData.data.identifier ~= nil and updatedData.data.identifier.runID ~= nil then
+      if enableKeyQueues == 1 and updatedData.data ~= nil and updatedData.data.identifier ~= nil and updatedData.data.identifier.runID ~= nil then
         -- add item to active in run
         local runID = updatedData.data.identifier.runID
-        local keyActiveRun = string.format("%s:v1:active:run:%s", keyPrefix, runID)
+        local keyActiveRun = string.format("%s:v2:active:run:%s", keyPrefix, runID)
 
-        increaseActiveRunCounters(keyActiveRun, keyIndexActivePartitionRuns, keyActiveRunsAccount, keyActiveRunsCustomConcurrencyKey1, keyActiveRunsCustomConcurrencyKey2, runID)
+        addToActiveRunSets(keyActiveRun, keyActiveRunsPartition, keyActiveRunsAccount, keyActiveRunsCustomConcurrencyKey1, keyActiveRunsCustomConcurrencyKey2, runID, itemID)
       end
 
       table.insert(itemUpdateArgs, itemID)
       table.insert(itemUpdateArgs, cjson.encode(updatedData))
+
+      table.insert(markActiveItemIDs, itemID)
 
       -- Increment number of refilled items
       refilled = refilled + 1
@@ -283,8 +285,8 @@ if refill > 0 then
     -- "Refill" items to ready set
     redis.call("ZADD", keyReadySet, unpack(readyArgs))
 
-    if drainActiveCounters ~= 1 then
-      increaseActiveCounters(keyActivePartition, keyActiveAccount, keyActiveCompound, keyActiveConcurrencyKey1, keyActiveConcurrencyKey2, refilled)
+    if enableKeyQueues == 1 then
+      addToActiveSets(keyActivePartition, keyActiveAccount, keyActiveCompound, keyActiveConcurrencyKey1, keyActiveConcurrencyKey2, markActiveItemIDs)
     end
 
     -- Update queue items with refill data

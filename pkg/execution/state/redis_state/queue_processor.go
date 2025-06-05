@@ -183,7 +183,7 @@ func (q *queue) Run(ctx context.Context, f osqueue.RunFunc) error {
 	go q.runInstrumentation(ctx)
 
 	// start execution and shadow scan concurrently
-	eg := errgroup.Group{}
+	eg, ctx := errgroup.WithContext(ctx)
 
 	eg.Go(func() error {
 		return q.executionScan(ctx, f)
@@ -997,12 +997,7 @@ func (q *queue) process(
 					return
 				}
 				if leaseID == nil {
-					q.log.Error("cannot extend lease since lease ID is nil",
-						"account_id", p.AccountID.String(),
-						"qi", qi.ID,
-						"fn_id", qi.FunctionID.String(),
-						"partition_id", p.ID,
-					)
+					q.log.Error("cannot extend lease since lease ID is nil", "qi", qi, "partition", p)
 					// Don't extend lease since one doesn't exist
 					errCh <- fmt.Errorf("cannot extend lease since lease ID is nil")
 					return
@@ -1010,13 +1005,7 @@ func (q *queue) process(
 				// Once a job has started, use a BG context to always renew.
 				leaseID, err = q.ExtendLease(context.Background(), qi, *leaseID, QueueLeaseDuration)
 				if err != nil && err != ErrQueueItemNotFound {
-					q.log.Error("error extending lease",
-						"error", err,
-						"account_id", p.AccountID.String(),
-						"qi", qi.ID,
-						"fn_id", qi.FunctionID.String(),
-						"partition_id", p.ID,
-					)
+					q.log.Error("error extending lease", "error", err, "qi", qi, "partition", p)
 					errCh <- fmt.Errorf("error extending lease while processing: %w", err)
 					return
 				}
@@ -1616,9 +1605,18 @@ func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error 
 		if p.queue.itemEnableKeyQueues(ctx, *item) {
 			err := p.queue.Requeue(ctx, p.queue.primaryQueueShard, *item, time.UnixMilli(item.AtMS))
 			if err != nil {
-				l.Error("could not requeue item to backlog after hitting limit", "error", err, "item", *item, "cause", cause)
+				l.Error("could not requeue item to backlog after hitting limit", "error", err, "item", *item, "key", key)
 				return fmt.Errorf("could not requeue to backlog: %w", err)
 			}
+
+			metrics.IncrRequeueExistingToBacklogCounter(ctx, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags: map[string]any{
+					"queue_shard":  p.queue.primaryQueueShard.Name,
+					"partition_id": item.FunctionID.String(),
+					"status":       "throttled",
+				},
+			})
 		}
 
 		return nil
@@ -1664,9 +1662,18 @@ func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error 
 		if p.queue.itemEnableKeyQueues(ctx, *item) {
 			err := p.queue.Requeue(ctx, p.queue.primaryQueueShard, *item, time.UnixMilli(item.AtMS))
 			if err != nil {
-				l.Error("could not requeue item to backlog after hitting limit", "error", err, "item", *item, "cause", cause)
+				l.Error("could not requeue item to backlog after hitting limit", "error", err, "item", *item, "key", key)
 				return fmt.Errorf("could not requeue to backlog: %w", err)
 			}
+
+			metrics.IncrRequeueExistingToBacklogCounter(ctx, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags: map[string]any{
+					"queue_shard":  p.queue.primaryQueueShard.Name,
+					"partition_id": item.FunctionID.String(),
+					"status":       status,
+				},
+			})
 		}
 
 		return fmt.Errorf("concurrency hit: %w", errProcessStopIterator)
@@ -1696,9 +1703,18 @@ func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error 
 		if p.queue.itemEnableKeyQueues(ctx, *item) {
 			err := p.queue.Requeue(ctx, p.queue.primaryQueueShard, *item, time.UnixMilli(item.AtMS))
 			if err != nil {
-				l.Error("could not requeue item to backlog after hitting limit", "error", err, "item", *item, "cause", cause)
+				l.Error("could not requeue item to backlog after hitting limit", "error", err, "item", *item, "key", key)
 				return fmt.Errorf("could not requeue to backlog: %w", err)
 			}
+
+			metrics.IncrRequeueExistingToBacklogCounter(ctx, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags: map[string]any{
+					"queue_shard":  p.queue.primaryQueueShard.Name,
+					"partition_id": item.FunctionID.String(),
+					"status":       "custom_key_concurrency_limit",
+				},
+			})
 		}
 		return nil
 	case ErrQueueItemNotFound:

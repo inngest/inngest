@@ -491,46 +491,107 @@ func TestBacklogNormalizationScanner(t *testing.T) {
 		QueueName: nil,
 	}
 
-	// Create backlog
-	for i := range 100 {
-		at := clock.Now().Add(time.Duration(i*100) * time.Millisecond)
-		_, err := q.EnqueueItem(ctx, defaultShard, item, at, osqueue.EnqueueOpts{})
+	t.Run("async normalization", func(t *testing.T) {
+		r.FlushAll()
+
+		// Create backlog
+		for i := range 100 {
+			at := clock.Now().Add(time.Duration(i*100) * time.Millisecond)
+			_, err := q.EnqueueItem(ctx, defaultShard, item, at, osqueue.EnqueueOpts{})
+			require.NoError(t, err)
+		}
+
+		// Verify backlog is created as expected
+		backlog := q.ItemBacklog(ctx, item)
+		require.NotEmpty(t, backlog.BacklogID)
+
+		shadowPartition := q.ItemShadowPartition(ctx, item)
+		require.NotEmpty(t, shadowPartition.PartitionID)
+
+		backlogCount, shouldNormalizeAsync, err := q.BacklogPrepareNormalize(ctx, &backlog, &shadowPartition, 5)
 		require.NoError(t, err)
-	}
+		require.True(t, shouldNormalizeAsync)
+		require.Equal(t, 100, backlogCount)
+		require.Equal(t, 100, zcard(t, rc, kg.BacklogSet(backlog.BacklogID)))
+		require.True(t, hasMember(t, r, kg.GlobalAccountNormalizeSet(), accountId.String()))
+		require.True(t, hasMember(t, r, kg.AccountNormalizeSet(accountId), fnID.String()))
+		require.True(t, hasMember(t, r, kg.PartitionNormalizeSet(fnID.String()), backlog.BacklogID))
 
-	// Verify backlog is created as expected
-	backlog := q.ItemBacklog(ctx, item)
-	require.NotEmpty(t, backlog.BacklogID)
+		bc := make(chan normalizeWorkerChanMsg, 1)
 
-	shadowPartition := q.ItemShadowPartition(ctx, item)
-	require.NotEmpty(t, shadowPartition.PartitionID)
+		err = q.iterateNormalizationPartition(ctx, clock.Now().Add(time.Hour), bc)
+		require.NoError(t, err)
 
-	backlogCount, shouldNormalizeAsync, err := q.BacklogPrepareNormalize(ctx, &backlog, &shadowPartition, 5)
-	require.NoError(t, err)
-	require.True(t, shouldNormalizeAsync)
-	require.Equal(t, 100, backlogCount)
-	require.Equal(t, 100, zcard(t, rc, kg.BacklogSet(backlog.BacklogID)))
-	require.True(t, hasMember(t, r, kg.GlobalAccountNormalizeSet(), accountId.String()))
-	require.True(t, hasMember(t, r, kg.AccountNormalizeSet(accountId), fnID.String()))
-	require.True(t, hasMember(t, r, kg.PartitionNormalizeSet(fnID.String()), backlog.BacklogID))
+		select {
+		case msg := <-bc:
+			require.Equal(t, backlog, *msg.b)
+		default:
+			require.Fail(t, "did not push backlog into channel")
+			return
+		}
 
-	bc := make(chan normalizeWorkerChanMsg, 1)
+		err = q.normalizeBacklog(ctx, &backlog, &shadowPartition)
+		require.NoError(t, err)
+		require.Equal(t, 0, zcard(t, rc, kg.BacklogSet(backlog.BacklogID)))
+		require.False(t, hasMember(t, r, kg.GlobalAccountNormalizeSet(), accountId.String()))
+		require.False(t, hasMember(t, r, kg.AccountNormalizeSet(accountId), fnID.String()))
+		require.False(t, hasMember(t, r, kg.PartitionNormalizeSet(fnID.String()), backlog.BacklogID))
+	})
 
-	err = q.iterateNormalizationPartition(ctx, clock.Now().Add(time.Hour), bc)
-	require.NoError(t, err)
+	t.Run("non async normalization", func(t *testing.T) {
+		r.FlushAll()
 
-	select {
-	case msg := <-bc:
-		require.Equal(t, backlog, *msg.b)
-	default:
-		require.Fail(t, "did not push backlog into channel")
-		return
-	}
+		// Create backlog
+		for i := range 3 {
+			at := clock.Now().Add(time.Duration(i*100) * time.Millisecond)
+			_, err := q.EnqueueItem(ctx, defaultShard, item, at, osqueue.EnqueueOpts{})
+			require.NoError(t, err)
+		}
 
-	err = q.normalizeBacklog(ctx, &backlog, &shadowPartition)
-	require.NoError(t, err)
-	require.Equal(t, 0, zcard(t, rc, kg.BacklogSet(backlog.BacklogID)))
-	require.False(t, hasMember(t, r, kg.GlobalAccountNormalizeSet(), accountId.String()))
-	require.False(t, hasMember(t, r, kg.AccountNormalizeSet(accountId), fnID.String()))
-	require.False(t, hasMember(t, r, kg.PartitionNormalizeSet(fnID.String()), backlog.BacklogID))
+		// Verify backlog is created as expected
+		backlog := q.ItemBacklog(ctx, item)
+		require.NotEmpty(t, backlog.BacklogID)
+
+		shadowPartition := q.ItemShadowPartition(ctx, item)
+		require.NotEmpty(t, shadowPartition.PartitionID)
+
+		backlogCount, shouldNormalizeAsync, err := q.BacklogPrepareNormalize(ctx, &backlog, &shadowPartition, 5)
+		require.NoError(t, err)
+		require.False(t, shouldNormalizeAsync)
+		require.Equal(t, 3, backlogCount)
+		require.Equal(t, 3, zcard(t, rc, kg.BacklogSet(backlog.BacklogID)))
+		require.False(t, hasMember(t, r, kg.GlobalAccountNormalizeSet(), accountId.String()))
+		require.False(t, hasMember(t, r, kg.AccountNormalizeSet(accountId), fnID.String()))
+		require.False(t, hasMember(t, r, kg.PartitionNormalizeSet(fnID.String()), backlog.BacklogID))
+	})
+
+	t.Run("non async normalization lease contention", func(t *testing.T) {
+		r.FlushAll()
+
+		// Create backlog
+		for i := range 3 {
+			at := clock.Now().Add(time.Duration(i*100) * time.Millisecond)
+			_, err := q.EnqueueItem(ctx, defaultShard, item, at, osqueue.EnqueueOpts{})
+			require.NoError(t, err)
+		}
+
+		// Verify backlog is created as expected
+		backlog := q.ItemBacklog(ctx, item)
+		require.NotEmpty(t, backlog.BacklogID)
+
+		shadowPartition := q.ItemShadowPartition(ctx, item)
+		require.NotEmpty(t, shadowPartition.PartitionID)
+
+		// simulate contention by leasing the backlog for normalization first
+		require.NoError(t, q.leaseBacklogForNormalization(ctx, &backlog))
+
+		backlogCount, shouldNormalizeAsync, err := q.BacklogPrepareNormalize(ctx, &backlog, &shadowPartition, 5)
+		require.NoError(t, err)
+		require.False(t, shouldNormalizeAsync)
+		require.Equal(t, 3, backlogCount)
+		require.Equal(t, 3, zcard(t, rc, kg.BacklogSet(backlog.BacklogID)))
+		require.False(t, hasMember(t, r, kg.GlobalAccountNormalizeSet(), accountId.String()))
+		require.False(t, hasMember(t, r, kg.AccountNormalizeSet(accountId), fnID.String()))
+		require.False(t, hasMember(t, r, kg.PartitionNormalizeSet(fnID.String()), backlog.BacklogID))
+	})
 }

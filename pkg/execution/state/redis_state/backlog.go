@@ -9,9 +9,19 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
+)
+
+var (
+	// NOTE: there's no logic behind this number, it's just a random pick for now
+	ThrottleBackoffMultiplierThreshold = 15 * time.Second
+)
+
+var (
+	ErrBacklogNotFound = fmt.Errorf("backlog not found")
 )
 
 type CustomConcurrencyLimit struct {
@@ -78,7 +88,7 @@ type QueueShadowPartition struct {
 	Concurrency ShadowPartitionConcurrency `json:"c,omitempty,omitzero"`
 
 	// Throttle configuration, optionally specifying key. If no key is set, the throttle value will be the function ID.
-	Throttle *ShadowPartitionThrottle `json:"t,omitempty"`
+	Throttle *ShadowPartitionThrottle `json:"t,omitempty,omitzero"`
 
 	// Flag to pause refilling to the ready queue.
 	PauseRefill bool `json:"norefill,omitempty"`
@@ -97,9 +107,9 @@ func (q QueueShadowPartition) inProgressKey(kg QueueKeyGenerator) string {
 	return kg.Concurrency("p", q.PartitionID)
 }
 
-// activeKey returns the key storing the active counter for the shadow partition
+// activeKey returns the key storing the active set for the shadow partition
 func (q QueueShadowPartition) activeKey(kg QueueKeyGenerator) string {
-	return kg.ActiveCounter("p", q.PartitionID)
+	return kg.ActiveSet("p", q.PartitionID)
 }
 
 // CustomConcurrencyLimit returns concurrency limit for custom concurrency key in position n (0, if not set)
@@ -145,33 +155,37 @@ func (q QueueShadowPartition) accountInProgressKey(kg QueueKeyGenerator) string 
 	return kg.Concurrency("account", q.AccountID.String())
 }
 
-// accountActiveKey returns the key storing the active counter for the shadow partition's account
+// accountActiveKey returns the key storing the active set for the shadow partition's account
 func (q QueueShadowPartition) accountActiveKey(kg QueueKeyGenerator) string {
 	// Do not track account concurrency for system queues
 	if q.SystemQueueName != nil {
-		return kg.ActiveCounter("", "")
+		return kg.ActiveSet("", "")
 	}
 
 	// This should never be unset
 	if q.AccountID == nil {
-		return kg.ActiveCounter("account", "")
+		return kg.ActiveSet("account", "")
 	}
 
-	return kg.ActiveCounter("account", q.AccountID.String())
+	return kg.ActiveSet("account", q.AccountID.String())
 }
 
 func (q QueueShadowPartition) accountActiveRunKey(kg QueueKeyGenerator) string {
 	// Do not track account run concurrency for system queues
 	if q.SystemQueueName != nil {
-		return kg.ActiveRunsCounter("", "")
+		return kg.ActiveRunsSet("", "")
 	}
 
 	// This should never be unset
 	if q.AccountID == nil {
-		return kg.ActiveRunsCounter("account", "")
+		return kg.ActiveRunsSet("account", "")
 	}
 
-	return kg.ActiveRunsCounter("account", q.AccountID.String())
+	return kg.ActiveRunsSet("account", q.AccountID.String())
+}
+
+func (q QueueShadowPartition) activeRunKey(kg QueueKeyGenerator) string {
+	return kg.ActiveRunsSet("p", q.PartitionID)
 }
 
 // BacklogConcurrencyKey represents a custom concurrency key, which can be scoped to the function, environment, or account.
@@ -224,7 +238,7 @@ type QueueBacklog struct {
 	ConcurrencyKeys []BacklogConcurrencyKey `json:"ck,omitempty"`
 
 	// Set for backlogs containing start items only for a given throttle configuration
-	Throttle *BacklogThrottle
+	Throttle *BacklogThrottle `json:"t,omitempty"`
 
 	SuccessiveThrottleConstrained          int `json:"stc,omitzero"`
 	SuccessiveCustomConcurrencyConstrained int `json:"sccc,omitzero"`
@@ -522,10 +536,10 @@ func (b BacklogConcurrencyKey) concurrencyKey(kg QueueKeyGenerator) string {
 	return kg.Concurrency("custom", b.CanonicalKeyID)
 }
 
-// customKeyActive returns the key to the active counter for the given custom concurrency key
+// customKeyActive returns the key to the active set for the given custom concurrency key
 func (b QueueBacklog) customKeyActive(kg QueueKeyGenerator, n int) string {
 	if n < 0 || n > len(b.ConcurrencyKeys) {
-		return kg.ActiveCounter("", "")
+		return kg.ActiveSet("", "")
 	}
 
 	key := b.ConcurrencyKeys[n-1]
@@ -535,7 +549,7 @@ func (b QueueBacklog) customKeyActive(kg QueueKeyGenerator, n int) string {
 // customKeyActiveRuns returns the key to the active runs counter for the given custom concurrency key
 func (b QueueBacklog) customKeyActiveRuns(kg QueueKeyGenerator, n int) string {
 	if n < 0 || n > len(b.ConcurrencyKeys) {
-		return kg.ActiveRunsCounter("", "")
+		return kg.ActiveRunsSet("", "")
 	}
 
 	key := b.ConcurrencyKeys[n-1]
@@ -547,16 +561,16 @@ func (b BacklogConcurrencyKey) activeKey(kg QueueKeyGenerator) string {
 	// - The scope (account, environment, function) to apply the concurrency limit on
 	// - The entity (account ID, envID, or function ID) based on the scope
 	// - The dynamic key value (hashed evaluated expression)
-	return kg.ActiveCounter("custom", b.CanonicalKeyID)
+	return kg.ActiveSet("custom", b.CanonicalKeyID)
 }
 
 func (b BacklogConcurrencyKey) activeRunsKey(kg QueueKeyGenerator) string {
-	return kg.ActiveRunsCounter("custom", b.CanonicalKeyID)
+	return kg.ActiveRunsSet("custom", b.CanonicalKeyID)
 }
 
 // activeKey returns backlog compound active key
 func (b QueueBacklog) activeKey(kg QueueKeyGenerator) string {
-	return kg.ActiveCounter("compound", b.BacklogID)
+	return kg.ActiveSet("compound", b.BacklogID)
 }
 
 func (b QueueBacklog) customConcurrencyKeyID(n int) string {
@@ -574,10 +588,27 @@ func (b QueueBacklog) requeueBackOff(now time.Time, constraint enums.QueueConstr
 	switch constraint {
 	case enums.QueueConstraintThrottle:
 		if partition.Throttle == nil {
+			logger.StdlibLogger(context.Background()).Error("throttle settings not defined while hitting throttle constraints", "shadow_partition", partition, "time", now)
 			return now.Add(PartitionThrottleLimitRequeueExtension)
 		}
 
-		return now.Add(PartitionThrottleLimitRequeueExtension + time.Duration(b.SuccessiveThrottleConstrained)*time.Second)
+		multiplier := b.SuccessiveThrottleConstrained
+		period := time.Duration(partition.Throttle.Period * int(time.Second))
+		// NOTE: for short periods, we want to increase the frequency of the checks to make sure we admit the items in the right timing
+		// and it's not too late
+		if period < ThrottleBackoffMultiplierThreshold {
+			multiplier /= 4
+		} else {
+			multiplier /= 2
+		}
+
+		backoff := time.Duration(multiplier) * time.Second
+		// guarantee a minimum duration
+		if backoff < PartitionThrottleLimitRequeueExtension {
+			backoff = PartitionThrottleLimitRequeueExtension
+		}
+
+		return now.Add(backoff)
 
 	case enums.QueueConstraintCustomConcurrencyKey1, enums.QueueConstraintCustomConcurrencyKey2:
 		next := now.Add(PartitionConcurrencyLimitRequeueExtension + time.Duration(b.SuccessiveCustomConcurrencyConstrained)*time.Second)
@@ -658,22 +689,18 @@ func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueSha
 		b.customKeyActive(kg, 2), // custom key 2
 		b.activeKey(kg),          // compound key (active for this backlog)
 
-		// Active run counters
-		// kg.RunActiveCounter(i.Data.Identifier.RunID), -> dynamically constructed in script for each item
-		sp.accountActiveRunKey(kg),                  // Counter for active runs in account
-		kg.ActivePartitionRunsIndex(sp.PartitionID), // Set index for active runs in partition
-		b.customKeyActiveRuns(kg, 1),                // Counter for active runs with custom concurrency key 1
-		b.customKeyActiveRuns(kg, 2),                // Counter for active runs with custom concurrency key 2
+		// Active run sets
+		// kg.RunActiveSet(i.Data.Identifier.RunID), -> dynamically constructed in script for each item
+		sp.accountActiveRunKey(kg),   // Set for active runs in account
+		sp.activeRunKey(kg),          // Set for active runs in partition
+		b.customKeyActiveRuns(kg, 1), // Set for active runs with custom concurrency key 1
+		b.customKeyActiveRuns(kg, 2), // Set for active runs with custom concurrency key 2
 	}
 
-	drainActiveCountersVal := "0"
-	if q.drainActiveCounters(ctx, accountID) {
-		drainActiveCountersVal = "1"
-	}
-
-	checkCapacityVal := "1"
-	if !q.allowKeyQueues(ctx, accountID) {
-		checkCapacityVal = "0"
+	enableKeyQueuesVal := "0"
+	// Don't check constraints if key queues have been disabled for this function (refill as quickly as possible)
+	if q.allowKeyQueues(ctx, accountID) {
+		enableKeyQueuesVal = "1"
 	}
 
 	args, err := StrSlice([]any{
@@ -695,8 +722,7 @@ func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueSha
 		throttlePeriod,
 
 		kg.QueuePrefix(),
-		drainActiveCountersVal,
-		checkCapacityVal,
+		enableKeyQueuesVal,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("could not serialize args: %w", err)

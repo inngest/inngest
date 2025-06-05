@@ -15,9 +15,7 @@ import (
 
 var tsSuffix = regexp.MustCompile(`\s*&&\s*\(\s*async.ts\s+==\s*null\s*\|\|\s*async.ts\s*>\s*\d*\)\s*$`)
 
-var (
-	ErrConsumePauseKeyMissing = fmt.Errorf("no idempotency key provided for consuming pauses")
-)
+var ErrConsumePauseKeyMissing = fmt.Errorf("no idempotency key provided for consuming pauses")
 
 // PauseMutater manages creating, leasing, and consuming pauses from a backend implementation.
 type PauseMutater interface {
@@ -241,6 +239,21 @@ type Pause struct {
 	TriggeringEventID *string `json:"tID,omitempty"`
 	// Metadata is additional metadata that should be stored with the pause
 	Metadata map[string]any
+}
+
+func (p Pause) GetOpcode() enums.Opcode {
+	if p.Opcode == nil {
+		return enums.OpcodeNone
+	}
+	switch *p.Opcode {
+	case enums.OpcodeWaitForEvent.String():
+		return enums.OpcodeWaitForEvent
+	case enums.OpcodeWaitForSignal.String():
+		return enums.OpcodeWaitForSignal
+	case enums.OpcodeInvokeFunction.String():
+		return enums.OpcodeInvokeFunction
+	}
+	return enums.OpcodeNone
 }
 
 func (p Pause) GetID() uuid.UUID {

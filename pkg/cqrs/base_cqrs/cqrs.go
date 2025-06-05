@@ -1646,6 +1646,31 @@ func (w wrapper) OtelTracesEnabled(ctx context.Context, accountID uuid.UUID) (bo
 	return true, nil
 }
 
+// For the API - CQRS return
+func (w wrapper) GetEventRuns(
+	ctx context.Context,
+	eventID ulid.ULID,
+	accountID uuid.UUID,
+	workspaceID uuid.UUID,
+) ([]*cqrs.FunctionRun, error) {
+	runs, err := w.q.GetFunctionRunsFromEvents(ctx, []ulid.ULID{eventID})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get function runs: %w", err)
+	}
+
+	result := []*cqrs.FunctionRun{}
+	for _, rawRun := range runs {
+		run, err := sqlToRun(&rawRun.FunctionRun, &rawRun.FunctionFinish)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert run: %w", err)
+		}
+
+		result = append(result, run.ToCQRS())
+	}
+
+	return result, nil
+}
+
 //
 // Connect
 //

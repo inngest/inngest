@@ -228,6 +228,12 @@ func level(levelVarName string) string {
 	return os.Getenv(levelVarName)
 }
 
+func FromSlog(l *slog.Logger) Logger {
+	return &logger{
+		l,
+	}
+}
+
 // logger is a wrapper over slog with additional levels
 type logger struct {
 	*slog.Logger

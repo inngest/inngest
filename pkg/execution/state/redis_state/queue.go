@@ -2,7 +2,6 @@ package redis_state
 
 import (
 	"context"
-	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -41,21 +40,6 @@ const (
 	PartitionSelectionMax = int64(100)
 	PartitionPeekMax      = PartitionSelectionMax * 3
 	AccountPeekMax        = int64(30)
-
-	AbsoluteShadowPartitionPeekMax int64 = 10 * ShadowPartitionPeekMaxBacklogs
-	NormalizeAccountPeekMax              = int64(30)
-	NormalizePartitionPeekMax            = int64(100)
-	NormalizeBacklogPeekMax              = int64(300) // same as ShadowPartitionPeekMax
-
-	// BacklogNormalizeAsyncLimit determines the minimum number of items required in an outdated backlog
-	// to require an async normalize job. For small backlogs, the added QPS may not be worth it and we should normalize JIT.
-	BacklogNormalizeAsyncLimit = 100
-
-	// BacklogRefillHardLimit sets the maximum number of items that can be refilled in a single backlogRefill operation.
-	BacklogRefillHardLimit = int64(1000)
-
-	// BacklogNormalizeHardLimit sets the batch size of items to be reenqueued into the appropriate backlogs durign normalization
-	BacklogNormalizeHardLimit = int64(1000)
 )
 
 const (
@@ -148,15 +132,6 @@ var (
 	ErrPartitionPaused               = fmt.Errorf("partition is paused")
 	ErrConfigAlreadyLeased           = fmt.Errorf("config scanner already leased")
 	ErrConfigLeaseExceedsLimits      = fmt.Errorf("config lease duration exceeds the maximum of %d seconds", int(ConfigLeaseMax.Seconds()))
-
-	ErrShadowPartitionAlreadyLeased               = fmt.Errorf("shadow partition already leased")
-	ErrShadowPartitionLeaseNotFound               = fmt.Errorf("shadow partition lease not found")
-	ErrShadowPartitionNotFound                    = fmt.Errorf("shadow partition not found")
-	ErrBacklogNotFound                            = fmt.Errorf("backlog not found")
-	ErrShadowPartitionPaused                      = fmt.Errorf("shadow partition refill is disabled")
-	ErrShadowPartitionBacklogPeekMaxExceedsLimits = fmt.Errorf("shadow partition backlog peek exceeded the maximum limit of %d", ShadowPartitionPeekMaxBacklogs)
-	ErrShadowPartitionPeekMaxExceedsLimits        = fmt.Errorf("shadow partition peek exceeded the maximum limit of %d", ShadowPartitionPeekMax)
-	ErrShadowPartitionAccountPeekMaxExceedsLimits = fmt.Errorf("account peek with shadow partitions exceeded the maximum limit of %d", ShadowPartitionAccountPeekMax)
 
 	ErrPartitionConcurrencyLimit = fmt.Errorf("at partition concurrency limit")
 	ErrAccountConcurrencyLimit   = fmt.Errorf("at account concurrency limit")
@@ -515,10 +490,6 @@ type AllowSystemKeyQueues func(ctx context.Context) bool
 // AllowKeyQueues determines if key queues should be enabled for the account
 type AllowKeyQueues func(ctx context.Context, acctID uuid.UUID) bool
 
-// DrainActiveCounters determines if active counters should be drained for the account
-// This can also be called for system queues, where account ID will be a zero UUID.
-type DrainActiveCounters func(ctx context.Context, acctID uuid.UUID) bool
-
 func WithAllowKeyQueues(kq AllowKeyQueues) QueueOpt {
 	return func(q *queue) {
 		q.allowKeyQueues = kq
@@ -546,12 +517,6 @@ type DisableSystemQueueLeaseChecks func(ctx context.Context) bool
 func WithDisableLeaseChecks(lc DisableLeaseChecks) QueueOpt {
 	return func(q *queue) {
 		q.disableLeaseChecks = lc
-	}
-}
-
-func WithKeyQueuesDrainActiveCounters(fn DrainActiveCounters) QueueOpt {
-	return func(q *queue) {
-		q.drainActiveCounters = fn
 	}
 }
 
@@ -664,9 +629,6 @@ func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 		allowKeyQueues: func(ctx context.Context, acctID uuid.UUID) bool {
 			return false
 		},
-		drainActiveCounters: func(ctx context.Context, acctID uuid.UUID) bool {
-			return false
-		},
 		enqueueSystemQueuesToBacklog: false,
 		disableLeaseChecks: func(ctx context.Context, acctID uuid.UUID) bool {
 			return false
@@ -740,7 +702,6 @@ type queue struct {
 
 	allowKeyQueues               AllowKeyQueues
 	enqueueSystemQueuesToBacklog bool
-	drainActiveCounters          DrainActiveCounters
 
 	disableLeaseChecks                DisableLeaseChecks
 	disableLeaseChecksForSystemQueues bool
@@ -1816,6 +1777,7 @@ func (q *queue) Migrate(ctx context.Context, sourceShardName string, fnID uuid.U
 
 	items, err := q.peek(ctx, shard, peekOpts{
 		PartitionKey: partitionKey,
+		PartitionID:  fnID.String(),
 		Limit:        limit,
 		Until:        time.Time{},
 	})
@@ -1946,6 +1908,7 @@ func (q *queue) Peek(ctx context.Context, partition *QueuePartition, until time.
 			Limit:        limit,
 			Until:        until,
 			PartitionKey: partitionKey,
+			PartitionID:  partition.ID,
 		},
 	)
 }
@@ -1977,12 +1940,14 @@ func (q *queue) PeekRandom(ctx context.Context, partition *QueuePartition, until
 			Limit:        limit,
 			Until:        until,
 			PartitionKey: partitionKey,
+			PartitionID:  partition.ID,
 			Random:       true,
 		},
 	)
 }
 
 type peekOpts struct {
+	PartitionID  string
 	PartitionKey string
 	Random       bool
 	Until        time.Time
@@ -2046,7 +2011,8 @@ func (q *queue) peek(ctx context.Context, shard QueueShard, opts peekOpts) ([]*o
 	items := make([]any, 0, len(allQueueItemIds))
 	missingQueueItems := make([]string, 0, len(allQueueItemIds))
 	for idx, itemId := range allQueueItemIds {
-		if potentiallyMissingItems[idx] == nil {
+		item := potentiallyMissingItems[idx]
+		if item == nil {
 			if itemId == nil {
 				return nil, fmt.Errorf("encountered nil queue item key in partition queue %q", opts.PartitionKey)
 			}
@@ -2058,7 +2024,7 @@ func (q *queue) peek(ctx context.Context, shard QueueShard, opts peekOpts) ([]*o
 
 			missingQueueItems = append(missingQueueItems, str)
 		} else {
-			items = append(items, potentiallyMissingItems[idx])
+			items = append(items, item)
 		}
 	}
 
@@ -2081,33 +2047,40 @@ func (q *queue) peek(ctx context.Context, shard QueueShard, opts peekOpts) ([]*o
 		}
 	}
 
-	now := q.clock.Now()
-	return util.ParallelDecode(items, func(val any) (*osqueue.QueueItem, error) {
+	return util.ParallelDecode(items, func(val any) (*osqueue.QueueItem, bool, error) {
 		if val == nil {
 			q.log.Error("nil item value in peek response", "partition", opts.PartitionKey)
-			return nil, nil
+			return nil, true, nil
 		}
 
 		str, ok := val.(string)
 		if !ok {
-			return nil, fmt.Errorf("non-string value in peek response: %T", val)
+			return nil, false, fmt.Errorf("non-string value in peek response: %T", val)
 		}
 
 		if str == "" {
-			return nil, fmt.Errorf("received empty string in decode queue item from peek")
+			return nil, false, fmt.Errorf("received empty string in decode queue item from peek")
 		}
 
 		qi := &osqueue.QueueItem{}
 		if err := json.Unmarshal(unsafe.Slice(unsafe.StringData(str), len(str)), qi); err != nil {
-			return nil, fmt.Errorf("error unmarshalling peeked queue item: %w", err)
+			return nil, false, fmt.Errorf("error unmarshalling peeked queue item: %w", err)
 		}
+
+		now := q.clock.Now()
 		if qi.IsLeased(now) {
+			metrics.IncrQueuePeekLeaseContentionCounter(ctx, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags:    map[string]any{"partition_id": opts.PartitionID, "queue_shard": shard.Name},
+			})
+
 			// Leased item, don't return.
-			return nil, nil
+			return nil, true, nil
 		}
+
 		// The nested osqueue.Item never has an ID set;  always re-set it
 		qi.Data.JobID = &qi.ID
-		return qi, nil
+		return qi, false, nil
 	})
 }
 
@@ -2231,7 +2204,9 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 
 	kg := q.primaryQueueShard.RedisClient.kg
 
-	refilledFromBacklog := q.itemEnableKeyQueues(ctx, item) && item.RefilledFrom != ""
+	enableKeyQueues := q.itemEnableKeyQueues(ctx, item)
+
+	refilledFromBacklog := enableKeyQueues && item.RefilledFrom != ""
 
 	checkConstraints := !refilledFromBacklog || !q.itemDisableLeaseChecks(ctx, item)
 
@@ -2297,19 +2272,19 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 		backlog.customKeyInProgress(kg, 1),
 		backlog.customKeyInProgress(kg, 2),
 
-		// Active counters (ready + in progress)
+		// Active set keys (ready + in progress)
 		partition.accountActiveKey(kg),
 		partition.activeKey(kg),
-		backlog.customKeyActive(kg, 2),
 		backlog.customKeyActive(kg, 1),
+		backlog.customKeyActive(kg, 2),
 		backlog.activeKey(kg),
 
-		// Active run counters
-		kg.RunActiveCounter(item.Data.Identifier.RunID),    // Counter for active items in run
-		partition.accountActiveRunKey(kg),                  // Counter for active runs in account
-		kg.ActivePartitionRunsIndex(partition.PartitionID), // Set index for active runs in partition
-		backlog.customKeyActiveRuns(kg, 1),                 // Counter for active runs with custom concurrency key 1
-		backlog.customKeyActiveRuns(kg, 2),                 // Counter for active runs with custom concurrency key 2
+		// Active run sets
+		kg.RunActiveSet(item.Data.Identifier.RunID), // Set for active items in run
+		partition.accountActiveRunKey(kg),           // Set for active runs in account
+		partition.activeRunKey(kg),                  // Set for active runs in partition
+		backlog.customKeyActiveRuns(kg, 1),          // Set for active runs with custom concurrency key 1
+		backlog.customKeyActiveRuns(kg, 2),          // Set for active runs with custom concurrency key 2
 
 		kg.ThrottleKey(item.Data.Throttle),
 	}
@@ -2317,11 +2292,6 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 	partConcurrency := partition.Concurrency.FunctionConcurrency
 	if partition.SystemQueueName != nil {
 		partConcurrency = partition.Concurrency.SystemConcurrency
-	}
-
-	drainActiveCountersVal := "0"
-	if q.drainActiveCounters(ctx, item.Data.Identifier.AccountID) {
-		drainActiveCountersVal = "1"
 	}
 
 	args, err := StrSlice([]any{
@@ -2342,7 +2312,6 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 		// Key queues v2
 		checkConstraintsVal,
 		refilledFromBacklogVal,
-		drainActiveCountersVal,
 	})
 	if err != nil {
 		return nil, err
@@ -2501,6 +2470,36 @@ func (q *queue) ExtendLease(ctx context.Context, i osqueue.QueueItem, leaseID ul
 	}
 }
 
+// activeKeysToGarbageCollect returns keys to garbage collect.
+// Note: The following keys are temporary and only used for cleanup and will be removed before Key Queues v2 GA
+func (q *queue) activeKeysToGarbageCollect(i osqueue.QueueItem, partition QueueShadowPartition, backlog QueueBacklog, kg QueueKeyGenerator) []string {
+	return []string{
+		// v1
+		strings.Replace(partition.accountActiveKey(kg), ":v2:", ":v1:", 1),
+		strings.Replace(partition.activeKey(kg), ":v2:", ":v1:", 1),
+		strings.Replace(backlog.customKeyActive(kg, 1), ":v2:", ":v1:", 1),
+		strings.Replace(backlog.customKeyActive(kg, 2), ":v2:", ":v1:", 1),
+		strings.Replace(backlog.activeKey(kg), ":v2:", ":v1:", 1),
+		strings.Replace(kg.RunActiveSet(i.Data.Identifier.RunID), ":v2:", ":v1:", 1),
+		strings.Replace(partition.accountActiveRunKey(kg), ":v2:", ":v1:", 1),
+		strings.Replace(partition.activeRunKey(kg), ":v2:active-runs:", ":v1:active-idx:runs:", 1),
+		strings.Replace(backlog.customKeyActiveRuns(kg, 1), ":v2:", ":v1:", 1),
+		strings.Replace(backlog.customKeyActiveRuns(kg, 2), ":v2:", ":v1:", 1),
+
+		// v0
+		strings.Replace(partition.accountActiveKey(kg), ":v2:", ":", 1),
+		strings.Replace(partition.activeKey(kg), ":v2:", ":", 1),
+		strings.Replace(backlog.customKeyActive(kg, 1), ":v2:", ":", 1),
+		strings.Replace(backlog.customKeyActive(kg, 2), ":v2:", ":", 1),
+		strings.Replace(backlog.activeKey(kg), ":v2:", ":", 1),
+		strings.Replace(kg.RunActiveSet(i.Data.Identifier.RunID), ":v2:", ":", 1),
+		strings.Replace(partition.accountActiveRunKey(kg), ":v2:", ":", 1),
+		strings.Replace(partition.activeRunKey(kg), ":v2:active-runs:", ":active-idx:runs:", 1),
+		strings.Replace(backlog.customKeyActiveRuns(kg, 1), ":v2:", ":", 1),
+		strings.Replace(backlog.customKeyActiveRuns(kg, 2), ":v2:", ":", 1),
+	}
+}
+
 // Dequeue removes an item from the queue entirely.
 func (q *queue) Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.QueueItem) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "Dequeue"), redis_telemetry.ScopeQueue)
@@ -2537,25 +2536,29 @@ func (q *queue) Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		backlog.customKeyInProgress(kg, 1),
 		backlog.customKeyInProgress(kg, 2),
 
-		// Active keys
+		// Active set keys
 		partition.accountActiveKey(kg),
 		partition.activeKey(kg),
 		backlog.customKeyActive(kg, 1),
 		backlog.customKeyActive(kg, 2),
 		backlog.activeKey(kg),
 
-		// Active run counters
-		kg.RunActiveCounter(i.Data.Identifier.RunID),       // Counter for active items in run
-		partition.accountActiveRunKey(kg),                  // Counter for active runs in account
-		kg.ActivePartitionRunsIndex(partition.PartitionID), // Set index for active runs in partition
-		backlog.customKeyActiveRuns(kg, 1),                 // Counter for active runs with custom concurrency key 1
-		backlog.customKeyActiveRuns(kg, 2),                 // Counter for active runs with custom concurrency key 2
+		// Active run sets
+		kg.RunActiveSet(i.Data.Identifier.RunID), // Set for active items in run
+		partition.accountActiveRunKey(kg),        // Set for active runs in account
+		partition.activeRunKey(kg),               // Set for active runs in partition
+		backlog.customKeyActiveRuns(kg, 1),       // Set for active runs with custom concurrency key 1
+		backlog.customKeyActiveRuns(kg, 2),       // Set for active runs with custom concurrency key 2
 
 		kg.Idempotency(i.ID),
 
 		// Singleton
 		kg.SingletonRunKey(i.Data.Identifier.RunID.String()),
 	}
+
+	gcKeys := q.activeKeysToGarbageCollect(i, partition, backlog, kg)
+	keys = append(keys, gcKeys...)
+
 	// Append indexes
 	for _, idx := range q.itemIndexer(ctx, i, queueShard.RedisClient.kg) {
 		if idx != "" {
@@ -2660,19 +2663,19 @@ func (q *queue) Requeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		backlog.customKeyInProgress(kg, 1),
 		backlog.customKeyInProgress(kg, 2),
 
-		// Active (counter) keys
+		// Active set keys
 		shadowPartition.accountActiveKey(kg),
 		shadowPartition.activeKey(kg),
 		backlog.customKeyActive(kg, 1),
 		backlog.customKeyActive(kg, 2),
 		backlog.activeKey(kg),
 
-		// Active run counters
-		kg.RunActiveCounter(i.Data.Identifier.RunID),             // Counter for active items in run
-		shadowPartition.accountActiveRunKey(kg),                  // Counter for active runs in account
-		kg.ActivePartitionRunsIndex(shadowPartition.PartitionID), // Set index for active runs in partition
-		backlog.customKeyActiveRuns(kg, 1),                       // Counter for active runs with custom concurrency key 1
-		backlog.customKeyActiveRuns(kg, 2),                       // Counter for active runs with custom concurrency key 2
+		// Active run sets
+		kg.RunActiveSet(i.Data.Identifier.RunID), // Set for active items in run
+		shadowPartition.accountActiveRunKey(kg),  // Set for active runs in account
+		shadowPartition.activeRunKey(kg),         // Set for active runs in partition
+		backlog.customKeyActiveRuns(kg, 1),       // Set for active runs with custom concurrency key 1
+		backlog.customKeyActiveRuns(kg, 2),       // Set for active runs with custom concurrency key 2
 
 		// key queues v2
 		kg.BacklogSet(backlog.BacklogID),
@@ -2755,84 +2758,6 @@ func (q *queue) Requeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 	default:
 		return fmt.Errorf("unknown response requeueing item: %v (%T)", status, status)
 	}
-}
-
-func (q *queue) ShadowPartitionLease(ctx context.Context, sp *QueueShadowPartition, duration time.Duration) (*ulid.ULID, error) {
-	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "ShadowPartitionLease"), redis_telemetry.ScopeQueue)
-
-	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
-		return nil, fmt.Errorf("unsupported queue shard kind for ShadowPartitionLease: %s", q.primaryQueueShard.Kind)
-	}
-
-	now := q.clock.Now()
-	leaseExpiry := now.Add(duration)
-	leaseID, err := ulid.New(ulid.Timestamp(leaseExpiry), rand.Reader)
-	if err != nil {
-		return nil, fmt.Errorf("could not generate leaseID: %w", err)
-	}
-
-	sp.LeaseID = &leaseID
-
-	accountID := uuid.Nil
-	if sp.AccountID != nil {
-		accountID = *sp.AccountID
-	}
-
-	keys := []string{
-		q.primaryQueueShard.RedisClient.kg.ShadowPartitionMeta(),
-		q.primaryQueueShard.RedisClient.kg.GlobalShadowPartitionSet(),
-		q.primaryQueueShard.RedisClient.kg.GlobalAccountShadowPartitions(),
-		q.primaryQueueShard.RedisClient.kg.AccountShadowPartitions(accountID),
-	}
-	args, err := StrSlice([]any{
-		sp.PartitionID,
-		accountID,
-		leaseID,
-		now.UnixMilli(),
-		leaseExpiry.UnixMilli(),
-	})
-	if err != nil {
-		return nil, fmt.Errorf("could not serialize args: %w", err)
-	}
-
-	status, err := scripts["queue/shadowPartitionLease"].Exec(
-		redis_telemetry.WithScriptName(ctx, "shadowPartitionLease"),
-		q.primaryQueueShard.RedisClient.unshardedRc,
-		keys,
-		args,
-	).AsInt64()
-	if err != nil {
-		return nil, fmt.Errorf("error leasing shadow partition: %w", err)
-	}
-	switch status {
-	case 0:
-		return &leaseID, nil
-	case -1:
-		return nil, ErrShadowPartitionNotFound
-	case -2:
-		return nil, ErrShadowPartitionAlreadyLeased
-	case -3:
-		return nil, ErrShadowPartitionPaused
-	default:
-		return nil, fmt.Errorf("unknown response leasing shadow partition: %v (%T)", status, status)
-	}
-}
-
-func (q *queue) peekGlobalShadowPartitionAccounts(ctx context.Context, sequential bool, until time.Time, limit int64) ([]uuid.UUID, error) {
-	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
-		return nil, fmt.Errorf("unsupported queue shard kind for peekGlobalShadowPartitionAccounts: %s", q.primaryQueueShard.Kind)
-	}
-
-	rc := q.primaryQueueShard.RedisClient
-
-	p := peeker[QueueBacklog]{
-		q:                      q,
-		opName:                 "peekGlobalShadowPartitionAccounts",
-		max:                    ShadowPartitionAccountPeekMax,
-		isMillisecondPrecision: true,
-	}
-
-	return p.peekUUIDPointer(ctx, rc.kg.GlobalAccountShadowPartitions(), sequential, until, limit)
 }
 
 func (q *queue) peekGlobalNormalizeAccounts(ctx context.Context, until time.Time, limit int64) ([]uuid.UUID, error) {
@@ -3179,25 +3104,25 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 	migrateIDs := map[uuid.UUID]bool{}
 
 	// Use parallel decoding as per Peek
-	partitions, err := util.ParallelDecode(encoded, func(val any) (*QueuePartition, error) {
+	partitions, err := util.ParallelDecode(encoded, func(val any) (*QueuePartition, bool, error) {
 		if val == nil {
 			q.log.Error("encountered nil partition item in pointer queue",
 				"encoded", encoded,
 				"missing", missingPartitions,
 				"key", partitionKey,
 			)
-			return nil, fmt.Errorf("encountered nil partition item in pointer queue %q", partitionKey)
+			return nil, false, fmt.Errorf("encountered nil partition item in pointer queue %q", partitionKey)
 		}
 
 		str, ok := val.(string)
 		if !ok {
-			return nil, fmt.Errorf("unknown type in partition peek: %T", val)
+			return nil, false, fmt.Errorf("unknown type in partition peek: %T", val)
 		}
 
 		item := &QueuePartition{}
 
 		if err := json.Unmarshal(unsafe.Slice(unsafe.StringData(str), len(str)), item); err != nil {
-			return nil, fmt.Errorf("error reading partition item: %w", err)
+			return nil, false, fmt.Errorf("error reading partition item: %w", err)
 		}
 		// Track the fn ID for partitions seen.  This allows us to do fast lookups of paused functions
 		// to prevent peeking/working on these items as an optimization.
@@ -3206,7 +3131,7 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 			fnIDs[*item.FunctionID] = false // default not paused
 			fnIDsMu.Unlock()
 		}
-		return item, nil
+		return item, false, nil
 	})
 	if err != nil {
 		return nil, fmt.Errorf("error decoding partitions: %w", err)
@@ -3248,14 +3173,14 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 				return nil, fmt.Errorf("unknown return type from mget fnMeta: %T", vals)
 			}
 
-			_, _ = util.ParallelDecode(vals, func(i any) (any, error) {
+			_, _ = util.ParallelDecode(vals, func(i any) (any, bool, error) {
 				str, ok := i.(string)
 				if !ok {
-					return nil, fmt.Errorf("unknown fnMeta type in partition peek: %T", i)
+					return nil, false, fmt.Errorf("unknown fnMeta type in partition peek: %T", i)
 				}
 				fnMeta := &FnMetadata{}
 				if err := json.Unmarshal(unsafe.Slice(unsafe.StringData(str), len(str)), fnMeta); err != nil {
-					return nil, fmt.Errorf("could not unmarshal fnMeta: %w", err)
+					return nil, false, fmt.Errorf("could not unmarshal fnMeta: %w", err)
 				}
 
 				fnIDsMu.Lock()
@@ -3265,7 +3190,7 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 				}
 				fnIDsMu.Unlock()
 
-				return nil, nil
+				return nil, true, nil
 			})
 		}
 	}

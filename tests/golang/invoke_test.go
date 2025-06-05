@@ -111,7 +111,6 @@ func TestInvoke(t *testing.T) {
 			as.NotNil(stepInfo.ReturnEventID)
 			as.NotNil(stepInfo.RunID)
 		})
-
 	})
 }
 
@@ -273,7 +272,6 @@ func TestInvokeTimeout(t *testing.T) {
 		inngestgo.EventTrigger("none", nil),
 		func(ctx context.Context, input inngestgo.Input[DebounceEvent]) (any, error) {
 			step.Sleep(ctx, "sleep", 5*time.Second)
-
 			return nil, nil
 		},
 	)
@@ -284,7 +282,7 @@ func TestInvokeTimeout(t *testing.T) {
 	_, err = inngestgo.CreateFunction(
 		inngestClient,
 		inngestgo.FunctionOpts{
-			ID: "main-fn",
+			ID:      "main-fn",
 		},
 		inngestgo.EventTrigger(evtName, nil),
 		func(ctx context.Context, input inngestgo.Input[DebounceEvent]) (any, error) {
@@ -334,8 +332,8 @@ func TestInvokeTimeout(t *testing.T) {
 			r.False(invoke.IsRoot)
 			r.Equal(rootSpanID, invoke.ParentSpanID)
 			r.Equal(models.StepOpInvoke.String(), invoke.StepOp)
-			r.NotNil(invoke.EndedAt)
 			r.Equal(models.RunTraceSpanStatusFailed.String(), invoke.Status)
+			r.NotNil(invoke.EndedAt)
 
 			// output test
 			assert.NotNil(t, invoke.OutputID)
@@ -353,7 +351,6 @@ func TestInvokeTimeout(t *testing.T) {
 			r.Nil(stepInfo.ReturnEventID)
 			r.Nil(stepInfo.RunID)
 		})
-
 	})
 }
 

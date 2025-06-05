@@ -144,17 +144,17 @@ func start(ctx context.Context, opts StartOpts) error {
 	stepLimitOverrides := make(map[string]int)
 	stateSizeLimitOverrides := make(map[string]int)
 
-	shardedRc, err := createInmemoryRedis(ctx, opts.Tick)
+	shardedRc, shardedCluster, err := createInmemoryRedis(ctx, opts.Tick)
 	if err != nil {
 		return err
 	}
 
-	unshardedRc, err := createInmemoryRedis(ctx, opts.Tick)
+	unshardedRc, unshardedCluster, err := createInmemoryRedis(ctx, opts.Tick)
 	if err != nil {
 		return err
 	}
 
-	connectRc, err := createInmemoryRedis(ctx, opts.Tick)
+	connectRc, connectCluster, err := createInmemoryRedis(ctx, opts.Tick)
 	if err != nil {
 		return err
 	}
@@ -566,6 +566,12 @@ func start(ctx context.Context, opts StartOpts) error {
 			Queue:              rq,
 			Executor:           exec,
 			StateManager:       smv2,
+			ResetAll: func() {
+				shardedCluster.FlushAll()
+				unshardedCluster.FlushAll()
+				connectCluster.FlushAll()
+
+			},
 		})})
 	}
 
@@ -579,7 +585,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	return service.StartAll(ctx, ds, runner, executorSvc, ds.Apiservice, connGateway)
 }
 
-func createInmemoryRedis(ctx context.Context, tick time.Duration) (rueidis.Client, error) {
+func createInmemoryRedis(ctx context.Context, tick time.Duration) (rueidis.Client, *miniredis.Miniredis, error) {
 	r := miniredis.NewMiniRedis()
 	_ = r.Start()
 	rc, err := rueidis.NewClient(rueidis.ClientOption{
@@ -587,7 +593,7 @@ func createInmemoryRedis(ctx context.Context, tick time.Duration) (rueidis.Clien
 		DisableCache: true,
 	})
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// If tick is lower than the default, tick every 50ms.  This lets us save
@@ -599,7 +605,7 @@ func createInmemoryRedis(ctx context.Context, tick time.Duration) (rueidis.Clien
 			r.FastForward(poll)
 		}
 	}()
-	return rc, nil
+	return rc, r, nil
 }
 
 func createConnectPubSubRedis() rueidis.ClientOption {

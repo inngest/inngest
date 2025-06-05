@@ -203,10 +203,7 @@ export const StepInfo = ({
             }`}
           />
 
-          <span className="text-basis text-sm font-normal">
-            {trace.isUserland && 'OTel/'}
-            {trace.name}
-          </span>
+          <span className="text-basis text-sm font-normal">{trace.name}</span>
         </div>
         {runID && trace.stepID && prettyInput && (
           <>
@@ -230,9 +227,11 @@ export const StepInfo = ({
 
       {expanded && (
         <div className="flex flex-row flex-wrap items-center justify-start gap-x-10 gap-y-4 px-4">
-          <ElementWrapper label="Queued at">
-            <TimeElement date={new Date(trace.queuedAt)} />
-          </ElementWrapper>
+          {!trace.isUserland && (
+            <ElementWrapper label="Queued at">
+              <TimeElement date={new Date(trace.queuedAt)} />
+            </ElementWrapper>
+          )}
 
           <ElementWrapper label="Started at">
             {trace.startedAt ? (
@@ -250,9 +249,11 @@ export const StepInfo = ({
             )}
           </ElementWrapper>
 
-          <ElementWrapper label="Delay">
-            <TextElement>{delayText}</TextElement>
-          </ElementWrapper>
+          {!trace.isUserland && (
+            <ElementWrapper label="Delay">
+              <TextElement>{delayText}</TextElement>
+            </ElementWrapper>
+          )}
 
           <ElementWrapper label="Duration">
             <TextElement>{durationText}</TextElement>
