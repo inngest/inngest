@@ -101,14 +101,6 @@ type Bufferer interface {
 	// This returns the total number of pauses in the buffer.
 	Write(ctx context.Context, index Index, pauses ...*state.Pause) (int, error)
 
-	// WriteFlushWatermark writes the given flush watermark for an index.  This allows us to resume
-	// flushing after a specific watermark.
-	WriteFlushWatermark(ctx context.Context, index Index, watermark FlushWatermark) error
-
-	// GetFlushWatermark returns the flush watermark for the given index, or nil if the index
-	// has not been flushed.
-	GetFlushWatermark(ctx context.Context, index Index) (*FlushWatermark, error)
-
 	// IndexExists returns whether the given index has pauses.  This returns true if there
 	// are items in the buffer, or if there are any blocks written to the backing block store.
 	IndexExists(ctx context.Context, i Index) (bool, error)
@@ -184,6 +176,13 @@ type BlockReader interface {
 	// ReadBlock reads a single block given an index and block ID.
 	ReadBlock(ctx context.Context, index Index, blockID ulid.ULID) (*Block, error)
 
+	// LastBlockMetadata returns metadata on the last block written for the given index.
+	// This allows us to check the last timestamp flushed overall.
+	LastBlockMetadata(ctx context.Context, index Index) (*blockMetadata, error)
+
+	// IndexExists returns whether we've written any blocks for the given index.
+	IndexExists(ctx context.Context, i Index) (bool, error)
+
 	// PauseByID returns a pause by a given ID.  Note that an index is required.
 	PauseByID(ctx context.Context, index Index, pauseID uuid.UUID) (*state.Pause, error)
 }
@@ -200,30 +199,4 @@ type BlockLeaser interface {
 
 	// Revoke drops a lease, allowing any other worker to flush an index.
 	Revoke(ctx context.Context, index Index, leaseID ulid.ULID) (err error)
-}
-
-// BlockKeyGenerator generates keys for block metadata.
-type BlockKeyGenerator interface {
-	// GenerateKey generates a key for a given block ID.
-	BlockKey(idx Index, blockID ulid.ULID) string
-
-	// BlockFlushIndex is the key which holds index => {timestamp, pauseID} tuples, allowing
-	// us to pick up flushing from a given point.
-	//
-	// NOTE: This stores the last {timestamp, pauseID} flushed, so the next scan range from
-	// blocksSince should exclude this pauseID.
-	BlockFlushWatermark(idx Index) string
-}
-
-// FlushWatermark represents the last pause flushed.
-type FlushWatermark struct {
-	// Epoch is the unix epoch of the last pause flushed.
-	Epoch int64 `json:"ts"`
-	// PauseID is the pause ID of the last pause flushed.
-	PauseID uuid.UUID `json:"id"`
-}
-
-// Time returns the epoch of the of the flushed watermark.
-func (f FlushWatermark) Time() time.Time {
-	return time.Unix(f.Epoch, 0)
 }

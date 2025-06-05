@@ -74,16 +74,14 @@ func (m manager) PauseBySignalID(ctx context.Context, workspaceID uuid.UUID, sig
 	return m.buf.PauseBySignalID(ctx, workspaceID, signal)
 }
 
-func (m manager) WriteFlushWatermark(ctx context.Context, index Index, wm FlushWatermark) error {
-	return m.buf.WriteFlushWatermark(ctx, index, wm)
-}
-
 func (m manager) IndexExists(ctx context.Context, i Index) (bool, error) {
-	return m.buf.IndexExists(ctx, i)
-}
+	ok, err := m.buf.IndexExists(ctx, i)
+	if err != nil || ok || m.bs == nil {
+		// It exists in the buffer, so no need to check blobstore.
+		return ok, err
+	}
 
-func (m manager) GetFlushWatermark(ctx context.Context, index Index) (*FlushWatermark, error) {
-	return m.buf.GetFlushWatermark(ctx, index)
+	return m.bs.IndexExists(ctx, i)
 }
 
 func (m manager) ConsumePause(ctx context.Context, pause state.Pause, opts state.ConsumePauseOpts) (state.ConsumePauseResult, func() error, error) {

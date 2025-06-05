@@ -176,21 +176,16 @@ func (b blockstore) flushIndexBlock(ctx context.Context, index Index) error {
 		return nil
 	}
 
-	// Firstly, we need to find the existing watermark for the current buffer.
+	// Firstly, we need to find the last block written for the current buffer.
 	// This lets us know where to read from, so that we can ignore any previous
 	// buffer flushes that may not have had corresponding deletes (as deletes)
 	// happen in goroutines best-effort.
-	wm, err := b.buf.GetFlushWatermark(ctx, index)
-	if err != nil {
-		return fmt.Errorf("error retrieving flush watermark: %w", err)
-	}
-	if wm == nil {
-		wm = &FlushWatermark{
-			Epoch: 0,
-		}
+	var since time.Time
+	if lastBlock, err := b.LastBlockMetadata(ctx, index); err == nil {
+		since = lastBlock.LastTimestamp()
 	}
 
-	iter, err := b.buf.PausesSince(ctx, index, wm.Time())
+	iter, err := b.buf.PausesSince(ctx, index, since)
 	if err != nil {
 		return fmt.Errorf("failed to load pauses from buffer: %w", err)
 	}
@@ -259,16 +254,9 @@ func (b blockstore) flushIndexBlock(ctx context.Context, index Index) error {
 		return fmt.Errorf("failed to write block index: %w", err)
 	}
 
-	// Write the block watermark so that we pick up flushing from this
-	// last index.
-	err = b.buf.WriteFlushWatermark(ctx, index, metadata.Watermark())
-	if err != nil {
-		return fmt.Errorf("failed to write block flush watermark: %w", err)
-	}
-
 	// Remove len(block.Pauses) from the buffer, as they've been flushed.
 	// NOTE: This can happen in the background as we pick flushing up from the
-	// previous watermark.
+	// last block written.
 	go func() {
 		if b.delete {
 			for _, p := range block.Pauses {
@@ -301,7 +289,7 @@ func (b blockstore) BlocksSince(ctx context.Context, index Index, since time.Tim
 
 	ids, err := b.rc.Do(
 		ctx,
-		b.rc.B().Zrangebyscore().Key(b.blockIndexKey(index)).Min(score).Max("+inf").Build(),
+		b.rc.B().Zrangebyscore().Key(blockIndexKey(index)).Min(score).Max("+inf").Build(),
 	).AsStrSlice()
 	if err != nil {
 		return nil, fmt.Errorf("error querying block index: since %s: %w", score, err)
@@ -346,7 +334,7 @@ func (b blockstore) Delete(ctx context.Context, index Index, pause state.Pause) 
 		return nil
 	}
 
-	err = b.rc.Do(ctx, b.rc.B().Sadd().Key(b.blockDeleteKey(index)).Member(pause.ID.String()).Build()).Error()
+	err = b.rc.Do(ctx, b.rc.B().Sadd().Key(blockDeleteKey(index)).Member(pause.ID.String()).Build()).Error()
 	if err != nil {
 		return fmt.Errorf("error tracking pause delete in block index: %w", err)
 	}
@@ -355,7 +343,7 @@ func (b blockstore) Delete(ctx context.Context, index Index, pause state.Pause) 
 	// compaction limit.
 	if rand.IntN(100) <= int(b.compactionSample*100) {
 		go func() {
-			size, err := b.rc.Do(ctx, b.rc.B().Scard().Key(b.blockDeleteKey(index)).Build()).AsInt64()
+			size, err := b.rc.Do(ctx, b.rc.B().Scard().Key(blockDeleteKey(index)).Build()).AsInt64()
 			if err != nil {
 				logger.StdlibLogger(ctx).Warn("error fetching block delete length", "error", err)
 				return
@@ -371,6 +359,42 @@ func (b blockstore) Delete(ctx context.Context, index Index, pause state.Pause) 
 	}
 
 	return nil
+}
+
+func (b *blockstore) IndexExists(ctx context.Context, i Index) (bool, error) {
+	md, err := b.LastBlockMetadata(ctx, i)
+	if err != nil {
+		return false, err
+	}
+	// the index exists if we have metadata.
+	return md != nil, nil
+}
+
+func (b *blockstore) LastBlockMetadata(ctx context.Context, index Index) (*blockMetadata, error) {
+	cmd := b.rc.B().
+		Zrevrangebyscore().
+		Key(blockIndexKey(index)).
+		Max("+inf").
+		Min("-inf").
+		Limit(0, 1).
+		Build()
+
+	id, err := b.rc.Do(ctx, cmd).ToString()
+	if rueidis.IsRedisNil(err) {
+		// Doesn't exist.
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("error looking up last block metadata write: %w", err)
+	}
+
+	cmd = b.rc.B().Hget().Key(blockMetadataKey(index)).Field(id).Build()
+
+	md := &blockMetadata{}
+	if err := b.rc.Do(ctx, cmd).DecodeJSON(md); err != nil {
+		return nil, fmt.Errorf("error loading last block metadata: %w", err)
+	}
+	return md, nil
 }
 
 func (b *blockstore) PauseByID(ctx context.Context, index Index, pauseID uuid.UUID) (*state.Pause, error) {
@@ -392,11 +416,12 @@ func (b *blockstore) Compact(ctx context.Context, idx Index) {
 	// 3. rewriting the block
 }
 
+// blockIDForTimestamp returns the block ID that contains pauses for the given timestamp.
 func (b *blockstore) blockIDForTimestamp(ctx context.Context, idx Index, ts time.Time) (*ulid.ULID, error) {
 	score := strconv.Itoa(int(ts.UnixMilli()))
 	ids, err := b.rc.Do(
 		ctx,
-		b.rc.B().Zrange().Key(b.blockIndexKey(idx)).Min("("+score).Max("+inf").Byscore().Limit(0, 1).Build(),
+		b.rc.B().Zrange().Key(blockIndexKey(idx)).Min("("+score).Max("+inf").Byscore().Limit(0, 1).Build(),
 	).AsStrSlice()
 	if len(ids) == 1 {
 		id, err := ulid.Parse(ids[0])
@@ -408,6 +433,8 @@ func (b *blockstore) blockIDForTimestamp(ctx context.Context, idx Index, ts time
 	return nil, err
 }
 
+// blockMetadata loads metadata for the givne block.  It reads timestamps for the first and last
+// pauses (as these aren't embedded in the pause) to create the correct start and end timestamps.
 func (b *blockstore) blockMetadata(ctx context.Context, idx Index, block *Block) (*blockMetadata, error) {
 	earliest, err := b.buf.PauseTimestamp(ctx, idx, *block.Pauses[0])
 	if err != nil {
@@ -430,6 +457,7 @@ func (b *blockstore) blockMetadata(ctx context.Context, idx Index, block *Block)
 	}, nil
 }
 
+// addBlockIndex writes the block metadata to the given index, recording the block as flushed.
 func (b *blockstore) addBlockIndex(ctx context.Context, idx Index, block *Block, md *blockMetadata) error {
 	// Block indexes are a zset of blocks stored by last pause timestamp,
 	// which is embedded into the pause ID.
@@ -443,7 +471,7 @@ func (b *blockstore) addBlockIndex(ctx context.Context, idx Index, block *Block,
 
 	cmd := b.rc.B().
 		Zadd().
-		Key(b.blockIndexKey(idx)).
+		Key(blockIndexKey(idx)).
 		ScoreMember().
 		ScoreMember(
 			float64(ulid.Time(block.ID.Time()).UnixMilli()),
@@ -458,31 +486,36 @@ func (b *blockstore) addBlockIndex(ctx context.Context, idx Index, block *Block,
 		ctx,
 		b.rc.B().
 			Hset().
-			Key(b.blockMetadataKey(idx)).
+			Key(blockMetadataKey(idx)).
 			FieldValue().
 			FieldValue(block.ID.String(), string(metadata)).
 			Build(),
 	).Error()
 }
 
-// GenerateKey generates a key for a given block ID.
+// GenerateKey generates a key for a given block ID.  This is used as the blobstore
+// path for writing blocks.
 func (b blockstore) BlockKey(idx Index, blockID ulid.ULID) string {
 	return fmt.Sprintf("pauses/%s/%s/blk_%s", idx.WorkspaceID, idx.EventName, blockID)
 }
 
 // blockIndexKey is internal and stores a list of all blocks for a given index.
-func (b *blockstore) blockIndexKey(idx Index) string {
+//
+// This is a zset containing block IDs -> the last pause timestamp.
+func blockIndexKey(idx Index) string {
 	return fmt.Sprintf("{estate}:blk:idx:%s:%s", idx.WorkspaceID, util.XXHash(idx.EventName))
 }
 
 // blockMetadataKey is internal and stores metadata for a given block.
-func (b *blockstore) blockMetadataKey(idx Index) string {
+//
+// This is an HMAP of block IDs -> metadata.
+func blockMetadataKey(idx Index) string {
 	return fmt.Sprintf("{estate}:blk:md:%s:%s", idx.WorkspaceID, util.XXHash(idx.EventName))
 }
 
 // blockDeleteKey tracks all deletes for a given index.
 // note that block
-func (b *blockstore) blockDeleteKey(idx Index) string {
+func blockDeleteKey(idx Index) string {
 	return fmt.Sprintf("{estate}:blk:dels:%s:%s", idx.WorkspaceID, util.XXHash(idx.EventName))
 }
 
@@ -504,13 +537,12 @@ type blockMetadata struct {
 	Len int `json:"len"`
 }
 
-func (b blockMetadata) Watermark() FlushWatermark {
-	return FlushWatermark{
-		// Timeranges are millisecond-granularity, but flush watermarks are second-
-		// level granularity.
-		Epoch:   b.Timeranges[1] / 1000,
-		PauseID: b.UUIDranges[1],
-	}
+func (b blockMetadata) FirstTimestamp() time.Time {
+	return time.UnixMilli(b.Timeranges[0])
+}
+
+func (b blockMetadata) LastTimestamp() time.Time {
+	return time.UnixMilli(b.Timeranges[1])
 }
 
 // blockID generates a deterministic ULID based off of this timestamp and

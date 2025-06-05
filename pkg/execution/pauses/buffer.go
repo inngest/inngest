@@ -2,7 +2,6 @@ package pauses
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -81,30 +80,7 @@ func (r redisAdapter) PauseBySignalID(ctx context.Context, workspaceID uuid.UUID
 	return r.rsm.PauseBySignalID(ctx, workspaceID, signal)
 }
 
-// WriteFlushWatermark writes the given flush watermark for an index.  This allows us to resume
-// flushing after a specific watermark.
-func (r redisAdapter) WriteFlushWatermark(ctx context.Context, index Index, watermark FlushWatermark) error {
-	return fmt.Errorf("not implemented")
-}
-
-// GetFlushWatermark returns the flush watermark for the given index, or nil if the index
-// has not been flushed.
-func (r redisAdapter) GetFlushWatermark(ctx context.Context, index Index) (*FlushWatermark, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-
-// IndexExists returns whether the given index has pauses.  This returns true if there
-// are items in the buffer, or if there are any blocks written to the backing block store.
+// IndexExists returns whether the buffer has any pauses for the index.
 func (r redisAdapter) IndexExists(ctx context.Context, i Index) (bool, error) {
-	ok, err := r.rsm.EventHasPauses(ctx, i.WorkspaceID, i.EventName)
-	if ok || err != nil {
-		return ok, err
-	}
-	// Check to see if we have a flush watermark for this index.  If so, we've flushed blocks
-	// for this index and we do have pauses for this particular index.
-	wm, err := r.GetFlushWatermark(ctx, i)
-	if err != nil {
-		return false, err
-	}
-	return wm != nil, nil
+	return r.rsm.EventHasPauses(ctx, i.WorkspaceID, i.EventName)
 }
