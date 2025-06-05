@@ -559,6 +559,7 @@ func (q *queue) scanShadowPartitions(ctx context.Context, until time.Time, qspc 
 // shadowScan iterates through the shadow partitions and attempt to add queue items
 // to the function partition for processing
 func (q *queue) shadowScan(ctx context.Context) error {
+	l := q.log.With("method", "shadowScan")
 	qspc := make(chan shadowPartitionChanMsg)
 
 	for i := int32(0); i < q.numShadowWorkers; i++ {
@@ -566,7 +567,9 @@ func (q *queue) shadowScan(ctx context.Context) error {
 	}
 
 	tick := q.clock.NewTicker(q.pollTick)
-	q.log.Debug("starting shadow scanner", "poll", q.pollTick.String())
+	l.Debug("starting shadow scanner", "poll", q.pollTick.String())
+
+	backoff := 200 * time.Millisecond
 
 	for {
 		select {
@@ -579,8 +582,22 @@ func (q *queue) shadowScan(ctx context.Context) error {
 			now := q.clock.Now()
 			scanUntil := now.Truncate(time.Second).Add(2 * PartitionLookahead)
 			if err := q.scanShadowPartitions(ctx, scanUntil, qspc); err != nil {
-				return fmt.Errorf("could not scan shadow partitions: %w", err)
+				if errors.Is(err, context.DeadlineExceeded) {
+					l.Warn("deadline exceeded scanning shadow partitions")
+					<-time.After(backoff)
+
+					// Backoff doubles up to 5 seconds
+					backoff = time.Duration(math.Min(float64(backoff*2), float64(5*time.Second)))
+					continue
+				}
+
+				if !errors.Is(err, context.Canceled) {
+					l.Error("error scanning shadow partitions", "error", err)
+				}
+				return fmt.Errorf("error scanning shadow partitions: %w", err)
 			}
+
+			backoff = 200 * time.Millisecond
 		}
 	}
 }
