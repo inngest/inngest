@@ -123,7 +123,8 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 				if leaseID == nil {
 					return
 				}
-				leaseID, err = q.ShadowPartitionExtendLease(ctx, shadowPart, *leaseID, ShadowPartitionLeaseDuration)
+				
+				newLeaseID, err := q.ShadowPartitionExtendLease(ctx, shadowPart, *leaseID, ShadowPartitionLeaseDuration)
 				if err != nil {
 					if errors.Is(err, ErrShadowPartitionAlreadyLeased) || errors.Is(err, ErrShadowPartitionLeaseNotFound) {
 						metrics.IncrQueueShadowPartitionLeaseContentionCounter(ctx, metrics.CounterOpt{
@@ -139,6 +140,12 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 					}
 					return
 				}
+
+				if newLeaseID == nil {
+					return
+				}
+
+				leaseID = newLeaseID
 			}
 		}
 	}()
