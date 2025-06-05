@@ -1689,6 +1689,7 @@ func TestRefillConstraints(t *testing.T) {
 			require.Equal(t, int64(testCase.expected.itemsInBacklog), itemsInBacklog)
 			require.Equal(t, int64(testCase.expected.itemsInReadyQueue), itemsInReadyQueue)
 
+			testLifecycles.lock.Lock()
 			switch res.Constraint {
 			case enums.QueueConstraintAccountConcurrency:
 				require.Equal(t, 1, testLifecycles.acctConcurrency[accountID1])
@@ -1700,6 +1701,7 @@ func TestRefillConstraints(t *testing.T) {
 				require.Equal(t, 1, testLifecycles.ckConcurrency[ck2.Key])
 			default:
 			}
+			testLifecycles.lock.Unlock()
 		})
 	}
 }
