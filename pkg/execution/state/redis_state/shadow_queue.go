@@ -264,7 +264,7 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 	}
 
 	if wasConstrained {
-		// Ran into constraint - remove existing continuation 
+		// Ran into constraint - remove existing continuation
 		q.removeShadowContinue(ctx, shadowPart, false)
 	} else {
 		// Not constrained so we can add a continuation
