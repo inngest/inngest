@@ -188,9 +188,9 @@ func (t testLifecycleListener) OnCustomKeyConcurrencyLimitReached(_ context.Cont
 }
 
 func (t testLifecycleListener) OnBacklogRefillConstraintHit(ctx context.Context, p *QueueShadowPartition, b *QueueBacklog, res *BacklogRefillResult) {
-	return
+	// no-op
 }
 
 func (t testLifecycleListener) OnBacklogRefilled(ctx context.Context, p *QueueShadowPartition, b *QueueBacklog, res *BacklogRefillResult) {
-	return
+	// no-op
 }
