@@ -2217,6 +2217,8 @@ func TestConstraintLifecycleReporting(t *testing.T) {
 	require.NotNil(t, res)
 	require.Equal(t, enums.QueueConstraintNotLimited, res.Constraint)
 	require.Equal(t, 0, testLifecycles.acctConcurrency[accountID1])
+	assert.Equal(t, 0, testLifecycles.fnConcurrency[fnID1])
+	assert.Equal(t, 0, testLifecycles.fnConcurrency[fnID2])
 
 	_ = addItem("test2", state.Identifier{
 		AccountID:   accountID1,
@@ -2231,6 +2233,7 @@ func TestConstraintLifecycleReporting(t *testing.T) {
 	require.EventuallyWithT(t, func(t *assert.CollectT) {
 		assert.Equal(t, 0, testLifecycles.acctConcurrency[accountID1])
 		assert.Equal(t, 1, testLifecycles.fnConcurrency[fnID1])
+		assert.Equal(t, 0, testLifecycles.fnConcurrency[fnID2])
 	}, 1*time.Second, 100*time.Millisecond)
 
 	itemB1 := addItem("test3", state.Identifier{
