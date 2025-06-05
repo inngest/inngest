@@ -201,6 +201,10 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 					err := q.leaseBacklogForNormalization(ctx, backlog)
 					return nil, err
 				}); err != nil {
+					if errors.Is(err, errBacklogAlreadyLeasedForNormalization) {
+						continue
+					}
+
 					return err
 				}
 

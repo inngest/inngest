@@ -1960,7 +1960,7 @@ func TestShadowPartitionPointerTimings(t *testing.T) {
 		require.Len(t, peeked, 1)
 		require.Equal(t, backlog, *peeked[0])
 
-		for i := 0; i < numItems; i++ {
+		for i := range numItems {
 			itemAt := now.Add(time.Duration(i+1) * time.Second)
 			refillUntil := itemAt
 			res, err := q.BacklogRefill(ctx, &backlog, &shadowPart, refillUntil)
