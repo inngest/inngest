@@ -472,27 +472,27 @@ func (b QueueBacklog) isDefault() bool {
 	return b.Throttle == nil && len(b.ConcurrencyKeys) == 0
 }
 
-func (b QueueBacklog) isOutdated(sp *QueueShadowPartition) bool {
+func (b QueueBacklog) isOutdated(sp *QueueShadowPartition) enums.QueueNormalizeReason {
 	// If this is the default backlog, don't normalize.
 	// If custom concurrency keys were added, previously-enqueued items
 	// in the default backlog do not have custom concurrency keys set.
 	if b.isDefault() {
-		return false
+		return enums.QueueNormalizeReasonUnchanged
 	}
 
 	// Throttle removed - move items back to default backlog
 	if b.Throttle != nil && sp.Throttle == nil {
-		return true
+		return enums.QueueNormalizeReasonThrottleRemoved
 	}
 
 	// Throttle key changed - move from old throttle key backlogs to the new throttle key backlogs
 	if b.Throttle != nil && sp.Throttle != nil && b.Throttle.ThrottleKeyExpressionHash != sp.Throttle.ThrottleKeyExpressionHash {
-		return true
+		return enums.QueueNormalizeReasonThrottleKeyChanged
 	}
 
-	// Throttle key count does not match
+	// Concurrency key count does not match
 	if len(b.ConcurrencyKeys) != len(sp.Concurrency.CustomConcurrencyKeys) {
-		return true
+		return enums.QueueNormalizeReasonCustomConcurrencyKeyCountMismatch
 	}
 
 	// All concurrency keys on backlog must be found on partition
@@ -507,7 +507,7 @@ func (b QueueBacklog) isOutdated(sp *QueueShadowPartition) bool {
 		}
 
 		if !hasKey {
-			return true
+			return enums.QueueNormalizeReasonCustomConcurrencyKeyNotFoundOnShadowPartition
 		}
 	}
 
@@ -515,7 +515,7 @@ func (b QueueBacklog) isOutdated(sp *QueueShadowPartition) bool {
 	// the backlog as we've compared the length, so the previous check will account for
 	// missing/different keys.
 
-	return false
+	return enums.QueueNormalizeReasonUnchanged
 }
 
 // customKeyInProgress returns the key to the "in progress" ZSET

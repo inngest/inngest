@@ -1011,7 +1011,7 @@ func TestBacklogIsOutdated(t *testing.T) {
 			Throttle: nil,
 		}
 
-		require.False(t, backlog.isOutdated(shadowPart))
+		require.Equal(t, enums.QueueNormalizeReasonUnchanged, backlog.isOutdated(shadowPart))
 	})
 
 	t.Run("adding concurrency keys should not mark default partition as outdated", func(t *testing.T) {
@@ -1030,7 +1030,7 @@ func TestBacklogIsOutdated(t *testing.T) {
 		}
 		backlog := &QueueBacklog{}
 
-		require.False(t, backlog.isOutdated(shadowPart))
+		require.Equal(t, enums.QueueNormalizeReasonUnchanged, backlog.isOutdated(shadowPart))
 	})
 
 	t.Run("changing concurrency key should mark as outdated", func(t *testing.T) {
@@ -1060,7 +1060,7 @@ func TestBacklogIsOutdated(t *testing.T) {
 			},
 		}
 
-		require.True(t, backlog.isOutdated(shadowPart))
+		require.Equal(t, enums.QueueNormalizeReasonCustomConcurrencyKeyNotFoundOnShadowPartition, backlog.isOutdated(shadowPart))
 	})
 
 	t.Run("removing concurrency key should mark as outdated", func(t *testing.T) {
@@ -1083,7 +1083,7 @@ func TestBacklogIsOutdated(t *testing.T) {
 			},
 		}
 
-		require.True(t, backlog.isOutdated(shadowPart))
+		require.Equal(t, enums.QueueNormalizeReasonCustomConcurrencyKeyCountMismatch, backlog.isOutdated(shadowPart))
 	})
 
 	t.Run("changing throttle key should mark as outdated", func(t *testing.T) {
@@ -1101,7 +1101,7 @@ func TestBacklogIsOutdated(t *testing.T) {
 			},
 		}
 
-		require.True(t, backlog.isOutdated(shadowPart))
+		require.Equal(t, enums.QueueNormalizeReasonThrottleKeyChanged, backlog.isOutdated(shadowPart))
 	})
 
 	t.Run("removing throttle key should mark as outdated", func(t *testing.T) {
@@ -1116,6 +1116,6 @@ func TestBacklogIsOutdated(t *testing.T) {
 			},
 		}
 
-		require.True(t, backlog.isOutdated(shadowPart))
+		require.Equal(t, enums.QueueNormalizeReasonThrottleRemoved, backlog.isOutdated(shadowPart))
 	})
 }

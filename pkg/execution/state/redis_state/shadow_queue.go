@@ -282,7 +282,7 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 
 func (q *queue) processShadowPartitionBacklog(ctx context.Context, shadowPart *QueueShadowPartition, backlog *QueueBacklog, refillUntil time.Time) (*BacklogRefillResult, bool, error) {
 	// May need to normalize - this will not happen for default backlogs
-	if backlog.isOutdated(shadowPart) {
+	if reason := backlog.isOutdated(shadowPart); reason != enums.QueueNormalizeReasonUnchanged {
 		// Prepare normalization, this will just run once as the shadow scanner
 		// won't pick it up again after this.
 		_, shouldNormalizeAsync, err := q.BacklogPrepareNormalize(
