@@ -350,11 +350,6 @@ func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp 
 		},
 	})
 
-	err := q.BacklogFinishNormalize(ctx, backlog, sp)
-	if err != nil {
-		return fmt.Errorf("could not finish normalization: %w", err)
-	}
-
 	q.log.Trace("normalized backlog", "backlog", backlog.BacklogID, "partition", sp.PartitionID)
 
 	return nil
