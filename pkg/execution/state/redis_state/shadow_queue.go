@@ -281,8 +281,13 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 }
 
 func (q *queue) processShadowPartitionBacklog(ctx context.Context, shadowPart *QueueShadowPartition, backlog *QueueBacklog, refillUntil time.Time) (*BacklogRefillResult, bool, error) {
+	enableKeyQueues := shadowPart.SystemQueueName != nil && q.enqueueSystemQueuesToBacklog
+	if shadowPart.AccountID != nil {
+		enableKeyQueues = q.allowKeyQueues(ctx, *shadowPart.AccountID)
+	}
+
 	// May need to normalize - this will not happen for default backlogs
-	if reason := backlog.isOutdated(shadowPart); reason != enums.QueueNormalizeReasonUnchanged {
+	if reason := backlog.isOutdated(shadowPart); enableKeyQueues && reason != enums.QueueNormalizeReasonUnchanged {
 		metrics.IncrQueueOutdatedBacklogCounter(ctx, metrics.CounterOpt{
 			PkgName: pkgName,
 			Tags: map[string]any{
