@@ -28,7 +28,7 @@ const (
 	ShadowPartitionPeekMinBacklogs = int64(10)
 	ShadowPartitionPeekMaxBacklogs = int64(100)
 
-	ShadowPartitionRequeueExtendedDuration = 5 * time.Second
+	ShadowPartitionRequeueExtendedDuration = 3 * time.Second
 )
 
 var (
@@ -170,6 +170,9 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 		Tags:    map[string]any{"partition_id": shadowPart.PartitionID},
 	})
 
+	// optional push back time for partition requeue
+	var partitionRequeueAt *time.Time
+
 	// Refill backlogs in random order
 	fullyProcessedBacklogs := 0
 	for _, idx := range util.RandPerm(len(backlogs)) {
@@ -249,7 +252,17 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 
 			switch res.Constraint {
 			case enums.QueueConstraintNotLimited: // no-op
+				// add a requeue time to push back the scan
+				if partitionRequeueAt == nil {
+					at := q.clock.Now().Add(ShadowPartitionRequeueExtendedDuration)
+					partitionRequeueAt = &at
+				}
+
 			default:
+				// NOTE:
+				// we don't want to add an extended amount of time for requeue when there are
+				// contraint hits, so we make sure to check more often in order to admit items
+				// into processing
 				metrics.IncrQueueBacklogRefillConstraintCounter(ctx, metrics.CounterOpt{
 					PkgName: pkgName,
 					Tags: map[string]any{
@@ -282,17 +295,14 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 		}
 
 		if !forceRequeueBacklogAt.IsZero() {
-			err = q.BacklogRequeue(ctx, backlog, shadowPart, forceRequeueBacklogAt)
-			if err != nil && !errors.Is(err, ErrBacklogNotFound) {
+			if err := q.BacklogRequeue(ctx, backlog, shadowPart, forceRequeueBacklogAt); err != nil && !errors.Is(err, ErrBacklogNotFound) {
 				return fmt.Errorf("could not requeue shadow partition: %w", err)
 			}
 		}
 
 		if !forceRequeueShadowPartitionAt.IsZero() {
 			q.removeShadowContinue(ctx, shadowPart, false)
-
-			err = q.ShadowPartitionRequeue(ctx, shadowPart, *leaseID, &forceRequeueShadowPartitionAt)
-			if err != nil {
+			if err := q.ShadowPartitionRequeue(ctx, shadowPart, *leaseID, &forceRequeueShadowPartitionAt); err != nil {
 				return fmt.Errorf("could not requeue shadow partition: %w", err)
 			}
 
@@ -329,8 +339,7 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 	q.addShadowContinue(ctx, shadowPart, continuationCount+1)
 
 	// Clear out current lease
-	requeueAt := q.clock.Now().Add(ShadowPartitionRequeueExtendedDuration)
-	err = q.ShadowPartitionRequeue(ctx, shadowPart, *leaseID, &requeueAt)
+	err = q.ShadowPartitionRequeue(ctx, shadowPart, *leaseID, partitionRequeueAt)
 	if err != nil {
 		return fmt.Errorf("could not requeue shadow partition: %w", err)
 	}
@@ -359,23 +368,27 @@ func (q *queue) scanShadowContinuations(ctx context.Context) error {
 		eg.Go(func() error {
 			sp := cont.shadowPart
 
-			if err := q.processShadowPartition(ctx, sp, c.count+1); err != nil {
+			_, err := durationWithTags(
+				ctx,
+				q.primaryQueueShard.Name,
+				"shadow_partition_process_duration",
+				q.clock.Now(),
+				func(ctx context.Context) (any, error) {
+					err := q.processShadowPartition(ctx, sp, cont.count)
+					return nil, err
+				},
+				map[string]any{"partition_id": sp.PartitionID},
+			)
+			if err != nil {
 				if err == ErrShadowPartitionLeaseNotFound {
-					q.removeShadowContinue(ctx, sp, false)
 					return nil
 				}
 				if !errors.Is(err, context.Canceled) {
-					q.log.Error("error processing shadow partition", "error", err, "continue", true)
+					q.log.Error("error processing shadow partition", "error", err, "continuation", true, "continuation_count", cont.count)
 				}
 				return err
 			}
 
-			metrics.IncrQueueShadowPartitionProcessedCounter(ctx, metrics.CounterOpt{
-				PkgName: pkgName,
-				Tags: map[string]any{
-					"queue_shard": q.primaryQueueShard.Name,
-				},
-			})
 			return nil
 		})
 	}
@@ -479,12 +492,6 @@ func (q *queue) shadowScan(ctx context.Context) error {
 			if err := q.scanShadowPartitions(ctx, scanUntil, qspc); err != nil {
 				return fmt.Errorf("could not scan shadow partitions: %w", err)
 			}
-
-			// q.log.Trace("scan loop",
-			// 	"start", now.Format(time.StampMilli),
-			// 	"until", scanUntil.Format(time.StampMilli),
-			// 	"dur", q.clock.Now().Sub(now).String(),
-			// )
 		}
 	}
 }

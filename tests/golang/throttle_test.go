@@ -13,7 +13,7 @@ import (
 )
 
 func TestThrottle(t *testing.T) {
-	basic := []struct {
+	tests := []struct {
 		name   string
 		limit  uint
 		burst  uint
@@ -50,8 +50,8 @@ func TestThrottle(t *testing.T) {
 		},
 	}
 
-	for _, test := range basic {
-		t.Run(fmt.Sprintf("Basic throttling - %s", test.name), func(t *testing.T) {
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
 			inngestClient, server, registerFuncs := NewSDKHandler(t, fmt.Sprintf("throttle %s", test.name))
 			defer server.Close()
 
@@ -85,7 +85,7 @@ func TestThrottle(t *testing.T) {
 			registerFuncs()
 
 			var events []any
-			for i := 0; i < funcs; i++ {
+			for range funcs {
 				events = append(events, inngestgo.Event{
 					Name: trigger,
 					Data: map[string]any{"test": true},
@@ -104,7 +104,7 @@ func TestThrottle(t *testing.T) {
 				time.Second,
 			)
 
-			for i := 0; i < funcs; i++ {
+			for i := range funcs {
 				fmt.Println(startTimes[i].Format(time.RFC3339))
 				if i == 0 {
 					continue
@@ -160,7 +160,7 @@ func TestThrottle(t *testing.T) {
 		require.NoError(t, err)
 		registerFuncs()
 
-		for i := 0; i < 3; i++ {
+		for i := range 3 {
 			go func(i int) {
 				_, err = inngestClient.Send(context.Background(), inngestgo.Event{
 					Name: trigger,

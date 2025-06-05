@@ -70,7 +70,7 @@ const (
 	// NOTE: This is the maximum latency introduced into concurrnecy limited partitions in the
 	//       worst case.
 	PartitionConcurrencyLimitRequeueExtension = 5 * time.Second
-	PartitionThrottleLimitRequeueExtension    = 2 * time.Second
+	PartitionThrottleLimitRequeueExtension    = 1 * time.Second
 	PartitionPausedRequeueExtension           = 24 * time.Hour
 	PartitionLookahead                        = time.Second
 

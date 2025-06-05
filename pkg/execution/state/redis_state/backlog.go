@@ -9,9 +9,15 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
+)
+
+var (
+	// NOTE: there's no logic behind this number, it's just a random pick for now
+	ThrottleBackoffMultiplierThreshold = 15 * time.Second
 )
 
 var (
@@ -582,10 +588,27 @@ func (b QueueBacklog) requeueBackOff(now time.Time, constraint enums.QueueConstr
 	switch constraint {
 	case enums.QueueConstraintThrottle:
 		if partition.Throttle == nil {
+			logger.StdlibLogger(context.Background()).Error("throttle settings not defined while hitting throttle constraints", "shadow_partition", partition, "time", now)
 			return now.Add(PartitionThrottleLimitRequeueExtension)
 		}
 
-		return now.Add(PartitionThrottleLimitRequeueExtension + time.Duration(b.SuccessiveThrottleConstrained)*time.Second)
+		multiplier := b.SuccessiveThrottleConstrained
+		period := time.Duration(partition.Throttle.Period * int(time.Second))
+		// NOTE: for short periods, we want to increase the frequency of the checks to make sure we admit the items in the right timing
+		// and it's not too late
+		if period < ThrottleBackoffMultiplierThreshold {
+			multiplier /= 4
+		} else {
+			multiplier /= 2
+		}
+
+		backoff := time.Duration(multiplier) * time.Second
+		// guarantee a minimum duration
+		if backoff < PartitionThrottleLimitRequeueExtension {
+			backoff = PartitionThrottleLimitRequeueExtension
+		}
+
+		return now.Add(backoff)
 
 	case enums.QueueConstraintCustomConcurrencyKey1, enums.QueueConstraintCustomConcurrencyKey2:
 		next := now.Add(PartitionConcurrencyLimitRequeueExtension + time.Duration(b.SuccessiveCustomConcurrencyConstrained)*time.Second)
