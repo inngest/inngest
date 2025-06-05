@@ -145,7 +145,7 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 		q.removeShadowContinue(ctx, shadowPart, false)
 
 		forceRequeueAt := q.clock.Now().Add(ShadowPartitionRefillPausedRequeueExtension)
-		err = q.ShadowPartitionRequeue(ctx, shadowPart, *leaseID, &forceRequeueAt)
+		err = q.ShadowPartitionRequeue(ctx, shadowPart, &forceRequeueAt)
 
 		var action string
 		switch err {
@@ -327,7 +327,7 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 
 		if !forceRequeueShadowPartitionAt.IsZero() {
 			q.removeShadowContinue(ctx, shadowPart, false)
-			err = q.ShadowPartitionRequeue(ctx, shadowPart, *leaseID, &forceRequeueShadowPartitionAt)
+			err = q.ShadowPartitionRequeue(ctx, shadowPart, &forceRequeueShadowPartitionAt)
 
 			var action string
 			switch err {
@@ -374,7 +374,7 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 		// No more backlogs right now, we can continue the scan loop until new items are added
 		q.removeShadowContinue(ctx, shadowPart, false)
 
-		err = q.ShadowPartitionRequeue(ctx, shadowPart, *leaseID, nil)
+		err = q.ShadowPartitionRequeue(ctx, shadowPart, nil)
 
 		var action string
 		switch err {
@@ -407,7 +407,7 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 	q.addShadowContinue(ctx, shadowPart, continuationCount+1)
 
 	// Clear out current lease
-	err = q.ShadowPartitionRequeue(ctx, shadowPart, *leaseID, partitionRequeueAt)
+	err = q.ShadowPartitionRequeue(ctx, shadowPart, partitionRequeueAt)
 
 	var action string
 	switch err {
@@ -815,7 +815,7 @@ func (q *queue) ShadowPartitionExtendLease(ctx context.Context, sp *QueueShadowP
 	}
 }
 
-func (q *queue) ShadowPartitionRequeue(ctx context.Context, sp *QueueShadowPartition, leaseID ulid.ULID, requeueAt *time.Time) error {
+func (q *queue) ShadowPartitionRequeue(ctx context.Context, sp *QueueShadowPartition, requeueAt *time.Time) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "ShadowPartitionRequeue"), redis_telemetry.ScopeQueue)
 
 	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
@@ -846,7 +846,6 @@ func (q *queue) ShadowPartitionRequeue(ctx context.Context, sp *QueueShadowParti
 	args, err := StrSlice([]any{
 		sp.PartitionID,
 		accountID,
-		leaseID,
 		q.clock.Now().UnixMilli(),
 		requeueAtMS,
 	})

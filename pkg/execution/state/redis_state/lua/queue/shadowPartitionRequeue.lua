@@ -20,9 +20,8 @@ local keyShadowPartitionSet              = KEYS[5]
 
 local partitionID = ARGV[1]
 local accountID   = ARGV[2]
-local leaseID     = ARGV[3]
-local nowMS       = tonumber(ARGV[4])
-local requeueAtMS = tonumber(ARGV[5])
+local nowMS       = tonumber(ARGV[3])
+local requeueAtMS = tonumber(ARGV[4])
 
 -- $include(decode_ulid_time.lua)
 -- $include(get_partition_item.lua)
@@ -33,11 +32,6 @@ local requeueAtMS = tonumber(ARGV[5])
 local existing = get_shadow_partition_item(keyShadowPartitionHash, partitionID)
 if existing == nil or existing == false then
   return -1
-end
-
--- Check for an existing lease.
-if existing.leaseID ~= nil and existing.leaseID ~= cjson.null and existing.leaseID ~= leaseID and decode_ulid_time(existing.leaseID) > nowMS then
-  return -2
 end
 
 -- Remove lease
