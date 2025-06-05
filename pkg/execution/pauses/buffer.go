@@ -52,8 +52,13 @@ func (r redisAdapter) Delete(ctx context.Context, index Index, pause state.Pause
 	return r.rsm.DeletePause(ctx, pause)
 }
 
-// Delete deletes a pause from the buffer, or returns ErrNotInBuffer if the pause is not in
-// the buffer.
+// PauseByID loads pauses by ID.
+//
+// This is only used for legacy pause timeout jobs enqueued without events or pauses;  in this case,
+// we need to load pauses by only their ID.  To do this, we keep a record of pause ID -> block ID
+// when flushing pauses to block storage.
+//
+// This can be deleted in Sept 2025.
 func (r redisAdapter) PauseByID(ctx context.Context, index Index, pauseID uuid.UUID) (*state.Pause, error) {
 	return r.rsm.PauseByID(ctx, pauseID)
 }
