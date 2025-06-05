@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@inngest/components/Button';
 import { Header } from '@inngest/components/Header/Header';
 import { InvokeButton } from '@inngest/components/InvokeButton';
-import { MetadataGrid, type MetadataItemProps } from '@inngest/components/Metadata';
+import { type MetadataItemProps } from '@inngest/components/Metadata';
 import { Pill } from '@inngest/components/Pill';
 import { AppsIcon } from '@inngest/components/icons/sections/Apps';
 import { EventsIcon } from '@inngest/components/icons/sections/Events';
@@ -23,7 +23,6 @@ import {
   type Function,
   type FunctionConfiguration,
 } from '@/store/generated';
-import Block from './Block';
 
 type FunctionConfigurationProps = {
   inngestFunction: Function;
@@ -481,69 +480,91 @@ export default function FunctionConfiguration({
           )}
         </div>
       </div>
-      <Block title="Configuration">
-        <MetadataGrid columns={2} metadataItems={miscellaneousItems} />
-        {eventBatchItems && (
-          <>
-            <h3 className="pb-2 pt-6 text-sm font-medium">Events Batch</h3>
-            <MetadataGrid columns={2} metadataItems={eventBatchItems} />
-          </>
-        )}
-        <h3 className="pb-2 pt-6 text-sm font-medium">Concurrency</h3>
-        <div className="space-y-3">
-          {configuration.concurrency.map((concurrencyItem, index) => {
-            const items: MetadataItemProps[] = [
-              {
-                label: 'Scope',
-                title: concurrencyItem.scope,
-                value: (
-                  <div className="lowercase first-letter:capitalize">{concurrencyItem.scope}</div>
-                ),
-              },
-              {
-                label: 'Limit',
-                value: `${concurrencyItem.limit.value}`,
-                ...(concurrencyItem.limit.isPlanLimit && {
-                  badge: {
-                    label: 'Plan Limit',
-                    description:
-                      'If not configured, the limit is set to the maximum value allowed within your plan.',
-                  },
-                }),
-                tooltip: 'The maximum number of concurrently running steps.',
-              },
-            ];
-
-            if (concurrencyItem.key) {
-              items.push({
-                label: 'Key',
-                value: concurrencyItem.key,
-                type: 'code',
-                size: 'large',
-              });
-            }
-            return <MetadataGrid key={index} columns={2} metadataItems={items} />;
-          })}
+      <div className="inline-flex flex-col items-start justify-start px-4 pb-6 pt-4">
+        <div className="flex flex-col justify-center break-words pb-3 text-xs uppercase tracking-wide text-gray-400">
+          Queue Configurations
         </div>
-        {rateLimitItems && (
-          <>
-            <h3 className="pb-2 pt-6 text-sm font-medium">Rate Limit</h3>
-            <MetadataGrid columns={2} metadataItems={rateLimitItems} />
-          </>
-        )}
-        {debounceItems && (
-          <>
-            <h3 className="pb-2 pt-6 text-sm font-medium">Debounce</h3>
-            <MetadataGrid columns={2} metadataItems={debounceItems} />
-          </>
-        )}
-        {throttleItems && (
-          <>
-            <h3 className="pb-2 pt-6 text-sm font-medium">Throttle</h3>
-            <MetadataGrid columns={2} metadataItems={throttleItems} />
-          </>
-        )}
-      </Block>
+        <div className="flex flex-col space-y-6 self-stretch ">
+          {inngestFunction.configuration.concurrency &&
+            inngestFunction.configuration.concurrency.map((concurrencyConfig, index) => (
+              <div className="overflow-hidden rounded border border-gray-300 ">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr className="h-8 bg-gray-100">
+                      <td className="text-basis px-2 text-sm font-medium" colSpan={2}>
+                        <div className="flex items-center gap-2">
+                          Concurrency ({index + 1})
+                          <RiInformationLine className="h-5 w-5" />
+                        </div>
+                      </td>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {/*can't apply px-2 to tr*/}
+                    <tr className="h-8 border-b border-gray-200">
+                      <td className="text-muted px-2 text-sm">Scope</td>
+                      <td className="text-basis px-2 text-right text-sm">
+                        {concurrencyConfig.scope}
+                      </td>
+                    </tr>
+                    <tr className="h-8 border-b border-gray-200">
+                      <td className="text-muted px-2 text-sm">Limit</td>
+                      <td className="text-basis px-2 text-right text-sm">
+                        {concurrencyConfig.limit.value}
+                        {concurrencyConfig.limit.isPlanLimit && (
+                          <Pill className="ml-2">Plan Limit</Pill>
+                        )}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            ))}
+          {inngestFunction.configuration.throttle && (
+            <div className="overflow-hidden rounded border border-gray-300 ">
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr className="h-8 bg-gray-100 bg-gray-50">
+                    <td className="text-basis px-2 text-sm font-medium" colSpan={2}>
+                      <div className="flex items-center gap-2">
+                        Throttle
+                        <RiInformationLine className="h-5 w-5" />
+                      </div>
+                    </td>
+                  </tr>
+                </thead>
+                <tbody>
+                  {/*can't apply px-2 to tr*/}
+                  <tr className="h-8 border-b border-gray-200">
+                    <td className="text-muted px-2 text-sm">Period</td>
+                    <td className="text-basis px-2 text-right text-sm">
+                      {inngestFunction.configuration.throttle.period}
+                    </td>
+                  </tr>
+                  <tr className="h-8 border-b border-gray-200">
+                    <td className="text-muted px-2 text-sm">Limit</td>
+                    <td className="text-basis px-2 text-right text-sm">
+                      <code>{inngestFunction.configuration.throttle.limit}</code>
+                    </td>
+                  </tr>
+                  <tr className="h-8 border-b border-gray-200">
+                    <td className="text-muted px-2 text-sm">Burst</td>
+                    <td className="text-basis px-2 text-right text-sm">
+                      <code>{inngestFunction.configuration.throttle.burst}</code>
+                    </td>
+                  </tr>
+                  <tr className="h-8 border-b border-gray-200">
+                    <td className="text-muted px-2 text-sm">Key</td>
+                    <td className="text-basis px-2 text-right text-sm">
+                      <code>{inngestFunction.configuration.throttle.key}</code>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
