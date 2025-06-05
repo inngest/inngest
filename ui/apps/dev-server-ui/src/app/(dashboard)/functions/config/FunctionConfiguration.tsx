@@ -5,10 +5,16 @@ import { Button } from '@inngest/components/Button';
 import { Header } from '@inngest/components/Header/Header';
 import { InvokeButton } from '@inngest/components/InvokeButton';
 import { MetadataGrid, type MetadataItemProps } from '@inngest/components/Metadata';
+import { Pill } from '@inngest/components/Pill';
 import { AppsIcon } from '@inngest/components/icons/sections/Apps';
 import { EventsIcon } from '@inngest/components/icons/sections/Events';
 import { FunctionsIcon } from '@inngest/components/icons/sections/Functions';
-import { RiArrowRightSLine, RiArrowRightUpLine, RiTimeLine } from '@remixicon/react';
+import {
+  RiArrowRightSLine,
+  RiArrowRightUpLine,
+  RiInformationLine,
+  RiTimeLine,
+} from '@remixicon/react';
 import { toast } from 'sonner';
 
 import {
@@ -310,6 +316,34 @@ export default function FunctionConfiguration({
               })}
             </div>
           )}
+
+          <div className="overflow-hidden rounded border border-gray-300 ">
+            <table className="w-full border-collapse">
+              <thead>
+                <tr className="h-8 bg-gray-100 bg-gray-50">
+                  <td className="text-basis px-2 text-sm font-medium" colSpan={2}>
+                    <div className="flex items-center gap-2">
+                      Retries
+                      <RiInformationLine className="h-5 w-5" />
+                    </div>
+                  </td>
+                </tr>
+              </thead>
+              <tbody>
+                {/*can't apply px-2 to tr*/}
+                <tr className="h-8 border-b border-gray-200">
+                  <td className="text-muted px-2 text-sm">Value</td>
+                  <td className="text-basis px-2 text-right text-sm">
+                    {inngestFunction.configuration.retries.value} retries
+                    {/*fix pluralization*/}
+                    {inngestFunction.configuration.retries.isDefault && (
+                      <Pill className="ml-2">Default</Pill>
+                    )}
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
       <Block title="Configuration">
