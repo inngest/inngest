@@ -1612,8 +1612,6 @@ func (e *executor) handlePause(
 			RunID:          resumeData.RunID,
 			StepName:       resumeData.StepName,
 			IdempotencyKey: evtID.String(),
-			PauseID:        pause.ID,
-			Attempts:       pause.MaxAttempts,
 		})
 		if errors.Is(err, state.ErrPauseLeased) ||
 			errors.Is(err, state.ErrPauseNotFound) ||
@@ -1686,8 +1684,6 @@ func (e *executor) HandleInvokeFinish(ctx context.Context, evt event.TrackedEven
 		RunID:          resumeData.RunID,
 		StepName:       resumeData.StepName,
 		IdempotencyKey: evtID.String(),
-		PauseID:        pause.ID,
-		Attempts:       pause.MaxAttempts,
 	})
 }
 
@@ -1745,7 +1741,11 @@ func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequ
 // Resume can also resume as a timeout.  This is a separate method so that we can resume
 // the timeout without loading and leasing pauses, relying on state store atomicity to instead
 // resume and cancel a pause.
-func (e *executor) ResumePauseTimeout(ctx context.Context, id sv2.ID, stepID string, r execution.ResumeRequest) error {
+func (e *executor) ResumePauseTimeout(ctx context.Context, pause state.Pause, r execution.ResumeRequest) error {
+	// (tonyhb): this could be refactored to not require a pause, and instead only require the fields
+	// necessary for timeouts.  This will save space in the queue.  This requires a refactor of the
+	// trace lifecycles, whihc also require pauses.
+	id := sv2.IDFromPause(pause)
 	md, err := e.smv2.LoadMetadata(ctx, id)
 	if err == state.ErrRunNotFound {
 		return err
@@ -1754,21 +1754,29 @@ func (e *executor) ResumePauseTimeout(ctx context.Context, id sv2.ID, stepID str
 		return fmt.Errorf("error loading metadata to resume from pause: %w", err)
 	}
 
-	data := []byte("null")
-	pending, err := e.smv2.SaveStep(ctx, id, stepID, data)
+	data, err := json.Marshal(r.With)
+	if err != nil {
+		return fmt.Errorf("error marshalling timeout step data: %w", err)
+	}
+
+	e.log.Debug("resuming from timeout ", "identifier", id)
+
+	pending, err := e.smv2.SaveStep(ctx, id, pause.DataKey, data)
 	if errors.Is(err, state.ErrDuplicateResponse) {
 		// cannot resume as the pause has already been resumed and consumed.
 		return nil
 	}
-	if !errors.Is(err, state.ErrIdempotentResponse) {
+	if err != nil && !errors.Is(err, state.ErrIdempotentResponse) {
 		// This is a non-idempotent error, so there was a legitimate error saving the response.
 		e.log.Error("error saving timeout step", "error", err, "identifier", id)
 		return err
 	}
+
 	if !pending {
 		// If there are no parallel steps ongoing, we must enqueue the next SDK ping to continue on with
 		// execution.
-		jobID := fmt.Sprintf("%s-%s-timeout", md.IdempotencyKey(), stepID)
+		jobID := fmt.Sprintf("%s-%s-timeout", md.IdempotencyKey(), pause.DataKey)
+
 		err = e.queue.Enqueue(ctx, queue.Item{
 			JobID: &jobID,
 			// Add a new group ID for the child;  this will be a new step.
@@ -1778,11 +1786,11 @@ func (e *executor) ResumePauseTimeout(ctx context.Context, id sv2.ID, stepID str
 			Identifier:            sv2.V1FromMetadata(md),
 			PriorityFactor:        md.Config.PriorityFactor,
 			CustomConcurrencyKeys: md.Config.CustomConcurrencyKeys,
-			MaxAttempts:           r.Attempts,
+			MaxAttempts:           pause.MaxAttempts,
 			Payload: queue.PayloadEdge{
 				Edge: inngest.Edge{
-					Outgoing: stepID,
-					Incoming: "step", // TODO: Check
+					Outgoing: pause.DataKey,
+					Incoming: "step",
 				},
 			},
 		}, time.Now(), queue.EnqueueOpts{})
@@ -1791,8 +1799,24 @@ func (e *executor) ResumePauseTimeout(ctx context.Context, id sv2.ID, stepID str
 		}
 	}
 
+	// Only run lifecycles if we consumed the pause and enqueued next step.
+	switch pause.GetOpcode() {
+	case enums.OpcodeInvokeFunction:
+		for _, e := range e.lifecycles {
+			go e.OnInvokeFunctionResumed(context.WithoutCancel(ctx), md, pause, r)
+		}
+	case enums.OpcodeWaitForSignal:
+		for _, e := range e.lifecycles {
+			go e.OnWaitForSignalResumed(context.WithoutCancel(ctx), md, pause, r)
+		}
+	case enums.OpcodeWaitForEvent:
+		for _, e := range e.lifecycles {
+			go e.OnWaitForEventResumed(context.WithoutCancel(ctx), md, pause, r)
+		}
+	}
+
 	// And delete the OG pause.
-	if err := e.pm.DeletePauseByID(ctx, r.PauseID); err != nil {
+	if err := e.pm.DeletePauseByID(ctx, pause.ID); err != nil {
 		return fmt.Errorf("deleting pause by ID: %w", err)
 	}
 
@@ -1901,15 +1925,16 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 		}
 
 		// Only run lifecycles if we consumed the pause and enqueued next step.
-		if pause.IsInvoke() {
+		switch pause.GetOpcode() {
+		case enums.OpcodeInvokeFunction:
 			for _, e := range e.lifecycles {
 				go e.OnInvokeFunctionResumed(context.WithoutCancel(ctx), md, pause, r)
 			}
-		} else if pause.IsSignal() {
+		case enums.OpcodeWaitForSignal:
 			for _, e := range e.lifecycles {
 				go e.OnWaitForSignalResumed(context.WithoutCancel(ctx), md, pause, r)
 			}
-		} else {
+		case enums.OpcodeWaitForEvent:
 			for _, e := range e.lifecycles {
 				go e.OnWaitForEventResumed(context.WithoutCancel(ctx), md, pause, r)
 			}
@@ -2739,7 +2764,7 @@ func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, i *runInsta
 		MaxAttempts:           i.item.MaxAttempts,
 		Payload: queue.PayloadPauseTimeout{
 			PauseID: pauseID,
-			StepID:  gen.ID,
+			Pause:   pause,
 		},
 	}, expires, queue.EnqueueOpts{})
 	if err == redis_state.ErrQueueItemExists {
@@ -2808,7 +2833,7 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, i *runInst
 		SourceFnVersion: i.item.Identifier.WorkflowVersion,
 	})
 
-	_, err = e.pm.SavePause(ctx, state.Pause{
+	pause := state.Pause{
 		ID:                  pauseID,
 		WorkspaceID:         i.md.ID.Tenant.EnvID,
 		Identifier:          sv2.NewPauseIdentifier(i.md.ID),
@@ -2828,7 +2853,8 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, i *runInst
 		Metadata: map[string]any{
 			consts.OtelPropagationKey: carrier,
 		},
-	})
+	}
+	_, err = e.pm.SavePause(ctx, pause)
 	if err == state.ErrPauseAlreadyExists {
 		return nil
 	}
@@ -2851,7 +2877,7 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, i *runInst
 		MaxAttempts:           i.item.MaxAttempts,
 		Payload: queue.PayloadPauseTimeout{
 			PauseID: pauseID,
-			StepID:  gen.ID,
+			Pause:   pause,
 		},
 	}, expires, queue.EnqueueOpts{})
 	if err == redis_state.ErrQueueItemExists {
@@ -2999,10 +3025,8 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, i *runInstan
 		PriorityFactor:        i.item.PriorityFactor,
 		CustomConcurrencyKeys: i.item.CustomConcurrencyKeys,
 		Payload: queue.PayloadPauseTimeout{
-			PauseID:     pauseID,
-			Event:       opts.Event,
-			StepID:      gen.ID,
-			MaxAttempts: i.item.GetMaxAttempts(),
+			PauseID: pauseID,
+			Pause:   pause,
 		},
 	}, expires, queue.EnqueueOpts{})
 	if err == redis_state.ErrQueueItemExists {
@@ -3270,8 +3294,6 @@ func (e *executor) ResumeSignal(ctx context.Context, workspaceID uuid.UUID, sign
 				Data:   data,
 			},
 		},
-		PauseID:  pause.ID,
-		Attempts: pause.MaxAttempts,
 	})
 	if err != nil {
 		if errors.Is(err, state.ErrPauseLeased) ||

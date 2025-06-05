@@ -408,20 +408,13 @@ type PayloadPauseBlockFlush struct {
 // This is always enqueued from any async match;  we must correctly decrement the
 // pending count in cases where the event is not received.
 type PayloadPauseTimeout struct {
+	// PauseID is the ID of the pause that the timeout job will resume.  This has
+	// existed since the beginning of Inngest, and is included for backcompat for
+	// future jobs.
 	PauseID uuid.UUID `json:"pauseID"`
-	// Opcode differentiates the type of timeout, eg. waitForEvent, waitForSignal
-	// or invoke.
-	Opcode enums.Opcode `json:"op"`
-	// Event is required such that we can load the pause by ID.  This is an empty
-	// string for signals and invokes.
-	Event string `json:"e,omitempty"`
-	// StepID is the ID of the step (the hashed opcode, and the key for step state)
-	// that will be timing out.  This lets us consume the timeout idempotently without
-	// loading the pause.
-	StepID string `json:"sID"`
-	// MaxAttempts stores the max number of attempts that the run was started with.  This
-	// is required when enqueueing the next step job once the timeout resumes.
-	MaxAttempts int `json:"atts"`
+	// Pause is the full pause struct for the timeout job.  Note that the identifier
+	// should not exist in the pause, as it already exists in the queue item.
+	Pause state.Pause `json:"pause"`
 }
 
 func HashID(_ context.Context, id string) string {

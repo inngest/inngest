@@ -91,7 +91,7 @@ type Executor interface {
 	Resume(ctx context.Context, p state.Pause, r ResumeRequest) error
 	// ResumePauseTimeout is an optimization over Resume which handles timeout cases for any paused
 	// steps, eg. step.waitForEvent, step.waitForSignal and step.invoke.
-	ResumePauseTimeout(ctx context.Context, id sv2.ID, stepID string, r ResumeRequest) error
+	ResumePauseTimeout(ctx context.Context, pause state.Pause, r ResumeRequest) error
 	// ResumeSignal handles resuming a signal, delegating to Resume() to resume the underlying pause.
 	ResumeSignal(ctx context.Context, workspaceID uuid.UUID, signalID string, data json.RawMessage) (*ResumeSignalResult, error)
 
@@ -236,12 +236,6 @@ type ResumeRequest struct {
 	IsTimeout bool
 	// IdempotencyKey is used to make sure pause consumption is idempotent
 	IdempotencyKey string
-	// PauseID is the ID of the pause that we're resuming.  This is provided
-	// so that ResumePauseTimeout can execute and clean up pauses without actually
-	// loading pauses itself.
-	PauseID uuid.UUID
-	// Attempts is the number of attempts that the function run is scheduled with.
-	Attempts *int
 }
 
 func (r *ResumeRequest) Error() string {

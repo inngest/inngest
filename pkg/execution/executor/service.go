@@ -211,8 +211,8 @@ func (s *svc) Run(ctx context.Context) error {
 			err = fmt.Errorf("unknown payload type: %T", item.Payload)
 		}
 
-		if err != nil {
-			s.log.Error("error handling queue item", "error", err)
+		if err != nil && err.Error() != "NonRetriableError" {
+			s.log.Error("error handling queue item", "error", err, "item", item)
 		}
 
 		return queue.RunResult{
@@ -286,22 +286,18 @@ func (s *svc) handlePauseTimeout(ctx context.Context, item queue.Item) error {
 
 	r := execution.ResumeRequest{
 		IsTimeout:      true,
-		PauseID:        pauseTimeout.PauseID,
 		IdempotencyKey: *item.JobID,
-		Attempts:       &pauseTimeout.MaxAttempts,
 	}
 
 	// If the pause timeout is for an invocation, store an error to cause the
 	// step to fail.
-	if pauseTimeout.Opcode == enums.OpcodeInvokeFunction {
+	if pauseTimeout.Pause.GetOpcode() == enums.OpcodeInvokeFunction {
 		r.SetInvokeTimeoutError()
 	}
 
-	id := sv2.IDFromV1(item.Identifier)
-
 	l.Debug("resuming timed out step")
 
-	return s.exec.ResumePauseTimeout(ctx, id, pauseTimeout.StepID, r)
+	return s.exec.ResumePauseTimeout(ctx, pauseTimeout.Pause, r)
 }
 
 // handleScheduledBatch checks for
