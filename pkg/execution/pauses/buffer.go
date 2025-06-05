@@ -72,6 +72,10 @@ func (r redisAdapter) PauseByInvokeCorrelationID(ctx context.Context, workspaceI
 	return r.rsm.PauseByInvokeCorrelationID(ctx, workspaceID, correlationID)
 }
 
+func (r redisAdapter) PauseBySignalID(ctx context.Context, workspaceID uuid.UUID, signal string) (*state.Pause, error) {
+	return r.rsm.PauseBySignalID(ctx, workspaceID, signal)
+}
+
 // WriteFlushWatermark writes the given flush watermark for an index.  This allows us to resume
 // flushing after a specific watermark.
 func (r redisAdapter) WriteFlushWatermark(ctx context.Context, index Index, watermark FlushWatermark) error {
@@ -82,4 +86,20 @@ func (r redisAdapter) WriteFlushWatermark(ctx context.Context, index Index, wate
 // has not been flushed.
 func (r redisAdapter) GetFlushWatermark(ctx context.Context, index Index) (*FlushWatermark, error) {
 	return nil, fmt.Errorf("not implemented")
+}
+
+// IndexExists returns whether the given index has pauses.  This returns true if there
+// are items in the buffer, or if there are any blocks written to the backing block store.
+func (r redisAdapter) IndexExists(ctx context.Context, i Index) (bool, error) {
+	ok, err := r.rsm.EventHasPauses(ctx, i.WorkspaceID, i.EventName)
+	if ok || err != nil {
+		return ok, err
+	}
+	// Check to see if we have a flush watermark for this index.  If so, we've flushed blocks
+	// for this index and we do have pauses for this particular index.
+	wm, err := r.GetFlushWatermark(ctx, i)
+	if err != nil {
+		return false, err
+	}
+	return wm != nil, nil
 }

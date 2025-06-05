@@ -70,8 +70,16 @@ func (m manager) PauseByInvokeCorrelationID(ctx context.Context, workspaceID uui
 	return m.buf.PauseByInvokeCorrelationID(ctx, workspaceID, correlationID)
 }
 
+func (m manager) PauseBySignalID(ctx context.Context, workspaceID uuid.UUID, signal string) (*state.Pause, error) {
+	return m.buf.PauseBySignalID(ctx, workspaceID, signal)
+}
+
 func (m manager) WriteFlushWatermark(ctx context.Context, index Index, wm FlushWatermark) error {
 	return m.buf.WriteFlushWatermark(ctx, index, wm)
+}
+
+func (m manager) IndexExists(ctx context.Context, i Index) (bool, error) {
+	return m.buf.IndexExists(ctx, i)
 }
 
 func (m manager) GetFlushWatermark(ctx context.Context, index Index) (*FlushWatermark, error) {

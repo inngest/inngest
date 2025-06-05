@@ -1524,7 +1524,7 @@ func (e *executor) handlePause(
 			eg.Go(func() error {
 				return e.pm.Delete(
 					context.Background(),
-					pauses.Index{WorkspaceID: pause.WorkspaceID, EventName: eventName},
+					pauses.Index{WorkspaceID: pause.WorkspaceID, EventName: evt.GetEvent().Name},
 					*pause,
 				)
 			})
@@ -1537,11 +1537,6 @@ func (e *executor) handlePause(
 		// NOTE: Some pauses may be nil or expired, as the iterator may take
 		// time to process.  We handle that here and assume that the event
 		// did not occur in time.
-		var eventName string
-		if pause.Event != nil {
-			eventName = *pause.Event
-		}
-
 		if pause.Expires.Time().Before(time.Now()) {
 			l.Debug("encountered expired pause")
 
@@ -1832,7 +1827,7 @@ func (e *executor) ResumePauseTimeout(ctx context.Context, pause state.Pause, r 
 	}
 
 	// And delete the OG pause.
-	if err := e.pm.DeletePauseByID(ctx, pause.ID); err != nil {
+	if err := e.pm.Delete(ctx, pauses.PauseIndex(pause), pause); err != nil {
 		return fmt.Errorf("deleting pause by ID: %w", err)
 	}
 
@@ -2745,7 +2740,7 @@ func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, i *runInsta
 		},
 	}
 
-	_, err = e.pm.SavePause(ctx, pause)
+	_, err = e.pm.Write(ctx, pauses.PauseIndex(pause), &pause)
 	if err == state.ErrSignalConflict {
 		return state.WrapInStandardError(
 			err,
@@ -3291,7 +3286,7 @@ func (e *executor) ResumeSignal(ctx context.Context, workspaceID uuid.UUID, sign
 		shouldDelete := pause.Expires.Time().Add(consts.PauseExpiredDeletionGracePeriod).Before(time.Now())
 		if shouldDelete {
 			l.Debug("deleting expired pause")
-			_ = e.pm.DeletePause(ctx, *pause)
+			_ = e.pm.Delete(ctx, pauses.PauseIndex(*pause), *pause)
 		}
 
 		return

@@ -46,6 +46,15 @@ type Index struct {
 	EventName   string    `json:"eventName"`
 }
 
+// PauseIndex returns an index for a given pause.
+func PauseIndex(p state.Pause) Index {
+	idx := Index{WorkspaceID: p.WorkspaceID}
+	if p.Event != nil {
+		idx.EventName = *p.Event
+	}
+	return idx
+}
+
 // Manager implements a buffer and a block reader/flusher, writing pauses to a buffer
 // then flushing them to blocks when the buffer fills.
 type Manager interface {
@@ -62,6 +71,10 @@ type Manager interface {
 	//
 	// This returns the total number of pauses in the buffer.
 	Write(ctx context.Context, index Index, pauses ...*state.Pause) (int, error)
+
+	// IndexExists returns whether the given index has pauses.  This returns true if there
+	// are items in the buffer, or if there are any blocks written to the backing block store.
+	IndexExists(ctx context.Context, i Index) (bool, error)
 
 	// ConsumePause consumes a pause.  This must be idempotent and first-write-wins:
 	// only one request to consume a pause can succeed, which requires locking pauses.
@@ -96,6 +109,10 @@ type Bufferer interface {
 	// has not been flushed.
 	GetFlushWatermark(ctx context.Context, index Index) (*FlushWatermark, error)
 
+	// IndexExists returns whether the given index has pauses.  This returns true if there
+	// are items in the buffer, or if there are any blocks written to the backing block store.
+	IndexExists(ctx context.Context, i Index) (bool, error)
+
 	// PausesSince loads pauses in the buffer for a given index, since a given time.
 	// If the time is ZeroTime, this must return all indexes in the buffer.  This time is
 	// inclusive, ie. it will include pauses created from the current since timestamp in
@@ -119,11 +136,15 @@ type Bufferer interface {
 	// This must return expired invoke pauses that have not yet been consumed
 	// in order to properly handle timeouts.
 	//
-	// NOTE: The bufferer handles O1 lookups of correlation IDs -> pauses.
-	PauseByInvokeCorrelationID(ctx context.Context, workspaceID uuid.UUID, correlationID string) (*state.Pause, error)
+	// NOTE: The bufferer handles O1 lookups of correlation IDs -> pauses.  These are not removed
+	// from the buffer and flushed to blocks
+	PauseByInvokeCorrelationID(ctx context.Context, envID uuid.UUID, correlationID string) (*state.Pause, error)
 
-	// PauseBySignalID returns a given pause by the correlation ID.
-	// PauseBySignalID(ctx context.Context, wsID uuid.UUID, signalID string) (*state.Pause, error)
+	// PauseBySignalID returns a given pause by the signal ID.
+	//
+	// NOTE: The bufferer handles O1 lookups of signals -> pauses.  These are not removed
+	// from the buffer and flushed to blocks
+	PauseBySignalID(ctx context.Context, envID uuid.UUID, signalID string) (*state.Pause, error)
 }
 
 // BlockStore is an implementation that reads and writes blocks.
