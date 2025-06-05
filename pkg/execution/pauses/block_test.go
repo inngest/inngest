@@ -3,6 +3,7 @@ package pauses
 import (
 	"context"
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -138,7 +139,10 @@ func TestBlockFlusher(t *testing.T) {
 	require.Len(t, blocks, 1)
 
 	// Verify the buffer has deleted the pause.
-	require.Len(t, mockBufferer.pauses, 0)
+	mockBufferer.mu.RLock()
+	pausesLen := len(mockBufferer.pauses)
+	mockBufferer.mu.RUnlock()
+	require.Equal(t, 0, pausesLen)
 
 	// Read the block back
 	block, err := store.ReadBlock(ctx, index, blocks[0])
@@ -148,22 +152,33 @@ func TestBlockFlusher(t *testing.T) {
 	require.Equal(t, pause.ID, block.Pauses[0].ID)
 
 	// Verify that the pauses are not in the buffer
-	require.Empty(t, mockBufferer.pauses, "pauses should be removed from buffer after flushing")
+	mockBufferer.mu.RLock()
+	pausesLen := len(mockBufferer.pauses)
+	mockBufferer.mu.RUnlock()
+	require.Equal(t, 0, pausesLen, "pauses should be removed from buffer after flushing")
 }
 
 // mockBufferer implements the Bufferer interface for testing
 type mockBufferer struct {
+	mu     sync.RWMutex
 	pauses []*state.Pause
 }
 
 func (m *mockBufferer) Write(ctx context.Context, index Index, pauses ...*state.Pause) (int, error) {
 	// For testing purposes, we'll just append the pauses to our mock buffer
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	m.pauses = append(m.pauses, pauses...)
 	return len(m.pauses), nil
 }
 
 func (m *mockBufferer) PausesSince(ctx context.Context, index Index, since time.Time) (state.PauseIterator, error) {
-	return &mockPauseIterator{pauses: m.pauses}, nil
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	// Create a copy of pauses to avoid race conditions
+	pausesCopy := make([]*state.Pause, len(m.pauses))
+	copy(pausesCopy, m.pauses)
+	return &mockPauseIterator{pauses: pausesCopy}, nil
 }
 
 func (m *mockBufferer) PauseTimestamp(ctx context.Context, index Index, pause state.Pause) (time.Time, error) {
@@ -176,6 +191,8 @@ func (m *mockBufferer) ConsumePause(ctx context.Context, p state.Pause, opts sta
 
 func (m *mockBufferer) Delete(ctx context.Context, index Index, pause state.Pause) error {
 	// For testing purposes, we'll just remove the pause from our mock buffer
+	m.mu.Lock()
+	defer m.mu.Unlock()
 	for i, p := range m.pauses {
 		if p.ID == pause.ID {
 			m.pauses = append(m.pauses[:i], m.pauses[i+1:]...)
@@ -202,6 +219,8 @@ func (m *mockBufferer) GetFlushWatermark(ctx context.Context, index Index) (*Flu
 }
 
 func (m *mockBufferer) IndexExists(ctx context.Context, i Index) (bool, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 	return len(m.pauses) > 0, nil
 }
 
