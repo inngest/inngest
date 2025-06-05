@@ -189,3 +189,23 @@ func (m *mockBlockReader) BlocksSince(ctx context.Context, idx Index, since time
 	// Not needed for this test
 	return nil, nil
 }
+
+func (m *mockBlockReader) LastBlockMetadata(ctx context.Context, index Index) (*blockMetadata, error) {
+	// Not needed for this test
+	return nil, nil
+}
+
+func (m *mockBlockReader) IndexExists(ctx context.Context, i Index) (bool, error) {
+	return len(m.blocks) > 0, nil
+}
+
+func (m *mockBlockReader) PauseByID(ctx context.Context, index Index, pauseID uuid.UUID) (*state.Pause, error) {
+	for _, block := range m.blocks {
+		for _, pause := range block.Pauses {
+			if pause.ID == pauseID {
+				return pause, nil
+			}
+		}
+	}
+	return nil, nil
+}

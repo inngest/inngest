@@ -210,12 +210,15 @@ func (m *mockBufferer) PauseBySignalID(ctx context.Context, workspaceID uuid.UUI
 	return nil, fmt.Errorf("not implemented in mock")
 }
 
-func (m *mockBufferer) WriteFlushWatermark(ctx context.Context, index Index, watermark FlushWatermark) error {
-	return nil
-}
-
-func (m *mockBufferer) GetFlushWatermark(ctx context.Context, index Index) (*FlushWatermark, error) {
-	return nil, nil
+func (m *mockBufferer) PauseByID(ctx context.Context, index Index, pauseID uuid.UUID) (*state.Pause, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	for _, p := range m.pauses {
+		if p.ID == pauseID {
+			return p, nil
+		}
+	}
+	return nil, fmt.Errorf("pause not found")
 }
 
 func (m *mockBufferer) IndexExists(ctx context.Context, i Index) (bool, error) {

@@ -207,6 +207,10 @@ func (m *mockBuffererWithConsume) ConsumePause(ctx context.Context, pause state.
 	return state.ConsumePauseResult{DidConsume: true}, func() error { return nil }, nil
 }
 
+func (m *mockBuffererWithConsume) PauseByID(ctx context.Context, index Index, pauseID uuid.UUID) (*state.Pause, error) {
+	return m.mockBufferer.PauseByID(ctx, index, pauseID)
+}
+
 type mockBlockStore struct {
 	deleteCalled bool
 }
@@ -230,4 +234,16 @@ func (m *mockBlockStore) ReadBlock(ctx context.Context, index Index, blockID uli
 func (m *mockBlockStore) Delete(ctx context.Context, index Index, pause state.Pause) error {
 	m.deleteCalled = true
 	return nil
+}
+
+func (m *mockBlockStore) LastBlockMetadata(ctx context.Context, index Index) (*blockMetadata, error) {
+	return nil, nil
+}
+
+func (m *mockBlockStore) IndexExists(ctx context.Context, i Index) (bool, error) {
+	return false, nil
+}
+
+func (m *mockBlockStore) PauseByID(ctx context.Context, index Index, pauseID uuid.UUID) (*state.Pause, error) {
+	return nil, nil
 }
