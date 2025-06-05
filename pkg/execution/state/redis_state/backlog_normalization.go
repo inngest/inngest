@@ -89,9 +89,7 @@ func (q *queue) backlogNormalizationScan(ctx context.Context) error {
 
 // iterateNormalizationPartition scans and iterate through the global normalization partition to process backlogs needing to be normalized
 func (q *queue) iterateNormalizationPartition(ctx context.Context, until time.Time, bc chan normalizeWorkerChanMsg) error {
-	// TODO: check capacity
-
-	// TODO introduce weight probability to blend account/global scanning
+	// introduce weight probability to blend account/global scanning
 	peekedAccounts, err := q.peekGlobalNormalizeAccounts(ctx, until, NormalizeAccountPeekMax)
 	if err != nil {
 		return fmt.Errorf("could not peek global normalize accounts: %w", err)
