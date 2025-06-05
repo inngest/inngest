@@ -120,6 +120,9 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 			case <-extendLeaseCtx.Done():
 				return
 			case <-time.Tick(ShadowPartitionLeaseDuration / 2):
+				if leaseID == nil {
+					return
+				}
 				leaseID, err = q.ShadowPartitionExtendLease(ctx, shadowPart, *leaseID, ShadowPartitionLeaseDuration)
 				if err != nil {
 					if errors.Is(err, ErrShadowPartitionAlreadyLeased) || errors.Is(err, ErrShadowPartitionLeaseNotFound) {
