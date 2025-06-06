@@ -1757,6 +1757,8 @@ func TestShadowPartitionUpdate(t *testing.T) {
 				},
 			},
 		},
+		// TODO: concurrency to none
+		// TODO: change concurrency
 		{
 			name:  "none to throttle",
 			conf1: itemConf{kind: osqueue.KindStart},
@@ -1778,6 +1780,7 @@ func TestShadowPartitionUpdate(t *testing.T) {
 				),
 			},
 		},
+		// TODO: throttle to none
 		{
 			name: "change throttle",
 			conf1: itemConf{
@@ -1856,15 +1859,26 @@ func TestShadowPartitionUpdate(t *testing.T) {
 
 			backlog1 := q.ItemBacklog(ctx, item1)
 			require.NotEmpty(t, backlog1.BacklogID)
-			if len(tc.conf1.concurrencyKeys) > 0 {
-				require.Len(t, backlog1.ConcurrencyKeys, len(tc.conf1.concurrencyKeys))
-			}
-			if tc.conf1.throttle != nil {
-				require.NotNil(t, backlog1.Throttle)
-			}
+			// fmt.Printf("Backlog1: %#v\n", backlog1.Throttle)
 
 			initialShadowPart := q.ItemShadowPartition(ctx, item1)
 			require.NotEmpty(t, initialShadowPart.PartitionID)
+
+			if len(tc.conf1.concurrencyKeys) > 0 {
+				require.Len(t, backlog1.ConcurrencyKeys, len(tc.conf1.concurrencyKeys))
+
+				hashes := make([]string, len(tc.conf1.concurrencyKeys))
+				for i, k := range initialShadowPart.Concurrency.CustomConcurrencyKeys {
+					hashes[i] = k.HashedKeyExpression
+				}
+				for _, k := range backlog1.ConcurrencyKeys {
+					require.Contains(t, hashes, k.HashedKeyExpression)
+				}
+			}
+			if tc.conf1.throttle != nil {
+				require.NotNil(t, backlog1.Throttle)
+				require.Equal(t, initialShadowPart.Throttle.ThrottleKeyExpressionHash, backlog1.Throttle.ThrottleKeyExpressionHash)
+			}
 
 			savedPart := QueueShadowPartition{}
 			require.NoError(t, json.Unmarshal([]byte(r.HGet(kg.ShadowPartitionMeta(), initialShadowPart.PartitionID)), &savedPart))
@@ -1909,14 +1923,28 @@ func TestShadowPartitionUpdate(t *testing.T) {
 			require.NotEqual(t, backlog1, backlog2)
 			if len(tc.conf2.concurrencyKeys) > 0 {
 				require.Len(t, backlog2.ConcurrencyKeys, len(tc.conf2.concurrencyKeys))
+
+				hashes := make([]string, len(tc.conf2.concurrencyKeys))
+				for i, k := range updatedShadowPart.Concurrency.CustomConcurrencyKeys {
+					hashes[i] = k.HashedKeyExpression
+				}
+				for _, k := range backlog2.ConcurrencyKeys {
+					require.Contains(t, hashes, k.HashedKeyExpression)
+				}
 			}
 			if tc.conf2.throttle != nil {
 				require.NotNil(t, backlog2.Throttle)
+				require.Equal(t, updatedShadowPart.Throttle.ThrottleKeyExpressionHash, backlog2.Throttle.ThrottleKeyExpressionHash)
 			}
+			// fmt.Printf("Backlog2: %#v\n", backlog2.Throttle)
 
 			savedPart = QueueShadowPartition{}
 			require.NoError(t, json.Unmarshal([]byte(r.HGet(kg.ShadowPartitionMeta(), initialShadowPart.PartitionID)), &savedPart))
 			require.Equal(t, updatedShadowPart, savedPart)
+
+			require.NotEqual(t, updatedShadowPart, initialShadowPart)
+			// fmt.Printf("Initial: %#v\n", initialShadowPart.Throttle)
+			// fmt.Printf("Updated: %#v\n", updatedShadowPart.Throttle)
 
 			//
 			// Ensure shadow partition is not reverted to old version
