@@ -7,7 +7,10 @@ import type {
   EntitlementRunCount,
 } from '@/gql/graphql';
 
-export type Plan = Omit<BillingPlan, 'entitlements' | 'features' | 'availableAddons' | 'addons'> & {
+export type Plan = Omit<
+  BillingPlan,
+  'entitlements' | 'features' | 'availableAddons' | 'addons' | 'slug'
+> & {
   entitlements: {
     concurrency: Pick<EntitlementConcurrency, 'limit'>;
     runCount: Pick<EntitlementRunCount, 'limit'>;
