@@ -451,7 +451,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 				return nil, fmt.Errorf("error finding previous event for debounced function: %w", err)
 			}
 
-			if evt != nil && evt.GetEvent().Name == event.InvokeFnName {
+			if evt != nil && evt.GetEvent().IsInvokeEvent() {
 				if err := e.InvokeFailHandler(ctx, execution.InvokeFailHandlerOpts{
 					OriginalEvent: evt,
 					FunctionID:    req.Function.ID.String(),
