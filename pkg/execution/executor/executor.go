@@ -25,6 +25,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/debounce"
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/driver/httpdriver"
+	"github.com/inngest/inngest/pkg/execution/pauses"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/realtime"
 	"github.com/inngest/inngest/pkg/execution/singleton"
@@ -140,7 +141,7 @@ func WithQueue(q queue.Queue) ExecutorOpt {
 }
 
 // WithPauseManager sets which pause manager to use when creating an executor.
-func WithPauseManager(pm state.PauseManager) ExecutorOpt {
+func WithPauseManager(pm pauses.Manager) ExecutorOpt {
 	return func(e execution.Executor) error {
 		e.(*executor).pm = pm
 		return nil
@@ -305,7 +306,7 @@ type executor struct {
 	// using trees.
 	exprAggregator expragg.Aggregator
 
-	pm   state.PauseManager
+	pm   pauses.Manager
 	smv2 sv2.RunService
 
 	queue               queue.Queue
@@ -654,7 +655,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 				Cancel:            true,
 				TriggeringEventID: &triggeringID,
 			}
-			_, err = e.pm.SavePause(ctx, pause)
+			_, err = e.pm.Write(ctx, pauses.Index{WorkspaceID: req.WorkspaceID, EventName: c.Event}, &pause)
 			switch err {
 			case nil, state.ErrPauseAlreadyExists: // no-op
 			default:
@@ -1521,7 +1522,11 @@ func (e *executor) handlePause(
 		cleanup := func(ctx context.Context) {
 			eg := errgroup.Group{}
 			eg.Go(func() error {
-				return e.pm.DeletePause(context.Background(), *pause)
+				return e.pm.Delete(
+					context.Background(),
+					pauses.Index{WorkspaceID: pause.WorkspaceID, EventName: evt.GetEvent().Name},
+					*pause,
+				)
 			})
 			eg.Go(func() error {
 				return e.exprAggregator.RemovePause(ctx, pause)
@@ -1539,6 +1544,7 @@ func (e *executor) handlePause(
 			if shouldDelete {
 				// Consume this pause to remove it entirely
 				l.Debug("deleting expired pause")
+
 				cleanup(ctx)
 			}
 			return nil
@@ -1647,6 +1653,11 @@ func (e *executor) HandleInvokeFinish(ctx context.Context, evt event.TrackedEven
 		return err
 	}
 
+	var eventName string
+	if pause.Event != nil {
+		eventName = *pause.Event
+	}
+
 	if pause.Expires.Time().Before(time.Now()) {
 		l.Debug("encountered expired pause")
 
@@ -1654,7 +1665,7 @@ func (e *executor) HandleInvokeFinish(ctx context.Context, evt event.TrackedEven
 		if shouldDelete {
 			// Consume this pause to remove it entirely
 			l.Debug("deleting expired pause")
-			_ = e.pm.DeletePause(context.Background(), *pause)
+			_ = e.pm.Delete(context.Background(), pauses.Index{WorkspaceID: pause.WorkspaceID, EventName: eventName}, *pause)
 		}
 
 		return nil
@@ -1669,7 +1680,7 @@ func (e *executor) HandleInvokeFinish(ctx context.Context, evt event.TrackedEven
 		// bookkeeping is not implemented.
 		if exists, err := e.smv2.Exists(ctx, sv2.IDFromPause(*pause)); !exists && err == nil {
 			// This function has ended.  Delete the pause and continue
-			_ = e.pm.DeletePause(context.Background(), *pause)
+			_ = e.pm.Delete(context.Background(), pauses.Index{WorkspaceID: pause.WorkspaceID, EventName: eventName}, *pause)
 			return nil
 		}
 	}
@@ -1816,7 +1827,7 @@ func (e *executor) ResumePauseTimeout(ctx context.Context, pause state.Pause, r 
 	}
 
 	// And delete the OG pause.
-	if err := e.pm.DeletePauseByID(ctx, pause.ID); err != nil {
+	if err := e.pm.Delete(ctx, pauses.PauseIndex(pause), pause); err != nil {
 		return fmt.Errorf("deleting pause by ID: %w", err)
 	}
 
@@ -1846,16 +1857,6 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 	}
 
 	err = util.Crit(ctx, "consume pause", func(ctx context.Context) error {
-		// Lease this pause so that only this thread can schedule the execution.
-		//
-		// If we don't do this, there's a chance that two concurrent runners
-		// attempt to enqueue the next step of the workflow.
-		err = e.pm.LeasePause(ctx, pause.ID)
-		if err == state.ErrPauseLeased || err == state.ErrPauseNotFound {
-			// Ignore;  this is being handled by another runner.
-			return nil
-		}
-
 		if pause.OnTimeout && r.EventID != nil {
 			// Delete this pause, as an event has occured which matches
 			// the timeout.  We can do this prior to leasing a pause as it's the
@@ -1892,7 +1893,8 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 		)
 
 		if !consumeResult.DidConsume {
-			// We don't need to do anything here.
+			// We don't need to do anything here.  This could be a dupe;  consuming a pause
+			// is transactional / atomic, so ignore this.
 			return nil
 		}
 
@@ -2738,7 +2740,7 @@ func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, i *runInsta
 		},
 	}
 
-	_, err = e.pm.SavePause(ctx, pause)
+	_, err = e.pm.Write(ctx, pauses.PauseIndex(pause), &pause)
 	if err == state.ErrSignalConflict {
 		return state.WrapInStandardError(
 			err,
@@ -2854,7 +2856,11 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, i *runInst
 			consts.OtelPropagationKey: carrier,
 		},
 	}
-	_, err = e.pm.SavePause(ctx, pause)
+	_, err = e.pm.Write(
+		ctx,
+		pauses.Index{WorkspaceID: i.md.ID.Tenant.EnvID, EventName: eventName},
+		&pause,
+	)
 	if err == state.ErrPauseAlreadyExists {
 		return nil
 	}
@@ -3003,8 +3009,12 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, i *runInstan
 			consts.OtelPropagationKey: carrier,
 		},
 	}
-	_, err = e.pm.SavePause(ctx, pause)
-	if err != nil && !errors.Is(err, state.ErrPauseAlreadyExists) {
+	idx := pauses.Index{WorkspaceID: i.md.ID.Tenant.EnvID, EventName: opts.Event}
+	_, err = e.pm.Write(ctx, idx, &pause)
+	if err != nil {
+		if err == state.ErrPauseAlreadyExists {
+			return nil
+		}
 		return err
 	}
 
@@ -3276,7 +3286,7 @@ func (e *executor) ResumeSignal(ctx context.Context, workspaceID uuid.UUID, sign
 		shouldDelete := pause.Expires.Time().Add(consts.PauseExpiredDeletionGracePeriod).Before(time.Now())
 		if shouldDelete {
 			l.Debug("deleting expired pause")
-			_ = e.pm.DeletePause(ctx, *pause)
+			_ = e.pm.Delete(ctx, pauses.PauseIndex(*pause), *pause)
 		}
 
 		return

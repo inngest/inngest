@@ -24,10 +24,6 @@ type PauseMutater interface {
 	// This returns the number of pauses in the current pause.Index.
 	SavePause(ctx context.Context, p Pause) (int64, error)
 
-	// PauseExists returns a nil error if a pause exists, or a state.ErrPauseNotFound error if
-	// a pause does not exist.
-	PauseExists(ctx context.Context, id uuid.UUID) error
-
 	// LeasePause allows us to lease the pause until the next step is enqueued, at which point
 	// we can 'consume' the pause to remove it.
 	//
