@@ -1400,18 +1400,6 @@ func (m unshardedMgr) PausesByEventSince(ctx context.Context, workspaceID uuid.U
 	return iter, err
 }
 
-func (m unshardedMgr) EvaluablesByID(ctx context.Context, ids ...uuid.UUID) ([]expr.Evaluable, error) {
-	items, err := m.PausesByID(ctx, ids...)
-	if err != nil {
-		return nil, err
-	}
-	evaluables := make([]expr.Evaluable, len(items))
-	for n, i := range items {
-		evaluables[n] = i
-	}
-	return evaluables, nil
-}
-
 func (m unshardedMgr) LoadEvaluablesSince(ctx context.Context, workspaceID uuid.UUID, eventName string, since time.Time, do func(context.Context, expr.Evaluable) error) error {
 	// Keep a list of pauses that should be deleted because they've expired.
 	//
