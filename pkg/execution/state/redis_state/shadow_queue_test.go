@@ -1757,8 +1757,42 @@ func TestShadowPartitionUpdate(t *testing.T) {
 				},
 			},
 		},
-		// TODO: concurrency to none
-		// TODO: change concurrency
+		{
+			name: "concurrency to none",
+			conf1: itemConf{
+				concurrencyKeys: []state.CustomConcurrency{
+					{
+						Key:                       util.ConcurrencyKey(enums.ConcurrencyScopeFn, fnID, "customer1"),
+						Hash:                      hashConcurrencyKey("event.data.customerId"),
+						Limit:                     123,
+						UnhashedEvaluatedKeyValue: "customer1",
+					},
+				},
+			},
+		},
+		{
+			name: "change concurrency",
+			conf1: itemConf{
+				concurrencyKeys: []state.CustomConcurrency{
+					{
+						Key:                       util.ConcurrencyKey(enums.ConcurrencyScopeFn, fnID, "customer1"),
+						Hash:                      hashConcurrencyKey("event.data.customerId"),
+						Limit:                     123,
+						UnhashedEvaluatedKeyValue: "customer1",
+					},
+				},
+			},
+			conf2: itemConf{
+				concurrencyKeys: []state.CustomConcurrency{
+					{
+						Key:                       util.ConcurrencyKey(enums.ConcurrencyScopeFn, fnID, "user10"),
+						Hash:                      hashConcurrencyKey("event.data.userId"),
+						Limit:                     123,
+						UnhashedEvaluatedKeyValue: "user10",
+					},
+				},
+			},
+		},
 		{
 			name:  "none to throttle",
 			conf1: itemConf{kind: osqueue.KindStart},
@@ -1780,7 +1814,26 @@ func TestShadowPartitionUpdate(t *testing.T) {
 				),
 			},
 		},
-		// TODO: throttle to none
+		{
+			name: "throttle to none",
+			conf1: itemConf{
+				kind: osqueue.KindStart,
+				throttle: osqueue.GetThrottleConfig(
+					ctx,
+					fnID,
+					&inngest.Throttle{
+						Limit:  10,
+						Period: 30 * time.Second,
+						Burst:  2,
+						Key:    util.StrPtr("event.data.customerId"),
+					},
+					inngestgo.Event{
+						Name: "hello/world",
+						Data: map[string]any{"customerId": 100},
+					}.Map(),
+				),
+			},
+		},
 		{
 			name: "change throttle",
 			conf1: itemConf{
