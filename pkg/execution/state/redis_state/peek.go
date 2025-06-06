@@ -4,14 +4,16 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
+	"time"
+	"unsafe"
+
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/redis/rueidis"
-	"time"
-	"unsafe"
 )
 
 type peeker[T any] struct {
@@ -28,6 +30,10 @@ type peeker[T any] struct {
 	handleMissingItems func(pointers []string) error
 	maker              func() *T
 	keyMetadataHash    string
+
+	// fromTime provides an optional start time for peeks
+	// instead of the default -INF
+	fromTime *time.Time
 }
 
 var (
@@ -70,6 +76,11 @@ func (p *peeker[T]) peek(ctx context.Context, keyOrderedPointerSet string, seque
 		script = "peekOrderedSetUntil"
 		ms := until.UnixMilli()
 
+		fromTime := "-inf"
+		if p.fromTime != nil && !p.fromTime.IsZero() {
+			fromTime = strconv.Itoa(int(p.fromTime.UnixMilli()))
+		}
+
 		untilTime := until.Unix()
 		if p.isMillisecondPrecision {
 			untilTime = until.UnixMilli()
@@ -81,6 +92,7 @@ func (p *peeker[T]) peek(ctx context.Context, keyOrderedPointerSet string, seque
 		}
 
 		rawArgs = []any{
+			fromTime,
 			untilTime,
 			ms,
 			limit,
