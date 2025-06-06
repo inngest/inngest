@@ -284,6 +284,8 @@ func TestQueueBacklogNormalization(t *testing.T) {
 	shadowPartition := q.ItemShadowPartition(ctx, item)
 	require.NotEmpty(t, shadowPartition.PartitionID)
 
+	constraints := PartitionConstraintConfig{}
+
 	// Mark backlog for normalization
 	backlogCount, shouldNormalizeAsync, err := q.BacklogPrepareNormalize(ctx, &backlog, &shadowPartition, 5)
 	require.NoError(t, err)
@@ -297,7 +299,7 @@ func TestQueueBacklogNormalization(t *testing.T) {
 	// Verify normalization
 	require.NoError(t, q.leaseBacklogForNormalization(ctx, &backlog)) // lease it first
 
-	require.NoError(t, q.normalizeBacklog(ctx, &backlog, &shadowPartition))
+	require.NoError(t, q.normalizeBacklog(ctx, &backlog, &shadowPartition, &constraints))
 	require.Equal(t, 0, zcard(t, rc, kg.BacklogSet(backlog.BacklogID)))
 	require.False(t, hasMember(t, r, kg.GlobalAccountNormalizeSet(), accountId.String()))
 	require.False(t, hasMember(t, r, kg.AccountNormalizeSet(accountId), fnID.String()))
@@ -438,7 +440,9 @@ func TestQueueBacklogNormalizationWithRewrite(t *testing.T) {
 	// Verify normalization
 	require.NoError(t, q.leaseBacklogForNormalization(ctx, &initialBacklog)) // lease it first
 
-	require.NoError(t, q.normalizeBacklog(ctx, &initialBacklog, &shadowPartition))
+	constraints := PartitionConstraintConfig{}
+
+	require.NoError(t, q.normalizeBacklog(ctx, &initialBacklog, &shadowPartition, &constraints))
 
 	require.Equal(t, 0, zcard(t, rc, kg.BacklogSet(initialBacklog.BacklogID)))
 	require.Equal(t, 10, zcard(t, rc, kg.BacklogSet(targetBacklog.BacklogID)))
@@ -530,7 +534,9 @@ func TestBacklogNormalizationScanner(t *testing.T) {
 			return
 		}
 
-		err = q.normalizeBacklog(ctx, &backlog, &shadowPartition)
+		constraints := PartitionConstraintConfig{}
+
+		err = q.normalizeBacklog(ctx, &backlog, &shadowPartition, &constraints)
 		require.NoError(t, err)
 		require.Equal(t, 0, zcard(t, rc, kg.BacklogSet(backlog.BacklogID)))
 		require.False(t, hasMember(t, r, kg.GlobalAccountNormalizeSet(), accountId.String()))

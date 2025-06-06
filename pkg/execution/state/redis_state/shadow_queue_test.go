@@ -108,7 +108,12 @@ func TestQueueRefillBacklog(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, 1, int(count))
 
-		res, err := q.BacklogRefill(ctx, &expectedBacklog, &shadowPartition, clock.Now())
+		res, err := q.BacklogRefill(ctx, &expectedBacklog, &shadowPartition, clock.Now(), &PartitionConstraintConfig{
+			Concurrency: ShadowPartitionConcurrency{
+				AccountConcurrency:  defaultConcurrency,
+				FunctionConcurrency: defaultConcurrency,
+			},
+		})
 		require.NoError(t, err)
 
 		require.Equal(t, 1, res.Refilled)
@@ -187,7 +192,12 @@ func TestQueueRefillBacklog(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, 4, int(count))
 
-		res, err := q.BacklogRefill(ctx, &expectedBacklog, &shadowPartition, clock.Now())
+		res, err := q.BacklogRefill(ctx, &expectedBacklog, &shadowPartition, clock.Now(), &PartitionConstraintConfig{
+			Concurrency: ShadowPartitionConcurrency{
+				AccountConcurrency:  defaultConcurrency,
+				FunctionConcurrency: defaultConcurrency,
+			},
+		})
 		require.NoError(t, err)
 
 		require.Equal(t, 1, res.Refilled)
@@ -303,7 +313,12 @@ func TestQueueRefillBacklog(t *testing.T) {
 
 		refillUntil := at.Add(time.Minute)
 
-		res, err := q.BacklogRefill(ctx, &backlog, &shadowPart, refillUntil)
+		res, err := q.BacklogRefill(ctx, &backlog, &shadowPart, refillUntil, &PartitionConstraintConfig{
+			Concurrency: ShadowPartitionConcurrency{
+				AccountConcurrency:  123,
+				FunctionConcurrency: 45,
+			},
+		})
 		require.NoError(t, err)
 
 		require.Equal(t, 2, res.TotalBacklogCount)
@@ -420,7 +435,12 @@ func TestQueueRefillBacklog(t *testing.T) {
 
 		refillUntil := at.Add(time.Minute)
 
-		res, err := q.BacklogRefill(ctx, &backlog, &shadowPart, refillUntil)
+		res, err := q.BacklogRefill(ctx, &backlog, &shadowPart, refillUntil, &PartitionConstraintConfig{
+			Concurrency: ShadowPartitionConcurrency{
+				AccountConcurrency:  123,
+				FunctionConcurrency: 45,
+			},
+		})
 		require.NoError(t, err)
 
 		require.Equal(t, 2, res.TotalBacklogCount)
@@ -443,7 +463,12 @@ func TestQueueRefillBacklog(t *testing.T) {
 
 		refillUntil = futureAt.Add(time.Minute)
 
-		res, err = q.BacklogRefill(ctx, &backlog, &shadowPart, refillUntil)
+		res, err = q.BacklogRefill(ctx, &backlog, &shadowPart, refillUntil, &PartitionConstraintConfig{
+			Concurrency: ShadowPartitionConcurrency{
+				AccountConcurrency:  123,
+				FunctionConcurrency: 45,
+			},
+		})
 		require.NoError(t, err)
 
 		require.Equal(t, 1, res.TotalBacklogCount)
@@ -1677,7 +1702,45 @@ func TestRefillConstraints(t *testing.T) {
 
 			logKeyValues()
 
-			res, _, err := q.processShadowPartitionBacklog(ctx, &shadowPart, &backlog, refillUntil)
+			constraints := &PartitionConstraintConfig{
+				Concurrency: ShadowPartitionConcurrency{
+					AccountConcurrency:  testCase.knobs.accountConcurrencyLimit,
+					FunctionConcurrency: testCase.knobs.functionConcurrencyLimit,
+				},
+			}
+
+			if testCase.knobs.customConcurrencyKey1 != nil {
+				scope, _, _, _ := testCase.knobs.customConcurrencyKey1.ParseKey()
+				constraints.Concurrency.CustomConcurrencyKeys = append(constraints.Concurrency.CustomConcurrencyKeys,
+					CustomConcurrencyLimit{
+						Mode:                enums.ConcurrencyModeStep,
+						Scope:               scope,
+						HashedKeyExpression: testCase.knobs.customConcurrencyKey1.Hash,
+						Limit:               testCase.knobs.customConcurrencyKey1.Limit,
+					})
+			}
+
+			if testCase.knobs.customConcurrencyKey2 != nil {
+				scope, _, _, _ := testCase.knobs.customConcurrencyKey2.ParseKey()
+				constraints.Concurrency.CustomConcurrencyKeys = append(constraints.Concurrency.CustomConcurrencyKeys,
+					CustomConcurrencyLimit{
+						Mode:                enums.ConcurrencyModeStep,
+						Scope:               scope,
+						HashedKeyExpression: testCase.knobs.customConcurrencyKey2.Hash,
+						Limit:               testCase.knobs.customConcurrencyKey2.Limit,
+					})
+			}
+
+			if testCase.knobs.throttle != nil {
+				constraints.Throttle = &ShadowPartitionThrottle{
+					ThrottleKeyExpressionHash: testCase.knobs.throttle.KeyExpressionHash,
+					Limit:                     testCase.knobs.throttle.Limit,
+					Burst:                     testCase.knobs.throttle.Burst,
+					Period:                    testCase.knobs.throttle.Period,
+				}
+			}
+
+			res, _, err := q.processShadowPartitionBacklog(ctx, &shadowPart, &backlog, refillUntil, constraints)
 			require.NoError(t, err)
 
 			logKeyValues()
@@ -2186,7 +2249,12 @@ func TestShadowPartitionPointerTimings(t *testing.T) {
 		for i := range numItems {
 			itemAt := now.Add(time.Duration(i+1) * time.Second)
 			refillUntil := itemAt
-			res, err := q.BacklogRefill(ctx, &backlog, &shadowPart, refillUntil)
+			res, err := q.BacklogRefill(ctx, &backlog, &shadowPart, refillUntil, &PartitionConstraintConfig{
+				Concurrency: ShadowPartitionConcurrency{
+					AccountConcurrency:  123,
+					FunctionConcurrency: 45,
+				},
+			})
 			require.NoError(t, err)
 
 			require.Equal(t, numItems-i, res.TotalBacklogCount)
@@ -2408,6 +2476,13 @@ func TestConstraintLifecycleReporting(t *testing.T) {
 	}
 	at := clock.Now()
 
+	constraints := PartitionConstraintConfig{
+		Concurrency: ShadowPartitionConcurrency{
+			AccountConcurrency:  1,
+			FunctionConcurrency: 1,
+		},
+	}
+
 	itemA1 := addItem("test1", state.Identifier{
 		AccountID:   accountID1,
 		WorkspaceID: envID1,
@@ -2420,7 +2495,7 @@ func TestConstraintLifecycleReporting(t *testing.T) {
 	require.Equal(t, 1, sp1.Concurrency.FunctionConcurrency)
 	require.Equal(t, 1, sp1.Concurrency.AccountConcurrency)
 
-	res, _, err := q.processShadowPartitionBacklog(ctx, &sp1, &b1, at.Add(time.Minute))
+	res, _, err := q.processShadowPartitionBacklog(ctx, &sp1, &b1, at.Add(time.Minute), &constraints)
 	require.NoError(t, err)
 	require.NotNil(t, res)
 	require.Equal(t, enums.QueueConstraintNotLimited, res.Constraint)
@@ -2437,7 +2512,7 @@ func TestConstraintLifecycleReporting(t *testing.T) {
 		WorkflowID:  fnID1,
 	}, at)
 
-	res, _, err = q.processShadowPartitionBacklog(ctx, &sp1, &b1, at.Add(time.Minute))
+	res, _, err = q.processShadowPartitionBacklog(ctx, &sp1, &b1, at.Add(time.Minute), &constraints)
 	require.NoError(t, err)
 	require.NotNil(t, res)
 	require.Equal(t, enums.QueueConstraintFunctionConcurrency, res.Constraint)
@@ -2459,7 +2534,7 @@ func TestConstraintLifecycleReporting(t *testing.T) {
 
 	sp2 := q.ItemShadowPartition(ctx, itemB1)
 
-	res, _, err = q.processShadowPartitionBacklog(ctx, &sp2, &b2, at.Add(time.Minute))
+	res, _, err = q.processShadowPartitionBacklog(ctx, &sp2, &b2, at.Add(time.Minute), &constraints)
 	require.NoError(t, err)
 	require.NotNil(t, res)
 	require.Equal(t, enums.QueueConstraintAccountConcurrency, res.Constraint)
@@ -2699,8 +2774,19 @@ func TestShadowPartitionBacklogNormalization(t *testing.T) {
 			fmt.Printf("Pre-procession partition backlogs: %#v\n", sp2)
 			// require.Len(t, sp2, 2)
 
+			constraints := PartitionConstraintConfig{
+				Concurrency: ShadowPartitionConcurrency{
+					SystemConcurrency:      0,
+					AccountConcurrency:     0,
+					FunctionConcurrency:    0,
+					AccountRunConcurrency:  0,
+					FunctionRunConcurrency: 0,
+					CustomConcurrencyKeys:  nil,
+				},
+			}
+
 			// attempt processing and expect normalization
-			_, processed, err := q.processShadowPartitionBacklog(ctx, &updatedShadowPart, &backlog1, at)
+			_, processed, err := q.processShadowPartitionBacklog(ctx, &updatedShadowPart, &backlog1, at, &constraints)
 			require.NoError(t, err)
 			require.Equal(t, tc.expectProcessed, processed)
 
