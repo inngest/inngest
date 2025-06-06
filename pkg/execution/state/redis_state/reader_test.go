@@ -59,6 +59,15 @@ func TestItemsByPartition(t *testing.T) {
 			interval:      time.Second,
 			expectedItems: 7,
 		},
+		{
+			name:          "with batch size",
+			num:           10,
+			from:          clock.Now(),
+			until:         clock.Now().Add(10 * time.Second).Truncate(time.Second),
+			interval:      10 * time.Millisecond,
+			expectedItems: 10,
+			batchSize:     2,
+		},
 		// {
 		// 	name:             "retrieve items backlogs",
 		// 	num:              14,
