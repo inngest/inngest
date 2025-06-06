@@ -532,7 +532,7 @@ func (s *svc) handleCancel(ctx context.Context, item queue.Item) error {
 			return fmt.Errorf("error selecting shard for cancellation: %w", err)
 		}
 
-		items, err := qm.ItemsByFunction(ctx, shard, c.FunctionID, from, c.StartedBefore,
+		items, err := qm.ItemsByPartition(ctx, shard, c.FunctionID, from, c.StartedBefore,
 			redis_state.WithQueueItemIteratorAllowKeyQueues(func() bool {
 				return s.allowKeyQueues(ctx, c.AccountID)
 			}),
