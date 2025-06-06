@@ -14,6 +14,7 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
+	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/inngest/inngestgo"
@@ -1738,6 +1739,14 @@ func TestShadowPartitionUpdate(t *testing.T) {
 		concurrencyKeys []state.CustomConcurrency
 	}
 
+	idv2 := sv2.ID{
+		FunctionID: fnID,
+		Tenant: sv2.Tenant{
+			AccountID: accountId,
+			EnvID:     wsID,
+		},
+	}
+
 	// test cases
 	tests := []struct {
 		name  string
@@ -1747,50 +1756,62 @@ func TestShadowPartitionUpdate(t *testing.T) {
 		{
 			name: "none to concurrency",
 			conf2: itemConf{
-				concurrencyKeys: []state.CustomConcurrency{
-					{
-						Key:                       util.ConcurrencyKey(enums.ConcurrencyScopeFn, fnID, "customer1"),
-						Hash:                      hashConcurrencyKey("event.data.customerId"),
-						Limit:                     123,
-						UnhashedEvaluatedKeyValue: "customer1",
+				concurrencyKeys: osqueue.GetCustomConcurrencyKeys(
+					ctx,
+					idv2,
+					[]inngest.Concurrency{
+						{Limit: 123, Key: util.StrPtr("event.data.customerId")},
 					},
-				},
+					inngestgo.Event{
+						Name: "yolo",
+						Data: map[string]any{"customerId": 10},
+					}.Map(),
+				),
 			},
 		},
 		{
 			name: "concurrency to none",
 			conf1: itemConf{
-				concurrencyKeys: []state.CustomConcurrency{
-					{
-						Key:                       util.ConcurrencyKey(enums.ConcurrencyScopeFn, fnID, "customer1"),
-						Hash:                      hashConcurrencyKey("event.data.customerId"),
-						Limit:                     123,
-						UnhashedEvaluatedKeyValue: "customer1",
+				concurrencyKeys: osqueue.GetCustomConcurrencyKeys(
+					ctx,
+					idv2,
+					[]inngest.Concurrency{
+						{Limit: 123, Key: util.StrPtr("event.data.customerId")},
 					},
-				},
+					inngestgo.Event{
+						Name: "yolo",
+						Data: map[string]any{"customerId": 10},
+					}.Map(),
+				),
 			},
 		},
 		{
 			name: "change concurrency",
 			conf1: itemConf{
-				concurrencyKeys: []state.CustomConcurrency{
-					{
-						Key:                       util.ConcurrencyKey(enums.ConcurrencyScopeFn, fnID, "customer1"),
-						Hash:                      hashConcurrencyKey("event.data.customerId"),
-						Limit:                     123,
-						UnhashedEvaluatedKeyValue: "customer1",
+				concurrencyKeys: osqueue.GetCustomConcurrencyKeys(
+					ctx,
+					idv2,
+					[]inngest.Concurrency{
+						{Limit: 123, Key: util.StrPtr("event.data.customerId")},
 					},
-				},
+					inngestgo.Event{
+						Name: "yolo",
+						Data: map[string]any{"customerId": 10},
+					}.Map(),
+				),
 			},
 			conf2: itemConf{
-				concurrencyKeys: []state.CustomConcurrency{
-					{
-						Key:                       util.ConcurrencyKey(enums.ConcurrencyScopeFn, fnID, "user10"),
-						Hash:                      hashConcurrencyKey("event.data.userId"),
-						Limit:                     123,
-						UnhashedEvaluatedKeyValue: "user10",
+				concurrencyKeys: osqueue.GetCustomConcurrencyKeys(
+					ctx,
+					idv2,
+					[]inngest.Concurrency{
+						{Limit: 123, Key: util.StrPtr("event.data.userId")},
 					},
-				},
+					inngestgo.Event{
+						Name: "yolo",
+						Data: map[string]any{"userId": 10},
+					}.Map(),
+				),
 			},
 		},
 		{
