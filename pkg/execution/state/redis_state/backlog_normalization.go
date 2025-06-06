@@ -323,8 +323,6 @@ func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp 
 				return fmt.Errorf("could not re-enqueue backlog item: %w", err)
 			}
 
-			// TODO Remove item pointer from old backlog (only pointer, do not drop item from hash)
-
 			processed += 1
 		}
 

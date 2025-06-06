@@ -295,7 +295,6 @@ func (q *queue) ItemBacklog(ctx context.Context, i osqueue.QueueItem) QueueBackl
 		}
 
 		b.BacklogID += fmt.Sprintf(":t<%s>", i.Data.Throttle.Key)
-		// b.BacklogID += fmt.Sprintf(":t<%s>", i.Data.Throttle.KeyExpressionHash)
 
 		if i.Data.Throttle.UnhashedThrottleKey != "" {
 			unhashedKey := i.Data.Throttle.UnhashedThrottleKey
