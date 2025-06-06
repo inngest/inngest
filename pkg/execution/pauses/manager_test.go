@@ -86,7 +86,7 @@ func TestManagerFlushingWithLowLimit(t *testing.T) {
 	time.Sleep(manager.flushDelay * 2)
 	// After waiting for the flush, there should only be 1 pause in the buffer,
 	// as the block size is 3 and there were 4 pauses in the buffer - leaving 1 remaining.
-	assert.Equal(t, 1, len(mockBufferer.pauses))
+	assert.Equal(t, 1, mockBufferer.pauseCount())
 
 	// Test 3: Verify blocks were created and retrievable
 	blocks, err := blockStore.BlocksSince(ctx, index, time.Time{})
@@ -117,7 +117,7 @@ func TestManagerFlushingWithLowLimit(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify the pause was deleted by trying to access it
-	mockBufferer.pauses = nil // Clear buffer to force reading from blocks
+	mockBufferer.clearPauses() // Clear buffer to force reading from blocks
 	iter, err = manager.PausesSince(ctx, index, time.Time{})
 	require.NoError(t, err)
 

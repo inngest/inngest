@@ -227,6 +227,19 @@ func (m *mockBufferer) IndexExists(ctx context.Context, i Index) (bool, error) {
 	return len(m.pauses) > 0, nil
 }
 
+// Helper methods for thread-safe access in tests
+func (m *mockBufferer) pauseCount() int {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return len(m.pauses)
+}
+
+func (m *mockBufferer) clearPauses() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.pauses = nil
+}
+
 // mockPauseIterator implements the PauseIterator interface for testing
 type mockPauseIterator struct {
 	pauses []*state.Pause
