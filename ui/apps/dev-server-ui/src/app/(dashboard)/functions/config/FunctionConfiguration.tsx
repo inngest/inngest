@@ -156,7 +156,7 @@ export default function FunctionConfiguration({
   }
 
   return (
-    <div className="flex flex-col">
+    <div className="flex flex-col overflow-hidden overflow-y-auto">
       <Header
         breadcrumb={[{ text: inngestFunction.name }]}
         action={

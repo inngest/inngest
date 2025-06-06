@@ -25,15 +25,10 @@ export default function FunctionDetails() {
   console.log({ data });
 
   return (
-    <div className="grid" style={{ gridTemplateColumns: '1fr 1fr 1fr 432px' }}>
-      <div style={{ gridColumn: 'span 3 / span 3' }}></div>
-      <div>
-        <FunctionConfiguration
-          inngestFunction={data.functionBySlug}
-          triggers={data.functionBySlug.triggers}
-          configuration={data.functionBySlug.configuration}
-        />
-      </div>
-    </div>
+    <FunctionConfiguration
+      inngestFunction={data.functionBySlug}
+      triggers={data.functionBySlug.triggers}
+      configuration={data.functionBySlug.configuration}
+    />
   );
 }
