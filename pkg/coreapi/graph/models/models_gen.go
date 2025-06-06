@@ -136,16 +136,17 @@ type EventsQuery struct {
 }
 
 type Function struct {
-	ID            string                 `json:"id"`
-	Name          string                 `json:"name"`
-	Slug          string                 `json:"slug"`
-	Config        string                 `json:"config"`
-	Configuration *FunctionConfiguration `json:"configuration"`
-	Concurrency   int                    `json:"concurrency"`
-	Triggers      []*FunctionTrigger     `json:"triggers,omitempty"`
-	URL           string                 `json:"url"`
-	AppID         string                 `json:"appID"`
-	App           *cqrs.App              `json:"app"`
+	ID             string                 `json:"id"`
+	Name           string                 `json:"name"`
+	Slug           string                 `json:"slug"`
+	FailureHandler *Function              `json:"failureHandler,omitempty"`
+	Config         string                 `json:"config"`
+	Configuration  *FunctionConfiguration `json:"configuration"`
+	Concurrency    int                    `json:"concurrency"`
+	Triggers       []*FunctionTrigger     `json:"triggers,omitempty"`
+	URL            string                 `json:"url"`
+	AppID          string                 `json:"appID"`
+	App            *cqrs.App              `json:"app"`
 }
 
 type FunctionConfiguration struct {
@@ -233,8 +234,9 @@ type FunctionRunsQuery struct {
 }
 
 type FunctionTrigger struct {
-	Type  FunctionTriggerTypes `json:"type"`
-	Value string               `json:"value"`
+	Type      FunctionTriggerTypes `json:"type"`
+	Value     string               `json:"value"`
+	Condition *string              `json:"condition,omitempty"`
 }
 
 type InvokeStepInfo struct {

@@ -129,6 +129,7 @@ type Function {
   id: String!
   name: String!
   slug: String!
+  failureHandler: Function
   config: String!
   configuration: FunctionConfiguration!
   concurrency: Int!
@@ -146,6 +147,7 @@ enum FunctionTriggerTypes {
 type FunctionTrigger {
   type: FunctionTriggerTypes!
   value: String!
+  condition: String
 }
 
 enum FunctionRunStatus {
