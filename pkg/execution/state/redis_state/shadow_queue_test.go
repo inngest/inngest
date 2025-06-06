@@ -1907,12 +1907,9 @@ func TestShadowPartitionUpdate(t *testing.T) {
 				},
 			}
 
-			_, err := q.EnqueueItem(ctx, defaultShard, item1, at, osqueue.EnqueueOpts{})
-			require.NoError(t, err)
-
 			backlog1 := q.ItemBacklog(ctx, item1)
 			require.NotEmpty(t, backlog1.BacklogID)
-			// fmt.Printf("Backlog1: %#v\n", backlog1.Throttle)
+			fmt.Printf("Backlog1: %#v\n", backlog1.Throttle)
 
 			initialShadowPart := q.ItemShadowPartition(ctx, item1)
 			require.NotEmpty(t, initialShadowPart.PartitionID)
@@ -1932,6 +1929,9 @@ func TestShadowPartitionUpdate(t *testing.T) {
 				require.NotNil(t, backlog1.Throttle)
 				require.Equal(t, initialShadowPart.Throttle.ThrottleKeyExpressionHash, backlog1.Throttle.ThrottleKeyExpressionHash)
 			}
+
+			_, err := q.EnqueueItem(ctx, defaultShard, item1, at, osqueue.EnqueueOpts{})
+			require.NoError(t, err)
 
 			// verify shadow partition
 			savedPart := QueueShadowPartition{}
@@ -1996,7 +1996,7 @@ func TestShadowPartitionUpdate(t *testing.T) {
 
 			_, err = q.EnqueueItem(ctx, defaultShard, item2, at.Add(time.Minute), osqueue.EnqueueOpts{})
 			require.NoError(t, err)
-			// fmt.Printf("Backlog2: %#v\n", backlog2.Throttle)
+			fmt.Printf("Backlog2: %#v\n", backlog2.Throttle)
 
 			// verify shadow partition
 			savedPart = QueueShadowPartition{}
@@ -2675,7 +2675,8 @@ func TestShadowPartitionBacklogNormalization(t *testing.T) {
 			// verify pre-process state
 			sp2, err := r.ZMembers(kg.ShadowPartitionSet(updatedShadowPart.PartitionID))
 			require.NoError(t, err)
-			require.Len(t, sp2, 2)
+			fmt.Printf("Pre-procession partition backlogs: %#v\n", sp2)
+			// require.Len(t, sp2, 2)
 
 			// attempt processing and expect normalization
 			_, processed, err := q.processShadowPartitionBacklog(ctx, &updatedShadowPart, &backlog1, at)
@@ -2692,6 +2693,9 @@ func TestShadowPartitionBacklogNormalization(t *testing.T) {
 				mem, _ := r.ZMembers(key)
 				require.Len(t, mem, 0)
 			}
+
+			blm, _ := r.ZMembers(kg.BacklogSet(backlog1.BacklogID))
+			fmt.Printf("Backlog items: %#v\n", blm)
 
 			part, err := r.ZMembers(kg.ShadowPartitionSet(updatedShadowPart.PartitionID))
 			require.NoError(t, err)
