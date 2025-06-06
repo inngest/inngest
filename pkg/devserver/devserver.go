@@ -780,6 +780,7 @@ func PartitionConstraintConfigGetter(smv2 sv2.StateLoader, dbcqrs cqrs.Manager) 
 			return nil, fmt.Errorf("could not convert workflow to inngest function: %w", err)
 		}
 
+		// TODO Make this reusable in cloud, it's the same operation with different data sources
 		accountLimit := consts.DefaultConcurrencyLimit
 
 		fnLimit := fn.ConcurrencyLimit()
