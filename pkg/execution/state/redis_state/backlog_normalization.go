@@ -16,6 +16,22 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+const (
+	NormalizeAccountPeekMax   = int64(30)
+	NormalizePartitionPeekMax = int64(100)
+	NormalizeBacklogPeekMax   = int64(300) // same as ShadowPartitionPeekMax
+
+	// BacklogNormalizeAsyncLimit determines the minimum number of items required in an outdated backlog
+	// to require an async normalize job. For small backlogs, the added QPS may not be worth it and we should normalize JIT.
+	BacklogNormalizeAsyncLimit = 100
+
+	// BacklogRefillHardLimit sets the maximum number of items that can be refilled in a single backlogRefill operation.
+	BacklogRefillHardLimit = int64(1000)
+
+	// BacklogNormalizeHardLimit sets the batch size of items to be reenqueued into the appropriate backlogs durign normalization
+	BacklogNormalizeHardLimit = int64(1000)
+)
+
 var (
 	errBacklogNormalizationLeaseExpired     = fmt.Errorf("backlog normalization lease expired")
 	errBacklogAlreadyLeasedForNormalization = fmt.Errorf("backlog already leased for normalization")
@@ -46,6 +62,7 @@ func (q *queue) backlogNormalizationWorker(ctx context.Context, nc chan normaliz
 // backlogNormalizationScan iterates through a partition of backlogs and reenqueue
 // the items to the appropriate backlogs
 func (q *queue) backlogNormalizationScan(ctx context.Context) error {
+	l := q.log.With("method", "backlogNormalizationScan")
 	bc := make(chan normalizeWorkerChanMsg)
 
 	for i := int32(0); i < q.numBacklogNormalizationWorkers; i++ {
@@ -53,7 +70,9 @@ func (q *queue) backlogNormalizationScan(ctx context.Context) error {
 	}
 
 	tick := q.clock.NewTicker(q.pollTick)
-	q.log.Debug("starting normalization scanner", "poll", q.pollTick.String())
+	l.Debug("starting normalization scanner", "poll", q.pollTick.String())
+
+	backoff := 200 * time.Millisecond
 
 	for {
 		select {
@@ -65,17 +84,30 @@ func (q *queue) backlogNormalizationScan(ctx context.Context) error {
 			until := q.clock.Now()
 
 			if err := q.iterateNormalizationPartition(ctx, until, bc); err != nil {
+				if errors.Is(err, context.DeadlineExceeded) {
+					l.Warn("deadline exceeded scanning backlog normalization partition")
+					<-time.After(backoff)
+
+					// Backoff doubles up to 5 seconds
+					backoff = time.Duration(math.Min(float64(backoff*2), float64(5*time.Second)))
+					continue
+				}
+
+				if !errors.Is(err, context.Canceled) {
+					l.Error("error scanning backlog normalization partitions", "error", err)
+				}
+
 				return fmt.Errorf("error scanning global normalization partition: %w", err)
 			}
+
+			backoff = 200 * time.Millisecond
 		}
 	}
 }
 
 // iterateNormalizationPartition scans and iterate through the global normalization partition to process backlogs needing to be normalized
 func (q *queue) iterateNormalizationPartition(ctx context.Context, until time.Time, bc chan normalizeWorkerChanMsg) error {
-	// TODO: check capacity
-
-	// TODO introduce weight probability to blend account/global scanning
+	// introduce weight probability to blend account/global scanning
 	peekedAccounts, err := q.peekGlobalNormalizeAccounts(ctx, until, NormalizeAccountPeekMax)
 	if err != nil {
 		return fmt.Errorf("could not peek global normalize accounts: %w", err)

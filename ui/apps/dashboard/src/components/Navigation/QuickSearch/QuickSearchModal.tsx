@@ -118,9 +118,8 @@ export function QuickSearchModal({ envSlug, envName, isOpen, onClose }: Props) {
                     key={res.data.event.id}
                     kind="event"
                     onClick={onClose}
-                    path={pathCreator.event({
+                    path={pathCreator.eventPopout({
                       envSlug: coerceEnvSlug(res.data.event.envSlug),
-                      eventName: res.data.event.name,
                       eventID: res.data.event.id,
                     })}
                     text={res.data.event.name}

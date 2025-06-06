@@ -381,13 +381,13 @@ func (s *svc) handleMessage(ctx context.Context, m pubsub.Message) error {
 
 	l := s.log.With(
 		"event", tracked.GetEvent().Name,
-		"id", tracked.GetEvent().ID,
+		"event_id", tracked.GetEvent().ID,
 		"internal_id", tracked.GetInternalID().String(),
 	)
 
 	ctx = logger.WithStdlib(ctx, l)
 
-	l.Info("received message")
+	l.Info("received event")
 
 	var errs error
 	wg := &sync.WaitGroup{}
@@ -596,7 +596,7 @@ func (s *svc) functions(ctx context.Context, tracked event.TrackedEvent) error {
 func (s *svc) invokes(ctx context.Context, evt event.TrackedEvent) error {
 	l := logger.StdlibLogger(ctx).With(
 		"event", evt.GetEvent().Name,
-		"id", evt.GetEvent().ID,
+		"event_id", evt.GetEvent().ID,
 		"internal_id", evt.GetInternalID().String(),
 	)
 
@@ -609,7 +609,7 @@ func (s *svc) invokes(ctx context.Context, evt event.TrackedEvent) error {
 func (s *svc) pauses(ctx context.Context, evt event.TrackedEvent) error {
 	l := logger.StdlibLogger(ctx).With(
 		"event", evt.GetEvent().Name,
-		"id", evt.GetEvent().ID,
+		"event_id", evt.GetEvent().ID,
 		"internal_id", evt.GetInternalID().String(),
 	)
 

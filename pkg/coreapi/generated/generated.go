@@ -180,6 +180,7 @@ type ComplexityRoot struct {
 		Priority      func(childComplexity int) int
 		RateLimit     func(childComplexity int) int
 		Retries       func(childComplexity int) int
+		Singleton     func(childComplexity int) int
 		Throttle      func(childComplexity int) int
 	}
 
@@ -421,6 +422,11 @@ type ComplexityRoot struct {
 		Edges      func(childComplexity int) int
 		PageInfo   func(childComplexity int) int
 		TotalCount func(childComplexity int) int
+	}
+
+	SingletonConfiguration struct {
+		Key  func(childComplexity int) int
+		Mode func(childComplexity int) int
 	}
 
 	SleepStepInfo struct {
@@ -1187,6 +1193,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.FunctionConfiguration.Retries(childComplexity), true
+
+	case "FunctionConfiguration.singleton":
+		if e.complexity.FunctionConfiguration.Singleton == nil {
+			break
+		}
+
+		return e.complexity.FunctionConfiguration.Singleton(childComplexity), true
 
 	case "FunctionConfiguration.throttle":
 		if e.complexity.FunctionConfiguration.Throttle == nil {
@@ -2455,6 +2468,20 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.RunsV2Connection.TotalCount(childComplexity), true
 
+	case "SingletonConfiguration.key":
+		if e.complexity.SingletonConfiguration.Key == nil {
+			break
+		}
+
+		return e.complexity.SingletonConfiguration.Key(childComplexity), true
+
+	case "SingletonConfiguration.mode":
+		if e.complexity.SingletonConfiguration.Mode == nil {
+			break
+		}
+
+		return e.complexity.SingletonConfiguration.Mode(childComplexity), true
+
 	case "SleepStepInfo.sleepUntil":
 		if e.complexity.SleepStepInfo.SleepUntil == nil {
 			break
@@ -3121,6 +3148,7 @@ type FunctionConfiguration {
   rateLimit: RateLimitConfiguration
   debounce: DebounceConfiguration
   throttle: ThrottleConfiguration
+  singleton: SingletonConfiguration
 }
 
 type CancellationConfiguration {
@@ -3177,6 +3205,16 @@ type ThrottleConfiguration {
   key: String
   limit: Int!
   period: String!
+}
+
+type SingletonConfiguration {
+  mode: SingletonMode!
+  key: String
+}
+
+enum SingletonMode {
+  SKIP
+  CANCEL
 }
 
 enum StepEventType {
@@ -7349,6 +7387,8 @@ func (ec *executionContext) fieldContext_Function_configuration(ctx context.Cont
 				return ec.fieldContext_FunctionConfiguration_debounce(ctx, field)
 			case "throttle":
 				return ec.fieldContext_FunctionConfiguration_throttle(ctx, field)
+			case "singleton":
+				return ec.fieldContext_FunctionConfiguration_singleton(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type FunctionConfiguration", field.Name)
 		},
@@ -7997,6 +8037,53 @@ func (ec *executionContext) fieldContext_FunctionConfiguration_throttle(ctx cont
 				return ec.fieldContext_ThrottleConfiguration_period(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type ThrottleConfiguration", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FunctionConfiguration_singleton(ctx context.Context, field graphql.CollectedField, obj *models.FunctionConfiguration) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_FunctionConfiguration_singleton(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Singleton, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*models.SingletonConfiguration)
+	fc.Result = res
+	return ec.marshalOSingletonConfiguration2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐSingletonConfiguration(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_FunctionConfiguration_singleton(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FunctionConfiguration",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "mode":
+				return ec.fieldContext_SingletonConfiguration_mode(ctx, field)
+			case "key":
+				return ec.fieldContext_SingletonConfiguration_key(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type SingletonConfiguration", field.Name)
 		},
 	}
 	return fc, nil
@@ -16353,6 +16440,91 @@ func (ec *executionContext) fieldContext_RunsV2Connection_totalCount(ctx context
 	return fc, nil
 }
 
+func (ec *executionContext) _SingletonConfiguration_mode(ctx context.Context, field graphql.CollectedField, obj *models.SingletonConfiguration) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SingletonConfiguration_mode(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Mode, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(models.SingletonMode)
+	fc.Result = res
+	return ec.marshalNSingletonMode2githubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐSingletonMode(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SingletonConfiguration_mode(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SingletonConfiguration",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type SingletonMode does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SingletonConfiguration_key(ctx context.Context, field graphql.CollectedField, obj *models.SingletonConfiguration) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SingletonConfiguration_key(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Key, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SingletonConfiguration_key(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SingletonConfiguration",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _SleepStepInfo_sleepUntil(ctx context.Context, field graphql.CollectedField, obj *models.SleepStepInfo) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_SleepStepInfo_sleepUntil(ctx, field)
 	if err != nil {
@@ -21607,6 +21779,10 @@ func (ec *executionContext) _FunctionConfiguration(ctx context.Context, sel ast.
 
 			out.Values[i] = ec._FunctionConfiguration_throttle(ctx, field, obj)
 
+		case "singleton":
+
+			out.Values[i] = ec._FunctionConfiguration_singleton(ctx, field, obj)
+
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -23473,6 +23649,38 @@ func (ec *executionContext) _RunsV2Connection(ctx context.Context, sel ast.Selec
 	return out
 }
 
+var singletonConfigurationImplementors = []string{"SingletonConfiguration"}
+
+func (ec *executionContext) _SingletonConfiguration(ctx context.Context, sel ast.SelectionSet, obj *models.SingletonConfiguration) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, singletonConfigurationImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("SingletonConfiguration")
+		case "mode":
+
+			out.Values[i] = ec._SingletonConfiguration_mode(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "key":
+
+			out.Values[i] = ec._SingletonConfiguration_key(ctx, field, obj)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
 var sleepStepInfoImplementors = []string{"SleepStepInfo", "StepInfo"}
 
 func (ec *executionContext) _SleepStepInfo(ctx context.Context, sel ast.SelectionSet, obj *models.SleepStepInfo) graphql.Marshaler {
@@ -25156,6 +25364,16 @@ func (ec *executionContext) marshalNRunsV2OrderByField2githubᚗcomᚋinngestᚋ
 	return v
 }
 
+func (ec *executionContext) unmarshalNSingletonMode2githubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐSingletonMode(ctx context.Context, v interface{}) (models.SingletonMode, error) {
+	var res models.SingletonMode
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNSingletonMode2githubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐSingletonMode(ctx context.Context, sel ast.SelectionSet, v models.SingletonMode) graphql.Marshaler {
+	return v
+}
+
 func (ec *executionContext) marshalNStreamItem2ᚕᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐStreamItemᚄ(ctx context.Context, sel ast.SelectionSet, v []*models.StreamItem) graphql.Marshaler {
 	ret := make(graphql.Array, len(v))
 	var wg sync.WaitGroup
@@ -26288,6 +26506,13 @@ func (ec *executionContext) marshalORunsV2OrderByField2ᚖgithubᚗcomᚋinngest
 		return graphql.Null
 	}
 	return v
+}
+
+func (ec *executionContext) marshalOSingletonConfiguration2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐSingletonConfiguration(ctx context.Context, sel ast.SelectionSet, v *models.SingletonConfiguration) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._SingletonConfiguration(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOStepError2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐStepError(ctx context.Context, sel ast.SelectionSet, v *models.StepError) graphql.Marshaler {

@@ -137,21 +137,10 @@ func (a API) GetEventRuns(ctx context.Context, eventID ulid.ULID) ([]*cqrs.Funct
 	if err != nil {
 		return nil, publicerr.Wrap(err, 401, "No auth found")
 	}
-	fr, err := a.opts.FunctionRunReader.GetFunctionRunsFromEvents(
-		ctx,
-		auth.AccountID(),
-		auth.WorkspaceID(),
-		[]ulid.ULID{eventID},
-	)
-	if err != nil {
-		return nil, publicerr.Wrap(err, 500, "Unable to query function runs")
-	}
 
-	result := []*cqrs.FunctionRun{}
-	for _, item := range fr {
-		if item.WorkspaceID == auth.WorkspaceID() {
-			result = append(result, item)
-		}
+	result, err := a.opts.TraceReader.GetEventRuns(ctx, eventID, auth.AccountID(), auth.WorkspaceID())
+	if err != nil {
+		return nil, publicerr.Wrap(err, 500, "Unable to query event runs")
 	}
 	return result, nil
 }

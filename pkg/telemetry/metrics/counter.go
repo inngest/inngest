@@ -366,6 +366,15 @@ func IncrBacklogRequeuedCounter(ctx context.Context, opts CounterOpt) {
 	})
 }
 
+func IncrRequeueExistingToBacklogCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "backlog_requeue_existing_total",
+		Description: "The total number of existing queue items that were requeued into backlogs from fn partition after hitting constraints",
+		Tags:        opts.Tags,
+	})
+}
+
 func ActiveShadowScannerCount(ctx context.Context, incr int64, opts CounterOpt) {
 	RecordUpDownCounterMetric(ctx, incr, CounterOpt{
 		PkgName:     opts.PkgName,
@@ -434,6 +443,15 @@ func IncrQueuePeekLeaseContentionCounter(ctx context.Context, opts CounterOpt) {
 		PkgName:     opts.PkgName,
 		MetricName:  "queue_peek_lease_contention",
 		Description: "Total number of leased queue items peeked for a partition",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrQueueOutdatedBacklogCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "queue_shadow_outdated_backlog_total",
+		Description: "The total number of times outdated backlogs were detected",
 		Tags:        opts.Tags,
 	})
 }

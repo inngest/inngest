@@ -23,6 +23,9 @@ type QueueLifecycleListener interface {
 		accountID uuid.UUID,
 		workspaceID *uuid.UUID,
 	)
+
+	OnBacklogRefillConstraintHit(ctx context.Context, p *QueueShadowPartition, b *QueueBacklog, res *BacklogRefillResult)
+	OnBacklogRefilled(ctx context.Context, p *QueueShadowPartition, b *QueueBacklog, res *BacklogRefillResult)
 }
 
 type QueueLifecycleListeners []QueueLifecycleListener
@@ -54,5 +57,17 @@ func (l QueueLifecycleListeners) OnAccountConcurrencyLimitReached(
 func (l QueueLifecycleListeners) OnCustomKeyConcurrencyLimitReached(ctx context.Context, key string) {
 	l.GoEach(func(listener QueueLifecycleListener) {
 		listener.OnCustomKeyConcurrencyLimitReached(ctx, key)
+	})
+}
+
+func (l QueueLifecycleListeners) OnBacklogRefillConstraintHit(ctx context.Context, p *QueueShadowPartition, b *QueueBacklog, res *BacklogRefillResult) {
+	l.GoEach(func(listener QueueLifecycleListener) {
+		listener.OnBacklogRefillConstraintHit(ctx, p, b, res)
+	})
+}
+
+func (l QueueLifecycleListeners) OnBacklogRefilled(ctx context.Context, p *QueueShadowPartition, b *QueueBacklog, res *BacklogRefillResult) {
+	l.GoEach(func(listener QueueLifecycleListener) {
+		listener.OnBacklogRefilled(ctx, p, b, res)
 	})
 }

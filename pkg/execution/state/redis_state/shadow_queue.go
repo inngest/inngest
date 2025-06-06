@@ -21,12 +21,24 @@ import (
 )
 
 const (
+	AbsoluteShadowPartitionPeekMax int64 = 10 * ShadowPartitionPeekMaxBacklogs
+
 	ShadowPartitionAccountPeekMax  = int64(30)
 	ShadowPartitionPeekMax         = int64(300) // same as PartitionPeekMax for now
 	ShadowPartitionPeekMinBacklogs = int64(10)
 	ShadowPartitionPeekMaxBacklogs = int64(100)
 
-	ShadowPartitionRequeueExtendedDuration = 5 * time.Second
+	ShadowPartitionRequeueExtendedDuration = 3 * time.Second
+)
+
+var (
+	ErrShadowPartitionAlreadyLeased               = fmt.Errorf("shadow partition already leased")
+	ErrShadowPartitionLeaseNotFound               = fmt.Errorf("shadow partition lease not found")
+	ErrShadowPartitionNotFound                    = fmt.Errorf("shadow partition not found")
+	ErrShadowPartitionPaused                      = fmt.Errorf("shadow partition refill is disabled")
+	ErrShadowPartitionBacklogPeekMaxExceedsLimits = fmt.Errorf("shadow partition backlog peek exceeded the maximum limit of %d", ShadowPartitionPeekMaxBacklogs)
+	ErrShadowPartitionPeekMaxExceedsLimits        = fmt.Errorf("shadow partition peek exceeded the maximum limit of %d", ShadowPartitionPeekMax)
+	ErrShadowPartitionAccountPeekMaxExceedsLimits = fmt.Errorf("account peek with shadow partitions exceeded the maximum limit of %d", ShadowPartitionAccountPeekMax)
 )
 
 // shadowWorker runs a blocking process that listens to item being pushed into the
@@ -45,6 +57,9 @@ func (q *queue) shadowWorker(ctx context.Context, qspc chan shadowPartitionChanM
 				q.clock.Now(),
 				func(ctx context.Context) (any, error) {
 					err := q.processShadowPartition(ctx, msg.sp, msg.continuationCount)
+					if errors.Is(err, context.Canceled) {
+						return nil, nil
+					}
 					return nil, err
 				},
 				map[string]any{"partition_id": msg.sp.PartitionID},
@@ -70,6 +85,7 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 				Tags: map[string]any{
 					"queue_shard":  q.primaryQueueShard.Name,
 					"partition_id": shadowPart.PartitionID,
+					"action":       "lease",
 				},
 			})
 			return nil
@@ -100,6 +116,9 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 	extendLeaseCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
+	ctx, jobCancel := context.WithCancel(context.WithoutCancel(ctx))
+	defer jobCancel()
+
 	// keep extending lease while we're processing
 	go func() {
 		for {
@@ -107,14 +126,35 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 			case <-extendLeaseCtx.Done():
 				return
 			case <-time.Tick(ShadowPartitionLeaseDuration / 2):
-				leaseID, err = q.ShadowPartitionExtendLease(ctx, shadowPart, *leaseID, ShadowPartitionLeaseDuration)
-				if err != nil {
-					if errors.Is(err, ErrShadowPartitionAlreadyLeased) || errors.Is(err, ErrShadowPartitionLeaseNotFound) {
-						// contention
-						return
-					}
+				if leaseID == nil {
 					return
 				}
+
+				newLeaseID, err := q.ShadowPartitionExtendLease(ctx, shadowPart, *leaseID, ShadowPartitionLeaseDuration)
+				if err != nil {
+					jobCancel()
+
+					// lease contention
+					if errors.Is(err, ErrShadowPartitionAlreadyLeased) || errors.Is(err, ErrShadowPartitionLeaseNotFound) {
+						metrics.IncrQueueShadowPartitionLeaseContentionCounter(ctx, metrics.CounterOpt{
+							PkgName: pkgName,
+							Tags: map[string]any{
+								"queue_shard":  q.primaryQueueShard.Name,
+								"partition_id": shadowPart.PartitionID,
+								"action":       "extend_lease",
+							},
+						})
+					}
+
+					return
+				}
+
+				if newLeaseID == nil {
+					jobCancel()
+					return
+				}
+
+				leaseID = newLeaseID
 			}
 		}
 	}()
@@ -124,18 +164,20 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 		q.removeShadowContinue(ctx, shadowPart, false)
 
 		forceRequeueAt := q.clock.Now().Add(ShadowPartitionRefillPausedRequeueExtension)
-		err = q.ShadowPartitionRequeue(ctx, shadowPart, *leaseID, &forceRequeueAt)
-		if err != nil {
+		err = q.ShadowPartitionRequeue(ctx, shadowPart, &forceRequeueAt)
+
+		switch err {
+		case nil, ErrShadowPartitionNotFound:
+			return nil
+		default:
 			return fmt.Errorf("could not requeue shadow partition: %w", err)
 		}
-
-		return nil
 	}
 
 	limit := ShadowPartitionPeekMaxBacklogs
 
 	// Scan a little further into the future
-	refillUntil := q.clock.Now().Truncate(time.Second).Add(2 * PartitionLookahead)
+	refillUntil := q.clock.Now().Truncate(time.Millisecond).Add(2 * PartitionLookahead)
 
 	// Pick a random backlog offset every time
 	sequential := false
@@ -149,147 +191,53 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 		Tags:    map[string]any{"partition_id": shadowPart.PartitionID},
 	})
 
-	// q.log.Trace("processing backlogs",
-	// 	"partition_id", shadowPart.PartitionID,
-	// 	"until", refillUntil.Format(time.StampMilli),
-	// 	"backlogs", len(backlogs),
-	// )
-
 	// Refill backlogs in random order
-	fullyProcessedBacklogs := 0
+	fullyProcessedBacklogs := 0 // Number of fully processed backlogs
+	var wasConstrained bool     // Whether we encountered constraints affecting the shadow partition
 	for _, idx := range util.RandPerm(len(backlogs)) {
-		backlog := backlogs[idx]
-
-		// May need to normalize - this will not happen for default backlogs
-		if backlog.isOutdated(shadowPart) {
-			// Prepare normalization, this will just run once as the shadow scanner
-			// won't pick it up again after this.
-			_, shouldNormalizeAsync, err := q.BacklogPrepareNormalize(
-				ctx,
-				backlog,
-				shadowPart,
-				q.backlogNormalizeAsyncLimit(ctx),
-			)
-			if err != nil {
-				return fmt.Errorf("could not prepare backlog for normalization: %w", err)
-			}
-
-			// If there are just a couple of items in the backlog, we can
-			// normalize right away, we have the guarantee that the backlog
-			// is not being normalized right now as it wouldn't be picked up
-			// by the shadow scanner otherwise.
-			if !shouldNormalizeAsync {
-				if _, err := duration(ctx, q.primaryQueueShard.Name, "normalize_lease", q.clock.Now(), func(ctx context.Context) (any, error) {
-					err := q.leaseBacklogForNormalization(ctx, backlog)
-					return nil, err
-				}); err != nil {
-					return err
-				}
-
-				if err := q.normalizeBacklog(ctx, backlog, shadowPart); err != nil {
-					return fmt.Errorf("could not normalize backlog: %w", err)
-				}
-			}
-
-			continue
-		}
-
-		res, err := durationWithTags(
-			ctx,
-			q.primaryQueueShard.Name,
-			"backlog_process_duration",
-			q.clock.Now(),
-			func(ctx context.Context) (*BacklogRefillResult, error) {
-				return q.BacklogRefill(ctx, backlog, shadowPart, refillUntil)
-			},
-			map[string]any{"partition_id": shadowPart.PartitionID},
-		)
-		if err != nil {
-			return fmt.Errorf("could not refill backlog: %w", err)
-		}
-
-		q.log.Trace("processed backlog",
-			"backlog", backlog.BacklogID,
-			"total", res.TotalBacklogCount,
-			"until", res.BacklogCountUntil,
-			"constrained", res.Constraint,
-			"capacity", res.Capacity,
-			"refill", res.Refill,
-			"refilled", res.Refilled,
-			"throttle", shadowPart.Throttle,
-		)
-
-		// instrumentation
-		{
-			opts := metrics.CounterOpt{
-				PkgName: pkgName,
-				Tags: map[string]any{
-					"queue_shard":  q.primaryQueueShard.Name,
-					"partition_id": shadowPart.PartitionID,
-				},
-			}
-
-			metrics.IncrBacklogProcessedCounter(ctx, opts)
-			metrics.IncrQueueBacklogRefilledCounter(ctx, int64(res.Refilled), opts)
-
-			switch res.Constraint {
-			case enums.QueueConstraintNotLimited: // no-op
-			default:
-				metrics.IncrQueueBacklogRefillConstraintCounter(ctx, metrics.CounterOpt{
-					PkgName: pkgName,
-					Tags: map[string]any{
-						"queue_shard":  q.primaryQueueShard.Name,
-						"partition_id": shadowPart.PartitionID,
-						"constraint":   res.Constraint.String(),
-					},
-				})
-			}
-
-			// NOTE: custom method to instrument result - potentially handling high cardinality data
-			q.instrumentBacklogResult(ctx, backlog, res)
-		}
-
-		var forceRequeueShadowPartitionAt time.Time
-		var forceRequeueBacklogAt time.Time
-
-		// If backlog is limited by function or account-level concurrency, stop refilling
-		isConcurrencyLimited := res.Constraint == enums.QueueConstraintAccountConcurrency ||
-			res.Constraint == enums.QueueConstraintFunctionConcurrency
-		if isConcurrencyLimited {
-			forceRequeueShadowPartitionAt = q.clock.Now().Add(PartitionConcurrencyLimitRequeueExtension)
-		}
-
-		// If backlog is concurrency limited by custom key, requeue just this backlog in the future
-		if res.Constraint == enums.QueueConstraintCustomConcurrencyKey1 || res.Constraint == enums.QueueConstraintCustomConcurrencyKey2 {
-			forceRequeueBacklogAt = backlog.requeueBackOff(q.clock.Now(), res.Constraint, shadowPart)
-		}
-
-		// If backlog is throttled, requeue just this backlog in the future
-		if res.Constraint == enums.QueueConstraintThrottle {
-			forceRequeueBacklogAt = backlog.requeueBackOff(q.clock.Now(), res.Constraint, shadowPart)
-		}
-
-		if !forceRequeueBacklogAt.IsZero() {
-			err = q.BacklogRequeue(ctx, backlog, shadowPart, forceRequeueBacklogAt)
-			if err != nil && !errors.Is(err, ErrBacklogNotFound) {
-				return fmt.Errorf("could not requeue shadow partition: %w", err)
-			}
-		}
-
-		if !forceRequeueShadowPartitionAt.IsZero() {
-			q.removeShadowContinue(ctx, shadowPart, false)
-
-			err = q.ShadowPartitionRequeue(ctx, shadowPart, *leaseID, &forceRequeueShadowPartitionAt)
-			if err != nil {
-				return fmt.Errorf("could not requeue shadow partition: %w", err)
-			}
-
+		// If cancelled, return early
+		if errors.Is(ctx.Err(), context.Canceled) {
 			return nil
 		}
 
-		remainingItems := res.TotalBacklogCount - res.Refilled
-		if remainingItems == 0 {
+		backlog := backlogs[idx]
+
+		res, fullyProcessed, err := q.processShadowPartitionBacklog(ctx, shadowPart, backlog, refillUntil)
+		if err != nil {
+			return fmt.Errorf("could not process backlog: %w", err)
+		}
+
+		// If we did not refill, continue on to next backlog
+		if res == nil {
+			continue
+		}
+
+		// If we fully refilled, track and continue
+		if fullyProcessed {
 			fullyProcessedBacklogs++
+			continue
+		}
+
+		// If we hit a constraint affecting the entire shadow partition, stop processing other backlogs
+		// and requeue the partition early, as we cannot refill items from other backlogs right now.
+		switch res.Constraint {
+		case enums.QueueConstraintNotLimited:
+			continue
+		case enums.QueueConstraintAccountConcurrency, enums.QueueConstraintFunctionConcurrency:
+			// No more backlogs right now, we can continue the scan loop until new items are added
+			q.removeShadowContinue(ctx, shadowPart, false)
+
+			forceRequeueShadowPartitionAt := q.clock.Now().Add(PartitionConcurrencyLimitRequeueExtension)
+
+			err = q.ShadowPartitionRequeue(ctx, shadowPart, &forceRequeueShadowPartitionAt)
+			switch err {
+			case nil, ErrShadowPartitionNotFound: // no-op
+				return nil
+			default:
+				return fmt.Errorf("could not requeue shadow partition: %w", err)
+			}
+		default:
+			wasConstrained = true
 		}
 	}
 
@@ -305,25 +253,189 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 		// No more backlogs right now, we can continue the scan loop until new items are added
 		q.removeShadowContinue(ctx, shadowPart, false)
 
-		err = q.ShadowPartitionRequeue(ctx, shadowPart, *leaseID, nil)
-		if err != nil {
+		err = q.ShadowPartitionRequeue(ctx, shadowPart, nil)
+
+		switch err {
+		case nil, ErrShadowPartitionNotFound: // no-op
+			return nil
+		default:
 			return fmt.Errorf("could not requeue shadow partition: %w", err)
 		}
-
-		return nil
 	}
 
-	// More backlogs, we can add a continuation
-	q.addShadowContinue(ctx, shadowPart, continuationCount+1)
+	if wasConstrained {
+		// Ran into constraint - remove existing continuation
+		q.removeShadowContinue(ctx, shadowPart, false)
+	} else {
+		// Not constrained so we can add a continuation
+		q.addShadowContinue(ctx, shadowPart, continuationCount+1)
+	}
 
-	// Clear out current lease
-	requeueAt := q.clock.Now().Add(ShadowPartitionRequeueExtendedDuration)
-	err = q.ShadowPartitionRequeue(ctx, shadowPart, *leaseID, &requeueAt)
-	if err != nil {
+	err = q.ShadowPartitionRequeue(ctx, shadowPart, nil)
+	switch err {
+	case nil, ErrShadowPartitionNotFound:
+		return nil
+	default:
 		return fmt.Errorf("could not requeue shadow partition: %w", err)
 	}
+}
 
-	return nil
+func (q *queue) processShadowPartitionBacklog(ctx context.Context, shadowPart *QueueShadowPartition, backlog *QueueBacklog, refillUntil time.Time) (*BacklogRefillResult, bool, error) {
+	enableKeyQueues := shadowPart.SystemQueueName != nil && q.enqueueSystemQueuesToBacklog
+	if shadowPart.AccountID != nil {
+		enableKeyQueues = q.allowKeyQueues(ctx, *shadowPart.AccountID)
+	}
+
+	// May need to normalize - this will not happen for default backlogs
+	if reason := backlog.isOutdated(shadowPart); enableKeyQueues && reason != enums.QueueNormalizeReasonUnchanged {
+		metrics.IncrQueueOutdatedBacklogCounter(ctx, metrics.CounterOpt{
+			PkgName: pkgName,
+			Tags: map[string]any{
+				"queue_shard":  q.primaryQueueShard.Name,
+				"partition_id": shadowPart.PartitionID,
+				"reason":       reason.String(),
+			},
+		})
+
+		// Prepare normalization, this will just run once as the shadow scanner
+		// won't pick it up again after this.
+		_, shouldNormalizeAsync, err := q.BacklogPrepareNormalize(
+			ctx,
+			backlog,
+			shadowPart,
+			q.backlogNormalizeAsyncLimit(ctx),
+		)
+		if err != nil {
+			return nil, false, fmt.Errorf("could not prepare backlog for normalization: %w", err)
+		}
+
+		// If there are just a couple of items in the backlog, we can
+		// normalize right away, we have the guarantee that the backlog
+		// is not being normalized right now as it wouldn't be picked up
+		// by the shadow scanner otherwise.
+		if !shouldNormalizeAsync {
+			if _, err := duration(ctx, q.primaryQueueShard.Name, "normalize_lease", q.clock.Now(), func(ctx context.Context) (any, error) {
+				err := q.leaseBacklogForNormalization(ctx, backlog)
+				return nil, err
+			}); err != nil {
+				if errors.Is(err, errBacklogAlreadyLeasedForNormalization) {
+					return nil, false, nil
+				}
+
+				return nil, false, fmt.Errorf("could not lease backlog: %w", err)
+			}
+
+			if err := q.normalizeBacklog(ctx, backlog, shadowPart); err != nil {
+				return nil, false, fmt.Errorf("could not normalize backlog: %w", err)
+			}
+		}
+
+		return nil, false, nil
+	}
+
+	res, err := durationWithTags(
+		ctx,
+		q.primaryQueueShard.Name,
+		"backlog_process_duration",
+		q.clock.Now(),
+		func(ctx context.Context) (*BacklogRefillResult, error) {
+			return q.BacklogRefill(ctx, backlog, shadowPart, refillUntil)
+		},
+		map[string]any{"partition_id": shadowPart.PartitionID},
+	)
+	if err != nil {
+		return nil, false, fmt.Errorf("could not refill backlog: %w", err)
+	}
+
+	q.log.Trace("processed backlog",
+		"backlog", backlog.BacklogID,
+		"total", res.TotalBacklogCount,
+		"until", res.BacklogCountUntil,
+		"constrained", res.Constraint,
+		"capacity", res.Capacity,
+		"refill", res.Refill,
+		"refilled", res.Refilled,
+		"throttle", shadowPart.Throttle,
+	)
+
+	// instrumentation
+	{
+		opts := metrics.CounterOpt{
+			PkgName: pkgName,
+			Tags: map[string]any{
+				"queue_shard":  q.primaryQueueShard.Name,
+				"partition_id": shadowPart.PartitionID,
+			},
+		}
+
+		metrics.IncrBacklogProcessedCounter(ctx, opts)
+		metrics.IncrQueueBacklogRefilledCounter(ctx, int64(res.Refilled), opts)
+
+		switch res.Constraint {
+		case enums.QueueConstraintNotLimited: // no-op
+		default:
+			// NOTE:
+			// we don't want to add an extended amount of time for requeue when there are
+			// contraint hits, so we make sure to check more often in order to admit items
+			// into processing
+			metrics.IncrQueueBacklogRefillConstraintCounter(ctx, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags: map[string]any{
+					"queue_shard":  q.primaryQueueShard.Name,
+					"partition_id": shadowPart.PartitionID,
+					"constraint":   res.Constraint.String(),
+				},
+			})
+
+			q.lifecycles.OnBacklogRefillConstraintHit(ctx, shadowPart, backlog, res)
+		}
+
+		// NOTE: custom method to instrument result - potentially handling high cardinality data
+		q.lifecycles.OnBacklogRefilled(ctx, shadowPart, backlog, res)
+
+		// Invoke previous constraint lifecycles to update UI
+		switch res.Constraint {
+		case enums.QueueConstraintAccountConcurrency:
+			if shadowPart.AccountID != nil {
+				q.lifecycles.OnAccountConcurrencyLimitReached(ctx, *shadowPart.AccountID, shadowPart.EnvID)
+			}
+		case enums.QueueConstraintFunctionConcurrency:
+			if shadowPart.FunctionID != nil {
+				q.lifecycles.OnFnConcurrencyLimitReached(ctx, *shadowPart.FunctionID)
+			}
+		case enums.QueueConstraintCustomConcurrencyKey1:
+			if len(backlog.ConcurrencyKeys) > 0 {
+				q.lifecycles.OnCustomKeyConcurrencyLimitReached(ctx, backlog.ConcurrencyKeys[0].CanonicalKeyID)
+			}
+		case enums.QueueConstraintCustomConcurrencyKey2:
+			if len(backlog.ConcurrencyKeys) > 1 {
+				q.lifecycles.OnCustomKeyConcurrencyLimitReached(ctx, backlog.ConcurrencyKeys[1].CanonicalKeyID)
+			}
+		default:
+		}
+	}
+
+	var forceRequeueBacklogAt time.Time
+
+	switch res.Constraint {
+	// If backlog is concurrency limited by custom key, requeue just this backlog in the future
+	case enums.QueueConstraintCustomConcurrencyKey1, enums.QueueConstraintCustomConcurrencyKey2:
+		forceRequeueBacklogAt = backlog.requeueBackOff(q.clock.Now(), res.Constraint, shadowPart)
+
+	// If backlog is throttled, requeue just this backlog in the future
+	case enums.QueueConstraintThrottle:
+		forceRequeueBacklogAt = backlog.requeueBackOff(q.clock.Now(), res.Constraint, shadowPart)
+	}
+
+	if !forceRequeueBacklogAt.IsZero() {
+		if err := q.BacklogRequeue(ctx, backlog, shadowPart, forceRequeueBacklogAt); err != nil && !errors.Is(err, ErrBacklogNotFound) {
+			return nil, false, fmt.Errorf("could not requeue backlog: %w", err)
+		}
+	}
+
+	remainingItems := res.TotalBacklogCount - res.Refilled
+	fullyProcessedBacklog := remainingItems == 0
+	return res, fullyProcessedBacklog, nil
 }
 
 type shadowPartitionChanMsg struct {
@@ -347,23 +459,30 @@ func (q *queue) scanShadowContinuations(ctx context.Context) error {
 		eg.Go(func() error {
 			sp := cont.shadowPart
 
-			if err := q.processShadowPartition(ctx, sp, c.count+1); err != nil {
+			_, err := durationWithTags(
+				ctx,
+				q.primaryQueueShard.Name,
+				"shadow_partition_process_duration",
+				q.clock.Now(),
+				func(ctx context.Context) (any, error) {
+					err := q.processShadowPartition(ctx, sp, cont.count)
+					if errors.Is(err, context.Canceled) {
+						return nil, nil
+					}
+					return nil, err
+				},
+				map[string]any{"partition_id": sp.PartitionID},
+			)
+			if err != nil {
 				if err == ErrShadowPartitionLeaseNotFound {
-					q.removeShadowContinue(ctx, sp, false)
 					return nil
 				}
 				if !errors.Is(err, context.Canceled) {
-					q.log.Error("error processing shadow partition", "error", err, "continue", true)
+					q.log.Error("error processing shadow partition", "error", err, "continuation", true, "continuation_count", cont.count)
 				}
 				return err
 			}
 
-			metrics.IncrQueueShadowPartitionProcessedCounter(ctx, metrics.CounterOpt{
-				PkgName: pkgName,
-				Tags: map[string]any{
-					"queue_shard": q.primaryQueueShard.Name,
-				},
-			})
 			return nil
 		})
 	}
@@ -445,6 +564,7 @@ func (q *queue) scanShadowPartitions(ctx context.Context, until time.Time, qspc 
 // shadowScan iterates through the shadow partitions and attempt to add queue items
 // to the function partition for processing
 func (q *queue) shadowScan(ctx context.Context) error {
+	l := q.log.With("method", "shadowScan")
 	qspc := make(chan shadowPartitionChanMsg)
 
 	for i := int32(0); i < q.numShadowWorkers; i++ {
@@ -452,7 +572,9 @@ func (q *queue) shadowScan(ctx context.Context) error {
 	}
 
 	tick := q.clock.NewTicker(q.pollTick)
-	q.log.Debug("starting shadow scanner", "poll", q.pollTick.String())
+	l.Debug("starting shadow scanner", "poll", q.pollTick.String())
+
+	backoff := 200 * time.Millisecond
 
 	for {
 		select {
@@ -465,14 +587,22 @@ func (q *queue) shadowScan(ctx context.Context) error {
 			now := q.clock.Now()
 			scanUntil := now.Truncate(time.Second).Add(2 * PartitionLookahead)
 			if err := q.scanShadowPartitions(ctx, scanUntil, qspc); err != nil {
-				return fmt.Errorf("could not scan shadow partitions: %w", err)
+				if errors.Is(err, context.DeadlineExceeded) {
+					l.Warn("deadline exceeded scanning shadow partitions")
+					<-time.After(backoff)
+
+					// Backoff doubles up to 5 seconds
+					backoff = time.Duration(math.Min(float64(backoff*2), float64(5*time.Second)))
+					continue
+				}
+
+				if !errors.Is(err, context.Canceled) {
+					l.Error("error scanning shadow partitions", "error", err)
+				}
+				return fmt.Errorf("error scanning shadow partitions: %w", err)
 			}
 
-			// q.log.Trace("scan loop",
-			// 	"start", now.Format(time.StampMilli),
-			// 	"until", scanUntil.Format(time.StampMilli),
-			// 	"dur", q.clock.Now().Sub(now).String(),
-			// )
+			backoff = 200 * time.Millisecond
 		}
 	}
 }
@@ -683,14 +813,12 @@ func (q *queue) ShadowPartitionExtendLease(ctx context.Context, sp *QueueShadowP
 		return nil, ErrShadowPartitionLeaseNotFound
 	case -3:
 		return nil, ErrShadowPartitionAlreadyLeased
-	case -4:
-		return nil, ErrShadowPartitionPaused
 	default:
 		return nil, fmt.Errorf("unknown response extending shadow partition lease: %v (%T)", status, status)
 	}
 }
 
-func (q *queue) ShadowPartitionRequeue(ctx context.Context, sp *QueueShadowPartition, leaseID ulid.ULID, requeueAt *time.Time) error {
+func (q *queue) ShadowPartitionRequeue(ctx context.Context, sp *QueueShadowPartition, requeueAt *time.Time) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "ShadowPartitionRequeue"), redis_telemetry.ScopeQueue)
 
 	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
@@ -721,7 +849,6 @@ func (q *queue) ShadowPartitionRequeue(ctx context.Context, sp *QueueShadowParti
 	args, err := StrSlice([]any{
 		sp.PartitionID,
 		accountID,
-		leaseID,
 		q.clock.Now().UnixMilli(),
 		requeueAtMS,
 	})
@@ -749,12 +876,95 @@ func (q *queue) ShadowPartitionRequeue(ctx context.Context, sp *QueueShadowParti
 	case 0:
 		return nil
 	case -1:
+		metrics.IncrQueueShadowPartitionLeaseContentionCounter(ctx, metrics.CounterOpt{
+			PkgName: pkgName,
+			Tags: map[string]any{
+				"queue_shard":  q.primaryQueueShard.Name,
+				"partition_id": sp.PartitionID,
+				"action":       "not_found",
+			},
+		})
+
 		return ErrShadowPartitionNotFound
-	case -2:
-		return ErrShadowPartitionAlreadyLeased
-	case -3:
-		return ErrShadowPartitionLeaseNotFound
 	default:
 		return fmt.Errorf("unknown response returning shadow partition lease: %v (%T)", status, status)
 	}
+}
+
+func (q *queue) ShadowPartitionLease(ctx context.Context, sp *QueueShadowPartition, duration time.Duration) (*ulid.ULID, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "ShadowPartitionLease"), redis_telemetry.ScopeQueue)
+
+	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
+		return nil, fmt.Errorf("unsupported queue shard kind for ShadowPartitionLease: %s", q.primaryQueueShard.Kind)
+	}
+
+	now := q.clock.Now()
+	leaseExpiry := now.Add(duration)
+	leaseID, err := ulid.New(ulid.Timestamp(leaseExpiry), rand.Reader)
+	if err != nil {
+		return nil, fmt.Errorf("could not generate leaseID: %w", err)
+	}
+
+	sp.LeaseID = &leaseID
+
+	accountID := uuid.Nil
+	if sp.AccountID != nil {
+		accountID = *sp.AccountID
+	}
+
+	keys := []string{
+		q.primaryQueueShard.RedisClient.kg.ShadowPartitionMeta(),
+		q.primaryQueueShard.RedisClient.kg.GlobalShadowPartitionSet(),
+		q.primaryQueueShard.RedisClient.kg.GlobalAccountShadowPartitions(),
+		q.primaryQueueShard.RedisClient.kg.AccountShadowPartitions(accountID),
+	}
+	args, err := StrSlice([]any{
+		sp.PartitionID,
+		accountID,
+		leaseID,
+		now.UnixMilli(),
+		leaseExpiry.UnixMilli(),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("could not serialize args: %w", err)
+	}
+
+	status, err := scripts["queue/shadowPartitionLease"].Exec(
+		redis_telemetry.WithScriptName(ctx, "shadowPartitionLease"),
+		q.primaryQueueShard.RedisClient.unshardedRc,
+		keys,
+		args,
+	).AsInt64()
+	if err != nil {
+		return nil, fmt.Errorf("error leasing shadow partition: %w", err)
+	}
+	switch status {
+	case 0:
+		return &leaseID, nil
+	case -1:
+		return nil, ErrShadowPartitionNotFound
+	case -2:
+		return nil, ErrShadowPartitionAlreadyLeased
+	case -3:
+		return nil, ErrShadowPartitionPaused
+	default:
+		return nil, fmt.Errorf("unknown response leasing shadow partition: %v (%T)", status, status)
+	}
+}
+
+func (q *queue) peekGlobalShadowPartitionAccounts(ctx context.Context, sequential bool, until time.Time, limit int64) ([]uuid.UUID, error) {
+	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
+		return nil, fmt.Errorf("unsupported queue shard kind for peekGlobalShadowPartitionAccounts: %s", q.primaryQueueShard.Kind)
+	}
+
+	rc := q.primaryQueueShard.RedisClient
+
+	p := peeker[QueueBacklog]{
+		q:                      q,
+		opName:                 "peekGlobalShadowPartitionAccounts",
+		max:                    ShadowPartitionAccountPeekMax,
+		isMillisecondPrecision: true,
+	}
+
+	return p.peekUUIDPointer(ctx, rc.kg.GlobalAccountShadowPartitions(), sequential, until, limit)
 }

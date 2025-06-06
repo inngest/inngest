@@ -31,7 +31,7 @@ local keyActiveCompound            = KEYS[16]
 
 local keyActiveRun                        = KEYS[17]
 local keyActiveRunsAccount                = KEYS[18]
-local keyIndexActivePartitionRuns         = KEYS[19]
+local keyActiveRunsPartition              = KEYS[19]
 local keyActiveRunsCustomConcurrencyKey1  = KEYS[20]
 local keyActiveRunsCustomConcurrencyKey2  = KEYS[21]
 
@@ -68,7 +68,7 @@ local backlogItem             = ARGV[12]
 -- $include(ends_with.lua)
 -- $include(update_account_queues.lua)
 -- $include(enqueue_to_partition.lua)
--- $include(update_active_counters.lua)
+-- $include(update_active_sets.lua)
 
 local item = get_queue_item(queueKey, queueID)
 if item == nil then
@@ -127,9 +127,9 @@ if exists_without_ending(keyInProgressAccount, ":-") then
     redis.call("ZREM", keyInProgressAccount, item.id)
 end
 
--- Decrease active counters
-decreaseActiveCounters(keyActivePartition, keyActiveAccount, keyActiveCompound, keyActiveConcurrencyKey1, keyActiveConcurrencyKey2)
-decreaseActiveRunCounters(keyActiveRun, keyIndexActivePartitionRuns, keyActiveRunsAccount, keyActiveRunsCustomConcurrencyKey1, keyActiveRunsCustomConcurrencyKey2, runID)
+-- Remove item from active sets
+removeFromActiveSets(keyActivePartition, keyActiveAccount, keyActiveCompound, keyActiveConcurrencyKey1, keyActiveConcurrencyKey2, queueID)
+removeFromActiveRunSets(keyActiveRun, keyActiveRunsPartition, keyActiveRunsAccount, keyActiveRunsCustomConcurrencyKey1, keyActiveRunsCustomConcurrencyKey2, runID, queueID)
 
 if requeueToBacklog == 1 then
 	--
