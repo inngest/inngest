@@ -212,13 +212,13 @@ func (q *queue) RunningCount(ctx context.Context, workflowID uuid.UUID) (int64, 
 }
 
 func (q *queue) ItemsByPartition(ctx context.Context, shard QueueShard, partitionID uuid.UUID, from time.Time, until time.Time, opts ...QueueIteratorOpt) (iter.Seq[*osqueue.QueueItem], error) {
-	opt := queueIterOpt{}
+	opt := queueIterOpt{batchSize: 1000}
 	for _, apply := range opts {
 		apply(&opt)
 	}
 
 	l := q.log.With(
-		"method", "ItemsByFunction",
+		"method", "ItemsByPartition",
 		"workflowID", partitionID.String(),
 		"from", from,
 		"until", until,
@@ -239,36 +239,59 @@ func (q *queue) ItemsByPartition(ctx context.Context, shard QueueShard, partitio
 		return nil, fmt.Errorf("error unmarshalling queue partition: %w", err)
 	}
 
+	ptFrom := from
+	// backlogFrom := from
+
 	return func(yield func(*osqueue.QueueItem) bool) {
 		for {
-			var processed, skipped int
+			var processed int
 
 			// peek function partition
-			// TODO: we need a way to peek from a score and not just -inf
-			items, err := q.Peek(ctx, &pt, until, AbsoluteQueuePeekMax)
+			items, err := q.peek(ctx, shard, peekOpts{
+				From:         &ptFrom,
+				Until:        until,
+				Limit:        opt.batchSize,
+				PartitionID:  partitionID.String(),
+				PartitionKey: pt.zsetKey(shard.RedisClient.kg),
+			})
 			if err != nil {
 				l.Error("error peeking items for iterator", "error", err)
 				return
 			}
 
-			for _, qi := range items {
-				// skip this if the item's expected time is not within the provided time range
-				at := time.UnixMilli(qi.AtMS)
-				if at.Before(from) || at.After(until) {
-					skipped++
-					continue
-				}
+			var start, end time.Time
 
+			for _, qi := range items {
 				if !yield(qi) {
 					return
 				}
+
+				at := time.UnixMilli(qi.AtMS)
+
+				if start.IsZero() {
+					start = at
+				}
+				end = at
+
+				ptFrom = at
 				processed++
 			}
+
+			l.Debug("processed items",
+				"count", processed,
+				"start", start.Format(time.StampMilli),
+				"end", end.Format(time.StampMilli),
+			)
 
 			// didn't process anything, exit loop
 			if processed == 0 {
 				break
 			}
+
+			// shift the starting point 1ms so it doesn't try to grab the same stuff again
+			// NOTE: this could result skipping items if the previous batch of items are all on
+			// the same milliseonc
+			ptFrom = ptFrom.Add(time.Millisecond)
 		}
 
 		if opt.allowKeyQueues() {
@@ -278,17 +301,17 @@ func (q *queue) ItemsByPartition(ctx context.Context, shard QueueShard, partitio
 			l = l.With("shadow_partition", spt)
 
 			for {
-				var processed, skipped int
+				var processed int
 
 				// TODO: maybe provide a different limit?
-				backlogs, _, err := q.ShadowPartitionPeek(ctx, &spt, true, until, q.peekMax)
+				backlogs, _, err := q.ShadowPartitionPeek(ctx, &spt, true, until, opt.batchSize)
 				if err != nil {
 					l.Error("error peeking backlogs for partition", "error", err)
 					return
 				}
 
 				for _, backlog := range backlogs {
-					items, _, err := q.backlogPeek(ctx, backlog, from, until, q.peekMax)
+					items, _, err := q.backlogPeek(ctx, backlog, from, until, opt.batchSize)
 					if err != nil {
 						l.Error("error retrieving queue items from backlog", "error", err)
 						return
@@ -297,7 +320,6 @@ func (q *queue) ItemsByPartition(ctx context.Context, shard QueueShard, partitio
 					for _, qi := range items {
 						at := time.UnixMilli(qi.AtMS)
 						if at.Before(from) || at.After(until) {
-							skipped++
 							continue
 						}
 
