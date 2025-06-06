@@ -9,8 +9,8 @@ export const GroupSpan = ({ width, depth = 1 }: GroupSpanProps) => {
   return (
     <div
       className={cn(
-        `bg-btnPrimary absolute z-0 rounded-sm`,
-        depth === 1 ? 'bg-opacity-5' : 'bg-opacity-10'
+        `bg-btnPrimary absolute rounded-sm`,
+        depth === 1 ? 'bg-opacity-20' : 'bg-opacity-10'
       )}
       style={{
         width: width,
