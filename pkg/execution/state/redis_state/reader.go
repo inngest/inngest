@@ -211,7 +211,7 @@ func (q *queue) RunningCount(ctx context.Context, workflowID uuid.UUID) (int64, 
 	return count, nil
 }
 
-func (q *queue) ItemsByFunction(ctx context.Context, shard QueueShard, workflowID uuid.UUID, from time.Time, until time.Time, opts ...QueueIteratorOpt) (iter.Seq[*osqueue.QueueItem], error) {
+func (q *queue) ItemsByPartition(ctx context.Context, shard QueueShard, partitionID uuid.UUID, from time.Time, until time.Time, opts ...QueueIteratorOpt) (iter.Seq[*osqueue.QueueItem], error) {
 	opt := queueIterOpt{}
 	for _, apply := range opts {
 		apply(&opt)
@@ -219,7 +219,7 @@ func (q *queue) ItemsByFunction(ctx context.Context, shard QueueShard, workflowI
 
 	l := q.log.With(
 		"method", "ItemsByFunction",
-		"workflowID", workflowID.String(),
+		"workflowID", partitionID.String(),
 		"from", from,
 		"until", until,
 	)
@@ -228,7 +228,7 @@ func (q *queue) ItemsByFunction(ctx context.Context, shard QueueShard, workflowI
 	hash := shard.RedisClient.kg.PartitionItem()
 	rc := shard.RedisClient.Client()
 
-	cmd := rc.B().Hget().Key(hash).Field(workflowID.String()).Build()
+	cmd := rc.B().Hget().Key(hash).Field(partitionID.String()).Build()
 	byt, err := rc.Do(ctx, cmd).AsBytes()
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving partition: %w", err)
