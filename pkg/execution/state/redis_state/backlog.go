@@ -980,7 +980,7 @@ func (q *queue) backlogPeek(ctx context.Context, b *QueueBacklog, from time.Time
 		return nil, 0, fmt.Errorf("expected backlog to be provided")
 	}
 
-	if limit > AbsoluteQueuePeekMax {
+	if limit > AbsoluteQueuePeekMax || limit > q.peekMax {
 		limit = q.peekMax
 	}
 	if limit <= 0 {
@@ -1014,6 +1014,7 @@ func (q *queue) backlogPeek(ctx context.Context, b *QueueBacklog, from time.Time
 			}
 			return nil
 		},
+		fromTime: &from,
 	}
 
 	res, err := p.peek(ctx, backlogSet, true, until, limit)
