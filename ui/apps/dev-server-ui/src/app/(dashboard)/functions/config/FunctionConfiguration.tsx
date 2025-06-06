@@ -191,7 +191,7 @@ export default function FunctionConfiguration({
             <div className="flex items-center gap-2 self-stretch rounded border border-gray-200 p-2">
               {/*bg-gray-100 (#F3F4F6) would be close to #F6F6F6.*/}
               {/*bg-[#F6F6F6]*/}
-              <div className="flex h-9 w-9 items-center justify-center gap-2 rounded bg-gray-100 p-2">
+              <div className="flex h-9 w-9 items-center justify-center gap-2 rounded bg-gray-100 p-2 dark:bg-transparent">
                 {/*width: 1.125rem → w-[1.125rem] (18px, no default utility for this size)*/}
                 {/*height: 1.125rem → h-[1.125rem] (18px, no default utility for this size)*/}
                 {/*flex-shrink: 0 → shrink-0*/}
@@ -236,7 +236,7 @@ export default function FunctionConfiguration({
               >
                 {/*bg-gray-100 (#F3F4F6) would be close to #F6F6F6.*/}
                 {/*bg-[#F6F6F6]*/}
-                <div className="flex h-9 w-9 items-center justify-center gap-2 rounded bg-gray-100 p-2">
+                <div className="flex h-9 w-9 items-center justify-center gap-2 rounded bg-gray-100 p-2 dark:bg-transparent">
                   {/*width: 1.125rem → w-[1.125rem] (18px, no default utility for this size)*/}
                   {/*height: 1.125rem → h-[1.125rem] (18px, no default utility for this size)*/}
                   {/*flex-shrink: 0 → shrink-0*/}
@@ -275,7 +275,7 @@ export default function FunctionConfiguration({
                 className="border-subtle bg-canvasBase hover:bg-canvasMuted block rounded-md border border-gray-200 "
               >
                 <div className="flex items-center gap-2 self-stretch rounded p-2">
-                  <div className="flex h-9 w-9 items-center justify-center gap-2 rounded bg-gray-100 p-2">
+                  <div className="flex h-9 w-9 items-center justify-center gap-2 rounded bg-gray-100 p-2 dark:bg-transparent">
                     <FunctionsIcon className="h-5 w-5" />
                   </div>
                   <div className="flex grow flex-col items-start justify-center gap-1 self-stretch">
@@ -294,7 +294,7 @@ export default function FunctionConfiguration({
                 return (
                   // className="border-subtle bg-canvasBase hover:bg-canvasMuted block rounded-md border border-gray-200 "
                   <div className="border-subtle flex items-center gap-2 self-stretch rounded border border-gray-200 p-2">
-                    <div className="flex h-9 w-9 items-center justify-center gap-2 rounded bg-gray-100 p-2">
+                    <div className="flex h-9 w-9 items-center justify-center gap-2 rounded bg-gray-100 p-2 dark:bg-transparent">
                       <EventsIcon className="h-5 w-5" />
                     </div>
                     <div className="flex grow flex-col items-start justify-center gap-1 self-stretch">
@@ -319,7 +319,7 @@ export default function FunctionConfiguration({
           <div className="overflow-hidden rounded border border-gray-300 ">
             <table className="w-full border-collapse">
               <thead>
-                <tr className="h-8 bg-gray-100 bg-gray-50">
+                <tr className="h-8 border-b bg-gray-100 dark:bg-transparent">
                   <td className="text-basis px-2 text-sm font-medium" colSpan={2}>
                     <div className="flex items-center gap-2">
                       Retries
@@ -354,7 +354,7 @@ export default function FunctionConfiguration({
             <div className="overflow-hidden rounded border border-gray-300 ">
               <table className="w-full border-collapse">
                 <thead>
-                  <tr className="h-8 bg-gray-100 bg-gray-50">
+                  <tr className="h-8 border-b bg-gray-100 dark:bg-transparent">
                     <td className="text-basis px-2 text-sm font-medium" colSpan={2}>
                       <div className="flex items-center gap-2">
                         Rate limit
@@ -391,7 +391,7 @@ export default function FunctionConfiguration({
             <div className="overflow-hidden rounded border border-gray-300 ">
               <table className="w-full border-collapse">
                 <thead>
-                  <tr className="h-8 bg-gray-100 bg-gray-50">
+                  <tr className="h-8 border-b bg-gray-100 dark:bg-transparent">
                     <td className="text-basis px-2 text-sm font-medium" colSpan={2}>
                       <div className="flex items-center gap-2">
                         Debounce
@@ -422,7 +422,7 @@ export default function FunctionConfiguration({
             <div className="overflow-hidden rounded border border-gray-300 ">
               <table className="w-full border-collapse">
                 <thead>
-                  <tr className="h-8 bg-gray-100 bg-gray-50">
+                  <tr className="h-8 border-b bg-gray-100 dark:bg-transparent">
                     <td className="text-basis px-2 text-sm font-medium" colSpan={2}>
                       <div className="flex items-center gap-2">
                         Priority
@@ -446,7 +446,7 @@ export default function FunctionConfiguration({
             <div className="overflow-hidden rounded border border-gray-300 ">
               <table className="w-full border-collapse">
                 <thead>
-                  <tr className="h-8 bg-gray-100 bg-gray-50">
+                  <tr className="h-8 border-b bg-gray-100 dark:bg-transparent">
                     <td className="text-basis px-2 text-sm font-medium" colSpan={2}>
                       <div className="flex items-center gap-2">
                         Batching
@@ -490,7 +490,7 @@ export default function FunctionConfiguration({
               <div className="overflow-hidden rounded border border-gray-300 ">
                 <table className="w-full border-collapse">
                   <thead>
-                    <tr className="h-8 bg-gray-100">
+                    <tr className="h-8 border-b bg-gray-100 dark:bg-transparent">
                       <td className="text-basis px-2 text-sm font-medium" colSpan={2}>
                         <div className="flex items-center gap-2">
                           Concurrency ({index + 1})
@@ -524,7 +524,7 @@ export default function FunctionConfiguration({
             <div className="overflow-hidden rounded border border-gray-300 ">
               <table className="w-full border-collapse">
                 <thead>
-                  <tr className="h-8 bg-gray-100 bg-gray-50">
+                  <tr className="h-8 border-b bg-gray-100 dark:bg-transparent">
                     <td className="text-basis px-2 text-sm font-medium" colSpan={2}>
                       <div className="flex items-center gap-2">
                         Throttle
