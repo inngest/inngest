@@ -461,10 +461,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 						"message": "Invoke was debounced",
 					},
 				}); err != nil {
-					logger.StdlibLogger(ctx).Warn(
-						"error handling invoke fail for debounced function",
-						"error", err,
-					)
+					return nil, fmt.Errorf("error handling invoke fail: %w", err)
 				}
 			}
 		}
