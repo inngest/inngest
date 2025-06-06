@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/expr"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/logger"
 )
@@ -235,6 +236,31 @@ func (m manager) PausesSince(ctx context.Context, index Index, since time.Time) 
 		m.bs,
 		blocks,
 	), nil
+}
+
+// LoadEvaluablesSince calls PausesSince and implements the aggregate expression interface implementation
+// for grouping many pauses together.
+func (m manager) LoadEvaluablesSince(ctx context.Context, workspaceID uuid.UUID, eventName string, since time.Time, do func(context.Context, expr.Evaluable) error) error {
+	iter, err := m.PausesSince(ctx, Index{WorkspaceID: workspaceID, EventName: eventName}, since)
+	if err != nil {
+		return err
+	}
+
+	for iter.Next(ctx) {
+		pause := iter.Val(ctx)
+		if pause == nil {
+			continue
+		}
+		if err := do(ctx, pause); err != nil {
+			return err
+		}
+	}
+
+	if iter.Error() != context.Canceled && (iter.Error() != nil && iter.Error().Error() != "scan done") {
+		return iter.Error()
+	}
+
+	return nil
 }
 
 // Delete deletes a pause from from block storage or the buffer.

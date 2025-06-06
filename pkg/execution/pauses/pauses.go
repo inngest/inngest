@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/expressions/expragg"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -58,6 +59,9 @@ func PauseIndex(p state.Pause) Index {
 // Manager implements a buffer and a block reader/flusher, writing pauses to a buffer
 // then flushing them to blocks when the buffer fills.
 type Manager interface {
+	// EvaluableLoader allows the Manager to be used within aggregate expression engines.
+	expragg.EvaluableLoader
+
 	// Bufferer is the core interface used to interact with pauses;  as an end user
 	// of this package you need to only write and read pauses since a given date.
 	Bufferer
