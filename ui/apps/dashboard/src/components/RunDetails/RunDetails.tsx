@@ -3,7 +3,6 @@
 import { RunDetailsV3 } from '@inngest/components/RunDetailsV3/RunDetailsV3';
 import { cn } from '@inngest/components/utils/classNames';
 
-import { useEnvironment } from '@/components/Environments/environment-context';
 import { useGetRun } from './useGetRun';
 import { useGetTraceResult } from './useGetTraceResult';
 import { useGetTrigger } from './useGetTrigger';
@@ -14,7 +13,6 @@ type Props = {
 };
 
 export function DashboardRunDetails({ runID, standalone = true }: Props) {
-  const env = useEnvironment();
   const getTraceResult = useGetTraceResult();
 
   const getTrigger = useGetTrigger();
