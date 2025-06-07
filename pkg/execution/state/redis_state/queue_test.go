@@ -3694,7 +3694,7 @@ func TestQueuePartitionRequeue(t *testing.T) {
 		//
 
 		// drop backlog
-		res, err := q.BacklogRefill(ctx, &backlog, &shadowPart, time.Now().Add(time.Minute))
+		res, err := q.BacklogRefill(ctx, &backlog, &shadowPart, time.Now().Add(time.Minute), &PartitionConstraintConfig{})
 		require.NoError(t, err)
 		require.Equal(t, 1, res.Refilled)
 
@@ -7225,7 +7225,13 @@ func TestQueueActiveCounters(t *testing.T) {
 			require.Zero(t, i.RefilledAt)
 
 			// refill
-			res, err := q.BacklogRefill(ctx, &backlog, &shadowPart, refillUntil)
+			res, err := q.BacklogRefill(ctx, &backlog, &shadowPart, refillUntil, &PartitionConstraintConfig{
+				Concurrency: ShadowPartitionConcurrency{
+					SystemConcurrency:   consts.DefaultConcurrencyLimit,
+					AccountConcurrency:  consts.DefaultConcurrencyLimit,
+					FunctionConcurrency: consts.DefaultConcurrencyLimit,
+				},
+			})
 			require.NoError(t, err)
 
 			require.Equal(t, 1, res.Refilled)
@@ -7287,7 +7293,13 @@ func TestQueueActiveCounters(t *testing.T) {
 			require.Zero(t, i.RefilledAt)
 
 			// refill
-			res, err := q.BacklogRefill(ctx, &backlog, &shadowPart, refillUntil)
+			res, err := q.BacklogRefill(ctx, &backlog, &shadowPart, refillUntil, &PartitionConstraintConfig{
+				Concurrency: ShadowPartitionConcurrency{
+					SystemConcurrency:   consts.DefaultConcurrencyLimit,
+					AccountConcurrency:  consts.DefaultConcurrencyLimit,
+					FunctionConcurrency: consts.DefaultConcurrencyLimit,
+				},
+			})
 			require.NoError(t, err)
 
 			require.Equal(t, 1, res.Refilled)
@@ -7522,7 +7534,13 @@ func TestQueueActiveCounters(t *testing.T) {
 			//
 
 			// refill
-			res, err := q.BacklogRefill(ctx, &backlog, &shadowPart, refillUntil)
+			res, err := q.BacklogRefill(ctx, &backlog, &shadowPart, refillUntil, &PartitionConstraintConfig{
+				Concurrency: ShadowPartitionConcurrency{
+					SystemConcurrency:   consts.DefaultConcurrencyLimit,
+					AccountConcurrency:  consts.DefaultConcurrencyLimit,
+					FunctionConcurrency: consts.DefaultConcurrencyLimit,
+				},
+			})
 			require.NoError(t, err)
 
 			require.Equal(t, 4, res.Refilled)

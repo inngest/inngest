@@ -986,17 +986,20 @@ func TestBacklogIsOutdated(t *testing.T) {
 	t.Run("same config should not be marked as outdated", func(t *testing.T) {
 		keyHash := util.XXHash("event.data.customerID")
 
-		shadowPart := &QueueShadowPartition{
-			Concurrency: ShadowPartitionConcurrency{
-				CustomConcurrencyKeys: []CustomConcurrencyLimit{
-					{
-						Scope:               enums.ConcurrencyScopeFn,
-						HashedKeyExpression: keyHash,
-						Limit:               10,
-					},
+		concurrency := ShadowPartitionConcurrency{
+			CustomConcurrencyKeys: []CustomConcurrencyLimit{
+				{
+					Scope:               enums.ConcurrencyScopeFn,
+					HashedKeyExpression: keyHash,
+					Limit:               10,
 				},
 			},
 		}
+
+		constraints := PartitionConstraintConfig{
+			Concurrency: concurrency,
+		}
+
 		backlog := &QueueBacklog{
 			ConcurrencyKeys: []BacklogConcurrencyKey{
 				{
@@ -1011,13 +1014,13 @@ func TestBacklogIsOutdated(t *testing.T) {
 			Throttle: nil,
 		}
 
-		require.Equal(t, enums.QueueNormalizeReasonUnchanged, backlog.isOutdated(shadowPart))
+		require.Equal(t, enums.QueueNormalizeReasonUnchanged, backlog.isOutdated(&constraints))
 	})
 
 	t.Run("adding concurrency keys should not mark default partition as outdated", func(t *testing.T) {
 		keyHash := util.XXHash("event.data.customerID")
 
-		shadowPart := &QueueShadowPartition{
+		constraints := &PartitionConstraintConfig{
 			Concurrency: ShadowPartitionConcurrency{
 				CustomConcurrencyKeys: []CustomConcurrencyLimit{
 					{
@@ -1030,14 +1033,14 @@ func TestBacklogIsOutdated(t *testing.T) {
 		}
 		backlog := &QueueBacklog{}
 
-		require.Equal(t, enums.QueueNormalizeReasonUnchanged, backlog.isOutdated(shadowPart))
+		require.Equal(t, enums.QueueNormalizeReasonUnchanged, backlog.isOutdated(constraints))
 	})
 
 	t.Run("changing concurrency key should mark as outdated", func(t *testing.T) {
 		keyHashOld := util.XXHash("event.data.customerID")
 		keyHashNew := util.XXHash("event.data.orgID")
 
-		shadowPart := &QueueShadowPartition{
+		constraints := &PartitionConstraintConfig{
 			Concurrency: ShadowPartitionConcurrency{
 				CustomConcurrencyKeys: []CustomConcurrencyLimit{
 					{
@@ -1060,13 +1063,13 @@ func TestBacklogIsOutdated(t *testing.T) {
 			},
 		}
 
-		require.Equal(t, enums.QueueNormalizeReasonCustomConcurrencyKeyNotFoundOnShadowPartition, backlog.isOutdated(shadowPart))
+		require.Equal(t, enums.QueueNormalizeReasonCustomConcurrencyKeyNotFoundOnShadowPartition, backlog.isOutdated(constraints))
 	})
 
 	t.Run("removing concurrency key should mark as outdated", func(t *testing.T) {
 		keyHashOld := util.XXHash("event.data.customerID")
 
-		shadowPart := &QueueShadowPartition{
+		constraints := &PartitionConstraintConfig{
 			Concurrency: ShadowPartitionConcurrency{
 				CustomConcurrencyKeys: nil,
 			},
@@ -1083,14 +1086,14 @@ func TestBacklogIsOutdated(t *testing.T) {
 			},
 		}
 
-		require.Equal(t, enums.QueueNormalizeReasonCustomConcurrencyKeyCountMismatch, backlog.isOutdated(shadowPart))
+		require.Equal(t, enums.QueueNormalizeReasonCustomConcurrencyKeyCountMismatch, backlog.isOutdated(constraints))
 	})
 
 	t.Run("changing throttle key should mark as outdated", func(t *testing.T) {
 		keyHashOld := util.XXHash("event.data.customerID")
 		keyHashNew := util.XXHash("event.data.orgID")
 
-		shadowPart := &QueueShadowPartition{
+		constraints := &PartitionConstraintConfig{
 			Throttle: &ShadowPartitionThrottle{
 				ThrottleKeyExpressionHash: keyHashNew,
 			},
@@ -1101,13 +1104,13 @@ func TestBacklogIsOutdated(t *testing.T) {
 			},
 		}
 
-		require.Equal(t, enums.QueueNormalizeReasonThrottleKeyChanged, backlog.isOutdated(shadowPart))
+		require.Equal(t, enums.QueueNormalizeReasonThrottleKeyChanged, backlog.isOutdated(constraints))
 	})
 
 	t.Run("same throttle key should not mark as outdated", func(t *testing.T) {
 		keyHash := util.XXHash("event.data.orgID")
 
-		shadowPart := &QueueShadowPartition{
+		constraints := &PartitionConstraintConfig{
 			Throttle: &ShadowPartitionThrottle{
 				ThrottleKeyExpressionHash: keyHash,
 			},
@@ -1118,13 +1121,13 @@ func TestBacklogIsOutdated(t *testing.T) {
 			},
 		}
 
-		require.Equal(t, enums.QueueNormalizeReasonUnchanged, backlog.isOutdated(shadowPart))
+		require.Equal(t, enums.QueueNormalizeReasonUnchanged, backlog.isOutdated(constraints))
 	})
 
 	t.Run("removing throttle key should mark as outdated", func(t *testing.T) {
 		keyHashOld := util.XXHash("event.data.customerID")
 
-		shadowPart := &QueueShadowPartition{
+		constraints := &PartitionConstraintConfig{
 			Throttle: nil,
 		}
 		backlog := &QueueBacklog{
@@ -1133,6 +1136,6 @@ func TestBacklogIsOutdated(t *testing.T) {
 			},
 		}
 
-		require.Equal(t, enums.QueueNormalizeReasonThrottleRemoved, backlog.isOutdated(shadowPart))
+		require.Equal(t, enums.QueueNormalizeReasonThrottleRemoved, backlog.isOutdated(constraints))
 	})
 }

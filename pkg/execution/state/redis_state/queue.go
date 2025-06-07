@@ -484,6 +484,16 @@ type ConcurrencyLimitGetter func(ctx context.Context, p QueuePartition) Partitio
 // SystemConcurrencyLimitGetter returns the concurrency limits for a given system partition.
 type SystemConcurrencyLimitGetter func(ctx context.Context, p QueuePartition) SystemPartitionConcurrencyLimits
 
+// PartitionConstraintConfigGetter returns the constraint configuration for a given partition
+type PartitionConstraintConfigGetter func(ctx context.Context, p QueueShadowPartition) (*PartitionConstraintConfig, error)
+
+// WithPartitionConstraintConfigGetter assigns a function that returns queue constraints for a given partition.
+func WithPartitionConstraintConfigGetter(f PartitionConstraintConfigGetter) func(q *queue) {
+	return func(q *queue) {
+		q.partitionConstraintConfigGetter = f
+	}
+}
+
 // AllowSystemKeyQueues determines if key queues should be enabled for system queues
 type AllowSystemKeyQueues func(ctx context.Context) bool
 
@@ -593,6 +603,16 @@ func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 		queueKindMapping:               make(map[string]string),
 		peekSizeForFunctions:           make(map[string]int64),
 		log:                            logger.StdlibLogger(ctx),
+		partitionConstraintConfigGetter: func(ctx context.Context, p QueueShadowPartition) (*PartitionConstraintConfig, error) {
+			def := defaultConcurrency
+
+			return &PartitionConstraintConfig{
+				Concurrency: ShadowPartitionConcurrency{
+					AccountConcurrency:  def,
+					FunctionConcurrency: def,
+				},
+			}, nil
+		},
 		concurrencyLimitGetter: func(ctx context.Context, p QueuePartition) PartitionConcurrencyLimits {
 			def := defaultConcurrency
 			if p.ConcurrencyLimit > 0 {
@@ -695,8 +715,9 @@ type queue struct {
 	systemConcurrencyLimitGetter    SystemConcurrencyLimitGetter
 	customConcurrencyLimitRefresher QueueItemConcurrencyKeyLimitRefresher
 
-	allowKeyQueues               AllowKeyQueues
-	enqueueSystemQueuesToBacklog bool
+	allowKeyQueues                  AllowKeyQueues
+	enqueueSystemQueuesToBacklog    bool
+	partitionConstraintConfigGetter PartitionConstraintConfigGetter
 
 	disableLeaseChecks                DisableLeaseChecks
 	disableLeaseChecksForSystemQueues bool

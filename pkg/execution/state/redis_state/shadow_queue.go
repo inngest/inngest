@@ -159,6 +159,11 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 		}
 	}()
 
+	latestConstraints, err := q.partitionConstraintConfigGetter(ctx, *shadowPart)
+	if err != nil {
+		return fmt.Errorf("could not retrieve latest constraints for partition: %w", err)
+	}
+
 	// Check if shadow partition cannot be processed (paused/refill disabled, etc.)
 	if shadowPart.PauseRefill {
 		q.removeShadowContinue(ctx, shadowPart, false)
@@ -202,7 +207,7 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 
 		backlog := backlogs[idx]
 
-		res, fullyProcessed, err := q.processShadowPartitionBacklog(ctx, shadowPart, backlog, refillUntil)
+		res, fullyProcessed, err := q.processShadowPartitionBacklog(ctx, shadowPart, backlog, refillUntil, latestConstraints)
 		if err != nil {
 			return fmt.Errorf("could not process backlog: %w", err)
 		}
@@ -280,14 +285,19 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 	}
 }
 
-func (q *queue) processShadowPartitionBacklog(ctx context.Context, shadowPart *QueueShadowPartition, backlog *QueueBacklog, refillUntil time.Time) (*BacklogRefillResult, bool, error) {
+func (q *queue) processShadowPartitionBacklog(ctx context.Context, shadowPart *QueueShadowPartition, backlog *QueueBacklog, refillUntil time.Time, constraints *PartitionConstraintConfig) (*BacklogRefillResult, bool, error) {
 	enableKeyQueues := shadowPart.SystemQueueName != nil && q.enqueueSystemQueuesToBacklog
 	if shadowPart.AccountID != nil {
 		enableKeyQueues = q.allowKeyQueues(ctx, *shadowPart.AccountID)
 	}
 
 	// May need to normalize - this will not happen for default backlogs
-	if reason := backlog.isOutdated(shadowPart); enableKeyQueues && reason != enums.QueueNormalizeReasonUnchanged {
+	if reason := backlog.isOutdated(constraints); enableKeyQueues && reason != enums.QueueNormalizeReasonUnchanged {
+		q.log.Trace("outdated backlog",
+			"backlog", backlog.BacklogID,
+			"reason", reason,
+		)
+
 		metrics.IncrQueueOutdatedBacklogCounter(ctx, metrics.CounterOpt{
 			PkgName: pkgName,
 			Tags: map[string]any{
@@ -314,6 +324,11 @@ func (q *queue) processShadowPartitionBacklog(ctx context.Context, shadowPart *Q
 		// is not being normalized right now as it wouldn't be picked up
 		// by the shadow scanner otherwise.
 		if !shouldNormalizeAsync {
+			q.log.Trace("normalizing backlog immediately",
+				"backlog", backlog.BacklogID,
+				"reason", reason,
+			)
+
 			if _, err := duration(ctx, q.primaryQueueShard.Name, "normalize_lease", q.clock.Now(), func(ctx context.Context) (any, error) {
 				err := q.leaseBacklogForNormalization(ctx, backlog)
 				return nil, err
@@ -325,7 +340,7 @@ func (q *queue) processShadowPartitionBacklog(ctx context.Context, shadowPart *Q
 				return nil, false, fmt.Errorf("could not lease backlog: %w", err)
 			}
 
-			if err := q.normalizeBacklog(ctx, backlog, shadowPart); err != nil {
+			if err := q.normalizeBacklog(ctx, backlog, shadowPart, constraints); err != nil {
 				return nil, false, fmt.Errorf("could not normalize backlog: %w", err)
 			}
 		}
@@ -339,7 +354,7 @@ func (q *queue) processShadowPartitionBacklog(ctx context.Context, shadowPart *Q
 		"backlog_process_duration",
 		q.clock.Now(),
 		func(ctx context.Context) (*BacklogRefillResult, error) {
-			return q.BacklogRefill(ctx, backlog, shadowPart, refillUntil)
+			return q.BacklogRefill(ctx, backlog, shadowPart, refillUntil, constraints)
 		},
 		map[string]any{"partition_id": shadowPart.PartitionID},
 	)
@@ -355,7 +370,8 @@ func (q *queue) processShadowPartitionBacklog(ctx context.Context, shadowPart *Q
 		"capacity", res.Capacity,
 		"refill", res.Refill,
 		"refilled", res.Refilled,
-		"throttle", shadowPart.Throttle,
+		"throttle_conf", shadowPart.Throttle,
+		"backlog_throttle", backlog.Throttle,
 	)
 
 	// instrumentation
