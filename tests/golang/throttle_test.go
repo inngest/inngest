@@ -65,7 +65,7 @@ func TestThrottle(t *testing.T) {
 				inngestClient,
 				inngestgo.FunctionOpts{
 					ID: "throttle-test",
-					Throttle: &inngestgo.Throttle{
+					Throttle: &inngestgo.FnThrottle{
 						Limit:  test.limit,
 						Period: test.period,
 						Burst:  test.burst,
@@ -137,7 +137,7 @@ func TestThrottle(t *testing.T) {
 			inngestClient,
 			inngestgo.FunctionOpts{
 				ID: "throttle-test-with-keys",
-				Throttle: &inngestgo.Throttle{
+				Throttle: &inngestgo.FnThrottle{
 					Key:    inngestgo.StrPtr("event.data.id"),
 					Limit:  1,
 					Period: 3 * time.Second,

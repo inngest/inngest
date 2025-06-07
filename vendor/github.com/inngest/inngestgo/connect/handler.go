@@ -14,11 +14,11 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
-	"github.com/inngest/inngest/pkg/execution/state"
-	"github.com/inngest/inngest/pkg/sdk"
 	"github.com/inngest/inngest/pkg/syscode"
 	connectproto "github.com/inngest/inngest/proto/gen/connect/v1"
+	"github.com/inngest/inngestgo/internal/fn"
 	"github.com/inngest/inngestgo/internal/sdkrequest"
+	"github.com/inngest/inngestgo/internal/types"
 	"github.com/pbnjay/memory"
 	"golang.org/x/sync/errgroup"
 )
@@ -83,12 +83,12 @@ func Connect(ctx context.Context, opts Opts, invokers map[string]FunctionInvoker
 }
 
 type FunctionInvoker interface {
-	InvokeFunction(ctx context.Context, slug string, stepId *string, request sdkrequest.Request) (any, []state.GeneratorOpcode, error)
+	InvokeFunction(ctx context.Context, slug string, stepId *string, request sdkrequest.Request) (any, []sdkrequest.GeneratorOpcode, error)
 }
 
 type ConnectApp struct {
 	AppName    string
-	Functions  []sdk.SDKFunction
+	Functions  []fn.SyncConfig
 	AppVersion *string
 }
 
@@ -96,7 +96,7 @@ type Opts struct {
 	Env  *string
 	Apps []ConnectApp
 
-	Capabilities sdk.Capabilities
+	Capabilities types.Capabilities
 
 	HashedSigningKey         []byte
 	HashedSigningKeyFallback []byte
@@ -448,7 +448,6 @@ func (h *connectHandler) processExecutorRequest(msg workerPoolMsg) {
 	processCtx := context.Background()
 
 	err := h.handleInvokeMessage(processCtx, msg.preparedConn, msg.msg)
-
 	// When we encounter an error, we cannot retry the connection from inside the goroutine.
 	// If we're dealing with connection loss, the next read loop will fail with the same error
 	// and handle the reconnection.
