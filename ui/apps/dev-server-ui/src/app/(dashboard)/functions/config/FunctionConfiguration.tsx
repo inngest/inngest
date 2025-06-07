@@ -291,7 +291,7 @@ export default function FunctionConfiguration({
           )}
           {inngestFunction.configuration.cancellations && (
             <div>
-              <span className="text-sm font-medium">Cancellations</span>
+              <span className="text-sm font-medium">Cancel On</span>
               {inngestFunction.configuration.cancellations.map((cancelOn) => {
                 // link to event in cloud
                 return (
