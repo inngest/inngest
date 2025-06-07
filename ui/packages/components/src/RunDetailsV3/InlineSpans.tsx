@@ -67,7 +67,11 @@ export function InlineSpans({ className, minTime, maxTime, trace, depth }: Props
         >
           <TooltipTrigger className="flex w-full flex-row">
             {spans.length > 0 && (
-              <GroupSpan depth={depth} width={spanRef.current?.clientWidth ?? 0} />
+              <GroupSpan
+                depth={depth}
+                status={trace.status}
+                width={spanRef.current?.clientWidth ?? 0}
+              />
             )}
             {spans.length ? (
               spans.map((span) => {
