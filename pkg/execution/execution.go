@@ -193,6 +193,16 @@ type ScheduleRequest struct {
 	FunctionPausedAt *time.Time
 }
 
+func (r *ScheduleRequest) IsInvoke() bool {
+	for _, e := range r.Events {
+		if e.GetEvent().Name != event.InvokeFnName {
+			return false
+		}
+	}
+
+	return true
+}
+
 type ScheduleRequestFromStep struct {
 	// StepID is the ID of the step that this function is being scheduled from.
 	StepID string
