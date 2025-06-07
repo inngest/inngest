@@ -110,6 +110,9 @@ export const pathCreator = {
   runPopout({ envSlug, runID }: { envSlug: string; runID: string }): Route {
     return `/env/${envSlug}/runs/${runID}` as Route;
   },
+  debugger({ envSlug, runID }: { envSlug: string; runID: string }): Route {
+    return `/env/${envSlug}/debugger/${runID}` as Route;
+  },
   runs({ envSlug }: { envSlug: string }): Route {
     return `/env/${envSlug}/runs` as Route;
   },

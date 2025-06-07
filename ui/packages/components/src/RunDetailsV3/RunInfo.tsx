@@ -1,6 +1,5 @@
 import { useState } from 'react';
-import type { Route } from 'next';
-import { RiArrowRightSLine, RiExternalLinkLine } from '@remixicon/react';
+import { RiArrowRightSLine } from '@remixicon/react';
 
 import { AITrace } from '../AI/AITrace';
 import { parseAIOutput } from '../AI/utils';
@@ -13,23 +12,19 @@ import {
   TextElement,
   TimeElement,
 } from '../DetailsCard/NewElement';
-import { Link } from '../Link';
 import type { Run as InitialRunData } from '../RunsPage/types';
+import { usePathCreator } from '../SharedContext/usePathCreator';
 import { AICell } from '../Table/Cell';
 import type { Result } from '../types/functionRun';
 import { toMaybeDate } from '../utils/date';
 import { isLazyDone, type Lazy } from '../utils/lazyLoad';
 import { Actions } from './Actions';
+import { Nav } from './Nav';
 import { formatDuration } from './utils';
 
 type Props = {
   standalone: boolean;
   className?: string;
-  pathCreator: {
-    app: (params: { externalAppID: string }) => Route;
-    function: (params: { functionSlug: string }) => Route;
-    runPopout: (params: { runID: string }) => Route;
-  };
   initialRunData?: InitialRunData;
   run: Lazy<Run>;
   runID: string;
@@ -58,11 +53,11 @@ type Run = {
   hasAI: boolean;
 };
 
-export const RunInfo = ({ pathCreator, initialRunData, run, runID, standalone, result }: Props) => {
+export const RunInfo = ({ initialRunData, run, runID, standalone, result }: Props) => {
   const [expanded, setExpanded] = useState(true);
   const allowCancel = isLazyDone(run) && !Boolean(run.trace.endedAt);
-
   const aiOutput = result?.data ? parseAIOutput(result.data) : undefined;
+  const { pathCreator } = usePathCreator();
 
   return (
     <div className="flex flex-col gap-2">
@@ -83,13 +78,7 @@ export const RunInfo = ({ pathCreator, initialRunData, run, runID, standalone, r
               <SkeletonElement />
             )}
           </div>
-          {!standalone && (
-            <Link
-              size="medium"
-              href={pathCreator.runPopout({ runID })}
-              iconAfter={<RiExternalLinkLine className="h-4 w-4 shrink-0" />}
-            />
-          )}
+          <Nav standalone={standalone} runID={runID} />
         </div>
 
         <div className="flex items-center gap-2">

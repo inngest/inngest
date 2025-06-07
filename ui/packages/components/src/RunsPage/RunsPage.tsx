@@ -58,7 +58,6 @@ type Props = {
   onRefresh?: () => void;
   onScroll: UIEventHandler<HTMLDivElement>;
   onScrollToTop: () => void;
-  pathCreator: React.ComponentProps<typeof RunDetailsV3>['pathCreator'];
   pollInterval?: number;
   apps?: Option[];
   functions?: Option[];
@@ -81,7 +80,6 @@ export function RunsPage({
   onRefresh,
   onScroll,
   onScrollToTop,
-  pathCreator,
   apps,
   functions,
   pollInterval,
@@ -240,7 +238,6 @@ export function RunsPage({
             getRun={getRun}
             initialRunData={rowData}
             getTrigger={getTrigger}
-            pathCreator={pathCreator}
             pollInterval={pollInterval}
             runID={rowData.id}
             standalone={false}
@@ -248,7 +245,7 @@ export function RunsPage({
         </div>
       );
     },
-    [getRun, getTraceResult, getTrigger, pathCreator, pollInterval]
+    [getRun, getTraceResult, getTrigger, pollInterval]
   );
 
   const options = useMemo(() => {

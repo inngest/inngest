@@ -94,6 +94,3 @@ export const Actions = ({ allowCancel, runID, fnID }: RunActions) => {
     </div>
   );
 };
-function useInfoQuery(): { data: any; isLoading: any } {
-  throw new Error('Function not implemented.');
-}
