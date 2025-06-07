@@ -1,15 +1,8 @@
 import { useContext } from 'react';
+import type { BooleanFlag } from '@inngest/components/SharedContext/useBooleanFlag';
 import { useFlags } from 'launchdarkly-react-client-sdk';
 
 import { IdentificationContext } from './ClientFeatureFlagProvider';
-
-type BooleanFlag = {
-  // Whether the flag is ready to be used. This will be false if the user has
-  // not been identified in the LaunchDarkly client.
-  isReady: boolean;
-
-  value: boolean;
-};
 
 export function useBooleanFlag(flag: string, defaultValue: boolean = false): BooleanFlag {
   const value: unknown = useFlags()[flag];
