@@ -69,6 +69,7 @@ func New(o Options) http.Handler {
 
 func (t *TestAPI) Reset(w http.ResponseWriter, r *http.Request) {
 	t.ResetAll()
+	logger.StdlibLogger(r.Context()).Info("Reset all data stores")
 	_, _ = w.Write([]byte("ok"))
 }
 
