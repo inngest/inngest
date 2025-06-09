@@ -296,7 +296,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		// Key queues
 		redis_state.WithNormalizeRefreshItemCustomConcurrencyKeys(NormalizeConcurrencyKeys(smv2, dbcqrs)),
 		redis_state.WithNormalizeRefreshItemThrottle(NormalizeThrottle(smv2, dbcqrs)),
-		redis_state.WithPartitionConstraintConfigGetter(PartitionConstraintConfigGetter(smv2, dbcqrs)),
+		redis_state.WithPartitionConstraintConfigGetter(PartitionConstraintConfigGetter(dbcqrs)),
 
 		redis_state.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 			return enableKeyQueues
@@ -759,7 +759,7 @@ func NormalizeThrottle(smv2 sv2.StateLoader, dbcqrs cqrs.Manager) redis_state.No
 	}
 }
 
-func PartitionConstraintConfigGetter(smv2 sv2.StateLoader, dbcqrs cqrs.Manager) redis_state.PartitionConstraintConfigGetter {
+func PartitionConstraintConfigGetter(dbcqrs cqrs.Manager) redis_state.PartitionConstraintConfigGetter {
 	return func(ctx context.Context, p redis_state.QueueShadowPartition) (*redis_state.PartitionConstraintConfig, error) {
 		if p.EnvID == nil || p.FunctionID == nil {
 			return &redis_state.PartitionConstraintConfig{
