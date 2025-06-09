@@ -1,8 +1,10 @@
 package gateway
 
 import (
-	"bytes"
+	"encoding/json"
 	"net/http"
+
+	"github.com/inngest/inngest/pkg/execution/exechttp"
 )
 
 type Request struct {
@@ -17,6 +19,18 @@ type Request struct {
 	// Method is the HTTP method to use for the request.  This is almost always
 	// POST for AI requests, but can be specified too.
 	Method string `json:"method,omitempty"`
+	// PublishOpts configures optional publishing to realtime.
+	Publish PublishOpts `json:"publish,omitzero"`
+
+	// StepID is added from the opcode as a reference.
+	StepID string `json:"-"`
+}
+
+// PublishOpts specifies the optional channel and topic if the response is to
+// be published in realtime, using Inngest's realtime capabilities.
+type PublishOpts struct {
+	Channel string `json:"channel"`
+	Topic   string `json:"topic"`
 }
 
 func (r Request) MarshalJSON() ([]byte, error) {
@@ -25,21 +39,29 @@ func (r Request) MarshalJSON() ([]byte, error) {
 	return nil, nil
 }
 
-func (r Request) HTTPRequest() (*http.Request, error) {
+// SerializableRequest returns an exechttp.SerializableRequest type from the request, without publish opts
+// filled.
+func (r Request) SerializableRequest() (exechttp.SerializableRequest, error) {
 	method := http.MethodPost
 	if r.Method != "" {
 		method = r.Method
 	}
 
 	// If the body is empty, we need to set it to an empty JSON object.
-	req, err := http.NewRequest(method, r.URL, bytes.NewReader([]byte(r.Body)))
+	req, err := exechttp.NewRequest(method, r.URL, json.RawMessage(r.Body))
 	if err != nil {
-		return nil, err
+		return exechttp.SerializableRequest{}, err
 	}
 
 	// Overwrite any headers if custom headers are added to opts.
 	for header, val := range r.Headers {
 		req.Header.Add(header, val)
+	}
+
+	req.Publish = exechttp.RequestPublishOpts{
+		Channel:   r.Publish.Channel,
+		Topic:     r.Publish.Topic,
+		RequestID: r.StepID,
 	}
 
 	return req, nil
