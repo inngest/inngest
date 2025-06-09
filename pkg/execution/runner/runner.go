@@ -634,12 +634,7 @@ func (s *svc) pauses(ctx context.Context, evt event.TrackedEvent) error {
 
 	l.Debug("handling found pauses for event")
 
-	iter, err := s.pm.PausesSince(ctx, idx, time.Time{})
-	if err != nil {
-		return fmt.Errorf("error finding event pauses: %w", err)
-	}
-
-	_, err = s.executor.HandlePauses(ctx, iter, evt)
+	_, err := s.executor.HandlePauses(ctx, evt)
 	if err != nil {
 		l.Error("error handling pauses", "error", err)
 	}

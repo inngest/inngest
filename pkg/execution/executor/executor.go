@@ -1330,16 +1330,35 @@ func (e *executor) executeDriverForStep(ctx context.Context, i *runInstance) (*s
 }
 
 // HandlePauses handles pauses loaded from an incoming event.
-func (e *executor) HandlePauses(ctx context.Context, iter state.PauseIterator, evt event.TrackedEvent) (execution.HandlePauseResult, error) {
+func (e *executor) HandlePauses(ctx context.Context, evt event.TrackedEvent) (execution.HandlePauseResult, error) {
+	idx := pauses.Index{
+		WorkspaceID: evt.GetWorkspaceID(),
+		EventName:   evt.GetEvent().Name,
+	}
+
+	aggregated, err := e.pm.Aggregated(
+		ctx,
+		idx,
+		consts.AggregatePauseThreshold,
+	)
+	if err != nil {
+		e.log.Error("error checking pause aggregation", "error", err)
+	}
+
 	// Use the aggregator for all funciton finished events, if there are more than
 	// 50 waiting.  It only takes a few milliseconds to iterate and handle less
 	// than 50;  anything more runs the risk of running slow.
-	if iter.Count() > consts.AggregatePauseThreshold {
+	if aggregated {
 		aggRes, err := e.handleAggregatePauses(ctx, evt)
 		if err != nil {
 			e.log.Error("error handling aggregate pauses", "error", err)
 		}
 		return aggRes, err
+	}
+
+	iter, err := e.pm.PausesSince(ctx, idx, time.Time{})
+	if err != nil {
+		return execution.HandlePauseResult{}, fmt.Errorf("error loading pause iterator: %w", err)
 	}
 
 	res, err := e.handlePausesAllNaively(ctx, iter, evt)

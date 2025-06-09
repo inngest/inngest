@@ -62,14 +62,22 @@ type Manager interface {
 	// EvaluableLoader allows the Manager to be used within aggregate expression engines.
 	expragg.EvaluableLoader
 
+	// Bufferer is the core interface used to interact with pauses;  as an end user
+	// of this package you need to only write and read pauses since a given date.
+	Bufferer
+
 	// Aggregated returns whether the index should be aggregated.  This is a quick lookup
 	// to see if we have flushed pauses to blocks, or if the buffer length is greater than
 	// the given number
 	Aggregated(ctx context.Context, index Index, minLen int64) (bool, error)
 
-	// Bufferer is the core interface used to interact with pauses;  as an end user
-	// of this package you need to only write and read pauses since a given date.
-	Bufferer
+	// PausesSince loads pauses in the buffer for a given index, since a given time.
+	// If the time is ZeroTime, this must return all indexes in the buffer.  This time is
+	// inclusive, ie. it will include pauses created from the current since timestamp in
+	// seconds.
+	//
+	// Note that this does not return blocks, as this only reads from the BufferIndexer.
+	PausesSince(ctx context.Context, index Index, since time.Time) (state.PauseIterator, error)
 
 	// PauseByID fetches a pause for a given ID.  It may return the pause from the buffer
 	// or from block storage, depending on the pause
