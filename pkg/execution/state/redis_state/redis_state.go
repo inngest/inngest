@@ -1333,6 +1333,14 @@ func (m unshardedMgr) PausesByID(ctx context.Context, ids ...uuid.UUID) ([]*stat
 	return pauses, merr
 }
 
+func (m unshardedMgr) PauseLen(ctx context.Context, workspaceID uuid.UUID, event string) (int64, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "PuaseLen"), redis_telemetry.ScopePauses)
+	pauses := m.u.Pauses()
+	key := pauses.kg.PauseEvent(ctx, workspaceID, event)
+	cntCmd := pauses.Client().B().Hlen().Key(key).Build()
+	return pauses.Client().Do(ctx, cntCmd).AsInt64()
+}
+
 // PausesByEvent returns all pauses for a given event within a workspace.
 func (m unshardedMgr) PausesByEvent(ctx context.Context, workspaceID uuid.UUID, event string) (state.PauseIterator, error) {
 	return m.pausesByEvent(ctx, workspaceID, event, time.Time{})

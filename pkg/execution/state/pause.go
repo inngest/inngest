@@ -56,6 +56,10 @@ type PauseGetter interface {
 	// PausesByEvent returns all pauses for a given event, in a given workspace.
 	PausesByEvent(ctx context.Context, workspaceID uuid.UUID, eventName string) (PauseIterator, error)
 
+	// PauseLen returns the number of pauses for a given workspace ID, eventName combo in
+	// the conneted datastore.
+	PauseLen(ctx context.Context, workspaceID uuid.UUID, eventName string) (int64, error)
+
 	PausesByEventSince(ctx context.Context, workspaceID uuid.UUID, event string, since time.Time) (PauseIterator, error)
 
 	// EventHasPauses returns whether the event has pauses stored.

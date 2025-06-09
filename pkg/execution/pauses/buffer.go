@@ -84,3 +84,7 @@ func (r redisAdapter) PauseBySignalID(ctx context.Context, workspaceID uuid.UUID
 func (r redisAdapter) IndexExists(ctx context.Context, i Index) (bool, error) {
 	return r.rsm.EventHasPauses(ctx, i.WorkspaceID, i.EventName)
 }
+
+func (r redisAdapter) BufferLen(ctx context.Context, i Index) (int64, error) {
+	return r.rsm.PauseLen(ctx, i.WorkspaceID, i.EventName)
+}

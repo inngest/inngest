@@ -75,6 +75,26 @@ func (m manager) PauseBySignalID(ctx context.Context, workspaceID uuid.UUID, sig
 	return m.buf.PauseBySignalID(ctx, workspaceID, signal)
 }
 
+func (m manager) BufferLen(ctx context.Context, idx Index) (int64, error) {
+	return m.buf.BufferLen(ctx, idx)
+}
+
+func (m manager) Aggregated(ctx context.Context, idx Index, minLen int64) (bool, error) {
+	// Check the buffer length by default.
+	n, err := m.buf.BufferLen(ctx, idx)
+	if err != nil {
+		return true, err
+	}
+	if n > minLen {
+		return true, nil
+	}
+	if m.bs == nil {
+		return false, nil
+	}
+	// If we've written a blob, aggregate, assuming there are always many pauses for this index.
+	return m.bs.IndexExists(ctx, idx)
+}
+
 func (m manager) IndexExists(ctx context.Context, i Index) (bool, error) {
 	ok, err := m.buf.IndexExists(ctx, i)
 	if err != nil || ok || m.bs == nil {

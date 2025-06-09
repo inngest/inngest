@@ -221,6 +221,12 @@ func (m *mockBufferer) PauseByID(ctx context.Context, index Index, pauseID uuid.
 	return nil, fmt.Errorf("pause not found")
 }
 
+func (m *mockBufferer) BufferLen(ctx context.Context, i Index) (int64, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return int64(len(m.pauses)), nil
+}
+
 func (m *mockBufferer) IndexExists(ctx context.Context, i Index) (bool, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
