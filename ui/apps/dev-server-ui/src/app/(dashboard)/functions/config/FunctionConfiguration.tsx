@@ -162,6 +162,8 @@ export default function FunctionConfiguration({
         action={
           <div className="flex flex-row items-center justify-end gap-2">
             <InvokeButton
+              kind="primary"
+              appearance="solid"
               disabled={false}
               doesFunctionAcceptPayload={doesFunctionAcceptPayload}
               btnAction={async ({ data, user }) => {
