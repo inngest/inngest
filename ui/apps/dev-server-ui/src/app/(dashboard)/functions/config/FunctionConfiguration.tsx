@@ -12,6 +12,7 @@ import { FunctionsIcon } from '@inngest/components/icons/sections/Functions';
 import {
   RiArrowRightSLine,
   RiArrowRightUpLine,
+  RiCloseLine,
   RiInformationLine,
   RiTimeLine,
 } from '@remixicon/react';
@@ -25,12 +26,14 @@ import {
 } from '@/store/generated';
 
 type FunctionConfigurationProps = {
+  onClose: () => void;
   inngestFunction: Function;
   triggers: any;
   configuration: FunctionConfiguration;
 };
 
 export default function FunctionConfiguration({
+  onClose,
   inngestFunction,
   triggers,
   configuration,
@@ -175,6 +178,13 @@ export default function FunctionConfiguration({
                 toast.success('Function invoked');
                 router.push('/runs');
               }}
+            />
+            <Button
+              icon={<RiCloseLine className="text-muted h-5 w-5" />}
+              kind="secondary"
+              appearance="ghost"
+              size="small"
+              onClick={() => onClose()}
             />
           </div>
         }

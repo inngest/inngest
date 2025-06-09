@@ -5,7 +5,11 @@ import { useSearchParams } from 'next/navigation';
 import FunctionConfiguration from '@/app/(dashboard)/functions/config/FunctionConfiguration';
 import { useGetFunctionQuery } from '@/store/generated';
 
-export default function FunctionDetails() {
+type FunctionDetailsProps = {
+  onClose: () => void;
+};
+
+export default function FunctionDetails({ onClose }: FunctionDetailsProps) {
   const params = useSearchParams();
 
   const functionSlug = params.get('slug');
@@ -14,7 +18,7 @@ export default function FunctionDetails() {
     { functionSlug: functionSlug },
     {
       refetchOnMountOrArgChange: true,
-    },
+    }
   );
 
   if (isFetching) {
@@ -26,6 +30,7 @@ export default function FunctionDetails() {
 
   return (
     <FunctionConfiguration
+      onClose={onClose}
       inngestFunction={data.functionBySlug}
       triggers={data.functionBySlug.triggers}
       configuration={data.functionBySlug.configuration}

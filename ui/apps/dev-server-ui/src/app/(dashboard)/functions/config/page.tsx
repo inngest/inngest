@@ -22,7 +22,7 @@ const FunctionSlideOver = () => {
 
   return (
     <SlideOver size={true ? 'small' : 'large'} onClose={closeSlideOver}>
-      <FunctionDetails />
+      <FunctionDetails onClose={closeSlideOver} />
     </SlideOver>
   );
 };
