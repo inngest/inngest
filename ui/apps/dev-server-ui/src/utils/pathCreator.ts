@@ -12,4 +12,7 @@ export const pathCreator = {
   runPopout({ runID }: { runID: string }): Route {
     return `/run?runID=${runID}` as Route;
   },
+  debugger({ runID }: { runID: string }): Route {
+    return `/debugger?runID=${runID}` as Route;
+  },
 };

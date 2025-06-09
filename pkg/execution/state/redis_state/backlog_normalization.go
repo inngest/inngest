@@ -62,6 +62,7 @@ func (q *queue) backlogNormalizationWorker(ctx context.Context, nc chan normaliz
 // backlogNormalizationScan iterates through a partition of backlogs and reenqueue
 // the items to the appropriate backlogs
 func (q *queue) backlogNormalizationScan(ctx context.Context) error {
+	l := q.log.With("method", "backlogNormalizationScan")
 	bc := make(chan normalizeWorkerChanMsg)
 
 	for i := int32(0); i < q.numBacklogNormalizationWorkers; i++ {
@@ -69,7 +70,9 @@ func (q *queue) backlogNormalizationScan(ctx context.Context) error {
 	}
 
 	tick := q.clock.NewTicker(q.pollTick)
-	q.log.Debug("starting normalization scanner", "poll", q.pollTick.String())
+	l.Debug("starting normalization scanner", "poll", q.pollTick.String())
+
+	backoff := 200 * time.Millisecond
 
 	for {
 		select {
@@ -81,8 +84,23 @@ func (q *queue) backlogNormalizationScan(ctx context.Context) error {
 			until := q.clock.Now()
 
 			if err := q.iterateNormalizationPartition(ctx, until, bc); err != nil {
+				if errors.Is(err, context.DeadlineExceeded) {
+					l.Warn("deadline exceeded scanning backlog normalization partition")
+					<-time.After(backoff)
+
+					// Backoff doubles up to 5 seconds
+					backoff = time.Duration(math.Min(float64(backoff*2), float64(5*time.Second)))
+					continue
+				}
+
+				if !errors.Is(err, context.Canceled) {
+					l.Error("error scanning backlog normalization partitions", "error", err)
+				}
+
 				return fmt.Errorf("error scanning global normalization partition: %w", err)
 			}
+
+			backoff = 200 * time.Millisecond
 		}
 	}
 }

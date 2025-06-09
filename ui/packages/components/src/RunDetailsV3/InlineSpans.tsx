@@ -4,6 +4,7 @@ import { ElementWrapper } from '../DetailsCard/Element';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../Tooltip';
 import { cn } from '../utils/classNames';
 import { toMaybeDate } from '../utils/date';
+import { GroupSpan } from './GroupSpan';
 import { Span } from './Span';
 import { type Trace } from './types';
 import { createSpanWidths, formatDuration, getSpanName } from './utils';
@@ -13,10 +14,12 @@ type Props = {
   maxTime: Date;
   minTime: Date;
   trace: Trace;
+  depth: number;
 };
 
-export function InlineSpans({ className, minTime, maxTime, trace }: Props) {
+export function InlineSpans({ className, minTime, maxTime, trace, depth }: Props) {
   const [open, setOpen] = useState(false);
+  const spanRef = useRef<HTMLDivElement | null>(null);
   const hoverTimeoutRef = useRef<NodeJS.Timeout>();
   const spanName = getSpanName(trace.name);
 
@@ -60,8 +63,16 @@ export function InlineSpans({ className, minTime, maxTime, trace }: Props) {
           style={{
             flexGrow: widths.queued + widths.running,
           }}
+          ref={spanRef}
         >
           <TooltipTrigger className="flex w-full flex-row">
+            {spans.length > 0 && (
+              <GroupSpan
+                depth={depth}
+                status={trace.status}
+                width={spanRef.current?.clientWidth ?? 0}
+              />
+            )}
             {spans.length ? (
               spans.map((span) => {
                 return (

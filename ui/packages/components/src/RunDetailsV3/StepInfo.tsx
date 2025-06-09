@@ -12,6 +12,7 @@ import {
   TimeElement,
 } from '../DetailsCard/NewElement';
 import { RerunModal } from '../Rerun/RerunModal';
+import { usePathCreator } from '../SharedContext/usePathCreator';
 import { Time } from '../Time';
 import { usePrettyJson } from '../hooks/usePrettyJson';
 import type { Result } from '../types/functionRun';
@@ -29,20 +30,14 @@ import {
   type StepInfoSleep,
   type StepInfoWait,
 } from './types';
-import { maybeBooleanToString, type PathCreator, type StepInfoType } from './utils';
+import { maybeBooleanToString, type StepInfoType } from './utils';
 
 type StepKindInfoProps = {
   stepInfo: StepInfoType['trace']['stepInfo'];
-  pathCreator: StepInfoType['pathCreator'];
 };
 
-const InvokeInfo = ({
-  stepInfo,
-  pathCreator,
-}: {
-  stepInfo: StepInfoInvoke;
-  pathCreator: PathCreator;
-}) => {
+const InvokeInfo = ({ stepInfo }: { stepInfo: StepInfoInvoke }) => {
+  const { pathCreator } = usePathCreator();
   const timeout = toMaybeDate(stepInfo.timeout);
   return (
     <>
@@ -117,7 +112,7 @@ const SignalInfo = ({ stepInfo }: { stepInfo: StepInfoSignal }) => {
 
 const getStepKindInfo = (props: StepKindInfoProps): JSX.Element | null =>
   isStepInfoInvoke(props.stepInfo) ? (
-    <InvokeInfo stepInfo={props.stepInfo} pathCreator={props.pathCreator} />
+    <InvokeInfo stepInfo={props.stepInfo} />
   ) : isStepInfoSleep(props.stepInfo) ? (
     <SleepInfo stepInfo={props.stepInfo} />
   ) : isStepInfoWait(props.stepInfo) ? (
@@ -137,7 +132,7 @@ export const StepInfo = ({
 }) => {
   const [expanded, setExpanded] = useState(true);
   const [rerunModalOpen, setRerunModalOpen] = useState(false);
-  const { runID, trace, pathCreator } = selectedStep;
+  const { runID, trace } = selectedStep;
   const [result, setResult] = useState<Result>();
 
   useEffect(() => {
@@ -183,7 +178,6 @@ export const StepInfo = ({
 
   const stepKindInfo = getStepKindInfo({
     stepInfo: trace.stepInfo,
-    pathCreator,
   });
 
   const aiOutput = result?.data ? parseAIOutput(result.data) : undefined;

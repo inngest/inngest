@@ -231,6 +231,7 @@ export type FunctionConfiguration = {
   priority: Maybe<Scalars['String']>;
   rateLimit: Maybe<RateLimitConfiguration>;
   retries: RetryConfiguration;
+  singleton: Maybe<SingletonConfiguration>;
   throttle: Maybe<ThrottleConfiguration>;
 };
 
@@ -724,6 +725,17 @@ export enum RunsV2OrderByField {
   EndedAt = 'ENDED_AT',
   QueuedAt = 'QUEUED_AT',
   StartedAt = 'STARTED_AT'
+}
+
+export type SingletonConfiguration = {
+  __typename?: 'SingletonConfiguration';
+  key: Maybe<Scalars['String']>;
+  mode: SingletonMode;
+};
+
+export enum SingletonMode {
+  Cancel = 'CANCEL',
+  Skip = 'SKIP'
 }
 
 export type SleepStepInfo = {
