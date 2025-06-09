@@ -136,18 +136,16 @@ func (m manager) ConsumePause(ctx context.Context, pause state.Pause, opts state
 		return res, cleanup, err
 	}
 
+	idx := Index{WorkspaceID: pause.WorkspaceID}
+	if pause.Event != nil {
+		idx.EventName = *pause.Event
+	}
+
 	// Note that we cannot consume pauses from the blobstore with no event or backing
 	// blob.
-	// if pause.Event == nil || m.bs == nil {
-	// 	// A Pause must always have an event for blocks, else we cannot build the
-	// 	// Index struct for deleting pauses.  It's also no longer possible to have pauses without
-	// 	// events, so this should never happen.
-	// 	return state.ConsumePauseResult{}, func() error { return nil }, fmt.Errorf("pause has no event")
-	// }
-
-	idx := Index{
-		pause.WorkspaceID,
-		*pause.Event,
+	if SkipFlushing(idx, []*state.Pause{&pause}) {
+		// This only exists in the buffer.  Return the buffer results.
+		return res, cleanup, err
 	}
 
 	// override the cleanup with idx deletion
