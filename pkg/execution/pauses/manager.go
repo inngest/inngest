@@ -3,7 +3,6 @@ package pauses
 import (
 	"context"
 	"errors"
-	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -106,13 +105,6 @@ func (m manager) IndexExists(ctx context.Context, i Index) (bool, error) {
 }
 
 func (m manager) ConsumePause(ctx context.Context, pause state.Pause, opts state.ConsumePauseOpts) (state.ConsumePauseResult, func() error, error) {
-	if pause.Event == nil {
-		// A Pause must always have an event for this manager, else we cannot build the
-		// Index struct for deleting pauses.  It's also no longer possible to have pauses without
-		// events, so this should never happen.
-		return state.ConsumePauseResult{}, func() error { return nil }, fmt.Errorf("pause has no event")
-	}
-
 	// NOTE: There is a race condition when flushing blocks:  we may copy a pause
 	// into a block, then while writing the block to disk delete/consume a pause
 	// that is being written.  In this case the metadata for a block
@@ -132,11 +124,10 @@ func (m manager) ConsumePause(ctx context.Context, pause state.Pause, opts state
 	// case when consuming, and always re-delete the pause.  that’s no big deal, but
 	// not the best.
 	//
-	// In the future, we could add two block indexes:  pending, and stofed.  this is a
+	// In the future, we could add two block indexes:  pending and flushed.  this is a
 	// pain, though, because we may die when uploading pending blocks, and that requires
 	// a bit of thought to work around, so we’ll just go with double deletes for now,
 	// assuming this won’t happen a ton.  this can be improved later.
-
 	res, cleanup, err := m.buf.ConsumePause(ctx, pause, opts)
 	// Is this an ErrDuplicateResponse?  If so, we've already consumed this pause,
 	// so delete it.  Similarly, if the error is nil we just consumed, so go ahead
@@ -144,6 +135,15 @@ func (m manager) ConsumePause(ctx context.Context, pause state.Pause, opts state
 	if err != nil {
 		return res, cleanup, err
 	}
+
+	// Note that we cannot consume pauses from the blobstore with no event or backing
+	// blob.
+	// if pause.Event == nil || m.bs == nil {
+	// 	// A Pause must always have an event for blocks, else we cannot build the
+	// 	// Index struct for deleting pauses.  It's also no longer possible to have pauses without
+	// 	// events, so this should never happen.
+	// 	return state.ConsumePauseResult{}, func() error { return nil }, fmt.Errorf("pause has no event")
+	// }
 
 	idx := Index{
 		pause.WorkspaceID,
