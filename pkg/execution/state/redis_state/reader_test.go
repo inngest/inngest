@@ -68,15 +68,43 @@ func TestItemsByPartition(t *testing.T) {
 			expectedItems: 10,
 			batchSize:     2,
 		},
-		// {
-		// 	name:             "retrieve items backlogs",
-		// 	num:              14,
-		// 	interval:         2 * time.Second,
-		// 	from:             clock.Now(),
-		// 	until:            clock.Now().Add(time.Minute),
-		// 	expectedItems:    14,
-		// 	keyQueuesEnabled: true,
-		// },
+		// With key queues
+		{
+			name:             "kq - retrieve items in one fetch",
+			num:              10,
+			from:             clock.Now(),
+			until:            clock.Now().Add(time.Minute),
+			expectedItems:    10,
+			keyQueuesEnabled: true,
+		},
+		{
+			name:             "kq - with interval",
+			num:              10,
+			from:             clock.Now(),
+			until:            clock.Now().Add(time.Minute),
+			interval:         time.Second,
+			expectedItems:    10,
+			keyQueuesEnabled: true,
+		},
+		{
+			name:             "kq - with out of range interval",
+			num:              10,
+			from:             clock.Now(),
+			until:            clock.Now().Add(7 * time.Second).Truncate(time.Second),
+			interval:         time.Second,
+			expectedItems:    7,
+			keyQueuesEnabled: true,
+		},
+		{
+			name:             "kq - with batch size",
+			num:              10,
+			from:             clock.Now(),
+			until:            clock.Now().Add(10 * time.Second).Truncate(time.Second),
+			interval:         10 * time.Millisecond,
+			expectedItems:    10,
+			batchSize:        2,
+			keyQueuesEnabled: true,
+		},
 	}
 
 	for _, tc := range testcases {
