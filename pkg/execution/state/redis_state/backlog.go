@@ -24,6 +24,13 @@ var (
 	ErrBacklogNotFound = fmt.Errorf("backlog not found")
 )
 
+type PartitionConstraintConfig struct {
+	Concurrency ShadowPartitionConcurrency `json:"c,omitempty,omitzero"`
+
+	// Throttle configuration, optionally specifying key. If no key is set, the throttle value will be the function ID.
+	Throttle *ShadowPartitionThrottle `json:"t,omitempty,omitzero"`
+}
+
 type CustomConcurrencyLimit struct {
 	Mode                enums.ConcurrencyMode  `json:"m"`
 	Scope               enums.ConcurrencyScope `json:"s"`
@@ -113,7 +120,17 @@ func (q QueueShadowPartition) activeKey(kg QueueKeyGenerator) string {
 }
 
 // CustomConcurrencyLimit returns concurrency limit for custom concurrency key in position n (0, if not set)
-func (q QueueShadowPartition) CustomConcurrencyLimit(n int) int {
+func (q *QueueShadowPartition) CustomConcurrencyLimit(n int) int {
+	if n < 0 || n > len(q.Concurrency.CustomConcurrencyKeys) {
+		return 0
+	}
+
+	key := q.Concurrency.CustomConcurrencyKeys[n-1]
+
+	return key.Limit
+}
+
+func (q *PartitionConstraintConfig) CustomConcurrencyLimit(n int) int {
 	if n < 0 || n > len(q.Concurrency.CustomConcurrencyKeys) {
 		return 0
 	}
@@ -472,7 +489,7 @@ func (b QueueBacklog) isDefault() bool {
 	return b.Throttle == nil && len(b.ConcurrencyKeys) == 0
 }
 
-func (b QueueBacklog) isOutdated(sp *QueueShadowPartition) enums.QueueNormalizeReason {
+func (b QueueBacklog) isOutdated(constraints *PartitionConstraintConfig) enums.QueueNormalizeReason {
 	// If this is the default backlog, don't normalize.
 	// If custom concurrency keys were added, previously-enqueued items
 	// in the default backlog do not have custom concurrency keys set.
@@ -481,17 +498,17 @@ func (b QueueBacklog) isOutdated(sp *QueueShadowPartition) enums.QueueNormalizeR
 	}
 
 	// Throttle removed - move items back to default backlog
-	if b.Throttle != nil && sp.Throttle == nil {
+	if b.Throttle != nil && constraints.Throttle == nil {
 		return enums.QueueNormalizeReasonThrottleRemoved
 	}
 
 	// Throttle key changed - move from old throttle key backlogs to the new throttle key backlogs
-	if b.Throttle != nil && sp.Throttle != nil && b.Throttle.ThrottleKeyExpressionHash != sp.Throttle.ThrottleKeyExpressionHash {
+	if b.Throttle != nil && constraints.Throttle != nil && b.Throttle.ThrottleKeyExpressionHash != constraints.Throttle.ThrottleKeyExpressionHash {
 		return enums.QueueNormalizeReasonThrottleKeyChanged
 	}
 
 	// Concurrency key count does not match
-	if len(b.ConcurrencyKeys) != len(sp.Concurrency.CustomConcurrencyKeys) {
+	if len(b.ConcurrencyKeys) != len(constraints.Concurrency.CustomConcurrencyKeys) {
 		return enums.QueueNormalizeReasonCustomConcurrencyKeyCountMismatch
 	}
 
@@ -499,7 +516,7 @@ func (b QueueBacklog) isOutdated(sp *QueueShadowPartition) enums.QueueNormalizeR
 	// This is quadratic but each backlog and shadow partition can only have up to 2 keys, so it's bounded.
 	for _, backlogKey := range b.ConcurrencyKeys {
 		hasKey := false
-		for _, shadowPartitionKey := range sp.Concurrency.CustomConcurrencyKeys {
+		for _, shadowPartitionKey := range constraints.Concurrency.CustomConcurrencyKeys {
 			if shadowPartitionKey.Mode == backlogKey.ConcurrencyMode && shadowPartitionKey.Scope == backlogKey.Scope && shadowPartitionKey.HashedKeyExpression == backlogKey.HashedKeyExpression {
 				hasKey = true
 				break
@@ -583,8 +600,6 @@ func (b QueueBacklog) customConcurrencyKeyID(n int) string {
 }
 
 func (b QueueBacklog) requeueBackOff(now time.Time, constraint enums.QueueConstraint, partition *QueueShadowPartition) time.Time {
-	max := now.Add(10 * time.Second)
-
 	switch constraint {
 	case enums.QueueConstraintThrottle:
 		if partition.Throttle == nil {
@@ -609,18 +624,17 @@ func (b QueueBacklog) requeueBackOff(now time.Time, constraint enums.QueueConstr
 		}
 
 		return now.Add(backoff)
-
 	case enums.QueueConstraintCustomConcurrencyKey1, enums.QueueConstraintCustomConcurrencyKey2:
-		next := now.Add(PartitionConcurrencyLimitRequeueExtension + time.Duration(b.SuccessiveCustomConcurrencyConstrained)*time.Second)
+		next := time.Duration(b.SuccessiveCustomConcurrencyConstrained) * time.Second
 
-		if next.After(max) {
-			next = max
+		if next > PartitionConcurrencyLimitRequeueExtension {
+			next = PartitionConcurrencyLimitRequeueExtension
 		}
 
-		return next
+		return now.Add(next)
+	default:
+		return now.Add(BacklogDefaultRequeueExtension)
 	}
-
-	return max
 }
 
 type BacklogRefillResult struct {
@@ -632,7 +646,7 @@ type BacklogRefillResult struct {
 	Refill            int
 }
 
-func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueShadowPartition, refillUntil time.Time) (*BacklogRefillResult, error) {
+func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueShadowPartition, refillUntil time.Time, latestConstraints *PartitionConstraintConfig) (*BacklogRefillResult, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "BacklogRefill"), redis_telemetry.ScopeQueue)
 
 	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
@@ -660,11 +674,11 @@ func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueSha
 		throttleKey                                  string
 		throttleLimit, throttleBurst, throttlePeriod int
 	)
-	if sp.Throttle != nil && b.Throttle != nil {
+	if latestConstraints.Throttle != nil && b.Throttle != nil {
 		throttleKey = b.Throttle.ThrottleKey
-		throttleLimit = sp.Throttle.Limit
-		throttleBurst = sp.Throttle.Burst
-		throttlePeriod = sp.Throttle.Period
+		throttleLimit = latestConstraints.Throttle.Limit
+		throttleBurst = latestConstraints.Throttle.Burst
+		throttlePeriod = latestConstraints.Throttle.Period
 	}
 
 	keys := []string{
@@ -711,10 +725,10 @@ func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueSha
 		refillLimit,
 		nowMS,
 
-		sp.Concurrency.AccountConcurrency,
-		sp.Concurrency.FunctionConcurrency,
-		sp.CustomConcurrencyLimit(1),
-		sp.CustomConcurrencyLimit(2),
+		latestConstraints.Concurrency.AccountConcurrency,
+		latestConstraints.Concurrency.FunctionConcurrency,
+		latestConstraints.CustomConcurrencyLimit(1),
+		latestConstraints.CustomConcurrencyLimit(2),
 
 		throttleKey,
 		throttleLimit,

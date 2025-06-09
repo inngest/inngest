@@ -38,8 +38,9 @@ var (
 )
 
 type normalizeWorkerChanMsg struct {
-	b  *QueueBacklog
-	sp *QueueShadowPartition
+	b           *QueueBacklog
+	sp          *QueueShadowPartition
+	constraints *PartitionConstraintConfig
 }
 
 // backlogNormalizationWorker runs a blocking process that listens to item being pushed into the normalization partition. This allows us to process individual
@@ -51,7 +52,7 @@ func (q *queue) backlogNormalizationWorker(ctx context.Context, nc chan normaliz
 			return
 
 		case msg := <-nc:
-			err := q.normalizeBacklog(ctx, msg.b, msg.sp)
+			err := q.normalizeBacklog(ctx, msg.b, msg.sp, msg.constraints)
 			if err != nil {
 				q.log.Error("could not normalize backlog", "error", err, "backlog", msg.b, "shadow", msg.sp)
 			}
@@ -158,6 +159,11 @@ func (q *queue) iterateNormalizationShadowPartition(ctx context.Context, shadowP
 			return err
 		}
 
+		constraints, err := q.partitionConstraintConfigGetter(ctx, *partition)
+		if err != nil {
+			return fmt.Errorf("could not get latest partition constraints: %w", err)
+		}
+
 		for _, bl := range backlogs {
 			// lease the backlog
 			_, err := duration(ctx, q.primaryQueueShard.Name, "normalize_lease", q.clock.Now(), func(ctx context.Context) (any, error) {
@@ -182,8 +188,9 @@ func (q *queue) iterateNormalizationShadowPartition(ctx context.Context, shadowP
 
 			// dump it into the channel for the workers to do their thing
 			bc <- normalizeWorkerChanMsg{
-				b:  bl,
-				sp: partition,
+				b:           bl,
+				sp:          partition,
+				constraints: constraints,
 			}
 		}
 	}
@@ -256,7 +263,7 @@ func (q *queue) extendBacklogNormalizationLease(ctx context.Context, now time.Ti
 // normalizeBacklog must be called with exclusive access to the shadow partition
 // NOTE: ideally this is one transaction in a lua script but enqueue_to_backlog is way too much work to
 // utilize
-func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp *QueueShadowPartition) error {
+func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp *QueueShadowPartition, latestConstraints *PartitionConstraintConfig) error {
 	l := q.log.With("backlog", backlog)
 
 	// extend the lease
@@ -314,6 +321,8 @@ func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp 
 			}
 			item.Data.Throttle = refreshedThrottle
 
+			q.log.Trace("retrieved refreshed throttle", "item", item, "refreshed_throttle", refreshedThrottle, "existing_throttle", existingThrottle, "sp", sp, "backlog", backlog)
+
 			if _, err := q.EnqueueItem(ctx, shard, *item, time.UnixMilli(item.AtMS), osqueue.EnqueueOpts{
 				PassthroughJobId:       true,
 				NormalizeFromBacklogID: backlog.BacklogID,
@@ -345,6 +354,8 @@ func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp 
 			"partition_id": backlog.ShadowPartitionID,
 		},
 	})
+
+	q.log.Trace("normalized backlog", "backlog", backlog.BacklogID, "partition", sp.PartitionID)
 
 	return nil
 }
