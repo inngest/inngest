@@ -264,7 +264,7 @@ func (q *queue) extendBacklogNormalizationLease(ctx context.Context, now time.Ti
 // NOTE: ideally this is one transaction in a lua script but enqueue_to_backlog is way too much work to
 // utilize
 func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp *QueueShadowPartition, latestConstraints *PartitionConstraintConfig) error {
-	l := q.log.With("backlog", backlog, "sp", sp)
+	l := q.log.With("backlog", backlog, "sp", sp, "constraints", latestConstraints)
 
 	// extend the lease
 	extendLeaseCtx, cancel := context.WithCancel(ctx)
