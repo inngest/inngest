@@ -311,7 +311,7 @@ export default function FunctionConfiguration({
                         </div>
                       )}
                       {cancelOn.timeout && (
-                        <div className="text-subtle text-xs">Timeout {cancelOn.timeout}</div>
+                        <div className="text-subtle text-xs">Timeout: {cancelOn.timeout}</div>
                       )}
                     </div>
                     {/*<RiArrowRightSLine className="h-5" />*/}
