@@ -212,7 +212,12 @@ func (q *queue) RunningCount(ctx context.Context, workflowID uuid.UUID) (int64, 
 }
 
 func (q *queue) ItemsByPartition(ctx context.Context, shard QueueShard, partitionID uuid.UUID, from time.Time, until time.Time, opts ...QueueIteratorOpt) (iter.Seq[*osqueue.QueueItem], error) {
-	opt := queueIterOpt{batchSize: 1000}
+	opt := queueIterOpt{
+		batchSize: 1000,
+		allowKeyQueues: func() bool {
+			return false
+		},
+	}
 	for _, apply := range opts {
 		apply(&opt)
 	}
@@ -345,22 +350,27 @@ func (q *queue) ItemsByPartition(ctx context.Context, shard QueueShard, partitio
 						"start", start.Format(time.StampMilli),
 						"end", end.Format(time.StampMilli),
 					)
-				}
 
-				// didn't process anything, meaning there's nothing left to do
-				// exit loop
-				if iterated == 0 {
-					return
-				}
+					// didn't process anything, meaning there's nothing left to do
+					// exit loop
+					if iterated == 0 {
+						return
+					}
 
-				backlogFrom = backlogFrom.Add(time.Millisecond)
+					backlogFrom = backlogFrom.Add(time.Millisecond)
+				}
 			}
 		}
 	}, nil
 }
 
 func (q *queue) ItemsByBacklog(ctx context.Context, shard QueueShard, backlogID string, from time.Time, until time.Time, opts ...QueueIteratorOpt) (iter.Seq[*osqueue.QueueItem], error) {
-	opt := queueIterOpt{}
+	opt := queueIterOpt{
+		batchSize: 1000,
+		allowKeyQueues: func() bool {
+			return false
+		},
+	}
 	for _, apply := range opts {
 		apply(&opt)
 	}
@@ -391,35 +401,46 @@ func (q *queue) ItemsByBacklog(ctx context.Context, shard QueueShard, backlogID 
 		return nil, fmt.Errorf("error unmarshalling backlog: %w", err)
 	}
 
+	backlogFrom := from
 	return func(yield func(*osqueue.QueueItem) bool) {
 		for {
-			var processed, skipped int
+			var iterated int
 
 			// peek items for backlog
-			items, _, err := q.backlogPeek(ctx, &backlog, from, until, q.peekMax)
+			items, _, err := q.backlogPeek(ctx, &backlog, backlogFrom, until, opt.batchSize)
 			if err != nil {
 				l.Error("error retrieving queue items from backlog", "error", err)
 				return
 			}
 
+			var start, end time.Time
 			for _, qi := range items {
-				at := time.UnixMilli(qi.AtMS)
-				if at.Before(from) || at.After(until) {
-					skipped++
-					continue
-				}
-
 				if !yield(qi) {
 					return
 				}
-				processed++
+				iterated++
+
+				at := time.UnixMilli(qi.AtMS)
+				if start.IsZero() {
+					start = at
+				}
+				end = at
+				backlogFrom = at
 			}
+
+			l.Debug("iterated items in backlog",
+				"count", iterated,
+				"start", start.Format(time.StampMilli),
+				"end", end.Format(time.StampMilli),
+			)
 
 			// didn't process anything, meaning there's nothing left to do
 			// exit loop
-			if processed == 0 {
+			if iterated == 0 {
 				return
 			}
+
+			backlogFrom = backlogFrom.Add(time.Millisecond)
 		}
 	}, nil
 }
