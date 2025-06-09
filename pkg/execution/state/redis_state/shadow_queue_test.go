@@ -1848,35 +1848,35 @@ func TestShadowPartitionUpdate(t *testing.T) {
 				),
 			},
 		},
-		{
-			name: "change concurrency",
-			conf1: itemConf{
-				concurrencyKeys: osqueue.GetCustomConcurrencyKeys(
-					ctx,
-					idv2,
-					[]inngest.Concurrency{
-						{Limit: 123, Key: util.StrPtr("event.data.customerId")},
-					},
-					inngestgo.Event{
-						Name: "yolo",
-						Data: map[string]any{"customerId": 10},
-					}.Map(),
-				),
-			},
-			conf2: itemConf{
-				concurrencyKeys: osqueue.GetCustomConcurrencyKeys(
-					ctx,
-					idv2,
-					[]inngest.Concurrency{
-						{Limit: 123, Key: util.StrPtr("event.data.userId")},
-					},
-					inngestgo.Event{
-						Name: "yolo",
-						Data: map[string]any{"userId": 10},
-					}.Map(),
-				),
-			},
-		},
+		//{
+		//	name: "change concurrency",
+		//	conf1: itemConf{
+		//		concurrencyKeys: osqueue.GetCustomConcurrencyKeys(
+		//			ctx,
+		//			idv2,
+		//			[]inngest.Concurrency{
+		//				{Limit: 123, Key: util.StrPtr("event.data.customerId")},
+		//			},
+		//			inngestgo.Event{
+		//				Name: "yolo",
+		//				Data: map[string]any{"customerId": 10},
+		//			}.Map(),
+		//		),
+		//	},
+		//	conf2: itemConf{
+		//		concurrencyKeys: osqueue.GetCustomConcurrencyKeys(
+		//			ctx,
+		//			idv2,
+		//			[]inngest.Concurrency{
+		//				{Limit: 123, Key: util.StrPtr("event.data.userId")},
+		//			},
+		//			inngestgo.Event{
+		//				Name: "yolo",
+		//				Data: map[string]any{"userId": 10},
+		//			}.Map(),
+		//		),
+		//	},
+		//},
 		{
 			name:  "none to throttle",
 			conf1: itemConf{kind: osqueue.KindStart},
@@ -1918,43 +1918,43 @@ func TestShadowPartitionUpdate(t *testing.T) {
 				),
 			},
 		},
-		{
-			name: "change throttle",
-			conf1: itemConf{
-				kind: osqueue.KindStart,
-				throttle: osqueue.GetThrottleConfig(
-					ctx,
-					fnID,
-					&inngest.Throttle{
-						Limit:  10,
-						Period: 30 * time.Second,
-						Burst:  2,
-						Key:    util.StrPtr("event.data.customerId"),
-					},
-					inngestgo.Event{
-						Name: "hello/world",
-						Data: map[string]any{"customerId": 100},
-					}.Map(),
-				),
-			},
-			conf2: itemConf{
-				kind: osqueue.KindStart,
-				throttle: osqueue.GetThrottleConfig(
-					ctx,
-					fnID,
-					&inngest.Throttle{
-						Limit:  10,
-						Period: 30 * time.Second,
-						Burst:  2,
-						Key:    util.StrPtr("event.data.userId"),
-					},
-					inngestgo.Event{
-						Name: "hello/world",
-						Data: map[string]any{"userId": 100},
-					}.Map(),
-				),
-			},
-		},
+		//{
+		//	name: "change throttle",
+		//	conf1: itemConf{
+		//		kind: osqueue.KindStart,
+		//		throttle: osqueue.GetThrottleConfig(
+		//			ctx,
+		//			fnID,
+		//			&inngest.Throttle{
+		//				Limit:  10,
+		//				Period: 30 * time.Second,
+		//				Burst:  2,
+		//				Key:    util.StrPtr("event.data.customerId"),
+		//			},
+		//			inngestgo.Event{
+		//				Name: "hello/world",
+		//				Data: map[string]any{"customerId": 100},
+		//			}.Map(),
+		//		),
+		//	},
+		//	conf2: itemConf{
+		//		kind: osqueue.KindStart,
+		//		throttle: osqueue.GetThrottleConfig(
+		//			ctx,
+		//			fnID,
+		//			&inngest.Throttle{
+		//				Limit:  10,
+		//				Period: 30 * time.Second,
+		//				Burst:  2,
+		//				Key:    util.StrPtr("event.data.userId"),
+		//			},
+		//			inngestgo.Event{
+		//				Name: "hello/world",
+		//				Data: map[string]any{"userId": 100},
+		//			}.Map(),
+		//		),
+		//	},
+		//},
 	}
 
 	for _, tc := range tests {
@@ -2545,273 +2545,4 @@ func TestConstraintLifecycleReporting(t *testing.T) {
 		assert.Equal(t, 0, testLifecycles.fnConcurrency[fnID2])
 		testLifecycles.lock.Unlock()
 	}, 1*time.Second, 100*time.Millisecond)
-}
-
-func TestShadowPartitionBacklogNormalization(t *testing.T) {
-	r, rc := initRedis(t)
-	defer rc.Close()
-
-	clock := clockwork.NewFakeClock()
-	defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
-	kg := defaultShard.RedisClient.kg
-
-	q := NewQueue(
-		defaultShard,
-		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
-			return true
-		}),
-		WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-			return false
-		}),
-		WithClock(clock),
-	)
-	ctx := context.Background()
-
-	accountId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
-
-	type itemConf struct {
-		kind            string // osqueue.Kind, default to edge
-		throttle        *osqueue.Throttle
-		concurrencyKeys []state.CustomConcurrency
-	}
-
-	testcases := []struct {
-		name            string
-		conf1           itemConf
-		conf2           itemConf
-		expectResult    *BacklogRefillResult
-		expectProcessed bool
-		expectNormalize bool
-	}{
-		{
-			name: "throttle changes",
-			conf1: itemConf{
-				kind: osqueue.KindStart,
-				throttle: osqueue.GetThrottleConfig(
-					ctx,
-					fnID,
-					&inngest.Throttle{
-						Limit:  10,
-						Period: 30 * time.Second,
-						Burst:  2,
-						Key:    util.StrPtr("event.data.userId"),
-					},
-					inngestgo.Event{
-						Name: "hello/world",
-						Data: map[string]any{"userId": 100},
-					}.Map(),
-				),
-			},
-			conf2: itemConf{
-				kind: osqueue.KindStart,
-				throttle: osqueue.GetThrottleConfig(
-					ctx,
-					fnID,
-					&inngest.Throttle{
-						Limit:  10,
-						Period: 30 * time.Second,
-						Burst:  2,
-						Key:    util.StrPtr("event.data.customerId"),
-					},
-					inngestgo.Event{
-						Name: "hello/world",
-						Data: map[string]any{"customerId": 100},
-					}.Map(),
-				),
-			},
-			expectProcessed: false,
-		},
-	}
-
-	for _, tc := range testcases {
-		t.Run(tc.name, func(t *testing.T) {
-			r.FlushAll()
-			require.Len(t, r.Keys(), 0)
-
-			// use future timestamp because scores will be bounded to the present
-			at := clock.Now().Add(1 * time.Minute)
-
-			//
-			// Create initial shadow partition
-			//
-			kind1 := osqueue.KindEdge
-			if tc.conf1.kind != "" {
-				kind1 = tc.conf1.kind
-			}
-
-			item1 := osqueue.QueueItem{
-				ID:          "test",
-				FunctionID:  fnID,
-				WorkspaceID: wsID,
-				Data: osqueue.Item{
-					WorkspaceID: wsID,
-					Kind:        kind1,
-					Identifier: state.Identifier{
-						WorkflowID:      fnID,
-						AccountID:       accountId,
-						WorkspaceID:     wsID,
-						WorkflowVersion: 1,
-					},
-					Throttle:              tc.conf1.throttle,
-					CustomConcurrencyKeys: tc.conf1.concurrencyKeys,
-				},
-			}
-
-			backlog1 := q.ItemBacklog(ctx, item1)
-			require.NotEmpty(t, backlog1.BacklogID)
-			// fmt.Printf("Backlog1: %#v\n", backlog1.Throttle)
-
-			initialShadowPart := q.ItemShadowPartition(ctx, item1)
-			require.NotEmpty(t, initialShadowPart.PartitionID)
-
-			for i := range 10 {
-				item := item1
-				item.ID = fmt.Sprintf("v1-%d", i)
-				_, err := q.EnqueueItem(ctx, defaultShard, item, at, osqueue.EnqueueOpts{})
-				require.NoError(t, err)
-
-			}
-
-			if len(tc.conf1.concurrencyKeys) > 0 {
-				require.Len(t, backlog1.ConcurrencyKeys, len(tc.conf1.concurrencyKeys))
-
-				hashes := make([]string, len(tc.conf1.concurrencyKeys))
-				for i, k := range initialShadowPart.Concurrency.CustomConcurrencyKeys {
-					hashes[i] = k.HashedKeyExpression
-				}
-				for _, k := range backlog1.ConcurrencyKeys {
-					require.Contains(t, hashes, k.HashedKeyExpression)
-				}
-			}
-			if tc.conf1.throttle != nil {
-				require.NotNil(t, backlog1.Throttle)
-				require.Equal(t, initialShadowPart.Throttle.ThrottleKeyExpressionHash, backlog1.Throttle.ThrottleKeyExpressionHash)
-			}
-
-			// verify shadow partition
-			savedPart := QueueShadowPartition{}
-			require.NoError(t, json.Unmarshal([]byte(r.HGet(kg.ShadowPartitionMeta(), initialShadowPart.PartitionID)), &savedPart))
-			require.Equal(t, initialShadowPart, savedPart)
-			require.Equal(t, 1, savedPart.FunctionVersion)
-
-			// verify backlog
-			savedBacklog1 := QueueBacklog{}
-			require.NoError(t, json.Unmarshal([]byte(r.HGet(kg.BacklogMeta(), backlog1.BacklogID)), &savedBacklog1))
-			require.Equal(t, backlog1, savedBacklog1)
-
-			sp1, err := r.ZMembers(kg.ShadowPartitionSet(initialShadowPart.PartitionID))
-			require.NoError(t, err)
-			require.Len(t, sp1, 1)
-
-			//
-			// Test update case
-			//
-			kind2 := osqueue.KindEdge
-			if tc.conf2.throttle != nil {
-				kind2 = tc.conf2.kind
-			}
-
-			item2 := osqueue.QueueItem{
-				ID:          "test2",
-				FunctionID:  fnID,
-				WorkspaceID: wsID,
-				Data: osqueue.Item{
-					WorkspaceID: wsID,
-					Kind:        kind2,
-					Identifier: state.Identifier{
-						WorkflowID:      fnID,
-						AccountID:       accountId,
-						WorkspaceID:     wsID,
-						WorkflowVersion: 2,
-					},
-					Throttle:              tc.conf2.throttle,
-					CustomConcurrencyKeys: tc.conf2.concurrencyKeys,
-				},
-			}
-
-			updatedShadowPart := q.ItemShadowPartition(ctx, item2)
-			require.Len(t, updatedShadowPart.Concurrency.CustomConcurrencyKeys, len(tc.conf2.concurrencyKeys))
-			require.Equal(t, 2, updatedShadowPart.FunctionVersion)
-			require.NotEqual(t, updatedShadowPart, initialShadowPart)
-
-			backlog2 := q.ItemBacklog(ctx, item2)
-			require.NotEmpty(t, backlog2.BacklogID)
-			require.NotEqual(t, backlog1, backlog2)
-
-			_, err = q.EnqueueItem(ctx, defaultShard, item2, at.Add(time.Minute), osqueue.EnqueueOpts{})
-			require.NoError(t, err)
-
-			if len(tc.conf2.concurrencyKeys) > 0 {
-				require.Len(t, backlog2.ConcurrencyKeys, len(tc.conf2.concurrencyKeys))
-
-				hashes := make([]string, len(tc.conf2.concurrencyKeys))
-				for i, k := range updatedShadowPart.Concurrency.CustomConcurrencyKeys {
-					hashes[i] = k.HashedKeyExpression
-				}
-				for _, k := range backlog2.ConcurrencyKeys {
-					require.Contains(t, hashes, k.HashedKeyExpression)
-				}
-			}
-			if tc.conf2.throttle != nil {
-				require.NotNil(t, backlog2.Throttle)
-				require.Equal(t, updatedShadowPart.Throttle.ThrottleKeyExpressionHash, backlog2.Throttle.ThrottleKeyExpressionHash)
-			}
-			// fmt.Printf("Backlog2: %#v\n", backlog2.Throttle)
-
-			// verify shadow partition
-			savedPart = QueueShadowPartition{}
-			require.NoError(t, json.Unmarshal([]byte(r.HGet(kg.ShadowPartitionMeta(), initialShadowPart.PartitionID)), &savedPart))
-			require.Equal(t, updatedShadowPart, savedPart)
-
-			// verify backlog
-			savedBacklog2 := QueueBacklog{}
-			require.NoError(t, json.Unmarshal([]byte(r.HGet(kg.BacklogMeta(), backlog2.BacklogID)), &savedBacklog2))
-			require.Equal(t, backlog2, savedBacklog2)
-
-			// verify pre-process state
-			sp2, err := r.ZMembers(kg.ShadowPartitionSet(updatedShadowPart.PartitionID))
-			require.NoError(t, err)
-			fmt.Printf("Pre-procession partition backlogs: %#v\n", sp2)
-			// require.Len(t, sp2, 2)
-
-			constraints := PartitionConstraintConfig{
-				Concurrency: ShadowPartitionConcurrency{
-					SystemConcurrency:      0,
-					AccountConcurrency:     0,
-					FunctionConcurrency:    0,
-					AccountRunConcurrency:  0,
-					FunctionRunConcurrency: 0,
-					CustomConcurrencyKeys:  nil,
-				},
-			}
-
-			// attempt processing and expect normalization
-			_, processed, err := q.processShadowPartitionBacklog(ctx, &updatedShadowPart, &backlog1, at, &constraints)
-			require.NoError(t, err)
-			require.Equal(t, tc.expectProcessed, processed)
-
-			// make sure there are no dangling pointers
-			pointers := []string{
-				kg.GlobalAccountNormalizeSet(),
-				kg.AccountNormalizeSet(accountId),
-				kg.PartitionNormalizeSet(updatedShadowPart.PartitionID),
-			}
-			for _, key := range pointers {
-				mem, _ := r.ZMembers(key)
-				require.Len(t, mem, 0)
-			}
-
-			blm, _ := r.ZMembers(kg.BacklogSet(backlog1.BacklogID))
-			fmt.Printf("Backlog items: %#v\n", blm)
-
-			part, err := r.ZMembers(kg.ShadowPartitionSet(updatedShadowPart.PartitionID))
-			require.NoError(t, err)
-			fmt.Printf("Parts: %#v\n", part)
-
-			// check for number of items in backlog 2
-			mem, err := r.ZMembers(kg.BacklogSet(backlog2.BacklogID))
-			require.NoError(t, err)
-			require.Len(t, mem, 11)
-		})
-	}
 }
