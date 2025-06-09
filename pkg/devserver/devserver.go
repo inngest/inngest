@@ -816,7 +816,7 @@ func PartitionConstraintConfigGetter(smv2 sv2.StateLoader, dbcqrs cqrs.Manager) 
 		if fn.Throttle != nil {
 			var exprHash string
 			if fn.Throttle.Key != nil {
-				exprHash = util.XXHash(fn.Throttle.Key)
+				exprHash = util.XXHash(*fn.Throttle.Key)
 			}
 
 			constraints.Throttle = &redis_state.ShadowPartitionThrottle{
