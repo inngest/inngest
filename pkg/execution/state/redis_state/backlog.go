@@ -600,8 +600,6 @@ func (b QueueBacklog) customConcurrencyKeyID(n int) string {
 }
 
 func (b QueueBacklog) requeueBackOff(now time.Time, constraint enums.QueueConstraint, partition *QueueShadowPartition) time.Time {
-	max := now.Add(10 * time.Second)
-
 	switch constraint {
 	case enums.QueueConstraintThrottle:
 		if partition.Throttle == nil {
@@ -626,18 +624,17 @@ func (b QueueBacklog) requeueBackOff(now time.Time, constraint enums.QueueConstr
 		}
 
 		return now.Add(backoff)
-
 	case enums.QueueConstraintCustomConcurrencyKey1, enums.QueueConstraintCustomConcurrencyKey2:
-		next := now.Add(PartitionConcurrencyLimitRequeueExtension + time.Duration(b.SuccessiveCustomConcurrencyConstrained)*time.Second)
+		next := time.Duration(b.SuccessiveCustomConcurrencyConstrained) * time.Second
 
-		if next.After(max) {
-			next = max
+		if next > PartitionConcurrencyLimitRequeueExtension {
+			next = PartitionConcurrencyLimitRequeueExtension
 		}
 
-		return next
+		return now.Add(next)
+	default:
+		return now.Add(BacklogDefaultRequeueExtension)
 	}
-
-	return max
 }
 
 type BacklogRefillResult struct {
