@@ -25,7 +25,6 @@ type Props = {
   getRun: (runID: string) => Promise<Run>;
   initialRunData?: InitialRunData;
   getTrigger: React.ComponentProps<typeof TriggerDetails>['getTrigger'];
-  pathCreator: React.ComponentProps<typeof RunInfo>['pathCreator'];
   pollInterval?: number;
   runID: string;
 };
@@ -51,7 +50,7 @@ export const RunDetailsV3 = (props: Props) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const leftColumnRef = useRef<HTMLDivElement>(null);
   const runInfoRef = useRef<HTMLDivElement>(null);
-  const { getResult, getRun, getTrigger, pathCreator, runID, standalone } = props;
+  const { getResult, getRun, getTrigger, runID, standalone } = props;
   const [pollInterval, setPollInterval] = useState(props.pollInterval);
   const [leftWidth, setLeftWidth] = useState(55);
   const [height, setHeight] = useState(0);
@@ -159,7 +158,6 @@ export const RunDetailsV3 = (props: Props) => {
           <div ref={runInfoRef} className="px-4">
             <RunInfo
               className="mb-4"
-              pathCreator={pathCreator}
               initialRunData={props.initialRunData}
               run={nullishToLazy(run)}
               runID={runID}
@@ -181,7 +179,7 @@ export const RunDetailsV3 = (props: Props) => {
                 node: waiting ? (
                   <Waiting />
                 ) : run ? (
-                  <Timeline pathCreator={pathCreator} runID={runID} trace={run?.trace} />
+                  <Timeline runID={runID} trace={run?.trace} />
                 ) : null,
               },
             ]}

@@ -31,7 +31,6 @@ import {
   type CountRunsQuery,
   type GetRunsQuery,
 } from '@/store/generated';
-import { pathCreator } from '@/utils/pathCreator';
 
 const pollInterval = 400;
 
@@ -189,7 +188,6 @@ export default function Page() {
         onRefresh={fetchNextPage}
         getTraceResult={getTraceResult}
         getTrigger={getTrigger}
-        pathCreator={pathCreator}
         pollInterval={pollInterval}
         scope="env"
         totalCount={totalCount}
