@@ -267,6 +267,8 @@ type TraceReader interface {
 	OtelTracesEnabled(ctx context.Context, accountID uuid.UUID) (bool, error)
 	// GetEventRuns returns the runs that were triggered by an event.
 	GetEventRuns(ctx context.Context, eventID ulid.ULID, accountID uuid.UUID, workspaceID uuid.UUID) ([]*FunctionRun, error)
+	// GetRun returns a single function run.
+	GetRun(ctx context.Context, runID ulid.ULID, accountID uuid.UUID, workspaceID uuid.UUID) (*FunctionRun, error)
 }
 
 type GetTraceRunOpt struct {
