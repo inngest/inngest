@@ -264,7 +264,7 @@ func (q *queue) extendBacklogNormalizationLease(ctx context.Context, now time.Ti
 // NOTE: ideally this is one transaction in a lua script but enqueue_to_backlog is way too much work to
 // utilize
 func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp *QueueShadowPartition, latestConstraints *PartitionConstraintConfig) error {
-	l := q.log.With("backlog", backlog)
+	l := q.log.With("backlog", backlog, "sp", sp)
 
 	// extend the lease
 	extendLeaseCtx, cancel := context.WithCancel(ctx)
@@ -321,7 +321,14 @@ func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp 
 			}
 			item.Data.Throttle = refreshedThrottle
 
-			q.log.Trace("retrieved refreshed throttle", "item", item, "refreshed_throttle", refreshedThrottle, "existing_throttle", existingThrottle, "sp", sp, "backlog", backlog)
+			targetBacklog := q.ItemBacklog(ctx, *item)
+
+			l.Debug(
+				"retrieved refreshed backlog",
+				"item", item,
+				"existing_throttle", existingThrottle,
+				"target", targetBacklog,
+			)
 
 			if _, err := q.EnqueueItem(ctx, shard, *item, time.UnixMilli(item.AtMS), osqueue.EnqueueOpts{
 				PassthroughJobId:       true,
