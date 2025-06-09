@@ -240,11 +240,10 @@ func (q *queue) ItemsByPartition(ctx context.Context, shard QueueShard, partitio
 	}
 
 	ptFrom := from
-	// backlogFrom := from
 
 	return func(yield func(*osqueue.QueueItem) bool) {
 		for {
-			var processed int
+			var iterated int
 
 			// peek function partition
 			items, err := q.peek(ctx, shard, peekOpts{
@@ -260,31 +259,28 @@ func (q *queue) ItemsByPartition(ctx context.Context, shard QueueShard, partitio
 			}
 
 			var start, end time.Time
-
 			for _, qi := range items {
 				if !yield(qi) {
 					return
 				}
 
 				at := time.UnixMilli(qi.AtMS)
-
 				if start.IsZero() {
 					start = at
 				}
 				end = at
-
 				ptFrom = at
-				processed++
+				iterated++
 			}
 
-			l.Debug("processed items",
-				"count", processed,
+			l.Debug("iterated items in partition",
+				"count", iterated,
 				"start", start.Format(time.StampMilli),
 				"end", end.Format(time.StampMilli),
 			)
 
 			// didn't process anything, exit loop
-			if processed == 0 {
+			if iterated == 0 {
 				break
 			}
 
@@ -310,42 +306,54 @@ func (q *queue) ItemsByPartition(ctx context.Context, shard QueueShard, partitio
 			}
 
 			l = l.With("shadow_partition", spt)
+			backlogFrom := from
 
 			for {
-				var processed int
+				var iterated int
 
 				// TODO: maybe provide a different limit?
-				backlogs, _, err := q.ShadowPartitionPeek(ctx, &spt, true, until, opt.batchSize)
+				backlogs, _, err := q.ShadowPartitionPeek(ctx, &spt, true, until, ShadowPartitionPeekMaxBacklogs)
 				if err != nil {
 					l.Error("error peeking backlogs for partition", "error", err)
 					return
 				}
 
 				for _, backlog := range backlogs {
-					items, _, err := q.backlogPeek(ctx, backlog, from, until, opt.batchSize)
+					items, _, err := q.backlogPeek(ctx, backlog, backlogFrom, until, opt.batchSize)
 					if err != nil {
 						l.Error("error retrieving queue items from backlog", "error", err)
 						return
 					}
 
+					var start, end time.Time
 					for _, qi := range items {
-						at := time.UnixMilli(qi.AtMS)
-						if at.Before(from) || at.After(until) {
-							continue
-						}
-
 						if !yield(qi) {
 							return
 						}
-						processed++
+						iterated++
+
+						at := time.UnixMilli(qi.AtMS)
+						if start.IsZero() {
+							start = at
+						}
+						end = at
+						backlogFrom = at
 					}
+
+					l.Debug("iterated items in backlog",
+						"count", iterated,
+						"start", start.Format(time.StampMilli),
+						"end", end.Format(time.StampMilli),
+					)
 				}
 
 				// didn't process anything, meaning there's nothing left to do
 				// exit loop
-				if processed == 0 {
+				if iterated == 0 {
 					return
 				}
+
+				backlogFrom = backlogFrom.Add(time.Millisecond)
 			}
 		}
 	}, nil

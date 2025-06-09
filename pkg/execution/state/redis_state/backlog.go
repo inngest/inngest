@@ -1014,7 +1014,8 @@ func (q *queue) backlogPeek(ctx context.Context, b *QueueBacklog, from time.Time
 			}
 			return nil
 		},
-		fromTime: &from,
+		isMillisecondPrecision: true,
+		fromTime:               &from,
 	}
 
 	res, err := p.peek(ctx, backlogSet, true, until, limit)
