@@ -446,3 +446,12 @@ func IncrQueuePeekLeaseContentionCounter(ctx context.Context, opts CounterOpt) {
 		Tags:        opts.Tags,
 	})
 }
+
+func IncrQueueOutdatedBacklogCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "queue_shadow_outdated_backlog_total",
+		Description: "The total number of times outdated backlogs were detected",
+		Tags:        opts.Tags,
+	})
+}

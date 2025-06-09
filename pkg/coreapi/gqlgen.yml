@@ -49,6 +49,8 @@ models:
     fields:
       app:
         resolver: true
+      failureHandler:
+        resolver: true
   FunctionRun:
     fields:
       history:
