@@ -5,5 +5,6 @@ import (
 )
 
 type SingletonStore interface {
-	Exists(ctx context.Context, key string) (bool, error)
+	GetCurrentRunID(ctx context.Context, key string) (*string, error)
+	ReleaseSingleton(ctx context.Context, key string) (*string, error)
 }
