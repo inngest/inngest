@@ -230,7 +230,7 @@ type Throttle struct {
 	// Otherwise, this is the function ID. In the case of evaluated keys, this may be large and should be truncated before usage.
 	UnhashedThrottleKey string `json:"-"`
 
-	KeyExpressionHash string `json:"-"`
+	KeyExpressionHash string `json:"keh"`
 }
 
 type Singleton struct {
@@ -429,14 +429,14 @@ func GetThrottleConfig(ctx context.Context, fnID uuid.UUID, throttle *inngest.Th
 
 	unhashedThrottleKey := fnID.String()
 	throttleKey := HashID(ctx, unhashedThrottleKey)
-	hashedThrottleExpr := ""
+	var throttleExpr string
 	if throttle.Key != nil {
 		val, _, _ := expressions.Evaluate(ctx, *throttle.Key, map[string]any{
 			"event": evtMap,
 		})
 		unhashedThrottleKey = fmt.Sprintf("%v", val)
 		throttleKey = throttleKey + "-" + HashID(ctx, unhashedThrottleKey)
-		hashedThrottleExpr = util.XXHash(*throttle.Key)
+		throttleExpr = *throttle.Key
 	}
 
 	return &Throttle{
@@ -445,7 +445,7 @@ func GetThrottleConfig(ctx context.Context, fnID uuid.UUID, throttle *inngest.Th
 		Burst:               int(throttle.Burst),
 		Period:              int(throttle.Period.Seconds()),
 		UnhashedThrottleKey: unhashedThrottleKey,
-		KeyExpressionHash:   hashedThrottleExpr,
+		KeyExpressionHash:   util.XXHash(throttleExpr),
 	}
 }
 

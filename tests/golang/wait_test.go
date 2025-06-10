@@ -493,23 +493,7 @@ func TestWaitForEvent_Timeout(t *testing.T) {
 	r := require.New(t)
 	c := client.New(t)
 
-	resetAll := func() {
-		reqUrl, err := url.Parse(c.APIHost + "/test/reset")
-		require.NoError(t, err)
-
-		req, err := http.NewRequestWithContext(ctx, http.MethodPost, reqUrl.String(), nil)
-		require.NoError(t, err)
-
-		resp, err := http.DefaultClient.Do(req)
-		require.NoError(t, err)
-
-		require.Equal(t, http.StatusOK, resp.StatusCode)
-
-		_, err = io.ReadAll(resp.Body)
-		require.NoError(t, err)
-	}
-
-	resetAll()
+	c.ResetAll(t)
 
 	appID := "TestWaitTimeout" + ulid.MustNew(ulid.Now(), nil).String()
 	inngestClient, server, registerFuncs := NewSDKHandler(t, appID)

@@ -320,6 +320,9 @@ type State interface {
 type Manager interface {
 	StateLoader
 	Mutater
+
+	// PauseManager embeds buffering pause services.  Note that this is
+	// superseded by pauses.Manager.
 	PauseManager
 }
 

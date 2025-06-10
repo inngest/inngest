@@ -16,6 +16,7 @@ import (
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/executor"
+	"github.com/inngest/inngest/pkg/execution/pauses"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
@@ -136,7 +137,7 @@ func TestScheduleRaceCondition(t *testing.T) {
 
 	exec, err := executor.NewExecutor(
 		executor.WithStateManager(smv2),
-		executor.WithPauseManager(sm),
+		executor.WithPauseManager(pauses.NewRedisOnlyManager(sm)),
 		executor.WithQueue(rq),
 		executor.WithLogger(logger.StdlibLogger(ctx)),
 		executor.WithFunctionLoader(loader),
@@ -303,7 +304,7 @@ func TestScheduleRaceConditionWithExistingIdempotencyKey(t *testing.T) {
 
 	exec, err := executor.NewExecutor(
 		executor.WithStateManager(smv2),
-		executor.WithPauseManager(sm),
+		executor.WithPauseManager(pauses.NewRedisOnlyManager(sm)),
 		executor.WithQueue(rq),
 		executor.WithLogger(logger.StdlibLogger(ctx)),
 		executor.WithFunctionLoader(loader),

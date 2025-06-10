@@ -27,10 +27,10 @@ export default function SlideOver({ children, onClose, size }: SlideOverProps) {
         <Transition.Child
           as={Fragment}
           appear={true}
-          enter="ease-in-out duration-500"
+          enter="ease-in-out duration-[250ms]"
           enterFrom="opacity-0"
           enterTo="opacity-100"
-          leave="ease-in-out duration-500"
+          leave="ease-in-out duration-[250ms]"
           leaveFrom="opacity-100"
           leaveTo="opacity-0"
         >
@@ -46,20 +46,20 @@ export default function SlideOver({ children, onClose, size }: SlideOverProps) {
             >
               <Transition.Child
                 as="div"
-                enter="transform transition ease-in-out duration-500 sm:duration-700"
+                enter="transform transition ease-in-out duration-[250ms]"
                 enterFrom="translate-x-full"
                 enterTo="translate-x-0"
-                leave="transform transition ease-in-out duration-500 sm:duration-700"
+                leave="transform transition ease-in-out duration-[250ms]"
                 leaveFrom="translate-x-0"
                 leaveTo="translate-x-full"
               >
                 <Dialog.Panel className="pointer-events-auto relative h-full w-screen">
                   <Transition.Child
                     as="div"
-                    enter="ease-in-out duration-500"
+                    enter="ease-in-out duration-[250ms]"
                     enterFrom="opacity-0"
                     enterTo="opacity-100"
-                    leave="ease-in-out duration-500"
+                    leave="ease-in-out duration-[250ms]"
                     leaveFrom="opacity-100"
                     leaveTo="opacity-0"
                   />

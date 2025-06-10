@@ -18,6 +18,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/batch"
 	"github.com/inngest/inngest/pkg/execution/executor"
+	"github.com/inngest/inngest/pkg/execution/pauses"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/ratelimit"
 	"github.com/inngest/inngest/pkg/execution/state"
@@ -67,6 +68,12 @@ func WithExecutor(e execution.Executor) func(s *svc) {
 func WithExecutionManager(l cqrs.Manager) func(s *svc) {
 	return func(s *svc) {
 		s.data = l
+	}
+}
+
+func WithPauseManager(pm pauses.Manager) func(s *svc) {
+	return func(s *svc) {
+		s.pm = pm
 	}
 }
 
@@ -142,6 +149,8 @@ type svc struct {
 	data cqrs.Manager
 	// state allows the creation of new function runs.
 	state state.Manager
+	// pauses allows management of pauses, used to resume function runs on matching events.
+	pm pauses.Manager
 	// queue allows the scheduling of new functions.
 	queue queue.Queue
 	// batcher handles batch operations
@@ -616,19 +625,16 @@ func (s *svc) pauses(ctx context.Context, evt event.TrackedEvent) error {
 	l.Trace("querying for pauses")
 
 	wsID := evt.GetWorkspaceID()
-	if ok, err := s.state.EventHasPauses(ctx, wsID, evt.GetEvent().Name); err == nil && !ok {
+	idx := pauses.Index{WorkspaceID: wsID, EventName: evt.GetEvent().Name}
+
+	if ok, err := s.pm.IndexExists(ctx, idx); err == nil && !ok {
 		l.Debug("no pauses found for event")
 		return nil
 	}
 
 	l.Debug("handling found pauses for event")
 
-	iter, err := s.state.PausesByEvent(ctx, wsID, evt.GetEvent().Name)
-	if err != nil {
-		return fmt.Errorf("error finding event pauses: %w", err)
-	}
-
-	_, err = s.executor.HandlePauses(ctx, iter, evt)
+	_, err := s.executor.HandlePauses(ctx, evt)
 	if err != nil {
 		l.Error("error handling pauses", "error", err)
 	}

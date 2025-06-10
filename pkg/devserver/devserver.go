@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/inngest/inngest/pkg/util"
 	"net/http"
 	"os"
 	"time"
@@ -41,6 +42,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/driver/httpdriver"
 	"github.com/inngest/inngest/pkg/execution/executor"
 	"github.com/inngest/inngest/pkg/execution/history"
+	"github.com/inngest/inngest/pkg/execution/pauses"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/ratelimit"
 	"github.com/inngest/inngest/pkg/execution/realtime"
@@ -295,7 +297,9 @@ func start(ctx context.Context, opts StartOpts) error {
 
 		// Key queues
 		redis_state.WithNormalizeRefreshItemCustomConcurrencyKeys(NormalizeConcurrencyKeys(smv2, dbcqrs)),
-		redis_state.WithNormalizeRefreshItemThrottle(NormalizeThrottle(smv2, dbcqrs)),
+		redis_state.WithRefreshItemThrottle(NormalizeThrottle(smv2, dbcqrs)),
+		redis_state.WithPartitionConstraintConfigGetter(PartitionConstraintConfigGetter(dbcqrs)),
+
 		redis_state.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 			return enableKeyQueues
 		}),
@@ -375,7 +379,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	exec, err := executor.NewExecutor(
 		executor.WithHTTPClient(httpClient),
 		executor.WithStateManager(smv2),
-		executor.WithPauseManager(sm),
+		executor.WithPauseManager(pauses.NewRedisOnlyManager(sm)),
 		executor.WithRuntimeDrivers(
 			drivers...,
 		),
@@ -444,6 +448,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		runner.WithCQRS(dbcqrs),
 		runner.WithExecutor(exec),
 		runner.WithExecutionManager(dbcqrs),
+		runner.WithPauseManager(pauses.NewRedisOnlyManager(sm)),
 		runner.WithEventManager(event.NewManager()),
 		runner.WithStateManager(sm),
 		runner.WithRunnerQueue(rq),
@@ -570,7 +575,6 @@ func start(ctx context.Context, opts StartOpts) error {
 				shardedCluster.FlushAll()
 				unshardedCluster.FlushAll()
 				connectCluster.FlushAll()
-
 			},
 		})})
 	}
@@ -720,8 +724,8 @@ func NormalizeConcurrencyKeys(smv2 sv2.StateLoader, dbcqrs cqrs.Manager) redis_s
 	}
 }
 
-func NormalizeThrottle(smv2 sv2.StateLoader, dbcqrs cqrs.Manager) redis_state.NormalizeRefreshItemThrottleFn {
-	return func(ctx context.Context, item *queue.QueueItem, existingThrottle *queue.Throttle, shadowPartition *redis_state.QueueShadowPartition) (*queue.Throttle, error) {
+func NormalizeThrottle(smv2 sv2.StateLoader, dbcqrs cqrs.Manager) redis_state.RefreshItemThrottleFn {
+	return func(ctx context.Context, item *queue.QueueItem) (*queue.Throttle, error) {
 		id := sv2.IDFromV1(item.Data.Identifier)
 
 		workflow, err := dbcqrs.GetFunctionByInternalUUID(ctx, id.Tenant.EnvID, id.FunctionID)
@@ -755,5 +759,77 @@ func NormalizeThrottle(smv2 sv2.StateLoader, dbcqrs cqrs.Manager) redis_state.No
 		evtMap := evt0.Map()
 
 		return queue.GetThrottleConfig(ctx, id.FunctionID, fn.Throttle, evtMap), nil
+	}
+}
+
+func PartitionConstraintConfigGetter(dbcqrs cqrs.Manager) redis_state.PartitionConstraintConfigGetter {
+	return func(ctx context.Context, p redis_state.QueueShadowPartition) (*redis_state.PartitionConstraintConfig, error) {
+		if p.EnvID == nil || p.FunctionID == nil {
+			return &redis_state.PartitionConstraintConfig{
+				Concurrency: redis_state.ShadowPartitionConcurrency{
+					SystemConcurrency:   consts.DefaultConcurrencyLimit,
+					AccountConcurrency:  consts.DefaultConcurrencyLimit,
+					FunctionConcurrency: consts.DefaultConcurrencyLimit,
+				},
+			}, nil
+		}
+
+		workflow, err := dbcqrs.GetFunctionByInternalUUID(ctx, *p.EnvID, *p.FunctionID)
+		if err != nil {
+			return nil, fmt.Errorf("could not find workflow: %w", err)
+		}
+		fn, err := workflow.InngestFunction()
+		if err != nil {
+			return nil, fmt.Errorf("could not convert workflow to inngest function: %w", err)
+		}
+
+		// TODO Make this reusable in cloud, it's the same operation with different data sources
+		accountLimit := consts.DefaultConcurrencyLimit
+
+		fnLimit := fn.ConcurrencyLimit()
+		if fnLimit <= 0 {
+			fnLimit = accountLimit
+		}
+
+		constraints := redis_state.PartitionConstraintConfig{
+			Concurrency: redis_state.ShadowPartitionConcurrency{
+				SystemConcurrency:     consts.DefaultConcurrencyLimit,
+				AccountConcurrency:    accountLimit,
+				FunctionConcurrency:   fnLimit,
+				CustomConcurrencyKeys: nil,
+			},
+		}
+
+		if fn.Concurrency != nil && len(fn.Concurrency.Limits) > 0 {
+			for _, limit := range fn.Concurrency.Limits {
+				if !limit.IsCustomLimit() {
+					continue
+				}
+
+				constraints.Concurrency.CustomConcurrencyKeys = append(constraints.Concurrency.CustomConcurrencyKeys,
+					redis_state.CustomConcurrencyLimit{
+						Mode:                enums.ConcurrencyModeStep,
+						Scope:               limit.Scope,
+						HashedKeyExpression: limit.Hash,
+						Limit:               limit.Limit,
+					})
+			}
+		}
+
+		if fn.Throttle != nil {
+			var keyExpr string
+			if fn.Throttle.Key != nil {
+				keyExpr = *fn.Throttle.Key
+			}
+
+			constraints.Throttle = &redis_state.ShadowPartitionThrottle{
+				ThrottleKeyExpressionHash: util.XXHash(keyExpr),
+				Limit:                     int(fn.Throttle.Limit),
+				Burst:                     int(fn.Throttle.Burst),
+				Period:                    int(fn.Throttle.Period.Seconds()),
+			}
+		}
+
+		return &constraints, nil
 	}
 }

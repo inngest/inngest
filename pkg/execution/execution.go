@@ -97,7 +97,7 @@ type Executor interface {
 
 	// HandlePauses handles pauses loaded from an incoming event.  This delegates to Cancel and
 	// Resume where necessary, depending on pauses that have been loaded and matched.
-	HandlePauses(ctx context.Context, iter state.PauseIterator, event event.TrackedEvent) (HandlePauseResult, error)
+	HandlePauses(ctx context.Context, event event.TrackedEvent) (HandlePauseResult, error)
 	// HandleInvokeFinish handles the invoke pauses from an incoming event. This delegates to Cancel and
 	// Resume where necessary
 	HandleInvokeFinish(ctx context.Context, event event.TrackedEvent) error

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/inngest/inngest/pkg/execution/singleton"
 	"net/http"
 	"net/url"
 	"os"
@@ -40,6 +41,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/driver/httpdriver"
 	"github.com/inngest/inngest/pkg/execution/executor"
 	"github.com/inngest/inngest/pkg/execution/history"
+	"github.com/inngest/inngest/pkg/execution/pauses"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/ratelimit"
 	"github.com/inngest/inngest/pkg/execution/runner"
@@ -256,7 +258,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		redis_state.WithShardSelector(shardSelector),
 		redis_state.WithQueueShardClients(queueShards),
 		redis_state.WithNormalizeRefreshItemCustomConcurrencyKeys(devserver.NormalizeConcurrencyKeys(smv2, dbcqrs)),
-		redis_state.WithNormalizeRefreshItemThrottle(devserver.NormalizeThrottle(smv2, dbcqrs)),
+		redis_state.WithRefreshItemThrottle(devserver.NormalizeThrottle(smv2, dbcqrs)),
 	}
 
 	rq := redis_state.NewQueue(queueShard, queueOpts...)
@@ -265,6 +267,8 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	batcher := batch.NewRedisBatchManager(shardedClient.Batch(), rq, batch.WithLogger(l))
 	debouncer := debounce.NewRedisDebouncer(unshardedClient.Debounce(), queueShard, rq)
+
+	sn := singleton.New(ctx, queueShard.RedisClient)
 
 	// Create a new expression aggregator, using Redis to load evaluables.
 	agg := expragg.NewAggregator(ctx, 100, 100, sm.(expragg.EvaluableLoader), expressions.ExprEvaluator, nil, nil)
@@ -319,7 +323,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	exec, err := executor.NewExecutor(
 		executor.WithHTTPClient(httpClient),
 		executor.WithStateManager(smv2),
-		executor.WithPauseManager(sm),
+		executor.WithPauseManager(pauses.NewRedisOnlyManager(sm)), // we may add block flushing to lite.
 		executor.WithRuntimeDrivers(
 			drivers...,
 		),
@@ -358,6 +362,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		executor.WithInvokeFailHandler(getInvokeFailHandler(ctx, pb, opts.Config.EventStream.Service.Concrete.TopicName())),
 		executor.WithSendingEventHandler(getSendingEventHandler(pb, opts.Config.EventStream.Service.Concrete.TopicName())),
 		executor.WithDebouncer(debouncer),
+		executor.WithSingletonManager(sn),
 		executor.WithBatcher(batcher),
 		executor.WithAssignedQueueShard(queueShard),
 		executor.WithShardSelector(shardSelector),
