@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import NextLink from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@inngest/components/Button';
+import ConfigurationBlock from '@inngest/components/FunctionConfiguration/ConfigurationBlock';
 import ConfigurationCategory from '@inngest/components/FunctionConfiguration/ConfigurationCategory';
 import ConfigurationSection from '@inngest/components/FunctionConfiguration/ConfigurationSection';
 import { Header } from '@inngest/components/Header/Header';
@@ -189,14 +190,10 @@ export function FunctionConfiguration({ onClose, inngestFunction }: FunctionConf
       <ConfigurationCategory title="Overview">
         <div className="flex flex-col space-y-6 self-stretch ">
           <ConfigurationSection title="App">
-            <div className="border-subtle flex items-center gap-2 self-stretch rounded border p-2">
-              <div className="bg-canvasSubtle text-light flex h-9 w-9 items-center justify-center gap-2 rounded p-2">
-                <AppsIcon className="h-5 w-5" />
-              </div>
-              <div className="text-basis flex grow flex-col items-start justify-center gap-1 self-stretch text-sm font-medium">
-                <div>{inngestFunction.app.name}</div>
-              </div>
-              <div className="self-end">
+            <ConfigurationBlock
+              icon={<AppsIcon className="h-5 w-5" />}
+              mainText={inngestFunction.app.name}
+              rightElement={
                 <Button
                   label="Go to apps"
                   href="/apps"
@@ -204,30 +201,33 @@ export function FunctionConfiguration({ onClose, inngestFunction }: FunctionConf
                   icon={<RiArrowRightUpLine />}
                   iconSide="right"
                 />
-              </div>
-            </div>
+              }
+            />
           </ConfigurationSection>
 
           <ConfigurationSection title="Triggers">
-            {inngestFunction.triggers.map((trigger) => (
-              <div
+            {triggers?.map((trigger) => (
+              <ConfigurationBlock
                 key={trigger.value}
-                className="border-subtle flex items-center gap-2 self-stretch border border-b-0 p-2 first:rounded-t last:rounded-b last:border-b"
-              >
-                <div className="bg-canvasSubtle text-light flex h-9 w-9 items-center justify-center gap-2 rounded p-2">
-                  {trigger.type == 'EVENT' && <EventsIcon className="h-5 w-5" />}
-                  {trigger.type == 'CRON' && <RiTimeLine className="h-5 w-5" />}
-                </div>
-                <div className="text-basis flex grow flex-col items-start justify-center gap-1 self-stretch text-sm font-medium">
-                  <div>{trigger.value}</div>
-                  {trigger.type == 'EVENT' && trigger.condition && (
+                icon={
+                  trigger.type == 'EVENT' ? (
+                    <EventsIcon className="h-5 w-5" />
+                  ) : (
+                    <RiTimeLine className="h-5 w-5" />
+                  )
+                }
+                mainText={trigger.value}
+                subText={
+                  trigger.type == 'EVENT' && trigger.condition ? (
                     <div className="text-muted text-sm">
                       <code>if: {trigger.condition}</code>
                       {/*handle overflow and pop up*/}
                     </div>
-                  )}
-                </div>
-              </div>
+                  ) : (
+                    <></>
+                  )
+                }
+              />
             ))}
           </ConfigurationSection>
         </div>
