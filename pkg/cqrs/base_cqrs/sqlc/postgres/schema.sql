@@ -207,6 +207,8 @@ CREATE TABLE spans (
 
   -- custom
   run_id TEXT NOT NULL,
+  app_id TEXT NOT NULL,
+  function_id TEXT NOT NULL,
   dynamic_span_id TEXT,
 
   PRIMARY KEY (trace_id, span_id)

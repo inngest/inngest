@@ -11,6 +11,10 @@ import (
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
 
+const (
+	cleanAttrs = false
+)
+
 type DBExporter struct {
 	q sqlc.Querier
 }
@@ -22,6 +26,8 @@ func (e *DBExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlyS
 		parentID := span.Parent().SpanID().String()
 		isExtensionSpan := span.Name() == meta.SpanNameDynamicExtension
 		var runID string
+		var appID string
+		var functionID string
 		var dynamicSpanID string
 
 		attrs := make(map[string]any)
@@ -29,18 +35,38 @@ func (e *DBExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlyS
 			// Capture but omit the run ID attribute from the span attributes
 			if string(attr.Key) == meta.AttributeRunID {
 				runID = attr.Value.AsString()
-				continue
+				if cleanAttrs {
+					continue
+				}
+			}
+
+			if string(attr.Key) == meta.AttributeAppID {
+				appID = attr.Value.AsString()
+				if cleanAttrs {
+					continue
+				}
+			}
+
+			if string(attr.Key) == meta.AttributeFunctionID {
+				functionID = attr.Value.AsString()
+				if cleanAttrs {
+					continue
+				}
 			}
 
 			// Capture but omit the dynamic span ID attribute from the span attributes
 			if string(attr.Key) == meta.AttributeDynamicSpanID {
 				dynamicSpanID = attr.Value.AsString()
-				continue
+				if cleanAttrs {
+					continue
+				}
 			}
 
 			// Omit drop span attribute if we're an extension span
 			if isExtensionSpan && string(attr.Key) == meta.AttributeDropSpan {
-				continue
+				if cleanAttrs {
+					continue
+				}
 			}
 
 			attrs[string(attr.Key)] = attr.Value.AsInterface()
@@ -75,6 +101,8 @@ func (e *DBExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlyS
 			StartTime:    span.StartTime(),
 			EndTime:      span.EndTime(),
 			RunID:        runID,
+			AppID:        appID,
+			FunctionID:   functionID,
 			Attributes:   string(attrsByt),
 			Links:        string(linksByt),
 			DynamicSpanID: sql.NullString{

@@ -130,6 +130,8 @@ type Span struct {
 	Attributes    interface{}
 	Links         interface{}
 	RunID         string
+	AppID         string
+	FunctionID    string
 	DynamicSpanID sql.NullString
 }
 

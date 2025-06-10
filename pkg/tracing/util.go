@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/queue"
@@ -20,7 +19,6 @@ import (
 func WithFunctionAttrs(f *inngest.Function) trace.SpanStartEventOption {
 	url, err := f.URI()
 	if err != nil {
-		spew.Dump(err)
 		return nil
 	}
 
@@ -188,45 +186,31 @@ func withGeneratorAttrs(op *state.GeneratorOpcode) []attribute.KeyValue {
 }
 
 func SpanRefFromQueueItem(i *queue.Item) *meta.SpanReference {
-	spew.Dump("tracing.SpanFromQueueItem")
 	if i == nil || i.Metadata == nil {
-		spew.Dump("tracing.SpanFromQueueItem", "no metadata")
 		return nil
 	}
 
 	if carrier, ok := i.Metadata[meta.PropagationKey]; ok {
-		spew.Dump("tracing.SpanFromQueueItem", "found carrier", carrier)
 		var out meta.SpanReference
 		if err := json.Unmarshal([]byte(carrier.(string)), &out); err == nil {
 			return &out
 		}
-
-		spew.Dump("tracing.SpanFromQueueItem", "error unmarshalling carrier")
 	}
-
-	spew.Dump("tracing.SpanFromQueueItem", "no carrier")
 
 	return nil
 }
 
 func SpanRefFromPause(p *state.Pause) *meta.SpanReference {
-	spew.Dump("tracing.SpanFromPause")
 	if p == nil || p.Metadata == nil {
-		spew.Dump("tracing.SpanFromPause", "no metadata")
 		return nil
 	}
 
 	if carrier, ok := p.Metadata[meta.PropagationKey]; ok {
-		spew.Dump("tracing.SpanFromPause", "found carrier", carrier)
 		var out meta.SpanReference
 		if err := json.Unmarshal([]byte(carrier.(string)), &out); err == nil {
 			return &out
 		}
-
-		spew.Dump("tracing.SpanFromPause", "error unmarshalling carrier")
 	}
-
-	spew.Dump("tracing.SpanFromPause", "no carrier")
 
 	return nil
 }

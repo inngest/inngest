@@ -6,11 +6,13 @@ import (
 	"sync"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/google/uuid"
 	"github.com/graph-gophers/dataloader"
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/run"
+	"github.com/inngest/inngest/pkg/tracing/meta"
 	rpbv2 "github.com/inngest/inngest/proto/gen/run/v2"
 	"github.com/oklog/ulid/v2"
 )
@@ -36,7 +38,140 @@ type traceReader struct {
 	reader  cqrs.TraceReader
 }
 
+// just run id
 func (tr *traceReader) GetRunTrace(ctx context.Context, keys dataloader.Keys) []*dataloader.Result {
+	results := make([]*dataloader.Result, len(keys))
+	var wg sync.WaitGroup
+
+	for i, key := range keys {
+		results[i] = &dataloader.Result{}
+
+		wg.Add(1)
+		go func(ctx context.Context, res *dataloader.Result, key dataloader.Key) {
+			defer wg.Done()
+
+			req, ok := key.Raw().(*TraceRequestKey)
+			if !ok {
+				res.Error = fmt.Errorf("unexpected type %T", key.Raw())
+				return
+			}
+
+			rootSpan, err := tr.reader.GetSpansByRunID(ctx, req.RunID)
+			if err != nil {
+				res.Error = fmt.Errorf("error retrieving trace: %w", err)
+				return
+			}
+
+			spew.Dump(rootSpan)
+
+			gqlRoot, err := tr.convertRunSpanToGQL(ctx, rootSpan)
+			if err != nil {
+				res.Error = fmt.Errorf("error converting run root to GQL: %w", err)
+				return
+			}
+
+			res.Data = gqlRoot
+			// TODO prime
+		}(ctx, results[i], key)
+	}
+
+	wg.Wait()
+
+	return results
+}
+
+func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.JackSpan) (*models.RunTraceSpan, error) {
+	var duration *int
+	status := models.RunTraceSpanStatusRunning
+	startedAt := span.GetStartedAtTime()
+	endedAt := span.GetEndedAtTime()
+	if startedAt != nil && endedAt != nil {
+		dur := int(endedAt.Sub(*startedAt).Milliseconds())
+		duration = &dur
+		status = models.RunTraceSpanStatusCompleted // TODO the actual statuses
+	}
+
+	gqlSpan := &models.RunTraceSpan{
+		AppID:        span.GetAppID(),
+		FunctionID:   span.GetFunctionID(),
+		RunID:        span.GetRunID(),
+		SpanID:       span.GetSpanID(),
+		TraceID:      span.GetTraceID(),
+		Name:         span.GetName(),
+		Status:       status,
+		Attempts:     span.GetAttempts(),
+		ParentSpanID: span.GetParentSpanID(),
+		IsRoot:       span.GetIsRoot(),
+
+		Duration: duration,
+		// OutputID: , TODO
+
+		QueuedAt:  span.GetQueuedAtTime(),
+		StartedAt: span.GetStartedAtTime(),
+		EndedAt:   span.GetEndedAtTime(),
+
+		// StepOp: ,
+		// StepID: ,
+		// StepInfo: ,
+
+		// IsUserland: ,
+		// UserlandSpan: ,
+	}
+
+	if len(span.Children) > 0 {
+		gqlSpan.ChildrenSpans = []*models.RunTraceSpan{}
+
+		for i, cs := range span.Children {
+			child, err := tr.convertRunSpanToGQL(ctx, cs)
+			if err != nil {
+				return nil, fmt.Errorf("error converting child span: %w", err)
+			}
+
+			// Decide on changes to this parent span based on the children.
+			switch span.Name {
+			case meta.SpanNameStepDiscovery:
+				{
+					gqlSpan.Status = child.Status
+					gqlSpan.StartedAt = child.StartedAt // TODO only first
+					gqlSpan.EndedAt = child.EndedAt
+					if child.Name != "" {
+						gqlSpan.Name = child.Name
+						child.Name = fmt.Sprintf("Attempt %d", i+1)
+					}
+					break
+				}
+
+			case meta.SpanNameStep:
+				{
+					// TODO multiple executions?
+					gqlSpan.Status = child.Status
+					gqlSpan.StartedAt = child.StartedAt // TODO only first
+					gqlSpan.EndedAt = child.EndedAt
+					if child.Name != "" {
+						gqlSpan.Name = child.Name // TODO only first
+					}
+					break
+				}
+			}
+
+			gqlSpan.ChildrenSpans = append(gqlSpan.ChildrenSpans, child)
+		}
+
+		// For the run span, the start is the first child span's start
+		if span.Name == meta.SpanNameRun {
+			gqlSpan.StartedAt = &gqlSpan.ChildrenSpans[0].QueuedAt
+			if gqlSpan.EndedAt != nil {
+				dur := int(gqlSpan.EndedAt.Sub(*gqlSpan.StartedAt).Milliseconds())
+				gqlSpan.Duration = &dur
+				gqlSpan.Status = models.RunTraceSpanStatusCompleted // TODO the actual statuses
+			}
+		}
+	}
+
+	return gqlSpan, nil
+}
+
+func (tr *traceReader) GetLegacyRunTrace(ctx context.Context, keys dataloader.Keys) []*dataloader.Result {
 	results := make([]*dataloader.Result, len(keys))
 
 	var wg sync.WaitGroup
@@ -319,7 +454,7 @@ func (k *SpanRequestKey) String() string {
 	return fmt.Sprintf("%s:%s:%s", k.TraceID, k.RunID, k.SpanID)
 }
 
-func (tr *traceReader) GetSpanRun(ctx context.Context, keys dataloader.Keys) []*dataloader.Result {
+func (tr *traceReader) GetLegacySpanRun(ctx context.Context, keys dataloader.Keys) []*dataloader.Result {
 	results := make([]*dataloader.Result, len(keys))
 
 	var wg sync.WaitGroup
@@ -345,7 +480,7 @@ func (tr *traceReader) GetSpanRun(ctx context.Context, keys dataloader.Keys) []*
 			// still be filtered out.
 			rootSpan, err := LoadOne[models.RunTraceSpan](
 				ctx,
-				tr.loaders.RunTraceLoader,
+				tr.loaders.LegacyRunTraceLoader,
 				&TraceRequestKey{TraceRunIdentifier: req.TraceRunIdentifier},
 			)
 			if err != nil {

@@ -130,6 +130,8 @@ type Span struct {
 	Attributes    pqtype.NullRawMessage
 	Links         pqtype.NullRawMessage
 	RunID         string
+	AppID         string
+	FunctionID    string
 	DynamicSpanID sql.NullString
 }
 

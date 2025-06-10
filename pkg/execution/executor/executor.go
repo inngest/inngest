@@ -13,7 +13,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/fatih/structs"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
@@ -469,6 +468,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		}
 		evts[n] = byt
 	}
+
 	// Evaluate the run priority based off of the input event data.
 	evtMap := req.Events[0].GetEvent().Map()
 	factor, _ := req.Function.RunPriorityFactor(ctx, evtMap)
@@ -1208,6 +1208,21 @@ func (f functionFinishedData) Map() map[string]any {
 func (e *executor) finalize(ctx context.Context, md sv2.Metadata, evts []json.RawMessage, fnSlug string, queueShard redis_state.QueueShard, resp state.DriverResponse) error {
 	ctx = context.WithoutCancel(ctx)
 
+	err := e.tracerProvider.UpdateSpan(&tracing.UpdateSpanOptions{
+		EndTime:    time.Now(),
+		Location:   "executor.finalize",
+		Metadata:   &md,
+		TargetSpan: tracing.RunSpanRefFromMetadata(&md),
+		Status:     codes.Ok, // TODO
+	})
+	if err != nil {
+		logger.StdlibLogger(ctx).Error(
+			"error updating run span end time",
+			"error", err,
+			"run_id", md.ID.RunID.String(),
+		)
+	}
+
 	// Parse events for the fail handler before deleting state.
 	inputEvents := make([]event.Event, len(evts))
 	for n, e := range evts {
@@ -1223,7 +1238,7 @@ func (e *executor) finalize(ctx context.Context, md sv2.Metadata, evts []json.Ra
 	}
 
 	// Delete the function state in every case.
-	_, err := e.smv2.Delete(ctx, md.ID)
+	_, err = e.smv2.Delete(ctx, md.ID)
 	if err != nil {
 		logger.StdlibLogger(ctx).Error(
 			"error deleting state in finalize",
@@ -2651,8 +2666,6 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, i *runInstance, gen
 	if err != nil {
 		return fmt.Errorf("error creating span for next step after Sleep: %w", err)
 	}
-
-	spew.Dump("metadata after thing", nextItem.Metadata)
 
 	// TODO Should this also include a parent step span? It will never have attempts.
 	err = e.queue.Enqueue(ctx, nextItem, until, queue.EnqueueOpts{})

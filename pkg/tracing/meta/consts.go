@@ -12,6 +12,11 @@ const (
 	SpanNameExecution        = "executor.execution"      // exec
 	SpanNameDynamicExtension = "EXTEND"                  // EXT
 
+	// Timings
+	AttributeQueuedAt  = "_inngest.queued_at"  // _q.at
+	AttributeStartedAt = "_inngest.started_at" // _s.at
+	AttributeEndedAt   = "_inngest.ended_at"   // _e.at
+
 	// Run attributes
 	AttributeAccountID        = "_inngest.account.id"        // _acct
 	AttributeAppID            = "_inngest.app.id"            // _app

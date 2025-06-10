@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -28,11 +29,104 @@ type JackSpan struct {
 	Name         string         `json:"name"`
 	Status       string         `json:"status"`
 	SpanID       string         `json:"span_id"`
+	TraceID      string         `json:"trace_id"`
 	StartTime    time.Time      `json:"start_time"`
 	EndTime      time.Time      `json:"end_time"`
 	ParentSpanID *string        `json:"parent_span_id,omitempty,omitzero"`
 	Attributes   map[string]any `json:"attributes,omitempty,omitzero"`
 	Children     []*JackSpan    `json:"children,omitempty,omitzero"`
+	RunID        ulid.ULID      `json:"run_id,omitempty,omitzero"`
+	AppID        uuid.UUID      `json:"app_id,omitempty,omitzero"`
+	FunctionID   uuid.UUID      `json:"function_id,omitempty,omitzero"`
+}
+
+func (s *JackSpan) anyUnixMilliToTime(v any) (time.Time, error) {
+	f, ok := v.(float64)
+	if !ok {
+		return time.Time{}, fmt.Errorf("expected float64, got %T", v)
+	}
+	return time.UnixMilli(int64(f)), nil
+}
+
+func (s *JackSpan) GetAppID() uuid.UUID {
+	return s.AppID
+}
+
+func (s *JackSpan) GetFunctionID() uuid.UUID {
+	return s.FunctionID
+}
+
+func (s *JackSpan) GetRunID() ulid.ULID {
+	return s.RunID
+}
+
+func (s *JackSpan) GetSpanID() string {
+	return s.SpanID
+}
+
+func (s *JackSpan) GetTraceID() string {
+	return s.TraceID
+}
+
+func (s *JackSpan) GetName() string {
+	if dn, ok := s.Attributes[meta.AttributeStepName]; ok {
+		if name, ok := dn.(string); ok {
+			return name
+		}
+	}
+
+	return s.Name
+}
+
+// TODO is this max?
+func (s *JackSpan) GetAttempts() *int {
+	if attempts, ok := s.Attributes[meta.AttributeStepAttempt]; ok {
+		if attempt, ok := attempts.(int); ok {
+			return &attempt
+		}
+	}
+
+	return nil
+}
+
+func (s *JackSpan) GetParentSpanID() *string {
+	if s.ParentSpanID == nil || *s.ParentSpanID == "" {
+		return nil
+	}
+
+	return s.ParentSpanID
+}
+
+func (s *JackSpan) GetIsRoot() bool {
+	parentSpanID := s.GetParentSpanID()
+
+	return parentSpanID == nil || *parentSpanID == "" || *parentSpanID == "0000000000000000"
+}
+
+func (s *JackSpan) GetQueuedAtTime() time.Time {
+	if q, err := s.anyUnixMilliToTime(s.Attributes[meta.AttributeQueuedAt]); err == nil {
+		return q
+	}
+
+	// This should always be a value, so if we don't have one, just use when
+	// the span was created.
+	return s.StartTime
+}
+
+func (s *JackSpan) GetStartedAtTime() *time.Time {
+	if st, err := s.anyUnixMilliToTime(s.Attributes[meta.AttributeStartedAt]); err == nil {
+		return &st
+	}
+
+	return nil
+}
+
+func (s *JackSpan) GetEndedAtTime() *time.Time {
+	if et, err := s.anyUnixMilliToTime(s.Attributes[meta.AttributeEndedAt]); err == nil {
+		return &et
+	}
+
+	return nil
 }
 
 // Span represents an distributed span in a function execution flow

@@ -2,11 +2,13 @@ package tracing
 
 import (
 	"context"
+	"time"
 
 	"github.com/inngest/inngest/pkg/execution/queue"
 	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/tracing/meta"
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
 
@@ -38,14 +40,14 @@ func (p *executionProcessor) OnStart(parent context.Context, s sdktrace.ReadWrit
 	}
 
 	// Do not set extra contextual data on extension spans
-	if s.Name() != meta.SpanNameDynamicExtension {
+	switch s.Name() {
+	case meta.SpanNameRun:
+		{
+			attrs = append(attrs,
+				attribute.Int64(meta.AttributeQueuedAt, time.Now().UnixMilli()),
+			)
 
-		switch s.Name() {
-		case meta.SpanNameRun:
-			{
-				if p.md == nil {
-					break
-				}
+			if p.md != nil {
 
 				eventIDs := make([]string, len(p.md.Config.EventIDs))
 				for i, id := range p.md.Config.EventIDs {
@@ -73,26 +75,60 @@ func (p *executionProcessor) OnStart(parent context.Context, s sdktrace.ReadWrit
 						attribute.Int64(meta.AttributeBatchTimestamp, int64(p.md.Config.BatchID.Time())),
 					)
 				}
-
-				break
 			}
 
-		case meta.SpanNameStep:
-			{
-				if p.qi != nil {
-					attrs = append(attrs,
-						attribute.Int(meta.AttributeStepMaxAttempts, p.qi.GetMaxAttempts()),
-						attribute.Int(meta.AttributeStepAttempt, p.qi.Attempt),
-					)
+			break
+		}
+
+	case meta.SpanNameStepDiscovery:
+		{
+			attrs = append(attrs,
+				attribute.Int64(meta.AttributeQueuedAt, time.Now().UnixMilli()),
+			)
+
+			break
+		}
+
+	case meta.SpanNameStep:
+		{
+			attrs = append(attrs,
+				attribute.Int64(meta.AttributeQueuedAt, time.Now().UnixMilli()),
+			)
+
+			if p.qi != nil {
+				attrs = append(attrs,
+					attribute.Int(meta.AttributeStepMaxAttempts, p.qi.GetMaxAttempts()),
+					attribute.Int(meta.AttributeStepAttempt, p.qi.Attempt),
+				)
+			}
+
+			break
+		}
+
+	case meta.SpanNameExecution:
+		{
+			attrs = append(attrs,
+				attribute.Int64(meta.AttributeStartedAt, time.Now().UnixMilli()),
+			)
+
+			break
+		}
+
+	case meta.SpanNameDynamicExtension:
+		{
+			for _, attr := range s.Attributes() {
+				if string(attr.Key) == meta.AttributeDynamicStatus {
+					if attr.Value.Type() == attribute.STRING && attr.Value.AsString() != codes.Unset.String() {
+						attrs = append(attrs,
+							attribute.Int64(meta.AttributeEndedAt, time.Now().UnixMilli()),
+						)
+					}
+
+					break
 				}
-
-				break
 			}
 
-		case meta.SpanNameExecution:
-			{
-				break
-			}
+			break
 		}
 	}
 

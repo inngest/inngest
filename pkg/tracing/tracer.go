@@ -132,10 +132,10 @@ func (tp *TracerProvider) CreateDroppableSpan(
 	}
 
 	// Only spans with parents can be dynamic? Hm.
+	spanRef.DynamicSpanID = span.SpanContext().SpanID().String()
 	if opts.Parent != nil {
 		spanRef.DynamicSpanTraceParent = opts.Parent.TraceParent
 		spanRef.DynamicSpanTraceState = opts.Parent.TraceState
-		spanRef.DynamicSpanID = span.SpanContext().SpanID().String()
 	}
 
 	span.SetAttributes(
@@ -190,13 +190,13 @@ func (tp *TracerProvider) UpdateSpan(
 	}
 	ctx := defaultPropagator.Extract(context.Background(), carrier)
 
-	tracer := tp.getTracer(opts.Metadata, opts.QueueItem)
-	_, span := tracer.Start(ctx, meta.SpanNameDynamicExtension, opts.SpanOptions...)
-
-	span.SetAttributes(
+	spanOpts := append(opts.SpanOptions, trace.WithAttributes(
 		attribute.String(meta.AttributeDynamicSpanID, opts.TargetSpan.DynamicSpanID),
 		attribute.String(meta.AttributeDynamicStatus, opts.Status.String()),
-	)
+	))
+
+	tracer := tp.getTracer(opts.Metadata, opts.QueueItem)
+	_, span := tracer.Start(ctx, meta.SpanNameDynamicExtension, spanOpts...)
 
 	span.End()
 	return nil

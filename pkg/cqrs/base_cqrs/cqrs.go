@@ -90,7 +90,6 @@ func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.Ja
 		return nil, err
 	}
 
-	// out := make([]*cqrs.JackSpan, len(spans))
 	spanMap := make(map[string]*cqrs.JackSpan)
 	var root *cqrs.JackSpan
 
@@ -114,9 +113,10 @@ func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.Ja
 			parentSpanID = &span.ParentSpanID.String
 		}
 
-		spanMap[span.SpanID] = &cqrs.JackSpan{
+		spanMap[span.DynamicSpanID.String] = &cqrs.JackSpan{
 			Status:       "running",
-			SpanID:       span.SpanID,
+			TraceID:      span.TraceID,
+			SpanID:       span.DynamicSpanID.String,
 			StartTime:    startTime,
 			EndTime:      endTime,
 			ParentSpanID: parentSpanID,
@@ -128,10 +128,10 @@ func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.Ja
 
 		// TODO same for links
 		for _, fragment := range fragments {
-			if spanMap[span.SpanID].Name == "" {
+			if spanMap[span.DynamicSpanID.String].Name == "" {
 				if name, ok := fragment["name"].(string); ok {
 					if strings.HasPrefix(name, "executor.") {
-						spanMap[span.SpanID].Name = name
+						spanMap[span.DynamicSpanID.String].Name = name
 					}
 				}
 			}
@@ -144,12 +144,25 @@ func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.Ja
 				}
 
 				for k, v := range fragmentAttr {
+					// Can remove this to not pass on needless attributes
+					spanMap[span.DynamicSpanID.String].Attributes[k] = v
+
 					if k == meta.AttributeDynamicStatus {
 						if status, ok := v.(string); ok {
-							spanMap[span.SpanID].Status = status
+							spanMap[span.DynamicSpanID.String].Status = status
 						}
+					} else if k == meta.AttributeAppID {
+						spanMap[span.DynamicSpanID.String].AppID = uuid.MustParse(v.(string))
+					} else if k == meta.AttributeFunctionID {
+						spanMap[span.DynamicSpanID.String].FunctionID = uuid.MustParse(v.(string))
+					} else if k == meta.AttributeRunID {
+						spanMap[span.DynamicSpanID.String].RunID = ulid.MustParse(v.(string))
+					} else if k == meta.AttributeStartedAt {
+						spanMap[span.DynamicSpanID.String].StartTime = time.UnixMilli(int64(v.(float64)))
+					} else if k == meta.AttributeEndedAt {
+						spanMap[span.DynamicSpanID.String].EndTime = time.UnixMilli(int64(v.(float64)))
 					} else {
-						spanMap[span.SpanID].Attributes[k] = v
+						spanMap[span.DynamicSpanID.String].Attributes[k] = v
 					}
 				}
 			}
@@ -2153,10 +2166,10 @@ func (w wrapper) GetWorkerConnections(ctx context.Context, opt cqrs.GetWorkerCon
 // copyWriter allows running duck-db specific functions as CQRS functions, copying CQRS types to DDB types
 // automatically.
 func copyWriter[
-PARAMS_IN any,
-INTERNAL_PARAMS any,
-IN any,
-OUT any,
+	PARAMS_IN any,
+	INTERNAL_PARAMS any,
+	IN any,
+	OUT any,
 ](
 	ctx context.Context,
 	f func(context.Context, INTERNAL_PARAMS) (IN, error),
@@ -2179,8 +2192,8 @@ OUT any,
 }
 
 func copyInto[
-IN any,
-OUT any,
+	IN any,
+	OUT any,
 ](
 	ctx context.Context,
 	f func(context.Context) (IN, error),
