@@ -211,7 +211,7 @@ func (q *queue) RunningCount(ctx context.Context, workflowID uuid.UUID) (int64, 
 	return count, nil
 }
 
-func (q *queue) ItemsByPartition(ctx context.Context, shard QueueShard, partitionID uuid.UUID, from time.Time, until time.Time, opts ...QueueIteratorOpt) (iter.Seq[*osqueue.QueueItem], error) {
+func (q *queue) ItemsByPartition(ctx context.Context, shard QueueShard, partitionID uuid.UUID, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*osqueue.QueueItem], error) {
 	opt := queueIterOpt{
 		batchSize: 1000,
 		allowKeyQueues: func() bool {
@@ -364,7 +364,7 @@ func (q *queue) ItemsByPartition(ctx context.Context, shard QueueShard, partitio
 	}, nil
 }
 
-func (q *queue) ItemsByBacklog(ctx context.Context, shard QueueShard, backlogID string, from time.Time, until time.Time, opts ...QueueIteratorOpt) (iter.Seq[*osqueue.QueueItem], error) {
+func (q *queue) ItemsByBacklog(ctx context.Context, shard QueueShard, backlogID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*osqueue.QueueItem], error) {
 	opt := queueIterOpt{
 		batchSize: 1000,
 		allowKeyQueues: func() bool {
