@@ -29,6 +29,7 @@ export default function ConfigurationBlock({
         <div>{mainText}</div>
         {subText && <div className="text-muted text-sm">{subText}</div>}
       </div>
+      {/*TODO should this be RiArrowRightSLine by default for NextLink*/}
       {rightElement}
     </div>
   );
@@ -36,7 +37,7 @@ export default function ConfigurationBlock({
   return href ? (
     <NextLink
       href={href}
-      className="border-subtle bg-canvasBase hover:bg-canvasMuted block rounded-md border border-gray-200 "
+      className="border-subtle bg-canvasBase hover:bg-canvasMuted block rounded-md border"
     >
       {content}
     </NextLink>

@@ -244,19 +244,14 @@ export function FunctionConfiguration({ onClose, inngestFunction }: FunctionConf
             )}
           </ConfigurationSection>
 
-          {inngestFunction.configuration.cancellations && (
-            <div>
-              <span className="text-sm font-medium">Cancel On</span>
-              {inngestFunction.configuration.cancellations.map((cancelOn) => {
-                // link to event in cloud
-                return (
-                  // className="border-subtle bg-canvasBase hover:bg-canvasMuted block rounded-md border border-gray-200 "
-                  <div className="border-subtle flex items-center gap-2 self-stretch rounded border border-gray-200 p-2">
-                    <div className="flex h-9 w-9 items-center justify-center gap-2 rounded bg-gray-100 p-2 dark:bg-transparent">
-                      <EventsIcon className="h-5 w-5" />
-                    </div>
-                    <div className="flex grow flex-col items-start justify-center gap-1 self-stretch">
-                      <div>{cancelOn.event}</div>
+          <ConfigurationSection title="Cancel On">
+            {inngestFunction.configuration.cancellations.map((cancelOn) => {
+              return (
+                <ConfigurationBlock
+                  icon={<EventsIcon className="h-5 w-5" />}
+                  mainText={cancelOn.event}
+                  subText={
+                    <>
                       {cancelOn.condition && (
                         <div className="text-xs">
                           <code>if: {cancelOn.condition}</code>
@@ -266,13 +261,12 @@ export function FunctionConfiguration({ onClose, inngestFunction }: FunctionConf
                       {cancelOn.timeout && (
                         <div className="text-subtle text-xs">Timeout: {cancelOn.timeout}</div>
                       )}
-                    </div>
-                    {/*<RiArrowRightSLine className="h-5" />*/}
-                  </div>
-                );
-              })}
-            </div>
-          )}
+                    </>
+                  }
+                />
+              );
+            })}
+          </ConfigurationSection>
 
           <div className="overflow-hidden rounded border border-gray-300 ">
             <table className="w-full border-collapse">
