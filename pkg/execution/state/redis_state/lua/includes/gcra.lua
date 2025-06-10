@@ -51,6 +51,8 @@ local function gcraUpdate(key, now_ms, period_ms, limit, burst, capacity)
     local expiry = (period_ms / 1000)
     redis.call("SET", key, new_tat, "EX", expiry)
   end
+
+  return new_tat
 end
 
 local function gcraCapacity(key, now_ms, period_ms, limit, burst)
@@ -75,5 +77,5 @@ local function gcraCapacity(key, now_ms, period_ms, limit, burst)
   local capacity = math.floor(time_capacity_remain / emission)
 
   -- this could be negative, which means no capacity
-  return math.min(capacity, limit + burst)
+  return { math.min(capacity, limit + burst), tat }
 end
