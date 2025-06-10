@@ -533,7 +533,7 @@ func (s *svc) handleCancel(ctx context.Context, item queue.Item) error {
 		}
 
 		items, err := qm.ItemsByPartition(ctx, shard, c.FunctionID, from, c.StartedBefore,
-			redis_state.WithQueueItemIteratorAllowKeyQueues(func() bool {
+			redis_state.WithQueueItemIterAllowKeyQueues(func() bool {
 				return s.allowKeyQueues(ctx, c.AccountID)
 			}),
 		)
@@ -593,7 +593,7 @@ func (s *svc) handleCancel(ctx context.Context, item queue.Item) error {
 		}
 
 		items, err := qm.ItemsByBacklog(ctx, shard, c.TargetID, from, c.StartedBefore,
-			redis_state.WithQueueItemIteratorAllowKeyQueues(func() bool {
+			redis_state.WithQueueItemIterAllowKeyQueues(func() bool {
 				return s.allowKeyQueues(ctx, c.AccountID)
 			}),
 		)
