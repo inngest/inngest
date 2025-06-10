@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import NextLink from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@inngest/components/Button';
+import { ConfigurationCategory } from '@inngest/components/FunctionConfiguration/ConfigurationCategory';
 import { Header } from '@inngest/components/Header/Header';
 import { InvokeButton } from '@inngest/components/InvokeButton';
 import { type MetadataItemProps } from '@inngest/components/Metadata';
@@ -184,11 +185,7 @@ export function FunctionConfiguration({ onClose, inngestFunction }: FunctionConf
           </div>
         }
       />
-      <div className="inline-flex flex-col items-start justify-start px-4 pb-6 pt-4">
-        {/* letter spacing */}
-        <h2 className="text-light pb-3 text-xs font-medium uppercase leading-4 tracking-wider">
-          Overview
-        </h2>
+      <ConfigurationCategory title="Overview">
         <div className="flex flex-col space-y-6 self-stretch ">
           <div>
             {/* do we want font weight 450 specifically? */}
@@ -239,11 +236,8 @@ export function FunctionConfiguration({ onClose, inngestFunction }: FunctionConf
             </div>
           </div>
         </div>
-      </div>
-      <div className="inline-flex flex-col items-start justify-start px-4 pb-6 pt-4">
-        <div className="flex flex-col justify-center break-words pb-3 text-xs uppercase tracking-wide text-gray-400">
-          Execution Configurations
-        </div>
+      </ConfigurationCategory>
+      <ConfigurationCategory title="Execution Configurations">
         <div className="flex flex-col space-y-6 self-stretch ">
           {/* should this one be even if it's not set, educational? */}
           {inngestFunction.failureHandler && (
@@ -324,11 +318,8 @@ export function FunctionConfiguration({ onClose, inngestFunction }: FunctionConf
             </table>
           </div>
         </div>
-      </div>
-      <div className="inline-flex flex-col items-start justify-start px-4 pb-6 pt-4">
-        <div className="flex flex-col justify-center break-words pb-3 text-xs uppercase tracking-wide text-gray-400">
-          Scheduling Configurations
-        </div>
+      </ConfigurationCategory>
+      <ConfigurationCategory title="Scheduling Configurations">
         <div className="flex flex-col space-y-6 self-stretch ">
           {inngestFunction.configuration.rateLimit && (
             <div className="overflow-hidden rounded border border-gray-300 ">
@@ -459,11 +450,8 @@ export function FunctionConfiguration({ onClose, inngestFunction }: FunctionConf
             </div>
           )}
         </div>
-      </div>
-      <div className="inline-flex flex-col items-start justify-start px-4 pb-6 pt-4">
-        <div className="flex flex-col justify-center break-words pb-3 text-xs uppercase tracking-wide text-gray-400">
-          Queue Configurations
-        </div>
+      </ConfigurationCategory>
+      <ConfigurationCategory title="Queue Configurations">
         <div className="flex flex-col space-y-6 self-stretch ">
           {inngestFunction.configuration.concurrency &&
             inngestFunction.configuration.concurrency.map((concurrencyConfig, index) => (
@@ -544,7 +532,7 @@ export function FunctionConfiguration({ onClose, inngestFunction }: FunctionConf
             </div>
           )}
         </div>
-      </div>
+      </ConfigurationCategory>
     </div>
   );
 }
