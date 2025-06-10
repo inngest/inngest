@@ -190,42 +190,21 @@ export default function FunctionConfiguration({
         }
       />
       <div className="inline-flex flex-col items-start justify-start px-4 pb-6 pt-4">
-        {/* do we want 'var(--textColor-light, #9B9B9B)'*/}
         {/* letter spacing */}
-        <div className="flex flex-col justify-center break-words pb-3 text-xs uppercase tracking-wide text-gray-400">
+        <h2 className="text-light pb-3 text-xs font-medium uppercase leading-4 tracking-wider">
           Overview
-        </div>
+        </h2>
         <div className="flex flex-col space-y-6 self-stretch ">
           <div>
             {/* do we want font weight 450 specifically? */}
-            <span className="text-sm font-medium">App</span>
+            <h3 className="text-basis mb-1 text-sm font-medium">App</h3>
             {/*border-gray-200 (#E5E7EB) would be close to #E2E2E2.*/}
-            <div className="flex items-center gap-2 self-stretch rounded border border-gray-200 p-2">
-              {/*bg-gray-100 (#F3F4F6) would be close to #F6F6F6.*/}
-              {/*bg-[#F6F6F6]*/}
-              <div className="flex h-9 w-9 items-center justify-center gap-2 rounded bg-gray-100 p-2 dark:bg-transparent">
-                {/*width: 1.125rem → w-[1.125rem] (18px, no default utility for this size)*/}
-                {/*height: 1.125rem → h-[1.125rem] (18px, no default utility for this size)*/}
-                {/*flex-shrink: 0 → shrink-0*/}
-                {/*aspect-ratio: 1/1 → aspect-square*/}
-
-                {/*Note: 1.125rem = 18px, which doesn't have a default Tailwind utility (the scale goes from w-4 = 16px to w-5 = 20px), so we use the arbitrary value syntax with square brackets.*/}
+            <div className="border-subtle flex items-center gap-2 self-stretch rounded border p-2">
+              <div className="bg-canvasSubtle text-light flex h-9 w-9 items-center justify-center gap-2 rounded p-2">
                 <AppsIcon className="h-5 w-5" />
               </div>
-              <div className="flex grow flex-col items-start justify-center gap-1 self-stretch">
+              <div className="text-basis flex grow flex-col items-start justify-center gap-1 self-stretch text-sm font-medium">
                 <div>{inngestFunction.app.name}</div>
-                {/*{inngestFunction.app.latestSync ? (*/}
-                {/*  <div>{inngestFunction.app.latestSync}</div>*/}
-                {/*) : (*/}
-                {/*  <></>*/}
-                {/*)}*/}
-                {/*{function_.current?.deploy?.createdAt && (*/}
-                {/*  <Time*/}
-                {/*    className="text-subtle text-xs"*/}
-                {/*    format="relative"*/}
-                {/*    value={new Date(function_.current.deploy.createdAt)}*/}
-                {/*  />*/}
-                {/*)}*/}
               </div>
               <div className="self-end">
                 <Button
@@ -240,30 +219,21 @@ export default function FunctionConfiguration({
           </div>
 
           <div>
-            {/*use header h2 or whatev*/}
-            <span className="text-sm font-medium">Triggers</span>
+            <h3 className="text-basis mb-1 text-sm font-medium">Triggers</h3>
             <div>
               {inngestFunction.triggers.map((trigger) => (
                 <div
                   key={trigger.value}
-                  className="flex items-center gap-2 self-stretch border border-b-0 border-gray-200 p-2 first:rounded-t last:rounded-b last:border-b"
+                  className="border-subtle flex items-center gap-2 self-stretch border border-b-0 p-2 first:rounded-t last:rounded-b last:border-b"
                 >
-                  {/*bg-gray-100 (#F3F4F6) would be close to #F6F6F6.*/}
-                  {/*bg-[#F6F6F6]*/}
-                  <div className="flex h-9 w-9 items-center justify-center gap-2 rounded bg-gray-100 p-2 dark:bg-transparent">
-                    {/*width: 1.125rem → w-[1.125rem] (18px, no default utility for this size)*/}
-                    {/*height: 1.125rem → h-[1.125rem] (18px, no default utility for this size)*/}
-                    {/*flex-shrink: 0 → shrink-0*/}
-                    {/*aspect-ratio: 1/1 → aspect-square*/}
-
-                    {/*Note: 1.125rem = 18px, which doesn't have a default Tailwind utility (the scale goes from w-4 = 16px to w-5 = 20px), so we use the arbitrary value syntax with square brackets.*/}
+                  <div className="bg-canvasSubtle text-light flex h-9 w-9 items-center justify-center gap-2 rounded p-2">
                     {trigger.type == 'EVENT' && <EventsIcon className="h-5 w-5" />}
                     {trigger.type == 'CRON' && <RiTimeLine className="h-5 w-5" />}
                   </div>
-                  <div className="flex grow flex-col items-start justify-center gap-1 self-stretch">
+                  <div className="text-basis flex grow flex-col items-start justify-center gap-1 self-stretch text-sm font-medium">
                     <div>{trigger.value}</div>
                     {trigger.type == 'EVENT' && trigger.condition && (
-                      <div className="text-xs">
+                      <div className="text-muted text-sm">
                         <code>if: {trigger.condition}</code>
                         {/*handle overflow and pop up*/}
                       </div>
