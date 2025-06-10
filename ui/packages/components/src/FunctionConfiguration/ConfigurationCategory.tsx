@@ -7,7 +7,7 @@ type ConfigurationCategoryProps = {
 
 export default function ConfigurationCategory({ title, children }: ConfigurationCategoryProps) {
   if (Children.toArray(children).length == 0) {
-    return false;
+    return null;
   }
 
   return (

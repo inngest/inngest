@@ -12,7 +12,7 @@ type ConfigurationTableProps = {
 
 export default function ConfigurationTable({ header, entries }: ConfigurationTableProps) {
   if (entries.length == 0) {
-    return <></>;
+    return null;
   }
 
   return (

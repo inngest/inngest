@@ -13,13 +13,7 @@ import { Pill } from '@inngest/components/Pill';
 import { AppsIcon } from '@inngest/components/icons/sections/Apps';
 import { EventsIcon } from '@inngest/components/icons/sections/Events';
 import { FunctionsIcon } from '@inngest/components/icons/sections/Functions';
-import {
-  RiArrowRightSLine,
-  RiArrowRightUpLine,
-  RiCloseLine,
-  RiInformationLine,
-  RiTimeLine,
-} from '@remixicon/react';
+import { RiArrowRightSLine, RiArrowRightUpLine, RiCloseLine, RiTimeLine } from '@remixicon/react';
 import { toast } from 'sonner';
 
 import {
@@ -162,6 +156,35 @@ export function FunctionConfiguration({ onClose, inngestFunction }: FunctionConf
     }
   }
 
+  // We show a separate table per concurrency configuration and only want to show the count if there is more than one
+  const concurrencyLimitCount = configuration.concurrency.length;
+  const concurrencyLimits: ConfigurationEntry[][] = configuration.concurrency.map(
+    (concurrencyLimit) => {
+      let concurrencyEntries = [
+        {
+          label: 'Scope',
+          value: concurrencyLimit.scope,
+        },
+        {
+          label: 'Limit',
+          value: (
+            <>
+              {concurrencyLimit.limit.value >= 1 && concurrencyLimit.limit.value}
+              {concurrencyLimit.limit.isPlanLimit && <Pill className="ml-2">Plan limit</Pill>}
+            </>
+          ),
+        },
+      ];
+      if (concurrencyLimit.key) {
+        concurrencyEntries.push({
+          label: 'Key',
+          value: <code>{concurrencyLimit.key}</code>,
+        });
+      }
+      return concurrencyEntries;
+    }
+  );
+
   return (
     <div className="flex flex-col overflow-hidden overflow-y-auto">
       <Header
@@ -293,46 +316,14 @@ export function FunctionConfiguration({ onClose, inngestFunction }: FunctionConf
         )}
       </ConfigurationCategory>
       <ConfigurationCategory title="Queue Configurations">
-        <div className="flex flex-col space-y-6 self-stretch ">
-          {inngestFunction.configuration.concurrency &&
-            inngestFunction.configuration.concurrency.map((concurrencyConfig, index) => (
-              <div className="overflow-hidden rounded border border-gray-300 ">
-                <table className="w-full border-collapse">
-                  <thead>
-                    <tr className="h-8 border-b bg-gray-100 dark:bg-transparent">
-                      <td className="text-basis px-2 text-sm font-medium" colSpan={2}>
-                        <div className="flex items-center gap-2">
-                          Concurrency ({index + 1})
-                          <RiInformationLine className="h-5 w-5" />
-                        </div>
-                      </td>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {/*can't apply px-2 to tr*/}
-                    <tr className="h-8 border-b border-gray-200">
-                      <td className="text-muted px-2 text-sm">Scope</td>
-                      <td className="text-basis px-2 text-right text-sm">
-                        {concurrencyConfig.scope}
-                      </td>
-                    </tr>
-                    <tr className="h-8 border-b border-gray-200">
-                      <td className="text-muted px-2 text-sm">Limit</td>
-                      <td className="text-basis px-2 text-right text-sm">
-                        {concurrencyConfig.limit.value}
-                        {concurrencyConfig.limit.isPlanLimit && (
-                          <Pill className="ml-2">Plan limit</Pill>
-                        )}
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            ))}
-          {inngestFunction.configuration.throttle && (
-            <ConfigurationTable header="Throttle" entries={throttleEntries} />
-          )}
-        </div>
+        {inngestFunction.configuration.concurrency &&
+          concurrencyLimits.map((concurrencyLimit, index) => {
+            const header = concurrencyLimitCount > 1 ? `Concurrency (${index + 1})` : 'Concurrency';
+            return <ConfigurationTable header={header} entries={concurrencyLimit} />;
+          })}
+        {inngestFunction.configuration.throttle && (
+          <ConfigurationTable header="Throttle" entries={throttleEntries} />
+        )}
       </ConfigurationCategory>
     </div>
   );
