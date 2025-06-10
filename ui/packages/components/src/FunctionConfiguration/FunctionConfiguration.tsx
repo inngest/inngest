@@ -23,7 +23,7 @@ import {
   useInvokeFunctionMutation,
   type Function,
   type FunctionConfiguration,
-} from '@/store/generated';
+} from '../../../../apps/dev-server-ui/src/store/generated';
 
 type FunctionConfigurationProps = {
   onClose: () => void;
@@ -32,7 +32,7 @@ type FunctionConfigurationProps = {
   configuration: FunctionConfiguration;
 };
 
-export default function FunctionConfiguration({
+export function FunctionConfiguration({
   onClose,
   inngestFunction,
   triggers,

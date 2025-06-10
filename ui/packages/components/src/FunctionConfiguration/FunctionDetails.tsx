@@ -1,15 +1,15 @@
 'use client';
 
 import { useSearchParams } from 'next/navigation';
+import { FunctionConfiguration } from '@inngest/components/FunctionConfiguration';
 
-import FunctionConfiguration from '@/app/(dashboard)/functions/config/FunctionConfiguration';
-import { useGetFunctionQuery } from '@/store/generated';
+import { useGetFunctionQuery } from '../../../../apps/dev-server-ui/src/store/generated';
 
 type FunctionDetailsProps = {
   onClose: () => void;
 };
 
-export default function FunctionDetails({ onClose }: FunctionDetailsProps) {
+export function FunctionDetails({ onClose }: FunctionDetailsProps) {
   const params = useSearchParams();
 
   const functionSlug = params.get('slug');
