@@ -1222,16 +1222,6 @@ func (m unshardedMgr) EventHasPauses(ctx context.Context, workspaceID uuid.UUID,
 	return pause.Client().Do(ctx, cmd).AsBool()
 }
 
-func (m unshardedMgr) PauseExists(ctx context.Context, pauseID uuid.UUID) error {
-	pauses := m.u.Pauses()
-	cmd := pauses.Client().B().Exists().Key(pauses.kg.Pause(ctx, pauseID)).Build()
-	exists, err := pauses.Client().Do(ctx, cmd).ToBool()
-	if err == rueidis.Nil || !exists {
-		return state.ErrPauseNotFound
-	}
-	return nil
-}
-
 func (m unshardedMgr) PauseByID(ctx context.Context, pauseID uuid.UUID) (*state.Pause, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "PauseByID"), redis_telemetry.ScopePauses)
 
@@ -1343,6 +1333,14 @@ func (m unshardedMgr) PausesByID(ctx context.Context, ids ...uuid.UUID) ([]*stat
 	return pauses, merr
 }
 
+func (m unshardedMgr) PauseLen(ctx context.Context, workspaceID uuid.UUID, event string) (int64, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "PuaseLen"), redis_telemetry.ScopePauses)
+	pauses := m.u.Pauses()
+	key := pauses.kg.PauseEvent(ctx, workspaceID, event)
+	cntCmd := pauses.Client().B().Hlen().Key(key).Build()
+	return pauses.Client().Do(ctx, cntCmd).AsInt64()
+}
+
 // PausesByEvent returns all pauses for a given event within a workspace.
 func (m unshardedMgr) PausesByEvent(ctx context.Context, workspaceID uuid.UUID, event string) (state.PauseIterator, error) {
 	return m.pausesByEvent(ctx, workspaceID, event, time.Time{})
@@ -1408,18 +1406,6 @@ func (m unshardedMgr) PausesByEventSince(ctx context.Context, workspaceID uuid.U
 	}
 	err = iter.init(ctx, ids, 100)
 	return iter, err
-}
-
-func (m unshardedMgr) EvaluablesByID(ctx context.Context, ids ...uuid.UUID) ([]expr.Evaluable, error) {
-	items, err := m.PausesByID(ctx, ids...)
-	if err != nil {
-		return nil, err
-	}
-	evaluables := make([]expr.Evaluable, len(items))
-	for n, i := range items {
-		evaluables[n] = i
-	}
-	return evaluables, nil
 }
 
 func (m unshardedMgr) LoadEvaluablesSince(ctx context.Context, workspaceID uuid.UUID, eventName string, since time.Time, do func(context.Context, expr.Evaluable) error) error {

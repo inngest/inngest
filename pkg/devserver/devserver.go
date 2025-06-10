@@ -42,6 +42,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/driver/httpdriver"
 	"github.com/inngest/inngest/pkg/execution/executor"
 	"github.com/inngest/inngest/pkg/execution/history"
+	"github.com/inngest/inngest/pkg/execution/pauses"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/ratelimit"
 	"github.com/inngest/inngest/pkg/execution/realtime"
@@ -377,7 +378,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	exec, err := executor.NewExecutor(
 		executor.WithHTTPClient(httpClient),
 		executor.WithStateManager(smv2),
-		executor.WithPauseManager(sm),
+		executor.WithPauseManager(pauses.NewRedisOnlyManager(sm)),
 		executor.WithRuntimeDrivers(
 			drivers...,
 		),
@@ -445,6 +446,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		runner.WithCQRS(dbcqrs),
 		runner.WithExecutor(exec),
 		runner.WithExecutionManager(dbcqrs),
+		runner.WithPauseManager(pauses.NewRedisOnlyManager(sm)),
 		runner.WithEventManager(event.NewManager()),
 		runner.WithStateManager(sm),
 		runner.WithRunnerQueue(rq),
@@ -571,7 +573,6 @@ func start(ctx context.Context, opts StartOpts) error {
 				shardedCluster.FlushAll()
 				unshardedCluster.FlushAll()
 				connectCluster.FlushAll()
-
 			},
 		})})
 	}

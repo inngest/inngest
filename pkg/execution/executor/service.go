@@ -212,7 +212,7 @@ func (s *svc) Run(ctx context.Context) error {
 		}
 
 		if err != nil && err.Error() != "NonRetriableError" {
-			s.log.Error("error handling queue item", "error", err, "item", item)
+			s.log.Error("error handling queue item", "error", err)
 		}
 
 		return queue.RunResult{
