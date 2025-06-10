@@ -247,9 +247,8 @@ export function FunctionConfiguration({ onClose, inngestFunction }: FunctionConf
               mainText={trigger.value}
               subText={
                 trigger.type == 'EVENT' && trigger.condition ? (
-                  <div className="text-muted text-sm">
+                  <div>
                     <code className="font-mono">if: {trigger.condition}</code>
-                    {/*handle overflow and pop up*/}
                   </div>
                 ) : (
                   <></>
@@ -279,17 +278,16 @@ export function FunctionConfiguration({ onClose, inngestFunction }: FunctionConf
                 icon={<EventsIcon className="h-5 w-5" />}
                 mainText={cancelOn.event}
                 subText={
-                  <>
+                  <div>
                     {cancelOn.condition && (
-                      <div className="text-xs">
-                        <code>if: {cancelOn.condition}</code>
-                        {/*handle overflow and pop up*/}
+                      <div className="text-muted text-xs">
+                        <code className="font-mono">if: {cancelOn.condition}</code>
                       </div>
                     )}
                     {cancelOn.timeout && (
-                      <div className="text-subtle text-xs">Timeout: {cancelOn.timeout}</div>
+                      <div className="text-muted text-xs">Timeout: {cancelOn.timeout}</div>
                     )}
-                  </>
+                  </div>
                 }
               />
             );

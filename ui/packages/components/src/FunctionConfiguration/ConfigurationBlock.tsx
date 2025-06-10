@@ -21,7 +21,7 @@ export default function ConfigurationBlock({
       <div className="bg-canvasSubtle text-light flex h-9 w-9 items-center justify-center gap-2 rounded p-2">
         {icon}
       </div>
-      <div className="text-basis flex w-full min-w-0 flex-1 flex-col items-start justify-center gap-1 self-stretch text-sm font-medium">
+      <div className="text-basis flex min-w-0 flex-col items-start justify-center gap-1 self-stretch text-sm font-medium">
         <div>{mainText}</div>
 
         {subText && (
@@ -29,7 +29,14 @@ export default function ConfigurationBlock({
             <TooltipTrigger asChild className="text-muted w-full truncate text-sm">
               {subText}
             </TooltipTrigger>
-            <TooltipContent className="text-muted text-sm">{subText}</TooltipContent>
+            <TooltipContent className="text-muted bg-canvasBase p-3 text-sm">
+              <div>
+                <h2 className="text-basis gap-1 text-xs">Expression</h2>
+                <div className="bg-codeEditor border-subtle text-muted flex items-start gap-2 self-stretch border px-3 text-xs leading-5">
+                  {subText}
+                </div>
+              </div>
+            </TooltipContent>
           </Tooltip>
         )}
         {/*{subText && <div className="text-muted truncate text-sm">{subText}</div>}*/}
