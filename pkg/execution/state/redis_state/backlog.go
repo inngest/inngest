@@ -105,27 +105,39 @@ type QueueShadowPartition struct {
 }
 
 // readyQueueKey returns the ZSET key to the ready queue
-func (q QueueShadowPartition) readyQueueKey(kg QueueKeyGenerator) string {
-	return kg.PartitionQueueSet(enums.PartitionTypeDefault, q.PartitionID, "")
+func (sp QueueShadowPartition) readyQueueKey(kg QueueKeyGenerator) string {
+	return kg.PartitionQueueSet(enums.PartitionTypeDefault, sp.PartitionID, "")
 }
 
 // inProgressKey returns the key storing the in progress set for the shadow partition
-func (q QueueShadowPartition) inProgressKey(kg QueueKeyGenerator) string {
-	return kg.Concurrency("p", q.PartitionID)
+func (sp QueueShadowPartition) inProgressKey(kg QueueKeyGenerator) string {
+	return kg.Concurrency("p", sp.PartitionID)
 }
 
 // activeKey returns the key storing the active set for the shadow partition
-func (q QueueShadowPartition) activeKey(kg QueueKeyGenerator) string {
-	return kg.ActiveSet("p", q.PartitionID)
+func (sp QueueShadowPartition) activeKey(kg QueueKeyGenerator) string {
+	return kg.ActiveSet("p", sp.PartitionID)
+}
+
+func (sp QueueShadowPartition) keyQueuesEnabled(ctx context.Context, q *queue) bool {
+	if sp.SystemQueueName != nil {
+		return q.enqueueSystemQueuesToBacklog
+	}
+
+	if sp.AccountID == nil || q.allowKeyQueues == nil {
+		return false
+	}
+
+	return q.allowKeyQueues(ctx, *sp.AccountID)
 }
 
 // CustomConcurrencyLimit returns concurrency limit for custom concurrency key in position n (0, if not set)
-func (q *QueueShadowPartition) CustomConcurrencyLimit(n int) int {
-	if n < 0 || n > len(q.Concurrency.CustomConcurrencyKeys) {
+func (sp *QueueShadowPartition) CustomConcurrencyLimit(n int) int {
+	if n < 0 || n > len(sp.Concurrency.CustomConcurrencyKeys) {
 		return 0
 	}
 
-	key := q.Concurrency.CustomConcurrencyKeys[n-1]
+	key := sp.Concurrency.CustomConcurrencyKeys[n-1]
 
 	return key.Limit
 }
@@ -140,14 +152,14 @@ func (q *PartitionConstraintConfig) CustomConcurrencyLimit(n int) int {
 	return key.Limit
 }
 
-func (q QueueShadowPartition) CustomConcurrencyKey(kg QueueKeyGenerator, b *QueueBacklog, n int) (string, int) {
+func (sp QueueShadowPartition) CustomConcurrencyKey(kg QueueKeyGenerator, b *QueueBacklog, n int) (string, int) {
 	if n < 0 || n > len(b.ConcurrencyKeys) {
 		return kg.Concurrency("", ""), 0
 	}
 
 	backlogKey := b.ConcurrencyKeys[n-1]
 
-	for _, key := range q.Concurrency.CustomConcurrencyKeys {
+	for _, key := range sp.Concurrency.CustomConcurrencyKeys {
 		if key.Scope == backlogKey.Scope && key.HashedKeyExpression == backlogKey.HashedKeyExpression {
 			// Return concrete key with latest limit from shadow partition
 			return backlogKey.concurrencyKey(kg), key.Limit
@@ -158,51 +170,51 @@ func (q QueueShadowPartition) CustomConcurrencyKey(kg QueueKeyGenerator, b *Queu
 }
 
 // accountInProgressKey returns the key storing the in progress set for the shadow partition's account
-func (q QueueShadowPartition) accountInProgressKey(kg QueueKeyGenerator) string {
+func (sp QueueShadowPartition) accountInProgressKey(kg QueueKeyGenerator) string {
 	// Do not track account concurrency for system queues
-	if q.SystemQueueName != nil {
+	if sp.SystemQueueName != nil {
 		return kg.Concurrency("", "")
 	}
 
 	// This should never be unset
-	if q.AccountID == nil {
+	if sp.AccountID == nil {
 		return kg.Concurrency("account", "")
 	}
 
-	return kg.Concurrency("account", q.AccountID.String())
+	return kg.Concurrency("account", sp.AccountID.String())
 }
 
 // accountActiveKey returns the key storing the active set for the shadow partition's account
-func (q QueueShadowPartition) accountActiveKey(kg QueueKeyGenerator) string {
+func (sp QueueShadowPartition) accountActiveKey(kg QueueKeyGenerator) string {
 	// Do not track account concurrency for system queues
-	if q.SystemQueueName != nil {
+	if sp.SystemQueueName != nil {
 		return kg.ActiveSet("", "")
 	}
 
 	// This should never be unset
-	if q.AccountID == nil {
+	if sp.AccountID == nil {
 		return kg.ActiveSet("account", "")
 	}
 
-	return kg.ActiveSet("account", q.AccountID.String())
+	return kg.ActiveSet("account", sp.AccountID.String())
 }
 
-func (q QueueShadowPartition) accountActiveRunKey(kg QueueKeyGenerator) string {
+func (sp QueueShadowPartition) accountActiveRunKey(kg QueueKeyGenerator) string {
 	// Do not track account run concurrency for system queues
-	if q.SystemQueueName != nil {
+	if sp.SystemQueueName != nil {
 		return kg.ActiveRunsSet("", "")
 	}
 
 	// This should never be unset
-	if q.AccountID == nil {
+	if sp.AccountID == nil {
 		return kg.ActiveRunsSet("account", "")
 	}
 
-	return kg.ActiveRunsSet("account", q.AccountID.String())
+	return kg.ActiveRunsSet("account", sp.AccountID.String())
 }
 
-func (q QueueShadowPartition) activeRunKey(kg QueueKeyGenerator) string {
-	return kg.ActiveRunsSet("p", q.PartitionID)
+func (sp QueueShadowPartition) activeRunKey(kg QueueKeyGenerator) string {
+	return kg.ActiveRunsSet("p", sp.PartitionID)
 }
 
 // BacklogConcurrencyKey represents a custom concurrency key, which can be scoped to the function, environment, or account.
@@ -713,7 +725,7 @@ func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueSha
 
 	enableKeyQueuesVal := "0"
 	// Don't check constraints if key queues have been disabled for this function (refill as quickly as possible)
-	if q.allowKeyQueues(ctx, accountID) {
+	if sp.keyQueuesEnabled(ctx, q) {
 		enableKeyQueuesVal = "1"
 	}
 

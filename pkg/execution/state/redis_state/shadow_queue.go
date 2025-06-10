@@ -159,6 +159,8 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 		}
 	}()
 
+	keyQueuesEnabled := shadowPart.keyQueuesEnabled(ctx, q)
+
 	latestConstraints, err := q.partitionConstraintConfigGetter(ctx, *shadowPart)
 	if err != nil {
 		return fmt.Errorf("could not retrieve latest constraints for partition: %w", err)
@@ -183,6 +185,11 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 
 	// Scan a little further into the future
 	refillUntil := q.clock.Now().Truncate(time.Millisecond).Add(2 * PartitionLookahead)
+	if !keyQueuesEnabled {
+		// If key queues are disabled, peek and refill all
+		// items in the entire backlog, not just the next 2 seconds.
+		refillUntil = q.clock.Now().Add(time.Hour * 24 * 365)
+	}
 
 	// Pick a random backlog offset every time
 	sequential := false
