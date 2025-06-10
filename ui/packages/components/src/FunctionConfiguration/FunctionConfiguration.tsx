@@ -9,7 +9,6 @@ import ConfigurationTable, {
 } from '@inngest/components/FunctionConfiguration/ConfigurationTable';
 import { Header } from '@inngest/components/Header/Header';
 import { InvokeButton } from '@inngest/components/InvokeButton';
-import { type MetadataItemProps } from '@inngest/components/Metadata';
 import { Pill } from '@inngest/components/Pill';
 import { AppsIcon } from '@inngest/components/icons/sections/Apps';
 import { EventsIcon } from '@inngest/components/icons/sections/Events';
@@ -138,7 +137,7 @@ export function FunctionConfiguration({ onClose, inngestFunction }: FunctionConf
     }
   }
 
-  let throttleEntries: MetadataItemProps[] | undefined;
+  let throttleEntries: ConfigurationEntry[] = [];
   if (configuration.throttle) {
     throttleEntries = [
       {
@@ -147,19 +146,18 @@ export function FunctionConfiguration({ onClose, inngestFunction }: FunctionConf
       },
       {
         label: 'Limit',
-        value: configuration.throttle.limit.toString(),
+        value: configuration.throttle.limit,
       },
       {
         label: 'Burst',
-        value: configuration.throttle.burst.toString(),
+        value: configuration.throttle.burst,
       },
     ];
 
     if (configuration.throttle.key) {
       throttleEntries.push({
         label: 'Key',
-        value: configuration.throttle.key,
-        type: 'code',
+        value: <code>{configuration.throttle.key}</code>,
       });
     }
   }
@@ -196,90 +194,86 @@ export function FunctionConfiguration({ onClose, inngestFunction }: FunctionConf
         }
       />
       <ConfigurationCategory title="Overview">
-        <div className="flex flex-col space-y-6 self-stretch ">
-          <ConfigurationSection title="App">
+        <ConfigurationSection title="App">
+          <ConfigurationBlock
+            icon={<AppsIcon className="h-5 w-5" />}
+            mainText={inngestFunction.app.name}
+            rightElement={
+              <Button
+                label="Go to apps"
+                href="/apps"
+                appearance="ghost"
+                icon={<RiArrowRightUpLine />}
+                iconSide="right"
+              />
+            }
+          />
+        </ConfigurationSection>
+
+        <ConfigurationSection title="Triggers">
+          {triggers?.map((trigger) => (
             <ConfigurationBlock
-              icon={<AppsIcon className="h-5 w-5" />}
-              mainText={inngestFunction.app.name}
-              rightElement={
-                <Button
-                  label="Go to apps"
-                  href="/apps"
-                  appearance="ghost"
-                  icon={<RiArrowRightUpLine />}
-                  iconSide="right"
-                />
+              key={trigger.value}
+              icon={
+                trigger.type == 'EVENT' ? (
+                  <EventsIcon className="h-5 w-5" />
+                ) : (
+                  <RiTimeLine className="h-5 w-5" />
+                )
+              }
+              mainText={trigger.value}
+              subText={
+                trigger.type == 'EVENT' && trigger.condition ? (
+                  <div className="text-muted text-sm">
+                    <code>if: {trigger.condition}</code>
+                    {/*handle overflow and pop up*/}
+                  </div>
+                ) : (
+                  <></>
+                )
               }
             />
-          </ConfigurationSection>
-
-          <ConfigurationSection title="Triggers">
-            {triggers?.map((trigger) => (
-              <ConfigurationBlock
-                key={trigger.value}
-                icon={
-                  trigger.type == 'EVENT' ? (
-                    <EventsIcon className="h-5 w-5" />
-                  ) : (
-                    <RiTimeLine className="h-5 w-5" />
-                  )
-                }
-                mainText={trigger.value}
-                subText={
-                  trigger.type == 'EVENT' && trigger.condition ? (
-                    <div className="text-muted text-sm">
-                      <code>if: {trigger.condition}</code>
-                      {/*handle overflow and pop up*/}
-                    </div>
-                  ) : (
-                    <></>
-                  )
-                }
-              />
-            ))}
-          </ConfigurationSection>
-        </div>
+          ))}
+        </ConfigurationSection>
       </ConfigurationCategory>
       <ConfigurationCategory title="Execution Configurations">
-        <div className="flex flex-col space-y-6 self-stretch ">
-          <ConfigurationSection title="Failure Handler">
-            {inngestFunction.failureHandler && (
+        <ConfigurationSection title="Failure Handler">
+          {inngestFunction.failureHandler && (
+            <ConfigurationBlock
+              icon={<FunctionsIcon className="h-5 w-5" />}
+              mainText={inngestFunction.failureHandler.slug}
+              rightElement={<RiArrowRightSLine className="h-5 w-5" />}
+              href={`/functions/config?slug=${inngestFunction.failureHandler.slug}`}
+            />
+          )}
+        </ConfigurationSection>
+
+        <ConfigurationSection title="Cancel On">
+          {inngestFunction.configuration.cancellations.map((cancelOn) => {
+            return (
               <ConfigurationBlock
-                icon={<FunctionsIcon className="h-5 w-5" />}
-                mainText={inngestFunction.failureHandler.slug}
-                rightElement={<RiArrowRightSLine className="h-5 w-5" />}
-                href={`/functions/config?slug=${inngestFunction.failureHandler.slug}`}
+                key={cancelOn.event}
+                icon={<EventsIcon className="h-5 w-5" />}
+                mainText={cancelOn.event}
+                subText={
+                  <>
+                    {cancelOn.condition && (
+                      <div className="text-xs">
+                        <code>if: {cancelOn.condition}</code>
+                        {/*handle overflow and pop up*/}
+                      </div>
+                    )}
+                    {cancelOn.timeout && (
+                      <div className="text-subtle text-xs">Timeout: {cancelOn.timeout}</div>
+                    )}
+                  </>
+                }
               />
-            )}
-          </ConfigurationSection>
+            );
+          })}
+        </ConfigurationSection>
 
-          <ConfigurationSection title="Cancel On">
-            {inngestFunction.configuration.cancellations.map((cancelOn) => {
-              return (
-                <ConfigurationBlock
-                  key={cancelOn.event}
-                  icon={<EventsIcon className="h-5 w-5" />}
-                  mainText={cancelOn.event}
-                  subText={
-                    <>
-                      {cancelOn.condition && (
-                        <div className="text-xs">
-                          <code>if: {cancelOn.condition}</code>
-                          {/*handle overflow and pop up*/}
-                        </div>
-                      )}
-                      {cancelOn.timeout && (
-                        <div className="text-subtle text-xs">Timeout: {cancelOn.timeout}</div>
-                      )}
-                    </>
-                  }
-                />
-              );
-            })}
-          </ConfigurationSection>
-
-          <ConfigurationTable header="Retries" entries={retryEntries} />
-        </div>
+        <ConfigurationTable header="Retries" entries={retryEntries} />
       </ConfigurationCategory>
       <ConfigurationCategory title="Scheduling Configurations">
         {inngestFunction.configuration.rateLimit && (
@@ -336,47 +330,7 @@ export function FunctionConfiguration({ onClose, inngestFunction }: FunctionConf
               </div>
             ))}
           {inngestFunction.configuration.throttle && (
-            <div className="overflow-hidden rounded border border-gray-300 ">
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr className="h-8 border-b bg-gray-100 dark:bg-transparent">
-                    <td className="text-basis px-2 text-sm font-medium" colSpan={2}>
-                      <div className="flex items-center gap-2">
-                        Throttle
-                        <RiInformationLine className="h-5 w-5" />
-                      </div>
-                    </td>
-                  </tr>
-                </thead>
-                <tbody>
-                  {/*can't apply px-2 to tr*/}
-                  <tr className="h-8 border-b border-gray-200">
-                    <td className="text-muted px-2 text-sm">Period</td>
-                    <td className="text-basis px-2 text-right text-sm">
-                      {inngestFunction.configuration.throttle.period}
-                    </td>
-                  </tr>
-                  <tr className="h-8 border-b border-gray-200">
-                    <td className="text-muted px-2 text-sm">Limit</td>
-                    <td className="text-basis px-2 text-right text-sm">
-                      <code>{inngestFunction.configuration.throttle.limit}</code>
-                    </td>
-                  </tr>
-                  <tr className="h-8 border-b border-gray-200">
-                    <td className="text-muted px-2 text-sm">Burst</td>
-                    <td className="text-basis px-2 text-right text-sm">
-                      <code>{inngestFunction.configuration.throttle.burst}</code>
-                    </td>
-                  </tr>
-                  <tr className="h-8 border-b border-gray-200">
-                    <td className="text-muted px-2 text-sm">Key</td>
-                    <td className="text-basis px-2 text-right text-sm">
-                      <code>{inngestFunction.configuration.throttle.key}</code>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
+            <ConfigurationTable header="Throttle" entries={throttleEntries} />
           )}
         </div>
       </ConfigurationCategory>
