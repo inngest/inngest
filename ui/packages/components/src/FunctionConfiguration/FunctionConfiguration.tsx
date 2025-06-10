@@ -4,6 +4,9 @@ import { Button } from '@inngest/components/Button';
 import ConfigurationBlock from '@inngest/components/FunctionConfiguration/ConfigurationBlock';
 import ConfigurationCategory from '@inngest/components/FunctionConfiguration/ConfigurationCategory';
 import ConfigurationSection from '@inngest/components/FunctionConfiguration/ConfigurationSection';
+import ConfigurationTable, {
+  type ConfigurationEntry,
+} from '@inngest/components/FunctionConfiguration/ConfigurationTable';
 import { Header } from '@inngest/components/Header/Header';
 import { InvokeButton } from '@inngest/components/InvokeButton';
 import { type MetadataItemProps } from '@inngest/components/Metadata';
@@ -41,6 +44,19 @@ export function FunctionConfiguration({ onClose, inngestFunction }: FunctionConf
   }, [triggers]);
 
   const [invokeFunction] = useInvokeFunctionMutation();
+
+  const retryEntries: ConfigurationEntry[] = [
+    {
+      // fix pluralization
+      label: 'Value',
+      value: (
+        <>
+          {inngestFunction.configuration.retries.value} retries
+          {inngestFunction.configuration.retries.isDefault && <Pill className="ml-2">Default</Pill>}
+        </>
+      ),
+    },
+  ];
 
   const miscellaneousItems: MetadataItemProps[] = [
     {
@@ -268,6 +284,7 @@ export function FunctionConfiguration({ onClose, inngestFunction }: FunctionConf
             })}
           </ConfigurationSection>
 
+          <ConfigurationTable header="Retries" entries={retryEntries}></ConfigurationTable>
           <div className="overflow-hidden rounded border border-gray-300 ">
             <table className="w-full border-collapse">
               <thead>
