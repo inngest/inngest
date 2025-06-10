@@ -815,13 +815,13 @@ func PartitionConstraintConfigGetter(dbcqrs cqrs.Manager) redis_state.PartitionC
 		}
 
 		if fn.Throttle != nil {
-			var exprHash string
+			var keyExpr string
 			if fn.Throttle.Key != nil {
-				exprHash = util.XXHash(*fn.Throttle.Key)
+				keyExpr = *fn.Throttle.Key
 			}
 
 			constraints.Throttle = &redis_state.ShadowPartitionThrottle{
-				ThrottleKeyExpressionHash: exprHash,
+				ThrottleKeyExpressionHash: util.XXHash(keyExpr),
 				Limit:                     int(fn.Throttle.Limit),
 				Burst:                     int(fn.Throttle.Burst),
 				Period:                    int(fn.Throttle.Period.Seconds()),
