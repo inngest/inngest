@@ -248,7 +248,7 @@ export function FunctionConfiguration({ onClose, inngestFunction }: FunctionConf
               subText={
                 trigger.type == 'EVENT' && trigger.condition ? (
                   <div className="text-muted text-sm">
-                    <code>if: {trigger.condition}</code>
+                    <code className="font-mono">if: {trigger.condition}</code>
                     {/*handle overflow and pop up*/}
                   </div>
                 ) : (

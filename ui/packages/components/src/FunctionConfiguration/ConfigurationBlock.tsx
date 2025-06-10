@@ -1,4 +1,5 @@
 import NextLink from 'next/link';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
 
 type ConfigurationBlockProps = {
   icon: React.ReactNode;
@@ -20,9 +21,18 @@ export default function ConfigurationBlock({
       <div className="bg-canvasSubtle text-light flex h-9 w-9 items-center justify-center gap-2 rounded p-2">
         {icon}
       </div>
-      <div className="text-basis flex grow flex-col items-start justify-center gap-1 self-stretch text-sm font-medium">
+      <div className="text-basis flex w-full min-w-0 flex-1 flex-col items-start justify-center gap-1 self-stretch text-sm font-medium">
         <div>{mainText}</div>
-        {subText && <div className="text-muted text-sm">{subText}</div>}
+
+        {subText && (
+          <Tooltip>
+            <TooltipTrigger asChild className="text-muted w-full truncate text-sm">
+              {subText}
+            </TooltipTrigger>
+            <TooltipContent className="text-muted text-sm">{subText}</TooltipContent>
+          </Tooltip>
+        )}
+        {/*{subText && <div className="text-muted truncate text-sm">{subText}</div>}*/}
       </div>
       {/*TODO should this be RiArrowRightSLine by default for NextLink*/}
       {rightElement}
