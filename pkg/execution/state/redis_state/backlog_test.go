@@ -165,7 +165,7 @@ func TestQueueItemBacklogs(t *testing.T) {
 		hashedThrottleKey := osqueue.HashID(ctx, rawThrottleKey)
 
 		expected := QueueBacklog{
-			BacklogID:         fmt.Sprintf("fn:%s:start:t<%s>", fnID, hashedThrottleKey),
+			BacklogID:         fmt.Sprintf("fn:%s:start:t<%s:%s>", fnID, throttleKeyExpressionHash, hashedThrottleKey),
 			Start:             true,
 			ShadowPartitionID: fnID.String(),
 
@@ -213,15 +213,17 @@ func TestQueueItemBacklogs(t *testing.T) {
 	t.Run("throttle with key", func(t *testing.T) {
 		rawThrottleKey := "customer1"
 		hashedThrottleKey := osqueue.HashID(ctx, rawThrottleKey)
+		exprHash := util.XXHash(rawThrottleKey)
 
 		expected := QueueBacklog{
-			BacklogID:         fmt.Sprintf("fn:%s:start:t<%s>", fnID, hashedThrottleKey),
+			BacklogID:         fmt.Sprintf("fn:%s:start:t<%s:%s>", fnID, exprHash, hashedThrottleKey),
 			Start:             true,
 			ShadowPartitionID: fnID.String(),
 
 			Throttle: &BacklogThrottle{
-				ThrottleKey:         hashedThrottleKey,
-				ThrottleKeyRawValue: rawThrottleKey,
+				ThrottleKey:               hashedThrottleKey,
+				ThrottleKeyRawValue:       rawThrottleKey,
+				ThrottleKeyExpressionHash: exprHash,
 			},
 		}
 
@@ -243,6 +245,7 @@ func TestQueueItemBacklogs(t *testing.T) {
 					Burst:               30,
 					Period:              700,
 					UnhashedThrottleKey: rawThrottleKey,
+					KeyExpressionHash:   exprHash,
 				},
 				CustomConcurrencyKeys: nil,
 				QueueName:             nil,
@@ -382,7 +385,7 @@ func TestQueueItemBacklogs(t *testing.T) {
 		}.ParseKey()
 
 		expected := QueueBacklog{
-			BacklogID:         fmt.Sprintf("fn:%s:c1<%s>", fnID, util.XXHash(fullKey)),
+			BacklogID:         fmt.Sprintf("fn:%s:c1<%s:%s>", fnID, hashedConcurrencyKeyExpr, util.XXHash(fullKey)),
 			ShadowPartitionID: fnID.String(),
 
 			ConcurrencyKeys: []BacklogConcurrencyKey{
@@ -432,6 +435,7 @@ func TestQueueItemBacklogs(t *testing.T) {
 
 	t.Run("concurrency + throttle start item", func(t *testing.T) {
 		rawThrottleKey := "customer1"
+		hashedThrottleExpr := util.XXHash(rawThrottleKey)
 		hashedThrottleKey := osqueue.HashID(ctx, rawThrottleKey)
 
 		hashedConcurrencyKeyExpr := hashConcurrencyKey("event.data.customerId")
@@ -446,13 +450,14 @@ func TestQueueItemBacklogs(t *testing.T) {
 		}.ParseKey()
 
 		expected := QueueBacklog{
-			BacklogID:         fmt.Sprintf("fn:%s:start:t<%s>:c1<%s>", fnID, hashedThrottleKey, util.XXHash(fullKey)),
+			BacklogID:         fmt.Sprintf("fn:%s:start:t<%s:%s>:c1<%s:%s>", fnID, hashedThrottleExpr, hashedThrottleExpr, hashedConcurrencyKeyExpr, util.XXHash(fullKey)),
 			Start:             true,
 			ShadowPartitionID: fnID.String(),
 
 			Throttle: &BacklogThrottle{
-				ThrottleKey:         hashedThrottleKey,
-				ThrottleKeyRawValue: rawThrottleKey,
+				ThrottleKey:               hashedThrottleKey,
+				ThrottleKeyRawValue:       rawThrottleKey,
+				ThrottleKeyExpressionHash: hashedThrottleExpr,
 			},
 
 			ConcurrencyKeys: []BacklogConcurrencyKey{
@@ -485,6 +490,7 @@ func TestQueueItemBacklogs(t *testing.T) {
 					Burst:               30,
 					Period:              700,
 					UnhashedThrottleKey: rawThrottleKey,
+					KeyExpressionHash:   hashedThrottleExpr,
 				},
 				CustomConcurrencyKeys: []state.CustomConcurrency{
 					{
@@ -518,7 +524,7 @@ func TestQueueItemBacklogs(t *testing.T) {
 		}.ParseKey()
 
 		expected := QueueBacklog{
-			BacklogID:         fmt.Sprintf("fn:%s:c1<%s>", fnID, util.XXHash(fullKey)),
+			BacklogID:         fmt.Sprintf("fn:%s:c1<%s:%s>", fnID, hashedConcurrencyKeyExpr, util.XXHash(fullKey)),
 			ShadowPartitionID: fnID.String(),
 
 			ConcurrencyKeys: []BacklogConcurrencyKey{
@@ -592,7 +598,7 @@ func TestQueueItemBacklogs(t *testing.T) {
 		}.ParseKey()
 
 		expected := QueueBacklog{
-			BacklogID:         fmt.Sprintf("fn:%s:c1<%s>:c2<%s>", fnID, util.XXHash(fullKey), util.XXHash(fullKey2)),
+			BacklogID:         fmt.Sprintf("fn:%s:c1<%s:%s>:c2<%s:%s>", fnID, hashedConcurrencyKeyExpr, util.XXHash(fullKey), hashedConcurrencyKeyExpr2, util.XXHash(fullKey2)),
 			ShadowPartitionID: fnID.String(),
 
 			ConcurrencyKeys: []BacklogConcurrencyKey{

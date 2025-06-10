@@ -311,7 +311,7 @@ func (q *queue) ItemBacklog(ctx context.Context, i osqueue.QueueItem) QueueBackl
 			ThrottleKeyExpressionHash: i.Data.Throttle.KeyExpressionHash,
 		}
 
-		b.BacklogID += fmt.Sprintf(":t<%s>", i.Data.Throttle.Key)
+		b.BacklogID += fmt.Sprintf(":t<%s:%s>", i.Data.Throttle.KeyExpressionHash, i.Data.Throttle.Key)
 
 		if i.Data.Throttle.UnhashedThrottleKey != "" {
 			unhashedKey := i.Data.Throttle.UnhashedThrottleKey
@@ -331,7 +331,7 @@ func (q *queue) ItemBacklog(ctx context.Context, i osqueue.QueueItem) QueueBackl
 		for i, key := range concurrencyKeys {
 			scope, entityID, checksum, _ := key.ParseKey()
 
-			b.BacklogID += fmt.Sprintf(":c%d<%s>", i+1, util.XXHash(key.Key))
+			b.BacklogID += fmt.Sprintf(":c%d<%s:%s>", i+1, key.Hash, util.XXHash(key.Key))
 
 			b.ConcurrencyKeys[i] = BacklogConcurrencyKey{
 				CanonicalKeyID: key.Key,

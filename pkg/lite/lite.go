@@ -258,7 +258,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		redis_state.WithShardSelector(shardSelector),
 		redis_state.WithQueueShardClients(queueShards),
 		redis_state.WithNormalizeRefreshItemCustomConcurrencyKeys(devserver.NormalizeConcurrencyKeys(smv2, dbcqrs)),
-		redis_state.WithNormalizeRefreshItemThrottle(devserver.NormalizeThrottle(smv2, dbcqrs)),
+		redis_state.WithRefreshItemThrottle(devserver.NormalizeThrottle(smv2, dbcqrs)),
 	}
 
 	rq := redis_state.NewQueue(queueShard, queueOpts...)
