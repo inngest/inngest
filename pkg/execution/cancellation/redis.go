@@ -23,7 +23,7 @@ var (
 )
 
 // NewRedisWriter writes cancellations to Redis.
-func NewRedisWriter(r rueidis.Client, q redis_state.QueueManager, prefix string) cqrs.CancellationWriter {
+func NewRedisWriter(r rueidis.Client, q queue.Producer, prefix string) cqrs.CancellationWriter {
 	if prefix == "" {
 		prefix = DefaultPrefix
 	}
@@ -40,7 +40,7 @@ func NewRedisReader(r rueidis.Client, prefix string) Reader {
 
 type redisReadWriter struct {
 	r      rueidis.Client
-	q      redis_state.QueueManager
+	q      queue.Producer
 	prefix string
 }
 
