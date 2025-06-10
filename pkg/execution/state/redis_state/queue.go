@@ -548,7 +548,7 @@ func WithQueueShadowPartitionProcessCount(spc QueueShadowPartitionProcessCount) 
 }
 
 type NormalizeRefreshItemCustomConcurrencyKeysFn func(ctx context.Context, item *osqueue.QueueItem, existingKeys []state.CustomConcurrency, shadowPartition *QueueShadowPartition) ([]state.CustomConcurrency, error)
-type NormalizeRefreshItemThrottleFn func(ctx context.Context, item *osqueue.QueueItem, existingThrottle *osqueue.Throttle, shadowPartition *QueueShadowPartition) (*osqueue.Throttle, error)
+type RefreshItemThrottleFn func(ctx context.Context, item *osqueue.QueueItem) (*osqueue.Throttle, error)
 
 func WithNormalizeRefreshItemCustomConcurrencyKeys(fn NormalizeRefreshItemCustomConcurrencyKeysFn) QueueOpt {
 	return func(q *queue) {
@@ -556,9 +556,9 @@ func WithNormalizeRefreshItemCustomConcurrencyKeys(fn NormalizeRefreshItemCustom
 	}
 }
 
-func WithNormalizeRefreshItemThrottle(fn NormalizeRefreshItemThrottleFn) QueueOpt {
+func WithRefreshItemThrottle(fn RefreshItemThrottleFn) QueueOpt {
 	return func(q *queue) {
-		q.normalizeRefreshItemThrottle = fn
+		q.refreshItemThrottle = fn
 	}
 }
 
@@ -670,8 +670,8 @@ func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 		normalizeRefreshItemCustomConcurrencyKeys: func(ctx context.Context, item *osqueue.QueueItem, existingKeys []state.CustomConcurrency, shadowPartition *QueueShadowPartition) ([]state.CustomConcurrency, error) {
 			return existingKeys, nil
 		},
-		normalizeRefreshItemThrottle: func(ctx context.Context, item *osqueue.QueueItem, existingThrottle *osqueue.Throttle, shadowPartition *QueueShadowPartition) (*osqueue.Throttle, error) {
-			return existingThrottle, nil
+		refreshItemThrottle: func(ctx context.Context, item *osqueue.QueueItem) (*osqueue.Throttle, error) {
+			return nil, nil
 		},
 	}
 
@@ -834,7 +834,7 @@ type queue struct {
 	backlogNormalizeLimit   int64
 
 	normalizeRefreshItemCustomConcurrencyKeys NormalizeRefreshItemCustomConcurrencyKeysFn
-	normalizeRefreshItemThrottle              NormalizeRefreshItemThrottleFn
+	refreshItemThrottle                       RefreshItemThrottleFn
 }
 
 type QueueRunMode struct {
@@ -2650,12 +2650,26 @@ func (q *queue) Requeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 
 	fnPartition, _ := q.ItemPartition(ctx, queueShard, i)
 	shadowPartition := q.ItemShadowPartition(ctx, i)
-	backlog := q.ItemBacklog(ctx, i)
+
+	requeueToBacklog := q.itemEnableKeyQueues(ctx, i)
 
 	requeueToBacklogsVal := "0"
-	if q.itemEnableKeyQueues(ctx, i) {
+	if requeueToBacklog {
 		requeueToBacklogsVal = "1"
+
+		// To avoid requeueing item into a stale backlog, retrieve latest throttle
+		if i.Data.Throttle != nil && i.Data.Throttle.KeyExpressionHash == "" {
+			refreshedThrottle, err := q.refreshItemThrottle(ctx, &i)
+			if err != nil {
+				return fmt.Errorf("could not refresh item throttle: %w", err)
+			}
+
+			// Update throttle to latest evaluated value + expression hash
+			i.Data.Throttle = refreshedThrottle
+		}
 	}
+
+	backlog := q.ItemBacklog(ctx, i)
 
 	keys := []string{
 		kg.QueueItem(),

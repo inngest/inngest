@@ -356,7 +356,7 @@ func TestQueueBacklogNormalizationWithRewrite(t *testing.T) {
 		WithNormalizeRefreshItemCustomConcurrencyKeys(func(ctx context.Context, item *osqueue.QueueItem, existingKeys []state.CustomConcurrency, shadowPartition *QueueShadowPartition) ([]state.CustomConcurrency, error) {
 			return customConc, nil
 		}),
-		WithNormalizeRefreshItemThrottle(func(ctx context.Context, item *osqueue.QueueItem, existingThrottle *osqueue.Throttle, shadowPartition *QueueShadowPartition) (*osqueue.Throttle, error) {
+		WithRefreshItemThrottle(func(ctx context.Context, item *osqueue.QueueItem) (*osqueue.Throttle, error) {
 			return throttle, nil
 		}),
 		WithClock(clock),

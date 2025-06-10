@@ -315,7 +315,7 @@ func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp 
 			item.Data.CustomConcurrencyKeys = refreshedCustomConcurrencyKeys
 			item.Data.Identifier.CustomConcurrencyKeys = nil
 
-			refreshedThrottle, err := q.normalizeRefreshItemThrottle(ctx, item, existingThrottle, sp)
+			refreshedThrottle, err := q.refreshItemThrottle(ctx, item)
 			if err != nil {
 				return fmt.Errorf("could not refresh throttle for item: %w", err)
 			}
