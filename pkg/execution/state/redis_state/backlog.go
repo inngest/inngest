@@ -119,6 +119,18 @@ func (q QueueShadowPartition) activeKey(kg QueueKeyGenerator) string {
 	return kg.ActiveSet("p", q.PartitionID)
 }
 
+func (sp QueueShadowPartition) keyQueuesEnabled(ctx context.Context, q *queue) bool {
+	if sp.SystemQueueName != nil {
+		return q.enqueueSystemQueuesToBacklog
+	}
+
+	if sp.AccountID == nil || q.allowKeyQueues == nil {
+		return false
+	}
+
+	return q.allowKeyQueues(ctx, *sp.AccountID)
+}
+
 // CustomConcurrencyLimit returns concurrency limit for custom concurrency key in position n (0, if not set)
 func (q *QueueShadowPartition) CustomConcurrencyLimit(n int) int {
 	if n < 0 || n > len(q.Concurrency.CustomConcurrencyKeys) {
@@ -713,7 +725,7 @@ func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueSha
 
 	enableKeyQueuesVal := "0"
 	// Don't check constraints if key queues have been disabled for this function (refill as quickly as possible)
-	if q.allowKeyQueues(ctx, accountID) {
+	if sp.keyQueuesEnabled(ctx, q) {
 		enableKeyQueuesVal = "1"
 	}
 
