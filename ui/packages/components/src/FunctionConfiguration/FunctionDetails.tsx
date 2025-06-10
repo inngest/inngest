@@ -28,12 +28,5 @@ export function FunctionDetails({ onClose }: FunctionDetailsProps) {
 
   console.log({ data });
 
-  return (
-    <FunctionConfiguration
-      onClose={onClose}
-      inngestFunction={data.functionBySlug}
-      triggers={data.functionBySlug.triggers}
-      configuration={data.functionBySlug.configuration}
-    />
-  );
+  return <FunctionConfiguration onClose={onClose} inngestFunction={data.functionBySlug} />;
 }

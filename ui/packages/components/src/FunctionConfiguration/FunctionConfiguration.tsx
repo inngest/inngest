@@ -22,22 +22,17 @@ import {
   FunctionTriggerTypes,
   useInvokeFunctionMutation,
   type Function,
-  type FunctionConfiguration,
 } from '../../../../apps/dev-server-ui/src/store/generated';
 
 type FunctionConfigurationProps = {
   onClose: () => void;
   inngestFunction: Function;
-  triggers: any;
-  configuration: FunctionConfiguration;
 };
 
-export function FunctionConfiguration({
-  onClose,
-  inngestFunction,
-  triggers,
-  configuration,
-}: FunctionConfigurationProps) {
+export function FunctionConfiguration({ onClose, inngestFunction }: FunctionConfigurationProps) {
+  const configuration = inngestFunction.configuration;
+  const triggers = inngestFunction.triggers;
+
   const router = useRouter();
   const doesFunctionAcceptPayload = useMemo(() => {
     return Boolean(triggers?.some((trigger) => trigger.type === FunctionTriggerTypes.Event));
