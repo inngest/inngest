@@ -420,19 +420,25 @@ func (q *queue) processShadowPartitionBacklog(ctx context.Context, shadowPart *Q
 		switch res.Constraint {
 		case enums.QueueConstraintAccountConcurrency:
 			if shadowPart.AccountID != nil {
-				q.lifecycles.OnAccountConcurrencyLimitReached(ctx, *shadowPart.AccountID, shadowPart.EnvID)
+				q.lifecycles.OnAccountConcurrencyLimitReached(context.WithoutCancel(ctx), *shadowPart.AccountID, shadowPart.EnvID)
 			}
 		case enums.QueueConstraintFunctionConcurrency:
 			if shadowPart.FunctionID != nil {
-				q.lifecycles.OnFnConcurrencyLimitReached(ctx, *shadowPart.FunctionID)
+				q.lifecycles.OnFnConcurrencyLimitReached(context.WithoutCancel(ctx), *shadowPart.FunctionID)
 			}
 		case enums.QueueConstraintCustomConcurrencyKey1:
+			if shadowPart.FunctionID != nil {
+				q.lifecycles.OnFnConcurrencyLimitReached(context.WithoutCancel(ctx), *shadowPart.FunctionID)
+			}
 			if len(backlog.ConcurrencyKeys) > 0 {
-				q.lifecycles.OnCustomKeyConcurrencyLimitReached(ctx, backlog.ConcurrencyKeys[0].CanonicalKeyID)
+				q.lifecycles.OnCustomKeyConcurrencyLimitReached(context.WithoutCancel(ctx), backlog.ConcurrencyKeys[0].CanonicalKeyID)
 			}
 		case enums.QueueConstraintCustomConcurrencyKey2:
+			if shadowPart.FunctionID != nil {
+				q.lifecycles.OnFnConcurrencyLimitReached(context.WithoutCancel(ctx), *shadowPart.FunctionID)
+			}
 			if len(backlog.ConcurrencyKeys) > 1 {
-				q.lifecycles.OnCustomKeyConcurrencyLimitReached(ctx, backlog.ConcurrencyKeys[1].CanonicalKeyID)
+				q.lifecycles.OnCustomKeyConcurrencyLimitReached(context.WithoutCancel(ctx), backlog.ConcurrencyKeys[1].CanonicalKeyID)
 			}
 		default:
 		}
