@@ -1,7 +1,6 @@
 import NextLink from 'next/link';
 
 type ConfigurationBlockProps = {
-  key?: React.Key;
   icon: React.ReactNode;
   mainText: string;
   subText?: React.ReactNode;
@@ -10,7 +9,6 @@ type ConfigurationBlockProps = {
 };
 
 export default function ConfigurationBlock({
-  key,
   icon,
   mainText,
   subText,
@@ -18,10 +16,7 @@ export default function ConfigurationBlock({
   href,
 }: ConfigurationBlockProps) {
   const content = (
-    <div
-      key={key}
-      className="border-subtle flex items-center gap-2 self-stretch border border-b-0 p-2 first:rounded-t last:rounded-b last:border-b"
-    >
+    <div className="border-subtle flex items-center gap-2 self-stretch border border-b-0 p-2 first:rounded-t last:rounded-b last:border-b">
       <div className="bg-canvasSubtle text-light flex h-9 w-9 items-center justify-center gap-2 rounded p-2">
         {icon}
       </div>

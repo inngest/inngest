@@ -170,6 +170,10 @@ export const FUNCTION = gql`
           limit
           period
         }
+        singleton {
+          key
+          mode
+        }
       }
       slug
       triggers {

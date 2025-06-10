@@ -6,8 +6,8 @@ type ConfigurationSectionProps = {
 };
 
 export default function ConfigurationSection({ title, children }: ConfigurationSectionProps) {
-  if (Children.count(children) == 0) {
-    return <></>;
+  if (Children.toArray(children).length == 0) {
+    return false;
   }
 
   return (

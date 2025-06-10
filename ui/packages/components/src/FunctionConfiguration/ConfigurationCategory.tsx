@@ -6,8 +6,8 @@ type ConfigurationCategoryProps = {
 };
 
 export default function ConfigurationCategory({ title, children }: ConfigurationCategoryProps) {
-  if (Children.count(children) == 0) {
-    return <></>;
+  if (Children.toArray(children).length == 0) {
+    return false;
   }
 
   return (
@@ -16,7 +16,7 @@ export default function ConfigurationCategory({ title, children }: Configuration
       <h2 className="text-light pb-3 text-xs font-medium uppercase leading-4 tracking-wider">
         {title}
       </h2>
-      {children}
+      <div className="flex flex-col space-y-6 self-stretch">{children}</div>
     </div>
   );
 }

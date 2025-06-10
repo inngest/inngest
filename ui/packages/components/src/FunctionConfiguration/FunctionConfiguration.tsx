@@ -58,56 +58,27 @@ export function FunctionConfiguration({ onClose, inngestFunction }: FunctionConf
     },
   ];
 
-  const miscellaneousItems: MetadataItemProps[] = [
-    {
-      size: 'large',
-      label: 'Retries',
-      value: configuration.retries.value.toString(),
-      ...(configuration.retries.isDefault && {
-        badge: {
-          label: 'Default',
-        },
-      }),
-      tooltip: 'The number of times the function will be retried when it errors.',
-    },
-  ];
-
-  if (configuration.priority) {
-    miscellaneousItems.push({
-      label: 'Priority',
-      value: configuration.priority,
-      size: 'large',
-      type: 'code',
-      tooltip:
-        'When the function is triggered multiple times simultaneously, the priority determines the order in which they are run.' +
-        '\n\n' +
-        'The priority value is determined by evaluating the configured expression. The higher the value, the higher the priority.',
-    });
-  }
-
-  let rateLimitItems: MetadataItemProps[] | undefined;
+  let rateLimitEntries: ConfigurationEntry[] = [];
   if (configuration.rateLimit) {
-    rateLimitItems = [
+    rateLimitEntries = [
+      { label: 'Limit', value: configuration.rateLimit.limit },
       {
         label: 'Period',
         value: configuration.rateLimit.period,
       },
-      { label: 'Limit', value: configuration.rateLimit.limit.toString() },
     ];
 
     if (configuration.rateLimit.key) {
-      rateLimitItems.push({
+      rateLimitEntries.push({
         label: 'Key',
-        value: configuration.rateLimit.key,
-        type: 'code',
-        size: 'large',
+        value: <code>{configuration.rateLimit.key}</code>,
       });
     }
   }
 
-  let debounceItems: MetadataItemProps[] | undefined;
+  let debounceEntries: ConfigurationEntry[] = [];
   if (configuration.debounce) {
-    debounceItems = [
+    debounceEntries = [
       {
         label: 'Period',
         value: configuration.debounce.period,
@@ -115,20 +86,26 @@ export function FunctionConfiguration({ onClose, inngestFunction }: FunctionConf
     ];
 
     if (configuration.debounce.key) {
-      debounceItems.push({
+      debounceEntries.push({
         label: 'Key',
-        value: configuration.debounce.key,
-        type: 'code',
+        value: <code>{configuration.debounce.key}</code>,
       });
     }
   }
 
-  let eventBatchItems: MetadataItemProps[] | undefined;
+  const priorityEntries: ConfigurationEntry[] = [
+    {
+      label: 'Run',
+      value: <code>{configuration.priority}</code>,
+    },
+  ];
+
+  let eventBatchEntries: ConfigurationEntry[] = [];
   if (configuration.eventsBatch) {
-    eventBatchItems = [
+    eventBatchEntries = [
       {
-        label: 'Max Size',
-        value: configuration.eventsBatch.maxSize.toString(),
+        label: 'Max size',
+        value: configuration.eventsBatch.maxSize,
       },
       {
         label: 'Timeout',
@@ -137,17 +114,33 @@ export function FunctionConfiguration({ onClose, inngestFunction }: FunctionConf
     ];
 
     if (configuration.eventsBatch.key) {
-      eventBatchItems.push({
+      eventBatchEntries.push({
         label: 'Key',
-        value: configuration.eventsBatch.key,
-        type: 'code',
+        value: <code>{configuration.eventsBatch.key}</code>,
       });
     }
   }
 
-  let throttleItems: MetadataItemProps[] | undefined;
+  let singletonEntries: ConfigurationEntry[] = [];
+  if (configuration.singleton) {
+    singletonEntries = [
+      {
+        label: 'Mode',
+        value: configuration.singleton.mode,
+      },
+    ];
+
+    if (configuration.singleton.key) {
+      singletonEntries.push({
+        label: 'Key',
+        value: <code>{configuration.singleton.key}</code>,
+      });
+    }
+  }
+
+  let throttleEntries: MetadataItemProps[] | undefined;
   if (configuration.throttle) {
-    throttleItems = [
+    throttleEntries = [
       {
         label: 'Period',
         value: configuration.throttle.period,
@@ -163,7 +156,7 @@ export function FunctionConfiguration({ onClose, inngestFunction }: FunctionConf
     ];
 
     if (configuration.throttle.key) {
-      throttleItems.push({
+      throttleEntries.push({
         label: 'Key',
         value: configuration.throttle.key,
         type: 'code',
@@ -264,6 +257,7 @@ export function FunctionConfiguration({ onClose, inngestFunction }: FunctionConf
             {inngestFunction.configuration.cancellations.map((cancelOn) => {
               return (
                 <ConfigurationBlock
+                  key={cancelOn.event}
                   icon={<EventsIcon className="h-5 w-5" />}
                   mainText={cancelOn.event}
                   subText={
@@ -284,167 +278,25 @@ export function FunctionConfiguration({ onClose, inngestFunction }: FunctionConf
             })}
           </ConfigurationSection>
 
-          <ConfigurationTable header="Retries" entries={retryEntries}></ConfigurationTable>
-          <div className="overflow-hidden rounded border border-gray-300 ">
-            <table className="w-full border-collapse">
-              <thead>
-                <tr className="h-8 border-b bg-gray-100 dark:bg-transparent">
-                  <td className="text-basis px-2 text-sm font-medium" colSpan={2}>
-                    <div className="flex items-center gap-2">
-                      Retries
-                      <RiInformationLine className="h-5 w-5" />
-                    </div>
-                  </td>
-                </tr>
-              </thead>
-              <tbody>
-                {/*can't apply px-2 to tr*/}
-                <tr className="h-8 border-b border-gray-200">
-                  <td className="text-muted px-2 text-sm">Value</td>
-                  <td className="text-basis px-2 text-right text-sm">
-                    {inngestFunction.configuration.retries.value} retries
-                    {/*fix pluralization*/}
-                    {inngestFunction.configuration.retries.isDefault && (
-                      <Pill className="ml-2">Default</Pill>
-                    )}
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+          <ConfigurationTable header="Retries" entries={retryEntries} />
         </div>
       </ConfigurationCategory>
       <ConfigurationCategory title="Scheduling Configurations">
-        <div className="flex flex-col space-y-6 self-stretch ">
-          {inngestFunction.configuration.rateLimit && (
-            <div className="overflow-hidden rounded border border-gray-300 ">
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr className="h-8 border-b bg-gray-100 dark:bg-transparent">
-                    <td className="text-basis px-2 text-sm font-medium" colSpan={2}>
-                      <div className="flex items-center gap-2">
-                        Rate limit
-                        <RiInformationLine className="h-5 w-5" />
-                      </div>
-                    </td>
-                  </tr>
-                </thead>
-                <tbody>
-                  {/*can't apply px-2 to tr*/}
-                  <tr className="h-8 border-b border-gray-200">
-                    <td className="text-muted px-2 text-sm">Limit</td>
-                    <td className="text-basis px-2 text-right text-sm">
-                      {inngestFunction.configuration.rateLimit.limit.toString()}
-                    </td>
-                  </tr>
-                  <tr className="h-8 border-b border-gray-200">
-                    <td className="text-muted px-2 text-sm">Period</td>
-                    <td className="text-basis px-2 text-right text-sm">
-                      {inngestFunction.configuration.rateLimit.period}
-                    </td>
-                  </tr>
-                  <tr className="h-8 border-b border-gray-200">
-                    <td className="text-muted px-2 text-sm">Key</td>
-                    <td className="text-basis px-2 text-right text-sm">
-                      <code>{inngestFunction.configuration.rateLimit.key}</code>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          )}
-          {inngestFunction.configuration.debounce && (
-            <div className="overflow-hidden rounded border border-gray-300 ">
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr className="h-8 border-b bg-gray-100 dark:bg-transparent">
-                    <td className="text-basis px-2 text-sm font-medium" colSpan={2}>
-                      <div className="flex items-center gap-2">
-                        Debounce
-                        <RiInformationLine className="h-5 w-5" />
-                      </div>
-                    </td>
-                  </tr>
-                </thead>
-                <tbody>
-                  {/*can't apply px-2 to tr*/}
-                  <tr className="h-8 border-b border-gray-200">
-                    <td className="text-muted px-2 text-sm">Period</td>
-                    <td className="text-basis px-2 text-right text-sm">
-                      {inngestFunction.configuration.debounce.period}
-                    </td>
-                  </tr>
-                  <tr className="h-8 border-b border-gray-200">
-                    <td className="text-muted px-2 text-sm">Key</td>
-                    <td className="text-basis px-2 text-right text-sm">
-                      <code>{inngestFunction.configuration.debounce.key}</code>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          )}
-          {inngestFunction.configuration.priority && (
-            <div className="overflow-hidden rounded border border-gray-300 ">
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr className="h-8 border-b bg-gray-100 dark:bg-transparent">
-                    <td className="text-basis px-2 text-sm font-medium" colSpan={2}>
-                      <div className="flex items-center gap-2">
-                        Priority
-                        <RiInformationLine className="h-5 w-5" />
-                      </div>
-                    </td>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr className="h-8 border-b border-gray-200">
-                    <td className="text-muted px-2 text-sm">Run</td>
-                    <td className="text-basis px-2 text-right text-sm">
-                      <code>{inngestFunction.configuration.priority}</code>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          )}
-          {inngestFunction.configuration.eventsBatch && (
-            <div className="overflow-hidden rounded border border-gray-300 ">
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr className="h-8 border-b bg-gray-100 dark:bg-transparent">
-                    <td className="text-basis px-2 text-sm font-medium" colSpan={2}>
-                      <div className="flex items-center gap-2">
-                        Batching
-                        <RiInformationLine className="h-5 w-5" />
-                      </div>
-                    </td>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr className="h-8 border-b border-gray-200">
-                    <td className="text-muted px-2 text-sm">Max size</td>
-                    <td className="text-basis px-2 text-right text-sm">
-                      <code>{inngestFunction.configuration.eventsBatch.maxSize.toString()}</code>
-                    </td>
-                  </tr>
-                  <tr className="h-8 border-b border-gray-200">
-                    <td className="text-muted px-2 text-sm">Timeout</td>
-                    <td className="text-basis px-2 text-right text-sm">
-                      <code>{inngestFunction.configuration.eventsBatch.timeout}</code>
-                    </td>
-                  </tr>
-                  <tr className="h-8 border-b border-gray-200">
-                    <td className="text-muted px-2 text-sm">Key</td>
-                    <td className="text-basis px-2 text-right text-sm">
-                      <code>{inngestFunction.configuration.eventsBatch.key}</code>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
+        {inngestFunction.configuration.rateLimit && (
+          <ConfigurationTable header="Rate limit" entries={rateLimitEntries} />
+        )}
+        {inngestFunction.configuration.debounce && (
+          <ConfigurationTable header="Debounce" entries={debounceEntries} />
+        )}
+        {inngestFunction.configuration.priority && (
+          <ConfigurationTable header="Priority" entries={priorityEntries} />
+        )}
+        {inngestFunction.configuration.eventsBatch && (
+          <ConfigurationTable header="Batching" entries={eventBatchEntries} />
+        )}
+        {inngestFunction.configuration.singleton && (
+          <ConfigurationTable header="Singleton" entries={singletonEntries} />
+        )}
       </ConfigurationCategory>
       <ConfigurationCategory title="Queue Configurations">
         <div className="flex flex-col space-y-6 self-stretch ">

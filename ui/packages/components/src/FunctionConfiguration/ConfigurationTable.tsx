@@ -30,7 +30,7 @@ export default function ConfigurationTable({ header, entries }: ConfigurationTab
         </thead>
         <tbody>
           {entries.map((entry) => (
-            <tr className="h-8 border-b">
+            <tr className="h-8 border-b" key={entry.label}>
               <td className="text-muted px-2 text-sm">{entry.label}</td>
               <td className="text-basis px-2 text-right text-sm">{entry.value}</td>
             </tr>
