@@ -1,9 +1,12 @@
+import NextLink from 'next/link';
+
 type ConfigurationBlockProps = {
   key?: React.Key;
   icon: React.ReactNode;
   mainText: string;
   subText?: React.ReactNode;
   rightElement?: React.ReactNode;
+  href?: string;
 };
 
 export default function ConfigurationBlock({
@@ -12,8 +15,9 @@ export default function ConfigurationBlock({
   mainText,
   subText,
   rightElement,
+  href,
 }: ConfigurationBlockProps) {
-  return (
+  const content = (
     <div
       key={key}
       className="border-subtle flex items-center gap-2 self-stretch border border-b-0 p-2 first:rounded-t last:rounded-b last:border-b"
@@ -25,7 +29,18 @@ export default function ConfigurationBlock({
         <div>{mainText}</div>
         {subText && <div className="text-muted text-sm">{subText}</div>}
       </div>
-      <div className="self-end">{rightElement}</div>
+      {rightElement}
     </div>
+  );
+
+  return href ? (
+    <NextLink
+      href={href}
+      className="border-subtle bg-canvasBase hover:bg-canvasMuted block rounded-md border border-gray-200 "
+    >
+      {content}
+    </NextLink>
+  ) : (
+    content
   );
 }

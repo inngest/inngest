@@ -1,5 +1,4 @@
 import { useMemo } from 'react';
-import NextLink from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@inngest/components/Button';
 import ConfigurationBlock from '@inngest/components/FunctionConfiguration/ConfigurationBlock';
@@ -234,27 +233,17 @@ export function FunctionConfiguration({ onClose, inngestFunction }: FunctionConf
       </ConfigurationCategory>
       <ConfigurationCategory title="Execution Configurations">
         <div className="flex flex-col space-y-6 self-stretch ">
-          {/* should this one be even if it's not set, educational? */}
-          {inngestFunction.failureHandler && (
-            <div>
-              <span className="text-sm font-medium">Failure Handler</span>
-              <NextLink
-                // link does not work yet, return to once we have finalized link structure
+          <ConfigurationSection title="Failure Handler">
+            {inngestFunction.failureHandler && (
+              <ConfigurationBlock
+                icon={<FunctionsIcon className="h-5 w-5" />}
+                mainText={inngestFunction.failureHandler.slug}
+                rightElement={<RiArrowRightSLine className="h-5 w-5" />}
                 href={`/functions/config?slug=${inngestFunction.failureHandler.slug}`}
-                className="border-subtle bg-canvasBase hover:bg-canvasMuted block rounded-md border border-gray-200 "
-              >
-                <div className="flex items-center gap-2 self-stretch rounded p-2">
-                  <div className="flex h-9 w-9 items-center justify-center gap-2 rounded bg-gray-100 p-2 dark:bg-transparent">
-                    <FunctionsIcon className="h-5 w-5" />
-                  </div>
-                  <div className="flex grow flex-col items-start justify-center gap-1 self-stretch">
-                    <div>{inngestFunction.failureHandler.slug}</div>
-                  </div>
-                  <RiArrowRightSLine className="h-5" />
-                </div>
-              </NextLink>
-            </div>
-          )}
+              />
+            )}
+          </ConfigurationSection>
+
           {inngestFunction.configuration.cancellations && (
             <div>
               <span className="text-sm font-medium">Cancel On</span>
