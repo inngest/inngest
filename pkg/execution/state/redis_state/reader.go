@@ -291,7 +291,7 @@ func (q *queue) ItemsByPartition(ctx context.Context, shard QueueShard, partitio
 
 			// shift the starting point 1ms so it doesn't try to grab the same stuff again
 			// NOTE: this could result skipping items if the previous batch of items are all on
-			// the same milliseonc
+			// the same millisecond
 			ptFrom = ptFrom.Add(time.Millisecond)
 		}
 
@@ -357,6 +357,9 @@ func (q *queue) ItemsByPartition(ctx context.Context, shard QueueShard, partitio
 						return
 					}
 
+					// shift the starting point 1ms so it doesn't try to grab the same stuff again
+					// NOTE: this could result skipping items if the previous batch of items are all on
+					// the same millisecond
 					backlogFrom = backlogFrom.Add(time.Millisecond)
 				}
 			}
@@ -440,6 +443,9 @@ func (q *queue) ItemsByBacklog(ctx context.Context, shard QueueShard, backlogID 
 				return
 			}
 
+			// shift the starting point 1ms so it doesn't try to grab the same stuff again
+			// NOTE: this could result skipping items if the previous batch of items are all on
+			// the same millisecond
 			backlogFrom = backlogFrom.Add(time.Millisecond)
 		}
 	}, nil
