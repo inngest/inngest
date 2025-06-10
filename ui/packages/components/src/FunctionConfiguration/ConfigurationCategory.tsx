@@ -5,7 +5,7 @@ type ConfigurationCategoryProps = {
   children: React.ReactNode;
 };
 
-export function ConfigurationCategory({ title, children }: ConfigurationCategoryProps) {
+export default function ConfigurationCategory({ title, children }: ConfigurationCategoryProps) {
   if (Children.count(children) == 0) {
     return <></>;
   }

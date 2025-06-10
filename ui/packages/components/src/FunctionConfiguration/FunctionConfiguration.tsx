@@ -2,7 +2,8 @@ import { useMemo } from 'react';
 import NextLink from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '@inngest/components/Button';
-import { ConfigurationCategory } from '@inngest/components/FunctionConfiguration/ConfigurationCategory';
+import ConfigurationCategory from '@inngest/components/FunctionConfiguration/ConfigurationCategory';
+import ConfigurationSection from '@inngest/components/FunctionConfiguration/ConfigurationSection';
 import { Header } from '@inngest/components/Header/Header';
 import { InvokeButton } from '@inngest/components/InvokeButton';
 import { type MetadataItemProps } from '@inngest/components/Metadata';
@@ -187,10 +188,7 @@ export function FunctionConfiguration({ onClose, inngestFunction }: FunctionConf
       />
       <ConfigurationCategory title="Overview">
         <div className="flex flex-col space-y-6 self-stretch ">
-          <div>
-            {/* do we want font weight 450 specifically? */}
-            <h3 className="text-basis mb-1 text-sm font-medium">App</h3>
-            {/*border-gray-200 (#E5E7EB) would be close to #E2E2E2.*/}
+          <ConfigurationSection title="App">
             <div className="border-subtle flex items-center gap-2 self-stretch rounded border p-2">
               <div className="bg-canvasSubtle text-light flex h-9 w-9 items-center justify-center gap-2 rounded p-2">
                 <AppsIcon className="h-5 w-5" />
@@ -208,33 +206,30 @@ export function FunctionConfiguration({ onClose, inngestFunction }: FunctionConf
                 />
               </div>
             </div>
-          </div>
+          </ConfigurationSection>
 
-          <div>
-            <h3 className="text-basis mb-1 text-sm font-medium">Triggers</h3>
-            <div>
-              {inngestFunction.triggers.map((trigger) => (
-                <div
-                  key={trigger.value}
-                  className="border-subtle flex items-center gap-2 self-stretch border border-b-0 p-2 first:rounded-t last:rounded-b last:border-b"
-                >
-                  <div className="bg-canvasSubtle text-light flex h-9 w-9 items-center justify-center gap-2 rounded p-2">
-                    {trigger.type == 'EVENT' && <EventsIcon className="h-5 w-5" />}
-                    {trigger.type == 'CRON' && <RiTimeLine className="h-5 w-5" />}
-                  </div>
-                  <div className="text-basis flex grow flex-col items-start justify-center gap-1 self-stretch text-sm font-medium">
-                    <div>{trigger.value}</div>
-                    {trigger.type == 'EVENT' && trigger.condition && (
-                      <div className="text-muted text-sm">
-                        <code>if: {trigger.condition}</code>
-                        {/*handle overflow and pop up*/}
-                      </div>
-                    )}
-                  </div>
+          <ConfigurationSection title="Triggers">
+            {inngestFunction.triggers.map((trigger) => (
+              <div
+                key={trigger.value}
+                className="border-subtle flex items-center gap-2 self-stretch border border-b-0 p-2 first:rounded-t last:rounded-b last:border-b"
+              >
+                <div className="bg-canvasSubtle text-light flex h-9 w-9 items-center justify-center gap-2 rounded p-2">
+                  {trigger.type == 'EVENT' && <EventsIcon className="h-5 w-5" />}
+                  {trigger.type == 'CRON' && <RiTimeLine className="h-5 w-5" />}
                 </div>
-              ))}
-            </div>
-          </div>
+                <div className="text-basis flex grow flex-col items-start justify-center gap-1 self-stretch text-sm font-medium">
+                  <div>{trigger.value}</div>
+                  {trigger.type == 'EVENT' && trigger.condition && (
+                    <div className="text-muted text-sm">
+                      <code>if: {trigger.condition}</code>
+                      {/*handle overflow and pop up*/}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
+          </ConfigurationSection>
         </div>
       </ConfigurationCategory>
       <ConfigurationCategory title="Execution Configurations">
