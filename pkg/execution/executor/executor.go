@@ -2909,7 +2909,7 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, i *runInst
 		return nil
 	} else if err != nil {
 		logger.StdlibLogger(ctx).Error(
-			"failed to create invoke pause",
+			"failed to enqueue invoke function pause timeout",
 			"error", err,
 			"run_id", i.md.ID.RunID,
 			"workspace_id", i.md.ID.Tenant.EnvID,
