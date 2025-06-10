@@ -64,7 +64,8 @@ export function FunctionConfiguration({ onClose, inngestFunction }: FunctionConf
     if (configuration.rateLimit.key) {
       rateLimitEntries.push({
         label: 'Key',
-        value: <code>{configuration.rateLimit.key}</code>,
+        value: configuration.rateLimit.key,
+        type: 'code',
       });
     }
   }
@@ -81,7 +82,8 @@ export function FunctionConfiguration({ onClose, inngestFunction }: FunctionConf
     if (configuration.debounce.key) {
       debounceEntries.push({
         label: 'Key',
-        value: <code>{configuration.debounce.key}</code>,
+        value: configuration.debounce.key,
+        type: 'code',
       });
     }
   }
@@ -89,7 +91,8 @@ export function FunctionConfiguration({ onClose, inngestFunction }: FunctionConf
   const priorityEntries: ConfigurationEntry[] = [
     {
       label: 'Run',
-      value: <code>{configuration.priority}</code>,
+      value: configuration.priority,
+      type: 'code',
     },
   ];
 
@@ -109,7 +112,8 @@ export function FunctionConfiguration({ onClose, inngestFunction }: FunctionConf
     if (configuration.eventsBatch.key) {
       eventBatchEntries.push({
         label: 'Key',
-        value: <code>{configuration.eventsBatch.key}</code>,
+        value: configuration.eventsBatch.key,
+        type: 'code',
       });
     }
   }
@@ -126,7 +130,8 @@ export function FunctionConfiguration({ onClose, inngestFunction }: FunctionConf
     if (configuration.singleton.key) {
       singletonEntries.push({
         label: 'Key',
-        value: <code>{configuration.singleton.key}</code>,
+        value: configuration.singleton.key,
+        type: 'code',
       });
     }
   }
@@ -151,7 +156,8 @@ export function FunctionConfiguration({ onClose, inngestFunction }: FunctionConf
     if (configuration.throttle.key) {
       throttleEntries.push({
         label: 'Key',
-        value: <code>{configuration.throttle.key}</code>,
+        value: configuration.throttle.key,
+        type: 'code',
       });
     }
   }
@@ -178,7 +184,8 @@ export function FunctionConfiguration({ onClose, inngestFunction }: FunctionConf
       if (concurrencyLimit.key) {
         concurrencyEntries.push({
           label: 'Key',
-          value: <code>{concurrencyLimit.key}</code>,
+          value: concurrencyLimit.key,
+          type: 'code',
         });
       }
       return concurrencyEntries;
