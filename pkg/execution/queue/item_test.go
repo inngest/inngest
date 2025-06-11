@@ -31,19 +31,18 @@ func TestLatency(t *testing.T) {
 			},
 			now:             time.Date(2025, 6, 11, 15, 7, 9, 0, time.Local),
 			expectedLatency: 4 * time.Second, // 5 -> 9
+			expectedSojourn: 5 * time.Second, // 0 -> 5
 		},
 		{
-			name: "expected sojourn delay to match",
+			name: "expected to match old sojourn time",
 			qi: QueueItem{
-				EnqueuedAt:       time.Date(2025, 6, 11, 15, 7, 0, 0, time.Local).UnixMilli(),
 				AtMS:             time.Date(2025, 6, 11, 15, 7, 1, 0, time.Local).UnixMilli(),
 				WallTimeMS:       time.Date(2025, 6, 11, 15, 7, 1, 0, time.Local).UnixMilli(),
-				RefilledFrom:     "backlog-1",
-				RefilledAt:       time.Date(2025, 6, 11, 15, 7, 5, 0, time.Local).UnixMilli(),
-				EarliestPeekTime: time.Date(2025, 6, 11, 15, 7, 8, 0, time.Local).UnixMilli(),
+				EarliestPeekTime: time.Date(2025, 6, 11, 15, 7, 6, 0, time.Local).UnixMilli(),
 			},
 			now:             time.Date(2025, 6, 11, 15, 7, 9, 0, time.Local),
-			expectedSojourn: 5 * time.Second, // 0 -> 5
+			expectedLatency: 5 * time.Second, // 5s between enqueue and first peek
+			expectedSojourn: 3 * time.Second, // 3s between first peek and now (processing)
 		},
 	}
 
