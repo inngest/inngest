@@ -1,7 +1,8 @@
+import type { InfoPopoverContent } from '@inngest/components/FunctionConfiguration/FunctionConfigurationTooltips';
 import { Info } from '@inngest/components/Info/Info';
 import { Link } from '@inngest/components/Link';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
-import { RiInformationLine } from '@remixicon/react';
+import { RiExternalLinkLine, RiInformationLine } from '@remixicon/react';
 
 export type ConfigurationEntry = {
   label: string;
@@ -12,9 +13,14 @@ export type ConfigurationEntry = {
 type ConfigurationTableProps = {
   header: string;
   entries: ConfigurationEntry[];
+  infoPopoverContent: InfoPopoverContent;
 };
 
-export default function ConfigurationTable({ header, entries }: ConfigurationTableProps) {
+export default function ConfigurationTable({
+  header,
+  entries,
+  infoPopoverContent,
+}: ConfigurationTableProps) {
   if (entries.length == 0) {
     return null;
   }
@@ -28,15 +34,18 @@ export default function ConfigurationTable({ header, entries }: ConfigurationTab
               <div className="flex items-center gap-2">
                 {header}
                 <Info
-                  text="List of all Inngest functions in the current environment."
+                  text={<span className="whitespace-pre-line">{infoPopoverContent.text}</span>}
                   action={
-                    <Link href={'https://www.inngest.com/docs/functions'} target="_blank">
-                      Learn how to create a function
+                    <Link
+                      href={infoPopoverContent.url}
+                      target="_blank"
+                      iconAfter={<RiExternalLinkLine className="h-4 w-4" />}
+                    >
+                      Learn more
                     </Link>
                   }
                   IconComponent={RiInformationLine}
                 />
-                <RiInformationLine className="bg-canvasSubtle h-5 w-5" />
               </div>
             </td>
           </tr>

@@ -7,9 +7,11 @@ import ConfigurationSection from '@inngest/components/FunctionConfiguration/Conf
 import ConfigurationTable, {
   type ConfigurationEntry,
 } from '@inngest/components/FunctionConfiguration/ConfigurationTable';
+import { TooltipCopy } from '@inngest/components/FunctionConfiguration/FunctionConfigurationTooltips';
 import { Header } from '@inngest/components/Header/Header';
 import { InvokeButton } from '@inngest/components/InvokeButton';
 import { Pill } from '@inngest/components/Pill';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
 import { AppsIcon } from '@inngest/components/icons/sections/Apps';
 import { EventsIcon } from '@inngest/components/icons/sections/Events';
 import { FunctionsIcon } from '@inngest/components/icons/sections/Functions';
@@ -40,11 +42,11 @@ export function FunctionConfiguration({ onClose, inngestFunction }: FunctionConf
 
   const retryEntries: ConfigurationEntry[] = [
     {
-      // fix pluralization
       label: 'Value',
       value: (
         <>
-          {inngestFunction.configuration.retries.value} retries
+          {inngestFunction.configuration.retries.value}{' '}
+          {inngestFunction.configuration.retries.value == 1 ? 'retry' : 'retries'}
           {inngestFunction.configuration.retries.isDefault && <Pill className="ml-2">Default</Pill>}
         </>
       ),
@@ -176,7 +178,19 @@ export function FunctionConfiguration({ onClose, inngestFunction }: FunctionConf
           value: (
             <>
               {concurrencyLimit.limit.value >= 1 && concurrencyLimit.limit.value}
-              {concurrencyLimit.limit.isPlanLimit && <Pill className="ml-2">Plan limit</Pill>}
+              {concurrencyLimit.limit.isPlanLimit && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span>
+                      <Pill className="ml-2">Plan limit</Pill>
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    If not configured, the limit is set to the maximum value allowed within your
+                    plan.
+                  </TooltipContent>
+                </Tooltip>
+              )}
             </>
           ),
         },
@@ -262,7 +276,7 @@ export function FunctionConfiguration({ onClose, inngestFunction }: FunctionConf
         </ConfigurationSection>
       </ConfigurationCategory>
       <ConfigurationCategory title="Execution Configurations">
-        <ConfigurationSection title="Failure Handler">
+        <ConfigurationSection title="Failure Handler" infoPopoverContent={TooltipCopy.failure}>
           {inngestFunction.failureHandler && (
             <ConfigurationBlock
               icon={<FunctionsIcon className="h-5 w-5" />}
@@ -273,7 +287,7 @@ export function FunctionConfiguration({ onClose, inngestFunction }: FunctionConf
           )}
         </ConfigurationSection>
 
-        <ConfigurationSection title="Cancel On">
+        <ConfigurationSection title="Cancel On" infoPopoverContent={TooltipCopy.cancelOn}>
           {inngestFunction.configuration.cancellations.map((cancelOn) => {
             return (
               <ConfigurationBlock
@@ -287,33 +301,67 @@ export function FunctionConfiguration({ onClose, inngestFunction }: FunctionConf
           })}
         </ConfigurationSection>
 
-        <ConfigurationTable header="Retries" entries={retryEntries} />
+        <ConfigurationTable
+          header="Retries"
+          entries={retryEntries}
+          infoPopoverContent={TooltipCopy.retries}
+        />
       </ConfigurationCategory>
       <ConfigurationCategory title="Scheduling Configurations">
         {inngestFunction.configuration.rateLimit && (
-          <ConfigurationTable header="Rate limit" entries={rateLimitEntries} />
+          <ConfigurationTable
+            header="Rate limit"
+            entries={rateLimitEntries}
+            infoPopoverContent={TooltipCopy.rateLimit}
+          />
         )}
         {inngestFunction.configuration.debounce && (
-          <ConfigurationTable header="Debounce" entries={debounceEntries} />
+          <ConfigurationTable
+            header="Debounce"
+            entries={debounceEntries}
+            infoPopoverContent={TooltipCopy.debounce}
+          />
         )}
         {inngestFunction.configuration.priority && (
-          <ConfigurationTable header="Priority" entries={priorityEntries} />
+          <ConfigurationTable
+            header="Priority"
+            entries={priorityEntries}
+            infoPopoverContent={TooltipCopy.priority}
+          />
         )}
         {inngestFunction.configuration.eventsBatch && (
-          <ConfigurationTable header="Batching" entries={eventBatchEntries} />
+          <ConfigurationTable
+            header="Batching"
+            entries={eventBatchEntries}
+            infoPopoverContent={TooltipCopy.batching}
+          />
         )}
         {inngestFunction.configuration.singleton && (
-          <ConfigurationTable header="Singleton" entries={singletonEntries} />
+          <ConfigurationTable
+            header="Singleton"
+            entries={singletonEntries}
+            infoPopoverContent={TooltipCopy.singleton}
+          />
         )}
       </ConfigurationCategory>
       <ConfigurationCategory title="Queue Configurations">
         {inngestFunction.configuration.concurrency &&
           concurrencyLimits.map((concurrencyLimit, index) => {
             const header = concurrencyLimitCount > 1 ? `Concurrency (${index + 1})` : 'Concurrency';
-            return <ConfigurationTable header={header} entries={concurrencyLimit} />;
+            return (
+              <ConfigurationTable
+                header={header}
+                entries={concurrencyLimit}
+                infoPopoverContent={TooltipCopy.concurrency}
+              />
+            );
           })}
         {inngestFunction.configuration.throttle && (
-          <ConfigurationTable header="Throttle" entries={throttleEntries} />
+          <ConfigurationTable
+            header="Throttle"
+            entries={throttleEntries}
+            infoPopoverContent={TooltipCopy.throttle}
+          />
         )}
       </ConfigurationCategory>
     </div>
