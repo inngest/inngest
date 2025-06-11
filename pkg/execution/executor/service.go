@@ -505,7 +505,7 @@ func (s *svc) handleCancel(ctx context.Context, item queue.Item) error {
 
 		id := sv2.ID{
 			RunID:      runID,
-			FunctionID: c.WorkspaceID,
+			FunctionID: c.FunctionID,
 			Tenant: sv2.Tenant{
 				AccountID: c.AccountID,
 				EnvID:     c.WorkspaceID,
