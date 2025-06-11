@@ -1,9 +1,10 @@
 import { useCallback, useState } from 'react';
-import { Button } from '@inngest/components/Button';
+import { Button, type ButtonAppearance, type ButtonKind } from '@inngest/components/Button';
 import { InvokeModal } from '@inngest/components/InvokeButton';
-import { RiFlashlightFill } from '@remixicon/react';
 
 type Props = {
+  kind?: ButtonKind;
+  appearance?: ButtonAppearance;
   disabled?: boolean;
   doesFunctionAcceptPayload: boolean;
   btnAction: (payload: {
@@ -13,6 +14,8 @@ type Props = {
 };
 
 export function InvokeButton({
+  kind,
+  appearance,
   disabled,
   doesFunctionAcceptPayload: hasEventTrigger,
   btnAction,
@@ -30,12 +33,12 @@ export function InvokeButton({
   return (
     <>
       <Button
-        kind="secondary"
-        appearance="outlined"
-        onClick={() => setIsModalOpen(true)}
+        kind={kind}
+        appearance={appearance}
+        onClick={(e) => {
+          setIsModalOpen(true);
+        }}
         disabled={disabled}
-        icon={<RiFlashlightFill className="text-sky-500" />}
-        iconSide="left"
         label="Invoke"
       />
 
