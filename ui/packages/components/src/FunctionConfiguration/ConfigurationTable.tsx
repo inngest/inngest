@@ -1,3 +1,5 @@
+import { Info } from '@inngest/components/Info/Info';
+import { Link } from '@inngest/components/Link';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
 import { RiInformationLine } from '@remixicon/react';
 
@@ -25,6 +27,15 @@ export default function ConfigurationTable({ header, entries }: ConfigurationTab
             <td className="text-basis px-2 text-sm font-medium" colSpan={2}>
               <div className="flex items-center gap-2">
                 {header}
+                <Info
+                  text="List of all Inngest functions in the current environment."
+                  action={
+                    <Link href={'https://www.inngest.com/docs/functions'} target="_blank">
+                      Learn how to create a function
+                    </Link>
+                  }
+                  IconComponent={RiInformationLine}
+                />
                 <RiInformationLine className="bg-canvasSubtle h-5 w-5" />
               </div>
             </td>
