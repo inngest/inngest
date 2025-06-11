@@ -44,6 +44,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/pauses"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/ratelimit"
+	"github.com/inngest/inngest/pkg/execution/realtime"
 	"github.com/inngest/inngest/pkg/execution/runner"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
@@ -84,6 +85,8 @@ type StartOpts struct {
 	// EventKey is used to authorize incoming events, ensuring they match the
 	// given key.
 	EventKey []string `json:"event_key"`
+
+	RealtimeJWTSecret []byte `json:"realtime-jwt-secret"`
 
 	ConnectGatewayPort int `json:"connect-gateway-port"`
 }
@@ -320,6 +323,8 @@ func start(ctx context.Context, opts StartOpts) error {
 		return fmt.Errorf("failed to create publisher: %w", err)
 	}
 
+	broadcaster := realtime.NewInProcessBroadcaster()
+
 	exec, err := executor.NewExecutor(
 		executor.WithHTTPClient(httpClient),
 		executor.WithStateManager(smv2),
@@ -329,6 +334,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		),
 		executor.WithExpressionAggregator(agg),
 		executor.WithQueue(rq),
+		executor.WithRealtimePublisher(broadcaster),
 		executor.WithLogger(l),
 		executor.WithFunctionLoader(loader),
 		executor.WithLifecycleListeners(
@@ -458,6 +464,8 @@ func start(ctx context.Context, opts StartOpts) error {
 			JobQueueReader:     ds.Queue.(queue.JobQueueReader),
 			Executor:           ds.Executor,
 			QueueShardSelector: shardSelector,
+			Broadcaster:        broadcaster,
+			RealtimeJWTSecret:  opts.RealtimeJWTSecret,
 		})
 	})
 
@@ -489,7 +497,7 @@ func start(ctx context.Context, opts StartOpts) error {
 			ConnectManager:             connectionManager,
 			ConnectResponseNotifier:    apiConnectProxy,
 			ConnectRequestStateManager: connectionManager,
-			Signer:                     auth.NewJWTSessionTokenSigner(consts.DevServerConnectJwtSecret),
+			Signer:                     auth.NewJWTSessionTokenSigner(opts.RealtimeJWTSecret),
 			RequestAuther:              ds,
 			ConnectGatewayRetriever:    ds,
 			EntitlementProvider:        ds,
@@ -513,7 +521,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	connGateway := connect.NewConnectGatewayService(
 		connect.WithConnectionStateManager(connectionManager),
 		connect.WithRequestReceiver(gatewayRequestReceiver),
-		connect.WithGatewayAuthHandler(auth.NewJWTAuthHandler(consts.DevServerConnectJwtSecret)),
+		connect.WithGatewayAuthHandler(auth.NewJWTAuthHandler(opts.RealtimeJWTSecret)),
 		connect.WithDev(),
 		connect.WithGatewayPublicPort(opts.ConnectGatewayPort),
 		connect.WithApiBaseUrl(fmt.Sprintf("http://%s:%d", opts.Config.CoreAPI.Addr, opts.Config.CoreAPI.Port)),
