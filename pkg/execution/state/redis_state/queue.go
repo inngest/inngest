@@ -1459,6 +1459,7 @@ func (q *queue) RunJobs(ctx context.Context, queueShardName string, workspaceID,
 			return nil, fmt.Errorf("error reading queue position: %w", err)
 		}
 		resp = append(resp, osqueue.JobResponse{
+			JobID:    qi.ID,
 			At:       time.UnixMilli(qi.AtMS),
 			Position: pos,
 			Kind:     qi.Data.Kind,

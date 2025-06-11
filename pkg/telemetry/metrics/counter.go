@@ -455,3 +455,12 @@ func IncrQueueOutdatedBacklogCounter(ctx context.Context, opts CounterOpt) {
 		Tags:        opts.Tags,
 	})
 }
+
+func IncrRunFinalizedCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "run_finalized_total",
+		Description: "The total number of calls to finalize a run.",
+		Tags:        opts.Tags,
+	})
+}
