@@ -27,7 +27,8 @@ type RunInfo struct {
 	// ContinueCount represents the total number of continues that the queue has processed
 	// via RunFunc returning true.  This allows us to prevent unbounded sequential processing
 	// on the same function by limiting the number of continues possible within a given chain.
-	ContinueCount uint
+	ContinueCount       uint
+	RefilledFromBacklog string
 }
 
 // RunFunc represents a function called to process each item in the queue.  This may be

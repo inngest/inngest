@@ -1047,10 +1047,7 @@ func (q *queue) process(
 		n := q.clock.Now()
 
 		// Track the sojourn (concurrency) latency.
-		var sojourn time.Duration
-		if qi.EarliestPeekTime > 0 {
-			sojourn = n.Sub(time.UnixMilli(qi.EarliestPeekTime))
-		}
+		sojourn := qi.SojournLatency(n)
 		doCtx := context.WithValue(jobCtx, sojournKey, sojourn)
 
 		// Track the latency on average globally.  Do this in a goroutine so that it doesn't
@@ -1058,7 +1055,7 @@ func (q *queue) process(
 		if qi.WallTimeMS == 0 {
 			qi.WallTimeMS = qi.AtMS // backcompat while WallTimeMS isn't valid.
 		}
-		latency := n.Sub(time.UnixMilli(qi.WallTimeMS)) - sojourn
+		latency := qi.Latency(n)
 		doCtx = context.WithValue(doCtx, latencyKey, latency)
 
 		// store started at and latency in ctx
@@ -1087,11 +1084,12 @@ func (q *queue) process(
 		})
 
 		runInfo := osqueue.RunInfo{
-			Latency:        latency,
-			SojournDelay:   sojourn,
-			Priority:       q.ppf(ctx, p),
-			QueueShardName: q.primaryQueueShard.Name,
-			ContinueCount:  continuationCtr,
+			Latency:             latency,
+			SojournDelay:        sojourn,
+			Priority:            q.ppf(ctx, p),
+			QueueShardName:      q.primaryQueueShard.Name,
+			ContinueCount:       continuationCtr,
+			RefilledFromBacklog: qi.RefilledFrom,
 		}
 
 		// Call the run func.
