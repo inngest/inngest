@@ -226,3 +226,79 @@ func TestSingletonCancelMode(t *testing.T) {
 		require.Equal(c, int32(1), atomic.LoadInt32(&successCounter), "success counter should be 1")
 	}, 15*time.Second, 100*time.Millisecond)
 }
+
+func TestSingletonDifferentKeysBothRun(t *testing.T) {
+	appName := uuid.New().String()
+
+	inngestClient, server, registerFuncs := NewSDKHandler(t, appName)
+	defer server.Close()
+
+	var successCounter int32
+	var cancelCounter int32
+
+	trigger := "test/singleton-cancel-different-keys"
+
+	_, err := inngestgo.CreateFunction(
+		inngestClient,
+		inngestgo.FunctionOpts{
+			ID: "fn-singleton-cancel-different-keys",
+			Singleton: &inngestgo.Singleton{
+				Key:  inngestgo.StrPtr("event.data.user.id"),
+				Mode: enums.SingletonModeCancel,
+			},
+		},
+		inngestgo.EventTrigger(trigger, nil),
+		func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
+			step.Sleep(ctx, "sleep", 5*time.Second)
+			return true, nil
+		},
+	)
+	require.NoError(t, err)
+
+	_, err = inngestgo.CreateFunction(
+		inngestClient,
+		inngestgo.FunctionOpts{ID: "on-cancel-different-keys"},
+		inngestgo.EventTrigger("inngest/function.cancelled", inngestgo.StrPtr(fmt.Sprintf(
+			"event.data.function_id == '%s-fn-singleton-cancel-different-keys'",
+			appName,
+		))),
+		func(ctx context.Context, input inngestgo.Input[map[string]any]) (any, error) {
+			atomic.AddInt32(&cancelCounter, 1)
+			return nil, nil
+		},
+	)
+	require.NoError(t, err)
+
+	_, err = inngestgo.CreateFunction(
+		inngestClient,
+		inngestgo.FunctionOpts{ID: "on-success-different-keys"},
+		inngestgo.EventTrigger("inngest/function.finished", inngestgo.StrPtr(fmt.Sprintf(
+			"event.data.function_id == '%s-fn-singleton-cancel-different-keys' && event.data.result == true",
+			appName,
+		))),
+		func(ctx context.Context, input inngestgo.Input[map[string]any]) (any, error) {
+			atomic.AddInt32(&successCounter, 1)
+			return nil, nil
+		},
+	)
+	require.NoError(t, err)
+
+	registerFuncs()
+
+	_, err = inngestClient.Send(context.Background(), inngestgo.Event{
+		Name: trigger,
+		Data: map[string]any{"user": map[string]any{"id": 1}},
+	})
+	require.NoError(t, err)
+
+	_, err = inngestClient.Send(context.Background(), inngestgo.Event{
+		Name: trigger,
+		Data: map[string]any{"user": map[string]any{"id": 2}},
+	})
+	require.NoError(t, err)
+
+	require.EventuallyWithT(t, func(c *assert.CollectT) {
+		require.Equal(c, int32(2), atomic.LoadInt32(&successCounter))
+		require.Equal(c, int32(0), atomic.LoadInt32(&cancelCounter))
+	}, 10*time.Second, 100*time.Millisecond)
+}
