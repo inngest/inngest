@@ -449,11 +449,11 @@ func (q *queue) processShadowPartitionBacklog(ctx context.Context, shadowPart *Q
 	switch res.Constraint {
 	// If backlog is concurrency limited by custom key, requeue just this backlog in the future
 	case enums.QueueConstraintCustomConcurrencyKey1, enums.QueueConstraintCustomConcurrencyKey2:
-		forceRequeueBacklogAt = backlog.requeueBackOff(q.clock.Now(), res.Constraint, shadowPart, constraints)
+		forceRequeueBacklogAt = backlog.requeueBackOff(q.clock.Now(), res.Constraint, constraints)
 
 	// If backlog is throttled, requeue just this backlog in the future
 	case enums.QueueConstraintThrottle:
-		forceRequeueBacklogAt = backlog.requeueBackOff(q.clock.Now(), res.Constraint, shadowPart, constraints)
+		forceRequeueBacklogAt = backlog.requeueBackOff(q.clock.Now(), res.Constraint, constraints)
 	}
 
 	if !forceRequeueBacklogAt.IsZero() {
