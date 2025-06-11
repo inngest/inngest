@@ -215,6 +215,7 @@ func (q *queue) executionScan(ctx context.Context, f osqueue.RunFunc) error {
 
 	backoff := time.Millisecond * 250
 
+	var err error
 LOOP:
 	for {
 		select {
@@ -222,12 +223,13 @@ LOOP:
 			// Kill signal
 			tick.Stop()
 			break LOOP
-		case err := <-q.quit:
+		case err = <-q.quit:
 			// An inner function received an error which was deemed irrecoverable, so
 			// we're quitting the queue.
 			q.log.Error("quitting runner internally", "error", err)
 			tick.Stop()
 			break LOOP
+
 		case <-tick.Chan():
 			if q.capacity() < minWorkersFree {
 				// Wait until we have more workers free.  This stops us from
@@ -238,7 +240,7 @@ LOOP:
 				continue
 			}
 
-			if err := q.scan(ctx); err != nil {
+			if err = q.scan(ctx); err != nil {
 				if errors.Is(err, context.DeadlineExceeded) {
 					q.log.Warn("deadline exceeded scanning partition pointers")
 					<-time.After(backoff)
@@ -263,7 +265,7 @@ LOOP:
 	q.log.Info("queue waiting to quit")
 	q.wg.Wait()
 
-	return nil
+	return err
 }
 
 // claimSequentialLease is a process which continually runs while listening to the queue,
