@@ -227,7 +227,7 @@ export function FunctionConfiguration({ onClose, inngestFunction }: FunctionConf
         <ConfigurationSection title="App">
           <ConfigurationBlock
             icon={<AppsIcon className="h-5 w-5" />}
-            mainText={inngestFunction.app.name}
+            mainContent={inngestFunction.app.name}
             rightElement={
               <Button
                 label="Go to apps"
@@ -245,21 +245,17 @@ export function FunctionConfiguration({ onClose, inngestFunction }: FunctionConf
             <ConfigurationBlock
               key={trigger.value}
               icon={
-                trigger.type == 'EVENT' ? (
+                trigger.type == FunctionTriggerTypes.Event ? (
                   <EventsIcon className="h-5 w-5" />
                 ) : (
                   <RiTimeLine className="h-5 w-5" />
                 )
               }
-              mainText={trigger.value}
-              subText={
-                trigger.type == 'EVENT' && trigger.condition ? (
-                  <div>
-                    <code className="font-mono">if: {trigger.condition}</code>
-                  </div>
-                ) : (
-                  <></>
-                )
+              mainContent={trigger.value}
+              expression={
+                trigger.type == FunctionTriggerTypes.Event && trigger.condition
+                  ? `if: ${trigger.condition}`
+                  : ''
               }
             />
           ))}
@@ -270,7 +266,7 @@ export function FunctionConfiguration({ onClose, inngestFunction }: FunctionConf
           {inngestFunction.failureHandler && (
             <ConfigurationBlock
               icon={<FunctionsIcon className="h-5 w-5" />}
-              mainText={inngestFunction.failureHandler.slug}
+              mainContent={inngestFunction.failureHandler.slug}
               rightElement={<RiArrowRightSLine className="h-5 w-5" />}
               href={`/functions/config?slug=${inngestFunction.failureHandler.slug}`}
             />
@@ -283,19 +279,9 @@ export function FunctionConfiguration({ onClose, inngestFunction }: FunctionConf
               <ConfigurationBlock
                 key={cancelOn.event}
                 icon={<EventsIcon className="h-5 w-5" />}
-                mainText={cancelOn.event}
-                subText={
-                  <div>
-                    {cancelOn.condition && (
-                      <div className="text-muted text-xs">
-                        <code className="font-mono">if: {cancelOn.condition}</code>
-                      </div>
-                    )}
-                    {cancelOn.timeout && (
-                      <div className="text-muted text-xs">Timeout: {cancelOn.timeout}</div>
-                    )}
-                  </div>
-                }
+                mainContent={cancelOn.event}
+                subContent={cancelOn.timeout ? `Timeout: ${cancelOn.timeout}` : ''}
+                expression={cancelOn.condition ? `if: ${cancelOn.condition}` : ''}
               />
             );
           })}
