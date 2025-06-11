@@ -17,6 +17,7 @@ import {
   getCoreRowModel,
   getFilteredRowModel,
   getSortedRowModel,
+  type Row,
   type SortingState,
 } from '@tanstack/react-table';
 import { toast } from 'sonner';
@@ -160,6 +161,34 @@ export default function FunctionList() {
     [isFetching, functions],
   );
 
+  const router = useRouter();
+
+  function handleOpenSlideOver({
+    e,
+    functionSlug,
+  }: {
+    e: React.MouseEvent<HTMLElement>;
+    functionSlug: string;
+  }) {
+    if (e.target instanceof HTMLElement) {
+      const params = new URLSearchParams({ slug: functionSlug });
+      const url = `/functions/config?${params.toString()}`;
+      router.push(url);
+    }
+  }
+
+  const customRowProps = (row: Row<Function>) => ({
+    style: {
+      cursor: 'pointer',
+    },
+    onClick: (e: React.MouseEvent<HTMLElement>) => {
+      handleOpenSlideOver({
+        e,
+        functionSlug: row.original.slug,
+      });
+    },
+  });
+
   return (
     <div className="flex min-h-0 min-w-0 flex-col">
       <Header
@@ -209,6 +238,7 @@ export default function FunctionList() {
             getFilteredRowModel: getFilteredRowModel(),
             onGlobalFilterChange: setGlobalFilter,
           }}
+          customRowProps={customRowProps}
           tableContainerRef={tableContainerRef}
           blankState={
             <BlankSlate
