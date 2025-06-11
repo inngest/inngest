@@ -28,7 +28,6 @@ import {
   useGetFunctionsQuery,
   useInvokeFunctionMutation,
   type Function,
-  type StreamItem,
 } from '@/store/generated';
 
 const columnHelper = createColumnHelper<Function>();
@@ -180,9 +179,8 @@ export default function FunctionTable() {
     }
   }
 
-  const customRowProps = (row: Row<StreamItem>) => ({
+  const customRowProps = (row: Row<Function>) => ({
     style: {
-      verticalAlign: row.original.runs && row.original.runs.length > 1 ? 'top' : 'middle',
       cursor: 'pointer',
     },
     onClick: (e: React.MouseEvent<HTMLElement>) => {

@@ -168,7 +168,7 @@ export function FunctionConfiguration({ onClose, inngestFunction }: FunctionConf
   const concurrencyLimitCount = configuration.concurrency.length;
   const concurrencyLimits: ConfigurationEntry[][] = configuration.concurrency.map(
     (concurrencyLimit) => {
-      let concurrencyEntries = [
+      let concurrencyEntries: ConfigurationEntry[] = [
         {
           label: 'Scope',
           value: concurrencyLimit.scope,

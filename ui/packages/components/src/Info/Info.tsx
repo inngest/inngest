@@ -12,7 +12,7 @@ export const Info = ({
 }: {
   text: string | ReactNode;
   action: ReactNode;
-  IconComponent: RemixiconComponentType;
+  IconComponent?: RemixiconComponentType;
 }) => (
   <Popover>
     <PopoverTrigger>
