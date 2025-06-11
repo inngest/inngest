@@ -1491,7 +1491,7 @@ func (p *processor) iterate(ctx context.Context) error {
 }
 
 func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error {
-	l := p.queue.log.With("partition", p.partition)
+	l := p.queue.log.With("partition", p.partition, "item", item)
 
 	// TODO: Create an in-memory mapping of rate limit keys that have been hit,
 	//       and don't bother to process if the queue item has a limited key.  This
@@ -1569,6 +1569,8 @@ func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error 
 		cause = key.cause
 	}
 
+	l = l.With("cause", cause)
+
 	switch cause {
 	case ErrQueueItemThrottled:
 		p.isCustomKeyLimitOnly = false
@@ -1586,7 +1588,7 @@ func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error 
 		if p.queue.itemEnableKeyQueues(ctx, *item) {
 			err := p.queue.Requeue(ctx, p.queue.primaryQueueShard, *item, time.UnixMilli(item.AtMS))
 			if err != nil {
-				l.Error("could not requeue item to backlog after hitting limit", "error", err, "item", *item, "key", key)
+				l.Error("could not requeue item to backlog after hitting throttle limit", "error", err)
 				return fmt.Errorf("could not requeue to backlog: %w", err)
 			}
 
@@ -1643,7 +1645,7 @@ func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error 
 		if p.queue.itemEnableKeyQueues(ctx, *item) {
 			err := p.queue.Requeue(ctx, p.queue.primaryQueueShard, *item, time.UnixMilli(item.AtMS))
 			if err != nil {
-				l.Error("could not requeue item to backlog after hitting limit", "error", err, "item", *item, "key", key)
+				l.Error("could not requeue item to backlog after hitting concurrency limit", "error", err)
 				return fmt.Errorf("could not requeue to backlog: %w", err)
 			}
 
@@ -1684,7 +1686,7 @@ func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error 
 		if p.queue.itemEnableKeyQueues(ctx, *item) {
 			err := p.queue.Requeue(ctx, p.queue.primaryQueueShard, *item, time.UnixMilli(item.AtMS))
 			if err != nil {
-				l.Error("could not requeue item to backlog after hitting limit", "error", err, "item", *item, "key", key)
+				l.Error("could not requeue item to backlog after hitting custom concurrency limit", "error", err)
 				return fmt.Errorf("could not requeue to backlog: %w", err)
 			}
 
