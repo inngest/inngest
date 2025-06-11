@@ -36,6 +36,7 @@ export function InvokeButton({
         kind={kind}
         appearance={appearance}
         onClick={(e) => {
+          e.stopPropagation();
           setIsModalOpen(true);
         }}
         disabled={disabled}
