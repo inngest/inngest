@@ -266,6 +266,27 @@ func (q *queue) extendBacklogNormalizationLease(ctx context.Context, now time.Ti
 func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp *QueueShadowPartition, latestConstraints *PartitionConstraintConfig) error {
 	l := q.log.With("backlog", backlog, "sp", sp, "constraints", latestConstraints)
 
+	start := q.clock.Now()
+	defer func() {
+		dur := q.clock.Now().Sub(start)
+
+		metrics.HistogramQueueOperationDuration(
+			ctx,
+			dur.Milliseconds(),
+			metrics.HistogramOpt{
+				PkgName: pkgName,
+				Tags: map[string]any{
+					"operation":   "normalize_backlog",
+					"queue_shard": q.primaryQueueShard.Name,
+				},
+			},
+		)
+
+		if dur > 1*time.Minute {
+			q.log.Debug("slow backlog normalization", "dur", dur, "backlog", backlog, "sp", sp, "constraints", latestConstraints)
+		}
+	}()
+
 	// extend the lease
 	extendLeaseCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
