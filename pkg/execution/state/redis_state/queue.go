@@ -2648,6 +2648,9 @@ func (q *queue) Requeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 	i.RefilledFrom = ""
 	i.RefilledAt = 0
 
+	// Reset enqueuedAt (used for latency calculation)
+	i.EnqueuedAt = now.UnixMilli()
+
 	fnPartition, _ := q.ItemPartition(ctx, queueShard, i)
 	shadowPartition := q.ItemShadowPartition(ctx, i)
 
