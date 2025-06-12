@@ -114,10 +114,15 @@ func (q QueueItem) Score(now time.Time) int64 {
 		now = time.Now()
 	}
 
+	// If we're scavenging a sleep, we can only fudge the time if the sleep is scheduled within the next 2s.
+	// Otherwise, we must return the original time.
+	sleepCanBeFudged := q.Data.Kind == KindSleep && q.AtMS <= now.Add(consts.FutureAtLimit).UnixMilli()
+
 	// If this is not a start/simple edge/edge error, we can ignore this.
 	if (q.Data.Kind != KindStart &&
 		q.Data.Kind != KindEdge &&
-		q.Data.Kind != KindEdgeError) || q.Data.Attempt > 0 {
+		q.Data.Kind != KindEdgeError &&
+		!sleepCanBeFudged) || q.Data.Attempt > 0 {
 		return q.AtMS
 	}
 
@@ -407,6 +412,15 @@ func (i *Item) UnmarshalJSON(b []byte) error {
 			return err
 		}
 		i.Payload = *p
+	case KindSleepScavenge:
+		if len(temp.Payload) == 0 {
+			return nil
+		}
+		p := &PayloadSleepScavenge{}
+		if err := json.Unmarshal(temp.Payload, p); err != nil {
+			return err
+		}
+		i.Payload = *p
 	}
 	return nil
 }
@@ -429,6 +443,11 @@ type PayloadEdge struct {
 
 type PayloadPauseBlockFlush struct {
 	EventName string `json:"e"`
+}
+
+type PayloadSleepScavenge struct {
+	SleepJobID string `json:"sjid"`
+	SleepUntil int64  `json:"su"`
 }
 
 // PayloadPauseTimeout is the payload stored when enqueueing a pause timeout, eg.

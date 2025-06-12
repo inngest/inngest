@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/config"
@@ -97,10 +99,11 @@ type svc struct {
 	// queue allows us to enqueue next steps.
 	queue queue.Queue
 	// exec runs the specific actions.
-	exec      execution.Executor
-	debouncer debounce.Debouncer
-	batcher   batch.BatchManager
-	log       logger.Logger
+	exec          execution.Executor
+	debouncer     debounce.Debouncer
+	batcher       batch.BatchManager
+	log           logger.Logger
+	shardSelector redis_state.ShardSelector
 
 	wg sync.WaitGroup
 
@@ -207,6 +210,8 @@ func (s *svc) Run(ctx context.Context) error {
 		case queue.KindQueueMigrate:
 			// NOOP:
 			// this kind don't work in the Dev server
+		case queue.KindSleepScavenge:
+			err = s.handleSleepScavenge(ctx, item)
 		default:
 			err = fmt.Errorf("unknown payload type: %T", item.Payload)
 		}
@@ -433,4 +438,46 @@ func (s *svc) findFunctionByID(ctx context.Context, fnID uuid.UUID) (*inngest.Fu
 		}
 	}
 	return nil, fmt.Errorf("no function found with ID: %s", fnID)
+}
+
+func (s *svc) handleSleepScavenge(ctx context.Context, item queue.Item) error {
+	l := s.log.With("run_id", item.Identifier.RunID.String())
+
+	sleepScavenge, ok := item.Payload.(queue.PayloadSleepScavenge)
+	if !ok {
+		return fmt.Errorf("unable to get sleep scavenge from queue item: %T", item.Payload)
+	}
+
+	l = l.With("sleep_job_id", sleepScavenge.SleepJobID, "sleep_until", time.UnixMilli(sleepScavenge.SleepUntil))
+
+	qm, ok := s.queue.(redis_state.QueueManager)
+	if !ok {
+		l.Warn("queue does not conform to queue manager")
+		return nil
+	}
+
+	// Retrieve current queue shard for sleep item. The account might have been migrated
+	// to a different shard since the original sleep item was enqueued, so we must fetch the shard now.
+	shard, err := s.shardSelector(ctx, item.Identifier.AccountID, nil)
+	if err != nil {
+		return fmt.Errorf("could not retrieve queue shard for sleep item:%w", err)
+	}
+
+	// The sleep item should usually exist
+	qi, err := qm.LoadQueueItem(ctx, shard.Name, sleepScavenge.SleepJobID)
+	if err != nil {
+		if errors.Is(err, redis_state.ErrQueueItemNotFound) {
+			return nil
+		}
+
+		return fmt.Errorf("could not load queue item: %w", err)
+	}
+
+	fudgedAt := time.UnixMilli(qi.Score(time.Now()))
+	err = qm.Requeue(ctx, shard, *qi, fudgedAt)
+	if err != nil {
+		return fmt.Errorf("could not requeue sleep item with fudged time: %w", err)
+	}
+
+	return nil
 }

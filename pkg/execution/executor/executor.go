@@ -2430,7 +2430,9 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, i *runInstance, gen
 		Incoming: edge.Edge.Incoming, // To re-call the SDK
 	}
 
-	startedAt := time.Now()
+	now := time.Now()
+
+	startedAt := now
 	until := startedAt.Add(dur)
 
 	// Create another group for the next item which will run.  We're enqueueing
@@ -2438,7 +2440,7 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, i *runInstance, gen
 	groupID := uuid.New().String()
 	ctx = state.WithGroupID(ctx, groupID)
 
-	jobID := fmt.Sprintf("%s-%s", i.md.IdempotencyKey(), gen.ID)
+	jobID := queue.HashID(ctx, fmt.Sprintf("%s-%s", i.md.IdempotencyKey(), gen.ID))
 	// TODO Should this also include a parent step span? It will never have attempts.
 	err = e.queue.Enqueue(ctx, queue.Item{
 		JobID:       &jobID,
@@ -2454,9 +2456,38 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, i *runInstance, gen
 		Attempt:               0,
 		MaxAttempts:           i.item.MaxAttempts,
 		Payload:               queue.PayloadEdge{Edge: nextEdge},
-	}, until, queue.EnqueueOpts{})
+	}, until, queue.EnqueueOpts{
+		PassthroughJobId: true,
+	})
 	if err == redis_state.ErrQueueItemExists {
 		return nil
+	}
+
+	// If we're processing a user function and the sleep duration is in the future,
+	// enqueue a sleep scavenge system queue item that will Requeue the original sleep queue item.
+	// We do this to fudge the original queue item at the exact time, the run was scheduled for to ensure
+	// sleeps for existing function runs are picked up earlier than items for later function runs.
+	scavengeAt := until.Add(-2 * time.Second)
+	if i.md.ID.Tenant.AccountID != uuid.Nil && i.md.ID.FunctionID != uuid.Nil && scavengeAt.After(now) {
+		scavengeJobID := fmt.Sprintf("scavenge-%s", jobID)
+		scavengeQueueName := fmt.Sprintf("sleep-scavenge:%s", i.md.ID.FunctionID)
+		err = e.queue.Enqueue(ctx, queue.Item{
+			JobID:          &scavengeJobID,
+			WorkspaceID:    i.md.ID.Tenant.EnvID,
+			QueueName:      &scavengeQueueName,
+			Kind:           queue.KindSleepScavenge,
+			Identifier:     i.item.Identifier,
+			PriorityFactor: i.item.PriorityFactor,
+			Attempt:        0,
+			MaxAttempts:    i.item.MaxAttempts,
+			Payload: queue.PayloadSleepScavenge{
+				SleepJobID: jobID,
+				SleepUntil: until.UnixMilli(),
+			},
+		}, scavengeAt, queue.EnqueueOpts{})
+		if err == redis_state.ErrQueueItemExists {
+			return nil
+		}
 	}
 
 	for _, e := range e.lifecycles {
