@@ -222,6 +222,8 @@ func (v v2) SaveStep(ctx context.Context, id state.ID, stepID string, data []byt
 		},
 		util.NewRetryConf(
 			util.WithRetryConfRetryableErrors(v.retryableError),
+			util.WithRetryConfMaxBackoff(10*time.Second),
+			util.WithRetryConfMaxAttempts(10),
 		),
 	)
 
