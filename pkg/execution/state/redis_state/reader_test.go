@@ -39,16 +39,16 @@ func TestItemsByPartition(t *testing.T) {
 		{
 			name:          "retrieve items in one fetch",
 			num:           10,
-			from:          clock.Now(),
+			from:          time.Time{},
 			until:         clock.Now().Add(time.Minute),
 			expectedItems: 10,
 		},
 		{
 			name:          "with interval",
 			num:           10,
-			from:          clock.Now(),
+			from:          time.Time{},
 			until:         clock.Now().Add(time.Minute),
-			interval:      time.Second,
+			interval:      -1 * time.Second,
 			expectedItems: 10,
 		},
 		{
@@ -62,7 +62,7 @@ func TestItemsByPartition(t *testing.T) {
 		{
 			name:          "with batch size",
 			num:           10,
-			from:          clock.Now(),
+			from:          time.Time{},
 			until:         clock.Now().Add(10 * time.Second).Truncate(time.Second),
 			interval:      10 * time.Millisecond,
 			expectedItems: 10,
@@ -80,7 +80,7 @@ func TestItemsByPartition(t *testing.T) {
 		{
 			name:             "kq - with interval",
 			num:              10,
-			from:             clock.Now(),
+			from:             time.Time{},
 			until:            clock.Now().Add(time.Minute),
 			interval:         time.Second,
 			expectedItems:    10,
@@ -98,9 +98,9 @@ func TestItemsByPartition(t *testing.T) {
 		{
 			name:             "kq - with batch size",
 			num:              10,
-			from:             clock.Now(),
+			from:             time.Time{},
 			until:            clock.Now().Add(10 * time.Second).Truncate(time.Second),
-			interval:         10 * time.Millisecond,
+			interval:         -10 * time.Millisecond,
 			expectedItems:    10,
 			batchSize:        2,
 			keyQueuesEnabled: true,
@@ -123,7 +123,11 @@ func TestItemsByPartition(t *testing.T) {
 			)
 
 			for i := range tc.num {
-				at := tc.from.Add(time.Duration(i) * tc.interval)
+				at := clock.Now()
+				if !tc.from.IsZero() {
+					at = tc.from
+				}
+				at = at.Add(time.Duration(i) * tc.interval)
 
 				item := osqueue.QueueItem{
 					ID:          fmt.Sprintf("test%d", i),

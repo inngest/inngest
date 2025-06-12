@@ -1842,7 +1842,7 @@ type peekOpts struct {
 
 func (q *queue) peek(ctx context.Context, shard QueueShard, opts peekOpts) ([]*osqueue.QueueItem, error) {
 	from := "-inf"
-	if opts.From != nil && opts.From.UnixMilli() > 0 {
+	if opts.From != nil && !opts.From.IsZero() {
 		from = strconv.Itoa(int(opts.From.UnixMilli()))
 	}
 

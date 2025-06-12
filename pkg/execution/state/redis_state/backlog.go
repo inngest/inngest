@@ -995,6 +995,11 @@ func (q *queue) backlogPeek(ctx context.Context, b *QueueBacklog, from time.Time
 		limit = q.peekMin
 	}
 
+	var fromTime *time.Time
+	if !from.IsZero() {
+		fromTime = &from
+	}
+
 	l := q.log.With(
 		"method", "backlogPeek",
 		"backlog", b,
@@ -1023,7 +1028,7 @@ func (q *queue) backlogPeek(ctx context.Context, b *QueueBacklog, from time.Time
 			return nil
 		},
 		isMillisecondPrecision: true,
-		fromTime:               &from,
+		fromTime:               fromTime,
 	}
 
 	res, err := p.peek(ctx, backlogSet, true, until, limit)
