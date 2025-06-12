@@ -377,7 +377,7 @@ func (q *queue) processShadowPartitionBacklog(ctx context.Context, shadowPart *Q
 		"capacity", res.Capacity,
 		"refill", res.Refill,
 		"refilled", res.Refilled,
-		"throttle_conf", shadowPart.Throttle,
+		"constraints", constraints,
 		"backlog_throttle", backlog.Throttle,
 	)
 
