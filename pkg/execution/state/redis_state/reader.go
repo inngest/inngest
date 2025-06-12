@@ -323,7 +323,9 @@ func (q *queue) ItemsByPartition(ctx context.Context, shard QueueShard, partitio
 					return
 				}
 
+				latestTimes := []time.Time{}
 				for _, backlog := range backlogs {
+					var last time.Time
 					items, _, err := q.backlogPeek(ctx, backlog, backlogFrom, until, opt.batchSize)
 					if err != nil {
 						l.Error("error retrieving queue items from backlog", "error", err)
@@ -342,7 +344,7 @@ func (q *queue) ItemsByPartition(ctx context.Context, shard QueueShard, partitio
 							start = at
 						}
 						end = at
-						backlogFrom = at
+						last = at
 					}
 
 					l.Debug("iterated items in backlog",
@@ -350,18 +352,26 @@ func (q *queue) ItemsByPartition(ctx context.Context, shard QueueShard, partitio
 						"start", start.Format(time.StampMilli),
 						"end", end.Format(time.StampMilli),
 					)
+					latestTimes = append(latestTimes, last)
 
 					// didn't process anything, meaning there's nothing left to do
 					// exit loop
 					if iterated == 0 {
 						return
 					}
-
-					// shift the starting point 1ms so it doesn't try to grab the same stuff again
-					// NOTE: this could result skipping items if the previous batch of items are all on
-					// the same millisecond
-					backlogFrom = backlogFrom.Add(time.Millisecond)
 				}
+
+				// find the earliest time within the last item timestamp of the previously processed backlogs
+				var earliest time.Time
+				for _, t := range latestTimes {
+					if earliest.IsZero() || t.Before(earliest) {
+						earliest = t
+					}
+				}
+				// shift the starting point 1ms so it doesn't try to grab the same stuff again
+				// NOTE: this could result skipping items if the previous batch of items are all on
+				// the same millisecond
+				backlogFrom = earliest.Add(time.Millisecond)
 			}
 		}
 	}, nil
