@@ -52,7 +52,7 @@ func TestQueueItemScore(t *testing.T) {
 			item := osqueue.QueueItem{
 				AtMS: time.Now().UnixMilli(),
 				Data: osqueue.Item{
-					Kind: osqueue.KindEdge,
+					Kind: kind,
 					Identifier: state.Identifier{
 						RunID: runID,
 					},
@@ -68,7 +68,7 @@ func TestQueueItemScore(t *testing.T) {
 			item := osqueue.QueueItem{
 				AtMS: atMS,
 				Data: osqueue.Item{
-					Kind: osqueue.KindEdge,
+					Kind: kind,
 					Identifier: state.Identifier{
 						RunID: runID,
 					},
@@ -83,7 +83,7 @@ func TestQueueItemScore(t *testing.T) {
 			item := osqueue.QueueItem{
 				AtMS: atMS,
 				Data: osqueue.Item{
-					Kind: osqueue.KindEdge,
+					Kind: kind,
 					Identifier: state.Identifier{
 						RunID:          runID,
 						PriorityFactor: int64ptr(-60),
@@ -91,8 +91,14 @@ func TestQueueItemScore(t *testing.T) {
 				},
 			}
 
+			expected := start.Add(60 * time.Second).UnixMilli()
+			if kind == osqueue.KindSleep {
+				// NOT FUDGED.  Sleeps do not move with fudge factors.
+				expected = start.UnixMilli()
+			}
+
 			actual := item.Score(time.Now())
-			require.Equal(t, start.Add(60*time.Second).UnixMilli(), actual, kind)
+			require.Equal(t, expected, actual, kind)
 		})
 
 	}
@@ -115,6 +121,48 @@ func TestQueueItemScore(t *testing.T) {
 		actual := item.Score(time.Now())
 		require.Equal(t, atMS, actual)
 	})
+
+	// Non-promotable kinds
+	kinds = []string{
+		osqueue.KindDebounce,
+		osqueue.KindScheduleBatch,
+		osqueue.KindQueueMigrate,
+		osqueue.KindPauseBlockFlush,
+		osqueue.KindJobPromote,
+	}
+	for _, kind := range kinds {
+		t.Run(fmt.Sprintf("%s: within promotion timerange", kind), func(t *testing.T) {
+			// Enqueue a job now, and ensure that it is fudged and promoted.
+			atMS := time.Now().UnixMilli()
+			item := osqueue.QueueItem{
+				AtMS: time.Now().UnixMilli(),
+				Data: osqueue.Item{
+					Kind: kind,
+					Identifier: state.Identifier{
+						RunID: runID,
+					},
+				},
+			}
+
+			actual := item.Score(time.Now())
+			require.Equal(t, atMS, actual, kind)
+		})
+
+		t.Run(fmt.Sprintf("%s: outside promotion timerange", kind), func(t *testing.T) {
+			atMS := time.Now().Add(consts.FutureAtLimit * 2).UnixMilli()
+			item := osqueue.QueueItem{
+				AtMS: atMS,
+				Data: osqueue.Item{
+					Kind: kind,
+					Identifier: state.Identifier{
+						RunID: runID,
+					},
+				},
+			}
+			actual := item.Score(time.Now())
+			require.Equal(t, atMS, actual, kind)
+		})
+	}
 }
 
 func TestQueueItemIsLeased(t *testing.T) {
