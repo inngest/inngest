@@ -122,7 +122,7 @@ func (q QueueItem) IsPromotableScore() bool {
 //
 // Future fudging allows us to reschedule jobs at an aprpoproate time through some other
 // queueing means.
-func (q QueueItem) RequiresPromotion(now time.Time) bool {
+func (q QueueItem) RequiresPromotionJob(now time.Time) bool {
 	if !q.IsPromotableScore() {
 		// If this doesn't have fudging enabled, ignore.
 		return false
@@ -156,7 +156,7 @@ func (q QueueItem) Score(now time.Time) int64 {
 		now = time.Now()
 	}
 
-	if !q.IsPromotableScore() || q.RequiresPromotion(now) {
+	if !q.IsPromotableScore() || q.RequiresPromotionJob(now) {
 		return q.AtMS
 	}
 
