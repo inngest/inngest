@@ -464,3 +464,12 @@ func IncrRunFinalizedCounter(ctx context.Context, opts CounterOpt) {
 		Tags:        opts.Tags,
 	})
 }
+
+func IncrStateWrittenCounter(ctx context.Context, size int, opts CounterOpt) {
+	RecordCounterMetric(ctx, int64(size), CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "state_store_bytes_written",
+		Description: "The total number of bytes written to the state store",
+		Tags:        opts.Tags,
+	})
+}
