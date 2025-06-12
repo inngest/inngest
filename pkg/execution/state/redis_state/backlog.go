@@ -611,16 +611,16 @@ func (b QueueBacklog) customConcurrencyKeyID(n int) string {
 	return key.CanonicalKeyID
 }
 
-func (b QueueBacklog) requeueBackOff(now time.Time, constraint enums.QueueConstraint, partition *QueueShadowPartition) time.Time {
+func (b QueueBacklog) requeueBackOff(now time.Time, constraint enums.QueueConstraint, constraints *PartitionConstraintConfig) time.Time {
 	switch constraint {
 	case enums.QueueConstraintThrottle:
-		if partition.Throttle == nil {
-			logger.StdlibLogger(context.Background()).Error("throttle settings not defined while hitting throttle constraints", "shadow_partition", partition, "time", now)
+		if constraints.Throttle == nil {
+			logger.StdlibLogger(context.Background()).Error("throttle settings not defined while hitting throttle constraints", "constraints", constraints, "time", now, "backlog", b)
 			return now.Add(PartitionThrottleLimitRequeueExtension)
 		}
 
 		multiplier := b.SuccessiveThrottleConstrained
-		period := time.Duration(partition.Throttle.Period * int(time.Second))
+		period := time.Duration(constraints.Throttle.Period * int(time.Second))
 		// NOTE: for short periods, we want to increase the frequency of the checks to make sure we admit the items in the right timing
 		// and it's not too late
 		if period < ThrottleBackoffMultiplierThreshold {
