@@ -6644,16 +6644,11 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 
 			require.False(t, hasMember(t, r, kg.BacklogSet(oldBacklog.BacklogID), qi.ID))
 
-			// put item in progress, this is tested separately
-			now := q.clock.Now()
-			leaseDur := 5 * time.Second
-			leaseID, err := q.Lease(ctx, qi, leaseDur, now, nil)
-			require.NoError(t, err)
-			require.NotNil(t, leaseID)
-
 			shadowPartition := q.ItemShadowPartition(ctx, item)
 
 			fnPart, _, _, _ := q.ItemPartitions(ctx, defaultShard, item)
+
+			require.True(t, hasMember(t, r, fnPart.zsetKey(kg), qi.ID), r.Keys())
 
 			requeueFor := at.Add(30 * time.Minute).Truncate(time.Minute)
 
@@ -6675,6 +6670,14 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 
 			require.Equal(t, requeueFor.UnixMilli(), int64(score(t, r, kg.GlobalAccountShadowPartitions(), accountId.String())))
 			require.Equal(t, requeueFor.UnixMilli(), int64(score(t, r, kg.AccountShadowPartitions(accountId), shadowPartition.PartitionID)))
+
+			var requeuedItem osqueue.QueueItem
+			queueItemStr := r.HGet(kg.QueueItem(), qi.ID)
+			require.NotEmpty(t, queueItemStr)
+			require.NoError(t, json.Unmarshal([]byte(queueItemStr), &requeuedItem))
+
+			require.NotNil(t, requeuedItem.Data.Throttle, queueItemStr)
+			require.Equal(t, newThrottle.KeyExpressionHash, requeuedItem.Data.Throttle.KeyExpressionHash)
 		})
 	})
 
