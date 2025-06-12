@@ -11,6 +11,7 @@ import (
 	statev1 "github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/util"
 )
 
@@ -225,6 +226,18 @@ func (v v2) SaveStep(ctx context.Context, id state.ID, stepID string, data []byt
 		),
 	)
 
+	if errors.Is(err, statev1.ErrIdempotentResponse) {
+		// This step data for this step ID has already been saved exactly as before.
+		logger.StdlibLogger(ctx).Warn(
+			"swallowing idempotent step response",
+			"attempt", attempt,
+			"run_id", id.RunID,
+			"step_id", stepID,
+		)
+		// NOTE: hasPending should be accurate in this case.
+		return hasPending, nil
+	}
+
 	if errors.Is(err, statev1.ErrDuplicateResponse) && attempt > 1 {
 		// Swallow the error. Since the 2nd attempt has a "duplicate response"
 		// (i.e. already exists in Redis), we can assume that the first attempt
@@ -239,6 +252,15 @@ func (v v2) SaveStep(ctx context.Context, id state.ID, stepID string, data []byt
 		)
 		return false, nil
 	}
+
+	// We only record the number of bytes written after handling idempotent and
+	// duplicate errors;  those don't count towards backing state store growth.
+	metrics.IncrStateWrittenCounter(ctx, len(data), metrics.CounterOpt{
+		PkgName: "redis_state",
+		Tags: map[string]any{
+			"account_id": id.Tenant.AccountID,
+		},
+	})
 
 	return hasPending, err
 }
