@@ -975,6 +975,13 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 					i.resp.Generator = []*state.GeneratorOpcode{}
 				}
 
+				metrics.IncrRunFinalizedCounter(ctx, metrics.CounterOpt{
+					PkgName: pkgName,
+					Tags: map[string]any{
+						"reason": "fail-early",
+					},
+				})
+
 				if err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), e.assignedQueueShard, *i.resp); err != nil {
 					l.Error("error running finish handler", "error", err)
 				}
@@ -1020,6 +1027,13 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 		// only OpcodeStepError causes try/catch to be handled and us to continue
 		// on error.
 
+		metrics.IncrRunFinalizedCounter(ctx, metrics.CounterOpt{
+			PkgName: pkgName,
+			Tags: map[string]any{
+				"reason": "resp-err",
+			},
+		})
+
 		// TODO: Refactor state input
 		if err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), e.assignedQueueShard, *i.resp); err != nil {
 			l.Error("error running finish handler", "error", err)
@@ -1036,6 +1050,13 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 	// The generator length check is necessary because parallel steps in older
 	// SDK versions (e.g. 2.7.2) can result in an OpcodeNone.
 	if len(i.resp.Generator) == 0 && i.resp.IsFunctionResult() {
+		metrics.IncrRunFinalizedCounter(ctx, metrics.CounterOpt{
+			PkgName: pkgName,
+			Tags: map[string]any{
+				"reason": "opcode-none",
+			},
+		})
+
 		// This is the function result.
 		if err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), e.assignedQueueShard, *i.resp); err != nil {
 			l.Error("error running finish handler", "error", err)
@@ -1748,6 +1769,13 @@ func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequ
 	if err != nil {
 		return fmt.Errorf("could not find shard for account %q: %w", md.ID.Tenant, err)
 	}
+
+	metrics.IncrRunFinalizedCounter(ctx, metrics.CounterOpt{
+		PkgName: pkgName,
+		Tags: map[string]any{
+			"reason": "cancel",
+		},
+	})
 
 	fnCancelledErr := state.ErrFunctionCancelled.Error()
 	if err := e.finalize(ctx, md, evts, f.Function.GetSlug(), shard, state.DriverResponse{

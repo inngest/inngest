@@ -196,6 +196,8 @@ func IsAlwaysRetryable(err error) bool {
 }
 
 type JobResponse struct {
+	// JobID is the item ID.
+	JobID string
 	// At represents the time the job is scheduled for.
 	At time.Time `json:"at"`
 	// Position represents the position for the job in the queue
