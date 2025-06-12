@@ -5,9 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"sync"
 	"time"
+
+	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/config"
@@ -210,8 +211,8 @@ func (s *svc) Run(ctx context.Context) error {
 		case queue.KindQueueMigrate:
 			// NOOP:
 			// this kind don't work in the Dev server
-		case queue.KindSleepScavenge:
-			err = s.handleSleepScavenge(ctx, item)
+		case queue.KindJobPromote:
+			err = s.handleJobPromote(ctx, item)
 		default:
 			err = fmt.Errorf("unknown payload type: %T", item.Payload)
 		}
@@ -440,15 +441,15 @@ func (s *svc) findFunctionByID(ctx context.Context, fnID uuid.UUID) (*inngest.Fu
 	return nil, fmt.Errorf("no function found with ID: %s", fnID)
 }
 
-func (s *svc) handleSleepScavenge(ctx context.Context, item queue.Item) error {
+func (s *svc) handleJobPromote(ctx context.Context, item queue.Item) error {
 	l := s.log.With("run_id", item.Identifier.RunID.String())
 
-	sleepScavenge, ok := item.Payload.(queue.PayloadSleepScavenge)
+	data, ok := item.Payload.(queue.PayloadJobPromote)
 	if !ok {
-		return fmt.Errorf("unable to get sleep scavenge from queue item: %T", item.Payload)
+		return fmt.Errorf("unable to get data from job promotion: %T", item.Payload)
 	}
 
-	l = l.With("sleep_job_id", sleepScavenge.SleepJobID, "sleep_until", time.UnixMilli(sleepScavenge.SleepUntil))
+	l = l.With("job_id", data.PromoteJobID, "scheduled_at", time.UnixMilli(data.ScheduledAt))
 
 	qm, ok := s.queue.(redis_state.QueueManager)
 	if !ok {
@@ -460,11 +461,11 @@ func (s *svc) handleSleepScavenge(ctx context.Context, item queue.Item) error {
 	// to a different shard since the original sleep item was enqueued, so we must fetch the shard now.
 	shard, err := s.shardSelector(ctx, item.Identifier.AccountID, nil)
 	if err != nil {
-		return fmt.Errorf("could not retrieve queue shard for sleep item:%w", err)
+		return fmt.Errorf("could not retrieve queue shard for job promotion:%w", err)
 	}
 
 	// The sleep item should usually exist
-	qi, err := qm.LoadQueueItem(ctx, shard.Name, sleepScavenge.SleepJobID)
+	qi, err := qm.LoadQueueItem(ctx, shard.Name, data.PromoteJobID)
 	if err != nil {
 		if errors.Is(err, redis_state.ErrQueueItemNotFound) {
 			return nil
@@ -478,10 +479,12 @@ func (s *svc) handleSleepScavenge(ctx context.Context, item queue.Item) error {
 		return nil
 	}
 
-	fudgedAt := time.UnixMilli(qi.Score(time.Now()))
-	err = qm.Requeue(ctx, shard, *qi, fudgedAt)
+	// Grab the score, which already handles promotion by fudigng the time to
+	// be that of the actual run ID, prioritizing older runs.
+	nextTime := time.UnixMilli(qi.Score(time.Now()))
+	err = qm.Requeue(ctx, shard, *qi, nextTime)
 	if err != nil {
-		return fmt.Errorf("could not requeue sleep item with fudged time: %w", err)
+		return fmt.Errorf("could not requeue job with promoted time: %w", err)
 	}
 
 	return nil

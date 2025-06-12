@@ -12,5 +12,5 @@ const (
 	KindEdgeError       = "edge-error" // KindEdgeError is used to indicate a final step error attempting a graceful save.
 	KindQueueMigrate    = "queue-migrate"
 	KindPauseBlockFlush = "pbf" // Flushes pauses from the buffer to blocks.
-	KindSleepScavenge   = "sleep-scavenge"
+	KindJobPromote      = "jps" // job promotion service
 )

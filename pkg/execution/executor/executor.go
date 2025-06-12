@@ -2463,33 +2463,6 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, i *runInstance, gen
 		return nil
 	}
 
-	// If we're processing a user function and the sleep duration is in the future,
-	// enqueue a sleep scavenge system queue item that will Requeue the original sleep queue item.
-	// We do this to fudge the original queue item at the exact time, the run was scheduled for to ensure
-	// sleeps for existing function runs are picked up earlier than items for later function runs.
-	scavengeAt := until.Add(-2 * time.Second)
-	if i.md.ID.Tenant.AccountID != uuid.Nil && i.md.ID.FunctionID != uuid.Nil && scavengeAt.After(now) {
-		scavengeJobID := fmt.Sprintf("scavenge-%s", jobID)
-		scavengeQueueName := fmt.Sprintf("sleep-scavenge:%s", i.md.ID.FunctionID)
-		err = e.queue.Enqueue(ctx, queue.Item{
-			JobID:          &scavengeJobID,
-			WorkspaceID:    i.md.ID.Tenant.EnvID,
-			QueueName:      &scavengeQueueName,
-			Kind:           queue.KindSleepScavenge,
-			Identifier:     i.item.Identifier,
-			PriorityFactor: i.item.PriorityFactor,
-			Attempt:        0,
-			MaxAttempts:    i.item.MaxAttempts,
-			Payload: queue.PayloadSleepScavenge{
-				SleepJobID: jobID,
-				SleepUntil: until.UnixMilli(),
-			},
-		}, scavengeAt, queue.EnqueueOpts{})
-		if err == redis_state.ErrQueueItemExists {
-			return nil
-		}
-	}
-
 	for _, e := range e.lifecycles {
 		go e.OnSleep(context.WithoutCancel(ctx), i.md, i.item, gen, until)
 	}
