@@ -1463,8 +1463,8 @@ func (p *processor) iterate(ctx context.Context) error {
 					if errors.Is(err, ErrQueueItemNotFound) {
 						return nil
 					}
-					return err
 				}
+				return err
 			})
 			continue
 		}
