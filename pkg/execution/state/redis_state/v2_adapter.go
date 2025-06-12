@@ -46,7 +46,7 @@ func (v v2) Create(ctx context.Context, s state.CreateState) (statev1.State, err
 		batchData[n] = data
 
 	}
-	return v.mgr.New(ctx, statev1.Input{
+	state, err := v.mgr.New(ctx, statev1.Input{
 		Identifier: statev1.Identifier{
 			RunID:                 s.Metadata.ID.RunID,
 			WorkflowID:            s.Metadata.ID.FunctionID,
@@ -69,6 +69,15 @@ func (v v2) Create(ctx context.Context, s state.CreateState) (statev1.State, err
 		Steps:          s.Steps,
 		StepInputs:     s.StepInputs,
 	})
+	if err == nil {
+		metrics.IncrStateWrittenCounter(ctx, len(batchData), metrics.CounterOpt{
+			PkgName: "redis_state",
+			Tags: map[string]any{
+				"account_id": s.Metadata.ID.Tenant.AccountID,
+			},
+		})
+	}
+	return state, err
 }
 
 // Delete deletes state, metadata, and - when pauses are included - associated pauses
