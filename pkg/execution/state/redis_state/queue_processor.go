@@ -1139,6 +1139,11 @@ func (q *queue) process(
 
 			qi.AtMS = at.UnixMilli()
 			if err := q.Requeue(context.WithoutCancel(ctx), q.primaryQueueShard, qi, at); err != nil {
+				if err == ErrQueueItemNotFound {
+					// Safe. The executor may have dequeued.
+					return nil
+				}
+
 				q.log.Error("error requeuing job", "error", err, "item", qi)
 				return err
 			}
@@ -1452,13 +1457,24 @@ func (p *processor) iterate(ctx context.Context) error {
 		if p.parallel {
 			item := *i
 			eg.Go(func() error {
-				return p.process(ctx, &item)
+				err := p.process(ctx, &item)
+				if err != nil {
+					// NOTE: ignore if the queue item is not found
+					if errors.Is(err, ErrQueueItemNotFound) {
+						return nil
+					}
+				}
+				return err
 			})
 			continue
 		}
 
 		// non-parallel (sequential fifo) processing.
 		if err = p.process(ctx, i); err != nil {
+			// NOTE: ignore if the queue item is not found
+			if errors.Is(err, ErrQueueItemNotFound) {
+				continue
+			}
 			// always break on the first error;  if processing returns an error we
 			// always assume that we stop iterating.
 			//
