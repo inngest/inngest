@@ -473,6 +473,11 @@ func (s *svc) handleSleepScavenge(ctx context.Context, item queue.Item) error {
 		return fmt.Errorf("could not load queue item: %w", err)
 	}
 
+	// Ignore sleep scavenging if already leased
+	if qi.IsLeased(time.Now()) {
+		return nil
+	}
+
 	fudgedAt := time.UnixMilli(qi.Score(time.Now()))
 	err = qm.Requeue(ctx, shard, *qi, fudgedAt)
 	if err != nil {
