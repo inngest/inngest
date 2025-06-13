@@ -298,6 +298,13 @@ func WithRealtimePublisher(b realtime.Publisher) ExecutorOpt {
 	}
 }
 
+func WithEventReader(r cqrs.EventReader) ExecutorOpt {
+	return func(e execution.Executor) error {
+		e.(*executor).eventReader = r
+		return nil
+	}
+}
+
 // executor represents a built-in executor for running workflows.
 type executor struct {
 	log logger.Logger
@@ -340,6 +347,9 @@ type executor struct {
 	shardFinder        redis_state.ShardSelector
 
 	traceReader cqrs.TraceReader
+
+	// eventReader is used to read events from the backing store.
+	eventReader cqrs.EventReader
 }
 
 func (e *executor) SetFinalizer(f execution.FinalizePublisher) {
@@ -415,7 +425,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	}
 
 	if req.Function.Debounce != nil && !req.PreventDebounce {
-		err := e.debouncer.Debounce(ctx, debounce.DebounceItem{
+		prevEventID, err := e.debouncer.Debounce(ctx, debounce.DebounceItem{
 			AccountID:        req.AccountID,
 			WorkspaceID:      req.WorkspaceID,
 			AppID:            req.AppID,
@@ -428,6 +438,35 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		if err != nil {
 			return nil, err
 		}
+
+		// If we have a previous event ID, that means that debouncing
+		// overwrote the execution for that event. If it's an invoke, we need
+		// to clean that up and send a finished event to stop the run from
+		// hanging.
+		//
+		// We have to make sure that we load the overwritten event here, as
+		// the new event that triggered the run could be a different type.
+		if prevEventID != nil {
+			evt, err := e.eventReader.FindEvent(ctx, req.WorkspaceID, *prevEventID)
+			if err != nil {
+				return nil, fmt.Errorf("error finding previous event for debounced function: %w", err)
+			}
+
+			if evt != nil && evt.GetEvent().IsInvokeEvent() {
+				if err := e.InvokeFailHandler(ctx, execution.InvokeFailHandlerOpts{
+					OriginalEvent: evt,
+					FunctionID:    req.Function.ID.String(),
+					RunID:         "",
+					Err: map[string]any{
+						"name":    "Error",
+						"message": "Invoke was debounced",
+					},
+				}); err != nil {
+					return nil, fmt.Errorf("error handling invoke fail: %w", err)
+				}
+			}
+		}
+
 		return nil, ErrFunctionDebounced
 	}
 
