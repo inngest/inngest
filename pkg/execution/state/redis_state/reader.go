@@ -275,6 +275,11 @@ func (q *queue) ItemsByPartition(ctx context.Context, shard QueueShard, partitio
 						return fmt.Errorf("error peeking backlogs for partition: %w", err)
 					}
 
+					if len(backlogs) == 0 {
+						l.Warn("no more backlogs to iterate")
+						return nil
+					}
+
 					latestTimes := []time.Time{}
 					for _, backlog := range backlogs {
 						var last time.Time
