@@ -3,7 +3,11 @@ package golang
 import (
 	"context"
 	"fmt"
+	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngestgo"
+	"github.com/inngest/inngestgo/step"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"sync/atomic"
 	"testing"
@@ -128,4 +132,173 @@ func TestSingletonFunctionWithKeyResolvingToFalse(t *testing.T) {
 
 	// The function executed twice
 	require.EqualValues(t, 2, atomic.LoadInt32(&total))
+}
+
+func TestSingletonCancelMode(t *testing.T) {
+	appName := uuid.New().String()
+
+	inngestClient, server, registerFuncs := NewSDKHandler(t, appName)
+	defer server.Close()
+
+	var successCounter int32
+	var cancelCounter int32
+	var startedCounter int32
+
+	trigger := "test/singleton-cancel"
+
+	_, err := inngestgo.CreateFunction(
+		inngestClient,
+		inngestgo.FunctionOpts{
+			ID: "fn-singleton-cancel",
+			Singleton: &inngestgo.Singleton{
+				Key:  inngestgo.StrPtr("event.data.user.id"),
+				Mode: enums.SingletonModeCancel,
+			},
+		},
+		inngestgo.EventTrigger(trigger, nil),
+		func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
+			_, err := step.Run(ctx, "counter1", func(ctx context.Context) (any, error) {
+				atomic.AddInt32(&startedCounter, 1)
+				return "done", nil
+			})
+			require.NoError(t, err)
+			step.Sleep(ctx, "sleep", 10*time.Second)
+
+			return true, nil
+		},
+	)
+
+	require.NoError(t, err)
+
+	_, err = inngestgo.CreateFunction(
+		inngestClient,
+		inngestgo.FunctionOpts{
+			ID: "on-cancel",
+		},
+		inngestgo.EventTrigger("inngest/function.cancelled",
+			inngestgo.StrPtr(fmt.Sprintf(
+				"event.data.function_id == '%s-fn-singleton-cancel'",
+				appName,
+			))),
+		func(ctx context.Context, input inngestgo.Input[map[string]any]) (any, error) {
+			atomic.AddInt32(&cancelCounter, 1)
+			return nil, nil
+		},
+	)
+
+	require.NoError(t, err)
+
+	_, err = inngestgo.CreateFunction(
+		inngestClient,
+		inngestgo.FunctionOpts{
+			ID: "on-finish",
+		},
+		inngestgo.EventTrigger("inngest/function.finished", inngestgo.StrPtr(fmt.Sprintf(
+			"event.data.function_id == '%s-fn-singleton-cancel' && event.data.result == true",
+			appName,
+		))),
+		func(ctx context.Context, input inngestgo.Input[map[string]any]) (any, error) {
+			atomic.AddInt32(&successCounter, 1)
+			return nil, nil
+		},
+	)
+
+	require.NoError(t, err)
+	registerFuncs()
+
+	numEvents := 50
+
+	for i := 0; i < numEvents; i++ {
+		go func() {
+			_, err := inngestClient.Send(context.Background(), inngestgo.Event{
+				Name: trigger,
+				Data: map[string]any{
+					"user": map[string]any{"id": 42},
+				},
+			})
+			require.NoError(t, err)
+		}()
+	}
+
+	require.EventuallyWithT(t, func(c *assert.CollectT) {
+		// Only the last one should have finished executing successfully, the rest should have been cancelled
+		require.Equal(c, int32(numEvents-1), atomic.LoadInt32(&cancelCounter), "cancel counter should be 1")
+		require.Equal(c, int32(1), atomic.LoadInt32(&successCounter), "success counter should be 1")
+	}, 15*time.Second, 100*time.Millisecond)
+}
+
+func TestSingletonDifferentKeysBothRun(t *testing.T) {
+	appName := uuid.New().String()
+
+	inngestClient, server, registerFuncs := NewSDKHandler(t, appName)
+	defer server.Close()
+
+	var successCounter int32
+	var cancelCounter int32
+
+	trigger := "test/singleton-cancel-different-keys"
+
+	_, err := inngestgo.CreateFunction(
+		inngestClient,
+		inngestgo.FunctionOpts{
+			ID: "fn-singleton-cancel-different-keys",
+			Singleton: &inngestgo.Singleton{
+				Key:  inngestgo.StrPtr("event.data.user.id"),
+				Mode: enums.SingletonModeCancel,
+			},
+		},
+		inngestgo.EventTrigger(trigger, nil),
+		func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
+			step.Sleep(ctx, "sleep", 5*time.Second)
+			return true, nil
+		},
+	)
+	require.NoError(t, err)
+
+	_, err = inngestgo.CreateFunction(
+		inngestClient,
+		inngestgo.FunctionOpts{ID: "on-cancel-different-keys"},
+		inngestgo.EventTrigger("inngest/function.cancelled", inngestgo.StrPtr(fmt.Sprintf(
+			"event.data.function_id == '%s-fn-singleton-cancel-different-keys'",
+			appName,
+		))),
+		func(ctx context.Context, input inngestgo.Input[map[string]any]) (any, error) {
+			atomic.AddInt32(&cancelCounter, 1)
+			return nil, nil
+		},
+	)
+	require.NoError(t, err)
+
+	_, err = inngestgo.CreateFunction(
+		inngestClient,
+		inngestgo.FunctionOpts{ID: "on-success-different-keys"},
+		inngestgo.EventTrigger("inngest/function.finished", inngestgo.StrPtr(fmt.Sprintf(
+			"event.data.function_id == '%s-fn-singleton-cancel-different-keys' && event.data.result == true",
+			appName,
+		))),
+		func(ctx context.Context, input inngestgo.Input[map[string]any]) (any, error) {
+			atomic.AddInt32(&successCounter, 1)
+			return nil, nil
+		},
+	)
+	require.NoError(t, err)
+
+	registerFuncs()
+
+	_, err = inngestClient.Send(context.Background(), inngestgo.Event{
+		Name: trigger,
+		Data: map[string]any{"user": map[string]any{"id": 1}},
+	})
+	require.NoError(t, err)
+
+	_, err = inngestClient.Send(context.Background(), inngestgo.Event{
+		Name: trigger,
+		Data: map[string]any{"user": map[string]any{"id": 2}},
+	})
+	require.NoError(t, err)
+
+	require.EventuallyWithT(t, func(c *assert.CollectT) {
+		require.Equal(c, int32(2), atomic.LoadInt32(&successCounter))
+		require.Equal(c, int32(0), atomic.LoadInt32(&cancelCounter))
+	}, 10*time.Second, 100*time.Millisecond)
 }
