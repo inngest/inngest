@@ -22,13 +22,48 @@ export function VerticalPlanCard({
         {transformedPlan.name}
         {displayTrialPill && <Pill>Trial</Pill>}
       </h4>
-      <div className="mb-1 text-xs font-bold uppercase">From</div>
+      {transformedPlan.name === 'Hobby - Free' ? (
+        <div className="mb-1 text-xs font-bold uppercase">Always</div>
+      ) : (
+        <div className="mb-1 text-xs font-bold uppercase">From</div>
+      )}
       <div className="text-2xl">
-        <span className="text-4xl font-medium">{transformedPlan.price}</span>/
-        {transformedPlan.billingPeriod}
+        <span className="text-4xl font-medium">{transformedPlan.price}</span>
+        {transformedPlan.price !== 'Contact us' && <>/{transformedPlan.billingPeriod}</>}
       </div>
 
-      <UpgradeButton plan={plan} currentPlan={currentPlan} onPlanChange={onPlanChange} />
+      {transformedPlan.name === 'Hobby - Free' ? (
+        (() => {
+          const paygPlan: Plan = {
+            ...plan,
+            id: 'hobby-payg',
+            name: 'Hobby (Pay as you go)',
+            amount: 0,
+          };
+          return (
+            <div className="flex gap-2">
+              <div className="w-1/4">
+                <UpgradeButton
+                  plan={plan}
+                  currentPlan={currentPlan}
+                  onPlanChange={onPlanChange}
+                  label="Free plan"
+                />
+              </div>
+              <div className="flex-1">
+                <UpgradeButton
+                  plan={paygPlan}
+                  currentPlan={currentPlan}
+                  onPlanChange={onPlanChange}
+                  label="Upgrade to pay-as-you-go"
+                />
+              </div>
+            </div>
+          );
+        })()
+      ) : (
+        <UpgradeButton plan={plan} currentPlan={currentPlan} onPlanChange={onPlanChange} />
+      )}
       <hr className="mb-6" />
       <ul className="flex flex-col">
         {transformedPlan.features.map((feature, i) => (
