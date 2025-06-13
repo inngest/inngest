@@ -977,8 +977,13 @@ func (q *queue) BacklogPrepareNormalize(ctx context.Context, b *QueueBacklog, sp
 	}
 }
 
-func (q *queue) backlogPeek(ctx context.Context, b *QueueBacklog, from time.Time, until time.Time, limit int64) ([]*osqueue.QueueItem, int, error) {
+func (q *queue) backlogPeek(ctx context.Context, b *QueueBacklog, from time.Time, until time.Time, limit int64, opts ...PeekOpt) ([]*osqueue.QueueItem, int, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "backlogPeek"), redis_telemetry.ScopeQueue)
+
+	opt := peekOption{}
+	for _, apply := range opts {
+		apply(&opt)
+	}
 
 	if !q.isPermittedQueueKind() {
 		return nil, 0, fmt.Errorf("unsupported queue shared kind for backlogPeek: %s", q.primaryQueueShard.Kind)
@@ -1009,6 +1014,10 @@ func (q *queue) backlogPeek(ctx context.Context, b *QueueBacklog, from time.Time
 	)
 
 	rc := q.primaryQueueShard.RedisClient
+	if opt.Shard != nil {
+		rc = opt.Shard.RedisClient
+	}
+
 	backlogSet := rc.kg.BacklogSet(b.BacklogID)
 
 	p := peeker[osqueue.QueueItem]{
@@ -1031,7 +1040,7 @@ func (q *queue) backlogPeek(ctx context.Context, b *QueueBacklog, from time.Time
 		fromTime:               fromTime,
 	}
 
-	res, err := p.peek(ctx, backlogSet, true, until, limit)
+	res, err := p.peek(ctx, backlogSet, true, until, limit, opts...)
 	if err != nil {
 		if errors.Is(err, ErrPeekerPeekExceedsMaxLimits) {
 			return nil, 0, ErrBacklogPeekMaxExceedsLimits

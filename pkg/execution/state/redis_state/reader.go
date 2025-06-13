@@ -270,7 +270,9 @@ func (q *queue) ItemsByPartition(ctx context.Context, shard QueueShard, partitio
 					var iterated int
 
 					// TODO: maybe provide a different limit?
-					backlogs, _, err := q.ShadowPartitionPeek(ctx, &spt, true, until, ShadowPartitionPeekMaxBacklogs)
+					backlogs, _, err := q.ShadowPartitionPeek(ctx, &spt, true, until, ShadowPartitionPeekMaxBacklogs,
+						WithPeekOptQueueShard(&shard),
+					)
 					if err != nil {
 						return fmt.Errorf("error peeking backlogs for partition: %w", err)
 					}
@@ -283,7 +285,9 @@ func (q *queue) ItemsByPartition(ctx context.Context, shard QueueShard, partitio
 					latestTimes := []time.Time{}
 					for _, backlog := range backlogs {
 						var last time.Time
-						items, _, err := q.backlogPeek(ctx, backlog, backlogFrom, until, opt.batchSize)
+						items, _, err := q.backlogPeek(ctx, backlog, backlogFrom, until, opt.batchSize,
+							WithPeekOptQueueShard(&shard),
+						)
 						if err != nil {
 							return fmt.Errorf("error retrieving queue items from backlog: %w", err)
 						}
