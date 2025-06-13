@@ -1609,9 +1609,9 @@ func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error 
 			metrics.IncrRequeueExistingToBacklogCounter(ctx, metrics.CounterOpt{
 				PkgName: pkgName,
 				Tags: map[string]any{
-					"queue_shard":  p.queue.primaryQueueShard.Name,
-					"partition_id": item.FunctionID.String(),
-					"status":       "throttled",
+					"queue_shard": p.queue.primaryQueueShard.Name,
+					// "partition_id": item.FunctionID.String(),
+					"status": "throttled",
 				},
 			})
 		}
@@ -1666,9 +1666,9 @@ func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error 
 			metrics.IncrRequeueExistingToBacklogCounter(ctx, metrics.CounterOpt{
 				PkgName: pkgName,
 				Tags: map[string]any{
-					"queue_shard":  p.queue.primaryQueueShard.Name,
-					"partition_id": item.FunctionID.String(),
-					"status":       status,
+					"queue_shard": p.queue.primaryQueueShard.Name,
+					// "partition_id": item.FunctionID.String(),
+					"status": status,
 				},
 			})
 		}
@@ -1707,9 +1707,9 @@ func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error 
 			metrics.IncrRequeueExistingToBacklogCounter(ctx, metrics.CounterOpt{
 				PkgName: pkgName,
 				Tags: map[string]any{
-					"queue_shard":  p.queue.primaryQueueShard.Name,
-					"partition_id": item.FunctionID.String(),
-					"status":       "custom_key_concurrency_limit",
+					"queue_shard": p.queue.primaryQueueShard.Name,
+					// "partition_id": item.FunctionID.String(),
+					"status": "custom_key_concurrency_limit",
 				},
 			})
 		}
