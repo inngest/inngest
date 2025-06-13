@@ -214,6 +214,7 @@ func (q *queue) RunningCount(ctx context.Context, workflowID uuid.UUID) (int64, 
 func (q *queue) ItemsByPartition(ctx context.Context, shard QueueShard, partitionID uuid.UUID, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*osqueue.QueueItem], error) {
 	opt := queueIterOpt{
 		batchSize: 1000,
+		interval:  500 * time.Millisecond,
 		allowKeyQueues: func() bool {
 			return false
 		},
@@ -247,132 +248,144 @@ func (q *queue) ItemsByPartition(ctx context.Context, shard QueueShard, partitio
 	ptFrom := from
 
 	return func(yield func(*osqueue.QueueItem) bool) {
-		for {
-			var iterated int
-
-			// peek function partition
-			items, err := q.peek(ctx, shard, peekOpts{
-				From:         &ptFrom,
-				Until:        until,
-				Limit:        opt.batchSize,
-				PartitionID:  partitionID.String(),
-				PartitionKey: pt.zsetKey(shard.RedisClient.kg),
-			})
-			if err != nil {
-				l.Error("error peeking items for iterator", "error", err)
-				return
-			}
-
-			var start, end time.Time
-			for _, qi := range items {
-				if !yield(qi) {
-					return
-				}
-
-				at := time.UnixMilli(qi.AtMS)
-				if start.IsZero() {
-					start = at
-				}
-				end = at
-				ptFrom = at
-				iterated++
-			}
-
-			l.Debug("iterated items in partition",
-				"count", iterated,
-				"start", start.Format(time.StampMilli),
-				"end", end.Format(time.StampMilli),
-			)
-
-			// didn't process anything, exit loop
-			if iterated == 0 {
-				break
-			}
-
-			// shift the starting point 1ms so it doesn't try to grab the same stuff again
-			// NOTE: this could result skipping items if the previous batch of items are all on
-			// the same millisecond
-			ptFrom = ptFrom.Add(time.Millisecond)
-		}
+		eg := errgroup.Group{}
 
 		if opt.allowKeyQueues() {
-			hash := shard.RedisClient.kg.ShadowPartitionMeta()
-			cmd := rc.B().Hget().Key(hash).Field(partitionID.String()).Build()
-			byt, err := rc.Do(ctx, cmd).AsBytes()
-			if err != nil {
-				l.Error("error retrieving shadow partition from queue", "error", err)
-				return
-			}
+			eg.Go(func() error {
+				hash := shard.RedisClient.kg.ShadowPartitionMeta()
+				cmd := rc.B().Hget().Key(hash).Field(partitionID.String()).Build()
+				byt, err := rc.Do(ctx, cmd).AsBytes()
+				if err != nil {
+					return fmt.Errorf("error retrieving shadow partition from queue: %w", err)
+				}
 
-			var spt QueueShadowPartition
-			if err := json.Unmarshal(byt, &spt); err != nil {
-				l.Error("error unmarshalling shadow partition", "error", err)
-				return
-			}
+				var spt QueueShadowPartition
+				if err := json.Unmarshal(byt, &spt); err != nil {
+					return fmt.Errorf("error unmarshalling shadow partition: %w", err)
+				}
 
-			l = l.With("shadow_partition", spt)
-			backlogFrom := from
+				l = l.With("shadow_partition", spt)
+				backlogFrom := from
 
+				for {
+					var iterated int
+
+					// TODO: maybe provide a different limit?
+					backlogs, _, err := q.ShadowPartitionPeek(ctx, &spt, true, until, ShadowPartitionPeekMaxBacklogs)
+					if err != nil {
+						return fmt.Errorf("error peeking backlogs for partition: %w", err)
+					}
+
+					latestTimes := []time.Time{}
+					for _, backlog := range backlogs {
+						var last time.Time
+						items, _, err := q.backlogPeek(ctx, backlog, backlogFrom, until, opt.batchSize)
+						if err != nil {
+							return fmt.Errorf("error retrieving queue items from backlog: %w", err)
+						}
+
+						var start, end time.Time
+						for _, qi := range items {
+							if !yield(qi) {
+								return nil
+							}
+							iterated++
+
+							at := time.UnixMilli(qi.AtMS)
+							if start.IsZero() {
+								start = at
+							}
+							end = at
+							last = at
+						}
+
+						l.Debug("iterated items in backlog",
+							"count", iterated,
+							"start", start.Format(time.StampMilli),
+							"end", end.Format(time.StampMilli),
+						)
+						latestTimes = append(latestTimes, last)
+
+						// didn't process anything, meaning there's nothing left to do
+						// exit loop
+						if iterated == 0 {
+							return nil
+						}
+					}
+
+					// find the earliest time within the last item timestamp of the previously processed backlogs
+					var earliest time.Time
+					for _, t := range latestTimes {
+						if earliest.IsZero() || t.Before(earliest) {
+							earliest = t
+						}
+					}
+					// shift the starting point 1ms so it doesn't try to grab the same stuff again
+					// NOTE: this could result skipping items if the previous batch of items are all on
+					// the same millisecond
+					backlogFrom = earliest.Add(time.Millisecond)
+
+					// wait a little before proceeding
+					<-time.After(opt.interval)
+				}
+			})
+		}
+
+		eg.Go(func() error {
 			for {
 				var iterated int
 
-				// TODO: maybe provide a different limit?
-				backlogs, _, err := q.ShadowPartitionPeek(ctx, &spt, true, until, ShadowPartitionPeekMaxBacklogs)
+				// peek function partition
+				items, err := q.peek(ctx, shard, peekOpts{
+					From:         &ptFrom,
+					Until:        until,
+					Limit:        opt.batchSize,
+					PartitionID:  partitionID.String(),
+					PartitionKey: pt.zsetKey(shard.RedisClient.kg),
+				})
 				if err != nil {
-					l.Error("error peeking backlogs for partition", "error", err)
-					return
+					l.Error("error peeking items for iterator", "error", err)
+					return fmt.Errorf("error peeking items for iterator: %w", err)
 				}
 
-				latestTimes := []time.Time{}
-				for _, backlog := range backlogs {
-					var last time.Time
-					items, _, err := q.backlogPeek(ctx, backlog, backlogFrom, until, opt.batchSize)
-					if err != nil {
-						l.Error("error retrieving queue items from backlog", "error", err)
-						return
+				var start, end time.Time
+				for _, qi := range items {
+					if !yield(qi) {
+						return nil
 					}
 
-					var start, end time.Time
-					for _, qi := range items {
-						if !yield(qi) {
-							return
-						}
-						iterated++
-
-						at := time.UnixMilli(qi.AtMS)
-						if start.IsZero() {
-							start = at
-						}
-						end = at
-						last = at
+					at := time.UnixMilli(qi.AtMS)
+					if start.IsZero() {
+						start = at
 					}
-
-					l.Debug("iterated items in backlog",
-						"count", iterated,
-						"start", start.Format(time.StampMilli),
-						"end", end.Format(time.StampMilli),
-					)
-					latestTimes = append(latestTimes, last)
-
-					// didn't process anything, meaning there's nothing left to do
-					// exit loop
-					if iterated == 0 {
-						return
-					}
+					end = at
+					ptFrom = at
+					iterated++
 				}
 
-				// find the earliest time within the last item timestamp of the previously processed backlogs
-				var earliest time.Time
-				for _, t := range latestTimes {
-					if earliest.IsZero() || t.Before(earliest) {
-						earliest = t
-					}
+				l.Debug("iterated items in partition",
+					"count", iterated,
+					"start", start.Format(time.StampMilli),
+					"end", end.Format(time.StampMilli),
+				)
+
+				// didn't process anything, exit loop
+				if iterated == 0 {
+					return nil
 				}
+
 				// shift the starting point 1ms so it doesn't try to grab the same stuff again
 				// NOTE: this could result skipping items if the previous batch of items are all on
 				// the same millisecond
-				backlogFrom = earliest.Add(time.Millisecond)
+				ptFrom = ptFrom.Add(time.Millisecond)
+
+				// wait a little before proceeding
+				<-time.After(opt.interval)
 			}
+		})
+
+		if err := eg.Wait(); err != nil {
+			l.Error("error iterating through items in partition", "error", err)
 		}
 	}, nil
 }
@@ -380,6 +393,7 @@ func (q *queue) ItemsByPartition(ctx context.Context, shard QueueShard, partitio
 func (q *queue) ItemsByBacklog(ctx context.Context, shard QueueShard, backlogID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*osqueue.QueueItem], error) {
 	opt := queueIterOpt{
 		batchSize: 1000,
+		interval:  500 * time.Millisecond,
 		allowKeyQueues: func() bool {
 			return false
 		},
@@ -457,6 +471,8 @@ func (q *queue) ItemsByBacklog(ctx context.Context, shard QueueShard, backlogID 
 			// NOTE: this could result skipping items if the previous batch of items are all on
 			// the same millisecond
 			backlogFrom = backlogFrom.Add(time.Millisecond)
+
+			<-time.After(opt.interval)
 		}
 	}, nil
 }
