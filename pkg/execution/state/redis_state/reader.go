@@ -444,7 +444,9 @@ func (q *queue) ItemsByBacklog(ctx context.Context, shard QueueShard, backlogID 
 			var iterated int
 
 			// peek items for backlog
-			items, _, err := q.backlogPeek(ctx, &backlog, backlogFrom, until, opt.batchSize)
+			items, _, err := q.backlogPeek(ctx, &backlog, backlogFrom, until, opt.batchSize,
+				WithPeekOptQueueShard(&shard),
+			)
 			if err != nil {
 				l.Error("error retrieving queue items from backlog", "error", err)
 				return
