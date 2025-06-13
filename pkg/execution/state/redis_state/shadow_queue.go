@@ -62,7 +62,9 @@ func (q *queue) shadowWorker(ctx context.Context, qspc chan shadowPartitionChanM
 					}
 					return nil, err
 				},
-				map[string]any{"partition_id": msg.sp.PartitionID},
+				map[string]any{
+					// 	"partition_id": msg.sp.PartitionID,
+				},
 			)
 			if err != nil {
 				q.log.Error("could not scan shadow partition", "error", err, "shadow_part", msg.sp, "continuation_count", msg.continuationCount)
@@ -86,9 +88,9 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 			metrics.IncrQueueShadowPartitionLeaseContentionCounter(ctx, metrics.CounterOpt{
 				PkgName: pkgName,
 				Tags: map[string]any{
-					"queue_shard":  q.primaryQueueShard.Name,
-					"partition_id": shadowPart.PartitionID,
-					"action":       "lease",
+					"queue_shard": q.primaryQueueShard.Name,
+					// "partition_id": shadowPart.PartitionID,
+					"action": "lease",
 				},
 			})
 			return nil
@@ -97,8 +99,8 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 			metrics.IncrQueueShadowPartitionGoneCounter(ctx, metrics.CounterOpt{
 				PkgName: pkgName,
 				Tags: map[string]any{
-					"queue_shard":  q.primaryQueueShard.Name,
-					"partition_id": shadowPart.PartitionID,
+					"queue_shard": q.primaryQueueShard.Name,
+					// "partition_id": shadowPart.PartitionID,
 				},
 			})
 			return nil
@@ -139,9 +141,9 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 						metrics.IncrQueueShadowPartitionLeaseContentionCounter(ctx, metrics.CounterOpt{
 							PkgName: pkgName,
 							Tags: map[string]any{
-								"queue_shard":  q.primaryQueueShard.Name,
-								"partition_id": shadowPart.PartitionID,
-								"action":       "extend_lease",
+								"queue_shard": q.primaryQueueShard.Name,
+								// "partition_id": shadowPart.PartitionID,
+								"action": "extend_lease",
 							},
 						})
 					}
@@ -200,7 +202,9 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 	}
 	metrics.GaugeShadowPartitionSize(ctx, int64(totalCount), metrics.GaugeOpt{
 		PkgName: pkgName,
-		Tags:    map[string]any{"partition_id": shadowPart.PartitionID},
+		Tags: map[string]any{
+			// "partition_id": shadowPart.PartitionID,
+		},
 	})
 
 	// Refill backlogs in random order
@@ -308,9 +312,9 @@ func (q *queue) processShadowPartitionBacklog(ctx context.Context, shadowPart *Q
 		metrics.IncrQueueOutdatedBacklogCounter(ctx, metrics.CounterOpt{
 			PkgName: pkgName,
 			Tags: map[string]any{
-				"queue_shard":  q.primaryQueueShard.Name,
-				"partition_id": shadowPart.PartitionID,
-				"reason":       reason.String(),
+				"queue_shard": q.primaryQueueShard.Name,
+				// "partition_id": shadowPart.PartitionID,
+				"reason": reason.String(),
 			},
 		})
 
@@ -363,7 +367,9 @@ func (q *queue) processShadowPartitionBacklog(ctx context.Context, shadowPart *Q
 		func(ctx context.Context) (*BacklogRefillResult, error) {
 			return q.BacklogRefill(ctx, backlog, shadowPart, refillUntil, constraints)
 		},
-		map[string]any{"partition_id": shadowPart.PartitionID},
+		map[string]any{
+			//	"partition_id": shadowPart.PartitionID,
+		},
 	)
 	if err != nil {
 		return nil, false, fmt.Errorf("could not refill backlog: %w", err)
@@ -386,8 +392,8 @@ func (q *queue) processShadowPartitionBacklog(ctx context.Context, shadowPart *Q
 		opts := metrics.CounterOpt{
 			PkgName: pkgName,
 			Tags: map[string]any{
-				"queue_shard":  q.primaryQueueShard.Name,
-				"partition_id": shadowPart.PartitionID,
+				"queue_shard": q.primaryQueueShard.Name,
+				// "partition_id": shadowPart.PartitionID,
 			},
 		}
 
@@ -404,9 +410,9 @@ func (q *queue) processShadowPartitionBacklog(ctx context.Context, shadowPart *Q
 			metrics.IncrQueueBacklogRefillConstraintCounter(ctx, metrics.CounterOpt{
 				PkgName: pkgName,
 				Tags: map[string]any{
-					"queue_shard":  q.primaryQueueShard.Name,
-					"partition_id": shadowPart.PartitionID,
-					"constraint":   res.Constraint.String(),
+					"queue_shard": q.primaryQueueShard.Name,
+					// "partition_id": shadowPart.PartitionID,
+					"constraint": res.Constraint.String(),
 				},
 			})
 
@@ -500,7 +506,9 @@ func (q *queue) scanShadowContinuations(ctx context.Context) error {
 					}
 					return nil, err
 				},
-				map[string]any{"partition_id": sp.PartitionID},
+				map[string]any{
+					// "partition_id": sp.PartitionID,
+				},
 			)
 			if err != nil {
 				if err == ErrShadowPartitionLeaseNotFound {
@@ -908,9 +916,9 @@ func (q *queue) ShadowPartitionRequeue(ctx context.Context, sp *QueueShadowParti
 		metrics.IncrQueueShadowPartitionLeaseContentionCounter(ctx, metrics.CounterOpt{
 			PkgName: pkgName,
 			Tags: map[string]any{
-				"queue_shard":  q.primaryQueueShard.Name,
-				"partition_id": sp.PartitionID,
-				"action":       "not_found",
+				"queue_shard": q.primaryQueueShard.Name,
+				// "partition_id": sp.PartitionID,
+				"action": "not_found",
 			},
 		})
 
