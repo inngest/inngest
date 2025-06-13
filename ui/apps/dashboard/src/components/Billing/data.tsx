@@ -100,6 +100,7 @@ export const currentPlanDocument = graphql(`
     account {
       plan {
         id
+        isLegacy
         name
         amount
         billingPeriod
@@ -186,6 +187,7 @@ export const plansDocument = graphql(`
   query GetPlans {
     plans {
       id
+      isLegacy
       name
       amount
       billingPeriod
