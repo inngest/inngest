@@ -22,6 +22,8 @@ export enum PlanNames {
   Free = 'Free Tier',
   Basic = 'Basic',
   Pro = 'Pro',
+  Hobby = 'Hobby',
+  HobbyPayg = 'Hobby (Pay as you go)',
   Enterprise = 'Enterprise',
 }
 
@@ -34,13 +36,18 @@ export function processPlan(plan: Plan) {
 
   const featureDescriptions = getFeatureDescriptions(name, entitlements);
 
+  const priceLabel =
+    name === 'Hobby (Pay as you go)'
+      ? '$0 - $75'
+      : new Intl.NumberFormat('en-US', {
+          style: 'currency',
+          currency: 'USD',
+          maximumFractionDigits: 0,
+        }).format(amount / 100);
+
   return {
     name,
-    price: new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      maximumFractionDigits: 0,
-    }).format(amount / 100),
+    price: priceLabel,
     billingPeriod: typeof billingPeriod === 'string' ? getPeriodAbbreviation(billingPeriod) : 'mo',
     features: featureDescriptions,
   };
@@ -94,15 +101,35 @@ function getFeatureDescriptions(planName: string, entitlements: Plan['entitlemen
     case PlanNames.Enterprise:
       return [
         ...(entitlements.runCount.limit
-          ? [`From 0-${numberFormatter.format(entitlements.runCount.limit)} runs/mo`]
+          ? [`From 0-${numberFormatter.format(entitlements.runCount.limit)} executions/mo`]
           : []),
-        `From 200 - ${numberFormatter.format(entitlements.concurrency.limit)}  concurrent steps`,
+        `From 500 concurrent steps`,
         'SAML, RBAC, and audit trails',
         'Exportable observability',
         'Dedicated infrastructure',
         '99.99% uptime SLAs',
         'Support SLAs',
         'Dedicated slack channel',
+      ];
+
+    case PlanNames.Hobby:
+      return [
+        '100k executions/mo included',
+        '25 concurrent steps',
+        '50 realtime connections',
+        '1M events/day',
+        'Logs, traces & observability',
+        'Community support',
+      ];
+
+    case PlanNames.HobbyPayg:
+      return [
+        'Usage scales beyond 100k executions',
+        'Pay-as-you-go billing',
+        'Unlimited branch & staging environments',
+        'Basic alerting',
+        'Add-on concurrency available',
+        'Paid realtime, tracing, and event usage scaling',
       ];
 
     default:
