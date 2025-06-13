@@ -41,7 +41,7 @@ func TestQueueItemScore(t *testing.T) {
 	start := parse(time.RFC3339, "2023-01-01T12:30:30.000Z")
 	runID := ulid.MustNew(uint64(start.UnixMilli()), rand.Reader)
 
-	// What we care about:  Items are promoted IFF the shceduled at time <=
+	// What we care about:  Items are promoted IFF the scheduled at time <=
 	// time.Now().Add(consts.FutureAtLimit).
 
 	kinds := []string{osqueue.KindEdge, osqueue.KindSleep, osqueue.KindStart, osqueue.KindEdgeError}
