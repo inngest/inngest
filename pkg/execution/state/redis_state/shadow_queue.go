@@ -202,7 +202,7 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 	}
 	metrics.GaugeShadowPartitionSize(ctx, int64(totalCount), metrics.GaugeOpt{
 		PkgName: pkgName,
-		Tags: map[string]any{
+		Tags:    map[string]any{
 			// "partition_id": shadowPart.PartitionID,
 		},
 	})

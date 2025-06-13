@@ -2628,6 +2628,8 @@ func (q *queue) Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 func (q *queue) Requeue(ctx context.Context, queueShard QueueShard, i osqueue.QueueItem, at time.Time) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "Requeue"), redis_telemetry.ScopeQueue)
 
+	l := q.log.With("item", i)
+
 	if queueShard.Kind != string(enums.QueueShardKindRedis) {
 		return fmt.Errorf("unsupported queue shard kind for Requeue: %s", queueShard.Kind)
 	}
@@ -2668,6 +2670,19 @@ func (q *queue) Requeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		if i.Data.Throttle != nil && i.Data.Throttle.KeyExpressionHash == "" {
 			refreshedThrottle, err := q.refreshItemThrottle(ctx, &i)
 			if err != nil {
+				// If we cannot find the event for the queue item, dequeue it. The state
+				// must exist for the entire duration of a function run.
+				if errors.Is(err, state.ErrEventNotFound) {
+					l.Warn("could not find event for refreshing throttle before requeue")
+
+					err := q.Dequeue(ctx, queueShard, i)
+					if err != nil {
+						return fmt.Errorf("could not dequeue item with missing throttle state: %w", err)
+					}
+
+					return nil
+				}
+
 				return fmt.Errorf("could not refresh item throttle: %w", err)
 			}
 
