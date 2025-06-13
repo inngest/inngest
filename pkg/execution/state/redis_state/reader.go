@@ -245,12 +245,12 @@ func (q *queue) ItemsByPartition(ctx context.Context, shard QueueShard, partitio
 		return nil, fmt.Errorf("error unmarshalling queue partition: %w", err)
 	}
 
-	ptFrom := from
-
 	return func(yield func(*osqueue.QueueItem) bool) {
 		eg := errgroup.Group{}
 
 		if opt.allowKeyQueues() {
+			backlogFrom := from
+
 			eg.Go(func() error {
 				hash := shard.RedisClient.kg.ShadowPartitionMeta()
 				cmd := rc.B().Hget().Key(hash).Field(partitionID.String()).Build()
@@ -265,7 +265,6 @@ func (q *queue) ItemsByPartition(ctx context.Context, shard QueueShard, partitio
 				}
 
 				l = l.With("shadow_partition", spt)
-				backlogFrom := from
 
 				for {
 					var iterated int
@@ -332,6 +331,8 @@ func (q *queue) ItemsByPartition(ctx context.Context, shard QueueShard, partitio
 		}
 
 		eg.Go(func() error {
+			ptFrom := from
+
 			for {
 				var iterated int
 
