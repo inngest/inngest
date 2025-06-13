@@ -100,6 +100,48 @@ func (q *QueueItem) SetID(ctx context.Context, str string) {
 	q.ID = HashID(ctx, str)
 }
 
+// IsPromotableScore returns whether a score can be fudged.
+func (q QueueItem) IsPromotableScore() bool {
+	switch q.Data.Kind {
+	case KindStart, KindSleep, KindEdge, KindPause, KindEdgeError:
+		// All user jobs can be fudged.
+		return true
+	}
+	return false
+}
+
+// RequiresPromotion returns true if the score needs future promotion (fudging the numbers!)
+// This is the case when a workflow job is enqueued in the future:
+//
+// - Workflow T0 runs a job which retries at T10
+// - 1,000,000 steps are enqueued for other workflows at T5
+// - At T10...
+//   - In order to run workflow T0's retry, we have to complete all 1M jobs from
+//     other *later* workflows before attempting the retry, meaning that we do not
+//     run older run's jobs before newer runs jobs.
+//
+// Future fudging allows us to reschedule jobs at an aprpoproate time through some other
+// queueing means.
+func (q QueueItem) RequiresPromotionJob(now time.Time) bool {
+	if !q.IsPromotableScore() {
+		// If this doesn't have fudging enabled, ignore.
+		return false
+	}
+
+	if now.IsZero() {
+		now = time.Now()
+	}
+
+	// If this is > 2 seconds in the future, don't mess with the time.
+	// This prevents any accidental fudging of future run times, even if the
+	// kind is edge (which should never exist... but, better to be safe).
+	if q.AtMS > now.Add(consts.FutureAtLimit).UnixMilli() {
+		return true
+	}
+
+	return false
+}
+
 // Score returns the score (time that the item should run) for the queue item.
 //
 // NOTE: In order to prioritize finishing older function runs with a busy function
@@ -114,22 +156,7 @@ func (q QueueItem) Score(now time.Time) int64 {
 		now = time.Now()
 	}
 
-	// If we're scavenging a sleep, we can only fudge the time if the sleep is scheduled within the next 2s.
-	// Otherwise, we must return the original time.
-	sleepCanBeFudged := q.Data.Kind == KindSleep && q.AtMS <= now.Add(consts.FutureAtLimit).UnixMilli()
-
-	// If this is not a start/simple edge/edge error, we can ignore this.
-	if (q.Data.Kind != KindStart &&
-		q.Data.Kind != KindEdge &&
-		q.Data.Kind != KindEdgeError &&
-		!sleepCanBeFudged) || q.Data.Attempt > 0 {
-		return q.AtMS
-	}
-
-	// If this is > 2 seconds in the future, don't mess with the time.
-	// This prevents any accidental fudging of future run times, even if the
-	// kind is edge (which should never exist... but, better to be safe).
-	if q.AtMS > now.Add(consts.FutureAtLimit).UnixMilli() {
+	if !q.IsPromotableScore() || q.RequiresPromotionJob(now) {
 		return q.AtMS
 	}
 
@@ -412,11 +439,11 @@ func (i *Item) UnmarshalJSON(b []byte) error {
 			return err
 		}
 		i.Payload = *p
-	case KindSleepScavenge:
+	case KindJobPromote:
 		if len(temp.Payload) == 0 {
 			return nil
 		}
-		p := &PayloadSleepScavenge{}
+		p := &PayloadJobPromote{}
 		if err := json.Unmarshal(temp.Payload, p); err != nil {
 			return err
 		}
@@ -445,9 +472,9 @@ type PayloadPauseBlockFlush struct {
 	EventName string `json:"e"`
 }
 
-type PayloadSleepScavenge struct {
-	SleepJobID string `json:"sjid"`
-	SleepUntil int64  `json:"su"`
+type PayloadJobPromote struct {
+	PromoteJobID string `json:"sjid"`
+	ScheduledAt  int64  `json:"su"`
 }
 
 // PayloadPauseTimeout is the payload stored when enqueueing a pause timeout, eg.
