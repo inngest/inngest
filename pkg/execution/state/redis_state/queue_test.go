@@ -103,7 +103,7 @@ func TestQueueItemScore(t *testing.T) {
 
 	}
 
-	t.Run("Sleep with prirotiy factor does nothing", func(t *testing.T) {
+	t.Run("Sleep with priority factor does nothing", func(t *testing.T) {
 		// A job enqueued in an hour should always be enqueued in an hour
 		// even with a priority factor.
 		atMS := time.Now().Add(time.Hour).UnixMilli()
