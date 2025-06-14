@@ -19,10 +19,12 @@ export default function UpgradeButton({
   plan,
   currentPlan,
   onPlanChange,
+  label,
 }: {
   plan: Plan;
   currentPlan: Plan;
   onPlanChange: () => void;
+  label?: string;
 }) {
   const router = useRouter();
   const [checkoutData, setCheckoutData] = useState<{
@@ -60,13 +62,15 @@ export default function UpgradeButton({
     return cardPlanAmount < currentPlanAmount;
   })();
 
-  const buttonLabel = isActive
-    ? 'My Plan'
-    : isEnterpriseCard
-    ? 'Get in touch'
-    : isLowerPlan
-    ? 'Downgrade'
-    : 'Upgrade';
+  const buttonLabel =
+    label ??
+    (isActive
+      ? 'My Plan'
+      : isEnterpriseCard
+      ? 'Get in touch'
+      : isLowerPlan
+      ? 'Downgrade'
+      : 'Upgrade');
 
   const onClickChangePlan = ({ item: { planID, name, amount }, action }: ChangePlanArgs) => {
     setCheckoutData({ items: [{ planID, name, quantity: 1, amount }], action });
