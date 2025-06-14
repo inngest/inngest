@@ -15,7 +15,7 @@ import { usePathCreator } from '../SharedContext/usePathCreator';
 
 type NavProps = {
   standalone: boolean;
-
+  functionSlug: string;
   runID: string;
 };
 
@@ -47,7 +47,7 @@ export const Standalone = ({ standalone, runID }: NavProps) => {
   );
 };
 
-export const Nav = ({ standalone, runID }: NavProps) => {
+export const Nav = ({ standalone, functionSlug, runID }: NavProps) => {
   const { booleanFlag } = useBooleanFlag();
   const { pathCreator } = usePathCreator();
 
@@ -65,10 +65,10 @@ export const Nav = ({ standalone, runID }: NavProps) => {
           appearance="outlined"
           label="Open in Debugger"
           className="rounder-r-none border-r-0"
-          href={pathCreator.debugger({ runID })}
+          href={pathCreator.debugger({ functionSlug, runID })}
         />
       }
-      right={<Standalone standalone={standalone} runID={runID} />}
+      right={<Standalone standalone={standalone} functionSlug={functionSlug} runID={runID} />}
     />
   ) : !standalone ? (
     <Link

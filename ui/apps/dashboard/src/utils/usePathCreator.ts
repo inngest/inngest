@@ -15,8 +15,12 @@ export const usePathCreator = () => {
         internalPathCreator.function({ envSlug: env.slug, functionSlug: params.functionSlug }),
       runPopout: (params: { runID: string }) =>
         internalPathCreator.runPopout({ envSlug: env.slug, runID: params.runID }),
-      debugger: (params: { runID: string }) =>
-        internalPathCreator.debugger({ envSlug: env.slug, runID: params.runID }),
+      debugger: (params: { functionSlug: string; runID?: string }) =>
+        internalPathCreator.debugger({
+          envSlug: env.slug,
+          functionSlug: params.functionSlug,
+          runID: params.runID,
+        }),
     };
   }, [env.slug]);
 

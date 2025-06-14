@@ -215,6 +215,7 @@ export type Function = {
   concurrency: Scalars['Int'];
   config: Scalars['String'];
   configuration: FunctionConfiguration;
+  failureHandler: Maybe<Function>;
   id: Scalars['String'];
   name: Scalars['String'];
   slug: Scalars['String'];
@@ -341,6 +342,7 @@ export enum FunctionStatus {
 
 export type FunctionTrigger = {
   __typename?: 'FunctionTrigger';
+  condition: Maybe<Scalars['String']>;
   type: FunctionTriggerTypes;
   value: Scalars['String'];
 };
