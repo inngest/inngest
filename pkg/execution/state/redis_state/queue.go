@@ -2676,7 +2676,7 @@ func (q *queue) Requeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 					l.Warn("could not find event for refreshing throttle before requeue")
 
 					err := q.Dequeue(ctx, queueShard, i)
-					if err != nil {
+					if err != nil && !errors.Is(err, ErrQueueItemNotFound) {
 						return fmt.Errorf("could not dequeue item with missing throttle state: %w", err)
 					}
 
