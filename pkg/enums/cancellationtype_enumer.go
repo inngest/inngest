@@ -8,11 +8,11 @@ import (
 	"strings"
 )
 
-const _CancellationTypeName = "NoneEventManual"
+const _CancellationTypeName = "NoneEventManualAPI"
 
-var _CancellationTypeIndex = [...]uint8{0, 4, 9, 15}
+var _CancellationTypeIndex = [...]uint8{0, 4, 9, 15, 18}
 
-const _CancellationTypeLowerName = "noneeventmanual"
+const _CancellationTypeLowerName = "noneeventmanualapi"
 
 func (i CancellationType) String() string {
 	if i < 0 || i >= CancellationType(len(_CancellationTypeIndex)-1) {
@@ -28,23 +28,27 @@ func _CancellationTypeNoOp() {
 	_ = x[CancellationTypeNone-(0)]
 	_ = x[CancellationTypeEvent-(1)]
 	_ = x[CancellationTypeManual-(2)]
+	_ = x[CancellationTypeAPI-(3)]
 }
 
-var _CancellationTypeValues = []CancellationType{CancellationTypeNone, CancellationTypeEvent, CancellationTypeManual}
+var _CancellationTypeValues = []CancellationType{CancellationTypeNone, CancellationTypeEvent, CancellationTypeManual, CancellationTypeAPI}
 
 var _CancellationTypeNameToValueMap = map[string]CancellationType{
-	_CancellationTypeName[0:4]:       CancellationTypeNone,
-	_CancellationTypeLowerName[0:4]:  CancellationTypeNone,
-	_CancellationTypeName[4:9]:       CancellationTypeEvent,
-	_CancellationTypeLowerName[4:9]:  CancellationTypeEvent,
-	_CancellationTypeName[9:15]:      CancellationTypeManual,
-	_CancellationTypeLowerName[9:15]: CancellationTypeManual,
+	_CancellationTypeName[0:4]:        CancellationTypeNone,
+	_CancellationTypeLowerName[0:4]:   CancellationTypeNone,
+	_CancellationTypeName[4:9]:        CancellationTypeEvent,
+	_CancellationTypeLowerName[4:9]:   CancellationTypeEvent,
+	_CancellationTypeName[9:15]:       CancellationTypeManual,
+	_CancellationTypeLowerName[9:15]:  CancellationTypeManual,
+	_CancellationTypeName[15:18]:      CancellationTypeAPI,
+	_CancellationTypeLowerName[15:18]: CancellationTypeAPI,
 }
 
 var _CancellationTypeNames = []string{
 	_CancellationTypeName[0:4],
 	_CancellationTypeName[4:9],
 	_CancellationTypeName[9:15],
+	_CancellationTypeName[15:18],
 }
 
 // CancellationTypeString retrieves an enum value from the enum constants string name.

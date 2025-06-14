@@ -4,13 +4,29 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
+	"time"
+	"unsafe"
+
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 	"github.com/inngest/inngest/pkg/util"
-	"time"
-	"unsafe"
 )
+
+type PeekOpt func(p *peekOption)
+
+type peekOption struct {
+	// Shard specifies which shard to use for the peek operation instead of the shard that the executor points to.
+	// The use of this should be rare, and should be limited to system queue operations as much as possible.
+	Shard *QueueShard
+}
+
+func WithPeekOptQueueShard(qs *QueueShard) PeekOpt {
+	return func(p *peekOption) {
+		p.Shard = qs
+	}
+}
 
 type peeker[T any] struct {
 	q      *queue
@@ -26,6 +42,10 @@ type peeker[T any] struct {
 	handleMissingItems func(pointers []string) error
 	maker              func() *T
 	keyMetadataHash    string
+
+	// fromTime provides an optional start time for peeks
+	// instead of the default -INF
+	fromTime *time.Time
 }
 
 var (
@@ -39,8 +59,13 @@ type peekResult[T any] struct {
 }
 
 // peek peeks up to <limit> items from the given ZSET up to until, in order if sequential is true, otherwise randomly.
-func (p *peeker[T]) peek(ctx context.Context, keyOrderedPointerSet string, sequential bool, until time.Time, limit int64) (*peekResult[T], error) {
+func (p *peeker[T]) peek(ctx context.Context, keyOrderedPointerSet string, sequential bool, until time.Time, limit int64, opts ...PeekOpt) (*peekResult[T], error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, p.opName), redis_telemetry.ScopeQueue)
+
+	opt := peekOption{}
+	for _, apply := range opts {
+		apply(&opt)
+	}
 
 	if p.maker == nil {
 		return nil, fmt.Errorf("missing 'maker' argument")
@@ -48,6 +73,11 @@ func (p *peeker[T]) peek(ctx context.Context, keyOrderedPointerSet string, seque
 
 	if p.q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
 		return nil, fmt.Errorf("unsupported queue shard kind for %s: %s", p.opName, p.q.primaryQueueShard.Kind)
+	}
+
+	rc := p.q.primaryQueueShard.RedisClient.Client()
+	if opt.Shard != nil {
+		rc = opt.Shard.RedisClient.Client()
 	}
 
 	if limit > p.max {
@@ -68,6 +98,11 @@ func (p *peeker[T]) peek(ctx context.Context, keyOrderedPointerSet string, seque
 		script = "peekOrderedSetUntil"
 		ms := until.UnixMilli()
 
+		fromTime := "-inf"
+		if p.fromTime != nil && !p.fromTime.IsZero() {
+			fromTime = strconv.Itoa(int(p.fromTime.UnixMilli()))
+		}
+
 		untilTime := until.Unix()
 		if p.isMillisecondPrecision {
 			untilTime = until.UnixMilli()
@@ -79,6 +114,7 @@ func (p *peeker[T]) peek(ctx context.Context, keyOrderedPointerSet string, seque
 		}
 
 		rawArgs = []any{
+			fromTime,
 			untilTime,
 			ms,
 			limit,
@@ -93,7 +129,7 @@ func (p *peeker[T]) peek(ctx context.Context, keyOrderedPointerSet string, seque
 
 	peekRet, err := scripts[fmt.Sprintf("queue/%s", script)].Exec(
 		redis_telemetry.WithScriptName(ctx, script),
-		p.q.primaryQueueShard.RedisClient.Client(),
+		rc,
 		[]string{
 			p.keyMetadataHash,
 			keyOrderedPointerSet,
