@@ -6,7 +6,7 @@ export type PathCreator = {
   app: (params: { externalAppID: string }) => Route;
   function: (params: { functionSlug: string }) => Route;
   runPopout: (params: { runID: string }) => Route;
-  debugger: (params: { runID: string }) => Route;
+  debugger: (params: { functionSlug: string; runID?: string }) => Route;
 };
 
 export const usePathCreator = () => {
