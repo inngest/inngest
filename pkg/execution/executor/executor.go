@@ -534,23 +534,50 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	var singletonConfig *queue.Singleton
 	data := req.Events[0].GetEvent().Map()
 
-	// Ignores Cancel mode for now
-	if req.Function.Singleton != nil && req.Function.Singleton.Mode == enums.SingletonModeSkip {
+	if req.Function.Singleton != nil {
 		singletonKey, err := singleton.SingletonKey(ctx, req.Function.ID, *req.Function.Singleton, data)
 		switch {
 		case err == nil:
-			// Attempt to early handle function singletons, function runs could still fail
-			// to enqueue later on when it atomically tries to acquire a function mutex.
-			alreadyRunning, err := e.singletonMgr.Singleton(ctx, singletonKey, *req.Function.Singleton)
+			// Attempt to early handle function singletons when in skip mode. Function runs may still
+			// fail to enqueue later when attempting to atomically acquire the function mutex.
+			//
+			// In cancel mode, this call releases the singleton mutex and atomically returns the
+			// current run holding the lock, which will be cancelled further down. After releasing,
+			// the lock becomes available to any competing run. If a faster run acquires it before
+			// this one tries to, it will fail to acquire the lock and be skipped; Effectively
+			// behaving as if the singleton mode were set to skip.
+			singletonRunID, err := e.singletonMgr.HandleSingleton(ctx, singletonKey, *req.Function.Singleton)
+
 			if err != nil {
 				return nil, err
 			}
 
-			if alreadyRunning {
-				// TODO: Handle cancellation mode
+			eventID := req.Events[0].GetInternalID()
 
-				// Immediately end before creating state
-				return nil, ErrFunctionSkipped
+			if singletonRunID != nil {
+				if req.Function.Singleton.Mode == enums.SingletonModeCancel {
+					singletonRunUlid, err := ulid.Parse(*singletonRunID)
+					if err != nil {
+						return nil, err
+					}
+
+					runID := sv2.ID{
+						RunID:      singletonRunUlid,
+						FunctionID: req.Function.ID,
+						Tenant: sv2.Tenant{
+							AccountID: req.AccountID,
+							EnvID:     req.WorkspaceID,
+						},
+					}
+
+					_ = e.Cancel(ctx, runID, execution.CancelRequest{
+						EventID: &eventID,
+					})
+
+				} else {
+					// Immediately end before creating state
+					return nil, ErrFunctionSkipped
+				}
 			}
 
 			singletonConfig = &queue.Singleton{Key: singletonKey}
