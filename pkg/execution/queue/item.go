@@ -150,6 +150,35 @@ func (q QueueItem) IsLeased(time time.Time) bool {
 	return q.LeaseID != nil && ulid.Time(q.LeaseID.Time()).After(time)
 }
 
+// SojournLatency is the delay due to concurrency limits, throttle, or other user-defined concurrency.
+func (q QueueItem) SojournLatency(now time.Time) time.Duration {
+	if q.RefilledAt == 0 {
+		var sojourn time.Duration
+		if q.EarliestPeekTime > 0 {
+			sojourn = now.Sub(time.UnixMilli(q.EarliestPeekTime))
+		}
+
+		return sojourn
+	}
+
+	refillDelay := time.Duration(q.RefilledAt-q.EnqueuedAt) * time.Millisecond
+	return refillDelay
+}
+
+// Latency represents the processing delay excluding sojourn latency.
+func (q QueueItem) Latency(now time.Time) time.Duration {
+	if q.RefilledAt == 0 {
+		sojourn := q.SojournLatency(now)
+
+		return now.Sub(time.UnixMilli(q.WallTimeMS)) - sojourn
+	}
+
+	// Time between refill and lease/processing
+	refilledAt := time.UnixMilli(q.RefilledAt)
+	processingDelay := now.Sub(refilledAt)
+	return processingDelay
+}
+
 // Item represents an item stored within a queue.
 //
 // Note that each individual implementation may wrap this to add their own fields,

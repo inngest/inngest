@@ -215,6 +215,7 @@ func (q *queue) executionScan(ctx context.Context, f osqueue.RunFunc) error {
 
 	backoff := time.Millisecond * 250
 
+	var err error
 LOOP:
 	for {
 		select {
@@ -222,12 +223,13 @@ LOOP:
 			// Kill signal
 			tick.Stop()
 			break LOOP
-		case err := <-q.quit:
+		case err = <-q.quit:
 			// An inner function received an error which was deemed irrecoverable, so
 			// we're quitting the queue.
 			q.log.Error("quitting runner internally", "error", err)
 			tick.Stop()
 			break LOOP
+
 		case <-tick.Chan():
 			if q.capacity() < minWorkersFree {
 				// Wait until we have more workers free.  This stops us from
@@ -238,7 +240,7 @@ LOOP:
 				continue
 			}
 
-			if err := q.scan(ctx); err != nil {
+			if err = q.scan(ctx); err != nil {
 				if errors.Is(err, context.DeadlineExceeded) {
 					q.log.Warn("deadline exceeded scanning partition pointers")
 					<-time.After(backoff)
@@ -263,7 +265,7 @@ LOOP:
 	q.log.Info("queue waiting to quit")
 	q.wg.Wait()
 
-	return nil
+	return err
 }
 
 // claimSequentialLease is a process which continually runs while listening to the queue,
@@ -1045,10 +1047,7 @@ func (q *queue) process(
 		n := q.clock.Now()
 
 		// Track the sojourn (concurrency) latency.
-		var sojourn time.Duration
-		if qi.EarliestPeekTime > 0 {
-			sojourn = n.Sub(time.UnixMilli(qi.EarliestPeekTime))
-		}
+		sojourn := qi.SojournLatency(n)
 		doCtx := context.WithValue(jobCtx, sojournKey, sojourn)
 
 		// Track the latency on average globally.  Do this in a goroutine so that it doesn't
@@ -1056,7 +1055,7 @@ func (q *queue) process(
 		if qi.WallTimeMS == 0 {
 			qi.WallTimeMS = qi.AtMS // backcompat while WallTimeMS isn't valid.
 		}
-		latency := n.Sub(time.UnixMilli(qi.WallTimeMS)) - sojourn
+		latency := qi.Latency(n)
 		doCtx = context.WithValue(doCtx, latencyKey, latency)
 
 		// store started at and latency in ctx
@@ -1085,11 +1084,12 @@ func (q *queue) process(
 		})
 
 		runInfo := osqueue.RunInfo{
-			Latency:        latency,
-			SojournDelay:   sojourn,
-			Priority:       q.ppf(ctx, p),
-			QueueShardName: q.primaryQueueShard.Name,
-			ContinueCount:  continuationCtr,
+			Latency:             latency,
+			SojournDelay:        sojourn,
+			Priority:            q.ppf(ctx, p),
+			QueueShardName:      q.primaryQueueShard.Name,
+			ContinueCount:       continuationCtr,
+			RefilledFromBacklog: qi.RefilledFrom,
 		}
 
 		// Call the run func.
@@ -1139,6 +1139,11 @@ func (q *queue) process(
 
 			qi.AtMS = at.UnixMilli()
 			if err := q.Requeue(context.WithoutCancel(ctx), q.primaryQueueShard, qi, at); err != nil {
+				if err == ErrQueueItemNotFound {
+					// Safe. The executor may have dequeued.
+					return nil
+				}
+
 				q.log.Error("error requeuing job", "error", err, "item", qi)
 				return err
 			}
@@ -1452,13 +1457,24 @@ func (p *processor) iterate(ctx context.Context) error {
 		if p.parallel {
 			item := *i
 			eg.Go(func() error {
-				return p.process(ctx, &item)
+				err := p.process(ctx, &item)
+				if err != nil {
+					// NOTE: ignore if the queue item is not found
+					if errors.Is(err, ErrQueueItemNotFound) {
+						return nil
+					}
+				}
+				return err
 			})
 			continue
 		}
 
 		// non-parallel (sequential fifo) processing.
 		if err = p.process(ctx, i); err != nil {
+			// NOTE: ignore if the queue item is not found
+			if errors.Is(err, ErrQueueItemNotFound) {
+				continue
+			}
 			// always break on the first error;  if processing returns an error we
 			// always assume that we stop iterating.
 			//
@@ -1489,7 +1505,7 @@ func (p *processor) iterate(ctx context.Context) error {
 }
 
 func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error {
-	l := p.queue.log.With("partition", p.partition)
+	l := p.queue.log.With("partition", p.partition, "item", item)
 
 	// TODO: Create an in-memory mapping of rate limit keys that have been hit,
 	//       and don't bother to process if the queue item has a limited key.  This
@@ -1567,6 +1583,8 @@ func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error 
 		cause = key.cause
 	}
 
+	l = l.With("cause", cause)
+
 	switch cause {
 	case ErrQueueItemThrottled:
 		p.isCustomKeyLimitOnly = false
@@ -1584,16 +1602,16 @@ func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error 
 		if p.queue.itemEnableKeyQueues(ctx, *item) {
 			err := p.queue.Requeue(ctx, p.queue.primaryQueueShard, *item, time.UnixMilli(item.AtMS))
 			if err != nil {
-				l.Error("could not requeue item to backlog after hitting limit", "error", err, "item", *item, "key", key)
+				l.Error("could not requeue item to backlog after hitting throttle limit", "error", err)
 				return fmt.Errorf("could not requeue to backlog: %w", err)
 			}
 
 			metrics.IncrRequeueExistingToBacklogCounter(ctx, metrics.CounterOpt{
 				PkgName: pkgName,
 				Tags: map[string]any{
-					"queue_shard":  p.queue.primaryQueueShard.Name,
-					"partition_id": item.FunctionID.String(),
-					"status":       "throttled",
+					"queue_shard": p.queue.primaryQueueShard.Name,
+					// "partition_id": item.FunctionID.String(),
+					"status": "throttled",
 				},
 			})
 		}
@@ -1641,16 +1659,16 @@ func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error 
 		if p.queue.itemEnableKeyQueues(ctx, *item) {
 			err := p.queue.Requeue(ctx, p.queue.primaryQueueShard, *item, time.UnixMilli(item.AtMS))
 			if err != nil {
-				l.Error("could not requeue item to backlog after hitting limit", "error", err, "item", *item, "key", key)
+				l.Error("could not requeue item to backlog after hitting concurrency limit", "error", err)
 				return fmt.Errorf("could not requeue to backlog: %w", err)
 			}
 
 			metrics.IncrRequeueExistingToBacklogCounter(ctx, metrics.CounterOpt{
 				PkgName: pkgName,
 				Tags: map[string]any{
-					"queue_shard":  p.queue.primaryQueueShard.Name,
-					"partition_id": item.FunctionID.String(),
-					"status":       status,
+					"queue_shard": p.queue.primaryQueueShard.Name,
+					// "partition_id": item.FunctionID.String(),
+					"status": status,
 				},
 			})
 		}
@@ -1682,16 +1700,16 @@ func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error 
 		if p.queue.itemEnableKeyQueues(ctx, *item) {
 			err := p.queue.Requeue(ctx, p.queue.primaryQueueShard, *item, time.UnixMilli(item.AtMS))
 			if err != nil {
-				l.Error("could not requeue item to backlog after hitting limit", "error", err, "item", *item, "key", key)
+				l.Error("could not requeue item to backlog after hitting custom concurrency limit", "error", err)
 				return fmt.Errorf("could not requeue to backlog: %w", err)
 			}
 
 			metrics.IncrRequeueExistingToBacklogCounter(ctx, metrics.CounterOpt{
 				PkgName: pkgName,
 				Tags: map[string]any{
-					"queue_shard":  p.queue.primaryQueueShard.Name,
-					"partition_id": item.FunctionID.String(),
-					"status":       "custom_key_concurrency_limit",
+					"queue_shard": p.queue.primaryQueueShard.Name,
+					// "partition_id": item.FunctionID.String(),
+					"status": "custom_key_concurrency_limit",
 				},
 			})
 		}

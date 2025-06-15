@@ -1459,6 +1459,7 @@ func (q *queue) RunJobs(ctx context.Context, queueShardName string, workspaceID,
 			return nil, fmt.Errorf("error reading queue position: %w", err)
 		}
 		resp = append(resp, osqueue.JobResponse{
+			JobID:    qi.ID,
 			At:       time.UnixMilli(qi.AtMS),
 			Position: pos,
 			Kind:     qi.Data.Kind,
@@ -2082,7 +2083,10 @@ func (q *queue) peek(ctx context.Context, shard QueueShard, opts peekOpts) ([]*o
 		if qi.IsLeased(now) {
 			metrics.IncrQueuePeekLeaseContentionCounter(ctx, metrics.CounterOpt{
 				PkgName: pkgName,
-				Tags:    map[string]any{"partition_id": opts.PartitionID, "queue_shard": shard.Name},
+				Tags: map[string]any{
+					// "partition_id": opts.PartitionID,
+					"queue_shard": shard.Name,
+				},
 			})
 
 			// Leased item, don't return.
@@ -2624,6 +2628,8 @@ func (q *queue) Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 func (q *queue) Requeue(ctx context.Context, queueShard QueueShard, i osqueue.QueueItem, at time.Time) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "Requeue"), redis_telemetry.ScopeQueue)
 
+	l := q.log.With("item", i)
+
 	if queueShard.Kind != string(enums.QueueShardKindRedis) {
 		return fmt.Errorf("unsupported queue shard kind for Requeue: %s", queueShard.Kind)
 	}
@@ -2648,6 +2654,9 @@ func (q *queue) Requeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 	i.RefilledFrom = ""
 	i.RefilledAt = 0
 
+	// Reset enqueuedAt (used for latency calculation)
+	i.EnqueuedAt = now.UnixMilli()
+
 	fnPartition, _ := q.ItemPartition(ctx, queueShard, i)
 	shadowPartition := q.ItemShadowPartition(ctx, i)
 
@@ -2661,6 +2670,19 @@ func (q *queue) Requeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		if i.Data.Throttle != nil && i.Data.Throttle.KeyExpressionHash == "" {
 			refreshedThrottle, err := q.refreshItemThrottle(ctx, &i)
 			if err != nil {
+				// If we cannot find the event for the queue item, dequeue it. The state
+				// must exist for the entire duration of a function run.
+				if errors.Is(err, state.ErrEventNotFound) {
+					l.Warn("could not find event for refreshing throttle before requeue")
+
+					err := q.Dequeue(ctx, queueShard, i)
+					if err != nil && !errors.Is(err, ErrQueueItemNotFound) {
+						return fmt.Errorf("could not dequeue item with missing throttle state: %w", err)
+					}
+
+					return nil
+				}
+
 				return fmt.Errorf("could not refresh item throttle: %w", err)
 			}
 
@@ -2769,8 +2791,8 @@ func (q *queue) Requeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 			metrics.IncrBacklogRequeuedCounter(ctx, metrics.CounterOpt{
 				PkgName: pkgName,
 				Tags: map[string]any{
-					"queue_shard":  q.primaryQueueShard.Name,
-					"partition_id": i.FunctionID.String(),
+					"queue_shard": q.primaryQueueShard.Name,
+					// "partition_id": i.FunctionID.String(),
 				},
 			})
 		}

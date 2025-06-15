@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"time"
 
 	"github.com/inngest/inngest/pkg/expressions"
@@ -97,6 +98,13 @@ func (r *runValidator) checkStepLimit(ctx context.Context) error {
 
 		resp.Err = &gracefulErr
 		resp.SetFinal()
+
+		metrics.IncrRunFinalizedCounter(ctx, metrics.CounterOpt{
+			PkgName: pkgName,
+			Tags: map[string]any{
+				"reason": "validation-step-limit-reached",
+			},
+		})
 
 		if err := r.e.finalize(ctx, r.md, r.evts, r.f.GetSlug(), r.e.assignedQueueShard, resp); err != nil {
 			l.Error("error running finish handler", "error", err)

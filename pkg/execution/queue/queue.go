@@ -27,7 +27,8 @@ type RunInfo struct {
 	// ContinueCount represents the total number of continues that the queue has processed
 	// via RunFunc returning true.  This allows us to prevent unbounded sequential processing
 	// on the same function by limiting the number of continues possible within a given chain.
-	ContinueCount uint
+	ContinueCount       uint
+	RefilledFromBacklog string
 }
 
 // RunFunc represents a function called to process each item in the queue.  This may be
@@ -195,6 +196,8 @@ func IsAlwaysRetryable(err error) bool {
 }
 
 type JobResponse struct {
+	// JobID is the item ID.
+	JobID string
 	// At represents the time the job is scheduled for.
 	At time.Time `json:"at"`
 	// Position represents the position for the job in the queue

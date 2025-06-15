@@ -181,8 +181,8 @@ func (q *queue) iterateNormalizationShadowPartition(ctx context.Context, shadowP
 			metrics.IncrBacklogNormalizationScannedCounter(ctx, metrics.CounterOpt{
 				PkgName: pkgName,
 				Tags: map[string]any{
-					"queue_shard":  q.primaryQueueShard.Name,
-					"partition_id": partition.PartitionID,
+					"queue_shard": q.primaryQueueShard.Name,
+					// "partition_id": partition.PartitionID,
 				},
 			})
 
@@ -266,6 +266,27 @@ func (q *queue) extendBacklogNormalizationLease(ctx context.Context, now time.Ti
 func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp *QueueShadowPartition, latestConstraints *PartitionConstraintConfig) error {
 	l := q.log.With("backlog", backlog, "sp", sp, "constraints", latestConstraints)
 
+	start := q.clock.Now()
+	defer func() {
+		dur := q.clock.Now().Sub(start)
+
+		metrics.HistogramQueueOperationDuration(
+			ctx,
+			dur.Milliseconds(),
+			metrics.HistogramOpt{
+				PkgName: pkgName,
+				Tags: map[string]any{
+					"operation":   "normalize_backlog",
+					"queue_shard": q.primaryQueueShard.Name,
+				},
+			},
+		)
+
+		if dur > 1*time.Minute {
+			q.log.Debug("slow backlog normalization", "dur", dur, "backlog", backlog, "sp", sp, "constraints", latestConstraints)
+		}
+	}()
+
 	// extend the lease
 	extendLeaseCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
@@ -348,8 +369,8 @@ func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp 
 		metrics.IncrBacklogNormalizedItemCounter(ctx, processed, metrics.CounterOpt{
 			PkgName: pkgName,
 			Tags: map[string]any{
-				"queue_shard":  q.primaryQueueShard.Name,
-				"partition_id": backlog.ShadowPartitionID,
+				"queue_shard": q.primaryQueueShard.Name,
+				// "partition_id": backlog.ShadowPartitionID,
 			},
 		})
 	}
@@ -357,8 +378,8 @@ func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp 
 	metrics.IncrBacklogNormalizedCounter(ctx, metrics.CounterOpt{
 		PkgName: pkgName,
 		Tags: map[string]any{
-			"queue_shard":  q.primaryQueueShard.Name,
-			"partition_id": backlog.ShadowPartitionID,
+			"queue_shard": q.primaryQueueShard.Name,
+			// "partition_id": backlog.ShadowPartitionID,
 		},
 	})
 
