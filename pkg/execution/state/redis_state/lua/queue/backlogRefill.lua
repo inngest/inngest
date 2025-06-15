@@ -12,7 +12,8 @@
     items_until,          -- Number of items within provided time range in backlog before refilling
     items_total,          -- Total number of items in backlog before refilling
     constraintCapacity,   -- Most limiting constraint capacity
-    refill                -- Number of items to refill (may include missing items)
+    refill,               -- Number of items to refill (may include missing items)
+    retryAfter            -- Optional unix timestamp in milliseconds to retry after (can be used to inform requeues)
   }
 
   Status values:
@@ -143,13 +144,18 @@ local function check_active_capacity(now_ms, keyActiveSet, limit)
 	return tonumber(limit)
 end
 
+local retryAfter = nil
+
 if enableKeyQueues == 1 then
   -- Check throttle capacity
   if (constraintCapacity == nil or constraintCapacity > 0) and throttlePeriod > 0 and throttleLimit > 0 then
-    local remainingThrottleCapacity = gcraCapacity(throttleKey, nowMS, throttlePeriod * 1000, throttleLimit, throttleBurst)
+    local gcraRes = gcraCapacity(throttleKey, nowMS, throttlePeriod * 1000, throttleLimit, throttleBurst)
+
+    local remainingThrottleCapacity = gcraRes[1]
     if constraintCapacity == nil or remainingThrottleCapacity < constraintCapacity then
       constraintCapacity = remainingThrottleCapacity
       status = 5
+      retryAfter = gcraRes[2]
     end
   end
 
@@ -362,4 +368,4 @@ end
 
 updateBacklogPointer(keyGlobalShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, keyShadowPartitionSet, keyBacklogSet, accountID, partitionID, backlogID)
 
-return { status, refilled, backlogCountUntil, backlogCountTotal, constraintCapacity, refill }
+return { status, refilled, backlogCountUntil, backlogCountTotal, constraintCapacity, refill, retryAfter }
