@@ -8,15 +8,13 @@ import (
 	"time"
 
 	"github.com/inngest/inngest/pkg/enums"
-	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngestgo/internal/sdkrequest"
 	str2duration "github.com/xhit/go-str2duration/v2"
 )
 
-var (
-	// ErrEventNotReceived is returned when a WaitForEvent call times out.  It indicates that a
-	// matching event was not received before the timeout.
-	ErrEventNotReceived = fmt.Errorf("event not received")
-)
+// ErrEventNotReceived is returned when a WaitForEvent call times out.  It indicates that a
+// matching event was not received before the timeout.
+var ErrEventNotReceived = fmt.Errorf("event not received")
 
 type WaitForEventOpts struct {
 	// Name represents the optional step name.
@@ -66,7 +64,7 @@ func WaitForEvent[T any](ctx context.Context, stepID string, opts WaitForEventOp
 		return output, nil
 	}
 
-	mgr.AppendOp(state.GeneratorOpcode{
+	mgr.AppendOp(sdkrequest.GeneratorOpcode{
 		ID:   op.MustHash(),
 		Op:   op.Op,
 		Name: opts.Name,

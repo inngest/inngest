@@ -369,7 +369,7 @@ func TestInvokeRateLimit(t *testing.T) {
 		inngestClient,
 		inngestgo.FunctionOpts{
 			ID: invokedFnName,
-			RateLimit: &inngestgo.RateLimit{
+			RateLimit: &inngestgo.FnRateLimit{
 				Limit:  1,
 				Period: 1 * time.Minute,
 			},
