@@ -547,7 +547,6 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 			// this one tries to, it will fail to acquire the lock and be skipped; Effectively
 			// behaving as if the singleton mode were set to skip.
 			singletonRunID, err := e.singletonMgr.HandleSingleton(ctx, singletonKey, *req.Function.Singleton)
-
 			if err != nil {
 				return nil, err
 			}
@@ -557,12 +556,8 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 			if singletonRunID != nil {
 				switch req.Function.Singleton.Mode {
 				case enums.SingletonModeCancel:
-					singletonRunUlid, err := ulid.Parse(*singletonRunID)
-					if err != nil {
-						return nil, err
-					}
 					runID := sv2.ID{
-						RunID:      singletonRunUlid,
+						RunID:      *singletonRunID,
 						FunctionID: req.Function.ID,
 						Tenant: sv2.Tenant{
 							AccountID: req.AccountID,

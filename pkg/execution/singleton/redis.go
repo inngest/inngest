@@ -2,9 +2,11 @@ package singleton
 
 import (
 	"context"
+
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/inngest/inngest/pkg/inngest"
+	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 )
 
@@ -28,11 +30,11 @@ type redisStore struct {
 	getAndDelScript *rueidis.Lua
 }
 
-func (r *redisStore) HandleSingleton(ctx context.Context, key string, s inngest.Singleton) (*string, error) {
+func (r *redisStore) HandleSingleton(ctx context.Context, key string, s inngest.Singleton) (*ulid.ULID, error) {
 	return singleton(ctx, r, key, s)
 }
 
-func (r *redisStore) ReleaseSingleton(ctx context.Context, key string) (*string, error) {
+func (r *redisStore) ReleaseSingleton(ctx context.Context, key string) (*ulid.ULID, error) {
 	redisKey := r.r.KeyGenerator().SingletonKey(&queue.Singleton{Key: key})
 	client := r.r.Client()
 
@@ -44,10 +46,15 @@ func (r *redisStore) ReleaseSingleton(ctx context.Context, key string) (*string,
 		return nil, err
 	}
 
-	return &val, nil
+	runID, err := ulid.Parse(val)
+	if err != nil {
+		return nil, err
+	}
+
+	return &runID, nil
 }
 
-func (r *redisStore) GetCurrentRunID(ctx context.Context, key string) (*string, error) {
+func (r *redisStore) GetCurrentRunID(ctx context.Context, key string) (*ulid.ULID, error) {
 	key = r.r.KeyGenerator().SingletonKey(&queue.Singleton{Key: key})
 
 	client := r.r.Client()
@@ -60,5 +67,10 @@ func (r *redisStore) GetCurrentRunID(ctx context.Context, key string) (*string, 
 		return nil, err
 	}
 
-	return &val, nil
+	runID, err := ulid.Parse(val)
+	if err != nil {
+		return nil, err
+	}
+
+	return &runID, nil
 }
