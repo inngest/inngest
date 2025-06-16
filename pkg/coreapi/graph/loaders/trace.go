@@ -267,6 +267,7 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 
 	if len(span.Children) > 0 {
 		gqlSpan.ChildrenSpans = []*models.RunTraceSpan{}
+		lastStepQueueTime := &gqlSpan.QueuedAt
 
 		for i, cs := range span.Children {
 			child, err := tr.convertRunSpanToGQL(ctx, cs)
@@ -306,6 +307,15 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 					}
 					if child.Attempts != nil && *child.Attempts > *gqlSpan.Attempts {
 						gqlSpan.Attempts = child.Attempts
+					}
+
+					// Executions should have queue times related to their
+					// siblings
+					if lastStepQueueTime != nil {
+						child.QueuedAt = *lastStepQueueTime
+					}
+					if child.EndedAt != nil {
+						lastStepQueueTime = child.EndedAt
 					}
 				}
 			}
