@@ -53,6 +53,9 @@ export function FunctionTable({ rows = [], isLoading }: Props) {
         onRowClick={(row) =>
           router.push(pathCreator.function({ envSlug: env.slug, functionSlug: row.original.slug }))
         }
+        getRowHref={(row) =>
+          pathCreator.function({ envSlug: env.slug, functionSlug: row.original.slug })
+        }
       />
     </main>
   );
