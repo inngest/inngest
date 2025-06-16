@@ -28,6 +28,7 @@ type BaseTableProps<T> = {
   isLoading?: boolean;
   columns: ColumnDef<T, any>[];
   onRowClick?: (row: Row<T>) => void;
+  getRowHref?: (row: Row<T>) => string;
   blankState?: React.ReactNode;
 };
 
@@ -43,6 +44,7 @@ export default function Table<T>({
   setSorting,
   renderSubComponent,
   onRowClick,
+  getRowHref,
   blankState,
   columns,
   expandedIDs = [],
@@ -159,18 +161,29 @@ export default function Table<T>({
             table.getRowModel().rows.map((row) => (
               <Fragment key={row.id}>
                 <tr
+                  role={getRowHref ? 'link' : undefined}
+                  tabIndex={onRowClick ? 0 : undefined}
+                  aria-label={getRowHref ? 'View details' : undefined}
                   className={cn(
                     hasId(row.original) && expandedIDs.includes(row.original.id)
                       ? 'h-[42px]'
                       : 'border-light box-border h-[42px] border-b',
                     onRowClick ? 'hover:bg-canvasSubtle cursor-pointer' : ''
                   )}
-                  onClick={() => {
+                  onClick={(e) => {
                     const modalsContainer = document.getElementById('modals');
                     const hasModals = modalsContainer && modalsContainer.children.length > 0;
-                    if (!hasModals) {
-                      onRowClick?.(row);
+                    if (hasModals) return;
+
+                    const url = getRowHref?.(row);
+                    if (url) {
+                      // Simulate native link behavior
+                      if (e.metaKey || e.ctrlKey || e.button === 1) {
+                        window.open(url, '_blank');
+                        return;
+                      }
                     }
+                    onRowClick?.(row);
                   }}
                 >
                   {row.getVisibleCells().map((cell, i) => {
