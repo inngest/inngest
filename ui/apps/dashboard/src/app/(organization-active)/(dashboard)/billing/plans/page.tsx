@@ -1,13 +1,14 @@
 import { Link } from '@inngest/components/Link/Link';
 
 import { HorizontalPlanCard, VerticalPlanCard } from '@/components/Billing/Plans/PlanCard';
-import { isEnterprisePlan, isLegacyPlan, type Plan } from '@/components/Billing/Plans/utils';
+import { isEnterprisePlan, type Plan } from '@/components/Billing/Plans/utils';
 import { currentPlan as getCurrentPlan, plans as getPlans } from '@/components/Billing/data';
 import { pathCreator } from '@/utils/urls';
 
 // This will move to the API as a custom plan at some point, for now we can hard code
 const ENTERPRISE_PLAN: Plan = {
   id: 'n/a',
+  isLegacy: false,
   name: 'Enterprise',
   amount: Infinity,
   billingPeriod: 'month',
@@ -35,11 +36,9 @@ export default async function Page() {
     return await getCurrentPlan();
   };
 
-  const isLegacy = isLegacyPlan(currentPlan);
-
   return (
     <>
-      {isLegacy && (
+      {currentPlan.isLegacy && (
         <div className="mb-8">
           <HorizontalPlanCard
             plan={currentPlan}
