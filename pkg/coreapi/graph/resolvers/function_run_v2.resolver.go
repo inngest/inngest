@@ -29,20 +29,6 @@ func (r *functionRunV2Resolver) Function(ctx context.Context, fn *models.Functio
 func (r *functionRunV2Resolver) Trace(ctx context.Context, fn *models.FunctionRunV2) (*models.RunTraceSpan, error) {
 	// TODO: handle the case when it's Scheduled
 	// there's no run so it should return empty but not error
-
-	// return loader.LoadOne[models.RunTraceSpan](
-	// 	ctx,
-	// 	loader.FromCtx(ctx).LegacyRunTraceLoader,
-	// 	&loader.TraceRequestKey{
-	// 		TraceRunIdentifier: &cqrs.TraceRunIdentifier{
-	// 			AppID:      fn.AppID,
-	// 			FunctionID: fn.FunctionID,
-	// 			RunID:      fn.ID,
-	// 			TraceID:    fn.TraceID,
-	// 		},
-	// 	},
-	// )
-
 	return loader.LoadOne[models.RunTraceSpan](
 		ctx,
 		loader.FromCtx(ctx).RunTraceLoader,
