@@ -555,12 +555,12 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 			eventID := req.Events[0].GetInternalID()
 
 			if singletonRunID != nil {
-				if req.Function.Singleton.Mode == enums.SingletonModeCancel {
+				switch req.Function.Singleton.Mode {
+				case enums.SingletonModeCancel:
 					singletonRunUlid, err := ulid.Parse(*singletonRunID)
 					if err != nil {
 						return nil, err
 					}
-
 					runID := sv2.ID{
 						RunID:      singletonRunUlid,
 						FunctionID: req.Function.ID,
@@ -569,18 +569,15 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 							EnvID:     req.WorkspaceID,
 						},
 					}
-
 					err = e.Cancel(ctx, runID, execution.CancelRequest{
 						EventID: &eventID,
 					})
-
 					logger.StdlibLogger(ctx).Error("error canceling singleton run", "error", err)
-				} else {
+				default:
 					// Immediately end before creating state
 					return nil, ErrFunctionSkipped
 				}
 			}
-
 			singletonConfig = &queue.Singleton{Key: singletonKey}
 		case errors.Is(err, singleton.ErrNotASingleton):
 			// We no-op, and we run the function normally not as a singleton
