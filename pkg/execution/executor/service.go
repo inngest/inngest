@@ -181,6 +181,26 @@ func (s *svc) getFinishHandler(ctx context.Context) (func(context.Context, sv2.I
 	}, nil
 }
 
+// Decide if the given `err` is an unexpected run error or part of the usual
+// flow. The return value of handling queue items can sometimes return errors in
+// order to trigger retries, but it's not actually an error of the system that
+// should be logged or cause issue.
+func (s *svc) isUnexpectedRunError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	if err.Error() == "NonRetriableError" {
+		return false
+	}
+
+	if errors.Is(err, ErrHandledStepError) {
+		return false
+	}
+
+	return true
+}
+
 func (s *svc) Run(ctx context.Context) error {
 	s.log.Info("subscribing to function queue")
 	return s.queue.Run(ctx, func(ctx context.Context, info queue.RunInfo, item queue.Item) (queue.RunResult, error) {
@@ -211,7 +231,7 @@ func (s *svc) Run(ctx context.Context) error {
 			err = fmt.Errorf("unknown payload type: %T", item.Payload)
 		}
 
-		if err != nil && err.Error() != "NonRetriableError" {
+		if s.isUnexpectedRunError(err) {
 			s.log.Error("error handling queue item", "error", err)
 		}
 
