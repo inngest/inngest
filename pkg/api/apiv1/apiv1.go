@@ -123,10 +123,6 @@ func (a *router) setup() {
 
 			r.Post("/traces/userland", a.traces)
 		})
-
-		r.Group(func(r chi.Router) {
-			r.Get("/jack/{runID}", a.jack)
-		})
 	})
 }
 
