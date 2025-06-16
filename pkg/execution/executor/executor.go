@@ -570,10 +570,11 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 						},
 					}
 
-					_ = e.Cancel(ctx, runID, execution.CancelRequest{
+					err = e.Cancel(ctx, runID, execution.CancelRequest{
 						EventID: &eventID,
 					})
 
+					logger.StdlibLogger(ctx).Error("error canceling singleton run", "error", err)
 				} else {
 					// Immediately end before creating state
 					return nil, ErrFunctionSkipped
