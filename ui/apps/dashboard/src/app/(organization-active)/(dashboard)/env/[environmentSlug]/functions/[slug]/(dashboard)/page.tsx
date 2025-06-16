@@ -98,7 +98,7 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
     }
   }
 
-  let appRoute = `/env/${params.environmentSlug}/apps/${function_.appName}` as Route;
+  let appRoute = `/env/${params.environmentSlug}/apps/${function_.app.name}` as Route;
 
   return (
     <>
@@ -178,7 +178,7 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
                 >
                   <div className="flex min-w-0 items-center">
                     <div className="min-w-0 flex-1">
-                      <p className="truncate font-medium">{function_.appName}</p>
+                      <p className="truncate font-medium">{function_.app.name}</p>
                       {function_.current?.deploy?.createdAt && (
                         <Time
                           className="text-subtle text-xs"
