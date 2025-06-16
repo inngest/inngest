@@ -46,6 +46,8 @@ type Opts struct {
 	RealtimeJWTSecret []byte
 	// TraceReader reads traces from a backing store.
 	TraceReader cqrs.TraceReader
+	// MetricsMiddleware is used to instrument the APIv1 endpoints.
+	MetricsMiddleware MetricsMiddleware
 }
 
 // AddRoutes adds a new API handler to the given router.
@@ -100,6 +102,10 @@ func (a *router) setup() {
 
 			if a.opts.CachingMiddleware != nil {
 				r.Use(a.opts.CachingMiddleware.Middleware)
+			}
+
+			if a.opts.MetricsMiddleware != nil {
+				r.Use(a.opts.MetricsMiddleware.Middleware)
 			}
 
 			r.Use(headers.ContentTypeJsonResponse())
