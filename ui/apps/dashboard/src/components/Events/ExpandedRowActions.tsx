@@ -1,5 +1,4 @@
 import { Button } from '@inngest/components/Button/Button';
-import { RiArrowRightUpLine } from '@remixicon/react';
 
 import { pathCreator } from '@/utils/urls';
 
@@ -16,12 +15,10 @@ export function ExpandedRowActions({ eventName, payload, onReplay, envSlug }: Ex
   return (
     <div className="flex items-center gap-2">
       <Button
-        label="Go to event type page"
+        label="Go to event type"
         href={eventName ? pathCreator.eventType({ envSlug, eventName }) : undefined}
-        appearance="ghost"
+        appearance="outlined"
         size="small"
-        icon={<RiArrowRightUpLine />}
-        iconSide="left"
         disabled={!eventName}
       />
       <Button
