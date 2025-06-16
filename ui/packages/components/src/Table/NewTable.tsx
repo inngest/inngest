@@ -176,12 +176,10 @@ export default function Table<T>({
                     if (hasModals) return;
 
                     const url = getRowHref?.(row);
-                    if (url) {
+                    if (url && (e.metaKey || e.ctrlKey || e.button === 1)) {
                       // Simulate native link behavior
-                      if (e.metaKey || e.ctrlKey || e.button === 1) {
-                        window.open(url, '_blank');
-                        return;
-                      }
+                      window.open(url, '_blank');
+                      return;
                     }
                     onRowClick?.(row);
                   }}
