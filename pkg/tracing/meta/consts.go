@@ -4,6 +4,10 @@ package meta
 const (
 	// Implementation
 	PropagationKey = "user-otel-ctx" // u-ctx
+	// Used when an internal error has occurred and may have resulted in a span
+	// being mishandled or have incorrect or imcomplete data. In this case, we
+	// should store any errors under this attribute.
+	InternalError = "_inngest.internal.error" // _int.err
 
 	// Top-level span names
 	SpanNameRun              = "executor.run"            // run
@@ -55,20 +59,30 @@ const (
 	// Run attributes
 	AttributeStepRunType = "_inngest.step.run.type" // _s.r.type
 
+	// Pause-related attributes
+	AttributeStepWaitExpired = "_inngest.step.wait.expired" // _s.w.expired
+	AttributeStepWaitExpiry  = "_inngest.step.wait.expiry"  // _s.w.expiry
+
 	// Invoke attributes
-	AttributeStepInvokeExpiry         = "_inngest.step.invoke_function.expiry"           // _s.if.exp
 	AttributeStepInvokeFunctionID     = "_inngest.step.invoke_function.id"               // _s.if.id
 	AttributeStepInvokeTriggerEventID = "_inngest.step.invoke_function.trigger_event_id" // _s.if.eid
+	AttributeStepInvokeFinishEventID  = "_inngest.step.invoke_function.finish_event_id"  // _s.if.fid
+	AttributeStepInvokeRunID          = "_inngest.step.invoke_function.run_id"           // _s.if.rid
 
 	// Sleep attributes
 	AttributeStepSleepDuration = "_inngest.step.sleep.duration" // _s.sleep
 
 	// WaitForEvent attributes
-	AttributeStepWaitForEventExpiry    = "_inngest.step.wait_for_event.expiry"     // _s.w.exp
 	AttributeStepWaitForEventIf        = "_inngest.step.wait_for_event.if"         // _s.w.if
 	AttributeStepWaitForEventName      = "_inngest.step.wait_for_event.name"       // _s.w.name
-	AttributeStepWaitForEventExpired   = "_inngest.step.wait_for_event.expired"    // _s.w.expired
 	AttributeStepWaitForEventMatchedID = "_inngest.step.wait_for_event.matched_id" // _s.w.mid
+
+	// Signal attributes
+	AttributeStepSignalName = "_inngest.step.signal.name" // _s.sig.name
+
+	// Gateway attributes
+	AttributeStepGatewayResponseStatusCode      = "_inngest.step.gateway.response.status_code" // _s.gw.res.st
+	AttributeStepGatewayResponseOutputSizeBytes = "_inngest.step.gateway.response.output_size" // _s.gw.res.sz
 
 	// HTTP (serve) attributes
 	AttributeRequestURL         = "_inngest.request.uri"          // _req.u

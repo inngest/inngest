@@ -10,10 +10,13 @@ CREATE TABLE spans (
   links JSONB,
 
   -- custom
-  run_id TEXT NOT NULL,
+  dynamic_span_id TEXT,
+  account_id TEXT NOT NULL,
   app_id TEXT NOT NULL,
   function_id TEXT NOT NULL,
-  dynamic_span_id TEXT,
+  run_id TEXT NOT NULL,
+  env_id TEXT NOT NULL,
+  output JSONB,
 
   PRIMARY KEY (trace_id, span_id)
 );

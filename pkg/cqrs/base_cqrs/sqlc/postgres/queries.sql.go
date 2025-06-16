@@ -1518,9 +1518,22 @@ func (q *Queries) InsertQueueSnapshotChunk(ctx context.Context, arg InsertQueueS
 const insertSpan = `-- name: InsertSpan :exec
 
 INSERT INTO spans (
-  span_id, trace_id, parent_span_id, name,
-  start_time, end_time, run_id, app_id, function_id, dynamic_span_id, attributes, links
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+  span_id,
+  trace_id,
+  parent_span_id,
+  name,
+  start_time,
+  end_time,
+  run_id,
+  account_id,
+  app_id,
+  function_id,
+  env_id,
+  dynamic_span_id,
+  attributes,
+  links,
+  output
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
 `
 
 type InsertSpanParams struct {
@@ -1531,11 +1544,14 @@ type InsertSpanParams struct {
 	StartTime     time.Time
 	EndTime       time.Time
 	RunID         string
+	AccountID     string
 	AppID         string
 	FunctionID    string
+	EnvID         string
 	DynamicSpanID sql.NullString
 	Attributes    pqtype.NullRawMessage
 	Links         pqtype.NullRawMessage
+	Output        pqtype.NullRawMessage
 }
 
 // New
@@ -1548,11 +1564,14 @@ func (q *Queries) InsertSpan(ctx context.Context, arg InsertSpanParams) error {
 		arg.StartTime,
 		arg.EndTime,
 		arg.RunID,
+		arg.AccountID,
 		arg.AppID,
 		arg.FunctionID,
+		arg.EnvID,
 		arg.DynamicSpanID,
 		arg.Attributes,
 		arg.Links,
+		arg.Output,
 	)
 	return err
 }

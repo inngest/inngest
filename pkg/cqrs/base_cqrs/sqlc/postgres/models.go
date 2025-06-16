@@ -129,10 +129,13 @@ type Span struct {
 	EndTime       time.Time
 	Attributes    pqtype.NullRawMessage
 	Links         pqtype.NullRawMessage
-	RunID         string
+	DynamicSpanID sql.NullString
+	AccountID     string
 	AppID         string
 	FunctionID    string
-	DynamicSpanID sql.NullString
+	RunID         string
+	EnvID         string
+	Output        pqtype.NullRawMessage
 }
 
 type Trace struct {

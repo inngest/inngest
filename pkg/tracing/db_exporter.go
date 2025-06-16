@@ -5,8 +5,8 @@ import (
 	"database/sql"
 	"encoding/json"
 
-	"github.com/davecgh/go-spew/spew"
 	sqlc "github.com/inngest/inngest/pkg/cqrs/base_cqrs/sqlc/sqlite"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/tracing/meta"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
@@ -25,13 +25,37 @@ func (e *DBExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlyS
 		spanID := span.SpanContext().SpanID().String()
 		parentID := span.Parent().SpanID().String()
 		isExtensionSpan := span.Name() == meta.SpanNameDynamicExtension
-		var runID string
+		var envID string
+		var accountID string
 		var appID string
-		var functionID string
 		var dynamicSpanID string
+		var functionID string
+		var output interface{}
+		var runID string
 
 		attrs := make(map[string]any)
 		for _, attr := range span.Attributes() {
+			// If output, extract and store separately
+			// This is always cleaned
+			if string(attr.Key) == meta.AttributeStepOutput {
+				output = attr.Value.AsInterface()
+				continue
+			}
+
+			if string(attr.Key) == meta.AttributeAccountID {
+				accountID = attr.Value.AsString()
+				if cleanAttrs {
+					continue
+				}
+			}
+
+			if string(attr.Key) == meta.AttributeEnvID {
+				envID = attr.Value.AsString()
+				if cleanAttrs {
+					continue
+				}
+			}
+
 			// Capture but omit the run ID attribute from the span attributes
 			if string(attr.Key) == meta.AttributeRunID {
 				runID = attr.Value.AsString()
@@ -74,22 +98,48 @@ func (e *DBExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlyS
 
 		// If we don't have a run ID, we can't store this span
 		if runID == "" {
-			// TODO Log error
-			spew.Dump("Failed to find run ID for span", span)
+			logger.StdlibLogger(ctx).Error("span missing run ID",
+				"span_id", spanID,
+				"trace_id", traceID,
+				"parent_id", parentID,
+				"name", span.Name(),
+				"start_time", span.StartTime(),
+				"end_time", span.EndTime(),
+				"app_id", appID,
+				"function_id", functionID,
+			)
 			continue
 		}
 
 		attrsByt, err := json.Marshal(attrs)
 		if err != nil {
-			// TODO Log error
-			spew.Dump("Failed to marshal span attributes", err)
+			logger.StdlibLogger(ctx).Error("failed to marshal span attributes",
+				"span_id", spanID,
+				"trace_id", traceID,
+				"parent_id", parentID,
+				"name", span.Name(),
+				"start_time", span.StartTime(),
+				"end_time", span.EndTime(),
+				"app_id", appID,
+				"function_id", functionID,
+				"error", err,
+			)
 			continue
 		}
 
 		linksByt, err := json.Marshal(span.Links())
 		if err != nil {
-			// TODO Log error
-			spew.Dump("Failed to marshal span links", err)
+			logger.StdlibLogger(ctx).Error("failed to marshal span links",
+				"span_id", spanID,
+				"trace_id", traceID,
+				"parent_id", parentID,
+				"name", span.Name(),
+				"start_time", span.StartTime(),
+				"end_time", span.EndTime(),
+				"app_id", appID,
+				"function_id", functionID,
+				"error", err,
+			)
 			continue
 		}
 
@@ -109,10 +159,22 @@ func (e *DBExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlyS
 				String: dynamicSpanID,
 				Valid:  dynamicSpanID != "",
 			},
+			AccountID: accountID,
+			EnvID:     envID,
+			Output:    output,
 		})
 		if err != nil {
-			// TODO Log error
-			spew.Dump("Failed to insert span", err)
+			logger.StdlibLogger(ctx).Error("failed to insert span into database",
+				"span_id", spanID,
+				"trace_id", traceID,
+				"parent_id", parentID,
+				"name", span.Name(),
+				"start_time", span.StartTime(),
+				"end_time", span.EndTime(),
+				"app_id", appID,
+				"function_id", functionID,
+				"error", err,
+			)
 			continue
 		}
 	}

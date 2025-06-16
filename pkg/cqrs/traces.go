@@ -25,22 +25,37 @@ const (
 	SpanStatusError
 )
 
-type JackSpan struct {
+// Raw otel span
+type RawOtelSpan struct {
 	Name         string         `json:"name"`
-	Status       string         `json:"status"`
 	SpanID       string         `json:"span_id"`
 	TraceID      string         `json:"trace_id"`
+	ParentSpanID *string        `json:"parent_span_id,omitempty"`
 	StartTime    time.Time      `json:"start_time"`
 	EndTime      time.Time      `json:"end_time"`
-	ParentSpanID *string        `json:"parent_span_id,omitempty,omitzero"`
-	Attributes   map[string]any `json:"attributes,omitempty,omitzero"`
-	Children     []*JackSpan    `json:"children,omitempty,omitzero"`
-	RunID        ulid.ULID      `json:"run_id,omitempty,omitzero"`
-	AppID        uuid.UUID      `json:"app_id,omitempty,omitzero"`
-	FunctionID   uuid.UUID      `json:"function_id,omitempty,omitzero"`
+	Attributes   map[string]any `json:"attributes,omitempty"`
 }
 
-func (s *JackSpan) anyUnixMilliToTime(v any) (time.Time, error) {
+type OtelSpan struct {
+	RawOtelSpan
+
+	Status               enums.StepStatus `json:"status"`
+	CalculatedQueuedTime *time.Time       `json:"queued_time,omitempty,omitzero"`
+	CalculatedStartTime  *time.Time       `json:"start_time,omitempty,omitzero"`
+	CalculatedEndTime    *time.Time       `json:"end_time,omitempty,omitzero"`
+
+	// A span may be marked as dropped following idempotency or that we intend
+	// to hide it (e.g. discovery steps).
+	MarkedAsDropped bool `json:"marked_as_dropped,omitempty,omitzero"`
+
+	RunID      ulid.ULID `json:"run_id,omitempty,omitzero"`
+	AppID      uuid.UUID `json:"app_id,omitempty,omitzero"`
+	FunctionID uuid.UUID `json:"function_id,omitempty,omitzero"`
+
+	Children []*OtelSpan `json:"children,omitempty,omitzero"`
+}
+
+func (s *OtelSpan) anyUnixMilliToTime(v any) (time.Time, error) {
 	f, ok := v.(float64)
 	if !ok {
 		return time.Time{}, fmt.Errorf("expected float64, got %T", v)
@@ -48,27 +63,27 @@ func (s *JackSpan) anyUnixMilliToTime(v any) (time.Time, error) {
 	return time.UnixMilli(int64(f)), nil
 }
 
-func (s *JackSpan) GetAppID() uuid.UUID {
+func (s *OtelSpan) GetAppID() uuid.UUID {
 	return s.AppID
 }
 
-func (s *JackSpan) GetFunctionID() uuid.UUID {
+func (s *OtelSpan) GetFunctionID() uuid.UUID {
 	return s.FunctionID
 }
 
-func (s *JackSpan) GetRunID() ulid.ULID {
+func (s *OtelSpan) GetRunID() ulid.ULID {
 	return s.RunID
 }
 
-func (s *JackSpan) GetSpanID() string {
+func (s *OtelSpan) GetSpanID() string {
 	return s.SpanID
 }
 
-func (s *JackSpan) GetTraceID() string {
+func (s *OtelSpan) GetTraceID() string {
 	return s.TraceID
 }
 
-func (s *JackSpan) GetName() string {
+func (s *OtelSpan) GetStepName() string {
 	if dn, ok := s.Attributes[meta.AttributeStepName]; ok {
 		if name, ok := dn.(string); ok {
 			return name
@@ -79,17 +94,17 @@ func (s *JackSpan) GetName() string {
 }
 
 // TODO is this max?
-func (s *JackSpan) GetAttempts() *int {
+func (s *OtelSpan) GetAttempts() int {
 	if attempts, ok := s.Attributes[meta.AttributeStepAttempt]; ok {
-		if attempt, ok := attempts.(int); ok {
-			return &attempt
+		if attempt, ok := attempts.(float64); ok {
+			return int(attempt)
 		}
 	}
 
-	return nil
+	return 0
 }
 
-func (s *JackSpan) GetParentSpanID() *string {
+func (s *OtelSpan) GetParentSpanID() *string {
 	if s.ParentSpanID == nil || *s.ParentSpanID == "" {
 		return nil
 	}
@@ -97,13 +112,14 @@ func (s *JackSpan) GetParentSpanID() *string {
 	return s.ParentSpanID
 }
 
-func (s *JackSpan) GetIsRoot() bool {
+func (s *OtelSpan) GetIsRoot() bool {
 	parentSpanID := s.GetParentSpanID()
 
 	return parentSpanID == nil || *parentSpanID == "" || *parentSpanID == "0000000000000000"
 }
 
-func (s *JackSpan) GetQueuedAtTime() time.Time {
+// TODO
+func (s *OtelSpan) GetQueuedAtTime() time.Time {
 	if q, err := s.anyUnixMilliToTime(s.Attributes[meta.AttributeQueuedAt]); err == nil {
 		return q
 	}
@@ -113,7 +129,8 @@ func (s *JackSpan) GetQueuedAtTime() time.Time {
 	return s.StartTime
 }
 
-func (s *JackSpan) GetStartedAtTime() *time.Time {
+// TODO
+func (s *OtelSpan) GetStartedAtTime() *time.Time {
 	if st, err := s.anyUnixMilliToTime(s.Attributes[meta.AttributeStartedAt]); err == nil {
 		return &st
 	}
@@ -121,7 +138,8 @@ func (s *JackSpan) GetStartedAtTime() *time.Time {
 	return nil
 }
 
-func (s *JackSpan) GetEndedAtTime() *time.Time {
+// TODO
+func (s *OtelSpan) GetEndedAtTime() *time.Time {
 	if et, err := s.anyUnixMilliToTime(s.Attributes[meta.AttributeEndedAt]); err == nil {
 		return &et
 	}
@@ -368,7 +386,7 @@ type TraceReader interface {
 	// GetSpanStack retrieves the step stack for the specified span
 	GetSpanStack(ctx context.Context, id SpanIdentifier) ([]string, error)
 	// Jack
-	GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*JackSpan, error)
+	GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*OtelSpan, error)
 	// TODO move to dedicated entitlement interface once that is implemented properly
 	// for both oss & cloud
 	OtelTracesEnabled(ctx context.Context, accountID uuid.UUID) (bool, error)

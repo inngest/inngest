@@ -356,9 +356,22 @@ SELECT * FROM worker_connections WHERE account_id = sqlc.arg('account_id') AND w
 
 -- name: InsertSpan :exec
 INSERT INTO spans (
-  span_id, trace_id, parent_span_id, name,
-  start_time, end_time, run_id, app_id, function_id, dynamic_span_id, attributes, links
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12);
+  span_id,
+  trace_id,
+  parent_span_id,
+  name,
+  start_time,
+  end_time,
+  run_id,
+  account_id,
+  app_id,
+  function_id,
+  env_id,
+  dynamic_span_id,
+  attributes,
+  links,
+  output
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15);
 
 -- name: GetSpansByRunID :many
 SELECT

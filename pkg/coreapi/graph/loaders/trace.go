@@ -6,11 +6,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/google/uuid"
 	"github.com/graph-gophers/dataloader"
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/pkg/cqrs"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/run"
 	"github.com/inngest/inngest/pkg/tracing/meta"
 	rpbv2 "github.com/inngest/inngest/proto/gen/run/v2"
@@ -62,7 +62,7 @@ func (tr *traceReader) GetRunTrace(ctx context.Context, keys dataloader.Keys) []
 				return
 			}
 
-			spew.Dump(rootSpan)
+			// spew.Dump(rootSpan)
 
 			gqlRoot, err := tr.convertRunSpanToGQL(ctx, rootSpan)
 			if err != nil {
@@ -80,7 +80,65 @@ func (tr *traceReader) GetRunTrace(ctx context.Context, keys dataloader.Keys) []
 	return results
 }
 
-func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.JackSpan) (*models.RunTraceSpan, error) {
+func (tr *traceReader) opcodeToGQL(op *enums.Opcode) *models.StepOp {
+	if op == nil {
+		return nil
+	}
+
+	switch *op {
+	case enums.OpcodeStepRun, enums.OpcodeStepError, enums.OpcodeStepPlanned:
+		op := models.StepOpRun
+		return &op
+	case enums.OpcodeAIGateway, enums.OpcodeGateway: // TODO gateway separate
+		op := models.StepOpAiGateway
+		return &op
+	case enums.OpcodeInvokeFunction:
+		op := models.StepOpInvoke
+		return &op
+	case enums.OpcodeSleep:
+		op := models.StepOpSleep
+		return &op
+	case enums.OpcodeWaitForEvent:
+		op := models.StepOpWaitForEvent
+		return &op
+	case enums.OpcodeWaitForSignal:
+		op := models.StepOpWaitForSignal
+		return &op
+	}
+
+	return nil
+}
+
+func (tr *traceReader) stepStatusToGQL(status *enums.StepStatus) *models.RunTraceSpanStatus {
+	if status == nil {
+		return nil
+	}
+
+	switch *status {
+	case enums.StepStatusRunning, enums.StepStatusInvoking:
+		s := models.RunTraceSpanStatusRunning
+		return &s
+	case enums.StepStatusCompleted, enums.StepStatusTimedOut:
+		s := models.RunTraceSpanStatusCompleted
+		return &s
+	case enums.StepStatusFailed, enums.StepStatusErrored:
+		s := models.RunTraceSpanStatusFailed
+		return &s
+	case enums.StepStatusCancelled:
+		s := models.RunTraceSpanStatusCancelled
+		return &s
+	case enums.StepStatusScheduled:
+		s := models.RunTraceSpanStatusQueued
+		return &s
+	case enums.StepStatusSleeping, enums.StepStatusWaiting:
+		s := models.RunTraceSpanStatusWaiting
+		return &s
+	}
+
+	return nil
+}
+
+func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelSpan) (*models.RunTraceSpan, error) {
 	var duration *int
 	status := models.RunTraceSpanStatusRunning
 	startedAt := span.GetStartedAtTime()
@@ -88,8 +146,22 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.JackS
 	if startedAt != nil && endedAt != nil {
 		dur := int(endedAt.Sub(*startedAt).Milliseconds())
 		duration = &dur
-		status = models.RunTraceSpanStatusCompleted // TODO the actual statuses
+		status = models.RunTraceSpanStatusCompleted
 	}
+
+	// Make sure we parse dynamic statuses from updates
+	if v, ok := span.Attributes[meta.AttributeDynamicStatus]; ok {
+		if strV, ok := v.(string); ok {
+			if s, err := enums.StepStatusString(strV); err == nil {
+				gqlStatus := tr.stepStatusToGQL(&s)
+				if gqlStatus != nil {
+					status = *gqlStatus
+				}
+			}
+		}
+	}
+
+	attempts := span.GetAttempts()
 
 	gqlSpan := &models.RunTraceSpan{
 		AppID:        span.GetAppID(),
@@ -97,9 +169,9 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.JackS
 		RunID:        span.GetRunID(),
 		SpanID:       span.GetSpanID(),
 		TraceID:      span.GetTraceID(),
-		Name:         span.GetName(),
+		Name:         span.GetStepName(),
 		Status:       status,
-		Attempts:     span.GetAttempts(),
+		Attempts:     &attempts,
 		ParentSpanID: span.GetParentSpanID(),
 		IsRoot:       span.GetIsRoot(),
 
@@ -110,12 +182,87 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.JackS
 		StartedAt: span.GetStartedAtTime(),
 		EndedAt:   span.GetEndedAtTime(),
 
-		// StepOp: ,
-		// StepID: ,
-		// StepInfo: ,
-
 		// IsUserland: ,
 		// UserlandSpan: ,
+	}
+
+	// If this was a discovery span, we may not want to show it.
+	showSpan := span.Name != meta.SpanNameStepDiscovery
+
+	if v, ok := span.Attributes[meta.AttributeStepOp]; ok {
+		if strV, ok := v.(string); ok {
+
+			if op, err := enums.OpcodeString(strV); err == nil {
+				gqlSpan.StepOp = tr.opcodeToGQL(&op)
+			}
+		}
+	}
+
+	if v, ok := span.Attributes[meta.AttributeStepID]; ok {
+		if strV, ok := v.(string); ok {
+			gqlSpan.StepID = &strV
+		}
+	}
+
+	if gqlSpan.StepOp != nil {
+		switch *gqlSpan.StepOp {
+		case models.StepOpRun:
+			{
+				var stepType *string
+				if v, ok := span.Attributes[meta.AttributeStepRunType]; ok {
+					if strV, ok := v.(string); ok {
+						stepType = &strV
+					}
+				}
+
+				gqlSpan.StepInfo = &models.RunStepInfo{
+					Type: stepType,
+				}
+			}
+		// case models.StepOpInvoke:
+		// 	{
+		// 		gqlSpan.StepInfo = &models.InvokeStepInfo{}
+		// 	}
+		case models.StepOpSleep:
+			{
+				dur, ok := span.Attributes[meta.AttributeStepSleepDuration]
+				if ok {
+					if intDur, ok := dur.(float64); ok {
+						gqlSpan.StepInfo = &models.SleepStepInfo{
+							SleepUntil: span.GetQueuedAtTime().Add(time.Duration(intDur) * time.Millisecond),
+						}
+					}
+				}
+			}
+		// case models.StepOpWaitForEvent:
+		// 	{
+		// 		gqlSpan.StepInfo = &models.WaitForEventStepInfo{}
+		// 	}
+		case models.StepOpWaitForSignal:
+			{
+				si := &models.WaitForSignalStepInfo{}
+
+				if v, ok := span.Attributes[meta.AttributeStepSignalName]; ok {
+					if strV, ok := v.(string); ok {
+						si.Signal = strV
+					}
+				}
+
+				if v, ok := span.Attributes[meta.AttributeStepWaitExpiry]; ok {
+					if intV, ok := v.(float64); ok {
+						si.Timeout = time.UnixMilli(int64(intV))
+					}
+				}
+
+				if v, ok := span.Attributes[meta.AttributeStepWaitExpired]; ok {
+					if boolV, ok := v.(bool); ok {
+						si.TimedOut = &boolV
+					}
+				}
+
+				gqlSpan.StepInfo = si
+			}
+		}
 	}
 
 	if len(span.Children) > 0 {
@@ -127,30 +274,39 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.JackS
 				return nil, fmt.Errorf("error converting child span: %w", err)
 			}
 
+			// We could also not have a child, for example if we're
+			// intentionally skipping it
+			if child == nil {
+				continue
+			}
+
+			if !cs.MarkedAsDropped {
+				showSpan = true
+			}
+
 			// Decide on changes to this parent span based on the children.
 			switch span.Name {
-			case meta.SpanNameStepDiscovery:
+			case meta.SpanNameStepDiscovery, meta.SpanNameStep:
 				{
 					gqlSpan.Status = child.Status
 					gqlSpan.StartedAt = child.StartedAt // TODO only first
 					gqlSpan.EndedAt = child.EndedAt
 					if child.Name != "" {
 						gqlSpan.Name = child.Name
-						child.Name = fmt.Sprintf("Attempt %d", i+1)
+						child.Name = fmt.Sprintf("Attempt %d", i)
 					}
-					break
-				}
-
-			case meta.SpanNameStep:
-				{
-					// TODO multiple executions?
-					gqlSpan.Status = child.Status
-					gqlSpan.StartedAt = child.StartedAt // TODO only first
-					gqlSpan.EndedAt = child.EndedAt
-					if child.Name != "" {
-						gqlSpan.Name = child.Name // TODO only first
+					if child.StepOp != nil {
+						gqlSpan.StepOp = child.StepOp
 					}
-					break
+					if child.StepID != nil && *child.StepID != "" {
+						gqlSpan.StepID = child.StepID
+					}
+					if child.StepInfo != nil {
+						gqlSpan.StepInfo = child.StepInfo
+					}
+					if child.Attempts != nil && *child.Attempts > *gqlSpan.Attempts {
+						gqlSpan.Attempts = child.Attempts
+					}
 				}
 			}
 
@@ -166,6 +322,10 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.JackS
 				gqlSpan.Status = models.RunTraceSpanStatusCompleted // TODO the actual statuses
 			}
 		}
+	}
+
+	if !showSpan {
+		return nil, nil
 	}
 
 	return gqlSpan, nil
@@ -281,11 +441,11 @@ func convertRunTreeToGQLModel(pb *rpbv2.RunSpan) (*models.RunTraceSpan, error) {
 	)
 
 	if pb.GetStartedAt() != nil {
-		ts := pb.GetStartedAt().AsTime()
+		ts := pb.GetStartedAt().AsTime().Truncate(time.Millisecond)
 		startedAt = &ts
 	}
 	if pb.GetEndedAt() != nil {
-		ts := pb.GetEndedAt().AsTime()
+		ts := pb.GetEndedAt().AsTime().Truncate(time.Millisecond)
 		endedAt = &ts
 	}
 
@@ -350,7 +510,7 @@ func convertRunTreeToGQLModel(pb *rpbv2.RunSpan) (*models.RunTraceSpan, error) {
 		Status:       status,
 		Attempts:     &attempts,
 		Duration:     &duration,
-		QueuedAt:     pb.GetQueuedAt().AsTime(),
+		QueuedAt:     pb.GetQueuedAt().AsTime().Truncate(time.Millisecond),
 		StartedAt:    startedAt,
 		EndedAt:      endedAt,
 		OutputID:     pb.OutputId,

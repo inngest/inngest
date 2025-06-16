@@ -129,10 +129,13 @@ type Span struct {
 	EndTime       time.Time
 	Attributes    interface{}
 	Links         interface{}
-	RunID         string
+	DynamicSpanID sql.NullString
+	AccountID     string
 	AppID         string
 	FunctionID    string
-	DynamicSpanID sql.NullString
+	RunID         string
+	EnvID         string
+	Output        interface{}
 }
 
 type Trace struct {

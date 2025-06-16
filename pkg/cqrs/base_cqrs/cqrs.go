@@ -83,15 +83,15 @@ func (w wrapper) dialect() string {
 	return "sqlite3"
 }
 
-func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.JackSpan, error) {
+func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.OtelSpan, error) {
 	spans, err := w.q.GetSpansByRunID(ctx, runID.String())
 	if err != nil {
 		logger.StdlibLogger(ctx).Error("error getting spans by run ID", "error", err)
 		return nil, err
 	}
 
-	spanMap := make(map[string]*cqrs.JackSpan)
-	var root *cqrs.JackSpan
+	spanMap := make(map[string]*cqrs.OtelSpan)
+	var root *cqrs.OtelSpan
 
 	for _, span := range spans {
 		st := strings.Split(span.StartTime.(string), " m=")[0]
@@ -113,14 +113,19 @@ func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.Ja
 			parentSpanID = &span.ParentSpanID.String
 		}
 
-		spanMap[span.DynamicSpanID.String] = &cqrs.JackSpan{
-			Status:       "running",
-			TraceID:      span.TraceID,
-			SpanID:       span.DynamicSpanID.String,
-			StartTime:    startTime,
-			EndTime:      endTime,
-			ParentSpanID: parentSpanID,
-			Attributes:   make(map[string]any),
+		newSpan := &cqrs.OtelSpan{
+			RawOtelSpan: cqrs.RawOtelSpan{
+				SpanID:       span.DynamicSpanID.String,
+				TraceID:      span.TraceID,
+				ParentSpanID: parentSpanID,
+				StartTime:    startTime,
+				EndTime:      endTime,
+				Name:         "",
+				Attributes:   make(map[string]any),
+			},
+			Status:          enums.StepStatusRunning,
+			RunID:           runID,
+			MarkedAsDropped: false,
 		}
 
 		var fragments []map[string]interface{}
@@ -128,11 +133,9 @@ func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.Ja
 
 		// TODO same for links
 		for _, fragment := range fragments {
-			if spanMap[span.DynamicSpanID.String].Name == "" {
-				if name, ok := fragment["name"].(string); ok {
-					if strings.HasPrefix(name, "executor.") {
-						spanMap[span.DynamicSpanID.String].Name = name
-					}
+			if name, ok := fragment["name"].(string); ok {
+				if strings.HasPrefix(name, "executor.") {
+					newSpan.Name = name
 				}
 			}
 
@@ -144,29 +147,50 @@ func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.Ja
 				}
 
 				for k, v := range fragmentAttr {
-					// Can remove this to not pass on needless attributes
-					spanMap[span.DynamicSpanID.String].Attributes[k] = v
+					// TODO Can remove this to not pass on needless attributes
+					newSpan.Attributes[k] = v
 
-					if k == meta.AttributeDynamicStatus {
-						if status, ok := v.(string); ok {
-							spanMap[span.DynamicSpanID.String].Status = status
+					switch k {
+					case meta.AttributeDynamicStatus:
+						{
+							if status, ok := v.(string); ok {
+								if statusStr, err := enums.StepStatusString(status); err == nil {
+									newSpan.Status = statusStr
+								}
+							}
 						}
-					} else if k == meta.AttributeAppID {
-						spanMap[span.DynamicSpanID.String].AppID = uuid.MustParse(v.(string))
-					} else if k == meta.AttributeFunctionID {
-						spanMap[span.DynamicSpanID.String].FunctionID = uuid.MustParse(v.(string))
-					} else if k == meta.AttributeRunID {
-						spanMap[span.DynamicSpanID.String].RunID = ulid.MustParse(v.(string))
-					} else if k == meta.AttributeStartedAt {
-						spanMap[span.DynamicSpanID.String].StartTime = time.UnixMilli(int64(v.(float64)))
-					} else if k == meta.AttributeEndedAt {
-						spanMap[span.DynamicSpanID.String].EndTime = time.UnixMilli(int64(v.(float64)))
-					} else {
-						spanMap[span.DynamicSpanID.String].Attributes[k] = v
+					case meta.AttributeAppID:
+						{
+							newSpan.AppID = uuid.MustParse(v.(string))
+						}
+					case meta.AttributeFunctionID:
+						{
+							newSpan.FunctionID = uuid.MustParse(v.(string))
+						}
+					case meta.AttributeRunID:
+						{
+							newSpan.RunID = ulid.MustParse(v.(string))
+						}
+					case meta.AttributeStartedAt:
+						{
+							newSpan.StartTime = time.UnixMilli(int64(v.(float64)))
+						}
+					case meta.AttributeEndedAt:
+						{
+							newSpan.EndTime = time.UnixMilli(int64(v.(float64)))
+						}
+					case meta.AttributeDropSpan:
+						{
+							newSpan.MarkedAsDropped = true
+						}
+					default:
+						newSpan.Attributes[k] = v
 					}
 				}
 			}
 		}
+
+		spanMap[span.DynamicSpanID.String] = newSpan
 	}
 
 	for _, span := range spanMap {
@@ -179,7 +203,7 @@ func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.Ja
 			// This is wrong. Either do it properly in DB or infer it
 			// correctly here. e.g. if child failed but more attempts coming,
 			// still running
-			if span.Status != "" && span.Status != "running" && (parent.Status == "" || parent.Status == "running") {
+			if span.Status != enums.StepStatusUnknown && span.Status != enums.StepStatusRunning && (parent.Status == enums.StepStatusUnknown || parent.Status == enums.StepStatusRunning) {
 				parent.Status = span.Status
 			}
 
@@ -194,7 +218,7 @@ func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.Ja
 	return root, nil
 }
 
-func sorter(span *cqrs.JackSpan) {
+func sorter(span *cqrs.OtelSpan) {
 	sort.Slice(span.Children, func(i, j int) bool {
 		return span.Children[i].StartTime.Before(span.Children[j].StartTime)
 	})

@@ -189,8 +189,6 @@ CREATE TABLE worker_connections (
     PRIMARY KEY(id, app_name)
 );
 
--- New
-
 CREATE TABLE spans (
   -- otel
   span_id TEXT NOT NULL,
@@ -203,10 +201,13 @@ CREATE TABLE spans (
   links JSON,
 
   -- custom
-  run_id TEXT NOT NULL,
+  dynamic_span_id TEXT,
+  account_id TEXT NOT NULL,
   app_id TEXT NOT NULL,
   function_id TEXT NOT NULL,
-  dynamic_span_id TEXT,
+  run_id TEXT NOT NULL,
+  env_id TEXT NOT NULL,
+  output JSON,
 
   PRIMARY KEY (trace_id, span_id)
 );

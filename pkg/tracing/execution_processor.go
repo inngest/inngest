@@ -4,11 +4,11 @@ import (
 	"context"
 	"time"
 
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/tracing/meta"
 	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/codes"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 )
 
@@ -28,6 +28,7 @@ func newExecutionProcessor(md *statev2.Metadata, qi *queue.Item, next sdktrace.S
 
 func (p *executionProcessor) OnStart(parent context.Context, s sdktrace.ReadWriteSpan) {
 	attrs := []attribute.KeyValue{}
+	now := time.Now() // TODO This should be something on qi etc
 
 	if p.md != nil {
 		attrs = append(attrs,
@@ -44,7 +45,7 @@ func (p *executionProcessor) OnStart(parent context.Context, s sdktrace.ReadWrit
 	case meta.SpanNameRun:
 		{
 			attrs = append(attrs,
-				attribute.Int64(meta.AttributeQueuedAt, time.Now().UnixMilli()),
+				attribute.Int64(meta.AttributeQueuedAt, now.UnixMilli()),
 			)
 
 			if p.md != nil {
@@ -83,7 +84,7 @@ func (p *executionProcessor) OnStart(parent context.Context, s sdktrace.ReadWrit
 	case meta.SpanNameStepDiscovery:
 		{
 			attrs = append(attrs,
-				attribute.Int64(meta.AttributeQueuedAt, time.Now().UnixMilli()),
+				attribute.Int64(meta.AttributeQueuedAt, now.UnixMilli()),
 			)
 
 			break
@@ -92,7 +93,7 @@ func (p *executionProcessor) OnStart(parent context.Context, s sdktrace.ReadWrit
 	case meta.SpanNameStep:
 		{
 			attrs = append(attrs,
-				attribute.Int64(meta.AttributeQueuedAt, time.Now().UnixMilli()),
+				attribute.Int64(meta.AttributeQueuedAt, now.UnixMilli()),
 			)
 
 			if p.qi != nil {
@@ -100,6 +101,13 @@ func (p *executionProcessor) OnStart(parent context.Context, s sdktrace.ReadWrit
 					attribute.Int(meta.AttributeStepMaxAttempts, p.qi.GetMaxAttempts()),
 					attribute.Int(meta.AttributeStepAttempt, p.qi.Attempt),
 				)
+
+				// Sleeps start as soon as they are queued
+				if p.qi.Kind == queue.KindSleep {
+					attrs = append(attrs,
+						attribute.Int64(meta.AttributeStartedAt, now.UnixMilli()),
+					)
+				}
 			}
 
 			break
@@ -108,8 +116,14 @@ func (p *executionProcessor) OnStart(parent context.Context, s sdktrace.ReadWrit
 	case meta.SpanNameExecution:
 		{
 			attrs = append(attrs,
-				attribute.Int64(meta.AttributeStartedAt, time.Now().UnixMilli()),
+				attribute.Int64(meta.AttributeStartedAt, now.UnixMilli()),
 			)
+
+			if p.qi != nil {
+				attrs = append(attrs,
+					attribute.Int(meta.AttributeStepAttempt, p.qi.Attempt),
+				)
+			}
 
 			break
 		}
@@ -118,9 +132,9 @@ func (p *executionProcessor) OnStart(parent context.Context, s sdktrace.ReadWrit
 		{
 			for _, attr := range s.Attributes() {
 				if string(attr.Key) == meta.AttributeDynamicStatus {
-					if attr.Value.Type() == attribute.STRING && attr.Value.AsString() != codes.Unset.String() {
+					if attr.Value.Type() == attribute.INT64 && enums.RunStatusEnded(enums.RunStatus(attr.Value.AsInt64())) {
 						attrs = append(attrs,
-							attribute.Int64(meta.AttributeEndedAt, time.Now().UnixMilli()),
+							attribute.Int64(meta.AttributeEndedAt, now.UnixMilli()),
 						)
 					}
 

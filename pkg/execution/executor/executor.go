@@ -293,7 +293,7 @@ func WithTraceReader(m cqrs.TraceReader) ExecutorOpt {
 	}
 }
 
-func WithTracerProvider(t *tracing.TracerProvider) ExecutorOpt {
+func WithTracerProvider(t tracing.TracerProvider) ExecutorOpt {
 	return func(e execution.Executor) error {
 		e.(*executor).tracerProvider = t
 		return nil
@@ -349,7 +349,7 @@ type executor struct {
 	shardFinder        redis_state.ShardSelector
 
 	traceReader    cqrs.TraceReader
-	tracerProvider *tracing.TracerProvider
+	tracerProvider tracing.TracerProvider
 }
 
 func (e *executor) SetFinalizer(f execution.FinalizePublisher) {
@@ -796,7 +796,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			EndTime:    time.Now(),
 			Location:   "executor.Execute",
 			QueueItem:  &item,
-			Status:     codes.Ok,
+			Status:     enums.StepStatusCompleted,
 			TargetSpan: tracing.SpanRefFromQueueItem(&item),
 		})
 		if err != nil {
@@ -1023,9 +1023,9 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	return util.CritT(ctx, "run step", func(ctx context.Context) (*state.DriverResponse, error) {
 		resp, err := e.run(ctx, &instance)
 
-		status := codes.Ok
-		if err != nil {
-			status = codes.Error
+		status := enums.StepStatusCompleted
+		if err != nil || resp.Err != nil || resp.UserError != nil {
+			status = enums.StepStatusFailed
 		}
 		e.tracerProvider.UpdateSpan(
 			&tracing.UpdateSpanOptions{
@@ -1235,7 +1235,7 @@ func (e *executor) finalize(ctx context.Context, md sv2.Metadata, evts []json.Ra
 		Location:   "executor.finalize",
 		Metadata:   &md,
 		TargetSpan: tracing.RunSpanRefFromMetadata(&md),
-		Status:     codes.Ok, // TODO
+		Status:     enums.StepStatusCompleted, // TODO
 	})
 	if err != nil {
 		logger.StdlibLogger(ctx).Error(
@@ -2082,9 +2082,9 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 			return nil
 		}
 
-		status := codes.Ok
+		status := enums.StepStatusCompleted
 		if r.IsTimeout {
-			status = codes.Error // TODO Our own codes pls; this is not an error
+			status = enums.StepStatusTimedOut
 		}
 		pauseSpan := tracing.SpanRefFromPause(&pause)
 		e.tracerProvider.UpdateSpan(&tracing.UpdateSpanOptions{

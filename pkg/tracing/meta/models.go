@@ -1,6 +1,5 @@
 package meta
 
-// TODO
 type SpanReference struct {
 	TraceParent string `json:"tp"`
 	TraceState  string `json:"ts"`
