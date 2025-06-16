@@ -1,4 +1,4 @@
-import NextLink from 'next/link';
+import { Link } from '@inngest/components/Link';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
 
 type ConfigurationBlockProps = {
@@ -50,9 +50,9 @@ export default function ConfigurationBlock({
   );
 
   return href ? (
-    <NextLink href={href} className="hover:bg-canvasMuted block">
+    <Link href={href} className="hover:bg-canvasMuted block">
       {content}
-    </NextLink>
+    </Link>
   ) : (
     content
   );

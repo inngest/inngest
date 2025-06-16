@@ -21,12 +21,12 @@ import { toast } from 'sonner';
 import {
   FunctionTriggerTypes,
   useInvokeFunctionMutation,
-  type Function,
+  type GetFunctionQuery,
 } from '../../../../apps/dev-server-ui/src/store/generated';
 
 type FunctionConfigurationProps = {
   onClose: () => void;
-  inngestFunction: Function;
+  inngestFunction: NonNullable<GetFunctionQuery['functionBySlug']>;
 };
 
 export function FunctionConfiguration({ onClose, inngestFunction }: FunctionConfigurationProps) {

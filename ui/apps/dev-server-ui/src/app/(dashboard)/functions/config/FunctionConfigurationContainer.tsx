@@ -2,7 +2,7 @@
 
 import { FunctionConfiguration } from '@inngest/components/FunctionConfiguration';
 
-import { useGetFunctionQuery, type Function } from '@/store/generated';
+import { useGetFunctionQuery } from '@/store/generated';
 
 type FunctionDetailsProps = {
   onClose: () => void;
@@ -21,8 +21,5 @@ export function FunctionConfigurationContainer({ onClose, functionSlug }: Functi
     return null;
   }
 
-  // TODO why is as Function needed?
-  return (
-    <FunctionConfiguration onClose={onClose} inngestFunction={data.functionBySlug as Function} />
-  );
+  return <FunctionConfiguration onClose={onClose} inngestFunction={data.functionBySlug} />;
 }
