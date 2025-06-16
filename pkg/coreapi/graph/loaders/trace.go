@@ -3,6 +3,7 @@ package loader
 import (
 	"context"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -292,10 +293,10 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 					gqlSpan.Status = child.Status
 					gqlSpan.StartedAt = child.StartedAt // TODO only first
 					gqlSpan.EndedAt = child.EndedAt
-					if child.Name != "" {
+					if strings.HasPrefix(gqlSpan.Name, "executor.") && child.Name != "" {
 						gqlSpan.Name = child.Name
-						child.Name = fmt.Sprintf("Attempt %d", i)
 					}
+					child.Name = fmt.Sprintf("Attempt %d", i)
 					if child.StepOp != nil {
 						gqlSpan.StepOp = child.StepOp
 					}
