@@ -253,19 +253,22 @@ func (q *queue) findMissingItemsWithStaticTargets(ctx context.Context, client ru
 			if rueidis.IsRedisNil(err) {
 				return nil
 			}
-			return fmt.Errorf("could not iterate key 1 for missing items: %w", err)
+			return fmt.Errorf("could not iterate source key for missing items: %w", err)
 		}
 
-		if entry.Cursor == 0 {
+		if len(entry.Elements) == 0 {
 			return nil
 		}
 
-		cursor = entry.Cursor
+		entryIDs := make([]string, 0, len(entry.Elements)/2)
+		for i := 0; i < len(entry.Elements); i += 2 {
+			entryIDs = append(entryIDs, entry.Elements[i])
+		}
 
 		entriesFound := make(map[string]struct{})
 
 		for _, targetKey := range targetKeys {
-			resp, err := client.Do(ctx, client.B().Zmscore().Key(targetKey).Member(entry.Elements...).Build()).ToAny()
+			resp, err := client.Do(ctx, client.B().Zmscore().Key(targetKey).Member(entryIDs...).Build()).ToAny()
 			if err != nil && !rueidis.IsRedisNil(err) {
 				return fmt.Errorf("could not check key 2 for missing items: %w", err)
 			}
@@ -277,16 +280,22 @@ func (q *queue) findMissingItemsWithStaticTargets(ctx context.Context, client ru
 
 			for i, score := range scores {
 				if score != nil {
-					entriesFound[entry.Elements[i]] = struct{}{}
+					entriesFound[entryIDs[i]] = struct{}{}
 				}
 			}
 		}
 
-		for _, element := range entry.Elements {
+		for _, element := range entryIDs {
 			if _, has := entriesFound[element]; !has {
 				onMissing(element)
 			}
 		}
+
+		if entry.Cursor == 0 {
+			return nil
+		}
+
+		cursor = entry.Cursor
 
 		<-time.After(100 * time.Millisecond)
 	}
@@ -320,20 +329,25 @@ func (q *queue) findMissingItemsWithDynamicTargets(
 			return fmt.Errorf("could not iterate key 1 for missing items: %w", err)
 		}
 
-		if entry.Cursor == 0 {
+		if len(entry.Elements) == 0 {
 			return nil
 		}
 
+		entryIDs := make([]string, 0, len(entry.Elements)/2)
+		for i := 0; i < len(entry.Elements); i += 2 {
+			entryIDs = append(entryIDs, entry.Elements[i])
+		}
+
 		// Retrieve item data
-		items := make([]*osqueue.QueueItem, 0, len(entry.Elements))
-		itemData, err := client.Do(ctx, client.B().Hmget().Key(kg.QueueItem()).Field(entry.Elements...).Build()).AsStrSlice()
+		items := make([]*osqueue.QueueItem, 0, len(entryIDs))
+		itemData, err := client.Do(ctx, client.B().Hmget().Key(kg.QueueItem()).Field(entryIDs...).Build()).AsStrSlice()
 		if err != nil {
 			return fmt.Errorf("could not get queue items: %w", err)
 		}
 
 		for i, itemStr := range itemData {
 			if itemStr == "" {
-				onMissing(entry.Elements[i])
+				onMissing(entryIDs[i])
 				continue
 			}
 
@@ -348,7 +362,7 @@ func (q *queue) findMissingItemsWithDynamicTargets(
 				continue
 			}
 
-			items[i] = &qi
+			items = append(items, &qi)
 		}
 
 		entriesFound := make(map[string]struct{})
@@ -357,6 +371,10 @@ func (q *queue) findMissingItemsWithDynamicTargets(
 		// Worst case, this transform 20 queue items in the chunk to 20 target keys, but usually this will
 		// be more efficient as items may belong to the same workflows.
 		for targetKey, items := range targetKeys(items) {
+			if len(items) == 0 {
+				continue
+			}
+
 			// Batch check scores for items
 			resp, err := client.Do(ctx, client.B().Zmscore().Key(targetKey).Member(items...).Build()).ToAny()
 			if err != nil && !rueidis.IsRedisNil(err) {
@@ -375,15 +393,19 @@ func (q *queue) findMissingItemsWithDynamicTargets(
 			}
 		}
 
-		for _, element := range entry.Elements {
+		for _, element := range entryIDs {
 			if _, has := entriesFound[element]; !has {
 				onMissing(element)
 			}
 		}
 
-		<-time.After(100 * time.Millisecond)
+		if entry.Cursor == 0 {
+			return nil
+		}
 
 		cursor = entry.Cursor
+
+		<-time.After(100 * time.Millisecond)
 	}
 }
 
