@@ -835,6 +835,13 @@ type queue struct {
 
 	normalizeRefreshItemCustomConcurrencyKeys NormalizeRefreshItemCustomConcurrencyKeysFn
 	refreshItemThrottle                       RefreshItemThrottleFn
+
+	// activeCheckerLeaseID stores the lease ID if this queue is the ActiveChecker processor.
+	// all runners attempt to claim this lease automatically.
+	activeCheckerLeaseID *ulid.ULID
+	// activeCheckerLeaseLock ensures that there are no data races writing to
+	// or reading from activeCheckerLeaseID in parallel.
+	activeCheckerLeaseLock *sync.RWMutex
 }
 
 type QueueRunMode struct {
@@ -873,6 +880,9 @@ type QueueRunMode struct {
 
 	// NormalizePartition enables the processing of partitions for normalization
 	NormalizePartition bool
+
+	// ActiveChecker enables background checking of active sets.
+	ActiveChecker bool
 }
 
 // continuation represents a partition continuation, forcung the queue to continue working

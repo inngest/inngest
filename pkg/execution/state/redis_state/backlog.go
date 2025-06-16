@@ -721,6 +721,9 @@ func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueSha
 		sp.activeRunKey(kg),          // Set for active runs in partition
 		b.customKeyActiveRuns(kg, 1), // Set for active runs with custom concurrency key 1
 		b.customKeyActiveRuns(kg, 2), // Set for active runs with custom concurrency key 2
+
+		kg.PartitionActiveCheckSet(),
+		kg.PartitionActiveCheckCooldown(sp.PartitionID),
 	}
 
 	enableKeyQueuesVal := "0"
@@ -728,6 +731,9 @@ func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueSha
 	if sp.keyQueuesEnabled(ctx, q) {
 		enableKeyQueuesVal = "1"
 	}
+
+	// TODO introduce conditional spot checking (probability in queue settings, feature flag, etc.)
+	shouldSpotCheckActiveSet := "1"
 
 	args, err := StrSlice([]any{
 		b.BacklogID,
@@ -749,6 +755,7 @@ func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueSha
 
 		kg.QueuePrefix(),
 		enableKeyQueuesVal,
+		shouldSpotCheckActiveSet,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("could not serialize args: %w", err)

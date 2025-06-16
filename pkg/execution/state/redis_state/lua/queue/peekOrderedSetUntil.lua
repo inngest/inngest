@@ -15,7 +15,6 @@ local peekUntilMS  = tonumber(ARGV[2])
 local limit        = tonumber(ARGV[3])
 local sequential   = tonumber(ARGV[4])
 
-
 local count = redis.call("ZCOUNT", keyOrderedPointerSet, "-inf", peekUntil)
 local offset = 0
 
