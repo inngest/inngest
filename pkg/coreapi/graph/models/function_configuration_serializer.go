@@ -143,8 +143,8 @@ func mapScope(internalEnum enums.ConcurrencyScope) ConcurrencyScope {
 
 func mapSingletonMode(internalEnum enums.SingletonMode) SingletonMode {
 	var enumMapping = map[enums.SingletonMode]SingletonMode{
-		enums.SingletonModeSkip: SingletonModeSkip,
-		//enums.SingletonModeCancel: SingletonModeCancel,
+		enums.SingletonModeSkip:   SingletonModeSkip,
+		enums.SingletonModeCancel: SingletonModeCancel,
 	}
 
 	if gqlEnum, ok := enumMapping[internalEnum]; ok {
