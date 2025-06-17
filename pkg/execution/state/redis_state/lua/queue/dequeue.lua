@@ -42,32 +42,8 @@ local keyActiveRunsCustomConcurrencyKey2  = KEYS[26]
 local keyIdempotency           = KEYS[27]
 local singletonRunKey          = KEYS[28]
 
--- NOTE: The following keys are temporary and only used for cleanup and will be removed before Key Queues v2 GA.
-local keyGcV1ActiveAccount                    = KEYS[29]
-local keyGcV1ActivePartition                  = KEYS[30]
-local keyGcV1ActiveConcurrencyKey1            = KEYS[31]
-local keyGcV1ActiveConcurrencyKey2            = KEYS[32]
-local keyGcV1ActiveCompound                   = KEYS[33]
-local keyGcV1ActiveRun                        = KEYS[34]
-local keyGcV1ActiveRunsAccount                = KEYS[35]
-local keyGcV1ActiveRunsPartition              = KEYS[36]
-local keyGcV1ActiveRunsCustomConcurrencyKey1  = KEYS[37]
-local keyGcV1ActiveRunsCustomConcurrencyKey2  = KEYS[38]
-
--- NOTE: The following keys are temporary and only used for cleanup and will be removed before Key Queues v2 GA.
-local keyGcV0ActiveAccount                    = KEYS[39]
-local keyGcV0ActivePartition                  = KEYS[40]
-local keyGcV0ActiveConcurrencyKey1            = KEYS[41]
-local keyGcV0ActiveConcurrencyKey2            = KEYS[42]
-local keyGcV0ActiveCompound                   = KEYS[43]
-local keyGcV0ActiveRun                        = KEYS[44]
-local keyGcV0ActiveRunsAccount                = KEYS[45]
-local keyGcV0ActiveRunsPartition              = KEYS[46]
-local keyGcV0ActiveRunsCustomConcurrencyKey1  = KEYS[47]
-local keyGcV0ActiveRunsCustomConcurrencyKey2  = KEYS[48]
-
-local keyItemIndexA            = KEYS[49]   -- custom item index 1
-local keyItemIndexB            = KEYS[50]  -- custom item index 2
+local keyItemIndexA            = KEYS[29]   -- custom item index 1
+local keyItemIndexB            = KEYS[30]  -- custom item index 2
 
 local queueID        = ARGV[1]
 local partitionID    = ARGV[2]
@@ -170,11 +146,6 @@ end
 removeFromActiveSets(keyActivePartition, keyActiveAccount, keyActiveCompound, keyActiveConcurrencyKey1, keyActiveConcurrencyKey2, queueID)
 removeFromActiveRunSets(keyActiveRun, keyActiveRunsPartition, keyActiveRunsAccount, keyActiveRunsCustomConcurrencyKey1, keyActiveRunsCustomConcurrencyKey2, runID, queueID)
 
--- GC: Delete old active keys
-redis.call('DEL', keyGcV0ActiveAccount, keyGcV0ActivePartition, keyGcV0ActiveConcurrencyKey1, keyGcV0ActiveConcurrencyKey2, keyGcV0ActiveCompound, keyGcV0ActiveRun, keyGcV0ActiveRunsAccount, keyGcV0ActiveRunsPartition, keyGcV0ActiveRunsCustomConcurrencyKey1, keyGcV0ActiveRunsCustomConcurrencyKey2)
-redis.call('DEL', keyGcV1ActiveAccount, keyGcV1ActivePartition, keyGcV1ActiveConcurrencyKey1, keyGcV1ActiveConcurrencyKey2, keyGcV1ActiveCompound, keyGcV1ActiveRun, keyGcV1ActiveRunsAccount, keyGcV1ActiveRunsPartition, keyGcV1ActiveRunsCustomConcurrencyKey1, keyGcV1ActiveRunsCustomConcurrencyKey2)
-
-
 -- Add optional indexes.
 if keyItemIndexA ~= "" and keyItemIndexA ~= false and keyItemIndexA ~= nil then
 	redis.call("ZREM", keyItemIndexA, queueID)
@@ -200,10 +171,13 @@ if singletonKey ~= nil and singletonKey ~= false and keyItemIndexA ~= "" and key
   local queueItemsCount = redis.call("ZCOUNT", keyItemIndexA, "-inf", "+inf")
   local singletonRunID = redis.call("GET", singletonKey)
 
-  if tonumber(queueItemsCount) == 0 and singletonRunID == runID then
+  if tonumber(queueItemsCount) == 0 then
     -- We just dequeued the last step
-    redis.call("DEL", singletonKey)
-    redis.call("DEL", singletonRunKey)
+     redis.call("DEL", singletonRunKey)
+
+     if singletonRunID == runID then
+        redis.call("DEL", singletonKey)
+    end
   end
 end
 

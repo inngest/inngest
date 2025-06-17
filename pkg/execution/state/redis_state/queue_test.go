@@ -7277,7 +7277,11 @@ func TestQueueEnqueueItemSingleton(t *testing.T) {
 	require.NoError(t, err)
 	defer rc.Close()
 
-	q := NewQueue(QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName})
+	defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+	q := NewQueue(defaultShard)
+
+	kg := defaultShard.RedisClient.KeyGenerator()
+
 	ctx := context.Background()
 
 	start := time.Now().Truncate(time.Second)
@@ -7344,6 +7348,81 @@ func TestQueueEnqueueItemSingleton(t *testing.T) {
 		require.NotEqual(t, qi1.ID, item1.ID)
 		newQueueItem := getQueueItem(t, r, item1.ID)
 		require.NotEqual(t, found.ID, newQueueItem.ID)
+	})
+
+	t.Run("It does not release the singleton when dequeuing if it's locked by a different run", func(t *testing.T) {
+		key := "example-cancel"
+		start := time.Now().Truncate(time.Second)
+
+		runId1 := ulid.MustNew(ulid.Now(), rand.Reader)
+		qi1 := osqueue.QueueItem{
+			Data: osqueue.Item{
+				Kind: osqueue.KindStart,
+				Identifier: state.Identifier{
+					RunID: runId1,
+				},
+				Singleton: &osqueue.Singleton{
+					Key: key,
+				},
+			},
+		}
+
+		runId2 := ulid.MustNew(ulid.Now(), rand.Reader)
+		qi2 := osqueue.QueueItem{
+			Data: osqueue.Item{
+				Kind: osqueue.KindStart,
+				Identifier: state.Identifier{
+					RunID: runId2,
+				},
+				Singleton: &osqueue.Singleton{
+					Key: key,
+				},
+			},
+		}
+
+		item1, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi1, start, osqueue.EnqueueOpts{})
+
+		require.NoError(t, err)
+		require.NotEqual(t, qi1.ID, item1.ID)
+		found := getQueueItem(t, r, item1.ID)
+		require.Equal(t, item1, found)
+
+		// Simulate locking release
+		deleted := r.Del(kg.SingletonKey(&osqueue.Singleton{
+			Key: key,
+		}))
+
+		require.Equal(t, deleted, true)
+
+		start = time.Now().Truncate(time.Second)
+		// Enqueue the new run
+		item2, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi2, start, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+		require.NotEqual(t, qi1.ID, item2.ID)
+		found = getQueueItem(t, r, item2.ID)
+		require.Equal(t, item2, found)
+
+		// Dequeue the first item
+		err = q.Dequeue(ctx, q.primaryQueueShard, item1)
+		require.NoError(t, err)
+
+		singletonRun, err := r.Get(kg.SingletonKey(&osqueue.Singleton{
+			Key: key,
+		}))
+
+		// Check that the lock isn't released because the first run doesn't own it anymore
+		require.NoError(t, err)
+		require.Equal(t, runId2.String(), singletonRun)
+
+		// Dequeue the second item
+		err = q.Dequeue(ctx, q.primaryQueueShard, item2)
+		require.NoError(t, err)
+
+		// Now the lock should be released
+		locked := r.Exists(kg.SingletonKey(&osqueue.Singleton{
+			Key: key,
+		}))
+		require.False(t, locked)
 	})
 }
 
@@ -7861,213 +7940,6 @@ func TestQueueActiveCounters(t *testing.T) {
 			require.Equal(t, 0, scard(kg.ActiveSet("p", fnID.String())))
 			require.Equal(t, 0, scard(kg.ActiveSet("account", accountID.String())))
 		})
-	})
-}
-
-func TestQueueGarbageCollectOldActiveKeys(t *testing.T) {
-	r := miniredis.RunT(t)
-	rc, err := rueidis.NewClient(rueidis.ClientOption{
-		InitAddress:  []string{r.Addr()},
-		DisableCache: true,
-	})
-	require.NoError(t, err)
-	defer rc.Close()
-
-	defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
-	kg := defaultShard.RedisClient.kg
-
-	enqueueToBacklog := false
-
-	clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Minute))
-	q := NewQueue(
-		defaultShard,
-		WithClock(clock),
-		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
-			return enqueueToBacklog
-		}),
-		WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-			return false
-		}),
-		WithDisableLeaseChecksForSystemQueues(false),
-	)
-	ctx := context.Background()
-
-	accountID, fnID, envID := uuid.New(), uuid.New(), uuid.New()
-
-	runID := ulid.MustNew(ulid.Timestamp(clock.Now()), rand.Reader)
-
-	t.Run("with custom concurrency keys", func(t *testing.T) {
-		ck1 := createConcurrencyKey(enums.ConcurrencyScopeFn, fnID, "test", 1)
-		ck2 := createConcurrencyKey(enums.ConcurrencyScopeAccount, accountID, "test2", 1)
-
-		item := osqueue.QueueItem{
-			ID:          "test",
-			FunctionID:  fnID,
-			WorkspaceID: envID,
-			Data: osqueue.Item{
-				WorkspaceID: envID,
-				Kind:        osqueue.KindEdge,
-				Identifier: state.Identifier{
-					WorkflowID:  fnID,
-					AccountID:   accountID,
-					WorkspaceID: envID,
-					RunID:       runID,
-				},
-				QueueName: nil,
-				Throttle:  nil,
-				CustomConcurrencyKeys: []state.CustomConcurrency{
-					ck1,
-					ck2,
-				},
-			},
-			QueueName: nil,
-		}
-
-		backlog := q.ItemBacklog(ctx, item)
-		shadowPartition := q.ItemShadowPartition(ctx, item)
-
-		keys := q.activeKeysToGarbageCollect(item, shadowPartition, backlog, kg)
-
-		ck1Hash := util.XXHash(ck1.Key)
-		ck2Hash := util.XXHash(ck2.Key)
-
-		require.Equal(t, []string{
-			// v1
-			fmt.Sprintf("{queue}:v1:active:account:%s", accountID.String()),
-			fmt.Sprintf("{queue}:v1:active:p:%s", fnID.String()),
-			fmt.Sprintf("{queue}:v1:active:custom:%s", ck1.Key),
-			fmt.Sprintf("{queue}:v1:active:custom:%s", ck2.Key),
-			fmt.Sprintf("{queue}:v1:active:compound:fn:%s:c1<%s:%s>:c2<%s:%s>", fnID.String(), ck1.Hash, ck1Hash, ck2.Hash, ck2Hash),
-			fmt.Sprintf("{queue}:v1:active:run:%s", runID.String()),
-			fmt.Sprintf("{queue}:v1:active-runs:account:%s", accountID.String()),
-			fmt.Sprintf("{queue}:v1:active-idx:runs:p:%s", fnID.String()),
-			fmt.Sprintf("{queue}:v1:active-runs:custom:%s", ck1.Key),
-			fmt.Sprintf("{queue}:v1:active-runs:custom:%s", ck2.Key),
-
-			// v0
-			fmt.Sprintf("{queue}:active:account:%s", accountID.String()),
-			fmt.Sprintf("{queue}:active:p:%s", fnID.String()),
-			fmt.Sprintf("{queue}:active:custom:%s", ck1.Key),
-			fmt.Sprintf("{queue}:active:custom:%s", ck2.Key),
-			fmt.Sprintf("{queue}:active:compound:fn:%s:c1<%s:%s>:c2<%s:%s>", fnID.String(), ck1.Hash, ck1Hash, ck2.Hash, ck2Hash),
-			fmt.Sprintf("{queue}:active:run:%s", runID.String()),
-			fmt.Sprintf("{queue}:active-runs:account:%s", accountID.String()),
-			fmt.Sprintf("{queue}:active-idx:runs:p:%s", fnID.String()),
-			fmt.Sprintf("{queue}:active-runs:custom:%s", ck1.Key),
-			fmt.Sprintf("{queue}:active-runs:custom:%s", ck2.Key),
-		}, keys)
-	})
-
-	t.Run("test with single custom concurrency", func(t *testing.T) {
-		ck1 := createConcurrencyKey(enums.ConcurrencyScopeFn, fnID, "test", 1)
-
-		item := osqueue.QueueItem{
-			ID:          "test",
-			FunctionID:  fnID,
-			WorkspaceID: envID,
-			Data: osqueue.Item{
-				WorkspaceID: envID,
-				Kind:        osqueue.KindEdge,
-				Identifier: state.Identifier{
-					WorkflowID:  fnID,
-					AccountID:   accountID,
-					WorkspaceID: envID,
-					RunID:       runID,
-				},
-				QueueName: nil,
-				Throttle:  nil,
-				CustomConcurrencyKeys: []state.CustomConcurrency{
-					ck1,
-				},
-			},
-			QueueName: nil,
-		}
-
-		backlog := q.ItemBacklog(ctx, item)
-		shadowPartition := q.ItemShadowPartition(ctx, item)
-
-		keys := q.activeKeysToGarbageCollect(item, shadowPartition, backlog, kg)
-
-		ck1Hash := util.XXHash(ck1.Key)
-
-		require.Equal(t, []string{
-			// v1
-			fmt.Sprintf("{queue}:v1:active:account:%s", accountID.String()),
-			fmt.Sprintf("{queue}:v1:active:p:%s", fnID.String()),
-			fmt.Sprintf("{queue}:v1:active:custom:%s", ck1.Key),
-			"{queue}:v1:active:-",
-			fmt.Sprintf("{queue}:v1:active:compound:fn:%s:c1<%s:%s>", fnID.String(), ck1.Hash, ck1Hash),
-			fmt.Sprintf("{queue}:v1:active:run:%s", runID.String()),
-			fmt.Sprintf("{queue}:v1:active-runs:account:%s", accountID.String()),
-			fmt.Sprintf("{queue}:v1:active-idx:runs:p:%s", fnID.String()),
-			fmt.Sprintf("{queue}:v1:active-runs:custom:%s", ck1.Key),
-			"{queue}:v1:active-runs:-",
-
-			// v0
-			fmt.Sprintf("{queue}:active:account:%s", accountID.String()),
-			fmt.Sprintf("{queue}:active:p:%s", fnID.String()),
-			fmt.Sprintf("{queue}:active:custom:%s", ck1.Key),
-			"{queue}:active:-",
-			fmt.Sprintf("{queue}:active:compound:fn:%s:c1<%s:%s>", fnID.String(), ck1.Hash, ck1Hash),
-			fmt.Sprintf("{queue}:active:run:%s", runID.String()),
-			fmt.Sprintf("{queue}:active-runs:account:%s", accountID.String()),
-			fmt.Sprintf("{queue}:active-idx:runs:p:%s", fnID.String()),
-			fmt.Sprintf("{queue}:active-runs:custom:%s", ck1.Key),
-			"{queue}:active-runs:-",
-		}, keys)
-	})
-
-	t.Run("test without custom concurrency", func(t *testing.T) {
-		item := osqueue.QueueItem{
-			ID:          "test",
-			FunctionID:  fnID,
-			WorkspaceID: envID,
-			Data: osqueue.Item{
-				WorkspaceID: envID,
-				Kind:        osqueue.KindEdge,
-				Identifier: state.Identifier{
-					WorkflowID:  fnID,
-					AccountID:   accountID,
-					WorkspaceID: envID,
-					RunID:       runID,
-				},
-				QueueName:             nil,
-				Throttle:              nil,
-				CustomConcurrencyKeys: []state.CustomConcurrency{},
-			},
-			QueueName: nil,
-		}
-
-		backlog := q.ItemBacklog(ctx, item)
-		shadowPartition := q.ItemShadowPartition(ctx, item)
-
-		keys := q.activeKeysToGarbageCollect(item, shadowPartition, backlog, kg)
-
-		require.Equal(t, []string{
-			// v1
-			fmt.Sprintf("{queue}:v1:active:account:%s", accountID.String()),
-			fmt.Sprintf("{queue}:v1:active:p:%s", fnID.String()),
-			"{queue}:v1:active:-",
-			"{queue}:v1:active:-",
-			fmt.Sprintf("{queue}:v1:active:compound:fn:%s", fnID.String()),
-			fmt.Sprintf("{queue}:v1:active:run:%s", runID.String()),
-			fmt.Sprintf("{queue}:v1:active-runs:account:%s", accountID.String()),
-			fmt.Sprintf("{queue}:v1:active-idx:runs:p:%s", fnID.String()),
-			"{queue}:v1:active-runs:-",
-			"{queue}:v1:active-runs:-",
-
-			// v0
-			fmt.Sprintf("{queue}:active:account:%s", accountID.String()),
-			fmt.Sprintf("{queue}:active:p:%s", fnID.String()),
-			"{queue}:active:-",
-			"{queue}:active:-",
-			fmt.Sprintf("{queue}:active:compound:fn:%s", fnID.String()),
-			fmt.Sprintf("{queue}:active:run:%s", runID.String()),
-			fmt.Sprintf("{queue}:active-runs:account:%s", accountID.String()),
-			fmt.Sprintf("{queue}:active-idx:runs:p:%s", fnID.String()),
-			"{queue}:active-runs:-",
-			"{queue}:active-runs:-",
-		}, keys)
 	})
 }
 

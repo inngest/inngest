@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 	"github.com/inngest/inngest/pkg/util"
+	"github.com/redis/rueidis"
 	"time"
 	"unsafe"
 )
@@ -261,4 +263,17 @@ func (p *peeker[T]) peekUUIDPointer(ctx context.Context, keyOrderedPointerSet st
 	}
 
 	return items, nil
+}
+
+func CleanupMissingPointers(ctx context.Context, key string, client rueidis.Client, log logger.Logger) func(pointers []string) error {
+	return func(pointers []string) error {
+		cmd := client.B().Zrem().Key(key).Member(pointers...).Build()
+
+		err := client.Do(ctx, cmd).Error()
+		if err != nil {
+			log.Warn("could not clean up missing items", "err", err, "missing", pointers, "source", key)
+		}
+
+		return nil
+	}
 }

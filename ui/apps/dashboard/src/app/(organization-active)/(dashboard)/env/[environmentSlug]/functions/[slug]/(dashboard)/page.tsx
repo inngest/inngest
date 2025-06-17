@@ -98,7 +98,7 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
     }
   }
 
-  let appRoute = `/env/${params.environmentSlug}/apps/${function_.appName}` as Route;
+  let appRoute = `/env/${params.environmentSlug}/apps/${function_.app.name}` as Route;
 
   return (
     <>
@@ -178,7 +178,7 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
                 >
                   <div className="flex min-w-0 items-center">
                     <div className="min-w-0 flex-1">
-                      <p className="truncate font-medium">{function_.appName}</p>
+                      <p className="truncate font-medium">{function_.app.name}</p>
                       {function_.current?.deploy?.createdAt && (
                         <Time
                           className="text-subtle text-xs"
@@ -238,58 +238,57 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
                   )}
                 </div>
               </Block>
-              {function_.configuration?.cancellations &&
-                function_.configuration.cancellations.length > 0 && (
-                  <Block title="Cancellation">
-                    <div className="space-y-3">
-                      {function_.configuration.cancellations.map((cancellation) => {
-                        return (
-                          <NextLink
-                            key={cancellation.event}
-                            href={pathCreator.eventType({
-                              envSlug: params.environmentSlug,
-                              eventName: cancellation.event,
-                            })}
-                            className="border-subtle bg-canvasBase hover:bg-canvasMuted block rounded-md border p-4"
-                          >
-                            <div className="flex min-w-0 items-center">
-                              <div className="min-w-0 flex-1 space-y-1">
-                                <div className="flex min-w-0 items-center">
-                                  <EventsIcon className="text-subtle w-8 shrink-0 pr-2" />
-                                  <p className="truncate font-medium">{cancellation.event}</p>
-                                </div>
-                                <dl className="text-xs">
-                                  {cancellation.condition && (
-                                    <div className="flex gap-1">
-                                      <dt className="text-subtle">If</dt>
-                                      <Tooltip>
-                                        <TooltipTrigger asChild>
-                                          <dd className="truncate font-mono ">
-                                            {cancellation.condition}
-                                          </dd>
-                                        </TooltipTrigger>
-                                        <TooltipContent className="font-mono text-xs">
-                                          {cancellation.condition}
-                                        </TooltipContent>
-                                      </Tooltip>
-                                    </div>
-                                  )}
-                                  {cancellation.timeout && (
-                                    <div className="flex gap-1">
-                                      <dt className="text-subtle">Timeout</dt>
-                                      <dd className="">{cancellation.timeout}</dd>
-                                    </div>
-                                  )}
-                                </dl>
+              {function_.configuration.cancellations.length > 0 && (
+                <Block title="Cancellation">
+                  <div className="space-y-3">
+                    {function_.configuration.cancellations.map((cancellation) => {
+                      return (
+                        <NextLink
+                          key={cancellation.event}
+                          href={pathCreator.eventType({
+                            envSlug: params.environmentSlug,
+                            eventName: cancellation.event,
+                          })}
+                          className="border-subtle bg-canvasBase hover:bg-canvasMuted block rounded-md border p-4"
+                        >
+                          <div className="flex min-w-0 items-center">
+                            <div className="min-w-0 flex-1 space-y-1">
+                              <div className="flex min-w-0 items-center">
+                                <EventsIcon className="text-subtle w-8 shrink-0 pr-2" />
+                                <p className="truncate font-medium">{cancellation.event}</p>
                               </div>
-                              <RiArrowRightSLine className="h-5" />
+                              <dl className="text-xs">
+                                {cancellation.condition && (
+                                  <div className="flex gap-1">
+                                    <dt className="text-subtle">If</dt>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <dd className="truncate font-mono ">
+                                          {cancellation.condition}
+                                        </dd>
+                                      </TooltipTrigger>
+                                      <TooltipContent className="font-mono text-xs">
+                                        {cancellation.condition}
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </div>
+                                )}
+                                {cancellation.timeout && (
+                                  <div className="flex gap-1">
+                                    <dt className="text-subtle">Timeout</dt>
+                                    <dd className="">{cancellation.timeout}</dd>
+                                  </div>
+                                )}
+                              </dl>
                             </div>
-                          </NextLink>
-                        );
-                      })}
-                    </div>
-                  </Block>
-                )}
+                            <RiArrowRightSLine className="h-5" />
+                          </div>
+                        </NextLink>
+                      );
+                    })}
+                  </div>
+                </Block>
+              )}
               {function_.failureHandler && (
                 <Block title="Failure Handler">
                   <div className="space-y-3">
@@ -313,9 +312,7 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
                   </div>
                 </Block>
               )}
-              {function_.configuration && (
-                <FunctionConfiguration configuration={function_.configuration} />
-              )}
+              {<FunctionConfiguration configuration={function_.configuration} />}
             </div>
           </ErrorBoundary>
         </aside>

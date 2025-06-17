@@ -562,6 +562,21 @@ func WithRefreshItemThrottle(fn RefreshItemThrottleFn) QueueOpt {
 	}
 }
 
+type EnableActiveSpotChecks func(ctx context.Context, acctID uuid.UUID) bool
+type ReadOnlySpotChecks func(ctx context.Context, acctID uuid.UUID) bool
+
+func WithEnableActiveSpotChecks(fn EnableActiveSpotChecks) QueueOpt {
+	return func(q *queue) {
+		q.enableActiveSpotChecks = fn
+	}
+}
+
+func WithReadOnlySpotChecks(fn ReadOnlySpotChecks) QueueOpt {
+	return func(q *queue) {
+		q.readOnlySpotChecks = fn
+	}
+}
+
 func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 	ctx := context.Background()
 
@@ -673,6 +688,12 @@ func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 		refreshItemThrottle: func(ctx context.Context, item *osqueue.QueueItem) (*osqueue.Throttle, error) {
 			return nil, nil
 		},
+		enableActiveSpotChecks: func(ctx context.Context, acctID uuid.UUID) bool {
+			return false
+		},
+		readOnlySpotChecks: func(ctx context.Context, acctID uuid.UUID) bool {
+			return true
+		},
 	}
 
 	// default to using primary queue client for shard selection
@@ -719,6 +740,8 @@ type queue struct {
 	allowKeyQueues                  AllowKeyQueues
 	enqueueSystemQueuesToBacklog    bool
 	partitionConstraintConfigGetter PartitionConstraintConfigGetter
+	enableActiveSpotChecks          EnableActiveSpotChecks
+	readOnlySpotChecks              ReadOnlySpotChecks
 
 	disableLeaseChecks                DisableLeaseChecks
 	disableLeaseChecksForSystemQueues bool
@@ -835,6 +858,13 @@ type queue struct {
 
 	normalizeRefreshItemCustomConcurrencyKeys NormalizeRefreshItemCustomConcurrencyKeysFn
 	refreshItemThrottle                       RefreshItemThrottleFn
+
+	// activeCheckerLeaseID stores the lease ID if this queue is the ActiveChecker processor.
+	// all runners attempt to claim this lease automatically.
+	activeCheckerLeaseID *ulid.ULID
+	// activeCheckerLeaseLock ensures that there are no data races writing to
+	// or reading from activeCheckerLeaseID in parallel.
+	activeCheckerLeaseLock *sync.RWMutex
 }
 
 type QueueRunMode struct {
@@ -873,6 +903,12 @@ type QueueRunMode struct {
 
 	// NormalizePartition enables the processing of partitions for normalization
 	NormalizePartition bool
+
+	// ActiveChecker enables background checking of active sets.
+	ActiveChecker bool
+
+	// ActiveCheckerSpotCheckProbability determines the weight of running spot checks on active sets when encountering concurrencity limits between 0 and 100 where 100 means always check.
+	ActiveCheckerSpotCheckProbability int
 }
 
 // continuation represents a partition continuation, forcung the queue to continue working
@@ -2109,7 +2145,10 @@ func (q *queue) peek(ctx context.Context, shard QueueShard, opts peekOpts) ([]*o
 		if qi.IsLeased(now) {
 			metrics.IncrQueuePeekLeaseContentionCounter(ctx, metrics.CounterOpt{
 				PkgName: pkgName,
-				Tags:    map[string]any{"partition_id": opts.PartitionID, "queue_shard": shard.Name},
+				Tags: map[string]any{
+					// "partition_id": opts.PartitionID,
+					"queue_shard": shard.Name,
+				},
 			})
 
 			// Leased item, don't return.
@@ -2508,36 +2547,6 @@ func (q *queue) ExtendLease(ctx context.Context, i osqueue.QueueItem, leaseID ul
 	}
 }
 
-// activeKeysToGarbageCollect returns keys to garbage collect.
-// Note: The following keys are temporary and only used for cleanup and will be removed before Key Queues v2 GA
-func (q *queue) activeKeysToGarbageCollect(i osqueue.QueueItem, partition QueueShadowPartition, backlog QueueBacklog, kg QueueKeyGenerator) []string {
-	return []string{
-		// v1
-		strings.Replace(partition.accountActiveKey(kg), ":v2:", ":v1:", 1),
-		strings.Replace(partition.activeKey(kg), ":v2:", ":v1:", 1),
-		strings.Replace(backlog.customKeyActive(kg, 1), ":v2:", ":v1:", 1),
-		strings.Replace(backlog.customKeyActive(kg, 2), ":v2:", ":v1:", 1),
-		strings.Replace(backlog.activeKey(kg), ":v2:", ":v1:", 1),
-		strings.Replace(kg.RunActiveSet(i.Data.Identifier.RunID), ":v2:", ":v1:", 1),
-		strings.Replace(partition.accountActiveRunKey(kg), ":v2:", ":v1:", 1),
-		strings.Replace(partition.activeRunKey(kg), ":v2:active-runs:", ":v1:active-idx:runs:", 1),
-		strings.Replace(backlog.customKeyActiveRuns(kg, 1), ":v2:", ":v1:", 1),
-		strings.Replace(backlog.customKeyActiveRuns(kg, 2), ":v2:", ":v1:", 1),
-
-		// v0
-		strings.Replace(partition.accountActiveKey(kg), ":v2:", ":", 1),
-		strings.Replace(partition.activeKey(kg), ":v2:", ":", 1),
-		strings.Replace(backlog.customKeyActive(kg, 1), ":v2:", ":", 1),
-		strings.Replace(backlog.customKeyActive(kg, 2), ":v2:", ":", 1),
-		strings.Replace(backlog.activeKey(kg), ":v2:", ":", 1),
-		strings.Replace(kg.RunActiveSet(i.Data.Identifier.RunID), ":v2:", ":", 1),
-		strings.Replace(partition.accountActiveRunKey(kg), ":v2:", ":", 1),
-		strings.Replace(partition.activeRunKey(kg), ":v2:active-runs:", ":active-idx:runs:", 1),
-		strings.Replace(backlog.customKeyActiveRuns(kg, 1), ":v2:", ":", 1),
-		strings.Replace(backlog.customKeyActiveRuns(kg, 2), ":v2:", ":", 1),
-	}
-}
-
 // Dequeue removes an item from the queue entirely.
 func (q *queue) Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.QueueItem) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "Dequeue"), redis_telemetry.ScopeQueue)
@@ -2594,9 +2603,6 @@ func (q *queue) Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		kg.SingletonRunKey(i.Data.Identifier.RunID.String()),
 	}
 
-	gcKeys := q.activeKeysToGarbageCollect(i, partition, backlog, kg)
-	keys = append(keys, gcKeys...)
-
 	// Append indexes
 	for _, idx := range q.itemIndexer(ctx, i, queueShard.RedisClient.kg) {
 		if idx != "" {
@@ -2651,6 +2657,8 @@ func (q *queue) Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 func (q *queue) Requeue(ctx context.Context, queueShard QueueShard, i osqueue.QueueItem, at time.Time) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "Requeue"), redis_telemetry.ScopeQueue)
 
+	l := q.log.With("item", i)
+
 	if queueShard.Kind != string(enums.QueueShardKindRedis) {
 		return fmt.Errorf("unsupported queue shard kind for Requeue: %s", queueShard.Kind)
 	}
@@ -2691,6 +2699,19 @@ func (q *queue) Requeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		if i.Data.Throttle != nil && i.Data.Throttle.KeyExpressionHash == "" {
 			refreshedThrottle, err := q.refreshItemThrottle(ctx, &i)
 			if err != nil {
+				// If we cannot find the event for the queue item, dequeue it. The state
+				// must exist for the entire duration of a function run.
+				if errors.Is(err, state.ErrEventNotFound) {
+					l.Warn("could not find event for refreshing throttle before requeue")
+
+					err := q.Dequeue(ctx, queueShard, i)
+					if err != nil && !errors.Is(err, ErrQueueItemNotFound) {
+						return fmt.Errorf("could not dequeue item with missing throttle state: %w", err)
+					}
+
+					return nil
+				}
+
 				return fmt.Errorf("could not refresh item throttle: %w", err)
 			}
 
@@ -2799,8 +2820,8 @@ func (q *queue) Requeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 			metrics.IncrBacklogRequeuedCounter(ctx, metrics.CounterOpt{
 				PkgName: pkgName,
 				Tags: map[string]any{
-					"queue_shard":  q.primaryQueueShard.Name,
-					"partition_id": i.FunctionID.String(),
+					"queue_shard": q.primaryQueueShard.Name,
+					// "partition_id": i.FunctionID.String(),
 				},
 			})
 		}

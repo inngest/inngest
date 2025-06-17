@@ -10,11 +10,11 @@ import (
 	"strings"
 )
 
-const _SingletonModeName = "skip"
+const _SingletonModeName = "skipcancel"
 
-var _SingletonModeIndex = [...]uint8{0, 4}
+var _SingletonModeIndex = [...]uint8{0, 4, 10}
 
-const _SingletonModeLowerName = "skip"
+const _SingletonModeLowerName = "skipcancel"
 
 func (i SingletonMode) String() string {
 	if i < 0 || i >= SingletonMode(len(_SingletonModeIndex)-1) {
@@ -28,17 +28,21 @@ func (i SingletonMode) String() string {
 func _SingletonModeNoOp() {
 	var x [1]struct{}
 	_ = x[SingletonModeSkip-(0)]
+	_ = x[SingletonModeCancel-(1)]
 }
 
-var _SingletonModeValues = []SingletonMode{SingletonModeSkip}
+var _SingletonModeValues = []SingletonMode{SingletonModeSkip, SingletonModeCancel}
 
 var _SingletonModeNameToValueMap = map[string]SingletonMode{
-	_SingletonModeName[0:4]:      SingletonModeSkip,
-	_SingletonModeLowerName[0:4]: SingletonModeSkip,
+	_SingletonModeName[0:4]:       SingletonModeSkip,
+	_SingletonModeLowerName[0:4]:  SingletonModeSkip,
+	_SingletonModeName[4:10]:      SingletonModeCancel,
+	_SingletonModeLowerName[4:10]: SingletonModeCancel,
 }
 
 var _SingletonModeNames = []string{
 	_SingletonModeName[0:4],
+	_SingletonModeName[4:10],
 }
 
 // SingletonModeString retrieves an enum value from the enum constants string name.

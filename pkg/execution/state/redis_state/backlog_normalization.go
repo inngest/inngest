@@ -181,8 +181,8 @@ func (q *queue) iterateNormalizationShadowPartition(ctx context.Context, shadowP
 			metrics.IncrBacklogNormalizationScannedCounter(ctx, metrics.CounterOpt{
 				PkgName: pkgName,
 				Tags: map[string]any{
-					"queue_shard":  q.primaryQueueShard.Name,
-					"partition_id": partition.PartitionID,
+					"queue_shard": q.primaryQueueShard.Name,
+					// "partition_id": partition.PartitionID,
 				},
 			})
 
@@ -369,8 +369,8 @@ func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp 
 		metrics.IncrBacklogNormalizedItemCounter(ctx, processed, metrics.CounterOpt{
 			PkgName: pkgName,
 			Tags: map[string]any{
-				"queue_shard":  q.primaryQueueShard.Name,
-				"partition_id": backlog.ShadowPartitionID,
+				"queue_shard": q.primaryQueueShard.Name,
+				// "partition_id": backlog.ShadowPartitionID,
 			},
 		})
 	}
@@ -378,8 +378,8 @@ func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp 
 	metrics.IncrBacklogNormalizedCounter(ctx, metrics.CounterOpt{
 		PkgName: pkgName,
 		Tags: map[string]any{
-			"queue_shard":  q.primaryQueueShard.Name,
-			"partition_id": backlog.ShadowPartitionID,
+			"queue_shard": q.primaryQueueShard.Name,
+			// "partition_id": backlog.ShadowPartitionID,
 		},
 	})
 
@@ -405,17 +405,7 @@ func (q *queue) ShadowPartitionPeekNormalizeBacklogs(ctx context.Context, sp *Qu
 		maker: func() *QueueBacklog {
 			return &QueueBacklog{}
 		},
-		handleMissingItems: func(pointers []string) error {
-			err := rc.Client().Do(ctx, rc.Client().B().Zrem().Key(partitionNormalizeSet).Member(pointers...).Build()).Error()
-			if err != nil {
-				q.log.Warn("failed to clean up dangling backlog pointers from shadow partition normalize set",
-					"missing", pointers,
-					"sp", sp,
-				)
-			}
-
-			return nil
-		},
+		handleMissingItems: CleanupMissingPointers(ctx, partitionNormalizeSet, rc.Client(), q.log.With("sp", sp)),
 		// faster option: load items regardless of zscore
 		ignoreUntil:            true,
 		isMillisecondPrecision: true,
@@ -446,17 +436,7 @@ func (q *queue) BacklogNormalizePeek(ctx context.Context, b *QueueBacklog, limit
 		maker: func() *osqueue.QueueItem {
 			return &osqueue.QueueItem{}
 		},
-		handleMissingItems: func(pointers []string) error {
-			err := rc.Client().Do(ctx, rc.Client().B().Zrem().Key(backlogSet).Member(pointers...).Build()).Error()
-			if err != nil {
-				q.log.Warn("failed to clean up dangling queue items from backlog",
-					"missing", pointers,
-					"backlog", b,
-				)
-			}
-
-			return nil
-		},
+		handleMissingItems: CleanupMissingPointers(ctx, backlogSet, rc.Client(), q.log.With("backlog", b)),
 		// faster option: load items regardless of zscore
 		ignoreUntil:            true,
 		isMillisecondPrecision: true,

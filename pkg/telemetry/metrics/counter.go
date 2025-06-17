@@ -473,3 +473,12 @@ func IncrStateWrittenCounter(ctx context.Context, size int, opts CounterOpt) {
 		Tags:        opts.Tags,
 	})
 }
+
+func IncrHTTPAPIRequestsCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "http_api_requests_total",
+		Description: "Total number of HTTP API requests",
+		Tags:        opts.Tags,
+	})
+}
