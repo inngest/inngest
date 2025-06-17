@@ -397,6 +397,8 @@ func (q *queue) ItemShadowPartition(ctx context.Context, i osqueue.QueueItem) Qu
 		q.log.Error("shadow partitions encountered queue item with inconsistent custom queue names, should have matching values for i.QueueName and i.Data.QueueName", "item", i)
 	}
 
+	accountID := i.Data.Identifier.AccountID
+
 	// The only case when we manually set a queueName is for system partitions
 	if queueName != nil {
 		systemPartition := QueuePartition{
@@ -404,10 +406,17 @@ func (q *queue) ItemShadowPartition(ctx context.Context, i osqueue.QueueItem) Qu
 			// partition, as it is used for conditional checks in Lua
 			ID:        *queueName,
 			QueueName: queueName,
+
+			AccountID: accountID,
 		}
 		// Fetch most recent system concurrency limit
 		systemLimits := q.systemConcurrencyLimitGetter(ctx, systemPartition)
 		systemPartition.ConcurrencyLimit = systemLimits.PartitionLimit
+
+		var aID *uuid.UUID
+		if accountID != uuid.Nil {
+			aID = &accountID
+		}
 
 		return QueueShadowPartition{
 			PartitionID:     *queueName,
@@ -415,6 +424,8 @@ func (q *queue) ItemShadowPartition(ctx context.Context, i osqueue.QueueItem) Qu
 			Concurrency: ShadowPartitionConcurrency{
 				SystemConcurrency: systemLimits.PartitionLimit,
 			},
+
+			AccountID: aID,
 		}
 	}
 
@@ -424,7 +435,6 @@ func (q *queue) ItemShadowPartition(ctx context.Context, i osqueue.QueueItem) Qu
 		q.log.Error("unexpected missing functionID in ItemShadowPartition call", "item", i, "stack", stack)
 	}
 
-	accountID := i.Data.Identifier.AccountID
 	if accountID == uuid.Nil {
 		stack := string(debug.Stack())
 		q.log.Error("unexpected missing accountID in ItemShadowPartition call", "item", i, "stack", stack)

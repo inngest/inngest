@@ -1163,6 +1163,8 @@ func (q *queue) ItemPartition(ctx context.Context, shard QueueShard, i osqueue.Q
 			// partition, as it is used for conditional checks in Lua
 			ID:        *queueName,
 			QueueName: queueName,
+
+			AccountID: i.Data.Identifier.AccountID,
 		}
 		// Fetch most recent system concurrency limit
 		systemLimits := q.systemConcurrencyLimitGetter(ctx, systemPartition)
