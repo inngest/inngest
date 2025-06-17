@@ -733,7 +733,7 @@ func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueSha
 	}
 
 	// TODO introduce conditional spot checking (probability in queue settings, feature flag, etc.)
-	shouldSpotCheckActiveSet := "1"
+	shouldSpotCheckActiveSet := q.allowKeyQueues "1"
 
 	args, err := StrSlice([]any{
 		b.BacklogID,

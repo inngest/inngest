@@ -2495,36 +2495,6 @@ func (q *queue) ExtendLease(ctx context.Context, i osqueue.QueueItem, leaseID ul
 	}
 }
 
-// activeKeysToGarbageCollect returns keys to garbage collect.
-// Note: The following keys are temporary and only used for cleanup and will be removed before Key Queues v2 GA
-func (q *queue) activeKeysToGarbageCollect(i osqueue.QueueItem, partition QueueShadowPartition, backlog QueueBacklog, kg QueueKeyGenerator) []string {
-	return []string{
-		// v1
-		strings.Replace(partition.accountActiveKey(kg), ":v2:", ":v1:", 1),
-		strings.Replace(partition.activeKey(kg), ":v2:", ":v1:", 1),
-		strings.Replace(backlog.customKeyActive(kg, 1), ":v2:", ":v1:", 1),
-		strings.Replace(backlog.customKeyActive(kg, 2), ":v2:", ":v1:", 1),
-		strings.Replace(backlog.activeKey(kg), ":v2:", ":v1:", 1),
-		strings.Replace(kg.RunActiveSet(i.Data.Identifier.RunID), ":v2:", ":v1:", 1),
-		strings.Replace(partition.accountActiveRunKey(kg), ":v2:", ":v1:", 1),
-		strings.Replace(partition.activeRunKey(kg), ":v2:active-runs:", ":v1:active-idx:runs:", 1),
-		strings.Replace(backlog.customKeyActiveRuns(kg, 1), ":v2:", ":v1:", 1),
-		strings.Replace(backlog.customKeyActiveRuns(kg, 2), ":v2:", ":v1:", 1),
-
-		// v0
-		strings.Replace(partition.accountActiveKey(kg), ":v2:", ":", 1),
-		strings.Replace(partition.activeKey(kg), ":v2:", ":", 1),
-		strings.Replace(backlog.customKeyActive(kg, 1), ":v2:", ":", 1),
-		strings.Replace(backlog.customKeyActive(kg, 2), ":v2:", ":", 1),
-		strings.Replace(backlog.activeKey(kg), ":v2:", ":", 1),
-		strings.Replace(kg.RunActiveSet(i.Data.Identifier.RunID), ":v2:", ":", 1),
-		strings.Replace(partition.accountActiveRunKey(kg), ":v2:", ":", 1),
-		strings.Replace(partition.activeRunKey(kg), ":v2:active-runs:", ":active-idx:runs:", 1),
-		strings.Replace(backlog.customKeyActiveRuns(kg, 1), ":v2:", ":", 1),
-		strings.Replace(backlog.customKeyActiveRuns(kg, 2), ":v2:", ":", 1),
-	}
-}
-
 // Dequeue removes an item from the queue entirely.
 func (q *queue) Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.QueueItem) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "Dequeue"), redis_telemetry.ScopeQueue)
@@ -2580,9 +2550,6 @@ func (q *queue) Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		// Singleton
 		kg.SingletonRunKey(i.Data.Identifier.RunID.String()),
 	}
-
-	gcKeys := q.activeKeysToGarbageCollect(i, partition, backlog, kg)
-	keys = append(keys, gcKeys...)
 
 	// Append indexes
 	for _, idx := range q.itemIndexer(ctx, i, queueShard.RedisClient.kg) {
