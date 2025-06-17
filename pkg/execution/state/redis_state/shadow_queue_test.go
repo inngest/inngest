@@ -501,10 +501,6 @@ func TestQueueRefillBacklog(t *testing.T) {
 		q := NewQueue(
 			defaultShard,
 			WithClock(clock),
-			WithRunMode(QueueRunMode{
-				ActiveChecker:                     true,
-				ActiveCheckerSpotCheckProbability: 100,
-			}),
 			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 				return enqueueToBacklog
 			}),
@@ -525,6 +521,8 @@ func TestQueueRefillBacklog(t *testing.T) {
 				ShadowContinuations:               true,
 				ShadowContinuationSkipProbability: 0,
 				NormalizePartition:                true,
+				ActiveChecker:                     true,
+				ActiveCheckerSpotCheckProbability: 100,
 			}),
 			WithBacklogRefillLimit(500),
 			WithConcurrencyLimitGetter(func(ctx context.Context, p QueuePartition) PartitionConcurrencyLimits {
