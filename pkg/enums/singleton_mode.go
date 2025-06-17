@@ -7,4 +7,7 @@ type SingletonMode int
 const (
 	// SingletonModeSkip skips the new run if another singleton instance is already in progress.
 	SingletonModeSkip SingletonMode = iota
+
+	// SingletonModeCancel cancels the currently running singleton instance and starts the new one.
+	SingletonModeCancel
 )

@@ -455,3 +455,30 @@ func IncrQueueOutdatedBacklogCounter(ctx context.Context, opts CounterOpt) {
 		Tags:        opts.Tags,
 	})
 }
+
+func IncrRunFinalizedCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "run_finalized_total",
+		Description: "The total number of calls to finalize a run.",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrStateWrittenCounter(ctx context.Context, size int, opts CounterOpt) {
+	RecordCounterMetric(ctx, int64(size), CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "state_store_bytes_written",
+		Description: "The total number of bytes written to the state store",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrHTTPAPIRequestsCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "http_api_requests_total",
+		Description: "Total number of HTTP API requests",
+		Tags:        opts.Tags,
+	})
+}

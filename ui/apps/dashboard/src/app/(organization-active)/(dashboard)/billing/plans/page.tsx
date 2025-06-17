@@ -1,7 +1,7 @@
 import { Link } from '@inngest/components/Link/Link';
 
 import { HorizontalPlanCard, VerticalPlanCard } from '@/components/Billing/Plans/PlanCard';
-import { isLegacyPlan, type Plan } from '@/components/Billing/Plans/utils';
+import { type Plan } from '@/components/Billing/Plans/utils';
 import { currentPlan as getCurrentPlan } from '@/components/Billing/data';
 import { pathCreator } from '@/utils/urls';
 
@@ -17,8 +17,6 @@ export default async function Page() {
     return await getCurrentPlan();
   };
 
-  const isLegacy = isLegacyPlan(currentPlan);
-
   // Hard-coded plan information (mirrors pricing page definitions)
   const plans: Plan[] = [
     {
@@ -31,6 +29,7 @@ export default async function Page() {
         history: { limit: 1 }, // 24h
         runCount: { limit: 100_000 },
       },
+      isLegacy: false,
     },
     {
       id: 'pro',
@@ -42,6 +41,7 @@ export default async function Page() {
         history: { limit: 7 },
         runCount: { limit: 1_000_000 },
       },
+      isLegacy: false,
     },
     {
       id: 'enterprise',
@@ -53,12 +53,13 @@ export default async function Page() {
         history: { limit: 7 },
         runCount: { limit: 1_000_000 },
       },
+      isLegacy: false,
     },
   ];
 
   return (
     <>
-      {isLegacy && (
+      {currentPlan.isLegacy && (
         <div className="mb-8">
           <HorizontalPlanCard
             plan={currentPlan}

@@ -51,6 +51,9 @@ local keyActiveRunsPartition              = KEYS[18]
 local keyActiveRunsCustomConcurrencyKey1  = KEYS[19]
 local keyActiveRunsCustomConcurrencyKey2  = KEYS[20]
 
+local keyPartitionActiveCheckSet          = KEYS[21]
+local keyPartitionActiveCheckCooldown  = KEYS[22]
+
 local backlogID     = ARGV[1]
 local partitionID   = ARGV[2]
 local accountID     = ARGV[3]
@@ -74,12 +77,15 @@ local keyPrefix = ARGV[15]
 
 local enableKeyQueues = tonumber(ARGV[16])
 
+local shouldSpotCheckActiveSet = tonumber(ARGV[17])
+
 -- $include(update_pointer_score.lua)
 -- $include(ends_with.lua)
 -- $include(update_account_queues.lua)
 -- $include(gcra.lua)
 -- $include(update_backlog_pointer.lua)
 -- $include(update_active_sets.lua)
+-- $include(active_check.lua)
 
 --
 -- Retrieve current backlog size
@@ -321,14 +327,16 @@ if refilled > 0 then
   end
 end
 
+
 --
 -- Adjust pointer scores for shadow scanning, potentially clean up
 --
 
--- Clean up backlog meta if we refilled the last item (or dropped all dangling item pointers)
-if tonumber(redis.call("ZCARD", keyBacklogSet)) == 0 then
-  redis.call("HDEL", keyBacklogMeta, backlogID)
-else
+local function update_backlog_successive_constrained_counters(keyBacklogMeta, backlogID, status)
+  --
+  -- Update successive constrained metrics in backlog meta
+  --
+
   local existing = cjson.decode(redis.call("HGET", keyBacklogMeta, backlogID))
 
   -- If not constrained, reset counters
@@ -360,6 +368,23 @@ else
   redis.call("HSET", keyBacklogMeta, backlogID, cjson.encode(existing))
 end
 
+-- Clean up backlog meta if we refilled the last item (or dropped all dangling item pointers)
+if tonumber(redis.call("ZCARD", keyBacklogSet)) == 0 then
+  redis.call("HDEL", keyBacklogMeta, backlogID)
+else
+  update_backlog_successive_constrained_counters(keyBacklogMeta, backlogID, status)
+end
+
+-- Always update pointers
 updateBacklogPointer(keyGlobalShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, keyShadowPartitionSet, keyBacklogSet, accountID, partitionID, backlogID)
+
+--
+-- Optional: Add partition to active checker set. This will verify that all items marked as active
+-- are either in the ready queue or in progress.
+--
+local concurrencyConstrained = status >= 1 and status <= 4
+if concurrencyConstrained and shouldSpotCheckActiveSet == 1 then
+    add_to_active_check(keyPartitionActiveCheckSet, keyPartitionActiveCheckCooldown, partitionID, nowMS)
+end
 
 return { status, refilled, backlogCountUntil, backlogCountTotal, constraintCapacity, refill }

@@ -246,3 +246,25 @@ func HistogramHTTPServerProcessingDuration(ctx context.Context, dur int64, opts 
 		},
 	})
 }
+
+func HistogramHTTPAPIDuration(ctx context.Context, dur int64, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, dur, HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "http_api_duration",
+		Description: "API request duration in ms",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  DefaultBoundaries,
+	})
+}
+
+func HistogramHTTPAPIBytesWritten(ctx context.Context, bytes int64, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, bytes, HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "http_api_bytes_written",
+		Description: "API response size in bytes",
+		Tags:        opts.Tags,
+		Unit:        "bytes",
+		Boundaries:  DefaultBoundaries,
+	})
+}

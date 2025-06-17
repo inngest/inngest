@@ -26,10 +26,6 @@ export enum PlanNames {
   Enterprise = 'Enterprise',
 }
 
-function isValidPlanName(name: string): name is PlanNames {
-  return (Object.values(PlanNames) as string[]).includes(name);
-}
-
 export function processPlan(plan: Plan) {
   const { name, amount, billingPeriod, entitlements } = plan;
 
@@ -142,8 +138,4 @@ export function isEnterprisePlan(plan: Plan | (Partial<BillingPlan> & { name: st
 
 export function isTrialPlan(plan: Plan | (Partial<BillingPlan> & { name: string })): boolean {
   return Boolean(plan.name.match(/Trial/i));
-}
-
-export function isLegacyPlan(plan: Plan | (Partial<BillingPlan> & { name: string })): boolean {
-  return !isEnterprisePlan(plan) && !isValidPlanName(plan.name);
 }

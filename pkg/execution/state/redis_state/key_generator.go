@@ -213,6 +213,9 @@ type QueueKeyGenerator interface {
 	AccountNormalizeSet(accountID uuid.UUID) string
 	PartitionNormalizeSet(partitionID string) string
 
+	PartitionActiveCheckSet() string
+	PartitionActiveCheckCooldown(partitionID string) string
+
 	//
 	// Queue metadata keys
 	//
@@ -226,6 +229,8 @@ type QueueKeyGenerator interface {
 	// Instrumentation returns the key which allows one worker to run instrumentation against
 	// the queue
 	Instrumentation() string
+	// ActiveChecker returns the key which allows a worker to run spot checks on recently-constrained backlogs
+	ActiveChecker() string
 	// Idempotency stores the map for storing idempotency keys in redis
 	Idempotency(key string) string
 	// Concurrency returns a key for a given concurrency string.  This stores an ordered
@@ -326,6 +331,10 @@ func (u queueKeyGenerator) Scavenger() string {
 
 func (u queueKeyGenerator) Instrumentation() string {
 	return fmt.Sprintf("{%s}:queue:instrument", u.queueDefaultKey)
+}
+
+func (u queueKeyGenerator) ActiveChecker() string {
+	return fmt.Sprintf("{%s}:queue:active-checker", u.queueDefaultKey)
 }
 
 func (u queueKeyGenerator) Idempotency(key string) string {
@@ -472,6 +481,17 @@ func (u queueKeyGenerator) PartitionNormalizeSet(partitionID string) string {
 
 	return fmt.Sprintf("{%s}:normalize:partition:%s:sorted", u.queueDefaultKey, partitionID)
 
+}
+
+func (u queueKeyGenerator) PartitionActiveCheckSet() string {
+	return fmt.Sprintf("{%s}:active-check:partition:sorted", u.queueDefaultKey)
+}
+
+func (u queueKeyGenerator) PartitionActiveCheckCooldown(partitionID string) string {
+	if partitionID == "" {
+		return fmt.Sprintf("{%s}:active-check:cooldown:partition:-", u.queueDefaultKey)
+	}
+	return fmt.Sprintf("{%s}:active-check:cooldown:partition:%s", u.queueDefaultKey, partitionID)
 }
 
 func (u queueKeyGenerator) QueuePrefix() string {

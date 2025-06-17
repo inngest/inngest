@@ -226,6 +226,7 @@ export function EventTypesTable({
             />
           }
           onRowClick={(row) => router.push(pathCreator.eventType({ eventName: row.original.name }))}
+          getRowHref={(row) => pathCreator.eventType({ eventName: row.original.name })}
         />
         {!hasNextPage &&
           hasEventTypesData &&

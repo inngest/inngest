@@ -3,6 +3,7 @@ package redis_state
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"time"
 
 	"github.com/google/uuid"
@@ -611,16 +612,16 @@ func (b QueueBacklog) customConcurrencyKeyID(n int) string {
 	return key.CanonicalKeyID
 }
 
-func (b QueueBacklog) requeueBackOff(now time.Time, constraint enums.QueueConstraint, partition *QueueShadowPartition) time.Time {
+func (b QueueBacklog) requeueBackOff(now time.Time, constraint enums.QueueConstraint, constraints *PartitionConstraintConfig) time.Time {
 	switch constraint {
 	case enums.QueueConstraintThrottle:
-		if partition.Throttle == nil {
-			logger.StdlibLogger(context.Background()).Error("throttle settings not defined while hitting throttle constraints", "shadow_partition", partition, "time", now)
+		if constraints.Throttle == nil {
+			logger.StdlibLogger(context.Background()).Error("throttle settings not defined while hitting throttle constraints", "constraints", constraints, "time", now, "backlog", b)
 			return now.Add(PartitionThrottleLimitRequeueExtension)
 		}
 
 		multiplier := b.SuccessiveThrottleConstrained
-		period := time.Duration(partition.Throttle.Period * int(time.Second))
+		period := time.Duration(constraints.Throttle.Period * int(time.Second))
 		// NOTE: for short periods, we want to increase the frequency of the checks to make sure we admit the items in the right timing
 		// and it's not too late
 		if period < ThrottleBackoffMultiplierThreshold {
@@ -721,6 +722,9 @@ func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueSha
 		sp.activeRunKey(kg),          // Set for active runs in partition
 		b.customKeyActiveRuns(kg, 1), // Set for active runs with custom concurrency key 1
 		b.customKeyActiveRuns(kg, 2), // Set for active runs with custom concurrency key 2
+
+		kg.PartitionActiveCheckSet(),
+		kg.PartitionActiveCheckCooldown(sp.PartitionID),
 	}
 
 	enableKeyQueuesVal := "0"
@@ -728,6 +732,9 @@ func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueSha
 	if sp.keyQueuesEnabled(ctx, q) {
 		enableKeyQueuesVal = "1"
 	}
+
+	// Enable conditional spot checking (probability in queue settings + feature flag)
+	shouldSpotCheckActiveSet := q.enableActiveSpotChecks(ctx, accountID) && rand.Intn(100) <= q.runMode.ActiveCheckerSpotCheckProbability
 
 	args, err := StrSlice([]any{
 		b.BacklogID,
@@ -749,6 +756,7 @@ func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueSha
 
 		kg.QueuePrefix(),
 		enableKeyQueuesVal,
+		shouldSpotCheckActiveSet,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("could not serialize args: %w", err)
