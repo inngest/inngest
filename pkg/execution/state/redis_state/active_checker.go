@@ -68,16 +68,26 @@ func (q *queue) shadowPartitionActiveCheck(ctx context.Context, sp *QueueShadowP
 		return fmt.Errorf("could not create checkID: %w", err)
 	}
 
+	accountID := uuid.Nil
+	if sp.AccountID != nil {
+		accountID = *sp.AccountID
+	}
+
+	readOnly := true
+	if q.readOnlySpotChecks != nil && !q.readOnlySpotChecks(ctx, accountID) {
+		readOnly = false
+	}
+
 	l := q.log.With("check_id", checkID.String())
 
 	// Check account
-	err = q.accountActiveCheck(ctx, sp, client, kg, l)
+	err = q.accountActiveCheck(ctx, sp, client, kg, l, readOnly)
 	if err != nil {
 		return fmt.Errorf("could not check account active items: %w", err)
 	}
 
 	// Check partition
-	err = q.partitionActiveCheck(ctx, sp, client, kg, l)
+	err = q.partitionActiveCheck(ctx, sp, client, kg, l, readOnly)
 	if err != nil {
 		return fmt.Errorf("could not check account for invalid active items: %w", err)
 	}
@@ -93,7 +103,7 @@ func (q *queue) shadowPartitionActiveCheck(ctx context.Context, sp *QueueShadowP
 		backlog := backlogs[bidx]
 
 		for _, key := range backlog.ConcurrencyKeys {
-			err := q.customConcurrencyActiveCheck(ctx, sp, key, client, kg, l)
+			err := q.customConcurrencyActiveCheck(ctx, sp, key, client, kg, l, readOnly)
 			if err != nil {
 				return fmt.Errorf("could not check custom concurrency key: %w", err)
 			}
@@ -123,6 +133,7 @@ func (q *queue) accountActiveCheck(
 	client rueidis.Client,
 	kg QueueKeyGenerator,
 	l logger.Logger,
+	readOnly bool,
 ) error {
 	// Compare the account active key
 	keyActive := sp.accountActiveKey(kg)
@@ -162,12 +173,14 @@ func (q *queue) accountActiveCheck(
 	}
 
 	if len(invalidItems) > 0 {
-		l.Debug("removing invalid items from account active key", "mode", "partition", "invalid", invalidItems, "partition", sp.PartitionID, "active", keyActive, "in_progress", keyInProgress)
+		l.Debug("removing invalid items from account active key", "mode", "partition", "invalid", invalidItems, "partition", sp.PartitionID, "active", keyActive, "in_progress", keyInProgress, "readonly", readOnly)
 
-		cmd := client.B().Zrem().Key(keyActive).Member(invalidItems...).Build()
-		err := client.Do(ctx, cmd).Error()
-		if err != nil {
-			return fmt.Errorf("could not remove invalid items from active set: %w", err)
+		if !readOnly {
+			cmd := client.B().Zrem().Key(keyActive).Member(invalidItems...).Build()
+			err := client.Do(ctx, cmd).Error()
+			if err != nil {
+				return fmt.Errorf("could not remove invalid items from active set: %w", err)
+			}
 		}
 	}
 
@@ -180,6 +193,7 @@ func (q *queue) partitionActiveCheck(
 	client rueidis.Client,
 	kg QueueKeyGenerator,
 	l logger.Logger,
+	readOnly bool,
 ) error {
 	keyActive := sp.activeKey(kg)
 	keyInProgress := sp.inProgressKey(kg)
@@ -195,19 +209,21 @@ func (q *queue) partitionActiveCheck(
 	}
 
 	if len(invalidItems) > 0 {
-		l.Debug("removing invalid items from active key", "mode", "partition", "invalid", invalidItems, "partition", sp.PartitionID, "active", keyActive, "ready", keyReady, "in_progress", keyInProgress)
+		l.Debug("removing invalid items from active key", "mode", "partition", "invalid", invalidItems, "partition", sp.PartitionID, "active", keyActive, "ready", keyReady, "in_progress", keyInProgress, "readonly", readOnly)
 
-		cmd := client.B().Zrem().Key(keyActive).Member(invalidItems...).Build()
-		err := client.Do(ctx, cmd).Error()
-		if err != nil {
-			return fmt.Errorf("could not remove invalid items from active set: %w", err)
+		if !readOnly {
+			cmd := client.B().Zrem().Key(keyActive).Member(invalidItems...).Build()
+			err := client.Do(ctx, cmd).Error()
+			if err != nil {
+				return fmt.Errorf("could not remove invalid items from active set: %w", err)
+			}
 		}
 	}
 
 	return nil
 }
 
-func (q *queue) customConcurrencyActiveCheck(ctx context.Context, sp *QueueShadowPartition, bcc BacklogConcurrencyKey, client rueidis.Client, kg QueueKeyGenerator, l logger.Logger) error {
+func (q *queue) customConcurrencyActiveCheck(ctx context.Context, sp *QueueShadowPartition, bcc BacklogConcurrencyKey, client rueidis.Client, kg QueueKeyGenerator, l logger.Logger, readOnly bool) error {
 	keyActive := bcc.activeKey(kg)
 	keyInProgress := bcc.concurrencyKey(kg)
 
@@ -224,12 +240,14 @@ func (q *queue) customConcurrencyActiveCheck(ctx context.Context, sp *QueueShado
 	}
 
 	if len(invalidItems) > 0 {
-		l.Debug("removing invalid items from active key", "invalid", "mode", "custom_concurrency", "bcc", bcc, invalidItems, "partition", sp.PartitionID, "active", keyActive, "ready", keyReady, "in_progress", keyInProgress)
+		l.Debug("removing invalid items from active key", "invalid", "mode", "custom_concurrency", "bcc", bcc, invalidItems, "partition", sp.PartitionID, "active", keyActive, "ready", keyReady, "in_progress", keyInProgress, "readonly", readOnly)
 
-		cmd := client.B().Zrem().Key(keyActive).Member(invalidItems...).Build()
-		err := client.Do(ctx, cmd).Error()
-		if err != nil {
-			return fmt.Errorf("could not remove invalid items from active set: %w", err)
+		if !readOnly {
+			cmd := client.B().Zrem().Key(keyActive).Member(invalidItems...).Build()
+			err := client.Do(ctx, cmd).Error()
+			if err != nil {
+				return fmt.Errorf("could not remove invalid items from active set: %w", err)
+			}
 		}
 	}
 

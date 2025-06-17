@@ -31,6 +31,12 @@ func TestShadowPartitionActiveCheck(t *testing.T) {
 		WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
 			return true
 		}),
+		WithReadOnlySpotChecks(func(ctx context.Context, acctID uuid.UUID) bool {
+			return false
+		}),
+		WithEnableActiveSpotChecks(func(ctx context.Context, acctID uuid.UUID) bool {
+			return true
+		}),
 	)
 
 	fnID, accountID, envID := uuid.New(), uuid.New(), uuid.New()

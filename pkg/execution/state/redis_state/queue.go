@@ -563,10 +563,17 @@ func WithRefreshItemThrottle(fn RefreshItemThrottleFn) QueueOpt {
 }
 
 type EnableActiveSpotChecks func(ctx context.Context, acctID uuid.UUID) bool
+type ReadOnlySpotChecks func(ctx context.Context, acctID uuid.UUID) bool
 
 func WithEnableActiveSpotChecks(fn EnableActiveSpotChecks) QueueOpt {
 	return func(q *queue) {
 		q.enableActiveSpotChecks = fn
+	}
+}
+
+func WithReadOnlySpotChecks(fn ReadOnlySpotChecks) QueueOpt {
+	return func(q *queue) {
+		q.readOnlySpotChecks = fn
 	}
 }
 
@@ -684,6 +691,9 @@ func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 		enableActiveSpotChecks: func(ctx context.Context, acctID uuid.UUID) bool {
 			return false
 		},
+		readOnlySpotChecks: func(ctx context.Context, acctID uuid.UUID) bool {
+			return true
+		},
 	}
 
 	// default to using primary queue client for shard selection
@@ -731,6 +741,7 @@ type queue struct {
 	enqueueSystemQueuesToBacklog    bool
 	partitionConstraintConfigGetter PartitionConstraintConfigGetter
 	enableActiveSpotChecks          EnableActiveSpotChecks
+	readOnlySpotChecks              ReadOnlySpotChecks
 
 	disableLeaseChecks                DisableLeaseChecks
 	disableLeaseChecksForSystemQueues bool
