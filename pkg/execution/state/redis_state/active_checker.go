@@ -260,6 +260,7 @@ func (q *queue) findMissingItemsWithStaticTargets(ctx context.Context, client ru
 			return nil
 		}
 
+		// Entries are returned as [item ID, score] tuples, so we want to skip all scores
 		entryIDs := make([]string, 0, len(entry.Elements)/2)
 		for i := 0; i < len(entry.Elements); i += 2 {
 			entryIDs = append(entryIDs, entry.Elements[i])
@@ -333,6 +334,7 @@ func (q *queue) findMissingItemsWithDynamicTargets(
 			return nil
 		}
 
+		// Entries are returned as [item ID, score] tuples, so we want to skip all scores
 		entryIDs := make([]string, 0, len(entry.Elements)/2)
 		for i := 0; i < len(entry.Elements); i += 2 {
 			entryIDs = append(entryIDs, entry.Elements[i])
