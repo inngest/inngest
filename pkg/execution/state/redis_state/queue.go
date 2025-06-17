@@ -865,6 +865,8 @@ type queue struct {
 	// activeCheckerLeaseLock ensures that there are no data races writing to
 	// or reading from activeCheckerLeaseID in parallel.
 	activeCheckerLeaseLock *sync.RWMutex
+
+	enableJobPromotion bool
 }
 
 type QueueRunMode struct {

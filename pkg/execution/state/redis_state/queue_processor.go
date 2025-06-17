@@ -145,7 +145,7 @@ func (q *queue) Enqueue(ctx context.Context, item osqueue.Item, at time.Time, op
 		//
 		// Without this, step.sleep or retries for a very old workflow may still lag behind steps from
 		// later workflows when scheduled in the future.  This can, worst case, cause never-ending runs.
-		if !qi.RequiresPromotionJob(q.clock.Now()) {
+		if !q.enableJobPromotion || !qi.RequiresPromotionJob(q.clock.Now()) {
 			// scheule a rebalance job automatically.
 			return nil
 		}
