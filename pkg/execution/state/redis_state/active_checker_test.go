@@ -195,6 +195,19 @@ func TestShadowPartitionActiveCheck(t *testing.T) {
 	})
 
 	t.Run("should clean up missing items from custom concurrency key active set", func(t *testing.T) {
+		cluster.FlushAll()
 
+		enqueueToBacklog = true
+		qi, err = q.EnqueueItem(ctx, defaultShard, item, clock.Now(), osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+
+		_, err = cluster.ZAdd(backlog.customKeyActive(kg, 1), float64(clock.Now().UnixMilli()), "missing-lol")
+		require.NoError(t, err)
+
+		err = q.shadowPartitionActiveCheck(ctx, &sp, client, kg)
+		require.NoError(t, err)
+
+		require.False(t, cluster.Exists(backlog.customKeyActive(kg, 1)))
+		require.NoError(t, err)
 	})
 }
