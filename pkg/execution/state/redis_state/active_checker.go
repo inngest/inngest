@@ -25,7 +25,7 @@ const (
 )
 
 func (q *queue) ActiveCheck(ctx context.Context) (int, error) {
-	// Peek partitions for active checks
+	// Peek shadow partitions for active checks
 	parts, err := q.PartitionActiveCheckPeek(ctx, PartitionActiveCheckPeekMax)
 	if err != nil {
 		return 0, fmt.Errorf("could not peek partitions for active checker: %w", err)
