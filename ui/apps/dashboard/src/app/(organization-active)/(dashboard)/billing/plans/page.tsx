@@ -20,7 +20,8 @@ export default async function Page() {
   // Hard-coded plan information (mirrors pricing page definitions)
   const plans: Plan[] = [
     {
-      id: 'hobby',
+      id: 'n/a',
+      slug: 'hobby-free-2025-06-13',
       name: 'Hobby - Free',
       amount: 0,
       billingPeriod: 'month',
@@ -32,7 +33,8 @@ export default async function Page() {
       isLegacy: false,
     },
     {
-      id: 'pro',
+      id: 'n/a',
+      slug: 'pro-2025-06-04',
       name: 'Pro',
       amount: 7_500, // $75.00
       billingPeriod: 'month',
@@ -44,7 +46,8 @@ export default async function Page() {
       isLegacy: false,
     },
     {
-      id: 'enterprise',
+      id: 'n/a',
+      slug: 'enterprise',
       name: 'Enterprise',
       amount: Infinity, // $75.00
       billingPeriod: 'month',

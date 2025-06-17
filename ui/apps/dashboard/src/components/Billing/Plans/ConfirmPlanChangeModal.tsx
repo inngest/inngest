@@ -18,8 +18,8 @@ type ConfirmPlanChangeModalProps = {
 };
 
 const UpdatePlanDocument = graphql(`
-  mutation UpdatePlan($planID: ID!) {
-    updatePlan(to: $planID) {
+  mutation UpdatePlan($planSlug: String!) {
+    updatePlan(slug: $planSlug) {
       plan {
         id
         name
@@ -45,11 +45,11 @@ export default function ConfirmPlanChangeModal({
   const handlePlanChange = async () => {
     // NOTE - We only support one Stripe plan/product in the API currently
     // so we just grab the first item
-    const planID = items[0]?.planID;
-    if (!planID) {
-      return setUiError('Unable to change your plan - Invalid Plan ID. Please contact support.');
+    const planSlug = items[0]?.planSlug;
+    if (!planSlug) {
+      return setUiError('Unable to change your plan - Invalid Plan Slug. Please contact support.');
     }
-    await updatePlan({ planID });
+    await updatePlan({ planSlug });
     onSuccess();
   };
 

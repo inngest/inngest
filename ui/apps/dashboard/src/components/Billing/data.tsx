@@ -100,6 +100,7 @@ export const currentPlanDocument = graphql(`
     account {
       plan {
         id
+        slug
         isLegacy
         name
         amount

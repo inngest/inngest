@@ -32,11 +32,11 @@ export function VerticalPlanCard({
         {transformedPlan.price !== 'Contact us' && <>/{transformedPlan.billingPeriod}</>}
       </div>
 
-      {transformedPlan.name === 'Hobby - Free' ? (
+      {transformedPlan.slug === 'hobby-free-2025-06-13' ? (
         (() => {
           const paygPlan: Plan = {
             ...plan,
-            id: 'hobby-payg',
+            slug: 'hobby-payg-2025-06-13',
             name: 'Hobby (Pay as you go)',
             amount: 0,
           };

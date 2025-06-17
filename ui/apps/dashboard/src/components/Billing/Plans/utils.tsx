@@ -7,10 +7,7 @@ import type {
   EntitlementRunCount,
 } from '@/gql/graphql';
 
-export type Plan = Omit<
-  BillingPlan,
-  'entitlements' | 'features' | 'availableAddons' | 'addons' | 'slug'
-> & {
+export type Plan = Omit<BillingPlan, 'entitlements' | 'features' | 'availableAddons' | 'addons'> & {
   entitlements: {
     concurrency: Pick<EntitlementConcurrency, 'limit'>;
     runCount: Pick<EntitlementRunCount, 'limit'>;
@@ -27,7 +24,7 @@ export enum PlanNames {
 }
 
 export function processPlan(plan: Plan) {
-  const { name, amount, billingPeriod, entitlements } = plan;
+  const { name, amount, billingPeriod, entitlements, slug } = plan;
 
   const featureDescriptions = getFeatureDescriptions(name, entitlements);
 
@@ -45,6 +42,7 @@ export function processPlan(plan: Plan) {
     price: priceLabel,
     billingPeriod: typeof billingPeriod === 'string' ? getPeriodAbbreviation(billingPeriod) : 'mo',
     features: featureDescriptions,
+    slug,
   };
 }
 
