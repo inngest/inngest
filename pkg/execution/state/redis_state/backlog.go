@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"runtime/debug"
 	"time"
 
 	"github.com/google/uuid"
@@ -408,8 +409,16 @@ func (q *queue) ItemShadowPartition(ctx context.Context, i osqueue.QueueItem) Qu
 		}
 	}
 
-	if i.FunctionID == uuid.Nil {
-		q.log.Error("unexpected missing functionID in ItemPartitions()", "item", i)
+	fnID := i.FunctionID
+	if fnID == uuid.Nil {
+		stack := string(debug.Stack())
+		q.log.Error("unexpected missing functionID in ItemShadowPartition call", "item", i, "stack", stack)
+	}
+
+	accountID := i.Data.Identifier.AccountID
+	if accountID == uuid.Nil {
+		stack := string(debug.Stack())
+		q.log.Error("unexpected missing accountID in ItemShadowPartition call", "item", i, "stack", stack)
 	}
 
 	// NOTE: This is an optimization that ensures we return *updated* concurrency keys
@@ -432,10 +441,10 @@ func (q *queue) ItemShadowPartition(ctx context.Context, i osqueue.QueueItem) Qu
 	}
 
 	fnPartition := QueuePartition{
-		ID:            i.FunctionID.String(),
+		ID:            fnID.String(),
 		PartitionType: int(enums.PartitionTypeDefault), // Function partition
-		FunctionID:    &i.FunctionID,
-		AccountID:     i.Data.Identifier.AccountID,
+		FunctionID:    &fnID,
+		AccountID:     accountID,
 	}
 
 	limits, _ := duration(ctx, q.primaryQueueShard.Name, "shadow_partition_fn_concurrency_getter", q.clock.Now(), func(ctx context.Context) (PartitionConcurrencyLimits, error) {
@@ -476,13 +485,13 @@ func (q *queue) ItemShadowPartition(ctx context.Context, i osqueue.QueueItem) Qu
 	}
 
 	return QueueShadowPartition{
-		PartitionID:     i.FunctionID.String(),
+		PartitionID:     fnID.String(),
 		FunctionVersion: i.Data.Identifier.WorkflowVersion,
 
 		// Identifiers
-		FunctionID: &i.FunctionID,
+		FunctionID: &fnID,
 		EnvID:      &i.WorkspaceID,
-		AccountID:  &i.Data.Identifier.AccountID,
+		AccountID:  &accountID,
 
 		// Currently configured limits
 		Concurrency: ShadowPartitionConcurrency{

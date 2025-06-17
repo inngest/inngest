@@ -503,7 +503,7 @@ func (s *svc) handleJobPromote(ctx context.Context, item queue.Item) error {
 	// be that of the actual run ID, prioritizing older runs.
 	nextTime := time.UnixMilli(qi.Score(time.Now()))
 	err = qm.Requeue(ctx, shard, *qi, nextTime)
-	if err != nil {
+	if err != nil && !errors.Is(err, redis_state.ErrQueueItemNotFound) {
 		return fmt.Errorf("could not requeue job with promoted time: %w", err)
 	}
 
