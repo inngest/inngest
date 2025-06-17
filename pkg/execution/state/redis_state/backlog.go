@@ -106,6 +106,15 @@ type QueueShadowPartition struct {
 	PauseEnqueue bool `json:"noenqueue,omitempty"`
 }
 
+func (sp QueueShadowPartition) GetAccountID() uuid.UUID {
+	accountID := uuid.Nil
+	if sp.AccountID != nil {
+		accountID = *sp.AccountID
+	}
+
+	return accountID
+}
+
 // readyQueueKey returns the ZSET key to the ready queue
 func (sp QueueShadowPartition) readyQueueKey(kg QueueKeyGenerator) string {
 	return kg.PartitionQueueSet(enums.PartitionTypeDefault, sp.PartitionID, "")
