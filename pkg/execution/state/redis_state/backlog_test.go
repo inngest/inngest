@@ -704,15 +704,8 @@ func TestQueueItemShadowPartition(t *testing.T) {
 			EnvID:           &wsID,
 			AccountID:       &accID,
 			SystemQueueName: nil,
-			Concurrency: ShadowPartitionConcurrency{
-				SystemConcurrency:     0,
-				AccountConcurrency:    100,
-				FunctionConcurrency:   25,
-				CustomConcurrencyKeys: nil,
-			},
-			Throttle:     nil,
-			PauseRefill:  false,
-			PauseEnqueue: false,
+			PauseRefill:     false,
+			PauseEnqueue:    false,
 		}
 
 		shadowPart := q.ItemShadowPartition(ctx, osqueue.QueueItem{
@@ -750,15 +743,8 @@ func TestQueueItemShadowPartition(t *testing.T) {
 			EnvID:           nil,
 			AccountID:       nil,
 			SystemQueueName: &sysQueueName,
-			Concurrency: ShadowPartitionConcurrency{
-				SystemConcurrency:     250,
-				AccountConcurrency:    0,
-				FunctionConcurrency:   0,
-				CustomConcurrencyKeys: nil,
-			},
-			Throttle:     nil,
-			PauseRefill:  false,
-			PauseEnqueue: false,
+			PauseRefill:     false,
+			PauseEnqueue:    false,
 		}
 
 		shadowPart := q.ItemShadowPartition(ctx, osqueue.QueueItem{
@@ -793,20 +779,8 @@ func TestQueueItemShadowPartition(t *testing.T) {
 			EnvID:           &wsID,
 			AccountID:       &accID,
 			SystemQueueName: nil,
-			Concurrency: ShadowPartitionConcurrency{
-				SystemConcurrency:     0,
-				AccountConcurrency:    100,
-				FunctionConcurrency:   25,
-				CustomConcurrencyKeys: nil,
-			},
-			Throttle: &ShadowPartitionThrottle{
-				ThrottleKeyExpressionHash: hashedThrottleKeyExpr,
-				Limit:                     70,
-				Burst:                     20,
-				Period:                    600,
-			},
-			PauseRefill:  false,
-			PauseEnqueue: false,
+			PauseRefill:     false,
+			PauseEnqueue:    false,
 		}
 
 		shadowPart := q.ItemShadowPartition(ctx, osqueue.QueueItem{
@@ -852,21 +826,8 @@ func TestQueueItemShadowPartition(t *testing.T) {
 			EnvID:           &wsID,
 			AccountID:       &accID,
 			SystemQueueName: nil,
-			Concurrency: ShadowPartitionConcurrency{
-				SystemConcurrency:   0,
-				AccountConcurrency:  100,
-				FunctionConcurrency: 25,
-				CustomConcurrencyKeys: []CustomConcurrencyLimit{
-					{
-						Scope:               enums.ConcurrencyScopeFn,
-						HashedKeyExpression: hashedConcurrencyKeyExpr,
-						Limit:               23,
-					},
-				},
-			},
-			Throttle:     nil,
-			PauseRefill:  false,
-			PauseEnqueue: false,
+			PauseRefill:     false,
+			PauseEnqueue:    false,
 		}
 
 		shadowPart := q.ItemShadowPartition(ctx, osqueue.QueueItem{
@@ -919,26 +880,8 @@ func TestQueueItemShadowPartition(t *testing.T) {
 			EnvID:           &wsID,
 			AccountID:       &accID,
 			SystemQueueName: nil,
-			Concurrency: ShadowPartitionConcurrency{
-				SystemConcurrency:   0,
-				AccountConcurrency:  100,
-				FunctionConcurrency: 25,
-				CustomConcurrencyKeys: []CustomConcurrencyLimit{
-					{
-						Scope:               enums.ConcurrencyScopeFn,
-						HashedKeyExpression: hashedConcurrencyKeyExpr,
-						Limit:               23,
-					},
-				},
-			},
-			Throttle: &ShadowPartitionThrottle{
-				ThrottleKeyExpressionHash: hashedThrottleKeyExpr,
-				Limit:                     70,
-				Burst:                     20,
-				Period:                    600,
-			},
-			PauseRefill:  false,
-			PauseEnqueue: false,
+			PauseRefill:     false,
+			PauseEnqueue:    false,
 		}
 
 		shadowPart := q.ItemShadowPartition(ctx, osqueue.QueueItem{

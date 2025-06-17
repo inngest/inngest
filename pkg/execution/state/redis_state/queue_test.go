@@ -821,6 +821,14 @@ func TestQueueSystemPartitions(t *testing.T) {
 			return PartitionConcurrencyLimits{5000, 5000, 5000}
 		}),
 		WithDisableLeaseChecksForSystemQueues(false),
+		WithPartitionConstraintConfigGetter(func(ctx context.Context, p QueueShadowPartition) (*PartitionConstraintConfig, error) {
+			return &PartitionConstraintConfig{
+				Concurrency: ShadowPartitionConcurrency{
+					AccountConcurrency: consts.DefaultConcurrencyLimit,
+					SystemConcurrency:  customTestLimit,
+				},
+			}, nil
+		}),
 	)
 	ctx := context.Background()
 
@@ -1387,6 +1395,15 @@ func TestQueueLease(t *testing.T) {
 			return PartitionConcurrencyLimits{1, 1, 1}
 		}
 
+		q.partitionConstraintConfigGetter = func(ctx context.Context, p QueueShadowPartition) (*PartitionConstraintConfig, error) {
+			return &PartitionConstraintConfig{
+				Concurrency: ShadowPartitionConcurrency{
+					AccountConcurrency:  1,
+					FunctionConcurrency: 1,
+				},
+			}, nil
+		}
+
 		fnID := uuid.New()
 		// Create a new item
 		itemA, err := q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{FunctionID: fnID}, start, osqueue.EnqueueOpts{})
@@ -1535,8 +1552,25 @@ func TestQueueLease(t *testing.T) {
 			}
 
 			ck := createConcurrencyKey(enums.ConcurrencyScopeFn, fnId, "foo", 1)
-			_, _, keyExprChecksum, err := ck.ParseKey()
+			scope, _, keyExprChecksum, err := ck.ParseKey()
 			require.NoError(t, err)
+
+			q.partitionConstraintConfigGetter = func(ctx context.Context, p QueueShadowPartition) (*PartitionConstraintConfig, error) {
+				return &PartitionConstraintConfig{
+					Concurrency: ShadowPartitionConcurrency{
+						AccountConcurrency:  NoConcurrencyLimit,
+						FunctionConcurrency: NoConcurrencyLimit,
+						CustomConcurrencyKeys: []CustomConcurrencyLimit{
+							{
+								Mode:                enums.ConcurrencyModeStep,
+								Scope:               scope,
+								HashedKeyExpression: ck.Hash,
+								Limit:               ck.Limit,
+							},
+						},
+					},
+				}, nil
+			}
 
 			// Create a new item
 			itemA, err := q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{
@@ -2142,6 +2176,29 @@ func TestQueueExtendLease(t *testing.T) {
 
 	t.Run("With custom keys in multiple partitions", func(t *testing.T) {
 		r.FlushAll()
+
+		q.partitionConstraintConfigGetter = func(ctx context.Context, p QueueShadowPartition) (*PartitionConstraintConfig, error) {
+			return &PartitionConstraintConfig{
+				Concurrency: ShadowPartitionConcurrency{
+					AccountConcurrency:  NoConcurrencyLimit,
+					FunctionConcurrency: NoConcurrencyLimit,
+					CustomConcurrencyKeys: []CustomConcurrencyLimit{
+						{
+							Mode:                enums.ConcurrencyModeStep,
+							Scope:               enums.ConcurrencyScopeAccount,
+							HashedKeyExpression: util.XXHash("acct-id"),
+							Limit:               10,
+						},
+						{
+							Mode:                enums.ConcurrencyModeStep,
+							Scope:               enums.ConcurrencyScopeFn,
+							HashedKeyExpression: util.XXHash("fn-id"),
+							Limit:               5,
+						},
+					},
+				},
+			}, nil
+		}
 
 		item, err := q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{
 			FunctionID: uuid.New(),
@@ -5105,7 +5162,6 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 
 			shadowPartition := q.ItemShadowPartition(ctx, item)
 			require.NotEmpty(t, shadowPartition.PartitionID)
-			require.Len(t, shadowPartition.Concurrency.CustomConcurrencyKeys, 1)
 
 			require.True(t, r.Exists(kg.BacklogMeta()), r.Keys())
 			require.True(t, r.Exists(kg.BacklogSet(backlog.BacklogID)))
@@ -5232,7 +5288,6 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 
 			shadowPartition := q.ItemShadowPartition(ctx, item)
 			require.NotEmpty(t, shadowPartition.PartitionID)
-			require.Len(t, shadowPartition.Concurrency.CustomConcurrencyKeys, 2)
 
 			require.True(t, r.Exists(kg.BacklogMeta()), r.Keys())
 			require.True(t, r.Exists(kg.BacklogSet(backlog.BacklogID)))
@@ -5444,6 +5499,13 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 		clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Second))
 		now := clock.Now()
 
+		accountId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
+
+		hashedConcurrencyKeyExpr := hashConcurrencyKey("event.data.customerId")
+		unhashedValue := "customer1"
+		scope := enums.ConcurrencyScopeFn
+		fullKey := util.ConcurrencyKey(scope, fnID, unhashedValue)
+
 		enqueueToBacklog := false
 		q := NewQueue(
 			defaultShard,
@@ -5470,21 +5532,31 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 			WithCustomConcurrencyKeyLimitRefresher(func(ctx context.Context, i osqueue.QueueItem) []state.CustomConcurrency {
 				return i.Data.GetConcurrencyKeys()
 			}),
+			WithPartitionConstraintConfigGetter(func(ctx context.Context, p QueueShadowPartition) (*PartitionConstraintConfig, error) {
+				return &PartitionConstraintConfig{
+					Concurrency: ShadowPartitionConcurrency{
+						SystemConcurrency:   678,
+						AccountConcurrency:  123,
+						FunctionConcurrency: 45,
+						CustomConcurrencyKeys: []CustomConcurrencyLimit{
+							{
+								Mode:                enums.ConcurrencyModeStep,
+								Scope:               scope,
+								HashedKeyExpression: hashedConcurrencyKeyExpr,
+								Limit:               123,
+							},
+						},
+					},
+				}, nil
+			}),
 		)
 		ctx := context.Background()
-
-		accountId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
 
 		// use future timestamp because scores will be bounded to the present
 		at := now.Add(10 * time.Minute).Truncate(time.Minute)
 
 		t.Run("should enqueue item to backlog", func(t *testing.T) {
 			require.Len(t, r.Keys(), 0)
-
-			hashedConcurrencyKeyExpr := hashConcurrencyKey("event.data.customerId")
-			unhashedValue := "customer1"
-			scope := enums.ConcurrencyScopeFn
-			fullKey := util.ConcurrencyKey(scope, fnID, unhashedValue)
 
 			item := osqueue.QueueItem{
 				ID:          "test",
@@ -5546,7 +5618,6 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 
 			shadowPartition := q.ItemShadowPartition(ctx, item)
 			require.NotEmpty(t, shadowPartition.PartitionID)
-			require.Len(t, shadowPartition.Concurrency.CustomConcurrencyKeys, 1)
 
 			// key queue v2 accounting
 			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, shadowPartition.accountInProgressKey(kg), qi.ID)))
@@ -5578,6 +5649,18 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 		clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Second))
 		now := clock.Now()
 
+		accountId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
+
+		hashedConcurrencyKeyExpr1 := hashConcurrencyKey("event.data.userId")
+		unhashedValue1 := "user1"
+		scope1 := enums.ConcurrencyScopeFn
+		fullKey1 := util.ConcurrencyKey(scope1, fnID, unhashedValue1)
+
+		hashedConcurrencyKeyExpr2 := hashConcurrencyKey("event.data.orgId")
+		unhashedValue2 := "org1"
+		scope2 := enums.ConcurrencyScopeEnv
+		fullKey2 := util.ConcurrencyKey(scope2, wsID, unhashedValue2)
+
 		enqueueToBacklog := false
 		q := NewQueue(
 			defaultShard,
@@ -5604,26 +5687,37 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 			WithCustomConcurrencyKeyLimitRefresher(func(ctx context.Context, i osqueue.QueueItem) []state.CustomConcurrency {
 				return i.Data.GetConcurrencyKeys()
 			}),
+			WithPartitionConstraintConfigGetter(func(ctx context.Context, p QueueShadowPartition) (*PartitionConstraintConfig, error) {
+				return &PartitionConstraintConfig{
+					Concurrency: ShadowPartitionConcurrency{
+						SystemConcurrency:   678,
+						AccountConcurrency:  123,
+						FunctionConcurrency: 45,
+						CustomConcurrencyKeys: []CustomConcurrencyLimit{
+							{
+								Mode:                enums.ConcurrencyModeStep,
+								Scope:               scope1,
+								HashedKeyExpression: hashedConcurrencyKeyExpr1,
+								Limit:               123,
+							},
+							{
+								Mode:                enums.ConcurrencyModeStep,
+								Scope:               scope2,
+								HashedKeyExpression: hashedConcurrencyKeyExpr2,
+								Limit:               234,
+							},
+						},
+					},
+				}, nil
+			}),
 		)
 		ctx := context.Background()
-
-		accountId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
 
 		// use future timestamp because scores will be bounded to the present
 		at := now.Add(10 * time.Minute)
 
 		t.Run("should enqueue item to backlog", func(t *testing.T) {
 			require.Len(t, r.Keys(), 0)
-
-			hashedConcurrencyKeyExpr1 := hashConcurrencyKey("event.data.userId")
-			unhashedValue1 := "user1"
-			scope1 := enums.ConcurrencyScopeFn
-			fullKey1 := util.ConcurrencyKey(scope1, fnID, unhashedValue1)
-
-			hashedConcurrencyKeyExpr2 := hashConcurrencyKey("event.data.orgId")
-			unhashedValue2 := "org1"
-			scope2 := enums.ConcurrencyScopeEnv
-			fullKey2 := util.ConcurrencyKey(scope2, wsID, unhashedValue2)
 
 			item := osqueue.QueueItem{
 				ID:          "test",
@@ -5689,7 +5783,6 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 
 			shadowPartition := q.ItemShadowPartition(ctx, item)
 			require.NotEmpty(t, shadowPartition.PartitionID)
-			require.Len(t, shadowPartition.Concurrency.CustomConcurrencyKeys, 2)
 
 			// key queue v2 accounting
 			require.Equal(t, leaseExpiry.UnixMilli(), int64(score(t, r, shadowPartition.accountInProgressKey(kg), qi.ID)))
@@ -5884,7 +5977,6 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 
 			shadowPartition := q.ItemShadowPartition(ctx, item)
 			require.NotEmpty(t, shadowPartition.PartitionID)
-			require.Len(t, shadowPartition.Concurrency.CustomConcurrencyKeys, 0)
 
 			fnPart, custom1, custom2, _ := q.ItemPartitions(ctx, defaultShard, item)
 			require.NotEmpty(t, fnPart.ID)
@@ -5969,6 +6061,13 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 		clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Second))
 		now := clock.Now()
 
+		accountId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
+
+		hashedConcurrencyKeyExpr := hashConcurrencyKey("event.data.customerId")
+		unhashedValue := "customer1"
+		scope := enums.ConcurrencyScopeFn
+		fullKey := util.ConcurrencyKey(scope, fnID, unhashedValue)
+
 		enqueueToBacklog := false
 		q := NewQueue(
 			defaultShard,
@@ -5979,21 +6078,28 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 			WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
 				return true
 			}),
+			WithPartitionConstraintConfigGetter(func(ctx context.Context, p QueueShadowPartition) (*PartitionConstraintConfig, error) {
+				return &PartitionConstraintConfig{
+					Concurrency: ShadowPartitionConcurrency{
+						CustomConcurrencyKeys: []CustomConcurrencyLimit{
+							{
+								Mode:                enums.ConcurrencyModeStep,
+								Scope:               scope,
+								HashedKeyExpression: hashedConcurrencyKeyExpr,
+								Limit:               123,
+							},
+						},
+					},
+				}, nil
+			}),
 		)
 		ctx := context.Background()
-
-		accountId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
 
 		// use future timestamp because scores will be bounded to the present
 		at := now.Add(10 * time.Minute)
 
 		t.Run("should requeue item to backlog", func(t *testing.T) {
 			require.Len(t, r.Keys(), 0)
-
-			hashedConcurrencyKeyExpr := hashConcurrencyKey("event.data.customerId")
-			unhashedValue := "customer1"
-			scope := enums.ConcurrencyScopeFn
-			fullKey := util.ConcurrencyKey(scope, fnID, unhashedValue)
 
 			item := osqueue.QueueItem{
 				ID:          "test",
@@ -6047,7 +6153,6 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 
 			shadowPartition := q.ItemShadowPartition(ctx, item)
 			require.NotEmpty(t, shadowPartition.PartitionID)
-			require.Len(t, shadowPartition.Concurrency.CustomConcurrencyKeys, 1)
 
 			fnPart, custom1, custom2, _ := q.ItemPartitions(ctx, defaultShard, item)
 			require.NotEmpty(t, custom1.ID)
@@ -6120,6 +6225,18 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 		clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Second))
 		now := clock.Now()
 
+		accountId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
+
+		hashedConcurrencyKeyExpr1 := hashConcurrencyKey("event.data.userId")
+		unhashedValue1 := "user1"
+		scope1 := enums.ConcurrencyScopeFn
+		fullKey1 := util.ConcurrencyKey(scope1, fnID, unhashedValue1)
+
+		hashedConcurrencyKeyExpr2 := hashConcurrencyKey("event.data.orgId")
+		unhashedValue2 := "org1"
+		scope2 := enums.ConcurrencyScopeEnv
+		fullKey2 := util.ConcurrencyKey(scope2, wsID, unhashedValue2)
+
 		enqueueToBacklog := false
 		q := NewQueue(
 			defaultShard,
@@ -6130,26 +6247,34 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 			WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
 				return true
 			}),
+			WithPartitionConstraintConfigGetter(func(ctx context.Context, p QueueShadowPartition) (*PartitionConstraintConfig, error) {
+				return &PartitionConstraintConfig{
+					Concurrency: ShadowPartitionConcurrency{
+						CustomConcurrencyKeys: []CustomConcurrencyLimit{
+							{
+								Mode:                enums.ConcurrencyModeStep,
+								Scope:               scope1,
+								HashedKeyExpression: hashedConcurrencyKeyExpr1,
+								Limit:               123,
+							},
+							{
+								Mode:                enums.ConcurrencyModeStep,
+								Scope:               scope2,
+								HashedKeyExpression: hashedConcurrencyKeyExpr2,
+								Limit:               234,
+							},
+						},
+					},
+				}, nil
+			}),
 		)
 		ctx := context.Background()
-
-		accountId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
 
 		// use future timestamp because scores will be bounded to the present
 		at := now.Add(10 * time.Minute)
 
 		t.Run("should requeue item to backlog", func(t *testing.T) {
 			require.Len(t, r.Keys(), 0)
-
-			hashedConcurrencyKeyExpr1 := hashConcurrencyKey("event.data.userId")
-			unhashedValue1 := "user1"
-			scope1 := enums.ConcurrencyScopeFn
-			fullKey1 := util.ConcurrencyKey(scope1, fnID, unhashedValue1)
-
-			hashedConcurrencyKeyExpr2 := hashConcurrencyKey("event.data.orgId")
-			unhashedValue2 := "org1"
-			scope2 := enums.ConcurrencyScopeEnv
-			fullKey2 := util.ConcurrencyKey(scope2, wsID, unhashedValue2)
 
 			item := osqueue.QueueItem{
 				ID:          "test",
@@ -6213,7 +6338,6 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 
 			shadowPartition := q.ItemShadowPartition(ctx, item)
 			require.NotEmpty(t, shadowPartition.PartitionID)
-			require.Len(t, shadowPartition.Concurrency.CustomConcurrencyKeys, 2)
 
 			fnPart, custom1, custom2, _ := q.ItemPartitions(ctx, defaultShard, item)
 			require.NotEmpty(t, custom1.ID)
@@ -6349,7 +6473,6 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 
 			shadowPartition := q.ItemShadowPartition(ctx, item)
 			require.NotEmpty(t, shadowPartition.PartitionID)
-			require.Len(t, shadowPartition.Concurrency.CustomConcurrencyKeys, 0)
 
 			fnPart, custom1, custom2, _ := q.ItemPartitions(ctx, defaultShard, item)
 			require.NotEmpty(t, fnPart.ID)
@@ -6490,7 +6613,6 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 
 		shadowPartition := q.ItemShadowPartition(ctx, item)
 		require.NotEmpty(t, shadowPartition.PartitionID)
-		require.Len(t, shadowPartition.Concurrency.CustomConcurrencyKeys, 0)
 
 		itemIsMember, err := r.SIsMember(kg.ActiveSet("run", runID.String()), qi.ID)
 		require.NoError(t, err)
@@ -6735,7 +6857,6 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 
 			shadowPartition := q.ItemShadowPartition(ctx, item)
 			require.NotEmpty(t, shadowPartition.PartitionID)
-			require.Len(t, shadowPartition.Concurrency.CustomConcurrencyKeys, 0)
 
 			fnPart, custom1, custom2, _ := q.ItemPartitions(ctx, defaultShard, item)
 			require.NotEmpty(t, fnPart.ID)
@@ -6836,7 +6957,6 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 
 			shadowPartition := q.ItemShadowPartition(ctx, item)
 			require.NotEmpty(t, shadowPartition.PartitionID)
-			require.Len(t, shadowPartition.Concurrency.CustomConcurrencyKeys, 0)
 
 			fnPart, custom1, custom2, _ := q.ItemPartitions(ctx, defaultShard, item)
 			require.NotEmpty(t, fnPart.ID)
@@ -6893,6 +7013,13 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 		defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
 		kg := defaultShard.RedisClient.kg
 
+		accountId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
+
+		hashedConcurrencyKeyExpr := hashConcurrencyKey("event.data.customerId")
+		unhashedValue := "customer1"
+		scope := enums.ConcurrencyScopeFn
+		fullKey := util.ConcurrencyKey(scope, fnID, unhashedValue)
+
 		enqueueToBacklog := false
 		q := NewQueue(
 			defaultShard,
@@ -6902,21 +7029,29 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 			WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
 				return true
 			}),
+			WithPartitionConstraintConfigGetter(func(ctx context.Context, p QueueShadowPartition) (*PartitionConstraintConfig, error) {
+				return &PartitionConstraintConfig{
+					Concurrency: ShadowPartitionConcurrency{
+						CustomConcurrencyKeys: []CustomConcurrencyLimit{
+							{
+								Mode:                enums.ConcurrencyModeStep,
+								Scope:               enums.ConcurrencyScopeFn,
+								HashedKeyExpression: hashedConcurrencyKeyExpr,
+								Limit:               123,
+							},
+						},
+					},
+					Throttle: nil,
+				}, nil
+			}),
 		)
 		ctx := context.Background()
-
-		accountId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
 
 		// use future timestamp because scores will be bounded to the present
 		at := time.Now().Add(10 * time.Minute)
 
 		t.Run("should dequeue item and update accounting", func(t *testing.T) {
 			require.Len(t, r.Keys(), 0)
-
-			hashedConcurrencyKeyExpr := hashConcurrencyKey("event.data.customerId")
-			unhashedValue := "customer1"
-			scope := enums.ConcurrencyScopeFn
-			fullKey := util.ConcurrencyKey(scope, fnID, unhashedValue)
 
 			item := osqueue.QueueItem{
 				ID:          "test",
@@ -6963,7 +7098,6 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 
 			shadowPartition := q.ItemShadowPartition(ctx, item)
 			require.NotEmpty(t, shadowPartition.PartitionID)
-			require.Len(t, shadowPartition.Concurrency.CustomConcurrencyKeys, 1)
 
 			fnPart, custom1, custom2, _ := q.ItemPartitions(ctx, defaultShard, item)
 			require.NotEmpty(t, fnPart.ID)
@@ -7023,6 +7157,18 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 		defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
 		kg := defaultShard.RedisClient.kg
 
+		accountId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
+
+		hashedConcurrencyKeyExpr1 := hashConcurrencyKey("event.data.userId")
+		unhashedValue1 := "user1"
+		scope1 := enums.ConcurrencyScopeFn
+		fullKey1 := util.ConcurrencyKey(scope1, fnID, unhashedValue1)
+
+		hashedConcurrencyKeyExpr2 := hashConcurrencyKey("event.data.orgId")
+		unhashedValue2 := "org1"
+		scope2 := enums.ConcurrencyScopeEnv
+		fullKey2 := util.ConcurrencyKey(scope2, wsID, unhashedValue2)
+
 		enqueueToBacklog := false
 		q := NewQueue(
 			defaultShard,
@@ -7032,26 +7178,35 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 			WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
 				return true
 			}),
+			WithPartitionConstraintConfigGetter(func(ctx context.Context, p QueueShadowPartition) (*PartitionConstraintConfig, error) {
+				return &PartitionConstraintConfig{
+					Concurrency: ShadowPartitionConcurrency{
+						CustomConcurrencyKeys: []CustomConcurrencyLimit{
+							{
+								Mode:                enums.ConcurrencyModeStep,
+								Scope:               scope1,
+								HashedKeyExpression: hashedConcurrencyKeyExpr1,
+								Limit:               123,
+							},
+							{
+								Mode:                enums.ConcurrencyModeStep,
+								Scope:               scope2,
+								HashedKeyExpression: hashedConcurrencyKeyExpr2,
+								Limit:               234,
+							},
+						},
+					},
+					Throttle: nil,
+				}, nil
+			}),
 		)
 		ctx := context.Background()
-
-		accountId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
 
 		// use future timestamp because scores will be bounded to the present
 		at := time.Now().Add(10 * time.Minute)
 
 		t.Run("should dequeue item and update accounting", func(t *testing.T) {
 			require.Len(t, r.Keys(), 0)
-
-			hashedConcurrencyKeyExpr1 := hashConcurrencyKey("event.data.userId")
-			unhashedValue1 := "user1"
-			scope1 := enums.ConcurrencyScopeFn
-			fullKey1 := util.ConcurrencyKey(scope1, fnID, unhashedValue1)
-
-			hashedConcurrencyKeyExpr2 := hashConcurrencyKey("event.data.orgId")
-			unhashedValue2 := "org1"
-			scope2 := enums.ConcurrencyScopeEnv
-			fullKey2 := util.ConcurrencyKey(scope2, wsID, unhashedValue2)
 
 			item := osqueue.QueueItem{
 				ID:          "test",
@@ -7104,7 +7259,6 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 
 			shadowPartition := q.ItemShadowPartition(ctx, item)
 			require.NotEmpty(t, shadowPartition.PartitionID)
-			require.Len(t, shadowPartition.Concurrency.CustomConcurrencyKeys, 2)
 
 			fnPart, custom1, custom2, _ := q.ItemPartitions(ctx, defaultShard, item)
 			require.NotEmpty(t, fnPart.ID)
@@ -7220,7 +7374,6 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 
 			shadowPartition := q.ItemShadowPartition(ctx, item)
 			require.NotEmpty(t, shadowPartition.PartitionID)
-			require.Len(t, shadowPartition.Concurrency.CustomConcurrencyKeys, 0)
 
 			fnPart, custom1, custom2, _ := q.ItemPartitions(ctx, defaultShard, item)
 			require.NotEmpty(t, fnPart.ID)

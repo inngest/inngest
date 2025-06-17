@@ -491,7 +491,30 @@ type PartitionConstraintConfigGetter func(ctx context.Context, p QueueShadowPart
 // WithPartitionConstraintConfigGetter assigns a function that returns queue constraints for a given partition.
 func WithPartitionConstraintConfigGetter(f PartitionConstraintConfigGetter) func(q *queue) {
 	return func(q *queue) {
-		q.partitionConstraintConfigGetter = f
+		q.partitionConstraintConfigGetter = func(ctx context.Context, p QueueShadowPartition) (*PartitionConstraintConfig, error) {
+			constraints, err := f(ctx, p)
+			if err != nil {
+				return nil, err
+			}
+
+			if constraints == nil {
+				// this should never happen; return default limits just in case (avoid panics)
+				return &PartitionConstraintConfig{
+					Concurrency: ShadowPartitionConcurrency{
+						SystemConcurrency:   consts.DefaultConcurrencyLimit,
+						AccountConcurrency:  consts.DefaultConcurrencyLimit,
+						FunctionConcurrency: consts.DefaultConcurrencyLimit,
+					},
+				}, nil
+			}
+
+			// Function concurrency may never be higher than account concurrency
+			if constraints.Concurrency.FunctionConcurrency > 0 && constraints.Concurrency.FunctionConcurrency > constraints.Concurrency.AccountConcurrency {
+				constraints.Concurrency.FunctionConcurrency = constraints.Concurrency.AccountConcurrency
+			}
+
+			return constraints, nil
+		}
 	}
 }
 
@@ -2307,6 +2330,10 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 
 	backlog := q.ItemBacklog(ctx, item)
 	partition := q.ItemShadowPartition(ctx, item)
+	constraints, err := q.partitionConstraintConfigGetter(ctx, partition)
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve latest partition constraints: %w", err)
+	}
 
 	if checkConstraints {
 		// Check to see if this key has already been denied in the lease iteration.
@@ -2366,9 +2393,9 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 		kg.ThrottleKey(item.Data.Throttle),
 	}
 
-	partConcurrency := partition.Concurrency.FunctionConcurrency
+	partConcurrency := constraints.Concurrency.FunctionConcurrency
 	if partition.SystemQueueName != nil {
-		partConcurrency = partition.Concurrency.SystemConcurrency
+		partConcurrency = constraints.Concurrency.SystemConcurrency
 	}
 
 	args, err := StrSlice([]any{
@@ -2381,10 +2408,10 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 		now.UnixMilli(),
 
 		// Concurrency limits
-		partition.Concurrency.AccountConcurrency,
+		constraints.Concurrency.AccountConcurrency,
 		partConcurrency,
-		partition.CustomConcurrencyLimit(1),
-		partition.CustomConcurrencyLimit(2),
+		constraints.CustomConcurrencyLimit(1),
+		constraints.CustomConcurrencyLimit(2),
 
 		// Key queues v2
 		checkConstraintsVal,
