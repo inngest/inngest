@@ -481,6 +481,152 @@ func TestQueueRefillBacklog(t *testing.T) {
 		require.False(t, r.Exists(kg.BacklogSet(backlog.BacklogID)))
 		require.False(t, r.Exists(kg.ShadowPartitionSet(shadowPart.PartitionID)))
 	})
+
+	t.Run("should move partition to active check queue when running into concurrency limit", func(t *testing.T) {
+		r := miniredis.RunT(t)
+		rc, err := rueidis.NewClient(rueidis.ClientOption{
+			InitAddress:  []string{r.Addr()},
+			DisableCache: true,
+		})
+		require.NoError(t, err)
+		defer rc.Close()
+
+		ctx := context.Background()
+
+		defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+
+		clock := clockwork.NewFakeClock()
+
+		enqueueToBacklog := true
+		q := NewQueue(
+			defaultShard,
+			WithClock(clock),
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+				return enqueueToBacklog
+			}),
+			WithEnqueueSystemPartitionsToBacklog(false),
+			WithDisableLeaseChecksForSystemQueues(false),
+			WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
+				return true
+			}),
+			WithRunMode(QueueRunMode{
+				Sequential:                        true,
+				Scavenger:                         true,
+				Partition:                         true,
+				Account:                           true,
+				AccountWeight:                     85,
+				ShadowPartition:                   true,
+				AccountShadowPartition:            true,
+				AccountShadowPartitionWeight:      85,
+				ShadowContinuations:               true,
+				ShadowContinuationSkipProbability: 0,
+				NormalizePartition:                true,
+			}),
+			WithBacklogRefillLimit(500),
+			WithConcurrencyLimitGetter(func(ctx context.Context, p QueuePartition) PartitionConcurrencyLimits {
+				return PartitionConcurrencyLimits{
+					AccountLimit:   123,
+					FunctionLimit:  45,
+					CustomKeyLimit: 0,
+				}
+			}),
+			WithCustomConcurrencyKeyLimitRefresher(func(ctx context.Context, i osqueue.QueueItem) []state.CustomConcurrency {
+				return i.Data.GetConcurrencyKeys()
+			}),
+			WithSystemConcurrencyLimitGetter(func(ctx context.Context, p QueuePartition) SystemPartitionConcurrencyLimits {
+				return SystemPartitionConcurrencyLimits{
+					GlobalLimit:    789,
+					PartitionLimit: 678,
+				}
+			}),
+		)
+
+		item := osqueue.QueueItem{
+			ID:          "test",
+			FunctionID:  fnID,
+			WorkspaceID: wsID,
+			Data: osqueue.Item{
+				WorkspaceID: wsID,
+				Kind:        osqueue.KindEdge,
+				Identifier: state.Identifier{
+					WorkflowID:  fnID,
+					AccountID:   accountId,
+					WorkspaceID: wsID,
+					RunID:       runID,
+				},
+				QueueName:             nil,
+				Throttle:              nil,
+				CustomConcurrencyKeys: nil,
+			},
+			QueueName: nil,
+		}
+
+		qi, err := q.EnqueueItem(ctx, defaultShard, item, q.clock.Now(), osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+
+		fnID2 := uuid.New()
+
+		item2 := osqueue.QueueItem{
+			ID:          "test-2",
+			FunctionID:  fnID2,
+			WorkspaceID: wsID,
+			Data: osqueue.Item{
+				WorkspaceID: wsID,
+				Kind:        osqueue.KindEdge,
+				Identifier: state.Identifier{
+					WorkflowID:  fnID2,
+					AccountID:   accountId,
+					WorkspaceID: wsID,
+					RunID:       runID,
+				},
+				QueueName:             nil,
+				Throttle:              nil,
+				CustomConcurrencyKeys: nil,
+			},
+			QueueName: nil,
+		}
+
+		_, err = q.EnqueueItem(ctx, defaultShard, item2, q.clock.Now(), osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+
+		b := q.ItemBacklog(ctx, qi)
+		sp := q.ItemShadowPartition(ctx, qi)
+
+		res, err := q.BacklogRefill(ctx, &b, &sp, q.clock.Now().Add(10*time.Second), &PartitionConstraintConfig{
+			Concurrency: ShadowPartitionConcurrency{
+				AccountConcurrency:  1,
+				FunctionConcurrency: 1,
+			},
+		})
+		require.NoError(t, err)
+		require.Equal(t, 1, res.TotalBacklogCount)
+		require.Equal(t, 1, res.Capacity)
+		require.Equal(t, 1, res.Refill)
+		require.Equal(t, 1, res.Refilled)
+		require.Equal(t, enums.QueueConstraintNotLimited, res.Constraint)
+
+		b2 := q.ItemBacklog(ctx, item2)
+		sp2 := q.ItemShadowPartition(ctx, item2)
+
+		res, err = q.BacklogRefill(ctx, &b2, &sp2, q.clock.Now().Add(10*time.Second), &PartitionConstraintConfig{
+			Concurrency: ShadowPartitionConcurrency{
+				AccountConcurrency:  1,
+				FunctionConcurrency: 1,
+			},
+		})
+		require.NoError(t, err)
+		require.Equal(t, 1, res.TotalBacklogCount)
+		require.Equal(t, 0, res.Capacity)
+		require.Equal(t, 0, res.Refill)
+		require.Equal(t, 0, res.Refilled)
+		require.Equal(t, enums.QueueConstraintAccountConcurrency, res.Constraint)
+
+		require.True(t, r.Exists(kg.PartitionActiveCheckSet()))
+		members, err := r.ZMembers(kg.PartitionActiveCheckSet())
+		require.NoError(t, err)
+		require.Len(t, members, 1)
+		require.Equal(t, fnID2.String(), members[0])
+	})
 }
 
 func TestQueueShadowPartitionLease(t *testing.T) {
