@@ -88,8 +88,8 @@ const columns = [
       const doesFunctionAcceptPayload = useMemo(() => {
         return Boolean(
           props.row?.original?.triggers?.some(
-            (trigger) => trigger.type === FunctionTriggerTypes.Event,
-          ),
+            (trigger) => trigger.type === FunctionTriggerTypes.Event
+          )
         );
       }, [props.row.original.triggers]);
 
@@ -147,7 +147,7 @@ export default function FunctionList() {
 
   const tableData = useMemo(
     () => (isFetching ? Array(8).fill({}) : functions),
-    [isFetching, functions],
+    [isFetching, functions]
   );
 
   const tableColumns = useMemo(
@@ -158,7 +158,7 @@ export default function FunctionList() {
             cell: () => <Skeleton className="my-[0.3rem] h-5" />,
           }))
         : columns,
-    [isFetching, functions],
+    [isFetching, functions]
   );
 
   const router = useRouter();

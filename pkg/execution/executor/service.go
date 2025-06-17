@@ -6,6 +6,9 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
+
+	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/config"
@@ -97,10 +100,11 @@ type svc struct {
 	// queue allows us to enqueue next steps.
 	queue queue.Queue
 	// exec runs the specific actions.
-	exec      execution.Executor
-	debouncer debounce.Debouncer
-	batcher   batch.BatchManager
-	log       logger.Logger
+	exec          execution.Executor
+	debouncer     debounce.Debouncer
+	batcher       batch.BatchManager
+	log           logger.Logger
+	shardSelector redis_state.ShardSelector
 
 	wg sync.WaitGroup
 
@@ -227,6 +231,8 @@ func (s *svc) Run(ctx context.Context) error {
 		case queue.KindQueueMigrate:
 			// NOOP:
 			// this kind don't work in the Dev server
+		case queue.KindJobPromote:
+			err = s.handleJobPromote(ctx, item)
 		default:
 			err = fmt.Errorf("unknown payload type: %T", item.Payload)
 		}
@@ -453,4 +459,53 @@ func (s *svc) findFunctionByID(ctx context.Context, fnID uuid.UUID) (*inngest.Fu
 		}
 	}
 	return nil, fmt.Errorf("no function found with ID: %s", fnID)
+}
+
+func (s *svc) handleJobPromote(ctx context.Context, item queue.Item) error {
+	l := s.log.With("run_id", item.Identifier.RunID.String())
+
+	data, ok := item.Payload.(queue.PayloadJobPromote)
+	if !ok {
+		return fmt.Errorf("unable to get data from job promotion: %T", item.Payload)
+	}
+
+	l = l.With("job_id", data.PromoteJobID, "scheduled_at", time.UnixMilli(data.ScheduledAt))
+
+	qm, ok := s.queue.(redis_state.QueueManager)
+	if !ok {
+		l.Warn("queue does not conform to queue manager")
+		return nil
+	}
+
+	// Retrieve current queue shard for sleep item. The account might have been migrated
+	// to a different shard since the original sleep item was enqueued, so we must fetch the shard now.
+	shard, err := s.shardSelector(ctx, item.Identifier.AccountID, nil)
+	if err != nil {
+		return fmt.Errorf("could not retrieve queue shard for job promotion:%w", err)
+	}
+
+	// The sleep item should usually exist
+	qi, err := qm.LoadQueueItem(ctx, shard.Name, data.PromoteJobID)
+	if err != nil {
+		if errors.Is(err, redis_state.ErrQueueItemNotFound) {
+			return nil
+		}
+
+		return fmt.Errorf("could not load queue item: %w", err)
+	}
+
+	// Ignore sleep scavenging if already leased
+	if qi.IsLeased(time.Now()) {
+		return nil
+	}
+
+	// Grab the score, which already handles promotion by fudigng the time to
+	// be that of the actual run ID, prioritizing older runs.
+	nextTime := time.UnixMilli(qi.Score(time.Now()))
+	err = qm.Requeue(ctx, shard, *qi, nextTime)
+	if err != nil {
+		return fmt.Errorf("could not requeue job with promoted time: %w", err)
+	}
+
+	return nil
 }

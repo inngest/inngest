@@ -1913,6 +1913,32 @@ func (q *queue) removeQueueItem(ctx context.Context, shard QueueShard, partition
 	}
 }
 
+func (q *queue) LoadQueueItem(ctx context.Context, shardName string, itemID string) (*osqueue.QueueItem, error) {
+	queueShard, ok := q.queueShardClients[shardName]
+	if !ok {
+		return nil, fmt.Errorf("queue shard not found %q", shardName)
+	}
+
+	kg := queueShard.RedisClient.KeyGenerator()
+	client := queueShard.RedisClient.Client()
+
+	queueItemStr, err := client.Do(ctx, client.B().Hget().Key(kg.QueueItem()).Field(itemID).Build()).ToString()
+	if err != nil {
+		if rueidis.IsRedisNil(err) {
+			return nil, ErrQueueItemNotFound
+		}
+
+		return nil, fmt.Errorf("could not load queue item: %w", err)
+	}
+
+	qi := &osqueue.QueueItem{}
+	if err := json.Unmarshal([]byte(queueItemStr), qi); err != nil {
+		return nil, fmt.Errorf("error unmarshalling loaded queue item: %w", err)
+	}
+
+	return qi, nil
+}
+
 // Peek takes n items from a queue, up until QueuePeekMax.  For peeking workflow/
 // function jobs the queue name must be the ID of the workflow;  each workflow has
 // its own queue of jobs using its ID as the queue name.
