@@ -176,6 +176,10 @@ func (q *queue) Run(ctx context.Context, f osqueue.RunFunc) error {
 		go q.runScavenger(ctx)
 	}
 
+	if q.runMode.ActiveChecker {
+		go q.runActiveChecker(ctx)
+	}
+
 	go q.runInstrumentation(ctx)
 
 	// start execution and shadow scan concurrently
@@ -383,6 +387,64 @@ func (q *queue) runScavenger(ctx context.Context) {
 			}
 			q.scavengerLeaseID = leaseID
 			q.scavengerLeaseLock.Unlock()
+		}
+	}
+}
+
+func (q *queue) runActiveChecker(ctx context.Context) {
+	// Attempt to claim the lease immediately.
+	leaseID, err := q.ConfigLease(ctx, q.primaryQueueShard.RedisClient.kg.ActiveChecker(), ConfigLeaseDuration, q.activeCheckerLease())
+	if err != ErrConfigAlreadyLeased && err != nil {
+		q.quit <- err
+		return
+	}
+
+	q.activeCheckerLeaseLock.Lock()
+	q.activeCheckerLeaseID = leaseID // no-op if not leased
+	q.activeCheckerLeaseLock.Unlock()
+
+	tick := q.clock.NewTicker(ConfigLeaseDuration / 3)
+	checkTick := q.clock.NewTicker(30 * time.Second)
+
+	for {
+		select {
+		case <-ctx.Done():
+			tick.Stop()
+			checkTick.Stop()
+			return
+		case <-checkTick.Chan():
+			// Active check backlogs
+			if q.isActiveChecker() {
+				count, err := q.ActiveCheck(ctx)
+				if err != nil {
+					q.log.Error("error checking active jobs", "error", err)
+				}
+				if count > 0 {
+					q.log.Trace("checked active jobs", "len", count)
+				}
+			}
+		case <-tick.Chan():
+			// Attempt to re-lease the lock.
+			leaseID, err := q.ConfigLease(ctx, q.primaryQueueShard.RedisClient.kg.ActiveChecker(), ConfigLeaseDuration, q.activeCheckerLease())
+			if err == ErrConfigAlreadyLeased {
+				// This is expected; every time there is > 1 runner listening to the
+				// queue there will be contention.
+				q.activeCheckerLeaseLock.Lock()
+				q.activeCheckerLeaseID = nil
+				q.activeCheckerLeaseLock.Unlock()
+				continue
+			}
+			if err != nil {
+				q.log.Error("error claiming active checker lease", "error", err)
+				q.activeCheckerLeaseLock.Lock()
+				q.activeCheckerLeaseID = nil
+				q.activeCheckerLeaseLock.Unlock()
+				continue
+			}
+
+			q.activeCheckerLeaseLock.Lock()
+			q.activeCheckerLeaseID = leaseID
+			q.activeCheckerLeaseLock.Unlock()
 		}
 	}
 }
@@ -1219,6 +1281,16 @@ func (q *queue) scavengerLease() *ulid.ULID {
 	return &copied
 }
 
+func (q *queue) activeCheckerLease() *ulid.ULID {
+	q.activeCheckerLeaseLock.RLock()
+	defer q.activeCheckerLeaseLock.RUnlock()
+	if q.activeCheckerLeaseID == nil {
+		return nil
+	}
+	copied := *q.activeCheckerLeaseID
+	return &copied
+}
+
 func (q *queue) capacity() int64 {
 	return int64(q.numWorkers) - atomic.LoadInt64(&q.sem.counter)
 }
@@ -1321,6 +1393,14 @@ func (q *queue) isSequential() bool {
 
 func (q *queue) isScavenger() bool {
 	l := q.scavengerLease()
+	if l == nil {
+		return false
+	}
+	return ulid.Time(l.Time()).After(q.clock.Now())
+}
+
+func (q *queue) isActiveChecker() bool {
+	l := q.activeCheckerLease()
 	if l == nil {
 		return false
 	}

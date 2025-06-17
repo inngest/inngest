@@ -768,17 +768,7 @@ func (q *queue) ShadowPartitionPeek(ctx context.Context, sp *QueueShadowPartitio
 		maker: func() *QueueBacklog {
 			return &QueueBacklog{}
 		},
-		handleMissingItems: func(pointers []string) error {
-			err := rc.Client().Do(ctx, rc.Client().B().Zrem().Key(shadowPartitionSet).Member(pointers...).Build()).Error()
-			if err != nil {
-				q.log.Warn("failed to clean up dangling backlogs from shard partition",
-					"missing", pointers,
-					"sp", sp,
-				)
-			}
-
-			return nil
-		},
+		handleMissingItems:     CleanupMissingPointers(ctx, shadowPartitionSet, rc.Client(), q.log.With("sp", sp)),
 		isMillisecondPrecision: true,
 	}
 

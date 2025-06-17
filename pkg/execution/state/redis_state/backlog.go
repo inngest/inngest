@@ -3,6 +3,7 @@ package redis_state
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"time"
 
 	"github.com/google/uuid"
@@ -721,6 +722,9 @@ func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueSha
 		sp.activeRunKey(kg),          // Set for active runs in partition
 		b.customKeyActiveRuns(kg, 1), // Set for active runs with custom concurrency key 1
 		b.customKeyActiveRuns(kg, 2), // Set for active runs with custom concurrency key 2
+
+		kg.PartitionActiveCheckSet(),
+		kg.PartitionActiveCheckCooldown(sp.PartitionID),
 	}
 
 	enableKeyQueuesVal := "0"
@@ -728,6 +732,9 @@ func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueSha
 	if sp.keyQueuesEnabled(ctx, q) {
 		enableKeyQueuesVal = "1"
 	}
+
+	// Enable conditional spot checking (probability in queue settings + feature flag)
+	shouldSpotCheckActiveSet := q.enableActiveSpotChecks(ctx, accountID) && rand.Intn(100) <= q.runMode.ActiveCheckerSpotCheckProbability
 
 	args, err := StrSlice([]any{
 		b.BacklogID,
@@ -749,6 +756,7 @@ func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueSha
 
 		kg.QueuePrefix(),
 		enableKeyQueuesVal,
+		shouldSpotCheckActiveSet,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("could not serialize args: %w", err)
