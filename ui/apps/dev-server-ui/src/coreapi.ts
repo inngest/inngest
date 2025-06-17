@@ -516,6 +516,7 @@ export const GET_TRACE_RESULT = gql`
         message
         name
         stack
+        cause
       }
     }
   }

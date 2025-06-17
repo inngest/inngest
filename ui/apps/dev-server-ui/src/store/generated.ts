@@ -747,6 +747,7 @@ export type SleepStepInfo = {
 
 export type StepError = {
   __typename?: 'StepError';
+  cause: Maybe<Scalars['String']>;
   message: Scalars['String'];
   name: Maybe<Scalars['String']>;
   stack: Maybe<Scalars['String']>;
@@ -1015,7 +1016,7 @@ export type GetTraceResultQueryVariables = Exact<{
 }>;
 
 
-export type GetTraceResultQuery = { __typename?: 'Query', runTraceSpanOutputByID: { __typename?: 'RunTraceSpanOutput', input: any | null, data: any | null, error: { __typename?: 'StepError', message: string, name: string | null, stack: string | null } | null } };
+export type GetTraceResultQuery = { __typename?: 'Query', runTraceSpanOutputByID: { __typename?: 'RunTraceSpanOutput', input: any | null, data: any | null, error: { __typename?: 'StepError', message: string, name: string | null, stack: string | null, cause: string | null } | null } };
 
 export type GetTriggerQueryVariables = Exact<{
   runID: Scalars['String'];
@@ -1519,6 +1520,7 @@ export const GetTraceResultDocument = `
       message
       name
       stack
+      cause
     }
   }
 }
