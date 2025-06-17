@@ -2,18 +2,22 @@
 
 import { useEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useClerk, useSignIn } from '@clerk/nextjs';
+import { useAuth, useClerk, useSignIn } from '@clerk/nextjs';
+
+import LoadingIcon from '@/icons/LoadingIcon';
+import { generateActorToken } from './action';
 
 export default function ImpersonateUsers() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const actorToken = searchParams.get('actor_token');
+  const userId = searchParams.get('user_id');
+  const auth = useAuth();
 
   const { isLoaded, signIn } = useSignIn();
   const { setActive } = useClerk();
 
   useEffect(() => {
-    if (!actorToken) {
+    if (!auth.userId || !userId) {
       router.push('/');
       return;
     }
@@ -22,9 +26,14 @@ export default function ImpersonateUsers() {
 
     const performImpersonation = async () => {
       try {
+        const res = await generateActorToken(auth.userId, userId);
+        if (!res.ok) {
+          console.log('Error retrieving token', res.error);
+          return;
+        }
         const { createdSessionId } = await signIn.create({
           strategy: 'ticket',
-          ticket: actorToken,
+          ticket: res.token,
         });
 
         await setActive({ session: createdSessionId });
@@ -36,15 +45,24 @@ export default function ImpersonateUsers() {
     };
 
     performImpersonation();
-  }, [actorToken, isLoaded, signIn, setActive, router]);
+  }, [userId, isLoaded, signIn, setActive, router, auth.userId]);
 
-  if (!actorToken) {
+  if (!userId) {
     return null;
   }
 
   if (!isLoaded) {
-    return <div>Loading...</div>;
+    return (
+      <div className="flex h-full w-full items-center justify-center">
+        <LoadingIcon />
+      </div>
+    );
   }
 
-  return <div>Signing you in...</div>;
+  return (
+    <div className="flex h-full w-full items-center justify-center gap-2">
+      <LoadingIcon />
+      <span>Signing you in...</span>
+    </div>
+  );
 }
