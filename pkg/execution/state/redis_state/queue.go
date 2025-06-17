@@ -717,6 +717,12 @@ func WithQueueShardClients(queueShards map[string]QueueShard) QueueOpt {
 	}
 }
 
+func WithEnableJobPromotion(enable bool) QueueOpt {
+	return func(q *queue) {
+		q.enableJobPromotion = enable
+	}
+}
+
 type queue struct {
 	// name is the identifiable name for this worker, for logging.
 	name string
@@ -865,6 +871,8 @@ type queue struct {
 	// activeCheckerLeaseLock ensures that there are no data races writing to
 	// or reading from activeCheckerLeaseID in parallel.
 	activeCheckerLeaseLock *sync.RWMutex
+
+	enableJobPromotion bool
 }
 
 type QueueRunMode struct {
@@ -1155,6 +1163,8 @@ func (q *queue) ItemPartition(ctx context.Context, shard QueueShard, i osqueue.Q
 			// partition, as it is used for conditional checks in Lua
 			ID:        *queueName,
 			QueueName: queueName,
+
+			AccountID: i.Data.Identifier.AccountID,
 		}
 		// Fetch most recent system concurrency limit
 		systemLimits := q.systemConcurrencyLimitGetter(ctx, systemPartition)
@@ -1325,13 +1335,13 @@ func (q *queue) EnqueueItem(ctx context.Context, shard QueueShard, i osqueue.Que
 
 	isSystemPartition := defaultPartition.IsSystem()
 
-	if i.Data.Identifier.AccountID == uuid.Nil && !isSystemPartition {
+	if defaultPartition.AccountID == uuid.Nil && !isSystemPartition {
 		q.log.Warn("attempting to enqueue item to non-system partition without account ID", "item", i)
 	}
 
 	enqueueToBacklogs := isSystemPartition && q.enqueueSystemQueuesToBacklog
-	if !isSystemPartition && i.Data.Identifier.AccountID != uuid.Nil && q.allowKeyQueues != nil {
-		enqueueToBacklogs = q.allowKeyQueues(ctx, i.Data.Identifier.AccountID)
+	if !isSystemPartition && defaultPartition.AccountID != uuid.Nil && q.allowKeyQueues != nil {
+		enqueueToBacklogs = q.allowKeyQueues(ctx, defaultPartition.AccountID)
 	}
 
 	var backlog QueueBacklog
@@ -1346,7 +1356,7 @@ func (q *queue) EnqueueItem(ctx context.Context, shard QueueShard, i osqueue.Que
 		kg.PartitionItem(),        // Partition item, map
 		kg.GlobalPartitionIndex(), // Global partition queue
 		kg.GlobalAccountIndex(),
-		kg.AccountPartitionIndex(i.Data.Identifier.AccountID), // new queue items always contain the account ID
+		kg.AccountPartitionIndex(defaultPartition.AccountID), // new queue items always contain the account ID
 		kg.Idempotency(i.ID),
 		kg.FnMetadata(i.FunctionID),
 
@@ -1360,12 +1370,12 @@ func (q *queue) EnqueueItem(ctx context.Context, shard QueueShard, i osqueue.Que
 		kg.ShadowPartitionSet(shadowPartition.PartitionID),
 		kg.ShadowPartitionMeta(),
 		kg.GlobalAccountShadowPartitions(),
-		kg.AccountShadowPartitions(i.Data.Identifier.AccountID), // will be empty for system queues
+		kg.AccountShadowPartitions(defaultPartition.AccountID), // will be empty for system queues
 
 		// Key queue Normalization
 		kg.BacklogSet(opts.NormalizeFromBacklogID),
 		kg.PartitionNormalizeSet(shadowPartition.PartitionID),
-		kg.AccountNormalizeSet(i.Data.Identifier.AccountID),
+		kg.AccountNormalizeSet(defaultPartition.AccountID),
 		kg.GlobalAccountNormalizeSet(),
 
 		// Singletons
@@ -1398,7 +1408,7 @@ func (q *queue) EnqueueItem(ctx context.Context, shard QueueShard, i osqueue.Que
 		},
 		defaultPartition,
 		defaultPartition.ID,
-		i.Data.Identifier.AccountID.String(),
+		defaultPartition.AccountID.String(),
 		i.Data.Identifier.RunID.String(),
 
 		enqueueToBacklogsVal,
@@ -2199,7 +2209,7 @@ func (q *queue) RequeueByJobID(ctx context.Context, queueShard QueueShard, jobID
 		queueShard.RedisClient.kg.PartitionItem(), // Partition item, map
 		queueShard.RedisClient.kg.GlobalPartitionIndex(),
 		queueShard.RedisClient.kg.GlobalAccountIndex(),
-		queueShard.RedisClient.kg.AccountPartitionIndex(i.Data.Identifier.AccountID),
+		queueShard.RedisClient.kg.AccountPartitionIndex(fnPartition.AccountID),
 
 		fnPartition.zsetKey(queueShard.RedisClient.kg),
 	}
@@ -2210,7 +2220,7 @@ func (q *queue) RequeueByJobID(ctx context.Context, queueShard QueueShard, jobID
 		strconv.Itoa(int(now.UnixMilli())),
 		fnPartition,
 		fnPartition.ID,
-		i.Data.Identifier.AccountID.String(),
+		fnPartition.AccountID.String(),
 	})
 	if err != nil {
 		return err
@@ -2337,6 +2347,8 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 		checkConstraintsVal = "1"
 	}
 
+	accountID := partition.GetAccountID()
+
 	keys := []string{
 		kg.QueueItem(),
 		kg.ConcurrencyIndex(),
@@ -2374,7 +2386,7 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 	args, err := StrSlice([]any{
 		item.ID,
 		partition.PartitionID,
-		item.Data.Identifier.AccountID,
+		accountID,
 		item.Data.Identifier.RunID.String(),
 
 		leaseID.String(),
@@ -2467,7 +2479,7 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 	case -5:
 		return nil, newKeyError(ErrConcurrencyLimitCustomKey, backlog.customConcurrencyKeyID(2))
 	case -6:
-		return nil, newKeyError(ErrAccountConcurrencyLimit, item.Data.Identifier.AccountID.String())
+		return nil, newKeyError(ErrAccountConcurrencyLimit, accountID.String())
 	case -7:
 		if item.Data.Throttle == nil {
 			// This should never happen, as the throttle key is nil.
@@ -2559,6 +2571,7 @@ func (q *queue) Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 
 	partition := q.ItemShadowPartition(ctx, i)
 	backlog := q.ItemBacklog(ctx, i)
+	accountID := partition.GetAccountID()
 
 	keys := []string{
 		kg.QueueItem(),
@@ -2569,13 +2582,13 @@ func (q *queue) Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		partition.readyQueueKey(kg),
 		kg.GlobalPartitionIndex(),
 		kg.GlobalAccountIndex(),
-		kg.AccountPartitionIndex(i.Data.Identifier.AccountID),
+		kg.AccountPartitionIndex(accountID),
 
 		kg.BacklogSet(backlog.BacklogID),
 		kg.ShadowPartitionSet(partition.PartitionID),
 		kg.GlobalShadowPartitionSet(),
 		kg.GlobalAccountShadowPartitions(),
-		kg.AccountShadowPartitions(i.Data.Identifier.AccountID),
+		kg.AccountShadowPartitions(accountID),
 
 		// In progress keys
 		partition.accountInProgressKey(kg),
@@ -2619,7 +2632,7 @@ func (q *queue) Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		i.ID,
 		partition.PartitionID,
 		backlog.BacklogID,
-		i.Data.Identifier.AccountID.String(),
+		accountID.String(),
 		i.Data.Identifier.RunID.String(),
 
 		int(idempotency.Seconds()),
@@ -2688,6 +2701,7 @@ func (q *queue) Requeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 
 	fnPartition, _ := q.ItemPartition(ctx, queueShard, i)
 	shadowPartition := q.ItemShadowPartition(ctx, i)
+	accountID := shadowPartition.GetAccountID()
 
 	requeueToBacklog := q.itemEnableKeyQueues(ctx, i)
 
@@ -2729,7 +2743,7 @@ func (q *queue) Requeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 
 		kg.GlobalPartitionIndex(),
 		kg.GlobalAccountIndex(),
-		kg.AccountPartitionIndex(i.Data.Identifier.AccountID),
+		kg.AccountPartitionIndex(accountID),
 
 		shadowPartition.readyQueueKey(kg),
 
@@ -2760,7 +2774,7 @@ func (q *queue) Requeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		kg.ShadowPartitionSet(shadowPartition.PartitionID),
 		kg.ShadowPartitionMeta(),
 		kg.GlobalAccountShadowPartitions(),
-		kg.AccountShadowPartitions(i.Data.Identifier.AccountID), // empty for system partitions
+		kg.AccountShadowPartitions(accountID), // empty for system partitions
 	}
 	// Append indexes
 	for _, idx := range q.itemIndexer(ctx, i, queueShard.RedisClient.kg) {
@@ -2774,7 +2788,7 @@ func (q *queue) Requeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		i,
 		at.UnixMilli(),
 
-		i.Data.Identifier.AccountID.String(),
+		accountID.String(),
 		i.Data.Identifier.RunID.String(),
 		fnPartition.ID,
 		fnPartition,
