@@ -41,12 +41,12 @@ local disableLeaseChecks = tonumber(ARGV[9])
 
 local existing = get_partition_item(keyPartitionMap, partitionID)
 if existing == nil or existing == false then
-    return { -4 }
+    return { -3 }
 end
 
 -- Check for an existing lease.
 if existing.leaseID ~= nil and existing.leaseID ~= cjson.null and decode_ulid_time(existing.leaseID) > currentTime then
-    return { -5 }
+    return { -4 }
 end
 
 -- Check whether the partition is currently paused.
@@ -54,7 +54,7 @@ end
 if existing.wid ~= nil and existing.wid ~= cjson.null then
     local fnMeta = get_fn_meta(keyFnMeta)
     if fnMeta ~= nil and fnMeta.off then
-        return {  -6 }
+        return { -5 }
     end
 end
 
