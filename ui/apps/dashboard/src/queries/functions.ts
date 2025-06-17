@@ -66,7 +66,9 @@ const GetFunctionsDocument = graphql(`
           totalPages
         }
         data {
-          appName
+          app {
+            name
+          }
           id
           slug
           name
@@ -159,7 +161,9 @@ const GetFunctionDocument = graphql(`
         slug
         isPaused
         isArchived
-        appName
+        app {
+          name
+        }
         current {
           triggers {
             eventName
