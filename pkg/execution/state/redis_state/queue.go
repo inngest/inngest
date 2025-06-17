@@ -562,6 +562,14 @@ func WithRefreshItemThrottle(fn RefreshItemThrottleFn) QueueOpt {
 	}
 }
 
+type EnableActiveSpotChecks func(ctx context.Context, acctID uuid.UUID) bool
+
+func WithEnableActiveSpotChecks(fn EnableActiveSpotChecks) QueueOpt {
+	return func(q *queue) {
+		q.enableActiveSpotChecks = fn
+	}
+}
+
 func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 	ctx := context.Background()
 
@@ -673,6 +681,9 @@ func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 		refreshItemThrottle: func(ctx context.Context, item *osqueue.QueueItem) (*osqueue.Throttle, error) {
 			return nil, nil
 		},
+		enableActiveSpotChecks: func(ctx context.Context, acctID uuid.UUID) bool {
+			return false
+		},
 	}
 
 	// default to using primary queue client for shard selection
@@ -719,6 +730,7 @@ type queue struct {
 	allowKeyQueues                  AllowKeyQueues
 	enqueueSystemQueuesToBacklog    bool
 	partitionConstraintConfigGetter PartitionConstraintConfigGetter
+	enableActiveSpotChecks          EnableActiveSpotChecks
 
 	disableLeaseChecks                DisableLeaseChecks
 	disableLeaseChecksForSystemQueues bool
@@ -883,6 +895,9 @@ type QueueRunMode struct {
 
 	// ActiveChecker enables background checking of active sets.
 	ActiveChecker bool
+
+	// ActiveCheckerSpotCheckProbability determines the weight of running spot checks on active sets when encountering concurrencity limits between 0 and 100 where 100 means always check.
+	ActiveCheckerSpotCheckProbability int
 }
 
 // continuation represents a partition continuation, forcung the queue to continue working

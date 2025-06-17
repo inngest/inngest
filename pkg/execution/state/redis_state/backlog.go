@@ -3,6 +3,7 @@ package redis_state
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"time"
 
 	"github.com/google/uuid"
@@ -732,8 +733,8 @@ func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueSha
 		enableKeyQueuesVal = "1"
 	}
 
-	// TODO introduce conditional spot checking (probability in queue settings, feature flag, etc.)
-	shouldSpotCheckActiveSet := q.allowKeyQueues "1"
+	// Enable conditional spot checking (probability in queue settings + feature flag)
+	shouldSpotCheckActiveSet := q.enableActiveSpotChecks(ctx, accountID) && rand.Intn(100) <= q.runMode.ActiveCheckerSpotCheckProbability
 
 	args, err := StrSlice([]any{
 		b.BacklogID,
