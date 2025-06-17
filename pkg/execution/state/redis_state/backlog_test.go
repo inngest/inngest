@@ -29,26 +29,6 @@ func TestQueueItemBacklogs(t *testing.T) {
 
 	q := NewQueue(
 		QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName},
-		WithConcurrencyLimitGetter(func(ctx context.Context, p QueuePartition) PartitionConcurrencyLimits {
-			return PartitionConcurrencyLimits{
-				AccountLimit:   100,
-				FunctionLimit:  25,
-				CustomKeyLimit: 0, // this is just used for PartitionLease on key queues v1
-			}
-		}),
-		WithCustomConcurrencyKeyLimitRefresher(func(ctx context.Context, i osqueue.QueueItem) []state.CustomConcurrency {
-			// Pretend current keys are latest version
-			return i.Data.GetConcurrencyKeys()
-		}),
-		WithSystemConcurrencyLimitGetter(func(ctx context.Context, p QueuePartition) SystemPartitionConcurrencyLimits {
-			return SystemPartitionConcurrencyLimits{
-				// this is used by the old system as "account concurrency" for system queues -- bounding the entirety of system queue concurrency
-				GlobalLimit: 0,
-
-				// this is used to enforce concurrency limits on individual system queues
-				PartitionLimit: 250,
-			}
-		}),
 	)
 	ctx := context.Background()
 
@@ -672,26 +652,6 @@ func TestQueueItemShadowPartition(t *testing.T) {
 
 	q := NewQueue(
 		QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName},
-		WithConcurrencyLimitGetter(func(ctx context.Context, p QueuePartition) PartitionConcurrencyLimits {
-			return PartitionConcurrencyLimits{
-				AccountLimit:   100,
-				FunctionLimit:  25,
-				CustomKeyLimit: 0, // this is just used for PartitionLease on key queues v1
-			}
-		}),
-		WithCustomConcurrencyKeyLimitRefresher(func(ctx context.Context, i osqueue.QueueItem) []state.CustomConcurrency {
-			// Pretend current keys are latest version
-			return i.Data.GetConcurrencyKeys()
-		}),
-		WithSystemConcurrencyLimitGetter(func(ctx context.Context, p QueuePartition) SystemPartitionConcurrencyLimits {
-			return SystemPartitionConcurrencyLimits{
-				// this is used by the old system as "account concurrency" for system queues -- bounding the entirety of system queue concurrency
-				GlobalLimit: 0,
-
-				// this is used to enforce concurrency limits on individual system queues
-				PartitionLimit: 250,
-			}
-		}),
 	)
 	ctx := context.Background()
 
@@ -704,15 +664,8 @@ func TestQueueItemShadowPartition(t *testing.T) {
 			EnvID:           &wsID,
 			AccountID:       &accID,
 			SystemQueueName: nil,
-			Concurrency: ShadowPartitionConcurrency{
-				SystemConcurrency:     0,
-				AccountConcurrency:    100,
-				FunctionConcurrency:   25,
-				CustomConcurrencyKeys: nil,
-			},
-			Throttle:     nil,
-			PauseRefill:  false,
-			PauseEnqueue: false,
+			PauseRefill:     false,
+			PauseEnqueue:    false,
 		}
 
 		shadowPart := q.ItemShadowPartition(ctx, osqueue.QueueItem{
@@ -750,15 +703,8 @@ func TestQueueItemShadowPartition(t *testing.T) {
 			EnvID:           nil,
 			AccountID:       nil,
 			SystemQueueName: &sysQueueName,
-			Concurrency: ShadowPartitionConcurrency{
-				SystemConcurrency:     250,
-				AccountConcurrency:    0,
-				FunctionConcurrency:   0,
-				CustomConcurrencyKeys: nil,
-			},
-			Throttle:     nil,
-			PauseRefill:  false,
-			PauseEnqueue: false,
+			PauseRefill:     false,
+			PauseEnqueue:    false,
 		}
 
 		shadowPart := q.ItemShadowPartition(ctx, osqueue.QueueItem{
@@ -793,20 +739,8 @@ func TestQueueItemShadowPartition(t *testing.T) {
 			EnvID:           &wsID,
 			AccountID:       &accID,
 			SystemQueueName: nil,
-			Concurrency: ShadowPartitionConcurrency{
-				SystemConcurrency:     0,
-				AccountConcurrency:    100,
-				FunctionConcurrency:   25,
-				CustomConcurrencyKeys: nil,
-			},
-			Throttle: &ShadowPartitionThrottle{
-				ThrottleKeyExpressionHash: hashedThrottleKeyExpr,
-				Limit:                     70,
-				Burst:                     20,
-				Period:                    600,
-			},
-			PauseRefill:  false,
-			PauseEnqueue: false,
+			PauseRefill:     false,
+			PauseEnqueue:    false,
 		}
 
 		shadowPart := q.ItemShadowPartition(ctx, osqueue.QueueItem{
@@ -852,21 +786,8 @@ func TestQueueItemShadowPartition(t *testing.T) {
 			EnvID:           &wsID,
 			AccountID:       &accID,
 			SystemQueueName: nil,
-			Concurrency: ShadowPartitionConcurrency{
-				SystemConcurrency:   0,
-				AccountConcurrency:  100,
-				FunctionConcurrency: 25,
-				CustomConcurrencyKeys: []CustomConcurrencyLimit{
-					{
-						Scope:               enums.ConcurrencyScopeFn,
-						HashedKeyExpression: hashedConcurrencyKeyExpr,
-						Limit:               23,
-					},
-				},
-			},
-			Throttle:     nil,
-			PauseRefill:  false,
-			PauseEnqueue: false,
+			PauseRefill:     false,
+			PauseEnqueue:    false,
 		}
 
 		shadowPart := q.ItemShadowPartition(ctx, osqueue.QueueItem{
@@ -919,26 +840,8 @@ func TestQueueItemShadowPartition(t *testing.T) {
 			EnvID:           &wsID,
 			AccountID:       &accID,
 			SystemQueueName: nil,
-			Concurrency: ShadowPartitionConcurrency{
-				SystemConcurrency:   0,
-				AccountConcurrency:  100,
-				FunctionConcurrency: 25,
-				CustomConcurrencyKeys: []CustomConcurrencyLimit{
-					{
-						Scope:               enums.ConcurrencyScopeFn,
-						HashedKeyExpression: hashedConcurrencyKeyExpr,
-						Limit:               23,
-					},
-				},
-			},
-			Throttle: &ShadowPartitionThrottle{
-				ThrottleKeyExpressionHash: hashedThrottleKeyExpr,
-				Limit:                     70,
-				Burst:                     20,
-				Period:                    600,
-			},
-			PauseRefill:  false,
-			PauseEnqueue: false,
+			PauseRefill:     false,
+			PauseEnqueue:    false,
 		}
 
 		shadowPart := q.ItemShadowPartition(ctx, osqueue.QueueItem{
@@ -992,7 +895,7 @@ func TestBacklogIsOutdated(t *testing.T) {
 	t.Run("same config should not be marked as outdated", func(t *testing.T) {
 		keyHash := util.XXHash("event.data.customerID")
 
-		concurrency := ShadowPartitionConcurrency{
+		concurrency := PartitionConcurrency{
 			CustomConcurrencyKeys: []CustomConcurrencyLimit{
 				{
 					Scope:               enums.ConcurrencyScopeFn,
@@ -1027,7 +930,7 @@ func TestBacklogIsOutdated(t *testing.T) {
 		keyHash := util.XXHash("event.data.customerID")
 
 		constraints := &PartitionConstraintConfig{
-			Concurrency: ShadowPartitionConcurrency{
+			Concurrency: PartitionConcurrency{
 				CustomConcurrencyKeys: []CustomConcurrencyLimit{
 					{
 						Scope:               enums.ConcurrencyScopeFn,
@@ -1047,7 +950,7 @@ func TestBacklogIsOutdated(t *testing.T) {
 		keyHashNew := util.XXHash("event.data.orgID")
 
 		constraints := &PartitionConstraintConfig{
-			Concurrency: ShadowPartitionConcurrency{
+			Concurrency: PartitionConcurrency{
 				CustomConcurrencyKeys: []CustomConcurrencyLimit{
 					{
 						Scope:               enums.ConcurrencyScopeFn,
@@ -1076,7 +979,7 @@ func TestBacklogIsOutdated(t *testing.T) {
 		keyHashOld := util.XXHash("event.data.customerID")
 
 		constraints := &PartitionConstraintConfig{
-			Concurrency: ShadowPartitionConcurrency{
+			Concurrency: PartitionConcurrency{
 				CustomConcurrencyKeys: nil,
 			},
 		}
@@ -1100,7 +1003,7 @@ func TestBacklogIsOutdated(t *testing.T) {
 		keyHashNew := util.XXHash("event.data.orgID")
 
 		constraints := &PartitionConstraintConfig{
-			Throttle: &ShadowPartitionThrottle{
+			Throttle: &PartitionThrottle{
 				ThrottleKeyExpressionHash: keyHashNew,
 			},
 		}
@@ -1117,7 +1020,7 @@ func TestBacklogIsOutdated(t *testing.T) {
 		keyHash := util.XXHash("event.data.orgID")
 
 		constraints := &PartitionConstraintConfig{
-			Throttle: &ShadowPartitionThrottle{
+			Throttle: &PartitionThrottle{
 				ThrottleKeyExpressionHash: keyHash,
 			},
 		}

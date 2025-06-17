@@ -4,12 +4,12 @@ import (
 	"context"
 	"fmt"
 	"math/rand"
+	"runtime/debug"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
-	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 	"github.com/inngest/inngest/pkg/util"
@@ -26,10 +26,10 @@ var (
 )
 
 type PartitionConstraintConfig struct {
-	Concurrency ShadowPartitionConcurrency `json:"c,omitempty,omitzero"`
+	Concurrency PartitionConcurrency `json:"c,omitempty,omitzero"`
 
 	// Throttle configuration, optionally specifying key. If no key is set, the throttle value will be the function ID.
-	Throttle *ShadowPartitionThrottle `json:"t,omitempty,omitzero"`
+	Throttle *PartitionThrottle `json:"t,omitempty,omitzero"`
 }
 
 type CustomConcurrencyLimit struct {
@@ -39,7 +39,7 @@ type CustomConcurrencyLimit struct {
 	Limit               int                    `json:"l"`
 }
 
-type ShadowPartitionThrottle struct {
+type PartitionThrottle struct {
 	// ThrottleKeyExpressionHash is the hashed throttle key expression, if set.
 	ThrottleKeyExpressionHash string `json:"tkh,omitempty"`
 
@@ -51,7 +51,7 @@ type ShadowPartitionThrottle struct {
 	Period int `json:"p"`
 }
 
-type ShadowPartitionConcurrency struct {
+type PartitionConcurrency struct {
 	// SystemConcurrency represents the concurrency limit to apply to system queues. Unset on regular function partitions.
 	SystemConcurrency int `json:"sc,omitempty"`
 
@@ -77,12 +77,6 @@ type QueueShadowPartition struct {
 	// ID is the same as the partition ID used across the queue.
 	PartitionID string `json:"id,omitempty"`
 
-	// FunctionVersion represents the current function version represented by this shadow partition.
-	// Whenever a newer function version is enqueued, the concurrency keys and limits in here will be adjusted
-	// accordingly as part of enqueue_to_backlog().
-	// System queues do not have function versions.
-	FunctionVersion int `json:"fv"`
-
 	// LeaseID represents a lease on this shadow partition.  If the LeaseID is not nil,
 	// this partition can be claimed by a shared-nothing refill worker to work on the
 	// backlogs within this shadow partition.
@@ -92,11 +86,6 @@ type QueueShadowPartition struct {
 	EnvID           *uuid.UUID `json:"eid,omitempty"`
 	AccountID       *uuid.UUID `json:"aid,omitempty"`
 	SystemQueueName *string    `json:"queueName,omitempty"`
-
-	Concurrency ShadowPartitionConcurrency `json:"c,omitempty,omitzero"`
-
-	// Throttle configuration, optionally specifying key. If no key is set, the throttle value will be the function ID.
-	Throttle *ShadowPartitionThrottle `json:"t,omitempty,omitzero"`
 
 	// Flag to pause refilling to the ready queue.
 	PauseRefill bool `json:"norefill,omitempty"`
@@ -132,17 +121,6 @@ func (sp QueueShadowPartition) keyQueuesEnabled(ctx context.Context, q *queue) b
 	return q.allowKeyQueues(ctx, *sp.AccountID)
 }
 
-// CustomConcurrencyLimit returns concurrency limit for custom concurrency key in position n (0, if not set)
-func (sp *QueueShadowPartition) CustomConcurrencyLimit(n int) int {
-	if n < 0 || n > len(sp.Concurrency.CustomConcurrencyKeys) {
-		return 0
-	}
-
-	key := sp.Concurrency.CustomConcurrencyKeys[n-1]
-
-	return key.Limit
-}
-
 func (q *PartitionConstraintConfig) CustomConcurrencyLimit(n int) int {
 	if n < 0 || n > len(q.Concurrency.CustomConcurrencyKeys) {
 		return 0
@@ -151,23 +129,6 @@ func (q *PartitionConstraintConfig) CustomConcurrencyLimit(n int) int {
 	key := q.Concurrency.CustomConcurrencyKeys[n-1]
 
 	return key.Limit
-}
-
-func (sp QueueShadowPartition) CustomConcurrencyKey(kg QueueKeyGenerator, b *QueueBacklog, n int) (string, int) {
-	if n < 0 || n > len(b.ConcurrencyKeys) {
-		return kg.Concurrency("", ""), 0
-	}
-
-	backlogKey := b.ConcurrencyKeys[n-1]
-
-	for _, key := range sp.Concurrency.CustomConcurrencyKeys {
-		if key.Scope == backlogKey.Scope && key.HashedKeyExpression == backlogKey.HashedKeyExpression {
-			// Return concrete key with latest limit from shadow partition
-			return backlogKey.concurrencyKey(kg), key.Limit
-		}
-	}
-
-	return kg.Concurrency("", ""), 0
 }
 
 // accountInProgressKey returns the key storing the in progress set for the shadow partition's account
@@ -370,10 +331,6 @@ func (q *queue) ItemBacklog(ctx context.Context, i osqueue.QueueItem) QueueBackl
 }
 
 func (q *queue) ItemShadowPartition(ctx context.Context, i osqueue.QueueItem) QueueShadowPartition {
-	var (
-		ckeys = i.Data.GetConcurrencyKeys()
-	)
-
 	queueName := i.QueueName
 
 	// sanity check: both QueueNames should be set, but sometimes aren't
@@ -389,112 +346,31 @@ func (q *queue) ItemShadowPartition(ctx context.Context, i osqueue.QueueItem) Qu
 
 	// The only case when we manually set a queueName is for system partitions
 	if queueName != nil {
-		systemPartition := QueuePartition{
-			// NOTE: Never remove this. The ID is required to enqueue items to the
-			// partition, as it is used for conditional checks in Lua
-			ID:        *queueName,
-			QueueName: queueName,
-		}
-		// Fetch most recent system concurrency limit
-		systemLimits := q.systemConcurrencyLimitGetter(ctx, systemPartition)
-		systemPartition.ConcurrencyLimit = systemLimits.PartitionLimit
-
 		return QueueShadowPartition{
 			PartitionID:     *queueName,
 			SystemQueueName: queueName,
-			Concurrency: ShadowPartitionConcurrency{
-				SystemConcurrency: systemLimits.PartitionLimit,
-			},
 		}
 	}
 
-	if i.FunctionID == uuid.Nil {
-		q.log.Error("unexpected missing functionID in ItemPartitions()", "item", i)
+	fnID := i.FunctionID
+	if fnID == uuid.Nil {
+		stack := string(debug.Stack())
+		q.log.Error("unexpected missing functionID in ItemShadowPartition call", "item", i, "stack", stack)
 	}
 
-	// NOTE: This is an optimization that ensures we return *updated* concurrency keys
-	// for any recently published function configuration.  The embeddeed ckeys from the
-	// queue items above may be outdated.
-	if q.customConcurrencyLimitRefresher != nil {
-		// As an optimization, allow fetching updated concurrency limits if desired.
-		updated, _ := duration(ctx, q.primaryQueueShard.Name, "shadow_partition_custom_concurrency_refresher", q.clock.Now(), func(ctx context.Context) ([]state.CustomConcurrency, error) {
-			return q.customConcurrencyLimitRefresher(ctx, i), nil
-		})
-		for _, update := range updated {
-			// This is quadratic, but concurrency keys are limited to 2 so it's
-			// okay.
-			for n, existing := range ckeys {
-				if existing.Key == update.Key {
-					ckeys[n].Limit = update.Limit
-				}
-			}
-		}
-	}
-
-	fnPartition := QueuePartition{
-		ID:            i.FunctionID.String(),
-		PartitionType: int(enums.PartitionTypeDefault), // Function partition
-		FunctionID:    &i.FunctionID,
-		AccountID:     i.Data.Identifier.AccountID,
-	}
-
-	limits, _ := duration(ctx, q.primaryQueueShard.Name, "shadow_partition_fn_concurrency_getter", q.clock.Now(), func(ctx context.Context) (PartitionConcurrencyLimits, error) {
-		return q.concurrencyLimitGetter(ctx, fnPartition), nil
-	})
-
-	// The concurrency limit for fns MUST be added for leasing.
-	fnPartition.ConcurrencyLimit = limits.FunctionLimit
-	if fnPartition.ConcurrencyLimit <= 0 {
-		// Use account-level limits, as there are no function level limits
-		fnPartition.ConcurrencyLimit = limits.AccountLimit
-	}
-
-	var customConcurrencyKeyLimits []CustomConcurrencyLimit
-	if len(ckeys) > 0 {
-		// Up to 2 concurrency keys.
-		for _, key := range ckeys {
-			scope, _, _, _ := key.ParseKey()
-
-			customConcurrencyKeyLimits = append(customConcurrencyKeyLimits, CustomConcurrencyLimit{
-				Mode:  enums.ConcurrencyModeStep, // TODO Support run concurrency
-				Scope: scope,
-				// Key is required to look up the respective limit when checking constraints for a given backlog.
-				HashedKeyExpression: key.Hash, // hash("event.data.customerId")
-				Limit:               key.Limit,
-			})
-		}
-	}
-
-	var throttle *ShadowPartitionThrottle
-	if i.Data.Throttle != nil {
-		throttle = &ShadowPartitionThrottle{
-			ThrottleKeyExpressionHash: i.Data.Throttle.KeyExpressionHash,
-			Limit:                     i.Data.Throttle.Limit,
-			Burst:                     i.Data.Throttle.Burst,
-			Period:                    i.Data.Throttle.Period,
-		}
+	accountID := i.Data.Identifier.AccountID
+	if accountID == uuid.Nil {
+		stack := string(debug.Stack())
+		q.log.Error("unexpected missing accountID in ItemShadowPartition call", "item", i, "stack", stack)
 	}
 
 	return QueueShadowPartition{
-		PartitionID:     i.FunctionID.String(),
-		FunctionVersion: i.Data.Identifier.WorkflowVersion,
+		PartitionID: fnID.String(),
 
 		// Identifiers
-		FunctionID: &i.FunctionID,
+		FunctionID: &fnID,
 		EnvID:      &i.WorkspaceID,
-		AccountID:  &i.Data.Identifier.AccountID,
-
-		// Currently configured limits
-		Concurrency: ShadowPartitionConcurrency{
-			AccountConcurrency:    limits.AccountLimit,
-			FunctionConcurrency:   fnPartition.ConcurrencyLimit,
-			CustomConcurrencyKeys: customConcurrencyKeyLimits,
-
-			// TODO Support run concurrency
-			AccountRunConcurrency:  0,
-			FunctionRunConcurrency: 0,
-		},
-		Throttle: throttle,
+		AccountID:  &accountID,
 	}
 }
 
