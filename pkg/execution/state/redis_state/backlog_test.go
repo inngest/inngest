@@ -29,26 +29,6 @@ func TestQueueItemBacklogs(t *testing.T) {
 
 	q := NewQueue(
 		QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName},
-		WithConcurrencyLimitGetter(func(ctx context.Context, p QueuePartition) PartitionConcurrencyLimits {
-			return PartitionConcurrencyLimits{
-				AccountLimit:   100,
-				FunctionLimit:  25,
-				CustomKeyLimit: 0, // this is just used for PartitionLease on key queues v1
-			}
-		}),
-		WithCustomConcurrencyKeyLimitRefresher(func(ctx context.Context, i osqueue.QueueItem) []state.CustomConcurrency {
-			// Pretend current keys are latest version
-			return i.Data.GetConcurrencyKeys()
-		}),
-		WithSystemConcurrencyLimitGetter(func(ctx context.Context, p QueuePartition) SystemPartitionConcurrencyLimits {
-			return SystemPartitionConcurrencyLimits{
-				// this is used by the old system as "account concurrency" for system queues -- bounding the entirety of system queue concurrency
-				GlobalLimit: 0,
-
-				// this is used to enforce concurrency limits on individual system queues
-				PartitionLimit: 250,
-			}
-		}),
 	)
 	ctx := context.Background()
 
@@ -672,26 +652,6 @@ func TestQueueItemShadowPartition(t *testing.T) {
 
 	q := NewQueue(
 		QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName},
-		WithConcurrencyLimitGetter(func(ctx context.Context, p QueuePartition) PartitionConcurrencyLimits {
-			return PartitionConcurrencyLimits{
-				AccountLimit:   100,
-				FunctionLimit:  25,
-				CustomKeyLimit: 0, // this is just used for PartitionLease on key queues v1
-			}
-		}),
-		WithCustomConcurrencyKeyLimitRefresher(func(ctx context.Context, i osqueue.QueueItem) []state.CustomConcurrency {
-			// Pretend current keys are latest version
-			return i.Data.GetConcurrencyKeys()
-		}),
-		WithSystemConcurrencyLimitGetter(func(ctx context.Context, p QueuePartition) SystemPartitionConcurrencyLimits {
-			return SystemPartitionConcurrencyLimits{
-				// this is used by the old system as "account concurrency" for system queues -- bounding the entirety of system queue concurrency
-				GlobalLimit: 0,
-
-				// this is used to enforce concurrency limits on individual system queues
-				PartitionLimit: 250,
-			}
-		}),
 	)
 	ctx := context.Background()
 

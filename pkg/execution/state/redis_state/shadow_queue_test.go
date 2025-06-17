@@ -252,21 +252,14 @@ func TestQueueRefillBacklog(t *testing.T) {
 				NormalizePartition:                true,
 			}),
 			WithBacklogRefillLimit(1),
-			WithConcurrencyLimitGetter(func(ctx context.Context, p QueuePartition) PartitionConcurrencyLimits {
-				return PartitionConcurrencyLimits{
-					AccountLimit:   123,
-					FunctionLimit:  45,
-					CustomKeyLimit: 0,
-				}
-			}),
-			WithCustomConcurrencyKeyLimitRefresher(func(ctx context.Context, i osqueue.QueueItem) []state.CustomConcurrency {
-				return i.Data.GetConcurrencyKeys()
-			}),
-			WithSystemConcurrencyLimitGetter(func(ctx context.Context, p QueuePartition) SystemPartitionConcurrencyLimits {
-				return SystemPartitionConcurrencyLimits{
-					GlobalLimit:    789,
-					PartitionLimit: 678,
-				}
+			WithPartitionConstraintConfigGetter(func(ctx context.Context, p QueueShadowPartition) (*PartitionConstraintConfig, error) {
+				return &PartitionConstraintConfig{
+					Concurrency: ShadowPartitionConcurrency{
+						AccountConcurrency:  123,
+						FunctionConcurrency: 45,
+					},
+					Throttle: nil,
+				}, nil
 			}),
 		)
 
@@ -367,21 +360,14 @@ func TestQueueRefillBacklog(t *testing.T) {
 				NormalizePartition:                true,
 			}),
 			WithBacklogRefillLimit(500),
-			WithConcurrencyLimitGetter(func(ctx context.Context, p QueuePartition) PartitionConcurrencyLimits {
-				return PartitionConcurrencyLimits{
-					AccountLimit:   123,
-					FunctionLimit:  45,
-					CustomKeyLimit: 0,
-				}
-			}),
-			WithCustomConcurrencyKeyLimitRefresher(func(ctx context.Context, i osqueue.QueueItem) []state.CustomConcurrency {
-				return i.Data.GetConcurrencyKeys()
-			}),
-			WithSystemConcurrencyLimitGetter(func(ctx context.Context, p QueuePartition) SystemPartitionConcurrencyLimits {
-				return SystemPartitionConcurrencyLimits{
-					GlobalLimit:    789,
-					PartitionLimit: 678,
-				}
+			WithPartitionConstraintConfigGetter(func(ctx context.Context, p QueueShadowPartition) (*PartitionConstraintConfig, error) {
+				return &PartitionConstraintConfig{
+					Concurrency: ShadowPartitionConcurrency{
+						AccountConcurrency:  123,
+						FunctionConcurrency: 45,
+					},
+					Throttle: nil,
+				}, nil
 			}),
 		)
 
@@ -522,21 +508,14 @@ func TestQueueRefillBacklog(t *testing.T) {
 				ActiveCheckerSpotCheckProbability: 100,
 			}),
 			WithBacklogRefillLimit(500),
-			WithConcurrencyLimitGetter(func(ctx context.Context, p QueuePartition) PartitionConcurrencyLimits {
-				return PartitionConcurrencyLimits{
-					AccountLimit:   123,
-					FunctionLimit:  45,
-					CustomKeyLimit: 0,
-				}
-			}),
-			WithCustomConcurrencyKeyLimitRefresher(func(ctx context.Context, i osqueue.QueueItem) []state.CustomConcurrency {
-				return i.Data.GetConcurrencyKeys()
-			}),
-			WithSystemConcurrencyLimitGetter(func(ctx context.Context, p QueuePartition) SystemPartitionConcurrencyLimits {
-				return SystemPartitionConcurrencyLimits{
-					GlobalLimit:    789,
-					PartitionLimit: 678,
-				}
+			WithPartitionConstraintConfigGetter(func(ctx context.Context, p QueueShadowPartition) (*PartitionConstraintConfig, error) {
+				return &PartitionConstraintConfig{
+					Concurrency: ShadowPartitionConcurrency{
+						AccountConcurrency:  123,
+						FunctionConcurrency: 45,
+					},
+					Throttle: nil,
+				}, nil
 			}),
 			WithEnableActiveSpotChecks(func(ctx context.Context, acctID uuid.UUID) bool {
 				return true
@@ -1689,21 +1668,14 @@ func TestRefillConstraints(t *testing.T) {
 					NormalizePartition:                true,
 				}),
 				WithBacklogRefillLimit(int64(testCase.knobs.maxRefill)),
-				WithConcurrencyLimitGetter(func(ctx context.Context, p QueuePartition) PartitionConcurrencyLimits {
-					return PartitionConcurrencyLimits{
-						AccountLimit:   testCase.knobs.accountConcurrencyLimit,
-						FunctionLimit:  testCase.knobs.functionConcurrencyLimit,
-						CustomKeyLimit: 0,
-					}
-				}),
-				WithCustomConcurrencyKeyLimitRefresher(func(ctx context.Context, i osqueue.QueueItem) []state.CustomConcurrency {
-					return i.Data.GetConcurrencyKeys()
-				}),
-				WithSystemConcurrencyLimitGetter(func(ctx context.Context, p QueuePartition) SystemPartitionConcurrencyLimits {
-					return SystemPartitionConcurrencyLimits{
-						GlobalLimit:    789,
-						PartitionLimit: 678,
-					}
+				WithPartitionConstraintConfigGetter(func(ctx context.Context, p QueueShadowPartition) (*PartitionConstraintConfig, error) {
+					return &PartitionConstraintConfig{
+						Concurrency: ShadowPartitionConcurrency{
+							AccountConcurrency:  123,
+							FunctionConcurrency: 45,
+						},
+						Throttle: nil,
+					}, nil
 				}),
 				WithQueueLifecycles(testLifecycles),
 			)
@@ -1967,21 +1939,14 @@ func TestShadowPartitionPointerTimings(t *testing.T) {
 				NormalizePartition:                true,
 			}),
 			WithBacklogRefillLimit(500),
-			WithConcurrencyLimitGetter(func(ctx context.Context, p QueuePartition) PartitionConcurrencyLimits {
-				return PartitionConcurrencyLimits{
-					AccountLimit:   123,
-					FunctionLimit:  45,
-					CustomKeyLimit: 0,
-				}
-			}),
-			WithCustomConcurrencyKeyLimitRefresher(func(ctx context.Context, i osqueue.QueueItem) []state.CustomConcurrency {
-				return i.Data.GetConcurrencyKeys()
-			}),
-			WithSystemConcurrencyLimitGetter(func(ctx context.Context, p QueuePartition) SystemPartitionConcurrencyLimits {
-				return SystemPartitionConcurrencyLimits{
-					GlobalLimit:    789,
-					PartitionLimit: 678,
-				}
+			WithPartitionConstraintConfigGetter(func(ctx context.Context, p QueueShadowPartition) (*PartitionConstraintConfig, error) {
+				return &PartitionConstraintConfig{
+					Concurrency: ShadowPartitionConcurrency{
+						AccountConcurrency:  123,
+						FunctionConcurrency: 45,
+					},
+					Throttle: nil,
+				}, nil
 			}),
 		)
 
@@ -2115,21 +2080,14 @@ func TestShadowPartitionPointerTimings(t *testing.T) {
 				NormalizePartition:                true,
 			}),
 			WithBacklogRefillLimit(500),
-			WithConcurrencyLimitGetter(func(ctx context.Context, p QueuePartition) PartitionConcurrencyLimits {
-				return PartitionConcurrencyLimits{
-					AccountLimit:   123,
-					FunctionLimit:  45,
-					CustomKeyLimit: 0,
-				}
-			}),
-			WithCustomConcurrencyKeyLimitRefresher(func(ctx context.Context, i osqueue.QueueItem) []state.CustomConcurrency {
-				return i.Data.GetConcurrencyKeys()
-			}),
-			WithSystemConcurrencyLimitGetter(func(ctx context.Context, p QueuePartition) SystemPartitionConcurrencyLimits {
-				return SystemPartitionConcurrencyLimits{
-					GlobalLimit:    789,
-					PartitionLimit: 678,
-				}
+			WithPartitionConstraintConfigGetter(func(ctx context.Context, p QueueShadowPartition) (*PartitionConstraintConfig, error) {
+				return &PartitionConstraintConfig{
+					Concurrency: ShadowPartitionConcurrency{
+						AccountConcurrency:  123,
+						FunctionConcurrency: 45,
+					},
+					Throttle: nil,
+				}, nil
 			}),
 		)
 
@@ -2222,21 +2180,14 @@ func TestConstraintLifecycleReporting(t *testing.T) {
 			NormalizePartition:                true,
 		}),
 		WithBacklogRefillLimit(100),
-		WithConcurrencyLimitGetter(func(ctx context.Context, p QueuePartition) PartitionConcurrencyLimits {
-			return PartitionConcurrencyLimits{
-				AccountLimit:   1,
-				FunctionLimit:  1,
-				CustomKeyLimit: 0,
-			}
-		}),
-		WithCustomConcurrencyKeyLimitRefresher(func(ctx context.Context, i osqueue.QueueItem) []state.CustomConcurrency {
-			return i.Data.GetConcurrencyKeys()
-		}),
-		WithSystemConcurrencyLimitGetter(func(ctx context.Context, p QueuePartition) SystemPartitionConcurrencyLimits {
-			return SystemPartitionConcurrencyLimits{
-				GlobalLimit:    789,
-				PartitionLimit: 678,
-			}
+		WithPartitionConstraintConfigGetter(func(ctx context.Context, p QueueShadowPartition) (*PartitionConstraintConfig, error) {
+			return &PartitionConstraintConfig{
+				Concurrency: ShadowPartitionConcurrency{
+					AccountConcurrency:  123,
+					FunctionConcurrency: 45,
+				},
+				Throttle: nil,
+			}, nil
 		}),
 		WithQueueLifecycles(testLifecycles),
 	)

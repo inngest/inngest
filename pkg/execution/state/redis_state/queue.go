@@ -364,37 +364,6 @@ func WithLogger(l logger.Logger) QueueOpt {
 	}
 }
 
-// WithCustomConcurrencyKeyLimitRefresher assigns a function that returns concurrency keys with
-// current limits for a given queue item, eg. a step in a function.
-func WithCustomConcurrencyKeyLimitRefresher(f QueueItemConcurrencyKeyLimitRefresher) func(q *queue) {
-	return func(q *queue) {
-		q.customConcurrencyLimitRefresher = f
-	}
-}
-
-// WithConcurrencyLimitGetter assigns a function that returns concurrency limits
-// for a given partition.
-func WithConcurrencyLimitGetter(f ConcurrencyLimitGetter) func(q *queue) {
-	return func(q *queue) {
-		q.concurrencyLimitGetter = func(ctx context.Context, p QueuePartition) PartitionConcurrencyLimits {
-			limits := f(ctx, p)
-			// Always clip limits for accounts to impose _some_ limit.
-			if limits.AccountLimit <= 0 {
-				limits.AccountLimit = consts.DefaultConcurrencyLimit
-			}
-			return limits
-		}
-	}
-}
-
-// WithConcurrencyLimitGetter assigns a function that returns concurrency limits
-// for a given partition.
-func WithSystemConcurrencyLimitGetter(f SystemConcurrencyLimitGetter) func(q *queue) {
-	return func(q *queue) {
-		q.systemConcurrencyLimitGetter = f
-	}
-}
-
 func WithBackoffFunc(f backoff.BackoffFunc) func(q *queue) {
 	return func(q *queue) {
 		q.backoffFunc = f
@@ -453,13 +422,6 @@ func WithPeekEWMA(on bool) func(q *queue) {
 	}
 }
 
-// QueueItemConcurrencyKeyLimitRefresher returns concurrency keys with current limits given a queue item.
-//
-// Each queue item can have its own concurrency keys.  For example, you can define
-// concurrency limits for steps within a function.  This ensures that there will never be
-// more than N concurrent items running at once.
-type QueueItemConcurrencyKeyLimitRefresher func(ctx context.Context, i osqueue.QueueItem) []state.CustomConcurrency
-
 type PartitionConcurrencyLimits struct {
 	// AccountLimit returns the current account concurrency limit, which is always applied. Defaults to maximum concurrency.
 	AccountLimit int
@@ -470,20 +432,6 @@ type PartitionConcurrencyLimits struct {
 	// CustomKeyLimit returns the custom concurrency limit for a concurrency key partition. Defaults to maximum concurrency.
 	CustomKeyLimit int
 }
-
-type SystemPartitionConcurrencyLimits struct {
-	// GlobalLimit returns the account-level equivalent concurrency limit for system partitions, which is always applied. Defaults to maximum concurrency.
-	GlobalLimit int
-
-	// PartitionLimit returns the partition-scoped concurrency limit, if configured. Defaults to maximum concurrency.
-	PartitionLimit int
-}
-
-// ConcurrencyLimitGetter returns the fn, account, and custom limits for a given partition.
-type ConcurrencyLimitGetter func(ctx context.Context, p QueuePartition) PartitionConcurrencyLimits
-
-// SystemConcurrencyLimitGetter returns the concurrency limits for a given system partition.
-type SystemConcurrencyLimitGetter func(ctx context.Context, p QueuePartition) SystemPartitionConcurrencyLimits
 
 // PartitionConstraintConfigGetter returns the constraint configuration for a given partition
 type PartitionConstraintConfigGetter func(ctx context.Context, p QueueShadowPartition) (*PartitionConstraintConfig, error)
@@ -510,6 +458,11 @@ func WithPartitionConstraintConfigGetter(f PartitionConstraintConfigGetter) func
 
 			// Function concurrency may never be higher than account concurrency
 			if constraints.Concurrency.FunctionConcurrency > 0 && constraints.Concurrency.FunctionConcurrency > constraints.Concurrency.AccountConcurrency {
+				constraints.Concurrency.FunctionConcurrency = constraints.Concurrency.AccountConcurrency
+			}
+
+			// If function concurrency is not defined, set it to account concurrency
+			if constraints.Concurrency.FunctionConcurrency <= 0 {
 				constraints.Concurrency.FunctionConcurrency = constraints.Concurrency.AccountConcurrency
 			}
 
@@ -652,36 +605,6 @@ func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 				},
 			}, nil
 		},
-		concurrencyLimitGetter: func(ctx context.Context, p QueuePartition) PartitionConcurrencyLimits {
-			def := defaultConcurrency
-			if p.ConcurrencyLimit > 0 {
-				def = p.ConcurrencyLimit
-			}
-			// Use the defaults, and add no concurrency limits to custom keys.
-			limits := PartitionConcurrencyLimits{
-				AccountLimit:   def,
-				FunctionLimit:  def,
-				CustomKeyLimit: -1,
-			}
-			if p.EvaluatedConcurrencyKey == "" {
-				limits.CustomKeyLimit = NoConcurrencyLimit
-			}
-			return limits
-		},
-		systemConcurrencyLimitGetter: func(ctx context.Context, p QueuePartition) SystemPartitionConcurrencyLimits {
-			def := defaultConcurrency
-			if p.ConcurrencyLimit > 0 {
-				def = p.ConcurrencyLimit
-			}
-			return SystemPartitionConcurrencyLimits{
-				GlobalLimit:    def,
-				PartitionLimit: def,
-			}
-		},
-		customConcurrencyLimitRefresher: func(ctx context.Context, item osqueue.QueueItem) []state.CustomConcurrency {
-			// No-op: Use whatever's in the queue item by default
-			return item.Data.GetConcurrencyKeys()
-		},
 		allowKeyQueues: func(ctx context.Context, acctID uuid.UUID) bool {
 			return false
 		},
@@ -755,10 +678,6 @@ type queue struct {
 	apf AccountPriorityFinder
 
 	lifecycles QueueLifecycleListeners
-
-	concurrencyLimitGetter          ConcurrencyLimitGetter
-	systemConcurrencyLimitGetter    SystemConcurrencyLimitGetter
-	customConcurrencyLimitRefresher QueueItemConcurrencyKeyLimitRefresher
 
 	allowKeyQueues                  AllowKeyQueues
 	enqueueSystemQueuesToBacklog    bool
@@ -1026,12 +945,6 @@ type QueuePartition struct {
 	// Concurrency
 	//
 
-	// ConcurrencyLimit represents the max concurrency for the queue partition.  This allows
-	// us to optimize the queue by checking for the max when leasing partitions
-	// directly.
-	//
-	// This ALWAYS exists, even for function level partitions.
-	ConcurrencyLimit int `json:"l,omitempty"`
 	// EvaluatedConcurrencyKey represents the evaluated and hashed custom key for the queue partition, if this is
 	// for a custom key.
 	EvaluatedConcurrencyKey string `json:"ck,omitempty"`
@@ -1153,7 +1066,7 @@ func (qp QueuePartition) MarshalBinary() ([]byte, error) {
 }
 
 // ItemPartitions returns the partition for a given item.
-func (q *queue) ItemPartition(ctx context.Context, shard QueueShard, i osqueue.QueueItem) (QueuePartition, int) {
+func (q *queue) ItemPartition(ctx context.Context, shard QueueShard, i osqueue.QueueItem) QueuePartition {
 	queueName := i.QueueName
 
 	// sanity check: both QueueNames should be set, but sometimes aren't
@@ -1179,11 +1092,8 @@ func (q *queue) ItemPartition(ctx context.Context, shard QueueShard, i osqueue.Q
 			ID:        *queueName,
 			QueueName: queueName,
 		}
-		// Fetch most recent system concurrency limit
-		systemLimits := q.systemConcurrencyLimitGetter(ctx, systemPartition)
-		systemPartition.ConcurrencyLimit = systemLimits.PartitionLimit
 
-		return systemPartition, systemLimits.GlobalLimit
+		return systemPartition
 	}
 
 	if i.FunctionID == uuid.Nil {
@@ -1197,56 +1107,19 @@ func (q *queue) ItemPartition(ctx context.Context, shard QueueShard, i osqueue.Q
 		AccountID:     i.Data.Identifier.AccountID,
 	}
 
-	limits, _ := duration(ctx, q.primaryQueueShard.Name, "partition_fn_concurrency_getter", q.clock.Now(), func(ctx context.Context) (PartitionConcurrencyLimits, error) {
-		// Get the function limit from the `concurrencyLimitGetter`.
-		return q.concurrencyLimitGetter(ctx, fnPartition), nil
-	})
-
-	// The concurrency limit for fns MUST be added for leasing.
-	fnPartition.ConcurrencyLimit = limits.FunctionLimit
-	if fnPartition.ConcurrencyLimit <= 0 {
-		// Use account-level limits, as there are no function level limits
-		fnPartition.ConcurrencyLimit = limits.AccountLimit
-	}
-
-	return fnPartition, limits.AccountLimit
+	return fnPartition
 }
 
 // ItemPartitions returns up 3 item partitions for a given queue item, as well as the account concurrency limit.
 // Note: Currently, we only ever return 2 partitions (2x custom concurrency keys or function + custom concurrency key)
 // Note: For backwards compatibility, we may return a third partition for the function itself, in case two custom concurrency keys are used.
 // This will change with the implementation of throttling key queues.
-func (q *queue) ItemPartitions(ctx context.Context, shard QueueShard, i osqueue.QueueItem) (fnPartition, customConcurrencyKey1, customConcurrencyKey2 QueuePartition, accountConcurrencyLimit int) {
-	fnPartition, accountConcurrencyLimit = q.ItemPartition(ctx, shard, i)
+func (q *queue) ItemPartitions(ctx context.Context, shard QueueShard, i osqueue.QueueItem) (fnPartition, customConcurrencyKey1, customConcurrencyKey2 QueuePartition) {
+	fnPartition = q.ItemPartition(ctx, shard, i)
 
 	ckeys := i.Data.GetConcurrencyKeys()
 	if len(ckeys) == 0 {
 		return
-	}
-
-	// Check if we have custom concurrency keys for the given function.  If so,
-	// we're going to create new partitions for each of the custom keys.  This allows
-	// us to create queues of queues for each concurrency key.
-	//
-	// See the 'key queues' spec for more information (internally).
-	//
-	// NOTE: This is an optimization that ensures we return *updated* concurrency keys
-	// for any recently published function configuration.  The embeddeed ckeys from the
-	// queue items above may be outdated.
-	if q.customConcurrencyLimitRefresher != nil {
-		// As an optimization, allow fetching updated concurrency limits if desired.
-		updated, _ := duration(ctx, q.primaryQueueShard.Name, "partition_custom_concurrency_getter", q.clock.Now(), func(ctx context.Context) ([]state.CustomConcurrency, error) {
-			return q.customConcurrencyLimitRefresher(ctx, i), nil
-		})
-		for _, update := range updated {
-			// This is quadratic, but concurrency keys are limited to 2 so it's
-			// okay.
-			for n, existing := range ckeys {
-				if existing.Key == update.Key {
-					ckeys[n].Limit = update.Limit
-				}
-			}
-		}
 	}
 
 	// Up to 2 concurrency keys.
@@ -1269,10 +1142,6 @@ func (q *queue) ItemPartitions(ctx context.Context, shard QueueShard, i osqueue.
 
 			EvaluatedConcurrencyKey:    key.Key,
 			UnevaluatedConcurrencyHash: key.Hash,
-
-			// Note: This uses the latest limit for the key queue,
-			// retrieved from customConcurrencyLimitRefresher
-			ConcurrencyLimit: key.Limit,
 		}
 
 		switch scope {
@@ -1344,7 +1213,7 @@ func (q *queue) EnqueueItem(ctx context.Context, shard QueueShard, i osqueue.Que
 
 	i.EnqueuedAt = now.UnixMilli()
 
-	defaultPartition, _ := q.ItemPartition(ctx, shard, i)
+	defaultPartition := q.ItemPartition(ctx, shard, i)
 
 	isSystemPartition := defaultPartition.IsSystem()
 
@@ -2215,7 +2084,7 @@ func (q *queue) RequeueByJobID(ctx context.Context, queueShard QueueShard, jobID
 	// the queue item instead of just the partition passed via args.
 	//
 	// This is because a single queue item may be present in more than one queue.
-	fnPartition, _ := q.ItemPartition(ctx, queueShard, i)
+	fnPartition := q.ItemPartition(ctx, queueShard, i)
 
 	keys := []string{
 		queueShard.RedisClient.kg.QueueItem(),
@@ -2713,7 +2582,7 @@ func (q *queue) Requeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 	// Reset enqueuedAt (used for latency calculation)
 	i.EnqueuedAt = now.UnixMilli()
 
-	fnPartition, _ := q.ItemPartition(ctx, queueShard, i)
+	fnPartition := q.ItemPartition(ctx, queueShard, i)
 	shadowPartition := q.ItemShadowPartition(ctx, i)
 
 	requeueToBacklog := q.itemEnableKeyQueues(ctx, i)
@@ -2896,16 +2765,25 @@ func (q *queue) PartitionLease(ctx context.Context, p *QueuePartition, duration 
 
 	kg := shard.RedisClient.kg
 
-	var accountLimit, functionLimit, customKeyLimit int
+	var accountID *uuid.UUID
+	if p.AccountID != uuid.Nil {
+		accountID = &p.AccountID
+	}
+
+	constraints, err := q.partitionConstraintConfigGetter(ctx, QueueShadowPartition{
+		PartitionID:     p.ID,
+		FunctionID:      p.FunctionID,
+		EnvID:           p.EnvID,
+		AccountID:       accountID,
+		SystemQueueName: p.QueueName,
+	})
+	if err != nil {
+		return nil, 0, fmt.Errorf("could not fetch constraints for partition: %w", err)
+	}
+
+	partitionConcurrency := constraints.Concurrency.FunctionConcurrency
 	if p.IsSystem() {
-		limits := q.systemConcurrencyLimitGetter(ctx, *p)
-		accountLimit = limits.GlobalLimit
-		functionLimit = limits.PartitionLimit
-	} else {
-		limits := q.concurrencyLimitGetter(ctx, *p)
-		accountLimit = limits.AccountLimit
-		functionLimit = limits.FunctionLimit
-		customKeyLimit = limits.CustomKeyLimit
+		partitionConcurrency = constraints.Concurrency.SystemConcurrency
 	}
 
 	// XXX: Check for function throttling prior to leasing;  if it's throttled we can requeue
@@ -2947,7 +2825,6 @@ func (q *queue) PartitionLease(ctx context.Context, p *QueuePartition, duration 
 		// concurrency limits prior to leasing, as an optimization.
 		p.acctConcurrencyKey(kg),
 		p.fnConcurrencyKey(kg),
-		p.customConcurrencyKey(kg),
 	}
 
 	args, err := StrSlice([]any{
@@ -2955,9 +2832,8 @@ func (q *queue) PartitionLease(ctx context.Context, p *QueuePartition, duration 
 		leaseID.String(),
 		now.UnixMilli(),
 		leaseExpires.Unix(),
-		accountLimit,
-		functionLimit,
-		customKeyLimit,
+		constraints.Concurrency.AccountConcurrency,
+		partitionConcurrency,
 		now.Add(PartitionConcurrencyLimitRequeueExtension).Unix(),
 		p.AccountID.String(),
 		disableLeaseChecksVal,
@@ -2992,15 +2868,13 @@ func (q *queue) PartitionLease(ctx context.Context, p *QueuePartition, duration 
 	case -2:
 		return nil, 0, ErrPartitionConcurrencyLimit
 	case -3:
-		return nil, 0, ErrConcurrencyLimitCustomKey
-	case -4:
 		return nil, 0, ErrPartitionNotFound
-	case -5:
+	case -4:
 		return nil, 0, ErrPartitionAlreadyLeased
-	case -6:
+	case -5:
 		return nil, 0, ErrPartitionPaused
 	default:
-		limit := functionLimit
+		limit := constraints.Concurrency.FunctionConcurrency
 		if len(result) == 2 {
 			limit = int(result[1])
 		}
