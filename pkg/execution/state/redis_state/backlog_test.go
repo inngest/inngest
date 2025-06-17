@@ -895,7 +895,7 @@ func TestBacklogIsOutdated(t *testing.T) {
 	t.Run("same config should not be marked as outdated", func(t *testing.T) {
 		keyHash := util.XXHash("event.data.customerID")
 
-		concurrency := ShadowPartitionConcurrency{
+		concurrency := PartitionConcurrency{
 			CustomConcurrencyKeys: []CustomConcurrencyLimit{
 				{
 					Scope:               enums.ConcurrencyScopeFn,
@@ -930,7 +930,7 @@ func TestBacklogIsOutdated(t *testing.T) {
 		keyHash := util.XXHash("event.data.customerID")
 
 		constraints := &PartitionConstraintConfig{
-			Concurrency: ShadowPartitionConcurrency{
+			Concurrency: PartitionConcurrency{
 				CustomConcurrencyKeys: []CustomConcurrencyLimit{
 					{
 						Scope:               enums.ConcurrencyScopeFn,
@@ -950,7 +950,7 @@ func TestBacklogIsOutdated(t *testing.T) {
 		keyHashNew := util.XXHash("event.data.orgID")
 
 		constraints := &PartitionConstraintConfig{
-			Concurrency: ShadowPartitionConcurrency{
+			Concurrency: PartitionConcurrency{
 				CustomConcurrencyKeys: []CustomConcurrencyLimit{
 					{
 						Scope:               enums.ConcurrencyScopeFn,
@@ -979,7 +979,7 @@ func TestBacklogIsOutdated(t *testing.T) {
 		keyHashOld := util.XXHash("event.data.customerID")
 
 		constraints := &PartitionConstraintConfig{
-			Concurrency: ShadowPartitionConcurrency{
+			Concurrency: PartitionConcurrency{
 				CustomConcurrencyKeys: nil,
 			},
 		}
@@ -1003,7 +1003,7 @@ func TestBacklogIsOutdated(t *testing.T) {
 		keyHashNew := util.XXHash("event.data.orgID")
 
 		constraints := &PartitionConstraintConfig{
-			Throttle: &ShadowPartitionThrottle{
+			Throttle: &PartitionThrottle{
 				ThrottleKeyExpressionHash: keyHashNew,
 			},
 		}
@@ -1020,7 +1020,7 @@ func TestBacklogIsOutdated(t *testing.T) {
 		keyHash := util.XXHash("event.data.orgID")
 
 		constraints := &PartitionConstraintConfig{
-			Throttle: &ShadowPartitionThrottle{
+			Throttle: &PartitionThrottle{
 				ThrottleKeyExpressionHash: keyHash,
 			},
 		}

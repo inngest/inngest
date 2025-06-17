@@ -764,7 +764,7 @@ func PartitionConstraintConfigGetter(dbcqrs cqrs.Manager) redis_state.PartitionC
 	return func(ctx context.Context, p redis_state.QueueShadowPartition) (*redis_state.PartitionConstraintConfig, error) {
 		if p.EnvID == nil || p.FunctionID == nil {
 			return &redis_state.PartitionConstraintConfig{
-				Concurrency: redis_state.ShadowPartitionConcurrency{
+				Concurrency: redis_state.PartitionConcurrency{
 					SystemConcurrency:   consts.DefaultConcurrencyLimit,
 					AccountConcurrency:  consts.DefaultConcurrencyLimit,
 					FunctionConcurrency: consts.DefaultConcurrencyLimit,
@@ -790,7 +790,7 @@ func PartitionConstraintConfigGetter(dbcqrs cqrs.Manager) redis_state.PartitionC
 		}
 
 		constraints := redis_state.PartitionConstraintConfig{
-			Concurrency: redis_state.ShadowPartitionConcurrency{
+			Concurrency: redis_state.PartitionConcurrency{
 				SystemConcurrency:     consts.DefaultConcurrencyLimit,
 				AccountConcurrency:    accountLimit,
 				FunctionConcurrency:   fnLimit,
@@ -820,7 +820,7 @@ func PartitionConstraintConfigGetter(dbcqrs cqrs.Manager) redis_state.PartitionC
 				keyExpr = *fn.Throttle.Key
 			}
 
-			constraints.Throttle = &redis_state.ShadowPartitionThrottle{
+			constraints.Throttle = &redis_state.PartitionThrottle{
 				ThrottleKeyExpressionHash: util.XXHash(keyExpr),
 				Limit:                     int(fn.Throttle.Limit),
 				Burst:                     int(fn.Throttle.Burst),

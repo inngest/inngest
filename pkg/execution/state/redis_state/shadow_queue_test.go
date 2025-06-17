@@ -106,7 +106,7 @@ func TestQueueRefillBacklog(t *testing.T) {
 		require.Equal(t, 1, int(count))
 
 		res, err := q.BacklogRefill(ctx, &expectedBacklog, &shadowPartition, clock.Now(), &PartitionConstraintConfig{
-			Concurrency: ShadowPartitionConcurrency{
+			Concurrency: PartitionConcurrency{
 				AccountConcurrency:  defaultConcurrency,
 				FunctionConcurrency: defaultConcurrency,
 			},
@@ -190,7 +190,7 @@ func TestQueueRefillBacklog(t *testing.T) {
 		require.Equal(t, 4, int(count))
 
 		res, err := q.BacklogRefill(ctx, &expectedBacklog, &shadowPartition, clock.Now(), &PartitionConstraintConfig{
-			Concurrency: ShadowPartitionConcurrency{
+			Concurrency: PartitionConcurrency{
 				AccountConcurrency:  defaultConcurrency,
 				FunctionConcurrency: defaultConcurrency,
 			},
@@ -254,7 +254,7 @@ func TestQueueRefillBacklog(t *testing.T) {
 			WithBacklogRefillLimit(1),
 			WithPartitionConstraintConfigGetter(func(ctx context.Context, p QueueShadowPartition) (*PartitionConstraintConfig, error) {
 				return &PartitionConstraintConfig{
-					Concurrency: ShadowPartitionConcurrency{
+					Concurrency: PartitionConcurrency{
 						AccountConcurrency:  123,
 						FunctionConcurrency: 45,
 					},
@@ -304,7 +304,7 @@ func TestQueueRefillBacklog(t *testing.T) {
 		refillUntil := at.Add(time.Minute)
 
 		res, err := q.BacklogRefill(ctx, &backlog, &shadowPart, refillUntil, &PartitionConstraintConfig{
-			Concurrency: ShadowPartitionConcurrency{
+			Concurrency: PartitionConcurrency{
 				AccountConcurrency:  123,
 				FunctionConcurrency: 45,
 			},
@@ -362,7 +362,7 @@ func TestQueueRefillBacklog(t *testing.T) {
 			WithBacklogRefillLimit(500),
 			WithPartitionConstraintConfigGetter(func(ctx context.Context, p QueueShadowPartition) (*PartitionConstraintConfig, error) {
 				return &PartitionConstraintConfig{
-					Concurrency: ShadowPartitionConcurrency{
+					Concurrency: PartitionConcurrency{
 						AccountConcurrency:  123,
 						FunctionConcurrency: 45,
 					},
@@ -419,7 +419,7 @@ func TestQueueRefillBacklog(t *testing.T) {
 		refillUntil := at.Add(time.Minute)
 
 		res, err := q.BacklogRefill(ctx, &backlog, &shadowPart, refillUntil, &PartitionConstraintConfig{
-			Concurrency: ShadowPartitionConcurrency{
+			Concurrency: PartitionConcurrency{
 				AccountConcurrency:  123,
 				FunctionConcurrency: 45,
 			},
@@ -447,7 +447,7 @@ func TestQueueRefillBacklog(t *testing.T) {
 		refillUntil = futureAt.Add(time.Minute)
 
 		res, err = q.BacklogRefill(ctx, &backlog, &shadowPart, refillUntil, &PartitionConstraintConfig{
-			Concurrency: ShadowPartitionConcurrency{
+			Concurrency: PartitionConcurrency{
 				AccountConcurrency:  123,
 				FunctionConcurrency: 45,
 			},
@@ -510,7 +510,7 @@ func TestQueueRefillBacklog(t *testing.T) {
 			WithBacklogRefillLimit(500),
 			WithPartitionConstraintConfigGetter(func(ctx context.Context, p QueueShadowPartition) (*PartitionConstraintConfig, error) {
 				return &PartitionConstraintConfig{
-					Concurrency: ShadowPartitionConcurrency{
+					Concurrency: PartitionConcurrency{
 						AccountConcurrency:  123,
 						FunctionConcurrency: 45,
 					},
@@ -574,7 +574,7 @@ func TestQueueRefillBacklog(t *testing.T) {
 		sp := q.ItemShadowPartition(ctx, qi)
 
 		res, err := q.BacklogRefill(ctx, &b, &sp, q.clock.Now().Add(10*time.Second), &PartitionConstraintConfig{
-			Concurrency: ShadowPartitionConcurrency{
+			Concurrency: PartitionConcurrency{
 				AccountConcurrency:  1,
 				FunctionConcurrency: 1,
 			},
@@ -590,7 +590,7 @@ func TestQueueRefillBacklog(t *testing.T) {
 		sp2 := q.ItemShadowPartition(ctx, item2)
 
 		res, err = q.BacklogRefill(ctx, &b2, &sp2, q.clock.Now().Add(10*time.Second), &PartitionConstraintConfig{
-			Concurrency: ShadowPartitionConcurrency{
+			Concurrency: PartitionConcurrency{
 				AccountConcurrency:  1,
 				FunctionConcurrency: 1,
 			},
@@ -1670,7 +1670,7 @@ func TestRefillConstraints(t *testing.T) {
 				WithBacklogRefillLimit(int64(testCase.knobs.maxRefill)),
 				WithPartitionConstraintConfigGetter(func(ctx context.Context, p QueueShadowPartition) (*PartitionConstraintConfig, error) {
 					return &PartitionConstraintConfig{
-						Concurrency: ShadowPartitionConcurrency{
+						Concurrency: PartitionConcurrency{
 							AccountConcurrency:  123,
 							FunctionConcurrency: 45,
 						},
@@ -1823,7 +1823,7 @@ func TestRefillConstraints(t *testing.T) {
 			logKeyValues()
 
 			constraints := &PartitionConstraintConfig{
-				Concurrency: ShadowPartitionConcurrency{
+				Concurrency: PartitionConcurrency{
 					AccountConcurrency:  testCase.knobs.accountConcurrencyLimit,
 					FunctionConcurrency: testCase.knobs.functionConcurrencyLimit,
 				},
@@ -1852,7 +1852,7 @@ func TestRefillConstraints(t *testing.T) {
 			}
 
 			if testCase.knobs.throttle != nil {
-				constraints.Throttle = &ShadowPartitionThrottle{
+				constraints.Throttle = &PartitionThrottle{
 					ThrottleKeyExpressionHash: testCase.knobs.throttle.KeyExpressionHash,
 					Limit:                     testCase.knobs.throttle.Limit,
 					Burst:                     testCase.knobs.throttle.Burst,
@@ -1941,7 +1941,7 @@ func TestShadowPartitionPointerTimings(t *testing.T) {
 			WithBacklogRefillLimit(500),
 			WithPartitionConstraintConfigGetter(func(ctx context.Context, p QueueShadowPartition) (*PartitionConstraintConfig, error) {
 				return &PartitionConstraintConfig{
-					Concurrency: ShadowPartitionConcurrency{
+					Concurrency: PartitionConcurrency{
 						AccountConcurrency:  123,
 						FunctionConcurrency: 45,
 					},
@@ -2006,7 +2006,7 @@ func TestShadowPartitionPointerTimings(t *testing.T) {
 			itemAt := now.Add(time.Duration(i+1) * time.Second)
 			refillUntil := itemAt
 			res, err := q.BacklogRefill(ctx, &backlog, &shadowPart, refillUntil, &PartitionConstraintConfig{
-				Concurrency: ShadowPartitionConcurrency{
+				Concurrency: PartitionConcurrency{
 					AccountConcurrency:  123,
 					FunctionConcurrency: 45,
 				},
@@ -2082,7 +2082,7 @@ func TestShadowPartitionPointerTimings(t *testing.T) {
 			WithBacklogRefillLimit(500),
 			WithPartitionConstraintConfigGetter(func(ctx context.Context, p QueueShadowPartition) (*PartitionConstraintConfig, error) {
 				return &PartitionConstraintConfig{
-					Concurrency: ShadowPartitionConcurrency{
+					Concurrency: PartitionConcurrency{
 						AccountConcurrency:  123,
 						FunctionConcurrency: 45,
 					},
@@ -2182,7 +2182,7 @@ func TestConstraintLifecycleReporting(t *testing.T) {
 		WithBacklogRefillLimit(100),
 		WithPartitionConstraintConfigGetter(func(ctx context.Context, p QueueShadowPartition) (*PartitionConstraintConfig, error) {
 			return &PartitionConstraintConfig{
-				Concurrency: ShadowPartitionConcurrency{
+				Concurrency: PartitionConcurrency{
 					AccountConcurrency:  123,
 					FunctionConcurrency: 45,
 				},
@@ -2219,7 +2219,7 @@ func TestConstraintLifecycleReporting(t *testing.T) {
 	at := clock.Now()
 
 	constraints := PartitionConstraintConfig{
-		Concurrency: ShadowPartitionConcurrency{
+		Concurrency: PartitionConcurrency{
 			AccountConcurrency:  1,
 			FunctionConcurrency: 1,
 		},

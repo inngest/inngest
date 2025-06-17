@@ -26,10 +26,10 @@ var (
 )
 
 type PartitionConstraintConfig struct {
-	Concurrency ShadowPartitionConcurrency `json:"c,omitempty,omitzero"`
+	Concurrency PartitionConcurrency `json:"c,omitempty,omitzero"`
 
 	// Throttle configuration, optionally specifying key. If no key is set, the throttle value will be the function ID.
-	Throttle *ShadowPartitionThrottle `json:"t,omitempty,omitzero"`
+	Throttle *PartitionThrottle `json:"t,omitempty,omitzero"`
 }
 
 type CustomConcurrencyLimit struct {
@@ -39,7 +39,7 @@ type CustomConcurrencyLimit struct {
 	Limit               int                    `json:"l"`
 }
 
-type ShadowPartitionThrottle struct {
+type PartitionThrottle struct {
 	// ThrottleKeyExpressionHash is the hashed throttle key expression, if set.
 	ThrottleKeyExpressionHash string `json:"tkh,omitempty"`
 
@@ -51,7 +51,7 @@ type ShadowPartitionThrottle struct {
 	Period int `json:"p"`
 }
 
-type ShadowPartitionConcurrency struct {
+type PartitionConcurrency struct {
 	// SystemConcurrency represents the concurrency limit to apply to system queues. Unset on regular function partitions.
 	SystemConcurrency int `json:"sc,omitempty"`
 

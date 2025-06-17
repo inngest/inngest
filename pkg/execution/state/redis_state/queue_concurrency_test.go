@@ -43,14 +43,14 @@ func TestQueuePartitionConcurrency(t *testing.T) {
 		switch *p.FunctionID {
 		case limit_1:
 			return &PartitionConstraintConfig{
-				Concurrency: ShadowPartitionConcurrency{
+				Concurrency: PartitionConcurrency{
 					AccountConcurrency:  NoConcurrencyLimit,
 					FunctionConcurrency: 1,
 				},
 			}, nil
 		case limit_10:
 			return &PartitionConstraintConfig{
-				Concurrency: ShadowPartitionConcurrency{
+				Concurrency: PartitionConcurrency{
 					AccountConcurrency:  NoConcurrencyLimit,
 					FunctionConcurrency: 10,
 				},
@@ -58,7 +58,7 @@ func TestQueuePartitionConcurrency(t *testing.T) {
 		default:
 			// No concurrency, which means use the default concurrency limits.
 			return &PartitionConstraintConfig{
-				Concurrency: ShadowPartitionConcurrency{
+				Concurrency: PartitionConcurrency{
 					AccountConcurrency:  NoConcurrencyLimit,
 					FunctionConcurrency: NoConcurrencyLimit,
 				},

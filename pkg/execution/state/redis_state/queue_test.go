@@ -802,7 +802,7 @@ func TestQueueSystemPartitions(t *testing.T) {
 		WithDisableLeaseChecksForSystemQueues(false),
 		WithPartitionConstraintConfigGetter(func(ctx context.Context, p QueueShadowPartition) (*PartitionConstraintConfig, error) {
 			return &PartitionConstraintConfig{
-				Concurrency: ShadowPartitionConcurrency{
+				Concurrency: PartitionConcurrency{
 					AccountConcurrency: consts.DefaultConcurrencyLimit,
 					SystemConcurrency:  customTestLimit,
 				},
@@ -1370,7 +1370,7 @@ func TestQueueLease(t *testing.T) {
 		// Only allow a single leased item
 		q.partitionConstraintConfigGetter = func(ctx context.Context, p QueueShadowPartition) (*PartitionConstraintConfig, error) {
 			return &PartitionConstraintConfig{
-				Concurrency: ShadowPartitionConcurrency{
+				Concurrency: PartitionConcurrency{
 					AccountConcurrency:  1,
 					FunctionConcurrency: 1,
 				},
@@ -1414,7 +1414,7 @@ func TestQueueLease(t *testing.T) {
 		// Only allow a single leased item via account limits
 		q.partitionConstraintConfigGetter = func(ctx context.Context, p QueueShadowPartition) (*PartitionConstraintConfig, error) {
 			return &PartitionConstraintConfig{
-				Concurrency: ShadowPartitionConcurrency{
+				Concurrency: PartitionConcurrency{
 					AccountConcurrency:  1,
 					FunctionConcurrency: NoConcurrencyLimit,
 				},
@@ -1451,7 +1451,7 @@ func TestQueueLease(t *testing.T) {
 			// Only allow a single leased item via custom concurrency limits
 			q.partitionConstraintConfigGetter = func(ctx context.Context, p QueueShadowPartition) (*PartitionConstraintConfig, error) {
 				return &PartitionConstraintConfig{
-					Concurrency: ShadowPartitionConcurrency{
+					Concurrency: PartitionConcurrency{
 						AccountConcurrency:  NoConcurrencyLimit,
 						FunctionConcurrency: NoConcurrencyLimit,
 						CustomConcurrencyKeys: []CustomConcurrencyLimit{
@@ -1529,7 +1529,7 @@ func TestQueueLease(t *testing.T) {
 			// Only allow a single leased item via custom concurrency limits
 			q.partitionConstraintConfigGetter = func(ctx context.Context, p QueueShadowPartition) (*PartitionConstraintConfig, error) {
 				return &PartitionConstraintConfig{
-					Concurrency: ShadowPartitionConcurrency{
+					Concurrency: PartitionConcurrency{
 						AccountConcurrency:  NoConcurrencyLimit,
 						FunctionConcurrency: NoConcurrencyLimit,
 						CustomConcurrencyKeys: []CustomConcurrencyLimit{
@@ -1550,7 +1550,7 @@ func TestQueueLease(t *testing.T) {
 
 			q.partitionConstraintConfigGetter = func(ctx context.Context, p QueueShadowPartition) (*PartitionConstraintConfig, error) {
 				return &PartitionConstraintConfig{
-					Concurrency: ShadowPartitionConcurrency{
+					Concurrency: PartitionConcurrency{
 						AccountConcurrency:  NoConcurrencyLimit,
 						FunctionConcurrency: NoConcurrencyLimit,
 						CustomConcurrencyKeys: []CustomConcurrencyLimit{
@@ -1665,7 +1665,7 @@ func TestQueueLease(t *testing.T) {
 
 			q.partitionConstraintConfigGetter = func(ctx context.Context, p QueueShadowPartition) (*PartitionConstraintConfig, error) {
 				return &PartitionConstraintConfig{
-					Concurrency: ShadowPartitionConcurrency{
+					Concurrency: PartitionConcurrency{
 						AccountConcurrency:  123_456,
 						FunctionConcurrency: 1,
 						CustomConcurrencyKeys: []CustomConcurrencyLimit{
@@ -2176,7 +2176,7 @@ func TestQueueExtendLease(t *testing.T) {
 
 		q.partitionConstraintConfigGetter = func(ctx context.Context, p QueueShadowPartition) (*PartitionConstraintConfig, error) {
 			return &PartitionConstraintConfig{
-				Concurrency: ShadowPartitionConcurrency{
+				Concurrency: PartitionConcurrency{
 					AccountConcurrency:  NoConcurrencyLimit,
 					FunctionConcurrency: NoConcurrencyLimit,
 					CustomConcurrencyKeys: []CustomConcurrencyLimit{
@@ -3065,7 +3065,7 @@ func TestQueuePartitionLease(t *testing.T) {
 			// Only allow a single leased item
 			q.partitionConstraintConfigGetter = func(ctx context.Context, p QueueShadowPartition) (*PartitionConstraintConfig, error) {
 				return &PartitionConstraintConfig{
-					Concurrency: ShadowPartitionConcurrency{
+					Concurrency: PartitionConcurrency{
 						AccountConcurrency:  1,
 						FunctionConcurrency: 1,
 					},
@@ -3101,7 +3101,7 @@ func TestQueuePartitionLease(t *testing.T) {
 			// Only allow a single leased item via account limits
 			q.partitionConstraintConfigGetter = func(ctx context.Context, p QueueShadowPartition) (*PartitionConstraintConfig, error) {
 				return &PartitionConstraintConfig{
-					Concurrency: ShadowPartitionConcurrency{
+					Concurrency: PartitionConcurrency{
 						AccountConcurrency:  1,
 						FunctionConcurrency: 100,
 					},
@@ -3139,7 +3139,7 @@ func TestQueuePartitionLease(t *testing.T) {
 			// Only allow a single leased item via account limits
 			q.partitionConstraintConfigGetter = func(ctx context.Context, p QueueShadowPartition) (*PartitionConstraintConfig, error) {
 				return &PartitionConstraintConfig{
-					Concurrency: ShadowPartitionConcurrency{
+					Concurrency: PartitionConcurrency{
 						AccountConcurrency:  100,
 						FunctionConcurrency: 100,
 					},
@@ -4074,7 +4074,7 @@ func TestQueueRequeueByJobID(t *testing.T) {
 	}
 	q.partitionConstraintConfigGetter = func(ctx context.Context, p QueueShadowPartition) (*PartitionConstraintConfig, error) {
 		return &PartitionConstraintConfig{
-			Concurrency: ShadowPartitionConcurrency{
+			Concurrency: PartitionConcurrency{
 				AccountConcurrency:  100,
 				FunctionConcurrency: 100,
 			},
@@ -5110,7 +5110,7 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 			}),
 			WithPartitionConstraintConfigGetter(func(ctx context.Context, p QueueShadowPartition) (*PartitionConstraintConfig, error) {
 				return &PartitionConstraintConfig{
-					Concurrency: ShadowPartitionConcurrency{
+					Concurrency: PartitionConcurrency{
 						AccountConcurrency:  123,
 						FunctionConcurrency: 45,
 						CustomConcurrencyKeys: []CustomConcurrencyLimit{
@@ -5227,7 +5227,7 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 			}),
 			WithPartitionConstraintConfigGetter(func(ctx context.Context, p QueueShadowPartition) (*PartitionConstraintConfig, error) {
 				return &PartitionConstraintConfig{
-					Concurrency: ShadowPartitionConcurrency{
+					Concurrency: PartitionConcurrency{
 						AccountConcurrency:  123,
 						FunctionConcurrency: 45,
 						CustomConcurrencyKeys: []CustomConcurrencyLimit{
@@ -5534,7 +5534,7 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 			}),
 			WithPartitionConstraintConfigGetter(func(ctx context.Context, p QueueShadowPartition) (*PartitionConstraintConfig, error) {
 				return &PartitionConstraintConfig{
-					Concurrency: ShadowPartitionConcurrency{
+					Concurrency: PartitionConcurrency{
 						SystemConcurrency:   678,
 						AccountConcurrency:  123,
 						FunctionConcurrency: 45,
@@ -5673,7 +5673,7 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 			}),
 			WithPartitionConstraintConfigGetter(func(ctx context.Context, p QueueShadowPartition) (*PartitionConstraintConfig, error) {
 				return &PartitionConstraintConfig{
-					Concurrency: ShadowPartitionConcurrency{
+					Concurrency: PartitionConcurrency{
 						SystemConcurrency:   678,
 						AccountConcurrency:  123,
 						FunctionConcurrency: 45,
@@ -6064,7 +6064,7 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 			}),
 			WithPartitionConstraintConfigGetter(func(ctx context.Context, p QueueShadowPartition) (*PartitionConstraintConfig, error) {
 				return &PartitionConstraintConfig{
-					Concurrency: ShadowPartitionConcurrency{
+					Concurrency: PartitionConcurrency{
 						CustomConcurrencyKeys: []CustomConcurrencyLimit{
 							{
 								Mode:                enums.ConcurrencyModeStep,
@@ -6233,7 +6233,7 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 			}),
 			WithPartitionConstraintConfigGetter(func(ctx context.Context, p QueueShadowPartition) (*PartitionConstraintConfig, error) {
 				return &PartitionConstraintConfig{
-					Concurrency: ShadowPartitionConcurrency{
+					Concurrency: PartitionConcurrency{
 						CustomConcurrencyKeys: []CustomConcurrencyLimit{
 							{
 								Mode:                enums.ConcurrencyModeStep,
@@ -7015,7 +7015,7 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 			}),
 			WithPartitionConstraintConfigGetter(func(ctx context.Context, p QueueShadowPartition) (*PartitionConstraintConfig, error) {
 				return &PartitionConstraintConfig{
-					Concurrency: ShadowPartitionConcurrency{
+					Concurrency: PartitionConcurrency{
 						CustomConcurrencyKeys: []CustomConcurrencyLimit{
 							{
 								Mode:                enums.ConcurrencyModeStep,
@@ -7164,7 +7164,7 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 			}),
 			WithPartitionConstraintConfigGetter(func(ctx context.Context, p QueueShadowPartition) (*PartitionConstraintConfig, error) {
 				return &PartitionConstraintConfig{
-					Concurrency: ShadowPartitionConcurrency{
+					Concurrency: PartitionConcurrency{
 						CustomConcurrencyKeys: []CustomConcurrencyLimit{
 							{
 								Mode:                enums.ConcurrencyModeStep,
@@ -7653,7 +7653,7 @@ func TestQueueActiveCounters(t *testing.T) {
 
 			// refill
 			res, err := q.BacklogRefill(ctx, &backlog, &shadowPart, refillUntil, &PartitionConstraintConfig{
-				Concurrency: ShadowPartitionConcurrency{
+				Concurrency: PartitionConcurrency{
 					SystemConcurrency:   consts.DefaultConcurrencyLimit,
 					AccountConcurrency:  consts.DefaultConcurrencyLimit,
 					FunctionConcurrency: consts.DefaultConcurrencyLimit,
@@ -7721,7 +7721,7 @@ func TestQueueActiveCounters(t *testing.T) {
 
 			// refill
 			res, err := q.BacklogRefill(ctx, &backlog, &shadowPart, refillUntil, &PartitionConstraintConfig{
-				Concurrency: ShadowPartitionConcurrency{
+				Concurrency: PartitionConcurrency{
 					SystemConcurrency:   consts.DefaultConcurrencyLimit,
 					AccountConcurrency:  consts.DefaultConcurrencyLimit,
 					FunctionConcurrency: consts.DefaultConcurrencyLimit,
@@ -7962,7 +7962,7 @@ func TestQueueActiveCounters(t *testing.T) {
 
 			// refill
 			res, err := q.BacklogRefill(ctx, &backlog, &shadowPart, refillUntil, &PartitionConstraintConfig{
-				Concurrency: ShadowPartitionConcurrency{
+				Concurrency: PartitionConcurrency{
 					SystemConcurrency:   consts.DefaultConcurrencyLimit,
 					AccountConcurrency:  consts.DefaultConcurrencyLimit,
 					FunctionConcurrency: consts.DefaultConcurrencyLimit,

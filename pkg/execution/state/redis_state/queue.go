@@ -448,7 +448,7 @@ func WithPartitionConstraintConfigGetter(f PartitionConstraintConfigGetter) func
 			if constraints == nil {
 				// this should never happen; return default limits just in case (avoid panics)
 				return &PartitionConstraintConfig{
-					Concurrency: ShadowPartitionConcurrency{
+					Concurrency: PartitionConcurrency{
 						SystemConcurrency:   consts.DefaultConcurrencyLimit,
 						AccountConcurrency:  consts.DefaultConcurrencyLimit,
 						FunctionConcurrency: consts.DefaultConcurrencyLimit,
@@ -599,7 +599,7 @@ func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 			def := defaultConcurrency
 
 			return &PartitionConstraintConfig{
-				Concurrency: ShadowPartitionConcurrency{
+				Concurrency: PartitionConcurrency{
 					AccountConcurrency:  def,
 					FunctionConcurrency: def,
 				},
