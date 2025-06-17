@@ -200,10 +200,13 @@ if singletonKey ~= nil and singletonKey ~= false and keyItemIndexA ~= "" and key
   local queueItemsCount = redis.call("ZCOUNT", keyItemIndexA, "-inf", "+inf")
   local singletonRunID = redis.call("GET", singletonKey)
 
-  if tonumber(queueItemsCount) == 0 and singletonRunID == runID then
+  if tonumber(queueItemsCount) == 0 then
     -- We just dequeued the last step
-    redis.call("DEL", singletonKey)
-    redis.call("DEL", singletonRunKey)
+     redis.call("DEL", singletonRunKey)
+
+     if singletonRunID == runID then
+        redis.call("DEL", singletonKey)
+    end
   end
 end
 
