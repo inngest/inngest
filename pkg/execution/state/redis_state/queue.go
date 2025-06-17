@@ -717,6 +717,12 @@ func WithQueueShardClients(queueShards map[string]QueueShard) QueueOpt {
 	}
 }
 
+func WithEnableJobPromotion(enable bool) QueueOpt {
+	return func(q *queue) {
+		q.enableJobPromotion = enable
+	}
+}
+
 type queue struct {
 	// name is the identifiable name for this worker, for logging.
 	name string
