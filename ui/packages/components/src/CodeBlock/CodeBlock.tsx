@@ -23,6 +23,13 @@ import { isDark } from '../utils/theme';
 const MAX_HEIGHT = 280; // Equivalent to 10 lines + padding
 const MAX_LINES = 10;
 
+const LoadingIndicator = () => (
+  <div className="bg-codeEditor flex h-full w-full items-center justify-center">
+    <span className="bg-primary-moderate animate-underline absolute left-0 top-0 h-px w-0" />
+    <div className="text-light text-sm">Loading...</div>
+  </div>
+);
+
 type MonacoEditorType = editor.IStandaloneCodeEditor | null;
 
 export type CodeBlockAction = {
@@ -50,6 +57,7 @@ interface CodeBlockProps {
   allowFullScreen?: boolean;
   resize?: boolean;
   alwaysFullHeight?: boolean;
+  loading?: boolean;
 }
 
 export function CodeBlock({
@@ -60,6 +68,7 @@ export function CodeBlock({
   allowFullScreen = false,
   resize = false,
   alwaysFullHeight = false,
+  loading = false,
 }: CodeBlockProps) {
   const [dark, setDark] = useState(isDark());
   const [editorHeight, setEditorHeight] = useState(MAX_HEIGHT);
@@ -347,6 +356,15 @@ export function CodeBlock({
                     />
                   </div>
                 </>
+              ) : loading ? (
+                <div
+                  className="relative"
+                  style={{
+                    height: alwaysFullHeight || fullScreen ? '100%' : `${MAX_HEIGHT}px`,
+                  }}
+                >
+                  <LoadingIndicator />
+                </div>
               ) : (
                 <Editor
                   className={cn('relative', (alwaysFullHeight || fullScreen) && 'h-full')}
@@ -354,12 +372,7 @@ export function CodeBlock({
                   defaultLanguage={language}
                   value={content}
                   theme="inngest-theme"
-                  loading={
-                    <div className="bg-codeEditor flex h-full w-full items-center justify-center">
-                      <span className="bg-primary-moderate animate-underline absolute left-0 top-0 h-px w-0" />
-                      <div className="text-light text-sm">Loading...</div>
-                    </div>
-                  }
+                  loading={<LoadingIndicator />}
                   options={{
                     // Need to set automaticLayout to true to avoid a resizing bug
                     // (code block never narrows). This is combined with the

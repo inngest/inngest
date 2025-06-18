@@ -69,6 +69,7 @@ export function EventDetails({
   });
 
   const {
+    isPending: isPendingPayload,
     error: payloadError,
     data: eventPayloadData,
     refetch: refetchPayload,
@@ -220,6 +221,7 @@ export function EventDetails({
             {!payloadError && (
               <div className="border-subtle border-t pl-px">
                 <CodeBlock
+                  loading={isPendingPayload}
                   header={{ title: 'Payload' }}
                   tab={{
                     content: prettyPayload,
