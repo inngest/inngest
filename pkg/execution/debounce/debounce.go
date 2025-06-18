@@ -996,3 +996,11 @@ func readRedisScripts(path string, entries []fs.DirEntry) {
 		scripts[name] = rueidis.NewLuaScript(val)
 	}
 }
+
+type DebounceTest interface {
+	TestQueueItem(ctx context.Context, di DebounceItem, debounceID ulid.ULID) queue.Item
+}
+
+func (d debouncer) TestQueueItem(ctx context.Context, di DebounceItem, debounceID ulid.ULID) queue.Item {
+	return d.queueItem(ctx, di, debounceID)
+}
