@@ -2,6 +2,7 @@ package redis_state
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"math/rand"
 	"runtime/debug"
@@ -24,6 +25,8 @@ var (
 
 var (
 	ErrBacklogNotFound = fmt.Errorf("backlog not found")
+
+	ErrBacklogPeekMaxExceedsLimits = fmt.Errorf("backlog peek exceeded the maximum limit")
 )
 
 type PartitionConstraintConfig struct {
@@ -998,4 +1001,78 @@ func (q *queue) BacklogPrepareNormalize(ctx context.Context, b *QueueBacklog, sp
 	default:
 		return 0, false, fmt.Errorf("unknown status preparing backlog normalization: %v (%T)", status, status)
 	}
+}
+
+func (q *queue) backlogPeek(ctx context.Context, b *QueueBacklog, from time.Time, until time.Time, limit int64, opts ...PeekOpt) ([]*osqueue.QueueItem, int, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "backlogPeek"), redis_telemetry.ScopeQueue)
+
+	opt := peekOption{}
+	for _, apply := range opts {
+		apply(&opt)
+	}
+
+	if !q.isPermittedQueueKind() {
+		return nil, 0, fmt.Errorf("unsupported queue shared kind for backlogPeek: %s", q.primaryQueueShard.Kind)
+	}
+
+	if b == nil {
+		return nil, 0, fmt.Errorf("expected backlog to be provided")
+	}
+
+	if limit > AbsoluteQueuePeekMax || limit > q.peekMax {
+		limit = q.peekMax
+	}
+	if limit <= 0 {
+		limit = q.peekMin
+	}
+
+	var fromTime *time.Time
+	if !from.IsZero() {
+		fromTime = &from
+	}
+
+	l := q.log.With(
+		"method", "backlogPeek",
+		"backlog", b,
+		"from", from,
+		"until", until,
+		"limit", limit,
+	)
+
+	rc := q.primaryQueueShard.RedisClient
+	if opt.Shard != nil {
+		rc = opt.Shard.RedisClient
+	}
+
+	backlogSet := rc.kg.BacklogSet(b.BacklogID)
+
+	p := peeker[osqueue.QueueItem]{
+		q:               q,
+		opName:          "backlogPeek",
+		keyMetadataHash: rc.kg.QueueItem(),
+		max:             q.peekMax,
+		maker: func() *osqueue.QueueItem {
+			return &osqueue.QueueItem{}
+		},
+		handleMissingItems: func(pointers []string) error {
+			cmd := rc.Client().B().Zrem().Key(rc.kg.QueueItem()).Member(pointers...).Build()
+			err := rc.Client().Do(ctx, cmd).Error()
+			if err != nil {
+				l.Warn("failed to clean up dangling queue items in the backlog", "missing", pointers)
+			}
+			return nil
+		},
+		isMillisecondPrecision: true,
+		fromTime:               fromTime,
+	}
+
+	res, err := p.peek(ctx, backlogSet, true, until, limit, opts...)
+	if err != nil {
+		if errors.Is(err, ErrPeekerPeekExceedsMaxLimits) {
+			return nil, 0, ErrBacklogPeekMaxExceedsLimits
+		}
+		return nil, 0, fmt.Errorf("error peeking backlog queue items, %w", err)
+	}
+
+	return res.Items, res.TotalCount, nil
 }

@@ -215,34 +215,17 @@ type JobResponse struct {
 type JobQueueReader interface {
 	// OutstandingJobCount returns the number of jobs in progress
 	// or scheduled for a given run.
-	OutstandingJobCount(
-		ctx context.Context,
-		workspaceID uuid.UUID,
-		workflowID uuid.UUID,
-		runID ulid.ULID,
-	) (int, error)
+	OutstandingJobCount(ctx context.Context, envID uuid.UUID, fnID uuid.UUID, runID ulid.ULID) (int, error)
 
 	// RunningCount returns the number of running (in-progress) jobs for a given function
 	RunningCount(ctx context.Context, workflowID uuid.UUID) (int64, error)
 
 	// StatusCount returns the total number of items in the function
 	// status queue.
-	StatusCount(
-		ctx context.Context,
-		workflowID uuid.UUID,
-		status string,
-	) (int64, error)
+	StatusCount(ctx context.Context, workflowID uuid.UUID, status string) (int64, error)
 
 	// RunJobs reads items in the queue for a specific run.
-	RunJobs(
-		ctx context.Context,
-		queueShardName string,
-		workspaceID uuid.UUID,
-		workflowID uuid.UUID,
-		runID ulid.ULID,
-		limit,
-		offset int64,
-	) ([]JobResponse, error)
+	RunJobs(ctx context.Context, queueShardName string, workspaceID uuid.UUID, workflowID uuid.UUID, runID ulid.ULID, limit, offset int64) ([]JobResponse, error)
 }
 
 // MigratePayload stores the information to be used when migrating a queue shard to another one
