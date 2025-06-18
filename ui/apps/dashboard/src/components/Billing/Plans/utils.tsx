@@ -9,7 +9,7 @@ import type {
 
 export type Plan = Omit<
   BillingPlan,
-  'entitlements' | 'features' | 'availableAddons' | 'addons' | 'slug' | 'isFree'
+  'entitlements' | 'features' | 'availableAddons' | 'addons' | 'slug'
 > & {
   entitlements: {
     concurrency: Pick<EntitlementConcurrency, 'limit'>;
