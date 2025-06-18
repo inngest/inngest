@@ -642,14 +642,6 @@ func (d debouncer) debounce(ctx context.Context, di DebounceItem, fn inngest.Fun
 	return err
 }
 
-type DebounceTest interface {
-	TestQueueItem(ctx context.Context, di DebounceItem, debounceID ulid.ULID) queue.Item
-}
-
-func (d debouncer) TestQueueItem(ctx context.Context, di DebounceItem, debounceID ulid.ULID) queue.Item {
-	return d.queueItem(ctx, di, debounceID)
-}
-
 func (d debouncer) queueItem(ctx context.Context, di DebounceItem, debounceID ulid.ULID) queue.Item {
 	maxAttempts := consts.MaxRetries + 1
 
@@ -1003,4 +995,12 @@ func readRedisScripts(path string, entries []fs.DirEntry) {
 		}
 		scripts[name] = rueidis.NewLuaScript(val)
 	}
+}
+
+type DebounceTest interface {
+	TestQueueItem(ctx context.Context, di DebounceItem, debounceID ulid.ULID) queue.Item
+}
+
+func (d debouncer) TestQueueItem(ctx context.Context, di DebounceItem, debounceID ulid.ULID) queue.Item {
+	return d.queueItem(ctx, di, debounceID)
 }
