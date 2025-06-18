@@ -1049,7 +1049,8 @@ func TestQueueSystemPartitions(t *testing.T) {
 
 		apIds := getAccountPartitions(t, rc, accountId)
 		// it should not add system queues to account partitions
-		require.Equal(t, 0, len(apIds))
+		require.Equal(t, 1, len(apIds))
+		require.Contains(t, apIds, qp.ID)
 	})
 }
 
