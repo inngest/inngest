@@ -232,6 +232,7 @@ export type BillingPlan = {
   entitlements: Entitlements;
   features: Scalars['Map'];
   id: Scalars['ID'];
+  isFree: Scalars['Boolean'];
   isLegacy: Scalars['Boolean'];
   name: Scalars['String'];
   slug: Scalars['String'];
@@ -1356,7 +1357,8 @@ export type MutationUpdatePaymentMethodArgs = {
 
 
 export type MutationUpdatePlanArgs = {
-  to: Scalars['ID'];
+  slug: InputMaybe<Scalars['String']>;
+  to: InputMaybe<Scalars['ID']>;
 };
 
 
@@ -2006,7 +2008,8 @@ export type StripeSubscriptionInput = {
 
 export type StripeSubscriptionItemsInput = {
   amount: Scalars['Int'];
-  planID: Scalars['ID'];
+  planID?: InputMaybe<Scalars['ID']>;
+  planSlug?: InputMaybe<Scalars['String']>;
   quantity: Scalars['Int'];
 };
 
