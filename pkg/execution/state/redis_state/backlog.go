@@ -406,8 +406,6 @@ func (q *queue) ItemShadowPartition(ctx context.Context, i osqueue.QueueItem) Qu
 			// partition, as it is used for conditional checks in Lua
 			ID:        *queueName,
 			QueueName: queueName,
-
-			AccountID: accountID,
 		}
 		// Fetch most recent system concurrency limit
 		systemLimits := q.systemConcurrencyLimitGetter(ctx, systemPartition)

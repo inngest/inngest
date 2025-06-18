@@ -1007,6 +1007,7 @@ func TestQueueSystemPartitions(t *testing.T) {
 	})
 
 	t.Run("It enqueues an item to account queues when account id is present", func(t *testing.T) {
+
 		r.FlushAll()
 
 		start := time.Now().Truncate(time.Second)
@@ -1043,12 +1044,12 @@ func TestQueueSystemPartitions(t *testing.T) {
 			QueueName:        &customQueueName,
 			PartitionType:    int(enums.PartitionTypeDefault),
 			ConcurrencyLimit: customTestLimit,
-			AccountID:        accountId,
+			AccountID:        uuid.Nil,
 		}, qp)
 
 		apIds := getAccountPartitions(t, rc, accountId)
-		require.Equal(t, 1, len(apIds))
-		require.Contains(t, apIds, qp.ID)
+		// it should not add system queues to account partitions
+		require.Equal(t, 0, len(apIds))
 	})
 }
 
