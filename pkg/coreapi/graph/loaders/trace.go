@@ -166,28 +166,27 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 
 	gqlSpan := &models.RunTraceSpan{
 		AppID:        span.GetAppID(),
+		Attempts:     &attempts,
+		Duration:     duration,
+		EndedAt:      span.GetEndedAtTime(),
 		FunctionID:   span.GetFunctionID(),
+		IsRoot:       span.GetIsRoot(),
+		Name:         span.GetStepName(),
+		OutputID:     span.GetOutputID(),
+		ParentSpanID: span.GetParentSpanID(),
+		QueuedAt:     span.GetQueuedAtTime(),
 		RunID:        span.GetRunID(),
 		SpanID:       span.GetSpanID(),
-		TraceID:      span.GetTraceID(),
-		Name:         span.GetStepName(),
+		StartedAt:    span.GetStartedAtTime(),
 		Status:       status,
-		Attempts:     &attempts,
-		ParentSpanID: span.GetParentSpanID(),
-		IsRoot:       span.GetIsRoot(),
+		TraceID:      span.GetTraceID(),
 
-		Duration: duration,
-		// OutputID: , TODO
-
-		QueuedAt:  span.GetQueuedAtTime(),
-		StartedAt: span.GetStartedAtTime(),
-		EndedAt:   span.GetEndedAtTime(),
-
-		// IsUserland: ,
-		// UserlandSpan: ,
+		// IsUserland: , TODO
+		// UserlandSpan: , TODO
 	}
 
 	// If this was a discovery span, we may not want to show it.
+
 	showSpan := span.Name != meta.SpanNameStepDiscovery
 
 	if v, ok := span.Attributes[meta.AttributeStepOp]; ok {
@@ -269,6 +268,7 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 	if len(span.Children) > 0 {
 		gqlSpan.ChildrenSpans = []*models.RunTraceSpan{}
 		lastStepQueueTime := &gqlSpan.QueuedAt
+		isFirstChild := true
 
 		for i, cs := range span.Children {
 			child, err := tr.convertRunSpanToGQL(ctx, cs)
@@ -291,7 +291,16 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 			case meta.SpanNameStepDiscovery, meta.SpanNameStep:
 				{
 					gqlSpan.Status = child.Status
-					gqlSpan.StartedAt = child.StartedAt // TODO only first
+
+					if isFirstChild {
+						isFirstChild = false
+						gqlSpan.StartedAt = child.StartedAt
+					}
+
+					if child.OutputID != nil && *child.OutputID != "" {
+						gqlSpan.OutputID = child.OutputID
+					}
+
 					gqlSpan.EndedAt = child.EndedAt
 					if strings.HasPrefix(gqlSpan.Name, "executor.") && child.Name != "" {
 						gqlSpan.Name = child.Name

@@ -1039,6 +1039,22 @@ func (q *Queries) GetQueueSnapshotChunks(ctx context.Context, snapshotID interfa
 	return items, nil
 }
 
+const getSpanOutput = `-- name: GetSpanOutput :one
+SELECT
+  -- MAX(CASE WHEN input IS NOT NULL THEN input END) as input, TODO
+  MAX(CASE WHEN output IS NOT NULL THEN output END) as output
+FROM spans
+WHERE span_id = ?
+LIMIT 1
+`
+
+func (q *Queries) GetSpanOutput(ctx context.Context, spanID string) (interface{}, error) {
+	row := q.db.QueryRowContext(ctx, getSpanOutput, spanID)
+	var output interface{}
+	err := row.Scan(&output)
+	return output, err
+}
+
 const getSpansByRunID = `-- name: GetSpansByRunID :many
 SELECT
   trace_id,
@@ -1049,7 +1065,8 @@ SELECT
   json_group_array(json_object(
     'name', name,
     'attributes', attributes,
-    'links', links
+    'links', links,
+    'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END
   )) AS span_fragments
 FROM spans
 WHERE run_id = ?

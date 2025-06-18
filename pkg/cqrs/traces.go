@@ -40,6 +40,7 @@ type OtelSpan struct {
 	RawOtelSpan
 
 	Status               enums.StepStatus `json:"status"`
+	OutputID             *string          `json:"output_id,omitempty,omitzero"`
 	CalculatedQueuedTime *time.Time       `json:"queued_time,omitempty,omitzero"`
 	CalculatedStartTime  *time.Time       `json:"start_time,omitempty,omitzero"`
 	CalculatedEndTime    *time.Time       `json:"end_time,omitempty,omitzero"`
@@ -91,6 +92,14 @@ func (s *OtelSpan) GetStepName() string {
 	}
 
 	return s.Name
+}
+
+func (s *OtelSpan) GetOutputID() *string {
+	if s.OutputID == nil || *s.OutputID == "" {
+		return nil
+	}
+
+	return s.OutputID
 }
 
 // TODO is this max?
@@ -381,12 +390,13 @@ type TraceReader interface {
 	GetTraceRun(ctx context.Context, id TraceRunIdentifier) (*TraceRun, error)
 	// GetTraceSpansByRun retrieves all the spans related to the trace
 	GetTraceSpansByRun(ctx context.Context, id TraceRunIdentifier) ([]*Span, error)
-	// GetSpanOutput retrieves the output for the specified span
-	GetSpanOutput(ctx context.Context, id SpanIdentifier) (*SpanOutput, error)
+	// LegacyGetSpanOutput retrieves the output for the specified span
+	LegacyGetSpanOutput(ctx context.Context, id SpanIdentifier) (*SpanOutput, error)
 	// GetSpanStack retrieves the step stack for the specified span
 	GetSpanStack(ctx context.Context, id SpanIdentifier) ([]string, error)
-	// Jack
+	// GetSpansByRunID retrieves all spans related to the specified run
 	GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*OtelSpan, error)
+	GetSpanOutput(ctx context.Context, id SpanIdentifier) (*SpanOutput, error)
 	// TODO move to dedicated entitlement interface once that is implemented properly
 	// for both oss & cloud
 	OtelTracesEnabled(ctx context.Context, accountID uuid.UUID) (bool, error)
@@ -447,6 +457,7 @@ type SpanIdentifier struct {
 	FunctionID  uuid.UUID `json:"fnID"`
 	TraceID     string    `json:"tid"`
 	SpanID      string    `json:"sid"`
+	Preview     *bool     `json:"preview,omitempty,omitzero"`
 }
 
 func (si *SpanIdentifier) Encode() (string, error) {

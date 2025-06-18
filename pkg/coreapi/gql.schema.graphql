@@ -442,7 +442,7 @@ type FunctionRunV2 {
 
   output: Bytes
 
-  trace: RunTraceSpan
+  trace(preview: Boolean): RunTraceSpan
   hasAI: Boolean!
 }
 

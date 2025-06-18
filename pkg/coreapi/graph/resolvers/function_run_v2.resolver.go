@@ -26,12 +26,15 @@ func (r *functionRunV2Resolver) Function(ctx context.Context, fn *models.Functio
 	return models.MakeFunction(fun)
 }
 
-func (r *functionRunV2Resolver) Trace(ctx context.Context, fn *models.FunctionRunV2) (*models.RunTraceSpan, error) {
-	// TODO: handle the case when it's Scheduled
-	// there's no run so it should return empty but not error
+func (r *functionRunV2Resolver) Trace(ctx context.Context, fn *models.FunctionRunV2, preview *bool) (*models.RunTraceSpan, error) {
+	targetLoader := loader.FromCtx(ctx).LegacyRunTraceLoader
+	if preview != nil && *preview {
+		targetLoader = loader.FromCtx(ctx).RunTraceLoader
+	}
+
 	return loader.LoadOne[models.RunTraceSpan](
 		ctx,
-		loader.FromCtx(ctx).RunTraceLoader,
+		targetLoader,
 		&loader.TraceRequestKey{
 			TraceRunIdentifier: &cqrs.TraceRunIdentifier{
 				AppID:      fn.AppID,

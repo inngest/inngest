@@ -355,9 +355,18 @@ SELECT
   json_group_array(json_object(
     'name', name,
     'attributes', attributes,
-    'links', links
+    'links', links,
+    'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END
   )) AS span_fragments
 FROM spans
 WHERE run_id = ?
 GROUP BY dynamic_span_id
 ORDER BY start_time;
+
+-- name: GetSpanOutput :one
+SELECT
+  -- MAX(CASE WHEN input IS NOT NULL THEN input END) as input, TODO
+  MAX(CASE WHEN output IS NOT NULL THEN output END) as output
+FROM spans
+WHERE span_id = ?
+LIMIT 1;

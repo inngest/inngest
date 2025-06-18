@@ -128,6 +128,8 @@ func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.Ot
 			MarkedAsDropped: false,
 		}
 
+		var outputSpanID *string
+
 		var fragments []map[string]interface{}
 		json.Unmarshal([]byte(span.SpanFragments.(string)), &fragments)
 
@@ -188,6 +190,28 @@ func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.Ot
 					}
 				}
 			}
+
+			if outputRef, ok := fragment["output_span_id"].(string); ok {
+				outputSpanID = &outputRef
+			}
+		}
+
+		// If this span has finished, set a preliminary output ID.
+		if outputSpanID != nil && *outputSpanID != "" {
+			p := true
+
+			id := &cqrs.SpanIdentifier{
+				SpanID:  *outputSpanID,
+				Preview: &p,
+			}
+
+			encoded, err := id.Encode()
+			if err != nil {
+				logger.StdlibLogger(ctx).Error("error encoding span identifier", "error", err)
+				return nil, err
+			}
+
+			newSpan.OutputID = &encoded
 		}
 
 		spanMap[span.DynamicSpanID.String] = newSpan
@@ -1251,6 +1275,33 @@ func (w wrapper) GetTraceRun(ctx context.Context, id cqrs.TraceRunIdentifier) (*
 }
 
 func (w wrapper) GetSpanOutput(ctx context.Context, opts cqrs.SpanIdentifier) (*cqrs.SpanOutput, error) {
+	if opts.SpanID == "" {
+		return nil, fmt.Errorf("spanID is required to retrieve output")
+	}
+
+	s, err := w.q.GetSpanOutput(ctx, opts.SpanID)
+	if err != nil {
+		return nil, fmt.Errorf("error retrieving span output: %w", err)
+	}
+
+	so := &cqrs.SpanOutput{}
+	var m map[string]any
+
+	if err := json.Unmarshal([]byte(fmt.Append(nil, s)), &m); err == nil {
+		if errData, ok := m["error"]; ok {
+			so.IsError = true
+			so.Data, _ = json.Marshal(errData)
+		} else if successData, ok := m["data"]; ok {
+			so.Data, _ = json.Marshal(successData)
+		} else {
+			return nil, fmt.Errorf("span output does not contain 'error' or 'data' keys")
+		}
+	}
+
+	return so, nil
+}
+
+func (w wrapper) LegacyGetSpanOutput(ctx context.Context, opts cqrs.SpanIdentifier) (*cqrs.SpanOutput, error) {
 	if opts.TraceID == "" {
 		return nil, fmt.Errorf("traceID is required to retrieve output")
 	}

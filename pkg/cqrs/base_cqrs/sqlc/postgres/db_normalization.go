@@ -787,6 +787,10 @@ func (q NormalizedQueries) GetSpansByRunID(ctx context.Context, runID string) ([
 	return sqliteRows, nil
 }
 
+func (q NormalizedQueries) GetSpanOutput(ctx context.Context, spanID string) (any, error) {
+	return nil, nil
+}
+
 func (q NormalizedQueries) InsertSpan(ctx context.Context, arg sqlc_sqlite.InsertSpanParams) error {
 	pgArg := InsertSpanParams{
 		SpanID:       arg.SpanID,

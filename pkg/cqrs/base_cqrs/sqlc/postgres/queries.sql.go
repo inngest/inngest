@@ -1020,6 +1020,22 @@ func (q *Queries) GetQueueSnapshotChunks(ctx context.Context, snapshotID string)
 	return items, nil
 }
 
+const getSpanOutput = `-- name: GetSpanOutput :one
+SELECT
+  MAX(CASE WHEN output IS NOT NULL THEN output END) as output
+FROM spans
+WHERE dynamic_span_id = $1
+GROUP BY dynamic_span_id
+`
+
+// MAX(CASE WHEN input IS NOT NULL THEN input END) as input, TODO
+func (q *Queries) GetSpanOutput(ctx context.Context, dynamicSpanID sql.NullString) (interface{}, error) {
+	row := q.db.QueryRowContext(ctx, getSpanOutput, dynamicSpanID)
+	var output interface{}
+	err := row.Scan(&output)
+	return output, err
+}
+
 const getSpansByRunID = `-- name: GetSpansByRunID :many
 SELECT
   trace_id,
@@ -1028,9 +1044,11 @@ SELECT
   MAX(end_time) AS end_time,
   parent_span_id,
   json_agg(json_build_object(
+    'span_id', span_id,
     'name', name,
     'attributes', attributes,
-    'links', links
+    'links', links,
+    'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END
   )) AS span_fragments
 FROM spans
 WHERE run_id = CAST($1 AS CHAR(26))

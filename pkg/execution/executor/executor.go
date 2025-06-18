@@ -1256,6 +1256,7 @@ func (e *executor) finalize(ctx context.Context, md sv2.Metadata, evts []json.Ra
 		Metadata:   &md,
 		TargetSpan: tracing.RunSpanRefFromMetadata(&md),
 		Status:     enums.StepStatusCompleted, // TODO
+		// TODO Output
 	})
 	if err != nil {
 		logger.StdlibLogger(ctx).Error(
