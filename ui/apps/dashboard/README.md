@@ -6,7 +6,7 @@ primary way to interact with Inngest Cloud.
 
 ## Setup
 
-Before being able to run the app for the first time, you need to follow the steps below:
+Before running the app for the first time, you need to follow the steps below:
 
 ### Prerequisites
 
