@@ -1643,14 +1643,12 @@ func (q *queue) Migrate(ctx context.Context, sourceShardName string, fnID uuid.U
 	// TODO Do we need to move items from backlogs?
 	partitionKey := shard.RedisClient.kg.PartitionQueueSet(enums.PartitionTypeDefault, fnID.String(), "")
 
-	items, err := q.peek(ctx, shard, peekOpts{
-		PartitionKey: partitionKey,
-		PartitionID:  fnID.String(),
-		Limit:        limit,
-		Until:        time.Time{},
-	})
+	from := time.Time{}
+	// setting it to 5 years ahead should be enough to cover all queue items in the partition
+	until := time.Now().Add(24 * time.Hour * 365 * 5)
+	items, err := q.ItemsByPartition(ctx, shard, fnID, from, until)
 	if err != nil {
-		return -1, fmt.Errorf("error peeking items for queue migration: %w", err)
+		return -1, fmt.Errorf("error preparing partition iteration: %w", err)
 	}
 
 	// Should process in order because we don't want out of order execution when moved over
@@ -1672,10 +1670,10 @@ func (q *queue) Migrate(ctx context.Context, sourceShardName string, fnID uuid.U
 		eg := errgroup.Group{}
 		eg.SetLimit(concurrency)
 
-		for _, qi := range items {
-			qi := qi
+		for qi := range items {
+			i := qi
 			eg.Go(func() error {
-				return process(qi)
+				return process(i)
 			})
 		}
 
@@ -1687,7 +1685,7 @@ func (q *queue) Migrate(ctx context.Context, sourceShardName string, fnID uuid.U
 		return atomic.LoadInt64(&processed), nil
 	}
 
-	for _, qi := range items {
+	for qi := range items {
 		if err := process(qi); err != nil {
 			return processed, err
 		}

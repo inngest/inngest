@@ -4507,7 +4507,7 @@ func TestMigrate(t *testing.T) {
 	fnID := uuid.New()
 
 	// Enqueue to shard 1
-	for i := 0; i < 5; i++ {
+	for range 5 {
 		lease := ulid.MustNew(ulid.Now(), rand.Reader)
 		id := state.Identifier{AccountID: acctID, WorkflowID: fnID, EventID: ulid.MustNew(ulid.Now(), rand.Reader), RunID: ulid.MustNew(ulid.Now(), rand.Reader)}
 		_, err = q1.EnqueueItem(ctx, shard1, osqueue.QueueItem{FunctionID: fnID, Data: osqueue.Item{Identifier: id}, LeaseID: &lease}, time.Now(), osqueue.EnqueueOpts{})
