@@ -52,8 +52,10 @@ const runQuery = graphql(`
               createdAt
             }
             triggers {
-              eventName
-              schedule
+              type
+              value
+              # eventName
+              # schedule
             }
             url
             validFrom
@@ -104,12 +106,7 @@ export function useRun({
       return new Error('result is missing run data');
     }
 
-    const triggers = (run.version?.triggers ?? []).map((trigger) => {
-      return {
-        type: trigger.schedule ? 'CRON' : 'EVENT',
-        value: trigger.schedule ?? trigger.eventName ?? '',
-      } as const;
-    });
+    const triggers = run.version?.triggers ?? [];
 
     return {
       func: {

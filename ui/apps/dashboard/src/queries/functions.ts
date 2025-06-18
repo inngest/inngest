@@ -76,8 +76,10 @@ const GetFunctionsDocument = graphql(`
           isArchived
           current {
             triggers {
-              eventName
-              schedule
+              type
+              value
+              # eventName
+              # schedule
             }
           }
         }
@@ -119,27 +121,27 @@ export function useFunctionsPage({
     ...res,
     data: {
       functions: res.data.workspace.workflows.data.map((fn) => {
-        let triggers: { type: 'EVENT' | 'CRON'; value: string }[] = [];
-        if (fn.current) {
-          for (const trigger of fn.current.triggers) {
-            if (trigger.schedule) {
-              triggers.push({
-                type: 'CRON',
-                value: trigger.schedule,
-              });
-            } else if (trigger.eventName) {
-              triggers.push({
-                type: 'EVENT',
-                value: trigger.eventName,
-              });
-            }
-          }
-        }
+        // let triggers: { type: 'EVENT' | 'CRON'; value: string }[] = [];
+        // if (fn.current) {
+        //   for (const trigger of fn.current.triggers) {
+        //     if (trigger.schedule) {
+        //       triggers.push({
+        //         type: 'CRON',
+        //         value: trigger.schedule,
+        //       });
+        //     } else if (trigger.eventName) {
+        //       triggers.push({
+        //         type: 'EVENT',
+        //         value: trigger.eventName,
+        //       });
+        //     }
+        //   }
+        // }
 
         return {
           ...fn,
           failureRate: undefined,
-          triggers,
+          triggers: fn.current?.triggers || [],
           usage: undefined,
         };
       }),
@@ -166,8 +168,10 @@ const GetFunctionDocument = graphql(`
         }
         current {
           triggers {
-            eventName
-            schedule
+            type
+            value
+            # eventName
+            # schedule
             condition
           }
           deploy {

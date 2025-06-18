@@ -9,7 +9,6 @@ import { useClient } from 'urql';
 
 import { graphql } from '@/gql';
 import { type AppsQuery } from '@/gql/graphql';
-import { transformTriggers } from '@/utils/triggers';
 
 export type FlattenedApp = Omit<
   AppsQuery['environment']['apps'][number],
@@ -54,8 +53,10 @@ const query = graphql(`
           name
           slug
           triggers {
-            eventName
-            schedule
+            type
+            value
+            # eventName
+            # schedule
           }
         }
       }
@@ -108,7 +109,7 @@ export function useApps({ envID, isArchived }: { envID: string; isArchived: bool
               ...latestSyncData,
               functions: functions.map((fn) => ({
                 ...fn,
-                triggers: transformTriggers(fn.triggers),
+                triggers: fn.triggers,
               })),
               __typename: 'App' as const,
             };
