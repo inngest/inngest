@@ -217,7 +217,7 @@ export function EventDetails({
                 {(version) => <TextElement>{version || '-'}</TextElement>}
               </LazyElementWrapper>
             </div>
-            {prettyPayload && (
+            {!payloadError && (
               <div className="border-subtle border-t pl-px">
                 <CodeBlock
                   header={{ title: 'Payload' }}

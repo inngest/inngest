@@ -62,7 +62,7 @@ export function CodeBlock({
   alwaysFullHeight = false,
 }: CodeBlockProps) {
   const [dark, setDark] = useState(isDark());
-  const [editorHeight, setEditorHeight] = useState(0);
+  const [editorHeight, setEditorHeight] = useState(MAX_HEIGHT);
   const [fullScreen, setFullScreen] = useState(false);
   const editorRef = useRef<MonacoEditorType>(null);
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -354,6 +354,12 @@ export function CodeBlock({
                   defaultLanguage={language}
                   value={content}
                   theme="inngest-theme"
+                  loading={
+                    <div className="bg-codeEditor flex h-full w-full items-center justify-center">
+                      <span className="bg-primary-moderate animate-underline absolute left-0 top-0 h-px w-0" />
+                      <div className="text-light text-sm">Loading...</div>
+                    </div>
+                  }
                   options={{
                     // Need to set automaticLayout to true to avoid a resizing bug
                     // (code block never narrows). This is combined with the
