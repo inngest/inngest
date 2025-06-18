@@ -118,32 +118,9 @@ func (q *queue) Enqueue(ctx context.Context, item osqueue.Item, at time.Time, op
 		qi.AtMS -= factor
 	}
 
-	shard := q.primaryQueueShard
-	switch {
-	// If the caller wants us to enqueue the job to a specific queue shard, use that.
-	case opts.ForceQueueShardName != "":
-		foundShard, ok := q.queueShardClients[opts.ForceQueueShardName]
-		if !ok {
-			return fmt.Errorf("tried to force invalid queue shard %q", opts.ForceQueueShardName)
-		}
-
-		shard = foundShard
-	// Otherwise, invoke the shard selector, if configured.
-	case q.shardSelector != nil:
-		// QueueName should be consistently specified on both levels. This safeguard ensures
-		// we'll check for both places, just in case.
-		qn := qi.Data.QueueName
-		if qn == nil {
-			qn = qi.QueueName
-		}
-
-		selected, err := q.shardSelector(ctx, qi.Data.Identifier.AccountID, qn)
-		if err != nil {
-			q.log.Error("error selecting shard", "error", err, "item", qi)
-			return fmt.Errorf("could not select shard: %w", err)
-		}
-
-		shard = selected
+	shard, err := q.selectShard(ctx, opts.ForceQueueShardName, qi)
+	if err != nil {
+		return err
 	}
 
 	metrics.IncrQueueItemStatusCounter(ctx, metrics.CounterOpt{
@@ -161,10 +138,85 @@ func (q *queue) Enqueue(ctx context.Context, item osqueue.Item, at time.Time, op
 		if err != nil {
 			return err
 		}
+
+		// XXX: If we've enqueued a user queue item (sleep, retry, step, etc.) and it's in the future,
+		// we want to ensure that we schedule a rebalance job which takes the queue item and places it
+		// at the correct score based off of the item's run ID when it becomes available.
+		//
+		// Without this, step.sleep or retries for a very old workflow may still lag behind steps from
+		// later workflows when scheduled in the future.  This can, worst case, cause never-ending runs.
+		if !q.enableJobPromotion || !qi.RequiresPromotionJob(q.clock.Now()) {
+			// scheule a rebalance job automatically.
+			return nil
+		}
+
+		// This is to prevent infinite recursion in case RequiresPromotion is accidentally refactored
+		// to include the below job kind.
+		if qi.Data.Kind == osqueue.KindJobPromote {
+			return nil
+		}
+
+		// This is the fudge job.  What a name!
+		//
+		// If we're processing a user function and the sleep duration is in the future,
+		// enqueue a sleep scavenge system queue item that will Requeue the original sleep queue item.
+		// We do this to fudge the original queue item at the exact time, the run was scheduled for to ensure
+		// sleeps for existing function runs are picked up earlier than items for later function runs.
+		promoteAt := time.UnixMilli(qi.AtMS).Add(consts.FutureAtLimit * -1)
+		promoteJobID := fmt.Sprintf("promote-%s", qi.ID)
+		promoteQueueName := fmt.Sprintf("job-promote:%s", qi.FunctionID)
+		err = q.Enqueue(ctx, osqueue.Item{
+			JobID:          &promoteJobID,
+			WorkspaceID:    qi.Data.WorkspaceID,
+			QueueName:      &promoteQueueName,
+			Kind:           osqueue.KindJobPromote,
+			Identifier:     qi.Data.Identifier,
+			PriorityFactor: qi.Data.PriorityFactor,
+			Attempt:        0,
+			Payload: osqueue.PayloadJobPromote{
+				PromoteJobID: qi.ID,
+				ScheduledAt:  qi.AtMS,
+			},
+		}, promoteAt, osqueue.EnqueueOpts{})
+		if err != nil && err != ErrQueueItemExists {
+			// This is best effort, and shouldn't fail the OG enqueue.
+			logger.StdlibLogger(ctx).Error("error scheduling promotion job", "error", err)
+		}
 		return nil
 	default:
 		return fmt.Errorf("unknown shard kind: %s", shard.Kind)
 	}
+}
+
+func (q *queue) selectShard(ctx context.Context, shardName string, qi osqueue.QueueItem) (QueueShard, error) {
+	shard := q.primaryQueueShard
+	switch {
+	// If the caller wants us to enqueue the job to a specific queue shard, use that.
+	case shardName != "":
+		foundShard, ok := q.queueShardClients[shardName]
+		if !ok {
+			return shard, fmt.Errorf("tried to force invalid queue shard %q", shardName)
+		}
+
+		shard = foundShard
+	// Otherwise, invoke the shard selector, if configured.
+	case q.shardSelector != nil:
+		// QueueName should be consistently specified on both levels. This safeguard ensures
+		// we'll check for both places, just in case.
+		qn := qi.Data.QueueName
+		if qn == nil {
+			qn = qi.QueueName
+		}
+
+		selected, err := q.shardSelector(ctx, qi.Data.Identifier.AccountID, qn)
+		if err != nil {
+			q.log.Error("error selecting shard", "error", err, "item", qi)
+			return shard, fmt.Errorf("could not select shard: %w", err)
+		}
+
+		shard = selected
+	}
+	return shard, nil
 }
 
 func (q *queue) Run(ctx context.Context, f osqueue.RunFunc) error {
@@ -174,6 +226,10 @@ func (q *queue) Run(ctx context.Context, f osqueue.RunFunc) error {
 
 	if q.runMode.Scavenger {
 		go q.runScavenger(ctx)
+	}
+
+	if q.runMode.ActiveChecker {
+		go q.runActiveChecker(ctx)
 	}
 
 	go q.runInstrumentation(ctx)
@@ -387,6 +443,64 @@ func (q *queue) runScavenger(ctx context.Context) {
 	}
 }
 
+func (q *queue) runActiveChecker(ctx context.Context) {
+	// Attempt to claim the lease immediately.
+	leaseID, err := q.ConfigLease(ctx, q.primaryQueueShard.RedisClient.kg.ActiveChecker(), ConfigLeaseDuration, q.activeCheckerLease())
+	if err != ErrConfigAlreadyLeased && err != nil {
+		q.quit <- err
+		return
+	}
+
+	q.activeCheckerLeaseLock.Lock()
+	q.activeCheckerLeaseID = leaseID // no-op if not leased
+	q.activeCheckerLeaseLock.Unlock()
+
+	tick := q.clock.NewTicker(ConfigLeaseDuration / 3)
+	checkTick := q.clock.NewTicker(30 * time.Second)
+
+	for {
+		select {
+		case <-ctx.Done():
+			tick.Stop()
+			checkTick.Stop()
+			return
+		case <-checkTick.Chan():
+			// Active check backlogs
+			if q.isActiveChecker() {
+				count, err := q.ActiveCheck(ctx)
+				if err != nil {
+					q.log.Error("error checking active jobs", "error", err)
+				}
+				if count > 0 {
+					q.log.Trace("checked active jobs", "len", count)
+				}
+			}
+		case <-tick.Chan():
+			// Attempt to re-lease the lock.
+			leaseID, err := q.ConfigLease(ctx, q.primaryQueueShard.RedisClient.kg.ActiveChecker(), ConfigLeaseDuration, q.activeCheckerLease())
+			if err == ErrConfigAlreadyLeased {
+				// This is expected; every time there is > 1 runner listening to the
+				// queue there will be contention.
+				q.activeCheckerLeaseLock.Lock()
+				q.activeCheckerLeaseID = nil
+				q.activeCheckerLeaseLock.Unlock()
+				continue
+			}
+			if err != nil {
+				q.log.Error("error claiming active checker lease", "error", err)
+				q.activeCheckerLeaseLock.Lock()
+				q.activeCheckerLeaseID = nil
+				q.activeCheckerLeaseLock.Unlock()
+				continue
+			}
+
+			q.activeCheckerLeaseLock.Lock()
+			q.activeCheckerLeaseID = leaseID
+			q.activeCheckerLeaseLock.Unlock()
+		}
+	}
+}
+
 func (q *queue) runInstrumentation(ctx context.Context) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "Instrument"), redis_telemetry.ScopeQueue)
 
@@ -450,8 +564,7 @@ func (q *queue) worker(ctx context.Context, f osqueue.RunFunc) {
 		select {
 		case <-ctx.Done():
 			return
-		case <-q.quit:
-			return
+
 		case i := <-q.workers:
 			// Create a new context which isn't cancelled by the parent, when quit.
 			// XXX: When jobs can have their own cancellation signals, move this into
@@ -1219,6 +1332,16 @@ func (q *queue) scavengerLease() *ulid.ULID {
 	return &copied
 }
 
+func (q *queue) activeCheckerLease() *ulid.ULID {
+	q.activeCheckerLeaseLock.RLock()
+	defer q.activeCheckerLeaseLock.RUnlock()
+	if q.activeCheckerLeaseID == nil {
+		return nil
+	}
+	copied := *q.activeCheckerLeaseID
+	return &copied
+}
+
 func (q *queue) capacity() int64 {
 	return int64(q.numWorkers) - atomic.LoadInt64(&q.sem.counter)
 }
@@ -1321,6 +1444,14 @@ func (q *queue) isSequential() bool {
 
 func (q *queue) isScavenger() bool {
 	l := q.scavengerLease()
+	if l == nil {
+		return false
+	}
+	return ulid.Time(l.Time()).After(q.clock.Now())
+}
+
+func (q *queue) isActiveChecker() bool {
+	l := q.activeCheckerLease()
 	if l == nil {
 		return false
 	}

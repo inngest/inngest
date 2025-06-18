@@ -3,12 +3,13 @@ package singleton
 import (
 	"context"
 	"fmt"
-	"log"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/expressions"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/util"
+	"github.com/oklog/ulid/v2"
 )
 
 var (
@@ -17,7 +18,7 @@ var (
 )
 
 type Singleton interface {
-	Singleton(ctx context.Context, key string, c inngest.Singleton) (bool, error)
+	HandleSingleton(ctx context.Context, key string, c inngest.Singleton) (*ulid.ULID, error)
 }
 
 // SingletonKey returns the singleton key given a function ID, singleton config,
@@ -46,10 +47,18 @@ func hash(res any, id uuid.UUID) string {
 	return fmt.Sprintf("%s-%s", id, sum)
 }
 
-func singleton(ctx context.Context, store SingletonStore, key string, s inngest.Singleton) (bool, error) {
-	result, err := store.Exists(ctx, key)
-	if err != nil {
-		log.Fatal(err)
+//	singleton retrieves or releases a singleton lock based on the given mode.
+//
+// - If the mode is SingletonModeSkip, it returns the currently held run ID without modifying the lock.
+//
+// - If the mode is SingletonModeCancel, it attempts to release the lock and returns the run ID that was released.
+func singleton(ctx context.Context, store SingletonStore, key string, s inngest.Singleton) (*ulid.ULID, error) {
+	switch s.Mode {
+	case enums.SingletonModeSkip:
+		return store.GetCurrentRunID(ctx, key)
+	case enums.SingletonModeCancel:
+		return store.ReleaseSingleton(ctx, key)
+	default:
+		return nil, fmt.Errorf("singleton mode %d not implemented", s.Mode)
 	}
-	return result, err
 }

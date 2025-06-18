@@ -2,7 +2,10 @@ package redis_state
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"math/rand"
+	"runtime/debug"
 	"time"
 
 	"github.com/google/uuid"
@@ -22,6 +25,8 @@ var (
 
 var (
 	ErrBacklogNotFound = fmt.Errorf("backlog not found")
+
+	ErrBacklogPeekMaxExceedsLimits = fmt.Errorf("backlog peek exceeded the maximum limit")
 )
 
 type PartitionConstraintConfig struct {
@@ -102,6 +107,15 @@ type QueueShadowPartition struct {
 
 	// Flag to pause enqueues to the shadow partition.
 	PauseEnqueue bool `json:"noenqueue,omitempty"`
+}
+
+func (sp QueueShadowPartition) GetAccountID() uuid.UUID {
+	accountID := uuid.Nil
+	if sp.AccountID != nil {
+		accountID = *sp.AccountID
+	}
+
+	return accountID
 }
 
 // readyQueueKey returns the ZSET key to the ready queue
@@ -386,6 +400,8 @@ func (q *queue) ItemShadowPartition(ctx context.Context, i osqueue.QueueItem) Qu
 		q.log.Error("shadow partitions encountered queue item with inconsistent custom queue names, should have matching values for i.QueueName and i.Data.QueueName", "item", i)
 	}
 
+	accountID := i.Data.Identifier.AccountID
+
 	// The only case when we manually set a queueName is for system partitions
 	if queueName != nil {
 		systemPartition := QueuePartition{
@@ -398,17 +414,31 @@ func (q *queue) ItemShadowPartition(ctx context.Context, i osqueue.QueueItem) Qu
 		systemLimits := q.systemConcurrencyLimitGetter(ctx, systemPartition)
 		systemPartition.ConcurrencyLimit = systemLimits.PartitionLimit
 
+		var aID *uuid.UUID
+		if accountID != uuid.Nil {
+			aID = &accountID
+		}
+
 		return QueueShadowPartition{
 			PartitionID:     *queueName,
 			SystemQueueName: queueName,
 			Concurrency: ShadowPartitionConcurrency{
 				SystemConcurrency: systemLimits.PartitionLimit,
 			},
+
+			AccountID: aID,
 		}
 	}
 
-	if i.FunctionID == uuid.Nil {
-		q.log.Error("unexpected missing functionID in ItemPartitions()", "item", i)
+	fnID := i.FunctionID
+	if fnID == uuid.Nil {
+		stack := string(debug.Stack())
+		q.log.Error("unexpected missing functionID in ItemShadowPartition call", "item", i, "stack", stack)
+	}
+
+	if accountID == uuid.Nil {
+		stack := string(debug.Stack())
+		q.log.Error("unexpected missing accountID in ItemShadowPartition call", "item", i, "stack", stack)
 	}
 
 	// NOTE: This is an optimization that ensures we return *updated* concurrency keys
@@ -431,10 +461,10 @@ func (q *queue) ItemShadowPartition(ctx context.Context, i osqueue.QueueItem) Qu
 	}
 
 	fnPartition := QueuePartition{
-		ID:            i.FunctionID.String(),
+		ID:            fnID.String(),
 		PartitionType: int(enums.PartitionTypeDefault), // Function partition
-		FunctionID:    &i.FunctionID,
-		AccountID:     i.Data.Identifier.AccountID,
+		FunctionID:    &fnID,
+		AccountID:     accountID,
 	}
 
 	limits, _ := duration(ctx, q.primaryQueueShard.Name, "shadow_partition_fn_concurrency_getter", q.clock.Now(), func(ctx context.Context) (PartitionConcurrencyLimits, error) {
@@ -475,13 +505,13 @@ func (q *queue) ItemShadowPartition(ctx context.Context, i osqueue.QueueItem) Qu
 	}
 
 	return QueueShadowPartition{
-		PartitionID:     i.FunctionID.String(),
+		PartitionID:     fnID.String(),
 		FunctionVersion: i.Data.Identifier.WorkflowVersion,
 
 		// Identifiers
-		FunctionID: &i.FunctionID,
+		FunctionID: &fnID,
 		EnvID:      &i.WorkspaceID,
-		AccountID:  &i.Data.Identifier.AccountID,
+		AccountID:  &accountID,
 
 		// Currently configured limits
 		Concurrency: ShadowPartitionConcurrency{
@@ -721,6 +751,9 @@ func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueSha
 		sp.activeRunKey(kg),          // Set for active runs in partition
 		b.customKeyActiveRuns(kg, 1), // Set for active runs with custom concurrency key 1
 		b.customKeyActiveRuns(kg, 2), // Set for active runs with custom concurrency key 2
+
+		kg.PartitionActiveCheckSet(),
+		kg.PartitionActiveCheckCooldown(sp.PartitionID),
 	}
 
 	enableKeyQueuesVal := "0"
@@ -728,6 +761,9 @@ func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueSha
 	if sp.keyQueuesEnabled(ctx, q) {
 		enableKeyQueuesVal = "1"
 	}
+
+	// Enable conditional spot checking (probability in queue settings + feature flag)
+	shouldSpotCheckActiveSet := q.enableActiveSpotChecks(ctx, accountID) && rand.Intn(100) <= q.runMode.ActiveCheckerSpotCheckProbability
 
 	args, err := StrSlice([]any{
 		b.BacklogID,
@@ -749,6 +785,7 @@ func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueSha
 
 		kg.QueuePrefix(),
 		enableKeyQueuesVal,
+		shouldSpotCheckActiveSet,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("could not serialize args: %w", err)
@@ -964,4 +1001,78 @@ func (q *queue) BacklogPrepareNormalize(ctx context.Context, b *QueueBacklog, sp
 	default:
 		return 0, false, fmt.Errorf("unknown status preparing backlog normalization: %v (%T)", status, status)
 	}
+}
+
+func (q *queue) backlogPeek(ctx context.Context, b *QueueBacklog, from time.Time, until time.Time, limit int64, opts ...PeekOpt) ([]*osqueue.QueueItem, int, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "backlogPeek"), redis_telemetry.ScopeQueue)
+
+	opt := peekOption{}
+	for _, apply := range opts {
+		apply(&opt)
+	}
+
+	if !q.isPermittedQueueKind() {
+		return nil, 0, fmt.Errorf("unsupported queue shared kind for backlogPeek: %s", q.primaryQueueShard.Kind)
+	}
+
+	if b == nil {
+		return nil, 0, fmt.Errorf("expected backlog to be provided")
+	}
+
+	if limit > AbsoluteQueuePeekMax || limit > q.peekMax {
+		limit = q.peekMax
+	}
+	if limit <= 0 {
+		limit = q.peekMin
+	}
+
+	var fromTime *time.Time
+	if !from.IsZero() {
+		fromTime = &from
+	}
+
+	l := q.log.With(
+		"method", "backlogPeek",
+		"backlog", b,
+		"from", from,
+		"until", until,
+		"limit", limit,
+	)
+
+	rc := q.primaryQueueShard.RedisClient
+	if opt.Shard != nil {
+		rc = opt.Shard.RedisClient
+	}
+
+	backlogSet := rc.kg.BacklogSet(b.BacklogID)
+
+	p := peeker[osqueue.QueueItem]{
+		q:               q,
+		opName:          "backlogPeek",
+		keyMetadataHash: rc.kg.QueueItem(),
+		max:             q.peekMax,
+		maker: func() *osqueue.QueueItem {
+			return &osqueue.QueueItem{}
+		},
+		handleMissingItems: func(pointers []string) error {
+			cmd := rc.Client().B().Zrem().Key(rc.kg.QueueItem()).Member(pointers...).Build()
+			err := rc.Client().Do(ctx, cmd).Error()
+			if err != nil {
+				l.Warn("failed to clean up dangling queue items in the backlog", "missing", pointers)
+			}
+			return nil
+		},
+		isMillisecondPrecision: true,
+		fromTime:               fromTime,
+	}
+
+	res, err := p.peek(ctx, backlogSet, true, until, limit, opts...)
+	if err != nil {
+		if errors.Is(err, ErrPeekerPeekExceedsMaxLimits) {
+			return nil, 0, ErrBacklogPeekMaxExceedsLimits
+		}
+		return nil, 0, fmt.Errorf("error peeking backlog queue items, %w", err)
+	}
+
+	return res.Items, res.TotalCount, nil
 }

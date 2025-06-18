@@ -559,25 +559,45 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	var singletonConfig *queue.Singleton
 	data := req.Events[0].GetEvent().Map()
 
-	// Ignores Cancel mode for now
-	if req.Function.Singleton != nil && req.Function.Singleton.Mode == enums.SingletonModeSkip {
+	if req.Function.Singleton != nil {
 		singletonKey, err := singleton.SingletonKey(ctx, req.Function.ID, *req.Function.Singleton, data)
 		switch {
 		case err == nil:
-			// Attempt to early handle function singletons, function runs could still fail
-			// to enqueue later on when it atomically tries to acquire a function mutex.
-			alreadyRunning, err := e.singletonMgr.Singleton(ctx, singletonKey, *req.Function.Singleton)
+			// Attempt to early handle function singletons when in skip mode. Function runs may still
+			// fail to enqueue later when attempting to atomically acquire the function mutex.
+			//
+			// In cancel mode, this call releases the singleton mutex and atomically returns the
+			// current run holding the lock, which will be cancelled further down. After releasing,
+			// the lock becomes available to any competing run. If a faster run acquires it before
+			// this one tries to, it will fail to acquire the lock and be skipped; Effectively
+			// behaving as if the singleton mode were set to skip.
+			singletonRunID, err := e.singletonMgr.HandleSingleton(ctx, singletonKey, *req.Function.Singleton)
 			if err != nil {
 				return nil, err
 			}
 
-			if alreadyRunning {
-				// TODO: Handle cancellation mode
+			eventID := req.Events[0].GetInternalID()
 
-				// Immediately end before creating state
-				return nil, ErrFunctionSkipped
+			if singletonRunID != nil {
+				switch req.Function.Singleton.Mode {
+				case enums.SingletonModeCancel:
+					runID := sv2.ID{
+						RunID:      *singletonRunID,
+						FunctionID: req.Function.ID,
+						Tenant: sv2.Tenant{
+							AccountID: req.AccountID,
+							EnvID:     req.WorkspaceID,
+						},
+					}
+					err = e.Cancel(ctx, runID, execution.CancelRequest{
+						EventID: &eventID,
+					})
+					logger.StdlibLogger(ctx).Error("error canceling singleton run", "error", err)
+				default:
+					// Immediately end before creating state
+					return nil, ErrFunctionSkipped
+				}
 			}
-
 			singletonConfig = &queue.Singleton{Key: singletonKey}
 		case errors.Is(err, singleton.ErrNotASingleton):
 			// We no-op, and we run the function normally not as a singleton
@@ -2672,7 +2692,9 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, i *runInstance, gen
 		Incoming: edge.Edge.Incoming, // To re-call the SDK
 	}
 
-	startedAt := time.Now()
+	now := time.Now()
+
+	startedAt := now
 	until := startedAt.Add(dur)
 
 	// Create another group for the next item which will run.  We're enqueueing
@@ -2680,7 +2702,7 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, i *runInstance, gen
 	groupID := uuid.New().String()
 	ctx = state.WithGroupID(ctx, groupID)
 
-	jobID := fmt.Sprintf("%s-%s", i.md.IdempotencyKey(), gen.ID)
+	jobID := queue.HashID(ctx, fmt.Sprintf("%s-%s", i.md.IdempotencyKey(), gen.ID))
 	nextItem := queue.Item{
 		JobID:       &jobID,
 		WorkspaceID: i.md.ID.Tenant.EnvID,
@@ -2716,8 +2738,9 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, i *runInstance, gen
 		return fmt.Errorf("error creating span for next step after Sleep: %w", err)
 	}
 
-	// TODO Should this also include a parent step span? It will never have attempts.
-	err = e.queue.Enqueue(ctx, nextItem, until, queue.EnqueueOpts{})
+	err = e.queue.Enqueue(ctx, nextItem, until, queue.EnqueueOpts{
+		PassthroughJobId: true,
+	})
 	if err == redis_state.ErrQueueItemExists {
 		span.Drop()
 		return nil

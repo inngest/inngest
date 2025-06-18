@@ -69,7 +69,7 @@ export default function FunctionLayout({
     [env.id, functionSlug, invokeFunction]
   );
 
-  const externalAppID = data?.workspace.workflow?.appName;
+  const externalAppID = data?.workspace.workflow?.app.name;
 
   if (error) {
     throw error;

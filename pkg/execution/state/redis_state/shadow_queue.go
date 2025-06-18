@@ -751,38 +751,36 @@ func (q *queue) removeShadowContinue(ctx context.Context, p *QueueShadowPartitio
 	}
 }
 
-func (q *queue) ShadowPartitionPeek(ctx context.Context, sp *QueueShadowPartition, sequential bool, until time.Time, limit int64) ([]*QueueBacklog, int, error) {
+func (q *queue) ShadowPartitionPeek(ctx context.Context, sp *QueueShadowPartition, sequential bool, until time.Time, limit int64, opts ...PeekOpt) ([]*QueueBacklog, int, error) {
 	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
 		return nil, 0, fmt.Errorf("unsupported queue shard kind for ShadowPartitionPeek: %s", q.primaryQueueShard.Kind)
 	}
 
+	opt := peekOption{}
+	for _, apply := range opts {
+		apply(&opt)
+	}
+
 	rc := q.primaryQueueShard.RedisClient
+	if opt.Shard != nil {
+		rc = opt.Shard.RedisClient
+	}
 
 	shadowPartitionSet := rc.kg.ShadowPartitionSet(sp.PartitionID)
 
 	p := peeker[QueueBacklog]{
 		q:               q,
 		opName:          "ShadowPartitionPeek",
-		keyMetadataHash: q.primaryQueueShard.RedisClient.kg.BacklogMeta(),
+		keyMetadataHash: rc.kg.BacklogMeta(),
 		max:             ShadowPartitionPeekMaxBacklogs,
 		maker: func() *QueueBacklog {
 			return &QueueBacklog{}
 		},
-		handleMissingItems: func(pointers []string) error {
-			err := rc.Client().Do(ctx, rc.Client().B().Zrem().Key(shadowPartitionSet).Member(pointers...).Build()).Error()
-			if err != nil {
-				q.log.Warn("failed to clean up dangling backlogs from shard partition",
-					"missing", pointers,
-					"sp", sp,
-				)
-			}
-
-			return nil
-		},
+		handleMissingItems:     CleanupMissingPointers(ctx, shadowPartitionSet, rc.Client(), q.log.With("sp", sp)),
 		isMillisecondPrecision: true,
 	}
 
-	res, err := p.peek(ctx, shadowPartitionSet, sequential, until, limit)
+	res, err := p.peek(ctx, shadowPartitionSet, sequential, until, limit, opts...)
 	if err != nil {
 		if errors.Is(err, ErrPeekerPeekExceedsMaxLimits) {
 			return nil, 0, ErrShadowPartitionBacklogPeekMaxExceedsLimits
