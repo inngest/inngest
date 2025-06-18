@@ -477,7 +477,7 @@ export const TRACE_DETAILS_FRAGMENT = gql`
 `;
 
 export const GET_RUN = gql`
-  query GetRun($runID: String!) {
+  query GetRun($runID: String!, $preview: Boolean) {
     run(runID: $runID) {
       function {
         app {
@@ -487,7 +487,7 @@ export const GET_RUN = gql`
         name
         slug
       }
-      trace {
+      trace(preview: $preview) {
         ...TraceDetails
         childrenSpans {
           ...TraceDetails

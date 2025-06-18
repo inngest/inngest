@@ -323,6 +323,11 @@ export type FunctionRunV2 = {
   triggerIDs: Array<Scalars['ULID']>;
 };
 
+
+export type FunctionRunV2TraceArgs = {
+  preview: InputMaybe<Scalars['Boolean']>;
+};
+
 export type FunctionRunV2Edge = {
   __typename?: 'FunctionRunV2Edge';
   cursor: Scalars['String'];
@@ -1005,6 +1010,7 @@ export type TraceDetailsFragment = { __typename?: 'RunTraceSpan', name: string, 
 
 export type GetRunQueryVariables = Exact<{
   runID: Scalars['String'];
+  preview: InputMaybe<Scalars['Boolean']>;
 }>;
 
 
@@ -1481,7 +1487,7 @@ export const CountRunsDocument = `
 }
     `;
 export const GetRunDocument = `
-    query GetRun($runID: String!) {
+    query GetRun($runID: String!, $preview: Boolean) {
   run(runID: $runID) {
     function {
       app {
@@ -1491,7 +1497,7 @@ export const GetRunDocument = `
       name
       slug
     }
-    trace {
+    trace(preview: $preview) {
       ...TraceDetails
       childrenSpans {
         ...TraceDetails

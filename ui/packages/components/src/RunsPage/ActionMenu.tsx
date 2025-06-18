@@ -15,12 +15,17 @@ export type RunsActionMenuProps = {
   setAutoRefresh: () => void;
   autoRefresh?: boolean;
   intervalSeconds?: number;
+
+  toggleTracesPreview: () => void;
+  tracesPreviewEnabled?: boolean;
 };
 
 export const RunsActionMenu = ({
   autoRefresh,
   setAutoRefresh,
   intervalSeconds = 5,
+  tracesPreviewEnabled,
+  toggleTracesPreview,
 }: RunsActionMenuProps) => {
   return (
     <div>
@@ -49,6 +54,20 @@ export const RunsActionMenu = ({
               onClick={(e) => {
                 e.stopPropagation();
                 setAutoRefresh();
+              }}
+            />
+          </DropdownMenuItem>
+          <DropdownMenuItem className="hover:bg-canvasBase">
+            <div className="flex flex-col">
+              <div className="text-basis text-sm">Traces Preview</div>
+              <div className="text-basis text-xs">Use a new Developer Preview mode of traces</div>
+            </div>
+            <Switch
+              checked={tracesPreviewEnabled}
+              className="data-[state=checked]:bg-primary-moderate"
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleTracesPreview();
               }}
             />
           </DropdownMenuItem>
