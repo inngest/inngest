@@ -4467,6 +4467,8 @@ func TestQueueRateLimit(t *testing.T) {
 func TestMigrate(t *testing.T) {
 	ctx := context.Background()
 
+	clock := clockwork.NewFakeClock()
+
 	// default redis
 	r1 := miniredis.RunT(t)
 	rc1, err := rueidis.NewClient(rueidis.ClientOption{InitAddress: []string{r1.Addr()}, DisableCache: true})
@@ -4493,6 +4495,7 @@ func TestMigrate(t *testing.T) {
 		WithPartitionPriorityFinder(func(ctx context.Context, part QueuePartition) uint {
 			return PriorityDefault
 		}),
+		WithClock(clock),
 	)
 
 	q2 := NewQueue(
@@ -4501,6 +4504,7 @@ func TestMigrate(t *testing.T) {
 		WithPartitionPriorityFinder(func(ctx context.Context, part QueuePartition) uint {
 			return PriorityDefault
 		}),
+		WithClock(clock),
 	)
 
 	acctID := uuid.New()
@@ -4508,9 +4512,8 @@ func TestMigrate(t *testing.T) {
 
 	// Enqueue to shard 1
 	for range 5 {
-		lease := ulid.MustNew(ulid.Now(), rand.Reader)
 		id := state.Identifier{AccountID: acctID, WorkflowID: fnID, EventID: ulid.MustNew(ulid.Now(), rand.Reader), RunID: ulid.MustNew(ulid.Now(), rand.Reader)}
-		_, err = q1.EnqueueItem(ctx, shard1, osqueue.QueueItem{FunctionID: fnID, Data: osqueue.Item{Identifier: id}, LeaseID: &lease}, time.Now(), osqueue.EnqueueOpts{})
+		err := q1.Enqueue(ctx, osqueue.Item{Identifier: id}, clock.Now(), osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 	}
 
@@ -4541,6 +4544,9 @@ func TestMigrate(t *testing.T) {
 	count, err = getItemCountForQueue(ctx, rc1, queueKey)
 	require.NoError(t, err)
 	require.Equal(t, int64(0), count)
+
+	clock.Advance(q1.idempotencyTTL + 5*time.Second)
+	r1.FastForward(q1.idempotencyTTL + 5*time.Second)
 
 	// Now, move everything back to queue 1
 	returned, err := q2.Migrate(ctx, shard2Name, fnID, 10, 0, func(ctx context.Context, qi *osqueue.QueueItem) error {

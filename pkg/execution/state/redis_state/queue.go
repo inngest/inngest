@@ -1636,17 +1636,12 @@ func (q *queue) Migrate(ctx context.Context, sourceShardName string, fnID uuid.U
 		return -1, fmt.Errorf("no queue shard available for '%s'", sourceShardName)
 	}
 
-	if limit > AbsoluteQueuePeekMax || limit <= 0 {
-		limit = AbsoluteQueuePeekMax
-	}
-
-	// TODO Do we need to move items from backlogs?
-	partitionKey := shard.RedisClient.kg.PartitionQueueSet(enums.PartitionTypeDefault, fnID.String(), "")
-
 	from := time.Time{}
 	// setting it to 5 years ahead should be enough to cover all queue items in the partition
-	until := time.Now().Add(24 * time.Hour * 365 * 5)
-	items, err := q.ItemsByPartition(ctx, shard, fnID, from, until)
+	until := q.clock.Now().Add(24 * time.Hour * 365 * 5)
+	items, err := q.ItemsByPartition(ctx, shard, fnID, from, until,
+		WithQueueItemIterBatchSize(limit),
+	)
 	if err != nil {
 		return -1, fmt.Errorf("error preparing partition iteration: %w", err)
 	}
@@ -1658,8 +1653,9 @@ func (q *queue) Migrate(ctx context.Context, sourceShardName string, fnID uuid.U
 		if err := handler(ctx, qi); err != nil {
 			return err
 		}
-		if err := q.removeQueueItem(ctx, shard, partitionKey, qi.ID); err != nil {
-			q.log.Error("error cleaning up queue item after migration", "error", err)
+
+		if err := q.Dequeue(ctx, shard, *qi); err != nil {
+			q.log.Error("error dequeueing queue item after migration", "error", err)
 		}
 
 		atomic.AddInt64(&processed, 1)
@@ -1691,7 +1687,7 @@ func (q *queue) Migrate(ctx context.Context, sourceShardName string, fnID uuid.U
 		}
 	}
 
-	return processed, nil
+	return atomic.LoadInt64(&processed), nil
 }
 
 func (q *queue) RemoveQueueItem(ctx context.Context, shardName string, partitionKey string, itemID string) error {
