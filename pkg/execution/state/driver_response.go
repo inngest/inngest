@@ -324,6 +324,58 @@ func (r *DriverResponse) IsDiscoveryResponse() bool {
 	return false
 }
 
+// GetFunctionOutput returns the serialized output of the function if this
+// response represents a function result. The output could also be an error.
+func (r *DriverResponse) GetFunctionOutput() (*string, error) {
+	if !r.IsFunctionResult() {
+		return nil, nil
+	}
+
+	output := r.Err
+	if r.Output != nil {
+		switch v := r.Output.(type) {
+		case string:
+			{
+				output = &v
+			}
+		case []byte:
+			{
+				s := string(v)
+				output = &s
+			}
+		default:
+			{
+				byt, err := json.Marshal(r.Output)
+				if err != nil {
+					return nil, fmt.Errorf("failed to marshal output: %w", err)
+				}
+
+				s := string(byt)
+				output = &s
+			}
+		}
+	}
+
+	// Now we have the output, we make sure it's keyed the same as regular step
+	// outputs are, either under `data` or `error`.
+	var keyedOutput *string
+	key := "data"
+	if r.Error() != "" {
+		key = "error"
+	}
+
+	keyedByt, err := json.Marshal(map[string]json.RawMessage{
+		key: json.RawMessage(*output),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal output as data: %w", err)
+	}
+	s := string(keyedByt)
+	keyedOutput = &s
+
+	return keyedOutput, nil
+}
+
 type WrappedStandardError struct {
 	err error
 

@@ -54,7 +54,8 @@ const (
 	// its wrapped form for the SDK. This data may not be stored with the span
 	// when it hits a store, and instead may be removed to be stored
 	// separately.
-	AttributeStepOutput = "_inngest.step.output" // _s.out
+	AttributeStepOutput    = "_inngest.step.output"     // _s.out
+	AttributeStepOutputRef = "_inngest.step.output.ref" // _s.out.ref
 
 	// Run attributes
 	AttributeStepRunType = "_inngest.step.run.type" // _s.r.type

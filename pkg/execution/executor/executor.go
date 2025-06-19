@@ -795,6 +795,8 @@ type runInstance struct {
 	resp       *state.DriverResponse
 	httpClient util.HTTPDoer
 	stackIndex int
+	// If specified, this is the span reference that represents this execution.
+	execSpan *meta.SpanReference
 }
 
 // Execute loads a workflow and the current run state, then executes the
@@ -809,9 +811,6 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	// for `tools.sleep` within generator functions.
 	isSleepResume := item.Kind == queue.KindSleep && item.Attempt == 0
 	if isSleepResume {
-		// tCtx, _ := e.tracerProvider.NewTracer(ctx, md, &item)
-		// e.tracerProvider.UpdateSpanEnd(tCtx, time.Now(),
-		// []attribute.KeyValue{})
 		err := e.tracerProvider.UpdateSpan(&tracing.UpdateSpanOptions{
 			EndTime:    time.Now(),
 			Location:   "executor.Execute",
@@ -1024,7 +1023,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		execParent = tracing.SpanRefFromQueueItem(&item)
 	}
 
-	execSpan, err := e.tracerProvider.CreateSpan(
+	instance.execSpan, err = e.tracerProvider.CreateSpan(
 		meta.SpanNameExecution,
 		&tracing.CreateSpanOptions{
 			Location:  "executor.Execute",
@@ -1053,9 +1052,9 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 				Location:   "executor.Execute",
 				Metadata:   &md,
 				QueueItem:  &item,
-				TargetSpan: execSpan,
+				TargetSpan: instance.execSpan,
 				SpanOptions: []trace.SpanStartOption{
-					tracing.WithDriverResponseAttrs(resp),
+					tracing.WithDriverResponseAttrs(resp, nil),
 				},
 				Status: status,
 			},
@@ -1124,7 +1123,7 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 					},
 				})
 
-				if err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), e.assignedQueueShard, *i.resp); err != nil {
+				if err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), e.assignedQueueShard, *i.resp, i.execSpan); err != nil {
 					l.Error("error running finish handler", "error", err)
 				}
 
@@ -1177,7 +1176,7 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 		})
 
 		// TODO: Refactor state input
-		if err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), e.assignedQueueShard, *i.resp); err != nil {
+		if err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), e.assignedQueueShard, *i.resp, i.execSpan); err != nil {
 			l.Error("error running finish handler", "error", err)
 		}
 
@@ -1200,7 +1199,7 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 		})
 
 		// This is the function result.
-		if err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), e.assignedQueueShard, *i.resp); err != nil {
+		if err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), e.assignedQueueShard, *i.resp, i.execSpan); err != nil {
 			l.Error("error running finish handler", "error", err)
 		}
 
@@ -1247,7 +1246,7 @@ func (f functionFinishedData) Map() map[string]any {
 // Returns a boolean indicating whether it performed finalization. If the run
 // had parallel steps then it may be false, since parallel steps cause the
 // function end to be reached multiple times in a single run
-func (e *executor) finalize(ctx context.Context, md sv2.Metadata, evts []json.RawMessage, fnSlug string, queueShard redis_state.QueueShard, resp state.DriverResponse) error {
+func (e *executor) finalize(ctx context.Context, md sv2.Metadata, evts []json.RawMessage, fnSlug string, queueShard redis_state.QueueShard, resp state.DriverResponse, outputSpanRef *meta.SpanReference) error {
 	ctx = context.WithoutCancel(ctx)
 
 	err := e.tracerProvider.UpdateSpan(&tracing.UpdateSpanOptions{
@@ -1255,8 +1254,10 @@ func (e *executor) finalize(ctx context.Context, md sv2.Metadata, evts []json.Ra
 		Location:   "executor.finalize",
 		Metadata:   &md,
 		TargetSpan: tracing.RunSpanRefFromMetadata(&md),
-		Status:     enums.StepStatusCompleted, // TODO
-		// TODO Output
+		Status:     enums.StepStatusCompleted, // TODO Status
+		SpanOptions: []trace.SpanStartOption{
+			tracing.WithDriverResponseAttrs(&resp, outputSpanRef),
+		},
 	})
 	if err != nil {
 		logger.StdlibLogger(ctx).Error(
@@ -1936,9 +1937,10 @@ func (e *executor) Cancel(ctx context.Context, id sv2.ID, r execution.CancelRequ
 	})
 
 	fnCancelledErr := state.ErrFunctionCancelled.Error()
+	// TODO Is the execspan set here? Does it matter?
 	if err := e.finalize(ctx, md, evts, f.Function.GetSlug(), shard, state.DriverResponse{
 		Err: &fnCancelledErr,
-	}); err != nil {
+	}, nil); err != nil {
 		l.Error("error running finish handler", "error", err)
 	}
 	for _, e := range e.lifecycles {

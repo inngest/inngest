@@ -127,7 +127,10 @@ func (s *OtelSpan) GetIsRoot() bool {
 	return parentSpanID == nil || *parentSpanID == "" || *parentSpanID == "0000000000000000"
 }
 
-// TODO
+// Get the time that the span was "queued". This will always be present. If a
+// value cannot be found internally (i.e. we haven't explicitly set the moment
+// this span was queued), then the time will match the span's start time in
+// order to show no queued time in the UI.
 func (s *OtelSpan) GetQueuedAtTime() time.Time {
 	if q, err := s.anyUnixMilliToTime(s.Attributes[meta.AttributeQueuedAt]); err == nil {
 		return q
@@ -138,7 +141,8 @@ func (s *OtelSpan) GetQueuedAtTime() time.Time {
 	return s.StartTime
 }
 
-// TODO
+// Get the time that the span started. Note that this is not necessarily when
+// the span created, as it may be dynamic.
 func (s *OtelSpan) GetStartedAtTime() *time.Time {
 	if st, err := s.anyUnixMilliToTime(s.Attributes[meta.AttributeStartedAt]); err == nil {
 		return &st
@@ -147,7 +151,8 @@ func (s *OtelSpan) GetStartedAtTime() *time.Time {
 	return nil
 }
 
-// TODO
+// Get the time that the span ended. Note that this is not necessarily when the
+// span was persisted, as it may be dynamic.
 func (s *OtelSpan) GetEndedAtTime() *time.Time {
 	if et, err := s.anyUnixMilliToTime(s.Attributes[meta.AttributeEndedAt]); err == nil {
 		return &et
@@ -457,7 +462,9 @@ type SpanIdentifier struct {
 	FunctionID  uuid.UUID `json:"fnID"`
 	TraceID     string    `json:"tid"`
 	SpanID      string    `json:"sid"`
-	Preview     *bool     `json:"preview,omitempty,omitzero"`
+
+	// Whether the output should direct to the tracing preview stores
+	Preview *bool `json:"preview,omitempty,omitzero"`
 }
 
 func (si *SpanIdentifier) Encode() (string, error) {

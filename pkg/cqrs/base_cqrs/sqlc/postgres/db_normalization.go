@@ -788,6 +788,7 @@ func (q NormalizedQueries) GetSpansByRunID(ctx context.Context, runID string) ([
 }
 
 func (q NormalizedQueries) GetSpanOutput(ctx context.Context, spanID string) (any, error) {
+	// TODO
 	return nil, nil
 }
 

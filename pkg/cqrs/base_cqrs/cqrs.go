@@ -91,6 +91,9 @@ func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.Ot
 	}
 
 	spanMap := make(map[string]*cqrs.OtelSpan)
+	// A map of dynamic span IDs to the specific span ID that contains an
+	// output
+	outputDynamicRefs := make(map[string]string)
 	var root *cqrs.OtelSpan
 
 	for _, span := range spans {
@@ -129,7 +132,6 @@ func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.Ot
 		}
 
 		var outputSpanID *string
-
 		var fragments []map[string]interface{}
 		json.Unmarshal([]byte(span.SpanFragments.(string)), &fragments)
 
@@ -193,31 +195,39 @@ func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.Ot
 
 			if outputRef, ok := fragment["output_span_id"].(string); ok {
 				outputSpanID = &outputRef
+				outputDynamicRefs[span.DynamicSpanID.String] = outputRef
 			}
 		}
 
 		// If this span has finished, set a preliminary output ID.
 		if outputSpanID != nil && *outputSpanID != "" {
-			p := true
-
-			id := &cqrs.SpanIdentifier{
-				SpanID:  *outputSpanID,
-				Preview: &p,
-			}
-
-			encoded, err := id.Encode()
+			newSpan.OutputID, err = encodeSpanOutputID(*outputSpanID)
 			if err != nil {
 				logger.StdlibLogger(ctx).Error("error encoding span identifier", "error", err)
 				return nil, err
 			}
-
-			newSpan.OutputID = &encoded
 		}
 
 		spanMap[span.DynamicSpanID.String] = newSpan
 	}
 
 	for _, span := range spanMap {
+		// If we have an output reference for this span, set the appropriate
+		// target span ID here
+		if ref, ok := span.Attributes[meta.AttributeStepOutputRef]; ok {
+			if refStr, ok := ref.(string); ok && refStr != "" {
+				if targetSpanID, ok := outputDynamicRefs[refStr]; ok {
+					// We've found the span ID that we need to target for
+					// this span. So let's use it!
+					span.OutputID, err = encodeSpanOutputID(targetSpanID)
+					if err != nil {
+						logger.StdlibLogger(ctx).Error("error encoding span output ID", "error", err)
+						return nil, err
+					}
+				}
+			}
+		}
+
 		if span.ParentSpanID == nil || *span.ParentSpanID == "" || *span.ParentSpanID == "0000000000000000" {
 			root = spanMap[span.SpanID]
 			continue
@@ -240,6 +250,22 @@ func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.Ot
 	sorter(root)
 
 	return root, nil
+}
+
+func encodeSpanOutputID(spanID string) (*string, error) {
+	p := true
+
+	id := &cqrs.SpanIdentifier{
+		SpanID:  spanID,
+		Preview: &p,
+	}
+
+	encoded, err := id.Encode()
+	if err != nil {
+		return nil, err
+	}
+
+	return &encoded, nil
 }
 
 func sorter(span *cqrs.OtelSpan) {
@@ -1287,14 +1313,16 @@ func (w wrapper) GetSpanOutput(ctx context.Context, opts cqrs.SpanIdentifier) (*
 	so := &cqrs.SpanOutput{}
 	var m map[string]any
 
-	if err := json.Unmarshal([]byte(fmt.Append(nil, s)), &m); err == nil {
+	so.Data = []byte(fmt.Append(nil, s))
+	if err := json.Unmarshal(so.Data, &m); err == nil && m != nil {
 		if errData, ok := m["error"]; ok {
 			so.IsError = true
 			so.Data, _ = json.Marshal(errData)
 		} else if successData, ok := m["data"]; ok {
 			so.Data, _ = json.Marshal(successData)
 		} else {
-			return nil, fmt.Errorf("span output does not contain 'error' or 'data' keys")
+			// TODO Log - this is an error and all outputs should be keyed,
+			// but we'll also assume that this is a successful output.
 		}
 	}
 
