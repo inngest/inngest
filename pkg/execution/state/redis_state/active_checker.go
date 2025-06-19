@@ -45,7 +45,12 @@ func (q *queue) ActiveCheck(ctx context.Context) (int, error) {
 	for _, backlog := range backlogs {
 		backlog := backlog
 		eg.Go(func() error {
-			l := q.log.With("backlog", backlog)
+			checkID, err := ulid.New(ulid.Timestamp(q.clock.Now()), rand.Reader)
+			if err != nil {
+				return fmt.Errorf("could not create checkID: %w", err)
+			}
+
+			l := q.log.With("backlog", backlog, "check_id", checkID)
 
 			l.Debug("attempting to active check backlog")
 
@@ -117,11 +122,6 @@ func (q *queue) backlogActiveCheck(ctx context.Context, b *QueueBacklog, client 
 		}
 	}
 
-	checkID, err := ulid.New(ulid.Timestamp(q.clock.Now()), rand.Reader)
-	if err != nil {
-		return false, fmt.Errorf("could not create checkID: %w", err)
-	}
-
 	accountID := uuid.Nil
 	if sp.AccountID != nil {
 		accountID = *sp.AccountID
@@ -132,7 +132,7 @@ func (q *queue) backlogActiveCheck(ctx context.Context, b *QueueBacklog, client 
 		readOnly = false
 	}
 
-	l = l.With("check_id", checkID.String(), "partition", sp.PartitionID, "account_id", accountID)
+	l = l.With("partition", sp.PartitionID, "account_id", accountID)
 
 	l.Debug("starting active check for partition")
 
