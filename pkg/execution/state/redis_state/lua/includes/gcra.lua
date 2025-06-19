@@ -77,5 +77,5 @@ local function gcraCapacity(key, now_ms, period_ms, limit, burst)
   local capacity = math.floor(time_capacity_remain / emission)
 
   -- this could be negative, which means no capacity
-  return { math.min(capacity, limit + burst), tat }
+  return math.min(capacity, limit + burst)
 end

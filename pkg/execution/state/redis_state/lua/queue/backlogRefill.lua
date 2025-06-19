@@ -149,9 +149,8 @@ local retryAfter = nil
 if enableKeyQueues == 1 then
   -- Check throttle capacity
   if (constraintCapacity == nil or constraintCapacity > 0) and throttlePeriod > 0 and throttleLimit > 0 then
-    local gcraRes = gcraCapacity(throttleKey, nowMS, throttlePeriod * 1000, throttleLimit, throttleBurst)
+    local remainingThrottleCapacity = gcraCapacity(throttleKey, nowMS, throttlePeriod * 1000, throttleLimit, throttleBurst)
 
-    local remainingThrottleCapacity = gcraRes[1]
     if constraintCapacity == nil or remainingThrottleCapacity < constraintCapacity then
       constraintCapacity = remainingThrottleCapacity
       status = 5
@@ -307,7 +306,7 @@ end
 
 -- update gcra theoretical arrival time
 if throttleLimit > 0 and throttlePeriod > 0 then
-  gcraUpdate(throttleKey, nowMS, throttlePeriod * 1000, throttleLimit, throttleBurst, refilled)
+  retryAfter = gcraUpdate(throttleKey, nowMS, throttlePeriod * 1000, throttleLimit, throttleBurst, refilled)
 end
 
 --
