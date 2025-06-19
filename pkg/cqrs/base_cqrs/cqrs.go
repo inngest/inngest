@@ -151,9 +151,6 @@ func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.Ot
 				}
 
 				for k, v := range fragmentAttr {
-					// TODO Can remove this to not pass on needless attributes
-					newSpan.Attributes[k] = v
-
 					switch k {
 					case meta.AttributeDynamicStatus:
 						{
