@@ -28,6 +28,8 @@ func NewDebugAPI(o Opts) (*debugAPI, error) {
 type Opts struct {
 	Log   logger.Logger
 	Queue redis_state.QueueManager
+
+	ShardSelector redis_state.ShardSelector
 }
 
 type debugAPI struct {
