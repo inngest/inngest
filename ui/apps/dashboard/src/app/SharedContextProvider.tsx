@@ -7,6 +7,7 @@ import {
 
 import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import { useCancelRun } from '@/queries/useCancelRun';
+import { useGetRun } from '@/queries/useGetRun';
 import { useInvokeRun } from '@/queries/useInvokeRun';
 import { useRerun } from '@/queries/useRerun';
 import { useRerunFromStep } from '@/queries/useRerunFromStep';
@@ -18,6 +19,7 @@ export const SharedContextProvider = ({ children }: { children: React.ReactNode 
   const rerun = useRerun();
   const cancelRun = useCancelRun();
   const pathCreator = usePathCreator();
+  const getRun = useGetRun();
 
   const handlers: Partial<SharedHandlers> = {
     invokeRun,
@@ -27,6 +29,7 @@ export const SharedContextProvider = ({ children }: { children: React.ReactNode 
     cloud: true,
     booleanFlag: useBooleanFlag,
     pathCreator,
+    getRun,
   };
 
   return <SharedProvider handlers={handlers}>{children}</SharedProvider>;

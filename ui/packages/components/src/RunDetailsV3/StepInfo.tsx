@@ -14,7 +14,7 @@ import {
 import { RerunModal } from '../Rerun/RerunModal';
 import { usePathCreator } from '../SharedContext/usePathCreator';
 import { Time } from '../Time';
-import { usePrettyJson } from '../hooks/usePrettyJson';
+import { usePrettyErrorBody, usePrettyJson } from '../hooks/usePrettyJson';
 import type { Result } from '../types/functionRun';
 import { formatMilliseconds, toMaybeDate } from '../utils/date';
 import { IO } from './IO';
@@ -183,6 +183,7 @@ export const StepInfo = ({
   const aiOutput = result?.data ? parseAIOutput(result.data) : undefined;
   const prettyInput = usePrettyJson(result?.input ?? '') || (result?.input ?? '');
   const prettyOutput = usePrettyJson(result?.data ?? '') || (result?.data ?? '');
+  const prettyErrorBody = usePrettyErrorBody(result?.error);
 
   return (
     <div className="sticky top-14 flex flex-col justify-start gap-2 overflow-hidden">
@@ -293,7 +294,7 @@ export const StepInfo = ({
                         title={`${result.error.name || 'Error'} ${
                           result.error.message ? `: ${result.error.message}` : ''
                         }`}
-                        raw={result.error.stack ?? ''}
+                        raw={prettyErrorBody ?? ''}
                         error={true}
                       />
                     ),

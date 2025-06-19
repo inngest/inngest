@@ -10,12 +10,13 @@ If sequential is 0, items are returned randomly if more items are available than
 local keyMetadataHash        = KEYS[1]
 local keyOrderedPointerSet   = KEYS[2]
 
-local peekUntil    = tonumber(ARGV[1])
-local peekUntilMS  = tonumber(ARGV[2])
-local limit        = tonumber(ARGV[3])
-local sequential   = tonumber(ARGV[4])
+local peekFrom     = ARGV[1]
+local peekUntil    = tonumber(ARGV[2])
+local peekUntilMS  = tonumber(ARGV[3])
+local limit        = tonumber(ARGV[4])
+local sequential   = tonumber(ARGV[5])
 
-local count = redis.call("ZCOUNT", keyOrderedPointerSet, "-inf", peekUntil)
+local count = redis.call("ZCOUNT", keyOrderedPointerSet, peekFrom, peekUntil)
 local offset = 0
 
 if count > limit and sequential == 0 then
@@ -24,7 +25,7 @@ if count > limit and sequential == 0 then
 	offset = math.random((count-limit)+1) - 1
 end
 
-local pointerIDs = redis.call("ZRANGE", keyOrderedPointerSet, "-inf", peekUntil, "BYSCORE", "LIMIT", offset, limit)
+local pointerIDs = redis.call("ZRANGE", keyOrderedPointerSet, peekFrom, peekUntil, "BYSCORE", "LIMIT", offset, limit)
 if #pointerIDs == 0 then
 	return {}
 end

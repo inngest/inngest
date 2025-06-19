@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"github.com/inngest/inngest/pkg/execution/state"
 	"math"
 	"time"
 
@@ -329,8 +330,21 @@ func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp 
 			existingThrottle := item.Data.Throttle
 			existingKeys := item.Data.GetConcurrencyKeys()
 
+			cleanupItem := func() {
+				// If event for item cannot be found, remove it from the backlog
+				err := q.removeQueueItem(ctx, shard, shard.RedisClient.KeyGenerator().BacklogSet(backlog.BacklogID), item.ID)
+				if err != nil {
+					q.log.Warn("could not remove queue item from backlog", "err", err)
+				}
+			}
+
 			refreshedCustomConcurrencyKeys, err := q.normalizeRefreshItemCustomConcurrencyKeys(ctx, item, existingKeys, sp)
 			if err != nil {
+				// If event for item cannot be found, remove it from the backlog
+				if errors.Is(err, state.ErrEventNotFound) {
+					cleanupItem()
+					continue
+				}
 				return fmt.Errorf("could not refresh custom concurrency keys for item: %w", err)
 			}
 			item.Data.CustomConcurrencyKeys = refreshedCustomConcurrencyKeys
@@ -338,6 +352,11 @@ func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp 
 
 			refreshedThrottle, err := q.refreshItemThrottle(ctx, item)
 			if err != nil {
+				// If event for item cannot be found, remove it from the backlog
+				if errors.Is(err, state.ErrEventNotFound) {
+					cleanupItem()
+					continue
+				}
 				return fmt.Errorf("could not refresh throttle for item: %w", err)
 			}
 			item.Data.Throttle = refreshedThrottle

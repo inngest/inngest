@@ -102,6 +102,7 @@ export const currentPlanDocument = graphql(`
         id
         slug
         isLegacy
+        isFree
         name
         amount
         billingPeriod
@@ -189,6 +190,7 @@ export const plansDocument = graphql(`
     plans {
       id
       isLegacy
+      isFree
       name
       amount
       billingPeriod

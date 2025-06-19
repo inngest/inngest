@@ -78,7 +78,10 @@ export const RunInfo = ({ initialRunData, run, runID, standalone, result }: Prop
               <SkeletonElement />
             )}
           </div>
-          <Nav standalone={standalone} runID={runID} />
+
+          {isLazyDone(run) && (
+            <Nav standalone={standalone} functionSlug={run.fn.name} runID={runID} />
+          )}
         </div>
 
         <div className="flex items-center gap-2">
