@@ -5,6 +5,11 @@ import (
 	"fmt"
 )
 
-func (q *queue) PartitionByID(ctx context.Context, shard QueueShard, partitionID string) (*QueuePartition, *QueueShadowPartition, error) {
-	return nil, nil, fmt.Errorf("not implemented")
+type PartitionInspectionResult struct {
+	QueuePartition       *QueuePartition
+	QueueShadowPartition *QueueShadowPartition
+}
+
+func (q *queue) PartitionByID(ctx context.Context, shard QueueShard, partitionID string) (*PartitionInspectionResult, error) {
+	return nil, fmt.Errorf("not implemented")
 }
