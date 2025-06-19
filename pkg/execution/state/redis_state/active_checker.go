@@ -33,6 +33,8 @@ func (q *queue) ActiveCheck(ctx context.Context) (int, error) {
 		return 0, fmt.Errorf("could not peek backlogs for active checker: %w", err)
 	}
 
+	l := q.log.With("scope", "active-check")
+
 	shard := q.primaryQueueShard
 	client := shard.RedisClient.Client()
 	kg := shard.RedisClient.KeyGenerator()
@@ -45,9 +47,14 @@ func (q *queue) ActiveCheck(ctx context.Context) (int, error) {
 	for _, backlog := range backlogs {
 		backlog := backlog
 		eg.Go(func() error {
-			l := q.log.With("backlog", backlog)
+			checkID, err := ulid.New(ulid.Timestamp(q.clock.Now()), rand.Reader)
+			if err != nil {
+				return fmt.Errorf("could not create checkID: %w", err)
+			}
 
-			l.Debug("attempting to active check backlog", backlog)
+			l = l.With("backlog", backlog, "check_id", checkID)
+
+			l.Debug("attempting to active check backlog")
 
 			cleanup, err := q.backlogActiveCheck(ctx, backlog, client, kg, l)
 			if cleanup {
@@ -117,11 +124,6 @@ func (q *queue) backlogActiveCheck(ctx context.Context, b *QueueBacklog, client 
 		}
 	}
 
-	checkID, err := ulid.New(ulid.Timestamp(q.clock.Now()), rand.Reader)
-	if err != nil {
-		return false, fmt.Errorf("could not create checkID: %w", err)
-	}
-
 	accountID := uuid.Nil
 	if sp.AccountID != nil {
 		accountID = *sp.AccountID
@@ -132,27 +134,27 @@ func (q *queue) backlogActiveCheck(ctx context.Context, b *QueueBacklog, client 
 		readOnly = false
 	}
 
-	l = l.With("check_id", checkID.String(), "partition", sp.PartitionID, "account_id", accountID)
+	l = l.With("partition", sp.PartitionID, "account_id", accountID)
 
 	l.Debug("starting active check for partition")
 
 	// Check account
 	if accountID != uuid.Nil && mathRand.Intn(100) <= q.runMode.ActiveCheckAccountCheckProbability {
-		err = q.accountActiveCheck(ctx, &sp, client, kg, l.With("scope", "account-check"), readOnly)
+		err := q.accountActiveCheck(ctx, &sp, client, kg, l.With("check-scope", "account-check"), readOnly)
 		if err != nil {
 			return false, fmt.Errorf("could not check account active items: %w", err)
 		}
 	}
 
 	// Check partition
-	err = q.partitionActiveCheck(ctx, &sp, client, kg, l.With("scope", "partition-check"), readOnly)
+	err := q.partitionActiveCheck(ctx, &sp, client, kg, l.With("check-scope", "partition-check"), readOnly)
 	if err != nil {
 		return false, fmt.Errorf("could not check account for invalid active items: %w", err)
 	}
 
 	// Check custom concurrency keys
 	for _, key := range b.ConcurrencyKeys {
-		err := q.customConcurrencyActiveCheck(ctx, &sp, key, client, kg, l.With("scope", "backlog-check"), readOnly)
+		err := q.customConcurrencyActiveCheck(ctx, &sp, key, client, kg, l.With("check-scope", "backlog-check"), readOnly)
 		if err != nil {
 			return false, fmt.Errorf("could not check custom concurrency key: %w", err)
 		}

@@ -390,7 +390,7 @@ func (q *queue) processShadowPartitionBacklog(ctx context.Context, shadowPart *Q
 	if len(res.RefilledItems) > 0 {
 		q.log.Debug(
 			"refilled items to ready queue",
-			"items", res.RefilledItems,
+			"job_id", res.RefilledItems,
 			"backlog", backlog.BacklogID,
 			"partition", shadowPart.PartitionID,
 		)
