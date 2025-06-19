@@ -921,8 +921,11 @@ type QueueRunMode struct {
 	// ActiveChecker enables background checking of active sets.
 	ActiveChecker bool
 
-	// ActiveCheckerSpotCheckProbability determines the weight of running spot checks on active sets when encountering concurrencity limits between 0 and 100 where 100 means always check.
-	ActiveCheckerSpotCheckProbability int
+	// BacklogRefillSpotCheckProbability determines the weight of adding backlogs to spot checks when concurrency limits between 0 and 100 where 100 means always check.
+	BacklogRefillSpotCheckProbability int
+
+	// ActiveCheckAccountCheckProbability determines the weight of running spot checks on accounts when running an active check
+	ActiveCheckAccountCheckProbability int
 }
 
 // continuation represents a partition continuation, forcung the queue to continue working

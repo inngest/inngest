@@ -752,8 +752,8 @@ func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueSha
 		b.customKeyActiveRuns(kg, 1), // Set for active runs with custom concurrency key 1
 		b.customKeyActiveRuns(kg, 2), // Set for active runs with custom concurrency key 2
 
-		kg.PartitionActiveCheckSet(),
-		kg.PartitionActiveCheckCooldown(sp.PartitionID),
+		kg.BacklogActiveCheckSet(),
+		kg.BacklogActiveCheckCooldown(b.BacklogID),
 	}
 
 	enableKeyQueuesVal := "0"
@@ -763,7 +763,7 @@ func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueSha
 	}
 
 	// Enable conditional spot checking (probability in queue settings + feature flag)
-	shouldSpotCheckActiveSet := q.enableActiveSpotChecks(ctx, accountID) && rand.Intn(100) <= q.runMode.ActiveCheckerSpotCheckProbability
+	shouldSpotCheckActiveSet := q.enableActiveSpotChecks(ctx, accountID) && rand.Intn(100) <= q.runMode.BacklogRefillSpotCheckProbability
 
 	args, err := StrSlice([]any{
 		b.BacklogID,

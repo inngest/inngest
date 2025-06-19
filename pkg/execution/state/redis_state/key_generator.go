@@ -213,8 +213,8 @@ type QueueKeyGenerator interface {
 	AccountNormalizeSet(accountID uuid.UUID) string
 	PartitionNormalizeSet(partitionID string) string
 
-	PartitionActiveCheckSet() string
-	PartitionActiveCheckCooldown(partitionID string) string
+	BacklogActiveCheckSet() string
+	BacklogActiveCheckCooldown(backlogID string) string
 
 	//
 	// Queue metadata keys
@@ -483,15 +483,15 @@ func (u queueKeyGenerator) PartitionNormalizeSet(partitionID string) string {
 
 }
 
-func (u queueKeyGenerator) PartitionActiveCheckSet() string {
-	return fmt.Sprintf("{%s}:active-check:partition:sorted", u.queueDefaultKey)
+func (u queueKeyGenerator) BacklogActiveCheckSet() string {
+	return fmt.Sprintf("{%s}:active-check:backlog:sorted", u.queueDefaultKey)
 }
 
-func (u queueKeyGenerator) PartitionActiveCheckCooldown(partitionID string) string {
-	if partitionID == "" {
-		return fmt.Sprintf("{%s}:active-check:cooldown:partition:-", u.queueDefaultKey)
+func (u queueKeyGenerator) BacklogActiveCheckCooldown(backlogID string) string {
+	if backlogID == "" {
+		return fmt.Sprintf("{%s}:active-check:cooldown:backlog:-", u.queueDefaultKey)
 	}
-	return fmt.Sprintf("{%s}:active-check:cooldown:partition:%s", u.queueDefaultKey, partitionID)
+	return fmt.Sprintf("{%s}:active-check:cooldown:backlog:%s", u.queueDefaultKey, backlogID)
 }
 
 func (u queueKeyGenerator) QueuePrefix() string {

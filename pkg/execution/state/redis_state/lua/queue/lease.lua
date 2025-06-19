@@ -171,11 +171,7 @@ if exists_without_ending(keyInProgressCustomConcurrencyKey2, ":-") == true then
   handleLease(keyInProgressCustomConcurrencyKey2, customConcurrencyKey2)
 end
 
--- If item was not refilled from backlog, we must update active sets during lease
--- to account used capacity for future backlog refills
-if refilledFromBacklog ~= 1 then
-  addToActiveSets(keyActivePartition, keyActiveAccount, keyActiveCompound, keyActiveConcurrencyKey1, keyActiveConcurrencyKey2, {item.id})
-  addToActiveRunSets(keyActiveRun, keyActiveRunsPartition, keyActiveRunsAccount, keyActiveRunsCustomConcurrencyKey1, keyActiveRunsCustomConcurrencyKey2, runID, item.id)
-end
+addToActiveSets(keyActivePartition, keyActiveAccount, keyActiveCompound, keyActiveConcurrencyKey1, keyActiveConcurrencyKey2, {item.id})
+addToActiveRunSets(keyActiveRun, keyActiveRunsPartition, keyActiveRunsAccount, keyActiveRunsCustomConcurrencyKey1, keyActiveRunsCustomConcurrencyKey2, runID, item.id)
 
 return 0

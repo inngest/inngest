@@ -51,8 +51,8 @@ local keyActiveRunsPartition              = KEYS[18]
 local keyActiveRunsCustomConcurrencyKey1  = KEYS[19]
 local keyActiveRunsCustomConcurrencyKey2  = KEYS[20]
 
-local keyPartitionActiveCheckSet          = KEYS[21]
-local keyPartitionActiveCheckCooldown  = KEYS[22]
+local keyBacklogActiveCheckSet       = KEYS[21]
+local keyBacklogActiveCheckCooldown  = KEYS[22]
 
 local backlogID     = ARGV[1]
 local partitionID   = ARGV[2]
@@ -379,12 +379,12 @@ end
 updateBacklogPointer(keyGlobalShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, keyShadowPartitionSet, keyBacklogSet, accountID, partitionID, backlogID)
 
 --
--- Optional: Add partition to active checker set. This will verify that all items marked as active
+-- Optional: Add backlog to active checker set. This will verify that all items marked as active
 -- are either in the ready queue or in progress.
 --
 local concurrencyConstrained = status >= 1 and status <= 4
 if concurrencyConstrained and shouldSpotCheckActiveSet == 1 then
-    add_to_active_check(keyPartitionActiveCheckSet, keyPartitionActiveCheckCooldown, partitionID, nowMS)
+    add_to_active_check(keyBacklogActiveCheckSet, keyBacklogActiveCheckCooldown, backlogID, nowMS)
 end
 
 return { status, refilled, backlogCountUntil, backlogCountTotal, constraintCapacity, refill }
