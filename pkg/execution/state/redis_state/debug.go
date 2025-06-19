@@ -9,6 +9,15 @@ import (
 type PartitionInspectionResult struct {
 	QueuePartition       *QueuePartition
 	QueueShadowPartition *QueueShadowPartition
+
+	Paused            bool `json:"paused"`
+	AccountActive     int  `json:"acct_active"`
+	AccountInProgress int  `json:"acct_in_progress"`
+	Ready             int  `json:"ready"`
+	InProgress        int  `json:"in_progress"`
+	Active            int  `json:"active"`
+	Future            int  `json:"future"`
+	Backlogs          int  `json:"backlogs"`
 }
 
 func (q *queue) PartitionByID(ctx context.Context, shard QueueShard, partitionID string) (*PartitionInspectionResult, error) {
@@ -45,8 +54,40 @@ func (q *queue) PartitionByID(ctx context.Context, shard QueueShard, partitionID
 		}
 	}
 
-	return &PartitionInspectionResult{
-		QueuePartition:       &qp,
-		QueueShadowPartition: &sqp,
-	}, nil
+	var result PartitionInspectionResult
+	{
+		keys := []string{
+			sqp.accountActiveKey(kg),
+			sqp.accountInProgressKey(kg),
+			sqp.readyQueueKey(kg),
+			sqp.inProgressKey(kg),
+			sqp.activeKey(kg),
+			kg.ShadowPartitionSet(sqp.PartitionID),
+		}
+		args, err := StrSlice([]any{
+			q.clock.Now().UnixMilli(),
+		})
+		if err != nil {
+			return nil, fmt.Errorf("error preparing args for redis: %w", err)
+		}
+
+		byt, err := scripts["queue/countCheck"].Exec(
+			ctx,
+			rc,
+			keys,
+			args,
+		).AsBytes()
+		if err != nil {
+			return nil, fmt.Errorf("error retriving counters: %w", err)
+		}
+
+		if err := json.Unmarshal(byt, &result); err != nil {
+			return nil, fmt.Errorf("error unmarhalling counter check: %w", err)
+		}
+	}
+
+	result.QueuePartition = &qp
+	result.QueueShadowPartition = &sqp
+
+	return &result, nil
 }
