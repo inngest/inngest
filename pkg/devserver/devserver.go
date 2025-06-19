@@ -534,8 +534,9 @@ func start(ctx context.Context, opts StartOpts) error {
 	}
 
 	debugapi, err := debugapi.NewDebugAPI(debugapi.Opts{
-		Log:   l,
-		Queue: rq,
+		Log:           l,
+		Queue:         rq,
+		ShardSelector: shardSelector,
 	})
 	if err != nil {
 		return err
