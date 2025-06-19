@@ -74,5 +74,11 @@ export function FunctionConfigurationContainer({ onClose, functionSlug }: Functi
     />
   );
 
-  return <FunctionConfiguration inngestFunction={data.functionBySlug} header={header} />;
+  return (
+    <FunctionConfiguration
+      inngestFunction={data.functionBySlug}
+      header={header}
+      getFunctionLink={(functionSlug) => `/functions/config?slug=${functionSlug}`}
+    />
+  );
 }

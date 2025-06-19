@@ -26,12 +26,16 @@ type FunctionConfigurationProps = {
   inngestFunction: NonNullable<GetFunctionQuery['functionBySlug']>;
   header?: ReactNode;
   deployCreatedAt?: string | null;
+  getEventLink?: (eventName: string) => string;
+  getFunctionLink?: (functionSlug: string) => string;
 };
 
 export function FunctionConfiguration({
   inngestFunction,
   header,
   deployCreatedAt,
+  getEventLink,
+  getFunctionLink,
 }: FunctionConfigurationProps) {
   const configuration = inngestFunction.configuration;
   const triggers = inngestFunction.triggers;
@@ -236,6 +240,10 @@ export function FunctionConfiguration({
                   icon={<EventsIcon className="h-5 w-5" />}
                   mainContent={trigger.value}
                   expression={trigger.condition ? `if: ${trigger.condition}` : ''}
+                  rightElement={
+                    getEventLink ? <RiArrowRightSLine className="h-5 w-5" /> : undefined
+                  }
+                  href={getEventLink ? getEventLink(trigger.value) : undefined}
                 />
               );
             } else {
@@ -252,8 +260,10 @@ export function FunctionConfiguration({
             <ConfigurationBlock
               icon={<FunctionsIcon className="h-5 w-5" />}
               mainContent={inngestFunction.failureHandler.slug}
-              rightElement={<RiArrowRightSLine className="h-5 w-5" />}
-              href={`/functions/config?slug=${inngestFunction.failureHandler.slug}`}
+              rightElement={getFunctionLink ? <RiArrowRightSLine className="h-5 w-5" /> : undefined}
+              href={
+                getFunctionLink ? getFunctionLink(inngestFunction.failureHandler.slug) : undefined
+              }
             />
           )}
         </ConfigurationSection>
@@ -267,6 +277,8 @@ export function FunctionConfiguration({
                 mainContent={cancelOn.event}
                 subContent={cancelOn.timeout ? `Timeout: ${cancelOn.timeout}` : ''}
                 expression={cancelOn.condition ? `if: ${cancelOn.condition}` : ''}
+                rightElement={getEventLink ? <RiArrowRightSLine className="h-5 w-5" /> : undefined}
+                href={getEventLink ? getEventLink(cancelOn.event) : undefined}
               />
             );
           })}
