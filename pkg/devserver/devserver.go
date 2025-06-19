@@ -483,7 +483,6 @@ func start(ctx context.Context, opts StartOpts) error {
 
 		apiv1.AddRoutes(r, apiv1.Opts{
 			CachingMiddleware:  caching,
-			EventReader:        ds.Data,
 			FunctionReader:     ds.Data,
 			FunctionRunReader:  ds.Data,
 			JobQueueReader:     ds.Queue.(queue.JobQueueReader),

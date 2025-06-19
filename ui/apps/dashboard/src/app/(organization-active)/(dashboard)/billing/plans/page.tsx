@@ -9,6 +9,7 @@ import { pathCreator } from '@/utils/urls';
 const ENTERPRISE_PLAN: Plan = {
   id: 'n/a',
   isLegacy: false,
+  isFree: false,
   name: 'Enterprise',
   amount: Infinity,
   billingPeriod: 'month',

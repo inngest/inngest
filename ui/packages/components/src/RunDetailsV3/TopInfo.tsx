@@ -16,7 +16,7 @@ import {
 import { ErrorCard } from '../Error/ErrorCard';
 import { InvokeModal } from '../InvokeButton';
 import { useInvokeRun } from '../SharedContext/useInvokeRun';
-import { usePrettyJson } from '../hooks/usePrettyJson';
+import { usePrettyErrorBody, usePrettyJson } from '../hooks/usePrettyJson';
 import { IconCloudArrowDown } from '../icons/CloudArrowDown';
 import type { Result } from '../types/functionRun';
 import { devServerURL, useDevServer } from '../utils/useDevServer';
@@ -108,6 +108,7 @@ export const TopInfo = ({ slug, getTrigger, runID, result }: TopInfoProps) => {
   }, [trigger?.payloads]);
 
   const prettyOutput = usePrettyJson(result?.data ?? '') || (result?.data ?? '');
+  const prettyErrorBody = usePrettyErrorBody(result?.error);
 
   const type = trigger?.isBatch ? 'BATCH' : trigger?.cron ? 'CRON' : 'EVENT';
 
@@ -273,7 +274,7 @@ export const TopInfo = ({ slug, getTrigger, runID, result }: TopInfoProps) => {
                         title={`${result.error.name || 'Error'} ${
                           result.error.message ? `: ${result.error.message}` : ''
                         }`}
-                        raw={result.error.stack ?? ''}
+                        raw={prettyErrorBody ?? ''}
                         error={true}
                       />
                     ),

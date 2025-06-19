@@ -567,6 +567,7 @@ type StepError {
   message: String!
   name: String
   stack: String
+  cause: Bytes
 }
 
 type RunTraceTrigger {

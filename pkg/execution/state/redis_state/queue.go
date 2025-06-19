@@ -618,6 +618,7 @@ func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 		wg:                             &sync.WaitGroup{},
 		seqLeaseLock:                   &sync.RWMutex{},
 		scavengerLeaseLock:             &sync.RWMutex{},
+		activeCheckerLeaseLock:         &sync.RWMutex{},
 		instrumentationLeaseLock:       &sync.RWMutex{},
 		pollTick:                       defaultPollTick,
 		idempotencyTTL:                 defaultIdempotencyTTL,

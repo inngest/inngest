@@ -263,6 +263,23 @@ func (qr *queryResolver) RunTraceSpanOutputByID(ctx context.Context, outputID st
 		err := json.Unmarshal(spanData.Data, &stepErr)
 		if err != nil {
 			logger.StdlibLogger(ctx).Error("error deserializing step error", "error", err)
+
+			// This may have been the `cause`, as that's any JSON value, but
+			// needs to be a string when parsed here. Let's try to save it.
+			if stepErr.Cause == nil || *stepErr.Cause == "" {
+				var rawErr map[string]any
+				if err := json.Unmarshal(spanData.Data, &rawErr); err == nil {
+					var causeStr *string
+					if cause, ok := rawErr["cause"]; ok {
+						if byt, err := json.Marshal(cause); err == nil {
+							s := string(byt)
+							causeStr = &s
+						}
+					}
+
+					stepErr.Cause = causeStr
+				}
+			}
 		}
 
 		if stepErr.Message == "" {

@@ -824,11 +824,11 @@ func (w wrapper) GetEventsByExpressions(ctx context.Context, cel []string) ([]*c
 	return res, nil
 }
 
-func (w wrapper) FindEvent(ctx context.Context, workspaceID uuid.UUID, internalID ulid.ULID) (*cqrs.Event, error) {
+func (w wrapper) GetEvent(ctx context.Context, internalID ulid.ULID, accountID uuid.UUID, workspaceID uuid.UUID) (*cqrs.Event, error) {
 	return w.GetEventByInternalID(ctx, internalID)
 }
 
-func (w wrapper) WorkspaceEvents(ctx context.Context, workspaceID uuid.UUID, opts *cqrs.WorkspaceEventsOpts) ([]cqrs.Event, error) {
+func (w wrapper) GetEvents(ctx context.Context, accountID uuid.UUID, workspaceID uuid.UUID, opts *cqrs.WorkspaceEventsOpts) ([]*cqrs.Event, error) {
 	if err := opts.Validate(); err != nil {
 		return nil, err
 	}
@@ -863,9 +863,10 @@ func (w wrapper) WorkspaceEvents(ctx context.Context, workspaceID uuid.UUID, opt
 	if err != nil {
 		return nil, err
 	}
-	out := make([]cqrs.Event, len(evts))
+	out := make([]*cqrs.Event, len(evts))
 	for n, evt := range evts {
-		out[n] = convertEvent(evt)
+		val := convertEvent(evt)
+		out[n] = &val
 	}
 	return out, nil
 }
