@@ -123,10 +123,10 @@ type EventReader interface {
 		limit int,
 		includeInternal bool,
 	) ([]*Event, error)
-	// GetEvents returns the latest events for a given workspace.
-	GetEvents(ctx context.Context, accountID uuid.UUID, workspaceID uuid.UUID, opts *WorkspaceEventsOpts) ([]*Event, error)
-	// GetEvent returns a specific event given an ID.
-	GetEvent(ctx context.Context, id ulid.ULID, accountID uuid.UUID, workspaceID uuid.UUID) (*Event, error)
+	// WorkspaceEvents returns the latest events for a given workspace.
+	WorkspaceEvents(ctx context.Context, workspaceID uuid.UUID, opts *WorkspaceEventsOpts) ([]Event, error)
+	// Find returns a specific event given an ID.
+	FindEvent(ctx context.Context, workspaceID uuid.UUID, id ulid.ULID) (*Event, error)
 }
 
 type EventBatchOpt func(eb *EventBatch)
