@@ -28,8 +28,6 @@ type Opts struct {
 	AuthFinder apiv1auth.AuthFinder
 	// Executor is required to cancel and manage function executions.
 	Executor execution.Executor
-	// EventReader allows reading of events from storage.
-	EventReader EventReader
 	// FunctionReader reads functions from a backing store.
 	FunctionReader cqrs.FunctionReader
 	// FunctionRunReader reads function runs, history, etc. from backing storage
