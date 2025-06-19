@@ -306,7 +306,7 @@ func (q *queue) ItemsByPartition(ctx context.Context, shard QueueShard, partitio
 		cmd := rc.B().Hget().Key(hash).Field(partitionID.String()).Build()
 		byt, err := rc.Do(ctx, cmd).AsBytes()
 		if err != nil {
-			l.Error("error retrieving shadow partition from queue", "error", err)
+			l.Warn("error retrieving shadow partition from queue", "error", err)
 			return
 		}
 
