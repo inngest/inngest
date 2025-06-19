@@ -151,9 +151,6 @@ func TestItemsByPartition(t *testing.T) {
 
 			items, err := q.ItemsByPartition(ctx, defaultShard, fnID, tc.from, tc.until,
 				WithQueueItemIterBatchSize(tc.batchSize),
-				WithQueueItemIterAllowKeyQueues(func() bool {
-					return tc.keyQueuesEnabled
-				}),
 			)
 			require.NoError(t, err)
 
@@ -270,9 +267,6 @@ func TestItemsByBacklog(t *testing.T) {
 
 			items, err := q.ItemsByBacklog(ctx, defaultShard, backlogID, tc.from, tc.until,
 				WithQueueItemIterBatchSize(tc.batchSize),
-				WithQueueItemIterAllowKeyQueues(func() bool {
-					return true
-				}),
 			)
 			require.NoError(t, err)
 
