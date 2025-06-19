@@ -26,6 +26,7 @@ type FunctionConfigurationProps = {
   inngestFunction: NonNullable<GetFunctionQuery['functionBySlug']>;
   header?: ReactNode;
   deployCreatedAt?: string | null;
+  getAppLink?: () => string;
   getEventLink?: (eventName: string) => string;
   getFunctionLink?: (functionSlug: string) => string;
 };
@@ -34,6 +35,7 @@ export function FunctionConfiguration({
   inngestFunction,
   header,
   deployCreatedAt,
+  getAppLink,
   getEventLink,
   getFunctionLink,
 }: FunctionConfigurationProps) {
@@ -218,14 +220,19 @@ export function FunctionConfiguration({
               deployCreatedAt ? <Time format="relative" value={new Date(deployCreatedAt)} /> : ''
             }
             rightElement={
-              <Button
-                label="Go to apps"
-                href="/apps"
-                appearance="ghost"
-                icon={<RiArrowRightUpLine />}
-                iconSide="right"
-              />
+              getAppLink ? (
+                <RiArrowRightSLine className="h-5 w-5" />
+              ) : (
+                <Button
+                  label="Go to apps"
+                  href="/apps"
+                  appearance="ghost"
+                  icon={<RiArrowRightUpLine />}
+                  iconSide="right"
+                />
+              )
             }
+            href={getAppLink ? getAppLink() : undefined}
           />
         </ConfigurationSection>
 

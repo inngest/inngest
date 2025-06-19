@@ -179,6 +179,7 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
                 <NewFunctionConfiguration
                   inngestFunction={function_ as unknown as Function}
                   deployCreatedAt={function_.current?.deploy?.createdAt}
+                  getAppLink={() => appRoute}
                   getEventLink={(eventName) =>
                     pathCreator.eventType({
                       envSlug: params.environmentSlug,
