@@ -1,6 +1,5 @@
 import { Pill } from '@inngest/components/Pill/Pill';
 import { RiCheckLine } from '@remixicon/react';
-import { current } from 'tailwindcss/colors';
 
 import { isActive, isTrialPlan, processPlan, type Plan } from '@/components/Billing/Plans/utils';
 import PayAsGoButton from './PayAsGoButton';
