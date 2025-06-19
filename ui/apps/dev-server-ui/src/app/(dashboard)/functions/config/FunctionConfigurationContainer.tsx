@@ -30,8 +30,7 @@ export function FunctionConfigurationContainer({ onClose, functionSlug }: Functi
 
   const [invokeFunction] = useInvokeFunctionMutation();
 
-  const inngestFunction = data?.functionBySlug;
-  const triggers = inngestFunction?.triggers;
+  const triggers = data?.functionBySlug?.triggers;
 
   const router = useRouter();
   const doesFunctionAcceptPayload = useMemo(() => {
@@ -41,6 +40,9 @@ export function FunctionConfigurationContainer({ onClose, functionSlug }: Functi
   if (isFetching || !data || !data.functionBySlug) {
     return null;
   }
+
+  // TypeScript flow analysis helper - function is guaranteed to exist after the null check above
+  const inngestFunction = data.functionBySlug;
 
   const header = (
     <Header

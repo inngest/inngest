@@ -47,7 +47,7 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
   const [{ data, fetching: isFetchingFunction }] = useFunction({
     functionSlug,
   });
-  const function_ = data?.workspace.workflow;
+  const possiblyNullFunction = data?.workspace.workflow;
 
   const [timeRangeParam, setTimeRangeParam] = useSearchParam('timeRange');
   const selectedTimeRange: TimeRange =
@@ -66,7 +66,7 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
     );
   }
 
-  if (!function_) {
+  if (!possiblyNullFunction) {
     return (
       <>
         <div className="mt-4 flex place-content-center">
@@ -75,6 +75,9 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
       </>
     );
   }
+
+  // TypeScript flow analysis helper - function_ is guaranteed to exist after the null check above
+  const function_ = possiblyNullFunction;
 
   const usageMetrics: UsageMetrics | undefined = usage?.reduce(
     (acc, u) => {
@@ -207,7 +210,7 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
                           <Time
                             className="text-subtle text-xs"
                             format="relative"
-                            value={new Date(function_.current.deploy.createdAt)}
+                            value={new Date(function_.current.deploy.createdAt || '')}
                           />
                         )}
                       </div>
@@ -332,7 +335,7 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
                       <NextLink
                         href={pathCreator.function({
                           envSlug: params.environmentSlug,
-                          functionSlug: function_.failureHandler.slug,
+                          functionSlug: function_.failureHandler.slug || '',
                         })}
                         className="border-subtle bg-canvasBase hover:bg-canvasMuted block rounded-md border p-4"
                       >
