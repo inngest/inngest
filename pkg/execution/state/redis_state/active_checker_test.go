@@ -2,13 +2,16 @@ package redis_state
 
 import (
 	"context"
+	"encoding/json"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/jonboulle/clockwork"
 	"github.com/stretchr/testify/require"
+	"log/slog"
 	"testing"
 )
 
@@ -17,6 +20,8 @@ func TestShadowPartitionActiveCheck(t *testing.T) {
 
 	cluster, rc := initRedis(t)
 	defer rc.Close()
+
+	l := logger.StdlibLogger(ctx, logger.WithLoggerLevel(slog.LevelDebug))
 
 	defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
 	clock := clockwork.NewFakeClock()
@@ -36,6 +41,11 @@ func TestShadowPartitionActiveCheck(t *testing.T) {
 		}),
 		WithEnableActiveSpotChecks(func(ctx context.Context, acctID uuid.UUID) bool {
 			return true
+		}),
+		WithRunMode(QueueRunMode{
+			ActiveChecker:                      true,
+			BacklogRefillSpotCheckProbability:  100,
+			ActiveCheckAccountCheckProbability: 100,
 		}),
 	)
 
@@ -71,8 +81,20 @@ func TestShadowPartitionActiveCheck(t *testing.T) {
 	client := defaultShard.RedisClient.Client()
 	kg := defaultShard.RedisClient.KeyGenerator()
 
-	t.Run("should not clean up active items from account active set", func(t *testing.T) {
+	setup := func(t *testing.T) {
 		cluster.FlushAll()
+
+		marshaled, err := json.Marshal(backlog)
+		require.NoError(t, err)
+		cluster.HSet(kg.BacklogMeta(), backlog.BacklogID, string(marshaled))
+
+		marshaled, err = json.Marshal(sp)
+		require.NoError(t, err)
+		cluster.HSet(kg.ShadowPartitionMeta(), sp.PartitionID, string(marshaled))
+	}
+
+	t.Run("should not clean up active items from account active set", func(t *testing.T) {
+		setup(t)
 
 		// goes to ready queue
 		enqueueToBacklog = false
@@ -82,7 +104,7 @@ func TestShadowPartitionActiveCheck(t *testing.T) {
 		_, err = cluster.ZAdd(sp.accountActiveKey(kg), float64(clock.Now().UnixMilli()), qi.ID)
 		require.NoError(t, err)
 
-		err = q.shadowPartitionActiveCheck(ctx, &sp, client, kg)
+		_, err = q.backlogActiveCheck(ctx, &backlog, client, kg, l)
 		require.NoError(t, err)
 
 		require.True(t, cluster.Exists(sp.accountActiveKey(kg)), cluster.Dump())
@@ -90,7 +112,7 @@ func TestShadowPartitionActiveCheck(t *testing.T) {
 	})
 
 	t.Run("should clean up non-active items from account active set", func(t *testing.T) {
-		cluster.FlushAll()
+		setup(t)
 
 		enqueueToBacklog = true
 		qi, err := q.EnqueueItem(ctx, defaultShard, item, clock.Now(), osqueue.EnqueueOpts{})
@@ -99,7 +121,7 @@ func TestShadowPartitionActiveCheck(t *testing.T) {
 		_, err = cluster.ZAdd(sp.accountActiveKey(kg), float64(clock.Now().UnixMilli()), qi.ID)
 		require.NoError(t, err)
 
-		err = q.shadowPartitionActiveCheck(ctx, &sp, client, kg)
+		_, err = q.backlogActiveCheck(ctx, &backlog, client, kg, l)
 		require.NoError(t, err)
 
 		require.False(t, cluster.Exists(sp.accountActiveKey(kg)), cluster.Dump())
@@ -107,12 +129,16 @@ func TestShadowPartitionActiveCheck(t *testing.T) {
 	})
 
 	t.Run("should clean up missing items from account active set", func(t *testing.T) {
-		cluster.FlushAll()
+		setup(t)
+
+		enqueueToBacklog = true
+		_, err := q.EnqueueItem(ctx, defaultShard, item, clock.Now(), osqueue.EnqueueOpts{})
+		require.NoError(t, err)
 
 		_, err = cluster.ZAdd(sp.accountActiveKey(kg), float64(clock.Now().UnixMilli()), "missing-lol")
 		require.NoError(t, err)
 
-		err = q.shadowPartitionActiveCheck(ctx, &sp, client, kg)
+		_, err = q.backlogActiveCheck(ctx, &backlog, client, kg, l)
 		require.NoError(t, err)
 
 		require.False(t, cluster.Exists(sp.accountActiveKey(kg)))
@@ -120,7 +146,7 @@ func TestShadowPartitionActiveCheck(t *testing.T) {
 	})
 
 	t.Run("should not clean up active items from partition active set", func(t *testing.T) {
-		cluster.FlushAll()
+		setup(t)
 
 		enqueueToBacklog = false
 		qi, err := q.EnqueueItem(ctx, defaultShard, item, clock.Now(), osqueue.EnqueueOpts{})
@@ -129,7 +155,7 @@ func TestShadowPartitionActiveCheck(t *testing.T) {
 		_, err = cluster.ZAdd(sp.activeKey(kg), float64(clock.Now().UnixMilli()), qi.ID)
 		require.NoError(t, err)
 
-		err = q.shadowPartitionActiveCheck(ctx, &sp, client, kg)
+		_, err = q.backlogActiveCheck(ctx, &backlog, client, kg, l)
 		require.NoError(t, err)
 
 		require.True(t, cluster.Exists(sp.activeKey(kg)))
@@ -137,7 +163,7 @@ func TestShadowPartitionActiveCheck(t *testing.T) {
 	})
 
 	t.Run("should clean up non-active items from partition active set", func(t *testing.T) {
-		cluster.FlushAll()
+		setup(t)
 
 		enqueueToBacklog = true
 		qi, err := q.EnqueueItem(ctx, defaultShard, item, clock.Now(), osqueue.EnqueueOpts{})
@@ -146,7 +172,7 @@ func TestShadowPartitionActiveCheck(t *testing.T) {
 		_, err = cluster.ZAdd(sp.activeKey(kg), float64(clock.Now().UnixMilli()), qi.ID)
 		require.NoError(t, err)
 
-		err = q.shadowPartitionActiveCheck(ctx, &sp, client, kg)
+		_, err = q.backlogActiveCheck(ctx, &backlog, client, kg, l)
 		require.NoError(t, err)
 
 		require.False(t, cluster.Exists(sp.activeKey(kg)))
@@ -154,12 +180,16 @@ func TestShadowPartitionActiveCheck(t *testing.T) {
 	})
 
 	t.Run("should clean up missing items from partition active set", func(t *testing.T) {
-		cluster.FlushAll()
+		setup(t)
+
+		enqueueToBacklog = true
+		_, err := q.EnqueueItem(ctx, defaultShard, item, clock.Now(), osqueue.EnqueueOpts{})
+		require.NoError(t, err)
 
 		_, err = cluster.ZAdd(sp.activeKey(kg), float64(clock.Now().UnixMilli()), "missing-lol")
 		require.NoError(t, err)
 
-		err = q.shadowPartitionActiveCheck(ctx, &sp, client, kg)
+		_, err = q.backlogActiveCheck(ctx, &backlog, client, kg, l)
 		require.NoError(t, err)
 
 		require.False(t, cluster.Exists(sp.activeKey(kg)))
@@ -167,7 +197,7 @@ func TestShadowPartitionActiveCheck(t *testing.T) {
 	})
 
 	t.Run("should not clean up active items from custom concurrency key active set", func(t *testing.T) {
-		cluster.FlushAll()
+		setup(t)
 
 		enqueueToBacklog = false
 		qi, err := q.EnqueueItem(ctx, defaultShard, item, clock.Now(), osqueue.EnqueueOpts{})
@@ -176,7 +206,7 @@ func TestShadowPartitionActiveCheck(t *testing.T) {
 		_, err = cluster.ZAdd(backlog.customKeyActive(kg, 1), float64(clock.Now().UnixMilli()), qi.ID)
 		require.NoError(t, err)
 
-		err = q.shadowPartitionActiveCheck(ctx, &sp, client, kg)
+		_, err = q.backlogActiveCheck(ctx, &backlog, client, kg, l)
 		require.NoError(t, err)
 
 		require.True(t, cluster.Exists(backlog.customKeyActive(kg, 1)))
@@ -184,7 +214,7 @@ func TestShadowPartitionActiveCheck(t *testing.T) {
 	})
 
 	t.Run("should clean up non-active items from custom concurrency key active set", func(t *testing.T) {
-		cluster.FlushAll()
+		setup(t)
 
 		enqueueToBacklog = true
 		qi, err := q.EnqueueItem(ctx, defaultShard, item, clock.Now(), osqueue.EnqueueOpts{})
@@ -193,7 +223,7 @@ func TestShadowPartitionActiveCheck(t *testing.T) {
 		_, err = cluster.ZAdd(backlog.customKeyActive(kg, 1), float64(clock.Now().UnixMilli()), qi.ID)
 		require.NoError(t, err)
 
-		err = q.shadowPartitionActiveCheck(ctx, &sp, client, kg)
+		_, err = q.backlogActiveCheck(ctx, &backlog, client, kg, l)
 		require.NoError(t, err)
 
 		require.False(t, cluster.Exists(backlog.customKeyActive(kg, 1)))
@@ -201,7 +231,7 @@ func TestShadowPartitionActiveCheck(t *testing.T) {
 	})
 
 	t.Run("should clean up missing items from custom concurrency key active set", func(t *testing.T) {
-		cluster.FlushAll()
+		setup(t)
 
 		enqueueToBacklog = true
 		qi, err = q.EnqueueItem(ctx, defaultShard, item, clock.Now(), osqueue.EnqueueOpts{})
@@ -210,7 +240,7 @@ func TestShadowPartitionActiveCheck(t *testing.T) {
 		_, err = cluster.ZAdd(backlog.customKeyActive(kg, 1), float64(clock.Now().UnixMilli()), "missing-lol")
 		require.NoError(t, err)
 
-		err = q.shadowPartitionActiveCheck(ctx, &sp, client, kg)
+		_, err = q.backlogActiveCheck(ctx, &backlog, client, kg, l)
 		require.NoError(t, err)
 
 		require.False(t, cluster.Exists(backlog.customKeyActive(kg, 1)))

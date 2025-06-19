@@ -9,10 +9,10 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/logger"
-	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 	"golang.org/x/sync/errgroup"
+	mathRand "math/rand"
 	"strconv"
 	"sync/atomic"
 	"time"
@@ -20,15 +20,17 @@ import (
 
 const (
 	PartitionActiveCheckPeekMax          = 10
+	BacklogActiveCheckPeekMax            = 10
 	PartitionActiveCheckBacklogPeekMax   = 20
 	PartitionActiveCheckCooldownDuration = 5 * time.Minute
+	BacklogActiveCheckCooldownDuration   = 5 * time.Minute
 )
 
 func (q *queue) ActiveCheck(ctx context.Context) (int, error) {
 	// Peek shadow partitions for active checks
-	parts, err := q.PartitionActiveCheckPeek(ctx, PartitionActiveCheckPeekMax)
+	backlogs, err := q.BacklogActiveCheckPeek(ctx, BacklogActiveCheckPeekMax)
 	if err != nil {
-		return 0, fmt.Errorf("could not peek partitions for active checker: %w", err)
+		return 0, fmt.Errorf("could not peek backlogs for active checker: %w", err)
 	}
 
 	shard := q.primaryQueueShard
@@ -39,13 +41,40 @@ func (q *queue) ActiveCheck(ctx context.Context) (int, error) {
 
 	eg := errgroup.Group{}
 
-	// Process partitions in parallel
-	for _, part := range parts {
-		part := part
+	// Process backlogs in parallel
+	for _, backlog := range backlogs {
+		backlog := backlog
 		eg.Go(func() error {
-			err := q.shadowPartitionActiveCheck(ctx, part, client, kg)
+			l := q.log.With("backlog", backlog)
+
+			l.Debug("attempting to active check backlog", backlog)
+
+			cleanup, err := q.backlogActiveCheck(ctx, backlog, client, kg, l)
+			if cleanup {
+				status, cerr := scripts["queue/activeCheckRemoveBacklog"].Exec(
+					ctx,
+					client,
+					[]string{
+						kg.BacklogActiveCheckSet(),
+						kg.BacklogActiveCheckCooldown(backlog.BacklogID),
+					},
+					[]string{
+						backlog.BacklogID,
+						strconv.Itoa(int(q.clock.Now().UnixMilli())),
+						strconv.Itoa(int(BacklogActiveCheckCooldownDuration.Seconds())),
+					},
+				).ToInt64()
+				if cerr != nil {
+					l.Error("could not mark backlog active check cooldown", "err", cerr)
+				}
+
+				if status != 0 {
+					l.Error("invalid status received from active check removal", "status", status)
+				}
+			}
+
 			if err != nil {
-				return fmt.Errorf("could not check partition for active keys: %w", err)
+				return fmt.Errorf("could not check backlog for active keys: %w", err)
 			}
 
 			atomic.AddInt64(&checked, 1)
@@ -62,10 +91,35 @@ func (q *queue) ActiveCheck(ctx context.Context) (int, error) {
 	return int(atomic.LoadInt64(&checked)), nil
 }
 
-func (q *queue) shadowPartitionActiveCheck(ctx context.Context, sp *QueueShadowPartition, client rueidis.Client, kg QueueKeyGenerator) error {
+func (q *queue) backlogActiveCheck(ctx context.Context, b *QueueBacklog, client rueidis.Client, kg QueueKeyGenerator, l logger.Logger) (bool, error) {
+	var sp QueueShadowPartition
+
+	{
+		str, err := client.Do(ctx, client.B().Hget().Key(kg.ShadowPartitionMeta()).Field(b.ShadowPartitionID).Build()).ToString()
+		if err != nil {
+			if rueidis.IsRedisNil(err) {
+				l.Debug("shadow partition meta hash not found, exiting")
+				return true, nil
+			}
+
+			return false, fmt.Errorf("could not get shadow partition: %w", err)
+		}
+
+		// If shadow partition is missing, clean up
+		if str == "" {
+			l.Debug("shadow partition not found for backlog, exiting")
+			return true, nil
+		}
+
+		if err := json.Unmarshal([]byte(str), &sp); err != nil {
+			l.Error("failed to unmarshal shadow partition", "err", err, "str", str)
+			return true, nil
+		}
+	}
+
 	checkID, err := ulid.New(ulid.Timestamp(q.clock.Now()), rand.Reader)
 	if err != nil {
-		return fmt.Errorf("could not create checkID: %w", err)
+		return false, fmt.Errorf("could not create checkID: %w", err)
 	}
 
 	accountID := uuid.Nil
@@ -78,53 +132,35 @@ func (q *queue) shadowPartitionActiveCheck(ctx context.Context, sp *QueueShadowP
 		readOnly = false
 	}
 
-	l := q.log.With("check_id", checkID.String())
+	l = l.With("check_id", checkID.String(), "partition", sp.PartitionID, "account_id", accountID)
+
+	l.Debug("starting active check for partition")
 
 	// Check account
-	err = q.accountActiveCheck(ctx, sp, client, kg, l, readOnly)
-	if err != nil {
-		return fmt.Errorf("could not check account active items: %w", err)
-	}
-
-	// Check partition
-	err = q.partitionActiveCheck(ctx, sp, client, kg, l, readOnly)
-	if err != nil {
-		return fmt.Errorf("could not check account for invalid active items: %w", err)
-	}
-
-	// Check custom concurrency keys
-	sequentialBacklogs := false
-	backlogs, _, err := q.ShadowPartitionPeek(ctx, sp, sequentialBacklogs, q.clock.Now(), PartitionActiveCheckBacklogPeekMax)
-	if err != nil {
-		return fmt.Errorf("could not peek backlogs for shadow partition active check: %w", err)
-	}
-
-	for _, bidx := range util.RandPerm(len(backlogs)) {
-		backlog := backlogs[bidx]
-
-		for _, key := range backlog.ConcurrencyKeys {
-			err := q.customConcurrencyActiveCheck(ctx, sp, key, client, kg, l, readOnly)
-			if err != nil {
-				return fmt.Errorf("could not check custom concurrency key: %w", err)
-			}
+	if accountID != uuid.Nil && mathRand.Intn(100) <= q.runMode.ActiveCheckAccountCheckProbability {
+		err = q.accountActiveCheck(ctx, &sp, client, kg, l, readOnly)
+		if err != nil {
+			return false, fmt.Errorf("could not check account active items: %w", err)
 		}
 	}
 
-	err = client.Do(ctx,
-		client.B().
-			Set().
-			Key(kg.PartitionActiveCheckCooldown(sp.PartitionID)).
-			Value(strconv.FormatInt(q.clock.Now().UnixMilli(), 10)).
-			Ex(PartitionActiveCheckCooldownDuration).
-			Build(),
-	).Error()
+	// Check partition
+	err = q.partitionActiveCheck(ctx, &sp, client, kg, l, readOnly)
 	if err != nil {
-		return fmt.Errorf("could not mark partition cooldown: %w", err)
+		return false, fmt.Errorf("could not check account for invalid active items: %w", err)
 	}
 
-	l.Trace("checked partition for invalid active keys", "partition", sp.PartitionID)
+	// Check custom concurrency keys
+	for _, key := range b.ConcurrencyKeys {
+		err := q.customConcurrencyActiveCheck(ctx, &sp, key, client, kg, l, readOnly)
+		if err != nil {
+			return false, fmt.Errorf("could not check custom concurrency key: %w", err)
+		}
+	}
 
-	return nil
+	l.Debug("checked partition for invalid active keys", "partition", sp.PartitionID)
+
+	return true, nil
 }
 
 func (q *queue) accountActiveCheck(
@@ -142,6 +178,8 @@ func (q *queue) accountActiveCheck(
 	keyInProgress := sp.accountInProgressKey(kg)
 
 	invalidItems := make([]string, 0)
+
+	l.Debug("checking account for invalid or missing active keys", "account", sp.AccountID, "key", keyActive)
 
 	err := q.findMissingItemsWithDynamicTargets(ctx, client, kg, keyActive, func(chunk []*osqueue.QueueItem) map[string][]string {
 		res := make(map[string][]string)
@@ -361,7 +399,7 @@ func (q *queue) findMissingItemsWithDynamicTargets(
 		// Retrieve item data
 		items := make([]*osqueue.QueueItem, 0, len(entryIDs))
 		itemData, err := client.Do(ctx, client.B().Hmget().Key(kg.QueueItem()).Field(entryIDs...).Build()).AsStrSlice()
-		if err != nil {
+		if err != nil && !rueidis.IsRedisNil(err) {
 			return fmt.Errorf("could not get queue items: %w", err)
 		}
 
@@ -429,23 +467,23 @@ func (q *queue) findMissingItemsWithDynamicTargets(
 	}
 }
 
-func (q *queue) PartitionActiveCheckPeek(ctx context.Context, peekSize int64) ([]*QueueShadowPartition, error) {
+func (q *queue) BacklogActiveCheckPeek(ctx context.Context, peekSize int64) ([]*QueueBacklog, error) {
 	shard := q.primaryQueueShard
 	client := shard.RedisClient.Client()
 	kg := shard.RedisClient.KeyGenerator()
 
-	key := kg.PartitionActiveCheckSet()
+	key := kg.BacklogActiveCheckSet()
 
-	peeker := peeker[QueueShadowPartition]{
+	peeker := peeker[QueueBacklog]{
 		q:                      q,
 		max:                    PartitionActiveCheckPeekMax,
 		opName:                 "peekPartitionActiveCheck",
 		isMillisecondPrecision: true,
 		handleMissingItems:     CleanupMissingPointers(ctx, key, client, q.log),
-		maker: func() *QueueShadowPartition {
-			return &QueueShadowPartition{}
+		maker: func() *QueueBacklog {
+			return &QueueBacklog{}
 		},
-		keyMetadataHash: kg.ShadowPartitionMeta(),
+		keyMetadataHash: kg.BacklogMeta(),
 	}
 
 	// Pick random partitions within bounds
