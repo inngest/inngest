@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/inngest/inngest/pkg/util"
 	"net/http"
 	"os"
 	"time"
+
+	"github.com/inngest/inngest/pkg/debugapi"
+	"github.com/inngest/inngest/pkg/util"
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/coocood/freecache"
@@ -531,6 +533,14 @@ func start(ctx context.Context, opts StartOpts) error {
 		return err
 	}
 
+	debugapi, err := debugapi.NewDebugAPI(debugapi.Opts{
+		Log:   l,
+		Queue: rq,
+	})
+	if err != nil {
+		return err
+	}
+
 	connectGatewayProxy, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectPubSubRedis, false, connectpubsub.RedisPubSubConnectorOpts{
 		Logger:             connectPubSubLogger.With("svc", "connect-gateway"),
 		Tracer:             conditionalTracer,
@@ -565,6 +575,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		{At: "/", Router: devAPI},
 		{At: "/v0", Router: core.Router},
 		{At: "/debug", Handler: middleware.Profiler()},
+		{At: "/dbg", Router: debugapi.Router},
 	}
 
 	if testapi.ShouldEnable() {
