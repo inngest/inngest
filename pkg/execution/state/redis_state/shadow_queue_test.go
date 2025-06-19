@@ -1903,6 +1903,10 @@ func TestRefillConstraints(t *testing.T) {
 			itemsInReadyQueue, err := rc.Do(ctx, rc.B().Zcount().Key(kg.PartitionQueueSet(enums.PartitionTypeDefault, shadowPart.PartitionID, "")).Min("-inf").Max(fmt.Sprintf("%d", refillUntil.UnixMilli())).Build()).ToInt64()
 			require.NoError(t, err)
 
+			// we do not test refilled items
+			require.Equal(t, testCase.expected.result.Refilled, len(res.RefilledItems))
+			res.RefilledItems = nil
+
 			require.Equal(t, testCase.expected.result, *res, "result comparison failed", res, itemsInBacklog, itemsInReadyQueue)
 
 			require.Equal(t, int64(testCase.expected.itemsInBacklog), itemsInBacklog)
