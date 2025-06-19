@@ -10,9 +10,11 @@ import { PopoverContent } from '@inngest/components/FunctionConfiguration/Functi
 import { Pill } from '@inngest/components/Pill';
 import { Time } from '@inngest/components/Time';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
+import { useCron } from '@inngest/components/hooks/useCron';
 import { AppsIcon } from '@inngest/components/icons/sections/Apps';
 import { EventsIcon } from '@inngest/components/icons/sections/Events';
 import { FunctionsIcon } from '@inngest/components/icons/sections/Functions';
+import { relativeTime } from '@inngest/components/utils/date';
 import { RiArrowRightSLine, RiArrowRightUpLine, RiTimeLine } from '@remixicon/react';
 
 import {
@@ -224,24 +226,24 @@ export function FunctionConfiguration({
         </ConfigurationSection>
 
         <ConfigurationSection title="Triggers">
-          {triggers?.map((trigger) => (
-            <ConfigurationBlock
-              key={trigger.value}
-              icon={
-                trigger.type == FunctionTriggerTypes.Event ? (
-                  <EventsIcon className="h-5 w-5" />
-                ) : (
-                  <RiTimeLine className="h-5 w-5" />
-                )
-              }
-              mainContent={trigger.value}
-              expression={
-                trigger.type == FunctionTriggerTypes.Event && trigger.condition
-                  ? `if: ${trigger.condition}`
-                  : ''
-              }
-            />
-          ))}
+          {triggers?.map((trigger) => {
+            if (trigger.type === FunctionTriggerTypes.Cron) {
+              return <CronTriggerBlock key={trigger.value} schedule={trigger.value} />;
+            } else if (trigger.type === FunctionTriggerTypes.Event) {
+              return (
+                <ConfigurationBlock
+                  key={trigger.value}
+                  icon={<EventsIcon className="h-5 w-5" />}
+                  mainContent={trigger.value}
+                  expression={trigger.condition ? `if: ${trigger.condition}` : ''}
+                />
+              );
+            } else {
+              // Exhaustive check - this should never be reached if all cases are handled
+              const _exhaustiveCheck: never = trigger.type;
+              return _exhaustiveCheck;
+            }
+          })}
         </ConfigurationSection>
       </ConfigurationCategory>
       <ConfigurationCategory title="Execution Configurations">
@@ -335,5 +337,32 @@ export function FunctionConfiguration({
         )}
       </ConfigurationCategory>
     </div>
+  );
+}
+
+type CronTriggerBlockProps = {
+  schedule: string;
+};
+
+function CronTriggerBlock({ schedule }: CronTriggerBlockProps) {
+  const { nextRun } = useCron(schedule);
+
+  return (
+    <ConfigurationBlock
+      icon={<RiTimeLine className="h-5 w-5" />}
+      mainContent={schedule}
+      subContent={
+        nextRun ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="truncate">{`Next run: ${relativeTime(nextRun)}`}</span>
+            </TooltipTrigger>
+            <TooltipContent className="font-mono text-xs">{nextRun.toISOString()}</TooltipContent>
+          </Tooltip>
+        ) : (
+          ''
+        )
+      }
+    />
   );
 }

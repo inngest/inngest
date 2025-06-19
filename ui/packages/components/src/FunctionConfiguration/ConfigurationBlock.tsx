@@ -4,7 +4,7 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Too
 type ConfigurationBlockProps = {
   icon: React.ReactNode;
   mainContent: string;
-  subContent?: string;
+  subContent?: React.ReactNode;
   expression?: string;
   rightElement?: React.ReactNode;
   href?: string;
