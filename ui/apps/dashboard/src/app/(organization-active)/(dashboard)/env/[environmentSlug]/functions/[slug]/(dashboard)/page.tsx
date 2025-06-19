@@ -176,7 +176,10 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
             {/* TODO replace with feature flag*/}
             {true ? (
               <div className="bg-canvasBase">
-                <NewFunctionConfiguration inngestFunction={function_ as unknown as Function} />
+                <NewFunctionConfiguration
+                  inngestFunction={function_ as unknown as Function}
+                  deployCreatedAt={function_.current?.deploy?.createdAt}
+                />
               </div>
             ) : (
               <div className="flex flex-col gap-10 px-6 py-4">

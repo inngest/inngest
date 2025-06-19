@@ -8,6 +8,7 @@ import ConfigurationTable, {
 } from '@inngest/components/FunctionConfiguration/ConfigurationTable';
 import { PopoverContent } from '@inngest/components/FunctionConfiguration/FunctionConfigurationInfoPopovers';
 import { Pill } from '@inngest/components/Pill';
+import { Time } from '@inngest/components/Time';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
 import { AppsIcon } from '@inngest/components/icons/sections/Apps';
 import { EventsIcon } from '@inngest/components/icons/sections/Events';
@@ -22,9 +23,14 @@ import {
 type FunctionConfigurationProps = {
   inngestFunction: NonNullable<GetFunctionQuery['functionBySlug']>;
   header?: ReactNode;
+  deployCreatedAt?: string | null;
 };
 
-export function FunctionConfiguration({ inngestFunction, header }: FunctionConfigurationProps) {
+export function FunctionConfiguration({
+  inngestFunction,
+  header,
+  deployCreatedAt,
+}: FunctionConfigurationProps) {
   const configuration = inngestFunction.configuration;
   const triggers = inngestFunction.triggers;
 
@@ -202,6 +208,9 @@ export function FunctionConfiguration({ inngestFunction, header }: FunctionConfi
           <ConfigurationBlock
             icon={<AppsIcon className="h-5 w-5" />}
             mainContent={inngestFunction.app.name}
+            subContent={
+              deployCreatedAt ? <Time format="relative" value={new Date(deployCreatedAt)} /> : ''
+            }
             rightElement={
               <Button
                 label="Go to apps"
