@@ -504,3 +504,27 @@ func (q *queue) BacklogActiveCheckPeek(ctx context.Context, peekSize int64) ([]*
 
 	return res.Items, nil
 }
+
+func (q *queue) AddBacklogToActiveCheck(ctx context.Context, shard QueueShard, accountID uuid.UUID, backlogID string) error {
+	kg := shard.RedisClient.KeyGenerator()
+	client := shard.RedisClient.Client()
+
+	status, err := scripts["queue/activeCheckAddBacklog"].Exec(ctx, client, []string{
+		kg.BacklogActiveCheckSet(),
+		kg.BacklogActiveCheckCooldown(backlogID),
+	},
+		[]string{
+			backlogID,
+			strconv.Itoa(int(q.clock.Now().UnixMilli())),
+		}).ToInt64()
+	if err != nil {
+		return fmt.Errorf("could not add backlog to active check: %w", err)
+	}
+
+	switch status {
+	case 0:
+		return nil
+	default:
+		return fmt.Errorf("invalid status code %v returned by add to active check", status)
+	}
+}

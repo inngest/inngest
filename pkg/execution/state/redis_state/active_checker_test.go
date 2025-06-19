@@ -93,6 +93,16 @@ func TestShadowPartitionActiveCheck(t *testing.T) {
 		cluster.HSet(kg.ShadowPartitionMeta(), sp.PartitionID, string(marshaled))
 	}
 
+	t.Run("adding to active check should work", func(t *testing.T) {
+		setup(t)
+
+		err := q.AddBacklogToActiveCheck(ctx, defaultShard, accountID, backlog.BacklogID)
+		require.NoError(t, err)
+
+		require.True(t, cluster.Exists(kg.BacklogActiveCheckSet()))
+		require.True(t, hasMember(t, cluster, kg.BacklogActiveCheckSet(), backlog.BacklogID))
+	})
+
 	t.Run("should not clean up active items from account active set", func(t *testing.T) {
 		setup(t)
 
