@@ -2,7 +2,6 @@ package debugapi
 
 import (
 	"encoding/json"
-	"fmt"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -23,7 +22,6 @@ func (a *debugAPI) partitionByID(w http.ResponseWriter, r *http.Request) {
 		queueName = &partitionID
 	}
 
-	fmt.Println("SHARD SELECTOR")
 	shard, err := a.ShardSelector(ctx, consts.DevServerAccountID, queueName)
 	if err != nil {
 		_ = publicerr.WriteHTTP(
@@ -33,7 +31,6 @@ func (a *debugAPI) partitionByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fmt.Println("RETRIEVE PARTITION")
 	res, err := a.Queue.PartitionByID(ctx, shard, partitionID)
 	if err != nil {
 		_ = publicerr.WriteHTTP(
@@ -63,7 +60,6 @@ func (a *debugAPI) partitionByID(w http.ResponseWriter, r *http.Request) {
 	resp := DebugResponse{
 		Data: partition,
 	}
-	fmt.Println("SUCCESS")
 	byt, err := json.Marshal(resp)
 	if err != nil {
 		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, http.StatusBadRequest, "error marshaling response"))
