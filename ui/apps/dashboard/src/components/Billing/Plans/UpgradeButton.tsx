@@ -44,7 +44,9 @@ export default function UpgradeButton({
   const isFreeCard = cardPlanName === PlanNames.Free;
 
   const isActive =
-    currentPlan.slug === plan.slug || (cardPlanName === PlanNames.Enterprise && isEnterprise);
+    currentPlan.slug === plan.slug ||
+    (cardPlanName === PlanNames.Enterprise && isEnterprise) ||
+    (currentPlan.slug === 'hobby-payg-2025-06-13' && plan.slug === 'hobby-free-2025-06-13');
 
   const isLowerPlan = (() => {
     if (isEnterprise) {

@@ -1,7 +1,9 @@
 import { Pill } from '@inngest/components/Pill/Pill';
 import { RiCheckLine } from '@remixicon/react';
+import { current } from 'tailwindcss/colors';
 
 import { isActive, isTrialPlan, processPlan, type Plan } from '@/components/Billing/Plans/utils';
+import PayAsGoButton from './PayAsGoButton';
 import UpgradeButton from './UpgradeButton';
 
 export function VerticalPlanCard({
@@ -18,11 +20,30 @@ export function VerticalPlanCard({
 
   return (
     <div className="border-muted bg-canvasBase rounded-md border p-6">
-      <h4 className="text-basis mb-2 flex items-center gap-2 text-2xl font-medium">
-        {transformedPlan.name}
-        {displayTrialPill && <Pill>Trial</Pill>}
-      </h4>
-      {transformedPlan.name === 'Hobby - Free' ? (
+      <div className="flex items-center justify-between gap-2">
+        <h4 className="text-basis mb-2 flex items-center gap-2 text-2xl font-medium">
+          {transformedPlan.name}
+          {displayTrialPill && <Pill>Trial</Pill>}
+        </h4>
+        {(currentPlan.slug === 'hobby-free-2025-06-13' ||
+          currentPlan.slug === 'hobby-payg-2025-06-13') &&
+          transformedPlan.slug === 'hobby-free-2025-06-13' && (
+            <PayAsGoButton
+              plan={
+                currentPlan.slug === 'hobby-free-2025-06-13'
+                  ? {
+                      ...plan,
+                      slug: 'hobby-payg-2025-06-13',
+                      name: 'Hobby (Pay-as-you-go)',
+                    }
+                  : plan
+              }
+              currentPlan={currentPlan}
+              onPlanChange={onPlanChange}
+            />
+          )}
+      </div>
+      {transformedPlan.slug === 'hobby-free-2025-06-13' ? (
         <div className="mb-1 text-xs font-bold uppercase">Always</div>
       ) : (
         <div className="mb-1 text-xs font-bold uppercase">From</div>
@@ -30,40 +51,12 @@ export function VerticalPlanCard({
       <div className="text-2xl">
         <span className="text-4xl font-medium">{transformedPlan.price}</span>
         {transformedPlan.price !== 'Contact us' && <>/{transformedPlan.billingPeriod}</>}
+        {currentPlan.slug === 'hobby-payg-2025-06-13' &&
+          transformedPlan.slug === 'hobby-free-2025-06-13' && (
+            <span className="text-base"> + additional usage billed</span>
+          )}
       </div>
-
-      {transformedPlan.slug === 'hobby-free-2025-06-13' ? (
-        (() => {
-          const paygPlan: Plan = {
-            ...plan,
-            slug: 'hobby-payg-2025-06-13',
-            name: 'Hobby (Pay as you go)',
-            amount: 0,
-          };
-          return (
-            <div className="flex gap-2">
-              <div className="w-1/4">
-                <UpgradeButton
-                  plan={plan}
-                  currentPlan={currentPlan}
-                  onPlanChange={onPlanChange}
-                  label="Free plan"
-                />
-              </div>
-              <div className="flex-1">
-                <UpgradeButton
-                  plan={paygPlan}
-                  currentPlan={currentPlan}
-                  onPlanChange={onPlanChange}
-                  label="Upgrade to pay-as-you-go"
-                />
-              </div>
-            </div>
-          );
-        })()
-      ) : (
-        <UpgradeButton plan={plan} currentPlan={currentPlan} onPlanChange={onPlanChange} />
-      )}
+      <UpgradeButton plan={plan} currentPlan={currentPlan} onPlanChange={onPlanChange} />
       <hr className="mb-6" />
       <ul className="flex flex-col">
         {transformedPlan.features.map((feature, i) => (

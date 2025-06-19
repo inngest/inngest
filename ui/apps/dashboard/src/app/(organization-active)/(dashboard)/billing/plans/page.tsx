@@ -22,7 +22,7 @@ export default async function Page() {
     {
       id: 'n/a',
       slug: 'hobby-free-2025-06-13',
-      name: 'Hobby - Free',
+      name: 'Hobby',
       amount: 0,
       billingPeriod: 'month',
       entitlements: {
@@ -31,6 +31,7 @@ export default async function Page() {
         runCount: { limit: 100_000 },
       },
       isLegacy: false,
+      isFree: true,
     },
     {
       id: 'n/a',
@@ -44,6 +45,7 @@ export default async function Page() {
         runCount: { limit: 1_000_000 },
       },
       isLegacy: false,
+      isFree: false,
     },
     {
       id: 'n/a',
@@ -57,6 +59,7 @@ export default async function Page() {
         runCount: { limit: 1_000_000 },
       },
       isLegacy: false,
+      isFree: false,
     },
   ];
 
