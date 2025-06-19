@@ -138,21 +138,21 @@ func (q *queue) backlogActiveCheck(ctx context.Context, b *QueueBacklog, client 
 
 	// Check account
 	if accountID != uuid.Nil && mathRand.Intn(100) <= q.runMode.ActiveCheckAccountCheckProbability {
-		err = q.accountActiveCheck(ctx, &sp, client, kg, l, readOnly)
+		err = q.accountActiveCheck(ctx, &sp, client, kg, l.With("scope", "account-check"), readOnly)
 		if err != nil {
 			return false, fmt.Errorf("could not check account active items: %w", err)
 		}
 	}
 
 	// Check partition
-	err = q.partitionActiveCheck(ctx, &sp, client, kg, l, readOnly)
+	err = q.partitionActiveCheck(ctx, &sp, client, kg, l.With("scope", "partition-check"), readOnly)
 	if err != nil {
 		return false, fmt.Errorf("could not check account for invalid active items: %w", err)
 	}
 
 	// Check custom concurrency keys
 	for _, key := range b.ConcurrencyKeys {
-		err := q.customConcurrencyActiveCheck(ctx, &sp, key, client, kg, l, readOnly)
+		err := q.customConcurrencyActiveCheck(ctx, &sp, key, client, kg, l.With("scope", "backlog-check"), readOnly)
 		if err != nil {
 			return false, fmt.Errorf("could not check custom concurrency key: %w", err)
 		}
@@ -181,7 +181,7 @@ func (q *queue) accountActiveCheck(
 
 	l.Debug("checking account for invalid or missing active keys", "account", sp.AccountID, "key", keyActive)
 
-	err := q.findMissingItemsWithDynamicTargets(ctx, client, kg, keyActive, func(chunk []*osqueue.QueueItem) map[string][]string {
+	err := q.findMissingItemsWithDynamicTargets(ctx, client, kg, keyActive, l, func(chunk []*osqueue.QueueItem) map[string][]string {
 		res := make(map[string][]string)
 
 		chunkIDs := make([]string, len(chunk))
@@ -369,6 +369,7 @@ func (q *queue) findMissingItemsWithDynamicTargets(
 	client rueidis.Client,
 	kg QueueKeyGenerator,
 	sourceKey string,
+	l logger.Logger,
 	targetKeys func(chunk []*osqueue.QueueItem) map[string][]string,
 	onMissing func(pointer string),
 ) error {
@@ -379,6 +380,9 @@ func (q *queue) findMissingItemsWithDynamicTargets(
 		// Load chunk
 		cmd := client.B().Zscan().Key(sourceKey).Cursor(cursor).Count(count).Build()
 		entry, err := client.Do(ctx, cmd).AsScanEntry()
+
+		l.Debug("scanned source", "key", sourceKey, "returned", len(entry.Elements), "cursor", entry.Cursor)
+
 		if err != nil {
 			if rueidis.IsRedisNil(err) {
 				return nil
@@ -402,6 +406,8 @@ func (q *queue) findMissingItemsWithDynamicTargets(
 		if err != nil && !rueidis.IsRedisNil(err) {
 			return fmt.Errorf("could not get queue items: %w", err)
 		}
+
+		l.Debug("retrieved item chunk", "key", sourceKey, "item_ids", entryIDs)
 
 		for i, itemStr := range itemData {
 			if itemStr == "" {
@@ -429,6 +435,8 @@ func (q *queue) findMissingItemsWithDynamicTargets(
 		// Worst case, this transform 20 queue items in the chunk to 20 target keys, but usually this will
 		// be more efficient as items may belong to the same workflows.
 		for targetKey, items := range targetKeys(items) {
+			l.Debug("comparing against target", "source", sourceKey, "target", targetKey, "items", items)
+
 			if len(items) == 0 {
 				continue
 			}
