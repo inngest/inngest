@@ -151,6 +151,11 @@ func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.Ot
 				}
 
 				for k, v := range fragmentAttr {
+					// TODO We should remove this and only keep non-Inngest
+					// attributes here instead. Especially if we use them
+					// below. For now, they're used sometimes.
+					newSpan.Attributes[k] = v
+
 					switch k {
 					case meta.AttributeDynamicStatus:
 						{
