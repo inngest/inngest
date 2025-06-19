@@ -1090,16 +1090,24 @@ func (q *queue) process(
 					// Don't extend lease when the ctx is done.
 					return
 				}
+
 				if leaseID == nil {
 					q.log.Error("cannot extend lease since lease ID is nil", "qi", qi, "partition", p)
 					// Don't extend lease since one doesn't exist
 					errCh <- fmt.Errorf("cannot extend lease since lease ID is nil")
 					return
 				}
+
 				// Once a job has started, use a BG context to always renew.
 				leaseID, err = q.ExtendLease(context.Background(), qi, *leaseID, QueueLeaseDuration)
-				if err != nil && err != ErrQueueItemNotFound {
-					q.log.Error("error extending lease", "error", err, "qi", qi, "partition", p)
+				if err != nil {
+					// log error if unexpected; the queue item may be removed by a Dequeue() operation
+					// invoked by finalize() (Cancellations, Parallelism)
+					if !errors.Is(ErrQueueItemNotFound, err) {
+						q.log.Error("error extending lease", "error", err, "qi", qi, "partition", p)
+					}
+
+					// always stop processing the queue item if lease cannot be extended
 					errCh <- fmt.Errorf("error extending lease while processing: %w", err)
 					return
 				}
