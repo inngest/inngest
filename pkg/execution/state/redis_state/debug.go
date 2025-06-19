@@ -14,6 +14,7 @@ type PartitionInspectionResult struct {
 	QueueShadowPartition *QueueShadowPartition
 
 	Paused            bool `json:"paused"`
+	Migrate           bool `json:"migrate"`
 	AccountActive     int  `json:"acct_active"`
 	AccountInProgress int  `json:"acct_in_progress"`
 	Ready             int  `json:"ready"`
@@ -96,6 +97,26 @@ func (q *queue) PartitionByID(ctx context.Context, shard QueueShard, partitionID
 
 		if err := json.Unmarshal(byt, &result); err != nil {
 			return nil, fmt.Errorf("error unmarhalling counter check: %w", err)
+		}
+	}
+
+	if qp.FunctionID != nil {
+		cmd := rc.B().Get().Key(kg.FnMetadata(*qp.FunctionID)).Build()
+		byt, err := rc.Do(ctx, cmd).AsBytes()
+		switch err {
+		case nil:
+			meta := FnMetadata{}
+			if err := json.Unmarshal(byt, &meta); err != nil {
+				return nil, fmt.Errorf("error unmarshaling function metadata: %w", err)
+			}
+			result.Paused = meta.Paused
+			result.Migrate = meta.Migrate
+
+		case rueidis.Nil:
+			// no-op
+
+		default:
+			return nil, fmt.Errorf("error retrieving function metadata: %w", err)
 		}
 	}
 
