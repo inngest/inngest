@@ -4474,10 +4474,10 @@ func TestMigrate(t *testing.T) {
 		{
 			name: "without key queues",
 		},
-		// {
-		// 	name:     "with key queues",
-		// 	keyQueue: true,
-		// },
+		{
+			name:     "with key queues",
+			keyQueue: true,
+		},
 	}
 
 	for _, tc := range testcases {
