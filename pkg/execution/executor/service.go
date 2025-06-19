@@ -484,6 +484,8 @@ func (s *svc) handleDebounce(ctx context.Context, item queue.Item) error {
 // handleCancel handles eager bulk cancellation
 //
 // TODO: halt work if a user decides to cancel this cancellation
+//
+// NOTE: this currently doesn't work since there are no CancellationReadWriter in OSS initialized
 func (s *svc) handleCancel(ctx context.Context, item queue.Item) error {
 	c := cqrs.Cancellation{}
 	if err := json.Unmarshal(item.Payload.(json.RawMessage), &c); err != nil {
@@ -532,11 +534,7 @@ func (s *svc) handleCancel(ctx context.Context, item queue.Item) error {
 			return fmt.Errorf("error selecting shard for cancellation: %w", err)
 		}
 
-		items, err := qm.ItemsByPartition(ctx, shard, c.FunctionID, from, c.StartedBefore,
-			redis_state.WithQueueItemIterAllowKeyQueues(func() bool {
-				return s.allowKeyQueues(ctx, c.AccountID)
-			}),
-		)
+		items, err := qm.ItemsByPartition(ctx, shard, c.FunctionID, from, c.StartedBefore)
 		if err != nil {
 			return fmt.Errorf("error retrieving partition items: %w", err)
 		}
@@ -592,11 +590,7 @@ func (s *svc) handleCancel(ctx context.Context, item queue.Item) error {
 			return fmt.Errorf("error selecting shard for cancellation: %w", err)
 		}
 
-		items, err := qm.ItemsByBacklog(ctx, shard, c.TargetID, from, c.StartedBefore,
-			redis_state.WithQueueItemIterAllowKeyQueues(func() bool {
-				return s.allowKeyQueues(ctx, c.AccountID)
-			}),
-		)
+		items, err := qm.ItemsByBacklog(ctx, shard, c.TargetID, from, c.StartedBefore)
 		if err != nil {
 			return fmt.Errorf("error retrieving backlog iterator: %w", err)
 		}
