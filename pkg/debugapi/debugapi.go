@@ -8,7 +8,7 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 )
 
-func NewDebugAPI(o Opts) (chi.Router, error) {
+func NewDebugAPI(o Opts) (*debugAPI, error) {
 	api := &debugAPI{
 		Router: chi.NewRouter(),
 		Opts:   o,
