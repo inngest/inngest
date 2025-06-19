@@ -2191,7 +2191,6 @@ export type Workflow = {
   configuration: FunctionConfiguration;
   current: Maybe<WorkflowVersion>;
   failureHandler: Maybe<Workflow>;
-  fnTriggers: Array<FunctionTrigger>;
   id: Scalars['ID'];
   isArchived: Scalars['Boolean'];
   isParentArchived: Scalars['Boolean'];
@@ -2273,7 +2272,6 @@ export type WorkflowVersion = {
   createdAt: Scalars['Time'];
   deploy: Maybe<Deploy>;
   description: Maybe<Scalars['NullString']>;
-  fnTriggers: Array<FunctionTrigger>;
   retries: Scalars['Int'];
   throttleCount: Scalars['Int'];
   throttlePeriod: Scalars['String'];
