@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
+	"github.com/inngest/inngest/pkg/publicerr"
 )
 
 func (a *debugAPI) partitionByID(w http.ResponseWriter, r *http.Request) {
@@ -25,26 +26,20 @@ func (a *debugAPI) partitionByID(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("SHARD SELECTOR")
 	shard, err := a.ShardSelector(ctx, consts.DevServerAccountID, queueName)
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte("error"))
+		_ = publicerr.WriteHTTP(
+			w,
+			publicerr.Wrapf(err, http.StatusBadRequest, "error finding shard: %s", err.Error()),
+		)
 		return
 	}
 
 	fmt.Println("RETRIEVE PARTITION")
 	qp, sqp, err := a.Queue.PartitionByID(ctx, shard, partitionID)
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-
-		resp := DebugResponse{
-			Error: fmt.Errorf("error retrieving partition: %w", err),
-		}
-		byt, err := json.Marshal(resp)
-		if err != nil {
-			w.Write([]byte(err.Error()))
-			return
-		}
-
-		w.Write(byt)
+		_ = publicerr.WriteHTTP(
+			w,
+			publicerr.Wrapf(err, http.StatusBadRequest, "error retrieving partition: %s", err.Error()),
+		)
 		return
 	}
 
@@ -67,8 +62,7 @@ func (a *debugAPI) partitionByID(w http.ResponseWriter, r *http.Request) {
 	fmt.Println("SUCCESS")
 	byt, err := json.Marshal(resp)
 	if err != nil {
-		w.WriteHeader(http.StatusBadRequest)
-		w.Write([]byte(err.Error()))
+		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, http.StatusBadRequest, "error marshaling response"))
 		return
 	}
 
