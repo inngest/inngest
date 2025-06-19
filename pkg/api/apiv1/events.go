@@ -24,17 +24,17 @@ const (
 // and filtering params.
 //
 // This has no API
-func (a API) GetEvents(ctx context.Context, opts *cqrs.WorkspaceEventsOpts) ([]*cqrs.Event, error) {
+func (a API) GetEvents(ctx context.Context, opts *cqrs.WorkspaceEventsOpts) ([]cqrs.Event, error) {
 	auth, err := a.opts.AuthFinder(ctx)
 	if err != nil {
 		return nil, publicerr.Wrap(err, 401, "No auth found")
 	}
 
-	if a.opts.TraceReader == nil {
-		return nil, publicerr.Errorf(500, "No trace reader specified")
+	if a.opts.EventReader == nil {
+		return nil, publicerr.Errorf(500, "No event reader specified")
 	}
 
-	events, err := a.opts.TraceReader.GetEvents(ctx, auth.AccountID(), auth.WorkspaceID(), opts)
+	events, err := a.opts.EventReader.WorkspaceEvents(ctx, auth.WorkspaceID(), opts)
 	if err != nil {
 		logger.StdlibLogger(ctx).Error("error querying events", "error", err)
 		return nil, publicerr.Wrap(err, 500, "Unable to query events")
@@ -101,10 +101,10 @@ func (a API) GetEvent(ctx context.Context, eventID ulid.ULID) (*cqrs.Event, erro
 	if err != nil {
 		return nil, publicerr.Wrap(err, 401, "No auth found")
 	}
-	if a.opts.TraceReader == nil {
-		return nil, publicerr.Errorf(500, "No trace reader specified")
+	if a.opts.EventReader == nil {
+		return nil, publicerr.Errorf(500, "No event reader specified")
 	}
-	event, err := a.opts.TraceReader.GetEvent(ctx, eventID, auth.AccountID(), auth.WorkspaceID())
+	event, err := a.opts.EventReader.FindEvent(ctx, auth.WorkspaceID(), eventID)
 	if err == sql.ErrNoRows {
 		return nil, publicerr.Wrap(err, 404, "Event not found")
 	}

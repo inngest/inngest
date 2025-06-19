@@ -629,11 +629,11 @@ func (w wrapper) GetEventsByExpressions(ctx context.Context, cel []string) ([]*c
 	return res, nil
 }
 
-func (w wrapper) GetEvent(ctx context.Context, internalID ulid.ULID, accountID uuid.UUID, workspaceID uuid.UUID) (*cqrs.Event, error) {
+func (w wrapper) FindEvent(ctx context.Context, workspaceID uuid.UUID, internalID ulid.ULID) (*cqrs.Event, error) {
 	return w.GetEventByInternalID(ctx, internalID)
 }
 
-func (w wrapper) GetEvents(ctx context.Context, accountID uuid.UUID, workspaceID uuid.UUID, opts *cqrs.WorkspaceEventsOpts) ([]*cqrs.Event, error) {
+func (w wrapper) WorkspaceEvents(ctx context.Context, workspaceID uuid.UUID, opts *cqrs.WorkspaceEventsOpts) ([]cqrs.Event, error) {
 	if err := opts.Validate(); err != nil {
 		return nil, err
 	}
@@ -668,10 +668,9 @@ func (w wrapper) GetEvents(ctx context.Context, accountID uuid.UUID, workspaceID
 	if err != nil {
 		return nil, err
 	}
-	out := make([]*cqrs.Event, len(evts))
+	out := make([]cqrs.Event, len(evts))
 	for n, evt := range evts {
-		val := convertEvent(evt)
-		out[n] = &val
+		out[n] = convertEvent(evt)
 	}
 	return out, nil
 }
@@ -2043,10 +2042,10 @@ func (w wrapper) GetWorkerConnections(ctx context.Context, opt cqrs.GetWorkerCon
 // copyWriter allows running duck-db specific functions as CQRS functions, copying CQRS types to DDB types
 // automatically.
 func copyWriter[
-	PARAMS_IN any,
-	INTERNAL_PARAMS any,
-	IN any,
-	OUT any,
+PARAMS_IN any,
+INTERNAL_PARAMS any,
+IN any,
+OUT any,
 ](
 	ctx context.Context,
 	f func(context.Context, INTERNAL_PARAMS) (IN, error),
@@ -2069,8 +2068,8 @@ func copyWriter[
 }
 
 func copyInto[
-	IN any,
-	OUT any,
+IN any,
+OUT any,
 ](
 	ctx context.Context,
 	f func(context.Context) (IN, error),
