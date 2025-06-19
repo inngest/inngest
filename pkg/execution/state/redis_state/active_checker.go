@@ -47,7 +47,7 @@ func (q *queue) ActiveCheck(ctx context.Context) (int, error) {
 		eg.Go(func() error {
 			l := q.log.With("backlog", backlog)
 
-			l.Debug("attempting to active check backlog", backlog)
+			l.Debug("attempting to active check backlog")
 
 			cleanup, err := q.backlogActiveCheck(ctx, backlog, client, kg, l)
 			if cleanup {
