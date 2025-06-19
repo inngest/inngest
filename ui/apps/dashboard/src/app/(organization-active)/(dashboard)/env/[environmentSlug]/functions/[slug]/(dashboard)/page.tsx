@@ -23,7 +23,6 @@ import { FunctionTriggerTypes } from '@/gql/graphql';
 import LoadingIcon from '@/icons/LoadingIcon';
 import { useFunction, useFunctionUsage } from '@/queries';
 import { pathCreator } from '@/utils/urls';
-import { type Function } from '../../../../../../../../../../dev-server-ui/src/store/generated';
 import DashboardTimeRangeFilter, {
   defaultTimeRange,
   getTimeRangeByKey,
@@ -177,7 +176,7 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
             {true ? (
               <div className="bg-canvasBase">
                 <NewFunctionConfiguration
-                  inngestFunction={function_ as unknown as Function}
+                  inngestFunction={function_}
                   deployCreatedAt={function_.current?.deploy?.createdAt}
                   getAppLink={() => appRoute}
                   getEventLink={(eventName) =>

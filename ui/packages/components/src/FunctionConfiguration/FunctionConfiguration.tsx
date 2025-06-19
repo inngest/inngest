@@ -17,13 +17,18 @@ import { FunctionsIcon } from '@inngest/components/icons/sections/Functions';
 import { relativeTime } from '@inngest/components/utils/date';
 import { RiArrowRightSLine, RiArrowRightUpLine, RiTimeLine } from '@remixicon/react';
 
+import type { GetFunctionQuery as DashboardGetFunctionQuery } from '../../../../apps/dashboard/src/gql/graphql';
 import {
   FunctionTriggerTypes,
-  type GetFunctionQuery,
+  type GetFunctionQuery as DevServerGetFunctionQuery,
 } from '../../../../apps/dev-server-ui/src/store/generated';
 
+type InngestFunction =
+  | NonNullable<DevServerGetFunctionQuery['functionBySlug']>
+  | NonNullable<DashboardGetFunctionQuery['workspace']['workflow']>;
+
 type FunctionConfigurationProps = {
-  inngestFunction: NonNullable<GetFunctionQuery['functionBySlug']>;
+  inngestFunction: InngestFunction;
   header?: ReactNode;
   deployCreatedAt?: string | null;
   getAppLink?: () => string;
