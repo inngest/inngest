@@ -91,7 +91,7 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
     ? '0.00'
     : (((usageMetrics.totalFailures || 0) / (usageMetrics.totalRuns || 0)) * 100).toFixed(2);
 
-  const triggers = function_.current?.fnTriggers || [];
+  const triggers = function_.current?.triggers || [];
 
   function handleTimeRangeChange(timeRange: TimeRange) {
     if (timeRange.key) {

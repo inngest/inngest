@@ -52,7 +52,7 @@ const query = graphql(`
           id
           name
           slug
-          fnTriggers {
+          triggers {
             type
             value
           }
@@ -107,7 +107,7 @@ export function useApps({ envID, isArchived }: { envID: string; isArchived: bool
               ...latestSyncData,
               functions: functions.map((fn) => ({
                 ...fn,
-                triggers: fn.fnTriggers,
+                triggers: fn.triggers,
               })),
               __typename: 'App' as const,
             };

@@ -51,7 +51,7 @@ const runQuery = graphql(`
               id
               createdAt
             }
-            fnTriggers {
+            triggers {
               type
               value
             }
@@ -104,7 +104,7 @@ export function useRun({
       return new Error('result is missing run data');
     }
 
-    const triggers = run.version?.fnTriggers ?? [];
+    const triggers = run.version?.triggers ?? [];
 
     return {
       func: {
