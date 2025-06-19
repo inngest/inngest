@@ -34,7 +34,7 @@ func (a *debugAPI) partitionByID(w http.ResponseWriter, r *http.Request) {
 	}
 
 	fmt.Println("RETRIEVE PARTITION")
-	qp, sqp, err := a.Queue.PartitionByID(ctx, shard, partitionID)
+	res, err := a.Queue.PartitionByID(ctx, shard, partitionID)
 	if err != nil {
 		_ = publicerr.WriteHTTP(
 			w,
@@ -44,14 +44,18 @@ func (a *debugAPI) partitionByID(w http.ResponseWriter, r *http.Request) {
 	}
 
 	partition := cqrs.QueuePartition{}
-	if qp != nil {
+	if res.QueuePartition != nil {
+		qp := res.QueuePartition
+
 		partition.ID = qp.ID
 		partition.AccountID = qp.AccountID
 		partition.EnvID = qp.EnvID
 		partition.FunctionID = qp.FunctionID
 	}
 
-	if sqp != nil {
+	if res.QueueShadowPartition != nil {
+		sqp := res.QueueShadowPartition
+
 		partition.PauseRefill = sqp.PauseRefill
 		partition.PauseEnqueue = sqp.PauseEnqueue
 	}
@@ -66,5 +70,5 @@ func (a *debugAPI) partitionByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Write(byt)
+	_, _ = w.Write(byt)
 }
