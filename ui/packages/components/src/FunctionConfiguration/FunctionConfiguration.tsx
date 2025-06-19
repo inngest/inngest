@@ -1,5 +1,4 @@
-import { useMemo } from 'react';
-import { useRouter } from 'next/navigation';
+import { type ReactNode } from 'react';
 import { Button } from '@inngest/components/Button';
 import ConfigurationBlock from '@inngest/components/FunctionConfiguration/ConfigurationBlock';
 import ConfigurationCategory from '@inngest/components/FunctionConfiguration/ConfigurationCategory';
@@ -8,37 +7,26 @@ import ConfigurationTable, {
   type ConfigurationEntry,
 } from '@inngest/components/FunctionConfiguration/ConfigurationTable';
 import { PopoverContent } from '@inngest/components/FunctionConfiguration/FunctionConfigurationInfoPopovers';
-import { Header } from '@inngest/components/Header/Header';
-import { InvokeButton } from '@inngest/components/InvokeButton';
 import { Pill } from '@inngest/components/Pill';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
 import { AppsIcon } from '@inngest/components/icons/sections/Apps';
 import { EventsIcon } from '@inngest/components/icons/sections/Events';
 import { FunctionsIcon } from '@inngest/components/icons/sections/Functions';
-import { RiArrowRightSLine, RiArrowRightUpLine, RiCloseLine, RiTimeLine } from '@remixicon/react';
-import { toast } from 'sonner';
+import { RiArrowRightSLine, RiArrowRightUpLine, RiTimeLine } from '@remixicon/react';
 
 import {
   FunctionTriggerTypes,
-  useInvokeFunctionMutation,
   type GetFunctionQuery,
 } from '../../../../apps/dev-server-ui/src/store/generated';
 
 type FunctionConfigurationProps = {
-  onClose: () => void;
   inngestFunction: NonNullable<GetFunctionQuery['functionBySlug']>;
+  header?: ReactNode;
 };
 
-export function FunctionConfiguration({ onClose, inngestFunction }: FunctionConfigurationProps) {
+export function FunctionConfiguration({ inngestFunction, header }: FunctionConfigurationProps) {
   const configuration = inngestFunction.configuration;
   const triggers = inngestFunction.triggers;
-
-  const router = useRouter();
-  const doesFunctionAcceptPayload = useMemo(() => {
-    return Boolean(triggers?.some((trigger) => trigger.type === FunctionTriggerTypes.Event));
-  }, [triggers]);
-
-  const [invokeFunction] = useInvokeFunctionMutation();
 
   const retryEntries: ConfigurationEntry[] = [
     {
@@ -208,35 +196,7 @@ export function FunctionConfiguration({ onClose, inngestFunction }: FunctionConf
 
   return (
     <div className="border-subtle flex flex-col overflow-hidden overflow-y-auto border-l-[0.5px]">
-      <Header
-        breadcrumb={[{ text: inngestFunction.name }]}
-        action={
-          <div className="flex flex-row items-center justify-end gap-2">
-            <InvokeButton
-              kind="primary"
-              appearance="solid"
-              disabled={false}
-              doesFunctionAcceptPayload={doesFunctionAcceptPayload}
-              btnAction={async ({ data, user }) => {
-                await invokeFunction({
-                  data,
-                  functionSlug: inngestFunction.slug,
-                  user,
-                });
-                toast.success('Function invoked');
-                router.push('/runs');
-              }}
-            />
-            <Button
-              icon={<RiCloseLine className="text-muted h-5 w-5" />}
-              kind="secondary"
-              appearance="ghost"
-              size="small"
-              onClick={() => onClose()}
-            />
-          </div>
-        }
-      />
+      {header}
       <ConfigurationCategory title="Overview">
         <ConfigurationSection title="App">
           <ConfigurationBlock
