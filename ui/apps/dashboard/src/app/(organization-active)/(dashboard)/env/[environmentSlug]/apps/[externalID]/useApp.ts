@@ -5,7 +5,6 @@ import {
 } from '@inngest/components/utils/appsParser';
 
 import { graphql } from '@/gql';
-import { transformTriggers } from '@/utils/triggers';
 import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
 
 const query = graphql(`
@@ -17,9 +16,9 @@ const query = graphql(`
         functions {
           id
           latestVersion {
-            triggers {
-              eventName
-              schedule
+            fnTriggers {
+              type
+              value
             }
           }
           name
@@ -81,7 +80,7 @@ export function useApp({ envID, externalAppID }: { envID: string; externalAppID:
         functions: app.functions.map((fn) => {
           return {
             ...fn,
-            triggers: transformTriggers(fn.latestVersion.triggers),
+            triggers: fn.latestVersion.fnTriggers,
           };
         }),
         latestSync,
