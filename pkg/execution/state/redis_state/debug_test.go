@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
@@ -29,10 +30,44 @@ func TestPartitionByID(t *testing.T) {
 
 	testcases := []struct {
 		name      string
+		num       int
+		interval  time.Duration
+		expected  PartitionInspectionResult
 		keyQueues bool
 	}{
 		{
-			name: "sample",
+			name: "simple",
+			num:  5,
+			expected: PartitionInspectionResult{
+				Ready:  5,
+				Future: 5,
+			},
+		},
+		{
+			name:     "with interval",
+			num:      5,
+			interval: time.Second,
+			expected: PartitionInspectionResult{
+				Ready:  5,
+				Future: 5,
+			},
+		},
+		{
+			name: "with key queues",
+			num:  10,
+			expected: PartitionInspectionResult{
+				Backlogs: 1,
+			},
+			keyQueues: true,
+		},
+		{
+			name:     "with key queues interval",
+			num:      10,
+			interval: time.Minute,
+			expected: PartitionInspectionResult{
+				Backlogs: 1,
+			},
+			keyQueues: true,
 		},
 	}
 
@@ -51,8 +86,9 @@ func TestPartitionByID(t *testing.T) {
 				WithClock(clock),
 			)
 
-			for i := range 5 {
+			for i := range tc.num {
 				at := clock.Now()
+				at = at.Add(time.Duration(i) * tc.interval)
 
 				item := osqueue.QueueItem{
 					ID:          fmt.Sprintf("test%d", i),
@@ -77,7 +113,15 @@ func TestPartitionByID(t *testing.T) {
 			res, err := q.PartitionByID(ctx, defaultShard, fnID.String())
 			require.NoError(t, err)
 
-			fmt.Printf("RESULT: %#v\n", res)
+			// fmt.Printf("RESULT: %#v\n", res)
+			require.Equal(t, tc.expected.Paused, res.Paused)
+			require.Equal(t, tc.expected.AccountActive, res.AccountActive)
+			require.Equal(t, tc.expected.AccountInProgress, res.AccountInProgress)
+			require.Equal(t, tc.expected.Ready, res.Ready)
+			require.Equal(t, tc.expected.InProgress, res.InProgress)
+			require.Equal(t, tc.expected.Active, res.Active)
+			require.Equal(t, tc.expected.Future, res.Future)
+			require.Equal(t, tc.expected.Backlogs, res.Backlogs)
 		})
 	}
 }

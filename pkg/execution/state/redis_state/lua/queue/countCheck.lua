@@ -18,7 +18,7 @@ local acct_in_progress = redis.call("ZCARD", keyAccountInProgress)
 local ready = redis.call("ZCARD", keyReady)
 local in_progress = redis.call("ZCOUNT", keyInProgress, nowMS, "+inf")
 local active = redis.call("SCARD", keyActive)
-local future = redis.call("ZCOUNT", "fn partition key", nowMS, "+inf")
+local future = redis.call("ZCOUNT", keyReady, nowMS, "+inf")
 
 local backlogs = redis.call("ZCARD", keyShadowPartition)
 
