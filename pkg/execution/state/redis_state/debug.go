@@ -25,12 +25,14 @@ type PartitionInspectionResult struct {
 
 func (q *queue) PartitionByID(ctx context.Context, shard QueueShard, partitionID string) (*PartitionInspectionResult, error) {
 	var (
-		qp  QueuePartition
-		sqp QueueShadowPartition
+		result PartitionInspectionResult
+		qp     QueuePartition
+		sqp    QueueShadowPartition
 	)
 
 	rc := shard.RedisClient.Client()
 	kg := shard.RedisClient.kg
+
 	// load queue partition
 	{
 		cmd := rc.B().Hget().Key(kg.PartitionItem()).Field(partitionID).Build()
@@ -42,6 +44,7 @@ func (q *queue) PartitionByID(ctx context.Context, shard QueueShard, partitionID
 		if err := json.Unmarshal(byt, &qp); err != nil {
 			return nil, fmt.Errorf("error unmarshalling queue partition: %w", err)
 		}
+		result.QueuePartition = &qp
 	}
 
 	// load shadow partition
@@ -58,13 +61,13 @@ func (q *queue) PartitionByID(ctx context.Context, shard QueueShard, partitionID
 			if err := json.Unmarshal(byt, &sqp); err != nil {
 				return nil, fmt.Errorf("error unmarshalling shadow partition: %w", err)
 			}
+			result.QueueShadowPartition = &sqp
 
 		default:
 			return nil, fmt.Errorf("error retrieving shadow partition: %w", err)
 		}
 	}
 
-	var result PartitionInspectionResult
 	{
 		keys := []string{
 			kg.ActiveSet("account", qp.AccountID.String()),
@@ -95,9 +98,6 @@ func (q *queue) PartitionByID(ctx context.Context, shard QueueShard, partitionID
 			return nil, fmt.Errorf("error unmarhalling counter check: %w", err)
 		}
 	}
-
-	result.QueuePartition = &qp
-	result.QueueShadowPartition = &sqp
 
 	return &result, nil
 }
