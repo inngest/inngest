@@ -4467,97 +4467,129 @@ func TestQueueRateLimit(t *testing.T) {
 func TestMigrate(t *testing.T) {
 	ctx := context.Background()
 
-	// default redis
-	r1 := miniredis.RunT(t)
-	rc1, err := rueidis.NewClient(rueidis.ClientOption{InitAddress: []string{r1.Addr()}, DisableCache: true})
-	require.NoError(t, err)
-	defer rc1.Close()
-
-	// other redis
-	r2 := miniredis.RunT(t)
-	rc2, err := rueidis.NewClient(rueidis.ClientOption{InitAddress: []string{r2.Addr()}, DisableCache: true})
-	require.NoError(t, err)
-	defer rc2.Close()
-
-	shard1Name := "default"
-	shard2Name := "yolo"
-
-	shard1 := QueueShard{Name: shard1Name, Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc1, QueueDefaultKey)}
-	shard2 := QueueShard{Name: shard2Name, Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc2, QueueDefaultKey)}
-
-	shards := map[string]QueueShard{shard1Name: shard1, shard2Name: shard2}
-
-	q1 := NewQueue(
-		shard1,
-		WithQueueShardClients(shards),
-		WithPartitionPriorityFinder(func(ctx context.Context, part QueuePartition) uint {
-			return PriorityDefault
-		}),
-	)
-
-	q2 := NewQueue(
-		shard2,
-		WithQueueShardClients(shards),
-		WithPartitionPriorityFinder(func(ctx context.Context, part QueuePartition) uint {
-			return PriorityDefault
-		}),
-	)
-
-	acctID := uuid.New()
-	fnID := uuid.New()
-
-	// Enqueue to shard 1
-	for i := 0; i < 5; i++ {
-		lease := ulid.MustNew(ulid.Now(), rand.Reader)
-		id := state.Identifier{AccountID: acctID, WorkflowID: fnID, EventID: ulid.MustNew(ulid.Now(), rand.Reader), RunID: ulid.MustNew(ulid.Now(), rand.Reader)}
-		_, err = q1.EnqueueItem(ctx, shard1, osqueue.QueueItem{FunctionID: fnID, Data: osqueue.Item{Identifier: id}, LeaseID: &lease}, time.Now(), osqueue.EnqueueOpts{})
-		require.NoError(t, err)
+	testcases := []struct {
+		name     string
+		keyQueue bool
+	}{
+		{
+			name: "without key queues",
+		},
+		{
+			name:     "with key queues",
+			keyQueue: true,
+		},
 	}
 
-	// Don't really need it since there are no executors to process the enqueued items
-	err = q1.SetFunctionMigrate(ctx, shard1Name, fnID, true)
-	require.NoError(t, err)
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			clock := clockwork.NewFakeClock()
 
-	queueKey := shard1.RedisClient.kg.PartitionQueueSet(enums.PartitionTypeDefault, fnID.String(), "")
+			// default redis
+			r1 := miniredis.RunT(t)
+			rc1, err := rueidis.NewClient(rueidis.ClientOption{InitAddress: []string{r1.Addr()}, DisableCache: true})
+			require.NoError(t, err)
+			defer rc1.Close()
 
-	// Verify that there are expected number of items in it
-	count, err := getItemCountForQueue(ctx, rc1, queueKey)
-	require.NoError(t, err)
-	require.Equal(t, int64(5), count)
+			// other redis
+			r2 := miniredis.RunT(t)
+			rc2, err := rueidis.NewClient(rueidis.ClientOption{InitAddress: []string{r2.Addr()}, DisableCache: true})
+			require.NoError(t, err)
+			defer rc2.Close()
 
-	// Attempt to migrate from shard1 to shard2
-	processed, err := q1.Migrate(ctx, shard1Name, fnID, 10, 0, func(ctx context.Context, qi *osqueue.QueueItem) error {
-		return q2.Enqueue(ctx, qi.Data, time.UnixMilli(qi.AtMS), osqueue.EnqueueOpts{PassthroughJobId: true})
-	})
-	require.NoError(t, err)
-	require.Equal(t, int64(5), processed)
+			shard1Name := "default"
+			shard2Name := "yolo"
 
-	// Verify that shard2 now have all the items
-	count2, err := getItemCountForQueue(ctx, rc2, queueKey)
-	require.NoError(t, err)
-	require.Equal(t, int64(5), count2)
+			shard1 := QueueShard{Name: shard1Name, Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc1, QueueDefaultKey)}
+			shard2 := QueueShard{Name: shard2Name, Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc2, QueueDefaultKey)}
 
-	// shard1 should no longer have anything
-	count, err = getItemCountForQueue(ctx, rc1, queueKey)
-	require.NoError(t, err)
-	require.Equal(t, int64(0), count)
+			shards := map[string]QueueShard{shard1Name: shard1, shard2Name: shard2}
 
-	// Now, move everything back to queue 1
-	returned, err := q2.Migrate(ctx, shard2Name, fnID, 10, 0, func(ctx context.Context, qi *osqueue.QueueItem) error {
-		return q1.Enqueue(ctx, qi.Data, time.UnixMilli(qi.AtMS), osqueue.EnqueueOpts{PassthroughJobId: true})
-	})
-	require.NoError(t, err)
-	require.Equal(t, int64(5), returned)
+			q1 := NewQueue(
+				shard1,
+				WithQueueShardClients(shards),
+				WithPartitionPriorityFinder(func(ctx context.Context, part QueuePartition) uint {
+					return PriorityDefault
+				}),
+				WithClock(clock),
+				WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+					return tc.keyQueue
+				}),
+			)
 
-	// shard1 should no longer have anything
-	count, err = getItemCountForQueue(ctx, rc1, queueKey)
-	require.NoError(t, err)
-	require.Equal(t, int64(5), count)
+			q2 := NewQueue(
+				shard2,
+				WithQueueShardClients(shards),
+				WithPartitionPriorityFinder(func(ctx context.Context, part QueuePartition) uint {
+					return PriorityDefault
+				}),
+				WithClock(clock),
+				WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+					return tc.keyQueue
+				}),
+			)
 
-	// Verify that shard2 now have all the items
-	count2, err = getItemCountForQueue(ctx, rc2, queueKey)
-	require.NoError(t, err)
-	require.Equal(t, int64(0), count2)
+			expectItemCountForPartition := func(ctx context.Context, q *queue, shard QueueShard, partitionID uuid.UUID, expected int) {
+				var count int
+
+				from := time.Time{}
+				until := q.clock.Now().Add(24 * time.Hour * 365)
+				items, err := q.ItemsByPartition(ctx, shard, partitionID, from, until)
+				require.NoError(t, err)
+
+				for range items {
+					count++
+				}
+				require.Equal(t, expected, count)
+			}
+
+			acctID := uuid.New()
+			fnID := uuid.New()
+
+			// Enqueue to shard 1
+			for range 5 {
+				id := state.Identifier{AccountID: acctID, WorkflowID: fnID, EventID: ulid.MustNew(ulid.Now(), rand.Reader), RunID: ulid.MustNew(ulid.Now(), rand.Reader)}
+				err := q1.Enqueue(ctx, osqueue.Item{Identifier: id}, clock.Now(), osqueue.EnqueueOpts{})
+				require.NoError(t, err)
+			}
+
+			// Don't really need it since there are no executors to process the enqueued items
+			err = q1.SetFunctionMigrate(ctx, shard1Name, fnID, true)
+			require.NoError(t, err)
+
+			// Verify that there are expected number of items in it
+			expectItemCountForPartition(ctx, q1, shard1, fnID, 5)
+
+			// Attempt to migrate from shard1 to shard2
+			processed, err := q1.Migrate(ctx, shard1Name, fnID, 10, 0, func(ctx context.Context, qi *osqueue.QueueItem) error {
+				return q2.Enqueue(ctx, qi.Data, time.UnixMilli(qi.AtMS), osqueue.EnqueueOpts{PassthroughJobId: true})
+			})
+			require.NoError(t, err)
+			require.Equal(t, int64(5), processed)
+
+			// Verify that shard2 now have all the items
+			expectItemCountForPartition(ctx, q2, shard2, fnID, 5)
+
+			// shard1 should no longer have anything
+			expectItemCountForPartition(ctx, q1, shard1, fnID, 0)
+
+			clock.Advance(q1.idempotencyTTL + 5*time.Second)
+			r1.FastForward(q1.idempotencyTTL + 5*time.Second)
+
+			// Now, move everything back to queue 1
+			returned, err := q2.Migrate(ctx, shard2Name, fnID, 10, 0, func(ctx context.Context, qi *osqueue.QueueItem) error {
+				return q1.Enqueue(ctx, qi.Data, time.UnixMilli(qi.AtMS), osqueue.EnqueueOpts{PassthroughJobId: true})
+			})
+			require.NoError(t, err)
+			require.Equal(t, int64(5), returned)
+
+			// shard1 should have the queue items again
+			expectItemCountForPartition(ctx, q1, shard1, fnID, 5)
+
+			// Verify that shard2 now have nothing
+			expectItemCountForPartition(ctx, q2, shard2, fnID, 0)
+		})
+	}
+
 }
 
 func getQueueItem(t *testing.T, r *miniredis.Miniredis, id string) osqueue.QueueItem {
@@ -4703,11 +4735,6 @@ func getFnMetadata(t *testing.T, r *miniredis.Miniredis, id uuid.UUID) (*FnMetad
 	err = json.Unmarshal([]byte(valJSON), &retv)
 	require.NoError(t, err)
 	return &retv, nil
-}
-
-func getItemCountForQueue(ctx context.Context, r rueidis.Client, key string) (int64, error) {
-	cmd := r.B().Zcount().Key(key).Min("-inf").Max("+inf").Build()
-	return r.Do(ctx, cmd).AsInt64()
 }
 
 func requireItemScoreEquals(t *testing.T, r *miniredis.Miniredis, item osqueue.QueueItem, expected time.Time) {
