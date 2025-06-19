@@ -4,6 +4,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+
+	"github.com/inngest/inngest/pkg/enums"
+	"github.com/redis/rueidis"
 )
 
 type PartitionInspectionResult struct {
@@ -45,23 +48,30 @@ func (q *queue) PartitionByID(ctx context.Context, shard QueueShard, partitionID
 	{
 		cmd := rc.B().Hget().Key(kg.ShadowPartitionMeta()).Field(partitionID).Build()
 		byt, err := rc.Do(ctx, cmd).AsBytes()
-		if err != nil {
-			return nil, fmt.Errorf("error retrieving shadow partition: %w", err)
-		}
+		switch err {
+		case rueidis.Nil:
+			// no-op
+			// there are cases shadow partition won't exists even when key queues are on.
+			// e.g. everything is processed, and nothing new is being scheduled
 
-		if err := json.Unmarshal(byt, &sqp); err != nil {
-			return nil, fmt.Errorf("error unmarshalling shadow partition: %w", err)
+		case nil:
+			if err := json.Unmarshal(byt, &sqp); err != nil {
+				return nil, fmt.Errorf("error unmarshalling shadow partition: %w", err)
+			}
+
+		default:
+			return nil, fmt.Errorf("error retrieving shadow partition: %w", err)
 		}
 	}
 
 	var result PartitionInspectionResult
 	{
 		keys := []string{
-			sqp.accountActiveKey(kg),
-			sqp.accountInProgressKey(kg),
-			sqp.readyQueueKey(kg),
-			sqp.inProgressKey(kg),
-			sqp.activeKey(kg),
+			kg.ActiveSet("account", qp.AccountID.String()),
+			kg.Concurrency("account", qp.AccountID.String()),
+			kg.PartitionQueueSet(enums.PartitionTypeDefault, qp.ID, ""),
+			kg.Concurrency("p", qp.ID),
+			kg.ActiveSet("p", qp.ID),
 			kg.ShadowPartitionSet(sqp.PartitionID),
 		}
 		args, err := StrSlice([]any{
