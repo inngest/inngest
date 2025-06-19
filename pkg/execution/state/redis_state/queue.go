@@ -1724,6 +1724,8 @@ func (q *queue) removeQueueItem(ctx context.Context, shard QueueShard, partition
 
 	switch code {
 	case 0:
+		q.log.Debug("removed queue item", "item_id", itemID)
+
 		return nil
 	default:
 		return fmt.Errorf("unknown status when attempting to remove item: %d", code)
@@ -2452,12 +2454,6 @@ func (q *queue) Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		return err
 	}
 
-	q.log.Trace("dequeueing item",
-		"id", i.ID,
-		"kind", i.Data.Kind,
-		"partition_id", partition.PartitionID,
-	)
-
 	status, err := scripts["queue/dequeue"].Exec(
 		redis_telemetry.WithScriptName(ctx, "dequeue"),
 		queueShard.RedisClient.unshardedRc,
@@ -2469,6 +2465,8 @@ func (q *queue) Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 	}
 	switch status {
 	case 0:
+		q.log.Debug("dequeued item", "item", i)
+
 		return nil
 	case 1:
 		return ErrQueueItemNotFound
