@@ -6,6 +6,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"fmt"
+	"log/slog"
 	"net/url"
 	"regexp"
 	"strconv"
@@ -13,7 +14,6 @@ import (
 	"time"
 
 	"github.com/gowebpki/jcs"
-	"github.com/inngest/inngest/pkg/logger"
 )
 
 var (
@@ -33,7 +33,7 @@ func Sign(ctx context.Context, at time.Time, key, body []byte) (string, error) {
 	if len(body) > 0 {
 		body, err = jcs.Transform(body)
 		if err != nil {
-			logger.StdlibLogger(ctx).Warn("failed to canonicalize body", "error", err)
+			slog.Default().Warn("failed to canonicalize body", "error", err)
 		}
 	}
 
@@ -46,7 +46,7 @@ func Sign(ctx context.Context, at time.Time, key, body []byte) (string, error) {
 	_, _ = mac.Write(body)
 	// Write the timestamp as a unix timestamp to the hmac to prevent
 	// timing attacks.
-	_, _ = mac.Write([]byte(fmt.Sprintf("%d", ts)))
+	_, _ = fmt.Fprintf(mac, "%d", ts)
 	sig := hex.EncodeToString(mac.Sum(nil))
 	return fmt.Sprintf("t=%d&s=%s", ts, sig), nil
 }
@@ -65,7 +65,7 @@ func signWithoutJCS(at time.Time, key, body []byte) (string, error) {
 	_, _ = mac.Write(body)
 	// Write the timestamp as a unix timestamp to the hmac to prevent
 	// timing attacks.
-	_, _ = mac.Write([]byte(fmt.Sprintf("%d", ts)))
+	_, _ = fmt.Fprintf(mac, "%d", ts)
 	sig := hex.EncodeToString(mac.Sum(nil))
 	return fmt.Sprintf("t=%d&s=%s", ts, sig), nil
 }

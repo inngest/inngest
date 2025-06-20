@@ -3,19 +3,26 @@ package inngestgo
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
+	"math"
+	mathrand "math/rand"
 	"net/http"
 	"net/url"
 	"os"
+	"time"
 
 	"github.com/inngest/inngestgo/internal/middleware"
 )
 
 const (
 	defaultEndpoint = "https://inn.gs"
+	retryAttempts   = 5
+	retryBaseDelay  = 100 * time.Millisecond
 )
 
 // Client represents a client used to send events to Inngest.
@@ -41,9 +48,13 @@ type ClientOpts struct {
 	// EventKey is your Inngest event key for sending events.  This defaults to the
 	// `INNGEST_EVENT_KEY` environment variable if nil.
 	EventKey *string
+
 	// EventURL is the URL of the event API to send events to.  This defaults to
 	// https://inn.gs if nil.
+	//
+	// Deprecated: Use EventAPIBaseURL instead.
 	EventURL *string
+
 	// Env is the branch environment to deploy to.  If nil, this uses
 	// os.Getenv("INNGEST_ENV").  This only deploys to branches if the
 	// signing key is a branch signing key.
@@ -114,6 +125,10 @@ func NewClient(opts ClientOpts) (Client, error) {
 		return nil, err
 	}
 
+	if opts.EventURL != nil {
+		opts.EventAPIBaseURL = opts.EventURL
+	}
+
 	if opts.Logger == nil {
 		opts.Logger = slog.Default()
 	}
@@ -127,8 +142,8 @@ func NewClient(opts ClientOpts) (Client, error) {
 	}
 	c.h = newHandler(c, clientOptsToHandlerOpts(opts))
 
-	if c.ClientOpts.HTTPClient == nil {
-		c.ClientOpts.HTTPClient = http.DefaultClient
+	if c.HTTPClient == nil {
+		c.HTTPClient = http.DefaultClient
 	}
 
 	return c, nil
@@ -211,8 +226,8 @@ func (a apiClient) Serve() http.Handler {
 }
 
 func (a apiClient) ServeWithOpts(opts ServeOpts) http.Handler {
-	a.h.handlerOpts.ServeOrigin = opts.Origin
-	a.h.handlerOpts.ServePath = opts.Path
+	a.h.ServeOrigin = opts.Origin
+	a.h.ServePath = opts.Path
 	return a.h
 }
 
@@ -228,7 +243,7 @@ func (a *apiClient) SetOptions(opts ClientOpts) error {
 }
 
 func (a *apiClient) SetURL(u *url.URL) {
-	a.ClientOpts.URL = u
+	a.URL = u
 	a.h.SetOptions(clientOptsToHandlerOpts(a.ClientOpts))
 }
 
@@ -244,7 +259,13 @@ func (a apiClient) Send(ctx context.Context, e any) (string, error) {
 	return res[0], nil
 }
 
-func (a apiClient) SendMany(ctx context.Context, e []any) ([]string, error) {
+func (a apiClient) SendMany(ctx context.Context, e []any) (ids []string, err error) {
+	go func() {
+		if r := recover(); r != nil {
+			err = fmt.Errorf("panic sending events: %v", r)
+		}
+	}()
+
 	for _, e := range e {
 		if v, ok := e.(validatable); ok {
 			if err := v.Validate(); err != nil {
@@ -253,78 +274,140 @@ func (a apiClient) SendMany(ctx context.Context, e []any) ([]string, error) {
 		}
 	}
 
+	seed, err := seed()
+	if err != nil {
+		return nil, err
+	}
+
 	byt, err := json.Marshal(e)
 	if err != nil {
 		return nil, fmt.Errorf("error marshalling event to json: %w", err)
 	}
 
-	ep := defaultEndpoint
-	if a.IsDev() {
-		ep = DevServerURL()
-	}
-	if a.EventURL != nil {
-		ep = *a.EventURL
+	var (
+		resp    *http.Response
+		respErr error
+	)
+	for attempt := 0; attempt < retryAttempts; attempt++ {
+		req, err := http.NewRequest(
+			http.MethodPost,
+			fmt.Sprintf("%s/e/%s", a.eventAPIBaseURL(), a.GetEventKey()),
+			bytes.NewBuffer(byt),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("error creating event request: %w", err)
+		}
+		SetBasicRequestHeaders(req)
+		req.Header.Set(HeaderKeyEventIDSeed, seed)
+
+		if a.GetEnv() != "" {
+			req.Header.Add(HeaderKeyEnv, a.GetEnv())
+		}
+		resp, respErr = a.HTTPClient.Do(req)
+
+		// Don't retry if the request was successful or if there was a 4xx
+		// status code. We don't want to retry on 4xx because the request is
+		// malformed and retrying will just fail again.
+		if respErr == nil && resp.StatusCode < 500 {
+			break
+		}
+
+		if respErr != nil && resp != nil && resp.Body != nil {
+			// Close since we're gonna retry and we don't want to leak resources.
+			_ = resp.Body.Close()
+		}
+
+		// Jitter between 0 and the base delay.
+		jitter := time.Duration(mathrand.Float64() * float64(retryBaseDelay))
+
+		// Exponential backoff with jitter.
+		delay := retryBaseDelay*time.Duration(math.Pow(2, float64(attempt))) + jitter
+
+		time.Sleep(delay)
 	}
 
-	url := fmt.Sprintf("%s/e/%s", ep, a.GetEventKey())
-	req, err := http.NewRequest(http.MethodPost, url, bytes.NewBuffer(byt))
-	if err != nil {
-		return nil, fmt.Errorf("error creating event request: %w", err)
-	}
-	SetBasicRequestHeaders(req)
-
-	if a.GetEnv() != "" {
-		req.Header.Add(HeaderKeyEnv, a.GetEnv())
+	if respErr != nil {
+		if resp != nil {
+			_ = resp.Body.Close()
+		}
+		return nil, respErr
 	}
 
-	resp, err := a.HTTPClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("error sending event request: %w", err)
+	if resp == nil {
+		// NOTE: We'd expect respErr to be non-nil and caught above in every case.  It's typically
+		// impossible that the response is nil AND respErr is nil.  For safety, though, we must check
+		// both cases.
+		return nil, fmt.Errorf("unable to send events:  no http response")
 	}
 
 	// There is no body to read;  the ingest API responds with status codes representing
 	// each error.  We don't necessarily care about the error behind this close.
-	defer resp.Body.Close()
+	defer func() {
+		_ = resp.Body.Close()
+	}()
 
 	var respBody eventAPIResponse
 	_ = json.NewDecoder(resp.Body).Decode(&respBody)
 
-	switch resp.StatusCode {
-	case 200, 201:
-		return respBody.IDs, nil
-	case 400:
-		var msg string
-		if respBody.Error != "" {
-			msg = respBody.Error
-		} else {
-			msg = "unknown error"
-		}
+	return handleEventResponse(respBody, resp.StatusCode)
+}
 
+func (a apiClient) eventAPIBaseURL() string {
+	if a.EventAPIBaseURL != nil {
+		return *a.EventAPIBaseURL
+	}
+
+	origin := os.Getenv("INNGEST_EVENT_API_BASE_URL")
+	if origin != "" {
+		return origin
+	}
+
+	origin = os.Getenv("INNGEST_BASE_URL")
+	if origin != "" {
+		return origin
+	}
+
+	if a.IsDev() {
+		return DevServerURL()
+	}
+
+	return defaultEventAPIOrigin
+}
+
+func handleEventResponse(r eventAPIResponse, status int) ([]string, error) {
+	msg := "unknown error"
+	if r.Error != "" {
+		msg = r.Error
+	}
+
+	switch status {
+	case 200, 201:
+		return r.IDs, nil
+	case 400:
 		// E.g. the event is invalid.
 		return nil, fmt.Errorf("bad request: %s", msg)
 	case 401:
-		var msg string
-		if respBody.Error != "" {
-			msg = respBody.Error
-		} else {
-			msg = "unknown error"
-		}
-
 		// E.g. the event key is invalid.
 		return nil, fmt.Errorf("unauthorized: %s", msg)
 	case 403:
-		var msg string
-		if respBody.Error != "" {
-			msg = respBody.Error
-		} else {
-			msg = "unknown error"
-		}
-
 		// E.g. the ingest key has an IP or event type allow/denylist.
 		return nil, fmt.Errorf("forbidden: %s", msg)
 	}
 
-	return nil, fmt.Errorf("unknown status code sending event: %d", resp.StatusCode)
+	return nil, fmt.Errorf("unknown status code sending event: %d", status)
+}
+
+func seed() (string, error) {
+	// Create the event ID seed header value. This is used to seed a
+	// deterministic event ID in the Inngest Server.
+	millis := time.Now().UnixMilli()
+	entropy := make([]byte, 10)
+	_, err := rand.Read(entropy)
+	if err != nil {
+		return "", fmt.Errorf("error creating event ID seed: %w", err)
+	}
+	entropyBase64 := base64.StdEncoding.EncodeToString(entropy)
+	return fmt.Sprintf("%d,%s", millis, entropyBase64), nil
 }
 
 // eventAPIResponse is the API response sent when responding to incoming events.
