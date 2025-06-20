@@ -9,7 +9,6 @@ import (
 
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/pkg/enums"
-	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/tests/client"
 	"github.com/inngest/inngestgo"
 	"github.com/inngest/inngestgo/group"
@@ -32,7 +31,7 @@ func TestParallelSteps(t *testing.T) {
 
 	_, err := inngestgo.CreateFunction(
 		inngestClient,
-		inngestgo.FunctionOpts{ID: "concurrent", Concurrency: []inngest.Concurrency{
+		inngestgo.FunctionOpts{ID: "concurrent", Concurrency: []inngestgo.FnConcurrency{
 			{Limit: 2, Scope: enums.ConcurrencyScopeFn},
 		}},
 		inngestgo.EventTrigger("test/parallel", nil),

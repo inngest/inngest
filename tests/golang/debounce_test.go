@@ -36,7 +36,7 @@ func TestDebounceWithSingleKey(t *testing.T) {
 		inngestClient,
 		inngestgo.FunctionOpts{
 			ID: "test-sdk",
-			Debounce: &inngestgo.Debounce{
+			Debounce: &inngestgo.FnDebounce{
 				Key:    "event.data.name",
 				Period: period,
 			},
@@ -136,7 +136,7 @@ func TestDebounecWithMultipleKeys(t *testing.T) {
 		inngestClient,
 		inngestgo.FunctionOpts{
 			ID: "test-sdk",
-			Debounce: &inngestgo.Debounce{
+			Debounce: &inngestgo.FnDebounce{
 				Key:    "event.data.name",
 				Period: 5 * time.Second,
 			},
@@ -178,7 +178,7 @@ func TestDebounce_OutOfOrderTS(t *testing.T) {
 		inngestClient,
 		inngestgo.FunctionOpts{
 			ID: "test-out-of-order-debounce-ignored",
-			Debounce: &inngestgo.Debounce{
+			Debounce: &inngestgo.FnDebounce{
 				Period: 5 * time.Second,
 			},
 		},
@@ -233,7 +233,7 @@ func TestDebounce_Timeout(t *testing.T) {
 		inngestClient,
 		inngestgo.FunctionOpts{
 			ID: "test-out-of-order-debounce-ignored",
-			Debounce: &inngestgo.Debounce{
+			Debounce: &inngestgo.FnDebounce{
 				Period:  period,
 				Timeout: &max,
 			},

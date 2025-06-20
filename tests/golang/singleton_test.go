@@ -3,15 +3,16 @@ package golang
 import (
 	"context"
 	"fmt"
+	"sync/atomic"
+	"testing"
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngestgo"
 	"github.com/inngest/inngestgo/step"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"sync/atomic"
-	"testing"
-	"time"
 )
 
 func TestSingletonFunction(t *testing.T) {
@@ -31,7 +32,7 @@ func TestSingletonFunction(t *testing.T) {
 		inngestClient,
 		inngestgo.FunctionOpts{
 			ID:        "fn-singleton",
-			Singleton: &inngestgo.Singleton{Key: inngestgo.StrPtr("event.data.user.id")},
+			Singleton: &inngestgo.FnSingleton{Key: inngestgo.StrPtr("event.data.user.id")},
 		},
 		inngestgo.EventTrigger(trigger, nil),
 		func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
@@ -95,7 +96,7 @@ func TestSingletonFunctionWithKeyResolvingToFalse(t *testing.T) {
 		inngestClient,
 		inngestgo.FunctionOpts{
 			ID:        "fn-singleton",
-			Singleton: &inngestgo.Singleton{Key: inngestgo.StrPtr("event.data.decision")},
+			Singleton: &inngestgo.FnSingleton{Key: inngestgo.StrPtr("event.data.decision")},
 		},
 		inngestgo.EventTrigger(trigger, nil),
 		func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
@@ -150,7 +151,7 @@ func TestSingletonCancelMode(t *testing.T) {
 		inngestClient,
 		inngestgo.FunctionOpts{
 			ID: "fn-singleton-cancel",
-			Singleton: &inngestgo.Singleton{
+			Singleton: &inngestgo.FnSingleton{
 				Key:  inngestgo.StrPtr("event.data.user.id"),
 				Mode: enums.SingletonModeCancel,
 			},
@@ -242,7 +243,7 @@ func TestSingletonDifferentKeysBothRun(t *testing.T) {
 		inngestClient,
 		inngestgo.FunctionOpts{
 			ID: "fn-singleton-cancel-different-keys",
-			Singleton: &inngestgo.Singleton{
+			Singleton: &inngestgo.FnSingleton{
 				Key:  inngestgo.StrPtr("event.data.user.id"),
 				Mode: enums.SingletonModeCancel,
 			},

@@ -100,7 +100,7 @@ func TestFunctionFailureHandlingWithRateLimit(t *testing.T) {
 		inngestClient,
 		inngestgo.FunctionOpts{
 			ID:        "failed",
-			RateLimit: &inngestgo.RateLimit{Limit: 1, Period: 24 * time.Hour, Key: inngestgo.StrPtr("event.data.number")},
+			RateLimit: &inngestgo.FnRateLimit{Limit: 1, Period: 24 * time.Hour, Key: inngestgo.StrPtr("event.data.number")},
 		},
 		inngestgo.EventTrigger(evtName, nil),
 		func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
@@ -114,7 +114,7 @@ func TestFunctionFailureHandlingWithRateLimit(t *testing.T) {
 		inngestClient,
 		inngestgo.FunctionOpts{
 			ID:        "failed-failure",
-			RateLimit: &inngestgo.RateLimit{Limit: 1, Period: 24 * time.Hour, Key: inngestgo.StrPtr("event.data.number")},
+			RateLimit: &inngestgo.FnRateLimit{Limit: 1, Period: 24 * time.Hour, Key: inngestgo.StrPtr("event.data.number")},
 		},
 		inngestgo.EventTrigger("inngest/function.failed", inngestgo.StrPtr(`event.data.function_id == "failed-rate-limit-failed"`)),
 		func(ctx context.Context, input inngestgo.Input[map[string]any]) (any, error) {

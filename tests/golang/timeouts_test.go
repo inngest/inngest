@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngestgo"
 	"github.com/inngest/inngestgo/step"
 	"github.com/stretchr/testify/require"
@@ -35,8 +34,8 @@ func TestTimeoutStart(t *testing.T) {
 		inngestClient,
 		inngestgo.FunctionOpts{
 			ID:          "fn-concurrency",
-			Concurrency: []inngest.Concurrency{{Limit: 1}},
-			Timeouts: &inngestgo.Timeouts{
+			Concurrency: []inngestgo.FnConcurrency{{Limit: 1}},
+			Timeouts: &inngestgo.FnTimeouts{
 				Start: &timeoutStart,
 			},
 		},
@@ -91,7 +90,7 @@ func TestTimeoutFinish(t *testing.T) {
 			inngestClient,
 			inngestgo.FunctionOpts{
 				ID: "timeouts-finish",
-				Timeouts: &inngestgo.Timeouts{
+				Timeouts: &inngestgo.FnTimeouts{
 					Start:  &timeoutStart,
 					Finish: &timeoutFinish,
 				},

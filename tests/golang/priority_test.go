@@ -7,7 +7,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngestgo"
 	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/require"
@@ -33,12 +32,12 @@ func TestFunctionPriorityRun(t *testing.T) {
 		inngestClient,
 		inngestgo.FunctionOpts{
 			ID: "priority-run-test",
-			Concurrency: []inngest.Concurrency{
+			Concurrency: []inngestgo.FnConcurrency{
 				{
 					Limit: 1,
 				},
 			},
-			Priority: &inngest.Priority{
+			Priority: &inngestgo.FnPriority{
 				Run: inngestgo.StrPtr(`event.data.priority == "high" ? 5 : 0`),
 			},
 		},

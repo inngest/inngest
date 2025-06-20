@@ -20,7 +20,7 @@ func TestFunctionWithRateLimit(t *testing.T) {
 		inngestClient,
 		inngestgo.FunctionOpts{
 			ID:        "rate-limit",
-			RateLimit: &inngestgo.RateLimit{Limit: 1, Period: 24 * time.Hour, Key: inngestgo.StrPtr("event.data.number")},
+			RateLimit: &inngestgo.FnRateLimit{Limit: 1, Period: 24 * time.Hour, Key: inngestgo.StrPtr("event.data.number")},
 		},
 		inngestgo.EventTrigger("test/ratelimit", nil),
 		func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
