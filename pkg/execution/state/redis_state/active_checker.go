@@ -528,6 +528,8 @@ func (q *queue) findMissingItemsWithDynamicTargets(
 
 		l.Debug("retrieved item chunk", "key", sourceSetKey, "job_id", entryIDs)
 
+		leasedIDs := make([]string, 0)
+
 		for i, itemStr := range itemData {
 			if itemStr == "" {
 				onMissing(entryIDs[i], "missing-item")
@@ -542,13 +544,21 @@ func (q *queue) findMissingItemsWithDynamicTargets(
 
 			// Item is definitely in progress if actively leased
 			if qi.IsLeased(q.clock.Now()) {
+				leasedIDs = append(leasedIDs, qi.ID)
 				continue
 			}
 
 			items = append(items, &qi)
 		}
 
-		l.Debug("loaded item data", "key", sourceSetKey, "job_id", entryIDs, "items", items, "missing", len(entryIDs)-len(items))
+		l.Debug(
+			"loaded item data",
+			"key", sourceSetKey,
+			"job_id", entryIDs,
+			"items", items,
+			"missing", len(entryIDs)-len(items),
+			"leased", leasedIDs,
+		)
 
 		entriesFound := make(map[string]struct{})
 
@@ -582,7 +592,7 @@ func (q *queue) findMissingItemsWithDynamicTargets(
 
 		for _, element := range items {
 			if _, has := entriesFound[element.ID]; !has {
-				onMissing(element, "missing-in-targets")
+				onMissing(element.ID, "missing-in-targets")
 			}
 		}
 
