@@ -1,5 +1,6 @@
 import { Link } from '@inngest/components/Link';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
+import { cn } from '@inngest/components/utils/classNames';
 
 type ConfigurationBlockProps = {
   icon: React.ReactNode;
@@ -20,8 +21,11 @@ export default function ConfigurationBlock({
 }: ConfigurationBlockProps) {
   const showSubContentAndExpressionSeparator = !!subContent && !!expression;
 
+  const borderClasses =
+    'border-subtle border-[0.5px] border-b-0 first:rounded-t last:rounded-b last:border-b-[0.5px]';
+
   const content = (
-    <div className="border-subtle flex items-center gap-2 self-stretch border-[0.5px] border-b-0 p-2 first:rounded-t last:rounded-b last:border-b-[0.5px]">
+    <div className="flex items-center gap-2 self-stretch p-2">
       <div className="bg-canvasSubtle text-light flex h-9 w-9 items-center justify-center gap-2 rounded p-2">
         {icon}
       </div>
@@ -50,10 +54,10 @@ export default function ConfigurationBlock({
   );
 
   return href ? (
-    <Link href={href} className="hover:bg-canvasMuted block">
+    <Link href={href} className={cn('hover:bg-canvasMuted block', borderClasses)}>
       {content}
     </Link>
   ) : (
-    content
+    <div className={cn(borderClasses)}>{content}</div>
   );
 }
