@@ -651,6 +651,9 @@ func (m shardedMgr) Load(ctx context.Context, accountId uuid.UUID, runID ulid.UL
 			return client.B().Get().Key(fnRunState.kg.Events(ctx, isSharded, id.WorkflowID, runID)).Build()
 		}).AsBytes()
 		if err != nil {
+			if rueidis.IsRedisNil(err) {
+				return nil, state.ErrEventNotFound
+			}
 			return nil, fmt.Errorf("failed to get batch; %w", err)
 		}
 		if err := json.Unmarshal(byt, &events); err != nil {
