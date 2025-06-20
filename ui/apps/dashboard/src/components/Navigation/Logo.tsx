@@ -68,7 +68,7 @@ export default function Logo({ collapsed, envSlug, envName, setCollapsed }: Logo
         ) : (
           <>
             <NextLink href={process.env.NEXT_PUBLIC_HOME_PATH as Route} scroll={false}>
-              <InngestLogo className="text-basis mr-2 mt-1" width={82} />
+              <InngestLogo className="text-basis mr-2" width={96} />
             </NextLink>
           </>
         )}

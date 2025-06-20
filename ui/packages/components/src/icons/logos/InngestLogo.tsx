@@ -6,9 +6,9 @@ type Props = {
   className?: any;
 };
 
-const defaultWidth = 100;
-const defaultHeight = 30;
-const widthToHeight = 100 / 30;
+const defaultWidth = 96;
+const defaultHeight = 18;
+const widthToHeight = 96 / 18;
 
 export const InngestLogo = ({
   width,
@@ -33,7 +33,7 @@ export const InngestLogo = ({
 
   return (
     <div className={className} style={style}>
-      <svg width={w} height={h} viewBox="0 0 100 30" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <svg width={w} height={h} viewBox="0 0 96 18" fill="none" xmlns="http://www.w3.org/2000/svg">
         <path d="M2.96148 1H0V17H2.96148V1Z" fill={fill} />
         <path
           d="M59.2047 14.0129C58.6663 14.0129 58.1455 13.789 57.809 13.3643C57.6921 13.2185 57.5965 13.0586 57.561 12.9022C57.4831 12.561 57.4477 12.1398 57.5415 11.6653C57.6779 10.9652 57.9773 10.3378 57.9773 8.98901C57.9773 7.64019 57.6673 7.00398 57.5185 6.30025C57.4087 5.77955 57.4601 5.32284 57.5646 4.96208C57.5929 4.85546 57.6549 4.74705 57.7328 4.6422C58.0658 4.18904 58.6114 3.94558 59.1711 3.94558H66.6846V1.00269H54.8723L54.8723 17H66.9414V14.0129H59.2083H59.2047Z"
