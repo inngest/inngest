@@ -397,5 +397,5 @@ SELECT
 --   MAX(CASE WHEN input IS NOT NULL THEN input END) as input, TODO
   MAX(CASE WHEN output IS NOT NULL THEN output END) as output
 FROM spans
-WHERE dynamic_span_id = $1
-GROUP BY dynamic_span_id;
+WHERE span_id = $1
+LIMIT 1;

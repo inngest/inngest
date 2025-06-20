@@ -13,7 +13,6 @@ import (
 	"time"
 
 	"github.com/aws/smithy-go/ptr"
-	"github.com/davecgh/go-spew/spew"
 	sq "github.com/doug-martin/goqu/v9"
 	_ "github.com/doug-martin/goqu/v9/dialect/postgres"
 	_ "github.com/doug-martin/goqu/v9/dialect/sqlite3"
@@ -245,7 +244,11 @@ func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.Ot
 
 			parent.Children = append(parent.Children, spanMap[span.SpanID])
 		} else {
-			spew.Dump("lost lineage :'(")
+			logger.StdlibLogger(ctx).Warn(
+				"lost lineage detected",
+				"spanID", span.SpanID,
+				"parentSpanID", span.ParentSpanID,
+			)
 		}
 	}
 

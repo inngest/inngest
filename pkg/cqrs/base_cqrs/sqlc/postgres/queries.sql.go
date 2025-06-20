@@ -1024,13 +1024,13 @@ const getSpanOutput = `-- name: GetSpanOutput :one
 SELECT
   MAX(CASE WHEN output IS NOT NULL THEN output END) as output
 FROM spans
-WHERE dynamic_span_id = $1
-GROUP BY dynamic_span_id
+WHERE span_id = $1
+LIMIT 1
 `
 
 // MAX(CASE WHEN input IS NOT NULL THEN input END) as input, TODO
-func (q *Queries) GetSpanOutput(ctx context.Context, dynamicSpanID sql.NullString) (interface{}, error) {
-	row := q.db.QueryRowContext(ctx, getSpanOutput, dynamicSpanID)
+func (q *Queries) GetSpanOutput(ctx context.Context, spanID string) (interface{}, error) {
+	row := q.db.QueryRowContext(ctx, getSpanOutput, spanID)
 	var output interface{}
 	err := row.Scan(&output)
 	return output, err

@@ -794,14 +794,21 @@ func (q NormalizedQueries) GetSpanOutput(ctx context.Context, spanID string) (an
 
 func (q NormalizedQueries) InsertSpan(ctx context.Context, arg sqlc_sqlite.InsertSpanParams) error {
 	pgArg := InsertSpanParams{
-		SpanID:       arg.SpanID,
-		TraceID:      arg.TraceID,
-		ParentSpanID: arg.ParentSpanID,
-		Name:         arg.Name,
-		StartTime:    arg.StartTime,
-		EndTime:      arg.EndTime,
-		RunID:        arg.RunID,
-		Attributes:   toNullRawMessage(arg.Attributes),
+		AccountID:     arg.AccountID,
+		AppID:         arg.AppID,
+		Attributes:    toNullRawMessage(arg.Attributes),
+		DynamicSpanID: arg.DynamicSpanID,
+		EndTime:       arg.EndTime,
+		EnvID:         arg.EnvID,
+		FunctionID:    arg.FunctionID,
+		Links:         toNullRawMessage(arg.Links),
+		Name:          arg.Name,
+		Output:        toNullRawMessage(arg.Output),
+		ParentSpanID:  arg.ParentSpanID,
+		RunID:         arg.RunID,
+		SpanID:        arg.SpanID,
+		StartTime:     arg.StartTime,
+		TraceID:       arg.TraceID,
 	}
 
 	return q.db.InsertSpan(ctx, pgArg)
