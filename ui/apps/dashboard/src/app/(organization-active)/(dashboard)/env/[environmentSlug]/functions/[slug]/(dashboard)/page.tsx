@@ -18,6 +18,7 @@ import { ErrorBoundary } from '@sentry/nextjs';
 import type { TimeRange } from '@/types/TimeRangeFilter';
 import FunctionConfiguration from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/functions/[slug]/(dashboard)/FunctionConfiguration';
 import Block from '@/components/Block';
+import { FunctionTriggerTypes } from '@/gql/graphql';
 import LoadingIcon from '@/icons/LoadingIcon';
 import { useFunction, useFunctionUsage } from '@/queries';
 import { pathCreator } from '@/utils/urls';
@@ -90,7 +91,7 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
     ? '0.00'
     : (((usageMetrics.totalFailures || 0) / (usageMetrics.totalRuns || 0)) * 100).toFixed(2);
 
-  const triggers = function_.current?.triggers || [];
+  const triggers = function_.current?.fnTriggers || [];
 
   function handleTimeRangeChange(timeRange: TimeRange) {
     if (timeRange.key) {
@@ -193,49 +194,62 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
               </Block>
               <Block title="Triggers">
                 <div className="space-y-3">
-                  {triggers.map((trigger) =>
-                    trigger.eventName ? (
-                      <NextLink
-                        key={trigger.eventName}
-                        href={pathCreator.eventType({
-                          envSlug: params.environmentSlug,
-                          eventName: trigger.eventName,
-                        })}
-                        className="border-subtle bg-canvasBase hover:bg-canvasMuted block rounded-md border p-4"
-                      >
-                        <div className="flex min-w-0 items-center">
-                          <div className="min-w-0 flex-1 space-y-1">
+                  {triggers.map((trigger) => {
+                    switch (trigger.type) {
+                      case FunctionTriggerTypes.Event:
+                        return (
+                          <NextLink
+                            key={trigger.value}
+                            href={pathCreator.eventType({
+                              envSlug: params.environmentSlug,
+                              eventName: trigger.value,
+                            })}
+                            className="border-subtle bg-canvasBase hover:bg-canvasMuted block rounded-md border p-4"
+                          >
                             <div className="flex min-w-0 items-center">
-                              <EventsIcon className="text-subtle w-8 shrink-0 pr-2" />
-                              <p className="truncate font-medium">{trigger.eventName}</p>
-                            </div>
-                            <dl className="text-xs">
-                              {trigger.condition && (
-                                <div className="flex gap-1">
-                                  <dt className="text-subtle">If</dt>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <dd className="truncate font-mono ">{trigger.condition}</dd>
-                                    </TooltipTrigger>
-                                    <TooltipContent className="font-mono text-xs">
-                                      {trigger.condition}
-                                    </TooltipContent>
-                                  </Tooltip>
+                              <div className="min-w-0 flex-1 space-y-1">
+                                <div className="flex min-w-0 items-center">
+                                  <EventsIcon className="text-subtle w-8 shrink-0 pr-2" />
+                                  <p className="truncate font-medium">{trigger.value}</p>
                                 </div>
-                              )}
-                            </dl>
-                          </div>
-                          <RiArrowRightSLine className="h-5" />
-                        </div>
-                      </NextLink>
-                    ) : trigger.schedule ? (
-                      <ScheduleTrigger
-                        key={trigger.schedule}
-                        schedule={trigger.schedule}
-                        condition={trigger.condition}
-                      />
-                    ) : null
-                  )}
+                                <dl className="text-xs">
+                                  {trigger.condition && (
+                                    <div className="flex gap-1">
+                                      <dt className="text-subtle">If</dt>
+                                      <Tooltip>
+                                        <TooltipTrigger asChild>
+                                          <dd className="truncate font-mono ">
+                                            {trigger.condition}
+                                          </dd>
+                                        </TooltipTrigger>
+                                        <TooltipContent className="font-mono text-xs">
+                                          {trigger.condition}
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    </div>
+                                  )}
+                                </dl>
+                              </div>
+                              <RiArrowRightSLine className="h-5" />
+                            </div>
+                          </NextLink>
+                        );
+
+                      case FunctionTriggerTypes.Cron:
+                        return (
+                          <ScheduleTrigger
+                            key={trigger.value}
+                            schedule={trigger.value}
+                            condition={trigger.condition}
+                          />
+                        );
+
+                      default:
+                        // Exhaustive check - this should never be reached if all cases are handled
+                        const _exhaustiveCheck: never = trigger.type;
+                        return _exhaustiveCheck;
+                    }
+                  })}
                 </div>
               </Block>
               {function_.configuration.cancellations.length > 0 && (

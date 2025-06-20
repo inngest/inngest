@@ -332,9 +332,9 @@ func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp 
 
 			cleanupItem := func() {
 				// If event for item cannot be found, remove it from the backlog
-				err := q.removeQueueItem(ctx, shard, shard.RedisClient.KeyGenerator().BacklogSet(backlog.BacklogID), item.ID)
+				err := q.Dequeue(ctx, shard, *item)
 				if err != nil {
-					q.log.Warn("could not remove queue item from backlog", "err", err)
+					q.log.Warn("could not dequeue queue item with missing event", "err", err)
 				}
 			}
 

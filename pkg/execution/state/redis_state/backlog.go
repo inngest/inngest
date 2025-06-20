@@ -686,6 +686,7 @@ type BacklogRefillResult struct {
 	BacklogCountUntil int
 	Capacity          int
 	Refill            int
+	RefilledItems     []string
 }
 
 func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueShadowPartition, refillUntil time.Time, latestConstraints *PartitionConstraintConfig) (*BacklogRefillResult, error) {
@@ -752,8 +753,8 @@ func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueSha
 		b.customKeyActiveRuns(kg, 1), // Set for active runs with custom concurrency key 1
 		b.customKeyActiveRuns(kg, 2), // Set for active runs with custom concurrency key 2
 
-		kg.PartitionActiveCheckSet(),
-		kg.PartitionActiveCheckCooldown(sp.PartitionID),
+		kg.BacklogActiveCheckSet(),
+		kg.BacklogActiveCheckCooldown(b.BacklogID),
 	}
 
 	enableKeyQueuesVal := "0"
@@ -763,7 +764,7 @@ func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueSha
 	}
 
 	// Enable conditional spot checking (probability in queue settings + feature flag)
-	shouldSpotCheckActiveSet := q.enableActiveSpotChecks(ctx, accountID) && rand.Intn(100) <= q.runMode.ActiveCheckerSpotCheckProbability
+	shouldSpotCheckActiveSet := q.enableActiveSpotChecks(ctx, accountID) && rand.Intn(100) <= q.runMode.BacklogRefillSpotCheckProbability
 
 	args, err := StrSlice([]any{
 		b.BacklogID,
@@ -802,8 +803,8 @@ func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueSha
 	}
 
 	returnTuple, ok := res.([]any)
-	if !ok || len(returnTuple) != 6 {
-		return nil, fmt.Errorf("expected return tuple to include 6 items")
+	if !ok || len(returnTuple) != 7 {
+		return nil, fmt.Errorf("expected return tuple to include 7 items")
 	}
 
 	status, ok := returnTuple[0].(int64)
@@ -836,12 +837,26 @@ func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueSha
 		return nil, fmt.Errorf("missing refill in returned tuple")
 	}
 
+	rawRefilledItemIDs, ok := returnTuple[6].([]any)
+	if !ok {
+		return nil, fmt.Errorf("missing refilled item IDs in returned tuple")
+	}
+
+	refilledItemIDs := make([]string, len(rawRefilledItemIDs))
+	for i, d := range rawRefilledItemIDs {
+		itemID, ok := d.(string)
+		if ok {
+			refilledItemIDs[i] = itemID
+		}
+	}
+
 	refillResult := &BacklogRefillResult{
 		Refilled:          int(refillCount),
 		TotalBacklogCount: int(backlogCountTotal),
 		BacklogCountUntil: int(backlogCountUntil),
 		Capacity:          int(capacity),
 		Refill:            int(refill),
+		RefilledItems:     refilledItemIDs,
 	}
 
 	switch status {

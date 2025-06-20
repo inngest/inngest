@@ -510,19 +510,20 @@ func TestQueueRefillBacklog(t *testing.T) {
 				return true
 			}),
 			WithRunMode(QueueRunMode{
-				Sequential:                        true,
-				Scavenger:                         true,
-				Partition:                         true,
-				Account:                           true,
-				AccountWeight:                     85,
-				ShadowPartition:                   true,
-				AccountShadowPartition:            true,
-				AccountShadowPartitionWeight:      85,
-				ShadowContinuations:               true,
-				ShadowContinuationSkipProbability: 0,
-				NormalizePartition:                true,
-				ActiveChecker:                     true,
-				ActiveCheckerSpotCheckProbability: 100,
+				Sequential:                         true,
+				Scavenger:                          true,
+				Partition:                          true,
+				Account:                            true,
+				AccountWeight:                      85,
+				ShadowPartition:                    true,
+				AccountShadowPartition:             true,
+				AccountShadowPartitionWeight:       85,
+				ShadowContinuations:                true,
+				ShadowContinuationSkipProbability:  0,
+				NormalizePartition:                 true,
+				ActiveChecker:                      true,
+				BacklogRefillSpotCheckProbability:  100,
+				ActiveCheckAccountCheckProbability: 100,
 			}),
 			WithBacklogRefillLimit(500),
 			WithConcurrencyLimitGetter(func(ctx context.Context, p QueuePartition) PartitionConcurrencyLimits {
@@ -626,11 +627,11 @@ func TestQueueRefillBacklog(t *testing.T) {
 		require.Equal(t, 0, res.Refilled)
 		require.Equal(t, enums.QueueConstraintAccountConcurrency, res.Constraint)
 
-		require.True(t, r.Exists(kg.PartitionActiveCheckSet()))
-		members, err := r.ZMembers(kg.PartitionActiveCheckSet())
+		require.True(t, r.Exists(kg.BacklogActiveCheckSet()))
+		members, err := r.ZMembers(kg.BacklogActiveCheckSet())
 		require.NoError(t, err)
 		require.Len(t, members, 1)
-		require.Equal(t, fnID2.String(), members[0])
+		require.Equal(t, b2.BacklogID, members[0])
 	})
 }
 
@@ -1901,6 +1902,10 @@ func TestRefillConstraints(t *testing.T) {
 
 			itemsInReadyQueue, err := rc.Do(ctx, rc.B().Zcount().Key(kg.PartitionQueueSet(enums.PartitionTypeDefault, shadowPart.PartitionID, "")).Min("-inf").Max(fmt.Sprintf("%d", refillUntil.UnixMilli())).Build()).ToInt64()
 			require.NoError(t, err)
+
+			// we do not test refilled items
+			require.Equal(t, testCase.expected.result.Refilled, len(res.RefilledItems))
+			res.RefilledItems = nil
 
 			require.Equal(t, testCase.expected.result, *res, "result comparison failed", res, itemsInBacklog, itemsInReadyQueue)
 

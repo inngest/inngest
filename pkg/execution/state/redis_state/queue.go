@@ -921,8 +921,11 @@ type QueueRunMode struct {
 	// ActiveChecker enables background checking of active sets.
 	ActiveChecker bool
 
-	// ActiveCheckerSpotCheckProbability determines the weight of running spot checks on active sets when encountering concurrencity limits between 0 and 100 where 100 means always check.
-	ActiveCheckerSpotCheckProbability int
+	// BacklogRefillSpotCheckProbability determines the weight of adding backlogs to spot checks when concurrency limits between 0 and 100 where 100 means always check.
+	BacklogRefillSpotCheckProbability int
+
+	// ActiveCheckAccountCheckProbability determines the weight of running spot checks on accounts when running an active check
+	ActiveCheckAccountCheckProbability int
 }
 
 // continuation represents a partition continuation, forcung the queue to continue working
@@ -1636,21 +1639,14 @@ func (q *queue) Migrate(ctx context.Context, sourceShardName string, fnID uuid.U
 		return -1, fmt.Errorf("no queue shard available for '%s'", sourceShardName)
 	}
 
-	if limit > AbsoluteQueuePeekMax || limit <= 0 {
-		limit = AbsoluteQueuePeekMax
-	}
-
-	// TODO Do we need to move items from backlogs?
-	partitionKey := shard.RedisClient.kg.PartitionQueueSet(enums.PartitionTypeDefault, fnID.String(), "")
-
-	items, err := q.peek(ctx, shard, peekOpts{
-		PartitionKey: partitionKey,
-		PartitionID:  fnID.String(),
-		Limit:        limit,
-		Until:        time.Time{},
-	})
+	from := time.Time{}
+	// setting it to 5 years ahead should be enough to cover all queue items in the partition
+	until := q.clock.Now().Add(24 * time.Hour * 365 * 5)
+	items, err := q.ItemsByPartition(ctx, shard, fnID, from, until,
+		WithQueueItemIterBatchSize(limit),
+	)
 	if err != nil {
-		return -1, fmt.Errorf("error peeking items for queue migration: %w", err)
+		return -1, fmt.Errorf("error preparing partition iteration: %w", err)
 	}
 
 	// Should process in order because we don't want out of order execution when moved over
@@ -1660,8 +1656,9 @@ func (q *queue) Migrate(ctx context.Context, sourceShardName string, fnID uuid.U
 		if err := handler(ctx, qi); err != nil {
 			return err
 		}
-		if err := q.removeQueueItem(ctx, shard, partitionKey, qi.ID); err != nil {
-			q.log.Error("error cleaning up queue item after migration", "error", err)
+
+		if err := q.Dequeue(ctx, shard, *qi); err != nil {
+			q.log.Error("error dequeueing queue item after migration", "error", err)
 		}
 
 		atomic.AddInt64(&processed, 1)
@@ -1672,10 +1669,10 @@ func (q *queue) Migrate(ctx context.Context, sourceShardName string, fnID uuid.U
 		eg := errgroup.Group{}
 		eg.SetLimit(concurrency)
 
-		for _, qi := range items {
-			qi := qi
+		for qi := range items {
+			i := qi
 			eg.Go(func() error {
-				return process(qi)
+				return process(i)
 			})
 		}
 
@@ -1687,13 +1684,13 @@ func (q *queue) Migrate(ctx context.Context, sourceShardName string, fnID uuid.U
 		return atomic.LoadInt64(&processed), nil
 	}
 
-	for _, qi := range items {
+	for qi := range items {
 		if err := process(qi); err != nil {
 			return processed, err
 		}
 	}
 
-	return processed, nil
+	return atomic.LoadInt64(&processed), nil
 }
 
 func (q *queue) RemoveQueueItem(ctx context.Context, shardName string, partitionKey string, itemID string) error {
@@ -1727,6 +1724,8 @@ func (q *queue) removeQueueItem(ctx context.Context, shard QueueShard, partition
 
 	switch code {
 	case 0:
+		q.log.Debug("removed queue item", "item_id", itemID)
+
 		return nil
 	default:
 		return fmt.Errorf("unknown status when attempting to remove item: %d", code)
@@ -2455,12 +2454,6 @@ func (q *queue) Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		return err
 	}
 
-	q.log.Trace("dequeueing item",
-		"id", i.ID,
-		"kind", i.Data.Kind,
-		"partition_id", partition.PartitionID,
-	)
-
 	status, err := scripts["queue/dequeue"].Exec(
 		redis_telemetry.WithScriptName(ctx, "dequeue"),
 		queueShard.RedisClient.unshardedRc,
@@ -2472,6 +2465,8 @@ func (q *queue) Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 	}
 	switch status {
 	case 0:
+		q.log.Debug("dequeued item", "job_id", i.ID, "item", i)
+
 		return nil
 	case 1:
 		return ErrQueueItemNotFound

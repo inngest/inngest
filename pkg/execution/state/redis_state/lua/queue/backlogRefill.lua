@@ -51,8 +51,8 @@ local keyActiveRunsPartition              = KEYS[18]
 local keyActiveRunsCustomConcurrencyKey1  = KEYS[19]
 local keyActiveRunsCustomConcurrencyKey2  = KEYS[20]
 
-local keyPartitionActiveCheckSet          = KEYS[21]
-local keyPartitionActiveCheckCooldown  = KEYS[22]
+local keyBacklogActiveCheckSet       = KEYS[21]
+local keyBacklogActiveCheckCooldown  = KEYS[22]
 
 local backlogID     = ARGV[1]
 local partitionID   = ARGV[2]
@@ -103,7 +103,7 @@ if backlogCountTotal == 0 then
   -- update backlog pointers
   updateBacklogPointer(keyGlobalShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, keyShadowPartitionSet, keyBacklogSet, accountID, partitionID, backlogID)
 
-  return { 0, 0, 0, backlogCountTotal, 0, 0 }
+  return { 0, 0, 0, backlogCountTotal, 0, 0, {} }
 end
 
 local backlogCountUntil = redis.call("ZCOUNT", keyBacklogSet, "-inf", refillUntilMS)
@@ -115,7 +115,7 @@ if backlogCountUntil == 0 then
   -- update backlog pointers
   updateBacklogPointer(keyGlobalShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, keyShadowPartitionSet, keyBacklogSet, accountID, partitionID, backlogID)
 
-  return { 0, 0, backlogCountUntil, backlogCountTotal, 0, 0 }
+  return { 0, 0, backlogCountUntil, backlogCountTotal, 0, 0, {} }
 end
 
 --
@@ -227,6 +227,7 @@ end
 local refilled = 0
 
 -- Only attempt to refill if we have capacity
+local refilledItemIDs = {}
 if refill > 0 then
   -- Move item(s) out of backlog and into partition
 
@@ -239,7 +240,6 @@ if refill > 0 then
 
   -- Reverse the items to be added to the ready set
   local readyArgs = {}
-  local markActiveItemIDs = {}
 
   local backlogRemArgs = {}
   local hasRemove = false
@@ -280,7 +280,7 @@ if refill > 0 then
       table.insert(itemUpdateArgs, itemID)
       table.insert(itemUpdateArgs, cjson.encode(updatedData))
 
-      table.insert(markActiveItemIDs, itemID)
+      table.insert(refilledItemIDs, itemID)
 
       -- Increment number of refilled items
       refilled = refilled + 1
@@ -292,7 +292,7 @@ if refill > 0 then
     redis.call("ZADD", keyReadySet, unpack(readyArgs))
 
     if enableKeyQueues == 1 then
-      addToActiveSets(keyActivePartition, keyActiveAccount, keyActiveCompound, keyActiveConcurrencyKey1, keyActiveConcurrencyKey2, markActiveItemIDs)
+      addToActiveSets(keyActivePartition, keyActiveAccount, keyActiveCompound, keyActiveConcurrencyKey1, keyActiveConcurrencyKey2, refilledItemIDs)
     end
 
     -- Update queue items with refill data
@@ -379,12 +379,12 @@ end
 updateBacklogPointer(keyGlobalShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, keyShadowPartitionSet, keyBacklogSet, accountID, partitionID, backlogID)
 
 --
--- Optional: Add partition to active checker set. This will verify that all items marked as active
+-- Optional: Add backlog to active checker set. This will verify that all items marked as active
 -- are either in the ready queue or in progress.
 --
 local concurrencyConstrained = status >= 1 and status <= 4
 if concurrencyConstrained and shouldSpotCheckActiveSet == 1 then
-    add_to_active_check(keyPartitionActiveCheckSet, keyPartitionActiveCheckCooldown, partitionID, nowMS)
+    add_to_active_check(keyBacklogActiveCheckSet, keyBacklogActiveCheckCooldown, backlogID, nowMS)
 end
 
-return { status, refilled, backlogCountUntil, backlogCountTotal, constraintCapacity, refill }
+return { status, refilled, backlogCountUntil, backlogCountTotal, constraintCapacity, refill, refilledItemIDs }

@@ -387,6 +387,15 @@ func (q *queue) processShadowPartitionBacklog(ctx context.Context, shadowPart *Q
 		"backlog_throttle", backlog.Throttle,
 	)
 
+	if len(res.RefilledItems) > 0 {
+		q.log.Debug(
+			"refilled items to ready queue",
+			"job_id", res.RefilledItems,
+			"backlog", backlog.BacklogID,
+			"partition", shadowPart.PartitionID,
+		)
+	}
+
 	// instrumentation
 	{
 		opts := metrics.CounterOpt{

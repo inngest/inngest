@@ -409,10 +409,6 @@ type TraceReader interface {
 	GetEventRuns(ctx context.Context, eventID ulid.ULID, accountID uuid.UUID, workspaceID uuid.UUID) ([]*FunctionRun, error)
 	// GetRun returns a single function run.
 	GetRun(ctx context.Context, runID ulid.ULID, accountID uuid.UUID, workspaceID uuid.UUID) (*FunctionRun, error)
-	// GetEvent returns a single event.
-	GetEvent(ctx context.Context, id ulid.ULID, accountID uuid.UUID, workspaceID uuid.UUID) (*Event, error)
-	// GetEvents returns a list of latest events.
-	GetEvents(ctx context.Context, accountID uuid.UUID, workspaceID uuid.UUID,opts *WorkspaceEventsOpts) ([]*Event, error)
 }
 
 type GetTraceRunOpt struct {

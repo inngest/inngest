@@ -8,11 +8,11 @@ import (
 	"strings"
 )
 
-const _CancellationKindName = "runbulk_runbacklog"
+const _CancellationKindName = "bulk_runrunbacklog"
 
-var _CancellationKindIndex = [...]uint8{0, 3, 11, 18}
+var _CancellationKindIndex = [...]uint8{0, 8, 11, 18}
 
-const _CancellationKindLowerName = "runbulk_runbacklog"
+const _CancellationKindLowerName = "bulk_runrunbacklog"
 
 func (i CancellationKind) String() string {
 	if i < 0 || i >= CancellationKind(len(_CancellationKindIndex)-1) {
@@ -25,25 +25,25 @@ func (i CancellationKind) String() string {
 // Re-run the stringer command to generate them again.
 func _CancellationKindNoOp() {
 	var x [1]struct{}
-	_ = x[CancellationKindRun-(0)]
-	_ = x[CancellationKindBulkRun-(1)]
+	_ = x[CancellationKindBulkRun-(0)]
+	_ = x[CancellationKindRun-(1)]
 	_ = x[CancellationKindBacklog-(2)]
 }
 
-var _CancellationKindValues = []CancellationKind{CancellationKindRun, CancellationKindBulkRun, CancellationKindBacklog}
+var _CancellationKindValues = []CancellationKind{CancellationKindBulkRun, CancellationKindRun, CancellationKindBacklog}
 
 var _CancellationKindNameToValueMap = map[string]CancellationKind{
-	_CancellationKindName[0:3]:        CancellationKindRun,
-	_CancellationKindLowerName[0:3]:   CancellationKindRun,
-	_CancellationKindName[3:11]:       CancellationKindBulkRun,
-	_CancellationKindLowerName[3:11]:  CancellationKindBulkRun,
+	_CancellationKindName[0:8]:        CancellationKindBulkRun,
+	_CancellationKindLowerName[0:8]:   CancellationKindBulkRun,
+	_CancellationKindName[8:11]:       CancellationKindRun,
+	_CancellationKindLowerName[8:11]:  CancellationKindRun,
 	_CancellationKindName[11:18]:      CancellationKindBacklog,
 	_CancellationKindLowerName[11:18]: CancellationKindBacklog,
 }
 
 var _CancellationKindNames = []string{
-	_CancellationKindName[0:3],
-	_CancellationKindName[3:11],
+	_CancellationKindName[0:8],
+	_CancellationKindName[8:11],
 	_CancellationKindName[11:18],
 }
 

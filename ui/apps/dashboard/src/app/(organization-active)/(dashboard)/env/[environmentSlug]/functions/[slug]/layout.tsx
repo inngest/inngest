@@ -16,6 +16,7 @@ import { CancelFunctionModal } from '@/components/Functions/CancelFunction/Cance
 import { PauseFunctionModal } from '@/components/Functions/PauseFunction/PauseModal';
 import NewReplayModal from '@/components/Replay/NewReplayModal';
 import { graphql } from '@/gql';
+import { FunctionTriggerTypes } from '@/gql/graphql';
 import { useFunction } from '@/queries';
 
 const InvokeFunctionDocument = graphql(`
@@ -52,8 +53,8 @@ export default function FunctionLayout({
   const { isArchived = false, isPaused } = fn ?? {};
 
   const doesFunctionAcceptPayload =
-    fn?.current?.triggers.some((trigger) => {
-      return trigger.eventName;
+    fn?.current?.fnTriggers.some((trigger) => {
+      return trigger.type == FunctionTriggerTypes.Event;
     }) ?? false;
 
   const invokeAction = useCallback(
