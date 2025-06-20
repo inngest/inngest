@@ -53,11 +53,11 @@ func (q *queue) ActiveCheck(ctx context.Context) (int, error) {
 				return fmt.Errorf("could not create checkID: %w", err)
 			}
 
-			l = l.With("backlog", backlog, "check_id", checkID)
+			l := l.With("backlog", backlog, "check_id", checkID)
 
 			l.Debug("attempting to active check backlog")
 
-			cleanup, err := q.backlogActiveCheck(ctx, backlog, client, kg)
+			cleanup, err := q.backlogActiveCheck(logger.WithStdlib(ctx, l), backlog, client, kg)
 			if cleanup {
 				status, cerr := scripts["queue/activeCheckRemoveBacklog"].Exec(
 					ctx,
@@ -235,7 +235,7 @@ func (q *queue) accountActiveCheck(
 		l.Debug(
 			"removing invalid items from account active key",
 			"mode", "account",
-			"invalid", invalidItems,
+			"job_id", invalidItems,
 			"reason", invalidReasons,
 			"partition_id", sp.PartitionID,
 			"active", keyActive,
@@ -528,8 +528,11 @@ func (q *queue) findMissingItemsWithDynamicTargets(
 
 		l.Debug("retrieved item chunk", "key", sourceSetKey, "job_id", entryIDs)
 
+		leasedIDs, missingIDs := make([]string, 0), make([]string, 0)
+
 		for i, itemStr := range itemData {
 			if itemStr == "" {
+				missingIDs = append(missingIDs, entryIDs[i])
 				onMissing(entryIDs[i], "missing-item")
 				continue
 			}
@@ -542,13 +545,21 @@ func (q *queue) findMissingItemsWithDynamicTargets(
 
 			// Item is definitely in progress if actively leased
 			if qi.IsLeased(q.clock.Now()) {
+				leasedIDs = append(leasedIDs, qi.ID)
 				continue
 			}
 
 			items = append(items, &qi)
 		}
 
-		l.Debug("loaded item data", "key", sourceSetKey, "job_id", entryIDs, "items", items, "missing", len(entryIDs)-len(items))
+		l.Debug(
+			"loaded item data",
+			"key", sourceSetKey,
+			"job_id", entryIDs,
+			"items", items,
+			"missing", missingIDs,
+			"leased", leasedIDs,
+		)
 
 		entriesFound := make(map[string]struct{})
 
@@ -556,11 +567,11 @@ func (q *queue) findMissingItemsWithDynamicTargets(
 		// Worst case, this transform 20 queue items in the chunk to 20 target keys, but usually this will
 		// be more efficient as items may belong to the same workflows.
 		for targetKey, items := range targetKeys(items) {
-			l.Debug("comparing against target", "source", sourceSetKey, "target", targetKey, "job_id", items)
-
 			if len(items) == 0 {
 				continue
 			}
+			
+			l.Debug("comparing against target", "source", sourceSetKey, "target", targetKey, "job_id", items)
 
 			// Batch check scores for items
 			resp, err := client.Do(ctx, client.B().Zmscore().Key(targetKey).Member(items...).Build()).ToAny()
@@ -580,9 +591,9 @@ func (q *queue) findMissingItemsWithDynamicTargets(
 			}
 		}
 
-		for _, element := range entryIDs {
-			if _, has := entriesFound[element]; !has {
-				onMissing(element, "missing-in-targets")
+		for _, element := range items {
+			if _, has := entriesFound[element.ID]; !has {
+				onMissing(element.ID, "missing-in-targets")
 			}
 		}
 
