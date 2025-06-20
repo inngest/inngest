@@ -37,6 +37,12 @@ func WithResumeAttrs(p *state.Pause, r *execution.ResumeRequest) trace.SpanStart
 	es := util.NewErrSet()
 	status := enums.StepStatusCompleted
 
+	if p != nil {
+		attrs = append(attrs,
+			attribute.String(meta.AttributeRunID, p.Identifier.RunID.String()),
+		)
+	}
+
 	if r != nil {
 		attrs = append(attrs,
 			attribute.Bool(meta.AttributeStepWaitExpired, r.IsTimeout),
@@ -44,6 +50,8 @@ func WithResumeAttrs(p *state.Pause, r *execution.ResumeRequest) trace.SpanStart
 
 		if r.With != nil {
 			if marshalledData, err := json.Marshal(r.With); err == nil {
+				// TODO For waitForEvent, this is not the entire event, as
+				// it's not coming back keyed. We can account for this here.
 				attrs = append(attrs,
 					attribute.String(meta.AttributeStepOutput, string(marshalledData)),
 				)
