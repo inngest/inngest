@@ -378,7 +378,6 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 			if gqlSpan.EndedAt != nil {
 				dur := int(gqlSpan.EndedAt.Sub(*gqlSpan.StartedAt).Milliseconds())
 				gqlSpan.Duration = &dur
-				gqlSpan.Status = models.RunTraceSpanStatusCompleted // TODO the actual statuses
 			}
 		}
 	}
