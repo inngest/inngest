@@ -567,11 +567,11 @@ func (q *queue) findMissingItemsWithDynamicTargets(
 		// Worst case, this transform 20 queue items in the chunk to 20 target keys, but usually this will
 		// be more efficient as items may belong to the same workflows.
 		for targetKey, items := range targetKeys(items) {
-			l.Debug("comparing against target", "source", sourceSetKey, "target", targetKey, "job_id", items)
-
 			if len(items) == 0 {
 				continue
 			}
+			
+			l.Debug("comparing against target", "source", sourceSetKey, "target", targetKey, "job_id", items)
 
 			// Batch check scores for items
 			resp, err := client.Do(ctx, client.B().Zmscore().Key(targetKey).Member(items...).Build()).ToAny()
