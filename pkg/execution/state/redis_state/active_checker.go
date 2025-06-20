@@ -9,6 +9,7 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 	"golang.org/x/sync/errgroup"
@@ -134,13 +135,17 @@ func (q *queue) backlogActiveCheck(ctx context.Context, b *QueueBacklog, client 
 		readOnly = false
 	}
 
-	l = l.With("partition_id", sp.PartitionID, "account_id", accountID)
+	l = l.With(
+		"backlog_id", b.BacklogID,
+		"partition_id", sp.PartitionID,
+		"account_id", accountID,
+	)
 
 	l.Debug("starting active check for partition")
 
 	// Check account
 	if accountID != uuid.Nil && mathRand.Intn(100) <= q.runMode.ActiveCheckAccountCheckProbability {
-		err := q.accountActiveCheck(ctx, &sp, client, kg, l.With("check-scope", "account-check"), readOnly)
+		err := q.accountActiveCheck(ctx, &sp, accountID, client, kg, l.With("check-scope", "account-check"), readOnly)
 		if err != nil {
 			return false, fmt.Errorf("could not check account active items: %w", err)
 		}
@@ -160,7 +165,7 @@ func (q *queue) backlogActiveCheck(ctx context.Context, b *QueueBacklog, client 
 		}
 	}
 
-	l.Debug("checked partition for invalid active keys", "partition_id", sp.PartitionID)
+	l.Debug("completed backlog check for invalid active keys")
 
 	return true, nil
 }
@@ -168,11 +173,13 @@ func (q *queue) backlogActiveCheck(ctx context.Context, b *QueueBacklog, client 
 func (q *queue) accountActiveCheck(
 	ctx context.Context,
 	sp *QueueShadowPartition,
+	accountID uuid.UUID,
 	client rueidis.Client,
 	kg QueueKeyGenerator,
 	l logger.Logger,
 	readOnly bool,
 ) error {
+
 	// Compare the account active key
 	keyActive := sp.accountActiveKey(kg)
 
@@ -180,10 +187,11 @@ func (q *queue) accountActiveCheck(
 	keyInProgress := sp.accountInProgressKey(kg)
 
 	invalidItems := make([]string, 0)
+	invalidReasons := make([]string, 0)
 
 	l.Debug("checking account for invalid or missing active keys", "account_id", sp.AccountID, "key", keyActive)
 
-	err := q.findMissingItemsWithDynamicTargets(ctx, client, kg, keyActive, l, func(chunk []*osqueue.QueueItem) map[string][]string {
+	err := q.findMissingItemsWithDynamicTargets(ctx, client, kg, keyActive, l, func(chunk []*osqueue.QueueItem, l logger.Logger) map[string][]string {
 		res := make(map[string][]string)
 
 		chunkIDs := make([]string, len(chunk))
@@ -205,17 +213,41 @@ func (q *queue) accountActiveCheck(
 		}
 
 		return res
-	}, func(pointer string) {
+	}, func(pointer string, reason string, l logger.Logger) {
 		invalidItems = append(invalidItems, pointer)
+		invalidReasons = append(invalidReasons, reason)
+		metrics.IncrQueueActiveCheckInvalidItemsFoundCounter(ctx, metrics.CounterOpt{
+			PkgName: pkgName,
+			Tags: map[string]any{
+				"account_id": accountID.String(),
+				"reason":     reason,
+			},
+		})
 	})
 	if err != nil {
 		return fmt.Errorf("could not check account for missing active items: %w", err)
 	}
 
 	if len(invalidItems) > 0 {
-		l.Debug("removing invalid items from account active key", "mode", "account", "invalid", invalidItems, "partition_id", sp.PartitionID, "active", keyActive, "in_progress", keyInProgress, "readonly", readOnly)
+		l.Debug(
+			"removing invalid items from account active key",
+			"mode", "account",
+			"invalid", invalidItems,
+			"reason", invalidReasons,
+			"partition_id", sp.PartitionID,
+			"active", keyActive,
+			"in_progress", keyInProgress,
+			"readonly", readOnly,
+		)
 
 		if !readOnly {
+			metrics.IncrQueueActiveCheckInvalidRemovedFoundCounter(ctx, int64(len(invalidItems)), metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags: map[string]any{
+					"account_id": accountID.String(),
+				},
+			})
+
 			cmd := client.B().Srem().Key(keyActive).Member(invalidItems...).Build()
 			err := client.Do(ctx, cmd).Error()
 			if err != nil {
@@ -249,7 +281,16 @@ func (q *queue) partitionActiveCheck(
 	}
 
 	if len(invalidItems) > 0 {
-		l.Debug("removing invalid items from active key", "mode", "partition", "invalid", invalidItems, "partition_id", sp.PartitionID, "active", keyActive, "ready", keyReady, "in_progress", keyInProgress, "readonly", readOnly)
+		l.Debug(
+			"removing invalid items from active key",
+			"mode", "partition",
+			"invalid", invalidItems,
+			"partition_id", sp.PartitionID,
+			"active", keyActive,
+			"ready", keyReady,
+			"in_progress", keyInProgress,
+			"readonly", readOnly,
+		)
 
 		if !readOnly {
 			cmd := client.B().Srem().Key(keyActive).Member(invalidItems...).Build()
@@ -280,7 +321,17 @@ func (q *queue) customConcurrencyActiveCheck(ctx context.Context, sp *QueueShado
 	}
 
 	if len(invalidItems) > 0 {
-		l.Debug("removing invalid items from active key", "invalid", "mode", "custom_concurrency", "bcc", bcc, invalidItems, "partition_id", sp.PartitionID, "active", keyActive, "ready", keyReady, "in_progress", keyInProgress, "readonly", readOnly)
+		l.Debug(
+			"removing invalid items from active key",
+			"invalid", invalidItems,
+			"mode", "custom_concurrency",
+			"bcc", bcc,
+			"partition_id", sp.PartitionID,
+			"active", keyActive,
+			"ready", keyReady,
+			"in_progress", keyInProgress,
+			"readonly", readOnly,
+		)
 
 		if !readOnly {
 			cmd := client.B().Srem().Key(keyActive).Member(invalidItems...).Build()
@@ -372,8 +423,8 @@ func (q *queue) findMissingItemsWithDynamicTargets(
 	kg QueueKeyGenerator,
 	sourceSetKey string,
 	l logger.Logger,
-	targetKeys func(chunk []*osqueue.QueueItem) map[string][]string,
-	onMissing func(pointer string),
+	targetKeys func(chunk []*osqueue.QueueItem, l logger.Logger) map[string][]string,
+	onMissing func(pointer string, reason string, l logger.Logger),
 ) error {
 	var cursor uint64
 	var count int64 = 20
@@ -382,6 +433,13 @@ func (q *queue) findMissingItemsWithDynamicTargets(
 		// Load chunk
 		cmd := client.B().Sscan().Key(sourceSetKey).Cursor(cursor).Count(count).Build()
 		entry, err := client.Do(ctx, cmd).AsScanEntry()
+
+		chunkID, err := ulid.New(ulid.Timestamp(q.clock.Now()), rand.Reader)
+		if err != nil {
+			return fmt.Errorf("could not create checkID: %w", err)
+		}
+
+		l = l.With("chunk_id", chunkID)
 
 		l.Debug("scanned source", "key", sourceSetKey, "returned", len(entry.Elements), "cursor", entry.Cursor)
 
@@ -413,7 +471,7 @@ func (q *queue) findMissingItemsWithDynamicTargets(
 
 		for i, itemStr := range itemData {
 			if itemStr == "" {
-				onMissing(entryIDs[i])
+				onMissing(entryIDs[i], "missing-item", l)
 				continue
 			}
 
@@ -431,12 +489,14 @@ func (q *queue) findMissingItemsWithDynamicTargets(
 			items = append(items, &qi)
 		}
 
+		l.Debug("loaded item data", "key", sourceSetKey, "found", entryIDs, "items", items, "missing", len(entryIDs)-len(items))
+
 		entriesFound := make(map[string]struct{})
 
 		// Retrieve keys to check against (need to check individual items but want to run batched operations)
 		// Worst case, this transform 20 queue items in the chunk to 20 target keys, but usually this will
 		// be more efficient as items may belong to the same workflows.
-		for targetKey, items := range targetKeys(items) {
+		for targetKey, items := range targetKeys(items, l) {
 			l.Debug("comparing against target", "source", sourceSetKey, "target", targetKey, "items", items)
 
 			if len(items) == 0 {
@@ -463,7 +523,7 @@ func (q *queue) findMissingItemsWithDynamicTargets(
 
 		for _, element := range entryIDs {
 			if _, has := entriesFound[element]; !has {
-				onMissing(element)
+				onMissing(element, "missing-in-targets", l)
 			}
 		}
 

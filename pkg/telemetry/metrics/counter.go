@@ -482,3 +482,21 @@ func IncrHTTPAPIRequestsCounter(ctx context.Context, opts CounterOpt) {
 		Tags:        opts.Tags,
 	})
 }
+
+func IncrQueueActiveCheckInvalidItemsFoundCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "queue_active_check_invalid_items_found_total",
+		Description: "The total number of invalid items found during an active check",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrQueueActiveCheckInvalidRemovedFoundCounter(ctx context.Context, val int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, val, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "queue_active_check_invalid_items_found_total",
+		Description: "The total number of invalid removed found during an active check",
+		Tags:        opts.Tags,
+	})
+}
