@@ -102,8 +102,21 @@ func (p *executionProcessor) OnStart(parent context.Context, s sdktrace.ReadWrit
 					attribute.Int(meta.AttributeStepAttempt, p.qi.Attempt),
 				)
 
-				// Sleeps start as soon as they are queued
-				if p.qi.Kind == queue.KindSleep {
+				// Some steps "start" as soon as they are queued
+				startWhenQueued := p.qi.Kind == queue.KindSleep
+				if !startWhenQueued {
+					for _, attr := range s.Attributes() {
+						if string(attr.Key) == meta.AttributeStepOp {
+							if attr.Value.Type() == attribute.STRING && attr.Value.AsString() == enums.OpcodeWaitForEvent.String() {
+								startWhenQueued = true
+								break
+							}
+						}
+
+					}
+				}
+
+				if startWhenQueued {
 					attrs = append(attrs,
 						attribute.Int64(meta.AttributeStartedAt, now.UnixMilli()),
 					)
