@@ -75,14 +75,17 @@ export default async function Page() {
     ? `$${(currentPlan.amount / 100).toFixed(2)}`
     : 'Free';
   const overageAllowed =
-    entitlements.runCount.overageAllowed || entitlements.stepCount.overageAllowed;
+    (entitlements.runCount.overageAllowed || entitlements.stepCount.overageAllowed) &&
+    currentPlan.slug !== 'hobby-free-2025-06-13';
 
   const paymentMethod = billing.paymentMethods?.[0] || null;
+  const isHobbyPlan =
+    currentPlan.slug === 'hobby-free-2025-06-13' || currentPlan.slug === 'hobby-payg-2025-06-13';
 
   return (
     <div className="grid grid-cols-3 gap-4">
       <Card className="col-span-2">
-        {!overageAllowed && (
+        {!overageAllowed && currentPlan.slug !== 'hobby-free-2025-06-13' && (
           <Alert
             severity="info"
             className="flex items-center justify-between text-sm"
@@ -98,19 +101,38 @@ export default async function Page() {
             For usage beyond the limits of this plan, upgrade to a new plan.
           </Alert>
         )}
+        {currentPlan.slug === 'hobby-free-2025-06-13' && (
+          <Alert
+            severity="info"
+            className="flex items-center justify-between text-sm"
+            link={
+              <Button
+                appearance="outlined"
+                kind="secondary"
+                label="Enable pay-as-you-go"
+                href={pathCreator.billing({ tab: 'plans', ref: 'app-billing-page-overview' })}
+              />
+            }
+          >
+            For usage beyond the limits of this plan, enable pay-as-you-go or upgrade to a new plan.
+          </Alert>
+        )}
 
         <Card.Content>
           <p className="text-muted mb-1">Your plan</p>
           <div className="flex items-center justify-between">
-            <p className="text-basis text-xl">{currentPlan.name}</p>
+            <p className="text-basis text-xl">
+              {currentPlan.name}{' '}
+              {currentPlan.slug === 'hobby-payg-2025-06-13' ? '(Pay-as-you-go)' : undefined}
+            </p>
             <Button
               appearance="ghost"
               label="Change plan"
               href={pathCreator.billing({ tab: 'plans', ref: 'app-billing-page-overview' })}
             />
           </div>
-          {!legacyNoRunsPlan && <LimitBar data={runs} className="my-4" />}
-          <LimitBar data={steps} className="mb-6" />
+          {!legacyNoRunsPlan && !isHobbyPlan && <LimitBar data={runs} className="my-4" />}
+          {!isHobbyPlan && <LimitBar data={steps} className="mb-6" />}
           <div className="border-subtle mb-6 border" />
           <EntitlementListItem
             planName={currentPlan.name}
