@@ -53,11 +53,11 @@ func (q *queue) ActiveCheck(ctx context.Context) (int, error) {
 				return fmt.Errorf("could not create checkID: %w", err)
 			}
 
-			l = l.With("backlog", backlog, "check_id", checkID)
+			l := l.With("backlog", backlog, "check_id", checkID)
 
 			l.Debug("attempting to active check backlog")
 
-			cleanup, err := q.backlogActiveCheck(ctx, backlog, client, kg)
+			cleanup, err := q.backlogActiveCheck(logger.WithStdlib(ctx, l), backlog, client, kg)
 			if cleanup {
 				status, cerr := scripts["queue/activeCheckRemoveBacklog"].Exec(
 					ctx,
