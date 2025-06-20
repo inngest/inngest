@@ -152,14 +152,14 @@ func (q *queue) backlogActiveCheck(ctx context.Context, b *QueueBacklog, client 
 	}
 
 	// Check partition
-	err := q.partitionActiveCheck(ctx, &sp, client, kg, l.With("check-scope", "partition-check"), readOnly)
+	err := q.partitionActiveCheck(ctx, &sp, accountID, client, kg, l.With("check-scope", "partition-check"), readOnly)
 	if err != nil {
 		return false, fmt.Errorf("could not check account for invalid active items: %w", err)
 	}
 
 	// Check custom concurrency keys
 	for _, key := range b.ConcurrencyKeys {
-		err := q.customConcurrencyActiveCheck(ctx, &sp, key, client, kg, l.With("check-scope", "backlog-check"), readOnly)
+		err := q.customConcurrencyActiveCheck(ctx, &sp, accountID, key, client, kg, l.With("check-scope", "backlog-check"), readOnly)
 		if err != nil {
 			return false, fmt.Errorf("could not check custom concurrency key: %w", err)
 		}
@@ -220,6 +220,7 @@ func (q *queue) accountActiveCheck(
 			PkgName: pkgName,
 			Tags: map[string]any{
 				"account_id": accountID.String(),
+				"check":      "account",
 				"reason":     reason,
 			},
 		})
@@ -241,10 +242,11 @@ func (q *queue) accountActiveCheck(
 		)
 
 		if !readOnly {
-			metrics.IncrQueueActiveCheckInvalidRemovedFoundCounter(ctx, int64(len(invalidItems)), metrics.CounterOpt{
+			metrics.IncrQueueActiveCheckInvalidItemsRemovedCounter(ctx, int64(len(invalidItems)), metrics.CounterOpt{
 				PkgName: pkgName,
 				Tags: map[string]any{
 					"account_id": accountID.String(),
+					"check":      "account",
 				},
 			})
 
@@ -262,6 +264,7 @@ func (q *queue) accountActiveCheck(
 func (q *queue) partitionActiveCheck(
 	ctx context.Context,
 	sp *QueueShadowPartition,
+	accountID uuid.UUID,
 	client rueidis.Client,
 	kg QueueKeyGenerator,
 	l logger.Logger,
@@ -275,6 +278,15 @@ func (q *queue) partitionActiveCheck(
 
 	err := q.findMissingItemsWithStaticTargets(ctx, client, keyActive, []string{keyInProgress, keyReady}, func(pointer string) {
 		invalidItems = append(invalidItems, pointer)
+
+		metrics.IncrQueueActiveCheckInvalidItemsFoundCounter(ctx, metrics.CounterOpt{
+			PkgName: pkgName,
+			Tags: map[string]any{
+				"account_id": accountID.String(),
+				"reason":     "missing-pointer",
+				"check":      "partition",
+			},
+		})
 	})
 	if err != nil {
 		return fmt.Errorf("could not check partition for missing active items: %w", err)
@@ -293,6 +305,14 @@ func (q *queue) partitionActiveCheck(
 		)
 
 		if !readOnly {
+			metrics.IncrQueueActiveCheckInvalidItemsRemovedCounter(ctx, int64(len(invalidItems)), metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags: map[string]any{
+					"account_id": accountID.String(),
+					"check":      "partition",
+				},
+			})
+
 			cmd := client.B().Srem().Key(keyActive).Member(invalidItems...).Build()
 			err := client.Do(ctx, cmd).Error()
 			if err != nil {
@@ -304,7 +324,7 @@ func (q *queue) partitionActiveCheck(
 	return nil
 }
 
-func (q *queue) customConcurrencyActiveCheck(ctx context.Context, sp *QueueShadowPartition, bcc BacklogConcurrencyKey, client rueidis.Client, kg QueueKeyGenerator, l logger.Logger, readOnly bool) error {
+func (q *queue) customConcurrencyActiveCheck(ctx context.Context, sp *QueueShadowPartition, accountID uuid.UUID, bcc BacklogConcurrencyKey, client rueidis.Client, kg QueueKeyGenerator, l logger.Logger, readOnly bool) error {
 	keyActive := bcc.activeKey(kg)
 	keyInProgress := bcc.concurrencyKey(kg)
 
@@ -315,6 +335,15 @@ func (q *queue) customConcurrencyActiveCheck(ctx context.Context, sp *QueueShado
 
 	err := q.findMissingItemsWithStaticTargets(ctx, client, keyActive, []string{keyInProgress, keyReady}, func(pointer string) {
 		invalidItems = append(invalidItems, pointer)
+
+		metrics.IncrQueueActiveCheckInvalidItemsFoundCounter(ctx, metrics.CounterOpt{
+			PkgName: pkgName,
+			Tags: map[string]any{
+				"account_id": accountID.String(),
+				"reason":     "missing-pointer",
+				"check":      "custom-concurrency",
+			},
+		})
 	})
 	if err != nil {
 		return fmt.Errorf("could not check custom concurrency key for missing active items: %w", err)
@@ -334,6 +363,14 @@ func (q *queue) customConcurrencyActiveCheck(ctx context.Context, sp *QueueShado
 		)
 
 		if !readOnly {
+			metrics.IncrQueueActiveCheckInvalidItemsRemovedCounter(ctx, int64(len(invalidItems)), metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags: map[string]any{
+					"account_id": accountID.String(),
+					"check":      "custom-concurrency",
+				},
+			})
+
 			cmd := client.B().Srem().Key(keyActive).Member(invalidItems...).Build()
 			err := client.Do(ctx, cmd).Error()
 			if err != nil {

@@ -492,11 +492,11 @@ func IncrQueueActiveCheckInvalidItemsFoundCounter(ctx context.Context, opts Coun
 	})
 }
 
-func IncrQueueActiveCheckInvalidRemovedFoundCounter(ctx context.Context, val int64, opts CounterOpt) {
+func IncrQueueActiveCheckInvalidItemsRemovedCounter(ctx context.Context, val int64, opts CounterOpt) {
 	RecordCounterMetric(ctx, val, CounterOpt{
 		PkgName:     opts.PkgName,
-		MetricName:  "queue_active_check_invalid_items_found_total",
-		Description: "The total number of invalid removed found during an active check",
+		MetricName:  "queue_active_check_invalid_items_removed_total",
+		Description: "The total number of invalid items removed during an active check",
 		Tags:        opts.Tags,
 	})
 }
