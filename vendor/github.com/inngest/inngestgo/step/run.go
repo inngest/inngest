@@ -7,10 +7,10 @@ import (
 	"reflect"
 
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngestgo/errors"
 	"github.com/inngest/inngestgo/internal"
 	"github.com/inngest/inngestgo/internal/middleware"
-	"github.com/inngest/inngestgo/internal/sdkrequest"
 )
 
 type RunOpts struct {
@@ -86,7 +86,7 @@ func Run[T any](
 	planParallel := targetID == nil && isParallel(ctx)
 	planBeforeRun := targetID == nil && mgr.Request().CallCtx.DisableImmediateExecution
 	if planParallel || planBeforeRun {
-		mgr.AppendOp(sdkrequest.GeneratorOpcode{
+		mgr.AppendOp(state.GeneratorOpcode{
 			ID:   hashedID,
 			Op:   enums.OpcodeStepPlanned,
 			Name: id,
@@ -117,21 +117,22 @@ func Run[T any](
 
 	mutated := out.Result
 	err = out.Error
+
 	if err != nil {
 		// If tihs is a StepFailure already, fail fast.
 		if errors.IsStepError(err) {
-			mgr.SetErr(fmt.Errorf("unhandled step error: %s", err))
+			mgr.SetErr(fmt.Errorf("Unhandled step error: %s", err))
 			panic(ControlHijack{})
 		}
 
 		result, _ := json.Marshal(mutated)
 
 		// Implement per-step errors.
-		mgr.AppendOp(sdkrequest.GeneratorOpcode{
+		mgr.AppendOp(state.GeneratorOpcode{
 			ID:   hashedID,
 			Op:   enums.OpcodeStepError,
 			Name: id,
-			Error: &sdkrequest.UserError{
+			Error: &state.UserError{
 				Name:    "Step failed",
 				Message: err.Error(),
 				Data:    result,
@@ -145,7 +146,7 @@ func Run[T any](
 	if err != nil {
 		mgr.SetErr(fmt.Errorf("unable to marshal run respone for '%s': %w", id, err))
 	}
-	mgr.AppendOp(sdkrequest.GeneratorOpcode{
+	mgr.AppendOp(state.GeneratorOpcode{
 		ID:   hashedID,
 		Op:   enums.OpcodeStepRun,
 		Name: id,

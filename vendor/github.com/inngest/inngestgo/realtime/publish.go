@@ -75,9 +75,7 @@ func PublishWithURL(ctx context.Context, apiUrl, channel, topic string, data []b
 	if err != nil {
 		return err
 	}
-	defer func() {
-		_ = resp.Body.Close()
-	}()
+	defer resp.Body.Close()
 	if resp.StatusCode != 200 {
 		byt, _ := io.ReadAll(resp.Body)
 		return fmt.Errorf("error publishing (status %d): %s", resp.StatusCode, byt)

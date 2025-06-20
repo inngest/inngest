@@ -30,7 +30,3 @@ go.work
 
 # IntelliJ-based editor files
 .idea
-
-# Release
-node_modules
-.npmrc

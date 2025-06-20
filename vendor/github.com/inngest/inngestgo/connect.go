@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/url"
 
+	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/publicerr"
 	"github.com/inngest/inngestgo/connect"
 	"github.com/inngest/inngestgo/internal/middleware"
@@ -134,7 +135,7 @@ func (h *handler) getServableFunctionBySlug(slug string) ServableFunction {
 	return fn
 }
 
-func (h *handler) InvokeFunction(ctx context.Context, slug string, stepId *string, request sdkrequest.Request) (any, []sdkrequest.GeneratorOpcode, error) {
+func (h *handler) InvokeFunction(ctx context.Context, slug string, stepId *string, request sdkrequest.Request) (any, []state.GeneratorOpcode, error) {
 	fn := h.getServableFunctionBySlug(slug)
 
 	if fn == nil {
