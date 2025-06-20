@@ -473,14 +473,14 @@ func (q *queue) findMissingItemsWithDynamicTargets(
 	var count int64 = 20
 
 	for {
-		// Load chunk
-		cmd := client.B().Sscan().Key(sourceSetKey).Cursor(cursor).Count(count).Build()
-		entry, err := client.Do(ctx, cmd).AsScanEntry()
-
 		chunkID, err := ulid.New(ulid.Timestamp(q.clock.Now()), rand.Reader)
 		if err != nil {
 			return fmt.Errorf("could not create checkID: %w", err)
 		}
+		
+		// Load chunk
+		cmd := client.B().Sscan().Key(sourceSetKey).Cursor(cursor).Count(count).Build()
+		entry, err := client.Do(ctx, cmd).AsScanEntry()
 
 		l = l.With("chunk_id", chunkID)
 
