@@ -1,7 +1,9 @@
-import { CodeBlock, type CodeBlockAction } from '../CodeBlock';
+import type { ReactNode } from 'react';
+
+import { NewCodeBlock, type CodeBlockAction } from '../NewCodeBlock';
 
 export type IOProps = {
-  title: string;
+  title?: string;
   actions?: CodeBlockAction[];
   raw?: string;
   error?: boolean;
@@ -10,7 +12,7 @@ export type IOProps = {
 export const IO = ({ title, actions, raw, error }: IOProps) => {
   return (
     <div className="text-muted h-full overflow-y-scroll" onWheel={(e) => e.stopPropagation()}>
-      <CodeBlock
+      <NewCodeBlock
         actions={actions}
         header={{ title, ...(error && { status: 'error' }) }}
         tab={{
