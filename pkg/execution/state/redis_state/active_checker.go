@@ -134,7 +134,7 @@ func (q *queue) backlogActiveCheck(ctx context.Context, b *QueueBacklog, client 
 		readOnly = false
 	}
 
-	l = l.With("partition", sp.PartitionID, "account_id", accountID)
+	l = l.With("partition_id", sp.PartitionID, "account_id", accountID)
 
 	l.Debug("starting active check for partition")
 
@@ -160,7 +160,7 @@ func (q *queue) backlogActiveCheck(ctx context.Context, b *QueueBacklog, client 
 		}
 	}
 
-	l.Debug("checked partition for invalid active keys", "partition", sp.PartitionID)
+	l.Debug("checked partition for invalid active keys", "partition_id", sp.PartitionID)
 
 	return true, nil
 }
@@ -181,7 +181,7 @@ func (q *queue) accountActiveCheck(
 
 	invalidItems := make([]string, 0)
 
-	l.Debug("checking account for invalid or missing active keys", "account", sp.AccountID, "key", keyActive)
+	l.Debug("checking account for invalid or missing active keys", "account_id", sp.AccountID, "key", keyActive)
 
 	err := q.findMissingItemsWithDynamicTargets(ctx, client, kg, keyActive, l, func(chunk []*osqueue.QueueItem) map[string][]string {
 		res := make(map[string][]string)
@@ -213,10 +213,10 @@ func (q *queue) accountActiveCheck(
 	}
 
 	if len(invalidItems) > 0 {
-		l.Debug("removing invalid items from account active key", "mode", "partition", "invalid", invalidItems, "partition", sp.PartitionID, "active", keyActive, "in_progress", keyInProgress, "readonly", readOnly)
+		l.Debug("removing invalid items from account active key", "mode", "account", "invalid", invalidItems, "partition_id", sp.PartitionID, "active", keyActive, "in_progress", keyInProgress, "readonly", readOnly)
 
 		if !readOnly {
-			cmd := client.B().Zrem().Key(keyActive).Member(invalidItems...).Build()
+			cmd := client.B().Srem().Key(keyActive).Member(invalidItems...).Build()
 			err := client.Do(ctx, cmd).Error()
 			if err != nil {
 				return fmt.Errorf("could not remove invalid items from active set: %w", err)
@@ -249,10 +249,10 @@ func (q *queue) partitionActiveCheck(
 	}
 
 	if len(invalidItems) > 0 {
-		l.Debug("removing invalid items from active key", "mode", "partition", "invalid", invalidItems, "partition", sp.PartitionID, "active", keyActive, "ready", keyReady, "in_progress", keyInProgress, "readonly", readOnly)
+		l.Debug("removing invalid items from active key", "mode", "partition", "invalid", invalidItems, "partition_id", sp.PartitionID, "active", keyActive, "ready", keyReady, "in_progress", keyInProgress, "readonly", readOnly)
 
 		if !readOnly {
-			cmd := client.B().Zrem().Key(keyActive).Member(invalidItems...).Build()
+			cmd := client.B().Srem().Key(keyActive).Member(invalidItems...).Build()
 			err := client.Do(ctx, cmd).Error()
 			if err != nil {
 				return fmt.Errorf("could not remove invalid items from active set: %w", err)
@@ -280,10 +280,10 @@ func (q *queue) customConcurrencyActiveCheck(ctx context.Context, sp *QueueShado
 	}
 
 	if len(invalidItems) > 0 {
-		l.Debug("removing invalid items from active key", "invalid", "mode", "custom_concurrency", "bcc", bcc, invalidItems, "partition", sp.PartitionID, "active", keyActive, "ready", keyReady, "in_progress", keyInProgress, "readonly", readOnly)
+		l.Debug("removing invalid items from active key", "invalid", "mode", "custom_concurrency", "bcc", bcc, invalidItems, "partition_id", sp.PartitionID, "active", keyActive, "ready", keyReady, "in_progress", keyInProgress, "readonly", readOnly)
 
 		if !readOnly {
-			cmd := client.B().Zrem().Key(keyActive).Member(invalidItems...).Build()
+			cmd := client.B().Srem().Key(keyActive).Member(invalidItems...).Build()
 			err := client.Do(ctx, cmd).Error()
 			if err != nil {
 				return fmt.Errorf("could not remove invalid items from active set: %w", err)
@@ -300,12 +300,12 @@ func (q *queue) customConcurrencyActiveCheck(ctx context.Context, sp *QueueShado
 // on item pointers.
 //
 // The missing items will then be bubbled up via onMissing.
-func (q *queue) findMissingItemsWithStaticTargets(ctx context.Context, client rueidis.Client, sourceKey string, targetKeys []string, onMissing func(pointer string)) error {
+func (q *queue) findMissingItemsWithStaticTargets(ctx context.Context, client rueidis.Client, sourceSetKey string, targetKeys []string, onMissing func(pointer string)) error {
 	var cursor uint64
 	var count int64 = 20
 
 	for {
-		cmd := client.B().Zscan().Key(sourceKey).Cursor(cursor).Count(count).Build()
+		cmd := client.B().Sscan().Key(sourceSetKey).Cursor(cursor).Count(count).Build()
 		entry, err := client.Do(ctx, cmd).AsScanEntry()
 		if err != nil {
 			if rueidis.IsRedisNil(err) {
@@ -360,7 +360,7 @@ func (q *queue) findMissingItemsWithStaticTargets(ctx context.Context, client ru
 	}
 }
 
-// findMissingItemsWithDynamicTargets attempts to find all items in sourceKey, which are not present in any of the targetKeys.
+// findMissingItemsWithDynamicTargets attempts to find all items in sourceSetKey, which are not present in any of the targetKeys.
 //
 // In constrast to findMissingItemsWithStaticTargets, this function strictly operates on queue items and will pass chunks of items
 // to a transformation function to retrieve targets and pointers to check for each target.
@@ -370,7 +370,7 @@ func (q *queue) findMissingItemsWithDynamicTargets(
 	ctx context.Context,
 	client rueidis.Client,
 	kg QueueKeyGenerator,
-	sourceKey string,
+	sourceSetKey string,
 	l logger.Logger,
 	targetKeys func(chunk []*osqueue.QueueItem) map[string][]string,
 	onMissing func(pointer string),
@@ -380,10 +380,10 @@ func (q *queue) findMissingItemsWithDynamicTargets(
 
 	for {
 		// Load chunk
-		cmd := client.B().Zscan().Key(sourceKey).Cursor(cursor).Count(count).Build()
+		cmd := client.B().Sscan().Key(sourceSetKey).Cursor(cursor).Count(count).Build()
 		entry, err := client.Do(ctx, cmd).AsScanEntry()
 
-		l.Debug("scanned source", "key", sourceKey, "returned", len(entry.Elements), "cursor", entry.Cursor)
+		l.Debug("scanned source", "key", sourceSetKey, "returned", len(entry.Elements), "cursor", entry.Cursor)
 
 		if err != nil {
 			if rueidis.IsRedisNil(err) {
@@ -409,7 +409,7 @@ func (q *queue) findMissingItemsWithDynamicTargets(
 			return fmt.Errorf("could not get queue items: %w", err)
 		}
 
-		l.Debug("retrieved item chunk", "key", sourceKey, "item_ids", entryIDs)
+		l.Debug("retrieved item chunk", "key", sourceSetKey, "item_ids", entryIDs)
 
 		for i, itemStr := range itemData {
 			if itemStr == "" {
@@ -437,7 +437,7 @@ func (q *queue) findMissingItemsWithDynamicTargets(
 		// Worst case, this transform 20 queue items in the chunk to 20 target keys, but usually this will
 		// be more efficient as items may belong to the same workflows.
 		for targetKey, items := range targetKeys(items) {
-			l.Debug("comparing against target", "source", sourceKey, "target", targetKey, "items", items)
+			l.Debug("comparing against target", "source", sourceSetKey, "target", targetKey, "items", items)
 
 			if len(items) == 0 {
 				continue
