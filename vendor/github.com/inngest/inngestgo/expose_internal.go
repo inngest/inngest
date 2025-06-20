@@ -10,7 +10,6 @@ type Debounce = fn.Debounce
 type Throttle = fn.Throttle
 type RateLimit = fn.RateLimit
 type Timeouts = fn.Timeouts
-type Singleton = fn.Singleton
 
 type Input[T any] = fn.Input[T]
 type InputCtx = fn.InputCtx

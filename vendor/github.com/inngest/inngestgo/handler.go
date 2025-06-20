@@ -738,7 +738,6 @@ func createFunctionConfigs(
 			Cancel:      fn.Config().Cancel,
 			Timeouts:    fn.Config().GetTimeouts(),
 			Throttle:    (*inngest.Throttle)(fn.Config().Throttle),
-			Singleton:   (*inngest.Singleton)(fn.Config().Singleton),
 			Steps: map[string]sdk.SDKStep{
 				"step": {
 					ID:      "step",
