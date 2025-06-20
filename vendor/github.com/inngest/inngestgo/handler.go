@@ -17,14 +17,12 @@ import (
 	"time"
 
 	"github.com/inngest/inngest/pkg/enums"
-	"github.com/inngest/inngest/pkg/execution/state"
-	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/publicerr"
-	"github.com/inngest/inngest/pkg/sdk"
 	"github.com/inngest/inngest/pkg/syscode"
 	sdkerrors "github.com/inngest/inngestgo/errors"
 	"github.com/inngest/inngestgo/internal"
 	"github.com/inngest/inngestgo/internal/event"
+	"github.com/inngest/inngestgo/internal/fn"
 	"github.com/inngest/inngestgo/internal/middleware"
 	"github.com/inngest/inngestgo/internal/sdkrequest"
 	"github.com/inngest/inngestgo/internal/types"
@@ -42,10 +40,10 @@ var (
 	// invoke request (100MB).
 	DefaultMaxBodySize = 1024 * 1024 * 100
 
-	capabilities = sdk.Capabilities{
-		InBandSync: sdk.InBandSyncV1,
-		TrustProbe: sdk.TrustProbeV1,
-		Connect:    sdk.ConnectV1,
+	capabilities = types.Capabilities{
+		InBandSync: types.InBandSyncV1,
+		TrustProbe: types.TrustProbeV1,
+		Connect:    types.ConnectV1,
 	}
 )
 
@@ -138,37 +136,48 @@ func (h handlerOpts) GetSigningKeyFallback() string {
 
 // GetAPIOrigin returns the host to use for sending API requests
 func (h handlerOpts) GetAPIBaseURL() string {
-	if h.APIBaseURL == nil {
-		base := os.Getenv("INNGEST_API_BASE_URL")
-		if base != "" {
-			return base
-		}
-
-		if h.isDev() {
-			return DevServerURL()
-		}
-
-		return defaultAPIOrigin
+	if h.APIBaseURL != nil {
+		return *h.APIBaseURL
 	}
 
-	return *h.APIBaseURL
-}
+	base := os.Getenv("INNGEST_API_BASE_URL")
+	if base != "" {
+		return base
+	}
 
-// GetEventAPIOrigin returns the host to use for sending events
-func (h handlerOpts) GetEventAPIBaseURL() string {
+	base = os.Getenv("INNGEST_BASE_URL")
+	if base != "" {
+		return base
+	}
+
 	if h.isDev() {
 		return DevServerURL()
 	}
 
-	if h.EventAPIBaseURL == nil {
-		origin := os.Getenv("INNGEST_EVENT_API_BASE_URL")
-		if origin != "" {
-			return origin
-		}
-		return defaultEventAPIOrigin
+	return defaultAPIOrigin
+}
+
+// GetEventAPIOrigin returns the host to use for sending events
+func (h handlerOpts) GetEventAPIBaseURL() string {
+	if h.EventAPIBaseURL != nil {
+		return *h.EventAPIBaseURL
 	}
 
-	return *h.EventAPIBaseURL
+	origin := os.Getenv("INNGEST_EVENT_API_BASE_URL")
+	if origin != "" {
+		return origin
+	}
+
+	origin = os.Getenv("INNGEST_BASE_URL")
+	if origin != "" {
+		return origin
+	}
+
+	if h.isDev() {
+		return DevServerURL()
+	}
+
+	return defaultEventAPIOrigin
 }
 
 // GetServeOrigin returns the host used for HTTP based executions
@@ -424,16 +433,16 @@ func (i inBandSynchronizeRequest) Validate() error {
 }
 
 type inBandSynchronizeResponse struct {
-	AppID       string            `json:"app_id"`
-	Env         *string           `json:"env"`
-	Framework   *string           `json:"framework"`
-	Functions   []sdk.SDKFunction `json:"functions"`
-	Inspection  map[string]any    `json:"inspection"`
-	Platform    *string           `json:"platform"`
-	SDKAuthor   string            `json:"sdk_author"`
-	SDKLanguage string            `json:"sdk_language"`
-	SDKVersion  string            `json:"sdk_version"`
-	URL         string            `json:"url"`
+	AppID       string          `json:"app_id"`
+	Env         *string         `json:"env"`
+	Framework   *string         `json:"framework"`
+	Functions   []fn.SyncConfig `json:"functions"`
+	Inspection  map[string]any  `json:"inspection"`
+	Platform    *string         `json:"platform"`
+	SDKAuthor   string          `json:"sdk_author"`
+	SDKLanguage string          `json:"sdk_language"`
+	SDKVersion  string          `json:"sdk_version"`
+	URL         string          `json:"url"`
 }
 
 func (h *handler) inBandSync(
@@ -441,7 +450,9 @@ func (h *handler) inBandSync(
 	r *http.Request,
 ) error {
 	ctx := r.Context()
-	defer r.Body.Close()
+	defer func() {
+		_ = r.Body.Close()
+	}()
 
 	var sig string
 	if !h.isDev() {
@@ -456,7 +467,7 @@ func (h *handler) inBandSync(
 		}
 	}
 
-	max := h.handlerOpts.MaxBodySize
+	max := h.MaxBodySize
 	if max == 0 {
 		max = DefaultMaxBodySize
 	}
@@ -599,13 +610,13 @@ func (h *handler) outOfBandSync(w http.ResponseWriter, r *http.Request) error {
 		appVersion = *h.AppVersion
 	}
 
-	config := sdk.RegisterRequest{
+	config := types.RegisterRequest{
 		URL:        fmt.Sprintf("%s://%s%s", scheme, host, pathAndParams),
 		V:          "1",
-		DeployType: sdk.DeployTypePing,
+		DeployType: types.DeployTypePing,
 		SDK:        HeaderValueSDK,
 		AppName:    h.appName,
-		Headers: sdk.Headers{
+		Headers: types.Headers{
 			Env:      h.GetEnv(),
 			Platform: platform(),
 		},
@@ -619,11 +630,7 @@ func (h *handler) outOfBandSync(w http.ResponseWriter, r *http.Request) error {
 	}
 	config.Functions = fns
 
-	registerURL := fmt.Sprintf("%s/fn/register", defaultAPIOrigin)
-	if h.isDev() {
-		// TODO: Check if dev server is up.  If not, error.  We can't deploy to production.
-		registerURL = fmt.Sprintf("%s/fn/register", DevServerURL())
-	}
+	registerURL := fmt.Sprintf("%s/fn/register", h.GetAPIBaseURL())
 	if h.RegisterURL != nil {
 		registerURL = *h.RegisterURL
 	}
@@ -676,7 +683,7 @@ func (h *handler) outOfBandSync(w http.ResponseWriter, r *http.Request) error {
 		if err := json.Unmarshal(byt, &body); err != nil {
 			return fmt.Errorf("error reading register response: %w\n\n%s", err, byt)
 		}
-		return fmt.Errorf("Error registering functions: %s", body["error"])
+		return fmt.Errorf("error registering functions: %s", body["error"])
 	}
 
 	w.Header().Add(HeaderKeySyncKind, SyncKindOutOfBand)
@@ -703,7 +710,7 @@ func createFunctionConfigs(
 	fns []ServableFunction,
 	appURL url.URL,
 	isConnect bool,
-) ([]sdk.SDKFunction, error) {
+) ([]fn.SyncConfig, error) {
 	if appName == "" {
 		return nil, fmt.Errorf("missing app name")
 	}
@@ -711,88 +718,12 @@ func createFunctionConfigs(
 		return nil, fmt.Errorf("missing URL")
 	}
 
-	fnConfigs := make([]sdk.SDKFunction, len(fns))
-	for i, fn := range fns {
-		c := fn.Config()
+	fnConfigs := make([]fn.SyncConfig, len(fns))
+	for i, sf := range fns {
+		f := fn.GetFnSyncConfig(sf)
+		f.UpdateSteps(appURL)
 
-		var retries *sdk.StepRetries
-		if c.Retries != nil {
-			retries = &sdk.StepRetries{
-				Attempts: *c.Retries,
-			}
-		}
-
-		// Modify URL to contain fn ID, step params
-		values := appURL.Query()
-		values.Set("fnId", fn.FullyQualifiedID()) // This should match the Slug below
-		values.Set("step", "step")
-		appURL.RawQuery = values.Encode()
-
-		f := sdk.SDKFunction{
-			Name:        fn.Name(),
-			Slug:        fn.FullyQualifiedID(),
-			Idempotency: c.Idempotency,
-			Priority:    fn.Config().Priority,
-			Triggers:    inngest.MultipleTriggers{},
-			RateLimit:   fn.Config().GetRateLimit(),
-			Cancel:      fn.Config().Cancel,
-			Timeouts:    fn.Config().GetTimeouts(),
-			Throttle:    (*inngest.Throttle)(fn.Config().Throttle),
-			Steps: map[string]sdk.SDKStep{
-				"step": {
-					ID:      "step",
-					Name:    fn.Name(),
-					Retries: retries,
-					Runtime: map[string]any{
-						"url": appURL.String(),
-					},
-				},
-			},
-		}
-
-		if c.Debounce != nil {
-			f.Debounce = &inngest.Debounce{
-				Key:    &c.Debounce.Key,
-				Period: c.Debounce.Period.String(),
-			}
-			if c.Debounce.Timeout != nil {
-				str := c.Debounce.Timeout.String()
-				f.Debounce.Timeout = &str
-			}
-		}
-
-		if c.BatchEvents != nil {
-			f.EventBatch = map[string]any{
-				"maxSize": c.BatchEvents.MaxSize,
-				"timeout": c.BatchEvents.Timeout,
-				"key":     c.BatchEvents.Key,
-			}
-		}
-
-		if len(c.Concurrency) > 0 {
-			// Marshal as an array, as the sdk/handler unmarshals correctly.
-			f.Concurrency = &inngest.ConcurrencyLimits{Limits: c.Concurrency}
-		}
-
-		triggers := fn.Trigger().Triggers()
-		for _, trigger := range triggers {
-			if trigger.EventTrigger != nil {
-				f.Triggers = append(f.Triggers, inngest.Trigger{
-					EventTrigger: &inngest.EventTrigger{
-						Event:      trigger.Event,
-						Expression: trigger.Expression,
-					},
-				})
-			} else {
-				f.Triggers = append(f.Triggers, inngest.Trigger{
-					CronTrigger: &inngest.CronTrigger{
-						Cron: trigger.Cron,
-					},
-				})
-			}
-		}
-
-		fnConfigs[i] = f
+		fnConfigs[i] = *f
 	}
 
 	return fnConfigs, nil
@@ -808,7 +739,9 @@ func (h *handler) invoke(w http.ResponseWriter, r *http.Request) error {
 	mw := middleware.NewMiddlewareManager().Add(cImpl.Middleware...)
 
 	var sig string
-	defer r.Body.Close()
+	defer func() {
+		_ = r.Body.Close()
+	}()
 
 	if !h.isDev() {
 		if sig = r.Header.Get(HeaderKeySignature); sig == "" {
@@ -816,7 +749,7 @@ func (h *handler) invoke(w http.ResponseWriter, r *http.Request) error {
 		}
 	}
 
-	max := h.handlerOpts.MaxBodySize
+	max := h.MaxBodySize
 	if max == 0 {
 		max = DefaultMaxBodySize
 	}
@@ -925,7 +858,7 @@ func (h *handler) invoke(w http.ResponseWriter, r *http.Request) error {
 	// 	     return err
 	// 	}
 	if sdkerrors.IsStepError(err) {
-		err = fmt.Errorf("Unhandled step error: %s", err)
+		err = fmt.Errorf("unhandled step error: %s", err)
 		noRetry = true
 	}
 
@@ -990,19 +923,19 @@ type insecureInspection struct {
 type secureInspection struct {
 	insecureInspection
 
-	APIOrigin              string           `json:"api_origin"`
-	AppID                  string           `json:"app_id"`
-	Capabilities           sdk.Capabilities `json:"capabilities"`
-	Env                    *string          `json:"env"`
-	EventAPIOrigin         string           `json:"event_api_origin"`
-	EventKeyHash           *string          `json:"event_key_hash"`
-	Framework              string           `json:"framework"`
-	SDKLanguage            string           `json:"sdk_language"`
-	SDKVersion             string           `json:"sdk_version"`
-	ServeOrigin            *string          `json:"serve_origin"`
-	ServePath              *string          `json:"serve_path"`
-	SigningKeyFallbackHash *string          `json:"signing_key_fallback_hash"`
-	SigningKeyHash         *string          `json:"signing_key_hash"`
+	APIOrigin              string             `json:"api_origin"`
+	AppID                  string             `json:"app_id"`
+	Capabilities           types.Capabilities `json:"capabilities"`
+	Env                    *string            `json:"env"`
+	EventAPIOrigin         string             `json:"event_api_origin"`
+	EventKeyHash           *string            `json:"event_key_hash"`
+	Framework              string             `json:"framework"`
+	SDKLanguage            string             `json:"sdk_language"`
+	SDKVersion             string             `json:"sdk_version"`
+	ServeOrigin            *string            `json:"serve_origin"`
+	ServePath              *string            `json:"serve_path"`
+	SigningKeyFallbackHash *string            `json:"signing_key_fallback_hash"`
+	SigningKeyHash         *string            `json:"signing_key_hash"`
 }
 
 func (h *handler) createInsecureInspection(
@@ -1098,7 +1031,9 @@ func (h *handler) createSecureInspection() (*secureInspection, error) {
 }
 
 func (h *handler) inspect(w http.ResponseWriter, r *http.Request) error {
-	defer r.Body.Close()
+	defer func() {
+		_ = r.Body.Close()
+	}()
 
 	sig := r.Header.Get(HeaderKeySignature)
 	if sig != "" {
@@ -1134,7 +1069,6 @@ func (h *handler) inspect(w http.ResponseWriter, r *http.Request) error {
 
 	w.Header().Set(HeaderKeyContentType, "application/json")
 	return json.NewEncoder(w).Encode(inspection)
-
 }
 
 type trustProbeResponse struct {
@@ -1160,7 +1094,7 @@ func (h *handler) trust(
 		}
 	}
 
-	max := h.handlerOpts.MaxBodySize
+	max := h.MaxBodySize
 	if max == 0 {
 		max = DefaultMaxBodySize
 	}
@@ -1235,7 +1169,7 @@ func invoke(
 	signingKey string,
 	input *sdkrequest.Request,
 	stepID *string,
-) (any, []state.GeneratorOpcode, error) {
+) (any, []sdkrequest.GeneratorOpcode, error) {
 	if sf.Func() == nil {
 		// This should never happen, but as sf.Func returns a nillable type we
 		// must check that the function exists.

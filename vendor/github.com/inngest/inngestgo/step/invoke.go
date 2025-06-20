@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/inngest/inngest/pkg/enums"
-	"github.com/inngest/inngest/pkg/execution/state"
 	sdkerrors "github.com/inngest/inngestgo/errors"
+	"github.com/inngest/inngestgo/internal/sdkrequest"
 	"github.com/xhit/go-str2duration/v2"
 )
 
@@ -77,7 +77,7 @@ func Invoke[T any](ctx context.Context, id string, opts InvokeOpts) (T, error) {
 		panic(ControlHijack{})
 	}
 
-	mgr.AppendOp(state.GeneratorOpcode{
+	mgr.AppendOp(sdkrequest.GeneratorOpcode{
 		ID:   op.MustHash(),
 		Op:   op.Op,
 		Name: id,
