@@ -139,6 +139,50 @@ func (tr *traceReader) stepStatusToGQL(status *enums.StepStatus) *models.RunTrac
 	return nil
 }
 
+func getStringAttr(attrs map[string]any, key string, target *string) {
+	if v, ok := attrs[key]; ok {
+		if strV, ok := v.(string); ok {
+			*target = strV
+		}
+	}
+}
+
+func getBoolAttr(attrs map[string]any, key string, target **bool) {
+	if v, ok := attrs[key]; ok {
+		if boolV, ok := v.(bool); ok {
+			*target = &boolV
+		}
+	}
+}
+
+func getULIDAttr(attrs map[string]any, key string, target *ulid.ULID) {
+	if v, ok := attrs[key]; ok {
+		if strV, ok := v.(string); ok {
+			if id, err := ulid.Parse(strV); err == nil {
+				*target = id
+			}
+		}
+	}
+}
+
+func getTimeAttr(attrs map[string]any, key string, target *time.Time) {
+	if v, ok := attrs[key]; ok {
+		if floatV, ok := v.(float64); ok {
+			*target = time.UnixMilli(int64(floatV))
+		}
+	}
+}
+
+func getDurAttr(attrs map[string]any, key string) *time.Duration {
+	if v, ok := attrs[key]; ok {
+		if floatV, ok := v.(float64); ok {
+			dur := time.Duration(floatV) * time.Millisecond
+			return &dur
+		}
+	}
+	return nil
+}
+
 func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelSpan) (*models.RunTraceSpan, error) {
 	var duration *int
 	status := models.RunTraceSpanStatusRunning
@@ -208,57 +252,52 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 		switch *gqlSpan.StepOp {
 		case models.StepOpRun:
 			{
-				var stepType *string
-				if v, ok := span.Attributes[meta.AttributeStepRunType]; ok {
-					if strV, ok := v.(string); ok {
-						stepType = &strV
-					}
-				}
+				si := &models.RunStepInfo{}
 
-				gqlSpan.StepInfo = &models.RunStepInfo{
-					Type: stepType,
-				}
+				getStringAttr(span.Attributes, meta.AttributeStepRunType, si.Type)
+
+				gqlSpan.StepInfo = si
 			}
-		// case models.StepOpInvoke:
-		// 	{
-		// 		gqlSpan.StepInfo = &models.InvokeStepInfo{}
-		// 	}
+		case models.StepOpInvoke:
+			{
+				si := &models.InvokeStepInfo{}
+
+				getULIDAttr(span.Attributes, meta.AttributeStepInvokeTriggerEventID, &si.TriggeringEventID)
+				getStringAttr(span.Attributes, meta.AttributeStepInvokeFunctionID, &si.FunctionID)
+				getTimeAttr(span.Attributes, meta.AttributeStepWaitExpiry, &si.Timeout)
+				getBoolAttr(span.Attributes, meta.AttributeStepWaitExpired, &si.TimedOut)
+				getULIDAttr(span.Attributes, meta.AttributeStepInvokeFinishEventID, si.ReturnEventID)
+				getULIDAttr(span.Attributes, meta.AttributeStepInvokeRunID, si.RunID)
+
+				gqlSpan.StepInfo = si
+			}
 		case models.StepOpSleep:
 			{
-				dur, ok := span.Attributes[meta.AttributeStepSleepDuration]
-				if ok {
-					if intDur, ok := dur.(float64); ok {
-						gqlSpan.StepInfo = &models.SleepStepInfo{
-							SleepUntil: span.GetQueuedAtTime().Add(time.Duration(intDur) * time.Millisecond),
-						}
+				if dur := getDurAttr(span.Attributes, meta.AttributeStepSleepDuration); dur != nil {
+					gqlSpan.StepInfo = &models.SleepStepInfo{
+						SleepUntil: span.GetQueuedAtTime().Add(*dur),
 					}
 				}
 			}
-		// case models.StepOpWaitForEvent:
-		// 	{
-		// 		gqlSpan.StepInfo = &models.WaitForEventStepInfo{}
-		// 	}
+		case models.StepOpWaitForEvent:
+			{
+				si := &models.WaitForEventStepInfo{}
+
+				getStringAttr(span.Attributes, meta.AttributeStepWaitForEventName, &si.EventName)
+				getStringAttr(span.Attributes, meta.AttributeStepWaitForEventIf, si.Expression)
+				getTimeAttr(span.Attributes, meta.AttributeStepWaitExpiry, &si.Timeout)
+				getULIDAttr(span.Attributes, meta.AttributeStepWaitForEventMatchedID, si.FoundEventID)
+				getBoolAttr(span.Attributes, meta.AttributeStepWaitExpired, &si.TimedOut)
+
+				gqlSpan.StepInfo = si
+			}
 		case models.StepOpWaitForSignal:
 			{
 				si := &models.WaitForSignalStepInfo{}
 
-				if v, ok := span.Attributes[meta.AttributeStepSignalName]; ok {
-					if strV, ok := v.(string); ok {
-						si.Signal = strV
-					}
-				}
-
-				if v, ok := span.Attributes[meta.AttributeStepWaitExpiry]; ok {
-					if intV, ok := v.(float64); ok {
-						si.Timeout = time.UnixMilli(int64(intV))
-					}
-				}
-
-				if v, ok := span.Attributes[meta.AttributeStepWaitExpired]; ok {
-					if boolV, ok := v.(bool); ok {
-						si.TimedOut = &boolV
-					}
-				}
+				getStringAttr(span.Attributes, meta.AttributeStepSignalName, &si.Signal)
+				getTimeAttr(span.Attributes, meta.AttributeStepWaitExpiry, &si.Timeout)
+				getBoolAttr(span.Attributes, meta.AttributeStepWaitExpired, &si.TimedOut)
 
 				gqlSpan.StepInfo = si
 			}
