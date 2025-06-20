@@ -48,6 +48,7 @@ export const RunsActionMenu = ({
                 Refreshes data every {intervalSeconds} seconds
               </div>
             </div>
+            <div className="flex-1" />
             <Switch
               checked={autoRefresh}
               className="data-[state=checked]:bg-primary-moderate"
@@ -62,6 +63,7 @@ export const RunsActionMenu = ({
               <div className="text-basis text-sm">Traces Preview</div>
               <div className="text-basis text-xs">Use a new Developer Preview mode of traces</div>
             </div>
+            <div className="flex-1" />
             <Switch
               checked={tracesPreviewEnabled}
               className="data-[state=checked]:bg-primary-moderate"
