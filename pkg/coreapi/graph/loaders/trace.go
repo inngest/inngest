@@ -183,15 +183,6 @@ func getTimeAttr(attrs map[string]any, key string, target *time.Time) {
 	}
 }
 
-func getTimePtrAttr(attrs map[string]any, key string, target **time.Time) {
-	if v, ok := attrs[key]; ok {
-		if ms, ok := v.(float64); ok {
-			t := time.UnixMilli(int64(ms))
-			*target = &t
-		}
-	}
-}
-
 func getDurAttr(attrs map[string]any, key string) *time.Duration {
 	if v, ok := attrs[key]; ok {
 		if floatV, ok := v.(float64); ok {

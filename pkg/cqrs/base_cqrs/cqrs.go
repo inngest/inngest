@@ -132,7 +132,7 @@ func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.Ot
 
 		var outputSpanID *string
 		var fragments []map[string]interface{}
-		json.Unmarshal([]byte(span.SpanFragments.(string)), &fragments)
+		_ = json.Unmarshal([]byte(span.SpanFragments.(string)), &fragments)
 
 		// TODO same for links
 		for _, fragment := range fragments {
@@ -1326,8 +1326,7 @@ func (w wrapper) GetSpanOutput(ctx context.Context, opts cqrs.SpanIdentifier) (*
 		} else if successData, ok := m["data"]; ok {
 			so.Data, _ = json.Marshal(successData)
 		} else {
-			// TODO Log - this is an error and all outputs should be keyed,
-			// but we'll also assume that this is a successful output.
+			logger.StdlibLogger(ctx).Error("span output is not keyed, assuming success", "spanID", opts.SpanID)
 		}
 	}
 
@@ -2274,10 +2273,10 @@ func (w wrapper) GetWorkerConnections(ctx context.Context, opt cqrs.GetWorkerCon
 // copyWriter allows running duck-db specific functions as CQRS functions, copying CQRS types to DDB types
 // automatically.
 func copyWriter[
-PARAMS_IN any,
-INTERNAL_PARAMS any,
-IN any,
-OUT any,
+	PARAMS_IN any,
+	INTERNAL_PARAMS any,
+	IN any,
+	OUT any,
 ](
 	ctx context.Context,
 	f func(context.Context, INTERNAL_PARAMS) (IN, error),
@@ -2300,8 +2299,8 @@ OUT any,
 }
 
 func copyInto[
-IN any,
-OUT any,
+	IN any,
+	OUT any,
 ](
 	ctx context.Context,
 	f func(context.Context) (IN, error),

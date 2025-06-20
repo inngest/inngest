@@ -1050,7 +1050,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		if err != nil || resp.Err != nil || resp.UserError != nil {
 			status = enums.StepStatusFailed
 		}
-		e.tracerProvider.UpdateSpan(
+		_ = e.tracerProvider.UpdateSpan(
 			&tracing.UpdateSpanOptions{
 				EndTime:    time.Now(),
 				Location:   "executor.Execute",
@@ -2119,7 +2119,7 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 			status = enums.StepStatusTimedOut
 		}
 		pauseSpan := tracing.SpanRefFromPause(&pause)
-		e.tracerProvider.UpdateSpan(&tracing.UpdateSpanOptions{
+		_ = e.tracerProvider.UpdateSpan(&tracing.UpdateSpanOptions{
 			EndTime:    time.Now(),
 			Location:   "executor.Resume",
 			Status:     status,
@@ -2175,12 +2175,12 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 				if err == redis_state.ErrQueueItemExists {
 					nextStepSpan.Drop()
 				} else {
-					nextStepSpan.Send()
+					_ = nextStepSpan.Send()
 					return fmt.Errorf("error enqueueing after pause: %w", err)
 				}
 			}
 
-			nextStepSpan.Send()
+			_ = nextStepSpan.Send()
 		}
 
 		// Only run lifecycles if we consumed the pause and enqueued next step.
@@ -2471,7 +2471,7 @@ func (e *executor) handleGeneratorStep(ctx context.Context, i *runInstance, gen 
 			return err
 		}
 
-		span.Send()
+		_ = span.Send()
 	}
 
 	for _, l := range e.lifecycles {
@@ -2607,7 +2607,7 @@ func (e *executor) handleStepError(ctx context.Context, i *runInstance, gen stat
 			return nil
 		}
 
-		span.Send()
+		_ = span.Send()
 	}
 
 	for _, l := range e.lifecycles {
@@ -2683,7 +2683,7 @@ func (e *executor) handleGeneratorStepPlanned(ctx context.Context, i *runInstanc
 		return nil
 	}
 
-	span.Send()
+	_ = span.Send()
 
 	for _, l := range e.lifecycles {
 		go l.OnStepScheduled(ctx, i.md, nextItem, &gen.Name)
@@ -2758,7 +2758,7 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, i *runInstance, gen
 		return nil
 	}
 
-	span.Send()
+	_ = span.Send()
 
 	for _, e := range e.lifecycles {
 		go e.OnSleep(context.WithoutCancel(ctx), i.md, i.item, gen, until)
@@ -3429,7 +3429,7 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, i *runInstan
 		return nil
 	}
 
-	span.Send()
+	_ = span.Send()
 
 	for _, e := range e.lifecycles {
 		go e.OnWaitForEvent(context.WithoutCancel(ctx), i.md, i.item, gen, pause)

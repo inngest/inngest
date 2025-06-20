@@ -85,8 +85,6 @@ func WithResumeAttrs(p *state.Pause, r *execution.ResumeRequest) trace.SpanStart
 					)
 				}
 
-			} else if p.IsSignal() {
-				// nothing extra yet
 			}
 		}
 	}

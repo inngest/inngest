@@ -26,7 +26,7 @@ func (n *noopTracerProvider) CreateSpan(name string, opts *CreateSpanOptions) (*
 		return nil, err
 	}
 
-	span.Send()
+	_ = span.Send()
 
 	return span.Ref, nil
 }
