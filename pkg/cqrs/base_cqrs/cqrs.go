@@ -1327,7 +1327,9 @@ func (w wrapper) GetSpanOutput(ctx context.Context, opts cqrs.SpanIdentifier) (*
 		} else if successData, ok := m["data"]; ok {
 			so.Data, _ = json.Marshal(successData)
 		} else {
-			logger.StdlibLogger(ctx).Error("span output is not keyed, assuming success", "spanID", opts.SpanID)
+			sanitizedSpanID := strings.ReplaceAll(opts.SpanID, "\n", "")
+			sanitizedSpanID = strings.ReplaceAll(sanitizedSpanID, "\r", "")
+			logger.StdlibLogger(ctx).Error("span output is not keyed, assuming success", "spanID", sanitizedSpanID)
 		}
 	}
 
