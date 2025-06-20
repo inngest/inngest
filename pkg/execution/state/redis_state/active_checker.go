@@ -528,10 +528,11 @@ func (q *queue) findMissingItemsWithDynamicTargets(
 
 		l.Debug("retrieved item chunk", "key", sourceSetKey, "job_id", entryIDs)
 
-		leasedIDs := make([]string, 0)
+		leasedIDs, missingIDs := make([]string, 0), make([]string, 0)
 
 		for i, itemStr := range itemData {
 			if itemStr == "" {
+				missingIDs = append(missingIDs, entryIDs[i])
 				onMissing(entryIDs[i], "missing-item")
 				continue
 			}
@@ -556,7 +557,7 @@ func (q *queue) findMissingItemsWithDynamicTargets(
 			"key", sourceSetKey,
 			"job_id", entryIDs,
 			"items", items,
-			"missing", len(entryIDs)-len(items),
+			"missing", missingIDs,
 			"leased", leasedIDs,
 		)
 
