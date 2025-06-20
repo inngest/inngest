@@ -1,68 +1,68 @@
-'use client';
+import { redirect } from 'next/navigation';
+import { auth } from '@clerk/nextjs/server';
 
-import { useEffect } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
-import { useAuth, useClerk, useSignIn } from '@clerk/nextjs';
+import ImpersonationClient from './impersonationClient';
 
-import LoadingIcon from '@/icons/LoadingIcon';
-import { generateActorToken } from './action';
+export default async function ImpersonateUsers({
+  searchParams,
+}: {
+  searchParams: { [key: string]: string | string[] | undefined };
+}) {
+  const user = auth();
+  const userId = searchParams['user_id'];
 
-export default function ImpersonateUsers() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
-  const userId = searchParams.get('user_id');
-  const auth = useAuth();
-
-  const { isLoaded, signIn } = useSignIn();
-  const { setActive } = useClerk();
-
-  useEffect(() => {
-    if (!auth.userId || !userId) {
-      router.push('/');
-      return;
-    }
-
-    if (!isLoaded) return;
-
-    const performImpersonation = async () => {
-      try {
-        const res = await generateActorToken(auth.userId, userId);
-        if (!res.ok) {
-          console.log('Error retrieving token', res.error);
-          return;
-        }
-        const { createdSessionId } = await signIn.create({
-          strategy: 'ticket',
-          ticket: res.token,
-        });
-
-        await setActive({ session: createdSessionId });
-        router.push('/');
-      } catch (err) {
-        console.error('Impersonation failed:', JSON.stringify(err, null, 2));
-        router.push('/');
-      }
-    };
-
-    performImpersonation();
-  }, [userId, isLoaded, signIn, setActive, router, auth.userId]);
-
-  if (!userId) {
-    return null;
+  if (!user.userId || !userId) {
+    console.log('Missing user or userId');
+    return redirect('/');
   }
 
-  if (!isLoaded) {
-    return (
-      <div className="flex h-full w-full items-center justify-center">
-        <LoadingIcon />
-      </div>
-    );
+  const INNGEST_ORG_ID = process.env.CLERK_INNGEST_ORG_ID;
+
+  if (!INNGEST_ORG_ID) {
+    console.log('Missing CLERK_INNGEST_ORG_ID env variable');
+    return redirect('/');
   }
 
-  return (
-    <div className="flex h-full w-full items-center justify-center gap-2">
-      <LoadingIcon />
-      <span>Signing you in...</span>
-    </div>
-  );
+  if (user.orgId !== INNGEST_ORG_ID) {
+    console.log('User is not in INNGEST_ORG_ID');
+    return redirect('/');
+  }
+  const actorId = user.userId;
+
+  const params = JSON.stringify({
+    user_id: userId,
+    actor: {
+      sub: actorId,
+    },
+  });
+
+  if (!process.env.CLERK_SECRET_KEY) {
+    console.log('Missing CLERK_SECRET_KEY env variable');
+    return redirect('/');
+  }
+  console.log('ACTOR: ', user.userId);
+  console.log('USER: ', actorId);
+
+  let res: Response;
+  try {
+    res = await fetch('https://api.clerk.com/v1/actor_tokens', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${process.env.CLERK_SECRET_KEY}`,
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: params,
+      cache: 'no-store',
+    });
+  } catch (e) {
+    return { ok: false, error: 'Network error while contacting Clerk' };
+  }
+
+  if (!res.ok) {
+    return { ok: false, error: 'Failed to generate actor token' };
+  }
+  const data = await res.json();
+
+  return <ImpersonationClient actorToken={data.token} />;
 }
