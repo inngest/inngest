@@ -243,7 +243,16 @@ func (qr *queryResolver) RunTraceSpanOutputByID(ctx context.Context, outputID st
 		return nil, fmt.Errorf("error parsing span identifier: %w", err)
 	}
 
-	spanData, err := qr.Data.GetSpanOutput(ctx, *id)
+	var (
+		spanData *cqrs.SpanOutput
+		err      error
+	)
+
+	if id.Preview == nil || !*id.Preview {
+		spanData, err = qr.Data.LegacyGetSpanOutput(ctx, *id)
+	} else {
+		spanData, err = qr.Data.GetSpanOutput(ctx, *id)
+	}
 	if err != nil {
 		return nil, err
 	}

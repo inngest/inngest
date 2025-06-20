@@ -57,7 +57,7 @@ export const DropdownMenuItem = forwardRef<
       {...props}
       ref={forwardedRef}
       className={cn(
-        'text-muted hover:bg-canvasSubtle flex cursor-pointer select-none items-center gap-2 rounded-md p-2 text-[0.8125rem]',
+        'text-muted hover:bg-canvasSubtle flex cursor-pointer select-none flex-row items-center gap-2 rounded-md p-2 text-[0.8125rem]',
         props.className
       )}
     >

@@ -296,6 +296,86 @@ func (r *DriverResponse) IsFunctionResult() bool {
 	return true
 }
 
+// IsDiscoveryResponse returns true if the response is the SDK reporting or
+// requesting steps to be done, or if it is reporting that it itself has done
+// work.
+func (r *DriverResponse) IsDiscoveryResponse() bool {
+	if len(r.Generator) == 0 {
+		// No generator ops, so this is not a discovery response.
+		return false
+	}
+
+	multipleOpsReported := len(r.Generator) > 1
+	if multipleOpsReported {
+		// Multiple ops reported, so this is a discovery response.
+		return true
+	}
+
+	firstOpIsRequest := r.Generator[0].Op != enums.OpcodeStep &&
+		r.Generator[0].Op != enums.OpcodeStepRun &&
+		r.Generator[0].Op != enums.OpcodeStepError
+	if firstOpIsRequest {
+		// First op is a request, so this is still a discovery response.
+		return true
+	}
+
+	// Response has a single op code which indicates the SDK did idempotent
+	// work during this execution.
+	return false
+}
+
+// GetFunctionOutput returns the serialized output of the function if this
+// response represents a function result. The output could also be an error.
+func (r *DriverResponse) GetFunctionOutput() (*string, error) {
+	if !r.IsFunctionResult() {
+		return nil, nil
+	}
+
+	output := r.Err
+	if r.Output != nil {
+		switch v := r.Output.(type) {
+		case string:
+			{
+				output = &v
+			}
+		case []byte:
+			{
+				s := string(v)
+				output = &s
+			}
+		default:
+			{
+				byt, err := json.Marshal(r.Output)
+				if err != nil {
+					return nil, fmt.Errorf("failed to marshal output: %w", err)
+				}
+
+				s := string(byt)
+				output = &s
+			}
+		}
+	}
+
+	// Now we have the output, we make sure it's keyed the same as regular step
+	// outputs are, either under `data` or `error`.
+	var keyedOutput *string
+	key := "data"
+	if r.Error() != "" {
+		key = "error"
+	}
+
+	keyedByt, err := json.Marshal(map[string]json.RawMessage{
+		key: json.RawMessage(*output),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal output as data: %w", err)
+	}
+	s := string(keyedByt)
+	keyedOutput = &s
+
+	return keyedOutput, nil
+}
+
 type WrappedStandardError struct {
 	err error
 

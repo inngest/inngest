@@ -4,10 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/inngest/inngest/pkg/util"
 	"net/http"
 	"os"
 	"time"
+
+	"github.com/inngest/inngest/pkg/util"
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/coocood/freecache"
@@ -61,6 +62,7 @@ import (
 	"github.com/inngest/inngest/pkg/service"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/inngest/inngest/pkg/testapi"
+	"github.com/inngest/inngest/pkg/tracing"
 	"github.com/inngest/inngest/pkg/util/awsgateway"
 	"github.com/redis/rueidis"
 	"go.opentelemetry.io/otel/propagation"
@@ -127,7 +129,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	l := logger.StdlibLogger(ctx)
 	ctx = logger.WithStdlib(ctx, l)
 
-	db, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{InMemory: true})
+	db, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{InMemory: false})
 	if err != nil {
 		return err
 	}
@@ -424,6 +426,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		executor.WithAssignedQueueShard(queueShard),
 		executor.WithShardSelector(shardSelector),
 		executor.WithTraceReader(dbcqrs),
+		executor.WithTracerProvider(tracing.NewSqlcTracerProvider(base_cqrs.NewQueries(db, dbDriver))),
 	)
 	if err != nil {
 		return err

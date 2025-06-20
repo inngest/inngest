@@ -323,3 +323,50 @@ DO UPDATE SET
 
 -- name: GetWorkerConnection :one
 SELECT * FROM worker_connections WHERE account_id = @account_id AND workspace_id = @workspace_id AND id = @connection_id;
+
+-- New
+
+-- name: InsertSpan :exec
+INSERT INTO spans (
+  span_id,
+  trace_id,
+  parent_span_id,
+  name,
+  start_time,
+  end_time,
+  run_id,
+  account_id,
+  app_id,
+  function_id,
+  env_id,
+  dynamic_span_id,
+  attributes,
+  links,
+  output
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+
+-- name: GetSpansByRunID :many
+SELECT
+  trace_id,
+  dynamic_span_id,
+  MIN(start_time) as start_time,
+  MAX(end_time) AS end_time,
+  parent_span_id,
+  json_group_array(json_object(
+    'name', name,
+    'attributes', attributes,
+    'links', links,
+    'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END
+  )) AS span_fragments
+FROM spans
+WHERE run_id = ?
+GROUP BY dynamic_span_id
+ORDER BY start_time;
+
+-- name: GetSpanOutput :one
+SELECT
+  -- input, TODO
+  output
+FROM spans
+WHERE span_id = ?
+LIMIT 1;

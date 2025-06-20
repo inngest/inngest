@@ -48,7 +48,7 @@ const CodeSearch = dynamic(() => import('@inngest/components/CodeSearch/CodeSear
 type Props = {
   data: Run[];
   defaultVisibleColumns?: ColumnID[];
-  features: Pick<Features, 'history'>;
+  features: Pick<Features, 'history' | 'tracesPreview'>;
   getRun: React.ComponentProps<typeof RunDetailsV3>['getRun'];
   getTraceResult: React.ComponentProps<typeof RunDetailsV3>['getResult'];
   getTrigger: React.ComponentProps<typeof RunDetailsV3>['getTrigger'];
@@ -241,11 +241,12 @@ export function RunsPage({
             pollInterval={pollInterval}
             runID={rowData.id}
             standalone={false}
+            tracesPreviewEnabled={features.tracesPreview}
           />
         </div>
       );
     },
-    [getRun, getTraceResult, getTrigger, pollInterval]
+    [getRun, getTraceResult, getTrigger, pollInterval, features.tracesPreview]
   );
 
   const options = useMemo(() => {

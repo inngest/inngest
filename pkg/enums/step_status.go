@@ -14,4 +14,14 @@ const (
 	StepStatusFailed
 	StepStatusErrored
 	StepStatusCancelled
+	StepStatusTimedOut
 )
+
+func (s StepStatus) IsEnded() bool {
+	switch s {
+	case StepStatusCompleted, StepStatusFailed, StepStatusErrored, StepStatusCancelled, StepStatusTimedOut:
+		return true
+	default:
+		return false
+	}
+}

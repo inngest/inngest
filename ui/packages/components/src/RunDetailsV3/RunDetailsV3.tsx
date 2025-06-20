@@ -21,12 +21,13 @@ import { useStepSelection } from './utils';
 
 type Props = {
   standalone: boolean;
-  getResult: (outputID: string) => Promise<Result>;
-  getRun: (runID: string) => Promise<Run>;
+  getResult: (outputID: string, preview?: boolean) => Promise<Result>;
+  getRun: (runID: string, preview?: boolean) => Promise<Run>;
   initialRunData?: InitialRunData;
   getTrigger: React.ComponentProps<typeof TriggerDetails>['getTrigger'];
   pollInterval?: number;
   runID: string;
+  tracesPreviewEnabled?: boolean;
 };
 
 type Run = {
@@ -104,10 +105,12 @@ export const RunDetailsV3 = (props: Props) => {
   }, [isDragging, handleMouseMove, handleMouseUp]);
 
   const runRes = useQuery({
-    queryKey: ['run', runID],
+    queryKey: ['run', runID, { preview: props.tracesPreviewEnabled }],
     queryFn: useCallback(() => {
-      return getRun(runID);
-    }, [getRun, runID]),
+      console.log('lollllyep', { 'props.tracesPreviewEnabled': props.tracesPreviewEnabled });
+
+      return getRun(runID, props.tracesPreviewEnabled);
+    }, [getRun, runID, props.tracesPreviewEnabled]),
     retry: 3,
     refetchInterval: pollInterval,
   });
@@ -116,15 +119,15 @@ export const RunDetailsV3 = (props: Props) => {
   const resultRes = useQuery({
     enabled: Boolean(outputID),
     refetchInterval: pollInterval,
-    queryKey: ['run-result', runID],
+    queryKey: ['run-result', runID, { preview: props.tracesPreviewEnabled }],
     queryFn: useCallback(() => {
       if (!outputID) {
         // Unreachable
         throw new Error('missing outputID');
       }
 
-      return getResult(outputID);
-    }, [getResult, outputID]),
+      return getResult(outputID, props.tracesPreviewEnabled);
+    }, [getResult, outputID, props.tracesPreviewEnabled]),
   });
 
   const run = runRes.data;

@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	ulid "github.com/oklog/ulid/v2"
+	"github.com/sqlc-dev/pqtype"
 )
 
 type App struct {
@@ -117,6 +118,24 @@ type QueueSnapshotChunk struct {
 	SnapshotID string
 	ChunkID    int32
 	Data       []byte
+}
+
+type Span struct {
+	SpanID        string
+	TraceID       string
+	ParentSpanID  sql.NullString
+	Name          string
+	StartTime     time.Time
+	EndTime       time.Time
+	Attributes    pqtype.NullRawMessage
+	Links         pqtype.NullRawMessage
+	DynamicSpanID sql.NullString
+	AccountID     string
+	AppID         string
+	FunctionID    string
+	RunID         string
+	EnvID         string
+	Output        pqtype.NullRawMessage
 }
 
 type Trace struct {
