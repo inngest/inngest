@@ -365,8 +365,8 @@ ORDER BY start_time;
 
 -- name: GetSpanOutput :one
 SELECT
-  -- MAX(CASE WHEN input IS NOT NULL THEN input END) as input, TODO
-  MAX(CASE WHEN output IS NOT NULL THEN output END) as output
+  -- input, TODO
+  output
 FROM spans
 WHERE span_id = ?
 LIMIT 1;

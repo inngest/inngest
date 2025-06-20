@@ -1022,16 +1022,16 @@ func (q *Queries) GetQueueSnapshotChunks(ctx context.Context, snapshotID string)
 
 const getSpanOutput = `-- name: GetSpanOutput :one
 SELECT
-  MAX(CASE WHEN output IS NOT NULL THEN output END) as output
+  -- input, TODO
+  output
 FROM spans
 WHERE span_id = $1
 LIMIT 1
 `
 
-// MAX(CASE WHEN input IS NOT NULL THEN input END) as input, TODO
-func (q *Queries) GetSpanOutput(ctx context.Context, spanID string) (interface{}, error) {
+func (q *Queries) GetSpanOutput(ctx context.Context, spanID string) (pqtype.NullRawMessage, error) {
 	row := q.db.QueryRowContext(ctx, getSpanOutput, spanID)
-	var output interface{}
+	var output pqtype.NullRawMessage
 	err := row.Scan(&output)
 	return output, err
 }
