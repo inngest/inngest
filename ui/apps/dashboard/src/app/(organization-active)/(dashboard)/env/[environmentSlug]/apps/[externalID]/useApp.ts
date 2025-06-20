@@ -16,7 +16,7 @@ const query = graphql(`
         functions {
           id
           latestVersion {
-            fnTriggers {
+            triggers {
               type
               value
             }
@@ -80,7 +80,7 @@ export function useApp({ envID, externalAppID }: { envID: string; externalAppID:
         functions: app.functions.map((fn) => {
           return {
             ...fn,
-            triggers: fn.latestVersion.fnTriggers,
+            triggers: fn.latestVersion.triggers,
           };
         }),
         latestSync,

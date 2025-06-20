@@ -75,7 +75,7 @@ const GetFunctionsDocument = graphql(`
           isPaused
           isArchived
           current {
-            fnTriggers {
+            triggers {
               type
               value
             }
@@ -122,7 +122,7 @@ export function useFunctionsPage({
         return {
           ...fn,
           failureRate: undefined,
-          triggers: fn.current?.fnTriggers || [],
+          triggers: fn.current?.triggers || [],
           usage: undefined,
         };
       }),
@@ -148,7 +148,7 @@ const GetFunctionDocument = graphql(`
           name
         }
         current {
-          fnTriggers {
+          triggers {
             type
             value
             condition
