@@ -150,7 +150,7 @@ func TestSingletonCancelMode(t *testing.T) {
 		inngestClient,
 		inngestgo.FunctionOpts{
 			ID: "fn-singleton-cancel",
-			Singleton: &inngestgo.Singleton{
+			Singleton: &inngestgo.FnSingleton{
 				Key:  inngestgo.StrPtr("event.data.user.id"),
 				Mode: enums.SingletonModeCancel,
 			},
@@ -242,7 +242,7 @@ func TestSingletonDifferentKeysBothRun(t *testing.T) {
 		inngestClient,
 		inngestgo.FunctionOpts{
 			ID: "fn-singleton-cancel-different-keys",
-			Singleton: &inngestgo.Singleton{
+			Singleton: &inngestgo.FnSingleton{
 				Key:  inngestgo.StrPtr("event.data.user.id"),
 				Mode: enums.SingletonModeCancel,
 			},
