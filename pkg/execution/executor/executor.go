@@ -1249,12 +1249,17 @@ func (f functionFinishedData) Map() map[string]any {
 func (e *executor) finalize(ctx context.Context, md sv2.Metadata, evts []json.RawMessage, fnSlug string, queueShard redis_state.QueueShard, resp state.DriverResponse, outputSpanRef *meta.SpanReference) error {
 	ctx = context.WithoutCancel(ctx)
 
+	runStatus := enums.StepStatusCompleted
+	if resp.Error() != "" {
+		runStatus = enums.StepStatusFailed
+	}
+
 	err := e.tracerProvider.UpdateSpan(&tracing.UpdateSpanOptions{
 		EndTime:    time.Now(),
 		Location:   "executor.finalize",
 		Metadata:   &md,
 		TargetSpan: tracing.RunSpanRefFromMetadata(&md),
-		Status:     enums.StepStatusCompleted, // TODO Status
+		Status:     runStatus,
 		SpanOptions: []trace.SpanStartOption{
 			tracing.WithDriverResponseAttrs(&resp, outputSpanRef),
 		},
