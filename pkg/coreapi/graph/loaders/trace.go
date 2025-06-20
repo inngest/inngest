@@ -380,6 +380,28 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 				gqlSpan.Duration = &dur
 			}
 		}
+
+		// Give spans some more meaningful names if somehow we don't have the
+		// correct information. This shouldn't be possible, but is a final
+		// pass to ensure we filter out internal-looking span names.
+		switch gqlSpan.Name {
+		case meta.SpanNameRun:
+			{
+				gqlSpan.Name = "Run"
+			}
+		case meta.SpanNameStep:
+			{
+				gqlSpan.Name = "Unknown step"
+			}
+		case meta.SpanNameStepDiscovery:
+			{
+				gqlSpan.Name = "Discovery step"
+			}
+		case meta.SpanNameExecution:
+			{
+				gqlSpan.Name = "Execution"
+			}
+		}
 	}
 
 	if !showSpan {
