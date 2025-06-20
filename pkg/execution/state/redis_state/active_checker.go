@@ -216,7 +216,7 @@ func (q *queue) accountActiveCheck(
 		l.Debug("removing invalid items from account active key", "mode", "account", "invalid", invalidItems, "partition_id", sp.PartitionID, "active", keyActive, "in_progress", keyInProgress, "readonly", readOnly)
 
 		if !readOnly {
-			cmd := client.B().Zrem().Key(keyActive).Member(invalidItems...).Build()
+			cmd := client.B().Srem().Key(keyActive).Member(invalidItems...).Build()
 			err := client.Do(ctx, cmd).Error()
 			if err != nil {
 				return fmt.Errorf("could not remove invalid items from active set: %w", err)
@@ -252,7 +252,7 @@ func (q *queue) partitionActiveCheck(
 		l.Debug("removing invalid items from active key", "mode", "partition", "invalid", invalidItems, "partition_id", sp.PartitionID, "active", keyActive, "ready", keyReady, "in_progress", keyInProgress, "readonly", readOnly)
 
 		if !readOnly {
-			cmd := client.B().Zrem().Key(keyActive).Member(invalidItems...).Build()
+			cmd := client.B().Srem().Key(keyActive).Member(invalidItems...).Build()
 			err := client.Do(ctx, cmd).Error()
 			if err != nil {
 				return fmt.Errorf("could not remove invalid items from active set: %w", err)
@@ -283,7 +283,7 @@ func (q *queue) customConcurrencyActiveCheck(ctx context.Context, sp *QueueShado
 		l.Debug("removing invalid items from active key", "invalid", "mode", "custom_concurrency", "bcc", bcc, invalidItems, "partition_id", sp.PartitionID, "active", keyActive, "ready", keyReady, "in_progress", keyInProgress, "readonly", readOnly)
 
 		if !readOnly {
-			cmd := client.B().Zrem().Key(keyActive).Member(invalidItems...).Build()
+			cmd := client.B().Srem().Key(keyActive).Member(invalidItems...).Build()
 			err := client.Do(ctx, cmd).Error()
 			if err != nil {
 				return fmt.Errorf("could not remove invalid items from active set: %w", err)

@@ -111,7 +111,7 @@ func TestShadowPartitionActiveCheck(t *testing.T) {
 		qi, err := q.EnqueueItem(ctx, defaultShard, item, clock.Now(), osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 
-		_, err = cluster.ZAdd(sp.accountActiveKey(kg), float64(clock.Now().UnixMilli()), qi.ID)
+		_, err = cluster.SAdd(sp.accountActiveKey(kg), qi.ID)
 		require.NoError(t, err)
 
 		_, err = q.backlogActiveCheck(ctx, &backlog, client, kg, l)
@@ -128,7 +128,7 @@ func TestShadowPartitionActiveCheck(t *testing.T) {
 		qi, err := q.EnqueueItem(ctx, defaultShard, item, clock.Now(), osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 
-		_, err = cluster.ZAdd(sp.accountActiveKey(kg), float64(clock.Now().UnixMilli()), qi.ID)
+		_, err = cluster.SAdd(sp.accountActiveKey(kg), qi.ID)
 		require.NoError(t, err)
 
 		_, err = q.backlogActiveCheck(ctx, &backlog, client, kg, l)
@@ -145,7 +145,7 @@ func TestShadowPartitionActiveCheck(t *testing.T) {
 		_, err := q.EnqueueItem(ctx, defaultShard, item, clock.Now(), osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 
-		_, err = cluster.ZAdd(sp.accountActiveKey(kg), float64(clock.Now().UnixMilli()), "missing-lol")
+		_, err = cluster.SAdd(sp.accountActiveKey(kg), "missing-lol")
 		require.NoError(t, err)
 
 		_, err = q.backlogActiveCheck(ctx, &backlog, client, kg, l)
@@ -162,7 +162,7 @@ func TestShadowPartitionActiveCheck(t *testing.T) {
 		qi, err := q.EnqueueItem(ctx, defaultShard, item, clock.Now(), osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 
-		_, err = cluster.ZAdd(sp.activeKey(kg), float64(clock.Now().UnixMilli()), qi.ID)
+		_, err = cluster.SAdd(sp.activeKey(kg), qi.ID)
 		require.NoError(t, err)
 
 		_, err = q.backlogActiveCheck(ctx, &backlog, client, kg, l)
@@ -179,7 +179,7 @@ func TestShadowPartitionActiveCheck(t *testing.T) {
 		qi, err := q.EnqueueItem(ctx, defaultShard, item, clock.Now(), osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 
-		_, err = cluster.ZAdd(sp.activeKey(kg), float64(clock.Now().UnixMilli()), qi.ID)
+		_, err = cluster.SAdd(sp.activeKey(kg), qi.ID)
 		require.NoError(t, err)
 
 		_, err = q.backlogActiveCheck(ctx, &backlog, client, kg, l)
@@ -196,7 +196,7 @@ func TestShadowPartitionActiveCheck(t *testing.T) {
 		_, err := q.EnqueueItem(ctx, defaultShard, item, clock.Now(), osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 
-		_, err = cluster.ZAdd(sp.activeKey(kg), float64(clock.Now().UnixMilli()), "missing-lol")
+		_, err = cluster.SAdd(sp.activeKey(kg), "missing-lol")
 		require.NoError(t, err)
 
 		_, err = q.backlogActiveCheck(ctx, &backlog, client, kg, l)
@@ -213,7 +213,7 @@ func TestShadowPartitionActiveCheck(t *testing.T) {
 		qi, err := q.EnqueueItem(ctx, defaultShard, item, clock.Now(), osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 
-		_, err = cluster.ZAdd(backlog.customKeyActive(kg, 1), float64(clock.Now().UnixMilli()), qi.ID)
+		_, err = cluster.SAdd(backlog.customKeyActive(kg, 1), qi.ID)
 		require.NoError(t, err)
 
 		_, err = q.backlogActiveCheck(ctx, &backlog, client, kg, l)
@@ -230,7 +230,7 @@ func TestShadowPartitionActiveCheck(t *testing.T) {
 		qi, err := q.EnqueueItem(ctx, defaultShard, item, clock.Now(), osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 
-		_, err = cluster.ZAdd(backlog.customKeyActive(kg, 1), float64(clock.Now().UnixMilli()), qi.ID)
+		_, err = cluster.SAdd(backlog.customKeyActive(kg, 1), qi.ID)
 		require.NoError(t, err)
 
 		_, err = q.backlogActiveCheck(ctx, &backlog, client, kg, l)
@@ -247,7 +247,7 @@ func TestShadowPartitionActiveCheck(t *testing.T) {
 		qi, err = q.EnqueueItem(ctx, defaultShard, item, clock.Now(), osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 
-		_, err = cluster.ZAdd(backlog.customKeyActive(kg, 1), float64(clock.Now().UnixMilli()), "missing-lol")
+		_, err = cluster.SAdd(backlog.customKeyActive(kg, 1), "missing-lol")
 		require.NoError(t, err)
 
 		_, err = q.backlogActiveCheck(ctx, &backlog, client, kg, l)
