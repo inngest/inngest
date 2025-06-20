@@ -14,11 +14,11 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       {
-        url: process.env.NEXT_PUBLIC_FAVICON ?? '/favicon-june-2024-light.png',
+        url: process.env.NEXT_PUBLIC_FAVICON ?? '/favicon-june-2025-light.svg',
         media: '(prefers-color-scheme: light)',
       },
       {
-        url: process.env.NEXT_PUBLIC_FAVICON ?? '/favicon-june-2024-dark.png',
+        url: process.env.NEXT_PUBLIC_FAVICON ?? '/favicon-june-2025-dark.svg',
         media: '(prefers-color-scheme: dark)',
       },
     ],
