@@ -106,6 +106,10 @@ func NewExecutor(opts ...ExecutorOpt) (execution.Executor, error) {
 		m.httpClient = httpdriver.Client(httpdriver.SecureDialerOpts{})
 	}
 
+	if m.tracerProvider == nil {
+		m.tracerProvider = tracing.NewNoopTracerProvider()
+	}
+
 	return m, nil
 }
 
