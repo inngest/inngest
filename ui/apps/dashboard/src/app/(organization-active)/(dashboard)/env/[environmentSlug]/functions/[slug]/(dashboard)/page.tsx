@@ -19,6 +19,7 @@ import { ErrorBoundary } from '@sentry/nextjs';
 import type { TimeRange } from '@/types/TimeRangeFilter';
 import FunctionConfiguration from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/functions/[slug]/(dashboard)/FunctionConfiguration';
 import Block from '@/components/Block';
+import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import { FunctionTriggerTypes } from '@/gql/graphql';
 import LoadingIcon from '@/icons/LoadingIcon';
 import { useFunction, useFunctionUsage } from '@/queries';
@@ -57,6 +58,8 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
     functionSlug,
     timeRange: selectedTimeRange,
   });
+
+  const { value: newFunctionConfigUiEnabled } = useBooleanFlag('new-function-config-ui', false);
 
   if (isFetchingFunction) {
     return (
@@ -175,8 +178,7 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
               </div>
             )}
           >
-            {/* TODO replace with feature flag*/}
-            {true ? (
+            {newFunctionConfigUiEnabled ? (
               <div className="bg-canvasBase">
                 <NewFunctionConfiguration
                   inngestFunction={function_}
