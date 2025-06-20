@@ -580,8 +580,8 @@ func (q *queue) findMissingItemsWithDynamicTargets(
 			}
 		}
 
-		for _, element := range entryIDs {
-			if _, has := entriesFound[element]; !has {
+		for _, element := range items {
+			if _, has := entriesFound[element.ID]; !has {
 				onMissing(element, "missing-in-targets")
 			}
 		}
