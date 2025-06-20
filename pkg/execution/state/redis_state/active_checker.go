@@ -57,7 +57,7 @@ func (q *queue) ActiveCheck(ctx context.Context) (int, error) {
 
 			l.Debug("attempting to active check backlog")
 
-			cleanup, err := q.backlogActiveCheck(ctx, backlog, client, kg, l)
+			cleanup, err := q.backlogActiveCheck(ctx, backlog, client, kg)
 			if cleanup {
 				status, cerr := scripts["queue/activeCheckRemoveBacklog"].Exec(
 					ctx,
@@ -99,7 +99,9 @@ func (q *queue) ActiveCheck(ctx context.Context) (int, error) {
 	return int(atomic.LoadInt64(&checked)), nil
 }
 
-func (q *queue) backlogActiveCheck(ctx context.Context, b *QueueBacklog, client rueidis.Client, kg QueueKeyGenerator, l logger.Logger) (bool, error) {
+func (q *queue) backlogActiveCheck(ctx context.Context, b *QueueBacklog, client rueidis.Client, kg QueueKeyGenerator) (bool, error) {
+	l := logger.StdlibLogger(ctx)
+
 	var sp QueueShadowPartition
 
 	{
@@ -145,21 +147,21 @@ func (q *queue) backlogActiveCheck(ctx context.Context, b *QueueBacklog, client 
 
 	// Check account
 	if accountID != uuid.Nil && mathRand.Intn(100) <= q.runMode.ActiveCheckAccountCheckProbability {
-		err := q.accountActiveCheck(ctx, &sp, accountID, client, kg, l.With("check-scope", "account-check"), readOnly)
+		err := q.accountActiveCheck(logger.WithStdlib(ctx, l.With("check-scope", "account-check")), &sp, accountID, client, kg, readOnly)
 		if err != nil {
 			return false, fmt.Errorf("could not check account active items: %w", err)
 		}
 	}
 
 	// Check partition
-	err := q.partitionActiveCheck(ctx, &sp, accountID, client, kg, l.With("check-scope", "partition-check"), readOnly)
+	err := q.partitionActiveCheck(logger.WithStdlib(ctx, l.With("check-scope", "partition-check")), &sp, accountID, client, kg, readOnly)
 	if err != nil {
 		return false, fmt.Errorf("could not check account for invalid active items: %w", err)
 	}
 
 	// Check custom concurrency keys
 	for _, key := range b.ConcurrencyKeys {
-		err := q.customConcurrencyActiveCheck(ctx, &sp, accountID, key, client, kg, l.With("check-scope", "backlog-check"), readOnly)
+		err := q.customConcurrencyActiveCheck(logger.WithStdlib(ctx, l.With("check-scope", "backlog-check")), &sp, accountID, key, client, kg, readOnly)
 		if err != nil {
 			return false, fmt.Errorf("could not check custom concurrency key: %w", err)
 		}
@@ -176,9 +178,9 @@ func (q *queue) accountActiveCheck(
 	accountID uuid.UUID,
 	client rueidis.Client,
 	kg QueueKeyGenerator,
-	l logger.Logger,
 	readOnly bool,
 ) error {
+	l := logger.StdlibLogger(ctx)
 
 	// Compare the account active key
 	keyActive := sp.accountActiveKey(kg)
@@ -191,7 +193,7 @@ func (q *queue) accountActiveCheck(
 
 	l.Debug("checking account for invalid or missing active keys", "account_id", sp.AccountID, "key", keyActive)
 
-	err := q.findMissingItemsWithDynamicTargets(ctx, client, kg, keyActive, l, func(chunk []*osqueue.QueueItem, l logger.Logger) map[string][]string {
+	err := q.findMissingItemsWithDynamicTargets(ctx, client, kg, keyActive, func(chunk []*osqueue.QueueItem) map[string][]string {
 		res := make(map[string][]string)
 
 		chunkIDs := make([]string, len(chunk))
@@ -213,7 +215,7 @@ func (q *queue) accountActiveCheck(
 		}
 
 		return res
-	}, func(pointer string, reason string, l logger.Logger) {
+	}, func(pointer string, reason string) {
 		invalidItems = append(invalidItems, pointer)
 		invalidReasons = append(invalidReasons, reason)
 		metrics.IncrQueueActiveCheckInvalidItemsFoundCounter(ctx, metrics.CounterOpt{
@@ -267,9 +269,10 @@ func (q *queue) partitionActiveCheck(
 	accountID uuid.UUID,
 	client rueidis.Client,
 	kg QueueKeyGenerator,
-	l logger.Logger,
 	readOnly bool,
 ) error {
+	l := logger.StdlibLogger(ctx)
+
 	keyActive := sp.activeKey(kg)
 	keyInProgress := sp.inProgressKey(kg)
 	keyReady := sp.readyQueueKey(kg)
@@ -324,7 +327,9 @@ func (q *queue) partitionActiveCheck(
 	return nil
 }
 
-func (q *queue) customConcurrencyActiveCheck(ctx context.Context, sp *QueueShadowPartition, accountID uuid.UUID, bcc BacklogConcurrencyKey, client rueidis.Client, kg QueueKeyGenerator, l logger.Logger, readOnly bool) error {
+func (q *queue) customConcurrencyActiveCheck(ctx context.Context, sp *QueueShadowPartition, accountID uuid.UUID, bcc BacklogConcurrencyKey, client rueidis.Client, kg QueueKeyGenerator, readOnly bool) error {
+	l := logger.StdlibLogger(ctx)
+
 	keyActive := bcc.activeKey(kg)
 	keyInProgress := bcc.concurrencyKey(kg)
 
@@ -459,10 +464,11 @@ func (q *queue) findMissingItemsWithDynamicTargets(
 	client rueidis.Client,
 	kg QueueKeyGenerator,
 	sourceSetKey string,
-	l logger.Logger,
-	targetKeys func(chunk []*osqueue.QueueItem, l logger.Logger) map[string][]string,
-	onMissing func(pointer string, reason string, l logger.Logger),
+	targetKeys func(chunk []*osqueue.QueueItem) map[string][]string,
+	onMissing func(pointer string, reason string),
 ) error {
+	l := logger.StdlibLogger(ctx)
+
 	var cursor uint64
 	var count int64 = 20
 
@@ -508,7 +514,7 @@ func (q *queue) findMissingItemsWithDynamicTargets(
 
 		for i, itemStr := range itemData {
 			if itemStr == "" {
-				onMissing(entryIDs[i], "missing-item", l)
+				onMissing(entryIDs[i], "missing-item")
 				continue
 			}
 
@@ -533,7 +539,7 @@ func (q *queue) findMissingItemsWithDynamicTargets(
 		// Retrieve keys to check against (need to check individual items but want to run batched operations)
 		// Worst case, this transform 20 queue items in the chunk to 20 target keys, but usually this will
 		// be more efficient as items may belong to the same workflows.
-		for targetKey, items := range targetKeys(items, l) {
+		for targetKey, items := range targetKeys(items) {
 			l.Debug("comparing against target", "source", sourceSetKey, "target", targetKey, "items", items)
 
 			if len(items) == 0 {
@@ -560,7 +566,7 @@ func (q *queue) findMissingItemsWithDynamicTargets(
 
 		for _, element := range entryIDs {
 			if _, has := entriesFound[element]; !has {
-				onMissing(element, "missing-in-targets", l)
+				onMissing(element, "missing-in-targets")
 			}
 		}
 
