@@ -60,7 +60,7 @@ func TestFunctionFailureHandling(t *testing.T) {
 
 			switch error["error"] {
 			case "NonRetriableError": // step error
-				require.Contains(t, error["message"], "Unhandled step error: nope", evt.Data)
+				require.Contains(t, error["message"], "unhandled step error: nope", evt.Data)
 			default: // panic
 				require.Contains(t, error["message"], "function panicked: nope", evt.Data)
 			}
