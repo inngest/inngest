@@ -3,13 +3,13 @@ package golang
 import (
 	"context"
 	"fmt"
+	"github.com/inngest/inngest/tests/client"
 	"sync/atomic"
 	"testing"
 	"time"
 
-	"github.com/inngest/inngest/tests/client"
-
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngestgo"
 	"github.com/stretchr/testify/require"
 )
@@ -34,7 +34,7 @@ func TestConcurrency_ScopeFunction(t *testing.T) {
 		inngestClient,
 		inngestgo.FunctionOpts{
 			ID: "fn-concurrency",
-			Concurrency: []inngestgo.FnConcurrency{
+			Concurrency: []inngest.Concurrency{
 				{
 					Limit: 1,
 				},
@@ -104,7 +104,7 @@ func TestConcurrency_ScopeFunction_FanOut(t *testing.T) {
 		inngestClient,
 		inngestgo.FunctionOpts{
 			ID: "acct-concurrency",
-			Concurrency: []inngestgo.FnConcurrency{
+			Concurrency: []inngest.Concurrency{
 				{
 					Limit: 1,
 					Scope: enums.ConcurrencyScopeFn,
@@ -127,7 +127,7 @@ func TestConcurrency_ScopeFunction_FanOut(t *testing.T) {
 		inngestClient,
 		inngestgo.FunctionOpts{
 			ID: "acct-concurrency-v2",
-			Concurrency: []inngestgo.FnConcurrency{
+			Concurrency: []inngest.Concurrency{
 				{
 					Limit: 1,
 					Scope: enums.ConcurrencyScopeFn,
@@ -194,7 +194,7 @@ func TestConcurrency_ScopeFunction_Key(t *testing.T) {
 		inngestClient,
 		inngestgo.FunctionOpts{
 			ID: "fn-concurrency",
-			Concurrency: []inngestgo.FnConcurrency{
+			Concurrency: []inngest.Concurrency{
 				{
 					Limit: 1,
 					Key:   inngestgo.StrPtr("event.data.num"),
@@ -282,7 +282,7 @@ func TestConcurrency_ScopeFunction_Key_Fn(t *testing.T) {
 		inngestClient,
 		inngestgo.FunctionOpts{
 			ID: "multiple-fn-concurrency",
-			Concurrency: []inngestgo.FnConcurrency{
+			Concurrency: []inngest.Concurrency{
 				{
 					Limit: limit,
 				},
