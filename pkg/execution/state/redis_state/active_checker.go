@@ -235,7 +235,7 @@ func (q *queue) accountActiveCheck(
 		l.Debug(
 			"removing invalid items from account active key",
 			"mode", "account",
-			"invalid", invalidItems,
+			"job_id", invalidItems,
 			"reason", invalidReasons,
 			"partition_id", sp.PartitionID,
 			"active", keyActive,
