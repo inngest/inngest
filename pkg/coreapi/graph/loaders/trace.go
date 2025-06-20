@@ -139,27 +139,37 @@ func (tr *traceReader) stepStatusToGQL(status *enums.StepStatus) *models.RunTrac
 	return nil
 }
 
-func getStringAttr(attrs map[string]any, key string, target *string) {
+func getAttr[T any](attrs map[string]any, key string, target *T) {
 	if v, ok := attrs[key]; ok {
-		if strV, ok := v.(string); ok {
-			*target = strV
+		if val, ok := v.(T); ok {
+			*target = val
 		}
 	}
 }
 
-func getBoolAttr(attrs map[string]any, key string, target **bool) {
+func getPtrAttr[T any](attrs map[string]any, key string, target **T) {
 	if v, ok := attrs[key]; ok {
-		if boolV, ok := v.(bool); ok {
-			*target = &boolV
+		if val, ok := v.(T); ok {
+			*target = &val
 		}
 	}
 }
 
 func getULIDAttr(attrs map[string]any, key string, target *ulid.ULID) {
 	if v, ok := attrs[key]; ok {
-		if strV, ok := v.(string); ok {
-			if id, err := ulid.Parse(strV); err == nil {
+		if str, ok := v.(string); ok {
+			if id, err := ulid.Parse(str); err == nil {
 				*target = id
+			}
+		}
+	}
+}
+
+func getULIDPtrAttr(attrs map[string]any, key string, target **ulid.ULID) {
+	if v, ok := attrs[key]; ok {
+		if str, ok := v.(string); ok {
+			if id, err := ulid.Parse(str); err == nil {
+				*target = &id
 			}
 		}
 	}
@@ -167,8 +177,17 @@ func getULIDAttr(attrs map[string]any, key string, target *ulid.ULID) {
 
 func getTimeAttr(attrs map[string]any, key string, target *time.Time) {
 	if v, ok := attrs[key]; ok {
-		if floatV, ok := v.(float64); ok {
-			*target = time.UnixMilli(int64(floatV))
+		if ms, ok := v.(float64); ok {
+			*target = time.UnixMilli(int64(ms))
+		}
+	}
+}
+
+func getTimePtrAttr(attrs map[string]any, key string, target **time.Time) {
+	if v, ok := attrs[key]; ok {
+		if ms, ok := v.(float64); ok {
+			t := time.UnixMilli(int64(ms))
+			*target = &t
 		}
 	}
 }
@@ -254,7 +273,7 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 			{
 				si := &models.RunStepInfo{}
 
-				getStringAttr(span.Attributes, meta.AttributeStepRunType, si.Type)
+				getPtrAttr(span.Attributes, meta.AttributeStepRunType, &si.Type)
 
 				gqlSpan.StepInfo = si
 			}
@@ -263,11 +282,11 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 				si := &models.InvokeStepInfo{}
 
 				getULIDAttr(span.Attributes, meta.AttributeStepInvokeTriggerEventID, &si.TriggeringEventID)
-				getStringAttr(span.Attributes, meta.AttributeStepInvokeFunctionID, &si.FunctionID)
+				getAttr(span.Attributes, meta.AttributeStepInvokeFunctionID, &si.FunctionID)
 				getTimeAttr(span.Attributes, meta.AttributeStepWaitExpiry, &si.Timeout)
-				getBoolAttr(span.Attributes, meta.AttributeStepWaitExpired, &si.TimedOut)
-				getULIDAttr(span.Attributes, meta.AttributeStepInvokeFinishEventID, si.ReturnEventID)
-				getULIDAttr(span.Attributes, meta.AttributeStepInvokeRunID, si.RunID)
+				getPtrAttr(span.Attributes, meta.AttributeStepWaitExpired, &si.TimedOut)
+				getULIDPtrAttr(span.Attributes, meta.AttributeStepInvokeFinishEventID, &si.ReturnEventID)
+				getULIDPtrAttr(span.Attributes, meta.AttributeStepInvokeRunID, &si.RunID)
 
 				gqlSpan.StepInfo = si
 			}
@@ -283,11 +302,11 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 			{
 				si := &models.WaitForEventStepInfo{}
 
-				getStringAttr(span.Attributes, meta.AttributeStepWaitForEventName, &si.EventName)
-				getStringAttr(span.Attributes, meta.AttributeStepWaitForEventIf, si.Expression)
+				getAttr(span.Attributes, meta.AttributeStepWaitForEventName, &si.EventName)
+				getPtrAttr(span.Attributes, meta.AttributeStepWaitForEventIf, &si.Expression)
 				getTimeAttr(span.Attributes, meta.AttributeStepWaitExpiry, &si.Timeout)
-				getULIDAttr(span.Attributes, meta.AttributeStepWaitForEventMatchedID, si.FoundEventID)
-				getBoolAttr(span.Attributes, meta.AttributeStepWaitExpired, &si.TimedOut)
+				getULIDPtrAttr(span.Attributes, meta.AttributeStepWaitForEventMatchedID, &si.FoundEventID)
+				getPtrAttr(span.Attributes, meta.AttributeStepWaitExpired, &si.TimedOut)
 
 				gqlSpan.StepInfo = si
 			}
@@ -295,9 +314,9 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 			{
 				si := &models.WaitForSignalStepInfo{}
 
-				getStringAttr(span.Attributes, meta.AttributeStepSignalName, &si.Signal)
+				getAttr(span.Attributes, meta.AttributeStepSignalName, &si.Signal)
 				getTimeAttr(span.Attributes, meta.AttributeStepWaitExpiry, &si.Timeout)
-				getBoolAttr(span.Attributes, meta.AttributeStepWaitExpired, &si.TimedOut)
+				getPtrAttr(span.Attributes, meta.AttributeStepWaitExpired, &si.TimedOut)
 
 				gqlSpan.StepInfo = si
 			}
