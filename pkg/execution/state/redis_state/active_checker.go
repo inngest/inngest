@@ -299,7 +299,7 @@ func (q *queue) partitionActiveCheck(
 		l.Debug(
 			"removing invalid items from active key",
 			"mode", "partition",
-			"invalid", invalidItems,
+			"job_id", invalidItems,
 			"partition_id", sp.PartitionID,
 			"active", keyActive,
 			"ready", keyReady,
@@ -357,7 +357,7 @@ func (q *queue) customConcurrencyActiveCheck(ctx context.Context, sp *QueueShado
 	if len(invalidItems) > 0 {
 		l.Debug(
 			"removing invalid items from active key",
-			"invalid", invalidItems,
+			"job_id", invalidItems,
 			"mode", "custom_concurrency",
 			"bcc", bcc,
 			"partition_id", sp.PartitionID,
@@ -394,12 +394,24 @@ func (q *queue) customConcurrencyActiveCheck(ctx context.Context, sp *QueueShado
 //
 // The missing items will then be bubbled up via onMissing.
 func (q *queue) findMissingItemsWithStaticTargets(ctx context.Context, client rueidis.Client, sourceSetKey string, targetKeys []string, onMissing func(pointer string)) error {
+	l := logger.StdlibLogger(ctx)
+
 	var cursor uint64
 	var count int64 = 20
 
 	for {
+		chunkID, err := ulid.New(ulid.Timestamp(q.clock.Now()), rand.Reader)
+		if err != nil {
+			return fmt.Errorf("could not create checkID: %w", err)
+		}
+
 		cmd := client.B().Sscan().Key(sourceSetKey).Cursor(cursor).Count(count).Build()
 		entry, err := client.Do(ctx, cmd).AsScanEntry()
+
+		l = l.With("chunk_id", chunkID)
+
+		l.Debug("scanned source", "key", sourceSetKey, "returned", len(entry.Elements), "cursor", entry.Cursor)
+
 		if err != nil {
 			if rueidis.IsRedisNil(err) {
 				return nil
@@ -417,9 +429,13 @@ func (q *queue) findMissingItemsWithStaticTargets(ctx context.Context, client ru
 			entryIDs = append(entryIDs, entry.Elements[i])
 		}
 
+		l.Debug("retrieved item chunk", "key", sourceSetKey, "job_id", entryIDs)
+
 		entriesFound := make(map[string]struct{})
 
 		for _, targetKey := range targetKeys {
+			l.Debug("comparing against target", "source", sourceSetKey, "target", targetKey, "job_id", entryIDs)
+
 			resp, err := client.Do(ctx, client.B().Zmscore().Key(targetKey).Member(entryIDs...).Build()).ToAny()
 			if err != nil && !rueidis.IsRedisNil(err) {
 				return fmt.Errorf("could not check key 2 for missing items: %w", err)
@@ -477,7 +493,7 @@ func (q *queue) findMissingItemsWithDynamicTargets(
 		if err != nil {
 			return fmt.Errorf("could not create checkID: %w", err)
 		}
-		
+
 		// Load chunk
 		cmd := client.B().Sscan().Key(sourceSetKey).Cursor(cursor).Count(count).Build()
 		entry, err := client.Do(ctx, cmd).AsScanEntry()
@@ -510,7 +526,7 @@ func (q *queue) findMissingItemsWithDynamicTargets(
 			return fmt.Errorf("could not get queue items: %w", err)
 		}
 
-		l.Debug("retrieved item chunk", "key", sourceSetKey, "item_ids", entryIDs)
+		l.Debug("retrieved item chunk", "key", sourceSetKey, "job_id", entryIDs)
 
 		for i, itemStr := range itemData {
 			if itemStr == "" {
@@ -532,7 +548,7 @@ func (q *queue) findMissingItemsWithDynamicTargets(
 			items = append(items, &qi)
 		}
 
-		l.Debug("loaded item data", "key", sourceSetKey, "found", entryIDs, "items", items, "missing", len(entryIDs)-len(items))
+		l.Debug("loaded item data", "key", sourceSetKey, "job_id", entryIDs, "items", items, "missing", len(entryIDs)-len(items))
 
 		entriesFound := make(map[string]struct{})
 
@@ -540,7 +556,7 @@ func (q *queue) findMissingItemsWithDynamicTargets(
 		// Worst case, this transform 20 queue items in the chunk to 20 target keys, but usually this will
 		// be more efficient as items may belong to the same workflows.
 		for targetKey, items := range targetKeys(items) {
-			l.Debug("comparing against target", "source", sourceSetKey, "target", targetKey, "items", items)
+			l.Debug("comparing against target", "source", sourceSetKey, "target", targetKey, "job_id", items)
 
 			if len(items) == 0 {
 				continue
