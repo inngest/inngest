@@ -3,7 +3,7 @@
 import NextLink from 'next/link';
 import { Button } from '@inngest/components/Button';
 import { InngestLogo } from '@inngest/components/icons/logos/InngestLogo';
-import { InngestLogoSmallBW } from '@inngest/components/icons/logos/InngestLogoSmall';
+import { InngestLogoSmall } from '@inngest/components/icons/logos/InngestLogoSmall';
 import { RiContractLeftLine, RiContractRightLine } from '@remixicon/react';
 
 import { useInfoQuery } from '@/store/devApi';
@@ -51,7 +51,7 @@ export default function Logo({ collapsed, setCollapsed }: LogoProps) {
       <div className={`flex flex-row items-center justify-start ${collapsed ? '' : 'mr-1.5'} `}>
         {collapsed ? (
           <div className="cursor-pointer group-hover:hidden">
-            <InngestLogoSmallBW className="text-basis" />
+            <InngestLogoSmall className="text-basis" />
           </div>
         ) : (
           <div className="flex flex-row items-center justify-start">
