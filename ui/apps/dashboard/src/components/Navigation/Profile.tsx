@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { usePathname } from 'next/navigation';
 
 import { ProfileMenu } from './ProfileMenu';
@@ -8,6 +9,7 @@ export type ProfileType = {
   displayName: string;
   isMarketplace: boolean;
   orgName?: string;
+  orgProfilePic: string | null;
 };
 
 export const Profile = ({ collapsed, profile }: { collapsed: boolean; profile: ProfileType }) => {
@@ -32,7 +34,17 @@ export const Profile = ({ collapsed, profile }: { collapsed: boolean; profile: P
           }`}
         >
           <div className="bg-canvasMuted text-subtle flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs uppercase">
-            {profile.orgName?.substring(0, 2) || '?'}
+            {profile.orgProfilePic ? (
+              <Image
+                src={profile.orgProfilePic}
+                className="h-8 w-8 rounded-full"
+                width={40}
+                height={40}
+                alt="org-profile-pic"
+              />
+            ) : (
+              profile.orgName?.substring(0, 2) || '?'
+            )}
           </div>
 
           {!collapsed && (
