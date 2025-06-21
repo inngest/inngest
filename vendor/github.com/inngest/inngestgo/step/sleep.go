@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/inngest/inngest/pkg/enums"
-	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngestgo/internal"
+	"github.com/inngest/inngestgo/internal/sdkrequest"
 	str2duration "github.com/xhit/go-str2duration/v2"
 )
 
@@ -31,7 +31,7 @@ func Sleep(ctx context.Context, id string, duration time.Duration) {
 		panic(ControlHijack{})
 	}
 	mw.BeforeExecution(ctx, mgr.MiddlewareCallCtx())
-	mgr.AppendOp(state.GeneratorOpcode{
+	mgr.AppendOp(sdkrequest.GeneratorOpcode{
 		ID:   op.MustHash(),
 		Op:   enums.OpcodeSleep,
 		Name: id,

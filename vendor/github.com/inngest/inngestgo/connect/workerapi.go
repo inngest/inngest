@@ -52,7 +52,9 @@ func (a *workerApiClient) start(ctx context.Context, hashedSigningKey []byte, re
 		return nil, fmt.Errorf("could not send start request: %w", err)
 	}
 
-	defer httpRes.Body.Close()
+	defer func() {
+		_ = httpRes.Body.Close()
+	}()
 
 	if httpRes.StatusCode != http.StatusOK {
 		if httpRes.StatusCode == http.StatusUnauthorized {
@@ -111,8 +113,9 @@ func (a *workerApiClient) sendBufferedMessage(ctx context.Context, hashedSigning
 	if err != nil {
 		return fmt.Errorf("could not send flush request: %w", err)
 	}
-
-	defer httpRes.Body.Close()
+	defer func() {
+		_ = httpRes.Body.Close()
+	}()
 
 	if httpRes.StatusCode != http.StatusOK {
 		return fmt.Errorf("unexpected status code: %d", httpRes.StatusCode)

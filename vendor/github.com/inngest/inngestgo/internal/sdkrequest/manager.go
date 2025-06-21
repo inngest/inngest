@@ -9,7 +9,6 @@ import (
 	"sync"
 
 	"github.com/inngest/inngest/pkg/enums"
-	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngestgo/experimental"
 	"github.com/inngest/inngestgo/internal/fn"
 	"github.com/inngest/inngestgo/internal/middleware"
@@ -31,16 +30,16 @@ type InvocationManager interface {
 	// SetErr sets the invocation's error.
 	SetErr(err error)
 	// AppendOp pushes a new generator op to the stack for future execution.
-	AppendOp(op state.GeneratorOpcode)
+	AppendOp(op GeneratorOpcode)
 	// Ops returns all pushed generator ops to the stack for future execution.
 	// These represent new steps that have not been previously memoized.
-	Ops() []state.GeneratorOpcode
+	Ops() []GeneratorOpcode
 	// Step returns step data for the given unhashed operation, if present in the
 	// incoming request data.
 	Step(ctx context.Context, op UnhashedOp) (json.RawMessage, bool)
 	// ReplayedStep returns whether we've replayed the given hashed step ID yet.
 	ReplayedStep(hashedID string) bool
-	// NewOp generates a new unhashed op for creating a state.GeneratorOpcode.  This
+	// NewOp generates a new unhashed op for creating a GeneratorOpcode.  This
 	// is required for future execution of a step.
 	NewOp(op enums.Opcode, id string, opts map[string]any) UnhashedOp
 	// SigningKey returns the signing key used for this request.  This lets us
@@ -97,7 +96,7 @@ type requestCtxManager struct {
 	err error
 	// Ops holds a list of buffered generator opcodes to send to the executor
 	// after this invocation.
-	ops []state.GeneratorOpcode
+	ops []GeneratorOpcode
 	// request represents the incoming request.
 	request *Request
 	// Indexes represents a map of indexes for each unhashed op.
@@ -138,19 +137,19 @@ func (r *requestCtxManager) Err() error {
 	return r.err
 }
 
-func (r *requestCtxManager) AppendOp(op state.GeneratorOpcode) {
+func (r *requestCtxManager) AppendOp(op GeneratorOpcode) {
 	r.l.Lock()
 	defer r.l.Unlock()
 
 	if r.ops == nil {
-		r.ops = []state.GeneratorOpcode{op}
+		r.ops = []GeneratorOpcode{op}
 		return
 	}
 
 	r.ops = append(r.ops, op)
 }
 
-func (r *requestCtxManager) Ops() []state.GeneratorOpcode {
+func (r *requestCtxManager) Ops() []GeneratorOpcode {
 	return r.ops
 }
 
@@ -242,4 +241,47 @@ func (u UnhashedOp) MustHash() string {
 		panic(fmt.Errorf("error hashing op: %w", err))
 	}
 	return h
+}
+
+// GeneratorOpcode is a reexport of inngest/state.GeneratorOpcode
+type GeneratorOpcode struct {
+	// Op represents the type of operation invoked in the function.
+	Op enums.Opcode `json:"op"`
+	// ID represents a hashed unique ID for the operation.  This acts
+	// as the generated step ID for the state store.
+	ID string `json:"id"`
+	// Name represents the name of the step, or the sleep duration for
+	// sleeps.
+	Name string `json:"name"`
+	// Opts indicate options for the operation, eg. matching expressions
+	// when setting up async event listeners via `waitForEvent`, or retry
+	// policies for steps.
+	Opts any `json:"opts"`
+	// Data is the resulting data from the operation, eg. the step
+	// output. Note that for gateway requests, this is initially the
+	// request input.
+	Data json.RawMessage `json:"data"`
+	// Error is the failing result from the operation, e.g. an error thrown
+	// from a step.  This MUST be in the shape of OpcodeError.
+	Error *UserError `json:"error"`
+	// SDK versions < 3.?.? don't respond with the display name.
+	DisplayName *string `json:"displayName"`
+}
+
+// UserError is a reexport of inngest/state.UserError
+type UserError struct {
+	Name    string `json:"name"`
+	Message string `json:"message"`
+	Stack   string `json:"stack,omitempty"`
+
+	// Data allows for multiple return values in eg. Golang.  If provided,
+	// the SDK MAY choose to store additional data for its own purposes here.
+	Data json.RawMessage `json:"data,omitempty"`
+
+	// NoRetry is set when parsing the opcode via the retry header.
+	// It is NOT set via the SDK.
+	NoRetry bool `json:"noRetry,omitempty"`
+
+	// Cause allows nested errors to be passed back to the SDK.
+	Cause *UserError `json:"cause,omitempty"`
 }

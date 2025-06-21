@@ -9,7 +9,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
-	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/tests/client"
 	"github.com/inngest/inngestgo"
 	"github.com/inngest/inngestgo/step"
@@ -40,7 +39,7 @@ func TestEventCancellation(t *testing.T) {
 		inngestClient,
 		inngestgo.FunctionOpts{
 			ID: "test-cancel",
-			Cancel: []inngest.Cancel{
+			Cancel: []inngestgo.FnCancel{
 				{Event: cancelEvtName, If: inngestgo.StrPtr("async.data.cancel == event.data.cancel")},
 			},
 		},
