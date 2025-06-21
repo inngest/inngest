@@ -9,6 +9,7 @@ const (
 	HeaderKeyAuthorization      = "Authorization"
 	HeaderKeyContentType        = "Content-Type"
 	HeaderKeyEnv                = "X-Inngest-Env"
+	HeaderKeyEventIDSeed        = "x-inngest-event-id-seed"
 	HeaderKeyExpectedServerKind = "X-Inngest-Expected-Server-Kind"
 	HeaderKeyNoRetry            = "X-Inngest-No-Retry"
 	HeaderKeyReqVersion         = "x-inngest-req-version"
