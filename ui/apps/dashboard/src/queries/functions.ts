@@ -134,6 +134,7 @@ export function useFunctionsPage({
   };
 }
 
+// TODO: remove current.triggers from this query after new FunctionConfiguration is fully rolled out
 const GetFunctionDocument = graphql(`
   query GetFunction($slug: String!, $environmentID: ID!) {
     workspace(id: $environmentID) {
@@ -157,6 +158,11 @@ const GetFunctionDocument = graphql(`
             id
             createdAt
           }
+        }
+        triggers {
+          type
+          value
+          condition
         }
         failureHandler {
           slug
