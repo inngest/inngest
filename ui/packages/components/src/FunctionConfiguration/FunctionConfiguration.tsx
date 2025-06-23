@@ -16,6 +16,7 @@ import { EventsIcon } from '@inngest/components/icons/sections/Events';
 import { FunctionsIcon } from '@inngest/components/icons/sections/Functions';
 import { relativeTime } from '@inngest/components/utils/date';
 import { RiArrowRightSLine, RiArrowRightUpLine, RiTimeLine } from '@remixicon/react';
+import cronstrue from 'cronstrue';
 
 import type { GetFunctionQuery as DashboardGetFunctionQuery } from '../../../../apps/dashboard/src/gql/graphql';
 import {
@@ -371,10 +372,27 @@ type CronTriggerBlockProps = {
 function CronTriggerBlock({ schedule }: CronTriggerBlockProps) {
   const { nextRun } = useCron(schedule);
 
+  const humanReadable = (() => {
+    try {
+      return cronstrue.toString(schedule);
+    } catch {
+      return schedule;
+    }
+  })();
+
+  const mainContent = (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span className="font-mono">{schedule}</span>
+      </TooltipTrigger>
+      <TooltipContent>{humanReadable}</TooltipContent>
+    </Tooltip>
+  );
+
   return (
     <ConfigurationBlock
       icon={<RiTimeLine className="h-5 w-5" />}
-      mainContent={schedule}
+      mainContent={mainContent}
       subContent={
         nextRun ? (
           <Tooltip>

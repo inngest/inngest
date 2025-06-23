@@ -4,7 +4,7 @@ import { cn } from '@inngest/components/utils/classNames';
 
 type ConfigurationBlockProps = {
   icon: React.ReactNode;
-  mainContent: string;
+  mainContent: React.ReactNode;
   subContent?: React.ReactNode;
   expression?: string;
   rightElement?: React.ReactNode;

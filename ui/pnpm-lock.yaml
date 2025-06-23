@@ -520,6 +520,9 @@ importers:
       croner:
         specifier: ^7.0.5
         version: 7.0.5
+      cronstrue:
+        specifier: ^2.51.0
+        version: 2.61.0
       date-fns:
         specifier: ^3.6.0
         version: 3.6.0
@@ -11323,6 +11326,11 @@ packages:
   /croner@7.0.5:
     resolution: {integrity: sha512-15HLCD7iXnMe5km54yc4LN5BH+Cg9uCQvbkJ0acHxFffE29w3Uvgb9s/l310UCVUgMwGSBNw9BAHsEb5uMgj1g==}
     engines: {node: '>=6.0'}
+    dev: false
+
+  /cronstrue@2.61.0:
+    resolution: {integrity: sha512-ootN5bvXbIQI9rW94+QsXN5eROtXWwew6NkdGxIRpS/UFWRggL0G5Al7a9GTBFEsuvVhJ2K3CntIIVt7L2ILhA==}
+    hasBin: true
     dev: false
 
   /cross-fetch@3.1.5:
