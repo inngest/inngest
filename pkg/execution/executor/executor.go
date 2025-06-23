@@ -603,6 +603,9 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 				}
 			}
 			singletonConfig = &queue.Singleton{Key: singletonKey}
+		case errors.Is(err, singleton.ErrEvaluatingSingletonExpression):
+			// Ignore singleton expressions if we cannot evaluate them
+			logger.StdlibLogger(ctx).Warn("error evaluating singleton expression", "error", err)
 		case errors.Is(err, singleton.ErrNotASingleton):
 			// We no-op, and we run the function normally not as a singleton
 		default:
