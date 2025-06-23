@@ -756,11 +756,11 @@ func parseScanResult(res any) (*activeCheckScanResult, error) {
 	}
 
 	stale := make([]osqueue.QueueItem, len(staleItems))
-	for i, item := range leasedItems {
+	for i, item := range staleItems {
 		if itemData, ok := item.(string); ok {
 			err := json.Unmarshal([]byte(itemData), &stale[i])
 			if err != nil {
-				return nil, fmt.Errorf("invalid queue item")
+				return nil, fmt.Errorf("invalid queue item: %w", err)
 			}
 		}
 	}

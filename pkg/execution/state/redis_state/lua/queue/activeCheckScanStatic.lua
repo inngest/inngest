@@ -15,6 +15,8 @@ local cursor = tonumber(ARGV[1])
 local batchSize = tonumber(ARGV[2])
 local nowMS = tonumber(ARGV[3])
 
+-- $include(decode_ulid_time.lua)
+
 local result = redis.call("SSCAN", keyActiveSet, cursor, "COUNT", batchSize)
 
 local nextCursor = result[1]
@@ -41,7 +43,7 @@ for i = 1, #setMembers do
     local parsedData = cjson.decode(itemData)
 
     -- if item is still leased, ignore
-    if parsedData.leaseID ~= nil and parsedData.leaseID ~= false and parsedData.leaseID > nowMS then
+    if parsedData.leaseID ~= nil and parsedData.leaseID ~= false and decode_ulid_time(parsedData.leaseID) > nowMS then
       table.insert(leasedItems, itemID)
     else
       -- item may be stale: check all targets
@@ -49,7 +51,7 @@ for i = 1, #setMembers do
       if targetScore1 == nil or targetScore1 == false then
         local targetScore2 = tonumber(redis.call("ZSCORE", keyStaticTarget2, itemID))
         if targetScore2 == nil or targetScore2 == false then
-          table.insert(staleItems, itemID)
+          table.insert(staleItems, itemData)
         end
       end
     end
