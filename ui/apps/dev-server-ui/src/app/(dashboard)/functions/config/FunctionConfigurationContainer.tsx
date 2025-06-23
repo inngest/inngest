@@ -1,6 +1,5 @@
 'use client';
 
-import { useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@inngest/components/Button';
 import { FunctionConfiguration } from '@inngest/components/FunctionConfiguration';
@@ -33,9 +32,9 @@ export function FunctionConfigurationContainer({ onClose, functionSlug }: Functi
   const triggers = data?.functionBySlug?.triggers;
 
   const router = useRouter();
-  const doesFunctionAcceptPayload = useMemo(() => {
-    return Boolean(triggers?.some((trigger) => trigger.type === FunctionTriggerTypes.Event));
-  }, [triggers]);
+  const doesFunctionAcceptPayload = Boolean(
+    triggers?.some((trigger) => trigger.type === FunctionTriggerTypes.Event)
+  );
 
   if (isFetching || !data || !data.functionBySlug) {
     return null;
