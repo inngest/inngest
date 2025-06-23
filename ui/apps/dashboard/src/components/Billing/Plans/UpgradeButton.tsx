@@ -54,7 +54,7 @@ export default function UpgradeButton({
       return !isEnterprisePlan(plan);
     }
     // For legacy plans, only Free Tier is a downgrade
-    if (currentPlan.isLegacy) {
+    if (currentPlan.isLegacy && !currentPlan.isFree) {
       return isFreeCard || plan.slug === 'hobby-free-2025-06-13';
     }
     // For non-enterprise plans, compare the amounts
