@@ -356,6 +356,10 @@ func (r *DriverResponse) GetFunctionOutput() (*string, error) {
 		}
 	}
 
+	if output == nil {
+		return nil, nil
+	}
+
 	// Now we have the output, we make sure it's keyed the same as regular step
 	// outputs are, either under `data` or `error`.
 	var keyedOutput *string
