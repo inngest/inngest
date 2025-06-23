@@ -135,8 +135,6 @@ export const StepInfo = ({
   const { runID, trace } = selectedStep;
   const [result, setResult] = useState<Result>();
 
-  console.log('result', result);
-
   useEffect(() => {
     let intervalId: ReturnType<typeof setInterval> | undefined;
     //
@@ -186,10 +184,6 @@ export const StepInfo = ({
   const prettyInput = usePrettyJson(result?.input ?? '') || (result?.input ?? '');
   const prettyOutput = usePrettyJson(result?.data ?? '') || (result?.data ?? '');
   const prettyErrorBody = usePrettyErrorBody(result?.error);
-
-  console.log('prettyOutput', prettyOutput);
-  console.log('prettyInput', prettyOutput);
-  console.log('aiOutput', aiOutput);
 
   return (
     <div className="sticky top-14 flex flex-col justify-start gap-2 overflow-hidden">
