@@ -187,8 +187,6 @@ func (q *queue) accountActiveCheck(
 	// To the account in progress key
 	keyInProgress := sp.accountInProgressKey(kg)
 
-	invalidItems := make([]string, 0)
-
 	l.Debug("checking account for invalid or missing active keys", "account_id", sp.AccountID, "key", keyActive, "in_progress", keyInProgress)
 
 	var batchSize int64 = 20
@@ -208,6 +206,8 @@ func (q *queue) accountActiveCheck(
 		}
 
 		l.Debug("scanned account", "res", res)
+
+		invalidItems := make([]string, 0)
 
 		if len(res.MissingItems) > 0 {
 			metrics.IncrQueueActiveCheckInvalidItemsFoundCounter(ctx, int64(len(res.MissingItems)), metrics.CounterOpt{
@@ -235,6 +235,34 @@ func (q *queue) accountActiveCheck(
 			}
 		}
 
+		if len(invalidItems) > 0 {
+			l.Debug(
+				"removing invalid items from account active key",
+				"mode", "account",
+				"job_id", invalidItems,
+				"partition_id", sp.PartitionID,
+				"active", keyActive,
+				"in_progress", keyInProgress,
+				"readonly", readOnly,
+			)
+
+			if !readOnly {
+				metrics.IncrQueueActiveCheckInvalidItemsRemovedCounter(ctx, int64(len(invalidItems)), metrics.CounterOpt{
+					PkgName: pkgName,
+					Tags: map[string]any{
+						"account_id": accountID.String(),
+						"check":      "account",
+					},
+				})
+
+				cmd := client.B().Srem().Key(keyActive).Member(invalidItems...).Build()
+				err := client.Do(ctx, cmd).Error()
+				if err != nil {
+					return fmt.Errorf("could not remove invalid items from active set: %w", err)
+				}
+			}
+		}
+
 		if res.NextCursor == 0 {
 			break
 		}
@@ -242,34 +270,6 @@ func (q *queue) accountActiveCheck(
 		cursor = res.NextCursor
 
 		<-time.After(100 * time.Millisecond)
-	}
-
-	if len(invalidItems) > 0 {
-		l.Debug(
-			"removing invalid items from account active key",
-			"mode", "account",
-			"job_id", invalidItems,
-			"partition_id", sp.PartitionID,
-			"active", keyActive,
-			"in_progress", keyInProgress,
-			"readonly", readOnly,
-		)
-
-		if !readOnly {
-			metrics.IncrQueueActiveCheckInvalidItemsRemovedCounter(ctx, int64(len(invalidItems)), metrics.CounterOpt{
-				PkgName: pkgName,
-				Tags: map[string]any{
-					"account_id": accountID.String(),
-					"check":      "account",
-				},
-			})
-
-			cmd := client.B().Srem().Key(keyActive).Member(invalidItems...).Build()
-			err := client.Do(ctx, cmd).Error()
-			if err != nil {
-				return fmt.Errorf("could not remove invalid items from active set: %w", err)
-			}
-		}
 	}
 
 	return nil
@@ -288,8 +288,6 @@ func (q *queue) partitionActiveCheck(
 	keyActive := sp.activeKey(kg)
 	keyInProgress := sp.inProgressKey(kg)
 	keyReady := sp.readyQueueKey(kg)
-
-	invalidItems := make([]string, 0)
 
 	var batchSize int64 = 20
 	var cursor int64
@@ -314,6 +312,8 @@ func (q *queue) partitionActiveCheck(
 		}
 
 		l.Debug("scanned partition", "res", res)
+
+		invalidItems := make([]string, 0)
 
 		if len(res.MissingItems) > 0 {
 			metrics.IncrQueueActiveCheckInvalidItemsFoundCounter(ctx, int64(len(res.MissingItems)), metrics.CounterOpt{
@@ -341,6 +341,35 @@ func (q *queue) partitionActiveCheck(
 			}
 		}
 
+		if len(invalidItems) > 0 {
+			l.Debug(
+				"removing invalid items from active key",
+				"mode", "partition",
+				"job_id", invalidItems,
+				"partition_id", sp.PartitionID,
+				"active", keyActive,
+				"ready", keyReady,
+				"in_progress", keyInProgress,
+				"readonly", readOnly,
+			)
+
+			if !readOnly {
+				metrics.IncrQueueActiveCheckInvalidItemsRemovedCounter(ctx, int64(len(invalidItems)), metrics.CounterOpt{
+					PkgName: pkgName,
+					Tags: map[string]any{
+						"account_id": accountID.String(),
+						"check":      "partition",
+					},
+				})
+
+				cmd := client.B().Srem().Key(keyActive).Member(invalidItems...).Build()
+				err := client.Do(ctx, cmd).Error()
+				if err != nil {
+					return fmt.Errorf("could not remove invalid items from active set: %w", err)
+				}
+			}
+		}
+
 		if res.NextCursor == 0 {
 			break
 		}
@@ -348,35 +377,6 @@ func (q *queue) partitionActiveCheck(
 		cursor = res.NextCursor
 
 		<-time.After(100 * time.Millisecond)
-	}
-
-	if len(invalidItems) > 0 {
-		l.Debug(
-			"removing invalid items from active key",
-			"mode", "partition",
-			"job_id", invalidItems,
-			"partition_id", sp.PartitionID,
-			"active", keyActive,
-			"ready", keyReady,
-			"in_progress", keyInProgress,
-			"readonly", readOnly,
-		)
-
-		if !readOnly {
-			metrics.IncrQueueActiveCheckInvalidItemsRemovedCounter(ctx, int64(len(invalidItems)), metrics.CounterOpt{
-				PkgName: pkgName,
-				Tags: map[string]any{
-					"account_id": accountID.String(),
-					"check":      "partition",
-				},
-			})
-
-			cmd := client.B().Srem().Key(keyActive).Member(invalidItems...).Build()
-			err := client.Do(ctx, cmd).Error()
-			if err != nil {
-				return fmt.Errorf("could not remove invalid items from active set: %w", err)
-			}
-		}
 	}
 
 	return nil
@@ -390,8 +390,6 @@ func (q *queue) customConcurrencyActiveCheck(ctx context.Context, sp *QueueShado
 
 	// Can use the partition ready queue as it includes _all_ concurrency keys' items
 	keyReady := sp.readyQueueKey(kg)
-
-	invalidItems := make([]string, 0)
 
 	var batchSize int64 = 20
 	var cursor int64
@@ -416,6 +414,8 @@ func (q *queue) customConcurrencyActiveCheck(ctx context.Context, sp *QueueShado
 		}
 
 		l.Debug("scanned partition", "res", res)
+
+		invalidItems := make([]string, 0)
 
 		if len(res.MissingItems) > 0 {
 			metrics.IncrQueueActiveCheckInvalidItemsFoundCounter(ctx, int64(len(res.MissingItems)), metrics.CounterOpt{
@@ -443,6 +443,36 @@ func (q *queue) customConcurrencyActiveCheck(ctx context.Context, sp *QueueShado
 			}
 		}
 
+		if len(invalidItems) > 0 {
+			l.Debug(
+				"removing invalid items from active key",
+				"job_id", invalidItems,
+				"mode", "custom_concurrency",
+				"bcc", bcc,
+				"partition_id", sp.PartitionID,
+				"active", keyActive,
+				"ready", keyReady,
+				"in_progress", keyInProgress,
+				"readonly", readOnly,
+			)
+
+			if !readOnly {
+				metrics.IncrQueueActiveCheckInvalidItemsRemovedCounter(ctx, int64(len(invalidItems)), metrics.CounterOpt{
+					PkgName: pkgName,
+					Tags: map[string]any{
+						"account_id": accountID.String(),
+						"check":      "custom-concurrency",
+					},
+				})
+
+				cmd := client.B().Srem().Key(keyActive).Member(invalidItems...).Build()
+				err := client.Do(ctx, cmd).Error()
+				if err != nil {
+					return fmt.Errorf("could not remove invalid items from active set: %w", err)
+				}
+			}
+		}
+
 		if res.NextCursor == 0 {
 			break
 		}
@@ -450,36 +480,6 @@ func (q *queue) customConcurrencyActiveCheck(ctx context.Context, sp *QueueShado
 		cursor = res.NextCursor
 
 		<-time.After(100 * time.Millisecond)
-	}
-
-	if len(invalidItems) > 0 {
-		l.Debug(
-			"removing invalid items from active key",
-			"job_id", invalidItems,
-			"mode", "custom_concurrency",
-			"bcc", bcc,
-			"partition_id", sp.PartitionID,
-			"active", keyActive,
-			"ready", keyReady,
-			"in_progress", keyInProgress,
-			"readonly", readOnly,
-		)
-
-		if !readOnly {
-			metrics.IncrQueueActiveCheckInvalidItemsRemovedCounter(ctx, int64(len(invalidItems)), metrics.CounterOpt{
-				PkgName: pkgName,
-				Tags: map[string]any{
-					"account_id": accountID.String(),
-					"check":      "custom-concurrency",
-				},
-			})
-
-			cmd := client.B().Srem().Key(keyActive).Member(invalidItems...).Build()
-			err := client.Do(ctx, cmd).Error()
-			if err != nil {
-				return fmt.Errorf("could not remove invalid items from active set: %w", err)
-			}
-		}
 	}
 
 	return nil
