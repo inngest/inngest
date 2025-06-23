@@ -688,17 +688,25 @@ func (q *queue) activeCheckScanAccount(ctx context.Context, shard QueueShard, sp
 	kg := shard.RedisClient.KeyGenerator()
 	client := shard.RedisClient.Client()
 
-	res, err := scripts["queue/activeCheckScanAccount"].Exec(ctx, client, []string{
-		sp.accountActiveKey(kg),
-		sp.accountInProgressKey(kg),
-		kg.QueueItem(),
-	},
-		[]string{
-			strconv.Itoa(int(cursor)),
-			strconv.Itoa(int(count)),
-			strconv.Itoa(int(q.clock.Now().UnixMilli())),
-			kg.QueuePrefix(),
-		}).ToAny()
+	res, err := duration(
+		ctx,
+		q.primaryQueueShard.Name,
+		"active_check_scan_account",
+		q.clock.Now(),
+		func(ctx context.Context) (any, error) {
+			res, err := scripts["queue/activeCheckScanAccount"].Exec(ctx, client, []string{
+				sp.accountActiveKey(kg),
+				sp.accountInProgressKey(kg),
+				kg.QueueItem(),
+			},
+				[]string{
+					strconv.Itoa(int(cursor)),
+					strconv.Itoa(int(count)),
+					strconv.Itoa(int(q.clock.Now().UnixMilli())),
+					kg.QueuePrefix(),
+				}).ToAny()
+			return res, err
+		})
 	if err != nil {
 		return nil, fmt.Errorf("could not scan account for active check: %w", err)
 	}
@@ -777,17 +785,25 @@ func (q *queue) activeCheckScanStatic(ctx context.Context, shard QueueShard, key
 	kg := shard.RedisClient.KeyGenerator()
 	client := shard.RedisClient.Client()
 
-	res, err := scripts["queue/activeCheckScanStatic"].Exec(ctx, client, []string{
-		keyActiveSet,
-		keyTarget1,
-		keyTarget2,
-		kg.QueueItem(),
-	},
-		[]string{
-			strconv.Itoa(int(cursor)),
-			strconv.Itoa(int(count)),
-			strconv.Itoa(int(q.clock.Now().UnixMilli())),
-		}).ToAny()
+	res, err := duration(
+		ctx,
+		q.primaryQueueShard.Name,
+		"active_check_scan_static",
+		q.clock.Now(),
+		func(ctx context.Context) (any, error) {
+			res, err := scripts["queue/activeCheckScanStatic"].Exec(ctx, client, []string{
+				keyActiveSet,
+				keyTarget1,
+				keyTarget2,
+				kg.QueueItem(),
+			},
+				[]string{
+					strconv.Itoa(int(cursor)),
+					strconv.Itoa(int(count)),
+					strconv.Itoa(int(q.clock.Now().UnixMilli())),
+				}).ToAny()
+			return res, err
+		})
 	if err != nil {
 		return nil, fmt.Errorf("could not scan static targets for active check: %w", err)
 	}
