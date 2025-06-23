@@ -105,6 +105,10 @@ type StartOpts struct {
 
 	ConnectGatewayPort int    `json:"connectGatewayPort"`
 	ConnectGatewayHost string `json:"connectGatewayHost"`
+
+	// InMemory controls whether to only use in-memory databases (as opposed to
+	// filesystem)
+	InMemory bool
 }
 
 // Create and start a new dev server.  The dev server is used during (surprise surprise)
@@ -129,7 +133,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	l := logger.StdlibLogger(ctx)
 	ctx = logger.WithStdlib(ctx, l)
 
-	db, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{InMemory: false})
+	db, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{InMemory: opts.InMemory})
 	if err != nil {
 		return err
 	}
