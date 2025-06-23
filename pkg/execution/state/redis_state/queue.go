@@ -567,12 +567,12 @@ func WithRefreshItemThrottle(fn RefreshItemThrottleFn) QueueOpt {
 	}
 }
 
-type EnableActiveSpotChecks func(ctx context.Context, acctID uuid.UUID) bool
+type ActiveSpotChecksProbability func(ctx context.Context, acctID uuid.UUID) (backlogRefillCheckProbability int, accountSpotCheckProbability int)
 type ReadOnlySpotChecks func(ctx context.Context, acctID uuid.UUID) bool
 
-func WithEnableActiveSpotChecks(fn EnableActiveSpotChecks) QueueOpt {
+func WithActiveSpotCheckProbability(fn ActiveSpotChecksProbability) QueueOpt {
 	return func(q *queue) {
-		q.enableActiveSpotChecks = fn
+		q.activeSpotCheckProbability = fn
 	}
 }
 
@@ -694,11 +694,11 @@ func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 		refreshItemThrottle: func(ctx context.Context, item *osqueue.QueueItem) (*osqueue.Throttle, error) {
 			return nil, nil
 		},
-		enableActiveSpotChecks: func(ctx context.Context, acctID uuid.UUID) bool {
-			return false
-		},
 		readOnlySpotChecks: func(ctx context.Context, acctID uuid.UUID) bool {
 			return true
+		},
+		activeSpotCheckProbability: func(ctx context.Context, acctID uuid.UUID) (backlogRefillCheckProbability int, accountSpotCheckProbability int) {
+			return 100, 100
 		},
 	}
 
@@ -752,7 +752,7 @@ type queue struct {
 	allowKeyQueues                  AllowKeyQueues
 	enqueueSystemQueuesToBacklog    bool
 	partitionConstraintConfigGetter PartitionConstraintConfigGetter
-	enableActiveSpotChecks          EnableActiveSpotChecks
+	activeSpotCheckProbability      ActiveSpotChecksProbability
 	readOnlySpotChecks              ReadOnlySpotChecks
 
 	disableLeaseChecks                DisableLeaseChecks
@@ -920,12 +920,6 @@ type QueueRunMode struct {
 
 	// ActiveChecker enables background checking of active sets.
 	ActiveChecker bool
-
-	// BacklogRefillSpotCheckProbability determines the weight of adding backlogs to spot checks when concurrency limits between 0 and 100 where 100 means always check.
-	BacklogRefillSpotCheckProbability int
-
-	// ActiveCheckAccountCheckProbability determines the weight of running spot checks on accounts when running an active check
-	ActiveCheckAccountCheckProbability int
 }
 
 // continuation represents a partition continuation, forcung the queue to continue working

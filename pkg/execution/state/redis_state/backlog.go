@@ -756,14 +756,17 @@ func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueSha
 		kg.BacklogActiveCheckCooldown(b.BacklogID),
 	}
 
+	enableKeyQueues := sp.keyQueuesEnabled(ctx, q)
+
 	enableKeyQueuesVal := "0"
 	// Don't check constraints if key queues have been disabled for this function (refill as quickly as possible)
-	if sp.keyQueuesEnabled(ctx, q) {
+	if enableKeyQueues {
 		enableKeyQueuesVal = "1"
 	}
 
 	// Enable conditional spot checking (probability in queue settings + feature flag)
-	shouldSpotCheckActiveSet := q.enableActiveSpotChecks(ctx, accountID) && rand.Intn(100) <= q.runMode.BacklogRefillSpotCheckProbability
+	refillProbability, _ := q.activeSpotCheckProbability(ctx, accountID)
+	shouldSpotCheckActiveSet := enableKeyQueues && rand.Intn(100) <= refillProbability
 
 	args, err := StrSlice([]any{
 		b.BacklogID,
