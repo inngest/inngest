@@ -98,7 +98,7 @@ export default function Page() {
                   <Alert.Link
                     severity="warning"
                     target="_blank"
-                    href="https://www.inngest.com/docs/security#rotation"
+                    href="https://www.inngest.com/docs/platform/signing-keys#rotation"
                   >
                     Learn More
                   </Alert.Link>
