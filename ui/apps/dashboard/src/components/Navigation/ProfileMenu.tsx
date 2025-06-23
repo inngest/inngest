@@ -6,12 +6,6 @@ import NextLink from 'next/link';
 import { SignOutButton, useClerk } from '@clerk/nextjs';
 import { Listbox } from '@headlessui/react';
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@inngest/components/DropdownMenu/DropdownMenu';
-import {
   RiAddCircleFill,
   RiArrowLeftRightLine,
   RiArrowRightLine,
@@ -19,7 +13,6 @@ import {
   RiEqualizerLine,
   RiGroupLine,
   RiLogoutCircleLine,
-  RiMore2Line,
   RiUserLine,
 } from '@remixicon/react';
 
@@ -140,26 +133,28 @@ export const ProfileMenu = ({ children, isMarketplace }: Props) => {
                     <div>{user?.emailAddresses[0]?.emailAddress}</div>
                   </div>
                 </div>
-                <div className="flex w-full flex-row justify-between pl-5 pt-2">
-                  <NextLink href="/settings/user" scroll={false}>
-                    <div className="hover:bg-canvasSubtle flex cursor-pointer flex-row items-center justify-start">
-                      <RiUserLine className="text-muted mr-0 h-4 w-4" /> Profile
-                    </div>
-                  </NextLink>
-                  <div className="hover:bg-canvasSubtle flex cursor-pointer flex-row items-center justify-start">
-                    <SignOutButton>
+                {!isMarketplace && (
+                  <div className="flex w-full flex-row justify-between pl-5 pt-2">
+                    <NextLink href="/settings/user" scroll={false}>
                       <div className="hover:bg-canvasSubtle flex cursor-pointer flex-row items-center justify-start">
-                        <RiLogoutCircleLine className="text-muted mr-0 h-4 w-4" /> Sign Out
+                        <RiUserLine className="text-muted mr-0 h-4 w-4" /> Profile
                       </div>
-                    </SignOutButton>
+                    </NextLink>
+                    <div className="hover:bg-canvasSubtle flex cursor-pointer flex-row items-center justify-start">
+                      <SignOutButton>
+                        <div className="hover:bg-canvasSubtle flex cursor-pointer flex-row items-center justify-start">
+                          <RiLogoutCircleLine className="text-muted mr-0 h-4 w-4" /> Sign Out
+                        </div>
+                      </SignOutButton>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             </Listbox.Option>
           )}
 
-          {client &&
-            client.sessions &&
+          {/* eslint-disable-next-line @typescript-eslint/no-unnecessary-condition */}
+          {client.sessions &&
             client.sessions
               .filter((session) => session.id !== currentSession?.id)
               .map((session) => {
@@ -213,12 +208,12 @@ export const ProfileMenu = ({ children, isMarketplace }: Props) => {
 
           <hr className="border-subtle" />
 
-          {client.sessions.length > 1 && (
+          {isMarketplace && (
             <Listbox.Option
               className="text-muted hover:bg-canvasSubtle m-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
               value="signOut"
             >
-              <SignOut isMarketplace={isMarketplace} multiSession={client?.sessions?.length > 1} />
+              <SignOut isMarketplace={isMarketplace} multiSession={client.sessions.length > 1} />
             </Listbox.Option>
           )}
         </Listbox.Options>
