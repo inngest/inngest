@@ -179,7 +179,7 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
             )}
           >
             {newFunctionConfigUiEnabled ? (
-              <div className="bg-canvasBase">
+              <div className="bg-canvasBase h-full overflow-y-auto">
                 <NewFunctionConfiguration
                   inngestFunction={function_}
                   deployCreatedAt={function_.current?.deploy?.createdAt}

@@ -1,4 +1,4 @@
-import { Link } from '@inngest/components/Link';
+import NextLink from 'next/link';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
 import { cn } from '@inngest/components/utils/classNames';
 
@@ -29,7 +29,7 @@ export default function ConfigurationBlock({
       <div className="bg-canvasSubtle text-light flex h-9 w-9 items-center justify-center gap-2 rounded p-2">
         {icon}
       </div>
-      <div className="text-basis flex min-w-0 flex-1 flex-col items-start justify-center gap-1 self-stretch text-sm">
+      <div className="text-basis flex min-w-0 flex-1 flex-col items-start justify-center gap-0.5 self-stretch text-sm">
         <div>{mainContent}</div>
 
         {(subContent || expression) && (
@@ -54,9 +54,9 @@ export default function ConfigurationBlock({
   );
 
   return href ? (
-    <Link href={href} className={cn('hover:bg-canvasMuted block', borderClasses)}>
+    <NextLink href={href} className={cn('hover:bg-canvasMuted block', borderClasses)}>
       {content}
-    </Link>
+    </NextLink>
   ) : (
     <div className={cn(borderClasses)}>{content}</div>
   );

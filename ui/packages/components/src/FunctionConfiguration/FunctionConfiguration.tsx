@@ -214,7 +214,7 @@ export function FunctionConfiguration({
   );
 
   return (
-    <div className="border-subtle flex flex-col overflow-hidden overflow-y-auto border-l-[0.5px]">
+    <div className="border-subtle flex h-full flex-col overflow-hidden overflow-y-auto border-l-[0.5px]">
       {header}
       <ConfigurationCategory title="Overview">
         <ConfigurationSection title="App">

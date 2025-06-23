@@ -35,6 +35,7 @@ export default function ConfigurationTable({
                 {header}
                 <Info
                   text={<span className="whitespace-pre-line">{infoPopoverContent.text}</span>}
+                  side="left"
                   action={
                     <Link
                       href={infoPopoverContent.url}
