@@ -38,7 +38,7 @@ const exampleAiOutput = {
   system_fingerprint: 'fp_afccf7958a',
 };
 
-const exampleInput = {
+export const exampleInput = {
   messages: [
     {
       content: 'Give me a famous quote about sidewalks and rain.',
@@ -49,7 +49,7 @@ const exampleInput = {
   temperature: 0.9,
 };
 
-const exampleOutput = {
+export const exampleOutput = {
   data: {
     id: 'chatcmpl-BjpG3gipnAUHsi3txqSt5XLp9G76J',
     object: 'chat.completion',
@@ -122,7 +122,7 @@ const data = [
 export const History = () => (
   <div className="flex w-full flex-col gap-2">
     {data.map((item, i) => (
-      <StepHistory {...item} defaultOpen={i === data.length - 1} />
+      <StepHistory {...item} defaultOpen={i === data.length - 1} key={`step-history-${item.id}`} />
     ))}
   </div>
 );

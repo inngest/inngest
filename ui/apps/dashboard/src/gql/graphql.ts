@@ -2211,7 +2211,7 @@ export type Workflow = {
   runs: Maybe<RunListConnection>;
   runsV2: Maybe<RunListConnection>;
   slug: Scalars['String'];
-  triggers: Array<WorkflowTrigger>;
+  triggers: Array<FunctionTrigger>;
   url: Scalars['String'];
   usage: Usage;
 };
@@ -2268,13 +2268,6 @@ export type WorkflowResponse = {
   workflow: Workflow;
 };
 
-export type WorkflowTrigger = {
-  __typename?: 'WorkflowTrigger';
-  condition: Maybe<Scalars['NullString']>;
-  eventName: Maybe<Scalars['NullString']>;
-  schedule: Maybe<Scalars['NullString']>;
-};
-
 export type WorkflowVersion = {
   __typename?: 'WorkflowVersion';
   createdAt: Scalars['Time'];
@@ -2284,7 +2277,7 @@ export type WorkflowVersion = {
   retries: Scalars['Int'];
   throttleCount: Scalars['Int'];
   throttlePeriod: Scalars['String'];
-  triggers: Array<WorkflowTrigger>;
+  triggers: Array<FunctionTrigger>;
   updatedAt: Scalars['Time'];
   url: Scalars['String'];
   validFrom: Maybe<Scalars['Time']>;

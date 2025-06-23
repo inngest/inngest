@@ -176,9 +176,6 @@ importers:
       react-dom:
         specifier: ^18.2.0
         version: 18.2.0(react@18.2.0)
-      react-json-tree:
-        specifier: ^0.20.0
-        version: 0.20.0(@types/react@18.2.11)(react@18.2.0)
       react-syntax-highlighter:
         specifier: ^15.5.0
         version: 15.5.0(react@18.2.0)
@@ -465,7 +462,7 @@ importers:
         version: 0.1.2(tailwindcss@3.4.1)
       '@monaco-editor/react':
         specifier: ^4.6.0
-        version: 4.6.0(monaco-editor@0.34.1)(react-dom@18.2.0)(react@18.2.0)
+        version: 4.6.0(monaco-editor@0.52.2)(react-dom@18.2.0)(react@18.2.0)
       '@radix-ui/react-accordion':
         specifier: ^1.1.2
         version: 1.1.2(@types/react-dom@18.2.4)(@types/react@18.2.11)(react-dom@18.2.0)(react@18.2.0)
@@ -539,8 +536,8 @@ importers:
         specifier: ^4.0.8
         version: 4.0.8
       monaco-editor:
-        specifier: ^0.34.1
-        version: 0.34.1
+        specifier: ^0.52.0
+        version: 0.52.2
       next:
         specifier: ^14.2.26
         version: 14.2.26(@babel/core@7.26.10)(react-dom@18.2.0)(react@18.2.0)
@@ -556,6 +553,9 @@ importers:
       react-dom:
         specifier: ^18.2.0
         version: 18.2.0(react@18.2.0)
+      react-json-tree:
+        specifier: ^0.20.0
+        version: 0.20.0(@types/react@18.2.11)(react@18.2.0)
       react-use:
         specifier: ^17.4.0
         version: 17.4.0(react-dom@18.2.0)(react@18.2.0)
@@ -4270,6 +4270,15 @@ packages:
       state-local: 1.0.7
     dev: false
 
+  /@monaco-editor/loader@1.4.0(monaco-editor@0.52.2):
+    resolution: {integrity: sha512-00ioBig0x642hytVspPl7DbQyaSWRaolYie/UFNjoTdvoKPzo6xrXLhTk9ixgIKcLH5b5vDOjVNiGyY+uDCUlg==}
+    peerDependencies:
+      monaco-editor: '>= 0.21.0 < 1'
+    dependencies:
+      monaco-editor: 0.52.2
+      state-local: 1.0.7
+    dev: false
+
   /@monaco-editor/react@4.6.0(monaco-editor@0.34.1)(react-dom@18.2.0)(react@18.2.0):
     resolution: {integrity: sha512-RFkU9/i7cN2bsq/iTkurMWOEErmYcY6JiQI3Jn+WeR/FGISH8JbHERjpS9oRuSOPvDMJI0Z8nJeKkbOs9sBYQw==}
     peerDependencies:
@@ -4279,6 +4288,19 @@ packages:
     dependencies:
       '@monaco-editor/loader': 1.4.0(monaco-editor@0.34.1)
       monaco-editor: 0.34.1
+      react: 18.2.0
+      react-dom: 18.2.0(react@18.2.0)
+    dev: false
+
+  /@monaco-editor/react@4.6.0(monaco-editor@0.52.2)(react-dom@18.2.0)(react@18.2.0):
+    resolution: {integrity: sha512-RFkU9/i7cN2bsq/iTkurMWOEErmYcY6JiQI3Jn+WeR/FGISH8JbHERjpS9oRuSOPvDMJI0Z8nJeKkbOs9sBYQw==}
+    peerDependencies:
+      monaco-editor: '>= 0.25.0 < 1'
+      react: ^16.8.0 || ^17.0.0 || ^18.0.0
+      react-dom: ^16.8.0 || ^17.0.0 || ^18.0.0
+    dependencies:
+      '@monaco-editor/loader': 1.4.0(monaco-editor@0.52.2)
+      monaco-editor: 0.52.2
       react: 18.2.0
       react-dom: 18.2.0(react@18.2.0)
     dev: false
@@ -6181,7 +6203,7 @@ packages:
     resolution: {integrity: sha512-USm05zrsFxYLPdWWq+K3STlWiT/3ELn3RcV5hJMghpeAIhxfsUIg6mt12CBJBInWMV4VneoV7SfGv8xIwo2qNQ==}
     engines: {node: '>=14.0.0'}
     peerDependencies:
-      rollup: '>=2.79.2'
+      rollup: '>=3.29.5'
     peerDependenciesMeta:
       rollup:
         optional: true
@@ -15187,6 +15209,10 @@ packages:
 
   /monaco-editor@0.34.1:
     resolution: {integrity: sha512-FKc80TyiMaruhJKKPz5SpJPIjL+dflGvz4CpuThaPMc94AyN7SeC9HQ8hrvaxX7EyHdJcUY5i4D0gNyJj1vSZQ==}
+    dev: false
+
+  /monaco-editor@0.52.2:
+    resolution: {integrity: sha512-GEQWEZmfkOGLdd3XK8ryrfWz3AIP8YymVXiPHEdewrUq7mh0qrKrfHLNCXcbB6sTnMLnOZ3ztSiKcciFUkIJwQ==}
     dev: false
 
   /mri@1.2.0:

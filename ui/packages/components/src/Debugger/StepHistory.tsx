@@ -4,9 +4,8 @@ import { RiLightbulbLine } from '@remixicon/react';
 import { AITrace } from '../AI/AITrace';
 import { Button } from '../Button';
 import { Pill } from '../Pill';
-import { IO } from '../RunDetailsV3/IO';
+import { NewIO } from '../RunDetailsV3/NewIO';
 import { Tabs } from '../RunDetailsV3/Tabs';
-import SegmentedControl from '../SegmentedControl/SegmentedControl';
 import { StatusDot } from '../Status/StatusDot';
 import { getStatusTextClass } from '../Status/statusClasses';
 import { cn } from '../utils/classNames';
@@ -35,7 +34,7 @@ export const StepHistory = ({
   const [open, setOpen] = useState(defaultOpen);
 
   return (
-    <div className="flex flex-col" key={id}>
+    <div className="flex flex-col">
       <div
         className="border-muted flex cursor-pointer flex-row items-center justify-between gap-2 border-b px-4 py-3"
         onClick={() => setOpen(!open)}
@@ -89,7 +88,7 @@ export const StepHistory = ({
                     {
                       label: 'Input',
                       id: 'input',
-                      node: <IO raw={JSON.stringify(input, null, 2)} title="Input" />,
+                      node: <NewIO raw={JSON.stringify(input, null, 2)} title="Input" />,
                     },
                   ]
                 : []),
@@ -98,7 +97,7 @@ export const StepHistory = ({
                     {
                       label: 'Output',
                       id: 'output',
-                      node: <IO title="Step Output" raw={JSON.stringify(output, null, 2)} />,
+                      node: <NewIO title="output" raw={JSON.stringify(output, null, 2)} />,
                     },
                   ]
                 : []),
@@ -106,13 +105,13 @@ export const StepHistory = ({
               {
                 label: 'Tools',
                 id: 'tools',
-                node: <IO title="Tools" raw="" />,
+                node: <NewIO title="Tools" raw='{"tools": "coming soon..."}' />,
               },
 
               {
                 label: 'State',
                 id: 'state',
-                node: <IO title="State" raw="" />,
+                node: <NewIO title="State" raw='{"state": "coming soon..."}' />,
               },
             ]}
           />

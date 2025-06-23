@@ -1,4 +1,6 @@
-import { CodeBlock, type CodeBlockAction } from '../CodeBlock';
+import { useRef } from 'react';
+
+import { NewCodeBlock, type CodeBlockAction } from '../NewCodeBlock/NewCodeBlock';
 
 export type IOProps = {
   title: string;
@@ -7,16 +9,16 @@ export type IOProps = {
   error?: boolean;
 };
 
-export const IO = ({ title, actions, raw, error }: IOProps) => {
+export const NewIO = ({ title, actions, raw, error }: IOProps) => {
+  const parentRef = useRef<HTMLDivElement>(null);
   return (
-    <div className="text-muted h-full overflow-y-scroll" onWheel={(e) => e.stopPropagation()}>
-      <CodeBlock
+    <div ref={parentRef} className="text-muted">
+      <NewCodeBlock
         actions={actions}
         header={{ title, ...(error && { status: 'error' }) }}
         tab={{
           content: raw ?? 'Unknown',
         }}
-        alwaysFullHeight={true}
         allowFullScreen={true}
       />
     </div>
