@@ -37,9 +37,9 @@ export const Profile = ({ collapsed, profile }: { collapsed: boolean; profile: P
             {profile.orgProfilePic ? (
               <Image
                 src={profile.orgProfilePic}
-                className="h-8 w-8 rounded-full"
-                width={40}
-                height={40}
+                className="h-8 w-8 rounded-full object-cover"
+                width={32}
+                height={32}
                 alt="org-profile-pic"
               />
             ) : (
