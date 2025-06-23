@@ -1,7 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { type Side } from '@radix-ui/react-popper';
+import { cn } from '@inngest/components/utils/classNames';
 import { RiQuestionLine } from '@remixicon/react';
 
 import { Popover, PopoverContent, PopoverTrigger } from '../Popover';
@@ -10,12 +10,12 @@ export const Info = ({
   text,
   action,
   iconElement,
-  side = 'right',
+  widthClassName = 'max-w-xs',
 }: {
   text: string | ReactNode;
   action: ReactNode;
   iconElement?: ReactNode;
-  side?: Side;
+  widthClassName?: string;
 }) => {
   const icon = iconElement ?? <RiQuestionLine className="text-subtle h-[18px] w-[18px]" />;
 
@@ -23,9 +23,9 @@ export const Info = ({
     <Popover>
       <PopoverTrigger>{icon}</PopoverTrigger>
       <PopoverContent
-        side={side}
+        side="right"
         align="start"
-        className="text-subtle flex max-w-xs flex-col text-sm leading-tight"
+        className={cn('text-subtle flex flex-col text-sm leading-tight', widthClassName)}
       >
         <div className="border-subtle border-b px-4 py-2 text-sm leading-tight">{text}</div>
 

@@ -28,7 +28,7 @@ export default function ConfigurationSection({
           <span className="text-muted flex items-center pl-1">
             <Info
               text={<span className="whitespace-pre-line">{infoPopoverContent.text}</span>}
-              side="left"
+              widthClassName="max-w-60"
               action={
                 <Link
                   href={infoPopoverContent.url}
