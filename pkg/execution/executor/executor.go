@@ -575,7 +575,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 			// the lock becomes available to any competing run. If a faster run acquires it before
 			// this one tries to, it will fail to acquire the lock and be skipped; Effectively
 			// behaving as if the singleton mode were set to skip.
-			singletonRunID, err := e.singletonMgr.HandleSingleton(ctx, singletonKey, *req.Function.Singleton)
+			singletonRunID, err := e.singletonMgr.HandleSingleton(ctx, singletonKey, *req.Function.Singleton, req.AccountID)
 			if err != nil {
 				return nil, err
 			}

@@ -114,7 +114,7 @@ type StartOpts struct {
 	// RedisURI allows connecting to external Redis instead of in-memory Redis
 	RedisURI string `json:"redis_uri"`
 
-	// PostgresURI allows connecting to external Postgres instead of SQLite  
+	// PostgresURI allows connecting to external Postgres instead of SQLite
 	PostgresURI string `json:"postgres_uri"`
 
 	// SQLiteDir specifies where SQLite files should be stored
@@ -373,7 +373,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	batcher := batch.NewRedisBatchManager(shardedClient.Batch(), rq, batch.WithLogger(l))
 	debouncer := debounce.NewRedisDebouncer(unshardedClient.Debounce(), queueShard, rq)
 
-	sn := singleton.New(ctx, queueShard.RedisClient)
+	sn := singleton.New(ctx, queueShards, shardSelector)
 
 	conditionalTracer := itrace.NewConditionalTracer(itrace.ConnectTracer(), itrace.AlwaysTrace)
 
