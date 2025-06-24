@@ -16,6 +16,14 @@
 }
 
 /* Override Clerk text colors */
+:root {
+  --clerk-logo: url('/images/logos/login-inngest-light.svg');
+}
+
+.dark {
+  --clerk-logo: url('/images/logos/login-inngest-dark.svg');
+}
+
 .cl-rootBox,
 .cl-rootBox
   :not([class*='__danger']):not([class*='__warning']):not([class*='__success']):not(

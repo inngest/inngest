@@ -8,11 +8,11 @@ export const metadata: Metadata = {
   icons: {
     icon: [
       {
-        url: '/favicon-june-2024-light.png',
+        url: '/favicon-june-2025.svg',
         media: '(prefers-color-scheme: light)',
       },
       {
-        url: '/favicon-june-2024-dark.png',
+        url: '/favicon-june-2025.svg',
         media: '(prefers-color-scheme: dark)',
       },
     ],

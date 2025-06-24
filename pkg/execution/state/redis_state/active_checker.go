@@ -6,9 +6,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/google/uuid"
-	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 	"golang.org/x/sync/errgroup"
@@ -52,11 +52,11 @@ func (q *queue) ActiveCheck(ctx context.Context) (int, error) {
 				return fmt.Errorf("could not create checkID: %w", err)
 			}
 
-			l = l.With("backlog", backlog, "check_id", checkID)
+			l := l.With("backlog", backlog, "check_id", checkID)
 
 			l.Debug("attempting to active check backlog")
 
-			cleanup, err := q.backlogActiveCheck(ctx, backlog, client, kg, l)
+			cleanup, err := q.backlogActiveCheck(logger.WithStdlib(ctx, l), backlog, client, kg)
 			if cleanup {
 				status, cerr := scripts["queue/activeCheckRemoveBacklog"].Exec(
 					ctx,
@@ -98,7 +98,9 @@ func (q *queue) ActiveCheck(ctx context.Context) (int, error) {
 	return int(atomic.LoadInt64(&checked)), nil
 }
 
-func (q *queue) backlogActiveCheck(ctx context.Context, b *QueueBacklog, client rueidis.Client, kg QueueKeyGenerator, l logger.Logger) (bool, error) {
+func (q *queue) backlogActiveCheck(ctx context.Context, b *QueueBacklog, client rueidis.Client, kg QueueKeyGenerator) (bool, error) {
+	l := logger.StdlibLogger(ctx)
+
 	var sp QueueShadowPartition
 
 	{
@@ -134,33 +136,37 @@ func (q *queue) backlogActiveCheck(ctx context.Context, b *QueueBacklog, client 
 		readOnly = false
 	}
 
-	l = l.With("partition_id", sp.PartitionID, "account_id", accountID)
+	l = l.With(
+		"backlog_id", b.BacklogID,
+		"partition_id", sp.PartitionID,
+		"account_id", accountID,
+	)
 
 	l.Debug("starting active check for partition")
 
 	// Check account
 	if accountID != uuid.Nil && mathRand.Intn(100) <= q.runMode.ActiveCheckAccountCheckProbability {
-		err := q.accountActiveCheck(ctx, &sp, client, kg, l.With("check-scope", "account-check"), readOnly)
+		err := q.accountActiveCheck(logger.WithStdlib(ctx, l.With("check-scope", "account-check")), &sp, accountID, client, kg, readOnly)
 		if err != nil {
 			return false, fmt.Errorf("could not check account active items: %w", err)
 		}
 	}
 
 	// Check partition
-	err := q.partitionActiveCheck(ctx, &sp, client, kg, l.With("check-scope", "partition-check"), readOnly)
+	err := q.partitionActiveCheck(logger.WithStdlib(ctx, l.With("check-scope", "partition-check")), &sp, accountID, client, kg, readOnly)
 	if err != nil {
 		return false, fmt.Errorf("could not check account for invalid active items: %w", err)
 	}
 
 	// Check custom concurrency keys
 	for _, key := range b.ConcurrencyKeys {
-		err := q.customConcurrencyActiveCheck(ctx, &sp, key, client, kg, l.With("check-scope", "backlog-check"), readOnly)
+		err := q.customConcurrencyActiveCheck(logger.WithStdlib(ctx, l.With("check-scope", "backlog-check")), &sp, accountID, key, client, kg, readOnly)
 		if err != nil {
 			return false, fmt.Errorf("could not check custom concurrency key: %w", err)
 		}
 	}
 
-	l.Debug("checked partition for invalid active keys", "partition_id", sp.PartitionID)
+	l.Debug("completed backlog check for invalid active keys")
 
 	return true, nil
 }
@@ -168,60 +174,102 @@ func (q *queue) backlogActiveCheck(ctx context.Context, b *QueueBacklog, client 
 func (q *queue) accountActiveCheck(
 	ctx context.Context,
 	sp *QueueShadowPartition,
+	accountID uuid.UUID,
 	client rueidis.Client,
 	kg QueueKeyGenerator,
-	l logger.Logger,
 	readOnly bool,
 ) error {
+	l := logger.StdlibLogger(ctx)
+
 	// Compare the account active key
 	keyActive := sp.accountActiveKey(kg)
 
 	// To the account in progress key
 	keyInProgress := sp.accountInProgressKey(kg)
 
-	invalidItems := make([]string, 0)
+	l.Debug("checking account for invalid or missing active keys", "account_id", sp.AccountID, "key", keyActive, "in_progress", keyInProgress)
 
-	l.Debug("checking account for invalid or missing active keys", "account_id", sp.AccountID, "key", keyActive)
+	var batchSize int64 = 20
+	var cursor int64
 
-	err := q.findMissingItemsWithDynamicTargets(ctx, client, kg, keyActive, l, func(chunk []*osqueue.QueueItem) map[string][]string {
-		res := make(map[string][]string)
-
-		chunkIDs := make([]string, len(chunk))
-		for i, d := range chunk {
-			chunkIDs[i] = d.ID
+	for {
+		chunkID, err := ulid.New(ulid.Timestamp(q.clock.Now()), rand.Reader)
+		if err != nil {
+			return fmt.Errorf("could not create checkID: %w", err)
 		}
 
-		// Always check in progress
-		res[keyInProgress] = chunkIDs
+		l := l.With("chunk_id", chunkID)
 
-		// Generate ready queue keys for item functions
-		for _, item := range chunk {
-			keyReady := kg.PartitionQueueSet(enums.PartitionTypeDefault, item.FunctionID.String(), "")
-			if item.FunctionID == uuid.Nil && item.QueueName != nil {
-				keyReady = kg.PartitionQueueSet(enums.PartitionTypeDefault, *item.QueueName, "")
+		res, err := q.activeCheckScanAccount(ctx, q.primaryQueueShard, sp, cursor, batchSize)
+		if err != nil {
+			return fmt.Errorf("could not scan account: %w", err)
+		}
+
+		l.Debug("scanned account", "res", res)
+
+		invalidItems := make([]string, 0)
+
+		if len(res.MissingItems) > 0 {
+			metrics.IncrQueueActiveCheckInvalidItemsFoundCounter(ctx, int64(len(res.MissingItems)), metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags: map[string]any{
+					"account_id": accountID.String(),
+					"check":      "account",
+					"reason":     "missing-item",
+				},
+			})
+			invalidItems = append(invalidItems, res.MissingItems...)
+		}
+
+		if len(res.StaleItems) > 0 {
+			for _, item := range res.StaleItems {
+				metrics.IncrQueueActiveCheckInvalidItemsFoundCounter(ctx, 1, metrics.CounterOpt{
+					PkgName: pkgName,
+					Tags: map[string]any{
+						"account_id": accountID.String(),
+						"check":      "account",
+						"reason":     "missing-in-targets",
+					},
+				})
+				invalidItems = append(invalidItems, item.ID)
 			}
-
-			res[keyReady] = append(res[keyReady], item.ID)
 		}
 
-		return res
-	}, func(pointer string) {
-		invalidItems = append(invalidItems, pointer)
-	})
-	if err != nil {
-		return fmt.Errorf("could not check account for missing active items: %w", err)
-	}
+		if len(invalidItems) > 0 {
+			l.Debug(
+				"removing invalid items from account active key",
+				"mode", "account",
+				"job_id", invalidItems,
+				"partition_id", sp.PartitionID,
+				"active", keyActive,
+				"in_progress", keyInProgress,
+				"readonly", readOnly,
+			)
 
-	if len(invalidItems) > 0 {
-		l.Debug("removing invalid items from account active key", "mode", "account", "invalid", invalidItems, "partition_id", sp.PartitionID, "active", keyActive, "in_progress", keyInProgress, "readonly", readOnly)
+			if !readOnly {
+				metrics.IncrQueueActiveCheckInvalidItemsRemovedCounter(ctx, int64(len(invalidItems)), metrics.CounterOpt{
+					PkgName: pkgName,
+					Tags: map[string]any{
+						"account_id": accountID.String(),
+						"check":      "account",
+					},
+				})
 
-		if !readOnly {
-			cmd := client.B().Srem().Key(keyActive).Member(invalidItems...).Build()
-			err := client.Do(ctx, cmd).Error()
-			if err != nil {
-				return fmt.Errorf("could not remove invalid items from active set: %w", err)
+				cmd := client.B().Srem().Key(keyActive).Member(invalidItems...).Build()
+				err := client.Do(ctx, cmd).Error()
+				if err != nil {
+					return fmt.Errorf("could not remove invalid items from active set: %w", err)
+				}
 			}
 		}
+
+		if res.NextCursor == 0 {
+			break
+		}
+
+		cursor = res.NextCursor
+
+		<-time.After(100 * time.Millisecond)
 	}
 
 	return nil
@@ -230,251 +278,211 @@ func (q *queue) accountActiveCheck(
 func (q *queue) partitionActiveCheck(
 	ctx context.Context,
 	sp *QueueShadowPartition,
+	accountID uuid.UUID,
 	client rueidis.Client,
 	kg QueueKeyGenerator,
-	l logger.Logger,
 	readOnly bool,
 ) error {
+	l := logger.StdlibLogger(ctx)
+
 	keyActive := sp.activeKey(kg)
 	keyInProgress := sp.inProgressKey(kg)
 	keyReady := sp.readyQueueKey(kg)
 
-	invalidItems := make([]string, 0)
+	var batchSize int64 = 20
+	var cursor int64
 
-	err := q.findMissingItemsWithStaticTargets(ctx, client, keyActive, []string{keyInProgress, keyReady}, func(pointer string) {
-		invalidItems = append(invalidItems, pointer)
-	})
-	if err != nil {
-		return fmt.Errorf("could not check partition for missing active items: %w", err)
-	}
+	for {
+		chunkID, err := ulid.New(ulid.Timestamp(q.clock.Now()), rand.Reader)
+		if err != nil {
+			return fmt.Errorf("could not create checkID: %w", err)
+		}
 
-	if len(invalidItems) > 0 {
-		l.Debug("removing invalid items from active key", "mode", "partition", "invalid", invalidItems, "partition_id", sp.PartitionID, "active", keyActive, "ready", keyReady, "in_progress", keyInProgress, "readonly", readOnly)
+		l := l.With("chunk_id", chunkID)
+		l.Debug("scanning partition",
+			"cursor", cursor,
+			"active", keyActive,
+			"in_progress", keyInProgress,
+			"ready", keyActive,
+		)
 
-		if !readOnly {
-			cmd := client.B().Srem().Key(keyActive).Member(invalidItems...).Build()
-			err := client.Do(ctx, cmd).Error()
-			if err != nil {
-				return fmt.Errorf("could not remove invalid items from active set: %w", err)
+		res, err := q.activeCheckScanStatic(ctx, q.primaryQueueShard, keyActive, keyReady, keyInProgress, cursor, batchSize)
+		if err != nil {
+			return fmt.Errorf("could not scan partition: %w", err)
+		}
+
+		l.Debug("scanned partition", "res", res)
+
+		invalidItems := make([]string, 0)
+
+		if len(res.MissingItems) > 0 {
+			metrics.IncrQueueActiveCheckInvalidItemsFoundCounter(ctx, int64(len(res.MissingItems)), metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags: map[string]any{
+					"account_id": accountID.String(),
+					"check":      "partition",
+					"reason":     "missing-item",
+				},
+			})
+			invalidItems = append(invalidItems, res.MissingItems...)
+		}
+
+		if len(res.StaleItems) > 0 {
+			for _, item := range res.StaleItems {
+				metrics.IncrQueueActiveCheckInvalidItemsFoundCounter(ctx, 1, metrics.CounterOpt{
+					PkgName: pkgName,
+					Tags: map[string]any{
+						"account_id": accountID.String(),
+						"check":      "partition",
+						"reason":     "missing-in-targets",
+					},
+				})
+				invalidItems = append(invalidItems, item.ID)
 			}
 		}
+
+		if len(invalidItems) > 0 {
+			l.Debug(
+				"removing invalid items from active key",
+				"mode", "partition",
+				"job_id", invalidItems,
+				"partition_id", sp.PartitionID,
+				"active", keyActive,
+				"ready", keyReady,
+				"in_progress", keyInProgress,
+				"readonly", readOnly,
+			)
+
+			if !readOnly {
+				metrics.IncrQueueActiveCheckInvalidItemsRemovedCounter(ctx, int64(len(invalidItems)), metrics.CounterOpt{
+					PkgName: pkgName,
+					Tags: map[string]any{
+						"account_id": accountID.String(),
+						"check":      "partition",
+					},
+				})
+
+				cmd := client.B().Srem().Key(keyActive).Member(invalidItems...).Build()
+				err := client.Do(ctx, cmd).Error()
+				if err != nil {
+					return fmt.Errorf("could not remove invalid items from active set: %w", err)
+				}
+			}
+		}
+
+		if res.NextCursor == 0 {
+			break
+		}
+
+		cursor = res.NextCursor
+
+		<-time.After(100 * time.Millisecond)
 	}
 
 	return nil
 }
 
-func (q *queue) customConcurrencyActiveCheck(ctx context.Context, sp *QueueShadowPartition, bcc BacklogConcurrencyKey, client rueidis.Client, kg QueueKeyGenerator, l logger.Logger, readOnly bool) error {
+func (q *queue) customConcurrencyActiveCheck(ctx context.Context, sp *QueueShadowPartition, accountID uuid.UUID, bcc BacklogConcurrencyKey, client rueidis.Client, kg QueueKeyGenerator, readOnly bool) error {
+	l := logger.StdlibLogger(ctx)
+
 	keyActive := bcc.activeKey(kg)
 	keyInProgress := bcc.concurrencyKey(kg)
 
 	// Can use the partition ready queue as it includes _all_ concurrency keys' items
 	keyReady := sp.readyQueueKey(kg)
 
-	invalidItems := make([]string, 0)
+	var batchSize int64 = 20
+	var cursor int64
 
-	err := q.findMissingItemsWithStaticTargets(ctx, client, keyActive, []string{keyInProgress, keyReady}, func(pointer string) {
-		invalidItems = append(invalidItems, pointer)
-	})
-	if err != nil {
-		return fmt.Errorf("could not check custom concurrency key for missing active items: %w", err)
-	}
+	for {
+		chunkID, err := ulid.New(ulid.Timestamp(q.clock.Now()), rand.Reader)
+		if err != nil {
+			return fmt.Errorf("could not create checkID: %w", err)
+		}
 
-	if len(invalidItems) > 0 {
-		l.Debug("removing invalid items from active key", "invalid", "mode", "custom_concurrency", "bcc", bcc, invalidItems, "partition_id", sp.PartitionID, "active", keyActive, "ready", keyReady, "in_progress", keyInProgress, "readonly", readOnly)
+		l := l.With("chunk_id", chunkID)
+		l.Debug("scanning custom concurrency key",
+			"cursor", cursor,
+			"active", keyActive,
+			"in_progress", keyInProgress,
+			"ready", keyActive,
+		)
 
-		if !readOnly {
-			cmd := client.B().Srem().Key(keyActive).Member(invalidItems...).Build()
-			err := client.Do(ctx, cmd).Error()
-			if err != nil {
-				return fmt.Errorf("could not remove invalid items from active set: %w", err)
+		res, err := q.activeCheckScanStatic(ctx, q.primaryQueueShard, keyActive, keyReady, keyInProgress, cursor, batchSize)
+		if err != nil {
+			return fmt.Errorf("could not scan custom concurrency key: %w", err)
+		}
+
+		l.Debug("scanned partition", "res", res)
+
+		invalidItems := make([]string, 0)
+
+		if len(res.MissingItems) > 0 {
+			metrics.IncrQueueActiveCheckInvalidItemsFoundCounter(ctx, int64(len(res.MissingItems)), metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags: map[string]any{
+					"account_id": accountID.String(),
+					"check":      "custom-concurrency",
+					"reason":     "missing-item",
+				},
+			})
+			invalidItems = append(invalidItems, res.MissingItems...)
+		}
+
+		if len(res.StaleItems) > 0 {
+			for _, item := range res.StaleItems {
+				metrics.IncrQueueActiveCheckInvalidItemsFoundCounter(ctx, 1, metrics.CounterOpt{
+					PkgName: pkgName,
+					Tags: map[string]any{
+						"account_id": accountID.String(),
+						"check":      "custom-concurrency",
+						"reason":     "missing-in-targets",
+					},
+				})
+				invalidItems = append(invalidItems, item.ID)
 			}
 		}
+
+		if len(invalidItems) > 0 {
+			l.Debug(
+				"removing invalid items from active key",
+				"job_id", invalidItems,
+				"mode", "custom_concurrency",
+				"bcc", bcc,
+				"partition_id", sp.PartitionID,
+				"active", keyActive,
+				"ready", keyReady,
+				"in_progress", keyInProgress,
+				"readonly", readOnly,
+			)
+
+			if !readOnly {
+				metrics.IncrQueueActiveCheckInvalidItemsRemovedCounter(ctx, int64(len(invalidItems)), metrics.CounterOpt{
+					PkgName: pkgName,
+					Tags: map[string]any{
+						"account_id": accountID.String(),
+						"check":      "custom-concurrency",
+					},
+				})
+
+				cmd := client.B().Srem().Key(keyActive).Member(invalidItems...).Build()
+				err := client.Do(ctx, cmd).Error()
+				if err != nil {
+					return fmt.Errorf("could not remove invalid items from active set: %w", err)
+				}
+			}
+		}
+
+		if res.NextCursor == 0 {
+			break
+		}
+
+		cursor = res.NextCursor
+
+		<-time.After(100 * time.Millisecond)
 	}
 
 	return nil
-}
-
-// findMissingItemsWithStaticTargets attempts to find all items in sourceKey, which are not present in any of the targetKeys.
-//
-// In constrast to findMissingItemsWithDynamicTargets, this function does not assume any particular data type and only operates
-// on item pointers.
-//
-// The missing items will then be bubbled up via onMissing.
-func (q *queue) findMissingItemsWithStaticTargets(ctx context.Context, client rueidis.Client, sourceSetKey string, targetKeys []string, onMissing func(pointer string)) error {
-	var cursor uint64
-	var count int64 = 20
-
-	for {
-		cmd := client.B().Sscan().Key(sourceSetKey).Cursor(cursor).Count(count).Build()
-		entry, err := client.Do(ctx, cmd).AsScanEntry()
-		if err != nil {
-			if rueidis.IsRedisNil(err) {
-				return nil
-			}
-			return fmt.Errorf("could not iterate source key for missing items: %w", err)
-		}
-
-		if len(entry.Elements) == 0 {
-			return nil
-		}
-
-		// Entries are returned as [item ID, score] tuples, so we want to skip all scores
-		entryIDs := make([]string, 0, len(entry.Elements)/2)
-		for i := 0; i < len(entry.Elements); i += 2 {
-			entryIDs = append(entryIDs, entry.Elements[i])
-		}
-
-		entriesFound := make(map[string]struct{})
-
-		for _, targetKey := range targetKeys {
-			resp, err := client.Do(ctx, client.B().Zmscore().Key(targetKey).Member(entryIDs...).Build()).ToAny()
-			if err != nil && !rueidis.IsRedisNil(err) {
-				return fmt.Errorf("could not check key 2 for missing items: %w", err)
-			}
-
-			scores, ok := resp.([]interface{})
-			if !ok {
-				return nil
-			}
-
-			for i, score := range scores {
-				if score != nil {
-					entriesFound[entryIDs[i]] = struct{}{}
-				}
-			}
-		}
-
-		for _, element := range entryIDs {
-			if _, has := entriesFound[element]; !has {
-				onMissing(element)
-			}
-		}
-
-		if entry.Cursor == 0 {
-			return nil
-		}
-
-		cursor = entry.Cursor
-
-		<-time.After(100 * time.Millisecond)
-	}
-}
-
-// findMissingItemsWithDynamicTargets attempts to find all items in sourceSetKey, which are not present in any of the targetKeys.
-//
-// In constrast to findMissingItemsWithStaticTargets, this function strictly operates on queue items and will pass chunks of items
-// to a transformation function to retrieve targets and pointers to check for each target.
-//
-// The missing items will then be bubbled up via onMissing.
-func (q *queue) findMissingItemsWithDynamicTargets(
-	ctx context.Context,
-	client rueidis.Client,
-	kg QueueKeyGenerator,
-	sourceSetKey string,
-	l logger.Logger,
-	targetKeys func(chunk []*osqueue.QueueItem) map[string][]string,
-	onMissing func(pointer string),
-) error {
-	var cursor uint64
-	var count int64 = 20
-
-	for {
-		// Load chunk
-		cmd := client.B().Sscan().Key(sourceSetKey).Cursor(cursor).Count(count).Build()
-		entry, err := client.Do(ctx, cmd).AsScanEntry()
-
-		l.Debug("scanned source", "key", sourceSetKey, "returned", len(entry.Elements), "cursor", entry.Cursor)
-
-		if err != nil {
-			if rueidis.IsRedisNil(err) {
-				return nil
-			}
-			return fmt.Errorf("could not iterate key 1 for missing items: %w", err)
-		}
-
-		if len(entry.Elements) == 0 {
-			return nil
-		}
-
-		// Entries are returned as [item ID, score] tuples, so we want to skip all scores
-		entryIDs := make([]string, 0, len(entry.Elements)/2)
-		for i := 0; i < len(entry.Elements); i += 2 {
-			entryIDs = append(entryIDs, entry.Elements[i])
-		}
-
-		// Retrieve item data
-		items := make([]*osqueue.QueueItem, 0, len(entryIDs))
-		itemData, err := client.Do(ctx, client.B().Hmget().Key(kg.QueueItem()).Field(entryIDs...).Build()).AsStrSlice()
-		if err != nil && !rueidis.IsRedisNil(err) {
-			return fmt.Errorf("could not get queue items: %w", err)
-		}
-
-		l.Debug("retrieved item chunk", "key", sourceSetKey, "item_ids", entryIDs)
-
-		for i, itemStr := range itemData {
-			if itemStr == "" {
-				onMissing(entryIDs[i])
-				continue
-			}
-
-			qi := osqueue.QueueItem{}
-			err := json.Unmarshal([]byte(itemStr), &qi)
-			if err != nil {
-				return fmt.Errorf("could not unmarshal queue item: %w", err)
-			}
-
-			// Item is definitely in progress if actively leased
-			if qi.IsLeased(q.clock.Now()) {
-				continue
-			}
-
-			items = append(items, &qi)
-		}
-
-		entriesFound := make(map[string]struct{})
-
-		// Retrieve keys to check against (need to check individual items but want to run batched operations)
-		// Worst case, this transform 20 queue items in the chunk to 20 target keys, but usually this will
-		// be more efficient as items may belong to the same workflows.
-		for targetKey, items := range targetKeys(items) {
-			l.Debug("comparing against target", "source", sourceSetKey, "target", targetKey, "items", items)
-
-			if len(items) == 0 {
-				continue
-			}
-
-			// Batch check scores for items
-			resp, err := client.Do(ctx, client.B().Zmscore().Key(targetKey).Member(items...).Build()).ToAny()
-			if err != nil && !rueidis.IsRedisNil(err) {
-				return fmt.Errorf("could not check target key for missing items: %w", err)
-			}
-
-			scores, ok := resp.([]interface{})
-			if !ok {
-				return nil
-			}
-
-			for i, score := range scores {
-				if score != nil {
-					entriesFound[items[i]] = struct{}{}
-				}
-			}
-		}
-
-		for _, element := range entryIDs {
-			if _, has := entriesFound[element]; !has {
-				onMissing(element)
-			}
-		}
-
-		if entry.Cursor == 0 {
-			return nil
-		}
-
-		cursor = entry.Cursor
-
-		<-time.After(100 * time.Millisecond)
-	}
 }
 
 func (q *queue) BacklogActiveCheckPeek(ctx context.Context, peekSize int64) ([]*QueueBacklog, error) {
@@ -529,4 +537,138 @@ func (q *queue) AddBacklogToActiveCheck(ctx context.Context, shard QueueShard, a
 	default:
 		return fmt.Errorf("invalid status code %v returned by add to active check", status)
 	}
+}
+
+type activeCheckScanResult struct {
+	NextCursor   int64
+	MissingItems []string
+	LeasedItems  []string
+	StaleItems   []osqueue.QueueItem
+}
+
+func (q *queue) activeCheckScanAccount(ctx context.Context, shard QueueShard, sp *QueueShadowPartition, cursor, count int64) (*activeCheckScanResult, error) {
+	kg := shard.RedisClient.KeyGenerator()
+	client := shard.RedisClient.Client()
+
+	res, err := duration(
+		ctx,
+		q.primaryQueueShard.Name,
+		"active_check_scan_account",
+		q.clock.Now(),
+		func(ctx context.Context) (any, error) {
+			res, err := scripts["queue/activeCheckScanAccount"].Exec(ctx, client, []string{
+				sp.accountActiveKey(kg),
+				sp.accountInProgressKey(kg),
+				kg.QueueItem(),
+			},
+				[]string{
+					strconv.Itoa(int(cursor)),
+					strconv.Itoa(int(count)),
+					strconv.Itoa(int(q.clock.Now().UnixMilli())),
+					kg.QueuePrefix(),
+				}).ToAny()
+			return res, err
+		})
+	if err != nil {
+		return nil, fmt.Errorf("could not scan account for active check: %w", err)
+	}
+
+	return parseScanResult(res)
+}
+
+func parseScanResult(res any) (*activeCheckScanResult, error) {
+	returnedSet, ok := res.([]any)
+	if !ok {
+		return nil, fmt.Errorf("expected to receive one or more set items")
+	}
+
+	if len(returnedSet) != 4 {
+		return nil, fmt.Errorf("expected 4 items to be returned")
+	}
+
+	nextCursor, ok := returnedSet[0].(string)
+	if !ok {
+		return nil, fmt.Errorf("missing next cursor")
+	}
+
+	parsedCursor, err := strconv.Atoi(nextCursor)
+	if err != nil {
+		return nil, fmt.Errorf("invalid cursor returned")
+	}
+
+	missingItems, ok := returnedSet[1].([]any)
+	if !ok {
+		return nil, fmt.Errorf("missing missing items")
+	}
+
+	missing := make([]string, len(missingItems))
+	for i, item := range missingItems {
+		if itemID, ok := item.(string); ok {
+			missing[i] = itemID
+		}
+	}
+
+	leasedItems, ok := returnedSet[2].([]any)
+	if !ok {
+		return nil, fmt.Errorf("missing leased items")
+	}
+
+	leased := make([]string, len(leasedItems))
+	for i, item := range leasedItems {
+		if itemID, ok := item.(string); ok {
+			leased[i] = itemID
+		}
+	}
+
+	staleItems, ok := returnedSet[3].([]any)
+	if !ok {
+		return nil, fmt.Errorf("missing stale items")
+	}
+
+	stale := make([]osqueue.QueueItem, len(staleItems))
+	for i, item := range staleItems {
+		if itemData, ok := item.(string); ok {
+			err := json.Unmarshal([]byte(itemData), &stale[i])
+			if err != nil {
+				return nil, fmt.Errorf("invalid queue item: %w", err)
+			}
+		}
+	}
+
+	return &activeCheckScanResult{
+		NextCursor:   int64(parsedCursor),
+		MissingItems: missing,
+		LeasedItems:  leased,
+		StaleItems:   stale,
+	}, nil
+}
+
+func (q *queue) activeCheckScanStatic(ctx context.Context, shard QueueShard, keyActiveSet, keyTarget1, keyTarget2 string, cursor, count int64) (*activeCheckScanResult, error) {
+	kg := shard.RedisClient.KeyGenerator()
+	client := shard.RedisClient.Client()
+
+	res, err := duration(
+		ctx,
+		q.primaryQueueShard.Name,
+		"active_check_scan_static",
+		q.clock.Now(),
+		func(ctx context.Context) (any, error) {
+			res, err := scripts["queue/activeCheckScanStatic"].Exec(ctx, client, []string{
+				keyActiveSet,
+				keyTarget1,
+				keyTarget2,
+				kg.QueueItem(),
+			},
+				[]string{
+					strconv.Itoa(int(cursor)),
+					strconv.Itoa(int(count)),
+					strconv.Itoa(int(q.clock.Now().UnixMilli())),
+				}).ToAny()
+			return res, err
+		})
+	if err != nil {
+		return nil, fmt.Errorf("could not scan static targets for active check: %w", err)
+	}
+
+	return parseScanResult(res)
 }

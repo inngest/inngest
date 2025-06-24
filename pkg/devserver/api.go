@@ -6,8 +6,6 @@ import (
 	_ "embed"
 	"encoding/json"
 	"fmt"
-	"github.com/inngest/inngest/pkg/cqrs/sync"
-	"github.com/inngest/inngest/pkg/enums"
 	"io"
 	"io/fs"
 	"net/http"
@@ -15,6 +13,9 @@ import (
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/inngest/inngest/pkg/cqrs/sync"
+	"github.com/inngest/inngest/pkg/enums"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"

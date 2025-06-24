@@ -323,6 +323,11 @@ export type FunctionRunV2 = {
   triggerIDs: Array<Scalars['ULID']>;
 };
 
+
+export type FunctionRunV2TraceArgs = {
+  preview: InputMaybe<Scalars['Boolean']>;
+};
+
 export type FunctionRunV2Edge = {
   __typename?: 'FunctionRunV2Edge';
   cursor: Scalars['String'];
@@ -747,7 +752,7 @@ export type SleepStepInfo = {
 
 export type StepError = {
   __typename?: 'StepError';
-  cause: Maybe<Scalars['String']>;
+  cause: Maybe<Scalars['Bytes']>;
   message: Scalars['String'];
   name: Maybe<Scalars['String']>;
   stack: Maybe<Scalars['String']>;
@@ -1006,6 +1011,7 @@ export type TraceDetailsFragment = { __typename?: 'RunTraceSpan', name: string, 
 
 export type GetRunQueryVariables = Exact<{
   runID: Scalars['String'];
+  preview: InputMaybe<Scalars['Boolean']>;
 }>;
 
 
@@ -1016,7 +1022,7 @@ export type GetTraceResultQueryVariables = Exact<{
 }>;
 
 
-export type GetTraceResultQuery = { __typename?: 'Query', runTraceSpanOutputByID: { __typename?: 'RunTraceSpanOutput', input: any | null, data: any | null, error: { __typename?: 'StepError', message: string, name: string | null, stack: string | null, cause: string | null } | null } };
+export type GetTraceResultQuery = { __typename?: 'Query', runTraceSpanOutputByID: { __typename?: 'RunTraceSpanOutput', input: any | null, data: any | null, error: { __typename?: 'StepError', message: string, name: string | null, stack: string | null, cause: any | null } | null } };
 
 export type GetTriggerQueryVariables = Exact<{
   runID: Scalars['String'];
@@ -1482,7 +1488,7 @@ export const CountRunsDocument = `
 }
     `;
 export const GetRunDocument = `
-    query GetRun($runID: String!) {
+    query GetRun($runID: String!, $preview: Boolean) {
   run(runID: $runID) {
     function {
       app {
@@ -1492,7 +1498,7 @@ export const GetRunDocument = `
       name
       slug
     }
-    trace {
+    trace(preview: $preview) {
       ...TraceDetails
       childrenSpans {
         ...TraceDetails

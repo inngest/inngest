@@ -122,25 +122,25 @@ export default function FunctionConfiguration({ configuration }: FunctionConfigu
   }
   const singletonItems: MetadataItemProps[] | undefined = configuration.singleton
     ? [
-      {
-        label: 'Mode',
-        title: configuration.singleton.mode,
-        value: (
-          <div className="lowercase first-letter:capitalize">{configuration.singleton.mode}</div>
-        ),
-        tooltip:
-          'Defines what happens if a run is already in progress: "Skip" ignores the new run, "Cancel" stops the current instance and runs the new one.',
-      },
-      ...(configuration.singleton.key
-        ? [
-          {
-            label: 'Key',
-            value: configuration.singleton.key,
-            type: 'code',
-          } as MetadataItemProps,
-        ]
-        : []),
-    ]
+        {
+          label: 'Mode',
+          title: configuration.singleton.mode,
+          value: (
+            <div className="lowercase first-letter:capitalize">{configuration.singleton.mode}</div>
+          ),
+          tooltip:
+            'Defines what happens if a run is already in progress: "Skip" ignores the new run, "Cancel" stops the current instance and runs the new one.',
+        },
+        ...(configuration.singleton.key
+          ? [
+              {
+                label: 'Key',
+                value: configuration.singleton.key,
+                type: 'code',
+              } as MetadataItemProps,
+            ]
+          : []),
+      ]
     : undefined;
 
   return (

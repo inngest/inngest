@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/inngest/inngest/pkg/util"
 	"net/http"
+	"net/url"
 	"os"
 	"time"
+
+	"github.com/inngest/inngest/pkg/util"
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/coocood/freecache"
@@ -61,6 +63,7 @@ import (
 	"github.com/inngest/inngest/pkg/service"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/inngest/inngest/pkg/testapi"
+	"github.com/inngest/inngest/pkg/tracing"
 	"github.com/inngest/inngest/pkg/util/awsgateway"
 	"github.com/redis/rueidis"
 	"go.opentelemetry.io/otel/propagation"
@@ -103,6 +106,19 @@ type StartOpts struct {
 
 	ConnectGatewayPort int    `json:"connectGatewayPort"`
 	ConnectGatewayHost string `json:"connectGatewayHost"`
+
+	// InMemory controls whether to only use in-memory databases (as opposed to
+	// filesystem)
+	InMemory bool
+
+	// RedisURI allows connecting to external Redis instead of in-memory Redis
+	RedisURI string `json:"redis_uri"`
+
+	// PostgresURI allows connecting to external Postgres instead of SQLite  
+	PostgresURI string `json:"postgres_uri"`
+
+	// SQLiteDir specifies where SQLite files should be stored
+	SQLiteDir string `json:"sqlite_dir"`
 }
 
 // Create and start a new dev server.  The dev server is used during (surprise surprise)
@@ -127,7 +143,11 @@ func start(ctx context.Context, opts StartOpts) error {
 	l := logger.StdlibLogger(ctx)
 	ctx = logger.WithStdlib(ctx, l)
 
-	db, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{InMemory: true})
+	db, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{
+		InMemory:    opts.InMemory,
+		PostgresURI: opts.PostgresURI,
+		Directory:   opts.SQLiteDir,
+	})
 	if err != nil {
 		return err
 	}
@@ -138,6 +158,9 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	// Initialize the devserver
 	dbDriver := "sqlite"
+	if opts.PostgresURI != "" {
+		dbDriver = "postgres"
+	}
 	dbcqrs := base_cqrs.NewCQRS(db, dbDriver)
 	hd := base_cqrs.NewHistoryDriver(db, dbDriver)
 	loader := dbcqrs.(state.FunctionLoader)
@@ -145,19 +168,48 @@ func start(ctx context.Context, opts StartOpts) error {
 	stepLimitOverrides := make(map[string]int)
 	stateSizeLimitOverrides := make(map[string]int)
 
-	shardedRc, shardedCluster, err := createInmemoryRedis(ctx, opts.Tick)
-	if err != nil {
-		return err
-	}
+	var shardedRc, unshardedRc, connectRc rueidis.Client
+	var shardedCluster, unshardedCluster, connectCluster *miniredis.Miniredis
 
-	unshardedRc, unshardedCluster, err := createInmemoryRedis(ctx, opts.Tick)
-	if err != nil {
-		return err
-	}
+	if opts.RedisURI != "" {
+		// Use external Redis
+		// Mask Redis URI credentials before logging
+		loggedURI := ""
+		if u, parseErr := url.Parse(opts.RedisURI); parseErr == nil {
+			loggedURI = " " + u.Redacted()
+		}
+		l.Info("using external redis", "url", loggedURI)
 
-	connectRc, connectCluster, err := createInmemoryRedis(ctx, opts.Tick)
-	if err != nil {
-		return err
+		shardedRc, err = connectToOrCreateRedis(opts.RedisURI)
+		if err != nil {
+			return err
+		}
+		unshardedRc, err = connectToOrCreateRedis(opts.RedisURI)
+		if err != nil {
+			return err
+		}
+		connectRcOpt, err := connectToOrCreateRedisOption(opts.RedisURI)
+		if err != nil {
+			return err
+		}
+		connectRc, err = rueidis.NewClient(connectRcOpt)
+		if err != nil {
+			return err
+		}
+	} else {
+		// Use in-memory Redis
+		shardedRc, shardedCluster, err = createInmemoryRedis(ctx, opts.Tick)
+		if err != nil {
+			return err
+		}
+		unshardedRc, unshardedCluster, err = createInmemoryRedis(ctx, opts.Tick)
+		if err != nil {
+			return err
+		}
+		connectRc, connectCluster, err = createInmemoryRedis(ctx, opts.Tick)
+		if err != nil {
+			return err
+		}
 	}
 
 	unshardedClient := redis_state.NewUnshardedClient(unshardedRc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
@@ -424,6 +476,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		executor.WithAssignedQueueShard(queueShard),
 		executor.WithShardSelector(shardSelector),
 		executor.WithTraceReader(dbcqrs),
+		executor.WithTracerProvider(tracing.NewSqlcTracerProvider(base_cqrs.NewQueries(db, dbDriver))),
 	)
 	if err != nil {
 		return err
@@ -480,7 +533,6 @@ func start(ctx context.Context, opts StartOpts) error {
 
 		apiv1.AddRoutes(r, apiv1.Opts{
 			CachingMiddleware:  caching,
-			EventReader:        ds.Data,
 			FunctionReader:     ds.Data,
 			FunctionRunReader:  ds.Data,
 			JobQueueReader:     ds.Queue.(queue.JobQueueReader),
@@ -574,9 +626,16 @@ func start(ctx context.Context, opts StartOpts) error {
 			Executor:           exec,
 			StateManager:       smv2,
 			ResetAll: func() {
-				shardedCluster.FlushAll()
-				unshardedCluster.FlushAll()
-				connectCluster.FlushAll()
+				// Only flush in-memory clusters if they exist
+				if shardedCluster != nil {
+					shardedCluster.FlushAll()
+				}
+				if unshardedCluster != nil {
+					unshardedCluster.FlushAll()
+				}
+				if connectCluster != nil {
+					connectCluster.FlushAll()
+				}
 			},
 		})})
 	}
@@ -834,4 +893,60 @@ func PartitionConstraintConfigGetter(dbcqrs cqrs.Manager) redis_state.PartitionC
 
 		return &constraints, nil
 	}
+}
+
+func connectToOrCreateRedis(redisURI string) (rueidis.Client, error) {
+	opt, err := connectToOrCreateRedisOption(redisURI)
+	if err != nil {
+		return nil, fmt.Errorf("could not create redis options: %w", err)
+	}
+
+	rc, err := rueidis.NewClient(opt)
+	if err != nil {
+		return nil, fmt.Errorf("error creating redis client: %w", err)
+	}
+
+	return rc, nil
+}
+
+func connectToOrCreateRedisOption(redisURI string) (rueidis.ClientOption, error) {
+	if redisURI == "" {
+		return createInmemoryRedisConnectionOpt()
+	}
+
+	opt, err := rueidis.ParseURL(redisURI)
+	if err != nil {
+		return rueidis.ClientOption{}, fmt.Errorf("error parsing redis uri: %w", err)
+	}
+
+	// Set default overrides
+	opt.DisableCache = true
+	opt.BlockingPoolSize = consts.RedisBlockingPoolSize
+
+	return opt, nil
+}
+
+// createInmemoryRedisConnectionOpt creates the options for a new connection to the in-memory Redis
+// server. If the server is not yet running, it will start one.
+func createInmemoryRedisConnectionOpt() (rueidis.ClientOption, error) {
+	// For devserver, we don't use a singleton like lite.go does
+	r := miniredis.NewMiniRedis()
+	err := r.Start()
+	if err != nil {
+		return rueidis.ClientOption{}, fmt.Errorf("error starting in-memory redis: %w", err)
+	}
+
+	poll := time.Second
+	go func() {
+		for range time.Tick(poll) {
+			r.FastForward(poll)
+		}
+	}()
+
+	return rueidis.ClientOption{
+		InitAddress:       []string{r.Addr()},
+		DisableCache:      true,
+		BlockingPoolSize:  consts.RedisBlockingPoolSize,
+		ForceSingleClient: true,
+	}, nil
 }

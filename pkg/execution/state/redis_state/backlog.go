@@ -401,6 +401,10 @@ func (q *queue) ItemShadowPartition(ctx context.Context, i osqueue.QueueItem) Qu
 	}
 
 	accountID := i.Data.Identifier.AccountID
+	if accountID == uuid.Nil {
+		stack := string(debug.Stack())
+		q.log.Error("unexpected missing accountID in ItemShadowPartition call", "item", i, "stack", stack)
+	}
 
 	// The only case when we manually set a queueName is for system partitions
 	if queueName != nil {
@@ -434,11 +438,6 @@ func (q *queue) ItemShadowPartition(ctx context.Context, i osqueue.QueueItem) Qu
 	if fnID == uuid.Nil {
 		stack := string(debug.Stack())
 		q.log.Error("unexpected missing functionID in ItemShadowPartition call", "item", i, "stack", stack)
-	}
-
-	if accountID == uuid.Nil {
-		stack := string(debug.Stack())
-		q.log.Error("unexpected missing accountID in ItemShadowPartition call", "item", i, "stack", stack)
 	}
 
 	// NOTE: This is an optimization that ensures we return *updated* concurrency keys

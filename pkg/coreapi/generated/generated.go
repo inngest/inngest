@@ -231,7 +231,7 @@ type ComplexityRoot struct {
 		SourceID       func(childComplexity int) int
 		StartedAt      func(childComplexity int) int
 		Status         func(childComplexity int) int
-		Trace          func(childComplexity int) int
+		Trace          func(childComplexity int, preview *bool) int
 		TraceID        func(childComplexity int) int
 		TriggerIDs     func(childComplexity int) int
 	}
@@ -555,7 +555,7 @@ type FunctionRunV2Resolver interface {
 
 	Function(ctx context.Context, obj *models.FunctionRunV2) (*models.Function, error)
 
-	Trace(ctx context.Context, obj *models.FunctionRunV2) (*models.RunTraceSpan, error)
+	Trace(ctx context.Context, obj *models.FunctionRunV2, preview *bool) (*models.RunTraceSpan, error)
 }
 type MutationResolver interface {
 	CreateApp(ctx context.Context, input models.CreateAppInput) (*cqrs.App, error)
@@ -1503,7 +1503,12 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			break
 		}
 
-		return e.complexity.FunctionRunV2.Trace(childComplexity), true
+		args, err := ec.field_FunctionRunV2_trace_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.FunctionRunV2.Trace(childComplexity, args["preview"].(*bool)), true
 
 	case "FunctionRunV2.traceID":
 		if e.complexity.FunctionRunV2.TraceID == nil {
@@ -3436,7 +3441,7 @@ type FunctionRunV2 {
 
   output: Bytes
 
-  trace: RunTraceSpan
+  trace(preview: Boolean): RunTraceSpan
   hasAI: Boolean!
 }
 
@@ -3670,6 +3675,21 @@ var parsedSchema = gqlparser.MustLoadSchema(sources...)
 // endregion ************************** generated!.gotpl **************************
 
 // region    ***************************** args.gotpl *****************************
+
+func (ec *executionContext) field_FunctionRunV2_trace_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 *bool
+	if tmp, ok := rawArgs["preview"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("preview"))
+		arg0, err = ec.unmarshalOBoolean2ᚖbool(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["preview"] = arg0
+	return args, nil
+}
 
 func (ec *executionContext) field_FunctionRun_historyItemOutput_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
@@ -10117,7 +10137,7 @@ func (ec *executionContext) _FunctionRunV2_trace(ctx context.Context, field grap
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.FunctionRunV2().Trace(rctx, obj)
+		return ec.resolvers.FunctionRunV2().Trace(rctx, obj, fc.Args["preview"].(*bool))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -10188,6 +10208,17 @@ func (ec *executionContext) fieldContext_FunctionRunV2_trace(ctx context.Context
 			}
 			return nil, fmt.Errorf("no field named %q was found under type RunTraceSpan", field.Name)
 		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_FunctionRunV2_trace_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return
 	}
 	return fc, nil
 }

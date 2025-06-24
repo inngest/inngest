@@ -290,6 +290,10 @@ func (p Pause) Edge() inngest.Edge {
 	}
 }
 
+func (p Pause) IsWaitForEvent() bool {
+	return p.Opcode != nil && *p.Opcode == enums.OpcodeWaitForEvent.String()
+}
+
 func (p Pause) IsInvoke() bool {
 	return p.Opcode != nil && *p.Opcode == enums.OpcodeInvokeFunction.String()
 }

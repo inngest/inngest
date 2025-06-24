@@ -13,6 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"log/slog"
 	"testing"
+	"time"
 )
 
 func TestShadowPartitionActiveCheck(t *testing.T) {
@@ -22,6 +23,8 @@ func TestShadowPartitionActiveCheck(t *testing.T) {
 	defer rc.Close()
 
 	l := logger.StdlibLogger(ctx, logger.WithLoggerLevel(slog.LevelDebug))
+
+	ctx = logger.WithStdlib(ctx, l)
 
 	defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
 	clock := clockwork.NewFakeClock()
@@ -93,6 +96,18 @@ func TestShadowPartitionActiveCheck(t *testing.T) {
 		cluster.HSet(kg.ShadowPartitionMeta(), sp.PartitionID, string(marshaled))
 	}
 
+	t.Run("should work on missing set", func(t *testing.T) {
+		setup(t)
+
+		res, err := q.activeCheckScanAccount(ctx, defaultShard, &sp, 0, 10)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+
+		res, err = q.activeCheckScanStatic(ctx, defaultShard, sp.activeKey(kg), sp.readyQueueKey(kg), sp.inProgressKey(kg), 0, 10)
+		require.NoError(t, err)
+		require.NotNil(t, res)
+	})
+
 	t.Run("adding to active check should work", func(t *testing.T) {
 		setup(t)
 
@@ -114,7 +129,36 @@ func TestShadowPartitionActiveCheck(t *testing.T) {
 		_, err = cluster.SAdd(sp.accountActiveKey(kg), qi.ID)
 		require.NoError(t, err)
 
-		_, err = q.backlogActiveCheck(ctx, &backlog, client, kg, l)
+		_, err = q.backlogActiveCheck(ctx, &backlog, client, kg)
+		require.NoError(t, err)
+
+		require.True(t, cluster.Exists(sp.accountActiveKey(kg)), cluster.Dump())
+		require.NoError(t, err)
+	})
+
+	t.Run("should not clean up leased items", func(t *testing.T) {
+		setup(t)
+
+		// goes to ready queue
+		enqueueToBacklog = false
+		qi, err := q.EnqueueItem(ctx, defaultShard, item, clock.Now(), osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+
+		leaseID, err := q.Lease(ctx, qi, 20*time.Second, q.clock.Now(), nil)
+		require.NoError(t, err)
+		require.NotNil(t, leaseID)
+
+		res, err := q.activeCheckScanAccount(ctx, defaultShard, &sp, 0, 10)
+		require.NoError(t, err)
+		require.Len(t, res.LeasedItems, 1)
+		require.Equal(t, qi.ID, res.LeasedItems[0])
+
+		res, err = q.activeCheckScanStatic(ctx, defaultShard, sp.activeKey(kg), sp.readyQueueKey(kg), sp.inProgressKey(kg), 0, 10)
+		require.NoError(t, err)
+		require.Len(t, res.LeasedItems, 1)
+		require.Equal(t, qi.ID, res.LeasedItems[0])
+
+		_, err = q.backlogActiveCheck(ctx, &backlog, client, kg)
 		require.NoError(t, err)
 
 		require.True(t, cluster.Exists(sp.accountActiveKey(kg)), cluster.Dump())
@@ -131,7 +175,12 @@ func TestShadowPartitionActiveCheck(t *testing.T) {
 		_, err = cluster.SAdd(sp.accountActiveKey(kg), qi.ID)
 		require.NoError(t, err)
 
-		_, err = q.backlogActiveCheck(ctx, &backlog, client, kg, l)
+		res, err := q.activeCheckScanAccount(ctx, defaultShard, &sp, 0, 10)
+		require.NoError(t, err)
+		require.Len(t, res.StaleItems, 1)
+		require.Equal(t, qi.ID, res.StaleItems[0].ID)
+
+		_, err = q.backlogActiveCheck(ctx, &backlog, client, kg)
 		require.NoError(t, err)
 
 		require.False(t, cluster.Exists(sp.accountActiveKey(kg)), cluster.Dump())
@@ -148,7 +197,7 @@ func TestShadowPartitionActiveCheck(t *testing.T) {
 		_, err = cluster.SAdd(sp.accountActiveKey(kg), "missing-lol")
 		require.NoError(t, err)
 
-		_, err = q.backlogActiveCheck(ctx, &backlog, client, kg, l)
+		_, err = q.backlogActiveCheck(ctx, &backlog, client, kg)
 		require.NoError(t, err)
 
 		require.False(t, cluster.Exists(sp.accountActiveKey(kg)))
@@ -165,7 +214,7 @@ func TestShadowPartitionActiveCheck(t *testing.T) {
 		_, err = cluster.SAdd(sp.activeKey(kg), qi.ID)
 		require.NoError(t, err)
 
-		_, err = q.backlogActiveCheck(ctx, &backlog, client, kg, l)
+		_, err = q.backlogActiveCheck(ctx, &backlog, client, kg)
 		require.NoError(t, err)
 
 		require.True(t, cluster.Exists(sp.activeKey(kg)))
@@ -182,7 +231,7 @@ func TestShadowPartitionActiveCheck(t *testing.T) {
 		_, err = cluster.SAdd(sp.activeKey(kg), qi.ID)
 		require.NoError(t, err)
 
-		_, err = q.backlogActiveCheck(ctx, &backlog, client, kg, l)
+		_, err = q.backlogActiveCheck(ctx, &backlog, client, kg)
 		require.NoError(t, err)
 
 		require.False(t, cluster.Exists(sp.activeKey(kg)))
@@ -199,7 +248,7 @@ func TestShadowPartitionActiveCheck(t *testing.T) {
 		_, err = cluster.SAdd(sp.activeKey(kg), "missing-lol")
 		require.NoError(t, err)
 
-		_, err = q.backlogActiveCheck(ctx, &backlog, client, kg, l)
+		_, err = q.backlogActiveCheck(ctx, &backlog, client, kg)
 		require.NoError(t, err)
 
 		require.False(t, cluster.Exists(sp.activeKey(kg)))
@@ -216,7 +265,7 @@ func TestShadowPartitionActiveCheck(t *testing.T) {
 		_, err = cluster.SAdd(backlog.customKeyActive(kg, 1), qi.ID)
 		require.NoError(t, err)
 
-		_, err = q.backlogActiveCheck(ctx, &backlog, client, kg, l)
+		_, err = q.backlogActiveCheck(ctx, &backlog, client, kg)
 		require.NoError(t, err)
 
 		require.True(t, cluster.Exists(backlog.customKeyActive(kg, 1)))
@@ -233,7 +282,7 @@ func TestShadowPartitionActiveCheck(t *testing.T) {
 		_, err = cluster.SAdd(backlog.customKeyActive(kg, 1), qi.ID)
 		require.NoError(t, err)
 
-		_, err = q.backlogActiveCheck(ctx, &backlog, client, kg, l)
+		_, err = q.backlogActiveCheck(ctx, &backlog, client, kg)
 		require.NoError(t, err)
 
 		require.False(t, cluster.Exists(backlog.customKeyActive(kg, 1)))
@@ -250,7 +299,7 @@ func TestShadowPartitionActiveCheck(t *testing.T) {
 		_, err = cluster.SAdd(backlog.customKeyActive(kg, 1), "missing-lol")
 		require.NoError(t, err)
 
-		_, err = q.backlogActiveCheck(ctx, &backlog, client, kg, l)
+		_, err = q.backlogActiveCheck(ctx, &backlog, client, kg)
 		require.NoError(t, err)
 
 		require.False(t, cluster.Exists(backlog.customKeyActive(kg, 1)))

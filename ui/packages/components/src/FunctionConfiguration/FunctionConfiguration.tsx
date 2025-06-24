@@ -1,5 +1,4 @@
-import { useMemo } from 'react';
-import { useRouter } from 'next/navigation';
+import { type ReactNode } from 'react';
 import { Button } from '@inngest/components/Button';
 import ConfigurationBlock from '@inngest/components/FunctionConfiguration/ConfigurationBlock';
 import ConfigurationCategory from '@inngest/components/FunctionConfiguration/ConfigurationCategory';
@@ -8,37 +7,45 @@ import ConfigurationTable, {
   type ConfigurationEntry,
 } from '@inngest/components/FunctionConfiguration/ConfigurationTable';
 import { PopoverContent } from '@inngest/components/FunctionConfiguration/FunctionConfigurationInfoPopovers';
-import { Header } from '@inngest/components/Header/Header';
-import { InvokeButton } from '@inngest/components/InvokeButton';
 import { Pill } from '@inngest/components/Pill';
+import { Time } from '@inngest/components/Time';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
+import { useCron } from '@inngest/components/hooks/useCron';
 import { AppsIcon } from '@inngest/components/icons/sections/Apps';
 import { EventsIcon } from '@inngest/components/icons/sections/Events';
 import { FunctionsIcon } from '@inngest/components/icons/sections/Functions';
-import { RiArrowRightSLine, RiArrowRightUpLine, RiCloseLine, RiTimeLine } from '@remixicon/react';
-import { toast } from 'sonner';
+import { relativeTime } from '@inngest/components/utils/date';
+import { RiArrowRightSLine, RiArrowRightUpLine, RiTimeLine } from '@remixicon/react';
 
+import type { GetFunctionQuery as DashboardGetFunctionQuery } from '../../../../apps/dashboard/src/gql/graphql';
 import {
   FunctionTriggerTypes,
-  useInvokeFunctionMutation,
-  type GetFunctionQuery,
+  type GetFunctionQuery as DevServerGetFunctionQuery,
 } from '../../../../apps/dev-server-ui/src/store/generated';
 
+type InngestFunction =
+  | NonNullable<DevServerGetFunctionQuery['functionBySlug']>
+  | NonNullable<DashboardGetFunctionQuery['workspace']['workflow']>;
+
 type FunctionConfigurationProps = {
-  onClose: () => void;
-  inngestFunction: NonNullable<GetFunctionQuery['functionBySlug']>;
+  inngestFunction: InngestFunction;
+  header?: ReactNode;
+  deployCreatedAt?: string | null;
+  getAppLink?: () => string;
+  getEventLink?: (eventName: string) => string;
+  getFunctionLink?: (functionSlug: string) => string;
 };
 
-export function FunctionConfiguration({ onClose, inngestFunction }: FunctionConfigurationProps) {
+export function FunctionConfiguration({
+  inngestFunction,
+  header,
+  deployCreatedAt,
+  getAppLink,
+  getEventLink,
+  getFunctionLink,
+}: FunctionConfigurationProps) {
   const configuration = inngestFunction.configuration;
   const triggers = inngestFunction.triggers;
-
-  const router = useRouter();
-  const doesFunctionAcceptPayload = useMemo(() => {
-    return Boolean(triggers?.some((trigger) => trigger.type === FunctionTriggerTypes.Event));
-  }, [triggers]);
-
-  const [invokeFunction] = useInvokeFunctionMutation();
 
   const retryEntries: ConfigurationEntry[] = [
     {
@@ -207,72 +214,56 @@ export function FunctionConfiguration({ onClose, inngestFunction }: FunctionConf
   );
 
   return (
-    <div className="border-subtle flex flex-col overflow-hidden overflow-y-auto border-l-[0.5px]">
-      <Header
-        breadcrumb={[{ text: inngestFunction.name }]}
-        action={
-          <div className="flex flex-row items-center justify-end gap-2">
-            <InvokeButton
-              kind="primary"
-              appearance="solid"
-              disabled={false}
-              doesFunctionAcceptPayload={doesFunctionAcceptPayload}
-              btnAction={async ({ data, user }) => {
-                await invokeFunction({
-                  data,
-                  functionSlug: inngestFunction.slug,
-                  user,
-                });
-                toast.success('Function invoked');
-                router.push('/runs');
-              }}
-            />
-            <Button
-              icon={<RiCloseLine className="text-muted h-5 w-5" />}
-              kind="secondary"
-              appearance="ghost"
-              size="small"
-              onClick={() => onClose()}
-            />
-          </div>
-        }
-      />
+    <div className="border-subtle flex h-full flex-col overflow-hidden overflow-y-auto border-l-[0.5px]">
+      {header}
       <ConfigurationCategory title="Overview">
         <ConfigurationSection title="App">
           <ConfigurationBlock
             icon={<AppsIcon className="h-5 w-5" />}
             mainContent={inngestFunction.app.name}
-            rightElement={
-              <Button
-                label="Go to apps"
-                href="/apps"
-                appearance="ghost"
-                icon={<RiArrowRightUpLine />}
-                iconSide="right"
-              />
+            subContent={
+              deployCreatedAt ? <Time format="relative" value={new Date(deployCreatedAt)} /> : ''
             }
+            rightElement={
+              getAppLink ? (
+                <RiArrowRightSLine className="h-5 w-5" />
+              ) : (
+                <Button
+                  label="Go to apps"
+                  href="/apps"
+                  appearance="ghost"
+                  icon={<RiArrowRightUpLine />}
+                  iconSide="right"
+                />
+              )
+            }
+            href={getAppLink ? getAppLink() : undefined}
           />
         </ConfigurationSection>
 
         <ConfigurationSection title="Triggers">
-          {triggers?.map((trigger) => (
-            <ConfigurationBlock
-              key={trigger.value}
-              icon={
-                trigger.type == FunctionTriggerTypes.Event ? (
-                  <EventsIcon className="h-5 w-5" />
-                ) : (
-                  <RiTimeLine className="h-5 w-5" />
-                )
-              }
-              mainContent={trigger.value}
-              expression={
-                trigger.type == FunctionTriggerTypes.Event && trigger.condition
-                  ? `if: ${trigger.condition}`
-                  : ''
-              }
-            />
-          ))}
+          {triggers?.map((trigger) => {
+            if (trigger.type === FunctionTriggerTypes.Cron) {
+              return <CronTriggerBlock key={trigger.value} schedule={trigger.value} />;
+            } else if (trigger.type === FunctionTriggerTypes.Event) {
+              return (
+                <ConfigurationBlock
+                  key={trigger.value}
+                  icon={<EventsIcon className="h-5 w-5" />}
+                  mainContent={trigger.value}
+                  expression={trigger.condition ? `if: ${trigger.condition}` : ''}
+                  rightElement={
+                    getEventLink ? <RiArrowRightSLine className="h-5 w-5" /> : undefined
+                  }
+                  href={getEventLink ? getEventLink(trigger.value) : undefined}
+                />
+              );
+            } else {
+              // Exhaustive check - this should never be reached if all cases are handled
+              const _exhaustiveCheck: never = trigger.type;
+              return _exhaustiveCheck;
+            }
+          })}
         </ConfigurationSection>
       </ConfigurationCategory>
       <ConfigurationCategory title="Execution Configurations">
@@ -281,8 +272,10 @@ export function FunctionConfiguration({ onClose, inngestFunction }: FunctionConf
             <ConfigurationBlock
               icon={<FunctionsIcon className="h-5 w-5" />}
               mainContent={inngestFunction.failureHandler.slug}
-              rightElement={<RiArrowRightSLine className="h-5 w-5" />}
-              href={`/functions/config?slug=${inngestFunction.failureHandler.slug}`}
+              rightElement={getFunctionLink ? <RiArrowRightSLine className="h-5 w-5" /> : undefined}
+              href={
+                getFunctionLink ? getFunctionLink(inngestFunction.failureHandler.slug) : undefined
+              }
             />
           )}
         </ConfigurationSection>
@@ -296,6 +289,8 @@ export function FunctionConfiguration({ onClose, inngestFunction }: FunctionConf
                 mainContent={cancelOn.event}
                 subContent={cancelOn.timeout ? `Timeout: ${cancelOn.timeout}` : ''}
                 expression={cancelOn.condition ? `if: ${cancelOn.condition}` : ''}
+                rightElement={getEventLink ? <RiArrowRightSLine className="h-5 w-5" /> : undefined}
+                href={getEventLink ? getEventLink(cancelOn.event) : undefined}
               />
             );
           })}
@@ -366,5 +361,32 @@ export function FunctionConfiguration({ onClose, inngestFunction }: FunctionConf
         )}
       </ConfigurationCategory>
     </div>
+  );
+}
+
+type CronTriggerBlockProps = {
+  schedule: string;
+};
+
+function CronTriggerBlock({ schedule }: CronTriggerBlockProps) {
+  const { nextRun } = useCron(schedule);
+
+  return (
+    <ConfigurationBlock
+      icon={<RiTimeLine className="h-5 w-5" />}
+      mainContent={schedule}
+      subContent={
+        nextRun ? (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="truncate">{`Next run: ${relativeTime(nextRun)}`}</span>
+            </TooltipTrigger>
+            <TooltipContent className="font-mono text-xs">{nextRun.toISOString()}</TooltipContent>
+          </Tooltip>
+        ) : (
+          ''
+        )
+      }
+    />
   );
 }

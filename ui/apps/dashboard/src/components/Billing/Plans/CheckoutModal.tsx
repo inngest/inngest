@@ -20,8 +20,8 @@ const {
 } = resolveConfig(tailwindConfig);
 
 export type CheckoutItem = {
-  /* Inngest plan id */
-  planID: string;
+  /* Inngest plan slug */
+  planSlug: string;
   name: string;
   quantity: number;
   amount: number;
@@ -107,7 +107,11 @@ function CheckoutForm({ items, onSuccess }: { items: CheckoutItem[]; onSuccess: 
       );
     }
 
-    const apiItems = items.map(({ planID, quantity, amount }) => ({ planID, quantity, amount }));
+    const apiItems = items.map(({ planSlug, quantity, amount }) => ({
+      planSlug,
+      quantity,
+      amount,
+    }));
 
     // Create the PaymentIntent
     const { data, error: createSubscriptionError } = await createStripeSubscription({

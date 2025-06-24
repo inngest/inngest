@@ -5,10 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"time"
-
-	"github.com/inngest/inngest/pkg/expressions"
 
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/event"
@@ -16,8 +13,10 @@ import (
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
+	"github.com/inngest/inngest/pkg/expressions"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -106,7 +105,7 @@ func (r *runValidator) checkStepLimit(ctx context.Context) error {
 			},
 		})
 
-		if err := r.e.finalize(ctx, r.md, r.evts, r.f.GetSlug(), r.e.assignedQueueShard, resp); err != nil {
+		if err := r.e.finalize(ctx, r.md, r.evts, r.f.GetSlug(), r.e.assignedQueueShard, resp, nil); err != nil {
 			l.Error("error running finish handler", "error", err)
 		}
 

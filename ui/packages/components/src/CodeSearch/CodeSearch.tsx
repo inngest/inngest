@@ -373,7 +373,7 @@ export default function CodeSearch({
     }, VALIDATION_DELAY);
   };
 
-  const expressionError = editorValidationError || searchError ;
+  const expressionError = editorValidationError || searchError;
 
   return (
     <>

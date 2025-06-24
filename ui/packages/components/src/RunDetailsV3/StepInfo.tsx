@@ -137,15 +137,24 @@ export const StepInfo = ({
 
   useEffect(() => {
     let intervalId: ReturnType<typeof setInterval> | undefined;
+
+    const refreshResult = () => {
+      if (trace.outputID) {
+        getResult(trace.outputID).then(setResult);
+      } else {
+        setResult(undefined);
+      }
+    };
+
     //
     // fetch once on load
-    trace.outputID && getResult(trace.outputID).then(setResult);
+    refreshResult();
 
     //
     // while the run is polling, continue polling for output
     if (pollInterval) {
       intervalId = setInterval(() => {
-        trace.outputID && getResult(trace.outputID).then(setResult);
+        refreshResult();
       }, pollInterval);
     }
 

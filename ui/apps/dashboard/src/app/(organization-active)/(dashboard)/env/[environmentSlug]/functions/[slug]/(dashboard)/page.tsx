@@ -4,6 +4,7 @@ import type { Route } from 'next';
 import NextLink from 'next/link';
 import { Alert } from '@inngest/components/Alert';
 import { Button } from '@inngest/components/Button';
+import { FunctionConfiguration as NewFunctionConfiguration } from '@inngest/components/FunctionConfiguration';
 import { Time } from '@inngest/components/Time';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
 import { useCron } from '@inngest/components/hooks/useCron';
@@ -18,6 +19,7 @@ import { ErrorBoundary } from '@sentry/nextjs';
 import type { TimeRange } from '@/types/TimeRangeFilter';
 import FunctionConfiguration from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/functions/[slug]/(dashboard)/FunctionConfiguration';
 import Block from '@/components/Block';
+import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import { FunctionTriggerTypes } from '@/gql/graphql';
 import LoadingIcon from '@/icons/LoadingIcon';
 import { useFunction, useFunctionUsage } from '@/queries';
@@ -46,7 +48,7 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
   const [{ data, fetching: isFetchingFunction }] = useFunction({
     functionSlug,
   });
-  const function_ = data?.workspace.workflow;
+  const possiblyNullFunction = data?.workspace.workflow;
 
   const [timeRangeParam, setTimeRangeParam] = useSearchParam('timeRange');
   const selectedTimeRange: TimeRange =
@@ -57,6 +59,8 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
     timeRange: selectedTimeRange,
   });
 
+  const { value: newFunctionConfigUiEnabled } = useBooleanFlag('new-function-config-ui', false);
+
   if (isFetchingFunction) {
     return (
       <div className="flex h-full w-full items-center justify-center">
@@ -65,7 +69,7 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
     );
   }
 
-  if (!function_) {
+  if (!possiblyNullFunction) {
     return (
       <>
         <div className="mt-4 flex place-content-center">
@@ -74,6 +78,9 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
       </>
     );
   }
+
+  // TypeScript flow analysis helper - function_ is guaranteed to exist after the null check above
+  const function_ = possiblyNullFunction;
 
   const usageMetrics: UsageMetrics | undefined = usage?.reduce(
     (acc, u) => {
@@ -91,7 +98,7 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
     ? '0.00'
     : (((usageMetrics.totalFailures || 0) / (usageMetrics.totalRuns || 0)) * 100).toFixed(2);
 
-  const triggers = function_.current?.fnTriggers || [];
+  const triggers = function_.current?.triggers || [];
 
   function handleTimeRangeChange(timeRange: TimeRange) {
     if (timeRange.key) {
@@ -150,7 +157,7 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
             />
           </div>
         </main>
-        <aside className="border-subtle bg-canvasSubtle overflow-y-auto border-l px-6 py-4">
+        <aside className="border-subtle bg-canvasSubtle overflow-y-auto">
           <ErrorBoundary
             fallback={({ error, resetError }) => (
               <div className="flex items-center justify-center">
@@ -171,38 +178,118 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
               </div>
             )}
           >
-            <div className="flex flex-col gap-10">
-              <Block title="App">
-                <NextLink
-                  href={appRoute}
-                  className="border-subtle bg-canvasBase hover:bg-canvasMuted block rounded-md border p-4"
-                >
-                  <div className="flex min-w-0 items-center">
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate font-medium">{function_.app.name}</p>
-                      {function_.current?.deploy?.createdAt && (
-                        <Time
-                          className="text-subtle text-xs"
-                          format="relative"
-                          value={new Date(function_.current.deploy.createdAt)}
-                        />
-                      )}
+            {newFunctionConfigUiEnabled ? (
+              <div className="bg-canvasBase h-full overflow-y-auto">
+                <NewFunctionConfiguration
+                  inngestFunction={function_}
+                  deployCreatedAt={function_.current?.deploy?.createdAt}
+                  getAppLink={() => appRoute}
+                  getEventLink={(eventName) =>
+                    pathCreator.eventType({
+                      envSlug: params.environmentSlug,
+                      eventName,
+                    })
+                  }
+                  getFunctionLink={(functionSlug) =>
+                    pathCreator.function({
+                      envSlug: params.environmentSlug,
+                      functionSlug,
+                    })
+                  }
+                />
+              </div>
+            ) : (
+              <div className="flex flex-col gap-10 px-6 py-4">
+                <Block title="App">
+                  <NextLink
+                    href={appRoute}
+                    className="border-subtle bg-canvasBase hover:bg-canvasMuted block rounded-md border p-4"
+                  >
+                    <div className="flex min-w-0 items-center">
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-medium">{function_.app.name}</p>
+                        {function_.current?.deploy?.createdAt && (
+                          <Time
+                            className="text-subtle text-xs"
+                            format="relative"
+                            value={new Date(function_.current.deploy.createdAt || '')}
+                          />
+                        )}
+                      </div>
+                      <RiArrowRightSLine className="h-5" />
                     </div>
-                    <RiArrowRightSLine className="h-5" />
+                  </NextLink>
+                </Block>
+                <Block title="Triggers">
+                  <div className="space-y-3">
+                    {triggers.map((trigger) => {
+                      switch (trigger.type) {
+                        case FunctionTriggerTypes.Event:
+                          return (
+                            <NextLink
+                              key={trigger.value}
+                              href={pathCreator.eventType({
+                                envSlug: params.environmentSlug,
+                                eventName: trigger.value,
+                              })}
+                              className="border-subtle bg-canvasBase hover:bg-canvasMuted block rounded-md border p-4"
+                            >
+                              <div className="flex min-w-0 items-center">
+                                <div className="min-w-0 flex-1 space-y-1">
+                                  <div className="flex min-w-0 items-center">
+                                    <EventsIcon className="text-subtle w-8 shrink-0 pr-2" />
+                                    <p className="truncate font-medium">{trigger.value}</p>
+                                  </div>
+                                  <dl className="text-xs">
+                                    {trigger.condition && (
+                                      <div className="flex gap-1">
+                                        <dt className="text-subtle">If</dt>
+                                        <Tooltip>
+                                          <TooltipTrigger asChild>
+                                            <dd className="truncate font-mono ">
+                                              {trigger.condition}
+                                            </dd>
+                                          </TooltipTrigger>
+                                          <TooltipContent className="font-mono text-xs">
+                                            {trigger.condition}
+                                          </TooltipContent>
+                                        </Tooltip>
+                                      </div>
+                                    )}
+                                  </dl>
+                                </div>
+                                <RiArrowRightSLine className="h-5" />
+                              </div>
+                            </NextLink>
+                          );
+
+                        case FunctionTriggerTypes.Cron:
+                          return (
+                            <ScheduleTrigger
+                              key={trigger.value}
+                              schedule={trigger.value}
+                              condition={trigger.condition}
+                            />
+                          );
+
+                        default:
+                          // Exhaustive check - this should never be reached if all cases are handled
+                          const _exhaustiveCheck: never = trigger.type;
+                          return _exhaustiveCheck;
+                      }
+                    })}
                   </div>
-                </NextLink>
-              </Block>
-              <Block title="Triggers">
-                <div className="space-y-3">
-                  {triggers.map((trigger) => {
-                    switch (trigger.type) {
-                      case FunctionTriggerTypes.Event:
+                </Block>
+                {function_.configuration.cancellations.length > 0 && (
+                  <Block title="Cancellation">
+                    <div className="space-y-3">
+                      {function_.configuration.cancellations.map((cancellation) => {
                         return (
                           <NextLink
-                            key={trigger.value}
+                            key={cancellation.event}
                             href={pathCreator.eventType({
                               envSlug: params.environmentSlug,
-                              eventName: trigger.value,
+                              eventName: cancellation.event,
                             })}
                             className="border-subtle bg-canvasBase hover:bg-canvasMuted block rounded-md border p-4"
                           >
@@ -210,22 +297,28 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
                               <div className="min-w-0 flex-1 space-y-1">
                                 <div className="flex min-w-0 items-center">
                                   <EventsIcon className="text-subtle w-8 shrink-0 pr-2" />
-                                  <p className="truncate font-medium">{trigger.value}</p>
+                                  <p className="truncate font-medium">{cancellation.event}</p>
                                 </div>
                                 <dl className="text-xs">
-                                  {trigger.condition && (
+                                  {cancellation.condition && (
                                     <div className="flex gap-1">
                                       <dt className="text-subtle">If</dt>
                                       <Tooltip>
                                         <TooltipTrigger asChild>
                                           <dd className="truncate font-mono ">
-                                            {trigger.condition}
+                                            {cancellation.condition}
                                           </dd>
                                         </TooltipTrigger>
                                         <TooltipContent className="font-mono text-xs">
-                                          {trigger.condition}
+                                          {cancellation.condition}
                                         </TooltipContent>
                                       </Tooltip>
+                                    </div>
+                                  )}
+                                  {cancellation.timeout && (
+                                    <div className="flex gap-1">
+                                      <dt className="text-subtle">Timeout</dt>
+                                      <dd className="">{cancellation.timeout}</dd>
                                     </div>
                                   )}
                                 </dl>
@@ -234,100 +327,38 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
                             </div>
                           </NextLink>
                         );
-
-                      case FunctionTriggerTypes.Cron:
-                        return (
-                          <ScheduleTrigger
-                            key={trigger.value}
-                            schedule={trigger.value}
-                            condition={trigger.condition}
-                          />
-                        );
-
-                      default:
-                        // Exhaustive check - this should never be reached if all cases are handled
-                        const _exhaustiveCheck: never = trigger.type;
-                        return _exhaustiveCheck;
-                    }
-                  })}
-                </div>
-              </Block>
-              {function_.configuration.cancellations.length > 0 && (
-                <Block title="Cancellation">
-                  <div className="space-y-3">
-                    {function_.configuration.cancellations.map((cancellation) => {
-                      return (
-                        <NextLink
-                          key={cancellation.event}
-                          href={pathCreator.eventType({
-                            envSlug: params.environmentSlug,
-                            eventName: cancellation.event,
-                          })}
-                          className="border-subtle bg-canvasBase hover:bg-canvasMuted block rounded-md border p-4"
-                        >
-                          <div className="flex min-w-0 items-center">
-                            <div className="min-w-0 flex-1 space-y-1">
-                              <div className="flex min-w-0 items-center">
-                                <EventsIcon className="text-subtle w-8 shrink-0 pr-2" />
-                                <p className="truncate font-medium">{cancellation.event}</p>
-                              </div>
-                              <dl className="text-xs">
-                                {cancellation.condition && (
-                                  <div className="flex gap-1">
-                                    <dt className="text-subtle">If</dt>
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <dd className="truncate font-mono ">
-                                          {cancellation.condition}
-                                        </dd>
-                                      </TooltipTrigger>
-                                      <TooltipContent className="font-mono text-xs">
-                                        {cancellation.condition}
-                                      </TooltipContent>
-                                    </Tooltip>
-                                  </div>
-                                )}
-                                {cancellation.timeout && (
-                                  <div className="flex gap-1">
-                                    <dt className="text-subtle">Timeout</dt>
-                                    <dd className="">{cancellation.timeout}</dd>
-                                  </div>
-                                )}
-                              </dl>
-                            </div>
-                            <RiArrowRightSLine className="h-5" />
-                          </div>
-                        </NextLink>
-                      );
-                    })}
-                  </div>
-                </Block>
-              )}
-              {function_.failureHandler && (
-                <Block title="Failure Handler">
-                  <div className="space-y-3">
-                    <NextLink
-                      href={pathCreator.function({
-                        envSlug: params.environmentSlug,
-                        functionSlug: function_.failureHandler.slug,
                       })}
-                      className="border-subtle bg-canvasBase hover:bg-canvasMuted block rounded-md border p-4"
-                    >
-                      <div className="flex min-w-0 items-center">
-                        <div className="min-w-0 flex-1">
-                          <div className="flex min-w-0 items-center">
-                            <FunctionsIcon className="text-subtle w-8 shrink-0 pr-2" />
-                            <p className="truncate font-medium">{function_.failureHandler.name}</p>
+                    </div>
+                  </Block>
+                )}
+                {function_.failureHandler && (
+                  <Block title="Failure Handler">
+                    <div className="space-y-3">
+                      <NextLink
+                        href={pathCreator.function({
+                          envSlug: params.environmentSlug,
+                          functionSlug: function_.failureHandler.slug || '',
+                        })}
+                        className="border-subtle bg-canvasBase hover:bg-canvasMuted block rounded-md border p-4"
+                      >
+                        <div className="flex min-w-0 items-center">
+                          <div className="min-w-0 flex-1">
+                            <div className="flex min-w-0 items-center">
+                              <FunctionsIcon className="text-subtle w-8 shrink-0 pr-2" />
+                              <p className="truncate font-medium">
+                                {function_.failureHandler.name}
+                              </p>
+                            </div>
                           </div>
+                          <RiArrowRightSLine className="h-5" />
                         </div>
-                        <RiArrowRightSLine className="h-5" />
-                      </div>
-                    </NextLink>
-                  </div>
-                </Block>
-              )}
-              {<FunctionConfiguration configuration={function_.configuration} />}
-            </div>
+                      </NextLink>
+                    </div>
+                  </Block>
+                )}
+                {<FunctionConfiguration configuration={function_.configuration} />}
+              </div>
+            )}
           </ErrorBoundary>
         </aside>
       </div>

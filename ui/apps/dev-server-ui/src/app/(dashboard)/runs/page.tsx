@@ -36,6 +36,7 @@ const pollInterval = 400;
 
 export default function Page() {
   const [autoRefresh, setAutoRefresh] = useState(true);
+  const [tracesPreviewEnabled, setTracesPreviewEnabled] = useState(false);
   const [filterApp] = useStringArraySearchParam('filterApp');
   const [totalCount, setTotalCount] = useState<number>();
   const [filteredStatus] = useValidatedArraySearchParam('filterStatus', isFunctionRunStatus);
@@ -165,9 +166,11 @@ export default function Page() {
               })}
             />
             <RunsActionMenu
-              setAutoRefresh={() => setAutoRefresh(!autoRefresh)}
+              setAutoRefresh={() => setAutoRefresh((v) => !v)}
               autoRefresh={autoRefresh}
               intervalSeconds={pollInterval / 1000}
+              toggleTracesPreview={() => setTracesPreviewEnabled((v) => !v)}
+              tracesPreviewEnabled={tracesPreviewEnabled}
             />
           </div>
         }
@@ -178,6 +181,7 @@ export default function Page() {
         defaultVisibleColumns={['status', 'id', 'trigger', 'function', 'queuedAt', 'endedAt']}
         features={{
           history: Number.MAX_SAFE_INTEGER,
+          tracesPreview: tracesPreviewEnabled,
         }}
         hasMore={hasNextPage ?? false}
         isLoadingInitial={isFetching && runs === undefined}
