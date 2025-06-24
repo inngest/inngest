@@ -35,6 +35,7 @@ export default function ConfigurationTable({
                 {header}
                 <Info
                   text={<span className="whitespace-pre-line">{infoPopoverContent.text}</span>}
+                  widthClassName="max-w-60"
                   action={
                     <Link
                       href={infoPopoverContent.url}

@@ -1,10 +1,11 @@
-import { Link } from '@inngest/components/Link';
+import NextLink from 'next/link';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
+import { cn } from '@inngest/components/utils/classNames';
 
 type ConfigurationBlockProps = {
   icon: React.ReactNode;
   mainContent: string;
-  subContent?: string;
+  subContent?: React.ReactNode;
   expression?: string;
   rightElement?: React.ReactNode;
   href?: string;
@@ -20,12 +21,15 @@ export default function ConfigurationBlock({
 }: ConfigurationBlockProps) {
   const showSubContentAndExpressionSeparator = !!subContent && !!expression;
 
+  const borderClasses =
+    'border-subtle border-[0.5px] border-b-0 first:rounded-t last:rounded-b last:border-b-[0.5px]';
+
   const content = (
-    <div className="border-subtle flex items-center gap-2 self-stretch border-[0.5px] border-b-0 p-2 first:rounded-t last:rounded-b last:border-b-[0.5px]">
+    <div className="flex items-center gap-2 self-stretch p-2">
       <div className="bg-canvasSubtle text-light flex h-9 w-9 items-center justify-center gap-2 rounded p-2">
         {icon}
       </div>
-      <div className="text-basis flex min-w-0 flex-1 flex-col items-start justify-center gap-1 self-stretch text-sm">
+      <div className="text-basis flex min-w-0 flex-1 flex-col items-start justify-center gap-0.5 self-stretch text-sm">
         <div>{mainContent}</div>
 
         {(subContent || expression) && (
@@ -50,10 +54,10 @@ export default function ConfigurationBlock({
   );
 
   return href ? (
-    <Link href={href} className="hover:bg-canvasMuted block">
+    <NextLink href={href} className={cn('hover:bg-canvasMuted block', borderClasses)}>
       {content}
-    </Link>
+    </NextLink>
   ) : (
-    content
+    <div className={cn(borderClasses)}>{content}</div>
   );
 }

@@ -356,6 +356,12 @@ func (r *DriverResponse) GetFunctionOutput() (*string, error) {
 		}
 	}
 
+	// If output is nil, somehow we have a function result with no output. That
+	// seems wrong.
+	if output == nil {
+		return nil, fmt.Errorf("function result has no output")
+	}
+
 	// Now we have the output, we make sure it's keyed the same as regular step
 	// outputs are, either under `data` or `error`.
 	var keyedOutput *string
