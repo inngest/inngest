@@ -42,13 +42,11 @@ func TestShadowPartitionActiveCheck(t *testing.T) {
 		WithReadOnlySpotChecks(func(ctx context.Context, acctID uuid.UUID) bool {
 			return false
 		}),
-		WithEnableActiveSpotChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-			return true
+		WithActiveSpotCheckProbability(func(ctx context.Context, acctID uuid.UUID) (int, int) {
+			return 100, 100
 		}),
 		WithRunMode(QueueRunMode{
-			ActiveChecker:                      true,
-			BacklogRefillSpotCheckProbability:  100,
-			ActiveCheckAccountCheckProbability: 100,
+			ActiveChecker: true,
 		}),
 	)
 

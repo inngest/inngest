@@ -510,20 +510,18 @@ func TestQueueRefillBacklog(t *testing.T) {
 				return true
 			}),
 			WithRunMode(QueueRunMode{
-				Sequential:                         true,
-				Scavenger:                          true,
-				Partition:                          true,
-				Account:                            true,
-				AccountWeight:                      85,
-				ShadowPartition:                    true,
-				AccountShadowPartition:             true,
-				AccountShadowPartitionWeight:       85,
-				ShadowContinuations:                true,
-				ShadowContinuationSkipProbability:  0,
-				NormalizePartition:                 true,
-				ActiveChecker:                      true,
-				BacklogRefillSpotCheckProbability:  100,
-				ActiveCheckAccountCheckProbability: 100,
+				Sequential:                        true,
+				Scavenger:                         true,
+				Partition:                         true,
+				Account:                           true,
+				AccountWeight:                     85,
+				ShadowPartition:                   true,
+				AccountShadowPartition:            true,
+				AccountShadowPartitionWeight:      85,
+				ShadowContinuations:               true,
+				ShadowContinuationSkipProbability: 0,
+				NormalizePartition:                true,
+				ActiveChecker:                     true,
 			}),
 			WithBacklogRefillLimit(500),
 			WithConcurrencyLimitGetter(func(ctx context.Context, p QueuePartition) PartitionConcurrencyLimits {
@@ -542,8 +540,8 @@ func TestQueueRefillBacklog(t *testing.T) {
 					PartitionLimit: 678,
 				}
 			}),
-			WithEnableActiveSpotChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-				return true
+			WithActiveSpotCheckProbability(func(ctx context.Context, acctID uuid.UUID) (int, int) {
+				return 100, 100
 			}),
 		)
 
@@ -598,6 +596,7 @@ func TestQueueRefillBacklog(t *testing.T) {
 		b := q.ItemBacklog(ctx, qi)
 		sp := q.ItemShadowPartition(ctx, qi)
 
+		enqueueToBacklog = true
 		res, err := q.BacklogRefill(ctx, &b, &sp, q.clock.Now().Add(10*time.Second), &PartitionConstraintConfig{
 			Concurrency: ShadowPartitionConcurrency{
 				AccountConcurrency:  1,
@@ -614,6 +613,7 @@ func TestQueueRefillBacklog(t *testing.T) {
 		b2 := q.ItemBacklog(ctx, item2)
 		sp2 := q.ItemShadowPartition(ctx, item2)
 
+		enqueueToBacklog = true
 		res, err = q.BacklogRefill(ctx, &b2, &sp2, q.clock.Now().Add(10*time.Second), &PartitionConstraintConfig{
 			Concurrency: ShadowPartitionConcurrency{
 				AccountConcurrency:  1,

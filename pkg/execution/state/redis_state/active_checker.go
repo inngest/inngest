@@ -145,7 +145,8 @@ func (q *queue) backlogActiveCheck(ctx context.Context, b *QueueBacklog, client 
 	l.Debug("starting active check for partition")
 
 	// Check account
-	if accountID != uuid.Nil && mathRand.Intn(100) <= q.runMode.ActiveCheckAccountCheckProbability {
+	_, accountSpotCheckProbability := q.activeSpotCheckProbability(ctx, accountID)
+	if accountID != uuid.Nil && mathRand.Intn(100) <= accountSpotCheckProbability {
 		err := q.accountActiveCheck(logger.WithStdlib(ctx, l.With("check-scope", "account-check")), &sp, accountID, client, kg, readOnly)
 		if err != nil {
 			return false, fmt.Errorf("could not check account active items: %w", err)
