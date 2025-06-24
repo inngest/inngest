@@ -12,7 +12,7 @@ local keyShadowPartition   = KEYS[6]
 
 local nowMS = ARGV[1]
 
-local acct_active = redis.call("ZCARD", keyAccountActive)
+local acct_active = redis.call("SCARD", keyAccountActive)
 local acct_in_progress = redis.call("ZCARD", keyAccountInProgress)
 
 local ready = redis.call("ZCARD", keyReady)
