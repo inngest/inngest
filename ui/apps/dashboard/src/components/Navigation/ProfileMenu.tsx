@@ -10,8 +10,8 @@ import {
   RiEqualizerLine,
   RiGroupLine,
   RiLogoutCircleLine,
-  RiUserAddLine,
   RiUserLine,
+  RiUserSharedLine,
 } from '@remixicon/react';
 
 import { pathCreator } from '@/utils/urls';
@@ -108,7 +108,7 @@ export const ProfileMenu = ({ children, isMarketplace }: Props) => {
               value="switchAccount"
             >
               <div className="hover:bg-canvasSubtle flex flex-row items-center justify-start">
-                <RiUserAddLine className="text-muted mr-2 h-4 w-4" />
+                <RiUserSharedLine className="text-muted mr-2 h-4 w-4" />
                 <div>Switch Account</div>
               </div>
             </Listbox.Option>
