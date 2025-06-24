@@ -27,7 +27,7 @@ type Props = React.PropsWithChildren<{
 }>;
 
 export const ProfileMenu = ({ children, isMarketplace }: Props) => {
-  const { client, user, organization, session: currentSession, setActive } = useClerk();
+  const { client, user, organization, session: currentSession, setActive, loaded } = useClerk();
   return (
     <Listbox>
       <Listbox.Button className="w-full cursor-pointer ring-0">{children}</Listbox.Button>
@@ -134,7 +134,7 @@ export const ProfileMenu = ({ children, isMarketplace }: Props) => {
                   </div>
                 </div>
                 {!isMarketplace && (
-                  <div className="flex w-full flex-row justify-between pl-5 pt-2">
+                  <div className="flex w-full flex-row justify-between gap-4 pl-5 pt-2">
                     <NextLink href="/settings/user" scroll={false}>
                       <div className="hover:bg-canvasSubtle flex cursor-pointer flex-row items-center justify-start">
                         <RiUserLine className="text-muted mr-0 h-4 w-4" /> Profile
@@ -153,8 +153,7 @@ export const ProfileMenu = ({ children, isMarketplace }: Props) => {
             </Listbox.Option>
           )}
 
-          {/* eslint-disable-next-line @typescript-eslint/no-unnecessary-condition */}
-          {client.sessions &&
+          {loaded &&
             client.sessions
               .filter((session) => session.id !== currentSession?.id)
               .map((session) => {
