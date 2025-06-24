@@ -60,7 +60,7 @@ jobs:
           EXPERIMENTAL_KEY_QUEUES_ENABLE: "${{ matrix.experimentalKeyQueues }}"
 
   golang:
-    name: "Go SDK / OS: (${{ matrix.os }}), key-queues: ${{ matrix.experimentalKeyQueues }}"
+    name: "Go SDK / OS: (${{ matrix.os }}), key-queues: ${{ matrix.experimentalKeyQueues }} / split: ${{ matrix.index }}"
     strategy:
       fail-fast: false
       matrix:
