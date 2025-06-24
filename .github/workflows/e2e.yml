@@ -66,8 +66,8 @@ jobs:
       matrix:
         os: [ubuntu-latest]
         experimentalKeyQueues: [ false, true ]
-        parallelism: [3]
-        index: [0, 1, 2]
+        parallelism: [5]
+        index: [0, 1, 2, 3, 4]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
