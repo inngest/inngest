@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { usePathCreator } from '@inngest/components/SharedContext/usePathCreator';
-import { RiGitForkLine, RiPlayLine, RiStopLine } from '@remixicon/react';
+import { RiGitForkLine, RiPauseLine, RiPlayLine, RiStopLine } from '@remixicon/react';
 
 import { Button } from '../Button';
 import { Timeline } from '../RunDetailsV3/Timeline';
 import { useGetRun } from '../SharedContext/useGetRun';
 import { Skeleton } from '../Skeleton';
 import { StatusDot } from '../Status/StatusDot';
+import { Tooltip, TooltipContent, TooltipTrigger } from '../Tooltip';
 import { useSearchParam } from '../hooks/useSearchParam';
 import { DragDivider } from '../icons/DragDivider';
 import { StepOver } from '../icons/debug/StepOver';
@@ -22,6 +23,7 @@ export const Debugger = ({ functionSlug }: { functionSlug: string }) => {
   const leftColumnRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [leftWidth, setLeftWidth] = useState(50);
+  const [running, setRunning] = useState(false);
 
   const fetchRun = async (runID: string) => {
     if (runID) {
@@ -96,11 +98,34 @@ export const Debugger = ({ functionSlug }: { functionSlug: string }) => {
         <div ref={leftColumnRef} style={{ width: `${leftWidth}%` }}>
           <div className="flex flex-col gap-2">
             <div className="border-muted  h-12 w-full border-b border-t px-4">
-              <div className="flex flex-row items-center gap-x-4">
-                <RiPlayLine className="text-muted h-4 w-4 cursor-pointer" />
-                <StepOver className="text-muted h-5 w-5 cursor-pointer" />
+              <div className="flex flex-row items-center gap-x-2">
+                <Tooltip>
+                  <TooltipTrigger>
+                    {running ? (
+                      <RiPauseLine className="text-muted hover:bg-canvasSubtle h-6 w-6 cursor-pointer rounded-md p-1" />
+                    ) : (
+                      <RiPlayLine className="text-muted hover:bg-canvasSubtle h-6 w-6 cursor-pointer rounded-md p-1" />
+                    )}
+                  </TooltipTrigger>
+                  <TooltipContent className="whitespace-pre-line">
+                    {running ? 'Pause' : 'Play'}
+                  </TooltipContent>
+                </Tooltip>
+
+                <Tooltip>
+                  <TooltipTrigger>
+                    <StepOver className="text-muted hover:bg-canvasSubtle h-6 w-6 cursor-pointer rounded-md p-1" />
+                  </TooltipTrigger>
+                  <TooltipContent className="whitespace-pre-line">Step Over</TooltipContent>
+                </Tooltip>
+
                 <div className="bg-canvasMuted my-2 h-8 w-px" />
-                <RiStopLine className="text-muted h-4 w-4 cursor-pointer" />
+                <Tooltip>
+                  <TooltipTrigger>
+                    <RiStopLine className="text-muted hover:bg-canvasSubtle h-6 w-6 cursor-pointer rounded-md p-1" />
+                  </TooltipTrigger>
+                  <TooltipContent className="whitespace-pre-line">Stop</TooltipContent>
+                </Tooltip>
               </div>
             </div>
             <div>
