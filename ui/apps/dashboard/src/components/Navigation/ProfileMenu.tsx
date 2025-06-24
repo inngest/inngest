@@ -207,7 +207,7 @@ export const ProfileMenu = ({ children, isMarketplace }: Props) => {
 
           <hr className="border-subtle" />
 
-          {isMarketplace && (
+          {loaded && (isMarketplace || client.sessions.length > 1) && (
             <Listbox.Option
               className="text-muted hover:bg-canvasSubtle m-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
               value="signOut"
