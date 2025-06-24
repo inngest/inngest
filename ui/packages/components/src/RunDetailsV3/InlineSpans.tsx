@@ -4,6 +4,7 @@ import { ElementWrapper } from '../DetailsCard/Element';
 import { Tooltip, TooltipContent, TooltipTrigger } from '../Tooltip';
 import { cn } from '../utils/classNames';
 import { toMaybeDate } from '../utils/date';
+import { GroupSpan } from './GroupSpan';
 import { Span } from './Span';
 import { type Trace } from './types';
 import { createSpanWidths, formatDuration, getSpanName } from './utils';
@@ -13,10 +14,12 @@ type Props = {
   maxTime: Date;
   minTime: Date;
   trace: Trace;
+  depth: number;
 };
 
-export function InlineSpans({ className, minTime, maxTime, trace }: Props) {
+export function InlineSpans({ className, minTime, maxTime, trace, depth }: Props) {
   const [open, setOpen] = useState(false);
+  const spanRef = useRef<HTMLDivElement | null>(null);
   const hoverTimeoutRef = useRef<NodeJS.Timeout>();
   const spanName = getSpanName(trace.name);
 
@@ -43,7 +46,6 @@ export function InlineSpans({ className, minTime, maxTime, trace }: Props) {
 
   //
   // when a span has step (not userland) children then we construct the span from them
-  // @ts-ignore - temporarily until we get monorepo deployed
   const stepChildren = trace.childrenSpans?.filter((s) => !s.isUserland) || [];
   const spans = !trace.isRoot && stepChildren.length ? stepChildren : [];
 
@@ -61,8 +63,16 @@ export function InlineSpans({ className, minTime, maxTime, trace }: Props) {
           style={{
             flexGrow: widths.queued + widths.running,
           }}
+          ref={spanRef}
         >
           <TooltipTrigger className="flex w-full flex-row">
+            {spans.length > 0 && (
+              <GroupSpan
+                depth={depth}
+                status={trace.status}
+                width={spanRef.current?.clientWidth ?? 0}
+              />
+            )}
             {spans.length ? (
               spans.map((span) => {
                 return (
@@ -84,16 +94,8 @@ export function InlineSpans({ className, minTime, maxTime, trace }: Props) {
         <div className="bg-canvasMuted h-0" style={{ flexGrow: widths.after }} />
       </div>
       <TooltipContent>
-        <div className="text-basis">
+        <div>
           <Times isDelayVisible={spans.length === 0} name={spanName} span={trace} />
-          {spans.map((span) => {
-            return (
-              <Fragment key={span.spanID}>
-                <hr className="my-2" />
-                <Times isDelayVisible={true} name={getSpanName(span.name)} span={span} />
-              </Fragment>
-            );
-          })}
         </div>
       </TooltipContent>
     </Tooltip>
@@ -124,11 +126,11 @@ function Times({
     <>
       <p className="mb-2 font-bold">{name}</p>
       <div className="flex gap-16">
-        <ElementWrapper className="w-fit" label="Duration">
+        <ElementWrapper className="[&>dt]:text-light w-fit" label="Duration">
           {duration > 0 ? formatDuration(duration) : '-'}
         </ElementWrapper>
 
-        <ElementWrapper className="w-fit" label="Delay">
+        <ElementWrapper className="[&>dt]:text-light w-fit" label="Delay">
           {isDelayVisible && delay > 0 ? formatDuration(delay) : '-'}
         </ElementWrapper>
       </div>

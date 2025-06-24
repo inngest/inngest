@@ -5,26 +5,25 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"net/http"
+	"net/url"
+	"time"
+
 	"github.com/inngest/inngest/pkg/connect/pubsub"
+	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/driver/httpdriver"
+	"github.com/inngest/inngest/pkg/execution/queue"
+	"github.com/inngest/inngest/pkg/execution/state"
+	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
+	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/syscode"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/oklog/ulid/v2"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
-	"net/http"
-	"net/url"
-	"time"
-
-	"github.com/inngest/inngest/pkg/consts"
-	"github.com/inngest/inngest/pkg/execution/driver"
-	"github.com/inngest/inngest/pkg/execution/queue"
-	"github.com/inngest/inngest/pkg/execution/state"
-	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
-	"github.com/inngest/inngest/pkg/inngest"
-	"github.com/inngest/inngest/pkg/syscode"
 )
 
 const (
@@ -76,6 +75,9 @@ func (e executor) Execute(ctx context.Context, sl sv2.StateLoader, s sv2.Metadat
 	defer func() {
 		metrics.HistogramConnectExecutorEndToEndDuration(ctx, time.Since(start).Milliseconds(), metrics.HistogramOpt{
 			PkgName: pkgName,
+			Tags: map[string]any{
+				"account_id": s.ID.Tenant.AccountID.String(),
+			},
 		})
 	}()
 
@@ -101,13 +103,15 @@ func (e executor) Execute(ctx context.Context, sl sv2.StateLoader, s sv2.Metadat
 
 // ProxyRequest proxies the request to the SDK over a long-lived connection with the given input.
 func ProxyRequest(ctx, traceCtx context.Context, forwarder pubsub.RequestForwarder, id sv2.ID, item queue.Item, r httpdriver.Request) (*state.DriverResponse, error) {
+	l := logger.StdlibLogger(ctx)
+
 	var requestID string
 	if item.JobID != nil {
 		// Use the stable queue item ID
 		requestID = *item.JobID
 	} else {
 		// This should never happen, handle it gracefully
-		logger.StdlibLogger(ctx).Warn("queue item missing jobID", "item", item, "id", id)
+		l.Warn("queue item missing jobID", "item", item, "id", id)
 		requestID = ulid.MustNew(ulid.Now(), rand.Reader).String()
 	}
 
@@ -115,6 +119,7 @@ func ProxyRequest(ctx, traceCtx context.Context, forwarder pubsub.RequestForward
 		// TODO Find out if we can supply this in a better way. We still use the URL concept a lot,
 		// even though this has no meaning in connect.
 		FunctionSlug:   r.URL.Query().Get("fnId"),
+		FunctionId:     id.FunctionID.String(),
 		RequestPayload: r.Input,
 		AppId:          id.Tenant.AppID.String(),
 		EnvId:          id.Tenant.EnvID.String(),
@@ -134,12 +139,23 @@ func ProxyRequest(ctx, traceCtx context.Context, forwarder pubsub.RequestForward
 		attribute.String("step_id", requestToForward.GetStepId()),
 	)
 
-	resp, err := do(ctx, traceCtx, forwarder, pubsub.ProxyOpts{
+	opts := pubsub.ProxyOpts{
 		AccountID: id.Tenant.AccountID,
 		EnvID:     id.Tenant.EnvID,
 		AppID:     id.Tenant.AppID,
 		Data:      &requestToForward,
-	})
+	}
+
+	if spanID, err := item.SpanID(); err != nil {
+		l.Error("error retrieving span ID",
+			"error", err,
+			"run_id", id.RunID.String(),
+		)
+	} else {
+		opts.SpanID = spanID.String()
+	}
+
+	resp, err := do(ctx, traceCtx, forwarder, opts)
 	if err != nil {
 		return nil, err
 	}
@@ -148,9 +164,6 @@ func ProxyRequest(ctx, traceCtx context.Context, forwarder pubsub.RequestForward
 }
 
 func do(ctx, traceCtx context.Context, forwarder pubsub.RequestForwarder, opts pubsub.ProxyOpts) (*httpdriver.Response, error) {
-	ctx, cancel := context.WithTimeout(ctx, consts.MaxFunctionTimeout)
-	defer cancel()
-
 	span := trace.SpanFromContext(traceCtx)
 
 	pre := time.Now()

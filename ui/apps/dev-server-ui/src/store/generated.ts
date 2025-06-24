@@ -55,6 +55,32 @@ export type AppsFilterV1 = {
   method?: InputMaybe<AppMethod>;
 };
 
+export type CancellationConfiguration = {
+  __typename?: 'CancellationConfiguration';
+  condition: Maybe<Scalars['String']>;
+  event: Scalars['String'];
+  timeout: Maybe<Scalars['String']>;
+};
+
+export type ConcurrencyConfiguration = {
+  __typename?: 'ConcurrencyConfiguration';
+  key: Maybe<Scalars['String']>;
+  limit: ConcurrencyLimitConfiguration;
+  scope: ConcurrencyScope;
+};
+
+export type ConcurrencyLimitConfiguration = {
+  __typename?: 'ConcurrencyLimitConfiguration';
+  isPlanLimit: Maybe<Scalars['Boolean']>;
+  value: Scalars['Int'];
+};
+
+export enum ConcurrencyScope {
+  Account = 'ACCOUNT',
+  Environment = 'ENVIRONMENT',
+  Function = 'FUNCTION'
+}
+
 export enum ConnectV1ConnectionStatus {
   Connected = 'CONNECTED',
   Disconnected = 'DISCONNECTED',
@@ -132,6 +158,12 @@ export type CreateAppInput = {
   url: Scalars['String'];
 };
 
+export type DebounceConfiguration = {
+  __typename?: 'DebounceConfiguration';
+  key: Maybe<Scalars['String']>;
+  period: Scalars['String'];
+};
+
 export type Event = {
   __typename?: 'Event';
   createdAt: Maybe<Scalars['Time']>;
@@ -162,6 +194,15 @@ export enum EventStatus {
   Running = 'RUNNING'
 }
 
+export type EventsBatchConfiguration = {
+  __typename?: 'EventsBatchConfiguration';
+  key: Maybe<Scalars['String']>;
+  /** The maximum number of events a batch can have. */
+  maxSize: Scalars['Int'];
+  /** How long to wait before running the function with the batch. */
+  timeout: Scalars['String'];
+};
+
 export type EventsQuery = {
   lastEventId?: InputMaybe<Scalars['ID']>;
   workspaceId?: Scalars['ID'];
@@ -173,11 +214,26 @@ export type Function = {
   appID: Scalars['String'];
   concurrency: Scalars['Int'];
   config: Scalars['String'];
+  configuration: FunctionConfiguration;
+  failureHandler: Maybe<Function>;
   id: Scalars['String'];
   name: Scalars['String'];
   slug: Scalars['String'];
   triggers: Maybe<Array<FunctionTrigger>>;
   url: Scalars['String'];
+};
+
+export type FunctionConfiguration = {
+  __typename?: 'FunctionConfiguration';
+  cancellations: Array<CancellationConfiguration>;
+  concurrency: Array<ConcurrencyConfiguration>;
+  debounce: Maybe<DebounceConfiguration>;
+  eventsBatch: Maybe<EventsBatchConfiguration>;
+  priority: Maybe<Scalars['String']>;
+  rateLimit: Maybe<RateLimitConfiguration>;
+  retries: RetryConfiguration;
+  singleton: Maybe<SingletonConfiguration>;
+  throttle: Maybe<ThrottleConfiguration>;
 };
 
 export type FunctionEvent = {
@@ -195,6 +251,11 @@ export enum FunctionEventType {
   Failed = 'FAILED',
   Started = 'STARTED'
 }
+
+export type FunctionQuery = {
+  functionSlug: Scalars['String'];
+  workspaceId?: Scalars['ID'];
+};
 
 export type FunctionRun = {
   __typename?: 'FunctionRun';
@@ -262,6 +323,11 @@ export type FunctionRunV2 = {
   triggerIDs: Array<Scalars['ULID']>;
 };
 
+
+export type FunctionRunV2TraceArgs = {
+  preview: InputMaybe<Scalars['Boolean']>;
+};
+
 export type FunctionRunV2Edge = {
   __typename?: 'FunctionRunV2Edge';
   cursor: Scalars['String'];
@@ -281,6 +347,7 @@ export enum FunctionStatus {
 
 export type FunctionTrigger = {
   __typename?: 'FunctionTrigger';
+  condition: Maybe<Scalars['String']>;
   type: FunctionTriggerTypes;
   value: Scalars['String'];
 };
@@ -403,6 +470,7 @@ export type Query = {
   apps: Array<App>;
   event: Maybe<Event>;
   events: Maybe<Array<Event>>;
+  functionBySlug: Maybe<Function>;
   functionRun: Maybe<FunctionRun>;
   functions: Maybe<Array<Function>>;
   run: Maybe<FunctionRunV2>;
@@ -432,6 +500,11 @@ export type QueryEventArgs = {
 
 export type QueryEventsArgs = {
   query: EventsQuery;
+};
+
+
+export type QueryFunctionBySlugArgs = {
+  query: FunctionQuery;
 };
 
 
@@ -480,9 +553,22 @@ export type QueryWorkerConnectionsArgs = {
   orderBy: Array<ConnectV1WorkerConnectionsOrderBy>;
 };
 
+export type RateLimitConfiguration = {
+  __typename?: 'RateLimitConfiguration';
+  key: Maybe<Scalars['String']>;
+  limit: Scalars['Int'];
+  period: Scalars['String'];
+};
+
 export type RerunFromStepInput = {
   input?: InputMaybe<Scalars['Bytes']>;
   stepID: Scalars['String'];
+};
+
+export type RetryConfiguration = {
+  __typename?: 'RetryConfiguration';
+  isDefault: Maybe<Scalars['Boolean']>;
+  value: Scalars['Int'];
 };
 
 export type RunHistoryCancel = {
@@ -648,6 +734,17 @@ export enum RunsV2OrderByField {
   StartedAt = 'STARTED_AT'
 }
 
+export type SingletonConfiguration = {
+  __typename?: 'SingletonConfiguration';
+  key: Maybe<Scalars['String']>;
+  mode: SingletonMode;
+};
+
+export enum SingletonMode {
+  Cancel = 'CANCEL',
+  Skip = 'SKIP'
+}
+
 export type SleepStepInfo = {
   __typename?: 'SleepStepInfo';
   sleepUntil: Scalars['Time'];
@@ -655,6 +752,7 @@ export type SleepStepInfo = {
 
 export type StepError = {
   __typename?: 'StepError';
+  cause: Maybe<Scalars['Bytes']>;
   message: Scalars['String'];
   name: Maybe<Scalars['String']>;
   stack: Maybe<Scalars['String']>;
@@ -688,14 +786,15 @@ export type StepEventWait = {
   expression: Maybe<Scalars['String']>;
 };
 
-export type StepInfo = InvokeStepInfo | RunStepInfo | SleepStepInfo | WaitForEventStepInfo;
+export type StepInfo = InvokeStepInfo | RunStepInfo | SleepStepInfo | WaitForEventStepInfo | WaitForSignalStepInfo;
 
 export enum StepOp {
   AiGateway = 'AI_GATEWAY',
   Invoke = 'INVOKE',
   Run = 'RUN',
   Sleep = 'SLEEP',
-  WaitForEvent = 'WAIT_FOR_EVENT'
+  WaitForEvent = 'WAIT_FOR_EVENT',
+  WaitForSignal = 'WAIT_FOR_SIGNAL'
 }
 
 export type StreamItem = {
@@ -720,6 +819,14 @@ export enum StreamType {
   Event = 'EVENT'
 }
 
+export type ThrottleConfiguration = {
+  __typename?: 'ThrottleConfiguration';
+  burst: Scalars['Int'];
+  key: Maybe<Scalars['String']>;
+  limit: Scalars['Int'];
+  period: Scalars['String'];
+};
+
 export type UpdateAppInput = {
   id: Scalars['String'];
   url: Scalars['String'];
@@ -741,6 +848,13 @@ export type WaitForEventStepInfo = {
   eventName: Scalars['String'];
   expression: Maybe<Scalars['String']>;
   foundEventID: Maybe<Scalars['ULID']>;
+  timedOut: Maybe<Scalars['Boolean']>;
+  timeout: Scalars['Time'];
+};
+
+export type WaitForSignalStepInfo = {
+  __typename?: 'WaitForSignalStepInfo';
+  signal: Scalars['String'];
   timedOut: Maybe<Scalars['Boolean']>;
   timeout: Scalars['Time'];
 };
@@ -768,6 +882,13 @@ export type GetFunctionsQueryVariables = Exact<{ [key: string]: never; }>;
 
 
 export type GetFunctionsQuery = { __typename?: 'Query', functions: Array<{ __typename?: 'Function', id: string, slug: string, name: string, url: string, triggers: Array<{ __typename?: 'FunctionTrigger', type: FunctionTriggerTypes, value: string }> | null, app: { __typename?: 'App', name: string } }> | null };
+
+export type GetFunctionQueryVariables = Exact<{
+  functionSlug: Scalars['String'];
+}>;
+
+
+export type GetFunctionQuery = { __typename?: 'Query', functionBySlug: { __typename?: 'Function', name: string, id: string, concurrency: number, config: string, slug: string, url: string, failureHandler: { __typename?: 'Function', slug: string } | null, configuration: { __typename?: 'FunctionConfiguration', priority: string | null, cancellations: Array<{ __typename?: 'CancellationConfiguration', event: string, timeout: string | null, condition: string | null }>, retries: { __typename?: 'RetryConfiguration', value: number, isDefault: boolean | null }, eventsBatch: { __typename?: 'EventsBatchConfiguration', maxSize: number, timeout: string, key: string | null } | null, concurrency: Array<{ __typename?: 'ConcurrencyConfiguration', scope: ConcurrencyScope, key: string | null, limit: { __typename?: 'ConcurrencyLimitConfiguration', value: number, isPlanLimit: boolean | null } }>, rateLimit: { __typename?: 'RateLimitConfiguration', limit: number, period: string, key: string | null } | null, debounce: { __typename?: 'DebounceConfiguration', period: string, key: string | null } | null, throttle: { __typename?: 'ThrottleConfiguration', burst: number, key: string | null, limit: number, period: string } | null, singleton: { __typename?: 'SingletonConfiguration', key: string | null, mode: SingletonMode } | null }, triggers: Array<{ __typename?: 'FunctionTrigger', type: FunctionTriggerTypes, value: string, condition: string | null }> | null, app: { __typename?: 'App', name: string } } | null };
 
 export type GetAppsQueryVariables = Exact<{ [key: string]: never; }>;
 
@@ -886,21 +1007,22 @@ export type CountRunsQueryVariables = Exact<{
 
 export type CountRunsQuery = { __typename?: 'Query', runs: { __typename?: 'RunsV2Connection', totalCount: number } };
 
-export type TraceDetailsFragment = { __typename?: 'RunTraceSpan', name: string, status: RunTraceSpanStatus, attempts: number | null, queuedAt: any, startedAt: any | null, endedAt: any | null, isRoot: boolean, isUserland: boolean, outputID: string | null, spanID: string, stepID: string | null, stepOp: StepOp | null, userlandSpan: { __typename?: 'UserlandSpan', spanName: string | null, spanKind: string | null, serviceName: string | null, scopeName: string | null, scopeVersion: string | null, spanAttrs: any | null, resourceAttrs: any | null } | null, stepInfo: { __typename: 'InvokeStepInfo', triggeringEventID: any, functionID: string, timeout: any, returnEventID: any | null, runID: any | null, timedOut: boolean | null } | { __typename: 'RunStepInfo', type: string | null } | { __typename: 'SleepStepInfo', sleepUntil: any } | { __typename: 'WaitForEventStepInfo', eventName: string, expression: string | null, timeout: any, foundEventID: any | null, timedOut: boolean | null } | null };
+export type TraceDetailsFragment = { __typename?: 'RunTraceSpan', name: string, status: RunTraceSpanStatus, attempts: number | null, queuedAt: any, startedAt: any | null, endedAt: any | null, isRoot: boolean, isUserland: boolean, outputID: string | null, spanID: string, stepID: string | null, stepOp: StepOp | null, userlandSpan: { __typename?: 'UserlandSpan', spanName: string | null, spanKind: string | null, serviceName: string | null, scopeName: string | null, scopeVersion: string | null, spanAttrs: any | null, resourceAttrs: any | null } | null, stepInfo: { __typename: 'InvokeStepInfo', triggeringEventID: any, functionID: string, timeout: any, returnEventID: any | null, runID: any | null, timedOut: boolean | null } | { __typename: 'RunStepInfo', type: string | null } | { __typename: 'SleepStepInfo', sleepUntil: any } | { __typename: 'WaitForEventStepInfo', eventName: string, expression: string | null, timeout: any, foundEventID: any | null, timedOut: boolean | null } | { __typename: 'WaitForSignalStepInfo', signal: string, timeout: any, timedOut: boolean | null } | null };
 
 export type GetRunQueryVariables = Exact<{
   runID: Scalars['String'];
+  preview: InputMaybe<Scalars['Boolean']>;
 }>;
 
 
-export type GetRunQuery = { __typename?: 'Query', run: { __typename?: 'FunctionRunV2', hasAI: boolean, function: { __typename?: 'Function', id: string, name: string, slug: string, app: { __typename?: 'App', name: string } }, trace: { __typename?: 'RunTraceSpan', name: string, status: RunTraceSpanStatus, attempts: number | null, queuedAt: any, startedAt: any | null, endedAt: any | null, isRoot: boolean, isUserland: boolean, outputID: string | null, spanID: string, stepID: string | null, stepOp: StepOp | null, childrenSpans: Array<{ __typename?: 'RunTraceSpan', name: string, status: RunTraceSpanStatus, attempts: number | null, queuedAt: any, startedAt: any | null, endedAt: any | null, isRoot: boolean, isUserland: boolean, outputID: string | null, spanID: string, stepID: string | null, stepOp: StepOp | null, childrenSpans: Array<{ __typename?: 'RunTraceSpan', name: string, status: RunTraceSpanStatus, attempts: number | null, queuedAt: any, startedAt: any | null, endedAt: any | null, isRoot: boolean, isUserland: boolean, outputID: string | null, spanID: string, stepID: string | null, stepOp: StepOp | null, childrenSpans: Array<{ __typename?: 'RunTraceSpan', name: string, status: RunTraceSpanStatus, attempts: number | null, queuedAt: any, startedAt: any | null, endedAt: any | null, isRoot: boolean, isUserland: boolean, outputID: string | null, spanID: string, stepID: string | null, stepOp: StepOp | null, childrenSpans: Array<{ __typename?: 'RunTraceSpan', name: string, status: RunTraceSpanStatus, attempts: number | null, queuedAt: any, startedAt: any | null, endedAt: any | null, isRoot: boolean, isUserland: boolean, outputID: string | null, spanID: string, stepID: string | null, stepOp: StepOp | null, userlandSpan: { __typename?: 'UserlandSpan', spanName: string | null, spanKind: string | null, serviceName: string | null, scopeName: string | null, scopeVersion: string | null, spanAttrs: any | null, resourceAttrs: any | null } | null, stepInfo: { __typename: 'InvokeStepInfo', triggeringEventID: any, functionID: string, timeout: any, returnEventID: any | null, runID: any | null, timedOut: boolean | null } | { __typename: 'RunStepInfo', type: string | null } | { __typename: 'SleepStepInfo', sleepUntil: any } | { __typename: 'WaitForEventStepInfo', eventName: string, expression: string | null, timeout: any, foundEventID: any | null, timedOut: boolean | null } | null }>, userlandSpan: { __typename?: 'UserlandSpan', spanName: string | null, spanKind: string | null, serviceName: string | null, scopeName: string | null, scopeVersion: string | null, spanAttrs: any | null, resourceAttrs: any | null } | null, stepInfo: { __typename: 'InvokeStepInfo', triggeringEventID: any, functionID: string, timeout: any, returnEventID: any | null, runID: any | null, timedOut: boolean | null } | { __typename: 'RunStepInfo', type: string | null } | { __typename: 'SleepStepInfo', sleepUntil: any } | { __typename: 'WaitForEventStepInfo', eventName: string, expression: string | null, timeout: any, foundEventID: any | null, timedOut: boolean | null } | null }>, userlandSpan: { __typename?: 'UserlandSpan', spanName: string | null, spanKind: string | null, serviceName: string | null, scopeName: string | null, scopeVersion: string | null, spanAttrs: any | null, resourceAttrs: any | null } | null, stepInfo: { __typename: 'InvokeStepInfo', triggeringEventID: any, functionID: string, timeout: any, returnEventID: any | null, runID: any | null, timedOut: boolean | null } | { __typename: 'RunStepInfo', type: string | null } | { __typename: 'SleepStepInfo', sleepUntil: any } | { __typename: 'WaitForEventStepInfo', eventName: string, expression: string | null, timeout: any, foundEventID: any | null, timedOut: boolean | null } | null }>, userlandSpan: { __typename?: 'UserlandSpan', spanName: string | null, spanKind: string | null, serviceName: string | null, scopeName: string | null, scopeVersion: string | null, spanAttrs: any | null, resourceAttrs: any | null } | null, stepInfo: { __typename: 'InvokeStepInfo', triggeringEventID: any, functionID: string, timeout: any, returnEventID: any | null, runID: any | null, timedOut: boolean | null } | { __typename: 'RunStepInfo', type: string | null } | { __typename: 'SleepStepInfo', sleepUntil: any } | { __typename: 'WaitForEventStepInfo', eventName: string, expression: string | null, timeout: any, foundEventID: any | null, timedOut: boolean | null } | null }>, userlandSpan: { __typename?: 'UserlandSpan', spanName: string | null, spanKind: string | null, serviceName: string | null, scopeName: string | null, scopeVersion: string | null, spanAttrs: any | null, resourceAttrs: any | null } | null, stepInfo: { __typename: 'InvokeStepInfo', triggeringEventID: any, functionID: string, timeout: any, returnEventID: any | null, runID: any | null, timedOut: boolean | null } | { __typename: 'RunStepInfo', type: string | null } | { __typename: 'SleepStepInfo', sleepUntil: any } | { __typename: 'WaitForEventStepInfo', eventName: string, expression: string | null, timeout: any, foundEventID: any | null, timedOut: boolean | null } | null } | null } | null };
+export type GetRunQuery = { __typename?: 'Query', run: { __typename?: 'FunctionRunV2', hasAI: boolean, function: { __typename?: 'Function', id: string, name: string, slug: string, app: { __typename?: 'App', name: string } }, trace: { __typename?: 'RunTraceSpan', name: string, status: RunTraceSpanStatus, attempts: number | null, queuedAt: any, startedAt: any | null, endedAt: any | null, isRoot: boolean, isUserland: boolean, outputID: string | null, spanID: string, stepID: string | null, stepOp: StepOp | null, childrenSpans: Array<{ __typename?: 'RunTraceSpan', name: string, status: RunTraceSpanStatus, attempts: number | null, queuedAt: any, startedAt: any | null, endedAt: any | null, isRoot: boolean, isUserland: boolean, outputID: string | null, spanID: string, stepID: string | null, stepOp: StepOp | null, childrenSpans: Array<{ __typename?: 'RunTraceSpan', name: string, status: RunTraceSpanStatus, attempts: number | null, queuedAt: any, startedAt: any | null, endedAt: any | null, isRoot: boolean, isUserland: boolean, outputID: string | null, spanID: string, stepID: string | null, stepOp: StepOp | null, childrenSpans: Array<{ __typename?: 'RunTraceSpan', name: string, status: RunTraceSpanStatus, attempts: number | null, queuedAt: any, startedAt: any | null, endedAt: any | null, isRoot: boolean, isUserland: boolean, outputID: string | null, spanID: string, stepID: string | null, stepOp: StepOp | null, childrenSpans: Array<{ __typename?: 'RunTraceSpan', name: string, status: RunTraceSpanStatus, attempts: number | null, queuedAt: any, startedAt: any | null, endedAt: any | null, isRoot: boolean, isUserland: boolean, outputID: string | null, spanID: string, stepID: string | null, stepOp: StepOp | null, userlandSpan: { __typename?: 'UserlandSpan', spanName: string | null, spanKind: string | null, serviceName: string | null, scopeName: string | null, scopeVersion: string | null, spanAttrs: any | null, resourceAttrs: any | null } | null, stepInfo: { __typename: 'InvokeStepInfo', triggeringEventID: any, functionID: string, timeout: any, returnEventID: any | null, runID: any | null, timedOut: boolean | null } | { __typename: 'RunStepInfo', type: string | null } | { __typename: 'SleepStepInfo', sleepUntil: any } | { __typename: 'WaitForEventStepInfo', eventName: string, expression: string | null, timeout: any, foundEventID: any | null, timedOut: boolean | null } | { __typename: 'WaitForSignalStepInfo', signal: string, timeout: any, timedOut: boolean | null } | null }>, userlandSpan: { __typename?: 'UserlandSpan', spanName: string | null, spanKind: string | null, serviceName: string | null, scopeName: string | null, scopeVersion: string | null, spanAttrs: any | null, resourceAttrs: any | null } | null, stepInfo: { __typename: 'InvokeStepInfo', triggeringEventID: any, functionID: string, timeout: any, returnEventID: any | null, runID: any | null, timedOut: boolean | null } | { __typename: 'RunStepInfo', type: string | null } | { __typename: 'SleepStepInfo', sleepUntil: any } | { __typename: 'WaitForEventStepInfo', eventName: string, expression: string | null, timeout: any, foundEventID: any | null, timedOut: boolean | null } | { __typename: 'WaitForSignalStepInfo', signal: string, timeout: any, timedOut: boolean | null } | null }>, userlandSpan: { __typename?: 'UserlandSpan', spanName: string | null, spanKind: string | null, serviceName: string | null, scopeName: string | null, scopeVersion: string | null, spanAttrs: any | null, resourceAttrs: any | null } | null, stepInfo: { __typename: 'InvokeStepInfo', triggeringEventID: any, functionID: string, timeout: any, returnEventID: any | null, runID: any | null, timedOut: boolean | null } | { __typename: 'RunStepInfo', type: string | null } | { __typename: 'SleepStepInfo', sleepUntil: any } | { __typename: 'WaitForEventStepInfo', eventName: string, expression: string | null, timeout: any, foundEventID: any | null, timedOut: boolean | null } | { __typename: 'WaitForSignalStepInfo', signal: string, timeout: any, timedOut: boolean | null } | null }>, userlandSpan: { __typename?: 'UserlandSpan', spanName: string | null, spanKind: string | null, serviceName: string | null, scopeName: string | null, scopeVersion: string | null, spanAttrs: any | null, resourceAttrs: any | null } | null, stepInfo: { __typename: 'InvokeStepInfo', triggeringEventID: any, functionID: string, timeout: any, returnEventID: any | null, runID: any | null, timedOut: boolean | null } | { __typename: 'RunStepInfo', type: string | null } | { __typename: 'SleepStepInfo', sleepUntil: any } | { __typename: 'WaitForEventStepInfo', eventName: string, expression: string | null, timeout: any, foundEventID: any | null, timedOut: boolean | null } | { __typename: 'WaitForSignalStepInfo', signal: string, timeout: any, timedOut: boolean | null } | null }>, userlandSpan: { __typename?: 'UserlandSpan', spanName: string | null, spanKind: string | null, serviceName: string | null, scopeName: string | null, scopeVersion: string | null, spanAttrs: any | null, resourceAttrs: any | null } | null, stepInfo: { __typename: 'InvokeStepInfo', triggeringEventID: any, functionID: string, timeout: any, returnEventID: any | null, runID: any | null, timedOut: boolean | null } | { __typename: 'RunStepInfo', type: string | null } | { __typename: 'SleepStepInfo', sleepUntil: any } | { __typename: 'WaitForEventStepInfo', eventName: string, expression: string | null, timeout: any, foundEventID: any | null, timedOut: boolean | null } | { __typename: 'WaitForSignalStepInfo', signal: string, timeout: any, timedOut: boolean | null } | null } | null } | null };
 
 export type GetTraceResultQueryVariables = Exact<{
   traceID: Scalars['String'];
 }>;
 
 
-export type GetTraceResultQuery = { __typename?: 'Query', runTraceSpanOutputByID: { __typename?: 'RunTraceSpanOutput', input: any | null, data: any | null, error: { __typename?: 'StepError', message: string, name: string | null, stack: string | null } | null } };
+export type GetTraceResultQuery = { __typename?: 'Query', runTraceSpanOutputByID: { __typename?: 'RunTraceSpanOutput', input: any | null, data: any | null, error: { __typename?: 'StepError', message: string, name: string | null, stack: string | null, cause: any | null } | null } };
 
 export type GetTriggerQueryVariables = Exact<{
   runID: Scalars['String'];
@@ -976,6 +1098,11 @@ export const TraceDetailsFragmentDoc = `
     }
     ... on RunStepInfo {
       type
+    }
+    ... on WaitForSignalStepInfo {
+      signal
+      timeout
+      timedOut
     }
   }
 }
@@ -1090,6 +1217,73 @@ export const GetFunctionsDocument = `
     triggers {
       type
       value
+    }
+    app {
+      name
+    }
+    url
+  }
+}
+    `;
+export const GetFunctionDocument = `
+    query GetFunction($functionSlug: String!) {
+  functionBySlug(query: {functionSlug: $functionSlug}) {
+    name
+    id
+    failureHandler {
+      slug
+    }
+    concurrency
+    config
+    configuration {
+      cancellations {
+        event
+        timeout
+        condition
+      }
+      retries {
+        value
+        isDefault
+      }
+      priority
+      eventsBatch {
+        maxSize
+        timeout
+        key
+      }
+      concurrency {
+        scope
+        limit {
+          value
+          isPlanLimit
+        }
+        key
+      }
+      rateLimit {
+        limit
+        period
+        key
+      }
+      debounce {
+        period
+        key
+      }
+      throttle {
+        burst
+        key
+        limit
+        period
+      }
+      singleton {
+        key
+        mode
+      }
+    }
+    slug
+    triggers {
+      type
+      value
+      condition
     }
     app {
       name
@@ -1294,7 +1488,7 @@ export const CountRunsDocument = `
 }
     `;
 export const GetRunDocument = `
-    query GetRun($runID: String!) {
+    query GetRun($runID: String!, $preview: Boolean) {
   run(runID: $runID) {
     function {
       app {
@@ -1304,7 +1498,7 @@ export const GetRunDocument = `
       name
       slug
     }
-    trace {
+    trace(preview: $preview) {
       ...TraceDetails
       childrenSpans {
         ...TraceDetails
@@ -1332,6 +1526,7 @@ export const GetTraceResultDocument = `
       message
       name
       stack
+      cause
     }
   }
 }
@@ -1415,6 +1610,9 @@ const injectedRtkApi = api.injectEndpoints({
     GetFunctions: build.query<GetFunctionsQuery, GetFunctionsQueryVariables | void>({
       query: (variables) => ({ document: GetFunctionsDocument, variables })
     }),
+    GetFunction: build.query<GetFunctionQuery, GetFunctionQueryVariables>({
+      query: (variables) => ({ document: GetFunctionDocument, variables })
+    }),
     GetApps: build.query<GetAppsQuery, GetAppsQueryVariables | void>({
       query: (variables) => ({ document: GetAppsDocument, variables })
     }),
@@ -1479,5 +1677,5 @@ const injectedRtkApi = api.injectEndpoints({
 });
 
 export { injectedRtkApi as api };
-export const { useGetEventQuery, useLazyGetEventQuery, useGetFunctionRunQuery, useLazyGetFunctionRunQuery, useGetFunctionsQuery, useLazyGetFunctionsQuery, useGetAppsQuery, useLazyGetAppsQuery, useGetAppQuery, useLazyGetAppQuery, useCreateAppMutation, useUpdateAppMutation, useDeleteAppMutation, useGetTriggersStreamQuery, useLazyGetTriggersStreamQuery, useGetFunctionRunStatusQuery, useLazyGetFunctionRunStatusQuery, useGetFunctionRunOutputQuery, useLazyGetFunctionRunOutputQuery, useGetHistoryItemOutputQuery, useLazyGetHistoryItemOutputQuery, useInvokeFunctionMutation, useCancelRunMutation, useRerunMutation, useRerunFromStepMutation, useGetRunsQuery, useLazyGetRunsQuery, useCountRunsQuery, useLazyCountRunsQuery, useGetRunQuery, useLazyGetRunQuery, useGetTraceResultQuery, useLazyGetTraceResultQuery, useGetTriggerQuery, useLazyGetTriggerQuery, useGetWorkerConnectionsQuery, useLazyGetWorkerConnectionsQuery, useCountWorkerConnectionsQuery, useLazyCountWorkerConnectionsQuery } = injectedRtkApi;
+export const { useGetEventQuery, useLazyGetEventQuery, useGetFunctionRunQuery, useLazyGetFunctionRunQuery, useGetFunctionsQuery, useLazyGetFunctionsQuery, useGetFunctionQuery, useLazyGetFunctionQuery, useGetAppsQuery, useLazyGetAppsQuery, useGetAppQuery, useLazyGetAppQuery, useCreateAppMutation, useUpdateAppMutation, useDeleteAppMutation, useGetTriggersStreamQuery, useLazyGetTriggersStreamQuery, useGetFunctionRunStatusQuery, useLazyGetFunctionRunStatusQuery, useGetFunctionRunOutputQuery, useLazyGetFunctionRunOutputQuery, useGetHistoryItemOutputQuery, useLazyGetHistoryItemOutputQuery, useInvokeFunctionMutation, useCancelRunMutation, useRerunMutation, useRerunFromStepMutation, useGetRunsQuery, useLazyGetRunsQuery, useCountRunsQuery, useLazyCountRunsQuery, useGetRunQuery, useLazyGetRunQuery, useGetTraceResultQuery, useLazyGetTraceResultQuery, useGetTriggerQuery, useLazyGetTriggerQuery, useGetWorkerConnectionsQuery, useLazyGetWorkerConnectionsQuery, useCountWorkerConnectionsQuery, useLazyCountWorkerConnectionsQuery } = injectedRtkApi;
 

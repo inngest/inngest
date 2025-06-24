@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -24,9 +25,9 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/history"
 	"github.com/inngest/inngest/pkg/execution/state"
-	"github.com/inngest/inngest/pkg/inngest/log"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/run"
+	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/inngest/inngest/pkg/util"
 	connpb "github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/jinzhu/copier"
@@ -79,6 +80,207 @@ func (w wrapper) dialect() string {
 	}
 
 	return "sqlite3"
+}
+
+func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.OtelSpan, error) {
+	spans, err := w.q.GetSpansByRunID(ctx, runID.String())
+	if err != nil {
+		logger.StdlibLogger(ctx).Error("error getting spans by run ID", "error", err)
+		return nil, err
+	}
+
+	spanMap := make(map[string]*cqrs.OtelSpan)
+	// A map of dynamic span IDs to the specific span ID that contains an
+	// output
+	outputDynamicRefs := make(map[string]string)
+	var root *cqrs.OtelSpan
+
+	for _, span := range spans {
+		st := strings.Split(span.StartTime.(string), " m=")[0]
+		startTime, err := time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", st)
+		if err != nil {
+			logger.StdlibLogger(ctx).Error("error parsing start time", "error", err)
+			return nil, err
+		}
+
+		et := strings.Split(span.EndTime.(string), " m=")[0]
+		endTime, err := time.Parse("2006-01-02 15:04:05.999999999 -0700 MST", et)
+		if err != nil {
+			logger.StdlibLogger(ctx).Error("error parsing end time", "error", err)
+			return nil, err
+		}
+
+		var parentSpanID *string
+		if span.ParentSpanID.Valid {
+			parentSpanID = &span.ParentSpanID.String
+		}
+
+		newSpan := &cqrs.OtelSpan{
+			RawOtelSpan: cqrs.RawOtelSpan{
+				SpanID:       span.DynamicSpanID.String,
+				TraceID:      span.TraceID,
+				ParentSpanID: parentSpanID,
+				StartTime:    startTime,
+				EndTime:      endTime,
+				Name:         "",
+				Attributes:   make(map[string]any),
+			},
+			Status:          enums.StepStatusRunning,
+			RunID:           runID,
+			MarkedAsDropped: false,
+		}
+
+		var outputSpanID *string
+		var fragments []map[string]interface{}
+		_ = json.Unmarshal([]byte(span.SpanFragments.(string)), &fragments)
+
+		// TODO same for links
+		for _, fragment := range fragments {
+			if name, ok := fragment["name"].(string); ok {
+				if strings.HasPrefix(name, "executor.") {
+					newSpan.Name = name
+				}
+			}
+
+			if attrs, ok := fragment["attributes"].(string); ok {
+				fragmentAttr := map[string]any{}
+				if err := json.Unmarshal([]byte(attrs), &fragmentAttr); err != nil {
+					logger.StdlibLogger(ctx).Error("error unmarshalling span attributes", "error", err)
+					return nil, err
+				}
+
+				for k, v := range fragmentAttr {
+					// TODO We should remove this and only keep non-Inngest
+					// attributes here instead. Especially if we use them
+					// below. For now, they're used sometimes.
+					newSpan.Attributes[k] = v
+
+					switch k {
+					case meta.AttributeDynamicStatus:
+						{
+							if status, ok := v.(string); ok {
+								if statusStr, err := enums.StepStatusString(status); err == nil {
+									newSpan.Status = statusStr
+								}
+							}
+						}
+					case meta.AttributeAppID:
+						{
+							newSpan.AppID = uuid.MustParse(v.(string))
+						}
+					case meta.AttributeFunctionID:
+						{
+							newSpan.FunctionID = uuid.MustParse(v.(string))
+						}
+					case meta.AttributeRunID:
+						{
+							newSpan.RunID = ulid.MustParse(v.(string))
+						}
+					case meta.AttributeStartedAt:
+						{
+							newSpan.StartTime = time.UnixMilli(int64(v.(float64)))
+						}
+					case meta.AttributeEndedAt:
+						{
+							newSpan.EndTime = time.UnixMilli(int64(v.(float64)))
+						}
+					case meta.AttributeDropSpan:
+						{
+							newSpan.MarkedAsDropped = true
+						}
+					default:
+						newSpan.Attributes[k] = v
+					}
+				}
+			}
+
+			if outputRef, ok := fragment["output_span_id"].(string); ok {
+				outputSpanID = &outputRef
+				outputDynamicRefs[span.DynamicSpanID.String] = outputRef
+			}
+		}
+
+		// If this span has finished, set a preliminary output ID.
+		if outputSpanID != nil && *outputSpanID != "" {
+			newSpan.OutputID, err = encodeSpanOutputID(*outputSpanID)
+			if err != nil {
+				logger.StdlibLogger(ctx).Error("error encoding span identifier", "error", err)
+				return nil, err
+			}
+		}
+
+		spanMap[span.DynamicSpanID.String] = newSpan
+	}
+
+	for _, span := range spanMap {
+		// If we have an output reference for this span, set the appropriate
+		// target span ID here
+		if ref, ok := span.Attributes[meta.AttributeStepOutputRef]; ok {
+			if refStr, ok := ref.(string); ok && refStr != "" {
+				if targetSpanID, ok := outputDynamicRefs[refStr]; ok {
+					// We've found the span ID that we need to target for
+					// this span. So let's use it!
+					span.OutputID, err = encodeSpanOutputID(targetSpanID)
+					if err != nil {
+						logger.StdlibLogger(ctx).Error("error encoding span output ID", "error", err)
+						return nil, err
+					}
+				}
+			}
+		}
+
+		if span.ParentSpanID == nil || *span.ParentSpanID == "" || *span.ParentSpanID == "0000000000000000" {
+			root = spanMap[span.SpanID]
+			continue
+		}
+
+		if parent, ok := spanMap[*span.ParentSpanID]; ok {
+			// This is wrong. Either do it properly in DB or infer it
+			// correctly here. e.g. if child failed but more attempts coming,
+			// still running
+			if span.Status != enums.StepStatusUnknown && span.Status != enums.StepStatusRunning && (parent.Status == enums.StepStatusUnknown || parent.Status == enums.StepStatusRunning) {
+				parent.Status = span.Status
+			}
+
+			parent.Children = append(parent.Children, spanMap[span.SpanID])
+		} else {
+			logger.StdlibLogger(ctx).Warn(
+				"lost lineage detected",
+				"spanID", span.SpanID,
+				"parentSpanID", span.ParentSpanID,
+			)
+		}
+	}
+
+	sorter(root)
+
+	return root, nil
+}
+
+func encodeSpanOutputID(spanID string) (*string, error) {
+	p := true
+
+	id := &cqrs.SpanIdentifier{
+		SpanID:  spanID,
+		Preview: &p,
+	}
+
+	encoded, err := id.Encode()
+	if err != nil {
+		return nil, err
+	}
+
+	return &encoded, nil
+}
+
+func sorter(span *cqrs.OtelSpan) {
+	sort.Slice(span.Children, func(i, j int) bool {
+		return span.Children[i].StartTime.Before(span.Children[j].StartTime)
+	})
+
+	for _, child := range span.Children {
+		sorter(child)
+	}
 }
 
 // LoadFunction implements the state.FunctionLoader interface.
@@ -630,11 +832,11 @@ func (w wrapper) GetEventsByExpressions(ctx context.Context, cel []string) ([]*c
 	return res, nil
 }
 
-func (w wrapper) FindEvent(ctx context.Context, workspaceID uuid.UUID, internalID ulid.ULID) (*cqrs.Event, error) {
+func (w wrapper) GetEvent(ctx context.Context, internalID ulid.ULID, accountID uuid.UUID, workspaceID uuid.UUID) (*cqrs.Event, error) {
 	return w.GetEventByInternalID(ctx, internalID)
 }
 
-func (w wrapper) WorkspaceEvents(ctx context.Context, workspaceID uuid.UUID, opts *cqrs.WorkspaceEventsOpts) ([]cqrs.Event, error) {
+func (w wrapper) GetEvents(ctx context.Context, accountID uuid.UUID, workspaceID uuid.UUID, opts *cqrs.WorkspaceEventsOpts) ([]*cqrs.Event, error) {
 	if err := opts.Validate(); err != nil {
 		return nil, err
 	}
@@ -669,9 +871,10 @@ func (w wrapper) WorkspaceEvents(ctx context.Context, workspaceID uuid.UUID, opt
 	if err != nil {
 		return nil, err
 	}
-	out := make([]cqrs.Event, len(evts))
+	out := make([]*cqrs.Event, len(evts))
 	for n, evt := range evts {
-		out[n] = convertEvent(evt)
+		val := convertEvent(evt)
+		out[n] = &val
 	}
 	return out, nil
 }
@@ -1104,6 +1307,36 @@ func (w wrapper) GetTraceRun(ctx context.Context, id cqrs.TraceRunIdentifier) (*
 }
 
 func (w wrapper) GetSpanOutput(ctx context.Context, opts cqrs.SpanIdentifier) (*cqrs.SpanOutput, error) {
+	if opts.SpanID == "" {
+		return nil, fmt.Errorf("spanID is required to retrieve output")
+	}
+
+	s, err := w.q.GetSpanOutput(ctx, opts.SpanID)
+	if err != nil {
+		return nil, fmt.Errorf("error retrieving span output: %w", err)
+	}
+
+	so := &cqrs.SpanOutput{}
+	var m map[string]any
+
+	so.Data = []byte(fmt.Append(nil, s))
+	if err := json.Unmarshal(so.Data, &m); err == nil && m != nil {
+		if errData, ok := m["error"]; ok {
+			so.IsError = true
+			so.Data, _ = json.Marshal(errData)
+		} else if successData, ok := m["data"]; ok {
+			so.Data, _ = json.Marshal(successData)
+		} else {
+			sanitizedSpanID := strings.ReplaceAll(opts.SpanID, "\n", "")
+			sanitizedSpanID = strings.ReplaceAll(sanitizedSpanID, "\r", "")
+			logger.StdlibLogger(ctx).Error("span output is not keyed, assuming success", "spanID", sanitizedSpanID)
+		}
+	}
+
+	return so, nil
+}
+
+func (w wrapper) LegacyGetSpanOutput(ctx context.Context, opts cqrs.SpanIdentifier) (*cqrs.SpanOutput, error) {
 	if opts.TraceID == "" {
 		return nil, fmt.Errorf("traceID is required to retrieve output")
 	}
@@ -1215,6 +1448,8 @@ type runsQueryBuilder struct {
 }
 
 func newRunsQueryBuilder(ctx context.Context, opt cqrs.GetTraceRunOpt) *runsQueryBuilder {
+	l := logger.StdlibLogger(ctx)
+
 	// filters
 	filter := []sq.Expression{}
 	if len(opt.Filter.AppID) > 0 {
@@ -1251,7 +1486,7 @@ func newRunsQueryBuilder(ctx context.Context, opt cqrs.GetTraceRunOpt) *runsQuer
 	reqcursor := &cqrs.TracePageCursor{}
 	if opt.Cursor != "" {
 		if err := reqcursor.Decode(opt.Cursor); err != nil {
-			log.From(ctx).Error().Err(err).Str("cursor", opt.Cursor).Msg("error decoding function run cursor")
+			l.Error("error decoding function run cursor", "error", err, "cursor", opt.Cursor)
 		}
 	}
 
@@ -1294,7 +1529,7 @@ func newRunsQueryBuilder(ctx context.Context, opt cqrs.GetTraceRunOpt) *runsQuer
 			case enums.TraceRunOrderDesc:
 				o = sq.C(field).Desc()
 			default:
-				log.From(ctx).Error().Str("field", field).Str("direction", d.String()).Msg("invalid direction specified for sorting")
+				l.Error("invalid direction specified for sorting", "field", field, "direction", d.String())
 				continue
 			}
 
@@ -1350,6 +1585,8 @@ func (w wrapper) GetTraceRunsCount(ctx context.Context, opt cqrs.GetTraceRunOpt)
 }
 
 func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*cqrs.TraceRun, error) {
+	l := logger.StdlibLogger(ctx)
+
 	// use evtIDs as post query filter
 	evtIDs := []string{}
 	expHandler, err := run.NewExpressionHandler(ctx,
@@ -1448,7 +1685,7 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 		if expHandler.HasOutputFilters() {
 			ok, err := expHandler.MatchOutputExpressions(ctx, data.Output)
 			if err != nil {
-				logger.StdlibLogger(ctx).Error("error inspecting run for output match",
+				l.Error("error inspecting run for output match",
 					"error", err,
 					"output", string(data.Output),
 					"acctID", data.AccountID,
@@ -1477,14 +1714,14 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 			case strings.ToLower(enums.TraceRunTimeEndedAt.String()):
 				pc.Cursors[k] = cqrs.TraceCursor{Field: k, Value: data.EndedAt}
 			default:
-				log.From(ctx).Warn().Str("field", k).Msg("unknown field registered as cursor")
+				l.Warn("unknown field registered as cursor", "field", k)
 				delete(pc.Cursors, k)
 			}
 		}
 
 		cursor, err := pc.Encode()
 		if err != nil {
-			log.From(ctx).Error().Err(err).Interface("page_cursor", pc).Msg("error encoding cursor")
+			l.Error("error encoding cursor", "error", err, "page_cursor", pc)
 		}
 		var cron *string
 		if data.CronSchedule.Valid {
@@ -1530,6 +1767,40 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 // entitlements here.
 func (w wrapper) OtelTracesEnabled(ctx context.Context, accountID uuid.UUID) (bool, error) {
 	return true, nil
+}
+
+// For the API - CQRS return
+func (w wrapper) GetEventRuns(
+	ctx context.Context,
+	eventID ulid.ULID,
+	accountID uuid.UUID,
+	workspaceID uuid.UUID,
+) ([]*cqrs.FunctionRun, error) {
+	runs, err := w.q.GetFunctionRunsFromEvents(ctx, []ulid.ULID{eventID})
+	if err != nil {
+		return nil, fmt.Errorf("failed to get function runs: %w", err)
+	}
+
+	result := []*cqrs.FunctionRun{}
+	for _, rawRun := range runs {
+		run, err := sqlToRun(&rawRun.FunctionRun, &rawRun.FunctionFinish)
+		if err != nil {
+			return nil, fmt.Errorf("failed to convert run: %w", err)
+		}
+
+		result = append(result, run.ToCQRS())
+	}
+
+	return result, nil
+}
+
+func (w wrapper) GetRun(
+	ctx context.Context,
+	runID ulid.ULID,
+	accountID uuid.UUID,
+	workspaceID uuid.UUID,
+) (*cqrs.FunctionRun, error) {
+	return w.GetFunctionRun(ctx, accountID, workspaceID, runID)
 }
 
 //
@@ -1682,6 +1953,8 @@ type workerConnectionsQueryBuilder struct {
 }
 
 func newWorkerConnectionsQueryBuilder(ctx context.Context, opt cqrs.GetWorkerConnectionOpt) *workerConnectionsQueryBuilder {
+	l := logger.StdlibLogger(ctx)
+
 	// filters
 	filter := []sq.Expression{}
 	if len(opt.Filter.AppID) > 0 {
@@ -1711,7 +1984,7 @@ func newWorkerConnectionsQueryBuilder(ctx context.Context, opt cqrs.GetWorkerCon
 	reqcursor := &cqrs.WorkerConnectionPageCursor{}
 	if opt.Cursor != "" {
 		if err := reqcursor.Decode(opt.Cursor); err != nil {
-			log.From(ctx).Error().Err(err).Str("cursor", opt.Cursor).Msg("error decoding worker connection history cursor")
+			l.Error("error decoding worker connection history cursor", "error", err, "cursor", opt.Cursor)
 		}
 	}
 
@@ -1754,7 +2027,7 @@ func newWorkerConnectionsQueryBuilder(ctx context.Context, opt cqrs.GetWorkerCon
 			case enums.WorkerConnectionSortOrderDesc:
 				o = sq.C(field).Desc()
 			default:
-				log.From(ctx).Error().Str("field", field).Str("direction", d.String()).Msg("invalid direction specified for sorting")
+				l.Error("invalid direction specified for sorting", "field", field, "direction", d.String())
 				continue
 			}
 
@@ -1810,6 +2083,8 @@ func (w wrapper) GetWorkerConnectionsCount(ctx context.Context, opt cqrs.GetWork
 }
 
 func (w wrapper) GetWorkerConnections(ctx context.Context, opt cqrs.GetWorkerConnectionOpt) ([]*cqrs.WorkerConnection, error) {
+	l := logger.StdlibLogger(ctx)
+
 	builder := newWorkerConnectionsQueryBuilder(ctx, opt)
 	filter := builder.filter
 	order := builder.order
@@ -1924,14 +2199,14 @@ func (w wrapper) GetWorkerConnections(ctx context.Context, opt cqrs.GetWorkerCon
 			case strings.ToLower(enums.WorkerConnectionTimeFieldDisconnectedAt.String()):
 				pc.Cursors[k] = cqrs.WorkerConnectionCursor{Field: k, Value: data.DisconnectedAt.Int64}
 			default:
-				log.From(ctx).Warn().Str("field", k).Msg("unknown field registered as cursor")
+				l.Warn("unknown field registered as cursor", "field", k)
 				delete(pc.Cursors, k)
 			}
 		}
 
 		cursor, err := pc.Encode()
 		if err != nil {
-			log.From(ctx).Error().Err(err).Interface("page_cursor", pc).Msg("error encoding cursor")
+			l.Error("error encoding cursor", "error", err, "page_cursor", pc)
 		}
 
 		connectedAt := time.UnixMilli(data.ConnectedAt)

@@ -66,15 +66,9 @@ function normalizeWidth({ totalWidth, width }: { totalWidth: number; width: numb
   return Math.max(Math.floor((width / totalWidth) * maxWidth), minWidth);
 }
 
-export type PathCreator = {
-  runPopout: (params: { runID: string }) => Route;
-};
-
 export type StepInfoType = {
   trace: Trace;
   runID: string;
-  result?: Result;
-  pathCreator: PathCreator;
 };
 
 type Listener = {

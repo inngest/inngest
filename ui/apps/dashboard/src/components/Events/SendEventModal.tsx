@@ -38,6 +38,7 @@ type SendEventModalProps = {
   eventName?: string;
   isOpen: boolean;
   onClose: () => void;
+  initialData?: string;
 };
 
 type TabType = {
@@ -104,13 +105,22 @@ export function SendEventModal({
   eventName = 'Your Event Name',
   isOpen,
   onClose,
+  initialData,
 }: SendEventModalProps) {
   const [payload, setPayload] = useState<
-    z.infer<typeof eventSchema> | z.infer<typeof eventSchema>[]
-  >({
-    name: eventName,
-    data: {},
+    | { name: string; data: Record<string, unknown> }
+    | { name: string; data: Record<string, unknown> }[]
+  >(() => {
+    try {
+      return initialData
+        ? { name: eventName, data: JSON.parse(initialData) }
+        : { name: eventName, data: {} };
+    } catch (error) {
+      console.error('Failed to parse initialData:', error);
+      return { name: eventName, data: {} };
+    }
   });
+
   const router = useRouter();
   const environment = useEnvironment();
   const eventKey = usePreferDefaultEventKey();

@@ -15,7 +15,7 @@ import { useEnvironment } from '@/components/Environments/environment-context';
 import { pathCreator } from '@/utils/urls';
 
 export type FunctionTableRow = {
-  appName: string | null;
+  app: { name: string };
   name: string;
   isArchived: boolean;
   isPaused: boolean;
@@ -52,6 +52,9 @@ export function FunctionTable({ rows = [], isLoading }: Props) {
         blankState={rows.length === 0 ? 'No functions' : null}
         onRowClick={(row) =>
           router.push(pathCreator.function({ envSlug: env.slug, functionSlug: row.original.slug }))
+        }
+        getRowHref={(row) =>
+          pathCreator.function({ envSlug: env.slug, functionSlug: row.original.slug })
         }
       />
     </main>
@@ -114,7 +117,7 @@ function createColumns(environmentSlug: string) {
       },
       header: 'Triggers',
     }),
-    columnHelper.accessor('appName', {
+    columnHelper.accessor((row) => row.app.name, {
       cell: (info) => {
         const appExternalID = info.getValue();
         if (!appExternalID) {

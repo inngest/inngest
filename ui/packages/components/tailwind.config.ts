@@ -11,10 +11,6 @@ export default {
         mono: ['CircularXXMono', ...defaultTheme.fontFamily.mono],
       },
       colors: {
-        slate: {
-          910: '#0C1323',
-          940: '#080D19',
-        },
         primary: {
           '3xSubtle': 'rgb(var(--color-primary-3xSubtle) / <alpha-value>)',
           '2xSubtle': 'rgb(var(--color-primary-2xSubtle) / <alpha-value>)',
@@ -130,6 +126,7 @@ export default {
         btnDangerHover: 'rgb(var(--color-background-btn-dangerHover) / <alpha-value>)',
         btnDangerPressed: 'rgb(var(--color-background-btn-dangerPressed) / <alpha-value>)',
         btnDangerDisabled: 'rgb(var(--color-background-btn-dangerDisabled) / <alpha-value>)',
+        tableHeader: 'rgb(var(--color-background-tableHeader) / <alpha-value>)',
       },
       textColor: {
         basis: 'rgb(var(--color-foreground-base) / <alpha-value>)',
@@ -178,6 +175,7 @@ export default {
         // temporary tooltip token
         tooltipArrow: 'rgb(var(--color-background-canvas-base) / <alpha-value>)',
         onContrast: 'rgb(var(--color-foreground-onContrast) / <alpha-value>)',
+        contrast: 'rgb(var(--color-background-contrast) / <alpha-value>)',
         basis: 'rgb(var(--color-foreground-base) / <alpha-value>)',
         subtle: 'rgb(var(--color-foreground-subtle) / <alpha-value>)',
         muted: 'rgb(var(--color-foreground-muted) / <alpha-value>)',

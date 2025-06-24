@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"log/slog"
 	"testing"
 	"time"
 
@@ -85,7 +84,7 @@ func TestCrit(t *testing.T) {
 		called := false
 
 		buf := bytes.NewBuffer(nil)
-		log := slog.New(slog.NewJSONHandler(buf, nil))
+		log := logger.StdlibLogger(bg, logger.WithLoggerWriter(buf))
 		ctx := logger.WithStdlib(bg, log)
 
 		err := Crit(ctx, "foo", func(ctx context.Context) error {

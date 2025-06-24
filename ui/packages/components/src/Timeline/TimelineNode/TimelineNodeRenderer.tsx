@@ -18,23 +18,25 @@ export type RenderedData = {
 
 function getIconForStatus(node: HistoryNode) {
   let icon: JSX.Element;
-  if (node.scope === 'function' && node.status === 'started') {
+  const status = node.status.toLowerCase();
+
+  if (node.scope === 'function' && status === 'started') {
     icon = <IconStatusCompleted />;
-  } else if (node.status === 'cancelled') {
+  } else if (status === 'cancelled') {
     icon = <IconStatusCancelled />;
-  } else if (node.status === 'completed') {
+  } else if (status === 'completed') {
     icon = <IconStatusCompleted />;
-  } else if (node.status === 'errored') {
+  } else if (status === 'errored') {
     icon = <IconStatusErrored />;
-  } else if (node.status === 'failed') {
+  } else if (status === 'failed') {
     icon = <IconStatusFailed />;
-  } else if (node.status === 'scheduled' || node.status === 'started') {
+  } else if (status === 'scheduled' || status === 'started') {
     icon = <IconStatusRunning />;
-  } else if (node.status === 'sleeping' || node.status === 'waiting') {
+  } else if (status === 'sleeping' || status === 'waiting') {
     icon = <IconStatusSleeping />;
   } else {
     // TODO: Use a question mark icon or something.
-    throw new Error(`unexpected status: ${node.status}`);
+    throw new Error(`unexpected status: ${status}`);
   }
   return icon;
 }

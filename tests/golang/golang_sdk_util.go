@@ -70,7 +70,7 @@ func NewSDKConnectHandler(t *testing.T, appID string, copts ...opt) inngestgo.Cl
 	opts := inngestgo.ClientOpts{
 		AppID:       appID,
 		EventKey:    &key,
-		Logger:      logger.StdlibLogger(context.Background()),
+		Logger:      logger.StdlibLogger(context.Background()).SLog(),
 		RegisterURL: inngestgo.StrPtr(fmt.Sprintf("%s/fn/register", DEV_URL)),
 	}
 

@@ -28,8 +28,6 @@ type Opts struct {
 	AuthFinder apiv1auth.AuthFinder
 	// Executor is required to cancel and manage function executions.
 	Executor execution.Executor
-	// EventReader allows reading of events from storage.
-	EventReader EventReader
 	// FunctionReader reads functions from a backing store.
 	FunctionReader cqrs.FunctionReader
 	// FunctionRunReader reads function runs, history, etc. from backing storage
@@ -46,6 +44,8 @@ type Opts struct {
 	RealtimeJWTSecret []byte
 	// TraceReader reads traces from a backing store.
 	TraceReader cqrs.TraceReader
+	// MetricsMiddleware is used to instrument the APIv1 endpoints.
+	MetricsMiddleware MetricsMiddleware
 }
 
 // AddRoutes adds a new API handler to the given router.
@@ -102,7 +102,13 @@ func (a *router) setup() {
 				r.Use(a.opts.CachingMiddleware.Middleware)
 			}
 
+			if a.opts.MetricsMiddleware != nil {
+				r.Use(a.opts.MetricsMiddleware.Middleware)
+			}
+
 			r.Use(headers.ContentTypeJsonResponse())
+
+			r.Post("/signals", a.receiveSignal)
 
 			r.Get("/events", a.getEvents)
 			r.Get("/events/{eventID}", a.getEvent)

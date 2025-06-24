@@ -1,6 +1,5 @@
 'use client';
 
-import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import { Runs } from '@/components/Runs';
 
 export default function Page({
@@ -11,13 +10,6 @@ export default function Page({
   };
 }) {
   const functionSlug = decodeURIComponent(params.slug);
-  const { value: traceAIEnabled, isReady: featureFlagReady } = useBooleanFlag('ai-traces');
 
-  return (
-    <Runs
-      functionSlug={functionSlug}
-      scope="fn"
-      traceAIEnabled={featureFlagReady && traceAIEnabled}
-    />
-  );
+  return <Runs functionSlug={functionSlug} scope="fn" />;
 }

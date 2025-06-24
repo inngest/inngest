@@ -14,7 +14,7 @@ Output:
 local keyPartitionMap         = KEYS[1] -- key storing all partitions
 local keyGlobalPartitionPtr   = KEYS[2] -- global top-level partitioned queue
 local keyGlobalAccountPointer = KEYS[3] -- accounts:sorted - zset
-local keyAccountPartitions    = KEYS[4] -- accounts:$accountId:partition:sorted - zset
+local keyAccountPartitions    = KEYS[4] -- accounts:$accountID:partition:sorted - zset
 local keyFnMeta               = KEYS[5]
 local keyAcctConcurrency      = KEYS[6] -- in progress queue for account
 local keyFnConcurrency        = KEYS[7] -- in progress queue for partition
@@ -29,7 +29,7 @@ local acctConcurrency         = tonumber(ARGV[5]) -- concurrency limit for the a
 local fnConcurrency           = tonumber(ARGV[6]) -- concurrency limit for this fn
 local customConcurrency       = tonumber(ARGV[7]) -- concurrency limit for the custom key
 local noCapacityScore         = tonumber(ARGV[8]) -- score if limit concurrency limit is hit
-local accountId               = ARGV[9]
+local accountID               = ARGV[9]
 
 -- key queues v2
 local disableLeaseChecks = tonumber(ARGV[10])
@@ -72,7 +72,7 @@ if disableLeaseChecks ~= 1 then
       local acctCap = check_concurrency(currentTime, keyAcctConcurrency, acctConcurrency)
       if acctCap <= 0 then
           requeue_partition(keyGlobalPartitionPtr, keyPartitionMap, existing, partitionID, noCapacityScore, currentTime)
-          update_account_queues(keyGlobalAccountPointer, keyAccountPartitions, partitionID, accountId, noCapacityScore)
+          update_account_queues(keyGlobalAccountPointer, keyAccountPartitions, partitionID, accountID, noCapacityScore)
           return { -1 }
       end
       if acctCap <= capacity then
@@ -86,7 +86,7 @@ if disableLeaseChecks ~= 1 then
       local fnCap = check_concurrency(currentTime, keyFnConcurrency, fnConcurrency)
       if fnCap <= 0 then
           requeue_partition(keyGlobalPartitionPtr, keyPartitionMap, existing, partitionID, noCapacityScore, currentTime)
-          update_account_queues(keyGlobalAccountPointer, keyAccountPartitions, partitionID, accountId, noCapacityScore)
+          update_account_queues(keyGlobalAccountPointer, keyAccountPartitions, partitionID, accountID, noCapacityScore)
           return { -2 }
       end
       if fnCap <= capacity then
@@ -102,7 +102,7 @@ if disableLeaseChecks ~= 1 then
       local customCap = check_concurrency(currentTime, keyCustomConcurrency, customConcurrency)
       if customCap <= 0 then
           requeue_partition(keyGlobalPartitionPtr, keyPartitionMap, existing, partitionID, noCapacityScore, currentTime)
-          update_account_queues(keyGlobalAccountPointer, keyAccountPartitions, partitionID, accountId, noCapacityScore)
+          update_account_queues(keyGlobalAccountPointer, keyAccountPartitions, partitionID, accountID, noCapacityScore)
           return { -3 }
       end
       if customCap <= capacity then
@@ -118,6 +118,6 @@ existing.last = currentTime -- in ms.
 -- Update item and index score
 redis.call("HSET", keyPartitionMap, partitionID, cjson.encode(existing))
 update_pointer_score_to(partitionID, keyGlobalPartitionPtr, leaseTime)
-update_account_queues(keyGlobalAccountPointer, keyAccountPartitions, partitionID, accountId, leaseTime)
+update_account_queues(keyGlobalAccountPointer, keyAccountPartitions, partitionID, accountID, leaseTime)
 
 return { existingTime, capacity }

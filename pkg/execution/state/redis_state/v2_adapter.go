@@ -11,6 +11,7 @@ import (
 	statev1 "github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/util"
 )
 
@@ -35,17 +36,17 @@ type v2 struct {
 }
 
 // Create creates new state in the store for the given run ID.
-func (v v2) Create(ctx context.Context, s state.CreateState) error {
+func (v v2) Create(ctx context.Context, s state.CreateState) (statev1.State, error) {
 	batchData := make([]map[string]any, len(s.Events))
 	for n, evt := range s.Events {
 		data := map[string]any{}
 		if err := json.Unmarshal(evt, &data); err != nil {
-			return err
+			return nil, err
 		}
 		batchData[n] = data
 
 	}
-	_, err := v.mgr.New(ctx, statev1.Input{
+	state, err := v.mgr.New(ctx, statev1.Input{
 		Identifier: statev1.Identifier{
 			RunID:                 s.Metadata.ID.RunID,
 			WorkflowID:            s.Metadata.ID.FunctionID,
@@ -68,7 +69,15 @@ func (v v2) Create(ctx context.Context, s state.CreateState) error {
 		Steps:          s.Steps,
 		StepInputs:     s.StepInputs,
 	})
-	return err
+	if err == nil {
+		metrics.IncrStateWrittenCounter(ctx, len(batchData), metrics.CounterOpt{
+			PkgName: "redis_state",
+			Tags: map[string]any{
+				"account_id": s.Metadata.ID.Tenant.AccountID,
+			},
+		})
+	}
+	return state, err
 }
 
 // Delete deletes state, metadata, and - when pauses are included - associated pauses
@@ -223,8 +232,22 @@ func (v v2) SaveStep(ctx context.Context, id state.ID, stepID string, data []byt
 		},
 		util.NewRetryConf(
 			util.WithRetryConfRetryableErrors(v.retryableError),
+			util.WithRetryConfMaxBackoff(10*time.Second),
+			util.WithRetryConfMaxAttempts(10),
 		),
 	)
+
+	if errors.Is(err, statev1.ErrIdempotentResponse) {
+		// This step data for this step ID has already been saved exactly as before.
+		logger.StdlibLogger(ctx).Warn(
+			"swallowing idempotent step response",
+			"attempt", attempt,
+			"run_id", id.RunID,
+			"step_id", stepID,
+		)
+		// NOTE: hasPending should be accurate in this case.
+		return hasPending, nil
+	}
 
 	if errors.Is(err, statev1.ErrDuplicateResponse) && attempt > 1 {
 		// Swallow the error. Since the 2nd attempt has a "duplicate response"
@@ -240,6 +263,15 @@ func (v v2) SaveStep(ctx context.Context, id state.ID, stepID string, data []byt
 		)
 		return false, nil
 	}
+
+	// We only record the number of bytes written after handling idempotent and
+	// duplicate errors;  those don't count towards backing state store growth.
+	metrics.IncrStateWrittenCounter(ctx, len(data), metrics.CounterOpt{
+		PkgName: "redis_state",
+		Tags: map[string]any{
+			"account_id": id.Tenant.AccountID,
+		},
+	})
 
 	return hasPending, err
 }

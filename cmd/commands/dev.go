@@ -169,6 +169,7 @@ func doDev(cmd *cobra.Command, args []string) {
 		URLs:               urls,
 		ConnectGatewayPort: connectGatewayPort,
 		ConnectGatewayHost: conf.CoreAPI.Addr,
+		InMemory:           true,
 	}
 
 	err = devserver.New(ctx, opts)

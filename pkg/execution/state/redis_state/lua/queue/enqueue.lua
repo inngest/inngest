@@ -22,11 +22,17 @@ local keyShadowPartitionSet              = KEYS[12]          -- shadow:sorted:<f
 local keyShadowPartitionMeta             = KEYS[13]          -- shadows
 local keyGlobalAccountShadowPartitionSet = KEYS[14]
 local keyAccountShadowPartitionSet       = KEYS[15]
-local keyNormalizeFromBacklogSet         = ARGV[16] -- signals if this is part of a normalization
 
-local keyItemIndexA           	= KEYS[17]          -- custom item index 1
-local keyItemIndexB           	= KEYS[18]          -- custom item index 2
+local keyNormalizeFromBacklogSet         = KEYS[16] -- signals if this is part of a normalization
+local keyPartitionNormalizeSet           = KEYS[17]
+local keyAccountNormalizeSet             = KEYS[18]
+local keyGlobalNormalizeSet              = KEYS[19]
 
+local singletonRunKey           	  = KEYS[20]
+local singletonKey           	  = KEYS[21]
+
+local keyItemIndexA           	= KEYS[22]          -- custom item index 1
+local keyItemIndexB           	= KEYS[23]          -- custom item index 2
 
 local queueItem           		= ARGV[1]           -- {id, lease id, attempt, max attempt, data, etc...}
 local queueID             		= ARGV[2]           -- id
@@ -37,12 +43,14 @@ local fnMetadata          		= ARGV[6]          -- function meta: {paused}
 local partitionItem      		  = ARGV[7]
 local partitionID        		  = ARGV[8]
 local accountID           		= ARGV[9]
+local runID                     = ARGV[10]
 
 -- Key queues v2
-local enqueueToBacklog				= tonumber(ARGV[10])
-local shadowPartitionItem     = ARGV[11]
-local backlogItem             = ARGV[12]
-local backlogID               = ARGV[13]
+local enqueueToBacklog				= tonumber(ARGV[11])
+local shadowPartitionItem     = ARGV[12]
+local backlogItem             = ARGV[13]
+local backlogID               = ARGV[14]
+local normalizeFromBacklogID  = ARGV[15]
 
 -- $include(update_pointer_score.lua)
 -- $include(ends_with.lua)
@@ -52,17 +60,28 @@ local backlogID               = ARGV[13]
 -- $include(ends_with.lua)
 
 -- Only skip idempotency checks if we're normalizing a backlog (we want to enqueue an existing item to a new backlog)
-if exists_without_ending(keyNormalizeFromBacklogSet, ":-") ~= true then
-  -- Check idempotency exists
-  if redis.call("EXISTS", idempotencyKey) ~= 0 then
-    return 1
+local is_normalize = exists_without_ending(keyNormalizeFromBacklogSet, ":-")
+
+-- Check idempotency exists
+if redis.call("EXISTS", idempotencyKey) ~= 0 and not is_normalize then
+  return 1
+end
+
+-- Make these a hash to save on memory usage
+if redis.call("HSETNX", queueKey, queueID, queueItem) == 0 and not is_normalize then
+  -- This already exists;  return an error.
+  return 1
+end
+
+-- Check if the item is a singleton and if an existing item already exists
+if exists_without_ending(singletonKey, ":singleton:-") then 
+  if redis.call("EXISTS", singletonKey) ~= 0 then
+    return 2
   end
 
-  -- Make these a hash to save on memory usage
-  if redis.call("HSETNX", queueKey, queueID, queueItem) == 0 then
-    -- This already exists;  return an error.
-    return 1
-  end
+  -- Set the singleton key to the item ID
+  redis.call("SET", singletonRunKey, singletonKey)
+  redis.call("SET", singletonKey, runID)
 end
 
 if enqueueToBacklog == 1 then
@@ -72,8 +91,24 @@ else
 end
 
 -- Normalization only: Remove from old backlog after enqueueing to new backlog
-if exists_without_ending(keyNormalizeFromBacklogSet, ":-") == true then
+if is_normalize then
   redis.call("ZREM", keyNormalizeFromBacklogSet, queueID)
+
+  -- Clean up normalize pointers if backlog is empty
+  if tonumber(redis.call("ZCARD", keyNormalizeFromBacklogSet)) == 0 then
+    -- Clean up normalize pointer from partition -> normalizeFromBacklogID
+    redis.call("ZREM", keyPartitionNormalizeSet, normalizeFromBacklogID)
+
+    -- If no more backlogs to normalize in partition, clean up account -> partition pointer
+    if tonumber(redis.call("ZCARD", keyPartitionNormalizeSet)) == 0 then
+      redis.call("ZREM", keyAccountNormalizeSet, partitionID)
+
+      -- If no more partitions to normalize in account, clean up global -> account pointer
+      if tonumber(redis.call("ZCARD", keyAccountNormalizeSet)) == 0 then
+        redis.call("ZREM", keyGlobalNormalizeSet, accountID)
+      end
+    end
+  end
 end
 
 if exists_without_ending(keyFnMetadata, ":fnMeta:-") == true then

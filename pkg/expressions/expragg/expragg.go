@@ -3,7 +3,6 @@ package expragg
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"sync"
 	"time"
 
@@ -32,7 +31,7 @@ func NewAggregator(
 	loader EvaluableLoader,
 	eval expr.ExpressionEvaluator,
 	kv expr.KV[*state.Pause],
-	log *slog.Logger,
+	log logger.Logger,
 ) Aggregator {
 	// use the package's singleton caching parser to create a new tree parser.
 	// this uses lifted expression parsing with caching for speed.
@@ -62,7 +61,6 @@ func NewAggregator(
 // The types are different as we must use the open source expr.Evaluable interfaces with aggregate evaluation.
 type EvaluableLoader interface {
 	LoadEvaluablesSince(ctx context.Context, workspaceID uuid.UUID, eventName string, since time.Time, do func(context.Context, expr.Evaluable) error) error
-	EvaluablesByID(ctx context.Context, evaluableIDs ...uuid.UUID) ([]expr.Evaluable, error)
 }
 
 // Aggregator manages a set of AggregateEvaluator instances to quickly evaluate expressions
@@ -100,7 +98,7 @@ type Aggregator interface {
 }
 
 type aggregator struct {
-	log *slog.Logger
+	log logger.Logger
 
 	records *ccache.Cache
 

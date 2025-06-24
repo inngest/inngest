@@ -3,7 +3,6 @@ package run
 import (
 	"context"
 	"encoding/json"
-	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -17,6 +16,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/inngest"
+	"github.com/inngest/inngest/pkg/logger"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/inngest/inngest/pkg/util/aigateway"
 	"github.com/oklog/ulid/v2"
@@ -26,9 +26,9 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-func NewTraceLifecycleListener(l *slog.Logger) execution.LifecycleListener {
+func NewTraceLifecycleListener(l logger.Logger) execution.LifecycleListener {
 	if l == nil {
-		l = slog.Default()
+		l = logger.StdlibLogger(context.Background())
 	}
 
 	return traceLifecycle{
@@ -39,7 +39,7 @@ func NewTraceLifecycleListener(l *slog.Logger) execution.LifecycleListener {
 type traceLifecycle struct {
 	execution.NoopLifecyceListener
 
-	log *slog.Logger
+	log logger.Logger
 }
 
 func (l traceLifecycle) OnFunctionScheduled(ctx context.Context, md statev2.Metadata, item queue.Item, evts []event.TrackedEvent) {
@@ -1199,6 +1199,113 @@ func (l traceLifecycle) OnWaitForEventResumed(
 			if pause.Expression != nil {
 				span.SetAttributes(attribute.String(consts.OtelSysStepWaitExpression, *pause.Expression))
 			}
+			if r.With != nil {
+				span.SetStepOutput(r.With)
+			}
+			if r.HasError() {
+				span.SetStatus(codes.Error, r.Error())
+			}
+		}
+	}
+}
+
+func (l traceLifecycle) OnWaitForSignal(
+	ctx context.Context,
+	md statev2.Metadata,
+	item queue.Item,
+	gen statev1.GeneratorOpcode,
+	pause statev1.Pause,
+) {
+	ctx = l.extractTraceCtx(ctx, md, false)
+
+	opts, err := gen.SignalOpts()
+	if err != nil {
+		l.log.Error("error retrieving signal wait opts", "error", err, "meta", md, "lifecycle", "OnWaitForSignal")
+		return
+	}
+
+	v, ok := pause.Metadata[consts.OtelPropagationKey]
+	if !ok {
+		l.log.Error("no trace propagation", "meta", md, "lifecycle", "OnWaitForSignal")
+		return
+	}
+	carrier, ok := v.(*itrace.TraceCarrier)
+	if !ok {
+		l.log.Error("no trace carrier", "meta", md, "lifecycle", "OnWaitForSignal")
+		return
+	}
+
+	_, span := NewSpan(ctx,
+		WithScope(consts.OtelScopeStep),
+		WithName(consts.OtelSpanWaitForSignal),
+		WithTimestamp(carrier.Timestamp),
+		WithSpanID(carrier.SpanID()),
+		WithSpanAttributes(
+			attribute.String(consts.OtelSysLifecycleID, "OnWaitForSignalResumed"),
+			attribute.String(consts.OtelSysStepOpcode, enums.OpcodeWaitForSignal.String()),
+			attribute.String(consts.OtelSysAccountID, pause.Identifier.AccountID.String()),
+			attribute.String(consts.OtelSysWorkspaceID, md.ID.Tenant.EnvID.String()),
+			attribute.String(consts.OtelSysAppID, md.ID.Tenant.AppID.String()),
+			attribute.String(consts.OtelSysFunctionID, md.ID.FunctionID.String()),
+			attribute.Int(consts.OtelSysFunctionVersion, md.Config.FunctionVersion),
+			attribute.String(consts.OtelAttrSDKRunID, pause.Identifier.RunID.String()),
+			attribute.Int(consts.OtelSysStepAttempt, 0),
+			attribute.Int(consts.OtelSysStepMaxAttempt, 1),
+			attribute.String(consts.OtelSysStepGroupID, pause.GroupID),
+			attribute.String(consts.OtelSysStepDisplayName, pause.StepName),
+			attribute.Int64(consts.OtelSysStepWaitExpires, pause.Expires.Time().UnixMilli()),
+			attribute.String(consts.OtelSysStepWaitSignalName, opts.Signal),
+		),
+	)
+	defer span.End()
+}
+
+func (l traceLifecycle) OnWaitForSignalResumed(
+	ctx context.Context,
+	md statev2.Metadata,
+	pause statev1.Pause,
+	r execution.ResumeRequest,
+) {
+	if pause.Metadata == nil {
+		l.log.Error("no pause metadata", "meta", md, "lifecycle", "OnWaitForSignalResumed")
+		return
+	}
+
+	meta, ok := pause.Metadata[consts.OtelPropagationKey]
+	if !ok {
+		l.log.Error("no trace", "meta", md, "lifecycle", "OnWaitForSignalResumed")
+		return
+	}
+
+	carrier := itrace.NewTraceCarrier()
+	if err := carrier.Unmarshal(meta); err == nil {
+		ctx = itrace.UserTracer().Propagator().Extract(ctx, propagation.MapCarrier(carrier.Context))
+		if carrier.CanResumePause() {
+			_, span := NewSpan(ctx,
+				WithScope(consts.OtelScopeStep),
+				WithName(consts.OtelSpanWaitForSignal),
+				WithTimestamp(carrier.Timestamp),
+				WithSpanID(carrier.SpanID()),
+				WithSpanAttributes(
+					attribute.String(consts.OtelSysLifecycleID, "OnWaitForSignalResumed"),
+					attribute.String(consts.OtelSysStepOpcode, enums.OpcodeWaitForSignal.String()),
+					attribute.String(consts.OtelSysAccountID, pause.Identifier.AccountID.String()),
+					attribute.String(consts.OtelSysWorkspaceID, md.ID.Tenant.EnvID.String()),
+					attribute.String(consts.OtelSysAppID, md.ID.Tenant.AppID.String()),
+					attribute.String(consts.OtelSysFunctionID, md.ID.FunctionID.String()),
+					attribute.Int(consts.OtelSysFunctionVersion, md.Config.FunctionVersion),
+					attribute.String(consts.OtelAttrSDKRunID, pause.Identifier.RunID.String()),
+					attribute.Int(consts.OtelSysStepAttempt, 0),
+					attribute.Int(consts.OtelSysStepMaxAttempt, 1),
+					attribute.String(consts.OtelSysStepGroupID, pause.GroupID),
+					attribute.String(consts.OtelSysStepDisplayName, pause.StepName),
+					attribute.Int64(consts.OtelSysStepWaitExpires, pause.Expires.Time().UnixMilli()),
+					attribute.String(consts.OtelSysStepWaitSignalName, *pause.SignalID),
+					attribute.Bool(consts.OtelSysStepWaitExpired, r.IsTimeout),
+				),
+			)
+			defer span.End()
+
 			if r.With != nil {
 				span.SetStepOutput(r.With)
 			}

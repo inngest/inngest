@@ -1,8 +1,6 @@
 --[[
 
 Output:
-  positive number: discrepancy in active counter
-
   0: Successfully leased item
   -1: Queue item not found
   -2: Queue item already leased
@@ -17,35 +15,48 @@ Output:
 ]]
 
 local keyQueueMap            	= KEYS[1]
-local keyPartitionFn          = KEYS[2]           -- queue:sorted:$workflowID - zset
+local concurrencyPointer      = KEYS[2]
 
--- We push our queue item ID into each concurrency queue
-local keyConcurrencyFn  				= KEYS[3] -- Account concurrency level
-local keyCustomConcurrencyKey1  = KEYS[4] -- When leasing an item we need to place the lease into this key.
-local keyCustomConcurrencyKey2  = KEYS[5] -- Optional for eg. for concurrency amongst steps
--- We push pointers to partition concurrency items to the partition concurrency item
-local concurrencyPointer      = KEYS[6]
-local keyGlobalPointer        = KEYS[7]
-local keyGlobalAccountPointer = KEYS[8] -- accounts:sorted - zset
-local keyAccountPartitions    = KEYS[9] -- accounts:$accountId:partition:sorted - zset
-local throttleKey             = KEYS[10] -- key used for throttling function run starts.
-local keyAcctConcurrency      = KEYS[11]
-local keyActiveCounter        = KEYS[12]
+local keyReadyQueue           = KEYS[3]           -- queue:sorted:$workflowID - zset
+
+-- In progress ZSETs for concurrency accounting
+local keyInProgressAccount               = KEYS[4]
+local keyInProgressPartition  				   = KEYS[5]
+local keyInProgressCustomConcurrencyKey1 = KEYS[6]
+local keyInProgressCustomConcurrencyKey2 = KEYS[7]
+
+-- Active sets for constraint capacity accounting
+local keyActiveAccount             = KEYS[8]
+local keyActivePartition           = KEYS[9]
+local keyActiveConcurrencyKey1     = KEYS[10]
+local keyActiveConcurrencyKey2     = KEYS[11]
+local keyActiveCompound            = KEYS[12]
+
+local keyActiveRun                        = KEYS[13]
+local keyActiveRunsAccount                = KEYS[14]
+local keyActiveRunsPartition              = KEYS[15]
+local keyActiveRunsCustomConcurrencyKey1  = KEYS[16]
+local keyActiveRunsCustomConcurrencyKey2  = KEYS[17]
+
+local throttleKey             = KEYS[18]
 
 local queueID      						= ARGV[1]
-local newLeaseKey  						= ARGV[2]
-local currentTime  						= tonumber(ARGV[3]) -- in ms
-local partitionID 					  = ARGV[4]
+local partitionID 					  = ARGV[2]
+local accountId       				= ARGV[3]
+local runID                   = ARGV[4]
+local newLeaseID  						= ARGV[5]
+
+local currentTime  						= tonumber(ARGV[6]) -- in ms
+
 -- We check concurrency limits when leasing queue items.
-local concurrencyFn    				= tonumber(ARGV[5])
-local customConcurrencyKey1   = tonumber(ARGV[6])
-local customConcurrencyKey2   = tonumber(ARGV[7])
--- And we always check against account concurrency limits
-local concurrencyAcct 				= tonumber(ARGV[8])
-local accountId       				= ARGV[9]
+local concurrencyAcct 				= tonumber(ARGV[7])
+local concurrencyPartition    = tonumber(ARGV[8])
+local customConcurrencyKey1   = tonumber(ARGV[9])
+local customConcurrencyKey2   = tonumber(ARGV[10])
 
 -- key queues v2
-local disableLeaseChecks = tonumber(ARGV[10])
+local checkConstraints    = tonumber(ARGV[11])
+local refilledFromBacklog = tonumber(ARGV[12])
 
 -- Use our custom Go preprocessor to inject the file from ./includes/
 -- $include(decode_ulid_time.lua)
@@ -56,6 +67,7 @@ local disableLeaseChecks = tonumber(ARGV[10])
 -- $include(gcra.lua)
 -- $include(ends_with.lua)
 -- $include(update_account_queues.lua)
+-- $include(update_active_sets.lua)
 
 -- first, get the queue item.  we must do this and bail early if the queue item
 -- was not found.
@@ -65,7 +77,7 @@ if item == nil then
 end
 
 -- Grab the current time from the new lease key.
-local nextTime = decode_ulid_time(newLeaseKey)
+local nextTime = decode_ulid_time(newLeaseID)
 -- check if the item is leased.
 if item.leaseID ~= nil and item.leaseID ~= cjson.null and decode_ulid_time(item.leaseID) > currentTime then
     -- This is already leased;  don't let this requester lease the item.
@@ -75,13 +87,14 @@ end
 -- Track the earliest time this job was attempted in the queue.
 item = set_item_peek_time(keyQueueMap, queueID, item, currentTime)
 
-if disableLeaseChecks ~= 1 then
+-- NOTE: we can probably skip this entire section if item comes from backlog?
+if checkConstraints == 1 then
 	-- Track throttling/rate limiting IF the queue item has throttling info set.  This allows
 	-- us to target specific queue items with rate limiting individually.
 	--
 	-- We handle this before concurrency as it's typically not used, and it's faster to handle than concurrency,
 	-- with o(1) operations vs o(log(n)).
-	if item.data ~= nil and item.data.throttle ~= nil then
+	if item.data ~= nil and item.data.throttle ~= nil and item.data.throttle.p > 0 and refilledFromBacklog == 0 then
 		local throttleResult = gcra(throttleKey, currentTime, item.data.throttle.p * 1000, item.data.throttle.l, item.data.throttle.b)
 		if throttleResult == false then
 			return -7
@@ -92,29 +105,29 @@ if disableLeaseChecks ~= 1 then
   -- leasing the partition and do not need to be checked again (only one worker can run a partition at
   -- once, and the capacity is kept in memory after leasing a partition)
   if customConcurrencyKey1 > 0 then
-      if check_concurrency(currentTime, keyCustomConcurrencyKey1, customConcurrencyKey1) <= 0 then
+      if check_concurrency(currentTime, keyInProgressCustomConcurrencyKey1, customConcurrencyKey1) <= 0 then
           return -4
       end
   end
   if customConcurrencyKey2 > 0 then
-      if check_concurrency(currentTime, keyCustomConcurrencyKey2, customConcurrencyKey2) <= 0 then
+      if check_concurrency(currentTime, keyInProgressCustomConcurrencyKey2, customConcurrencyKey2) <= 0 then
           return -5
       end
   end
-  if concurrencyFn > 0 then
-      if check_concurrency(currentTime, keyConcurrencyFn, concurrencyFn) <= 0 then
+  if concurrencyPartition > 0 then
+      if check_concurrency(currentTime, keyInProgressPartition, concurrencyPartition) <= 0 then
           return -3
       end
   end
   if concurrencyAcct > 0 then
-      if check_concurrency(currentTime, keyAcctConcurrency, concurrencyAcct) <= 0 then
+      if check_concurrency(currentTime, keyInProgressAccount, concurrencyAcct) <= 0 then
           return -6
       end
   end
 end
 
 -- Update the item's lease key.
-item.leaseID = newLeaseKey
+item.leaseID = newLeaseID
 redis.call("HSET", keyQueueMap, queueID, cjson.encode(item))
 
 local function handleLease(keyConcurrency, concurrencyLimit)
@@ -126,18 +139,20 @@ end
 
 -- Remove the item from our sorted index, as this is no longer on the queue; it's in-progress
 -- and stored in functionConcurrencyKey.
-redis.call("ZREM", keyPartitionFn, item.id)
+redis.call("ZREM", keyReadyQueue, item.id)
 
--- Always add this to acct level concurrency queues
-redis.call("ZADD", keyAcctConcurrency, nextTime, item.id)
+if exists_without_ending(keyInProgressAccount, ":-") then
+  -- Always add this to acct level concurrency queues
+  redis.call("ZADD", keyInProgressAccount, nextTime, item.id)
+end
 
 -- Always add this to fn level concurrency queues for scavenging
-redis.call("ZADD", keyConcurrencyFn, nextTime, item.id)
+redis.call("ZADD", keyInProgressPartition, nextTime, item.id)
 
 -- For every queue that we lease from, ensure that it exists in the scavenger pointer queue
 -- so that expired leases can be re-processed.  We want to take the earliest time from the
 -- concurrency queue such that we get a previously lost job if possible.
-local inProgressScores = redis.call("ZRANGE", keyConcurrencyFn, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")
+local inProgressScores = redis.call("ZRANGE", keyInProgressPartition, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")
 if inProgressScores ~= false then
   local earliestLease = tonumber(inProgressScores[2])
   -- Add the earliest time to the pointer queue for in-progress, allowing us to scavenge
@@ -148,40 +163,15 @@ if inProgressScores ~= false then
   redis.call("ZADD", concurrencyPointer, earliestLease, partitionID)
 end
 
-if exists_without_ending(keyCustomConcurrencyKey1, ":-") == true then
-  handleLease(keyCustomConcurrencyKey1, customConcurrencyKey1)
+if exists_without_ending(keyInProgressCustomConcurrencyKey1, ":-") == true then
+  handleLease(keyInProgressCustomConcurrencyKey1, customConcurrencyKey1)
 end
 
-if exists_without_ending(keyCustomConcurrencyKey2, ":-") == true then
-  handleLease(keyCustomConcurrencyKey2, customConcurrencyKey2)
+if exists_without_ending(keyInProgressCustomConcurrencyKey2, ":-") == true then
+  handleLease(keyInProgressCustomConcurrencyKey2, customConcurrencyKey2)
 end
 
-local expectedActive = 0
-if exists_without_ending(keyCustomConcurrencyKey1, ":-") == true and exists_without_ending(keyCustomConcurrencyKey2, ":-") == true then
-  -- both concurrency keys are set, compute the intersection of both keys
-  for _, _ in ipairs(redis.call("ZINTER", 2, keyCustomConcurrencyKey1, keyCustomConcurrencyKey2)) do
-    expectedActive = expectedActive + 1
-  end
-elseif exists_without_ending(keyCustomConcurrencyKey1, ":-") == true then
-  -- only first key is set
-  expectedActive = redis.call("ZCARD", keyCustomConcurrencyKey1)
-else
-  -- no key is set
-  expectedActive = redis.call("ZCARD", keyConcurrencyFn)
-end
-
--- Set initial value for active counter
-local currentActive = redis.call("GET", keyActiveCounter)
-if currentActive == nil or currentActive == false then
-  -- key not set, provide initial value
-  redis.call("SET", keyActiveCounter, expectedActive)
-elseif currentActive ~= expectedActive then
-  -- discrepancy between current and expected value
-  redis.call("SET", keyActiveCounter, expectedActive)
-  return math.abs(currentActive - expectedActive)
-else
-  -- key exists, simply increment by one
-  redis.call("INCR", keyActiveCounter)
-end
+addToActiveSets(keyActivePartition, keyActiveAccount, keyActiveCompound, keyActiveConcurrencyKey1, keyActiveConcurrencyKey2, {item.id})
+addToActiveRunSets(keyActiveRun, keyActiveRunsPartition, keyActiveRunsAccount, keyActiveRunsCustomConcurrencyKey1, keyActiveRunsCustomConcurrencyKey2, runID, item.id)
 
 return 0

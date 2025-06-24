@@ -4,11 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"github.com/google/uuid"
-	connecterrors "github.com/inngest/inngest/pkg/connect/errors"
-	"github.com/inngest/inngest/pkg/consts"
 	"io"
-	"log/slog"
 	"net"
 	"net/http"
 	"strings"
@@ -16,11 +12,15 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/connect/auth"
+	connecterrors "github.com/inngest/inngest/pkg/connect/errors"
 	"github.com/inngest/inngest/pkg/connect/pubsub"
 	"github.com/inngest/inngest/pkg/connect/state"
 	"github.com/inngest/inngest/pkg/connect/types"
 	"github.com/inngest/inngest/pkg/connect/wsproto"
+	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/syscode"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	connectpb "github.com/inngest/inngest/proto/gen/connect/v1"
@@ -55,12 +55,16 @@ func (c *connectGatewaySvc) closeWithConnectError(ws *websocket.Conn, serr *conn
 	// reason must be limited to 125 bytes and should not be dynamic,
 	// so we restrict it to the known syscodes to prevent unintentional overflows
 	err := ws.Close(serr.StatusCode, serr.SysCode)
-	if errors.Is(err, context.DeadlineExceeded) {
-		return
-	}
+	if err != nil {
+		if errors.Is(err, context.DeadlineExceeded) {
+			return
+		}
 
-	if isConnectionClosedErr(err) {
-		c.logger.Error("could not close WebSocket connection", "err", err, "serr", serr)
+		if isConnectionClosedErr(err) {
+			return
+		}
+
+		c.logger.Debug("could not close WebSocket connection", "err", err, "serr", serr)
 	}
 }
 
@@ -71,7 +75,7 @@ type connectionHandler struct {
 	ws   *websocket.Conn
 
 	updateLock sync.Mutex
-	log        *slog.Logger
+	log        logger.Logger
 
 	remoteAddr string
 
@@ -171,9 +175,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			// This is deferred so we always update the semaphore
 			defer c.connectionCount.Done()
 			ch.log.Debug("Closing WebSocket connection", "reason", closeReason)
-			if c.devlogger != nil {
-				c.devlogger.Info().Msg("worker disconnected")
-			}
+			c.logger.Trace("worker disconnected")
 
 			closed = true
 
@@ -421,22 +423,23 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 					closeErr := websocket.CloseError{}
 					if errors.As(err, &closeErr) {
 						// Empty reason (unexpected)
-						if closeErr.Code == websocket.StatusNoStatusRcvd && closeErr.Reason == "" {
+						if closeErr.Reason == "" {
 							return nil
 						}
 
 						// Force-closed during draining after timeout
 						if closeErr.Code == ErrDraining.StatusCode && closeErr.Reason == ErrDraining.SysCode {
+							setCloseReason(connectpb.WorkerDisconnectReason_GATEWAY_DRAINING.String())
 							return nil
 						}
-
-						ch.log.Debug("connection closed with code and reason", "code", closeErr.Code.String(), "reason", closeErr.Reason)
 
 						// Expected worker shutdown
 						if closeErr.Code == websocket.StatusNormalClosure && closeErr.Reason == connectpb.WorkerDisconnectReason_WORKER_SHUTDOWN.String() {
 							setCloseReason(connectpb.WorkerDisconnectReason_WORKER_SHUTDOWN.String())
 							return nil
 						}
+
+						ch.log.Debug("connection closed with code and reason", "code", closeErr.Code.String(), "reason", closeErr.Reason)
 
 						// If client connection closed unexpectedly, we should store the reason, if set.
 						// If the reason is set, it may have been an intentional close, so the connection
@@ -562,9 +565,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 
 		{
 			ch.log.Debug("connection is ready")
-			if c.devlogger != nil {
-				c.devlogger.Info().Strs("app_names", conn.AppNames()).Msg("worker connected")
-			}
+			c.logger.Trace("worker connected", "app_names", conn.AppNames())
 
 			successTags := map[string]any{
 				"success": true,
@@ -838,7 +839,7 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 				return nil
 			}
 
-			c.log.Debug("extended lease for long-running request")
+			c.log.Debug("extended lease for long-running request", "req_id", data.RequestId)
 
 			// Extended lease, all good
 			return nil
@@ -931,13 +932,13 @@ func (c *connectionHandler) establishConnection(ctx context.Context) (*state.Con
 
 	err := wsproto.Read(shorterContext, c.ws, &initialMessage)
 	if err != nil {
+		if ctx.Err() != nil {
+			return nil, &ErrDraining
+		}
+
 		if isConnectionClosedErr(err) {
 			c.log.Warn("connection was closed during handshake")
 			return nil, nil
-		}
-
-		if ctx.Err() != nil {
-			return nil, &ErrDraining
 		}
 
 		code := syscode.CodeConnectInternal
@@ -1145,7 +1146,7 @@ func (c *connectionHandler) handleSdkReply(ctx context.Context, msg *connectpb.C
 
 	// Persist response in buffer, which is polled by executor.
 	err := c.svc.stateManager.SaveResponse(ctx, c.conn.EnvID, data.RequestId, data)
-	if err != nil {
+	if err != nil && !errors.Is(err, state.ErrResponseAlreadyBuffered) {
 		return fmt.Errorf("could not save response: %w", err)
 	}
 

@@ -121,6 +121,74 @@ export const FUNCTIONS = gql`
   }
 `;
 
+export const FUNCTION = gql`
+  query GetFunction($functionSlug: String!) {
+    functionBySlug(query: { functionSlug: $functionSlug }) {
+      name
+      id
+      failureHandler {
+        slug
+      }
+      concurrency
+      config
+      configuration {
+        cancellations {
+          event
+          timeout
+          condition
+        }
+        retries {
+          value
+          isDefault
+        }
+        priority
+        eventsBatch {
+          maxSize
+          timeout
+          key
+        }
+        concurrency {
+          scope
+          limit {
+            value
+            isPlanLimit
+          }
+          key
+        }
+        rateLimit {
+          limit
+          period
+          key
+        }
+        debounce {
+          period
+          key
+        }
+        throttle {
+          burst
+          key
+          limit
+          period
+        }
+        singleton {
+          key
+          mode
+        }
+      }
+      slug
+      triggers {
+        type
+        value
+        condition
+      }
+      app {
+        name
+      }
+      url
+    }
+  }
+`;
+
 export const APPS = gql`
   query GetApps {
     apps {
@@ -399,12 +467,17 @@ export const TRACE_DETAILS_FRAGMENT = gql`
       ... on RunStepInfo {
         type
       }
+      ... on WaitForSignalStepInfo {
+        signal
+        timeout
+        timedOut
+      }
     }
   }
 `;
 
 export const GET_RUN = gql`
-  query GetRun($runID: String!) {
+  query GetRun($runID: String!, $preview: Boolean) {
     run(runID: $runID) {
       function {
         app {
@@ -414,7 +487,7 @@ export const GET_RUN = gql`
         name
         slug
       }
-      trace {
+      trace(preview: $preview) {
         ...TraceDetails
         childrenSpans {
           ...TraceDetails
@@ -443,6 +516,7 @@ export const GET_TRACE_RESULT = gql`
         message
         name
         stack
+        cause
       }
     }
   }

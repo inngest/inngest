@@ -6,11 +6,11 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/jonboulle/clockwork"
 	"github.com/oklog/ulid/v2"
 	"google.golang.org/protobuf/types/known/timestamppb"
 	"io/fs"
-	"log/slog"
 	"regexp"
 	"slices"
 	"strings"
@@ -92,7 +92,7 @@ func readRedisScripts(path string, entries []fs.DirEntry) {
 type redisConnectionStateManager struct {
 	c      clockwork.Clock
 	client rueidis.Client
-	logger *slog.Logger
+	logger logger.Logger
 }
 
 type RedisStateManagerOpt struct {
@@ -402,6 +402,121 @@ return 0
 	default:
 		return fmt.Errorf("unknown status when storing connection metadata: %d", resp)
 	}
+}
+
+var connsHashKeyPattern = `\{([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})\}:conns`
+var connsHashKeyPatternRegEx = regexp.MustCompile(connsHashKeyPattern)
+
+func (r *redisConnectionStateManager) GarbageCollectConnections(ctx context.Context) (int, error) {
+	var cursor uint64
+	var cleanedUp int
+	for {
+		scan, err := r.client.Do(ctx, r.client.B().Scan().Cursor(cursor).Count(50).Build()).AsScanEntry()
+		if err != nil {
+			return 0, fmt.Errorf("could not scan: %w", err)
+		}
+
+		for _, key := range scan.Elements {
+			if !strings.HasSuffix(key, ":conns") {
+				continue
+			}
+
+			matches := connsHashKeyPatternRegEx.FindStringSubmatch(key)
+			if len(matches) < 2 {
+				continue
+			}
+
+			envID, err := uuid.Parse(matches[1])
+			if err != nil {
+				return 0, fmt.Errorf("could not parse env ID: %w", err)
+			}
+
+			var hcursor uint64
+
+			for {
+				res, err := r.client.Do(ctx, r.client.B().Hscan().Key(key).Cursor(hcursor).Count(100).Build()).AsScanEntry()
+				if err != nil {
+					return 0, fmt.Errorf("could not get connections: %w", err)
+				}
+
+				for i := 0; i < len(res.Elements); i += 2 {
+					connID, err := ulid.Parse(res.Elements[i])
+					if err != nil {
+						return 0, fmt.Errorf("could not parse connection ID: %w", err)
+					}
+					connData := res.Elements[i+1]
+
+					var conn connpb.ConnMetadata
+					if err := json.Unmarshal([]byte(connData), &conn); err != nil {
+						return 0, fmt.Errorf("could not parse connection data: %w", err)
+					}
+
+					connectionHeartbeatMissed := conn.LastHeartbeatAt.AsTime().Before(time.Now().Add(-consts.ConnectGCThreshold))
+					if connectionHeartbeatMissed {
+						err = r.DeleteConnection(ctx, envID, connID)
+						if err != nil {
+							return 0, fmt.Errorf("could not delete connection: %w", err)
+						}
+
+						cleanedUp++
+					}
+				}
+
+				if res.Cursor == 0 {
+					break
+				}
+				hcursor = res.Cursor
+			}
+		}
+
+		if scan.Cursor == 0 {
+			break
+		}
+
+		cursor = scan.Cursor
+	}
+
+	return cleanedUp, nil
+}
+
+func (r *redisConnectionStateManager) GarbageCollectGateways(ctx context.Context) (int, error) {
+	var cleanedUp int
+	var hcursor uint64
+
+	for {
+		res, err := r.client.Do(ctx, r.client.B().Hscan().Key(r.gatewaysHashKey()).Cursor(hcursor).Count(100).Build()).AsScanEntry()
+		if err != nil {
+			return 0, fmt.Errorf("could not get gateways: %w", err)
+		}
+
+		for i := 0; i < len(res.Elements); i += 2 {
+			connData := res.Elements[i+1]
+
+			var gw Gateway
+			if err := json.Unmarshal([]byte(connData), &gw); err != nil {
+				return 0, fmt.Errorf("could not parse gateway data: %w", err)
+			}
+
+			gwLastHeartbeat := time.UnixMilli(gw.LastHeartbeatAtMS)
+
+			gwHeartbeatMissed := gwLastHeartbeat.Before(time.Now().Add(-consts.ConnectGCThreshold))
+			if gwHeartbeatMissed {
+				err = r.DeleteGateway(ctx, gw.Id)
+				if err != nil {
+					return 0, fmt.Errorf("could not delete gateway: %w", err)
+				}
+
+				cleanedUp++
+			}
+		}
+
+		if res.Cursor == 0 {
+			break
+		}
+		hcursor = res.Cursor
+	}
+
+	return cleanedUp, nil
 }
 
 func (r *redisConnectionStateManager) DeleteConnection(ctx context.Context, envID uuid.UUID, connID ulid.ULID) error {

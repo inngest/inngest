@@ -10,7 +10,7 @@ import (
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/enums"
-	"github.com/inngest/inngest/pkg/inngest/log"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -243,7 +243,16 @@ func (qr *queryResolver) RunTraceSpanOutputByID(ctx context.Context, outputID st
 		return nil, fmt.Errorf("error parsing span identifier: %w", err)
 	}
 
-	spanData, err := qr.Data.GetSpanOutput(ctx, *id)
+	var (
+		spanData *cqrs.SpanOutput
+		err      error
+	)
+
+	if id.Preview == nil || !*id.Preview {
+		spanData, err = qr.Data.LegacyGetSpanOutput(ctx, *id)
+	} else {
+		spanData, err = qr.Data.GetSpanOutput(ctx, *id)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -253,7 +262,24 @@ func (qr *queryResolver) RunTraceSpanOutputByID(ctx context.Context, outputID st
 		var stepErr models.StepError
 		err := json.Unmarshal(spanData.Data, &stepErr)
 		if err != nil {
-			log.From(ctx).Error().Err(err).Msg("error deserializing step error")
+			logger.StdlibLogger(ctx).Error("error deserializing step error", "error", err)
+
+			// This may have been the `cause`, as that's any JSON value, but
+			// needs to be a string when parsed here. Let's try to save it.
+			if stepErr.Cause == nil || *stepErr.Cause == "" {
+				var rawErr map[string]any
+				if err := json.Unmarshal(spanData.Data, &rawErr); err == nil {
+					var causeStr *string
+					if cause, ok := rawErr["cause"]; ok {
+						if byt, err := json.Marshal(cause); err == nil {
+							s := string(byt)
+							causeStr = &s
+						}
+					}
+
+					stepErr.Cause = causeStr
+				}
+			}
 		}
 
 		if stepErr.Message == "" {

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from '@inngest/components/Button';
 import { RiArrowRightSLine } from '@remixicon/react';
 
@@ -12,34 +12,32 @@ import {
   TimeElement,
 } from '../DetailsCard/NewElement';
 import { RerunModal } from '../Rerun/RerunModal';
+import { usePathCreator } from '../SharedContext/usePathCreator';
 import { Time } from '../Time';
-import { usePrettyJson } from '../hooks/usePrettyJson';
+import { usePrettyErrorBody, usePrettyJson } from '../hooks/usePrettyJson';
+import type { Result } from '../types/functionRun';
 import { formatMilliseconds, toMaybeDate } from '../utils/date';
 import { IO } from './IO';
 import { Tabs } from './Tabs';
 import { UserlandAttrs } from './UserlandAttrs';
 import {
   isStepInfoInvoke,
+  isStepInfoSignal,
   isStepInfoSleep,
   isStepInfoWait,
   type StepInfoInvoke,
+  type StepInfoSignal,
   type StepInfoSleep,
   type StepInfoWait,
 } from './types';
-import { maybeBooleanToString, type PathCreator, type StepInfoType } from './utils';
+import { maybeBooleanToString, type StepInfoType } from './utils';
 
 type StepKindInfoProps = {
   stepInfo: StepInfoType['trace']['stepInfo'];
-  pathCreator: StepInfoType['pathCreator'];
 };
 
-const InvokeInfo = ({
-  stepInfo,
-  pathCreator,
-}: {
-  stepInfo: StepInfoInvoke;
-  pathCreator: PathCreator;
-}) => {
+const InvokeInfo = ({ stepInfo }: { stepInfo: StepInfoInvoke }) => {
+  const { pathCreator } = usePathCreator();
   const timeout = toMaybeDate(stepInfo.timeout);
   return (
     <>
@@ -95,19 +93,77 @@ const WaitInfo = ({ stepInfo }: { stepInfo: StepInfoWait }) => {
   );
 };
 
+const SignalInfo = ({ stepInfo }: { stepInfo: StepInfoSignal }) => {
+  const timeout = toMaybeDate(stepInfo.timeout);
+  return (
+    <>
+      <ElementWrapper label="Signal name">
+        <TextElement>{stepInfo.signal}</TextElement>
+      </ElementWrapper>
+      <ElementWrapper label="Timeout">
+        {timeout ? <TimeElement date={timeout} /> : <TextElement>-</TextElement>}
+      </ElementWrapper>
+      <ElementWrapper label="Timed out">
+        <TextElement>{maybeBooleanToString(stepInfo.timedOut)}</TextElement>
+      </ElementWrapper>
+    </>
+  );
+};
+
 const getStepKindInfo = (props: StepKindInfoProps): JSX.Element | null =>
   isStepInfoInvoke(props.stepInfo) ? (
-    <InvokeInfo stepInfo={props.stepInfo} pathCreator={props.pathCreator} />
+    <InvokeInfo stepInfo={props.stepInfo} />
   ) : isStepInfoSleep(props.stepInfo) ? (
     <SleepInfo stepInfo={props.stepInfo} />
   ) : isStepInfoWait(props.stepInfo) ? (
     <WaitInfo stepInfo={props.stepInfo} />
+  ) : isStepInfoSignal(props.stepInfo) ? (
+    <SignalInfo stepInfo={props.stepInfo} />
   ) : null;
 
-export const StepInfo = ({ selectedStep }: { selectedStep: StepInfoType }) => {
+export const StepInfo = ({
+  selectedStep,
+  getResult,
+  pollInterval,
+}: {
+  selectedStep: StepInfoType;
+  getResult: (outputID: string) => Promise<Result>;
+  pollInterval?: number;
+}) => {
   const [expanded, setExpanded] = useState(true);
   const [rerunModalOpen, setRerunModalOpen] = useState(false);
-  const { runID, result, trace, pathCreator } = selectedStep;
+  const { runID, trace } = selectedStep;
+  const [result, setResult] = useState<Result>();
+
+  useEffect(() => {
+    let intervalId: ReturnType<typeof setInterval> | undefined;
+
+    const refreshResult = () => {
+      if (trace.outputID) {
+        getResult(trace.outputID).then(setResult);
+      } else {
+        setResult(undefined);
+      }
+    };
+
+    //
+    // fetch once on load
+    refreshResult();
+
+    //
+    // while the run is polling, continue polling for output
+    if (pollInterval) {
+      intervalId = setInterval(() => {
+        refreshResult();
+      }, pollInterval);
+    }
+
+    return () => {
+      if (intervalId) {
+        clearInterval(intervalId);
+      }
+    };
+  }, [getResult, trace.outputID, pollInterval, setResult]);
 
   const delayText = formatMilliseconds(
     (toMaybeDate(trace.startedAt) ?? new Date()).getTime() - new Date(trace.queuedAt).getTime()
@@ -131,12 +187,12 @@ export const StepInfo = ({ selectedStep }: { selectedStep: StepInfoType }) => {
 
   const stepKindInfo = getStepKindInfo({
     stepInfo: trace.stepInfo,
-    pathCreator,
   });
 
   const aiOutput = result?.data ? parseAIOutput(result.data) : undefined;
   const prettyInput = usePrettyJson(result?.input ?? '') || (result?.input ?? '');
   const prettyOutput = usePrettyJson(result?.data ?? '') || (result?.data ?? '');
+  const prettyErrorBody = usePrettyErrorBody(result?.error);
 
   return (
     <div className="sticky top-14 flex flex-col justify-start gap-2 overflow-hidden">
@@ -151,11 +207,7 @@ export const StepInfo = ({ selectedStep }: { selectedStep: StepInfoType }) => {
             }`}
           />
 
-          <span className="text-basis text-sm font-normal">
-            {/* @ts-ignore - temporarily until we get monorepo deployed */}
-            {trace.isUserland && 'OTel/'}
-            {trace.name}
-          </span>
+          <span className="text-basis text-sm font-normal">{trace.name}</span>
         </div>
         {runID && trace.stepID && prettyInput && (
           <>
@@ -179,9 +231,11 @@ export const StepInfo = ({ selectedStep }: { selectedStep: StepInfoType }) => {
 
       {expanded && (
         <div className="flex flex-row flex-wrap items-center justify-start gap-x-10 gap-y-4 px-4">
-          <ElementWrapper label="Queued at">
-            <TimeElement date={new Date(trace.queuedAt)} />
-          </ElementWrapper>
+          {!trace.isUserland && (
+            <ElementWrapper label="Queued at">
+              <TimeElement date={new Date(trace.queuedAt)} />
+            </ElementWrapper>
+          )}
 
           <ElementWrapper label="Started at">
             {trace.startedAt ? (
@@ -199,9 +253,11 @@ export const StepInfo = ({ selectedStep }: { selectedStep: StepInfoType }) => {
             )}
           </ElementWrapper>
 
-          <ElementWrapper label="Delay">
-            <TextElement>{delayText}</TextElement>
-          </ElementWrapper>
+          {!trace.isUserland && (
+            <ElementWrapper label="Delay">
+              <TextElement>{delayText}</TextElement>
+            </ElementWrapper>
+          )}
 
           <ElementWrapper label="Duration">
             <TextElement>{durationText}</TextElement>
@@ -213,46 +269,50 @@ export const StepInfo = ({ selectedStep }: { selectedStep: StepInfoType }) => {
         </div>
       )}
 
-      <Tabs
-        defaultActive={result?.error ? 'error' : prettyInput ? 'input' : 'output'}
-        tabs={[
-          ...(prettyInput
-            ? [
-                {
-                  label: 'Input',
-                  id: 'input',
-                  node: <IO title="Step Input" raw={prettyInput} />,
-                },
-              ]
-            : []),
-          ...(prettyOutput
-            ? [
-                {
-                  label: 'Output',
-                  id: 'output',
-                  node: <IO title="Step Output" raw={prettyOutput} />,
-                },
-              ]
-            : []),
-          ...(result?.error
-            ? [
-                {
-                  label: 'Error',
-                  id: 'error',
-                  node: (
-                    <IO
-                      title={`${result.error.name || 'Error'} ${
-                        result.error.message ? `: ${result.error.message}` : ''
-                      }`}
-                      raw={result.error.stack ?? ''}
-                      error={true}
-                    />
-                  ),
-                },
-              ]
-            : []),
-        ]}
-      />
+      {trace.isUserland && trace.userlandSpan ? (
+        <UserlandAttrs userlandSpan={trace.userlandSpan} />
+      ) : (
+        <Tabs
+          defaultActive={result?.error ? 'error' : prettyInput ? 'input' : 'output'}
+          tabs={[
+            ...(prettyInput
+              ? [
+                  {
+                    label: 'Input',
+                    id: 'input',
+                    node: <IO title="Step Input" raw={prettyInput} />,
+                  },
+                ]
+              : []),
+            ...(prettyOutput
+              ? [
+                  {
+                    label: 'Output',
+                    id: 'output',
+                    node: <IO title="Step Output" raw={prettyOutput} />,
+                  },
+                ]
+              : []),
+            ...(result?.error
+              ? [
+                  {
+                    label: 'Error',
+                    id: 'error',
+                    node: (
+                      <IO
+                        title={`${result.error.name || 'Error'} ${
+                          result.error.message ? `: ${result.error.message}` : ''
+                        }`}
+                        raw={prettyErrorBody ?? ''}
+                        error={true}
+                      />
+                    ),
+                  },
+                ]
+              : []),
+          ]}
+        />
+      )}
     </div>
   );
 };

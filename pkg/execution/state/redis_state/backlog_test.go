@@ -54,7 +54,7 @@ func TestQueueItemBacklogs(t *testing.T) {
 
 	fnID, wsID, accID := uuid.New(), uuid.New(), uuid.New()
 
-	t.Run("basic item", func(t *testing.T) {
+	t.Run("basic edge item", func(t *testing.T) {
 		expected := QueueBacklog{
 			// expect default backlog to be used
 			BacklogID:         fmt.Sprintf("fn:%s", fnID),
@@ -84,8 +84,42 @@ func TestQueueItemBacklogs(t *testing.T) {
 
 		// default backlog is not for a concurrency key, so the concurrency key should be empty (function-level concurrency accounting is handled for the shadow partition)
 		kg := queueKeyGenerator{queueDefaultKey: QueueDefaultKey}
-		require.Equal(t, kg.Concurrency("", ""), backlog.concurrencyKey(kg, 1))
-		require.Equal(t, kg.Concurrency("", ""), backlog.concurrencyKey(kg, 2))
+		require.Equal(t, kg.Concurrency("", ""), backlog.customKeyInProgress(kg, 1))
+		require.Equal(t, kg.Concurrency("", ""), backlog.customKeyInProgress(kg, 2))
+	})
+
+	t.Run("basic start item", func(t *testing.T) {
+		expected := QueueBacklog{
+			BacklogID:         fmt.Sprintf("fn:%s:start", fnID),
+			Start:             true,
+			ShadowPartitionID: fnID.String(),
+		}
+
+		backlog := q.ItemBacklog(ctx, osqueue.QueueItem{
+			ID:          "test",
+			FunctionID:  fnID,
+			WorkspaceID: wsID,
+			Data: osqueue.Item{
+				WorkspaceID: wsID,
+				Kind:        osqueue.KindStart,
+				Identifier: state.Identifier{
+					WorkflowID:  fnID,
+					AccountID:   accID,
+					WorkspaceID: wsID,
+				},
+				Throttle:              nil,
+				CustomConcurrencyKeys: nil,
+				QueueName:             nil,
+			},
+			QueueName: nil,
+		})
+
+		require.Equal(t, expected, backlog)
+
+		// default backlog is not for a concurrency key, so the concurrency key should be empty (function-level concurrency accounting is handled for the shadow partition)
+		kg := queueKeyGenerator{queueDefaultKey: QueueDefaultKey}
+		require.Equal(t, kg.Concurrency("", ""), backlog.customKeyInProgress(kg, 1))
+		require.Equal(t, kg.Concurrency("", ""), backlog.customKeyInProgress(kg, 2))
 	})
 
 	t.Run("system queue", func(t *testing.T) {
@@ -120,8 +154,8 @@ func TestQueueItemBacklogs(t *testing.T) {
 
 		// default backlog is not for a concurrency key, so the concurrency key should be empty (function-level concurrency accounting is handled for the shadow partition)
 		kg := queueKeyGenerator{queueDefaultKey: QueueDefaultKey}
-		require.Equal(t, kg.Concurrency("", ""), backlog.concurrencyKey(kg, 1))
-		require.Equal(t, kg.Concurrency("", ""), backlog.concurrencyKey(kg, 2))
+		require.Equal(t, kg.Concurrency("", ""), backlog.customKeyInProgress(kg, 1))
+		require.Equal(t, kg.Concurrency("", ""), backlog.customKeyInProgress(kg, 2))
 
 	})
 
@@ -131,7 +165,8 @@ func TestQueueItemBacklogs(t *testing.T) {
 		hashedThrottleKey := osqueue.HashID(ctx, rawThrottleKey)
 
 		expected := QueueBacklog{
-			BacklogID:         fmt.Sprintf("fn:%s:t<%s>", fnID, hashedThrottleKey),
+			BacklogID:         fmt.Sprintf("fn:%s:start:t<%s:%s>", fnID, throttleKeyExpressionHash, hashedThrottleKey),
+			Start:             true,
 			ShadowPartitionID: fnID.String(),
 
 			Throttle: &BacklogThrottle{
@@ -171,21 +206,24 @@ func TestQueueItemBacklogs(t *testing.T) {
 
 		// default backlog is not for a concurrency key, so the concurrency key should be empty (function-level concurrency accounting is handled for the shadow partition)
 		kg := queueKeyGenerator{queueDefaultKey: QueueDefaultKey}
-		require.Equal(t, kg.Concurrency("", ""), backlog.concurrencyKey(kg, 1))
-		require.Equal(t, kg.Concurrency("", ""), backlog.concurrencyKey(kg, 2))
+		require.Equal(t, kg.Concurrency("", ""), backlog.customKeyInProgress(kg, 1))
+		require.Equal(t, kg.Concurrency("", ""), backlog.customKeyInProgress(kg, 2))
 	})
 
 	t.Run("throttle with key", func(t *testing.T) {
 		rawThrottleKey := "customer1"
 		hashedThrottleKey := osqueue.HashID(ctx, rawThrottleKey)
+		exprHash := util.XXHash(rawThrottleKey)
 
 		expected := QueueBacklog{
-			BacklogID:         fmt.Sprintf("fn:%s:t<%s>", fnID, hashedThrottleKey),
+			BacklogID:         fmt.Sprintf("fn:%s:start:t<%s:%s>", fnID, exprHash, hashedThrottleKey),
+			Start:             true,
 			ShadowPartitionID: fnID.String(),
 
 			Throttle: &BacklogThrottle{
-				ThrottleKey:         hashedThrottleKey,
-				ThrottleKeyRawValue: rawThrottleKey,
+				ThrottleKey:               hashedThrottleKey,
+				ThrottleKeyRawValue:       rawThrottleKey,
+				ThrottleKeyExpressionHash: exprHash,
 			},
 		}
 
@@ -207,6 +245,7 @@ func TestQueueItemBacklogs(t *testing.T) {
 					Burst:               30,
 					Period:              700,
 					UnhashedThrottleKey: rawThrottleKey,
+					KeyExpressionHash:   exprHash,
 				},
 				CustomConcurrencyKeys: nil,
 				QueueName:             nil,
@@ -218,8 +257,8 @@ func TestQueueItemBacklogs(t *testing.T) {
 
 		// default backlog is not for a concurrency key, so the concurrency key should be empty (function-llevel concurrency accounting is handled for the shadow partition)
 		kg := queueKeyGenerator{queueDefaultKey: QueueDefaultKey}
-		require.Equal(t, kg.Concurrency("", ""), backlog.concurrencyKey(kg, 1))
-		require.Equal(t, kg.Concurrency("", ""), backlog.concurrencyKey(kg, 2))
+		require.Equal(t, kg.Concurrency("", ""), backlog.customKeyInProgress(kg, 1))
+		require.Equal(t, kg.Concurrency("", ""), backlog.customKeyInProgress(kg, 2))
 	})
 
 	t.Run("throttle on edge item", func(t *testing.T) {
@@ -261,8 +300,8 @@ func TestQueueItemBacklogs(t *testing.T) {
 
 		// default backlog is not for a concurrency key, so the concurrency key should be empty (function-llevel concurrency accounting is handled for the shadow partition)
 		kg := queueKeyGenerator{queueDefaultKey: QueueDefaultKey}
-		require.Equal(t, kg.Concurrency("", ""), backlog.concurrencyKey(kg, 1))
-		require.Equal(t, kg.Concurrency("", ""), backlog.concurrencyKey(kg, 2))
+		require.Equal(t, kg.Concurrency("", ""), backlog.customKeyInProgress(kg, 1))
+		require.Equal(t, kg.Concurrency("", ""), backlog.customKeyInProgress(kg, 2))
 	})
 
 	t.Run("function concurrency", func(t *testing.T) {
@@ -295,8 +334,8 @@ func TestQueueItemBacklogs(t *testing.T) {
 
 		// default backlog is not for a concurrency key, so the concurrency key should be empty (function-llevel concurrency accounting is handled for the shadow partition)
 		kg := queueKeyGenerator{queueDefaultKey: QueueDefaultKey}
-		require.Equal(t, kg.Concurrency("", ""), backlog.concurrencyKey(kg, 1))
-		require.Equal(t, kg.Concurrency("", ""), backlog.concurrencyKey(kg, 2))
+		require.Equal(t, kg.Concurrency("", ""), backlog.customKeyInProgress(kg, 1))
+		require.Equal(t, kg.Concurrency("", ""), backlog.customKeyInProgress(kg, 2))
 	})
 
 	t.Run("account concurrency", func(t *testing.T) {
@@ -329,8 +368,8 @@ func TestQueueItemBacklogs(t *testing.T) {
 
 		// default backlog is not for a concurrency key, so the concurrency key should be empty (function-llevel concurrency accounting is handled for the shadow partition)
 		kg := queueKeyGenerator{queueDefaultKey: QueueDefaultKey}
-		require.Equal(t, kg.Concurrency("", ""), backlog.concurrencyKey(kg, 1))
-		require.Equal(t, kg.Concurrency("", ""), backlog.concurrencyKey(kg, 2))
+		require.Equal(t, kg.Concurrency("", ""), backlog.customKeyInProgress(kg, 1))
+		require.Equal(t, kg.Concurrency("", ""), backlog.customKeyInProgress(kg, 2))
 	})
 
 	t.Run("custom concurrency", func(t *testing.T) {
@@ -346,16 +385,17 @@ func TestQueueItemBacklogs(t *testing.T) {
 		}.ParseKey()
 
 		expected := QueueBacklog{
-			BacklogID:         fmt.Sprintf("fn:%s:c1<%s>", fnID, util.XXHash(fullKey)),
+			BacklogID:         fmt.Sprintf("fn:%s:c1<%s:%s>", fnID, hashedConcurrencyKeyExpr, util.XXHash(fullKey)),
 			ShadowPartitionID: fnID.String(),
 
 			ConcurrencyKeys: []BacklogConcurrencyKey{
 				{
-					ConcurrencyScope:            scope,
-					ConcurrencyScopeEntity:      entity,
-					ConcurrencyKey:              hashedConcurrencyKeyExpr,
-					ConcurrencyKeyValue:         checksum,
-					ConcurrencyKeyUnhashedValue: unhashedValue,
+					CanonicalKeyID:      fullKey,
+					Scope:               scope,
+					EntityID:            entity,
+					HashedKeyExpression: hashedConcurrencyKeyExpr,
+					HashedValue:         checksum,
+					UnhashedValue:       unhashedValue,
 				},
 			},
 		}
@@ -389,12 +429,13 @@ func TestQueueItemBacklogs(t *testing.T) {
 		require.Equal(t, expected, backlog)
 
 		kg := queueKeyGenerator{queueDefaultKey: QueueDefaultKey}
-		require.Equal(t, kg.Concurrency("custom", util.ConcurrencyKey(scope, entity, unhashedValue)), backlog.concurrencyKey(kg, 1))
-		require.Equal(t, kg.Concurrency("", ""), backlog.concurrencyKey(kg, 2))
+		require.Equal(t, kg.Concurrency("custom", util.ConcurrencyKey(scope, entity, unhashedValue)), backlog.customKeyInProgress(kg, 1))
+		require.Equal(t, kg.Concurrency("", ""), backlog.customKeyInProgress(kg, 2))
 	})
 
 	t.Run("concurrency + throttle start item", func(t *testing.T) {
 		rawThrottleKey := "customer1"
+		hashedThrottleExpr := util.XXHash(rawThrottleKey)
 		hashedThrottleKey := osqueue.HashID(ctx, rawThrottleKey)
 
 		hashedConcurrencyKeyExpr := hashConcurrencyKey("event.data.customerId")
@@ -409,21 +450,24 @@ func TestQueueItemBacklogs(t *testing.T) {
 		}.ParseKey()
 
 		expected := QueueBacklog{
-			BacklogID:         fmt.Sprintf("fn:%s:t<%s>:c1<%s>", fnID, hashedThrottleKey, util.XXHash(fullKey)),
+			BacklogID:         fmt.Sprintf("fn:%s:start:t<%s:%s>:c1<%s:%s>", fnID, hashedThrottleExpr, hashedThrottleExpr, hashedConcurrencyKeyExpr, util.XXHash(fullKey)),
+			Start:             true,
 			ShadowPartitionID: fnID.String(),
 
 			Throttle: &BacklogThrottle{
-				ThrottleKey:         hashedThrottleKey,
-				ThrottleKeyRawValue: rawThrottleKey,
+				ThrottleKey:               hashedThrottleKey,
+				ThrottleKeyRawValue:       rawThrottleKey,
+				ThrottleKeyExpressionHash: hashedThrottleExpr,
 			},
 
 			ConcurrencyKeys: []BacklogConcurrencyKey{
 				{
-					ConcurrencyScope:            scope,
-					ConcurrencyScopeEntity:      entity,
-					ConcurrencyKey:              hashedConcurrencyKeyExpr,
-					ConcurrencyKeyValue:         checksum,
-					ConcurrencyKeyUnhashedValue: unhashedValue,
+					CanonicalKeyID:      fullKey,
+					Scope:               scope,
+					EntityID:            entity,
+					HashedKeyExpression: hashedConcurrencyKeyExpr,
+					HashedValue:         checksum,
+					UnhashedValue:       unhashedValue,
 				},
 			},
 		}
@@ -446,6 +490,7 @@ func TestQueueItemBacklogs(t *testing.T) {
 					Burst:               30,
 					Period:              700,
 					UnhashedThrottleKey: rawThrottleKey,
+					KeyExpressionHash:   hashedThrottleExpr,
 				},
 				CustomConcurrencyKeys: []state.CustomConcurrency{
 					{
@@ -479,16 +524,17 @@ func TestQueueItemBacklogs(t *testing.T) {
 		}.ParseKey()
 
 		expected := QueueBacklog{
-			BacklogID:         fmt.Sprintf("fn:%s:c1<%s>", fnID, util.XXHash(fullKey)),
+			BacklogID:         fmt.Sprintf("fn:%s:c1<%s:%s>", fnID, hashedConcurrencyKeyExpr, util.XXHash(fullKey)),
 			ShadowPartitionID: fnID.String(),
 
 			ConcurrencyKeys: []BacklogConcurrencyKey{
 				{
-					ConcurrencyScope:            scope,
-					ConcurrencyKey:              hashedConcurrencyKeyExpr,
-					ConcurrencyScopeEntity:      entity,
-					ConcurrencyKeyValue:         checksum,
-					ConcurrencyKeyUnhashedValue: unhashedValue,
+					CanonicalKeyID:      fullKey,
+					Scope:               scope,
+					HashedKeyExpression: hashedConcurrencyKeyExpr,
+					EntityID:            entity,
+					HashedValue:         checksum,
+					UnhashedValue:       unhashedValue,
 				},
 			},
 		}
@@ -552,23 +598,25 @@ func TestQueueItemBacklogs(t *testing.T) {
 		}.ParseKey()
 
 		expected := QueueBacklog{
-			BacklogID:         fmt.Sprintf("fn:%s:c1<%s>:c2<%s>", fnID, util.XXHash(fullKey), util.XXHash(fullKey2)),
+			BacklogID:         fmt.Sprintf("fn:%s:c1<%s:%s>:c2<%s:%s>", fnID, hashedConcurrencyKeyExpr, util.XXHash(fullKey), hashedConcurrencyKeyExpr2, util.XXHash(fullKey2)),
 			ShadowPartitionID: fnID.String(),
 
 			ConcurrencyKeys: []BacklogConcurrencyKey{
 				{
-					ConcurrencyScope:            scope,
-					ConcurrencyScopeEntity:      entity,
-					ConcurrencyKey:              hashedConcurrencyKeyExpr,
-					ConcurrencyKeyValue:         checksum,
-					ConcurrencyKeyUnhashedValue: unhashedValue,
+					CanonicalKeyID:      fullKey,
+					Scope:               scope,
+					EntityID:            entity,
+					HashedKeyExpression: hashedConcurrencyKeyExpr,
+					HashedValue:         checksum,
+					UnhashedValue:       unhashedValue,
 				},
 				{
-					ConcurrencyScope:            scope2,
-					ConcurrencyScopeEntity:      entity2,
-					ConcurrencyKey:              hashedConcurrencyKeyExpr2,
-					ConcurrencyKeyValue:         checksum2,
-					ConcurrencyKeyUnhashedValue: unhashedValue2,
+					CanonicalKeyID:      fullKey2,
+					Scope:               scope2,
+					EntityID:            entity2,
+					HashedKeyExpression: hashedConcurrencyKeyExpr2,
+					HashedValue:         checksum2,
+					UnhashedValue:       unhashedValue2,
 				},
 			},
 		}
@@ -608,8 +656,8 @@ func TestQueueItemBacklogs(t *testing.T) {
 		require.Equal(t, expected, backlog)
 
 		kg := queueKeyGenerator{queueDefaultKey: QueueDefaultKey}
-		require.Equal(t, kg.Concurrency("custom", util.ConcurrencyKey(scope, entity, unhashedValue)), backlog.concurrencyKey(kg, 1))
-		require.Equal(t, kg.Concurrency("custom", util.ConcurrencyKey(scope2, entity2, unhashedValue2)), backlog.concurrencyKey(kg, 2))
+		require.Equal(t, kg.Concurrency("custom", util.ConcurrencyKey(scope, entity, unhashedValue)), backlog.customKeyInProgress(kg, 1))
+		require.Equal(t, kg.Concurrency("custom", util.ConcurrencyKey(scope2, entity2, unhashedValue2)), backlog.customKeyInProgress(kg, 2))
 	})
 }
 
@@ -651,18 +699,20 @@ func TestQueueItemShadowPartition(t *testing.T) {
 
 	t.Run("basic item", func(t *testing.T) {
 		expected := QueueShadowPartition{
-			PartitionID:           fnID.String(),
-			FunctionID:            &fnID,
-			EnvID:                 &wsID,
-			AccountID:             &accID,
-			SystemQueueName:       nil,
-			SystemConcurrency:     0,
-			AccountConcurrency:    100,
-			FunctionConcurrency:   25,
-			CustomConcurrencyKeys: nil,
-			Throttle:              nil,
-			PauseRefill:           false,
-			PauseEnqueue:          false,
+			PartitionID:     fnID.String(),
+			FunctionID:      &fnID,
+			EnvID:           &wsID,
+			AccountID:       &accID,
+			SystemQueueName: nil,
+			Concurrency: ShadowPartitionConcurrency{
+				SystemConcurrency:     0,
+				AccountConcurrency:    100,
+				FunctionConcurrency:   25,
+				CustomConcurrencyKeys: nil,
+			},
+			Throttle:     nil,
+			PauseRefill:  false,
+			PauseEnqueue: false,
 		}
 
 		shadowPart := q.ItemShadowPartition(ctx, osqueue.QueueItem{
@@ -695,18 +745,20 @@ func TestQueueItemShadowPartition(t *testing.T) {
 		sysQueueName := osqueue.KindQueueMigrate
 
 		expected := QueueShadowPartition{
-			PartitionID:           sysQueueName,
-			FunctionID:            nil,
-			EnvID:                 nil,
-			AccountID:             nil,
-			SystemQueueName:       &sysQueueName,
-			SystemConcurrency:     250,
-			AccountConcurrency:    0,
-			FunctionConcurrency:   0,
-			CustomConcurrencyKeys: nil,
-			Throttle:              nil,
-			PauseRefill:           false,
-			PauseEnqueue:          false,
+			PartitionID:     sysQueueName,
+			FunctionID:      nil,
+			EnvID:           nil,
+			AccountID:       nil,
+			SystemQueueName: &sysQueueName,
+			Concurrency: ShadowPartitionConcurrency{
+				SystemConcurrency:     250,
+				AccountConcurrency:    0,
+				FunctionConcurrency:   0,
+				CustomConcurrencyKeys: nil,
+			},
+			Throttle:     nil,
+			PauseRefill:  false,
+			PauseEnqueue: false,
 		}
 
 		shadowPart := q.ItemShadowPartition(ctx, osqueue.QueueItem{
@@ -727,7 +779,7 @@ func TestQueueItemShadowPartition(t *testing.T) {
 		require.Equal(t, kg.Concurrency("p", sysQueueName), shadowPart.inProgressKey(kg))
 
 		// expect empty key: system queues should not track account concurrency
-		require.Equal(t, kg.Concurrency("account", sysQueueName), shadowPart.accountInProgressKey(kg))
+		require.Equal(t, kg.Concurrency("account", ""), shadowPart.accountInProgressKey(kg))
 	})
 
 	t.Run("throttle", func(t *testing.T) {
@@ -736,15 +788,17 @@ func TestQueueItemShadowPartition(t *testing.T) {
 		hashedThrottleKey := osqueue.HashID(ctx, rawThrottleKey)
 
 		expected := QueueShadowPartition{
-			PartitionID:           fnID.String(),
-			FunctionID:            &fnID,
-			EnvID:                 &wsID,
-			AccountID:             &accID,
-			SystemQueueName:       nil,
-			SystemConcurrency:     0,
-			AccountConcurrency:    100,
-			FunctionConcurrency:   25,
-			CustomConcurrencyKeys: nil,
+			PartitionID:     fnID.String(),
+			FunctionID:      &fnID,
+			EnvID:           &wsID,
+			AccountID:       &accID,
+			SystemQueueName: nil,
+			Concurrency: ShadowPartitionConcurrency{
+				SystemConcurrency:     0,
+				AccountConcurrency:    100,
+				FunctionConcurrency:   25,
+				CustomConcurrencyKeys: nil,
+			},
 			Throttle: &ShadowPartitionThrottle{
 				ThrottleKeyExpressionHash: hashedThrottleKeyExpr,
 				Limit:                     70,
@@ -793,19 +847,21 @@ func TestQueueItemShadowPartition(t *testing.T) {
 		fullKey := util.ConcurrencyKey(enums.ConcurrencyScopeFn, fnID, unhashedValue)
 
 		expected := QueueShadowPartition{
-			PartitionID:         fnID.String(),
-			FunctionID:          &fnID,
-			EnvID:               &wsID,
-			AccountID:           &accID,
-			SystemQueueName:     nil,
-			SystemConcurrency:   0,
-			AccountConcurrency:  100,
-			FunctionConcurrency: 25,
-			CustomConcurrencyKeys: map[string]CustomConcurrencyLimit{
-				concurrencyKeyID(enums.ConcurrencyScopeFn, hashedConcurrencyKeyExpr): {
-					Scope: enums.ConcurrencyScopeFn,
-					Key:   hashedConcurrencyKeyExpr,
-					Limit: 23,
+			PartitionID:     fnID.String(),
+			FunctionID:      &fnID,
+			EnvID:           &wsID,
+			AccountID:       &accID,
+			SystemQueueName: nil,
+			Concurrency: ShadowPartitionConcurrency{
+				SystemConcurrency:   0,
+				AccountConcurrency:  100,
+				FunctionConcurrency: 25,
+				CustomConcurrencyKeys: []CustomConcurrencyLimit{
+					{
+						Scope:               enums.ConcurrencyScopeFn,
+						HashedKeyExpression: hashedConcurrencyKeyExpr,
+						Limit:               23,
+					},
 				},
 			},
 			Throttle:     nil,
@@ -858,19 +914,21 @@ func TestQueueItemShadowPartition(t *testing.T) {
 		fullKey := util.ConcurrencyKey(enums.ConcurrencyScopeFn, fnID, unhashedValue)
 
 		expected := QueueShadowPartition{
-			PartitionID:         fnID.String(),
-			FunctionID:          &fnID,
-			EnvID:               &wsID,
-			AccountID:           &accID,
-			SystemQueueName:     nil,
-			SystemConcurrency:   0,
-			AccountConcurrency:  100,
-			FunctionConcurrency: 25,
-			CustomConcurrencyKeys: map[string]CustomConcurrencyLimit{
-				concurrencyKeyID(enums.ConcurrencyScopeFn, hashedConcurrencyKeyExpr): {
-					Scope: enums.ConcurrencyScopeFn,
-					Key:   hashedConcurrencyKeyExpr,
-					Limit: 23,
+			PartitionID:     fnID.String(),
+			FunctionID:      &fnID,
+			EnvID:           &wsID,
+			AccountID:       &accID,
+			SystemQueueName: nil,
+			Concurrency: ShadowPartitionConcurrency{
+				SystemConcurrency:   0,
+				AccountConcurrency:  100,
+				FunctionConcurrency: 25,
+				CustomConcurrencyKeys: []CustomConcurrencyLimit{
+					{
+						Scope:               enums.ConcurrencyScopeFn,
+						HashedKeyExpression: hashedConcurrencyKeyExpr,
+						Limit:               23,
+					},
 				},
 			},
 			Throttle: &ShadowPartitionThrottle{
@@ -934,102 +992,114 @@ func TestBacklogIsOutdated(t *testing.T) {
 	t.Run("same config should not be marked as outdated", func(t *testing.T) {
 		keyHash := util.XXHash("event.data.customerID")
 
-		shadowPart := &QueueShadowPartition{
-			CustomConcurrencyKeys: map[string]CustomConcurrencyLimit{
-				concurrencyKeyID(enums.ConcurrencyScopeFn, keyHash): {
-					Scope: enums.ConcurrencyScopeFn,
-					Key:   keyHash,
-					Limit: 10,
+		concurrency := ShadowPartitionConcurrency{
+			CustomConcurrencyKeys: []CustomConcurrencyLimit{
+				{
+					Scope:               enums.ConcurrencyScopeFn,
+					HashedKeyExpression: keyHash,
+					Limit:               10,
 				},
 			},
 		}
+
+		constraints := PartitionConstraintConfig{
+			Concurrency: concurrency,
+		}
+
 		backlog := &QueueBacklog{
 			ConcurrencyKeys: []BacklogConcurrencyKey{
 				{
-					ConcurrencyScope:            enums.ConcurrencyScopeFn,
-					ConcurrencyScopeEntity:      uuid.UUID{},
-					ConcurrencyKey:              keyHash,
-					ConcurrencyKeyValue:         util.XXHash("xyz"),
-					ConcurrencyKeyUnhashedValue: "xyz",
+					CanonicalKeyID:      fmt.Sprintf("f:%s:%s", uuid.Nil, util.XXHash("xyz")),
+					Scope:               enums.ConcurrencyScopeFn,
+					EntityID:            uuid.UUID{},
+					HashedKeyExpression: keyHash,
+					HashedValue:         util.XXHash("xyz"),
+					UnhashedValue:       "xyz",
 				},
 			},
 			Throttle: nil,
 		}
 
-		require.False(t, backlog.isOutdated(shadowPart))
+		require.Equal(t, enums.QueueNormalizeReasonUnchanged, backlog.isOutdated(&constraints))
 	})
 
 	t.Run("adding concurrency keys should not mark default partition as outdated", func(t *testing.T) {
 		keyHash := util.XXHash("event.data.customerID")
 
-		shadowPart := &QueueShadowPartition{
-			CustomConcurrencyKeys: map[string]CustomConcurrencyLimit{
-				concurrencyKeyID(enums.ConcurrencyScopeFn, keyHash): {
-					Scope: enums.ConcurrencyScopeFn,
-					Key:   keyHash,
-					Limit: 10,
+		constraints := &PartitionConstraintConfig{
+			Concurrency: ShadowPartitionConcurrency{
+				CustomConcurrencyKeys: []CustomConcurrencyLimit{
+					{
+						Scope:               enums.ConcurrencyScopeFn,
+						HashedKeyExpression: keyHash,
+						Limit:               10,
+					},
 				},
 			},
 		}
 		backlog := &QueueBacklog{}
 
-		require.False(t, backlog.isOutdated(shadowPart))
+		require.Equal(t, enums.QueueNormalizeReasonUnchanged, backlog.isOutdated(constraints))
 	})
 
 	t.Run("changing concurrency key should mark as outdated", func(t *testing.T) {
 		keyHashOld := util.XXHash("event.data.customerID")
 		keyHashNew := util.XXHash("event.data.orgID")
 
-		shadowPart := &QueueShadowPartition{
-			CustomConcurrencyKeys: map[string]CustomConcurrencyLimit{
-				concurrencyKeyID(enums.ConcurrencyScopeFn, keyHashNew): {
-					Scope: enums.ConcurrencyScopeFn,
-					Key:   keyHashNew,
-					Limit: 10,
+		constraints := &PartitionConstraintConfig{
+			Concurrency: ShadowPartitionConcurrency{
+				CustomConcurrencyKeys: []CustomConcurrencyLimit{
+					{
+						Scope:               enums.ConcurrencyScopeFn,
+						HashedKeyExpression: keyHashNew,
+						Limit:               10,
+					},
 				},
 			},
 		}
 		backlog := &QueueBacklog{
 			ConcurrencyKeys: []BacklogConcurrencyKey{
 				{
-					ConcurrencyScope:            enums.ConcurrencyScopeFn,
-					ConcurrencyScopeEntity:      uuid.UUID{},
-					ConcurrencyKey:              keyHashOld,
-					ConcurrencyKeyValue:         util.XXHash("xyz"),
-					ConcurrencyKeyUnhashedValue: "xyz",
+					Scope:               enums.ConcurrencyScopeFn,
+					EntityID:            uuid.UUID{},
+					HashedKeyExpression: keyHashOld,
+					HashedValue:         util.XXHash("xyz"),
+					UnhashedValue:       "xyz",
 				},
 			},
 		}
 
-		require.True(t, backlog.isOutdated(shadowPart))
+		require.Equal(t, enums.QueueNormalizeReasonCustomConcurrencyKeyNotFoundOnShadowPartition, backlog.isOutdated(constraints))
 	})
 
 	t.Run("removing concurrency key should mark as outdated", func(t *testing.T) {
 		keyHashOld := util.XXHash("event.data.customerID")
 
-		shadowPart := &QueueShadowPartition{
-			CustomConcurrencyKeys: nil,
+		constraints := &PartitionConstraintConfig{
+			Concurrency: ShadowPartitionConcurrency{
+				CustomConcurrencyKeys: nil,
+			},
 		}
 		backlog := &QueueBacklog{
 			ConcurrencyKeys: []BacklogConcurrencyKey{
 				{
-					ConcurrencyScope:            enums.ConcurrencyScopeFn,
-					ConcurrencyScopeEntity:      uuid.UUID{},
-					ConcurrencyKey:              keyHashOld,
-					ConcurrencyKeyValue:         util.XXHash("xyz"),
-					ConcurrencyKeyUnhashedValue: "xyz",
+					Scope:               enums.ConcurrencyScopeFn,
+					EntityID:            uuid.UUID{},
+					HashedKeyExpression: keyHashOld,
+					HashedValue:         util.XXHash("xyz"),
+					UnhashedValue:       "xyz",
 				},
 			},
 		}
 
-		require.True(t, backlog.isOutdated(shadowPart))
+		require.Equal(t, enums.QueueNormalizeReasonCustomConcurrencyKeyCountMismatch, backlog.isOutdated(constraints))
 	})
 
 	t.Run("changing throttle key should mark as outdated", func(t *testing.T) {
 		keyHashOld := util.XXHash("event.data.customerID")
 		keyHashNew := util.XXHash("event.data.orgID")
 
-		shadowPart := &QueueShadowPartition{
+		constraints := &PartitionConstraintConfig{
 			Throttle: &ShadowPartitionThrottle{
 				ThrottleKeyExpressionHash: keyHashNew,
 			},
@@ -1040,13 +1110,30 @@ func TestBacklogIsOutdated(t *testing.T) {
 			},
 		}
 
-		require.True(t, backlog.isOutdated(shadowPart))
+		require.Equal(t, enums.QueueNormalizeReasonThrottleKeyChanged, backlog.isOutdated(constraints))
+	})
+
+	t.Run("same throttle key should not mark as outdated", func(t *testing.T) {
+		keyHash := util.XXHash("event.data.orgID")
+
+		constraints := &PartitionConstraintConfig{
+			Throttle: &ShadowPartitionThrottle{
+				ThrottleKeyExpressionHash: keyHash,
+			},
+		}
+		backlog := &QueueBacklog{
+			Throttle: &BacklogThrottle{
+				ThrottleKeyExpressionHash: keyHash,
+			},
+		}
+
+		require.Equal(t, enums.QueueNormalizeReasonUnchanged, backlog.isOutdated(constraints))
 	})
 
 	t.Run("removing throttle key should mark as outdated", func(t *testing.T) {
 		keyHashOld := util.XXHash("event.data.customerID")
 
-		shadowPart := &QueueShadowPartition{
+		constraints := &PartitionConstraintConfig{
 			Throttle: nil,
 		}
 		backlog := &QueueBacklog{
@@ -1055,6 +1142,6 @@ func TestBacklogIsOutdated(t *testing.T) {
 			},
 		}
 
-		require.True(t, backlog.isOutdated(shadowPart))
+		require.Equal(t, enums.QueueNormalizeReasonThrottleRemoved, backlog.isOutdated(constraints))
 	})
 }

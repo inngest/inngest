@@ -15,6 +15,7 @@ const query = graphql(`
           message
           name
           stack
+          cause
         }
       }
     }

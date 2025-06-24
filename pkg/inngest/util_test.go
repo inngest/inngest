@@ -5,6 +5,15 @@ import (
 	"testing"
 )
 
+func TestDeterministicSha1UUID(t *testing.T) {
+	src := "yolo"
+
+	id1 := DeterministicSha1UUID(src)
+	id2 := DeterministicSha1UUID(src)
+
+	require.Equal(t, id1, id2)
+}
+
 func TestDeterministicUUIDV7(t *testing.T) {
 	t.Run("should generate deterministic UUID v7", func(t *testing.T) {
 		seed := "1234567890123456"

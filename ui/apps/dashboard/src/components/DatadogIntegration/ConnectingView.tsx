@@ -14,10 +14,13 @@ export default function SetupPage({ errorMessage }: Props) {
         <Alert severity="warning" className="text-base">
           This Datadog organization was previously connected to Inngest, and you’ll need to remove
           Inngest’s old API key from your Datadog account manually before reconnecting.
-          <Alert.Link severity="warning" target="_blank" href="https://www.inngest.com/docs/">
-            Please see our documentation for instructions.
+          <Alert.Link
+            severity="warning"
+            target="_blank"
+            href="https://app.datadoghq.com/organization-settings/api-keys?filter=Inngest"
+          >
+            Please proceed to the Datadog API Keys management page and remove the old key.
           </Alert.Link>
-          {/* TODO(cdzombak): update docs link once it's written */}
         </Alert>
       );
     }

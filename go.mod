@@ -27,6 +27,7 @@ require (
 	github.com/eko/gocache/store/freecache/v4 v4.2.1
 	github.com/eko/gocache/store/rueidis/v4 v4.1.5
 	github.com/fatih/structs v1.1.0
+	github.com/felixge/httpsnoop v1.0.4
 	github.com/go-chi/chi/v5 v5.0.10
 	github.com/go-chi/cors v1.2.1
 	github.com/golang-jwt/jwt/v5 v5.2.2
@@ -37,7 +38,7 @@ require (
 	github.com/gowebpki/jcs v1.0.0
 	github.com/graph-gophers/dataloader v5.0.0+incompatible
 	github.com/hashicorp/go-multierror v1.1.1
-	github.com/inngest/expr v0.0.0-20250509191721-c3e4aff53538
+	github.com/inngest/expr v0.0.0-20250521221349-ef1dab5028e5
 	github.com/inngest/go-httpstat v0.0.0-20250321152849-8f5b26507651
 	github.com/inngest/inngestgo v0.11.3-0.20250429191110-4664557d870a
 	github.com/jackc/pgx/v5 v5.5.4
@@ -48,6 +49,7 @@ require (
 	github.com/karlseguin/ccache/v3 v3.0.6
 	github.com/lib/pq v1.10.9
 	github.com/liushuangls/go-anthropic/v2 v2.12.2
+	github.com/lmittmann/tint v1.1.0
 	github.com/mattn/go-isatty v0.0.20
 	github.com/mitchellh/go-homedir v1.1.0
 	github.com/nats-io/nats.go v1.37.0
@@ -56,12 +58,12 @@ require (
 	github.com/pquerna/cachecontrol v0.2.0
 	github.com/redis/rueidis v1.0.51
 	github.com/robfig/cron/v3 v3.0.1
-	github.com/rs/zerolog v1.26.1
 	github.com/sashabaranov/go-openai v1.35.6
 	github.com/shirou/gopsutil v3.21.11+incompatible
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.10.1
+	github.com/sqlc-dev/pqtype v0.3.0
 	github.com/stretchr/testify v1.10.0
 	github.com/throttled/throttled/v2 v2.11.0
 	github.com/twmb/franz-go v1.18.1
@@ -87,7 +89,6 @@ require (
 	gocloud.dev/pubsub/natspubsub v0.25.0
 	golang.org/x/mod v0.21.0
 	golang.org/x/sync v0.12.0
-	golang.org/x/term v0.30.0
 	gonum.org/v1/gonum v0.12.0
 	google.golang.org/genproto/googleapis/api v0.0.0-20241021214115-324edc3d5d38
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20241021214115-324edc3d5d38
@@ -135,7 +136,6 @@ require (
 	github.com/cpuguy83/go-md2man/v2 v2.0.4 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/emicklei/proto v1.6.15 // indirect
-	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
 	github.com/getsentry/sentry-go v0.27.0 // indirect
 	github.com/go-logr/logr v1.4.2 // indirect

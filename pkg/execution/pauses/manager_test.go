@@ -59,7 +59,7 @@ func TestManagerFlushingWithLowLimit(t *testing.T) {
 	inProcessFlusher := InMemoryFlushProcessor(blockStore).(*flushInProcess)
 
 	// Create manager with our configured flusher and a short flush delay
-	manager := NewManager(mockBufferer, blockStore, inProcessFlusher)
+	manager := NewManager(mockBufferer, blockStore, inProcessFlusher).(*manager)
 	manager.flushDelay = 100 * time.Millisecond // Short delay for tests
 
 	// Create test index
@@ -86,7 +86,7 @@ func TestManagerFlushingWithLowLimit(t *testing.T) {
 	time.Sleep(manager.flushDelay * 2)
 	// After waiting for the flush, there should only be 1 pause in the buffer,
 	// as the block size is 3 and there were 4 pauses in the buffer - leaving 1 remaining.
-	assert.Equal(t, 1, len(mockBufferer.pauses))
+	assert.Equal(t, 1, mockBufferer.pauseCount())
 
 	// Test 3: Verify blocks were created and retrievable
 	blocks, err := blockStore.BlocksSince(ctx, index, time.Time{})
@@ -117,7 +117,7 @@ func TestManagerFlushingWithLowLimit(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify the pause was deleted by trying to access it
-	mockBufferer.pauses = nil // Clear buffer to force reading from blocks
+	mockBufferer.clearPauses() // Clear buffer to force reading from blocks
 	iter, err = manager.PausesSince(ctx, index, time.Time{})
 	require.NoError(t, err)
 
@@ -164,8 +164,11 @@ func TestConsumePause(t *testing.T) {
 	}
 
 	// Test consuming a pause
-	result, err := manager.ConsumePause(ctx, pause, "test-data")
+	result, cleanup, err := manager.ConsumePause(ctx, pause, state.ConsumePauseOpts{
+		Data: "test-data",
+	})
 	require.NoError(t, err)
+	require.NoError(t, cleanup())
 	assert.Equal(t, true, result.DidConsume)
 	assert.True(t, mockBufferer.consumeCalled, "ConsumePause should be called on the buffer")
 	assert.True(t, mockBlockStore.deleteCalled, "Delete should be called on the blockstore")
@@ -199,9 +202,13 @@ type mockBuffererWithConsume struct {
 	consumeCalled bool
 }
 
-func (m *mockBuffererWithConsume) ConsumePause(ctx context.Context, pause state.Pause, data any) (state.ConsumePauseResult, error) {
+func (m *mockBuffererWithConsume) ConsumePause(ctx context.Context, pause state.Pause, opts state.ConsumePauseOpts) (state.ConsumePauseResult, func() error, error) {
 	m.consumeCalled = true
-	return state.ConsumePauseResult{DidConsume: true}, nil
+	return state.ConsumePauseResult{DidConsume: true}, func() error { return nil }, nil
+}
+
+func (m *mockBuffererWithConsume) PauseByID(ctx context.Context, index Index, pauseID uuid.UUID) (*state.Pause, error) {
+	return m.mockBufferer.PauseByID(ctx, index, pauseID)
 }
 
 type mockBlockStore struct {
@@ -227,4 +234,16 @@ func (m *mockBlockStore) ReadBlock(ctx context.Context, index Index, blockID uli
 func (m *mockBlockStore) Delete(ctx context.Context, index Index, pause state.Pause) error {
 	m.deleteCalled = true
 	return nil
+}
+
+func (m *mockBlockStore) LastBlockMetadata(ctx context.Context, index Index) (*blockMetadata, error) {
+	return nil, nil
+}
+
+func (m *mockBlockStore) IndexExists(ctx context.Context, i Index) (bool, error) {
+	return false, nil
+}
+
+func (m *mockBlockStore) PauseByID(ctx context.Context, index Index, pauseID uuid.UUID) (*state.Pause, error) {
+	return nil, nil
 }

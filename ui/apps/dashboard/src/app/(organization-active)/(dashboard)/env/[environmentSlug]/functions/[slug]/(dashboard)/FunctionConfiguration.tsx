@@ -120,6 +120,28 @@ export default function FunctionConfiguration({ configuration }: FunctionConfigu
       });
     }
   }
+  const singletonItems: MetadataItemProps[] | undefined = configuration.singleton
+    ? [
+        {
+          label: 'Mode',
+          title: configuration.singleton.mode,
+          value: (
+            <div className="lowercase first-letter:capitalize">{configuration.singleton.mode}</div>
+          ),
+          tooltip:
+            'Defines what happens if a run is already in progress: "Skip" ignores the new run, "Cancel" stops the current instance and runs the new one.',
+        },
+        ...(configuration.singleton.key
+          ? [
+              {
+                label: 'Key',
+                value: configuration.singleton.key,
+                type: 'code',
+              } as MetadataItemProps,
+            ]
+          : []),
+      ]
+    : undefined;
 
   return (
     <Block title="Configuration">
@@ -182,6 +204,12 @@ export default function FunctionConfiguration({ configuration }: FunctionConfigu
         <>
           <h3 className="pb-2 pt-6 text-sm font-medium">Throttle</h3>
           <MetadataGrid columns={2} metadataItems={throttleItems} />
+        </>
+      )}
+      {singletonItems && (
+        <>
+          <h3 className="pb-2 pt-6 text-sm font-medium">Singleton</h3>
+          <MetadataGrid columns={2} metadataItems={singletonItems} />
         </>
       )}
     </Block>

@@ -4,7 +4,15 @@ loadEnvConfig(process.cwd());
 
 /** @type {import('graphql-config').IGraphQLConfig} */
 const config = {
-  schema: `${process.env.NEXT_PUBLIC_API_URL}/gql`,
+  schema: [
+    {
+      [`${process.env.NEXT_PUBLIC_API_URL}/gql`]: {
+        headers: {
+          authorization: `Bearer ${process.env.GQL_INTROSPECTION_SECRET}`,
+        },
+      },
+    },
+  ],
   documents: './src/**/*.{tsx,ts}',
   extensions: {
     codegen: {

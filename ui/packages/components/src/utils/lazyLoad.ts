@@ -3,7 +3,7 @@
 // will be loaded in the future. This is useful for components that need to
 // fetch data asynchronously, but need to render something in the meantime
 
-const loadingSentinel = Symbol();
+export const loadingSentinel = Symbol();
 
 // This type is used to represent a value that is lazily loaded; think of it
 // like a Promise. It can be either the value itself or a loading symbol. Use

@@ -5,11 +5,7 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
-	"github.com/inngest/inngest/pkg/connect/auth"
-	"github.com/inngest/inngest/pkg/consts"
-	"github.com/inngest/inngest/pkg/telemetry/metrics"
-	"github.com/rs/zerolog"
-	"log/slog"
+	mathRand "math/rand"
 	"net/http"
 	"os"
 	"sync"
@@ -18,15 +14,19 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/connect/auth"
 	"github.com/inngest/inngest/pkg/connect/pubsub"
 	"github.com/inngest/inngest/pkg/connect/state"
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/oklog/ulid/v2"
 	"golang.org/x/sync/errgroup"
 )
 
 const (
 	GatewayInstrumentInterval = 20 * time.Second
+	GatewayGCInterval         = 30 * time.Minute
 )
 
 type gatewayOpt func(*connectGatewaySvc)
@@ -69,8 +69,7 @@ type connectGatewaySvc struct {
 	gatewayId ulid.ULID
 	dev       bool
 
-	logger    *slog.Logger
-	devlogger *zerolog.Logger
+	logger logger.Logger
 
 	runCtx context.Context
 
@@ -257,9 +256,6 @@ func (c *connectGatewaySvc) Pre(ctx context.Context) error {
 	// Set up gateway-specific logger with info for correlations
 	c.logger = logger.StdlibLogger(ctx).With("gateway_id", c.gatewayId)
 	if c.dev {
-		// Initialize prettier logger for dev server
-		c.devlogger = logger.From(ctx)
-
 		// Hide verbose connect gateway logs in dev server by default
 		if os.Getenv("CONNECT_GATEWAY_FULL_LOGS") != "true" {
 			c.logger = logger.VoidLogger()
@@ -350,6 +346,36 @@ func (c *connectGatewaySvc) instrument(ctx context.Context) {
 	}
 }
 
+func (c *connectGatewaySvc) gc(ctx context.Context) {
+	for {
+		jitter := time.Minute * time.Duration(mathRand.Intn(30))
+		periodWithJitter := GatewayGCInterval + jitter
+
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(periodWithJitter):
+		}
+
+		{
+			deleted, err := c.stateManager.GarbageCollectConnections(ctx)
+			if err != nil {
+				logger.StdlibLogger(ctx).Error("failed to garbage collect connections", "err", err)
+			}
+			logger.StdlibLogger(ctx).Debug("garbage-collected connections", "deleted", deleted)
+		}
+
+		{
+			deleted, err := c.stateManager.GarbageCollectGateways(ctx)
+			if err != nil {
+				logger.StdlibLogger(ctx).Error("failed to garbage collect gateways", "err", err)
+			}
+			logger.StdlibLogger(ctx).Debug("garbage-collected gateways", "deleted", deleted)
+		}
+
+	}
+}
+
 func (c *connectGatewaySvc) Run(ctx context.Context) error {
 	c.runCtx = ctx
 
@@ -418,6 +444,9 @@ func (c *connectGatewaySvc) Run(ctx context.Context) error {
 	// Periodically report metrics
 	go c.instrument(ctx)
 
+	// Periodically garbage collect old connections
+	go c.gc(ctx)
+
 	return eg.Wait()
 }
 
@@ -426,10 +455,10 @@ func (c *connectGatewaySvc) updateGatewayState(status state.GatewayStatus) error
 	defer c.stateUpdateLock.Unlock()
 
 	err := c.stateManager.UpsertGateway(context.Background(), &state.Gateway{
-		Id:              c.gatewayId,
-		Status:          status,
-		LastHeartbeatAt: time.Now(),
-		Hostname:        c.hostname,
+		Id:                c.gatewayId,
+		Status:            status,
+		LastHeartbeatAtMS: time.Now().UnixMilli(),
+		Hostname:          c.hostname,
 	})
 	if err != nil {
 		c.logger.Error("failed to update gateway status in state", "status", status, "error", err)

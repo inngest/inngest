@@ -64,7 +64,12 @@ func (g GeneratorOpcode) UserDefinedName() string {
 	// SDK versions < 3.?.? don't respond with the display
 	// name, so we we'll use the deprecated name field as a
 	// fallback.
-	return g.Name
+	if g.Name != "" {
+		return g.Name
+	}
+
+	// If all is lost, just show the ID
+	return g.ID
 }
 
 // HasAI checks if this op is related to AI.
@@ -129,6 +134,44 @@ func (g GeneratorOpcode) Output() (string, error) {
 // `StepError` being passed back from an SDK.
 func (g GeneratorOpcode) IsError() bool {
 	return g.Error != nil
+}
+
+type GenericOpts struct {
+	StackLine string `json:"stackLine,omitempty,omitzero"`
+}
+
+func (r *GenericOpts) UnmarshalAny(a any) error {
+	opts := GenericOpts{}
+	var mappedByt []byte
+	switch typ := a.(type) {
+	case []byte:
+		mappedByt = typ
+	default:
+		byt, err := json.Marshal(a)
+		if err != nil {
+			return err
+		}
+		mappedByt = byt
+	}
+	if err := json.Unmarshal(mappedByt, &opts); err != nil {
+		return err
+	}
+
+	*r = opts
+	return nil
+}
+
+func (g GeneratorOpcode) StackLine() (*string, error) {
+	opts := &GenericOpts{}
+	if err := opts.UnmarshalAny(g.Opts); err != nil {
+		return nil, err
+	}
+
+	if opts.StackLine == "" {
+		return nil, nil
+	}
+
+	return &opts.StackLine, nil
 }
 
 // Returns, if any, the type of a StepRun operation.
@@ -197,6 +240,52 @@ func (g GeneratorOpcode) SleepDuration() (time.Duration, error) {
 	}
 
 	return str2duration.ParseDuration(opts.Duration)
+}
+
+func (g GeneratorOpcode) SignalOpts() (*SignalOpts, error) {
+	opts := &SignalOpts{}
+	if err := opts.UnmarshalAny(g.Opts); err != nil {
+		return nil, err
+	}
+	return opts, nil
+}
+
+type SignalOpts struct {
+	Signal     string `json:"signal"`
+	Timeout    string `json:"timeout"`
+	OnConflict string `json:"conflict"`
+}
+
+func (s *SignalOpts) UnmarshalAny(a any) error {
+	opts := SignalOpts{}
+	var mappedByt []byte
+	switch typ := a.(type) {
+	case []byte:
+		mappedByt = typ
+	default:
+		byt, err := json.Marshal(a)
+		if err != nil {
+			return err
+		}
+		mappedByt = byt
+	}
+	if err := json.Unmarshal(mappedByt, &opts); err != nil {
+		return err
+	}
+	*s = opts
+	return nil
+}
+
+func (s SignalOpts) Expires() (time.Time, error) {
+	if s.Timeout == "" {
+		return time.Now().AddDate(1, 0, 0), nil
+	}
+
+	dur, err := str2duration.ParseDuration(s.Timeout)
+	if err != nil {
+		return time.Time{}, err
+	}
+	return time.Now().Add(dur), nil
 }
 
 func (g GeneratorOpcode) InvokeFunctionOpts() (*InvokeFunctionOpts, error) {

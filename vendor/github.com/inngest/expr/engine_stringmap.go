@@ -14,10 +14,13 @@ import (
 
 func newStringEqualityMatcher(concurrency int64) MatchingEngine {
 	return &stringLookup{
-		lock:        &sync.RWMutex{},
-		vars:        map[string]struct{}{},
-		equality:    variableMap{},
-		inequality:  inequalityMap{},
+		lock:       &sync.RWMutex{},
+		vars:       map[string]struct{}{},
+		equality:   variableMap{},
+		inequality: inequalityMap{},
+		// in stores all `in` operators, eg `"foo" in vars.a`.  This lets us
+		// properly iterate over variables for in equaltiy matching.
+		in:          variableMap{},
 		concurrency: concurrency,
 	}
 }
@@ -49,6 +52,9 @@ type stringLookup struct {
 	// this performs string equality lookups.
 	equality variableMap
 
+	// in stores a list of all variables mapped to `in` operators, performing lookups across arrays.
+	in variableMap
+
 	// inequality stores all variables referenced within inequality checks mapped to the value,
 	// which is then mapped to expression parts.
 	//
@@ -76,16 +82,32 @@ func (n *stringLookup) Match(ctx context.Context, input map[string]any, result *
 			}
 
 			// default to an empty string
-			str := ""
-			if res := x.Get(input); len(res) > 0 {
-				if value, ok := res[0].(string); ok {
-					str = value
+			res := x.Get(input)
+			if len(res) == 0 {
+				res = []any{""}
+			}
+
+			var optimized int32
+			switch val := res[0].(type) {
+			case string:
+				if n.equalitySearch(ctx, path, val, result) {
+					atomic.AddInt32(&optimized, 1)
+				}
+			case []any:
+				for _, item := range val {
+					if n.inSearch(ctx, path, item, result) {
+						atomic.AddInt32(&optimized, 1)
+					}
+				}
+			case []string:
+				for _, item := range val {
+					if n.inSearch(ctx, path, item, result) {
+						atomic.AddInt32(&optimized, 1)
+					}
 				}
 			}
 
-			opt := n.equalitySearch(ctx, path, str, result)
-
-			if opt {
+			if optimized > 0 {
 				// Set optimized to true in every case.
 				atomic.AddInt32(&neqOptimized, 1)
 			}
@@ -128,11 +150,18 @@ func (n *stringLookup) Match(ctx context.Context, input map[string]any, result *
 //
 // Note that Search does not match inequality items.
 func (n *stringLookup) Search(ctx context.Context, variable string, input any, result *MatchResult) {
-	str, ok := input.(string)
-	if !ok {
-		return
+	switch val := input.(type) {
+	case string:
+		n.equalitySearch(ctx, variable, val, result)
+	case []any:
+		for _, item := range val {
+			n.inSearch(ctx, variable, item, result)
+		}
+	case []string:
+		for _, item := range val {
+			n.inSearch(ctx, variable, item, result)
+		}
 	}
-	n.equalitySearch(ctx, variable, str, result)
 }
 
 func (n *stringLookup) equalitySearch(ctx context.Context, variable string, input string, result *MatchResult) (neqOptimized bool) {
@@ -153,6 +182,26 @@ func (n *stringLookup) equalitySearch(ctx context.Context, variable string, inpu
 	}
 
 	return neqOptimized
+}
+
+func (n *stringLookup) inSearch(ctx context.Context, variable string, input any, result *MatchResult) (neqOptimized bool) {
+	str, ok := input.(string)
+	if !ok {
+		return
+	}
+
+	hashedInput := n.hash(str)
+	for _, part := range n.in[hashedInput] {
+		if part.Ident != nil && *part.Ident != variable {
+			// The variables don't match.
+			continue
+		}
+		if part.GroupID.Flag() != OptimizeNone {
+			neqOptimized = true
+		}
+		result.Add(part.EvaluableID, part.GroupID)
+	}
+	return
 }
 
 // inequalitySearch performs lookups for != matches.
@@ -232,6 +281,28 @@ func (n *stringLookup) Add(ctx context.Context, p ExpressionPart) error {
 
 		n.inequality[p.Predicate.Ident][val] = append(n.inequality[p.Predicate.Ident][val], p.ToStored())
 		return nil
+
+	case operators.In:
+		// If this is an "in" operator, take the predicate's literal and ensure that we
+		// check appropriately.
+
+		switch v := p.Predicate.Literal.(type) {
+		case string:
+			// Assume that we're going to match an array in the event.
+
+			n.lock.Lock()
+			defer n.lock.Unlock()
+			val := n.hash(v)
+
+			n.vars[p.Predicate.Ident] = struct{}{}
+
+			if _, ok := n.in[val]; !ok {
+				n.in[val] = []*StoredExpressionPart{p.ToStored()}
+				return nil
+			}
+			n.in[val] = append(n.in[val], p.ToStored())
+		}
+
 	default:
 		return fmt.Errorf("StringHash engines only support string equality/inequality")
 	}

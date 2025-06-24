@@ -4,8 +4,11 @@ import { client } from '@/store/baseApi';
 import { GetRunDocument, type GetRunQuery } from '@/store/generated';
 
 export function useGetRun() {
-  return useCallback(async (runID: string) => {
-    const data: GetRunQuery = await client.request(GetRunDocument, { runID });
+  return useCallback(async (runID: string, preview?: boolean) => {
+    const data: GetRunQuery = await client.request(GetRunDocument, {
+      runID,
+      preview,
+    });
     const run = data.run;
 
     if (!run) {

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { Alert } from '@inngest/components/Alert';
 import { Header } from '@inngest/components/Header/Header';
+import { methodTypes } from '@inngest/components/types/app';
 import type { CombinedError } from 'urql';
 
 import { ActionsMenu } from '@/components/Apps/ActionsMenu';
@@ -102,6 +103,9 @@ export default function Layout({ children, params: { externalID } }: Props) {
                 disableValidate={res.data.isParentArchived}
                 showResync={() => setShowResync(true)}
                 disableResync={res.data.isArchived}
+                disableValidate={
+                  res.data.isParentArchived || res.data.method === methodTypes.Connect
+                }
               />
             )}
             {res.data && res.data.isArchived && (

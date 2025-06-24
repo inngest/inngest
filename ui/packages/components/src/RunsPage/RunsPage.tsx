@@ -23,9 +23,7 @@ import { useLocalStorage } from 'react-use';
 
 import type { RangeChangeProps } from '../DatePicker/RangePicker';
 import EntityFilter from '../Filter/EntityFilter';
-import { RunDetailsV2 } from '../RunDetailsV2';
 import { RunDetailsV3 } from '../RunDetailsV3/RunDetailsV3';
-import { useLegacyTrace } from '../SharedContext/useLegacyTrace';
 import {
   useBatchedSearchParams,
   useSearchParam,
@@ -50,24 +48,23 @@ const CodeSearch = dynamic(() => import('@inngest/components/CodeSearch/CodeSear
 type Props = {
   data: Run[];
   defaultVisibleColumns?: ColumnID[];
-  features: Pick<Features, 'history'>;
-  getRun: React.ComponentProps<typeof RunDetailsV2>['getRun'];
-  getTraceResult: React.ComponentProps<typeof RunDetailsV2>['getResult'];
-  getTrigger: React.ComponentProps<typeof RunDetailsV2>['getTrigger'];
+  features: Pick<Features, 'history' | 'tracesPreview'>;
+  getRun: React.ComponentProps<typeof RunDetailsV3>['getRun'];
+  getTraceResult: React.ComponentProps<typeof RunDetailsV3>['getResult'];
+  getTrigger: React.ComponentProps<typeof RunDetailsV3>['getTrigger'];
   hasMore: boolean;
   isLoadingInitial: boolean;
   isLoadingMore: boolean;
   onRefresh?: () => void;
   onScroll: UIEventHandler<HTMLDivElement>;
   onScrollToTop: () => void;
-  pathCreator: React.ComponentProps<typeof RunDetailsV2>['pathCreator'];
   pollInterval?: number;
   apps?: Option[];
   functions?: Option[];
   functionIsPaused?: boolean;
   scope: ViewScope;
   totalCount: number | undefined;
-  traceAIEnabled?: boolean;
+  searchError?: Error;
 };
 
 export function RunsPage({
@@ -83,20 +80,17 @@ export function RunsPage({
   onRefresh,
   onScroll,
   onScrollToTop,
-  pathCreator,
   apps,
   functions,
   pollInterval,
   functionIsPaused,
   scope,
   totalCount,
-  traceAIEnabled = false,
+  searchError,
 }: Props) {
   const containerRef = useRef<HTMLDivElement>(null);
   const columns = useScopedColumns(scope);
   const [showSearch, setShowSearch] = useState(false);
-
-  const { enabled: legacyTraceEnabled } = useLegacyTrace();
 
   const displayAllColumns = useMemo(() => {
     const out: Record<string, boolean> = {};
@@ -238,43 +232,21 @@ export function RunsPage({
   const renderSubComponent = useCallback(
     (rowData: Run) => {
       return (
-        <div className={`border-subtle  ${traceAIEnabled ? '' : 'border-l-4 pb-6'}`}>
-          {traceAIEnabled && !legacyTraceEnabled ? (
-            <RunDetailsV3
-              getResult={getTraceResult}
-              getRun={getRun}
-              initialRunData={rowData}
-              getTrigger={getTrigger}
-              pathCreator={pathCreator}
-              pollInterval={pollInterval}
-              runID={rowData.id}
-              standalone={false}
-            />
-          ) : (
-            <RunDetailsV2
-              getResult={getTraceResult}
-              getRun={getRun}
-              initialRunData={rowData}
-              getTrigger={getTrigger}
-              pathCreator={pathCreator}
-              pollInterval={pollInterval}
-              runID={rowData.id}
-              standalone={false}
-              traceAIEnabled={traceAIEnabled}
-            />
-          )}
+        <div className={`border-subtle `}>
+          <RunDetailsV3
+            getResult={getTraceResult}
+            getRun={getRun}
+            initialRunData={rowData}
+            getTrigger={getTrigger}
+            pollInterval={pollInterval}
+            runID={rowData.id}
+            standalone={false}
+            tracesPreviewEnabled={features.tracesPreview}
+          />
         </div>
       );
     },
-    [
-      getRun,
-      getTraceResult,
-      getTrigger,
-      pathCreator,
-      pollInterval,
-      legacyTraceEnabled,
-      traceAIEnabled,
-    ]
+    [getRun, getTraceResult, getTrigger, pollInterval, features.tracesPreview]
   );
 
   const options = useMemo(() => {
@@ -300,7 +272,7 @@ export function RunsPage({
   return (
     <main className="bg-canvasBase text-basis no-scrollbar flex-1 overflow-hidden focus-visible:outline-none">
       <div className="bg-canvasBase sticky top-0 z-10 flex flex-col">
-        <div className="border-subtle flex h-[58px] items-center justify-between gap-2 border-b px-3">
+        <div className="flex h-[58px] items-center justify-between gap-2 px-3">
           <div className="flex items-center gap-2">
             <SelectGroup>
               <TimeFieldFilter
@@ -396,6 +368,7 @@ export function RunsPage({
               onSearch={onSearchChange}
               placeholder="event.data.userId == “1234” or output.count > 10"
               value={search}
+              searchError={searchError}
             />
           </>
         )}

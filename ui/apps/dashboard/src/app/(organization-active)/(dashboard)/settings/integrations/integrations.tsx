@@ -17,7 +17,11 @@ type Integration = {
   title: string;
   slug: string;
   Icon: ReactNode;
-  actionButton: (args: { enabled: boolean; hasError?: boolean }) => ReactNode;
+  actionButton: (args: {
+    enabled: boolean;
+    hasError?: boolean;
+    isMarketplace?: boolean;
+  }) => ReactNode;
   description: string;
   upvoteId?: string;
 };
@@ -27,17 +31,43 @@ const INTEGRATIONS: Integration[] = [
     title: 'Vercel',
     slug: 'vercel',
     Icon: <IconVercel className="text-onContrast h-6 w-6" />,
-    actionButton: ({ enabled, hasError }) => (
-      <Button
-        disabled={hasError}
-        kind="primary"
-        appearance="solid"
-        size="medium"
-        href={enabled ? '/settings/integrations/vercel' : '/settings/integrations/vercel/connect'}
-        label={enabled ? 'Manage' : 'Connect'}
-        prefetch={true}
-      />
-    ),
+    actionButton: ({ enabled, hasError, isMarketplace }) => {
+      let label: string;
+      let target = undefined;
+      let url: string;
+      if (isMarketplace) {
+        // Marketplace integration installed.
+
+        label = 'Manage';
+        target = '_blank';
+
+        // Managed in Vercel's dashboard.
+        url = 'https://vercel.com/integrations/inngest';
+      } else if (enabled) {
+        // Non-marketplace integration installed.
+
+        label = 'Manage';
+        url = '/settings/integrations/vercel';
+      } else {
+        // Integration not installed.
+
+        label = 'Connect';
+        url = '/settings/integrations/vercel/connect';
+      }
+
+      return (
+        <Button
+          disabled={hasError}
+          kind="primary"
+          appearance="solid"
+          size="medium"
+          href={url}
+          label={label}
+          prefetch={true}
+          target={target}
+        />
+      );
+    },
     description:
       'Host your Inngest functions on Vercel and automatically sync them every time you deploy code.',
   },
@@ -132,13 +162,13 @@ type Props = {
     error?: string;
     slug: string;
     enabled: boolean;
+    isMarketplace?: boolean;
     projects: unknown[];
   }[];
 };
 
 export default function IntegrationsList({ integrations }: Props) {
   const { value: supabaseIntegration } = useBooleanFlag('supabase-integration');
-  const { value: ddIntegration } = useBooleanFlag('datadog-integration');
 
   const getIntegrationData = (slug: string) =>
     integrations.find((integration) => integration.slug === slug);
@@ -149,10 +179,10 @@ export default function IntegrationsList({ integrations }: Props) {
       <div className="grid w-[800px] grid-cols-2 gap-6">
         {INTEGRATIONS.map((i: Integration, n) => {
           if (i.title === 'Supabase' && !supabaseIntegration) return;
-          if (i.title === 'Datadog' && !ddIntegration) return;
 
           const integrationData = getIntegrationData(i.slug);
           const isEnabled = Boolean(integrationData?.enabled);
+          const isMarketplace = Boolean(integrationData?.isMarketplace);
 
           return (
             <Card key={`integration-card-${n}`}>
@@ -164,6 +194,7 @@ export default function IntegrationsList({ integrations }: Props) {
                   {i.actionButton({
                     enabled: isEnabled,
                     hasError: Boolean(integrationData?.error),
+                    isMarketplace,
                   })}
                 </div>
                 <div className="text-basis mt-[18px] text-lg font-medium">{i.title}</div>

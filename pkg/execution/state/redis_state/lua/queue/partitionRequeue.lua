@@ -7,24 +7,26 @@
   Return values:
   0 - Updated priority
   1 - Partition not found
-  2 - Partition deleted
+  2 - Garbage collected (but backlog still exists): Partition pointers removed
+  3 - Garbage collected (all metadata dropped): Partition metadata deleted
 
 ]]
 
 local partitionKey            = KEYS[1]
 local keyGlobalPartitionPtr   = KEYS[2]
 local keyGlobalAccountPointer = KEYS[3] -- accounts:sorted - zset
-local keyAccountPartitions    = KEYS[4] -- accounts:$accountId:partition:sorted - zset
+local keyAccountPartitions    = KEYS[4] -- accounts:$accountID:partition:sorted - zset
 local partitionMeta           = KEYS[5]
 local keyFnMetadata           = KEYS[6]           -- fnMeta:$id - hash
 local keyPartitionZset        = KEYS[7]
 local partitionConcurrencyKey = KEYS[8] -- We can only GC a partition if no running jobs occur.
 local queueKey                = KEYS[9]
+local keyShadowPartitionSet   = KEYS[10]
 
 local partitionID             = ARGV[1]
 local atMS                    = tonumber(ARGV[2]) -- time in milliseconds
 local forceAt                 = tonumber(ARGV[3])
-local accountId               = ARGV[4]
+local accountID               = ARGV[4]
 
 local atS = math.floor(atMS / 1000) -- in seconds;  partitions are currently second granularity, but this should change.
 
@@ -39,17 +41,15 @@ if existing == nil then
     return 1
 end
 
+-- Always reset lease ID so next caller can lease partition
+existing.leaseID = nil
+
+-- update partition with removed lease ID
+redis.call("HSET", partitionKey, partitionID, cjson.encode(existing))
+
 -- If there are no items in the workflow queue, we can safely remove the
 -- partition.
 if tonumber(redis.call("ZCARD", keyPartitionZset)) == 0 and tonumber(redis.call("ZCARD", partitionConcurrencyKey)) == 0 then
-    redis.call("HDEL", partitionKey, partitionID)             -- Remove the item
-    redis.call("DEL", partitionMeta)                         -- Remove the partition meta (this is to clean up legacy data)
-
-    -- Clean up function metadata (which supersedes partition metadata)
-    if exists_without_ending(keyFnMetadata, ":fnMeta:-") == true then
-      redis.call("DEL", keyFnMetadata)
-    end
-
     redis.call("ZREM", keyGlobalPartitionPtr, partitionID)    -- Remove the partition from global index
 
     if account_is_set(keyAccountPartitions) then
@@ -58,8 +58,21 @@ if tonumber(redis.call("ZCARD", keyPartitionZset)) == 0 and tonumber(redis.call(
       -- If this was the last account partition, remove account from global queue of accounts
       local numAccountPartitions = tonumber(redis.call("ZCARD", keyAccountPartitions))
       if numAccountPartitions == 0 then
-        redis.call("ZREM", keyGlobalAccountPointer, accountId)
+        redis.call("ZREM", keyGlobalAccountPointer, accountID)
       end
+    end
+
+    -- Only drop partition information if no more backlogs exist for the partition
+    if tonumber(redis.call("ZCARD", keyShadowPartitionSet)) == 0 then
+      redis.call("HDEL", partitionKey, partitionID)             -- Remove the item
+      redis.call("DEL", partitionMeta)                         -- Remove the partition meta (this is to clean up legacy data)
+
+      -- Clean up function metadata (which supersedes partition metadata)
+      if exists_without_ending(keyFnMetadata, ":fnMeta:-") == true then
+        redis.call("DEL", keyFnMetadata)
+      end
+
+      return 3
     end
 
     return 2
@@ -91,9 +104,8 @@ end
 
 
 existing.at = atS
-existing.leaseID = nil
 redis.call("HSET", partitionKey, partitionID, cjson.encode(existing))
 update_pointer_score_to(partitionID, keyGlobalPartitionPtr, atS)
-update_account_queues(keyGlobalAccountPointer, keyAccountPartitions, partitionID, accountId, atS)
+update_account_queues(keyGlobalAccountPointer, keyAccountPartitions, partitionID, accountID, atS)
 
 return 0

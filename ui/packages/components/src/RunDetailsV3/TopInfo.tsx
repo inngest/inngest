@@ -13,10 +13,10 @@ import {
   TextElement,
   TimeElement,
 } from '../DetailsCard/NewElement';
+import { ErrorCard } from '../Error/ErrorCard';
 import { InvokeModal } from '../InvokeButton';
-import { ErrorCard } from '../RunDetailsV2/ErrorCard';
 import { useInvokeRun } from '../SharedContext/useInvokeRun';
-import { usePrettyJson } from '../hooks/usePrettyJson';
+import { usePrettyErrorBody, usePrettyJson } from '../hooks/usePrettyJson';
 import { IconCloudArrowDown } from '../icons/CloudArrowDown';
 import type { Result } from '../types/functionRun';
 import { devServerURL, useDevServer } from '../utils/useDevServer';
@@ -108,6 +108,7 @@ export const TopInfo = ({ slug, getTrigger, runID, result }: TopInfoProps) => {
   }, [trigger?.payloads]);
 
   const prettyOutput = usePrettyJson(result?.data ?? '') || (result?.data ?? '');
+  const prettyErrorBody = usePrettyErrorBody(result?.error);
 
   const type = trigger?.isBatch ? 'BATCH' : trigger?.cron ? 'CRON' : 'EVENT';
 
@@ -129,7 +130,7 @@ export const TopInfo = ({ slug, getTrigger, runID, result }: TopInfoProps) => {
 
   return (
     <div className="sticky top-14 flex flex-col justify-start gap-2 overflow-hidden">
-      <div className="flex h-11 w-full flex-row items-center justify-between border-none px-4">
+      <div className="flex h-11 w-full flex-row items-center justify-between border-none px-4 pt-2">
         <div
           className="text-basis flex cursor-pointer items-center justify-start gap-2"
           onClick={() => setExpanded(!expanded)}
@@ -273,7 +274,7 @@ export const TopInfo = ({ slug, getTrigger, runID, result }: TopInfoProps) => {
                         title={`${result.error.name || 'Error'} ${
                           result.error.message ? `: ${result.error.message}` : ''
                         }`}
-                        raw={result.error.stack ?? ''}
+                        raw={prettyErrorBody ?? ''}
                         error={true}
                       />
                     ),

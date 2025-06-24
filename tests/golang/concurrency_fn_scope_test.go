@@ -3,6 +3,7 @@ package golang
 import (
 	"context"
 	"fmt"
+	"github.com/inngest/inngest/tests/client"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -14,6 +15,9 @@ import (
 )
 
 func TestConcurrency_ScopeFunction(t *testing.T) {
+	c := client.New(t)
+	c.ResetAll(t)
+
 	inngestClient, server, registerFuncs := NewSDKHandler(t, "concurrency")
 	defer server.Close()
 
@@ -159,7 +163,7 @@ func TestConcurrency_ScopeFunction_FanOut(t *testing.T) {
 	// Eventually the fn starts.
 	require.Eventually(t, func() bool {
 		return atomic.LoadInt32(&inProgressA) == 1 && atomic.LoadInt32(&inProgressB) == 1
-	}, 2*time.Second, 50*time.Millisecond)
+	}, 3*time.Second, 50*time.Millisecond)
 
 	for i := 0; i < (numEvents*fnDuration)+1; i++ {
 		<-time.After(time.Second)
@@ -167,6 +171,7 @@ func TestConcurrency_ScopeFunction_FanOut(t *testing.T) {
 		require.LessOrEqual(t, atomic.LoadInt32(&inProgressB), int32(1))
 	}
 
+	<-time.After(time.Second)
 	require.EqualValues(t, 3, atomic.LoadInt32(&totalA))
 	require.EqualValues(t, 3, atomic.LoadInt32(&totalB))
 }

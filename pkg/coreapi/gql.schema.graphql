@@ -129,7 +129,9 @@ type Function {
   id: String!
   name: String!
   slug: String!
+  failureHandler: Function
   config: String!
+  configuration: FunctionConfiguration!
   concurrency: Int!
   triggers: [FunctionTrigger!]
   url: String!
@@ -145,6 +147,7 @@ enum FunctionTriggerTypes {
 type FunctionTrigger {
   type: FunctionTriggerTypes!
   value: String!
+  condition: String
 }
 
 enum FunctionRunStatus {
@@ -168,6 +171,84 @@ type FunctionEvent {
   type: FunctionEventType
   output: String
   createdAt: Time
+}
+
+type FunctionConfiguration {
+  cancellations: [CancellationConfiguration!]!
+  retries: RetryConfiguration!
+  priority: String
+  eventsBatch: EventsBatchConfiguration
+  concurrency: [ConcurrencyConfiguration!]!
+  rateLimit: RateLimitConfiguration
+  debounce: DebounceConfiguration
+  throttle: ThrottleConfiguration
+  singleton: SingletonConfiguration
+}
+
+type CancellationConfiguration {
+  event: String!
+  timeout: String
+  condition: String
+}
+
+type RetryConfiguration {
+  value: Int!
+  isDefault: Boolean
+}
+
+type EventsBatchConfiguration {
+  "The maximum number of events a batch can have."
+  maxSize: Int!
+
+  "How long to wait before running the function with the batch."
+  timeout: String!
+
+  key: String
+}
+
+type ConcurrencyConfiguration {
+  scope: ConcurrencyScope!
+  limit: ConcurrencyLimitConfiguration!
+  key: String
+}
+
+enum ConcurrencyScope {
+  ACCOUNT
+  ENVIRONMENT
+  FUNCTION
+}
+
+type ConcurrencyLimitConfiguration {
+  value: Int!
+  isPlanLimit: Boolean
+}
+
+type RateLimitConfiguration {
+  limit: Int!
+  period: String!
+  key: String
+}
+
+type DebounceConfiguration {
+  period: String!
+  key: String
+}
+
+type ThrottleConfiguration {
+  burst: Int!
+  key: String
+  limit: Int!
+  period: String!
+}
+
+type SingletonConfiguration {
+  mode: SingletonMode!
+  key: String
+}
+
+enum SingletonMode {
+  SKIP
+  CANCEL
 }
 
 enum StepEventType {
@@ -361,7 +442,7 @@ type FunctionRunV2 {
 
   output: Bytes
 
-  trace: RunTraceSpan
+  trace(preview: Boolean): RunTraceSpan
   hasAI: Boolean!
 }
 
@@ -392,6 +473,7 @@ enum StepOp {
   SLEEP # sleep for a duration
   WAIT_FOR_EVENT # wait for an event
   AI_GATEWAY
+  WAIT_FOR_SIGNAL
 }
 
 union StepInfo =
@@ -399,6 +481,7 @@ union StepInfo =
   | SleepStepInfo
   | WaitForEventStepInfo
   | RunStepInfo
+  | WaitForSignalStepInfo
 
 type InvokeStepInfo {
   triggeringEventID: ULID!
@@ -418,6 +501,12 @@ type WaitForEventStepInfo {
   expression: String
   timeout: Time!
   foundEventID: ULID
+  timedOut: Boolean
+}
+
+type WaitForSignalStepInfo {
+  signal: String!
+  timeout: Time!
   timedOut: Boolean
 }
 
@@ -478,6 +567,7 @@ type StepError {
   message: String!
   name: String
   stack: String
+  cause: Bytes
 }
 
 type RunTraceTrigger {

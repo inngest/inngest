@@ -28,6 +28,7 @@ type BaseTableProps<T> = {
   isLoading?: boolean;
   columns: ColumnDef<T, any>[];
   onRowClick?: (row: Row<T>) => void;
+  getRowHref?: (row: Row<T>) => string;
   blankState?: React.ReactNode;
 };
 
@@ -43,6 +44,7 @@ export default function Table<T>({
   setSorting,
   renderSubComponent,
   onRowClick,
+  getRowHref,
   blankState,
   columns,
   expandedIDs = [],
@@ -88,7 +90,7 @@ export default function Table<T>({
   });
 
   const tableStyles = 'w-full';
-  const tableHeadStyles = 'bg-canvasSubtle sticky top-0 z-[2]';
+  const tableHeadStyles = 'bg-tableHeader sticky top-0 z-[2]';
   const tableColumnStyles = 'px-4';
   const expandedRowSideBorder =
     'before:bg-surfaceMuted relative before:absolute before:bottom-0 before:left-0 before:top-0 before:w-0.5';
@@ -159,18 +161,27 @@ export default function Table<T>({
             table.getRowModel().rows.map((row) => (
               <Fragment key={row.id}>
                 <tr
+                  role={getRowHref ? 'link' : undefined}
+                  tabIndex={onRowClick ? 0 : undefined}
+                  aria-label={getRowHref ? 'View details' : undefined}
                   className={cn(
                     hasId(row.original) && expandedIDs.includes(row.original.id)
                       ? 'h-[42px]'
-                      : 'border-light h-[42px] border-b',
-                    onRowClick ? 'hover:bg-canvasSubtle/40 cursor-pointer' : ''
+                      : 'border-light box-border h-[42px] border-b',
+                    onRowClick ? 'hover:bg-canvasSubtle cursor-pointer' : ''
                   )}
-                  onClick={() => {
+                  onClick={(e) => {
                     const modalsContainer = document.getElementById('modals');
                     const hasModals = modalsContainer && modalsContainer.children.length > 0;
-                    if (!hasModals) {
-                      onRowClick?.(row);
+                    if (hasModals) return;
+
+                    const url = getRowHref?.(row);
+                    if (url && (e.metaKey || e.ctrlKey || e.button === 1)) {
+                      // Simulate native link behavior
+                      window.open(url, '_blank');
+                      return;
                     }
+                    onRowClick?.(row);
                   }}
                 >
                   {row.getVisibleCells().map((cell, i) => {
@@ -182,7 +193,12 @@ export default function Table<T>({
                           width: cell.column.getSize(),
                           maxWidth: cell.column.getSize(),
                         }}
-                        className={cn(isIconOnlyColumn ? '' : tableColumnStyles)}
+                        className={cn(
+                          i === 0 && hasId(row.original) && expandedIDs.includes(row.original.id)
+                            ? expandedRowSideBorder
+                            : '',
+                          isIconOnlyColumn ? '' : tableColumnStyles
+                        )}
                       >
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
                       </td>
@@ -193,11 +209,22 @@ export default function Table<T>({
                   expandedIDs.includes(row.original.id) &&
                   renderSubComponent &&
                   !isLoading && (
-                    <tr className="border-light border-b">
-                      <td colSpan={row.getVisibleCells().length} className={expandedRowSideBorder}>
-                        {renderSubComponent({ row })}
-                      </td>
-                    </tr>
+                    <>
+                      <tr>
+                        <td
+                          colSpan={row.getVisibleCells().length}
+                          className={expandedRowSideBorder}
+                        >
+                          {renderSubComponent({ row })}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td
+                          colSpan={row.getVisibleCells().length}
+                          className="border-light border-b pb-6"
+                        ></td>
+                      </tr>
+                    </>
                   )}
               </Fragment>
             ))}

@@ -6,6 +6,7 @@ import { Header } from '@inngest/components/Header/Header';
 import { ActionsMenu } from '@/components/Events/ActionsMenu';
 import ArchiveEventModal from '@/components/Events/ArchiveEventModal';
 import SendEventButton from '@/components/Events/SendEventButton';
+import { pathCreator } from '@/utils/urls';
 
 type EventLayoutProps = {
   children: React.ReactNode;
@@ -19,9 +20,6 @@ export default function EventLayout({
   children,
   params: { environmentSlug: envSlug, eventTypeName: eventSlug },
 }: EventLayoutProps) {
-  const eventTypesPath = `/env/${envSlug}/event-types`;
-  const eventsPath = `/env/${envSlug}/event-types/${eventSlug}/events`;
-  const eventPath = `/env/${envSlug}/event-types/${eventSlug}`;
   const eventName = decodeURIComponent(eventSlug);
   const [showArchive, setShowArchive] = useState(false);
 
@@ -29,18 +27,18 @@ export default function EventLayout({
     <>
       <Header
         breadcrumb={[
-          { text: 'Event types', href: eventTypesPath },
-          { text: eventName, href: eventPath },
+          { text: 'Event types', href: pathCreator.eventTypes({ envSlug }) },
+          { text: eventName, href: pathCreator.eventType({ envSlug, eventName }) },
         ]}
         tabs={[
           {
-            href: eventPath,
+            href: pathCreator.eventType({ envSlug, eventName }),
             children: 'Dashboard',
             exactRouteMatch: true,
           },
           {
-            href: eventsPath,
             children: 'Events',
+            href: pathCreator.eventTypeEvents({ envSlug, eventName }),
           },
         ]}
         action={

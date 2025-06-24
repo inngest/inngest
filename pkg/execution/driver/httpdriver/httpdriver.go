@@ -11,7 +11,6 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -23,13 +22,11 @@ import (
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	headerspkg "github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/inngest"
-	"github.com/inngest/inngest/pkg/inngest/log"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/syscode"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
-	"go.opentelemetry.io/otel/propagation"
-	"go.opentelemetry.io/otel/trace"
 )
 
 var (
@@ -86,6 +83,8 @@ func (e executor) RuntimeType() string {
 }
 
 func (e executor) Execute(ctx context.Context, sl sv2.StateLoader, s sv2.Metadata, item queue.Item, edge inngest.Edge, step inngest.Step, idx, attempt int) (*state.DriverResponse, error) {
+	l := logger.StdlibLogger(ctx)
+
 	if e.requireLocalSigningKey && len(e.localSigningKey) == 0 {
 		return nil, fmt.Errorf("server requires that a signing key is set to run functions")
 	}
@@ -100,54 +99,21 @@ func (e executor) Execute(ctx context.Context, sl sv2.StateLoader, s sv2.Metadat
 		return nil, err
 	}
 
-	headers := map[string]string{}
-
-	span := trace.SpanFromContext(ctx)
-	sc := span.SpanContext()
-
-	// Add some items to trace state to ensure that the SDK can parrot them
-	// back to us for userland spans.
-	//
-	// After a tracing refactor, this will no longer be required to send to
-	// SDKs because they will not need to parrot back any data.
-	ts, err := sc.TraceState().Insert("inngest@app", s.ID.Tenant.AppID.String())
-	if err != nil {
-		// Not a failure; only userland spans suffer, so log and ignore
-		log.From(ctx).Warn().
-			Str("run_id", s.ID.RunID.String()).
-			Msg("failed to add app ID to trace state")
-	}
-
-	ts, err = ts.Insert("inngest@fn", s.ID.FunctionID.String())
-	if err != nil {
-		// Not a failure; only userland spans suffer, so log and ignore
-		log.From(ctx).Warn().
-			Str("run_id", s.ID.RunID.String()).
-			Msg("failed to add function ID to trace state")
-	}
-
-	sc = trace.NewSpanContext(trace.SpanContextConfig{
-		TraceID:    sc.TraceID(),
-		SpanID:     sc.SpanID(),
-		TraceFlags: sc.TraceFlags(),
-		TraceState: ts,
-		Remote:     sc.IsRemote(),
-	})
-	ctx = trace.ContextWithSpanContext(ctx, sc)
-	itrace.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(headers))
-	if headers["traceparent"] != "" {
-		// The span ID will be incorrect here as lifecycles can not affec the
-		// ctx. To patch, we manually set the span ID here to what we know it
-		// should be based on the item
-		parts := strings.Split(headers["traceparent"], "-")
-		if len(parts) == 4 {
-			spanID, err := item.SpanID()
-			if err != nil {
-				return nil, fmt.Errorf("error parsing span ID: %w", err)
-			}
-
-			parts[2] = spanID.String()
-			headers["traceparent"] = strings.Join(parts, "-")
+	headers := make(map[string]string)
+	if spanID, err := item.SpanID(); err != nil {
+		l.Error("error retrieving span ID", "error", err, "run_id", s.ID.RunID.String())
+	} else {
+		headers, err = itrace.HeadersFromTraceState(
+			ctx,
+			spanID.String(),
+			s.ID.Tenant.AppID.String(),
+			s.ID.FunctionID.String(),
+		)
+		if err != nil {
+			l.Warn("failed to add userland data to trace state",
+				"error", err,
+				"run_id", s.ID.RunID.String(),
+			)
 		}
 	}
 
@@ -215,6 +181,8 @@ func DoRequest(ctx context.Context, c util.HTTPDoer, r Request) (*state.DriverRe
 }
 
 func HandleHttpResponse(ctx context.Context, r Request, resp *Response) (*state.DriverResponse, error) {
+	l := logger.StdlibLogger(ctx)
+
 	var err error
 	if resp.StatusCode == 206 {
 		// This is a generator-based function returning opcodes.
@@ -274,11 +242,11 @@ func HandleHttpResponse(ctx context.Context, r Request, resp *Response) (*state.
 	}
 
 	if dr.Err == nil && resp.StatusCode == 200 && !resp.IsSDK {
-		log.From(ctx).Info().
-			Interface("headers", resp.Header).
-			Str("run_id", r.RunID.String()).
-			Str("url", r.URL.String()).
-			Msg("response did not come from an Inngest SDK")
+		l.Info("response did not come from an Inngest SDK",
+			"headers", resp.Header,
+			"run_id", r.RunID.String(),
+			"url", r.URL.String(),
+		)
 		// TODO: Call dr.SetError and set dr.Output. We aren't doing that yet
 		// because we want to observe logs first
 	}
@@ -324,6 +292,8 @@ func HandleHttpResponse(ctx context.Context, r Request, resp *Response) (*state.
 }
 
 func do(ctx context.Context, c util.HTTPDoer, r Request) (*Response, *httpstat.Result, error) {
+	l := logger.StdlibLogger(ctx)
+
 	if c == nil {
 		c = defaultClient
 	}
@@ -366,13 +336,12 @@ func do(ctx context.Context, c util.HTTPDoer, r Request) (*Response, *httpstat.R
 
 	// Handle no response errors.
 	if errors.Is(err, ErrUnableToReach) {
-		log.From(ctx).
-			Warn().
-			Str("url", r.URL.String()).
-			Interface("step", r.Step).
-			Interface("edge	", r.Edge).
-			Int64("req_dur_ms", dur.Milliseconds()).
-			Msg("EOF writing request to SDK")
+		l.Warn("EOF writing request to SDK",
+			"url", r.URL.String(),
+			"step", r.Step,
+			"edge	", r.Edge,
+			"req_dur_ms", dur.Milliseconds(),
+		)
 		return nil, tracking, err
 	}
 	if err != nil && len(byt) == 0 {
@@ -393,15 +362,14 @@ func do(ctx context.Context, c util.HTTPDoer, r Request) (*Response, *httpstat.R
 	}
 
 	if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
-		log.From(ctx).
-			Error().
-			Err(err).
-			Str("url", r.URL.String()).
-			Str("response", string(byt)).
-			Interface("headers", resp.Header).
-			Interface("step", r.Step).
-			Interface("edge	", r.Edge).
-			Msg("http eof reading response")
+		l.Error("http eof reading response",
+			"error", err,
+			"url", r.URL.String(),
+			"response", string(byt),
+			"headers", resp.Header,
+			"step", r.Step,
+			"edge	", r.Edge,
+		)
 	}
 
 	// These variables are extracted from streaming and non-streaming responses separately.
@@ -449,10 +417,11 @@ func do(ctx context.Context, c util.HTTPDoer, r Request) (*Response, *httpstat.R
 
 	if statusCode == 0 {
 		// Unreachable
-		log.From(ctx).Error().Err(err).
-			Str("body", string(byt)).
-			Str("run_id", r.RunID.String()).
-			Msg("status code is 0")
+		l.Error("status code is 0",
+			"error", err,
+			"body", string(byt),
+			"run_id", r.RunID.String(),
+		)
 	}
 
 	// Check the retry status from the headers and versions.

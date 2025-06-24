@@ -7,7 +7,7 @@ import { createColumnHelper } from '@tanstack/react-table';
 import { StatusDot } from '../Status/StatusDot';
 import type { EventsTable } from './EventsTable';
 
-const columnHelper = createColumnHelper<Omit<Event, 'payload'>>();
+const columnHelper = createColumnHelper<Event>();
 
 const columnsIDs = ['name', 'runs', 'receivedAt'] as const;
 export type ColumnID = (typeof columnsIDs)[number];
@@ -22,8 +22,10 @@ function ensureColumnID(id: ColumnID): ColumnID {
 
 export function useColumns({
   pathCreator,
+  singleEventTypePage,
 }: {
   pathCreator: React.ComponentProps<typeof EventsTable>['pathCreator'];
+  singleEventTypePage: React.ComponentProps<typeof EventsTable>['singleEventTypePage'];
 }) {
   const columns = [
     columnHelper.accessor('receivedAt', {
@@ -31,21 +33,25 @@ export function useColumns({
         const receivedAt = info.getValue();
         return <TimeCell date={receivedAt} />;
       },
+      size: 200,
       header: 'Received at',
-      maxSize: 400,
       enableSorting: false,
       id: ensureColumnID('receivedAt'),
     }),
-    columnHelper.accessor('name', {
-      cell: (info) => {
-        const name = info.getValue();
-        return <TextCell>{name}</TextCell>;
-      },
-      header: 'Event name',
-      maxSize: 400,
-      enableSorting: false,
-      id: ensureColumnID('name'),
-    }),
+    ...(!singleEventTypePage
+      ? [
+          columnHelper.accessor('name', {
+            cell: (info) => {
+              const name = info.getValue();
+              return <TextCell>{name}</TextCell>;
+            },
+            size: 300,
+            header: 'Event name',
+            enableSorting: false,
+            id: ensureColumnID('name'),
+          }),
+        ]
+      : []),
     columnHelper.accessor('runs', {
       cell: (info) => {
         const runs = info.getValue();
@@ -82,6 +88,7 @@ export function useColumns({
           />
         );
       },
+      size: 500,
       header: 'Functions triggered',
       enableSorting: false,
       id: ensureColumnID('runs'),

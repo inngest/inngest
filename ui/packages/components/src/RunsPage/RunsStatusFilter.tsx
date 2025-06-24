@@ -24,6 +24,8 @@ export default function RunsStatusFilter({
       // Hide skipped runs from filter
     } else if (status === 'SKIPPED') {
       return false;
+    } else if (status === 'WAITING') {
+      return false;
     }
     return true;
   });

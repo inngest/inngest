@@ -43,9 +43,7 @@ export const ActionsMenu = ({
             Resync app
           </DropdownMenuItem>
         )}
-        <OptionalTooltip
-          tooltip={disableValidate ? 'No syncs. App health check not available.' : undefined}
-        >
+        <OptionalTooltip tooltip={disableValidate ? 'App health check not available.' : undefined}>
           <DropdownMenuItem disabled={disableValidate} onSelect={showValidate}>
             <RiFirstAidKitLine className="h-4 w-4" />
             Check app health

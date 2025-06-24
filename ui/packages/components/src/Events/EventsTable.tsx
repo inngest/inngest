@@ -1,24 +1,31 @@
 'use client';
 
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type UIEventHandler } from 'react';
 import type { Route } from 'next';
 import dynamic from 'next/dynamic';
 import { Button } from '@inngest/components/Button';
+import { ErrorCard } from '@inngest/components/Error/ErrorCard';
 import TableBlankState from '@inngest/components/EventTypes/TableBlankState';
 import { TimeFilter } from '@inngest/components/Filter/TimeFilter';
 import { Pill } from '@inngest/components/Pill';
 import NewTable from '@inngest/components/Table/NewTable';
-import { DEFAULT_TIME } from '@inngest/components/hooks/useCalculatedStartTime';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip/Tooltip';
+import {
+  DEFAULT_TIME,
+  useCalculatedStartTime,
+} from '@inngest/components/hooks/useCalculatedStartTime';
 import { type Event, type PageInfo } from '@inngest/components/types/event';
+import { type EventType } from '@inngest/components/types/eventType';
 import { cn } from '@inngest/components/utils/classNames';
 import { durationToString, parseDuration } from '@inngest/components/utils/date';
 import { RiArrowRightUpLine, RiSearchLine } from '@remixicon/react';
-import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 
 import type { RangeChangeProps } from '../DatePicker/RangePicker';
 import EntityFilter from '../Filter/EntityFilter';
 import {
   useBatchedSearchParams,
+  useBooleanSearchParam,
   useSearchParam,
   useStringArraySearchParam,
 } from '../hooks/useSearchParam';
@@ -31,67 +38,148 @@ const CodeSearch = dynamic(() => import('@inngest/components/CodeSearch/CodeSear
   ssr: false,
 });
 
-const refreshInterval = 5000;
-
 export function EventsTable({
   getEvents,
   getEventDetails,
   getEventPayload,
+  getEventTypes,
+  eventNames,
+  singleEventTypePage,
   pathCreator,
   emptyActions,
   expandedRowActions,
   features,
+  standalone = false,
 }: {
   emptyActions: React.ReactNode;
-  expandedRowActions: (eventName: string) => React.ReactNode;
+  expandedRowActions: ({
+    eventName,
+    payload,
+  }: {
+    eventName?: string;
+    payload?: string;
+  }) => React.ReactNode;
   pathCreator: {
     eventType: (params: { eventName: string }) => Route;
     runPopout: (params: { runID: string }) => Route;
+    eventPopout: (params: { eventID: string }) => Route;
   };
   getEvents: ({
     cursor,
-    eventName,
+    eventNames,
     source,
     startTime,
+    endTime,
     celQuery,
+    includeInternalEvents,
   }: {
-    eventName?: string[];
-    cursor?: string | null;
+    eventNames: string[] | null;
+    cursor: string | null;
     source?: string;
-    startTime?: string;
+    startTime: string;
+    endTime: string | null;
     celQuery?: string;
-  }) => Promise<{ events: Omit<Event, 'payload'>[]; pageInfo: PageInfo; totalCount: number }>;
-  getEventDetails: ({ eventName }: { eventName: string }) => Promise<Omit<Event, 'payload'>>;
-  getEventPayload: ({ eventName }: { eventName: string }) => Promise<Pick<Event, 'payload'>>;
+    includeInternalEvents?: boolean;
+  }) => Promise<{ events: Event[]; pageInfo: PageInfo; totalCount: number }>;
+  getEventDetails: ({ eventID }: { eventID: string }) => Promise<Event>;
+  getEventPayload: ({ eventID }: { eventID: string }) => Promise<Pick<Event, 'payload'>>;
+  getEventTypes: () => Promise<Required<Pick<EventType, 'name' | 'id'>>[]>;
+  eventNames?: string[];
+  singleEventTypePage?: boolean;
   features: Pick<Features, 'history'>;
+  standalone?: boolean;
 }) {
-  const columns = useColumns({ pathCreator });
-  const [cursor, setCursor] = useState<string | null>(null);
+  const columns = useColumns({ pathCreator, singleEventTypePage });
   const [showSearch, setShowSearch] = useState(false);
   const [lastDays] = useSearchParam('last');
   const [startTime] = useSearchParam('start');
   const [endTime] = useSearchParam('end');
   const batchUpdate = useBatchedSearchParams();
-  const [filteredEvent = [], setFilteredEvent, removeFilteredEvent] =
+  const [filteredEvent, setFilteredEvent, removeFilteredEvent] =
     useStringArraySearchParam('filterEvent');
+  const [includeInternalEvents] = useBooleanSearchParam('includeInternal');
   const [search, setSearch, removeSearch] = useSearchParam('search');
   const source = undefined;
   const [expandedIDs, setExpandedIDs] = useState<string[]>([]);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [isScrollable, setIsScrollable] = useState(false);
+
+  /* The start date comes from either the absolute start time or the relative time */
+  const calculatedStartTime = useCalculatedStartTime({ lastDays, startTime });
+
+  const scrollToTop = useCallback(
+    (smooth = false) => {
+      if (containerRef.current) {
+        containerRef.current.scrollTo({
+          top: 0,
+          behavior: smooth ? 'smooth' : 'auto',
+        });
+      }
+    },
+    [containerRef.current]
+  );
 
   const {
     isPending, // first load, no data
     error,
+    fetchNextPage,
+    hasNextPage,
     data: eventsData,
-    isFetching, // refetching
-    // TODO: implement infinite scrolling
-  } = useQuery({
-    queryKey: ['events', { cursor, eventName: filteredEvent, source, startTime, celQuery: search }],
-    queryFn: useCallback(() => {
-      return getEvents({ cursor, eventName: filteredEvent, source, startTime, celQuery: search });
-    }, [getEvents, cursor, filteredEvent, source, startTime, search]),
-    placeholderData: keepPreviousData,
-    refetchInterval: !cursor ? refreshInterval : 0,
+    isFetching,
+    refetch,
+    isFetchingNextPage,
+  } = useInfiniteQuery({
+    queryKey: [
+      'events',
+      {
+        eventNames: filteredEvent || eventNames || null,
+        source,
+        startTime: calculatedStartTime.toISOString(),
+        endTime: endTime ?? null,
+        celQuery: search,
+        includeInternalEvents: includeInternalEvents ?? true,
+      },
+    ],
+    queryFn: ({ pageParam }: { pageParam: string | null }) =>
+      getEvents({
+        cursor: pageParam,
+        eventNames: filteredEvent ?? eventNames ?? null,
+        source,
+        startTime: calculatedStartTime.toISOString(),
+        endTime: endTime ?? null,
+        celQuery: search,
+        includeInternalEvents,
+      }),
+    getNextPageParam: (lastPage) => {
+      if (!lastPage || !lastPage.pageInfo.hasNextPage) {
+        return undefined;
+      }
+      return lastPage.pageInfo.endCursor;
+    },
+    initialPageParam: null,
+    select: (data) => ({
+      ...data,
+      events: data.pages.flatMap((page) => page.events),
+      totalCount: data.pages[data.pages.length - 1]?.totalCount ?? 0,
+    }),
   });
+  /* TODO: Find out what to do with the event types filter, since it will affect performance */
+
+  // const { data: eventTypesData } = useQuery({
+  //   queryKey: ['event-types'],
+  //   queryFn: () => getEventTypes(),
+  // });
+
+  // const onEventFilterChange = useCallback(
+  //   (value: string[]) => {
+  //     if (value.length > 0) {
+  //       setFilteredEvent(value);
+  //     } else {
+  //       removeFilteredEvent();
+  //     }
+  //   },
+  //   [removeFilteredEvent, setFilteredEvent]
+  // );
 
   const onSearchChange = useCallback(
     (value: string) => {
@@ -101,18 +189,7 @@ export function EventsTable({
         removeSearch();
       }
     },
-    [setSearch]
-  );
-
-  const onEventFilterChange = useCallback(
-    (value: string[]) => {
-      if (value.length > 0) {
-        setFilteredEvent(value);
-      } else {
-        removeFilteredEvent();
-      }
-    },
-    [removeFilteredEvent, setFilteredEvent]
+    [setSearch, removeSearch]
   );
 
   const onDaysChange = useCallback(
@@ -134,31 +211,64 @@ export function EventsTable({
     [batchUpdate]
   );
 
+  useEffect(() => {
+    const el = containerRef.current;
+    if (el) {
+      setIsScrollable(el.scrollHeight > el.clientHeight);
+    }
+  }, [eventsData]);
+
+  const hasEventsData = eventsData?.events && eventsData?.events.length > 0;
+
+  const onScroll: UIEventHandler<HTMLDivElement> = useCallback(
+    (event) => {
+      if (hasEventsData && hasNextPage) {
+        const { scrollHeight, scrollTop, clientHeight } = event.target as HTMLDivElement;
+
+        // Check if scrolled to the bottom
+        const reachedBottom = scrollHeight - scrollTop - clientHeight < 200;
+        if (reachedBottom && !isFetching && !isFetchingNextPage) {
+          fetchNextPage();
+        }
+      }
+    },
+    [fetchNextPage, hasNextPage, isFetchingNextPage, hasEventsData, isFetching]
+  );
+
+  if (error) {
+    return <ErrorCard error={error} reset={() => refetch()} />;
+  }
+
   return (
     <div className="bg-canvasBase text-basis no-scrollbar flex-1 overflow-hidden focus-visible:outline-none">
       <div className="bg-canvasBase sticky top-0 z-10">
         <div className="m-3 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            {/* TODO: Wire entity */}
-            <EntityFilter
+            {/* <EntityFilter
               type="event"
               onFilterChange={onEventFilterChange}
-              selectedEntities={filteredEvent}
-              entities={[]}
-            />
-            <Button
-              icon={<RiSearchLine />}
-              size="large"
-              iconSide="left"
-              appearance="outlined"
-              label={showSearch ? 'Hide search' : 'Show search'}
-              onClick={() => setShowSearch((prev) => !prev)}
-              className={cn(
-                search
-                  ? 'after:bg-secondary-moderate after:mb-3 after:ml-0.5 after:h-2 after:w-2 after:rounded'
-                  : ''
-              )}
-            />
+              selectedEntities={filteredEvent ?? []}
+              entities={eventTypesData ?? []}
+            /> */}
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  disabled
+                  icon={<RiSearchLine />}
+                  size="large"
+                  iconSide="left"
+                  appearance="outlined"
+                  label={showSearch ? 'Hide search' : 'Show search'}
+                  onClick={() => setShowSearch((prev) => !prev)}
+                  className={cn(
+                    search
+                      ? 'after:bg-secondary-moderate after:mb-3 after:ml-0.5 after:h-2 after:w-2 after:rounded'
+                      : ''
+                  )}
+                />
+              </TooltipTrigger>
+              <TooltipContent>Coming soon</TooltipContent>
+            </Tooltip>
             <TotalCount totalCount={eventsData?.totalCount} />
           </div>
           <div className="flex">
@@ -213,21 +323,27 @@ export function EventsTable({
         )}
       </div>
 
-      <div className="h-[calc(100%-58px)] overflow-y-auto">
+      <div className="h-[calc(100%-58px)] overflow-y-auto" onScroll={onScroll} ref={containerRef}>
         <NewTable
           columns={columns}
           data={eventsData?.events || []}
-          isLoading={isPending}
+          isLoading={isPending || (isFetching && !isFetchingNextPage)}
           blankState={<TableBlankState actions={emptyActions} />}
-          renderSubComponent={({ row }) => (
-            <EventDetails
-              pathCreator={pathCreator}
-              row={row}
-              getEventDetails={getEventDetails}
-              getEventPayload={getEventPayload}
-              expandedRowActions={expandedRowActions}
-            />
-          )}
+          renderSubComponent={({ row }) => {
+            const { id, name, runs } = row.original;
+            const initialData: Pick<Event, 'name' | 'runs'> = { name, runs };
+            return (
+              <EventDetails
+                pathCreator={pathCreator}
+                initialData={initialData}
+                getEventDetails={getEventDetails}
+                getEventPayload={getEventPayload}
+                expandedRowActions={expandedRowActions}
+                standalone={standalone}
+                eventID={id}
+              />
+            );
+          }}
           expandedIDs={expandedIDs}
           onRowClick={(row) => {
             if (expandedIDs.includes(row.original.id)) {
@@ -241,6 +357,22 @@ export function EventsTable({
             }
           }}
         />
+        {!hasNextPage && hasEventsData && isScrollable && !isFetchingNextPage && !isFetching && (
+          <div className="flex flex-col items-center pb-4 pt-8">
+            <p className="text-muted text-sm">No additional events found.</p>
+            <Button
+              label="Back to top"
+              kind="primary"
+              appearance="ghost"
+              onClick={() => scrollToTop(true)}
+            />
+          </div>
+        )}
+        {isFetchingNextPage && (
+          <div className="flex flex-col items-center">
+            <Button appearance="outlined" label="loading" loading={true} />
+          </div>
+        )}
       </div>
     </div>
   );

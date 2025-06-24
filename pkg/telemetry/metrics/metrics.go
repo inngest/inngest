@@ -103,7 +103,7 @@ func NewOTLPMeterProvider(ctx context.Context, svc string) (*meter, error) {
 	// NOTE:
 	// assuming the otel collector is within the same private network, we can
 	// skip grpc auth, but probably still better to get it work for production
-	conn, err := grpc.Dial(endpoint,
+	conn, err := grpc.NewClient(endpoint,
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 	)
 	if err != nil {

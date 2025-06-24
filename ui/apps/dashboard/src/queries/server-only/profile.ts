@@ -19,6 +19,7 @@ export type ProfileDisplayType = {
   isMarketplace: boolean;
   orgName?: string;
   displayName: string;
+  orgProfilePic: string | null;
 };
 
 const ProfileQuery = graphql(`
@@ -33,6 +34,7 @@ const ProfileQuery = graphql(`
 export const getProfileDisplay = async (): Promise<ProfileDisplayType> => {
   let orgName: string | undefined;
   let displayName: string;
+  let orgProfilePic: string | null;
 
   const res = await graphqlAPI.request(ProfileQuery);
   if (res.account.marketplace) {
@@ -40,6 +42,7 @@ export const getProfileDisplay = async (): Promise<ProfileDisplayType> => {
 
     orgName = res.account.name ?? undefined;
     displayName = 'System';
+    orgProfilePic = null;
   } else {
     const { user, org } = await getProfile();
     orgName = org?.name;
@@ -47,12 +50,14 @@ export const getProfileDisplay = async (): Promise<ProfileDisplayType> => {
       user.firstName || user.lastName
         ? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim()
         : user.username ?? '';
+    orgProfilePic = org?.hasImage ? org.imageUrl : null;
   }
 
   return {
     isMarketplace: Boolean(res.account.marketplace),
     orgName,
     displayName,
+    orgProfilePic,
   };
 };
 

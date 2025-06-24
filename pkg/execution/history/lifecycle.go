@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"log/slog"
 	"net/http"
 	"strings"
 	"time"
@@ -24,9 +23,9 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
-func NewLifecycleListener(l *slog.Logger, d ...Driver) execution.LifecycleListener {
+func NewLifecycleListener(l logger.Logger, d ...Driver) execution.LifecycleListener {
 	if l == nil {
-		l = slog.Default()
+		l = logger.StdlibLogger(context.Background())
 	}
 	return lifecycle{
 		log:     l,
@@ -35,7 +34,7 @@ func NewLifecycleListener(l *slog.Logger, d ...Driver) execution.LifecycleListen
 }
 
 type lifecycle struct {
-	log     *slog.Logger
+	log     logger.Logger
 	drivers []Driver
 }
 
@@ -715,6 +714,112 @@ func (l lifecycle) OnInvokeFunctionResumed(
 	for _, d := range l.drivers {
 		if err := d.Write(context.WithoutCancel(ctx), h); err != nil {
 			l.log.Error("execution lifecycle error", "lifecycle", "onInvokeFunctionResumed", "error", err)
+		}
+	}
+}
+
+// OnWaitForSignal is called when a function is waiting for a signal to
+// continue. This is used for the `step.waitForSignal()` step.
+func (l lifecycle) OnWaitForSignal(
+	ctx context.Context,
+	md sv2.Metadata,
+	item queue.Item,
+	op state.GeneratorOpcode,
+	_ state.Pause,
+) {
+	groupID, err := toUUID(item.GroupID)
+	if err != nil {
+		l.log.Error(
+			"error parsing group ID",
+			"error", err,
+			"group_id", item.GroupID,
+			"run_id", md.ID.RunID.String(),
+		)
+	}
+
+	stepName := op.UserDefinedName()
+
+	var expires time.Time
+	opts, err := op.SignalOpts()
+	if err == nil && opts != nil {
+		expires, _ = opts.Expires()
+	}
+
+	h := History{
+		ID:              ulid.MustNew(ulid.Now(), rand.Reader),
+		AccountID:       md.ID.Tenant.AccountID,
+		WorkspaceID:     md.ID.Tenant.EnvID,
+		CreatedAt:       time.Now(),
+		FunctionID:      md.ID.FunctionID,
+		FunctionVersion: int64(md.Config.FunctionVersion),
+		GroupID:         groupID,
+		RunID:           md.ID.RunID,
+		Type:            enums.HistoryTypeStepWaiting.String(),
+		Attempt:         int64(item.Attempt),
+		IdempotencyKey:  md.IdempotencyKey(),
+		EventID:         md.Config.EventID(),
+		StepName:        &stepName,
+		StepID:          &op.ID,
+		BatchID:         md.Config.BatchID,
+		WaitForSignal: &WaitForSignal{
+			Signal:  opts.Signal,
+			Timeout: expires,
+		},
+	}
+	for _, d := range l.drivers {
+		if err := d.Write(context.WithoutCancel(ctx), h); err != nil {
+			l.log.Error("execution lifecycle error", "lifecycle", "onWaitForSignal", "error", err)
+		}
+	}
+}
+
+// OnWaitForSignalResumed is called when a function is resumed from waiting for
+// a signal.
+func (l lifecycle) OnWaitForSignalResumed(
+	ctx context.Context,
+	md sv2.Metadata,
+	pause state.Pause,
+	req execution.ResumeRequest,
+) {
+	var groupIDUUID *uuid.UUID
+	groupID := pause.GroupID
+	if groupID != "" {
+		val, err := toUUID(groupID)
+		if err != nil {
+			l.log.Error(
+				"error parsing group ID",
+				"error", err,
+				"group_id", groupID,
+				"run_id", md.ID.RunID.String(),
+			)
+		}
+		groupIDUUID = val
+	}
+	var stepName *string
+	if req.StepName != "" {
+		stepName = &req.StepName
+	}
+	h := History{
+		AccountID:       md.ID.Tenant.AccountID,
+		WorkspaceID:     md.ID.Tenant.EnvID,
+		CreatedAt:       time.Now(),
+		EventID:         md.Config.EventID(),
+		FunctionID:      md.ID.FunctionID,
+		FunctionVersion: int64(md.Config.FunctionVersion),
+		GroupID:         groupIDUUID,
+		ID:              ulid.MustNew(ulid.Now(), rand.Reader),
+		IdempotencyKey:  md.IdempotencyKey(),
+		RunID:           md.ID.RunID,
+		Type:            enums.HistoryTypeStepCompleted.String(),
+		StepName:        stepName,
+		BatchID:         md.Config.BatchID,
+		WaitForSignalResult: &WaitForSignalResult{
+			Timeout: req.IsTimeout,
+		},
+	}
+	for _, d := range l.drivers {
+		if err := d.Write(context.WithoutCancel(ctx), h); err != nil {
+			l.log.Error("execution lifecycle error", "lifecycle", "onWaitForSignalResumed", "error", err)
 		}
 	}
 }

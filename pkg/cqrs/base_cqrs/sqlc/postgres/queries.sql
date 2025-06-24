@@ -351,3 +351,51 @@ DO UPDATE SET
 
 -- name: GetWorkerConnection :one
 SELECT * FROM worker_connections WHERE account_id = sqlc.arg('account_id') AND workspace_id = sqlc.arg('workspace_id') AND id = sqlc.arg('connection_id');
+
+-- New
+
+-- name: InsertSpan :exec
+INSERT INTO spans (
+  span_id,
+  trace_id,
+  parent_span_id,
+  name,
+  start_time,
+  end_time,
+  run_id,
+  account_id,
+  app_id,
+  function_id,
+  env_id,
+  dynamic_span_id,
+  attributes,
+  links,
+  output
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15);
+
+-- name: GetSpansByRunID :many
+SELECT
+  trace_id,
+  dynamic_span_id,
+  MIN(start_time) as start_time,
+  MAX(end_time) AS end_time,
+  parent_span_id,
+  json_agg(json_build_object(
+    'span_id', span_id,
+    'name', name,
+    'attributes', attributes,
+    'links', links,
+    'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END
+  )) AS span_fragments
+FROM spans
+WHERE run_id = CAST($1 AS CHAR(26))
+GROUP BY dynamic_span_id
+ORDER BY start_time;
+
+-- name: GetSpanOutput :one
+SELECT
+  -- input, TODO
+  output
+FROM spans
+WHERE span_id = $1
+LIMIT 1;

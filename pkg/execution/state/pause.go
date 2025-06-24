@@ -2,6 +2,7 @@ package state
 
 import (
 	"context"
+	"fmt"
 	"regexp"
 	"time"
 
@@ -14,16 +15,14 @@ import (
 
 var tsSuffix = regexp.MustCompile(`\s*&&\s*\(\s*async.ts\s+==\s*null\s*\|\|\s*async.ts\s*>\s*\d*\)\s*$`)
 
+var ErrConsumePauseKeyMissing = fmt.Errorf("no idempotency key provided for consuming pauses")
+
 // PauseMutater manages creating, leasing, and consuming pauses from a backend implementation.
 type PauseMutater interface {
 	// SavePause indicates that the traversal of an edge is paused until some future time.
 	//
 	// This returns the number of pauses in the current pause.Index.
 	SavePause(ctx context.Context, p Pause) (int64, error)
-
-	// PauseExists returns a nil error if a pause exists, or a state.ErrPauseNotFound error if
-	// a pause does not exist.
-	PauseExists(ctx context.Context, id uuid.UUID) error
 
 	// LeasePause allows us to lease the pause until the next step is enqueued, at which point
 	// we can 'consume' the pause to remove it.
@@ -42,7 +41,7 @@ type PauseMutater interface {
 	//
 	// Any data passed when consuming a pause will be stored within function run state
 	// for future reference using the pause's DataKey.
-	ConsumePause(ctx context.Context, p Pause, data any) (ConsumePauseResult, error)
+	ConsumePause(ctx context.Context, p Pause, opts ConsumePauseOpts) (ConsumePauseResult, func() error, error)
 
 	// DeletePause permanently deletes a pause.
 	DeletePause(ctx context.Context, p Pause) error
@@ -56,6 +55,10 @@ type PauseMutater interface {
 type PauseGetter interface {
 	// PausesByEvent returns all pauses for a given event, in a given workspace.
 	PausesByEvent(ctx context.Context, workspaceID uuid.UUID, eventName string) (PauseIterator, error)
+
+	// PauseLen returns the number of pauses for a given workspace ID, eventName combo in
+	// the conneted datastore.
+	PauseLen(ctx context.Context, workspaceID uuid.UUID, eventName string) (int64, error)
 
 	PausesByEventSince(ctx context.Context, workspaceID uuid.UUID, event string, since time.Time) (PauseIterator, error)
 
@@ -80,9 +83,18 @@ type PauseGetter interface {
 	// This should not return consumed pauses.
 	PauseByInvokeCorrelationID(ctx context.Context, wsID uuid.UUID, correlationID string) (*Pause, error)
 
+	// PauseBySignalCorrelationID returns a given pause by the correlation ID.
+	PauseBySignalID(ctx context.Context, wsID uuid.UUID, signalID string) (*Pause, error)
+
 	// PauseCreatedAt returns the timestamp a pause was created, using the given
 	// workspace <> event Index.
 	PauseCreatedAt(ctx context.Context, workspaceID uuid.UUID, event string, pauseID uuid.UUID) (time.Time, error)
+}
+
+// ConsumePauseOpts are the options to be passed in for consuming a pause
+type ConsumePauseOpts struct {
+	IdempotencyKey string
+	Data           any
 }
 
 type ConsumePauseResult struct {
@@ -192,6 +204,11 @@ type Pause struct {
 	// This is used to be able to accurately reconstruct the entire invocation
 	// span.
 	InvokeTargetFnID *string `json:"itFnID,omitempty"`
+	// SignalID is the ID of the signal that is responsible for this pause.
+	SignalID *string `json:"signalID,omitempty"`
+	// ReplaceSignalOnConflict indicates whether we should supersede the
+	// signal if a wait already exists for the signal ID.
+	ReplaceSignalOnConflict bool `json:"-"`
 	// OnTimeout indicates that this incoming edge should only be ran
 	// when the pause times out, if set to true.
 	OnTimeout bool `json:"onTimeout,omitempty,omitzero"`
@@ -222,6 +239,21 @@ type Pause struct {
 	TriggeringEventID *string `json:"tID,omitempty"`
 	// Metadata is additional metadata that should be stored with the pause
 	Metadata map[string]any
+}
+
+func (p Pause) GetOpcode() enums.Opcode {
+	if p.Opcode == nil {
+		return enums.OpcodeNone
+	}
+	switch *p.Opcode {
+	case enums.OpcodeWaitForEvent.String():
+		return enums.OpcodeWaitForEvent
+	case enums.OpcodeWaitForSignal.String():
+		return enums.OpcodeWaitForSignal
+	case enums.OpcodeInvokeFunction.String():
+		return enums.OpcodeInvokeFunction
+	}
+	return enums.OpcodeNone
 }
 
 func (p Pause) GetID() uuid.UUID {
@@ -258,8 +290,16 @@ func (p Pause) Edge() inngest.Edge {
 	}
 }
 
+func (p Pause) IsWaitForEvent() bool {
+	return p.Opcode != nil && *p.Opcode == enums.OpcodeWaitForEvent.String()
+}
+
 func (p Pause) IsInvoke() bool {
 	return p.Opcode != nil && *p.Opcode == enums.OpcodeInvokeFunction.String()
+}
+
+func (p Pause) IsSignal() bool {
+	return p.Opcode != nil && *p.Opcode == enums.OpcodeWaitForSignal.String()
 }
 
 type ResumeData struct {

@@ -13,16 +13,14 @@ import (
 	"sync"
 	"time"
 
-	v0 "github.com/inngest/inngest/pkg/connect/rest/v0"
-	"github.com/inngest/inngest/pkg/enums"
-
-	"github.com/inngest/inngest/pkg/connect/auth"
-
 	"github.com/inngest/inngest/pkg/cli"
+	"github.com/inngest/inngest/pkg/connect/auth"
+	v0 "github.com/inngest/inngest/pkg/connect/rest/v0"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/deploy"
 	"github.com/inngest/inngest/pkg/devserver/discovery"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/history"
@@ -30,7 +28,6 @@ import (
 	"github.com/inngest/inngest/pkg/execution/runner"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/inngest"
-	"github.com/inngest/inngest/pkg/inngest/log"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/pubsub"
 	"github.com/inngest/inngest/pkg/sdk"
@@ -66,6 +63,7 @@ func NewService(opts StartOpts, runner runner.Runner, data cqrs.Manager, pb pubs
 		redisClient:             rc,
 		historyWriter:           hw,
 		singleNodeServiceOpts:   snso,
+		log:                     logger.StdlibLogger(context.Background()),
 	}
 }
 
@@ -103,6 +101,8 @@ type devserver struct {
 	// These options are used to configure the server's behaviour as a
 	// single-node service instead of a dev environment.
 	singleNodeServiceOpts *SingleNodeServiceOpts
+
+	log logger.Logger
 }
 
 type SingleNodeServiceOpts struct {
@@ -238,7 +238,7 @@ func (d *devserver) startPersistenceRoutine(ctx context.Context) {
 		select {
 		case <-ticker.C:
 			if err := d.exportRedisSnapshot(ctx); err != nil {
-				logger.From(ctx).Error().Err(err).Msg("error exporting Redis snapshot")
+				d.log.Error("error exporting Redis snapshot", "error", err)
 			}
 		case <-ctx.Done():
 			return
@@ -251,7 +251,7 @@ func (d *devserver) startPersistenceRoutine(ctx context.Context) {
 // This lets the dev server start and wait for the SDK server to come up at
 // any point.
 func (d *devserver) runDiscovery(ctx context.Context) {
-	logger.From(ctx).Info().Msg("autodiscovering locally hosted SDKs")
+	d.log.Info("autodiscovering locally hosted SDKs")
 	pollInterval := time.Duration(d.Opts.PollInterval) * time.Second
 	for d.Opts.Autodiscover {
 		if ctx.Err() != nil {
@@ -260,7 +260,7 @@ func (d *devserver) runDiscovery(ctx context.Context) {
 		// If we have found any app, disable auto-discovery
 		apps, err := d.Data.GetApps(ctx, consts.DevServerEnvID, nil)
 		if err == nil && len(apps) > 0 {
-			logger.From(ctx).Info().Msg("apps synced, disabling auto-discovery")
+			d.log.Info("apps synced, disabling auto-discovery")
 			d.Opts.Autodiscover = false
 		} else {
 			_ = discovery.Autodiscover(ctx)
@@ -298,7 +298,7 @@ func (d *devserver) pollSDKs(ctx context.Context) {
 			},
 		}
 		if _, err := d.Data.UpsertApp(ctx, params); err != nil {
-			log.From(ctx).Error().Err(err).Msg("error inserting app from scan")
+			d.log.Error("error inserting app from scan", "error", err)
 		}
 	}
 
@@ -363,25 +363,25 @@ func (d *devserver) pollSDKs(ctx context.Context) {
 func (d *devserver) HandleEvent(ctx context.Context, e *event.Event, seed *event.SeededID) (string, error) {
 	// ctx is the request context, so we need to re-add
 	// the caller here.
-	l := logger.From(ctx).With().Str("caller", d.Name()).Logger()
-	ctx = logger.With(ctx, l)
+	l := d.log.With("caller", d.Name())
+	ctx = logger.WithStdlib(ctx, l)
 
-	l.Debug().Str("event", e.Name).Msg("handling event")
+	l.Debug("handling event", "event", e.Name)
 
 	trackedEvent := event.NewOSSTrackedEvent(*e, seed)
 
 	byt, err := json.Marshal(trackedEvent)
 	if err != nil {
-		l.Error().Err(err).Msg("error unmarshalling event as JSON")
+		l.Error("error unmarshalling event as JSON", "error", err)
 		return "", err
 	}
 
-	l.Info().
-		Str("event_name", trackedEvent.GetEvent().Name).
-		Str("internal_id", trackedEvent.GetInternalID().String()).
-		Str("external_id", trackedEvent.GetEvent().ID).
-		Interface("event", trackedEvent.GetEvent()).
-		Msg("publishing event")
+	l.Info("publishing event",
+		"event_name", trackedEvent.GetEvent().Name,
+		"internal_id", trackedEvent.GetInternalID().String(),
+		"external_id", trackedEvent.GetEvent().ID,
+		"event", trackedEvent.GetEvent(),
+	)
 
 	carrier := itrace.NewTraceCarrier()
 	itrace.UserTracer().Propagator().Inject(ctx, propagation.MapCarrier(carrier.Context))
@@ -409,18 +409,18 @@ func (d *devserver) exportRedisSnapshot(ctx context.Context) (err error) {
 	var (
 		snapshotID cqrs.SnapshotID
 		snapshot   = make(map[string]cqrs.SnapshotValue)
-		l          = logger.From(ctx).With().Str("caller", d.Name()).Logger()
+		l          = d.log.With("caller", d.Name())
 	)
 
-	l.Info().Msg("exporting Redis snapshot")
+	d.log.Info("exporting Redis snapshot")
 	defer func() {
 		if err != nil {
-			l.Error().Err(err).Msg("error exporting Redis snapshot")
+			l.Error("error exporting Redis snapshot", "error", err)
 		}
 
 		jsonData, _ := json.Marshal(snapshot)
 		humanSize := fmt.Sprintf("%.2fKB", float64(len(jsonData))/1024)
-		l.Info().Str("size", humanSize).Str("snapshot_id", snapshotID.String()).Msg("exported Redis snapshot")
+		d.log.Info("exported Redis snapshot", "size", humanSize, "snapshot_id", snapshotID.String())
 	}()
 
 	// Get a dedicated client for this operation, which should block all other
@@ -543,19 +543,19 @@ func (d *devserver) importRedisSnapshot(ctx context.Context) (imported bool, err
 	d.singleNodeServiceOpts.snapshotLock.Lock()
 	defer d.singleNodeServiceOpts.snapshotLock.Unlock()
 
-	l := logger.From(ctx).With().Str("caller", d.Name()).Logger()
-	l.Info().Msg("importing Redis snapshot")
+	l := d.log.With("caller", d.Name())
+	l.Info("importing Redis snapshot")
 
 	snapshot, err := d.Data.GetLatestQueueSnapshot(ctx)
 	defer func() {
 		if err != nil {
-			l.Error().Err(err).Msg("error importing Redis snapshot")
+			l.Error("error importing Redis snapshot", "error", err)
 		} else if imported {
 			jsonData, _ := json.Marshal(snapshot)
 			humanSize := fmt.Sprintf("%.2fKB", float64(len(jsonData))/1024)
-			l.Info().Str("size", humanSize).Msg("imported Redis snapshot")
+			l.Info("imported Redis snapshot", "size", humanSize)
 		} else {
-			l.Info().Msg("no snapshot to import")
+			l.Info("no snapshot to import")
 		}
 	}()
 	if err != nil {
@@ -601,7 +601,7 @@ func (d *devserver) importRedisSnapshot(ctx context.Context) (imported bool, err
 				if strVal, ok := v.(string); ok {
 					strValues = append(strValues, strVal)
 				} else {
-					l.Warn().Interface("value", v).Msgf("skipping non-string value in set for key %s", key)
+					l.Warn("skipping non-string value in set for key", "key", key, "value", v)
 				}
 			}
 			saddCmd := rc.B().Sadd().Key(key).Member(strValues...).Build()
@@ -713,15 +713,16 @@ func upsertErroredApp(
 	appURL string,
 	pingError error,
 ) {
+	l := logger.StdlibLogger(ctx)
 	tx, err := mgr.WithTx(ctx)
 	if err != nil {
-		logger.From(ctx).Error().Err(err).Msg("error creating transaction")
+		l.Error("error creating transaction", "error", err)
 		return
 	}
 
 	rollback := func(ctx context.Context) {
 		if err := tx.Rollback(ctx); err != nil {
-			logger.From(ctx).Error().Err(err).Msg("error rolling back transaction")
+			l.Error("error rolling back transaction", "error", err)
 		}
 	}
 
@@ -738,13 +739,13 @@ func upsertErroredApp(
 			Url: appURL,
 		})
 		if err != nil {
-			logger.From(ctx).Error().Err(err).Msg("error inserting app")
+			l.Error("error inserting app", "error", err)
 			rollback(ctx)
 			return
 		}
 
 		if err = tx.Commit(ctx); err != nil {
-			logger.From(ctx).Error().Err(err).Msg("error inserting app")
+			l.Error("error inserting app", "error", err)
 			rollback(ctx)
 			return
 		}
@@ -753,7 +754,7 @@ func upsertErroredApp(
 	}
 
 	if err != nil {
-		logger.From(ctx).Error().Err(err).Msg("error getting app")
+		l.Error("error getting app", "error", err)
 		rollback(ctx)
 		return
 	}
@@ -765,13 +766,13 @@ func upsertErroredApp(
 		},
 	})
 	if err != nil {
-		logger.From(ctx).Error().Err(err).Msg("error updating app")
+		l.Error("error updating app", "error", err)
 		rollback(ctx)
 		return
 	}
 
 	if err = tx.Commit(ctx); err != nil {
-		logger.From(ctx).Error().Err(err).Msg("error updating app")
+		l.Error("error updating app", "error", err)
 		rollback(ctx)
 		return
 	}

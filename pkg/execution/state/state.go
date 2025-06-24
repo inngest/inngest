@@ -2,6 +2,7 @@ package state
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -30,14 +31,21 @@ var (
 	ErrRunNotFound         = fmt.Errorf("run not found in state store")
 	// ErrPauseLeased is returned when attempting to lease a pause that is
 	// already leased by another event.
-	ErrPauseLeased        = fmt.Errorf("pause already leased")
-	ErrPauseAlreadyExists = fmt.Errorf("pause already exists")
-	ErrIdentifierExists   = fmt.Errorf("identifier already exists")
-	ErrFunctionCancelled  = fmt.Errorf("function cancelled")
-	ErrFunctionComplete   = fmt.Errorf("function completed")
-	ErrFunctionFailed     = fmt.Errorf("function failed")
-	ErrFunctionOverflowed = fmt.Errorf("function has too many steps")
-	ErrDuplicateResponse  = fmt.Errorf("duplicate response")
+	ErrPauseLeased         = fmt.Errorf("pause already leased")
+	ErrPauseAlreadyExists  = fmt.Errorf("pause already exists")
+	ErrSignalConflict      = fmt.Errorf("signal wait already exists for another run")
+	ErrIdentifierExists    = fmt.Errorf("identifier already exists")
+	ErrIdentifierTomestone = fmt.Errorf("run for idempotency key is done")
+	ErrInvalidIdentifier   = fmt.Errorf("identifier is not a valid ULID")
+	ErrFunctionCancelled   = fmt.Errorf("function cancelled")
+	ErrFunctionComplete    = fmt.Errorf("function completed")
+	ErrFunctionFailed      = fmt.Errorf("function failed")
+	ErrFunctionOverflowed  = fmt.Errorf("function has too many steps")
+	ErrDuplicateResponse   = fmt.Errorf("duplicate response")
+	// ErrIdempotentResponse is used when saving a step's result, and indicates that the step
+	// already had the exact data in the state store.  This allows higher level code to save
+	// the same step data multiple times relying on this error for idempotency checking.
+	ErrIdempotentResponse = fmt.Errorf("idempotent response")
 	ErrEventNotFound      = fmt.Errorf("event not found in state store")
 	ErrFunctionPaused     = fmt.Errorf("function is paused")
 	ErrStateOverflowed    = fmt.Errorf("state is too large")
@@ -110,7 +118,8 @@ type CustomConcurrency struct {
 	// this concurrency key.
 	Limit int `json:"l"`
 
-	// UnhashedEvaluatedKeyValue stores the unhashed evaluated key value
+	// UnhashedEvaluatedKeyValue stores the unhashed evaluated key value.
+	// This is only set after Schedule() or backlog normalization.
 	UnhashedEvaluatedKeyValue string `json:"-"`
 }
 
@@ -311,6 +320,9 @@ type State interface {
 type Manager interface {
 	StateLoader
 	Mutater
+
+	// PauseManager embeds buffering pause services.  Note that this is
+	// superseded by pauses.Manager.
 	PauseManager
 }
 
@@ -406,6 +418,11 @@ type Mutater interface {
 type MemoizedStep struct {
 	ID   string `json:"id"`
 	Data any    `json:"data"`
+}
+
+type SignalStepReturn struct {
+	Signal string          `json:"signal"`
+	Data   json.RawMessage `json:"data"`
 }
 
 // Input is the input for creating new state.  The required fields are Workflow,

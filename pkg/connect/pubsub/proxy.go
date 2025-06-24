@@ -6,27 +6,27 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/inngest/inngest/pkg/connect/routing"
-	"github.com/inngest/inngest/pkg/connect/state"
-	"github.com/inngest/inngest/pkg/consts"
-	"github.com/inngest/inngest/pkg/syscode"
-	"github.com/inngest/inngest/pkg/telemetry/trace"
-	"github.com/inngest/inngest/pkg/util"
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/codes"
-	"go.opentelemetry.io/otel/propagation"
-	"google.golang.org/protobuf/types/known/timestamppb"
-	"log/slog"
 	mathRand "math/rand"
 	"sync"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/connect/routing"
+	"github.com/inngest/inngest/pkg/connect/state"
+	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/syscode"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
+	"github.com/inngest/inngest/pkg/telemetry/trace"
+	"github.com/inngest/inngest/pkg/util"
 	connectpb "github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
+	"go.opentelemetry.io/otel/propagation"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 const (
@@ -94,7 +94,7 @@ type redisPubSubConnector struct {
 	subscribers     map[string]map[string]chan string
 	subscribersLock sync.RWMutex
 
-	logger *slog.Logger
+	logger logger.Logger
 	tracer trace.ConditionalTracer
 
 	stateManager state.StateManager
@@ -106,7 +106,7 @@ type redisPubSubConnector struct {
 }
 
 type RedisPubSubConnectorOpts struct {
-	Logger             *slog.Logger
+	Logger             logger.Logger
 	Tracer             trace.ConditionalTracer
 	StateManager       state.StateManager
 	EnforceLeaseExpiry EnforceLeaseExpiryFunc
@@ -132,7 +132,9 @@ type ProxyOpts struct {
 	AccountID uuid.UUID
 	EnvID     uuid.UUID
 	AppID     uuid.UUID
+	SpanID    string
 	Data      *connectpb.GatewayExecutorRequestData
+	logger    logger.Logger
 }
 
 // Proxy forwards a request to the executor and waits for a response.
@@ -140,12 +142,22 @@ type ProxyOpts struct {
 // If the gateway does not ack the message within a 10-second timeout, an error is returned.
 // If no response is received before the context is canceled, an error is returned.
 func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*connectpb.SDKResponse, error) {
-	<-i.setup
+	select {
+	case <-i.setup:
+	case <-time.After(10 * time.Second):
+		return nil, fmt.Errorf("expected setup to be completed within 10s")
+	}
 
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
-	l := i.logger.With(
+	l := logger.StdlibLogger(ctx)
+	if opts.logger != nil {
+		l = opts.logger
+	}
+
+	l = l.With(
+		"scope", "connect_proxy",
 		"app_id", opts.AppID.String(),
 		"env_id", opts.EnvID.String(),
 		"account_id", opts.AccountID.String(),
@@ -203,9 +215,19 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 	}
 
 	{
-		userTraceCtx := propagation.MapCarrier{}
-		// Note: The user context is stored in `ctx`
-		trace.UserTracer().Propagator().Inject(ctx, userTraceCtx)
+
+		userTraceCtx, err := trace.HeadersFromTraceState(
+			ctx,
+			opts.SpanID,
+			opts.AppID.String(),
+			opts.Data.FunctionId,
+		)
+		if err != nil {
+			span.RecordError(err)
+			l.Error("could not get user trace ctx", "err", err)
+			return nil, fmt.Errorf("could not get user trace ctx: %w", err)
+		}
+
 		marshaled, err := json.Marshal(userTraceCtx)
 		if err != nil {
 			return nil, fmt.Errorf("could not marshal user trace ctx: %w", err)
@@ -232,12 +254,17 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 					},
 				})
 			}, true, gatewayAckSubscribed)
-			if !gatewayAcked {
+			if ctx.Err() != nil && !gatewayAcked {
 				span.RecordError(fmt.Errorf("gateway ack not received in time"))
 				l.Warn("gateway did not ack request")
 			}
 		}()
-		<-gatewayAckSubscribed
+
+		select {
+		case <-gatewayAckSubscribed:
+		case <-time.After(5 * time.Second):
+			return nil, fmt.Errorf("did not subscribe to gateway ack within 5s")
+		}
 	}
 
 	// Receive worker acknowledgement for o11y (this is not a reliable channel - do not depend on it for the critical path)
@@ -254,7 +281,12 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 				})
 			}, true, workerAckSubscribed)
 		}()
-		<-workerAckSubscribed
+
+		select {
+		case <-workerAckSubscribed:
+		case <-time.After(5 * time.Second):
+			return nil, fmt.Errorf("did not subscribe to worker ack within 5s")
+		}
 	}
 
 	// Await SDK response forwarded by gateway
@@ -266,6 +298,8 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 	go func() {
 		for {
 			select {
+			case <-ctx.Done():
+				return
 			case <-waitForResponseCtx.Done():
 				return
 			// Poll every two seconds with a jitter of up to 3 seconds
@@ -280,6 +314,8 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 			}
 
 			if resp != nil {
+				span.AddEvent("ReplyReceivedPoll")
+
 				l.Debug("received response via polling")
 
 				reply = resp
@@ -287,6 +323,8 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 				cancelWaitForResponseCtx()
 				return
 			}
+
+			span.AddEvent("ReplyPollOk")
 		}
 	}()
 
@@ -299,6 +337,8 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 			// This may take a while: This waits until we receive the SDK response, and we allow for up to 2h in the serverless execution model
 			i.subscribe(waitForResponseCtx, i.channelAppRequestsReply(opts.Data.RequestId), func(msg string) {
 				span.AddEvent("ReplyReceived")
+
+				l.Debug("received response via pubsub")
 
 				err := proto.Unmarshal([]byte(msg), reply)
 				if err != nil {
@@ -313,7 +353,12 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 				cancelWaitForResponseCtx()
 			}, true, replySubscribed)
 		}()
-		<-replySubscribed
+
+		select {
+		case <-replySubscribed:
+		case <-time.After(5 * time.Second):
+			return nil, fmt.Errorf("did not subscribe to reply within 5s")
+		}
 	}
 
 	// Attempt to lease the request. If the request is still running on a worker,
@@ -379,6 +424,7 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 			}
 
 			l.Debug("request is still leased by worker")
+			span.AddEvent("RequestLeaseOk")
 		}
 	}()
 
@@ -411,9 +457,21 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 		}
 
 		l.Debug("forwarded executor request to gateway", "gateway_id", route.GatewayID, "conn_id", route.ConnectionID)
+
+		metrics.IncrConnectRouterPubSubMessageSentCounter(ctx, 1, metrics.CounterOpt{
+			PkgName: pkgName,
+		})
 	}
 
 	select {
+	case <-ctx.Done():
+		return nil, fmt.Errorf("parent context was closed unexpectedly")
+	// Handle maximum function timeout
+	case <-time.After(consts.MaxFunctionTimeout):
+		return nil, syscode.Error{
+			Code:    syscode.CodeRequestTooLong,
+			Message: "The worker took longer than the maximum request duration to respond to the request.",
+		}
 	// Await SDK response forwarded by gateway
 	// This may take a while: This waits until we receive the SDK response, and we allow for up to 2h in the serverless execution model
 	case <-waitForResponseCtx.Done():
@@ -442,6 +500,7 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 			l.Error("could not delete response", "err", err)
 		}
 
+		l.Debug("returning reply", "status", reply.Status)
 		return reply, nil
 	// If the worker terminates or otherwise fails to continue extending the lease,
 	// we must retry the step as soon as possible.

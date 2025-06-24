@@ -14,7 +14,7 @@ import EnvSelectMenu from '@/components/Environments/EnvSelectMenu';
 import { graphql } from '@/gql';
 import { useEnvironments } from '@/queries';
 import type { Environment } from '@/utils/environments';
-import { GetDatadogSetupDataDocument, ddMarketplaceHref } from './SetupPage';
+import { GetDatadogSetupDataDocument, ddIntegrationHref } from './SetupPage';
 
 const EnableDatadogConnectionDocument = graphql(`
   mutation EnableDatadogConnection($organizationID: UUID!, $envID: UUID!) {
@@ -102,7 +102,12 @@ export default function AddConnectionPage({}) {
   }
 
   return (
-    <Card accentColor={cardAccentColor} accentPosition="left" className="w-full">
+    <Card
+      accentColor={cardAccentColor}
+      accentPosition="left"
+      className="h-full overflow-visible"
+      contentClassName="overflow-visible"
+    >
       <Card.Header>
         <div className="text-basis mb-1 text-sm">Choose an environment to connect to Datadog:</div>
         <EnvSelectMenu onSelect={onEnvSelect} className="mb-2" />
@@ -122,7 +127,7 @@ export default function AddConnectionPage({}) {
             </p>
             <p>
               To connect a new Datadog organization, please{' '}
-              <Link href={ddMarketplaceHref} className="underline">
+              <Link href={ddIntegrationHref} className="underline">
                 navigate to the Inngest integration from your Datadog organization
               </Link>{' '}
               and start the connection process from there.

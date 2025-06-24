@@ -8,7 +8,6 @@
   -1 - Shadow partition not found
   -2 - Shadow partition not leased
   -3 - Shadow partition already leased
-  -4 - Shadow partition paused
 
 ]]
 
@@ -45,10 +44,6 @@ if existing.leaseID ~= leaseID and decode_ulid_time(existing.leaseID) > nowMS th
   return -3
 end
 
--- If shadow partition is paused (no refill), skip
-if existing.norefill then
-  return -4
-end
 
 -- Update to new lease ID
 existing.leaseID = newLeaseID

@@ -20,15 +20,15 @@ import (
 )
 
 const (
-	EventReceivedName  = "event/event.received"
-	InternalNamePrefix = "inngest/"
-	FnFailedName       = InternalNamePrefix + "function.failed"
-	FnFinishedName     = InternalNamePrefix + "function.finished"
-	FnCancelledName    = InternalNamePrefix + "function.cancelled"
+	EventReceivedName  = consts.EventReceivedName
+	InternalNamePrefix = consts.InternalNamePrefix
+	FnFailedName       = consts.FnFailedName
+	FnFinishedName     = consts.FnFinishedName
+	FnCancelledName    = consts.FnCancelledName
 	// InvokeEventName is the event name used to invoke specific functions via an
 	// API.  Note that invoking functions still sends an event in the usual manner.
-	InvokeFnName = InternalNamePrefix + "function.invoked"
-	FnCronName   = InternalNamePrefix + "scheduled.timer"
+	InvokeFnName = consts.FnInvokeName
+	FnCronName   = consts.FnCronName
 )
 
 var (

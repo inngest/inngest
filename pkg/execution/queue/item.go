@@ -7,6 +7,11 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/inngest/inngest/pkg/enums"
+	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
+	"github.com/inngest/inngest/pkg/expressions"
+	"github.com/inngest/inngest/pkg/util"
+
 	"github.com/cespare/xxhash/v2"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
@@ -81,10 +86,60 @@ type QueueItem struct {
 	// the idempotency key immediately;  the same debounce key should become available
 	// for another debounced function run.
 	IdempotencyPeriod *time.Duration `json:"ip,omitempty"`
+
+	// Refilled from backlog ID, set if item was refilled from backlog. Removed during requeue to partition.
+	RefilledFrom string `json:"rf,omitempty"`
+	RefilledAt   int64  `json:"rat,omitempty"`
+
+	// EnqueuedAt tracks the unix timestamp of enqueueing the queue item (to the backlog or directly to
+	// the partition). This is not the same as AtMS for items scheduled in the future or past.
+	EnqueuedAt int64 `json:"eat"`
 }
 
 func (q *QueueItem) SetID(ctx context.Context, str string) {
 	q.ID = HashID(ctx, str)
+}
+
+// IsPromotableScore returns whether a score can be fudged.
+func (q QueueItem) IsPromotableScore() bool {
+	switch q.Data.Kind {
+	case KindStart, KindSleep, KindEdge, KindPause, KindEdgeError:
+		// All user jobs can be fudged.
+		return true
+	}
+	return false
+}
+
+// RequiresPromotion returns true if the score needs future promotion (fudging the numbers!)
+// This is the case when a workflow job is enqueued in the future:
+//
+// - Workflow T0 runs a job which retries at T10
+// - 1,000,000 steps are enqueued for other workflows at T5
+// - At T10...
+//   - In order to run workflow T0's retry, we have to complete all 1M jobs from
+//     other *later* workflows before attempting the retry, meaning that we do not
+//     run older run's jobs before newer runs jobs.
+//
+// Future fudging allows us to reschedule jobs at an aprpoproate time through some other
+// queueing means.
+func (q QueueItem) RequiresPromotionJob(now time.Time) bool {
+	if !q.IsPromotableScore() {
+		// If this doesn't have fudging enabled, ignore.
+		return false
+	}
+
+	if now.IsZero() {
+		now = time.Now()
+	}
+
+	// If this is > 2 seconds in the future, don't mess with the time.
+	// This prevents any accidental fudging of future run times, even if the
+	// kind is edge (which should never exist... but, better to be safe).
+	if q.AtMS > now.Add(consts.FutureAtLimit).UnixMilli() {
+		return true
+	}
+
+	return false
 }
 
 // Score returns the score (time that the item should run) for the queue item.
@@ -101,17 +156,7 @@ func (q QueueItem) Score(now time.Time) int64 {
 		now = time.Now()
 	}
 
-	// If this is not a start/simple edge/edge error, we can ignore this.
-	if (q.Data.Kind != KindStart &&
-		q.Data.Kind != KindEdge &&
-		q.Data.Kind != KindEdgeError) || q.Data.Attempt > 0 {
-		return q.AtMS
-	}
-
-	// If this is > 2 seconds in the future, don't mess with the time.
-	// This prevents any accidental fudging of future run times, even if the
-	// kind is edge (which should never exist... but, better to be safe).
-	if q.AtMS > now.Add(consts.FutureAtLimit).UnixMilli() {
+	if !q.IsPromotableScore() || q.RequiresPromotionJob(now) {
 		return q.AtMS
 	}
 
@@ -135,6 +180,35 @@ func (q QueueItem) MarshalBinary() ([]byte, error) {
 // based on the time passed in.
 func (q QueueItem) IsLeased(time time.Time) bool {
 	return q.LeaseID != nil && ulid.Time(q.LeaseID.Time()).After(time)
+}
+
+// SojournLatency is the delay due to concurrency limits, throttle, or other user-defined concurrency.
+func (q QueueItem) SojournLatency(now time.Time) time.Duration {
+	if q.RefilledAt == 0 {
+		var sojourn time.Duration
+		if q.EarliestPeekTime > 0 {
+			sojourn = now.Sub(time.UnixMilli(q.EarliestPeekTime))
+		}
+
+		return sojourn
+	}
+
+	refillDelay := time.Duration(q.RefilledAt-q.EnqueuedAt) * time.Millisecond
+	return refillDelay
+}
+
+// Latency represents the processing delay excluding sojourn latency.
+func (q QueueItem) Latency(now time.Time) time.Duration {
+	if q.RefilledAt == 0 {
+		sojourn := q.SojournLatency(now)
+
+		return now.Sub(time.UnixMilli(q.WallTimeMS)) - sojourn
+	}
+
+	// Time between refill and lease/processing
+	refilledAt := time.UnixMilli(q.RefilledAt)
+	processingDelay := now.Sub(refilledAt)
+	return processingDelay
 }
 
 // Item represents an item stored within a queue.
@@ -168,7 +242,7 @@ type Item struct {
 	Payload any `json:"payload,omitempty"`
 	// Metadata is used for storing additional metadata related to the queue item.
 	// e.g. tracing data
-	Metadata map[string]string `json:"metadata,omitempty"`
+	Metadata map[string]any `json:"metadata,omitempty"`
 	// QueueName allows control over the queue name.  If not provided, this falls
 	// back to the queue mapping defined on the queue or the workflow ID of the fn.
 	QueueName *string `json:"qn,omitempty"`
@@ -177,6 +251,9 @@ type Item struct {
 	// Throttle represents GCRA rate limiting for the queue item, which is applied when
 	// attempting to lease the item from the queue.
 	Throttle *Throttle `json:"throttle,omitempty"`
+	// Singleton represents a singleton key for the queue item, which is used to
+	// not allow multiple start items to be scheduled at the same time.
+	Singleton *Singleton `json:"singleton,omitempty"`
 	// CustomConcurrencyKeys stores custom concurrency keys for this function run.  This
 	// allows us to use custom concurrency keys for each job when processing steps for
 	// the function, with cached expression results.
@@ -190,6 +267,13 @@ type Item struct {
 	// this run has.  All next steps will use this as the factor when scheduling
 	// future edge jobs (on their first attempt).
 	PriorityFactor *int64 `json:"pf,omitempty"`
+}
+
+func (i Item) GetMaxAttempts() int {
+	if i.MaxAttempts == nil {
+		return consts.DefaultRetryCount
+	}
+	return *i.MaxAttempts
 }
 
 type Throttle struct {
@@ -207,7 +291,17 @@ type Throttle struct {
 	// Otherwise, this is the function ID. In the case of evaluated keys, this may be large and should be truncated before usage.
 	UnhashedThrottleKey string `json:"-"`
 
-	KeyExpressionHash string `json:"-"`
+	KeyExpressionHash string `json:"keh"`
+}
+
+type Singleton struct {
+	// Key is the unique singleton key that's used to group queue items when
+	// processing singleton items.
+	Key string `json:"k"`
+
+	// Mode defines the behavior when a new singleton run is queued while another is active.
+	// It determines whether to skip the new run or cancel the current one and replace it.
+	Mode enums.SingletonMode `json:"m"`
 }
 
 // SpanID generates a spanID based on the combination the jobID and attempt
@@ -266,13 +360,6 @@ func (i Item) GetPriorityFactor() int64 {
 	return 0
 }
 
-func (i Item) GetMaxAttempts() int {
-	if i.MaxAttempts == nil {
-		return consts.DefaultRetryCount
-	}
-	return *i.MaxAttempts
-}
-
 // IsStepKind determines if the item is considered a step
 func (i Item) IsStepKind() bool {
 	return i.Kind == KindStart || i.Kind == KindEdge || i.Kind == KindSleep || i.Kind == KindEdgeError
@@ -287,10 +374,11 @@ func (i *Item) UnmarshalJSON(b []byte) error {
 		Attempt               int                       `json:"atts"`
 		MaxAttempts           *int                      `json:"maxAtts,omitempty"`
 		Payload               json.RawMessage           `json:"payload"`
-		Metadata              map[string]string         `json:"metadata"`
+		Metadata              map[string]any            `json:"metadata"`
 		QueueName             *string                   `json:"qn,omitempty"`
 		RunInfo               *RunInfo                  `json:"runinfo,omitempty"`
 		Throttle              *Throttle                 `json:"throttle"`
+		Singleton             *Singleton                `json:"singleton"`
 		CustomConcurrencyKeys []state.CustomConcurrency `json:"cck,omitempty"`
 		PriorityFactor        *int64                    `json:"pf,omitempty"`
 	}
@@ -308,6 +396,7 @@ func (i *Item) UnmarshalJSON(b []byte) error {
 	i.MaxAttempts = temp.MaxAttempts
 	i.Metadata = temp.Metadata
 	i.Throttle = temp.Throttle
+	i.Singleton = temp.Singleton
 	i.RunInfo = temp.RunInfo
 	i.CustomConcurrencyKeys = temp.CustomConcurrencyKeys
 	i.PriorityFactor = temp.PriorityFactor
@@ -350,6 +439,15 @@ func (i *Item) UnmarshalJSON(b []byte) error {
 			return err
 		}
 		i.Payload = *p
+	case KindJobPromote:
+		if len(temp.Payload) == 0 {
+			return nil
+		}
+		p := &PayloadJobPromote{}
+		if err := json.Unmarshal(temp.Payload, p); err != nil {
+			return err
+		}
+		i.Payload = *p
 	}
 	return nil
 }
@@ -374,17 +472,99 @@ type PayloadPauseBlockFlush struct {
 	EventName string `json:"e"`
 }
 
+type PayloadJobPromote struct {
+	PromoteJobID string `json:"sjid"`
+	ScheduledAt  int64  `json:"su"`
+}
+
 // PayloadPauseTimeout is the payload stored when enqueueing a pause timeout, eg.
 // a future task to check whether an event has been received yet.
 //
 // This is always enqueued from any async match;  we must correctly decrement the
 // pending count in cases where the event is not received.
 type PayloadPauseTimeout struct {
-	PauseID   uuid.UUID `json:"pauseID"`
-	OnTimeout bool      `json:"onTimeout"`
+	// PauseID is the ID of the pause that the timeout job will resume.  This has
+	// existed since the beginning of Inngest, and is included for backcompat for
+	// future jobs.
+	PauseID uuid.UUID `json:"pauseID"`
+	// Pause is the full pause struct for the timeout job.  Note that the identifier
+	// should not exist in the pause, as it already exists in the queue item.
+	Pause state.Pause `json:"pause"`
 }
 
 func HashID(_ context.Context, id string) string {
 	ui := xxhash.Sum64String(id)
 	return strconv.FormatUint(ui, 36)
+}
+
+func GetThrottleConfig(ctx context.Context, fnID uuid.UUID, throttle *inngest.Throttle, evtMap map[string]any) *Throttle {
+	if throttle == nil {
+		return nil
+	}
+
+	unhashedThrottleKey := fnID.String()
+	throttleKey := HashID(ctx, unhashedThrottleKey)
+	var throttleExpr string
+	if throttle.Key != nil {
+		val, _, _ := expressions.Evaluate(ctx, *throttle.Key, map[string]any{
+			"event": evtMap,
+		})
+		unhashedThrottleKey = fmt.Sprintf("%v", val)
+		throttleKey = throttleKey + "-" + HashID(ctx, unhashedThrottleKey)
+		throttleExpr = *throttle.Key
+	}
+
+	return &Throttle{
+		Key:                 throttleKey,
+		Limit:               int(throttle.Limit),
+		Burst:               int(throttle.Burst),
+		Period:              int(throttle.Period.Seconds()),
+		UnhashedThrottleKey: unhashedThrottleKey,
+		KeyExpressionHash:   util.XXHash(throttleExpr),
+	}
+}
+
+func GetCustomConcurrencyKeys(ctx context.Context, id sv2.ID, customConcurrency []inngest.Concurrency, evtMap map[string]any) []state.CustomConcurrency {
+	if len(customConcurrency) == 0 {
+		return nil
+	}
+
+	var keys []state.CustomConcurrency
+
+	// Ensure we evaluate concurrency keys when scheduling the function.
+	for _, limit := range customConcurrency {
+		if !limit.IsCustomLimit() {
+			continue
+		}
+
+		// Ensure we bind the limit to the correct scope.
+		scopeID := id.FunctionID
+		switch limit.Scope {
+		case enums.ConcurrencyScopeAccount:
+			scopeID = id.Tenant.AccountID
+		case enums.ConcurrencyScopeEnv:
+			scopeID = id.Tenant.EnvID
+		}
+
+		evaluated := limit.Evaluate(ctx, evtMap)
+		key := util.ConcurrencyKey(limit.Scope, scopeID, evaluated)
+
+		// Store the concurrency limit in the function.  By copying in the raw expression hash,
+		// we can update the concurrency limits for in-progress runs as new function versions
+		// are stored.
+		//
+		// The raw keys are stored in the function state so that we don't need to re-evaluate
+		// keys and input each time, as they're constant through the function run.
+		keys = append(
+			keys,
+			sv2.CustomConcurrency{
+				Key:                       key,
+				Hash:                      limit.Hash,
+				Limit:                     limit.Limit,
+				UnhashedEvaluatedKeyValue: evaluated,
+			},
+		)
+	}
+
+	return keys
 }
