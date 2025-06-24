@@ -47,8 +47,7 @@ jobs:
 
       - name: Test
         run: |
-          curl -sfL https://raw.githubusercontent.com/Songmu/gotesplit/main/install.sh | sh -s
-          bin/gotesplit -total ${{ matrix.parallelism }} -index ${{ matrix.index }} $(find . -iname "*_test.go" | xargs -I {} dirname {} | uniq | grep -v "./tests") -- -v -race -count=1
+          go test -v $(find . -iname "*_test.go" | xargs -I {} dirname {} | uniq | grep -v "./tests") -race -count=1
         env:
           TEST_MODE: true
           EXPERIMENTAL_KEY_QUEUES_ENABLE: "${{ matrix.experimentalKeyQueues }}"
