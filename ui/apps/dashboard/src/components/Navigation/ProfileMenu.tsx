@@ -41,6 +41,17 @@ export const ProfileMenu = ({ children, isMarketplace }: Props) => {
 
           <hr className="border-subtle" />
 
+          <NextLink href="/settings/user" scroll={false}>
+            <Listbox.Option
+              className="text-muted hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
+              value="userProfile"
+            >
+              <div className="hover:bg-canvasSubtle flex flex-row items-center justify-start">
+                <RiUserLine className="text-muted mr-2 h-4 w-4" />
+                <div>Your Profile</div>
+              </div>
+            </Listbox.Option>
+          </NextLink>
           <NextLink href="/settings/organization" scroll={false}>
             <Listbox.Option
               className="text-muted hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
@@ -77,17 +88,6 @@ export const ProfileMenu = ({ children, isMarketplace }: Props) => {
               </Listbox.Option>
             </NextLink>
           )}
-          <NextLink href="/sign-in/choose" scroll={false}>
-            <Listbox.Option
-              className="text-muted hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
-              value="switchAccount"
-            >
-              <div className="hover:bg-canvasSubtle flex flex-row items-center justify-start">
-                <RiUserAddLine className="text-muted mr-2 h-4 w-4" />
-                <div>Switch Account</div>
-              </div>
-            </Listbox.Option>
-          </NextLink>
           <a href="/organization-list">
             <Listbox.Option
               className="text-muted hover:bg-canvasSubtle m-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
@@ -102,17 +102,18 @@ export const ProfileMenu = ({ children, isMarketplace }: Props) => {
 
           <hr className="border-subtle" />
 
-          <NextLink href="/settings/user" scroll={false}>
+          <NextLink href="/sign-in/choose" scroll={false}>
             <Listbox.Option
-              className="text-muted hover:bg-canvasSubtle mx-2 mt-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
-              value="userProfile"
+              className="text-muted hover:bg-canvasSubtle m-2 mx-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
+              value="switchAccount"
             >
               <div className="hover:bg-canvasSubtle flex flex-row items-center justify-start">
-                <RiUserLine className="text-muted mr-2 h-4 w-4" />
-                <div>Your Profile</div>
+                <RiUserAddLine className="text-muted mr-2 h-4 w-4" />
+                <div>Switch Account</div>
               </div>
             </Listbox.Option>
           </NextLink>
+          <hr className="border-subtle" />
           <Listbox.Option
             className="text-muted hover:bg-canvasSubtle m-2 flex h-8 cursor-pointer items-center px-2 text-[13px]"
             value="signOut"
