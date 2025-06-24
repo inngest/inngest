@@ -39,6 +39,7 @@ func NewCmdStart(rootCmd *cobra.Command) *cobra.Command {
 	baseFlags.StringSliceP("sdk-url", "u", []string{}, "App serve URLs to sync (ex. http://localhost:3000/api/inngest)")
 	baseFlags.String("signing-key", "", "Signing key used to sign and validate data between the server and apps.")
 	baseFlags.StringSlice("event-key", []string{}, "Event key(s) that will be used by apps to send events to the server.")
+	baseFlags.String("realtime-jwt-secret", "", "JWT secret used for realtime connections and authentication.")
 	cmd.Flags().AddFlagSet(baseFlags)
 	groups = append(groups, FlagGroup{name: "Flags:", fs: baseFlags})
 
@@ -158,6 +159,7 @@ func doStart(cmd *cobra.Command, args []string) {
 		SQLiteDir:          viper.GetString("sqlite-dir"),
 		SigningKey:         viper.GetString("signing-key"),
 		EventKey:           viper.GetStringSlice("event-key"),
+		RealtimeJWTSecret:  []byte(viper.GetString("realtime-jwt-secret")),
 		ConnectGatewayPort: viper.GetInt("connect-gateway-port"),
 	}
 
