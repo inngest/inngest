@@ -12,7 +12,6 @@ import { ArchivedAppBanner } from '@/components/ArchivedAppBanner';
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { ArchiveModal } from './ArchiveModal';
 import { ResyncButton } from './ResyncButton';
-import ResyncModal from './ResyncModal';
 import { UnarchiveButton } from './UnarchiveButton';
 import { ValidateModal } from './ValidateButton/ValidateModal';
 import { useNavData } from './useNavData';
@@ -42,7 +41,6 @@ const Error = ({ error, externalID }: { error: Error; externalID: string }) => {
 export default function Layout({ children, params: { externalID } }: Props) {
   const [showArchive, setShowArchive] = useState(false);
   const [showValidate, setShowValidate] = useState(false);
-  const [showResync, setShowResync] = useState(false);
   const pathname = usePathname();
 
   const externalAppID = decodeURIComponent(externalID);
@@ -71,16 +69,6 @@ export default function Layout({ children, params: { externalID } }: Props) {
           onClose={() => setShowArchive(false)}
         />
       )}
-      {res.data?.latestSync?.url && (
-        <ResyncModal
-          appExternalID={externalAppID}
-          appMethod={res.data.method}
-          isOpen={showResync}
-          onClose={() => setShowResync(false)}
-          url={res.data.latestSync.url}
-          platform={res.data.latestSync.platform}
-        />
-      )}
       <Header
         breadcrumb={[
           { text: 'Apps', href: `/env/${env.slug}/apps` },
@@ -100,9 +88,7 @@ export default function Layout({ children, params: { externalID } }: Props) {
                 showArchive={() => setShowArchive(true)}
                 disableArchive={!res.data.latestSync?.url}
                 showValidate={() => setShowValidate(true)}
-                disableValidate={res.data.isParentArchived}
-                showResync={() => setShowResync(true)}
-                disableResync={res.data.isArchived}
+                disableResync={true}
                 disableValidate={
                   res.data.isParentArchived || res.data.method === methodTypes.Connect
                 }

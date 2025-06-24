@@ -81,6 +81,7 @@ export default function AppCards({ apps, envSlug }: { apps: FlattenedApp[]; envS
                       disableArchive={!app.url}
                       showValidate={() => handleShowModal(app, 'validate')}
                       disableValidate={app.isParentArchived || app.method === methodTypes.Connect}
+                      showResync={() => handleShowModal(app, 'resync')}
                     />
                   </div>
                 }
