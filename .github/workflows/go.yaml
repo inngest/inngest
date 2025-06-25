@@ -37,12 +37,15 @@ jobs:
     name: "Test / OS: ${{ matrix.os }}, key-queues: ${{ matrix.experimentalKeyQueues }}"
     steps:
       - uses: actions/checkout@v4
+
       - name: Set up Go
         uses: actions/setup-go@v2
         with:
           go-version: '1.24'
+
       - name: Test
-        run: go test -v $(find . -iname "*_test.go" | xargs -I {} dirname {} | uniq | grep -v "./tests") -race -count=1
+        run: |
+          go test -v $(find . -iname "*_test.go" | xargs -I {} dirname {} | uniq | grep -v "./tests") -race -count=1
         env:
           TEST_MODE: true
           EXPERIMENTAL_KEY_QUEUES_ENABLE: "${{ matrix.experimentalKeyQueues }}"
