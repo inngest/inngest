@@ -1,5 +1,5 @@
 <div align="center">
-  <a href="https://www.inngest.com"><img src="https://user-images.githubusercontent.com/306177/191580717-1f563f4c-31e3-4aa0-848c-5ddc97808a9a.png" width="250" /></a>
+  <a href="https://www.inngest.com"><img src="https://github.com/inngest/.github/raw/main/profile/github-readme-banner-2025-06-20.png"/></a>
   <br/>
   <br/>
   <p>
@@ -14,7 +14,7 @@
 
   </p>
 </div>
-	  
+
 <hr />
 
 # `inngestgo`: Durable execution in Go
@@ -33,7 +33,7 @@ complex primitives such as concurrency, parallelism, event batching, or distribu
 - Type safe functions, durable workflows, and steps using generics
 - Event stream sampling built in
 - Declarative flow control (concurrency, prioritization, batching, debounce, rate limiting)
-- Zero-infrastructure.  Inngest handles orchestration and calls your functions.
+- Zero-infrastructure. Inngest handles orchestration and calls your functions.
 
 # Examples
 

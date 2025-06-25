@@ -291,7 +291,7 @@ func (h *connectHandler) handleConnection(ctx context.Context, data connectionEs
 					h.workerPool.inProgressLeasesLock.Unlock()
 				}
 			default:
-				h.logger.Error("got unknown gateway request", "err", err)
+				h.logger.Debug("got unknown gateway request", "err", err)
 				continue
 			}
 		}

@@ -6,8 +6,8 @@ import (
 	"reflect"
 
 	"github.com/gosimple/slug"
-	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngestgo/internal/event"
+	"github.com/inngest/inngestgo/internal/fn"
 )
 
 // Slugify converts a string to a slug. This is only useful for replicating the
@@ -53,7 +53,7 @@ func IntPtr(i int) *int { return &i }
 func CreateFunction[T any](
 	c Client,
 	fc FunctionOpts,
-	trigger inngest.Trigger,
+	trigger fn.Triggerable,
 	f SDKFunction[T],
 ) (ServableFunction, error) {
 	// Validate that the input type is a concrete type, and not an interface.
@@ -89,18 +89,18 @@ func CreateFunction[T any](
 	return sf, nil
 }
 
-func EventTrigger(name string, expression *string) inngest.Trigger {
-	return inngest.Trigger{
-		EventTrigger: &inngest.EventTrigger{
+func EventTrigger(name string, expression *string) fn.Trigger {
+	return fn.Trigger{
+		EventTrigger: &fn.EventTrigger{
 			Event:      name,
 			Expression: expression,
 		},
 	}
 }
 
-func CronTrigger(cron string) inngest.Trigger {
-	return inngest.Trigger{
-		CronTrigger: &inngest.CronTrigger{
+func CronTrigger(cron string) fn.Trigger {
+	return fn.Trigger{
+		CronTrigger: &fn.CronTrigger{
 			Cron: cron,
 		},
 	}
@@ -122,7 +122,7 @@ type SDKFunction[T any] func(ctx context.Context, input Input[T]) (any, error)
 type servableFunc struct {
 	appID   string
 	fc      FunctionOpts
-	trigger inngest.Trigger
+	trigger fn.Triggerable
 	f       any
 }
 
@@ -145,7 +145,7 @@ func (s servableFunc) Name() string {
 	return s.fc.Name
 }
 
-func (s servableFunc) Trigger() inngest.Trigger {
+func (s servableFunc) Trigger() fn.Triggerable {
 	return s.trigger
 }
 
