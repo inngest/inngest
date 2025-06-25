@@ -12,7 +12,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/inngest/inngest/pkg/execution/driver/httpdriver"
+	"github.com/inngest/inngest/pkg/execution/exechttp"
 	"github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/publicerr"
 	"github.com/inngest/inngestgo"
@@ -34,7 +34,7 @@ var (
 
 	Client = http.Client{
 		Timeout:       10 * time.Second,
-		CheckRedirect: httpdriver.CheckRedirect,
+		CheckRedirect: exechttp.CheckRedirect,
 	}
 )
 

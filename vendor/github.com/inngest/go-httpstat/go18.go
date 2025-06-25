@@ -3,6 +3,7 @@ package httpstat
 import (
 	"context"
 	"crypto/tls"
+	"net"
 	"net/http/httptrace"
 	"strings"
 	"time"
@@ -20,7 +21,7 @@ func (r *Result) End(t time.Time) {
 	}
 
 	r.contentTransfer = r.transferDone.Sub(r.transferStart)
-	r.total = r.transferDone.Sub(r.dnsStart)
+	r.Total = r.transferDone.Sub(r.dnsStart)
 }
 
 // ContentTransfer returns the duration of content transfer time.
@@ -28,13 +29,6 @@ func (r *Result) End(t time.Time) {
 // be time after read body (go-httpstat can not detect that time).
 func (r *Result) ContentTransfer(t time.Time) time.Duration {
 	return t.Sub(r.serverDone)
-}
-
-// Total returns the duration of total http request.
-// It is from dns lookup start time to the given time. The
-// time must be time after read body (go-httpstat can not detect that time).
-func (r *Result) Total(t time.Time) time.Duration {
-	return r.total
 }
 
 func withClientTrace(ctx context.Context, r *Result) context.Context {
@@ -107,7 +101,25 @@ func withClientTrace(ctx context.Context, r *Result) context.Context {
 				r.isReused = true
 			}
 
-			r.ConnectedTo = i.Conn.RemoteAddr()
+			switch addr := i.Conn.RemoteAddr().(type) {
+			case *net.TCPAddr:
+				r.ConnectedTo = ConnectedTo{
+					IP:   addr.IP.String(),
+					Port: addr.Port,
+					Zone: addr.Zone,
+				}
+			case *net.UDPAddr:
+				r.ConnectedTo = ConnectedTo{
+					IP:   addr.IP.String(),
+					Port: addr.Port,
+					Zone: addr.Zone,
+				}
+			case *net.IPAddr:
+				r.ConnectedTo = ConnectedTo{
+					IP:   addr.IP.String(),
+					Zone: addr.Zone,
+				}
+			}
 		},
 
 		WroteRequest: func(info httptrace.WroteRequestInfo) {

@@ -1,14 +1,15 @@
 package aigateway
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 
 	// NOTE: We don't use the default `openai` package because Stainless SDKs don't
 	// support Unmarshal() on Param structs, due to their Field handling.
 	// See https://play.golang.com/p/UX60snrf3gp for more info.
+	"github.com/inngest/inngest/pkg/execution/exechttp"
 	openai "github.com/sashabaranov/go-openai"
 )
 
@@ -39,6 +40,18 @@ type Request struct {
 	// Body indicates the raw content of the request, as a slice of JSON bytes.
 	// It's expected that this comes from our SDKs directly.
 	Body json.RawMessage `json:"body"`
+	// PublishOpts configures optional publishing to realtime.
+	Publish PublishOpts `json:"publish,omitzero"`
+
+	// StepID is added when returning a Request from an opcode.
+	StepID string `json:"-"`
+}
+
+// PublishOpts specifies the optional channel and topic if the response is to
+// be published in realtime, using Inngest's realtime capabilities.
+type PublishOpts struct {
+	Channel string `json:"channel"`
+	Topic   string `json:"topic"`
 }
 
 func (r Request) MarshalJSON() ([]byte, error) {
@@ -47,10 +60,21 @@ func (r Request) MarshalJSON() ([]byte, error) {
 	return nil, nil
 }
 
-func (r Request) HTTPRequest() (*http.Request, error) {
-	req, err := http.NewRequest(http.MethodPost, r.URL, bytes.NewReader(r.Body))
+func (r Request) SerializableRequest() (exechttp.SerializableRequest, error) {
+	parsed, err := url.Parse(r.URL)
 	if err != nil {
-		return nil, err
+		return exechttp.SerializableRequest{}, err
+	}
+	req := exechttp.SerializableRequest{
+		Method: http.MethodPost,
+		URL:    r.URL,
+		Body:   r.Body,
+		Header: http.Header{},
+		Publish: exechttp.RequestPublishOpts{
+			Channel:   r.Publish.Channel,
+			Topic:     r.Publish.Topic,
+			RequestID: r.StepID,
+		},
 	}
 
 	// Always sending JSON.
@@ -60,9 +84,9 @@ func (r Request) HTTPRequest() (*http.Request, error) {
 	switch r.Format {
 	case FormatGemini:
 		// Gemini adds the auth key as a query param
-		values := req.URL.Query()
+		values := parsed.Query()
 		values.Add("key", r.AuthKey)
-		req.URL.RawQuery = values.Encode()
+		parsed.RawQuery = values.Encode()
 	case FormatBedrock:
 		// Bedrock's auth should be the fully-generated AWS key derived from the
 		// secret and signing key.
@@ -79,6 +103,8 @@ func (r Request) HTTPRequest() (*http.Request, error) {
 	for header, val := range r.Headers {
 		req.Header.Add(header, val)
 	}
+
+	req.URL = parsed.String()
 
 	return req, nil
 }

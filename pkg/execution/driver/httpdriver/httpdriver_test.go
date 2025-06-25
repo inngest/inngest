@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/execution/exechttp"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/syscode"
 	"github.com/stretchr/testify/require"
@@ -51,7 +53,7 @@ func TestRedirect(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	client := Client(SecureDialerOpts{AllowPrivate: true})
+	client := exechttp.Client(exechttp.SecureDialerOpts{AllowPrivate: true})
 	res, _, err := do(context.Background(), client, Request{URL: parseURL(ts.URL), Input: input})
 	require.NoError(t, err)
 	require.Equal(t, 200, res.StatusCode)
@@ -73,7 +75,7 @@ func TestRetryAfter(t *testing.T) {
 		}))
 		defer ts.Close()
 
-		client := Client(SecureDialerOpts{AllowPrivate: true})
+		client := exechttp.Client(exechttp.SecureDialerOpts{AllowPrivate: true})
 		res, _, err := do(context.Background(), client, Request{URL: parseURL(ts.URL), Input: input})
 		require.NoError(t, err)
 		require.Equal(t, 500, res.StatusCode)
@@ -192,7 +194,7 @@ func TestParseStream(t *testing.T) {
 
 func TestStreamResponseTooLarge(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		data := make([]byte, consts.MaxSDKResponseBodySize)
+		data := make([]byte, consts.MaxSDKResponseBodySize+2)
 		_, err := rand.Read(data)
 		require.NoError(t, err)
 
@@ -204,14 +206,15 @@ func TestStreamResponseTooLarge(t *testing.T) {
 
 	defer ts.Close()
 	u, _ := url.Parse(ts.URL)
-	client := Client(SecureDialerOpts{AllowPrivate: true})
+	client := exechttp.Client(exechttp.SecureDialerOpts{AllowPrivate: true})
 	r, _, err := do(context.Background(), client, Request{
 		URL: *u,
 	})
-	require.NotNil(t, r)
+
+	require.NotNil(t, err)
+	require.NotNil(t, r, "expected some response")
 	require.NotNil(t, r.SysErr)
 	require.Equal(t, r.SysErr.Code, syscode.CodeOutputTooLarge)
-	require.NotNil(t, err)
 }
 
 func TestTiming(t *testing.T) {
@@ -225,17 +228,17 @@ func TestTiming(t *testing.T) {
 
 	defer ts.Close()
 	u, _ := url.Parse(ts.URL)
-	client := Client(SecureDialerOpts{AllowPrivate: true})
+	client := exechttp.Client(exechttp.SecureDialerOpts{AllowPrivate: true})
 	r, result, err := do(context.Background(), client, Request{
 		URL:   *u,
 		Input: []byte("test"),
 	})
 
-	require.NotNil(t, r)
+	require.NotNil(t, r, "got nil response")
 	require.Nil(t, err)
 
-	require.Equal(t, strings.ReplaceAll(ts.URL, "http://", ""), result.ConnectedTo.String())
 	require.True(t, result.StartTransfer > time.Second)
 	require.True(t, result.ServerProcessing > time.Second)
-	require.True(t, result.Total(time.Time{}) > time.Second)
+	require.True(t, result.Total > time.Second)
+	require.Equal(t, strings.ReplaceAll(ts.URL, "http://", ""), fmt.Sprintf("%s:%d", result.ConnectedTo.IP, result.ConnectedTo.Port))
 }

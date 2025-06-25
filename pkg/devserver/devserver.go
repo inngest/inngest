@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/http"
 	"net/url"
 	"os"
 	"time"
@@ -41,7 +40,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/batch"
 	"github.com/inngest/inngest/pkg/execution/debounce"
 	"github.com/inngest/inngest/pkg/execution/driver"
-	"github.com/inngest/inngest/pkg/execution/driver/httpdriver"
+	"github.com/inngest/inngest/pkg/execution/exechttp"
 	"github.com/inngest/inngest/pkg/execution/executor"
 	"github.com/inngest/inngest/pkg/execution/history"
 	"github.com/inngest/inngest/pkg/execution/pauses"
@@ -400,12 +399,18 @@ func start(ctx context.Context, opts StartOpts) error {
 	// automatically transform dev requests to lambda invocations.
 	//
 	// We also make sure to allow local requests.
-	httpClient := httpdriver.Client(httpdriver.SecureDialerOpts{
-		AllowHostDocker: true, // In local dev, this is OK
-		AllowPrivate:    true, // In local dev, this is OK
-		AllowNAT64:      true, // In local dev, this is OK
-	})
-	httpClient.(*http.Client).Transport = awsgateway.NewTransformTripper(httpClient.(*http.Client).Transport)
+	httpClient := exechttp.Client(
+		exechttp.SecureDialerOpts{
+			AllowHostDocker: true, // In local dev, this is OK
+			AllowPrivate:    true, // In local dev, this is OK
+			AllowNAT64:      true, // In local dev, this is OK
+		},
+		// Enable publishing of any requests made directly from the dev server.  Note that this
+		// is different from the cloud.
+		exechttp.WithRealtimePublishing(),
+	)
+
+	httpClient.Client.Transport = awsgateway.NewTransformTripper(httpClient.Client.Transport)
 	deploy.Client.Transport = awsgateway.NewTransformTripper(deploy.Client.Transport)
 
 	drivers := []driver.Driver{}
@@ -476,6 +481,10 @@ func start(ctx context.Context, opts StartOpts) error {
 		executor.WithAssignedQueueShard(queueShard),
 		executor.WithShardSelector(shardSelector),
 		executor.WithTraceReader(dbcqrs),
+		executor.WithRealtimeConfig(executor.ExecutorRealtimeConfig{
+			Secret:     consts.DevServerRealtimeJWTSecret,
+			PublishURL: fmt.Sprintf("http://%s:%d/v1/realtime/publish", opts.Config.CoreAPI.Addr, opts.Config.CoreAPI.Port),
+		}),
 		executor.WithTracerProvider(tracing.NewSqlcTracerProvider(base_cqrs.NewQueries(db, dbDriver))),
 	)
 	if err != nil {

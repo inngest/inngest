@@ -1,4 +1,4 @@
-package httpdriver
+package exechttp
 
 import (
 	"context"
@@ -107,7 +107,6 @@ func TestSecureDialer(t *testing.T) {
 					},
 				}))
 				_, err := c.Get(fmt.Sprintf("http://%s", h))
-
 				if err != nil {
 					require.NotContains(t, err.Error(), "private IP range")
 					return
@@ -157,7 +156,6 @@ func TestSecureDialer(t *testing.T) {
 					},
 				}))
 				_, err := c.Get(fmt.Sprintf("http://%s", h))
-
 				if err != nil {
 					require.NotContains(t, err.Error(), "NAT64 address")
 					return

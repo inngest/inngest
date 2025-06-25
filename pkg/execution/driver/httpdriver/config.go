@@ -3,6 +3,7 @@ package httpdriver
 import (
 	"github.com/inngest/inngest/pkg/config/registration"
 	"github.com/inngest/inngest/pkg/execution/driver"
+	"github.com/inngest/inngest/pkg/execution/exechttp"
 )
 
 func init() {
@@ -25,7 +26,7 @@ func (Config) DriverName() string { return "http" }
 func (c Config) NewDriver(opts ...registration.NewDriverOpts) (driver.Driver, error) {
 	var skey []byte
 	requireLocalSigningKey := false
-	client := defaultClient
+	client := exechttp.RequestExecutor(defaultClient)
 	if len(opts) > 0 {
 		if opts[0].LocalSigningKey != nil {
 			skey = []byte(*opts[0].LocalSigningKey)

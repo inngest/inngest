@@ -451,6 +451,9 @@ func (g *GeneratorOpcode) GatewayOpts() (gateway.Request, error) {
 		return gateway.Request{}, err
 	}
 
+	// Add the step ID as a reference.
+	req.StepID = g.ID
+
 	return req, nil
 }
 
@@ -475,6 +478,9 @@ func (g *GeneratorOpcode) AIGatewayOpts() (aigateway.Request, error) {
 	if err := json.Unmarshal(optByt, &req); err != nil {
 		return aigateway.Request{}, err
 	}
+
+	// Add the step ID for reference.
+	req.StepID = g.ID
 
 	return req, nil
 }

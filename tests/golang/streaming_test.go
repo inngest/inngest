@@ -182,7 +182,7 @@ func TestStreaming(t *testing.T) {
 			if runOutput.Error.Stack == nil {
 				return
 			}
-			a.Contains(*runOutput.Error.Stack, "connection reset by peer")
+			a.Contains(*runOutput.Error.Stack, "Your server reset the connection while we were reading the reply")
 		}, 10*time.Second, time.Second)
 	})
 }
