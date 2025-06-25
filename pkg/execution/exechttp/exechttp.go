@@ -167,9 +167,13 @@ func (e ExtendedClient) DoRequest(ctx context.Context, r SerializableRequest) (*
 
 	out := &Response{
 		Body:       byt,
-		StatusCode: resp.StatusCode,
-		StatResult: tracking,
 		Header:     resp.Header,
+		StatResult: tracking,
+		StatusCode: resp.StatusCode,
+		Status:     resp.Status,
+		Proto:      resp.Proto,
+		ProtoMajor: resp.ProtoMajor,
+		ProtoMinor: resp.ProtoMinor,
 	}
 
 	if len(byt) > consts.MaxSDKResponseBodySize {
@@ -183,9 +187,14 @@ func (e ExtendedClient) DoRequest(ctx context.Context, r SerializableRequest) (*
 
 type Response struct {
 	Body       []byte
-	StatusCode int
 	Header     http.Header
 	StatResult *httpstat.Result
+
+	StatusCode int    // e.g. 200
+	Status     string // e.g. "200 OK"
+	Proto      string // e.g. "HTTP/1.0"
+	ProtoMajor int    // e.g. 1
+	ProtoMinor int    // e.g. 0
 }
 
 // Client returns a new HTTP transport.
