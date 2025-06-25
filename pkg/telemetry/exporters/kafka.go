@@ -161,10 +161,10 @@ func (e *kafkaSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadO
 		if err != nil {
 			l.Error("error serializing span into binary",
 				"err", err,
-				"acctID", id.AccountId,
-				"wsID", id.EnvId,
-				"fnID", id.FunctionId,
-				"runID", id.RunId,
+				"account_id", id.AccountId,
+				"env_id", id.EnvId,
+				"fn_id", id.FunctionId,
+				"run_id", id.RunId,
 			)
 		}
 
@@ -199,7 +199,13 @@ func (e *kafkaSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadO
 
 			status := "success"
 			if err != nil {
-				l.Error("error on producing span", "error", err)
+				l.Error("error on producing span",
+					"error", err,
+					"account_id", id.AccountId,
+					"env_id", id.EnvId,
+					"fn_id", id.FunctionId,
+					"run_id", id.RunId,
+				)
 				status = "error"
 			}
 
