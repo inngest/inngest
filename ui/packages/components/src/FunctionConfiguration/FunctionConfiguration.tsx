@@ -16,13 +16,13 @@ import { EventsIcon } from '@inngest/components/icons/sections/Events';
 import { FunctionsIcon } from '@inngest/components/icons/sections/Functions';
 import { relativeTime } from '@inngest/components/utils/date';
 import { RiArrowRightSLine, RiArrowRightUpLine, RiTimeLine } from '@remixicon/react';
-import cronstrue from 'cronstrue';
 
 import type { GetFunctionQuery as DashboardGetFunctionQuery } from '../../../../apps/dashboard/src/gql/graphql';
 import {
   FunctionTriggerTypes,
   type GetFunctionQuery as DevServerGetFunctionQuery,
 } from '../../../../apps/dev-server-ui/src/store/generated';
+import { getHumanReadableCron } from '../utils/cron';
 
 type InngestFunction =
   | NonNullable<DevServerGetFunctionQuery['functionBySlug']>
@@ -372,18 +372,10 @@ type CronTriggerBlockProps = {
 function CronTriggerBlock({ schedule }: CronTriggerBlockProps) {
   const { nextRun } = useCron(schedule);
 
-  const humanReadable = (() => {
-    try {
-      return cronstrue.toString(schedule);
-    } catch {
-      return schedule;
-    }
-  })();
-
   return (
     <ConfigurationBlock
       icon={<RiTimeLine className="h-5 w-5" />}
-      mainContent={humanReadable}
+      mainContent={getHumanReadableCron(schedule)}
       rightElement={<Pill className="font-mono">{schedule}</Pill>}
       subContent={
         nextRun ? (
