@@ -8,8 +8,6 @@ import (
 	"os"
 	"time"
 
-	"github.com/inngest/inngest/pkg/util"
-
 	"github.com/alicebob/miniredis/v2"
 	"github.com/coocood/freecache"
 	"github.com/eko/gocache/lib/v4/cache"
@@ -33,6 +31,7 @@ import (
 	"github.com/inngest/inngest/pkg/coreapi"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/cqrs/base_cqrs"
+	"github.com/inngest/inngest/pkg/debugapi"
 	"github.com/inngest/inngest/pkg/deploy"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
@@ -63,6 +62,7 @@ import (
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/inngest/inngest/pkg/testapi"
 	"github.com/inngest/inngest/pkg/tracing"
+	"github.com/inngest/inngest/pkg/util"
 	"github.com/inngest/inngest/pkg/util/awsgateway"
 	"github.com/redis/rueidis"
 	"go.opentelemetry.io/otel/propagation"
@@ -592,6 +592,15 @@ func start(ctx context.Context, opts StartOpts) error {
 		return err
 	}
 
+	debugapi, err := debugapi.NewDebugAPI(debugapi.Opts{
+		Log:           l,
+		Queue:         rq,
+		ShardSelector: shardSelector,
+	})
+	if err != nil {
+		return err
+	}
+
 	connectGatewayProxy, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectPubSubRedis, false, connectpubsub.RedisPubSubConnectorOpts{
 		Logger:             connectPubSubLogger.With("svc", "connect-gateway"),
 		Tracer:             conditionalTracer,
@@ -626,6 +635,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		{At: "/", Router: devAPI},
 		{At: "/v0", Router: core.Router},
 		{At: "/debug", Handler: middleware.Profiler()},
+		{At: "/dbg", Router: debugapi.Router},
 	}
 
 	if testapi.ShouldEnable() {
