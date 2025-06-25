@@ -380,19 +380,11 @@ function CronTriggerBlock({ schedule }: CronTriggerBlockProps) {
     }
   })();
 
-  const mainContent = (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <span className="font-mono">{schedule}</span>
-      </TooltipTrigger>
-      <TooltipContent>{humanReadable}</TooltipContent>
-    </Tooltip>
-  );
-
   return (
     <ConfigurationBlock
       icon={<RiTimeLine className="h-5 w-5" />}
-      mainContent={mainContent}
+      mainContent={humanReadable}
+      rightElement={<Pill className="font-mono">{schedule}</Pill>}
       subContent={
         nextRun ? (
           <Tooltip>
