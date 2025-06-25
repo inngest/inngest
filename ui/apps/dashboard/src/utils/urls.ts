@@ -52,23 +52,8 @@ export const pathCreator = {
   createApp({ envSlug }: { envSlug: string }): Route {
     return `/env/${envSlug}/apps/sync-new` as Route;
   },
-  // TODO: use eventPopout instead once we release new events
-  event({
-    envSlug,
-    eventName,
-    eventID,
-  }: {
-    envSlug: string;
-    eventName: string;
-    eventID: string;
-  }): Route {
-    return `/env/${envSlug}/event-types/${encodeURIComponent(
-      eventName
-    )}/events/${eventID}` as Route;
-  },
-  // TODO: rename new-events to events and adjust redirect once we release new events
   eventPopout({ envSlug, eventID }: { envSlug: string; eventID: string }): Route {
-    return `/env/${envSlug}/new-events/${eventID}` as Route;
+    return `/env/${envSlug}/events/${eventID}` as Route;
   },
   eventType({ envSlug, eventName }: { envSlug: string; eventName: string }): Route {
     return `/env/${envSlug}/event-types/${encodeURIComponent(eventName)}` as Route;
@@ -76,9 +61,8 @@ export const pathCreator = {
   eventTypes({ envSlug }: { envSlug: string }): Route {
     return `/env/${envSlug}/event-types` as Route;
   },
-  // TODO: rename new-events to events once we release new events
   eventTypeEvents({ envSlug, eventName }: { envSlug: string; eventName: string }): Route {
-    return `/env/${envSlug}/event-types/${encodeURIComponent(eventName)}/new-events` as Route;
+    return `/env/${envSlug}/event-types/${encodeURIComponent(eventName)}/events` as Route;
   },
   envs(): Route {
     return '/env' as Route;
@@ -125,6 +109,17 @@ export const pathCreator = {
   },
   runPopout({ envSlug, runID }: { envSlug: string; runID: string }): Route {
     return `/env/${envSlug}/runs/${runID}` as Route;
+  },
+  debugger({
+    envSlug,
+    functionSlug,
+    runID,
+  }: {
+    envSlug: string;
+    functionSlug: string;
+    runID?: string;
+  }): Route {
+    return `/env/${envSlug}/debugger/${functionSlug}${runID ? `?runID=${runID}` : ''}` as Route;
   },
   runs({ envSlug }: { envSlug: string }): Route {
     return `/env/${envSlug}/runs` as Route;

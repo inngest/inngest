@@ -18,8 +18,9 @@ func MakeFunction(f *cqrs.Function) (*Function, error) {
 	triggers := make([]*FunctionTrigger, len(fn.Triggers))
 	for n, t := range fn.Triggers {
 		var (
-			val string
-			typ FunctionTriggerTypes
+			val       string
+			typ       FunctionTriggerTypes
+			condition *string
 		)
 		if t.CronTrigger != nil {
 			typ = FunctionTriggerTypesCron
@@ -28,10 +29,12 @@ func MakeFunction(f *cqrs.Function) (*Function, error) {
 		if t.EventTrigger != nil {
 			typ = FunctionTriggerTypesEvent
 			val = t.Event
+			condition = t.Expression
 		}
 		triggers[n] = &FunctionTrigger{
-			Type:  typ,
-			Value: val,
+			Type:      typ,
+			Value:     val,
+			Condition: condition,
 		}
 	}
 
@@ -40,15 +43,18 @@ func MakeFunction(f *cqrs.Function) (*Function, error) {
 		concurrency = fn.Concurrency.PartitionConcurrency()
 	}
 
+	config := ToFunctionConfiguration(fn, UnknownPlanConcurrencyLimit)
+
 	return &Function{
-		AppID:       f.AppID.String(),
-		ID:          f.ID.String(),
-		Name:        f.Name,
-		Slug:        f.Slug,
-		Config:      string(f.Config),
-		Concurrency: concurrency,
-		Triggers:    triggers,
-		URL:         fn.Steps[0].URI,
+		AppID:         f.AppID.String(),
+		ID:            f.ID.String(),
+		Name:          f.Name,
+		Slug:          f.Slug,
+		Config:        string(f.Config),
+		Configuration: config,
+		Concurrency:   concurrency,
+		Triggers:      triggers,
+		URL:           fn.Steps[0].URI,
 	}, nil
 }
 

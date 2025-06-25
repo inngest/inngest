@@ -28,7 +28,8 @@ func (a router) GetFunctionRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fr, err := a.opts.FunctionRunReader.GetFunctionRun(ctx, auth.AccountID(), auth.WorkspaceID(), runID)
+	fr, err := a.opts.TraceReader.GetRun(ctx, runID, auth.AccountID(), auth.WorkspaceID())
+
 	if err != nil {
 		_ = publicerr.WriteHTTP(w, publicerr.Wrapf(err, 500, "Unable to load function run: %s", chi.URLParam(r, "runID")))
 		return
@@ -45,12 +46,8 @@ func (a API) CancelFunctionRun(ctx context.Context, runID ulid.ULID) error {
 		return publicerr.Wrap(err, 401, "No auth found")
 	}
 
-	fr, err := a.opts.FunctionRunReader.GetFunctionRun(
-		ctx,
-		auth.AccountID(),
-		auth.WorkspaceID(),
-		runID,
-	)
+	fr, err := a.opts.TraceReader.GetRun(ctx, runID, auth.AccountID(), auth.WorkspaceID())
+
 	if err != nil {
 		return publicerr.Wrapf(err, 404, "Unable to load function run: %s", runID)
 	}
@@ -99,12 +96,8 @@ func (a router) GetFunctionRunJobs(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	fr, err := a.opts.FunctionRunReader.GetFunctionRun(
-		ctx,
-		auth.AccountID(),
-		auth.WorkspaceID(),
-		runID,
-	)
+	fr, err := a.opts.TraceReader.GetRun(ctx, runID, auth.AccountID(), auth.WorkspaceID())
+
 	if err != nil {
 		_ = publicerr.WriteHTTP(w, publicerr.Wrapf(err, 500, "Unable to load function run: %s", chi.URLParam(r, "runID")))
 		return

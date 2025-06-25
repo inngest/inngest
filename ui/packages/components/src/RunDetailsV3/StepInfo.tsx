@@ -12,8 +12,9 @@ import {
   TimeElement,
 } from '../DetailsCard/NewElement';
 import { RerunModal } from '../Rerun/RerunModal';
+import { usePathCreator } from '../SharedContext/usePathCreator';
 import { Time } from '../Time';
-import { usePrettyJson } from '../hooks/usePrettyJson';
+import { usePrettyErrorBody, usePrettyJson } from '../hooks/usePrettyJson';
 import type { Result } from '../types/functionRun';
 import { formatMilliseconds, toMaybeDate } from '../utils/date';
 import { IO } from './IO';
@@ -29,20 +30,14 @@ import {
   type StepInfoSleep,
   type StepInfoWait,
 } from './types';
-import { maybeBooleanToString, type PathCreator, type StepInfoType } from './utils';
+import { maybeBooleanToString, type StepInfoType } from './utils';
 
 type StepKindInfoProps = {
   stepInfo: StepInfoType['trace']['stepInfo'];
-  pathCreator: StepInfoType['pathCreator'];
 };
 
-const InvokeInfo = ({
-  stepInfo,
-  pathCreator,
-}: {
-  stepInfo: StepInfoInvoke;
-  pathCreator: PathCreator;
-}) => {
+const InvokeInfo = ({ stepInfo }: { stepInfo: StepInfoInvoke }) => {
+  const { pathCreator } = usePathCreator();
   const timeout = toMaybeDate(stepInfo.timeout);
   return (
     <>
@@ -117,7 +112,7 @@ const SignalInfo = ({ stepInfo }: { stepInfo: StepInfoSignal }) => {
 
 const getStepKindInfo = (props: StepKindInfoProps): JSX.Element | null =>
   isStepInfoInvoke(props.stepInfo) ? (
-    <InvokeInfo stepInfo={props.stepInfo} pathCreator={props.pathCreator} />
+    <InvokeInfo stepInfo={props.stepInfo} />
   ) : isStepInfoSleep(props.stepInfo) ? (
     <SleepInfo stepInfo={props.stepInfo} />
   ) : isStepInfoWait(props.stepInfo) ? (
@@ -137,20 +132,29 @@ export const StepInfo = ({
 }) => {
   const [expanded, setExpanded] = useState(true);
   const [rerunModalOpen, setRerunModalOpen] = useState(false);
-  const { runID, trace, pathCreator } = selectedStep;
+  const { runID, trace } = selectedStep;
   const [result, setResult] = useState<Result>();
 
   useEffect(() => {
     let intervalId: ReturnType<typeof setInterval> | undefined;
+
+    const refreshResult = () => {
+      if (trace.outputID) {
+        getResult(trace.outputID).then(setResult);
+      } else {
+        setResult(undefined);
+      }
+    };
+
     //
     // fetch once on load
-    trace.outputID && getResult(trace.outputID).then(setResult);
+    refreshResult();
 
     //
     // while the run is polling, continue polling for output
     if (pollInterval) {
       intervalId = setInterval(() => {
-        trace.outputID && getResult(trace.outputID).then(setResult);
+        refreshResult();
       }, pollInterval);
     }
 
@@ -183,12 +187,12 @@ export const StepInfo = ({
 
   const stepKindInfo = getStepKindInfo({
     stepInfo: trace.stepInfo,
-    pathCreator,
   });
 
   const aiOutput = result?.data ? parseAIOutput(result.data) : undefined;
   const prettyInput = usePrettyJson(result?.input ?? '') || (result?.input ?? '');
   const prettyOutput = usePrettyJson(result?.data ?? '') || (result?.data ?? '');
+  const prettyErrorBody = usePrettyErrorBody(result?.error);
 
   return (
     <div className="sticky top-14 flex flex-col justify-start gap-2 overflow-hidden">
@@ -203,10 +207,7 @@ export const StepInfo = ({
             }`}
           />
 
-          <span className="text-basis text-sm font-normal">
-            {trace.isUserland && 'OTel/'}
-            {trace.name}
-          </span>
+          <span className="text-basis text-sm font-normal">{trace.name}</span>
         </div>
         {runID && trace.stepID && prettyInput && (
           <>
@@ -230,9 +231,11 @@ export const StepInfo = ({
 
       {expanded && (
         <div className="flex flex-row flex-wrap items-center justify-start gap-x-10 gap-y-4 px-4">
-          <ElementWrapper label="Queued at">
-            <TimeElement date={new Date(trace.queuedAt)} />
-          </ElementWrapper>
+          {!trace.isUserland && (
+            <ElementWrapper label="Queued at">
+              <TimeElement date={new Date(trace.queuedAt)} />
+            </ElementWrapper>
+          )}
 
           <ElementWrapper label="Started at">
             {trace.startedAt ? (
@@ -250,9 +253,11 @@ export const StepInfo = ({
             )}
           </ElementWrapper>
 
-          <ElementWrapper label="Delay">
-            <TextElement>{delayText}</TextElement>
-          </ElementWrapper>
+          {!trace.isUserland && (
+            <ElementWrapper label="Delay">
+              <TextElement>{delayText}</TextElement>
+            </ElementWrapper>
+          )}
 
           <ElementWrapper label="Duration">
             <TextElement>{durationText}</TextElement>
@@ -298,7 +303,7 @@ export const StepInfo = ({
                         title={`${result.error.name || 'Error'} ${
                           result.error.message ? `: ${result.error.message}` : ''
                         }`}
-                        raw={result.error.stack ?? ''}
+                        raw={prettyErrorBody ?? ''}
                         error={true}
                       />
                     ),

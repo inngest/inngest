@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"github.com/inngest/inngest/pkg/execution/state"
 	"math"
 	"time"
 
@@ -16,14 +17,31 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
+const (
+	NormalizeAccountPeekMax   = int64(30)
+	NormalizePartitionPeekMax = int64(100)
+	NormalizeBacklogPeekMax   = int64(300) // same as ShadowPartitionPeekMax
+
+	// BacklogNormalizeAsyncLimit determines the minimum number of items required in an outdated backlog
+	// to require an async normalize job. For small backlogs, the added QPS may not be worth it and we should normalize JIT.
+	BacklogNormalizeAsyncLimit = 100
+
+	// BacklogRefillHardLimit sets the maximum number of items that can be refilled in a single backlogRefill operation.
+	BacklogRefillHardLimit = int64(1000)
+
+	// BacklogNormalizeHardLimit sets the batch size of items to be reenqueued into the appropriate backlogs durign normalization
+	BacklogNormalizeHardLimit = int64(1000)
+)
+
 var (
 	errBacklogNormalizationLeaseExpired     = fmt.Errorf("backlog normalization lease expired")
 	errBacklogAlreadyLeasedForNormalization = fmt.Errorf("backlog already leased for normalization")
 )
 
 type normalizeWorkerChanMsg struct {
-	b  *QueueBacklog
-	sp *QueueShadowPartition
+	b           *QueueBacklog
+	sp          *QueueShadowPartition
+	constraints *PartitionConstraintConfig
 }
 
 // backlogNormalizationWorker runs a blocking process that listens to item being pushed into the normalization partition. This allows us to process individual
@@ -35,7 +53,7 @@ func (q *queue) backlogNormalizationWorker(ctx context.Context, nc chan normaliz
 			return
 
 		case msg := <-nc:
-			err := q.normalizeBacklog(ctx, msg.b, msg.sp)
+			err := q.normalizeBacklog(ctx, msg.b, msg.sp, msg.constraints)
 			if err != nil {
 				q.log.Error("could not normalize backlog", "error", err, "backlog", msg.b, "shadow", msg.sp)
 			}
@@ -46,6 +64,7 @@ func (q *queue) backlogNormalizationWorker(ctx context.Context, nc chan normaliz
 // backlogNormalizationScan iterates through a partition of backlogs and reenqueue
 // the items to the appropriate backlogs
 func (q *queue) backlogNormalizationScan(ctx context.Context) error {
+	l := q.log.With("method", "backlogNormalizationScan")
 	bc := make(chan normalizeWorkerChanMsg)
 
 	for i := int32(0); i < q.numBacklogNormalizationWorkers; i++ {
@@ -53,7 +72,9 @@ func (q *queue) backlogNormalizationScan(ctx context.Context) error {
 	}
 
 	tick := q.clock.NewTicker(q.pollTick)
-	q.log.Debug("starting normalization scanner", "poll", q.pollTick.String())
+	l.Debug("starting normalization scanner", "poll", q.pollTick.String())
+
+	backoff := 200 * time.Millisecond
 
 	for {
 		select {
@@ -65,17 +86,30 @@ func (q *queue) backlogNormalizationScan(ctx context.Context) error {
 			until := q.clock.Now()
 
 			if err := q.iterateNormalizationPartition(ctx, until, bc); err != nil {
+				if errors.Is(err, context.DeadlineExceeded) {
+					l.Warn("deadline exceeded scanning backlog normalization partition")
+					<-time.After(backoff)
+
+					// Backoff doubles up to 5 seconds
+					backoff = time.Duration(math.Min(float64(backoff*2), float64(5*time.Second)))
+					continue
+				}
+
+				if !errors.Is(err, context.Canceled) {
+					l.Error("error scanning backlog normalization partitions", "error", err)
+				}
+
 				return fmt.Errorf("error scanning global normalization partition: %w", err)
 			}
+
+			backoff = 200 * time.Millisecond
 		}
 	}
 }
 
 // iterateNormalizationPartition scans and iterate through the global normalization partition to process backlogs needing to be normalized
 func (q *queue) iterateNormalizationPartition(ctx context.Context, until time.Time, bc chan normalizeWorkerChanMsg) error {
-	// TODO: check capacity
-
-	// TODO introduce weight probability to blend account/global scanning
+	// introduce weight probability to blend account/global scanning
 	peekedAccounts, err := q.peekGlobalNormalizeAccounts(ctx, until, NormalizeAccountPeekMax)
 	if err != nil {
 		return fmt.Errorf("could not peek global normalize accounts: %w", err)
@@ -126,6 +160,11 @@ func (q *queue) iterateNormalizationShadowPartition(ctx context.Context, shadowP
 			return err
 		}
 
+		constraints, err := q.partitionConstraintConfigGetter(ctx, *partition)
+		if err != nil {
+			return fmt.Errorf("could not get latest partition constraints: %w", err)
+		}
+
 		for _, bl := range backlogs {
 			// lease the backlog
 			_, err := duration(ctx, q.primaryQueueShard.Name, "normalize_lease", q.clock.Now(), func(ctx context.Context) (any, error) {
@@ -143,15 +182,16 @@ func (q *queue) iterateNormalizationShadowPartition(ctx context.Context, shadowP
 			metrics.IncrBacklogNormalizationScannedCounter(ctx, metrics.CounterOpt{
 				PkgName: pkgName,
 				Tags: map[string]any{
-					"queue_shard":  q.primaryQueueShard.Name,
-					"partition_id": partition.PartitionID,
+					"queue_shard": q.primaryQueueShard.Name,
+					// "partition_id": partition.PartitionID,
 				},
 			})
 
 			// dump it into the channel for the workers to do their thing
 			bc <- normalizeWorkerChanMsg{
-				b:  bl,
-				sp: partition,
+				b:           bl,
+				sp:          partition,
+				constraints: constraints,
 			}
 		}
 	}
@@ -224,8 +264,29 @@ func (q *queue) extendBacklogNormalizationLease(ctx context.Context, now time.Ti
 // normalizeBacklog must be called with exclusive access to the shadow partition
 // NOTE: ideally this is one transaction in a lua script but enqueue_to_backlog is way too much work to
 // utilize
-func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp *QueueShadowPartition) error {
-	l := q.log.With("backlog", backlog)
+func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp *QueueShadowPartition, latestConstraints *PartitionConstraintConfig) error {
+	l := q.log.With("backlog", backlog, "sp", sp, "constraints", latestConstraints)
+
+	start := q.clock.Now()
+	defer func() {
+		dur := q.clock.Now().Sub(start)
+
+		metrics.HistogramQueueOperationDuration(
+			ctx,
+			dur.Milliseconds(),
+			metrics.HistogramOpt{
+				PkgName: pkgName,
+				Tags: map[string]any{
+					"operation":   "normalize_backlog",
+					"queue_shard": q.primaryQueueShard.Name,
+				},
+			},
+		)
+
+		if dur > 1*time.Minute {
+			q.log.Debug("slow backlog normalization", "dur", dur, "backlog", backlog, "sp", sp, "constraints", latestConstraints)
+		}
+	}()
 
 	// extend the lease
 	extendLeaseCtx, cancel := context.WithCancel(ctx)
@@ -269,18 +330,45 @@ func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp 
 			existingThrottle := item.Data.Throttle
 			existingKeys := item.Data.GetConcurrencyKeys()
 
+			cleanupItem := func() {
+				// If event for item cannot be found, remove it from the backlog
+				err := q.Dequeue(ctx, shard, *item)
+				if err != nil {
+					q.log.Warn("could not dequeue queue item with missing event", "err", err)
+				}
+			}
+
 			refreshedCustomConcurrencyKeys, err := q.normalizeRefreshItemCustomConcurrencyKeys(ctx, item, existingKeys, sp)
 			if err != nil {
+				// If event for item cannot be found, remove it from the backlog
+				if errors.Is(err, state.ErrEventNotFound) {
+					cleanupItem()
+					continue
+				}
 				return fmt.Errorf("could not refresh custom concurrency keys for item: %w", err)
 			}
 			item.Data.CustomConcurrencyKeys = refreshedCustomConcurrencyKeys
 			item.Data.Identifier.CustomConcurrencyKeys = nil
 
-			refreshedThrottle, err := q.normalizeRefreshItemThrottle(ctx, item, existingThrottle, sp)
+			refreshedThrottle, err := q.refreshItemThrottle(ctx, item)
 			if err != nil {
+				// If event for item cannot be found, remove it from the backlog
+				if errors.Is(err, state.ErrEventNotFound) {
+					cleanupItem()
+					continue
+				}
 				return fmt.Errorf("could not refresh throttle for item: %w", err)
 			}
 			item.Data.Throttle = refreshedThrottle
+
+			targetBacklog := q.ItemBacklog(ctx, *item)
+
+			l.Debug(
+				"retrieved refreshed backlog",
+				"item", item,
+				"existing_throttle", existingThrottle,
+				"target", targetBacklog,
+			)
 
 			if _, err := q.EnqueueItem(ctx, shard, *item, time.UnixMilli(item.AtMS), osqueue.EnqueueOpts{
 				PassthroughJobId:       true,
@@ -300,8 +388,8 @@ func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp 
 		metrics.IncrBacklogNormalizedItemCounter(ctx, processed, metrics.CounterOpt{
 			PkgName: pkgName,
 			Tags: map[string]any{
-				"queue_shard":  q.primaryQueueShard.Name,
-				"partition_id": backlog.ShadowPartitionID,
+				"queue_shard": q.primaryQueueShard.Name,
+				// "partition_id": backlog.ShadowPartitionID,
 			},
 		})
 	}
@@ -309,10 +397,12 @@ func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp 
 	metrics.IncrBacklogNormalizedCounter(ctx, metrics.CounterOpt{
 		PkgName: pkgName,
 		Tags: map[string]any{
-			"queue_shard":  q.primaryQueueShard.Name,
-			"partition_id": backlog.ShadowPartitionID,
+			"queue_shard": q.primaryQueueShard.Name,
+			// "partition_id": backlog.ShadowPartitionID,
 		},
 	})
+
+	q.log.Trace("normalized backlog", "backlog", backlog.BacklogID, "partition", sp.PartitionID)
 
 	return nil
 }
@@ -334,17 +424,7 @@ func (q *queue) ShadowPartitionPeekNormalizeBacklogs(ctx context.Context, sp *Qu
 		maker: func() *QueueBacklog {
 			return &QueueBacklog{}
 		},
-		handleMissingItems: func(pointers []string) error {
-			err := rc.Client().Do(ctx, rc.Client().B().Zrem().Key(partitionNormalizeSet).Member(pointers...).Build()).Error()
-			if err != nil {
-				q.log.Warn("failed to clean up dangling backlog pointers from shadow partition normalize set",
-					"missing", pointers,
-					"sp", sp,
-				)
-			}
-
-			return nil
-		},
+		handleMissingItems: CleanupMissingPointers(ctx, partitionNormalizeSet, rc.Client(), q.log.With("sp", sp)),
 		// faster option: load items regardless of zscore
 		ignoreUntil:            true,
 		isMillisecondPrecision: true,
@@ -375,17 +455,7 @@ func (q *queue) BacklogNormalizePeek(ctx context.Context, b *QueueBacklog, limit
 		maker: func() *osqueue.QueueItem {
 			return &osqueue.QueueItem{}
 		},
-		handleMissingItems: func(pointers []string) error {
-			err := rc.Client().Do(ctx, rc.Client().B().Zrem().Key(backlogSet).Member(pointers...).Build()).Error()
-			if err != nil {
-				q.log.Warn("failed to clean up dangling queue items from backlog",
-					"missing", pointers,
-					"backlog", b,
-				)
-			}
-
-			return nil
-		},
+		handleMissingItems: CleanupMissingPointers(ctx, backlogSet, rc.Client(), q.log.With("backlog", b)),
 		// faster option: load items regardless of zscore
 		ignoreUntil:            true,
 		isMillisecondPrecision: true,

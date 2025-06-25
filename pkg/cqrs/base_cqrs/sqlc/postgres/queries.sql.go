@@ -8,12 +8,14 @@ package sqlc
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"strings"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/lib/pq"
 	ulid "github.com/oklog/ulid/v2"
+	"github.com/sqlc-dev/pqtype"
 )
 
 const deleteApp = `-- name: DeleteApp :exec
@@ -1018,6 +1020,81 @@ func (q *Queries) GetQueueSnapshotChunks(ctx context.Context, snapshotID string)
 	return items, nil
 }
 
+const getSpanOutput = `-- name: GetSpanOutput :one
+SELECT
+  -- input, TODO
+  output
+FROM spans
+WHERE span_id = $1
+LIMIT 1
+`
+
+func (q *Queries) GetSpanOutput(ctx context.Context, spanID string) (pqtype.NullRawMessage, error) {
+	row := q.db.QueryRowContext(ctx, getSpanOutput, spanID)
+	var output pqtype.NullRawMessage
+	err := row.Scan(&output)
+	return output, err
+}
+
+const getSpansByRunID = `-- name: GetSpansByRunID :many
+SELECT
+  trace_id,
+  dynamic_span_id,
+  MIN(start_time) as start_time,
+  MAX(end_time) AS end_time,
+  parent_span_id,
+  json_agg(json_build_object(
+    'span_id', span_id,
+    'name', name,
+    'attributes', attributes,
+    'links', links,
+    'output_span_id', CASE WHEN output IS NOT NULL THEN span_id ELSE NULL END
+  )) AS span_fragments
+FROM spans
+WHERE run_id = CAST($1 AS CHAR(26))
+GROUP BY dynamic_span_id
+ORDER BY start_time
+`
+
+type GetSpansByRunIDRow struct {
+	TraceID       string
+	DynamicSpanID sql.NullString
+	StartTime     interface{}
+	EndTime       interface{}
+	ParentSpanID  sql.NullString
+	SpanFragments json.RawMessage
+}
+
+func (q *Queries) GetSpansByRunID(ctx context.Context, dollar_1 string) ([]*GetSpansByRunIDRow, error) {
+	rows, err := q.db.QueryContext(ctx, getSpansByRunID, dollar_1)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*GetSpansByRunIDRow
+	for rows.Next() {
+		var i GetSpansByRunIDRow
+		if err := rows.Scan(
+			&i.TraceID,
+			&i.DynamicSpanID,
+			&i.StartTime,
+			&i.EndTime,
+			&i.ParentSpanID,
+			&i.SpanFragments,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getTraceRun = `-- name: GetTraceRun :one
 SELECT run_id, account_id, workspace_id, app_id, function_id, trace_id, queued_at, started_at, ended_at, status, source_id, trigger_ids, output, is_debounce, batch_id, cron_schedule, has_ai FROM trace_runs WHERE run_id = $1::CHAR(26)
 `
@@ -1453,6 +1530,67 @@ type InsertQueueSnapshotChunkParams struct {
 
 func (q *Queries) InsertQueueSnapshotChunk(ctx context.Context, arg InsertQueueSnapshotChunkParams) error {
 	_, err := q.db.ExecContext(ctx, insertQueueSnapshotChunk, arg.SnapshotID, arg.ChunkID, arg.Data)
+	return err
+}
+
+const insertSpan = `-- name: InsertSpan :exec
+
+INSERT INTO spans (
+  span_id,
+  trace_id,
+  parent_span_id,
+  name,
+  start_time,
+  end_time,
+  run_id,
+  account_id,
+  app_id,
+  function_id,
+  env_id,
+  dynamic_span_id,
+  attributes,
+  links,
+  output
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+`
+
+type InsertSpanParams struct {
+	SpanID        string
+	TraceID       string
+	ParentSpanID  sql.NullString
+	Name          string
+	StartTime     time.Time
+	EndTime       time.Time
+	RunID         string
+	AccountID     string
+	AppID         string
+	FunctionID    string
+	EnvID         string
+	DynamicSpanID sql.NullString
+	Attributes    pqtype.NullRawMessage
+	Links         pqtype.NullRawMessage
+	Output        pqtype.NullRawMessage
+}
+
+// New
+func (q *Queries) InsertSpan(ctx context.Context, arg InsertSpanParams) error {
+	_, err := q.db.ExecContext(ctx, insertSpan,
+		arg.SpanID,
+		arg.TraceID,
+		arg.ParentSpanID,
+		arg.Name,
+		arg.StartTime,
+		arg.EndTime,
+		arg.RunID,
+		arg.AccountID,
+		arg.AppID,
+		arg.FunctionID,
+		arg.EnvID,
+		arg.DynamicSpanID,
+		arg.Attributes,
+		arg.Links,
+		arg.Output,
+	)
 	return err
 }
 

@@ -27,7 +27,8 @@ type RunInfo struct {
 	// ContinueCount represents the total number of continues that the queue has processed
 	// via RunFunc returning true.  This allows us to prevent unbounded sequential processing
 	// on the same function by limiting the number of continues possible within a given chain.
-	ContinueCount uint
+	ContinueCount       uint
+	RefilledFromBacklog string
 }
 
 // RunFunc represents a function called to process each item in the queue.  This may be
@@ -88,6 +89,7 @@ type Migrator interface {
 
 type QueueDirectAccess interface {
 	RemoveQueueItem(ctx context.Context, shard string, partitionKey string, itemID string) error
+	LoadQueueItem(ctx context.Context, shard string, itemID string) (*QueueItem, error)
 }
 
 // QuitError is an error that, when returned, quits the queue.  This always retries
@@ -195,6 +197,8 @@ func IsAlwaysRetryable(err error) bool {
 }
 
 type JobResponse struct {
+	// JobID is the item ID.
+	JobID string
 	// At represents the time the job is scheduled for.
 	At time.Time `json:"at"`
 	// Position represents the position for the job in the queue
@@ -211,34 +215,17 @@ type JobResponse struct {
 type JobQueueReader interface {
 	// OutstandingJobCount returns the number of jobs in progress
 	// or scheduled for a given run.
-	OutstandingJobCount(
-		ctx context.Context,
-		workspaceID uuid.UUID,
-		workflowID uuid.UUID,
-		runID ulid.ULID,
-	) (int, error)
+	OutstandingJobCount(ctx context.Context, envID uuid.UUID, fnID uuid.UUID, runID ulid.ULID) (int, error)
 
 	// RunningCount returns the number of running (in-progress) jobs for a given function
 	RunningCount(ctx context.Context, workflowID uuid.UUID) (int64, error)
 
 	// StatusCount returns the total number of items in the function
 	// status queue.
-	StatusCount(
-		ctx context.Context,
-		workflowID uuid.UUID,
-		status string,
-	) (int64, error)
+	StatusCount(ctx context.Context, workflowID uuid.UUID, status string) (int64, error)
 
 	// RunJobs reads items in the queue for a specific run.
-	RunJobs(
-		ctx context.Context,
-		queueShardName string,
-		workspaceID uuid.UUID,
-		workflowID uuid.UUID,
-		runID ulid.ULID,
-		limit,
-		offset int64,
-	) ([]JobResponse, error)
+	RunJobs(ctx context.Context, queueShardName string, workspaceID uuid.UUID, workflowID uuid.UUID, runID ulid.ULID, limit, offset int64) ([]JobResponse, error)
 }
 
 // MigratePayload stores the information to be used when migrating a queue shard to another one

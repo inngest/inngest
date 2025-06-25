@@ -45,6 +45,8 @@ type Querier interface {
 	// Queue snapshots
 	//
 	GetQueueSnapshotChunks(ctx context.Context, snapshotID interface{}) ([]*GetQueueSnapshotChunksRow, error)
+	GetSpanOutput(ctx context.Context, spanID string) (interface{}, error)
+	GetSpansByRunID(ctx context.Context, runID string) ([]*GetSpansByRunIDRow, error)
 	GetTraceRun(ctx context.Context, runID ulid.ULID) (*TraceRun, error)
 	GetTraceSpanOutput(ctx context.Context, arg GetTraceSpanOutputParams) ([]*Trace, error)
 	GetTraceSpans(ctx context.Context, arg GetTraceSpansParams) ([]*Trace, error)
@@ -70,6 +72,8 @@ type Querier interface {
 	//
 	InsertHistory(ctx context.Context, arg InsertHistoryParams) error
 	InsertQueueSnapshotChunk(ctx context.Context, arg InsertQueueSnapshotChunkParams) error
+	// New
+	InsertSpan(ctx context.Context, arg InsertSpanParams) error
 	//
 	// Traces
 	//

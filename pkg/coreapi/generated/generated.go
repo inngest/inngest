@@ -79,6 +79,23 @@ type ComplexityRoot struct {
 		Url            func(childComplexity int) int
 	}
 
+	CancellationConfiguration struct {
+		Condition func(childComplexity int) int
+		Event     func(childComplexity int) int
+		Timeout   func(childComplexity int) int
+	}
+
+	ConcurrencyConfiguration struct {
+		Key   func(childComplexity int) int
+		Limit func(childComplexity int) int
+		Scope func(childComplexity int) int
+	}
+
+	ConcurrencyLimitConfiguration struct {
+		IsPlanLimit func(childComplexity int) int
+		Value       func(childComplexity int) int
+	}
+
 	ConnectV1WorkerConnection struct {
 		App              func(childComplexity int) int
 		AppID            func(childComplexity int) int
@@ -116,6 +133,11 @@ type ComplexityRoot struct {
 		TotalCount func(childComplexity int) int
 	}
 
+	DebounceConfiguration struct {
+		Key    func(childComplexity int) int
+		Period func(childComplexity int) int
+	}
+
 	Event struct {
 		CreatedAt    func(childComplexity int) int
 		ExternalID   func(childComplexity int) int
@@ -131,16 +153,36 @@ type ComplexityRoot struct {
 		Workspace    func(childComplexity int) int
 	}
 
+	EventsBatchConfiguration struct {
+		Key     func(childComplexity int) int
+		MaxSize func(childComplexity int) int
+		Timeout func(childComplexity int) int
+	}
+
 	Function struct {
-		App         func(childComplexity int) int
-		AppID       func(childComplexity int) int
-		Concurrency func(childComplexity int) int
-		Config      func(childComplexity int) int
-		ID          func(childComplexity int) int
-		Name        func(childComplexity int) int
-		Slug        func(childComplexity int) int
-		Triggers    func(childComplexity int) int
-		URL         func(childComplexity int) int
+		App            func(childComplexity int) int
+		AppID          func(childComplexity int) int
+		Concurrency    func(childComplexity int) int
+		Config         func(childComplexity int) int
+		Configuration  func(childComplexity int) int
+		FailureHandler func(childComplexity int) int
+		ID             func(childComplexity int) int
+		Name           func(childComplexity int) int
+		Slug           func(childComplexity int) int
+		Triggers       func(childComplexity int) int
+		URL            func(childComplexity int) int
+	}
+
+	FunctionConfiguration struct {
+		Cancellations func(childComplexity int) int
+		Concurrency   func(childComplexity int) int
+		Debounce      func(childComplexity int) int
+		EventsBatch   func(childComplexity int) int
+		Priority      func(childComplexity int) int
+		RateLimit     func(childComplexity int) int
+		Retries       func(childComplexity int) int
+		Singleton     func(childComplexity int) int
+		Throttle      func(childComplexity int) int
 	}
 
 	FunctionEvent struct {
@@ -189,7 +231,7 @@ type ComplexityRoot struct {
 		SourceID       func(childComplexity int) int
 		StartedAt      func(childComplexity int) int
 		Status         func(childComplexity int) int
-		Trace          func(childComplexity int) int
+		Trace          func(childComplexity int, preview *bool) int
 		TraceID        func(childComplexity int) int
 		TriggerIDs     func(childComplexity int) int
 	}
@@ -200,8 +242,9 @@ type ComplexityRoot struct {
 	}
 
 	FunctionTrigger struct {
-		Type  func(childComplexity int) int
-		Value func(childComplexity int) int
+		Condition func(childComplexity int) int
+		Type      func(childComplexity int) int
+		Value     func(childComplexity int) int
 	}
 
 	FunctionVersion struct {
@@ -245,6 +288,7 @@ type ComplexityRoot struct {
 		Apps                   func(childComplexity int, filter *models.AppsFilterV1) int
 		Event                  func(childComplexity int, query models.EventQuery) int
 		Events                 func(childComplexity int, query models.EventsQuery) int
+		FunctionBySlug         func(childComplexity int, query models.FunctionQuery) int
 		FunctionRun            func(childComplexity int, query models.FunctionRunQuery) int
 		Functions              func(childComplexity int) int
 		Run                    func(childComplexity int, runID string) int
@@ -254,6 +298,17 @@ type ComplexityRoot struct {
 		Stream                 func(childComplexity int, query models.StreamQuery) int
 		WorkerConnection       func(childComplexity int, connectionID ulid.ULID) int
 		WorkerConnections      func(childComplexity int, first int, after *string, orderBy []*models.ConnectV1WorkerConnectionsOrderBy, filter models.ConnectV1WorkerConnectionsFilter) int
+	}
+
+	RateLimitConfiguration struct {
+		Key    func(childComplexity int) int
+		Limit  func(childComplexity int) int
+		Period func(childComplexity int) int
+	}
+
+	RetryConfiguration struct {
+		IsDefault func(childComplexity int) int
+		Value     func(childComplexity int) int
 	}
 
 	RunHistoryCancel struct {
@@ -371,11 +426,17 @@ type ComplexityRoot struct {
 		TotalCount func(childComplexity int) int
 	}
 
+	SingletonConfiguration struct {
+		Key  func(childComplexity int) int
+		Mode func(childComplexity int) int
+	}
+
 	SleepStepInfo struct {
 		SleepUntil func(childComplexity int) int
 	}
 
 	StepError struct {
+		Cause   func(childComplexity int) int
 		Message func(childComplexity int) int
 		Name    func(childComplexity int) int
 		Stack   func(childComplexity int) int
@@ -405,6 +466,13 @@ type ComplexityRoot struct {
 		Runs      func(childComplexity int) int
 		Trigger   func(childComplexity int) int
 		Type      func(childComplexity int) int
+	}
+
+	ThrottleConfiguration struct {
+		Burst  func(childComplexity int) int
+		Key    func(childComplexity int) int
+		Limit  func(childComplexity int) int
+		Period func(childComplexity int) int
 	}
 
 	UserlandSpan struct {
@@ -464,6 +532,8 @@ type EventResolver interface {
 	FunctionRuns(ctx context.Context, obj *models.Event) ([]*models.FunctionRun, error)
 }
 type FunctionResolver interface {
+	FailureHandler(ctx context.Context, obj *models.Function) (*models.Function, error)
+
 	App(ctx context.Context, obj *models.Function) (*cqrs.App, error)
 }
 type FunctionRunResolver interface {
@@ -485,7 +555,7 @@ type FunctionRunV2Resolver interface {
 
 	Function(ctx context.Context, obj *models.FunctionRunV2) (*models.Function, error)
 
-	Trace(ctx context.Context, obj *models.FunctionRunV2) (*models.RunTraceSpan, error)
+	Trace(ctx context.Context, obj *models.FunctionRunV2, preview *bool) (*models.RunTraceSpan, error)
 }
 type MutationResolver interface {
 	CreateApp(ctx context.Context, input models.CreateAppInput) (*cqrs.App, error)
@@ -502,6 +572,7 @@ type QueryResolver interface {
 	Stream(ctx context.Context, query models.StreamQuery) ([]*models.StreamItem, error)
 	Event(ctx context.Context, query models.EventQuery) (*models.Event, error)
 	Events(ctx context.Context, query models.EventsQuery) ([]*models.Event, error)
+	FunctionBySlug(ctx context.Context, query models.FunctionQuery) (*models.Function, error)
 	Functions(ctx context.Context) ([]*models.Function, error)
 	FunctionRun(ctx context.Context, query models.FunctionRunQuery) (*models.FunctionRun, error)
 	Runs(ctx context.Context, first int, after *string, orderBy []*models.RunsV2OrderBy, filter models.RunsFilterV2) (*models.RunsV2Connection, error)
@@ -637,6 +708,62 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.App.Url(childComplexity), true
+
+	case "CancellationConfiguration.condition":
+		if e.complexity.CancellationConfiguration.Condition == nil {
+			break
+		}
+
+		return e.complexity.CancellationConfiguration.Condition(childComplexity), true
+
+	case "CancellationConfiguration.event":
+		if e.complexity.CancellationConfiguration.Event == nil {
+			break
+		}
+
+		return e.complexity.CancellationConfiguration.Event(childComplexity), true
+
+	case "CancellationConfiguration.timeout":
+		if e.complexity.CancellationConfiguration.Timeout == nil {
+			break
+		}
+
+		return e.complexity.CancellationConfiguration.Timeout(childComplexity), true
+
+	case "ConcurrencyConfiguration.key":
+		if e.complexity.ConcurrencyConfiguration.Key == nil {
+			break
+		}
+
+		return e.complexity.ConcurrencyConfiguration.Key(childComplexity), true
+
+	case "ConcurrencyConfiguration.limit":
+		if e.complexity.ConcurrencyConfiguration.Limit == nil {
+			break
+		}
+
+		return e.complexity.ConcurrencyConfiguration.Limit(childComplexity), true
+
+	case "ConcurrencyConfiguration.scope":
+		if e.complexity.ConcurrencyConfiguration.Scope == nil {
+			break
+		}
+
+		return e.complexity.ConcurrencyConfiguration.Scope(childComplexity), true
+
+	case "ConcurrencyLimitConfiguration.isPlanLimit":
+		if e.complexity.ConcurrencyLimitConfiguration.IsPlanLimit == nil {
+			break
+		}
+
+		return e.complexity.ConcurrencyLimitConfiguration.IsPlanLimit(childComplexity), true
+
+	case "ConcurrencyLimitConfiguration.value":
+		if e.complexity.ConcurrencyLimitConfiguration.Value == nil {
+			break
+		}
+
+		return e.complexity.ConcurrencyLimitConfiguration.Value(childComplexity), true
 
 	case "ConnectV1WorkerConnection.app":
 		if e.complexity.ConnectV1WorkerConnection.App == nil {
@@ -834,6 +961,20 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.ConnectV1WorkerConnectionsConnection.TotalCount(childComplexity), true
 
+	case "DebounceConfiguration.key":
+		if e.complexity.DebounceConfiguration.Key == nil {
+			break
+		}
+
+		return e.complexity.DebounceConfiguration.Key(childComplexity), true
+
+	case "DebounceConfiguration.period":
+		if e.complexity.DebounceConfiguration.Period == nil {
+			break
+		}
+
+		return e.complexity.DebounceConfiguration.Period(childComplexity), true
+
 	case "Event.createdAt":
 		if e.complexity.Event.CreatedAt == nil {
 			break
@@ -918,6 +1059,27 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Event.Workspace(childComplexity), true
 
+	case "EventsBatchConfiguration.key":
+		if e.complexity.EventsBatchConfiguration.Key == nil {
+			break
+		}
+
+		return e.complexity.EventsBatchConfiguration.Key(childComplexity), true
+
+	case "EventsBatchConfiguration.maxSize":
+		if e.complexity.EventsBatchConfiguration.MaxSize == nil {
+			break
+		}
+
+		return e.complexity.EventsBatchConfiguration.MaxSize(childComplexity), true
+
+	case "EventsBatchConfiguration.timeout":
+		if e.complexity.EventsBatchConfiguration.Timeout == nil {
+			break
+		}
+
+		return e.complexity.EventsBatchConfiguration.Timeout(childComplexity), true
+
 	case "Function.app":
 		if e.complexity.Function.App == nil {
 			break
@@ -945,6 +1107,20 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Function.Config(childComplexity), true
+
+	case "Function.configuration":
+		if e.complexity.Function.Configuration == nil {
+			break
+		}
+
+		return e.complexity.Function.Configuration(childComplexity), true
+
+	case "Function.failureHandler":
+		if e.complexity.Function.FailureHandler == nil {
+			break
+		}
+
+		return e.complexity.Function.FailureHandler(childComplexity), true
 
 	case "Function.id":
 		if e.complexity.Function.ID == nil {
@@ -980,6 +1156,69 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Function.URL(childComplexity), true
+
+	case "FunctionConfiguration.cancellations":
+		if e.complexity.FunctionConfiguration.Cancellations == nil {
+			break
+		}
+
+		return e.complexity.FunctionConfiguration.Cancellations(childComplexity), true
+
+	case "FunctionConfiguration.concurrency":
+		if e.complexity.FunctionConfiguration.Concurrency == nil {
+			break
+		}
+
+		return e.complexity.FunctionConfiguration.Concurrency(childComplexity), true
+
+	case "FunctionConfiguration.debounce":
+		if e.complexity.FunctionConfiguration.Debounce == nil {
+			break
+		}
+
+		return e.complexity.FunctionConfiguration.Debounce(childComplexity), true
+
+	case "FunctionConfiguration.eventsBatch":
+		if e.complexity.FunctionConfiguration.EventsBatch == nil {
+			break
+		}
+
+		return e.complexity.FunctionConfiguration.EventsBatch(childComplexity), true
+
+	case "FunctionConfiguration.priority":
+		if e.complexity.FunctionConfiguration.Priority == nil {
+			break
+		}
+
+		return e.complexity.FunctionConfiguration.Priority(childComplexity), true
+
+	case "FunctionConfiguration.rateLimit":
+		if e.complexity.FunctionConfiguration.RateLimit == nil {
+			break
+		}
+
+		return e.complexity.FunctionConfiguration.RateLimit(childComplexity), true
+
+	case "FunctionConfiguration.retries":
+		if e.complexity.FunctionConfiguration.Retries == nil {
+			break
+		}
+
+		return e.complexity.FunctionConfiguration.Retries(childComplexity), true
+
+	case "FunctionConfiguration.singleton":
+		if e.complexity.FunctionConfiguration.Singleton == nil {
+			break
+		}
+
+		return e.complexity.FunctionConfiguration.Singleton(childComplexity), true
+
+	case "FunctionConfiguration.throttle":
+		if e.complexity.FunctionConfiguration.Throttle == nil {
+			break
+		}
+
+		return e.complexity.FunctionConfiguration.Throttle(childComplexity), true
 
 	case "FunctionEvent.createdAt":
 		if e.complexity.FunctionEvent.CreatedAt == nil {
@@ -1264,7 +1503,12 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			break
 		}
 
-		return e.complexity.FunctionRunV2.Trace(childComplexity), true
+		args, err := ec.field_FunctionRunV2_trace_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.FunctionRunV2.Trace(childComplexity, args["preview"].(*bool)), true
 
 	case "FunctionRunV2.traceID":
 		if e.complexity.FunctionRunV2.TraceID == nil {
@@ -1293,6 +1537,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.FunctionRunV2Edge.Node(childComplexity), true
+
+	case "FunctionTrigger.condition":
+		if e.complexity.FunctionTrigger.Condition == nil {
+			break
+		}
+
+		return e.complexity.FunctionTrigger.Condition(childComplexity), true
 
 	case "FunctionTrigger.type":
 		if e.complexity.FunctionTrigger.Type == nil {
@@ -1559,6 +1810,18 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Query.Events(childComplexity, args["query"].(models.EventsQuery)), true
 
+	case "Query.functionBySlug":
+		if e.complexity.Query.FunctionBySlug == nil {
+			break
+		}
+
+		args, err := ec.field_Query_functionBySlug_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.Query.FunctionBySlug(childComplexity, args["query"].(models.FunctionQuery)), true
+
 	case "Query.functionRun":
 		if e.complexity.Query.FunctionRun == nil {
 			break
@@ -1661,6 +1924,41 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.Query.WorkerConnections(childComplexity, args["first"].(int), args["after"].(*string), args["orderBy"].([]*models.ConnectV1WorkerConnectionsOrderBy), args["filter"].(models.ConnectV1WorkerConnectionsFilter)), true
+
+	case "RateLimitConfiguration.key":
+		if e.complexity.RateLimitConfiguration.Key == nil {
+			break
+		}
+
+		return e.complexity.RateLimitConfiguration.Key(childComplexity), true
+
+	case "RateLimitConfiguration.limit":
+		if e.complexity.RateLimitConfiguration.Limit == nil {
+			break
+		}
+
+		return e.complexity.RateLimitConfiguration.Limit(childComplexity), true
+
+	case "RateLimitConfiguration.period":
+		if e.complexity.RateLimitConfiguration.Period == nil {
+			break
+		}
+
+		return e.complexity.RateLimitConfiguration.Period(childComplexity), true
+
+	case "RetryConfiguration.isDefault":
+		if e.complexity.RetryConfiguration.IsDefault == nil {
+			break
+		}
+
+		return e.complexity.RetryConfiguration.IsDefault(childComplexity), true
+
+	case "RetryConfiguration.value":
+		if e.complexity.RetryConfiguration.Value == nil {
+			break
+		}
+
+		return e.complexity.RetryConfiguration.Value(childComplexity), true
 
 	case "RunHistoryCancel.eventID":
 		if e.complexity.RunHistoryCancel.EventID == nil {
@@ -2194,12 +2492,33 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.RunsV2Connection.TotalCount(childComplexity), true
 
+	case "SingletonConfiguration.key":
+		if e.complexity.SingletonConfiguration.Key == nil {
+			break
+		}
+
+		return e.complexity.SingletonConfiguration.Key(childComplexity), true
+
+	case "SingletonConfiguration.mode":
+		if e.complexity.SingletonConfiguration.Mode == nil {
+			break
+		}
+
+		return e.complexity.SingletonConfiguration.Mode(childComplexity), true
+
 	case "SleepStepInfo.sleepUntil":
 		if e.complexity.SleepStepInfo.SleepUntil == nil {
 			break
 		}
 
 		return e.complexity.SleepStepInfo.SleepUntil(childComplexity), true
+
+	case "StepError.cause":
+		if e.complexity.StepError.Cause == nil {
+			break
+		}
+
+		return e.complexity.StepError.Cause(childComplexity), true
 
 	case "StepError.message":
 		if e.complexity.StepError.Message == nil {
@@ -2341,6 +2660,34 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.StreamItem.Type(childComplexity), true
 
+	case "ThrottleConfiguration.burst":
+		if e.complexity.ThrottleConfiguration.Burst == nil {
+			break
+		}
+
+		return e.complexity.ThrottleConfiguration.Burst(childComplexity), true
+
+	case "ThrottleConfiguration.key":
+		if e.complexity.ThrottleConfiguration.Key == nil {
+			break
+		}
+
+		return e.complexity.ThrottleConfiguration.Key(childComplexity), true
+
+	case "ThrottleConfiguration.limit":
+		if e.complexity.ThrottleConfiguration.Limit == nil {
+			break
+		}
+
+		return e.complexity.ThrottleConfiguration.Limit(childComplexity), true
+
+	case "ThrottleConfiguration.period":
+		if e.complexity.ThrottleConfiguration.Period == nil {
+			break
+		}
+
+		return e.complexity.ThrottleConfiguration.Period(childComplexity), true
+
 	case "UserlandSpan.resourceAttrs":
 		if e.complexity.UserlandSpan.ResourceAttrs == nil {
 			break
@@ -2468,6 +2815,7 @@ func (e *executableSchema) Exec(ctx context.Context) graphql.ResponseHandler {
 		ec.unmarshalInputCreateAppInput,
 		ec.unmarshalInputEventQuery,
 		ec.unmarshalInputEventsQuery,
+		ec.unmarshalInputFunctionQuery,
 		ec.unmarshalInputFunctionRunQuery,
 		ec.unmarshalInputFunctionRunsQuery,
 		ec.unmarshalInputRerunFromStepInput,
@@ -2579,6 +2927,8 @@ input RerunFromStepInput {
   # Get all events sent
   events(query: EventsQuery!): [Event!]
 
+  functionBySlug(query: FunctionQuery!): Function
+
   # Get all functions registered
   functions: [Function!]
 
@@ -2619,6 +2969,11 @@ input EventQuery {
 input EventsQuery {
   workspaceId: ID! = "local"
   lastEventId: ID
+}
+
+input FunctionQuery {
+  workspaceId: ID! = "local"
+  functionSlug: String!
 }
 
 input FunctionRunQuery {
@@ -2773,7 +3128,9 @@ type Function {
   id: String!
   name: String!
   slug: String!
+  failureHandler: Function
   config: String!
+  configuration: FunctionConfiguration!
   concurrency: Int!
   triggers: [FunctionTrigger!]
   url: String!
@@ -2789,6 +3146,7 @@ enum FunctionTriggerTypes {
 type FunctionTrigger {
   type: FunctionTriggerTypes!
   value: String!
+  condition: String
 }
 
 enum FunctionRunStatus {
@@ -2812,6 +3170,84 @@ type FunctionEvent {
   type: FunctionEventType
   output: String
   createdAt: Time
+}
+
+type FunctionConfiguration {
+  cancellations: [CancellationConfiguration!]!
+  retries: RetryConfiguration!
+  priority: String
+  eventsBatch: EventsBatchConfiguration
+  concurrency: [ConcurrencyConfiguration!]!
+  rateLimit: RateLimitConfiguration
+  debounce: DebounceConfiguration
+  throttle: ThrottleConfiguration
+  singleton: SingletonConfiguration
+}
+
+type CancellationConfiguration {
+  event: String!
+  timeout: String
+  condition: String
+}
+
+type RetryConfiguration {
+  value: Int!
+  isDefault: Boolean
+}
+
+type EventsBatchConfiguration {
+  "The maximum number of events a batch can have."
+  maxSize: Int!
+
+  "How long to wait before running the function with the batch."
+  timeout: String!
+
+  key: String
+}
+
+type ConcurrencyConfiguration {
+  scope: ConcurrencyScope!
+  limit: ConcurrencyLimitConfiguration!
+  key: String
+}
+
+enum ConcurrencyScope {
+  ACCOUNT
+  ENVIRONMENT
+  FUNCTION
+}
+
+type ConcurrencyLimitConfiguration {
+  value: Int!
+  isPlanLimit: Boolean
+}
+
+type RateLimitConfiguration {
+  limit: Int!
+  period: String!
+  key: String
+}
+
+type DebounceConfiguration {
+  period: String!
+  key: String
+}
+
+type ThrottleConfiguration {
+  burst: Int!
+  key: String
+  limit: Int!
+  period: String!
+}
+
+type SingletonConfiguration {
+  mode: SingletonMode!
+  key: String
+}
+
+enum SingletonMode {
+  SKIP
+  CANCEL
 }
 
 enum StepEventType {
@@ -3005,7 +3441,7 @@ type FunctionRunV2 {
 
   output: Bytes
 
-  trace: RunTraceSpan
+  trace(preview: Boolean): RunTraceSpan
   hasAI: Boolean!
 }
 
@@ -3130,6 +3566,7 @@ type StepError {
   message: String!
   name: String
   stack: String
+  cause: Bytes
 }
 
 type RunTraceTrigger {
@@ -3238,6 +3675,21 @@ var parsedSchema = gqlparser.MustLoadSchema(sources...)
 // endregion ************************** generated!.gotpl **************************
 
 // region    ***************************** args.gotpl *****************************
+
+func (ec *executionContext) field_FunctionRunV2_trace_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 *bool
+	if tmp, ok := rawArgs["preview"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("preview"))
+		arg0, err = ec.unmarshalOBoolean2ᚖbool(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["preview"] = arg0
+	return args, nil
+}
 
 func (ec *executionContext) field_FunctionRun_historyItemOutput_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
@@ -3453,6 +3905,21 @@ func (ec *executionContext) field_Query_events_args(ctx context.Context, rawArgs
 	if tmp, ok := rawArgs["query"]; ok {
 		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("query"))
 		arg0, err = ec.unmarshalNEventsQuery2githubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐEventsQuery(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["query"] = arg0
+	return args, nil
+}
+
+func (ec *executionContext) field_Query_functionBySlug_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 models.FunctionQuery
+	if tmp, ok := rawArgs["query"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("query"))
+		arg0, err = ec.unmarshalNFunctionQuery2githubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐFunctionQuery(ctx, tmp)
 		if err != nil {
 			return nil, err
 		}
@@ -4102,8 +4569,12 @@ func (ec *executionContext) fieldContext_App_functions(ctx context.Context, fiel
 				return ec.fieldContext_Function_name(ctx, field)
 			case "slug":
 				return ec.fieldContext_Function_slug(ctx, field)
+			case "failureHandler":
+				return ec.fieldContext_Function_failureHandler(ctx, field)
 			case "config":
 				return ec.fieldContext_Function_config(ctx, field)
+			case "configuration":
+				return ec.fieldContext_Function_configuration(ctx, field)
 			case "concurrency":
 				return ec.fieldContext_Function_concurrency(ctx, field)
 			case "triggers":
@@ -4331,6 +4802,352 @@ func (ec *executionContext) fieldContext_App_autodiscovered(ctx context.Context,
 		Field:      field,
 		IsMethod:   true,
 		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CancellationConfiguration_event(ctx context.Context, field graphql.CollectedField, obj *models.CancellationConfiguration) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_CancellationConfiguration_event(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Event, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_CancellationConfiguration_event(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CancellationConfiguration",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CancellationConfiguration_timeout(ctx context.Context, field graphql.CollectedField, obj *models.CancellationConfiguration) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_CancellationConfiguration_timeout(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Timeout, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_CancellationConfiguration_timeout(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CancellationConfiguration",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _CancellationConfiguration_condition(ctx context.Context, field graphql.CollectedField, obj *models.CancellationConfiguration) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_CancellationConfiguration_condition(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Condition, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_CancellationConfiguration_condition(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "CancellationConfiguration",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ConcurrencyConfiguration_scope(ctx context.Context, field graphql.CollectedField, obj *models.ConcurrencyConfiguration) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ConcurrencyConfiguration_scope(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Scope, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(models.ConcurrencyScope)
+	fc.Result = res
+	return ec.marshalNConcurrencyScope2githubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐConcurrencyScope(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ConcurrencyConfiguration_scope(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ConcurrencyConfiguration",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type ConcurrencyScope does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ConcurrencyConfiguration_limit(ctx context.Context, field graphql.CollectedField, obj *models.ConcurrencyConfiguration) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ConcurrencyConfiguration_limit(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Limit, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*models.ConcurrencyLimitConfiguration)
+	fc.Result = res
+	return ec.marshalNConcurrencyLimitConfiguration2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐConcurrencyLimitConfiguration(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ConcurrencyConfiguration_limit(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ConcurrencyConfiguration",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "value":
+				return ec.fieldContext_ConcurrencyLimitConfiguration_value(ctx, field)
+			case "isPlanLimit":
+				return ec.fieldContext_ConcurrencyLimitConfiguration_isPlanLimit(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type ConcurrencyLimitConfiguration", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ConcurrencyConfiguration_key(ctx context.Context, field graphql.CollectedField, obj *models.ConcurrencyConfiguration) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ConcurrencyConfiguration_key(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Key, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ConcurrencyConfiguration_key(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ConcurrencyConfiguration",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ConcurrencyLimitConfiguration_value(ctx context.Context, field graphql.CollectedField, obj *models.ConcurrencyLimitConfiguration) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ConcurrencyLimitConfiguration_value(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Value, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ConcurrencyLimitConfiguration_value(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ConcurrencyLimitConfiguration",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ConcurrencyLimitConfiguration_isPlanLimit(ctx context.Context, field graphql.CollectedField, obj *models.ConcurrencyLimitConfiguration) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ConcurrencyLimitConfiguration_isPlanLimit(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.IsPlanLimit, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*bool)
+	fc.Result = res
+	return ec.marshalOBoolean2ᚖbool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ConcurrencyLimitConfiguration_isPlanLimit(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ConcurrencyLimitConfiguration",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type Boolean does not have child fields")
 		},
@@ -5639,6 +6456,91 @@ func (ec *executionContext) fieldContext_ConnectV1WorkerConnectionsConnection_to
 	return fc, nil
 }
 
+func (ec *executionContext) _DebounceConfiguration_period(ctx context.Context, field graphql.CollectedField, obj *models.DebounceConfiguration) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_DebounceConfiguration_period(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Period, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_DebounceConfiguration_period(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "DebounceConfiguration",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _DebounceConfiguration_key(ctx context.Context, field graphql.CollectedField, obj *models.DebounceConfiguration) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_DebounceConfiguration_key(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Key, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_DebounceConfiguration_key(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "DebounceConfiguration",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Event_id(ctx context.Context, field graphql.CollectedField, obj *models.Event) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Event_id(ctx, field)
 	if err != nil {
@@ -6176,6 +7078,135 @@ func (ec *executionContext) fieldContext_Event_functionRuns(ctx context.Context,
 	return fc, nil
 }
 
+func (ec *executionContext) _EventsBatchConfiguration_maxSize(ctx context.Context, field graphql.CollectedField, obj *models.EventsBatchConfiguration) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_EventsBatchConfiguration_maxSize(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.MaxSize, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_EventsBatchConfiguration_maxSize(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "EventsBatchConfiguration",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _EventsBatchConfiguration_timeout(ctx context.Context, field graphql.CollectedField, obj *models.EventsBatchConfiguration) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_EventsBatchConfiguration_timeout(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Timeout, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_EventsBatchConfiguration_timeout(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "EventsBatchConfiguration",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _EventsBatchConfiguration_key(ctx context.Context, field graphql.CollectedField, obj *models.EventsBatchConfiguration) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_EventsBatchConfiguration_key(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Key, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_EventsBatchConfiguration_key(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "EventsBatchConfiguration",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Function_id(ctx context.Context, field graphql.CollectedField, obj *models.Function) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Function_id(ctx, field)
 	if err != nil {
@@ -6308,6 +7339,71 @@ func (ec *executionContext) fieldContext_Function_slug(ctx context.Context, fiel
 	return fc, nil
 }
 
+func (ec *executionContext) _Function_failureHandler(ctx context.Context, field graphql.CollectedField, obj *models.Function) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Function_failureHandler(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Function().FailureHandler(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*models.Function)
+	fc.Result = res
+	return ec.marshalOFunction2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐFunction(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Function_failureHandler(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Function",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Function_id(ctx, field)
+			case "name":
+				return ec.fieldContext_Function_name(ctx, field)
+			case "slug":
+				return ec.fieldContext_Function_slug(ctx, field)
+			case "failureHandler":
+				return ec.fieldContext_Function_failureHandler(ctx, field)
+			case "config":
+				return ec.fieldContext_Function_config(ctx, field)
+			case "configuration":
+				return ec.fieldContext_Function_configuration(ctx, field)
+			case "concurrency":
+				return ec.fieldContext_Function_concurrency(ctx, field)
+			case "triggers":
+				return ec.fieldContext_Function_triggers(ctx, field)
+			case "url":
+				return ec.fieldContext_Function_url(ctx, field)
+			case "appID":
+				return ec.fieldContext_Function_appID(ctx, field)
+			case "app":
+				return ec.fieldContext_Function_app(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Function", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Function_config(ctx context.Context, field graphql.CollectedField, obj *models.Function) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Function_config(ctx, field)
 	if err != nil {
@@ -6347,6 +7443,70 @@ func (ec *executionContext) fieldContext_Function_config(ctx context.Context, fi
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _Function_configuration(ctx context.Context, field graphql.CollectedField, obj *models.Function) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Function_configuration(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Configuration, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*models.FunctionConfiguration)
+	fc.Result = res
+	return ec.marshalNFunctionConfiguration2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐFunctionConfiguration(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Function_configuration(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Function",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "cancellations":
+				return ec.fieldContext_FunctionConfiguration_cancellations(ctx, field)
+			case "retries":
+				return ec.fieldContext_FunctionConfiguration_retries(ctx, field)
+			case "priority":
+				return ec.fieldContext_FunctionConfiguration_priority(ctx, field)
+			case "eventsBatch":
+				return ec.fieldContext_FunctionConfiguration_eventsBatch(ctx, field)
+			case "concurrency":
+				return ec.fieldContext_FunctionConfiguration_concurrency(ctx, field)
+			case "rateLimit":
+				return ec.fieldContext_FunctionConfiguration_rateLimit(ctx, field)
+			case "debounce":
+				return ec.fieldContext_FunctionConfiguration_debounce(ctx, field)
+			case "throttle":
+				return ec.fieldContext_FunctionConfiguration_throttle(ctx, field)
+			case "singleton":
+				return ec.fieldContext_FunctionConfiguration_singleton(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type FunctionConfiguration", field.Name)
 		},
 	}
 	return fc, nil
@@ -6436,6 +7596,8 @@ func (ec *executionContext) fieldContext_Function_triggers(ctx context.Context, 
 				return ec.fieldContext_FunctionTrigger_type(ctx, field)
 			case "value":
 				return ec.fieldContext_FunctionTrigger_value(ctx, field)
+			case "condition":
+				return ec.fieldContext_FunctionTrigger_condition(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type FunctionTrigger", field.Name)
 		},
@@ -6602,6 +7764,444 @@ func (ec *executionContext) fieldContext_Function_app(ctx context.Context, field
 				return ec.fieldContext_App_autodiscovered(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type App", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FunctionConfiguration_cancellations(ctx context.Context, field graphql.CollectedField, obj *models.FunctionConfiguration) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_FunctionConfiguration_cancellations(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Cancellations, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.([]*models.CancellationConfiguration)
+	fc.Result = res
+	return ec.marshalNCancellationConfiguration2ᚕᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐCancellationConfigurationᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_FunctionConfiguration_cancellations(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FunctionConfiguration",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "event":
+				return ec.fieldContext_CancellationConfiguration_event(ctx, field)
+			case "timeout":
+				return ec.fieldContext_CancellationConfiguration_timeout(ctx, field)
+			case "condition":
+				return ec.fieldContext_CancellationConfiguration_condition(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type CancellationConfiguration", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FunctionConfiguration_retries(ctx context.Context, field graphql.CollectedField, obj *models.FunctionConfiguration) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_FunctionConfiguration_retries(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Retries, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(*models.RetryConfiguration)
+	fc.Result = res
+	return ec.marshalNRetryConfiguration2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐRetryConfiguration(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_FunctionConfiguration_retries(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FunctionConfiguration",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "value":
+				return ec.fieldContext_RetryConfiguration_value(ctx, field)
+			case "isDefault":
+				return ec.fieldContext_RetryConfiguration_isDefault(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type RetryConfiguration", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FunctionConfiguration_priority(ctx context.Context, field graphql.CollectedField, obj *models.FunctionConfiguration) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_FunctionConfiguration_priority(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Priority, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_FunctionConfiguration_priority(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FunctionConfiguration",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FunctionConfiguration_eventsBatch(ctx context.Context, field graphql.CollectedField, obj *models.FunctionConfiguration) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_FunctionConfiguration_eventsBatch(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.EventsBatch, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*models.EventsBatchConfiguration)
+	fc.Result = res
+	return ec.marshalOEventsBatchConfiguration2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐEventsBatchConfiguration(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_FunctionConfiguration_eventsBatch(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FunctionConfiguration",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "maxSize":
+				return ec.fieldContext_EventsBatchConfiguration_maxSize(ctx, field)
+			case "timeout":
+				return ec.fieldContext_EventsBatchConfiguration_timeout(ctx, field)
+			case "key":
+				return ec.fieldContext_EventsBatchConfiguration_key(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type EventsBatchConfiguration", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FunctionConfiguration_concurrency(ctx context.Context, field graphql.CollectedField, obj *models.FunctionConfiguration) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_FunctionConfiguration_concurrency(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Concurrency, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.([]*models.ConcurrencyConfiguration)
+	fc.Result = res
+	return ec.marshalNConcurrencyConfiguration2ᚕᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐConcurrencyConfigurationᚄ(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_FunctionConfiguration_concurrency(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FunctionConfiguration",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "scope":
+				return ec.fieldContext_ConcurrencyConfiguration_scope(ctx, field)
+			case "limit":
+				return ec.fieldContext_ConcurrencyConfiguration_limit(ctx, field)
+			case "key":
+				return ec.fieldContext_ConcurrencyConfiguration_key(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type ConcurrencyConfiguration", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FunctionConfiguration_rateLimit(ctx context.Context, field graphql.CollectedField, obj *models.FunctionConfiguration) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_FunctionConfiguration_rateLimit(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.RateLimit, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*models.RateLimitConfiguration)
+	fc.Result = res
+	return ec.marshalORateLimitConfiguration2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐRateLimitConfiguration(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_FunctionConfiguration_rateLimit(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FunctionConfiguration",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "limit":
+				return ec.fieldContext_RateLimitConfiguration_limit(ctx, field)
+			case "period":
+				return ec.fieldContext_RateLimitConfiguration_period(ctx, field)
+			case "key":
+				return ec.fieldContext_RateLimitConfiguration_key(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type RateLimitConfiguration", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FunctionConfiguration_debounce(ctx context.Context, field graphql.CollectedField, obj *models.FunctionConfiguration) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_FunctionConfiguration_debounce(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Debounce, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*models.DebounceConfiguration)
+	fc.Result = res
+	return ec.marshalODebounceConfiguration2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐDebounceConfiguration(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_FunctionConfiguration_debounce(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FunctionConfiguration",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "period":
+				return ec.fieldContext_DebounceConfiguration_period(ctx, field)
+			case "key":
+				return ec.fieldContext_DebounceConfiguration_key(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type DebounceConfiguration", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FunctionConfiguration_throttle(ctx context.Context, field graphql.CollectedField, obj *models.FunctionConfiguration) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_FunctionConfiguration_throttle(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Throttle, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*models.ThrottleConfiguration)
+	fc.Result = res
+	return ec.marshalOThrottleConfiguration2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐThrottleConfiguration(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_FunctionConfiguration_throttle(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FunctionConfiguration",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "burst":
+				return ec.fieldContext_ThrottleConfiguration_burst(ctx, field)
+			case "key":
+				return ec.fieldContext_ThrottleConfiguration_key(ctx, field)
+			case "limit":
+				return ec.fieldContext_ThrottleConfiguration_limit(ctx, field)
+			case "period":
+				return ec.fieldContext_ThrottleConfiguration_period(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type ThrottleConfiguration", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FunctionConfiguration_singleton(ctx context.Context, field graphql.CollectedField, obj *models.FunctionConfiguration) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_FunctionConfiguration_singleton(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Singleton, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*models.SingletonConfiguration)
+	fc.Result = res
+	return ec.marshalOSingletonConfiguration2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐSingletonConfiguration(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_FunctionConfiguration_singleton(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FunctionConfiguration",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "mode":
+				return ec.fieldContext_SingletonConfiguration_mode(ctx, field)
+			case "key":
+				return ec.fieldContext_SingletonConfiguration_key(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type SingletonConfiguration", field.Name)
 		},
 	}
 	return fc, nil
@@ -6984,8 +8584,12 @@ func (ec *executionContext) fieldContext_FunctionRun_function(ctx context.Contex
 				return ec.fieldContext_Function_name(ctx, field)
 			case "slug":
 				return ec.fieldContext_Function_slug(ctx, field)
+			case "failureHandler":
+				return ec.fieldContext_Function_failureHandler(ctx, field)
 			case "config":
 				return ec.fieldContext_Function_config(ctx, field)
+			case "configuration":
+				return ec.fieldContext_Function_configuration(ctx, field)
 			case "concurrency":
 				return ec.fieldContext_Function_concurrency(ctx, field)
 			case "triggers":
@@ -7989,8 +9593,12 @@ func (ec *executionContext) fieldContext_FunctionRunV2_function(ctx context.Cont
 				return ec.fieldContext_Function_name(ctx, field)
 			case "slug":
 				return ec.fieldContext_Function_slug(ctx, field)
+			case "failureHandler":
+				return ec.fieldContext_Function_failureHandler(ctx, field)
 			case "config":
 				return ec.fieldContext_Function_config(ctx, field)
+			case "configuration":
+				return ec.fieldContext_Function_configuration(ctx, field)
 			case "concurrency":
 				return ec.fieldContext_Function_concurrency(ctx, field)
 			case "triggers":
@@ -8529,7 +10137,7 @@ func (ec *executionContext) _FunctionRunV2_trace(ctx context.Context, field grap
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.FunctionRunV2().Trace(rctx, obj)
+		return ec.resolvers.FunctionRunV2().Trace(rctx, obj, fc.Args["preview"].(*bool))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -8600,6 +10208,17 @@ func (ec *executionContext) fieldContext_FunctionRunV2_trace(ctx context.Context
 			}
 			return nil, fmt.Errorf("no field named %q was found under type RunTraceSpan", field.Name)
 		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_FunctionRunV2_trace_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return
 	}
 	return fc, nil
 }
@@ -8852,6 +10471,47 @@ func (ec *executionContext) _FunctionTrigger_value(ctx context.Context, field gr
 }
 
 func (ec *executionContext) fieldContext_FunctionTrigger_value(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FunctionTrigger",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FunctionTrigger_condition(ctx context.Context, field graphql.CollectedField, obj *models.FunctionTrigger) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_FunctionTrigger_condition(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Condition, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_FunctionTrigger_condition(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "FunctionTrigger",
 		Field:      field,
@@ -10471,6 +12131,82 @@ func (ec *executionContext) fieldContext_Query_events(ctx context.Context, field
 	return fc, nil
 }
 
+func (ec *executionContext) _Query_functionBySlug(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Query_functionBySlug(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Query().FunctionBySlug(rctx, fc.Args["query"].(models.FunctionQuery))
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*models.Function)
+	fc.Result = res
+	return ec.marshalOFunction2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐFunction(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Query_functionBySlug(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Query",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Function_id(ctx, field)
+			case "name":
+				return ec.fieldContext_Function_name(ctx, field)
+			case "slug":
+				return ec.fieldContext_Function_slug(ctx, field)
+			case "failureHandler":
+				return ec.fieldContext_Function_failureHandler(ctx, field)
+			case "config":
+				return ec.fieldContext_Function_config(ctx, field)
+			case "configuration":
+				return ec.fieldContext_Function_configuration(ctx, field)
+			case "concurrency":
+				return ec.fieldContext_Function_concurrency(ctx, field)
+			case "triggers":
+				return ec.fieldContext_Function_triggers(ctx, field)
+			case "url":
+				return ec.fieldContext_Function_url(ctx, field)
+			case "appID":
+				return ec.fieldContext_Function_appID(ctx, field)
+			case "app":
+				return ec.fieldContext_Function_app(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Function", field.Name)
+		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_Query_functionBySlug_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Query_functions(ctx context.Context, field graphql.CollectedField) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Query_functions(ctx, field)
 	if err != nil {
@@ -10513,8 +12249,12 @@ func (ec *executionContext) fieldContext_Query_functions(ctx context.Context, fi
 				return ec.fieldContext_Function_name(ctx, field)
 			case "slug":
 				return ec.fieldContext_Function_slug(ctx, field)
+			case "failureHandler":
+				return ec.fieldContext_Function_failureHandler(ctx, field)
 			case "config":
 				return ec.fieldContext_Function_config(ctx, field)
+			case "configuration":
+				return ec.fieldContext_Function_configuration(ctx, field)
 			case "concurrency":
 				return ec.fieldContext_Function_concurrency(ctx, field)
 			case "triggers":
@@ -11198,6 +12938,220 @@ func (ec *executionContext) fieldContext_Query___schema(ctx context.Context, fie
 				return ec.fieldContext___Schema_directives(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type __Schema", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RateLimitConfiguration_limit(ctx context.Context, field graphql.CollectedField, obj *models.RateLimitConfiguration) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RateLimitConfiguration_limit(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Limit, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RateLimitConfiguration_limit(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RateLimitConfiguration",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RateLimitConfiguration_period(ctx context.Context, field graphql.CollectedField, obj *models.RateLimitConfiguration) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RateLimitConfiguration_period(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Period, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RateLimitConfiguration_period(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RateLimitConfiguration",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RateLimitConfiguration_key(ctx context.Context, field graphql.CollectedField, obj *models.RateLimitConfiguration) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RateLimitConfiguration_key(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Key, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RateLimitConfiguration_key(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RateLimitConfiguration",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RetryConfiguration_value(ctx context.Context, field graphql.CollectedField, obj *models.RetryConfiguration) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RetryConfiguration_value(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Value, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RetryConfiguration_value(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RetryConfiguration",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RetryConfiguration_isDefault(ctx context.Context, field graphql.CollectedField, obj *models.RetryConfiguration) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RetryConfiguration_isDefault(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.IsDefault, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*bool)
+	fc.Result = res
+	return ec.marshalOBoolean2ᚖbool(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RetryConfiguration_isDefault(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RetryConfiguration",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Boolean does not have child fields")
 		},
 	}
 	return fc, nil
@@ -14210,6 +16164,8 @@ func (ec *executionContext) fieldContext_RunTraceSpanOutput_error(ctx context.Co
 				return ec.fieldContext_StepError_name(ctx, field)
 			case "stack":
 				return ec.fieldContext_StepError_stack(ctx, field)
+			case "cause":
+				return ec.fieldContext_StepError_cause(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type StepError", field.Name)
 		},
@@ -14664,6 +16620,91 @@ func (ec *executionContext) fieldContext_RunsV2Connection_totalCount(ctx context
 	return fc, nil
 }
 
+func (ec *executionContext) _SingletonConfiguration_mode(ctx context.Context, field graphql.CollectedField, obj *models.SingletonConfiguration) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SingletonConfiguration_mode(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Mode, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(models.SingletonMode)
+	fc.Result = res
+	return ec.marshalNSingletonMode2githubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐSingletonMode(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SingletonConfiguration_mode(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SingletonConfiguration",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type SingletonMode does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _SingletonConfiguration_key(ctx context.Context, field graphql.CollectedField, obj *models.SingletonConfiguration) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_SingletonConfiguration_key(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Key, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_SingletonConfiguration_key(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "SingletonConfiguration",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _SleepStepInfo_sleepUntil(ctx context.Context, field graphql.CollectedField, obj *models.SleepStepInfo) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_SleepStepInfo_sleepUntil(ctx, field)
 	if err != nil {
@@ -14829,6 +16870,47 @@ func (ec *executionContext) fieldContext_StepError_stack(ctx context.Context, fi
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _StepError_cause(ctx context.Context, field graphql.CollectedField, obj *models.StepError) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_StepError_cause(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Cause, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOBytes2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_StepError_cause(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "StepError",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Bytes does not have child fields")
 		},
 	}
 	return fc, nil
@@ -15632,6 +17714,179 @@ func (ec *executionContext) fieldContext_StreamItem_inBatch(ctx context.Context,
 		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type Boolean does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ThrottleConfiguration_burst(ctx context.Context, field graphql.CollectedField, obj *models.ThrottleConfiguration) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ThrottleConfiguration_burst(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Burst, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ThrottleConfiguration_burst(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ThrottleConfiguration",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ThrottleConfiguration_key(ctx context.Context, field graphql.CollectedField, obj *models.ThrottleConfiguration) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ThrottleConfiguration_key(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Key, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ThrottleConfiguration_key(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ThrottleConfiguration",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ThrottleConfiguration_limit(ctx context.Context, field graphql.CollectedField, obj *models.ThrottleConfiguration) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ThrottleConfiguration_limit(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Limit, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(int)
+	fc.Result = res
+	return ec.marshalNInt2int(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ThrottleConfiguration_limit(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ThrottleConfiguration",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Int does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _ThrottleConfiguration_period(ctx context.Context, field graphql.CollectedField, obj *models.ThrottleConfiguration) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_ThrottleConfiguration_period(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Period, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(string)
+	fc.Result = res
+	return ec.marshalNString2string(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_ThrottleConfiguration_period(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "ThrottleConfiguration",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
 		},
 	}
 	return fc, nil
@@ -18361,6 +20616,46 @@ func (ec *executionContext) unmarshalInputEventsQuery(ctx context.Context, obj i
 	return it, nil
 }
 
+func (ec *executionContext) unmarshalInputFunctionQuery(ctx context.Context, obj interface{}) (models.FunctionQuery, error) {
+	var it models.FunctionQuery
+	asMap := map[string]interface{}{}
+	for k, v := range obj.(map[string]interface{}) {
+		asMap[k] = v
+	}
+
+	if _, present := asMap["workspaceId"]; !present {
+		asMap["workspaceId"] = "local"
+	}
+
+	fieldsInOrder := [...]string{"workspaceId", "functionSlug"}
+	for _, k := range fieldsInOrder {
+		v, ok := asMap[k]
+		if !ok {
+			continue
+		}
+		switch k {
+		case "workspaceId":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("workspaceId"))
+			it.WorkspaceID, err = ec.unmarshalNID2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		case "functionSlug":
+			var err error
+
+			ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("functionSlug"))
+			it.FunctionSlug, err = ec.unmarshalNString2string(ctx, v)
+			if err != nil {
+				return it, err
+			}
+		}
+	}
+
+	return it, nil
+}
+
 func (ec *executionContext) unmarshalInputFunctionRunQuery(ctx context.Context, obj interface{}) (models.FunctionRunQuery, error) {
 	var it models.FunctionRunQuery
 	asMap := map[string]interface{}{}
@@ -18980,6 +21275,113 @@ func (ec *executionContext) _App(ctx context.Context, sel ast.SelectionSet, obj 
 	return out
 }
 
+var cancellationConfigurationImplementors = []string{"CancellationConfiguration"}
+
+func (ec *executionContext) _CancellationConfiguration(ctx context.Context, sel ast.SelectionSet, obj *models.CancellationConfiguration) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, cancellationConfigurationImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("CancellationConfiguration")
+		case "event":
+
+			out.Values[i] = ec._CancellationConfiguration_event(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "timeout":
+
+			out.Values[i] = ec._CancellationConfiguration_timeout(ctx, field, obj)
+
+		case "condition":
+
+			out.Values[i] = ec._CancellationConfiguration_condition(ctx, field, obj)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var concurrencyConfigurationImplementors = []string{"ConcurrencyConfiguration"}
+
+func (ec *executionContext) _ConcurrencyConfiguration(ctx context.Context, sel ast.SelectionSet, obj *models.ConcurrencyConfiguration) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, concurrencyConfigurationImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ConcurrencyConfiguration")
+		case "scope":
+
+			out.Values[i] = ec._ConcurrencyConfiguration_scope(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "limit":
+
+			out.Values[i] = ec._ConcurrencyConfiguration_limit(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "key":
+
+			out.Values[i] = ec._ConcurrencyConfiguration_key(ctx, field, obj)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var concurrencyLimitConfigurationImplementors = []string{"ConcurrencyLimitConfiguration"}
+
+func (ec *executionContext) _ConcurrencyLimitConfiguration(ctx context.Context, sel ast.SelectionSet, obj *models.ConcurrencyLimitConfiguration) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, concurrencyLimitConfigurationImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ConcurrencyLimitConfiguration")
+		case "value":
+
+			out.Values[i] = ec._ConcurrencyLimitConfiguration_value(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "isPlanLimit":
+
+			out.Values[i] = ec._ConcurrencyLimitConfiguration_isPlanLimit(ctx, field, obj)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
 var connectV1WorkerConnectionImplementors = []string{"ConnectV1WorkerConnection"}
 
 func (ec *executionContext) _ConnectV1WorkerConnection(ctx context.Context, sel ast.SelectionSet, obj *models.ConnectV1WorkerConnection) graphql.Marshaler {
@@ -19238,6 +21640,38 @@ func (ec *executionContext) _ConnectV1WorkerConnectionsConnection(ctx context.Co
 	return out
 }
 
+var debounceConfigurationImplementors = []string{"DebounceConfiguration"}
+
+func (ec *executionContext) _DebounceConfiguration(ctx context.Context, sel ast.SelectionSet, obj *models.DebounceConfiguration) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, debounceConfigurationImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("DebounceConfiguration")
+		case "period":
+
+			out.Values[i] = ec._DebounceConfiguration_period(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "key":
+
+			out.Values[i] = ec._DebounceConfiguration_key(ctx, field, obj)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
 var eventImplementors = []string{"Event"}
 
 func (ec *executionContext) _Event(ctx context.Context, sel ast.SelectionSet, obj *models.Event) graphql.Marshaler {
@@ -19375,6 +21809,45 @@ func (ec *executionContext) _Event(ctx context.Context, sel ast.SelectionSet, ob
 	return out
 }
 
+var eventsBatchConfigurationImplementors = []string{"EventsBatchConfiguration"}
+
+func (ec *executionContext) _EventsBatchConfiguration(ctx context.Context, sel ast.SelectionSet, obj *models.EventsBatchConfiguration) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, eventsBatchConfigurationImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("EventsBatchConfiguration")
+		case "maxSize":
+
+			out.Values[i] = ec._EventsBatchConfiguration_maxSize(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "timeout":
+
+			out.Values[i] = ec._EventsBatchConfiguration_timeout(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "key":
+
+			out.Values[i] = ec._EventsBatchConfiguration_key(ctx, field, obj)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
 var functionImplementors = []string{"Function"}
 
 func (ec *executionContext) _Function(ctx context.Context, sel ast.SelectionSet, obj *models.Function) graphql.Marshaler {
@@ -19406,9 +21879,33 @@ func (ec *executionContext) _Function(ctx context.Context, sel ast.SelectionSet,
 			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&invalids, 1)
 			}
+		case "failureHandler":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Function_failureHandler(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		case "config":
 
 			out.Values[i] = ec._Function_config(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				atomic.AddUint32(&invalids, 1)
+			}
+		case "configuration":
+
+			out.Values[i] = ec._Function_configuration(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&invalids, 1)
@@ -19458,6 +21955,72 @@ func (ec *executionContext) _Function(ctx context.Context, sel ast.SelectionSet,
 				return innerFunc(ctx)
 
 			})
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var functionConfigurationImplementors = []string{"FunctionConfiguration"}
+
+func (ec *executionContext) _FunctionConfiguration(ctx context.Context, sel ast.SelectionSet, obj *models.FunctionConfiguration) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, functionConfigurationImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("FunctionConfiguration")
+		case "cancellations":
+
+			out.Values[i] = ec._FunctionConfiguration_cancellations(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "retries":
+
+			out.Values[i] = ec._FunctionConfiguration_retries(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "priority":
+
+			out.Values[i] = ec._FunctionConfiguration_priority(ctx, field, obj)
+
+		case "eventsBatch":
+
+			out.Values[i] = ec._FunctionConfiguration_eventsBatch(ctx, field, obj)
+
+		case "concurrency":
+
+			out.Values[i] = ec._FunctionConfiguration_concurrency(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "rateLimit":
+
+			out.Values[i] = ec._FunctionConfiguration_rateLimit(ctx, field, obj)
+
+		case "debounce":
+
+			out.Values[i] = ec._FunctionConfiguration_debounce(ctx, field, obj)
+
+		case "throttle":
+
+			out.Values[i] = ec._FunctionConfiguration_throttle(ctx, field, obj)
+
+		case "singleton":
+
+			out.Values[i] = ec._FunctionConfiguration_singleton(ctx, field, obj)
+
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -19950,6 +22513,10 @@ func (ec *executionContext) _FunctionTrigger(ctx context.Context, sel ast.Select
 			if out.Values[i] == graphql.Null {
 				invalids++
 			}
+		case "condition":
+
+			out.Values[i] = ec._FunctionTrigger_condition(ctx, field, obj)
+
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -20337,6 +22904,26 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			out.Concurrently(i, func() graphql.Marshaler {
 				return rrm(innerCtx)
 			})
+		case "functionBySlug":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Query_functionBySlug(ctx, field)
+				return res
+			}
+
+			rrm := func(ctx context.Context) graphql.Marshaler {
+				return ec.OperationContext.RootResolverMiddleware(ctx, innerFunc)
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return rrm(innerCtx)
+			})
 		case "functions":
 			field := field
 
@@ -20520,6 +23107,77 @@ func (ec *executionContext) _Query(ctx context.Context, sel ast.SelectionSet) gr
 			out.Values[i] = ec.OperationContext.RootResolverMiddleware(innerCtx, func(ctx context.Context) (res graphql.Marshaler) {
 				return ec._Query___schema(ctx, field)
 			})
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var rateLimitConfigurationImplementors = []string{"RateLimitConfiguration"}
+
+func (ec *executionContext) _RateLimitConfiguration(ctx context.Context, sel ast.SelectionSet, obj *models.RateLimitConfiguration) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, rateLimitConfigurationImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("RateLimitConfiguration")
+		case "limit":
+
+			out.Values[i] = ec._RateLimitConfiguration_limit(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "period":
+
+			out.Values[i] = ec._RateLimitConfiguration_period(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "key":
+
+			out.Values[i] = ec._RateLimitConfiguration_key(ctx, field, obj)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var retryConfigurationImplementors = []string{"RetryConfiguration"}
+
+func (ec *executionContext) _RetryConfiguration(ctx context.Context, sel ast.SelectionSet, obj *models.RetryConfiguration) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, retryConfigurationImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("RetryConfiguration")
+		case "value":
+
+			out.Values[i] = ec._RetryConfiguration_value(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "isDefault":
+
+			out.Values[i] = ec._RetryConfiguration_isDefault(ctx, field, obj)
 
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
@@ -21233,6 +23891,38 @@ func (ec *executionContext) _RunsV2Connection(ctx context.Context, sel ast.Selec
 	return out
 }
 
+var singletonConfigurationImplementors = []string{"SingletonConfiguration"}
+
+func (ec *executionContext) _SingletonConfiguration(ctx context.Context, sel ast.SelectionSet, obj *models.SingletonConfiguration) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, singletonConfigurationImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("SingletonConfiguration")
+		case "mode":
+
+			out.Values[i] = ec._SingletonConfiguration_mode(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "key":
+
+			out.Values[i] = ec._SingletonConfiguration_key(ctx, field, obj)
+
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
 var sleepStepInfoImplementors = []string{"SleepStepInfo", "StepInfo"}
 
 func (ec *executionContext) _SleepStepInfo(ctx context.Context, sel ast.SelectionSet, obj *models.SleepStepInfo) graphql.Marshaler {
@@ -21285,6 +23975,10 @@ func (ec *executionContext) _StepError(ctx context.Context, sel ast.SelectionSet
 		case "stack":
 
 			out.Values[i] = ec._StepError_stack(ctx, field, obj)
+
+		case "cause":
+
+			out.Values[i] = ec._StepError_cause(ctx, field, obj)
 
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
@@ -21448,6 +24142,52 @@ func (ec *executionContext) _StreamItem(ctx context.Context, sel ast.SelectionSe
 				return innerFunc(ctx)
 
 			})
+		default:
+			panic("unknown field " + strconv.Quote(field.Name))
+		}
+	}
+	out.Dispatch()
+	if invalids > 0 {
+		return graphql.Null
+	}
+	return out
+}
+
+var throttleConfigurationImplementors = []string{"ThrottleConfiguration"}
+
+func (ec *executionContext) _ThrottleConfiguration(ctx context.Context, sel ast.SelectionSet, obj *models.ThrottleConfiguration) graphql.Marshaler {
+	fields := graphql.CollectFields(ec.OperationContext, sel, throttleConfigurationImplementors)
+	out := graphql.NewFieldSet(fields)
+	var invalids uint32
+	for i, field := range fields {
+		switch field.Name {
+		case "__typename":
+			out.Values[i] = graphql.MarshalString("ThrottleConfiguration")
+		case "burst":
+
+			out.Values[i] = ec._ThrottleConfiguration_burst(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "key":
+
+			out.Values[i] = ec._ThrottleConfiguration_key(ctx, field, obj)
+
+		case "limit":
+
+			out.Values[i] = ec._ThrottleConfiguration_limit(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "period":
+
+			out.Values[i] = ec._ThrottleConfiguration_period(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -22070,6 +24810,134 @@ func (ec *executionContext) marshalNBytes2ᚕstringᚄ(ctx context.Context, sel 
 	return ret
 }
 
+func (ec *executionContext) marshalNCancellationConfiguration2ᚕᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐCancellationConfigurationᚄ(ctx context.Context, sel ast.SelectionSet, v []*models.CancellationConfiguration) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNCancellationConfiguration2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐCancellationConfiguration(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNCancellationConfiguration2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐCancellationConfiguration(ctx context.Context, sel ast.SelectionSet, v *models.CancellationConfiguration) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._CancellationConfiguration(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNConcurrencyConfiguration2ᚕᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐConcurrencyConfigurationᚄ(ctx context.Context, sel ast.SelectionSet, v []*models.ConcurrencyConfiguration) graphql.Marshaler {
+	ret := make(graphql.Array, len(v))
+	var wg sync.WaitGroup
+	isLen1 := len(v) == 1
+	if !isLen1 {
+		wg.Add(len(v))
+	}
+	for i := range v {
+		i := i
+		fc := &graphql.FieldContext{
+			Index:  &i,
+			Result: &v[i],
+		}
+		ctx := graphql.WithFieldContext(ctx, fc)
+		f := func(i int) {
+			defer func() {
+				if r := recover(); r != nil {
+					ec.Error(ctx, ec.Recover(ctx, r))
+					ret = nil
+				}
+			}()
+			if !isLen1 {
+				defer wg.Done()
+			}
+			ret[i] = ec.marshalNConcurrencyConfiguration2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐConcurrencyConfiguration(ctx, sel, v[i])
+		}
+		if isLen1 {
+			f(i)
+		} else {
+			go f(i)
+		}
+
+	}
+	wg.Wait()
+
+	for _, e := range ret {
+		if e == graphql.Null {
+			return graphql.Null
+		}
+	}
+
+	return ret
+}
+
+func (ec *executionContext) marshalNConcurrencyConfiguration2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐConcurrencyConfiguration(ctx context.Context, sel ast.SelectionSet, v *models.ConcurrencyConfiguration) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._ConcurrencyConfiguration(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNConcurrencyLimitConfiguration2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐConcurrencyLimitConfiguration(ctx context.Context, sel ast.SelectionSet, v *models.ConcurrencyLimitConfiguration) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._ConcurrencyLimitConfiguration(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalNConcurrencyScope2githubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐConcurrencyScope(ctx context.Context, v interface{}) (models.ConcurrencyScope, error) {
+	var res models.ConcurrencyScope
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNConcurrencyScope2githubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐConcurrencyScope(ctx context.Context, sel ast.SelectionSet, v models.ConcurrencyScope) graphql.Marshaler {
+	return v
+}
+
 func (ec *executionContext) unmarshalNConnectV1ConnectionStatus2githubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐConnectV1ConnectionStatus(ctx context.Context, v interface{}) (models.ConnectV1ConnectionStatus, error) {
 	var res models.ConnectV1ConnectionStatus
 	err := res.UnmarshalGQL(v)
@@ -22332,6 +25200,21 @@ func (ec *executionContext) marshalNFunction2ᚖgithubᚗcomᚋinngestᚋinngest
 	return ec._Function(ctx, sel, v)
 }
 
+func (ec *executionContext) marshalNFunctionConfiguration2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐFunctionConfiguration(ctx context.Context, sel ast.SelectionSet, v *models.FunctionConfiguration) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._FunctionConfiguration(ctx, sel, v)
+}
+
+func (ec *executionContext) unmarshalNFunctionQuery2githubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐFunctionQuery(ctx context.Context, v interface{}) (models.FunctionQuery, error) {
+	res, err := ec.unmarshalInputFunctionQuery(ctx, v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
 func (ec *executionContext) marshalNFunctionRun2githubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐFunctionRun(ctx context.Context, sel ast.SelectionSet, v models.FunctionRun) graphql.Marshaler {
 	return ec._FunctionRun(ctx, sel, &v)
 }
@@ -22508,6 +25391,16 @@ func (ec *executionContext) marshalNPageInfo2ᚖgithubᚗcomᚋinngestᚋinngest
 		return graphql.Null
 	}
 	return ec._PageInfo(ctx, sel, v)
+}
+
+func (ec *executionContext) marshalNRetryConfiguration2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐRetryConfiguration(ctx context.Context, sel ast.SelectionSet, v *models.RetryConfiguration) graphql.Marshaler {
+	if v == nil {
+		if !graphql.HasFieldError(ctx, graphql.GetFieldContext(ctx)) {
+			ec.Errorf(ctx, "the requested element is null which the schema does not allow")
+		}
+		return graphql.Null
+	}
+	return ec._RetryConfiguration(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalNRunHistoryItem2ᚕᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋhistory_readerᚐRunHistoryᚄ(ctx context.Context, sel ast.SelectionSet, v []*history_reader.RunHistory) graphql.Marshaler {
@@ -22714,6 +25607,16 @@ func (ec *executionContext) unmarshalNRunsV2OrderByField2githubᚗcomᚋinngest�
 }
 
 func (ec *executionContext) marshalNRunsV2OrderByField2githubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐRunsV2OrderByField(ctx context.Context, sel ast.SelectionSet, v models.RunsV2OrderByField) graphql.Marshaler {
+	return v
+}
+
+func (ec *executionContext) unmarshalNSingletonMode2githubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐSingletonMode(ctx context.Context, v interface{}) (models.SingletonMode, error) {
+	var res models.SingletonMode
+	err := res.UnmarshalGQL(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalNSingletonMode2githubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐSingletonMode(ctx context.Context, sel ast.SelectionSet, v models.SingletonMode) graphql.Marshaler {
 	return v
 }
 
@@ -23314,6 +26217,13 @@ func (ec *executionContext) marshalOConnectV1WorkerConnectionsOrderByField2ᚖgi
 	return v
 }
 
+func (ec *executionContext) marshalODebounceConfiguration2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐDebounceConfiguration(ctx context.Context, sel ast.SelectionSet, v *models.DebounceConfiguration) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._DebounceConfiguration(ctx, sel, v)
+}
+
 func (ec *executionContext) marshalOEvent2ᚕᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐEventᚄ(ctx context.Context, sel ast.SelectionSet, v []*models.Event) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
@@ -23382,6 +26292,13 @@ func (ec *executionContext) marshalOEventStatus2ᚖgithubᚗcomᚋinngestᚋinng
 		return graphql.Null
 	}
 	return v
+}
+
+func (ec *executionContext) marshalOEventsBatchConfiguration2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐEventsBatchConfiguration(ctx context.Context, sel ast.SelectionSet, v *models.EventsBatchConfiguration) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._EventsBatchConfiguration(ctx, sel, v)
 }
 
 func (ec *executionContext) marshalOFunction2ᚕᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐFunctionᚄ(ctx context.Context, sel ast.SelectionSet, v []*models.Function) graphql.Marshaler {
@@ -23750,6 +26667,13 @@ func (ec *executionContext) marshalOMap2map(ctx context.Context, sel ast.Selecti
 	return res
 }
 
+func (ec *executionContext) marshalORateLimitConfiguration2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐRateLimitConfiguration(ctx context.Context, sel ast.SelectionSet, v *models.RateLimitConfiguration) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._RateLimitConfiguration(ctx, sel, v)
+}
+
 func (ec *executionContext) unmarshalORerunFromStepInput2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐRerunFromStepInput(ctx context.Context, v interface{}) (*models.RerunFromStepInput, error) {
 	if v == nil {
 		return nil, nil
@@ -23830,6 +26754,13 @@ func (ec *executionContext) marshalORunsV2OrderByField2ᚖgithubᚗcomᚋinngest
 	return v
 }
 
+func (ec *executionContext) marshalOSingletonConfiguration2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐSingletonConfiguration(ctx context.Context, sel ast.SelectionSet, v *models.SingletonConfiguration) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._SingletonConfiguration(ctx, sel, v)
+}
+
 func (ec *executionContext) marshalOStepError2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐStepError(ctx context.Context, sel ast.SelectionSet, v *models.StepError) graphql.Marshaler {
 	if v == nil {
 		return graphql.Null
@@ -23907,6 +26838,13 @@ func (ec *executionContext) marshalOString2ᚖstring(ctx context.Context, sel as
 	}
 	res := graphql.MarshalString(*v)
 	return res
+}
+
+func (ec *executionContext) marshalOThrottleConfiguration2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐThrottleConfiguration(ctx context.Context, sel ast.SelectionSet, v *models.ThrottleConfiguration) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	return ec._ThrottleConfiguration(ctx, sel, v)
 }
 
 func (ec *executionContext) unmarshalOTime2ᚖtimeᚐTime(ctx context.Context, v interface{}) (*time.Time, error) {

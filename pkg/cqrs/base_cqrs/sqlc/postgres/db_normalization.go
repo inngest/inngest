@@ -772,3 +772,44 @@ func (q NormalizedQueries) GetFunctionRuns(ctx context.Context) ([]*sqlc_sqlite.
 
 	return sqliteRows, nil
 }
+
+func (q NormalizedQueries) GetSpansByRunID(ctx context.Context, runID string) ([]*sqlc_sqlite.GetSpansByRunIDRow, error) {
+	rows, err := q.db.GetSpansByRunID(ctx, runID)
+	if err != nil {
+		return nil, err
+	}
+
+	sqliteRows := make([]*sqlc_sqlite.GetSpansByRunIDRow, len(rows))
+	for i, row := range rows {
+		sqliteRows[i], _ = row.ToSQLite()
+	}
+
+	return sqliteRows, nil
+}
+
+func (q NormalizedQueries) GetSpanOutput(ctx context.Context, spanID string) (any, error) {
+	// TODO
+	return nil, nil
+}
+
+func (q NormalizedQueries) InsertSpan(ctx context.Context, arg sqlc_sqlite.InsertSpanParams) error {
+	pgArg := InsertSpanParams{
+		AccountID:     arg.AccountID,
+		AppID:         arg.AppID,
+		Attributes:    toNullRawMessage(arg.Attributes),
+		DynamicSpanID: arg.DynamicSpanID,
+		EndTime:       arg.EndTime,
+		EnvID:         arg.EnvID,
+		FunctionID:    arg.FunctionID,
+		Links:         toNullRawMessage(arg.Links),
+		Name:          arg.Name,
+		Output:        toNullRawMessage(arg.Output),
+		ParentSpanID:  arg.ParentSpanID,
+		RunID:         arg.RunID,
+		SpanID:        arg.SpanID,
+		StartTime:     arg.StartTime,
+		TraceID:       arg.TraceID,
+	}
+
+	return q.db.InsertSpan(ctx, pgArg)
+}

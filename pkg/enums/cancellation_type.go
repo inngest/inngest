@@ -7,7 +7,7 @@ type CancellationType int
 const (
 	// CancellationTypeNone represents the default CancellationType 0, which does nothing
 	CancellationTypeNone CancellationType = iota
-
 	CancellationTypeEvent
 	CancellationTypeManual
+	CancellationTypeAPI
 )

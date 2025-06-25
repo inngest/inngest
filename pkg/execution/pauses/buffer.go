@@ -4,14 +4,20 @@ import (
 	"context"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/execution/state"
 )
+
+// StateBufferer transforms a state.Manager into a state.Bufferer
+func StateBufferer(rsm state.PauseManager) Bufferer {
+	return &redisAdapter{rsm}
+}
 
 // redisAdapter transforms a state.Manager into a state.Buffer, changing the interfaces slightly
 // according to this package.
 type redisAdapter struct {
 	// rsm represents the redis state manager in redis_state.
-	rsm state.Manager
+	rsm state.PauseManager
 }
 
 // Write writes one or more pauses to the backing store.  Note that the index
@@ -42,12 +48,18 @@ func (r redisAdapter) PausesSince(ctx context.Context, index Index, since time.T
 // Delete deletes a pause from the buffer, or returns ErrNotInBuffer if the pause is not in
 // the buffer.
 func (r redisAdapter) Delete(ctx context.Context, index Index, pause state.Pause) error {
-	// Check if pause is in buffer;  if not, return ErrNotInBuffer so that we can default
-	// to deleting the pause from the backing store.
-	if r.rsm.PauseExists(ctx, pause.ID) == state.ErrPauseNotFound {
-		return ErrNotInBuffer
-	}
 	return r.rsm.DeletePause(ctx, pause)
+}
+
+// PauseByID loads pauses by ID.
+//
+// This is only used for legacy pause timeout jobs enqueued without events or pauses;  in this case,
+// we need to load pauses by only their ID.  To do this, we keep a record of pause ID -> block ID
+// when flushing pauses to block storage.
+//
+// This can be deleted in Sept 2025.
+func (r redisAdapter) PauseByID(ctx context.Context, index Index, pauseID uuid.UUID) (*state.Pause, error) {
+	return r.rsm.PauseByID(ctx, pauseID)
 }
 
 // PauseTimestamp returns the created at timestamp for a pause.
@@ -58,4 +70,21 @@ func (r redisAdapter) PauseTimestamp(ctx context.Context, index Index, pause sta
 
 func (r redisAdapter) ConsumePause(ctx context.Context, pause state.Pause, opts state.ConsumePauseOpts) (state.ConsumePauseResult, func() error, error) {
 	return r.rsm.ConsumePause(ctx, pause, opts)
+}
+
+func (r redisAdapter) PauseByInvokeCorrelationID(ctx context.Context, workspaceID uuid.UUID, correlationID string) (*state.Pause, error) {
+	return r.rsm.PauseByInvokeCorrelationID(ctx, workspaceID, correlationID)
+}
+
+func (r redisAdapter) PauseBySignalID(ctx context.Context, workspaceID uuid.UUID, signal string) (*state.Pause, error) {
+	return r.rsm.PauseBySignalID(ctx, workspaceID, signal)
+}
+
+// IndexExists returns whether the buffer has any pauses for the index.
+func (r redisAdapter) IndexExists(ctx context.Context, i Index) (bool, error) {
+	return r.rsm.EventHasPauses(ctx, i.WorkspaceID, i.EventName)
+}
+
+func (r redisAdapter) BufferLen(ctx context.Context, i Index) (int64, error) {
+	return r.rsm.PauseLen(ctx, i.WorkspaceID, i.EventName)
 }

@@ -4,7 +4,7 @@ import type { Route } from 'next';
 import NextLink from 'next/link';
 import { Button } from '@inngest/components/Button';
 import { InngestLogo } from '@inngest/components/icons/logos/InngestLogo';
-import { InngestLogoSmallBW } from '@inngest/components/icons/logos/InngestLogoSmall';
+import { InngestLogoSmall } from '@inngest/components/icons/logos/InngestLogoSmall';
 import { RiContractLeftLine, RiContractRightLine } from '@remixicon/react';
 
 import { QuickSearch } from './QuickSearch/QuickSearch';
@@ -63,12 +63,12 @@ export default function Logo({ collapsed, envSlug, envName, setCollapsed }: Logo
       <div className={`flex flex-row items-center justify-start ${collapsed ? '' : 'mr-1'} `}>
         {collapsed ? (
           <div className="cursor-pointer group-hover:hidden">
-            <InngestLogoSmallBW className="text-basis" />
+            <InngestLogoSmall className="text-basis" />
           </div>
         ) : (
           <>
             <NextLink href={process.env.NEXT_PUBLIC_HOME_PATH as Route} scroll={false}>
-              <InngestLogo className="text-basis mr-2 mt-1" width={82} />
+              <InngestLogo className="text-basis mr-2" width={96} />
             </NextLink>
           </>
         )}

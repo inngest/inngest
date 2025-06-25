@@ -3,6 +3,7 @@ package golang
 import (
 	"context"
 	"fmt"
+	"github.com/inngest/inngest/tests/client"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -15,6 +16,9 @@ import (
 )
 
 func TestConcurrency_ScopeAccount(t *testing.T) {
+	c := client.New(t)
+	c.ResetAll(t)
+
 	inngestClient, server, registerFuncs := NewSDKHandler(t, "concurrency")
 	defer server.Close()
 

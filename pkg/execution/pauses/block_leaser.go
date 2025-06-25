@@ -11,9 +11,14 @@ import (
 	"github.com/redis/rueidis"
 )
 
-type redisBlockLeaser struct {
-	rc rueidis.Client
+// NewRedisBlockLeaser creates a new lease manager across Redis, using the given
+// prefix for any keys stored.
+func NewRedisBlockLeaser(rc rueidis.Client, prefix string, duration time.Duration) BlockLeaser {
+	return &redisBlockLeaser{rc: rc, prefix: prefix, duration: duration}
+}
 
+type redisBlockLeaser struct {
+	rc       rueidis.Client
 	prefix   string
 	duration time.Duration
 }

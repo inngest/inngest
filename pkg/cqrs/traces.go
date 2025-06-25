@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -23,6 +24,142 @@ const (
 	SpanStatusOk
 	SpanStatusError
 )
+
+// Raw otel span
+type RawOtelSpan struct {
+	Name         string         `json:"name"`
+	SpanID       string         `json:"span_id"`
+	TraceID      string         `json:"trace_id"`
+	ParentSpanID *string        `json:"parent_span_id,omitempty"`
+	StartTime    time.Time      `json:"start_time"`
+	EndTime      time.Time      `json:"end_time"`
+	Attributes   map[string]any `json:"attributes,omitempty"`
+}
+
+type OtelSpan struct {
+	RawOtelSpan
+
+	Status               enums.StepStatus `json:"status"`
+	OutputID             *string          `json:"output_id,omitempty,omitzero"`
+	CalculatedQueuedTime *time.Time       `json:"queued_time,omitempty,omitzero"`
+	CalculatedStartTime  *time.Time       `json:"start_time,omitempty,omitzero"`
+	CalculatedEndTime    *time.Time       `json:"end_time,omitempty,omitzero"`
+
+	// A span may be marked as dropped following idempotency or that we intend
+	// to hide it (e.g. discovery steps).
+	MarkedAsDropped bool `json:"marked_as_dropped,omitempty,omitzero"`
+
+	RunID      ulid.ULID `json:"run_id,omitempty,omitzero"`
+	AppID      uuid.UUID `json:"app_id,omitempty,omitzero"`
+	FunctionID uuid.UUID `json:"function_id,omitempty,omitzero"`
+
+	Children []*OtelSpan `json:"children,omitempty,omitzero"`
+}
+
+func (s *OtelSpan) anyUnixMilliToTime(v any) (time.Time, error) {
+	f, ok := v.(float64)
+	if !ok {
+		return time.Time{}, fmt.Errorf("expected float64, got %T", v)
+	}
+	return time.UnixMilli(int64(f)), nil
+}
+
+func (s *OtelSpan) GetAppID() uuid.UUID {
+	return s.AppID
+}
+
+func (s *OtelSpan) GetFunctionID() uuid.UUID {
+	return s.FunctionID
+}
+
+func (s *OtelSpan) GetRunID() ulid.ULID {
+	return s.RunID
+}
+
+func (s *OtelSpan) GetSpanID() string {
+	return s.SpanID
+}
+
+func (s *OtelSpan) GetTraceID() string {
+	return s.TraceID
+}
+
+func (s *OtelSpan) GetStepName() string {
+	if dn, ok := s.Attributes[meta.AttributeStepName]; ok {
+		if name, ok := dn.(string); ok {
+			return name
+		}
+	}
+
+	return s.Name
+}
+
+func (s *OtelSpan) GetOutputID() *string {
+	if s.OutputID == nil || *s.OutputID == "" {
+		return nil
+	}
+
+	return s.OutputID
+}
+
+// TODO is this max?
+func (s *OtelSpan) GetAttempts() int {
+	if attempts, ok := s.Attributes[meta.AttributeStepAttempt]; ok {
+		if attempt, ok := attempts.(float64); ok {
+			return int(attempt)
+		}
+	}
+
+	return 0
+}
+
+func (s *OtelSpan) GetParentSpanID() *string {
+	if s.ParentSpanID == nil || *s.ParentSpanID == "" {
+		return nil
+	}
+
+	return s.ParentSpanID
+}
+
+func (s *OtelSpan) GetIsRoot() bool {
+	parentSpanID := s.GetParentSpanID()
+
+	return parentSpanID == nil || *parentSpanID == "" || *parentSpanID == "0000000000000000"
+}
+
+// Get the time that the span was "queued". This will always be present. If a
+// value cannot be found internally (i.e. we haven't explicitly set the moment
+// this span was queued), then the time will match the span's start time in
+// order to show no queued time in the UI.
+func (s *OtelSpan) GetQueuedAtTime() time.Time {
+	if q, err := s.anyUnixMilliToTime(s.Attributes[meta.AttributeQueuedAt]); err == nil {
+		return q
+	}
+
+	// This should always be a value, so if we don't have one, just use when
+	// the span was created.
+	return s.StartTime
+}
+
+// Get the time that the span started. Note that this is not necessarily when
+// the span created, as it may be dynamic.
+func (s *OtelSpan) GetStartedAtTime() *time.Time {
+	if st, err := s.anyUnixMilliToTime(s.Attributes[meta.AttributeStartedAt]); err == nil {
+		return &st
+	}
+
+	return nil
+}
+
+// Get the time that the span ended. Note that this is not necessarily when the
+// span was persisted, as it may be dynamic.
+func (s *OtelSpan) GetEndedAtTime() *time.Time {
+	if et, err := s.anyUnixMilliToTime(s.Attributes[meta.AttributeEndedAt]); err == nil {
+		return &et
+	}
+
+	return nil
+}
 
 // Span represents an distributed span in a function execution flow
 type Span struct {
@@ -258,13 +395,24 @@ type TraceReader interface {
 	GetTraceRun(ctx context.Context, id TraceRunIdentifier) (*TraceRun, error)
 	// GetTraceSpansByRun retrieves all the spans related to the trace
 	GetTraceSpansByRun(ctx context.Context, id TraceRunIdentifier) ([]*Span, error)
-	// GetSpanOutput retrieves the output for the specified span
-	GetSpanOutput(ctx context.Context, id SpanIdentifier) (*SpanOutput, error)
+	// LegacyGetSpanOutput retrieves the output for the specified span
+	LegacyGetSpanOutput(ctx context.Context, id SpanIdentifier) (*SpanOutput, error)
 	// GetSpanStack retrieves the step stack for the specified span
 	GetSpanStack(ctx context.Context, id SpanIdentifier) ([]string, error)
+	// GetSpansByRunID retrieves all spans related to the specified run
+	GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*OtelSpan, error)
+	GetSpanOutput(ctx context.Context, id SpanIdentifier) (*SpanOutput, error)
 	// TODO move to dedicated entitlement interface once that is implemented properly
 	// for both oss & cloud
 	OtelTracesEnabled(ctx context.Context, accountID uuid.UUID) (bool, error)
+	// GetEventRuns returns the runs that were triggered by an event.
+	GetEventRuns(ctx context.Context, eventID ulid.ULID, accountID uuid.UUID, workspaceID uuid.UUID) ([]*FunctionRun, error)
+	// GetRun returns a single function run.
+	GetRun(ctx context.Context, runID ulid.ULID, accountID uuid.UUID, workspaceID uuid.UUID) (*FunctionRun, error)
+	// GetEvent returns a single event.
+	GetEvent(ctx context.Context, id ulid.ULID, accountID uuid.UUID, workspaceID uuid.UUID) (*Event, error)
+	// GetEvents returns a list of latest events.
+	GetEvents(ctx context.Context, accountID uuid.UUID, workspaceID uuid.UUID,opts *WorkspaceEventsOpts) ([]*Event, error)
 }
 
 type GetTraceRunOpt struct {
@@ -318,6 +466,9 @@ type SpanIdentifier struct {
 	FunctionID  uuid.UUID `json:"fnID"`
 	TraceID     string    `json:"tid"`
 	SpanID      string    `json:"sid"`
+
+	// Whether the output should direct to the tracing preview stores
+	Preview *bool `json:"preview,omitempty,omitzero"`
 }
 
 func (si *SpanIdentifier) Encode() (string, error) {

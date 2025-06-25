@@ -27,6 +27,7 @@ require (
 	github.com/eko/gocache/store/freecache/v4 v4.2.1
 	github.com/eko/gocache/store/rueidis/v4 v4.1.5
 	github.com/fatih/structs v1.1.0
+	github.com/felixge/httpsnoop v1.0.4
 	github.com/go-chi/chi/v5 v5.0.10
 	github.com/go-chi/cors v1.2.1
 	github.com/golang-jwt/jwt/v5 v5.2.2
@@ -62,6 +63,7 @@ require (
 	github.com/spf13/cobra v1.8.1
 	github.com/spf13/pflag v1.0.5
 	github.com/spf13/viper v1.10.1
+	github.com/sqlc-dev/pqtype v0.3.0
 	github.com/stretchr/testify v1.10.0
 	github.com/throttled/throttled/v2 v2.11.0
 	github.com/twmb/franz-go v1.18.1
@@ -134,7 +136,6 @@ require (
 	github.com/cpuguy83/go-md2man/v2 v2.0.4 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/emicklei/proto v1.6.15 // indirect
-	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/fsnotify/fsnotify v1.7.0 // indirect
 	github.com/getsentry/sentry-go v0.27.0 // indirect
 	github.com/go-logr/logr v1.4.2 // indirect

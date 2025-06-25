@@ -35,7 +35,7 @@ local keyActiveCompound            = KEYS[21]
 
 local keyActiveRun                        = KEYS[22]
 local keyActiveRunsAccount                = KEYS[23]
-local keyIndexActivePartitionRuns         = KEYS[24]
+local keyActiveRunsPartition              = KEYS[24]
 local keyActiveRunsCustomConcurrencyKey1  = KEYS[25]
 local keyActiveRunsCustomConcurrencyKey2  = KEYS[26]
 
@@ -58,7 +58,7 @@ local idempotencyTTL = tonumber(ARGV[6])
 -- $include(ends_with.lua)
 -- $include(update_account_queues.lua)
 -- $include(update_backlog_pointer.lua)
--- $include(update_active_counters.lua)
+-- $include(update_active_sets.lua)
 
 --
 -- Fetch this item to see if it was in progress prior to deleting.
@@ -142,9 +142,9 @@ if exists_without_ending(keyInProgressAccount, ":-") then
   redis.call("ZREM", keyInProgressAccount, item.id)
 end
 
--- Decrease active counters
-decreaseActiveCounters(keyActivePartition, keyActiveAccount, keyActiveCompound, keyActiveConcurrencyKey1, keyActiveConcurrencyKey2)
-decreaseActiveRunCounters(keyActiveRun, keyIndexActivePartitionRuns, keyActiveRunsAccount, keyActiveRunsCustomConcurrencyKey1, keyActiveRunsCustomConcurrencyKey2, runID)
+-- Remove item from active sets
+removeFromActiveSets(keyActivePartition, keyActiveAccount, keyActiveCompound, keyActiveConcurrencyKey1, keyActiveConcurrencyKey2, queueID)
+removeFromActiveRunSets(keyActiveRun, keyActiveRunsPartition, keyActiveRunsAccount, keyActiveRunsCustomConcurrencyKey1, keyActiveRunsCustomConcurrencyKey2, runID, queueID)
 
 -- Add optional indexes.
 if keyItemIndexA ~= "" and keyItemIndexA ~= false and keyItemIndexA ~= nil then
@@ -171,10 +171,13 @@ if singletonKey ~= nil and singletonKey ~= false and keyItemIndexA ~= "" and key
   local queueItemsCount = redis.call("ZCOUNT", keyItemIndexA, "-inf", "+inf")
   local singletonRunID = redis.call("GET", singletonKey)
 
-  if tonumber(queueItemsCount) == 0 and singletonRunID == runID then
+  if tonumber(queueItemsCount) == 0 then
     -- We just dequeued the last step
-    redis.call("DEL", singletonKey)
-    redis.call("DEL", singletonRunKey)
+     redis.call("DEL", singletonRunKey)
+
+     if singletonRunID == runID then
+        redis.call("DEL", singletonKey)
+    end
   end
 end
 

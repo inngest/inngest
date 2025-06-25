@@ -69,6 +69,7 @@ export function EventDetails({
   });
 
   const {
+    isPending: isPendingPayload,
     error: payloadError,
     data: eventPayloadData,
     refetch: refetchPayload,
@@ -217,9 +218,10 @@ export function EventDetails({
                 {(version) => <TextElement>{version || '-'}</TextElement>}
               </LazyElementWrapper>
             </div>
-            {prettyPayload && (
+            {!payloadError && (
               <div className="border-subtle border-t pl-px">
                 <CodeBlock
+                  loading={isPendingPayload}
                   header={{ title: 'Payload' }}
                   tab={{
                     content: prettyPayload,

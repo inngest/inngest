@@ -2,6 +2,7 @@ import { Pill } from '@inngest/components/Pill/Pill';
 import { RiCheckLine } from '@remixicon/react';
 
 import { isActive, isTrialPlan, processPlan, type Plan } from '@/components/Billing/Plans/utils';
+import PayAsGoButton from './PayAsGoButton';
 import UpgradeButton from './UpgradeButton';
 
 export function VerticalPlanCard({
@@ -18,16 +19,42 @@ export function VerticalPlanCard({
 
   return (
     <div className="border-muted bg-canvasBase rounded-md border p-6">
-      <h4 className="text-basis mb-2 flex items-center gap-2 text-2xl font-medium">
-        {transformedPlan.name}
-        {displayTrialPill && <Pill>Trial</Pill>}
-      </h4>
-      <div className="mb-1 text-xs font-bold uppercase">From</div>
-      <div className="text-2xl">
-        <span className="text-4xl font-medium">{transformedPlan.price}</span>/
-        {transformedPlan.billingPeriod}
+      <div className="flex items-center justify-between gap-2">
+        <h4 className="text-basis mb-2 flex items-center gap-2 text-2xl font-medium">
+          {transformedPlan.name}
+          {displayTrialPill && <Pill>Trial</Pill>}
+        </h4>
+        {(currentPlan.slug === 'hobby-free-2025-06-13' ||
+          currentPlan.slug === 'hobby-payg-2025-06-13') &&
+          transformedPlan.slug === 'hobby-free-2025-06-13' && (
+            <PayAsGoButton
+              plan={
+                currentPlan.slug === 'hobby-free-2025-06-13'
+                  ? {
+                      ...plan,
+                      slug: 'hobby-payg-2025-06-13',
+                      name: 'Hobby (Pay-as-you-go)',
+                    }
+                  : plan
+              }
+              currentPlan={currentPlan}
+              onPlanChange={onPlanChange}
+            />
+          )}
       </div>
-
+      {transformedPlan.slug === 'hobby-free-2025-06-13' ? (
+        <div className="mb-1 text-xs font-bold uppercase">Always</div>
+      ) : (
+        <div className="mb-1 text-xs font-bold uppercase">From</div>
+      )}
+      <div className="text-2xl">
+        <span className="text-4xl font-medium">{transformedPlan.price}</span>
+        {transformedPlan.price !== 'Contact us' && <>/{transformedPlan.billingPeriod}</>}
+        {currentPlan.slug === 'hobby-payg-2025-06-13' &&
+          transformedPlan.slug === 'hobby-free-2025-06-13' && (
+            <span className="text-base"> + additional usage billed</span>
+          )}
+      </div>
       <UpgradeButton plan={plan} currentPlan={currentPlan} onPlanChange={onPlanChange} />
       <hr className="mb-6" />
       <ul className="flex flex-col">

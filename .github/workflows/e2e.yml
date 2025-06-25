@@ -60,12 +60,14 @@ jobs:
           EXPERIMENTAL_KEY_QUEUES_ENABLE: "${{ matrix.experimentalKeyQueues }}"
 
   golang:
-    name: "Go SDK / OS: (${{ matrix.os }}), key-queues: ${{ matrix.experimentalKeyQueues }}"
+    name: "Go SDK / OS: (${{ matrix.os }}), key-queues: ${{ matrix.experimentalKeyQueues }} / split: ${{ matrix.index }}"
     strategy:
       fail-fast: false
       matrix:
         os: [ubuntu-latest]
         experimentalKeyQueues: [ false, true ]
+        parallelism: [5]
+        index: [0, 1, 2, 3, 4]
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -83,7 +85,9 @@ jobs:
           echo "Ran dev server"
           sleep 5
           curl http://127.0.0.1:8288/dev > /dev/null 2> /dev/null
-          go test ./tests/golang -v -count=1
+
+          curl -sfL https://raw.githubusercontent.com/Songmu/gotesplit/main/install.sh | sh -s
+          bin/gotesplit -total ${{ matrix.parallelism }} -index ${{ matrix.index }} ./tests/golang -- -v -count=1
         env:
           API_URL: http://127.0.0.1:8288
           INNGEST_EVENT_KEY: test

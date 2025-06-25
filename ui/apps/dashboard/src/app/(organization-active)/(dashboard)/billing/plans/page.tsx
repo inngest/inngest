@@ -1,31 +1,13 @@
 import { Link } from '@inngest/components/Link/Link';
 
 import { HorizontalPlanCard, VerticalPlanCard } from '@/components/Billing/Plans/PlanCard';
-import { isEnterprisePlan, isLegacyPlan, type Plan } from '@/components/Billing/Plans/utils';
-import { currentPlan as getCurrentPlan, plans as getPlans } from '@/components/Billing/data';
+import { type Plan } from '@/components/Billing/Plans/utils';
+import { currentPlan as getCurrentPlan } from '@/components/Billing/data';
 import { pathCreator } from '@/utils/urls';
-
-// This will move to the API as a custom plan at some point, for now we can hard code
-const ENTERPRISE_PLAN: Plan = {
-  id: 'n/a',
-  name: 'Enterprise',
-  amount: Infinity,
-  billingPeriod: 'month',
-  entitlements: {
-    concurrency: { limit: 100000 },
-    history: {
-      limit: 90,
-    },
-    runCount: {
-      limit: 100000000000,
-    },
-  },
-};
 
 export const dynamic = 'force-dynamic';
 
 export default async function Page() {
-  const plans = await getPlans();
   const { plan: currentPlan } = await getCurrentPlan();
 
   if (!currentPlan) throw new Error('Failed to fetch current plan');
@@ -35,11 +17,55 @@ export default async function Page() {
     return await getCurrentPlan();
   };
 
-  const isLegacy = isLegacyPlan(currentPlan);
+  // Hard-coded plan information (mirrors pricing page definitions)
+  const plans: Plan[] = [
+    {
+      id: 'n/a',
+      slug: 'hobby-free-2025-06-13',
+      name: 'Hobby',
+      amount: 0,
+      billingPeriod: 'month',
+      entitlements: {
+        concurrency: { limit: 25 },
+        history: { limit: 1 }, // 24h
+        runCount: { limit: 100_000 },
+      },
+      isLegacy: false,
+      isFree: true,
+    },
+    {
+      id: 'n/a',
+      slug: 'pro-2025-06-04',
+      name: 'Pro',
+      amount: 7_500, // $75.00
+      billingPeriod: 'month',
+      entitlements: {
+        concurrency: { limit: 100 },
+        history: { limit: 7 },
+        runCount: { limit: 1_000_000 },
+      },
+      isLegacy: false,
+      isFree: false,
+    },
+    {
+      id: 'n/a',
+      slug: 'enterprise',
+      name: 'Enterprise',
+      amount: Infinity, // $75.00
+      billingPeriod: 'month',
+      entitlements: {
+        concurrency: { limit: 100 },
+        history: { limit: 7 },
+        runCount: { limit: 1_000_000 },
+      },
+      isLegacy: false,
+      isFree: false,
+    },
+  ];
 
   return (
     <>
-      {isLegacy && (
+      {currentPlan.isLegacy && (
         <div className="mb-8">
           <HorizontalPlanCard
             plan={currentPlan}
@@ -49,36 +75,16 @@ export default async function Page() {
         </div>
       )}
       <p className="text-subtle mb-4">Available plans</p>
-      {isEnterprisePlan(currentPlan) && (
-        <div className="mb-4">
-          <HorizontalPlanCard
-            plan={ENTERPRISE_PLAN}
+      <div className="mb-4 grid grid-cols-3 gap-4">
+        {plans.map((plan) => (
+          <VerticalPlanCard
+            key={plan.id}
+            plan={plan}
             currentPlan={currentPlan}
             onPlanChange={refetchCurrentPlan}
           />
-        </div>
-      )}
-      <div className="mb-4 grid grid-cols-3 gap-4">
-        {plans.map((plan) => {
-          if (plan) {
-            return (
-              <VerticalPlanCard
-                key={plan.id}
-                plan={plan}
-                currentPlan={currentPlan}
-                onPlanChange={refetchCurrentPlan}
-              />
-            );
-          }
-        })}
+        ))}
       </div>
-      {!isEnterprisePlan(currentPlan) && (
-        <HorizontalPlanCard
-          plan={ENTERPRISE_PLAN}
-          currentPlan={currentPlan}
-          onPlanChange={refetchCurrentPlan}
-        />
-      )}
       <div className="mt-4 text-center text-sm">
         Want to cancel your plan?{' '}
         <Link

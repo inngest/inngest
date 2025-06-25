@@ -17,7 +17,7 @@ export const getNavRoute = (activeEnv: EnvType, link: string) => `/env/${activeE
 
 export default function Navigation({ collapsed, activeEnv }: NavProps) {
   return (
-    <div className={`text-basis mx-4 mt-5 flex h-full flex-col`}>
+    <div className={`text-basis mx-4 mt-4 flex h-full flex-col`}>
       <div
         className={`flex ${
           collapsed ? 'flex-col' : 'flex-row'

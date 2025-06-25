@@ -2,10 +2,10 @@ package redis_state
 
 import (
 	"context"
-	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"iter"
 	"math"
 	mrand "math/rand"
 	"strconv"
@@ -16,14 +16,11 @@ import (
 	"unsafe"
 
 	"github.com/VividCortex/ewma"
-
-	"github.com/inngest/inngest/pkg/enums"
-	"golang.org/x/sync/errgroup"
-
 	"github.com/google/uuid"
 	"github.com/hashicorp/go-multierror"
 	"github.com/inngest/inngest/pkg/backoff"
 	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/logger"
@@ -33,6 +30,7 @@ import (
 	"github.com/jonboulle/clockwork"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
+	"golang.org/x/sync/errgroup"
 	"golang.org/x/sync/semaphore"
 	"gonum.org/v1/gonum/stat/sampleuv"
 )
@@ -41,21 +39,6 @@ const (
 	PartitionSelectionMax = int64(100)
 	PartitionPeekMax      = PartitionSelectionMax * 3
 	AccountPeekMax        = int64(30)
-
-	AbsoluteShadowPartitionPeekMax int64 = 10 * ShadowPartitionPeekMaxBacklogs
-	NormalizeAccountPeekMax              = int64(30)
-	NormalizePartitionPeekMax            = int64(100)
-	NormalizeBacklogPeekMax              = int64(300) // same as ShadowPartitionPeekMax
-
-	// BacklogNormalizeAsyncLimit determines the minimum number of items required in an outdated backlog
-	// to require an async normalize job. For small backlogs, the added QPS may not be worth it and we should normalize JIT.
-	BacklogNormalizeAsyncLimit = 100
-
-	// BacklogRefillHardLimit sets the maximum number of items that can be refilled in a single backlogRefill operation.
-	BacklogRefillHardLimit = int64(1000)
-
-	// BacklogNormalizeHardLimit sets the batch size of items to be reenqueued into the appropriate backlogs durign normalization
-	BacklogNormalizeHardLimit = int64(1000)
 )
 
 const (
@@ -95,6 +78,7 @@ const (
 
 	ShadowPartitionRefillCapacityReachedRequeueExtension = 1 * time.Second
 	ShadowPartitionRefillPausedRequeueExtension          = 24 * time.Hour
+	BacklogDefaultRequeueExtension                       = 2 * time.Second
 
 	// default values
 	DefaultQueuePeekMin  int64 = 300
@@ -149,15 +133,6 @@ var (
 	ErrConfigAlreadyLeased           = fmt.Errorf("config scanner already leased")
 	ErrConfigLeaseExceedsLimits      = fmt.Errorf("config lease duration exceeds the maximum of %d seconds", int(ConfigLeaseMax.Seconds()))
 
-	ErrShadowPartitionAlreadyLeased               = fmt.Errorf("shadow partition already leased")
-	ErrShadowPartitionLeaseNotFound               = fmt.Errorf("shadow partition lease not found")
-	ErrShadowPartitionNotFound                    = fmt.Errorf("shadow partition not found")
-	ErrBacklogNotFound                            = fmt.Errorf("backlog not found")
-	ErrShadowPartitionPaused                      = fmt.Errorf("shadow partition refill is disabled")
-	ErrShadowPartitionBacklogPeekMaxExceedsLimits = fmt.Errorf("shadow partition backlog peek exceeded the maximum limit of %d", ShadowPartitionPeekMaxBacklogs)
-	ErrShadowPartitionPeekMaxExceedsLimits        = fmt.Errorf("shadow partition peek exceeded the maximum limit of %d", ShadowPartitionPeekMax)
-	ErrShadowPartitionAccountPeekMaxExceedsLimits = fmt.Errorf("account peek with shadow partitions exceeded the maximum limit of %d", ShadowPartitionAccountPeekMax)
-
 	ErrPartitionConcurrencyLimit = fmt.Errorf("at partition concurrency limit")
 	ErrAccountConcurrencyLimit   = fmt.Errorf("at account concurrency limit")
 
@@ -184,6 +159,12 @@ type QueueManager interface {
 	Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.QueueItem) error
 	Requeue(ctx context.Context, queueShard QueueShard, i osqueue.QueueItem, at time.Time) error
 	RequeueByJobID(ctx context.Context, queueShard QueueShard, jobID string, at time.Time) error
+
+	// ItemsByPartition returns a queue item iterator for a function within a specific time range
+	ItemsByPartition(ctx context.Context, queueShard QueueShard, partitionID uuid.UUID, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*osqueue.QueueItem], error)
+
+	// ItemsByBacklog returns a queue item iterator for a backlog within a specific time range
+	ItemsByBacklog(ctx context.Context, queueShard QueueShard, backlogID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*osqueue.QueueItem], error)
 }
 
 // PartitionPriorityFinder returns the priority for a given queue partition.
@@ -509,15 +490,21 @@ type ConcurrencyLimitGetter func(ctx context.Context, p QueuePartition) Partitio
 // SystemConcurrencyLimitGetter returns the concurrency limits for a given system partition.
 type SystemConcurrencyLimitGetter func(ctx context.Context, p QueuePartition) SystemPartitionConcurrencyLimits
 
+// PartitionConstraintConfigGetter returns the constraint configuration for a given partition
+type PartitionConstraintConfigGetter func(ctx context.Context, p QueueShadowPartition) (*PartitionConstraintConfig, error)
+
+// WithPartitionConstraintConfigGetter assigns a function that returns queue constraints for a given partition.
+func WithPartitionConstraintConfigGetter(f PartitionConstraintConfigGetter) func(q *queue) {
+	return func(q *queue) {
+		q.partitionConstraintConfigGetter = f
+	}
+}
+
 // AllowSystemKeyQueues determines if key queues should be enabled for system queues
 type AllowSystemKeyQueues func(ctx context.Context) bool
 
 // AllowKeyQueues determines if key queues should be enabled for the account
 type AllowKeyQueues func(ctx context.Context, acctID uuid.UUID) bool
-
-// DrainActiveCounters determines if active counters should be drained for the account
-// This can also be called for system queues, where account ID will be a zero UUID.
-type DrainActiveCounters func(ctx context.Context, acctID uuid.UUID) bool
 
 func WithAllowKeyQueues(kq AllowKeyQueues) QueueOpt {
 	return func(q *queue) {
@@ -549,12 +536,6 @@ func WithDisableLeaseChecks(lc DisableLeaseChecks) QueueOpt {
 	}
 }
 
-func WithKeyQueuesDrainActiveCounters(fn DrainActiveCounters) QueueOpt {
-	return func(q *queue) {
-		q.drainActiveCounters = fn
-	}
-}
-
 // QueueShadowPartitionProcessCount determines how many times the shadow scanner
 // continue to process a shadow partition's backlog.
 // This helps with reducing churn on leases for the shadow partition and allow handling
@@ -571,11 +552,8 @@ func WithQueueShadowPartitionProcessCount(spc QueueShadowPartitionProcessCount) 
 	}
 }
 
-// BacklogInstrumentor provides the function to be used for instrumenting backlog results
-type BacklogInstrumentor func(ctx context.Context, backlog *QueueBacklog, result *BacklogRefillResult)
-
 type NormalizeRefreshItemCustomConcurrencyKeysFn func(ctx context.Context, item *osqueue.QueueItem, existingKeys []state.CustomConcurrency, shadowPartition *QueueShadowPartition) ([]state.CustomConcurrency, error)
-type NormalizeRefreshItemThrottleFn func(ctx context.Context, item *osqueue.QueueItem, existingThrottle *osqueue.Throttle, shadowPartition *QueueShadowPartition) (*osqueue.Throttle, error)
+type RefreshItemThrottleFn func(ctx context.Context, item *osqueue.QueueItem) (*osqueue.Throttle, error)
 
 func WithNormalizeRefreshItemCustomConcurrencyKeys(fn NormalizeRefreshItemCustomConcurrencyKeysFn) QueueOpt {
 	return func(q *queue) {
@@ -583,9 +561,24 @@ func WithNormalizeRefreshItemCustomConcurrencyKeys(fn NormalizeRefreshItemCustom
 	}
 }
 
-func WithNormalizeRefreshItemThrottle(fn NormalizeRefreshItemThrottleFn) QueueOpt {
+func WithRefreshItemThrottle(fn RefreshItemThrottleFn) QueueOpt {
 	return func(q *queue) {
-		q.normalizeRefreshItemThrottle = fn
+		q.refreshItemThrottle = fn
+	}
+}
+
+type ActiveSpotChecksProbability func(ctx context.Context, acctID uuid.UUID) (backlogRefillCheckProbability int, accountSpotCheckProbability int)
+type ReadOnlySpotChecks func(ctx context.Context, acctID uuid.UUID) bool
+
+func WithActiveSpotCheckProbability(fn ActiveSpotChecksProbability) QueueOpt {
+	return func(q *queue) {
+		q.activeSpotCheckProbability = fn
+	}
+}
+
+func WithReadOnlySpotChecks(fn ReadOnlySpotChecks) QueueOpt {
+	return func(q *queue) {
+		q.readOnlySpotChecks = fn
 	}
 }
 
@@ -625,12 +618,23 @@ func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 		wg:                             &sync.WaitGroup{},
 		seqLeaseLock:                   &sync.RWMutex{},
 		scavengerLeaseLock:             &sync.RWMutex{},
+		activeCheckerLeaseLock:         &sync.RWMutex{},
 		instrumentationLeaseLock:       &sync.RWMutex{},
 		pollTick:                       defaultPollTick,
 		idempotencyTTL:                 defaultIdempotencyTTL,
 		queueKindMapping:               make(map[string]string),
 		peekSizeForFunctions:           make(map[string]int64),
 		log:                            logger.StdlibLogger(ctx),
+		partitionConstraintConfigGetter: func(ctx context.Context, p QueueShadowPartition) (*PartitionConstraintConfig, error) {
+			def := defaultConcurrency
+
+			return &PartitionConstraintConfig{
+				Concurrency: ShadowPartitionConcurrency{
+					AccountConcurrency:  def,
+					FunctionConcurrency: def,
+				},
+			}, nil
+		},
 		concurrencyLimitGetter: func(ctx context.Context, p QueuePartition) PartitionConcurrencyLimits {
 			def := defaultConcurrency
 			if p.ConcurrencyLimit > 0 {
@@ -664,9 +668,6 @@ func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 		allowKeyQueues: func(ctx context.Context, acctID uuid.UUID) bool {
 			return false
 		},
-		drainActiveCounters: func(ctx context.Context, acctID uuid.UUID) bool {
-			return false
-		},
 		enqueueSystemQueuesToBacklog: false,
 		disableLeaseChecks: func(ctx context.Context, acctID uuid.UUID) bool {
 			return false
@@ -687,13 +688,17 @@ func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 		shadowContinuationLimit: consts.DefaultQueueContinueLimit,
 		shadowContinues:         map[string]shadowContinuation{},
 		shadowContinueCooldown:  map[string]time.Time{},
-		// instrumentation
-		instrumentBacklogResult: func(ctx context.Context, backlog *QueueBacklog, result *BacklogRefillResult) {},
 		normalizeRefreshItemCustomConcurrencyKeys: func(ctx context.Context, item *osqueue.QueueItem, existingKeys []state.CustomConcurrency, shadowPartition *QueueShadowPartition) ([]state.CustomConcurrency, error) {
 			return existingKeys, nil
 		},
-		normalizeRefreshItemThrottle: func(ctx context.Context, item *osqueue.QueueItem, existingThrottle *osqueue.Throttle, shadowPartition *QueueShadowPartition) (*osqueue.Throttle, error) {
-			return existingThrottle, nil
+		refreshItemThrottle: func(ctx context.Context, item *osqueue.QueueItem) (*osqueue.Throttle, error) {
+			return nil, nil
+		},
+		readOnlySpotChecks: func(ctx context.Context, acctID uuid.UUID) bool {
+			return true
+		},
+		activeSpotCheckProbability: func(ctx context.Context, acctID uuid.UUID) (backlogRefillCheckProbability int, accountSpotCheckProbability int) {
+			return 100, 100
 		},
 	}
 
@@ -718,6 +723,12 @@ func WithQueueShardClients(queueShards map[string]QueueShard) QueueOpt {
 	}
 }
 
+func WithEnableJobPromotion(enable bool) QueueOpt {
+	return func(q *queue) {
+		q.enableJobPromotion = enable
+	}
+}
+
 type queue struct {
 	// name is the identifiable name for this worker, for logging.
 	name string
@@ -738,9 +749,11 @@ type queue struct {
 	systemConcurrencyLimitGetter    SystemConcurrencyLimitGetter
 	customConcurrencyLimitRefresher QueueItemConcurrencyKeyLimitRefresher
 
-	allowKeyQueues               AllowKeyQueues
-	enqueueSystemQueuesToBacklog bool
-	drainActiveCounters          DrainActiveCounters
+	allowKeyQueues                  AllowKeyQueues
+	enqueueSystemQueuesToBacklog    bool
+	partitionConstraintConfigGetter PartitionConstraintConfigGetter
+	activeSpotCheckProbability      ActiveSpotChecksProbability
+	readOnlySpotChecks              ReadOnlySpotChecks
 
 	disableLeaseChecks                DisableLeaseChecks
 	disableLeaseChecksForSystemQueues bool
@@ -821,9 +834,6 @@ type queue struct {
 	// instrumentationLeaseLock ensures that there are no data races writing to or
 	// reading from instrumentationLeaseID
 	instrumentationLeaseLock *sync.RWMutex
-	// instrumentBacklogResult is a function to instrument the result of backlog operations.
-	// this could be used to provide customer instrumentation methods
-	instrumentBacklogResult BacklogInstrumentor
 
 	// scavengerLeaseID stores the lease ID if this queue is the scavenger processor.
 	// all runners attempt to claim this lease automatically.
@@ -859,7 +869,16 @@ type queue struct {
 	backlogNormalizeLimit   int64
 
 	normalizeRefreshItemCustomConcurrencyKeys NormalizeRefreshItemCustomConcurrencyKeysFn
-	normalizeRefreshItemThrottle              NormalizeRefreshItemThrottleFn
+	refreshItemThrottle                       RefreshItemThrottleFn
+
+	// activeCheckerLeaseID stores the lease ID if this queue is the ActiveChecker processor.
+	// all runners attempt to claim this lease automatically.
+	activeCheckerLeaseID *ulid.ULID
+	// activeCheckerLeaseLock ensures that there are no data races writing to
+	// or reading from activeCheckerLeaseID in parallel.
+	activeCheckerLeaseLock *sync.RWMutex
+
+	enableJobPromotion bool
 }
 
 type QueueRunMode struct {
@@ -881,9 +900,6 @@ type QueueRunMode struct {
 	// Continuations enables continuations
 	Continuations bool
 
-	// PauseFlusher enables flushing pauses from hot storage to blob store
-	PauseFlusher bool
-
 	// Shadow enables shadow partition processing
 	ShadowPartition bool
 
@@ -901,6 +917,9 @@ type QueueRunMode struct {
 
 	// NormalizePartition enables the processing of partitions for normalization
 	NormalizePartition bool
+
+	// ActiveChecker enables background checking of active sets.
+	ActiveChecker bool
 }
 
 // continuation represents a partition continuation, forcung the queue to continue working
@@ -1317,13 +1336,13 @@ func (q *queue) EnqueueItem(ctx context.Context, shard QueueShard, i osqueue.Que
 
 	isSystemPartition := defaultPartition.IsSystem()
 
-	if i.Data.Identifier.AccountID == uuid.Nil && !isSystemPartition {
+	if defaultPartition.AccountID == uuid.Nil && !isSystemPartition {
 		q.log.Warn("attempting to enqueue item to non-system partition without account ID", "item", i)
 	}
 
 	enqueueToBacklogs := isSystemPartition && q.enqueueSystemQueuesToBacklog
-	if !isSystemPartition && i.Data.Identifier.AccountID != uuid.Nil && q.allowKeyQueues != nil {
-		enqueueToBacklogs = q.allowKeyQueues(ctx, i.Data.Identifier.AccountID)
+	if !isSystemPartition && defaultPartition.AccountID != uuid.Nil && q.allowKeyQueues != nil {
+		enqueueToBacklogs = q.allowKeyQueues(ctx, defaultPartition.AccountID)
 	}
 
 	var backlog QueueBacklog
@@ -1432,199 +1451,6 @@ func (q *queue) EnqueueItem(ctx context.Context, shard QueueShard, i osqueue.Que
 	default:
 		return i, fmt.Errorf("unknown response enqueueing item: %v (%T)", status, status)
 	}
-}
-
-// RunJobs returns a list of jobs that are due to run for a given run ID.
-func (q *queue) RunJobs(ctx context.Context, queueShardName string, workspaceID, workflowID uuid.UUID, runID ulid.ULID, limit, offset int64) ([]osqueue.JobResponse, error) {
-	if limit > 1000 || limit <= 0 {
-		limit = 1000
-	}
-
-	shard, ok := q.queueShardClients[queueShardName]
-	if !ok {
-		return nil, fmt.Errorf("queue shard %s not found", queueShardName)
-	}
-
-	if shard.Kind != string(enums.QueueShardKindRedis) {
-		return nil, fmt.Errorf("unsupported queue shard kind for RunJobs: %s", shard.Kind)
-	}
-
-	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "RunJobs"), redis_telemetry.ScopeQueue)
-
-	cmd := shard.RedisClient.unshardedRc.B().Zscan().Key(shard.RedisClient.kg.RunIndex(runID)).Cursor(uint64(offset)).Count(limit).Build()
-	jobIDs, err := shard.RedisClient.unshardedRc.Do(ctx, cmd).AsScanEntry()
-	if err != nil {
-		return nil, fmt.Errorf("error reading index: %w", err)
-	}
-
-	if len(jobIDs.Elements) == 0 {
-		return []osqueue.JobResponse{}, nil
-	}
-
-	// Get all job items.
-	jsonItems, err := shard.RedisClient.unshardedRc.Do(ctx, shard.RedisClient.unshardedRc.B().Hmget().Key(shard.RedisClient.kg.QueueItem()).Field(jobIDs.Elements...).Build()).AsStrSlice()
-	if err != nil {
-		return nil, fmt.Errorf("error reading jobs: %w", err)
-	}
-
-	resp := []osqueue.JobResponse{}
-	for _, str := range jsonItems {
-		if len(str) == 0 {
-			continue
-		}
-		qi := &osqueue.QueueItem{}
-
-		if err := json.Unmarshal([]byte(str), qi); err != nil {
-			return nil, fmt.Errorf("error unmarshalling queue item: %w", err)
-		}
-		if qi.Data.Identifier.WorkspaceID != workspaceID {
-			continue
-		}
-		// TODO Do we need to check backlogs here?
-		cmd := shard.RedisClient.unshardedRc.B().Zrank().Key(shard.RedisClient.kg.FnQueueSet(workflowID.String())).Member(qi.ID).Build()
-		pos, err := shard.RedisClient.unshardedRc.Do(ctx, cmd).AsInt64()
-		if !rueidis.IsRedisNil(err) && err != nil {
-			return nil, fmt.Errorf("error reading queue position: %w", err)
-		}
-		resp = append(resp, osqueue.JobResponse{
-			At:       time.UnixMilli(qi.AtMS),
-			Position: pos,
-			Kind:     qi.Data.Kind,
-			Attempt:  qi.Data.Attempt,
-			Raw:      qi,
-		})
-	}
-
-	return resp, nil
-}
-
-func (q *queue) OutstandingJobCount(ctx context.Context, workspaceID, workflowID uuid.UUID, runID ulid.ULID) (int, error) {
-	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "OutstandingJobCount"), redis_telemetry.ScopeQueue)
-
-	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
-		return 0, fmt.Errorf("unsupported queue shard kind for OutstandingJobCount: %s", q.primaryQueueShard.Kind)
-	}
-
-	cmd := q.primaryQueueShard.RedisClient.unshardedRc.B().Zcard().Key(q.primaryQueueShard.RedisClient.kg.RunIndex(runID)).Build()
-	count, err := q.primaryQueueShard.RedisClient.unshardedRc.Do(ctx, cmd).AsInt64()
-	if err != nil {
-		return 0, fmt.Errorf("error counting index cardinality: %w", err)
-	}
-	return int(count), nil
-}
-
-func (q *queue) StatusCount(ctx context.Context, workflowID uuid.UUID, status string) (int64, error) {
-	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "StatusCount"), redis_telemetry.ScopeQueue)
-
-	iterate := func(client *QueueClient) (int64, error) {
-		key := client.kg.Status(status, workflowID)
-		cmd := client.unshardedRc.B().Zcount().Key(key).Min("-inf").Max("+inf").Build()
-		count, err := client.unshardedRc.Do(ctx, cmd).AsInt64()
-		if err != nil {
-			return 0, fmt.Errorf("error inspecting function queue status: %w", err)
-		}
-
-		return count, nil
-	}
-
-	var count int64
-
-	// Map-reduce over shards
-	if q.queueShardClients != nil {
-		eg := errgroup.Group{}
-
-		for shardName, shard := range q.queueShardClients {
-			shard := shard
-
-			if shard.Kind != string(enums.QueueShardKindRedis) {
-				// TODO Support other storage backends
-				continue
-			}
-
-			eg.Go(func() error {
-				shardCount, err := iterate(shard.RedisClient)
-				if err != nil {
-					return fmt.Errorf("could not count status for shard %s: %w", shardName, err)
-				}
-				atomic.AddInt64(&count, shardCount)
-				return nil
-			})
-		}
-
-		err := eg.Wait()
-		if err != nil {
-			return 0, err
-		}
-	}
-
-	return count, nil
-}
-
-func (q *queue) RunningCount(ctx context.Context, workflowID uuid.UUID) (int64, error) {
-	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "RunningCount"), redis_telemetry.ScopeQueue)
-
-	iterate := func(client *QueueClient) (int64, error) {
-		// Load the partition for a given queue.  This allows us to generate the concurrency
-		// key properly via the given function.
-		//
-		// TODO: Remove the ability to change keys based off of initialized inputs.  It's more trouble than
-		// it's worth, and ends up meaning we have more queries to write (such as this) in order to load
-		// relevant data.
-		cmd := client.unshardedRc.B().Hget().Key(client.kg.PartitionItem()).Field(workflowID.String()).Build()
-		enc, err := client.unshardedRc.Do(ctx, cmd).AsBytes()
-		if rueidis.IsRedisNil(err) {
-			return 0, nil
-		}
-		if err != nil {
-			return 0, fmt.Errorf("error fetching partition: %w", err)
-		}
-		item := &QueuePartition{}
-		if err = json.Unmarshal(enc, item); err != nil {
-			return 0, fmt.Errorf("error reading partition item: %w", err)
-		}
-
-		// Fetch the concurrency via the partition concurrency name.
-		key := client.kg.Concurrency("p", workflowID.String())
-		cmd = client.unshardedRc.B().Zcard().Key(key).Build()
-		count, err := client.unshardedRc.Do(ctx, cmd).AsInt64()
-		if err != nil {
-			return 0, fmt.Errorf("error inspecting running job count: %w", err)
-		}
-		return count, nil
-	}
-
-	var count int64
-
-	// Map-reduce over shards
-	if q.queueShardClients != nil {
-		eg := errgroup.Group{}
-
-		for _, shard := range q.queueShardClients {
-			if shard.Kind != string(enums.QueueShardKindRedis) {
-				// TODO Support other storage backends
-				continue
-			}
-
-			shard := shard
-			eg.Go(func() error {
-				shardCount, err := iterate(shard.RedisClient)
-				if err != nil {
-					return fmt.Errorf("could not count running jobs for shard %s: %w", shard.Name, err)
-				}
-				atomic.AddInt64(&count, shardCount)
-				return nil
-			})
-		}
-
-		err := eg.Wait()
-		if err != nil {
-			return 0, err
-		}
-	}
-
-	// TODO Support other storage backends
-
-	return count, nil
 }
 
 // SetFunctionPaused sets the "Paused" flag (represented in JSON as "off") for the given
@@ -1807,20 +1633,14 @@ func (q *queue) Migrate(ctx context.Context, sourceShardName string, fnID uuid.U
 		return -1, fmt.Errorf("no queue shard available for '%s'", sourceShardName)
 	}
 
-	if limit > AbsoluteQueuePeekMax || limit <= 0 {
-		limit = AbsoluteQueuePeekMax
-	}
-
-	// TODO Do we need to move items from backlogs?
-	partitionKey := shard.RedisClient.kg.PartitionQueueSet(enums.PartitionTypeDefault, fnID.String(), "")
-
-	items, err := q.peek(ctx, shard, peekOpts{
-		PartitionKey: partitionKey,
-		Limit:        limit,
-		Until:        time.Time{},
-	})
+	from := time.Time{}
+	// setting it to 5 years ahead should be enough to cover all queue items in the partition
+	until := q.clock.Now().Add(24 * time.Hour * 365 * 5)
+	items, err := q.ItemsByPartition(ctx, shard, fnID, from, until,
+		WithQueueItemIterBatchSize(limit),
+	)
 	if err != nil {
-		return -1, fmt.Errorf("error peeking items for queue migration: %w", err)
+		return -1, fmt.Errorf("error preparing partition iteration: %w", err)
 	}
 
 	// Should process in order because we don't want out of order execution when moved over
@@ -1830,8 +1650,9 @@ func (q *queue) Migrate(ctx context.Context, sourceShardName string, fnID uuid.U
 		if err := handler(ctx, qi); err != nil {
 			return err
 		}
-		if err := q.removeQueueItem(ctx, shard, partitionKey, qi.ID); err != nil {
-			q.log.Error("error cleaning up queue item after migration", "error", err)
+
+		if err := q.Dequeue(ctx, shard, *qi); err != nil {
+			q.log.Error("error dequeueing queue item after migration", "error", err)
 		}
 
 		atomic.AddInt64(&processed, 1)
@@ -1842,10 +1663,10 @@ func (q *queue) Migrate(ctx context.Context, sourceShardName string, fnID uuid.U
 		eg := errgroup.Group{}
 		eg.SetLimit(concurrency)
 
-		for _, qi := range items {
-			qi := qi
+		for qi := range items {
+			i := qi
 			eg.Go(func() error {
-				return process(qi)
+				return process(i)
 			})
 		}
 
@@ -1857,13 +1678,13 @@ func (q *queue) Migrate(ctx context.Context, sourceShardName string, fnID uuid.U
 		return atomic.LoadInt64(&processed), nil
 	}
 
-	for _, qi := range items {
+	for qi := range items {
 		if err := process(qi); err != nil {
 			return processed, err
 		}
 	}
 
-	return processed, nil
+	return atomic.LoadInt64(&processed), nil
 }
 
 func (q *queue) RemoveQueueItem(ctx context.Context, shardName string, partitionKey string, itemID string) error {
@@ -1897,10 +1718,38 @@ func (q *queue) removeQueueItem(ctx context.Context, shard QueueShard, partition
 
 	switch code {
 	case 0:
+		q.log.Debug("removed queue item", "item_id", itemID)
+
 		return nil
 	default:
 		return fmt.Errorf("unknown status when attempting to remove item: %d", code)
 	}
+}
+
+func (q *queue) LoadQueueItem(ctx context.Context, shardName string, itemID string) (*osqueue.QueueItem, error) {
+	queueShard, ok := q.queueShardClients[shardName]
+	if !ok {
+		return nil, fmt.Errorf("queue shard not found %q", shardName)
+	}
+
+	kg := queueShard.RedisClient.KeyGenerator()
+	client := queueShard.RedisClient.Client()
+
+	queueItemStr, err := client.Do(ctx, client.B().Hget().Key(kg.QueueItem()).Field(itemID).Build()).ToString()
+	if err != nil {
+		if rueidis.IsRedisNil(err) {
+			return nil, ErrQueueItemNotFound
+		}
+
+		return nil, fmt.Errorf("could not load queue item: %w", err)
+	}
+
+	qi := &osqueue.QueueItem{}
+	if err := json.Unmarshal([]byte(queueItemStr), qi); err != nil {
+		return nil, fmt.Errorf("error unmarshalling loaded queue item: %w", err)
+	}
+
+	return qi, nil
 }
 
 // Peek takes n items from a queue, up until QueuePeekMax.  For peeking workflow/
@@ -1946,6 +1795,7 @@ func (q *queue) Peek(ctx context.Context, partition *QueuePartition, until time.
 			Limit:        limit,
 			Until:        until,
 			PartitionKey: partitionKey,
+			PartitionID:  partition.ID,
 		},
 	)
 }
@@ -1977,19 +1827,27 @@ func (q *queue) PeekRandom(ctx context.Context, partition *QueuePartition, until
 			Limit:        limit,
 			Until:        until,
 			PartitionKey: partitionKey,
+			PartitionID:  partition.ID,
 			Random:       true,
 		},
 	)
 }
 
 type peekOpts struct {
+	PartitionID  string
 	PartitionKey string
 	Random       bool
+	From         *time.Time
 	Until        time.Time
 	Limit        int64
 }
 
 func (q *queue) peek(ctx context.Context, shard QueueShard, opts peekOpts) ([]*osqueue.QueueItem, error) {
+	from := "-inf"
+	if opts.From != nil && !opts.From.IsZero() {
+		from = strconv.Itoa(int(opts.From.UnixMilli()))
+	}
+
 	until := "+inf"
 	if opts.Until.UnixMilli() > 0 {
 		until = strconv.Itoa(int(opts.Until.UnixMilli()))
@@ -2005,6 +1863,7 @@ func (q *queue) peek(ctx context.Context, shard QueueShard, opts peekOpts) ([]*o
 		shard.RedisClient.kg.QueueItem(),
 	}
 	args, err := StrSlice([]any{
+		from,
 		until,
 		opts.Limit,
 		randomOffset,
@@ -2046,7 +1905,8 @@ func (q *queue) peek(ctx context.Context, shard QueueShard, opts peekOpts) ([]*o
 	items := make([]any, 0, len(allQueueItemIds))
 	missingQueueItems := make([]string, 0, len(allQueueItemIds))
 	for idx, itemId := range allQueueItemIds {
-		if potentiallyMissingItems[idx] == nil {
+		item := potentiallyMissingItems[idx]
+		if item == nil {
 			if itemId == nil {
 				return nil, fmt.Errorf("encountered nil queue item key in partition queue %q", opts.PartitionKey)
 			}
@@ -2058,7 +1918,7 @@ func (q *queue) peek(ctx context.Context, shard QueueShard, opts peekOpts) ([]*o
 
 			missingQueueItems = append(missingQueueItems, str)
 		} else {
-			items = append(items, potentiallyMissingItems[idx])
+			items = append(items, item)
 		}
 	}
 
@@ -2081,33 +1941,43 @@ func (q *queue) peek(ctx context.Context, shard QueueShard, opts peekOpts) ([]*o
 		}
 	}
 
-	now := q.clock.Now()
-	return util.ParallelDecode(items, func(val any) (*osqueue.QueueItem, error) {
+	return util.ParallelDecode(items, func(val any) (*osqueue.QueueItem, bool, error) {
 		if val == nil {
 			q.log.Error("nil item value in peek response", "partition", opts.PartitionKey)
-			return nil, nil
+			return nil, true, nil
 		}
 
 		str, ok := val.(string)
 		if !ok {
-			return nil, fmt.Errorf("non-string value in peek response: %T", val)
+			return nil, false, fmt.Errorf("non-string value in peek response: %T", val)
 		}
 
 		if str == "" {
-			return nil, fmt.Errorf("received empty string in decode queue item from peek")
+			return nil, false, fmt.Errorf("received empty string in decode queue item from peek")
 		}
 
 		qi := &osqueue.QueueItem{}
 		if err := json.Unmarshal(unsafe.Slice(unsafe.StringData(str), len(str)), qi); err != nil {
-			return nil, fmt.Errorf("error unmarshalling peeked queue item: %w", err)
+			return nil, false, fmt.Errorf("error unmarshalling peeked queue item: %w", err)
 		}
+
+		now := q.clock.Now()
 		if qi.IsLeased(now) {
+			metrics.IncrQueuePeekLeaseContentionCounter(ctx, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags: map[string]any{
+					// "partition_id": opts.PartitionID,
+					"queue_shard": shard.Name,
+				},
+			})
+
 			// Leased item, don't return.
-			return nil, nil
+			return nil, true, nil
 		}
+
 		// The nested osqueue.Item never has an ID set;  always re-set it
 		qi.Data.JobID = &qi.ID
-		return qi, nil
+		return qi, false, nil
 	})
 }
 
@@ -2231,7 +2101,9 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 
 	kg := q.primaryQueueShard.RedisClient.kg
 
-	refilledFromBacklog := q.itemEnableKeyQueues(ctx, item) && item.RefilledFrom != ""
+	enableKeyQueues := q.itemEnableKeyQueues(ctx, item)
+
+	refilledFromBacklog := enableKeyQueues && item.RefilledFrom != ""
 
 	checkConstraints := !refilledFromBacklog || !q.itemDisableLeaseChecks(ctx, item)
 
@@ -2297,19 +2169,19 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 		backlog.customKeyInProgress(kg, 1),
 		backlog.customKeyInProgress(kg, 2),
 
-		// Active counters (ready + in progress)
+		// Active set keys (ready + in progress)
 		partition.accountActiveKey(kg),
 		partition.activeKey(kg),
-		backlog.customKeyActive(kg, 2),
 		backlog.customKeyActive(kg, 1),
+		backlog.customKeyActive(kg, 2),
 		backlog.activeKey(kg),
 
-		// Active run counters
-		kg.RunActiveCounter(item.Data.Identifier.RunID),    // Counter for active items in run
-		partition.accountActiveRunKey(kg),                  // Counter for active runs in account
-		kg.ActivePartitionRunsIndex(partition.PartitionID), // Set index for active runs in partition
-		backlog.customKeyActiveRuns(kg, 1),                 // Counter for active runs with custom concurrency key 1
-		backlog.customKeyActiveRuns(kg, 2),                 // Counter for active runs with custom concurrency key 2
+		// Active run sets
+		kg.RunActiveSet(item.Data.Identifier.RunID), // Set for active items in run
+		partition.accountActiveRunKey(kg),           // Set for active runs in account
+		partition.activeRunKey(kg),                  // Set for active runs in partition
+		backlog.customKeyActiveRuns(kg, 1),          // Set for active runs with custom concurrency key 1
+		backlog.customKeyActiveRuns(kg, 2),          // Set for active runs with custom concurrency key 2
 
 		kg.ThrottleKey(item.Data.Throttle),
 	}
@@ -2317,11 +2189,6 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 	partConcurrency := partition.Concurrency.FunctionConcurrency
 	if partition.SystemQueueName != nil {
 		partConcurrency = partition.Concurrency.SystemConcurrency
-	}
-
-	drainActiveCountersVal := "0"
-	if q.drainActiveCounters(ctx, item.Data.Identifier.AccountID) {
-		drainActiveCountersVal = "1"
 	}
 
 	args, err := StrSlice([]any{
@@ -2342,7 +2209,6 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 		// Key queues v2
 		checkConstraintsVal,
 		refilledFromBacklogVal,
-		drainActiveCountersVal,
 	})
 	if err != nil {
 		return nil, err
@@ -2537,25 +2403,26 @@ func (q *queue) Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		backlog.customKeyInProgress(kg, 1),
 		backlog.customKeyInProgress(kg, 2),
 
-		// Active keys
+		// Active set keys
 		partition.accountActiveKey(kg),
 		partition.activeKey(kg),
 		backlog.customKeyActive(kg, 1),
 		backlog.customKeyActive(kg, 2),
 		backlog.activeKey(kg),
 
-		// Active run counters
-		kg.RunActiveCounter(i.Data.Identifier.RunID),       // Counter for active items in run
-		partition.accountActiveRunKey(kg),                  // Counter for active runs in account
-		kg.ActivePartitionRunsIndex(partition.PartitionID), // Set index for active runs in partition
-		backlog.customKeyActiveRuns(kg, 1),                 // Counter for active runs with custom concurrency key 1
-		backlog.customKeyActiveRuns(kg, 2),                 // Counter for active runs with custom concurrency key 2
+		// Active run sets
+		kg.RunActiveSet(i.Data.Identifier.RunID), // Set for active items in run
+		partition.accountActiveRunKey(kg),        // Set for active runs in account
+		partition.activeRunKey(kg),               // Set for active runs in partition
+		backlog.customKeyActiveRuns(kg, 1),       // Set for active runs with custom concurrency key 1
+		backlog.customKeyActiveRuns(kg, 2),       // Set for active runs with custom concurrency key 2
 
 		kg.Idempotency(i.ID),
 
 		// Singleton
 		kg.SingletonRunKey(i.Data.Identifier.RunID.String()),
 	}
+
 	// Append indexes
 	for _, idx := range q.itemIndexer(ctx, i, queueShard.RedisClient.kg) {
 		if idx != "" {
@@ -2581,12 +2448,6 @@ func (q *queue) Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		return err
 	}
 
-	q.log.Trace("dequeueing item",
-		"id", i.ID,
-		"kind", i.Data.Kind,
-		"partition_id", partition.PartitionID,
-	)
-
 	status, err := scripts["queue/dequeue"].Exec(
 		redis_telemetry.WithScriptName(ctx, "dequeue"),
 		queueShard.RedisClient.unshardedRc,
@@ -2598,6 +2459,8 @@ func (q *queue) Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 	}
 	switch status {
 	case 0:
+		q.log.Debug("dequeued item", "job_id", i.ID, "item", i)
+
 		return nil
 	case 1:
 		return ErrQueueItemNotFound
@@ -2609,6 +2472,8 @@ func (q *queue) Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 // Requeue requeues an item in the future.
 func (q *queue) Requeue(ctx context.Context, queueShard QueueShard, i osqueue.QueueItem, at time.Time) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "Requeue"), redis_telemetry.ScopeQueue)
+
+	l := q.log.With("item", i)
 
 	if queueShard.Kind != string(enums.QueueShardKindRedis) {
 		return fmt.Errorf("unsupported queue shard kind for Requeue: %s", queueShard.Kind)
@@ -2634,14 +2499,44 @@ func (q *queue) Requeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 	i.RefilledFrom = ""
 	i.RefilledAt = 0
 
+	// Reset enqueuedAt (used for latency calculation)
+	i.EnqueuedAt = now.UnixMilli()
+
 	fnPartition, _ := q.ItemPartition(ctx, queueShard, i)
 	shadowPartition := q.ItemShadowPartition(ctx, i)
-	backlog := q.ItemBacklog(ctx, i)
+
+	requeueToBacklog := q.itemEnableKeyQueues(ctx, i)
 
 	requeueToBacklogsVal := "0"
-	if q.itemEnableKeyQueues(ctx, i) {
+	if requeueToBacklog {
 		requeueToBacklogsVal = "1"
+
+		// To avoid requeueing item into a stale backlog, retrieve latest throttle
+		if i.Data.Throttle != nil && i.Data.Throttle.KeyExpressionHash == "" {
+			refreshedThrottle, err := q.refreshItemThrottle(ctx, &i)
+			if err != nil {
+				// If we cannot find the event for the queue item, dequeue it. The state
+				// must exist for the entire duration of a function run.
+				if errors.Is(err, state.ErrEventNotFound) {
+					l.Warn("could not find event for refreshing throttle before requeue")
+
+					err := q.Dequeue(ctx, queueShard, i)
+					if err != nil && !errors.Is(err, ErrQueueItemNotFound) {
+						return fmt.Errorf("could not dequeue item with missing throttle state: %w", err)
+					}
+
+					return nil
+				}
+
+				return fmt.Errorf("could not refresh item throttle: %w", err)
+			}
+
+			// Update throttle to latest evaluated value + expression hash
+			i.Data.Throttle = refreshedThrottle
+		}
 	}
+
+	backlog := q.ItemBacklog(ctx, i)
 
 	keys := []string{
 		kg.QueueItem(),
@@ -2660,19 +2555,19 @@ func (q *queue) Requeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		backlog.customKeyInProgress(kg, 1),
 		backlog.customKeyInProgress(kg, 2),
 
-		// Active (counter) keys
+		// Active set keys
 		shadowPartition.accountActiveKey(kg),
 		shadowPartition.activeKey(kg),
 		backlog.customKeyActive(kg, 1),
 		backlog.customKeyActive(kg, 2),
 		backlog.activeKey(kg),
 
-		// Active run counters
-		kg.RunActiveCounter(i.Data.Identifier.RunID),             // Counter for active items in run
-		shadowPartition.accountActiveRunKey(kg),                  // Counter for active runs in account
-		kg.ActivePartitionRunsIndex(shadowPartition.PartitionID), // Set index for active runs in partition
-		backlog.customKeyActiveRuns(kg, 1),                       // Counter for active runs with custom concurrency key 1
-		backlog.customKeyActiveRuns(kg, 2),                       // Counter for active runs with custom concurrency key 2
+		// Active run sets
+		kg.RunActiveSet(i.Data.Identifier.RunID), // Set for active items in run
+		shadowPartition.accountActiveRunKey(kg),  // Set for active runs in account
+		shadowPartition.activeRunKey(kg),         // Set for active runs in partition
+		backlog.customKeyActiveRuns(kg, 1),       // Set for active runs with custom concurrency key 1
+		backlog.customKeyActiveRuns(kg, 2),       // Set for active runs with custom concurrency key 2
 
 		// key queues v2
 		kg.BacklogSet(backlog.BacklogID),
@@ -2741,8 +2636,8 @@ func (q *queue) Requeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 			metrics.IncrBacklogRequeuedCounter(ctx, metrics.CounterOpt{
 				PkgName: pkgName,
 				Tags: map[string]any{
-					"queue_shard":  q.primaryQueueShard.Name,
-					"partition_id": i.FunctionID.String(),
+					"queue_shard": q.primaryQueueShard.Name,
+					// "partition_id": i.FunctionID.String(),
 				},
 			})
 		}
@@ -2755,84 +2650,6 @@ func (q *queue) Requeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 	default:
 		return fmt.Errorf("unknown response requeueing item: %v (%T)", status, status)
 	}
-}
-
-func (q *queue) ShadowPartitionLease(ctx context.Context, sp *QueueShadowPartition, duration time.Duration) (*ulid.ULID, error) {
-	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "ShadowPartitionLease"), redis_telemetry.ScopeQueue)
-
-	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
-		return nil, fmt.Errorf("unsupported queue shard kind for ShadowPartitionLease: %s", q.primaryQueueShard.Kind)
-	}
-
-	now := q.clock.Now()
-	leaseExpiry := now.Add(duration)
-	leaseID, err := ulid.New(ulid.Timestamp(leaseExpiry), rand.Reader)
-	if err != nil {
-		return nil, fmt.Errorf("could not generate leaseID: %w", err)
-	}
-
-	sp.LeaseID = &leaseID
-
-	accountID := uuid.Nil
-	if sp.AccountID != nil {
-		accountID = *sp.AccountID
-	}
-
-	keys := []string{
-		q.primaryQueueShard.RedisClient.kg.ShadowPartitionMeta(),
-		q.primaryQueueShard.RedisClient.kg.GlobalShadowPartitionSet(),
-		q.primaryQueueShard.RedisClient.kg.GlobalAccountShadowPartitions(),
-		q.primaryQueueShard.RedisClient.kg.AccountShadowPartitions(accountID),
-	}
-	args, err := StrSlice([]any{
-		sp.PartitionID,
-		accountID,
-		leaseID,
-		now.UnixMilli(),
-		leaseExpiry.UnixMilli(),
-	})
-	if err != nil {
-		return nil, fmt.Errorf("could not serialize args: %w", err)
-	}
-
-	status, err := scripts["queue/shadowPartitionLease"].Exec(
-		redis_telemetry.WithScriptName(ctx, "shadowPartitionLease"),
-		q.primaryQueueShard.RedisClient.unshardedRc,
-		keys,
-		args,
-	).AsInt64()
-	if err != nil {
-		return nil, fmt.Errorf("error leasing shadow partition: %w", err)
-	}
-	switch status {
-	case 0:
-		return &leaseID, nil
-	case -1:
-		return nil, ErrShadowPartitionNotFound
-	case -2:
-		return nil, ErrShadowPartitionAlreadyLeased
-	case -3:
-		return nil, ErrShadowPartitionPaused
-	default:
-		return nil, fmt.Errorf("unknown response leasing shadow partition: %v (%T)", status, status)
-	}
-}
-
-func (q *queue) peekGlobalShadowPartitionAccounts(ctx context.Context, sequential bool, until time.Time, limit int64) ([]uuid.UUID, error) {
-	if q.primaryQueueShard.Kind != string(enums.QueueShardKindRedis) {
-		return nil, fmt.Errorf("unsupported queue shard kind for peekGlobalShadowPartitionAccounts: %s", q.primaryQueueShard.Kind)
-	}
-
-	rc := q.primaryQueueShard.RedisClient
-
-	p := peeker[QueueBacklog]{
-		q:                      q,
-		opName:                 "peekGlobalShadowPartitionAccounts",
-		max:                    ShadowPartitionAccountPeekMax,
-		isMillisecondPrecision: true,
-	}
-
-	return p.peekUUIDPointer(ctx, rc.kg.GlobalAccountShadowPartitions(), sequential, until, limit)
 }
 
 func (q *queue) peekGlobalNormalizeAccounts(ctx context.Context, until time.Time, limit int64) ([]uuid.UUID, error) {
@@ -3179,25 +2996,25 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 	migrateIDs := map[uuid.UUID]bool{}
 
 	// Use parallel decoding as per Peek
-	partitions, err := util.ParallelDecode(encoded, func(val any) (*QueuePartition, error) {
+	partitions, err := util.ParallelDecode(encoded, func(val any) (*QueuePartition, bool, error) {
 		if val == nil {
 			q.log.Error("encountered nil partition item in pointer queue",
 				"encoded", encoded,
 				"missing", missingPartitions,
 				"key", partitionKey,
 			)
-			return nil, fmt.Errorf("encountered nil partition item in pointer queue %q", partitionKey)
+			return nil, false, fmt.Errorf("encountered nil partition item in pointer queue %q", partitionKey)
 		}
 
 		str, ok := val.(string)
 		if !ok {
-			return nil, fmt.Errorf("unknown type in partition peek: %T", val)
+			return nil, false, fmt.Errorf("unknown type in partition peek: %T", val)
 		}
 
 		item := &QueuePartition{}
 
 		if err := json.Unmarshal(unsafe.Slice(unsafe.StringData(str), len(str)), item); err != nil {
-			return nil, fmt.Errorf("error reading partition item: %w", err)
+			return nil, false, fmt.Errorf("error reading partition item: %w", err)
 		}
 		// Track the fn ID for partitions seen.  This allows us to do fast lookups of paused functions
 		// to prevent peeking/working on these items as an optimization.
@@ -3206,7 +3023,7 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 			fnIDs[*item.FunctionID] = false // default not paused
 			fnIDsMu.Unlock()
 		}
-		return item, nil
+		return item, false, nil
 	})
 	if err != nil {
 		return nil, fmt.Errorf("error decoding partitions: %w", err)
@@ -3248,14 +3065,14 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 				return nil, fmt.Errorf("unknown return type from mget fnMeta: %T", vals)
 			}
 
-			_, _ = util.ParallelDecode(vals, func(i any) (any, error) {
+			_, _ = util.ParallelDecode(vals, func(i any) (any, bool, error) {
 				str, ok := i.(string)
 				if !ok {
-					return nil, fmt.Errorf("unknown fnMeta type in partition peek: %T", i)
+					return nil, false, fmt.Errorf("unknown fnMeta type in partition peek: %T", i)
 				}
 				fnMeta := &FnMetadata{}
 				if err := json.Unmarshal(unsafe.Slice(unsafe.StringData(str), len(str)), fnMeta); err != nil {
-					return nil, fmt.Errorf("could not unmarshal fnMeta: %w", err)
+					return nil, false, fmt.Errorf("could not unmarshal fnMeta: %w", err)
 				}
 
 				fnIDsMu.Lock()
@@ -3265,7 +3082,7 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 				}
 				fnIDsMu.Unlock()
 
-				return nil, nil
+				return nil, true, nil
 			})
 		}
 	}
