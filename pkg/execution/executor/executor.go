@@ -554,9 +554,8 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	config.NewSetFunctionTrace(runSpanRef)
 
 	// If this is paused, immediately end just before creating state.
-	isPaused := req.FunctionPausedAt != nil && req.FunctionPausedAt.Before(time.Now())
-	if isPaused {
-		return e.handleFunctionSkipped(ctx, req, metadata, evts, enums.SkipReasonFunctionPaused)
+	if skipped := req.SkipReason(); skipped != enums.SkipReasonNone {
+		return e.handleFunctionSkipped(ctx, req, metadata, evts, skipped)
 	}
 
 	mapped := make([]map[string]any, len(req.Events))
