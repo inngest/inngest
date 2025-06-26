@@ -234,12 +234,12 @@ func (q *queue) ItemsByPartition(ctx context.Context, shard QueueShard, partitio
 	cmd := rc.B().Hget().Key(hash).Field(partitionID.String()).Build()
 	byt, err := rc.Do(ctx, cmd).AsBytes()
 	if err != nil {
-		return nil, fmt.Errorf("error retrieving partition: %w", err)
+		return nil, fmt.Errorf("error retrieving partition '%s': %w", partitionID.String(), err)
 	}
 
 	var pt QueuePartition
 	if err := json.Unmarshal(byt, &pt); err != nil {
-		return nil, fmt.Errorf("error unmarshalling queue partition: %w", err)
+		return nil, fmt.Errorf("error unmarshalling queue partition '%s': %w", partitionID.String(), err)
 	}
 
 	return func(yield func(*osqueue.QueueItem) bool) {
