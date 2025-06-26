@@ -10,11 +10,11 @@ import (
 	"strings"
 )
 
-const _SkipReasonName = "NoneFunctionPausedSingleton"
+const _SkipReasonName = "NoneFunctionPausedSingletonFunctionDrained"
 
-var _SkipReasonIndex = [...]uint8{0, 4, 18, 27}
+var _SkipReasonIndex = [...]uint8{0, 4, 18, 27, 42}
 
-const _SkipReasonLowerName = "nonefunctionpausedsingleton"
+const _SkipReasonLowerName = "nonefunctionpausedsingletonfunctiondrained"
 
 func (i SkipReason) String() string {
 	if i < 0 || i >= SkipReason(len(_SkipReasonIndex)-1) {
@@ -30,9 +30,10 @@ func _SkipReasonNoOp() {
 	_ = x[SkipReasonNone-(0)]
 	_ = x[SkipReasonFunctionPaused-(1)]
 	_ = x[SkipReasonSingleton-(2)]
+	_ = x[SkipReasonFunctionDrained-(3)]
 }
 
-var _SkipReasonValues = []SkipReason{SkipReasonNone, SkipReasonFunctionPaused, SkipReasonSingleton}
+var _SkipReasonValues = []SkipReason{SkipReasonNone, SkipReasonFunctionPaused, SkipReasonSingleton, SkipReasonFunctionDrained}
 
 var _SkipReasonNameToValueMap = map[string]SkipReason{
 	_SkipReasonName[0:4]:        SkipReasonNone,
@@ -41,12 +42,15 @@ var _SkipReasonNameToValueMap = map[string]SkipReason{
 	_SkipReasonLowerName[4:18]:  SkipReasonFunctionPaused,
 	_SkipReasonName[18:27]:      SkipReasonSingleton,
 	_SkipReasonLowerName[18:27]: SkipReasonSingleton,
+	_SkipReasonName[27:42]:      SkipReasonFunctionDrained,
+	_SkipReasonLowerName[27:42]: SkipReasonFunctionDrained,
 }
 
 var _SkipReasonNames = []string{
 	_SkipReasonName[0:4],
 	_SkipReasonName[4:18],
 	_SkipReasonName[18:27],
+	_SkipReasonName[27:42],
 }
 
 // SkipReasonString retrieves an enum value from the enum constants string name.

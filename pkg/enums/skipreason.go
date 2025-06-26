@@ -14,4 +14,7 @@ const (
 	// SkipReasonSingleton indicates that the run was skipped because another
 	// run of the same singleton function was already in progress.
 	SkipReasonSingleton
+
+	// SkipReasonFunctionDrained indicates that the function is draining.
+	SkipReasonFunctionDrained
 )
