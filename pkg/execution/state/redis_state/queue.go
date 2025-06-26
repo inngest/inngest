@@ -1642,6 +1642,11 @@ func (q *queue) Migrate(ctx context.Context, sourceShardName string, fnID uuid.U
 		WithQueueItemIterBatchSize(limit),
 	)
 	if err != nil {
+		// the partition doesn't exist, meaning there are no workloads
+		if errors.Is(err, rueidis.Nil) {
+			return 0, nil
+		}
+
 		return -1, fmt.Errorf("error preparing partition iteration: %w", err)
 	}
 
