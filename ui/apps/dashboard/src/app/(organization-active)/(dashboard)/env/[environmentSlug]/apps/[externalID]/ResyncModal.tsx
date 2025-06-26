@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Alert } from '@inngest/components/Alert';
 import { Button } from '@inngest/components/Button';
 import { Input } from '@inngest/components/Forms/Input';
@@ -53,6 +53,15 @@ export default function ResyncModal({
   const [isSyncing, setIsSyncing] = useState(false);
   const env = useEnvironment();
   const [, resyncApp] = useMutation(ResyncAppDocument);
+  const syncButtonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      setTimeout(() => {
+        syncButtonRef.current?.focus();
+      }, 100);
+    }
+  }, [isOpen]);
 
   if (isURLOverridden) {
     url = overrideValue;
@@ -152,7 +161,6 @@ export default function ResyncModal({
               }}
               readOnly={!isURLOverridden}
               className={cn(!isURLOverridden && 'bg-disabled')}
-              tabIndex={-1}
             />
           </div>
           <div className="mb-6">
@@ -164,7 +172,6 @@ export default function ResyncModal({
                   setURLOverridden((prev) => !prev);
                 }}
                 id="override"
-                tabIndex={-1}
               />
               <SwitchLabel htmlFor="override">Override Input</SwitchLabel>
             </SwitchWrapper>
@@ -195,15 +202,14 @@ export default function ResyncModal({
           onClick={onClose}
           disabled={isSyncing}
           label="Cancel"
-          tabIndex={-1}
         />
 
         <Button
+          ref={syncButtonRef}
           onClick={onSync}
           disabled={isSyncing || (!isURLOverridden && isConnect)}
           kind="primary"
           label={isConnect ? 'Migrate app' : 'Resync app'}
-          autoFocus
         />
       </Modal.Footer>
     </Modal>
