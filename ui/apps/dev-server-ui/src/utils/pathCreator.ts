@@ -5,6 +5,9 @@ export const pathCreator = {
     // TODO: Make this goes to a specific app page when we add that feature
     return '/apps' as Route;
   },
+  eventPopout({ eventID }: { eventID: string }): Route {
+    return `/events?eventID=${eventID}` as Route;
+  },
   function({ functionSlug }: { functionSlug: string }): Route {
     // TODO: Make this goes to a specific app page when we add that feature
     return '/functions' as Route;
