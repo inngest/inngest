@@ -8,9 +8,9 @@ import { Skeleton } from '@inngest/components/Skeleton/Skeleton';
 import { NumberCell, TextCell } from '@inngest/components/Table';
 import NewTable from '@inngest/components/Table/NewTable';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
+import { getHumanReadableCron } from '@inngest/components/hooks/useCron';
 import { type Trigger } from '@inngest/components/types/trigger';
 import { cn } from '@inngest/components/utils/classNames';
-import { getHumanReadableCron } from '@inngest/components/utils/cron';
 import { createColumnHelper } from '@tanstack/react-table';
 
 import { useEnvironment } from '@/components/Environments/environment-context';

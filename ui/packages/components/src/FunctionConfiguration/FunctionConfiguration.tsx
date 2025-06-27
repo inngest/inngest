@@ -10,7 +10,7 @@ import { PopoverContent } from '@inngest/components/FunctionConfiguration/Functi
 import { Pill } from '@inngest/components/Pill';
 import { Time } from '@inngest/components/Time';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
-import { useCron } from '@inngest/components/hooks/useCron';
+import { getHumanReadableCron, useCron } from '@inngest/components/hooks/useCron';
 import { AppsIcon } from '@inngest/components/icons/sections/Apps';
 import { EventsIcon } from '@inngest/components/icons/sections/Events';
 import { FunctionsIcon } from '@inngest/components/icons/sections/Functions';
@@ -22,7 +22,6 @@ import {
   FunctionTriggerTypes,
   type GetFunctionQuery as DevServerGetFunctionQuery,
 } from '../../../../apps/dev-server-ui/src/store/generated';
-import { getHumanReadableCron } from '../utils/cron';
 
 type InngestFunction =
   | NonNullable<DevServerGetFunctionQuery['functionBySlug']>
