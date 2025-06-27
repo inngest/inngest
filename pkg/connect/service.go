@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	mathRand "math/rand"
+	"net"
 	"net/http"
 	"os"
 	"sync"
@@ -83,7 +84,8 @@ type connectGatewaySvc struct {
 	workerRequestExtendLeaseInterval                      time.Duration
 	workerRequestLeaseDuration                            time.Duration
 
-	hostname string
+	hostname  string
+	ipAddress net.IP
 
 	// groupName specifies the name of the deployment group in case this gateway is one of many replicas.
 	groupName string
@@ -252,6 +254,16 @@ func (c *connectGatewaySvc) Name() string {
 	return "connect-gateway"
 }
 
+func getOutboundIP() (net.IP, error) {
+	if ipStr := os.Getenv("CONNECT_GATEWAY_IP"); ipStr != "" {
+		ip := net.ParseIP(ipStr)
+		if ip == nil {
+			return nil, fmt.Errorf("could not parse gateway ip: %s", ipStr)
+		}
+	}
+	return net.IPv4(127, 0, 0, 1), nil
+}
+
 func (c *connectGatewaySvc) Pre(ctx context.Context) error {
 	// Set up gateway-specific logger with info for correlations
 	c.logger = logger.StdlibLogger(ctx).With("gateway_id", c.gatewayId)
@@ -267,6 +279,12 @@ func (c *connectGatewaySvc) Pre(ctx context.Context) error {
 		return fmt.Errorf("could not get hostname: %w", err)
 	}
 	c.hostname = hostname
+
+	ip, err := getOutboundIP()
+	if err != nil {
+		return fmt.Errorf("could not get local ip address: %w", err)
+	}
+	c.ipAddress = ip
 
 	if err := c.updateGatewayState(state.GatewayStatusStarting); err != nil {
 		return fmt.Errorf("could not set initial gateway state: %w", err)
@@ -459,6 +477,7 @@ func (c *connectGatewaySvc) updateGatewayState(status state.GatewayStatus) error
 		Status:            status,
 		LastHeartbeatAtMS: time.Now().UnixMilli(),
 		Hostname:          c.hostname,
+		IPAddress:         c.ipAddress,
 	})
 	if err != nil {
 		c.logger.Error("failed to update gateway status in state", "status", status, "error", err)
