@@ -206,7 +206,7 @@ export function FunctionConfiguration({
                     <hr className="border-subtle my-2 " />
                     <p className="text-sm">
                       <Link
-                        href="/billing/plans"
+                        href="/billing/plans?ref=concurrency-limit-tooltip"
                         className="flex items-center gap-1 text-sm text-blue-500 hover:underline"
                         target="_blank"
                       >
