@@ -136,7 +136,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 		})
 
 		// Do not accept new connections if the gateway is draining
-		if c.isDraining {
+		if c.isDraining.Load() {
 			c.closeDraining(ws)
 			return
 		}
@@ -179,7 +179,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 
 			closed = true
 
-			if c.isDraining {
+			if c.isDraining.Load() {
 				c.closeDraining(ws)
 				return
 			}
@@ -623,7 +623,7 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 
 	switch msg.Kind {
 	case connectpb.GatewayMessageType_WORKER_READY:
-		if c.svc.isDraining {
+		if c.svc.isDraining.Load() {
 			return &ErrDraining
 		}
 
@@ -643,7 +643,7 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 
 		return nil
 	case connectpb.GatewayMessageType_WORKER_HEARTBEAT:
-		if c.svc.isDraining {
+		if c.svc.isDraining.Load() {
 			return &ErrDraining
 		}
 
@@ -673,7 +673,7 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 
 		return nil
 	case connectpb.GatewayMessageType_WORKER_PAUSE:
-		if c.svc.isDraining {
+		if c.svc.isDraining.Load() {
 			return &ErrDraining
 		}
 
