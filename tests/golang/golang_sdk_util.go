@@ -34,7 +34,7 @@ func NewSDKHandler(t *testing.T, appID string, copts ...opt) (inngestgo.Client, 
 	opts := inngestgo.ClientOpts{
 		AppID:       appID,
 		EventKey:    &key,
-		Logger:      slog.Default(),
+		Logger:      slog.New(slog.DiscardHandler),
 		RegisterURL: inngestgo.StrPtr(fmt.Sprintf("%s/fn/register", DEV_URL)),
 	}
 

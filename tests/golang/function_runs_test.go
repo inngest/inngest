@@ -3,12 +3,14 @@ package golang
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/tests/client"
 	"github.com/inngest/inngestgo"
@@ -38,15 +40,21 @@ func TestFunctionRunList(t *testing.T) {
 	var (
 		ok     int32
 		failed int32
+
+		// We want to constrain queries to only these function IDs.  In order to
+		// do such a thing, we store a list of our function IDs in each execution.
+		ids sync.Map
 	)
+
 	_, err := inngestgo.CreateFunction(
 		inngestClient,
 		inngestgo.FunctionOpts{
-			ID: "fn-run-ok",
+			ID: fmt.Sprintf("fn-run-ok-%s", okEventName),
 		},
 		inngestgo.EventTrigger(okEventName, nil),
 		func(ctx context.Context, input inngestgo.Input[FnRunTestEvtData]) (any, error) {
 			atomic.AddInt32(&ok, 1)
+			ids.Store(uuid.MustParse(input.InputCtx.FunctionID), true)
 			return map[string]any{"num": input.Event.Data.Index * 2}, nil
 		},
 	)
@@ -54,12 +62,17 @@ func TestFunctionRunList(t *testing.T) {
 	_, err = inngestgo.CreateFunction(
 		inngestClient,
 		inngestgo.FunctionOpts{
-			ID:      "fn-run-err",
+			ID:      fmt.Sprintf("fn-run-err-%s", failedEventName),
 			Retries: inngestgo.IntPtr(0),
 		},
 		inngestgo.EventTrigger(failedEventName, nil),
 		func(ctx context.Context, input inngestgo.Input[FnRunTestEvt]) (any, error) {
 			atomic.AddInt32(&failed, 1)
+			ids.Store(uuid.MustParse(input.InputCtx.FunctionID), true)
+			// NOTE: If functions end at the same millisecond, this breaks dev server pagination.
+			// Randomizing the duration means that we have less of a chance for functions to end
+			// on the same millisecond, meaning pagination works as expected.
+			<-time.After(time.Duration(rand.Intn(100)) * time.Millisecond)
 			return nil, fmt.Errorf("fail")
 		},
 	)
@@ -219,6 +232,15 @@ func TestFunctionRunList(t *testing.T) {
 	})
 
 	t.Run("paginate with status filter", func(t *testing.T) {
+		// Constrain to our function IDs only.
+		fnIDs := []uuid.UUID{}
+		ids.Range(func(key any, value any) bool {
+			if id, ok := key.(uuid.UUID); ok {
+				fnIDs = append(fnIDs, id)
+			}
+			return true
+		})
+
 		require.EventuallyWithT(t, func(t *assert.CollectT) {
 			items := 2
 			edges, pageInfo, total := c.FunctionRuns(ctx, client.FunctionRunOpt{
@@ -230,7 +252,8 @@ func TestFunctionRunList(t *testing.T) {
 				Order: []models.RunsV2OrderBy{
 					{Field: models.RunsV2OrderByFieldEndedAt, Direction: models.RunsOrderByDirectionDesc},
 				},
-				Items: items,
+				FunctionIDs: fnIDs,
+				Items:       items,
 			})
 
 			assert.Equal(t, 2, len(edges))
@@ -248,11 +271,12 @@ func TestFunctionRunList(t *testing.T) {
 				Order: []models.RunsV2OrderBy{
 					{Field: models.RunsV2OrderByFieldEndedAt, Direction: models.RunsOrderByDirectionDesc},
 				},
-				Cursor: *pageInfo.EndCursor,
+				FunctionIDs: fnIDs,
+				Cursor:      *pageInfo.EndCursor,
 			})
 
 			remain := failureTotal - items // we should paginate and remove the 2 previous from the total.
-			assert.False(t, pageInfo.HasNextPage)
+			assert.False(t, pageInfo.HasNextPage, "Failed with IDs: %s (%s)", fnIDs, fmt.Sprintf("fn-run-err-%s", failedEventName))
 			assert.Equal(t, failureTotal, total)
 			assert.Equal(t, remain, len(edges), "Got %#v and page info %#v", edges, pageInfo)
 		}, 10*time.Second, 2*time.Second)
