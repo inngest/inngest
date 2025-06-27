@@ -115,6 +115,8 @@ const (
 	defaultIdempotencyTTL = 12 * time.Hour
 	defaultConcurrency    = 1000 // TODO: add function to override.
 
+	defaultInstrumentInterval = 10 * time.Second
+
 	NoConcurrencyLimit = -1
 )
 
@@ -690,6 +692,7 @@ func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 		queueKindMapping:               make(map[string]string),
 		peekSizeForFunctions:           make(map[string]int64),
 		log:                            logger.StdlibLogger(ctx),
+		instrumentInterval:             defaultInstrumentInterval,
 		partitionConstraintConfigGetter: func(ctx context.Context, p QueueShadowPartition) (*PartitionConstraintConfig, error) {
 			def := defaultConcurrency
 
@@ -921,6 +924,8 @@ type queue struct {
 	// instrumentationLeaseLock ensures that there are no data races writing to or
 	// reading from instrumentationLeaseID
 	instrumentationLeaseLock *sync.RWMutex
+	// instrumentInterval represents the frequency and instrumentation will attempt to run
+	instrumentInterval time.Duration
 
 	// scavengerLeaseID stores the lease ID if this queue is the scavenger processor.
 	// all runners attempt to claim this lease automatically.
