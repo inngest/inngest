@@ -416,9 +416,11 @@ func start(ctx context.Context, opts StartOpts) error {
 	drivers := []driver.Driver{}
 	for _, driverConfig := range opts.Config.Execution.Drivers {
 		d, err := driverConfig.NewDriver(registration.NewDriverOpts{
-			ConnectForwarder:  executorProxy,
-			ConditionalTracer: conditionalTracer,
-			HTTPClient:        httpClient,
+			ConnectForwarder:       executorProxy,
+			ConditionalTracer:      conditionalTracer,
+			HTTPClient:             httpClient,
+			LocalSigningKey:        opts.SigningKey,
+			RequireLocalSigningKey: opts.RequireKeys,
 		})
 		if err != nil {
 			return err
