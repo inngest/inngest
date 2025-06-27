@@ -1,4 +1,5 @@
 import { type ReactNode } from 'react';
+import Link from 'next/link';
 import { Button } from '@inngest/components/Button';
 import ConfigurationBlock from '@inngest/components/FunctionConfiguration/ConfigurationBlock';
 import ConfigurationCategory from '@inngest/components/FunctionConfiguration/ConfigurationCategory';
@@ -15,7 +16,12 @@ import { AppsIcon } from '@inngest/components/icons/sections/Apps';
 import { EventsIcon } from '@inngest/components/icons/sections/Events';
 import { FunctionsIcon } from '@inngest/components/icons/sections/Functions';
 import { relativeTime } from '@inngest/components/utils/date';
-import { RiArrowRightSLine, RiArrowRightUpLine, RiTimeLine } from '@remixicon/react';
+import {
+  RiArrowRightSLine,
+  RiArrowRightUpLine,
+  RiExternalLinkLine,
+  RiTimeLine,
+} from '@remixicon/react';
 
 import type { GetFunctionQuery as DashboardGetFunctionQuery } from '../../../../apps/dashboard/src/gql/graphql';
 import {
@@ -192,9 +198,21 @@ export function FunctionConfiguration({
                       <Pill className="ml-2">Plan limit</Pill>
                     </span>
                   </TooltipTrigger>
-                  <TooltipContent>
-                    If not configured, the limit is set to the maximum value allowed within your
-                    plan.
+                  <TooltipContent className="max-w-xs py-2 text-left">
+                    <p className="max-w-xs text-sm">
+                      Running into limits? Easily upgrade your plan or boost concurrency on your
+                      existing plan.
+                    </p>
+                    <hr className="border-subtle my-2 " />
+                    <p className="text-sm">
+                      <Link
+                        href="/billing/plans"
+                        className="flex items-center gap-1 text-sm text-blue-500 hover:underline"
+                        target="_blank"
+                      >
+                        Explore plans <RiExternalLinkLine className="h-4 w-4" />
+                      </Link>
+                    </p>
                   </TooltipContent>
                 </Tooltip>
               )}
