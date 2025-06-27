@@ -9,6 +9,7 @@ import (
 	"github.com/inngest/inngest/cmd/commands/internal/localconfig"
 	"github.com/inngest/inngest/pkg/config"
 	"github.com/inngest/inngest/pkg/devserver"
+	"github.com/inngest/inngest/pkg/headers"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -156,6 +157,8 @@ func doStart(cmd *cobra.Command, args []string) {
 		fmt.Println("Error: at least one event-key is required")
 		os.Exit(1)
 	}
+
+	conf.ServerKind = headers.ServerKindCloud
 
 	opts := devserver.StartOpts{
 		Config:             *conf,
