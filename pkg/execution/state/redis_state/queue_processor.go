@@ -523,7 +523,7 @@ func (q *queue) runInstrumentation(ctx context.Context) {
 	setLease(leaseID)
 
 	tick := q.clock.NewTicker(ConfigLeaseMax / 3)
-	instr := q.clock.NewTicker(20 * time.Second)
+	instr := q.clock.NewTicker(10 * time.Second)
 
 	for {
 		select {

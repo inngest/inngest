@@ -584,6 +584,14 @@ func WithReadOnlySpotChecks(fn ReadOnlySpotChecks) QueueOpt {
 	}
 }
 
+type TenantInstrumentor func(ctx context.Context, qp *QueuePartition) error
+
+func WithTenantInstrumentor(fn TenantInstrumentor) QueueOpt {
+	return func(q *queue) {
+		q.tenantInstrumentor = fn
+	}
+}
+
 func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 	ctx := context.Background()
 
@@ -679,6 +687,9 @@ func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 		shadowPartitionProcessCount: func(ctx context.Context, acctID uuid.UUID) int {
 			return 5
 		},
+		tenantInstrumentor: func(ctx context.Context, qp *QueuePartition) error {
+			return nil
+		},
 		itemIndexer:             QueueItemIndexerFunc,
 		backoffFunc:             backoff.DefaultBackoff,
 		clock:                   clockwork.NewRealClock(),
@@ -762,6 +773,8 @@ type queue struct {
 
 	backlogNormalizeAsyncLimit  BacklogNormalizeAsyncLimitCount
 	shadowPartitionProcessCount QueueShadowPartitionProcessCount
+
+	tenantInstrumentor TenantInstrumentor
 
 	// idempotencyTTL is the default or static idempotency duration apply to jobs,
 	// if idempotencyTTLFunc is not defined.
@@ -3428,6 +3441,8 @@ func (q *queue) InProgress(ctx context.Context, prefix string, concurrencyKey st
 }
 
 func (q *queue) Instrument(ctx context.Context) error {
+	l := logger.StdlibLogger(ctx)
+
 	// Check on global partition and queue partition sizes
 	var offset, total int64
 	chunkSize := int64(1000)
@@ -3457,6 +3472,8 @@ func (q *queue) Instrument(ctx context.Context) error {
 			go func(ctx context.Context, pkey string) {
 				defer wg.Done()
 
+				l := l.With("partitionKey", pkey)
+
 				// If this is not a fully-qualified key, assume that this is an old (system) partition queue
 				queueKey := pkey
 				if !isKeyConcurrencyPointerItem(pkey) {
@@ -3480,6 +3497,26 @@ func (q *queue) Instrument(ctx context.Context) error {
 				})
 
 				atomic.AddInt64(&total, 1)
+
+				qp := QueuePartition{}
+				{
+					shard := q.primaryQueueShard
+					hash := shard.RedisClient.kg.PartitionItem()
+					cmd := r.B().Hget().Key(hash).Field(pkey).Build()
+					byt, err := r.Do(ctx, cmd).AsBytes()
+					if err != nil {
+						l.Error("error loading partition", "error", err)
+						return
+					}
+					if err := json.Unmarshal(byt, &qp); err != nil {
+						l.Error("error unmarshalling partition", "error", err)
+						return
+					}
+				}
+
+				if err := q.tenantInstrumentor(ctx, &qp); err != nil {
+					l.Error("error running tenant instrumentor", "error", err)
+				}
 			}(ctx, pk)
 
 		}
