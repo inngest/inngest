@@ -90,7 +90,7 @@ type connectGatewaySvc struct {
 
 	lifecycles []ConnectGatewayLifecycleListener
 
-	isDraining      bool
+	isDraining      atomic.Bool
 	connectionCount connectionCounter
 	drainListener   *drainListener
 	stateUpdateLock sync.Mutex
@@ -101,7 +101,7 @@ func (c *connectGatewaySvc) MaintenanceAPI() http.Handler {
 }
 
 func (c *connectGatewaySvc) IsDraining() bool {
-	return c.isDraining
+	return c.isDraining.Load()
 }
 
 func (c *connectGatewaySvc) IsDrained() bool {
@@ -151,7 +151,7 @@ func WithDev() gatewayOpt {
 
 func WithStartAsDraining(isDraining bool) gatewayOpt {
 	return func(svc *connectGatewaySvc) {
-		svc.isDraining = isDraining
+		svc.isDraining.Store(isDraining)
 	}
 }
 
@@ -215,7 +215,7 @@ func NewConnectGatewayService(opts ...gatewayOpt) *connectGatewaySvc {
 	}
 
 	readinessHandler := func(writer http.ResponseWriter, request *http.Request) {
-		if gateway.isDraining {
+		if gateway.isDraining.Load() {
 			writer.WriteHeader(http.StatusServiceUnavailable)
 			return
 		}
@@ -284,7 +284,7 @@ func (c *connectGatewaySvc) heartbeat(ctx context.Context) {
 			return
 		case <-heartbeatTicker.C:
 			status := state.GatewayStatusActive
-			if c.isDraining {
+			if c.isDraining.Load() {
 				status = state.GatewayStatusDraining
 			}
 
@@ -324,7 +324,7 @@ func (c *connectGatewaySvc) instrument(ctx context.Context) {
 			Tags:    additionalTags,
 		})
 
-		if c.isDraining {
+		if c.isDraining.Load() {
 			metrics.GaugeConnectDrainingGateway(ctx, 1, metrics.GaugeOpt{
 				PkgName: pkgName,
 				Tags:    additionalTags,
@@ -431,7 +431,7 @@ func (c *connectGatewaySvc) Run(ctx context.Context) error {
 		return nil
 	})
 
-	if !c.isDraining {
+	if !c.isDraining.Load() {
 		err := c.updateGatewayState(state.GatewayStatusActive)
 		if err != nil {
 			return fmt.Errorf("could not update gateway state: %w", err)
@@ -516,7 +516,7 @@ func (c *connectGatewaySvc) DrainGateway() error {
 	if err != nil {
 		return fmt.Errorf("could not update gateway state: %w", err)
 	}
-	c.isDraining = true
+	c.isDraining.Store(true)
 	c.drainListener.Notify()
 	return nil
 }
@@ -526,6 +526,6 @@ func (c *connectGatewaySvc) ActivateGateway() error {
 	if err != nil {
 		return fmt.Errorf("could not update gateway state: %w", err)
 	}
-	c.isDraining = false
+	c.isDraining.Store(false)
 	return nil
 }
