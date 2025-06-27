@@ -1429,8 +1429,13 @@ func (m unshardedMgr) LoadEvaluablesSince(ctx context.Context, workspaceID uuid.
 		}
 
 		if pause.Expires.Time().Before(time.Now()) {
-			shouldDelete := pause.Expires.Time().Add(consts.PauseExpiredDeletionGracePeriod).Before(time.Now())
-			if shouldDelete {
+			// runTS is the time that the run started.
+			runTS := time.UnixMilli(int64(pause.Identifier.RunID.Time()))
+			// isMaxAge returns whether the pause is greater than the max age allowed
+			isMaxAge := time.Now().Add(-1 * consts.CancelTimeout).After(runTS)
+			afterGrace := pause.Expires.Time().Add(consts.PauseExpiredDeletionGracePeriod).Before(time.Now())
+
+			if isMaxAge || afterGrace {
 				expired = append(expired, pause)
 			}
 			continue

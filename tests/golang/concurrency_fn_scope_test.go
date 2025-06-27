@@ -3,10 +3,11 @@ package golang
 import (
 	"context"
 	"fmt"
-	"github.com/inngest/inngest/tests/client"
 	"sync/atomic"
 	"testing"
 	"time"
+
+	"github.com/inngest/inngest/tests/client"
 
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngestgo"
@@ -80,7 +81,11 @@ func TestConcurrency_ScopeFunction(t *testing.T) {
 		require.LessOrEqual(t, atomic.LoadInt32(&inProgress), int32(1))
 	}
 
-	require.EqualValues(t, 3, atomic.LoadInt32(&total))
+	// Eventually, within 2 seconds of waiting after the total function duration,
+	// all tests have started.
+	require.Eventually(t, func() bool {
+		return atomic.LoadInt32(&total) == 3
+	}, 2*time.Second, 50*time.Millisecond)
 }
 
 // TestConcurrency_ScopeFunction_FanOut tests function limits with two functions,

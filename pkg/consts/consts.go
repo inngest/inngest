@@ -112,7 +112,7 @@ const (
 
 	DefaultQueueContinueLimit = uint(5)
 
-	PauseExpiredDeletionGracePeriod = time.Minute * 5
+	PauseExpiredDeletionGracePeriod = time.Minute * 20
 
 	DefaultQueueShardName = "default"
 
