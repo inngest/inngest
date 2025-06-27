@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/batch"
 
 	"github.com/google/uuid"
@@ -191,6 +192,14 @@ type ScheduleRequest struct {
 	PreventDebounce bool
 	// FunctionPausedAt indicates whether the function is paused.
 	FunctionPausedAt *time.Time
+
+	// RunMode represents how this function runs.  Async functions are, by nature,
+	// purely background orchestration driven by queues, and so on.  Sync functions
+	// are ephemeral functions that start their live via eg. API requests.
+	//
+	// The default is always RunModeAsync which is safer:  asyncs are always backed
+	// by the queue.
+	RunMode enums.RunMode
 }
 
 type ScheduleRequestFromStep struct {

@@ -75,6 +75,8 @@ type DevFunctionWriter interface {
 
 type InsertFunctionParams struct {
 	ID        uuid.UUID
+	AccountID uuid.UUID
+	EnvID     uuid.UUID
 	AppID     uuid.UUID
 	Name      string
 	Slug      string

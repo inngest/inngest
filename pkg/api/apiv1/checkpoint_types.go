@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/util"
 	"github.com/inngest/inngestgo"
 	"github.com/oklog/ulid/v2"
 )
@@ -15,10 +17,11 @@ type CheckpointNewRunRequest struct {
 	// event TS.
 	Seed string `json:"seed"`
 
-	// TODO
 	// Idempotency allows the customization of an idempotency key, allowing us to
 	// handle API idempotency using Inngest.
-	// Idempotency string `json:"idempotency"`
+	Idempotency string `json:"idempotency"`
+
+	// XXX: SDK Version and language??
 
 	// Event embeds the key request information which is used as the triggering
 	// event for API-based runs.
@@ -56,9 +59,18 @@ type NewAPIRunData struct {
 	Body json.RawMessage `json:"body"`
 }
 
-func (r CheckpointNewRunRequest) RunID() ulid.ULID {
-	// TODO: Seed + TS
-	return ulid.ULID{}
+func (r CheckpointNewRunRequest) AppSlug() string {
+	return r.Event.Data.Domain
+}
+
+// AppID returns a deterministic V1 UUID based off of the environment ID
+// and the given app slug.
+func (r CheckpointNewRunRequest) AppID(envID uuid.UUID) uuid.UUID {
+	return util.DeterministicUUID(append(envID[:], []byte(r.AppSlug())...))
+}
+
+func (r CheckpointNewRunRequest) AppURL() string {
+	return r.Event.Data.Domain
 }
 
 func (r CheckpointNewRunRequest) FnSlug() string {
@@ -68,8 +80,15 @@ func (r CheckpointNewRunRequest) FnSlug() string {
 	return fmt.Sprintf("%s %s", r.Event.Data.Method, r.Event.Data.Path)
 }
 
-func (r CheckpointNewRunRequest) AppSlug() string {
-	return r.Event.Data.Domain
+// Fn returns a deterministic V1 UUID based off of the environment ID
+// and the given fn slug.
+func (r CheckpointNewRunRequest) FnID(envID uuid.UUID) uuid.UUID {
+	return util.DeterministicUUID(append(envID[:], []byte(r.FnSlug())...))
+}
+
+func (r CheckpointNewRunRequest) RunID() ulid.ULID {
+	// TODO: Seed + TS
+	return ulid.ULID{}
 }
 
 func (r CheckpointNewRunRequest) FnConfig() string {
