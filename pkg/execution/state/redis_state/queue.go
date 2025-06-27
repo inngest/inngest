@@ -853,7 +853,9 @@ type queue struct {
 	// remain idempotent.
 	idempotencyTTLFunc func(context.Context, osqueue.QueueItem) time.Duration
 	// pollTick is the interval between each scan for jobs.
-	pollTick time.Duration
+	pollTick                 time.Duration
+	shadowPollTick           time.Duration
+	backlogNormalizePollTick time.Duration
 	// quit is a channel that any method can send on to trigger termination
 	// of the Run loop.  This typically accepts an error, but a nil error
 	// will still quit the runner.
