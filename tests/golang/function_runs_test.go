@@ -3,6 +3,7 @@ package golang
 import (
 	"context"
 	"fmt"
+	"math/rand"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -48,7 +49,7 @@ func TestFunctionRunList(t *testing.T) {
 	_, err := inngestgo.CreateFunction(
 		inngestClient,
 		inngestgo.FunctionOpts{
-			ID: "fn-run-ok",
+			ID: fmt.Sprintf("fn-run-ok-%s", okEventName),
 		},
 		inngestgo.EventTrigger(okEventName, nil),
 		func(ctx context.Context, input inngestgo.Input[FnRunTestEvtData]) (any, error) {
@@ -61,13 +62,17 @@ func TestFunctionRunList(t *testing.T) {
 	_, err = inngestgo.CreateFunction(
 		inngestClient,
 		inngestgo.FunctionOpts{
-			ID:      "fn-run-err",
+			ID:      fmt.Sprintf("fn-run-err-%s", failedEventName),
 			Retries: inngestgo.IntPtr(0),
 		},
 		inngestgo.EventTrigger(failedEventName, nil),
 		func(ctx context.Context, input inngestgo.Input[FnRunTestEvt]) (any, error) {
 			atomic.AddInt32(&failed, 1)
 			ids.Store(uuid.MustParse(input.InputCtx.FunctionID), true)
+			// NOTE: If functions end at the same millisecond, this breaks dev server pagination.
+			// Randomizing the duration means that we have less of a chance for functions to end
+			// on the same millisecond, meaning pagination works as expected.
+			<-time.After(time.Duration(rand.Intn(100)) * time.Millisecond)
 			return nil, fmt.Errorf("fail")
 		},
 	)
@@ -271,7 +276,7 @@ func TestFunctionRunList(t *testing.T) {
 			})
 
 			remain := failureTotal - items // we should paginate and remove the 2 previous from the total.
-			assert.False(t, pageInfo.HasNextPage)
+			assert.False(t, pageInfo.HasNextPage, "Failed with IDs: %s (%s)", fnIDs, fmt.Sprintf("fn-run-err-%s", failedEventName))
 			assert.Equal(t, failureTotal, total)
 			assert.Equal(t, remain, len(edges), "Got %#v and page info %#v", edges, pageInfo)
 		}, 10*time.Second, 2*time.Second)
