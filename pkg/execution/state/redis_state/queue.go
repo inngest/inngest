@@ -646,6 +646,12 @@ func WithTenantInstrumentor(fn TenantInstrumentor) QueueOpt {
 	}
 }
 
+func WithInstrumentInterval(t time.Duration) QueueOpt {
+	return func(q *queue) {
+		q.instrumentInterval = t
+	}
+}
+
 func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 	ctx := context.Background()
 
