@@ -1,0 +1,16 @@
+syntax = "proto3";
+package connect.v1;
+
+option go_package = "github.com/inngest/inngest/proto/gen/connect/v1;connect";
+
+service ConnectGateway {
+  rpc Forward(ForwardRequest) returns (ForwardResponse) {}
+}
+
+message ForwardRequest {
+  // Add fields as needed, or leave empty for now
+}
+
+message ForwardResponse {
+  // Add fields as needed, or leave empty for now
+}

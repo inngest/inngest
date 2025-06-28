@@ -21,8 +21,10 @@ import (
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
+	pb "github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/oklog/ulid/v2"
 	"golang.org/x/sync/errgroup"
+	"google.golang.org/grpc"
 )
 
 const (
@@ -60,10 +62,14 @@ type ConnectEntitlementRetriever interface {
 }
 
 type connectGatewaySvc struct {
+	pb.ConnectGatewayServer
+
 	gatewayPublicPort int
 
 	gatewayRoutes  chi.Router
 	maintenanceApi chi.Router
+
+	grpcServer *grpc.Server
 
 	// gatewayId is a unique identifier, generated each time the service is started.
 	// This should be used to uniquely identify the gateway instance when sending messages and routing requests.
@@ -210,6 +216,8 @@ func NewConnectGatewayService(opts ...gatewayOpt) *connectGatewaySvc {
 		workerRequestExtendLeaseInterval:                      consts.ConnectWorkerRequestExtendLeaseInterval,
 		workerRequestLeaseDuration:                            consts.ConnectWorkerRequestLeaseDuration,
 		consecutiveWorkerHeartbeatMissesBeforeConnectionClose: 5,
+
+		grpcServer: grpc.NewServer(),
 	}
 
 	for _, opt := range opts {
@@ -289,6 +297,9 @@ func (c *connectGatewaySvc) Pre(ctx context.Context) error {
 	if err := c.updateGatewayState(state.GatewayStatusStarting); err != nil {
 		return fmt.Errorf("could not set initial gateway state: %w", err)
 	}
+
+	// Register gRPC server
+	pb.RegisterConnectGatewayServer(c.grpcServer, c)
 
 	return nil
 }
@@ -447,6 +458,18 @@ func (c *connectGatewaySvc) Run(ctx context.Context) error {
 		c.logger.Debug("receiver wait finished")
 
 		return nil
+	})
+
+	eg.Go(func() error {
+		// TODO: Get from an env variable
+		addr := fmt.Sprintf(":%d", 50051)
+
+		l, err := net.Listen("tcp", addr)
+		if err != nil {
+			return fmt.Errorf("could not listen for: %w", err)
+		}
+		logger.StdlibLogger(ctx).Info("starting grpc server", "addr", addr)
+		return c.grpcServer.Serve(l)
 	})
 
 	if !c.isDraining.Load() {
