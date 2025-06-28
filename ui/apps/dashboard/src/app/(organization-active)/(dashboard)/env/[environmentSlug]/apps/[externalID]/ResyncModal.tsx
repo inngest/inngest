@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Alert } from '@inngest/components/Alert';
 import { Button } from '@inngest/components/Button';
 import { Input } from '@inngest/components/Forms/Input';
@@ -53,6 +53,15 @@ export default function ResyncModal({
   const [isSyncing, setIsSyncing] = useState(false);
   const env = useEnvironment();
   const [, resyncApp] = useMutation(ResyncAppDocument);
+  const syncButtonRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (isOpen) {
+      setTimeout(() => {
+        syncButtonRef.current?.focus();
+      }, 100);
+    }
+  }, [isOpen]);
 
   if (isURLOverridden) {
     url = overrideValue;
@@ -196,6 +205,7 @@ export default function ResyncModal({
         />
 
         <Button
+          ref={syncButtonRef}
           onClick={onSync}
           disabled={isSyncing || (!isURLOverridden && isConnect)}
           kind="primary"
