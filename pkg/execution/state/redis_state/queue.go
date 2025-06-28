@@ -648,7 +648,9 @@ func WithTenantInstrumentor(fn TenantInstrumentor) QueueOpt {
 
 func WithInstrumentInterval(t time.Duration) QueueOpt {
 	return func(q *queue) {
-		q.instrumentInterval = t
+		if t > 0 {
+			q.instrumentInterval = t
+		}
 	}
 }
 
