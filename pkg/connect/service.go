@@ -15,6 +15,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	connectConfig "github.com/inngest/inngest/pkg/config/connect"
 	"github.com/inngest/inngest/pkg/connect/auth"
 	"github.com/inngest/inngest/pkg/connect/pubsub"
 	"github.com/inngest/inngest/pkg/connect/state"
@@ -262,23 +263,6 @@ func (c *connectGatewaySvc) Name() string {
 	return "connect-gateway"
 }
 
-func getOutboundIP() (net.IP, error) {
-	if ipStr := os.Getenv("CONNECT_GATEWAY_IP"); ipStr != "" {
-		ip := net.ParseIP(ipStr)
-		if ip == nil {
-			return nil, fmt.Errorf("could not parse gateway ip: %s", ipStr)
-		}
-	}
-	conn, err := net.Dial("udp", "8.8.8.8:80")
-	if err != nil {
-		return nil, err
-	}
-	defer conn.Close()
-	localAddr := conn.LocalAddr().(*net.UDPAddr)
-
-	return localAddr.IP, nil
-}
-
 func (c *connectGatewaySvc) Pre(ctx context.Context) error {
 	// Set up gateway-specific logger with info for correlations
 	c.logger = logger.StdlibLogger(ctx).With("gateway_id", c.gatewayId)
@@ -295,12 +279,7 @@ func (c *connectGatewaySvc) Pre(ctx context.Context) error {
 	}
 	c.hostname = hostname
 
-	ip, err := getOutboundIP()
-	if err != nil {
-		return fmt.Errorf("could not get local ip address: %w", err)
-	}
-	c.logger.Info("got outbound ip address", "ip", ip)
-	c.ipAddress = ip
+	c.ipAddress = connectConfig.Gateway(ctx).GRPCIP
 
 	if err := c.updateGatewayState(state.GatewayStatusStarting); err != nil {
 		return fmt.Errorf("could not set initial gateway state: %w", err)
@@ -468,9 +447,10 @@ func (c *connectGatewaySvc) Run(ctx context.Context) error {
 		return nil
 	})
 
+	connectConfig := connectConfig.Gateway(ctx)
+
 	eg.Go(func() error {
-		// TODO: Get from an env variable
-		addr := fmt.Sprintf(":%d", 50051)
+		addr := fmt.Sprintf(":%d", connectConfig.GRPCPort)
 
 		l, err := net.Listen("tcp", addr)
 		if err != nil {

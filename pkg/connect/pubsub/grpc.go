@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	connectConfig "github.com/inngest/inngest/pkg/config/connect"
 	"github.com/inngest/inngest/pkg/connect/state"
 	"github.com/inngest/inngest/pkg/logger"
 	connectpb "github.com/inngest/inngest/proto/gen/connect/v1"
@@ -32,12 +33,14 @@ func (i *gatewayGrpcForwarder) ConnectToGateways(ctx context.Context) error {
 	logger.StdlibLogger(ctx).Debug("got connect gateways to connect to", "len", len(gateways))
 
 	for _, g := range gateways {
-		url := fmt.Sprintf("%s:%d", g.IPAddress, 50051)
+		url := fmt.Sprintf("%s:%d", g.IPAddress, connectConfig.Gateway(ctx).GRPCPort)
 		conn, err := grpc.NewClient(url, grpc.WithTransportCredentials(insecure.NewCredentials()))
 		if err != nil {
 			logger.StdlibLogger(ctx).Error("could not create grpc client", err)
 		}
+
 		rpcClient := connectpb.NewConnectGatewayClient(conn)
+
 		// grpc.NewClient doesn't establish a connection immediately; it connects on the first RPC call.
 		// Ping is called to eagerly validate that the connection is working. This can be removed later if not needed.
 		result, err := rpcClient.Ping(ctx, &connectpb.PingRequest{})
