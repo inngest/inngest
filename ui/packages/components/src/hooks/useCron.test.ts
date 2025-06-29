@@ -262,3 +262,52 @@ describe('useCron - nextRun - robfig/cron test cases', (t) => {
     }
   );
 });
+
+describe('useCron - nextRun - issue 2631 cases', (t) => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  // Test cases around day of month + day of week expressions
+  // https://github.com/inngest/inngest/issues/2631
+  const issue2631Cases = [
+    {
+      current_time: '2025-06-11T15:00:00-0600',
+      spec: 'TZ=America/Denver 0 14 */10 * 1-5',
+      expected_time: '2025-06-12T14:00:00-0600',
+    },
+    {
+      current_time: '2025-06-12T14:00:00-0600',
+      spec: 'TZ=America/Denver 0 14 */10 * 1-5',
+      expected_time: '2025-06-13T14:00:00-0600',
+    },
+    {
+      current_time: '2025-06-20T14:00:00-0600',
+      spec: 'TZ=America/Denver 0 14 */10 * 1-5',
+      expected_time: '2025-06-21T14:00:00-0600',
+    },
+    {
+      current_time: '2025-06-21T14:00:00-0600',
+      spec: 'TZ=America/Denver 0 14 */10 * 1-5',
+      expected_time: '2025-06-23T14:00:00-0600',
+    },
+  ];
+
+  test.each(issue2631Cases)(
+    'if current is $current_time and spec is $spec, next run is $expected_time',
+    ({ current_time, spec, expected_time }) => {
+      const date = parseISO(current_time);
+      vi.setSystemTime(date);
+
+      const { result } = renderHook(() => useCron(spec));
+      assert.isNotNull(result.current.nextRun);
+      const nextRun = result.current.nextRun!;
+      const expected = parseISO(expected_time);
+      assert.equal(nextRun.toISOString(), expected.toISOString());
+    }
+  );
+});
