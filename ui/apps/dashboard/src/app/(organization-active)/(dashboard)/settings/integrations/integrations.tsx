@@ -31,21 +31,11 @@ const INTEGRATIONS: Integration[] = [
     title: 'Vercel',
     slug: 'vercel',
     Icon: <IconVercel className="text-onContrast h-6 w-6" />,
-    actionButton: ({ enabled, hasError, isMarketplace }) => {
+    actionButton: ({ enabled, hasError }) => {
       let label: string;
       let target = undefined;
       let url: string;
-      if (isMarketplace) {
-        // Marketplace integration installed.
-
-        label = 'Manage';
-        target = '_blank';
-
-        // Managed in Vercel's dashboard.
-        url = 'https://vercel.com/integrations/inngest';
-      } else if (enabled) {
-        // Non-marketplace integration installed.
-
+      if (enabled) {
         label = 'Manage';
         url = '/settings/integrations/vercel';
       } else {
