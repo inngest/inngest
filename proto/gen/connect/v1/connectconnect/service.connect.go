@@ -35,11 +35,14 @@ const (
 const (
 	// ConnectGatewayForwardProcedure is the fully-qualified name of the ConnectGateway's Forward RPC.
 	ConnectGatewayForwardProcedure = "/connect.v1.ConnectGateway/Forward"
+	// ConnectGatewayPingProcedure is the fully-qualified name of the ConnectGateway's Ping RPC.
+	ConnectGatewayPingProcedure = "/connect.v1.ConnectGateway/Ping"
 )
 
 // ConnectGatewayClient is a client for the connect.v1.ConnectGateway service.
 type ConnectGatewayClient interface {
 	Forward(context.Context, *connect.Request[v1.ForwardRequest]) (*connect.Response[v1.ForwardResponse], error)
+	Ping(context.Context, *connect.Request[v1.PingRequest]) (*connect.Response[v1.PingResponse], error)
 }
 
 // NewConnectGatewayClient constructs a client for the connect.v1.ConnectGateway service. By
@@ -59,12 +62,19 @@ func NewConnectGatewayClient(httpClient connect.HTTPClient, baseURL string, opts
 			connect.WithSchema(connectGatewayMethods.ByName("Forward")),
 			connect.WithClientOptions(opts...),
 		),
+		ping: connect.NewClient[v1.PingRequest, v1.PingResponse](
+			httpClient,
+			baseURL+ConnectGatewayPingProcedure,
+			connect.WithSchema(connectGatewayMethods.ByName("Ping")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // connectGatewayClient implements ConnectGatewayClient.
 type connectGatewayClient struct {
 	forward *connect.Client[v1.ForwardRequest, v1.ForwardResponse]
+	ping    *connect.Client[v1.PingRequest, v1.PingResponse]
 }
 
 // Forward calls connect.v1.ConnectGateway.Forward.
@@ -72,9 +82,15 @@ func (c *connectGatewayClient) Forward(ctx context.Context, req *connect.Request
 	return c.forward.CallUnary(ctx, req)
 }
 
+// Ping calls connect.v1.ConnectGateway.Ping.
+func (c *connectGatewayClient) Ping(ctx context.Context, req *connect.Request[v1.PingRequest]) (*connect.Response[v1.PingResponse], error) {
+	return c.ping.CallUnary(ctx, req)
+}
+
 // ConnectGatewayHandler is an implementation of the connect.v1.ConnectGateway service.
 type ConnectGatewayHandler interface {
 	Forward(context.Context, *connect.Request[v1.ForwardRequest]) (*connect.Response[v1.ForwardResponse], error)
+	Ping(context.Context, *connect.Request[v1.PingRequest]) (*connect.Response[v1.PingResponse], error)
 }
 
 // NewConnectGatewayHandler builds an HTTP handler from the service implementation. It returns the
@@ -90,10 +106,18 @@ func NewConnectGatewayHandler(svc ConnectGatewayHandler, opts ...connect.Handler
 		connect.WithSchema(connectGatewayMethods.ByName("Forward")),
 		connect.WithHandlerOptions(opts...),
 	)
+	connectGatewayPingHandler := connect.NewUnaryHandler(
+		ConnectGatewayPingProcedure,
+		svc.Ping,
+		connect.WithSchema(connectGatewayMethods.ByName("Ping")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/connect.v1.ConnectGateway/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case ConnectGatewayForwardProcedure:
 			connectGatewayForwardHandler.ServeHTTP(w, r)
+		case ConnectGatewayPingProcedure:
+			connectGatewayPingHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -105,4 +129,8 @@ type UnimplementedConnectGatewayHandler struct{}
 
 func (UnimplementedConnectGatewayHandler) Forward(context.Context, *connect.Request[v1.ForwardRequest]) (*connect.Response[v1.ForwardResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("connect.v1.ConnectGateway.Forward is not implemented"))
+}
+
+func (UnimplementedConnectGatewayHandler) Ping(context.Context, *connect.Request[v1.PingRequest]) (*connect.Response[v1.PingResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("connect.v1.ConnectGateway.Ping is not implemented"))
 }

@@ -20,6 +20,7 @@ const _ = grpc.SupportPackageIsVersion9
 
 const (
 	ConnectGateway_Forward_FullMethodName = "/connect.v1.ConnectGateway/Forward"
+	ConnectGateway_Ping_FullMethodName    = "/connect.v1.ConnectGateway/Ping"
 )
 
 // ConnectGatewayClient is the client API for ConnectGateway service.
@@ -27,6 +28,7 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type ConnectGatewayClient interface {
 	Forward(ctx context.Context, in *ForwardRequest, opts ...grpc.CallOption) (*ForwardResponse, error)
+	Ping(ctx context.Context, in *PingRequest, opts ...grpc.CallOption) (*PingResponse, error)
 }
 
 type connectGatewayClient struct {
@@ -47,11 +49,22 @@ func (c *connectGatewayClient) Forward(ctx context.Context, in *ForwardRequest, 
 	return out, nil
 }
 
+func (c *connectGatewayClient) Ping(ctx context.Context, in *PingRequest, opts ...grpc.CallOption) (*PingResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PingResponse)
+	err := c.cc.Invoke(ctx, ConnectGateway_Ping_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ConnectGatewayServer is the server API for ConnectGateway service.
 // All implementations must embed UnimplementedConnectGatewayServer
 // for forward compatibility.
 type ConnectGatewayServer interface {
 	Forward(context.Context, *ForwardRequest) (*ForwardResponse, error)
+	Ping(context.Context, *PingRequest) (*PingResponse, error)
 	mustEmbedUnimplementedConnectGatewayServer()
 }
 
@@ -64,6 +77,9 @@ type UnimplementedConnectGatewayServer struct{}
 
 func (UnimplementedConnectGatewayServer) Forward(context.Context, *ForwardRequest) (*ForwardResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Forward not implemented")
+}
+func (UnimplementedConnectGatewayServer) Ping(context.Context, *PingRequest) (*PingResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Ping not implemented")
 }
 func (UnimplementedConnectGatewayServer) mustEmbedUnimplementedConnectGatewayServer() {}
 func (UnimplementedConnectGatewayServer) testEmbeddedByValue()                        {}
@@ -104,6 +120,24 @@ func _ConnectGateway_Forward_Handler(srv interface{}, ctx context.Context, dec f
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ConnectGateway_Ping_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PingRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ConnectGatewayServer).Ping(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ConnectGateway_Ping_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ConnectGatewayServer).Ping(ctx, req.(*PingRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ConnectGateway_ServiceDesc is the grpc.ServiceDesc for ConnectGateway service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -114,6 +148,10 @@ var ConnectGateway_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Forward",
 			Handler:    _ConnectGateway_Forward_Handler,
+		},
+		{
+			MethodName: "Ping",
+			Handler:    _ConnectGateway_Ping_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

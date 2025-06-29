@@ -792,3 +792,24 @@ func (r *redisConnectionStateManager) GetGateway(ctx context.Context, gatewayId 
 
 	return &gateway, nil
 }
+
+func (r *redisConnectionStateManager) GetAllGateways(ctx context.Context) ([]*Gateway, error) {
+	gatewaysMap, err := r.client.Do(
+		ctx,
+		r.client.B().Hgetall().Key(r.gatewaysHashKey()).Build(),
+	).AsStrMap()
+	if err != nil {
+		return nil, fmt.Errorf("could not get all gateways: %w", err)
+	}
+
+	gateways := make([]*Gateway, 0, len(gatewaysMap))
+	for gatewayId, gatewayData := range gatewaysMap {
+		var gateway Gateway
+		if err := json.Unmarshal([]byte(gatewayData), &gateway); err != nil {
+			return nil, fmt.Errorf("could not unmarshal gateway state for ID %s: %w", gatewayId, err)
+		}
+		gateways = append(gateways, &gateway)
+	}
+
+	return gateways, nil
+}

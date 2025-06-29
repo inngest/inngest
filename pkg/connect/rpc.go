@@ -7,6 +7,13 @@ import (
 )
 
 func (c *connectGatewaySvc) Forward(ctx context.Context, req *pb.ForwardRequest) (*pb.ForwardResponse, error) {
-	// your logic here
 	return nil, nil
 }
+
+
+func (c *connectGatewaySvc) Ping(ctx context.Context, req *pb.PingRequest) (*pb.PingResponse, error) {
+	return &pb.PingResponse{
+		Message: "ok",
+	}, nil
+}
+
