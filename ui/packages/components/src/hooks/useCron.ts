@@ -1,20 +1,43 @@
 import { useEffect, useMemo, useState } from 'react';
 import Cron from 'croner';
+import cronstrue from 'cronstrue';
 
 const timezonePattern = /^TZ=([A-Za-z\/_]+)\s+/;
 
 const getCron = (schedule: string) => {
-  let pattern = schedule;
-  const match = pattern.match(timezonePattern);
+  const [expression, timezone] = splitExpressionAndTimezone(schedule);
+
+  return Cron(expression, { timezone: timezone });
+};
+
+const splitExpressionAndTimezone = (schedule: string): [string, string] => {
+  let expression = schedule;
+  const match = expression.match(timezonePattern);
 
   let timezone = 'Etc/UTC'; // default timezone
   if (match?.[1]) {
     timezone = match[1];
-    pattern = pattern.replace(timezonePattern, ''); // remove timezone from schedule
+    expression = expression.replace(timezonePattern, ''); // remove timezone from schedule
   }
 
-  return Cron(pattern.trim(), { timezone: timezone });
+  return [expression.trim(), timezone];
 };
+
+/**
+ * Converts a cron expression to a human-readable description.
+ * Falls back to the original cron expression if parsing fails.
+ */
+export function getHumanReadableCron(schedule: string): string {
+  const [expression, _timezone] = splitExpressionAndTimezone(schedule);
+  try {
+    return cronstrue.toString(expression);
+  } catch {
+    // intentionally not using the throwExceptionOnParseError option because the error message is
+    // too long for intended UI. This should be unreachable anyway if our backend cron validation
+    // is in sync with this frontend behavior
+    return 'error parsing cron expression';
+  }
+}
 
 interface CronDetails {
   /**
