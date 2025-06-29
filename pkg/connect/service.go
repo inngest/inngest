@@ -269,7 +269,14 @@ func getOutboundIP() (net.IP, error) {
 			return nil, fmt.Errorf("could not parse gateway ip: %s", ipStr)
 		}
 	}
-	return net.IPv4(127, 0, 0, 1), nil
+	conn, err := net.Dial("udp", "8.8.8.8:80")
+	if err != nil {
+		return nil, err
+	}
+	defer conn.Close()
+	localAddr := conn.LocalAddr().(*net.UDPAddr)
+
+	return localAddr.IP, nil
 }
 
 func (c *connectGatewaySvc) Pre(ctx context.Context) error {
@@ -292,6 +299,7 @@ func (c *connectGatewaySvc) Pre(ctx context.Context) error {
 	if err != nil {
 		return fmt.Errorf("could not get local ip address: %w", err)
 	}
+	c.logger.Info("got outbound ip address", "ip", ip)
 	c.ipAddress = ip
 
 	if err := c.updateGatewayState(state.GatewayStatusStarting); err != nil {

@@ -59,6 +59,7 @@ type GatewayManager interface {
 	UpsertGateway(ctx context.Context, gateway *Gateway) error
 	DeleteGateway(ctx context.Context, gatewayId ulid.ULID) error
 	GetGateway(ctx context.Context, gatewayId ulid.ULID) (*Gateway, error)
+	GetAllGateways(ctx context.Context) ([]*Gateway, error)
 }
 
 type RequestStateManager interface {

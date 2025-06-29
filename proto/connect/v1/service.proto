@@ -5,6 +5,7 @@ option go_package = "github.com/inngest/inngest/proto/gen/connect/v1;connect";
 
 service ConnectGateway {
   rpc Forward(ForwardRequest) returns (ForwardResponse) {}
+  rpc Ping(PingRequest) returns (PingResponse) {}
 }
 
 message ForwardRequest {
@@ -13,4 +14,12 @@ message ForwardRequest {
 
 message ForwardResponse {
   // Add fields as needed, or leave empty for now
+}
+
+message PingRequest {
+  // Empty request message for ping
+}
+
+message PingResponse {
+  string message = 1;
 }

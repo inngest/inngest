@@ -107,14 +107,17 @@ type redisPubSubConnector struct {
 
 	enforceLeaseExpiry EnforceLeaseExpiryFunc
 
+	gatewayGrpcForwarder GatewayGrpcForwarder
+
 	RequestReceiver
 }
 
 type RedisPubSubConnectorOpts struct {
-	Logger             logger.Logger
-	Tracer             trace.ConditionalTracer
-	StateManager       state.StateManager
-	EnforceLeaseExpiry EnforceLeaseExpiryFunc
+	Logger               logger.Logger
+	Tracer               trace.ConditionalTracer
+	StateManager         state.StateManager
+	EnforceLeaseExpiry   EnforceLeaseExpiryFunc
+	GatewayGrpcForwarder GatewayGrpcForwarder
 }
 
 func newRedisPubSubConnector(client rueidis.Client, opts RedisPubSubConnectorOpts) *redisPubSubConnector {
@@ -697,6 +700,14 @@ func (i *redisPubSubConnector) Wait(ctx context.Context) error {
 			}()
 		},
 	})
+
+	if i.gatewayGrpcForwarder != nil {
+		// NOTE: Remove later just for testing when waiting for gateways to be up first
+		go func() {
+			time.Sleep(2 * time.Second)
+			i.gatewayGrpcForwarder.ConnectToGateways(ctx)
+		}()
+	}
 
 	err := <-wait // disconnected with err
 	if err != nil && !errors.Is(err, rueidis.ErrClosing) {
