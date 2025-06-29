@@ -23,6 +23,7 @@ import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 
 import type { RangeChangeProps } from '../DatePicker/RangePicker';
 import EntityFilter from '../Filter/EntityFilter';
+import { usePathCreator } from '../SharedContext/usePathCreator';
 import {
   useBatchedSearchParams,
   useBooleanSearchParam,
@@ -45,7 +46,6 @@ export function EventsTable({
   getEventTypes,
   eventNames,
   singleEventTypePage,
-  pathCreator,
   emptyActions,
   expandedRowActions,
   features,
@@ -89,6 +89,7 @@ export function EventsTable({
   features: Pick<Features, 'history'>;
   standalone?: boolean;
 }) {
+  const { pathCreator } = usePathCreator();
   const columns = useColumns({ pathCreator, singleEventTypePage });
   const [showSearch, setShowSearch] = useState(false);
   const [lastDays] = useSearchParam('last');
