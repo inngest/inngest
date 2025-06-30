@@ -1,6 +1,8 @@
 syntax = "proto3";
 package connect.v1;
 
+import "connect/v1/connect.proto";
+
 option go_package = "github.com/inngest/inngest/proto/gen/connect/v1;connect";
 
 service ConnectGateway {
@@ -9,11 +11,12 @@ service ConnectGateway {
 }
 
 message ForwardRequest {
-  // Add fields as needed, or leave empty for now
+  string connectionID = 1;
+  GatewayExecutorRequestData data = 2;
 }
 
 message ForwardResponse {
-  // Add fields as needed, or leave empty for now
+  bool success = 1;
 }
 
 message PingRequest {

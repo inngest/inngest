@@ -71,6 +71,7 @@ type connectGatewaySvc struct {
 	maintenanceApi chi.Router
 
 	grpcServer *grpc.Server
+	wsConnections sync.Map
 
 	// gatewayId is a unique identifier, generated each time the service is started.
 	// This should be used to uniquely identify the gateway instance when sending messages and routing requests.
