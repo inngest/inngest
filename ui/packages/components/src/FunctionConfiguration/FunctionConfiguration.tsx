@@ -1,5 +1,4 @@
 import { type ReactNode } from 'react';
-import Link from 'next/link';
 import { Button } from '@inngest/components/Button';
 import ConfigurationBlock from '@inngest/components/FunctionConfiguration/ConfigurationBlock';
 import ConfigurationCategory from '@inngest/components/FunctionConfiguration/ConfigurationCategory';
@@ -8,6 +7,8 @@ import ConfigurationTable, {
   type ConfigurationEntry,
 } from '@inngest/components/FunctionConfiguration/ConfigurationTable';
 import { PopoverContent } from '@inngest/components/FunctionConfiguration/FunctionConfigurationInfoPopovers';
+import { Info } from '@inngest/components/Info/Info';
+import { Link } from '@inngest/components/Link';
 import { Pill } from '@inngest/components/Pill';
 import { Time } from '@inngest/components/Time';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
@@ -20,6 +21,7 @@ import {
   RiArrowRightSLine,
   RiArrowRightUpLine,
   RiExternalLinkLine,
+  RiInformationLine,
   RiTimeLine,
 } from '@remixicon/react';
 
@@ -192,29 +194,35 @@ export function FunctionConfiguration({
             <>
               {concurrencyLimit.limit.value >= 1 && concurrencyLimit.limit.value}
               {concurrencyLimit.limit.isPlanLimit && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span>
-                      <Pill className="ml-2">Plan limit</Pill>
-                    </span>
-                  </TooltipTrigger>
-                  <TooltipContent className="max-w-xs py-2 text-left">
-                    <p className="max-w-xs text-sm">
+                <Info
+                  side="bottom"
+                  align="end"
+                  text={
+                    <span className="whitespace-pre-line">
                       Running into limits? Easily upgrade your plan or boost concurrency on your
                       existing plan.
-                    </p>
-                    <hr className="border-subtle my-2 " />
-                    <p className="text-sm">
-                      <Link
-                        href="/billing/plans?ref=concurrency-limit-tooltip"
-                        className="flex items-center gap-1 text-sm text-blue-500 hover:underline"
-                        target="_blank"
-                      >
-                        Explore plans <RiExternalLinkLine className="h-4 w-4" />
-                      </Link>
-                    </p>
-                  </TooltipContent>
-                </Tooltip>
+                    </span>
+                  }
+                  widthClassName="max-w-xs"
+                  action={
+                    <Link
+                      href="/billing/plans?ref=concurrency-limit-tooltip"
+                      target="_blank"
+                      iconAfter={<RiExternalLinkLine className="h-4 w-4" />}
+                    >
+                      Explore plans
+                    </Link>
+                  }
+                  iconElement={
+                    <Pill
+                      className="flex items-center gap-1"
+                      icon={<RiInformationLine className="h-[18px] w-[18px]" />}
+                      iconSide="right"
+                    >
+                      <span className="whitespace-nowrap">Plan limit</span>
+                    </Pill>
+                  }
+                />
               )}
             </>
           ),
