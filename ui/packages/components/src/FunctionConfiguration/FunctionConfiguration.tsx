@@ -10,7 +10,7 @@ import { PopoverContent } from '@inngest/components/FunctionConfiguration/Functi
 import { Pill } from '@inngest/components/Pill';
 import { Time } from '@inngest/components/Time';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
-import { useCron } from '@inngest/components/hooks/useCron';
+import { getHumanReadableCron, useCron } from '@inngest/components/hooks/useCron';
 import { AppsIcon } from '@inngest/components/icons/sections/Apps';
 import { EventsIcon } from '@inngest/components/icons/sections/Events';
 import { FunctionsIcon } from '@inngest/components/icons/sections/Functions';
@@ -374,7 +374,8 @@ function CronTriggerBlock({ schedule }: CronTriggerBlockProps) {
   return (
     <ConfigurationBlock
       icon={<RiTimeLine className="h-5 w-5" />}
-      mainContent={schedule}
+      mainContent={getHumanReadableCron(schedule)}
+      rightElement={<Pill className="font-mono">{schedule}</Pill>}
       subContent={
         nextRun ? (
           <Tooltip>
