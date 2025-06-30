@@ -22,7 +22,9 @@ const (
 )
 
 type ForwardRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
+	state         protoimpl.MessageState      `protogen:"open.v1"`
+	ConnectionID  string                      `protobuf:"bytes,1,opt,name=connectionID,proto3" json:"connectionID,omitempty"`
+	Data          *GatewayExecutorRequestData `protobuf:"bytes,2,opt,name=data,proto3" json:"data,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -57,8 +59,23 @@ func (*ForwardRequest) Descriptor() ([]byte, []int) {
 	return file_connect_v1_service_proto_rawDescGZIP(), []int{0}
 }
 
+func (x *ForwardRequest) GetConnectionID() string {
+	if x != nil {
+		return x.ConnectionID
+	}
+	return ""
+}
+
+func (x *ForwardRequest) GetData() *GatewayExecutorRequestData {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
 type ForwardResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -91,6 +108,13 @@ func (x *ForwardResponse) ProtoReflect() protoreflect.Message {
 // Deprecated: Use ForwardResponse.ProtoReflect.Descriptor instead.
 func (*ForwardResponse) Descriptor() ([]byte, []int) {
 	return file_connect_v1_service_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *ForwardResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
 }
 
 type PingRequest struct {
@@ -178,9 +202,12 @@ var File_connect_v1_service_proto protoreflect.FileDescriptor
 const file_connect_v1_service_proto_rawDesc = "" +
 	"\n" +
 	"\x18connect/v1/service.proto\x12\n" +
-	"connect.v1\"\x10\n" +
-	"\x0eForwardRequest\"\x11\n" +
-	"\x0fForwardResponse\"\r\n" +
+	"connect.v1\x1a\x18connect/v1/connect.proto\"p\n" +
+	"\x0eForwardRequest\x12\"\n" +
+	"\fconnectionID\x18\x01 \x01(\tR\fconnectionID\x12:\n" +
+	"\x04data\x18\x02 \x01(\v2&.connect.v1.GatewayExecutorRequestDataR\x04data\"+\n" +
+	"\x0fForwardResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\"\r\n" +
 	"\vPingRequest\"(\n" +
 	"\fPingResponse\x12\x18\n" +
 	"\amessage\x18\x01 \x01(\tR\amessage2\x93\x01\n" +
@@ -202,21 +229,23 @@ func file_connect_v1_service_proto_rawDescGZIP() []byte {
 
 var file_connect_v1_service_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
 var file_connect_v1_service_proto_goTypes = []any{
-	(*ForwardRequest)(nil),  // 0: connect.v1.ForwardRequest
-	(*ForwardResponse)(nil), // 1: connect.v1.ForwardResponse
-	(*PingRequest)(nil),     // 2: connect.v1.PingRequest
-	(*PingResponse)(nil),    // 3: connect.v1.PingResponse
+	(*ForwardRequest)(nil),             // 0: connect.v1.ForwardRequest
+	(*ForwardResponse)(nil),            // 1: connect.v1.ForwardResponse
+	(*PingRequest)(nil),                // 2: connect.v1.PingRequest
+	(*PingResponse)(nil),               // 3: connect.v1.PingResponse
+	(*GatewayExecutorRequestData)(nil), // 4: connect.v1.GatewayExecutorRequestData
 }
 var file_connect_v1_service_proto_depIdxs = []int32{
-	0, // 0: connect.v1.ConnectGateway.Forward:input_type -> connect.v1.ForwardRequest
-	2, // 1: connect.v1.ConnectGateway.Ping:input_type -> connect.v1.PingRequest
-	1, // 2: connect.v1.ConnectGateway.Forward:output_type -> connect.v1.ForwardResponse
-	3, // 3: connect.v1.ConnectGateway.Ping:output_type -> connect.v1.PingResponse
-	2, // [2:4] is the sub-list for method output_type
-	0, // [0:2] is the sub-list for method input_type
-	0, // [0:0] is the sub-list for extension type_name
-	0, // [0:0] is the sub-list for extension extendee
-	0, // [0:0] is the sub-list for field type_name
+	4, // 0: connect.v1.ForwardRequest.data:type_name -> connect.v1.GatewayExecutorRequestData
+	0, // 1: connect.v1.ConnectGateway.Forward:input_type -> connect.v1.ForwardRequest
+	2, // 2: connect.v1.ConnectGateway.Ping:input_type -> connect.v1.PingRequest
+	1, // 3: connect.v1.ConnectGateway.Forward:output_type -> connect.v1.ForwardResponse
+	3, // 4: connect.v1.ConnectGateway.Ping:output_type -> connect.v1.PingResponse
+	3, // [3:5] is the sub-list for method output_type
+	1, // [1:3] is the sub-list for method input_type
+	1, // [1:1] is the sub-list for extension type_name
+	1, // [1:1] is the sub-list for extension extendee
+	0, // [0:1] is the sub-list for field type_name
 }
 
 func init() { file_connect_v1_service_proto_init() }
@@ -224,6 +253,7 @@ func file_connect_v1_service_proto_init() {
 	if File_connect_v1_service_proto != nil {
 		return
 	}
+	file_connect_v1_connect_proto_init()
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{

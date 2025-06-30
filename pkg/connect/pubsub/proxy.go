@@ -456,7 +456,9 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 
 		// Forward the request
 		// TODO Replace executor -> gateway PubSub communication with point-to-point (gRPC)
-		err = i.RouteExecutorRequest(ctx, route.GatewayID, route.ConnectionID, opts.Data)
+		// err = i.RouteExecutorRequest(ctx, route.GatewayID, route.ConnectionID, opts.Data)
+		err = i.gatewayGrpcForwarder.Forward(ctx, route.GatewayID, route.ConnectionID, opts.Data)
+
 		if err != nil {
 			span.RecordError(err)
 			span.SetStatus(codes.Error, "could not forward request to gateway")
