@@ -206,7 +206,7 @@ export function FunctionConfiguration({
                   widthClassName="max-w-xs"
                   action={
                     <Link
-                      href="/billing/plans?ref=concurrency-limit-tooltip"
+                      href="/billing/plans?ref=concurrency-limit-popover"
                       target="_blank"
                       iconAfter={<RiExternalLinkLine className="h-4 w-4" />}
                     >
