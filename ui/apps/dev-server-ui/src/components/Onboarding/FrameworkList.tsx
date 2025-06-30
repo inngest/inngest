@@ -124,11 +124,9 @@ export default function FrameworkList({ frameworksData, title, description }: Fr
               <NextLink
                 onClick={() =>
                   trackEvent('cli/onboarding.action', {
-                    metadata: {
-                      type: 'btn-click',
-                      label: 'choose-framework-from-list',
-                      framework: framework.framework,
-                    },
+                    type: 'btn-click',
+                    label: 'choose-framework-from-list',
+                    framework: framework.framework,
                   })
                 }
                 href={framework.link.url}
