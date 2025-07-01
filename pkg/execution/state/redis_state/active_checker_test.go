@@ -91,7 +91,35 @@ func TestShadowPartitionActiveCheck(t *testing.T) {
 		marshaled, err = json.Marshal(sp)
 		require.NoError(t, err)
 		cluster.HSet(kg.ShadowPartitionMeta(), sp.PartitionID, string(marshaled))
+
+		q.activeCheckAccountProbability = 0
 	}
+
+	t.Run("should work on missing account set", func(t *testing.T) {
+		setup(t)
+
+		q.activeCheckAccountProbability = 100
+		_, err := q.ActiveCheck(ctx)
+		require.NoError(t, err)
+	})
+
+	t.Run("account entrypoint should work", func(t *testing.T) {
+		setup(t)
+
+		testAccountID := uuid.New()
+		_, err := cluster.ZAdd(kg.AccountActiveCheckSet(), float64(q.clock.Now().UnixMilli()), testAccountID.String())
+		require.NoError(t, err)
+
+		keyActive := kg.ActiveSet("account", testAccountID.String())
+		_, err = cluster.SAdd(keyActive, "invalid")
+		require.True(t, cluster.Exists(keyActive))
+
+		q.activeCheckAccountProbability = 100
+		_, err = q.ActiveCheck(ctx)
+		require.NoError(t, err)
+
+		require.False(t, cluster.Exists(keyActive))
+	})
 
 	t.Run("should work on missing set", func(t *testing.T) {
 		setup(t)
