@@ -1,10 +1,13 @@
 package apiv1
 
 import (
+	"crypto/rand"
 	"encoding/json"
 	"fmt"
 
+	"github.com/fatih/structs"
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/inngest/inngestgo"
 	"github.com/oklog/ulid/v2"
@@ -94,4 +97,27 @@ func (r CheckpointNewRunRequest) RunID() ulid.ULID {
 func (r CheckpointNewRunRequest) FnConfig() string {
 	// TODO
 	return ""
+}
+
+// runEvent creates a new event.Event from the CheckpointNewRunRequest.  This allows us to
+// record the input params for each API-based run as if it were a regular event-driven app.
+func runEvent(r CheckpointNewRunRequest) event.Event {
+	// TODO: Refactor event.Event to use inngestgo.Event as its base type.
+	s := structs.New(r.Event.Data)
+	s.TagName = "json"
+
+	evt := event.Event{
+		Name:      r.Event.Name,
+		Data:      s.Map(),
+		Timestamp: r.Event.Timestamp,
+		Version:   r.Event.Version,
+	}
+
+	if r.Event.ID == nil {
+		evt.ID = ulid.MustNew(ulid.Now(), rand.Reader).String()
+	} else {
+		evt.ID = *r.Event.ID
+	}
+
+	return evt
 }
