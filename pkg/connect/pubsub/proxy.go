@@ -734,11 +734,7 @@ func (i *redisPubSubConnector) Wait(ctx context.Context) error {
 	})
 
 	if i.gatewayGrpcForwarder != nil {
-		// NOTE: Remove later just for testing when waiting for gateways to be up first
-		go func() {
-			time.Sleep(2 * time.Second)
-			i.gatewayGrpcForwarder.ConnectToGateways(ctx)
-		}()
+		i.gatewayGrpcForwarder.ConnectToGateways(ctx)
 	}
 
 	err := <-wait // disconnected with err
