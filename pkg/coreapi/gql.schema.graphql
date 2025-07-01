@@ -95,6 +95,52 @@ enum EventStatus {
   NO_FUNCTIONS
 }
 
+type EventsConnection {
+  edges: [EventsEdge!]!
+  pageInfo: PageInfo!
+  totalCount: Int!
+}
+
+type EventsEdge {
+  node: EventV2!
+  cursor: String!
+}
+
+type EventV2 {
+  envID: UUID!
+
+  # Internal ID.
+  id: ULID!
+
+  # The "id" field.
+  idempotencyKey: String
+
+  name: String!
+
+  # The "ts" field, or receivedAt if "ts" was not set.
+  occurredAt: Time!
+
+  # The raw event data. Basically what the event producer sent.
+  raw: String!
+
+  # When the event was received by Inngest.
+  receivedAt: Time!
+
+  # NOTE: Should this use Relay-style pagination?
+  runs: [FunctionRunV2!]!
+
+  source: EventSource
+
+  # The "version" field.
+  version: String
+}
+
+type EventSource {
+  id: ID!
+  name: String
+  sourceKind: String!
+}
+
 enum FunctionStatus {
   RUNNING
   COMPLETED
