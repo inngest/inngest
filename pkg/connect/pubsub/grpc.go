@@ -22,7 +22,7 @@ type gatewayGrpcForwarder struct {
 	gatewayManager state.GatewayManager
 	mu             sync.RWMutex
 
-	// TODO: Cleanup old gateways
+	// TODO: gc gateways
 	grpcClients    map[string]connectpb.ConnectGatewayClient
 }
 
