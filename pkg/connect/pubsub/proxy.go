@@ -478,14 +478,12 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 
 			// Ack here instead of needing a pubsub ack message
 			if err != nil {
-				span.AddEvent("WorkerAck")
 				metrics.HistogramConnectProxyAckTime(ctx, time.Since(proxyStartTime).Milliseconds(), metrics.HistogramOpt{
 					PkgName: pkgName,
 					Tags: map[string]any{
-						"kind": "worker",
+						"kind": "gateway",
 					},
 				})
-
 			}
 		} else {
 			err = i.RouteExecutorRequest(ctx, route.GatewayID, route.ConnectionID, opts.Data)
