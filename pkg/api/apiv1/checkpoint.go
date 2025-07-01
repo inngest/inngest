@@ -13,9 +13,14 @@ import (
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/state"
-	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/oklog/ulid/v2"
 )
+
+type CheckpointAPI interface {
+	CheckpointNewRun(w http.ResponseWriter, r *http.Request)
+	CheckpointSteps(w http.ResponseWriter, r *http.Request)
+	CheckpointResponse(w http.ResponseWriter, r *http.Request)
+}
 
 type CheckpointOpts struct {
 	AppCreator      cqrs.AppCreator
@@ -69,29 +74,28 @@ func (a checkpointAPI) CheckpointNewRun(w http.ResponseWriter, r *http.Request) 
 			Method: enums.AppMethodAPI.String(),
 		})
 		if err != nil {
-			// TODO: Return HTTP error
+			// TODO: Log HTTP error
 			return
 		}
 
 		// TODO: Create the function, if it doesn't exist.
-		fn, err := a.FunctionCreator.InsertFunction(ctx, cqrs.InsertFunctionParams{
+		_, err = a.FunctionCreator.InsertFunction(ctx, cqrs.InsertFunctionParams{
 			ID:        input.FnID(auth.WorkspaceID()),
 			AccountID: auth.AccountID(),
 			EnvID:     auth.WorkspaceID(),
 			AppID:     app.ID,
 			Name:      input.FnSlug(),
 			Slug:      input.FnSlug(),
-			Config:    input.FnConfig(),
+			Config:    input.FnConfig(auth.WorkspaceID()),
 			CreatedAt: time.UnixMilli(input.Event.Timestamp),
 		})
 		if err != nil {
-			// TODO: Return HTTP error
+			// TODO: Log HTTP error
 			return
 		}
-		fn.InngestFunction()
 	}()
 
-	var fn *inngest.Function
+	fn := input.Fn(auth.WorkspaceID())
 
 	// Create a new run.  Note that this is currently of type API, and is a sync function.
 	// Because of this, it has no job in the queue.
@@ -99,7 +103,7 @@ func (a checkpointAPI) CheckpointNewRun(w http.ResponseWriter, r *http.Request) 
 	// We do this by inserting into the state store and adding a trace.  Note that API functions
 	// SHOULD automatically have a timeout after 60 minutes.
 	meta, err := a.Executor.Schedule(ctx, execution.ScheduleRequest{
-		Function:    *fn,
+		Function:    fn,
 		AccountID:   auth.AccountID(),
 		WorkspaceID: auth.WorkspaceID(),
 		AppID:       input.AppID(auth.WorkspaceID()),

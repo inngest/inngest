@@ -8,6 +8,7 @@ import (
 	"github.com/fatih/structs"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/event"
+	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/inngest/inngestgo"
 	"github.com/oklog/ulid/v2"
@@ -94,9 +95,20 @@ func (r CheckpointNewRunRequest) RunID() ulid.ULID {
 	return ulid.ULID{}
 }
 
-func (r CheckpointNewRunRequest) FnConfig() string {
-	// TODO
-	return ""
+func (r CheckpointNewRunRequest) Fn(envID uuid.UUID) inngest.Function {
+	return inngest.Function{
+		ID:              r.FnID(envID),
+		ConfigVersion:   1,
+		FunctionVersion: 1,
+		Name:            r.FnSlug(),
+		Slug:            r.FnSlug(),
+	}
+}
+
+func (r CheckpointNewRunRequest) FnConfig(envID uuid.UUID) string {
+	fn := r.Fn(envID)
+	byt, _ := json.Marshal(fn)
+	return string(byt)
 }
 
 // runEvent creates a new event.Event from the CheckpointNewRunRequest.  This allows us to
