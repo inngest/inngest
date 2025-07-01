@@ -386,11 +386,14 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 		}
 
 		{
-			onSubscribed := make(chan struct{})
+			onSubscribedPubsub := make(chan struct{})
+			onSubscribedGRPC := make(chan struct{})
 			// Wait for relevant messages and forward them over the WebSocket connection
-			// TODO: Maybe I should use a feature flag
-			go ch.receiveRouterMessagesFromGRPC(ctx, onSubscribed)
-			<-onSubscribed
+			go ch.receiveRouterMessagesFromPubsub(ctx, onSubscribedPubsub)
+			<-onSubscribedPubsub
+
+			go ch.receiveRouterMessagesFromGRPC(ctx, onSubscribedGRPC)
+			<-onSubscribedGRPC
 		}
 
 		// Run loop
@@ -883,15 +886,9 @@ func (c *connectionHandler) receiveRouterMessagesFromGRPC(ctx context.Context, o
 
 			rawBytes, err := proto.Marshal(data)
 			if err != nil {
-				// Should never happen
-				c.log.Error("failed to marshal message", "err", err)
-				continue
-			}
-
-			if err != nil {
 				// TODO This should never happen, we should likely push the message into a dead-letter queue.
 				c.log.Error("invalid protobuf received by grpc", "err", err, "msg", rawBytes, "gateway_id", c.conn.GatewayId, "conn_id", c.conn.ConnectionId)
-				return
+				continue
 			}
 
 			log := c.log.With(
@@ -909,20 +906,6 @@ func (c *connectionHandler) receiveRouterMessagesFromGRPC(ctx context.Context, o
 				PkgName: pkgName,
 				Tags:    additionalMetricsTags,
 			})
-
-			// TODO: Get rid of this when the ack handling is moved to after the rpc call.
-			err = c.svc.receiver.AckMessage(ctx, data.RequestId, pubsub.AckSourceGateway)
-			if err != nil {
-				log.Error("failed to ack message", "err", err)
-				// The executor will retry the message if it doesn't receive an ack
-				continue
-			}
-
-			// Do not forward messages if the connection is already draining
-			if ctx.Err() != nil {
-				log.Warn("acked message but connection is draining, not forwarding message")
-				continue
-			}
 
 			// Forward message to SDK!
 			err = wsproto.Write(ctx, c.ws, &connectpb.ConnectMessage{
