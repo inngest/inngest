@@ -1,7 +1,6 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState, type UIEventHandler } from 'react';
-import type { Route } from 'next';
 import dynamic from 'next/dynamic';
 import { Button } from '@inngest/components/Button';
 import { ErrorCard } from '@inngest/components/Error/ErrorCard';
@@ -59,11 +58,6 @@ export function EventsTable({
     eventName?: string;
     payload?: string;
   }) => React.ReactNode;
-  pathCreator: {
-    eventType: (params: { eventName: string }) => Route;
-    runPopout: (params: { runID: string }) => Route;
-    eventPopout: (params: { eventID: string }) => Route;
-  };
   getEvents: ({
     cursor,
     eventNames,
@@ -83,7 +77,7 @@ export function EventsTable({
   }) => Promise<{ events: Event[]; pageInfo: PageInfo; totalCount: number }>;
   getEventDetails: ({ eventID }: { eventID: string }) => Promise<Event>;
   getEventPayload: ({ eventID }: { eventID: string }) => Promise<Pick<Event, 'payload'>>;
-  getEventTypes: () => Promise<Required<Pick<EventType, 'name' | 'id'>>[]>;
+  getEventTypes?: () => Promise<Required<Pick<EventType, 'name' | 'id'>>[]>;
   eventNames?: string[];
   singleEventTypePage?: boolean;
   features: Pick<Features, 'history'>;

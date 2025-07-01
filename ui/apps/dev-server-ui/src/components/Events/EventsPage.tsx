@@ -8,13 +8,12 @@ import { Header } from '@inngest/components/Header/Header';
 import { RefreshButton } from '@inngest/components/Refresh/RefreshButton';
 import { RiExternalLinkLine, RiRefreshLine } from '@remixicon/react';
 
-// import { ExpandedRowActions } from '@/components/Events/ExpandedRowActions';
 import SendEventButton from '@/components/Event/SendEventButton';
-// import { useAllEventTypes } from '@/components/EventTypes/useEventTypes';
 import { EventInfo } from '@/components/Events/EventInfo';
-
+import { ExpandedRowActions } from '@/components/Events/ExpandedRowActions';
 // import { SendEventModal } from '@/components/Events/SendEventModal';
-// import { useEventDetails, useEventPayload, useEvents } from '@/components/Events/useEvents';
+import { useEventDetails, useEventPayload, useEvents } from '@/components/Events/useEvents';
+
 // import { useReplayModal } from '@/components/Events/useReplayModal';
 
 export default function EventsPage({
@@ -27,10 +26,9 @@ export default function EventsPage({
   const router = useRouter();
   //   const { isModalVisible, selectedEvent, openModal, closeModal } = useReplayModal();
 
-  //   const getEvents = useEvents();
-  //   const getEventDetails = useEventDetails();
-  //   const getEventPayload = useEventPayload();
-  //   const getEventTypes = useAllEventTypes();
+  const getEvents = useEvents();
+  const getEventDetails = useEventDetails();
+  const getEventPayload = useEventPayload();
 
   return (
     <>
@@ -54,11 +52,10 @@ export default function EventsPage({
           }
         />
       )}
-      {/* <EventsTable
+      <EventsTable
         getEvents={getEvents}
         getEventDetails={getEventDetails}
         getEventPayload={getEventPayload}
-        getEventTypes={getEventTypes}
         eventNames={eventTypeNames}
         singleEventTypePage={false}
         features={{
@@ -86,12 +83,12 @@ export default function EventsPage({
           <ExpandedRowActions
             eventName={eventName}
             payload={payload}
-            onReplay={openModal}
-            envSlug={envSlug}
+            onReplay={() => {}}
+            // onReplay={openModal}
           />
         )}
       />
-      {selectedEvent && (
+      {/* {selectedEvent && (
         <SendEventModal
           isOpen={isModalVisible}
           eventName={selectedEvent.name}
