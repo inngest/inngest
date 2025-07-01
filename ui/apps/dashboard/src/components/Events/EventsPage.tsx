@@ -1,6 +1,5 @@
 'use client';
 
-import { useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@inngest/components/Button/Button';
 import { EventsTable } from '@inngest/components/Events/EventsTable';
@@ -16,7 +15,6 @@ import SendEventButton from '@/components/Events/SendEventButton';
 import { SendEventModal } from '@/components/Events/SendEventModal';
 import { useEventDetails, useEventPayload, useEvents } from '@/components/Events/useEvents';
 import { useReplayModal } from '@/components/Events/useReplayModal';
-import { createInternalPathCreator } from '@/components/Events/utils';
 import { useAccountFeatures } from '@/utils/useAccountFeatures';
 
 export default function EventsPage({
@@ -31,7 +29,6 @@ export default function EventsPage({
   singleEventTypePage?: boolean;
 }) {
   const router = useRouter();
-  const internalPathCreator = useMemo(() => createInternalPathCreator(envSlug), [envSlug]);
   const { isModalVisible, selectedEvent, openModal, closeModal } = useReplayModal();
 
   const getEvents = useEvents();
@@ -56,7 +53,6 @@ export default function EventsPage({
         />
       )}
       <EventsTable
-        pathCreator={internalPathCreator}
         getEvents={getEvents}
         getEventDetails={getEventDetails}
         getEventPayload={getEventPayload}

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import NextLink from 'next/link';
 import { ErrorCard } from '@inngest/components/Error/ErrorCard';
+import { type PathCreator } from '@inngest/components/SharedContext/usePathCreator';
 import { Skeleton } from '@inngest/components/Skeleton';
 import { Time } from '@inngest/components/Time';
 import { usePrettyJson } from '@inngest/components/hooks/usePrettyJson';
@@ -42,7 +43,7 @@ export function EventDetails({
 }: {
   initialData?: Pick<Event, 'name' | 'runs'>;
   eventID: string;
-  pathCreator: React.ComponentProps<typeof EventsTable>['pathCreator'];
+  pathCreator: PathCreator;
   getEventDetails: React.ComponentProps<typeof EventsTable>['getEventDetails'];
   getEventPayload: React.ComponentProps<typeof EventsTable>['getEventPayload'];
   getEventRuns?: ({ eventID }: { eventID: string }) => Promise<Pick<Event, 'runs' | 'name'>>;
