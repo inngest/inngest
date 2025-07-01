@@ -268,6 +268,8 @@ func start(ctx context.Context, opts StartOpts) error {
 		redis_state.WithIdempotencyTTL(time.Hour),
 		redis_state.WithNumWorkers(int32(opts.QueueWorkers)),
 		redis_state.WithPollTick(opts.Tick),
+		redis_state.WithShadowPollTick(2 * opts.Tick),
+		redis_state.WithBacklogNormalizePollTick(5 * opts.Tick),
 		redis_state.WithCustomConcurrencyKeyLimitRefresher(func(ctx context.Context, i queue.QueueItem) []state.CustomConcurrency {
 			keys := i.Data.GetConcurrencyKeys()
 

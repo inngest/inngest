@@ -107,7 +107,10 @@ const (
 	defaultBacklogNormalizationWorkers = 10
 	defaultBacklogNormalizeLimit       = int64(500)
 
-	defaultPollTick       = 10 * time.Millisecond
+	defaultPollTick                 = 10 * time.Millisecond
+	defaultShadowPollTick           = 100 * time.Millisecond
+	defaultBacklogNormalizePollTick = 250 * time.Millisecond
+
 	defaultIdempotencyTTL = 12 * time.Hour
 	defaultConcurrency    = 1000 // TODO: add function to override.
 
@@ -282,6 +285,22 @@ func WithPeekEWMALength(l int) QueueOpt {
 func WithPollTick(t time.Duration) QueueOpt {
 	return func(q *queue) {
 		q.pollTick = t
+	}
+}
+
+// WithShadowPollTick specifies the interval at which the queue will poll the backing store
+// for available shadow partitions.
+func WithShadowPollTick(t time.Duration) QueueOpt {
+	return func(q *queue) {
+		q.shadowPollTick = t
+	}
+}
+
+// WithBacklogNormalizePollTick specifies the interval at which the queue will poll the backing store
+// for available backlogs to normalize.
+func WithBacklogNormalizePollTick(t time.Duration) QueueOpt {
+	return func(q *queue) {
+		q.backlogNormalizePollTick = t
 	}
 }
 
@@ -623,6 +642,8 @@ func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 		activeCheckerLeaseLock:         &sync.RWMutex{},
 		instrumentationLeaseLock:       &sync.RWMutex{},
 		pollTick:                       defaultPollTick,
+		shadowPollTick:                 defaultShadowPollTick,
+		backlogNormalizePollTick:       defaultBacklogNormalizePollTick,
 		idempotencyTTL:                 defaultIdempotencyTTL,
 		queueKindMapping:               make(map[string]string),
 		peekSizeForFunctions:           make(map[string]int64),
@@ -860,6 +881,9 @@ type queue struct {
 	// continuesLock protects the continues map.
 	continuesLock     *sync.Mutex
 	continuationLimit uint
+
+	shadowPollTick           time.Duration
+	backlogNormalizePollTick time.Duration
 
 	shadowContinues         map[string]shadowContinuation
 	shadowContinueCooldown  map[string]time.Time

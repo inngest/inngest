@@ -71,8 +71,8 @@ func (q *queue) backlogNormalizationScan(ctx context.Context) error {
 		go q.backlogNormalizationWorker(ctx, bc)
 	}
 
-	tick := q.clock.NewTicker(q.pollTick)
-	l.Debug("starting normalization scanner", "poll", q.pollTick.String())
+	tick := q.clock.NewTicker(q.backlogNormalizePollTick)
+	l.Debug("starting normalization scanner", "poll", q.backlogNormalizePollTick.String())
 
 	backoff := 200 * time.Millisecond
 
