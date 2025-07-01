@@ -132,6 +132,8 @@ func newRedisPubSubConnector(client rueidis.Client, opts RedisPubSubConnectorOpt
 		shouldUseGRPC = func(ctx context.Context, accountID uuid.UUID) bool {
 			return false
 		}
+	} else {
+		shouldUseGRPC = opts.ShouldUseGRPC
 	}
 
 	return &redisPubSubConnector{
