@@ -111,6 +111,8 @@ const (
 	defaultIdempotencyTTL = 12 * time.Hour
 	defaultConcurrency    = 1000 // TODO: add function to override.
 
+	DefaultInstrumentInterval = 10 * time.Second
+
 	NoConcurrencyLimit = -1
 )
 
@@ -282,6 +284,18 @@ func WithPeekEWMALength(l int) QueueOpt {
 func WithPollTick(t time.Duration) QueueOpt {
 	return func(q *queue) {
 		q.pollTick = t
+	}
+}
+
+func WithShadowPollTick(t time.Duration) QueueOpt {
+	return func(q *queue) {
+		q.shadowPollTick = t
+	}
+}
+
+func WithBacklogNormalizePollTick(t time.Duration) QueueOpt {
+	return func(q *queue) {
+		q.backlogNormalizePollTick = t
 	}
 }
 
@@ -584,6 +598,22 @@ func WithReadOnlySpotChecks(fn ReadOnlySpotChecks) QueueOpt {
 	}
 }
 
+type TenantInstrumentor func(ctx context.Context, qp *QueuePartition) error
+
+func WithTenantInstrumentor(fn TenantInstrumentor) QueueOpt {
+	return func(q *queue) {
+		q.tenantInstrumentor = fn
+	}
+}
+
+func WithInstrumentInterval(t time.Duration) QueueOpt {
+	return func(q *queue) {
+		if t > 0 {
+			q.instrumentInterval = t
+		}
+	}
+}
+
 func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 	ctx := context.Background()
 
@@ -623,10 +653,13 @@ func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 		activeCheckerLeaseLock:         &sync.RWMutex{},
 		instrumentationLeaseLock:       &sync.RWMutex{},
 		pollTick:                       defaultPollTick,
+		shadowPollTick:                 defaultPollTick,
+		backlogNormalizePollTick:       defaultPollTick,
 		idempotencyTTL:                 defaultIdempotencyTTL,
 		queueKindMapping:               make(map[string]string),
 		peekSizeForFunctions:           make(map[string]int64),
 		log:                            logger.StdlibLogger(ctx),
+		instrumentInterval:             DefaultInstrumentInterval,
 		partitionConstraintConfigGetter: func(ctx context.Context, p QueueShadowPartition) (*PartitionConstraintConfig, error) {
 			def := defaultConcurrency
 
@@ -678,6 +711,9 @@ func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 		backlogNormalizeAsyncLimit:        func(ctx context.Context) int { return BacklogNormalizeAsyncLimit },
 		shadowPartitionProcessCount: func(ctx context.Context, acctID uuid.UUID) int {
 			return 5
+		},
+		tenantInstrumentor: func(ctx context.Context, qp *QueuePartition) error {
+			return nil
 		},
 		itemIndexer:             QueueItemIndexerFunc,
 		backoffFunc:             backoff.DefaultBackoff,
@@ -763,6 +799,8 @@ type queue struct {
 	backlogNormalizeAsyncLimit  BacklogNormalizeAsyncLimitCount
 	shadowPartitionProcessCount QueueShadowPartitionProcessCount
 
+	tenantInstrumentor TenantInstrumentor
+
 	// idempotencyTTL is the default or static idempotency duration apply to jobs,
 	// if idempotencyTTLFunc is not defined.
 	idempotencyTTL time.Duration
@@ -770,7 +808,9 @@ type queue struct {
 	// remain idempotent.
 	idempotencyTTLFunc func(context.Context, osqueue.QueueItem) time.Duration
 	// pollTick is the interval between each scan for jobs.
-	pollTick time.Duration
+	pollTick                 time.Duration
+	shadowPollTick           time.Duration
+	backlogNormalizePollTick time.Duration
 	// quit is a channel that any method can send on to trigger termination
 	// of the Run loop.  This typically accepts an error, but a nil error
 	// will still quit the runner.
@@ -836,6 +876,8 @@ type queue struct {
 	// instrumentationLeaseLock ensures that there are no data races writing to or
 	// reading from instrumentationLeaseID
 	instrumentationLeaseLock *sync.RWMutex
+	// instrumentInterval represents the frequency and instrumentation will attempt to run
+	instrumentInterval time.Duration
 
 	// scavengerLeaseID stores the lease ID if this queue is the scavenger processor.
 	// all runners attempt to claim this lease automatically.
@@ -3428,6 +3470,8 @@ func (q *queue) InProgress(ctx context.Context, prefix string, concurrencyKey st
 }
 
 func (q *queue) Instrument(ctx context.Context) error {
+	l := logger.StdlibLogger(ctx)
+
 	// Check on global partition and queue partition sizes
 	var offset, total int64
 	chunkSize := int64(1000)
@@ -3457,6 +3501,8 @@ func (q *queue) Instrument(ctx context.Context) error {
 			go func(ctx context.Context, pkey string) {
 				defer wg.Done()
 
+				l := l.With("partitionKey", pkey)
+
 				// If this is not a fully-qualified key, assume that this is an old (system) partition queue
 				queueKey := pkey
 				if !isKeyConcurrencyPointerItem(pkey) {
@@ -3480,6 +3526,26 @@ func (q *queue) Instrument(ctx context.Context) error {
 				})
 
 				atomic.AddInt64(&total, 1)
+
+				qp := QueuePartition{}
+				{
+					shard := q.primaryQueueShard
+					hash := shard.RedisClient.kg.PartitionItem()
+					cmd := r.B().Hget().Key(hash).Field(pkey).Build()
+					byt, err := r.Do(ctx, cmd).AsBytes()
+					if err != nil {
+						l.Error("error loading partition", "error", err)
+						return
+					}
+					if err := json.Unmarshal(byt, &qp); err != nil {
+						l.Error("error unmarshalling partition", "error", err)
+						return
+					}
+				}
+
+				if err := q.tenantInstrumentor(ctx, &qp); err != nil {
+					l.Error("error running tenant instrumentor", "error", err)
+				}
 			}(ctx, pk)
 
 		}

@@ -266,7 +266,6 @@ func (q *queue) executionScan(ctx context.Context, f osqueue.RunFunc) error {
 	}
 
 	tick := q.clock.NewTicker(q.pollTick)
-
 	q.log.Debug("starting queue worker", "poll", q.pollTick.String())
 
 	backoff := time.Millisecond * 250
@@ -523,7 +522,7 @@ func (q *queue) runInstrumentation(ctx context.Context) {
 	setLease(leaseID)
 
 	tick := q.clock.NewTicker(ConfigLeaseMax / 3)
-	instr := q.clock.NewTicker(20 * time.Second)
+	instr := q.clock.NewTicker(q.instrumentInterval)
 
 	for {
 		select {
