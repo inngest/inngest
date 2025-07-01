@@ -112,6 +112,8 @@ func TestShadowPartitionActiveCheck(t *testing.T) {
 
 		keyActive := kg.ActiveSet("account", testAccountID.String())
 		_, err = cluster.SAdd(keyActive, "invalid")
+		require.NoError(t, err)
+
 		require.True(t, cluster.Exists(keyActive))
 
 		q.activeCheckAccountProbability = 100
