@@ -110,6 +110,7 @@ const (
 	defaultPollTick                 = 10 * time.Millisecond
 	defaultShadowPollTick           = 100 * time.Millisecond
 	defaultBacklogNormalizePollTick = 250 * time.Millisecond
+	defaultActiveCheckTick          = 10 * time.Second
 
 	defaultIdempotencyTTL = 12 * time.Hour
 	defaultConcurrency    = 1000 // TODO: add function to override.
@@ -301,6 +302,21 @@ func WithShadowPollTick(t time.Duration) QueueOpt {
 func WithBacklogNormalizePollTick(t time.Duration) QueueOpt {
 	return func(q *queue) {
 		q.backlogNormalizePollTick = t
+	}
+}
+
+// WithActiveCheckPollTick specifies the interval at which the queue will poll the backing store
+// for available backlogs to normalize.
+func WithActiveCheckPollTick(t time.Duration) QueueOpt {
+	return func(q *queue) {
+		q.activeCheckTick = t
+	}
+}
+
+// WithActiveCheckAccountProbability specifies the probability of processing accounts vs. backlogs during an active check run.
+func WithActiveCheckAccountProbability(p int) QueueOpt {
+	return func(q *queue) {
+		q.activeCheckAccountProbability = p
 	}
 }
 
@@ -644,6 +660,7 @@ func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 		pollTick:                       defaultPollTick,
 		shadowPollTick:                 defaultShadowPollTick,
 		backlogNormalizePollTick:       defaultBacklogNormalizePollTick,
+		activeCheckTick:                defaultActiveCheckTick,
 		idempotencyTTL:                 defaultIdempotencyTTL,
 		queueKindMapping:               make(map[string]string),
 		peekSizeForFunctions:           make(map[string]int64),
@@ -723,6 +740,7 @@ func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 		activeSpotCheckProbability: func(ctx context.Context, acctID uuid.UUID) (backlogRefillCheckProbability int, accountSpotCheckProbability int) {
 			return 100, 100
 		},
+		activeCheckAccountProbability: 10,
 	}
 
 	// default to using primary queue client for shard selection
@@ -775,8 +793,10 @@ type queue struct {
 	allowKeyQueues                  AllowKeyQueues
 	enqueueSystemQueuesToBacklog    bool
 	partitionConstraintConfigGetter PartitionConstraintConfigGetter
-	activeSpotCheckProbability      ActiveSpotChecksProbability
-	readOnlySpotChecks              ReadOnlySpotChecks
+
+	activeSpotCheckProbability    ActiveSpotChecksProbability
+	readOnlySpotChecks            ReadOnlySpotChecks
+	activeCheckAccountProbability int
 
 	disableLeaseChecks                DisableLeaseChecks
 	disableLeaseChecksForSystemQueues bool
@@ -884,6 +904,7 @@ type queue struct {
 
 	shadowPollTick           time.Duration
 	backlogNormalizePollTick time.Duration
+	activeCheckTick          time.Duration
 
 	shadowContinues         map[string]shadowContinuation
 	shadowContinueCooldown  map[string]time.Time
