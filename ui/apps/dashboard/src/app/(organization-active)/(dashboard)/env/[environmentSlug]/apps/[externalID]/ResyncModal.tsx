@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { Alert } from '@inngest/components/Alert';
 import { Button } from '@inngest/components/Button';
 import { Input } from '@inngest/components/Forms/Input';
@@ -55,14 +55,6 @@ export default function ResyncModal({
   const [, resyncApp] = useMutation(ResyncAppDocument);
   const syncButtonRef = useRef<HTMLButtonElement>(null);
 
-  useEffect(() => {
-    if (isOpen) {
-      setTimeout(() => {
-        syncButtonRef.current?.focus();
-      }, 100);
-    }
-  }, [isOpen]);
-
   if (isURLOverridden) {
     url = overrideValue;
   }
@@ -112,7 +104,7 @@ export default function ResyncModal({
   const isConnect = appMethod === methodTypes.Connect;
 
   return (
-    <Modal className="w-[800px]" isOpen={isOpen} onClose={onClose}>
+    <Modal className="w-[800px]" initialFocus={syncButtonRef} isOpen={isOpen} onClose={onClose}>
       <Modal.Header>
         <div className="flex flex-row items-center gap-3">
           <RiLoopLeftLine className="h-6 w-6" />
