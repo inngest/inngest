@@ -734,7 +734,9 @@ func (i *redisPubSubConnector) Wait(ctx context.Context) error {
 	})
 
 	if i.gatewayGrpcForwarder != nil {
-		i.gatewayGrpcForwarder.ConnectToGateways(ctx)
+		if err := i.gatewayGrpcForwarder.ConnectToGateways(ctx); err != nil {
+			return err
+		}
 	}
 
 	err := <-wait // disconnected with err
