@@ -617,8 +617,8 @@ func (q *queue) shadowScan(ctx context.Context) error {
 		go q.shadowWorker(ctx, qspc)
 	}
 
-	tick := q.clock.NewTicker(q.pollTick)
-	l.Debug("starting shadow scanner", "poll", q.pollTick.String())
+	tick := q.clock.NewTicker(q.shadowPollTick)
+	l.Debug("starting shadow scanner", "poll", q.shadowPollTick.String())
 
 	backoff := 200 * time.Millisecond
 
