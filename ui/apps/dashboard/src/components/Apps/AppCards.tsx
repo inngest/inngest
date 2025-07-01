@@ -9,6 +9,7 @@ import WorkerCounter from '@inngest/components/Workers/ConnectedWorkersDescripti
 import { methodTypes } from '@inngest/components/types/app';
 
 import { ArchiveModal } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/apps/[externalID]/ArchiveModal';
+import ResyncModal from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/apps/[externalID]/ResyncModal';
 import { ValidateModal } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/apps/[externalID]/ValidateButton/ValidateModal';
 import { type FlattenedApp } from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/apps/useApps';
 import { ActionsMenu } from '@/components/Apps/ActionsMenu';
@@ -21,9 +22,9 @@ export default function AppCards({ apps, envSlug }: { apps: FlattenedApp[]; envS
   const router = useRouter();
 
   const [selectedApp, setSelectedApp] = useState<FlattenedApp | null>(null);
-  const [modalType, setModalType] = useState<'archive' | 'validate' | null>(null);
+  const [modalType, setModalType] = useState<'archive' | 'validate' | 'resync' | null>(null);
 
-  const handleShowModal = (app: FlattenedApp, type: 'archive' | 'validate') => {
+  const handleShowModal = (app: FlattenedApp, type: 'archive' | 'validate' | 'resync') => {
     setSelectedApp(app);
     setModalType(type);
   };
@@ -80,6 +81,7 @@ export default function AppCards({ apps, envSlug }: { apps: FlattenedApp[]; envS
                       disableArchive={!app.url}
                       showValidate={() => handleShowModal(app, 'validate')}
                       disableValidate={app.isParentArchived || app.method === methodTypes.Connect}
+                      showResync={() => handleShowModal(app, 'resync')}
                     />
                   </div>
                 }
@@ -105,6 +107,16 @@ export default function AppCards({ apps, envSlug }: { apps: FlattenedApp[]; envS
           isArchived={selectedApp.isArchived}
           isOpen={true}
           onClose={handleCloseModal}
+        />
+      )}
+      {selectedApp?.url && modalType === 'resync' && (
+        <ResyncModal
+          appExternalID={selectedApp.externalID}
+          appMethod={selectedApp.method}
+          isOpen={true}
+          onClose={handleCloseModal}
+          url={selectedApp.url}
+          platform={selectedApp.platform || null}
         />
       )}
     </>

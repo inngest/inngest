@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { cn } from '@inngest/components/utils/classNames';
 import * as Dialog from '@radix-ui/react-dialog';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -18,6 +19,9 @@ type ModalProps = {
   footer?: React.ReactNode;
 
   alignTop?: boolean;
+
+  /** Ref to the element to focus when the modal opens */
+  initialFocus?: React.RefObject<HTMLElement>;
 };
 
 export function Modal({
@@ -29,8 +33,17 @@ export function Modal({
   className = 'max-w-lg',
   footer,
   alignTop,
+  initialFocus,
 }: ModalProps) {
   const container = typeof document !== 'undefined' ? document.getElementById('modals') : undefined;
+
+  useEffect(() => {
+    if (isOpen && initialFocus) {
+      const timeout = setTimeout(() => initialFocus.current?.focus(), 100);
+      return () => clearTimeout(timeout);
+    }
+  }, [isOpen, initialFocus]);
+
   return (
     <Dialog.Root open={isOpen} onOpenChange={onClose} modal>
       <AnimatePresence>
