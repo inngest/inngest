@@ -323,14 +323,18 @@ func WithActiveCheckAccountProbability(p int) QueueOpt {
 // WithActiveCheckAccountConcurrency specifies the number of accounts to be peeked and processed by the active checker in parallel
 func WithActiveCheckAccountConcurrency(p int) QueueOpt {
 	return func(q *queue) {
-		q.activeCheckAccountConcurrency = int64(p)
+		if p > 0 {
+			q.activeCheckAccountConcurrency = int64(p)
+		}
 	}
 }
 
 // WithActiveCheckBacklogConcurrency specifies the number of backlogs to be peeked and processed by the active checker in parallel
 func WithActiveCheckBacklogConcurrency(p int) QueueOpt {
 	return func(q *queue) {
-		q.activeCheckBacklogConcurrency = int64(p)
+		if p > 0 {
+			q.activeCheckBacklogConcurrency = int64(p)
+		}
 	}
 }
 
