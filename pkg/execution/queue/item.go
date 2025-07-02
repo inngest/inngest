@@ -194,6 +194,9 @@ func (q QueueItem) SojournLatency(now time.Time) time.Duration {
 		return sojourn
 	}
 
+	// Track the entire time from enqueueing an item to refilling, including
+	// expected static (item in the future) and dynamic (time spent waiting due to concurrency limits) delays.
+	// note: System delays may be included in this.
 	return q.RefillDelay() + q.ExpectedDelay()
 }
 
@@ -209,7 +212,8 @@ func (q QueueItem) Latency(now time.Time) time.Duration {
 	return q.LeaseDelay(now)
 }
 
-// ExpectedDelay returns the expected delay for a queue item (usually 0, positive if scheduled into the future)
+// ExpectedDelay returns the expected delay for a queue item (usually 0, positive if scheduled into the future).
+// This is based on static information and thus does _not_ capture the time spent waiting due to concurrency constraints, etc.
 func (q QueueItem) ExpectedDelay() time.Duration {
 	if q.EnqueuedAt == 0 {
 		return 0
@@ -231,7 +235,10 @@ func (q QueueItem) RefillDelay() time.Duration {
 	enqueuedAt := time.UnixMilli(q.EnqueuedAt)
 
 	refillDelay := refilledAt.Sub(enqueuedAt)
-	refillDelay = refillDelay - q.ExpectedDelay() // ignore expected delay (if item was scheduled in the future)
+
+	// ignore expected delay (if item was scheduled in the future)
+	// note: this does not account for time spent waiting due to hitting concurrency limits, etc.
+	refillDelay = refillDelay - q.ExpectedDelay()
 
 	return refillDelay
 }
