@@ -1740,7 +1740,7 @@ func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error 
 
 		if p.queue.itemEnableKeyQueues(ctx, *item) {
 			err := p.queue.Requeue(ctx, p.queue.primaryQueueShard, *item, time.UnixMilli(item.AtMS))
-			if err != nil {
+			if err != nil && !errors.Is(err, ErrQueueItemNotFound) {
 				l.Error("could not requeue item to backlog after hitting throttle limit", "error", err)
 				return fmt.Errorf("could not requeue to backlog: %w", err)
 			}
@@ -1797,7 +1797,7 @@ func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error 
 
 		if p.queue.itemEnableKeyQueues(ctx, *item) {
 			err := p.queue.Requeue(ctx, p.queue.primaryQueueShard, *item, time.UnixMilli(item.AtMS))
-			if err != nil {
+			if err != nil && !errors.Is(err, ErrQueueItemNotFound) {
 				l.Error("could not requeue item to backlog after hitting concurrency limit", "error", err)
 				return fmt.Errorf("could not requeue to backlog: %w", err)
 			}
@@ -1838,7 +1838,7 @@ func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error 
 
 		if p.queue.itemEnableKeyQueues(ctx, *item) {
 			err := p.queue.Requeue(ctx, p.queue.primaryQueueShard, *item, time.UnixMilli(item.AtMS))
-			if err != nil {
+			if err != nil && !errors.Is(err, ErrQueueItemNotFound) {
 				l.Error("could not requeue item to backlog after hitting custom concurrency limit", "error", err)
 				return fmt.Errorf("could not requeue to backlog: %w", err)
 			}
