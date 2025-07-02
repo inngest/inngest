@@ -20,9 +20,16 @@ import (
 )
 
 const (
+	// ActiveCheckBacklogConcurrency determines how many accounts are peeked and processed in parallel
 	ActiveCheckAccountConcurrency = 30
+
+	// ActiveCheckBacklogConcurrency determines how many backlogs are peeked and processed in parallel
 	ActiveCheckBacklogConcurrency = 30
- 
+
+	// ActiveCheckScanBatchSize determines how many queue items are scanned in each loop.
+	// More queue items will slow down the active checker but yield faster iteration over the set. Tune carefully.
+	ActiveCheckScanBatchSize = 25
+
 	BacklogActiveCheckCooldownDuration = 1 * time.Minute
 	AccountActiveCheckCooldownDuration = 1 * time.Minute
 )
@@ -263,7 +270,6 @@ func (q *queue) accountActiveCheck(
 
 	l.Debug("checking account for invalid or missing active keys", "account_id", accountID, "key", keyActive, "in_progress", keyInProgress)
 
-	var batchSize int64 = 20
 	var cursor int64
 
 	for {
@@ -274,7 +280,7 @@ func (q *queue) accountActiveCheck(
 
 		l := l.With("chunk_id", chunkID)
 
-		res, err := q.activeCheckScan(ctx, q.primaryQueueShard, keyActive, keyInProgress, cursor, batchSize)
+		res, err := q.activeCheckScan(ctx, q.primaryQueueShard, keyActive, keyInProgress, cursor, q.activeCheckScanBatchSize)
 		if err != nil {
 			return fmt.Errorf("could not scan account: %w", err)
 		}
@@ -369,7 +375,6 @@ func (q *queue) partitionActiveCheck(
 	keyInProgress := sp.inProgressKey(kg)
 	keyReady := sp.readyQueueKey(kg)
 
-	var batchSize int64 = 20
 	var cursor int64
 
 	for {
@@ -386,7 +391,7 @@ func (q *queue) partitionActiveCheck(
 			"ready", keyActive,
 		)
 
-		res, err := q.activeCheckScan(ctx, q.primaryQueueShard, keyActive, keyInProgress, cursor, batchSize)
+		res, err := q.activeCheckScan(ctx, q.primaryQueueShard, keyActive, keyInProgress, cursor, q.activeCheckScanBatchSize)
 		if err != nil {
 			return fmt.Errorf("could not scan partition: %w", err)
 		}
@@ -468,7 +473,6 @@ func (q *queue) customConcurrencyActiveCheck(ctx context.Context, sp *QueueShado
 	keyActive := bcc.activeKey(kg)
 	keyInProgress := bcc.concurrencyKey(kg)
 
-	var batchSize int64 = 20
 	var cursor int64
 
 	for {
@@ -484,7 +488,7 @@ func (q *queue) customConcurrencyActiveCheck(ctx context.Context, sp *QueueShado
 			"in_progress", keyInProgress,
 		)
 
-		res, err := q.activeCheckScan(ctx, q.primaryQueueShard, keyActive, keyInProgress, cursor, batchSize)
+		res, err := q.activeCheckScan(ctx, q.primaryQueueShard, keyActive, keyInProgress, cursor, q.activeCheckScanBatchSize)
 		if err != nil {
 			return fmt.Errorf("could not scan custom concurrency key: %w", err)
 		}

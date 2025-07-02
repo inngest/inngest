@@ -338,6 +338,15 @@ func WithActiveCheckBacklogConcurrency(p int) QueueOpt {
 	}
 }
 
+// WithActiveCheckScanBatchSize specifies the batch size for iterating over active sets
+func WithActiveCheckScanBatchSize(p int) QueueOpt {
+	return func(q *queue) {
+		if p > 0 {
+			q.activeCheckScanBatchSize = int64(p)
+		}
+	}
+}
+
 func WithQueueItemIndexer(i QueueItemIndexer) QueueOpt {
 	return func(q *queue) {
 		q.itemIndexer = i
@@ -761,6 +770,7 @@ func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 		activeCheckAccountProbability: 10,
 		activeCheckAccountConcurrency: ActiveCheckAccountConcurrency,
 		activeCheckBacklogConcurrency: ActiveCheckBacklogConcurrency,
+		activeCheckScanBatchSize:      ActiveCheckScanBatchSize,
 	}
 
 	// default to using primary queue client for shard selection
@@ -817,6 +827,7 @@ type queue struct {
 	activeCheckTick               time.Duration
 	activeCheckAccountConcurrency int64
 	activeCheckBacklogConcurrency int64
+	activeCheckScanBatchSize      int64
 
 	activeCheckAccountProbability int
 	activeSpotCheckProbability    ActiveSpotChecksProbability
