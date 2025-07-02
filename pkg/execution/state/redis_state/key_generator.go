@@ -215,6 +215,8 @@ type QueueKeyGenerator interface {
 
 	BacklogActiveCheckSet() string
 	BacklogActiveCheckCooldown(backlogID string) string
+	AccountActiveCheckSet() string
+	AccountActiveCheckCooldown(accountID string) string
 
 	//
 	// Queue metadata keys
@@ -492,6 +494,17 @@ func (u queueKeyGenerator) BacklogActiveCheckCooldown(backlogID string) string {
 		return fmt.Sprintf("{%s}:active-check:cooldown:backlog:-", u.queueDefaultKey)
 	}
 	return fmt.Sprintf("{%s}:active-check:cooldown:backlog:%s", u.queueDefaultKey, backlogID)
+}
+
+func (u queueKeyGenerator) AccountActiveCheckSet() string {
+	return fmt.Sprintf("{%s}:active-check:account:sorted", u.queueDefaultKey)
+}
+
+func (u queueKeyGenerator) AccountActiveCheckCooldown(accountID string) string {
+	if accountID == "" {
+		return fmt.Sprintf("{%s}:active-check:cooldown:account:-", u.queueDefaultKey)
+	}
+	return fmt.Sprintf("{%s}:active-check:cooldown:account:%s", u.queueDefaultKey, accountID)
 }
 
 func (u queueKeyGenerator) QueuePrefix() string {
