@@ -2276,26 +2276,7 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 		return nil, fmt.Errorf("error leasing queue item: %w", err)
 	}
 
-	leaseDelay := now.Sub(time.UnixMilli(item.EnqueuedAt))
-	metrics.HistogramQueueOperationDelay(ctx, leaseDelay, metrics.HistogramOpt{
-		PkgName: pkgName,
-		Tags: map[string]any{
-			"queue_shard": q.primaryQueueShard.Name,
-			"op":          "lease",
-		}},
-	)
-
-	refillDelay := now.Sub(time.UnixMilli(item.RefilledAt))
-	metrics.HistogramQueueOperationDelay(ctx, refillDelay, metrics.HistogramOpt{
-		PkgName: pkgName,
-		Tags: map[string]any{
-			"queue_shard": q.primaryQueueShard.Name,
-			"op":          "refill",
-		}},
-	)
-
-	delayMS := item.AtMS - item.EnqueuedAt
-	itemDelay := time.Duration(delayMS) * time.Millisecond
+	itemDelay := item.ExpectedDelay()
 	metrics.HistogramQueueOperationDelay(ctx, itemDelay, metrics.HistogramOpt{
 		PkgName: pkgName,
 		Tags: map[string]any{
@@ -2304,14 +2285,35 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 		}},
 	)
 
-	q.log.Trace("leasing item",
+	l := q.log.With("item_delay", itemDelay.String())
+
+	refillDelay := item.RefillDelay()
+	metrics.HistogramQueueOperationDelay(ctx, refillDelay, metrics.HistogramOpt{
+		PkgName: pkgName,
+		Tags: map[string]any{
+			"queue_shard": q.primaryQueueShard.Name,
+			"op":          "refill",
+		}},
+	)
+	l = l.With("refill_delay", refillDelay.String())
+
+	// leaseDelay is the time between refilling and leasing
+	leaseDelay := item.LeaseDelay(now)
+	metrics.HistogramQueueOperationDelay(ctx, leaseDelay, metrics.HistogramOpt{
+		PkgName: pkgName,
+		Tags: map[string]any{
+			"queue_shard": q.primaryQueueShard.Name,
+			"op":          "lease",
+		}},
+	)
+	l = l.With("lease_delay", leaseDelay.String())
+
+	l.Trace("leasing item",
 		"id", item.ID,
 		"kind", item.Data.Kind,
 		"lease_id", leaseID.String(),
 		"partition_id", partition.PartitionID,
 		"item_delay", itemDelay.String(),
-		"refill_delay", refillDelay.String(),
-		"lease_delay", leaseDelay.String(),
 		"refilled", refilledFromBacklog,
 		"check", checkConstraints,
 		"status", status,
