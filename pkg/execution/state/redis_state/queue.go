@@ -110,6 +110,7 @@ const (
 	defaultPollTick                 = 10 * time.Millisecond
 	defaultShadowPollTick           = 100 * time.Millisecond
 	defaultBacklogNormalizePollTick = 250 * time.Millisecond
+	defaultActiveCheckTick          = 10 * time.Second
 
 	defaultIdempotencyTTL = 12 * time.Hour
 	defaultConcurrency    = 1000 // TODO: add function to override.
@@ -301,6 +302,48 @@ func WithShadowPollTick(t time.Duration) QueueOpt {
 func WithBacklogNormalizePollTick(t time.Duration) QueueOpt {
 	return func(q *queue) {
 		q.backlogNormalizePollTick = t
+	}
+}
+
+// WithActiveCheckPollTick specifies the interval at which the queue will poll the backing store
+// for available backlogs to normalize.
+func WithActiveCheckPollTick(t time.Duration) QueueOpt {
+	return func(q *queue) {
+		q.activeCheckTick = t
+	}
+}
+
+// WithActiveCheckAccountProbability specifies the probability of processing accounts vs. backlogs during an active check run.
+func WithActiveCheckAccountProbability(p int) QueueOpt {
+	return func(q *queue) {
+		q.activeCheckAccountProbability = p
+	}
+}
+
+// WithActiveCheckAccountConcurrency specifies the number of accounts to be peeked and processed by the active checker in parallel
+func WithActiveCheckAccountConcurrency(p int) QueueOpt {
+	return func(q *queue) {
+		if p > 0 {
+			q.activeCheckAccountConcurrency = int64(p)
+		}
+	}
+}
+
+// WithActiveCheckBacklogConcurrency specifies the number of backlogs to be peeked and processed by the active checker in parallel
+func WithActiveCheckBacklogConcurrency(p int) QueueOpt {
+	return func(q *queue) {
+		if p > 0 {
+			q.activeCheckBacklogConcurrency = int64(p)
+		}
+	}
+}
+
+// WithActiveCheckScanBatchSize specifies the batch size for iterating over active sets
+func WithActiveCheckScanBatchSize(p int) QueueOpt {
+	return func(q *queue) {
+		if p > 0 {
+			q.activeCheckScanBatchSize = int64(p)
+		}
 	}
 }
 
@@ -644,6 +687,7 @@ func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 		pollTick:                       defaultPollTick,
 		shadowPollTick:                 defaultShadowPollTick,
 		backlogNormalizePollTick:       defaultBacklogNormalizePollTick,
+		activeCheckTick:                defaultActiveCheckTick,
 		idempotencyTTL:                 defaultIdempotencyTTL,
 		queueKindMapping:               make(map[string]string),
 		peekSizeForFunctions:           make(map[string]int64),
@@ -723,6 +767,10 @@ func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 		activeSpotCheckProbability: func(ctx context.Context, acctID uuid.UUID) (backlogRefillCheckProbability int, accountSpotCheckProbability int) {
 			return 100, 100
 		},
+		activeCheckAccountProbability: 10,
+		activeCheckAccountConcurrency: ActiveCheckAccountConcurrency,
+		activeCheckBacklogConcurrency: ActiveCheckBacklogConcurrency,
+		activeCheckScanBatchSize:      ActiveCheckScanBatchSize,
 	}
 
 	// default to using primary queue client for shard selection
@@ -775,8 +823,21 @@ type queue struct {
 	allowKeyQueues                  AllowKeyQueues
 	enqueueSystemQueuesToBacklog    bool
 	partitionConstraintConfigGetter PartitionConstraintConfigGetter
-	activeSpotCheckProbability      ActiveSpotChecksProbability
-	readOnlySpotChecks              ReadOnlySpotChecks
+
+	activeCheckTick               time.Duration
+	activeCheckAccountConcurrency int64
+	activeCheckBacklogConcurrency int64
+	activeCheckScanBatchSize      int64
+
+	activeCheckAccountProbability int
+	activeSpotCheckProbability    ActiveSpotChecksProbability
+	readOnlySpotChecks            ReadOnlySpotChecks
+	// activeCheckerLeaseID stores the lease ID if this queue is the ActiveChecker processor.
+	// all runners attempt to claim this lease automatically.
+	activeCheckerLeaseID *ulid.ULID
+	// activeCheckerLeaseLock ensures that there are no data races writing to
+	// or reading from activeCheckerLeaseID in parallel.
+	activeCheckerLeaseLock *sync.RWMutex
 
 	disableLeaseChecks                DisableLeaseChecks
 	disableLeaseChecksForSystemQueues bool
@@ -896,13 +957,6 @@ type queue struct {
 
 	normalizeRefreshItemCustomConcurrencyKeys NormalizeRefreshItemCustomConcurrencyKeysFn
 	refreshItemThrottle                       RefreshItemThrottleFn
-
-	// activeCheckerLeaseID stores the lease ID if this queue is the ActiveChecker processor.
-	// all runners attempt to claim this lease automatically.
-	activeCheckerLeaseID *ulid.ULID
-	// activeCheckerLeaseLock ensures that there are no data races writing to
-	// or reading from activeCheckerLeaseID in parallel.
-	activeCheckerLeaseLock *sync.RWMutex
 
 	enableJobPromotion bool
 }
@@ -2255,26 +2309,7 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 		return nil, fmt.Errorf("error leasing queue item: %w", err)
 	}
 
-	leaseDelay := now.Sub(time.UnixMilli(item.EnqueuedAt))
-	metrics.HistogramQueueOperationDelay(ctx, leaseDelay, metrics.HistogramOpt{
-		PkgName: pkgName,
-		Tags: map[string]any{
-			"queue_shard": q.primaryQueueShard.Name,
-			"op":          "lease",
-		}},
-	)
-
-	refillDelay := now.Sub(time.UnixMilli(item.RefilledAt))
-	metrics.HistogramQueueOperationDelay(ctx, refillDelay, metrics.HistogramOpt{
-		PkgName: pkgName,
-		Tags: map[string]any{
-			"queue_shard": q.primaryQueueShard.Name,
-			"op":          "refill",
-		}},
-	)
-
-	delayMS := item.AtMS - item.EnqueuedAt
-	itemDelay := time.Duration(delayMS) * time.Millisecond
+	itemDelay := item.ExpectedDelay()
 	metrics.HistogramQueueOperationDelay(ctx, itemDelay, metrics.HistogramOpt{
 		PkgName: pkgName,
 		Tags: map[string]any{
@@ -2283,14 +2318,35 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 		}},
 	)
 
-	q.log.Trace("leasing item",
+	l := q.log.With("item_delay", itemDelay.String())
+
+	refillDelay := item.RefillDelay()
+	metrics.HistogramQueueOperationDelay(ctx, refillDelay, metrics.HistogramOpt{
+		PkgName: pkgName,
+		Tags: map[string]any{
+			"queue_shard": q.primaryQueueShard.Name,
+			"op":          "refill",
+		}},
+	)
+	l = l.With("refill_delay", refillDelay.String())
+
+	// leaseDelay is the time between refilling and leasing
+	leaseDelay := item.LeaseDelay(now)
+	metrics.HistogramQueueOperationDelay(ctx, leaseDelay, metrics.HistogramOpt{
+		PkgName: pkgName,
+		Tags: map[string]any{
+			"queue_shard": q.primaryQueueShard.Name,
+			"op":          "lease",
+		}},
+	)
+	l = l.With("lease_delay", leaseDelay.String())
+
+	l.Trace("leasing item",
 		"id", item.ID,
 		"kind", item.Data.Kind,
 		"lease_id", leaseID.String(),
 		"partition_id", partition.PartitionID,
 		"item_delay", itemDelay.String(),
-		"refill_delay", refillDelay.String(),
-		"lease_delay", leaseDelay.String(),
 		"refilled", refilledFromBacklog,
 		"check", checkConstraints,
 		"status", status,

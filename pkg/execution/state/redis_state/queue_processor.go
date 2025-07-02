@@ -456,7 +456,7 @@ func (q *queue) runActiveChecker(ctx context.Context) {
 	q.activeCheckerLeaseLock.Unlock()
 
 	tick := q.clock.NewTicker(ConfigLeaseDuration / 3)
-	checkTick := q.clock.NewTicker(30 * time.Second)
+	checkTick := q.clock.NewTicker(q.activeCheckTick)
 
 	for {
 		select {

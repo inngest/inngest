@@ -96,6 +96,16 @@ func HistogramQueueOperationDelay(ctx context.Context, delay time.Duration, opts
 	})
 }
 
+func HistogramQueueActiveCheckDuration(ctx context.Context, delay time.Duration, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, delay.Milliseconds(), HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "queue_active_check_duration",
+		Description: "Distribution of active check durations",
+		Tags:        opts.Tags,
+		Boundaries:  DefaultBoundaries,
+	})
+}
+
 func HistogramRedisCommandDuration(ctx context.Context, value int64, opts HistogramOpt) {
 	RecordIntHistogramMetric(ctx, value, HistogramOpt{
 		PkgName:     opts.PkgName,

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"strconv"
 	"time"
 
@@ -193,8 +194,10 @@ func (q QueueItem) SojournLatency(now time.Time) time.Duration {
 		return sojourn
 	}
 
-	refillDelay := time.Duration(q.RefilledAt-q.EnqueuedAt) * time.Millisecond
-	return refillDelay
+	// Track the entire time from enqueueing an item to refilling, including
+	// expected static (item in the future) and dynamic (time spent waiting due to concurrency limits) delays.
+	// note: System delays may be included in this.
+	return q.RefillDelay() + q.ExpectedDelay()
 }
 
 // Latency represents the processing delay excluding sojourn latency.
@@ -206,9 +209,47 @@ func (q QueueItem) Latency(now time.Time) time.Duration {
 	}
 
 	// Time between refill and lease/processing
+	return q.LeaseDelay(now)
+}
+
+// ExpectedDelay returns the expected delay for a queue item (usually 0, positive if scheduled into the future).
+// This is based on static information and thus does _not_ capture the time spent waiting due to concurrency constraints, etc.
+func (q QueueItem) ExpectedDelay() time.Duration {
+	if q.EnqueuedAt == 0 {
+		return 0
+	}
+
+	delayMS := q.AtMS - q.EnqueuedAt
+	delayMS = int64(math.Max(float64(delayMS), 0)) // ignore negative delays (item was planned earlier than enqueued)
+	itemDelay := time.Duration(delayMS) * time.Millisecond
+
+	return itemDelay
+}
+
+// RefillDelay returns the time it took from enqueueing to refilling (minus expected delays)
+func (q QueueItem) RefillDelay() time.Duration {
+	if q.RefilledAt == 0 || q.EnqueuedAt == 0 {
+		return 0
+	}
 	refilledAt := time.UnixMilli(q.RefilledAt)
-	processingDelay := now.Sub(refilledAt)
-	return processingDelay
+	enqueuedAt := time.UnixMilli(q.EnqueuedAt)
+
+	refillDelay := refilledAt.Sub(enqueuedAt)
+
+	// ignore expected delay (if item was scheduled in the future)
+	// note: this does not account for time spent waiting due to hitting concurrency limits, etc.
+	refillDelay = refillDelay - q.ExpectedDelay()
+
+	return refillDelay
+}
+
+// LeaseDelay returns the time between refilling and leasing
+func (q QueueItem) LeaseDelay(now time.Time) time.Duration {
+	if q.RefilledAt == 0 {
+		return 0
+	}
+
+	return now.Sub(time.UnixMilli(q.RefilledAt))
 }
 
 // Item represents an item stored within a queue.

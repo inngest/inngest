@@ -500,3 +500,12 @@ func IncrQueueActiveCheckInvalidItemsRemovedCounter(ctx context.Context, val int
 		Tags:        opts.Tags,
 	})
 }
+
+func IncrQueueActiveCheckAccountScannedCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "queue_active_check_account_scanned_total",
+		Description: "The total number of times an account was scanned during an active check",
+		Tags:        opts.Tags,
+	})
+}
