@@ -152,6 +152,8 @@ func (q *queue) ActiveCheck(ctx context.Context) (int, error) {
 }
 
 func (q *queue) backlogActiveCheck(ctx context.Context, b *QueueBacklog, shard QueueShard, kg QueueKeyGenerator) (bool, error) {
+	accountID := uuid.Nil
+
 	start := q.clock.Now()
 	defer func() {
 		dur := q.clock.Now().Sub(start)
@@ -161,6 +163,7 @@ func (q *queue) backlogActiveCheck(ctx context.Context, b *QueueBacklog, shard Q
 			Tags: map[string]any{
 				"queue_shard": q.primaryQueueShard.Name,
 				"type":        "backlog",
+				"account_id":  accountID,
 			},
 		})
 	}()
@@ -193,7 +196,6 @@ func (q *queue) backlogActiveCheck(ctx context.Context, b *QueueBacklog, shard Q
 		}
 	}
 
-	accountID := uuid.Nil
 	if sp.AccountID != nil {
 		accountID = *sp.AccountID
 	}
