@@ -275,7 +275,7 @@ func (q *queue) accountActiveCheck(
 
 		l := l.With("chunk_id", chunkID)
 
-		res, err := q.activeCheckScanAccount(ctx, q.primaryQueueShard, keyActive, keyInProgress, cursor, batchSize)
+		res, err := q.activeCheckScan(ctx, q.primaryQueueShard, keyActive, keyInProgress, cursor, batchSize)
 		if err != nil {
 			return fmt.Errorf("could not scan account: %w", err)
 		}
@@ -387,7 +387,7 @@ func (q *queue) partitionActiveCheck(
 			"ready", keyActive,
 		)
 
-		res, err := q.activeCheckScanStatic(ctx, q.primaryQueueShard, keyActive, keyReady, keyInProgress, cursor, batchSize)
+		res, err := q.activeCheckScan(ctx, q.primaryQueueShard, keyActive, keyInProgress, cursor, batchSize)
 		if err != nil {
 			return fmt.Errorf("could not scan partition: %w", err)
 		}
@@ -469,9 +469,6 @@ func (q *queue) customConcurrencyActiveCheck(ctx context.Context, sp *QueueShado
 	keyActive := bcc.activeKey(kg)
 	keyInProgress := bcc.concurrencyKey(kg)
 
-	// Can use the partition ready queue as it includes _all_ concurrency keys' items
-	keyReady := sp.readyQueueKey(kg)
-
 	var batchSize int64 = 20
 	var cursor int64
 
@@ -486,10 +483,9 @@ func (q *queue) customConcurrencyActiveCheck(ctx context.Context, sp *QueueShado
 			"cursor", cursor,
 			"active", keyActive,
 			"in_progress", keyInProgress,
-			"ready", keyActive,
 		)
 
-		res, err := q.activeCheckScanStatic(ctx, q.primaryQueueShard, keyActive, keyReady, keyInProgress, cursor, batchSize)
+		res, err := q.activeCheckScan(ctx, q.primaryQueueShard, keyActive, keyInProgress, cursor, batchSize)
 		if err != nil {
 			return fmt.Errorf("could not scan custom concurrency key: %w", err)
 		}
@@ -532,7 +528,6 @@ func (q *queue) customConcurrencyActiveCheck(ctx context.Context, sp *QueueShado
 				"bcc", bcc,
 				"partition_id", sp.PartitionID,
 				"active", keyActive,
-				"ready", keyReady,
 				"in_progress", keyInProgress,
 				"readonly", readOnly,
 			)
@@ -654,17 +649,17 @@ type activeCheckScanResult struct {
 	StaleItems   []osqueue.QueueItem
 }
 
-func (q *queue) activeCheckScanAccount(ctx context.Context, shard QueueShard, keyActive, keyInProgress string, cursor, count int64) (*activeCheckScanResult, error) {
+func (q *queue) activeCheckScan(ctx context.Context, shard QueueShard, keyActive, keyInProgress string, cursor, count int64) (*activeCheckScanResult, error) {
 	kg := shard.RedisClient.KeyGenerator()
 	client := shard.RedisClient.Client()
 
 	res, err := duration(
 		ctx,
 		q.primaryQueueShard.Name,
-		"active_check_scan_account",
+		"active_check_scan",
 		q.clock.Now(),
 		func(ctx context.Context) (any, error) {
-			res, err := scripts["queue/activeCheckScanAccount"].Exec(ctx, client, []string{
+			res, err := scripts["queue/activeCheckScan"].Exec(ctx, client, []string{
 				keyActive,
 				keyInProgress,
 				kg.QueueItem(),
@@ -678,7 +673,7 @@ func (q *queue) activeCheckScanAccount(ctx context.Context, shard QueueShard, ke
 			return res, err
 		})
 	if err != nil {
-		return nil, fmt.Errorf("could not scan account for active check: %w", err)
+		return nil, fmt.Errorf("could not scan for active check: %w", err)
 	}
 
 	return parseScanResult(res)
@@ -749,36 +744,6 @@ func parseScanResult(res any) (*activeCheckScanResult, error) {
 		LeasedItems:  leased,
 		StaleItems:   stale,
 	}, nil
-}
-
-func (q *queue) activeCheckScanStatic(ctx context.Context, shard QueueShard, keyActiveSet, keyTarget1, keyTarget2 string, cursor, count int64) (*activeCheckScanResult, error) {
-	kg := shard.RedisClient.KeyGenerator()
-	client := shard.RedisClient.Client()
-
-	res, err := duration(
-		ctx,
-		q.primaryQueueShard.Name,
-		"active_check_scan_static",
-		q.clock.Now(),
-		func(ctx context.Context) (any, error) {
-			res, err := scripts["queue/activeCheckScanStatic"].Exec(ctx, client, []string{
-				keyActiveSet,
-				keyTarget1,
-				keyTarget2,
-				kg.QueueItem(),
-			},
-				[]string{
-					strconv.Itoa(int(cursor)),
-					strconv.Itoa(int(count)),
-					strconv.Itoa(int(q.clock.Now().UnixMilli())),
-				}).ToAny()
-			return res, err
-		})
-	if err != nil {
-		return nil, fmt.Errorf("could not scan static targets for active check: %w", err)
-	}
-
-	return parseScanResult(res)
 }
 
 func (q *queue) activeCheckRemove(ctx context.Context, shard QueueShard, keyActiveCheckSet, keyActiveCheckCooldown, pointer string, cooldown time.Duration) error {

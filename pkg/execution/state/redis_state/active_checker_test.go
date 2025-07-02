@@ -126,11 +126,7 @@ func TestShadowPartitionActiveCheck(t *testing.T) {
 	t.Run("should work on missing set", func(t *testing.T) {
 		setup(t)
 
-		res, err := q.activeCheckScanAccount(ctx, defaultShard, sp.accountActiveKey(kg), sp.accountInProgressKey(kg), 0, 10)
-		require.NoError(t, err)
-		require.NotNil(t, res)
-
-		res, err = q.activeCheckScanStatic(ctx, defaultShard, sp.activeKey(kg), sp.readyQueueKey(kg), sp.inProgressKey(kg), 0, 10)
+		res, err := q.activeCheckScan(ctx, defaultShard, sp.accountActiveKey(kg), sp.accountInProgressKey(kg), 0, 10)
 		require.NoError(t, err)
 		require.NotNil(t, res)
 	})
@@ -175,12 +171,12 @@ func TestShadowPartitionActiveCheck(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, leaseID)
 
-		res, err := q.activeCheckScanAccount(ctx, defaultShard, sp.accountActiveKey(kg), sp.accountInProgressKey(kg), 0, 10)
+		res, err := q.activeCheckScan(ctx, defaultShard, sp.accountActiveKey(kg), sp.accountInProgressKey(kg), 0, 10)
 		require.NoError(t, err)
 		require.Len(t, res.LeasedItems, 1)
 		require.Equal(t, qi.ID, res.LeasedItems[0])
 
-		res, err = q.activeCheckScanStatic(ctx, defaultShard, sp.activeKey(kg), sp.readyQueueKey(kg), sp.inProgressKey(kg), 0, 10)
+		res, err = q.activeCheckScan(ctx, defaultShard, sp.activeKey(kg), sp.inProgressKey(kg), 0, 10)
 		require.NoError(t, err)
 		require.Len(t, res.LeasedItems, 1)
 		require.Equal(t, qi.ID, res.LeasedItems[0])
@@ -202,7 +198,7 @@ func TestShadowPartitionActiveCheck(t *testing.T) {
 		_, err = cluster.SAdd(sp.accountActiveKey(kg), qi.ID)
 		require.NoError(t, err)
 
-		res, err := q.activeCheckScanAccount(ctx, defaultShard, sp.accountActiveKey(kg), sp.accountInProgressKey(kg), 0, 10)
+		res, err := q.activeCheckScan(ctx, defaultShard, sp.accountActiveKey(kg), sp.accountInProgressKey(kg), 0, 10)
 		require.NoError(t, err)
 		require.Len(t, res.StaleItems, 1)
 		require.Equal(t, qi.ID, res.StaleItems[0].ID)
