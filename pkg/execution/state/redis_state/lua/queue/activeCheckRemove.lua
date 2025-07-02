@@ -6,6 +6,9 @@ local nowMS           = tonumber(ARGV[2])
 local cooldownSeconds = tonumber(ARGV[3])
 
 redis.call("ZREM", keyActiveCheckSet, pointer)
-redis.call("SET", keyActiveCheckCooldown, nowMS, "EX", cooldownSeconds)
+
+if cooldownSeconds > 0 then
+  redis.call("SET", keyActiveCheckCooldown, nowMS, "EX", cooldownSeconds)
+end
 
 return 0

@@ -25,7 +25,7 @@ const (
 	BacklogActiveCheckPeekMax     = 30
 
 	BacklogActiveCheckCooldownDuration = 1 * time.Minute
-	AccountActiveCheckCooldownDuration = 5 * time.Minute
+	AccountActiveCheckCooldownDuration = 1 * time.Minute
 )
 
 func (q *queue) ActiveCheck(ctx context.Context) (int, error) {
@@ -65,7 +65,14 @@ func (q *queue) ActiveCheck(ctx context.Context) (int, error) {
 					return fmt.Errorf("could not check account active items: %w", err)
 				}
 
-				err = q.activeCheckRemove(ctx, shard, kg.AccountActiveCheckSet(), kg.AccountActiveCheckCooldown(accountID.String()), accountID.String())
+				err = q.activeCheckRemove(
+					ctx,
+					shard,
+					kg.AccountActiveCheckSet(),
+					kg.AccountActiveCheckCooldown(accountID.String()),
+					accountID.String(),
+					AccountActiveCheckCooldownDuration,
+				)
 				if err != nil {
 					l.Error("could not remove backlog from active check set", "err", err)
 				}
@@ -107,7 +114,14 @@ func (q *queue) ActiveCheck(ctx context.Context) (int, error) {
 
 			cleanup, err := q.backlogActiveCheck(logger.WithStdlib(ctx, l), backlog, shard, kg)
 			if cleanup {
-				cerr := q.activeCheckRemove(ctx, shard, kg.BacklogActiveCheckSet(), kg.BacklogActiveCheckCooldown(backlog.BacklogID), backlog.BacklogID)
+				cerr := q.activeCheckRemove(
+					ctx,
+					shard,
+					kg.BacklogActiveCheckSet(),
+					kg.BacklogActiveCheckCooldown(backlog.BacklogID),
+					backlog.BacklogID,
+					BacklogActiveCheckCooldownDuration,
+				)
 				if cerr != nil {
 					l.Error("could not remove backlog from active check set", "err", cerr)
 				}
@@ -767,7 +781,7 @@ func (q *queue) activeCheckScanStatic(ctx context.Context, shard QueueShard, key
 	return parseScanResult(res)
 }
 
-func (q *queue) activeCheckRemove(ctx context.Context, shard QueueShard, keyActiveCheckSet, keyActiveCheckCooldown, pointer string) error {
+func (q *queue) activeCheckRemove(ctx context.Context, shard QueueShard, keyActiveCheckSet, keyActiveCheckCooldown, pointer string, cooldown time.Duration) error {
 	if shard.Kind != string(enums.QueueShardKindRedis) {
 		return fmt.Errorf("unexpected queue shard kind %v", shard.Kind)
 	}
@@ -784,7 +798,7 @@ func (q *queue) activeCheckRemove(ctx context.Context, shard QueueShard, keyActi
 		[]string{
 			pointer,
 			strconv.Itoa(int(q.clock.Now().UnixMilli())),
-			strconv.Itoa(int(AccountActiveCheckCooldownDuration.Seconds())),
+			strconv.Itoa(int(cooldown.Seconds())),
 		},
 	).ToInt64()
 	if err != nil {
