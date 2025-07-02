@@ -159,8 +159,8 @@ func (q *queue) backlogActiveCheck(ctx context.Context, b *QueueBacklog, shard Q
 		metrics.HistogramQueueActiveCheckDuration(ctx, dur, metrics.HistogramOpt{
 			PkgName: pkgName,
 			Tags: map[string]any{
-				"queue": q.primaryQueueShard.Name,
-				"type":  "backlog",
+				"queue_shard": q.primaryQueueShard.Name,
+				"type":        "backlog",
 			},
 		})
 	}()
@@ -253,9 +253,9 @@ func (q *queue) accountActiveCheck(
 		metrics.HistogramQueueActiveCheckDuration(ctx, dur, metrics.HistogramOpt{
 			PkgName: pkgName,
 			Tags: map[string]any{
-				"queue":      q.primaryQueueShard.Name,
-				"type":       "account",
-				"account_id": accountID.String(),
+				"queue_shard": q.primaryQueueShard.Name,
+				"type":        "account",
+				"account_id":  accountID.String(),
 			},
 		})
 	}()
@@ -293,9 +293,10 @@ func (q *queue) accountActiveCheck(
 			metrics.IncrQueueActiveCheckInvalidItemsFoundCounter(ctx, int64(len(res.MissingItems)), metrics.CounterOpt{
 				PkgName: pkgName,
 				Tags: map[string]any{
-					"account_id": accountID.String(),
-					"check":      "account",
-					"reason":     "missing-item",
+					"queue_shard": q.primaryQueueShard.Name,
+					"account_id":  accountID.String(),
+					"check":       "account",
+					"reason":      "missing-item",
 				},
 			})
 			invalidItems = append(invalidItems, res.MissingItems...)
@@ -306,9 +307,10 @@ func (q *queue) accountActiveCheck(
 				metrics.IncrQueueActiveCheckInvalidItemsFoundCounter(ctx, 1, metrics.CounterOpt{
 					PkgName: pkgName,
 					Tags: map[string]any{
-						"account_id": accountID.String(),
-						"check":      "account",
-						"reason":     "missing-in-targets",
+						"queue_shard": q.primaryQueueShard.Name,
+						"account_id":  accountID.String(),
+						"check":       "account",
+						"reason":      "missing-in-targets",
 					},
 				})
 				invalidItems = append(invalidItems, item.ID)
@@ -329,8 +331,9 @@ func (q *queue) accountActiveCheck(
 				metrics.IncrQueueActiveCheckInvalidItemsRemovedCounter(ctx, int64(len(invalidItems)), metrics.CounterOpt{
 					PkgName: pkgName,
 					Tags: map[string]any{
-						"account_id": accountID.String(),
-						"check":      "account",
+						"queue_shard": q.primaryQueueShard.Name,
+						"account_id":  accountID.String(),
+						"check":       "account",
 					},
 				})
 
@@ -354,7 +357,8 @@ func (q *queue) accountActiveCheck(
 	metrics.IncrQueueActiveCheckAccountScannedCounter(ctx, metrics.CounterOpt{
 		PkgName: pkgName,
 		Tags: map[string]any{
-			"account_id": accountID.String(),
+			"queue_shard": q.primaryQueueShard.Name,
+			"account_id":  accountID.String(),
 		},
 	})
 
@@ -404,9 +408,10 @@ func (q *queue) partitionActiveCheck(
 			metrics.IncrQueueActiveCheckInvalidItemsFoundCounter(ctx, int64(len(res.MissingItems)), metrics.CounterOpt{
 				PkgName: pkgName,
 				Tags: map[string]any{
-					"account_id": accountID.String(),
-					"check":      "partition",
-					"reason":     "missing-item",
+					"queue_shard": q.primaryQueueShard.Name,
+					"account_id":  accountID.String(),
+					"check":       "partition",
+					"reason":      "missing-item",
 				},
 			})
 			invalidItems = append(invalidItems, res.MissingItems...)
@@ -417,9 +422,10 @@ func (q *queue) partitionActiveCheck(
 				metrics.IncrQueueActiveCheckInvalidItemsFoundCounter(ctx, 1, metrics.CounterOpt{
 					PkgName: pkgName,
 					Tags: map[string]any{
-						"account_id": accountID.String(),
-						"check":      "partition",
-						"reason":     "missing-in-targets",
+						"queue_shard": q.primaryQueueShard.Name,
+						"account_id":  accountID.String(),
+						"check":       "partition",
+						"reason":      "missing-in-targets",
 					},
 				})
 				invalidItems = append(invalidItems, item.ID)
@@ -442,8 +448,9 @@ func (q *queue) partitionActiveCheck(
 				metrics.IncrQueueActiveCheckInvalidItemsRemovedCounter(ctx, int64(len(invalidItems)), metrics.CounterOpt{
 					PkgName: pkgName,
 					Tags: map[string]any{
-						"account_id": accountID.String(),
-						"check":      "partition",
+						"queue_shard": q.primaryQueueShard.Name,
+						"account_id":  accountID.String(),
+						"check":       "partition",
 					},
 				})
 
@@ -501,9 +508,10 @@ func (q *queue) customConcurrencyActiveCheck(ctx context.Context, sp *QueueShado
 			metrics.IncrQueueActiveCheckInvalidItemsFoundCounter(ctx, int64(len(res.MissingItems)), metrics.CounterOpt{
 				PkgName: pkgName,
 				Tags: map[string]any{
-					"account_id": accountID.String(),
-					"check":      "custom-concurrency",
-					"reason":     "missing-item",
+					"queue_shard": q.primaryQueueShard.Name,
+					"account_id":  accountID.String(),
+					"check":       "custom-concurrency",
+					"reason":      "missing-item",
 				},
 			})
 			invalidItems = append(invalidItems, res.MissingItems...)
@@ -514,9 +522,10 @@ func (q *queue) customConcurrencyActiveCheck(ctx context.Context, sp *QueueShado
 				metrics.IncrQueueActiveCheckInvalidItemsFoundCounter(ctx, 1, metrics.CounterOpt{
 					PkgName: pkgName,
 					Tags: map[string]any{
-						"account_id": accountID.String(),
-						"check":      "custom-concurrency",
-						"reason":     "missing-in-targets",
+						"queue_shard": q.primaryQueueShard.Name,
+						"account_id":  accountID.String(),
+						"check":       "custom-concurrency",
+						"reason":      "missing-in-targets",
 					},
 				})
 				invalidItems = append(invalidItems, item.ID)
@@ -539,8 +548,9 @@ func (q *queue) customConcurrencyActiveCheck(ctx context.Context, sp *QueueShado
 				metrics.IncrQueueActiveCheckInvalidItemsRemovedCounter(ctx, int64(len(invalidItems)), metrics.CounterOpt{
 					PkgName: pkgName,
 					Tags: map[string]any{
-						"account_id": accountID.String(),
-						"check":      "custom-concurrency",
+						"queue_shard": q.primaryQueueShard.Name,
+						"account_id":  accountID.String(),
+						"check":       "custom-concurrency",
 					},
 				})
 
