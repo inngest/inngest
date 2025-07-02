@@ -194,8 +194,7 @@ func (q QueueItem) SojournLatency(now time.Time) time.Duration {
 		return sojourn
 	}
 
-	refillDelay := time.Duration(q.RefilledAt-q.EnqueuedAt) * time.Millisecond
-	return refillDelay
+	return q.RefillDelay()
 }
 
 // Latency represents the processing delay excluding sojourn latency.
@@ -207,9 +206,7 @@ func (q QueueItem) Latency(now time.Time) time.Duration {
 	}
 
 	// Time between refill and lease/processing
-	refilledAt := time.UnixMilli(q.RefilledAt)
-	processingDelay := now.Sub(refilledAt)
-	return processingDelay
+	return q.LeaseDelay(now)
 }
 
 // ExpectedDelay returns the expected delay for a queue item (usually 0, positive if scheduled into the future)
