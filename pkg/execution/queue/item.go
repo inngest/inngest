@@ -194,7 +194,7 @@ func (q QueueItem) SojournLatency(now time.Time) time.Duration {
 		return sojourn
 	}
 
-	return q.RefillDelay()
+	return q.RefillDelay() + q.ExpectedDelay()
 }
 
 // Latency represents the processing delay excluding sojourn latency.
