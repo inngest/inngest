@@ -1,12 +1,12 @@
 'use client';
 
 import { EventDetails } from '@inngest/components/Events/EventDetails';
+import { useReplayModal } from '@inngest/components/Events/useReplayModal';
 import { usePathCreator } from '@inngest/components/SharedContext/usePathCreator';
 
 import { ExpandedRowActions } from '@/components/Events/ExpandedRowActions';
 import { SendEventModal } from '@/components/Events/SendEventModal';
 import { useEventDetails, useEventPayload, useEventRuns } from '@/components/Events/useEvents';
-import { useReplayModal } from '@/components/Events/useReplayModal';
 
 type Props = {
   params: {

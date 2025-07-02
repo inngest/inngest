@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@inngest/components/Button/Button';
 import { EventsTable } from '@inngest/components/Events/EventsTable';
 import { InternalEventsToggle } from '@inngest/components/Events/InternalEventsToggle';
+import { useReplayModal } from '@inngest/components/Events/useReplayModal';
 import { Header } from '@inngest/components/Header/Header';
 import { RefreshButton } from '@inngest/components/Refresh/RefreshButton';
 import { RiExternalLinkLine, RiRefreshLine } from '@remixicon/react';
@@ -14,7 +15,6 @@ import { ExpandedRowActions } from '@/components/Events/ExpandedRowActions';
 import SendEventButton from '@/components/Events/SendEventButton';
 import { SendEventModal } from '@/components/Events/SendEventModal';
 import { useEventDetails, useEventPayload, useEvents } from '@/components/Events/useEvents';
-import { useReplayModal } from '@/components/Events/useReplayModal';
 import { useAccountFeatures } from '@/utils/useAccountFeatures';
 
 export default function EventsPage({
