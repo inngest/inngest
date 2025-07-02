@@ -320,6 +320,20 @@ func WithActiveCheckAccountProbability(p int) QueueOpt {
 	}
 }
 
+// WithActiveCheckAccountConcurrency specifies the number of accounts to be peeked and processed by the active checker in parallel
+func WithActiveCheckAccountConcurrency(p int) QueueOpt {
+	return func(q *queue) {
+		q.activeCheckAccountConcurrency = int64(p)
+	}
+}
+
+// WithActiveCheckBacklogConcurrency specifies the number of backlogs to be peeked and processed by the active checker in parallel
+func WithActiveCheckBacklogConcurrency(p int) QueueOpt {
+	return func(q *queue) {
+		q.activeCheckBacklogConcurrency = int64(p)
+	}
+}
+
 func WithQueueItemIndexer(i QueueItemIndexer) QueueOpt {
 	return func(q *queue) {
 		q.itemIndexer = i
@@ -741,6 +755,8 @@ func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 			return 100, 100
 		},
 		activeCheckAccountProbability: 10,
+		activeCheckAccountConcurrency: ActiveCheckAccountConcurrency,
+		activeCheckBacklogConcurrency: ActiveCheckBacklogConcurrency,
 	}
 
 	// default to using primary queue client for shard selection
@@ -794,9 +810,19 @@ type queue struct {
 	enqueueSystemQueuesToBacklog    bool
 	partitionConstraintConfigGetter PartitionConstraintConfigGetter
 
+	activeCheckTick               time.Duration
+	activeCheckAccountConcurrency int64
+	activeCheckBacklogConcurrency int64
+
+	activeCheckAccountProbability int
 	activeSpotCheckProbability    ActiveSpotChecksProbability
 	readOnlySpotChecks            ReadOnlySpotChecks
-	activeCheckAccountProbability int
+	// activeCheckerLeaseID stores the lease ID if this queue is the ActiveChecker processor.
+	// all runners attempt to claim this lease automatically.
+	activeCheckerLeaseID *ulid.ULID
+	// activeCheckerLeaseLock ensures that there are no data races writing to
+	// or reading from activeCheckerLeaseID in parallel.
+	activeCheckerLeaseLock *sync.RWMutex
 
 	disableLeaseChecks                DisableLeaseChecks
 	disableLeaseChecksForSystemQueues bool
@@ -904,7 +930,6 @@ type queue struct {
 
 	shadowPollTick           time.Duration
 	backlogNormalizePollTick time.Duration
-	activeCheckTick          time.Duration
 
 	shadowContinues         map[string]shadowContinuation
 	shadowContinueCooldown  map[string]time.Time
@@ -917,13 +942,6 @@ type queue struct {
 
 	normalizeRefreshItemCustomConcurrencyKeys NormalizeRefreshItemCustomConcurrencyKeysFn
 	refreshItemThrottle                       RefreshItemThrottleFn
-
-	// activeCheckerLeaseID stores the lease ID if this queue is the ActiveChecker processor.
-	// all runners attempt to claim this lease automatically.
-	activeCheckerLeaseID *ulid.ULID
-	// activeCheckerLeaseLock ensures that there are no data races writing to
-	// or reading from activeCheckerLeaseID in parallel.
-	activeCheckerLeaseLock *sync.RWMutex
 
 	enableJobPromotion bool
 }

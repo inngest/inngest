@@ -22,8 +22,7 @@ import (
 const (
 	ActiveCheckAccountConcurrency = 30
 	ActiveCheckBacklogConcurrency = 30
-	BacklogActiveCheckPeekMax     = 30
-
+ 
 	BacklogActiveCheckCooldownDuration = 1 * time.Minute
 	AccountActiveCheckCooldownDuration = 1 * time.Minute
 )
@@ -37,7 +36,7 @@ func (q *queue) ActiveCheck(ctx context.Context) (int, error) {
 
 	// Check account entrypoint
 	if mathRand.Intn(100) <= q.activeCheckAccountProbability {
-		accountIDs, err := q.AccountActiveCheckPeek(ctx, ActiveCheckAccountConcurrency)
+		accountIDs, err := q.AccountActiveCheckPeek(ctx, q.activeCheckAccountConcurrency)
 		if err != nil {
 			return 0, fmt.Errorf("could not peek accounts for active checker: %w", err)
 		}
@@ -90,7 +89,7 @@ func (q *queue) ActiveCheck(ctx context.Context) (int, error) {
 	}
 
 	// Peek backlogs for active checks
-	backlogs, err := q.BacklogActiveCheckPeek(ctx, BacklogActiveCheckPeekMax)
+	backlogs, err := q.BacklogActiveCheckPeek(ctx, q.activeCheckBacklogConcurrency)
 	if err != nil {
 		return 0, fmt.Errorf("could not peek backlogs for active checker: %w", err)
 	}
@@ -570,7 +569,7 @@ func (q *queue) BacklogActiveCheckPeek(ctx context.Context, peekSize int64) ([]*
 
 	peeker := peeker[QueueBacklog]{
 		q:                      q,
-		max:                    ActiveCheckBacklogConcurrency,
+		max:                    q.activeCheckBacklogConcurrency,
 		opName:                 "peekBacklogActiveCheck",
 		isMillisecondPrecision: true,
 		handleMissingItems:     CleanupMissingPointers(ctx, key, client, q.log),
@@ -600,7 +599,7 @@ func (q *queue) AccountActiveCheckPeek(ctx context.Context, peekSize int64) ([]u
 
 	peeker := peeker[QueueBacklog]{
 		q:                      q,
-		max:                    ActiveCheckAccountConcurrency,
+		max:                    q.activeCheckAccountConcurrency,
 		opName:                 "peekAccountActiveCheck",
 		isMillisecondPrecision: true,
 		handleMissingItems:     CleanupMissingPointers(ctx, key, client, q.log),
