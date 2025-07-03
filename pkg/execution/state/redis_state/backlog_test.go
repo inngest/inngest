@@ -3,6 +3,7 @@ package redis_state
 import (
 	"context"
 	"fmt"
+	"math"
 	"strconv"
 	"testing"
 
@@ -1144,4 +1145,72 @@ func TestBacklogIsOutdated(t *testing.T) {
 
 		require.Equal(t, enums.QueueNormalizeReasonThrottleRemoved, backlog.isOutdated(constraints))
 	})
+}
+
+func TestShuffleBacklogs(t *testing.T) {
+	iterations := 1000
+
+	matches := 0
+
+	for i := 0; i < iterations; i++ {
+		b1Start := &QueueBacklog{
+			BacklogID: "b-1:start",
+			Start:     true,
+		}
+
+		b1 := &QueueBacklog{
+			BacklogID: "b-1",
+		}
+
+		b2Start := &QueueBacklog{
+			BacklogID: "b-2:start",
+			Start:     true,
+		}
+
+		b2 := &QueueBacklog{
+			BacklogID: "b-2",
+		}
+
+		b3Start := &QueueBacklog{
+			BacklogID: "b-3:start",
+			Start:     true,
+		}
+
+		b3 := &QueueBacklog{
+			BacklogID: "b-3",
+		}
+
+		shuffled := shuffleBacklogs([]*QueueBacklog{
+			b1,
+			b1Start,
+			b2,
+			b2Start,
+			b3,
+			b3Start,
+		})
+
+		findIndex := func(b *QueueBacklog) int {
+			for i, backlog := range shuffled {
+				if backlog.BacklogID == b.BacklogID {
+					return i
+				}
+			}
+
+			return -1
+		}
+
+		if findIndex(b1) > findIndex(b1Start) {
+			continue
+		}
+		if findIndex(b2) > findIndex(b2Start) {
+			continue
+		}
+		if findIndex(b3) > findIndex(b3Start) {
+			continue
+		}
+
+		matches++
+	}
+
+	require.Greater(t, matches, int(math.Ceil(float64(iterations)/2)))
 }

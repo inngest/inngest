@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"gonum.org/v1/gonum/stat/sampleuv"
 	"math/rand"
 	"runtime/debug"
 	"time"
@@ -1081,4 +1082,27 @@ func (q *queue) backlogPeek(ctx context.Context, b *QueueBacklog, from time.Time
 	}
 
 	return res.Items, res.TotalCount, nil
+}
+
+func shuffleBacklogs(b []*QueueBacklog) []*QueueBacklog {
+	weights := make([]float64, len(b))
+	for i, backlog := range b {
+		if backlog.Start {
+			weights[i] = 1.0
+		} else {
+			weights[i] = 10.0
+		}
+	}
+
+	w := sampleuv.NewWeighted(weights, rnd)
+	result := make([]*QueueBacklog, len(b))
+	for n := range result {
+		idx, ok := w.Take()
+		if !ok {
+			return b
+		}
+		result[n] = b[idx]
+	}
+
+	return result
 }

@@ -15,7 +15,6 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
-	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
 	"golang.org/x/sync/errgroup"
 )
@@ -216,13 +215,11 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 		refilledItems  int  // Number of refilled items
 	)
 
-	for _, idx := range util.RandPerm(len(backlogs)) {
+	for _, backlog := range shuffleBacklogs(backlogs) {
 		// If cancelled, return early
 		if errors.Is(ctx.Err(), context.Canceled) {
 			return nil
 		}
-
-		backlog := backlogs[idx]
 
 		res, fullyProcessed, err := q.processShadowPartitionBacklog(ctx, shadowPart, backlog, refillUntil, latestConstraints)
 		if err != nil {
