@@ -11,8 +11,8 @@ export const Info = ({
   action,
   iconElement,
   widthClassName = 'max-w-xs',
-  side,
-  align,
+  side = 'right',
+  align = 'start',
 }: {
   text: string | ReactNode;
   action: ReactNode;
@@ -27,8 +27,8 @@ export const Info = ({
     <Popover>
       <PopoverTrigger>{icon}</PopoverTrigger>
       <PopoverContent
-        side={side ?? 'right'}
-        align={align ?? 'start'}
+        side={side}
+        align={align}
         className={cn('text-subtle flex flex-col text-sm leading-tight', widthClassName)}
       >
         <div className="border-subtle border-b px-4 py-2 text-sm leading-tight">{text}</div>
