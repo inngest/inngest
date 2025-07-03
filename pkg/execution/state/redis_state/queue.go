@@ -1517,6 +1517,12 @@ func (q *queue) EnqueueItem(ctx context.Context, shard QueueShard, i osqueue.Que
 	}
 	switch status {
 	case 0:
+		// Hint to executor that we should refill if the item has no delay
+		refillSoon := i.ExpectedDelay() < ShadowPartitionLookahead
+		if enqueueToBacklogs && refillSoon {
+			q.addShadowContinue(ctx, &shadowPartition, 0)
+		}
+
 		return i, nil
 	case 1:
 		return i, ErrQueueItemExists

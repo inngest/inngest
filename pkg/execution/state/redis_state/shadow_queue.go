@@ -29,6 +29,8 @@ const (
 	ShadowPartitionPeekMaxBacklogs = int64(100)
 
 	ShadowPartitionRequeueExtendedDuration = 3 * time.Second
+
+	ShadowPartitionLookahead = 2 * PartitionLookahead
 )
 
 var (
@@ -186,7 +188,7 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 	limit := ShadowPartitionPeekMaxBacklogs
 
 	// Scan a little further into the future
-	refillUntil := q.clock.Now().Truncate(time.Millisecond).Add(2 * PartitionLookahead)
+	refillUntil := q.clock.Now().Truncate(time.Millisecond).Add(ShadowPartitionLookahead)
 	if !keyQueuesEnabled {
 		// If key queues are disabled, peek and refill all
 		// items in the entire backlog, not just the next 2 seconds.
@@ -655,7 +657,7 @@ func (q *queue) shadowScan(ctx context.Context) error {
 		case <-tick.Chan():
 			// Scan a little further into the future
 			now := q.clock.Now()
-			scanUntil := now.Truncate(time.Second).Add(2 * PartitionLookahead)
+			scanUntil := now.Truncate(time.Second).Add(ShadowPartitionLookahead)
 			if err := q.scanShadowPartitions(ctx, scanUntil, qspc); err != nil {
 				if errors.Is(err, context.DeadlineExceeded) {
 					l.Warn("deadline exceeded scanning shadow partitions")
