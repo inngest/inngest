@@ -23,8 +23,8 @@ var (
 
 func Gateway(ctx context.Context) ConnectGateway {
 	configOnce.Do(func() {
-		ipKey := "connect.gateway.ip"
-		portKey := "connect.gateway.port"
+		ipKey := "connect.gateway.grpc.ip"
+		portKey := "connect.gateway.grpc.port"
 
 		viper.SetDefault(ipKey, getOutboundIP())
 		viper.SetDefault(portKey, 50052)
