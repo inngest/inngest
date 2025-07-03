@@ -5,12 +5,13 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"net"
 	"os"
 	"sync"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/google/uuid"
@@ -32,7 +33,7 @@ func useGRPCAlways(ctx context.Context, accountID uuid.UUID) bool {
 	return true
 }
 
-type mockGatewayGrpcForwarder struct {
+type mockGatewayGRPCForwarder struct {
 	forwardCalls []mockForwardCall
 	mu           sync.Mutex
 }
@@ -43,7 +44,7 @@ type mockForwardCall struct {
 	data         *connectpb.GatewayExecutorRequestData
 }
 
-func (m *mockGatewayGrpcForwarder) Forward(ctx context.Context, gatewayID ulid.ULID, connectionID ulid.ULID, data *connectpb.GatewayExecutorRequestData) error {
+func (m *mockGatewayGRPCForwarder) Forward(ctx context.Context, gatewayID ulid.ULID, connectionID ulid.ULID, data *connectpb.GatewayExecutorRequestData) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.forwardCalls = append(m.forwardCalls, mockForwardCall{
@@ -54,11 +55,11 @@ func (m *mockGatewayGrpcForwarder) Forward(ctx context.Context, gatewayID ulid.U
 	return nil
 }
 
-func (m *mockGatewayGrpcForwarder) ConnectToGateways(ctx context.Context) error {
+func (m *mockGatewayGRPCForwarder) ConnectToGateways(ctx context.Context) error {
 	return nil
 }
 
-func (m *mockGatewayGrpcForwarder) getForwardCalls() []mockForwardCall {
+func (m *mockGatewayGRPCForwarder) getForwardCalls() []mockForwardCall {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	calls := make([]mockForwardCall, len(m.forwardCalls))
@@ -85,7 +86,7 @@ func TestProxyGRPCPath(t *testing.T) {
 	defer cancel()
 
 	sm := state.NewRedisConnectionStateManager(rc)
-	mockForwarder := &mockGatewayGrpcForwarder{}
+	mockForwarder := &mockGatewayGRPCForwarder{}
 
 	connector := newRedisPubSubConnector(rc, RedisPubSubConnectorOpts{
 		Logger:       l,
@@ -95,7 +96,7 @@ func TestProxyGRPCPath(t *testing.T) {
 			return true
 		},
 		ShouldUseGRPC:        useGRPCAlways,
-		GatewayGrpcForwarder: mockForwarder,
+		GatewayGRPCForwarder: mockForwarder,
 	})
 
 	fnID, accID, envID, appID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
@@ -293,7 +294,7 @@ func TestProxyGRPCPolling(t *testing.T) {
 	defer cancel()
 
 	sm := state.NewRedisConnectionStateManager(rc)
-	mockForwarder := &mockGatewayGrpcForwarder{}
+	mockForwarder := &mockGatewayGRPCForwarder{}
 
 	connector := newRedisPubSubConnector(rc, RedisPubSubConnectorOpts{
 		Logger:       l,
@@ -303,7 +304,7 @@ func TestProxyGRPCPolling(t *testing.T) {
 			return true
 		},
 		ShouldUseGRPC:        useGRPCAlways,
-		GatewayGrpcForwarder: mockForwarder,
+		GatewayGRPCForwarder: mockForwarder,
 	})
 
 	fnID, accID, envID, appID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
@@ -499,7 +500,7 @@ func TestProxyGRPCLeaseExpiry(t *testing.T) {
 	defer cancel()
 
 	sm := state.NewRedisConnectionStateManager(rc)
-	mockForwarder := &mockGatewayGrpcForwarder{}
+	mockForwarder := &mockGatewayGRPCForwarder{}
 
 	connector := newRedisPubSubConnector(rc, RedisPubSubConnectorOpts{
 		Logger:       l,
@@ -509,7 +510,7 @@ func TestProxyGRPCLeaseExpiry(t *testing.T) {
 			return true
 		},
 		ShouldUseGRPC:        useGRPCAlways,
-		GatewayGrpcForwarder: mockForwarder,
+		GatewayGRPCForwarder: mockForwarder,
 	})
 
 	fnID, accID, envID, appID := uuid.New(), uuid.New(), uuid.New(), uuid.New()

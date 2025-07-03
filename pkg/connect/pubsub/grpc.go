@@ -3,6 +3,8 @@ package pubsub
 import (
 	"context"
 	"fmt"
+	"sync"
+
 	connectConfig "github.com/inngest/inngest/pkg/config/connect"
 	"github.com/inngest/inngest/pkg/connect/state"
 	"github.com/inngest/inngest/pkg/logger"
@@ -10,31 +12,30 @@ import (
 	"github.com/oklog/ulid/v2"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
-	"sync"
 )
 
-type GatewayGrpcForwarder interface {
+type GatewayGRPCForwarder interface {
 	ConnectToGateways(ctx context.Context) error
 	Forward(ctx context.Context, gatewayID ulid.ULID, connectionID ulid.ULID, data *connectpb.GatewayExecutorRequestData) error
 }
 
-type gatewayGrpcForwarder struct {
+type gatewayGRPCForwarder struct {
 	gatewayManager state.GatewayManager
 	mu             sync.RWMutex
 
 	// TODO: gc gateways
-	grpcClients    map[string]connectpb.ConnectGatewayClient
+	grpcClients map[string]connectpb.ConnectGatewayClient
 }
 
-func NewGatewayGrpcForwarder(stateManager state.GatewayManager) GatewayGrpcForwarder {
-	return &gatewayGrpcForwarder{
+func NewGatewayGRPCForwarder(stateManager state.GatewayManager) GatewayGRPCForwarder {
+	return &gatewayGRPCForwarder{
 		gatewayManager: stateManager,
 		grpcClients:    map[string]connectpb.ConnectGatewayClient{},
 	}
 }
 
 // Connect to all gateways through gRPC
-func (i *gatewayGrpcForwarder) ConnectToGateways(ctx context.Context) error {
+func (i *gatewayGRPCForwarder) ConnectToGateways(ctx context.Context) error {
 	gateways, err := i.gatewayManager.GetAllGateways(ctx)
 	if err != nil {
 		return err
@@ -71,7 +72,7 @@ func (i *gatewayGrpcForwarder) ConnectToGateways(ctx context.Context) error {
 }
 
 // connectToGateway attempts to create a new gRPC client for a gateway that wasn't doesn't have a grpc client yet.
-func (i *gatewayGrpcForwarder) connectToGateway(ctx context.Context, gatewayID ulid.ULID) (connectpb.ConnectGatewayClient, error) {
+func (i *gatewayGRPCForwarder) connectToGateway(ctx context.Context, gatewayID ulid.ULID) (connectpb.ConnectGatewayClient, error) {
 	gateway, err := i.gatewayManager.GetGateway(ctx, gatewayID)
 	if err != nil {
 		return nil, fmt.Errorf("could not find gateway %s: %w", gatewayID.String(), err)
@@ -99,7 +100,7 @@ func (i *gatewayGrpcForwarder) connectToGateway(ctx context.Context, gatewayID u
 	return rpcClient, nil
 }
 
-func (i *gatewayGrpcForwarder) Forward(ctx context.Context, gatewayID ulid.ULID, connectionID ulid.ULID, data *connectpb.GatewayExecutorRequestData) error {
+func (i *gatewayGRPCForwarder) Forward(ctx context.Context, gatewayID ulid.ULID, connectionID ulid.ULID, data *connectpb.GatewayExecutorRequestData) error {
 	i.mu.RLock()
 	grpcClient := i.grpcClients[gatewayID.String()]
 	i.mu.RUnlock()
