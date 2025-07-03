@@ -47,7 +47,7 @@ func (tp *sqlcTracerProvider) getTracer(md *statev2.Metadata, qi *queue.Item) tr
 }
 
 func (d *DroppableSpan) Drop() {
-	d.span.SetAttributes(attribute.Bool(meta.AttributeDropSpan, true))
+	d.span.SetAttributes(attribute.Bool(meta.Attrs.DropSpan.Key(), true))
 	// Send span but we don't care if it makes it or not, as we're dropping
 	// anyway
 	d.span.End()
@@ -123,7 +123,7 @@ func (tp *sqlcTracerProvider) CreateDroppableSpan(
 	}
 
 	span.SetAttributes(
-		attribute.String(meta.AttributeDynamicSpanID, spanRef.DynamicSpanID),
+		attribute.String(meta.Attrs.DynamicSpanID.Key(), spanRef.DynamicSpanID),
 	)
 
 	if len(opts.Carriers) > 0 {
@@ -163,12 +163,12 @@ func (tp *sqlcTracerProvider) UpdateSpan(
 	ctx := defaultPropagator.Extract(context.Background(), carrier)
 
 	attrs := []attribute.KeyValue{
-		attribute.String(meta.AttributeDynamicSpanID, opts.TargetSpan.DynamicSpanID),
-		attribute.String(meta.AttributeDynamicStatus, opts.Status.String()),
+		attribute.String(meta.Attrs.DynamicSpanID.Key(), opts.TargetSpan.DynamicSpanID),
+		attribute.String(meta.Attrs.DynamicStatus.Key(), opts.Status.String()),
 	}
 
 	if opts.Status.IsEnded() {
-		attrs = append(attrs, attribute.Int64(meta.AttributeEndedAt, opts.EndTime.UnixMilli()))
+		attrs = append(attrs, attribute.Int64(meta.Attrs.EndedAt.Key(), opts.EndTime.UnixMilli()))
 	}
 
 	// Be careful to make sure that whatever attrs we specify here are

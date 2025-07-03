@@ -37,19 +37,19 @@ func (e *DBExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlyS
 		for _, attr := range span.Attributes() {
 			// If output, extract and store separately
 			// This is always cleaned
-			if string(attr.Key) == meta.AttributeStepOutput {
+			if string(attr.Key) == meta.Attrs.StepOutput.Key() {
 				output = attr.Value.AsInterface()
 				continue
 			}
 
-			if string(attr.Key) == meta.AttributeAccountID {
+			if string(attr.Key) == meta.Attrs.AccountID.Key() {
 				accountID = attr.Value.AsString()
 				if cleanAttrs {
 					continue
 				}
 			}
 
-			if string(attr.Key) == meta.AttributeEnvID {
+			if string(attr.Key) == meta.Attrs.EnvID.Key() {
 				envID = attr.Value.AsString()
 				if cleanAttrs {
 					continue
@@ -57,21 +57,21 @@ func (e *DBExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlyS
 			}
 
 			// Capture but omit the run ID attribute from the span attributes
-			if string(attr.Key) == meta.AttributeRunID {
+			if string(attr.Key) == meta.Attrs.RunID.Key() {
 				runID = attr.Value.AsString()
 				if cleanAttrs {
 					continue
 				}
 			}
 
-			if string(attr.Key) == meta.AttributeAppID {
+			if string(attr.Key) == meta.Attrs.AppID.Key() {
 				appID = attr.Value.AsString()
 				if cleanAttrs {
 					continue
 				}
 			}
 
-			if string(attr.Key) == meta.AttributeFunctionID {
+			if string(attr.Key) == meta.Attrs.FunctionID.Key() {
 				functionID = attr.Value.AsString()
 				if cleanAttrs {
 					continue
@@ -79,7 +79,7 @@ func (e *DBExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlyS
 			}
 
 			// Capture but omit the dynamic span ID attribute from the span attributes
-			if string(attr.Key) == meta.AttributeDynamicSpanID {
+			if string(attr.Key) == meta.Attrs.DynamicSpanID.Key() {
 				dynamicSpanID = attr.Value.AsString()
 				if cleanAttrs {
 					continue
@@ -87,7 +87,7 @@ func (e *DBExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlyS
 			}
 
 			// Omit drop span attribute if we're an extension span
-			if isExtensionSpan && string(attr.Key) == meta.AttributeDropSpan {
+			if isExtensionSpan && string(attr.Key) == meta.Attrs.DropSpan.Key() {
 				if cleanAttrs {
 					continue
 				}

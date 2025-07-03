@@ -45,6 +45,9 @@ type OtelSpan struct {
 	CalculatedStartTime  *time.Time       `json:"start_time,omitempty,omitzero"`
 	CalculatedEndTime    *time.Time       `json:"end_time,omitempty,omitzero"`
 
+	// Parsed attributes from the span
+	Attributes *meta.ExtractedValues `json:"attributes,omitempty,omitzero"`
+
 	// A span may be marked as dropped following idempotency or that we intend
 	// to hide it (e.g. discovery steps).
 	MarkedAsDropped bool `json:"marked_as_dropped,omitempty,omitzero"`
@@ -85,10 +88,8 @@ func (s *OtelSpan) GetTraceID() string {
 }
 
 func (s *OtelSpan) GetStepName() string {
-	if dn, ok := s.Attributes[meta.AttributeStepName]; ok {
-		if name, ok := dn.(string); ok {
-			return name
-		}
+	if dn := s.Attributes.StepName; dn != nil {
+		return *dn
 	}
 
 	return s.Name
@@ -104,10 +105,8 @@ func (s *OtelSpan) GetOutputID() *string {
 
 // TODO is this max?
 func (s *OtelSpan) GetAttempts() int {
-	if attempts, ok := s.Attributes[meta.AttributeStepAttempt]; ok {
-		if attempt, ok := attempts.(float64); ok {
-			return int(attempt)
-		}
+	if attempts := s.Attributes.StepAttempt; attempts != nil {
+		return *attempts
 	}
 
 	return 0
@@ -132,8 +131,8 @@ func (s *OtelSpan) GetIsRoot() bool {
 // this span was queued), then the time will match the span's start time in
 // order to show no queued time in the UI.
 func (s *OtelSpan) GetQueuedAtTime() time.Time {
-	if q, err := s.anyUnixMilliToTime(s.Attributes[meta.AttributeQueuedAt]); err == nil {
-		return q
+	if q := s.Attributes.QueuedAt; q != nil {
+		return *q
 	}
 
 	// This should always be a value, so if we don't have one, just use when
@@ -144,21 +143,13 @@ func (s *OtelSpan) GetQueuedAtTime() time.Time {
 // Get the time that the span started. Note that this is not necessarily when
 // the span created, as it may be dynamic.
 func (s *OtelSpan) GetStartedAtTime() *time.Time {
-	if st, err := s.anyUnixMilliToTime(s.Attributes[meta.AttributeStartedAt]); err == nil {
-		return &st
-	}
-
-	return nil
+	return s.Attributes.StartedAt
 }
 
 // Get the time that the span ended. Note that this is not necessarily when the
 // span was persisted, as it may be dynamic.
 func (s *OtelSpan) GetEndedAtTime() *time.Time {
-	if et, err := s.anyUnixMilliToTime(s.Attributes[meta.AttributeEndedAt]); err == nil {
-		return &et
-	}
-
-	return nil
+	return s.Attributes.EndedAt
 }
 
 // Span represents an distributed span in a function execution flow
@@ -412,7 +403,7 @@ type TraceReader interface {
 	// GetEvent returns a single event.
 	GetEvent(ctx context.Context, id ulid.ULID, accountID uuid.UUID, workspaceID uuid.UUID) (*Event, error)
 	// GetEvents returns a list of latest events.
-	GetEvents(ctx context.Context, accountID uuid.UUID, workspaceID uuid.UUID,opts *WorkspaceEventsOpts) ([]*Event, error)
+	GetEvents(ctx context.Context, accountID uuid.UUID, workspaceID uuid.UUID, opts *WorkspaceEventsOpts) ([]*Event, error)
 }
 
 type GetTraceRunOpt struct {

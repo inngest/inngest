@@ -27,26 +27,20 @@ func newExecutionProcessor(md *statev2.Metadata, qi *queue.Item, next sdktrace.S
 }
 
 func (p *executionProcessor) OnStart(parent context.Context, s sdktrace.ReadWriteSpan) {
-	attrs := []attribute.KeyValue{}
+	rawAttrs := meta.RawAttrs{}
 	now := time.Now() // TODO This should be something on qi etc
 
 	if p.md != nil {
-		attrs = append(attrs,
-			attribute.String(meta.AttributeRunID, p.md.ID.RunID.String()),
-		)
+		meta.AddRawAttr(&rawAttrs, meta.Attrs.RunID, &p.md.ID.RunID)
 	} else if p.qi != nil {
-		attrs = append(attrs,
-			attribute.String(meta.AttributeRunID, p.qi.Identifier.RunID.String()),
-		)
+		meta.AddRawAttr(&rawAttrs, meta.Attrs.RunID, &p.qi.Identifier.RunID)
 	}
 
 	// Do not set extra contextual data on extension spans
 	switch s.Name() {
 	case meta.SpanNameRun:
 		{
-			attrs = append(attrs,
-				attribute.Int64(meta.AttributeQueuedAt, now.UnixMilli()),
-			)
+			meta.AddRawAttr(&rawAttrs, meta.Attrs.QueuedAt, &now)
 
 			if p.md != nil {
 
@@ -55,26 +49,21 @@ func (p *executionProcessor) OnStart(parent context.Context, s sdktrace.ReadWrit
 					eventIDs[i] = id.String()
 				}
 
-				attrs = append(attrs,
-					attribute.String(meta.AttributeFunctionID, p.md.ID.FunctionID.String()),
-					attribute.Int(meta.AttributeFunctionVersion, p.md.Config.FunctionVersion),
-					attribute.StringSlice(meta.AttributeEventIDs, eventIDs),
-					attribute.String(meta.AttributeAccountID, p.md.ID.Tenant.AccountID.String()),
-					attribute.String(meta.AttributeEnvID, p.md.ID.Tenant.EnvID.String()),
-					attribute.String(meta.AttributeAppID, p.md.ID.Tenant.AppID.String()),
-				)
+				meta.AddRawAttr(&rawAttrs, meta.Attrs.FunctionID, &p.md.ID.FunctionID)
+				meta.AddRawAttr(&rawAttrs, meta.Attrs.FunctionVersion, &p.md.Config.FunctionVersion)
+				meta.AddRawAttr(&rawAttrs, meta.Attrs.EventIDs, &eventIDs)
+				meta.AddRawAttr(&rawAttrs, meta.Attrs.AccountID, &p.md.ID.Tenant.AccountID)
+				meta.AddRawAttr(&rawAttrs, meta.Attrs.EnvID, &p.md.ID.Tenant.EnvID)
+				meta.AddRawAttr(&rawAttrs, meta.Attrs.AppID, &p.md.ID.Tenant.AppID)
 
 				if p.md.Config.CronSchedule() != nil {
-					attrs = append(attrs,
-						attribute.String(meta.AttributeCronSchedule, *p.md.Config.CronSchedule()),
-					)
+					meta.AddRawAttr(&rawAttrs, meta.Attrs.CronSchedule, p.md.Config.CronSchedule())
 				}
 
 				if p.md.Config.BatchID != nil {
-					attrs = append(attrs,
-						attribute.String(meta.AttributeBatchID, p.md.Config.BatchID.String()),
-						attribute.Int64(meta.AttributeBatchTimestamp, int64(p.md.Config.BatchID.Time())),
-					)
+					batchTS := time.UnixMilli(int64(p.md.Config.BatchID.Time()))
+					meta.AddRawAttr(&rawAttrs, meta.Attrs.BatchID, p.md.Config.BatchID)
+					meta.AddRawAttr(&rawAttrs, meta.Attrs.BatchTimestamp, &batchTS)
 				}
 			}
 
@@ -83,30 +72,24 @@ func (p *executionProcessor) OnStart(parent context.Context, s sdktrace.ReadWrit
 
 	case meta.SpanNameStepDiscovery:
 		{
-			attrs = append(attrs,
-				attribute.Int64(meta.AttributeQueuedAt, now.UnixMilli()),
-			)
+			meta.AddRawAttr(&rawAttrs, meta.Attrs.QueuedAt, &now)
 
 			break
 		}
 
 	case meta.SpanNameStep:
 		{
-			attrs = append(attrs,
-				attribute.Int64(meta.AttributeQueuedAt, now.UnixMilli()),
-			)
+			meta.AddRawAttr(&rawAttrs, meta.Attrs.QueuedAt, &now)
 
 			if p.qi != nil {
-				attrs = append(attrs,
-					attribute.Int(meta.AttributeStepMaxAttempts, p.qi.GetMaxAttempts()),
-					attribute.Int(meta.AttributeStepAttempt, p.qi.Attempt),
-				)
+				meta.AddRawAttr(&rawAttrs, meta.Attrs.StepMaxAttempts, p.qi.MaxAttempts)
+				meta.AddRawAttr(&rawAttrs, meta.Attrs.StepAttempt, &p.qi.Attempt)
 
 				// Some steps "start" as soon as they are queued
 				startWhenQueued := p.qi.Kind == queue.KindSleep
 				if !startWhenQueued {
 					for _, attr := range s.Attributes() {
-						if string(attr.Key) == meta.AttributeStepOp {
+						if string(attr.Key) == meta.Attrs.StepOp.Key() {
 							if attr.Value.Type() == attribute.STRING && attr.Value.AsString() == enums.OpcodeWaitForEvent.String() {
 								startWhenQueued = true
 								break
@@ -117,9 +100,7 @@ func (p *executionProcessor) OnStart(parent context.Context, s sdktrace.ReadWrit
 				}
 
 				if startWhenQueued {
-					attrs = append(attrs,
-						attribute.Int64(meta.AttributeStartedAt, now.UnixMilli()),
-					)
+					meta.AddRawAttr(&rawAttrs, meta.Attrs.StartedAt, &now)
 				}
 			}
 
@@ -128,14 +109,10 @@ func (p *executionProcessor) OnStart(parent context.Context, s sdktrace.ReadWrit
 
 	case meta.SpanNameExecution:
 		{
-			attrs = append(attrs,
-				attribute.Int64(meta.AttributeStartedAt, now.UnixMilli()),
-			)
+			meta.AddRawAttr(&rawAttrs, meta.Attrs.StartedAt, &now)
 
 			if p.qi != nil {
-				attrs = append(attrs,
-					attribute.Int(meta.AttributeStepAttempt, p.qi.Attempt),
-				)
+				meta.AddRawAttr(&rawAttrs, meta.Attrs.StepAttempt, &p.qi.Attempt)
 			}
 
 			break
@@ -144,11 +121,9 @@ func (p *executionProcessor) OnStart(parent context.Context, s sdktrace.ReadWrit
 	case meta.SpanNameDynamicExtension:
 		{
 			for _, attr := range s.Attributes() {
-				if string(attr.Key) == meta.AttributeDynamicStatus {
+				if string(attr.Key) == meta.Attrs.DynamicStatus.Key() {
 					if attr.Value.Type() == attribute.INT64 && enums.RunStatusEnded(enums.RunStatus(attr.Value.AsInt64())) {
-						attrs = append(attrs,
-							attribute.Int64(meta.AttributeEndedAt, now.UnixMilli()),
-						)
+						meta.AddRawAttr(&rawAttrs, meta.Attrs.EndedAt, &now)
 					}
 
 					break
@@ -159,7 +134,7 @@ func (p *executionProcessor) OnStart(parent context.Context, s sdktrace.ReadWrit
 		}
 	}
 
-	s.SetAttributes(attrs...)
+	s.SetAttributes(rawAttrs.Serialize()...)
 	p.next.OnStart(parent, s)
 }
 
@@ -167,7 +142,7 @@ func (p *executionProcessor) OnEnd(s sdktrace.ReadOnlySpan) {
 	// If the span isn't an extension span, judge if it should be dropped.
 	if s.Name() != meta.SpanNameDynamicExtension {
 		for _, attr := range s.Attributes() {
-			if string(attr.Key) == meta.AttributeDropSpan && attr.Value.AsBool() {
+			if string(attr.Key) == meta.Attrs.DropSpan.Key() && attr.Value.AsBool() {
 				// Toggle this on and off to see or remove dropped spans
 				return // Don't export dropped spans
 			}
