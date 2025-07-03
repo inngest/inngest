@@ -209,7 +209,11 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 
 	// Refill backlogs in random order
 	fullyProcessedBacklogs := 0 // Number of fully processed backlogs
-	var wasConstrained bool     // Whether we encountered constraints affecting the shadow partition
+	var (
+		wasConstrained bool // Whether we encountered constraints affecting the shadow partition
+		refilledItems  int  // Number of refilled items
+	)
+
 	for _, idx := range util.RandPerm(len(backlogs)) {
 		// If cancelled, return early
 		if errors.Is(ctx.Err(), context.Canceled) {
@@ -227,6 +231,8 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 		if res == nil {
 			continue
 		}
+
+		refilledItems += res.Refilled
 
 		// If we fully refilled, track and continue
 		if fullyProcessed {
@@ -285,6 +291,29 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 	} else {
 		// Not constrained so we can add a continuation
 		q.addShadowContinue(ctx, shadowPart, continuationCount+1)
+
+		if refilledItems > 0 {
+
+			var accountID uuid.UUID
+			if shadowPart.AccountID != nil {
+				accountID = *shadowPart.AccountID
+			}
+
+			// Add an in-memory hint to process the partition immediately if we refilled items
+			q.addContinue(ctx, &QueuePartition{
+				ID:               shadowPart.PartitionID,
+				PartitionType:    int(enums.PartitionTypeDefault),
+				QueueName:        shadowPart.SystemQueueName,
+				ConcurrencyScope: 0,
+				FunctionID:       shadowPart.FunctionID,
+				EnvID:            shadowPart.EnvID,
+				AccountID:        accountID,
+
+				// Do these need to be set?
+				Last:      0,
+				ForceAtMS: 0,
+			}, 1)
+		}
 	}
 
 	err = q.ShadowPartitionRequeue(ctx, shadowPart, nil)
