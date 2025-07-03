@@ -107,7 +107,7 @@ type redisPubSubConnector struct {
 
 	enforceLeaseExpiry EnforceLeaseExpiryFunc
 
-	gatewayGrpcForwarder GatewayGrpcForwarder
+	gatewayGRPCForwarder GatewayGRPCForwarder
 
 	shouldUseGRPC UseGRPCFunc
 
@@ -121,7 +121,7 @@ type RedisPubSubConnectorOpts struct {
 	Tracer               trace.ConditionalTracer
 	StateManager         state.StateManager
 	EnforceLeaseExpiry   EnforceLeaseExpiryFunc
-	GatewayGrpcForwarder GatewayGrpcForwarder
+	GatewayGRPCForwarder GatewayGRPCForwarder
 
 	ShouldUseGRPC UseGRPCFunc
 }
@@ -145,7 +145,7 @@ func newRedisPubSubConnector(client rueidis.Client, opts RedisPubSubConnectorOpt
 		setup:              make(chan struct{}),
 		enforceLeaseExpiry: opts.EnforceLeaseExpiry,
 
-		gatewayGrpcForwarder: opts.GatewayGrpcForwarder,
+		gatewayGRPCForwarder: opts.GatewayGRPCForwarder,
 		shouldUseGRPC:        shouldUseGRPC,
 
 		// For routing
@@ -474,7 +474,7 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 
 		// Forward the request
 		if i.shouldUseGRPC(ctx, opts.AccountID) {
-			err = i.gatewayGrpcForwarder.Forward(ctx, route.GatewayID, route.ConnectionID, opts.Data)
+			err = i.gatewayGRPCForwarder.Forward(ctx, route.GatewayID, route.ConnectionID, opts.Data)
 
 			// Ack here instead of needing a pubsub ack message
 			if err != nil {
@@ -733,8 +733,8 @@ func (i *redisPubSubConnector) Wait(ctx context.Context) error {
 		},
 	})
 
-	if i.gatewayGrpcForwarder != nil {
-		if err := i.gatewayGrpcForwarder.ConnectToGateways(ctx); err != nil {
+	if i.gatewayGRPCForwarder != nil {
+		if err := i.gatewayGRPCForwarder.ConnectToGateways(ctx); err != nil {
 			return err
 		}
 	}
