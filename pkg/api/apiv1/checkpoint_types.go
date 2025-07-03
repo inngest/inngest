@@ -86,8 +86,8 @@ func (r CheckpointNewRunRequest) FnSlug() string {
 
 // Fn returns a deterministic V1 UUID based off of the environment ID
 // and the given fn slug.
-func (r CheckpointNewRunRequest) FnID(envID uuid.UUID) uuid.UUID {
-	return util.DeterministicUUID(append(envID[:], []byte(r.FnSlug())...))
+func (r CheckpointNewRunRequest) FnID(appID uuid.UUID) uuid.UUID {
+	return util.DeterministicUUID(append(appID[:], []byte(r.FnSlug())...))
 }
 
 func (r CheckpointNewRunRequest) RunID() ulid.ULID {

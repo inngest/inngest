@@ -78,9 +78,8 @@ func (a checkpointAPI) CheckpointNewRun(w http.ResponseWriter, r *http.Request) 
 			return
 		}
 
-		// TODO: Create the function, if it doesn't exist.
 		_, err = a.FunctionCreator.InsertFunction(ctx, cqrs.InsertFunctionParams{
-			ID:        input.FnID(auth.WorkspaceID()),
+			ID:        input.FnID(input.AppID(auth.WorkspaceID())),
 			AccountID: auth.AccountID(),
 			EnvID:     auth.WorkspaceID(),
 			AppID:     app.ID,
