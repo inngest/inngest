@@ -469,7 +469,7 @@ func (q NormalizedQueries) WorkspaceNamedEvents(ctx context.Context, params sqlc
 		InternalID:   params.Cursor,
 		ReceivedAt:   params.Before,
 		ReceivedAt_2: params.After,
-		EventName:    params.Name,
+		EventName:    params.Names[0],
 		Limit:        int32(params.Limit),
 	}
 
