@@ -204,7 +204,7 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 	}
 	metrics.GaugeShadowPartitionSize(ctx, int64(totalCount), metrics.GaugeOpt{
 		PkgName: pkgName,
-		Tags: map[string]any{
+		Tags:    map[string]any{
 			// "partition_id": shadowPart.PartitionID,
 		},
 	})
@@ -309,10 +309,7 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 				FunctionID:    shadowPart.FunctionID,
 				EnvID:         shadowPart.EnvID,
 				AccountID:     accountID,
-
-				// Do these need to be set?
-				Last:      0,
-				ForceAtMS: 0,
+				Last:          0, // This is populated during PartitionLease
 			}, 1)
 		}
 	}
