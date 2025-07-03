@@ -204,7 +204,7 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 	}
 	metrics.GaugeShadowPartitionSize(ctx, int64(totalCount), metrics.GaugeOpt{
 		PkgName: pkgName,
-		Tags:    map[string]any{
+		Tags: map[string]any{
 			// "partition_id": shadowPart.PartitionID,
 		},
 	})
@@ -303,13 +303,12 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 
 			// Add an in-memory hint to process the partition immediately if we refilled items
 			q.addContinue(ctx, &QueuePartition{
-				ID:               shadowPart.PartitionID,
-				PartitionType:    int(enums.PartitionTypeDefault),
-				QueueName:        shadowPart.SystemQueueName,
-				ConcurrencyScope: 0,
-				FunctionID:       shadowPart.FunctionID,
-				EnvID:            shadowPart.EnvID,
-				AccountID:        accountID,
+				ID:            shadowPart.PartitionID,
+				PartitionType: int(enums.PartitionTypeDefault),
+				QueueName:     shadowPart.SystemQueueName,
+				FunctionID:    shadowPart.FunctionID,
+				EnvID:         shadowPart.EnvID,
+				AccountID:     accountID,
 
 				// Do these need to be set?
 				Last:      0,
