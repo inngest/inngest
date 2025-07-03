@@ -82,8 +82,8 @@ type EventWriter interface {
 type WorkspaceEventsOpts struct {
 	Cursor *ulid.ULID
 	Limit  int
-	// Name filters events to a given name.
-	Name *string
+	// Name filters events to given names.
+	Names []string
 	// Newest represents the newest time to load events from.  Events newer than
 	// this cutoff will not be loaded.
 	Newest time.Time

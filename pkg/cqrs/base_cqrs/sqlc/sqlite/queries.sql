@@ -170,11 +170,12 @@ WHERE
 ORDER BY e.internal_id DESC
 LIMIT ?;
 
+
 -- name: WorkspaceEvents :many
 SELECT * FROM events WHERE internal_id < @cursor AND received_at <= @before AND received_at >= @after ORDER BY internal_id DESC LIMIT ?;
 
 -- name: WorkspaceNamedEvents :many
-SELECT * FROM events WHERE internal_id < @cursor AND received_at <= @before AND received_at >= @after AND event_name = @name ORDER BY internal_id DESC LIMIT ?;
+SELECT * FROM events WHERE internal_id < @cursor AND received_at <= @before AND received_at >= @after AND event_name in (sqlc.slice('@names')) ORDER BY internal_id DESC LIMIT ?;
 
 --
 -- History

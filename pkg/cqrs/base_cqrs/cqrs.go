@@ -849,7 +849,7 @@ func (w wrapper) GetEvents(ctx context.Context, accountID uuid.UUID, workspaceID
 		err  error
 	)
 
-	if opts.Name == nil {
+	if len(opts.Names) == 0 {
 		params := sqlc.WorkspaceEventsParams{
 			Cursor: *opts.Cursor,
 			Before: opts.Newest,
@@ -859,7 +859,7 @@ func (w wrapper) GetEvents(ctx context.Context, accountID uuid.UUID, workspaceID
 		evts, err = w.q.WorkspaceEvents(ctx, params)
 	} else {
 		params := sqlc.WorkspaceNamedEventsParams{
-			Name:   *opts.Name,
+			Names:  opts.Names,
 			Cursor: *opts.Cursor,
 			Before: opts.Newest,
 			After:  opts.Oldest,
