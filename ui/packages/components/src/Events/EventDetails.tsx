@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import NextLink from 'next/link';
 import { ErrorCard } from '@inngest/components/Error/ErrorCard';
-import { type PathCreator } from '@inngest/components/SharedContext/usePathCreator';
+import { usePathCreator } from '@inngest/components/SharedContext/usePathCreator';
 import { Skeleton } from '@inngest/components/Skeleton';
 import { Time } from '@inngest/components/Time';
 import { usePrettyJson } from '@inngest/components/hooks/usePrettyJson';
@@ -37,13 +37,11 @@ export function EventDetails({
   getEventDetails,
   getEventPayload,
   getEventRuns,
-  pathCreator,
   expandedRowActions,
   standalone,
 }: {
   initialData?: Pick<Event, 'name' | 'runs'>;
   eventID: string;
-  pathCreator: PathCreator;
   getEventDetails: React.ComponentProps<typeof EventsTable>['getEventDetails'];
   getEventPayload: React.ComponentProps<typeof EventsTable>['getEventPayload'];
   getEventRuns?: ({ eventID }: { eventID: string }) => Promise<Pick<Event, 'runs' | 'name'>>;
@@ -56,6 +54,7 @@ export function EventDetails({
   const [leftWidth, setLeftWidth] = useState(70);
   const [isDragging, setIsDragging] = useState(false);
   const { isRunning, send } = useDevServer();
+  const { pathCreator } = usePathCreator();
 
   const {
     isPending, // first load, no data

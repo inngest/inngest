@@ -329,7 +329,6 @@ export function EventsTable({
             const initialData: Pick<Event, 'name' | 'runs'> = { name, runs };
             return (
               <EventDetails
-                pathCreator={pathCreator}
                 initialData={initialData}
                 getEventDetails={getEventDetails}
                 getEventPayload={getEventPayload}

@@ -2,7 +2,6 @@
 
 import { EventDetails } from '@inngest/components/Events/EventDetails';
 import { useReplayModal } from '@inngest/components/Events/useReplayModal';
-import { usePathCreator } from '@inngest/components/SharedContext/usePathCreator';
 
 import { ExpandedRowActions } from '@/components/Events/ExpandedRowActions';
 import { SendEventModal } from '@/components/Events/SendEventModal';
@@ -20,7 +19,6 @@ export default function Page({ params }: Props) {
   const envSlug = params.environmentSlug;
 
   const { isModalVisible, selectedEvent, openModal, closeModal } = useReplayModal();
-  const { pathCreator } = usePathCreator();
 
   const getEventDetails = useEventDetails();
   const getEventPayload = useEventPayload();
@@ -29,7 +27,6 @@ export default function Page({ params }: Props) {
   return (
     <>
       <EventDetails
-        pathCreator={pathCreator}
         eventID={eventID}
         standalone
         getEventDetails={getEventDetails}
