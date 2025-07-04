@@ -9,7 +9,7 @@ local capacity = tonumber(ARGV[6])
 
 if capacity > 0 then
   gcraUpdate(gcraKey, nowMS, period, limit, burst, capacity)
-  return -1
+  return {-1,0}
 end
 
 return gcraCapacity(gcraKey, nowMS, period, limit, burst)

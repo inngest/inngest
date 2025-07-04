@@ -1109,12 +1109,6 @@ type QueuePartition struct {
 	// This must be set so that we can fetch the latest concurrency limits dynamically when
 	// leasing a partition, if desired, via the ConcurrencyLimitGetter.
 	UnevaluatedConcurrencyHash string `json:"ch,omitempty"`
-	// LimitOwner represents the function ID that set the max concurrency limit for
-	// this function.  This allows us to lower the max if the owner/enqueueing function
-	// ID matches - otherwise, once set, the max can never lower.
-	LimitOwner *uuid.UUID `json:"lID,omitempty"`
-
-	// TODO: Throttling;  embed max limit/period/etc?
 }
 
 func (qp QueuePartition) IsSystem() bool {
@@ -1523,6 +1517,12 @@ func (q *queue) EnqueueItem(ctx context.Context, shard QueueShard, i osqueue.Que
 	}
 	switch status {
 	case 0:
+		// Hint to executor that we should refill if the item has no delay
+		refillSoon := i.ExpectedDelay() < ShadowPartitionLookahead
+		if enqueueToBacklogs && refillSoon {
+			q.addShadowContinue(ctx, &shadowPartition, 0)
+		}
+
 		return i, nil
 	case 1:
 		return i, ErrQueueItemExists
