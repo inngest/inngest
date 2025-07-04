@@ -232,9 +232,8 @@ func (g *WorkerGroup) Sync(ctx context.Context, groupManager WorkerGroupManager,
 	}
 
 	config := sdk.RegisterRequest{
-		V: "1",
-		// TODO only do this on the devserver
-		URL:        fmt.Sprintf("%s?app_name=%s", connURL.String(), g.AppName),
+		V:          "1",
+		URL:        appURL,
 		DeployType: sdk.DeployTypeConnect,
 		SDK:        sdkVersion,
 		AppName:    g.AppName,
