@@ -84,6 +84,11 @@ type RequestReceiver interface {
 	Wait(ctx context.Context) error
 }
 
+type subscription struct {
+	ch  chan string
+	ctx context.Context
+}
+
 type EnforceLeaseExpiryFunc func(ctx context.Context, accountID uuid.UUID) bool
 
 type redisPubSubConnector struct {
@@ -91,7 +96,7 @@ type redisPubSubConnector struct {
 	pubSubClient rueidis.DedicatedClient
 	setup        chan struct{}
 
-	subscribers     map[string]map[string]chan string
+	subscribers     map[string]map[string]*subscription
 	subscribersLock sync.RWMutex
 
 	logger logger.Logger
@@ -115,7 +120,7 @@ type RedisPubSubConnectorOpts struct {
 func newRedisPubSubConnector(client rueidis.Client, opts RedisPubSubConnectorOpts) *redisPubSubConnector {
 	return &redisPubSubConnector{
 		client:             client,
-		subscribers:        make(map[string]map[string]chan string),
+		subscribers:        make(map[string]map[string]*subscription),
 		subscribersLock:    sync.RWMutex{},
 		logger:             opts.Logger,
 		tracer:             opts.Tracer,
@@ -546,12 +551,15 @@ func (i *redisPubSubConnector) subscribe(ctx context.Context, channel string, on
 
 		if _, ok := i.subscribers[channel]; !ok {
 			// subscribe to channel
-			i.subscribers[channel] = make(map[string]chan string)
+			i.subscribers[channel] = make(map[string]*subscription)
 		} else {
 			redisSubscribed = true
 		}
 
-		i.subscribers[channel][subId] = msgs
+		i.subscribers[channel][subId] = &subscription{
+			ch:  msgs,
+			ctx: ctx,
+		}
 
 		i.subscribersLock.Unlock()
 	}
@@ -677,8 +685,14 @@ func (i *redisPubSubConnector) Wait(ctx context.Context) error {
 					return
 				}
 
-				for _, receiverChan := range subs {
-					receiverChan <- m.Message
+				for _, sub := range subs {
+					select {
+					case sub.ch <- m.Message:
+						// Message successfully sent
+					case <-sub.ctx.Done():
+						// Subscriber's context is cancelled; stop processing further
+						continue
+					}
 				}
 			}()
 		},
