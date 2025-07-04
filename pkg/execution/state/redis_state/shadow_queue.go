@@ -30,6 +30,8 @@ const (
 	ShadowPartitionRequeueExtendedDuration = 3 * time.Second
 
 	ShadowPartitionLookahead = 2 * PartitionLookahead
+
+	BacklogForceRequeueMaxBackoff = 5 * time.Minute
 )
 
 var (
@@ -491,6 +493,11 @@ func (q *queue) processShadowPartitionBacklog(ctx context.Context, shadowPart *Q
 	}
 
 	if !forceRequeueBacklogAt.IsZero() {
+		// Cap maximum backoff to ensure constraint updates (changing throttle period, etc.) are reflected reasonably quickly
+		if forceRequeueBacklogAt.Sub(q.clock.Now()) > BacklogForceRequeueMaxBackoff {
+			forceRequeueBacklogAt = q.clock.Now().Add(BacklogForceRequeueMaxBackoff)
+		}
+
 		if err := q.BacklogRequeue(ctx, backlog, shadowPart, forceRequeueBacklogAt); err != nil && !errors.Is(err, ErrBacklogNotFound) {
 			return nil, false, fmt.Errorf("could not requeue backlog: %w", err)
 		}
