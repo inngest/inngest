@@ -12,6 +12,7 @@ import (
 	"github.com/redis/rueidis"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/protobuf/types/known/timestamppb"
+	"net"
 	"strings"
 	"testing"
 	"time"
@@ -992,5 +993,95 @@ func TestGarbageCollectGateways(t *testing.T) {
 		require.Error(t, err)
 		require.ErrorIs(t, err, ErrGatewayNotFound)
 		require.Nil(t, gw)
+	})
+}
+
+func TestGetAllGateways(t *testing.T) {
+	t.Run("should return empty slice when no gateways exist", func(t *testing.T) {
+		r := miniredis.RunT(t)
+
+		rc, err := rueidis.NewClient(rueidis.ClientOption{
+			InitAddress:  []string{r.Addr()},
+			DisableCache: true,
+		})
+		require.NoError(t, err)
+		defer rc.Close()
+
+		connManager := NewRedisConnectionStateManager(rc)
+
+		ctx := context.Background()
+
+		gateways, err := connManager.GetAllGateways(ctx)
+		require.NoError(t, err)
+		require.Empty(t, gateways)
+	})
+
+	t.Run("should return multiple gateways", func(t *testing.T) {
+		r := miniredis.RunT(t)
+
+		rc, err := rueidis.NewClient(rueidis.ClientOption{
+			InitAddress:  []string{r.Addr()},
+			DisableCache: true,
+		})
+		require.NoError(t, err)
+		defer rc.Close()
+
+		connManager := NewRedisConnectionStateManager(rc)
+
+		ctx := context.Background()
+
+		gwID1 := ulid.MustNew(ulid.Now(), rand.Reader)
+		gwID2 := ulid.MustNew(ulid.Now(), rand.Reader)
+		gwID3 := ulid.MustNew(ulid.Now(), rand.Reader)
+
+		expectedGw1 := &Gateway{
+			Id:                gwID1,
+			Status:            GatewayStatusActive,
+			LastHeartbeatAtMS: time.Now().Truncate(time.Second).UnixMilli(),
+			Hostname:          "gw-1",
+			IPAddress:         net.ParseIP("192.168.1.10"),
+		}
+
+		expectedGw2 := &Gateway{
+			Id:                gwID2,
+			Status:            GatewayStatusDraining,
+			LastHeartbeatAtMS: time.Now().Add(-1 * time.Minute).Truncate(time.Second).UnixMilli(),
+			Hostname:          "gw-2",
+			IPAddress:         net.ParseIP("192.168.1.20"),
+		}
+
+		expectedGw3 := &Gateway{
+			Id:                gwID3,
+			Status:            GatewayStatusActive,
+			LastHeartbeatAtMS: time.Now().Add(-2 * time.Minute).Truncate(time.Second).UnixMilli(),
+			Hostname:          "gw-3",
+			IPAddress:         net.ParseIP("10.0.0.5"),
+		}
+
+		err = connManager.UpsertGateway(ctx, expectedGw1)
+		require.NoError(t, err)
+
+		err = connManager.UpsertGateway(ctx, expectedGw2)
+		require.NoError(t, err)
+
+		err = connManager.UpsertGateway(ctx, expectedGw3)
+		require.NoError(t, err)
+
+		gateways, err := connManager.GetAllGateways(ctx)
+		require.NoError(t, err)
+		require.Len(t, gateways, 3)
+
+		gatewayMap := make(map[string]*Gateway)
+		for _, gw := range gateways {
+			gatewayMap[gw.Id.String()] = gw
+		}
+
+		require.Equal(t, *expectedGw1, *gatewayMap[gwID1.String()])
+		require.Equal(t, *expectedGw2, *gatewayMap[gwID2.String()])
+		require.Equal(t, *expectedGw3, *gatewayMap[gwID3.String()])
+
+		require.True(t, expectedGw1.IPAddress.Equal(gatewayMap[gwID1.String()].IPAddress))
+		require.True(t, expectedGw2.IPAddress.Equal(gatewayMap[gwID2.String()].IPAddress))
+		require.True(t, expectedGw3.IPAddress.Equal(gatewayMap[gwID3.String()].IPAddress))
 	})
 }

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	mathRand "math/rand"
+	"net"
 	"net/http"
 	"os"
 	"sync"
@@ -14,14 +15,17 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
+	connectConfig "github.com/inngest/inngest/pkg/config/connect"
 	"github.com/inngest/inngest/pkg/connect/auth"
 	"github.com/inngest/inngest/pkg/connect/pubsub"
 	"github.com/inngest/inngest/pkg/connect/state"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
+	pb "github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/oklog/ulid/v2"
 	"golang.org/x/sync/errgroup"
+	"google.golang.org/grpc"
 )
 
 const (
@@ -59,10 +63,15 @@ type ConnectEntitlementRetriever interface {
 }
 
 type connectGatewaySvc struct {
+	pb.ConnectGatewayServer
+
 	gatewayPublicPort int
 
 	gatewayRoutes  chi.Router
 	maintenanceApi chi.Router
+
+	grpcServer *grpc.Server
+	wsConnections sync.Map
 
 	// gatewayId is a unique identifier, generated each time the service is started.
 	// This should be used to uniquely identify the gateway instance when sending messages and routing requests.
@@ -83,7 +92,8 @@ type connectGatewaySvc struct {
 	workerRequestExtendLeaseInterval                      time.Duration
 	workerRequestLeaseDuration                            time.Duration
 
-	hostname string
+	hostname  string
+	ipAddress net.IP
 
 	// groupName specifies the name of the deployment group in case this gateway is one of many replicas.
 	groupName string
@@ -208,6 +218,8 @@ func NewConnectGatewayService(opts ...gatewayOpt) *connectGatewaySvc {
 		workerRequestExtendLeaseInterval:                      consts.ConnectWorkerRequestExtendLeaseInterval,
 		workerRequestLeaseDuration:                            consts.ConnectWorkerRequestLeaseDuration,
 		consecutiveWorkerHeartbeatMissesBeforeConnectionClose: 5,
+
+		grpcServer: grpc.NewServer(),
 	}
 
 	for _, opt := range opts {
@@ -268,9 +280,14 @@ func (c *connectGatewaySvc) Pre(ctx context.Context) error {
 	}
 	c.hostname = hostname
 
+	c.ipAddress = connectConfig.Gateway(ctx).GRPCIP
+
 	if err := c.updateGatewayState(state.GatewayStatusStarting); err != nil {
 		return fmt.Errorf("could not set initial gateway state: %w", err)
 	}
+
+	// Register gRPC server
+	pb.RegisterConnectGatewayServer(c.grpcServer, c)
 
 	return nil
 }
@@ -431,6 +448,19 @@ func (c *connectGatewaySvc) Run(ctx context.Context) error {
 		return nil
 	})
 
+	connectConfig := connectConfig.Gateway(ctx)
+
+	eg.Go(func() error {
+		addr := fmt.Sprintf(":%d", connectConfig.GRPCPort)
+
+		l, err := net.Listen("tcp", addr)
+		if err != nil {
+			return fmt.Errorf("could not listen for: %w", err)
+		}
+		logger.StdlibLogger(ctx).Info("starting grpc server", "addr", addr)
+		return c.grpcServer.Serve(l)
+	})
+
 	if !c.isDraining.Load() {
 		err := c.updateGatewayState(state.GatewayStatusActive)
 		if err != nil {
@@ -459,6 +489,7 @@ func (c *connectGatewaySvc) updateGatewayState(status state.GatewayStatus) error
 		Status:            status,
 		LastHeartbeatAtMS: time.Now().UnixMilli(),
 		Hostname:          c.hostname,
+		IPAddress:         c.ipAddress,
 	})
 	if err != nil {
 		c.logger.Error("failed to update gateway status in state", "status", status, "error", err)

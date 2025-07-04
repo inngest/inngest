@@ -46,6 +46,7 @@ gen:
 .PHONY: protobuf
 protobuf:
 	buf generate
+	buf generate --path proto/connect/v1 --template proto/connect/v1/buf.gen.yaml
 
 # $GOBIN must be set and be in your path for this to work
 .PHONY: queries

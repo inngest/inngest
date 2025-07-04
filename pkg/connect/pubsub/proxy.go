@@ -107,17 +107,35 @@ type redisPubSubConnector struct {
 
 	enforceLeaseExpiry EnforceLeaseExpiryFunc
 
+	gatewayGRPCForwarder GatewayGRPCForwarder
+
+	shouldUseGRPC UseGRPCFunc
+
 	RequestReceiver
 }
 
+type UseGRPCFunc func(ctx context.Context, accountID uuid.UUID) bool
+
 type RedisPubSubConnectorOpts struct {
-	Logger             logger.Logger
-	Tracer             trace.ConditionalTracer
-	StateManager       state.StateManager
-	EnforceLeaseExpiry EnforceLeaseExpiryFunc
+	Logger               logger.Logger
+	Tracer               trace.ConditionalTracer
+	StateManager         state.StateManager
+	EnforceLeaseExpiry   EnforceLeaseExpiryFunc
+	GatewayGRPCForwarder GatewayGRPCForwarder
+
+	ShouldUseGRPC UseGRPCFunc
 }
 
 func newRedisPubSubConnector(client rueidis.Client, opts RedisPubSubConnectorOpts) *redisPubSubConnector {
+	var shouldUseGRPC UseGRPCFunc
+	if opts.ShouldUseGRPC == nil {
+		shouldUseGRPC = func(ctx context.Context, accountID uuid.UUID) bool {
+			return false
+		}
+	} else {
+		shouldUseGRPC = opts.ShouldUseGRPC
+	}
+
 	return &redisPubSubConnector{
 		client:             client,
 		subscribers:        make(map[string]map[string]*subscription),
@@ -126,6 +144,9 @@ func newRedisPubSubConnector(client rueidis.Client, opts RedisPubSubConnectorOpt
 		tracer:             opts.Tracer,
 		setup:              make(chan struct{}),
 		enforceLeaseExpiry: opts.EnforceLeaseExpiry,
+
+		gatewayGRPCForwarder: opts.GatewayGRPCForwarder,
+		shouldUseGRPC:        shouldUseGRPC,
 
 		// For routing
 		stateManager: opts.StateManager,
@@ -242,8 +263,8 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 	}
 
 	// Receive gateway acknowledgement for o11y (this is not a reliable channel - do not depend on it for the critical path)
-	{
-		// TODO Replace executor -> gateway PubSub communication with point-to-point (gRPC)
+	// TODO: Remove this once we fully switch to gRPC
+	if !i.shouldUseGRPC(ctx, opts.AccountID) {
 		var gatewayAcked bool
 		gatewayAckSubscribed := make(chan struct{})
 		withAckTimeout, cancel := context.WithTimeout(ctx, 10*time.Second)
@@ -452,8 +473,22 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 		}
 
 		// Forward the request
-		// TODO Replace executor -> gateway PubSub communication with point-to-point (gRPC)
-		err = i.RouteExecutorRequest(ctx, route.GatewayID, route.ConnectionID, opts.Data)
+		if i.shouldUseGRPC(ctx, opts.AccountID) {
+			err = i.gatewayGRPCForwarder.Forward(ctx, route.GatewayID, route.ConnectionID, opts.Data)
+
+			// Ack here instead of needing a pubsub ack message
+			if err != nil {
+				metrics.HistogramConnectProxyAckTime(ctx, time.Since(proxyStartTime).Milliseconds(), metrics.HistogramOpt{
+					PkgName: pkgName,
+					Tags: map[string]any{
+						"kind": "gateway",
+					},
+				})
+			}
+		} else {
+			err = i.RouteExecutorRequest(ctx, route.GatewayID, route.ConnectionID, opts.Data)
+		}
+
 		if err != nil {
 			span.RecordError(err)
 			span.SetStatus(codes.Error, "could not forward request to gateway")
@@ -697,6 +732,12 @@ func (i *redisPubSubConnector) Wait(ctx context.Context) error {
 			}()
 		},
 	})
+
+	if i.gatewayGRPCForwarder != nil {
+		if err := i.gatewayGRPCForwarder.ConnectToGateways(ctx); err != nil {
+			return err
+		}
+	}
 
 	err := <-wait // disconnected with err
 	if err != nil && !errors.Is(err, rueidis.ErrClosing) {
