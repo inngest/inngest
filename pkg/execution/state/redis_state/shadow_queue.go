@@ -351,7 +351,7 @@ func (q *queue) processShadowPartitionBacklog(ctx context.Context, shadowPart *Q
 				return nil, false, fmt.Errorf("could not lease backlog: %w", err)
 			}
 
-			if err := q.normalizeBacklog(ctx, backlog, shadowPart, constraints); err != nil {
+			if err := q.normalizeBacklog(ctx, backlog, shadowPart, constraints, true); err != nil {
 				return nil, false, fmt.Errorf("could not normalize backlog: %w", err)
 			}
 		}
