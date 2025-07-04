@@ -7,6 +7,8 @@ import ConfigurationTable, {
   type ConfigurationEntry,
 } from '@inngest/components/FunctionConfiguration/ConfigurationTable';
 import { PopoverContent } from '@inngest/components/FunctionConfiguration/FunctionConfigurationInfoPopovers';
+import { Info } from '@inngest/components/Info/Info';
+import { Link } from '@inngest/components/Link';
 import { Pill } from '@inngest/components/Pill';
 import { Time } from '@inngest/components/Time';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
@@ -15,9 +17,16 @@ import { AppsIcon } from '@inngest/components/icons/sections/Apps';
 import { EventsIcon } from '@inngest/components/icons/sections/Events';
 import { FunctionsIcon } from '@inngest/components/icons/sections/Functions';
 import { relativeTime } from '@inngest/components/utils/date';
-import { RiArrowRightSLine, RiArrowRightUpLine, RiTimeLine } from '@remixicon/react';
+import {
+  RiArrowRightSLine,
+  RiArrowRightUpLine,
+  RiExternalLinkLine,
+  RiInformationLine,
+  RiTimeLine,
+} from '@remixicon/react';
 
 import type { GetFunctionQuery as DashboardGetFunctionQuery } from '../../../../apps/dashboard/src/gql/graphql';
+import { pathCreator } from '../../../../apps/dashboard/src/utils/urls';
 import {
   FunctionTriggerTypes,
   type GetFunctionQuery as DevServerGetFunctionQuery,
@@ -186,17 +195,38 @@ export function FunctionConfiguration({
             <>
               {concurrencyLimit.limit.value >= 1 && concurrencyLimit.limit.value}
               {concurrencyLimit.limit.isPlanLimit && (
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <span>
-                      <Pill className="ml-2">Plan limit</Pill>
+                <Info
+                  side="bottom"
+                  align="end"
+                  text={
+                    <span className="whitespace-pre-line">
+                      Running into limits? Easily upgrade your plan or boost concurrency on your
+                      existing plan.
                     </span>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    If not configured, the limit is set to the maximum value allowed within your
-                    plan.
-                  </TooltipContent>
-                </Tooltip>
+                  }
+                  widthClassName="max-w-xs"
+                  action={
+                    <Link
+                      href={pathCreator.billing({
+                        tab: 'plans',
+                        ref: 'concurrency-limit-popover',
+                      })}
+                      target="_blank"
+                      iconAfter={<RiExternalLinkLine className="h-4 w-4" />}
+                    >
+                      Explore plans
+                    </Link>
+                  }
+                  iconElement={
+                    <Pill
+                      className="flex items-center gap-1"
+                      icon={<RiInformationLine className="h-[18px] w-[18px]" />}
+                      iconSide="right"
+                    >
+                      <span className="whitespace-nowrap">Plan limit</span>
+                    </Pill>
+                  }
+                />
               )}
             </>
           ),
