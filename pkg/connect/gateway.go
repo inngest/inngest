@@ -306,7 +306,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			for _, group := range conn.Groups {
 				group := group
 				eg.Go(func() error {
-					err := group.Sync(ctx, c.stateManager, c.apiBaseUrl, conn.Data)
+					err := group.Sync(ctx, c.stateManager, c.apiBaseUrl, conn.Data, c.dev)
 					if err != nil {
 						return fmt.Errorf("could not sync app %q: %w", group.AppName, err)
 					}
