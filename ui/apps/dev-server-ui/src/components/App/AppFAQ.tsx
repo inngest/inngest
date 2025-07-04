@@ -24,10 +24,8 @@ export default function AppFAQ({ openByDefault = false }) {
             <HelperCard
               onClick={() =>
                 trackEvent('cli/onboarding.action', {
-                  metadata: {
-                    type: 'btn-click',
-                    label: 'choose-framework',
-                  },
+                  type: 'btn-click',
+                  label: 'choose-framework',
                 })
               }
               href="/apps/choose-framework"
@@ -42,10 +40,8 @@ export default function AppFAQ({ openByDefault = false }) {
             <HelperCard
               onClick={() =>
                 trackEvent('cli/onboarding.action', {
-                  metadata: {
-                    type: 'btn-click',
-                    label: 'choose-template',
-                  },
+                  type: 'btn-click',
+                  label: 'choose-template',
                 })
               }
               href="/apps/choose-template"
@@ -60,10 +56,8 @@ export default function AppFAQ({ openByDefault = false }) {
             <HelperCard
               onClick={() =>
                 trackEvent('cli/onboarding.action', {
-                  metadata: {
-                    type: 'btn-click',
-                    label: 'run-demo',
-                  },
+                  type: 'btn-click',
+                  label: 'run-demo',
                 })
               }
               href="https://github.com/inngest/inngest-demo"

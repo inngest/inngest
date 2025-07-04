@@ -1,14 +1,14 @@
 export function useTracking() {
   const trackEvent = async (eventName: string, eventData: Record<string, any> = {}) => {
     try {
-      const response = await fetch(createDevServerURL('/telemetry'), {
+      const response = await fetch(createDevServerURL('/v0/telemetry'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           eventName,
-          data: eventData,
+          ...eventData,
         }),
       });
 
