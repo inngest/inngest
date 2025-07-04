@@ -53,7 +53,7 @@ func (q *queue) backlogNormalizationWorker(ctx context.Context, nc chan normaliz
 			return
 
 		case msg := <-nc:
-			err := q.normalizeBacklog(ctx, msg.b, msg.sp, msg.constraints)
+			err := q.normalizeBacklog(ctx, msg.b, msg.sp, msg.constraints, false)
 			if err != nil {
 				q.log.Error("could not normalize backlog", "error", err, "backlog", msg.b, "shadow", msg.sp)
 			}
@@ -264,8 +264,11 @@ func (q *queue) extendBacklogNormalizationLease(ctx context.Context, now time.Ti
 // normalizeBacklog must be called with exclusive access to the shadow partition
 // NOTE: ideally this is one transaction in a lua script but enqueue_to_backlog is way too much work to
 // utilize
-func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp *QueueShadowPartition, latestConstraints *PartitionConstraintConfig) error {
-	l := q.log.With("backlog", backlog, "sp", sp, "constraints", latestConstraints)
+func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp *QueueShadowPartition, latestConstraints *PartitionConstraintConfig, immediate bool) error {
+	metrics.ActiveBacklogNormalizeCount(ctx, 1, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name}})
+	defer metrics.ActiveBacklogNormalizeCount(ctx, -1, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name}})
+
+	l := q.log.With("backlog", backlog, "sp", sp, "constraints", latestConstraints, "immediate", immediate)
 
 	start := q.clock.Now()
 	defer func() {
@@ -284,7 +287,7 @@ func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp 
 		)
 
 		if dur > 1*time.Minute {
-			q.log.Debug("slow backlog normalization", "dur", dur, "backlog", backlog, "sp", sp, "constraints", latestConstraints)
+			l.Debug("slow backlog normalization", "dur", dur, "backlog", backlog, "sp", sp, "constraints", latestConstraints)
 		}
 	}()
 
@@ -311,6 +314,8 @@ func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp 
 		}
 	}()
 
+	l.Debug("starting backlog normalization")
+
 	shard := q.primaryQueueShard
 	var processed int64
 	for {
@@ -334,7 +339,7 @@ func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp 
 				// If event for item cannot be found, remove it from the backlog
 				err := q.Dequeue(ctx, shard, *item)
 				if err != nil {
-					q.log.Warn("could not dequeue queue item with missing event", "err", err)
+					l.Warn("could not dequeue queue item with missing event", "err", err)
 				}
 			}
 
@@ -389,6 +394,7 @@ func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp 
 			PkgName: pkgName,
 			Tags: map[string]any{
 				"queue_shard": q.primaryQueueShard.Name,
+				"immediate":   immediate,
 				// "partition_id": backlog.ShadowPartitionID,
 			},
 		})
@@ -398,11 +404,12 @@ func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp 
 		PkgName: pkgName,
 		Tags: map[string]any{
 			"queue_shard": q.primaryQueueShard.Name,
+			"immediate":   immediate,
 			// "partition_id": backlog.ShadowPartitionID,
 		},
 	})
 
-	q.log.Trace("normalized backlog", "backlog", backlog.BacklogID, "partition", sp.PartitionID)
+	l.Debug("normalized backlog")
 
 	return nil
 }
