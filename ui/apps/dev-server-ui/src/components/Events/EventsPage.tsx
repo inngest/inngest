@@ -9,24 +9,18 @@ import { Header } from '@inngest/components/Header/Header';
 import { RefreshButton } from '@inngest/components/Refresh/RefreshButton';
 import { RiExternalLinkLine, RiRefreshLine } from '@remixicon/react';
 
-import { useAllEventTypes } from '@/components/EventTypes/useEventTypes';
+import SendEventButton from '@/components/Event/SendEventButton';
+import SendEventModal from '@/components/Event/SendEventModal';
 import { EventInfo } from '@/components/Events/EventInfo';
 import { ExpandedRowActions } from '@/components/Events/ExpandedRowActions';
-import SendEventButton from '@/components/Events/SendEventButton';
-import { SendEventModal } from '@/components/Events/SendEventModal';
 import { useEventDetails, useEventPayload, useEvents } from '@/components/Events/useEvents';
-import { useAccountFeatures } from '@/utils/useAccountFeatures';
 
 export default function EventsPage({
-  environmentSlug: envSlug,
   eventTypeNames,
   showHeader = true,
-  singleEventTypePage = false,
 }: {
-  environmentSlug: string;
   eventTypeNames?: string[];
   showHeader?: boolean;
-  singleEventTypePage?: boolean;
 }) {
   const router = useRouter();
   const { isModalVisible, selectedEvent, openModal, closeModal } = useReplayModal();
@@ -34,8 +28,6 @@ export default function EventsPage({
   const getEvents = useEvents();
   const getEventDetails = useEventDetails();
   const getEventPayload = useEventPayload();
-  const getEventTypes = useAllEventTypes();
-  const features = useAccountFeatures();
 
   return (
     <>
@@ -46,7 +38,14 @@ export default function EventsPage({
           action={
             <div className="flex items-center gap-1.5">
               <RefreshButton />
-              <SendEventButton />
+              <SendEventButton
+                label="Send event"
+                data={JSON.stringify({
+                  name: '',
+                  data: {},
+                  user: {},
+                })}
+              />
               <InternalEventsToggle />
             </div>
           }
@@ -56,11 +55,10 @@ export default function EventsPage({
         getEvents={getEvents}
         getEventDetails={getEventDetails}
         getEventPayload={getEventPayload}
-        getEventTypes={getEventTypes}
         eventNames={eventTypeNames}
-        singleEventTypePage={singleEventTypePage}
+        singleEventTypePage={false}
         features={{
-          history: features.data?.history ?? 7,
+          history: Number.MAX_SAFE_INTEGER,
         }}
         emptyActions={
           <>
@@ -81,21 +79,11 @@ export default function EventsPage({
           </>
         }
         expandedRowActions={({ eventName, payload }) => (
-          <ExpandedRowActions
-            eventName={eventName}
-            payload={payload}
-            onReplay={openModal}
-            envSlug={envSlug}
-          />
+          <ExpandedRowActions eventName={eventName} payload={payload} onReplay={openModal} />
         )}
       />
       {selectedEvent && (
-        <SendEventModal
-          isOpen={isModalVisible}
-          eventName={selectedEvent.name}
-          onClose={closeModal}
-          initialData={selectedEvent.data}
-        />
+        <SendEventModal isOpen={isModalVisible} onClose={closeModal} data={selectedEvent.data} />
       )}
     </>
   );
