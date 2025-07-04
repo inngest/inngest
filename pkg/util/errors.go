@@ -8,7 +8,7 @@ type ErrSet struct {
 	errs []error
 }
 
-func NewErrSet() *ErrSet {
+func NewErrSet(errs ...error) *ErrSet {
 	return &ErrSet{}
 }
 
@@ -28,4 +28,18 @@ func (e *ErrSet) Err() error {
 	}
 
 	return errors.Join(e.errs...)
+}
+
+func (e *ErrSet) Merge(other *ErrSet) *ErrSet {
+	if other == nil {
+		return e
+	}
+
+	if e == nil {
+		return other
+	}
+
+	new := NewErrSet(append(e.errs, other.errs...)...)
+
+	return new
 }

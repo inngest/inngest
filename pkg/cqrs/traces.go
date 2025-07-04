@@ -39,11 +39,8 @@ type RawOtelSpan struct {
 type OtelSpan struct {
 	RawOtelSpan
 
-	Status               enums.StepStatus `json:"status"`
-	OutputID             *string          `json:"output_id,omitempty,omitzero"`
-	CalculatedQueuedTime *time.Time       `json:"queued_time,omitempty,omitzero"`
-	CalculatedStartTime  *time.Time       `json:"start_time,omitempty,omitzero"`
-	CalculatedEndTime    *time.Time       `json:"end_time,omitempty,omitzero"`
+	Status   enums.StepStatus `json:"status"`
+	OutputID *string          `json:"output_id,omitempty,omitzero"`
 
 	// Parsed attributes from the span
 	Attributes *meta.ExtractedValues `json:"attributes,omitempty,omitzero"`
@@ -57,14 +54,6 @@ type OtelSpan struct {
 	FunctionID uuid.UUID `json:"function_id,omitempty,omitzero"`
 
 	Children []*OtelSpan `json:"children,omitempty,omitzero"`
-}
-
-func (s *OtelSpan) anyUnixMilliToTime(v any) (time.Time, error) {
-	f, ok := v.(float64)
-	if !ok {
-		return time.Time{}, fmt.Errorf("expected float64, got %T", v)
-	}
-	return time.UnixMilli(int64(f)), nil
 }
 
 func (s *OtelSpan) GetAppID() uuid.UUID {

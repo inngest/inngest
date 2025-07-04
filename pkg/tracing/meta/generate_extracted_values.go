@@ -54,15 +54,16 @@ func main() {
 package meta
 
 import (
+	"net/http"
 	"time"
-	
+
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/oklog/ulid/v2"
 )
 
 // ExtractedValues mirrors the Attrs struct but with actual pointer types
-// instead of Attr wrappers. This allows for type-safe access to deserialized values.
+// instead of attr wrappers. This allows for type-safe access to deserialized values.
 type ExtractedValues struct {
 `
 
@@ -70,7 +71,7 @@ type ExtractedValues struct {
 	for _, field := range attrsStruct.Fields.List {
 		for _, name := range field.Names {
 			fieldName := name.Name
-			
+
 			// Extract the type from Attr[T] to get T
 			typeName := extractTypeFromAttr(field.Type)
 			if typeName != "" {
@@ -97,7 +98,7 @@ type ExtractedValues struct {
 func extractTypeFromAttr(expr ast.Expr) string {
 	// Handle Attr[T] where T is the type we want
 	if indexExpr, ok := expr.(*ast.IndexExpr); ok {
-		if ident, ok := indexExpr.X.(*ast.Ident); ok && ident.Name == "Attr" {
+		if ident, ok := indexExpr.X.(*ast.Ident); ok && ident.Name == "attr" {
 			return exprToString(indexExpr.Index)
 		}
 	}

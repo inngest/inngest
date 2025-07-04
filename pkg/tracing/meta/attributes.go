@@ -11,121 +11,125 @@ import (
 
 var Attrs = struct {
 	// Timings
-	StartedAt Attr[*time.Time]
-	QueuedAt  Attr[*time.Time]
-	EndedAt   Attr[*time.Time]
+	StartedAt attr[*time.Time]
+	QueuedAt  attr[*time.Time]
+	EndedAt   attr[*time.Time]
 
 	// Run attributes
-	AccountID       Attr[*uuid.UUID]
-	AppID           Attr[*uuid.UUID]
-	BatchID         Attr[*ulid.ULID]
-	BatchTimestamp  Attr[*time.Time]
-	CronSchedule    Attr[*string]
-	DropSpan        Attr[*bool]
-	EnvID           Attr[*uuid.UUID]
-	EventIDs        Attr[*[]string]
-	FunctionID      Attr[*uuid.UUID]
-	FunctionVersion Attr[*int]
-	RunID           Attr[*ulid.ULID]
+	AccountID       attr[*uuid.UUID]
+	AppID           attr[*uuid.UUID]
+	BatchID         attr[*ulid.ULID]
+	BatchTimestamp  attr[*time.Time]
+	CronSchedule    attr[*string]
+	DropSpan        attr[*bool]
+	EnvID           attr[*uuid.UUID]
+	EventIDs        attr[*[]string]
+	FunctionID      attr[*uuid.UUID]
+	FunctionVersion attr[*int]
+	RunID           attr[*ulid.ULID]
 
 	// Dynamic span controls
-	DynamicSpanID Attr[*string]
-	DynamicStatus Attr[*enums.StepStatus]
+	DynamicSpanID attr[*string]
+	DynamicStatus attr[*enums.StepStatus]
 
 	// Internal and debugging
-	InternalLocation Attr[*string]
-	InternalError    Attr[*string]
+	InternalLocation attr[*string]
+	// Internal as we want this only to be set by internal logic.
+	internalError attr[*string]
 
 	// Step attributes
-	StepID           Attr[*string]
-	StepName         Attr[*string]
-	StepOp           Attr[*enums.Opcode]
-	StepAttempt      Attr[*int]
-	StepMaxAttempts  Attr[*int]
-	StepCodeLocation Attr[*string]
+	StepID           attr[*string]
+	StepName         attr[*string]
+	StepOp           attr[*enums.Opcode]
+	StepAttempt      attr[*int]
+	StepMaxAttempts  attr[*int]
+	StepCodeLocation attr[*string]
 	// StepOutput is the data that has been returned from the step, in
 	// its wrapped form for the SDK. This data may not be stored with the span
 	// when it hits a store, and instead may be removed to be stored
 	// separately.
-	StepOutput    Attr[*any]
-	StepOutputRef Attr[*string]
+	StepOutput    attr[*string]
+	StepOutputRef attr[*string]
 
 	// step.run attributes
-	StepRunType Attr[*string]
+	StepRunType attr[*string]
 
 	// Pause-related attributes
-	StepWaitExpired Attr[*bool]
-	StepWaitExpiry  Attr[*time.Time]
+	StepWaitExpired attr[*bool]
+	StepWaitExpiry  attr[*time.Time]
 
 	// Invoke attributes
-	StepInvokeFunctionID     Attr[*uuid.UUID]
-	StepInvokeTriggerEventID Attr[*string]
-	StepInvokeFinishEventID  Attr[*string]
-	StepInvokeRunID          Attr[*ulid.ULID]
+	StepInvokeFunctionID     attr[*string]
+	StepInvokeTriggerEventID attr[*ulid.ULID]
+	StepInvokeFinishEventID  attr[*ulid.ULID]
+	StepInvokeRunID          attr[*ulid.ULID]
 
 	// step.sleep attributes
-	StepSleepDuration Attr[*time.Duration]
+	StepSleepDuration attr[*time.Duration]
 
 	// step.waitForEvent attributes
-	StepWaitForEventIf        Attr[*string]
-	StepWaitForEventName      Attr[*string]
-	StepWaitForEventMatchedID Attr[*string]
+	StepWaitForEventIf        attr[*string]
+	StepWaitForEventName      attr[*string]
+	StepWaitForEventMatchedID attr[*ulid.ULID]
 
 	// Signal attributes
-	StepSignalName Attr[*string]
+	StepSignalName attr[*string]
 
 	// Gateway attributes
-	StepGatewayResponseStatusCode      Attr[*int]
-	StepGatewayResponseOutputSizeBytes Attr[*int]
+	StepGatewayResponseStatusCode      attr[*int]
+	StepGatewayResponseOutputSizeBytes attr[*int]
 
 	// HTTP (serve) attributes
-	RequestURL         Attr[*string]
-	ResponseHeaders    Attr[*http.Header]
-	ResponseStatusCode Attr[*int]
-	ResponseOutputSize Attr[*int]
+	RequestURL         attr[*string]
+	ResponseHeaders    attr[*http.Header]
+	ResponseStatusCode attr[*int]
+	ResponseOutputSize attr[*int]
+
+	AIThingBob attr[*string]
 }{
-	StartedAt:      TimeAttr("_inngest.started_at"),      // _s.st
-	QueuedAt:       TimeAttr("_inngest.queued_at"),       // _s.q
-	EndedAt:        TimeAttr("_inngest.ended_at"),        // _s.e
-	AccountID:      UUIDAttr("_inngest.account.id"),      // _acct
-	AppID:          UUIDAttr("_inngest.app.id"),          // _app
-	BatchID:        ULIDAttr("_inngest.batch.id"),        // _b.id
-	BatchTimestamp: TimeAttr("_inngest.batch.ts"),        // _b.ts
-	CronSchedule:   StringAttr("_inngest.cron.schedule"), // _cron
-	DropSpan:       BoolAttr("_inngest.executor.drop"),   // _drop
-	EnvID:          UUIDAttr("_inngest.env.id"),          // _env
-	// EventIDs:       StringSliceAttr("_inngest.event.ids"), // _e.ids
-	FunctionID:                         UUIDAttr("_inngest.function.id"),     // _fn
-	FunctionVersion:                    IntAttr("_inngest.function.version"), // _fn.v
-	RunID:                              ULIDAttr("_inngest.run.id"),
-	DynamicSpanID:                      StringAttr("_inngest.dynamic.span.id"),    // _d.id
-	DynamicStatus:                      StepStatusAttr("_inngest.dynamic.status"), // _d.st
-	InternalLocation:                   StringAttr("_inngest.internal.location"),  // _i.loc
-	InternalError:                      StringAttr("_inngest.internal.error"),     // _i.err
-	StepID:                             StringAttr("_inngest.step.id"),            // _s.id
-	StepName:                           StringAttr("_inngest.step.name"),          // _s.name
-	StepOp:                             StepOpAttr("_inngest.step.op"),            // _s
-	StepAttempt:                        IntAttr("_inngest.step.attempt"),          // _s.attempt
-	StepMaxAttempts:                    IntAttr("_inngest.step.max_attempts"),     // _s.max_attempts
-	StepCodeLocation:                   StringAttr("_inngest.step.code_location"), // _s.code_loc
-	StepOutput:                         AnyAttr("_inngest.step.output"),
-	StepOutputRef:                      StringAttr("_inngest.step.output_ref"),                      // _s.output_ref
-	StepRunType:                        StringAttr("_inngest.step.run.type"),                        // _s.run.type
-	StepWaitExpired:                    BoolAttr("_inngest.step.wait.expired"),                      // _s.wait
-	StepWaitExpiry:                     TimeAttr("_inngest.step.wait.expiry"),                       // _s.wait.expiry
-	StepInvokeFunctionID:               UUIDAttr("_inngest.step.invoke.function.id"),                // _s.invoke.fn.id
-	StepInvokeTriggerEventID:           StringAttr("_inngest.step.invoke.trigger.event.id"),         // _s.invoke.trigger.event.id
-	StepInvokeFinishEventID:            StringAttr("_inngest.step.invoke.finish.event.id"),          // _s.invoke.finish.event.id
-	StepInvokeRunID:                    ULIDAttr("_inngest.step.invoke.run.id"),                     // _s.invoke.run.id
-	StepSleepDuration:                  DurationAttr("_inngest.step.sleep.duration"),                // _s.sleep.duration
-	StepWaitForEventIf:                 StringAttr("_inngest.step.wait_for_event.if"),               // _s.wfe.if
-	StepWaitForEventName:               StringAttr("_inngest.step.wait_for_event.name"),             // _s.wfe.name
-	StepWaitForEventMatchedID:          StringAttr("_inngest.step.wait_for_event.matched_id"),       // _s.wfe.matched_id
-	StepSignalName:                     StringAttr("_inngest.step.signal.name"),                     // _s.signal.name
-	StepGatewayResponseStatusCode:      IntAttr("_inngest.step.gateway.response.status_code"),       // _s.gateway.response.status_code
-	StepGatewayResponseOutputSizeBytes: IntAttr("_inngest.step.gateway.response.output_size_bytes"), // _s.gateway.response.output_size_bytes
-	RequestURL:                         StringAttr("_inngest.request.url"),                          // _req.url
-	ResponseHeaders:                    HttpHeaderAttr("_inngest.response.headers"),                 // _res.headers
-	ResponseStatusCode:                 IntAttr("_inngest.response.status_code"),                    // _res.status_code
-	ResponseOutputSize:                 IntAttr("_inngest.response.output_size"),                    // _res.output_size
+	internalError: StringAttr("internal.error"),
+
+	AccountID:                          UUIDAttr("account.id"),
+	AppID:                              UUIDAttr("app.id"),
+	BatchID:                            ULIDAttr("batch.id"),
+	BatchTimestamp:                     TimeAttr("batch.ts"),
+	CronSchedule:                       StringAttr("cron.schedule"),
+	DropSpan:                           BoolAttr("executor.drop"),
+	DynamicSpanID:                      StringAttr("dynamic.span.id"),
+	DynamicStatus:                      StepStatusAttr("dynamic.status"),
+	EndedAt:                            TimeAttr("ended_at"),
+	EnvID:                              UUIDAttr("env.id"),
+	EventIDs:                           StringSliceAttr("event.ids"),
+	FunctionID:                         UUIDAttr("function.id"),
+	FunctionVersion:                    IntAttr("function.version"),
+	InternalLocation:                   StringAttr("internal.location"),
+	QueuedAt:                           TimeAttr("queued_at"),
+	RequestURL:                         StringAttr("request.url"),
+	ResponseHeaders:                    HttpHeaderAttr("response.headers"),
+	ResponseOutputSize:                 IntAttr("response.output_size"),
+	ResponseStatusCode:                 IntAttr("response.status_code"),
+	RunID:                              ULIDAttr("run.id"),
+	StartedAt:                          TimeAttr("started_at"),
+	StepAttempt:                        IntAttr("step.attempt"),
+	StepCodeLocation:                   StringAttr("step.code_location"),
+	StepGatewayResponseOutputSizeBytes: IntAttr("step.gateway.response.output_size_bytes"),
+	StepGatewayResponseStatusCode:      IntAttr("step.gateway.response.status_code"),
+	StepID:                             StringAttr("step.id"),
+	StepInvokeFinishEventID:            ULIDAttr("step.invoke.finish.event.id"),
+	StepInvokeFunctionID:               StringAttr("step.invoke.function.id"),
+	StepInvokeRunID:                    ULIDAttr("step.invoke.run.id"),
+	StepInvokeTriggerEventID:           ULIDAttr("step.invoke.trigger.event.id"),
+	StepMaxAttempts:                    IntAttr("step.max_attempts"),
+	StepName:                           StringAttr("step.name"),
+	StepOp:                             StepOpAttr("step.op"),
+	StepOutput:                         StringAttr("step.output"),
+	StepOutputRef:                      StringAttr("step.output_ref"),
+	StepRunType:                        StringAttr("step.run.type"),
+	StepSignalName:                     StringAttr("step.signal.name"),
+	StepSleepDuration:                  DurationAttr("step.sleep.duration"),
+	StepWaitExpired:                    BoolAttr("step.wait.expired"),
+	StepWaitExpiry:                     TimeAttr("step.wait.expiry"),
+	StepWaitForEventIf:                 StringAttr("step.wait_for_event.if"),
+	StepWaitForEventMatchedID:          ULIDAttr("step.wait_for_event.matched_id"),
+	StepWaitForEventName:               StringAttr("step.wait_for_event.name"),
 }

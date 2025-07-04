@@ -17,28 +17,33 @@ type TracerProvider interface {
 	UpdateSpan(opts *UpdateSpanOptions) error
 }
 
+type SpanDebugData struct {
+	Location string
+}
+
 type DroppableSpan struct {
 	span trace.Span
 	Ref  *meta.SpanReference
 }
 
 type CreateSpanOptions struct {
-	Carriers    []map[string]any
-	FollowsFrom *meta.SpanReference
-	Location    string
-	Metadata    *statev2.Metadata
-	Parent      *meta.SpanReference
-	QueueItem   *queue.Item
-	SpanOptions []trace.SpanStartOption
+	Attributes         *meta.SerializableAttrs
+	Carriers           []map[string]any
+	Debug              *SpanDebugData
+	FollowsFrom        *meta.SpanReference
+	Metadata           *statev2.Metadata
+	Parent             *meta.SpanReference
+	QueueItem          *queue.Item
+	RawOtelSpanOptions []trace.SpanStartOption
 }
 
 type UpdateSpanOptions struct {
-	Carrier     map[string]string
-	EndTime     time.Time
-	Location    string
-	Metadata    *statev2.Metadata
-	QueueItem   *queue.Item
-	SpanOptions []trace.SpanStartOption
-	Status      enums.StepStatus
-	TargetSpan  *meta.SpanReference
+	Attributes         *meta.SerializableAttrs
+	Debug              *SpanDebugData
+	EndTime            time.Time
+	Metadata           *statev2.Metadata
+	QueueItem          *queue.Item
+	RawOtelSpanOptions []trace.SpanStartOption
+	Status             enums.StepStatus
+	TargetSpan         *meta.SpanReference
 }

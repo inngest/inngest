@@ -13,50 +13,43 @@ import (
 	statev2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/tracing/meta"
-	"github.com/inngest/inngest/pkg/util"
-	"go.opentelemetry.io/otel/attribute"
+	"github.com/oklog/ulid/v2"
 	"go.opentelemetry.io/otel/propagation"
 	"go.opentelemetry.io/otel/trace"
 )
 
-func WithFunctionAttrs(f *inngest.Function) trace.SpanStartEventOption {
-	url, err := f.URI()
-	if err != nil {
-		return trace.WithAttributes(
-			attribute.String(meta.InternalError, fmt.Errorf("failed to get function URI: %w", err).Error()),
-		)
+func FunctionAttrs(f *inngest.Function) *meta.SerializableAttrs {
+	rawAttrs := meta.NewRawAttrs()
+
+	if url, err := f.URI(); err == nil {
+		urlString := url.String()
+		meta.AddRawAttr(rawAttrs, meta.Attrs.RequestURL, &urlString)
+	} else {
+		rawAttrs.AddErr(fmt.Errorf("failed to get function URI: %w", err))
 	}
 
-	return trace.WithAttributes(
-		attribute.String(meta.AttributeRequestURL, url.String()),
-	)
+	return rawAttrs
 }
 
-func WithResumeAttrs(p *state.Pause, r *execution.ResumeRequest) trace.SpanStartEventOption {
-	attrs := []attribute.KeyValue{}
-	es := util.NewErrSet()
+func ResumeAttrs(p *state.Pause, r *execution.ResumeRequest) *meta.SerializableAttrs {
+	rawAttrs := meta.NewRawAttrs()
 	status := enums.StepStatusCompleted
 
 	if p != nil {
-		attrs = append(attrs,
-			attribute.String(meta.AttributeRunID, p.Identifier.RunID.String()),
-		)
+		meta.AddRawAttr(rawAttrs, meta.Attrs.RunID, &p.Identifier.RunID)
 	}
 
 	if r != nil {
-		attrs = append(attrs,
-			attribute.Bool(meta.AttributeStepWaitExpired, r.IsTimeout),
-		)
+		meta.AddRawAttr(rawAttrs, meta.Attrs.StepWaitExpired, &r.IsTimeout)
 
 		if r.With != nil {
 			if marshalledData, err := json.Marshal(r.With); err == nil {
 				// TODO For waitForEvent, this is not the entire event, as
 				// it's not coming back keyed. We can account for this here.
-				attrs = append(attrs,
-					attribute.String(meta.AttributeStepOutput, string(marshalledData)),
-				)
+				marshalledDataString := string(marshalledData)
+				meta.AddRawAttr(rawAttrs, meta.Attrs.StepOutput, &marshalledDataString)
 			} else {
-				es.Add(fmt.Errorf("failed to marshal resume data: %w", err))
+				rawAttrs.AddErr(fmt.Errorf("failed to marshal resume data: %w", err))
 			}
 		}
 
@@ -66,55 +59,31 @@ func WithResumeAttrs(p *state.Pause, r *execution.ResumeRequest) trace.SpanStart
 
 		if p != nil {
 			if p.IsInvoke() {
-				if r.EventID != nil {
-					attrs = append(attrs,
-						attribute.String(meta.AttributeStepInvokeFinishEventID, r.EventID.String()),
-					)
-				}
-
-				if r.RunID != nil {
-					attrs = append(attrs,
-						attribute.String(meta.AttributeStepInvokeRunID, r.RunID.String()),
-					)
-				}
-
+				meta.AddRawAttr(rawAttrs, meta.Attrs.StepInvokeFinishEventID, r.EventID)
+				meta.AddRawAttr(rawAttrs, meta.Attrs.StepInvokeRunID, r.RunID)
 			} else if p.IsWaitForEvent() {
-				if r.EventID != nil {
-					attrs = append(attrs,
-						attribute.String(meta.AttributeStepWaitForEventMatchedID, r.EventID.String()),
-					)
-				}
-
+				meta.AddRawAttr(rawAttrs, meta.Attrs.StepWaitForEventMatchedID, r.EventID)
 			}
 		}
 	}
 
-	attrs = append(attrs,
-		attribute.String(meta.AttributeDynamicStatus, status.String()),
-	)
+	meta.AddRawAttr(rawAttrs, meta.Attrs.DynamicStatus, &status)
 
-	if es.HasErrors() {
-		attrs = append(attrs,
-			attribute.String(meta.InternalError, es.Err().Error()),
-		)
-	}
-
-	return trace.WithAttributes(attrs...)
+	return rawAttrs
 }
 
 // ApplyResponseToSpan applies details from the given `DriverResponse` to the
 // given span. This is used for adding additional details to the span after the
 // exectution has completed.
-func WithDriverResponseAttrs(
+func DriverResponseAttrs(
 	resp *state.DriverResponse,
 
 	// This is the span reference for the span that output is saved against. If
 	// this is present, we should reference this span when setting output
 	// instead of persisting it again here.
 	outputSpanRef *meta.SpanReference,
-) trace.SpanStartEventOption {
-	attrs := []attribute.KeyValue{}
-	es := util.NewErrSet()
+) *meta.SerializableAttrs {
+	rawAttrs := meta.NewRawAttrs()
 
 	if resp.IsDiscoveryResponse() {
 		// We ignore discovery responses and rely on other spans to show steps
@@ -123,68 +92,54 @@ func WithDriverResponseAttrs(
 		// Note that we also do not return early here; even though we're
 		// intending to drop this span when viewing, it's still useful for it
 		// to collect as much data as it can.
-		attrs = append(attrs, attribute.Bool(meta.AttributeDropSpan, true))
+		dropSpan := true
+		meta.AddRawAttr(rawAttrs, meta.Attrs.DropSpan, &dropSpan)
 	}
 
 	fnOutput, err := resp.GetFunctionOutput()
 	if err != nil {
-		es.Add(fmt.Errorf("failed to get function output: %w", err))
+		rawAttrs.AddErr(fmt.Errorf("failed to get function output: %w", err))
 	} else if fnOutput != nil {
 		if outputSpanRef != nil {
 			if outputSpanRef.DynamicSpanID == "" {
-				es.Add(fmt.Errorf("output span reference is missing dynamic span ID"))
+				rawAttrs.AddErr(fmt.Errorf("output span reference is missing dynamic span ID"))
 			} else {
-				attrs = append(attrs,
-					attribute.String(meta.AttributeStepOutputRef, outputSpanRef.DynamicSpanID),
-				)
+				meta.AddRawAttr(rawAttrs, meta.Attrs.StepOutputRef, &outputSpanRef.DynamicSpanID)
 			}
 		} else {
-			attrs = append(attrs,
-				attribute.String(meta.AttributeStepOutput, *fnOutput),
-			)
+			meta.AddRawAttr(rawAttrs, meta.Attrs.StepOutput, fnOutput)
 		}
 	}
 
-	headerByt, _ := json.Marshal(resp.Header)
-	attrs = append(attrs,
-		attribute.String(meta.AttributeResponseHeaders, string(headerByt)),
-		attribute.Int(meta.AttributeResponseStatusCode, resp.StatusCode),
-		attribute.Int(meta.AttributeResponseOutputSize, resp.OutputSize),
-	)
+	meta.AddRawAttr(rawAttrs, meta.Attrs.ResponseHeaders, &resp.Header)
+	meta.AddRawAttr(rawAttrs, meta.Attrs.ResponseStatusCode, &resp.StatusCode)
+	meta.AddRawAttr(rawAttrs, meta.Attrs.ResponseOutputSize, &resp.OutputSize)
 
 	// If we have a single op to process, also add any generator data to the
-	// span
+	// span and overwrite any clashes
 	if op := resp.TraceVisibleStepExecution(); op != nil {
-		attrs = append(attrs, withGeneratorAttrs(op)...)
+		rawAttrs = rawAttrs.Merge(GeneratorAttrs(op))
 	}
 
-	if es.HasErrors() {
-		attrs = append(attrs,
-			attribute.String(meta.InternalError, es.Err().Error()),
-		)
-	}
-
-	return trace.WithAttributes(attrs...)
+	return rawAttrs
 }
 
-func WithGeneratorAttrs(op *state.GeneratorOpcode) trace.SpanStartEventOption {
-	return trace.WithAttributes(withGeneratorAttrs(op)...)
+func GeneratorAttrs(op *state.GeneratorOpcode) *meta.SerializableAttrs {
+	return generatorAttrs(op)
 }
 
-func withGeneratorAttrs(op *state.GeneratorOpcode) []attribute.KeyValue {
+func generatorAttrs(op *state.GeneratorOpcode) *meta.SerializableAttrs {
 	// Generic attributes for all steps
-	attrs := []attribute.KeyValue{
-		attribute.String(meta.AttributeStepID, op.ID),
-		attribute.String(meta.AttributeStepOp, op.Op.String()),
-		attribute.String(meta.AttributeStepName, op.UserDefinedName()),
-	}
-	es := util.NewErrSet()
+	stepName := op.UserDefinedName()
+	rawAttrs := meta.NewRawAttrs(
+		meta.Attr(meta.Attrs.StepID, &op.ID),
+		meta.Attr(meta.Attrs.StepOp, &op.Op),
+		meta.Attr(meta.Attrs.StepName, &stepName),
+	)
 
 	// Try get stack line
 	if stack, err := op.StackLine(); err == nil && stack != nil && *stack != "" {
-		attrs = append(attrs,
-			attribute.String(meta.AttributeCodeLocation, *stack),
-		)
+		meta.AddRawAttr(rawAttrs, meta.Attrs.StepCodeLocation, stack)
 	}
 
 	switch op.Op {
@@ -201,30 +156,28 @@ func withGeneratorAttrs(op *state.GeneratorOpcode) []attribute.KeyValue {
 	case enums.OpcodeInvokeFunction:
 		{
 			if opts, err := op.InvokeFunctionOpts(); err == nil {
-				attrs = append(attrs,
-					// attribute.Int64(AttributeStepInvokeExpiry, opts.),
-					attribute.String(meta.AttributeStepInvokeFunctionID, opts.FunctionID),
-					attribute.String(meta.AttributeStepInvokeTriggerEventID, opts.Payload.ID),
-				)
+				meta.AddRawAttr(rawAttrs, meta.Attrs.StepInvokeFunctionID, &opts.FunctionID)
+
+				if id, err := ulid.Parse(opts.Payload.ID); err == nil {
+					meta.AddRawAttr(rawAttrs, meta.Attrs.StepInvokeTriggerEventID, &id)
+				} else {
+					rawAttrs.AddErr(fmt.Errorf("failed to parse invoke trigger event ID: %w", err))
+				}
 
 				if expiry, err := opts.Expires(); err == nil {
-					attrs = append(attrs,
-						attribute.Int64(meta.AttributeStepWaitExpiry, expiry.UnixMilli()),
-					)
+					meta.AddRawAttr(rawAttrs, meta.Attrs.StepWaitExpiry, &expiry)
 				}
 			} else {
-				es.Add(fmt.Errorf("failed to get invoke function opts: %w", err))
+				rawAttrs.AddErr(fmt.Errorf("failed to get invoke function opts: %w", err))
 			}
 		}
 
 	case enums.OpcodeSleep:
 		{
 			if dur, err := op.SleepDuration(); err == nil {
-				attrs = append(attrs,
-					attribute.Int64(meta.AttributeStepSleepDuration, dur.Milliseconds()),
-				)
+				meta.AddRawAttr(rawAttrs, meta.Attrs.StepSleepDuration, &dur)
 			} else {
-				es.Add(fmt.Errorf("failed to get sleep duration: %w", err))
+				rawAttrs.AddErr(fmt.Errorf("failed to get sleep duration: %w", err))
 			}
 		}
 
@@ -232,24 +185,20 @@ func withGeneratorAttrs(op *state.GeneratorOpcode) []attribute.KeyValue {
 		{
 			// Output (success or error)
 			if output, err := op.Output(); err == nil {
-				attrs = append(attrs,
-					attribute.String(meta.AttributeStepOutput, output),
-				)
+				meta.AddRawAttr(rawAttrs, meta.Attrs.StepOutput, &output)
 			} else {
-				es.Add(fmt.Errorf("failed to get step output: %w", err))
+				rawAttrs.AddErr(fmt.Errorf("failed to get step output: %w", err))
 			}
 
 			// Run type (sub-types of step.run)
 			if typ := op.RunType(); typ != "" {
-				attrs = append(attrs,
-					attribute.String(meta.AttributeStepRunType, typ),
-				)
+				meta.AddRawAttr(rawAttrs, meta.Attrs.StepRunType, &typ)
 			}
 
 			// Set status if we've encountered an error
 			if op.Error != nil {
-				attrs = append(attrs,
-					attribute.String(meta.AttributeDynamicStatus, enums.StepStatusErrored.String()))
+				status := enums.StepStatusErrored
+				meta.AddRawAttr(rawAttrs, meta.Attrs.DynamicStatus, &status)
 			}
 		}
 
@@ -261,94 +210,67 @@ func withGeneratorAttrs(op *state.GeneratorOpcode) []attribute.KeyValue {
 	case enums.OpcodeWaitForEvent:
 		{
 			if opts, err := op.WaitForEventOpts(); err == nil {
-				attrs = append(attrs,
-					attribute.String(meta.AttributeStepWaitForEventName, opts.Event),
-				)
+				meta.AddRawAttr(rawAttrs, meta.Attrs.StepWaitForEventName, &opts.Event)
 
 				if expiry, err := opts.Expires(); err == nil {
-					attrs = append(attrs,
-						attribute.Int64(meta.AttributeStepWaitExpiry, expiry.UnixMilli()),
-					)
+					meta.AddRawAttr(rawAttrs, meta.Attrs.StepWaitExpiry, &expiry)
 				} else {
-					es.Add(fmt.Errorf("failed to get wait for event expiry: %w", err))
+					rawAttrs.AddErr(fmt.Errorf("failed to get wait for event expiry: %w", err))
 
 				}
 
 				if opts.If != nil && *opts.If != "" {
-					attrs = append(attrs,
-						attribute.String(meta.AttributeStepWaitForEventIf, *opts.If),
-					)
+					meta.AddRawAttr(rawAttrs, meta.Attrs.StepWaitForEventIf, opts.If)
 				}
 			} else {
-				es.Add(fmt.Errorf("failed to get wait for event opts: %w", err))
+				rawAttrs.AddErr(fmt.Errorf("failed to get wait for event opts: %w", err))
 			}
 		}
 	case enums.OpcodeWaitForSignal:
 		{
 			if opts, err := op.SignalOpts(); err == nil {
-				attrs = append(attrs,
-					attribute.String(meta.AttributeStepSignalName, opts.Signal),
-				)
+				meta.AddRawAttr(rawAttrs, meta.Attrs.StepSignalName, &opts.Signal)
 
 				if expiry, err := opts.Expires(); err == nil {
-					attrs = append(attrs,
-						attribute.Int64(meta.AttributeStepWaitExpiry, expiry.UnixMilli()),
-					)
+					meta.AddRawAttr(rawAttrs, meta.Attrs.StepWaitExpiry, &expiry)
 				} else {
-					es.Add(fmt.Errorf("failed to get wait for signal expiry: %w", err))
+					rawAttrs.AddErr(fmt.Errorf("failed to get wait for signal expiry: %w", err))
 				}
 			} else {
-				es.Add(fmt.Errorf("failed to get wait for signal opts: %w", err))
+				rawAttrs.AddErr(fmt.Errorf("failed to get wait for signal opts: %w", err))
 			}
 		}
 	}
 
-	if es.HasErrors() {
-		attrs = append(attrs,
-			attribute.String(meta.InternalError, es.Err().Error()),
-		)
-	}
-
-	return attrs
+	return rawAttrs
 }
 
-func WithGatewayResponseAttrs(resp *http.Response, userErr *state.UserError) trace.SpanStartEventOption {
-	attrs := []attribute.KeyValue{}
-	es := util.NewErrSet()
+func GatewayResponseAttrs(resp *http.Response, userErr *state.UserError) trace.SpanStartEventOption {
+	rawAttrs := meta.NewRawAttrs()
 
 	if resp != nil {
-		attrs = append(attrs,
-			attribute.Int(meta.AttributeStepGatewayResponseStatusCode, resp.StatusCode),
-			attribute.Int(meta.AttributeStepGatewayResponseOutputSizeBytes, int(resp.ContentLength)),
-		)
+		meta.AddRawAttr(rawAttrs, meta.Attrs.StepGatewayResponseStatusCode, &resp.StatusCode)
+
+		contentLength := int(resp.ContentLength)
+		meta.AddRawAttr(rawAttrs, meta.Attrs.StepGatewayResponseOutputSizeBytes, &contentLength)
 	}
 
 	if userErr != nil {
-		attrs = append(attrs,
-			attribute.String(meta.AttributeDynamicStatus, enums.StepStatusErrored.String()),
-		)
+		status := enums.StepStatusErrored
+		meta.AddRawAttr(rawAttrs, meta.Attrs.DynamicStatus, &status)
 
 		if userErrByt, err := json.Marshal(userErr); err == nil {
-			attrs = append(attrs,
-				attribute.String(meta.AttributeStepOutput, string(userErrByt)),
-			)
+			output := string(userErrByt)
+			meta.AddRawAttr(rawAttrs, meta.Attrs.StepOutput, &output)
 		} else {
-			es.Add(fmt.Errorf("failed to marshal user error: %w", err))
+			rawAttrs.AddErr(fmt.Errorf("failed to marshal user error: %w", err))
 		}
 	} else {
-		attrs = append(attrs,
-			attribute.String(meta.AttributeDynamicStatus, enums.StepStatusCompleted.String()),
-		)
+		status := enums.StepStatusCompleted
+		meta.AddRawAttr(rawAttrs, meta.Attrs.DynamicStatus, &status)
 	}
 
-	if es.HasErrors() {
-		attrs = append(attrs,
-
-			attribute.String(meta.InternalError, es.Err().Error()),
-		)
-	}
-
-	return trace.WithAttributes(attrs...)
+	return trace.WithAttributes(rawAttrs.Serialize()...)
 }
 
 func SpanRefFromQueueItem(i *queue.Item) *meta.SpanReference {

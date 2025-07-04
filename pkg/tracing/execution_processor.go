@@ -27,20 +27,20 @@ func newExecutionProcessor(md *statev2.Metadata, qi *queue.Item, next sdktrace.S
 }
 
 func (p *executionProcessor) OnStart(parent context.Context, s sdktrace.ReadWriteSpan) {
-	rawAttrs := meta.RawAttrs{}
+	rawAttrs := meta.NewRawAttrs()
 	now := time.Now() // TODO This should be something on qi etc
 
 	if p.md != nil {
-		meta.AddRawAttr(&rawAttrs, meta.Attrs.RunID, &p.md.ID.RunID)
+		meta.AddRawAttr(rawAttrs, meta.Attrs.RunID, &p.md.ID.RunID)
 	} else if p.qi != nil {
-		meta.AddRawAttr(&rawAttrs, meta.Attrs.RunID, &p.qi.Identifier.RunID)
+		meta.AddRawAttr(rawAttrs, meta.Attrs.RunID, &p.qi.Identifier.RunID)
 	}
 
 	// Do not set extra contextual data on extension spans
 	switch s.Name() {
 	case meta.SpanNameRun:
 		{
-			meta.AddRawAttr(&rawAttrs, meta.Attrs.QueuedAt, &now)
+			meta.AddRawAttr(rawAttrs, meta.Attrs.QueuedAt, &now)
 
 			if p.md != nil {
 
@@ -49,21 +49,21 @@ func (p *executionProcessor) OnStart(parent context.Context, s sdktrace.ReadWrit
 					eventIDs[i] = id.String()
 				}
 
-				meta.AddRawAttr(&rawAttrs, meta.Attrs.FunctionID, &p.md.ID.FunctionID)
-				meta.AddRawAttr(&rawAttrs, meta.Attrs.FunctionVersion, &p.md.Config.FunctionVersion)
-				meta.AddRawAttr(&rawAttrs, meta.Attrs.EventIDs, &eventIDs)
-				meta.AddRawAttr(&rawAttrs, meta.Attrs.AccountID, &p.md.ID.Tenant.AccountID)
-				meta.AddRawAttr(&rawAttrs, meta.Attrs.EnvID, &p.md.ID.Tenant.EnvID)
-				meta.AddRawAttr(&rawAttrs, meta.Attrs.AppID, &p.md.ID.Tenant.AppID)
+				meta.AddRawAttr(rawAttrs, meta.Attrs.FunctionID, &p.md.ID.FunctionID)
+				meta.AddRawAttr(rawAttrs, meta.Attrs.FunctionVersion, &p.md.Config.FunctionVersion)
+				meta.AddRawAttr(rawAttrs, meta.Attrs.EventIDs, &eventIDs)
+				meta.AddRawAttr(rawAttrs, meta.Attrs.AccountID, &p.md.ID.Tenant.AccountID)
+				meta.AddRawAttr(rawAttrs, meta.Attrs.EnvID, &p.md.ID.Tenant.EnvID)
+				meta.AddRawAttr(rawAttrs, meta.Attrs.AppID, &p.md.ID.Tenant.AppID)
 
 				if p.md.Config.CronSchedule() != nil {
-					meta.AddRawAttr(&rawAttrs, meta.Attrs.CronSchedule, p.md.Config.CronSchedule())
+					meta.AddRawAttr(rawAttrs, meta.Attrs.CronSchedule, p.md.Config.CronSchedule())
 				}
 
 				if p.md.Config.BatchID != nil {
 					batchTS := time.UnixMilli(int64(p.md.Config.BatchID.Time()))
-					meta.AddRawAttr(&rawAttrs, meta.Attrs.BatchID, p.md.Config.BatchID)
-					meta.AddRawAttr(&rawAttrs, meta.Attrs.BatchTimestamp, &batchTS)
+					meta.AddRawAttr(rawAttrs, meta.Attrs.BatchID, p.md.Config.BatchID)
+					meta.AddRawAttr(rawAttrs, meta.Attrs.BatchTimestamp, &batchTS)
 				}
 			}
 
@@ -72,18 +72,18 @@ func (p *executionProcessor) OnStart(parent context.Context, s sdktrace.ReadWrit
 
 	case meta.SpanNameStepDiscovery:
 		{
-			meta.AddRawAttr(&rawAttrs, meta.Attrs.QueuedAt, &now)
+			meta.AddRawAttr(rawAttrs, meta.Attrs.QueuedAt, &now)
 
 			break
 		}
 
 	case meta.SpanNameStep:
 		{
-			meta.AddRawAttr(&rawAttrs, meta.Attrs.QueuedAt, &now)
+			meta.AddRawAttr(rawAttrs, meta.Attrs.QueuedAt, &now)
 
 			if p.qi != nil {
-				meta.AddRawAttr(&rawAttrs, meta.Attrs.StepMaxAttempts, p.qi.MaxAttempts)
-				meta.AddRawAttr(&rawAttrs, meta.Attrs.StepAttempt, &p.qi.Attempt)
+				meta.AddRawAttr(rawAttrs, meta.Attrs.StepMaxAttempts, p.qi.MaxAttempts)
+				meta.AddRawAttr(rawAttrs, meta.Attrs.StepAttempt, &p.qi.Attempt)
 
 				// Some steps "start" as soon as they are queued
 				startWhenQueued := p.qi.Kind == queue.KindSleep
@@ -100,7 +100,7 @@ func (p *executionProcessor) OnStart(parent context.Context, s sdktrace.ReadWrit
 				}
 
 				if startWhenQueued {
-					meta.AddRawAttr(&rawAttrs, meta.Attrs.StartedAt, &now)
+					meta.AddRawAttr(rawAttrs, meta.Attrs.StartedAt, &now)
 				}
 			}
 
@@ -109,10 +109,10 @@ func (p *executionProcessor) OnStart(parent context.Context, s sdktrace.ReadWrit
 
 	case meta.SpanNameExecution:
 		{
-			meta.AddRawAttr(&rawAttrs, meta.Attrs.StartedAt, &now)
+			meta.AddRawAttr(rawAttrs, meta.Attrs.StartedAt, &now)
 
 			if p.qi != nil {
-				meta.AddRawAttr(&rawAttrs, meta.Attrs.StepAttempt, &p.qi.Attempt)
+				meta.AddRawAttr(rawAttrs, meta.Attrs.StepAttempt, &p.qi.Attempt)
 			}
 
 			break
@@ -123,7 +123,7 @@ func (p *executionProcessor) OnStart(parent context.Context, s sdktrace.ReadWrit
 			for _, attr := range s.Attributes() {
 				if string(attr.Key) == meta.Attrs.DynamicStatus.Key() {
 					if attr.Value.Type() == attribute.INT64 && enums.RunStatusEnded(enums.RunStatus(attr.Value.AsInt64())) {
-						meta.AddRawAttr(&rawAttrs, meta.Attrs.EndedAt, &now)
+						meta.AddRawAttr(rawAttrs, meta.Attrs.EndedAt, &now)
 					}
 
 					break

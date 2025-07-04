@@ -91,7 +91,20 @@ func (tp *sqlcTracerProvider) CreateDroppableSpan(
 		ctx = defaultPropagator.Extract(context.Background(), carrier)
 	}
 
-	spanOptions := append(opts.SpanOptions, trace.WithSpanKind(trace.SpanKindServer))
+	givenAttrs := []attribute.KeyValue{}
+	if opts.Attributes != nil {
+		givenAttrs = opts.Attributes.Serialize()
+	}
+
+	spanOptions := append(
+		[]trace.SpanStartOption{
+			trace.WithAttributes(givenAttrs...),
+		},
+		opts.RawOtelSpanOptions...,
+	)
+
+	spanOptions = append(spanOptions, trace.WithSpanKind(trace.SpanKindServer))
+
 	if opts.FollowsFrom != nil {
 		spanOptions = append(
 			spanOptions,
@@ -171,9 +184,20 @@ func (tp *sqlcTracerProvider) UpdateSpan(
 		attrs = append(attrs, attribute.Int64(meta.Attrs.EndedAt.Key(), opts.EndTime.UnixMilli()))
 	}
 
+	givenAttrs := []attribute.KeyValue{}
+	if opts.Attributes != nil {
+		givenAttrs = opts.Attributes.Serialize()
+	}
+
 	// Be careful to make sure that whatever attrs we specify here are
 	// overwritten by whatever is given in options; the caller knows best.
-	spanOpts := append([]trace.SpanStartOption{trace.WithAttributes(attrs...)}, opts.SpanOptions...)
+	spanOpts := append(
+		[]trace.SpanStartOption{
+			trace.WithAttributes(attrs...),
+			trace.WithAttributes(givenAttrs...),
+		},
+		opts.RawOtelSpanOptions...,
+	)
 
 	tracer := tp.getTracer(opts.Metadata, opts.QueueItem)
 	_, span := tracer.Start(ctx, meta.SpanNameDynamicExtension, spanOpts...)

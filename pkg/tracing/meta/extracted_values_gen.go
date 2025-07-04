@@ -3,15 +3,16 @@
 package meta
 
 import (
+	"net/http"
 	"time"
-	
+
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/oklog/ulid/v2"
 )
 
 // ExtractedValues mirrors the Attrs struct but with actual pointer types
-// instead of Attr wrappers. This allows for type-safe access to deserialized values.
+// instead of attr wrappers. This allows for type-safe access to deserialized values.
 type ExtractedValues struct {
 	StartedAt *time.Time
 	QueuedAt *time.Time
@@ -30,31 +31,32 @@ type ExtractedValues struct {
 	DynamicSpanID *string
 	DynamicStatus *enums.StepStatus
 	InternalLocation *string
-	InternalError *string
+	internalError *string
 	StepID *string
 	StepName *string
 	StepOp *enums.Opcode
 	StepAttempt *int
 	StepMaxAttempts *int
 	StepCodeLocation *string
-	StepOutput *any
+	StepOutput *string
 	StepOutputRef *string
 	StepRunType *string
 	StepWaitExpired *bool
 	StepWaitExpiry *time.Time
-	StepInvokeFunctionID *uuid.UUID
-	StepInvokeTriggerEventID *string
-	StepInvokeFinishEventID *string
+	StepInvokeFunctionID *string
+	StepInvokeTriggerEventID *ulid.ULID
+	StepInvokeFinishEventID *ulid.ULID
 	StepInvokeRunID *ulid.ULID
 	StepSleepDuration *time.Duration
 	StepWaitForEventIf *string
 	StepWaitForEventName *string
-	StepWaitForEventMatchedID *string
+	StepWaitForEventMatchedID *ulid.ULID
 	StepSignalName *string
 	StepGatewayResponseStatusCode *int
 	StepGatewayResponseOutputSizeBytes *int
 	RequestURL *string
-	ResponseHeaders *map[string]string
+	ResponseHeaders *http.Header
 	ResponseStatusCode *int
 	ResponseOutputSize *int
+	AIThingBob *string
 }
