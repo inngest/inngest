@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"math"
+	"runtime"
 	"time"
 
 	"github.com/inngest/inngest/pkg/enums"
@@ -53,7 +54,13 @@ func (q *queue) backlogNormalizationWorker(ctx context.Context, nc chan normaliz
 			return
 
 		case msg := <-nc:
-			err := q.normalizeBacklog(ctx, msg.b, msg.sp, msg.constraints)
+			_, err := durationWithTags(ctx, q.primaryQueueShard.Name, "normalize_backlog", q.clock.Now(), func(ctx context.Context) (any, error) {
+				err := q.normalizeBacklog(ctx, msg.b, msg.sp, msg.constraints)
+				return nil, err
+
+			}, map[string]any{
+				"async_processing": true,
+			})
 			if err != nil {
 				q.log.Error("could not normalize backlog", "error", err, "backlog", msg.b, "shadow", msg.sp)
 			}
@@ -265,28 +272,13 @@ func (q *queue) extendBacklogNormalizationLease(ctx context.Context, now time.Ti
 // NOTE: ideally this is one transaction in a lua script but enqueue_to_backlog is way too much work to
 // utilize
 func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp *QueueShadowPartition, latestConstraints *PartitionConstraintConfig) error {
-	l := q.log.With("backlog", backlog, "sp", sp, "constraints", latestConstraints)
+	_, file, line, _ := runtime.Caller(1)
+	caller := fmt.Sprintf("%s:%d", file, line)
 
-	start := q.clock.Now()
-	defer func() {
-		dur := q.clock.Now().Sub(start)
+	metrics.ActiveBacklogNormalizeCount(ctx, 1, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name}})
+	defer metrics.ActiveBacklogNormalizeCount(ctx, -1, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name}})
 
-		metrics.HistogramQueueOperationDuration(
-			ctx,
-			dur.Milliseconds(),
-			metrics.HistogramOpt{
-				PkgName: pkgName,
-				Tags: map[string]any{
-					"operation":   "normalize_backlog",
-					"queue_shard": q.primaryQueueShard.Name,
-				},
-			},
-		)
-
-		if dur > 1*time.Minute {
-			q.log.Debug("slow backlog normalization", "dur", dur, "backlog", backlog, "sp", sp, "constraints", latestConstraints)
-		}
-	}()
+	l := q.log.With("backlog", backlog, "sp", sp, "constraints", latestConstraints, "caller", caller)
 
 	// extend the lease
 	extendLeaseCtx, cancel := context.WithCancel(ctx)
@@ -311,6 +303,8 @@ func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp 
 		}
 	}()
 
+	l.Debug("starting backlog normalization")
+
 	shard := q.primaryQueueShard
 	var processed int64
 	for {
@@ -334,7 +328,7 @@ func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp 
 				// If event for item cannot be found, remove it from the backlog
 				err := q.Dequeue(ctx, shard, *item)
 				if err != nil {
-					q.log.Warn("could not dequeue queue item with missing event", "err", err)
+					l.Warn("could not dequeue queue item with missing event", "err", err)
 				}
 			}
 
@@ -402,7 +396,7 @@ func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp 
 		},
 	})
 
-	q.log.Trace("normalized backlog", "backlog", backlog.BacklogID, "partition", sp.PartitionID)
+	l.Debug("normalized backlog")
 
 	return nil
 }
