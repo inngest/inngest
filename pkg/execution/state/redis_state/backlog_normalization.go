@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/telemetry"
 	"math"
 	"time"
 
@@ -53,7 +54,13 @@ func (q *queue) backlogNormalizationWorker(ctx context.Context, nc chan normaliz
 			return
 
 		case msg := <-nc:
-			err := q.normalizeBacklog(ctx, msg.b, msg.sp, msg.constraints, false)
+			_, err := durationWithTags(ctx, q.primaryQueueShard.Name, "normalize_backlog", q.clock.Now(), func(ctx context.Context) (any, error) {
+				err := q.normalizeBacklog(ctx, msg.b, msg.sp, msg.constraints)
+				return nil, err
+
+			}, map[string]any{
+				"async_processing": true,
+			})
 			if err != nil {
 				q.log.Error("could not normalize backlog", "error", err, "backlog", msg.b, "shadow", msg.sp)
 			}
@@ -264,32 +271,13 @@ func (q *queue) extendBacklogNormalizationLease(ctx context.Context, now time.Ti
 // normalizeBacklog must be called with exclusive access to the shadow partition
 // NOTE: ideally this is one transaction in a lua script but enqueue_to_backlog is way too much work to
 // utilize
-func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp *QueueShadowPartition, latestConstraints *PartitionConstraintConfig, immediate bool) error {
-	metrics.ActiveBacklogNormalizeCount(ctx, 1, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name}})
-	defer metrics.ActiveBacklogNormalizeCount(ctx, -1, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name}})
+func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp *QueueShadowPartition, latestConstraints *PartitionConstraintConfig) error {
+	caller := telemetry.Caller()
 
-	l := q.log.With("backlog", backlog, "sp", sp, "constraints", latestConstraints, "immediate", immediate)
+	metrics.ActiveBacklogNormalizeCount(ctx, 1, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name, "caller": caller}})
+	defer metrics.ActiveBacklogNormalizeCount(ctx, -1, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name, "caller": caller}})
 
-	start := q.clock.Now()
-	defer func() {
-		dur := q.clock.Now().Sub(start)
-
-		metrics.HistogramQueueOperationDuration(
-			ctx,
-			dur.Milliseconds(),
-			metrics.HistogramOpt{
-				PkgName: pkgName,
-				Tags: map[string]any{
-					"operation":   "normalize_backlog",
-					"queue_shard": q.primaryQueueShard.Name,
-				},
-			},
-		)
-
-		if dur > 1*time.Minute {
-			l.Debug("slow backlog normalization", "dur", dur, "backlog", backlog, "sp", sp, "constraints", latestConstraints)
-		}
-	}()
+	l := q.log.With("backlog", backlog, "sp", sp, "constraints", latestConstraints, "caller", caller)
 
 	// extend the lease
 	extendLeaseCtx, cancel := context.WithCancel(ctx)
@@ -394,7 +382,7 @@ func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp 
 			PkgName: pkgName,
 			Tags: map[string]any{
 				"queue_shard": q.primaryQueueShard.Name,
-				"immediate":   immediate,
+				"caller":      caller,
 				// "partition_id": backlog.ShadowPartitionID,
 			},
 		})
@@ -404,7 +392,7 @@ func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp 
 		PkgName: pkgName,
 		Tags: map[string]any{
 			"queue_shard": q.primaryQueueShard.Name,
-			"immediate":   immediate,
+			"caller":      caller,
 			// "partition_id": backlog.ShadowPartitionID,
 		},
 	})
