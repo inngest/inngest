@@ -275,8 +275,8 @@ func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp 
 	_, file, line, _ := runtime.Caller(1)
 	caller := fmt.Sprintf("%s:%d", file, line)
 
-	metrics.ActiveBacklogNormalizeCount(ctx, 1, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name, "caller": caller}})
-	defer metrics.ActiveBacklogNormalizeCount(ctx, -1, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name, "caller": caller}})
+	metrics.ActiveBacklogNormalizeCount(ctx, 1, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name}})
+	defer metrics.ActiveBacklogNormalizeCount(ctx, -1, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name}})
 
 	l := q.log.With("backlog", backlog, "sp", sp, "constraints", latestConstraints, "caller", caller)
 
@@ -383,7 +383,6 @@ func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp 
 			PkgName: pkgName,
 			Tags: map[string]any{
 				"queue_shard": q.primaryQueueShard.Name,
-				"caller":      caller,
 				// "partition_id": backlog.ShadowPartitionID,
 			},
 		})
@@ -393,7 +392,6 @@ func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp 
 		PkgName: pkgName,
 		Tags: map[string]any{
 			"queue_shard": q.primaryQueueShard.Name,
-			"caller":      caller,
 			// "partition_id": backlog.ShadowPartitionID,
 		},
 	})
