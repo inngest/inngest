@@ -1232,6 +1232,7 @@ func TestRefillConstraints(t *testing.T) {
 		result            BacklogRefillResult
 		itemsInBacklog    int
 		itemsInReadyQueue int
+		retryAt           time.Duration
 	}
 
 	type currentValues struct {
@@ -1646,6 +1647,7 @@ func TestRefillConstraints(t *testing.T) {
 					Refill:            0,
 					Refilled:          0,
 				},
+				retryAt: 6 * time.Minute, // expect GCRA to allow the next item after 6m
 			},
 		},
 	}
@@ -1810,10 +1812,11 @@ func TestRefillConstraints(t *testing.T) {
 
 			testThrottle := testCase.knobs.throttle
 			if testThrottle != nil {
-				runGCRAScript := func(t *testing.T, rc rueidis.Client, key string, now time.Time, period time.Duration, limit, burst, capacity int) int {
+				runGCRAScript := func(t *testing.T, rc rueidis.Client, key string, now time.Time, period time.Duration, limit, burst, capacity int) (int, time.Time) {
+					nowMS := now.UnixMilli()
 					args, err := StrSlice([]any{
 						key,
-						now.UnixMilli(),
+						nowMS,
 						limit,
 						burst,
 						period.Milliseconds(),
@@ -1821,14 +1824,28 @@ func TestRefillConstraints(t *testing.T) {
 					})
 					require.NoError(t, err)
 
-					statusOrCapacity, err := scripts["test/gcra_capacity"].Exec(t.Context(), rc, []string{}, args).ToInt64()
+					res, err := scripts["test/gcra_capacity"].Exec(t.Context(), rc, []string{}, args).ToAny()
 					require.NoError(t, err)
+
+					capacityAndRetry, ok := res.([]any)
+					require.True(t, ok)
+
+					statusOrCapacity, ok := capacityAndRetry[0].(int64)
+					require.True(t, ok)
+
+					var retryAt time.Time
+					retryAtMillis, ok := capacityAndRetry[1].(int64)
+					require.True(t, ok)
+
+					if retryAtMillis > nowMS {
+						retryAt = time.UnixMilli(retryAtMillis)
+					}
 
 					switch statusOrCapacity {
 					case -1:
-						return 0
+						return 0, retryAt
 					default:
-						return int(statusOrCapacity)
+						return int(statusOrCapacity), retryAt
 					}
 				}
 
@@ -1906,6 +1923,15 @@ func TestRefillConstraints(t *testing.T) {
 			// we do not test refilled items
 			require.Equal(t, testCase.expected.result.Refilled, len(res.RefilledItems))
 			res.RefilledItems = nil
+
+			if !res.RetryAt.IsZero() {
+				require.Greater(t, testCase.expected.retryAt.Milliseconds(), int64(0))
+				diff := clock.Now().Add(testCase.expected.retryAt)
+
+				require.WithinDuration(t, diff, res.RetryAt, 10*time.Second)
+
+				res.RetryAt = time.Time{}
+			}
 
 			require.Equal(t, testCase.expected.result, *res, "result comparison failed", res, itemsInBacklog, itemsInReadyQueue)
 
