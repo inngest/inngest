@@ -509,3 +509,12 @@ func IncrQueueActiveCheckAccountScannedCounter(ctx context.Context, opts Counter
 		Tags:        opts.Tags,
 	})
 }
+
+func ActiveBacklogNormalizeCount(ctx context.Context, incr int64, opts CounterOpt) {
+	RecordUpDownCounterMetric(ctx, incr, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "active_backlog_normalize_count",
+		Description: "The number of active backlog normalizations",
+		Tags:        opts.Tags,
+	})
+}
