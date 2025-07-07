@@ -959,9 +959,6 @@ type queue struct {
 	continuesLock     *sync.Mutex
 	continuationLimit uint
 
-	shadowPollTick           time.Duration
-	backlogNormalizePollTick time.Duration
-
 	shadowContinues         map[string]shadowContinuation
 	shadowContinueCooldown  map[string]time.Time
 	shadowContinuesLock     *sync.Mutex
