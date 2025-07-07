@@ -33,19 +33,19 @@ func TestLuaGCRA(t *testing.T) {
 		statusOrCapacity, ok := capacityAndRetry[0].(int64)
 		require.True(t, ok)
 
-		var retryAfter time.Time
-		retryAfterMillis, ok := capacityAndRetry[1].(int64)
+		var retryAt time.Time
+		retryAtMillis, ok := capacityAndRetry[1].(int64)
 		require.True(t, ok)
 
-		if retryAfterMillis > nowMS {
-			retryAfter = time.UnixMilli(retryAfterMillis)
+		if retryAtMillis > nowMS {
+			retryAt = time.UnixMilli(retryAtMillis)
 		}
 
 		switch statusOrCapacity {
 		case -1:
-			return 0, retryAfter
+			return 0, retryAt
 		default:
-			return int(statusOrCapacity), retryAfter
+			return int(statusOrCapacity), retryAt
 		}
 	}
 
@@ -106,13 +106,13 @@ func TestLuaGCRA(t *testing.T) {
 		require.True(t, r.Exists(key))
 
 		now := clock.Now().Add(time.Second)
-		capa, retryAfter := runScript(t, rc, key, now, period, limit, burst, 0)
+		capa, retryAt := runScript(t, rc, key, now, period, limit, burst, 0)
 		require.Equal(t, 0, capa)
-		require.False(t, retryAfter.IsZero())
+		require.False(t, retryAt.IsZero())
 		// for a gcra period of 60min and 5 items, we expect to "refill" one item every 12 minutes,
 		// thus the earliest next request should arrive in 12min
 		expectedRetry := now.Add(12 * time.Minute)
-		require.WithinDuration(t, expectedRetry, retryAfter, 10*time.Second)
+		require.WithinDuration(t, expectedRetry, retryAt, 10*time.Second)
 
 		capa, _ = runScript(t, rc, key, clock.Now(), period, limit, burst, 2)
 		require.Equal(t, 0, capa)
@@ -134,7 +134,7 @@ func TestLuaGCRA(t *testing.T) {
 		capacityBefore int
 		capacityAfter  int
 
-		retryAfter time.Duration
+		retryAt time.Duration
 	}
 
 	type tableTest struct {
@@ -170,7 +170,7 @@ func TestLuaGCRA(t *testing.T) {
 					capacityBefore:  5,
 					consumeCapacity: 5,
 					capacityAfter:   0,
-					retryAfter:      time.Minute * (60 / 10),
+					retryAt:         time.Minute * (60 / 10),
 				},
 				{
 					delay:           1 * time.Hour,
@@ -204,7 +204,7 @@ func TestLuaGCRA(t *testing.T) {
 					capacityBefore:  90, // assume 10 items got refilled since 1 hour passed
 					consumeCapacity: 90,
 					capacityAfter:   0,
-					retryAfter:      6 * time.Minute,
+					retryAt:         6 * time.Minute,
 				},
 				{
 					delay:           1 * time.Hour,
@@ -252,7 +252,7 @@ func TestLuaGCRA(t *testing.T) {
 					capacityAfter:   0,
 					// we are 15mins in (10 + 5 above) without consuming, so the next
 					// refill is expected in (6 + 6 + 6) - (10 + 5) = 3 mins
-					retryAfter: 3 * time.Minute,
+					retryAt: 3 * time.Minute,
 				},
 				{
 					delay:           60 * time.Minute,
@@ -278,7 +278,7 @@ func TestLuaGCRA(t *testing.T) {
 					capacityBefore:  1,
 					consumeCapacity: 1,
 					capacityAfter:   0,
-					retryAfter:      5 * time.Second,
+					retryAt:         5 * time.Second,
 				},
 				{
 					delay:           5 * time.Second,
@@ -312,13 +312,13 @@ func TestLuaGCRA(t *testing.T) {
 					require.Equal(t, 0, capa, "gcra update in action %d failed", i)
 				}
 
-				capa, retryAfter := runScript(t, rc, key, current, test.period, test.limit, test.burst, 0)
+				capa, retryAt := runScript(t, rc, key, current, test.period, test.limit, test.burst, 0)
 				require.Equal(t, a.capacityAfter, capa, "capacity after in action %d failed", i)
-				if a.retryAfter > 0 {
-					require.False(t, retryAfter.IsZero())
-					require.WithinDuration(t, current.Add(a.retryAfter), retryAfter, 10*time.Second, "retry after in action %d did not match expectation", i)
+				if a.retryAt > 0 {
+					require.False(t, retryAt.IsZero())
+					require.WithinDuration(t, current.Add(a.retryAt), retryAt, 10*time.Second, "retry after in action %d did not match expectation", i)
 				} else {
-					require.True(t, retryAfter.IsZero(), "retry after in action %d failed with unexpected retry in %s", i, retryAfter.Sub(current).String())
+					require.True(t, retryAt.IsZero(), "retry after in action %d failed with unexpected retry in %s", i, retryAt.Sub(current).String())
 				}
 			}
 		})

@@ -1232,7 +1232,7 @@ func TestRefillConstraints(t *testing.T) {
 		result            BacklogRefillResult
 		itemsInBacklog    int
 		itemsInReadyQueue int
-		retryAfter        time.Duration
+		retryAt           time.Duration
 	}
 
 	type currentValues struct {
@@ -1647,7 +1647,7 @@ func TestRefillConstraints(t *testing.T) {
 					Refill:            0,
 					Refilled:          0,
 				},
-				retryAfter: 6 * time.Minute, // expect GCRA to allow the next item after 6m
+				retryAt: 6 * time.Minute, // expect GCRA to allow the next item after 6m
 			},
 		},
 	}
@@ -1833,19 +1833,19 @@ func TestRefillConstraints(t *testing.T) {
 					statusOrCapacity, ok := capacityAndRetry[0].(int64)
 					require.True(t, ok)
 
-					var retryAfter time.Time
-					retryAfterMillis, ok := capacityAndRetry[1].(int64)
+					var retryAt time.Time
+					retryAtMillis, ok := capacityAndRetry[1].(int64)
 					require.True(t, ok)
 
-					if retryAfterMillis > nowMS {
-						retryAfter = time.UnixMilli(retryAfterMillis)
+					if retryAtMillis > nowMS {
+						retryAt = time.UnixMilli(retryAtMillis)
 					}
 
 					switch statusOrCapacity {
 					case -1:
-						return 0, retryAfter
+						return 0, retryAt
 					default:
-						return int(statusOrCapacity), retryAfter
+						return int(statusOrCapacity), retryAt
 					}
 				}
 
@@ -1924,13 +1924,13 @@ func TestRefillConstraints(t *testing.T) {
 			require.Equal(t, testCase.expected.result.Refilled, len(res.RefilledItems))
 			res.RefilledItems = nil
 
-			if !res.RetryAfter.IsZero() {
-				require.Greater(t, testCase.expected.retryAfter.Milliseconds(), int64(0))
-				diff := clock.Now().Add(testCase.expected.retryAfter)
+			if !res.RetryAt.IsZero() {
+				require.Greater(t, testCase.expected.retryAt.Milliseconds(), int64(0))
+				diff := clock.Now().Add(testCase.expected.retryAt)
 
-				require.WithinDuration(t, diff, res.RetryAfter, 10*time.Second)
+				require.WithinDuration(t, diff, res.RetryAt, 10*time.Second)
 
-				res.RetryAfter = time.Time{}
+				res.RetryAt = time.Time{}
 			}
 
 			require.Equal(t, testCase.expected.result, *res, "result comparison failed", res, itemsInBacklog, itemsInReadyQueue)

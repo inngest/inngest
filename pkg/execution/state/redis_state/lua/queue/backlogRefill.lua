@@ -141,7 +141,7 @@ local constraintCapacity = nil
 
 -- Set initial status to success, progressively add more specific capacity constraints
 local status = 0
-local retryAfter = 0
+local retryAt = 0
 
 local function check_active_capacity(now_ms, keyActiveSet, limit)
 	local count = redis.call("SCARD", keyActiveSet)
@@ -157,11 +157,11 @@ if enableKeyQueues == 1 then
   if (constraintCapacity == nil or constraintCapacity > 0) and throttlePeriod > 0 and throttleLimit > 0 then
     local gcraRes = gcraCapacity(throttleKey, nowMS, throttlePeriod * 1000, throttleLimit, throttleBurst)
     local remainingThrottleCapacity = gcraRes[1]
-    local throttleRetryAfter = gcraRes[2]
+    local throttleRetryAt = gcraRes[2]
     if constraintCapacity == nil or remainingThrottleCapacity < constraintCapacity then
       constraintCapacity = remainingThrottleCapacity
       status = 5
-      retryAfter = throttleRetryAfter
+      retryAt = throttleRetryAt
     end
   end
 
@@ -393,4 +393,4 @@ if concurrencyConstrained and shouldSpotCheckActiveSet == 1 then
     add_to_active_check(keyBacklogActiveCheckSet, keyBacklogActiveCheckCooldown, backlogID, nowMS)
 end
 
-return { status, refilled, backlogCountUntil, backlogCountTotal, constraintCapacity, refill, refilledItemIDs, retryAfter }
+return { status, refilled, backlogCountUntil, backlogCountTotal, constraintCapacity, refill, refilledItemIDs, retryAt }

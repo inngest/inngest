@@ -496,7 +496,7 @@ func (q *queue) processShadowPartitionBacklog(ctx context.Context, shadowPart *Q
 		}
 	}
 
-	forceRequeueBacklogAt := res.RetryAfter
+	forceRequeueBacklogAt := res.RetryAt
 	switch res.Constraint {
 	// If backlog is concurrency limited by custom key, requeue just this backlog in the future
 	case enums.QueueConstraintCustomConcurrencyKey1, enums.QueueConstraintCustomConcurrencyKey2:

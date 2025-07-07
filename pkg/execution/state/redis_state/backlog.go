@@ -664,7 +664,7 @@ type BacklogRefillResult struct {
 	Capacity          int
 	Refill            int
 	RefilledItems     []string
-	RetryAfter        time.Time
+	RetryAt           time.Time
 }
 
 func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueShadowPartition, refillUntil time.Time, latestConstraints *PartitionConstraintConfig) (*BacklogRefillResult, error) {
@@ -831,14 +831,14 @@ func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueSha
 		}
 	}
 
-	var retryAfter time.Time
-	retryAfterMillis, ok := returnTuple[7].(int64)
+	var retryAt time.Time
+	retryAtMillis, ok := returnTuple[7].(int64)
 	if !ok {
-		return nil, fmt.Errorf("missing retryAfter in returned tuple")
+		return nil, fmt.Errorf("missing retryAt in returned tuple")
 	}
 
-	if retryAfterMillis > nowMS {
-		retryAfter = time.UnixMilli(retryAfterMillis)
+	if retryAtMillis > nowMS {
+		retryAt = time.UnixMilli(retryAtMillis)
 	}
 
 	refillResult := &BacklogRefillResult{
@@ -848,7 +848,7 @@ func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueSha
 		Capacity:          int(capacity),
 		Refill:            int(refill),
 		RefilledItems:     refilledItemIDs,
-		RetryAfter:        retryAfter,
+		RetryAt:           retryAt,
 	}
 
 	switch status {
