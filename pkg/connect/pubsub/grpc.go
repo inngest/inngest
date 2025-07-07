@@ -173,25 +173,25 @@ func (i *gatewayGRPCForwarder) Forward(ctx context.Context, gatewayID ulid.ULID,
 	return err
 }
 
-func (g *gatewayGRPCForwarder) startGarbageCollectClients(ctx context.Context) {
+func (i *gatewayGRPCForwarder) startGarbageCollectClients(ctx context.Context) {
 	ticker := time.NewTicker(5 * time.Minute)
 	defer ticker.Stop()
 
 	for {
 		select {
 		case <-ticker.C:
-			_, _ = g.GarbageCollectClients()
+			_, _ = i.GarbageCollectClients()
 		case <-ctx.Done():
 			return
 		}
 	}
 }
 
-func (g *gatewayGRPCForwarder) GarbageCollectClients() (int, error) {
+func (i *gatewayGRPCForwarder) GarbageCollectClients() (int, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
-	existingGatewayIDs, err := g.gatewayManager.GetAllGatewayIDs(ctx)
+	existingGatewayIDs, err := i.gatewayManager.GetAllGatewayIDs(ctx)
 	if err != nil {
 		logger.StdlibLogger(ctx).Error("could not get connect gateways IDs")
 		return 0, err
@@ -202,14 +202,14 @@ func (g *gatewayGRPCForwarder) GarbageCollectClients() (int, error) {
 		existingSet[id] = true
 	}
 
-	g.mu.Lock()
-	defer g.mu.Unlock()
+	i.mu.Lock()
+	defer i.mu.Unlock()
 
 	var deletedCount int
 
-	for gatewayId, _ := range g.grpcClients {
+	for gatewayId := range i.grpcClients {
 		if !existingSet[gatewayId] {
-			delete(g.grpcClients, gatewayId)
+			delete(i.grpcClients, gatewayId)
 			deletedCount++
 		}
 	}
