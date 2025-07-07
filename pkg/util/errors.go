@@ -9,7 +9,7 @@ type ErrSet struct {
 }
 
 func NewErrSet(errs ...error) *ErrSet {
-	return &ErrSet{}
+	return &ErrSet{errs: errs}
 }
 
 func (e *ErrSet) Add(err error) {
