@@ -1,5 +1,8 @@
 import { useCallback } from 'react';
 
+import { client } from '@/store/baseApi';
+import { EVENTS_QUERY } from '../../coreapi';
+
 type EventsQueryVariables = {
   eventNames: string[] | null;
   cursor: string | null;
@@ -21,37 +24,50 @@ export function useEvents() {
       celQuery,
       includeInternalEvents,
     }: EventsQueryVariables) => {
-      // Mocked fake delay + sample response
-      await new Promise((res) => setTimeout(res, 300));
+      const result = await client.request(
+        EVENTS_QUERY,
+        {
+          startTime,
+          endTime,
+          cursor,
+          celQuery,
+          eventNames,
+          includeInternalEvents,
+        },
+        { requestPolicy: 'network-only' }
+      );
+
+      console.log({ result });
+
+      if (result.error) {
+        throw new Error(result.error.message);
+      }
+
+      if (!result.eventsV2) {
+        throw new Error('no data returned');
+      }
+
+      const eventsData = result.eventsV2;
+      const events = eventsData.edges.map(({ node }) => ({
+        ...node,
+        receivedAt: new Date(node.receivedAt),
+        runs: node.runs.map((run) => ({
+          fnName: run.function.name,
+          fnSlug: run.function.slug,
+          status: run.status,
+          id: run.id,
+          completedAt: run.endedAt ? new Date(run.endedAt) : undefined,
+          startedAt: run.startedAt ? new Date(run.startedAt) : undefined,
+        })),
+      }));
 
       return {
-        events: [
-          {
-            name: 'UserSignedUp',
-            id: 'evt_1',
-            receivedAt: new Date(),
-            runs: [
-              {
-                fnName: 'SendWelcomeEmail',
-                fnSlug: 'send-welcome-email',
-                status: 'COMPLETED',
-                id: 'run_1',
-                startedAt: new Date(),
-                completedAt: new Date(),
-              },
-            ],
-          },
-        ],
-        pageInfo: {
-          hasNextPage: false,
-          endCursor: null,
-          hasPreviousPage: false,
-          startCursor: null,
-        },
-        totalCount: 1,
+        events,
+        pageInfo: eventsData.pageInfo,
+        totalCount: eventsData.totalCount,
       };
     },
-    []
+    [client]
   );
 }
 
