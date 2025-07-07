@@ -6,8 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"github.com/inngest/inngest/pkg/execution/state"
-	"github.com/inngest/inngest/pkg/telemetry"
 	"math"
+	"runtime"
 	"time"
 
 	"github.com/inngest/inngest/pkg/enums"
@@ -272,7 +272,8 @@ func (q *queue) extendBacklogNormalizationLease(ctx context.Context, now time.Ti
 // NOTE: ideally this is one transaction in a lua script but enqueue_to_backlog is way too much work to
 // utilize
 func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp *QueueShadowPartition, latestConstraints *PartitionConstraintConfig) error {
-	caller := telemetry.Caller()
+	_, file, line, _ := runtime.Caller(1)
+	caller := fmt.Sprintf("%s:%d", file, line)
 
 	metrics.ActiveBacklogNormalizeCount(ctx, 1, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name, "caller": caller}})
 	defer metrics.ActiveBacklogNormalizeCount(ctx, -1, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name, "caller": caller}})
