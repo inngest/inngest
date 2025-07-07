@@ -238,6 +238,42 @@ func IncrConnectGatewayReceivedRouterPubSubMessageCounter(ctx context.Context, v
 	})
 }
 
+func IncrConnectGatewayGRPCClientCreateCounter(ctx context.Context, value int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, value, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "connect_gateway.grpc.client_created",
+		Description: "The total number of GRPC clients created",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrConnectGatewayGRPCClientGCCounter(ctx context.Context, value int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, value, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "connect_gateway.grpc.client_garbage_collected",
+		Description: "The total number of GRPC client garbage collected",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrConnectGatewayGRPCForwardCounter(ctx context.Context, value int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, value, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "connect_gateway.grpc.forward_total",
+		Description: "Total number of messages forwarded via gRPC to connect gateways",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrConnectGatewayGRPCClientFailureCounter(ctx context.Context, value int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, value, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "connect_gateway.grpc.client_failure_total",
+		Description: "Total number of gRPC client creation failures for connect gateways",
+		Tags:        opts.Tags,
+	})
+}
+
 func IncrConnectRouterPubSubMessageSentCounter(ctx context.Context, value int64, opts CounterOpt) {
 	RecordCounterMetric(ctx, value, CounterOpt{
 		PkgName:     opts.PkgName,

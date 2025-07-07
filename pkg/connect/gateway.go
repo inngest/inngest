@@ -902,9 +902,15 @@ func (c *connectionHandler) receiveRouterMessagesFromGRPC(ctx context.Context, o
 			)
 
 			log.Debug("gateway received grpc message")
+			grpcTags := map[string]any{
+				"transport": "grpc",
+			}
+			for k, v := range additionalMetricsTags {
+				grpcTags[k] = v
+			}
 			metrics.IncrConnectGatewayReceivedRouterPubSubMessageCounter(ctx, 1, metrics.CounterOpt{
 				PkgName: pkgName,
-				Tags:    additionalMetricsTags,
+				Tags:    grpcTags,
 			})
 
 			// Forward message to SDK!
@@ -946,9 +952,15 @@ func (c *connectionHandler) receiveRouterMessagesFromPubsub(ctx context.Context,
 
 		log.Debug("gateway received msg")
 
+		pubsubTags := map[string]any{
+			"transport": "pubsub",
+		}
+		for k, v := range additionalMetricsTags {
+			pubsubTags[k] = v
+		}
 		metrics.IncrConnectGatewayReceivedRouterPubSubMessageCounter(ctx, 1, metrics.CounterOpt{
 			PkgName: pkgName,
-			Tags:    additionalMetricsTags,
+			Tags:    pubsubTags,
 		})
 
 		// Do not forward messages if the connection is already draining

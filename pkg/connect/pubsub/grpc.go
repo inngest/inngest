@@ -9,6 +9,7 @@ import (
 	connectConfig "github.com/inngest/inngest/pkg/config/connect"
 	"github.com/inngest/inngest/pkg/connect/state"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	connectpb "github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/oklog/ulid/v2"
 	"google.golang.org/grpc"
@@ -90,10 +91,14 @@ func (i *gatewayGRPCForwarder) ConnectToGateways(ctx context.Context) error {
 	i.mu.Lock()
 	defer i.mu.Unlock()
 
+	i.grpcClients = map[string]connectpb.ConnectGatewayClient{}
+
 	for _, g := range gateways {
 		rpcClient, err := i.createGRPCClient(ctx, g)
 		if err != nil {
 			logger.StdlibLogger(ctx).Error("could not create grpc client", "error", err)
+
+			metrics.IncrConnectGatewayGRPCClientFailureCounter(ctx, 1, metrics.CounterOpt{})
 			continue
 		}
 
@@ -101,6 +106,10 @@ func (i *gatewayGRPCForwarder) ConnectToGateways(ctx context.Context) error {
 		url := fmt.Sprintf("%s:%d", g.IPAddress, connectConfig.Gateway(ctx).GRPCPort)
 		logger.StdlibLogger(ctx).Info("connected to connect gateway", "url", url)
 	}
+
+	metrics.IncrConnectGatewayGRPCClientCreateCounter(ctx, int64(len(i.grpcClients)), metrics.CounterOpt{
+		Tags: map[string]any{"method": "connect-to-all"},
+	})
 
 	return nil
 }
@@ -124,6 +133,10 @@ func (i *gatewayGRPCForwarder) connectToGateway(ctx context.Context, gatewayID u
 	url := fmt.Sprintf("%s:%d", gateway.IPAddress, connectConfig.Gateway(ctx).GRPCPort)
 	logger.StdlibLogger(ctx).Info("just-in-time connected to connect gateway", "url", url)
 
+	metrics.IncrConnectGatewayGRPCClientCreateCounter(ctx, int64(1), metrics.CounterOpt{
+		Tags: map[string]any{"method": "just-in-time"},
+	})
+
 	return rpcClient, nil
 }
 
@@ -139,6 +152,8 @@ func (i *gatewayGRPCForwarder) Forward(ctx context.Context, gatewayID ulid.ULID,
 		grpcClient, err = i.connectToGateway(ctx, gatewayID)
 		if err != nil {
 			logger.StdlibLogger(ctx).Error("could not create just-in-time grpc client", "gatewayID", gatewayID.String(), "err", err)
+
+			metrics.IncrConnectGatewayGRPCClientFailureCounter(ctx, 1, metrics.CounterOpt{})
 			return fmt.Errorf("could not find or create grpc client for gateway %s: %w", gatewayID.String(), err)
 		}
 	}
@@ -149,6 +164,12 @@ func (i *gatewayGRPCForwarder) Forward(ctx context.Context, gatewayID ulid.ULID,
 	})
 
 	logger.StdlibLogger(ctx).Debug("grpc message forwarded to connect gateway", "reply", reply, "err", err)
+
+	success := err == nil
+	metrics.IncrConnectGatewayGRPCForwardCounter(ctx, 1, metrics.CounterOpt{
+		Tags: map[string]any{"success": success},
+	})
+
 	return err
 }
 
