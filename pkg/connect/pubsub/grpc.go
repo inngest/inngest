@@ -25,17 +25,57 @@ type gatewayGRPCForwarder struct {
 	mu             sync.RWMutex
 
 	grpcClients map[string]connectpb.ConnectGatewayClient
+	dialer      GRPCDialer
 }
 
+type GRPCDialer func(target string, opts ...grpc.DialOption) (*grpc.ClientConn, error)
+
 func NewGatewayGRPCForwarder(ctx context.Context, stateManager state.GatewayManager) GatewayGRPCForwarder {
+	return NewGatewayGRPCForwarderWithDialer(ctx, stateManager, grpc.NewClient)
+}
+
+func NewGatewayGRPCForwarderWithDialer(ctx context.Context, stateManager state.GatewayManager, dialer GRPCDialer) GatewayGRPCForwarder {
 	forwarder := &gatewayGRPCForwarder{
 		gatewayManager: stateManager,
 		grpcClients:    map[string]connectpb.ConnectGatewayClient{},
+		dialer:         dialer,
 	}
 
 	go forwarder.startGarbageCollectClients(ctx)
 
 	return forwarder
+}
+
+// createGRPCClient creates a gRPC client for a gateway and validates the connection
+func (i *gatewayGRPCForwarder) createGRPCClient(ctx context.Context, gateway *state.Gateway) (connectpb.ConnectGatewayClient, error) {
+	url := fmt.Sprintf("%s:%d", gateway.IPAddress, connectConfig.Gateway(ctx).GRPCPort)
+
+	var conn *grpc.ClientConn
+	var err error
+
+	if i.dialer == nil {
+		return nil, fmt.Errorf("gateway dialer is nil")
+	}
+
+	conn, err = i.dialer(url, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		return nil, fmt.Errorf("could not create grpc client for %s: %w", url, err)
+	}
+
+	rpcClient := connectpb.NewConnectGatewayClient(conn)
+
+	// grpc.NewClient doesn't establish a connection immediately; it connects on the first RPC call.
+	// Ping is called to eagerly validate that the connection is working. This can be removed later if not needed.
+	result, err := rpcClient.Ping(ctx, &connectpb.PingRequest{})
+	if err != nil {
+		return nil, fmt.Errorf("could not ping gateway %s: %w", url, err)
+	}
+
+	if result.GetMessage() != "ok" {
+		return nil, fmt.Errorf("unexpected connect gateway ping response: %s", result.GetMessage())
+	}
+
+	return rpcClient, nil
 }
 
 // ConnectToGateways connects to all gateways through gRPC
@@ -51,30 +91,15 @@ func (i *gatewayGRPCForwarder) ConnectToGateways(ctx context.Context) error {
 	defer i.mu.Unlock()
 
 	for _, g := range gateways {
+		rpcClient, err := i.createGRPCClient(ctx, g)
+		if err != nil {
+			logger.StdlibLogger(ctx).Error("could not create grpc client", "error", err)
+			continue
+		}
+
+		i.grpcClients[g.Id.String()] = rpcClient
 		url := fmt.Sprintf("%s:%d", g.IPAddress, connectConfig.Gateway(ctx).GRPCPort)
-		conn, err := grpc.NewClient(url, grpc.WithTransportCredentials(insecure.NewCredentials()))
-		if err != nil {
-			logger.StdlibLogger(ctx).Error("could not create grpc client", err)
-			continue
-		}
-
-		rpcClient := connectpb.NewConnectGatewayClient(conn)
-
-		// grpc.NewClient doesn't establish a connection immediately; it connects on the first RPC call.
-		// Ping is called to eagerly validate that the connection is working. This can be removed later if not needed.
-		result, err := rpcClient.Ping(ctx, &connectpb.PingRequest{})
-		if err != nil {
-			logger.StdlibLogger(ctx).Error("could not ping gateway", "error", err)
-			continue
-		}
-
-		message := result.GetMessage()
-		if message == "ok" {
-			i.grpcClients[g.Id.String()] = rpcClient
-			logger.StdlibLogger(ctx).Info("connected to connect gateway", "message", message, "url", url)
-		} else {
-			logger.StdlibLogger(ctx).Warn("unexpected connect gateway ping response", "message", message)
-		}
+		logger.StdlibLogger(ctx).Info("connected to connect gateway", "url", url)
 	}
 
 	return nil
@@ -87,24 +112,17 @@ func (i *gatewayGRPCForwarder) connectToGateway(ctx context.Context, gatewayID u
 		return nil, fmt.Errorf("could not find gateway %s: %w", gatewayID.String(), err)
 	}
 
-	url := fmt.Sprintf("%s:%d", gateway.IPAddress, connectConfig.Gateway(ctx).GRPCPort)
-	conn, err := grpc.NewClient(url, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	rpcClient, err := i.createGRPCClient(ctx, gateway)
 	if err != nil {
-		return nil, fmt.Errorf("could not create grpc client for %s: %w", url, err)
-	}
-
-	rpcClient := connectpb.NewConnectGatewayClient(conn)
-
-	result, err := rpcClient.Ping(ctx, &connectpb.PingRequest{})
-	if err != nil || result.GetMessage() != "ok" {
-		return nil, fmt.Errorf("could not ping gateway %s: %w", url, err)
+		return nil, fmt.Errorf("could not create grpc client for gateway %s: %w", gatewayID.String(), err)
 	}
 
 	i.mu.Lock()
 	i.grpcClients[gatewayID.String()] = rpcClient
 	i.mu.Unlock()
 
-	logger.StdlibLogger(ctx).Info("just-in-time connected to connect gateway", "message", result, "url", url)
+	url := fmt.Sprintf("%s:%d", gateway.IPAddress, connectConfig.Gateway(ctx).GRPCPort)
+	logger.StdlibLogger(ctx).Info("just-in-time connected to connect gateway", "url", url)
 
 	return rpcClient, nil
 }
@@ -141,21 +159,21 @@ func (g *gatewayGRPCForwarder) startGarbageCollectClients(ctx context.Context) {
 	for {
 		select {
 		case <-ticker.C:
-			g.GarbageCollectClients()
+			_, _ = g.GarbageCollectClients()
 		case <-ctx.Done():
 			return
 		}
 	}
 }
 
-func (g *gatewayGRPCForwarder) GarbageCollectClients() {
+func (g *gatewayGRPCForwarder) GarbageCollectClients() (int, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	existingGatewayIDs, err := g.gatewayManager.GetAllGatewayIDs(ctx)
 	if err != nil {
 		logger.StdlibLogger(ctx).Error("could not get connect gateways IDs")
-		return
+		return 0, err
 	}
 
 	existingSet := make(map[string]bool, len(existingGatewayIDs))
@@ -176,4 +194,5 @@ func (g *gatewayGRPCForwarder) GarbageCollectClients() {
 	}
 
 	logger.StdlibLogger(ctx).Debug("cleaned up gRPC clients of dead connect gateways", "deleted", deletedCount)
+	return deletedCount, nil
 }
