@@ -122,12 +122,50 @@ type EventQuery struct {
 	EventID     string `json:"eventId"`
 }
 
+type EventSource struct {
+	ID         string  `json:"id"`
+	Name       *string `json:"name,omitempty"`
+	SourceKind string  `json:"sourceKind"`
+}
+
+type EventV2 struct {
+	EnvID          uuid.UUID        `json:"envID"`
+	ID             ulid.ULID        `json:"id"`
+	IdempotencyKey *string          `json:"idempotencyKey,omitempty"`
+	Name           string           `json:"name"`
+	OccurredAt     time.Time        `json:"occurredAt"`
+	Raw            string           `json:"raw"`
+	ReceivedAt     time.Time        `json:"receivedAt"`
+	Runs           []*FunctionRunV2 `json:"runs"`
+	Source         *EventSource     `json:"source,omitempty"`
+	Version        *string          `json:"version,omitempty"`
+}
+
 type EventsBatchConfiguration struct {
 	// The maximum number of events a batch can have.
 	MaxSize int `json:"maxSize"`
 	// How long to wait before running the function with the batch.
 	Timeout string  `json:"timeout"`
 	Key     *string `json:"key,omitempty"`
+}
+
+type EventsConnection struct {
+	Edges      []*EventsEdge `json:"edges"`
+	PageInfo   *PageInfo     `json:"pageInfo"`
+	TotalCount int           `json:"totalCount"`
+}
+
+type EventsEdge struct {
+	Node   *EventV2 `json:"node"`
+	Cursor string   `json:"cursor"`
+}
+
+type EventsFilter struct {
+	EventNames            []string   `json:"eventNames,omitempty"`
+	From                  time.Time  `json:"from"`
+	IncludeInternalEvents bool       `json:"includeInternalEvents"`
+	Query                 *string    `json:"query,omitempty"`
+	Until                 *time.Time `json:"until,omitempty"`
 }
 
 type EventsQuery struct {
