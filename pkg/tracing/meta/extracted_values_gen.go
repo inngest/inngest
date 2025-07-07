@@ -58,5 +58,4 @@ type ExtractedValues struct {
 	ResponseHeaders *http.Header
 	ResponseStatusCode *int
 	ResponseOutputSize *int
-	AIThingBob *string
 }

@@ -84,8 +84,6 @@ var Attrs = struct {
 	ResponseHeaders    attr[*http.Header]
 	ResponseStatusCode attr[*int]
 	ResponseOutputSize attr[*int]
-
-	AIThingBob attr[*string]
 }{
 	internalError: StringAttr("internal.error"),
 

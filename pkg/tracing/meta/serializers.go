@@ -23,7 +23,7 @@ type SerializableAttrs struct {
 	Attrs []SerializableAttr
 }
 
-func NewRawAttrs(attrs ...SerializableAttr) *SerializableAttrs {
+func NewAttrSet(attrs ...SerializableAttr) *SerializableAttrs {
 	return &SerializableAttrs{
 		Attrs: attrs,
 	}
@@ -35,7 +35,7 @@ type SerializableAttr struct {
 	value     any
 }
 
-func AddRawAttr[T any](r *SerializableAttrs, attr attr[T], value T) {
+func AddAttr[T any](r *SerializableAttrs, attr attr[T], value T) {
 	r.Attrs = append(r.Attrs, Attr(attr, value))
 }
 
@@ -51,7 +51,7 @@ func (r *SerializableAttrs) Merge(other *SerializableAttrs) *SerializableAttrs {
 	es := r.es
 	o := other
 	if o == nil {
-		o = NewRawAttrs()
+		o = NewAttrSet()
 	} else if o.es != nil {
 		es = r.es.Merge(o.es)
 	}
