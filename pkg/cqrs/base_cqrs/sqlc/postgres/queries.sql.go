@@ -1453,6 +1453,8 @@ func (q *Queries) InsertFunctionRun(ctx context.Context, arg InsertFunctionRunPa
 const insertHistory = `-- name: InsertHistory :exec
 
 
+
+
 INSERT INTO history
     (id, created_at, run_started_at, function_id, function_version, run_id, event_id, batch_id, group_id, idempotency_key, type, attempt, latency_ms, step_name, step_id, step_type, url, cancel_request, sleep, wait_for_event, wait_result, invoke_function, invoke_function_result, result) VALUES
     ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24)
@@ -1485,6 +1487,8 @@ type InsertHistoryParams struct {
 	Result               sql.NullString
 }
 
+// TODO fix this to work with multiple event_names
+//
 // History
 func (q *Queries) InsertHistory(ctx context.Context, arg InsertHistoryParams) error {
 	_, err := q.db.ExecContext(ctx, insertHistory,
@@ -2000,6 +2004,39 @@ func (q *Queries) UpsertApp(ctx context.Context, arg UpsertAppParams) (*App, err
 		&i.AppVersion,
 	)
 	return &i, err
+}
+
+const workspaceCountEvents = `-- name: WorkspaceCountEvents :one
+SELECT count(*) FROM events WHERE received_at <= $1 AND received_at >= $2
+`
+
+type WorkspaceCountEventsParams struct {
+	ReceivedAt   time.Time
+	ReceivedAt_2 time.Time
+}
+
+func (q *Queries) WorkspaceCountEvents(ctx context.Context, arg WorkspaceCountEventsParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, workspaceCountEvents, arg.ReceivedAt, arg.ReceivedAt_2)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const workspaceCountNamedEvents = `-- name: WorkspaceCountNamedEvents :one
+SELECT count(*) FROM events WHERE received_at <= $1 AND received_at >= $2 AND event_name = $3
+`
+
+type WorkspaceCountNamedEventsParams struct {
+	ReceivedAt   time.Time
+	ReceivedAt_2 time.Time
+	EventName    string
+}
+
+func (q *Queries) WorkspaceCountNamedEvents(ctx context.Context, arg WorkspaceCountNamedEventsParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, workspaceCountNamedEvents, arg.ReceivedAt, arg.ReceivedAt_2, arg.EventName)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
 }
 
 const workspaceEvents = `-- name: WorkspaceEvents :many

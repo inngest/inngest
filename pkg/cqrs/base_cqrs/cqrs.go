@@ -879,6 +879,27 @@ func (w wrapper) GetEvents(ctx context.Context, accountID uuid.UUID, workspaceID
 	return out, nil
 }
 
+func (w wrapper) GetEventsCount(ctx context.Context, accountID uuid.UUID, workspaceID uuid.UUID, opts *cqrs.WorkspaceEventsOpts) (int64, error) {
+	if err := opts.Validate(); err != nil {
+		return 0, err
+	}
+
+	if len(opts.Names) == 0 {
+		params := sqlc.WorkspaceCountEventsParams{
+			Before: opts.Newest,
+			After:  opts.Oldest,
+		}
+		return w.q.WorkspaceCountEvents(ctx, params)
+	} else {
+		params := sqlc.WorkspaceCountNamedEventsParams{
+			Names:  opts.Names,
+			Before: opts.Newest,
+			After:  opts.Oldest,
+		}
+		return w.q.WorkspaceCountNamedEvents(ctx, params)
+	}
+}
+
 func (w wrapper) GetEventsIDbound(
 	ctx context.Context,
 	ids cqrs.IDBound,

@@ -177,6 +177,12 @@ SELECT * FROM events WHERE internal_id < @cursor AND received_at <= @before AND 
 -- name: WorkspaceNamedEvents :many
 SELECT * FROM events WHERE internal_id < @cursor AND received_at <= @before AND received_at >= @after AND event_name in (sqlc.slice('@names')) ORDER BY internal_id DESC LIMIT ?;
 
+-- name: WorkspaceCountEvents :one
+SELECT count(*) FROM events WHERE received_at <= @before AND received_at >= @after;
+
+-- name: WorkspaceCountNamedEvents :one
+SELECT count(*) FROM events WHERE received_at <= @before AND received_at >= @after AND event_name in (sqlc.slice('@names'));
+
 --
 -- History
 --
