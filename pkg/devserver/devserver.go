@@ -386,7 +386,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	// Create a new expression aggregator, using Redis to load evaluables.
 	agg := expragg.NewAggregator(ctx, 100, 100, sm.(expragg.EvaluableLoader), expressions.ExprEvaluator, nil, nil)
 
-	gatewayGRPCForwarder := connectpubsub.NewGatewayGRPCForwarder(connectionManager)
+	gatewayGRPCForwarder := connectpubsub.NewGatewayGRPCForwarder(ctx, connectionManager)
 
 	executorProxy, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectPubSubRedis, true, connectpubsub.RedisPubSubConnectorOpts{
 		Logger:               connectPubSubLogger.With("svc", "executor"),

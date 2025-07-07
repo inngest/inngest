@@ -60,6 +60,7 @@ type GatewayManager interface {
 	DeleteGateway(ctx context.Context, gatewayId ulid.ULID) error
 	GetGateway(ctx context.Context, gatewayId ulid.ULID) (*Gateway, error)
 	GetAllGateways(ctx context.Context) ([]*Gateway, error)
+	GetAllGatewayIDs(ctx context.Context) ([]string, error)
 }
 
 type RequestStateManager interface {

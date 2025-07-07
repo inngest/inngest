@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sync"
+	"time"
 
 	connectConfig "github.com/inngest/inngest/pkg/config/connect"
 	"github.com/inngest/inngest/pkg/connect/state"
@@ -23,18 +24,21 @@ type gatewayGRPCForwarder struct {
 	gatewayManager state.GatewayManager
 	mu             sync.RWMutex
 
-	// TODO: gc gateways
 	grpcClients map[string]connectpb.ConnectGatewayClient
 }
 
-func NewGatewayGRPCForwarder(stateManager state.GatewayManager) GatewayGRPCForwarder {
-	return &gatewayGRPCForwarder{
+func NewGatewayGRPCForwarder(ctx context.Context, stateManager state.GatewayManager) GatewayGRPCForwarder {
+	forwarder := &gatewayGRPCForwarder{
 		gatewayManager: stateManager,
 		grpcClients:    map[string]connectpb.ConnectGatewayClient{},
 	}
+
+	go forwarder.startGarbageCollectClients(ctx)
+
+	return forwarder
 }
 
-// Connect to all gateways through gRPC
+// ConnectToGateways connects to all gateways through gRPC
 func (i *gatewayGRPCForwarder) ConnectToGateways(ctx context.Context) error {
 	gateways, err := i.gatewayManager.GetAllGateways(ctx)
 	if err != nil {
@@ -59,12 +63,17 @@ func (i *gatewayGRPCForwarder) ConnectToGateways(ctx context.Context) error {
 		// grpc.NewClient doesn't establish a connection immediately; it connects on the first RPC call.
 		// Ping is called to eagerly validate that the connection is working. This can be removed later if not needed.
 		result, err := rpcClient.Ping(ctx, &connectpb.PingRequest{})
+		if err != nil {
+			logger.StdlibLogger(ctx).Error("could not ping gateway", "error", err)
+			continue
+		}
+
 		message := result.GetMessage()
-		if err != nil || message != "ok" {
-			logger.StdlibLogger(ctx).Error("could not ping connect gateway at startup", "url", url, "message", message, "err", err)
-		} else {
+		if message == "ok" {
 			i.grpcClients[g.Id.String()] = rpcClient
 			logger.StdlibLogger(ctx).Info("connected to connect gateway", "message", message, "url", url)
+		} else {
+			logger.StdlibLogger(ctx).Warn("unexpected connect gateway ping response", "message", message)
 		}
 	}
 
@@ -95,7 +104,7 @@ func (i *gatewayGRPCForwarder) connectToGateway(ctx context.Context, gatewayID u
 	i.grpcClients[gatewayID.String()] = rpcClient
 	i.mu.Unlock()
 
-	logger.StdlibLogger(ctx).Info("dynamically connected to connect gateway", "message", result, "url", url)
+	logger.StdlibLogger(ctx).Info("just-in-time connected to connect gateway", "message", result, "url", url)
 
 	return rpcClient, nil
 }
@@ -111,7 +120,7 @@ func (i *gatewayGRPCForwarder) Forward(ctx context.Context, gatewayID ulid.ULID,
 		var err error
 		grpcClient, err = i.connectToGateway(ctx, gatewayID)
 		if err != nil {
-			logger.StdlibLogger(ctx).Error("could not create grpc client dynamically", "gatewayID", gatewayID.String(), "err", err)
+			logger.StdlibLogger(ctx).Error("could not create just-in-time grpc client", "gatewayID", gatewayID.String(), "err", err)
 			return fmt.Errorf("could not find or create grpc client for gateway %s: %w", gatewayID.String(), err)
 		}
 	}
@@ -123,4 +132,48 @@ func (i *gatewayGRPCForwarder) Forward(ctx context.Context, gatewayID ulid.ULID,
 
 	logger.StdlibLogger(ctx).Debug("grpc message forwarded to connect gateway", "reply", reply, "err", err)
 	return err
+}
+
+func (g *gatewayGRPCForwarder) startGarbageCollectClients(ctx context.Context) {
+	ticker := time.NewTicker(5 * time.Minute)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ticker.C:
+			g.GarbageCollectClients()
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+func (g *gatewayGRPCForwarder) GarbageCollectClients() {
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	existingGatewayIDs, err := g.gatewayManager.GetAllGatewayIDs(ctx)
+	if err != nil {
+		logger.StdlibLogger(ctx).Error("could not get connect gateways IDs")
+		return
+	}
+
+	existingSet := make(map[string]bool, len(existingGatewayIDs))
+	for _, id := range existingGatewayIDs {
+		existingSet[id] = true
+	}
+
+	g.mu.Lock()
+	defer g.mu.Unlock()
+
+	var deletedCount int
+
+	for gatewayId, _ := range g.grpcClients {
+		if !existingSet[gatewayId] {
+			delete(g.grpcClients, gatewayId)
+			deletedCount++
+		}
+	}
+
+	logger.StdlibLogger(ctx).Debug("cleaned up gRPC clients of dead connect gateways", "deleted", deletedCount)
 }

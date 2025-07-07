@@ -813,3 +813,14 @@ func (r *redisConnectionStateManager) GetAllGateways(ctx context.Context) ([]*Ga
 
 	return gateways, nil
 }
+
+func (r *redisConnectionStateManager) GetAllGatewayIDs(ctx context.Context) ([]string, error) {
+	gatewayIDs, err := r.client.Do(
+		ctx,
+		r.client.B().Hkeys().Key(r.gatewaysHashKey()).Build(),
+	).AsStrSlice()
+	if err != nil {
+		return nil, fmt.Errorf("could not get gateway IDs: %w", err)
+	}
+	return gatewayIDs, nil
+}
