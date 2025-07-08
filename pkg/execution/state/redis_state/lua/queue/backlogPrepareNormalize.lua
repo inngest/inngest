@@ -76,7 +76,6 @@ if currentScore == false or tonumber(currentScore) > normalizeTime then
 end
 
 -- Remove from backlog and update pointers
-
 redis.call("ZREM", keyShadowPartitionSet, backlogID)
 
 -- If shadow partition has no more backlogs, update global/account pointers
