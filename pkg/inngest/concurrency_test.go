@@ -192,28 +192,3 @@ func TestConcurrencyEvaluate(t *testing.T) {
 		})
 	}
 }
-
-func TestHash(t *testing.T) {
-	// render-packshot-editing-req a7c765dd-2aa2-4701-874d-21b692823d18
-	// backlog: 34t4ozwxcos8a (from Schedule)
-	// constraints: q8f0bzinpknf
-	
-	hashKey := func(str string) string {
-		return strconv.FormatUint(xxhash.Sum64String(str), 36)
-	}
-	fmt.Println(hashKey(""))
-
-	fmt.Println(hashKey("nil"))
-
-	key := "\nevent.data.shopId + (\n    (has(event.data.concurrencyBucket) && event.data.concurrencyBucket > 0)\n        ? (\":\" + string(event.data.concurrencyBucket))\n        : \"\"\n)\n    "
-	limit := Concurrency{
-		Key: &key,
-	}
-
-	ret := limit.Evaluate(context.Background(), map[string]any{
-		"whatever": "cool",
-	})
-	fmt.Println(ret)
-
-	fmt.Println(hashKey(ret))
-}
