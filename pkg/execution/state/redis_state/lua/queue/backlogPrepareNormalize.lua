@@ -79,6 +79,13 @@ end
 redis.call("ZREM", keyShadowPartitionSet, backlogID)
 
 -- If shadow partition has no more backlogs, update global/account pointers
-updateBacklogPointer(keyGlobalShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, keyShadowPartitionSet, keyBacklogSet, accountID, partitionID, backlogID)
+if tonumber(redis.call("ZCARD", keyShadowPartitionSet)) == 0 then
+  redis.call("ZREM", keyGlobalShadowPartitionSet, partitionID)
+  redis.call("ZREM", keyAccountShadowPartitionSet, partitionID)
+
+  if tonumber(redis.call("ZCARD", keyAccountShadowPartitionSet)) == 0 then
+    redis.call("ZREM", keyGlobalAccountShadowPartitionSet, accountID)
+  end
+end
 
 return { 1, backlogCount }
