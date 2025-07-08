@@ -49,7 +49,7 @@ const INTEGRATIONS: Integration[] = [
         <Button
           disabled={hasError}
           kind="primary"
-          appearance="solid"
+          appearance={enabled ? 'outlined' : 'solid'}
           size="medium"
           href={url}
           label={label}
@@ -69,7 +69,7 @@ const INTEGRATIONS: Integration[] = [
       <Button
         disabled={hasError}
         kind="primary"
-        appearance="solid"
+        appearance={enabled ? 'outlined' : 'solid'}
         size="medium"
         href={enabled ? '/settings/integrations/neon' : '/settings/integrations/neon/connect'}
         label={enabled ? 'Manage' : 'Connect'}
@@ -86,7 +86,7 @@ const INTEGRATIONS: Integration[] = [
       <Button
         disabled={hasError}
         kind="primary"
-        appearance="solid"
+        appearance={enabled ? 'outlined' : 'solid'}
         size="medium"
         href={
           enabled ? '/settings/integrations/supabase' : '/settings/integrations/supabase/connect'
@@ -122,7 +122,7 @@ const INTEGRATIONS: Integration[] = [
     actionButton: () => (
       <Button
         iconSide="left"
-        appearance="solid"
+        appearance="outlined"
         size="medium"
         label="Configure"
         href="/settings/integrations/prometheus"
