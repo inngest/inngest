@@ -959,6 +959,8 @@ func (q *queue) BacklogPrepareNormalize(ctx context.Context, b *QueueBacklog, sp
 
 	keys := []string{
 		kg.BacklogMeta(),
+		kg.ShadowPartitionMeta(),
+
 		kg.BacklogSet(b.BacklogID),
 		kg.ShadowPartitionSet(sp.PartitionID),
 		kg.GlobalShadowPartitionSet(),
