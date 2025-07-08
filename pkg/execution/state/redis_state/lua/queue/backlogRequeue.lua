@@ -18,6 +18,7 @@ local keyGlobalAccountShadowPartitionSet = KEYS[5]
 local keyAccountShadowPartitionSet       = KEYS[6]
 local keyShadowPartitionSet              = KEYS[7]
 local keyBacklogSet                      = KEYS[8]
+local keyPartitionNormalizeSet           = KEYS[9]
 
 local accountID   = ARGV[1]
 local partitionID = ARGV[2]
@@ -38,7 +39,7 @@ if tonumber(redis.call("ZCARD", keyBacklogSet)) == 0 then
   redis.call("HDEL", keyBacklogMeta, backlogID)
 
   -- Update pointers
-  updateBacklogPointer(keyShadowPartitionMeta, keyBacklogMeta, keyGlobalShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, keyShadowPartitionSet, keyBacklogSet, accountID, partitionID, backlogID)
+  updateBacklogPointer(keyShadowPartitionMeta, keyBacklogMeta, keyGlobalShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, keyShadowPartitionSet, keyBacklogSet, keyPartitionNormalizeSet, accountID, partitionID, backlogID)
 
   return 1
 end

@@ -737,6 +737,8 @@ func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueSha
 
 		kg.BacklogActiveCheckSet(),
 		kg.BacklogActiveCheckCooldown(b.BacklogID),
+
+		kg.PartitionNormalizeSet(sp.PartitionID),
 	}
 
 	enableKeyQueues := sp.keyQueuesEnabled(ctx, q)
@@ -902,6 +904,8 @@ func (q *queue) BacklogRequeue(ctx context.Context, backlog *QueueBacklog, sp *Q
 		kg.AccountShadowPartitions(accountID),
 		kg.ShadowPartitionSet(sp.PartitionID),
 		kg.BacklogSet(backlog.BacklogID),
+
+		kg.PartitionNormalizeSet(sp.PartitionID),
 	}
 	args, err := StrSlice([]any{
 		accountID,

@@ -2486,6 +2486,7 @@ func (q *queue) Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		kg.GlobalShadowPartitionSet(),
 		kg.GlobalAccountShadowPartitions(),
 		kg.AccountShadowPartitions(i.Data.Identifier.AccountID),
+		kg.PartitionNormalizeSet(partition.PartitionID),
 
 		// In progress keys
 		partition.accountInProgressKey(kg),

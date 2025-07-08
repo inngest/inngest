@@ -47,7 +47,7 @@ if backlogCount == nil or backlogCount == false or backlogCount == 0 then
   redis.call("HDEL", keyBacklogMeta, backlogID)
 
   -- Update pointers
-  updateBacklogPointer(keyShadowPartitionMeta, keyBacklogMeta, keyGlobalShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, keyShadowPartitionSet, keyBacklogSet, accountID, partitionID, backlogID)
+  updateBacklogPointer(keyShadowPartitionMeta, keyBacklogMeta, keyGlobalShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, keyShadowPartitionSet, keyBacklogSet, keyPartitionNormalizeSet, accountID, partitionID, backlogID)
 
   return { -2, 0 }
 end
@@ -84,8 +84,7 @@ redis.call("ZREM", keyShadowPartitionSet, backlogID)
 
 -- If shadow partition has no more backlogs, update global/account pointers
 if tonumber(redis.call("ZCARD", keyShadowPartitionSet)) == 0 then
-  -- clean up shadow partition metadata
-  redis.call("HDEL", keyShadowPartitionMeta, partitionID)
+  -- do not clean up shadow partition metadata yet, as we may still normalize
 
   redis.call("ZREM", keyGlobalShadowPartitionSet, partitionID)
   redis.call("ZREM", keyAccountShadowPartitionSet, partitionID)

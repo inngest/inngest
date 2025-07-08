@@ -24,29 +24,30 @@ local keyShadowPartitionSet              = KEYS[11]
 local keyGlobalShadowPartitionSet        = KEYS[12]
 local keyGlobalAccountShadowPartitionSet = KEYS[13]
 local keyAccountShadowPartitionSet       = KEYS[14]
+local keyPartitionNormalizeSet           = KEYS[15]
 
-local keyInProgressAccount                  = KEYS[15]
-local keyInProgressPartition                = KEYS[16] -- Account concurrency level
-local keyInProgressCustomConcurrencyKey1    = KEYS[17] -- When leasing an item we need to place the lease into this key.
-local keyInProgressCustomConcurrencyKey2    = KEYS[18] -- Optional for eg. for concurrency amongst steps
+local keyInProgressAccount                  = KEYS[16]
+local keyInProgressPartition                = KEYS[17] -- Account concurrency level
+local keyInProgressCustomConcurrencyKey1    = KEYS[18] -- When leasing an item we need to place the lease into this key.
+local keyInProgressCustomConcurrencyKey2    = KEYS[19] -- Optional for eg. for concurrency amongst steps
 
-local keyActiveAccount             = KEYS[19]
-local keyActivePartition           = KEYS[20]
-local keyActiveConcurrencyKey1     = KEYS[21]
-local keyActiveConcurrencyKey2     = KEYS[22]
-local keyActiveCompound            = KEYS[23]
+local keyActiveAccount             = KEYS[20]
+local keyActivePartition           = KEYS[21]
+local keyActiveConcurrencyKey1     = KEYS[22]
+local keyActiveConcurrencyKey2     = KEYS[23]
+local keyActiveCompound            = KEYS[24]
 
-local keyActiveRun                        = KEYS[24]
-local keyActiveRunsAccount                = KEYS[25]
-local keyActiveRunsPartition              = KEYS[26]
-local keyActiveRunsCustomConcurrencyKey1  = KEYS[27]
-local keyActiveRunsCustomConcurrencyKey2  = KEYS[28]
+local keyActiveRun                        = KEYS[25]
+local keyActiveRunsAccount                = KEYS[26]
+local keyActiveRunsPartition              = KEYS[27]
+local keyActiveRunsCustomConcurrencyKey1  = KEYS[28]
+local keyActiveRunsCustomConcurrencyKey2  = KEYS[29]
 
-local keyIdempotency           = KEYS[29]
-local singletonRunKey          = KEYS[30]
+local keyIdempotency           = KEYS[30]
+local singletonRunKey          = KEYS[31]
 
-local keyItemIndexA            = KEYS[31]   -- custom item index 1
-local keyItemIndexB            = KEYS[32]  -- custom item index 2
+local keyItemIndexA            = KEYS[32]   -- custom item index 1
+local keyItemIndexB            = KEYS[33]  -- custom item index 2
 
 local queueID        = ARGV[1]
 local partitionID    = ARGV[2]
@@ -163,7 +164,7 @@ if backlogScore ~= nil and backlogScore ~= false and backlogScore > 0 then
   redis.call("ZREM", keyBacklogSet, queueID)
 
   -- update backlog pointers
-  updateBacklogPointer(keyShadowPartitionMeta, keyBacklogMeta, keyGlobalShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, keyShadowPartitionSet, keyBacklogSet, accountID, partitionID, backlogID)
+  updateBacklogPointer(keyShadowPartitionMeta, keyBacklogMeta, keyGlobalShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, keyShadowPartitionSet, keyBacklogSet, dequeue(ctx, accountID, partitionID, backlogID)
 end
 
 

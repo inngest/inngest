@@ -58,6 +58,8 @@ local keyActiveRunsCustomConcurrencyKey2  = KEYS[21]
 local keyBacklogActiveCheckSet       = KEYS[22]
 local keyBacklogActiveCheckCooldown  = KEYS[23]
 
+local keyPartitionNormalizeSet       = KEYS[24]
+
 local backlogID     = ARGV[1]
 local partitionID   = ARGV[2]
 local accountID     = ARGV[3]
@@ -105,7 +107,7 @@ if backlogCountTotal == 0 then
   redis.call("HDEL", keyBacklogMeta, backlogID)
 
   -- update backlog pointers
-  updateBacklogPointer(keyShadowPartitionMeta, keyBacklogMeta, keyGlobalShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, keyShadowPartitionSet, keyBacklogSet, accountID, partitionID, backlogID)
+  updateBacklogPointer(keyShadowPartitionMeta, keyBacklogMeta, keyGlobalShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, keyShadowPartitionSet, keyBacklogSet, keyPartitionNormalizeSet, accountID, partitionID, backlogID)
 
   return { 0, 0, 0, backlogCountTotal, 0, 0, {}, 0 }
 end
@@ -117,7 +119,7 @@ end
 
 if backlogCountUntil == 0 then
   -- update backlog pointers
-  updateBacklogPointer(keyShadowPartitionMeta, keyBacklogMeta, keyGlobalShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, keyShadowPartitionSet, keyBacklogSet, accountID, partitionID, backlogID)
+  updateBacklogPointer(keyShadowPartitionMeta, keyBacklogMeta, keyGlobalShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, keyShadowPartitionSet, keyBacklogSet, keyPartitionNormalizeSet, accountID, partitionID, backlogID)
 
   return { 0, 0, backlogCountUntil, backlogCountTotal, 0, 0, {}, 0 }
 end
@@ -384,7 +386,7 @@ else
 end
 
 -- Always update pointers
-updateBacklogPointer(keyShadowPartitionMeta, keyBacklogMeta, keyGlobalShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, keyShadowPartitionSet, keyBacklogSet, accountID, partitionID, backlogID)
+updateBacklogPointer(keyShadowPartitionMeta, keyBacklogMeta, keyGlobalShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, keyShadowPartitionSet, keyBacklogSet, keyPartitionNormalizeSet, accountID, partitionID, backlogID)
 
 --
 -- Optional: Add backlog to active checker set. This will verify that all items marked as active

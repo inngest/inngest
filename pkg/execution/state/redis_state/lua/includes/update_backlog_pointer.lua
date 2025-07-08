@@ -1,4 +1,4 @@
-local function updateBacklogPointer(keyShadowPartitionMeta, keyBacklogMeta, keyGlobalShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, keyShadowPartitionSet, keyBacklogSet, accountID, partitionID, backlogID)
+local function updateBacklogPointer(keyShadowPartitionMeta, keyBacklogMeta, keyGlobalShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, keyShadowPartitionSet, keyBacklogSet, keyPartitionNormalizeSet, accountID, partitionID, backlogID)
   -- Retrieve the earliest item score in the backlog in milliseconds
   local earliestBacklogScore = get_earliest_score(keyBacklogSet)
 
@@ -11,8 +11,10 @@ local function updateBacklogPointer(keyShadowPartitionMeta, keyBacklogMeta, keyG
 
     -- If shadow partition has no more backlogs, update global/account pointers
     if tonumber(redis.call("ZCARD", keyShadowPartitionSet)) == 0 then
-      -- Remove meta
-      redis.call("HDEL", keyShadowPartitionMeta, partitionID)
+      -- Remove meta, only if no more async normalizations are due
+      if tonumber(redis.call("ZCARD", keyPartitionNormalizeSet)) == 0 then
+        redis.call("HDEL", keyShadowPartitionMeta, partitionID)
+      end
 
       redis.call("ZREM", keyGlobalShadowPartitionSet, partitionID)
       redis.call("ZREM", keyAccountShadowPartitionSet, partitionID)
