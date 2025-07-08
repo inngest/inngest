@@ -27,6 +27,8 @@ var (
 	ErrBacklogNotFound = fmt.Errorf("backlog not found")
 
 	ErrBacklogPeekMaxExceedsLimits = fmt.Errorf("backlog peek exceeded the maximum limit")
+
+	ErrBacklogGarbageCollected = fmt.Errorf("backlog was garbage-collected")
 )
 
 type PartitionConstraintConfig struct {
@@ -703,8 +705,10 @@ func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueSha
 	}
 
 	keys := []string{
-		kg.BacklogSet(b.BacklogID),
+		kg.ShadowPartitionMeta(),
 		kg.BacklogMeta(),
+
+		kg.BacklogSet(b.BacklogID),
 		kg.ShadowPartitionSet(sp.PartitionID),
 		kg.GlobalShadowPartitionSet(),
 		kg.GlobalAccountShadowPartitions(),
@@ -733,6 +737,8 @@ func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueSha
 
 		kg.BacklogActiveCheckSet(),
 		kg.BacklogActiveCheckCooldown(b.BacklogID),
+
+		kg.PartitionNormalizeSet(sp.PartitionID),
 	}
 
 	enableKeyQueues := sp.keyQueuesEnabled(ctx, q)
@@ -891,12 +897,15 @@ func (q *queue) BacklogRequeue(ctx context.Context, backlog *QueueBacklog, sp *Q
 	keys := []string{
 		kg.ShadowPartitionMeta(),
 		kg.BacklogMeta(),
+		kg.ShadowPartitionMeta(),
 
 		kg.GlobalShadowPartitionSet(),
 		kg.GlobalAccountShadowPartitions(),
 		kg.AccountShadowPartitions(accountID),
 		kg.ShadowPartitionSet(sp.PartitionID),
 		kg.BacklogSet(backlog.BacklogID),
+
+		kg.PartitionNormalizeSet(sp.PartitionID),
 	}
 	args, err := StrSlice([]any{
 		accountID,
@@ -953,6 +962,9 @@ func (q *queue) BacklogPrepareNormalize(ctx context.Context, b *QueueBacklog, sp
 	}
 
 	keys := []string{
+		kg.BacklogMeta(),
+		kg.ShadowPartitionMeta(),
+
 		kg.BacklogSet(b.BacklogID),
 		kg.ShadowPartitionSet(sp.PartitionID),
 		kg.GlobalShadowPartitionSet(),
@@ -1005,6 +1017,8 @@ func (q *queue) BacklogPrepareNormalize(ctx context.Context, b *QueueBacklog, sp
 		return int(backlogCount), true, nil
 	case -1:
 		return int(backlogCount), false, nil
+	case -2:
+		return 0, false, ErrBacklogGarbageCollected
 	default:
 		return 0, false, fmt.Errorf("unknown status preparing backlog normalization: %v (%T)", status, status)
 	}

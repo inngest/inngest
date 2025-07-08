@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"github.com/inngest/inngest/pkg/logger"
 	"math"
 	mrand "math/rand"
 	"sync"
@@ -330,12 +331,14 @@ func (q *queue) processShadowPartitionBacklog(ctx context.Context, shadowPart *Q
 
 	// May need to normalize - this will not happen for default backlogs
 	if reason := backlog.isOutdated(constraints); enableKeyQueues && reason != enums.QueueNormalizeReasonUnchanged {
-		q.log.Debug("outdated backlog",
+		l := q.log.With(
 			"sp", shadowPart,
 			"constraints", constraints,
 			"backlog", backlog,
 			"reason", reason,
 		)
+
+		l.Debug("outdated backlog")
 
 		metrics.IncrQueueOutdatedBacklogCounter(ctx, metrics.CounterOpt{
 			PkgName: pkgName,
@@ -346,6 +349,18 @@ func (q *queue) processShadowPartitionBacklog(ctx context.Context, shadowPart *Q
 			},
 		})
 
+		// ensure exclusive access to backlog
+		if _, err := duration(ctx, q.primaryQueueShard.Name, "normalize_lease", q.clock.Now(), func(ctx context.Context) (any, error) {
+			err := q.leaseBacklogForNormalization(ctx, backlog)
+			return nil, err
+		}); err != nil {
+			if errors.Is(err, errBacklogAlreadyLeasedForNormalization) {
+				return nil, false, nil
+			}
+
+			return nil, false, fmt.Errorf("could not lease backlog: %w", err)
+		}
+
 		// Prepare normalization, this will just run once as the shadow scanner
 		// won't pick it up again after this.
 		_, shouldNormalizeAsync, err := q.BacklogPrepareNormalize(
@@ -354,8 +369,14 @@ func (q *queue) processShadowPartitionBacklog(ctx context.Context, shadowPart *Q
 			shadowPart,
 			q.backlogNormalizeAsyncLimit(ctx),
 		)
-		if err != nil {
+		if err != nil && !errors.Is(err, ErrBacklogGarbageCollected) {
 			return nil, false, fmt.Errorf("could not prepare backlog for normalization: %w", err)
+		}
+
+		// If backlog was empty and garbage-collected, exit early
+		if errors.Is(err, ErrBacklogGarbageCollected) {
+			l.Debug("garbage-collected empty backlog")
+			return nil, false, nil
 		}
 
 		// If there are just a couple of items in the backlog, we can
@@ -363,26 +384,10 @@ func (q *queue) processShadowPartitionBacklog(ctx context.Context, shadowPart *Q
 		// is not being normalized right now as it wouldn't be picked up
 		// by the shadow scanner otherwise.
 		if !shouldNormalizeAsync {
-			q.log.Debug("normalizing backlog immediately",
-				"sp", shadowPart,
-				"backlog", backlog,
-				"reason", reason,
-				"constraints", constraints,
-			)
-
-			if _, err := duration(ctx, q.primaryQueueShard.Name, "normalize_lease", q.clock.Now(), func(ctx context.Context) (any, error) {
-				err := q.leaseBacklogForNormalization(ctx, backlog)
-				return nil, err
-			}); err != nil {
-				if errors.Is(err, errBacklogAlreadyLeasedForNormalization) {
-					return nil, false, nil
-				}
-
-				return nil, false, fmt.Errorf("could not lease backlog: %w", err)
-			}
+			l.Debug("normalizing backlog immediately")
 
 			_, err := durationWithTags(ctx, q.primaryQueueShard.Name, "normalize_backlog", q.clock.Now(), func(ctx context.Context) (any, error) {
-				err := q.normalizeBacklog(ctx, backlog, shadowPart, constraints)
+				err := q.normalizeBacklog(logger.WithStdlib(ctx, l), backlog, shadowPart, constraints)
 				return nil, err
 
 			}, map[string]any{

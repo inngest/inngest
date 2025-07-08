@@ -173,6 +173,48 @@ func TestQueueBacklogPrepareNormalize(t *testing.T) {
 		QueueName: nil,
 	}
 
+	t.Run("should garbage-collect empty backlog pointer", func(t *testing.T) {
+		r.FlushAll()
+
+		qi, err := q.EnqueueItem(ctx, defaultShard, item, at, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+
+		expectedBacklog := q.ItemBacklog(ctx, item)
+		require.NotEmpty(t, expectedBacklog.BacklogID)
+		require.NotEmpty(t, r.HGet(kg.BacklogMeta(), expectedBacklog.BacklogID))
+
+		shadowPartition := q.ItemShadowPartition(ctx, item)
+		require.NotEmpty(t, shadowPartition.PartitionID)
+
+		// expect backlog in shadow partition
+		require.True(t, hasMember(t, r, kg.ShadowPartitionSet(shadowPartition.PartitionID), expectedBacklog.BacklogID))
+
+		// remove item from backlog
+		_, err = r.ZRem(kg.BacklogSet(expectedBacklog.BacklogID), qi.ID)
+		require.NoError(t, err)
+		require.False(t, r.Exists(kg.BacklogSet(expectedBacklog.BacklogID)))
+
+		// still expect backlog in shadow partition
+		require.True(t, hasMember(t, r, kg.ShadowPartitionSet(shadowPartition.PartitionID), expectedBacklog.BacklogID))
+
+		backlogCount, shouldNormalizeAsync, err := q.BacklogPrepareNormalize(ctx, &expectedBacklog, &shadowPartition, 1)
+		require.Error(t, err)
+		require.ErrorIs(t, err, ErrBacklogGarbageCollected)
+		require.False(t, shouldNormalizeAsync)
+		require.Equal(t, 0, backlogCount)
+
+		require.False(t, hasMember(t, r, kg.GlobalAccountNormalizeSet(), accountId.String()))
+		require.False(t, hasMember(t, r, kg.AccountNormalizeSet(accountId), fnID.String()))
+		require.False(t, hasMember(t, r, kg.PartitionNormalizeSet(fnID.String()), expectedBacklog.BacklogID))
+
+		require.False(t, r.Exists(kg.BacklogSet(expectedBacklog.BacklogID)))
+		require.Empty(t, r.HGet(kg.BacklogMeta(), expectedBacklog.BacklogID))
+
+		// no longer expect backlog in shadow partition set
+		require.False(t, hasMember(t, r, kg.ShadowPartitionSet(shadowPartition.PartitionID), expectedBacklog.BacklogID))
+
+	})
+
 	t.Run("should move backlog to normalization set", func(t *testing.T) {
 		r.FlushAll()
 
