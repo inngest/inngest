@@ -9,7 +9,7 @@ package tracev1
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
-	_ "google.golang.org/protobuf/types/known/structpb"
+	structpb "google.golang.org/protobuf/types/known/structpb"
 	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	sync "sync"
@@ -24,14 +24,14 @@ const (
 )
 
 type Span struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	SpanId        string                 `protobuf:"bytes,1,opt,name=span_id,json=spanId,proto3" json:"span_id,omitempty"`
-	TraceId       string                 `protobuf:"bytes,2,opt,name=trace_id,json=traceId,proto3" json:"trace_id,omitempty"`
-	ParentSpanId  *string                `protobuf:"bytes,3,opt,name=parent_span_id,json=parentSpanId,proto3,oneof" json:"parent_span_id,omitempty"`
-	Name          string                 `protobuf:"bytes,4,opt,name=name,proto3" json:"name,omitempty"`
-	StartTime     *timestamppb.Timestamp `protobuf:"bytes,5,opt,name=start_time,json=startTime,proto3" json:"start_time,omitempty"`
-	EndTime       *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=end_time,json=endTime,proto3" json:"end_time,omitempty"`
-	Attributes    map[string]string      `protobuf:"bytes,7,rep,name=attributes,proto3" json:"attributes,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	state         protoimpl.MessageState     `protogen:"open.v1"`
+	SpanId        string                     `protobuf:"bytes,1,opt,name=span_id,json=spanId,proto3" json:"span_id,omitempty"`
+	TraceId       string                     `protobuf:"bytes,2,opt,name=trace_id,json=traceId,proto3" json:"trace_id,omitempty"`
+	ParentSpanId  *string                    `protobuf:"bytes,3,opt,name=parent_span_id,json=parentSpanId,proto3,oneof" json:"parent_span_id,omitempty"`
+	Name          string                     `protobuf:"bytes,4,opt,name=name,proto3" json:"name,omitempty"`
+	StartTime     *timestamppb.Timestamp     `protobuf:"bytes,5,opt,name=start_time,json=startTime,proto3" json:"start_time,omitempty"`
+	EndTime       *timestamppb.Timestamp     `protobuf:"bytes,6,opt,name=end_time,json=endTime,proto3" json:"end_time,omitempty"`
+	Attributes    map[string]*structpb.Value `protobuf:"bytes,7,rep,name=attributes,proto3" json:"attributes,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -108,7 +108,7 @@ func (x *Span) GetEndTime() *timestamppb.Timestamp {
 	return nil
 }
 
-func (x *Span) GetAttributes() map[string]string {
+func (x *Span) GetAttributes() map[string]*structpb.Value {
 	if x != nil {
 		return x.Attributes
 	}
@@ -119,7 +119,7 @@ var File_trace_v1_span_proto protoreflect.FileDescriptor
 
 const file_trace_v1_span_proto_rawDesc = "" +
 	"\n" +
-	"\x13trace/v1/span.proto\x12\btrace.v1\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xfd\x02\n" +
+	"\x13trace/v1/span.proto\x12\btrace.v1\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\x95\x03\n" +
 	"\x04Span\x12\x17\n" +
 	"\aspan_id\x18\x01 \x01(\tR\x06spanId\x12\x19\n" +
 	"\btrace_id\x18\x02 \x01(\tR\atraceId\x12)\n" +
@@ -130,10 +130,10 @@ const file_trace_v1_span_proto_rawDesc = "" +
 	"\bend_time\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\aendTime\x12>\n" +
 	"\n" +
 	"attributes\x18\a \x03(\v2\x1e.trace.v1.Span.AttributesEntryR\n" +
-	"attributes\x1a=\n" +
+	"attributes\x1aU\n" +
 	"\x0fAttributesEntry\x12\x10\n" +
-	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
-	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01B\x11\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12,\n" +
+	"\x05value\x18\x02 \x01(\v2\x16.google.protobuf.ValueR\x05value:\x028\x01B\x11\n" +
 	"\x0f_parent_span_idB7Z5github.com/inngest/inngest/proto/gen/trace/v1;tracev1b\x06proto3"
 
 var (
@@ -153,16 +153,18 @@ var file_trace_v1_span_proto_goTypes = []any{
 	(*Span)(nil),                  // 0: trace.v1.Span
 	nil,                           // 1: trace.v1.Span.AttributesEntry
 	(*timestamppb.Timestamp)(nil), // 2: google.protobuf.Timestamp
+	(*structpb.Value)(nil),        // 3: google.protobuf.Value
 }
 var file_trace_v1_span_proto_depIdxs = []int32{
 	2, // 0: trace.v1.Span.start_time:type_name -> google.protobuf.Timestamp
 	2, // 1: trace.v1.Span.end_time:type_name -> google.protobuf.Timestamp
 	1, // 2: trace.v1.Span.attributes:type_name -> trace.v1.Span.AttributesEntry
-	3, // [3:3] is the sub-list for method output_type
-	3, // [3:3] is the sub-list for method input_type
-	3, // [3:3] is the sub-list for extension type_name
-	3, // [3:3] is the sub-list for extension extendee
-	0, // [0:3] is the sub-list for field type_name
+	3, // 3: trace.v1.Span.AttributesEntry.value:type_name -> google.protobuf.Value
+	4, // [4:4] is the sub-list for method output_type
+	4, // [4:4] is the sub-list for method input_type
+	4, // [4:4] is the sub-list for extension type_name
+	4, // [4:4] is the sub-list for extension extendee
+	0, // [0:4] is the sub-list for field type_name
 }
 
 func init() { file_trace_v1_span_proto_init() }

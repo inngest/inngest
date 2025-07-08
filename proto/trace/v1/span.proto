@@ -13,5 +13,5 @@ message Span {
   string name = 4;
   google.protobuf.Timestamp start_time = 5;
   google.protobuf.Timestamp end_time = 6;
-  map<string, string> attributes = 7;
+  map<string, google.protobuf.Value> attributes = 7;
 }
