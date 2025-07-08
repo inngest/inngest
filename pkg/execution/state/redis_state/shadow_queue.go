@@ -372,8 +372,6 @@ func (q *queue) processShadowPartitionBacklog(ctx context.Context, shadowPart *Q
 		// is not being normalized right now as it wouldn't be picked up
 		// by the shadow scanner otherwise.
 		if !shouldNormalizeAsync {
-			l.Debug("normalizing backlog immediately")
-
 			if _, err := duration(ctx, q.primaryQueueShard.Name, "normalize_lease", q.clock.Now(), func(ctx context.Context) (any, error) {
 				err := q.leaseBacklogForNormalization(ctx, backlog)
 				return nil, err
@@ -384,6 +382,8 @@ func (q *queue) processShadowPartitionBacklog(ctx context.Context, shadowPart *Q
 
 				return nil, false, fmt.Errorf("could not lease backlog: %w", err)
 			}
+
+			l.Debug("normalizing backlog immediately")
 
 			_, err := durationWithTags(ctx, q.primaryQueueShard.Name, "normalize_backlog", q.clock.Now(), func(ctx context.Context) (any, error) {
 				err := q.normalizeBacklog(logger.WithStdlib(ctx, l), backlog, shadowPart, constraints)
