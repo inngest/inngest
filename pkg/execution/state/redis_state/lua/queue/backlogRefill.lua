@@ -12,7 +12,9 @@
     items_until,          -- Number of items within provided time range in backlog before refilling
     items_total,          -- Total number of items in backlog before refilling
     constraintCapacity,   -- Most limiting constraint capacity
-    refill                -- Number of items to refill (may include missing items)
+    refill,               -- Number of items to refill (may include missing items)
+    refilled_item_ids,    -- Set of refilled item IDs
+    retry_after           -- Unix timestamp after which retrying has a lower chance of running into constraints
   }
 
   Status values:
@@ -103,7 +105,7 @@ if backlogCountTotal == 0 then
   -- update backlog pointers
   updateBacklogPointer(keyGlobalShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, keyShadowPartitionSet, keyBacklogSet, accountID, partitionID, backlogID)
 
-  return { 0, 0, 0, backlogCountTotal, 0, 0, {} }
+  return { 0, 0, 0, backlogCountTotal, 0, 0, {}, 0 }
 end
 
 local backlogCountUntil = redis.call("ZCOUNT", keyBacklogSet, "-inf", refillUntilMS)
@@ -115,7 +117,7 @@ if backlogCountUntil == 0 then
   -- update backlog pointers
   updateBacklogPointer(keyGlobalShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, keyShadowPartitionSet, keyBacklogSet, accountID, partitionID, backlogID)
 
-  return { 0, 0, backlogCountUntil, backlogCountTotal, 0, 0, {} }
+  return { 0, 0, backlogCountUntil, backlogCountTotal, 0, 0, {}, 0 }
 end
 
 --
@@ -139,6 +141,7 @@ local constraintCapacity = nil
 
 -- Set initial status to success, progressively add more specific capacity constraints
 local status = 0
+local retryAt = 0
 
 local function check_active_capacity(now_ms, keyActiveSet, limit)
 	local count = redis.call("SCARD", keyActiveSet)
@@ -152,10 +155,13 @@ end
 if enableKeyQueues == 1 then
   -- Check throttle capacity
   if (constraintCapacity == nil or constraintCapacity > 0) and throttlePeriod > 0 and throttleLimit > 0 then
-    local remainingThrottleCapacity = gcraCapacity(throttleKey, nowMS, throttlePeriod * 1000, throttleLimit, throttleBurst)
+    local gcraRes = gcraCapacity(throttleKey, nowMS, throttlePeriod * 1000, throttleLimit, throttleBurst)
+    local remainingThrottleCapacity = gcraRes[1]
+    local throttleRetryAt = gcraRes[2]
     if constraintCapacity == nil or remainingThrottleCapacity < constraintCapacity then
       constraintCapacity = remainingThrottleCapacity
       status = 5
+      retryAt = throttleRetryAt
     end
   end
 
@@ -387,4 +393,4 @@ if concurrencyConstrained and shouldSpotCheckActiveSet == 1 then
     add_to_active_check(keyBacklogActiveCheckSet, keyBacklogActiveCheckCooldown, backlogID, nowMS)
 end
 
-return { status, refilled, backlogCountUntil, backlogCountTotal, constraintCapacity, refill, refilledItemIDs }
+return { status, refilled, backlogCountUntil, backlogCountTotal, constraintCapacity, refill, refilledItemIDs, retryAt }

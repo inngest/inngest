@@ -15,7 +15,6 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
-	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
 	"golang.org/x/sync/errgroup"
 )
@@ -29,6 +28,10 @@ const (
 	ShadowPartitionPeekMaxBacklogs = int64(100)
 
 	ShadowPartitionRequeueExtendedDuration = 3 * time.Second
+
+	ShadowPartitionLookahead = 2 * PartitionLookahead
+
+	BacklogForceRequeueMaxBackoff = 5 * time.Minute
 )
 
 var (
@@ -186,7 +189,7 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 	limit := ShadowPartitionPeekMaxBacklogs
 
 	// Scan a little further into the future
-	refillUntil := q.clock.Now().Truncate(time.Millisecond).Add(2 * PartitionLookahead)
+	refillUntil := q.clock.Now().Truncate(time.Millisecond).Add(ShadowPartitionLookahead)
 	if !keyQueuesEnabled {
 		// If key queues are disabled, peek and refill all
 		// items in the entire backlog, not just the next 2 seconds.
@@ -209,14 +212,16 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 
 	// Refill backlogs in random order
 	fullyProcessedBacklogs := 0 // Number of fully processed backlogs
-	var wasConstrained bool     // Whether we encountered constraints affecting the shadow partition
-	for _, idx := range util.RandPerm(len(backlogs)) {
+	var (
+		wasConstrained bool // Whether we encountered constraints affecting the shadow partition
+		refilledItems  int  // Number of refilled items
+	)
+
+	for _, backlog := range shuffleBacklogs(backlogs) {
 		// If cancelled, return early
 		if errors.Is(ctx.Err(), context.Canceled) {
 			return nil
 		}
-
-		backlog := backlogs[idx]
 
 		res, fullyProcessed, err := q.processShadowPartitionBacklog(ctx, shadowPart, backlog, refillUntil, latestConstraints)
 		if err != nil {
@@ -227,6 +232,8 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 		if res == nil {
 			continue
 		}
+
+		refilledItems += res.Refilled
 
 		// If we fully refilled, track and continue
 		if fullyProcessed {
@@ -285,6 +292,25 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 	} else {
 		// Not constrained so we can add a continuation
 		q.addShadowContinue(ctx, shadowPart, continuationCount+1)
+
+		if refilledItems > 0 {
+
+			var accountID uuid.UUID
+			if shadowPart.AccountID != nil {
+				accountID = *shadowPart.AccountID
+			}
+
+			// Add an in-memory hint to process the partition immediately if we refilled items
+			q.addContinue(ctx, &QueuePartition{
+				ID:            shadowPart.PartitionID,
+				PartitionType: int(enums.PartitionTypeDefault),
+				QueueName:     shadowPart.SystemQueueName,
+				FunctionID:    shadowPart.FunctionID,
+				EnvID:         shadowPart.EnvID,
+				AccountID:     accountID,
+				Last:          0, // This is populated during PartitionLease
+			}, 1)
+		}
 	}
 
 	err = q.ShadowPartitionRequeue(ctx, shadowPart, nil)
@@ -304,8 +330,10 @@ func (q *queue) processShadowPartitionBacklog(ctx context.Context, shadowPart *Q
 
 	// May need to normalize - this will not happen for default backlogs
 	if reason := backlog.isOutdated(constraints); enableKeyQueues && reason != enums.QueueNormalizeReasonUnchanged {
-		q.log.Trace("outdated backlog",
-			"backlog", backlog.BacklogID,
+		q.log.Debug("outdated backlog",
+			"sp", shadowPart,
+			"constraints", constraints,
+			"backlog", backlog,
 			"reason", reason,
 		)
 
@@ -335,9 +363,11 @@ func (q *queue) processShadowPartitionBacklog(ctx context.Context, shadowPart *Q
 		// is not being normalized right now as it wouldn't be picked up
 		// by the shadow scanner otherwise.
 		if !shouldNormalizeAsync {
-			q.log.Trace("normalizing backlog immediately",
-				"backlog", backlog.BacklogID,
+			q.log.Debug("normalizing backlog immediately",
+				"sp", shadowPart,
+				"backlog", backlog,
 				"reason", reason,
+				"constraints", constraints,
 			)
 
 			if _, err := duration(ctx, q.primaryQueueShard.Name, "normalize_lease", q.clock.Now(), func(ctx context.Context) (any, error) {
@@ -351,7 +381,14 @@ func (q *queue) processShadowPartitionBacklog(ctx context.Context, shadowPart *Q
 				return nil, false, fmt.Errorf("could not lease backlog: %w", err)
 			}
 
-			if err := q.normalizeBacklog(ctx, backlog, shadowPart, constraints); err != nil {
+			_, err := durationWithTags(ctx, q.primaryQueueShard.Name, "normalize_backlog", q.clock.Now(), func(ctx context.Context) (any, error) {
+				err := q.normalizeBacklog(ctx, backlog, shadowPart, constraints)
+				return nil, err
+
+			}, map[string]any{
+				"async_processing": false,
+			})
+			if err != nil {
 				return nil, false, fmt.Errorf("could not normalize backlog: %w", err)
 			}
 		}
@@ -459,19 +496,19 @@ func (q *queue) processShadowPartitionBacklog(ctx context.Context, shadowPart *Q
 		}
 	}
 
-	var forceRequeueBacklogAt time.Time
-
+	forceRequeueBacklogAt := res.RetryAt
 	switch res.Constraint {
 	// If backlog is concurrency limited by custom key, requeue just this backlog in the future
 	case enums.QueueConstraintCustomConcurrencyKey1, enums.QueueConstraintCustomConcurrencyKey2:
 		forceRequeueBacklogAt = backlog.requeueBackOff(q.clock.Now(), res.Constraint, constraints)
-
-	// If backlog is throttled, requeue just this backlog in the future
-	case enums.QueueConstraintThrottle:
-		forceRequeueBacklogAt = backlog.requeueBackOff(q.clock.Now(), res.Constraint, constraints)
 	}
 
 	if !forceRequeueBacklogAt.IsZero() {
+		// Cap maximum backoff to ensure constraint updates (changing throttle period, etc.) are reflected reasonably quickly
+		if forceRequeueBacklogAt.Sub(q.clock.Now()) > BacklogForceRequeueMaxBackoff {
+			forceRequeueBacklogAt = q.clock.Now().Add(BacklogForceRequeueMaxBackoff)
+		}
+
 		if err := q.BacklogRequeue(ctx, backlog, shadowPart, forceRequeueBacklogAt); err != nil && !errors.Is(err, ErrBacklogNotFound) {
 			return nil, false, fmt.Errorf("could not requeue backlog: %w", err)
 		}
@@ -631,7 +668,7 @@ func (q *queue) shadowScan(ctx context.Context) error {
 		case <-tick.Chan():
 			// Scan a little further into the future
 			now := q.clock.Now()
-			scanUntil := now.Truncate(time.Second).Add(2 * PartitionLookahead)
+			scanUntil := now.Truncate(time.Second).Add(ShadowPartitionLookahead)
 			if err := q.scanShadowPartitions(ctx, scanUntil, qspc); err != nil {
 				if errors.Is(err, context.DeadlineExceeded) {
 					l.Warn("deadline exceeded scanning shadow partitions")

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"gonum.org/v1/gonum/stat/sampleuv"
 	"math/rand"
 	"runtime/debug"
 	"time"
@@ -12,7 +13,6 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
-	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
@@ -643,29 +643,6 @@ func (b QueueBacklog) customConcurrencyKeyID(n int) string {
 
 func (b QueueBacklog) requeueBackOff(now time.Time, constraint enums.QueueConstraint, constraints *PartitionConstraintConfig) time.Time {
 	switch constraint {
-	case enums.QueueConstraintThrottle:
-		if constraints.Throttle == nil {
-			logger.StdlibLogger(context.Background()).Error("throttle settings not defined while hitting throttle constraints", "constraints", constraints, "time", now, "backlog", b)
-			return now.Add(PartitionThrottleLimitRequeueExtension)
-		}
-
-		multiplier := b.SuccessiveThrottleConstrained
-		period := time.Duration(constraints.Throttle.Period * int(time.Second))
-		// NOTE: for short periods, we want to increase the frequency of the checks to make sure we admit the items in the right timing
-		// and it's not too late
-		if period < ThrottleBackoffMultiplierThreshold {
-			multiplier /= 4
-		} else {
-			multiplier /= 2
-		}
-
-		backoff := time.Duration(multiplier) * time.Second
-		// guarantee a minimum duration
-		if backoff < PartitionThrottleLimitRequeueExtension {
-			backoff = PartitionThrottleLimitRequeueExtension
-		}
-
-		return now.Add(backoff)
 	case enums.QueueConstraintCustomConcurrencyKey1, enums.QueueConstraintCustomConcurrencyKey2:
 		next := time.Duration(b.SuccessiveCustomConcurrencyConstrained) * time.Second
 
@@ -687,6 +664,7 @@ type BacklogRefillResult struct {
 	Capacity          int
 	Refill            int
 	RefilledItems     []string
+	RetryAt           time.Time
 }
 
 func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueShadowPartition, refillUntil time.Time, latestConstraints *PartitionConstraintConfig) (*BacklogRefillResult, error) {
@@ -806,7 +784,7 @@ func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueSha
 	}
 
 	returnTuple, ok := res.([]any)
-	if !ok || len(returnTuple) != 7 {
+	if !ok || len(returnTuple) != 8 {
 		return nil, fmt.Errorf("expected return tuple to include 7 items")
 	}
 
@@ -853,6 +831,16 @@ func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueSha
 		}
 	}
 
+	var retryAt time.Time
+	retryAtMillis, ok := returnTuple[7].(int64)
+	if !ok {
+		return nil, fmt.Errorf("missing retryAt in returned tuple")
+	}
+
+	if retryAtMillis > nowMS {
+		retryAt = time.UnixMilli(retryAtMillis)
+	}
+
 	refillResult := &BacklogRefillResult{
 		Refilled:          int(refillCount),
 		TotalBacklogCount: int(backlogCountTotal),
@@ -860,6 +848,7 @@ func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueSha
 		Capacity:          int(capacity),
 		Refill:            int(refill),
 		RefilledItems:     refilledItemIDs,
+		RetryAt:           retryAt,
 	}
 
 	switch status {
@@ -1093,4 +1082,27 @@ func (q *queue) backlogPeek(ctx context.Context, b *QueueBacklog, from time.Time
 	}
 
 	return res.Items, res.TotalCount, nil
+}
+
+func shuffleBacklogs(b []*QueueBacklog) []*QueueBacklog {
+	weights := make([]float64, len(b))
+	for i, backlog := range b {
+		if backlog.Start {
+			weights[i] = 1.0
+		} else {
+			weights[i] = 10.0
+		}
+	}
+
+	w := sampleuv.NewWeighted(weights, rnd)
+	result := make([]*QueueBacklog, len(b))
+	for n := range result {
+		idx, ok := w.Take()
+		if !ok {
+			return b
+		}
+		result[n] = b[idx]
+	}
+
+	return result
 }
