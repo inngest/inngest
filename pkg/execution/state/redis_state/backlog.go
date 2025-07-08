@@ -895,6 +895,7 @@ func (q *queue) BacklogRequeue(ctx context.Context, backlog *QueueBacklog, sp *Q
 	keys := []string{
 		kg.ShadowPartitionMeta(),
 		kg.BacklogMeta(),
+		kg.ShadowPartitionMeta(),
 
 		kg.GlobalShadowPartitionSet(),
 		kg.GlobalAccountShadowPartitions(),

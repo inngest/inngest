@@ -77,10 +77,16 @@ if currentScore == false or tonumber(currentScore) > normalizeTime then
 end
 
 -- Remove from backlog and update pointers
+-- Note: The backlog is not yet empty, but we don't want to process it,
+-- as it is outdated. That's why we don't call updateBacklogPointer which would
+-- use the earliest item score as pointer instead of dropping it altogether.
 redis.call("ZREM", keyShadowPartitionSet, backlogID)
 
 -- If shadow partition has no more backlogs, update global/account pointers
 if tonumber(redis.call("ZCARD", keyShadowPartitionSet)) == 0 then
+  -- clean up shadow partition metadata
+  redis.call("HDEL", keyShadowPartitionMeta, partitionID)
+
   redis.call("ZREM", keyGlobalShadowPartitionSet, partitionID)
   redis.call("ZREM", keyAccountShadowPartitionSet, partitionID)
 
