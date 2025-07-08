@@ -349,6 +349,18 @@ func (q *queue) processShadowPartitionBacklog(ctx context.Context, shadowPart *Q
 			},
 		})
 
+		// ensure exclusive access to backlog
+		if _, err := duration(ctx, q.primaryQueueShard.Name, "normalize_lease", q.clock.Now(), func(ctx context.Context) (any, error) {
+			err := q.leaseBacklogForNormalization(ctx, backlog)
+			return nil, err
+		}); err != nil {
+			if errors.Is(err, errBacklogAlreadyLeasedForNormalization) {
+				return nil, false, nil
+			}
+
+			return nil, false, fmt.Errorf("could not lease backlog: %w", err)
+		}
+
 		// Prepare normalization, this will just run once as the shadow scanner
 		// won't pick it up again after this.
 		_, shouldNormalizeAsync, err := q.BacklogPrepareNormalize(
@@ -372,17 +384,6 @@ func (q *queue) processShadowPartitionBacklog(ctx context.Context, shadowPart *Q
 		// is not being normalized right now as it wouldn't be picked up
 		// by the shadow scanner otherwise.
 		if !shouldNormalizeAsync {
-			if _, err := duration(ctx, q.primaryQueueShard.Name, "normalize_lease", q.clock.Now(), func(ctx context.Context) (any, error) {
-				err := q.leaseBacklogForNormalization(ctx, backlog)
-				return nil, err
-			}); err != nil {
-				if errors.Is(err, errBacklogAlreadyLeasedForNormalization) {
-					return nil, false, nil
-				}
-
-				return nil, false, fmt.Errorf("could not lease backlog: %w", err)
-			}
-
 			l.Debug("normalizing backlog immediately")
 
 			_, err := durationWithTags(ctx, q.primaryQueueShard.Name, "normalize_backlog", q.clock.Now(), func(ctx context.Context) (any, error) {
