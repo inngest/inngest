@@ -9,17 +9,20 @@
 
   1 - Moved backlog to normalize set
   -1 - Fewer items than minimum
+  -2 - Garbage-collected empty backlog
 ]]
 
-local keyBacklogSet                      = KEYS[1]
-local keyShadowPartitionSet              = KEYS[2]
-local keyGlobalShadowPartitionSet        = KEYS[3]
-local keyGlobalAccountShadowPartitionSet = KEYS[4]
-local keyAccountShadowPartitionSet       = KEYS[5]
+local keyBacklogMeta                     = KEYS[1]
 
-local keyGlobalNormalizeSet              = KEYS[6]
-local keyAccountNormalizeSet             = KEYS[7]
-local keyPartitionNormalizeSet           = KEYS[8]
+local keyBacklogSet                      = KEYS[2]
+local keyShadowPartitionSet              = KEYS[3]
+local keyGlobalShadowPartitionSet        = KEYS[4]
+local keyGlobalAccountShadowPartitionSet = KEYS[5]
+local keyAccountShadowPartitionSet       = KEYS[6]
+
+local keyGlobalNormalizeSet              = KEYS[7]
+local keyAccountNormalizeSet             = KEYS[8]
+local keyPartitionNormalizeSet           = KEYS[9]
 
 local backlogID             = ARGV[1]
 local partitionID           = ARGV[2]
@@ -27,11 +30,31 @@ local accountID             = ARGV[3]
 local normalizeTime         = tonumber(ARGV[4])
 local normalizeAsyncMinimum = tonumber(ARGV[5])
 
+-- $include(update_pointer_score.lua)
+-- $include(ends_with.lua)
+-- $include(update_account_queues.lua)
+-- $include(update_backlog_pointer.lua)
+
+local backlogCount = redis.call("ZCARD", keyBacklogSet)
+
+-- If backlog is empty, garbage-collect it from shadow partition
+if backlogCount == nil or backlogCount == false or backlogCount == 0 then
+  -- Remove pointer from shadow partition
+  redis.call("ZREM", keyShadowPartitionSet, backlogID)
+
+  -- Remove meta
+  redis.call("HDEL", keyBacklogMeta, backlogID)
+
+  -- Update pointers
+  updateBacklogPointer(keyGlobalShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, keyShadowPartitionSet, keyBacklogSet, accountID, partitionID, backlogID)
+
+  return { -2, 0 }
+end
+
 -- If there's a minimum number of backlog items required to normalize asynchronously,
 -- we do not need to move backlog pointers to the normalization ZSETs but can just normalize
 -- in the same shadow scanner loop iteration.
-local backlogCount = redis.call("ZCARD", keyBacklogSet)
-if normalizeAsyncMinimum > 0 and backlogCount ~= false and backlogCount ~= nil and backlogCount < normalizeAsyncMinimum then
+if normalizeAsyncMinimum > 0 and backlogCount < normalizeAsyncMinimum then
   return { -1, backlogCount }
 end
 
@@ -57,13 +80,6 @@ end
 redis.call("ZREM", keyShadowPartitionSet, backlogID)
 
 -- If shadow partition has no more backlogs, update global/account pointers
-if tonumber(redis.call("ZCARD", keyShadowPartitionSet)) == 0 then
-  redis.call("ZREM", keyGlobalShadowPartitionSet, partitionID)
-  redis.call("ZREM", keyAccountShadowPartitionSet, partitionID)
-
-  if tonumber(redis.call("ZCARD", keyAccountShadowPartitionSet)) == 0 then
-    redis.call("ZREM", keyGlobalAccountShadowPartitionSet, accountID)
-  end
-end
+updateBacklogPointer(keyGlobalShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, keyShadowPartitionSet, keyBacklogSet, accountID, partitionID, backlogID)
 
 return { 1, backlogCount }

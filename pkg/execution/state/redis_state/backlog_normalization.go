@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/logger"
 	"math"
 	"runtime"
 	"time"
@@ -278,7 +279,7 @@ func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp 
 	metrics.ActiveBacklogNormalizeCount(ctx, 1, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name}})
 	defer metrics.ActiveBacklogNormalizeCount(ctx, -1, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name}})
 
-	l := q.log.With(
+	l := logger.StdlibLogger(ctx).With(
 		"backlog", backlog,
 		"sp", sp,
 		"constraints", latestConstraints,

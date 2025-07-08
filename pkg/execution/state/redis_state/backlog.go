@@ -27,6 +27,8 @@ var (
 	ErrBacklogNotFound = fmt.Errorf("backlog not found")
 
 	ErrBacklogPeekMaxExceedsLimits = fmt.Errorf("backlog peek exceeded the maximum limit")
+
+	ErrBacklogGarbageCollected = fmt.Errorf("backlog was garbage-collected")
 )
 
 type PartitionConstraintConfig struct {
@@ -953,6 +955,7 @@ func (q *queue) BacklogPrepareNormalize(ctx context.Context, b *QueueBacklog, sp
 	}
 
 	keys := []string{
+		kg.BacklogMeta(),
 		kg.BacklogSet(b.BacklogID),
 		kg.ShadowPartitionSet(sp.PartitionID),
 		kg.GlobalShadowPartitionSet(),
@@ -1005,6 +1008,8 @@ func (q *queue) BacklogPrepareNormalize(ctx context.Context, b *QueueBacklog, sp
 		return int(backlogCount), true, nil
 	case -1:
 		return int(backlogCount), false, nil
+	case -2:
+		return 0, false, ErrBacklogGarbageCollected
 	default:
 		return 0, false, fmt.Errorf("unknown status preparing backlog normalization: %v (%T)", status, status)
 	}
