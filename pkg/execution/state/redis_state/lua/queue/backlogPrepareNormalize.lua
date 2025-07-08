@@ -40,9 +40,6 @@ local backlogCount = redis.call("ZCARD", keyBacklogSet)
 
 -- If backlog is empty, garbage-collect it from shadow partition
 if backlogCount == nil or backlogCount == false or backlogCount == 0 then
-  -- Remove pointer from shadow partition
-  redis.call("ZREM", keyShadowPartitionSet, backlogID)
-
   -- Update pointers
   updateBacklogPointer(keyShadowPartitionMeta, keyBacklogMeta, keyGlobalShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, keyShadowPartitionSet, keyBacklogSet, keyPartitionNormalizeSet, accountID, partitionID, backlogID)
 
