@@ -27,34 +27,36 @@
   5 - Throttled
 ]]
 
-local keyBacklogSet                      = KEYS[1]
+local keyShadowPartitionMeta             = KEYS[1]
 local keyBacklogMeta                     = KEYS[2]
-local keyShadowPartitionSet              = KEYS[3]
-local keyGlobalShadowPartitionSet        = KEYS[4]
-local keyGlobalAccountShadowPartitionSet = KEYS[5]
-local keyAccountShadowPartitionSet       = KEYS[6]
 
-local keyReadySet                        = KEYS[7]
-local keyGlobalPointer        	         = KEYS[8] -- partition:sorted - zset
-local keyGlobalAccountPointer 	         = KEYS[9] -- accounts:sorted - zset
-local keyAccountPartitions    	         = KEYS[10] -- accounts:$accountID:partition:sorted - zset
+local keyBacklogSet                      = KEYS[3]
+local keyShadowPartitionSet              = KEYS[4]
+local keyGlobalShadowPartitionSet        = KEYS[5]
+local keyGlobalAccountShadowPartitionSet = KEYS[6]
+local keyAccountShadowPartitionSet       = KEYS[7]
 
-local keyQueueItemHash                   = KEYS[11]
+local keyReadySet                        = KEYS[8]
+local keyGlobalPointer        	         = KEYS[9] -- partition:sorted - zset
+local keyGlobalAccountPointer 	         = KEYS[10] -- accounts:sorted - zset
+local keyAccountPartitions    	         = KEYS[11] -- accounts:$accountID:partition:sorted - zset
+
+local keyQueueItemHash                   = KEYS[12]
 
 -- Constraint-related accounting keys
-local keyActiveAccount           = KEYS[12]
-local keyActivePartition         = KEYS[13]
-local keyActiveConcurrencyKey1   = KEYS[14]
-local keyActiveConcurrencyKey2   = KEYS[15]
-local keyActiveCompound          = KEYS[16]
+local keyActiveAccount           = KEYS[13]
+local keyActivePartition         = KEYS[14]
+local keyActiveConcurrencyKey1   = KEYS[15]
+local keyActiveConcurrencyKey2   = KEYS[16]
+local keyActiveCompound          = KEYS[17]
 
-local keyActiveRunsAccount                = KEYS[17]
-local keyActiveRunsPartition              = KEYS[18]
-local keyActiveRunsCustomConcurrencyKey1  = KEYS[19]
-local keyActiveRunsCustomConcurrencyKey2  = KEYS[20]
+local keyActiveRunsAccount                = KEYS[18]
+local keyActiveRunsPartition              = KEYS[19]
+local keyActiveRunsCustomConcurrencyKey1  = KEYS[20]
+local keyActiveRunsCustomConcurrencyKey2  = KEYS[21]
 
-local keyBacklogActiveCheckSet       = KEYS[21]
-local keyBacklogActiveCheckCooldown  = KEYS[22]
+local keyBacklogActiveCheckSet       = KEYS[22]
+local keyBacklogActiveCheckCooldown  = KEYS[23]
 
 local backlogID     = ARGV[1]
 local partitionID   = ARGV[2]
@@ -103,7 +105,7 @@ if backlogCountTotal == 0 then
   redis.call("HDEL", keyBacklogMeta, backlogID)
 
   -- update backlog pointers
-  updateBacklogPointer(keyGlobalShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, keyShadowPartitionSet, keyBacklogSet, accountID, partitionID, backlogID)
+  updateBacklogPointer(keyShadowPartitionMeta, keyBacklogMeta, keyGlobalShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, keyShadowPartitionSet, keyBacklogSet, accountID, partitionID, backlogID)
 
   return { 0, 0, 0, backlogCountTotal, 0, 0, {}, 0 }
 end
@@ -115,7 +117,7 @@ end
 
 if backlogCountUntil == 0 then
   -- update backlog pointers
-  updateBacklogPointer(keyGlobalShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, keyShadowPartitionSet, keyBacklogSet, accountID, partitionID, backlogID)
+  updateBacklogPointer(keyShadowPartitionMeta, keyBacklogMeta, keyGlobalShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, keyShadowPartitionSet, keyBacklogSet, accountID, partitionID, backlogID)
 
   return { 0, 0, backlogCountUntil, backlogCountTotal, 0, 0, {}, 0 }
 end
@@ -382,7 +384,7 @@ else
 end
 
 -- Always update pointers
-updateBacklogPointer(keyGlobalShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, keyShadowPartitionSet, keyBacklogSet, accountID, partitionID, backlogID)
+updateBacklogPointer(keyShadowPartitionMeta, keyBacklogMeta, keyGlobalShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, keyShadowPartitionSet, keyBacklogSet, accountID, partitionID, backlogID)
 
 --
 -- Optional: Add backlog to active checker set. This will verify that all items marked as active

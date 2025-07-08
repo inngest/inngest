@@ -13,16 +13,17 @@
 ]]
 
 local keyBacklogMeta                     = KEYS[1]
+local keyShadowPartitionMeta             = KEYS[2]
 
-local keyBacklogSet                      = KEYS[2]
-local keyShadowPartitionSet              = KEYS[3]
-local keyGlobalShadowPartitionSet        = KEYS[4]
-local keyGlobalAccountShadowPartitionSet = KEYS[5]
-local keyAccountShadowPartitionSet       = KEYS[6]
+local keyBacklogSet                      = KEYS[3]
+local keyShadowPartitionSet              = KEYS[4]
+local keyGlobalShadowPartitionSet        = KEYS[5]
+local keyGlobalAccountShadowPartitionSet = KEYS[6]
+local keyAccountShadowPartitionSet       = KEYS[7]
 
-local keyGlobalNormalizeSet              = KEYS[7]
-local keyAccountNormalizeSet             = KEYS[8]
-local keyPartitionNormalizeSet           = KEYS[9]
+local keyGlobalNormalizeSet              = KEYS[8]
+local keyAccountNormalizeSet             = KEYS[9]
+local keyPartitionNormalizeSet           = KEYS[10]
 
 local backlogID             = ARGV[1]
 local partitionID           = ARGV[2]
@@ -46,7 +47,7 @@ if backlogCount == nil or backlogCount == false or backlogCount == 0 then
   redis.call("HDEL", keyBacklogMeta, backlogID)
 
   -- Update pointers
-  updateBacklogPointer(keyGlobalShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, keyShadowPartitionSet, keyBacklogSet, accountID, partitionID, backlogID)
+  updateBacklogPointer(keyShadowPartitionMeta, keyBacklogMeta, keyGlobalShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, keyShadowPartitionSet, keyBacklogSet, accountID, partitionID, backlogID)
 
   return { -2, 0 }
 end
