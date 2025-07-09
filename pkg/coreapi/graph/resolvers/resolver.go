@@ -60,6 +60,10 @@ func (r *Resolver) ConnectV1WorkerConnectionsConnection() generated.ConnectV1Wor
 	return &connectV1workerConnectionResolver{r}
 }
 
+func (r *Resolver) EventsConnection() generated.EventsConnectionResolver {
+	return &eventsConnectionResolver{r}
+}
+
 type mutationResolver struct{ *Resolver }
 type queryResolver struct{ *Resolver }
 type eventResolver struct{ *Resolver }
@@ -72,3 +76,4 @@ type connectV1workerConnectionResolver struct{ *Resolver }
 type functionResolver struct{ *Resolver }
 type streamItemResolver struct{ *Resolver }
 type runsV2ConnResolver struct{ *Resolver }
+type eventsConnectionResolver struct{ *Resolver }

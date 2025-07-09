@@ -86,11 +86,6 @@ func (qr *queryResolver) EventsV2(ctx context.Context, first int, after *string,
 		})
 	}
 
-	totalCount, err := qr.Data.GetEventsCount(ctx, consts.DevServerAccountID, consts.DevServerEnvID, opts)
-	if err != nil {
-		return nil, err
-	}
-
 	// somewhat inaccurate if the last page has exactly the number of entries requested,
 	// but the next page will just be a page with 0 and hasNextPage = false
 	hasNextPage := len(eventEdges) == first
@@ -109,7 +104,6 @@ func (qr *queryResolver) EventsV2(ctx context.Context, first int, after *string,
 			StartCursor:     startCursor,
 			EndCursor:       endCursor,
 		},
-		TotalCount: int(totalCount),
 	}, nil
 }
 

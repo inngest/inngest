@@ -48,6 +48,7 @@ type ResolverRoot interface {
 	ConnectV1WorkerConnection() ConnectV1WorkerConnectionResolver
 	ConnectV1WorkerConnectionsConnection() ConnectV1WorkerConnectionsConnectionResolver
 	Event() EventResolver
+	EventsConnection() EventsConnectionResolver
 	Function() FunctionResolver
 	FunctionRun() FunctionRunResolver
 	FunctionRunV2() FunctionRunV2Resolver
@@ -561,6 +562,9 @@ type EventResolver interface {
 	TotalRuns(ctx context.Context, obj *models.Event) (*int, error)
 	Raw(ctx context.Context, obj *models.Event) (*string, error)
 	FunctionRuns(ctx context.Context, obj *models.Event) ([]*models.FunctionRun, error)
+}
+type EventsConnectionResolver interface {
+	TotalCount(ctx context.Context, obj *models.EventsConnection) (int, error)
 }
 type FunctionResolver interface {
 	FailureHandler(ctx context.Context, obj *models.Function) (*models.Function, error)
@@ -8200,7 +8204,7 @@ func (ec *executionContext) _EventsConnection_totalCount(ctx context.Context, fi
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.TotalCount, nil
+		return ec.resolvers.EventsConnection().TotalCount(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -8221,8 +8225,8 @@ func (ec *executionContext) fieldContext_EventsConnection_totalCount(ctx context
 	fc = &graphql.FieldContext{
 		Object:     "EventsConnection",
 		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type Int does not have child fields")
 		},
@@ -23244,22 +23248,35 @@ func (ec *executionContext) _EventsConnection(ctx context.Context, sel ast.Selec
 			out.Values[i] = ec._EventsConnection_edges(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "pageInfo":
 
 			out.Values[i] = ec._EventsConnection_pageInfo(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "totalCount":
+			field := field
 
-			out.Values[i] = ec._EventsConnection_totalCount(ctx, field, obj)
-
-			if out.Values[i] == graphql.Null {
-				invalids++
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._EventsConnection_totalCount(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&invalids, 1)
+				}
+				return res
 			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
