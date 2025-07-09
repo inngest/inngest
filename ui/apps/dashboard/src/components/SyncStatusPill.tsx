@@ -16,6 +16,16 @@ export const syncKind: Record<string, AppKind> = {
   success: 'primary',
 } as const satisfies { [key in SyncStatus]: unknown };
 
+const hiddenSyncStatusesOnAppCard = [
+  'duplicate',
+  'success',
+] as const satisfies readonly SyncStatus[];
+
+export const isSyncStatusHiddenOnAppCard = (status: string | undefined) => {
+  if (!status) return true;
+  return String(hiddenSyncStatusesOnAppCard).includes(status);
+};
+
 type Props = {
   status: string;
   iconOnly?: boolean;
