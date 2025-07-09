@@ -43,6 +43,7 @@ type FunctionConfigurationProps = {
   getAppLink?: () => string;
   getEventLink?: (eventName: string) => string;
   getFunctionLink?: (functionSlug: string) => string;
+  getBillingUrl?: () => string;
 };
 
 export function FunctionConfiguration({
@@ -52,6 +53,7 @@ export function FunctionConfiguration({
   getAppLink,
   getEventLink,
   getFunctionLink,
+  getBillingUrl,
 }: FunctionConfigurationProps) {
   const configuration = inngestFunction.configuration;
   const triggers = inngestFunction.triggers;
@@ -194,7 +196,7 @@ export function FunctionConfiguration({
           value: (
             <>
               {concurrencyLimit.limit.value >= 1 && concurrencyLimit.limit.value}
-              {concurrencyLimit.limit.isPlanLimit && (
+              {concurrencyLimit.limit.isPlanLimit && getBillingUrl && (
                 <Info
                   side="bottom"
                   align="end"
@@ -207,10 +209,7 @@ export function FunctionConfiguration({
                   widthClassName="max-w-xs"
                   action={
                     <Link
-                      href={pathCreator.billing({
-                        tab: 'plans',
-                        ref: 'concurrency-limit-popover',
-                      })}
+                      href={getBillingUrl()}
                       target="_blank"
                       iconAfter={<RiExternalLinkLine className="h-4 w-4" />}
                     >
