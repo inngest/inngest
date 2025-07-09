@@ -24,10 +24,6 @@ const (
 	NormalizePartitionPeekMax = int64(100)
 	NormalizeBacklogPeekMax   = int64(300) // same as ShadowPartitionPeekMax
 
-	// BacklogNormalizeAsyncLimit determines the minimum number of items required in an outdated backlog
-	// to require an async normalize job. For small backlogs, the added QPS may not be worth it and we should normalize JIT.
-	BacklogNormalizeAsyncLimit = 100
-
 	// BacklogRefillHardLimit sets the maximum number of items that can be refilled in a single backlogRefill operation.
 	BacklogRefillHardLimit = int64(1000)
 

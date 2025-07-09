@@ -3,13 +3,10 @@
   Removes backlog pointer from shadow partition and into normalize partition.
   Will update shadow partition pointers accordingly.
 
-  Returns a tuple of {status, items_in_backlog}
-
-  Status values:
+  Return status values:
 
   1 - Moved backlog to normalize set
-  -1 - Fewer items than minimum
-  -2 - Garbage-collected empty backlog
+  -1 - Garbage-collected empty backlog
 ]]
 
 local keyBacklogMeta                     = KEYS[1]
@@ -43,16 +40,8 @@ if backlogCount == nil or backlogCount == false or backlogCount == 0 then
   -- Update pointers
   updateBacklogPointer(keyShadowPartitionMeta, keyBacklogMeta, keyGlobalShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, keyShadowPartitionSet, keyBacklogSet, keyPartitionNormalizeSet, accountID, partitionID, backlogID)
 
-  return { -2, 0 }
+  return -1
 end
-
--- If there's a minimum number of backlog items required to normalize asynchronously,
--- we do not need to move backlog pointers to the normalization ZSETs but can just normalize
--- in the same shadow scanner loop iteration.
-if normalizeAsyncMinimum > 0 and backlogCount < normalizeAsyncMinimum then
-  return { -1, backlogCount }
-end
-
 
 -- Add to normalize sets
 local currentScore = redis.call("ZSCORE", keyPartitionNormalizeSet, backlogID)
@@ -88,4 +77,4 @@ if tonumber(redis.call("ZCARD", keyShadowPartitionSet)) == 0 then
   end
 end
 
-return { 1, backlogCount }
+return 1
