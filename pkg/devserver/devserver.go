@@ -876,6 +876,8 @@ func PartitionConstraintConfigGetter(dbcqrs cqrs.Manager) redis_state.PartitionC
 		}
 
 		constraints := redis_state.PartitionConstraintConfig{
+			FunctionVersion: fn.FunctionVersion,
+			
 			Concurrency: redis_state.ShadowPartitionConcurrency{
 				SystemConcurrency:     consts.DefaultConcurrencyLimit,
 				AccountConcurrency:    accountLimit,
