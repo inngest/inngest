@@ -5,7 +5,6 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
-	"github.com/inngest/inngest/pkg/logger"
 	"math"
 	mrand "math/rand"
 	"sync"
@@ -363,12 +362,7 @@ func (q *queue) processShadowPartitionBacklog(ctx context.Context, shadowPart *Q
 
 		// Prepare normalization, this will just run once as the shadow scanner
 		// won't pick it up again after this.
-		_, shouldNormalizeAsync, err := q.BacklogPrepareNormalize(
-			ctx,
-			backlog,
-			shadowPart,
-			q.backlogNormalizeAsyncLimit(ctx),
-		)
+		err := q.BacklogPrepareNormalize(ctx, backlog, shadowPart)
 		if err != nil && !errors.Is(err, ErrBacklogGarbageCollected) {
 			return nil, false, fmt.Errorf("could not prepare backlog for normalization: %w", err)
 		}
@@ -377,25 +371,6 @@ func (q *queue) processShadowPartitionBacklog(ctx context.Context, shadowPart *Q
 		if errors.Is(err, ErrBacklogGarbageCollected) {
 			l.Debug("garbage-collected empty backlog")
 			return nil, false, nil
-		}
-
-		// If there are just a couple of items in the backlog, we can
-		// normalize right away, we have the guarantee that the backlog
-		// is not being normalized right now as it wouldn't be picked up
-		// by the shadow scanner otherwise.
-		if !shouldNormalizeAsync {
-			l.Debug("normalizing backlog immediately")
-
-			_, err := durationWithTags(ctx, q.primaryQueueShard.Name, "normalize_backlog", q.clock.Now(), func(ctx context.Context) (any, error) {
-				err := q.normalizeBacklog(logger.WithStdlib(ctx, l), backlog, shadowPart, constraints)
-				return nil, err
-
-			}, map[string]any{
-				"async_processing": false,
-			})
-			if err != nil {
-				return nil, false, fmt.Errorf("could not normalize backlog: %w", err)
-			}
 		}
 
 		return nil, false, nil

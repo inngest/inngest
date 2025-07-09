@@ -58,6 +58,7 @@ local normalizeFromBacklogID  = ARGV[15]
 -- $include(get_partition_item.lua)
 -- $include(enqueue_to_partition.lua)
 -- $include(ends_with.lua)
+-- $include(update_backlog_pointer.lua)
 
 -- Only skip idempotency checks if we're normalizing a backlog (we want to enqueue an existing item to a new backlog)
 local is_normalize = exists_without_ending(keyNormalizeFromBacklogSet, ":-")
