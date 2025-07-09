@@ -47,22 +47,18 @@ func TestEventList(t *testing.T) {
 			From:       time.Now().Add(-time.Minute).UTC(),
 		}
 		r.EventuallyWithT(func(t *assert.CollectT) {
-			a := assert.New(t)
+			r := require.New(t)
 			res, err := c.GetEvents(ctx, client.GetEventsOpts{
 				PageSize: pageSize,
 				Filter:   eventsFilter,
 			})
-			if !a.NoError(err) {
-				return
-			}
+			r.NoError(err)
 
-			a.Equal(numEvents, res.TotalCount)
-			a.True(res.PageInfo.HasNextPage)
-			a.Len(res.Edges, pageSize)
+			r.Equal(numEvents, res.TotalCount)
+			r.True(res.PageInfo.HasNextPage)
+			r.Len(res.Edges, pageSize)
 
-			if !a.NotNil(res.PageInfo.EndCursor) {
-				return
-			}
+			r.NotNil(res.PageInfo.EndCursor)
 
 			cursor = *res.PageInfo.EndCursor
 
@@ -74,19 +70,17 @@ func TestEventList(t *testing.T) {
 
 		// Get the next page.
 		r.EventuallyWithT(func(t *assert.CollectT) {
-			a := assert.New(t)
+			r := require.New(t)
 			res, err := c.GetEvents(ctx, client.GetEventsOpts{
 				PageSize: pageSize,
 				Cursor:   &cursor,
 				Filter:   eventsFilter,
 			})
-			if !a.NoError(err) {
-				return
-			}
+			r.NoError(err)
 
-			a.Equal(50, res.TotalCount)
-			a.False(res.PageInfo.HasNextPage)
-			a.Len(res.Edges, 10)
+			r.Equal(50, res.TotalCount)
+			r.False(res.PageInfo.HasNextPage)
+			r.Len(res.Edges, 10)
 
 			for _, edge := range res.Edges {
 				uniqueEventIDs[edge.Node.ID] = true
@@ -114,7 +108,7 @@ func TestEventList(t *testing.T) {
 		event1ID, err := ic.Send(ctx, inngestgo.Event{Name: event1Name})
 		r.NoError(err)
 		r.EventuallyWithT(func(t *assert.CollectT) {
-			a := assert.New(t)
+			r := require.New(t)
 			res, err := c.GetEvents(ctx, client.GetEventsOpts{
 				PageSize: 10,
 				Filter: models.EventsFilter{
@@ -122,11 +116,9 @@ func TestEventList(t *testing.T) {
 					From:       time.Now().Add(-time.Minute).UTC(),
 				},
 			})
-			if !a.NoError(err) {
-				return
-			}
-			a.Equal(1, res.TotalCount)
-			a.Len(res.Edges, 1)
+			r.NoError(err)
+			r.Equal(1, res.TotalCount)
+			r.Len(res.Edges, 1)
 		}, time.Second*10, time.Second*1)
 
 		// Send a 2nd event and wait for it show in the API.
@@ -134,7 +126,7 @@ func TestEventList(t *testing.T) {
 		r.NoError(err)
 		var res *models.EventsConnection
 		r.EventuallyWithT(func(t *assert.CollectT) {
-			a := assert.New(t)
+			r := require.New(t)
 
 			var err error
 			res, err = c.GetEvents(ctx, client.GetEventsOpts{
@@ -144,11 +136,9 @@ func TestEventList(t *testing.T) {
 					From:       time.Now().Add(-time.Minute),
 				},
 			})
-			if !a.NoError(err) {
-				return
-			}
-			a.Equal(2, res.TotalCount)
-			a.Len(res.Edges, 2)
+			r.NoError(err)
+			r.Equal(2, res.TotalCount)
+			r.Len(res.Edges, 2)
 		}, time.Second*10, time.Second*1)
 
 		// 1st event in the API response is the 2nd event sent, since it's in
@@ -207,7 +197,7 @@ func TestEventList(t *testing.T) {
 
 			var raw string
 			r.EventuallyWithT(func(t *assert.CollectT) {
-				a := assert.New(t)
+				r := require.New(t)
 				res, err := c.GetEvents(ctx, client.GetEventsOpts{
 					PageSize: 10,
 					Filter: models.EventsFilter{
@@ -215,13 +205,9 @@ func TestEventList(t *testing.T) {
 						From:       time.Now().Add(-time.Minute),
 					},
 				})
-				if !a.NoError(err) {
-					return
-				}
+				r.NoError(err)
 
-				if !a.Len(res.Edges, 1) {
-					return
-				}
+				r.Len(res.Edges, 1)
 				raw = res.Edges[0].Node.Raw
 			}, time.Second*10, time.Second*1)
 
@@ -269,7 +255,7 @@ func TestEventList(t *testing.T) {
 
 			var raw string
 			r.EventuallyWithT(func(t *assert.CollectT) {
-				a := assert.New(t)
+				r := require.New(t)
 				res, err := c.GetEvents(ctx, client.GetEventsOpts{
 					PageSize: 10,
 					Filter: models.EventsFilter{
@@ -277,13 +263,9 @@ func TestEventList(t *testing.T) {
 						From:       time.Now().Add(-time.Minute),
 					},
 				})
-				if !a.NoError(err) {
-					return
-				}
+				r.NoError(err)
 
-				if !a.Len(res.Edges, 1) {
-					return
-				}
+				r.Len(res.Edges, 1)
 				raw = res.Edges[0].Node.Raw
 			}, time.Second*10, time.Second*1)
 
@@ -324,7 +306,7 @@ func TestEventList(t *testing.T) {
 
 		var runs []*models.FunctionRunV2
 		r.EventuallyWithT(func(t *assert.CollectT) {
-			a := assert.New(t)
+			r := require.New(t)
 			res, err := c.GetEvents(ctx, client.GetEventsOpts{
 				PageSize: 10,
 				Filter: models.EventsFilter{
@@ -332,14 +314,10 @@ func TestEventList(t *testing.T) {
 					From:       time.Now().Add(-time.Minute),
 				},
 			})
-			if !a.NoError(err) {
-				return
-			}
+			r.NoError(err)
 
 			// Includes "inngest/function.finished".
-			//if !a.Len(res.Edges, 2) {
-			//	return
-			//}
+			// r.Len(res.Edges, 2)
 
 			for _, edge := range res.Edges {
 				if edge.Node.ID == ulid.MustParse(eventID) {
@@ -347,15 +325,8 @@ func TestEventList(t *testing.T) {
 				}
 			}
 			// TODO: punting on FunctionRunsV2 for now
-			if !a.Len(runs, 0) {
-				return
-			}
-			//if !a.Len(runs, 1) {
-			//	return
-			//}
-			//
-			//a.Equal("fn", runs[0].Function.Name)
-			//a.Equal(models.FunctionRunStatusCompleted, runs[0].Status)
+			r.Len(runs, 0)
+			//r.Len(runs, 1)
 		}, time.Second*10, time.Second*1)
 	})
 }
