@@ -49,10 +49,10 @@ models:
     fields:
       totalCount:
         resolver: true
-#  EventV2:
-#    fields:
-#      raw:
-#        resolver: true
+  EventV2:
+    fields:
+      raw:
+        resolver: true
 #      runs:
 #        resolver: true
 #      source:

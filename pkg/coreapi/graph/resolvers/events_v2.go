@@ -50,18 +50,12 @@ func (qr *queryResolver) EventsV2(ctx context.Context, first int, after *string,
 	eventEdges := []*models.EventsEdge{}
 	for _, e := range events {
 
-		raw, err := marshalRaw(e)
-		if err != nil {
-			return nil, err
-		}
-
 		eventV2 := models.EventV2{
 			EnvID:          e.WorkspaceID,
 			ID:             e.InternalID(),
 			IdempotencyKey: &e.EventID,
 			Name:           e.EventName,
 			OccurredAt:     time.UnixMilli(e.EventTS),
-			Raw:            raw,
 			ReceivedAt:     e.ReceivedAt,
 			Runs:           []*models.FunctionRunV2{}, // TODO
 			Version:        &e.EventVersion,
@@ -105,36 +99,6 @@ func (qr *queryResolver) EventsV2(ctx context.Context, first int, after *string,
 			EndCursor:       endCursor,
 		},
 	}, nil
-}
-
-func marshalRaw(e *cqrs.Event) (string, error) {
-	data := e.EventData
-	if data == nil {
-		data = make(map[string]any)
-	}
-
-	var version *string
-	if len(e.EventVersion) > 0 {
-		version = &e.EventVersion
-	}
-
-	id := e.InternalID().String()
-	if len(e.EventID) > 0 {
-		id = e.EventID
-	}
-
-	byt, err := json.Marshal(map[string]any{
-		"data": data,
-		"id":   id,
-		"name": e.EventName,
-		"ts":   e.EventTS,
-		"v":    version,
-	})
-	if err != nil {
-		return "", err
-	}
-	return string(byt), nil
-
 }
 
 func (c *EventsV2ConnectionCursor) Decode(val string) error {

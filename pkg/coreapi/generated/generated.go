@@ -48,6 +48,7 @@ type ResolverRoot interface {
 	ConnectV1WorkerConnection() ConnectV1WorkerConnectionResolver
 	ConnectV1WorkerConnectionsConnection() ConnectV1WorkerConnectionsConnectionResolver
 	Event() EventResolver
+	EventV2() EventV2Resolver
 	EventsConnection() EventsConnectionResolver
 	Function() FunctionResolver
 	FunctionRun() FunctionRunResolver
@@ -562,6 +563,9 @@ type EventResolver interface {
 	TotalRuns(ctx context.Context, obj *models.Event) (*int, error)
 	Raw(ctx context.Context, obj *models.Event) (*string, error)
 	FunctionRuns(ctx context.Context, obj *models.Event) ([]*models.FunctionRun, error)
+}
+type EventV2Resolver interface {
+	Raw(ctx context.Context, obj *models.EventV2) (string, error)
 }
 type EventsConnectionResolver interface {
 	TotalCount(ctx context.Context, obj *models.EventsConnection) (int, error)
@@ -7709,7 +7713,7 @@ func (ec *executionContext) _EventV2_raw(ctx context.Context, field graphql.Coll
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return obj.Raw, nil
+		return ec.resolvers.EventV2().Raw(rctx, obj)
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -7730,8 +7734,8 @@ func (ec *executionContext) fieldContext_EventV2_raw(ctx context.Context, field 
 	fc = &graphql.FieldContext{
 		Object:     "EventV2",
 		Field:      field,
-		IsMethod:   false,
-		IsResolver: false,
+		IsMethod:   true,
+		IsResolver: true,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type String does not have child fields")
 		},
@@ -23127,14 +23131,14 @@ func (ec *executionContext) _EventV2(ctx context.Context, sel ast.SelectionSet, 
 			out.Values[i] = ec._EventV2_envID(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "id":
 
 			out.Values[i] = ec._EventV2_id(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "idempotencyKey":
 
@@ -23145,35 +23149,48 @@ func (ec *executionContext) _EventV2(ctx context.Context, sel ast.SelectionSet, 
 			out.Values[i] = ec._EventV2_name(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "occurredAt":
 
 			out.Values[i] = ec._EventV2_occurredAt(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "raw":
+			field := field
 
-			out.Values[i] = ec._EventV2_raw(ctx, field, obj)
-
-			if out.Values[i] == graphql.Null {
-				invalids++
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._EventV2_raw(ctx, field, obj)
+				if res == graphql.Null {
+					atomic.AddUint32(&invalids, 1)
+				}
+				return res
 			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		case "receivedAt":
 
 			out.Values[i] = ec._EventV2_receivedAt(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "runs":
 
 			out.Values[i] = ec._EventV2_runs(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
-				invalids++
+				atomic.AddUint32(&invalids, 1)
 			}
 		case "source":
 
