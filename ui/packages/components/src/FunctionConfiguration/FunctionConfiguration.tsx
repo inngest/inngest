@@ -26,7 +26,6 @@ import {
 } from '@remixicon/react';
 
 import type { GetFunctionQuery as DashboardGetFunctionQuery } from '../../../../apps/dashboard/src/gql/graphql';
-import { pathCreator } from '../../../../apps/dashboard/src/utils/urls';
 import {
   FunctionTriggerTypes,
   type GetFunctionQuery as DevServerGetFunctionQuery,
