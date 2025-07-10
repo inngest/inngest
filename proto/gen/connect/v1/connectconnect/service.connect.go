@@ -23,6 +23,8 @@ const _ = connect.IsAtLeastVersion1_13_0
 const (
 	// ConnectGatewayName is the fully-qualified name of the ConnectGateway service.
 	ConnectGatewayName = "connect.v1.ConnectGateway"
+	// ConnectExecutorName is the fully-qualified name of the ConnectExecutor service.
+	ConnectExecutorName = "connect.v1.ConnectExecutor"
 )
 
 // These constants are the fully-qualified names of the RPCs defined in this package. They're
@@ -37,6 +39,8 @@ const (
 	ConnectGatewayForwardProcedure = "/connect.v1.ConnectGateway/Forward"
 	// ConnectGatewayPingProcedure is the fully-qualified name of the ConnectGateway's Ping RPC.
 	ConnectGatewayPingProcedure = "/connect.v1.ConnectGateway/Ping"
+	// ConnectExecutorReplyProcedure is the fully-qualified name of the ConnectExecutor's Reply RPC.
+	ConnectExecutorReplyProcedure = "/connect.v1.ConnectExecutor/Reply"
 )
 
 // ConnectGatewayClient is a client for the connect.v1.ConnectGateway service.
@@ -133,4 +137,74 @@ func (UnimplementedConnectGatewayHandler) Forward(context.Context, *connect.Requ
 
 func (UnimplementedConnectGatewayHandler) Ping(context.Context, *connect.Request[v1.PingRequest]) (*connect.Response[v1.PingResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("connect.v1.ConnectGateway.Ping is not implemented"))
+}
+
+// ConnectExecutorClient is a client for the connect.v1.ConnectExecutor service.
+type ConnectExecutorClient interface {
+	Reply(context.Context, *connect.Request[v1.ReplyRequest]) (*connect.Response[v1.ReplyResponse], error)
+}
+
+// NewConnectExecutorClient constructs a client for the connect.v1.ConnectExecutor service. By
+// default, it uses the Connect protocol with the binary Protobuf Codec, asks for gzipped responses,
+// and sends uncompressed requests. To use the gRPC or gRPC-Web protocols, supply the
+// connect.WithGRPC() or connect.WithGRPCWeb() options.
+//
+// The URL supplied here should be the base URL for the Connect or gRPC server (for example,
+// http://api.acme.com or https://acme.com/grpc).
+func NewConnectExecutorClient(httpClient connect.HTTPClient, baseURL string, opts ...connect.ClientOption) ConnectExecutorClient {
+	baseURL = strings.TrimRight(baseURL, "/")
+	connectExecutorMethods := v1.File_connect_v1_service_proto.Services().ByName("ConnectExecutor").Methods()
+	return &connectExecutorClient{
+		reply: connect.NewClient[v1.ReplyRequest, v1.ReplyResponse](
+			httpClient,
+			baseURL+ConnectExecutorReplyProcedure,
+			connect.WithSchema(connectExecutorMethods.ByName("Reply")),
+			connect.WithClientOptions(opts...),
+		),
+	}
+}
+
+// connectExecutorClient implements ConnectExecutorClient.
+type connectExecutorClient struct {
+	reply *connect.Client[v1.ReplyRequest, v1.ReplyResponse]
+}
+
+// Reply calls connect.v1.ConnectExecutor.Reply.
+func (c *connectExecutorClient) Reply(ctx context.Context, req *connect.Request[v1.ReplyRequest]) (*connect.Response[v1.ReplyResponse], error) {
+	return c.reply.CallUnary(ctx, req)
+}
+
+// ConnectExecutorHandler is an implementation of the connect.v1.ConnectExecutor service.
+type ConnectExecutorHandler interface {
+	Reply(context.Context, *connect.Request[v1.ReplyRequest]) (*connect.Response[v1.ReplyResponse], error)
+}
+
+// NewConnectExecutorHandler builds an HTTP handler from the service implementation. It returns the
+// path on which to mount the handler and the handler itself.
+//
+// By default, handlers support the Connect, gRPC, and gRPC-Web protocols with the binary Protobuf
+// and JSON codecs. They also support gzip compression.
+func NewConnectExecutorHandler(svc ConnectExecutorHandler, opts ...connect.HandlerOption) (string, http.Handler) {
+	connectExecutorMethods := v1.File_connect_v1_service_proto.Services().ByName("ConnectExecutor").Methods()
+	connectExecutorReplyHandler := connect.NewUnaryHandler(
+		ConnectExecutorReplyProcedure,
+		svc.Reply,
+		connect.WithSchema(connectExecutorMethods.ByName("Reply")),
+		connect.WithHandlerOptions(opts...),
+	)
+	return "/connect.v1.ConnectExecutor/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case ConnectExecutorReplyProcedure:
+			connectExecutorReplyHandler.ServeHTTP(w, r)
+		default:
+			http.NotFound(w, r)
+		}
+	})
+}
+
+// UnimplementedConnectExecutorHandler returns CodeUnimplemented from all methods.
+type UnimplementedConnectExecutorHandler struct{}
+
+func (UnimplementedConnectExecutorHandler) Reply(context.Context, *connect.Request[v1.ReplyRequest]) (*connect.Response[v1.ReplyResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("connect.v1.ConnectExecutor.Reply is not implemented"))
 }
