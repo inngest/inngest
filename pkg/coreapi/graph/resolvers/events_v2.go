@@ -8,8 +8,11 @@ import (
 	"time"
 
 	"github.com/inngest/inngest/pkg/consts"
+	loader "github.com/inngest/inngest/pkg/coreapi/graph/loaders"
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/pkg/cqrs"
+
+	"github.com/graph-gophers/dataloader"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -47,9 +50,13 @@ func (qr *queryResolver) EventsV2(ctx context.Context, first int, after *string,
 		return nil, err
 	}
 
+	targetLoader := loader.FromCtx(ctx).EventLoader
+
 	eventEdges := []*models.EventsEdge{}
 	for _, e := range events {
-		eventV2 := cqrsEventToGqlEvent(e)
+		targetLoader.Prime(ctx, dataloader.StringKey(e.InternalID().String()), e)
+
+		eventV2 := cqrsEventToGQLEvent(e)
 
 		cursorByt, err := json.Marshal(EventsV2ConnectionCursor{ID: eventV2.ID.String()})
 		if err != nil {
