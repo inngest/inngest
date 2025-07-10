@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"gonum.org/v1/gonum/stat/sampleuv"
+	"iter"
 	"math/rand"
 	"runtime/debug"
 	"time"
@@ -16,6 +16,7 @@ import (
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
+	"gonum.org/v1/gonum/stat/sampleuv"
 )
 
 var (
@@ -1095,6 +1096,14 @@ func (q *queue) backlogPeek(ctx context.Context, b *QueueBacklog, from time.Time
 	}
 
 	return res.Items, res.TotalCount, nil
+}
+
+func (q *queue) BacklogsByPartition(ctx context.Context, queueShard QueueShard, partitionID string) (iter.Seq[*QueueBacklog], error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+func (q *queue) BacklogSize(ctx context.Context, queueShard QueueShard, backlogID string) (int64, error) {
+	return 0, fmt.Errorf("not implemented")
 }
 
 func shuffleBacklogs(b []*QueueBacklog) []*QueueBacklog {
