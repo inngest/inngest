@@ -45,7 +45,8 @@ var (
 )
 
 var (
-	durOpShadowPartitionRequeue = "shadow_partition_requeue"
+	durOpGobalShadowPartitionAccountPeek = "global_shadow_partition_account_peek"
+	durOpShadowPartitionRequeue          = "shadow_partition_requeue"
 )
 
 // shadowWorker runs a blocking process that listens to item being pushed into the
@@ -576,7 +577,9 @@ func (q *queue) scanShadowPartitions(ctx context.Context, until time.Time, qspc 
 	shouldScanAccount := q.runMode.AccountShadowPartition && mrand.Intn(100) <= q.runMode.AccountShadowPartitionWeight
 	if shouldScanAccount {
 		sequential := false
-		peekedAccounts, err := q.peekGlobalShadowPartitionAccounts(ctx, sequential, until, ShadowPartitionAccountPeekMax)
+		peekedAccounts, err := duration(ctx, q.primaryQueueShard.Name, durOpGobalShadowPartitionAccountPeek, q.clock.Now(), func(ctx context.Context) ([]uuid.UUID, error) {
+			return q.peekGlobalShadowPartitionAccounts(ctx, sequential, until, ShadowPartitionAccountPeekMax)
+		})
 		if err != nil {
 			return fmt.Errorf("could not peek global shadow partition accounts: %w", err)
 		}
