@@ -1,0 +1,1 @@
+export { FunctionConfiguration } from './FunctionConfiguration';

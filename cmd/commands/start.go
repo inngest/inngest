@@ -9,7 +9,7 @@ import (
 	"github.com/inngest/inngest/cmd/commands/internal/localconfig"
 	"github.com/inngest/inngest/pkg/config"
 	"github.com/inngest/inngest/pkg/devserver"
-	"github.com/inngest/inngest/pkg/lite"
+	"github.com/inngest/inngest/pkg/headers"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -146,22 +146,39 @@ func doStart(cmd *cobra.Command, args []string) {
 		tick = devserver.DefaultTick
 	}
 
-	opts := lite.StartOpts{
-		Config:             *conf,
-		PollInterval:       viper.GetInt("poll-interval"),
-		RedisURI:           viper.GetString("redis-uri"),
-		PostgresURI:        viper.GetString("postgres-uri"),
-		RetryInterval:      viper.GetInt("retry-interval"),
-		QueueWorkers:       viper.GetInt("queue-workers"),
-		Tick:               time.Duration(tick) * time.Millisecond,
-		URLs:               viper.GetStringSlice("sdk-url"),
-		SQLiteDir:          viper.GetString("sqlite-dir"),
-		SigningKey:         viper.GetString("signing-key"),
-		EventKey:           viper.GetStringSlice("event-key"),
-		ConnectGatewayPort: viper.GetInt("connect-gateway-port"),
+	signingKey := viper.GetString("signing-key")
+	if signingKey == "" {
+		fmt.Println("Error: signing-key is required")
+		os.Exit(1)
 	}
 
-	err = lite.New(ctx, opts)
+	eventKeys := viper.GetStringSlice("event-key")
+	if len(eventKeys) == 0 {
+		fmt.Println("Error: at least one event-key is required")
+		os.Exit(1)
+	}
+
+	conf.ServerKind = headers.ServerKindCloud
+
+	opts := devserver.StartOpts{
+		Config:             *conf,
+		ConnectGatewayHost: conf.CoreAPI.Addr,
+		ConnectGatewayPort: viper.GetInt("connect-gateway-port"),
+		EventKeys:          eventKeys,
+		InMemory:           false,
+		PollInterval:       viper.GetInt("poll-interval"),
+		PostgresURI:        viper.GetString("postgres-uri"),
+		QueueWorkers:       viper.GetInt("queue-workers"),
+		RedisURI:           viper.GetString("redis-uri"),
+		RequireKeys:        true,
+		RetryInterval:      viper.GetInt("retry-interval"),
+		SigningKey:         &signingKey,
+		SQLiteDir:          viper.GetString("sqlite-dir"),
+		Tick:               time.Duration(tick) * time.Millisecond,
+		URLs:               viper.GetStringSlice("sdk-url"),
+	}
+
+	err = devserver.New(ctx, opts)
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)

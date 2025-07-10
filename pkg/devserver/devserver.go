@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"net/http"
+	"net/url"
 	"os"
 	"time"
 
@@ -31,6 +31,7 @@ import (
 	"github.com/inngest/inngest/pkg/coreapi"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/cqrs/base_cqrs"
+	"github.com/inngest/inngest/pkg/debugapi"
 	"github.com/inngest/inngest/pkg/deploy"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
@@ -38,9 +39,10 @@ import (
 	"github.com/inngest/inngest/pkg/execution/batch"
 	"github.com/inngest/inngest/pkg/execution/debounce"
 	"github.com/inngest/inngest/pkg/execution/driver"
-	"github.com/inngest/inngest/pkg/execution/driver/httpdriver"
+	"github.com/inngest/inngest/pkg/execution/exechttp"
 	"github.com/inngest/inngest/pkg/execution/executor"
 	"github.com/inngest/inngest/pkg/execution/history"
+	"github.com/inngest/inngest/pkg/execution/pauses"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/ratelimit"
 	"github.com/inngest/inngest/pkg/execution/realtime"
@@ -59,6 +61,8 @@ import (
 	"github.com/inngest/inngest/pkg/service"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/inngest/inngest/pkg/testapi"
+	"github.com/inngest/inngest/pkg/tracing"
+	"github.com/inngest/inngest/pkg/util"
 	"github.com/inngest/inngest/pkg/util/awsgateway"
 	"github.com/redis/rueidis"
 	"go.opentelemetry.io/otel/propagation"
@@ -101,6 +105,19 @@ type StartOpts struct {
 
 	ConnectGatewayPort int    `json:"connectGatewayPort"`
 	ConnectGatewayHost string `json:"connectGatewayHost"`
+
+	// InMemory controls whether to only use in-memory databases (as opposed to
+	// filesystem)
+	InMemory bool
+
+	// RedisURI allows connecting to external Redis instead of in-memory Redis
+	RedisURI string `json:"redis_uri"`
+
+	// PostgresURI allows connecting to external Postgres instead of SQLite
+	PostgresURI string `json:"postgres_uri"`
+
+	// SQLiteDir specifies where SQLite files should be stored
+	SQLiteDir string `json:"sqlite_dir"`
 }
 
 // Create and start a new dev server.  The dev server is used during (surprise surprise)
@@ -125,7 +142,11 @@ func start(ctx context.Context, opts StartOpts) error {
 	l := logger.StdlibLogger(ctx)
 	ctx = logger.WithStdlib(ctx, l)
 
-	db, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{InMemory: true})
+	db, err := base_cqrs.New(base_cqrs.BaseCQRSOptions{
+		InMemory:    opts.InMemory,
+		PostgresURI: opts.PostgresURI,
+		Directory:   opts.SQLiteDir,
+	})
 	if err != nil {
 		return err
 	}
@@ -136,6 +157,9 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	// Initialize the devserver
 	dbDriver := "sqlite"
+	if opts.PostgresURI != "" {
+		dbDriver = "postgres"
+	}
 	dbcqrs := base_cqrs.NewCQRS(db, dbDriver)
 	hd := base_cqrs.NewHistoryDriver(db, dbDriver)
 	loader := dbcqrs.(state.FunctionLoader)
@@ -143,19 +167,48 @@ func start(ctx context.Context, opts StartOpts) error {
 	stepLimitOverrides := make(map[string]int)
 	stateSizeLimitOverrides := make(map[string]int)
 
-	shardedRc, shardedCluster, err := createInmemoryRedis(ctx, opts.Tick)
-	if err != nil {
-		return err
-	}
+	var shardedRc, unshardedRc, connectRc rueidis.Client
+	var shardedCluster, unshardedCluster, connectCluster *miniredis.Miniredis
 
-	unshardedRc, unshardedCluster, err := createInmemoryRedis(ctx, opts.Tick)
-	if err != nil {
-		return err
-	}
+	if opts.RedisURI != "" {
+		// Use external Redis
+		// Mask Redis URI credentials before logging
+		loggedURI := ""
+		if u, parseErr := url.Parse(opts.RedisURI); parseErr == nil {
+			loggedURI = " " + u.Redacted()
+		}
+		l.Info("using external redis", "url", loggedURI)
 
-	connectRc, connectCluster, err := createInmemoryRedis(ctx, opts.Tick)
-	if err != nil {
-		return err
+		shardedRc, err = connectToOrCreateRedis(opts.RedisURI)
+		if err != nil {
+			return err
+		}
+		unshardedRc, err = connectToOrCreateRedis(opts.RedisURI)
+		if err != nil {
+			return err
+		}
+		connectRcOpt, err := connectToOrCreateRedisOption(opts.RedisURI)
+		if err != nil {
+			return err
+		}
+		connectRc, err = rueidis.NewClient(connectRcOpt)
+		if err != nil {
+			return err
+		}
+	} else {
+		// Use in-memory Redis
+		shardedRc, shardedCluster, err = createInmemoryRedis(ctx, opts.Tick)
+		if err != nil {
+			return err
+		}
+		unshardedRc, unshardedCluster, err = createInmemoryRedis(ctx, opts.Tick)
+		if err != nil {
+			return err
+		}
+		connectRc, connectCluster, err = createInmemoryRedis(ctx, opts.Tick)
+		if err != nil {
+			return err
+		}
 	}
 
 	unshardedClient := redis_state.NewUnshardedClient(unshardedRc, redis_state.StateDefaultKey, redis_state.QueueDefaultKey)
@@ -215,6 +268,8 @@ func start(ctx context.Context, opts StartOpts) error {
 		redis_state.WithIdempotencyTTL(time.Hour),
 		redis_state.WithNumWorkers(int32(opts.QueueWorkers)),
 		redis_state.WithPollTick(opts.Tick),
+		redis_state.WithShadowPollTick(2 * opts.Tick),
+		redis_state.WithBacklogNormalizePollTick(5 * opts.Tick),
 		redis_state.WithCustomConcurrencyKeyLimitRefresher(func(ctx context.Context, i queue.QueueItem) []state.CustomConcurrency {
 			keys := i.Data.GetConcurrencyKeys()
 
@@ -294,7 +349,9 @@ func start(ctx context.Context, opts StartOpts) error {
 
 		// Key queues
 		redis_state.WithNormalizeRefreshItemCustomConcurrencyKeys(NormalizeConcurrencyKeys(smv2, dbcqrs)),
-		redis_state.WithNormalizeRefreshItemThrottle(NormalizeThrottle(smv2, dbcqrs)),
+		redis_state.WithRefreshItemThrottle(NormalizeThrottle(smv2, dbcqrs)),
+		redis_state.WithPartitionConstraintConfigGetter(PartitionConstraintConfigGetter(dbcqrs)),
+
 		redis_state.WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 			return enableKeyQueues
 		}),
@@ -317,7 +374,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	batcher := batch.NewRedisBatchManager(shardedClient.Batch(), rq, batch.WithLogger(l))
 	debouncer := debounce.NewRedisDebouncer(unshardedClient.Debounce(), queueShard, rq)
 
-	sn := singleton.New(ctx, queueShard.RedisClient)
+	sn := singleton.New(ctx, queueShards, shardSelector)
 
 	conditionalTracer := itrace.NewConditionalTracer(itrace.ConnectTracer(), itrace.AlwaysTrace)
 
@@ -329,11 +386,14 @@ func start(ctx context.Context, opts StartOpts) error {
 	// Create a new expression aggregator, using Redis to load evaluables.
 	agg := expragg.NewAggregator(ctx, 100, 100, sm.(expragg.EvaluableLoader), expressions.ExprEvaluator, nil, nil)
 
+	gatewayGRPCForwarder := connectpubsub.NewGatewayGRPCForwarder(ctx, connectionManager)
+
 	executorProxy, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectPubSubRedis, true, connectpubsub.RedisPubSubConnectorOpts{
-		Logger:             connectPubSubLogger.With("svc", "executor"),
-		Tracer:             conditionalTracer,
-		StateManager:       connectionManager,
-		EnforceLeaseExpiry: enforceConnectLeaseExpiry,
+		Logger:               connectPubSubLogger.With("svc", "executor"),
+		Tracer:               conditionalTracer,
+		StateManager:         connectionManager,
+		EnforceLeaseExpiry:   enforceConnectLeaseExpiry,
+		GatewayGRPCForwarder: gatewayGRPCForwarder,
 	}))
 	if err != nil {
 		return fmt.Errorf("failed to create connect pubsub connector: %w", err)
@@ -344,20 +404,28 @@ func start(ctx context.Context, opts StartOpts) error {
 	// automatically transform dev requests to lambda invocations.
 	//
 	// We also make sure to allow local requests.
-	httpClient := httpdriver.Client(httpdriver.SecureDialerOpts{
-		AllowHostDocker: true, // In local dev, this is OK
-		AllowPrivate:    true, // In local dev, this is OK
-		AllowNAT64:      true, // In local dev, this is OK
-	})
-	httpClient.(*http.Client).Transport = awsgateway.NewTransformTripper(httpClient.(*http.Client).Transport)
+	httpClient := exechttp.Client(
+		exechttp.SecureDialerOpts{
+			AllowHostDocker: true, // In local dev, this is OK
+			AllowPrivate:    true, // In local dev, this is OK
+			AllowNAT64:      true, // In local dev, this is OK
+		},
+		// Enable publishing of any requests made directly from the dev server.  Note that this
+		// is different from the cloud.
+		exechttp.WithRealtimePublishing(),
+	)
+
+	httpClient.Client.Transport = awsgateway.NewTransformTripper(httpClient.Client.Transport)
 	deploy.Client.Transport = awsgateway.NewTransformTripper(deploy.Client.Transport)
 
 	drivers := []driver.Driver{}
 	for _, driverConfig := range opts.Config.Execution.Drivers {
 		d, err := driverConfig.NewDriver(registration.NewDriverOpts{
-			ConnectForwarder:  executorProxy,
-			ConditionalTracer: conditionalTracer,
-			HTTPClient:        httpClient,
+			ConnectForwarder:       executorProxy,
+			ConditionalTracer:      conditionalTracer,
+			HTTPClient:             httpClient,
+			LocalSigningKey:        opts.SigningKey,
+			RequireLocalSigningKey: opts.RequireKeys,
 		})
 		if err != nil {
 			return err
@@ -374,7 +442,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	exec, err := executor.NewExecutor(
 		executor.WithHTTPClient(httpClient),
 		executor.WithStateManager(smv2),
-		executor.WithPauseManager(sm),
+		executor.WithPauseManager(pauses.NewRedisOnlyManager(sm)),
 		executor.WithRuntimeDrivers(
 			drivers...,
 		),
@@ -421,6 +489,11 @@ func start(ctx context.Context, opts StartOpts) error {
 		executor.WithAssignedQueueShard(queueShard),
 		executor.WithShardSelector(shardSelector),
 		executor.WithTraceReader(dbcqrs),
+		executor.WithRealtimeConfig(executor.ExecutorRealtimeConfig{
+			Secret:     consts.DevServerRealtimeJWTSecret,
+			PublishURL: fmt.Sprintf("http://%s:%d/v1/realtime/publish", opts.Config.CoreAPI.Addr, opts.Config.CoreAPI.Port),
+		}),
+		executor.WithTracerProvider(tracing.NewSqlcTracerProvider(base_cqrs.NewQueries(db, dbDriver))),
 	)
 	if err != nil {
 		return err
@@ -436,6 +509,10 @@ func start(ctx context.Context, opts StartOpts) error {
 		executor.WithServiceBatcher(batcher),
 		executor.WithServiceDebouncer(debouncer),
 		executor.WithServiceLogger(l),
+		executor.WithServiceShardSelector(shardSelector),
+		executor.WithServiceEnableKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+			return enableKeyQueues
+		}),
 	)
 
 	runner := runner.NewService(
@@ -443,6 +520,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		runner.WithCQRS(dbcqrs),
 		runner.WithExecutor(exec),
 		runner.WithExecutionManager(dbcqrs),
+		runner.WithPauseManager(pauses.NewRedisOnlyManager(sm)),
 		runner.WithEventManager(event.NewManager()),
 		runner.WithStateManager(sm),
 		runner.WithRunnerQueue(rq),
@@ -472,7 +550,6 @@ func start(ctx context.Context, opts StartOpts) error {
 
 		apiv1.AddRoutes(r, apiv1.Opts{
 			CachingMiddleware:  caching,
-			EventReader:        ds.Data,
 			FunctionReader:     ds.Data,
 			FunctionRunReader:  ds.Data,
 			JobQueueReader:     ds.Queue.(queue.JobQueueReader),
@@ -523,6 +600,15 @@ func start(ctx context.Context, opts StartOpts) error {
 		return err
 	}
 
+	debugapi, err := debugapi.NewDebugAPI(debugapi.Opts{
+		Log:           l,
+		Queue:         rq,
+		ShardSelector: shardSelector,
+	})
+	if err != nil {
+		return err
+	}
+
 	connectGatewayProxy, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectPubSubRedis, false, connectpubsub.RedisPubSubConnectorOpts{
 		Logger:             connectPubSubLogger.With("svc", "connect-gateway"),
 		Tracer:             conditionalTracer,
@@ -557,6 +643,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		{At: "/", Router: devAPI},
 		{At: "/v0", Router: core.Router},
 		{At: "/debug", Handler: middleware.Profiler()},
+		{At: "/dbg", Router: debugapi.Router},
 	}
 
 	if testapi.ShouldEnable() {
@@ -566,10 +653,16 @@ func start(ctx context.Context, opts StartOpts) error {
 			Executor:           exec,
 			StateManager:       smv2,
 			ResetAll: func() {
-				shardedCluster.FlushAll()
-				unshardedCluster.FlushAll()
-				connectCluster.FlushAll()
-
+				// Only flush in-memory clusters if they exist
+				if shardedCluster != nil {
+					shardedCluster.FlushAll()
+				}
+				if unshardedCluster != nil {
+					unshardedCluster.FlushAll()
+				}
+				if connectCluster != nil {
+					connectCluster.FlushAll()
+				}
 			},
 		})})
 	}
@@ -719,8 +812,8 @@ func NormalizeConcurrencyKeys(smv2 sv2.StateLoader, dbcqrs cqrs.Manager) redis_s
 	}
 }
 
-func NormalizeThrottle(smv2 sv2.StateLoader, dbcqrs cqrs.Manager) redis_state.NormalizeRefreshItemThrottleFn {
-	return func(ctx context.Context, item *queue.QueueItem, existingThrottle *queue.Throttle, shadowPartition *redis_state.QueueShadowPartition) (*queue.Throttle, error) {
+func NormalizeThrottle(smv2 sv2.StateLoader, dbcqrs cqrs.Manager) redis_state.RefreshItemThrottleFn {
+	return func(ctx context.Context, item *queue.QueueItem) (*queue.Throttle, error) {
 		id := sv2.IDFromV1(item.Data.Identifier)
 
 		workflow, err := dbcqrs.GetFunctionByInternalUUID(ctx, id.Tenant.EnvID, id.FunctionID)
@@ -755,4 +848,134 @@ func NormalizeThrottle(smv2 sv2.StateLoader, dbcqrs cqrs.Manager) redis_state.No
 
 		return queue.GetThrottleConfig(ctx, id.FunctionID, fn.Throttle, evtMap), nil
 	}
+}
+
+func PartitionConstraintConfigGetter(dbcqrs cqrs.Manager) redis_state.PartitionConstraintConfigGetter {
+	return func(ctx context.Context, p redis_state.QueueShadowPartition) (*redis_state.PartitionConstraintConfig, error) {
+		if p.EnvID == nil || p.FunctionID == nil {
+			return &redis_state.PartitionConstraintConfig{
+				Concurrency: redis_state.ShadowPartitionConcurrency{
+					SystemConcurrency:   consts.DefaultConcurrencyLimit,
+					AccountConcurrency:  consts.DefaultConcurrencyLimit,
+					FunctionConcurrency: consts.DefaultConcurrencyLimit,
+				},
+			}, nil
+		}
+
+		workflow, err := dbcqrs.GetFunctionByInternalUUID(ctx, *p.EnvID, *p.FunctionID)
+		if err != nil {
+			return nil, fmt.Errorf("could not find workflow: %w", err)
+		}
+		fn, err := workflow.InngestFunction()
+		if err != nil {
+			return nil, fmt.Errorf("could not convert workflow to inngest function: %w", err)
+		}
+
+		// TODO Make this reusable in cloud, it's the same operation with different data sources
+		accountLimit := consts.DefaultConcurrencyLimit
+
+		fnLimit := fn.ConcurrencyLimit()
+		if fnLimit <= 0 {
+			fnLimit = accountLimit
+		}
+
+		constraints := redis_state.PartitionConstraintConfig{
+			FunctionVersion: fn.FunctionVersion,
+			
+			Concurrency: redis_state.ShadowPartitionConcurrency{
+				SystemConcurrency:     consts.DefaultConcurrencyLimit,
+				AccountConcurrency:    accountLimit,
+				FunctionConcurrency:   fnLimit,
+				CustomConcurrencyKeys: nil,
+			},
+		}
+
+		if fn.Concurrency != nil && len(fn.Concurrency.Limits) > 0 {
+			for _, limit := range fn.Concurrency.Limits {
+				if !limit.IsCustomLimit() {
+					continue
+				}
+
+				constraints.Concurrency.CustomConcurrencyKeys = append(constraints.Concurrency.CustomConcurrencyKeys,
+					redis_state.CustomConcurrencyLimit{
+						Mode:                enums.ConcurrencyModeStep,
+						Scope:               limit.Scope,
+						HashedKeyExpression: limit.Hash,
+						Limit:               limit.Limit,
+					})
+			}
+		}
+
+		if fn.Throttle != nil {
+			var keyExpr string
+			if fn.Throttle.Key != nil {
+				keyExpr = *fn.Throttle.Key
+			}
+
+			constraints.Throttle = &redis_state.ShadowPartitionThrottle{
+				ThrottleKeyExpressionHash: util.XXHash(keyExpr),
+				Limit:                     int(fn.Throttle.Limit),
+				Burst:                     int(fn.Throttle.Burst),
+				Period:                    int(fn.Throttle.Period.Seconds()),
+			}
+		}
+
+		return &constraints, nil
+	}
+}
+
+func connectToOrCreateRedis(redisURI string) (rueidis.Client, error) {
+	opt, err := connectToOrCreateRedisOption(redisURI)
+	if err != nil {
+		return nil, fmt.Errorf("could not create redis options: %w", err)
+	}
+
+	rc, err := rueidis.NewClient(opt)
+	if err != nil {
+		return nil, fmt.Errorf("error creating redis client: %w", err)
+	}
+
+	return rc, nil
+}
+
+func connectToOrCreateRedisOption(redisURI string) (rueidis.ClientOption, error) {
+	if redisURI == "" {
+		return createInmemoryRedisConnectionOpt()
+	}
+
+	opt, err := rueidis.ParseURL(redisURI)
+	if err != nil {
+		return rueidis.ClientOption{}, fmt.Errorf("error parsing redis uri: %w", err)
+	}
+
+	// Set default overrides
+	opt.DisableCache = true
+	opt.BlockingPoolSize = consts.RedisBlockingPoolSize
+
+	return opt, nil
+}
+
+// createInmemoryRedisConnectionOpt creates the options for a new connection to the in-memory Redis
+// server. If the server is not yet running, it will start one.
+func createInmemoryRedisConnectionOpt() (rueidis.ClientOption, error) {
+	// For devserver, we don't use a singleton like lite.go does
+	r := miniredis.NewMiniRedis()
+	err := r.Start()
+	if err != nil {
+		return rueidis.ClientOption{}, fmt.Errorf("error starting in-memory redis: %w", err)
+	}
+
+	poll := time.Second
+	go func() {
+		for range time.Tick(poll) {
+			r.FastForward(poll)
+		}
+	}()
+
+	return rueidis.ClientOption{
+		InitAddress:       []string{r.Addr()},
+		DisableCache:      true,
+		BlockingPoolSize:  consts.RedisBlockingPoolSize,
+		ForceSingleClient: true,
+	}, nil
 }

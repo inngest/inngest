@@ -61,5 +61,6 @@ export type Result = {
     message: string;
     name: string | null;
     stack: string | null;
+    cause: string | null;
   } | null;
 };

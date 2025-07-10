@@ -65,7 +65,7 @@ func TestThrottle(t *testing.T) {
 				inngestClient,
 				inngestgo.FunctionOpts{
 					ID: "throttle-test",
-					Throttle: &inngestgo.Throttle{
+					Throttle: &inngestgo.ConfigThrottle{
 						Limit:  test.limit,
 						Period: test.period,
 						Burst:  test.burst,
@@ -112,6 +112,9 @@ func TestThrottle(t *testing.T) {
 
 				sincePreviousStart := startTimes[i].Sub(startTimes[i-1])
 
+				// Truncate to a second so that we ignore ~ms gaps.
+				sincePreviousStart = sincePreviousStart.Truncate(time.Second)
+
 				// Sometimes runs start a little before the throttle period, but
 				// shouldn't be more than 1 second before
 				require.GreaterOrEqual(t, sincePreviousStart, test.minGap)
@@ -129,15 +132,13 @@ func TestThrottle(t *testing.T) {
 
 		trigger := "test/timeouts-start-key"
 
-		var (
-			total int32
-		)
+		var total int32
 
 		_, err := inngestgo.CreateFunction(
 			inngestClient,
 			inngestgo.FunctionOpts{
 				ID: "throttle-test-with-keys",
-				Throttle: &inngestgo.Throttle{
+				Throttle: &inngestgo.ConfigThrottle{
 					Key:    inngestgo.StrPtr("event.data.id"),
 					Limit:  1,
 					Period: 3 * time.Second,

@@ -238,6 +238,42 @@ func IncrConnectGatewayReceivedRouterPubSubMessageCounter(ctx context.Context, v
 	})
 }
 
+func IncrConnectGatewayGRPCClientCreateCounter(ctx context.Context, value int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, value, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "connect_gateway.grpc.client_created",
+		Description: "The total number of GRPC clients created",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrConnectGatewayGRPCClientGCCounter(ctx context.Context, value int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, value, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "connect_gateway.grpc.client_garbage_collected",
+		Description: "The total number of GRPC client garbage collected",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrConnectGatewayGRPCForwardCounter(ctx context.Context, value int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, value, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "connect_gateway.grpc.forward_total",
+		Description: "Total number of messages forwarded via gRPC to connect gateways",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrConnectGatewayGRPCClientFailureCounter(ctx context.Context, value int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, value, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "connect_gateway.grpc.client_failure_total",
+		Description: "Total number of gRPC client creation failures for connect gateways",
+		Tags:        opts.Tags,
+	})
+}
+
 func IncrConnectRouterPubSubMessageSentCounter(ctx context.Context, value int64, opts CounterOpt) {
 	RecordCounterMetric(ctx, value, CounterOpt{
 		PkgName:     opts.PkgName,
@@ -452,6 +488,69 @@ func IncrQueueOutdatedBacklogCounter(ctx context.Context, opts CounterOpt) {
 		PkgName:     opts.PkgName,
 		MetricName:  "queue_shadow_outdated_backlog_total",
 		Description: "The total number of times outdated backlogs were detected",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrRunFinalizedCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "run_finalized_total",
+		Description: "The total number of calls to finalize a run.",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrStateWrittenCounter(ctx context.Context, size int, opts CounterOpt) {
+	RecordCounterMetric(ctx, int64(size), CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "state_store_bytes_written",
+		Description: "The total number of bytes written to the state store",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrHTTPAPIRequestsCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "http_api_requests_total",
+		Description: "Total number of HTTP API requests",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrQueueActiveCheckInvalidItemsFoundCounter(ctx context.Context, val int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, val, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "queue_active_check_invalid_items_found_total",
+		Description: "The total number of invalid items found during an active check",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrQueueActiveCheckInvalidItemsRemovedCounter(ctx context.Context, val int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, val, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "queue_active_check_invalid_items_removed_total",
+		Description: "The total number of invalid items removed during an active check",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrQueueActiveCheckAccountScannedCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "queue_active_check_account_scanned_total",
+		Description: "The total number of times an account was scanned during an active check",
+		Tags:        opts.Tags,
+	})
+}
+
+func ActiveBacklogNormalizeCount(ctx context.Context, incr int64, opts CounterOpt) {
+	RecordUpDownCounterMetric(ctx, incr, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "active_backlog_normalize_count",
+		Description: "The number of active backlog normalizations",
 		Tags:        opts.Tags,
 	})
 }

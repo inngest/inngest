@@ -12,7 +12,9 @@
     items_until,          -- Number of items within provided time range in backlog before refilling
     items_total,          -- Total number of items in backlog before refilling
     constraintCapacity,   -- Most limiting constraint capacity
-    refill                -- Number of items to refill (may include missing items)
+    refill,               -- Number of items to refill (may include missing items)
+    refilled_item_ids,    -- Set of refilled item IDs
+    retry_after           -- Unix timestamp after which retrying has a lower chance of running into constraints
   }
 
   Status values:
@@ -25,31 +27,38 @@
   5 - Throttled
 ]]
 
-local keyBacklogSet                      = KEYS[1]
+local keyShadowPartitionMeta             = KEYS[1]
 local keyBacklogMeta                     = KEYS[2]
-local keyShadowPartitionSet              = KEYS[3]
-local keyGlobalShadowPartitionSet        = KEYS[4]
-local keyGlobalAccountShadowPartitionSet = KEYS[5]
-local keyAccountShadowPartitionSet       = KEYS[6]
 
-local keyReadySet                        = KEYS[7]
-local keyGlobalPointer        	         = KEYS[8] -- partition:sorted - zset
-local keyGlobalAccountPointer 	         = KEYS[9] -- accounts:sorted - zset
-local keyAccountPartitions    	         = KEYS[10] -- accounts:$accountID:partition:sorted - zset
+local keyBacklogSet                      = KEYS[3]
+local keyShadowPartitionSet              = KEYS[4]
+local keyGlobalShadowPartitionSet        = KEYS[5]
+local keyGlobalAccountShadowPartitionSet = KEYS[6]
+local keyAccountShadowPartitionSet       = KEYS[7]
 
-local keyQueueItemHash                   = KEYS[11]
+local keyReadySet                        = KEYS[8]
+local keyGlobalPointer        	         = KEYS[9] -- partition:sorted - zset
+local keyGlobalAccountPointer 	         = KEYS[10] -- accounts:sorted - zset
+local keyAccountPartitions    	         = KEYS[11] -- accounts:$accountID:partition:sorted - zset
+
+local keyQueueItemHash                   = KEYS[12]
 
 -- Constraint-related accounting keys
-local keyActiveAccount           = KEYS[12]
-local keyActivePartition         = KEYS[13]
-local keyActiveConcurrencyKey1   = KEYS[14]
-local keyActiveConcurrencyKey2   = KEYS[15]
-local keyActiveCompound          = KEYS[16]
+local keyActiveAccount           = KEYS[13]
+local keyActivePartition         = KEYS[14]
+local keyActiveConcurrencyKey1   = KEYS[15]
+local keyActiveConcurrencyKey2   = KEYS[16]
+local keyActiveCompound          = KEYS[17]
 
-local keyActiveRunsAccount                = KEYS[17]
-local keyActiveRunsPartition              = KEYS[18]
-local keyActiveRunsCustomConcurrencyKey1  = KEYS[19]
-local keyActiveRunsCustomConcurrencyKey2  = KEYS[20]
+local keyActiveRunsAccount                = KEYS[18]
+local keyActiveRunsPartition              = KEYS[19]
+local keyActiveRunsCustomConcurrencyKey1  = KEYS[20]
+local keyActiveRunsCustomConcurrencyKey2  = KEYS[21]
+
+local keyBacklogActiveCheckSet       = KEYS[22]
+local keyBacklogActiveCheckCooldown  = KEYS[23]
+
+local keyPartitionNormalizeSet       = KEYS[24]
 
 local backlogID     = ARGV[1]
 local partitionID   = ARGV[2]
@@ -74,12 +83,15 @@ local keyPrefix = ARGV[15]
 
 local enableKeyQueues = tonumber(ARGV[16])
 
+local shouldSpotCheckActiveSet = tonumber(ARGV[17])
+
 -- $include(update_pointer_score.lua)
 -- $include(ends_with.lua)
 -- $include(update_account_queues.lua)
 -- $include(gcra.lua)
 -- $include(update_backlog_pointer.lua)
 -- $include(update_active_sets.lua)
+-- $include(active_check.lua)
 
 --
 -- Retrieve current backlog size
@@ -95,9 +107,9 @@ if backlogCountTotal == 0 then
   redis.call("HDEL", keyBacklogMeta, backlogID)
 
   -- update backlog pointers
-  updateBacklogPointer(keyGlobalShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, keyShadowPartitionSet, keyBacklogSet, accountID, partitionID, backlogID)
+  updateBacklogPointer(keyShadowPartitionMeta, keyBacklogMeta, keyGlobalShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, keyShadowPartitionSet, keyBacklogSet, keyPartitionNormalizeSet, accountID, partitionID, backlogID)
 
-  return { 0, 0, 0, backlogCountTotal, 0, 0 }
+  return { 0, 0, 0, backlogCountTotal, 0, 0, {}, 0 }
 end
 
 local backlogCountUntil = redis.call("ZCOUNT", keyBacklogSet, "-inf", refillUntilMS)
@@ -107,9 +119,9 @@ end
 
 if backlogCountUntil == 0 then
   -- update backlog pointers
-  updateBacklogPointer(keyGlobalShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, keyShadowPartitionSet, keyBacklogSet, accountID, partitionID, backlogID)
+  updateBacklogPointer(keyShadowPartitionMeta, keyBacklogMeta, keyGlobalShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, keyShadowPartitionSet, keyBacklogSet, keyPartitionNormalizeSet, accountID, partitionID, backlogID)
 
-  return { 0, 0, backlogCountUntil, backlogCountTotal, 0, 0 }
+  return { 0, 0, backlogCountUntil, backlogCountTotal, 0, 0, {}, 0 }
 end
 
 --
@@ -133,6 +145,7 @@ local constraintCapacity = nil
 
 -- Set initial status to success, progressively add more specific capacity constraints
 local status = 0
+local retryAt = 0
 
 local function check_active_capacity(now_ms, keyActiveSet, limit)
 	local count = redis.call("SCARD", keyActiveSet)
@@ -146,10 +159,13 @@ end
 if enableKeyQueues == 1 then
   -- Check throttle capacity
   if (constraintCapacity == nil or constraintCapacity > 0) and throttlePeriod > 0 and throttleLimit > 0 then
-    local remainingThrottleCapacity = gcraCapacity(throttleKey, nowMS, throttlePeriod * 1000, throttleLimit, throttleBurst)
+    local gcraRes = gcraCapacity(throttleKey, nowMS, throttlePeriod * 1000, throttleLimit, throttleBurst)
+    local remainingThrottleCapacity = gcraRes[1]
+    local throttleRetryAt = gcraRes[2]
     if constraintCapacity == nil or remainingThrottleCapacity < constraintCapacity then
       constraintCapacity = remainingThrottleCapacity
       status = 5
+      retryAt = throttleRetryAt
     end
   end
 
@@ -221,6 +237,7 @@ end
 local refilled = 0
 
 -- Only attempt to refill if we have capacity
+local refilledItemIDs = {}
 if refill > 0 then
   -- Move item(s) out of backlog and into partition
 
@@ -233,7 +250,6 @@ if refill > 0 then
 
   -- Reverse the items to be added to the ready set
   local readyArgs = {}
-  local markActiveItemIDs = {}
 
   local backlogRemArgs = {}
   local hasRemove = false
@@ -274,7 +290,7 @@ if refill > 0 then
       table.insert(itemUpdateArgs, itemID)
       table.insert(itemUpdateArgs, cjson.encode(updatedData))
 
-      table.insert(markActiveItemIDs, itemID)
+      table.insert(refilledItemIDs, itemID)
 
       -- Increment number of refilled items
       refilled = refilled + 1
@@ -286,7 +302,7 @@ if refill > 0 then
     redis.call("ZADD", keyReadySet, unpack(readyArgs))
 
     if enableKeyQueues == 1 then
-      addToActiveSets(keyActivePartition, keyActiveAccount, keyActiveCompound, keyActiveConcurrencyKey1, keyActiveConcurrencyKey2, markActiveItemIDs)
+      addToActiveSets(keyActivePartition, keyActiveAccount, keyActiveCompound, keyActiveConcurrencyKey1, keyActiveConcurrencyKey2, refilledItemIDs)
     end
 
     -- Update queue items with refill data
@@ -321,14 +337,16 @@ if refilled > 0 then
   end
 end
 
+
 --
 -- Adjust pointer scores for shadow scanning, potentially clean up
 --
 
--- Clean up backlog meta if we refilled the last item (or dropped all dangling item pointers)
-if tonumber(redis.call("ZCARD", keyBacklogSet)) == 0 then
-  redis.call("HDEL", keyBacklogMeta, backlogID)
-else
+local function update_backlog_successive_constrained_counters(keyBacklogMeta, backlogID, status)
+  --
+  -- Update successive constrained metrics in backlog meta
+  --
+
   local existing = cjson.decode(redis.call("HGET", keyBacklogMeta, backlogID))
 
   -- If not constrained, reset counters
@@ -360,6 +378,23 @@ else
   redis.call("HSET", keyBacklogMeta, backlogID, cjson.encode(existing))
 end
 
-updateBacklogPointer(keyGlobalShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, keyShadowPartitionSet, keyBacklogSet, accountID, partitionID, backlogID)
+-- Clean up backlog meta if we refilled the last item (or dropped all dangling item pointers)
+if tonumber(redis.call("ZCARD", keyBacklogSet)) == 0 then
+  redis.call("HDEL", keyBacklogMeta, backlogID)
+else
+  update_backlog_successive_constrained_counters(keyBacklogMeta, backlogID, status)
+end
 
-return { status, refilled, backlogCountUntil, backlogCountTotal, constraintCapacity, refill }
+-- Always update pointers
+updateBacklogPointer(keyShadowPartitionMeta, keyBacklogMeta, keyGlobalShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, keyShadowPartitionSet, keyBacklogSet, keyPartitionNormalizeSet, accountID, partitionID, backlogID)
+
+--
+-- Optional: Add backlog to active checker set. This will verify that all items marked as active
+-- are either in the ready queue or in progress.
+--
+local concurrencyConstrained = status >= 1 and status <= 4
+if concurrencyConstrained and shouldSpotCheckActiveSet == 1 then
+    add_to_active_check(keyBacklogActiveCheckSet, keyBacklogActiveCheckCooldown, backlogID, nowMS)
+end
+
+return { status, refilled, backlogCountUntil, backlogCountTotal, constraintCapacity, refill, refilledItemIDs, retryAt }

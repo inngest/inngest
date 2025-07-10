@@ -282,7 +282,7 @@ func TestInvokeTimeout(t *testing.T) {
 	_, err = inngestgo.CreateFunction(
 		inngestClient,
 		inngestgo.FunctionOpts{
-			ID:      "main-fn",
+			ID: "main-fn",
 		},
 		inngestgo.EventTrigger(evtName, nil),
 		func(ctx context.Context, input inngestgo.Input[DebounceEvent]) (any, error) {
@@ -369,7 +369,7 @@ func TestInvokeRateLimit(t *testing.T) {
 		inngestClient,
 		inngestgo.FunctionOpts{
 			ID: invokedFnName,
-			RateLimit: &inngestgo.RateLimit{
+			RateLimit: &inngestgo.ConfigRateLimit{
 				Limit:  1,
 				Period: 1 * time.Minute,
 			},

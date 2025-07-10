@@ -1,23 +1,14 @@
 'use client';
 
 import type { Route } from 'next';
-import NextLink from 'next/link';
 import { Alert } from '@inngest/components/Alert';
 import { Button } from '@inngest/components/Button';
-import { Time } from '@inngest/components/Time';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
-import { useCron } from '@inngest/components/hooks/useCron';
+import { FunctionConfiguration } from '@inngest/components/FunctionConfiguration';
 import { useSearchParam } from '@inngest/components/hooks/useSearchParam';
-import { EventsIcon } from '@inngest/components/icons/sections/Events';
-import { FunctionsIcon } from '@inngest/components/icons/sections/Functions';
 import { cn } from '@inngest/components/utils/classNames';
-import { relativeTime } from '@inngest/components/utils/date';
-import { RiArrowRightSLine, RiTimeLine } from '@remixicon/react';
 import { ErrorBoundary } from '@sentry/nextjs';
 
 import type { TimeRange } from '@/types/TimeRangeFilter';
-import FunctionConfiguration from '@/app/(organization-active)/(dashboard)/env/[environmentSlug]/functions/[slug]/(dashboard)/FunctionConfiguration';
-import Block from '@/components/Block';
 import LoadingIcon from '@/icons/LoadingIcon';
 import { useFunction, useFunctionUsage } from '@/queries';
 import { pathCreator } from '@/utils/urls';
@@ -90,15 +81,13 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
     ? '0.00'
     : (((usageMetrics.totalFailures || 0) / (usageMetrics.totalRuns || 0)) * 100).toFixed(2);
 
-  const triggers = function_.current?.triggers || [];
-
   function handleTimeRangeChange(timeRange: TimeRange) {
     if (timeRange.key) {
       setTimeRangeParam(timeRange.key);
     }
   }
 
-  let appRoute = `/env/${params.environmentSlug}/apps/${function_.appName}` as Route;
+  let appRoute = `/env/${params.environmentSlug}/apps/${function_.app.name}` as Route;
 
   return (
     <>
@@ -149,7 +138,7 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
             />
           </div>
         </main>
-        <aside className="border-subtle bg-canvasSubtle overflow-y-auto border-l px-6 py-4">
+        <aside className="border-subtle bg-canvasSubtle overflow-y-auto">
           <ErrorBoundary
             fallback={({ error, resetError }) => (
               <div className="flex items-center justify-center">
@@ -170,204 +159,28 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
               </div>
             )}
           >
-            <div className="flex flex-col gap-10">
-              <Block title="App">
-                <NextLink
-                  href={appRoute}
-                  className="border-subtle bg-canvasBase hover:bg-canvasMuted block rounded-md border p-4"
-                >
-                  <div className="flex min-w-0 items-center">
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate font-medium">{function_.appName}</p>
-                      {function_.current?.deploy?.createdAt && (
-                        <Time
-                          className="text-subtle text-xs"
-                          format="relative"
-                          value={new Date(function_.current.deploy.createdAt)}
-                        />
-                      )}
-                    </div>
-                    <RiArrowRightSLine className="h-5" />
-                  </div>
-                </NextLink>
-              </Block>
-              <Block title="Triggers">
-                <div className="space-y-3">
-                  {triggers.map((trigger) =>
-                    trigger.eventName ? (
-                      <NextLink
-                        key={trigger.eventName}
-                        href={pathCreator.eventType({
-                          envSlug: params.environmentSlug,
-                          eventName: trigger.eventName,
-                        })}
-                        className="border-subtle bg-canvasBase hover:bg-canvasMuted block rounded-md border p-4"
-                      >
-                        <div className="flex min-w-0 items-center">
-                          <div className="min-w-0 flex-1 space-y-1">
-                            <div className="flex min-w-0 items-center">
-                              <EventsIcon className="text-subtle w-8 shrink-0 pr-2" />
-                              <p className="truncate font-medium">{trigger.eventName}</p>
-                            </div>
-                            <dl className="text-xs">
-                              {trigger.condition && (
-                                <div className="flex gap-1">
-                                  <dt className="text-subtle">If</dt>
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <dd className="truncate font-mono ">{trigger.condition}</dd>
-                                    </TooltipTrigger>
-                                    <TooltipContent className="font-mono text-xs">
-                                      {trigger.condition}
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </div>
-                              )}
-                            </dl>
-                          </div>
-                          <RiArrowRightSLine className="h-5" />
-                        </div>
-                      </NextLink>
-                    ) : trigger.schedule ? (
-                      <ScheduleTrigger
-                        key={trigger.schedule}
-                        schedule={trigger.schedule}
-                        condition={trigger.condition}
-                      />
-                    ) : null
-                  )}
-                </div>
-              </Block>
-              {function_.configuration?.cancellations &&
-                function_.configuration.cancellations.length > 0 && (
-                  <Block title="Cancellation">
-                    <div className="space-y-3">
-                      {function_.configuration.cancellations.map((cancellation) => {
-                        return (
-                          <NextLink
-                            key={cancellation.event}
-                            href={pathCreator.eventType({
-                              envSlug: params.environmentSlug,
-                              eventName: cancellation.event,
-                            })}
-                            className="border-subtle bg-canvasBase hover:bg-canvasMuted block rounded-md border p-4"
-                          >
-                            <div className="flex min-w-0 items-center">
-                              <div className="min-w-0 flex-1 space-y-1">
-                                <div className="flex min-w-0 items-center">
-                                  <EventsIcon className="text-subtle w-8 shrink-0 pr-2" />
-                                  <p className="truncate font-medium">{cancellation.event}</p>
-                                </div>
-                                <dl className="text-xs">
-                                  {cancellation.condition && (
-                                    <div className="flex gap-1">
-                                      <dt className="text-subtle">If</dt>
-                                      <Tooltip>
-                                        <TooltipTrigger asChild>
-                                          <dd className="truncate font-mono ">
-                                            {cancellation.condition}
-                                          </dd>
-                                        </TooltipTrigger>
-                                        <TooltipContent className="font-mono text-xs">
-                                          {cancellation.condition}
-                                        </TooltipContent>
-                                      </Tooltip>
-                                    </div>
-                                  )}
-                                  {cancellation.timeout && (
-                                    <div className="flex gap-1">
-                                      <dt className="text-subtle">Timeout</dt>
-                                      <dd className="">{cancellation.timeout}</dd>
-                                    </div>
-                                  )}
-                                </dl>
-                              </div>
-                              <RiArrowRightSLine className="h-5" />
-                            </div>
-                          </NextLink>
-                        );
-                      })}
-                    </div>
-                  </Block>
-                )}
-              {function_.failureHandler && (
-                <Block title="Failure Handler">
-                  <div className="space-y-3">
-                    <NextLink
-                      href={pathCreator.function({
-                        envSlug: params.environmentSlug,
-                        functionSlug: function_.failureHandler.slug,
-                      })}
-                      className="border-subtle bg-canvasBase hover:bg-canvasMuted block rounded-md border p-4"
-                    >
-                      <div className="flex min-w-0 items-center">
-                        <div className="min-w-0 flex-1">
-                          <div className="flex min-w-0 items-center">
-                            <FunctionsIcon className="text-subtle w-8 shrink-0 pr-2" />
-                            <p className="truncate font-medium">{function_.failureHandler.name}</p>
-                          </div>
-                        </div>
-                        <RiArrowRightSLine className="h-5" />
-                      </div>
-                    </NextLink>
-                  </div>
-                </Block>
-              )}
-              {function_.configuration && (
-                <FunctionConfiguration configuration={function_.configuration} />
-              )}
+            <div className="bg-canvasBase h-full overflow-y-auto">
+              <FunctionConfiguration
+                inngestFunction={function_}
+                deployCreatedAt={function_.current?.deploy?.createdAt}
+                getAppLink={() => appRoute}
+                getEventLink={(eventName) =>
+                  pathCreator.eventType({
+                    envSlug: params.environmentSlug,
+                    eventName,
+                  })
+                }
+                getFunctionLink={(functionSlug) =>
+                  pathCreator.function({
+                    envSlug: params.environmentSlug,
+                    functionSlug,
+                  })
+                }
+              />
             </div>
           </ErrorBoundary>
         </aside>
       </div>
     </>
-  );
-}
-
-type ScheduleTriggerProps = {
-  schedule: string;
-  condition: string | null;
-};
-
-function ScheduleTrigger({ schedule, condition }: ScheduleTriggerProps) {
-  const { nextRun } = useCron(schedule);
-
-  return (
-    <div className="border-subtle bg-canvasBase rounded-md border p-4">
-      <div className="flex min-w-0 items-center">
-        <div className="min-w-0 flex-1 space-y-1">
-          <div className="flex min-w-0 items-center">
-            <RiTimeLine className="text-subtle w-8 shrink-0 pr-2" />
-            <p className="truncate font-medium">{schedule}</p>
-          </div>
-          <dl className="text-xs">
-            {condition && (
-              <div className="flex gap-1">
-                <dt className="text-subtle">If</dt>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <dd className="truncate font-mono ">{condition}</dd>
-                  </TooltipTrigger>
-                  <TooltipContent className="font-mono text-xs">{condition}</TooltipContent>
-                </Tooltip>
-              </div>
-            )}
-            {nextRun && (
-              <div className="flex gap-1">
-                <dt className="text-subtle">Next run</dt>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <dd className="truncate">{relativeTime(nextRun)}</dd>
-                  </TooltipTrigger>
-                  <TooltipContent className="font-mono text-xs">
-                    {nextRun.toISOString()}
-                  </TooltipContent>
-                </Tooltip>
-              </div>
-            )}
-          </dl>
-        </div>
-      </div>
-    </div>
   );
 }

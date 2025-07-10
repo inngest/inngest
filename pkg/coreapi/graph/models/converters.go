@@ -3,6 +3,7 @@ package models
 import (
 	"context"
 	"fmt"
+
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/logger"
@@ -17,8 +18,9 @@ func MakeFunction(f *cqrs.Function) (*Function, error) {
 	triggers := make([]*FunctionTrigger, len(fn.Triggers))
 	for n, t := range fn.Triggers {
 		var (
-			val string
-			typ FunctionTriggerTypes
+			val       string
+			typ       FunctionTriggerTypes
+			condition *string
 		)
 		if t.CronTrigger != nil {
 			typ = FunctionTriggerTypesCron
@@ -27,10 +29,12 @@ func MakeFunction(f *cqrs.Function) (*Function, error) {
 		if t.EventTrigger != nil {
 			typ = FunctionTriggerTypesEvent
 			val = t.Event
+			condition = t.Expression
 		}
 		triggers[n] = &FunctionTrigger{
-			Type:  typ,
-			Value: val,
+			Type:      typ,
+			Value:     val,
+			Condition: condition,
 		}
 	}
 

@@ -160,16 +160,17 @@ type ComplexityRoot struct {
 	}
 
 	Function struct {
-		App           func(childComplexity int) int
-		AppID         func(childComplexity int) int
-		Concurrency   func(childComplexity int) int
-		Config        func(childComplexity int) int
-		Configuration func(childComplexity int) int
-		ID            func(childComplexity int) int
-		Name          func(childComplexity int) int
-		Slug          func(childComplexity int) int
-		Triggers      func(childComplexity int) int
-		URL           func(childComplexity int) int
+		App            func(childComplexity int) int
+		AppID          func(childComplexity int) int
+		Concurrency    func(childComplexity int) int
+		Config         func(childComplexity int) int
+		Configuration  func(childComplexity int) int
+		FailureHandler func(childComplexity int) int
+		ID             func(childComplexity int) int
+		Name           func(childComplexity int) int
+		Slug           func(childComplexity int) int
+		Triggers       func(childComplexity int) int
+		URL            func(childComplexity int) int
 	}
 
 	FunctionConfiguration struct {
@@ -230,7 +231,7 @@ type ComplexityRoot struct {
 		SourceID       func(childComplexity int) int
 		StartedAt      func(childComplexity int) int
 		Status         func(childComplexity int) int
-		Trace          func(childComplexity int) int
+		Trace          func(childComplexity int, preview *bool) int
 		TraceID        func(childComplexity int) int
 		TriggerIDs     func(childComplexity int) int
 	}
@@ -241,8 +242,9 @@ type ComplexityRoot struct {
 	}
 
 	FunctionTrigger struct {
-		Type  func(childComplexity int) int
-		Value func(childComplexity int) int
+		Condition func(childComplexity int) int
+		Type      func(childComplexity int) int
+		Value     func(childComplexity int) int
 	}
 
 	FunctionVersion struct {
@@ -434,6 +436,7 @@ type ComplexityRoot struct {
 	}
 
 	StepError struct {
+		Cause   func(childComplexity int) int
 		Message func(childComplexity int) int
 		Name    func(childComplexity int) int
 		Stack   func(childComplexity int) int
@@ -529,6 +532,8 @@ type EventResolver interface {
 	FunctionRuns(ctx context.Context, obj *models.Event) ([]*models.FunctionRun, error)
 }
 type FunctionResolver interface {
+	FailureHandler(ctx context.Context, obj *models.Function) (*models.Function, error)
+
 	App(ctx context.Context, obj *models.Function) (*cqrs.App, error)
 }
 type FunctionRunResolver interface {
@@ -550,7 +555,7 @@ type FunctionRunV2Resolver interface {
 
 	Function(ctx context.Context, obj *models.FunctionRunV2) (*models.Function, error)
 
-	Trace(ctx context.Context, obj *models.FunctionRunV2) (*models.RunTraceSpan, error)
+	Trace(ctx context.Context, obj *models.FunctionRunV2, preview *bool) (*models.RunTraceSpan, error)
 }
 type MutationResolver interface {
 	CreateApp(ctx context.Context, input models.CreateAppInput) (*cqrs.App, error)
@@ -1110,6 +1115,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.Function.Configuration(childComplexity), true
 
+	case "Function.failureHandler":
+		if e.complexity.Function.FailureHandler == nil {
+			break
+		}
+
+		return e.complexity.Function.FailureHandler(childComplexity), true
+
 	case "Function.id":
 		if e.complexity.Function.ID == nil {
 			break
@@ -1491,7 +1503,12 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			break
 		}
 
-		return e.complexity.FunctionRunV2.Trace(childComplexity), true
+		args, err := ec.field_FunctionRunV2_trace_args(context.TODO(), rawArgs)
+		if err != nil {
+			return 0, false
+		}
+
+		return e.complexity.FunctionRunV2.Trace(childComplexity, args["preview"].(*bool)), true
 
 	case "FunctionRunV2.traceID":
 		if e.complexity.FunctionRunV2.TraceID == nil {
@@ -1520,6 +1537,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.FunctionRunV2Edge.Node(childComplexity), true
+
+	case "FunctionTrigger.condition":
+		if e.complexity.FunctionTrigger.Condition == nil {
+			break
+		}
+
+		return e.complexity.FunctionTrigger.Condition(childComplexity), true
 
 	case "FunctionTrigger.type":
 		if e.complexity.FunctionTrigger.Type == nil {
@@ -2489,6 +2513,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.SleepStepInfo.SleepUntil(childComplexity), true
 
+	case "StepError.cause":
+		if e.complexity.StepError.Cause == nil {
+			break
+		}
+
+		return e.complexity.StepError.Cause(childComplexity), true
+
 	case "StepError.message":
 		if e.complexity.StepError.Message == nil {
 			break
@@ -3097,6 +3128,7 @@ type Function {
   id: String!
   name: String!
   slug: String!
+  failureHandler: Function
   config: String!
   configuration: FunctionConfiguration!
   concurrency: Int!
@@ -3114,6 +3146,7 @@ enum FunctionTriggerTypes {
 type FunctionTrigger {
   type: FunctionTriggerTypes!
   value: String!
+  condition: String
 }
 
 enum FunctionRunStatus {
@@ -3408,7 +3441,7 @@ type FunctionRunV2 {
 
   output: Bytes
 
-  trace: RunTraceSpan
+  trace(preview: Boolean): RunTraceSpan
   hasAI: Boolean!
 }
 
@@ -3533,6 +3566,7 @@ type StepError {
   message: String!
   name: String
   stack: String
+  cause: Bytes
 }
 
 type RunTraceTrigger {
@@ -3641,6 +3675,21 @@ var parsedSchema = gqlparser.MustLoadSchema(sources...)
 // endregion ************************** generated!.gotpl **************************
 
 // region    ***************************** args.gotpl *****************************
+
+func (ec *executionContext) field_FunctionRunV2_trace_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
+	var err error
+	args := map[string]interface{}{}
+	var arg0 *bool
+	if tmp, ok := rawArgs["preview"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("preview"))
+		arg0, err = ec.unmarshalOBoolean2ᚖbool(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["preview"] = arg0
+	return args, nil
+}
 
 func (ec *executionContext) field_FunctionRun_historyItemOutput_args(ctx context.Context, rawArgs map[string]interface{}) (map[string]interface{}, error) {
 	var err error
@@ -4520,6 +4569,8 @@ func (ec *executionContext) fieldContext_App_functions(ctx context.Context, fiel
 				return ec.fieldContext_Function_name(ctx, field)
 			case "slug":
 				return ec.fieldContext_Function_slug(ctx, field)
+			case "failureHandler":
+				return ec.fieldContext_Function_failureHandler(ctx, field)
 			case "config":
 				return ec.fieldContext_Function_config(ctx, field)
 			case "configuration":
@@ -7288,6 +7339,71 @@ func (ec *executionContext) fieldContext_Function_slug(ctx context.Context, fiel
 	return fc, nil
 }
 
+func (ec *executionContext) _Function_failureHandler(ctx context.Context, field graphql.CollectedField, obj *models.Function) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_Function_failureHandler(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return ec.resolvers.Function().FailureHandler(rctx, obj)
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*models.Function)
+	fc.Result = res
+	return ec.marshalOFunction2ᚖgithubᚗcomᚋinngestᚋinngestᚋpkgᚋcoreapiᚋgraphᚋmodelsᚐFunction(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_Function_failureHandler(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "Function",
+		Field:      field,
+		IsMethod:   true,
+		IsResolver: true,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			switch field.Name {
+			case "id":
+				return ec.fieldContext_Function_id(ctx, field)
+			case "name":
+				return ec.fieldContext_Function_name(ctx, field)
+			case "slug":
+				return ec.fieldContext_Function_slug(ctx, field)
+			case "failureHandler":
+				return ec.fieldContext_Function_failureHandler(ctx, field)
+			case "config":
+				return ec.fieldContext_Function_config(ctx, field)
+			case "configuration":
+				return ec.fieldContext_Function_configuration(ctx, field)
+			case "concurrency":
+				return ec.fieldContext_Function_concurrency(ctx, field)
+			case "triggers":
+				return ec.fieldContext_Function_triggers(ctx, field)
+			case "url":
+				return ec.fieldContext_Function_url(ctx, field)
+			case "appID":
+				return ec.fieldContext_Function_appID(ctx, field)
+			case "app":
+				return ec.fieldContext_Function_app(ctx, field)
+			}
+			return nil, fmt.Errorf("no field named %q was found under type Function", field.Name)
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _Function_config(ctx context.Context, field graphql.CollectedField, obj *models.Function) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_Function_config(ctx, field)
 	if err != nil {
@@ -7480,6 +7596,8 @@ func (ec *executionContext) fieldContext_Function_triggers(ctx context.Context, 
 				return ec.fieldContext_FunctionTrigger_type(ctx, field)
 			case "value":
 				return ec.fieldContext_FunctionTrigger_value(ctx, field)
+			case "condition":
+				return ec.fieldContext_FunctionTrigger_condition(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type FunctionTrigger", field.Name)
 		},
@@ -8466,6 +8584,8 @@ func (ec *executionContext) fieldContext_FunctionRun_function(ctx context.Contex
 				return ec.fieldContext_Function_name(ctx, field)
 			case "slug":
 				return ec.fieldContext_Function_slug(ctx, field)
+			case "failureHandler":
+				return ec.fieldContext_Function_failureHandler(ctx, field)
 			case "config":
 				return ec.fieldContext_Function_config(ctx, field)
 			case "configuration":
@@ -9473,6 +9593,8 @@ func (ec *executionContext) fieldContext_FunctionRunV2_function(ctx context.Cont
 				return ec.fieldContext_Function_name(ctx, field)
 			case "slug":
 				return ec.fieldContext_Function_slug(ctx, field)
+			case "failureHandler":
+				return ec.fieldContext_Function_failureHandler(ctx, field)
 			case "config":
 				return ec.fieldContext_Function_config(ctx, field)
 			case "configuration":
@@ -10015,7 +10137,7 @@ func (ec *executionContext) _FunctionRunV2_trace(ctx context.Context, field grap
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.FunctionRunV2().Trace(rctx, obj)
+		return ec.resolvers.FunctionRunV2().Trace(rctx, obj, fc.Args["preview"].(*bool))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -10086,6 +10208,17 @@ func (ec *executionContext) fieldContext_FunctionRunV2_trace(ctx context.Context
 			}
 			return nil, fmt.Errorf("no field named %q was found under type RunTraceSpan", field.Name)
 		},
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			err = ec.Recover(ctx, r)
+			ec.Error(ctx, err)
+		}
+	}()
+	ctx = graphql.WithFieldContext(ctx, fc)
+	if fc.Args, err = ec.field_FunctionRunV2_trace_args(ctx, field.ArgumentMap(ec.Variables)); err != nil {
+		ec.Error(ctx, err)
+		return
 	}
 	return fc, nil
 }
@@ -10338,6 +10471,47 @@ func (ec *executionContext) _FunctionTrigger_value(ctx context.Context, field gr
 }
 
 func (ec *executionContext) fieldContext_FunctionTrigger_value(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "FunctionTrigger",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _FunctionTrigger_condition(ctx context.Context, field graphql.CollectedField, obj *models.FunctionTrigger) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_FunctionTrigger_condition(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Condition, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_FunctionTrigger_condition(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
 	fc = &graphql.FieldContext{
 		Object:     "FunctionTrigger",
 		Field:      field,
@@ -11999,6 +12173,8 @@ func (ec *executionContext) fieldContext_Query_functionBySlug(ctx context.Contex
 				return ec.fieldContext_Function_name(ctx, field)
 			case "slug":
 				return ec.fieldContext_Function_slug(ctx, field)
+			case "failureHandler":
+				return ec.fieldContext_Function_failureHandler(ctx, field)
 			case "config":
 				return ec.fieldContext_Function_config(ctx, field)
 			case "configuration":
@@ -12073,6 +12249,8 @@ func (ec *executionContext) fieldContext_Query_functions(ctx context.Context, fi
 				return ec.fieldContext_Function_name(ctx, field)
 			case "slug":
 				return ec.fieldContext_Function_slug(ctx, field)
+			case "failureHandler":
+				return ec.fieldContext_Function_failureHandler(ctx, field)
 			case "config":
 				return ec.fieldContext_Function_config(ctx, field)
 			case "configuration":
@@ -15986,6 +16164,8 @@ func (ec *executionContext) fieldContext_RunTraceSpanOutput_error(ctx context.Co
 				return ec.fieldContext_StepError_name(ctx, field)
 			case "stack":
 				return ec.fieldContext_StepError_stack(ctx, field)
+			case "cause":
+				return ec.fieldContext_StepError_cause(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type StepError", field.Name)
 		},
@@ -16690,6 +16870,47 @@ func (ec *executionContext) fieldContext_StepError_stack(ctx context.Context, fi
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
 			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _StepError_cause(ctx context.Context, field graphql.CollectedField, obj *models.StepError) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_StepError_cause(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.Cause, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOBytes2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_StepError_cause(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "StepError",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type Bytes does not have child fields")
 		},
 	}
 	return fc, nil
@@ -21658,6 +21879,23 @@ func (ec *executionContext) _Function(ctx context.Context, sel ast.SelectionSet,
 			if out.Values[i] == graphql.Null {
 				atomic.AddUint32(&invalids, 1)
 			}
+		case "failureHandler":
+			field := field
+
+			innerFunc := func(ctx context.Context) (res graphql.Marshaler) {
+				defer func() {
+					if r := recover(); r != nil {
+						ec.Error(ctx, ec.Recover(ctx, r))
+					}
+				}()
+				res = ec._Function_failureHandler(ctx, field, obj)
+				return res
+			}
+
+			out.Concurrently(i, func() graphql.Marshaler {
+				return innerFunc(ctx)
+
+			})
 		case "config":
 
 			out.Values[i] = ec._Function_config(ctx, field, obj)
@@ -22275,6 +22513,10 @@ func (ec *executionContext) _FunctionTrigger(ctx context.Context, sel ast.Select
 			if out.Values[i] == graphql.Null {
 				invalids++
 			}
+		case "condition":
+
+			out.Values[i] = ec._FunctionTrigger_condition(ctx, field, obj)
+
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))
 		}
@@ -23733,6 +23975,10 @@ func (ec *executionContext) _StepError(ctx context.Context, sel ast.SelectionSet
 		case "stack":
 
 			out.Values[i] = ec._StepError_stack(ctx, field, obj)
+
+		case "cause":
+
+			out.Values[i] = ec._StepError_cause(ctx, field, obj)
 
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))

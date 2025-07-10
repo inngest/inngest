@@ -11,6 +11,7 @@ import (
 	"github.com/inngest/inngest/pkg/event"
 	statev1 "github.com/inngest/inngest/pkg/execution/state"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
+	"github.com/inngest/inngest/pkg/tracing/meta"
 	"github.com/oklog/ulid/v2"
 	"go.opentelemetry.io/otel/trace"
 )
@@ -342,6 +343,34 @@ func (c *Config) FunctionTrace() *itrace.TraceCarrier {
 		}
 
 	}
+	return nil
+}
+
+func (c *Config) NewSetFunctionTrace(carrier *meta.SpanReference) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	c.initContext()
+	c.Context[meta.PropagationKey] = *carrier
+}
+
+func (c *Config) NewFunctionTrace() *meta.SpanReference {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+
+	if c.Context == nil {
+		return nil
+	}
+
+	if raw, ok := c.Context[meta.PropagationKey]; ok {
+		if data, err := json.Marshal(raw); err == nil {
+			var meta meta.SpanReference
+			if err := json.Unmarshal(data, &meta); err == nil {
+				return &meta
+			}
+		}
+	}
+
 	return nil
 }
 

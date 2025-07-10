@@ -8,8 +8,8 @@ import (
 	"reflect"
 
 	"github.com/inngest/inngest/pkg/enums"
-	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngestgo/errors"
+	"github.com/inngest/inngestgo/internal/sdkrequest"
 )
 
 type InferFormat string
@@ -29,7 +29,6 @@ func Infer[InputT any, OutputT any](
 	id string,
 	in InferOpts[InputT],
 ) (out OutputT, err error) {
-
 	mgr := preflight(ctx)
 	op := mgr.NewOp(enums.OpcodeAIGateway, id, nil)
 	hashedID := op.MustHash()
@@ -96,7 +95,7 @@ func Infer[InputT any, OutputT any](
 		panic(ControlHijack{})
 	}
 
-	mgr.AppendOp(state.GeneratorOpcode{
+	mgr.AppendOp(sdkrequest.GeneratorOpcode{
 		ID:   hashedID,
 		Op:   enums.OpcodeAIGateway,
 		Name: id,

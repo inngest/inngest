@@ -90,7 +90,8 @@ type Function struct {
 
 	// Singleton ensures that only one instance of the function runs at a time for a given key.
 	// If another invocation is received while an instance is running, the behavior depends on
-	// the mode property: `skip` will drop the new invocation.
+	// the mode property: `skip` will drop the new invocation, `cancel` will cancel the
+	// running instance and start the new one.
 	Singleton *Singleton `json:"singleton,omitempty"`
 
 	// Actions represents the actions to take for this function.  If empty, this assumes

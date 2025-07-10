@@ -84,6 +84,11 @@ type RequestReceiver interface {
 	Wait(ctx context.Context) error
 }
 
+type subscription struct {
+	ch  chan string
+	ctx context.Context
+}
+
 type EnforceLeaseExpiryFunc func(ctx context.Context, accountID uuid.UUID) bool
 
 type redisPubSubConnector struct {
@@ -91,7 +96,7 @@ type redisPubSubConnector struct {
 	pubSubClient rueidis.DedicatedClient
 	setup        chan struct{}
 
-	subscribers     map[string]map[string]chan string
+	subscribers     map[string]map[string]*subscription
 	subscribersLock sync.RWMutex
 
 	logger logger.Logger
@@ -102,25 +107,46 @@ type redisPubSubConnector struct {
 
 	enforceLeaseExpiry EnforceLeaseExpiryFunc
 
+	gatewayGRPCForwarder GatewayGRPCForwarder
+
+	shouldUseGRPC UseGRPCFunc
+
 	RequestReceiver
 }
 
+type UseGRPCFunc func(ctx context.Context, accountID uuid.UUID) bool
+
 type RedisPubSubConnectorOpts struct {
-	Logger             logger.Logger
-	Tracer             trace.ConditionalTracer
-	StateManager       state.StateManager
-	EnforceLeaseExpiry EnforceLeaseExpiryFunc
+	Logger               logger.Logger
+	Tracer               trace.ConditionalTracer
+	StateManager         state.StateManager
+	EnforceLeaseExpiry   EnforceLeaseExpiryFunc
+	GatewayGRPCForwarder GatewayGRPCForwarder
+
+	ShouldUseGRPC UseGRPCFunc
 }
 
 func newRedisPubSubConnector(client rueidis.Client, opts RedisPubSubConnectorOpts) *redisPubSubConnector {
+	var shouldUseGRPC UseGRPCFunc
+	if opts.ShouldUseGRPC == nil {
+		shouldUseGRPC = func(ctx context.Context, accountID uuid.UUID) bool {
+			return false
+		}
+	} else {
+		shouldUseGRPC = opts.ShouldUseGRPC
+	}
+
 	return &redisPubSubConnector{
 		client:             client,
-		subscribers:        make(map[string]map[string]chan string),
+		subscribers:        make(map[string]map[string]*subscription),
 		subscribersLock:    sync.RWMutex{},
 		logger:             opts.Logger,
 		tracer:             opts.Tracer,
 		setup:              make(chan struct{}),
 		enforceLeaseExpiry: opts.EnforceLeaseExpiry,
+
+		gatewayGRPCForwarder: opts.GatewayGRPCForwarder,
+		shouldUseGRPC:        shouldUseGRPC,
 
 		// For routing
 		stateManager: opts.StateManager,
@@ -237,8 +263,8 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 	}
 
 	// Receive gateway acknowledgement for o11y (this is not a reliable channel - do not depend on it for the critical path)
-	{
-		// TODO Replace executor -> gateway PubSub communication with point-to-point (gRPC)
+	// TODO: Remove this once we fully switch to gRPC
+	if !i.shouldUseGRPC(ctx, opts.AccountID) {
 		var gatewayAcked bool
 		gatewayAckSubscribed := make(chan struct{})
 		withAckTimeout, cancel := context.WithTimeout(ctx, 10*time.Second)
@@ -447,8 +473,22 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 		}
 
 		// Forward the request
-		// TODO Replace executor -> gateway PubSub communication with point-to-point (gRPC)
-		err = i.RouteExecutorRequest(ctx, route.GatewayID, route.ConnectionID, opts.Data)
+		if i.shouldUseGRPC(ctx, opts.AccountID) {
+			err = i.gatewayGRPCForwarder.Forward(ctx, route.GatewayID, route.ConnectionID, opts.Data)
+
+			// Ack here instead of needing a pubsub ack message
+			if err != nil {
+				metrics.HistogramConnectProxyAckTime(ctx, time.Since(proxyStartTime).Milliseconds(), metrics.HistogramOpt{
+					PkgName: pkgName,
+					Tags: map[string]any{
+						"kind": "gateway",
+					},
+				})
+			}
+		} else {
+			err = i.RouteExecutorRequest(ctx, route.GatewayID, route.ConnectionID, opts.Data)
+		}
+
 		if err != nil {
 			span.RecordError(err)
 			span.SetStatus(codes.Error, "could not forward request to gateway")
@@ -546,12 +586,15 @@ func (i *redisPubSubConnector) subscribe(ctx context.Context, channel string, on
 
 		if _, ok := i.subscribers[channel]; !ok {
 			// subscribe to channel
-			i.subscribers[channel] = make(map[string]chan string)
+			i.subscribers[channel] = make(map[string]*subscription)
 		} else {
 			redisSubscribed = true
 		}
 
-		i.subscribers[channel][subId] = msgs
+		i.subscribers[channel][subId] = &subscription{
+			ch:  msgs,
+			ctx: ctx,
+		}
 
 		i.subscribersLock.Unlock()
 	}
@@ -677,12 +720,24 @@ func (i *redisPubSubConnector) Wait(ctx context.Context) error {
 					return
 				}
 
-				for _, receiverChan := range subs {
-					receiverChan <- m.Message
+				for _, sub := range subs {
+					select {
+					case sub.ch <- m.Message:
+						// Message successfully sent
+					case <-sub.ctx.Done():
+						// Subscriber's context is cancelled; stop processing further
+						continue
+					}
 				}
 			}()
 		},
 	})
+
+	if i.gatewayGRPCForwarder != nil {
+		if err := i.gatewayGRPCForwarder.ConnectToGateways(ctx); err != nil {
+			return err
+		}
+	}
 
 	err := <-wait // disconnected with err
 	if err != nil && !errors.Is(err, rueidis.ErrClosing) {

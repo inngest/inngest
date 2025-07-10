@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/inngest/inngest/pkg/execution/driver/httpdriver"
+	"github.com/inngest/inngest/pkg/execution/exechttp"
 	"github.com/inngest/inngestgo"
 	"github.com/stretchr/testify/require"
 )
@@ -58,7 +58,7 @@ func TestRedirect(t *testing.T) {
 
 	req, err := http.NewRequest(http.MethodPut, redirectServer.URL(), nil)
 	r.NoError(err)
-	resp, err := httpdriver.Client(httpdriver.SecureDialerOpts{AllowPrivate: true}).Do(req)
+	resp, err := exechttp.Client(exechttp.SecureDialerOpts{AllowPrivate: true}).Do(req)
 	r.NoError(err)
 	r.Equal(200, resp.StatusCode)
 

@@ -21,10 +21,12 @@ export default function Provider({ children }: React.PropsWithChildren) {
     <ClerkProvider
       appearance={{
         layout: {
-          logoImageUrl: '/images/logos/inngest.svg',
           logoPlacement: 'outside' as const,
         },
         elements: {
+          logoImage: {
+            content: 'var(--clerk-logo)',
+          },
           button: cn(
             '!shadow-none disabled:cursor-not-allowed disabled:pointer-events-auto font-normal',
             primarySolidButton,

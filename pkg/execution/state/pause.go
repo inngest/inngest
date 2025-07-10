@@ -24,10 +24,6 @@ type PauseMutater interface {
 	// This returns the number of pauses in the current pause.Index.
 	SavePause(ctx context.Context, p Pause) (int64, error)
 
-	// PauseExists returns a nil error if a pause exists, or a state.ErrPauseNotFound error if
-	// a pause does not exist.
-	PauseExists(ctx context.Context, id uuid.UUID) error
-
 	// LeasePause allows us to lease the pause until the next step is enqueued, at which point
 	// we can 'consume' the pause to remove it.
 	//
@@ -59,6 +55,10 @@ type PauseMutater interface {
 type PauseGetter interface {
 	// PausesByEvent returns all pauses for a given event, in a given workspace.
 	PausesByEvent(ctx context.Context, workspaceID uuid.UUID, eventName string) (PauseIterator, error)
+
+	// PauseLen returns the number of pauses for a given workspace ID, eventName combo in
+	// the conneted datastore.
+	PauseLen(ctx context.Context, workspaceID uuid.UUID, eventName string) (int64, error)
 
 	PausesByEventSince(ctx context.Context, workspaceID uuid.UUID, event string, since time.Time) (PauseIterator, error)
 
@@ -288,6 +288,10 @@ func (p Pause) Edge() inngest.Edge {
 		Outgoing: p.Outgoing,
 		Incoming: p.Incoming,
 	}
+}
+
+func (p Pause) IsWaitForEvent() bool {
+	return p.Opcode != nil && *p.Opcode == enums.OpcodeWaitForEvent.String()
 }
 
 func (p Pause) IsInvoke() bool {

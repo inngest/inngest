@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/config"
@@ -18,16 +19,23 @@ import (
 	"github.com/inngest/inngest/pkg/execution/debounce"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
+	"github.com/inngest/inngest/pkg/expressions"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/pubsub"
 	"github.com/inngest/inngest/pkg/run"
 	"github.com/inngest/inngest/pkg/service"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
+	"github.com/oklog/ulid/v2"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/propagation"
 	"golang.org/x/sync/errgroup"
+)
+
+var (
+	nilULID = ulid.ULID{}
 )
 
 type Opt func(s *svc)
@@ -80,11 +88,34 @@ func WithServiceLogger(l logger.Logger) func(s *svc) {
 	}
 }
 
+func WithServiceShardSelector(sl redis_state.ShardSelector) func(s *svc) {
+	return func(s *svc) {
+		s.findShard = sl
+	}
+}
+
+func WithServiceEnableKeyQueues(kq func(ctx context.Context, acctID uuid.UUID) bool) func(*svc) {
+	return func(s *svc) {
+		s.allowKeyQueues = kq
+	}
+}
+
 func NewService(c config.Config, opts ...Opt) service.Service {
-	svc := &svc{config: c, log: logger.StdlibLogger(context.Background())}
+	svc := &svc{
+		config: c,
+		log:    logger.StdlibLogger(context.Background()),
+		allowKeyQueues: func(ctx context.Context, acctID uuid.UUID) bool {
+			return false
+		},
+	}
 	for _, o := range opts {
 		o(svc)
 	}
+	// don't proceed if shard selector is not set
+	if svc.findShard == nil {
+		panic("shard selector need to be provided for executor service")
+	}
+
 	return svc
 }
 
@@ -97,14 +128,18 @@ type svc struct {
 	// queue allows us to enqueue next steps.
 	queue queue.Queue
 	// exec runs the specific actions.
-	exec      execution.Executor
-	debouncer debounce.Debouncer
-	batcher   batch.BatchManager
-	log       logger.Logger
+	exec          execution.Executor
+	debouncer     debounce.Debouncer
+	batcher       batch.BatchManager
+	log           logger.Logger
+	shardSelector redis_state.ShardSelector
 
 	wg sync.WaitGroup
 
-	opts []ExecutorOpt
+	opts      []ExecutorOpt
+	findShard redis_state.ShardSelector
+
+	allowKeyQueues func(ctx context.Context, acctID uuid.UUID) bool
 }
 
 func (s *svc) Name() string {
@@ -181,6 +216,26 @@ func (s *svc) getFinishHandler(ctx context.Context) (func(context.Context, sv2.I
 	}, nil
 }
 
+// Decide if the given `err` is an unexpected run error or part of the usual
+// flow. The return value of handling queue items can sometimes return errors in
+// order to trigger retries, but it's not actually an error of the system that
+// should be logged or cause issue.
+func (s *svc) isUnexpectedRunError(err error) bool {
+	if err == nil {
+		return false
+	}
+
+	if err.Error() == "NonRetriableError" {
+		return false
+	}
+
+	if errors.Is(err, ErrHandledStepError) {
+		return false
+	}
+
+	return true
+}
+
 func (s *svc) Run(ctx context.Context) error {
 	s.log.Info("subscribing to function queue")
 	return s.queue.Run(ctx, func(ctx context.Context, info queue.RunInfo, item queue.Item) (queue.RunResult, error) {
@@ -204,15 +259,19 @@ func (s *svc) Run(ctx context.Context) error {
 			err = s.handleDebounce(ctx, item)
 		case queue.KindScheduleBatch:
 			err = s.handleScheduledBatch(ctx, item)
+		case queue.KindCancel:
+			err = s.handleCancel(ctx, item)
 		case queue.KindQueueMigrate:
 			// NOOP:
 			// this kind don't work in the Dev server
+		case queue.KindJobPromote:
+			err = s.handleJobPromote(ctx, item)
 		default:
 			err = fmt.Errorf("unknown payload type: %T", item.Payload)
 		}
 
-		if err != nil && err.Error() != "NonRetriableError" {
-			s.log.Error("error handling queue item", "error", err, "item", item)
+		if s.isUnexpectedRunError(err) {
+			s.log.Error("error handling queue item", "error", err)
 		}
 
 		return queue.RunResult{
@@ -422,6 +481,170 @@ func (s *svc) handleDebounce(ctx context.Context, item queue.Item) error {
 	return nil
 }
 
+// handleCancel handles eager bulk cancellation
+//
+// TODO: halt work if a user decides to cancel this cancellation
+//
+// NOTE: this currently doesn't work since there are no CancellationReadWriter in OSS initialized
+func (s *svc) handleCancel(ctx context.Context, item queue.Item) error {
+	c := cqrs.Cancellation{}
+	if err := json.Unmarshal(item.Payload.(json.RawMessage), &c); err != nil {
+		return fmt.Errorf("error unmarshalling cancellation payload: %w", err)
+	}
+
+	l := s.log.With(
+		"kind", c.Kind.String(),
+		"cancellation", c,
+	)
+
+	switch c.Kind {
+	case enums.CancellationKindRun:
+		runID, err := ulid.Parse(c.TargetID)
+		if err != nil {
+			l.Error("invalid runID provided for cancellation", "error", err)
+			return fmt.Errorf("error parsing runID provided: %w", err)
+		}
+
+		id := sv2.ID{
+			RunID:      runID,
+			FunctionID: c.FunctionID,
+			Tenant: sv2.Tenant{
+				AccountID: c.AccountID,
+				EnvID:     c.WorkspaceID,
+				AppID:     c.AppID,
+			},
+		}
+
+		return s.exec.Cancel(ctx, id, execution.CancelRequest{
+			CancellationID: &c.ID,
+		})
+	case enums.CancellationKindBulkRun:
+		var from time.Time
+		if c.StartedAfter != nil {
+			from = *c.StartedAfter
+		}
+
+		qm, ok := s.queue.(redis_state.QueueManager)
+		if !ok {
+			return fmt.Errorf("expected queue manager for cancellation")
+		}
+
+		shard, err := s.findShard(ctx, c.AccountID, c.QueueName)
+		if err != nil {
+			return fmt.Errorf("error selecting shard for cancellation: %w", err)
+		}
+
+		items, err := qm.ItemsByPartition(ctx, shard, c.FunctionID, from, c.StartedBefore)
+		if err != nil {
+			return fmt.Errorf("error retrieving partition items: %w", err)
+		}
+
+		// Iterate over queue items
+		for qi := range items {
+			if qi == nil {
+				// NOTE: this shouldn't happen but is fine to ignore.
+				l.Warn("nil queue item in partition item iterator")
+				continue
+			}
+
+			if c.If != nil {
+				st, err := s.state.Load(ctx, c.AccountID, qi.Data.Identifier.RunID)
+				if err != nil {
+					l.Error("error loading state for cancellation", "error", err, "queue_item", qi)
+					return fmt.Errorf("error loading state for cancellation: %w", err)
+				}
+
+				event := st.Event()
+				ok, _, err := expressions.EvaluateBoolean(ctx, *c.If, map[string]any{"event": event})
+				if err != nil {
+					// NOTE: log but don't exit here, since we want to conitnue
+					l.Error("error evaluating cancellation expression", "error", err, "queue_item", qi)
+					continue
+				}
+
+				// this queue item shouldn't be cancelled
+				if !ok {
+					continue
+				}
+			}
+
+			if err := s.exec.Cancel(ctx, sv2.IDFromV1(qi.Data.Identifier), execution.CancelRequest{
+				CancellationID: &c.ID,
+			}); err != nil {
+				return err
+			}
+		}
+	case enums.CancellationKindBacklog:
+		var from time.Time
+		if c.StartedAfter != nil {
+			from = *c.StartedAfter
+		}
+
+		qm, ok := s.queue.(redis_state.QueueManager)
+		if !ok {
+			return fmt.Errorf("expected queue manager for cancellation")
+		}
+
+		shard, err := s.findShard(ctx, c.AccountID, c.QueueName)
+		if err != nil {
+			return fmt.Errorf("error selecting shard for cancellation: %w", err)
+		}
+
+		items, err := qm.ItemsByBacklog(ctx, shard, c.TargetID, from, c.StartedBefore)
+		if err != nil {
+			return fmt.Errorf("error retrieving backlog iterator: %w", err)
+		}
+
+		// iterate over queue items
+		for qi := range items {
+			if qi == nil {
+				// NOTE: this shouldn't happen, but also is fine to ignore
+				l.Warn("nil queue item in backlog item iterator")
+				continue
+			}
+
+			// Check if it's a run
+			if qi.Data.Identifier.RunID != nilULID {
+				if c.If != nil {
+					st, err := s.state.Load(ctx, c.AccountID, qi.Data.Identifier.RunID)
+					if err != nil {
+						l.Error("error loading state for cancellation", "error", err, "queue_item", qi)
+						return fmt.Errorf("error loading state for cancellation: %w", err)
+					}
+
+					event := st.Event()
+					ok, _, err := expressions.EvaluateBoolean(ctx, *c.If, map[string]any{"event": event})
+					if err != nil {
+						// NOTE: log but don't exit here, since we want to conitnue
+						l.Error("error evaluating cancellation expression", "error", err, "queue_item", qi)
+						continue
+					}
+
+					// this queue item shouldn't be cancelled
+					if !ok {
+						continue
+					}
+				}
+
+				if err := s.exec.Cancel(ctx, sv2.IDFromV1(qi.Data.Identifier), execution.CancelRequest{
+					CancellationID: &c.ID,
+				}); err != nil {
+					return err
+				}
+
+				continue
+			}
+
+			// dequeue the item
+			if err := qm.Dequeue(ctx, shard, *qi); err != nil {
+				return err
+			}
+		}
+	}
+
+	return nil
+}
+
 func (s *svc) findFunctionByID(ctx context.Context, fnID uuid.UUID) (*inngest.Function, error) {
 	fns, err := s.data.Functions(ctx)
 	if err != nil {
@@ -433,4 +656,53 @@ func (s *svc) findFunctionByID(ctx context.Context, fnID uuid.UUID) (*inngest.Fu
 		}
 	}
 	return nil, fmt.Errorf("no function found with ID: %s", fnID)
+}
+
+func (s *svc) handleJobPromote(ctx context.Context, item queue.Item) error {
+	l := s.log.With("run_id", item.Identifier.RunID.String())
+
+	data, ok := item.Payload.(queue.PayloadJobPromote)
+	if !ok {
+		return fmt.Errorf("unable to get data from job promotion: %T", item.Payload)
+	}
+
+	l = l.With("job_id", data.PromoteJobID, "scheduled_at", time.UnixMilli(data.ScheduledAt))
+
+	qm, ok := s.queue.(redis_state.QueueManager)
+	if !ok {
+		l.Warn("queue does not conform to queue manager")
+		return nil
+	}
+
+	// Retrieve current queue shard for sleep item. The account might have been migrated
+	// to a different shard since the original sleep item was enqueued, so we must fetch the shard now.
+	shard, err := s.shardSelector(ctx, item.Identifier.AccountID, nil)
+	if err != nil {
+		return fmt.Errorf("could not retrieve queue shard for job promotion:%w", err)
+	}
+
+	// The sleep item should usually exist
+	qi, err := qm.LoadQueueItem(ctx, shard.Name, data.PromoteJobID)
+	if err != nil {
+		if errors.Is(err, redis_state.ErrQueueItemNotFound) {
+			return nil
+		}
+
+		return fmt.Errorf("could not load queue item: %w", err)
+	}
+
+	// Ignore sleep scavenging if already leased
+	if qi.IsLeased(time.Now()) {
+		return nil
+	}
+
+	// Grab the score, which already handles promotion by fudigng the time to
+	// be that of the actual run ID, prioritizing older runs.
+	nextTime := time.UnixMilli(qi.Score(time.Now()))
+	err = qm.Requeue(ctx, shard, *qi, nextTime)
+	if err != nil && !errors.Is(err, redis_state.ErrQueueItemNotFound) {
+		return fmt.Errorf("could not requeue job with promoted time: %w", err)
+	}
+
+	return nil
 }

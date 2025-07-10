@@ -31,21 +31,11 @@ const INTEGRATIONS: Integration[] = [
     title: 'Vercel',
     slug: 'vercel',
     Icon: <IconVercel className="text-onContrast h-6 w-6" />,
-    actionButton: ({ enabled, hasError, isMarketplace }) => {
+    actionButton: ({ enabled, hasError }) => {
       let label: string;
       let target = undefined;
       let url: string;
-      if (isMarketplace) {
-        // Marketplace integration installed.
-
-        label = 'Manage';
-        target = '_blank';
-
-        // Managed in Vercel's dashboard.
-        url = 'https://vercel.com/integrations/inngest';
-      } else if (enabled) {
-        // Non-marketplace integration installed.
-
+      if (enabled) {
         label = 'Manage';
         url = '/settings/integrations/vercel';
       } else {
@@ -59,7 +49,7 @@ const INTEGRATIONS: Integration[] = [
         <Button
           disabled={hasError}
           kind="primary"
-          appearance="solid"
+          appearance={enabled ? 'outlined' : 'solid'}
           size="medium"
           href={url}
           label={label}
@@ -79,7 +69,7 @@ const INTEGRATIONS: Integration[] = [
       <Button
         disabled={hasError}
         kind="primary"
-        appearance="solid"
+        appearance={enabled ? 'outlined' : 'solid'}
         size="medium"
         href={enabled ? '/settings/integrations/neon' : '/settings/integrations/neon/connect'}
         label={enabled ? 'Manage' : 'Connect'}
@@ -96,7 +86,7 @@ const INTEGRATIONS: Integration[] = [
       <Button
         disabled={hasError}
         kind="primary"
-        appearance="solid"
+        appearance={enabled ? 'outlined' : 'solid'}
         size="medium"
         href={
           enabled ? '/settings/integrations/supabase' : '/settings/integrations/supabase/connect'
@@ -132,7 +122,7 @@ const INTEGRATIONS: Integration[] = [
     actionButton: () => (
       <Button
         iconSide="left"
-        appearance="solid"
+        appearance="outlined"
         size="medium"
         label="Configure"
         href="/settings/integrations/prometheus"

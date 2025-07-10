@@ -88,6 +88,7 @@ export default function Layout({ children, params: { externalID } }: Props) {
                 showArchive={() => setShowArchive(true)}
                 disableArchive={!res.data.latestSync?.url}
                 showValidate={() => setShowValidate(true)}
+                disableResync={true}
                 disableValidate={
                   res.data.isParentArchived || res.data.method === methodTypes.Connect
                 }

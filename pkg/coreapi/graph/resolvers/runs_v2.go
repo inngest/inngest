@@ -243,7 +243,16 @@ func (qr *queryResolver) RunTraceSpanOutputByID(ctx context.Context, outputID st
 		return nil, fmt.Errorf("error parsing span identifier: %w", err)
 	}
 
-	spanData, err := qr.Data.GetSpanOutput(ctx, *id)
+	var (
+		spanData *cqrs.SpanOutput
+		err      error
+	)
+
+	if id.Preview == nil || !*id.Preview {
+		spanData, err = qr.Data.LegacyGetSpanOutput(ctx, *id)
+	} else {
+		spanData, err = qr.Data.GetSpanOutput(ctx, *id)
+	}
 	if err != nil {
 		return nil, err
 	}
@@ -254,6 +263,23 @@ func (qr *queryResolver) RunTraceSpanOutputByID(ctx context.Context, outputID st
 		err := json.Unmarshal(spanData.Data, &stepErr)
 		if err != nil {
 			logger.StdlibLogger(ctx).Error("error deserializing step error", "error", err)
+
+			// This may have been the `cause`, as that's any JSON value, but
+			// needs to be a string when parsed here. Let's try to save it.
+			if stepErr.Cause == nil || *stepErr.Cause == "" {
+				var rawErr map[string]any
+				if err := json.Unmarshal(spanData.Data, &rawErr); err == nil {
+					var causeStr *string
+					if cause, ok := rawErr["cause"]; ok {
+						if byt, err := json.Marshal(cause); err == nil {
+							s := string(byt)
+							causeStr = &s
+						}
+					}
+
+					stepErr.Cause = causeStr
+				}
+			}
 		}
 
 		if stepErr.Message == "" {

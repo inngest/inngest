@@ -96,6 +96,16 @@ func HistogramQueueOperationDelay(ctx context.Context, delay time.Duration, opts
 	})
 }
 
+func HistogramQueueActiveCheckDuration(ctx context.Context, delay time.Duration, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, delay.Milliseconds(), HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "queue_active_check_duration",
+		Description: "Distribution of active check durations",
+		Tags:        opts.Tags,
+		Boundaries:  DefaultBoundaries,
+	})
+}
+
 func HistogramRedisCommandDuration(ctx context.Context, value int64, opts HistogramOpt) {
 	RecordIntHistogramMetric(ctx, value, HistogramOpt{
 		PkgName:     opts.PkgName,
@@ -244,5 +254,27 @@ func HistogramHTTPServerProcessingDuration(ctx context.Context, dur int64, opts 
 			5000, 10000, 30_000, 60_000, 120_000,
 			300_000, 900_000, 1_800_000, // 5m, 15m, 30m
 		},
+	})
+}
+
+func HistogramHTTPAPIDuration(ctx context.Context, dur int64, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, dur, HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "http_api_duration",
+		Description: "API request duration in ms",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  DefaultBoundaries,
+	})
+}
+
+func HistogramHTTPAPIBytesWritten(ctx context.Context, bytes int64, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, bytes, HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "http_api_bytes_written",
+		Description: "API response size in bytes",
+		Tags:        opts.Tags,
+		Unit:        "bytes",
+		Boundaries:  DefaultBoundaries,
 	})
 }

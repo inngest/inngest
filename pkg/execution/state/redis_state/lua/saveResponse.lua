@@ -21,7 +21,7 @@ local outputData = ARGV[2]
 
 if redis.call("HEXISTS", keyStep, stepID) == 1 then
 	-- If the data is exactly the same, return -2, indicating an idempotent save req.
-	if redis.call("HGET", keyStep) == outputData then
+	if redis.call("HGET", keyStep, stepID) == outputData then
 		-- The data is the same.
 		local hasStepsPending = redis.call("SCARD", keyStepsPending) > 0 and 1 or 0
 		return { -2, hasStepsPending }

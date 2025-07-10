@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/batch"
 
 	"github.com/google/uuid"
@@ -97,7 +98,7 @@ type Executor interface {
 
 	// HandlePauses handles pauses loaded from an incoming event.  This delegates to Cancel and
 	// Resume where necessary, depending on pauses that have been loaded and matched.
-	HandlePauses(ctx context.Context, iter state.PauseIterator, event event.TrackedEvent) (HandlePauseResult, error)
+	HandlePauses(ctx context.Context, event event.TrackedEvent) (HandlePauseResult, error)
 	// HandleInvokeFinish handles the invoke pauses from an incoming event. This delegates to Cancel and
 	// Resume where necessary
 	HandleInvokeFinish(ctx context.Context, event event.TrackedEvent) error
@@ -191,6 +192,20 @@ type ScheduleRequest struct {
 	PreventDebounce bool
 	// FunctionPausedAt indicates whether the function is paused.
 	FunctionPausedAt *time.Time
+	// DrainedAt indicates the time that the function started draining.  Draining is
+	// similar to paused in that new functions skip, but current functions continue
+	// to execute.
+	DrainedAt *time.Time
+}
+
+func (r ScheduleRequest) SkipReason() enums.SkipReason {
+	if r.FunctionPausedAt != nil && r.FunctionPausedAt.Before(time.Now()) {
+		return enums.SkipReasonFunctionPaused
+	}
+	if r.DrainedAt != nil && r.DrainedAt.Before(time.Now()) {
+		return enums.SkipReasonFunctionDrained
+	}
+	return enums.SkipReasonNone
 }
 
 func (r *ScheduleRequest) IsInvoke() bool {

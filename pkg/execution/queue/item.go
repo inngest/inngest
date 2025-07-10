@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"strconv"
 	"time"
 
@@ -100,6 +101,48 @@ func (q *QueueItem) SetID(ctx context.Context, str string) {
 	q.ID = HashID(ctx, str)
 }
 
+// IsPromotableScore returns whether a score can be fudged.
+func (q QueueItem) IsPromotableScore() bool {
+	switch q.Data.Kind {
+	case KindStart, KindSleep, KindEdge, KindPause, KindEdgeError:
+		// All user jobs can be fudged.
+		return true
+	}
+	return false
+}
+
+// RequiresPromotion returns true if the score needs future promotion (fudging the numbers!)
+// This is the case when a workflow job is enqueued in the future:
+//
+// - Workflow T0 runs a job which retries at T10
+// - 1,000,000 steps are enqueued for other workflows at T5
+// - At T10...
+//   - In order to run workflow T0's retry, we have to complete all 1M jobs from
+//     other *later* workflows before attempting the retry, meaning that we do not
+//     run older run's jobs before newer runs jobs.
+//
+// Future fudging allows us to reschedule jobs at an aprpoproate time through some other
+// queueing means.
+func (q QueueItem) RequiresPromotionJob(now time.Time) bool {
+	if !q.IsPromotableScore() {
+		// If this doesn't have fudging enabled, ignore.
+		return false
+	}
+
+	if now.IsZero() {
+		now = time.Now()
+	}
+
+	// If this is > 2 seconds in the future, don't mess with the time.
+	// This prevents any accidental fudging of future run times, even if the
+	// kind is edge (which should never exist... but, better to be safe).
+	if q.AtMS > now.Add(consts.FutureAtLimit).UnixMilli() {
+		return true
+	}
+
+	return false
+}
+
 // Score returns the score (time that the item should run) for the queue item.
 //
 // NOTE: In order to prioritize finishing older function runs with a busy function
@@ -114,17 +157,7 @@ func (q QueueItem) Score(now time.Time) int64 {
 		now = time.Now()
 	}
 
-	// If this is not a start/simple edge/edge error, we can ignore this.
-	if (q.Data.Kind != KindStart &&
-		q.Data.Kind != KindEdge &&
-		q.Data.Kind != KindEdgeError) || q.Data.Attempt > 0 {
-		return q.AtMS
-	}
-
-	// If this is > 2 seconds in the future, don't mess with the time.
-	// This prevents any accidental fudging of future run times, even if the
-	// kind is edge (which should never exist... but, better to be safe).
-	if q.AtMS > now.Add(consts.FutureAtLimit).UnixMilli() {
+	if !q.IsPromotableScore() || q.RequiresPromotionJob(now) {
 		return q.AtMS
 	}
 
@@ -148,6 +181,75 @@ func (q QueueItem) MarshalBinary() ([]byte, error) {
 // based on the time passed in.
 func (q QueueItem) IsLeased(time time.Time) bool {
 	return q.LeaseID != nil && ulid.Time(q.LeaseID.Time()).After(time)
+}
+
+// SojournLatency is the delay due to concurrency limits, throttle, or other user-defined concurrency.
+func (q QueueItem) SojournLatency(now time.Time) time.Duration {
+	if q.RefilledAt == 0 {
+		var sojourn time.Duration
+		if q.EarliestPeekTime > 0 {
+			sojourn = now.Sub(time.UnixMilli(q.EarliestPeekTime))
+		}
+
+		return sojourn
+	}
+
+	// Track the entire time from enqueueing an item to refilling, including
+	// expected static (item in the future) and dynamic (time spent waiting due to concurrency limits) delays.
+	// note: System delays may be included in this.
+	return q.RefillDelay() + q.ExpectedDelay()
+}
+
+// Latency represents the processing delay excluding sojourn latency.
+func (q QueueItem) Latency(now time.Time) time.Duration {
+	if q.RefilledAt == 0 {
+		sojourn := q.SojournLatency(now)
+
+		return now.Sub(time.UnixMilli(q.WallTimeMS)) - sojourn
+	}
+
+	// Time between refill and lease/processing
+	return q.LeaseDelay(now)
+}
+
+// ExpectedDelay returns the expected delay for a queue item (usually 0, positive if scheduled into the future).
+// This is based on static information and thus does _not_ capture the time spent waiting due to concurrency constraints, etc.
+func (q QueueItem) ExpectedDelay() time.Duration {
+	if q.EnqueuedAt == 0 {
+		return 0
+	}
+
+	delayMS := q.AtMS - q.EnqueuedAt
+	delayMS = int64(math.Max(float64(delayMS), 0)) // ignore negative delays (item was planned earlier than enqueued)
+	itemDelay := time.Duration(delayMS) * time.Millisecond
+
+	return itemDelay
+}
+
+// RefillDelay returns the time it took from enqueueing to refilling (minus expected delays)
+func (q QueueItem) RefillDelay() time.Duration {
+	if q.RefilledAt == 0 || q.EnqueuedAt == 0 {
+		return 0
+	}
+	refilledAt := time.UnixMilli(q.RefilledAt)
+	enqueuedAt := time.UnixMilli(q.EnqueuedAt)
+
+	refillDelay := refilledAt.Sub(enqueuedAt)
+
+	// ignore expected delay (if item was scheduled in the future)
+	// note: this does not account for time spent waiting due to hitting concurrency limits, etc.
+	refillDelay = refillDelay - q.ExpectedDelay()
+
+	return refillDelay
+}
+
+// LeaseDelay returns the time between refilling and leasing
+func (q QueueItem) LeaseDelay(now time.Time) time.Duration {
+	if q.RefilledAt == 0 {
+		return 0
+	}
+
+	return now.Sub(time.UnixMilli(q.RefilledAt))
 }
 
 // Item represents an item stored within a queue.
@@ -181,7 +283,7 @@ type Item struct {
 	Payload any `json:"payload,omitempty"`
 	// Metadata is used for storing additional metadata related to the queue item.
 	// e.g. tracing data
-	Metadata map[string]string `json:"metadata,omitempty"`
+	Metadata map[string]any `json:"metadata,omitempty"`
 	// QueueName allows control over the queue name.  If not provided, this falls
 	// back to the queue mapping defined on the queue or the workflow ID of the fn.
 	QueueName *string `json:"qn,omitempty"`
@@ -230,7 +332,7 @@ type Throttle struct {
 	// Otherwise, this is the function ID. In the case of evaluated keys, this may be large and should be truncated before usage.
 	UnhashedThrottleKey string `json:"-"`
 
-	KeyExpressionHash string `json:"-"`
+	KeyExpressionHash string `json:"keh"`
 }
 
 type Singleton struct {
@@ -313,7 +415,7 @@ func (i *Item) UnmarshalJSON(b []byte) error {
 		Attempt               int                       `json:"atts"`
 		MaxAttempts           *int                      `json:"maxAtts,omitempty"`
 		Payload               json.RawMessage           `json:"payload"`
-		Metadata              map[string]string         `json:"metadata"`
+		Metadata              map[string]any            `json:"metadata"`
 		QueueName             *string                   `json:"qn,omitempty"`
 		RunInfo               *RunInfo                  `json:"runinfo,omitempty"`
 		Throttle              *Throttle                 `json:"throttle"`
@@ -378,6 +480,15 @@ func (i *Item) UnmarshalJSON(b []byte) error {
 			return err
 		}
 		i.Payload = *p
+	case KindJobPromote:
+		if len(temp.Payload) == 0 {
+			return nil
+		}
+		p := &PayloadJobPromote{}
+		if err := json.Unmarshal(temp.Payload, p); err != nil {
+			return err
+		}
+		i.Payload = *p
 	}
 	return nil
 }
@@ -400,6 +511,11 @@ type PayloadEdge struct {
 
 type PayloadPauseBlockFlush struct {
 	EventName string `json:"e"`
+}
+
+type PayloadJobPromote struct {
+	PromoteJobID string `json:"sjid"`
+	ScheduledAt  int64  `json:"su"`
 }
 
 // PayloadPauseTimeout is the payload stored when enqueueing a pause timeout, eg.
@@ -429,14 +545,14 @@ func GetThrottleConfig(ctx context.Context, fnID uuid.UUID, throttle *inngest.Th
 
 	unhashedThrottleKey := fnID.String()
 	throttleKey := HashID(ctx, unhashedThrottleKey)
-	hashedThrottleExpr := ""
+	var throttleExpr string
 	if throttle.Key != nil {
 		val, _, _ := expressions.Evaluate(ctx, *throttle.Key, map[string]any{
 			"event": evtMap,
 		})
 		unhashedThrottleKey = fmt.Sprintf("%v", val)
 		throttleKey = throttleKey + "-" + HashID(ctx, unhashedThrottleKey)
-		hashedThrottleExpr = util.XXHash(*throttle.Key)
+		throttleExpr = *throttle.Key
 	}
 
 	return &Throttle{
@@ -445,7 +561,7 @@ func GetThrottleConfig(ctx context.Context, fnID uuid.UUID, throttle *inngest.Th
 		Burst:               int(throttle.Burst),
 		Period:              int(throttle.Period.Seconds()),
 		UnhashedThrottleKey: unhashedThrottleKey,
-		KeyExpressionHash:   hashedThrottleExpr,
+		KeyExpressionHash:   util.XXHash(throttleExpr),
 	}
 }
 

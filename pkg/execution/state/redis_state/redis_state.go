@@ -651,6 +651,9 @@ func (m shardedMgr) Load(ctx context.Context, accountId uuid.UUID, runID ulid.UL
 			return client.B().Get().Key(fnRunState.kg.Events(ctx, isSharded, id.WorkflowID, runID)).Build()
 		}).AsBytes()
 		if err != nil {
+			if rueidis.IsRedisNil(err) {
+				return nil, state.ErrEventNotFound
+			}
 			return nil, fmt.Errorf("failed to get batch; %w", err)
 		}
 		if err := json.Unmarshal(byt, &events); err != nil {
@@ -1222,16 +1225,6 @@ func (m unshardedMgr) EventHasPauses(ctx context.Context, workspaceID uuid.UUID,
 	return pause.Client().Do(ctx, cmd).AsBool()
 }
 
-func (m unshardedMgr) PauseExists(ctx context.Context, pauseID uuid.UUID) error {
-	pauses := m.u.Pauses()
-	cmd := pauses.Client().B().Exists().Key(pauses.kg.Pause(ctx, pauseID)).Build()
-	exists, err := pauses.Client().Do(ctx, cmd).ToBool()
-	if err == rueidis.Nil || !exists {
-		return state.ErrPauseNotFound
-	}
-	return nil
-}
-
 func (m unshardedMgr) PauseByID(ctx context.Context, pauseID uuid.UUID) (*state.Pause, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "PauseByID"), redis_telemetry.ScopePauses)
 
@@ -1343,6 +1336,14 @@ func (m unshardedMgr) PausesByID(ctx context.Context, ids ...uuid.UUID) ([]*stat
 	return pauses, merr
 }
 
+func (m unshardedMgr) PauseLen(ctx context.Context, workspaceID uuid.UUID, event string) (int64, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "PuaseLen"), redis_telemetry.ScopePauses)
+	pauses := m.u.Pauses()
+	key := pauses.kg.PauseEvent(ctx, workspaceID, event)
+	cntCmd := pauses.Client().B().Hlen().Key(key).Build()
+	return pauses.Client().Do(ctx, cntCmd).AsInt64()
+}
+
 // PausesByEvent returns all pauses for a given event within a workspace.
 func (m unshardedMgr) PausesByEvent(ctx context.Context, workspaceID uuid.UUID, event string) (state.PauseIterator, error) {
 	return m.pausesByEvent(ctx, workspaceID, event, time.Time{})
@@ -1410,18 +1411,6 @@ func (m unshardedMgr) PausesByEventSince(ctx context.Context, workspaceID uuid.U
 	return iter, err
 }
 
-func (m unshardedMgr) EvaluablesByID(ctx context.Context, ids ...uuid.UUID) ([]expr.Evaluable, error) {
-	items, err := m.PausesByID(ctx, ids...)
-	if err != nil {
-		return nil, err
-	}
-	evaluables := make([]expr.Evaluable, len(items))
-	for n, i := range items {
-		evaluables[n] = i
-	}
-	return evaluables, nil
-}
-
 func (m unshardedMgr) LoadEvaluablesSince(ctx context.Context, workspaceID uuid.UUID, eventName string, since time.Time, do func(context.Context, expr.Evaluable) error) error {
 	// Keep a list of pauses that should be deleted because they've expired.
 	//
@@ -1440,8 +1429,13 @@ func (m unshardedMgr) LoadEvaluablesSince(ctx context.Context, workspaceID uuid.
 		}
 
 		if pause.Expires.Time().Before(time.Now()) {
-			shouldDelete := pause.Expires.Time().Add(consts.PauseExpiredDeletionGracePeriod).Before(time.Now())
-			if shouldDelete {
+			// runTS is the time that the run started.
+			runTS := time.UnixMilli(int64(pause.Identifier.RunID.Time()))
+			// isMaxAge returns whether the pause is greater than the max age allowed
+			isMaxAge := time.Now().Add(-1 * consts.CancelTimeout).After(runTS)
+			afterGrace := pause.Expires.Time().Add(consts.PauseExpiredDeletionGracePeriod).Before(time.Now())
+
+			if isMaxAge || afterGrace {
 				expired = append(expired, pause)
 			}
 			continue

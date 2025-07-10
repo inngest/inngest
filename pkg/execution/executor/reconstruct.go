@@ -96,7 +96,7 @@ func reconstruct(ctx context.Context, tr cqrs.TraceReader, req execution.Schedul
 			return fmt.Errorf("step found in stack but span not found in original run")
 		}
 
-		output, err := tr.GetSpanOutput(ctx, cqrs.SpanIdentifier{
+		output, err := tr.LegacyGetSpanOutput(ctx, cqrs.SpanIdentifier{
 			AccountID:   req.AccountID,
 			WorkspaceID: req.WorkspaceID,
 			AppID:       req.AppID,

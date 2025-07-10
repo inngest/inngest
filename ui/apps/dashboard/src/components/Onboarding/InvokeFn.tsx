@@ -9,6 +9,7 @@ import { Select, type Option } from '@inngest/components/Select/Select';
 import { RiCheckboxCircleFill } from '@remixicon/react';
 import { toast } from 'sonner';
 
+import { FunctionTriggerTypes } from '@/gql/graphql';
 import { pathCreator } from '@/utils/urls';
 import { OnboardingSteps } from '../Onboarding/types';
 import { invokeFunction, prefetchFunctions } from './actions';
@@ -29,7 +30,8 @@ interface FunctionOption extends Option {
   slug: string;
   current: {
     triggers: {
-      eventName?: string;
+      type: string;
+      value: string;
     }[];
   };
 }
@@ -49,7 +51,9 @@ export default function InvokeFn() {
   const isOnboardingCompleted = lastCompletedStep?.isFinalStep;
 
   const hasEventTrigger =
-    selectedFunction?.current.triggers.some((trigger) => trigger.eventName) ?? false;
+    selectedFunction?.current.triggers.some(
+      (trigger) => trigger.type == FunctionTriggerTypes.Event
+    ) ?? false;
 
   useEffect(() => {
     const loadFunctions = async () => {
@@ -202,7 +206,7 @@ export default function InvokeFn() {
               />
               <Button
                 appearance="outlined"
-                label="Skip, take me to dashboard"
+                label="Skip to dashboard"
                 onClick={() => {
                   updateCompletedSteps(currentStepName, {
                     metadata: {

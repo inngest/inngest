@@ -78,6 +78,9 @@ end
 -- Update the queue item with a nil lease, at, atMS, etc.
 redis.call("HSET", queueKey, queueID, queueItem)
 
+-- Remove item from ready queue
+redis.call("ZREM", keyReadyQueue, item.id)
+
 
 -- This removes the queue item from the concurrency/in-progress queue and ensures that the concurrency
 -- index/scavenger queue is updated to the next earliest item.

@@ -5,10 +5,10 @@ import (
 
 	"github.com/inngest/inngest/pkg/connect/pubsub"
 	"github.com/inngest/inngest/pkg/execution/driver"
+	"github.com/inngest/inngest/pkg/execution/exechttp"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/telemetry/trace"
-	"github.com/inngest/inngest/pkg/util"
 )
 
 var (
@@ -64,7 +64,7 @@ type NewDriverOpts struct {
 
 	ConnectForwarder  pubsub.RequestForwarder
 	ConditionalTracer trace.ConditionalTracer
-	HTTPClient        util.HTTPDoer
+	HTTPClient        exechttp.RequestExecutor
 }
 
 // DriverConfig is an interface used to determine driver config structs.
@@ -81,8 +81,8 @@ type DriverConfig interface {
 type QueueConfig interface {
 	QueueName() string
 	Queue() (queue.Queue, error)
-	//Producer() (queue.Producer, error)
-	//Consumer() (queue.Consumer, error)
+	// Producer() (queue.Producer, error)
+	// Consumer() (queue.Consumer, error)
 }
 
 type StateConfig interface {

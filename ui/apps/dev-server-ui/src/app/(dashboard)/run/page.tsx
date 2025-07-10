@@ -7,7 +7,6 @@ import { cn } from '@inngest/components/utils/classNames';
 import { useGetRun } from '@/hooks/useGetRun';
 import { useGetTraceResult } from '@/hooks/useGetTraceResult';
 import { useGetTrigger } from '@/hooks/useGetTrigger';
-import { pathCreator } from '@/utils/pathCreator';
 
 export default function Page() {
   const [runID] = useSearchParam('runID');
@@ -22,7 +21,6 @@ export default function Page() {
   return (
     <div className={cn('bg-canvasBase overflow-y-auto pt-8')}>
       <RunDetailsV3
-        pathCreator={pathCreator}
         standalone
         getResult={getTraceResult}
         getRun={getRun}

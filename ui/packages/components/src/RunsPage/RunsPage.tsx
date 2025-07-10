@@ -48,7 +48,7 @@ const CodeSearch = dynamic(() => import('@inngest/components/CodeSearch/CodeSear
 type Props = {
   data: Run[];
   defaultVisibleColumns?: ColumnID[];
-  features: Pick<Features, 'history'>;
+  features: Pick<Features, 'history' | 'tracesPreview'>;
   getRun: React.ComponentProps<typeof RunDetailsV3>['getRun'];
   getTraceResult: React.ComponentProps<typeof RunDetailsV3>['getResult'];
   getTrigger: React.ComponentProps<typeof RunDetailsV3>['getTrigger'];
@@ -58,7 +58,6 @@ type Props = {
   onRefresh?: () => void;
   onScroll: UIEventHandler<HTMLDivElement>;
   onScrollToTop: () => void;
-  pathCreator: React.ComponentProps<typeof RunDetailsV3>['pathCreator'];
   pollInterval?: number;
   apps?: Option[];
   functions?: Option[];
@@ -81,7 +80,6 @@ export function RunsPage({
   onRefresh,
   onScroll,
   onScrollToTop,
-  pathCreator,
   apps,
   functions,
   pollInterval,
@@ -240,15 +238,15 @@ export function RunsPage({
             getRun={getRun}
             initialRunData={rowData}
             getTrigger={getTrigger}
-            pathCreator={pathCreator}
             pollInterval={pollInterval}
             runID={rowData.id}
             standalone={false}
+            tracesPreviewEnabled={features.tracesPreview}
           />
         </div>
       );
     },
-    [getRun, getTraceResult, getTrigger, pathCreator, pollInterval]
+    [getRun, getTraceResult, getTrigger, pollInterval, features.tracesPreview]
   );
 
   const options = useMemo(() => {

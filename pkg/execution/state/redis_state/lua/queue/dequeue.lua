@@ -16,58 +16,38 @@ local keyGlobalPointer         = KEYS[5]
 local keyGlobalAccountPointer  = KEYS[6]           -- accounts:sorted - zset
 local keyAccountPartitions     = KEYS[7]           -- accounts:$accountID:partition:sorted - zset
 
-local keyBacklogSet                      = KEYS[8]
-local keyShadowPartitionSet              = KEYS[9]
-local keyGlobalShadowPartitionSet        = KEYS[10]
-local keyGlobalAccountShadowPartitionSet = KEYS[11]
-local keyAccountShadowPartitionSet       = KEYS[12]
+local keyShadowPartitionMeta             = KEYS[8]
+local keyBacklogMeta                     = KEYS[9]
 
-local keyInProgressAccount                  = KEYS[13]
-local keyInProgressPartition                = KEYS[14] -- Account concurrency level
-local keyInProgressCustomConcurrencyKey1    = KEYS[15] -- When leasing an item we need to place the lease into this key.
-local keyInProgressCustomConcurrencyKey2    = KEYS[16] -- Optional for eg. for concurrency amongst steps
+local keyBacklogSet                      = KEYS[10]
+local keyShadowPartitionSet              = KEYS[11]
+local keyGlobalShadowPartitionSet        = KEYS[12]
+local keyGlobalAccountShadowPartitionSet = KEYS[13]
+local keyAccountShadowPartitionSet       = KEYS[14]
+local keyPartitionNormalizeSet           = KEYS[15]
 
-local keyActiveAccount             = KEYS[17]
-local keyActivePartition           = KEYS[18]
-local keyActiveConcurrencyKey1     = KEYS[19]
-local keyActiveConcurrencyKey2     = KEYS[20]
-local keyActiveCompound            = KEYS[21]
+local keyInProgressAccount                  = KEYS[16]
+local keyInProgressPartition                = KEYS[17] -- Account concurrency level
+local keyInProgressCustomConcurrencyKey1    = KEYS[18] -- When leasing an item we need to place the lease into this key.
+local keyInProgressCustomConcurrencyKey2    = KEYS[19] -- Optional for eg. for concurrency amongst steps
 
-local keyActiveRun                        = KEYS[22]
-local keyActiveRunsAccount                = KEYS[23]
-local keyActiveRunsPartition              = KEYS[24]
-local keyActiveRunsCustomConcurrencyKey1  = KEYS[25]
-local keyActiveRunsCustomConcurrencyKey2  = KEYS[26]
+local keyActiveAccount             = KEYS[20]
+local keyActivePartition           = KEYS[21]
+local keyActiveConcurrencyKey1     = KEYS[22]
+local keyActiveConcurrencyKey2     = KEYS[23]
+local keyActiveCompound            = KEYS[24]
 
-local keyIdempotency           = KEYS[27]
-local singletonRunKey          = KEYS[28]
+local keyActiveRun                        = KEYS[25]
+local keyActiveRunsAccount                = KEYS[26]
+local keyActiveRunsPartition              = KEYS[27]
+local keyActiveRunsCustomConcurrencyKey1  = KEYS[28]
+local keyActiveRunsCustomConcurrencyKey2  = KEYS[29]
 
--- NOTE: The following keys are temporary and only used for cleanup and will be removed before Key Queues v2 GA.
-local keyGcV1ActiveAccount                    = KEYS[29]
-local keyGcV1ActivePartition                  = KEYS[30]
-local keyGcV1ActiveConcurrencyKey1            = KEYS[31]
-local keyGcV1ActiveConcurrencyKey2            = KEYS[32]
-local keyGcV1ActiveCompound                   = KEYS[33]
-local keyGcV1ActiveRun                        = KEYS[34]
-local keyGcV1ActiveRunsAccount                = KEYS[35]
-local keyGcV1ActiveRunsPartition              = KEYS[36]
-local keyGcV1ActiveRunsCustomConcurrencyKey1  = KEYS[37]
-local keyGcV1ActiveRunsCustomConcurrencyKey2  = KEYS[38]
+local keyIdempotency           = KEYS[30]
+local singletonRunKey          = KEYS[31]
 
--- NOTE: The following keys are temporary and only used for cleanup and will be removed before Key Queues v2 GA.
-local keyGcV0ActiveAccount                    = KEYS[39]
-local keyGcV0ActivePartition                  = KEYS[40]
-local keyGcV0ActiveConcurrencyKey1            = KEYS[41]
-local keyGcV0ActiveConcurrencyKey2            = KEYS[42]
-local keyGcV0ActiveCompound                   = KEYS[43]
-local keyGcV0ActiveRun                        = KEYS[44]
-local keyGcV0ActiveRunsAccount                = KEYS[45]
-local keyGcV0ActiveRunsPartition              = KEYS[46]
-local keyGcV0ActiveRunsCustomConcurrencyKey1  = KEYS[47]
-local keyGcV0ActiveRunsCustomConcurrencyKey2  = KEYS[48]
-
-local keyItemIndexA            = KEYS[49]   -- custom item index 1
-local keyItemIndexB            = KEYS[50]  -- custom item index 2
+local keyItemIndexA            = KEYS[32]   -- custom item index 1
+local keyItemIndexB            = KEYS[33]  -- custom item index 2
 
 local queueID        = ARGV[1]
 local partitionID    = ARGV[2]
@@ -170,11 +150,6 @@ end
 removeFromActiveSets(keyActivePartition, keyActiveAccount, keyActiveCompound, keyActiveConcurrencyKey1, keyActiveConcurrencyKey2, queueID)
 removeFromActiveRunSets(keyActiveRun, keyActiveRunsPartition, keyActiveRunsAccount, keyActiveRunsCustomConcurrencyKey1, keyActiveRunsCustomConcurrencyKey2, runID, queueID)
 
--- GC: Delete old active keys
-redis.call('DEL', keyGcV0ActiveAccount, keyGcV0ActivePartition, keyGcV0ActiveConcurrencyKey1, keyGcV0ActiveConcurrencyKey2, keyGcV0ActiveCompound, keyGcV0ActiveRun, keyGcV0ActiveRunsAccount, keyGcV0ActiveRunsPartition, keyGcV0ActiveRunsCustomConcurrencyKey1, keyGcV0ActiveRunsCustomConcurrencyKey2)
-redis.call('DEL', keyGcV1ActiveAccount, keyGcV1ActivePartition, keyGcV1ActiveConcurrencyKey1, keyGcV1ActiveConcurrencyKey2, keyGcV1ActiveCompound, keyGcV1ActiveRun, keyGcV1ActiveRunsAccount, keyGcV1ActiveRunsPartition, keyGcV1ActiveRunsCustomConcurrencyKey1, keyGcV1ActiveRunsCustomConcurrencyKey2)
-
-
 -- Add optional indexes.
 if keyItemIndexA ~= "" and keyItemIndexA ~= false and keyItemIndexA ~= nil then
 	redis.call("ZREM", keyItemIndexA, queueID)
@@ -189,7 +164,7 @@ if backlogScore ~= nil and backlogScore ~= false and backlogScore > 0 then
   redis.call("ZREM", keyBacklogSet, queueID)
 
   -- update backlog pointers
-  updateBacklogPointer(keyGlobalShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, keyShadowPartitionSet, keyBacklogSet, accountID, partitionID, backlogID)
+  updateBacklogPointer(keyShadowPartitionMeta, keyBacklogMeta, keyGlobalShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, keyShadowPartitionSet, keyBacklogSet, keyPartitionNormalizeSet, accountID, partitionID, backlogID)
 end
 
 
@@ -200,10 +175,13 @@ if singletonKey ~= nil and singletonKey ~= false and keyItemIndexA ~= "" and key
   local queueItemsCount = redis.call("ZCOUNT", keyItemIndexA, "-inf", "+inf")
   local singletonRunID = redis.call("GET", singletonKey)
 
-  if tonumber(queueItemsCount) == 0 and singletonRunID == runID then
+  if tonumber(queueItemsCount) == 0 then
     -- We just dequeued the last step
-    redis.call("DEL", singletonKey)
-    redis.call("DEL", singletonRunKey)
+     redis.call("DEL", singletonRunKey)
+
+     if singletonRunID == runID then
+        redis.call("DEL", singletonKey)
+    end
   end
 end
 

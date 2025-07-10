@@ -11,10 +11,6 @@ export default {
         mono: ['CircularXXMono', ...defaultTheme.fontFamily.mono],
       },
       colors: {
-        slate: {
-          910: '#0C1323',
-          940: '#080D19',
-        },
         primary: {
           '3xSubtle': 'rgb(var(--color-primary-3xSubtle) / <alpha-value>)',
           '2xSubtle': 'rgb(var(--color-primary-2xSubtle) / <alpha-value>)',

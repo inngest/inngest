@@ -8,7 +8,7 @@ import { toast } from 'sonner';
 import CheckoutModal, { type CheckoutItem } from '@/components/Billing/Plans/CheckoutModal';
 import ConfirmPlanChangeModal from '@/components/Billing/Plans/ConfirmPlanChangeModal';
 import { pathCreator } from '@/utils/urls';
-import { PlanNames, isEnterprisePlan, isLegacyPlan, type Plan } from './utils';
+import { PlanNames, isEnterprisePlan, type Plan } from './utils';
 
 type ChangePlanArgs = {
   item: CheckoutItem;
@@ -19,10 +19,12 @@ export default function UpgradeButton({
   plan,
   currentPlan,
   onPlanChange,
+  label,
 }: {
   plan: Plan;
   currentPlan: Plan;
   onPlanChange: () => void;
+  label?: string;
 }) {
   const router = useRouter();
   const [checkoutData, setCheckoutData] = useState<{
@@ -33,7 +35,6 @@ export default function UpgradeButton({
   const showChangePlanModal =
     checkoutData?.action === 'downgrade' || checkoutData?.action === 'cancel';
 
-  const currentPlanName = currentPlan.name;
   const cardPlanName = plan.name;
   const currentPlanAmount = currentPlan.amount;
   const cardPlanAmount = plan.amount;
@@ -42,10 +43,10 @@ export default function UpgradeButton({
   const isEnterpriseCard = cardPlanName === PlanNames.Enterprise;
   const isFreeCard = cardPlanName === PlanNames.Free;
 
-  const isLegacy = isLegacyPlan(currentPlan);
-
   const isActive =
-    currentPlanName === cardPlanName || (cardPlanName === PlanNames.Enterprise && isEnterprise);
+    currentPlan.slug === plan.slug ||
+    (cardPlanName === PlanNames.Enterprise && isEnterprise) ||
+    (currentPlan.slug === 'hobby-payg-2025-06-13' && plan.slug === 'hobby-free-2025-06-13');
 
   const isLowerPlan = (() => {
     if (isEnterprise) {
@@ -53,23 +54,35 @@ export default function UpgradeButton({
       return !isEnterprisePlan(plan);
     }
     // For legacy plans, only Free Tier is a downgrade
-    if (isLegacy) {
-      return isFreeCard;
+    if (currentPlan.isLegacy && !currentPlan.isFree) {
+      return isFreeCard || plan.slug === 'hobby-free-2025-06-13';
     }
     // For non-enterprise plans, compare the amounts
     return cardPlanAmount < currentPlanAmount;
   })();
 
-  const buttonLabel = isActive
-    ? 'My Plan'
-    : isEnterpriseCard
-    ? 'Get in touch'
-    : isLowerPlan
-    ? 'Downgrade'
-    : 'Upgrade';
+  let buttonLabel: string | undefined;
+  if (isActive) {
+    // Always override the label if the plan is active
+    buttonLabel = 'My Plan';
+  } else if (label) {
+    buttonLabel = label;
+  }
 
-  const onClickChangePlan = ({ item: { planID, name, amount }, action }: ChangePlanArgs) => {
-    setCheckoutData({ items: [{ planID, name, quantity: 1, amount }], action });
+  if (!buttonLabel) {
+    // If there still isn't a label then we need find a default
+
+    if (isEnterpriseCard) {
+      buttonLabel = 'Get in touch';
+    } else if (isLowerPlan) {
+      buttonLabel = 'Downgrade';
+    } else {
+      buttonLabel = 'Upgrade';
+    }
+  }
+
+  const onClickChangePlan = ({ item: { planSlug, name, amount }, action }: ChangePlanArgs) => {
+    setCheckoutData({ items: [{ planSlug, name, quantity: 1, amount }], action });
   };
 
   const onChangePlanSuccess = () => {
@@ -94,7 +107,7 @@ export default function UpgradeButton({
           if (isActive || isEnterpriseCard) return;
           onClickChangePlan({
             action: isFreeCard ? 'cancel' : isLowerPlan ? 'downgrade' : 'upgrade',
-            item: { planID: plan.id, name: plan.name, quantity: 1, amount: plan.amount },
+            item: { planSlug: plan.slug, name: plan.name, quantity: 1, amount: plan.amount },
           });
         }}
       />

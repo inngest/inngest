@@ -3,8 +3,10 @@ package golang
 import (
 	"context"
 	"fmt"
+	"log"
 	"log/slog"
 	"math/rand"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -32,7 +34,7 @@ func NewSDKHandler(t *testing.T, appID string, copts ...opt) (inngestgo.Client, 
 	opts := inngestgo.ClientOpts{
 		AppID:       appID,
 		EventKey:    &key,
-		Logger:      slog.Default(),
+		Logger:      slog.New(slog.DiscardHandler),
 		RegisterURL: inngestgo.StrPtr(fmt.Sprintf("%s/fn/register", DEV_URL)),
 	}
 
@@ -115,10 +117,12 @@ func (h HTTPServer) LocalURL() string {
 // This is a copy of httptest, but listens on the docker gateway instead of 127.0.0.1
 // only - which doesn't work in tests as the executor's localhost is different.
 func NewHTTPServer(f http.Handler) *HTTPServer {
-	var port int32
-	for port < 10000 {
-		port = rand.Int31n(65335)
+	l, err := net.Listen("tcp", ":0")
+	if err != nil {
+		log.Fatal(err)
 	}
+	port := l.Addr().(*net.TCPAddr).Port
+	l.Close()
 
 	s := &http.Server{
 		Addr:           fmt.Sprintf("0.0.0.0:%d", port),
@@ -138,7 +142,7 @@ func NewHTTPServer(f http.Handler) *HTTPServer {
 	// Give it ime to start.
 	<-time.After(20 * time.Millisecond)
 
-	return &HTTPServer{Server: s, Port: port}
+	return &HTTPServer{Server: s, Port: int32(port)}
 }
 
 func NewHTTPSServer(f http.Handler) *HTTPServer {

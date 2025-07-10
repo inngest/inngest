@@ -74,6 +74,20 @@ local function gcraCapacity(key, now_ms, period_ms, limit, burst)
   -- convert time capacity to token capacity
   local capacity = math.floor(time_capacity_remain / emission)
 
-  -- this could be negative, which means no capacity
-  return math.min(capacity, limit + burst)
+  -- Convert the remaining time budget back into a number of tokens.
+  local capacity = math.floor(time_capacity_remain / emission)
+
+  -- The capacity cannot exceed the defined limit + burst.
+  local final_capacity = math.min(capacity, limit + burst)
+
+  if final_capacity < 1 then
+    -- We are throttled. Calculate the time when the capacity will be >= 1.
+    -- This is the point where enough time has passed to "earn" one token.
+    -- The formula is derived from solving for the future time `t` where capacity becomes 1.
+    local next_available_at_ms = tat - total_capacity_time + emission
+    return { final_capacity, math.ceil(next_available_at_ms) }
+  else
+    -- Not throttled, so there is no "next available time" to report.
+    return { final_capacity, 0 }
+  end
 end

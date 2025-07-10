@@ -7,15 +7,18 @@ import { HorizontalPillList, Pill, PillContent } from '@inngest/components/Pill'
 import { Skeleton } from '@inngest/components/Skeleton/Skeleton';
 import { NumberCell, TextCell } from '@inngest/components/Table';
 import NewTable from '@inngest/components/Table/NewTable';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
+import { getHumanReadableCron } from '@inngest/components/hooks/useCron';
 import { type Trigger } from '@inngest/components/types/trigger';
 import { cn } from '@inngest/components/utils/classNames';
 import { createColumnHelper } from '@tanstack/react-table';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
+import { FunctionTriggerTypes } from '@/gql/graphql';
 import { pathCreator } from '@/utils/urls';
 
 export type FunctionTableRow = {
-  appName: string | null;
+  app: { name: string };
   name: string;
   isArchived: boolean;
   isPaused: boolean;
@@ -52,6 +55,9 @@ export function FunctionTable({ rows = [], isLoading }: Props) {
         blankState={rows.length === 0 ? 'No functions' : null}
         onRowClick={(row) =>
           router.push(pathCreator.function({ envSlug: env.slug, functionSlug: row.original.slug }))
+        }
+        getRowHref={(row) =>
+          pathCreator.function({ envSlug: env.slug, functionSlug: row.original.slug })
         }
       />
     </main>
@@ -96,7 +102,7 @@ function createColumns(environmentSlug: string) {
                 <Pill
                   appearance="outlined"
                   href={
-                    trigger.type === 'EVENT'
+                    trigger.type === FunctionTriggerTypes.Event
                       ? pathCreator.eventType({
                           envSlug: environmentSlug,
                           eventName: trigger.value,
@@ -105,7 +111,18 @@ function createColumns(environmentSlug: string) {
                   }
                   key={trigger.type + trigger.value}
                 >
-                  <PillContent type={trigger.type}>{trigger.value}</PillContent>
+                  {trigger.type === FunctionTriggerTypes.Cron ? (
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <span>
+                          <PillContent type={trigger.type}>{trigger.value}</PillContent>
+                        </span>
+                      </TooltipTrigger>
+                      <TooltipContent>{getHumanReadableCron(trigger.value)}</TooltipContent>
+                    </Tooltip>
+                  ) : (
+                    <PillContent type={trigger.type}>{trigger.value}</PillContent>
+                  )}
                 </Pill>
               );
             })}
@@ -114,7 +131,7 @@ function createColumns(environmentSlug: string) {
       },
       header: 'Triggers',
     }),
-    columnHelper.accessor('appName', {
+    columnHelper.accessor((row) => row.app.name, {
       cell: (info) => {
         const appExternalID = info.getValue();
         if (!appExternalID) {

@@ -1,0 +1,28 @@
+syntax = "proto3";
+package connect.v1;
+
+import "connect/v1/connect.proto";
+
+option go_package = "github.com/inngest/inngest/proto/gen/connect/v1;connect";
+
+service ConnectGateway {
+  rpc Forward(ForwardRequest) returns (ForwardResponse) {}
+  rpc Ping(PingRequest) returns (PingResponse) {}
+}
+
+message ForwardRequest {
+  string connectionID = 1;
+  GatewayExecutorRequestData data = 2;
+}
+
+message ForwardResponse {
+  bool success = 1;
+}
+
+message PingRequest {
+  // Empty request message for ping
+}
+
+message PingResponse {
+  string message = 1;
+}

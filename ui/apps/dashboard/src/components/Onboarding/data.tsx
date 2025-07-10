@@ -73,7 +73,8 @@ export const InvokeFunctionLookupDocument = graphql(`
           slug
           current {
             triggers {
-              eventName
+              type
+              value
             }
           }
         }

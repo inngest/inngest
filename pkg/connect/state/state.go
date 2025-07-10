@@ -6,6 +6,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net"
+	"net/http"
+	"net/url"
+	"time"
+
 	"github.com/coder/websocket"
 	"github.com/inngest/inngest/pkg/backoff"
 	connecterrors "github.com/inngest/inngest/pkg/connect/errors"
@@ -15,10 +21,6 @@ import (
 	"github.com/inngest/inngest/pkg/syscode"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/oklog/ulid/v2"
-	"io"
-	"net/http"
-	"net/url"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/headers"
@@ -57,6 +59,8 @@ type GatewayManager interface {
 	UpsertGateway(ctx context.Context, gateway *Gateway) error
 	DeleteGateway(ctx context.Context, gatewayId ulid.ULID) error
 	GetGateway(ctx context.Context, gatewayId ulid.ULID) (*Gateway, error)
+	GetAllGateways(ctx context.Context) ([]*Gateway, error)
+	GetAllGatewayIDs(ctx context.Context) ([]string, error)
 }
 
 type RequestStateManager interface {
@@ -156,6 +160,8 @@ type Gateway struct {
 	LastHeartbeatAtMS int64         `json:"last_heartbeat"`
 
 	Hostname string `json:"hostname"`
+
+	IPAddress net.IP `json:"ip"`
 }
 
 // Connection have all the metadata associated with a worker connection
@@ -185,7 +191,7 @@ func (c *Connection) AppNames() []string {
 // an out-of-band Sync request is sent to the API. This is expected to handle idempotency, so subsequent calls return the same App ID and Sync ID
 // given the same idempotency key.
 // - To enable rollback functionality, the API should trigger a new sync if, and only if, the requested idempotency key does not match the current deploy.
-func (g *WorkerGroup) Sync(ctx context.Context, groupManager WorkerGroupManager, apiBaseUrl string, initialReq *connpb.WorkerConnectRequestData) error {
+func (g *WorkerGroup) Sync(ctx context.Context, groupManager WorkerGroupManager, apiBaseUrl string, initialReq *connpb.WorkerConnectRequestData, isDev bool) error {
 	// The group is expected to exist in the state, as UpsertConnection also creates the group if it doesn't exist
 	existingGroup, err := groupManager.GetWorkerGroupByHash(ctx, g.EnvID, g.Hash)
 	if err != nil {
@@ -222,9 +228,18 @@ func (g *WorkerGroup) Sync(ctx context.Context, groupManager WorkerGroupManager,
 		appVersion = *g.AppVersion
 	}
 
+	appURL := connURL.String()
+
+	// When running on the dev server, make sure to append the app name to create a deterministic UUID
+	// This is necessary for multi-app connections, where each app sends an individual sync request and should
+	// always use the same App ID to avoid creating duplicate apps when changing the function configuration.
+	if isDev {
+		appURL += fmt.Sprintf("?app_name=%s", url.QueryEscape(g.AppName))
+	}
+
 	config := sdk.RegisterRequest{
 		V:          "1",
-		URL:        connURL.String(),
+		URL:        appURL,
 		DeployType: sdk.DeployTypeConnect,
 		SDK:        sdkVersion,
 		AppName:    g.AppName,

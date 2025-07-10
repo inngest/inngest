@@ -1,7 +1,6 @@
 package httpdriver
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -17,6 +16,7 @@ import (
 	"github.com/inngest/go-httpstat"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/execution/driver"
+	"github.com/inngest/inngest/pkg/execution/exechttp"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
@@ -25,7 +25,6 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/syscode"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
-	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -36,43 +35,16 @@ var (
 	ErrNoRetryAfter  = fmt.Errorf("no retry after present")
 	ErrNotSDK        = syscode.Error{Code: syscode.CodeNotSDK}
 
-	defaultClient = Client(SecureDialerOpts{})
+	defaultClient = exechttp.Client(exechttp.SecureDialerOpts{})
 )
 
 const (
 	AccountIDHeader = "account-id"
 )
 
-// Client returns a new HTTP transport.
-func Transport(opts SecureDialerOpts) *http.Transport {
-	t := &http.Transport{
-		DialContext:           SecureDialer(opts),
-		ForceAttemptHTTP2:     true,
-		MaxIdleConns:          5,
-		IdleConnTimeout:       2 * time.Second,
-		TLSHandshakeTimeout:   10 * time.Second,
-		ExpectContinueTimeout: 1 * time.Second,
-		DisableKeepAlives:     true,
-		// New, ensuring that services can take their time before
-		// responding with headers as they process long running
-		// jobs.
-		ResponseHeaderTimeout: consts.MaxFunctionTimeout,
-	}
-
-	return t
-}
-
-// Client returns a new HTTP client.
-func Client(opts SecureDialerOpts) util.HTTPDoer {
-	return util.HTTPDoer(&http.Client{
-		Timeout:       consts.MaxFunctionTimeout,
-		CheckRedirect: CheckRedirect,
-		Transport:     Transport(opts),
-	})
-}
-
 type executor struct {
-	Client                 util.HTTPDoer
+	// Client represents an http client used to create outgoing requests.
+	Client                 exechttp.RequestExecutor
 	localSigningKey        []byte
 	requireLocalSigningKey bool
 }
@@ -117,7 +89,7 @@ func (e executor) Execute(ctx context.Context, sl sv2.StateLoader, s sv2.Metadat
 		}
 	}
 
-	dr, _, err := DoRequest(ctx, e.Client, Request{
+	dr, _, err := ExecuteDriverRequest(ctx, e.Client, Request{
 		SigningKey: e.localSigningKey,
 		URL:        *uri,
 		Input:      input,
@@ -151,8 +123,8 @@ type Request struct {
 	Headers map[string]string
 }
 
-// DoRequest executes the HTTP request with the given input.
-func DoRequest(ctx context.Context, c util.HTTPDoer, r Request) (*state.DriverResponse, *httpstat.Result, error) {
+// ExecuteDriverRequest executes the HTTP request with the given input.
+func ExecuteDriverRequest(ctx context.Context, c exechttp.RequestExecutor, r Request) (*state.DriverResponse, *httpstat.Result, error) {
 	if c == nil {
 		c = defaultClient
 	}
@@ -291,7 +263,7 @@ func HandleHttpResponse(ctx context.Context, r Request, resp *Response) (*state.
 	return dr, err
 }
 
-func do(ctx context.Context, c util.HTTPDoer, r Request) (*Response, *httpstat.Result, error) {
+func do(ctx context.Context, c exechttp.RequestExecutor, r Request) (*Response, *httpstat.Result, error) {
 	l := logger.StdlibLogger(ctx)
 
 	if c == nil {
@@ -301,7 +273,7 @@ func do(ctx context.Context, c util.HTTPDoer, r Request) (*Response, *httpstat.R
 	ctx, cancel := context.WithTimeout(ctx, consts.MaxFunctionTimeout)
 	defer cancel()
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, r.URL.String(), bytes.NewBuffer(r.Input))
+	req, err := exechttp.NewRequest(http.MethodPost, r.URL.String(), r.Input)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error creating request: %w", err)
 	}
@@ -310,9 +282,6 @@ func do(ctx context.Context, c util.HTTPDoer, r Request) (*Response, *httpstat.R
 	if r.AccountID != uuid.Nil {
 		req.Header.Add(AccountIDHeader, r.AccountID.String())
 	}
-
-	// Always close the request after reading the body, ensuring the connection is not recycled.
-	req.Close = true
 
 	if len(r.SigningKey) > 0 {
 		req.Header.Add("X-Inngest-Signature", Sign(ctx, r.SigningKey, r.Input))
@@ -326,30 +295,24 @@ func do(ctx context.Context, c util.HTTPDoer, r Request) (*Response, *httpstat.R
 		req.Header.Add(k, v)
 	}
 
-	// Track HTTP stats, eg. TLS handshake timeouts, DNS lookups, etc.
-	tracking := &httpstat.Result{}
-	req = req.WithContext(httpstat.WithHTTPStat(req.Context(), tracking))
-
 	// Perform the request.
-	resp, byt, dur, err := ExecuteRequest(ctx, c, req)
-	tracking.End(time.Now())
+	resp, err := c.DoRequest(ctx, req)
 
 	// Handle no response errors.
-	if errors.Is(err, ErrUnableToReach) {
+	if errors.Is(err, exechttp.ErrUnableToReach) {
 		l.Warn("EOF writing request to SDK",
 			"url", r.URL.String(),
 			"step", r.Step,
 			"edge	", r.Edge,
-			"req_dur_ms", dur.Milliseconds(),
 		)
-		return nil, tracking, err
+		return nil, nil, err
 	}
-	if err != nil && len(byt) == 0 {
-		return nil, tracking, err
+	if resp == nil {
+		return nil, nil, err
 	}
 
 	var sysErr *syscode.Error
-	if errors.Is(err, ErrBodyTooLarge) {
+	if errors.Is(err, exechttp.ErrBodyTooLarge) {
 		sysErr = &syscode.Error{Code: syscode.CodeOutputTooLarge}
 		//
 		// downstream executor code expects system error codes here for traces
@@ -358,14 +321,13 @@ func do(ctx context.Context, c util.HTTPDoer, r Request) (*Response, *httpstat.R
 
 		// Override the output so the user sees the syserrV in the UI rather
 		// than a JSON parsing error
-		byt, _ = json.Marshal(sysErr.Code)
+		resp.Body, _ = json.Marshal(sysErr.Code)
 	}
 
 	if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
 		l.Error("http eof reading response",
 			"error", err,
 			"url", r.URL.String(),
-			"response", string(byt),
 			"headers", resp.Header,
 			"step", r.Step,
 			"edge	", r.Edge,
@@ -384,7 +346,7 @@ func do(ctx context.Context, c util.HTTPDoer, r Request) (*Response, *httpstat.R
 		retryAt    *time.Time
 	)
 
-	body = byt
+	body = resp.Body
 	statusCode = resp.StatusCode
 	headers := resp.Header
 
@@ -400,9 +362,9 @@ func do(ctx context.Context, c util.HTTPDoer, r Request) (*Response, *httpstat.R
 	// send a 201 status code and namespace in this way, so failing to parse
 	// here is an error.
 	if resp.StatusCode == 201 && sysErr == nil {
-		stream, err := ParseStream(byt)
+		stream, err := ParseStream(resp.Body)
 		if err != nil {
-			return nil, tracking, fmt.Errorf("error parsing stream: %w", err)
+			return nil, resp.StatResult, fmt.Errorf("error parsing stream: %w", err)
 		} else {
 			// These are all contained within a single wrapper.
 			body = stream.Body
@@ -419,7 +381,6 @@ func do(ctx context.Context, c util.HTTPDoer, r Request) (*Response, *httpstat.R
 		// Unreachable
 		l.Error("status code is 0",
 			"error", err,
-			"body", string(byt),
 			"run_id", r.RunID.String(),
 		)
 	}
@@ -442,7 +403,7 @@ func do(ctx context.Context, c util.HTTPDoer, r Request) (*Response, *httpstat.R
 	return &Response{
 		Body:           body,
 		StatusCode:     statusCode,
-		Duration:       dur,
+		Duration:       resp.StatResult.Total,
 		RetryAt:        retryAt,
 		NoRetry:        noRetry,
 		RequestVersion: rv,
@@ -450,8 +411,7 @@ func do(ctx context.Context, c util.HTTPDoer, r Request) (*Response, *httpstat.R
 		Sdk:            headers.Get(headerSDK),
 		Header:         headers,
 		SysErr:         sysErr,
-	}, tracking, err
-
+	}, resp.StatResult, err
 }
 
 type Response struct {

@@ -3,6 +3,7 @@ package redis_state
 import (
 	"context"
 	"fmt"
+	"math"
 	"strconv"
 	"testing"
 
@@ -165,7 +166,7 @@ func TestQueueItemBacklogs(t *testing.T) {
 		hashedThrottleKey := osqueue.HashID(ctx, rawThrottleKey)
 
 		expected := QueueBacklog{
-			BacklogID:         fmt.Sprintf("fn:%s:start:t<%s>", fnID, hashedThrottleKey),
+			BacklogID:         fmt.Sprintf("fn:%s:start:t<%s:%s>", fnID, throttleKeyExpressionHash, hashedThrottleKey),
 			Start:             true,
 			ShadowPartitionID: fnID.String(),
 
@@ -213,15 +214,17 @@ func TestQueueItemBacklogs(t *testing.T) {
 	t.Run("throttle with key", func(t *testing.T) {
 		rawThrottleKey := "customer1"
 		hashedThrottleKey := osqueue.HashID(ctx, rawThrottleKey)
+		exprHash := util.XXHash(rawThrottleKey)
 
 		expected := QueueBacklog{
-			BacklogID:         fmt.Sprintf("fn:%s:start:t<%s>", fnID, hashedThrottleKey),
+			BacklogID:         fmt.Sprintf("fn:%s:start:t<%s:%s>", fnID, exprHash, hashedThrottleKey),
 			Start:             true,
 			ShadowPartitionID: fnID.String(),
 
 			Throttle: &BacklogThrottle{
-				ThrottleKey:         hashedThrottleKey,
-				ThrottleKeyRawValue: rawThrottleKey,
+				ThrottleKey:               hashedThrottleKey,
+				ThrottleKeyRawValue:       rawThrottleKey,
+				ThrottleKeyExpressionHash: exprHash,
 			},
 		}
 
@@ -243,6 +246,7 @@ func TestQueueItemBacklogs(t *testing.T) {
 					Burst:               30,
 					Period:              700,
 					UnhashedThrottleKey: rawThrottleKey,
+					KeyExpressionHash:   exprHash,
 				},
 				CustomConcurrencyKeys: nil,
 				QueueName:             nil,
@@ -382,7 +386,7 @@ func TestQueueItemBacklogs(t *testing.T) {
 		}.ParseKey()
 
 		expected := QueueBacklog{
-			BacklogID:         fmt.Sprintf("fn:%s:c1<%s>", fnID, util.XXHash(fullKey)),
+			BacklogID:         fmt.Sprintf("fn:%s:c1<%s:%s>", fnID, hashedConcurrencyKeyExpr, util.XXHash(fullKey)),
 			ShadowPartitionID: fnID.String(),
 
 			ConcurrencyKeys: []BacklogConcurrencyKey{
@@ -432,6 +436,7 @@ func TestQueueItemBacklogs(t *testing.T) {
 
 	t.Run("concurrency + throttle start item", func(t *testing.T) {
 		rawThrottleKey := "customer1"
+		hashedThrottleExpr := util.XXHash(rawThrottleKey)
 		hashedThrottleKey := osqueue.HashID(ctx, rawThrottleKey)
 
 		hashedConcurrencyKeyExpr := hashConcurrencyKey("event.data.customerId")
@@ -446,13 +451,14 @@ func TestQueueItemBacklogs(t *testing.T) {
 		}.ParseKey()
 
 		expected := QueueBacklog{
-			BacklogID:         fmt.Sprintf("fn:%s:start:t<%s>:c1<%s>", fnID, hashedThrottleKey, util.XXHash(fullKey)),
+			BacklogID:         fmt.Sprintf("fn:%s:start:t<%s:%s>:c1<%s:%s>", fnID, hashedThrottleExpr, hashedThrottleExpr, hashedConcurrencyKeyExpr, util.XXHash(fullKey)),
 			Start:             true,
 			ShadowPartitionID: fnID.String(),
 
 			Throttle: &BacklogThrottle{
-				ThrottleKey:         hashedThrottleKey,
-				ThrottleKeyRawValue: rawThrottleKey,
+				ThrottleKey:               hashedThrottleKey,
+				ThrottleKeyRawValue:       rawThrottleKey,
+				ThrottleKeyExpressionHash: hashedThrottleExpr,
 			},
 
 			ConcurrencyKeys: []BacklogConcurrencyKey{
@@ -485,6 +491,7 @@ func TestQueueItemBacklogs(t *testing.T) {
 					Burst:               30,
 					Period:              700,
 					UnhashedThrottleKey: rawThrottleKey,
+					KeyExpressionHash:   hashedThrottleExpr,
 				},
 				CustomConcurrencyKeys: []state.CustomConcurrency{
 					{
@@ -518,7 +525,7 @@ func TestQueueItemBacklogs(t *testing.T) {
 		}.ParseKey()
 
 		expected := QueueBacklog{
-			BacklogID:         fmt.Sprintf("fn:%s:c1<%s>", fnID, util.XXHash(fullKey)),
+			BacklogID:         fmt.Sprintf("fn:%s:c1<%s:%s>", fnID, hashedConcurrencyKeyExpr, util.XXHash(fullKey)),
 			ShadowPartitionID: fnID.String(),
 
 			ConcurrencyKeys: []BacklogConcurrencyKey{
@@ -592,7 +599,7 @@ func TestQueueItemBacklogs(t *testing.T) {
 		}.ParseKey()
 
 		expected := QueueBacklog{
-			BacklogID:         fmt.Sprintf("fn:%s:c1<%s>:c2<%s>", fnID, util.XXHash(fullKey), util.XXHash(fullKey2)),
+			BacklogID:         fmt.Sprintf("fn:%s:c1<%s:%s>:c2<%s:%s>", fnID, hashedConcurrencyKeyExpr, util.XXHash(fullKey), hashedConcurrencyKeyExpr2, util.XXHash(fullKey2)),
 			ShadowPartitionID: fnID.String(),
 
 			ConcurrencyKeys: []BacklogConcurrencyKey{
@@ -986,17 +993,20 @@ func TestBacklogIsOutdated(t *testing.T) {
 	t.Run("same config should not be marked as outdated", func(t *testing.T) {
 		keyHash := util.XXHash("event.data.customerID")
 
-		shadowPart := &QueueShadowPartition{
-			Concurrency: ShadowPartitionConcurrency{
-				CustomConcurrencyKeys: []CustomConcurrencyLimit{
-					{
-						Scope:               enums.ConcurrencyScopeFn,
-						HashedKeyExpression: keyHash,
-						Limit:               10,
-					},
+		concurrency := ShadowPartitionConcurrency{
+			CustomConcurrencyKeys: []CustomConcurrencyLimit{
+				{
+					Scope:               enums.ConcurrencyScopeFn,
+					HashedKeyExpression: keyHash,
+					Limit:               10,
 				},
 			},
 		}
+
+		constraints := PartitionConstraintConfig{
+			Concurrency: concurrency,
+		}
+
 		backlog := &QueueBacklog{
 			ConcurrencyKeys: []BacklogConcurrencyKey{
 				{
@@ -1011,13 +1021,13 @@ func TestBacklogIsOutdated(t *testing.T) {
 			Throttle: nil,
 		}
 
-		require.Equal(t, enums.QueueNormalizeReasonUnchanged, backlog.isOutdated(shadowPart))
+		require.Equal(t, enums.QueueNormalizeReasonUnchanged, backlog.isOutdated(&constraints))
 	})
 
 	t.Run("adding concurrency keys should not mark default partition as outdated", func(t *testing.T) {
 		keyHash := util.XXHash("event.data.customerID")
 
-		shadowPart := &QueueShadowPartition{
+		constraints := &PartitionConstraintConfig{
 			Concurrency: ShadowPartitionConcurrency{
 				CustomConcurrencyKeys: []CustomConcurrencyLimit{
 					{
@@ -1030,14 +1040,14 @@ func TestBacklogIsOutdated(t *testing.T) {
 		}
 		backlog := &QueueBacklog{}
 
-		require.Equal(t, enums.QueueNormalizeReasonUnchanged, backlog.isOutdated(shadowPart))
+		require.Equal(t, enums.QueueNormalizeReasonUnchanged, backlog.isOutdated(constraints))
 	})
 
 	t.Run("changing concurrency key should mark as outdated", func(t *testing.T) {
 		keyHashOld := util.XXHash("event.data.customerID")
 		keyHashNew := util.XXHash("event.data.orgID")
 
-		shadowPart := &QueueShadowPartition{
+		constraints := &PartitionConstraintConfig{
 			Concurrency: ShadowPartitionConcurrency{
 				CustomConcurrencyKeys: []CustomConcurrencyLimit{
 					{
@@ -1060,13 +1070,13 @@ func TestBacklogIsOutdated(t *testing.T) {
 			},
 		}
 
-		require.Equal(t, enums.QueueNormalizeReasonCustomConcurrencyKeyNotFoundOnShadowPartition, backlog.isOutdated(shadowPart))
+		require.Equal(t, enums.QueueNormalizeReasonCustomConcurrencyKeyNotFoundOnShadowPartition, backlog.isOutdated(constraints))
 	})
 
 	t.Run("removing concurrency key should mark as outdated", func(t *testing.T) {
 		keyHashOld := util.XXHash("event.data.customerID")
 
-		shadowPart := &QueueShadowPartition{
+		constraints := &PartitionConstraintConfig{
 			Concurrency: ShadowPartitionConcurrency{
 				CustomConcurrencyKeys: nil,
 			},
@@ -1083,14 +1093,14 @@ func TestBacklogIsOutdated(t *testing.T) {
 			},
 		}
 
-		require.Equal(t, enums.QueueNormalizeReasonCustomConcurrencyKeyCountMismatch, backlog.isOutdated(shadowPart))
+		require.Equal(t, enums.QueueNormalizeReasonCustomConcurrencyKeyCountMismatch, backlog.isOutdated(constraints))
 	})
 
 	t.Run("changing throttle key should mark as outdated", func(t *testing.T) {
 		keyHashOld := util.XXHash("event.data.customerID")
 		keyHashNew := util.XXHash("event.data.orgID")
 
-		shadowPart := &QueueShadowPartition{
+		constraints := &PartitionConstraintConfig{
 			Throttle: &ShadowPartitionThrottle{
 				ThrottleKeyExpressionHash: keyHashNew,
 			},
@@ -1101,13 +1111,13 @@ func TestBacklogIsOutdated(t *testing.T) {
 			},
 		}
 
-		require.Equal(t, enums.QueueNormalizeReasonThrottleKeyChanged, backlog.isOutdated(shadowPart))
+		require.Equal(t, enums.QueueNormalizeReasonThrottleKeyChanged, backlog.isOutdated(constraints))
 	})
 
 	t.Run("same throttle key should not mark as outdated", func(t *testing.T) {
 		keyHash := util.XXHash("event.data.orgID")
 
-		shadowPart := &QueueShadowPartition{
+		constraints := &PartitionConstraintConfig{
 			Throttle: &ShadowPartitionThrottle{
 				ThrottleKeyExpressionHash: keyHash,
 			},
@@ -1118,13 +1128,13 @@ func TestBacklogIsOutdated(t *testing.T) {
 			},
 		}
 
-		require.Equal(t, enums.QueueNormalizeReasonUnchanged, backlog.isOutdated(shadowPart))
+		require.Equal(t, enums.QueueNormalizeReasonUnchanged, backlog.isOutdated(constraints))
 	})
 
 	t.Run("removing throttle key should mark as outdated", func(t *testing.T) {
 		keyHashOld := util.XXHash("event.data.customerID")
 
-		shadowPart := &QueueShadowPartition{
+		constraints := &PartitionConstraintConfig{
 			Throttle: nil,
 		}
 		backlog := &QueueBacklog{
@@ -1133,6 +1143,74 @@ func TestBacklogIsOutdated(t *testing.T) {
 			},
 		}
 
-		require.Equal(t, enums.QueueNormalizeReasonThrottleRemoved, backlog.isOutdated(shadowPart))
+		require.Equal(t, enums.QueueNormalizeReasonThrottleRemoved, backlog.isOutdated(constraints))
 	})
+}
+
+func TestShuffleBacklogs(t *testing.T) {
+	iterations := 1000
+
+	matches := 0
+
+	for i := 0; i < iterations; i++ {
+		b1Start := &QueueBacklog{
+			BacklogID: "b-1:start",
+			Start:     true,
+		}
+
+		b1 := &QueueBacklog{
+			BacklogID: "b-1",
+		}
+
+		b2Start := &QueueBacklog{
+			BacklogID: "b-2:start",
+			Start:     true,
+		}
+
+		b2 := &QueueBacklog{
+			BacklogID: "b-2",
+		}
+
+		b3Start := &QueueBacklog{
+			BacklogID: "b-3:start",
+			Start:     true,
+		}
+
+		b3 := &QueueBacklog{
+			BacklogID: "b-3",
+		}
+
+		shuffled := shuffleBacklogs([]*QueueBacklog{
+			b1,
+			b1Start,
+			b2,
+			b2Start,
+			b3,
+			b3Start,
+		})
+
+		findIndex := func(b *QueueBacklog) int {
+			for i, backlog := range shuffled {
+				if backlog.BacklogID == b.BacklogID {
+					return i
+				}
+			}
+
+			return -1
+		}
+
+		if findIndex(b1) > findIndex(b1Start) {
+			continue
+		}
+		if findIndex(b2) > findIndex(b2Start) {
+			continue
+		}
+		if findIndex(b3) > findIndex(b3Start) {
+			continue
+		}
+
+		matches++
+	}
+
+	require.Greater(t, matches, int(math.Ceil(float64(iterations)/2)))
 }
