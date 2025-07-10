@@ -20,10 +20,7 @@ import { EnvironmentType } from '@/utils/environments';
 import { EnvironmentArchiveDropdownItem } from './EnvironmentArchiveDropdownItem';
 import EnvironmentListTable from './EnvironmentListTable';
 
-// EnvNavMenu is the dropdown menu used in the left sidebar that allows the user to select an environment.
-// On select, it will navigate to the selected environment.
-// It allows selecting branch environments.
-export default function EnvNavMenu() {
+export default function Environments() {
   const [openCustomEnvDropdownId, setOpenCustomEnvDropdownId] = useState<string | null>(null);
   const router = useRouter();
   const [{ data: envs = [], fetching }] = useEnvironments();
