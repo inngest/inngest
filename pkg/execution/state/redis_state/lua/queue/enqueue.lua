@@ -58,6 +58,7 @@ local normalizeFromBacklogID  = ARGV[15]
 -- $include(get_partition_item.lua)
 -- $include(enqueue_to_partition.lua)
 -- $include(ends_with.lua)
+-- $include(update_backlog_pointer.lua)
 
 -- Only skip idempotency checks if we're normalizing a backlog (we want to enqueue an existing item to a new backlog)
 local is_normalize = exists_without_ending(keyNormalizeFromBacklogSet, ":-")
@@ -93,6 +94,9 @@ end
 -- Normalization only: Remove from old backlog after enqueueing to new backlog
 if is_normalize then
   redis.call("ZREM", keyNormalizeFromBacklogSet, queueID)
+
+  -- Clean up backlog pointers for old backlog
+  updateBacklogPointer(keyShadowPartitionMeta, keyBacklogMeta, keyGlobalShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, keyShadowPartitionSet, keyBacklogSet, keyPartitionNormalizeSet, accountID, partitionID, backlogID)
 
   -- Clean up normalize pointers if backlog is empty
   if tonumber(redis.call("ZCARD", keyNormalizeFromBacklogSet)) == 0 then
