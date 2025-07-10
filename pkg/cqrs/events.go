@@ -82,8 +82,8 @@ type EventWriter interface {
 type WorkspaceEventsOpts struct {
 	Cursor *ulid.ULID
 	Limit  int
-	// Name filters events to a given name.
-	Name *string
+	// Name filters events to given names.
+	Names []string
 	// Newest represents the newest time to load events from.  Events newer than
 	// this cutoff will not be loaded.
 	Newest time.Time
@@ -125,6 +125,8 @@ type EventReader interface {
 	) ([]*Event, error)
 	// GetEvents returns the latest events for a given workspace.
 	GetEvents(ctx context.Context, accountID uuid.UUID, workspaceID uuid.UUID, opts *WorkspaceEventsOpts) ([]*Event, error)
+	// GetEventsCount returns the total count of events filtered by event name and from/until time range
+	GetEventsCount(ctx context.Context, accountID uuid.UUID, workspaceID uuid.UUID, opts *WorkspaceEventsOpts) (int64, error)
 	// GetEvent returns a specific event given an ID.
 	GetEvent(ctx context.Context, id ulid.ULID, accountID uuid.UUID, workspaceID uuid.UUID) (*Event, error)
 }

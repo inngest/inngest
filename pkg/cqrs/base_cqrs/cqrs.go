@@ -849,7 +849,7 @@ func (w wrapper) GetEvents(ctx context.Context, accountID uuid.UUID, workspaceID
 		err  error
 	)
 
-	if opts.Name == nil {
+	if len(opts.Names) == 0 {
 		params := sqlc.WorkspaceEventsParams{
 			Cursor: *opts.Cursor,
 			Before: opts.Newest,
@@ -859,7 +859,7 @@ func (w wrapper) GetEvents(ctx context.Context, accountID uuid.UUID, workspaceID
 		evts, err = w.q.WorkspaceEvents(ctx, params)
 	} else {
 		params := sqlc.WorkspaceNamedEventsParams{
-			Name:   *opts.Name,
+			Names:  opts.Names,
 			Cursor: *opts.Cursor,
 			Before: opts.Newest,
 			After:  opts.Oldest,
@@ -877,6 +877,27 @@ func (w wrapper) GetEvents(ctx context.Context, accountID uuid.UUID, workspaceID
 		out[n] = &val
 	}
 	return out, nil
+}
+
+func (w wrapper) GetEventsCount(ctx context.Context, accountID uuid.UUID, workspaceID uuid.UUID, opts *cqrs.WorkspaceEventsOpts) (int64, error) {
+	if err := opts.Validate(); err != nil {
+		return 0, err
+	}
+
+	if len(opts.Names) == 0 {
+		params := sqlc.WorkspaceCountEventsParams{
+			Before: opts.Newest,
+			After:  opts.Oldest,
+		}
+		return w.q.WorkspaceCountEvents(ctx, params)
+	} else {
+		params := sqlc.WorkspaceCountNamedEventsParams{
+			Names:  opts.Names,
+			Before: opts.Newest,
+			After:  opts.Oldest,
+		}
+		return w.q.WorkspaceCountNamedEvents(ctx, params)
+	}
 }
 
 func (w wrapper) GetEventsIDbound(

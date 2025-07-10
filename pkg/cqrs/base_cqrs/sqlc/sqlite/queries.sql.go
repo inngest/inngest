@@ -2000,6 +2000,51 @@ func (q *Queries) UpsertApp(ctx context.Context, arg UpsertAppParams) (*App, err
 	return &i, err
 }
 
+const workspaceCountEvents = `-- name: WorkspaceCountEvents :one
+SELECT count(*) FROM events WHERE received_at <= ?1 AND received_at >= ?2
+`
+
+type WorkspaceCountEventsParams struct {
+	Before time.Time
+	After  time.Time
+}
+
+func (q *Queries) WorkspaceCountEvents(ctx context.Context, arg WorkspaceCountEventsParams) (int64, error) {
+	row := q.db.QueryRowContext(ctx, workspaceCountEvents, arg.Before, arg.After)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
+const workspaceCountNamedEvents = `-- name: WorkspaceCountNamedEvents :one
+SELECT count(*) FROM events WHERE received_at <= ?1 AND received_at >= ?2 AND event_name in (/*SLICE:@names*/?)
+`
+
+type WorkspaceCountNamedEventsParams struct {
+	Before time.Time
+	After  time.Time
+	Names  []string
+}
+
+func (q *Queries) WorkspaceCountNamedEvents(ctx context.Context, arg WorkspaceCountNamedEventsParams) (int64, error) {
+	query := workspaceCountNamedEvents
+	var queryParams []interface{}
+	queryParams = append(queryParams, arg.Before)
+	queryParams = append(queryParams, arg.After)
+	if len(arg.Names) > 0 {
+		for _, v := range arg.Names {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:@names*/?", strings.Repeat(",?", len(arg.Names))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:@names*/?", "NULL", 1)
+	}
+	row := q.db.QueryRowContext(ctx, query, queryParams...)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
+
 const workspaceEvents = `-- name: WorkspaceEvents :many
 SELECT internal_id, account_id, workspace_id, source, source_id, received_at, event_id, event_name, event_data, event_user, event_v, event_ts FROM events WHERE internal_id < ? AND received_at <= ? AND received_at >= ? ORDER BY internal_id DESC LIMIT ?
 `
@@ -2053,25 +2098,33 @@ func (q *Queries) WorkspaceEvents(ctx context.Context, arg WorkspaceEventsParams
 }
 
 const workspaceNamedEvents = `-- name: WorkspaceNamedEvents :many
-SELECT internal_id, account_id, workspace_id, source, source_id, received_at, event_id, event_name, event_data, event_user, event_v, event_ts FROM events WHERE internal_id < ? AND received_at <= ? AND received_at >= ? AND event_name = ? ORDER BY internal_id DESC LIMIT ?
+SELECT internal_id, account_id, workspace_id, source, source_id, received_at, event_id, event_name, event_data, event_user, event_v, event_ts FROM events WHERE internal_id < ? AND received_at <= ? AND received_at >= ? AND event_name in (/*SLICE:@names*/?) ORDER BY internal_id DESC LIMIT ?
 `
 
 type WorkspaceNamedEventsParams struct {
 	Cursor ulid.ULID
 	Before time.Time
 	After  time.Time
-	Name   string
+	Names  []string
 	Limit  int64
 }
 
 func (q *Queries) WorkspaceNamedEvents(ctx context.Context, arg WorkspaceNamedEventsParams) ([]*Event, error) {
-	rows, err := q.db.QueryContext(ctx, workspaceNamedEvents,
-		arg.Cursor,
-		arg.Before,
-		arg.After,
-		arg.Name,
-		arg.Limit,
-	)
+	query := workspaceNamedEvents
+	var queryParams []interface{}
+	queryParams = append(queryParams, arg.Cursor)
+	queryParams = append(queryParams, arg.Before)
+	queryParams = append(queryParams, arg.After)
+	if len(arg.Names) > 0 {
+		for _, v := range arg.Names {
+			queryParams = append(queryParams, v)
+		}
+		query = strings.Replace(query, "/*SLICE:@names*/?", strings.Repeat(",?", len(arg.Names))[1:], 1)
+	} else {
+		query = strings.Replace(query, "/*SLICE:@names*/?", "NULL", 1)
+	}
+	queryParams = append(queryParams, arg.Limit)
+	rows, err := q.db.QueryContext(ctx, query, queryParams...)
 	if err != nil {
 		return nil, err
 	}

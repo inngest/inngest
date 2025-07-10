@@ -81,7 +81,7 @@ func (a router) getEvents(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if name := r.FormValue("name"); name != "" {
-		opts.Name = &name
+		opts.Names = []string{name}
 	}
 
 	events, err := a.API.GetEvents(ctx, &opts)
