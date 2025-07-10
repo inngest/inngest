@@ -44,6 +44,10 @@ var (
 	ErrShadowPartitionAccountPeekMaxExceedsLimits = fmt.Errorf("account peek with shadow partitions exceeded the maximum limit of %d", ShadowPartitionAccountPeekMax)
 )
 
+var (
+	durOpShadowPartitionRequeue = "shadow_partition_requeue"
+)
+
 // shadowWorker runs a blocking process that listens to item being pushed into the
 // shadow queue partition channel. This allows us to process an individual shadow partition.
 func (q *queue) shadowWorker(ctx context.Context, qspc chan shadowPartitionChanMsg) {
@@ -176,8 +180,10 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 		q.removeShadowContinue(ctx, shadowPart, false)
 
 		forceRequeueAt := q.clock.Now().Add(ShadowPartitionRefillPausedRequeueExtension)
-		err = q.ShadowPartitionRequeue(ctx, shadowPart, &forceRequeueAt)
-
+		_, err = durationWithTags(ctx, q.primaryQueueShard.Name, durOpShadowPartitionRequeue, q.clock.Now(), func(ctx context.Context) (any, error) {
+			err := q.ShadowPartitionRequeue(ctx, shadowPart, &forceRequeueAt)
+			return nil, err
+		}, map[string]any{"reason": "paused"})
 		switch err {
 		case nil, ErrShadowPartitionNotFound:
 			return nil
@@ -252,7 +258,10 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 
 			forceRequeueShadowPartitionAt := q.clock.Now().Add(PartitionConcurrencyLimitRequeueExtension)
 
-			err = q.ShadowPartitionRequeue(ctx, shadowPart, &forceRequeueShadowPartitionAt)
+			_, err = durationWithTags(ctx, q.primaryQueueShard.Name, durOpShadowPartitionRequeue, q.clock.Now(), func(ctx context.Context) (any, error) {
+				err := q.ShadowPartitionRequeue(ctx, shadowPart, &forceRequeueShadowPartitionAt)
+				return nil, err
+			}, map[string]any{"reason": "concurrency_limited", "cause": res.Constraint.String()})
 			switch err {
 			case nil, ErrShadowPartitionNotFound: // no-op
 				return nil
@@ -276,8 +285,10 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 		// No more backlogs right now, we can continue the scan loop until new items are added
 		q.removeShadowContinue(ctx, shadowPart, false)
 
-		err = q.ShadowPartitionRequeue(ctx, shadowPart, nil)
-
+		_, err = durationWithTags(ctx, q.primaryQueueShard.Name, durOpShadowPartitionRequeue, q.clock.Now(), func(ctx context.Context) (any, error) {
+			err := q.ShadowPartitionRequeue(ctx, shadowPart, nil)
+			return nil, err
+		}, map[string]any{"reason": "empty"})
 		switch err {
 		case nil, ErrShadowPartitionNotFound: // no-op
 			return nil
@@ -313,7 +324,10 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 		}
 	}
 
-	err = q.ShadowPartitionRequeue(ctx, shadowPart, nil)
+	_, err = durationWithTags(ctx, q.primaryQueueShard.Name, durOpShadowPartitionRequeue, q.clock.Now(), func(ctx context.Context) (any, error) {
+		err := q.ShadowPartitionRequeue(ctx, shadowPart, nil)
+		return nil, err
+	}, map[string]any{"reason": "handled"})
 	switch err {
 	case nil, ErrShadowPartitionNotFound:
 		return nil
