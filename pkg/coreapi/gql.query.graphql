@@ -10,6 +10,8 @@ type Query {
   # Get all events sent
   events(query: EventsQuery!): [Event!]
 
+  eventV2(id: ULID!): EventV2!
+
   eventsV2(
     first: Int! = 40
     after: String

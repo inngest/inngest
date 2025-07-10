@@ -3,9 +3,17 @@ package resolvers
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/pkg/cqrs"
+	"github.com/oklog/ulid/v2"
 )
+
+func (qr *queryResolver) EventV2(ctx context.Context, id ulid.ULID) (*models.EventV2, error) {
+	//event, err := qr.Data.GetEventByInternalID(ctx, id)
+
+	return nil, errors.New("NOT IMPLEMENTED")
+}
 
 func (e eventV2Resolver) Raw(ctx context.Context, obj *models.EventV2) (string, error) {
 	event, err := e.Data.GetEventByInternalID(ctx, obj.ID)
