@@ -3,13 +3,21 @@ package resolvers
 import (
 	"context"
 	"encoding/json"
+	loader "github.com/inngest/inngest/pkg/coreapi/graph/loaders"
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/oklog/ulid/v2"
 )
 
 func (qr *queryResolver) EventV2(ctx context.Context, id ulid.ULID) (*models.EventV2, error) {
-	event, err := qr.Data.GetEventByInternalID(ctx, id)
+	targetLoader := loader.FromCtx(ctx).EventLoader
+
+	event, err := loader.LoadOneWithString[cqrs.Event](
+		ctx,
+		targetLoader,
+		id.String(),
+	)
+
 	if err != nil {
 		return nil, err
 	}
@@ -18,7 +26,13 @@ func (qr *queryResolver) EventV2(ctx context.Context, id ulid.ULID) (*models.Eve
 }
 
 func (e eventV2Resolver) Raw(ctx context.Context, obj *models.EventV2) (string, error) {
-	event, err := e.Data.GetEventByInternalID(ctx, obj.ID)
+	targetLoader := loader.FromCtx(ctx).EventLoader
+
+	event, err := loader.LoadOneWithString[cqrs.Event](
+		ctx,
+		targetLoader,
+		obj.ID.String(),
+	)
 	if err != nil {
 		return "", err
 	}
