@@ -154,7 +154,11 @@ export const RunDetailsV3 = (props: Props) => {
           </div>
         </div>
       )}
-      <div ref={containerRef} className="flex flex-row">
+      <div
+        ref={containerRef}
+        className="flex flex-row"
+        style={{ minHeight: MIN_HEIGHT, maxHeight: 'calc(100vh - 240px)' }}
+      >
         <div ref={leftColumnRef} className="flex flex-col gap-2" style={{ width: `${leftWidth}%` }}>
           <div ref={runInfoRef} className="px-4">
             <RunInfo
@@ -172,19 +176,22 @@ export const RunDetailsV3 = (props: Props) => {
               />
             )}
           </div>
-          <Tabs
-            tabs={[
-              {
-                label: 'Trace',
-                id: 'trace',
-                node: waiting ? (
-                  <Waiting />
-                ) : run ? (
-                  <Timeline runID={runID} trace={run?.trace} />
-                ) : null,
-              },
-            ]}
-          />
+
+          <div className="overflow-hidden">
+            <Tabs
+              tabs={[
+                {
+                  label: 'Trace',
+                  id: 'trace',
+                  node: waiting ? (
+                    <Waiting />
+                  ) : run ? (
+                    <Timeline runID={runID} trace={run?.trace} />
+                  ) : null,
+                },
+              ]}
+            />
+          </div>
         </div>
 
         <div className="relative cursor-col-resize" onMouseDown={handleMouseDown}>
@@ -202,8 +209,8 @@ export const RunDetailsV3 = (props: Props) => {
         </div>
 
         <div
-          className="border-muted flex flex-col justify-start"
-          style={{ width: `${100 - leftWidth}%`, height: standalone ? '85vh' : height }}
+          className="border-muted flex flex-col justify-start overflow-hidden"
+          style={{ width: `${100 - leftWidth}%` }}
         >
           {selectedStep && !selectedStep.trace.isRoot ? (
             <StepInfo

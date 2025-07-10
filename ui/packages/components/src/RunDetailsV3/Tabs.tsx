@@ -49,7 +49,7 @@ export const Tabs = ({ tabs, defaultActive = '' }: { tabs: TabsType; defaultActi
           </Tab>
         ))}
       </div>
-      <div className="relative h-full">
+      <div className="relative h-full overflow-y-auto">
         {tabs.map((tab, i) => {
           const tabActive = active === tab.id || (active == '' && i === 0);
           return (
