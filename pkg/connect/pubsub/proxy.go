@@ -117,13 +117,13 @@ type redisPubSubConnector struct {
 type UseGRPCFunc func(ctx context.Context, accountID uuid.UUID) bool
 
 type RedisPubSubConnectorOpts struct {
-	Logger               logger.Logger
-	Tracer               trace.ConditionalTracer
-	StateManager         state.StateManager
-	EnforceLeaseExpiry   EnforceLeaseExpiryFunc
-	GatewayGRPCForwarder GatewayGRPCForwarder
+	Logger             logger.Logger
+	Tracer             trace.ConditionalTracer
+	StateManager       state.StateManager
+	EnforceLeaseExpiry EnforceLeaseExpiryFunc
 
-	ShouldUseGRPC UseGRPCFunc
+	ShouldUseGRPC        UseGRPCFunc
+	GatewayGRPCForwarder GatewayGRPCForwarder
 }
 
 func newRedisPubSubConnector(client rueidis.Client, opts RedisPubSubConnectorOpts) *redisPubSubConnector {
@@ -357,7 +357,7 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 	// Alternatively, the gateway will send the response as soon as it comes in.
 	// This is unreliable but quicker than polling for the response, so we use this
 	// as a best-effort notification mechanism.
-	{
+	if !i.shouldUseGRPC(ctx, opts.AccountID) {
 		replySubscribed := make(chan struct{})
 		go func() {
 			// This may take a while: This waits until we receive the SDK response, and we allow for up to 2h in the serverless execution model
@@ -384,6 +384,27 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 		case <-replySubscribed:
 		case <-time.After(5 * time.Second):
 			return nil, fmt.Errorf("did not subscribe to reply within 5s")
+		}
+	} else {
+		replySubscribed := make(chan struct{})
+		go func() {
+			replyReceived := make(chan *connectpb.SDKResponse)
+			i.gatewayGRPCForwarder.Subscribe(ctx, opts.Data.RequestId, replyReceived)
+
+			close(replySubscribed)
+
+			reply = <-replyReceived
+			span.AddEvent("ReplyReceivedGRPC")
+			l.Debug("received response via gRPC")
+
+			cancelWaitForResponseCtx()
+		}()
+
+		select {
+		case <-replySubscribed:
+			defer i.gatewayGRPCForwarder.Unsubscribe(ctx, opts.Data.RequestId)
+		case <-time.After(5 * time.Second):
+			return nil, fmt.Errorf("did not subscribe to grpc reply within 5s")
 		}
 	}
 

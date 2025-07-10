@@ -13,6 +13,7 @@ import (
 
 	"github.com/coder/websocket"
 	"github.com/google/uuid"
+	connectConfig "github.com/inngest/inngest/pkg/config/connect"
 	"github.com/inngest/inngest/pkg/connect/auth"
 	connecterrors "github.com/inngest/inngest/pkg/connect/errors"
 	"github.com/inngest/inngest/pkg/connect/pubsub"
@@ -26,6 +27,8 @@ import (
 	connectpb "github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/oklog/ulid/v2"
 	"golang.org/x/sync/errgroup"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -1238,12 +1241,32 @@ func (c *connectionHandler) handleSdkReply(ctx context.Context, msg *connectpb.C
 		return fmt.Errorf("could not save response: %w", err)
 	}
 
+	executorIP, err := c.svc.stateManager.GetExecutorIP(ctx, c.conn.EnvID, data.RequestId)
+	l.Info("got executor IP", "ip", executorIP, "err", err)
+	if err != nil {
+		return fmt.Errorf("could not get executor IP")
+	}
+
+	grpcURL := fmt.Sprintf("%s:%d", executorIP, connectConfig.Executor(ctx).GRPCPort)
+
+	conn, err := grpc.NewClient(grpcURL, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		return fmt.Errorf("could not create grpc client for %s: %w", grpcURL, err)
+	}
+	rpcClient := connectpb.NewConnectExecutorClient(conn)
+
+	result, err := rpcClient.Reply(ctx, &connectpb.ReplyRequest{Data: data})
+	if err != nil {
+		return fmt.Errorf("could not create grpc client for %s: %w", grpcURL, err)
+	}
+	l.Info("sent response through gRPC", "result", result)
+
 	// Send a best-effort PubSub message to fast-track the response,
 	// this is unreliable and must be combined with a reliable store like the buffer above.
-	err = c.svc.receiver.NotifyExecutor(ctx, data)
-	if err != nil {
-		return fmt.Errorf("could not notify executor: %w", err)
-	}
+	// err = c.svc.receiver.NotifyExecutor(ctx, data)
+	// if err != nil {
+	// 	return fmt.Errorf("could not notify executor: %w", err)
+	// }
 
 	replyAck, err := proto.Marshal(&connectpb.WorkerReplyAckData{
 		RequestId: data.RequestId,

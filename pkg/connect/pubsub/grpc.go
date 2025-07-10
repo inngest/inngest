@@ -20,14 +20,28 @@ import (
 type GatewayGRPCForwarder interface {
 	ConnectToGateways(ctx context.Context) error
 	Forward(ctx context.Context, gatewayID ulid.ULID, connectionID ulid.ULID, data *connectpb.GatewayExecutorRequestData) error
+
+	//TODO: move to receiver
+	Subscribe(ctx context.Context, requestID string, channel chan *connectpb.SDKResponse)
+	Unsubscribe(ctx context.Context, requestID string)
+}
+
+type GRPCReceiver interface {
 }
 
 type gatewayGRPCForwarder struct {
 	gatewayManager state.GatewayManager
-	mu             sync.RWMutex
+	logger         logger.Logger
 
+	// Request forwarding
+	mu          sync.RWMutex
 	grpcClients map[string]connectpb.ConnectGatewayClient
 	dialer      GRPCDialer
+
+	// Request receiver
+	connectpb.ConnectExecutorServer
+	grpcServer       *grpc.Server
+	inFlightRequests sync.Map
 }
 
 type GRPCDialer func(target string, opts ...grpc.DialOption) (*grpc.ClientConn, error)
@@ -37,20 +51,67 @@ func gatewayURL(ctx context.Context, gateway *state.Gateway) string {
 	return net.JoinHostPort(gateway.IPAddress.String(), fmt.Sprintf("%d", connectConfig.Gateway(ctx).GRPCPort))
 }
 
-func NewGatewayGRPCForwarder(ctx context.Context, stateManager state.GatewayManager) GatewayGRPCForwarder {
-	return NewGatewayGRPCForwarderWithDialer(ctx, stateManager, grpc.NewClient)
+func NewGatewayGRPCForwarder(ctx context.Context, stateManager state.GatewayManager, logger logger.Logger) GatewayGRPCForwarder {
+	return NewGatewayGRPCForwarderWithDialer(ctx, stateManager, grpc.NewClient, logger)
 }
 
-func NewGatewayGRPCForwarderWithDialer(ctx context.Context, stateManager state.GatewayManager, dialer GRPCDialer) GatewayGRPCForwarder {
+func NewGatewayGRPCForwarderWithDialer(ctx context.Context, stateManager state.GatewayManager, dialer GRPCDialer, logger logger.Logger) GatewayGRPCForwarder {
 	forwarder := &gatewayGRPCForwarder{
 		gatewayManager: stateManager,
-		grpcClients:    map[string]connectpb.ConnectGatewayClient{},
-		dialer:         dialer,
+		logger:         logger,
+
+		grpcClients: map[string]connectpb.ConnectGatewayClient{},
+		dialer:      dialer,
+
+		grpcServer: grpc.NewServer(),
 	}
 
+	connectpb.RegisterConnectExecutorServer(forwarder.grpcServer, forwarder)
+
 	go forwarder.startGarbageCollectClients(ctx)
+	go forwarder.gRPCServerListen(ctx)
 
 	return forwarder
+}
+
+func (i *gatewayGRPCForwarder) gRPCServerListen(ctx context.Context) {
+	addr := fmt.Sprintf(":%d", connectConfig.Executor(ctx).GRPCPort)
+
+	l, err := net.Listen("tcp", addr)
+	if err != nil {
+		i.logger.Error("could not listen for: %w", err)
+		return
+	}
+
+	i.logger.Info("starting executor grpc server", "addr", addr)
+	i.grpcServer.Serve(l)
+}
+
+func (i *gatewayGRPCForwarder) Reply(ctx context.Context, req *connectpb.ReplyRequest) (*connectpb.ReplyResponse, error) {
+	if ch, ok := i.inFlightRequests.Load(req.Data.RequestId); ok {
+		replyChan := ch.(chan *connectpb.SDKResponse)
+
+		select {
+		case replyChan <- req.Data:
+			return &connectpb.ReplyResponse{Success: true}, nil
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+			i.logger.Error("reply channel was closed")
+			return &connectpb.ReplyResponse{Success: false}, nil
+		}
+	}
+
+	i.logger.Error("reply channel has likely unsubscribed before getting a reply")
+	return &connectpb.ReplyResponse{Success: false}, nil
+}
+
+func (i *gatewayGRPCForwarder) Subscribe(ctx context.Context, requestID string, channel chan *connectpb.SDKResponse) {
+	i.inFlightRequests.Store(requestID, channel)
+}
+
+func (i *gatewayGRPCForwarder) Unsubscribe(ctx context.Context, requestID string) {
+	i.inFlightRequests.Delete(requestID)
 }
 
 // createGRPCClient creates a gRPC client for a gateway and validates the connection
@@ -132,9 +193,8 @@ func (i *gatewayGRPCForwarder) connectToGateway(ctx context.Context, gatewayID u
 		return nil, fmt.Errorf("could not create grpc client for gateway %s: %w", gatewayID.String(), err)
 	}
 
-	i.mu.Lock()
+	// Mutex lock should have been acquired before calling the current function
 	i.grpcClients[gatewayID.String()] = rpcClient
-	i.mu.Unlock()
 
 	url := gatewayURL(ctx, gateway)
 	logger.StdlibLogger(ctx).Info("just-in-time connected to connect gateway", "url", url)
@@ -147,23 +207,32 @@ func (i *gatewayGRPCForwarder) connectToGateway(ctx context.Context, gatewayID u
 }
 
 func (i *gatewayGRPCForwarder) Forward(ctx context.Context, gatewayID ulid.ULID, connectionID ulid.ULID, data *connectpb.GatewayExecutorRequestData) error {
+	var grpcClient connectpb.ConnectGatewayClient
+
 	i.mu.RLock()
-	grpcClient := i.grpcClients[gatewayID.String()]
+	grpcClient = i.grpcClients[gatewayID.String()]
 	i.mu.RUnlock()
 
 	if grpcClient == nil {
-		logger.StdlibLogger(ctx).Warn("grpc client not found for gateway, attempting to create dynamically", "gatewayID", gatewayID.String())
+		// Upgrade lock to make sure that only one instance is creating a grpc client
+		i.mu.Lock()
+		grpcClient = i.grpcClients[gatewayID.String()]
 
-		var err error
-		grpcClient, err = i.connectToGateway(ctx, gatewayID)
-		if err != nil {
-			logger.StdlibLogger(ctx).Error("could not create just-in-time grpc client", "gatewayID", gatewayID.String(), "err", err)
+		if grpcClient == nil {
 
-			metrics.IncrConnectGatewayGRPCClientFailureCounter(ctx, 1, metrics.CounterOpt{})
-			return fmt.Errorf("could not find or create grpc client for gateway %s: %w", gatewayID.String(), err)
+			logger.StdlibLogger(ctx).Warn("grpc client not found for gateway, attempting to create dynamically", "gatewayID", gatewayID.String())
+
+			var err error
+			grpcClient, err = i.connectToGateway(ctx, gatewayID)
+			if err != nil {
+				logger.StdlibLogger(ctx).Error("could not create just-in-time grpc client", "gatewayID", gatewayID.String(), "err", err)
+
+				metrics.IncrConnectGatewayGRPCClientFailureCounter(ctx, 1, metrics.CounterOpt{})
+				return fmt.Errorf("could not find or create grpc client for gateway %s: %w", gatewayID.String(), err)
+			}
 		}
+		i.mu.Unlock()
 	}
-
 	reply, err := grpcClient.Forward(ctx, &connectpb.ForwardRequest{
 		ConnectionID: connectionID.String(),
 		Data:         data,
@@ -199,7 +268,7 @@ func (i *gatewayGRPCForwarder) GarbageCollectClients() (int, error) {
 
 	existingGatewayIDs, err := i.gatewayManager.GetAllGatewayIDs(ctx)
 	if err != nil {
-		logger.StdlibLogger(ctx).Error("could not get connect gateways IDs")
+		i.logger.Error("could not get connect gateways IDs")
 		return 0, err
 	}
 
@@ -220,6 +289,6 @@ func (i *gatewayGRPCForwarder) GarbageCollectClients() (int, error) {
 		}
 	}
 
-	logger.StdlibLogger(ctx).Debug("cleaned up gRPC clients of dead connect gateways", "deleted", deletedCount)
+	i.logger.Debug("cleaned up gRPC clients of dead connect gateways", "deleted", deletedCount)
 	return deletedCount, nil
 }
