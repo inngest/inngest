@@ -27,9 +27,13 @@ var (
 	ErrBacklogNotFound = fmt.Errorf("backlog not found")
 
 	ErrBacklogPeekMaxExceedsLimits = fmt.Errorf("backlog peek exceeded the maximum limit")
+
+	ErrBacklogGarbageCollected = fmt.Errorf("backlog was garbage-collected")
 )
 
 type PartitionConstraintConfig struct {
+	FunctionVersion int `json:"fv,omitempty,omitzero"`
+
 	Concurrency ShadowPartitionConcurrency `json:"c,omitempty,omitzero"`
 
 	// Throttle configuration, optionally specifying key. If no key is set, the throttle value will be the function ID.
@@ -271,8 +275,9 @@ type BacklogThrottle struct {
 }
 
 type QueueBacklog struct {
-	BacklogID         string `json:"id,omitempty"`
-	ShadowPartitionID string `json:"sid,omitempty"`
+	BacklogID               string `json:"id,omitempty"`
+	ShadowPartitionID       string `json:"sid,omitempty"`
+	EarliestFunctionVersion int    `json:"fv,omitempty"`
 
 	// Start marks backlogs representing items with KindStart.
 	Start bool `json:"start,omitempty"`
@@ -318,6 +323,10 @@ func (q *queue) ItemBacklog(ctx context.Context, i osqueue.QueueItem) QueueBackl
 	b := QueueBacklog{
 		BacklogID:         fmt.Sprintf("fn:%s", i.FunctionID),
 		ShadowPartitionID: i.FunctionID.String(),
+
+		// Store earliest function version. Since we do not update backlog metadata,
+		// this may be older than the latest items in the backlog.
+		EarliestFunctionVersion: i.Data.Identifier.WorkflowVersion,
 
 		// Start items should be moved into their own backlog. This is useful for
 		// function run concurrency: To determine how many new runs can start, we can
@@ -532,6 +541,16 @@ func (b QueueBacklog) isDefault() bool {
 }
 
 func (b QueueBacklog) isOutdated(constraints *PartitionConstraintConfig) enums.QueueNormalizeReason {
+	if constraints == nil {
+		return enums.QueueNormalizeReasonUnchanged
+	}
+
+	// If the backlog represents newer items than the constraints we're working on,
+	// do not attempt to mark the backlog as outdated. Constraints MUST be >= backlog function version at all times.
+	if b.EarliestFunctionVersion > 0 && constraints.FunctionVersion > 0 && b.EarliestFunctionVersion > constraints.FunctionVersion {
+		return enums.QueueNormalizeReasonUnchanged
+	}
+
 	// If this is the default backlog, don't normalize.
 	// If custom concurrency keys were added, previously-enqueued items
 	// in the default backlog do not have custom concurrency keys set.
@@ -703,8 +722,10 @@ func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueSha
 	}
 
 	keys := []string{
-		kg.BacklogSet(b.BacklogID),
+		kg.ShadowPartitionMeta(),
 		kg.BacklogMeta(),
+
+		kg.BacklogSet(b.BacklogID),
 		kg.ShadowPartitionSet(sp.PartitionID),
 		kg.GlobalShadowPartitionSet(),
 		kg.GlobalAccountShadowPartitions(),
@@ -733,6 +754,8 @@ func (q *queue) BacklogRefill(ctx context.Context, b *QueueBacklog, sp *QueueSha
 
 		kg.BacklogActiveCheckSet(),
 		kg.BacklogActiveCheckCooldown(b.BacklogID),
+
+		kg.PartitionNormalizeSet(sp.PartitionID),
 	}
 
 	enableKeyQueues := sp.keyQueuesEnabled(ctx, q)
@@ -891,12 +914,15 @@ func (q *queue) BacklogRequeue(ctx context.Context, backlog *QueueBacklog, sp *Q
 	keys := []string{
 		kg.ShadowPartitionMeta(),
 		kg.BacklogMeta(),
+		kg.ShadowPartitionMeta(),
 
 		kg.GlobalShadowPartitionSet(),
 		kg.GlobalAccountShadowPartitions(),
 		kg.AccountShadowPartitions(accountID),
 		kg.ShadowPartitionSet(sp.PartitionID),
 		kg.BacklogSet(backlog.BacklogID),
+
+		kg.PartitionNormalizeSet(sp.PartitionID),
 	}
 	args, err := StrSlice([]any{
 		accountID,
@@ -937,13 +963,13 @@ func (q *queue) BacklogRequeue(ctx context.Context, backlog *QueueBacklog, sp *Q
 	}
 }
 
-func (q *queue) BacklogPrepareNormalize(ctx context.Context, b *QueueBacklog, sp *QueueShadowPartition, normalizeAsyncMinimum int) (int, bool, error) {
+func (q *queue) BacklogPrepareNormalize(ctx context.Context, b *QueueBacklog, sp *QueueShadowPartition) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "BacklogPrepareNormalize"), redis_telemetry.ScopeQueue)
 
 	shard := q.primaryQueueShard
 
 	if shard.Kind != string(enums.QueueShardKindRedis) {
-		return 0, false, fmt.Errorf("unsupported queue shard kind for BacklogPrepareNormalize: %s", shard.Kind)
+		return fmt.Errorf("unsupported queue shard kind for BacklogPrepareNormalize: %s", shard.Kind)
 	}
 	kg := shard.RedisClient.kg
 
@@ -953,6 +979,9 @@ func (q *queue) BacklogPrepareNormalize(ctx context.Context, b *QueueBacklog, sp
 	}
 
 	keys := []string{
+		kg.BacklogMeta(),
+		kg.ShadowPartitionMeta(),
+
 		kg.BacklogSet(b.BacklogID),
 		kg.ShadowPartitionSet(sp.PartitionID),
 		kg.GlobalShadowPartitionSet(),
@@ -969,44 +998,28 @@ func (q *queue) BacklogPrepareNormalize(ctx context.Context, b *QueueBacklog, sp
 		accountID,
 		// order normalize by timestamp
 		q.clock.Now().UnixMilli(),
-		normalizeAsyncMinimum,
 	})
 	if err != nil {
-		return 0, false, fmt.Errorf("could not serialize args: %w", err)
+		return fmt.Errorf("could not serialize args: %w", err)
 	}
 
-	res, err := scripts["queue/backlogPrepareNormalize"].Exec(
+	status, err := scripts["queue/backlogPrepareNormalize"].Exec(
 		redis_telemetry.WithScriptName(ctx, "backlogPrepareNormalize"),
 		shard.RedisClient.unshardedRc,
 		keys,
 		args,
-	).ToAny()
+	).ToInt64()
 	if err != nil {
-		return 0, false, fmt.Errorf("error preparing backlog normalization: %w", err)
-	}
-
-	statusCountTuple, ok := res.([]any)
-	if !ok || len(statusCountTuple) != 2 {
-		return 0, false, fmt.Errorf("expected return tuple to include status and refill count")
-	}
-
-	status, ok := statusCountTuple[0].(int64)
-	if !ok {
-		return 0, false, fmt.Errorf("missing status in status-count tuple")
-	}
-
-	backlogCount, ok := statusCountTuple[1].(int64)
-	if !ok {
-		return 0, false, fmt.Errorf("missing refillCount in status-count tuple")
+		return fmt.Errorf("error preparing backlog normalization: %w", err)
 	}
 
 	switch status {
 	case 1:
-		return int(backlogCount), true, nil
+		return nil
 	case -1:
-		return int(backlogCount), false, nil
+		return ErrBacklogGarbageCollected
 	default:
-		return 0, false, fmt.Errorf("unknown status preparing backlog normalization: %v (%T)", status, status)
+		return fmt.Errorf("unknown status preparing backlog normalization: %v (%T)", status, status)
 	}
 }
 

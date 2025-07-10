@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/logger"
 	"math"
 	"runtime"
 	"time"
@@ -22,10 +23,6 @@ const (
 	NormalizeAccountPeekMax   = int64(30)
 	NormalizePartitionPeekMax = int64(100)
 	NormalizeBacklogPeekMax   = int64(300) // same as ShadowPartitionPeekMax
-
-	// BacklogNormalizeAsyncLimit determines the minimum number of items required in an outdated backlog
-	// to require an async normalize job. For small backlogs, the added QPS may not be worth it and we should normalize JIT.
-	BacklogNormalizeAsyncLimit = 100
 
 	// BacklogRefillHardLimit sets the maximum number of items that can be refilled in a single backlogRefill operation.
 	BacklogRefillHardLimit = int64(1000)
@@ -278,7 +275,12 @@ func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp 
 	metrics.ActiveBacklogNormalizeCount(ctx, 1, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name}})
 	defer metrics.ActiveBacklogNormalizeCount(ctx, -1, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name}})
 
-	l := q.log.With("backlog", backlog, "sp", sp, "constraints", latestConstraints, "caller", caller)
+	l := logger.StdlibLogger(ctx).With(
+		"backlog", backlog,
+		"sp", sp,
+		"constraints", latestConstraints,
+		"caller", caller,
+	)
 
 	// extend the lease
 	extendLeaseCtx, cancel := context.WithCancel(ctx)
@@ -314,8 +316,11 @@ func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp 
 		}
 
 		if res.TotalCount == 0 {
+			l.Debug("no more items in backlog", "processed", processed, "removed", res.RemovedCount)
 			break
 		}
+
+		l.Debug("peeked items to normalize", "count", len(res.Items), "total", res.TotalCount, "removed", res.RemovedCount)
 
 		for _, item := range res.Items {
 			// We must modify the queue item to ensure q.ItemBacklog and q.ItemShadowPartition
@@ -323,6 +328,12 @@ func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp 
 			// the desired new backlog.
 			existingThrottle := item.Data.Throttle
 			existingKeys := item.Data.GetConcurrencyKeys()
+
+			l = l.With(
+				"item", item,
+				"existing_concurrency", existingKeys,
+				"existing_throttle", existingThrottle,
+			)
 
 			cleanupItem := func() {
 				// If event for item cannot be found, remove it from the backlog
@@ -343,6 +354,7 @@ func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp 
 			}
 			item.Data.CustomConcurrencyKeys = refreshedCustomConcurrencyKeys
 			item.Data.Identifier.CustomConcurrencyKeys = nil
+			l = l.With("refreshed_concurrency", refreshedCustomConcurrencyKeys)
 
 			refreshedThrottle, err := q.refreshItemThrottle(ctx, item)
 			if err != nil {
@@ -354,15 +366,16 @@ func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp 
 				return fmt.Errorf("could not refresh throttle for item: %w", err)
 			}
 			item.Data.Throttle = refreshedThrottle
+			l = l.With("refreshed_throttle", refreshedThrottle)
 
 			targetBacklog := q.ItemBacklog(ctx, *item)
+			l = l.With("target", targetBacklog)
 
-			l.Debug(
-				"retrieved refreshed backlog",
-				"item", item,
-				"existing_throttle", existingThrottle,
-				"target", targetBacklog,
-			)
+			if reason := targetBacklog.isOutdated(latestConstraints); reason != enums.QueueNormalizeReasonUnchanged {
+				l.Warn("target backlog in normalization is outdated, this likely causes infinite normalization")
+			}
+
+			l.Debug("retrieved refreshed backlog")
 
 			if _, err := q.EnqueueItem(ctx, shard, *item, time.UnixMilli(item.AtMS), osqueue.EnqueueOpts{
 				PassthroughJobId:       true,
@@ -396,7 +409,7 @@ func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp 
 		},
 	})
 
-	l.Debug("normalized backlog")
+	l.Debug("normalized backlog", "processed", processed)
 
 	return nil
 }
@@ -455,7 +468,10 @@ func (q *queue) BacklogNormalizePeek(ctx context.Context, b *QueueBacklog, limit
 		isMillisecondPrecision: true,
 	}
 
-	res, err := p.peek(ctx, backlogSet, false, q.clock.Now(), limit)
+	// this is essentially +inf as no queue items should ever be scheduled >2y out
+	normalizeLookahead := q.clock.Now().Add(time.Hour * 24 * 365 * 2)
+
+	res, err := p.peek(ctx, backlogSet, false, normalizeLookahead, limit)
 	if err != nil {
 		return nil, fmt.Errorf("could not peek backlog items for normalization: %w", err)
 	}

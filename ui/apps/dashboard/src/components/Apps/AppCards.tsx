@@ -15,6 +15,7 @@ import { type FlattenedApp } from '@/app/(organization-active)/(dashboard)/env/[
 import { ActionsMenu } from '@/components/Apps/ActionsMenu';
 import getAppCardContent from '@/components/Apps/AppCardContent';
 import { pathCreator } from '@/utils/urls';
+import { isSyncStatusHiddenOnAppCard } from '../SyncStatusPill';
 import { useWorkersCount } from '../Workers/useWorker';
 
 export default function AppCards({ apps, envSlug }: { apps: FlattenedApp[]; envSlug: string }) {
@@ -59,7 +60,7 @@ export default function AppCards({ apps, envSlug }: { apps: FlattenedApp[]; envS
                 url={pathCreator.app({ envSlug, externalAppID: app.externalID })}
                 app={app}
                 pill={
-                  status ? (
+                  status && !isSyncStatusHiddenOnAppCard(app.status) ? (
                     <Pill appearance="outlined" kind={appKind}>
                       {status}
                     </Pill>

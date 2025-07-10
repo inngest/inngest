@@ -386,11 +386,14 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 		}
 
 		{
-			onSubscribed := make(chan struct{})
+			onSubscribedPubsub := make(chan struct{})
+			onSubscribedGRPC := make(chan struct{})
 			// Wait for relevant messages and forward them over the WebSocket connection
-			go ch.receiveRouterMessages(ctx, onSubscribed)
+			go ch.receiveRouterMessagesFromPubsub(ctx, onSubscribedPubsub)
+			<-onSubscribedPubsub
 
-			<-onSubscribed
+			go ch.receiveRouterMessagesFromGRPC(ctx, onSubscribedGRPC)
+			<-onSubscribedGRPC
 		}
 
 		// Run loop
@@ -852,7 +855,85 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 	return nil
 }
 
-func (c *connectionHandler) receiveRouterMessages(ctx context.Context, onSubscribed chan struct{}) {
+func (c *connectionHandler) receiveRouterMessagesFromGRPC(ctx context.Context, onSubscribed chan struct{}) {
+	additionalMetricsTags := c.svc.metricsTags()
+
+	messageChan := make(chan *connectpb.GatewayExecutorRequestData)
+
+	connectionID := c.conn.ConnectionId.String()
+	c.svc.wsConnections.Store(connectionID, messageChan)
+
+	// Ensure cleanup when function exits
+	defer func() {
+		c.svc.wsConnections.Delete(connectionID)
+		close(messageChan)
+	}()
+
+	close(onSubscribed)
+
+	// Process messages from the gRPC channel
+	for {
+		select {
+		case <-ctx.Done():
+			c.log.Debug("connection is draining, not forwarding message")
+			return
+
+		case data, ok := <-messageChan:
+			if !ok {
+				c.log.Error("BUG: message channel was closed unexpectedly - this should never happen")
+				return
+			}
+
+			rawBytes, err := proto.Marshal(data)
+			if err != nil {
+				// TODO This should never happen, we should likely push the message into a dead-letter queue.
+				c.log.Error("invalid protobuf received by grpc", "err", err, "msg", rawBytes, "gateway_id", c.conn.GatewayId, "conn_id", c.conn.ConnectionId)
+				continue
+			}
+
+			log := c.log.With(
+				"app_id", data.AppId,
+				"app_name", data.AppName,
+				"req_id", data.RequestId,
+				"fn_slug", data.FunctionSlug,
+				"step_id", data.StepId,
+				"run_id", data.RunId,
+				"method", "grpc",
+			)
+
+			log.Debug("gateway received grpc message")
+			grpcTags := map[string]any{
+				"transport": "grpc",
+			}
+			for k, v := range additionalMetricsTags {
+				grpcTags[k] = v
+			}
+			metrics.IncrConnectGatewayReceivedRouterPubSubMessageCounter(ctx, 1, metrics.CounterOpt{
+				PkgName: pkgName,
+				Tags:    grpcTags,
+			})
+
+			// Forward message to SDK!
+			err = wsproto.Write(ctx, c.ws, &connectpb.ConnectMessage{
+				Kind:    connectpb.GatewayMessageType_GATEWAY_EXECUTOR_REQUEST,
+				Payload: rawBytes,
+			})
+			if err != nil {
+				if isConnectionClosedErr(err) {
+					return
+				}
+				log.Error("failed to forward message to worker", "err", err)
+				// The connection cannot be used, the next read loop will run into the connection error and close the connection.
+				// If the worker receives the message, it will send an ack through a new connection. Otherwise, the message will be redelivered.
+				continue
+			}
+
+			log.Debug("forwarded message to worker")
+		}
+	}
+}
+
+func (c *connectionHandler) receiveRouterMessagesFromPubsub(ctx context.Context, onSubscribed chan struct{}) {
 	additionalMetricsTags := c.svc.metricsTags()
 
 	// Receive execution-related messages for the app, forwarded by the router.
@@ -866,13 +947,20 @@ func (c *connectionHandler) receiveRouterMessages(ctx context.Context, onSubscri
 			"fn_slug", data.FunctionSlug,
 			"step_id", data.StepId,
 			"run_id", data.RunId,
+			"method", "pubsub",
 		)
 
 		log.Debug("gateway received msg")
 
+		pubsubTags := map[string]any{
+			"transport": "pubsub",
+		}
+		for k, v := range additionalMetricsTags {
+			pubsubTags[k] = v
+		}
 		metrics.IncrConnectGatewayReceivedRouterPubSubMessageCounter(ctx, 1, metrics.CounterOpt{
 			PkgName: pkgName,
-			Tags:    additionalMetricsTags,
+			Tags:    pubsubTags,
 		})
 
 		// Do not forward messages if the connection is already draining

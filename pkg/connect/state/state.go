@@ -6,6 +6,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
+	"net"
+	"net/http"
+	"net/url"
+	"time"
+
 	"github.com/coder/websocket"
 	"github.com/inngest/inngest/pkg/backoff"
 	connecterrors "github.com/inngest/inngest/pkg/connect/errors"
@@ -15,10 +21,6 @@ import (
 	"github.com/inngest/inngest/pkg/syscode"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/oklog/ulid/v2"
-	"io"
-	"net/http"
-	"net/url"
-	"time"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/headers"
@@ -57,6 +59,8 @@ type GatewayManager interface {
 	UpsertGateway(ctx context.Context, gateway *Gateway) error
 	DeleteGateway(ctx context.Context, gatewayId ulid.ULID) error
 	GetGateway(ctx context.Context, gatewayId ulid.ULID) (*Gateway, error)
+	GetAllGateways(ctx context.Context) ([]*Gateway, error)
+	GetAllGatewayIDs(ctx context.Context) ([]string, error)
 }
 
 type RequestStateManager interface {
@@ -156,6 +160,8 @@ type Gateway struct {
 	LastHeartbeatAtMS int64         `json:"last_heartbeat"`
 
 	Hostname string `json:"hostname"`
+
+	IPAddress net.IP `json:"ip"`
 }
 
 // Connection have all the metadata associated with a worker connection

@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { InlineCode } from '@inngest/components/Code';
 import { RiInformationLine } from '@remixicon/react';
 
 import DashboardCodeBlock from '@/components/DashboardCodeBlock/DashboardCodeBlock';
@@ -22,8 +23,7 @@ export default function ConfigSteps({ metricsGranularitySeconds }: Props) {
         <div className="border-subtle ml-3 border-l">
           <div className="before:border-subtle before:text-basis before:bg-canvasBase relative ml-[32px] pb-7 before:absolute before:left-[-46px] before:h-[28px] before:w-[28px] before:rounded-full before:border before:text-center before:align-middle before:text-[13px] before:content-['1']">
             <div className="text-basis mb-4 text-base">
-              Select an environment to view its Prometheus{' '}
-              <code className="bg-gray-100 p-0.5">scrape_config</code>.
+              Select an environment to view its Prometheus <InlineCode>scrape_config</InlineCode>.
             </div>
             <EnvSelectMenu onSelect={setSelectedEnv} />
           </div>
@@ -32,8 +32,8 @@ export default function ConfigSteps({ metricsGranularitySeconds }: Props) {
         <div className="ml-3">
           <div className="before:border-subtle before:text-basis before:bg-canvasBase relative ml-[32px] pb-5 before:absolute before:left-[-46px] before:h-[28px] before:w-[28px] before:rounded-full before:border before:text-center before:align-middle before:text-[13px] before:content-['2']">
             <div className="text-basis mb-2 text-base">
-              Add this item to the <code className="bg-gray-100 p-0.5">scrape_configs</code> section
-              of your Prometheus configuration.
+              Add this item to the <InlineCode>scrape_configs</InlineCode> section of your
+              Prometheus configuration.
             </div>
             <div className="text-muted mb-4 text-base">
               <RiInformationLine className="text-light -mt-1 mr-1 inline-block h-5 w-5" />
