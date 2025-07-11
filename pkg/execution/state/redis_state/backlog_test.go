@@ -6,6 +6,7 @@ import (
 	"math"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/cespare/xxhash/v2"
@@ -1213,4 +1214,66 @@ func TestShuffleBacklogs(t *testing.T) {
 	}
 
 	require.Greater(t, matches, int(math.Ceil(float64(iterations)/2)))
+}
+
+func TestBacklogSize(t *testing.T) {
+	_, rc := initRedis(t)
+	defer rc.Close()
+
+	defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+
+	q := NewQueue(
+		defaultShard,
+		WithConcurrencyLimitGetter(func(ctx context.Context, p QueuePartition) PartitionConcurrencyLimits {
+			return PartitionConcurrencyLimits{
+				AccountLimit:   100,
+				FunctionLimit:  25,
+				CustomKeyLimit: 0, // this is just used for PartitionLease on key queues v1
+			}
+		}),
+		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+			return true
+		}),
+	)
+	ctx := context.Background()
+
+	fnID, wsID, accID := uuid.New(), uuid.New(), uuid.New()
+
+	count := 10
+	var backlogID string
+
+	for i := range count {
+		item := osqueue.QueueItem{
+			ID:          fmt.Sprintf("test%d", i),
+			FunctionID:  fnID,
+			WorkspaceID: wsID,
+			Data: osqueue.Item{
+				WorkspaceID: wsID,
+				Kind:        osqueue.KindEdge,
+				Identifier: state.Identifier{
+					WorkflowID:  fnID,
+					AccountID:   accID,
+					WorkspaceID: wsID,
+				},
+				Throttle:              nil,
+				CustomConcurrencyKeys: nil,
+				QueueName:             nil,
+			},
+			QueueName: nil,
+		}
+
+		if backlogID == "" {
+			backlog := q.ItemBacklog(ctx, item)
+			backlogID = backlog.BacklogID
+		}
+
+		_, err := q.EnqueueItem(ctx, defaultShard, item, time.Now(), osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+	}
+	require.NotEmpty(t, backlogID)
+
+	size, err := q.BacklogSize(ctx, defaultShard, backlogID)
+	require.NoError(t, err)
+
+	require.EqualValues(t, count, size)
 }
