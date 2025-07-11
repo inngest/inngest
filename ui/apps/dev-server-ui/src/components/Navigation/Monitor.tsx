@@ -1,4 +1,5 @@
 import { MenuItem } from '@inngest/components/Menu/MenuItem';
+import { EventLogsIcon } from '@inngest/components/icons/sections/EventLogs';
 import { RiMistLine } from '@remixicon/react';
 
 import { IconFeed } from '@/icons/Feed';
@@ -16,6 +17,13 @@ export default function Monitor({ collapsed }: { collapsed: boolean }) {
         collapsed={collapsed}
         text="Runs"
         icon={<RiMistLine className="h-[18px] w-[18px]" />}
+      />
+      <MenuItem
+        href="/events"
+        collapsed={collapsed}
+        text="Events"
+        icon={<EventLogsIcon className="h-[18px] w-[18px]" />}
+        beta
       />
       <MenuItem
         href="/stream"
