@@ -2238,7 +2238,6 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 	keys := []string{
 		kg.QueueItem(),
 		kg.ConcurrencyIndex(),
-		kg.PartitionConcurrencyIndex(),
 
 		partition.readyQueueKey(kg),
 

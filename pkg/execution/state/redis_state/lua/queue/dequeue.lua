@@ -113,11 +113,6 @@ end
 -- score, and ensure that it's updated in the global pointer index.
 --
 
--- Clear the ForceAtMS from the pointer.
-local existing = get_partition_item(keyPartitionMap, partitionID)
-existing.forceAtMS = nil
-redis.call("HSET", keyPartitionMap, partitionID, cjson.encode(existing))
-
 local partitionInProgressScore = tonumber(redis.call("ZSCORE", keyPartitionConcurrencyIndex, partitionID))
 local partitionIsProcessing = partitionInProgressScore ~= nil and partitionInProgressScore > 0
 
@@ -134,6 +129,11 @@ if not partitionIsProcessing then
           -- have capacity.  Note the earliest score is in MS while partitions are stored in S.
           update_pointer_score_to(partitionID, keyGlobalPointer, earliestScore)
           update_account_queues(keyGlobalAccountPointer, keyAccountPartitions, partitionID, accountID, earliestScore)
+
+          -- Clear the ForceAtMS from the pointer.
+          local existing = get_partition_item(keyPartitionMap, partitionID)
+          existing.forceAtMS = nil
+          redis.call("HSET", keyPartitionMap, partitionID, cjson.encode(existing))
         end
     end
   end
