@@ -566,6 +566,18 @@ export type EntitlementConnectWorkerConnections = {
   limit: Maybe<Scalars['Int']>;
 };
 
+export type EntitlementEvents = {
+  __typename?: 'EntitlementEvents';
+  limit: Maybe<Scalars['Int']>;
+  overageAllowed: Scalars['Boolean'];
+};
+
+export type EntitlementExecutions = {
+  __typename?: 'EntitlementExecutions';
+  limit: Maybe<Scalars['Int']>;
+  overageAllowed: Scalars['Boolean'];
+};
+
 export type EntitlementInt = {
   __typename?: 'EntitlementInt';
   limit: Scalars['Int'];
@@ -622,6 +634,8 @@ export type Entitlements = {
   eventBatchCount: EntitlementInt;
   eventBatchTimeout: EntitlementInt;
   eventSize: EntitlementInt;
+  events: EntitlementEvents;
+  executions: EntitlementExecutions;
   hipaa: EntitlementBool;
   history: EntitlementInt;
   metricsExport: EntitlementBool;
@@ -629,8 +643,12 @@ export type Entitlements = {
   metricsExportGranularity: EntitlementInt;
   otelTraces: EntitlementBool;
   planID: Maybe<Scalars['UUID']>;
+  realtimeConnections: EntitlementInt;
+  realtimeMessages: EntitlementInt;
   runCount: EntitlementRunCount;
+  runDuration: EntitlementInt;
   stepCount: EntitlementStepCount;
+  tracingCustomSpans: EntitlementInt;
   userCount: EntitlementUserCount;
 };
 
@@ -2184,14 +2202,12 @@ export type WaitForEventStepInfo = {
 export type Workflow = {
   __typename?: 'Workflow';
   app: App;
-  appName: Maybe<Scalars['String']>;
   archivedAt: Maybe<Scalars['Time']>;
   cancellationRunCount: Scalars['Int'];
   cancellations: CancellationConnection;
   configuration: FunctionConfiguration;
   current: Maybe<WorkflowVersion>;
   failureHandler: Maybe<Workflow>;
-  fnTriggers: Array<FunctionTrigger>;
   id: Scalars['ID'];
   isArchived: Scalars['Boolean'];
   isParentArchived: Scalars['Boolean'];
@@ -2273,7 +2289,6 @@ export type WorkflowVersion = {
   createdAt: Scalars['Time'];
   deploy: Maybe<Deploy>;
   description: Maybe<Scalars['NullString']>;
-  fnTriggers: Array<FunctionTrigger>;
   retries: Scalars['Int'];
   throttleCount: Scalars['Int'];
   throttlePeriod: Scalars['String'];

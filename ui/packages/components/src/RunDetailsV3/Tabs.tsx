@@ -37,7 +37,7 @@ export const Tabs = ({ tabs, defaultActive = '' }: { tabs: TabsType; defaultActi
   }, [defaultActive]);
 
   return (
-    <div className="flex w-full flex-col">
+    <div className="flex h-full w-full flex-col">
       <div className="border-muted flex w-full flex-row gap-4 border-b px-4">
         {tabs.map((t: TabType, i: number) => (
           <Tab
@@ -49,19 +49,20 @@ export const Tabs = ({ tabs, defaultActive = '' }: { tabs: TabsType; defaultActi
           </Tab>
         ))}
       </div>
-      <div className="relative">
-        {tabs.map((tab, i) => (
-          <div
-            key={`content-${i}`}
-            className={`w-full ${
-              active === tab.id || (active == '' && i === 0)
-                ? 'visible opacity-100'
-                : 'invisible h-0 opacity-0'
-            }`}
-          >
-            {tab.node}
-          </div>
-        ))}
+      <div className="relative h-full overflow-y-auto">
+        {tabs.map((tab, i) => {
+          const tabActive = active === tab.id || (active == '' && i === 0);
+          return (
+            <div
+              key={`content-${i}`}
+              className={`w-full ${
+                tabActive ? 'visible h-full opacity-100' : 'invisible h-0 opacity-0'
+              }`}
+            >
+              {tabActive && tab.node}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
