@@ -1099,8 +1099,88 @@ func (q *queue) backlogPeek(ctx context.Context, b *QueueBacklog, from time.Time
 	return res.Items, res.TotalCount, nil
 }
 
-func (q *queue) BacklogsByPartition(ctx context.Context, queueShard QueueShard, partitionID string) (iter.Seq[*QueueBacklog], error) {
-	return nil, fmt.Errorf("not implemented")
+// NOTE: this function only work with key queues
+func (q *queue) BacklogsByPartition(ctx context.Context, queueShard QueueShard, partitionID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueueBacklog], error) {
+	opt := queueIterOpt{
+		batchSize: 1000,
+		interval:  50 * time.Millisecond,
+	}
+	for _, apply := range opts {
+		apply(&opt)
+	}
+
+	l := q.log.With(
+		"method", "BacklogsByPartition",
+		"partitionID", partitionID,
+		"from", from,
+		"until", until,
+	)
+
+	// rc := queueShard.RedisClient.Client()
+	kg := queueShard.RedisClient.kg
+
+	return func(yield func(*QueueBacklog) bool) {
+		hashKey := kg.BacklogMeta()
+		ptFrom := from
+
+		for {
+			fmt.Println("FROM:", ptFrom.Format(time.StampMilli))
+
+			var iterated int
+
+			peeker := peeker[QueueBacklog]{
+				q:                      q,
+				max:                    opt.batchSize,
+				opName:                 "backlogsByPartition",
+				isMillisecondPrecision: true,
+				handleMissingItems: func(pointers []string) error {
+					// don't interfere, clean up will happen in normal processing anyways
+					return nil
+				},
+				maker: func() *QueueBacklog {
+					return &QueueBacklog{}
+				},
+				keyMetadataHash: hashKey,
+				fromTime:        &ptFrom,
+			}
+
+			isSequential := true
+			res, err := peeker.peek(ctx, kg.ShadowPartitionSet(partitionID), isSequential, q.clock.Now(), opt.batchSize)
+			if err != nil {
+				l.Error("error peeking backlogs for partition", "partition_id", partitionID)
+				return
+			}
+
+			for _, bl := range res.Items {
+				if bl == nil {
+					continue
+				}
+				// fmt.Println("ID:", bl.BacklogID)
+
+				if !yield(bl) {
+					return
+				}
+
+				// TODO: need to update the time based on the score of the last backlog
+				iterated++
+			}
+
+			l.Debug("iterated backlogs in partition", "count", iterated)
+
+			// didn't process anything, exit loop
+			if iterated == 0 {
+				break
+			}
+
+			// shift the starting point 1ms so it doesn't try to grab the same stuff again
+			// NOTE: this could result skipping items if the previous batch of items are all on
+			// the same millisecond
+			ptFrom = ptFrom.Add(time.Millisecond)
+
+			// wait a little before processing the next batch
+			<-time.After(opt.interval)
+		}
+	}, nil
 }
 
 func (q *queue) BacklogSize(ctx context.Context, queueShard QueueShard, backlogID string) (int64, error) {

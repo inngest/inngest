@@ -173,7 +173,7 @@ type QueueManager interface {
 	ItemsByBacklog(ctx context.Context, queueShard QueueShard, backlogID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*osqueue.QueueItem], error)
 
 	// BacklogsByPartition returns an iterator for the partition's backlogs
-	BacklogsByPartition(ctx context.Context, queueShard QueueShard, partitionID string) (iter.Seq[*QueueBacklog], error)
+	BacklogsByPartition(ctx context.Context, queueShard QueueShard, partitionID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueueBacklog], error)
 	// BacklogSize retrieves the number of items in the specified backlog
 	BacklogSize(ctx context.Context, queueShard QueueShard, backlogID string) (int64, error)
 
