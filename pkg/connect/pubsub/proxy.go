@@ -107,8 +107,7 @@ type redisPubSubConnector struct {
 
 	enforceLeaseExpiry EnforceLeaseExpiryFunc
 
-	gatewayGRPCForwarder GatewayGRPCForwarder
-
+	gatewayGRPCManager GatewayGRPCManager
 	shouldUseGRPC UseGRPCFunc
 
 	RequestReceiver
@@ -122,8 +121,8 @@ type RedisPubSubConnectorOpts struct {
 	StateManager       state.StateManager
 	EnforceLeaseExpiry EnforceLeaseExpiryFunc
 
-	ShouldUseGRPC        UseGRPCFunc
-	GatewayGRPCForwarder GatewayGRPCForwarder
+	ShouldUseGRPC      UseGRPCFunc
+	GatewayGRPCManager GatewayGRPCManager
 }
 
 func newRedisPubSubConnector(client rueidis.Client, opts RedisPubSubConnectorOpts) *redisPubSubConnector {
@@ -145,7 +144,7 @@ func newRedisPubSubConnector(client rueidis.Client, opts RedisPubSubConnectorOpt
 		setup:              make(chan struct{}),
 		enforceLeaseExpiry: opts.EnforceLeaseExpiry,
 
-		gatewayGRPCForwarder: opts.GatewayGRPCForwarder,
+		gatewayGRPCManager: opts.GatewayGRPCManager,
 		shouldUseGRPC:        shouldUseGRPC,
 
 		// For routing
@@ -389,7 +388,7 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 		replySubscribed := make(chan struct{})
 		go func() {
 			replyReceived := make(chan *connectpb.SDKResponse)
-			i.gatewayGRPCForwarder.Subscribe(ctx, opts.Data.RequestId, replyReceived)
+			i.gatewayGRPCManager.Subscribe(ctx, opts.Data.RequestId, replyReceived)
 
 			close(replySubscribed)
 
@@ -402,7 +401,7 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 
 		select {
 		case <-replySubscribed:
-			defer i.gatewayGRPCForwarder.Unsubscribe(ctx, opts.Data.RequestId)
+			defer i.gatewayGRPCManager.Unsubscribe(ctx, opts.Data.RequestId)
 		case <-time.After(5 * time.Second):
 			return nil, fmt.Errorf("did not subscribe to grpc reply within 5s")
 		}
@@ -495,7 +494,7 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 
 		// Forward the request
 		if i.shouldUseGRPC(ctx, opts.AccountID) {
-			err = i.gatewayGRPCForwarder.Forward(ctx, route.GatewayID, route.ConnectionID, opts.Data)
+			err = i.gatewayGRPCManager.Forward(ctx, route.GatewayID, route.ConnectionID, opts.Data)
 
 			// Ack here instead of needing a pubsub ack message
 			if err != nil {
@@ -754,8 +753,8 @@ func (i *redisPubSubConnector) Wait(ctx context.Context) error {
 		},
 	})
 
-	if i.gatewayGRPCForwarder != nil {
-		if err := i.gatewayGRPCForwarder.ConnectToGateways(ctx); err != nil {
+	if i.gatewayGRPCManager != nil {
+		if err := i.gatewayGRPCManager.ConnectToGateways(ctx); err != nil {
 			return err
 		}
 	}

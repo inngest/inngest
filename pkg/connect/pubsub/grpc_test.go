@@ -114,7 +114,7 @@ func TestConnectToGateways(t *testing.T) {
 	err := gatewayManager.UpsertGateway(ctx, gateway)
 	require.NoError(t, err)
 
-	forwarder := NewGatewayGRPCForwarderWithDialer(ctx, gatewayManager, bufDialer)
+	forwarder := NewGatewayGRPCManagerWithDialer(ctx, gatewayManager, bufDialer)
 
 	t.Run("connects to single gateway", func(t *testing.T) {
 		mockServer.reset()
@@ -165,7 +165,7 @@ func TestForward(t *testing.T) {
 	err := gatewayManager.UpsertGateway(ctx, gateway)
 	require.NoError(t, err)
 
-	forwarder := NewGatewayGRPCForwarderWithDialer(ctx, gatewayManager, bufDialer)
+	forwarder := NewGatewayGRPCManagerWithDialer(ctx, gatewayManager, bufDialer)
 
 	t.Run("forwards to existing gateway", func(t *testing.T) {
 		mockServer.reset()
@@ -235,7 +235,7 @@ func TestForward(t *testing.T) {
 
 		newGatewayManager, newCleanup := setupRedisGatewayManager(t)
 		defer newCleanup()
-		newForwarder := NewGatewayGRPCForwarderWithDialer(ctx, newGatewayManager, bufDialer)
+		newForwarder := NewGatewayGRPCManagerWithDialer(ctx, newGatewayManager, bufDialer)
 
 		gatewayID1 := ulid.MustNew(ulid.Now(), rand.Reader)
 		gateway1 := &state.Gateway{
@@ -297,7 +297,7 @@ func TestGarbageCollectClients(t *testing.T) {
 		err := gatewayManager.UpsertGateway(ctx, gateway)
 		require.NoError(t, err)
 
-		forwarder := NewGatewayGRPCForwarderWithDialer(ctx, gatewayManager, bufDialer)
+		forwarder := NewGatewayGRPCManagerWithDialer(ctx, gatewayManager, bufDialer)
 
 		err = forwarder.ConnectToGateways(ctx)
 		require.NoError(t, err)
@@ -305,7 +305,7 @@ func TestGarbageCollectClients(t *testing.T) {
 		err = gatewayManager.DeleteGateway(ctx, gatewayID)
 		require.NoError(t, err)
 
-		forwarderImpl := forwarder.(*gatewayGRPCForwarder)
+		forwarderImpl := forwarder.(*gatewayGRPCManager)
 		deletedCount, err := forwarderImpl.GarbageCollectClients()
 		require.NoError(t, err)
 		require.Equal(t, 1, deletedCount, "Should have deleted exactly 1 client")
@@ -329,7 +329,7 @@ func TestGarbageCollectClients(t *testing.T) {
 
 		newGatewayManager, newCleanup := setupRedisGatewayManager(t)
 		defer newCleanup()
-		newForwarder := NewGatewayGRPCForwarderWithDialer(ctx, newGatewayManager, bufDialer)
+		newForwarder := NewGatewayGRPCManagerWithDialer(ctx, newGatewayManager, bufDialer)
 
 		gatewayID2 := ulid.MustNew(ulid.Now(), rand.Reader)
 		time.Sleep(1 * time.Millisecond)
@@ -369,7 +369,7 @@ func TestGarbageCollectClients(t *testing.T) {
 		err = newGatewayManager.DeleteGateway(ctx, gatewayID3)
 		require.NoError(t, err)
 
-		newForwarderImpl := newForwarder.(*gatewayGRPCForwarder)
+		newForwarderImpl := newForwarder.(*gatewayGRPCManager)
 		deletedCount, err := newForwarderImpl.GarbageCollectClients()
 		require.NoError(t, err)
 		require.Equal(t, 2, deletedCount, "Should have deleted exactly 2 clients")
@@ -383,8 +383,8 @@ func TestGarbageCollectClients(t *testing.T) {
 		gatewayManager, cleanup := setupRedisGatewayManager(t)
 		defer cleanup()
 
-		forwarder := NewGatewayGRPCForwarderWithDialer(ctx, gatewayManager, nil)
-		forwarderImpl := forwarder.(*gatewayGRPCForwarder)
+		forwarder := NewGatewayGRPCManagerWithDialer(ctx, gatewayManager, nil)
+		forwarderImpl := forwarder.(*gatewayGRPCManager)
 
 		cleanup()
 
@@ -415,7 +415,7 @@ func TestGatewayGRPCForwarderWithFailingServer(t *testing.T) {
 	err := gatewayManager.UpsertGateway(ctx, gateway)
 	require.NoError(t, err)
 
-	forwarder := NewGatewayGRPCForwarderWithDialer(ctx, gatewayManager, failingDialer)
+	forwarder := NewGatewayGRPCManagerWithDialer(ctx, gatewayManager, failingDialer)
 
 	t.Run("ConnectToGateways should ignore connection failures", func(t *testing.T) {
 		err := forwarder.ConnectToGateways(ctx)

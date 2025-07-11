@@ -96,7 +96,7 @@ func TestProxyGRPCPath(t *testing.T) {
 			return true
 		},
 		ShouldUseGRPC:        useGRPCAlways,
-		GatewayGRPCForwarder: mockForwarder,
+		GatewayGRPCManager: mockForwarder,
 	})
 
 	fnID, accID, envID, appID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
@@ -304,7 +304,7 @@ func TestProxyGRPCPolling(t *testing.T) {
 			return true
 		},
 		ShouldUseGRPC:        useGRPCAlways,
-		GatewayGRPCForwarder: mockForwarder,
+		GatewayGRPCManager: mockForwarder,
 	})
 
 	fnID, accID, envID, appID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
@@ -510,7 +510,7 @@ func TestProxyGRPCLeaseExpiry(t *testing.T) {
 			return true
 		},
 		ShouldUseGRPC:        useGRPCAlways,
-		GatewayGRPCForwarder: mockForwarder,
+		GatewayGRPCManager: mockForwarder,
 	})
 
 	fnID, accID, envID, appID := uuid.New(), uuid.New(), uuid.New(), uuid.New()

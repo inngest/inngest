@@ -389,14 +389,14 @@ func start(ctx context.Context, opts StartOpts) error {
 	agg := expragg.NewAggregator(ctx, 100, 100, sm.(expragg.EvaluableLoader), expressions.ExprEvaluator, nil, nil)
 
 	executorLogger := connectPubSubLogger.With("svc", "executor")
-	gatewayGRPCForwarder := connectpubsub.NewGatewayGRPCForwarder(ctx, connectionManager, executorLogger)
+	gatewayGRPCForwarder := connectpubsub.NewGatewayGRPCManager(ctx, connectionManager, executorLogger)
 
 	executorProxy, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectPubSubRedis, true, connectpubsub.RedisPubSubConnectorOpts{
 		Logger:               executorLogger,
 		Tracer:               conditionalTracer,
 		StateManager:         connectionManager,
 		EnforceLeaseExpiry:   enforceConnectLeaseExpiry,
-		GatewayGRPCForwarder: gatewayGRPCForwarder,
+		GatewayGRPCManager: gatewayGRPCForwarder,
 	}))
 	if err != nil {
 		return fmt.Errorf("failed to create connect pubsub connector: %w", err)
