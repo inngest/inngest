@@ -21,16 +21,17 @@ interface PaginationProps {
   currentPage: number;
   numPages: number;
   setCurrentPage: Dispatch<SetStateAction<number>>;
+  variant?: 'normal' | 'narrow';
 }
 
 export function Pagination(props: PaginationProps) {
-  const { currentPage, numPages, setCurrentPage } = props;
+  const { currentPage, numPages, setCurrentPage, variant = 'normal' } = props;
 
   if (numPages === 0) return null;
 
   const pages = useMemo(
-    () => getVisiblePages({ current: currentPage, total: numPages }),
-    [currentPage, numPages]
+    () => getVisiblePages({ current: currentPage, total: numPages, variant }),
+    [currentPage, numPages, variant]
   );
 
   return (
@@ -67,6 +68,7 @@ export function Pagination(props: PaginationProps) {
           );
         })}
       </div>
+
       <CaretButton {...props} typ="forward" />
       <CaretButton {...props} typ="last" />
     </div>
