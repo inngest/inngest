@@ -1419,11 +1419,11 @@ func TestPartitionBacklogSize(t *testing.T) {
 			name: "enqueue on one shard",
 			num:  100,
 		},
-		// {
-		// 	name:   "enqueue on both shards",
-		// 	num:    200,
-		// 	rotate: true,
-		// },
+		{
+			name:   "enqueue on both shards",
+			num:    200,
+			rotate: true,
+		},
 	}
 
 	for _, tc := range testcases {
@@ -1474,7 +1474,7 @@ func TestPartitionBacklogSize(t *testing.T) {
 				}
 
 				if tc.rotate {
-					// enqueue to both queues in order
+					// enqueue to both queues, simulate queue migrations
 					switch i % 2 {
 					case 0:
 						_, err := q1.EnqueueItem(ctx, shard1, item, clock.Now(), osqueue.EnqueueOpts{})
@@ -1483,7 +1483,6 @@ func TestPartitionBacklogSize(t *testing.T) {
 						_, err := q2.EnqueueItem(ctx, shard2, item, clock.Now(), osqueue.EnqueueOpts{})
 						require.NoError(t, err)
 					}
-
 				} else {
 					_, err := q1.EnqueueItem(ctx, shard1, item, clock.Now(), osqueue.EnqueueOpts{})
 					require.NoError(t, err)

@@ -1144,7 +1144,9 @@ func (q *queue) BacklogsByPartition(ctx context.Context, queueShard QueueShard, 
 			}
 
 			isSequential := true
-			res, err := peeker.peek(ctx, kg.ShadowPartitionSet(partitionID), isSequential, until, opt.batchSize)
+			res, err := peeker.peek(ctx, kg.ShadowPartitionSet(partitionID), isSequential, until, opt.batchSize,
+				WithPeekOptQueueShard(&queueShard),
+			)
 			if err != nil {
 				l.Error("error peeking backlogs for partition", "partition_id", partitionID, "err", err)
 				return
@@ -1202,7 +1204,6 @@ func (q *queue) PartitionBacklogSize(ctx context.Context, partitionID string) (i
 
 	for _, shard := range q.queueShardClients {
 		shard := shard
-		fmt.Printf("SHARD: %#v\n", shard)
 
 		wg.Add(1)
 		go func() {
@@ -1210,7 +1211,6 @@ func (q *queue) PartitionBacklogSize(ctx context.Context, partitionID string) (i
 
 			backlogs, err := q.BacklogsByPartition(ctx, shard, partitionID, time.Time{}, until)
 			if err != nil {
-				fmt.Println("ERROR: iter,", err.Error())
 				l.Error("error preparing backlog iterator", "error", err, "shard", shard)
 				return
 			}
@@ -1225,7 +1225,6 @@ func (q *queue) PartitionBacklogSize(ctx context.Context, partitionID string) (i
 
 					size, err := q.BacklogSize(ctx, shard, backlogID)
 					if err != nil {
-						fmt.Println("ERROR: size,", err.Error())
 						l.Error("error retrieving backlog size", "error", err, "backlog", bl)
 						return
 					}
