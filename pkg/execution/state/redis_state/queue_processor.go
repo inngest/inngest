@@ -234,6 +234,10 @@ func (q *queue) Run(ctx context.Context, f osqueue.RunFunc) error {
 
 	go q.runInstrumentation(ctx)
 
+	if q.runMode.ShadowPartition {
+		go q.runBacklogEnroller(ctx)
+	}
+
 	// start execution and shadow scan concurrently
 	eg, ctx := errgroup.WithContext(ctx)
 
@@ -547,6 +551,62 @@ func (q *queue) runInstrumentation(ctx context.Context) {
 
 			if err != nil {
 				q.log.Error("error claiming instrumentation lease", "error", err)
+				setLease(nil)
+				continue
+			}
+
+			setLease(leaseID)
+		}
+	}
+}
+
+func (q *queue) runBacklogEnroller(ctx context.Context) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "BacklogEnroll"), redis_telemetry.ScopeQueue)
+
+	leaseID, err := q.ConfigLease(ctx, q.primaryQueueShard.RedisClient.kg.BacklogEnroll(), ConfigLeaseMax, q.backlogEnrollLease())
+	if err != ErrConfigAlreadyLeased && err != nil {
+		q.quit <- err
+		return
+	}
+
+	setLease := func(lease *ulid.ULID) {
+		q.backlogEnrollLeaseLock.Lock()
+		defer q.backlogEnrollLeaseLock.Unlock()
+		q.backlogEnrollLeaseID = lease
+
+		if lease != nil && q.backlogEnrollLeaseID == nil {
+			metrics.IncrBacklogEnrollLeaseClaimsCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name}})
+		}
+	}
+
+	setLease(leaseID)
+
+	tick := q.clock.NewTicker(ConfigLeaseMax / 3)
+	enrollTick := q.clock.NewTicker(q.backlogEnrollInterval)
+
+	for {
+		select {
+		case <-ctx.Done():
+			tick.Stop()
+			enrollTick.Stop()
+			return
+		case <-enrollTick.Chan():
+			if q.isBacklogEnroller() {
+				if _, err := q.BacklogEnroll(ctx); err != nil {
+					q.log.Error("error running backlogEnroll", "error", err)
+				}
+			}
+		case <-tick.Chan():
+			metrics.GaugeWorkerQueueCapacity(ctx, int64(q.numWorkers), metrics.GaugeOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name}})
+
+			leaseID, err := q.ConfigLease(ctx, q.primaryQueueShard.RedisClient.kg.BacklogEnroll(), ConfigLeaseMax, q.backlogEnrollLease())
+			if err == ErrConfigAlreadyLeased {
+				setLease(nil)
+				continue
+			}
+
+			if err != nil {
+				q.log.Error("error claiming backlogEnroll lease", "error", err)
 				setLease(nil)
 				continue
 			}
@@ -1327,6 +1387,16 @@ func (q *queue) instrumentationLease() *ulid.ULID {
 	return &copied
 }
 
+func (q *queue) backlogEnrollLease() *ulid.ULID {
+	q.backlogEnrollLeaseLock.RLock()
+	defer q.backlogEnrollLeaseLock.RUnlock()
+	if q.backlogEnrollLeaseID == nil {
+		return nil
+	}
+	copied := *q.backlogEnrollLeaseID
+	return &copied
+}
+
 // scavengerLease is a helper method for concurrently reading the sequential
 // lease ID.
 func (q *queue) scavengerLease() *ulid.ULID {
@@ -1467,6 +1537,14 @@ func (q *queue) isActiveChecker() bool {
 
 func (q *queue) isInstrumentator() bool {
 	l := q.instrumentationLease()
+	if l == nil {
+		return false
+	}
+	return ulid.Time(l.Time()).After(q.clock.Now())
+}
+
+func (q *queue) isBacklogEnroller() bool {
+	l := q.backlogEnrollLease()
 	if l == nil {
 		return false
 	}

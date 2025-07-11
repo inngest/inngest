@@ -231,6 +231,9 @@ type QueueKeyGenerator interface {
 	// Instrumentation returns the key which allows one worker to run instrumentation against
 	// the queue
 	Instrumentation() string
+	// BacklogEnroll returns the key which allows one worker to run item backlog enrollment against
+	// the queue
+	BacklogEnroll() string
 	// ActiveChecker returns the key which allows a worker to run spot checks on recently-constrained backlogs
 	ActiveChecker() string
 	// Idempotency stores the map for storing idempotency keys in redis
@@ -333,6 +336,10 @@ func (u queueKeyGenerator) Scavenger() string {
 
 func (u queueKeyGenerator) Instrumentation() string {
 	return fmt.Sprintf("{%s}:queue:instrument", u.queueDefaultKey)
+}
+
+func (u queueKeyGenerator) BacklogEnroll() string {
+	return fmt.Sprintf("{%s}:queue:backlog-enroll", u.queueDefaultKey)
 }
 
 func (u queueKeyGenerator) ActiveChecker() string {
