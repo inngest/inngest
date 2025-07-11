@@ -8,43 +8,45 @@ Output:
   2: Successfully re-queued to backlog -- TODO: this should be a temporary status
 ]]
 
-local queueKey                = KEYS[1] -- queue:item - hash: { $itemID: $item }
-local keyPartitionMap         = KEYS[2] -- partition:item - hash: { $workflowID: $partition }
-local concurrencyPointer      = KEYS[3]
+local queueKey                            = KEYS[1] -- queue:item - hash: { $itemID: $item }
+local keyPartitionMap                     = KEYS[2] -- partition:item - hash: { $workflowID: $partition }
+local concurrencyPointer                  = KEYS[3]
+local keyPartitionConcurrencyIndex        = KEYS[4]
+local keyShadowPartitionConcurrencyIndex  = KEYS[5]
 
-local keyGlobalPointer        = KEYS[4] -- partition:sorted - zset
-local keyGlobalAccountPointer = KEYS[5] -- accounts:sorted - zset
-local keyAccountPartitions    = KEYS[6] -- accounts:$accountID:partition:sorted
+local keyGlobalPointer                    = KEYS[6] -- partition:sorted - zset
+local keyGlobalAccountPointer             = KEYS[7] -- accounts:sorted - zset
+local keyAccountPartitions                = KEYS[8] -- accounts:$accountID:partition:sorted
 
-local keyReadyQueue           = KEYS[7] -- queue:sorted:$workflowID - zset
+local keyReadyQueue                       = KEYS[9] -- queue:sorted:$workflowID - zset
 
-local keyInProgressAccount                  = KEYS[8]
-local keyInProgressPartition                = KEYS[9]
-local keyInProgressCustomConcurrencyKey1    = KEYS[10]
-local keyInProgressCustomConcurrencyKey2    = KEYS[11]
+local keyInProgressAccount                = KEYS[10]
+local keyInProgressPartition              = KEYS[11]
+local keyInProgressCustomConcurrencyKey1  = KEYS[12]
+local keyInProgressCustomConcurrencyKey2  = KEYS[13]
 
-local keyActiveAccount             = KEYS[12]
-local keyActivePartition           = KEYS[13]
-local keyActiveConcurrencyKey1     = KEYS[14]
-local keyActiveConcurrencyKey2     = KEYS[15]
-local keyActiveCompound            = KEYS[16]
+local keyActiveAccount                    = KEYS[14]
+local keyActivePartition                  = KEYS[15]
+local keyActiveConcurrencyKey1            = KEYS[16]
+local keyActiveConcurrencyKey2            = KEYS[17]
+local keyActiveCompound                   = KEYS[18]
 
-local keyActiveRun                        = KEYS[17]
-local keyActiveRunsAccount                = KEYS[18]
-local keyActiveRunsPartition              = KEYS[19]
-local keyActiveRunsCustomConcurrencyKey1  = KEYS[20]
-local keyActiveRunsCustomConcurrencyKey2  = KEYS[21]
+local keyActiveRun                        = KEYS[19]
+local keyActiveRunsAccount                = KEYS[20]
+local keyActiveRunsPartition              = KEYS[21]
+local keyActiveRunsCustomConcurrencyKey1  = KEYS[22]
+local keyActiveRunsCustomConcurrencyKey2  = KEYS[23]
 
-local keyBacklogSet                      = KEYS[22]          -- backlog:sorted:<backlogID> - zset
-local keyBacklogMeta                     = KEYS[23]          -- backlogs - hash
-local keyGlobalShadowPartitionSet        = KEYS[24]          -- shadow:sorted
-local keyShadowPartitionSet              = KEYS[25]          -- shadow:sorted:<fnID|queueName> - zset
-local keyShadowPartitionMeta             = KEYS[26]          -- shadows
-local keyGlobalAccountShadowPartitionSet = KEYS[27]
-local keyAccountShadowPartitionSet       = KEYS[28]
+local keyBacklogSet                       = KEYS[24]          -- backlog:sorted:<backlogID> - zset
+local keyBacklogMeta                      = KEYS[25]          -- backlogs - hash
+local keyGlobalShadowPartitionSet         = KEYS[26]          -- shadow:sorted
+local keyShadowPartitionSet               = KEYS[27]          -- shadow:sorted:<fnID|queueName> - zset
+local keyShadowPartitionMeta              = KEYS[28]          -- shadows
+local keyGlobalAccountShadowPartitionSet  = KEYS[29]
+local keyAccountShadowPartitionSet        = KEYS[30]
 
-local keyItemIndexA           = KEYS[29]          -- custom item index 1
-local keyItemIndexB           = KEYS[30]          -- custom item index 2
+local keyItemIndexA                       = KEYS[31]          -- custom item index 1
+local keyItemIndexB                       = KEYS[32]          -- custom item index 2
 
 local queueID             = ARGV[1]           -- id
 local queueItem           = ARGV[2]
@@ -143,7 +145,7 @@ else
   --
   -- Enqueue item to partition queues again
   --
-  requeue_to_partition(keyReadyQueue, partitionID, partitionItem, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, queueScore, queueID, nowMS, accountID)
+  requeue_to_partition(keyReadyQueue, partitionID, partitionItem, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, keyPartitionConcurrencyIndex, queueScore, queueID, nowMS, accountID)
 end
 
 -- Add optional indexes.

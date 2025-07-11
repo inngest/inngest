@@ -6,48 +6,49 @@ Output:
 
 ]]
 
-local keyQueueMap              = KEYS[1]
-local keyPartitionMap          = KEYS[2]
+local keyQueueMap                        = KEYS[1]
+local keyPartitionMap                    = KEYS[2]
 
-local concurrencyPointer       = KEYS[3]
+local concurrencyPointer                 = KEYS[3]
+local keyPartitionConcurrencyIndex       = KEYS[4]
 
-local keyReadyQueue            = KEYS[4]  -- queue:sorted:$workflowID - zset
-local keyGlobalPointer         = KEYS[5]
-local keyGlobalAccountPointer  = KEYS[6]           -- accounts:sorted - zset
-local keyAccountPartitions     = KEYS[7]           -- accounts:$accountID:partition:sorted - zset
+local keyReadyQueue                      = KEYS[5]  -- queue:sorted:$workflowID - zset
+local keyGlobalPointer                   = KEYS[6]
+local keyGlobalAccountPointer            = KEYS[7]           -- accounts:sorted - zset
+local keyAccountPartitions               = KEYS[8]           -- accounts:$accountID:partition:sorted - zset
 
-local keyShadowPartitionMeta             = KEYS[8]
-local keyBacklogMeta                     = KEYS[9]
+local keyShadowPartitionMeta             = KEYS[9]
+local keyBacklogMeta                     = KEYS[10]
 
-local keyBacklogSet                      = KEYS[10]
-local keyShadowPartitionSet              = KEYS[11]
-local keyGlobalShadowPartitionSet        = KEYS[12]
-local keyGlobalAccountShadowPartitionSet = KEYS[13]
-local keyAccountShadowPartitionSet       = KEYS[14]
-local keyPartitionNormalizeSet           = KEYS[15]
+local keyBacklogSet                      = KEYS[11]
+local keyShadowPartitionSet              = KEYS[12]
+local keyGlobalShadowPartitionSet        = KEYS[13]
+local keyGlobalAccountShadowPartitionSet = KEYS[14]
+local keyAccountShadowPartitionSet       = KEYS[15]
+local keyPartitionNormalizeSet           = KEYS[16]
 
-local keyInProgressAccount                  = KEYS[16]
-local keyInProgressPartition                = KEYS[17] -- Account concurrency level
-local keyInProgressCustomConcurrencyKey1    = KEYS[18] -- When leasing an item we need to place the lease into this key.
-local keyInProgressCustomConcurrencyKey2    = KEYS[19] -- Optional for eg. for concurrency amongst steps
+local keyInProgressAccount                  = KEYS[17]
+local keyInProgressPartition                = KEYS[18] -- Account concurrency level
+local keyInProgressCustomConcurrencyKey1    = KEYS[19] -- When leasing an item we need to place the lease into this key.
+local keyInProgressCustomConcurrencyKey2    = KEYS[20] -- Optional for eg. for concurrency amongst steps
 
-local keyActiveAccount             = KEYS[20]
-local keyActivePartition           = KEYS[21]
-local keyActiveConcurrencyKey1     = KEYS[22]
-local keyActiveConcurrencyKey2     = KEYS[23]
-local keyActiveCompound            = KEYS[24]
+local keyActiveAccount             = KEYS[21]
+local keyActivePartition           = KEYS[22]
+local keyActiveConcurrencyKey1     = KEYS[23]
+local keyActiveConcurrencyKey2     = KEYS[24]
+local keyActiveCompound            = KEYS[25]
 
-local keyActiveRun                        = KEYS[25]
-local keyActiveRunsAccount                = KEYS[26]
-local keyActiveRunsPartition              = KEYS[27]
-local keyActiveRunsCustomConcurrencyKey1  = KEYS[28]
-local keyActiveRunsCustomConcurrencyKey2  = KEYS[29]
+local keyActiveRun                        = KEYS[26]
+local keyActiveRunsAccount                = KEYS[27]
+local keyActiveRunsPartition              = KEYS[28]
+local keyActiveRunsCustomConcurrencyKey1  = KEYS[29]
+local keyActiveRunsCustomConcurrencyKey2  = KEYS[30]
 
-local keyIdempotency           = KEYS[30]
-local singletonRunKey          = KEYS[31]
+local keyIdempotency           = KEYS[31]
+local singletonRunKey          = KEYS[32]
 
-local keyItemIndexA            = KEYS[32]   -- custom item index 1
-local keyItemIndexB            = KEYS[33]  -- custom item index 2
+local keyItemIndexA            = KEYS[33]   -- custom item index 1
+local keyItemIndexB            = KEYS[34]  -- custom item index 2
 
 local queueID        = ARGV[1]
 local partitionID    = ARGV[2]
@@ -111,24 +112,30 @@ end
 -- For each partition, we now have an extra available capacity.  Check the partition's
 -- score, and ensure that it's updated in the global pointer index.
 --
-local minScores = redis.call("ZRANGE", keyReadyQueue, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")
-if minScores ~= nil and minScores ~= false and #minScores ~= 0 then
-  -- If there's nothing int he partition set (no more jobs), end early, as we don't need to
-  -- check partition scores.
-  local currentScore = redis.call("ZSCORE", keyGlobalPointer, partitionID)
-  if currentScore ~= nil and currentScore ~= false then
-    local earliestScore = tonumber(minScores[2])/1000
-      if tonumber(currentScore) > earliestScore then
-        -- Update the global index now that there's capacity, even if we've forced, as we now
-        -- have capacity.  Note the earliest score is in MS while partitions are stored in S.
-        update_pointer_score_to(partitionID, keyGlobalPointer, earliestScore)
-        update_account_queues(keyGlobalAccountPointer, keyAccountPartitions, partitionID, accountID, earliestScore)
 
-        -- Clear the ForceAtMS from the pointer.
-        local existing = get_partition_item(keyPartitionMap, partitionID)
-        existing.forceAtMS = nil
-        redis.call("HSET", keyPartitionMap, partitionID, cjson.encode(existing))
-      end
+-- Clear the ForceAtMS from the pointer.
+local existing = get_partition_item(keyPartitionMap, partitionID)
+existing.forceAtMS = nil
+redis.call("HSET", keyPartitionMap, partitionID, cjson.encode(existing))
+
+local partitionInProgressScore = tonumber(redis.call("ZSCORE", keyPartitionConcurrencyIndex, partitionID))
+local partitionIsProcessing = partitionInProgressScore ~= nil and partitionInProgressScore > 0
+
+if not partitionIsProcessing then
+  local minScores = redis.call("ZRANGE", keyReadyQueue, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")
+  if minScores ~= nil and minScores ~= false and #minScores ~= 0 then
+    -- If there's nothing int he partition set (no more jobs), end early, as we don't need to
+    -- check partition scores.
+    local currentScore = redis.call("ZSCORE", keyGlobalPointer, partitionID)
+    if currentScore ~= nil and currentScore ~= false then
+      local earliestScore = tonumber(minScores[2])/1000
+        if tonumber(currentScore) > earliestScore then
+          -- Update the global index now that there's capacity, even if we've forced, as we now
+          -- have capacity.  Note the earliest score is in MS while partitions are stored in S.
+          update_pointer_score_to(partitionID, keyGlobalPointer, earliestScore)
+          update_account_queues(keyGlobalAccountPointer, keyAccountPartitions, partitionID, accountID, earliestScore)
+        end
+    end
   end
 end
 

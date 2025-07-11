@@ -2069,6 +2069,8 @@ func (q *queue) RequeueByJobID(ctx context.Context, queueShard QueueShard, jobID
 		return fmt.Errorf("unsupported queue shard kind for RequeueByJobID: %s", queueShard.Kind)
 	}
 
+	kg := queueShard.RedisClient.KeyGenerator()
+
 	jobID = osqueue.HashID(ctx, jobID)
 
 	// Find the queue item so that we can fetch the shard info.
@@ -2090,13 +2092,13 @@ func (q *queue) RequeueByJobID(ctx context.Context, queueShard QueueShard, jobID
 	fnPartition, _ := q.ItemPartition(ctx, queueShard, i)
 
 	keys := []string{
-		queueShard.RedisClient.kg.QueueItem(),
-		queueShard.RedisClient.kg.PartitionItem(), // Partition item, map
-		queueShard.RedisClient.kg.GlobalPartitionIndex(),
-		queueShard.RedisClient.kg.GlobalAccountIndex(),
-		queueShard.RedisClient.kg.AccountPartitionIndex(i.Data.Identifier.AccountID),
-
-		fnPartition.zsetKey(queueShard.RedisClient.kg),
+		kg.QueueItem(),
+		kg.PartitionItem(), // Partition item, map
+		kg.GlobalPartitionIndex(),
+		kg.GlobalAccountIndex(),
+		kg.AccountPartitionIndex(i.Data.Identifier.AccountID),
+		fnPartition.zsetKey(kg),
+		kg.PartitionConcurrencyIndex(),
 	}
 
 	args, err := StrSlice([]any{

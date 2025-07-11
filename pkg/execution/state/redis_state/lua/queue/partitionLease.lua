@@ -11,15 +11,15 @@ Output:
 
 ]]
 
-local keyPartitionMap         = KEYS[1] -- key storing all partitions
-local keyGlobalPartitionPtr   = KEYS[2] -- global top-level partitioned queue
-local keyGlobalAccountPointer = KEYS[3] -- accounts:sorted - zset
-local keyAccountPartitions    = KEYS[4] -- accounts:$accountID:partition:sorted - zset
-local keyFnMeta               = KEYS[5]
-local keyAcctConcurrency      = KEYS[6] -- in progress queue for account
-local keyFnConcurrency        = KEYS[7] -- in progress queue for partition
-local keyCustomConcurrency    = KEYS[8] -- in progress queue for custom key
-
+local keyPartitionMap               = KEYS[1] -- key storing all partitions
+local keyGlobalPartitionPtr         = KEYS[2] -- global top-level partitioned queue
+local keyGlobalAccountPointer       = KEYS[3] -- accounts:sorted - zset
+local keyAccountPartitions          = KEYS[4] -- accounts:$accountID:partition:sorted - zset
+local keyFnMeta                     = KEYS[5]
+local keyAcctConcurrency            = KEYS[6] -- in progress queue for account
+local keyFnConcurrency              = KEYS[7] -- in progress queue for partition
+local keyCustomConcurrency          = KEYS[8] -- in progress queue for custom key
+local keyPartitionConcurrencyIndex  = KEYS[9]
 
 local partitionID             = ARGV[1]
 local leaseID                 = ARGV[2]
@@ -117,7 +117,18 @@ existing.last = currentTime -- in ms.
 
 -- Update item and index score
 redis.call("HSET", keyPartitionMap, partitionID, cjson.encode(existing))
-update_pointer_score_to(partitionID, keyGlobalPartitionPtr, leaseTime)
-update_account_queues(keyGlobalAccountPointer, keyAccountPartitions, partitionID, accountID, leaseTime)
+
+-- Move partition from global pointer -> partition "in progress" set
+redis.call("ZADD", keyPartitionConcurrencyIndex, leaseTime, partitionID)
+
+redis.call("ZREM", keyGlobalPartitionPtr, partitionID)
+if account_is_set(keyAccountPartitions) then
+  redis.call("ZREM", keyAccountPartitions, partitionID)
+
+  local numAccountPartitions = tonumber(redis.call("ZCARD", keyAccountPartitions))
+  if numAccountPartitions == 0 then
+    redis.call("ZREM", keyGlobalAccountPointer, accountID)
+  end
+end
 
 return { existingTime, capacity }
