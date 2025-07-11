@@ -233,16 +233,28 @@ type QueueKeyGenerator interface {
 	Instrumentation() string
 	// ActiveChecker returns the key which allows a worker to run spot checks on recently-constrained backlogs
 	ActiveChecker() string
+
 	// Idempotency stores the map for storing idempotency keys in redis
 	Idempotency(key string) string
+
 	// Concurrency returns a key for a given concurrency string.  This stores an ordered
 	// zset of items that are in progress for the given concurrency key, giving us a total count
 	// of in-progress leased items.
 	Concurrency(prefix, key string) string
+
 	// ConcurrencyIndex returns a key for storing pointers to partition concurrency queues that
 	// have in-progress work.  This allows us to scan and scavenge jobs in concurrency queues where
 	// leases have expired (in the case of failed workers)
 	ConcurrencyIndex() string
+
+	// PartitionConcurrencyIndex returns the concurrency index storing partitions that are currently
+	// processing. This is periodically visited by the scavenger to move expired partitions back.
+	PartitionConcurrencyIndex() string
+
+	// ShadowPartitionConcurrencyIndex returns the concurrency index storing shadow partitions that are currently
+	// processing. This is periodically visited by the scavenger to move expired shadow partitions back.
+	ShadowPartitionConcurrencyIndex() string
+
 	// ThrottleKey returns the throttle key for a given queue item.
 	ThrottleKey(t *osqueue.Throttle) string
 	// RunIndex returns the index for storing job IDs associated with run IDs.
@@ -353,6 +365,14 @@ func (u queueKeyGenerator) Concurrency(prefix, key string) string {
 
 func (u queueKeyGenerator) ConcurrencyIndex() string {
 	return fmt.Sprintf("{%s}:concurrency:sorted", u.queueDefaultKey)
+}
+
+func (u queueKeyGenerator) PartitionConcurrencyIndex() string {
+	return fmt.Sprintf("{%s}:concurrency:partition:sorted", u.queueDefaultKey)
+}
+
+func (u queueKeyGenerator) ShadowPartitionConcurrencyIndex() string {
+	return fmt.Sprintf("{%s}:concurrency:shadow-partition:sorted", u.queueDefaultKey)
 }
 
 func (u queueKeyGenerator) RunIndex(runID ulid.ULID) string {

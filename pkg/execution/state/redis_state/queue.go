@@ -1422,6 +1422,8 @@ func (q *queue) EnqueueItem(ctx context.Context, shard QueueShard, i osqueue.Que
 		kg.AccountPartitionIndex(i.Data.Identifier.AccountID), // new queue items always contain the account ID
 		kg.Idempotency(i.ID),
 		kg.FnMetadata(i.FunctionID),
+		kg.PartitionConcurrencyIndex(),
+		kg.ShadowPartitionConcurrencyIndex(),
 
 		// Add all 3 partition sets
 		defaultPartition.zsetKey(kg),
@@ -2233,6 +2235,7 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 	keys := []string{
 		kg.QueueItem(),
 		kg.ConcurrencyIndex(),
+		kg.PartitionConcurrencyIndex(),
 
 		partition.readyQueueKey(kg),
 
@@ -2400,13 +2403,14 @@ func (q *queue) ExtendLease(ctx context.Context, i osqueue.QueueItem, leaseID ul
 	partition := q.ItemShadowPartition(ctx, i)
 
 	keys := []string{
-		q.primaryQueueShard.RedisClient.kg.QueueItem(),
+		kg.QueueItem(),
 		// And pass in the key queue's concurrency keys.
 		partition.inProgressKey(kg),
 		backlog.customKeyInProgress(kg, 1),
 		backlog.customKeyInProgress(kg, 2),
 		partition.accountInProgressKey(kg),
-		q.primaryQueueShard.RedisClient.kg.ConcurrencyIndex(),
+		kg.ConcurrencyIndex(),
+		kg.PartitionConcurrencyIndex(),
 	}
 
 	args, err := StrSlice([]any{
@@ -2460,6 +2464,7 @@ func (q *queue) Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		kg.PartitionItem(),
 
 		kg.ConcurrencyIndex(),
+		kg.PartitionConcurrencyIndex(),
 
 		partition.readyQueueKey(kg),
 		kg.GlobalPartitionIndex(),
@@ -2621,6 +2626,8 @@ func (q *queue) Requeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		kg.QueueItem(),
 		kg.PartitionItem(), // Partition item, map
 		kg.ConcurrencyIndex(),
+		kg.PartitionConcurrencyIndex(),
+		kg.ShadowPartitionConcurrencyIndex(),
 
 		kg.GlobalPartitionIndex(),
 		kg.GlobalAccountIndex(),
@@ -2816,6 +2823,8 @@ func (q *queue) PartitionLease(ctx context.Context, p *QueuePartition, duration 
 		p.acctConcurrencyKey(kg),
 		p.fnConcurrencyKey(kg),
 		p.customConcurrencyKey(kg),
+
+		kg.PartitionConcurrencyIndex(),
 	}
 
 	args, err := StrSlice([]any{
@@ -3399,6 +3408,8 @@ func (q *queue) PartitionRequeue(ctx context.Context, shard QueueShard, p *Queue
 
 		// Backlogs in shadow partition
 		kg.ShadowPartitionSet(p.ID),
+
+		kg.PartitionConcurrencyIndex(),
 	}
 	force := 0
 	if forceAt {
@@ -3445,45 +3456,6 @@ func (q *queue) PartitionRequeue(ctx context.Context, shard QueueShard, p *Queue
 		return ErrPartitionGarbageCollected
 	default:
 		return fmt.Errorf("unknown response requeueing item: %d", status)
-	}
-}
-
-// PartitionReprioritize reprioritizes a workflow's QueueItems within the queue.
-func (q *queue) PartitionReprioritize(ctx context.Context, queueName string, priority uint) error {
-	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "PartitionReprioritize"), redis_telemetry.ScopeQueue)
-
-	if priority > PriorityMin {
-		return ErrPriorityTooLow
-	}
-	if priority < PriorityMax {
-		return ErrPriorityTooHigh
-	}
-
-	args, err := StrSlice([]any{
-		queueName,
-		priority,
-	})
-	if err != nil {
-		return err
-	}
-
-	keys := []string{q.primaryQueueShard.RedisClient.kg.PartitionItem()}
-	status, err := scripts["queue/partitionReprioritize"].Exec(
-		redis_telemetry.WithScriptName(ctx, "partitionReprioritize"),
-		q.primaryQueueShard.RedisClient.unshardedRc,
-		keys,
-		args,
-	).AsInt64()
-	if err != nil {
-		return fmt.Errorf("error enqueueing item: %w", err)
-	}
-	switch status {
-	case 0:
-		return nil
-	case 1:
-		return ErrPartitionNotFound
-	default:
-		return fmt.Errorf("unknown response reprioritizing partition: %d", status)
 	}
 }
 
