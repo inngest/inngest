@@ -1,6 +1,6 @@
 import { Header } from '@inngest/components/Header/Header';
 
-import Environments from '@/components/Environments/EnvNavMenu';
+import Environments from '@/components/Environments/Environments';
 import Layout from '@/components/Layout/Layout';
 
 export default async function EnvsPage() {
