@@ -2412,7 +2412,6 @@ func (q *queue) ExtendLease(ctx context.Context, i osqueue.QueueItem, leaseID ul
 		backlog.customKeyInProgress(kg, 2),
 		partition.accountInProgressKey(kg),
 		kg.ConcurrencyIndex(),
-		kg.PartitionConcurrencyIndex(),
 	}
 
 	args, err := StrSlice([]any{
