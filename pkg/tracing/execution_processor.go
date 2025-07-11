@@ -32,8 +32,16 @@ func (p *executionProcessor) OnStart(parent context.Context, s sdktrace.ReadWrit
 
 	if p.md != nil {
 		meta.AddAttr(rawAttrs, meta.Attrs.RunID, &p.md.ID.RunID)
+		meta.AddAttr(rawAttrs, meta.Attrs.FunctionID, &p.md.ID.FunctionID)
+		meta.AddAttr(rawAttrs, meta.Attrs.AccountID, &p.md.ID.Tenant.AccountID)
+		meta.AddAttr(rawAttrs, meta.Attrs.EnvID, &p.md.ID.Tenant.EnvID)
+		meta.AddAttr(rawAttrs, meta.Attrs.AppID, &p.md.ID.Tenant.AppID)
 	} else if p.qi != nil {
 		meta.AddAttr(rawAttrs, meta.Attrs.RunID, &p.qi.Identifier.RunID)
+		meta.AddAttr(rawAttrs, meta.Attrs.FunctionID, &p.qi.Identifier.WorkflowID)
+		meta.AddAttr(rawAttrs, meta.Attrs.AccountID, &p.qi.Identifier.AccountID)
+		meta.AddAttr(rawAttrs, meta.Attrs.EnvID, &p.qi.Identifier.WorkspaceID)
+		meta.AddAttr(rawAttrs, meta.Attrs.AppID, &p.qi.Identifier.AppID)
 	}
 
 	// Do not set extra contextual data on extension spans
@@ -49,12 +57,8 @@ func (p *executionProcessor) OnStart(parent context.Context, s sdktrace.ReadWrit
 					eventIDs[i] = id.String()
 				}
 
-				meta.AddAttr(rawAttrs, meta.Attrs.FunctionID, &p.md.ID.FunctionID)
 				meta.AddAttr(rawAttrs, meta.Attrs.FunctionVersion, &p.md.Config.FunctionVersion)
 				meta.AddAttr(rawAttrs, meta.Attrs.EventIDs, &eventIDs)
-				meta.AddAttr(rawAttrs, meta.Attrs.AccountID, &p.md.ID.Tenant.AccountID)
-				meta.AddAttr(rawAttrs, meta.Attrs.EnvID, &p.md.ID.Tenant.EnvID)
-				meta.AddAttr(rawAttrs, meta.Attrs.AppID, &p.md.ID.Tenant.AppID)
 
 				if p.md.Config.CronSchedule() != nil {
 					meta.AddAttr(rawAttrs, meta.Attrs.CronSchedule, p.md.Config.CronSchedule())
