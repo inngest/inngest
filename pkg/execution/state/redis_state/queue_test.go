@@ -2862,7 +2862,8 @@ func TestQueuePartitionLease(t *testing.T) {
 	require.NoError(t, err)
 	defer rc.Close()
 
-	q := NewQueue(QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName})
+	shard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+	q := NewQueue(shard)
 	ctx := context.Background()
 
 	_, err = q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{FunctionID: idA}, atA, osqueue.EnqueueOpts{})
@@ -2896,29 +2897,40 @@ func TestQueuePartitionLease(t *testing.T) {
 		// Pause so that we can assert that the last lease time was set correctly.
 		<-time.After(50 * time.Millisecond)
 
-		t.Run("It updates the partition score", func(t *testing.T) {
+		t.Run("It removes the partition from the global pointer set", func(t *testing.T) {
 			items, err := q.PartitionPeek(ctx, true, now.Add(time.Hour), PartitionPeekMax)
 
 			// Require the lease ID is within 25 MS of the expected value.
 			require.WithinDuration(t, leaseUntil, ulid.Time(leaseID.Time()), 25*time.Millisecond)
 
 			require.NoError(t, err)
-			require.Len(t, items, 3)
+			require.Len(t, items, 2)
 			require.EqualValues(t, []*QueuePartition{
 				{ID: idB.String(), FunctionID: &idB, AccountID: uuid.Nil, ConcurrencyLimit: consts.DefaultConcurrencyLimit},
 				{ID: idC.String(), FunctionID: &idC, AccountID: uuid.Nil, ConcurrencyLimit: consts.DefaultConcurrencyLimit},
+			}, items)
+
+			inProgress, err := q.partitionPeek(ctx, shard.RedisClient.kg.PartitionConcurrencyIndex(), true, now.Add(time.Hour), PartitionPeekMax, nil)
+			require.NoError(t, err)
+
+			require.Len(t, inProgress, 1)
+			require.Equal(t, []*QueuePartition{
 				{
 					ID:               idA.String(),
 					FunctionID:       &idA,
 					AccountID:        uuid.Nil,
-					Last:             items[2].Last, // Use the leased partition time.
+					Last:             inProgress[0].Last, // Use the leased partition time.
 					LeaseID:          leaseID,
 					ConcurrencyLimit: consts.DefaultConcurrencyLimit,
 				}, // idA is now last.
-			}, items)
-			requirePartitionScoreEquals(t, r, &idA, leaseUntil)
+			}, inProgress)
+
+			require.Equal(t,
+				leaseUntil.Unix(), // pointer timestamp is in seconds
+				int64(score(t, r, shard.RedisClient.kg.PartitionConcurrencyIndex(), idA.String())),
+			)
 			// require that the last leased time is within 5ms for tests
-			require.WithinDuration(t, leasedAt, time.UnixMilli(items[2].Last), 5*time.Millisecond)
+			require.WithinDuration(t, leasedAt, time.UnixMilli(inProgress[0].Last), 5*time.Millisecond)
 		})
 
 		t.Run("It can't lease an existing partition lease", func(t *testing.T) {
@@ -2928,21 +2940,30 @@ func TestQueuePartitionLease(t *testing.T) {
 			require.Zero(t, capacity)
 
 			// Assert that score didn't change (we added 1 second in the previous test)
-			requirePartitionScoreEquals(t, r, &idA, leaseUntil)
+			require.Equal(t,
+				leaseUntil.Unix(), // pointer timestamp is in seconds
+				int64(score(t, r, shard.RedisClient.kg.PartitionConcurrencyIndex(), idA.String())),
+			)
 		})
 	})
 
 	t.Run("It allows leasing an expired partition lease", func(t *testing.T) {
 		<-time.After(time.Until(leaseUntil))
 
-		requirePartitionScoreEquals(t, r, &idA, leaseUntil)
+		require.Equal(t,
+			leaseUntil.Unix(),
+			int64(score(t, r, shard.RedisClient.kg.PartitionConcurrencyIndex(), idA.String())),
+		)
 
 		id, capacity, err := q.PartitionLease(ctx, &pA, time.Second*5)
 		require.Nil(t, err)
 		require.NotNil(t, id)
 		require.NotZero(t, capacity)
 
-		requirePartitionScoreEquals(t, r, &idA, time.Now().Add(time.Second*5))
+		require.Equal(t,
+			time.Now().Add(time.Second*5).Unix(),
+			int64(score(t, r, shard.RedisClient.kg.PartitionConcurrencyIndex(), idA.String())),
+		)
 	})
 
 	t.Run("Partition pausing", func(t *testing.T) {

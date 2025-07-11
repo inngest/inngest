@@ -3731,7 +3731,7 @@ func (q *queue) ScavengePartitions(ctx context.Context, limit int) (int, error) 
 
 	// Find all items that have an expired lease - eg. where the min time for a lease is between
 	// (0-now] in unix milliseconds.
-	now := fmt.Sprintf("%d", q.clock.Now().UnixMilli())
+	now := fmt.Sprintf("%d", q.clock.Now().Unix()) // partition lease time is in seconds
 
 	count, err := client.Do(ctx, client.B().Zcount().Key(kg.PartitionConcurrencyIndex()).Min("-inf").Max(now).Build()).AsInt64()
 	if err != nil {
@@ -3748,7 +3748,7 @@ func (q *queue) ScavengePartitions(ctx context.Context, limit int) (int, error) 
 		Min("-inf").
 		Max(now).
 		Byscore().
-		Limit(q.randomScavengeOffset(q.clock.Now().UnixMilli(), count, limit), int64(limit)).
+		Limit(q.randomScavengeOffset(q.clock.Now().Unix(), count, limit), int64(limit)).
 		Build()
 
 	partitionIDs, err := client.Do(ctx, cmd).AsStrSlice()
