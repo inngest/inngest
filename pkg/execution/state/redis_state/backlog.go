@@ -1160,7 +1160,7 @@ func (q *queue) BacklogsByPartition(ctx context.Context, queueShard QueueShard, 
 				iterated++
 			}
 
-			ptFrom = time.UnixMilli(int64(res.Cursor))
+			ptFrom = time.UnixMilli(res.Cursor)
 
 			l.Trace("iterated backlogs in partition", "count", iterated)
 

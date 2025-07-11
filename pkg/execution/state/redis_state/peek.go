@@ -59,7 +59,9 @@ type peekResult[T any] struct {
 	TotalCount   int
 	RemovedCount int
 
-	Cursor int
+	// Cursor represents the score of the last item in the peek result.
+	// This can be used for pagination within iterators
+	Cursor int64
 }
 
 // peek peeks up to <limit> items from the given ZSET up to until, in order if sequential is true, otherwise randomly.
@@ -235,7 +237,7 @@ func (p *peeker[T]) peek(ctx context.Context, keyOrderedPointerSet string, seque
 		Items:        items,
 		TotalCount:   int(totalCount),
 		RemovedCount: len(missingItems),
-		Cursor:       int(cursor),
+		Cursor:       cursor,
 	}, nil
 }
 
