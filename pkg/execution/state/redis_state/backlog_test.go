@@ -1224,7 +1224,6 @@ func TestBacklogsByPartition(t *testing.T) {
 	ctx := context.Background()
 	clock := clockwork.NewFakeClock()
 	defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
-	// kg := defaultShard.RedisClient.kg
 
 	acctId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
 
@@ -1241,6 +1240,30 @@ func TestBacklogsByPartition(t *testing.T) {
 			name:          "simple",
 			num:           10,
 			expectedItems: 10,
+			until:         clock.Now().Add(time.Minute),
+		},
+		{
+			name:          "with interval",
+			num:           100,
+			until:         clock.Now().Add(time.Minute),
+			interval:      -1 * time.Second,
+			expectedItems: 100,
+		},
+		{
+			name:          "with out of range interval",
+			num:           10,
+			from:          clock.Now(),
+			until:         clock.Now().Add(7 * time.Second).Truncate(time.Second),
+			interval:      time.Second,
+			expectedItems: 7,
+		},
+		{
+			name:          "with batch size",
+			num:           500,
+			until:         clock.Now().Add(10 * time.Second).Truncate(time.Second),
+			interval:      10 * time.Millisecond,
+			expectedItems: 500,
+			batchSize:     150,
 		},
 	}
 
@@ -1252,9 +1275,6 @@ func TestBacklogsByPartition(t *testing.T) {
 				defaultShard,
 				WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 					return true
-				}),
-				WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
-					return false
 				}),
 				WithClock(clock),
 			)
