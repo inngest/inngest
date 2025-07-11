@@ -7,6 +7,8 @@ import (
 	"iter"
 	"math/rand"
 	"runtime/debug"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -1178,6 +1180,64 @@ func (q *queue) BacklogsByPartition(ctx context.Context, queueShard QueueShard, 
 			<-time.After(opt.interval)
 		}
 	}, nil
+}
+
+func (q *queue) PartitionBacklogSize(ctx context.Context, partitionID string) (int64, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "partitionBacklogSize"), redis_telemetry.ScopeQueue)
+
+	if q.queueShardClients == nil {
+		return 0, nil
+	}
+
+	l := q.log.With(
+		"method", "PartitionBacklogSize",
+		"partition_id", partitionID,
+	)
+
+	var (
+		wg    sync.WaitGroup
+		count int64
+	)
+	until := q.clock.Now().Add(24 * time.Hour * 365) // 1y ahead
+
+	for _, shard := range q.queueShardClients {
+		shard := shard
+		fmt.Printf("SHARD: %#v\n", shard)
+
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+
+			backlogs, err := q.BacklogsByPartition(ctx, shard, partitionID, time.Time{}, until)
+			if err != nil {
+				fmt.Println("ERROR: iter,", err.Error())
+				l.Error("error preparing backlog iterator", "error", err, "shard", shard)
+				return
+			}
+
+			bwg := sync.WaitGroup{}
+			for bl := range backlogs {
+				bwg.Add(1)
+				backlogID := bl.BacklogID
+
+				go func() {
+					defer bwg.Done()
+
+					size, err := q.BacklogSize(ctx, shard, backlogID)
+					if err != nil {
+						fmt.Println("ERROR: size,", err.Error())
+						l.Error("error retrieving backlog size", "error", err, "backlog", bl)
+						return
+					}
+					atomic.AddInt64(&count, size)
+				}()
+			}
+			bwg.Wait()
+		}()
+	}
+	wg.Wait()
+
+	return count, nil
 }
 
 func (q *queue) BacklogSize(ctx context.Context, queueShard QueueShard, backlogID string) (int64, error) {
