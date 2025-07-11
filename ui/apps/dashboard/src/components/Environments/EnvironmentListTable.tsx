@@ -9,6 +9,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@inngest/components/DropdownMenu';
+import { Pagination } from '@inngest/components/Pagination';
 import { Switch } from '@inngest/components/Switch';
 import { AppsIcon } from '@inngest/components/icons/sections/Apps';
 import { cn } from '@inngest/components/utils/classNames';
@@ -41,18 +42,15 @@ const EnableEnvironmentAutoArchiveDocument = graphql(`
 const PER_PAGE = 10;
 
 export default function EnvironmentListTable({ envs }: { envs: Environment[] }) {
-  const [page, setPage] = useState(0);
+  const [page, setPage] = useState(1);
   const numPages = Math.ceil(envs.length / PER_PAGE);
-  const pages = Array(numPages)
-    .fill(null)
-    .map((_, i) => i);
 
   const sortedEnvs = envs.sort(
     (a, b) =>
       new Date(b.lastDeployedAt || b.createdAt).valueOf() -
       new Date(a.lastDeployedAt || a.createdAt).valueOf()
   );
-  const visibleEnvs = sortedEnvs.slice(page * PER_PAGE, (page + 1) * PER_PAGE);
+  const visibleEnvs = sortedEnvs.slice((page - 1) * PER_PAGE, page * PER_PAGE);
 
   return (
     <table className="w-full">
@@ -89,19 +87,13 @@ export default function EnvironmentListTable({ envs }: { envs: Environment[] }) 
           </tr>
         )}
       </tbody>
-      {pages.length > 1 && (
+      {numPages > 1 && (
         <tfoot className="border-subtle border-t">
           <tr>
-            <td colSpan={4} className="px-4 py-1 text-center">
-              {pages.map((_, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => setPage(idx)}
-                  className="transition-color text-link hover:decoration-link mx-1 cursor-pointer px-2 underline decoration-transparent decoration-2 underline-offset-4 duration-300"
-                >
-                  {idx + 1}
-                </button>
-              ))}
+            <td colSpan={4}>
+              <div className="flex flex-row items-center justify-center px-4 py-1">
+                <Pagination currentPage={page} numPages={numPages} setCurrentPage={setPage} />
+              </div>
             </td>
           </tr>
         </tfoot>

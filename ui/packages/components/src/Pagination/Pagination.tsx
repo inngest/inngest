@@ -1,0 +1,152 @@
+'use client';
+
+import {
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from 'react';
+import {
+  RiArrowLeftDoubleLine,
+  RiArrowLeftSLine,
+  RiArrowRightDoubleLine,
+  RiArrowRightSLine,
+  type RemixiconComponentType,
+} from '@remixicon/react';
+
+import { Button } from '../Button';
+import { cn } from '../utils/classNames';
+import { getVisiblePages } from './getVisiblePages';
+
+// Both numbers and ellipses use same base styles to prevent shifting.
+const PAGE_NUMBER_BASE_CLASSES =
+  'flex h-6 items-center justify-center min-w-8 text-sm tabular-nums';
+
+const NARROW_VARIANT_BREAKPOINT = 450;
+
+interface PaginationProps {
+  currentPage: number;
+  numPages: number;
+  setCurrentPage: Dispatch<SetStateAction<number>>;
+  variant?: 'normal' | 'narrow';
+}
+
+export function Pagination(props: PaginationProps) {
+  const { currentPage, numPages, setCurrentPage, variant: propVariant } = props;
+
+  const outerRef = useRef<HTMLDivElement>(null);
+  const [autoVariant, setAutoVariant] = useState<'narrow' | 'normal'>('normal');
+
+  // TODO: Use a ResizeObserver to detect changes in width if necessary.
+  useLayoutEffect(() => {
+    if (propVariant !== undefined) return;
+
+    const container = outerRef.current;
+    if (container === null) return;
+
+    const width = container.getBoundingClientRect().width;
+    setAutoVariant(width < NARROW_VARIANT_BREAKPOINT ? 'narrow' : 'normal');
+  }, [propVariant]);
+
+  const variant = propVariant ?? autoVariant;
+
+  if (numPages === 0) return null;
+
+  const pages = useMemo(
+    () => getVisiblePages({ current: currentPage, total: numPages, variant }),
+    [currentPage, numPages, variant]
+  );
+
+  return (
+    <div ref={outerRef} className="flex w-full justify-center">
+      <div className="flex items-center">
+        <CaretButton {...props} typ="first" />
+        <CaretButton {...props} typ="back" />
+
+        <div className="flex gap-1">
+          {pages.map((page, index) => {
+            // Render ellipsis.
+            if (typeof page !== 'number') {
+              return (
+                <div className={PAGE_NUMBER_BASE_CLASSES} key={`ellipsis-${index}`}>
+                  {page}
+                </div>
+              );
+            }
+
+            const isActive = currentPage === page;
+
+            return (
+              <button
+                key={page}
+                onClick={() => setCurrentPage(page)}
+                className={cn(
+                  PAGE_NUMBER_BASE_CLASSES,
+                  'rounded-md px-2',
+                  isActive && 'bg-contrast text-onContrast',
+                  !isActive && 'hover:bg-canvasSubtle'
+                )}
+              >
+                {page}
+              </button>
+            );
+          })}
+        </div>
+
+        <CaretButton {...props} typ="forward" />
+        <CaretButton {...props} typ="last" />
+      </div>
+    </div>
+  );
+}
+
+const CARET_ICON_MAP: Record<'back' | 'first' | 'forward' | 'last', RemixiconComponentType> = {
+  back: RiArrowLeftSLine,
+  first: RiArrowLeftDoubleLine,
+  forward: RiArrowRightSLine,
+  last: RiArrowRightDoubleLine,
+};
+
+interface CaretButtonProps extends PaginationProps {
+  typ: keyof typeof CARET_ICON_MAP;
+}
+
+function CaretButton({ typ, ...paginationProps }: CaretButtonProps) {
+  const { currentPage, numPages, setCurrentPage } = paginationProps;
+
+  const onFirstPage = currentPage === 1;
+  const onLastPage = currentPage === numPages;
+
+  let disabled = false;
+  if (['back', 'first'].includes(typ) && onFirstPage) disabled = true;
+  if (['forward', 'last'].includes(typ) && onLastPage) disabled = true;
+
+  const Icon = CARET_ICON_MAP[typ];
+
+  return (
+    <Button
+      appearance="ghost"
+      className="group mx-1 mr-1 h-6 w-6 p-0"
+      disabled={disabled}
+      icon={<Icon className="bg-canvasBase group-disabled:text-disabled text-basis h-6 w-6" />}
+      onClick={() => {
+        switch (typ) {
+          case 'back':
+            setCurrentPage((p) => p - 1);
+            break;
+          case 'first':
+            setCurrentPage(1);
+            break;
+          case 'forward':
+            setCurrentPage((p) => p + 1);
+            break;
+          case 'last':
+            setCurrentPage(paginationProps.numPages);
+            break;
+        }
+      }}
+    />
+  );
+}
