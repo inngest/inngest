@@ -7992,7 +7992,7 @@ func TestQueueActiveCounters(t *testing.T) {
 	})
 }
 
-func TestQueuePartitionScavenge(t *testing.T) {
+func TestQueueScavengePartitions(t *testing.T) {
 	r := miniredis.RunT(t)
 	rc, err := rueidis.NewClient(rueidis.ClientOption{
 		InitAddress:  []string{r.Addr()},
@@ -8072,7 +8072,9 @@ func TestQueuePartitionScavenge(t *testing.T) {
 	require.False(t, hasMember(t, r, kg.GlobalPartitionIndex(), qp.ID))
 	require.False(t, hasMember(t, r, kg.AccountPartitionIndex(accountID), qp.ID))
 	require.False(t, hasMember(t, r, kg.GlobalAccountIndex(), accountID.String()))
+
 	require.True(t, hasMember(t, r, kg.PartitionConcurrencyIndex(), qp.ID))
+	require.Equal(t, clock.Now().Add(5*time.Second).Unix(), int64(score(t, r, kg.PartitionConcurrencyIndex(), qp.ID)))
 
 	//
 	// step 3: requeue partition, expect it to move from in progress -> global/account pointer
