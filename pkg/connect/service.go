@@ -34,6 +34,7 @@ const (
 )
 
 type gatewayOpt func(*connectGatewaySvc)
+type useGRPCFunc func(ctx context.Context, accountID uuid.UUID) bool
 
 type connectionCounter struct {
 	count  uint64
@@ -70,7 +71,7 @@ type connectGatewaySvc struct {
 	gatewayRoutes  chi.Router
 	maintenanceApi chi.Router
 
-	grpcServer *grpc.Server
+	grpcServer    *grpc.Server
 	wsConnections sync.Map
 
 	// gatewayId is a unique identifier, generated each time the service is started.
@@ -104,6 +105,8 @@ type connectGatewaySvc struct {
 	connectionCount connectionCounter
 	drainListener   *drainListener
 	stateUpdateLock sync.Mutex
+
+	shouldUseGRPC useGRPCFunc
 }
 
 func (c *connectGatewaySvc) MaintenanceAPI() http.Handler {
@@ -207,6 +210,12 @@ func WithConsecutiveWorkerHeartbeatMissesBeforeConnectionClose(misses int) gatew
 	}
 }
 
+func WithShouldUseGRPC(fn useGRPCFunc) gatewayOpt {
+	return func(svc *connectGatewaySvc) {
+		svc.shouldUseGRPC = fn
+	}
+}
+
 func NewConnectGatewayService(opts ...gatewayOpt) *connectGatewaySvc {
 	gateway := &connectGatewaySvc{
 		gatewayId:         ulid.MustNew(ulid.Now(), rand.Reader),
@@ -220,6 +229,9 @@ func NewConnectGatewayService(opts ...gatewayOpt) *connectGatewaySvc {
 		consecutiveWorkerHeartbeatMissesBeforeConnectionClose: 5,
 
 		grpcServer: grpc.NewServer(),
+		shouldUseGRPC: func(ctx context.Context, accountID uuid.UUID) bool {
+			return false
+		},
 	}
 
 	for _, opt := range opts {
