@@ -58,6 +58,8 @@ type peekResult[T any] struct {
 	Items        []*T
 	TotalCount   int
 	RemovedCount int
+
+	Cursor int
 }
 
 // peek peeks up to <limit> items from the given ZSET up to until, in order if sequential is true, otherwise randomly.
@@ -148,9 +150,9 @@ func (p *peeker[T]) peek(ctx context.Context, keyOrderedPointerSet string, seque
 		return nil, fmt.Errorf("unknown return type from %s: %T", p.opName, peekRet)
 	}
 
-	var totalCount int64
+	var totalCount, cursor int64
 	var potentiallyMissingItems, allPointerIDs []any
-	if len(returnedSet) == 3 {
+	if len(returnedSet) == 4 {
 		totalCount, ok = returnedSet[0].(int64)
 		if !ok {
 			return nil, fmt.Errorf("unexpected first item in set returned from %s: %T", p.opName, returnedSet[0])
@@ -158,15 +160,20 @@ func (p *peeker[T]) peek(ctx context.Context, keyOrderedPointerSet string, seque
 
 		potentiallyMissingItems, ok = returnedSet[1].([]any)
 		if !ok {
-			return nil, fmt.Errorf("unexpected second item in set returned from %s: %T", p.opName, peekRet)
+			return nil, fmt.Errorf("unexpected second item in set returned from %s: %T", p.opName, returnedSet[1])
 		}
 
 		allPointerIDs, ok = returnedSet[2].([]any)
 		if !ok {
-			return nil, fmt.Errorf("unexpected third item in set returned from %s: %T", p.opName, peekRet)
+			return nil, fmt.Errorf("unexpected third item in set returned from %s: %T", p.opName, returnedSet[2])
+		}
+
+		cursor, ok = returnedSet[3].(int64)
+		if !ok {
+			return nil, fmt.Errorf("invalid cursor returned from %s: %T", p.opName, returnedSet[3])
 		}
 	} else if len(returnedSet) != 0 {
-		return nil, fmt.Errorf("expected zero or three items in set returned by %s: %v", p.opName, returnedSet)
+		return nil, fmt.Errorf("expected zero or four items in set returned by %s: %v", p.opName, returnedSet)
 	}
 
 	encoded := make([]any, 0)
@@ -228,6 +235,7 @@ func (p *peeker[T]) peek(ctx context.Context, keyOrderedPointerSet string, seque
 		Items:        items,
 		TotalCount:   int(totalCount),
 		RemovedCount: len(missingItems),
+		Cursor:       int(cursor),
 	}, nil
 }
 

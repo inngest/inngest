@@ -1237,11 +1237,11 @@ func TestBacklogsByPartition(t *testing.T) {
 		expectedItems int
 		batchSize     int64
 	}{
-		// {
-		// 	name:          "simple",
-		// 	num:           10,
-		// 	expectedItems: 10,
-		// },
+		{
+			name:          "simple",
+			num:           10,
+			expectedItems: 10,
+		},
 	}
 
 	for _, tc := range testcases {
