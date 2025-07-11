@@ -63,8 +63,6 @@ func (tr *traceReader) GetRunTrace(ctx context.Context, keys dataloader.Keys) []
 				return
 			}
 
-			// spew.Dump(rootSpan)
-
 			gqlRoot, err := tr.convertRunSpanToGQL(ctx, rootSpan)
 			if err != nil {
 				res.Error = fmt.Errorf("error converting run root to GQL: %w", err)
@@ -139,60 +137,6 @@ func (tr *traceReader) stepStatusToGQL(status *enums.StepStatus) *models.RunTrac
 	return nil
 }
 
-func getAttr[T any](attrs map[string]any, key string, target *T) {
-	if v, ok := attrs[key]; ok {
-		if val, ok := v.(T); ok {
-			*target = val
-		}
-	}
-}
-
-func getPtrAttr[T any](attrs map[string]any, key string, target **T) {
-	if v, ok := attrs[key]; ok {
-		if val, ok := v.(T); ok {
-			*target = &val
-		}
-	}
-}
-
-func getULIDAttr(attrs map[string]any, key string, target *ulid.ULID) {
-	if v, ok := attrs[key]; ok {
-		if str, ok := v.(string); ok {
-			if id, err := ulid.Parse(str); err == nil {
-				*target = id
-			}
-		}
-	}
-}
-
-func getULIDPtrAttr(attrs map[string]any, key string, target **ulid.ULID) {
-	if v, ok := attrs[key]; ok {
-		if str, ok := v.(string); ok {
-			if id, err := ulid.Parse(str); err == nil {
-				*target = &id
-			}
-		}
-	}
-}
-
-func getTimeAttr(attrs map[string]any, key string, target *time.Time) {
-	if v, ok := attrs[key]; ok {
-		if ms, ok := v.(float64); ok {
-			*target = time.UnixMilli(int64(ms))
-		}
-	}
-}
-
-func getDurAttr(attrs map[string]any, key string) *time.Duration {
-	if v, ok := attrs[key]; ok {
-		if floatV, ok := v.(float64); ok {
-			dur := time.Duration(floatV) * time.Millisecond
-			return &dur
-		}
-	}
-	return nil
-}
-
 func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelSpan) (*models.RunTraceSpan, error) {
 	var duration *int
 	status := models.RunTraceSpanStatusRunning
@@ -205,14 +149,9 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 	}
 
 	// Make sure we parse dynamic statuses from updates
-	if v, ok := span.Attributes[meta.AttributeDynamicStatus]; ok {
-		if strV, ok := v.(string); ok {
-			if s, err := enums.StepStatusString(strV); err == nil {
-				gqlStatus := tr.stepStatusToGQL(&s)
-				if gqlStatus != nil {
-					status = *gqlStatus
-				}
-			}
+	if span.Attributes.DynamicStatus != nil {
+		if gqlStatus := tr.stepStatusToGQL(span.Attributes.DynamicStatus); gqlStatus != nil {
+			status = *gqlStatus
 		}
 	}
 
@@ -243,71 +182,83 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 
 	showSpan := span.Name != meta.SpanNameStepDiscovery
 
-	if v, ok := span.Attributes[meta.AttributeStepOp]; ok {
-		if strV, ok := v.(string); ok {
-
-			if op, err := enums.OpcodeString(strV); err == nil {
-				gqlSpan.StepOp = tr.opcodeToGQL(&op)
-			}
-		}
+	if span.Attributes.StepOp != nil {
+		gqlSpan.StepOp = tr.opcodeToGQL(span.Attributes.StepOp)
 	}
 
-	if v, ok := span.Attributes[meta.AttributeStepID]; ok {
-		if strV, ok := v.(string); ok {
-			gqlSpan.StepID = &strV
-		}
+	if span.Attributes.StepID != nil {
+		gqlSpan.StepID = span.Attributes.StepID
 	}
 
 	if gqlSpan.StepOp != nil {
 		switch *gqlSpan.StepOp {
 		case models.StepOpRun:
 			{
-				si := &models.RunStepInfo{}
-
-				getPtrAttr(span.Attributes, meta.AttributeStepRunType, &si.Type)
-
-				gqlSpan.StepInfo = si
+				gqlSpan.StepInfo = &models.RunStepInfo{
+					Type: span.Attributes.StepRunType,
+				}
 			}
 		case models.StepOpInvoke:
 			{
-				si := &models.InvokeStepInfo{}
+				si := &models.InvokeStepInfo{
+					TimedOut:      span.Attributes.StepWaitExpired,
+					ReturnEventID: span.Attributes.StepInvokeFinishEventID,
+					RunID:         span.Attributes.StepInvokeRunID,
+				}
 
-				getULIDAttr(span.Attributes, meta.AttributeStepInvokeTriggerEventID, &si.TriggeringEventID)
-				getAttr(span.Attributes, meta.AttributeStepInvokeFunctionID, &si.FunctionID)
-				getTimeAttr(span.Attributes, meta.AttributeStepWaitExpiry, &si.Timeout)
-				getPtrAttr(span.Attributes, meta.AttributeStepWaitExpired, &si.TimedOut)
-				getULIDPtrAttr(span.Attributes, meta.AttributeStepInvokeFinishEventID, &si.ReturnEventID)
-				getULIDPtrAttr(span.Attributes, meta.AttributeStepInvokeRunID, &si.RunID)
+				if span.Attributes.StepInvokeTriggerEventID != nil {
+					si.TriggeringEventID = *span.Attributes.StepInvokeTriggerEventID
+				}
+
+				if span.Attributes.StepInvokeFunctionID != nil {
+					si.FunctionID = *span.Attributes.StepInvokeFunctionID
+				}
+
+				if span.Attributes.StepWaitExpiry != nil {
+					si.Timeout = *span.Attributes.StepWaitExpiry
+				}
 
 				gqlSpan.StepInfo = si
 			}
 		case models.StepOpSleep:
 			{
-				if dur := getDurAttr(span.Attributes, meta.AttributeStepSleepDuration); dur != nil {
+				if span.Attributes.StepSleepDuration != nil {
 					gqlSpan.StepInfo = &models.SleepStepInfo{
-						SleepUntil: span.GetQueuedAtTime().Add(*dur),
+						SleepUntil: span.GetQueuedAtTime().Add(*span.Attributes.StepSleepDuration),
 					}
 				}
 			}
 		case models.StepOpWaitForEvent:
 			{
-				si := &models.WaitForEventStepInfo{}
+				si := &models.WaitForEventStepInfo{
+					Expression:   span.Attributes.StepWaitForEventIf,
+					TimedOut:     span.Attributes.StepWaitExpired,
+					FoundEventID: span.Attributes.StepWaitForEventMatchedID,
+				}
 
-				getAttr(span.Attributes, meta.AttributeStepWaitForEventName, &si.EventName)
-				getPtrAttr(span.Attributes, meta.AttributeStepWaitForEventIf, &si.Expression)
-				getTimeAttr(span.Attributes, meta.AttributeStepWaitExpiry, &si.Timeout)
-				getULIDPtrAttr(span.Attributes, meta.AttributeStepWaitForEventMatchedID, &si.FoundEventID)
-				getPtrAttr(span.Attributes, meta.AttributeStepWaitExpired, &si.TimedOut)
+				if span.Attributes.StepWaitForEventName != nil {
+					si.EventName = *span.Attributes.StepWaitForEventName
+				}
+
+				if span.Attributes.StepWaitExpiry != nil {
+					si.Timeout = *span.Attributes.StepWaitExpiry
+				}
 
 				gqlSpan.StepInfo = si
 			}
 		case models.StepOpWaitForSignal:
 			{
-				si := &models.WaitForSignalStepInfo{}
+				si := &models.WaitForSignalStepInfo{
+					TimedOut: span.Attributes.StepWaitExpired,
+				}
 
-				getAttr(span.Attributes, meta.AttributeStepSignalName, &si.Signal)
-				getTimeAttr(span.Attributes, meta.AttributeStepWaitExpiry, &si.Timeout)
-				getPtrAttr(span.Attributes, meta.AttributeStepWaitExpired, &si.TimedOut)
+				if span.Attributes.StepSignalName != nil {
+					si.Signal = *span.Attributes.StepSignalName
+				}
+
+				if span.Attributes.StepWaitExpiry != nil {
+					si.Timeout = *span.Attributes.StepWaitExpiry
+				}
 
 				gqlSpan.StepInfo = si
 			}
