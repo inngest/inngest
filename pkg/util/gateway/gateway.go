@@ -2,6 +2,7 @@ package gateway
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
 
 	"github.com/inngest/inngest/pkg/execution/exechttp"
@@ -49,13 +50,16 @@ func (r Request) SerializableRequest() (exechttp.SerializableRequest, error) {
 
 	// Handle different body types properly for JSON serialization
 	var bodyRaw json.RawMessage
-	if r.Body == "" {
-		bodyRaw = json.RawMessage("null")
-	} else if json.Valid([]byte(r.Body)) {
-		bodyRaw = json.RawMessage(r.Body)
-	} else {
-		bodyBytes, _ := json.Marshal(r.Body)
-		bodyRaw = json.RawMessage(bodyBytes)
+	if r.Body != "" {
+		if json.Valid([]byte(r.Body)) {
+			bodyRaw = json.RawMessage(r.Body)
+		} else {
+			bodyBytes, err := json.Marshal(r.Body)
+			if err != nil {
+				return exechttp.SerializableRequest{}, fmt.Errorf("error marshaling request body: %w", err)
+			}
+			bodyRaw = json.RawMessage(bodyBytes)
+		}
 	}
 
 	req, err := exechttp.NewRequest(method, r.URL, bodyRaw)
