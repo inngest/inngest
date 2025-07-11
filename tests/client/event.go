@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/99designs/gqlgen/graphql"
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
+	"github.com/oklog/ulid/v2"
 )
 
 type GetEventsOpts struct {
@@ -84,4 +85,53 @@ func (c *Client) GetEvents(ctx context.Context, opts GetEventsOpts) (*models.Eve
 	}
 
 	return data.EventsV2, nil
+}
+
+func (c *Client) GetEvent(ctx context.Context, id ulid.ULID) (*models.EventV2, error) {
+	c.Helper()
+
+	query := `
+		query GetEvent($id: ULID!) {
+			eventV2(id: $id) {
+				id
+				idempotencyKey
+				name
+				occurredAt
+				raw
+				receivedAt
+				runs {
+					id
+					function {
+						name
+					}
+					status
+				}
+				version
+			}
+		}`
+
+	resp, err := c.DoGQL(ctx, graphql.RawParams{
+		Query: query,
+		Variables: map[string]any{
+			"id": id.String(),
+		},
+	})
+
+	if err != nil {
+		return nil, err
+	}
+	if len(resp.Errors) > 0 {
+		return nil, fmt.Errorf("err with gql: %#v", resp.Errors)
+	}
+
+	type response struct {
+		EventV2 models.EventV2 `json:"eventV2"`
+	}
+
+	data := &response{}
+	if err := json.Unmarshal(resp.Data, data); err != nil {
+		return nil, err
+	}
+
+	return &data.EventV2, nil
 }
