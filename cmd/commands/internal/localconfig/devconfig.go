@@ -98,6 +98,7 @@ func mapDevFlags(cmd *cobra.Command) error {
 	err = errors.Join(err, viper.BindPFlag("tick", cmd.Flags().Lookup("tick")))
 	err = errors.Join(err, viper.BindPFlag("sdk-url", cmd.Flags().Lookup("sdk-url")))
 	err = errors.Join(err, viper.BindPFlag("connect-gateway-port", cmd.Flags().Lookup("connect-gateway-port")))
+	err = errors.Join(err, viper.BindPFlag("in-memory", cmd.Flags().Lookup("in-memory")))
 
 	return err
 }
