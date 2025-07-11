@@ -1390,3 +1390,114 @@ func TestBacklogSize(t *testing.T) {
 
 	require.EqualValues(t, count, size)
 }
+
+func TestPartitionBacklogSize(t *testing.T) {
+	r1, rc1 := initRedis(t)
+	defer rc1.Close()
+
+	r2, rc2 := initRedis(t)
+	defer rc2.Close()
+
+	ctx := context.Background()
+	clock := clockwork.NewFakeClock()
+
+	shard1 := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc1, QueueDefaultKey), Name: "one"}
+	shard2 := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc2, QueueDefaultKey), Name: "two"}
+	queueShards := map[string]QueueShard{
+		"one": shard1,
+		"two": shard2,
+	}
+
+	acctId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
+
+	testcases := []struct {
+		name   string
+		num    int
+		rotate bool
+	}{
+		{
+			name: "enqueue on one shard",
+			num:  100,
+		},
+		// {
+		// 	name:   "enqueue on both shards",
+		// 	num:    200,
+		// 	rotate: true,
+		// },
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			r1.FlushAll()
+			r2.FlushAll()
+
+			q1 := NewQueue(
+				shard1,
+				WithQueueShardClients(queueShards),
+				WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+					return true
+				}),
+				WithClock(clock),
+			)
+			q2 := NewQueue(
+				shard2,
+				WithQueueShardClients(queueShards),
+				WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+					return true
+				}),
+				WithClock(clock),
+			)
+
+			for i := range tc.num {
+				id := fmt.Sprintf("test%d", i)
+				item := osqueue.QueueItem{
+					ID:          id,
+					FunctionID:  fnID,
+					WorkspaceID: wsID,
+					Data: osqueue.Item{
+						WorkspaceID: wsID,
+						Kind:        osqueue.KindEdge,
+						Identifier: state.Identifier{
+							AccountID:       acctId,
+							WorkspaceID:     wsID,
+							WorkflowID:      fnID,
+							WorkflowVersion: 1,
+						},
+						CustomConcurrencyKeys: []state.CustomConcurrency{
+							{
+								Key:   id,
+								Hash:  hashConcurrencyKey(id),
+								Limit: 10,
+							},
+						},
+					},
+				}
+
+				if tc.rotate {
+					// enqueue to both queues in order
+					switch i % 2 {
+					case 0:
+						_, err := q1.EnqueueItem(ctx, shard1, item, clock.Now(), osqueue.EnqueueOpts{})
+						require.NoError(t, err)
+					case 1:
+						_, err := q2.EnqueueItem(ctx, shard2, item, clock.Now(), osqueue.EnqueueOpts{})
+						require.NoError(t, err)
+					}
+
+				} else {
+					_, err := q1.EnqueueItem(ctx, shard1, item, clock.Now(), osqueue.EnqueueOpts{})
+					require.NoError(t, err)
+				}
+			}
+
+			// NOTE: should return the same result regardless of which shard initiated the instrumentation
+			size1, err := q1.PartitionBacklogSize(ctx, fnID.String())
+			require.NoError(t, err)
+			require.EqualValues(t, tc.num, size1)
+
+			size2, err := q2.PartitionBacklogSize(ctx, fnID.String())
+			require.NoError(t, err)
+			require.EqualValues(t, tc.num, size2)
+		})
+	}
+}

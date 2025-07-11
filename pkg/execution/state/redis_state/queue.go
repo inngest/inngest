@@ -178,6 +178,10 @@ type QueueManager interface {
 	BacklogSize(ctx context.Context, queueShard QueueShard, backlogID string) (int64, error)
 
 	PartitionByID(ctx context.Context, queueShard QueueShard, partitionID string) (*PartitionInspectionResult, error)
+
+	// PartitionBacklogSize returns the point in time backlog size of the partition.
+	// This will sum the size of all backlogs in that partition
+	PartitionBacklogSize(ctx context.Context, partitionID string) (int64, error)
 }
 
 // PartitionPriorityFinder returns the priority for a given queue partition.
