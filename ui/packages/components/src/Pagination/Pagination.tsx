@@ -11,6 +11,11 @@ import {
 
 import { Button } from '../Button';
 import { cn } from '../utils/classNames';
+import { getVisiblePages } from './getVisiblePages';
+
+// Both numbers and ellipses use same base styles to prevent shifting.
+const PAGE_NUMBER_BASE_CLASSES =
+  'flex h-6 items-center justify-center min-w-8 text-sm tabular-nums';
 
 interface PaginationProps {
   currentPage: number;
@@ -24,34 +29,44 @@ export function Pagination(props: PaginationProps) {
   if (numPages === 0) return null;
 
   const pages = useMemo(
-    () =>
-      Array(numPages)
-        .fill(null)
-        .map((_, i) => i + 1),
-    [numPages]
+    () => getVisiblePages({ current: currentPage, total: numPages }),
+    [currentPage, numPages]
   );
 
   return (
     <div className="flex items-center">
       <CaretButton {...props} typ="first" />
       <CaretButton {...props} typ="back" />
-      {pages.map((page) => {
-        const isActive = currentPage === page;
 
-        return (
-          <button
-            key={page}
-            onClick={() => setCurrentPage(page)}
-            className={cn(
-              'mx-0 rounded-md px-3 py-1 text-sm',
-              isActive && 'bg-contrast text-onContrast',
-              !isActive && 'hover:bg-canvasSubtle'
-            )}
-          >
-            {page}
-          </button>
-        );
-      })}
+      <div className="flex gap-1">
+        {pages.map((page, index) => {
+          // Render ellipsis.
+          if (typeof page !== 'number') {
+            return (
+              <div className={PAGE_NUMBER_BASE_CLASSES} key={`ellipsis-${index}`}>
+                {page}
+              </div>
+            );
+          }
+
+          const isActive = currentPage === page;
+
+          return (
+            <button
+              key={page}
+              onClick={() => setCurrentPage(page)}
+              className={cn(
+                PAGE_NUMBER_BASE_CLASSES,
+                'rounded-md px-2',
+                isActive && 'bg-contrast text-onContrast',
+                !isActive && 'hover:bg-canvasSubtle'
+              )}
+            >
+              {page}
+            </button>
+          );
+        })}
+      </div>
       <CaretButton {...props} typ="forward" />
       <CaretButton {...props} typ="last" />
     </div>
@@ -84,7 +99,7 @@ function CaretButton({ typ, ...paginationProps }: CaretButtonProps) {
   return (
     <Button
       appearance="ghost"
-      className="group mr-1 h-6 w-6 p-0"
+      className="group mx-1 mr-1 h-6 w-6 p-0"
       disabled={disabled}
       icon={<Icon className="bg-canvasBase group-disabled:text-disabled text-basis h-6 w-6" />}
       onClick={() => {
