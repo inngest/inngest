@@ -47,8 +47,18 @@ func (r Request) SerializableRequest() (exechttp.SerializableRequest, error) {
 		method = r.Method
 	}
 
-	// If the body is empty, we need to set it to an empty JSON object.
-	req, err := exechttp.NewRequest(method, r.URL, json.RawMessage(r.Body))
+	// Handle different body types properly for JSON serialization
+	var bodyRaw json.RawMessage
+	if r.Body == "" {
+		bodyRaw = json.RawMessage("null")
+	} else if json.Valid([]byte(r.Body)) {
+		bodyRaw = json.RawMessage(r.Body)
+	} else {
+		bodyBytes, _ := json.Marshal(r.Body)
+		bodyRaw = json.RawMessage(bodyBytes)
+	}
+
+	req, err := exechttp.NewRequest(method, r.URL, bodyRaw)
 	if err != nil {
 		return exechttp.SerializableRequest{}, err
 	}
