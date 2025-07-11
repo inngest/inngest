@@ -1116,7 +1116,6 @@ func (q *queue) BacklogsByPartition(ctx context.Context, queueShard QueueShard, 
 		"until", until,
 	)
 
-	// rc := queueShard.RedisClient.Client()
 	kg := queueShard.RedisClient.kg
 
 	return func(yield func(*QueueBacklog) bool) {
@@ -1124,8 +1123,6 @@ func (q *queue) BacklogsByPartition(ctx context.Context, queueShard QueueShard, 
 		ptFrom := from
 
 		for {
-			fmt.Println("FROM:", ptFrom.Format(time.StampMilli))
-
 			var iterated int
 
 			peeker := peeker[QueueBacklog]{
@@ -1147,7 +1144,7 @@ func (q *queue) BacklogsByPartition(ctx context.Context, queueShard QueueShard, 
 			isSequential := true
 			res, err := peeker.peek(ctx, kg.ShadowPartitionSet(partitionID), isSequential, q.clock.Now(), opt.batchSize)
 			if err != nil {
-				l.Error("error peeking backlogs for partition", "partition_id", partitionID)
+				l.Error("error peeking backlogs for partition", "partition_id", partitionID, "err", err)
 				return
 			}
 
@@ -1155,17 +1152,17 @@ func (q *queue) BacklogsByPartition(ctx context.Context, queueShard QueueShard, 
 				if bl == nil {
 					continue
 				}
-				// fmt.Println("ID:", bl.BacklogID)
 
 				if !yield(bl) {
 					return
 				}
 
-				// TODO: need to update the time based on the score of the last backlog
 				iterated++
 			}
 
-			l.Debug("iterated backlogs in partition", "count", iterated)
+			ptFrom = time.UnixMilli(int64(res.Cursor))
+
+			l.Trace("iterated backlogs in partition", "count", iterated)
 
 			// didn't process anything, exit loop
 			if iterated == 0 {
