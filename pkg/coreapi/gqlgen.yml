@@ -45,6 +45,18 @@ models:
         resolver: true
       raw:
         resolver: true
+  EventsConnection:
+    fields:
+      totalCount:
+        resolver: true
+  EventV2:
+    fields:
+      raw:
+        resolver: true
+#      runs:
+#        resolver: true
+#      source:
+#        resolver: true
   Function:
     fields:
       app:

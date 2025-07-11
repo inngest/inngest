@@ -10,6 +10,12 @@ type Query {
   # Get all events sent
   events(query: EventsQuery!): [Event!]
 
+  eventsV2(
+    first: Int! = 40
+    after: String
+    filter: EventsFilter!
+  ): EventsConnection!
+
   functionBySlug(query: FunctionQuery!): Function
 
   # Get all functions registered
@@ -78,4 +84,15 @@ input StreamQuery {
   before: ID
   limit: Int! = 20
   includeInternalEvents: Boolean
+}
+
+input EventsFilter {
+  eventNames: [String!]
+  from: Time!
+  includeInternalEvents: Boolean! = false
+
+  # CEL query string.
+  query: String
+
+  until: Time
 }

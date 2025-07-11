@@ -19,6 +19,16 @@ type NormalizedQueries struct {
 	db *Queries
 }
 
+func (q NormalizedQueries) WorkspaceCountEvents(ctx context.Context, arg sqlc_sqlite.WorkspaceCountEventsParams) (int64, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (q NormalizedQueries) WorkspaceCountNamedEvents(ctx context.Context, arg sqlc_sqlite.WorkspaceCountNamedEventsParams) (int64, error) {
+	//TODO implement me
+	panic("implement me")
+}
+
 func (q NormalizedQueries) GetWorkerConnection(ctx context.Context, arg sqlc_sqlite.GetWorkerConnectionParams) (*sqlc_sqlite.WorkerConnection, error) {
 	wc, err := q.db.GetWorkerConnection(ctx, GetWorkerConnectionParams{
 		AccountID:    arg.AccountID,
@@ -469,7 +479,7 @@ func (q NormalizedQueries) WorkspaceNamedEvents(ctx context.Context, params sqlc
 		InternalID:   params.Cursor,
 		ReceivedAt:   params.Before,
 		ReceivedAt_2: params.After,
-		EventName:    params.Name,
+		EventName:    params.Names[0],
 		Limit:        int32(params.Limit),
 	}
 

@@ -185,6 +185,13 @@ export type EventQuery = {
   workspaceId?: Scalars['ID'];
 };
 
+export type EventSource = {
+  __typename?: 'EventSource';
+  id: Scalars['ID'];
+  name: Maybe<Scalars['String']>;
+  sourceKind: Scalars['String'];
+};
+
 export enum EventStatus {
   Completed = 'COMPLETED',
   Failed = 'FAILED',
@@ -194,6 +201,20 @@ export enum EventStatus {
   Running = 'RUNNING'
 }
 
+export type EventV2 = {
+  __typename?: 'EventV2';
+  envID: Scalars['UUID'];
+  id: Scalars['ULID'];
+  idempotencyKey: Maybe<Scalars['String']>;
+  name: Scalars['String'];
+  occurredAt: Scalars['Time'];
+  raw: Scalars['String'];
+  receivedAt: Scalars['Time'];
+  runs: Array<FunctionRunV2>;
+  source: Maybe<EventSource>;
+  version: Maybe<Scalars['String']>;
+};
+
 export type EventsBatchConfiguration = {
   __typename?: 'EventsBatchConfiguration';
   key: Maybe<Scalars['String']>;
@@ -201,6 +222,27 @@ export type EventsBatchConfiguration = {
   maxSize: Scalars['Int'];
   /** How long to wait before running the function with the batch. */
   timeout: Scalars['String'];
+};
+
+export type EventsConnection = {
+  __typename?: 'EventsConnection';
+  edges: Array<EventsEdge>;
+  pageInfo: PageInfo;
+  totalCount: Scalars['Int'];
+};
+
+export type EventsEdge = {
+  __typename?: 'EventsEdge';
+  cursor: Scalars['String'];
+  node: EventV2;
+};
+
+export type EventsFilter = {
+  eventNames?: InputMaybe<Array<Scalars['String']>>;
+  from: Scalars['Time'];
+  includeInternalEvents?: Scalars['Boolean'];
+  query?: InputMaybe<Scalars['String']>;
+  until?: InputMaybe<Scalars['Time']>;
 };
 
 export type EventsQuery = {
@@ -470,6 +512,7 @@ export type Query = {
   apps: Array<App>;
   event: Maybe<Event>;
   events: Maybe<Array<Event>>;
+  eventsV2: EventsConnection;
   functionBySlug: Maybe<Function>;
   functionRun: Maybe<FunctionRun>;
   functions: Maybe<Array<Function>>;
@@ -500,6 +543,13 @@ export type QueryEventArgs = {
 
 export type QueryEventsArgs = {
   query: EventsQuery;
+};
+
+
+export type QueryEventsV2Args = {
+  after: InputMaybe<Scalars['String']>;
+  filter: EventsFilter;
+  first?: Scalars['Int'];
 };
 
 
