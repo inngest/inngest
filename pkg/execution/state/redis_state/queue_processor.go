@@ -411,6 +411,14 @@ func (q *queue) runScavenger(ctx context.Context) {
 				if count > 0 {
 					q.log.Info("scavenged lost jobs", "len", count)
 				}
+
+				count, err = q.ScavengePartitions(ctx, ScavengePartitionPeekSize)
+				if err != nil {
+					q.log.Error("error scavenging partitions", "error", err)
+				}
+				if count > 0 {
+					q.log.Info("scavenged expired partitions", "len", count)
+				}
 			}
 		case <-tick.Chan():
 			// Attempt to re-lease the lock.

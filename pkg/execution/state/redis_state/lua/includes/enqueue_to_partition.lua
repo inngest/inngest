@@ -7,7 +7,7 @@ local function enqueue_get_partition_item(partitionKey, id)
 	return nil
 end
 
-local function enqueue_to_partition(keyPartitionSet, partitionID, partitionItem, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, queueScore, queueID, partitionTime, nowMS, accountID)
+local function enqueue_to_partition(keyPartitionSet, partitionID, partitionItem, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, keyPartitionConcurrencyIndex, queueScore, queueID, partitionTime, nowMS, accountID)
 	if partitionID == "" then
 		-- This is a blank partition, so don't even bother.  This allows us to pre-allocate
 		-- 3 partitions per item, even if an item only needs a single partition.
@@ -41,6 +41,13 @@ local function enqueue_to_partition(keyPartitionSet, partitionID, partitionItem,
 	--       Because of this discrepancy, we have to pass in a "partitionID" to this function so
 	--       that we can properly do backcompat in the global queue of queues.
 	redis.call("HSETNX", keyPartitionMap, partitionID, partitionItem) -- store the partition
+
+  -- do not update partition if it's currently getting processed
+  local inProgressScore = tonumber(redis.call("ZSCORE", keyPartitionConcurrencyIndex, partitionID))
+  if inProgressScore ~= nil and inProgressScore > 0 then
+    -- Partition is currently processing, do not update the pointer
+    return
+  end
 
 	-- Potentially update the global queue of queues (global partitions).
 	local currentScore = redis.call("ZSCORE", keyGlobalPointer, partitionID)
@@ -115,7 +122,7 @@ end
 -- requeue_to_partition is similar to enqueue, but always fetches the minimum score for a partition to
 -- update global pointers instead of using the current queue item's score.
 -- Requires: update_account_queues.lua which requires update_pointer_score.lua, ends_with.lua
-local function requeue_to_partition(keyPartitionSet, partitionID, partitionItem, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, queueScore, queueID, nowMS, accountID)
+local function requeue_to_partition(keyPartitionSet, partitionID, partitionItem, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, keyPartitionConcurrencyIndex, queueScore, queueID, nowMS, accountID)
 	if partitionID == "" then
 		-- This is a blank partition, so don't even bother.  This allows us to pre-allocate
 		-- 3 partitions per item, even if an item only needs a single partition.
@@ -134,6 +141,13 @@ local function requeue_to_partition(keyPartitionSet, partitionID, partitionItem,
 	--       Because of this discrepancy, we have to pass in a "partitionID" to this function so
 	--       that we can properly do backcompat in the global queue of queues.
 	redis.call("HSETNX", keyPartitionMap, partitionID, partitionItem) -- store the partition
+
+  -- do not update partition if it's currently getting processed
+  local inProgressScore = tonumber(redis.call("ZSCORE", keyPartitionConcurrencyIndex, partitionID))
+  if inProgressScore ~= nil and inProgressScore > 0 then
+    -- Partition is currently processing, do not update the pointer
+    return
+  end
 
 	-- Get the minimum score for the queue.
 	local minScores = redis.call("ZRANGE", keyPartitionSet, "-inf", "+inf", "BYSCORE", "LIMIT", 0, 1, "WITHSCORES")

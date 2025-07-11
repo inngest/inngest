@@ -5,34 +5,36 @@ Enqueus an item within the queue.
 
 --]]
 
-local queueKey                	= KEYS[1]           -- queue:item - hash: { $itemID: $item }
-local keyPartitionMap         	= KEYS[2]           -- partition:item - hash: { $workflowID: $partition }
-local keyGlobalPointer        	= KEYS[3]           -- partition:sorted - zset
-local keyGlobalAccountPointer 	= KEYS[4]           -- accounts:sorted - zset
-local keyAccountPartitions    	= KEYS[5]           -- accounts:$accountID:partition:sorted - zset
-local idempotencyKey          	= KEYS[6]           -- seen:$key
-local keyFnMetadata           	= KEYS[7]           -- fnMeta:$id - hash
-local keyPartition           	  = KEYS[8]           -- queue:sorted:$workflowID - zset
+local queueKey                	          = KEYS[1]           -- queue:item - hash: { $itemID: $item }
+local keyPartitionMap         	          = KEYS[2]           -- partition:item - hash: { $workflowID: $partition }
+local keyGlobalPointer        	          = KEYS[3]           -- partition:sorted - zset
+local keyGlobalAccountPointer 	          = KEYS[4]           -- accounts:sorted - zset
+local keyAccountPartitions    	          = KEYS[5]           -- accounts:$accountID:partition:sorted - zset
+local idempotencyKey          	          = KEYS[6]           -- seen:$key
+local keyFnMetadata           	          = KEYS[7]           -- fnMeta:$id - hash
+local keyPartitionConcurrencyIndex        = KEYS[8]
+local keyShadowPartitionConcurrencyIndex  = KEYS[9]
+local keyPartition           	            = KEYS[10]           -- queue:sorted:$workflowID - zset
 
 -- Key queues v2
-local keyBacklogSet                      = KEYS[9]          -- backlog:sorted:<backlogID> - zset
-local keyBacklogMeta                     = KEYS[10]          -- backlogs - hash
-local keyGlobalShadowPartitionSet        = KEYS[11]          -- shadow:sorted
-local keyShadowPartitionSet              = KEYS[12]          -- shadow:sorted:<fnID|queueName> - zset
-local keyShadowPartitionMeta             = KEYS[13]          -- shadows
-local keyGlobalAccountShadowPartitionSet = KEYS[14]
-local keyAccountShadowPartitionSet       = KEYS[15]
+local keyBacklogSet                       = KEYS[11]          -- backlog:sorted:<backlogID> - zset
+local keyBacklogMeta                      = KEYS[12]          -- backlogs - hash
+local keyGlobalShadowPartitionSet         = KEYS[13]          -- shadow:sorted
+local keyShadowPartitionSet               = KEYS[14]          -- shadow:sorted:<fnID|queueName> - zset
+local keyShadowPartitionMeta              = KEYS[15]          -- shadows
+local keyGlobalAccountShadowPartitionSet  = KEYS[16]
+local keyAccountShadowPartitionSet        = KEYS[17]
 
-local keyNormalizeFromBacklogSet         = KEYS[16] -- signals if this is part of a normalization
-local keyPartitionNormalizeSet           = KEYS[17]
-local keyAccountNormalizeSet             = KEYS[18]
-local keyGlobalNormalizeSet              = KEYS[19]
+local keyNormalizeFromBacklogSet          = KEYS[18] -- signals if this is part of a normalization
+local keyPartitionNormalizeSet            = KEYS[19]
+local keyAccountNormalizeSet              = KEYS[20]
+local keyGlobalNormalizeSet               = KEYS[21]
 
-local singletonRunKey           	  = KEYS[20]
-local singletonKey           	  = KEYS[21]
+local singletonRunKey           	  = KEYS[22]
+local singletonKey           	  = KEYS[23]
 
-local keyItemIndexA           	= KEYS[22]          -- custom item index 1
-local keyItemIndexB           	= KEYS[23]          -- custom item index 2
+local keyItemIndexA           	= KEYS[24]          -- custom item index 1
+local keyItemIndexB           	= KEYS[25]          -- custom item index 2
 
 local queueItem           		= ARGV[1]           -- {id, lease id, attempt, max attempt, data, etc...}
 local queueID             		= ARGV[2]           -- id
@@ -88,7 +90,7 @@ end
 if enqueueToBacklog == 1 then
 	enqueue_to_backlog(keyBacklogSet, backlogID, backlogItem, partitionID, shadowPartitionItem, partitionItem, keyPartitionMap, keyBacklogMeta, keyGlobalShadowPartitionSet, keyShadowPartitionMeta, keyShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, queueScore, queueID, partitionTime, nowMS, accountID)
 else
-  enqueue_to_partition(keyPartition, partitionID, partitionItem, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, queueScore, queueID, partitionTime, nowMS, accountID)
+  enqueue_to_partition(keyPartition, partitionID, partitionItem, keyPartitionMap, keyGlobalPointer, keyGlobalAccountPointer, keyAccountPartitions, keyPartitionConcurrencyIndex, queueScore, queueID, partitionTime, nowMS, accountID)
 end
 
 -- Normalization only: Remove from old backlog after enqueueing to new backlog

@@ -2862,7 +2862,8 @@ func TestQueuePartitionLease(t *testing.T) {
 	require.NoError(t, err)
 	defer rc.Close()
 
-	q := NewQueue(QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName})
+	shard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+	q := NewQueue(shard)
 	ctx := context.Background()
 
 	_, err = q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{FunctionID: idA}, atA, osqueue.EnqueueOpts{})
@@ -2896,29 +2897,40 @@ func TestQueuePartitionLease(t *testing.T) {
 		// Pause so that we can assert that the last lease time was set correctly.
 		<-time.After(50 * time.Millisecond)
 
-		t.Run("It updates the partition score", func(t *testing.T) {
+		t.Run("It removes the partition from the global pointer set", func(t *testing.T) {
 			items, err := q.PartitionPeek(ctx, true, now.Add(time.Hour), PartitionPeekMax)
 
 			// Require the lease ID is within 25 MS of the expected value.
 			require.WithinDuration(t, leaseUntil, ulid.Time(leaseID.Time()), 25*time.Millisecond)
 
 			require.NoError(t, err)
-			require.Len(t, items, 3)
+			require.Len(t, items, 2)
 			require.EqualValues(t, []*QueuePartition{
 				{ID: idB.String(), FunctionID: &idB, AccountID: uuid.Nil, ConcurrencyLimit: consts.DefaultConcurrencyLimit},
 				{ID: idC.String(), FunctionID: &idC, AccountID: uuid.Nil, ConcurrencyLimit: consts.DefaultConcurrencyLimit},
+			}, items)
+
+			inProgress, err := q.partitionPeek(ctx, shard.RedisClient.kg.PartitionConcurrencyIndex(), true, now.Add(time.Hour), PartitionPeekMax, nil)
+			require.NoError(t, err)
+
+			require.Len(t, inProgress, 1)
+			require.Equal(t, []*QueuePartition{
 				{
 					ID:               idA.String(),
 					FunctionID:       &idA,
 					AccountID:        uuid.Nil,
-					Last:             items[2].Last, // Use the leased partition time.
+					Last:             inProgress[0].Last, // Use the leased partition time.
 					LeaseID:          leaseID,
 					ConcurrencyLimit: consts.DefaultConcurrencyLimit,
 				}, // idA is now last.
-			}, items)
-			requirePartitionScoreEquals(t, r, &idA, leaseUntil)
+			}, inProgress)
+
+			require.Equal(t,
+				leaseUntil.Unix(), // pointer timestamp is in seconds
+				int64(score(t, r, shard.RedisClient.kg.PartitionConcurrencyIndex(), idA.String())),
+			)
 			// require that the last leased time is within 5ms for tests
-			require.WithinDuration(t, leasedAt, time.UnixMilli(items[2].Last), 5*time.Millisecond)
+			require.WithinDuration(t, leasedAt, time.UnixMilli(inProgress[0].Last), 5*time.Millisecond)
 		})
 
 		t.Run("It can't lease an existing partition lease", func(t *testing.T) {
@@ -2928,21 +2940,30 @@ func TestQueuePartitionLease(t *testing.T) {
 			require.Zero(t, capacity)
 
 			// Assert that score didn't change (we added 1 second in the previous test)
-			requirePartitionScoreEquals(t, r, &idA, leaseUntil)
+			require.Equal(t,
+				leaseUntil.Unix(), // pointer timestamp is in seconds
+				int64(score(t, r, shard.RedisClient.kg.PartitionConcurrencyIndex(), idA.String())),
+			)
 		})
 	})
 
 	t.Run("It allows leasing an expired partition lease", func(t *testing.T) {
 		<-time.After(time.Until(leaseUntil))
 
-		requirePartitionScoreEquals(t, r, &idA, leaseUntil)
+		require.Equal(t,
+			leaseUntil.Unix(),
+			int64(score(t, r, shard.RedisClient.kg.PartitionConcurrencyIndex(), idA.String())),
+		)
 
 		id, capacity, err := q.PartitionLease(ctx, &pA, time.Second*5)
 		require.Nil(t, err)
 		require.NotNil(t, id)
 		require.NotZero(t, capacity)
 
-		requirePartitionScoreEquals(t, r, &idA, time.Now().Add(time.Second*5))
+		require.Equal(t,
+			time.Now().Add(time.Second*5).Unix(),
+			int64(score(t, r, shard.RedisClient.kg.PartitionConcurrencyIndex(), idA.String())),
+		)
 	})
 
 	t.Run("Partition pausing", func(t *testing.T) {
@@ -7969,6 +7990,131 @@ func TestQueueActiveCounters(t *testing.T) {
 			require.Equal(t, 0, scard(kg.ActiveSet("account", accountID.String())))
 		})
 	})
+}
+
+func TestQueueScavengePartitions(t *testing.T) {
+	r := miniredis.RunT(t)
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	shard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+	kg := shard.RedisClient.kg
+
+	enqueueToBacklog := false
+
+	clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Minute))
+	q := NewQueue(
+		shard,
+		WithClock(clock),
+		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+			return enqueueToBacklog
+		}),
+		WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
+			return false
+		}),
+		WithDisableLeaseChecksForSystemQueues(false),
+	)
+	ctx := context.Background()
+
+	accountID, fnID, envID := uuid.New(), uuid.New(), uuid.New()
+
+	runID := ulid.MustNew(ulid.Timestamp(clock.Now()), rand.Reader)
+
+	item := osqueue.QueueItem{
+		ID:          "test",
+		FunctionID:  fnID,
+		WorkspaceID: envID,
+		Data: osqueue.Item{
+			WorkspaceID: envID,
+			Kind:        osqueue.KindEdge,
+			Identifier: state.Identifier{
+				WorkflowID:  fnID,
+				AccountID:   accountID,
+				WorkspaceID: envID,
+				RunID:       runID,
+			},
+			QueueName:             nil,
+			Throttle:              nil,
+			CustomConcurrencyKeys: nil,
+		},
+		QueueName: nil,
+	}
+
+	//
+	// step 1: enqueue item. will add to partition
+	//
+
+	qi, err := q.EnqueueItem(ctx, shard, item, clock.Now(), osqueue.EnqueueOpts{})
+	require.NoError(t, err)
+
+	qp, err := q.queuePartitionByID(ctx, shard, fnID.String())
+	require.NoError(t, err)
+
+	require.True(t, hasMember(t, r, kg.GlobalPartitionIndex(), qp.ID))
+	require.True(t, hasMember(t, r, kg.AccountPartitionIndex(accountID), qp.ID))
+	require.True(t, hasMember(t, r, kg.GlobalAccountIndex(), accountID.String()))
+
+	// in progress should not yet exist
+	require.False(t, hasMember(t, r, kg.PartitionConcurrencyIndex(), qp.ID))
+
+	//
+	// step 2: lease partition, expect it to move from global/account pointer -> in progress set
+	//
+
+	leaseID, _, err := q.PartitionLease(ctx, qp, 5*time.Second)
+	require.NoError(t, err)
+	require.NotNil(t, leaseID)
+
+	require.False(t, hasMember(t, r, kg.GlobalPartitionIndex(), qp.ID))
+	require.False(t, hasMember(t, r, kg.AccountPartitionIndex(accountID), qp.ID))
+	require.False(t, hasMember(t, r, kg.GlobalAccountIndex(), accountID.String()))
+
+	require.True(t, hasMember(t, r, kg.PartitionConcurrencyIndex(), qp.ID))
+	require.Equal(t, clock.Now().Add(5*time.Second).Unix(), int64(score(t, r, kg.PartitionConcurrencyIndex(), qp.ID)))
+
+	//
+	// step 3: requeue partition, expect it to move from in progress -> global/account pointer
+	//
+
+	err = q.PartitionRequeue(ctx, shard, qp, clock.Now(), false)
+	require.NoError(t, err)
+
+	require.True(t, hasMember(t, r, kg.GlobalPartitionIndex(), qp.ID))
+	require.True(t, hasMember(t, r, kg.AccountPartitionIndex(accountID), qp.ID))
+	require.True(t, hasMember(t, r, kg.GlobalAccountIndex(), accountID.String()))
+	require.False(t, hasMember(t, r, kg.PartitionConcurrencyIndex(), qp.ID))
+
+	//
+	// step 4: lease again, expire, attempt to scavenge
+	//
+	leaseID, _, err = q.PartitionLease(ctx, qp, 5*time.Second)
+	require.NoError(t, err)
+	require.NotNil(t, leaseID)
+
+	r.FastForward(10 * time.Second)
+	clock.Advance(10 * time.Second)
+
+	require.True(t, hasMember(t, r, kg.PartitionConcurrencyIndex(), qp.ID))
+	require.False(t, hasMember(t, r, kg.GlobalPartitionIndex(), qp.ID))
+	require.False(t, hasMember(t, r, kg.AccountPartitionIndex(accountID), qp.ID))
+	require.False(t, hasMember(t, r, kg.GlobalAccountIndex(), accountID.String()))
+
+	scavenged, err := q.ScavengePartitions(ctx, 100)
+	require.NoError(t, err)
+	require.Equal(t, 1, scavenged)
+
+	require.True(t, hasMember(t, r, kg.GlobalPartitionIndex(), qp.ID))
+	require.True(t, hasMember(t, r, kg.AccountPartitionIndex(accountID), qp.ID))
+	require.True(t, hasMember(t, r, kg.GlobalAccountIndex(), accountID.String()))
+	require.False(t, hasMember(t, r, kg.PartitionConcurrencyIndex(), qp.ID))
+
+	err = q.Dequeue(ctx, shard, qi)
+	require.NoError(t, err)
+
 }
 
 func score(t *testing.T, r *miniredis.Miniredis, key string, member string) float64 {

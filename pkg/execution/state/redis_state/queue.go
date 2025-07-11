@@ -92,6 +92,7 @@ const (
 	ConfigLeaseMax                = 20 * time.Second
 
 	ScavengePeekSize                 = 100
+	ScavengePartitionPeekSize        = 20
 	ScavengeConcurrencyQueuePeekSize = 100
 
 	PriorityMax     uint = 0
@@ -1422,6 +1423,8 @@ func (q *queue) EnqueueItem(ctx context.Context, shard QueueShard, i osqueue.Que
 		kg.AccountPartitionIndex(i.Data.Identifier.AccountID), // new queue items always contain the account ID
 		kg.Idempotency(i.ID),
 		kg.FnMetadata(i.FunctionID),
+		kg.PartitionConcurrencyIndex(),
+		kg.ShadowPartitionConcurrencyIndex(),
 
 		// Add all 3 partition sets
 		defaultPartition.zsetKey(kg),
@@ -2067,6 +2070,8 @@ func (q *queue) RequeueByJobID(ctx context.Context, queueShard QueueShard, jobID
 		return fmt.Errorf("unsupported queue shard kind for RequeueByJobID: %s", queueShard.Kind)
 	}
 
+	kg := queueShard.RedisClient.KeyGenerator()
+
 	jobID = osqueue.HashID(ctx, jobID)
 
 	// Find the queue item so that we can fetch the shard info.
@@ -2088,13 +2093,13 @@ func (q *queue) RequeueByJobID(ctx context.Context, queueShard QueueShard, jobID
 	fnPartition, _ := q.ItemPartition(ctx, queueShard, i)
 
 	keys := []string{
-		queueShard.RedisClient.kg.QueueItem(),
-		queueShard.RedisClient.kg.PartitionItem(), // Partition item, map
-		queueShard.RedisClient.kg.GlobalPartitionIndex(),
-		queueShard.RedisClient.kg.GlobalAccountIndex(),
-		queueShard.RedisClient.kg.AccountPartitionIndex(i.Data.Identifier.AccountID),
-
-		fnPartition.zsetKey(queueShard.RedisClient.kg),
+		kg.QueueItem(),
+		kg.PartitionItem(), // Partition item, map
+		kg.GlobalPartitionIndex(),
+		kg.GlobalAccountIndex(),
+		kg.AccountPartitionIndex(i.Data.Identifier.AccountID),
+		fnPartition.zsetKey(kg),
+		kg.PartitionConcurrencyIndex(),
 	}
 
 	args, err := StrSlice([]any{
@@ -2400,13 +2405,13 @@ func (q *queue) ExtendLease(ctx context.Context, i osqueue.QueueItem, leaseID ul
 	partition := q.ItemShadowPartition(ctx, i)
 
 	keys := []string{
-		q.primaryQueueShard.RedisClient.kg.QueueItem(),
+		kg.QueueItem(),
 		// And pass in the key queue's concurrency keys.
 		partition.inProgressKey(kg),
 		backlog.customKeyInProgress(kg, 1),
 		backlog.customKeyInProgress(kg, 2),
 		partition.accountInProgressKey(kg),
-		q.primaryQueueShard.RedisClient.kg.ConcurrencyIndex(),
+		kg.ConcurrencyIndex(),
 	}
 
 	args, err := StrSlice([]any{
@@ -2460,6 +2465,7 @@ func (q *queue) Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		kg.PartitionItem(),
 
 		kg.ConcurrencyIndex(),
+		kg.PartitionConcurrencyIndex(),
 
 		partition.readyQueueKey(kg),
 		kg.GlobalPartitionIndex(),
@@ -2621,6 +2627,8 @@ func (q *queue) Requeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 		kg.QueueItem(),
 		kg.PartitionItem(), // Partition item, map
 		kg.ConcurrencyIndex(),
+		kg.PartitionConcurrencyIndex(),
+		kg.ShadowPartitionConcurrencyIndex(),
 
 		kg.GlobalPartitionIndex(),
 		kg.GlobalAccountIndex(),
@@ -2816,6 +2824,8 @@ func (q *queue) PartitionLease(ctx context.Context, p *QueuePartition, duration 
 		p.acctConcurrencyKey(kg),
 		p.fnConcurrencyKey(kg),
 		p.customConcurrencyKey(kg),
+
+		kg.PartitionConcurrencyIndex(),
 	}
 
 	args, err := StrSlice([]any{
@@ -3399,6 +3409,8 @@ func (q *queue) PartitionRequeue(ctx context.Context, shard QueueShard, p *Queue
 
 		// Backlogs in shadow partition
 		kg.ShadowPartitionSet(p.ID),
+
+		kg.PartitionConcurrencyIndex(),
 	}
 	force := 0
 	if forceAt {
@@ -3445,45 +3457,6 @@ func (q *queue) PartitionRequeue(ctx context.Context, shard QueueShard, p *Queue
 		return ErrPartitionGarbageCollected
 	default:
 		return fmt.Errorf("unknown response requeueing item: %d", status)
-	}
-}
-
-// PartitionReprioritize reprioritizes a workflow's QueueItems within the queue.
-func (q *queue) PartitionReprioritize(ctx context.Context, queueName string, priority uint) error {
-	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "PartitionReprioritize"), redis_telemetry.ScopeQueue)
-
-	if priority > PriorityMin {
-		return ErrPriorityTooLow
-	}
-	if priority < PriorityMax {
-		return ErrPriorityTooHigh
-	}
-
-	args, err := StrSlice([]any{
-		queueName,
-		priority,
-	})
-	if err != nil {
-		return err
-	}
-
-	keys := []string{q.primaryQueueShard.RedisClient.kg.PartitionItem()}
-	status, err := scripts["queue/partitionReprioritize"].Exec(
-		redis_telemetry.WithScriptName(ctx, "partitionReprioritize"),
-		q.primaryQueueShard.RedisClient.unshardedRc,
-		keys,
-		args,
-	).AsInt64()
-	if err != nil {
-		return fmt.Errorf("error enqueueing item: %w", err)
-	}
-	switch status {
-	case 0:
-		return nil
-	case 1:
-		return ErrPartitionNotFound
-	default:
-		return fmt.Errorf("unknown response reprioritizing partition: %d", status)
 	}
 }
 
@@ -3737,6 +3710,69 @@ func (q *queue) Scavenge(ctx context.Context, limit int) (int, error) {
 	}
 
 	return counter, resultErr
+}
+
+// Scavenge attempts to find jobs that may have been lost due to killed workers.  Workers are shared
+// nothing, and each item in a queue has a lease.  If a worker dies, it will not finish the job and
+// cannot renew the item's lease.
+//
+// We scan all partition concurrency queues - queues of leases - to find leases that have expired.
+func (q *queue) ScavengePartitions(ctx context.Context, limit int) (int, error) {
+	shard := q.primaryQueueShard
+
+	if shard.Kind != string(enums.QueueShardKindRedis) {
+		return 0, fmt.Errorf("unsupported queue shard kind for ScavengePartitions: %s", shard.Kind)
+	}
+
+	client := shard.RedisClient.unshardedRc
+	kg := shard.RedisClient.KeyGenerator()
+
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "ScavengePartitions"), redis_telemetry.ScopeQueue)
+
+	// Find all items that have an expired lease - eg. where the min time for a lease is between
+	// (0-now] in unix milliseconds.
+	now := fmt.Sprintf("%d", q.clock.Now().Unix()) // partition lease time is in seconds
+
+	count, err := client.Do(ctx, client.B().Zcount().Key(kg.PartitionConcurrencyIndex()).Min("-inf").Max(now).Build()).AsInt64()
+	if err != nil {
+		return 0, fmt.Errorf("error counting partition concurrency index: %w", err)
+	}
+
+	// exit early if no partitions have expired
+	if count == 0 {
+		return 0, nil
+	}
+
+	cmd := client.B().Zrange().
+		Key(kg.PartitionConcurrencyIndex()).
+		Min("-inf").
+		Max(now).
+		Byscore().
+		Limit(q.randomScavengeOffset(q.clock.Now().Unix(), count, limit), int64(limit)).
+		Build()
+
+	partitionIDs, err := client.Do(ctx, cmd).AsStrSlice()
+	if err != nil {
+		return 0, fmt.Errorf("error scavenging for lost partitions: %w", err)
+	}
+
+	counter := 0
+
+	for _, partitionID := range partitionIDs {
+		qp, err := q.queuePartitionByID(ctx, shard, partitionID)
+		if err != nil {
+			return 0, fmt.Errorf("could not load partition by ID: %w", err)
+		}
+
+		err = q.PartitionRequeue(ctx, shard, qp, q.clock.Now(), false)
+		if err != nil {
+			return 0, fmt.Errorf("could not requeue expired partition: %w", err)
+		}
+
+		counter++
+	}
+
+	return counter, nil
 }
 
 // ConfigLease allows a worker to lease config keys for sequential or scavenger processing.
