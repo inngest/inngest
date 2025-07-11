@@ -16,6 +16,7 @@ import (
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
+	"github.com/redis/rueidis"
 	"gonum.org/v1/gonum/stat/sampleuv"
 )
 
@@ -1103,7 +1104,15 @@ func (q *queue) BacklogsByPartition(ctx context.Context, queueShard QueueShard, 
 }
 
 func (q *queue) BacklogSize(ctx context.Context, queueShard QueueShard, backlogID string) (int64, error) {
-	return 0, fmt.Errorf("not implemented")
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "backlogSize"), redis_telemetry.ScopeQueue)
+
+	rc := queueShard.RedisClient.Client()
+	cmd := rc.B().Zcard().Key(queueShard.RedisClient.kg.BacklogSet(backlogID)).Build()
+	count, err := rc.Do(ctx, cmd).AsInt64()
+	if rueidis.IsRedisNil(err) {
+		return 0, nil
+	}
+	return count, err
 }
 
 func shuffleBacklogs(b []*QueueBacklog) []*QueueBacklog {
