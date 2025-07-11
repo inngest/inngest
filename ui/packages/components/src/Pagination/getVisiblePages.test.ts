@@ -1,14 +1,7 @@
 import assert from 'node:assert';
 import { describe, it } from 'vitest';
 
-import { getVisiblePages } from './getVisiblePages';
-
-// Helper function to create inclusive ranges
-function makeInclusiveRange(start: number, end: number): Array<number> {
-  const result = [];
-  for (let i = start; i <= end; i++) result.push(i);
-  return result;
-}
+import { getVisiblePages, makeInclusiveRange } from './getVisiblePages';
 
 describe('getVisiblePages', () => {
   describe('normal variant (7 slots - DEFAULT)', () => {
