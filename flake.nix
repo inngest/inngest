@@ -9,7 +9,11 @@
   outputs = { self, nixpkgs, flake-utils, ... }:
     flake-utils.lib.eachDefaultSystem (system:
       let
-        pkgs = import nixpkgs { inherit system; };
+        pkgs = import nixpkgs {
+          inherit system;
+
+          config.allowUnfree = true;
+        };
         corepack = pkgs.stdenv.mkDerivation {
           name = "corepack";
           buildInputs = [ pkgs.nodejs_22 ];
@@ -56,6 +60,8 @@
             protoc-gen-go
             protoc-gen-go-grpc
             protoc-gen-connect-go
+            claude-code
+            gemini-cli
           ];
         };
       });
