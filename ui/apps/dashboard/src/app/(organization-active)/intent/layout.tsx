@@ -5,7 +5,6 @@ import { getProfileDisplay } from '@/queries/server-only/profile';
 
 export default async function SettingsLayout({ children }: { children: React.ReactNode }) {
   const profile = await getProfileDisplay();
-  console.log('profile', profile);
   return (
     <div className="h-full overflow-y-scroll">
       <div className="mx-auto flex h-full max-w-screen-xl flex-col px-6">
