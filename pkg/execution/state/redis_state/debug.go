@@ -24,10 +24,30 @@ type PartitionInspectionResult struct {
 	Backlogs          int  `json:"backlogs"`
 }
 
+func (q *queue) queuePartitionByID(ctx context.Context, shard QueueShard, partitionID string) (*QueuePartition, error) {
+	var qp QueuePartition
+	rc := shard.RedisClient.Client()
+	kg := shard.RedisClient.KeyGenerator()
+
+	cmd := rc.B().Hget().Key(kg.PartitionItem()).Field(partitionID).Build()
+	byt, err := rc.Do(ctx, cmd).AsBytes()
+	if err != nil {
+		if rueidis.IsRedisNil(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("error retrieving queue partition: %w", err)
+	}
+
+	if err := json.Unmarshal(byt, &qp); err != nil {
+		return nil, fmt.Errorf("error unmarshalling queue partition: %w", err)
+	}
+
+	return &qp, nil
+}
+
 func (q *queue) PartitionByID(ctx context.Context, shard QueueShard, partitionID string) (*PartitionInspectionResult, error) {
 	var (
 		result PartitionInspectionResult
-		qp     QueuePartition
 		sqp    QueueShadowPartition
 	)
 
@@ -35,17 +55,14 @@ func (q *queue) PartitionByID(ctx context.Context, shard QueueShard, partitionID
 	kg := shard.RedisClient.kg
 
 	// load queue partition
-	{
-		cmd := rc.B().Hget().Key(kg.PartitionItem()).Field(partitionID).Build()
-		byt, err := rc.Do(ctx, cmd).AsBytes()
-		if err != nil {
-			return nil, fmt.Errorf("error retrieving queue partition: %w", err)
-		}
+	qp, err := q.queuePartitionByID(ctx, shard, partitionID)
+	if err != nil {
+		return nil, fmt.Errorf("could not retrieve queue partition: %w", err)
+	}
+	result.QueuePartition = qp
 
-		if err := json.Unmarshal(byt, &qp); err != nil {
-			return nil, fmt.Errorf("error unmarshalling queue partition: %w", err)
-		}
-		result.QueuePartition = &qp
+	if qp == nil {
+		return &result, nil
 	}
 
 	// load shadow partition

@@ -92,6 +92,7 @@ const (
 	ConfigLeaseMax                = 20 * time.Second
 
 	ScavengePeekSize                 = 100
+	ScavengePartitionPeekSize        = 20
 	ScavengeConcurrencyQueuePeekSize = 100
 
 	PriorityMax     uint = 0
@@ -3710,6 +3711,69 @@ func (q *queue) Scavenge(ctx context.Context, limit int) (int, error) {
 	}
 
 	return counter, resultErr
+}
+
+// Scavenge attempts to find jobs that may have been lost due to killed workers.  Workers are shared
+// nothing, and each item in a queue has a lease.  If a worker dies, it will not finish the job and
+// cannot renew the item's lease.
+//
+// We scan all partition concurrency queues - queues of leases - to find leases that have expired.
+func (q *queue) ScavengePartitions(ctx context.Context, limit int) (int, error) {
+	shard := q.primaryQueueShard
+
+	if shard.Kind != string(enums.QueueShardKindRedis) {
+		return 0, fmt.Errorf("unsupported queue shard kind for ScavengePartitions: %s", shard.Kind)
+	}
+
+	client := shard.RedisClient.unshardedRc
+	kg := shard.RedisClient.KeyGenerator()
+
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "ScavengePartitions"), redis_telemetry.ScopeQueue)
+
+	// Find all items that have an expired lease - eg. where the min time for a lease is between
+	// (0-now] in unix milliseconds.
+	now := fmt.Sprintf("%d", q.clock.Now().UnixMilli())
+
+	count, err := client.Do(ctx, client.B().Zcount().Key(kg.PartitionConcurrencyIndex()).Min("-inf").Max(now).Build()).AsInt64()
+	if err != nil {
+		return 0, fmt.Errorf("error counting partition concurrency index: %w", err)
+	}
+
+	// exit early if no partitions have expired
+	if count == 0 {
+		return 0, nil
+	}
+
+	cmd := client.B().Zrange().
+		Key(kg.PartitionConcurrencyIndex()).
+		Min("-inf").
+		Max(now).
+		Byscore().
+		Limit(q.randomScavengeOffset(q.clock.Now().UnixMilli(), count, limit), int64(limit)).
+		Build()
+
+	partitionIDs, err := client.Do(ctx, cmd).AsStrSlice()
+	if err != nil {
+		return 0, fmt.Errorf("error scavenging for lost partitions: %w", err)
+	}
+
+	counter := 0
+
+	for _, partitionID := range partitionIDs {
+		qp, err := q.queuePartitionByID(ctx, shard, partitionID)
+		if err != nil {
+			return 0, fmt.Errorf("could not load partition by ID: %w", err)
+		}
+
+		err = q.PartitionRequeue(ctx, shard, qp, q.clock.Now(), false)
+		if err != nil {
+			return 0, fmt.Errorf("could not requeue expired partition: %w", err)
+		}
+
+		counter++
+	}
+
+	return counter, nil
 }
 
 // ConfigLease allows a worker to lease config keys for sequential or scavenger processing.
