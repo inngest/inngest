@@ -16,6 +16,7 @@ import (
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/util"
+	"github.com/jonboulle/clockwork"
 	"github.com/redis/rueidis"
 	"github.com/stretchr/testify/require"
 )
@@ -1214,6 +1215,98 @@ func TestShuffleBacklogs(t *testing.T) {
 	}
 
 	require.Greater(t, matches, int(math.Ceil(float64(iterations)/2)))
+}
+
+func TestBacklogsByPartition(t *testing.T) {
+	r, rc := initRedis(t)
+	defer rc.Close()
+
+	ctx := context.Background()
+	clock := clockwork.NewFakeClock()
+	defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+	// kg := defaultShard.RedisClient.kg
+
+	acctId, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
+
+	testcases := []struct {
+		name          string
+		num           int
+		interval      time.Duration
+		from          time.Time
+		until         time.Time
+		expectedItems int
+		batchSize     int64
+	}{
+		// {
+		// 	name:          "simple",
+		// 	num:           10,
+		// 	expectedItems: 10,
+		// },
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			r.FlushAll()
+
+			q := NewQueue(
+				defaultShard,
+				WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+					return true
+				}),
+				WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
+					return false
+				}),
+				WithClock(clock),
+			)
+
+			for i := range tc.num {
+				at := clock.Now()
+				if !tc.from.IsZero() {
+					at = tc.from
+				}
+				at = at.Add(time.Duration(i) * tc.interval)
+
+				id := fmt.Sprintf("test%d", i)
+				item := osqueue.QueueItem{
+					ID:          id,
+					FunctionID:  fnID,
+					WorkspaceID: wsID,
+					Data: osqueue.Item{
+						WorkspaceID: wsID,
+						Kind:        osqueue.KindEdge,
+						Identifier: state.Identifier{
+							AccountID:       acctId,
+							WorkspaceID:     wsID,
+							WorkflowID:      fnID,
+							WorkflowVersion: 1,
+						},
+						CustomConcurrencyKeys: []state.CustomConcurrency{
+							{
+								Key:   id,
+								Hash:  hashConcurrencyKey(id),
+								Limit: 10,
+							},
+						},
+					},
+				}
+
+				_, err := q.EnqueueItem(ctx, defaultShard, item, at, osqueue.EnqueueOpts{})
+				require.NoError(t, err)
+			}
+
+			items, err := q.BacklogsByPartition(ctx, defaultShard, fnID.String(), tc.from, tc.until,
+				WithQueueItemIterBatchSize(tc.batchSize),
+			)
+			require.NoError(t, err)
+
+			var count int
+			for range items {
+				count++
+			}
+
+			require.Equal(t, tc.expectedItems, count)
+		})
+	}
 }
 
 func TestBacklogSize(t *testing.T) {
