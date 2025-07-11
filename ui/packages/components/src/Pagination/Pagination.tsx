@@ -1,6 +1,13 @@
 'use client';
 
-import { useMemo, type Dispatch, type SetStateAction } from 'react';
+import {
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type Dispatch,
+  type SetStateAction,
+} from 'react';
 import {
   RiArrowLeftDoubleLine,
   RiArrowLeftSLine,
@@ -17,6 +24,8 @@ import { getVisiblePages } from './getVisiblePages';
 const PAGE_NUMBER_BASE_CLASSES =
   'flex h-6 items-center justify-center min-w-8 text-sm tabular-nums';
 
+const NARROW_VARIANT_BREAKPOINT = 450;
+
 interface PaginationProps {
   currentPage: number;
   numPages: number;
@@ -25,7 +34,23 @@ interface PaginationProps {
 }
 
 export function Pagination(props: PaginationProps) {
-  const { currentPage, numPages, setCurrentPage, variant = 'normal' } = props;
+  const { currentPage, numPages, setCurrentPage, variant: propVariant } = props;
+
+  const outerRef = useRef<HTMLDivElement>(null);
+  const [autoVariant, setAutoVariant] = useState<'narrow' | 'normal'>('normal');
+
+  // TODO: Use a ResizeObserver to detect changes in width if necessary.
+  useLayoutEffect(() => {
+    if (propVariant !== undefined) return;
+
+    const container = outerRef.current;
+    if (container === null) return;
+
+    const width = container.getBoundingClientRect().width;
+    setAutoVariant(width < NARROW_VARIANT_BREAKPOINT ? 'narrow' : 'normal');
+  }, [propVariant]);
+
+  const variant = propVariant ?? autoVariant;
 
   if (numPages === 0) return null;
 
@@ -35,42 +60,44 @@ export function Pagination(props: PaginationProps) {
   );
 
   return (
-    <div className="flex items-center">
-      <CaretButton {...props} typ="first" />
-      <CaretButton {...props} typ="back" />
+    <div ref={outerRef} className="flex w-full justify-center">
+      <div className="flex items-center">
+        <CaretButton {...props} typ="first" />
+        <CaretButton {...props} typ="back" />
 
-      <div className="flex gap-1">
-        {pages.map((page, index) => {
-          // Render ellipsis.
-          if (typeof page !== 'number') {
+        <div className="flex gap-1">
+          {pages.map((page, index) => {
+            // Render ellipsis.
+            if (typeof page !== 'number') {
+              return (
+                <div className={PAGE_NUMBER_BASE_CLASSES} key={`ellipsis-${index}`}>
+                  {page}
+                </div>
+              );
+            }
+
+            const isActive = currentPage === page;
+
             return (
-              <div className={PAGE_NUMBER_BASE_CLASSES} key={`ellipsis-${index}`}>
+              <button
+                key={page}
+                onClick={() => setCurrentPage(page)}
+                className={cn(
+                  PAGE_NUMBER_BASE_CLASSES,
+                  'rounded-md px-2',
+                  isActive && 'bg-contrast text-onContrast',
+                  !isActive && 'hover:bg-canvasSubtle'
+                )}
+              >
                 {page}
-              </div>
+              </button>
             );
-          }
+          })}
+        </div>
 
-          const isActive = currentPage === page;
-
-          return (
-            <button
-              key={page}
-              onClick={() => setCurrentPage(page)}
-              className={cn(
-                PAGE_NUMBER_BASE_CLASSES,
-                'rounded-md px-2',
-                isActive && 'bg-contrast text-onContrast',
-                !isActive && 'hover:bg-canvasSubtle'
-              )}
-            >
-              {page}
-            </button>
-          );
-        })}
+        <CaretButton {...props} typ="forward" />
+        <CaretButton {...props} typ="last" />
       </div>
-
-      <CaretButton {...props} typ="forward" />
-      <CaretButton {...props} typ="last" />
     </div>
   );
 }
