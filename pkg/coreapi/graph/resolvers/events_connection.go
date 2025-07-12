@@ -16,7 +16,7 @@ func (r *eventsConnectionResolver) TotalCount(
 ) (int, error) {
 	filter := graphql.GetFieldContext(ctx).Parent.Args["filter"].(models.EventsFilter)
 
-	opts := &cqrs.WorkspaceEventsOpts{
+	opts := cqrs.WorkspaceEventsOpts{
 		Limit: cqrs.MaxEvents, // pass in dummy value to pass validation, but won't be used in actual count query
 		Names: filter.EventNames,
 	}

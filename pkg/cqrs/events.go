@@ -126,7 +126,7 @@ type EventReader interface {
 	// GetEvents returns the latest events for a given workspace.
 	GetEvents(ctx context.Context, accountID uuid.UUID, workspaceID uuid.UUID, opts *WorkspaceEventsOpts) ([]*Event, error)
 	// GetEventsCount returns the total count of events filtered by event name and from/until time range
-	GetEventsCount(ctx context.Context, accountID uuid.UUID, workspaceID uuid.UUID, opts *WorkspaceEventsOpts) (int64, error)
+	GetEventsCount(ctx context.Context, accountID uuid.UUID, workspaceID uuid.UUID, opts WorkspaceEventsOpts) (int64, error)
 	// GetEvent returns a specific event given an ID.
 	GetEvent(ctx context.Context, id ulid.ULID, accountID uuid.UUID, workspaceID uuid.UUID) (*Event, error)
 }
