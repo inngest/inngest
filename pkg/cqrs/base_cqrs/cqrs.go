@@ -925,6 +925,9 @@ func (w wrapper) GetEventsCount(ctx context.Context, accountID uuid.UUID, worksp
 		Order(order...).
 		Prepared(true).
 		ToSQL()
+	if err != nil {
+		return 0, err
+	}
 
 	var count int64
 	err = w.db.QueryRowContext(ctx, sql, args...).Scan(&count)
@@ -947,8 +950,12 @@ func newEventsQueryBuilder(ctx context.Context, opt cqrs.WorkspaceEventsOpts) *e
 	if opt.Cursor != nil {
 		filter = append(filter, sq.C("internal_id").Lt(*opt.Cursor))
 	}
+
 	if len(opt.Names) > 0 {
 		filter = append(filter, sq.C("event_name").In(opt.Names))
+	}
+	if !opt.IncludeInternalEvents {
+		filter = append(filter, sq.C("event_name").NotLike("inngest/%"))
 	}
 
 	order := []sqexp.OrderedExpression{}

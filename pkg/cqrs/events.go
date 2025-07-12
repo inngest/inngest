@@ -89,7 +89,8 @@ type WorkspaceEventsOpts struct {
 	Newest time.Time
 	// Oldest represents the oldest events to load.  Events older than this
 	// cutoff will not be loaded.
-	Oldest time.Time
+	Oldest                time.Time
+	IncludeInternalEvents bool
 }
 
 func (o *WorkspaceEventsOpts) Validate() error {
