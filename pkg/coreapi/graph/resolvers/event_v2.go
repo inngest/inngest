@@ -25,6 +25,10 @@ func (qr *queryResolver) EventV2(ctx context.Context, id ulid.ULID) (*models.Eve
 	return cqrsEventToGQLEvent(event), nil
 }
 
+func (e eventV2Resolver) Runs(ctx context.Context, obj *models.EventV2) ([]*models.FunctionRunV2, error) {
+	return []*models.FunctionRunV2{}, nil
+}
+
 func (e eventV2Resolver) Raw(ctx context.Context, obj *models.EventV2) (string, error) {
 	targetLoader := loader.FromCtx(ctx).EventLoader
 
