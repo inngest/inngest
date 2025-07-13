@@ -250,6 +250,9 @@ SELECT * FROM traces WHERE trace_id = @trace_id AND run_id = @run_id ORDER BY ti
 -- name: GetTraceSpanOutput :many
 select * from traces where trace_id = @trace_id AND span_id = @span_id ORDER BY timestamp_unix_ms DESC, duration DESC;
 
+-- name: GetTraceRunsByTriggerId :many
+SELECT * FROM trace_runs WHERE INSTR(CAST(trigger_ids AS TEXT), @event_id) > 0;
+
 
 --
 -- Queue snapshots
