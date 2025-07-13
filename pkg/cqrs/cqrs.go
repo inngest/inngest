@@ -31,7 +31,7 @@ type Manager interface {
 
 	// Trace / dev only
 	TraceReadWriter
-	TraceWriterDev
+	TraceReadWriterDev
 
 	// Connection history
 	ConnectionHistoryReadWriter
