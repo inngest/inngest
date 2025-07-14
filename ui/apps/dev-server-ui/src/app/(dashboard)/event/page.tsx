@@ -7,6 +7,7 @@ import { useSearchParam } from '@inngest/components/hooks/useSearchParam';
 import SendEventModal from '@/components/Event/SendEventModal';
 import { ExpandedRowActions } from '@/components/Events/ExpandedRowActions';
 import { useEventDetails, useEventPayload, useEventRuns } from '@/components/Events/useEvents';
+import { useFeatureFlags } from '@/hooks/useFeatureFlags';
 
 export default function Page() {
   const [eventID] = useSearchParam('eventID');
@@ -16,9 +17,14 @@ export default function Page() {
   const getEventPayload = useEventPayload();
   const getEventRuns = useEventRuns();
 
+  const { featureFlags } = useFeatureFlags();
+  const isEventsEnabled = featureFlags.FEATURE_EVENTS;
+
   if (!eventID) {
     throw new Error('missing eventID in search params');
   }
+
+  if (!isEventsEnabled) return null;
 
   return (
     <>

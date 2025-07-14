@@ -2,9 +2,13 @@ import { MenuItem } from '@inngest/components/Menu/MenuItem';
 import { EventLogsIcon } from '@inngest/components/icons/sections/EventLogs';
 import { RiMistLine } from '@remixicon/react';
 
+import { useFeatureFlags } from '@/hooks/useFeatureFlags';
 import { IconFeed } from '@/icons/Feed';
 
 export default function Monitor({ collapsed }: { collapsed: boolean }) {
+  const { featureFlags } = useFeatureFlags();
+  const isEventsEnabled = featureFlags.FEATURE_EVENTS;
+
   return (
     <div className={`jusity-center mt-5 flex flex-col`}>
       {collapsed ? (
@@ -18,13 +22,15 @@ export default function Monitor({ collapsed }: { collapsed: boolean }) {
         text="Runs"
         icon={<RiMistLine className="h-[18px] w-[18px]" />}
       />
-      <MenuItem
-        href="/events"
-        collapsed={collapsed}
-        text="Events"
-        icon={<EventLogsIcon className="h-[18px] w-[18px]" />}
-        beta
-      />
+      {isEventsEnabled && (
+        <MenuItem
+          href="/events"
+          collapsed={collapsed}
+          text="Events"
+          icon={<EventLogsIcon className="h-[18px] w-[18px]" />}
+          beta
+        />
+      )}
       <MenuItem
         href="/stream"
         collapsed={collapsed}
