@@ -84,6 +84,9 @@ type connectionHandler struct {
 
 	lastHeartbeatLock       sync.Mutex
 	lastHeartbeatReceivedAt time.Time
+
+	grpcLock    sync.RWMutex
+	grpcClients map[string]connectpb.ConnectExecutorClient
 }
 
 func (c *connectionHandler) setLastHeartbeat(time time.Time) {
@@ -155,11 +158,12 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 		}
 
 		ch := &connectionHandler{
-			svc:        c,
-			log:        c.logger,
-			ws:         ws,
-			updateLock: sync.Mutex{},
-			remoteAddr: remoteAddr,
+			svc:         c,
+			log:         c.logger,
+			ws:          ws,
+			updateLock:  sync.Mutex{},
+			remoteAddr:  remoteAddr,
+			grpcClients: map[string]connectpb.ConnectExecutorClient{},
 		}
 
 		closeReason := connectpb.WorkerDisconnectReason_UNEXPECTED.String()
@@ -1248,18 +1252,39 @@ func (c *connectionHandler) handleSdkReply(ctx context.Context, msg *connectpb.C
 			return fmt.Errorf("could not get executor IP")
 		}
 
-		grpcURL := fmt.Sprintf("%s:%d", executorIP, connectConfig.Executor(ctx).GRPCPort)
+		grpcURL := net.JoinHostPort(executorIP.String(), fmt.Sprintf("%d", connectConfig.Executor(ctx).GRPCPort))
 
-		conn, err := grpc.NewClient(grpcURL, grpc.WithTransportCredentials(insecure.NewCredentials()))
-		if err != nil {
-			return fmt.Errorf("could not create grpc client for %s: %w", grpcURL, err)
-		}
-		rpcClient := connectpb.NewConnectExecutorClient(conn)
+		var grpcClient connectpb.ConnectExecutorClient
 
-		result, err := rpcClient.Reply(ctx, &connectpb.ReplyRequest{Data: data})
-		if err != nil {
-			return fmt.Errorf("could not create grpc client for %s: %w", grpcURL, err)
+		c.grpcLock.RLock()
+		grpcClient = c.grpcClients[executorIP.String()]
+		c.grpcLock.RUnlock()
+
+		if grpcClient == nil {
+			// Upgrade lock to make sure that only one instance is creating a grpc client
+			c.grpcLock.Lock()
+			grpcClient = c.grpcClients[executorIP.String()]
+
+			if grpcClient == nil {
+				logger.StdlibLogger(ctx).Info("grpc client not found for executor, creating one dynamically", "url", grpcURL)
+
+				conn, err := grpc.NewClient(grpcURL, grpc.WithTransportCredentials(insecure.NewCredentials()))
+				if err != nil {
+					c.grpcLock.Unlock()
+					return fmt.Errorf("could not create grpc client for %s: %w", grpcURL, err)
+				}
+
+				grpcClient = connectpb.NewConnectExecutorClient(conn)
+				c.grpcClients[executorIP.String()] = grpcClient
+			}
+			c.grpcLock.Unlock()
 		}
+
+		result, err := grpcClient.Reply(ctx, &connectpb.ReplyRequest{Data: data})
+		if err != nil {
+			return fmt.Errorf("could not send response through grpc %s: %w", grpcURL, err)
+		}
+
 		l.Info("sent response through gRPC", "result", result)
 	} else {
 		// Send a best-effort PubSub message to fast-track the response,

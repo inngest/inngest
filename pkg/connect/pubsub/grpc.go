@@ -231,6 +231,7 @@ func (i *gatewayGRPCManager) Forward(ctx context.Context, gatewayID ulid.ULID, c
 				logger.StdlibLogger(ctx).Error("could not create just-in-time grpc client", "gatewayID", gatewayID.String(), "err", err)
 
 				metrics.IncrConnectGatewayGRPCClientFailureCounter(ctx, 1, metrics.CounterOpt{})
+				i.mu.Unlock()
 				return fmt.Errorf("could not find or create grpc client for gateway %s: %w", gatewayID.String(), err)
 			}
 		}
