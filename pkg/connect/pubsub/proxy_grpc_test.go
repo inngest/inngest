@@ -71,12 +71,21 @@ func (m *mockGatewayGRPCManager) Subscribe(ctx context.Context, requestID string
 	return channel
 }
 
+func (m *mockGatewayGRPCManager) SubscribeWorkerAck(ctx context.Context, requestID string) chan *connectpb.AckMessage {
+	// Empty mock
+	return nil
+}
+
 func (m *mockGatewayGRPCManager) Unsubscribe(ctx context.Context, requestID string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.subscriptions != nil {
 		delete(m.subscriptions, requestID)
 	}
+}
+
+func (m *mockGatewayGRPCManager) UnsubscribeWorkerAck(ctx context.Context, requestID string) {
+	// Empty mock
 }
 
 func (m *mockGatewayGRPCManager) getForwardCalls() []mockForwardCall {

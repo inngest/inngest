@@ -19,6 +19,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/test/bufconn"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 func setupRedisGatewayManager(t *testing.T) (state.GatewayManager, func()) {
@@ -86,6 +87,10 @@ func (m *mockConnectGatewayServer) Ping(ctx context.Context, req *connectpb.Ping
 func (m *mockConnectGatewayServer) Forward(ctx context.Context, req *connectpb.ForwardRequest) (*connectpb.ForwardResponse, error) {
 	m.forwardCount++
 	return &connectpb.ForwardResponse{}, nil
+}
+
+func (m *mockConnectGatewayServer) Ack(ctx context.Context, req *connectpb.AckMessage) (*connectpb.AckResponse, error) {
+	return &connectpb.AckResponse{Success: true}, nil
 }
 
 func (m *mockConnectGatewayServer) getPingCount() int {
@@ -632,5 +637,175 @@ func TestSubscribeUnsubscribe(t *testing.T) {
 
 	t.Run("unsubscribe non-existent subscription should not panic", func(t *testing.T) {
 		forwarder.Unsubscribe(ctx, "non-existent-request")
+	})
+}
+
+func TestSubscribeUnsubscribeWorkerAck(t *testing.T) {
+	ctx, _, bufDialer, gatewayManager, cleanup := setupTestEnvironment(t)
+	defer cleanup()
+
+	forwarder := NewGatewayGRPCManagerWithDialer(ctx, gatewayManager, bufDialer, logger.StdlibLogger(ctx))
+	forwarderImpl := forwarder.(*gatewayGRPCManager)
+
+	t.Run("worker ack subscription lifecycle", func(t *testing.T) {
+		requestID1 := "worker-ack-request-1"
+		requestID2 := "worker-ack-request-2"
+
+		// Subscribe to two different worker ack requests
+		ackCh1 := forwarder.SubscribeWorkerAck(ctx, requestID1)
+		ackCh2 := forwarder.SubscribeWorkerAck(ctx, requestID2)
+
+		// Create ack messages for both
+		ack1 := &connectpb.AckMessage{
+			RequestId: requestID1,
+			Ts:        timestamppb.Now(),
+		}
+
+		ack2 := &connectpb.AckMessage{
+			RequestId: requestID2,
+			Ts:        timestamppb.Now(),
+		}
+
+		// Start goroutines to receive acks before sending them
+		var receivedAck1, receivedAck2 *connectpb.AckMessage
+		var wg sync.WaitGroup
+		wg.Add(2)
+
+		go func() {
+			defer wg.Done()
+			select {
+			case receivedAck1 = <-ackCh1:
+			case <-time.After(1 * time.Second):
+				require.Fail(t, "expected ack 1 to be delivered")
+			}
+		}()
+
+		go func() {
+			defer wg.Done()
+			select {
+			case receivedAck2 = <-ackCh2:
+			case <-time.After(1 * time.Second):
+				require.Fail(t, "expected ack 2 to be delivered")
+			}
+		}()
+
+		time.Sleep(10 * time.Millisecond)
+
+		// Both should succeed
+		resp1, err := forwarderImpl.Ack(ctx, ack1)
+		require.NoError(t, err)
+		require.True(t, resp1.Success)
+
+		resp2, err := forwarderImpl.Ack(ctx, ack2)
+		require.NoError(t, err)
+		require.True(t, resp2.Success)
+
+		// Wait for all acks to be received
+		wg.Wait()
+
+		// Verify both acks are delivered to correct channels
+		require.Equal(t, requestID1, receivedAck1.RequestId)
+		require.Equal(t, requestID2, receivedAck2.RequestId)
+
+		// Unsubscribe from request1
+		forwarder.UnsubscribeWorkerAck(ctx, requestID1)
+
+		// Sending ack to request1 should now fail
+		resp1Retry, err := forwarderImpl.Ack(ctx, ack1)
+		require.NoError(t, err)
+		require.False(t, resp1Retry.Success)
+
+		// But request2 should still work
+		var receivedAck2Retry *connectpb.AckMessage
+		go func() {
+			select {
+			case receivedAck2Retry = <-ackCh2:
+			case <-time.After(1 * time.Second):
+				require.Fail(t, "expected ack 2 to be delivered")
+			}
+		}()
+
+		time.Sleep(10 * time.Millisecond)
+
+		resp2Retry, err := forwarderImpl.Ack(ctx, ack2)
+		require.NoError(t, err)
+		require.True(t, resp2Retry.Success)
+
+		// Verify the second ack was received
+		time.Sleep(100 * time.Millisecond)
+		require.NotNil(t, receivedAck2Retry)
+		require.Equal(t, requestID2, receivedAck2Retry.RequestId)
+
+		// Clean up
+		forwarder.UnsubscribeWorkerAck(ctx, requestID2)
+	})
+
+	t.Run("delivers ack to subscribed channel", func(t *testing.T) {
+		requestID := "test-worker-ack-123"
+
+		// Subscribe to receive worker acks
+		ackCh := forwarder.SubscribeWorkerAck(ctx, requestID)
+
+		// Create an ack message
+		ackMsg := &connectpb.AckMessage{
+			RequestId: requestID,
+			Ts:        timestamppb.Now(),
+		}
+
+		go func() {
+			select {
+			// Verify the ack was delivered to the channel
+			case receivedAck := <-ackCh:
+				require.Equal(t, requestID, receivedAck.RequestId)
+				require.NotNil(t, receivedAck.Ts)
+			case <-time.After(1 * time.Second):
+				require.Fail(t, "expected ack to be delivered to subscription channel")
+			}
+		}()
+
+		time.Sleep(20 * time.Millisecond)
+
+		resp, err := forwarderImpl.Ack(ctx, ackMsg)
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+		require.True(t, resp.Success)
+
+		forwarder.UnsubscribeWorkerAck(ctx, requestID)
+	})
+
+	t.Run("returns false when no worker ack subscription exists", func(t *testing.T) {
+		requestID := "non-existent-worker-ack-request"
+
+		ackMsg := &connectpb.AckMessage{
+			RequestId: requestID,
+			Ts:        timestamppb.Now(),
+		}
+
+		resp, err := forwarderImpl.Ack(ctx, ackMsg)
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+		require.False(t, resp.Success)
+	})
+
+	t.Run("handles unsubscribed worker ack channel gracefully", func(t *testing.T) {
+		requestID := "test-worker-ack-unsubscribed"
+
+		forwarder.SubscribeWorkerAck(ctx, requestID)
+
+		ackMsg := &connectpb.AckMessage{
+			RequestId: requestID,
+			Ts:        timestamppb.Now(),
+		}
+
+		forwarder.UnsubscribeWorkerAck(ctx, requestID)
+
+		resp, err := forwarderImpl.Ack(ctx, ackMsg)
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+		require.False(t, resp.Success)
+	})
+
+	t.Run("unsubscribe non-existent worker ack subscription should not panic", func(t *testing.T) {
+		forwarder.UnsubscribeWorkerAck(ctx, "non-existent-worker-ack-request")
 	})
 }
