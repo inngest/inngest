@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"sort"
 	"strconv"
 	"strings"
@@ -132,9 +133,9 @@ func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.Ot
 
 		var outputSpanID *string
 		var fragments []map[string]interface{}
+		groupedAttrs := make(map[string]any)
 		_ = json.Unmarshal([]byte(span.SpanFragments.(string)), &fragments)
 
-		// TODO same for links
 		for _, fragment := range fragments {
 			if name, ok := fragment["name"].(string); ok {
 				if strings.HasPrefix(name, "executor.") {
@@ -149,55 +150,43 @@ func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.Ot
 					return nil, err
 				}
 
-				for k, v := range fragmentAttr {
-					// TODO We should remove this and only keep non-Inngest
-					// attributes here instead. Especially if we use them
-					// below. For now, they're used sometimes.
-					newSpan.Attributes[k] = v
+				maps.Copy(groupedAttrs, fragmentAttr)
 
-					switch k {
-					case meta.AttributeDynamicStatus:
-						{
-							if status, ok := v.(string); ok {
-								if statusStr, err := enums.StepStatusString(status); err == nil {
-									newSpan.Status = statusStr
-								}
-							}
-						}
-					case meta.AttributeAppID:
-						{
-							newSpan.AppID = uuid.MustParse(v.(string))
-						}
-					case meta.AttributeFunctionID:
-						{
-							newSpan.FunctionID = uuid.MustParse(v.(string))
-						}
-					case meta.AttributeRunID:
-						{
-							newSpan.RunID = ulid.MustParse(v.(string))
-						}
-					case meta.AttributeStartedAt:
-						{
-							newSpan.StartTime = time.UnixMilli(int64(v.(float64)))
-						}
-					case meta.AttributeEndedAt:
-						{
-							newSpan.EndTime = time.UnixMilli(int64(v.(float64)))
-						}
-					case meta.AttributeDropSpan:
-						{
-							newSpan.MarkedAsDropped = true
-						}
-					default:
-						newSpan.Attributes[k] = v
-					}
+				if outputRef, ok := fragment["output_span_id"].(string); ok {
+					outputSpanID = &outputRef
+					outputDynamicRefs[span.DynamicSpanID.String] = outputRef
 				}
 			}
+		}
 
-			if outputRef, ok := fragment["output_span_id"].(string); ok {
-				outputSpanID = &outputRef
-				outputDynamicRefs[span.DynamicSpanID.String] = outputRef
-			}
+		newSpan.Attributes = meta.ExtractTypedValues(groupedAttrs)
+
+		if newSpan.Attributes.DynamicStatus != nil {
+			newSpan.Status = *newSpan.Attributes.DynamicStatus
+		}
+
+		if newSpan.Attributes.AppID != nil {
+			newSpan.AppID = *newSpan.Attributes.AppID
+		}
+
+		if newSpan.Attributes.FunctionID != nil {
+			newSpan.FunctionID = *newSpan.Attributes.FunctionID
+		}
+
+		if newSpan.Attributes.RunID != nil {
+			newSpan.RunID = *newSpan.Attributes.RunID
+		}
+
+		if newSpan.Attributes.StartedAt != nil {
+			newSpan.StartTime = *newSpan.Attributes.StartedAt
+		}
+
+		if newSpan.Attributes.EndedAt != nil {
+			newSpan.EndTime = *newSpan.Attributes.EndedAt
+		}
+
+		if newSpan.Attributes.DropSpan != nil && *newSpan.Attributes.DropSpan {
+			newSpan.MarkedAsDropped = true
 		}
 
 		// If this span has finished, set a preliminary output ID.
@@ -215,18 +204,17 @@ func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.Ot
 	for _, span := range spanMap {
 		// If we have an output reference for this span, set the appropriate
 		// target span ID here
-		if ref, ok := span.Attributes[meta.AttributeStepOutputRef]; ok {
-			if refStr, ok := ref.(string); ok && refStr != "" {
-				if targetSpanID, ok := outputDynamicRefs[refStr]; ok {
-					// We've found the span ID that we need to target for
-					// this span. So let's use it!
-					span.OutputID, err = encodeSpanOutputID(targetSpanID)
-					if err != nil {
-						logger.StdlibLogger(ctx).Error("error encoding span output ID", "error", err)
-						return nil, err
-					}
+		if spanRefStr := span.Attributes.StepOutputRef; spanRefStr != nil && *spanRefStr != "" {
+			if targetSpanID, ok := outputDynamicRefs[*spanRefStr]; ok {
+				// We've found the span ID that we need to target for
+				// this span. So let's use it!
+				span.OutputID, err = encodeSpanOutputID(targetSpanID)
+				if err != nil {
+					logger.StdlibLogger(ctx).Error("error encoding span output ID", "error", err)
+					return nil, err
 				}
 			}
+
 		}
 
 		if span.ParentSpanID == nil || *span.ParentSpanID == "" || *span.ParentSpanID == "0000000000000000" {
@@ -250,6 +238,10 @@ func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.Ot
 				"parentSpanID", span.ParentSpanID,
 			)
 		}
+	}
+
+	if root == nil {
+		return nil, fmt.Errorf("no root span found for run %s", runID.String())
 	}
 
 	sorter(root)

@@ -3,6 +3,7 @@ package pubsub
 import (
 	"context"
 	"fmt"
+	"net"
 	"sync"
 	"time"
 
@@ -31,6 +32,11 @@ type gatewayGRPCForwarder struct {
 
 type GRPCDialer func(target string, opts ...grpc.DialOption) (*grpc.ClientConn, error)
 
+// gatewayURL creates a URL for connecting to a gateway's gRPC port
+func gatewayURL(ctx context.Context, gateway *state.Gateway) string {
+	return net.JoinHostPort(gateway.IPAddress.String(), fmt.Sprintf("%d", connectConfig.Gateway(ctx).GRPCPort))
+}
+
 func NewGatewayGRPCForwarder(ctx context.Context, stateManager state.GatewayManager) GatewayGRPCForwarder {
 	return NewGatewayGRPCForwarderWithDialer(ctx, stateManager, grpc.NewClient)
 }
@@ -49,7 +55,7 @@ func NewGatewayGRPCForwarderWithDialer(ctx context.Context, stateManager state.G
 
 // createGRPCClient creates a gRPC client for a gateway and validates the connection
 func (i *gatewayGRPCForwarder) createGRPCClient(ctx context.Context, gateway *state.Gateway) (connectpb.ConnectGatewayClient, error) {
-	url := fmt.Sprintf("%s:%d", gateway.IPAddress, connectConfig.Gateway(ctx).GRPCPort)
+	url := gatewayURL(ctx, gateway)
 
 	var conn *grpc.ClientConn
 	var err error
@@ -103,7 +109,7 @@ func (i *gatewayGRPCForwarder) ConnectToGateways(ctx context.Context) error {
 		}
 
 		i.grpcClients[g.Id.String()] = rpcClient
-		url := fmt.Sprintf("%s:%d", g.IPAddress, connectConfig.Gateway(ctx).GRPCPort)
+		url := gatewayURL(ctx, g)
 		logger.StdlibLogger(ctx).Info("connected to connect gateway", "url", url)
 	}
 
@@ -130,7 +136,7 @@ func (i *gatewayGRPCForwarder) connectToGateway(ctx context.Context, gatewayID u
 	i.grpcClients[gatewayID.String()] = rpcClient
 	i.mu.Unlock()
 
-	url := fmt.Sprintf("%s:%d", gateway.IPAddress, connectConfig.Gateway(ctx).GRPCPort)
+	url := gatewayURL(ctx, gateway)
 	logger.StdlibLogger(ctx).Info("just-in-time connected to connect gateway", "url", url)
 
 	metrics.IncrConnectGatewayGRPCClientCreateCounter(ctx, int64(1), metrics.CounterOpt{

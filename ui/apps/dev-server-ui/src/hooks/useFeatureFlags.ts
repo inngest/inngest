@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 
 interface FeatureFlags {
   FEATURE_CEL_SEARCH?: boolean;
+  FEATURE_EVENTS?: boolean;
 }
 
 export function useFeatureFlags() {

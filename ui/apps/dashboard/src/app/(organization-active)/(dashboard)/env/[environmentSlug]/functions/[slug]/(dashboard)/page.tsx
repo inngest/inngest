@@ -88,6 +88,10 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
   }
 
   let appRoute = `/env/${params.environmentSlug}/apps/${function_.app.name}` as Route;
+  let billingUrl = pathCreator.billing({
+    tab: 'plans',
+    ref: 'concurrency-limit-popover',
+  });
 
   return (
     <>
@@ -164,6 +168,7 @@ export default function FunctionDashboardPage({ params }: FunctionDashboardProps
                 inngestFunction={function_}
                 deployCreatedAt={function_.current?.deploy?.createdAt}
                 getAppLink={() => appRoute}
+                getBillingUrl={() => billingUrl}
                 getEventLink={(eventName) =>
                   pathCreator.eventType({
                     envSlug: params.environmentSlug,

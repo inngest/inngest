@@ -20,10 +20,7 @@ import { EnvironmentType } from '@/utils/environments';
 import { EnvironmentArchiveDropdownItem } from './EnvironmentArchiveDropdownItem';
 import EnvironmentListTable from './EnvironmentListTable';
 
-// EnvNavMenu is the dropdown menu used in the left sidebar that allows the user to select an environment.
-// On select, it will navigate to the selected environment.
-// It allows selecting branch environments.
-export default function EnvNavMenu() {
+export default function Environments() {
   const [openCustomEnvDropdownId, setOpenCustomEnvDropdownId] = useState<string | null>(null);
   const router = useRouter();
   const [{ data: envs = [], fetching }] = useEnvironments();
@@ -72,46 +69,7 @@ export default function EnvNavMenu() {
           </DropdownMenu>
         </div>
 
-        {Boolean(branchParent) && (
-          <div className="border-subtle my-12 border-t pt-8">
-            <div className="mb-8 flex w-full items-center justify-between">
-              <h2 className="text-lg font-medium">Branch Environments</h2>
-              <div className="flex items-center gap-2">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      kind="secondary"
-                      appearance="outlined"
-                      size="medium"
-                      icon={<RiMore2Line />}
-                    />
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent>
-                    <DropdownMenuItem
-                      onSelect={() => router.push(`/env/${branchParent?.slug}/manage`)}
-                    >
-                      <RiSettingsLine className="h-4 w-4" />
-                      Manage
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      className="text-success"
-                      onSelect={() => router.push(`/env/${branchParent?.slug || 'branch'}/apps`)}
-                    >
-                      <RiAddLine className="h-4 w-4" />
-                      Sync new app
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            </div>
-
-            <div className=" border-subtle mt-8 overflow-hidden rounded-md border">
-              <EnvironmentListTable envs={branches} />
-            </div>
-          </div>
-        )}
-
-        <div className="border-subtle border-t pt-8">
+        <div className="border-subtle my-12 border-t pt-8">
           <div className="mb-4 flex w-full items-center justify-between">
             <h2 className="text-lg font-medium">Custom Environments</h2>
             <Button href="create-environment" kind="primary" label="Create environment" />
@@ -166,6 +124,45 @@ export default function EnvNavMenu() {
             <p className="text-basis py-3 text-center text-sm">No custom environments yet</p>
           )}
         </div>
+
+        {Boolean(branchParent) && (
+          <div className="border-subtle border-t pt-8">
+            <div className="mb-8 flex w-full items-center justify-between">
+              <h2 className="text-lg font-medium">Branch Environments</h2>
+              <div className="flex items-center gap-2">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      kind="secondary"
+                      appearance="outlined"
+                      size="medium"
+                      icon={<RiMore2Line />}
+                    />
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent>
+                    <DropdownMenuItem
+                      onSelect={() => router.push(`/env/${branchParent?.slug}/manage`)}
+                    >
+                      <RiSettingsLine className="h-4 w-4" />
+                      Manage
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      className="text-success"
+                      onSelect={() => router.push(`/env/${branchParent?.slug || 'branch'}/apps`)}
+                    >
+                      <RiAddLine className="h-4 w-4" />
+                      Sync new app
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </div>
+            </div>
+
+            <div className=" border-subtle mt-8 overflow-hidden rounded-md border">
+              <EnvironmentListTable envs={branches} />
+            </div>
+          </div>
+        )}
       </div>
 
       <Toaster />

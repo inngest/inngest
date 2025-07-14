@@ -123,15 +123,18 @@ type loaders struct {
 	RunTraceLoader       *dataloader.Loader
 	LegacyRunTraceLoader *dataloader.Loader
 	RunSpanLoader        *dataloader.Loader
+	EventLoader          *dataloader.Loader
 }
 
 func newLoaders(params LoaderParams) *loaders {
 	loaders := &loaders{}
 	tr := &traceReader{loaders: loaders, reader: params.DB}
+	er := &eventReader{loaders: loaders, reader: params.DB}
 
 	loaders.RunTraceLoader = dataloader.NewBatchedLoader(tr.GetRunTrace)
 	loaders.LegacyRunTraceLoader = dataloader.NewBatchedLoader(tr.GetLegacyRunTrace)
 	loaders.RunSpanLoader = dataloader.NewBatchedLoader(tr.GetLegacySpanRun)
+	loaders.EventLoader = dataloader.NewBatchedLoader(er.GetEvents)
 
 	return loaders
 }

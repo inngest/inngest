@@ -8,8 +8,11 @@ import (
 	"time"
 
 	"github.com/inngest/inngest/pkg/consts"
+	loader "github.com/inngest/inngest/pkg/coreapi/graph/loaders"
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/pkg/cqrs"
+
+	"github.com/graph-gophers/dataloader"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -47,27 +50,13 @@ func (qr *queryResolver) EventsV2(ctx context.Context, first int, after *string,
 		return nil, err
 	}
 
+	targetLoader := loader.FromCtx(ctx).EventLoader
+
 	eventEdges := []*models.EventsEdge{}
 	for _, e := range events {
+		targetLoader.Prime(ctx, dataloader.StringKey(e.InternalID().String()), e)
 
-		eventV2 := models.EventV2{
-			EnvID:          e.WorkspaceID,
-			ID:             e.InternalID(),
-			IdempotencyKey: &e.EventID,
-			Name:           e.EventName,
-			OccurredAt:     time.UnixMilli(e.EventTS),
-			ReceivedAt:     e.ReceivedAt,
-			Runs:           []*models.FunctionRunV2{}, // TODO
-			Version:        &e.EventVersion,
-		}
-
-		if e.SourceID != nil {
-			eventV2.Source = &models.EventSource{
-				ID:         e.SourceID.String(),
-				Name:       &e.Source,
-				SourceKind: "TODO",
-			}
-		}
+		eventV2 := cqrsEventToGQLEvent(e)
 
 		cursorByt, err := json.Marshal(EventsV2ConnectionCursor{ID: eventV2.ID.String()})
 		if err != nil {
@@ -75,7 +64,7 @@ func (qr *queryResolver) EventsV2(ctx context.Context, first int, after *string,
 		}
 
 		eventEdges = append(eventEdges, &models.EventsEdge{
-			Node:   &eventV2,
+			Node:   eventV2,
 			Cursor: base64.StdEncoding.EncodeToString(cursorByt),
 		})
 	}
@@ -111,4 +100,27 @@ func (c *EventsV2ConnectionCursor) Decode(val string) error {
 
 type EventsV2ConnectionCursor struct {
 	ID string
+}
+
+func cqrsEventToGQLEvent(e *cqrs.Event) *models.EventV2 {
+	eventV2 := models.EventV2{
+		EnvID:          e.WorkspaceID,
+		ID:             e.InternalID(),
+		IdempotencyKey: &e.EventID,
+		Name:           e.EventName,
+		OccurredAt:     time.UnixMilli(e.EventTS),
+		ReceivedAt:     e.ReceivedAt,
+		Runs:           []*models.FunctionRunV2{}, // TODO
+		Version:        &e.EventVersion,
+	}
+
+	if e.SourceID != nil {
+		eventV2.Source = &models.EventSource{
+			ID:         e.SourceID.String(),
+			Name:       &e.Source,
+			SourceKind: "TODO",
+		}
+	}
+
+	return &eventV2
 }

@@ -2,27 +2,29 @@
 
 import { EventDetails } from '@inngest/components/Events/EventDetails';
 import { useReplayModal } from '@inngest/components/Events/useReplayModal';
+import { useSearchParam } from '@inngest/components/hooks/useSearchParam';
 
+import SendEventModal from '@/components/Event/SendEventModal';
 import { ExpandedRowActions } from '@/components/Events/ExpandedRowActions';
-import { SendEventModal } from '@/components/Events/SendEventModal';
 import { useEventDetails, useEventPayload, useEventRuns } from '@/components/Events/useEvents';
+import { useFeatureFlags } from '@/hooks/useFeatureFlags';
 
-type Props = {
-  params: {
-    eventID: string;
-    environmentSlug: string;
-  };
-};
-
-export default function Page({ params }: Props) {
-  const eventID = decodeURIComponent(params.eventID);
-  const envSlug = params.environmentSlug;
-
+export default function Page() {
+  const [eventID] = useSearchParam('eventID');
   const { isModalVisible, selectedEvent, openModal, closeModal } = useReplayModal();
 
   const getEventDetails = useEventDetails();
   const getEventPayload = useEventPayload();
   const getEventRuns = useEventRuns();
+
+  const { featureFlags } = useFeatureFlags();
+  const isEventsEnabled = featureFlags.FEATURE_EVENTS;
+
+  if (!eventID) {
+    throw new Error('missing eventID in search params');
+  }
+
+  if (!isEventsEnabled) return null;
 
   return (
     <>
@@ -33,21 +35,11 @@ export default function Page({ params }: Props) {
         getEventPayload={getEventPayload}
         getEventRuns={getEventRuns}
         expandedRowActions={({ eventName, payload }) => (
-          <ExpandedRowActions
-            eventName={eventName}
-            payload={payload}
-            onReplay={openModal}
-            envSlug={envSlug}
-          />
+          <ExpandedRowActions eventName={eventName} payload={payload} onReplay={openModal} />
         )}
       />
       {selectedEvent && (
-        <SendEventModal
-          isOpen={isModalVisible}
-          eventName={selectedEvent.name}
-          onClose={closeModal}
-          initialData={selectedEvent.data}
-        />
+        <SendEventModal isOpen={isModalVisible} onClose={closeModal} data={selectedEvent.data} />
       )}
     </>
   );

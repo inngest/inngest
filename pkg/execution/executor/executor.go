@@ -543,7 +543,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	runSpanRef, err := e.tracerProvider.CreateSpan(
 		meta.SpanNameRun,
 		&tracing.CreateSpanOptions{
-			Location: "executor.Schedule",
+			Debug:    &tracing.SpanDebugData{Location: "executor.Schedule"},
 			Metadata: &metadata,
 		},
 	)
@@ -836,7 +836,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	if isSleepResume {
 		err := e.tracerProvider.UpdateSpan(&tracing.UpdateSpanOptions{
 			EndTime:    time.Now(),
-			Location:   "executor.Execute",
+			Debug:      &tracing.SpanDebugData{Location: "executor.Execute"},
 			QueueItem:  &item,
 			Status:     enums.StepStatusCompleted,
 			TargetSpan: tracing.SpanRefFromQueueItem(&item),
@@ -1014,7 +1014,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		execParent, err = e.tracerProvider.CreateSpan(
 			meta.SpanNameStepDiscovery,
 			&tracing.CreateSpanOptions{
-				Location:  "executor.Execute",
+				Debug:     &tracing.SpanDebugData{Location: "executor.Execute"},
 				Parent:    tracing.RunSpanRefFromMetadata(&md),
 				Metadata:  &md,
 				QueueItem: &item,
@@ -1031,7 +1031,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			meta.SpanNameStepDiscovery,
 			&tracing.CreateSpanOptions{
 				FollowsFrom: tracing.SpanRefFromQueueItem(&item),
-				Location:    "executor.Execute",
+				Debug:       &tracing.SpanDebugData{Location: "executor.Execute"},
 				Metadata:    &md,
 				Parent:      tracing.RunSpanRefFromMetadata(&md),
 				QueueItem:   &item,
@@ -1049,13 +1049,14 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	instance.execSpan, err = e.tracerProvider.CreateSpan(
 		meta.SpanNameExecution,
 		&tracing.CreateSpanOptions{
-			Location:  "executor.Execute",
-			Parent:    execParent,
-			Metadata:  &md,
-			QueueItem: &item,
-			SpanOptions: []trace.SpanStartOption{
-				tracing.WithFunctionAttrs(&instance.f),
-			},
+			Debug:      &tracing.SpanDebugData{Location: "executor.Execute"},
+			Parent:     execParent,
+			Metadata:   &md,
+			QueueItem:  &item,
+			Attributes: tracing.FunctionAttrs(&instance.f),
+			// SpanOptions: []trace.SpanStartOption{
+			// 	tracing.WithFunctionAttrs(&instance.f),
+			// },
 		},
 	)
 	if err != nil {
@@ -1072,14 +1073,12 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		_ = e.tracerProvider.UpdateSpan(
 			&tracing.UpdateSpanOptions{
 				EndTime:    time.Now(),
-				Location:   "executor.Execute",
+				Debug:      &tracing.SpanDebugData{Location: "executor.Execute"},
 				Metadata:   &md,
 				QueueItem:  &item,
 				TargetSpan: instance.execSpan,
-				SpanOptions: []trace.SpanStartOption{
-					tracing.WithDriverResponseAttrs(resp, nil),
-				},
-				Status: status,
+				Status:     status,
+				Attributes: tracing.DriverResponseAttrs(resp, nil),
 			},
 		)
 
@@ -1279,13 +1278,11 @@ func (e *executor) finalize(ctx context.Context, md sv2.Metadata, evts []json.Ra
 
 	err := e.tracerProvider.UpdateSpan(&tracing.UpdateSpanOptions{
 		EndTime:    time.Now(),
-		Location:   "executor.finalize",
+		Debug:      &tracing.SpanDebugData{Location: "executor.finalize"},
 		Metadata:   &md,
 		TargetSpan: tracing.RunSpanRefFromMetadata(&md),
 		Status:     runStatus,
-		SpanOptions: []trace.SpanStartOption{
-			tracing.WithDriverResponseAttrs(&resp, outputSpanRef),
-		},
+		Attributes: tracing.DriverResponseAttrs(&resp, outputSpanRef),
 	})
 	if err != nil {
 		logger.StdlibLogger(ctx).Error(
@@ -2140,12 +2137,10 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 		pauseSpan := tracing.SpanRefFromPause(&pause)
 		_ = e.tracerProvider.UpdateSpan(&tracing.UpdateSpanOptions{
 			EndTime:    time.Now(),
-			Location:   "executor.Resume",
+			Debug:      &tracing.SpanDebugData{Location: "executor.Resume"},
 			Status:     status,
 			TargetSpan: pauseSpan,
-			SpanOptions: []trace.SpanStartOption{
-				tracing.WithResumeAttrs(&pause, &r),
-			},
+			Attributes: tracing.ResumeAttrs(&pause, &r),
 		})
 
 		if !consumeResult.HasPendingSteps {
@@ -2179,7 +2174,7 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 				&tracing.CreateSpanOptions{
 					Carriers:    []map[string]any{nextItem.Metadata},
 					FollowsFrom: pauseSpan,
-					Location:    "executor.Resume",
+					Debug:       &tracing.SpanDebugData{Location: "executor.Resume"},
 					Metadata:    &md,
 					Parent:      tracing.RunSpanRefFromMetadata(&md),
 					QueueItem:   &nextItem,
@@ -2467,7 +2462,7 @@ func (e *executor) handleGeneratorStep(ctx context.Context, i *runInstance, gen 
 			&tracing.CreateSpanOptions{
 				Carriers:    []map[string]any{nextItem.Metadata},
 				FollowsFrom: tracing.SpanRefFromQueueItem(&i.item),
-				Location:    "executor.handleGeneratorStep",
+				Debug:       &tracing.SpanDebugData{Location: "executor.handleGeneratorStep"},
 				Metadata:    &i.md,
 				Parent:      tracing.RunSpanRefFromMetadata(&i.md),
 				QueueItem:   &nextItem,
@@ -2610,7 +2605,7 @@ func (e *executor) handleStepError(ctx context.Context, i *runInstance, gen stat
 			&tracing.CreateSpanOptions{
 				Carriers:    []map[string]any{nextItem.Metadata},
 				FollowsFrom: tracing.SpanRefFromQueueItem(&i.item),
-				Location:    "executor.handleStepError",
+				Debug:       &tracing.SpanDebugData{Location: "executor.handleStepError"},
 				Metadata:    &i.md,
 				QueueItem:   &nextItem,
 				Parent:      tracing.RunSpanRefFromMetadata(&i.md),
@@ -2683,13 +2678,11 @@ func (e *executor) handleGeneratorStepPlanned(ctx context.Context, i *runInstanc
 		&tracing.CreateSpanOptions{
 			Carriers:    []map[string]any{nextItem.Metadata},
 			FollowsFrom: tracing.SpanRefFromQueueItem(&i.item),
-			Location:    "executor.handleGeneratorStepPlanned",
+			Debug:       &tracing.SpanDebugData{Location: "executor.handleGeneratorStepPlanned"},
 			Metadata:    &i.md,
 			QueueItem:   &nextItem,
 			Parent:      tracing.RunSpanRefFromMetadata(&i.md),
-			SpanOptions: []trace.SpanStartOption{
-				tracing.WithGeneratorAttrs(&gen),
-			},
+			Attributes:  tracing.GeneratorAttrs(&gen),
 		},
 	)
 	if err != nil {
@@ -2756,13 +2749,11 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, i *runInstance, gen
 		&tracing.CreateSpanOptions{
 			Carriers:    []map[string]any{nextItem.Metadata},
 			FollowsFrom: tracing.SpanRefFromQueueItem(&i.item),
-			Location:    "executor.handleGeneratorSleep",
+			Debug:       &tracing.SpanDebugData{Location: "executor.handleGeneratorSleep"},
 			Metadata:    &i.md,
 			QueueItem:   &nextItem,
 			Parent:      tracing.RunSpanRefFromMetadata(&i.md),
-			SpanOptions: []trace.SpanStartOption{
-				tracing.WithGeneratorAttrs(&gen),
-			},
+			Attributes:  tracing.GeneratorAttrs(&gen),
 		},
 	)
 	if err != nil {
@@ -3424,13 +3415,11 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, i *runInstan
 		&tracing.CreateSpanOptions{
 			Carriers:    []map[string]any{pause.Metadata, nextItem.Metadata},
 			FollowsFrom: tracing.SpanRefFromQueueItem(&i.item),
-			Location:    "executor.handleGeneratorWaitForEvent",
+			Debug:       &tracing.SpanDebugData{Location: "executor.handleGeneratorWaitForEvent"},
 			Metadata:    &i.md,
 			QueueItem:   &nextItem,
 			Parent:      tracing.RunSpanRefFromMetadata(&i.md),
-			SpanOptions: []trace.SpanStartOption{
-				tracing.WithGeneratorAttrs(&gen),
-			},
+			Attributes:  tracing.GeneratorAttrs(&gen),
 		},
 	)
 	if err != nil {
