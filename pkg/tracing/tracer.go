@@ -129,14 +129,19 @@ func (tp *otelTracerProvider) CreateDroppableSpan(
 		ctx = defaultPropagator.Extract(context.Background(), carrier)
 	}
 
-	givenAttrs := []attribute.KeyValue{}
-	if opts.Attributes != nil {
-		givenAttrs = opts.Attributes.Serialize()
+	attrs := opts.Attributes
+	if attrs == nil {
+		attrs = meta.NewAttrSet()
+	}
+	if opts.Debug != nil {
+		if opts.Debug.Location != "" {
+			meta.AddAttr(attrs, meta.Attrs.InternalLocation, &opts.Debug.Location)
+		}
 	}
 
 	spanOptions := append(
 		[]trace.SpanStartOption{
-			trace.WithAttributes(givenAttrs...),
+			trace.WithAttributes(attrs.Serialize()...),
 		},
 		opts.RawOtelSpanOptions...,
 	)
@@ -203,7 +208,6 @@ func (tp *otelTracerProvider) UpdateSpan(
 	}
 
 	if opts.TargetSpan.DynamicSpanID == "" {
-		// Oof. Not good.
 		return fmt.Errorf("target span is not dynamic; has no DynamicSpanID")
 	}
 
@@ -213,26 +217,30 @@ func (tp *otelTracerProvider) UpdateSpan(
 	}
 	ctx := defaultPropagator.Extract(context.Background(), carrier)
 
-	attrs := []attribute.KeyValue{
-		attribute.String(meta.Attrs.DynamicSpanID.Key(), opts.TargetSpan.DynamicSpanID),
-		attribute.String(meta.Attrs.DynamicStatus.Key(), opts.Status.String()),
-	}
+	attrs := meta.NewAttrSet(
+		meta.Attr(meta.Attrs.DynamicSpanID, &opts.TargetSpan.DynamicSpanID),
+		meta.Attr(meta.Attrs.DynamicStatus, &opts.Status),
+	)
 
 	if opts.Status.IsEnded() {
-		attrs = append(attrs, attribute.Int64(meta.Attrs.EndedAt.Key(), opts.EndTime.UnixMilli()))
+		meta.AddAttr(attrs, meta.Attrs.EndedAt, &opts.EndTime)
 	}
 
-	givenAttrs := []attribute.KeyValue{}
-	if opts.Attributes != nil {
-		givenAttrs = opts.Attributes.Serialize()
+	if opts.Debug != nil {
+		if opts.Debug.Location != "" {
+			meta.AddAttr(attrs, meta.Attrs.InternalLocation, &opts.Debug.Location)
+		}
 	}
 
 	// Be careful to make sure that whatever attrs we specify here are
 	// overwritten by whatever is given in options; the caller knows best.
+	if opts.Attributes != nil {
+		attrs = attrs.Merge(opts.Attributes)
+	}
+
 	spanOpts := append(
 		[]trace.SpanStartOption{
-			trace.WithAttributes(attrs...),
-			trace.WithAttributes(givenAttrs...),
+			trace.WithAttributes(attrs.Serialize()...),
 		},
 		opts.RawOtelSpanOptions...,
 	)
