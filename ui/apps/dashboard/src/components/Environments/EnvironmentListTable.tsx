@@ -49,7 +49,7 @@ export default function EnvironmentListTable({ envs }: { envs: Environment[] }) 
   );
 
   const {
-    BoundPagination,
+    BoundPagination: BranchEnvsPagination,
     currentPageData: visibleEnvs,
     totalPages,
   } = usePaginationUI({ data: sortedEnvs, pageSize: PER_PAGE });
@@ -94,7 +94,7 @@ export default function EnvironmentListTable({ envs }: { envs: Environment[] }) 
           <tr>
             <td colSpan={4}>
               <div className="flex flex-row items-center justify-center px-4 py-1">
-                <BoundPagination />
+                <BranchEnvsPagination />
               </div>
             </td>
           </tr>
