@@ -57,6 +57,8 @@ func NewQueries(db *sql.DB, driver string) (q sqlc.Querier) {
 }
 
 func NewCQRS(db *sql.DB, driver string) cqrs.Manager {
+	// Force goqu to use prepared statements for consistency with sqlc
+	sq.SetDefaultPrepared(true)
 	return wrapper{
 		driver: driver,
 		q:      NewQueries(db, driver),
@@ -859,7 +861,6 @@ func (w wrapper) GetEvents(ctx context.Context, accountID uuid.UUID, workspaceID
 		Where(filter...).
 		Order(order...).
 		Limit(uint(opts.Limit)).
-		Prepared(true).
 		ToSQL()
 
 	if err != nil {
@@ -915,7 +916,6 @@ func (w wrapper) GetEventsCount(ctx context.Context, accountID uuid.UUID, worksp
 		Select(sq.COUNT("*").As("count")).
 		Where(filter...).
 		Order(order...).
-		Prepared(true).
 		ToSQL()
 	if err != nil {
 		return 0, err
