@@ -45,7 +45,7 @@ func NewCmdStart(rootCmd *cobra.Command) *cobra.Command {
 	persistenceFlags := pflag.NewFlagSet("persistence", pflag.ExitOnError)
 	persistenceFlags.String("sqlite-dir", "", "Directory for where to write SQLite database.")
 	persistenceFlags.String("redis-uri", "", "Redis server URI for external queue and run state. Defaults to self-contained, in-memory Redis server with periodic snapshot backups.")
-	persistenceFlags.String("postgres-uri", "", "[Experimental] PostgreSQL database URI for configuration and history persistence. Defaults to SQLite database.")
+	persistenceFlags.String("postgres-uri", "", "PostgreSQL database URI for configuration and history persistence. Defaults to SQLite database.")
 	cmd.Flags().AddFlagSet(persistenceFlags)
 	groups = append(groups, FlagGroup{name: "Persistence Flags:", fs: persistenceFlags})
 
