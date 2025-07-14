@@ -50,8 +50,8 @@ export default function EnvironmentListTable({ envs }: { envs: Environment[] }) 
 
   const {
     BoundPagination: BranchEnvsPagination,
-    currentPageData: visibleEnvs,
-    totalPages,
+    currentPageData: visibleBranchEnvs,
+    totalPages: totalBranchEnvsPages,
   } = usePaginationUI({ data: sortedEnvs, pageSize: PER_PAGE });
 
   return (
@@ -79,8 +79,8 @@ export default function EnvironmentListTable({ envs }: { envs: Environment[] }) 
               There are no branch environments
             </td>
           </tr>
-        ) : visibleEnvs.length ? (
-          visibleEnvs.map((env, i) => <TableRow env={env} key={i} />)
+        ) : visibleBranchEnvs.length ? (
+          visibleBranchEnvs.map((env, i) => <TableRow env={env} key={i} />)
         ) : (
           <tr>
             <td colSpan={4} className="text-basis px-4 py-3 text-center text-sm">
@@ -89,7 +89,7 @@ export default function EnvironmentListTable({ envs }: { envs: Environment[] }) 
           </tr>
         )}
       </tbody>
-      {totalPages > 1 && (
+      {totalBranchEnvsPages > 1 && (
         <tfoot className="border-subtle border-t">
           <tr>
             <td colSpan={4}>
