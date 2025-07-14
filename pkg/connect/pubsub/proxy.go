@@ -108,7 +108,7 @@ type redisPubSubConnector struct {
 	enforceLeaseExpiry EnforceLeaseExpiryFunc
 
 	gatewayGRPCManager GatewayGRPCManager
-	shouldUseGRPC UseGRPCFunc
+	shouldUseGRPC      UseGRPCFunc
 
 	RequestReceiver
 }
@@ -145,7 +145,7 @@ func newRedisPubSubConnector(client rueidis.Client, opts RedisPubSubConnectorOpt
 		enforceLeaseExpiry: opts.EnforceLeaseExpiry,
 
 		gatewayGRPCManager: opts.GatewayGRPCManager,
-		shouldUseGRPC:        shouldUseGRPC,
+		shouldUseGRPC:      shouldUseGRPC,
 
 		// For routing
 		stateManager: opts.StateManager,
@@ -394,6 +394,8 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 			reply = <-replyReceived
 			span.AddEvent("ReplyReceivedGRPC")
 			l.Debug("received response via gRPC")
+
+			metrics.IncrConnectGatewayGRPCReplyCounter(ctx, 1, metrics.CounterOpt{})
 
 			cancelWaitForResponseCtx()
 		}()
