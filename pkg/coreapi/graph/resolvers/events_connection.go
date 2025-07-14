@@ -16,13 +16,15 @@ func (r *eventsConnectionResolver) TotalCount(
 ) (int, error) {
 	filter := graphql.GetFieldContext(ctx).Parent.Args["filter"].(models.EventsFilter)
 
-	opts := &cqrs.WorkspaceEventsOpts{
-		Limit: cqrs.MaxEvents, // pass in dummy value to pass validation, but won't be used in actual count query
-		Names: filter.EventNames,
+	opts := cqrs.WorkspaceEventsOpts{
+		Limit:                 cqrs.MaxEvents, // pass in dummy value to pass validation, but won't be used in actual count query
+		Names:                 filter.EventNames,
+		IncludeInternalEvents: filter.IncludeInternalEvents,
+		Oldest:                filter.From,
 	}
-	opts.Oldest = filter.From
 
-	opts.Newest = time.Now() // TODO: this is slightly problematic for total count as user pages through results
+	// this relies on the frontend not requesting TotalCount except on loading the first page
+	opts.Newest = time.Now()
 	if filter.Until != nil {
 		opts.Newest = *filter.Until
 	}

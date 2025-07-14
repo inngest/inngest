@@ -3,6 +3,7 @@ package golang
 import (
 	"context"
 	"encoding/json"
+	"slices"
 	"testing"
 	"time"
 
@@ -329,4 +330,107 @@ func TestEventList(t *testing.T) {
 			//r.Len(runs, 1)
 		}, time.Second*10, time.Second*1)
 	})
+
+	t.Run("internal events", func(t *testing.T) {
+		r := require.New(t)
+		ctx := context.Background()
+		c := client.New(t)
+
+		inngestClient, server, registerFuncs := NewSDKHandler(t, "internal-events")
+		defer server.Close()
+
+		eventName := randomSuffix("evt")
+		_, err := inngestgo.CreateFunction(
+			inngestClient,
+			inngestgo.FunctionOpts{ID: "fn"},
+			inngestgo.EventTrigger(eventName, nil),
+			func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
+				return nil, nil
+			},
+		)
+		r.NoError(err)
+		registerFuncs()
+
+		// Send event and wait for it to show in the API.
+		_, err = inngestClient.Send(ctx, event.Event{Name: eventName})
+		r.NoError(err)
+
+		// For extracting function_id from Raw
+		type Raw struct {
+			Data struct {
+				FunctionID string `json:"function_id"`
+			} `json:"data"`
+		}
+		expectedFunctionId := "internal-events-fn"
+		r.EventuallyWithT(func(t *assert.CollectT) {
+			// Explicitly include internal events.
+			res, err := c.GetEvents(ctx, client.GetEventsOpts{
+				PageSize: 50,
+				Filter: models.EventsFilter{
+					EventNames:            []string{eventName, "inngest/function.finished"},
+					From:                  time.Now().Add(-time.Minute),
+					IncludeInternalEvents: true,
+				},
+			})
+			r.NoError(err)
+
+			// Theoretically we want exactly equals to 2 but don't always get it due to poor test isolation
+			r.GreaterOrEqual(res.TotalCount, 2)
+			// Also due to poor test isolation, if there are more events in the last minute than a single page size
+			// this might fail. Possibly remove this
+			r.Equal(len(res.Edges), res.TotalCount)
+
+			// Guarantee that at least one of the events we saw was from eventName and another from inngest/function.finished
+			r.True(slices.ContainsFunc(res.Edges, func(e *models.EventsEdge) bool {
+				return e.Node.Name == eventName
+			}))
+			r.True(slices.ContainsFunc(res.Edges, func(e *models.EventsEdge) bool {
+				if e.Node.Name == "inngest/function.finished" {
+					var raw Raw
+					err := json.Unmarshal([]byte(e.Node.Raw), &raw)
+					r.NoError(err)
+
+					return raw.Data.FunctionID == expectedFunctionId
+				}
+				return false
+			}))
+
+		}, time.Second*10, time.Second*1)
+
+		// Explicitly exclude internal events.
+		res, err := c.GetEvents(ctx, client.GetEventsOpts{
+			PageSize: 10,
+			Filter: models.EventsFilter{
+				EventNames:            []string{eventName, "inngest/function.finished"},
+				From:                  time.Now().Add(-time.Minute),
+				IncludeInternalEvents: false,
+			},
+		})
+		r.NoError(err)
+		r.Equal(1, res.TotalCount)
+		r.Len(res.Edges, 1)
+		// The inngest/function.finished event is omitted even though it's in the EventNames filter
+		r.True(slices.ContainsFunc(res.Edges, func(e *models.EventsEdge) bool {
+			return e.Node.Name == eventName
+		}))
+
+		// Implicitly exclude internal events (it has the same effect as
+		// explicitly excluding them).
+		res, err = c.GetEvents(ctx, client.GetEventsOpts{
+			PageSize: 10,
+			Filter: models.EventsFilter{
+				EventNames: []string{eventName, "inngest/function.finished"},
+				From:       time.Now().Add(-time.Minute),
+			},
+		})
+		r.NoError(err)
+		r.Equal(1, res.TotalCount)
+		r.Len(res.Edges, 1)
+		// The inngest/function.finished event is omitted even though it's in the EventNames filter
+		r.True(slices.ContainsFunc(res.Edges, func(e *models.EventsEdge) bool {
+			return e.Node.Name == eventName
+		}))
+
+	})
+
 }

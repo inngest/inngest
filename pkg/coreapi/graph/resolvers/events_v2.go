@@ -16,11 +16,16 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
+const defaultPageSize = 40
+
 func (qr *queryResolver) EventsV2(ctx context.Context, first int, after *string, filter models.EventsFilter) (*models.EventsConnection, error) {
-	// TODO limit first
+	pageSize := defaultPageSize
+	if first > 0 && first <= cqrs.MaxEvents {
+		pageSize = first
+	}
 
 	opts := &cqrs.WorkspaceEventsOpts{
-		Limit: first,
+		Limit: pageSize,
 		Names: filter.EventNames,
 	}
 
@@ -38,9 +43,14 @@ func (qr *queryResolver) EventsV2(ctx context.Context, first int, after *string,
 		}
 	}
 
+	opts.IncludeInternalEvents = filter.IncludeInternalEvents
+
 	opts.Oldest = filter.From
 
-	opts.Newest = time.Now() // TODO: this is slightly problematic for total count as user pages through results
+	// If we don't have a cursor, fetch the latest events
+	// otherwise this has no impact
+	opts.Newest = time.Now()
+
 	if filter.Until != nil {
 		opts.Newest = *filter.Until
 	}
