@@ -24,20 +24,21 @@ import { getVisiblePages } from './getVisiblePages';
 const PAGE_NUMBER_BASE_CLASSES =
   'flex h-6 items-center justify-center min-w-8 text-sm tabular-nums';
 
-const NARROW_VARIANT_BREAKPOINT = 450;
+const NARROW_VARIANT_BREAKPOINT = 525;
+const TINY_VARIANT_BREAKPOINT = 400;
 
 export interface PaginationProps {
   currentPage: number;
   setCurrentPage: (action: SetStateAction<number>) => void;
   totalPages: number;
-  variant?: 'normal' | 'narrow';
+  variant?: 'normal' | 'narrow' | 'tiny';
 }
 
 export function Pagination(props: PaginationProps) {
   const { currentPage, setCurrentPage, totalPages, variant: propVariant } = props;
 
   const outerRef = useRef<HTMLDivElement>(null);
-  const [autoVariant, setAutoVariant] = useState<'narrow' | 'normal'>('normal');
+  const [autoVariant, setAutoVariant] = useState<'narrow' | 'normal' | 'tiny'>('normal');
 
   // TODO: Use a ResizeObserver to detect changes in width if necessary.
   useLayoutEffect(() => {
@@ -47,7 +48,10 @@ export function Pagination(props: PaginationProps) {
     if (container === null) return;
 
     const width = container.getBoundingClientRect().width;
-    setAutoVariant(width < NARROW_VARIANT_BREAKPOINT ? 'narrow' : 'normal');
+
+    if (width < TINY_VARIANT_BREAKPOINT) setAutoVariant('tiny');
+    else if (width < NARROW_VARIANT_BREAKPOINT) setAutoVariant('narrow');
+    else setAutoVariant('normal');
   }, [propVariant]);
 
   const variant = propVariant ?? autoVariant;

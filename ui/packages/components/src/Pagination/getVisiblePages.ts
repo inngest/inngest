@@ -9,7 +9,7 @@ const ONE_BASED_INDEX_OFFSET = 1;
 type GetVisiblePagesConfig = {
   current: number;
   total: number;
-  variant?: 'normal' | 'narrow';
+  variant?: 'normal' | 'narrow' | 'tiny';
 };
 
 type PaginationConfig = {
@@ -25,6 +25,8 @@ export function getVisiblePages({
   total,
   variant = 'normal',
 }: GetVisiblePagesConfig): Array<number | '...'> {
+  if (variant === 'tiny') return [current];
+
   const slots = variant === 'narrow' ? 5 : 7;
 
   // How many consecutive pages each pattern shows (calculated to fill exactly <slots> slots)
