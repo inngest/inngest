@@ -8051,7 +8051,9 @@ func TestQueueBacklogEnroll(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 0, int(count))
 
-	res, err := q.BacklogEnroll(ctx)
+	qp, _ := q.ItemPartition(ctx, defaultShard, item)
+
+	res, err := q.BacklogEnroll(ctx, &qp)
 	require.NoError(t, err)
 
 	require.Equal(t, 200, int(res.Total))
@@ -8065,7 +8067,7 @@ func TestQueueBacklogEnroll(t *testing.T) {
 
 	// Doing it again should yield no items
 
-	res, err = q.BacklogEnroll(ctx)
+	res, err = q.BacklogEnroll(ctx, &qp)
 	require.NoError(t, err)
 
 	require.Equal(t, 100, int(res.Total))    // only 100 items found now
