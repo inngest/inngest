@@ -133,9 +133,13 @@ function CaretButton({ typ, ...paginationProps }: CaretButtonProps) {
   return (
     <Button
       appearance="ghost"
-      className="group mx-1 mr-1 h-6 w-6 p-0"
+      className={cn(
+        'group mx-1 h-6 w-8 rounded-md',
+        !disabled && 'hover:bg-canvasSubtle',
+        disabled && '!bg-transparent'
+      )}
       disabled={disabled}
-      icon={<Icon className="bg-canvasBase group-disabled:text-disabled text-basis h-6 w-6" />}
+      icon={<Icon className="group-disabled:text-disabled text-basis h-6 w-6" />}
       onClick={() => {
         switch (typ) {
           case 'back':
