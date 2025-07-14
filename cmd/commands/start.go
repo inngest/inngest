@@ -55,6 +55,7 @@ func NewCmdStart(rootCmd *cobra.Command) *cobra.Command {
 	advancedFlags.Int("queue-workers", devserver.DefaultQueueWorkers, "Number of executor workers to execute steps from the queue")
 	advancedFlags.Int("tick", devserver.DefaultTick, "The interval (in milliseconds) at which the executor polls the queue")
 	advancedFlags.Int("connect-gateway-port", devserver.DefaultConnectGatewayPort, "Port to expose connect gateway endpoint")
+	advancedFlags.Bool("no-ui", false, "Disable the web UI and GraphQL API endpoint")
 	cmd.Flags().AddFlagSet(advancedFlags)
 	groups = append(groups, FlagGroup{name: "Advanced Flags:", fs: advancedFlags})
 
@@ -166,6 +167,7 @@ func doStart(cmd *cobra.Command, args []string) {
 		ConnectGatewayPort: viper.GetInt("connect-gateway-port"),
 		EventKeys:          eventKeys,
 		InMemory:           false,
+		NoUI:               viper.GetBool("no-ui"),
 		PollInterval:       viper.GetInt("poll-interval"),
 		PostgresURI:        viper.GetString("postgres-uri"),
 		QueueWorkers:       viper.GetInt("queue-workers"),
