@@ -15,9 +15,7 @@ type GetVisiblePagesConfig = {
 type PaginationConfig = {
   current: number;
   beginningConsecutivePages: number;
-  beginningThreshold: number;
   endConsecutivePages: number;
-  endThreshold: number;
   middleConsecutivePages: number;
   total: number;
 };
@@ -46,9 +44,7 @@ export function getVisiblePages({
   const config: PaginationConfig = {
     current,
     beginningConsecutivePages,
-    beginningThreshold: lastPageForBeginningPattern,
     endConsecutivePages,
-    endThreshold: firstPageForEndPattern,
     middleConsecutivePages,
     total,
   };
