@@ -1,0 +1,17 @@
+syntax = "proto3";
+package trace.v1;
+
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/inngest/inngest/proto/gen/trace/v1;tracev1";
+
+message Span {
+  string span_id = 1;
+  string trace_id = 2;
+  optional string parent_span_id = 3;
+  string name = 4;
+  google.protobuf.Timestamp start_time = 5;
+  google.protobuf.Timestamp end_time = 6;
+  map<string, google.protobuf.Value> attributes = 7;
+}
