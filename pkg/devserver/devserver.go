@@ -106,6 +106,8 @@ type StartOpts struct {
 	ConnectGatewayPort int    `json:"connectGatewayPort"`
 	ConnectGatewayHost string `json:"connectGatewayHost"`
 
+	NoUI bool
+
 	// InMemory controls whether to only use in-memory databases (as opposed to
 	// filesystem)
 	InMemory bool
@@ -540,7 +542,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	// start the API
 	// Create a new API endpoint which hosts SDK-related functionality for
 	// registering functions.
-	devAPI := NewDevAPI(ds, DevAPIOptions{disableUI: false})
+	devAPI := NewDevAPI(ds, DevAPIOptions{disableUI: opts.NoUI})
 
 	devAPI.Route("/v1", func(r chi.Router) {
 		// Add the V1 API to our dev server API.
@@ -571,18 +573,18 @@ func start(ctx context.Context, opts StartOpts) error {
 		return fmt.Errorf("failed to create connect pubsub connector: %w", err)
 	}
 
-	// TODO wire up new EnableGraphQL option with --no-ui flag
 	core, err := coreapi.NewCoreApi(coreapi.Options{
-		Data:          ds.Data,
-		Config:        ds.Opts.Config,
-		Logger:        l,
-		Runner:        ds.Runner,
-		Tracker:       ds.Tracker,
-		State:         ds.State,
-		Queue:         ds.Queue,
-		EventHandler:  ds.HandleEvent,
-		Executor:      ds.Executor,
-		HistoryReader: memory_reader.NewReader(),
+		Data:           ds.Data,
+		Config:         ds.Opts.Config,
+		Logger:         l,
+		Runner:         ds.Runner,
+		Tracker:        ds.Tracker,
+		State:          ds.State,
+		Queue:          ds.Queue,
+		EventHandler:   ds.HandleEvent,
+		Executor:       ds.Executor,
+		HistoryReader:  memory_reader.NewReader(),
+		DisableGraphQL: &opts.NoUI,
 		ConnectOpts: connectv0.Opts{
 			GroupManager:               connectionManager,
 			ConnectManager:             connectionManager,
