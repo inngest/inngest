@@ -114,7 +114,11 @@ func (i *gatewayGRPCManager) Subscribe(ctx context.Context, requestID string, ch
 }
 
 func (i *gatewayGRPCManager) Unsubscribe(ctx context.Context, requestID string) {
-	i.inFlightRequests.Delete(requestID)
+	ch, loaded := i.inFlightRequests.LoadAndDelete(requestID)
+	if loaded {
+		replyChan := ch.(chan *connectpb.SDKResponse)
+		close(replyChan)
+	}
 }
 
 // createGRPCClient creates a gRPC client for a gateway and validates the connection

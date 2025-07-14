@@ -434,3 +434,170 @@ func TestGatewayGRPCForwarderWithFailingServer(t *testing.T) {
 		require.Contains(t, err.Error(), "connection failed")
 	})
 }
+
+func TestReply(t *testing.T) {
+	ctx, _, bufDialer, gatewayManager, cleanup := setupTestEnvironment(t)
+	defer cleanup()
+
+	forwarder := NewGatewayGRPCManagerWithDialer(ctx, gatewayManager, bufDialer, logger.StdlibLogger(ctx))
+	forwarderImpl := forwarder.(*gatewayGRPCManager)
+
+	t.Run("delivers reply to subscribed channel", func(t *testing.T) {
+		requestID := "test-request-123"
+		responseCh := make(chan *connectpb.SDKResponse, 1)
+
+		// Subscribe to receive responses
+		forwarder.Subscribe(ctx, requestID, responseCh)
+
+		// Create a reply request
+		replyReq := &connectpb.ReplyRequest{
+			Data: &connectpb.SDKResponse{
+				RequestId:      requestID,
+				AccountId:      "acc-123",
+				EnvId:          "env-123",
+				AppId:          "app-123",
+				Status:         connectpb.SDKResponseStatus_DONE,
+				Body:           []byte("test response"),
+				SdkVersion:     "test-version",
+				RequestVersion: 1,
+			},
+		}
+
+		resp, err := forwarderImpl.Reply(ctx, replyReq)
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+		require.True(t, resp.Success)
+
+		// Verify the response was delivered to the channel
+		select {
+		case receivedResp := <-responseCh:
+			require.Equal(t, requestID, receivedResp.RequestId)
+			require.Equal(t, connectpb.SDKResponseStatus_DONE, receivedResp.Status)
+			require.Equal(t, []byte("test response"), receivedResp.Body)
+		case <-time.After(1 * time.Second):
+			require.Fail(t, "expected response to be delivered to subscription channel")
+		}
+
+		forwarder.Unsubscribe(ctx, requestID)
+	})
+
+	t.Run("returns false when no subscription exists", func(t *testing.T) {
+		requestID := "non-existent-request"
+
+		replyReq := &connectpb.ReplyRequest{
+			Data: &connectpb.SDKResponse{
+				RequestId: requestID,
+				Status:    connectpb.SDKResponseStatus_DONE,
+			},
+		}
+
+		resp, err := forwarderImpl.Reply(ctx, replyReq)
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+		require.False(t, resp.Success)
+	})
+
+	t.Run("handles unsubscribed channel gracefully", func(t *testing.T) {
+		requestID := "test-request-full"
+		responseCh := make(chan *connectpb.SDKResponse)
+
+		forwarder.Subscribe(ctx, requestID, responseCh)
+
+		replyReq := &connectpb.ReplyRequest{
+			Data: &connectpb.SDKResponse{
+				RequestId: requestID,
+				Status:    connectpb.SDKResponseStatus_DONE,
+			},
+		}
+
+		forwarder.Unsubscribe(ctx, requestID)
+
+		resp, err := forwarderImpl.Reply(ctx, replyReq)
+		require.NoError(t, err)
+		require.NotNil(t, resp)
+		require.False(t, resp.Success)
+	})
+}
+
+func TestSubscribeUnsubscribe(t *testing.T) {
+	ctx, _, bufDialer, gatewayManager, cleanup := setupTestEnvironment(t)
+	defer cleanup()
+
+	forwarder := NewGatewayGRPCManagerWithDialer(ctx, gatewayManager, bufDialer, logger.StdlibLogger(ctx))
+	forwarderImpl := forwarder.(*gatewayGRPCManager)
+
+	t.Run("subscription lifecycle", func(t *testing.T) {
+		requestID1 := "request-1"
+		requestID2 := "request-2"
+		responseCh1 := make(chan *connectpb.SDKResponse, 1)
+		responseCh2 := make(chan *connectpb.SDKResponse, 1)
+
+		// Subscribe to two different requests
+		forwarder.Subscribe(ctx, requestID1, responseCh1)
+		forwarder.Subscribe(ctx, requestID2, responseCh2)
+
+		// Send replies to both
+		reply1 := &connectpb.ReplyRequest{
+			Data: &connectpb.SDKResponse{
+				RequestId: requestID1,
+				Status:    connectpb.SDKResponseStatus_DONE,
+				Body:      []byte("response 1"),
+			},
+		}
+
+		reply2 := &connectpb.ReplyRequest{
+			Data: &connectpb.SDKResponse{
+				RequestId: requestID2,
+				Status:    connectpb.SDKResponseStatus_DONE,
+				Body:      []byte("response 2"),
+			},
+		}
+
+		// Both should succeed
+		resp1, err := forwarderImpl.Reply(ctx, reply1)
+		require.NoError(t, err)
+		require.True(t, resp1.Success)
+
+		resp2, err := forwarderImpl.Reply(ctx, reply2)
+		require.NoError(t, err)
+		require.True(t, resp2.Success)
+
+		// Verify both responses are delivered to correct channels
+		select {
+		case receivedResp := <-responseCh1:
+			require.Equal(t, requestID1, receivedResp.RequestId)
+			require.Equal(t, []byte("response 1"), receivedResp.Body)
+		case <-time.After(1 * time.Second):
+			require.Fail(t, "expected response 1 to be delivered")
+		}
+
+		select {
+		case receivedResp := <-responseCh2:
+			require.Equal(t, requestID2, receivedResp.RequestId)
+			require.Equal(t, []byte("response 2"), receivedResp.Body)
+		case <-time.After(1 * time.Second):
+			require.Fail(t, "expected response 2 to be delivered")
+		}
+
+		// Unsubscribe from request1
+		forwarder.Unsubscribe(ctx, requestID1)
+
+		// Sending reply to request1 should now fail
+		resp1Retry, err := forwarderImpl.Reply(ctx, reply1)
+		require.NoError(t, err)
+		require.False(t, resp1Retry.Success)
+
+		// But request2 should still work
+		resp2Retry, err := forwarderImpl.Reply(ctx, reply2)
+		require.NoError(t, err)
+		require.True(t, resp2Retry.Success)
+
+		// Clean up
+		forwarder.Unsubscribe(ctx, requestID2)
+	})
+
+	t.Run("unsubscribe non-existent subscription should not panic", func(t *testing.T) {
+		forwarder.Unsubscribe(ctx, "non-existent-request")
+	})
+
+}
