@@ -36,8 +36,8 @@ func (er eventV2Resolver) Runs(ctx context.Context, obj *models.EventV2) ([]*mod
 		return nil, err
 	}
 
-	functionRuns := make([]*models.FunctionRunV2, len(traceRuns))
-	for i, r := range traceRuns {
+	functionRuns := make([]*models.FunctionRunV2, 0, len(traceRuns))
+	for _, r := range traceRuns {
 		// TODO dedupe cqrs.TraceRun to models.FunctionRunV2 transformation
 		var (
 			started   *time.Time
@@ -66,7 +66,7 @@ func (er eventV2Resolver) Runs(ctx context.Context, obj *models.EventV2) ([]*mod
 			continue
 		}
 
-		functionRuns[i] = &models.FunctionRunV2{
+		functionRuns = append(functionRuns, &models.FunctionRunV2{
 			ID:             runID,
 			AppID:          r.AppID,
 			FunctionID:     r.FunctionID,
@@ -81,7 +81,7 @@ func (er eventV2Resolver) Runs(ctx context.Context, obj *models.EventV2) ([]*mod
 			BatchCreatedAt: batchTime,
 			CronSchedule:   r.CronSchedule,
 			HasAi:          r.HasAI,
-		}
+		})
 	}
 	return functionRuns, nil
 }
