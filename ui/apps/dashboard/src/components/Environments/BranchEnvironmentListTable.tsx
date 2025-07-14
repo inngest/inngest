@@ -41,7 +41,7 @@ const EnableEnvironmentAutoArchiveDocument = graphql(`
 
 const PER_PAGE = 10;
 
-export default function EnvironmentListTable({ envs }: { envs: Environment[] }) {
+export default function BranchEnvironmentListTable({ envs }: { envs: Environment[] }) {
   const sortedEnvs = envs.sort(
     (a, b) =>
       new Date(b.lastDeployedAt || b.createdAt).valueOf() -
