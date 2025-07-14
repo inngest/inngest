@@ -803,7 +803,7 @@ github.com/ohler55/ojg
 github.com/ohler55/ojg/alt
 github.com/ohler55/ojg/gen
 github.com/ohler55/ojg/jp
-# github.com/oklog/ulid/v2 v2.1.0
+# github.com/oklog/ulid/v2 v2.1.1
 ## explicit; go 1.15
 github.com/oklog/ulid/v2
 # github.com/opentracing/opentracing-go v1.2.0
