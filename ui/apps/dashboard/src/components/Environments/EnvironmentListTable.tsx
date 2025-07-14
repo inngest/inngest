@@ -92,10 +92,8 @@ export default function EnvironmentListTable({ envs }: { envs: Environment[] }) 
       {totalBranchEnvsPages > 1 && (
         <tfoot className="border-subtle border-t">
           <tr>
-            <td colSpan={4}>
-              <div className="flex flex-row items-center justify-center px-4 py-1">
-                <BranchEnvsPagination />
-              </div>
+            <td colSpan={4} className="px-4 py-1">
+              <BranchEnvsPagination />
             </td>
           </tr>
         </tfoot>
