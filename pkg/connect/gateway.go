@@ -13,7 +13,6 @@ import (
 
 	"github.com/coder/websocket"
 	"github.com/google/uuid"
-	connectConfig "github.com/inngest/inngest/pkg/config/connect"
 	"github.com/inngest/inngest/pkg/connect/auth"
 	connecterrors "github.com/inngest/inngest/pkg/connect/errors"
 	"github.com/inngest/inngest/pkg/connect/pubsub"
@@ -27,8 +26,6 @@ import (
 	connectpb "github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/oklog/ulid/v2"
 	"golang.org/x/sync/errgroup"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -85,9 +82,6 @@ type connectionHandler struct {
 
 	lastHeartbeatLock       sync.Mutex
 	lastHeartbeatReceivedAt time.Time
-
-	grpcLock    sync.RWMutex
-	grpcClients map[string]connectpb.ConnectExecutorClient
 }
 
 func (c *connectionHandler) setLastHeartbeat(time time.Time) {
@@ -159,12 +153,11 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 		}
 
 		ch := &connectionHandler{
-			svc:         c,
-			log:         c.logger,
-			ws:          ws,
-			updateLock:  sync.Mutex{},
-			remoteAddr:  remoteAddr,
-			grpcClients: map[string]connectpb.ConnectExecutorClient{},
+			svc:        c,
+			log:        c.logger,
+			ws:         ws,
+			updateLock: sync.Mutex{},
+			remoteAddr: remoteAddr,
 		}
 
 		closeReason := connectpb.WorkerDisconnectReason_UNEXPECTED.String()
@@ -729,44 +722,13 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 
 			if useGRPC {
 
-				executorIP, err := c.svc.stateManager.GetExecutorIP(ctx, c.conn.EnvID, data.RequestId)
+				grpcClient, err := c.svc.getOrCreateGRPCClient(ctx, c.log, c.conn.EnvID, data.RequestId)
 				if err != nil {
 					return &connecterrors.SocketError{
 						SysCode:    syscode.CodeConnectInternal,
 						StatusCode: websocket.StatusInternalError,
-						Msg:        "could not get executor",
+						Msg:        "could not create grpc client to ack",
 					}
-				}
-
-				grpcURL := net.JoinHostPort(executorIP.String(), fmt.Sprintf("%d", connectConfig.Executor(ctx).GRPCPort))
-
-				var grpcClient connectpb.ConnectExecutorClient
-				c.grpcLock.RLock()
-				grpcClient = c.grpcClients[executorIP.String()]
-				c.grpcLock.RUnlock()
-
-				if grpcClient == nil {
-					// Upgrade lock to make sure that only one instance is creating a grpc client
-					c.grpcLock.Lock()
-					grpcClient = c.grpcClients[executorIP.String()]
-
-					if grpcClient == nil {
-						logger.StdlibLogger(ctx).Info("grpc client not found for executor, creating one dynamically", "url", grpcURL)
-
-						conn, err := grpc.NewClient(grpcURL, grpc.WithTransportCredentials(insecure.NewCredentials()))
-						if err != nil {
-							c.grpcLock.Unlock()
-							return &connecterrors.SocketError{
-								SysCode:    syscode.CodeConnectInternal,
-								StatusCode: websocket.StatusInternalError,
-								Msg:        "could not create grpc client to ack",
-							}
-						}
-
-						grpcClient = connectpb.NewConnectExecutorClient(conn)
-						c.grpcClients[executorIP.String()] = grpcClient
-					}
-					c.grpcLock.Unlock()
 				}
 
 				_, err = grpcClient.Ack(ctx, &connectpb.AckMessage{
@@ -1317,43 +1279,14 @@ func (c *connectionHandler) handleSdkReply(ctx context.Context, msg *connectpb.C
 	}
 
 	if c.svc.shouldUseGRPC(ctx, c.conn.AccountID) {
-		executorIP, err := c.svc.stateManager.GetExecutorIP(ctx, c.conn.EnvID, data.RequestId)
-		l.Info("got executor IP", "ip", executorIP, "err", err)
+		grpcClient, err := c.svc.getOrCreateGRPCClient(ctx, l, c.conn.EnvID, data.RequestId)
 		if err != nil {
-			return fmt.Errorf("could not get executor IP")
-		}
-
-		grpcURL := net.JoinHostPort(executorIP.String(), fmt.Sprintf("%d", connectConfig.Executor(ctx).GRPCPort))
-
-		var grpcClient connectpb.ConnectExecutorClient
-
-		c.grpcLock.RLock()
-		grpcClient = c.grpcClients[executorIP.String()]
-		c.grpcLock.RUnlock()
-
-		if grpcClient == nil {
-			// Upgrade lock to make sure that only one instance is creating a grpc client
-			c.grpcLock.Lock()
-			grpcClient = c.grpcClients[executorIP.String()]
-
-			if grpcClient == nil {
-				logger.StdlibLogger(ctx).Info("grpc client not found for executor, creating one dynamically", "url", grpcURL)
-
-				conn, err := grpc.NewClient(grpcURL, grpc.WithTransportCredentials(insecure.NewCredentials()))
-				if err != nil {
-					c.grpcLock.Unlock()
-					return fmt.Errorf("could not create grpc client for %s: %w", grpcURL, err)
-				}
-
-				grpcClient = connectpb.NewConnectExecutorClient(conn)
-				c.grpcClients[executorIP.String()] = grpcClient
-			}
-			c.grpcLock.Unlock()
+			return err
 		}
 
 		result, err := grpcClient.Reply(ctx, &connectpb.ReplyRequest{Data: data})
 		if err != nil {
-			return fmt.Errorf("could not send response through grpc %s: %w", grpcURL, err)
+			return fmt.Errorf("could not send response through grpc: %w", err)
 		}
 
 		l.Info("sent response through gRPC", "result", result)

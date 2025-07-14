@@ -26,6 +26,7 @@ import (
 	"github.com/oklog/ulid/v2"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 const (
@@ -107,6 +108,9 @@ type connectGatewaySvc struct {
 	stateUpdateLock sync.Mutex
 
 	shouldUseGRPC useGRPCFunc
+
+	grpcLock    sync.RWMutex
+	grpcClients map[string]pb.ConnectExecutorClient
 }
 
 func (c *connectGatewaySvc) MaintenanceAPI() http.Handler {
@@ -232,6 +236,7 @@ func NewConnectGatewayService(opts ...gatewayOpt) *connectGatewaySvc {
 		shouldUseGRPC: func(ctx context.Context, accountID uuid.UUID) bool {
 			return false
 		},
+		grpcClients: make(map[string]pb.ConnectExecutorClient),
 	}
 
 	for _, opt := range opts {
@@ -571,4 +576,44 @@ func (c *connectGatewaySvc) ActivateGateway() error {
 	}
 	c.isDraining.Store(false)
 	return nil
+}
+
+// getOrCreateGRPCClient gets the executor IP and returns a gRPC client for that executor,
+// creating one if it doesn't exist.
+func (c *connectGatewaySvc) getOrCreateGRPCClient(ctx context.Context, l logger.Logger, envID uuid.UUID, requestId string) (pb.ConnectExecutorClient, error) {
+	ip, err := c.stateManager.GetExecutorIP(ctx, envID, requestId)
+	if err != nil {
+		return nil, fmt.Errorf("could not get executor IP")
+	}
+	executorIP := ip.String()
+
+	grpcURL := net.JoinHostPort(executorIP, fmt.Sprintf("%d", connectConfig.Executor(ctx).GRPCPort))
+
+	var grpcClient pb.ConnectExecutorClient
+
+	c.grpcLock.RLock()
+	grpcClient = c.grpcClients[executorIP]
+	c.grpcLock.RUnlock()
+
+	if grpcClient == nil {
+		// Upgrade lock to make sure that only one instance is creating a grpc client
+		c.grpcLock.Lock()
+		grpcClient = c.grpcClients[executorIP]
+
+		if grpcClient == nil {
+			l.Info("grpc client not found for executor, creating one dynamically", "url", grpcURL)
+
+			conn, err := grpc.NewClient(grpcURL, grpc.WithTransportCredentials(insecure.NewCredentials()))
+			if err != nil {
+				c.grpcLock.Unlock()
+				return nil, fmt.Errorf("could not create grpc client for %s: %w", grpcURL, err)
+			}
+
+			grpcClient = pb.NewConnectExecutorClient(conn)
+			c.grpcClients[executorIP] = grpcClient
+		}
+		c.grpcLock.Unlock()
+	}
+
+	return grpcClient, nil
 }
