@@ -23,7 +23,7 @@ type GatewayGRPCForwarder interface {
 }
 
 type GatewayGRPCReceiver interface {
-	Subscribe(ctx context.Context, requestID string, channel chan *connectpb.SDKResponse)
+	Subscribe(ctx context.Context, requestID string) chan *connectpb.SDKResponse
 	Unsubscribe(ctx context.Context, requestID string)
 }
 
@@ -109,8 +109,10 @@ func (i *gatewayGRPCManager) Reply(ctx context.Context, req *connectpb.ReplyRequ
 	return &connectpb.ReplyResponse{Success: false}, nil
 }
 
-func (i *gatewayGRPCManager) Subscribe(ctx context.Context, requestID string, channel chan *connectpb.SDKResponse) {
+func (i *gatewayGRPCManager) Subscribe(ctx context.Context, requestID string) chan *connectpb.SDKResponse {
+	channel := make(chan *connectpb.SDKResponse)
 	i.inFlightRequests.Store(requestID, channel)
+	return channel
 }
 
 func (i *gatewayGRPCManager) Unsubscribe(ctx context.Context, requestID string) {

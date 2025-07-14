@@ -60,13 +60,15 @@ func (m *mockGatewayGRPCManager) ConnectToGateways(ctx context.Context) error {
 	return nil
 }
 
-func (m *mockGatewayGRPCManager) Subscribe(ctx context.Context, requestID string, channel chan *connectpb.SDKResponse) {
+func (m *mockGatewayGRPCManager) Subscribe(ctx context.Context, requestID string) chan *connectpb.SDKResponse {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	if m.subscriptions == nil {
 		m.subscriptions = make(map[string]chan *connectpb.SDKResponse)
 	}
+	channel := make(chan *connectpb.SDKResponse, 1)
 	m.subscriptions[requestID] = channel
+	return channel
 }
 
 func (m *mockGatewayGRPCManager) Unsubscribe(ctx context.Context, requestID string) {

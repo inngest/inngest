@@ -387,8 +387,7 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 	} else {
 		replySubscribed := make(chan struct{})
 		go func() {
-			replyReceived := make(chan *connectpb.SDKResponse)
-			i.gatewayGRPCManager.Subscribe(ctx, opts.Data.RequestId, replyReceived)
+			replyReceived := i.gatewayGRPCManager.Subscribe(ctx, opts.Data.RequestId)
 
 			close(replySubscribed)
 

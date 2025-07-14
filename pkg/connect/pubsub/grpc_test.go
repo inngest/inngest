@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"errors"
 	"net"
+	"sync"
 	"testing"
 	"time"
 
@@ -444,10 +445,9 @@ func TestReply(t *testing.T) {
 
 	t.Run("delivers reply to subscribed channel", func(t *testing.T) {
 		requestID := "test-request-123"
-		responseCh := make(chan *connectpb.SDKResponse, 1)
 
 		// Subscribe to receive responses
-		forwarder.Subscribe(ctx, requestID, responseCh)
+		responseCh := forwarder.Subscribe(ctx, requestID)
 
 		// Create a reply request
 		replyReq := &connectpb.ReplyRequest{
@@ -463,20 +463,24 @@ func TestReply(t *testing.T) {
 			},
 		}
 
+		go func() {
+			select {
+			// Verify the response was delivered to the channel
+			case receivedResp := <-responseCh:
+				require.Equal(t, requestID, receivedResp.RequestId)
+				require.Equal(t, connectpb.SDKResponseStatus_DONE, receivedResp.Status)
+				require.Equal(t, []byte("test response"), receivedResp.Body)
+			case <-time.After(1 * time.Second):
+				require.Fail(t, "expected response to be delivered to subscription channel")
+			}
+		}()
+
+		time.Sleep(20 * time.Millisecond)
+
 		resp, err := forwarderImpl.Reply(ctx, replyReq)
 		require.NoError(t, err)
 		require.NotNil(t, resp)
 		require.True(t, resp.Success)
-
-		// Verify the response was delivered to the channel
-		select {
-		case receivedResp := <-responseCh:
-			require.Equal(t, requestID, receivedResp.RequestId)
-			require.Equal(t, connectpb.SDKResponseStatus_DONE, receivedResp.Status)
-			require.Equal(t, []byte("test response"), receivedResp.Body)
-		case <-time.After(1 * time.Second):
-			require.Fail(t, "expected response to be delivered to subscription channel")
-		}
 
 		forwarder.Unsubscribe(ctx, requestID)
 	})
@@ -499,9 +503,8 @@ func TestReply(t *testing.T) {
 
 	t.Run("handles unsubscribed channel gracefully", func(t *testing.T) {
 		requestID := "test-request-full"
-		responseCh := make(chan *connectpb.SDKResponse)
 
-		forwarder.Subscribe(ctx, requestID, responseCh)
+		forwarder.Subscribe(ctx, requestID)
 
 		replyReq := &connectpb.ReplyRequest{
 			Data: &connectpb.SDKResponse{
@@ -529,12 +532,10 @@ func TestSubscribeUnsubscribe(t *testing.T) {
 	t.Run("subscription lifecycle", func(t *testing.T) {
 		requestID1 := "request-1"
 		requestID2 := "request-2"
-		responseCh1 := make(chan *connectpb.SDKResponse, 1)
-		responseCh2 := make(chan *connectpb.SDKResponse, 1)
 
 		// Subscribe to two different requests
-		forwarder.Subscribe(ctx, requestID1, responseCh1)
-		forwarder.Subscribe(ctx, requestID2, responseCh2)
+		responseCh1 := forwarder.Subscribe(ctx, requestID1)
+		responseCh2 := forwarder.Subscribe(ctx, requestID2)
 
 		// Send replies to both
 		reply1 := &connectpb.ReplyRequest{
@@ -553,6 +554,31 @@ func TestSubscribeUnsubscribe(t *testing.T) {
 			},
 		}
 
+		// Start goroutines to receive responses before sending replies
+		var receivedResp1, receivedResp2 *connectpb.SDKResponse
+		var wg sync.WaitGroup
+		wg.Add(2)
+
+		go func() {
+			defer wg.Done()
+			select {
+			case receivedResp1 = <-responseCh1:
+			case <-time.After(1 * time.Second):
+				require.Fail(t, "expected response 1 to be delivered")
+			}
+		}()
+
+		go func() {
+			defer wg.Done()
+			select {
+			case receivedResp2 = <-responseCh2:
+			case <-time.After(1 * time.Second):
+				require.Fail(t, "expected response 2 to be delivered")
+			}
+		}()
+
+		time.Sleep(10 * time.Millisecond)
+
 		// Both should succeed
 		resp1, err := forwarderImpl.Reply(ctx, reply1)
 		require.NoError(t, err)
@@ -562,22 +588,14 @@ func TestSubscribeUnsubscribe(t *testing.T) {
 		require.NoError(t, err)
 		require.True(t, resp2.Success)
 
-		// Verify both responses are delivered to correct channels
-		select {
-		case receivedResp := <-responseCh1:
-			require.Equal(t, requestID1, receivedResp.RequestId)
-			require.Equal(t, []byte("response 1"), receivedResp.Body)
-		case <-time.After(1 * time.Second):
-			require.Fail(t, "expected response 1 to be delivered")
-		}
+		// Wait for all responses to be received
+		wg.Wait()
 
-		select {
-		case receivedResp := <-responseCh2:
-			require.Equal(t, requestID2, receivedResp.RequestId)
-			require.Equal(t, []byte("response 2"), receivedResp.Body)
-		case <-time.After(1 * time.Second):
-			require.Fail(t, "expected response 2 to be delivered")
-		}
+		// Verify both responses are delivered to correct channels
+		require.Equal(t, requestID1, receivedResp1.RequestId)
+		require.Equal(t, []byte("response 1"), receivedResp1.Body)
+		require.Equal(t, requestID2, receivedResp2.RequestId)
+		require.Equal(t, []byte("response 2"), receivedResp2.Body)
 
 		// Unsubscribe from request1
 		forwarder.Unsubscribe(ctx, requestID1)
@@ -587,10 +605,26 @@ func TestSubscribeUnsubscribe(t *testing.T) {
 		require.NoError(t, err)
 		require.False(t, resp1Retry.Success)
 
-		// But request2 should still work
+		// But request2 should still work - start a goroutine to consume the message
+		var receivedResp2Retry *connectpb.SDKResponse
+		go func() {
+			select {
+			case receivedResp2Retry = <-responseCh2:
+			case <-time.After(1 * time.Second):
+				require.Fail(t, "expected response 2 to be delivered")
+			}
+		}()
+
+		time.Sleep(10 * time.Millisecond)
+
 		resp2Retry, err := forwarderImpl.Reply(ctx, reply2)
 		require.NoError(t, err)
 		require.True(t, resp2Retry.Success)
+
+		// Verify the second message was received
+		time.Sleep(100 * time.Millisecond)
+		require.NotNil(t, receivedResp2Retry)
+		require.Equal(t, requestID2, receivedResp2Retry.RequestId)
 
 		// Clean up
 		forwarder.Unsubscribe(ctx, requestID2)
@@ -599,5 +633,4 @@ func TestSubscribeUnsubscribe(t *testing.T) {
 	t.Run("unsubscribe non-existent subscription should not panic", func(t *testing.T) {
 		forwarder.Unsubscribe(ctx, "non-existent-request")
 	})
-
 }
