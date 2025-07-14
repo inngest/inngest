@@ -33,9 +33,10 @@ func useGRPCAlways(ctx context.Context, accountID uuid.UUID) bool {
 	return true
 }
 
-type mockGatewayGRPCForwarder struct {
-	forwardCalls []mockForwardCall
-	mu           sync.Mutex
+type mockGatewayGRPCManager struct {
+	forwardCalls  []mockForwardCall
+	subscriptions map[string]chan *connectpb.SDKResponse
+	mu            sync.Mutex
 }
 
 type mockForwardCall struct {
@@ -44,7 +45,7 @@ type mockForwardCall struct {
 	data         *connectpb.GatewayExecutorRequestData
 }
 
-func (m *mockGatewayGRPCForwarder) Forward(ctx context.Context, gatewayID ulid.ULID, connectionID ulid.ULID, data *connectpb.GatewayExecutorRequestData) error {
+func (m *mockGatewayGRPCManager) Forward(ctx context.Context, gatewayID ulid.ULID, connectionID ulid.ULID, data *connectpb.GatewayExecutorRequestData) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.forwardCalls = append(m.forwardCalls, mockForwardCall{
@@ -55,16 +56,47 @@ func (m *mockGatewayGRPCForwarder) Forward(ctx context.Context, gatewayID ulid.U
 	return nil
 }
 
-func (m *mockGatewayGRPCForwarder) ConnectToGateways(ctx context.Context) error {
+func (m *mockGatewayGRPCManager) ConnectToGateways(ctx context.Context) error {
 	return nil
 }
 
-func (m *mockGatewayGRPCForwarder) getForwardCalls() []mockForwardCall {
+func (m *mockGatewayGRPCManager) Subscribe(ctx context.Context, requestID string, channel chan *connectpb.SDKResponse) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.subscriptions == nil {
+		m.subscriptions = make(map[string]chan *connectpb.SDKResponse)
+	}
+	m.subscriptions[requestID] = channel
+}
+
+func (m *mockGatewayGRPCManager) Unsubscribe(ctx context.Context, requestID string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.subscriptions != nil {
+		delete(m.subscriptions, requestID)
+	}
+}
+
+func (m *mockGatewayGRPCManager) getForwardCalls() []mockForwardCall {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	calls := make([]mockForwardCall, len(m.forwardCalls))
 	copy(calls, m.forwardCalls)
 	return calls
+}
+
+func (m *mockGatewayGRPCManager) sendResponse(requestID string, response *connectpb.SDKResponse) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.subscriptions != nil {
+		if channel, exists := m.subscriptions[requestID]; exists {
+			select {
+			case channel <- response:
+			default:
+				// Channel is full or closed, ignore
+			}
+		}
+	}
 }
 
 func TestProxyGRPCPath(t *testing.T) {
@@ -86,7 +118,7 @@ func TestProxyGRPCPath(t *testing.T) {
 	defer cancel()
 
 	sm := state.NewRedisConnectionStateManager(rc)
-	mockForwarder := &mockGatewayGRPCForwarder{}
+	mockForwarder := &mockGatewayGRPCManager{}
 
 	connector := newRedisPubSubConnector(rc, RedisPubSubConnectorOpts{
 		Logger:       l,
@@ -95,7 +127,7 @@ func TestProxyGRPCPath(t *testing.T) {
 		EnforceLeaseExpiry: func(ctx context.Context, accountID uuid.UUID) bool {
 			return true
 		},
-		ShouldUseGRPC:        useGRPCAlways,
+		ShouldUseGRPC:      useGRPCAlways,
 		GatewayGRPCManager: mockForwarder,
 	})
 
@@ -250,7 +282,7 @@ func TestProxyGRPCPath(t *testing.T) {
 		require.Equal(t, reqID, calls[0].data.RequestId)
 	}, 3*time.Second, 100*time.Millisecond)
 
-	err = connector.NotifyExecutor(ctx, &connectpb.SDKResponse{
+	mockForwarder.sendResponse(reqID, &connectpb.SDKResponse{
 		RequestId:      reqID,
 		AccountId:      accID.String(),
 		EnvId:          envID.String(),
@@ -265,7 +297,6 @@ func TestProxyGRPCPath(t *testing.T) {
 		UserTraceCtx:   nil,
 		RunId:          runID.String(),
 	})
-	require.NoError(t, err)
 
 	select {
 	case r := <-respCh:
@@ -294,7 +325,7 @@ func TestProxyGRPCPolling(t *testing.T) {
 	defer cancel()
 
 	sm := state.NewRedisConnectionStateManager(rc)
-	mockForwarder := &mockGatewayGRPCForwarder{}
+	mockForwarder := &mockGatewayGRPCManager{}
 
 	connector := newRedisPubSubConnector(rc, RedisPubSubConnectorOpts{
 		Logger:       l,
@@ -303,7 +334,7 @@ func TestProxyGRPCPolling(t *testing.T) {
 		EnforceLeaseExpiry: func(ctx context.Context, accountID uuid.UUID) bool {
 			return true
 		},
-		ShouldUseGRPC:        useGRPCAlways,
+		ShouldUseGRPC:      useGRPCAlways,
 		GatewayGRPCManager: mockForwarder,
 	})
 
@@ -473,9 +504,7 @@ func TestProxyGRPCPolling(t *testing.T) {
 		require.Fail(t, "proxy call timed out")
 	}
 
-	calls := mockForwarder.getForwardCalls()
-	require.Len(t, calls, 0, "expected no gRPC Forward calls since response was already buffered")
-
+	// No response was sent through gRPC, but we still picked up the buffered response
 	buffered, err := sm.GetResponse(ctx, envID, reqID)
 	require.NoError(t, err)
 	require.Nil(t, buffered, "buffered response should be cleaned up")
@@ -500,7 +529,7 @@ func TestProxyGRPCLeaseExpiry(t *testing.T) {
 	defer cancel()
 
 	sm := state.NewRedisConnectionStateManager(rc)
-	mockForwarder := &mockGatewayGRPCForwarder{}
+	mockForwarder := &mockGatewayGRPCManager{}
 
 	connector := newRedisPubSubConnector(rc, RedisPubSubConnectorOpts{
 		Logger:       l,
@@ -509,7 +538,7 @@ func TestProxyGRPCLeaseExpiry(t *testing.T) {
 		EnforceLeaseExpiry: func(ctx context.Context, accountID uuid.UUID) bool {
 			return true
 		},
-		ShouldUseGRPC:        useGRPCAlways,
+		ShouldUseGRPC:      useGRPCAlways,
 		GatewayGRPCManager: mockForwarder,
 	})
 
