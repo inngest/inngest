@@ -177,7 +177,11 @@ func (d *devserver) Run(ctx context.Context) error {
 			fmt.Println("")
 			fmt.Println("")
 			fmt.Print(cli.BoldStyle.Render(fmt.Sprintf("\tInngest%s online ", prettyName)))
-			fmt.Printf("%s\n\n", cli.TextStyle.Render(fmt.Sprintf("at %s, visible at the following URLs:", addr)))
+			if d.Opts.NoUI {
+				fmt.Printf("%s\n\n", cli.TextStyle.Render(fmt.Sprintf("at %s, web UI and GraphQL API endpoint disabled:", addr)))
+			} else {
+				fmt.Printf("%s\n\n", cli.TextStyle.Render(fmt.Sprintf("at %s, visible at the following URLs:", addr)))
+			}
 			for n, ip := range localIPs() {
 				style := cli.BoldStyle
 				if n > 0 {

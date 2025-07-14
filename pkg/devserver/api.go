@@ -40,13 +40,19 @@ type devapi struct {
 	// TODO: Refactor this so that it's a part of the devserver, instead
 	// of holding a reference which is a weird pattern (tonyhb)
 	devserver *devserver
+	disableUI bool
 }
 
-func NewDevAPI(d *devserver) chi.Router {
+type DevAPIOptions struct {
+	disableUI bool
+}
+
+func NewDevAPI(d *devserver, o DevAPIOptions) chi.Router {
 	// Return a chi router, which lets us attach routes to a handler.
 	api := &devapi{
 		Router:    chi.NewMux(),
 		devserver: d,
+		disableUI: o.disableUI,
 	}
 	api.addRoutes()
 	return api
@@ -75,20 +81,23 @@ func (a *devapi) addRoutes() {
 	a.Post("/fn/state-size-limit", a.SetStateSizeLimit)
 	a.Delete("/fn/state-size-limit", a.RemoveStateSizeLimit)
 
-	// Go embeds files relative to the current source, which embeds
-	// all under ./static.  We remove the ./static
-	// directory by using fs.Sub: https://pkg.go.dev/io/fs#Sub.
-	staticFS, _ := fs.Sub(static, "static")
-	a.Get("/images/*", http.FileServer(http.FS(staticFS)).ServeHTTP)
+	// Only register static file serving if UI is enabled
+	if !a.disableUI {
+		// Go embeds files relative to the current source, which embeds
+		// all under ./static.  We remove the ./static
+		// directory by using fs.Sub: https://pkg.go.dev/io/fs#Sub.
+		staticFS, _ := fs.Sub(static, "static")
+		a.Get("/images/*", http.FileServer(http.FS(staticFS)).ServeHTTP)
 
-	a.Get("/assets/*", http.FileServer(http.FS(staticFS)).ServeHTTP)
-	a.Get("/_next/*", http.FileServer(http.FS(staticFS)).ServeHTTP)
-	a.Get("/{file}.txt", http.FileServer(http.FS(staticFS)).ServeHTTP)
-	a.Get("/{file}.svg", http.FileServer(http.FS(staticFS)).ServeHTTP)
-	a.Get("/{file}.jpg", http.FileServer(http.FS(staticFS)).ServeHTTP)
-	a.Get("/{file}.png", http.FileServer(http.FS(staticFS)).ServeHTTP)
-	// Everything else loads the UI.
-	a.NotFound(a.UI)
+		a.Get("/assets/*", http.FileServer(http.FS(staticFS)).ServeHTTP)
+		a.Get("/_next/*", http.FileServer(http.FS(staticFS)).ServeHTTP)
+		a.Get("/{file}.txt", http.FileServer(http.FS(staticFS)).ServeHTTP)
+		a.Get("/{file}.svg", http.FileServer(http.FS(staticFS)).ServeHTTP)
+		a.Get("/{file}.jpg", http.FileServer(http.FS(staticFS)).ServeHTTP)
+		a.Get("/{file}.png", http.FileServer(http.FS(staticFS)).ServeHTTP)
+		// Everything else loads the UI.
+		a.NotFound(a.UI)
+	}
 }
 
 func (a devapi) UI(w http.ResponseWriter, r *http.Request) {

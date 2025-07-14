@@ -836,59 +836,126 @@ func (w wrapper) GetEvents(ctx context.Context, accountID uuid.UUID, workspaceID
 		opts.Cursor = &endULID
 	}
 
-	var (
-		evts []*sqlc.Event
-		err  error
-	)
+	builder := newEventsQueryBuilder(ctx, *opts)
+	filter := builder.filter
+	order := builder.order
 
-	if len(opts.Names) == 0 {
-		params := sqlc.WorkspaceEventsParams{
-			Cursor: *opts.Cursor,
-			Before: opts.Newest,
-			After:  opts.Oldest,
-			Limit:  int64(opts.Limit),
-		}
-		evts, err = w.q.WorkspaceEvents(ctx, params)
-	} else {
-		params := sqlc.WorkspaceNamedEventsParams{
-			Names:  opts.Names,
-			Cursor: *opts.Cursor,
-			Before: opts.Newest,
-			After:  opts.Oldest,
-			Limit:  int64(opts.Limit),
-		}
-		evts, err = w.q.WorkspaceNamedEvents(ctx, params)
-	}
+	sql, args, err := sq.Dialect(w.dialect()).
+		From("events").
+		Select(
+			"internal_id",
+			"account_id",
+			"workspace_id",
+			"source",
+			"source_id",
+			"received_at",
+			"event_id",
+			"event_name",
+			"event_data",
+			"event_user",
+			"event_v",
+			"event_ts",
+		).
+		Where(filter...).
+		Order(order...).
+		Limit(uint(opts.Limit)).
+		Prepared(true).
+		ToSQL()
 
 	if err != nil {
 		return nil, err
 	}
-	out := make([]*cqrs.Event, len(evts))
-	for n, evt := range evts {
-		val := convertEvent(evt)
-		out[n] = &val
+
+	rows, err := w.db.QueryContext(ctx, sql, args...)
+	if err != nil {
+		return nil, err
 	}
+	defer rows.Close()
+
+	out := make([]*cqrs.Event, 0, opts.Limit)
+	for rows.Next() {
+		data := sqlc.Event{}
+		if err := rows.Scan(
+			&data.InternalID,
+			&data.AccountID,
+			&data.WorkspaceID,
+			&data.Source,
+			&data.SourceID,
+			&data.ReceivedAt,
+			&data.EventID,
+			&data.EventName,
+			&data.EventData,
+			&data.EventUser,
+			&data.EventV,
+			&data.EventTs,
+		); err != nil {
+			return nil, err
+		}
+		val := convertEvent(&data)
+		out = append(out, &val)
+	}
+
 	return out, nil
 }
 
-func (w wrapper) GetEventsCount(ctx context.Context, accountID uuid.UUID, workspaceID uuid.UUID, opts *cqrs.WorkspaceEventsOpts) (int64, error) {
+func (w wrapper) GetEventsCount(ctx context.Context, accountID uuid.UUID, workspaceID uuid.UUID, opts cqrs.WorkspaceEventsOpts) (int64, error) {
 	if err := opts.Validate(); err != nil {
 		return 0, err
 	}
 
-	if len(opts.Names) == 0 {
-		params := sqlc.WorkspaceCountEventsParams{
-			Before: opts.Newest,
-			After:  opts.Oldest,
-		}
-		return w.q.WorkspaceCountEvents(ctx, params)
-	} else {
-		params := sqlc.WorkspaceCountNamedEventsParams{
-			Names:  opts.Names,
-			Before: opts.Newest,
-			After:  opts.Oldest,
-		}
-		return w.q.WorkspaceCountNamedEvents(ctx, params)
+	// We don't want to consider cursor pagination for total count, so overwrite input param
+	opts.Cursor = &endULID
+
+	builder := newEventsQueryBuilder(ctx, opts)
+	filter := builder.filter
+	order := builder.order
+
+	sql, args, err := sq.Dialect(w.dialect()).
+		From("events").
+		Select(sq.COUNT("*").As("count")).
+		Where(filter...).
+		Order(order...).
+		Prepared(true).
+		ToSQL()
+	if err != nil {
+		return 0, err
+	}
+
+	var count int64
+	err = w.db.QueryRowContext(ctx, sql, args...).Scan(&count)
+	if err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
+type eventsQueryBuilder struct {
+	filter []sq.Expression
+	order  []sqexp.OrderedExpression
+}
+
+func newEventsQueryBuilder(ctx context.Context, opt cqrs.WorkspaceEventsOpts) *eventsQueryBuilder {
+	filter := []sq.Expression{}
+
+	filter = append(filter, sq.C("received_at").Lte(opt.Newest))
+	filter = append(filter, sq.C("received_at").Gte(opt.Oldest))
+	if opt.Cursor != nil {
+		filter = append(filter, sq.C("internal_id").Lt(*opt.Cursor))
+	}
+
+	if len(opt.Names) > 0 {
+		filter = append(filter, sq.C("event_name").In(opt.Names))
+	}
+	if !opt.IncludeInternalEvents {
+		filter = append(filter, sq.C("event_name").NotLike("inngest/%"))
+	}
+
+	order := []sqexp.OrderedExpression{}
+	order = append(order, sq.C("internal_id").Desc())
+
+	return &eventsQueryBuilder{
+		filter: filter,
+		order:  order,
 	}
 }
 
