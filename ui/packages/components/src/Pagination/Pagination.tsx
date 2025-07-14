@@ -26,15 +26,15 @@ const PAGE_NUMBER_BASE_CLASSES =
 
 const NARROW_VARIANT_BREAKPOINT = 450;
 
-interface PaginationProps {
+export interface PaginationProps {
   currentPage: number;
-  numPages: number;
   setCurrentPage: Dispatch<SetStateAction<number>>;
+  totalPages: number;
   variant?: 'normal' | 'narrow';
 }
 
 export function Pagination(props: PaginationProps) {
-  const { currentPage, numPages, setCurrentPage, variant: propVariant } = props;
+  const { currentPage, setCurrentPage, totalPages, variant: propVariant } = props;
 
   const outerRef = useRef<HTMLDivElement>(null);
   const [autoVariant, setAutoVariant] = useState<'narrow' | 'normal'>('normal');
@@ -52,11 +52,11 @@ export function Pagination(props: PaginationProps) {
 
   const variant = propVariant ?? autoVariant;
 
-  if (numPages === 0) return null;
+  if (totalPages === 0) return null;
 
   const pages = useMemo(
-    () => getVisiblePages({ current: currentPage, total: numPages, variant }),
-    [currentPage, numPages, variant]
+    () => getVisiblePages({ current: currentPage, total: totalPages, variant }),
+    [currentPage, totalPages, variant]
   );
 
   return (
@@ -114,10 +114,10 @@ interface CaretButtonProps extends PaginationProps {
 }
 
 function CaretButton({ typ, ...paginationProps }: CaretButtonProps) {
-  const { currentPage, numPages, setCurrentPage } = paginationProps;
+  const { currentPage, totalPages, setCurrentPage } = paginationProps;
 
   const onFirstPage = currentPage === 1;
-  const onLastPage = currentPage === numPages;
+  const onLastPage = currentPage === totalPages;
 
   let disabled = false;
   if (['back', 'first'].includes(typ) && onFirstPage) disabled = true;
@@ -143,7 +143,7 @@ function CaretButton({ typ, ...paginationProps }: CaretButtonProps) {
             setCurrentPage((p) => p + 1);
             break;
           case 'last':
-            setCurrentPage(paginationProps.numPages);
+            setCurrentPage(paginationProps.totalPages);
             break;
         }
       }}
