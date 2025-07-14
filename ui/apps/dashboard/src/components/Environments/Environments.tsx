@@ -1,6 +1,5 @@
 'use client';
 
-import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@inngest/components/Button';
 import {
@@ -10,18 +9,16 @@ import {
   DropdownMenuTrigger,
 } from '@inngest/components/DropdownMenu';
 import { AppsIcon } from '@inngest/components/icons/sections/Apps';
-import { cn } from '@inngest/components/utils/classNames';
 import { RiAddLine, RiMore2Line, RiSettingsLine } from '@remixicon/react';
 
 import Toaster from '@/components/Toaster';
 import LoadingIcon from '@/icons/LoadingIcon';
 import { useEnvironments } from '@/queries';
 import { EnvironmentType } from '@/utils/environments';
-import { EnvironmentArchiveDropdownItem } from './EnvironmentArchiveDropdownItem';
-import EnvironmentListTable from './EnvironmentListTable';
+import BranchEnvironmentListTable from './BranchEnvironmentListTable';
+import { CustomEnvironmentListTable } from './CustomEnvironmentListTable';
 
 export default function Environments() {
-  const [openCustomEnvDropdownId, setOpenCustomEnvDropdownId] = useState<string | null>(null);
   const router = useRouter();
   const [{ data: envs = [], fetching }] = useEnvironments();
 
@@ -74,55 +71,10 @@ export default function Environments() {
             <h2 className="text-lg font-medium">Custom Environments</h2>
             <Button href="create-environment" kind="primary" label="Create environment" />
           </div>
-          {customEnvs.length > 0 ? (
-            customEnvs.map((env) => (
-              <div
-                key={env.id}
-                className="border-subtle bg-canvasBase mt-4 flex items-center justify-between rounded-md border px-4 py-1.5"
-              >
-                <h3 className="flex items-center gap-2 text-sm font-medium">
-                  <span
-                    className={cn(
-                      'block h-2 w-2 rounded-full',
-                      env.isArchived ? 'bg-surfaceMuted' : 'bg-primary-moderate '
-                    )}
-                  />
-                  {env.name}
-                </h3>
-                <DropdownMenu
-                  modal
-                  open={openCustomEnvDropdownId === env.id}
-                  onOpenChange={(open) => setOpenCustomEnvDropdownId(open ? env.id : null)}
-                >
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      kind="secondary"
-                      appearance="outlined"
-                      size="medium"
-                      icon={<RiMore2Line />}
-                    />
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent>
-                    <DropdownMenuItem onSelect={() => router.push(`/env/${env.slug}/manage`)}>
-                      <RiSettingsLine className="h-4 w-4" />
-                      Manage
-                    </DropdownMenuItem>
 
-                    <DropdownMenuItem onSelect={() => router.push(`/env/${env.slug}/apps`)}>
-                      <AppsIcon className="h-4 w-4" />
-                      Go to apps
-                    </DropdownMenuItem>
-                    <EnvironmentArchiveDropdownItem
-                      env={env}
-                      onClose={() => setOpenCustomEnvDropdownId(null)}
-                    />
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </div>
-            ))
-          ) : (
-            <p className="text-basis py-3 text-center text-sm">No custom environments yet</p>
-          )}
+          <div className="border-subtle mt-8 overflow-hidden rounded-md border">
+            <CustomEnvironmentListTable envs={customEnvs} />
+          </div>
         </div>
 
         {Boolean(branchParent) && (
@@ -158,8 +110,8 @@ export default function Environments() {
               </div>
             </div>
 
-            <div className=" border-subtle mt-8 overflow-hidden rounded-md border">
-              <EnvironmentListTable envs={branches} />
+            <div className="border-subtle mt-8 overflow-hidden rounded-md border">
+              <BranchEnvironmentListTable envs={branches} />
             </div>
           </div>
         )}
