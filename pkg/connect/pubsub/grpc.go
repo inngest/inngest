@@ -114,9 +114,7 @@ func (i *gatewayGRPCManager) Reply(ctx context.Context, req *connectpb.ReplyRequ
 }
 
 func (i *gatewayGRPCManager) Ack(ctx context.Context, req *connectpb.AckMessage) (*connectpb.AckResponse, error) {
-	key := fmt.Sprintf("worker_requests_ack:%s", req.RequestId)
-
-	if ch, ok := i.inFlightAcks.Load(key); ok {
+	if ch, ok := i.inFlightAcks.Load(req.RequestId); ok {
 		ackChan := ch.(chan *connectpb.AckMessage)
 
 		select {
@@ -141,10 +139,8 @@ func (i *gatewayGRPCManager) Subscribe(ctx context.Context, requestID string) ch
 }
 
 func (i *gatewayGRPCManager) SubscribeWorkerAck(ctx context.Context, requestID string) chan *connectpb.AckMessage {
-	key := fmt.Sprintf("worker_requests_ack:%s", requestID)
-
 	channel := make(chan *connectpb.AckMessage)
-	i.inFlightAcks.Store(key, channel)
+	i.inFlightAcks.Store(requestID, channel)
 	return channel
 }
 
@@ -157,9 +153,7 @@ func (i *gatewayGRPCManager) Unsubscribe(ctx context.Context, requestID string) 
 }
 
 func (i *gatewayGRPCManager) UnsubscribeWorkerAck(ctx context.Context, requestID string) {
-	key := fmt.Sprintf("worker_requests_ack:%s", requestID)
-
-	ch, loaded := i.inFlightAcks.LoadAndDelete(key)
+	ch, loaded := i.inFlightAcks.LoadAndDelete(requestID)
 	if loaded {
 		replyChan := ch.(chan *connectpb.AckMessage)
 		close(replyChan)
