@@ -86,12 +86,16 @@ func (i *gatewayGRPCManager) gRPCServerListen(ctx context.Context) {
 
 	l, err := net.Listen("tcp", addr)
 	if err != nil {
-		i.logger.Error("could not listen for: %w", err)
+		i.logger.Error("could not listen for grpc", "err", err, "addr", addr)
 		return
 	}
 
 	i.logger.Info("starting executor grpc server", "addr", addr)
-	i.grpcServer.Serve(l)
+	err = i.grpcServer.Serve(l)
+	if err != nil {
+		i.logger.Error("could not serve for grpc", "err", err, "addr", addr)
+		return
+	}
 }
 
 func (i *gatewayGRPCManager) Reply(ctx context.Context, req *connectpb.ReplyRequest) (*connectpb.ReplyResponse, error) {
