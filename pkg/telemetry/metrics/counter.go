@@ -148,11 +148,11 @@ func IncrBatchProcessStartCounter(ctx context.Context, opts CounterOpt) {
 	})
 }
 
-func IncrInstrumentationLeaseClaimsCounter(ctx context.Context, opts CounterOpt) {
+func IncrPartitionIterateLeaseClaimsCounter(ctx context.Context, opts CounterOpt) {
 	RecordCounterMetric(ctx, 1, CounterOpt{
 		PkgName:     opts.PkgName,
-		MetricName:  "queue_instrumentation_lease_claims_total",
-		Description: "Total number of instrumentation lease claimed by executors",
+		MetricName:  "queue_partition_iterate_lease_claims_total",
+		Description: "Total number of partition iterator leases claimed by executors",
 		Tags:        opts.Tags,
 	})
 }
