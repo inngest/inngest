@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
+import { useCallback, useEffect, useMemo, useState, type SetStateAction } from 'react';
 
 export type UsePaginationConfig<T> = {
   data: Array<T>;
@@ -46,6 +46,13 @@ export function usePagination<T>({
   const currentPageData = useMemo(() => {
     return data.slice((currentPage - 1) * pageSize, currentPage * pageSize);
   }, [data, currentPage, pageSize]);
+
+  useEffect(() => {
+    if (currentPage !== 1 && (currentPage > totalPages || currentPage < 1)) {
+      console.warn(`usePagination: currentPage is out of bounds; setting to 1.`);
+      setCurrentPage(1);
+    }
+  }, [currentPage, totalPages]);
 
   return useMemo(
     () => ({
