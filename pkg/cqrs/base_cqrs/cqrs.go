@@ -42,7 +42,6 @@ const (
 var (
 	// end represents a ulid ending with 'Z', eg. a far out cursor.
 	endULID = ulid.ULID([16]byte{'Z'})
-	nilULID = ulid.ULID{}
 	nilUUID = uuid.UUID{}
 )
 
@@ -971,7 +970,7 @@ func (w wrapper) GetEventsIDbound(
 	}
 
 	if ids.After == nil {
-		ids.After = &nilULID
+		ids.After = &ulid.Zero
 	}
 
 	evts, err := w.q.GetEventsIDbound(ctx, sqlc.GetEventsIDboundParams{
@@ -1141,10 +1140,10 @@ func toCQRSRun(run sqlc.FunctionRun, finish sqlc.FunctionFinish) *cqrs.FunctionR
 		EventID:         run.EventID,
 		WorkspaceID:     run.WorkspaceID,
 	}
-	if run.BatchID != nilULID {
+	if !run.BatchID.IsZero() {
 		copied.BatchID = &run.BatchID
 	}
-	if run.OriginalRunID != nilULID {
+	if !run.OriginalRunID.IsZero() {
 		copied.OriginalRunID = &run.OriginalRunID
 	}
 	if run.Cron.Valid {
@@ -1355,7 +1354,7 @@ func (w wrapper) GetTraceRunsByTriggerID(ctx context.Context, triggerID ulid.ULI
 			cron    *string
 		)
 
-		if run.BatchID != nilULID {
+		if !run.BatchID.IsZero() {
 			isBatch = true
 			batchID = &run.BatchID
 		}
@@ -1405,7 +1404,7 @@ func (w wrapper) GetTraceRun(ctx context.Context, id cqrs.TraceRunIdentifier) (*
 		cron    *string
 	)
 
-	if run.BatchID != nilULID {
+	if !run.BatchID.IsZero() {
 		isBatch = true
 		batchID = &run.BatchID
 	}
@@ -1860,7 +1859,7 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 			cron = &data.CronSchedule.String
 		}
 		var batchID *ulid.ULID
-		isBatch := data.BatchID != nilULID
+		isBatch := !data.BatchID.IsZero()
 		if isBatch {
 			batchID = &data.BatchID
 		}

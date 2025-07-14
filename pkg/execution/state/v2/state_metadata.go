@@ -185,7 +185,7 @@ func (c *Config) EventID() ulid.ULID {
 	if len(c.EventIDs) > 0 {
 		return c.EventIDs[0]
 	}
-	return ulid.ULID{}
+	return ulid.Zero
 }
 
 func (c *Config) GetSpanID() (*trace.SpanID, error) {

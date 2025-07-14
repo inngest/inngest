@@ -232,7 +232,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 			},
 		}, start, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
-		require.NotEqual(t, item.ID, ulid.ULID{})
+		require.NotEqual(t, item.ID, ulid.Zero)
 		require.Equal(t, time.UnixMilli(item.WallTimeMS).Truncate(time.Second), start)
 
 		// Ensure that our data is set up correctly.
@@ -675,7 +675,7 @@ func TestQueueEnqueueItem(t *testing.T) {
 			},
 		}, start, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
-		require.NotEqual(t, item.ID, ulid.ULID{})
+		require.NotEqual(t, item.ID, ulid.Zero)
 		require.Equal(t, time.UnixMilli(item.WallTimeMS).Truncate(time.Second), start)
 
 		assert.Equal(t, QueuePartition{
@@ -840,7 +840,7 @@ func TestQueueSystemPartitions(t *testing.T) {
 	t.Run("It enqueues an item", func(t *testing.T) {
 		item, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi, start, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
-		require.NotEqual(t, item.ID, ulid.ULID{})
+		require.NotEqual(t, item.ID, ulid.Zero)
 		require.Equal(t, time.UnixMilli(item.WallTimeMS).Truncate(time.Second), start)
 
 		// Ensure that our data is set up correctly.
@@ -895,12 +895,12 @@ func TestQueueSystemPartitions(t *testing.T) {
 	t.Run("leases partition items while respecting concurrency", func(t *testing.T) {
 		item, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi, start, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
-		require.NotEqual(t, item.ID, ulid.ULID{})
+		require.NotEqual(t, item.ID, ulid.Zero)
 		require.Equal(t, time.UnixMilli(item.WallTimeMS).Truncate(time.Second), start)
 
 		item2, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi, start, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
-		require.NotEqual(t, item.ID, ulid.ULID{})
+		require.NotEqual(t, item.ID, ulid.Zero)
 		require.Equal(t, time.UnixMilli(item.WallTimeMS).Truncate(time.Second), start)
 
 		// Ensure that our data is set up correctly.
@@ -933,7 +933,7 @@ func TestQueueSystemPartitions(t *testing.T) {
 
 		item, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi, start, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
-		require.NotEqual(t, item.ID, ulid.ULID{})
+		require.NotEqual(t, item.ID, ulid.Zero)
 		require.Equal(t, time.UnixMilli(item.WallTimeMS).Truncate(time.Second), start)
 
 		qp := getSystemPartition(t, r, customQueueName)
@@ -1030,7 +1030,7 @@ func TestQueueSystemPartitions(t *testing.T) {
 
 		item, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi, start, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
-		require.NotEqual(t, item.ID, ulid.ULID{})
+		require.NotEqual(t, item.ID, ulid.Zero)
 		require.Equal(t, time.UnixMilli(item.WallTimeMS).Truncate(time.Second), start)
 
 		// Ensure that our data is set up correctly.
@@ -2133,7 +2133,7 @@ func TestQueueExtendLease(t *testing.T) {
 		item = getQueueItem(t, r, item.ID)
 		require.Nil(t, item.LeaseID)
 
-		nextID, err := q.ExtendLease(ctx, item, ulid.ULID{}, 10*time.Second)
+		nextID, err := q.ExtendLease(ctx, item, ulid.Zero, 10*time.Second)
 		require.EqualValues(t, ErrQueueItemNotLeased, err)
 		require.Nil(t, nextID)
 
@@ -3833,7 +3833,7 @@ func TestQueueScavenge(t *testing.T) {
 
 		item, err := q.EnqueueItem(ctx, q.primaryQueueShard, qi, start, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
-		require.NotEqual(t, item.ID, ulid.ULID{})
+		require.NotEqual(t, item.ID, ulid.Zero)
 		require.Equal(t, time.UnixMilli(item.WallTimeMS).Truncate(time.Second), start)
 
 		qp := getDefaultPartition(t, r, id)

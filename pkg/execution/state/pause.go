@@ -323,7 +323,7 @@ func (p Pause) GetResumeData(evt event.Event) ResumeData {
 	isInvokeFunctionOpcode := p.Opcode != nil && *p.Opcode == enums.OpcodeInvokeFunction.String()
 	if isInvokeFunctionOpcode && evt.IsFinishedEvent() {
 		if retRunID, ok := evt.Data["run_id"].(string); ok {
-			if ulidRunID, _ := ulid.Parse(retRunID); ulidRunID != (ulid.ULID{}) {
+			if ulidRunID, _ := ulid.Parse(retRunID); !ulidRunID.IsZero() {
 				ret.RunID = &ulidRunID
 			}
 		}
