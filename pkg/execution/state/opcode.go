@@ -484,3 +484,30 @@ func (g *GeneratorOpcode) AIGatewayOpts() (aigateway.Request, error) {
 
 	return req, nil
 }
+
+// OptimizedParallelism returns true if the step has optimized parallelism
+// enabled. Defaults to true (including if there any errors)
+func (g *GeneratorOpcode) OptimizedParallelism() bool {
+	var optByt []byte
+	switch typ := g.Opts.(type) {
+	case []byte:
+		optByt = typ
+	default:
+		var err error
+		optByt, err = json.Marshal(g.Opts)
+		if err != nil {
+			return true
+		}
+	}
+
+	var opts map[string]any
+	if err := json.Unmarshal(optByt, &opts); err != nil {
+		return true
+	}
+
+	v, ok := opts["opt_par"].(bool)
+	if !ok {
+		return true
+	}
+	return v
+}

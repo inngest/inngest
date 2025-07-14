@@ -503,6 +503,20 @@ func GetEdge(i Item) (*PayloadEdge, error) {
 	}
 }
 
+// OptimizedParallelism returns true if the item has optimized parallelism
+// enabled.
+func (i Item) OptimizedParallelism() bool {
+	optPar, ok := i.Metadata["opt_par"].(bool)
+	if !ok {
+		return true
+	}
+	return optPar
+}
+
+func (i *Item) SetOptimizedParallelism(optPar bool) {
+	i.Metadata["opt_par"] = optPar
+}
+
 // PayloadEdge is the payload stored when enqueueing an edge traversal to execute
 // the incoming step of the edge.
 type PayloadEdge struct {

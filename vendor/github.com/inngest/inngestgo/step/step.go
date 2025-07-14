@@ -11,9 +11,10 @@ type ControlHijack struct{}
 type ctxKey string
 
 const (
-	targetStepIDKey = ctxKey("stepID")
-	ParallelKey     = ctxKey("parallelKey")
-	isWithinStepKey = ctxKey("in-step")
+	targetStepIDKey     = ctxKey("stepID")
+	ParallelKey         = ctxKey("parallelKey")
+	OptimizeParallelKey = ctxKey("optimizeParallelKey")
+	isWithinStepKey     = ctxKey("in-step")
 )
 
 var (
@@ -79,4 +80,13 @@ func IsWithinStep(ctx context.Context) bool {
 
 func setWithinStep(ctx context.Context) context.Context {
 	return context.WithValue(ctx, isWithinStepKey, &struct{}{})
+}
+
+func optimizeParallel(ctx context.Context) *bool {
+	if v := ctx.Value(OptimizeParallelKey); v != nil {
+		if c, ok := v.(bool); ok {
+			return &c
+		}
+	}
+	return nil
 }

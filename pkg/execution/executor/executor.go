@@ -2455,8 +2455,9 @@ func (e *executor) handleGeneratorStep(ctx context.Context, i *runInstance, gen 
 		Payload:               queue.PayloadEdge{Edge: nextEdge},
 		Metadata:              make(map[string]any),
 	}
+	nextItem.SetOptimizedParallelism(gen.OptimizedParallelism())
 
-	if !hasPendingSteps {
+	if !hasPendingSteps || !i.item.OptimizedParallelism() {
 		span, err := e.tracerProvider.CreateDroppableSpan(
 			meta.SpanNameStepDiscovery,
 			&tracing.CreateSpanOptions{
@@ -2598,8 +2599,9 @@ func (e *executor) handleStepError(ctx context.Context, i *runInstance, gen stat
 		Payload:               queue.PayloadEdge{Edge: nextEdge},
 		Metadata:              make(map[string]any),
 	}
+	nextItem.SetOptimizedParallelism(gen.OptimizedParallelism())
 
-	if !hasPendingSteps {
+	if !hasPendingSteps || !i.item.OptimizedParallelism() {
 		span, err := e.tracerProvider.CreateDroppableSpan(
 			meta.SpanNameStepDiscovery,
 			&tracing.CreateSpanOptions{
@@ -2672,6 +2674,7 @@ func (e *executor) handleGeneratorStepPlanned(ctx context.Context, i *runInstanc
 		},
 		Metadata: make(map[string]any),
 	}
+	nextItem.SetOptimizedParallelism(gen.OptimizedParallelism())
 
 	span, err := e.tracerProvider.CreateDroppableSpan(
 		meta.SpanNameStep,
@@ -2743,6 +2746,7 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, i *runInstance, gen
 		Payload:               queue.PayloadEdge{Edge: nextEdge},
 		Metadata:              make(map[string]any),
 	}
+	nextItem.SetOptimizedParallelism(gen.OptimizedParallelism())
 
 	span, err := e.tracerProvider.CreateDroppableSpan(
 		meta.SpanNameStep,
@@ -2880,7 +2884,7 @@ func (e *executor) handleGeneratorGateway(ctx context.Context, i *runInstance, g
 		Payload:               queue.PayloadEdge{Edge: nextEdge},
 	}
 
-	if !hasPendingSteps {
+	if !hasPendingSteps || !i.item.OptimizedParallelism() {
 		err = e.queue.Enqueue(ctx, nextItem, now, queue.EnqueueOpts{})
 		if err == redis_state.ErrQueueItemExists {
 			return nil
@@ -3039,7 +3043,7 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, i *runInstance,
 		Payload:               queue.PayloadEdge{Edge: nextEdge},
 	}
 
-	if !hasPendingSteps {
+	if !hasPendingSteps || !i.item.OptimizedParallelism() {
 		err = e.queue.Enqueue(ctx, nextItem, now, queue.EnqueueOpts{})
 		if err == redis_state.ErrQueueItemExists {
 			return nil
@@ -3409,6 +3413,7 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, i *runInstan
 		},
 		Metadata: make(map[string]any),
 	}
+	nextItem.SetOptimizedParallelism(gen.OptimizedParallelism())
 
 	span, err := e.tracerProvider.CreateDroppableSpan(
 		meta.SpanNameStep,

@@ -29,7 +29,22 @@ func Parallel(
 	ctx context.Context,
 	fns ...func(ctx context.Context) (any, error),
 ) Results {
+	return ParallelWithOpts(ctx, ParallelOpts{}, fns...)
+}
+
+type ParallelOpts struct {
+	Optimize *bool
+}
+
+func ParallelWithOpts(
+	ctx context.Context,
+	opts ParallelOpts,
+	fns ...func(ctx context.Context) (any, error),
+) Results {
 	ctx = context.WithValue(ctx, step.ParallelKey, true)
+	if opts.Optimize != nil {
+		ctx = context.WithValue(ctx, step.OptimizeParallelKey, *opts.Optimize)
+	}
 
 	results := Results{}
 	isPlanned := false

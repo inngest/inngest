@@ -85,14 +85,19 @@ func Run[T any](
 		panic(ControlHijack{})
 	}
 
+	optimizeParallel := optimizeParallel(ctx)
 	planParallel := targetID == nil && isParallel(ctx)
 	planBeforeRun := targetID == nil && mgr.Request().CallCtx.DisableImmediateExecution
 	if planParallel || planBeforeRun {
-		mgr.AppendOp(sdkrequest.GeneratorOpcode{
+		op := sdkrequest.GeneratorOpcode{
 			ID:   hashedID,
 			Op:   enums.OpcodeStepPlanned,
 			Name: id,
-		})
+		}
+		if optimizeParallel != nil && !*optimizeParallel {
+			op.Opts = map[string]any{"opt_par": false}
+		}
+		mgr.AppendOp(op)
 		panic(ControlHijack{})
 	}
 
