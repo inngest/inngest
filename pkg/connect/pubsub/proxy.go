@@ -289,9 +289,9 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 		case <-gatewayAckSubscribed:
 		case <-time.After(5 * time.Second):
 			return nil, fmt.Errorf("did not subscribe to gateway ack within 5s")
-	}
+		}
 
-	// Receive worker acknowledgement for o11y (this is not a reliable channel - do not depend on it for the critical path)
+		// Receive worker acknowledgement for o11y (this is not a reliable channel - do not depend on it for the critical path)
 		workerAckSubscribed := make(chan struct{})
 		go func() {
 			i.subscribe(ctx, i.channelAppRequestsAck(opts.Data.RequestId, AckSourceWorker), func(_ string) {

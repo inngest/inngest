@@ -719,8 +719,10 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 			}
 
 			useGRPC := c.svc.shouldUseGRPC(ctx, accountID)
+			var transport string
 
 			if useGRPC {
+				transport = "grpc"
 
 				grpcClient, err := c.svc.getOrCreateGRPCClient(ctx, c.log, c.conn.EnvID, data.RequestId)
 				if err != nil {
@@ -731,22 +733,22 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 					}
 				}
 
-				_, err = grpcClient.Ack(ctx, &connectpb.AckMessage{
+				reply, err := grpcClient.Ack(ctx, &connectpb.AckMessage{
 					RequestId: data.RequestId,
 					Ts:        timestamppb.Now()})
 
-				if err != nil {
+				if err != nil || !reply.Success {
 					// This should never happen: Failing the ack means we will redeliver the same request even though
 					// the worker already started processing it.
-					c.log.Error("failed to ack message", "err", err)
+					c.log.Error("failed to ack message through gRPC", "err", err, "reply", reply)
 					return &connecterrors.SocketError{
 						SysCode:    syscode.CodeConnectInternal,
 						StatusCode: websocket.StatusInternalError,
-						Msg:        "could not ack message",
+						Msg:        "could not ack message through gRPC",
 					}
 				}
-
 			} else {
+				transport = "pubsub"
 				// This will be sent exactly once, as the router selected this gateway to handle the request
 				// Even if the gateway is draining, we should ack the message, the SDK will buffer messages and use a new connection to report results
 				err := c.svc.receiver.AckMessage(context.Background(), data.RequestId, pubsub.AckSourceWorker)
@@ -765,6 +767,7 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 			c.log.Debug("worker acked message",
 				"req_id", data.RequestId,
 				"run_id", data.RunId,
+				"transport", transport,
 			)
 
 			// TODO Should we send a reverse ack to the worker to start processing the request?
@@ -938,7 +941,7 @@ func (c *connectionHandler) receiveRouterMessagesFromGRPC(ctx context.Context, o
 				"fn_slug", data.FunctionSlug,
 				"step_id", data.StepId,
 				"run_id", data.RunId,
-				"method", "grpc",
+				"transport", "grpc",
 			)
 
 			log.Debug("gateway received grpc message")
@@ -987,7 +990,7 @@ func (c *connectionHandler) receiveRouterMessagesFromPubsub(ctx context.Context,
 			"fn_slug", data.FunctionSlug,
 			"step_id", data.StepId,
 			"run_id", data.RunId,
-			"method", "pubsub",
+			"transport", "pubsub",
 		)
 
 		log.Debug("gateway received msg")
