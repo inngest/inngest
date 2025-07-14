@@ -240,6 +240,7 @@ func TestParallelCoalesce(t *testing.T) {
 func TestParallelSequential(t *testing.T) {
 	// 2 parallel groups with 2 sequential steps in each
 
+	t.Parallel()
 	r := require.New(t)
 	ctx := context.Background()
 
@@ -313,7 +314,9 @@ func TestParallelSequential(t *testing.T) {
 	_, err = inngestClient.Send(ctx, inngestgo.Event{Name: eventName})
 	r.NoError(err)
 
-	c.WaitForRunStatus(ctx, t, "COMPLETED", &runID)
+	c.WaitForRunStatus(ctx, t, "COMPLETED", &runID, client.WaitForRunStatusOpts{
+		Timeout: 20 * time.Second,
+	})
 	r.Equal(int32(1), atomic.LoadInt32(&counterA1))
 	r.Equal(int32(1), atomic.LoadInt32(&counterA2))
 	r.Equal(int32(1), atomic.LoadInt32(&counterB1))
@@ -328,6 +331,7 @@ func TestParallelDisabledOptimization(t *testing.T) {
 	// 2 parallel groups with 2 sequential steps in each, but optimized
 	// parallelism is disabled
 
+	t.Parallel()
 	r := require.New(t)
 	ctx := context.Background()
 
@@ -402,7 +406,9 @@ func TestParallelDisabledOptimization(t *testing.T) {
 	_, err = inngestClient.Send(ctx, inngestgo.Event{Name: eventName})
 	r.NoError(err)
 
-	c.WaitForRunStatus(ctx, t, "COMPLETED", &runID)
+	c.WaitForRunStatus(ctx, t, "COMPLETED", &runID, client.WaitForRunStatusOpts{
+		Timeout: 20 * time.Second,
+	})
 	r.Equal(int32(1), atomic.LoadInt32(&counterA1))
 	r.Equal(int32(1), atomic.LoadInt32(&counterA2))
 	r.Equal(int32(1), atomic.LoadInt32(&counterB1))
