@@ -540,7 +540,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	// start the API
 	// Create a new API endpoint which hosts SDK-related functionality for
 	// registering functions.
-	devAPI := NewDevAPI(ds)
+	devAPI := NewDevAPI(ds, DevAPIOptions{disableUI: false})
 
 	devAPI.Route("/v1", func(r chi.Router) {
 		// Add the V1 API to our dev server API.
@@ -571,6 +571,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		return fmt.Errorf("failed to create connect pubsub connector: %w", err)
 	}
 
+	// TODO wire up new EnableGraphQL option with --no-ui flag
 	core, err := coreapi.NewCoreApi(coreapi.Options{
 		Data:          ds.Data,
 		Config:        ds.Opts.Config,
@@ -880,7 +881,7 @@ func PartitionConstraintConfigGetter(dbcqrs cqrs.Manager) redis_state.PartitionC
 
 		constraints := redis_state.PartitionConstraintConfig{
 			FunctionVersion: fn.FunctionVersion,
-			
+
 			Concurrency: redis_state.ShadowPartitionConcurrency{
 				SystemConcurrency:     consts.DefaultConcurrencyLimit,
 				AccountConcurrency:    accountLimit,
