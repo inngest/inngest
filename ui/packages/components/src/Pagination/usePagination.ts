@@ -1,4 +1,4 @@
-import { useMemo, useState, type Dispatch, type SetStateAction } from 'react';
+import { useCallback, useMemo, useState, type Dispatch, type SetStateAction } from 'react';
 
 export type UsePaginationConfig<T> = {
   data: Array<T>;
@@ -8,7 +8,7 @@ export type UsePaginationConfig<T> = {
 export type UsePaginationOutput<T> = {
   currentPage: number;
   currentPageData: T[];
-  setCurrentPage: Dispatch<SetStateAction<number>>;
+  setCurrentPage: (action: SetStateAction<number>) => void;
   totalPages: number;
 };
 
@@ -20,12 +20,40 @@ export function usePagination<T>({
 
   const totalPages = Math.ceil(data.length / pageSize);
 
+  const setCurrentPageSafe = useCallback(
+    (action: SetStateAction<number>) => {
+      setCurrentPage((prev: number) => {
+        const newPage = typeof action === 'function' ? action(prev) : action;
+
+        if (newPage < 1) {
+          console.warn(`usePagination: newPage is less than 1; setting to 1.`);
+          return 1;
+        }
+
+        if (newPage > totalPages) {
+          console.warn(
+            `usePagination: newPage is greater than totalPages; setting to ${totalPages}.`
+          );
+          return totalPages;
+        }
+
+        return newPage;
+      });
+    },
+    [totalPages]
+  );
+
   const currentPageData = useMemo(() => {
     return data.slice((currentPage - 1) * pageSize, currentPage * pageSize);
   }, [data, currentPage, pageSize]);
 
   return useMemo(
-    () => ({ totalPages, currentPage, setCurrentPage, currentPageData }),
-    [currentPage, currentPageData, totalPages, setCurrentPage]
+    () => ({
+      currentPage,
+      currentPageData,
+      setCurrentPage: setCurrentPageSafe,
+      totalPages,
+    }),
+    [currentPage, currentPageData, totalPages, setCurrentPageSafe]
   );
 }

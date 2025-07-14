@@ -28,7 +28,7 @@ const NARROW_VARIANT_BREAKPOINT = 450;
 
 export interface PaginationProps {
   currentPage: number;
-  setCurrentPage: Dispatch<SetStateAction<number>>;
+  setCurrentPage: (action: SetStateAction<number>) => void;
   totalPages: number;
   variant?: 'normal' | 'narrow';
 }
