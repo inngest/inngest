@@ -209,7 +209,7 @@ export default function EnvironmentSelectMenu({
               <NextLink
                 prefetch={true}
                 href="/env"
-                className="hover:bg-canvasSubtle text-subtle flex h-10 cursor-pointer items-center gap-2 whitespace-nowrap px-3 text-[13px] font-normal"
+                className="hover:bg-canvasSubtle text-subtle flex h-10 cursor-pointer items-center gap-3 whitespace-nowrap px-3 text-[13px] font-normal"
               >
                 <RiCloudFill className="h-3 w-3" />
                 View All Environments
