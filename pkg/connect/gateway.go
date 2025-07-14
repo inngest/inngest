@@ -30,6 +30,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 const (
@@ -715,17 +716,87 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 				}
 			}
 
-			// This will be sent exactly once, as the router selected this gateway to handle the request
-			// Even if the gateway is draining, we should ack the message, the SDK will buffer messages and use a new connection to report results
-			err := c.svc.receiver.AckMessage(context.Background(), data.RequestId, pubsub.AckSourceWorker)
+			accountID, err := uuid.Parse(data.AccountId)
 			if err != nil {
-				// This should never happen: Failing the ack means we will redeliver the same request even though
-				// the worker already started processing it.
-				c.log.Error("failed to ack message", "err", err)
 				return &connecterrors.SocketError{
 					SysCode:    syscode.CodeConnectInternal,
 					StatusCode: websocket.StatusInternalError,
-					Msg:        "could not ack message",
+					Msg:        "accountID is not a valid UUID",
+				}
+			}
+
+			useGRPC := c.svc.shouldUseGRPC(ctx, accountID)
+
+			if useGRPC {
+
+				executorIP, err := c.svc.stateManager.GetExecutorIP(ctx, c.conn.EnvID, data.RequestId)
+				if err != nil {
+					return &connecterrors.SocketError{
+						SysCode:    syscode.CodeConnectInternal,
+						StatusCode: websocket.StatusInternalError,
+						Msg:        "could not get executor",
+					}
+				}
+
+				grpcURL := net.JoinHostPort(executorIP.String(), fmt.Sprintf("%d", connectConfig.Executor(ctx).GRPCPort))
+
+				var grpcClient connectpb.ConnectExecutorClient
+				c.grpcLock.RLock()
+				grpcClient = c.grpcClients[executorIP.String()]
+				c.grpcLock.RUnlock()
+
+				if grpcClient == nil {
+					// Upgrade lock to make sure that only one instance is creating a grpc client
+					c.grpcLock.Lock()
+					grpcClient = c.grpcClients[executorIP.String()]
+
+					if grpcClient == nil {
+						logger.StdlibLogger(ctx).Info("grpc client not found for executor, creating one dynamically", "url", grpcURL)
+
+						conn, err := grpc.NewClient(grpcURL, grpc.WithTransportCredentials(insecure.NewCredentials()))
+						if err != nil {
+							c.grpcLock.Unlock()
+							return &connecterrors.SocketError{
+								SysCode:    syscode.CodeConnectInternal,
+								StatusCode: websocket.StatusInternalError,
+								Msg:        "could not create grpc client to ack",
+							}
+						}
+
+						grpcClient = connectpb.NewConnectExecutorClient(conn)
+						c.grpcClients[executorIP.String()] = grpcClient
+					}
+					c.grpcLock.Unlock()
+				}
+
+				_, err = grpcClient.Ack(ctx, &connectpb.AckMessage{
+					RequestId: data.RequestId,
+					Ts:        timestamppb.Now()})
+
+				if err != nil {
+					// This should never happen: Failing the ack means we will redeliver the same request even though
+					// the worker already started processing it.
+					c.log.Error("failed to ack message", "err", err)
+					return &connecterrors.SocketError{
+						SysCode:    syscode.CodeConnectInternal,
+						StatusCode: websocket.StatusInternalError,
+						Msg:        "could not ack message",
+					}
+				}
+
+			} else {
+				// This will be sent exactly once, as the router selected this gateway to handle the request
+				// Even if the gateway is draining, we should ack the message, the SDK will buffer messages and use a new connection to report results
+				err := c.svc.receiver.AckMessage(context.Background(), data.RequestId, pubsub.AckSourceWorker)
+				if err != nil {
+					// This should never happen: Failing the ack means we will redeliver the same request even though
+					// the worker already started processing it.
+					c.log.Error("failed to ack message", "err", err)
+					return &connecterrors.SocketError{
+						SysCode:    syscode.CodeConnectInternal,
+						StatusCode: websocket.StatusInternalError,
+						Msg:        "could not ack message",
+					}
 				}
 			}
 

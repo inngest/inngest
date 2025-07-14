@@ -24,7 +24,10 @@ type GatewayGRPCForwarder interface {
 
 type GatewayGRPCReceiver interface {
 	Subscribe(ctx context.Context, requestID string) chan *connectpb.SDKResponse
+	SubscribeWorkerAck(ctx context.Context, requestID string) chan *connectpb.AckMessage
+
 	Unsubscribe(ctx context.Context, requestID string)
+	UnsubscribeWorkerAck(ctx context.Context, requestID string)
 }
 
 type GatewayGRPCManager interface {
@@ -45,6 +48,7 @@ type gatewayGRPCManager struct {
 	connectpb.ConnectExecutorServer
 	grpcServer       *grpc.Server
 	inFlightRequests sync.Map
+	inFlightAcks     sync.Map
 }
 
 type GRPCDialer func(target string, opts ...grpc.DialOption) (*grpc.ClientConn, error)
@@ -109,9 +113,38 @@ func (i *gatewayGRPCManager) Reply(ctx context.Context, req *connectpb.ReplyRequ
 	return &connectpb.ReplyResponse{Success: false}, nil
 }
 
+func (i *gatewayGRPCManager) Ack(ctx context.Context, req *connectpb.AckMessage) (*connectpb.AckResponse, error) {
+	key := fmt.Sprintf("worker_requests_ack:%s", req.RequestId)
+
+	if ch, ok := i.inFlightAcks.Load(key); ok {
+		ackChan := ch.(chan *connectpb.AckMessage)
+
+		select {
+		case ackChan <- req:
+			return &connectpb.AckResponse{Success: true}, nil
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+			i.logger.Error("ack channel was closed")
+			return &connectpb.AckResponse{Success: false}, nil
+		}
+	}
+
+	i.logger.Error("ack channel has likely unsubscribed before getting an ack")
+	return &connectpb.AckResponse{Success: false}, nil
+}
+
 func (i *gatewayGRPCManager) Subscribe(ctx context.Context, requestID string) chan *connectpb.SDKResponse {
 	channel := make(chan *connectpb.SDKResponse)
 	i.inFlightRequests.Store(requestID, channel)
+	return channel
+}
+
+func (i *gatewayGRPCManager) SubscribeWorkerAck(ctx context.Context, requestID string) chan *connectpb.AckMessage {
+	key := fmt.Sprintf("worker_requests_ack:%s", requestID)
+
+	channel := make(chan *connectpb.AckMessage)
+	i.inFlightAcks.Store(key, channel)
 	return channel
 }
 
@@ -119,6 +152,16 @@ func (i *gatewayGRPCManager) Unsubscribe(ctx context.Context, requestID string) 
 	ch, loaded := i.inFlightRequests.LoadAndDelete(requestID)
 	if loaded {
 		replyChan := ch.(chan *connectpb.SDKResponse)
+		close(replyChan)
+	}
+}
+
+func (i *gatewayGRPCManager) UnsubscribeWorkerAck(ctx context.Context, requestID string) {
+	key := fmt.Sprintf("worker_requests_ack:%s", requestID)
+
+	ch, loaded := i.inFlightAcks.LoadAndDelete(key)
+	if loaded {
+		replyChan := ch.(chan *connectpb.AckMessage)
 		close(replyChan)
 	}
 }

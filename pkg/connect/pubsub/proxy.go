@@ -289,11 +289,9 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 		case <-gatewayAckSubscribed:
 		case <-time.After(5 * time.Second):
 			return nil, fmt.Errorf("did not subscribe to gateway ack within 5s")
-		}
 	}
 
 	// Receive worker acknowledgement for o11y (this is not a reliable channel - do not depend on it for the critical path)
-	{
 		workerAckSubscribed := make(chan struct{})
 		go func() {
 			i.subscribe(ctx, i.channelAppRequestsAck(opts.Data.RequestId, AckSourceWorker), func(_ string) {
@@ -301,7 +299,8 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 				metrics.HistogramConnectProxyAckTime(ctx, time.Since(proxyStartTime).Milliseconds(), metrics.HistogramOpt{
 					PkgName: pkgName,
 					Tags: map[string]any{
-						"kind": "worker",
+						"kind":      "worker",
+						"transport": "pubsub",
 					},
 				})
 			}, true, workerAckSubscribed)
@@ -312,6 +311,23 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 		case <-time.After(5 * time.Second):
 			return nil, fmt.Errorf("did not subscribe to worker ack within 5s")
 		}
+	} else {
+		ch := i.gatewayGRPCManager.SubscribeWorkerAck(ctx, opts.Data.RequestId)
+		defer i.gatewayGRPCManager.UnsubscribeWorkerAck(ctx, opts.Data.RequestId)
+
+		go func() {
+			<-ch
+
+			span.AddEvent("WorkerAck")
+			metrics.HistogramConnectProxyAckTime(ctx, time.Since(proxyStartTime).Milliseconds(), metrics.HistogramOpt{
+				PkgName: pkgName,
+				Tags: map[string]any{
+					"kind":      "worker",
+					"transport": "grpc",
+				},
+			})
+
+		}()
 	}
 
 	// Await SDK response forwarded by gateway
@@ -353,9 +369,6 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 		}
 	}()
 
-	// Alternatively, the gateway will send the response as soon as it comes in.
-	// This is unreliable but quicker than polling for the response, so we use this
-	// as a best-effort notification mechanism.
 	if !i.shouldUseGRPC(ctx, opts.AccountID) {
 		replySubscribed := make(chan struct{})
 		go func() {
@@ -385,6 +398,9 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 			return nil, fmt.Errorf("did not subscribe to reply within 5s")
 		}
 	} else {
+		// Alternatively, the gateway will send the response as soon as it comes in.
+		// This is unreliable but quicker than polling for the response, so we use this
+		// as a best-effort notification mechanism.
 		replySubscribed := make(chan struct{})
 		go func() {
 			replyReceived := i.gatewayGRPCManager.Subscribe(ctx, opts.Data.RequestId)

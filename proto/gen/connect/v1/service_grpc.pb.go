@@ -160,6 +160,7 @@ var ConnectGateway_ServiceDesc = grpc.ServiceDesc{
 
 const (
 	ConnectExecutor_Reply_FullMethodName = "/connect.v1.ConnectExecutor/Reply"
+	ConnectExecutor_Ack_FullMethodName   = "/connect.v1.ConnectExecutor/Ack"
 )
 
 // ConnectExecutorClient is the client API for ConnectExecutor service.
@@ -167,6 +168,7 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type ConnectExecutorClient interface {
 	Reply(ctx context.Context, in *ReplyRequest, opts ...grpc.CallOption) (*ReplyResponse, error)
+	Ack(ctx context.Context, in *AckMessage, opts ...grpc.CallOption) (*AckResponse, error)
 }
 
 type connectExecutorClient struct {
@@ -187,11 +189,22 @@ func (c *connectExecutorClient) Reply(ctx context.Context, in *ReplyRequest, opt
 	return out, nil
 }
 
+func (c *connectExecutorClient) Ack(ctx context.Context, in *AckMessage, opts ...grpc.CallOption) (*AckResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AckResponse)
+	err := c.cc.Invoke(ctx, ConnectExecutor_Ack_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ConnectExecutorServer is the server API for ConnectExecutor service.
 // All implementations must embed UnimplementedConnectExecutorServer
 // for forward compatibility.
 type ConnectExecutorServer interface {
 	Reply(context.Context, *ReplyRequest) (*ReplyResponse, error)
+	Ack(context.Context, *AckMessage) (*AckResponse, error)
 	mustEmbedUnimplementedConnectExecutorServer()
 }
 
@@ -204,6 +217,9 @@ type UnimplementedConnectExecutorServer struct{}
 
 func (UnimplementedConnectExecutorServer) Reply(context.Context, *ReplyRequest) (*ReplyResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Reply not implemented")
+}
+func (UnimplementedConnectExecutorServer) Ack(context.Context, *AckMessage) (*AckResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Ack not implemented")
 }
 func (UnimplementedConnectExecutorServer) mustEmbedUnimplementedConnectExecutorServer() {}
 func (UnimplementedConnectExecutorServer) testEmbeddedByValue()                         {}
@@ -244,6 +260,24 @@ func _ConnectExecutor_Reply_Handler(srv interface{}, ctx context.Context, dec fu
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ConnectExecutor_Ack_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AckMessage)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ConnectExecutorServer).Ack(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ConnectExecutor_Ack_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ConnectExecutorServer).Ack(ctx, req.(*AckMessage))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ConnectExecutor_ServiceDesc is the grpc.ServiceDesc for ConnectExecutor service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -254,6 +288,10 @@ var ConnectExecutor_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Reply",
 			Handler:    _ConnectExecutor_Reply_Handler,
+		},
+		{
+			MethodName: "Ack",
+			Handler:    _ConnectExecutor_Ack_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
