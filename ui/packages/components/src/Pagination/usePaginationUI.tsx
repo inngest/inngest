@@ -32,13 +32,16 @@ export function usePaginationUI<T>({
         />
       );
     };
-  }, [currentPage, totalPages, setCurrentPage]);
+  }, [currentPage, setCurrentPage, totalPages]);
 
-  return {
-    BoundPagination,
-    currentPage,
-    currentPageData,
-    setCurrentPage,
-    totalPages,
-  };
+  return useMemo(
+    () => ({
+      BoundPagination,
+      currentPage,
+      currentPageData,
+      setCurrentPage,
+      totalPages,
+    }),
+    [BoundPagination, currentPage, currentPageData, setCurrentPage, totalPages]
+  );
 }
