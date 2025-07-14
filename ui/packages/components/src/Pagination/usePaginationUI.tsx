@@ -7,7 +7,7 @@ type PaginationPropsPassThrough = Omit<
   PaginationProps,
   'currentPage' | 'setCurrentPage' | 'totalPages'
 >;
-type UsePaginationUIConfig<T> = UsePaginationConfig<T> & PaginationPropsPassThrough;
+type UsePaginationUIConfig<T> = UsePaginationConfig<T>;
 type UsePaginationUIOutput<T> = UsePaginationOutput<T> & {
   BoundPagination: React.ComponentType<PaginationPropsPassThrough>;
 };
