@@ -9,7 +9,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@inngest/components/DropdownMenu';
-import { Pagination } from '@inngest/components/Pagination';
+import { usePaginationUI } from '@inngest/components/Pagination';
 import { Switch } from '@inngest/components/Switch';
 import { AppsIcon } from '@inngest/components/icons/sections/Apps';
 import { cn } from '@inngest/components/utils/classNames';
@@ -42,15 +42,17 @@ const EnableEnvironmentAutoArchiveDocument = graphql(`
 const PER_PAGE = 10;
 
 export default function EnvironmentListTable({ envs }: { envs: Environment[] }) {
-  const [page, setPage] = useState(1);
-  const numPages = Math.ceil(envs.length / PER_PAGE);
-
   const sortedEnvs = envs.sort(
     (a, b) =>
       new Date(b.lastDeployedAt || b.createdAt).valueOf() -
       new Date(a.lastDeployedAt || a.createdAt).valueOf()
   );
-  const visibleEnvs = sortedEnvs.slice((page - 1) * PER_PAGE, page * PER_PAGE);
+
+  const {
+    BoundPagination,
+    currentPageData: visibleEnvs,
+    totalPages,
+  } = usePaginationUI({ data: sortedEnvs, pageSize: PER_PAGE });
 
   return (
     <table className="w-full">
@@ -87,12 +89,12 @@ export default function EnvironmentListTable({ envs }: { envs: Environment[] }) 
           </tr>
         )}
       </tbody>
-      {numPages > 1 && (
+      {totalPages > 1 && (
         <tfoot className="border-subtle border-t">
           <tr>
             <td colSpan={4}>
               <div className="flex flex-row items-center justify-center px-4 py-1">
-                <Pagination currentPage={page} numPages={numPages} setCurrentPage={setPage} />
+                <BoundPagination />
               </div>
             </td>
           </tr>
