@@ -1,13 +1,6 @@
 'use client';
 
-import {
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-  type Dispatch,
-  type SetStateAction,
-} from 'react';
+import { useLayoutEffect, useMemo, useRef, useState, type SetStateAction } from 'react';
 import {
   RiArrowLeftDoubleLine,
   RiArrowLeftSLine,
@@ -24,8 +17,8 @@ import { getVisiblePages } from './getVisiblePages';
 const PAGE_NUMBER_BASE_CLASSES =
   'flex h-6 items-center justify-center min-w-8 text-sm tabular-nums';
 
-const NARROW_VARIANT_BREAKPOINT = 525;
-const TINY_VARIANT_BREAKPOINT = 400;
+const NARROW_VARIANT_BREAKPOINT = 475;
+const TINY_VARIANT_BREAKPOINT = 350;
 
 export interface PaginationProps {
   currentPage: number;
@@ -40,18 +33,26 @@ export function Pagination(props: PaginationProps) {
   const outerRef = useRef<HTMLDivElement>(null);
   const [autoVariant, setAutoVariant] = useState<'narrow' | 'normal' | 'tiny'>('normal');
 
-  // TODO: Use a ResizeObserver to detect changes in width if necessary.
   useLayoutEffect(() => {
     if (propVariant !== undefined) return;
 
-    const container = outerRef.current;
-    if (container === null) return;
+    const updateVariant = (width: number) => {
+      if (width < TINY_VARIANT_BREAKPOINT) setAutoVariant('tiny');
+      else if (width < NARROW_VARIANT_BREAKPOINT) setAutoVariant('narrow');
+      else setAutoVariant('normal');
+    };
 
-    const width = container.getBoundingClientRect().width;
+    const observer = new ResizeObserver(([entry]) => {
+      if (entry === undefined) return;
+      updateVariant(entry.contentRect.width);
+    });
 
-    if (width < TINY_VARIANT_BREAKPOINT) setAutoVariant('tiny');
-    else if (width < NARROW_VARIANT_BREAKPOINT) setAutoVariant('narrow');
-    else setAutoVariant('normal');
+    if (outerRef.current) {
+      updateVariant(outerRef.current.getBoundingClientRect().width);
+      observer.observe(outerRef.current);
+    }
+
+    return () => observer.disconnect();
   }, [propVariant]);
 
   const variant = propVariant ?? autoVariant;
