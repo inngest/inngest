@@ -27,6 +27,7 @@ import (
 	"github.com/oklog/ulid/v2"
 	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 const (
@@ -708,23 +709,65 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 				}
 			}
 
-			// This will be sent exactly once, as the router selected this gateway to handle the request
-			// Even if the gateway is draining, we should ack the message, the SDK will buffer messages and use a new connection to report results
-			err := c.svc.receiver.AckMessage(context.Background(), data.RequestId, pubsub.AckSourceWorker)
+			accountID, err := uuid.Parse(data.AccountId)
 			if err != nil {
-				// This should never happen: Failing the ack means we will redeliver the same request even though
-				// the worker already started processing it.
-				c.log.Error("failed to ack message", "err", err)
 				return &connecterrors.SocketError{
 					SysCode:    syscode.CodeConnectInternal,
 					StatusCode: websocket.StatusInternalError,
-					Msg:        "could not ack message",
+					Msg:        "accountID is not a valid UUID",
+				}
+			}
+
+			useGRPC := c.svc.shouldUseGRPC(ctx, accountID)
+			var transport string
+
+			if useGRPC {
+				transport = "grpc"
+
+				grpcClient, err := c.svc.getOrCreateGRPCClient(ctx, c.log, c.conn.EnvID, data.RequestId)
+				if err != nil {
+					return &connecterrors.SocketError{
+						SysCode:    syscode.CodeConnectInternal,
+						StatusCode: websocket.StatusInternalError,
+						Msg:        "could not create grpc client to ack",
+					}
+				}
+
+				reply, err := grpcClient.Ack(ctx, &connectpb.AckMessage{
+					RequestId: data.RequestId,
+					Ts:        timestamppb.Now()})
+
+				if err != nil || !reply.Success {
+					// This should never happen: Failing the ack means we will redeliver the same request even though
+					// the worker already started processing it.
+					c.log.Error("failed to ack message through gRPC", "err", err, "reply", reply)
+					return &connecterrors.SocketError{
+						SysCode:    syscode.CodeConnectInternal,
+						StatusCode: websocket.StatusInternalError,
+						Msg:        "could not ack message through gRPC",
+					}
+				}
+			} else {
+				transport = "pubsub"
+				// This will be sent exactly once, as the router selected this gateway to handle the request
+				// Even if the gateway is draining, we should ack the message, the SDK will buffer messages and use a new connection to report results
+				err := c.svc.receiver.AckMessage(context.Background(), data.RequestId, pubsub.AckSourceWorker)
+				if err != nil {
+					// This should never happen: Failing the ack means we will redeliver the same request even though
+					// the worker already started processing it.
+					c.log.Error("failed to ack message", "err", err)
+					return &connecterrors.SocketError{
+						SysCode:    syscode.CodeConnectInternal,
+						StatusCode: websocket.StatusInternalError,
+						Msg:        "could not ack message",
+					}
 				}
 			}
 
 			c.log.Debug("worker acked message",
 				"req_id", data.RequestId,
 				"run_id", data.RunId,
+				"transport", transport,
 			)
 
 			// TODO Should we send a reverse ack to the worker to start processing the request?
@@ -898,7 +941,7 @@ func (c *connectionHandler) receiveRouterMessagesFromGRPC(ctx context.Context, o
 				"fn_slug", data.FunctionSlug,
 				"step_id", data.StepId,
 				"run_id", data.RunId,
-				"method", "grpc",
+				"transport", "grpc",
 			)
 
 			log.Debug("gateway received grpc message")
@@ -947,7 +990,7 @@ func (c *connectionHandler) receiveRouterMessagesFromPubsub(ctx context.Context,
 			"fn_slug", data.FunctionSlug,
 			"step_id", data.StepId,
 			"run_id", data.RunId,
-			"method", "pubsub",
+			"transport", "pubsub",
 		)
 
 		log.Debug("gateway received msg")
@@ -1238,11 +1281,25 @@ func (c *connectionHandler) handleSdkReply(ctx context.Context, msg *connectpb.C
 		return fmt.Errorf("could not save response: %w", err)
 	}
 
-	// Send a best-effort PubSub message to fast-track the response,
-	// this is unreliable and must be combined with a reliable store like the buffer above.
-	err = c.svc.receiver.NotifyExecutor(ctx, data)
-	if err != nil {
-		return fmt.Errorf("could not notify executor: %w", err)
+	if c.svc.shouldUseGRPC(ctx, c.conn.AccountID) {
+		grpcClient, err := c.svc.getOrCreateGRPCClient(ctx, l, c.conn.EnvID, data.RequestId)
+		if err != nil {
+			return err
+		}
+
+		result, err := grpcClient.Reply(ctx, &connectpb.ReplyRequest{Data: data})
+		if err != nil {
+			return fmt.Errorf("could not send response through grpc: %w", err)
+		}
+
+		l.Info("sent response through gRPC", "result", result)
+	} else {
+		// Send a best-effort PubSub message to fast-track the response,
+		// this is unreliable and must be combined with a reliable store like the buffer above.
+		err = c.svc.receiver.NotifyExecutor(ctx, data)
+		if err != nil {
+			return fmt.Errorf("could not notify executor: %w", err)
+		}
 	}
 
 	replyAck, err := proto.Marshal(&connectpb.WorkerReplyAckData{

@@ -265,6 +265,15 @@ func IncrConnectGatewayGRPCForwardCounter(ctx context.Context, value int64, opts
 	})
 }
 
+func IncrConnectGatewayGRPCReplyCounter(ctx context.Context, value int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, value, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "connect_gateway.grpc.reply_total",
+		Description: "Total number of replies coming from connect gateways to executors",
+		Tags:        opts.Tags,
+	})
+}
+
 func IncrConnectGatewayGRPCClientFailureCounter(ctx context.Context, value int64, opts CounterOpt) {
 	RecordCounterMetric(ctx, value, CounterOpt{
 		PkgName:     opts.PkgName,
