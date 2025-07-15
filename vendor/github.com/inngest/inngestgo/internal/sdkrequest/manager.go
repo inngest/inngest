@@ -268,6 +268,29 @@ type GeneratorOpcode struct {
 	DisplayName *string `json:"displayName"`
 }
 
+func (g *GeneratorOpcode) OptimizedParallelism(enabled *bool) {
+	if enabled == nil || *enabled {
+		// No need to do anything since optimized parallelism is opt-out
+		return
+	}
+	// g.Opts[enums.OptKeyOptPar.String()] = false
+
+	opts, ok := g.Opts.(map[string]any)
+	if !ok {
+		var err error
+		opts, err = types.StructToMap(g.Opts)
+		if err != nil {
+			// Unreachable
+			return
+		}
+	}
+	if opts == nil {
+		opts = make(map[string]any)
+	}
+	opts[enums.OptKeyOptPar.String()] = false
+	g.Opts = opts
+}
+
 // UserError is a reexport of inngest/state.UserError
 type UserError struct {
 	Name    string `json:"name"`

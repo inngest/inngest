@@ -514,6 +514,9 @@ func (i Item) OptimizedParallelism() bool {
 }
 
 func (i *Item) SetOptimizedParallelism(optPar bool) {
+	if i.Metadata == nil {
+		i.Metadata = make(map[string]any)
+	}
 	i.Metadata[enums.OptKeyOptPar.String()] = optPar
 }
 

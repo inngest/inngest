@@ -29,6 +29,7 @@ func Infer[InputT any, OutputT any](
 	id string,
 	in InferOpts[InputT],
 ) (out OutputT, err error) {
+	targetID := getTargetStepID(ctx)
 	mgr := preflight(ctx)
 	op := mgr.NewOp(enums.OpcodeAIGateway, id, nil)
 	hashedID := op.MustHash()
@@ -95,7 +96,11 @@ func Infer[InputT any, OutputT any](
 		panic(ControlHijack{})
 	}
 
-	mgr.AppendOp(sdkrequest.GeneratorOpcode{
+	if targetID != nil && *targetID != hashedID {
+		panic(ControlHijack{})
+	}
+
+	plannedOp := sdkrequest.GeneratorOpcode{
 		ID:   hashedID,
 		Op:   enums.OpcodeAIGateway,
 		Name: id,
@@ -107,7 +112,9 @@ func Infer[InputT any, OutputT any](
 			Body:    in.Body,
 		},
 		Data: reqBytes,
-	})
+	}
+	plannedOp.OptimizedParallelism(optimizeParallel(ctx))
+	mgr.AppendOp(plannedOp)
 	panic(ControlHijack{})
 }
 

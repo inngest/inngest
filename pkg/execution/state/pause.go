@@ -337,3 +337,20 @@ func (p Pause) GetResumeData(evt event.Event) ResumeData {
 
 	return ret
 }
+
+// OptimizedParallelism returns true if the step has optimized parallelism
+// enabled. Defaults to true
+func (p Pause) OptimizedParallelism() bool {
+	optPar, ok := p.Metadata[enums.OptKeyOptPar.String()].(bool)
+	if !ok {
+		return true
+	}
+	return optPar
+}
+
+func (p *Pause) SetOptimizedParallelism(optPar bool) {
+	if p.Metadata == nil {
+		p.Metadata = make(map[string]any)
+	}
+	p.Metadata[enums.OptKeyOptPar.String()] = optPar
+}

@@ -43,6 +43,7 @@ func Fetch[OutputT any](
 	id string,
 	in FetchOpts,
 ) (out FetchResponse[OutputT], err error) {
+	targetID := getTargetStepID(ctx)
 	mgr := preflight(ctx)
 	op := mgr.NewOp(enums.OpcodeGateway, id, nil)
 	hashedID := op.MustHash()
@@ -77,11 +78,17 @@ func Fetch[OutputT any](
 		return out, err
 	}
 
-	mgr.AppendOp(sdkrequest.GeneratorOpcode{
+	if targetID != nil && *targetID != hashedID {
+		panic(ControlHijack{})
+	}
+
+	plannedOp := sdkrequest.GeneratorOpcode{
 		ID:   hashedID,
 		Op:   enums.OpcodeGateway,
 		Name: id,
 		Opts: in,
-	})
+	}
+	plannedOp.OptimizedParallelism(optimizeParallel(ctx))
+	mgr.AppendOp(plannedOp)
 	panic(ControlHijack{})
 }

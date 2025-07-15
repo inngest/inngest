@@ -18,11 +18,16 @@ type SleepOpts struct {
 }
 
 func Sleep(ctx context.Context, id string, duration time.Duration) {
+	targetID := getTargetStepID(ctx)
 	mgr := preflight(ctx)
 	op := mgr.NewOp(enums.OpcodeSleep, id, nil)
 	if _, ok := mgr.Step(ctx, op); ok {
 		// We've already slept.
 		return
+	}
+
+	if targetID != nil && *targetID != op.MustHash() {
+		panic(ControlHijack{})
 	}
 
 	mw, ok := internal.MiddlewareManagerFromContext(ctx)
@@ -31,14 +36,16 @@ func Sleep(ctx context.Context, id string, duration time.Duration) {
 		panic(ControlHijack{})
 	}
 	mw.BeforeExecution(ctx, mgr.MiddlewareCallCtx())
-	mgr.AppendOp(sdkrequest.GeneratorOpcode{
+	plannedOp := sdkrequest.GeneratorOpcode{
 		ID:   op.MustHash(),
 		Op:   enums.OpcodeSleep,
 		Name: id,
 		Opts: map[string]any{
 			"duration": str2duration.String(duration),
 		},
-	})
+	}
+	plannedOp.OptimizedParallelism(optimizeParallel(ctx))
+	mgr.AppendOp(plannedOp)
 
 	panic(ControlHijack{})
 }

@@ -361,7 +361,7 @@ func TestParallelDisabledOptimization(t *testing.T) {
 				}
 
 				res := group.ParallelWithOpts(ctx,
-					group.ParallelOpts{Optimize: inngestgo.Ptr(false)},
+					group.ParallelOpts{OptimizeParallel: inngestgo.Ptr(false)},
 					func(ctx context.Context) (any, error) {
 						_, err := step.Run(ctx, "a1", func(ctx context.Context) (any, error) {
 							atomic.AddInt32(&counterA1, 1)
@@ -424,80 +424,109 @@ func TestParallelDisabledOptimization(t *testing.T) {
 	})
 
 	t.Run("all step kinds", func(t *testing.T) {
+		// Ensure that all step kinds work with the "optimize parallel" control. This is
+		// necessary because we need to write Executor logic for each step kind
+
 		t.Parallel()
 
-		r := require.New(t)
-		ctx := context.Background()
-		c := client.New(t)
-		inngestClient, server, registerFuncs := NewSDKHandler(t, randomSuffix("app"))
-		defer server.Close()
+		type testCase struct {
+			optimizeParallel *bool
 
-		eventName := randomSuffix("event")
-		var (
-			counterRequest int32
-			runID          string
-		)
-		_, err := inngestgo.CreateFunction(
-			inngestClient,
-			inngestgo.FunctionOpts{ID: "fn", Retries: inngestgo.Ptr(0)},
-			inngestgo.EventTrigger(eventName, nil),
-			func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
-				atomic.AddInt32(&counterRequest, 1)
-				if runID == "" {
-					runID = input.InputCtx.RunID
-				}
+			// The number of expected SDK requests. Discovery steps count
+			expRequestCount int32
+		}
+		cases := []testCase{
+			{optimizeParallel: nil, expRequestCount: 4},
+			{optimizeParallel: inngestgo.Ptr(true), expRequestCount: 4},
+			{optimizeParallel: inngestgo.Ptr(false), expRequestCount: 9},
+		}
 
-				res := group.ParallelWithOpts(ctx,
-					group.ParallelOpts{Optimize: inngestgo.Ptr(true)},
-					func(ctx context.Context) (any, error) {
-						return step.Fetch[string](ctx, "fetch", step.FetchOpts{
-							URL:    "http://0.0.0.0:0",
-							Method: "GET",
-						})
-					},
-					func(ctx context.Context) (any, error) {
-						return step.Invoke[any](
-							ctx,
-							"invoke",
-							step.InvokeOpts{
-								FunctionId: randomSuffix("invalid-fn"),
-								Timeout:    2 * time.Second,
+		for _, tc := range cases {
+			var name string
+			if tc.optimizeParallel == nil {
+				name = "optimize=nil"
+			} else {
+				name = fmt.Sprintf("optimize=%t", *tc.optimizeParallel)
+			}
+
+			t.Run(name, func(t *testing.T) {
+				t.Parallel()
+				r := require.New(t)
+				ctx := context.Background()
+				c := client.New(t)
+				inngestClient, server, registerFuncs := NewSDKHandler(t, randomSuffix("app"))
+				defer server.Close()
+
+				eventName := randomSuffix("event")
+				var (
+					counterRequest int32
+					runID          string
+				)
+				_, err := inngestgo.CreateFunction(
+					inngestClient,
+					inngestgo.FunctionOpts{ID: "fn", Retries: inngestgo.Ptr(0)},
+					inngestgo.EventTrigger(eventName, nil),
+					func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
+						atomic.AddInt32(&counterRequest, 1)
+						if runID == "" {
+							runID = input.InputCtx.RunID
+						}
+
+						res := group.ParallelWithOpts(ctx,
+							group.ParallelOpts{OptimizeParallel: tc.optimizeParallel},
+							func(ctx context.Context) (any, error) {
+								return step.Fetch[string](ctx, "fetch", step.FetchOpts{
+									URL:    "http://0.0.0.0:0",
+									Method: "GET",
+								})
+							},
+							func(ctx context.Context) (any, error) {
+								return step.Invoke[any](
+									ctx,
+									"invoke",
+									step.InvokeOpts{
+										FunctionId: "does-not-exist",
+										Timeout:    1 * time.Second,
+									},
+								)
+							},
+							func(ctx context.Context) (any, error) {
+								return step.Run(ctx, "run", func(ctx context.Context) (any, error) {
+									time.Sleep(3 * time.Second)
+									return nil, nil
+								})
+							},
+							func(ctx context.Context) (any, error) {
+								step.Sleep(ctx, "sleep", 5*time.Second)
+								return nil, nil
+							},
+							func(ctx context.Context) (any, error) {
+								return step.WaitForEvent[any](ctx, "wait", step.WaitForEventOpts{
+									Event:   "does-not-exist",
+									Timeout: 7 * time.Second,
+								})
 							},
 						)
-					},
-					func(ctx context.Context) (any, error) {
-						return step.Run(ctx, "run", func(ctx context.Context) (any, error) {
-							time.Sleep(4 * time.Second)
-							return nil, nil
-						})
-					},
-					func(ctx context.Context) (any, error) {
-						step.Sleep(ctx, "delay", 6*time.Second)
-						return nil, nil
-					},
-					func(ctx context.Context) (any, error) {
-						return step.WaitForEvent[any](ctx, "wait", step.WaitForEventOpts{
-							Event:   randomSuffix("never"),
-							Timeout: 8 * time.Second,
-						})
+
+						// Sleep long enough to ensure all the discovery steps
+						// had enough time to run
+						step.Sleep(ctx, "coalesce", 5*time.Second)
+
+						return res, nil
 					},
 				)
+				r.NoError(err)
+				registerFuncs()
 
-				fmt.Println("done")
+				_, err = inngestClient.Send(ctx, inngestgo.Event{Name: eventName})
+				r.NoError(err)
 
-				return res, nil
-			},
-		)
-		r.NoError(err)
-		registerFuncs()
-
-		_, err = inngestClient.Send(ctx, inngestgo.Event{Name: eventName})
-		r.NoError(err)
-
-		c.WaitForRunStatus(ctx, t, "COMPLETED", &runID, client.WaitForRunStatusOpts{
-			Timeout: 20 * time.Second,
-		})
-		fmt.Println(counterRequest)
+				c.WaitForRunStatus(ctx, t, "COMPLETED", &runID, client.WaitForRunStatusOpts{
+					Timeout: 20 * time.Second,
+				})
+				r.Equal(tc.expRequestCount, atomic.LoadInt32(&counterRequest))
+			})
+		}
 	})
 
 }
