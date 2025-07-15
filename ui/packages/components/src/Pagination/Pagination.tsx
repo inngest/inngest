@@ -17,8 +17,8 @@ import { getVisiblePages } from './getVisiblePages';
 const PAGE_NUMBER_BASE_CLASSES =
   'flex h-8 items-center justify-center min-w-8 text-sm tabular-nums';
 
-const NARROW_VARIANT_BREAKPOINT = 475;
-const TINY_VARIANT_BREAKPOINT = 350;
+const NARROW_VARIANT_BREAKPOINT = 550;
+const TINY_VARIANT_BREAKPOINT = 400;
 
 export interface PaginationProps {
   currentPage: number;
