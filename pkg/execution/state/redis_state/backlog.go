@@ -1145,7 +1145,7 @@ func (q *queue) BacklogsByPartition(ctx context.Context, queueShard QueueShard, 
 			}
 
 			isSequential := true
-			res, err := peeker.peek(ctx, kg.ShadowPartitionSet(partitionID), isSequential, q.clock.Now(), opt.batchSize,
+			res, err := peeker.peek(ctx, kg.ShadowPartitionSet(partitionID), isSequential, until, opt.batchSize,
 				WithPeekOptQueueShard(&queueShard),
 			)
 			if err != nil {
