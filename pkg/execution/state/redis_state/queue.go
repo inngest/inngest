@@ -835,8 +835,6 @@ func WithEnableJobPromotion(enable bool) QueueOpt {
 	}
 }
 
-type IteratorHook func(partitionID string, keyPartitionSet string)
-
 type queue struct {
 	// name is the identifiable name for this worker, for logging.
 	name string
