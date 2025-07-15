@@ -84,7 +84,6 @@ func (e exporterHandler) Handle(ctx context.Context, record slog.Record) error {
 	exportRecord.SetSeverityText(sev.String())
 
 	attrs := make([]otellog.KeyValue, 0)
-	i := 0
 	eventName := ""
 	record.Attrs(func(attr slog.Attr) bool {
 		// extract event name
@@ -93,11 +92,10 @@ func (e exporterHandler) Handle(ctx context.Context, record slog.Record) error {
 			return true
 		}
 
-		attrs[i] = otellog.KeyValue{
+		attrs = append(attrs, otellog.KeyValue{
 			Key:   attr.Key,
 			Value: convertAttr(attr.Value),
-		}
-		i++
+		})
 		return true
 	})
 
