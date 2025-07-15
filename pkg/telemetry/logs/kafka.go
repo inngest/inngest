@@ -152,7 +152,7 @@ func (e *kafkaLogsExporter) Export(ctx context.Context, records []log.Record) er
 			rec.SetObservedTimestamp(time.Now())
 		}
 
-		transformed := LogRecord(rec)
+		transformed := ResourceLogs([]log.Record{rec})[0]
 
 		byt, err := proto.Marshal(transformed)
 		if err != nil {
