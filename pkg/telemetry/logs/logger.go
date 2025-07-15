@@ -21,7 +21,7 @@ import (
 
 	Exporter handler -- Translate logs --> OTel logger
 
-	OTel logger -- Emit logs --> OTel batch processor -- Export --> Exporter
+	OTel logger -- Emit logs --> OTel simple processor -- Export --> Exporter
 
 	Exporter -- Produce --> Kafka
 */
@@ -57,8 +57,8 @@ type exporterHandler struct {
 }
 
 func newExporterHandler(exporter log.Exporter) slog.Handler {
-	// Batch records before exporting
-	processor := log.NewBatchProcessor(exporter)
+	// Immediately export records (add to Kafka produce batch)
+	processor := log.NewSimpleProcessor(exporter)
 
 	// Create scoped logger on resource
 	otelLogger := log.
