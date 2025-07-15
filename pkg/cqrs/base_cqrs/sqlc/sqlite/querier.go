@@ -88,10 +88,6 @@ type Querier interface {
 	UpdateAppURL(ctx context.Context, arg UpdateAppURLParams) (*App, error)
 	UpdateFunctionConfig(ctx context.Context, arg UpdateFunctionConfigParams) (*Function, error)
 	UpsertApp(ctx context.Context, arg UpsertAppParams) (*App, error)
-	WorkspaceCountEvents(ctx context.Context, arg WorkspaceCountEventsParams) (int64, error)
-	WorkspaceCountNamedEvents(ctx context.Context, arg WorkspaceCountNamedEventsParams) (int64, error)
-	WorkspaceEvents(ctx context.Context, arg WorkspaceEventsParams) ([]*Event, error)
-	WorkspaceNamedEvents(ctx context.Context, arg WorkspaceNamedEventsParams) ([]*Event, error)
 }
 
 var _ Querier = (*Queries)(nil)
