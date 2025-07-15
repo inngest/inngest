@@ -166,7 +166,7 @@ func (i *gatewayGRPCManager) UnsubscribeWorkerAck(ctx context.Context, requestID
 
 // createGRPCClient creates a gRPC client for a gateway and validates the connection
 func (i *gatewayGRPCManager) createGRPCClient(ctx context.Context, gateway *state.Gateway) (connectpb.ConnectGatewayClient, error) {
-	url := fmt.Sprintf("%s:%d", gateway.IPAddress, connectConfig.Gateway(ctx).GRPCPort)
+	url := gatewayURL(ctx, gateway)
 
 	var conn *grpc.ClientConn
 	var err error
