@@ -58,8 +58,8 @@ func LogRecordFromProto(lr *lpb.LogRecord) ParsedRecord {
 		}
 
 		if lr.SpanId != nil {
-			if SpanID := trace.TraceID(lr.SpanId); SpanID.IsValid() {
-				spanIDStr = SpanID.String()
+			if spanID := trace.SpanID(lr.SpanId); spanID.IsValid() {
+				spanIDStr = spanID.String()
 			}
 		}
 	}
