@@ -20,13 +20,11 @@ const (
 )
 
 var (
-	defaultMsgKey       = "run_id"
 	defaultMaxProduceMB = 30 // 30MB
 )
 
 type kafkaLogsExporter struct {
 	client *kgo.Client
-	key    string
 }
 
 type kafkaLogsExporterOpts struct {
@@ -80,7 +78,6 @@ func WithKafkaExporterMaxProduceMB(size int) KafkaLogsExporterOpts {
 func NewKafkaLogExporter(ctx context.Context, opts ...KafkaLogsExporterOpts) (log.Exporter, error) {
 	conf := &kafkaLogsExporterOpts{
 		maxProduceMB: defaultMaxProduceMB,
-		key:          defaultMsgKey,
 	}
 
 	for _, apply := range opts {
@@ -132,7 +129,6 @@ func NewKafkaLogExporter(ctx context.Context, opts ...KafkaLogsExporterOpts) (lo
 
 	return &kafkaLogsExporter{
 		client: cl,
-		key:    conf.key,
 	}, nil
 }
 
