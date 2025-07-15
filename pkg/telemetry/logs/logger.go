@@ -129,11 +129,11 @@ func convertAttr(attr slog.Value) otellog.Value {
 		return otellog.StringValue(attr.Time().Format(time.RFC3339))
 	case slog.KindGroup:
 		group := attr.Group()
-		attrs := make([]otellog.Value, len(group))
-		for i, a := range group {
-			attrs[i] = convertAttr(a.Value)
+		attrs := make(map[string]otellog.Value, len(group))
+		for _, a := range group {
+			attrs[a.Key] = convertAttr(a.Value)
 		}
-		return otellog.SliceValue(attrs...)
+		return otellog.MapValue(attrs)
 	case slog.KindLogValuer:
 		lv := attr.LogValuer()
 		val := lv.LogValue()
