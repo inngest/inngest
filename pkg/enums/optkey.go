@@ -1,4 +1,4 @@
-//go:generate go run github.com/dmarkham/enumer -trimprefix=OptKey -type=OptKey -json -text
+//go:generate go run github.com/dmarkham/enumer -trimprefix=OptKey -type=OptKey -json -text -transform=title-lower
 
 package enums
 
