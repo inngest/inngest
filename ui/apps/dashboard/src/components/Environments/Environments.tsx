@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@inngest/components/Button';
 import {
@@ -8,13 +9,15 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@inngest/components/DropdownMenu';
+import { Search } from '@inngest/components/Forms/Search';
+import useDebounce from '@inngest/components/hooks/useDebounce';
 import { AppsIcon } from '@inngest/components/icons/sections/Apps';
 import { RiAddLine, RiMore2Line, RiSettingsLine } from '@remixicon/react';
 
 import Toaster from '@/components/Toaster';
 import LoadingIcon from '@/icons/LoadingIcon';
 import { useEnvironments } from '@/queries';
-import { EnvironmentType } from '@/utils/environments';
+import { EnvironmentType, type Environment } from '@/utils/environments';
 import BranchEnvironmentListTable from './BranchEnvironmentListTable';
 import { CustomEnvironmentListTable } from './CustomEnvironmentListTable';
 
@@ -22,9 +25,15 @@ export default function Environments() {
   const router = useRouter();
   const [{ data: envs = [], fetching }] = useEnvironments();
 
+  const [searchInput, setSearchInput] = useState<string>('');
+  const [searchParam, setSearchParam] = useState<string>('');
+  const debouncedSearch = useDebounce(() => {
+    setSearchParam(searchInput);
+  }, 400);
+
   const branchParent = envs.find((env) => env.type === EnvironmentType.BranchParent);
-  const branches = envs.filter((env) => env.type === EnvironmentType.BranchChild);
-  const customEnvs = envs.filter((env) => env.type === EnvironmentType.Test);
+  const branches = filterEnvironments(EnvironmentType.BranchChild, searchParam, envs);
+  const customEnvs = filterEnvironments(EnvironmentType.Test, searchParam, envs);
 
   if (fetching) {
     return (
@@ -38,9 +47,18 @@ export default function Environments() {
     <>
       <div className="mx-auto w-full max-w-[860px] px-12 py-16">
         <div className="mb-4 flex w-full items-center  justify-between">
-          <h2 className="text-lg font-medium">Production Environment</h2>
+          <h2 className="text-lg font-medium">Environments</h2>
+          <Search
+            name="search"
+            onUpdate={(value) => {
+              setSearchInput(value);
+              debouncedSearch();
+            }}
+            placeholder="Search environments"
+            value={searchInput}
+          />
         </div>
-        <p className="text-muted mt-2 max-w-[400px] text-sm">
+        <p className="text-muted max-w-[400px] text-sm">
           This is where you&apos;ll deploy all of your production apps.
         </p>
 
@@ -120,4 +138,11 @@ export default function Environments() {
       <Toaster />
     </>
   );
+}
+
+function filterEnvironments(type: EnvironmentType, searchParam: string, envs: Environment[]) {
+  return envs.filter((env) => {
+    if (env.type !== type) return false;
+    return searchParam === '' || env.name.toLowerCase().includes(searchParam.toLowerCase());
+  });
 }
