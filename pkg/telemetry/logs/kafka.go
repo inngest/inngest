@@ -209,3 +209,24 @@ func (e *kafkaLogsExporter) Shutdown(ctx context.Context) error {
 	e.client.Close()
 	return nil
 }
+
+type noopExporter struct{}
+
+func (n noopExporter) Export(ctx context.Context, records []log.Record) error {
+	// no-op
+	return nil
+}
+
+func (n noopExporter) Shutdown(ctx context.Context) error {
+	// no-op
+	return nil
+}
+
+func (n noopExporter) ForceFlush(ctx context.Context) error {
+	// no-op
+	return nil
+}
+
+func NewNoopKafkaExporter() log.Exporter {
+	return noopExporter{}
+}
