@@ -243,7 +243,6 @@ func TestParallelSequential(t *testing.T) {
 	t.Parallel()
 	r := require.New(t)
 	ctx := context.Background()
-
 	c := client.New(t)
 	inngestClient, server, registerFuncs := NewSDKHandler(t, randomSuffix("app"))
 	defer server.Close()
@@ -259,7 +258,7 @@ func TestParallelSequential(t *testing.T) {
 	)
 	_, err := inngestgo.CreateFunction(
 		inngestClient,
-		inngestgo.FunctionOpts{ID: "fn"},
+		inngestgo.FunctionOpts{ID: "fn", Retries: inngestgo.Ptr(0)},
 		inngestgo.EventTrigger(eventName, nil),
 		func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
 			if runID == "" {
@@ -305,6 +304,7 @@ func TestParallelSequential(t *testing.T) {
 				},
 			)
 
+			stepOrder = append(stepOrder, "end")
 			return res, nil
 		},
 	)
@@ -324,97 +324,180 @@ func TestParallelSequential(t *testing.T) {
 
 	// a2 completes after b1 because "optimized parallelism" doesn't continue
 	// until all parallel steps end
-	r.Equal([]string{"a1", "b1", "a2", "b2"}, stepOrder)
+	r.Equal([]string{"a1", "b1", "a2", "b2", "end"}, stepOrder)
 }
 
 func TestParallelDisabledOptimization(t *testing.T) {
-	// 2 parallel groups with 2 sequential steps in each, but optimized
-	// parallelism is disabled
-
 	t.Parallel()
-	r := require.New(t)
-	ctx := context.Background()
 
-	c := client.New(t)
-	inngestClient, server, registerFuncs := NewSDKHandler(t, randomSuffix("app"))
-	defer server.Close()
+	t.Run("parallel race", func(t *testing.T) {
+		// 2 parallel groups with 2 sequential steps in each, but optimized
+		// parallelism is disabled. This allows the 2 groups to "race" (i.e. all
+		// the steps in one group can complete irrespective of the other group)
 
-	eventName := randomSuffix("event")
-	var (
-		counterA1 int32
-		counterA2 int32
-		counterB1 int32
-		counterB2 int32
-		runID     string
-		stepOrder []string
-	)
-	_, err := inngestgo.CreateFunction(
-		inngestClient,
-		inngestgo.FunctionOpts{ID: "fn"},
-		inngestgo.EventTrigger(eventName, nil),
-		func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
-			if runID == "" {
-				runID = input.InputCtx.RunID
-			}
+		t.Parallel()
+		r := require.New(t)
+		ctx := context.Background()
+		c := client.New(t)
+		inngestClient, server, registerFuncs := NewSDKHandler(t, randomSuffix("app"))
+		defer server.Close()
 
-			res := group.ParallelWithOpts(ctx,
-				group.ParallelOpts{Optimize: inngestgo.BoolPtr(false)},
-				func(ctx context.Context) (any, error) {
-					_, err := step.Run(ctx, "a1", func(ctx context.Context) (any, error) {
-						atomic.AddInt32(&counterA1, 1)
-						stepOrder = append(stepOrder, "a1")
-						return nil, nil
-					})
-					if err != nil {
+		eventName := randomSuffix("event")
+		var (
+			counterA1 int32
+			counterA2 int32
+			counterB1 int32
+			counterB2 int32
+			runID     string
+			stepOrder []string
+		)
+		_, err := inngestgo.CreateFunction(
+			inngestClient,
+			inngestgo.FunctionOpts{ID: "fn", Retries: inngestgo.Ptr(0)},
+			inngestgo.EventTrigger(eventName, nil),
+			func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
+				if runID == "" {
+					runID = input.InputCtx.RunID
+				}
+
+				res := group.ParallelWithOpts(ctx,
+					group.ParallelOpts{Optimize: inngestgo.Ptr(false)},
+					func(ctx context.Context) (any, error) {
+						_, err := step.Run(ctx, "a1", func(ctx context.Context) (any, error) {
+							atomic.AddInt32(&counterA1, 1)
+							stepOrder = append(stepOrder, "a1")
+							return nil, nil
+						})
+						if err != nil {
+							return nil, err
+						}
+
+						_, err = step.Run(ctx, "a2", func(ctx context.Context) (any, error) {
+							atomic.AddInt32(&counterA2, 1)
+							stepOrder = append(stepOrder, "a2")
+							return nil, nil
+						})
 						return nil, err
-					}
+					},
+					func(ctx context.Context) (any, error) {
+						_, err := step.Run(ctx, "b1", func(ctx context.Context) (any, error) {
+							atomic.AddInt32(&counterB1, 1)
+							time.Sleep(2 * time.Second)
+							stepOrder = append(stepOrder, "b1")
+							return nil, nil
+						})
+						if err != nil {
+							return nil, err
+						}
 
-					_, err = step.Run(ctx, "a2", func(ctx context.Context) (any, error) {
-						atomic.AddInt32(&counterA2, 1)
-						stepOrder = append(stepOrder, "a2")
-						return nil, nil
-					})
-					return nil, err
-				},
-				func(ctx context.Context) (any, error) {
-					_, err := step.Run(ctx, "b1", func(ctx context.Context) (any, error) {
-						atomic.AddInt32(&counterB1, 1)
-						time.Sleep(2 * time.Second)
-						stepOrder = append(stepOrder, "b1")
-						return nil, nil
-					})
-					if err != nil {
+						_, err = step.Run(ctx, "b2", func(ctx context.Context) (any, error) {
+							atomic.AddInt32(&counterB2, 1)
+							time.Sleep(2 * time.Second)
+							stepOrder = append(stepOrder, "b2")
+							return nil, nil
+						})
 						return nil, err
-					}
+					},
+				)
 
-					_, err = step.Run(ctx, "b2", func(ctx context.Context) (any, error) {
-						atomic.AddInt32(&counterB2, 1)
-						time.Sleep(2 * time.Second)
-						stepOrder = append(stepOrder, "b2")
-						return nil, nil
-					})
-					return nil, err
-				},
-			)
+				stepOrder = append(stepOrder, "end")
+				return res, nil
+			},
+		)
+		r.NoError(err)
+		registerFuncs()
 
-			return res, nil
-		},
-	)
-	r.NoError(err)
-	registerFuncs()
+		_, err = inngestClient.Send(ctx, inngestgo.Event{Name: eventName})
+		r.NoError(err)
 
-	_, err = inngestClient.Send(ctx, inngestgo.Event{Name: eventName})
-	r.NoError(err)
+		c.WaitForRunStatus(ctx, t, "COMPLETED", &runID, client.WaitForRunStatusOpts{
+			Timeout: 20 * time.Second,
+		})
+		r.Equal(int32(1), atomic.LoadInt32(&counterA1))
+		r.Equal(int32(1), atomic.LoadInt32(&counterA2))
+		r.Equal(int32(1), atomic.LoadInt32(&counterB1))
+		r.Equal(int32(1), atomic.LoadInt32(&counterB2))
 
-	c.WaitForRunStatus(ctx, t, "COMPLETED", &runID, client.WaitForRunStatusOpts{
-		Timeout: 20 * time.Second,
+		// Steps are in logical order because disabling optimized parallelism causes
+		// the parallel groups to race
+		r.Equal([]string{"a1", "a2", "b1", "b2", "end"}, stepOrder)
 	})
-	r.Equal(int32(1), atomic.LoadInt32(&counterA1))
-	r.Equal(int32(1), atomic.LoadInt32(&counterA2))
-	r.Equal(int32(1), atomic.LoadInt32(&counterB1))
-	r.Equal(int32(1), atomic.LoadInt32(&counterB2))
 
-	// Steps are in logical order because disabling optimized parallelism causes
-	// the parallel groups to race
-	r.Equal([]string{"a1", "a2", "b1", "b2"}, stepOrder)
+	t.Run("all step kinds", func(t *testing.T) {
+		t.Parallel()
+
+		r := require.New(t)
+		ctx := context.Background()
+		c := client.New(t)
+		inngestClient, server, registerFuncs := NewSDKHandler(t, randomSuffix("app"))
+		defer server.Close()
+
+		eventName := randomSuffix("event")
+		var (
+			counterRequest int32
+			runID          string
+		)
+		_, err := inngestgo.CreateFunction(
+			inngestClient,
+			inngestgo.FunctionOpts{ID: "fn", Retries: inngestgo.Ptr(0)},
+			inngestgo.EventTrigger(eventName, nil),
+			func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
+				atomic.AddInt32(&counterRequest, 1)
+				if runID == "" {
+					runID = input.InputCtx.RunID
+				}
+
+				res := group.ParallelWithOpts(ctx,
+					group.ParallelOpts{Optimize: inngestgo.Ptr(true)},
+					func(ctx context.Context) (any, error) {
+						return step.Fetch[string](ctx, "fetch", step.FetchOpts{
+							URL:    "http://0.0.0.0:0",
+							Method: "GET",
+						})
+					},
+					func(ctx context.Context) (any, error) {
+						return step.Invoke[any](
+							ctx,
+							"invoke",
+							step.InvokeOpts{
+								FunctionId: randomSuffix("invalid-fn"),
+								Timeout:    2 * time.Second,
+							},
+						)
+					},
+					func(ctx context.Context) (any, error) {
+						return step.Run(ctx, "run", func(ctx context.Context) (any, error) {
+							time.Sleep(4 * time.Second)
+							return nil, nil
+						})
+					},
+					func(ctx context.Context) (any, error) {
+						step.Sleep(ctx, "delay", 6*time.Second)
+						return nil, nil
+					},
+					func(ctx context.Context) (any, error) {
+						return step.WaitForEvent[any](ctx, "wait", step.WaitForEventOpts{
+							Event:   randomSuffix("never"),
+							Timeout: 8 * time.Second,
+						})
+					},
+				)
+
+				fmt.Println("done")
+
+				return res, nil
+			},
+		)
+		r.NoError(err)
+		registerFuncs()
+
+		_, err = inngestClient.Send(ctx, inngestgo.Event{Name: eventName})
+		r.NoError(err)
+
+		c.WaitForRunStatus(ctx, t, "COMPLETED", &runID, client.WaitForRunStatusOpts{
+			Timeout: 20 * time.Second,
+		})
+		fmt.Println(counterRequest)
+	})
+
 }
