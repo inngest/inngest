@@ -1,4 +1,4 @@
-package exporters
+package logs
 
 import (
 	"context"

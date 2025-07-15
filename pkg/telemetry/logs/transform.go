@@ -1,4 +1,4 @@
-package exporters
+package logs
 
 import (
 	cpb "go.opentelemetry.io/proto/otlp/common/v1"
