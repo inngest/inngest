@@ -39,6 +39,13 @@ const (
 	ConnectGatewayPingProcedure = "/connect.v1.ConnectGateway/Ping"
 )
 
+// These variables are the protoreflect.Descriptor objects for the RPCs defined in this package.
+var (
+	connectGatewayServiceDescriptor       = v1.File_connect_v1_service_proto.Services().ByName("ConnectGateway")
+	connectGatewayForwardMethodDescriptor = connectGatewayServiceDescriptor.Methods().ByName("Forward")
+	connectGatewayPingMethodDescriptor    = connectGatewayServiceDescriptor.Methods().ByName("Ping")
+)
+
 // ConnectGatewayClient is a client for the connect.v1.ConnectGateway service.
 type ConnectGatewayClient interface {
 	Forward(context.Context, *connect.Request[v1.ForwardRequest]) (*connect.Response[v1.ForwardResponse], error)
@@ -54,18 +61,17 @@ type ConnectGatewayClient interface {
 // http://api.acme.com or https://acme.com/grpc).
 func NewConnectGatewayClient(httpClient connect.HTTPClient, baseURL string, opts ...connect.ClientOption) ConnectGatewayClient {
 	baseURL = strings.TrimRight(baseURL, "/")
-	connectGatewayMethods := v1.File_connect_v1_service_proto.Services().ByName("ConnectGateway").Methods()
 	return &connectGatewayClient{
 		forward: connect.NewClient[v1.ForwardRequest, v1.ForwardResponse](
 			httpClient,
 			baseURL+ConnectGatewayForwardProcedure,
-			connect.WithSchema(connectGatewayMethods.ByName("Forward")),
+			connect.WithSchema(connectGatewayForwardMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
 		ping: connect.NewClient[v1.PingRequest, v1.PingResponse](
 			httpClient,
 			baseURL+ConnectGatewayPingProcedure,
-			connect.WithSchema(connectGatewayMethods.ByName("Ping")),
+			connect.WithSchema(connectGatewayPingMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
 	}
@@ -99,17 +105,16 @@ type ConnectGatewayHandler interface {
 // By default, handlers support the Connect, gRPC, and gRPC-Web protocols with the binary Protobuf
 // and JSON codecs. They also support gzip compression.
 func NewConnectGatewayHandler(svc ConnectGatewayHandler, opts ...connect.HandlerOption) (string, http.Handler) {
-	connectGatewayMethods := v1.File_connect_v1_service_proto.Services().ByName("ConnectGateway").Methods()
 	connectGatewayForwardHandler := connect.NewUnaryHandler(
 		ConnectGatewayForwardProcedure,
 		svc.Forward,
-		connect.WithSchema(connectGatewayMethods.ByName("Forward")),
+		connect.WithSchema(connectGatewayForwardMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
 	connectGatewayPingHandler := connect.NewUnaryHandler(
 		ConnectGatewayPingProcedure,
 		svc.Ping,
-		connect.WithSchema(connectGatewayMethods.ByName("Ping")),
+		connect.WithSchema(connectGatewayPingMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
 	return "/connect.v1.ConnectGateway/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

@@ -77,7 +77,7 @@ func TestProxyGRPCPath(t *testing.T) {
 	defer rc.Close()
 
 	l := logger.StdlibLogger(context.Background(),
-		logger.WithHandler(logger.TextHandler),
+		logger.WithHandlerType(logger.TextHandler),
 		logger.WithLoggerWriter(os.Stdout),
 		logger.WithLoggerLevel(logger.LevelDebug),
 	)
@@ -285,7 +285,7 @@ func TestProxyGRPCPolling(t *testing.T) {
 	defer rc.Close()
 
 	l := logger.StdlibLogger(context.Background(),
-		logger.WithHandler(logger.TextHandler),
+		logger.WithHandlerType(logger.TextHandler),
 		logger.WithLoggerWriter(os.Stdout),
 		logger.WithLoggerLevel(logger.LevelDebug),
 	)
@@ -491,7 +491,7 @@ func TestProxyGRPCLeaseExpiry(t *testing.T) {
 	defer rc.Close()
 
 	l := logger.StdlibLogger(context.Background(),
-		logger.WithHandler(logger.TextHandler),
+		logger.WithHandlerType(logger.TextHandler),
 		logger.WithLoggerWriter(os.Stdout),
 		logger.WithLoggerLevel(logger.LevelDebug),
 	)

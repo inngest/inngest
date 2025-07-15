@@ -210,7 +210,7 @@ func setup(t *testing.T, stateMan state.StateManager, opts setupOpts, connsToCre
 func TestFullConnectRouting(t *testing.T) {
 
 	log := logger.StdlibLogger(context.Background(),
-		logger.WithHandler(logger.TextHandler),
+		logger.WithHandlerType(logger.TextHandler),
 		logger.WithLoggerWriter(os.Stdout),
 		logger.WithLoggerLevel(logger.LevelDebug),
 	)
@@ -362,7 +362,7 @@ func TestFullConnectRouting(t *testing.T) {
 
 func TestIsHealthy(t *testing.T) {
 	log := logger.StdlibLogger(context.Background(),
-		logger.WithHandler(logger.TextHandler),
+		logger.WithHandlerType(logger.TextHandler),
 		logger.WithLoggerWriter(os.Stdout),
 		logger.WithLoggerLevel(logger.LevelDebug),
 	)
