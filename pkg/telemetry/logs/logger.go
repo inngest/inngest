@@ -32,11 +32,9 @@ func NewKafkaLogger(
 	ctx context.Context,
 	existing logger.Logger,
 	exporter log.Exporter,
-
-	scope string,
 ) logger.Logger {
 	// Translate slog records to OTel, emit, then send to exporter
-	exporterHandler := newExporterHandler(scope, exporter)
+	exporterHandler := newExporterHandler(exporter)
 
 	// Push logs to existing handler
 	split := logger.NewSplitHandler(
@@ -58,14 +56,14 @@ type exporterHandler struct {
 	group string
 }
 
-func newExporterHandler(scope string, exporter log.Exporter) slog.Handler {
+func newExporterHandler(exporter log.Exporter) slog.Handler {
 	// Batch records before exporting
 	processor := log.NewBatchProcessor(exporter)
 
 	// Create scoped logger on resource
 	otelLogger := log.
 		NewLoggerProvider(log.WithProcessor(processor)).
-		Logger(scope)
+		Logger("logger")
 
 	return &exporterHandler{
 		logger: otelLogger,
