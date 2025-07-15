@@ -85,7 +85,7 @@ func NewKafkaLogExporter(ctx context.Context, opts ...KafkaLogsExporterOpts) (lo
 	}
 
 	if len(conf.addrs) == 0 {
-		return nil, fmt.Errorf("not kafka broker addresses provided")
+		return nil, fmt.Errorf("no kafka broker addresses provided")
 	}
 
 	if conf.topic == "" {
