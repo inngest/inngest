@@ -42,8 +42,8 @@ func NewKafkaLogger(
 		exporterHandler,    // Push logs to Kafka
 	)
 
-	// Create new inngest logger with forced handler
-	return logger.StdlibLogger(ctx, logger.WithHandler(split))
+	// Create new inngest logger with export handler
+	return logger.FromSlog(slog.New(split), existing.Level())
 }
 
 // exporterHandler is a translation layer between slog.Logger and OTel.

@@ -16,10 +16,10 @@ var (
 
 type stdlibKey struct{}
 
-type handlerType int
+type handler int
 
 const (
-	JSONHandler handlerType = iota
+	JSONHandler handler = iota
 	TextHandler
 	DevHandler
 )
@@ -74,10 +74,9 @@ type Logger interface {
 type LoggerOpt func(o *loggerOpts)
 
 type loggerOpts struct {
-	writer      io.Writer
-	level       slog.Level
-	handlerType handlerType
-	handler     slog.Handler
+	writer  io.Writer
+	level   slog.Level
+	handler handler
 }
 
 func WithLoggerLevel(lvl slog.Level) LoggerOpt {
@@ -92,44 +91,31 @@ func WithLoggerWriter(w io.Writer) LoggerOpt {
 	}
 }
 
-func WithHandlerType(h handlerType) LoggerOpt {
-	return func(o *loggerOpts) {
-		o.handlerType = h
-	}
-}
-
-func WithHandler(h slog.Handler) LoggerOpt {
+func WithHandler(h handler) LoggerOpt {
 	return func(o *loggerOpts) {
 		o.handler = h
 	}
 }
 
 func newLogger(opts ...LoggerOpt) Logger {
-	handlerType := DevHandler
+	handler := DevHandler
 	switch strings.ToLower(os.Getenv("LOG_HANDLER")) {
 	case "json":
-		handlerType = JSONHandler
+		handler = JSONHandler
 	case "dev":
-		handlerType = DevHandler
+		handler = DevHandler
 	case "txt", "text":
-		handlerType = TextHandler
+		handler = TextHandler
 	}
 
 	o := &loggerOpts{
-		level:       StdlibLevel(level("LOG_LEVEL")),
-		writer:      os.Stderr,
-		handlerType: handlerType,
+		level:   StdlibLevel(level("LOG_LEVEL")),
+		writer:  os.Stderr,
+		handler: handler,
 	}
 
 	for _, apply := range opts {
 		apply(o)
-	}
-
-	if o.handler != nil {
-		return &logger{
-			Logger: slog.New(o.handler),
-			level:  o.level,
-		}
 	}
 
 	hopts := slog.HandlerOptions{
@@ -152,7 +138,7 @@ func newLogger(opts ...LoggerOpt) Logger {
 		},
 	}
 
-	switch o.handlerType {
+	switch o.handler {
 	case DevHandler:
 		return &logger{
 			Logger: slog.New(tint.NewHandler(o.writer, &tint.Options{
@@ -249,9 +235,10 @@ func level(levelVarName string) string {
 	return os.Getenv(levelVarName)
 }
 
-func FromSlog(l *slog.Logger) Logger {
+func FromSlog(l *slog.Logger, level slog.Level) Logger {
 	return &logger{
 		Logger: l,
+		level:  level,
 	}
 }
 

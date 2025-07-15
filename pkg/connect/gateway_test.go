@@ -713,7 +713,7 @@ type testingParameters struct {
 
 func createTestingGateway(t *testing.T, params ...testingParameters) testingResources {
 	l := logger.StdlibLogger(context.Background(),
-		logger.WithHandlerType(logger.TextHandler),
+		logger.WithHandler(logger.TextHandler),
 		logger.WithLoggerWriter(os.Stdout),
 		logger.WithLoggerLevel(logger.LevelDebug),
 	)
