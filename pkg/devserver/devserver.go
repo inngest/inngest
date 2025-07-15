@@ -546,6 +546,9 @@ func start(ctx context.Context, opts StartOpts) error {
 			Dev:                        true,
 			EntitlementProvider:        ds,
 			ConditionalTracer:          conditionalTracer,
+			ShouldUseGRPC: func(ctx context.Context, accountID uuid.UUID) bool {
+				return false
+			},
 		},
 	})
 	if err != nil {

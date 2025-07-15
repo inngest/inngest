@@ -2,6 +2,9 @@ package connectv0
 
 import (
 	"context"
+	"net/url"
+	"sync"
+
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/google/uuid"
@@ -10,7 +13,7 @@ import (
 	"github.com/inngest/inngest/pkg/connect/state"
 	"github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/telemetry/trace"
-	"net/url"
+	pb "github.com/inngest/inngest/proto/gen/connect/v1"
 )
 
 type Opts struct {
@@ -24,6 +27,8 @@ type Opts struct {
 	ConnectGatewayRetriever ConnectGatewayRetriever
 	EntitlementProvider     EntitlementProvider
 	ConditionalTracer       trace.ConditionalTracer
+
+	ShouldUseGRPC pubsub.UseGRPCFunc
 
 	Dev bool
 }
@@ -63,6 +68,9 @@ type ConnectGatewayRetriever interface {
 type connectApiRouter struct {
 	chi.Router
 	Opts
+
+	grpcLock    sync.RWMutex
+	grpcClients map[string]pb.ConnectExecutorClient
 }
 
 // New creates a v0 connect REST API, which exposes connection states, history, and more.
@@ -72,6 +80,7 @@ func New(r chi.Router, opts Opts) *connectApiRouter {
 	api := &connectApiRouter{
 		Router: r,
 		Opts:   opts,
+		grpcClients: make(map[string]pb.ConnectExecutorClient),
 	}
 	api.setup()
 	return api

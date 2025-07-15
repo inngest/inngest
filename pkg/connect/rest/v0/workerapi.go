@@ -4,7 +4,9 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
+	"net"
 	"net/http"
 
 	"github.com/inngest/inngest/pkg/connect/state"
@@ -14,9 +16,13 @@ import (
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/propagation"
 
+	connectConfig "github.com/inngest/inngest/pkg/config/connect"
 	"github.com/inngest/inngest/pkg/connect/auth"
 	"github.com/inngest/inngest/pkg/publicerr"
 	"github.com/inngest/inngest/proto/gen/connect/v1"
+	pb "github.com/inngest/inngest/proto/gen/connect/v1"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -130,6 +136,7 @@ func (cr *connectApiRouter) start(w http.ResponseWriter, r *http.Request) {
 
 func (cr *connectApiRouter) flushBuffer(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
+	l := logger.StdlibLogger(ctx)
 
 	hashedSigningKey := r.Header.Get("Authorization")
 	{
@@ -148,10 +155,7 @@ func (cr *connectApiRouter) flushBuffer(w http.ResponseWriter, r *http.Request) 
 
 	res, err := cr.RequestAuther.AuthenticateRequest(ctx, hashedSigningKey, envOverride)
 	if err != nil {
-		logger.StdlibLogger(ctx).Error(
-			"could not authenticate connect start request",
-			"err", err,
-		)
+		l.Error("could not authenticate connect start request", "err", err)
 
 		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 401, "authentication failed"))
 		return
@@ -194,7 +198,7 @@ func (cr *connectApiRouter) flushBuffer(w http.ResponseWriter, r *http.Request) 
 		RequestId: reqBody.RequestId,
 	})
 	if err != nil {
-		logger.StdlibLogger(ctx).Error("could not marshal flush response", "err", err)
+		l.Error("could not marshal flush response", "err", err)
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "could not marshal flush api response")
 
@@ -205,7 +209,7 @@ func (cr *connectApiRouter) flushBuffer(w http.ResponseWriter, r *http.Request) 
 	// Reliable path: Buffer the response to be picked up by the executor
 	err = cr.ConnectRequestStateManager.SaveResponse(ctx, res.EnvID, reqBody.RequestId, reqBody)
 	if err != nil && !errors.Is(err, state.ErrResponseAlreadyBuffered) {
-		logger.StdlibLogger(ctx).Error("could not buffer response", "err", err)
+		l.Error("could not buffer response", "err", err)
 		span.RecordError(err)
 		span.SetStatus(codes.Error, "could not buffer response")
 
@@ -213,15 +217,73 @@ func (cr *connectApiRouter) flushBuffer(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	// Unreliable fast-track: Notify the executor via PubSub (best-effort, this may be dropped)
-	if err := cr.ConnectResponseNotifier.NotifyExecutor(ctx, reqBody); err != nil {
-		logger.StdlibLogger(ctx).Error("could not notify executor to flush connect message", "err", err)
-		span.RecordError(err)
-		span.SetStatus(codes.Error, "could not notify executor to flush connect sdk response")
+	if cr.ShouldUseGRPC(ctx, res.AccountID) {
+		ip, err := cr.ConnectRequestStateManager.GetExecutorIP(ctx, res.EnvID, reqBody.RequestId)
+		if err != nil {
+			// Likely because the request lease has expired
+			l.Error("could not get executor IP", "err", err)
+			span.RecordError(err)
+			span.SetStatus(codes.Error, "could not get executor IP")
 
-		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 500, "could not notify executor"))
+			_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 500, "could not get executor"))
+			return
+		}
 
-		return
+		executorIP := ip.String()
+		grpcURL := net.JoinHostPort(executorIP, fmt.Sprintf("%d", connectConfig.Executor(ctx).GRPCPort))
+
+		var grpcClient pb.ConnectExecutorClient
+
+		cr.grpcLock.RLock()
+		grpcClient = cr.grpcClients[executorIP]
+		cr.grpcLock.RUnlock()
+
+		if grpcClient == nil {
+			// Upgrade lock to make sure that only one instance is creating a grpc client
+			cr.grpcLock.Lock()
+			defer cr.grpcLock.Unlock()
+			grpcClient = cr.grpcClients[executorIP]
+
+			if grpcClient == nil {
+				l.Info("grpc client not found for executor, creating one dynamically", "url", grpcURL)
+
+				conn, err := grpc.NewClient(grpcURL, grpc.WithTransportCredentials(insecure.NewCredentials()))
+				if err != nil {
+					l.Error("could not create grpc client", "url", grpcURL, "err", err)
+					span.RecordError(err)
+					span.SetStatus(codes.Error, "could not create grpc client")
+
+					_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 500, "could not create grpc client"))
+
+					return
+				}
+
+				grpcClient = pb.NewConnectExecutorClient(conn)
+				cr.grpcClients[executorIP] = grpcClient
+			}
+		}
+
+		result, err := grpcClient.Reply(ctx, &pb.ReplyRequest{Data: reqBody})
+		if err != nil || !result.Success {
+			l.Error("could not notify executor to flush connect message", "err", err)
+			span.RecordError(err)
+			span.SetStatus(codes.Error, "could not notify executor to flush connect sdk response")
+
+			_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 500, "could not notify executor"))
+			return
+		}
+
+	} else {
+		// Unreliable fast-track: Notify the executor via PubSub (best-effort, this may be dropped)
+		if err := cr.ConnectResponseNotifier.NotifyExecutor(ctx, reqBody); err != nil {
+			l.Error("could not notify executor to flush connect message", "err", err)
+			span.RecordError(err)
+			span.SetStatus(codes.Error, "could not notify executor to flush connect sdk response")
+
+			_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 500, "could not notify executor"))
+
+			return
+		}
 	}
 
 	// Send response once executor was notified
