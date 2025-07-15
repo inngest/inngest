@@ -1578,10 +1578,14 @@ func (q *queue) SetFunctionPaused(ctx context.Context, accountId uuid.UUID, fnID
 			Paused: paused,
 		}
 
-		keys := []string{shard.RedisClient.kg.FnMetadata(fnID)}
+		keys := []string{
+			shard.RedisClient.kg.FnMetadata(fnID),
+			shard.RedisClient.kg.ShadowPartitionMeta(),
+		}
 		args, err := StrSlice([]any{
 			pausedArg,
 			defaultFnMetadata,
+			fnID.String(),
 		})
 		if err != nil {
 			return err
@@ -1699,10 +1703,14 @@ func (q *queue) SetFunctionMigrate(ctx context.Context, sourceShard string, fnID
 		flag = 1
 	}
 
-	keys := []string{shard.RedisClient.kg.FnMetadata(fnID)}
+	keys := []string{
+		shard.RedisClient.kg.FnMetadata(fnID),
+		shard.RedisClient.kg.ShadowPartitionMeta(),
+	}
 	args, err := StrSlice([]any{
 		flag,
 		defaultMeta,
+		fnID.String(),
 	})
 	if err != nil {
 		return err
