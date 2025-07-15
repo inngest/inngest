@@ -57,7 +57,7 @@ export function SeatOverageBanner({ data, onDismiss }: SeatOverageBannerProps) {
           <span className="font-semibold">
             You&apos;re using {data.userCount} seats but your plan includes {data.userLimit}.
           </span>{' '}
-          Upgrade to avoid disruptions.
+          Upgrade now and keep everyone on the team.
         </>
       }
       cta={

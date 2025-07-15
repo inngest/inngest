@@ -81,7 +81,7 @@ export function SeatOverageToast({ data, onDismiss }: SeatOverageToastProps) {
           onClick={handleDismiss}
         />
       </div>
-      <div className="text-muted px-3 pb-3 text-sm">Upgrade to avoid disruptions.</div>
+      <div className="text-muted px-3 pb-3 text-sm">Upgrade now and keep everyone on the team.</div>
       <div className="border-subtle border-t px-3 py-2">
         <Link
           href={pathCreator.billing({
