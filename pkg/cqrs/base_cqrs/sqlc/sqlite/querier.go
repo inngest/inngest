@@ -48,6 +48,7 @@ type Querier interface {
 	GetSpanOutput(ctx context.Context, spanID string) (interface{}, error)
 	GetSpansByRunID(ctx context.Context, runID string) ([]*GetSpansByRunIDRow, error)
 	GetTraceRun(ctx context.Context, runID ulid.ULID) (*TraceRun, error)
+	GetTraceRunsByTriggerId(ctx context.Context, eventID string) ([]*TraceRun, error)
 	GetTraceSpanOutput(ctx context.Context, arg GetTraceSpanOutputParams) ([]*Trace, error)
 	GetTraceSpans(ctx context.Context, arg GetTraceSpansParams) ([]*Trace, error)
 	GetWorkerConnection(ctx context.Context, arg GetWorkerConnectionParams) (*WorkerConnection, error)

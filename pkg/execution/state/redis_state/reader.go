@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"iter"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -147,15 +148,23 @@ func (q *queue) StatusCount(ctx context.Context, workflowID uuid.UUID, status st
 func (q *queue) RunningCount(ctx context.Context, workflowID uuid.UUID) (int64, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "RunningCount"), redis_telemetry.ScopeQueue)
 
+	l := q.log.With(
+		"method", "RunningCount",
+		"pkg", pkgName,
+		"fn_id", workflowID,
+	)
+
 	iterate := func(client *QueueClient) (int64, error) {
+		rc := client.unshardedRc
+
 		// Load the partition for a given queue.  This allows us to generate the concurrency
 		// key properly via the given function.
 		//
 		// TODO: Remove the ability to change keys based off of initialized inputs.  It's more trouble than
 		// it's worth, and ends up meaning we have more queries to write (such as this) in order to load
 		// relevant data.
-		cmd := client.unshardedRc.B().Hget().Key(client.kg.PartitionItem()).Field(workflowID.String()).Build()
-		enc, err := client.unshardedRc.Do(ctx, cmd).AsBytes()
+		cmd := rc.B().Hget().Key(client.kg.PartitionItem()).Field(workflowID.String()).Build()
+		enc, err := rc.Do(ctx, cmd).AsBytes()
 		if rueidis.IsRedisNil(err) {
 			return 0, nil
 		}
@@ -167,13 +176,44 @@ func (q *queue) RunningCount(ctx context.Context, workflowID uuid.UUID) (int64, 
 			return 0, fmt.Errorf("error reading partition item: %w", err)
 		}
 
-		// Fetch the concurrency via the partition concurrency name.
-		key := client.kg.Concurrency("p", workflowID.String())
-		cmd = client.unshardedRc.B().Zcard().Key(key).Build()
-		count, err := client.unshardedRc.Do(ctx, cmd).AsInt64()
-		if err != nil {
-			return 0, fmt.Errorf("error inspecting running job count: %w", err)
+		var (
+			count int64
+			wg    sync.WaitGroup
+		)
+
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+
+			// Fetch the concurrency via the partition concurrency name.
+			key := client.kg.Concurrency("p", workflowID.String())
+			cmd = rc.B().Zcard().Key(key).Build()
+			cnt, err := rc.Do(ctx, cmd).AsInt64()
+			if err != nil {
+				l.Error("error inspecting running job count", "error", err)
+				return
+			}
+			atomic.AddInt64(&count, cnt)
+		}()
+
+		// NOTE: this could cause some misalignment in metrics during key queue enrollments
+		if q.allowKeyQueues(ctx, item.AccountID) {
+			wg.Add(1)
+			go func() {
+				defer wg.Done()
+
+				key := client.kg.PartitionQueueSet(enums.PartitionTypeDefault, workflowID.String(), "")
+				cmd := rc.B().Zcard().Key(key).Build()
+				cnt, err := rc.Do(ctx, cmd).AsInt64()
+				if err != nil {
+					l.Error("error inspecting ready queue job count", "error", err)
+					return
+				}
+				atomic.AddInt64(&count, cnt)
+			}()
 		}
+
+		wg.Wait()
 		return count, nil
 	}
 

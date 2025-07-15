@@ -13,9 +13,10 @@ import (
 )
 
 const (
-	defaultBatchMaxSize = 10_000
-	defaultConcurrency  = 100
-	defaultBatchTimeout = 200 * time.Millisecond
+	defaultBatchMaxSize             = 10_000
+	defaultSharedInputBufferMaxSize = 50_000
+	defaultConcurrency              = 100
+	defaultBatchTimeout             = 200 * time.Millisecond
 )
 
 type BatchSpanProcessorOpt func(b *batchSpanProcessor)
@@ -24,6 +25,14 @@ func WithBatchProcessorBufferSize(size int) BatchSpanProcessorOpt {
 	return func(b *batchSpanProcessor) {
 		if size > 0 {
 			b.maxSize = size
+		}
+	}
+}
+
+func WithBatchProcessorSharedInputBufferSize(size int) BatchSpanProcessorOpt {
+	return func(b *batchSpanProcessor) {
+		if size > 0 {
+			b.maxSharedInputBufferSize = size
 		}
 	}
 }
@@ -45,32 +54,34 @@ func WithBatchProcessorConcurrency(c int) BatchSpanProcessorOpt {
 }
 
 type batchSpanProcessor struct {
-	mt          sync.RWMutex
-	exporter    trace.SpanExporter
-	maxSize     int
-	concurrency int
-	timeout     time.Duration
-	buffer      map[string][]trace.ReadOnlySpan
-	pointer     uuid.UUID
-	in          chan *trace.ReadOnlySpan
-	out         chan string
+	mt                       sync.RWMutex
+	exporter                 trace.SpanExporter
+	maxSize                  int
+	maxSharedInputBufferSize int
+	concurrency              int
+	timeout                  time.Duration
+	buffer                   map[string][]trace.ReadOnlySpan
+	pointer                  uuid.UUID
+	in                       chan *trace.ReadOnlySpan
+	out                      chan string
 }
 
 func NewBatchSpanProcessor(ctx context.Context, exporter trace.SpanExporter, opts ...BatchSpanProcessorOpt) trace.SpanProcessor {
 	p := &batchSpanProcessor{
-		mt:          sync.RWMutex{},
-		exporter:    exporter,
-		maxSize:     defaultBatchMaxSize,
-		timeout:     defaultBatchTimeout,
-		concurrency: defaultConcurrency,
-		buffer:      map[string][]trace.ReadOnlySpan{},
-		pointer:     uuid.New(),
+		mt:                       sync.RWMutex{},
+		exporter:                 exporter,
+		maxSize:                  defaultBatchMaxSize,
+		maxSharedInputBufferSize: defaultSharedInputBufferMaxSize,
+		timeout:                  defaultBatchTimeout,
+		concurrency:              defaultConcurrency,
+		buffer:                   map[string][]trace.ReadOnlySpan{},
+		pointer:                  uuid.New(),
 	}
 
 	for _, apply := range opts {
 		apply(p)
 	}
-	p.in = make(chan *trace.ReadOnlySpan, p.maxSize)
+	p.in = make(chan *trace.ReadOnlySpan, p.maxSharedInputBufferSize)
 	p.out = make(chan string, p.maxSize)
 
 	// start process loop

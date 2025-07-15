@@ -1,7 +1,6 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState, type UIEventHandler } from 'react';
-import type { Route } from 'next';
 import dynamic from 'next/dynamic';
 import { Button } from '@inngest/components/Button';
 import { ErrorCard } from '@inngest/components/Error/ErrorCard';
@@ -23,6 +22,7 @@ import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 
 import type { RangeChangeProps } from '../DatePicker/RangePicker';
 import EntityFilter from '../Filter/EntityFilter';
+import { usePathCreator } from '../SharedContext/usePathCreator';
 import {
   useBatchedSearchParams,
   useBooleanSearchParam,
@@ -45,7 +45,6 @@ export function EventsTable({
   getEventTypes,
   eventNames,
   singleEventTypePage,
-  pathCreator,
   emptyActions,
   expandedRowActions,
   features,
@@ -59,11 +58,6 @@ export function EventsTable({
     eventName?: string;
     payload?: string;
   }) => React.ReactNode;
-  pathCreator: {
-    eventType: (params: { eventName: string }) => Route;
-    runPopout: (params: { runID: string }) => Route;
-    eventPopout: (params: { eventID: string }) => Route;
-  };
   getEvents: ({
     cursor,
     eventNames,
@@ -83,12 +77,13 @@ export function EventsTable({
   }) => Promise<{ events: Event[]; pageInfo: PageInfo; totalCount: number }>;
   getEventDetails: ({ eventID }: { eventID: string }) => Promise<Event>;
   getEventPayload: ({ eventID }: { eventID: string }) => Promise<Pick<Event, 'payload'>>;
-  getEventTypes: () => Promise<Required<Pick<EventType, 'name' | 'id'>>[]>;
+  getEventTypes?: () => Promise<Required<Pick<EventType, 'name' | 'id'>>[]>;
   eventNames?: string[];
   singleEventTypePage?: boolean;
   features: Pick<Features, 'history'>;
   standalone?: boolean;
 }) {
+  const { pathCreator } = usePathCreator();
   const columns = useColumns({ pathCreator, singleEventTypePage });
   const [showSearch, setShowSearch] = useState(false);
   const [lastDays] = useSearchParam('last');
@@ -334,7 +329,6 @@ export function EventsTable({
             const initialData: Pick<Event, 'name' | 'runs'> = { name, runs };
             return (
               <EventDetails
-                pathCreator={pathCreator}
                 initialData={initialData}
                 getEventDetails={getEventDetails}
                 getEventPayload={getEventPayload}

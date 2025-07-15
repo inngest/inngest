@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"sort"
 	"strconv"
 	"strings"
@@ -132,9 +133,9 @@ func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.Ot
 
 		var outputSpanID *string
 		var fragments []map[string]interface{}
+		groupedAttrs := make(map[string]any)
 		_ = json.Unmarshal([]byte(span.SpanFragments.(string)), &fragments)
 
-		// TODO same for links
 		for _, fragment := range fragments {
 			if name, ok := fragment["name"].(string); ok {
 				if strings.HasPrefix(name, "executor.") {
@@ -149,55 +150,43 @@ func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.Ot
 					return nil, err
 				}
 
-				for k, v := range fragmentAttr {
-					// TODO We should remove this and only keep non-Inngest
-					// attributes here instead. Especially if we use them
-					// below. For now, they're used sometimes.
-					newSpan.Attributes[k] = v
+				maps.Copy(groupedAttrs, fragmentAttr)
 
-					switch k {
-					case meta.AttributeDynamicStatus:
-						{
-							if status, ok := v.(string); ok {
-								if statusStr, err := enums.StepStatusString(status); err == nil {
-									newSpan.Status = statusStr
-								}
-							}
-						}
-					case meta.AttributeAppID:
-						{
-							newSpan.AppID = uuid.MustParse(v.(string))
-						}
-					case meta.AttributeFunctionID:
-						{
-							newSpan.FunctionID = uuid.MustParse(v.(string))
-						}
-					case meta.AttributeRunID:
-						{
-							newSpan.RunID = ulid.MustParse(v.(string))
-						}
-					case meta.AttributeStartedAt:
-						{
-							newSpan.StartTime = time.UnixMilli(int64(v.(float64)))
-						}
-					case meta.AttributeEndedAt:
-						{
-							newSpan.EndTime = time.UnixMilli(int64(v.(float64)))
-						}
-					case meta.AttributeDropSpan:
-						{
-							newSpan.MarkedAsDropped = true
-						}
-					default:
-						newSpan.Attributes[k] = v
-					}
+				if outputRef, ok := fragment["output_span_id"].(string); ok {
+					outputSpanID = &outputRef
+					outputDynamicRefs[span.DynamicSpanID.String] = outputRef
 				}
 			}
+		}
 
-			if outputRef, ok := fragment["output_span_id"].(string); ok {
-				outputSpanID = &outputRef
-				outputDynamicRefs[span.DynamicSpanID.String] = outputRef
-			}
+		newSpan.Attributes = meta.ExtractTypedValues(groupedAttrs)
+
+		if newSpan.Attributes.DynamicStatus != nil {
+			newSpan.Status = *newSpan.Attributes.DynamicStatus
+		}
+
+		if newSpan.Attributes.AppID != nil {
+			newSpan.AppID = *newSpan.Attributes.AppID
+		}
+
+		if newSpan.Attributes.FunctionID != nil {
+			newSpan.FunctionID = *newSpan.Attributes.FunctionID
+		}
+
+		if newSpan.Attributes.RunID != nil {
+			newSpan.RunID = *newSpan.Attributes.RunID
+		}
+
+		if newSpan.Attributes.StartedAt != nil {
+			newSpan.StartTime = *newSpan.Attributes.StartedAt
+		}
+
+		if newSpan.Attributes.EndedAt != nil {
+			newSpan.EndTime = *newSpan.Attributes.EndedAt
+		}
+
+		if newSpan.Attributes.DropSpan != nil && *newSpan.Attributes.DropSpan {
+			newSpan.MarkedAsDropped = true
 		}
 
 		// If this span has finished, set a preliminary output ID.
@@ -215,18 +204,17 @@ func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.Ot
 	for _, span := range spanMap {
 		// If we have an output reference for this span, set the appropriate
 		// target span ID here
-		if ref, ok := span.Attributes[meta.AttributeStepOutputRef]; ok {
-			if refStr, ok := ref.(string); ok && refStr != "" {
-				if targetSpanID, ok := outputDynamicRefs[refStr]; ok {
-					// We've found the span ID that we need to target for
-					// this span. So let's use it!
-					span.OutputID, err = encodeSpanOutputID(targetSpanID)
-					if err != nil {
-						logger.StdlibLogger(ctx).Error("error encoding span output ID", "error", err)
-						return nil, err
-					}
+		if spanRefStr := span.Attributes.StepOutputRef; spanRefStr != nil && *spanRefStr != "" {
+			if targetSpanID, ok := outputDynamicRefs[*spanRefStr]; ok {
+				// We've found the span ID that we need to target for
+				// this span. So let's use it!
+				span.OutputID, err = encodeSpanOutputID(targetSpanID)
+				if err != nil {
+					logger.StdlibLogger(ctx).Error("error encoding span output ID", "error", err)
+					return nil, err
 				}
 			}
+
 		}
 
 		if span.ParentSpanID == nil || *span.ParentSpanID == "" || *span.ParentSpanID == "0000000000000000" {
@@ -250,6 +238,10 @@ func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.Ot
 				"parentSpanID", span.ParentSpanID,
 			)
 		}
+	}
+
+	if root == nil {
+		return nil, fmt.Errorf("no root span found for run %s", runID.String())
 	}
 
 	sorter(root)
@@ -844,59 +836,126 @@ func (w wrapper) GetEvents(ctx context.Context, accountID uuid.UUID, workspaceID
 		opts.Cursor = &endULID
 	}
 
-	var (
-		evts []*sqlc.Event
-		err  error
-	)
+	builder := newEventsQueryBuilder(ctx, *opts)
+	filter := builder.filter
+	order := builder.order
 
-	if len(opts.Names) == 0 {
-		params := sqlc.WorkspaceEventsParams{
-			Cursor: *opts.Cursor,
-			Before: opts.Newest,
-			After:  opts.Oldest,
-			Limit:  int64(opts.Limit),
-		}
-		evts, err = w.q.WorkspaceEvents(ctx, params)
-	} else {
-		params := sqlc.WorkspaceNamedEventsParams{
-			Names:  opts.Names,
-			Cursor: *opts.Cursor,
-			Before: opts.Newest,
-			After:  opts.Oldest,
-			Limit:  int64(opts.Limit),
-		}
-		evts, err = w.q.WorkspaceNamedEvents(ctx, params)
-	}
+	sql, args, err := sq.Dialect(w.dialect()).
+		From("events").
+		Select(
+			"internal_id",
+			"account_id",
+			"workspace_id",
+			"source",
+			"source_id",
+			"received_at",
+			"event_id",
+			"event_name",
+			"event_data",
+			"event_user",
+			"event_v",
+			"event_ts",
+		).
+		Where(filter...).
+		Order(order...).
+		Limit(uint(opts.Limit)).
+		Prepared(true).
+		ToSQL()
 
 	if err != nil {
 		return nil, err
 	}
-	out := make([]*cqrs.Event, len(evts))
-	for n, evt := range evts {
-		val := convertEvent(evt)
-		out[n] = &val
+
+	rows, err := w.db.QueryContext(ctx, sql, args...)
+	if err != nil {
+		return nil, err
 	}
+	defer rows.Close()
+
+	out := make([]*cqrs.Event, 0, opts.Limit)
+	for rows.Next() {
+		data := sqlc.Event{}
+		if err := rows.Scan(
+			&data.InternalID,
+			&data.AccountID,
+			&data.WorkspaceID,
+			&data.Source,
+			&data.SourceID,
+			&data.ReceivedAt,
+			&data.EventID,
+			&data.EventName,
+			&data.EventData,
+			&data.EventUser,
+			&data.EventV,
+			&data.EventTs,
+		); err != nil {
+			return nil, err
+		}
+		val := convertEvent(&data)
+		out = append(out, &val)
+	}
+
 	return out, nil
 }
 
-func (w wrapper) GetEventsCount(ctx context.Context, accountID uuid.UUID, workspaceID uuid.UUID, opts *cqrs.WorkspaceEventsOpts) (int64, error) {
+func (w wrapper) GetEventsCount(ctx context.Context, accountID uuid.UUID, workspaceID uuid.UUID, opts cqrs.WorkspaceEventsOpts) (int64, error) {
 	if err := opts.Validate(); err != nil {
 		return 0, err
 	}
 
-	if len(opts.Names) == 0 {
-		params := sqlc.WorkspaceCountEventsParams{
-			Before: opts.Newest,
-			After:  opts.Oldest,
-		}
-		return w.q.WorkspaceCountEvents(ctx, params)
-	} else {
-		params := sqlc.WorkspaceCountNamedEventsParams{
-			Names:  opts.Names,
-			Before: opts.Newest,
-			After:  opts.Oldest,
-		}
-		return w.q.WorkspaceCountNamedEvents(ctx, params)
+	// We don't want to consider cursor pagination for total count, so overwrite input param
+	opts.Cursor = &endULID
+
+	builder := newEventsQueryBuilder(ctx, opts)
+	filter := builder.filter
+	order := builder.order
+
+	sql, args, err := sq.Dialect(w.dialect()).
+		From("events").
+		Select(sq.COUNT("*").As("count")).
+		Where(filter...).
+		Order(order...).
+		Prepared(true).
+		ToSQL()
+	if err != nil {
+		return 0, err
+	}
+
+	var count int64
+	err = w.db.QueryRowContext(ctx, sql, args...).Scan(&count)
+	if err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
+type eventsQueryBuilder struct {
+	filter []sq.Expression
+	order  []sqexp.OrderedExpression
+}
+
+func newEventsQueryBuilder(ctx context.Context, opt cqrs.WorkspaceEventsOpts) *eventsQueryBuilder {
+	filter := []sq.Expression{}
+
+	filter = append(filter, sq.C("received_at").Lte(opt.Newest))
+	filter = append(filter, sq.C("received_at").Gte(opt.Oldest))
+	if opt.Cursor != nil {
+		filter = append(filter, sq.C("internal_id").Lt(*opt.Cursor))
+	}
+
+	if len(opt.Names) > 0 {
+		filter = append(filter, sq.C("event_name").In(opt.Names))
+	}
+	if !opt.IncludeInternalEvents {
+		filter = append(filter, sq.C("event_name").NotLike("inngest/%"))
+	}
+
+	order := []sqexp.OrderedExpression{}
+	order = append(order, sq.C("internal_id").Desc())
+
+	return &eventsQueryBuilder{
+		filter: filter,
+		order:  order,
 	}
 }
 
@@ -1275,6 +1334,58 @@ func (w wrapper) FindOrBuildTraceRun(ctx context.Context, opts cqrs.FindOrCreate
 	}
 
 	return &new, nil
+}
+
+func (w wrapper) GetTraceRunsByTriggerID(ctx context.Context, triggerID ulid.ULID) ([]*cqrs.TraceRun, error) {
+	// convert sqlc.TraceRun{} to cqrs.TraceRun{}
+	sqlcTraceRuns, err := w.q.GetTraceRunsByTriggerId(ctx, triggerID.String())
+	if err != nil {
+		return nil, err
+	}
+	cqrsTraceRuns := make([]*cqrs.TraceRun, len(sqlcTraceRuns))
+	// dedupe this conversion
+	for i, run := range sqlcTraceRuns {
+		start := time.UnixMilli(run.StartedAt)
+		end := time.UnixMilli(run.EndedAt)
+		triggerIDS := strings.Split(string(run.TriggerIds), ",")
+
+		var (
+			isBatch bool
+			batchID *ulid.ULID
+			cron    *string
+		)
+
+		if run.BatchID != nilULID {
+			isBatch = true
+			batchID = &run.BatchID
+		}
+
+		if run.CronSchedule.Valid {
+			cron = &run.CronSchedule.String
+		}
+
+		cqrsTraceRuns[i] = &cqrs.TraceRun{
+			AccountID:    run.AccountID,
+			WorkspaceID:  run.WorkspaceID,
+			AppID:        run.AppID,
+			FunctionID:   run.FunctionID,
+			TraceID:      string(run.TraceID),
+			RunID:        run.RunID.String(),
+			QueuedAt:     time.UnixMilli(run.QueuedAt),
+			StartedAt:    start,
+			EndedAt:      end,
+			Duration:     end.Sub(start),
+			SourceID:     run.SourceID,
+			TriggerIDs:   triggerIDS,
+			Output:       run.Output,
+			Status:       enums.RunCodeToStatus(run.Status),
+			BatchID:      batchID,
+			IsBatch:      isBatch,
+			CronSchedule: cron,
+			HasAI:        run.HasAi,
+		}
+	}
+	return cqrsTraceRuns, nil
 }
 
 func (w wrapper) GetTraceRun(ctx context.Context, id cqrs.TraceRunIdentifier) (*cqrs.TraceRun, error) {

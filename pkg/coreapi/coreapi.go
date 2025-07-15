@@ -53,7 +53,15 @@ type Options struct {
 	// ingesting events will not work.
 	RequireKeys bool
 
+	// DisableGraphQL controls whether GraphQL endpoints are enabled
+	DisableGraphQL *bool
+
 	ConnectOpts connectv0.Opts
+}
+
+func (o Options) isGraphQLEnabled() bool {
+	// Default to true if not explicitly set to false
+	return o.DisableGraphQL == nil || !*o.DisableGraphQL
 }
 
 func NewCoreApi(o Options) (*CoreAPI, error) {
@@ -87,21 +95,23 @@ func NewCoreApi(o Options) (*CoreAPI, error) {
 		}),
 	)
 
-	srv := handler.NewDefaultServer(generated.NewExecutableSchema(generated.Config{Resolvers: &resolvers.Resolver{
-		Data:            o.Data,
-		HistoryReader:   o.HistoryReader,
-		Runner:          o.Runner,
-		Queue:           o.Queue,
-		EventHandler:    o.EventHandler,
-		Executor:        o.Executor,
-		ServerKind:      o.Config.GetServerKind(),
-		LocalSigningKey: o.LocalSigningKey,
-		RequireKeys:     o.RequireKeys,
-	}}))
+	if o.isGraphQLEnabled() {
+		srv := handler.NewDefaultServer(generated.NewExecutableSchema(generated.Config{Resolvers: &resolvers.Resolver{
+			Data:            o.Data,
+			HistoryReader:   o.HistoryReader,
+			Runner:          o.Runner,
+			Queue:           o.Queue,
+			EventHandler:    o.EventHandler,
+			Executor:        o.Executor,
+			ServerKind:      o.Config.GetServerKind(),
+			LocalSigningKey: o.LocalSigningKey,
+			RequireKeys:     o.RequireKeys,
+		}}))
 
-	// TODO - Add option for enabling GraphQL Playground
-	a.Handle("/", playground.Handler("GraphQL playground", "/v0/gql"))
-	a.Handle("/gql", srv)
+		// TODO - Add option for enabling GraphQL Playground
+		a.Handle("/", playground.Handler("GraphQL playground", "/v0/gql"))
+		a.Handle("/gql", srv)
+	}
 
 	// V0 APIs
 	a.Delete("/runs/{runID}", a.CancelRun)

@@ -1124,6 +1124,51 @@ func (q *Queries) GetTraceRun(ctx context.Context, runID string) (*TraceRun, err
 	return &i, err
 }
 
+const getTraceRunsByTriggerId = `-- name: GetTraceRunsByTriggerId :many
+SELECT run_id, account_id, workspace_id, app_id, function_id, trace_id, queued_at, started_at, ended_at, status, source_id, trigger_ids, output, is_debounce, batch_id, cron_schedule, has_ai FROM trace_runs WHERE POSITION($1 IN trigger_ids::text) > 0
+`
+
+func (q *Queries) GetTraceRunsByTriggerId(ctx context.Context, eventID interface{}) ([]*TraceRun, error) {
+	rows, err := q.db.QueryContext(ctx, getTraceRunsByTriggerId, eventID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*TraceRun
+	for rows.Next() {
+		var i TraceRun
+		if err := rows.Scan(
+			&i.RunID,
+			&i.AccountID,
+			&i.WorkspaceID,
+			&i.AppID,
+			&i.FunctionID,
+			&i.TraceID,
+			&i.QueuedAt,
+			&i.StartedAt,
+			&i.EndedAt,
+			&i.Status,
+			&i.SourceID,
+			&i.TriggerIds,
+			&i.Output,
+			&i.IsDebounce,
+			&i.BatchID,
+			&i.CronSchedule,
+			&i.HasAi,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getTraceSpanOutput = `-- name: GetTraceSpanOutput :many
 SELECT timestamp, timestamp_unix_ms, trace_id, span_id, parent_span_id, trace_state, span_name, span_kind, service_name, resource_attributes, scope_name, scope_version, span_attributes, duration, status_code, status_message, events, links, run_id FROM traces WHERE trace_id = $1 AND span_id = $2 ORDER BY timestamp_unix_ms DESC, duration DESC
 `

@@ -2983,6 +2983,71 @@ func TestQueuePartitionLease(t *testing.T) {
 		})
 	})
 
+	t.Run("Partition pausing with key queues", func(t *testing.T) {
+		r.FlushAll() // reset everything
+		q := NewQueue(
+			QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName},
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+				return true
+			}))
+		ctx := context.Background()
+
+		acctID := uuid.New()
+		_, err = q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{FunctionID: idA, Data: osqueue.Item{Identifier: state.Identifier{AccountID: acctID, WorkflowID: idA}}}, atA, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+		_, err = q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{FunctionID: idB, Data: osqueue.Item{Identifier: state.Identifier{AccountID: acctID, WorkflowID: idB}}}, atB, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+		_, err = q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{FunctionID: idC, Data: osqueue.Item{Identifier: state.Identifier{AccountID: acctID, WorkflowID: idC}}}, atC, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+
+		getShadowPartition := func(fnID uuid.UUID) QueueShadowPartition {
+			var sp QueueShadowPartition
+
+			str, err := rc.Do(ctx, rc.B().Hget().Key(q.primaryQueueShard.RedisClient.kg.ShadowPartitionMeta()).Field(fnID.String()).Build()).ToString()
+			require.NoError(t, err, r.Dump())
+
+			require.NoError(t, json.Unmarshal([]byte(str), &sp))
+			return sp
+		}
+
+		t.Run("Fails to lease a paused partition", func(t *testing.T) {
+			sp := getShadowPartition(idA)
+			require.False(t, sp.PauseRefill)
+
+			// pause fn A's partition:
+			err = q.SetFunctionPaused(ctx, uuid.Nil, idA, true)
+			require.NoError(t, err)
+
+			sp = getShadowPartition(idA)
+			require.True(t, sp.PauseRefill)
+
+			// attempt to lease the paused partition:
+			id, capacity, err := q.PartitionLease(ctx, &pA, time.Second*5)
+			require.Nil(t, id)
+			require.Error(t, err)
+			require.Zero(t, capacity)
+			require.ErrorIs(t, err, ErrPartitionPaused)
+		})
+
+		t.Run("Succeeds to lease a previously paused partition", func(t *testing.T) {
+			sp := getShadowPartition(idA)
+			require.True(t, sp.PauseRefill)
+
+			// unpause fn A's partition:
+			err = q.SetFunctionPaused(ctx, uuid.Nil, idA, false)
+			require.NoError(t, err)
+
+			sp = getShadowPartition(idA)
+			require.False(t, sp.PauseRefill)
+
+			// attempt to lease the unpaused partition:
+			id, capacity, err := q.PartitionLease(ctx, &pA, time.Second*5)
+			require.NotNil(t, id)
+			require.NoError(t, err)
+			require.NotZero(t, capacity)
+		})
+	})
+
 	t.Run("With key partitions", func(t *testing.T) {
 		fnID := uuid.New()
 
@@ -3898,6 +3963,63 @@ func TestQueueSetFunctionMigrate(t *testing.T) {
 		meta, err = getFnMetadata(t, r, fnID)
 		require.NoError(t, err)
 		require.False(t, meta.Migrate)
+	})
+
+	t.Run("with key queues", func(t *testing.T) {
+		q := NewQueue(
+			QueueShard{Name: "default", Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey)},
+			WithPartitionPriorityFinder(func(ctx context.Context, part QueuePartition) uint {
+				return PriorityDefault
+			}),
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+				return true
+			}),
+		)
+		ctx := context.Background()
+
+		acctID := uuid.New()
+		now := time.Now().Truncate(time.Second)
+		fnID := uuid.New()
+		id := state.Identifier{AccountID: acctID, WorkflowID: fnID}
+		_, err = q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{FunctionID: fnID, Data: osqueue.Item{Identifier: id}}, now, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+
+		getShadowPartition := func() QueueShadowPartition {
+			var sp QueueShadowPartition
+
+			str, err := rc.Do(ctx, rc.B().Hget().Key(q.primaryQueueShard.RedisClient.kg.ShadowPartitionMeta()).Field(fnID.String()).Build()).ToString()
+			require.NoError(t, err)
+
+			require.NoError(t, json.Unmarshal([]byte(str), &sp))
+			return sp
+		}
+
+		sp := getShadowPartition()
+		require.Equal(t, fnID.String(), sp.PartitionID)
+		require.False(t, sp.PauseRefill)
+
+		err = q.SetFunctionMigrate(ctx, "default", fnID, true)
+		require.NoError(t, err)
+
+		meta, err := getFnMetadata(t, r, fnID)
+		require.NoError(t, err)
+		require.True(t, meta.Migrate)
+
+		sp = getShadowPartition()
+		require.Equal(t, fnID.String(), sp.PartitionID)
+		require.True(t, sp.PauseRefill)
+
+		// disable migration flag
+		err = q.SetFunctionMigrate(ctx, "default", fnID, false)
+		require.NoError(t, err)
+
+		meta, err = getFnMetadata(t, r, fnID)
+		require.NoError(t, err)
+		require.False(t, meta.Migrate)
+
+		sp = getShadowPartition()
+		require.Equal(t, fnID.String(), sp.PartitionID)
+		require.False(t, sp.PauseRefill)
 	})
 
 	t.Run("with other shards", func(t *testing.T) {

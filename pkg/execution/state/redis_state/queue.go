@@ -179,6 +179,10 @@ type QueueManager interface {
 	BacklogSize(ctx context.Context, queueShard QueueShard, backlogID string) (int64, error)
 
 	PartitionByID(ctx context.Context, queueShard QueueShard, partitionID string) (*PartitionInspectionResult, error)
+
+	// PartitionBacklogSize returns the point in time backlog size of the partition.
+	// This will sum the size of all backlogs in that partition
+	PartitionBacklogSize(ctx context.Context, partitionID string) (int64, error)
 }
 
 // PartitionPriorityFinder returns the priority for a given queue partition.
@@ -1593,10 +1597,14 @@ func (q *queue) SetFunctionPaused(ctx context.Context, accountId uuid.UUID, fnID
 			Paused: paused,
 		}
 
-		keys := []string{shard.RedisClient.kg.FnMetadata(fnID)}
+		keys := []string{
+			shard.RedisClient.kg.FnMetadata(fnID),
+			shard.RedisClient.kg.ShadowPartitionMeta(),
+		}
 		args, err := StrSlice([]any{
 			pausedArg,
 			defaultFnMetadata,
+			fnID.String(),
 		})
 		if err != nil {
 			return err
@@ -1714,10 +1722,14 @@ func (q *queue) SetFunctionMigrate(ctx context.Context, sourceShard string, fnID
 		flag = 1
 	}
 
-	keys := []string{shard.RedisClient.kg.FnMetadata(fnID)}
+	keys := []string{
+		shard.RedisClient.kg.FnMetadata(fnID),
+		shard.RedisClient.kg.ShadowPartitionMeta(),
+	}
 	args, err := StrSlice([]any{
 		flag,
 		defaultMeta,
+		fnID.String(),
 	})
 	if err != nil {
 		return err
