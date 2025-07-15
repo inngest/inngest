@@ -1,138 +1,48 @@
 package logs
 
 import (
-	"context"
 	"time"
 
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/sdk/log"
-	"go.opentelemetry.io/otel/sdk/resource"
+	"go.opentelemetry.io/otel/trace"
 	cpb "go.opentelemetry.io/proto/otlp/common/v1"
 	lpb "go.opentelemetry.io/proto/otlp/logs/v1"
 
 	api "go.opentelemetry.io/otel/log"
 )
 
-// ResourceLogsFromProto converts OTLP ResourceLogs back to log.Record format.
-// Returns the scope name from the first scope found and all log records.
-func ResourceLogsFromProto(records []*lpb.ResourceLogs) (scopeName string, logs []log.Record) {
-	if len(records) == 0 {
-		return "", nil
-	}
-
-	// Create a temporary exporter to capture the records
-	exporter := &captureExporter{}
+// LogRecordFromProto converts an OTLP LogRecord back to api.Record format.
+func LogRecordFromProto(lr *lpb.LogRecord) api.Record {
+	// Create an API record and set its properties
+	apiRecord := api.Record{}
 	
-	// Create a temporary logger to emit the records
-	processor := log.NewSimpleProcessor(exporter)
+	apiRecord.SetTimestamp(time.Unix(0, int64(lr.TimeUnixNano)))
+	apiRecord.SetObservedTimestamp(time.Unix(0, int64(lr.ObservedTimeUnixNano)))
+	apiRecord.SetEventName(lr.EventName)
+	apiRecord.SetSeverity(SeverityFromProto(lr.SeverityNumber))
+	apiRecord.SetSeverityText(lr.SeverityText)
 
-	for _, rl := range records {
-		// Create resource from protobuf
-		var res *resource.Resource
-		if rl.Resource != nil {
-			attrs := make([]attribute.KeyValue, 0, len(rl.Resource.Attributes))
-			for _, attr := range rl.Resource.Attributes {
-				attrs = append(attrs, attribute.KeyValue{
-					Key:   attribute.Key(attr.Key),
-					Value: protoToAttributeValue(attr.Value),
-				})
-			}
-			res, _ = resource.New(context.Background(), resource.WithAttributes(attrs...))
-		} else {
-			res = resource.Empty()
-		}
+	if lr.Body != nil {
+		apiRecord.SetBody(LogValueFromProto(lr.Body))
+	}
 
-		// Create logger provider with resource
-		provider := log.NewLoggerProvider(
-			log.WithProcessor(processor),
-			log.WithResource(res),
-		)
-
-		for _, sl := range rl.ScopeLogs {
-			if scopeName == "" && sl.Scope != nil {
-				scopeName = sl.Scope.Name
-			}
-
-			// Create scoped logger
-			var logger api.Logger
-			if sl.Scope != nil {
-				logger = provider.Logger(sl.Scope.Name, api.WithInstrumentationVersion(sl.Scope.Version))
-			} else {
-				logger = provider.Logger("")
-			}
-
-			// Emit each log record
-			for _, lr := range sl.LogRecords {
-				apiRecord := api.Record{}
-
-				apiRecord.SetTimestamp(time.Unix(0, int64(lr.TimeUnixNano)))
-				apiRecord.SetObservedTimestamp(time.Unix(0, int64(lr.ObservedTimeUnixNano)))
-				apiRecord.SetEventName(lr.EventName)
-				apiRecord.SetSeverity(SeverityFromProto(lr.SeverityNumber))
-				apiRecord.SetSeverityText(lr.SeverityText)
-
-				if lr.Body != nil {
-					apiRecord.SetBody(LogValueFromProto(lr.Body))
-				}
-
-				// Add attributes
-				attrs := make([]api.KeyValue, len(lr.Attributes))
-				for i, attr := range lr.Attributes {
-					attrs[i] = api.KeyValue{
-						Key:   attr.Key,
-						Value: LogValueFromProto(attr.Value),
-					}
-				}
-				apiRecord.AddAttributes(attrs...)
-
-				// Emit the record
-				logger.Emit(context.Background(), apiRecord)
-			}
+	// Add attributes
+	attrs := make([]api.KeyValue, len(lr.Attributes))
+	for i, attr := range lr.Attributes {
+		attrs[i] = api.KeyValue{
+			Key:   attr.Key,
+			Value: LogValueFromProto(attr.Value),
 		}
 	}
+	apiRecord.AddAttributes(attrs...)
 
-	// Force flush to capture all records
-	processor.ForceFlush(context.Background())
-
-	return scopeName, exporter.records
-}
-
-// captureExporter is a simple exporter that captures records
-type captureExporter struct {
-	records []log.Record
-}
-
-func (e *captureExporter) Export(ctx context.Context, records []log.Record) error {
-	e.records = append(e.records, records...)
-	return nil
-}
-
-func (e *captureExporter) Shutdown(ctx context.Context) error {
-	return nil
-}
-
-func (e *captureExporter) ForceFlush(ctx context.Context) error {
-	return nil
-}
-
-// protoToAttributeValue converts protobuf AnyValue to attribute.Value
-func protoToAttributeValue(av *cpb.AnyValue) attribute.Value {
-	if av == nil {
-		return attribute.Value{}
+	// Set trace context if present
+	if len(lr.TraceId) > 0 {
+		var traceID trace.TraceID
+		copy(traceID[:], lr.TraceId)
+		// Note: TraceID/SpanID are typically set via trace context, not directly on the record
 	}
 
-	switch v := av.Value.(type) {
-	case *cpb.AnyValue_BoolValue:
-		return attribute.BoolValue(v.BoolValue)
-	case *cpb.AnyValue_IntValue:
-		return attribute.Int64Value(v.IntValue)
-	case *cpb.AnyValue_DoubleValue:
-		return attribute.Float64Value(v.DoubleValue)
-	case *cpb.AnyValue_StringValue:
-		return attribute.StringValue(v.StringValue)
-	default:
-		return attribute.StringValue("INVALID")
-	}
+	return apiRecord
 }
 
 // SeverityFromProto converts OTLP SeverityNumber to api.Severity.

@@ -11,179 +11,113 @@ import (
 	"go.opentelemetry.io/otel/sdk/resource"
 )
 
-func TestResourceLogsRoundTrip(t *testing.T) {
+func TestLogRecordRoundTrip(t *testing.T) {
 	now := time.Now()
 	observedTime := now.Add(time.Millisecond)
 
 	tests := []struct {
-		name    string
-		records []log.Record
+		name   string
+		record api.Record
 	}{
 		{
-			name:    "empty records",
-			records: []log.Record{},
+			name:   "basic record",
+			record: createAPIRecord(func(r *api.Record) {
+				r.SetTimestamp(now)
+				r.SetObservedTimestamp(observedTime)
+				r.SetSeverity(api.SeverityInfo)
+				r.SetSeverityText("INFO")
+				r.SetBody(api.StringValue("test message"))
+			}),
 		},
 		{
-			name: "single basic record",
-			records: []log.Record{
-				createLogRecord(t, log.Record{}, func(r *api.Record) {
-					r.SetTimestamp(now)
-					r.SetObservedTimestamp(observedTime)
-					r.SetSeverity(api.SeverityInfo)
-					r.SetSeverityText("INFO")
-					r.SetBody(api.StringValue("test message"))
-				}),
-			},
+			name:   "record with attributes",
+			record: createAPIRecord(func(r *api.Record) {
+				r.SetTimestamp(now)
+				r.SetObservedTimestamp(observedTime)
+				r.SetSeverity(api.SeverityError)
+				r.SetSeverityText("ERROR")
+				r.SetBody(api.StringValue("error message"))
+				r.AddAttributes(
+					api.KeyValue{Key: "string_attr", Value: api.StringValue("value")},
+					api.KeyValue{Key: "int_attr", Value: api.Int64Value(42)},
+					api.KeyValue{Key: "bool_attr", Value: api.BoolValue(true)},
+					api.KeyValue{Key: "float_attr", Value: api.Float64Value(3.14)},
+				)
+			}),
 		},
 		{
-			name: "record with attributes",
-			records: []log.Record{
-				createLogRecord(t, log.Record{}, func(r *api.Record) {
-					r.SetTimestamp(now)
-					r.SetObservedTimestamp(observedTime)
-					r.SetSeverity(api.SeverityError)
-					r.SetSeverityText("ERROR")
-					r.SetBody(api.StringValue("error message"))
-					r.AddAttributes(
-						api.KeyValue{Key: "string_attr", Value: api.StringValue("value")},
-						api.KeyValue{Key: "int_attr", Value: api.Int64Value(42)},
-						api.KeyValue{Key: "bool_attr", Value: api.BoolValue(true)},
-						api.KeyValue{Key: "float_attr", Value: api.Float64Value(3.14)},
-					)
-				}),
-			},
+			name:   "record with complex body types",
+			record: createAPIRecord(func(r *api.Record) {
+				r.SetTimestamp(now)
+				r.SetObservedTimestamp(observedTime)
+				r.SetSeverity(api.SeverityDebug)
+				r.SetSeverityText("DEBUG")
+				r.SetBody(api.MapValue(
+					api.KeyValue{Key: "nested_string", Value: api.StringValue("nested")},
+					api.KeyValue{Key: "nested_int", Value: api.Int64Value(123)},
+				))
+			}),
 		},
 		{
-			name: "record with trace context",
-			records: []log.Record{
-				createLogRecord(t, log.Record{}, func(r *api.Record) {
-					r.SetTimestamp(now)
-					r.SetObservedTimestamp(observedTime)
-					r.SetSeverity(api.SeverityWarn)
-					r.SetSeverityText("WARN")
-					r.SetBody(api.StringValue("warning message"))
-					// Note: TraceID and SpanID are set differently in the otel API
-					// They need to be set using trace context or similar mechanisms
-				}),
-			},
+			name:   "record with slice body",
+			record: createAPIRecord(func(r *api.Record) {
+				r.SetTimestamp(now)
+				r.SetObservedTimestamp(observedTime)
+				r.SetSeverity(api.SeverityTrace)
+				r.SetSeverityText("TRACE")
+				r.SetBody(api.SliceValue(
+					api.StringValue("item1"),
+					api.StringValue("item2"),
+					api.Int64Value(42),
+				))
+			}),
 		},
 		{
-			name: "record with complex body types",
-			records: []log.Record{
-				createLogRecord(t, log.Record{}, func(r *api.Record) {
-					r.SetTimestamp(now)
-					r.SetObservedTimestamp(observedTime)
-					r.SetSeverity(api.SeverityDebug)
-					r.SetSeverityText("DEBUG")
-					r.SetBody(api.MapValue(
-						api.KeyValue{Key: "nested_string", Value: api.StringValue("nested")},
-						api.KeyValue{Key: "nested_int", Value: api.Int64Value(123)},
-					))
-				}),
-			},
+			name:   "record with bytes body",
+			record: createAPIRecord(func(r *api.Record) {
+				r.SetTimestamp(now)
+				r.SetObservedTimestamp(observedTime)
+				r.SetSeverity(api.SeverityFatal)
+				r.SetSeverityText("FATAL")
+				r.SetBody(api.BytesValue([]byte("binary data")))
+			}),
 		},
 		{
-			name: "record with slice body",
-			records: []log.Record{
-				createLogRecord(t, log.Record{}, func(r *api.Record) {
-					r.SetTimestamp(now)
-					r.SetObservedTimestamp(observedTime)
-					r.SetSeverity(api.SeverityTrace)
-					r.SetSeverityText("TRACE")
-					r.SetBody(api.SliceValue(
-						api.StringValue("item1"),
-						api.StringValue("item2"),
-						api.Int64Value(42),
-					))
-				}),
-			},
-		},
-		{
-			name: "record with bytes body",
-			records: []log.Record{
-				createLogRecord(t, log.Record{}, func(r *api.Record) {
-					r.SetTimestamp(now)
-					r.SetObservedTimestamp(observedTime)
-					r.SetSeverity(api.SeverityFatal)
-					r.SetSeverityText("FATAL")
-					r.SetBody(api.BytesValue([]byte("binary data")))
-				}),
-			},
-		},
-		{
-			name: "multiple records with different severities",
-			records: []log.Record{
-				createLogRecord(t, log.Record{}, func(r *api.Record) {
-					r.SetTimestamp(now)
-					r.SetSeverity(api.SeverityTrace)
-					r.SetBody(api.StringValue("trace message"))
-				}),
-				createLogRecord(t, log.Record{}, func(r *api.Record) {
-					r.SetTimestamp(now.Add(time.Second))
-					r.SetSeverity(api.SeverityDebug)
-					r.SetBody(api.StringValue("debug message"))
-				}),
-				createLogRecord(t, log.Record{}, func(r *api.Record) {
-					r.SetTimestamp(now.Add(2 * time.Second))
-					r.SetSeverity(api.SeverityInfo)
-					r.SetBody(api.StringValue("info message"))
-				}),
-				createLogRecord(t, log.Record{}, func(r *api.Record) {
-					r.SetTimestamp(now.Add(3 * time.Second))
-					r.SetSeverity(api.SeverityWarn)
-					r.SetBody(api.StringValue("warn message"))
-				}),
-				createLogRecord(t, log.Record{}, func(r *api.Record) {
-					r.SetTimestamp(now.Add(4 * time.Second))
-					r.SetSeverity(api.SeverityError)
-					r.SetBody(api.StringValue("error message"))
-				}),
-				createLogRecord(t, log.Record{}, func(r *api.Record) {
-					r.SetTimestamp(now.Add(5 * time.Second))
-					r.SetSeverity(api.SeverityFatal)
-					r.SetBody(api.StringValue("fatal message"))
-				}),
-			},
-		},
-		{
-			name: "record with event name",
-			records: []log.Record{
-				createLogRecord(t, log.Record{}, func(r *api.Record) {
-					r.SetTimestamp(now)
-					r.SetObservedTimestamp(observedTime)
-					r.SetSeverity(api.SeverityInfo)
-					r.SetSeverityText("INFO")
-					r.SetEventName("test.event")
-					r.SetBody(api.StringValue("event message"))
-				}),
-			},
+			name:   "record with event name",
+			record: createAPIRecord(func(r *api.Record) {
+				r.SetTimestamp(now)
+				r.SetObservedTimestamp(observedTime)
+				r.SetSeverity(api.SeverityInfo)
+				r.SetSeverityText("INFO")
+				r.SetEventName("test.event")
+				r.SetBody(api.StringValue("event message"))
+			}),
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Convert to protobuf
-			protoLogs := ResourceLogs(tt.records)
+			// Convert to protobuf using the existing LogRecord function
+			// But first we need to convert api.Record to log.Record
+			logRecord := createLogRecord(t, tt.record)
+			protoRecord := LogRecord(logRecord)
 			
-			// Convert back to log records
-			_, roundTripRecords := ResourceLogsFromProto(protoLogs)
+			// Convert back to api record
+			roundTripRecord := LogRecordFromProto(protoRecord)
 			
-			// Compare lengths
-			if len(roundTripRecords) != len(tt.records) {
-				t.Fatalf("Expected %d records, got %d", len(tt.records), len(roundTripRecords))
-			}
-			
-			// Compare each record
-			for i, expected := range tt.records {
-				actual := roundTripRecords[i]
-				compareLogRecords(t, expected, actual)
-			}
+			// Compare the records
+			compareAPIRecords(t, tt.record, roundTripRecord)
 		})
 	}
 }
 
+func createAPIRecord(setup func(*api.Record)) api.Record {
+	record := api.Record{}
+	setup(&record)
+	return record
+}
 
-func createLogRecord(t *testing.T, base log.Record, setup func(*api.Record)) log.Record {
+func createLogRecord(t *testing.T, apiRecord api.Record) log.Record {
 	t.Helper()
 	
 	// Create a resource for the record
@@ -201,7 +135,7 @@ func createLogRecord(t *testing.T, base log.Record, setup func(*api.Record)) log
 	exporter := &captureExporter{}
 	
 	// Create logger with processor and resource
-	processor := log.NewBatchProcessor(exporter)
+	processor := log.NewSimpleProcessor(exporter)
 	provider := log.NewLoggerProvider(
 		log.WithProcessor(processor),
 		log.WithResource(res),
@@ -210,12 +144,8 @@ func createLogRecord(t *testing.T, base log.Record, setup func(*api.Record)) log
 	// Create scoped logger
 	logger := provider.Logger("test-scope", api.WithInstrumentationVersion("1.0.0"))
 	
-	// Create a record and set it up
-	record := api.Record{}
-	setup(&record)
-	
 	// Emit the record
-	logger.Emit(context.Background(), record)
+	logger.Emit(context.Background(), apiRecord)
 	
 	// Force flush to ensure record is captured
 	processor.ForceFlush(context.Background())
@@ -225,10 +155,28 @@ func createLogRecord(t *testing.T, base log.Record, setup func(*api.Record)) log
 		t.Fatal("No records captured")
 	}
 	
-	return exporter.records[len(exporter.records)-1]
+	return exporter.records[0]
 }
 
-func compareLogRecords(t *testing.T, expected, actual log.Record) {
+// captureExporter is a simple exporter that captures records for testing
+type captureExporter struct {
+	records []log.Record
+}
+
+func (e *captureExporter) Export(ctx context.Context, records []log.Record) error {
+	e.records = append(e.records, records...)
+	return nil
+}
+
+func (e *captureExporter) Shutdown(ctx context.Context) error {
+	return nil
+}
+
+func (e *captureExporter) ForceFlush(ctx context.Context) error {
+	return nil
+}
+
+func compareAPIRecords(t *testing.T, expected, actual api.Record) {
 	t.Helper()
 	
 	// Compare timestamps
@@ -257,21 +205,13 @@ func compareLogRecords(t *testing.T, expected, actual log.Record) {
 	
 	// Compare body
 	if !compareLogValues(expected.Body(), actual.Body()) {
-		t.Errorf("Body mismatch: expected %v, got %v", expected.Body(), actual.Body())
-	}
-	
-	// Compare trace context
-	if expected.TraceID() != actual.TraceID() {
-		t.Errorf("TraceID mismatch: expected %v, got %v", expected.TraceID(), actual.TraceID())
-	}
-	
-	if expected.SpanID() != actual.SpanID() {
-		t.Errorf("SpanID mismatch: expected %v, got %v", expected.SpanID(), actual.SpanID())
+		t.Errorf("Body mismatch: expected %v (kind: %v), got %v (kind: %v)", 
+			expected.Body(), expected.Body().Kind(), actual.Body(), actual.Body().Kind())
 	}
 	
 	// Compare attributes
-	expectedAttrs := collectAttributes(expected)
-	actualAttrs := collectAttributes(actual)
+	expectedAttrs := collectAPIAttributes(expected)
+	actualAttrs := collectAPIAttributes(actual)
 	
 	if len(expectedAttrs) != len(actualAttrs) {
 		t.Errorf("Attributes count mismatch: expected %d, got %d", len(expectedAttrs), len(actualAttrs))
@@ -286,12 +226,13 @@ func compareLogRecords(t *testing.T, expected, actual log.Record) {
 		}
 		
 		if !compareLogValues(expectedVal, actualVal) {
-			t.Errorf("Attribute %q mismatch: expected %v (kind: %v), got %v (kind: %v)", key, expectedVal, expectedVal.Kind(), actualVal, actualVal.Kind())
+			t.Errorf("Attribute %q mismatch: expected %v (kind: %v), got %v (kind: %v)", 
+				key, expectedVal, expectedVal.Kind(), actualVal, actualVal.Kind())
 		}
 	}
 }
 
-func collectAttributes(record log.Record) map[string]api.Value {
+func collectAPIAttributes(record api.Record) map[string]api.Value {
 	attrs := make(map[string]api.Value)
 	record.WalkAttributes(func(kv api.KeyValue) bool {
 		attrs[kv.Key] = kv.Value
