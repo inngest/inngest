@@ -7,17 +7,72 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	otellog "go.opentelemetry.io/otel/log"
 	"go.opentelemetry.io/otel/sdk/log"
+	"go.opentelemetry.io/otel/sdk/resource"
 
 	"log/slog"
 	"time"
 )
 
+/*
+	This package connects our logging libraries with a Kafka exporter, using the OTLP Protobuf definitions for logs.
+
+	Logger (slog.Logger) -- Info() --> Handler
+
+	Handler --> SplitHandler --> text handler (stdout/stderr)
+							 --> exporter handler
+
+	Exporter handler -- Translate logs --> OTel logger
+
+	OTel logger -- Emit logs --> OTel batch processor -- Export --> Exporter
+
+	Exporter -- Produce --> Kafka
+*/
+
+// NewKafkaLogger returns a split logger.Logger given a Kafka exporter.
+// The split logger will emit logs to both the existing logger and exporter.
+func NewKafkaLogger(
+	ctx context.Context,
+	existing logger.Logger,
+	exporter log.Exporter,
+
+	resource *resource.Resource,
+	scope string,
+) logger.Logger {
+	// Translate slog records to OTel, emit, then send to exporter
+	exporterHandler := newExporterHandler(resource, scope, exporter)
+
+	// Push logs to existing handler
+	split := logger.NewSplitHandler(
+		existing.Handler(), // Log to stdout/stderr
+		exporterHandler,    // Push logs to Kafka
+	)
+
+	// Create new inngest logger with forced handler
+	return logger.StdlibLogger(ctx, logger.WithHandler(split))
+}
+
+// exporterHandler is a translation layer between slog.Logger and OTel.
+// It receives an OTel logger instance and will emit logs.
 type exporterHandler struct {
-	exporter log.Exporter
-	level    slog.Level
+	logger otellog.Logger
+	level  slog.Level
 
 	attrs []slog.Attr
 	group string
+}
+
+func newExporterHandler(res *resource.Resource, scope string, exporter log.Exporter) slog.Handler {
+	// Batch records before exporting
+	processor := log.NewBatchProcessor(exporter)
+
+	// Create scoped logger on resource
+	otelLogger := log.
+		NewLoggerProvider(log.WithProcessor(processor), log.WithResource(res)).
+		Logger(scope)
+
+	return &exporterHandler{
+		logger: otelLogger,
+	}
 }
 
 func (e exporterHandler) Enabled(ctx context.Context, level slog.Level) bool {
@@ -25,7 +80,7 @@ func (e exporterHandler) Enabled(ctx context.Context, level slog.Level) bool {
 }
 
 func (e exporterHandler) Handle(ctx context.Context, record slog.Record) error {
-	exportRecord := log.Record{}
+	exportRecord := otellog.Record{}
 	exportRecord.SetTimestamp(record.Time)
 	exportRecord.SetObservedTimestamp(time.Now())
 
@@ -51,21 +106,14 @@ func (e exporterHandler) Handle(ctx context.Context, record slog.Record) error {
 		return true
 	})
 
-	exportRecord.SetAttributes(attrs...)
+	exportRecord.AddAttributes(attrs...)
 	exportRecord.SetBody(otellog.StringValue(record.Message))
 
 	if eventName != "" {
 		exportRecord.SetEventName(eventName)
 	}
 
-	// TODO Get current span + trace IDs
-	//exportRecord.SetSpanID()
-	//exportRecord.SetTraceID()
-
-	err := e.exporter.Export(ctx, []log.Record{exportRecord})
-	if err != nil {
-		return fmt.Errorf("could not export record: %w", err)
-	}
+	e.logger.Emit(ctx, exportRecord)
 
 	return nil
 }
@@ -149,38 +197,17 @@ func (e exporterHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
 	}
 
 	return exporterHandler{
-		exporter: e.exporter,
-		level:    e.level,
-		attrs:    mergedAttributes,
+		logger: e.logger,
+		level:  e.level,
+		attrs:  mergedAttributes,
 	}
 }
 
 func (e exporterHandler) WithGroup(name string) slog.Handler {
 	return exporterHandler{
-		exporter: e.exporter,
-		level:    e.level,
-		attrs:    e.attrs,
-		group:    name,
+		logger: e.logger,
+		level:  e.level,
+		attrs:  e.attrs,
+		group:  name,
 	}
-}
-
-func newExporterHandler(exporter log.Exporter) slog.Handler {
-	return &exporterHandler{
-		exporter: exporter,
-	}
-}
-
-func NewKafkaLogger(
-	ctx context.Context,
-	existing logger.Logger,
-	exporter log.Exporter,
-) logger.Logger {
-	handler := newExporterHandler(exporter)
-
-	split := logger.NewSplitHandler(
-		existing.Handler(),
-		handler,
-	)
-
-	return logger.StdlibLogger(ctx, logger.WithHandler(split))
 }
