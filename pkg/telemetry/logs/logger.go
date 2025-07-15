@@ -7,8 +7,6 @@ import (
 	"github.com/inngest/inngest/pkg/logger"
 	otellog "go.opentelemetry.io/otel/log"
 	"go.opentelemetry.io/otel/sdk/log"
-	"go.opentelemetry.io/otel/sdk/resource"
-
 	"log/slog"
 	"time"
 )
@@ -35,11 +33,10 @@ func NewKafkaLogger(
 	existing logger.Logger,
 	exporter log.Exporter,
 
-	resource *resource.Resource,
 	scope string,
 ) logger.Logger {
 	// Translate slog records to OTel, emit, then send to exporter
-	exporterHandler := newExporterHandler(resource, scope, exporter)
+	exporterHandler := newExporterHandler(scope, exporter)
 
 	// Push logs to existing handler
 	split := logger.NewSplitHandler(
@@ -61,13 +58,13 @@ type exporterHandler struct {
 	group string
 }
 
-func newExporterHandler(res *resource.Resource, scope string, exporter log.Exporter) slog.Handler {
+func newExporterHandler(scope string, exporter log.Exporter) slog.Handler {
 	// Batch records before exporting
 	processor := log.NewBatchProcessor(exporter)
 
 	// Create scoped logger on resource
 	otelLogger := log.
-		NewLoggerProvider(log.WithProcessor(processor), log.WithResource(res)).
+		NewLoggerProvider(log.WithProcessor(processor)).
 		Logger(scope)
 
 	return &exporterHandler{
