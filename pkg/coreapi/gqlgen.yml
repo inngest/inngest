@@ -53,8 +53,8 @@ models:
     fields:
       raw:
         resolver: true
-#      runs:
-#        resolver: true
+      runs:
+        resolver: true
 #      source:
 #        resolver: true
   Function:

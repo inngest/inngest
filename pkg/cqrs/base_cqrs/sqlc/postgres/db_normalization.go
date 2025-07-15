@@ -739,6 +739,20 @@ func (q NormalizedQueries) GetTraceSpanOutput(ctx context.Context, arg sqlc_sqli
 	return sqliteTraces, nil
 }
 
+func (q NormalizedQueries) GetTraceRunsByTriggerId(ctx context.Context, eventID string) ([]*sqlc_sqlite.TraceRun, error) {
+	traces, err := q.db.GetTraceRunsByTriggerId(ctx, eventID)
+	if err != nil {
+		return nil, err
+	}
+
+	sqliteTraces := make([]*sqlc_sqlite.TraceRun, len(traces))
+	for i, trace := range traces {
+		sqliteTraces[i], _ = trace.ToSQLite()
+	}
+
+	return sqliteTraces, nil
+}
+
 func (q NormalizedQueries) InsertFunctionFinish(ctx context.Context, arg sqlc_sqlite.InsertFunctionFinishParams) error {
 	var completedStepCount int32
 	if arg.CompletedStepCount.Valid {
