@@ -16,10 +16,10 @@ var (
 
 type stdlibKey struct{}
 
-type handler int
+type handlerType int
 
 const (
-	JSONHandler handler = iota
+	JSONHandler handlerType = iota
 	TextHandler
 	DevHandler
 )
@@ -38,6 +38,9 @@ const (
 	LevelEmergency = slog.Level(12)
 )
 
+// LoggerEventName is a special attribute key used for extracting the event name for event logs.
+const LoggerEventName = "inngest_logger_event_name"
+
 type Logger interface {
 	//
 	// Methods from slog.Logger
@@ -53,6 +56,7 @@ type Logger interface {
 	Log(ctx context.Context, level slog.Level, msg string, args ...any)
 	LogAttrs(ctx context.Context, level slog.Level, msg string, args ...slog.Attr)
 	Handler() slog.Handler
+	Level() slog.Level
 	With(args ...any) Logger
 
 	//
@@ -70,9 +74,10 @@ type Logger interface {
 type LoggerOpt func(o *loggerOpts)
 
 type loggerOpts struct {
-	writer  io.Writer
-	level   slog.Level
-	handler handler
+	writer      io.Writer
+	level       slog.Level
+	handlerType handlerType
+	handler     slog.Handler
 }
 
 func WithLoggerLevel(lvl slog.Level) LoggerOpt {
@@ -87,31 +92,44 @@ func WithLoggerWriter(w io.Writer) LoggerOpt {
 	}
 }
 
-func WithHandler(h handler) LoggerOpt {
+func WithHandlerType(h handlerType) LoggerOpt {
+	return func(o *loggerOpts) {
+		o.handlerType = h
+	}
+}
+
+func WithHandler(h slog.Handler) LoggerOpt {
 	return func(o *loggerOpts) {
 		o.handler = h
 	}
 }
 
 func newLogger(opts ...LoggerOpt) Logger {
-	handler := DevHandler
+	handlerType := DevHandler
 	switch strings.ToLower(os.Getenv("LOG_HANDLER")) {
 	case "json":
-		handler = JSONHandler
+		handlerType = JSONHandler
 	case "dev":
-		handler = DevHandler
+		handlerType = DevHandler
 	case "txt", "text":
-		handler = TextHandler
+		handlerType = TextHandler
 	}
 
 	o := &loggerOpts{
-		level:   StdlibLevel(level("LOG_LEVEL")),
-		writer:  os.Stderr,
-		handler: handler,
+		level:       StdlibLevel(level("LOG_LEVEL")),
+		writer:      os.Stderr,
+		handlerType: handlerType,
 	}
 
 	for _, apply := range opts {
 		apply(o)
+	}
+
+	if o.handler != nil {
+		return &logger{
+			Logger: slog.New(o.handler),
+			level:  o.level,
+		}
 	}
 
 	hopts := slog.HandlerOptions{
@@ -134,7 +152,7 @@ func newLogger(opts ...LoggerOpt) Logger {
 		},
 	}
 
-	switch o.handler {
+	switch o.handlerType {
 	case DevHandler:
 		return &logger{
 			Logger: slog.New(tint.NewHandler(o.writer, &tint.Options{
@@ -165,16 +183,19 @@ func newLogger(opts ...LoggerOpt) Logger {
 					return a
 				},
 			})),
+			level: o.level,
 		}
 
 	case TextHandler:
 		return &logger{
 			Logger: slog.New(slog.NewTextHandler(o.writer, &hopts)),
+			level:  o.level,
 		}
 
 	default:
 		return &logger{
 			Logger: slog.New(slog.NewJSONHandler(o.writer, &hopts)),
+			level:  o.level,
 		}
 	}
 }
@@ -230,13 +251,18 @@ func level(levelVarName string) string {
 
 func FromSlog(l *slog.Logger) Logger {
 	return &logger{
-		l,
+		Logger: l,
 	}
 }
 
 // logger is a wrapper over slog with additional levels
 type logger struct {
 	*slog.Logger
+	level slog.Level
+}
+
+func (l *logger) Level() slog.Level {
+	return l.level
 }
 
 func (l *logger) With(args ...any) Logger {
