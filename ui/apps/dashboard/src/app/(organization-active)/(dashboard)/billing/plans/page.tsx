@@ -1,5 +1,6 @@
 import { Link } from '@inngest/components/Link/Link';
 
+import { AddonCard, type AddonCardProps } from '@/components/Billing/Plans/AddonCard';
 import { HorizontalPlanCard, VerticalPlanCard } from '@/components/Billing/Plans/PlanCard';
 import { type Plan } from '@/components/Billing/Plans/utils';
 import { currentPlan as getCurrentPlan } from '@/components/Billing/data';
@@ -63,6 +64,25 @@ export default async function Page() {
     },
   ];
 
+  const addons: Array<{
+    title: string;
+    description: string;
+    price?: string;
+    priceUnit?: string;
+    action: AddonCardProps['action'];
+  }> = [
+    {
+      title: 'Priority Support: Dedicated Slack Channel',
+      description: 'Get faster response times and dedicated support from our team.',
+      price: '$200',
+      priceUnit: 'month',
+      action: {
+        type: 'button' as const,
+        label: 'Contact Sales',
+      },
+    },
+  ];
+
   return (
     <>
       {currentPlan.isLegacy && (
@@ -95,6 +115,20 @@ export default async function Page() {
         >
           Contact us
         </Link>
+      </div>
+      <p className="text-subtle mb-4 mt-8">Addons</p>
+      <div className="mb-4 flex flex-col gap-4 sm:flex-row sm:items-stretch">
+        {addons.map((addon) => (
+          <div key={addon.title} className="flex-1">
+            <AddonCard
+              title={addon.title}
+              description={addon.description}
+              price={addon.price}
+              priceUnit={addon.priceUnit}
+              action={addon.action}
+            />
+          </div>
+        ))}
       </div>
     </>
   );
