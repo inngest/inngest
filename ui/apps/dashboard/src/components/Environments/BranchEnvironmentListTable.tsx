@@ -39,7 +39,7 @@ const EnableEnvironmentAutoArchiveDocument = graphql(`
   }
 `);
 
-const PER_PAGE = 10;
+const PER_PAGE = 5;
 
 export default function BranchEnvironmentListTable({ envs }: { envs: Environment[] }) {
   const sortedEnvs = envs.sort(

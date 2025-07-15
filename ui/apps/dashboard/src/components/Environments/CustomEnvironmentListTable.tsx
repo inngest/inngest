@@ -17,7 +17,7 @@ import { RiMore2Line, RiSettingsLine } from '@remixicon/react';
 import type { Environment } from '@/utils/environments';
 import { EnvironmentArchiveDropdownItem } from './EnvironmentArchiveDropdownItem';
 
-const PER_PAGE = 10;
+const PER_PAGE = 5;
 
 export function CustomEnvironmentListTable({ envs }: { envs: Environment[] }) {
   const {
