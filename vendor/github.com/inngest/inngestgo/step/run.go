@@ -95,7 +95,7 @@ func Run[T any](
 			Name: id,
 		}
 		if optimizeParallel != nil && !*optimizeParallel {
-			op.Opts = map[string]any{"opt_par": false}
+			op.Opts = map[string]any{enums.OptKeyOptPar.String(): false}
 		}
 		mgr.AppendOp(op)
 		panic(ControlHijack{})

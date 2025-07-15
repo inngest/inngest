@@ -503,10 +503,10 @@ func GetEdge(i Item) (*PayloadEdge, error) {
 	}
 }
 
-// OptimizedParallelism returns true if the item has optimized parallelism
-// enabled.
+// OptimizedParallelism returns true if the step has optimized parallelism
+// enabled. Defaults to true
 func (i Item) OptimizedParallelism() bool {
-	optPar, ok := i.Metadata["opt_par"].(bool)
+	optPar, ok := i.Metadata[enums.OptKeyOptPar.String()].(bool)
 	if !ok {
 		return true
 	}
@@ -514,7 +514,7 @@ func (i Item) OptimizedParallelism() bool {
 }
 
 func (i *Item) SetOptimizedParallelism(optPar bool) {
-	i.Metadata["opt_par"] = optPar
+	i.Metadata[enums.OptKeyOptPar.String()] = optPar
 }
 
 // PayloadEdge is the payload stored when enqueueing an edge traversal to execute

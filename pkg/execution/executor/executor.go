@@ -2457,7 +2457,7 @@ func (e *executor) handleGeneratorStep(ctx context.Context, i *runInstance, gen 
 	}
 	nextItem.SetOptimizedParallelism(gen.OptimizedParallelism())
 
-	if !hasPendingSteps || !i.item.OptimizedParallelism() {
+	if shouldEnqueueDiscovery(hasPendingSteps, &i.item) {
 		span, err := e.tracerProvider.CreateDroppableSpan(
 			meta.SpanNameStepDiscovery,
 			&tracing.CreateSpanOptions{
@@ -2601,7 +2601,7 @@ func (e *executor) handleStepError(ctx context.Context, i *runInstance, gen stat
 	}
 	nextItem.SetOptimizedParallelism(gen.OptimizedParallelism())
 
-	if !hasPendingSteps || !i.item.OptimizedParallelism() {
+	if shouldEnqueueDiscovery(hasPendingSteps, &i.item) {
 		span, err := e.tracerProvider.CreateDroppableSpan(
 			meta.SpanNameStepDiscovery,
 			&tracing.CreateSpanOptions{
@@ -2884,7 +2884,7 @@ func (e *executor) handleGeneratorGateway(ctx context.Context, i *runInstance, g
 		Payload:               queue.PayloadEdge{Edge: nextEdge},
 	}
 
-	if !hasPendingSteps || !i.item.OptimizedParallelism() {
+	if shouldEnqueueDiscovery(hasPendingSteps, &i.item) {
 		err = e.queue.Enqueue(ctx, nextItem, now, queue.EnqueueOpts{})
 		if err == redis_state.ErrQueueItemExists {
 			return nil
@@ -3043,7 +3043,7 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, i *runInstance,
 		Payload:               queue.PayloadEdge{Edge: nextEdge},
 	}
 
-	if !hasPendingSteps || !i.item.OptimizedParallelism() {
+	if shouldEnqueueDiscovery(hasPendingSteps, &i.item) {
 		err = e.queue.Enqueue(ctx, nextItem, now, queue.EnqueueOpts{})
 		if err == redis_state.ErrQueueItemExists {
 			return nil
@@ -3790,4 +3790,10 @@ func (e *executor) addRequestPublishOpts(ctx context.Context, i *runInstance, sr
 
 	sr.Publish.Token = token
 	sr.Publish.PublishURL = e.rtconfig.PublishURL
+}
+
+// shouldEnqueueDiscovery returns true if the ended step should have a discovery
+// step enqueued
+func shouldEnqueueDiscovery(hasPendingSteps bool, qi *queue.Item) bool {
+	return !hasPendingSteps || !qi.OptimizedParallelism()
 }

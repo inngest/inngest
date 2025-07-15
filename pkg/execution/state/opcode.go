@@ -505,7 +505,7 @@ func (g *GeneratorOpcode) OptimizedParallelism() bool {
 		return true
 	}
 
-	v, ok := opts["opt_par"].(bool)
+	v, ok := opts[enums.OptKeyOptPar.String()].(bool)
 	if !ok {
 		return true
 	}
