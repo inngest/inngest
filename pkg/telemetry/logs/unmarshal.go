@@ -10,11 +10,18 @@ import (
 	api "go.opentelemetry.io/otel/log"
 )
 
+type ParsedRecord struct {
+	api.Record
+
+	TraceID string
+	SpanID  string
+}
+
 // LogRecordFromProto converts an OTLP LogRecord back to api.Record format.
-func LogRecordFromProto(lr *lpb.LogRecord) api.Record {
+func LogRecordFromProto(lr *lpb.LogRecord) ParsedRecord {
 	// Create an API record and set its properties
 	apiRecord := api.Record{}
-	
+
 	apiRecord.SetTimestamp(time.Unix(0, int64(lr.TimeUnixNano)))
 	apiRecord.SetObservedTimestamp(time.Unix(0, int64(lr.ObservedTimeUnixNano)))
 	apiRecord.SetEventName(lr.EventName)
@@ -42,7 +49,26 @@ func LogRecordFromProto(lr *lpb.LogRecord) api.Record {
 		// Note: TraceID/SpanID are typically set via trace context, not directly on the record
 	}
 
-	return apiRecord
+	var traceIDStr, spanIDStr string
+	{
+		if lr.TraceId != nil {
+			if traceID := trace.TraceID(lr.TraceId); traceID.IsValid() {
+				traceIDStr = traceID.String()
+			}
+		}
+
+		if lr.SpanId != nil {
+			if SpanID := trace.TraceID(lr.SpanId); SpanID.IsValid() {
+				spanIDStr = SpanID.String()
+			}
+		}
+	}
+
+	return ParsedRecord{
+		Record:  apiRecord,
+		TraceID: traceIDStr,
+		SpanID:  spanIDStr,
+	}
 }
 
 // SeverityFromProto converts OTLP SeverityNumber to api.Severity.

@@ -20,7 +20,7 @@ func TestLogRecordRoundTrip(t *testing.T) {
 		record api.Record
 	}{
 		{
-			name:   "basic record",
+			name: "basic record",
 			record: createAPIRecord(func(r *api.Record) {
 				r.SetTimestamp(now)
 				r.SetObservedTimestamp(observedTime)
@@ -30,7 +30,7 @@ func TestLogRecordRoundTrip(t *testing.T) {
 			}),
 		},
 		{
-			name:   "record with attributes",
+			name: "record with attributes",
 			record: createAPIRecord(func(r *api.Record) {
 				r.SetTimestamp(now)
 				r.SetObservedTimestamp(observedTime)
@@ -46,7 +46,7 @@ func TestLogRecordRoundTrip(t *testing.T) {
 			}),
 		},
 		{
-			name:   "record with complex body types",
+			name: "record with complex body types",
 			record: createAPIRecord(func(r *api.Record) {
 				r.SetTimestamp(now)
 				r.SetObservedTimestamp(observedTime)
@@ -59,7 +59,7 @@ func TestLogRecordRoundTrip(t *testing.T) {
 			}),
 		},
 		{
-			name:   "record with slice body",
+			name: "record with slice body",
 			record: createAPIRecord(func(r *api.Record) {
 				r.SetTimestamp(now)
 				r.SetObservedTimestamp(observedTime)
@@ -73,7 +73,7 @@ func TestLogRecordRoundTrip(t *testing.T) {
 			}),
 		},
 		{
-			name:   "record with bytes body",
+			name: "record with bytes body",
 			record: createAPIRecord(func(r *api.Record) {
 				r.SetTimestamp(now)
 				r.SetObservedTimestamp(observedTime)
@@ -83,7 +83,7 @@ func TestLogRecordRoundTrip(t *testing.T) {
 			}),
 		},
 		{
-			name:   "record with event name",
+			name: "record with event name",
 			record: createAPIRecord(func(r *api.Record) {
 				r.SetTimestamp(now)
 				r.SetObservedTimestamp(observedTime)
@@ -101,12 +101,12 @@ func TestLogRecordRoundTrip(t *testing.T) {
 			// But first we need to convert api.Record to log.Record
 			logRecord := createLogRecord(t, tt.record)
 			protoRecord := LogRecord(logRecord)
-			
+
 			// Convert back to api record
 			roundTripRecord := LogRecordFromProto(protoRecord)
-			
+
 			// Compare the records
-			compareAPIRecords(t, tt.record, roundTripRecord)
+			compareAPIRecords(t, tt.record, roundTripRecord.Record)
 		})
 	}
 }
@@ -119,7 +119,7 @@ func createAPIRecord(setup func(*api.Record)) api.Record {
 
 func createLogRecord(t *testing.T, apiRecord api.Record) log.Record {
 	t.Helper()
-	
+
 	// Create a resource for the record
 	res, err := resource.New(context.Background(),
 		resource.WithAttributes(
@@ -130,31 +130,31 @@ func createLogRecord(t *testing.T, apiRecord api.Record) log.Record {
 	if err != nil {
 		t.Fatal(err)
 	}
-	
+
 	// Create test exporter to capture records
 	exporter := &captureExporter{}
-	
+
 	// Create logger with processor and resource
 	processor := log.NewSimpleProcessor(exporter)
 	provider := log.NewLoggerProvider(
 		log.WithProcessor(processor),
 		log.WithResource(res),
 	)
-	
+
 	// Create scoped logger
 	logger := provider.Logger("test-scope", api.WithInstrumentationVersion("1.0.0"))
-	
+
 	// Emit the record
 	logger.Emit(context.Background(), apiRecord)
-	
+
 	// Force flush to ensure record is captured
 	processor.ForceFlush(context.Background())
-	
+
 	// Return the captured record
 	if len(exporter.records) == 0 {
 		t.Fatal("No records captured")
 	}
-	
+
 	return exporter.records[0]
 }
 
@@ -178,55 +178,55 @@ func (e *captureExporter) ForceFlush(ctx context.Context) error {
 
 func compareAPIRecords(t *testing.T, expected, actual api.Record) {
 	t.Helper()
-	
+
 	// Compare timestamps
 	if !expected.Timestamp().Equal(actual.Timestamp()) {
 		t.Errorf("Timestamp mismatch: expected %v, got %v", expected.Timestamp(), actual.Timestamp())
 	}
-	
+
 	if !expected.ObservedTimestamp().Equal(actual.ObservedTimestamp()) {
 		t.Errorf("ObservedTimestamp mismatch: expected %v, got %v", expected.ObservedTimestamp(), actual.ObservedTimestamp())
 	}
-	
+
 	// Compare severity
 	if expected.Severity() != actual.Severity() {
 		t.Errorf("Severity mismatch: expected %v, got %v", expected.Severity(), actual.Severity())
 	}
-	
+
 	// Compare severity text
 	if expected.SeverityText() != actual.SeverityText() {
 		t.Errorf("SeverityText mismatch: expected %q, got %q", expected.SeverityText(), actual.SeverityText())
 	}
-	
+
 	// Compare event name
 	if expected.EventName() != actual.EventName() {
 		t.Errorf("EventName mismatch: expected %q, got %q", expected.EventName(), actual.EventName())
 	}
-	
+
 	// Compare body
 	if !compareLogValues(expected.Body(), actual.Body()) {
-		t.Errorf("Body mismatch: expected %v (kind: %v), got %v (kind: %v)", 
+		t.Errorf("Body mismatch: expected %v (kind: %v), got %v (kind: %v)",
 			expected.Body(), expected.Body().Kind(), actual.Body(), actual.Body().Kind())
 	}
-	
+
 	// Compare attributes
 	expectedAttrs := collectAPIAttributes(expected)
 	actualAttrs := collectAPIAttributes(actual)
-	
+
 	if len(expectedAttrs) != len(actualAttrs) {
 		t.Errorf("Attributes count mismatch: expected %d, got %d", len(expectedAttrs), len(actualAttrs))
 		return
 	}
-	
+
 	for key, expectedVal := range expectedAttrs {
 		actualVal, exists := actualAttrs[key]
 		if !exists {
 			t.Errorf("Missing attribute %q", key)
 			continue
 		}
-		
+
 		if !compareLogValues(expectedVal, actualVal) {
-			t.Errorf("Attribute %q mismatch: expected %v (kind: %v), got %v (kind: %v)", 
+			t.Errorf("Attribute %q mismatch: expected %v (kind: %v), got %v (kind: %v)",
 				key, expectedVal, expectedVal.Kind(), actualVal, actualVal.Kind())
 		}
 	}
@@ -245,7 +245,7 @@ func compareLogValues(expected, actual api.Value) bool {
 	if expected.Kind() != actual.Kind() {
 		return false
 	}
-	
+
 	switch expected.Kind() {
 	case api.KindBool:
 		return expected.AsBool() == actual.AsBool()
@@ -285,17 +285,17 @@ func compareLogValues(expected, actual api.Value) bool {
 		if len(expectedMap) != len(actualMap) {
 			return false
 		}
-		
+
 		expectedKVs := make(map[string]api.Value)
 		for _, kv := range expectedMap {
 			expectedKVs[kv.Key] = kv.Value
 		}
-		
+
 		actualKVs := make(map[string]api.Value)
 		for _, kv := range actualMap {
 			actualKVs[kv.Key] = kv.Value
 		}
-		
+
 		for key, expectedVal := range expectedKVs {
 			actualVal, exists := actualKVs[key]
 			if !exists || !compareLogValues(expectedVal, actualVal) {
