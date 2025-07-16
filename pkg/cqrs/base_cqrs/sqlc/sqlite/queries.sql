@@ -171,18 +171,6 @@ ORDER BY e.internal_id DESC
 LIMIT ?;
 
 
--- name: WorkspaceEvents :many
-SELECT * FROM events WHERE internal_id < @cursor AND received_at <= @before AND received_at >= @after ORDER BY internal_id DESC LIMIT ?;
-
--- name: WorkspaceNamedEvents :many
-SELECT * FROM events WHERE internal_id < @cursor AND received_at <= @before AND received_at >= @after AND event_name in (sqlc.slice('@names')) ORDER BY internal_id DESC LIMIT ?;
-
--- name: WorkspaceCountEvents :one
-SELECT count(*) FROM events WHERE received_at <= @before AND received_at >= @after;
-
--- name: WorkspaceCountNamedEvents :one
-SELECT count(*) FROM events WHERE received_at <= @before AND received_at >= @after AND event_name in (sqlc.slice('@names'));
-
 --
 -- History
 --
@@ -249,6 +237,9 @@ SELECT * FROM traces WHERE trace_id = @trace_id AND run_id = @run_id ORDER BY ti
 
 -- name: GetTraceSpanOutput :many
 select * from traces where trace_id = @trace_id AND span_id = @span_id ORDER BY timestamp_unix_ms DESC, duration DESC;
+
+-- name: GetTraceRunsByTriggerId :many
+SELECT * FROM trace_runs WHERE INSTR(CAST(trigger_ids AS TEXT), @event_id) > 0;
 
 
 --

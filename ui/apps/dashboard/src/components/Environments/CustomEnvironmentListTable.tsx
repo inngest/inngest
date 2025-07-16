@@ -27,45 +27,45 @@ export function CustomEnvironmentListTable({ envs }: { envs: Environment[] }) {
   } = usePaginationUI({ data: envs, pageSize: PER_PAGE });
 
   return (
-    <table className="w-full">
-      <thead className="border-subtle border-b text-left">
-        <tr>
-          <th scope="col" className="text-muted px-4 py-3 text-sm font-semibold">
-            Name
-          </th>
-          <th scope="col" className="text-muted px-4 py-3 text-sm font-semibold">
-            Status
-          </th>
-          <th scope="col" className="w-0 pr-4"></th>
-        </tr>
-      </thead>
-      <tbody className="divide-subtle divide-y px-4 py-3">
-        {envs.length === 0 ? (
-          <tr>
-            <td colSpan={3} className="text-basis px-4 py-3 text-center text-sm">
-              There are no custom environments
-            </td>
-          </tr>
-        ) : visibleCustomEnvs.length ? (
-          visibleCustomEnvs.map((env, i) => <TableRow env={env} key={i} />)
-        ) : (
-          <tr>
-            <td colSpan={3} className="text-basis px-4 py-3 text-center text-sm">
-              There are no more custom environments
-            </td>
-          </tr>
-        )}
-      </tbody>
+    <div className="w-full">
+      <div className="overflow-x-auto">
+        <table className="w-full">
+          <thead className="border-subtle border-b text-left">
+            <tr>
+              <th scope="col" className="text-muted px-4 py-3 text-sm font-semibold">
+                Name
+              </th>
+              <th scope="col" className="text-muted px-4 py-3 text-sm font-semibold">
+                Status
+              </th>
+              <th scope="col" className="w-0 pr-4"></th>
+            </tr>
+          </thead>
+          <tbody className="divide-subtle divide-y px-4 py-3">
+            {envs.length === 0 ? (
+              <tr>
+                <td colSpan={3} className="text-basis px-4 py-3 text-center text-sm">
+                  There are no custom environments
+                </td>
+              </tr>
+            ) : visibleCustomEnvs.length ? (
+              visibleCustomEnvs.map((env, i) => <TableRow env={env} key={i} />)
+            ) : (
+              <tr>
+                <td colSpan={3} className="text-basis px-4 py-3 text-center text-sm">
+                  There are no more custom environments
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
       {totalCustomEnvsPages > 1 && (
-        <tfoot className="border-subtle border-t">
-          <tr>
-            <td colSpan={3} className="px-4 py-1">
-              <CustomEnvsPagination />
-            </td>
-          </tr>
-        </tfoot>
+        <div className="border-subtle flex justify-center border-t px-4 py-1">
+          <CustomEnvsPagination />
+        </div>
       )}
-    </table>
+    </div>
   );
 }
 

@@ -1142,6 +1142,51 @@ func (q *Queries) GetTraceRun(ctx context.Context, runID ulid.ULID) (*TraceRun, 
 	return &i, err
 }
 
+const getTraceRunsByTriggerId = `-- name: GetTraceRunsByTriggerId :many
+SELECT run_id, account_id, workspace_id, app_id, function_id, trace_id, queued_at, started_at, ended_at, status, source_id, trigger_ids, output, is_debounce, batch_id, cron_schedule, has_ai FROM trace_runs WHERE INSTR(CAST(trigger_ids AS TEXT), ?1) > 0
+`
+
+func (q *Queries) GetTraceRunsByTriggerId(ctx context.Context, eventID string) ([]*TraceRun, error) {
+	rows, err := q.db.QueryContext(ctx, getTraceRunsByTriggerId, eventID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []*TraceRun
+	for rows.Next() {
+		var i TraceRun
+		if err := rows.Scan(
+			&i.RunID,
+			&i.AccountID,
+			&i.WorkspaceID,
+			&i.AppID,
+			&i.FunctionID,
+			&i.TraceID,
+			&i.QueuedAt,
+			&i.StartedAt,
+			&i.EndedAt,
+			&i.Status,
+			&i.SourceID,
+			&i.TriggerIds,
+			&i.Output,
+			&i.IsDebounce,
+			&i.BatchID,
+			&i.CronSchedule,
+			&i.HasAi,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, &i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getTraceSpanOutput = `-- name: GetTraceSpanOutput :many
 select timestamp, timestamp_unix_ms, trace_id, span_id, parent_span_id, trace_state, span_name, span_kind, service_name, resource_attributes, scope_name, scope_version, span_attributes, duration, status_code, status_message, events, links, run_id from traces where trace_id = ?1 AND span_id = ?2 ORDER BY timestamp_unix_ms DESC, duration DESC
 `
@@ -1998,163 +2043,4 @@ func (q *Queries) UpsertApp(ctx context.Context, arg UpsertAppParams) (*App, err
 		&i.AppVersion,
 	)
 	return &i, err
-}
-
-const workspaceCountEvents = `-- name: WorkspaceCountEvents :one
-SELECT count(*) FROM events WHERE received_at <= ?1 AND received_at >= ?2
-`
-
-type WorkspaceCountEventsParams struct {
-	Before time.Time
-	After  time.Time
-}
-
-func (q *Queries) WorkspaceCountEvents(ctx context.Context, arg WorkspaceCountEventsParams) (int64, error) {
-	row := q.db.QueryRowContext(ctx, workspaceCountEvents, arg.Before, arg.After)
-	var count int64
-	err := row.Scan(&count)
-	return count, err
-}
-
-const workspaceCountNamedEvents = `-- name: WorkspaceCountNamedEvents :one
-SELECT count(*) FROM events WHERE received_at <= ?1 AND received_at >= ?2 AND event_name in (/*SLICE:@names*/?)
-`
-
-type WorkspaceCountNamedEventsParams struct {
-	Before time.Time
-	After  time.Time
-	Names  []string
-}
-
-func (q *Queries) WorkspaceCountNamedEvents(ctx context.Context, arg WorkspaceCountNamedEventsParams) (int64, error) {
-	query := workspaceCountNamedEvents
-	var queryParams []interface{}
-	queryParams = append(queryParams, arg.Before)
-	queryParams = append(queryParams, arg.After)
-	if len(arg.Names) > 0 {
-		for _, v := range arg.Names {
-			queryParams = append(queryParams, v)
-		}
-		query = strings.Replace(query, "/*SLICE:@names*/?", strings.Repeat(",?", len(arg.Names))[1:], 1)
-	} else {
-		query = strings.Replace(query, "/*SLICE:@names*/?", "NULL", 1)
-	}
-	row := q.db.QueryRowContext(ctx, query, queryParams...)
-	var count int64
-	err := row.Scan(&count)
-	return count, err
-}
-
-const workspaceEvents = `-- name: WorkspaceEvents :many
-SELECT internal_id, account_id, workspace_id, source, source_id, received_at, event_id, event_name, event_data, event_user, event_v, event_ts FROM events WHERE internal_id < ? AND received_at <= ? AND received_at >= ? ORDER BY internal_id DESC LIMIT ?
-`
-
-type WorkspaceEventsParams struct {
-	Cursor ulid.ULID
-	Before time.Time
-	After  time.Time
-	Limit  int64
-}
-
-func (q *Queries) WorkspaceEvents(ctx context.Context, arg WorkspaceEventsParams) ([]*Event, error) {
-	rows, err := q.db.QueryContext(ctx, workspaceEvents,
-		arg.Cursor,
-		arg.Before,
-		arg.After,
-		arg.Limit,
-	)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []*Event
-	for rows.Next() {
-		var i Event
-		if err := rows.Scan(
-			&i.InternalID,
-			&i.AccountID,
-			&i.WorkspaceID,
-			&i.Source,
-			&i.SourceID,
-			&i.ReceivedAt,
-			&i.EventID,
-			&i.EventName,
-			&i.EventData,
-			&i.EventUser,
-			&i.EventV,
-			&i.EventTs,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, &i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
-}
-
-const workspaceNamedEvents = `-- name: WorkspaceNamedEvents :many
-SELECT internal_id, account_id, workspace_id, source, source_id, received_at, event_id, event_name, event_data, event_user, event_v, event_ts FROM events WHERE internal_id < ? AND received_at <= ? AND received_at >= ? AND event_name in (/*SLICE:@names*/?) ORDER BY internal_id DESC LIMIT ?
-`
-
-type WorkspaceNamedEventsParams struct {
-	Cursor ulid.ULID
-	Before time.Time
-	After  time.Time
-	Names  []string
-	Limit  int64
-}
-
-func (q *Queries) WorkspaceNamedEvents(ctx context.Context, arg WorkspaceNamedEventsParams) ([]*Event, error) {
-	query := workspaceNamedEvents
-	var queryParams []interface{}
-	queryParams = append(queryParams, arg.Cursor)
-	queryParams = append(queryParams, arg.Before)
-	queryParams = append(queryParams, arg.After)
-	if len(arg.Names) > 0 {
-		for _, v := range arg.Names {
-			queryParams = append(queryParams, v)
-		}
-		query = strings.Replace(query, "/*SLICE:@names*/?", strings.Repeat(",?", len(arg.Names))[1:], 1)
-	} else {
-		query = strings.Replace(query, "/*SLICE:@names*/?", "NULL", 1)
-	}
-	queryParams = append(queryParams, arg.Limit)
-	rows, err := q.db.QueryContext(ctx, query, queryParams...)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-	var items []*Event
-	for rows.Next() {
-		var i Event
-		if err := rows.Scan(
-			&i.InternalID,
-			&i.AccountID,
-			&i.WorkspaceID,
-			&i.Source,
-			&i.SourceID,
-			&i.ReceivedAt,
-			&i.EventID,
-			&i.EventName,
-			&i.EventData,
-			&i.EventUser,
-			&i.EventV,
-			&i.EventTs,
-		); err != nil {
-			return nil, err
-		}
-		items = append(items, &i)
-	}
-	if err := rows.Close(); err != nil {
-		return nil, err
-	}
-	if err := rows.Err(); err != nil {
-		return nil, err
-	}
-	return items, nil
 }
