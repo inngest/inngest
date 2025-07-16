@@ -55,50 +55,53 @@ export default function EnvironmentListTable({ envs }: { envs: Environment[] }) 
   } = usePaginationUI({ data: sortedEnvs, pageSize: PER_PAGE });
 
   return (
-    <table className="w-full">
-      <thead className="border-subtle border-b text-left">
-        <tr>
-          <th scope="col" className="text-muted px-4 py-3 text-sm font-semibold">
-            Name
-          </th>
-          <th scope="col" className="text-muted px-4 py-3 text-sm font-semibold">
-            Status
-          </th>
+    <div className="w-full">
+      <div className="overflow-x-auto">
+        <table className="w-full">
+          <thead className="border-subtle border-b text-left">
+            <tr>
+              <th scope="col" className="text-muted px-4 py-3 text-sm font-semibold">
+                Name
+              </th>
+              <th scope="col" className="text-muted px-4 py-3 text-sm font-semibold">
+                Status
+              </th>
 
-          <th scope="col" className="text-muted w-0 whitespace-nowrap pl-4 text-sm font-semibold">
-            Auto Archive
-          </th>
+              <th
+                scope="col"
+                className="text-muted w-0 whitespace-nowrap pl-4 text-sm font-semibold"
+              >
+                Auto Archive
+              </th>
 
-          <th scope="col" className="w-0 pr-4"></th>
-        </tr>
-      </thead>
-      <tbody className="divide-subtle divide-y px-4 py-3">
-        {envs.length === 0 ? (
-          <tr>
-            <td colSpan={4} className="text-basis px-4 py-3 text-center text-sm">
-              There are no branch environments
-            </td>
-          </tr>
-        ) : visibleBranchEnvs.length ? (
-          visibleBranchEnvs.map((env, i) => <TableRow env={env} key={i} />)
-        ) : (
-          <tr>
-            <td colSpan={4} className="text-basis px-4 py-3 text-center text-sm">
-              There are no more branch environments
-            </td>
-          </tr>
-        )}
-      </tbody>
+              <th scope="col" className="w-0 pr-4"></th>
+            </tr>
+          </thead>
+          <tbody className="divide-subtle divide-y px-4 py-3">
+            {envs.length === 0 ? (
+              <tr>
+                <td colSpan={4} className="text-basis px-4 py-3 text-center text-sm">
+                  There are no branch environments
+                </td>
+              </tr>
+            ) : visibleBranchEnvs.length ? (
+              visibleBranchEnvs.map((env, i) => <TableRow env={env} key={i} />)
+            ) : (
+              <tr>
+                <td colSpan={4} className="text-basis px-4 py-3 text-center text-sm">
+                  There are no more branch environments
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
       {totalBranchEnvsPages > 1 && (
-        <tfoot className="border-subtle border-t">
-          <tr>
-            <td colSpan={4} className="px-4 py-1">
-              <BranchEnvsPagination />
-            </td>
-          </tr>
-        </tfoot>
+        <div className="border-subtle flex justify-center border-t px-4 py-1">
+          <BranchEnvsPagination />
+        </div>
       )}
-    </table>
+    </div>
   );
 }
 
