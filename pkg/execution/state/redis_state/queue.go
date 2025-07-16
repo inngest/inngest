@@ -1020,6 +1020,7 @@ type PartitionIdentifier struct {
 	SystemQueueName *string
 	FunctionID      uuid.UUID
 	AccountID       uuid.UUID
+	EnvID           uuid.UUID
 }
 
 // QueuePartition represents an individual queue for a workflow.  It stores the
@@ -1091,10 +1092,17 @@ func (qp QueuePartition) Identifier() PartitionIdentifier {
 		fnID = *qp.FunctionID
 	}
 
+	envID := uuid.UUID{}
+	if qp.EnvID != nil {
+		envID = *qp.EnvID
+	}
+
 	return PartitionIdentifier{
 		SystemQueueName: qp.QueueName,
-		FunctionID:      fnID,
-		AccountID:       qp.AccountID,
+
+		AccountID:  qp.AccountID,
+		FunctionID: fnID,
+		EnvID:      envID,
 	}
 }
 

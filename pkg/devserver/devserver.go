@@ -272,73 +272,9 @@ func start(ctx context.Context, opts StartOpts) error {
 		redis_state.WithPollTick(opts.Tick),
 		redis_state.WithShadowPollTick(2 * opts.Tick),
 		redis_state.WithBacklogNormalizePollTick(5 * opts.Tick),
-		redis_state.WithCustomConcurrencyKeyLimitRefresher(func(ctx context.Context, i queue.QueueItem) []state.CustomConcurrency {
-			keys := i.Data.GetConcurrencyKeys()
 
-			fn, err := dbcqrs.GetFunctionByInternalUUID(ctx, i.Data.Identifier.WorkspaceID, i.Data.Identifier.WorkflowID)
-			if err != nil {
-				// Use what's stored in the state store.
-				return keys
-			}
-			f, err := fn.InngestFunction()
-			if err != nil {
-				return keys
-			}
-
-			if f.Concurrency != nil {
-				for _, c := range f.Concurrency.Limits {
-					if !c.IsCustomLimit() {
-						continue
-					}
-					// If there's a concurrency key with the same hash, use the new function's
-					// concurrency limits.
-					//
-					// NOTE:  This is accidentally quadratic but is okay as we bound concurrency
-					// keys to a low value (2-3).
-					for n, actual := range keys {
-						if actual.Hash != "" && actual.Hash == c.Hash {
-							actual.Limit = c.Limit
-							keys[n] = actual
-						}
-					}
-				}
-			}
-
-			return keys
-		}),
 		redis_state.WithLogger(l),
-		redis_state.WithConcurrencyLimitGetter(func(ctx context.Context, p redis_state.QueuePartition) redis_state.PartitionConcurrencyLimits {
-			// In the dev server, there are never account limits.
-			limits := redis_state.PartitionConcurrencyLimits{
-				AccountLimit: redis_state.NoConcurrencyLimit,
-			}
 
-			// Ensure that we return the correct concurrency values per
-			// partition.
-			funcs, err := dbcqrs.GetFunctions(ctx)
-			if err != nil {
-				return redis_state.PartitionConcurrencyLimits{
-					AccountLimit:   redis_state.NoConcurrencyLimit,
-					FunctionLimit:  consts.DefaultConcurrencyLimit,
-					CustomKeyLimit: consts.DefaultConcurrencyLimit,
-				}
-			}
-			for _, fun := range funcs {
-				f, _ := fun.InngestFunction()
-				if f.ID == uuid.Nil {
-					f.ID = f.DeterministicUUID()
-				}
-				// Update the function's concurrency here with latest defaults
-				if p.FunctionID != nil && f.ID == *p.FunctionID && f.Concurrency != nil && f.Concurrency.PartitionConcurrency() > 0 {
-					limits.FunctionLimit = f.Concurrency.PartitionConcurrency()
-				}
-			}
-			if p.EvaluatedConcurrencyKey != "" {
-				limits.CustomKeyLimit = p.ConcurrencyLimit
-			}
-
-			return limits
-		}),
 		redis_state.WithShardSelector(shardSelector),
 		redis_state.WithQueueShardClients(queueShards),
 		//redis_state.WithKindToQueueMapping(map[string]string{
@@ -854,24 +790,36 @@ func NormalizeThrottle(smv2 sv2.StateLoader, dbcqrs cqrs.Manager) redis_state.Re
 }
 
 func PartitionConstraintConfigGetter(dbcqrs cqrs.Manager) redis_state.PartitionConstraintConfigGetter {
-	return func(ctx context.Context, p redis_state.QueueShadowPartition) (*redis_state.PartitionConstraintConfig, error) {
-		if p.EnvID == nil || p.FunctionID == nil {
-			return &redis_state.PartitionConstraintConfig{
+	return func(ctx context.Context, p redis_state.PartitionIdentifier) redis_state.PartitionConstraintConfig {
+		if p.SystemQueueName != nil {
+			return redis_state.PartitionConstraintConfig{
+				Concurrency: redis_state.PartitionConcurrency{
+					SystemConcurrency:   consts.DefaultSystemConcurrencyLimit,
+					AccountConcurrency:  consts.DefaultSystemConcurrencyLimit,
+					FunctionConcurrency: consts.DefaultSystemConcurrencyLimit,
+				},
+			}
+		}
+
+		workflow, err := dbcqrs.GetFunctionByInternalUUID(ctx, p.EnvID, p.FunctionID)
+		if err != nil {
+			return redis_state.PartitionConstraintConfig{
 				Concurrency: redis_state.PartitionConcurrency{
 					SystemConcurrency:   consts.DefaultConcurrencyLimit,
 					AccountConcurrency:  consts.DefaultConcurrencyLimit,
 					FunctionConcurrency: consts.DefaultConcurrencyLimit,
 				},
-			}, nil
-		}
-
-		workflow, err := dbcqrs.GetFunctionByInternalUUID(ctx, *p.EnvID, *p.FunctionID)
-		if err != nil {
-			return nil, fmt.Errorf("could not find workflow: %w", err)
+			}
 		}
 		fn, err := workflow.InngestFunction()
 		if err != nil {
-			return nil, fmt.Errorf("could not convert workflow to inngest function: %w", err)
+			return redis_state.PartitionConstraintConfig{
+				Concurrency: redis_state.PartitionConcurrency{
+					SystemConcurrency:   consts.DefaultConcurrencyLimit,
+					AccountConcurrency:  consts.DefaultConcurrencyLimit,
+					FunctionConcurrency: consts.DefaultConcurrencyLimit,
+				},
+			}
 		}
 
 		// TODO Make this reusable in cloud, it's the same operation with different data sources
@@ -923,7 +871,7 @@ func PartitionConstraintConfigGetter(dbcqrs cqrs.Manager) redis_state.PartitionC
 			}
 		}
 
-		return &constraints, nil
+		return constraints
 	}
 }
 

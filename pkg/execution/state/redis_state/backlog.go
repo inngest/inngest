@@ -123,10 +123,17 @@ func (sp QueueShadowPartition) Identifier() PartitionIdentifier {
 		accountID = *sp.AccountID
 	}
 
+	envID := uuid.UUID{}
+	if sp.EnvID != nil {
+		envID = *sp.EnvID
+	}
+
 	return PartitionIdentifier{
 		SystemQueueName: sp.SystemQueueName,
-		FunctionID:      fnID,
-		AccountID:       accountID,
+
+		AccountID:  accountID,
+		EnvID:      envID,
+		FunctionID: fnID,
 	}
 }
 
