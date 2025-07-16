@@ -439,7 +439,7 @@ func (q *queue) ShadowPartitionPeekNormalizeBacklogs(ctx context.Context, sp *Qu
 		isMillisecondPrecision: true,
 	}
 
-	res, err := p.peek(ctx, partitionNormalizeSet, false, q.clock.Now(), limit)
+	res, err := p.peek(ctx, partitionNormalizeSet, WithPeekOptUntil(q.clock.Now()), WithPeekOptLimit(limit))
 	if err != nil {
 		return nil, fmt.Errorf("could not peek backlogs for normalization: %w", err)
 	}
@@ -473,7 +473,7 @@ func (q *queue) BacklogNormalizePeek(ctx context.Context, b *QueueBacklog, limit
 	// this is essentially +inf as no queue items should ever be scheduled >2y out
 	normalizeLookahead := q.clock.Now().Add(time.Hour * 24 * 365 * 2)
 
-	res, err := p.peek(ctx, backlogSet, false, normalizeLookahead, limit)
+	res, err := p.peek(ctx, backlogSet, WithPeekOptUntil(normalizeLookahead), WithPeekOptLimit(limit))
 	if err != nil {
 		return nil, fmt.Errorf("could not peek backlog items for normalization: %w", err)
 	}

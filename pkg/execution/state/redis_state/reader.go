@@ -3,6 +3,7 @@ package redis_state
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"iter"
 	"sync"
@@ -533,24 +534,40 @@ func (q *queue) GlobalPartitions(ctx context.Context, queueShard QueueShard, fro
 		apply(&opt)
 	}
 
+	duplicates := newRecentStrings(int(3 * opt.batchSize))
+
 	l := q.log.With(
 		"method", "GlobalPartitions",
 		"from", from,
 		"until", until,
 	)
 
+	l.Trace("peeking global partitions",
+		"from", from.UnixMilli(),
+		"until", until.UnixMilli(),
+		"limit", opt.batchSize,
+	)
+
 	kg := queueShard.RedisClient.kg
 
 	return func(yield func(partition *QueuePartition) bool) {
 		hashKey := kg.PartitionItem()
-		ptFrom := from
 
+		windowFrom := from
+		var windowUntilOverride time.Time
+		var offset int64
 		for {
 			var iterated int
 
 			peeker := peeker[QueuePartition]{
-				q:                      q,
-				max:                    opt.batchSize,
+				q:   q,
+				max: opt.batchSize,
+
+				// Whenever multiple partitions are on the same second, we will use offset-based pagination.
+				// This is unavoidable as ZSET scores are not unique (i.e. multiple partitions for the same second).
+				// We limit the max offset here.
+				maxOffset: 5000,
+
 				opName:                 "globalPartitions",
 				isMillisecondPrecision: false,
 				handleMissingItems: func(pointers []string) error {
@@ -561,32 +578,63 @@ func (q *queue) GlobalPartitions(ctx context.Context, queueShard QueueShard, fro
 					return &QueuePartition{}
 				},
 				keyMetadataHash: hashKey,
-				fromTime:        &ptFrom,
 			}
 
-			isSequential := true
-			res, err := peeker.peek(ctx, kg.GlobalPartitionIndex(), isSequential, until, opt.batchSize,
+			upperLimit := until
+			if !windowUntilOverride.IsZero() {
+				upperLimit = windowUntilOverride
+			}
+
+			res, err := peeker.peek(ctx, kg.GlobalPartitionIndex(),
+				WithPeekOptSequential(true),
+				WithPeekOptFrom(windowFrom),
+				WithPeekOptUntil(upperLimit),
+				WithPeekOptLimit(opt.batchSize),
 				WithPeekOptQueueShard(&queueShard),
+				WithPeekOptOffset(offset),
 			)
 			if err != nil {
+				if errors.Is(err, ErrMaxOffsetReached) {
+					// skip to next second, as we've reached the max offset for this second
+					windowFrom = windowFrom.Add(time.Second)
+					offset = 0
+					windowUntilOverride = time.Time{}
+					continue
+				}
+
 				l.Error("error peeking global partitions", "err", err)
 				return
 			}
 
-			for _, bl := range res.Items {
-				if bl == nil {
+			l.Trace("peeked global partitions",
+				"from", windowFrom.UnixMilli(),
+				"until", until.UnixMilli(),
+				"limit", opt.batchSize,
+				"offset", offset,
+
+				"total_count", res.TotalCount,
+				"page_size", len(res.Items),
+				"cursor", res.Cursor,
+			)
+
+			for _, part := range res.Items {
+				if part == nil {
 					continue
 				}
 
-				if !yield(bl) {
+				// Remove duplicate results
+				if duplicates.Contains(part.ID) {
+					iterated++
+					continue
+				}
+				duplicates.Add(part.ID)
+
+				if !yield(part) {
 					return
 				}
 
 				iterated++
 			}
-
-			// Note how we use time.Unix here as pointers are measured in seconds
-			ptFrom = time.Unix(res.Cursor, 0)
 
 			l.Trace("iterated global partitions", "count", iterated)
 
@@ -595,10 +643,21 @@ func (q *queue) GlobalPartitions(ctx context.Context, queueShard QueueShard, fro
 				break
 			}
 
-			// shift the starting point 1ms so it doesn't try to grab the same stuff again
-			// NOTE: this could result skipping items if the previous batch of items are all on
-			// the same millisecond
-			ptFrom = ptFrom.Add(time.Millisecond)
+			// if we returned the entire data set, exit
+			if res.TotalCount == len(res.Items) {
+				break
+			}
+
+			// If the last item is still the same second, use the offset
+			if res.Cursor == windowFrom.Unix() {
+				// keep window from constant, we're still looking at the same window but with an offset
+				offset += int64(len(res.Items))
+				windowUntilOverride = windowFrom.Add(time.Second)
+			} else {
+				windowFrom = time.Unix(res.Cursor, 0)
+				windowUntilOverride = time.Time{}
+				offset = 0
+			}
 
 			// wait a little before processing the next batch
 			<-time.After(opt.interval)
@@ -615,25 +674,41 @@ func (q *queue) GlobalShadowPartitions(ctx context.Context, queueShard QueueShar
 		apply(&opt)
 	}
 
+	duplicates := newRecentStrings(int(3 * opt.batchSize))
+
 	l := q.log.With(
 		"method", "GlobalShadowPartitions",
 		"from", from,
 		"until", until,
 	)
 
+	l.Trace("peeking global shadow partitions",
+		"from", from.UnixMilli(),
+		"until", until.UnixMilli(),
+		"limit", opt.batchSize,
+	)
+
 	kg := queueShard.RedisClient.kg
 
 	return func(yield func(partition *QueueShadowPartition) bool) {
-		hashKey := kg.PartitionItem()
-		ptFrom := from
+		hashKey := kg.ShadowPartitionMeta()
 
+		windowFrom := from
+		var windowUntilOverride time.Time
+		var offset int64
 		for {
 			var iterated int
 
 			peeker := peeker[QueueShadowPartition]{
-				q:                      q,
-				max:                    opt.batchSize,
-				opName:                 "globalPartitions",
+				q:   q,
+				max: opt.batchSize,
+
+				// Whenever multiple partitions are on the same millisecond, we will use offset-based pagination.
+				// This is unavoidable as ZSET scores are not unique (i.e. multiple partitions for the same millisecond).
+				// We limit the max offset here.
+				maxOffset: 5000,
+
+				opName:                 "globalShadowPartitions",
 				isMillisecondPrecision: true,
 				handleMissingItems: func(pointers []string) error {
 					// don't interfere, clean up will happen in normal processing anyways
@@ -643,46 +718,130 @@ func (q *queue) GlobalShadowPartitions(ctx context.Context, queueShard QueueShar
 					return &QueueShadowPartition{}
 				},
 				keyMetadataHash: hashKey,
-				fromTime:        &ptFrom,
 			}
 
-			isSequential := true
-			res, err := peeker.peek(ctx, kg.GlobalShadowPartitionSet(), isSequential, until, opt.batchSize,
+			upperLimit := until
+			if !windowUntilOverride.IsZero() {
+				upperLimit = windowUntilOverride
+			}
+
+			res, err := peeker.peek(ctx, kg.GlobalShadowPartitionSet(),
+				WithPeekOptSequential(true),
+				WithPeekOptFrom(windowFrom),
+				WithPeekOptUntil(upperLimit),
+				WithPeekOptLimit(opt.batchSize),
 				WithPeekOptQueueShard(&queueShard),
+				WithPeekOptOffset(offset),
 			)
 			if err != nil {
+				if errors.Is(err, ErrMaxOffsetReached) {
+					// skip to next millisecond, as we've reached the max offset for this millisecond
+					windowFrom = windowFrom.Add(time.Millisecond)
+					offset = 0
+					windowUntilOverride = time.Time{}
+					continue
+				}
+
 				l.Error("error peeking global shadow partitions", "err", err)
 				return
 			}
 
-			for _, bl := range res.Items {
-				if bl == nil {
+			l.Trace("peeked global shdow partitions",
+				"from", windowFrom.UnixMilli(),
+				"until", until.UnixMilli(),
+				"limit", opt.batchSize,
+				"offset", offset,
+
+				"total_count", res.TotalCount,
+				"page_size", len(res.Items),
+				"cursor", res.Cursor,
+			)
+
+			for _, part := range res.Items {
+				if part == nil {
 					continue
 				}
 
-				if !yield(bl) {
+				// Remove duplicate results
+				if duplicates.Contains(part.PartitionID) {
+					iterated++
+					continue
+				}
+				duplicates.Add(part.PartitionID)
+
+				if !yield(part) {
 					return
 				}
 
 				iterated++
 			}
 
-			ptFrom = time.UnixMilli(res.Cursor)
-
-			l.Trace("iterated global partitions", "count", iterated)
+			l.Trace("iterated global shadow partitions", "count", iterated)
 
 			// didn't process anything, exit loop
 			if iterated == 0 {
 				break
 			}
 
-			// shift the starting point 1ms so it doesn't try to grab the same stuff again
-			// NOTE: this could result skipping items if the previous batch of items are all on
-			// the same millisecond
-			ptFrom = ptFrom.Add(time.Millisecond)
+			// if we returned the entire data set, exit
+			if res.TotalCount == len(res.Items) {
+				break
+			}
+
+			// If the last item is still the same millisecond, use the offset
+			if res.Cursor == windowFrom.Unix() {
+				// keep window from constant, we're still looking at the same window but with an offset
+				offset += int64(len(res.Items))
+				windowUntilOverride = windowFrom.Add(time.Millisecond)
+			} else {
+				windowFrom = time.Unix(res.Cursor, 0)
+				windowUntilOverride = time.Time{}
+				offset = 0
+			}
 
 			// wait a little before processing the next batch
 			<-time.After(opt.interval)
 		}
 	}, nil
+}
+
+type recentStrings struct {
+	capacity int
+	buffer   []string
+	index    int
+	size     int
+	seen     map[string]bool
+}
+
+func newRecentStrings(capacity int) *recentStrings {
+	return &recentStrings{
+		capacity: capacity,
+		buffer:   make([]string, capacity),
+		index:    0,
+		size:     0,
+		seen:     make(map[string]bool),
+	}
+}
+
+func (rs *recentStrings) Add(s string) {
+	// If buffer is full, remove the oldest item
+	if rs.size == rs.capacity {
+		oldest := rs.buffer[rs.index]
+		delete(rs.seen, oldest)
+	} else {
+		rs.size++
+	}
+
+	// Add new item
+	rs.buffer[rs.index] = s
+	rs.seen[s] = true
+	rs.index = (rs.index + 1) % rs.capacity
+}
+
+func (rs *recentStrings) Contains(s string) bool {
+	return rs.seen[s]
+}
+
+func (rs *recentStrings) Size() int {
+	return rs.size
 }

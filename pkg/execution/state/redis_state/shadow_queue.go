@@ -709,7 +709,7 @@ func (q *queue) peekShadowPartitions(ctx context.Context, partitionIndexKey stri
 		isMillisecondPrecision: true,
 	}
 
-	res, err := p.peek(ctx, partitionIndexKey, sequential, until, peekLimit)
+	res, err := p.peek(ctx, partitionIndexKey, WithPeekOptSequential(sequential), WithPeekOptUntil(until), WithPeekOptLimit(peekLimit))
 	if err != nil {
 		if errors.Is(err, ErrPeekerPeekExceedsMaxLimits) {
 			return nil, ErrShadowPartitionPeekMaxExceedsLimits
@@ -823,7 +823,8 @@ func (q *queue) ShadowPartitionPeek(ctx context.Context, sp *QueueShadowPartitio
 		isMillisecondPrecision: true,
 	}
 
-	res, err := p.peek(ctx, shadowPartitionSet, sequential, until, limit, opts...)
+	opts = append(opts, WithPeekOptSequential(sequential), WithPeekOptUntil(until), WithPeekOptLimit(limit))
+	res, err := p.peek(ctx, shadowPartitionSet, opts...)
 	if err != nil {
 		if errors.Is(err, ErrPeekerPeekExceedsMaxLimits) {
 			return nil, 0, ErrShadowPartitionBacklogPeekMaxExceedsLimits

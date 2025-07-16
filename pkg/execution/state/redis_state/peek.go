@@ -16,12 +16,32 @@ import (
 	"github.com/redis/rueidis"
 )
 
+var ErrMaxOffsetReached = fmt.Errorf("max peek offset reached")
+
 type PeekOpt func(p *peekOption)
 
 type peekOption struct {
 	// Shard specifies which shard to use for the peek operation instead of the shard that the executor points to.
 	// The use of this should be rare, and should be limited to system queue operations as much as possible.
 	Shard *QueueShard
+
+	// From provides an optional start time for peeks
+	// instead of the default -INF
+	From time.Time
+
+	// Until provides an optional start time for peeks
+	// instead of the default +INF
+	Until time.Time
+
+	// Sequential defines whether a random offset will be picked
+	Sequential bool
+
+	// Limit defines the number of items returned
+	Limit int64
+
+	// Offset defines an optional offset to continue a peek. This
+	// must be used carefully, as offsets can reduce lookup performance.
+	Offset int64
 }
 
 func WithPeekOptQueueShard(qs *QueueShard) PeekOpt {
@@ -30,10 +50,41 @@ func WithPeekOptQueueShard(qs *QueueShard) PeekOpt {
 	}
 }
 
+func WithPeekOptFrom(from time.Time) PeekOpt {
+	return func(p *peekOption) {
+		p.From = from
+	}
+}
+
+func WithPeekOptUntil(until time.Time) PeekOpt {
+	return func(p *peekOption) {
+		p.Until = until
+	}
+}
+
+func WithPeekOptSequential(seq bool) PeekOpt {
+	return func(p *peekOption) {
+		p.Sequential = seq
+	}
+}
+
+func WithPeekOptLimit(limit int64) PeekOpt {
+	return func(p *peekOption) {
+		p.Limit = limit
+	}
+}
+
+func WithPeekOptOffset(offset int64) PeekOpt {
+	return func(p *peekOption) {
+		p.Offset = offset
+	}
+}
+
 type peeker[T any] struct {
-	q      *queue
-	max    int64
-	opName string
+	q         *queue
+	max       int64
+	maxOffset int64
+	opName    string
 
 	// if ignoreUntil is provided, the entire count is returned and items are peeked even
 	// if the score exceeds the until value (usually the current time).
@@ -44,10 +95,6 @@ type peeker[T any] struct {
 	handleMissingItems func(pointers []string) error
 	maker              func() *T
 	keyMetadataHash    string
-
-	// fromTime provides an optional start time for peeks
-	// instead of the default -INF
-	fromTime *time.Time
 }
 
 var (
@@ -65,7 +112,11 @@ type peekResult[T any] struct {
 }
 
 // peek peeks up to <limit> items from the given ZSET up to until, in order if sequential is true, otherwise randomly.
-func (p *peeker[T]) peek(ctx context.Context, keyOrderedPointerSet string, sequential bool, until time.Time, limit int64, opts ...PeekOpt) (*peekResult[T], error) {
+func (p *peeker[T]) peek(
+	ctx context.Context,
+	keyOrderedPointerSet string,
+	opts ...PeekOpt,
+) (*peekResult[T], error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, p.opName), redis_telemetry.ScopeQueue)
 
 	opt := peekOption{}
@@ -86,6 +137,7 @@ func (p *peeker[T]) peek(ctx context.Context, keyOrderedPointerSet string, seque
 		rc = opt.Shard.RedisClient.Client()
 	}
 
+	limit := opt.Limit
 	if limit > p.max {
 		return nil, ErrPeekerPeekExceedsMaxLimits
 	}
@@ -102,29 +154,45 @@ func (p *peeker[T]) peek(ctx context.Context, keyOrderedPointerSet string, seque
 		}
 	} else {
 		script = "peekOrderedSetUntil"
-		ms := until.UnixMilli()
 
 		fromTime := "-inf"
-		if p.fromTime != nil && !p.fromTime.IsZero() {
-			fromTime = strconv.Itoa(int(p.fromTime.UnixMilli()))
+		if !opt.From.IsZero() {
+			fromTime = strconv.Itoa(int(opt.From.Unix()))
+			if p.isMillisecondPrecision {
+				fromTime = strconv.Itoa(int(opt.From.UnixMilli()))
+			}
 		}
 
-		untilTime := until.Unix()
-		if p.isMillisecondPrecision {
-			untilTime = until.UnixMilli()
+		untilTime := "+inf"
+		if !opt.Until.IsZero() {
+			untilTime = strconv.Itoa(int(opt.Until.Unix()))
+			if p.isMillisecondPrecision {
+				untilTime = strconv.Itoa(int(opt.Until.UnixMilli()))
+			}
+		}
+
+		offsetRandomSeed := p.q.clock.Now().UnixMilli()
+		if !opt.Until.IsZero() {
+			offsetRandomSeed = opt.Until.UnixMilli()
 		}
 
 		isSequential := 0
-		if sequential {
+		if opt.Sequential {
 			isSequential = 1
+		}
+
+		offset := opt.Offset
+		if opt.Offset >= p.maxOffset {
+			return nil, ErrMaxOffsetReached
 		}
 
 		rawArgs = []any{
 			fromTime,
 			untilTime,
-			ms,
+			offsetRandomSeed,
 			limit,
 			isSequential,
+			offset,
 		}
 	}
 

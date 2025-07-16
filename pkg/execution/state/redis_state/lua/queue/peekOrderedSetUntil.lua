@@ -15,9 +15,9 @@ local peekUntil    = tonumber(ARGV[2])
 local peekUntilMS  = tonumber(ARGV[3])
 local limit        = tonumber(ARGV[4])
 local sequential   = tonumber(ARGV[5])
+local offset       = tonumber(ARGV[6])
 
 local count = redis.call("ZCOUNT", keyOrderedPointerSet, peekFrom, peekUntil)
-local offset = 0
 
 if count > limit and sequential == 0 then
 	math.randomseed(peekUntilMS);

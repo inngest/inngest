@@ -1076,9 +1076,9 @@ func (q *queue) backlogPeek(ctx context.Context, b *QueueBacklog, from time.Time
 		limit = q.peekMin
 	}
 
-	var fromTime *time.Time
+	var fromTime time.Time
 	if !from.IsZero() {
-		fromTime = &from
+		fromTime = from
 	}
 
 	l := q.log.With(
@@ -1113,10 +1113,10 @@ func (q *queue) backlogPeek(ctx context.Context, b *QueueBacklog, from time.Time
 			return nil
 		},
 		isMillisecondPrecision: true,
-		fromTime:               fromTime,
 	}
 
-	res, err := p.peek(ctx, backlogSet, true, until, limit, opts...)
+	opts = append(opts, WithPeekOptFrom(fromTime), WithPeekOptUntil(until), WithPeekOptSequential(true))
+	res, err := p.peek(ctx, backlogSet, opts...)
 	if err != nil {
 		if errors.Is(err, ErrPeekerPeekExceedsMaxLimits) {
 			return nil, 0, ErrBacklogPeekMaxExceedsLimits
@@ -1166,11 +1166,13 @@ func (q *queue) BacklogsByPartition(ctx context.Context, queueShard QueueShard, 
 					return &QueueBacklog{}
 				},
 				keyMetadataHash: hashKey,
-				fromTime:        &ptFrom,
 			}
 
-			isSequential := true
-			res, err := peeker.peek(ctx, kg.ShadowPartitionSet(partitionID), isSequential, until, opt.batchSize,
+			res, err := peeker.peek(ctx, kg.ShadowPartitionSet(partitionID),
+				WithPeekOptSequential(true),
+				WithPeekOptFrom(ptFrom),
+				WithPeekOptUntil(until),
+				WithPeekOptLimit(opt.batchSize),
 				WithPeekOptQueueShard(&queueShard),
 			)
 			if err != nil {

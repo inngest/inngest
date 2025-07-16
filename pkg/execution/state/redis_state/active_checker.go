@@ -596,9 +596,11 @@ func (q *queue) BacklogActiveCheckPeek(ctx context.Context, peekSize int64) ([]*
 	}
 
 	// Pick random backlogs within bounds
-	isSequential := false
-
-	res, err := peeker.peek(ctx, key, isSequential, q.clock.Now(), peekSize)
+	res, err := peeker.peek(ctx, key,
+		WithPeekOptSequential(false),
+		WithPeekOptUntil(q.clock.Now()),
+		WithPeekOptLimit(peekSize),
+	)
 	if err != nil {
 		return nil, fmt.Errorf("could not peek active check backlogs: %w", err)
 	}
