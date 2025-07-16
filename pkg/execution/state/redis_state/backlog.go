@@ -118,6 +118,31 @@ type QueueShadowPartition struct {
 	PauseEnqueue bool `json:"noenqueue,omitempty"`
 }
 
+func (sp QueueShadowPartition) Identifier() PartitionIdentifier {
+	fnID := uuid.UUID{}
+	if sp.FunctionID != nil {
+		fnID = *sp.FunctionID
+	}
+
+	accountID := uuid.UUID{}
+	if sp.AccountID != nil {
+		accountID = *sp.AccountID
+	}
+
+	envID := uuid.UUID{}
+	if sp.EnvID != nil {
+		envID = *sp.EnvID
+	}
+
+	return PartitionIdentifier{
+		SystemQueueName: sp.SystemQueueName,
+
+		AccountID:  accountID,
+		EnvID:      envID,
+		FunctionID: fnID,
+	}
+}
+
 func (sp QueueShadowPartition) GetAccountID() uuid.UUID {
 	accountID := uuid.Nil
 	if sp.AccountID != nil {

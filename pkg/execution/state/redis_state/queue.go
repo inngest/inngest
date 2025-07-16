@@ -175,6 +175,7 @@ type QueueManager interface {
 
 	// BacklogsByPartition returns an iterator for the partition's backlogs
 	BacklogsByPartition(ctx context.Context, queueShard QueueShard, partitionID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueueBacklog], error)
+
 	// BacklogSize retrieves the number of items in the specified backlog
 	BacklogSize(ctx context.Context, queueShard QueueShard, backlogID string) (int64, error)
 
@@ -183,6 +184,12 @@ type QueueManager interface {
 	// PartitionBacklogSize returns the point in time backlog size of the partition.
 	// This will sum the size of all backlogs in that partition
 	PartitionBacklogSize(ctx context.Context, partitionID string) (int64, error)
+
+	// GlobalPartitions returns an iterator for all partitions in the global partition set
+	GlobalPartitions(ctx context.Context, queueShard QueueShard, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueuePartition], error)
+
+	// GlobalPartitions returns an iterator for all shadow partitions in the global shadow partition set
+	GlobalShadowPartitions(ctx context.Context, queueShard QueueShard, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueueShadowPartition], error)
 }
 
 // PartitionPriorityFinder returns the priority for a given queue partition.
@@ -654,7 +661,7 @@ func WithReadOnlySpotChecks(fn ReadOnlySpotChecks) QueueOpt {
 	}
 }
 
-type TenantInstrumentor func(ctx context.Context, qp *QueuePartition) error
+type TenantInstrumentor func(ctx context.Context, pi PartitionIdentifier) error
 
 func WithTenantInstrumentor(fn TenantInstrumentor) QueueOpt {
 	return func(q *queue) {
@@ -776,7 +783,7 @@ func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 		shadowPartitionProcessCount: func(ctx context.Context, acctID uuid.UUID) int {
 			return 5
 		},
-		tenantInstrumentor: func(ctx context.Context, qp *QueuePartition) error {
+		tenantInstrumentor: func(ctx context.Context, pi PartitionIdentifier) error {
 			return nil
 		},
 		itemIndexer:             QueueItemIndexerFunc,
@@ -1081,6 +1088,13 @@ type FnMetadata struct {
 	Migrate bool `json:"migrate"`
 }
 
+type PartitionIdentifier struct {
+	SystemQueueName *string
+	FunctionID      uuid.UUID
+	AccountID       uuid.UUID
+	EnvID           uuid.UUID
+}
+
 // QueuePartition represents an individual queue for a workflow.  It stores the
 // time of the earliest job within the workflow.
 type QueuePartition struct {
@@ -1148,6 +1162,26 @@ type QueuePartition struct {
 	// This must be set so that we can fetch the latest concurrency limits dynamically when
 	// leasing a partition, if desired, via the ConcurrencyLimitGetter.
 	UnevaluatedConcurrencyHash string `json:"ch,omitempty"`
+}
+
+func (qp QueuePartition) Identifier() PartitionIdentifier {
+	fnID := uuid.UUID{}
+	if qp.FunctionID != nil {
+		fnID = *qp.FunctionID
+	}
+
+	envID := uuid.UUID{}
+	if qp.EnvID != nil {
+		envID = *qp.EnvID
+	}
+
+	return PartitionIdentifier{
+		SystemQueueName: qp.QueueName,
+
+		AccountID:  qp.AccountID,
+		FunctionID: fnID,
+		EnvID:      envID,
+	}
 }
 
 func (qp QueuePartition) IsSystem() bool {
@@ -3562,7 +3596,7 @@ func (q *queue) IteratePartitions(ctx context.Context) error {
 	l := logger.StdlibLogger(ctx)
 
 	// Check on global partition and queue partition sizes
-	var offset, total int64
+	var total int64
 	chunkSize := q.partitionIteratorChunkSize
 
 	// Semaphore to limit backlog enrollment concurrency
@@ -3571,207 +3605,88 @@ func (q *queue) IteratePartitions(ctx context.Context) error {
 	// Wait until all partitions have been processed
 	wg := sync.WaitGroup{}
 
-	r := q.primaryQueueShard.RedisClient.unshardedRc
-	// iterate through all the partitions in the global partitions in chunks
-	for {
-		// grab the global partition by chunks
-		cmd := r.B().Zrange().
-			Key(q.primaryQueueShard.RedisClient.kg.GlobalPartitionIndex()).
-			Min("-inf").
-			Max("+inf").
-			Byscore().
-			Limit(offset, chunkSize).
-			Build()
+	shard := q.primaryQueueShard
+	kg := shard.RedisClient.KeyGenerator()
+	rc := shard.RedisClient.Client()
 
-		pkeys, err := r.Do(ctx, cmd).AsStrSlice()
-		if err != nil {
-			return fmt.Errorf("error retrieving partitions for instrumentation: %w", err)
-		}
+	from := time.Time{}
+	to := q.clock.Now().Add(time.Hour * 24 * 365 * 2)
 
-		for _, pk := range pkeys {
-			wg.Add(1)
+	partitions, err := q.GlobalPartitions(ctx, shard, from, to, WithQueueItemIterBatchSize(chunkSize))
+	if err != nil {
+		return fmt.Errorf("could not iterate global partitions")
+	}
 
-			// check each partition concurrently
-			go func(ctx context.Context, pkey string) {
-				defer wg.Done()
+	for partition := range partitions {
+		wg.Add(1)
 
-				l := l.With("partitionKey", pkey)
+		// check each partition concurrently
+		partition := partition
+		go func() {
+			defer wg.Done()
 
-				// If this is not a fully-qualified key, assume that this is an old (system) partition queue
-				queueKey := pkey
-				if !isKeyConcurrencyPointerItem(pkey) {
-					queueKey = q.primaryQueueShard.RedisClient.kg.PartitionQueueSet(enums.PartitionTypeDefault, pkey, "")
-				}
+			cntCmd := rc.B().Zcard().Key(partition.zsetKey(kg)).Build()
+			count, err := q.primaryQueueShard.RedisClient.unshardedRc.Do(ctx, cntCmd).AsInt64()
+			if err != nil {
+				q.log.Warn("error checking partition count", "partition_id", partition.ID, "context", "instrumentation")
+				return
+			}
 
-				cntCmd := r.B().Zcard().Key(queueKey).Build()
-				count, err := q.primaryQueueShard.RedisClient.unshardedRc.Do(ctx, cntCmd).AsInt64()
+			metrics.GaugePartitionSize(ctx, count, metrics.GaugeOpt{
+				PkgName: pkgName,
+				Tags: map[string]any{
+					// NOTE: potentially high cardinality but this gives better clarify of stuff
+					"partition":   partition.ID,
+					"queue_shard": q.primaryQueueShard.Name,
+				},
+			})
+
+			atomic.AddInt64(&total, 1)
+
+			if err := q.tenantInstrumentor(ctx, partition.Identifier()); err != nil {
+				l.Error("error running tenant instrumentor", "error", err)
+			}
+
+			// Acquire semaphore before enrolling backlog. This limits concurrency to the configured value.
+			// - This will not block new goroutines from launching for subsequent reporting.
+			// - Due to using wg.Wait() below, this will block IteratePartitions from exiting
+			// until all partition items have been enrolled to backlogs.
+			{
+				err = sem.Acquire(ctx, 1)
 				if err != nil {
-					q.log.Warn("error checking partition count", "pkey", pkey, "context", "instrumentation")
 					return
 				}
+				defer sem.Release(1)
 
-				metrics.GaugePartitionSize(ctx, count, metrics.GaugeOpt{
-					PkgName: pkgName,
-					Tags: map[string]any{
-						// NOTE: potentially high cardinality but this gives better clarify of stuff
-						"partition":   pkey,
-						"queue_shard": q.primaryQueueShard.Name,
-					},
-				})
-
-				atomic.AddInt64(&total, 1)
-
-				qp := QueuePartition{}
-				{
-					shard := q.primaryQueueShard
-					hash := shard.RedisClient.kg.PartitionItem()
-					cmd := r.B().Hget().Key(hash).Field(pkey).Build()
-					byt, err := r.Do(ctx, cmd).AsBytes()
-					if err != nil {
-						l.Error("error loading partition", "error", err)
-						return
-					}
-					if err := json.Unmarshal(byt, &qp); err != nil {
-						l.Error("error unmarshalling partition", "error", err)
-						return
-					}
+				res, err := q.BacklogEnroll(ctx, partition)
+				if err != nil {
+					l.Error("error enrolling backlog", "error", err)
 				}
 
-				if err := q.tenantInstrumentor(ctx, &qp); err != nil {
-					l.Error("error running tenant instrumentor", "error", err)
-				}
+				l.Trace("enrolled future items to backlogs", "res", res, "partition", partition)
+			}
+		}()
+	}
 
-				// Acquire semaphore before enrolling backlog. This limits concurrency to the configured value.
-				// - This will not block new goroutines from launching for subsequent reporting.
-				// - Due to using wg.Wait() below, this will block IteratePartitions from exiting
-				// until all partition items have been enrolled to backlogs.
-				{
-					err = sem.Acquire(ctx, 1)
-					if err != nil {
-						return
-					}
-					defer sem.Release(1)
+	shadowPartitions, err := q.GlobalShadowPartitions(ctx, shard, from, to, WithQueueItemIterBatchSize(chunkSize))
+	if err != nil {
+		return fmt.Errorf("could not iterate global shadow partitions")
+	}
 
-					res, err := q.BacklogEnroll(ctx, &qp)
-					if err != nil {
-						l.Error("error enrolling backlog", "error", err)
-					}
+	for shadowPartition := range shadowPartitions {
+		wg.Add(1)
 
-					l.Trace("enrolled future items to backlogs", "res", res, "partition", qp)
-				}
-			}(ctx, pk)
-		}
+		go func() {
+			defer wg.Done()
 
-		// end of pagination, exit
-		if len(pkeys) < int(chunkSize) {
-			break
-		}
-
-		offset += chunkSize
+			l = l.With("shadow", true, "partition_id", shadowPartition.PartitionID)
+			if err := q.tenantInstrumentor(ctx, shadowPartition.Identifier()); err != nil {
+				l.Error("error running tenant instrumentor on shadow partition", "error", err)
+			}
+		}()
 	}
 
 	// Wait until all partitions have been processed before reporting gauge
-	wg.Wait()
-
-	// instrument the total count of global partition
-	metrics.GaugeGlobalPartitionSize(ctx, atomic.LoadInt64(&total), metrics.GaugeOpt{
-		PkgName: pkgName,
-		Tags: map[string]any{
-			"queue_shard": q.primaryQueueShard.Name,
-		},
-	})
-
-	return nil
-}
-
-func (q *queue) Instrument(ctx context.Context) error {
-	l := logger.StdlibLogger(ctx)
-
-	// Check on global partition and queue partition sizes
-	var offset, total int64
-	chunkSize := int64(1000)
-
-	r := q.primaryQueueShard.RedisClient.unshardedRc
-	// iterate through all the partitions in the global partitions in chunks
-	wg := sync.WaitGroup{}
-	for {
-		// grab the global partition by chunks
-		cmd := r.B().Zrange().
-			Key(q.primaryQueueShard.RedisClient.kg.GlobalPartitionIndex()).
-			Min("-inf").
-			Max("+inf").
-			Byscore().
-			Limit(offset, chunkSize).
-			Build()
-
-		pkeys, err := r.Do(ctx, cmd).AsStrSlice()
-		if err != nil {
-			return fmt.Errorf("error retrieving partitions for instrumentation: %w", err)
-		}
-
-		for _, pk := range pkeys {
-			wg.Add(1)
-
-			// check each partition concurrently
-			go func(ctx context.Context, pkey string) {
-				defer wg.Done()
-
-				l := l.With("partitionKey", pkey)
-
-				// If this is not a fully-qualified key, assume that this is an old (system) partition queue
-				queueKey := pkey
-				if !isKeyConcurrencyPointerItem(pkey) {
-					queueKey = q.primaryQueueShard.RedisClient.kg.PartitionQueueSet(enums.PartitionTypeDefault, pkey, "")
-				}
-
-				cntCmd := r.B().Zcount().Key(queueKey).Min("-inf").Max("+inf").Build()
-				count, err := q.primaryQueueShard.RedisClient.unshardedRc.Do(ctx, cntCmd).AsInt64()
-				if err != nil {
-					q.log.Warn("error checking partition count", "pkey", pkey, "context", "instrumentation")
-					return
-				}
-
-				metrics.GaugePartitionSize(ctx, count, metrics.GaugeOpt{
-					PkgName: pkgName,
-					Tags: map[string]any{
-						// NOTE: potentially high cardinality but this gives better clarify of stuff
-						"partition":   pkey,
-						"queue_shard": q.primaryQueueShard.Name,
-					},
-				})
-
-				atomic.AddInt64(&total, 1)
-
-				qp := QueuePartition{}
-				{
-					shard := q.primaryQueueShard
-					hash := shard.RedisClient.kg.PartitionItem()
-					cmd := r.B().Hget().Key(hash).Field(pkey).Build()
-					byt, err := r.Do(ctx, cmd).AsBytes()
-					if err != nil {
-						l.Error("error loading partition", "error", err)
-						return
-					}
-					if err := json.Unmarshal(byt, &qp); err != nil {
-						l.Error("error unmarshalling partition", "error", err)
-						return
-					}
-				}
-
-				if err := q.tenantInstrumentor(ctx, &qp); err != nil {
-					l.Error("error running tenant instrumentor", "error", err)
-				}
-			}(ctx, pk)
-
-		}
-		// end of pagination, exit
-		if len(pkeys) < int(chunkSize) {
-			break
-		}
-
-		offset += chunkSize
-	}
-
 	wg.Wait()
 
 	// instrument the total count of global partition

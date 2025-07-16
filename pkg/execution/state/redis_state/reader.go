@@ -523,3 +523,166 @@ func (q *queue) ItemsByBacklog(ctx context.Context, shard QueueShard, backlogID 
 		}
 	}, nil
 }
+
+func (q *queue) GlobalPartitions(ctx context.Context, queueShard QueueShard, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueuePartition], error) {
+	opt := queueIterOpt{
+		batchSize: 1000,
+		interval:  50 * time.Millisecond,
+	}
+	for _, apply := range opts {
+		apply(&opt)
+	}
+
+	l := q.log.With(
+		"method", "GlobalPartitions",
+		"from", from,
+		"until", until,
+	)
+
+	kg := queueShard.RedisClient.kg
+
+	return func(yield func(partition *QueuePartition) bool) {
+		hashKey := kg.PartitionItem()
+		ptFrom := from
+
+		for {
+			var iterated int
+
+			peeker := peeker[QueuePartition]{
+				q:                      q,
+				max:                    opt.batchSize,
+				opName:                 "globalPartitions",
+				isMillisecondPrecision: false,
+				handleMissingItems: func(pointers []string) error {
+					// don't interfere, clean up will happen in normal processing anyways
+					return nil
+				},
+				maker: func() *QueuePartition {
+					return &QueuePartition{}
+				},
+				keyMetadataHash: hashKey,
+				fromTime:        &ptFrom,
+			}
+
+			isSequential := true
+			res, err := peeker.peek(ctx, kg.GlobalPartitionIndex(), isSequential, until, opt.batchSize,
+				WithPeekOptQueueShard(&queueShard),
+			)
+			if err != nil {
+				l.Error("error peeking global partitions", "err", err)
+				return
+			}
+
+			for _, bl := range res.Items {
+				if bl == nil {
+					continue
+				}
+
+				if !yield(bl) {
+					return
+				}
+
+				iterated++
+			}
+
+			// Note how we use time.Unix here as pointers are measured in seconds
+			ptFrom = time.Unix(res.Cursor, 0)
+
+			l.Trace("iterated global partitions", "count", iterated)
+
+			// didn't process anything, exit loop
+			if iterated == 0 {
+				break
+			}
+
+			// shift the starting point 1ms so it doesn't try to grab the same stuff again
+			// NOTE: this could result skipping items if the previous batch of items are all on
+			// the same millisecond
+			ptFrom = ptFrom.Add(time.Millisecond)
+
+			// wait a little before processing the next batch
+			<-time.After(opt.interval)
+		}
+	}, nil
+}
+
+func (q *queue) GlobalShadowPartitions(ctx context.Context, queueShard QueueShard, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueueShadowPartition], error) {
+	opt := queueIterOpt{
+		batchSize: 1000,
+		interval:  50 * time.Millisecond,
+	}
+	for _, apply := range opts {
+		apply(&opt)
+	}
+
+	l := q.log.With(
+		"method", "GlobalShadowPartitions",
+		"from", from,
+		"until", until,
+	)
+
+	kg := queueShard.RedisClient.kg
+
+	return func(yield func(partition *QueueShadowPartition) bool) {
+		hashKey := kg.PartitionItem()
+		ptFrom := from
+
+		for {
+			var iterated int
+
+			peeker := peeker[QueueShadowPartition]{
+				q:                      q,
+				max:                    opt.batchSize,
+				opName:                 "globalPartitions",
+				isMillisecondPrecision: true,
+				handleMissingItems: func(pointers []string) error {
+					// don't interfere, clean up will happen in normal processing anyways
+					return nil
+				},
+				maker: func() *QueueShadowPartition {
+					return &QueueShadowPartition{}
+				},
+				keyMetadataHash: hashKey,
+				fromTime:        &ptFrom,
+			}
+
+			isSequential := true
+			res, err := peeker.peek(ctx, kg.GlobalShadowPartitionSet(), isSequential, until, opt.batchSize,
+				WithPeekOptQueueShard(&queueShard),
+			)
+			if err != nil {
+				l.Error("error peeking global shadow partitions", "err", err)
+				return
+			}
+
+			for _, bl := range res.Items {
+				if bl == nil {
+					continue
+				}
+
+				if !yield(bl) {
+					return
+				}
+
+				iterated++
+			}
+
+			ptFrom = time.UnixMilli(res.Cursor)
+
+			l.Trace("iterated global partitions", "count", iterated)
+
+			// didn't process anything, exit loop
+			if iterated == 0 {
+				break
+			}
+
+			// shift the starting point 1ms so it doesn't try to grab the same stuff again
+			// NOTE: this could result skipping items if the previous batch of items are all on
+			// the same millisecond
+			ptFrom = ptFrom.Add(time.Millisecond)
+
+			// wait a little before processing the next batch
+			<-time.After(opt.interval)
+		}
+	}, nil
+}
