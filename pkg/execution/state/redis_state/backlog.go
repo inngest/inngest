@@ -405,10 +405,6 @@ func (q *queue) ItemBacklog(ctx context.Context, i osqueue.QueueItem) QueueBackl
 }
 
 func (q *queue) ItemShadowPartition(ctx context.Context, i osqueue.QueueItem) QueueShadowPartition {
-	var (
-		ckeys = i.Data.GetConcurrencyKeys()
-	)
-
 	queueName := i.QueueName
 
 	// sanity check: both QueueNames should be set, but sometimes aren't
@@ -448,22 +444,6 @@ func (q *queue) ItemShadowPartition(ctx context.Context, i osqueue.QueueItem) Qu
 	if fnID == uuid.Nil {
 		stack := string(debug.Stack())
 		q.log.Error("unexpected missing functionID in ItemShadowPartition call", "item", i, "stack", stack)
-	}
-
-	var customConcurrencyKeyLimits []CustomConcurrencyLimit
-	if len(ckeys) > 0 {
-		// Up to 2 concurrency keys.
-		for _, key := range ckeys {
-			scope, _, _, _ := key.ParseKey()
-
-			customConcurrencyKeyLimits = append(customConcurrencyKeyLimits, CustomConcurrencyLimit{
-				Mode:  enums.ConcurrencyModeStep, // TODO Support run concurrency
-				Scope: scope,
-				// Key is required to look up the respective limit when checking constraints for a given backlog.
-				HashedKeyExpression: key.Hash, // hash("event.data.customerId")
-				Limit:               key.Limit,
-			})
-		}
 	}
 
 	return QueueShadowPartition{
