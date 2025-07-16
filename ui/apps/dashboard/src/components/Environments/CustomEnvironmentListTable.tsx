@@ -16,10 +16,16 @@ import { RiMore2Line, RiSettingsLine } from '@remixicon/react';
 
 import type { Environment } from '@/utils/environments';
 import { EnvironmentArchiveDropdownItem } from './EnvironmentArchiveDropdownItem';
+import { FilterResultDetails } from './FilterResultDetails';
 
 const PER_PAGE = 5;
 
-export function CustomEnvironmentListTable({ envs }: { envs: Environment[] }) {
+type CustomEnvironmentListTableProps = {
+  envs: Environment[];
+  totalEnvs: number;
+};
+
+export function CustomEnvironmentListTable({ envs, totalEnvs }: CustomEnvironmentListTableProps) {
   const {
     BoundPagination: CustomEnvsPagination,
     currentPageData: visibleCustomEnvs,
@@ -60,11 +66,14 @@ export function CustomEnvironmentListTable({ envs }: { envs: Environment[] }) {
           </tbody>
         </table>
       </div>
-      {totalCustomEnvsPages > 1 && (
-        <div className="border-subtle flex justify-center border-t px-4 py-1">
-          <CustomEnvsPagination />
-        </div>
-      )}
+      <div className="border-subtle flex border-t px-1 py-1">
+        <FilterResultDetails denominator={totalEnvs} numerator={envs.length} />
+        {totalCustomEnvsPages > 1 && (
+          <div className="ml-4 flex-1">
+            <CustomEnvsPagination className="justify-end" />
+          </div>
+        )}
+      </div>
     </div>
   );
 }

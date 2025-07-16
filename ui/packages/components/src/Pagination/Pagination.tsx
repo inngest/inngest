@@ -25,10 +25,11 @@ export interface PaginationProps {
   setCurrentPage: (action: SetStateAction<number>) => void;
   totalPages: number;
   variant?: 'normal' | 'narrow' | 'tiny';
+  className?: string;
 }
 
 export function Pagination(props: PaginationProps) {
-  const { currentPage, setCurrentPage, totalPages, variant: propVariant } = props;
+  const { className, currentPage, setCurrentPage, totalPages, variant: propVariant } = props;
 
   const outerRef = useRef<HTMLDivElement>(null);
   const [autoVariant, setAutoVariant] = useState<'narrow' | 'normal' | 'tiny'>('normal');
@@ -65,7 +66,7 @@ export function Pagination(props: PaginationProps) {
   );
 
   return (
-    <div ref={outerRef} className="flex w-full justify-center">
+    <div ref={outerRef} className={cn('flex w-full justify-center', className)}>
       <div className="flex items-center">
         <CaretButton {...props} typ="first" />
         <CaretButton {...props} typ="back" />

@@ -22,6 +22,7 @@ import { type Environment } from '@/utils/environments';
 import { notNullish } from '@/utils/typeGuards';
 import { pathCreator } from '@/utils/urls';
 import { EnvironmentArchiveDropdownItem } from './EnvironmentArchiveDropdownItem';
+import { FilterResultDetails } from './FilterResultDetails';
 
 const DisableEnvironmentAutoArchiveDocument = graphql(`
   mutation DisableEnvironmentAutoArchiveDocument($id: ID!) {
@@ -41,7 +42,15 @@ const EnableEnvironmentAutoArchiveDocument = graphql(`
 
 const PER_PAGE = 5;
 
-export default function BranchEnvironmentListTable({ envs }: { envs: Environment[] }) {
+type BranchEnvironmentListTableProps = {
+  envs: Environment[];
+  totalEnvs: number;
+};
+
+export default function BranchEnvironmentListTable({
+  envs,
+  totalEnvs,
+}: BranchEnvironmentListTableProps) {
   const sortedEnvs = envs.sort(
     (a, b) =>
       new Date(b.lastDeployedAt || b.createdAt).valueOf() -
@@ -96,11 +105,14 @@ export default function BranchEnvironmentListTable({ envs }: { envs: Environment
           </tbody>
         </table>
       </div>
-      {totalBranchEnvsPages > 1 && (
-        <div className="border-subtle flex justify-center border-t px-4 py-1">
-          <BranchEnvsPagination />
-        </div>
-      )}
+      <div className="border-subtle flex border-t px-1 py-1">
+        <FilterResultDetails denominator={totalEnvs} numerator={envs.length} />
+        {totalBranchEnvsPages > 1 && (
+          <div className="ml-4 flex-1">
+            <BranchEnvsPagination className="justify-end" />
+          </div>
+        )}
+      </div>
     </div>
   );
 }
