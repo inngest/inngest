@@ -50,6 +50,9 @@ var (
 	connectGatewayServiceDescriptor       = v1.File_connect_v1_service_proto.Services().ByName("ConnectGateway")
 	connectGatewayForwardMethodDescriptor = connectGatewayServiceDescriptor.Methods().ByName("Forward")
 	connectGatewayPingMethodDescriptor    = connectGatewayServiceDescriptor.Methods().ByName("Ping")
+	connectExecutorServiceDescriptor      = v1.File_connect_v1_service_proto.Services().ByName("ConnectExecutor")
+	connectExecutorReplyMethodDescriptor  = connectExecutorServiceDescriptor.Methods().ByName("Reply")
+	connectExecutorAckMethodDescriptor    = connectExecutorServiceDescriptor.Methods().ByName("Ack")
 )
 
 // ConnectGatewayClient is a client for the connect.v1.ConnectGateway service.
@@ -161,18 +164,17 @@ type ConnectExecutorClient interface {
 // http://api.acme.com or https://acme.com/grpc).
 func NewConnectExecutorClient(httpClient connect.HTTPClient, baseURL string, opts ...connect.ClientOption) ConnectExecutorClient {
 	baseURL = strings.TrimRight(baseURL, "/")
-	connectExecutorMethods := v1.File_connect_v1_service_proto.Services().ByName("ConnectExecutor").Methods()
 	return &connectExecutorClient{
 		reply: connect.NewClient[v1.ReplyRequest, v1.ReplyResponse](
 			httpClient,
 			baseURL+ConnectExecutorReplyProcedure,
-			connect.WithSchema(connectExecutorMethods.ByName("Reply")),
+			connect.WithSchema(connectExecutorReplyMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
 		ack: connect.NewClient[v1.AckMessage, v1.AckResponse](
 			httpClient,
 			baseURL+ConnectExecutorAckProcedure,
-			connect.WithSchema(connectExecutorMethods.ByName("Ack")),
+			connect.WithSchema(connectExecutorAckMethodDescriptor),
 			connect.WithClientOptions(opts...),
 		),
 	}
@@ -206,17 +208,16 @@ type ConnectExecutorHandler interface {
 // By default, handlers support the Connect, gRPC, and gRPC-Web protocols with the binary Protobuf
 // and JSON codecs. They also support gzip compression.
 func NewConnectExecutorHandler(svc ConnectExecutorHandler, opts ...connect.HandlerOption) (string, http.Handler) {
-	connectExecutorMethods := v1.File_connect_v1_service_proto.Services().ByName("ConnectExecutor").Methods()
 	connectExecutorReplyHandler := connect.NewUnaryHandler(
 		ConnectExecutorReplyProcedure,
 		svc.Reply,
-		connect.WithSchema(connectExecutorMethods.ByName("Reply")),
+		connect.WithSchema(connectExecutorReplyMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
 	connectExecutorAckHandler := connect.NewUnaryHandler(
 		ConnectExecutorAckProcedure,
 		svc.Ack,
-		connect.WithSchema(connectExecutorMethods.ByName("Ack")),
+		connect.WithSchema(connectExecutorAckMethodDescriptor),
 		connect.WithHandlerOptions(opts...),
 	)
 	return "/connect.v1.ConnectExecutor/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
