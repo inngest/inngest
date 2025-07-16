@@ -1448,17 +1448,25 @@ func TestQueueLease(t *testing.T) {
 	t.Run("With custom concurrency limits", func(t *testing.T) {
 		t.Run("with account keys", func(t *testing.T) {
 			r.FlushAll()
+
+			ck := createConcurrencyKey(enums.ConcurrencyScopeAccount, uuid.Nil, "foo", 1)
+
 			// Only allow a single leased item via custom concurrency limits
 			q.partitionConstraintConfigGetter = func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
 				return PartitionConstraintConfig{
 					Concurrency: PartitionConcurrency{
 						AccountConcurrency:  NoConcurrencyLimit,
 						FunctionConcurrency: NoConcurrencyLimit,
+						CustomConcurrencyKeys: []CustomConcurrencyLimit{
+							{
+								Scope:               enums.ConcurrencyScopeAccount,
+								HashedKeyExpression: ck.Hash,
+								Limit:               ck.Limit,
+							},
+						},
 					},
 				}
 			}
-
-			ck := createConcurrencyKey(enums.ConcurrencyScopeAccount, uuid.Nil, "foo", 1)
 
 			// Create a new item
 			fnA := uuid.New()
@@ -1520,19 +1528,25 @@ func TestQueueLease(t *testing.T) {
 			accountId := uuid.New()
 			fnId := uuid.New()
 
+			ck := createConcurrencyKey(enums.ConcurrencyScopeFn, fnId, "foo", 1)
+			_, _, keyExprChecksum, err := ck.ParseKey()
+			require.NoError(t, err)
 			// Only allow a single leased item via custom concurrency limits
 			q.partitionConstraintConfigGetter = func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
 				return PartitionConstraintConfig{
 					Concurrency: PartitionConcurrency{
 						AccountConcurrency:  NoConcurrencyLimit,
 						FunctionConcurrency: NoConcurrencyLimit,
+						CustomConcurrencyKeys: []CustomConcurrencyLimit{
+							{
+								Scope:               enums.ConcurrencyScopeFn,
+								HashedKeyExpression: ck.Hash,
+								Limit:               ck.Limit,
+							},
+						},
 					},
 				}
 			}
-
-			ck := createConcurrencyKey(enums.ConcurrencyScopeFn, fnId, "foo", 1)
-			_, _, keyExprChecksum, err := ck.ParseKey()
-			require.NoError(t, err)
 
 			// Create a new item
 			itemA, err := q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{
@@ -1621,15 +1635,6 @@ func TestQueueLease(t *testing.T) {
 		t.Run("with two distinct functions it processes both", func(t *testing.T) {
 			r.FlushAll()
 
-			q.partitionConstraintConfigGetter = func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
-				return PartitionConstraintConfig{
-					Concurrency: PartitionConcurrency{
-						AccountConcurrency:  123_456,
-						FunctionConcurrency: 1,
-					},
-				}
-			}
-
 			fnIDA := uuid.New()
 			fnIDB := uuid.New()
 
@@ -1640,6 +1645,27 @@ func TestQueueLease(t *testing.T) {
 			ckB := createConcurrencyKey(enums.ConcurrencyScopeFn, fnIDB, "foo", 1)
 			_, _, evaluatedKeyChecksumB, err := ckB.ParseKey()
 			require.NoError(t, err)
+
+			q.partitionConstraintConfigGetter = func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
+				return PartitionConstraintConfig{
+					Concurrency: PartitionConcurrency{
+						AccountConcurrency:  123_456,
+						FunctionConcurrency: 1,
+						CustomConcurrencyKeys: []CustomConcurrencyLimit{
+							{
+								Scope:               enums.ConcurrencyScopeFn,
+								HashedKeyExpression: ckA.Hash,
+								Limit:               ckA.Limit,
+							},
+							{
+								Scope:               enums.ConcurrencyScopeFn,
+								HashedKeyExpression: ckB.Hash,
+								Limit:               ckB.Limit,
+							},
+						},
+					},
+				}
+			}
 
 			// Create a new item
 			itemA1, err := q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{FunctionID: fnIDA, Data: osqueue.Item{CustomConcurrencyKeys: []state.CustomConcurrency{ckA}}}, start, osqueue.EnqueueOpts{})
@@ -1988,6 +2014,28 @@ func TestQueueLease(t *testing.T) {
 		accountId := uuid.New()
 
 		evaluatedKey := util.ConcurrencyKey(enums.ConcurrencyScopeAccount, accountId, "customer-1")
+		ck := state.CustomConcurrency{
+			Key:   evaluatedKey,
+			Hash:  util.XXHash("event.data.customerId"),
+			Limit: 10,
+		}
+
+		q.partitionConstraintConfigGetter = func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
+			return PartitionConstraintConfig{
+				Concurrency: PartitionConcurrency{
+					SystemConcurrency:   0,
+					AccountConcurrency:  123,
+					FunctionConcurrency: 45,
+					CustomConcurrencyKeys: []CustomConcurrencyLimit{
+						{
+							Scope:               enums.ConcurrencyScopeAccount,
+							HashedKeyExpression: ck.Hash,
+							Limit:               ck.Limit,
+						},
+					},
+				},
+			}
+		}
 
 		fnId := uuid.New()
 		item, err := q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{
@@ -1998,11 +2046,7 @@ func TestQueueLease(t *testing.T) {
 					WorkflowID: fnId,
 				},
 				CustomConcurrencyKeys: []state.CustomConcurrency{
-					{
-						Key:   evaluatedKey,
-						Hash:  util.XXHash("event.data.customerId"),
-						Limit: 10,
-					},
+					ck,
 				},
 			},
 		}, start, osqueue.EnqueueOpts{})
@@ -2139,26 +2183,50 @@ func TestQueueExtendLease(t *testing.T) {
 	t.Run("With custom keys in multiple partitions", func(t *testing.T) {
 		r.FlushAll()
 
+		ckA := state.CustomConcurrency{
+			Key: util.ConcurrencyKey(
+				enums.ConcurrencyScopeAccount,
+				uuid.Nil,
+				"acct-id",
+			),
+			Limit: 10,
+		}
+		ckB := state.CustomConcurrency{
+			Key: util.ConcurrencyKey(
+				enums.ConcurrencyScopeFn,
+				uuid.Nil,
+				"fn-id",
+			),
+			Limit: 5,
+		}
+
+		q.partitionConstraintConfigGetter = func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
+			return PartitionConstraintConfig{
+				Concurrency: PartitionConcurrency{
+					AccountConcurrency:  123,
+					FunctionConcurrency: 45,
+					CustomConcurrencyKeys: []CustomConcurrencyLimit{
+						{
+							Scope:               enums.ConcurrencyScopeAccount,
+							HashedKeyExpression: ckA.Hash,
+							Limit:               ckA.Limit,
+						},
+						{
+							Scope:               enums.ConcurrencyScopeFn,
+							HashedKeyExpression: ckB.Hash,
+							Limit:               ckB.Limit,
+						},
+					},
+				},
+			}
+		}
+
 		item, err := q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{
 			FunctionID: uuid.New(),
 			Data: osqueue.Item{
 				CustomConcurrencyKeys: []state.CustomConcurrency{
-					{
-						Key: util.ConcurrencyKey(
-							enums.ConcurrencyScopeAccount,
-							uuid.Nil,
-							"acct-id",
-						),
-						Limit: 10,
-					},
-					{
-						Key: util.ConcurrencyKey(
-							enums.ConcurrencyScopeFn,
-							uuid.Nil,
-							"fn-id",
-						),
-						Limit: 5,
-					},
+					ckA,
+					ckB,
 				},
 			},
 		}, start, osqueue.EnqueueOpts{})
@@ -5224,6 +5292,29 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 			scope := enums.ConcurrencyScopeFn
 			fullKey := util.ConcurrencyKey(scope, fnID, unhashedValue)
 
+			ckA := state.CustomConcurrency{
+				Key:                       fullKey,
+				Hash:                      hashedConcurrencyKeyExpr,
+				Limit:                     123,
+				UnhashedEvaluatedKeyValue: unhashedValue,
+			}
+
+			q.partitionConstraintConfigGetter = func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
+				return PartitionConstraintConfig{
+					Concurrency: PartitionConcurrency{
+						AccountConcurrency:  123,
+						FunctionConcurrency: 45,
+						CustomConcurrencyKeys: []CustomConcurrencyLimit{
+							{
+								Scope:               enums.ConcurrencyScopeFn,
+								HashedKeyExpression: ckA.Hash,
+								Limit:               ckA.Limit,
+							},
+						},
+					},
+				}
+			}
+
 			item := osqueue.QueueItem{
 				ID:          "test",
 				FunctionID:  fnID,
@@ -5239,12 +5330,7 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 					QueueName: nil,
 					Throttle:  nil,
 					CustomConcurrencyKeys: []state.CustomConcurrency{
-						{
-							Key:                       fullKey,
-							Hash:                      hashedConcurrencyKeyExpr,
-							Limit:                     123,
-							UnhashedEvaluatedKeyValue: unhashedValue,
-						},
+						ckA,
 					},
 				},
 				QueueName: nil,
@@ -5335,6 +5421,39 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 			unhashedValue2 := "org1"
 			scope2 := enums.ConcurrencyScopeEnv
 			fullKey2 := util.ConcurrencyKey(scope2, fnID, unhashedValue2)
+			ckA := state.CustomConcurrency{
+				Key:                       fullKey1,
+				Hash:                      hashedConcurrencyKeyExpr1,
+				Limit:                     123,
+				UnhashedEvaluatedKeyValue: unhashedValue1,
+			}
+			ckB := state.CustomConcurrency{
+				Key:                       fullKey2,
+				Hash:                      hashedConcurrencyKeyExpr2,
+				Limit:                     234,
+				UnhashedEvaluatedKeyValue: unhashedValue2,
+			}
+
+			q.partitionConstraintConfigGetter = func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
+				return PartitionConstraintConfig{
+					Concurrency: PartitionConcurrency{
+						AccountConcurrency:  123,
+						FunctionConcurrency: 45,
+						CustomConcurrencyKeys: []CustomConcurrencyLimit{
+							{
+								Scope:               enums.ConcurrencyScopeFn,
+								HashedKeyExpression: ckA.Hash,
+								Limit:               ckA.Limit,
+							},
+							{
+								Scope:               enums.ConcurrencyScopeEnv,
+								HashedKeyExpression: ckB.Hash,
+								Limit:               ckB.Limit,
+							},
+						},
+					},
+				}
+			}
 
 			item := osqueue.QueueItem{
 				ID:          "test",
@@ -5351,18 +5470,8 @@ func TestQueueEnqueueToBacklog(t *testing.T) {
 					QueueName: nil,
 					Throttle:  nil,
 					CustomConcurrencyKeys: []state.CustomConcurrency{
-						{
-							Key:                       fullKey1,
-							Hash:                      hashedConcurrencyKeyExpr1,
-							Limit:                     123,
-							UnhashedEvaluatedKeyValue: unhashedValue1,
-						},
-						{
-							Key:                       fullKey2,
-							Hash:                      hashedConcurrencyKeyExpr2,
-							Limit:                     234,
-							UnhashedEvaluatedKeyValue: unhashedValue2,
-						},
+						ckA,
+						ckB,
 					},
 				},
 				QueueName: nil,
@@ -5632,6 +5741,29 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 			scope := enums.ConcurrencyScopeFn
 			fullKey := util.ConcurrencyKey(scope, fnID, unhashedValue)
 
+			ckA := state.CustomConcurrency{
+				Key:                       fullKey,
+				Hash:                      hashedConcurrencyKeyExpr,
+				Limit:                     123,
+				UnhashedEvaluatedKeyValue: unhashedValue,
+			}
+
+			q.partitionConstraintConfigGetter = func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
+				return PartitionConstraintConfig{
+					Concurrency: PartitionConcurrency{
+						AccountConcurrency:  123,
+						FunctionConcurrency: 45,
+						CustomConcurrencyKeys: []CustomConcurrencyLimit{
+							{
+								Scope:               enums.ConcurrencyScopeFn,
+								HashedKeyExpression: ckA.Hash,
+								Limit:               ckA.Limit,
+							},
+						},
+					},
+				}
+			}
+
 			item := osqueue.QueueItem{
 				ID:          "test",
 				FunctionID:  fnID,
@@ -5647,12 +5779,7 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 					QueueName: nil,
 					Throttle:  nil,
 					CustomConcurrencyKeys: []state.CustomConcurrency{
-						{
-							Key:                       fullKey,
-							Hash:                      hashedConcurrencyKeyExpr,
-							Limit:                     123,
-							UnhashedEvaluatedKeyValue: unhashedValue,
-						},
+						ckA,
 					},
 				},
 				QueueName:    nil,
@@ -5766,6 +5893,40 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 			scope2 := enums.ConcurrencyScopeEnv
 			fullKey2 := util.ConcurrencyKey(scope2, wsID, unhashedValue2)
 
+			ckA := state.CustomConcurrency{
+				Key:                       fullKey1,
+				Hash:                      hashedConcurrencyKeyExpr1,
+				Limit:                     123,
+				UnhashedEvaluatedKeyValue: unhashedValue1,
+			}
+			ckB := state.CustomConcurrency{
+				Key:                       fullKey2,
+				Hash:                      hashedConcurrencyKeyExpr2,
+				Limit:                     234,
+				UnhashedEvaluatedKeyValue: unhashedValue2,
+			}
+
+			q.partitionConstraintConfigGetter = func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
+				return PartitionConstraintConfig{
+					Concurrency: PartitionConcurrency{
+						AccountConcurrency:  123,
+						FunctionConcurrency: 45,
+						CustomConcurrencyKeys: []CustomConcurrencyLimit{
+							{
+								Scope:               enums.ConcurrencyScopeFn,
+								HashedKeyExpression: ckA.Hash,
+								Limit:               ckA.Limit,
+							},
+							{
+								Scope:               enums.ConcurrencyScopeEnv,
+								HashedKeyExpression: ckB.Hash,
+								Limit:               ckB.Limit,
+							},
+						},
+					},
+				}
+			}
+
 			item := osqueue.QueueItem{
 				ID:          "test",
 				FunctionID:  fnID,
@@ -5781,18 +5942,8 @@ func TestQueueLeaseWithoutValidation(t *testing.T) {
 					QueueName: nil,
 					Throttle:  nil,
 					CustomConcurrencyKeys: []state.CustomConcurrency{
-						{
-							Key:                       fullKey1,
-							Hash:                      hashedConcurrencyKeyExpr1,
-							Limit:                     123,
-							UnhashedEvaluatedKeyValue: unhashedValue1,
-						},
-						{
-							Key:                       fullKey2,
-							Hash:                      hashedConcurrencyKeyExpr2,
-							Limit:                     234,
-							UnhashedEvaluatedKeyValue: unhashedValue2,
-						},
+						ckA,
+						ckB,
 					},
 				},
 				QueueName: nil,
@@ -6140,6 +6291,29 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 			scope := enums.ConcurrencyScopeFn
 			fullKey := util.ConcurrencyKey(scope, fnID, unhashedValue)
 
+			ckA := state.CustomConcurrency{
+				Key:                       fullKey,
+				Hash:                      hashedConcurrencyKeyExpr,
+				Limit:                     123,
+				UnhashedEvaluatedKeyValue: unhashedValue,
+			}
+
+			q.partitionConstraintConfigGetter = func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
+				return PartitionConstraintConfig{
+					Concurrency: PartitionConcurrency{
+						AccountConcurrency:  123,
+						FunctionConcurrency: 45,
+						CustomConcurrencyKeys: []CustomConcurrencyLimit{
+							{
+								Scope:               enums.ConcurrencyScopeFn,
+								HashedKeyExpression: ckA.Hash,
+								Limit:               ckA.Limit,
+							},
+						},
+					},
+				}
+			}
+
 			item := osqueue.QueueItem{
 				ID:          "test",
 				FunctionID:  fnID,
@@ -6155,12 +6329,7 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 					QueueName: nil,
 					Throttle:  nil,
 					CustomConcurrencyKeys: []state.CustomConcurrency{
-						{
-							Key:                       fullKey,
-							Hash:                      hashedConcurrencyKeyExpr,
-							Limit:                     123,
-							UnhashedEvaluatedKeyValue: unhashedValue,
-						},
+						ckA,
 					},
 				},
 				QueueName: nil,
@@ -6298,6 +6467,40 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 			scope2 := enums.ConcurrencyScopeEnv
 			fullKey2 := util.ConcurrencyKey(scope2, wsID, unhashedValue2)
 
+			ckA := state.CustomConcurrency{
+				Key:                       fullKey1,
+				Hash:                      hashedConcurrencyKeyExpr1,
+				Limit:                     123,
+				UnhashedEvaluatedKeyValue: unhashedValue1,
+			}
+			ckB := state.CustomConcurrency{
+				Key:                       fullKey2,
+				Hash:                      hashedConcurrencyKeyExpr2,
+				Limit:                     234,
+				UnhashedEvaluatedKeyValue: unhashedValue2,
+			}
+
+			q.partitionConstraintConfigGetter = func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
+				return PartitionConstraintConfig{
+					Concurrency: PartitionConcurrency{
+						AccountConcurrency:  123,
+						FunctionConcurrency: 45,
+						CustomConcurrencyKeys: []CustomConcurrencyLimit{
+							{
+								Scope:               enums.ConcurrencyScopeFn,
+								HashedKeyExpression: ckA.Hash,
+								Limit:               ckA.Limit,
+							},
+							{
+								Scope:               enums.ConcurrencyScopeEnv,
+								HashedKeyExpression: ckB.Hash,
+								Limit:               ckB.Limit,
+							},
+						},
+					},
+				}
+			}
+
 			item := osqueue.QueueItem{
 				ID:          "test",
 				FunctionID:  fnID,
@@ -6313,18 +6516,8 @@ func TestQueueRequeueToBacklog(t *testing.T) {
 					QueueName: nil,
 					Throttle:  nil,
 					CustomConcurrencyKeys: []state.CustomConcurrency{
-						{
-							Key:                       fullKey1,
-							Hash:                      hashedConcurrencyKeyExpr1,
-							Limit:                     123,
-							UnhashedEvaluatedKeyValue: unhashedValue1,
-						},
-						{
-							Key:                       fullKey2,
-							Hash:                      hashedConcurrencyKeyExpr2,
-							Limit:                     234,
-							UnhashedEvaluatedKeyValue: unhashedValue2,
-						},
+						ckA,
+						ckB,
 					},
 				},
 				QueueName: nil,
@@ -7075,6 +7268,29 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 			scope := enums.ConcurrencyScopeFn
 			fullKey := util.ConcurrencyKey(scope, fnID, unhashedValue)
 
+			ckA := state.CustomConcurrency{
+				Key:                       fullKey,
+				Hash:                      hashedConcurrencyKeyExpr,
+				Limit:                     123,
+				UnhashedEvaluatedKeyValue: unhashedValue,
+			}
+
+			q.partitionConstraintConfigGetter = func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
+				return PartitionConstraintConfig{
+					Concurrency: PartitionConcurrency{
+						AccountConcurrency:  123,
+						FunctionConcurrency: 45,
+						CustomConcurrencyKeys: []CustomConcurrencyLimit{
+							{
+								Scope:               enums.ConcurrencyScopeFn,
+								HashedKeyExpression: ckA.Hash,
+								Limit:               ckA.Limit,
+							},
+						},
+					},
+				}
+			}
+
 			item := osqueue.QueueItem{
 				ID:          "test",
 				FunctionID:  fnID,
@@ -7090,12 +7306,7 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 					QueueName: nil,
 					Throttle:  nil,
 					CustomConcurrencyKeys: []state.CustomConcurrency{
-						{
-							Key:                       fullKey,
-							Hash:                      hashedConcurrencyKeyExpr,
-							Limit:                     123,
-							UnhashedEvaluatedKeyValue: unhashedValue,
-						},
+						ckA,
 					},
 				},
 				QueueName: nil,
@@ -7212,6 +7423,40 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 			scope2 := enums.ConcurrencyScopeEnv
 			fullKey2 := util.ConcurrencyKey(scope2, wsID, unhashedValue2)
 
+			ckA := state.CustomConcurrency{
+				Key:                       fullKey1,
+				Hash:                      hashedConcurrencyKeyExpr1,
+				Limit:                     123,
+				UnhashedEvaluatedKeyValue: unhashedValue1,
+			}
+			ckB := state.CustomConcurrency{
+				Key:                       fullKey2,
+				Hash:                      hashedConcurrencyKeyExpr2,
+				Limit:                     234,
+				UnhashedEvaluatedKeyValue: unhashedValue2,
+			}
+
+			q.partitionConstraintConfigGetter = func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
+				return PartitionConstraintConfig{
+					Concurrency: PartitionConcurrency{
+						AccountConcurrency:  123,
+						FunctionConcurrency: 45,
+						CustomConcurrencyKeys: []CustomConcurrencyLimit{
+							{
+								Scope:               enums.ConcurrencyScopeFn,
+								HashedKeyExpression: ckA.Hash,
+								Limit:               ckA.Limit,
+							},
+							{
+								Scope:               enums.ConcurrencyScopeEnv,
+								HashedKeyExpression: ckB.Hash,
+								Limit:               ckB.Limit,
+							},
+						},
+					},
+				}
+			}
+
 			item := osqueue.QueueItem{
 				ID:          "test",
 				FunctionID:  fnID,
@@ -7227,18 +7472,8 @@ func TestQueueDequeueUpdateAccounting(t *testing.T) {
 					QueueName: nil,
 					Throttle:  nil,
 					CustomConcurrencyKeys: []state.CustomConcurrency{
-						{
-							Key:                       fullKey1,
-							Hash:                      hashedConcurrencyKeyExpr1,
-							Limit:                     123,
-							UnhashedEvaluatedKeyValue: unhashedValue1,
-						},
-						{
-							Key:                       fullKey2,
-							Hash:                      hashedConcurrencyKeyExpr2,
-							Limit:                     234,
-							UnhashedEvaluatedKeyValue: unhashedValue2,
-						},
+						ckA,
+						ckB,
 					},
 				},
 				QueueName: nil,
