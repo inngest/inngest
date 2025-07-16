@@ -3,14 +3,19 @@ package state
 import (
 	"context"
 	"crypto/rand"
+	"encoding/json"
+	"errors"
 	"fmt"
+	"net"
+	"time"
+
 	"github.com/google/uuid"
+	connectConfig "github.com/inngest/inngest/pkg/config/connect"
 	"github.com/inngest/inngest/pkg/consts"
 	connpb "github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 	"google.golang.org/protobuf/proto"
-	"time"
 )
 
 var (
@@ -20,6 +25,11 @@ var (
 
 	ErrResponseAlreadyBuffered = fmt.Errorf("response already buffered")
 )
+
+type Lease struct {
+	LeaseID    ulid.ULID `json:"leaseID"`
+	ExecutorIP net.IP    `json:"executorIP"`
+}
 
 // keyRequestLease points to the key storing the request lease
 func (r *redisConnectionStateManager) keyRequestLease(envID uuid.UUID, requestID string) string {
@@ -52,6 +62,9 @@ func (r *redisConnectionStateManager) LeaseRequest(ctx context.Context, envID uu
 		leaseID.String(),
 		fmt.Sprintf("%d", int(keyExpiry.Seconds())),
 		fmt.Sprintf("%d", now.UnixMilli()),
+
+		// Mapping the request to the current executor
+		connectConfig.Executor(ctx).GRPCIP.String(),
 	}
 
 	status, err := scripts["lease"].Exec(
@@ -167,6 +180,26 @@ func (r *redisConnectionStateManager) DeleteLease(ctx context.Context, envID uui
 	}
 
 	return nil
+}
+
+// GetExecutorIP retrieves the IP of the executor that owns the request's lease.
+func (r *redisConnectionStateManager) GetExecutorIP(ctx context.Context, envID uuid.UUID, requestID string) (net.IP, error) {
+	cmd := r.client.B().Get().Key(r.keyRequestLease(envID, requestID)).Build()
+
+	reply, err := r.client.Do(ctx, cmd).ToString()
+	if err != nil {
+		if errors.Is(err, rueidis.Nil) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	lease := Lease{}
+	if err := json.Unmarshal([]byte(reply), &lease); err != nil {
+		return nil, err
+	}
+
+	return lease.ExecutorIP, nil
 }
 
 // SaveResponse is an idempotent, atomic write for reliably buffering a response for the executor to pick up

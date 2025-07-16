@@ -77,6 +77,9 @@ type RequestStateManager interface {
 	// DeleteLease allows the executor to clean up the lease once the request is done processing.
 	DeleteLease(ctx context.Context, envID uuid.UUID, requestID string) error
 
+	// GetExecutorIP retrieves the IP of the executor that owns the request's lease.
+	GetExecutorIP(ctx context.Context, envID uuid.UUID, requestID string) (net.IP, error)
+
 	// SaveResponse is an idempotent, atomic write for reliably buffering a response for the executor to pick up
 	// in case Redis PubSub fails to notify the executor.
 	SaveResponse(ctx context.Context, envID uuid.UUID, requestID string, resp *connpb.SDKResponse) error
