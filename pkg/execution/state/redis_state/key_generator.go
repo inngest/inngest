@@ -228,8 +228,9 @@ type QueueKeyGenerator interface {
 	// Scavenger returns the key which allows a worker to claim scavenger processing
 	// of the partitions for lost jobs
 	Scavenger() string
-	// PartitionIterator returns the key which allows one worker to periodically iterate partitions
-	PartitionIterator() string
+	// Instrumentation returns the key which allows one worker to run instrumentation against
+	// the queue
+	Instrumentation() string
 	// ActiveChecker returns the key which allows a worker to run spot checks on recently-constrained backlogs
 	ActiveChecker() string
 	// Idempotency stores the map for storing idempotency keys in redis
@@ -330,8 +331,8 @@ func (u queueKeyGenerator) Scavenger() string {
 	return fmt.Sprintf("{%s}:queue:scavenger", u.queueDefaultKey)
 }
 
-func (u queueKeyGenerator) PartitionIterator() string {
-	return fmt.Sprintf("{%s}:queue:partition-iterator", u.queueDefaultKey)
+func (u queueKeyGenerator) Instrumentation() string {
+	return fmt.Sprintf("{%s}:queue:instrument", u.queueDefaultKey)
 }
 
 func (u queueKeyGenerator) ActiveChecker() string {
