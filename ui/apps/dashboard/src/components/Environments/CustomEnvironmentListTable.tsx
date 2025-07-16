@@ -22,15 +22,20 @@ const PER_PAGE = 5;
 
 type CustomEnvironmentListTableProps = {
   envs: Environment[];
+  searchParam: string;
   totalEnvs: number;
 };
 
-export function CustomEnvironmentListTable({ envs, totalEnvs }: CustomEnvironmentListTableProps) {
+export function CustomEnvironmentListTable({
+  envs,
+  searchParam,
+  totalEnvs,
+}: CustomEnvironmentListTableProps) {
   const {
     BoundPagination: CustomEnvsPagination,
     currentPageData: visibleCustomEnvs,
     totalPages: totalCustomEnvsPages,
-  } = usePaginationUI({ data: envs, pageSize: PER_PAGE });
+  } = usePaginationUI({ data: envs, id: searchParam, pageSize: PER_PAGE });
 
   return (
     <div className="w-full">

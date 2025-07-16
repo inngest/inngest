@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type SetStateAction } from '
 
 export type UsePaginationConfig<T> = {
   data: Array<T>;
+  id: string;
   pageSize?: number;
 };
 
@@ -14,6 +15,7 @@ export type UsePaginationOutput<T> = {
 
 export function usePagination<T>({
   data,
+  id,
   pageSize = 10,
 }: UsePaginationConfig<T>): UsePaginationOutput<T> {
   const [currentPage, setCurrentPage] = useState(1);
@@ -53,6 +55,11 @@ export function usePagination<T>({
       setCurrentPage(1);
     }
   }, [currentPage, totalPages]);
+
+  // Reset the current page when the id (e.g. searchParam) changes
+  useEffect(() => {
+    if (currentPage !== 1) setCurrentPage(1);
+  }, [id]);
 
   return useMemo(
     () => ({

@@ -44,11 +44,13 @@ const PER_PAGE = 5;
 
 type BranchEnvironmentListTableProps = {
   envs: Environment[];
+  searchParam: string;
   totalEnvs: number;
 };
 
 export default function BranchEnvironmentListTable({
   envs,
+  searchParam,
   totalEnvs,
 }: BranchEnvironmentListTableProps) {
   const sortedEnvs = envs.sort(
@@ -61,7 +63,7 @@ export default function BranchEnvironmentListTable({
     BoundPagination: BranchEnvsPagination,
     currentPageData: visibleBranchEnvs,
     totalPages: totalBranchEnvsPages,
-  } = usePaginationUI({ data: sortedEnvs, pageSize: PER_PAGE });
+  } = usePaginationUI({ data: sortedEnvs, id: searchParam, pageSize: PER_PAGE });
 
   return (
     <div className="w-full">

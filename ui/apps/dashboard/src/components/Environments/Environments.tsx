@@ -116,6 +116,7 @@ export default function Environments() {
             <div className="border-subtle overflow-hidden rounded-md border">
               <CustomEnvironmentListTable
                 envs={customEnvsData.filtered}
+                searchParam={searchParam}
                 totalEnvs={customEnvsData.total}
               />
             </div>
@@ -156,6 +157,7 @@ export default function Environments() {
               <div className="border-subtle overflow-hidden rounded-md border">
                 <BranchEnvironmentListTable
                   envs={branchEnvsData.filtered}
+                  searchParam={searchParam}
                   totalEnvs={branchEnvsData.total}
                 />
               </div>

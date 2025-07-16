@@ -14,10 +14,12 @@ type UsePaginationUIOutput<T> = UsePaginationOutput<T> & {
 
 export function usePaginationUI<T>({
   data,
+  id,
   pageSize = 10,
 }: UsePaginationUIConfig<T>): UsePaginationUIOutput<T> {
   const { currentPage, currentPageData, setCurrentPage, totalPages } = usePagination({
     data,
+    id,
     pageSize,
   });
 
