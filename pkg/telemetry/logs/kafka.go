@@ -3,7 +3,6 @@ package logs
 import (
 	"context"
 	"fmt"
-	"github.com/inngest/inngest/pkg/util"
 	"go.opentelemetry.io/otel/sdk/log"
 	"sync"
 	"time"
@@ -164,7 +163,7 @@ func (e *kafkaLogsExporter) Export(ctx context.Context, records []log.Record) er
 
 		// set a near-random key to ensure uniform distribution
 		// across Kafka partitions
-		key := util.XXHash(ts.String())
+		key := ts.String()
 
 		rec := &kgo.Record{
 			Key:   []byte(key),
