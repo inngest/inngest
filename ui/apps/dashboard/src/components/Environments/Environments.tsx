@@ -124,7 +124,7 @@ export default function Environments() {
           {Boolean(branchParent) && (
             <div>
               <div className="mb-2 flex w-full items-center justify-between">
-                <h2 className="text-md font-medium">Branch Environments</h2>
+                <h2 className="text-md font-medium">Branch environments</h2>
                 <div className="flex items-center gap-2">
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
