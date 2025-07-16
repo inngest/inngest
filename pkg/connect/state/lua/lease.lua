@@ -8,8 +8,9 @@ Output:
 local keyRequestLease = KEYS[1]
 
 local newLeaseID 			= ARGV[1]
-local expiry					= tonumber(ARGV[2])
+local expiry				= tonumber(ARGV[2])
 local currentTime			= tonumber(ARGV[3])
+local executorIP			= ARGV[4]
 
 -- $include(decode_ulid_time.lua)
 -- $include(get_request_lease.lua)
@@ -23,7 +24,8 @@ end
 
 -- Case 2: Lease does not exist
 requestItem = {
-	leaseID = newLeaseID
+	leaseID = newLeaseID,
+	executorIP = executorIP
 }
 redis.call("SET", keyRequestLease, cjson.encode(requestItem), "EX", expiry)
 return 1

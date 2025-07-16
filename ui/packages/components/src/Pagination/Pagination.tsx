@@ -15,10 +15,10 @@ import { getVisiblePages } from './getVisiblePages';
 
 // Both numbers and ellipses use same base styles to prevent shifting.
 const PAGE_NUMBER_BASE_CLASSES =
-  'flex h-6 items-center justify-center min-w-8 text-sm tabular-nums';
+  'flex h-8 items-center justify-center min-w-8 text-sm tabular-nums';
 
-const NARROW_VARIANT_BREAKPOINT = 475;
-const TINY_VARIANT_BREAKPOINT = 350;
+const NARROW_VARIANT_BREAKPOINT = 550;
+const TINY_VARIANT_BREAKPOINT = 400;
 
 export interface PaginationProps {
   currentPage: number;
@@ -134,7 +134,7 @@ function CaretButton({ typ, ...paginationProps }: CaretButtonProps) {
     <Button
       appearance="ghost"
       className={cn(
-        'group mx-1 h-6 w-8 rounded-md',
+        'group mx-1 h-8 w-8 rounded-md',
         !disabled && 'hover:bg-canvasSubtle',
         disabled && '!bg-transparent'
       )}

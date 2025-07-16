@@ -4,8 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
-	"math"
-
 	"github.com/google/uuid"
 	sqlc_sqlite "github.com/inngest/inngest/pkg/cqrs/base_cqrs/sqlc/sqlite"
 	"github.com/oklog/ulid/v2"
@@ -17,16 +15,6 @@ func NewNormalized(db DBTX) sqlc_sqlite.Querier {
 
 type NormalizedQueries struct {
 	db *Queries
-}
-
-func (q NormalizedQueries) WorkspaceCountEvents(ctx context.Context, arg sqlc_sqlite.WorkspaceCountEventsParams) (int64, error) {
-	//TODO implement me
-	panic("implement me")
-}
-
-func (q NormalizedQueries) WorkspaceCountNamedEvents(ctx context.Context, arg sqlc_sqlite.WorkspaceCountNamedEventsParams) (int64, error) {
-	//TODO implement me
-	panic("implement me")
 }
 
 func (q NormalizedQueries) GetWorkerConnection(ctx context.Context, arg sqlc_sqlite.GetWorkerConnectionParams) (*sqlc_sqlite.WorkerConnection, error) {
@@ -443,59 +431,6 @@ func (q NormalizedQueries) GetEventsByInternalIDs(ctx context.Context, ids []uli
 	return sqliteEvents, nil
 }
 
-func (q NormalizedQueries) WorkspaceEvents(ctx context.Context, params sqlc_sqlite.WorkspaceEventsParams) ([]*sqlc_sqlite.Event, error) {
-	// Keep CodeQL happy
-	if params.Limit > math.MaxInt32 || params.Limit < math.MinInt32 {
-		return nil, fmt.Errorf("limit must be a valid int32")
-	}
-
-	pgParams := WorkspaceEventsParams{
-		InternalID:   params.Cursor,
-		ReceivedAt:   params.Before,
-		ReceivedAt_2: params.After,
-		Limit:        int32(params.Limit),
-	}
-
-	events, err := q.db.WorkspaceEvents(ctx, pgParams)
-	if err != nil {
-		return nil, err
-	}
-
-	sqliteEvents := make([]*sqlc_sqlite.Event, len(events))
-	for i, event := range events {
-		sqliteEvents[i], _ = event.ToSQLite()
-	}
-
-	return sqliteEvents, nil
-}
-
-func (q NormalizedQueries) WorkspaceNamedEvents(ctx context.Context, params sqlc_sqlite.WorkspaceNamedEventsParams) ([]*sqlc_sqlite.Event, error) {
-	// Keep CodeQL happy
-	if params.Limit > math.MaxInt32 || params.Limit < math.MinInt32 {
-		return nil, fmt.Errorf("limit must be a valid int32")
-	}
-
-	pgParams := WorkspaceNamedEventsParams{
-		InternalID:   params.Cursor,
-		ReceivedAt:   params.Before,
-		ReceivedAt_2: params.After,
-		EventName:    params.Names[0],
-		Limit:        int32(params.Limit),
-	}
-
-	events, err := q.db.WorkspaceNamedEvents(ctx, pgParams)
-	if err != nil {
-		return nil, err
-	}
-
-	sqliteEvents := make([]*sqlc_sqlite.Event, len(events))
-	for i, event := range events {
-		sqliteEvents[i], _ = event.ToSQLite()
-	}
-
-	return sqliteEvents, nil
-}
-
 func (q NormalizedQueries) GetEventsIDbound(ctx context.Context, params sqlc_sqlite.GetEventsIDboundParams) ([]*sqlc_sqlite.Event, error) {
 	pgParams := GetEventsIDboundParams{
 		InternalID:   params.After,
@@ -732,6 +667,20 @@ func (q NormalizedQueries) GetTraceSpanOutput(ctx context.Context, arg sqlc_sqli
 	}
 
 	sqliteTraces := make([]*sqlc_sqlite.Trace, len(traces))
+	for i, trace := range traces {
+		sqliteTraces[i], _ = trace.ToSQLite()
+	}
+
+	return sqliteTraces, nil
+}
+
+func (q NormalizedQueries) GetTraceRunsByTriggerId(ctx context.Context, eventID string) ([]*sqlc_sqlite.TraceRun, error) {
+	traces, err := q.db.GetTraceRunsByTriggerId(ctx, eventID)
+	if err != nil {
+		return nil, err
+	}
+
+	sqliteTraces := make([]*sqlc_sqlite.TraceRun, len(traces))
 	for i, trace := range traces {
 		sqliteTraces[i], _ = trace.ToSQLite()
 	}

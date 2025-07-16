@@ -38,6 +38,9 @@ const (
 	LevelEmergency = slog.Level(12)
 )
 
+// LoggerEventName is a special attribute key used for extracting the event name for event logs.
+const LoggerEventName = "inngest_logger_event_name"
+
 type Logger interface {
 	//
 	// Methods from slog.Logger
@@ -53,6 +56,7 @@ type Logger interface {
 	Log(ctx context.Context, level slog.Level, msg string, args ...any)
 	LogAttrs(ctx context.Context, level slog.Level, msg string, args ...slog.Attr)
 	Handler() slog.Handler
+	Level() slog.Level
 	With(args ...any) Logger
 
 	//
@@ -165,16 +169,19 @@ func newLogger(opts ...LoggerOpt) Logger {
 					return a
 				},
 			})),
+			level: o.level,
 		}
 
 	case TextHandler:
 		return &logger{
 			Logger: slog.New(slog.NewTextHandler(o.writer, &hopts)),
+			level:  o.level,
 		}
 
 	default:
 		return &logger{
 			Logger: slog.New(slog.NewJSONHandler(o.writer, &hopts)),
+			level:  o.level,
 		}
 	}
 }
@@ -228,15 +235,21 @@ func level(levelVarName string) string {
 	return os.Getenv(levelVarName)
 }
 
-func FromSlog(l *slog.Logger) Logger {
+func FromSlog(l *slog.Logger, level slog.Level) Logger {
 	return &logger{
-		l,
+		Logger: l,
+		level:  level,
 	}
 }
 
 // logger is a wrapper over slog with additional levels
 type logger struct {
 	*slog.Logger
+	level slog.Level
+}
+
+func (l *logger) Level() slog.Level {
+	return l.level
 }
 
 func (l *logger) With(args ...any) Logger {

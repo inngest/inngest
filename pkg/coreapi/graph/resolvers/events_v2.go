@@ -120,7 +120,6 @@ func cqrsEventToGQLEvent(e *cqrs.Event) *models.EventV2 {
 		Name:           e.EventName,
 		OccurredAt:     time.UnixMilli(e.EventTS),
 		ReceivedAt:     e.ReceivedAt,
-		Runs:           []*models.FunctionRunV2{}, // TODO
 		Version:        &e.EventVersion,
 	}
 

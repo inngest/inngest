@@ -9,6 +9,7 @@ package connect
 import (
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
+	timestamppb "google.golang.org/protobuf/types/known/timestamppb"
 	reflect "reflect"
 	sync "sync"
 	unsafe "unsafe"
@@ -197,12 +198,196 @@ func (x *PingResponse) GetMessage() string {
 	return ""
 }
 
+type ReplyRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Data          *SDKResponse           `protobuf:"bytes,1,opt,name=data,proto3" json:"data,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReplyRequest) Reset() {
+	*x = ReplyRequest{}
+	mi := &file_connect_v1_service_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReplyRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReplyRequest) ProtoMessage() {}
+
+func (x *ReplyRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_connect_v1_service_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReplyRequest.ProtoReflect.Descriptor instead.
+func (*ReplyRequest) Descriptor() ([]byte, []int) {
+	return file_connect_v1_service_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *ReplyRequest) GetData() *SDKResponse {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+type ReplyResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReplyResponse) Reset() {
+	*x = ReplyResponse{}
+	mi := &file_connect_v1_service_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReplyResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReplyResponse) ProtoMessage() {}
+
+func (x *ReplyResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_connect_v1_service_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReplyResponse.ProtoReflect.Descriptor instead.
+func (*ReplyResponse) Descriptor() ([]byte, []int) {
+	return file_connect_v1_service_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *ReplyResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
+type AckMessage struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RequestId     string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	Ts            *timestamppb.Timestamp `protobuf:"bytes,2,opt,name=ts,proto3" json:"ts,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AckMessage) Reset() {
+	*x = AckMessage{}
+	mi := &file_connect_v1_service_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AckMessage) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AckMessage) ProtoMessage() {}
+
+func (x *AckMessage) ProtoReflect() protoreflect.Message {
+	mi := &file_connect_v1_service_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AckMessage.ProtoReflect.Descriptor instead.
+func (*AckMessage) Descriptor() ([]byte, []int) {
+	return file_connect_v1_service_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *AckMessage) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+func (x *AckMessage) GetTs() *timestamppb.Timestamp {
+	if x != nil {
+		return x.Ts
+	}
+	return nil
+}
+
+type AckResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AckResponse) Reset() {
+	*x = AckResponse{}
+	mi := &file_connect_v1_service_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AckResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AckResponse) ProtoMessage() {}
+
+func (x *AckResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_connect_v1_service_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AckResponse.ProtoReflect.Descriptor instead.
+func (*AckResponse) Descriptor() ([]byte, []int) {
+	return file_connect_v1_service_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *AckResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
+}
+
 var File_connect_v1_service_proto protoreflect.FileDescriptor
 
 const file_connect_v1_service_proto_rawDesc = "" +
 	"\n" +
 	"\x18connect/v1/service.proto\x12\n" +
-	"connect.v1\x1a\x18connect/v1/connect.proto\"p\n" +
+	"connect.v1\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x18connect/v1/connect.proto\"p\n" +
 	"\x0eForwardRequest\x12\"\n" +
 	"\fconnectionID\x18\x01 \x01(\tR\fconnectionID\x12:\n" +
 	"\x04data\x18\x02 \x01(\v2&.connect.v1.GatewayExecutorRequestDataR\x04data\"+\n" +
@@ -210,10 +395,24 @@ const file_connect_v1_service_proto_rawDesc = "" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\"\r\n" +
 	"\vPingRequest\"(\n" +
 	"\fPingResponse\x12\x18\n" +
-	"\amessage\x18\x01 \x01(\tR\amessage2\x93\x01\n" +
+	"\amessage\x18\x01 \x01(\tR\amessage\";\n" +
+	"\fReplyRequest\x12+\n" +
+	"\x04data\x18\x01 \x01(\v2\x17.connect.v1.SDKResponseR\x04data\")\n" +
+	"\rReplyResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess\"W\n" +
+	"\n" +
+	"AckMessage\x12\x1d\n" +
+	"\n" +
+	"request_id\x18\x01 \x01(\tR\trequestId\x12*\n" +
+	"\x02ts\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\x02ts\"'\n" +
+	"\vAckResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\bR\asuccess2\x93\x01\n" +
 	"\x0eConnectGateway\x12D\n" +
 	"\aForward\x12\x1a.connect.v1.ForwardRequest\x1a\x1b.connect.v1.ForwardResponse\"\x00\x12;\n" +
-	"\x04Ping\x12\x17.connect.v1.PingRequest\x1a\x18.connect.v1.PingResponse\"\x00B9Z7github.com/inngest/inngest/proto/gen/connect/v1;connectb\x06proto3"
+	"\x04Ping\x12\x17.connect.v1.PingRequest\x1a\x18.connect.v1.PingResponse\"\x002\x8b\x01\n" +
+	"\x0fConnectExecutor\x12>\n" +
+	"\x05Reply\x12\x18.connect.v1.ReplyRequest\x1a\x19.connect.v1.ReplyResponse\"\x00\x128\n" +
+	"\x03Ack\x12\x16.connect.v1.AckMessage\x1a\x17.connect.v1.AckResponse\"\x00B9Z7github.com/inngest/inngest/proto/gen/connect/v1;connectb\x06proto3"
 
 var (
 	file_connect_v1_service_proto_rawDescOnce sync.Once
@@ -227,25 +426,37 @@ func file_connect_v1_service_proto_rawDescGZIP() []byte {
 	return file_connect_v1_service_proto_rawDescData
 }
 
-var file_connect_v1_service_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_connect_v1_service_proto_msgTypes = make([]protoimpl.MessageInfo, 8)
 var file_connect_v1_service_proto_goTypes = []any{
 	(*ForwardRequest)(nil),             // 0: connect.v1.ForwardRequest
 	(*ForwardResponse)(nil),            // 1: connect.v1.ForwardResponse
 	(*PingRequest)(nil),                // 2: connect.v1.PingRequest
 	(*PingResponse)(nil),               // 3: connect.v1.PingResponse
-	(*GatewayExecutorRequestData)(nil), // 4: connect.v1.GatewayExecutorRequestData
+	(*ReplyRequest)(nil),               // 4: connect.v1.ReplyRequest
+	(*ReplyResponse)(nil),              // 5: connect.v1.ReplyResponse
+	(*AckMessage)(nil),                 // 6: connect.v1.AckMessage
+	(*AckResponse)(nil),                // 7: connect.v1.AckResponse
+	(*GatewayExecutorRequestData)(nil), // 8: connect.v1.GatewayExecutorRequestData
+	(*SDKResponse)(nil),                // 9: connect.v1.SDKResponse
+	(*timestamppb.Timestamp)(nil),      // 10: google.protobuf.Timestamp
 }
 var file_connect_v1_service_proto_depIdxs = []int32{
-	4, // 0: connect.v1.ForwardRequest.data:type_name -> connect.v1.GatewayExecutorRequestData
-	0, // 1: connect.v1.ConnectGateway.Forward:input_type -> connect.v1.ForwardRequest
-	2, // 2: connect.v1.ConnectGateway.Ping:input_type -> connect.v1.PingRequest
-	1, // 3: connect.v1.ConnectGateway.Forward:output_type -> connect.v1.ForwardResponse
-	3, // 4: connect.v1.ConnectGateway.Ping:output_type -> connect.v1.PingResponse
-	3, // [3:5] is the sub-list for method output_type
-	1, // [1:3] is the sub-list for method input_type
-	1, // [1:1] is the sub-list for extension type_name
-	1, // [1:1] is the sub-list for extension extendee
-	0, // [0:1] is the sub-list for field type_name
+	8,  // 0: connect.v1.ForwardRequest.data:type_name -> connect.v1.GatewayExecutorRequestData
+	9,  // 1: connect.v1.ReplyRequest.data:type_name -> connect.v1.SDKResponse
+	10, // 2: connect.v1.AckMessage.ts:type_name -> google.protobuf.Timestamp
+	0,  // 3: connect.v1.ConnectGateway.Forward:input_type -> connect.v1.ForwardRequest
+	2,  // 4: connect.v1.ConnectGateway.Ping:input_type -> connect.v1.PingRequest
+	4,  // 5: connect.v1.ConnectExecutor.Reply:input_type -> connect.v1.ReplyRequest
+	6,  // 6: connect.v1.ConnectExecutor.Ack:input_type -> connect.v1.AckMessage
+	1,  // 7: connect.v1.ConnectGateway.Forward:output_type -> connect.v1.ForwardResponse
+	3,  // 8: connect.v1.ConnectGateway.Ping:output_type -> connect.v1.PingResponse
+	5,  // 9: connect.v1.ConnectExecutor.Reply:output_type -> connect.v1.ReplyResponse
+	7,  // 10: connect.v1.ConnectExecutor.Ack:output_type -> connect.v1.AckResponse
+	7,  // [7:11] is the sub-list for method output_type
+	3,  // [3:7] is the sub-list for method input_type
+	3,  // [3:3] is the sub-list for extension type_name
+	3,  // [3:3] is the sub-list for extension extendee
+	0,  // [0:3] is the sub-list for field type_name
 }
 
 func init() { file_connect_v1_service_proto_init() }
@@ -260,9 +471,9 @@ func file_connect_v1_service_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_connect_v1_service_proto_rawDesc), len(file_connect_v1_service_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   4,
+			NumMessages:   8,
 			NumExtensions: 0,
-			NumServices:   1,
+			NumServices:   2,
 		},
 		GoTypes:           file_connect_v1_service_proto_goTypes,
 		DependencyIndexes: file_connect_v1_service_proto_depIdxs,

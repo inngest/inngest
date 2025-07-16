@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"gonum.org/v1/gonum/stat/sampleuv"
+	"iter"
 	"math/rand"
 	"runtime/debug"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -16,6 +18,8 @@ import (
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
+	"github.com/redis/rueidis"
+	"gonum.org/v1/gonum/stat/sampleuv"
 )
 
 var (
@@ -1095,6 +1099,156 @@ func (q *queue) backlogPeek(ctx context.Context, b *QueueBacklog, from time.Time
 	}
 
 	return res.Items, res.TotalCount, nil
+}
+
+// NOTE: this function only work with key queues
+func (q *queue) BacklogsByPartition(ctx context.Context, queueShard QueueShard, partitionID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueueBacklog], error) {
+	opt := queueIterOpt{
+		batchSize: 1000,
+		interval:  50 * time.Millisecond,
+	}
+	for _, apply := range opts {
+		apply(&opt)
+	}
+
+	l := q.log.With(
+		"method", "BacklogsByPartition",
+		"partitionID", partitionID,
+		"from", from,
+		"until", until,
+	)
+
+	kg := queueShard.RedisClient.kg
+
+	return func(yield func(*QueueBacklog) bool) {
+		hashKey := kg.BacklogMeta()
+		ptFrom := from
+
+		for {
+			var iterated int
+
+			peeker := peeker[QueueBacklog]{
+				q:                      q,
+				max:                    opt.batchSize,
+				opName:                 "backlogsByPartition",
+				isMillisecondPrecision: true,
+				handleMissingItems: func(pointers []string) error {
+					// don't interfere, clean up will happen in normal processing anyways
+					return nil
+				},
+				maker: func() *QueueBacklog {
+					return &QueueBacklog{}
+				},
+				keyMetadataHash: hashKey,
+				fromTime:        &ptFrom,
+			}
+
+			isSequential := true
+			res, err := peeker.peek(ctx, kg.ShadowPartitionSet(partitionID), isSequential, until, opt.batchSize,
+				WithPeekOptQueueShard(&queueShard),
+			)
+			if err != nil {
+				l.Error("error peeking backlogs for partition", "partition_id", partitionID, "err", err)
+				return
+			}
+
+			for _, bl := range res.Items {
+				if bl == nil {
+					continue
+				}
+
+				if !yield(bl) {
+					return
+				}
+
+				iterated++
+			}
+
+			ptFrom = time.UnixMilli(res.Cursor)
+
+			l.Trace("iterated backlogs in partition", "count", iterated)
+
+			// didn't process anything, exit loop
+			if iterated == 0 {
+				break
+			}
+
+			// shift the starting point 1ms so it doesn't try to grab the same stuff again
+			// NOTE: this could result skipping items if the previous batch of items are all on
+			// the same millisecond
+			ptFrom = ptFrom.Add(time.Millisecond)
+
+			// wait a little before processing the next batch
+			<-time.After(opt.interval)
+		}
+	}, nil
+}
+
+func (q *queue) PartitionBacklogSize(ctx context.Context, partitionID string) (int64, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "partitionBacklogSize"), redis_telemetry.ScopeQueue)
+
+	if q.queueShardClients == nil {
+		return 0, nil
+	}
+
+	l := q.log.With(
+		"method", "PartitionBacklogSize",
+		"partition_id", partitionID,
+	)
+
+	var (
+		wg    sync.WaitGroup
+		count int64
+	)
+	until := q.clock.Now().Add(24 * time.Hour * 365) // 1y ahead
+
+	for _, shard := range q.queueShardClients {
+		shard := shard
+
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+
+			backlogs, err := q.BacklogsByPartition(ctx, shard, partitionID, time.Time{}, until)
+			if err != nil {
+				l.Error("error preparing backlog iterator", "error", err, "shard", shard)
+				return
+			}
+
+			bwg := sync.WaitGroup{}
+			for bl := range backlogs {
+				bwg.Add(1)
+				backlogID := bl.BacklogID
+
+				go func() {
+					defer bwg.Done()
+
+					size, err := q.BacklogSize(ctx, shard, backlogID)
+					if err != nil {
+						l.Error("error retrieving backlog size", "error", err, "backlog", bl)
+						return
+					}
+					atomic.AddInt64(&count, size)
+				}()
+			}
+			bwg.Wait()
+		}()
+	}
+	wg.Wait()
+
+	return count, nil
+}
+
+func (q *queue) BacklogSize(ctx context.Context, queueShard QueueShard, backlogID string) (int64, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "backlogSize"), redis_telemetry.ScopeQueue)
+
+	rc := queueShard.RedisClient.Client()
+	cmd := rc.B().Zcard().Key(queueShard.RedisClient.kg.BacklogSet(backlogID)).Build()
+	count, err := rc.Do(ctx, cmd).AsInt64()
+	if rueidis.IsRedisNil(err) {
+		return 0, nil
+	}
+	return count, err
 }
 
 func shuffleBacklogs(b []*QueueBacklog) []*QueueBacklog {
