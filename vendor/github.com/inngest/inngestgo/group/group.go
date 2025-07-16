@@ -3,6 +3,7 @@ package group
 import (
 	"context"
 
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngestgo/step"
 )
 
@@ -33,14 +34,9 @@ func Parallel(
 }
 
 type ParallelOpts struct {
-	// OptimizeParallel is a boolean that indicates whether to optimize parallel
-	// execution. Defaults to true.
-	//
-	// When disabled, parallel groups will run "independently" (steps in each
-	// group won't wait for steps in other groups) at the expense of extra
-	// requests sent to your SDK (increasing bandwidth). There's no need to
-	// disable this if you don't have more than 1 step in a parallel group.
-	OptimizeParallel *bool
+	// ParallelMode controls "discovery request" scheduling after a parallel
+	// step ends. Defaults to ParallelModeWait.
+	ParallelMode enums.ParallelMode
 }
 
 func ParallelWithOpts(
@@ -49,9 +45,7 @@ func ParallelWithOpts(
 	fns ...func(ctx context.Context) (any, error),
 ) Results {
 	ctx = context.WithValue(ctx, step.ParallelKey, true)
-	if opts.OptimizeParallel != nil {
-		ctx = context.WithValue(ctx, step.OptimizeParallelKey, *opts.OptimizeParallel)
-	}
+	ctx = context.WithValue(ctx, step.ParallelModeKey, opts.ParallelMode)
 
 	results := Results{}
 	isPlanned := false

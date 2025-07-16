@@ -44,7 +44,7 @@ func Sleep(ctx context.Context, id string, duration time.Duration) {
 			"duration": str2duration.String(duration),
 		},
 	}
-	plannedOp.OptimizedParallelism(optimizeParallel(ctx))
+	plannedOp.SetParallelMode(parallelMode(ctx))
 	mgr.AppendOp(plannedOp)
 
 	panic(ControlHijack{})

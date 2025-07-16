@@ -113,7 +113,7 @@ func Infer[InputT any, OutputT any](
 		},
 		Data: reqBytes,
 	}
-	plannedOp.OptimizedParallelism(optimizeParallel(ctx))
+	plannedOp.SetParallelMode(parallelMode(ctx))
 	mgr.AppendOp(plannedOp)
 	panic(ControlHijack{})
 }

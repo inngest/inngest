@@ -76,7 +76,7 @@ func WaitForEvent[T any](ctx context.Context, stepID string, opts WaitForEventOp
 		Name: opts.Name,
 		Opts: op.Opts,
 	}
-	plannedOp.OptimizedParallelism(optimizeParallel(ctx))
+	plannedOp.SetParallelMode(parallelMode(ctx))
 	mgr.AppendOp(plannedOp)
 	panic(ControlHijack{})
 }

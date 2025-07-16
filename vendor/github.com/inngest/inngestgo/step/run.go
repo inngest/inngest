@@ -93,7 +93,7 @@ func Run[T any](
 			Op:   enums.OpcodeStepPlanned,
 			Name: id,
 		}
-		plannedOp.OptimizedParallelism(optimizeParallel(ctx))
+		plannedOp.SetParallelMode(parallelMode(ctx))
 		mgr.AppendOp(plannedOp)
 		panic(ControlHijack{})
 	}

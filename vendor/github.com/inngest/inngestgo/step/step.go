@@ -3,6 +3,7 @@ package step
 import (
 	"context"
 
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngestgo/internal/sdkrequest"
 )
 
@@ -11,10 +12,10 @@ type ControlHijack struct{}
 type ctxKey string
 
 const (
-	targetStepIDKey     = ctxKey("stepID")
-	ParallelKey         = ctxKey("parallelKey")
-	OptimizeParallelKey = ctxKey("optimizeParallelKey")
-	isWithinStepKey     = ctxKey("in-step")
+	targetStepIDKey = ctxKey("stepID")
+	ParallelKey     = ctxKey("parallelKey")
+	ParallelModeKey = ctxKey("parallelModeKey")
+	isWithinStepKey = ctxKey("in-step")
 )
 
 var (
@@ -82,11 +83,11 @@ func setWithinStep(ctx context.Context) context.Context {
 	return context.WithValue(ctx, isWithinStepKey, &struct{}{})
 }
 
-func optimizeParallel(ctx context.Context) *bool {
-	if v := ctx.Value(OptimizeParallelKey); v != nil {
-		if c, ok := v.(bool); ok {
-			return &c
+func parallelMode(ctx context.Context) enums.ParallelMode {
+	if v := ctx.Value(ParallelModeKey); v != nil {
+		if c, ok := v.(enums.ParallelMode); ok {
+			return c
 		}
 	}
-	return nil
+	return enums.ParallelModeNone
 }

@@ -858,7 +858,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			return nil, err
 		}
 
-		if !shouldEnqueueDiscovery(hasPendingSteps, &item) {
+		if !shouldEnqueueDiscovery(hasPendingSteps, item.ParallelMode) {
 			// Other steps are pending before we re-enter the function, so
 			// we're now done with this execution.
 			return nil, nil
@@ -2015,7 +2015,7 @@ func (e *executor) ResumePauseTimeout(ctx context.Context, pause state.Pause, r 
 		return err
 	}
 
-	if shouldEnqueueDiscovery(hasPendingSteps, &pause) {
+	if shouldEnqueueDiscovery(hasPendingSteps, pause.ParallelMode) {
 		// If there are no parallel steps ongoing, we must enqueue the next SDK ping to continue on with
 		// execution.
 		jobID := fmt.Sprintf("%s-%s-timeout", md.IdempotencyKey(), pause.DataKey)
@@ -2143,7 +2143,7 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 			Attributes: tracing.ResumeAttrs(&pause, &r),
 		})
 
-		if shouldEnqueueDiscovery(consumeResult.HasPendingSteps, &pause) {
+		if shouldEnqueueDiscovery(consumeResult.HasPendingSteps, pause.ParallelMode) {
 			// Schedule an execution from the pause's entrypoint.  We do this
 			// after consuming the pause to guarantee the event data is
 			// stored via the pause for the next run.  If the ConsumePause
@@ -2454,10 +2454,10 @@ func (e *executor) handleGeneratorStep(ctx context.Context, i *runInstance, gen 
 		MaxAttempts:           i.item.MaxAttempts,
 		Payload:               queue.PayloadEdge{Edge: nextEdge},
 		Metadata:              make(map[string]any),
+		ParallelMode:          gen.ParallelMode(),
 	}
-	nextItem.SetOptimizedParallelism(gen.OptimizedParallelism())
 
-	if shouldEnqueueDiscovery(hasPendingSteps, &i.item) {
+	if shouldEnqueueDiscovery(hasPendingSteps, i.item.ParallelMode) {
 		span, err := e.tracerProvider.CreateDroppableSpan(
 			meta.SpanNameStepDiscovery,
 			&tracing.CreateSpanOptions{
@@ -2598,10 +2598,10 @@ func (e *executor) handleStepError(ctx context.Context, i *runInstance, gen stat
 		MaxAttempts:           i.item.MaxAttempts,
 		Payload:               queue.PayloadEdge{Edge: nextEdge},
 		Metadata:              make(map[string]any),
+		ParallelMode:          gen.ParallelMode(),
 	}
-	nextItem.SetOptimizedParallelism(gen.OptimizedParallelism())
 
-	if shouldEnqueueDiscovery(hasPendingSteps, &i.item) {
+	if shouldEnqueueDiscovery(hasPendingSteps, i.item.ParallelMode) {
 		span, err := e.tracerProvider.CreateDroppableSpan(
 			meta.SpanNameStepDiscovery,
 			&tracing.CreateSpanOptions{
@@ -2672,9 +2672,9 @@ func (e *executor) handleGeneratorStepPlanned(ctx context.Context, i *runInstanc
 		Payload: queue.PayloadEdge{
 			Edge: nextEdge,
 		},
-		Metadata: make(map[string]any),
+		Metadata:     make(map[string]any),
+		ParallelMode: gen.ParallelMode(),
 	}
-	nextItem.SetOptimizedParallelism(gen.OptimizedParallelism())
 
 	span, err := e.tracerProvider.CreateDroppableSpan(
 		meta.SpanNameStep,
@@ -2745,8 +2745,8 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, i *runInstance, gen
 		MaxAttempts:           i.item.MaxAttempts,
 		Payload:               queue.PayloadEdge{Edge: nextEdge},
 		Metadata:              make(map[string]any),
+		ParallelMode:          gen.ParallelMode(),
 	}
-	nextItem.SetOptimizedParallelism(gen.OptimizedParallelism())
 
 	span, err := e.tracerProvider.CreateDroppableSpan(
 		meta.SpanNameStep,
@@ -2882,9 +2882,10 @@ func (e *executor) handleGeneratorGateway(ctx context.Context, i *runInstance, g
 		Attempt:               0,
 		MaxAttempts:           i.item.MaxAttempts,
 		Payload:               queue.PayloadEdge{Edge: nextEdge},
+		ParallelMode:          gen.ParallelMode(),
 	}
 
-	if shouldEnqueueDiscovery(hasPendingSteps, &gen) {
+	if shouldEnqueueDiscovery(hasPendingSteps, gen.ParallelMode()) {
 		err = e.queue.Enqueue(ctx, nextItem, now, queue.EnqueueOpts{})
 		if err == redis_state.ErrQueueItemExists {
 			return nil
@@ -3041,9 +3042,10 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, i *runInstance,
 		Attempt:               0,
 		MaxAttempts:           i.item.MaxAttempts,
 		Payload:               queue.PayloadEdge{Edge: nextEdge},
+		ParallelMode:          gen.ParallelMode(),
 	}
 
-	if shouldEnqueueDiscovery(hasPendingSteps, &i.item) {
+	if shouldEnqueueDiscovery(hasPendingSteps, i.item.ParallelMode) {
 		err = e.queue.Enqueue(ctx, nextItem, now, queue.EnqueueOpts{})
 		if err == redis_state.ErrQueueItemExists {
 			return nil
@@ -3107,8 +3109,8 @@ func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, i *runInsta
 		Metadata: map[string]any{
 			consts.OtelPropagationKey: carrier,
 		},
+		ParallelMode: gen.ParallelMode(),
 	}
-	pause.SetOptimizedParallelism(gen.OptimizedParallelism())
 
 	_, err = e.pm.Write(ctx, pauses.PauseIndex(pause), &pause)
 	if err == state.ErrSignalConflict {
@@ -3138,6 +3140,7 @@ func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, i *runInsta
 			PauseID: pauseID,
 			Pause:   pause,
 		},
+		ParallelMode: gen.ParallelMode(),
 	}, expires, queue.EnqueueOpts{})
 	if err == redis_state.ErrQueueItemExists {
 		return nil
@@ -3225,8 +3228,8 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, i *runInst
 		Metadata: map[string]any{
 			consts.OtelPropagationKey: carrier,
 		},
+		ParallelMode: gen.ParallelMode(),
 	}
-	pause.SetOptimizedParallelism(gen.OptimizedParallelism())
 	_, err = e.pm.Write(
 		ctx,
 		pauses.Index{WorkspaceID: i.md.ID.Tenant.EnvID, EventName: eventName},
@@ -3256,6 +3259,7 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, i *runInst
 			PauseID: pauseID,
 			Pause:   pause,
 		},
+		ParallelMode: gen.ParallelMode(),
 	}, expires, queue.EnqueueOpts{})
 	if err == redis_state.ErrQueueItemExists {
 		return nil
@@ -3391,8 +3395,8 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, i *runInstan
 		Metadata: map[string]any{
 			consts.OtelPropagationKey: carrier,
 		},
+		ParallelMode: gen.ParallelMode(),
 	}
-	pause.SetOptimizedParallelism(gen.OptimizedParallelism())
 
 	// SDK-based event coordination is called both when an event is received
 	// OR on timeout, depending on which happens first.  Both routes consume
@@ -3414,9 +3418,9 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, i *runInstan
 			PauseID: pauseID,
 			Pause:   pause,
 		},
-		Metadata: make(map[string]any),
+		Metadata:     make(map[string]any),
+		ParallelMode: gen.ParallelMode(),
 	}
-	nextItem.SetOptimizedParallelism(gen.OptimizedParallelism())
 
 	span, err := e.tracerProvider.CreateDroppableSpan(
 		meta.SpanNameStep,
@@ -3795,12 +3799,8 @@ func (e *executor) addRequestPublishOpts(ctx context.Context, i *runInstance, sr
 	sr.Publish.PublishURL = e.rtconfig.PublishURL
 }
 
-type enqueueDiscoverable interface {
-	OptimizedParallelism() bool
-}
-
 // shouldEnqueueDiscovery returns true if the ended step should have a discovery
 // step enqueued
-func shouldEnqueueDiscovery(hasPendingSteps bool, item enqueueDiscoverable) bool {
-	return !hasPendingSteps || !item.OptimizedParallelism()
+func shouldEnqueueDiscovery(hasPendingSteps bool, mode enums.ParallelMode) bool {
+	return !hasPendingSteps || mode == enums.ParallelModeRace
 }

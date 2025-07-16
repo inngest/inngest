@@ -89,7 +89,7 @@ func Invoke[T any](ctx context.Context, id string, opts InvokeOpts) (T, error) {
 		Name: id,
 		Opts: op.Opts,
 	}
-	plannedOp.OptimizedParallelism(optimizeParallel(ctx))
+	plannedOp.SetParallelMode(parallelMode(ctx))
 	mgr.AppendOp(plannedOp)
 	panic(ControlHijack{})
 }

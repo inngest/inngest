@@ -88,7 +88,7 @@ func Fetch[OutputT any](
 		Name: id,
 		Opts: in,
 	}
-	plannedOp.OptimizedParallelism(optimizeParallel(ctx))
+	plannedOp.SetParallelMode(parallelMode(ctx))
 	mgr.AppendOp(plannedOp)
 	panic(ControlHijack{})
 }

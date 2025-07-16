@@ -485,9 +485,9 @@ func (g *GeneratorOpcode) AIGatewayOpts() (aigateway.Request, error) {
 	return req, nil
 }
 
-// OptimizedParallelism returns true if the step has optimized parallelism
-// enabled. Defaults to true (including if there any errors)
-func (g *GeneratorOpcode) OptimizedParallelism() bool {
+// ParallelMode returns the parallel mode for the step. Defaults to
+// ParallelModeNone (including if there any errors)
+func (g *GeneratorOpcode) ParallelMode() enums.ParallelMode {
 	var optByt []byte
 	switch typ := g.Opts.(type) {
 	case []byte:
@@ -496,18 +496,24 @@ func (g *GeneratorOpcode) OptimizedParallelism() bool {
 		var err error
 		optByt, err = json.Marshal(g.Opts)
 		if err != nil {
-			return true
+			return enums.ParallelModeNone
 		}
 	}
 
 	var opts map[string]any
 	if err := json.Unmarshal(optByt, &opts); err != nil {
-		return true
+		return enums.ParallelModeNone
 	}
 
-	v, ok := opts[enums.OptKeyOptPar.String()].(bool)
+	raw, ok := opts[enums.OptKeyParallelMode.String()].(string)
 	if !ok {
-		return true
+		return enums.ParallelModeNone
 	}
-	return v
+
+	mode, err := enums.ParallelModeString(raw)
+	if err != nil {
+		return enums.ParallelModeNone
+	}
+
+	return mode
 }

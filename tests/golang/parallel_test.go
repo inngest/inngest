@@ -361,7 +361,7 @@ func TestParallelDisabledOptimization(t *testing.T) {
 				}
 
 				res := group.ParallelWithOpts(ctx,
-					group.ParallelOpts{OptimizeParallel: inngestgo.Ptr(false)},
+					group.ParallelOpts{ParallelMode: enums.ParallelModeRace},
 					func(ctx context.Context) (any, error) {
 						_, err := step.Run(ctx, "a1", func(ctx context.Context) (any, error) {
 							atomic.AddInt32(&counterA1, 1)
@@ -430,26 +430,19 @@ func TestParallelDisabledOptimization(t *testing.T) {
 		t.Parallel()
 
 		type testCase struct {
-			optimizeParallel *bool
+			parallelMode enums.ParallelMode
 
 			// The number of expected SDK requests. Discovery steps count
 			expRequestCount int32
 		}
 		cases := []testCase{
-			{optimizeParallel: nil, expRequestCount: 4},
-			{optimizeParallel: inngestgo.Ptr(true), expRequestCount: 4},
-			{optimizeParallel: inngestgo.Ptr(false), expRequestCount: 9},
+			{parallelMode: enums.ParallelModeNone, expRequestCount: 4},
+			{parallelMode: enums.ParallelModeWait, expRequestCount: 4},
+			{parallelMode: enums.ParallelModeRace, expRequestCount: 9},
 		}
 
 		for _, tc := range cases {
-			var name string
-			if tc.optimizeParallel == nil {
-				name = "optimize=nil"
-			} else {
-				name = fmt.Sprintf("optimize=%t", *tc.optimizeParallel)
-			}
-
-			t.Run(name, func(t *testing.T) {
+			t.Run(fmt.Sprintf("optimize=%s", tc.parallelMode.String()), func(t *testing.T) {
 				t.Parallel()
 				r := require.New(t)
 				ctx := context.Background()
@@ -473,7 +466,7 @@ func TestParallelDisabledOptimization(t *testing.T) {
 						}
 
 						res := group.ParallelWithOpts(ctx,
-							group.ParallelOpts{OptimizeParallel: tc.optimizeParallel},
+							group.ParallelOpts{ParallelMode: tc.parallelMode},
 							func(ctx context.Context) (any, error) {
 								return step.Fetch[string](ctx, "fetch", step.FetchOpts{
 									URL:    "http://0.0.0.0:0",

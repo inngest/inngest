@@ -268,12 +268,11 @@ type GeneratorOpcode struct {
 	DisplayName *string `json:"displayName"`
 }
 
-func (g *GeneratorOpcode) OptimizedParallelism(enabled *bool) {
-	if enabled == nil || *enabled {
-		// No need to do anything since optimized parallelism is opt-out
+func (g *GeneratorOpcode) SetParallelMode(mode enums.ParallelMode) {
+	if mode != enums.ParallelModeRace {
+		// No need to do anything since "race" is opt-in.
 		return
 	}
-	// g.Opts[enums.OptKeyOptPar.String()] = false
 
 	opts, ok := g.Opts.(map[string]any)
 	if !ok {
@@ -287,7 +286,7 @@ func (g *GeneratorOpcode) OptimizedParallelism(enabled *bool) {
 	if opts == nil {
 		opts = make(map[string]any)
 	}
-	opts[enums.OptKeyOptPar.String()] = false
+	opts[enums.OptKeyParallelMode.String()] = mode.String()
 	g.Opts = opts
 }
 

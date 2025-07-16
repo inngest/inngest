@@ -95,7 +95,7 @@ func WaitForSignal[T any](ctx context.Context, stepID string, opts WaitForSignal
 		DisplayName: &opts.Name,
 		Opts:        op.Opts,
 	}
-	plannedOp.OptimizedParallelism(optimizeParallel(ctx))
+	plannedOp.SetParallelMode(parallelMode(ctx))
 	mgr.AppendOp(plannedOp)
 	panic(ControlHijack{})
 }
