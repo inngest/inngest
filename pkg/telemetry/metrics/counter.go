@@ -220,6 +220,24 @@ func IncrSpanBatchProcessorDeadLetterPublishStatusCounter(ctx context.Context, o
 	})
 }
 
+func IncrLogExportDataLoss(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "log_export_data_loss_total",
+		Description: "Total number of data loss detected in logs",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrLogRecordExportedCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "log_records_exported_total",
+		Description: "Total number of log records exported",
+		Tags:        opts.Tags,
+	})
+}
+
 func IncrAggregatePausesEvaluatedCounter(ctx context.Context, value int64, opts CounterOpt) {
 	RecordCounterMetric(ctx, value, CounterOpt{
 		PkgName:     opts.PkgName,
