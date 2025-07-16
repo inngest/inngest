@@ -5,9 +5,8 @@ import "time"
 type QueueIterOpt func(o *queueIterOpt)
 
 type queueIterOpt struct {
-	batchSize      int64
-	interval       time.Duration
-	ignoreBacklogs bool
+	batchSize int64
+	interval  time.Duration
 }
 
 func WithQueueItemIterBatchSize(size int64) QueueIterOpt {
@@ -21,11 +20,5 @@ func WithQueueItemIterBatchSize(size int64) QueueIterOpt {
 func WithQueueItemIterInterval(itv time.Duration) QueueIterOpt {
 	return func(o *queueIterOpt) {
 		o.interval = itv
-	}
-}
-
-func WithQueueItemIterIgnoreBacklogs(ignore bool) QueueIterOpt {
-	return func(o *queueIterOpt) {
-		o.ignoreBacklogs = ignore
 	}
 }
