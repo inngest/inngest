@@ -17,6 +17,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/api"
 	"github.com/inngest/inngest/pkg/api/apiv1"
+	"github.com/inngest/inngest/pkg/authn"
 	"github.com/inngest/inngest/pkg/backoff"
 	"github.com/inngest/inngest/pkg/config"
 	_ "github.com/inngest/inngest/pkg/config/defaults"
@@ -392,10 +393,10 @@ func start(ctx context.Context, opts StartOpts) error {
 	gatewayGRPCForwarder := connectpubsub.NewGatewayGRPCManager(ctx, connectionManager, executorLogger)
 
 	executorProxy, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectPubSubRedis, true, connectpubsub.RedisPubSubConnectorOpts{
-		Logger:               executorLogger,
-		Tracer:               conditionalTracer,
-		StateManager:         connectionManager,
-		EnforceLeaseExpiry:   enforceConnectLeaseExpiry,
+		Logger:             executorLogger,
+		Tracer:             conditionalTracer,
+		StateManager:       connectionManager,
+		EnforceLeaseExpiry: enforceConnectLeaseExpiry,
 		GatewayGRPCManager: gatewayGRPCForwarder,
 	}))
 	if err != nil {
@@ -543,7 +544,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	// start the API
 	// Create a new API endpoint which hosts SDK-related functionality for
 	// registering functions.
-	devAPI := NewDevAPI(ds, DevAPIOptions{disableUI: opts.NoUI})
+	devAPI := NewDevAPI(ds, DevAPIOptions{AuthMiddleware: authn.SigningKeyMiddleware(opts.SigningKey), disableUI: opts.NoUI})
 
 	devAPI.Route("/v1", func(r chi.Router) {
 		// Add the V1 API to our dev server API.
@@ -575,6 +576,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	}
 
 	core, err := coreapi.NewCoreApi(coreapi.Options{
+		AuthMiddleware: authn.SigningKeyMiddleware(opts.SigningKey),
 		Data:           ds.Data,
 		Config:         ds.Opts.Config,
 		Logger:         l,

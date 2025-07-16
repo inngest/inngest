@@ -44,7 +44,8 @@ type devapi struct {
 }
 
 type DevAPIOptions struct {
-	disableUI bool
+	disableUI      bool
+	AuthMiddleware func(http.Handler) http.Handler
 }
 
 func NewDevAPI(d *devserver, o DevAPIOptions) chi.Router {
@@ -54,11 +55,11 @@ func NewDevAPI(d *devserver, o DevAPIOptions) chi.Router {
 		devserver: d,
 		disableUI: o.disableUI,
 	}
-	api.addRoutes()
+	api.addRoutes(o.AuthMiddleware)
 	return api
 }
 
-func (a *devapi) addRoutes() {
+func (a *devapi) addRoutes(AuthMiddleware func(http.Handler) http.Handler) {
 	a.Use(func(next http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
 			l := a.devserver.log.With("caller", a.devserver.Name())
@@ -69,17 +70,22 @@ func (a *devapi) addRoutes() {
 	})
 	a.Use(headers.StaticHeadersMiddleware(a.devserver.Opts.Config.GetServerKind()))
 
-	a.Get("/dev", a.Info)
-	a.Post("/dev/traces", a.OTLPTrace)
-	a.Post("/fn/register", a.Register)
-	// This allows tests to remove apps by URL
-	a.Delete("/fn/remove", a.RemoveApp)
+	a.Get("/dev", a.Info)              // appears to be used by the front end, should this be turned off when the --no-ui flag is enabled?
+	a.Post("/dev/traces", a.OTLPTrace) // this breaks when the AuthMiddleware is applied to it so I removed it
 
-	// This allows tests to update step limits per function
-	a.Post("/fn/step-limit", a.SetStepLimit)
-	a.Delete("/fn/step-limit", a.RemoveStepLimit)
-	a.Post("/fn/state-size-limit", a.SetStateSizeLimit)
-	a.Delete("/fn/state-size-limit", a.RemoveStateSizeLimit)
+	a.Group(func(r chi.Router) {
+		r.Use(AuthMiddleware)
+
+		r.Post("/fn/register", a.Register)
+		// This allows tests to remove apps by URL
+		r.Delete("/fn/remove", a.RemoveApp)
+
+		// This allows tests to update step limits per function
+		r.Post("/fn/step-limit", a.SetStepLimit)
+		r.Delete("/fn/step-limit", a.RemoveStepLimit)
+		r.Post("/fn/state-size-limit", a.SetStateSizeLimit)
+		r.Delete("/fn/state-size-limit", a.RemoveStateSizeLimit)
+	})
 
 	// Only register static file serving if UI is enabled
 	if !a.disableUI {
@@ -98,6 +104,7 @@ func (a *devapi) addRoutes() {
 		// Everything else loads the UI.
 		a.NotFound(a.UI)
 	}
+
 }
 
 func (a devapi) UI(w http.ResponseWriter, r *http.Request) {
