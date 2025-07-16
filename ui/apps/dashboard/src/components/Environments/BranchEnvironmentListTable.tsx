@@ -87,32 +87,28 @@ export default function BranchEnvironmentListTable({
             </tr>
           </thead>
           <tbody className="divide-subtle divide-y px-4 py-3">
-            {envs.length === 0 ? (
+            {totalEnvs === 0 ? (
               <tr>
                 <td colSpan={4} className="text-basis px-4 py-3 text-center text-sm">
                   There are no branch environments
                 </td>
               </tr>
-            ) : visibleBranchEnvs.length ? (
-              visibleBranchEnvs.map((env, i) => <TableRow env={env} key={i} />)
             ) : (
-              <tr>
-                <td colSpan={4} className="text-basis px-4 py-3 text-center text-sm">
-                  There are no more branch environments
-                </td>
-              </tr>
+              visibleBranchEnvs.map((env, i) => <TableRow env={env} key={i} />)
             )}
           </tbody>
         </table>
       </div>
-      <div className="border-subtle flex border-t px-1 py-1">
-        <FilterResultDetails denominator={totalEnvs} numerator={envs.length} />
-        {totalBranchEnvsPages > 1 && (
-          <div className="flex flex-1 items-center">
-            <BranchEnvsPagination className="justify-end max-[625px]:justify-center" />
-          </div>
-        )}
-      </div>
+      {totalEnvs > 0 && (
+        <div className="border-subtle flex border-t px-1 py-1">
+          <FilterResultDetails denominator={totalEnvs} numerator={envs.length} />
+          {totalBranchEnvsPages > 1 && (
+            <div className="flex flex-1 items-center">
+              <BranchEnvsPagination className="justify-end max-[625px]:justify-center" />
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

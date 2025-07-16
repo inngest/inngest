@@ -48,32 +48,28 @@ export function CustomEnvironmentListTable({ envs, totalEnvs }: CustomEnvironmen
             </tr>
           </thead>
           <tbody className="divide-subtle divide-y px-4 py-3">
-            {envs.length === 0 ? (
+            {totalEnvs === 0 ? (
               <tr>
                 <td colSpan={3} className="text-basis px-4 py-3 text-center text-sm">
                   There are no custom environments
                 </td>
               </tr>
-            ) : visibleCustomEnvs.length ? (
-              visibleCustomEnvs.map((env, i) => <TableRow env={env} key={i} />)
             ) : (
-              <tr>
-                <td colSpan={3} className="text-basis px-4 py-3 text-center text-sm">
-                  There are no more custom environments
-                </td>
-              </tr>
+              visibleCustomEnvs.map((env, i) => <TableRow env={env} key={i} />)
             )}
           </tbody>
         </table>
       </div>
-      <div className="border-subtle flex border-t px-1 py-1">
-        <FilterResultDetails denominator={totalEnvs} numerator={envs.length} />
-        {totalCustomEnvsPages > 1 && (
-          <div className="flex flex-1">
-            <CustomEnvsPagination className="justify-end max-[625px]:justify-center" />
-          </div>
-        )}
-      </div>
+      {totalEnvs > 0 && (
+        <div className="border-subtle flex border-t px-1 py-1">
+          <FilterResultDetails denominator={totalEnvs} numerator={envs.length} />
+          {totalCustomEnvsPages > 1 && (
+            <div className="flex flex-1">
+              <CustomEnvsPagination className="justify-end max-[625px]:justify-center" />
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
