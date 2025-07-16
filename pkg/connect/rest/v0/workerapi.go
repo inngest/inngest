@@ -20,7 +20,6 @@ import (
 	"github.com/inngest/inngest/pkg/connect/auth"
 	"github.com/inngest/inngest/pkg/publicerr"
 	"github.com/inngest/inngest/proto/gen/connect/v1"
-	pb "github.com/inngest/inngest/proto/gen/connect/v1"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/protobuf/proto"
@@ -232,7 +231,7 @@ func (cr *connectApiRouter) flushBuffer(w http.ResponseWriter, r *http.Request) 
 		executorIP := ip.String()
 		grpcURL := net.JoinHostPort(executorIP, fmt.Sprintf("%d", connectConfig.Executor(ctx).GRPCPort))
 
-		var grpcClient pb.ConnectExecutorClient
+		var grpcClient connect.ConnectExecutorClient
 
 		cr.grpcLock.RLock()
 		grpcClient = cr.grpcClients[executorIP]
@@ -258,12 +257,12 @@ func (cr *connectApiRouter) flushBuffer(w http.ResponseWriter, r *http.Request) 
 					return
 				}
 
-				grpcClient = pb.NewConnectExecutorClient(conn)
+				grpcClient = connect.NewConnectExecutorClient(conn)
 				cr.grpcClients[executorIP] = grpcClient
 			}
 		}
 
-		result, err := grpcClient.Reply(ctx, &pb.ReplyRequest{Data: reqBody})
+		result, err := grpcClient.Reply(ctx, &connect.ReplyRequest{Data: reqBody})
 		if err != nil || !result.Success {
 			l.Error("could not notify executor to flush connect message", "err", err)
 			span.RecordError(err)
