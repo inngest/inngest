@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@inngest/components/Button';
 import {
@@ -32,8 +32,16 @@ export default function Environments() {
   }, 400);
 
   const branchParent = envs.find((env) => env.type === EnvironmentType.BranchParent);
-  const branches = filterEnvironments(EnvironmentType.BranchChild, searchParam, envs);
-  const customEnvs = filterEnvironments(EnvironmentType.Test, searchParam, envs);
+
+  const branches = useMemo(
+    () => filterEnvironments(EnvironmentType.BranchChild, searchParam, envs),
+    [searchParam, envs]
+  );
+
+  const customEnvs = useMemo(
+    () => filterEnvironments(EnvironmentType.Test, searchParam, envs),
+    [searchParam, envs]
+  );
 
   if (fetching) {
     return (
@@ -46,10 +54,52 @@ export default function Environments() {
   return (
     <>
       <div className="mx-auto w-full max-w-[860px] px-12 py-16">
-        <div className="mb-4 flex w-full items-center  justify-between">
-          <h2 className="text-lg font-medium">Environments</h2>
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-2">
+            <div className="flex w-full items-center justify-between">
+              <h2 className="text-xl font-medium">Production environment</h2>
+            </div>
+
+            <p className="text-muted max-w-[400px] text-sm">
+              This is where you&apos;ll deploy all of your production apps.
+            </p>
+          </div>
+
+          <div className="bg-info flex items-center justify-between rounded-md px-4 py-2">
+            <h3 className="flex items-center gap-2 text-sm font-medium tracking-wide">
+              <span className="bg-primary-moderate block h-2 w-2 rounded-full" />
+              Production
+            </h3>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  kind="secondary"
+                  appearance="outlined"
+                  size="medium"
+                  icon={<RiMore2Line />}
+                />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent>
+                <DropdownMenuItem onSelect={() => router.push('/env/production/manage')}>
+                  <RiSettingsLine className="h-4 w-4" />
+                  Manage
+                </DropdownMenuItem>
+                <DropdownMenuItem onSelect={() => router.push('/env/production/apps')}>
+                  <AppsIcon className="h-4 w-4" />
+                  Go to apps
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        </div>
+
+        <div className="mb-2 flex flex-col gap-3">
+          <div className="border-subtle mt-8 flex w-full items-center justify-between border-t pt-8">
+            <h2 className="text-xl font-medium">Other environments</h2>
+          </div>
+
           <Search
-            name="search"
+            name="search-other-envs"
             onUpdate={(value) => {
               setSearchInput(value);
               debouncedSearch();
@@ -58,81 +108,56 @@ export default function Environments() {
             value={searchInput}
           />
         </div>
-        <p className="text-muted max-w-[400px] text-sm">
-          This is where you&apos;ll deploy all of your production apps.
-        </p>
 
-        <div className="bg-info mt-4 flex items-center justify-between rounded-md px-4 py-2">
-          <h3 className="flex items-center gap-2 text-sm font-medium tracking-wide">
-            <span className="bg-primary-moderate block h-2 w-2 rounded-full" />
-            Production
-          </h3>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button kind="secondary" appearance="outlined" size="medium" icon={<RiMore2Line />} />
-            </DropdownMenuTrigger>
-            <DropdownMenuContent>
-              <DropdownMenuItem onSelect={() => router.push('/env/production/manage')}>
-                <RiSettingsLine className="h-4 w-4" />
-                Manage
-              </DropdownMenuItem>
-              <DropdownMenuItem onSelect={() => router.push('/env/production/apps')}>
-                <AppsIcon className="h-4 w-4" />
-                Go to apps
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-
-        <div className="border-subtle my-12 border-t pt-8">
-          <div className="mb-4 flex w-full items-center justify-between">
-            <h2 className="text-lg font-medium">Custom Environments</h2>
-            <Button href="create-environment" kind="primary" label="Create environment" />
+        <div className="flex flex-col gap-6">
+          <div className="pt-6">
+            <div className="mb-2 flex w-full items-center justify-between">
+              <h2 className="text-md font-medium">Custom environments</h2>
+              <Button href="create-environment" kind="primary" label="Create environment" />
+            </div>
+            <div className="border-subtle overflow-hidden rounded-md border">
+              <CustomEnvironmentListTable envs={customEnvs} />
+            </div>
           </div>
 
-          <div className="border-subtle mt-8 overflow-hidden rounded-md border">
-            <CustomEnvironmentListTable envs={customEnvs} />
-          </div>
-        </div>
-
-        {Boolean(branchParent) && (
-          <div className="border-subtle border-t pt-8">
-            <div className="mb-8 flex w-full items-center justify-between">
-              <h2 className="text-lg font-medium">Branch Environments</h2>
-              <div className="flex items-center gap-2">
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button
-                      kind="secondary"
-                      appearance="outlined"
-                      size="medium"
-                      icon={<RiMore2Line />}
-                    />
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent>
-                    <DropdownMenuItem
-                      onSelect={() => router.push(`/env/${branchParent?.slug}/manage`)}
-                    >
-                      <RiSettingsLine className="h-4 w-4" />
-                      Manage
-                    </DropdownMenuItem>
-                    <DropdownMenuItem
-                      className="text-success"
-                      onSelect={() => router.push(`/env/${branchParent?.slug || 'branch'}/apps`)}
-                    >
-                      <RiAddLine className="h-4 w-4" />
-                      Sync new app
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+          {Boolean(branchParent) && (
+            <div>
+              <div className="mb-2 flex w-full items-center justify-between">
+                <h2 className="text-md font-medium">Branch Environments</h2>
+                <div className="flex items-center gap-2">
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        kind="secondary"
+                        appearance="outlined"
+                        size="medium"
+                        icon={<RiMore2Line />}
+                      />
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent>
+                      <DropdownMenuItem
+                        onSelect={() => router.push(`/env/${branchParent?.slug}/manage`)}
+                      >
+                        <RiSettingsLine className="h-4 w-4" />
+                        Manage
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        className="text-success"
+                        onSelect={() => router.push(`/env/${branchParent?.slug || 'branch'}/apps`)}
+                      >
+                        <RiAddLine className="h-4 w-4" />
+                        Sync new app
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                </div>
+              </div>
+              <div className="border-subtle overflow-hidden rounded-md border">
+                <BranchEnvironmentListTable envs={branches} />
               </div>
             </div>
-
-            <div className="border-subtle mt-8 overflow-hidden rounded-md border">
-              <BranchEnvironmentListTable envs={branches} />
-            </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       <Toaster />
