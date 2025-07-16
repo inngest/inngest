@@ -108,7 +108,7 @@ export default function BranchEnvironmentListTable({
       <div className="border-subtle flex border-t px-1 py-1">
         <FilterResultDetails denominator={totalEnvs} numerator={envs.length} />
         {totalBranchEnvsPages > 1 && (
-          <div className="ml-4 flex-1">
+          <div className="ml-4 flex flex-1 items-center">
             <BranchEnvsPagination className="justify-end" />
           </div>
         )}
