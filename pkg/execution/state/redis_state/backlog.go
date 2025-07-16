@@ -4,9 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"gonum.org/v1/gonum/stat/sampleuv"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
+	"iter"
 	"math/rand"
 	"runtime/debug"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
@@ -16,6 +19,8 @@ import (
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
+	"github.com/redis/rueidis"
+	"gonum.org/v1/gonum/stat/sampleuv"
 )
 
 var (
@@ -1097,6 +1102,156 @@ func (q *queue) backlogPeek(ctx context.Context, b *QueueBacklog, from time.Time
 	return res.Items, res.TotalCount, nil
 }
 
+// NOTE: this function only work with key queues
+func (q *queue) BacklogsByPartition(ctx context.Context, queueShard QueueShard, partitionID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueueBacklog], error) {
+	opt := queueIterOpt{
+		batchSize: 1000,
+		interval:  50 * time.Millisecond,
+	}
+	for _, apply := range opts {
+		apply(&opt)
+	}
+
+	l := q.log.With(
+		"method", "BacklogsByPartition",
+		"partitionID", partitionID,
+		"from", from,
+		"until", until,
+	)
+
+	kg := queueShard.RedisClient.kg
+
+	return func(yield func(*QueueBacklog) bool) {
+		hashKey := kg.BacklogMeta()
+		ptFrom := from
+
+		for {
+			var iterated int
+
+			peeker := peeker[QueueBacklog]{
+				q:                      q,
+				max:                    opt.batchSize,
+				opName:                 "backlogsByPartition",
+				isMillisecondPrecision: true,
+				handleMissingItems: func(pointers []string) error {
+					// don't interfere, clean up will happen in normal processing anyways
+					return nil
+				},
+				maker: func() *QueueBacklog {
+					return &QueueBacklog{}
+				},
+				keyMetadataHash: hashKey,
+				fromTime:        &ptFrom,
+			}
+
+			isSequential := true
+			res, err := peeker.peek(ctx, kg.ShadowPartitionSet(partitionID), isSequential, until, opt.batchSize,
+				WithPeekOptQueueShard(&queueShard),
+			)
+			if err != nil {
+				l.Error("error peeking backlogs for partition", "partition_id", partitionID, "err", err)
+				return
+			}
+
+			for _, bl := range res.Items {
+				if bl == nil {
+					continue
+				}
+
+				if !yield(bl) {
+					return
+				}
+
+				iterated++
+			}
+
+			ptFrom = time.UnixMilli(res.Cursor)
+
+			l.Trace("iterated backlogs in partition", "count", iterated)
+
+			// didn't process anything, exit loop
+			if iterated == 0 {
+				break
+			}
+
+			// shift the starting point 1ms so it doesn't try to grab the same stuff again
+			// NOTE: this could result skipping items if the previous batch of items are all on
+			// the same millisecond
+			ptFrom = ptFrom.Add(time.Millisecond)
+
+			// wait a little before processing the next batch
+			<-time.After(opt.interval)
+		}
+	}, nil
+}
+
+func (q *queue) PartitionBacklogSize(ctx context.Context, partitionID string) (int64, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "partitionBacklogSize"), redis_telemetry.ScopeQueue)
+
+	if q.queueShardClients == nil {
+		return 0, nil
+	}
+
+	l := q.log.With(
+		"method", "PartitionBacklogSize",
+		"partition_id", partitionID,
+	)
+
+	var (
+		wg    sync.WaitGroup
+		count int64
+	)
+	until := q.clock.Now().Add(24 * time.Hour * 365) // 1y ahead
+
+	for _, shard := range q.queueShardClients {
+		shard := shard
+
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+
+			backlogs, err := q.BacklogsByPartition(ctx, shard, partitionID, time.Time{}, until)
+			if err != nil {
+				l.Error("error preparing backlog iterator", "error", err, "shard", shard)
+				return
+			}
+
+			bwg := sync.WaitGroup{}
+			for bl := range backlogs {
+				bwg.Add(1)
+				backlogID := bl.BacklogID
+
+				go func() {
+					defer bwg.Done()
+
+					size, err := q.BacklogSize(ctx, shard, backlogID)
+					if err != nil {
+						l.Error("error retrieving backlog size", "error", err, "backlog", bl)
+						return
+					}
+					atomic.AddInt64(&count, size)
+				}()
+			}
+			bwg.Wait()
+		}()
+	}
+	wg.Wait()
+
+	return count, nil
+}
+
+func (q *queue) BacklogSize(ctx context.Context, queueShard QueueShard, backlogID string) (int64, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "backlogSize"), redis_telemetry.ScopeQueue)
+
+	rc := queueShard.RedisClient.Client()
+	cmd := rc.B().Zcard().Key(queueShard.RedisClient.kg.BacklogSet(backlogID)).Build()
+	count, err := rc.Do(ctx, cmd).AsInt64()
+	if rueidis.IsRedisNil(err) {
+		return 0, nil
+	}
+	return count, err
+}
+
 func shuffleBacklogs(b []*QueueBacklog) []*QueueBacklog {
 	weights := make([]float64, len(b))
 	for i, backlog := range b {
@@ -1118,4 +1273,141 @@ func shuffleBacklogs(b []*QueueBacklog) []*QueueBacklog {
 	}
 
 	return result
+}
+
+type BacklogEnrollResult struct {
+	Skipped bool
+
+	Enrolled int64
+	Total    int64
+	Refilled int64
+	Invalid  int64
+	Leased   int64
+	Disabled int64
+}
+
+func (q *queue) BacklogEnroll(ctx context.Context, qp *QueuePartition) (*BacklogEnrollResult, error) {
+	// Do not support backlog enrollment for system queues
+	if qp.FunctionID == nil {
+		return &BacklogEnrollResult{Skipped: true}, nil
+	}
+	fnID := *qp.FunctionID
+
+	// If no account ID is present, skip
+	accountID := qp.AccountID
+	if accountID == uuid.Nil {
+		return &BacklogEnrollResult{Skipped: true}, nil
+	}
+
+	// If key queues are disabled for the account, skip
+	if !q.allowKeyQueues(ctx, accountID) {
+		return &BacklogEnrollResult{Skipped: true}, nil
+	}
+
+	shard := q.primaryQueueShard
+	var enrolled, total, refilled, invalid, leased, disabled int64
+
+	// Only consider items enqueued at least 5s into the future
+	from := q.clock.Now().Add(5 * time.Second)
+	until := q.clock.Now().Add(2 * 365 * 24 * time.Hour)
+
+	items, err := q.ItemsByPartition(ctx, shard, fnID, from, until, WithQueueItemIterIgnoreBacklogs(true))
+	if err != nil {
+		return nil, fmt.Errorf("could not get iterate items by partition: %w", err)
+	}
+
+	for item := range items {
+		atomic.AddInt64(&total, 1)
+
+		if item == nil {
+			atomic.AddInt64(&invalid, 1)
+			continue
+		}
+
+		// if item was refilled from backlog, ignore
+		if item.RefilledFrom != "" {
+			atomic.AddInt64(&refilled, 1)
+			continue
+		}
+
+		if item.IsLeased(q.clock.Now()) {
+			atomic.AddInt64(&leased, 1)
+
+			// this should never happen, as we're only including future items
+			continue
+		}
+
+		if !q.itemEnableKeyQueues(ctx, *item) {
+			atomic.AddInt64(&disabled, 1)
+
+			// This is an early exit: If the account is not enrolled to key queues, it doesn't
+			// make sense to continue iterating, as all subsequent items returned by the iterator
+			// belong to the same function queue, thus the same account, and will also not be enabled.
+			break
+		}
+
+		err := q.Requeue(ctx, shard, *item, time.UnixMilli(item.AtMS))
+		if err != nil {
+			return nil, fmt.Errorf("could not enroll future item to backlog: %w", err)
+		}
+
+		atomic.AddInt64(&enrolled, 1)
+	}
+
+	metrics.IncrQueueBacklogItemsEnrolledCount(ctx, atomic.LoadInt64(&enrolled), metrics.CounterOpt{
+		PkgName: pkgName,
+		Tags: map[string]any{
+			"queue_shard": shard.Name,
+			"status":      "enrolled",
+		},
+	})
+
+	metrics.IncrQueueBacklogItemsEnrolledCount(ctx, atomic.LoadInt64(&total), metrics.CounterOpt{
+		PkgName: pkgName,
+		Tags: map[string]any{
+			"queue_shard": shard.Name,
+			"status":      "total",
+		},
+	})
+
+	metrics.IncrQueueBacklogItemsEnrolledCount(ctx, atomic.LoadInt64(&refilled), metrics.CounterOpt{
+		PkgName: pkgName,
+		Tags: map[string]any{
+			"queue_shard": shard.Name,
+			"status":      "refilled",
+		},
+	})
+
+	metrics.IncrQueueBacklogItemsEnrolledCount(ctx, atomic.LoadInt64(&invalid), metrics.CounterOpt{
+		PkgName: pkgName,
+		Tags: map[string]any{
+			"queue_shard": shard.Name,
+			"status":      "invalid",
+		},
+	})
+
+	metrics.IncrQueueBacklogItemsEnrolledCount(ctx, atomic.LoadInt64(&leased), metrics.CounterOpt{
+		PkgName: pkgName,
+		Tags: map[string]any{
+			"queue_shard": shard.Name,
+			"status":      "leased",
+		},
+	})
+
+	metrics.IncrQueueBacklogItemsEnrolledCount(ctx, atomic.LoadInt64(&disabled), metrics.CounterOpt{
+		PkgName: pkgName,
+		Tags: map[string]any{
+			"queue_shard": shard.Name,
+			"status":      "disabled",
+		},
+	})
+
+	return &BacklogEnrollResult{
+		Enrolled: enrolled,
+		Total:    total,
+		Refilled: refilled,
+		Invalid:  invalid,
+		Leased:   leased,
+		Disabled: disabled,
+	}, nil
 }

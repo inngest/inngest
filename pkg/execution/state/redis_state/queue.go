@@ -115,6 +115,9 @@ const (
 	defaultIdempotencyTTL = 12 * time.Hour
 	defaultConcurrency    = 1000 // TODO: add function to override.
 
+	DefaultPartitionIterateInterval  = 10 * time.Second
+	DefaultPartitionIterateChunkSize = 1000
+
 	NoConcurrencyLimit = -1
 )
 
@@ -170,7 +173,16 @@ type QueueManager interface {
 	// ItemsByBacklog returns a queue item iterator for a backlog within a specific time range
 	ItemsByBacklog(ctx context.Context, queueShard QueueShard, backlogID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*osqueue.QueueItem], error)
 
+	// BacklogsByPartition returns an iterator for the partition's backlogs
+	BacklogsByPartition(ctx context.Context, queueShard QueueShard, partitionID string, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*QueueBacklog], error)
+	// BacklogSize retrieves the number of items in the specified backlog
+	BacklogSize(ctx context.Context, queueShard QueueShard, backlogID string) (int64, error)
+
 	PartitionByID(ctx context.Context, queueShard QueueShard, partitionID string) (*PartitionInspectionResult, error)
+
+	// PartitionBacklogSize returns the point in time backlog size of the partition.
+	// This will sum the size of all backlogs in that partition
+	PartitionBacklogSize(ctx context.Context, partitionID string) (int64, error)
 }
 
 // PartitionPriorityFinder returns the priority for a given queue partition.
@@ -260,6 +272,12 @@ func WithBacklogRefillLimit(limit int64) QueueOpt {
 func WithBacklogNormalizationLimit(limit int64) QueueOpt {
 	return func(q *queue) {
 		q.backlogNormalizeLimit = limit
+	}
+}
+
+func WithBacklogEnrollConcurrency(concurrency int64) QueueOpt {
+	return func(q *queue) {
+		q.backlogEnrollConcurrency = concurrency
 	}
 }
 
@@ -636,6 +654,28 @@ func WithReadOnlySpotChecks(fn ReadOnlySpotChecks) QueueOpt {
 	}
 }
 
+type TenantInstrumentor func(ctx context.Context, qp *QueuePartition) error
+
+func WithTenantInstrumentor(fn TenantInstrumentor) QueueOpt {
+	return func(q *queue) {
+		q.tenantInstrumentor = fn
+	}
+}
+
+func WithPartitionIterationInterval(t time.Duration) QueueOpt {
+	return func(q *queue) {
+		if t > 0 {
+			q.partitionIteratorInterval = t
+		}
+	}
+}
+
+func WithPartitionIterationChunkSize(chunkSize int64) QueueOpt {
+	return func(q *queue) {
+		q.partitionIteratorChunkSize = chunkSize
+	}
+}
+
 func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 	ctx := context.Background()
 
@@ -648,12 +688,13 @@ func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 		apf: func(_ context.Context, _ uuid.UUID) uint {
 			return PriorityDefault
 		},
-		peekMin:               DefaultQueuePeekMin,
-		peekMax:               DefaultQueuePeekMax,
-		shadowPeekMin:         ShadowPartitionPeekMinBacklogs,
-		shadowPeekMax:         ShadowPartitionPeekMaxBacklogs,
-		backlogRefillLimit:    BacklogRefillHardLimit,
-		backlogNormalizeLimit: defaultBacklogNormalizeLimit,
+		peekMin:                  DefaultQueuePeekMin,
+		peekMax:                  DefaultQueuePeekMax,
+		shadowPeekMin:            ShadowPartitionPeekMinBacklogs,
+		shadowPeekMax:            ShadowPartitionPeekMaxBacklogs,
+		backlogRefillLimit:       BacklogRefillHardLimit,
+		backlogNormalizeLimit:    defaultBacklogNormalizeLimit,
+		backlogEnrollConcurrency: BacklogEnrollDefaultConcurrency,
 		runMode: QueueRunMode{
 			Sequential:                        true,
 			Scavenger:                         true,
@@ -673,7 +714,7 @@ func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 		seqLeaseLock:                   &sync.RWMutex{},
 		scavengerLeaseLock:             &sync.RWMutex{},
 		activeCheckerLeaseLock:         &sync.RWMutex{},
-		instrumentationLeaseLock:       &sync.RWMutex{},
+		partitionIteratorLeaseLock:     &sync.RWMutex{},
 		pollTick:                       defaultPollTick,
 		shadowPollTick:                 defaultShadowPollTick,
 		backlogNormalizePollTick:       defaultBacklogNormalizePollTick,
@@ -682,6 +723,8 @@ func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 		queueKindMapping:               make(map[string]string),
 		peekSizeForFunctions:           make(map[string]int64),
 		log:                            logger.StdlibLogger(ctx),
+		partitionIteratorInterval:      DefaultPartitionIterateInterval,
+		partitionIteratorChunkSize:     DefaultPartitionIterateChunkSize,
 		partitionConstraintConfigGetter: func(ctx context.Context, p QueueShadowPartition) (*PartitionConstraintConfig, error) {
 			def := defaultConcurrency
 
@@ -732,6 +775,9 @@ func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 		disableLeaseChecksForSystemQueues: true,
 		shadowPartitionProcessCount: func(ctx context.Context, acctID uuid.UUID) int {
 			return 5
+		},
+		tenantInstrumentor: func(ctx context.Context, qp *QueuePartition) error {
+			return nil
 		},
 		itemIndexer:             QueueItemIndexerFunc,
 		backoffFunc:             backoff.DefaultBackoff,
@@ -833,6 +879,8 @@ type queue struct {
 
 	shadowPartitionProcessCount QueueShadowPartitionProcessCount
 
+	tenantInstrumentor TenantInstrumentor
+
 	// idempotencyTTL is the default or static idempotency duration apply to jobs,
 	// if idempotencyTTLFunc is not defined.
 	idempotencyTTL time.Duration
@@ -840,7 +888,9 @@ type queue struct {
 	// remain idempotent.
 	idempotencyTTLFunc func(context.Context, osqueue.QueueItem) time.Duration
 	// pollTick is the interval between each scan for jobs.
-	pollTick time.Duration
+	pollTick                 time.Duration
+	shadowPollTick           time.Duration
+	backlogNormalizePollTick time.Duration
 	// quit is a channel that any method can send on to trigger termination
 	// of the Run loop.  This typically accepts an error, but a nil error
 	// will still quit the runner.
@@ -900,12 +950,15 @@ type queue struct {
 	// or reading from seqLeaseID in parallel.
 	seqLeaseLock *sync.RWMutex
 
-	// instrumentationLeaseID stores the lease ID if executor is running queue
-	// instrumentations
-	instrumentationLeaseID *ulid.ULID
-	// instrumentationLeaseLock ensures that there are no data races writing to or
-	// reading from instrumentationLeaseID
-	instrumentationLeaseLock *sync.RWMutex
+	// partitionIteratorLeaseID stores the lease ID if executor is running queue
+	// partition iteration
+	partitionIteratorLeaseID *ulid.ULID
+	// partitionIteratorLeaseLock ensures that there are no data races writing to or
+	// reading from partitionIteratorLeaseID
+	partitionIteratorLeaseLock *sync.RWMutex
+	// partitionIteratorInterval defines how frequently partition iteration will run
+	partitionIteratorInterval  time.Duration
+	partitionIteratorChunkSize int64
 
 	// scavengerLeaseID stores the lease ID if this queue is the scavenger processor.
 	// all runners attempt to claim this lease automatically.
@@ -931,17 +984,15 @@ type queue struct {
 	continuesLock     *sync.Mutex
 	continuationLimit uint
 
-	shadowPollTick           time.Duration
-	backlogNormalizePollTick time.Duration
-
-	shadowContinues         map[string]shadowContinuation
-	shadowContinueCooldown  map[string]time.Time
-	shadowContinuesLock     *sync.Mutex
-	shadowContinuationLimit uint
-	shadowPeekMin           int64
-	shadowPeekMax           int64
-	backlogRefillLimit      int64
-	backlogNormalizeLimit   int64
+	shadowContinues          map[string]shadowContinuation
+	shadowContinueCooldown   map[string]time.Time
+	shadowContinuesLock      *sync.Mutex
+	shadowContinuationLimit  uint
+	shadowPeekMin            int64
+	shadowPeekMax            int64
+	backlogRefillLimit       int64
+	backlogNormalizeLimit    int64
+	backlogEnrollConcurrency int64
 
 	normalizeRefreshItemCustomConcurrencyKeys NormalizeRefreshItemCustomConcurrencyKeysFn
 	refreshItemThrottle                       RefreshItemThrottleFn
@@ -1544,10 +1595,14 @@ func (q *queue) SetFunctionPaused(ctx context.Context, accountId uuid.UUID, fnID
 			Paused: paused,
 		}
 
-		keys := []string{shard.RedisClient.kg.FnMetadata(fnID)}
+		keys := []string{
+			shard.RedisClient.kg.FnMetadata(fnID),
+			shard.RedisClient.kg.ShadowPartitionMeta(),
+		}
 		args, err := StrSlice([]any{
 			pausedArg,
 			defaultFnMetadata,
+			fnID.String(),
 		})
 		if err != nil {
 			return err
@@ -1665,10 +1720,14 @@ func (q *queue) SetFunctionMigrate(ctx context.Context, sourceShard string, fnID
 		flag = 1
 	}
 
-	keys := []string{shard.RedisClient.kg.FnMetadata(fnID)}
+	keys := []string{
+		shard.RedisClient.kg.FnMetadata(fnID),
+		shard.RedisClient.kg.ShadowPartitionMeta(),
+	}
 	args, err := StrSlice([]any{
 		flag,
 		defaultMeta,
+		fnID.String(),
 	})
 	if err != nil {
 		return err
@@ -3499,7 +3558,135 @@ func (q *queue) InProgress(ctx context.Context, prefix string, concurrencyKey st
 	return q.primaryQueueShard.RedisClient.unshardedRc.Do(ctx, cmd).AsInt64()
 }
 
+func (q *queue) IteratePartitions(ctx context.Context) error {
+	l := logger.StdlibLogger(ctx)
+
+	// Check on global partition and queue partition sizes
+	var offset, total int64
+	chunkSize := q.partitionIteratorChunkSize
+
+	// Semaphore to limit backlog enrollment concurrency
+	sem := semaphore.NewWeighted(q.backlogEnrollConcurrency)
+
+	// Wait until all partitions have been processed
+	wg := sync.WaitGroup{}
+
+	r := q.primaryQueueShard.RedisClient.unshardedRc
+	// iterate through all the partitions in the global partitions in chunks
+	for {
+		// grab the global partition by chunks
+		cmd := r.B().Zrange().
+			Key(q.primaryQueueShard.RedisClient.kg.GlobalPartitionIndex()).
+			Min("-inf").
+			Max("+inf").
+			Byscore().
+			Limit(offset, chunkSize).
+			Build()
+
+		pkeys, err := r.Do(ctx, cmd).AsStrSlice()
+		if err != nil {
+			return fmt.Errorf("error retrieving partitions for instrumentation: %w", err)
+		}
+
+		for _, pk := range pkeys {
+			wg.Add(1)
+
+			// check each partition concurrently
+			go func(ctx context.Context, pkey string) {
+				defer wg.Done()
+
+				l := l.With("partitionKey", pkey)
+
+				// If this is not a fully-qualified key, assume that this is an old (system) partition queue
+				queueKey := pkey
+				if !isKeyConcurrencyPointerItem(pkey) {
+					queueKey = q.primaryQueueShard.RedisClient.kg.PartitionQueueSet(enums.PartitionTypeDefault, pkey, "")
+				}
+
+				cntCmd := r.B().Zcard().Key(queueKey).Build()
+				count, err := q.primaryQueueShard.RedisClient.unshardedRc.Do(ctx, cntCmd).AsInt64()
+				if err != nil {
+					q.log.Warn("error checking partition count", "pkey", pkey, "context", "instrumentation")
+					return
+				}
+
+				metrics.GaugePartitionSize(ctx, count, metrics.GaugeOpt{
+					PkgName: pkgName,
+					Tags: map[string]any{
+						// NOTE: potentially high cardinality but this gives better clarify of stuff
+						"partition":   pkey,
+						"queue_shard": q.primaryQueueShard.Name,
+					},
+				})
+
+				atomic.AddInt64(&total, 1)
+
+				qp := QueuePartition{}
+				{
+					shard := q.primaryQueueShard
+					hash := shard.RedisClient.kg.PartitionItem()
+					cmd := r.B().Hget().Key(hash).Field(pkey).Build()
+					byt, err := r.Do(ctx, cmd).AsBytes()
+					if err != nil {
+						l.Error("error loading partition", "error", err)
+						return
+					}
+					if err := json.Unmarshal(byt, &qp); err != nil {
+						l.Error("error unmarshalling partition", "error", err)
+						return
+					}
+				}
+
+				if err := q.tenantInstrumentor(ctx, &qp); err != nil {
+					l.Error("error running tenant instrumentor", "error", err)
+				}
+
+				// Acquire semaphore before enrolling backlog. This limits concurrency to the configured value.
+				// - This will not block new goroutines from launching for subsequent reporting.
+				// - Due to using wg.Wait() below, this will block IteratePartitions from exiting
+				// until all partition items have been enrolled to backlogs.
+				{
+					err = sem.Acquire(ctx, 1)
+					if err != nil {
+						return
+					}
+					defer sem.Release(1)
+
+					res, err := q.BacklogEnroll(ctx, &qp)
+					if err != nil {
+						l.Error("error enrolling backlog", "error", err)
+					}
+
+					l.Trace("enrolled future items to backlogs", "res", res, "partition", qp)
+				}
+			}(ctx, pk)
+		}
+
+		// end of pagination, exit
+		if len(pkeys) < int(chunkSize) {
+			break
+		}
+
+		offset += chunkSize
+	}
+
+	// Wait until all partitions have been processed before reporting gauge
+	wg.Wait()
+
+	// instrument the total count of global partition
+	metrics.GaugeGlobalPartitionSize(ctx, atomic.LoadInt64(&total), metrics.GaugeOpt{
+		PkgName: pkgName,
+		Tags: map[string]any{
+			"queue_shard": q.primaryQueueShard.Name,
+		},
+	})
+
+	return nil
+}
+
 func (q *queue) Instrument(ctx context.Context) error {
+	l := logger.StdlibLogger(ctx)
+
 	// Check on global partition and queue partition sizes
 	var offset, total int64
 	chunkSize := int64(1000)
@@ -3529,6 +3716,8 @@ func (q *queue) Instrument(ctx context.Context) error {
 			go func(ctx context.Context, pkey string) {
 				defer wg.Done()
 
+				l := l.With("partitionKey", pkey)
+
 				// If this is not a fully-qualified key, assume that this is an old (system) partition queue
 				queueKey := pkey
 				if !isKeyConcurrencyPointerItem(pkey) {
@@ -3552,6 +3741,26 @@ func (q *queue) Instrument(ctx context.Context) error {
 				})
 
 				atomic.AddInt64(&total, 1)
+
+				qp := QueuePartition{}
+				{
+					shard := q.primaryQueueShard
+					hash := shard.RedisClient.kg.PartitionItem()
+					cmd := r.B().Hget().Key(hash).Field(pkey).Build()
+					byt, err := r.Do(ctx, cmd).AsBytes()
+					if err != nil {
+						l.Error("error loading partition", "error", err)
+						return
+					}
+					if err := json.Unmarshal(byt, &qp); err != nil {
+						l.Error("error unmarshalling partition", "error", err)
+						return
+					}
+				}
+
+				if err := q.tenantInstrumentor(ctx, &qp); err != nil {
+					l.Error("error running tenant instrumentor", "error", err)
+				}
 			}(ctx, pk)
 
 		}
@@ -3563,6 +3772,8 @@ func (q *queue) Instrument(ctx context.Context) error {
 		offset += chunkSize
 	}
 
+	wg.Wait()
+
 	// instrument the total count of global partition
 	metrics.GaugeGlobalPartitionSize(ctx, atomic.LoadInt64(&total), metrics.GaugeOpt{
 		PkgName: pkgName,
@@ -3570,8 +3781,6 @@ func (q *queue) Instrument(ctx context.Context) error {
 			"queue_shard": q.primaryQueueShard.Name,
 		},
 	})
-
-	wg.Wait()
 
 	return nil
 }

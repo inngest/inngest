@@ -232,7 +232,7 @@ func (q *queue) Run(ctx context.Context, f osqueue.RunFunc) error {
 		go q.runActiveChecker(ctx)
 	}
 
-	go q.runInstrumentation(ctx)
+	go q.runPeriodicPartitionIterator(ctx)
 
 	// start execution and shadow scan concurrently
 	eg, ctx := errgroup.WithContext(ctx)
@@ -266,7 +266,6 @@ func (q *queue) executionScan(ctx context.Context, f osqueue.RunFunc) error {
 	}
 
 	tick := q.clock.NewTicker(q.pollTick)
-
 	q.log.Debug("starting queue worker", "poll", q.pollTick.String())
 
 	backoff := time.Millisecond * 250
@@ -501,53 +500,53 @@ func (q *queue) runActiveChecker(ctx context.Context) {
 	}
 }
 
-func (q *queue) runInstrumentation(ctx context.Context) {
-	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "Instrument"), redis_telemetry.ScopeQueue)
+func (q *queue) runPeriodicPartitionIterator(ctx context.Context) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "IteratePartition"), redis_telemetry.ScopeQueue)
 
-	leaseID, err := q.ConfigLease(ctx, q.primaryQueueShard.RedisClient.kg.Instrumentation(), ConfigLeaseMax, q.instrumentationLease())
+	leaseID, err := q.ConfigLease(ctx, q.primaryQueueShard.RedisClient.kg.PartitionIterator(), ConfigLeaseMax, q.partitionIteratorLease())
 	if err != ErrConfigAlreadyLeased && err != nil {
 		q.quit <- err
 		return
 	}
 
 	setLease := func(lease *ulid.ULID) {
-		q.instrumentationLeaseLock.Lock()
-		defer q.instrumentationLeaseLock.Unlock()
-		q.instrumentationLeaseID = lease
+		q.partitionIteratorLeaseLock.Lock()
+		defer q.partitionIteratorLeaseLock.Unlock()
+		q.partitionIteratorLeaseID = lease
 
-		if lease != nil && q.instrumentationLeaseID == nil {
-			metrics.IncrInstrumentationLeaseClaimsCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name}})
+		if lease != nil && q.partitionIteratorLeaseID == nil {
+			metrics.IncrPartitionIterateLeaseClaimsCounter(ctx, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name}})
 		}
 	}
 
 	setLease(leaseID)
 
 	tick := q.clock.NewTicker(ConfigLeaseMax / 3)
-	instr := q.clock.NewTicker(20 * time.Second)
+	iterateTick := q.clock.NewTicker(q.partitionIteratorInterval)
 
 	for {
 		select {
 		case <-ctx.Done():
 			tick.Stop()
-			instr.Stop()
+			iterateTick.Stop()
 			return
-		case <-instr.Chan():
-			if q.isInstrumentator() {
-				if err := q.Instrument(ctx); err != nil {
-					q.log.Error("error running instrumentation", "error", err)
+		case <-iterateTick.Chan():
+			if q.isPartitionIterator() {
+				if err := q.IteratePartitions(ctx); err != nil {
+					q.log.Error("error running partition iterator", "error", err)
 				}
 			}
 		case <-tick.Chan():
 			metrics.GaugeWorkerQueueCapacity(ctx, int64(q.numWorkers), metrics.GaugeOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name}})
 
-			leaseID, err := q.ConfigLease(ctx, q.primaryQueueShard.RedisClient.kg.Instrumentation(), ConfigLeaseMax, q.instrumentationLease())
+			leaseID, err := q.ConfigLease(ctx, q.primaryQueueShard.RedisClient.kg.PartitionIterator(), ConfigLeaseMax, q.partitionIteratorLease())
 			if err == ErrConfigAlreadyLeased {
 				setLease(nil)
 				continue
 			}
 
 			if err != nil {
-				q.log.Error("error claiming instrumentation lease", "error", err)
+				q.log.Error("error claiming partition iterator lease", "error", err)
 				setLease(nil)
 				continue
 			}
@@ -1316,15 +1315,15 @@ func (q *queue) sequentialLease() *ulid.ULID {
 	return &copied
 }
 
-// instrumentationLease is a helper method for concurrently reading the
-// instrumentation lease ID.
-func (q *queue) instrumentationLease() *ulid.ULID {
-	q.instrumentationLeaseLock.RLock()
-	defer q.instrumentationLeaseLock.RUnlock()
-	if q.instrumentationLeaseID == nil {
+// partitionIteratorLease is a helper method for concurrently reading the
+// partition iterator lease ID.
+func (q *queue) partitionIteratorLease() *ulid.ULID {
+	q.partitionIteratorLeaseLock.RLock()
+	defer q.partitionIteratorLeaseLock.RUnlock()
+	if q.partitionIteratorLeaseID == nil {
 		return nil
 	}
-	copied := *q.instrumentationLeaseID
+	copied := *q.partitionIteratorLeaseID
 	return &copied
 }
 
@@ -1466,8 +1465,8 @@ func (q *queue) isActiveChecker() bool {
 	return ulid.Time(l.Time()).After(q.clock.Now())
 }
 
-func (q *queue) isInstrumentator() bool {
-	l := q.instrumentationLease()
+func (q *queue) isPartitionIterator() bool {
+	l := q.partitionIteratorLease()
 	if l == nil {
 		return false
 	}

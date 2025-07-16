@@ -29,6 +29,8 @@ const (
 
 	// BacklogNormalizeHardLimit sets the batch size of items to be reenqueued into the appropriate backlogs durign normalization
 	BacklogNormalizeHardLimit = int64(1000)
+
+	BacklogEnrollDefaultConcurrency = int64(20)
 )
 
 var (

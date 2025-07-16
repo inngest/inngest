@@ -57,6 +57,8 @@ func NewQueries(db *sql.DB, driver string) (q sqlc.Querier) {
 }
 
 func NewCQRS(db *sql.DB, driver string) cqrs.Manager {
+	// Force goqu to use prepared statements for consistency with sqlc
+	sq.SetDefaultPrepared(true)
 	return wrapper{
 		driver: driver,
 		q:      NewQueries(db, driver),
@@ -859,7 +861,6 @@ func (w wrapper) GetEvents(ctx context.Context, accountID uuid.UUID, workspaceID
 		Where(filter...).
 		Order(order...).
 		Limit(uint(opts.Limit)).
-		Prepared(true).
 		ToSQL()
 
 	if err != nil {
@@ -915,7 +916,6 @@ func (w wrapper) GetEventsCount(ctx context.Context, accountID uuid.UUID, worksp
 		Select(sq.COUNT("*").As("count")).
 		Where(filter...).
 		Order(order...).
-		Prepared(true).
 		ToSQL()
 	if err != nil {
 		return 0, err
@@ -1334,6 +1334,58 @@ func (w wrapper) FindOrBuildTraceRun(ctx context.Context, opts cqrs.FindOrCreate
 	}
 
 	return &new, nil
+}
+
+func (w wrapper) GetTraceRunsByTriggerID(ctx context.Context, triggerID ulid.ULID) ([]*cqrs.TraceRun, error) {
+	// convert sqlc.TraceRun{} to cqrs.TraceRun{}
+	sqlcTraceRuns, err := w.q.GetTraceRunsByTriggerId(ctx, triggerID.String())
+	if err != nil {
+		return nil, err
+	}
+	cqrsTraceRuns := make([]*cqrs.TraceRun, len(sqlcTraceRuns))
+	// dedupe this conversion
+	for i, run := range sqlcTraceRuns {
+		start := time.UnixMilli(run.StartedAt)
+		end := time.UnixMilli(run.EndedAt)
+		triggerIDS := strings.Split(string(run.TriggerIds), ",")
+
+		var (
+			isBatch bool
+			batchID *ulid.ULID
+			cron    *string
+		)
+
+		if run.BatchID != nilULID {
+			isBatch = true
+			batchID = &run.BatchID
+		}
+
+		if run.CronSchedule.Valid {
+			cron = &run.CronSchedule.String
+		}
+
+		cqrsTraceRuns[i] = &cqrs.TraceRun{
+			AccountID:    run.AccountID,
+			WorkspaceID:  run.WorkspaceID,
+			AppID:        run.AppID,
+			FunctionID:   run.FunctionID,
+			TraceID:      string(run.TraceID),
+			RunID:        run.RunID.String(),
+			QueuedAt:     time.UnixMilli(run.QueuedAt),
+			StartedAt:    start,
+			EndedAt:      end,
+			Duration:     end.Sub(start),
+			SourceID:     run.SourceID,
+			TriggerIDs:   triggerIDS,
+			Output:       run.Output,
+			Status:       enums.RunCodeToStatus(run.Status),
+			BatchID:      batchID,
+			IsBatch:      isBatch,
+			CronSchedule: cron,
+			HasAI:        run.HasAi,
+		}
+	}
+	return cqrsTraceRuns, nil
 }
 
 func (w wrapper) GetTraceRun(ctx context.Context, id cqrs.TraceRunIdentifier) (*cqrs.TraceRun, error) {

@@ -2983,6 +2983,71 @@ func TestQueuePartitionLease(t *testing.T) {
 		})
 	})
 
+	t.Run("Partition pausing with key queues", func(t *testing.T) {
+		r.FlushAll() // reset everything
+		q := NewQueue(
+			QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName},
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+				return true
+			}))
+		ctx := context.Background()
+
+		acctID := uuid.New()
+		_, err = q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{FunctionID: idA, Data: osqueue.Item{Identifier: state.Identifier{AccountID: acctID, WorkflowID: idA}}}, atA, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+		_, err = q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{FunctionID: idB, Data: osqueue.Item{Identifier: state.Identifier{AccountID: acctID, WorkflowID: idB}}}, atB, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+		_, err = q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{FunctionID: idC, Data: osqueue.Item{Identifier: state.Identifier{AccountID: acctID, WorkflowID: idC}}}, atC, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+
+		getShadowPartition := func(fnID uuid.UUID) QueueShadowPartition {
+			var sp QueueShadowPartition
+
+			str, err := rc.Do(ctx, rc.B().Hget().Key(q.primaryQueueShard.RedisClient.kg.ShadowPartitionMeta()).Field(fnID.String()).Build()).ToString()
+			require.NoError(t, err, r.Dump())
+
+			require.NoError(t, json.Unmarshal([]byte(str), &sp))
+			return sp
+		}
+
+		t.Run("Fails to lease a paused partition", func(t *testing.T) {
+			sp := getShadowPartition(idA)
+			require.False(t, sp.PauseRefill)
+
+			// pause fn A's partition:
+			err = q.SetFunctionPaused(ctx, uuid.Nil, idA, true)
+			require.NoError(t, err)
+
+			sp = getShadowPartition(idA)
+			require.True(t, sp.PauseRefill)
+
+			// attempt to lease the paused partition:
+			id, capacity, err := q.PartitionLease(ctx, &pA, time.Second*5)
+			require.Nil(t, id)
+			require.Error(t, err)
+			require.Zero(t, capacity)
+			require.ErrorIs(t, err, ErrPartitionPaused)
+		})
+
+		t.Run("Succeeds to lease a previously paused partition", func(t *testing.T) {
+			sp := getShadowPartition(idA)
+			require.True(t, sp.PauseRefill)
+
+			// unpause fn A's partition:
+			err = q.SetFunctionPaused(ctx, uuid.Nil, idA, false)
+			require.NoError(t, err)
+
+			sp = getShadowPartition(idA)
+			require.False(t, sp.PauseRefill)
+
+			// attempt to lease the unpaused partition:
+			id, capacity, err := q.PartitionLease(ctx, &pA, time.Second*5)
+			require.NotNil(t, id)
+			require.NoError(t, err)
+			require.NotZero(t, capacity)
+		})
+	})
+
 	t.Run("With key partitions", func(t *testing.T) {
 		fnID := uuid.New()
 
@@ -3898,6 +3963,63 @@ func TestQueueSetFunctionMigrate(t *testing.T) {
 		meta, err = getFnMetadata(t, r, fnID)
 		require.NoError(t, err)
 		require.False(t, meta.Migrate)
+	})
+
+	t.Run("with key queues", func(t *testing.T) {
+		q := NewQueue(
+			QueueShard{Name: "default", Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey)},
+			WithPartitionPriorityFinder(func(ctx context.Context, part QueuePartition) uint {
+				return PriorityDefault
+			}),
+			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+				return true
+			}),
+		)
+		ctx := context.Background()
+
+		acctID := uuid.New()
+		now := time.Now().Truncate(time.Second)
+		fnID := uuid.New()
+		id := state.Identifier{AccountID: acctID, WorkflowID: fnID}
+		_, err = q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{FunctionID: fnID, Data: osqueue.Item{Identifier: id}}, now, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+
+		getShadowPartition := func() QueueShadowPartition {
+			var sp QueueShadowPartition
+
+			str, err := rc.Do(ctx, rc.B().Hget().Key(q.primaryQueueShard.RedisClient.kg.ShadowPartitionMeta()).Field(fnID.String()).Build()).ToString()
+			require.NoError(t, err)
+
+			require.NoError(t, json.Unmarshal([]byte(str), &sp))
+			return sp
+		}
+
+		sp := getShadowPartition()
+		require.Equal(t, fnID.String(), sp.PartitionID)
+		require.False(t, sp.PauseRefill)
+
+		err = q.SetFunctionMigrate(ctx, "default", fnID, true)
+		require.NoError(t, err)
+
+		meta, err := getFnMetadata(t, r, fnID)
+		require.NoError(t, err)
+		require.True(t, meta.Migrate)
+
+		sp = getShadowPartition()
+		require.Equal(t, fnID.String(), sp.PartitionID)
+		require.True(t, sp.PauseRefill)
+
+		// disable migration flag
+		err = q.SetFunctionMigrate(ctx, "default", fnID, false)
+		require.NoError(t, err)
+
+		meta, err = getFnMetadata(t, r, fnID)
+		require.NoError(t, err)
+		require.False(t, meta.Migrate)
+
+		sp = getShadowPartition()
+		require.Equal(t, fnID.String(), sp.PartitionID)
+		require.False(t, sp.PauseRefill)
 	})
 
 	t.Run("with other shards", func(t *testing.T) {
@@ -7969,6 +8091,110 @@ func TestQueueActiveCounters(t *testing.T) {
 			require.Equal(t, 0, scard(kg.ActiveSet("account", accountID.String())))
 		})
 	})
+}
+
+func TestQueueBacklogEnroll(t *testing.T) {
+	r := miniredis.RunT(t)
+	rc, err := rueidis.NewClient(rueidis.ClientOption{
+		InitAddress:  []string{r.Addr()},
+		DisableCache: true,
+	})
+	require.NoError(t, err)
+	defer rc.Close()
+
+	defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+
+	enqueueToBacklog := false
+
+	clock := clockwork.NewFakeClockAt(time.Now().Truncate(time.Minute))
+	q := NewQueue(
+		defaultShard,
+		WithClock(clock),
+		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+			return enqueueToBacklog
+		}),
+		WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
+			return false
+		}),
+		WithDisableLeaseChecksForSystemQueues(false),
+	)
+	ctx := context.Background()
+
+	accountID, fnID, envID := uuid.New(), uuid.New(), uuid.New()
+	runID := ulid.MustNew(ulid.Timestamp(clock.Now()), rand.Reader)
+
+	item := osqueue.QueueItem{
+		FunctionID:  fnID,
+		WorkspaceID: envID,
+		Data: osqueue.Item{
+			WorkspaceID: envID,
+			Kind:        osqueue.KindEdge,
+			Identifier: state.Identifier{
+				WorkflowID:  fnID,
+				AccountID:   accountID,
+				WorkspaceID: envID,
+				RunID:       runID,
+			},
+			QueueName:             nil,
+			Throttle:              nil,
+			CustomConcurrencyKeys: nil,
+		},
+		QueueName: nil,
+	}
+
+	nowItems := 100
+	for i := 0; i < nowItems; i++ {
+		_, err := q.EnqueueItem(ctx, defaultShard, item, clock.Now(), osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+	}
+
+	futureItems := 100
+	for i := 0; i < futureItems; i++ {
+		at := clock.Now().Add(5*time.Second + (time.Duration(i) * time.Second))
+		_, err := q.EnqueueItem(ctx, defaultShard, item, at, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+	}
+
+	refilledItems := 100
+	for i := 0; i < refilledItems; i++ {
+		at := clock.Now().Add(5*time.Second + (time.Duration(i) * time.Second))
+		item := item
+		item.RefilledFrom = "fake-backlog"
+		item.RefilledAt = at.UnixMilli()
+		_, err := q.EnqueueItem(ctx, defaultShard, item, at, osqueue.EnqueueOpts{})
+		require.NoError(t, err)
+	}
+
+	// Make sure items are requeued to backlog
+	enqueueToBacklog = true
+
+	// expect no items in backlog
+	count, err := q.BacklogSize(ctx, defaultShard, q.ItemBacklog(ctx, item).BacklogID)
+	require.NoError(t, err)
+	require.Equal(t, 0, int(count))
+
+	qp, _ := q.ItemPartition(ctx, defaultShard, item)
+
+	res, err := q.BacklogEnroll(ctx, &qp)
+	require.NoError(t, err)
+
+	require.Equal(t, 200, int(res.Total))
+	require.Equal(t, 100, int(res.Refilled))
+	require.Equal(t, 100, int(res.Enrolled))
+
+	// expect 100 items added
+	count, err = q.BacklogSize(ctx, defaultShard, q.ItemBacklog(ctx, item).BacklogID)
+	require.NoError(t, err)
+	require.Equal(t, 100, int(count), r.Dump())
+
+	// Doing it again should yield no items
+
+	res, err = q.BacklogEnroll(ctx, &qp)
+	require.NoError(t, err)
+
+	require.Equal(t, 100, int(res.Total))    // only 100 items found now
+	require.Equal(t, 100, int(res.Refilled)) // same refilled items as previously
+	require.Equal(t, 0, int(res.Enrolled))   // no more enrollemt this time around
 }
 
 func score(t *testing.T, r *miniredis.Miniredis, key string, member string) float64 {

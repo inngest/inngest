@@ -361,9 +361,11 @@ type TraceWriter interface {
 	InsertTraceRun(ctx context.Context, run *TraceRun) error
 }
 
-type TraceWriterDev interface {
+type TraceReadWriterDev interface {
 	// FindOrCreateTraceRun will return a TraceRun by runID, or create a new one if it doesn't exists
 	FindOrBuildTraceRun(ctx context.Context, opts FindOrCreateTraceRunOpt) (*TraceRun, error)
+	// Returns a list of TraceRun triggered by triggerID
+	GetTraceRunsByTriggerID(ctx context.Context, triggerID ulid.ULID) ([]*TraceRun, error)
 }
 
 type TraceReader interface {

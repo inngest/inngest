@@ -48,6 +48,7 @@ type Querier interface {
 	GetSpanOutput(ctx context.Context, spanID string) (interface{}, error)
 	GetSpansByRunID(ctx context.Context, runID string) ([]*GetSpansByRunIDRow, error)
 	GetTraceRun(ctx context.Context, runID ulid.ULID) (*TraceRun, error)
+	GetTraceRunsByTriggerId(ctx context.Context, eventID string) ([]*TraceRun, error)
 	GetTraceSpanOutput(ctx context.Context, arg GetTraceSpanOutputParams) ([]*Trace, error)
 	GetTraceSpans(ctx context.Context, arg GetTraceSpansParams) ([]*Trace, error)
 	GetWorkerConnection(ctx context.Context, arg GetWorkerConnectionParams) (*WorkerConnection, error)
@@ -87,10 +88,6 @@ type Querier interface {
 	UpdateAppURL(ctx context.Context, arg UpdateAppURLParams) (*App, error)
 	UpdateFunctionConfig(ctx context.Context, arg UpdateFunctionConfigParams) (*Function, error)
 	UpsertApp(ctx context.Context, arg UpsertAppParams) (*App, error)
-	WorkspaceCountEvents(ctx context.Context, arg WorkspaceCountEventsParams) (int64, error)
-	WorkspaceCountNamedEvents(ctx context.Context, arg WorkspaceCountNamedEventsParams) (int64, error)
-	WorkspaceEvents(ctx context.Context, arg WorkspaceEventsParams) ([]*Event, error)
-	WorkspaceNamedEvents(ctx context.Context, arg WorkspaceNamedEventsParams) ([]*Event, error)
 }
 
 var _ Querier = (*Queries)(nil)
