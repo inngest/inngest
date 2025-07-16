@@ -33,15 +33,13 @@ export default function Environments() {
 
   const branchParent = envs.find((env) => env.type === EnvironmentType.BranchParent);
 
-  const branches = useMemo(
-    () => filterEnvironments(EnvironmentType.BranchChild, searchParam, envs),
-    [searchParam, envs]
-  );
+  const branchEnvsData = useMemo(() => {
+    return filterEnvironments(EnvironmentType.BranchChild, searchParam, envs);
+  }, [searchParam, envs]);
 
-  const customEnvs = useMemo(
-    () => filterEnvironments(EnvironmentType.Test, searchParam, envs),
-    [searchParam, envs]
-  );
+  const customEnvsData = useMemo(() => {
+    return filterEnvironments(EnvironmentType.Test, searchParam, envs);
+  }, [searchParam, envs]);
 
   if (fetching) {
     return (
@@ -116,7 +114,10 @@ export default function Environments() {
               <Button href="create-environment" kind="primary" label="Create environment" />
             </div>
             <div className="border-subtle overflow-hidden rounded-md border">
-              <CustomEnvironmentListTable envs={customEnvs} />
+              <CustomEnvironmentListTable
+                envs={customEnvsData.filtered}
+                totalEnvs={customEnvsData.total}
+              />
             </div>
           </div>
 
@@ -153,7 +154,10 @@ export default function Environments() {
                 </div>
               </div>
               <div className="border-subtle overflow-hidden rounded-md border">
-                <BranchEnvironmentListTable envs={branches} />
+                <BranchEnvironmentListTable
+                  envs={branchEnvsData.filtered}
+                  totalEnvs={branchEnvsData.total}
+                />
               </div>
             </div>
           )}
@@ -166,8 +170,18 @@ export default function Environments() {
 }
 
 function filterEnvironments(type: EnvironmentType, searchParam: string, envs: Environment[]) {
-  return envs.filter((env) => {
-    if (env.type !== type) return false;
-    return searchParam === '' || env.name.toLowerCase().includes(searchParam.toLowerCase());
-  });
+  const filtered: Environment[] = [];
+  let total = 0;
+
+  for (const env of envs) {
+    if (env.type !== type) continue;
+
+    total++;
+
+    if (searchParam === '' || env.name.toLowerCase().includes(searchParam.toLowerCase())) {
+      filtered.push(env);
+    }
+  }
+
+  return { filtered, total };
 }
