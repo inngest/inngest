@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"iter"
 	"math/rand"
 	"runtime/debug"
@@ -1272,4 +1273,141 @@ func shuffleBacklogs(b []*QueueBacklog) []*QueueBacklog {
 	}
 
 	return result
+}
+
+type BacklogEnrollResult struct {
+	Skipped bool
+
+	Enrolled int64
+	Total    int64
+	Refilled int64
+	Invalid  int64
+	Leased   int64
+	Disabled int64
+}
+
+func (q *queue) BacklogEnroll(ctx context.Context, qp *QueuePartition) (*BacklogEnrollResult, error) {
+	// Do not support backlog enrollment for system queues
+	if qp.FunctionID == nil {
+		return &BacklogEnrollResult{Skipped: true}, nil
+	}
+	fnID := *qp.FunctionID
+
+	// If no account ID is present, skip
+	accountID := qp.AccountID
+	if accountID == uuid.Nil {
+		return &BacklogEnrollResult{Skipped: true}, nil
+	}
+
+	// If key queues are disabled for the account, skip
+	if !q.allowKeyQueues(ctx, accountID) {
+		return &BacklogEnrollResult{Skipped: true}, nil
+	}
+
+	shard := q.primaryQueueShard
+	var enrolled, total, refilled, invalid, leased, disabled int64
+
+	// Only consider items enqueued at least 5s into the future
+	from := q.clock.Now().Add(5 * time.Second)
+	until := q.clock.Now().Add(2 * 365 * 24 * time.Hour)
+
+	items, err := q.ItemsByPartition(ctx, shard, fnID, from, until, WithQueueItemIterIgnoreBacklogs(true))
+	if err != nil {
+		return nil, fmt.Errorf("could not get iterate items by partition: %w", err)
+	}
+
+	for item := range items {
+		atomic.AddInt64(&total, 1)
+
+		if item == nil {
+			atomic.AddInt64(&invalid, 1)
+			continue
+		}
+
+		// if item was refilled from backlog, ignore
+		if item.RefilledFrom != "" {
+			atomic.AddInt64(&refilled, 1)
+			continue
+		}
+
+		if item.IsLeased(q.clock.Now()) {
+			atomic.AddInt64(&leased, 1)
+
+			// this should never happen, as we're only including future items
+			continue
+		}
+
+		if !q.itemEnableKeyQueues(ctx, *item) {
+			atomic.AddInt64(&disabled, 1)
+
+			// This is an early exit: If the account is not enrolled to key queues, it doesn't
+			// make sense to continue iterating, as all subsequent items returned by the iterator
+			// belong to the same function queue, thus the same account, and will also not be enabled.
+			break
+		}
+
+		err := q.Requeue(ctx, shard, *item, time.UnixMilli(item.AtMS))
+		if err != nil {
+			return nil, fmt.Errorf("could not enroll future item to backlog: %w", err)
+		}
+
+		atomic.AddInt64(&enrolled, 1)
+	}
+
+	metrics.IncrQueueBacklogItemsEnrolledCount(ctx, atomic.LoadInt64(&enrolled), metrics.CounterOpt{
+		PkgName: pkgName,
+		Tags: map[string]any{
+			"queue_shard": shard.Name,
+			"status":      "enrolled",
+		},
+	})
+
+	metrics.IncrQueueBacklogItemsEnrolledCount(ctx, atomic.LoadInt64(&total), metrics.CounterOpt{
+		PkgName: pkgName,
+		Tags: map[string]any{
+			"queue_shard": shard.Name,
+			"status":      "total",
+		},
+	})
+
+	metrics.IncrQueueBacklogItemsEnrolledCount(ctx, atomic.LoadInt64(&refilled), metrics.CounterOpt{
+		PkgName: pkgName,
+		Tags: map[string]any{
+			"queue_shard": shard.Name,
+			"status":      "refilled",
+		},
+	})
+
+	metrics.IncrQueueBacklogItemsEnrolledCount(ctx, atomic.LoadInt64(&invalid), metrics.CounterOpt{
+		PkgName: pkgName,
+		Tags: map[string]any{
+			"queue_shard": shard.Name,
+			"status":      "invalid",
+		},
+	})
+
+	metrics.IncrQueueBacklogItemsEnrolledCount(ctx, atomic.LoadInt64(&leased), metrics.CounterOpt{
+		PkgName: pkgName,
+		Tags: map[string]any{
+			"queue_shard": shard.Name,
+			"status":      "leased",
+		},
+	})
+
+	metrics.IncrQueueBacklogItemsEnrolledCount(ctx, atomic.LoadInt64(&disabled), metrics.CounterOpt{
+		PkgName: pkgName,
+		Tags: map[string]any{
+			"queue_shard": shard.Name,
+			"status":      "disabled",
+		},
+	})
+
+	return &BacklogEnrollResult{
+		Enrolled: enrolled,
+		Total:    total,
+		Refilled: refilled,
+		Invalid:  invalid,
+		Leased:   leased,
+		Disabled: disabled,
+	}, nil
 }

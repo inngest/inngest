@@ -1276,6 +1276,9 @@ func TestBacklogsByPartition(t *testing.T) {
 				WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
 					return true
 				}),
+				WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
+					return false
+				}),
 				WithClock(clock),
 			)
 
