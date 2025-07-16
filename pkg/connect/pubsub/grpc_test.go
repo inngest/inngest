@@ -612,7 +612,10 @@ func TestSubscribeUnsubscribe(t *testing.T) {
 
 		// But request2 should still work - start a goroutine to consume the message
 		var receivedResp2Retry *connectpb.SDKResponse
+		var wg2 sync.WaitGroup
+		wg2.Add(1)
 		go func() {
+			defer wg2.Done()
 			select {
 			case receivedResp2Retry = <-responseCh2:
 			case <-time.After(1 * time.Second):
@@ -626,8 +629,8 @@ func TestSubscribeUnsubscribe(t *testing.T) {
 		require.NoError(t, err)
 		require.True(t, resp2Retry.Success)
 
-		// Verify the second message was received
-		time.Sleep(100 * time.Millisecond)
+		// Wait for the second message to be received
+		wg2.Wait()
 		require.NotNil(t, receivedResp2Retry)
 		require.Equal(t, requestID2, receivedResp2Retry.RequestId)
 
@@ -717,7 +720,10 @@ func TestSubscribeUnsubscribeWorkerAck(t *testing.T) {
 
 		// But request2 should still work
 		var receivedAck2Retry *connectpb.AckMessage
+		var wg2 sync.WaitGroup
+		wg2.Add(1)
 		go func() {
+			defer wg2.Done()
 			select {
 			case receivedAck2Retry = <-ackCh2:
 			case <-time.After(1 * time.Second):
@@ -731,8 +737,8 @@ func TestSubscribeUnsubscribeWorkerAck(t *testing.T) {
 		require.NoError(t, err)
 		require.True(t, resp2Retry.Success)
 
-		// Verify the second ack was received
-		time.Sleep(100 * time.Millisecond)
+		// Wait for the second ack to be received
+		wg2.Wait()
 		require.NotNil(t, receivedAck2Retry)
 		require.Equal(t, requestID2, receivedAck2Retry.RequestId)
 
