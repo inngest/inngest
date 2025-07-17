@@ -34,15 +34,16 @@ import (
 type Options struct {
 	Data cqrs.Manager
 
-	Config        config.Config
-	Logger        logger.Logger
-	Runner        runner.Runner
-	Tracker       *runner.Tracker
-	State         state.Manager
-	Queue         queue.JobQueueReader
-	EventHandler  api.EventHandler
-	Executor      execution.Executor
-	HistoryReader history_reader.Reader
+	AuthMiddleware func(http.Handler) http.Handler
+	Config         config.Config
+	Logger         logger.Logger
+	Runner         runner.Runner
+	Tracker        *runner.Tracker
+	State          state.Manager
+	Queue          queue.JobQueueReader
+	EventHandler   api.EventHandler
+	Executor       execution.Executor
+	HistoryReader  history_reader.Reader
 
 	// LocalSigningKey is the key used to sign events for self-hosted services.
 	LocalSigningKey string
@@ -114,13 +115,13 @@ func NewCoreApi(o Options) (*CoreAPI, error) {
 	}
 
 	// V0 APIs
-	a.Delete("/runs/{runID}", a.CancelRun)
+	a.With(o.AuthMiddleware).Delete("/runs/{runID}", a.CancelRun)
 	// NOTE: These are present in the 2.x and 3.x SDKs to enable large payload sizes.
-	a.Get("/runs/{runID}/batch", a.GetEventBatch)
-	a.Get("/runs/{runID}/actions", a.GetActions)
-	a.Post("/telemetry", a.TrackEvent)
+	a.With(o.AuthMiddleware).Get("/runs/{runID}/batch", a.GetEventBatch)
+	a.With(o.AuthMiddleware).Get("/runs/{runID}/actions", a.GetActions)
+	a.With(o.AuthMiddleware).Post("/telemetry", a.TrackEvent)
 
-	a.Mount("/connect", connectv0.New(a, o.ConnectOpts))
+	a.With(o.AuthMiddleware).Mount("/connect", connectv0.New(a, o.ConnectOpts))
 
 	return a, nil
 }

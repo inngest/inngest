@@ -647,7 +647,7 @@ func WithReadOnlySpotChecks(fn ReadOnlySpotChecks) QueueOpt {
 	}
 }
 
-type TenantInstrumentor func(ctx context.Context, qp *QueuePartition) error
+type TenantInstrumentor func(ctx context.Context, partitionID string) error
 
 func WithTenantInstrumentor(fn TenantInstrumentor) QueueOpt {
 	return func(q *queue) {
@@ -761,7 +761,7 @@ func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 		shadowPartitionProcessCount: func(ctx context.Context, acctID uuid.UUID) int {
 			return 5
 		},
-		tenantInstrumentor: func(ctx context.Context, qp *QueuePartition) error {
+		tenantInstrumentor: func(ctx context.Context, partitionID string) error {
 			return nil
 		},
 		itemIndexer:             QueueItemIndexerFunc,
@@ -3588,34 +3588,23 @@ func (q *queue) Instrument(ctx context.Context) error {
 					return
 				}
 
-				metrics.GaugePartitionSize(ctx, count, metrics.GaugeOpt{
-					PkgName: pkgName,
-					Tags: map[string]any{
-						// NOTE: potentially high cardinality but this gives better clarify of stuff
-						"partition":   pkey,
-						"queue_shard": q.primaryQueueShard.Name,
-					},
-				})
-
-				atomic.AddInt64(&total, 1)
-
-				qp := QueuePartition{}
-				{
-					shard := q.primaryQueueShard
-					hash := shard.RedisClient.kg.PartitionItem()
-					cmd := r.B().Hget().Key(hash).Field(pkey).Build()
-					byt, err := r.Do(ctx, cmd).AsBytes()
-					if err != nil {
-						l.Error("error loading partition", "error", err)
-						return
-					}
-					if err := json.Unmarshal(byt, &qp); err != nil {
-						l.Error("error unmarshalling partition", "error", err)
-						return
-					}
+				// NOTE: tmp workaround for cardinality issues
+				// ideally we want to instrument everything, but until there's a better way to do this, we primarily care only
+				// about large size partitions
+				if count > 10_000 {
+					metrics.GaugePartitionSize(ctx, count, metrics.GaugeOpt{
+						PkgName: pkgName,
+						Tags: map[string]any{
+							// NOTE: potentially high cardinality but this gives better clarify of stuff
+							// this is potentially useless for key queues
+							"partition":   pkey,
+							"queue_shard": q.primaryQueueShard.Name,
+						},
+					})
 				}
 
-				if err := q.tenantInstrumentor(ctx, &qp); err != nil {
+				atomic.AddInt64(&total, 1)
+				if err := q.tenantInstrumentor(ctx, pk); err != nil {
 					l.Error("error running tenant instrumentor", "error", err)
 				}
 			}(ctx, pk)
