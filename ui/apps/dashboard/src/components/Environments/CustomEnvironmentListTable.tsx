@@ -16,15 +16,26 @@ import { RiMore2Line, RiSettingsLine } from '@remixicon/react';
 
 import type { Environment } from '@/utils/environments';
 import { EnvironmentArchiveDropdownItem } from './EnvironmentArchiveDropdownItem';
+import { FilterResultDetails } from './FilterResultDetails';
 
 const PER_PAGE = 5;
 
-export function CustomEnvironmentListTable({ envs }: { envs: Environment[] }) {
+type CustomEnvironmentListTableProps = {
+  envs: Environment[];
+  searchParam: string;
+  unfilteredEnvsCount: number;
+};
+
+export function CustomEnvironmentListTable({
+  envs,
+  searchParam,
+  unfilteredEnvsCount,
+}: CustomEnvironmentListTableProps) {
   const {
     BoundPagination: CustomEnvsPagination,
     currentPageData: visibleCustomEnvs,
     totalPages: totalCustomEnvsPages,
-  } = usePaginationUI({ data: envs, pageSize: PER_PAGE });
+  } = usePaginationUI({ data: envs, id: searchParam, pageSize: PER_PAGE });
 
   return (
     <div className="w-full">
@@ -42,29 +53,32 @@ export function CustomEnvironmentListTable({ envs }: { envs: Environment[] }) {
             </tr>
           </thead>
           <tbody className="divide-subtle divide-y px-4 py-3">
-            {envs.length === 0 ? (
+            {unfilteredEnvsCount === 0 ? (
               <tr>
-                <td colSpan={3} className="text-basis px-4 py-3 text-center text-sm">
-                  There are no custom environments
+                <td colSpan={3} className="text-muted px-4 py-3 text-center text-sm">
+                  No custom environments exist
                 </td>
               </tr>
-            ) : visibleCustomEnvs.length ? (
-              visibleCustomEnvs.map((env, i) => <TableRow env={env} key={i} />)
+            ) : visibleCustomEnvs.length === 0 ? (
+              <tr>
+                <td colSpan={3} className="text-muted px-4 py-3 text-center text-sm">
+                  No results found
+                </td>
+              </tr>
             ) : (
-              <tr>
-                <td colSpan={3} className="text-basis px-4 py-3 text-center text-sm">
-                  There are no more custom environments
-                </td>
-              </tr>
+              visibleCustomEnvs.map((env, i) => <TableRow env={env} key={i} />)
             )}
           </tbody>
         </table>
       </div>
-      {totalCustomEnvsPages > 1 && (
-        <div className="border-subtle flex justify-center border-t px-4 py-1">
-          <CustomEnvsPagination />
-        </div>
-      )}
+      <div className="border-subtle flex border-t px-1 py-1">
+        <FilterResultDetails hasFilter={searchParam !== ''} size={envs.length} />
+        {totalCustomEnvsPages > 1 && (
+          <div className="flex flex-1">
+            <CustomEnvsPagination className="justify-end max-[625px]:justify-center" />
+          </div>
+        )}
+      </div>
     </div>
   );
 }

@@ -22,6 +22,7 @@ import { type Environment } from '@/utils/environments';
 import { notNullish } from '@/utils/typeGuards';
 import { pathCreator } from '@/utils/urls';
 import { EnvironmentArchiveDropdownItem } from './EnvironmentArchiveDropdownItem';
+import { FilterResultDetails } from './FilterResultDetails';
 
 const DisableEnvironmentAutoArchiveDocument = graphql(`
   mutation DisableEnvironmentAutoArchiveDocument($id: ID!) {
@@ -41,7 +42,17 @@ const EnableEnvironmentAutoArchiveDocument = graphql(`
 
 const PER_PAGE = 5;
 
-export default function BranchEnvironmentListTable({ envs }: { envs: Environment[] }) {
+type BranchEnvironmentListTableProps = {
+  envs: Environment[];
+  searchParam: string;
+  unfilteredEnvsCount: number;
+};
+
+export default function BranchEnvironmentListTable({
+  envs,
+  searchParam,
+  unfilteredEnvsCount,
+}: BranchEnvironmentListTableProps) {
   const sortedEnvs = envs.sort(
     (a, b) =>
       new Date(b.lastDeployedAt || b.createdAt).valueOf() -
@@ -52,7 +63,9 @@ export default function BranchEnvironmentListTable({ envs }: { envs: Environment
     BoundPagination: BranchEnvsPagination,
     currentPageData: visibleBranchEnvs,
     totalPages: totalBranchEnvsPages,
-  } = usePaginationUI({ data: sortedEnvs, pageSize: PER_PAGE });
+  } = usePaginationUI({ data: sortedEnvs, id: searchParam, pageSize: PER_PAGE });
+
+  const hasFilter = searchParam !== '';
 
   return (
     <div className="w-full">
@@ -78,29 +91,32 @@ export default function BranchEnvironmentListTable({ envs }: { envs: Environment
             </tr>
           </thead>
           <tbody className="divide-subtle divide-y px-4 py-3">
-            {envs.length === 0 ? (
+            {unfilteredEnvsCount === 0 ? (
               <tr>
-                <td colSpan={4} className="text-basis px-4 py-3 text-center text-sm">
-                  There are no branch environments
+                <td colSpan={4} className="text-muted px-4 py-3 text-center text-sm">
+                  No branch environments exist
                 </td>
               </tr>
-            ) : visibleBranchEnvs.length ? (
-              visibleBranchEnvs.map((env, i) => <TableRow env={env} key={i} />)
+            ) : visibleBranchEnvs.length === 0 ? (
+              <tr>
+                <td colSpan={4} className="text-muted px-4 py-3 text-center text-sm">
+                  No results found
+                </td>
+              </tr>
             ) : (
-              <tr>
-                <td colSpan={4} className="text-basis px-4 py-3 text-center text-sm">
-                  There are no more branch environments
-                </td>
-              </tr>
+              visibleBranchEnvs.map((env, i) => <TableRow env={env} key={i} />)
             )}
           </tbody>
         </table>
       </div>
-      {totalBranchEnvsPages > 1 && (
-        <div className="border-subtle flex justify-center border-t px-4 py-1">
-          <BranchEnvsPagination />
-        </div>
-      )}
+      <div className="border-subtle flex border-t px-1 py-1">
+        <FilterResultDetails hasFilter={hasFilter} size={envs.length} />
+        {totalBranchEnvsPages > 1 && (
+          <div className="flex flex-1">
+            <BranchEnvsPagination className="justify-end max-[625px]:justify-center" />
+          </div>
+        )}
+      </div>
     </div>
   );
 }
