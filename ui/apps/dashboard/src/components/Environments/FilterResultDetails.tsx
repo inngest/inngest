@@ -1,3 +1,5 @@
+'use client';
+
 type FilterResultDetailsProps = {
   hasFilter: boolean;
   size: number;
