@@ -61,7 +61,7 @@ func HandleSigningKey(ctx context.Context, clientProvidedKey string, trustedSign
 	normalizedTrustedKey := normalizeKey(trustedSigningKey)
 
 	// trusted key is provided in plain text, user can provide either plain text or hashed so we need to check against
-	hashedTrustedKey, _ := hashedSigningKey(normalizedTrustedKey)
+	hashedTrustedKey, _ := HashedSigningKey(normalizedTrustedKey)
 
 	// Check if client key matches either the plain text or hashed version
 	if subtle.ConstantTimeCompare([]byte(normalizedClientKey), []byte(normalizedTrustedKey)) == 1 ||
@@ -78,7 +78,7 @@ func normalizeKey(key string) string {
 	return keyRegexp.ReplaceAllString(key, "")
 }
 
-func hashedSigningKey(key string) (string, error) {
+func HashedSigningKey(key string) (string, error) {
 	key = normalizeKey(key)
 
 	dst := make([]byte, hex.DecodedLen(len(key)))
