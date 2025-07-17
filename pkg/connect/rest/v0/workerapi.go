@@ -47,8 +47,6 @@ func (cr *connectApiRouter) start(w http.ResponseWriter, r *http.Request) {
 
 	envOverride := r.Header.Get("X-Inngest-Env")
 
-	l = l.With("env", envOverride)
-
 	res, err := cr.RequestAuther.AuthenticateRequest(ctx, hashedSigningKey, envOverride)
 	if err != nil {
 		l.Error("could not authenticate connect start request", "err", err)
@@ -153,7 +151,6 @@ func (cr *connectApiRouter) flushBuffer(w http.ResponseWriter, r *http.Request) 
 		logger.StdlibLogger(ctx).Error(
 			"could not authenticate connect start request",
 			"err", err,
-			"env", envOverride,
 		)
 
 		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 401, "authentication failed"))
