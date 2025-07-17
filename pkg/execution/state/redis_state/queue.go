@@ -3588,15 +3588,20 @@ func (q *queue) Instrument(ctx context.Context) error {
 					return
 				}
 
-				metrics.GaugePartitionSize(ctx, count, metrics.GaugeOpt{
-					PkgName: pkgName,
-					Tags: map[string]any{
-						// NOTE: potentially high cardinality but this gives better clarify of stuff
-						// this is potentially useless for key queues
-						"partition":   pkey,
-						"queue_shard": q.primaryQueueShard.Name,
-					},
-				})
+				// NOTE: tmp workaround for cardinality issues
+				// ideally we want to instrument everything, but until there's a better way to do this, we primarily care only
+				// about large size partitions
+				if count > 10_000 {
+					metrics.GaugePartitionSize(ctx, count, metrics.GaugeOpt{
+						PkgName: pkgName,
+						Tags: map[string]any{
+							// NOTE: potentially high cardinality but this gives better clarify of stuff
+							// this is potentially useless for key queues
+							"partition":   pkey,
+							"queue_shard": q.primaryQueueShard.Name,
+						},
+					})
+				}
 
 				atomic.AddInt64(&total, 1)
 				if err := q.tenantInstrumentor(ctx, pk); err != nil {
