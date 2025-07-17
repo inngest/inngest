@@ -78,9 +78,20 @@ export default function EventsPage({
             />
           </>
         }
-        expandedRowActions={({ eventName, payload }) => (
-          <ExpandedRowActions eventName={eventName} payload={payload} onReplay={openModal} />
-        )}
+        expandedRowActions={({ eventName, payload }) => {
+          return (
+            <ExpandedRowActions
+              eventName={eventName}
+              payload={payload}
+              onReplay={() => {
+                if (!eventName || !payload) {
+                  return;
+                }
+                openModal(eventName, payload);
+              }}
+            />
+          );
+        }}
       />
       {selectedEvent && (
         <SendEventModal isOpen={isModalVisible} onClose={closeModal} data={selectedEvent.data} />
