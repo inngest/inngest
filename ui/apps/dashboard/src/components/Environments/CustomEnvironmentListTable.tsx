@@ -23,13 +23,13 @@ const PER_PAGE = 5;
 type CustomEnvironmentListTableProps = {
   envs: Environment[];
   searchParam: string;
-  totalEnvs: number;
+  unfilteredEnvsCount: number;
 };
 
 export function CustomEnvironmentListTable({
   envs,
   searchParam,
-  totalEnvs,
+  unfilteredEnvsCount,
 }: CustomEnvironmentListTableProps) {
   const {
     BoundPagination: CustomEnvsPagination,
@@ -53,10 +53,16 @@ export function CustomEnvironmentListTable({
             </tr>
           </thead>
           <tbody className="divide-subtle divide-y px-4 py-3">
-            {totalEnvs === 0 ? (
+            {unfilteredEnvsCount === 0 ? (
               <tr>
-                <td colSpan={3} className="text-basis px-4 py-3 text-center text-sm">
-                  There are no custom environments
+                <td colSpan={4} className="text-muted px-4 py-3 text-center text-sm">
+                  No custom environments exist
+                </td>
+              </tr>
+            ) : visibleCustomEnvs.length === 0 ? (
+              <tr>
+                <td colSpan={4} className="text-muted px-4 py-3 text-center text-sm">
+                  No results found
                 </td>
               </tr>
             ) : (

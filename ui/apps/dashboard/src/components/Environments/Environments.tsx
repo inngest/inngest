@@ -117,7 +117,7 @@ export default function Environments() {
               <CustomEnvironmentListTable
                 envs={customEnvsData.filtered}
                 searchParam={searchParam}
-                totalEnvs={customEnvsData.total}
+                unfilteredEnvsCount={customEnvsData.total}
               />
             </div>
           </div>
@@ -158,7 +158,7 @@ export default function Environments() {
                 <BranchEnvironmentListTable
                   envs={branchEnvsData.filtered}
                   searchParam={searchParam}
-                  totalEnvs={branchEnvsData.total}
+                  unfilteredEnvsCount={branchEnvsData.total}
                 />
               </div>
             </div>

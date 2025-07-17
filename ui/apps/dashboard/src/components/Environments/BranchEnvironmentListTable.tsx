@@ -45,13 +45,13 @@ const PER_PAGE = 5;
 type BranchEnvironmentListTableProps = {
   envs: Environment[];
   searchParam: string;
-  totalEnvs: number;
+  unfilteredEnvsCount: number;
 };
 
 export default function BranchEnvironmentListTable({
   envs,
   searchParam,
-  totalEnvs,
+  unfilteredEnvsCount,
 }: BranchEnvironmentListTableProps) {
   const sortedEnvs = envs.sort(
     (a, b) =>
@@ -64,6 +64,8 @@ export default function BranchEnvironmentListTable({
     currentPageData: visibleBranchEnvs,
     totalPages: totalBranchEnvsPages,
   } = usePaginationUI({ data: sortedEnvs, id: searchParam, pageSize: PER_PAGE });
+
+  const hasFilter = searchParam !== '';
 
   return (
     <div className="w-full">
@@ -89,10 +91,16 @@ export default function BranchEnvironmentListTable({
             </tr>
           </thead>
           <tbody className="divide-subtle divide-y px-4 py-3">
-            {totalEnvs === 0 ? (
+            {unfilteredEnvsCount === 0 ? (
               <tr>
-                <td colSpan={4} className="text-basis px-4 py-3 text-center text-sm">
-                  There are no branch environments
+                <td colSpan={4} className="text-muted px-4 py-3 text-center text-sm">
+                  No branch environments exist
+                </td>
+              </tr>
+            ) : visibleBranchEnvs.length === 0 ? (
+              <tr>
+                <td colSpan={4} className="text-muted px-4 py-3 text-center text-sm">
+                  No results found
                 </td>
               </tr>
             ) : (
@@ -102,7 +110,7 @@ export default function BranchEnvironmentListTable({
         </table>
       </div>
       <div className="border-subtle flex border-t px-1 py-1">
-        <FilterResultDetails hasFilter={searchParam !== ''} size={envs.length} />
+        <FilterResultDetails hasFilter={hasFilter} size={envs.length} />
         {totalBranchEnvsPages > 1 && (
           <div className="flex flex-1">
             <BranchEnvsPagination className="justify-end max-[625px]:justify-center" />
