@@ -8,11 +8,11 @@ import (
 	"strings"
 )
 
-const _OptKeyName = "noneoptPar"
+const _OptKeyName = "noneparallelMode"
 
-var _OptKeyIndex = [...]uint8{0, 4, 10}
+var _OptKeyIndex = [...]uint8{0, 4, 16}
 
-const _OptKeyLowerName = "noneoptpar"
+const _OptKeyLowerName = "noneparallelmode"
 
 func (i OptKey) String() string {
 	if i < 0 || i >= OptKey(len(_OptKeyIndex)-1) {
@@ -26,21 +26,21 @@ func (i OptKey) String() string {
 func _OptKeyNoOp() {
 	var x [1]struct{}
 	_ = x[OptKeyNone-(0)]
-	_ = x[OptKeyOptPar-(1)]
+	_ = x[OptKeyParallelMode-(1)]
 }
 
-var _OptKeyValues = []OptKey{OptKeyNone, OptKeyOptPar}
+var _OptKeyValues = []OptKey{OptKeyNone, OptKeyParallelMode}
 
 var _OptKeyNameToValueMap = map[string]OptKey{
 	_OptKeyName[0:4]:       OptKeyNone,
 	_OptKeyLowerName[0:4]:  OptKeyNone,
-	_OptKeyName[4:10]:      OptKeyOptPar,
-	_OptKeyLowerName[4:10]: OptKeyOptPar,
+	_OptKeyName[4:16]:      OptKeyParallelMode,
+	_OptKeyLowerName[4:16]: OptKeyParallelMode,
 }
 
 var _OptKeyNames = []string{
 	_OptKeyName[0:4],
-	_OptKeyName[4:10],
+	_OptKeyName[4:16],
 }
 
 // OptKeyString retrieves an enum value from the enum constants string name.
