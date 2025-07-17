@@ -303,10 +303,24 @@ func (l *logger) SLog() *slog.Logger {
 	return l.Logger
 }
 
-func (l *logger) ReportError(msg string, tags map[string]string) {
+// reportErrorOpt provides options to tweak error reporting behaviors
+type reportErrorOpt struct {
+	log bool
+}
+
+type ReportErrorOpt func(o *reportErrorOpt)
+
+func (l *logger) ReportError(msg string, tags map[string]string, opts ...ReportErrorOpt) {
 	if sentry.CurrentHub().Client() == nil {
 		l.Warn("sentry is not initialized")
 		return
+	}
+
+	opt := reportErrorOpt{
+		log: true, // NOTE: defaults to true for now, can be disabled later
+	}
+	for _, apply := range opts {
+		apply(&opt)
 	}
 
 	// only report to sentry if initialize
@@ -316,10 +330,18 @@ func (l *logger) ReportError(msg string, tags map[string]string) {
 		sentry.CaptureException(errors.New(msg))
 	})
 
-	args := []any{}
-	for k, v := range tags {
-		args = append(args, k, v)
-	}
+	if opt.log {
+		args := []any{}
+		for k, v := range tags {
+			args = append(args, k, v)
+		}
 
-	l.Error(msg, args...)
+		l.Error(msg, args...)
+	}
+}
+
+func WithErrorReportLog(enable bool) ReportErrorOpt {
+	return func(o *reportErrorOpt) {
+		o.log = enable
+	}
 }
