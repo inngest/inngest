@@ -55,13 +55,13 @@ export function CustomEnvironmentListTable({
           <tbody className="divide-subtle divide-y px-4 py-3">
             {unfilteredEnvsCount === 0 ? (
               <tr>
-                <td colSpan={4} className="text-muted px-4 py-3 text-center text-sm">
+                <td colSpan={3} className="text-muted px-4 py-3 text-center text-sm">
                   No custom environments exist
                 </td>
               </tr>
             ) : visibleCustomEnvs.length === 0 ? (
               <tr>
-                <td colSpan={4} className="text-muted px-4 py-3 text-center text-sm">
+                <td colSpan={3} className="text-muted px-4 py-3 text-center text-sm">
                   No results found
                 </td>
               </tr>
