@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"iter"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -147,12 +146,6 @@ func (q *queue) StatusCount(ctx context.Context, workflowID uuid.UUID, status st
 
 func (q *queue) RunningCount(ctx context.Context, workflowID uuid.UUID) (int64, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "RunningCount"), redis_telemetry.ScopeQueue)
-
-	l := q.log.With(
-		"method", "RunningCount",
-		"pkg", pkgName,
-		"fn_id", workflowID,
-	)
 
 	iterate := func(client *QueueClient) (int64, error) {
 		rc := client.unshardedRc
