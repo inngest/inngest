@@ -2,8 +2,6 @@ import { MenuItem } from '@inngest/components/Menu/MenuItem';
 import { EventLogsIcon } from '@inngest/components/icons/sections/EventLogs';
 import { RiMistLine } from '@remixicon/react';
 
-import { IconFeed } from '@/icons/Feed';
-
 export default function Monitor({ collapsed }: { collapsed: boolean }) {
   return (
     <div className={`jusity-center mt-5 flex flex-col`}>
@@ -23,13 +21,6 @@ export default function Monitor({ collapsed }: { collapsed: boolean }) {
         collapsed={collapsed}
         text="Events"
         icon={<EventLogsIcon className="h-[18px] w-[18px]" />}
-        beta
-      />
-      <MenuItem
-        href="/stream"
-        collapsed={collapsed}
-        text="Stream"
-        icon={<IconFeed className="h-[18px] w-[18px]" />}
       />
     </div>
   );
