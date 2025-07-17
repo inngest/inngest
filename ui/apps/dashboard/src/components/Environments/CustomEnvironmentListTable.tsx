@@ -22,20 +22,23 @@ const PER_PAGE = 5;
 
 type CustomEnvironmentListTableProps = {
   envs: Environment[];
-  searchParam: string;
+  paginationKey: string;
   unfilteredEnvsCount: number;
 };
 
 export function CustomEnvironmentListTable({
   envs,
-  searchParam,
+  paginationKey,
   unfilteredEnvsCount,
 }: CustomEnvironmentListTableProps) {
   const {
     BoundPagination: CustomEnvsPagination,
     currentPageData: visibleCustomEnvs,
     totalPages: totalCustomEnvsPages,
-  } = usePaginationUI({ data: envs, id: searchParam, pageSize: PER_PAGE });
+  } = usePaginationUI({ data: envs, id: paginationKey, pageSize: PER_PAGE });
+
+  // For now, we always filter by status, so we always have a filter.
+  const hasFilter = true;
 
   return (
     <div className="w-full">
@@ -72,7 +75,7 @@ export function CustomEnvironmentListTable({
         </table>
       </div>
       <div className="border-subtle flex border-t px-1 py-1">
-        <FilterResultDetails hasFilter={searchParam !== ''} size={envs.length} />
+        <FilterResultDetails hasFilter={hasFilter} size={envs.length} />
         {totalCustomEnvsPages > 1 && (
           <div className="flex flex-1">
             <CustomEnvsPagination className="justify-end max-[625px]:justify-center" />
