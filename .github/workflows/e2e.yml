@@ -12,6 +12,9 @@ on:
 permissions:
   contents: read
 
+env:
+  GOCOVERDIR: "coverage"
+
 jobs:
   ts:
     name: "TS SDK / OS: (${{ matrix.os }}), key-queues: ${{ matrix.experimentalKeyQueues }}"
@@ -38,7 +41,7 @@ jobs:
         run: make build-ui
       - name: Build dev serve
         run: |
-          go build -o ./inngest-bin ./cmd/main.go
+          go build -cover -o ./inngest-bin ./cmd/main.go
       - name: Run E2E tests
         run: |
           cd ./tests/js
@@ -47,6 +50,7 @@ jobs:
           sleep 5
           cd ../../
           echo "Running dev server"
+          mkdir $GOCOVERDIR
           nohup ./inngest-bin dev --no-discovery 2> /tmp/dev-output.txt &
           echo "Ran dev server"
           sleep 5
@@ -59,6 +63,20 @@ jobs:
           TEST_MODE: true
           EXPERIMENTAL_KEY_QUEUES_ENABLE: "${{ matrix.experimentalKeyQueues }}"
 
+      - name: Convert coverage for tooling
+        run: |
+          ls -la $GOCOVERDIR
+          # pass in all the directories in coverage to be merged
+          go tool covdata percent -i=$GOCOVERDIR | tee coverage.txt
+
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          flags: ts-e2e,kq-${{ matrix.experimentalKeyQueues }}
+
+  # refs:
+  #  - https://go.dev/doc/build-cover
   golang:
     name: "Go SDK / OS: (${{ matrix.os }}), key-queues: ${{ matrix.experimentalKeyQueues }} / split: ${{ matrix.index }}"
     strategy:
@@ -77,10 +95,11 @@ jobs:
           go-version: "1.24"
       - name: Build dev server
         run: |
-          go build -o ./inngest-bin ./cmd/main.go
+          go build -cover -o ./inngest-bin ./cmd/main.go
       - name: Run E2E tests
         run: |
           echo "Running dev server"
+          mkdir $GOCOVERDIR
           nohup ./inngest-bin dev --no-discovery 2> /tmp/dev-output.txt &
           echo "Ran dev server"
           sleep 5
@@ -95,6 +114,18 @@ jobs:
           INNGEST_DEV: http://127.0.0.1:8288
           TEST_MODE: true
           EXPERIMENTAL_KEY_QUEUES_ENABLE: "${{ matrix.experimentalKeyQueues }}"
+
+      - name: Convert coverage for tooling
+        run: |
+          ls -la $GOCOVERDIR
+          # pass in all the directories in coverage to be merged
+          go tool covdata percent -i=$GOCOVERDIR | tee coverage.txt
+
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          flags: go-e2e,split-${{ matrix.index }},kq-${{ matrix.experimentalKeyQueues }}
 
   execution:
     name: "Execution / OS: (${{ matrix.os }}), key-queues: ${{ matrix.experimentalKeyQueues }}"
@@ -112,6 +143,12 @@ jobs:
           go-version: "1.24"
 
       - name: Run execution tests
-        run: go test ./tests/execution/... -v -count=1
+        run: go test ./tests/execution/... -v -count=1 -coverprofile=coverage.txt
         env:
           EXPERIMENTAL_KEY_QUEUES_ENABLE: "${{ matrix.experimentalKeyQueues }}"
+
+      - name: Upload coverage reports to Codecov
+        uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          flags: exec,kq-${{ matrix.experimentalKeyQueues }}
