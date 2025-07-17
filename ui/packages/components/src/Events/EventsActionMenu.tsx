@@ -10,7 +10,17 @@ import { RiSettingsLine } from '@remixicon/react';
 
 import { useBooleanSearchParam } from '../hooks/useSearchParam';
 
-export const InternalEventsToggle = () => {
+export type EventsActionMenuProps = {
+  setAutoRefresh?: () => void;
+  autoRefresh?: boolean;
+  intervalSeconds?: number;
+};
+
+export const EventsActionMenu = ({
+  autoRefresh,
+  setAutoRefresh,
+  intervalSeconds = 5,
+}: EventsActionMenuProps) => {
   const [includeInternalEvents, setIncludeInternalEvents, remove] =
     useBooleanSearchParam('includeInternal');
   const handleToggle = (include: boolean) => {
@@ -33,13 +43,35 @@ export const InternalEventsToggle = () => {
         />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem className="hover:bg-canvasBase">
-          <SwitchWrapper>
+        {autoRefresh && setAutoRefresh && (
+          <DropdownMenuItem className="hover:bg-canvasBase">
+            <div className="flex flex-col">
+              <div className="text-basis text-sm">Auto Refresh</div>
+              <div className="text-basis text-xs">
+                Refreshes data every {intervalSeconds} seconds
+              </div>
+            </div>
+            <div className="flex-1" />
+            <Switch
+              checked={autoRefresh}
+              className="data-[state=checked]:bg-primary-moderate"
+              onClick={(e) => {
+                e.stopPropagation();
+                setAutoRefresh();
+              }}
+            />
+          </DropdownMenuItem>
+        )}
+        <DropdownMenuItem className="hover:bg-canvasBase justify-between">
+          <SwitchWrapper className="flex-1 justify-between">
             <div className="text-basis text-sm">Show internal events</div>
             <Switch
               id="show-internal-events"
               checked={includeInternalEvents ?? true}
               onCheckedChange={handleToggle}
+              onClick={(e) => {
+                e.stopPropagation();
+              }}
             />
           </SwitchWrapper>
         </DropdownMenuItem>
