@@ -85,6 +85,8 @@ func WaitForSignal[T any](ctx context.Context, stepID string, opts WaitForSignal
 	}
 
 	if targetID != nil && *targetID != hashedID {
+		// Don't report this step since targeting is happening and it isn't
+		// targeted
 		panic(ControlHijack{})
 	}
 

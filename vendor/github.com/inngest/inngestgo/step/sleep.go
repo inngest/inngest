@@ -27,6 +27,8 @@ func Sleep(ctx context.Context, id string, duration time.Duration) {
 	}
 
 	if targetID != nil && *targetID != op.MustHash() {
+		// Don't report this step since targeting is happening and it isn't
+		// targeted
 		panic(ControlHijack{})
 	}
 

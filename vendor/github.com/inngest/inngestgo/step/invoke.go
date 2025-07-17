@@ -80,6 +80,8 @@ func Invoke[T any](ctx context.Context, id string, opts InvokeOpts) (T, error) {
 	}
 
 	if targetID != nil && *targetID != hashedID {
+		// Don't report this step since targeting is happening and it isn't
+		// targeted
 		panic(ControlHijack{})
 	}
 

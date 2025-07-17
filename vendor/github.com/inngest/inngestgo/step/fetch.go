@@ -79,6 +79,8 @@ func Fetch[OutputT any](
 	}
 
 	if targetID != nil && *targetID != hashedID {
+		// Don't report this step since targeting is happening and it isn't
+		// targeted
 		panic(ControlHijack{})
 	}
 
