@@ -275,7 +275,7 @@ func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp 
 	metrics.ActiveBacklogNormalizeCount(ctx, 1, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name}})
 	defer metrics.ActiveBacklogNormalizeCount(ctx, -1, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name}})
 
-	l := logger.StdlibLogger(ctx).With(
+	l := q.log.With(
 		"backlog", backlog,
 		"sp", sp,
 		"constraints", latestConstraints,
@@ -329,7 +329,7 @@ func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp 
 			existingThrottle := item.Data.Throttle
 			existingKeys := item.Data.GetConcurrencyKeys()
 
-			l = l.With(
+			log := l.With(
 				"item", item,
 				"existing_concurrency", existingKeys,
 				"existing_throttle", existingThrottle,
@@ -339,7 +339,7 @@ func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp 
 				// If event for item cannot be found, remove it from the backlog
 				err := q.Dequeue(ctx, shard, *item)
 				if err != nil {
-					l.Warn("could not dequeue queue item with missing event", "err", err)
+					log.Warn("could not dequeue queue item with missing event", "err", err)
 				}
 			}
 
@@ -354,7 +354,7 @@ func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp 
 			}
 			item.Data.CustomConcurrencyKeys = refreshedCustomConcurrencyKeys
 			item.Data.Identifier.CustomConcurrencyKeys = nil
-			l = l.With("refreshed_concurrency", refreshedCustomConcurrencyKeys)
+			log = log.With("refreshed_concurrency", refreshedCustomConcurrencyKeys)
 
 			refreshedThrottle, err := q.refreshItemThrottle(ctx, item)
 			if err != nil {
@@ -366,16 +366,16 @@ func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp 
 				return fmt.Errorf("could not refresh throttle for item: %w", err)
 			}
 			item.Data.Throttle = refreshedThrottle
-			l = l.With("refreshed_throttle", refreshedThrottle)
+			log = log.With("refreshed_throttle", refreshedThrottle)
 
 			targetBacklog := q.ItemBacklog(ctx, *item)
-			l = l.With("target", targetBacklog)
+			log = log.With("target", targetBacklog)
 
 			if reason := targetBacklog.isOutdated(latestConstraints); reason != enums.QueueNormalizeReasonUnchanged {
-				l.Warn("target backlog in normalization is outdated, this likely causes infinite normalization")
+				log.Warn("target backlog in normalization is outdated, this likely causes infinite normalization")
 			}
 
-			l.Debug("retrieved refreshed backlog")
+			log.Debug("retrieved refreshed backlog")
 
 			if _, err := q.EnqueueItem(ctx, shard, *item, time.UnixMilli(item.AtMS), osqueue.EnqueueOpts{
 				PassthroughJobId:       true,
