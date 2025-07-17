@@ -4,14 +4,15 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"errors"
+	"io"
+	"net/http"
+
 	"github.com/inngest/inngest/pkg/connect/state"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/oklog/ulid/v2"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/propagation"
-	"io"
-	"net/http"
 
 	"github.com/inngest/inngest/pkg/connect/auth"
 	"github.com/inngest/inngest/pkg/publicerr"
@@ -21,7 +22,7 @@ import (
 
 func (cr *connectApiRouter) start(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
-	connectionId, err := ulid.New(ulid.Now(), rand.Reader)
+	connectionID, err := ulid.New(ulid.Now(), rand.Reader)
 	if err != nil {
 		logger.StdlibLogger(ctx).Error("could not generate connection id", "err", err)
 
@@ -29,7 +30,7 @@ func (cr *connectApiRouter) start(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	l := logger.StdlibLogger(ctx).With("conn_id", connectionId)
+	l := logger.StdlibLogger(ctx).With("conn_id", connectionID)
 
 	hashedSigningKey := r.Header.Get("Authorization")
 	{
@@ -45,8 +46,6 @@ func (cr *connectApiRouter) start(w http.ResponseWriter, r *http.Request) {
 	}
 
 	envOverride := r.Header.Get("X-Inngest-Env")
-
-	l = l.With("key", hashedSigningKey, "env", envOverride)
 
 	res, err := cr.RequestAuther.AuthenticateRequest(ctx, hashedSigningKey, envOverride)
 	if err != nil {
@@ -98,7 +97,7 @@ func (cr *connectApiRouter) start(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	gatewayGroup, gatewayUrl, err := cr.ConnectGatewayRetriever.RetrieveGateway(ctx, RetrieveGatewayOpts{
+	gatewayGroup, gatewayURL, err := cr.ConnectGatewayRetriever.RetrieveGateway(ctx, RetrieveGatewayOpts{
 		AccountID:   res.AccountID,
 		EnvID:       res.EnvID,
 		Exclude:     reqBody.ExcludeGateways,
@@ -112,11 +111,11 @@ func (cr *connectApiRouter) start(w http.ResponseWriter, r *http.Request) {
 	}
 
 	msg, err := proto.Marshal(&connect.StartResponse{
-		GatewayEndpoint: gatewayUrl.String(),
+		GatewayEndpoint: gatewayURL.String(),
 		GatewayGroup:    gatewayGroup,
 		SessionToken:    token,
 		SyncToken:       hashedSigningKey,
-		ConnectionId:    connectionId.String(),
+		ConnectionId:    connectionID.String(),
 	})
 	if err != nil {
 		l.Error("could not marshal start response", "err", err)
@@ -149,7 +148,10 @@ func (cr *connectApiRouter) flushBuffer(w http.ResponseWriter, r *http.Request) 
 
 	res, err := cr.RequestAuther.AuthenticateRequest(ctx, hashedSigningKey, envOverride)
 	if err != nil {
-		logger.StdlibLogger(ctx).Error("could not authenticate connect start request", "err", err, "key", hashedSigningKey, "env", envOverride)
+		logger.StdlibLogger(ctx).Error(
+			"could not authenticate connect start request",
+			"err", err,
+		)
 
 		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 401, "authentication failed"))
 		return
@@ -184,8 +186,7 @@ func (cr *connectApiRouter) flushBuffer(w http.ResponseWriter, r *http.Request) 
 	}
 
 	traceCtx := trace.SystemTracer().Propagator().Extract(ctx, systemTraceCtx)
-	// nolint:ineffassign,staticcheck
-	traceCtx, span := cr.ConditionalTracer.NewSpan(traceCtx, "FlushMessage", res.AccountID, res.EnvID)
+	_, span := cr.ConditionalTracer.NewSpan(traceCtx, "FlushMessage", res.AccountID, res.EnvID)
 	defer span.End()
 
 	// Marshal response before notifying executor, marshaling should never fail
