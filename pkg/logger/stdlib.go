@@ -73,7 +73,7 @@ type Logger interface {
 	SLog() *slog.Logger
 
 	// ReportError is a wrapper over Error, and will also submit a report to the error report tool
-	ReportError(msg string, tags map[string]string, args ...any)
+	ReportError(msg string, tags map[string]string)
 }
 
 type LoggerOpt func(o *loggerOpts)
@@ -175,18 +175,21 @@ func newLogger(opts ...LoggerOpt) Logger {
 				},
 			})),
 			level: o.level,
+			attrs: []any{},
 		}
 
 	case TextHandler:
 		return &logger{
 			Logger: slog.New(slog.NewTextHandler(o.writer, &hopts)),
 			level:  o.level,
+			attrs:  []any{},
 		}
 
 	default:
 		return &logger{
 			Logger: slog.New(slog.NewJSONHandler(o.writer, &hopts)),
 			level:  o.level,
+			attrs:  []any{},
 		}
 	}
 }
@@ -251,6 +254,9 @@ func FromSlog(l *slog.Logger, level slog.Level) Logger {
 type logger struct {
 	*slog.Logger
 	level slog.Level
+
+	// attrs represent the additional attributes used for this logger
+	attrs []any
 }
 
 func (l *logger) Level() slog.Level {
@@ -265,6 +271,7 @@ func (l *logger) With(args ...any) Logger {
 	log := l.Logger.With(args...)
 	return &logger{
 		Logger: log,
+		attrs:  append(l.attrs, args...),
 	}
 }
 
@@ -296,11 +303,23 @@ func (l *logger) SLog() *slog.Logger {
 	return l.Logger
 }
 
-func (l *logger) ReportError(msg string, tags map[string]string, args ...any) {
+func (l *logger) ReportError(msg string, tags map[string]string) {
+	if sentry.CurrentHub().Client() == nil {
+		l.Warn("sentry is not initialized")
+		return
+	}
+
+	// only report to sentry if initialize
 	sentry.WithScope(func(scope *sentry.Scope) {
 		scope.SetTags(tags)
 		scope.SetLevel(sentry.LevelError)
 		sentry.CaptureException(errors.New(msg))
 	})
+
+	args := []any{}
+	for k, v := range tags {
+		args = append(args, k, v)
+	}
+
 	l.Error(msg, args...)
 }
