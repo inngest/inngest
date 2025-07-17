@@ -51,7 +51,6 @@ export function usePagination<T>({
 
   useEffect(() => {
     if (currentPage !== 1 && (currentPage > totalPages || currentPage < 1)) {
-      console.warn(`usePagination: currentPage is out of bounds; setting to 1.`);
       setCurrentPage(1);
     }
   }, [currentPage, totalPages]);
