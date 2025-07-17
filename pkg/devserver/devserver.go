@@ -552,6 +552,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		caching := apiv1.NewCacheMiddleware(cache)
 
 		apiv1.AddRoutes(r, apiv1.Opts{
+			AuthMiddleware:     authn.SigningKeyMiddleware(opts.SigningKey),
 			CachingMiddleware:  caching,
 			FunctionReader:     ds.Data,
 			FunctionRunReader:  ds.Data,
