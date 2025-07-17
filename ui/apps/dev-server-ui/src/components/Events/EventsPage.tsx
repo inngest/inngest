@@ -1,12 +1,12 @@
 'use client';
 
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@inngest/components/Button/Button';
+import { EventsActionMenu } from '@inngest/components/Events/EventsActionMenu';
 import { EventsTable } from '@inngest/components/Events/EventsTable';
-import { InternalEventsToggle } from '@inngest/components/Events/InternalEventsToggle';
 import { useReplayModal } from '@inngest/components/Events/useReplayModal';
 import { Header } from '@inngest/components/Header/Header';
-import { RefreshButton } from '@inngest/components/Refresh/RefreshButton';
 import { RiExternalLinkLine, RiRefreshLine } from '@remixicon/react';
 
 import SendEventButton from '@/components/Event/SendEventButton';
@@ -14,6 +14,8 @@ import SendEventModal from '@/components/Event/SendEventModal';
 import { EventInfo } from '@/components/Events/EventInfo';
 import { ExpandedRowActions } from '@/components/Events/ExpandedRowActions';
 import { useEventDetails, useEventPayload, useEvents } from '@/components/Events/useEvents';
+
+const pollInterval = 400;
 
 export default function EventsPage({
   eventTypeNames,
@@ -23,6 +25,7 @@ export default function EventsPage({
   showHeader?: boolean;
 }) {
   const router = useRouter();
+  const [autoRefresh, setAutoRefresh] = useState(true);
   const { isModalVisible, selectedEvent, openModal, closeModal } = useReplayModal();
 
   const getEvents = useEvents();
@@ -37,7 +40,6 @@ export default function EventsPage({
           infoIcon={<EventInfo />}
           action={
             <div className="flex items-center gap-1.5">
-              <RefreshButton />
               <SendEventButton
                 label="Send event"
                 data={JSON.stringify({
@@ -46,7 +48,11 @@ export default function EventsPage({
                   user: {},
                 })}
               />
-              <InternalEventsToggle />
+              <EventsActionMenu
+                setAutoRefresh={() => setAutoRefresh((v) => !v)}
+                autoRefresh={autoRefresh}
+                intervalSeconds={pollInterval / 1000}
+              />
             </div>
           }
         />
@@ -60,6 +66,8 @@ export default function EventsPage({
         features={{
           history: Number.MAX_SAFE_INTEGER,
         }}
+        pollInterval={pollInterval}
+        autoRefresh={autoRefresh}
         emptyActions={
           <>
             <Button
@@ -78,9 +86,20 @@ export default function EventsPage({
             />
           </>
         }
-        expandedRowActions={({ eventName, payload }) => (
-          <ExpandedRowActions eventName={eventName} payload={payload} onReplay={openModal} />
-        )}
+        expandedRowActions={({ eventName, payload }) => {
+          return (
+            <ExpandedRowActions
+              eventName={eventName}
+              payload={payload}
+              onReplay={() => {
+                if (!eventName || !payload) {
+                  return;
+                }
+                openModal(eventName, payload);
+              }}
+            />
+          );
+        }}
       />
       {selectedEvent && (
         <SendEventModal isOpen={isModalVisible} onClose={closeModal} data={selectedEvent.data} />

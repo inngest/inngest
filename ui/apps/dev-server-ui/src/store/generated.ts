@@ -511,6 +511,7 @@ export type Query = {
   app: Maybe<App>;
   apps: Array<App>;
   event: Maybe<Event>;
+  eventV2: EventV2;
   events: Maybe<Array<Event>>;
   eventsV2: EventsConnection;
   functionBySlug: Maybe<Function>;
@@ -538,6 +539,11 @@ export type QueryAppsArgs = {
 
 export type QueryEventArgs = {
   query: EventQuery;
+};
+
+
+export type QueryEventV2Args = {
+  id: Scalars['ULID'];
 };
 
 
@@ -1103,6 +1109,39 @@ export type CountWorkerConnectionsQueryVariables = Exact<{
 
 export type CountWorkerConnectionsQuery = { __typename?: 'Query', workerConnections: { __typename?: 'ConnectV1WorkerConnectionsConnection', totalCount: number } };
 
+export type GetEventsV2QueryVariables = Exact<{
+  cursor: InputMaybe<Scalars['String']>;
+  startTime: Scalars['Time'];
+  endTime: InputMaybe<Scalars['Time']>;
+  celQuery?: InputMaybe<Scalars['String']>;
+  eventNames?: InputMaybe<Array<Scalars['String']> | Scalars['String']>;
+  includeInternalEvents?: InputMaybe<Scalars['Boolean']>;
+}>;
+
+
+export type GetEventsV2Query = { __typename?: 'Query', eventsV2: { __typename?: 'EventsConnection', totalCount: number, edges: Array<{ __typename?: 'EventsEdge', node: { __typename?: 'EventV2', name: string, id: any, receivedAt: any, runs: Array<{ __typename?: 'FunctionRunV2', status: FunctionRunStatus, id: any, startedAt: any | null, endedAt: any | null, function: { __typename?: 'Function', name: string, slug: string } }> } }>, pageInfo: { __typename?: 'PageInfo', hasNextPage: boolean, endCursor: string | null, hasPreviousPage: boolean, startCursor: string | null } } };
+
+export type GetEventV2QueryVariables = Exact<{
+  eventID: Scalars['ULID'];
+}>;
+
+
+export type GetEventV2Query = { __typename?: 'Query', eventV2: { __typename?: 'EventV2', name: string, id: any, receivedAt: any, idempotencyKey: string | null, occurredAt: any, version: string | null, source: { __typename?: 'EventSource', name: string | null } | null } };
+
+export type GetEventV2PayloadQueryVariables = Exact<{
+  eventID: Scalars['ULID'];
+}>;
+
+
+export type GetEventV2PayloadQuery = { __typename?: 'Query', eventV2: { __typename?: 'EventV2', raw: string } };
+
+export type GetEventV2RunsQueryVariables = Exact<{
+  eventID: Scalars['ULID'];
+}>;
+
+
+export type GetEventV2RunsQuery = { __typename?: 'Query', eventV2: { __typename?: 'EventV2', name: string, runs: Array<{ __typename?: 'FunctionRunV2', status: FunctionRunStatus, id: any, startedAt: any | null, endedAt: any | null, function: { __typename?: 'Function', name: string, slug: string } }> } };
+
 export const TraceDetailsFragmentDoc = `
     fragment TraceDetails on RunTraceSpan {
   name
@@ -1648,6 +1687,79 @@ export const CountWorkerConnectionsDocument = `
   }
 }
     `;
+export const GetEventsV2Document = `
+    query GetEventsV2($cursor: String, $startTime: Time!, $endTime: Time, $celQuery: String = null, $eventNames: [String!] = null, $includeInternalEvents: Boolean = true) {
+  eventsV2(
+    first: 30
+    after: $cursor
+    filter: {from: $startTime, until: $endTime, query: $celQuery, eventNames: $eventNames, includeInternalEvents: $includeInternalEvents}
+  ) {
+    edges {
+      node {
+        name
+        id
+        receivedAt
+        runs {
+          status
+          id
+          startedAt
+          endedAt
+          function {
+            name
+            slug
+          }
+        }
+      }
+    }
+    totalCount
+    pageInfo {
+      hasNextPage
+      endCursor
+      hasPreviousPage
+      startCursor
+    }
+  }
+}
+    `;
+export const GetEventV2Document = `
+    query GetEventV2($eventID: ULID!) {
+  eventV2(id: $eventID) {
+    name
+    id
+    receivedAt
+    idempotencyKey
+    occurredAt
+    version
+    source {
+      name
+    }
+  }
+}
+    `;
+export const GetEventV2PayloadDocument = `
+    query GetEventV2Payload($eventID: ULID!) {
+  eventV2(id: $eventID) {
+    raw
+  }
+}
+    `;
+export const GetEventV2RunsDocument = `
+    query GetEventV2Runs($eventID: ULID!) {
+  eventV2(id: $eventID) {
+    name
+    runs {
+      status
+      id
+      startedAt
+      endedAt
+      function {
+        name
+        slug
+      }
+    }
+  }
+}
+    `;
 
 const injectedRtkApi = api.injectEndpoints({
   endpoints: (build) => ({
@@ -1723,9 +1835,21 @@ const injectedRtkApi = api.injectEndpoints({
     CountWorkerConnections: build.query<CountWorkerConnectionsQuery, CountWorkerConnectionsQueryVariables>({
       query: (variables) => ({ document: CountWorkerConnectionsDocument, variables })
     }),
+    GetEventsV2: build.query<GetEventsV2Query, GetEventsV2QueryVariables>({
+      query: (variables) => ({ document: GetEventsV2Document, variables })
+    }),
+    GetEventV2: build.query<GetEventV2Query, GetEventV2QueryVariables>({
+      query: (variables) => ({ document: GetEventV2Document, variables })
+    }),
+    GetEventV2Payload: build.query<GetEventV2PayloadQuery, GetEventV2PayloadQueryVariables>({
+      query: (variables) => ({ document: GetEventV2PayloadDocument, variables })
+    }),
+    GetEventV2Runs: build.query<GetEventV2RunsQuery, GetEventV2RunsQueryVariables>({
+      query: (variables) => ({ document: GetEventV2RunsDocument, variables })
+    }),
   }),
 });
 
 export { injectedRtkApi as api };
-export const { useGetEventQuery, useLazyGetEventQuery, useGetFunctionRunQuery, useLazyGetFunctionRunQuery, useGetFunctionsQuery, useLazyGetFunctionsQuery, useGetFunctionQuery, useLazyGetFunctionQuery, useGetAppsQuery, useLazyGetAppsQuery, useGetAppQuery, useLazyGetAppQuery, useCreateAppMutation, useUpdateAppMutation, useDeleteAppMutation, useGetTriggersStreamQuery, useLazyGetTriggersStreamQuery, useGetFunctionRunStatusQuery, useLazyGetFunctionRunStatusQuery, useGetFunctionRunOutputQuery, useLazyGetFunctionRunOutputQuery, useGetHistoryItemOutputQuery, useLazyGetHistoryItemOutputQuery, useInvokeFunctionMutation, useCancelRunMutation, useRerunMutation, useRerunFromStepMutation, useGetRunsQuery, useLazyGetRunsQuery, useCountRunsQuery, useLazyCountRunsQuery, useGetRunQuery, useLazyGetRunQuery, useGetTraceResultQuery, useLazyGetTraceResultQuery, useGetTriggerQuery, useLazyGetTriggerQuery, useGetWorkerConnectionsQuery, useLazyGetWorkerConnectionsQuery, useCountWorkerConnectionsQuery, useLazyCountWorkerConnectionsQuery } = injectedRtkApi;
+export const { useGetEventQuery, useLazyGetEventQuery, useGetFunctionRunQuery, useLazyGetFunctionRunQuery, useGetFunctionsQuery, useLazyGetFunctionsQuery, useGetFunctionQuery, useLazyGetFunctionQuery, useGetAppsQuery, useLazyGetAppsQuery, useGetAppQuery, useLazyGetAppQuery, useCreateAppMutation, useUpdateAppMutation, useDeleteAppMutation, useGetTriggersStreamQuery, useLazyGetTriggersStreamQuery, useGetFunctionRunStatusQuery, useLazyGetFunctionRunStatusQuery, useGetFunctionRunOutputQuery, useLazyGetFunctionRunOutputQuery, useGetHistoryItemOutputQuery, useLazyGetHistoryItemOutputQuery, useInvokeFunctionMutation, useCancelRunMutation, useRerunMutation, useRerunFromStepMutation, useGetRunsQuery, useLazyGetRunsQuery, useCountRunsQuery, useLazyCountRunsQuery, useGetRunQuery, useLazyGetRunQuery, useGetTraceResultQuery, useLazyGetTraceResultQuery, useGetTriggerQuery, useLazyGetTriggerQuery, useGetWorkerConnectionsQuery, useLazyGetWorkerConnectionsQuery, useCountWorkerConnectionsQuery, useLazyCountWorkerConnectionsQuery, useGetEventsV2Query, useLazyGetEventsV2Query, useGetEventV2Query, useLazyGetEventV2Query, useGetEventV2PayloadQuery, useLazyGetEventV2PayloadQuery, useGetEventV2RunsQuery, useLazyGetEventV2RunsQuery } = injectedRtkApi;
 

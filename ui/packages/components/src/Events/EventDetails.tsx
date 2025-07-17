@@ -39,6 +39,8 @@ export function EventDetails({
   getEventRuns,
   expandedRowActions,
   standalone,
+  pollInterval,
+  autoRefresh,
 }: {
   initialData?: Pick<Event, 'name' | 'runs'>;
   eventID: string;
@@ -47,6 +49,8 @@ export function EventDetails({
   getEventRuns?: ({ eventID }: { eventID: string }) => Promise<Pick<Event, 'runs' | 'name'>>;
   expandedRowActions: React.ComponentProps<typeof EventsTable>['expandedRowActions'];
   standalone: boolean;
+  pollInterval?: number;
+  autoRefresh?: boolean;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const leftColumnRef = useRef<HTMLDivElement>(null);
@@ -66,6 +70,7 @@ export function EventDetails({
     queryFn: useCallback(() => {
       return getEventDetails({ eventID: eventID });
     }, [getEventDetails, eventID]),
+    refetchInterval: autoRefresh ? pollInterval : false,
   });
 
   const {
@@ -78,6 +83,7 @@ export function EventDetails({
     queryFn: useCallback(() => {
       return getEventPayload({ eventID: eventID });
     }, [getEventPayload, eventID]),
+    refetchInterval: autoRefresh ? pollInterval : false,
   });
 
   const {
@@ -94,6 +100,7 @@ export function EventDetails({
       return getEventRuns({ eventID });
     }, [getEventRuns, eventID]),
     enabled: !!getEventRuns,
+    refetchInterval: autoRefresh ? pollInterval : false,
   });
 
   const handleMouseDown = useCallback(() => {
