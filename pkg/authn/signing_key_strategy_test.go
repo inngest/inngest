@@ -12,7 +12,7 @@ import (
 func TestHandleSigningKey(t *testing.T) {
 	trustedKey := "signkey-test-abc123def456"
 	trustedKeyNormalized := "abc123def456"
-	hashedTrusted, err := hashedSigningKey(trustedKeyNormalized)
+	hashedTrusted, err := HashedSigningKey(trustedKeyNormalized)
 	require.NoError(t, err)
 
 	t.Run("should accept valid plain text key", func(t *testing.T) {
@@ -112,7 +112,7 @@ func TestSigningKeyMiddleware(t *testing.T) {
 	t.Run("should authenticate with hashed signing key", func(t *testing.T) {
 		middleware := SigningKeyMiddleware(&trustedKey)
 
-		hashedKey, err := hashedSigningKey("abc123def456")
+		hashedKey, err := HashedSigningKey("abc123def456")
 		require.NoError(t, err)
 
 		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -247,13 +247,13 @@ func TestNormalizeKey(t *testing.T) {
 func TestHashedSigningKey(t *testing.T) {
 	t.Run("should hash valid hex key", func(t *testing.T) {
 		key := "abc123def456"
-		hashed, err := hashedSigningKey(key)
+		hashed, err := HashedSigningKey(key)
 		require.NoError(t, err)
 		require.NotEmpty(t, hashed)
 		require.NotEqual(t, key, hashed)
 
 		// Hash should be deterministic
-		hashed2, err := hashedSigningKey(key)
+		hashed2, err := HashedSigningKey(key)
 		require.NoError(t, err)
 		require.Equal(t, hashed, hashed2)
 	})
@@ -262,10 +262,10 @@ func TestHashedSigningKey(t *testing.T) {
 		keyWithPrefix := "signkey-test-abc123def456"
 		keyWithoutPrefix := "abc123def456"
 
-		hashed1, err := hashedSigningKey(keyWithPrefix)
+		hashed1, err := HashedSigningKey(keyWithPrefix)
 		require.NoError(t, err)
 
-		hashed2, err := hashedSigningKey(keyWithoutPrefix)
+		hashed2, err := HashedSigningKey(keyWithoutPrefix)
 		require.NoError(t, err)
 
 		require.Equal(t, hashed1, hashed2)
@@ -273,12 +273,12 @@ func TestHashedSigningKey(t *testing.T) {
 
 	t.Run("should return error for invalid hex", func(t *testing.T) {
 		invalidHex := "xyz123"
-		_, err := hashedSigningKey(invalidHex)
+		_, err := HashedSigningKey(invalidHex)
 		require.Error(t, err)
 	})
 
 	t.Run("should handle empty string", func(t *testing.T) {
-		hashed, err := hashedSigningKey("")
+		hashed, err := HashedSigningKey("")
 		require.NoError(t, err)
 		require.NotEmpty(t, hashed)
 		// Empty string should produce a consistent hash
