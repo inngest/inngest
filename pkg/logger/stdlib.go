@@ -2,11 +2,13 @@ package logger
 
 import (
 	"context"
+	"errors"
 	"io"
 	"log/slog"
 	"os"
 	"strings"
 
+	"github.com/getsentry/sentry-go"
 	"github.com/lmittmann/tint"
 )
 
@@ -69,6 +71,9 @@ type Logger interface {
 	Emergency(msg string, args ...any)
 	EmergencyContext(ctx context.Context, msg string, args ...any)
 	SLog() *slog.Logger
+
+	// ReportError is a wrapper over Error, and will also submit a report to the error report tool
+	ReportError(msg string, tags map[string]string, args ...any)
 }
 
 type LoggerOpt func(o *loggerOpts)
@@ -289,4 +294,13 @@ func (l *logger) EmergencyContext(ctx context.Context, msg string, args ...any) 
 
 func (l *logger) SLog() *slog.Logger {
 	return l.Logger
+}
+
+func (l *logger) ReportError(msg string, tags map[string]string, args ...any) {
+	sentry.WithScope(func(scope *sentry.Scope) {
+		scope.SetTags(tags)
+		scope.SetLevel(sentry.LevelError)
+		sentry.CaptureException(errors.New(msg))
+	})
+	l.Error(msg, args...)
 }
