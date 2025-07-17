@@ -73,7 +73,7 @@ jobs:
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          flags: ts-e2e
+          flags: ts-e2e,kq-${{ matrix.experimentalKeyQueues }}
 
   # refs:
   #  - https://go.dev/doc/build-cover

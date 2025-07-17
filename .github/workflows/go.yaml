@@ -54,4 +54,4 @@ jobs:
         uses: codecov/codecov-action@v5
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
-          flags: unit
+          flags: unit,kq-${{ matrix.experimentalKeyQueues }}
