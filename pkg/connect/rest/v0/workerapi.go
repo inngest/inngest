@@ -189,7 +189,6 @@ func (cr *connectApiRouter) flushBuffer(w http.ResponseWriter, r *http.Request) 
 	}
 
 	traceCtx := trace.SystemTracer().Propagator().Extract(ctx, systemTraceCtx)
-	// nolint:ineffassign,staticcheck
 	_, span := cr.ConditionalTracer.NewSpan(traceCtx, "FlushMessage", res.AccountID, res.EnvID)
 	defer span.End()
 
