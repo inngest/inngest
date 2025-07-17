@@ -39,12 +39,6 @@ func SigningKeyMiddleware(signingKey *string) func(http.Handler) http.Handler {
 
 			token := TokenFromHeader(r)
 
-			if len(token) == 0 {
-				// No signing key provided, deny access
-				http.Error(w, "Authentication failed", http.StatusUnauthorized)
-				return
-			}
-
 			authCtx, err := HandleSigningKey(r.Context(), token, *signingKey)
 			if err != nil {
 				http.Error(w, "Authentication failed", http.StatusUnauthorized)
@@ -59,6 +53,9 @@ func SigningKeyMiddleware(signingKey *string) func(http.Handler) http.Handler {
 }
 
 func HandleSigningKey(ctx context.Context, clientProvidedKey string, trustedSigningKey string) (*AuthContext, error) {
+	if len(clientProvidedKey) == 0 {
+		return nil, errors.New("invalid signing key")
+	}
 	// normalize both trusted and provided keys (strip human readable headers)
 	normalizedClientKey := normalizeKey(clientProvidedKey)
 	normalizedTrustedKey := normalizeKey(trustedSigningKey)
