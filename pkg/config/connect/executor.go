@@ -24,11 +24,8 @@ func Executor(ctx context.Context) ConnectExecutor {
 		ipKey := "connect.executor.grpc.ip"
 		portKey := "connect.executor.grpc.port"
 
-		viper.SetDefault(ipKey, getOutboundIP())
-		viper.SetDefault(portKey, 50053)
-
-		ipStr := viper.GetString(ipKey)
-		port := viper.GetUint32(portKey)
+		ipStr := getWithDefault(ipKey, getOutboundIP(), viper.GetString)
+		port := getWithDefault(portKey, uint32(50053), viper.GetUint32)
 
 		ip := net.ParseIP(ipStr)
 		if ip == nil {

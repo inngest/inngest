@@ -84,10 +84,10 @@ const documents = {
     "\n  mutation DisableDatadogConnection($connectionID: UUID!) {\n    disableDatadogConnection(connectionID: $connectionID)\n  }\n": types.DisableDatadogConnectionDocument,
     "\n  mutation RemoveDatadogOrganization($organizationID: UUID!) {\n    removeDatadogOrganization(organizationID: $organizationID)\n  }\n": types.RemoveDatadogOrganizationDocument,
     "\n  mutation StartDatadogIntegration($ddSite: String!, $ddDomain: String!) {\n    datadogOAuthRedirectURL(ddSite: $ddSite, ddDomain: $ddDomain)\n  }\n": types.StartDatadogIntegrationDocument,
-    "\n  mutation ArchiveEnvironment($id: ID!) {\n    archiveEnvironment(id: $id) {\n      id\n    }\n  }\n": types.ArchiveEnvironmentDocument,
-    "\n  mutation UnarchiveEnvironment($id: ID!) {\n    unarchiveEnvironment(id: $id) {\n      id\n    }\n  }\n": types.UnarchiveEnvironmentDocument,
     "\n  mutation DisableEnvironmentAutoArchiveDocument($id: ID!) {\n    disableEnvironmentAutoArchive(id: $id) {\n      id\n    }\n  }\n": types.DisableEnvironmentAutoArchiveDocumentDocument,
     "\n  mutation EnableEnvironmentAutoArchive($id: ID!) {\n    enableEnvironmentAutoArchive(id: $id) {\n      id\n    }\n  }\n": types.EnableEnvironmentAutoArchiveDocument,
+    "\n  mutation ArchiveEnvironment($id: ID!) {\n    archiveEnvironment(id: $id) {\n      id\n    }\n  }\n": types.ArchiveEnvironmentDocument,
+    "\n  mutation UnarchiveEnvironment($id: ID!) {\n    unarchiveEnvironment(id: $id) {\n      id\n    }\n  }\n": types.UnarchiveEnvironmentDocument,
     "\n  query GetEventTypesV2($envID: ID!, $cursor: String, $archived: Boolean, $nameSearch: String) {\n    environment: workspace(id: $envID) {\n      eventTypesV2(\n        after: $cursor\n        first: 30\n        filter: { archived: $archived, nameSearch: $nameSearch }\n      ) {\n        edges {\n          node {\n            name\n            functions {\n              edges {\n                node {\n                  id\n                  slug\n                  name\n                }\n              }\n            }\n          }\n        }\n        pageInfo {\n          hasNextPage\n          endCursor\n          hasPreviousPage\n          startCursor\n        }\n      }\n    }\n  }\n": types.GetEventTypesV2Document,
     "\n  query GetEventTypeVolumeV2($envID: ID!, $eventName: String!, $startTime: Time!, $endTime: Time!) {\n    environment: workspace(id: $envID) {\n      eventType(name: $eventName) {\n        name\n        usage(opts: { period: hour, from: $startTime, to: $endTime }) {\n          total\n          data {\n            count\n            slot\n          }\n        }\n      }\n    }\n  }\n": types.GetEventTypeVolumeV2Document,
     "\n  query GetEventType($envID: ID!, $eventName: String!) {\n    environment: workspace(id: $envID) {\n      eventType(name: $eventName) {\n        name\n        functions {\n          edges {\n            node {\n              id\n              slug\n              name\n            }\n          }\n        }\n      }\n    }\n  }\n": types.GetEventTypeDocument,
@@ -447,19 +447,19 @@ export function graphql(source: "\n  mutation StartDatadogIntegration($ddSite: S
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
-export function graphql(source: "\n  mutation ArchiveEnvironment($id: ID!) {\n    archiveEnvironment(id: $id) {\n      id\n    }\n  }\n"): (typeof documents)["\n  mutation ArchiveEnvironment($id: ID!) {\n    archiveEnvironment(id: $id) {\n      id\n    }\n  }\n"];
-/**
- * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
- */
-export function graphql(source: "\n  mutation UnarchiveEnvironment($id: ID!) {\n    unarchiveEnvironment(id: $id) {\n      id\n    }\n  }\n"): (typeof documents)["\n  mutation UnarchiveEnvironment($id: ID!) {\n    unarchiveEnvironment(id: $id) {\n      id\n    }\n  }\n"];
-/**
- * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
- */
 export function graphql(source: "\n  mutation DisableEnvironmentAutoArchiveDocument($id: ID!) {\n    disableEnvironmentAutoArchive(id: $id) {\n      id\n    }\n  }\n"): (typeof documents)["\n  mutation DisableEnvironmentAutoArchiveDocument($id: ID!) {\n    disableEnvironmentAutoArchive(id: $id) {\n      id\n    }\n  }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */
 export function graphql(source: "\n  mutation EnableEnvironmentAutoArchive($id: ID!) {\n    enableEnvironmentAutoArchive(id: $id) {\n      id\n    }\n  }\n"): (typeof documents)["\n  mutation EnableEnvironmentAutoArchive($id: ID!) {\n    enableEnvironmentAutoArchive(id: $id) {\n      id\n    }\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation ArchiveEnvironment($id: ID!) {\n    archiveEnvironment(id: $id) {\n      id\n    }\n  }\n"): (typeof documents)["\n  mutation ArchiveEnvironment($id: ID!) {\n    archiveEnvironment(id: $id) {\n      id\n    }\n  }\n"];
+/**
+ * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
+ */
+export function graphql(source: "\n  mutation UnarchiveEnvironment($id: ID!) {\n    unarchiveEnvironment(id: $id) {\n      id\n    }\n  }\n"): (typeof documents)["\n  mutation UnarchiveEnvironment($id: ID!) {\n    unarchiveEnvironment(id: $id) {\n      id\n    }\n  }\n"];
 /**
  * The graphql function is used to parse GraphQL queries into a document that can be used by GraphQL clients.
  */

@@ -21,16 +21,20 @@ var (
 	configOnce    sync.Once
 )
 
+func getWithDefault[T any](key string, defaultValue T, getter func(string) T) T {
+	if viper.IsSet(key) {
+		return getter(key)
+	}
+	return defaultValue
+}
+
 func Gateway(ctx context.Context) ConnectGateway {
 	configOnce.Do(func() {
 		ipKey := "connect.gateway.grpc.ip"
 		portKey := "connect.gateway.grpc.port"
 
-		viper.SetDefault(ipKey, getOutboundIP())
-		viper.SetDefault(portKey, 50052)
-
-		ipStr := viper.GetString(ipKey)
-		port := viper.GetUint32(portKey)
+		ipStr := getWithDefault(ipKey, getOutboundIP(), viper.GetString)
+		port := getWithDefault(portKey, uint32(50052), viper.GetUint32)
 
 		ip := net.ParseIP(ipStr)
 		if ip == nil {
