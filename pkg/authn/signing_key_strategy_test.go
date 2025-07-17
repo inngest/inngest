@@ -76,7 +76,7 @@ func TestSigningKeyMiddleware(t *testing.T) {
 
 		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte("success"))
+			_, _ = w.Write([]byte("success"))
 		})
 
 		req := httptest.NewRequest("GET", "/test", nil)
@@ -96,7 +96,7 @@ func TestSigningKeyMiddleware(t *testing.T) {
 			require.NotNil(t, authCtx)
 
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte("authenticated"))
+			_, _ = w.Write([]byte("authenticated"))
 		})
 
 		req := httptest.NewRequest("GET", "/test", nil)
@@ -117,7 +117,7 @@ func TestSigningKeyMiddleware(t *testing.T) {
 
 		handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
-			w.Write([]byte("authenticated"))
+			_, _ = w.Write([]byte("authenticated"))
 		})
 
 		req := httptest.NewRequest("GET", "/test", nil)
