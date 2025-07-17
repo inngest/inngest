@@ -73,7 +73,7 @@ type Logger interface {
 	SLog() *slog.Logger
 
 	// ReportError is a wrapper over Error, and will also submit a report to the error report tool
-	ReportError(msg string, tags map[string]string)
+	ReportError(msg string, tags map[string]string, opts ...ReportErrorOpt)
 }
 
 type LoggerOpt func(o *loggerOpts)
