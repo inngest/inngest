@@ -65,16 +65,14 @@ export function CustomEnvironmentListTable({
           </tbody>
         </table>
       </div>
-      {totalEnvs > 0 && (
-        <div className="border-subtle flex border-t px-1 py-1">
-          <FilterResultDetails denominator={totalEnvs} numerator={envs.length} />
-          {totalCustomEnvsPages > 1 && (
-            <div className="flex flex-1">
-              <CustomEnvsPagination className="justify-end max-[625px]:justify-center" />
-            </div>
-          )}
-        </div>
-      )}
+      <div className="border-subtle flex border-t px-1 py-1">
+        <FilterResultDetails hasFilter={searchParam !== ''} size={envs.length} />
+        {totalCustomEnvsPages > 1 && (
+          <div className="flex flex-1">
+            <CustomEnvsPagination className="justify-end max-[625px]:justify-center" />
+          </div>
+        )}
+      </div>
     </div>
   );
 }

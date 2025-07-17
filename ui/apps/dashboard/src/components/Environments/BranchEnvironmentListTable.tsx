@@ -101,16 +101,14 @@ export default function BranchEnvironmentListTable({
           </tbody>
         </table>
       </div>
-      {totalEnvs > 0 && (
-        <div className="border-subtle flex border-t px-1 py-1">
-          <FilterResultDetails denominator={totalEnvs} numerator={envs.length} />
-          {totalBranchEnvsPages > 1 && (
-            <div className="flex flex-1 items-center">
-              <BranchEnvsPagination className="justify-end max-[625px]:justify-center" />
-            </div>
-          )}
-        </div>
-      )}
+      <div className="border-subtle flex border-t px-1 py-1">
+        <FilterResultDetails hasFilter={searchParam !== ''} size={envs.length} />
+        {totalBranchEnvsPages > 1 && (
+          <div className="flex flex-1">
+            <BranchEnvsPagination className="justify-end max-[625px]:justify-center" />
+          </div>
+        )}
+      </div>
     </div>
   );
 }
