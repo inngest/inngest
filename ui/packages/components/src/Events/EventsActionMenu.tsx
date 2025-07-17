@@ -43,7 +43,7 @@ export const EventsActionMenu = ({
         />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        {autoRefresh && setAutoRefresh && (
+        {setAutoRefresh && (
           <DropdownMenuItem className="hover:bg-canvasBase">
             <div className="flex flex-col">
               <div className="text-basis text-sm">Auto Refresh</div>
