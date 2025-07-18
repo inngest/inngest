@@ -21,9 +21,12 @@ import (
 )
 
 const (
-	NormalizeAccountPeekMax   = int64(30)
+	// NormalizeAccountPeekMax sets the maximum number of accounts that can be peeked from the global normalization index.
+	NormalizeAccountPeekMax = int64(30)
+	// NormalizePartitionPeekMax sets the maximum number of backlogs that can be peeked from the shadow partition.
 	NormalizePartitionPeekMax = int64(100)
-	NormalizeBacklogPeekMax   = int64(300) // same as ShadowPartitionPeekMax
+	// NormalizeBacklogPeekMax sets the maximum number of items that can be peeked from a backlog during normalization.
+	NormalizeBacklogPeekMax = int64(100) // same as ShadowPartitionPeekMax
 
 	// BacklogRefillHardLimit sets the maximum number of items that can be refilled in a single backlogRefill operation.
 	BacklogRefillHardLimit = int64(1000)
@@ -494,7 +497,7 @@ func (q *queue) BacklogNormalizePeek(ctx context.Context, b *QueueBacklog, limit
 		q:               q,
 		opName:          "BacklogNormalizePeek",
 		keyMetadataHash: q.primaryQueueShard.RedisClient.kg.QueueItem(),
-		max:             NormalizePartitionPeekMax,
+		max:             NormalizeBacklogPeekMax,
 		maker: func() *osqueue.QueueItem {
 			return &osqueue.QueueItem{}
 		},
