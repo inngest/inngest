@@ -103,7 +103,9 @@ func (r *mutationResolver) InvokeFunction(
 			Data: data,
 			User: user,
 		},
-		FnID: functionSlug,
+		FnID:           functionSlug,
+		DebugSessionID: debugSessionID,
+		DebugRunID:     debugRunID,
 	})
 
 	ctx, span := run.NewSpan(ctx,

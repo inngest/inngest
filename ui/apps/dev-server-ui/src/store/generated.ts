@@ -478,6 +478,8 @@ export type MutationDeleteAppByNameArgs = {
 
 export type MutationInvokeFunctionArgs = {
   data: InputMaybe<Scalars['Map']>;
+  debugRunID: InputMaybe<Scalars['ULID']>;
+  debugSessionID: InputMaybe<Scalars['ULID']>;
   functionSlug: Scalars['String'];
   user: InputMaybe<Scalars['Map']>;
 };
@@ -1017,6 +1019,8 @@ export type InvokeFunctionMutationVariables = Exact<{
   functionSlug: Scalars['String'];
   data: InputMaybe<Scalars['Map']>;
   user: InputMaybe<Scalars['Map']>;
+  debugSessionID: InputMaybe<Scalars['ULID']>;
+  debugRunID: InputMaybe<Scalars['ULID']>;
 }>;
 
 
@@ -1039,6 +1043,8 @@ export type RerunMutation = { __typename?: 'Mutation', rerun: any };
 export type RerunFromStepMutationVariables = Exact<{
   runID: Scalars['ULID'];
   fromStep: RerunFromStepInput;
+  debugSessionID?: InputMaybe<Scalars['ULID']>;
+  debugRunID?: InputMaybe<Scalars['ULID']>;
 }>;
 
 
@@ -1510,8 +1516,14 @@ export const GetHistoryItemOutputDocument = `
 }
     `;
 export const InvokeFunctionDocument = `
-    mutation InvokeFunction($functionSlug: String!, $data: Map, $user: Map) {
-  invokeFunction(data: $data, functionSlug: $functionSlug, user: $user)
+    mutation InvokeFunction($functionSlug: String!, $data: Map, $user: Map, $debugSessionID: ULID, $debugRunID: ULID) {
+  invokeFunction(
+    data: $data
+    functionSlug: $functionSlug
+    user: $user
+    debugSessionID: $debugSessionID
+    debugRunID: $debugRunID
+  )
 }
     `;
 export const CancelRunDocument = `
@@ -1527,8 +1539,13 @@ export const RerunDocument = `
 }
     `;
 export const RerunFromStepDocument = `
-    mutation RerunFromStep($runID: ULID!, $fromStep: RerunFromStepInput!) {
-  rerun(runID: $runID, fromStep: $fromStep)
+    mutation RerunFromStep($runID: ULID!, $fromStep: RerunFromStepInput!, $debugSessionID: ULID = null, $debugRunID: ULID = null) {
+  rerun(
+    runID: $runID
+    fromStep: $fromStep
+    debugSessionID: $debugSessionID
+    debugRunID: $debugRunID
+  )
 }
     `;
 export const GetRunsDocument = `

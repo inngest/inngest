@@ -757,6 +757,14 @@ func Initialize(ctx context.Context, opts InitOpts) (*sv2.Metadata, error) {
 	// use the internal event ID
 	idempotencyKey := tracked.GetEvent().ID
 
+	var debugSessionID, debugRunID *ulid.ULID
+	if evt := tracked.GetEvent(); evt.IsInvokeEvent() {
+		if metadata, err := evt.InngestMetadata(); err == nil {
+			debugSessionID = metadata.DebugSessionID
+			debugRunID = metadata.DebugRunID
+		}
+	}
+
 	// If this is a debounced function, run this through a debouncer.
 	md, err := opts.exec.Schedule(ctx, execution.ScheduleRequest{
 		WorkspaceID:    wsID,
@@ -765,6 +773,8 @@ func Initialize(ctx context.Context, opts InitOpts) (*sv2.Metadata, error) {
 		Events:         []event.TrackedEvent{tracked},
 		IdempotencyKey: &idempotencyKey,
 		AccountID:      consts.DevServerAccountID,
+		DebugSessionID: debugSessionID,
+		DebugRunID:     debugRunID,
 	})
 
 	switch err {
