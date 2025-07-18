@@ -698,7 +698,7 @@ func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 		log:                            logger.StdlibLogger(ctx),
 		partitionIteratorInterval:      DefaultPartitionIterateInterval,
 		partitionIteratorChunkSize:     DefaultPartitionIterateChunkSize,
-		pa:wrtitionConstraintConfigGetter: func(ctx context.Context, pi PartitionIdentifier) PartitionConstraintConfig {
+		partitionConstraintConfigGetter: func(ctx context.Context, pi PartitionIdentifier) PartitionConstraintConfig {
 			def := defaultConcurrency
 
 			return PartitionConstraintConfig{
@@ -2278,7 +2278,8 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 		Tags: map[string]any{
 			"queue_shard": q.primaryQueueShard.Name,
 			"op":          "item",
-		}},
+		},
+	},
 	)
 
 	l := q.log.With("item_delay", itemDelay.String())
@@ -2289,7 +2290,8 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 		Tags: map[string]any{
 			"queue_shard": q.primaryQueueShard.Name,
 			"op":          "refill",
-		}},
+		},
+	},
 	)
 	l = l.With("refill_delay", refillDelay.String())
 
@@ -2300,7 +2302,8 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 		Tags: map[string]any{
 			"queue_shard": q.primaryQueueShard.Name,
 			"op":          "lease",
-		}},
+		},
+	},
 	)
 	l = l.With("lease_delay", leaseDelay.String())
 
@@ -3520,34 +3523,24 @@ func (q *queue) IteratePartitions(ctx context.Context) error {
 					return
 				}
 
-				metrics.GaugePartitionSize(ctx, count, metrics.GaugeOpt{
-					PkgName: pkgName,
-					Tags: map[string]any{
-						// NOTE: potentially high cardinality but this gives better clarify of stuff
-						"partition":   pkey,
-						"queue_shard": q.primaryQueueShard.Name,
-					},
-				})
+				// NOTE: tmp workaround for cardinality issues
+				// ideally we want to instrument everything, but until there's a better way to do this, we primarily care only
+				// about large size partitions
+				if count > 10_000 {
+					metrics.GaugePartitionSize(ctx, count, metrics.GaugeOpt{
+						PkgName: pkgName,
+						Tags: map[string]any{
+							// NOTE: potentially high cardinality but this gives better clarify of stuff
+							// this is potentially useless for key queues
+							"partition":   pkey,
+							"queue_shard": q.primaryQueueShard.Name,
+						},
+					})
+				}
 
 				atomic.AddInt64(&total, 1)
 
-				qp := QueuePartition{}
-				{
-					shard := q.primaryQueueShard
-					hash := shard.RedisClient.kg.PartitionItem()
-					cmd := r.B().Hget().Key(hash).Field(pkey).Build()
-					byt, err := r.Do(ctx, cmd).AsBytes()
-					if err != nil {
-						l.Error("error loading partition", "error", err)
-						return
-					}
-					if err := json.Unmarshal(byt, &qp); err != nil {
-						l.Error("error unmarshalling partition", "error", err)
-						return
-					}
-				}
-
-				if err := q.tenantInstrumentor(ctx, &qp); err != nil {
+				if err := q.tenantInstrumentor(ctx, pk); err != nil {
 					l.Error("error running tenant instrumentor", "error", err)
 				}
 
@@ -3561,6 +3554,22 @@ func (q *queue) IteratePartitions(ctx context.Context) error {
 						return
 					}
 					defer sem.Release(1)
+
+					qp := QueuePartition{}
+					{
+						shard := q.primaryQueueShard
+						hash := shard.RedisClient.kg.PartitionItem()
+						cmd := r.B().Hget().Key(hash).Field(pkey).Build()
+						byt, err := r.Do(ctx, cmd).AsBytes()
+						if err != nil {
+							l.Error("error loading partition", "error", err)
+							return
+						}
+						if err := json.Unmarshal(byt, &qp); err != nil {
+							l.Error("error unmarshalling partition", "error", err)
+							return
+						}
+					}
 
 					res, err := q.BacklogEnroll(ctx, &qp)
 					if err != nil {
