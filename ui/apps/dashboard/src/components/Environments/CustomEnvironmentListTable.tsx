@@ -57,7 +57,7 @@ export function CustomEnvironmentListTable({
                 </td>
               </tr>
             ) : (
-              visibleCustomEnvs.map((env, i) => <TableRow env={env} key={i} />)
+              visibleCustomEnvs.map((env) => <TableRow env={env} key={env.id} />)
             )}
           </tbody>
         </table>
