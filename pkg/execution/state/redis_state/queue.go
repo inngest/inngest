@@ -105,7 +105,7 @@ const (
 	defaultNumWorkers                  = 100
 	defaultNumShadowWorkers            = 100
 	defaultBacklogNormalizationWorkers = 10
-	defaultBacklogNormalizeLimit       = int64(500)
+	defaultBacklogNormalizeConcurrency = int64(20)
 
 	defaultPollTick                 = 10 * time.Millisecond
 	defaultShadowPollTick           = 100 * time.Millisecond
@@ -268,9 +268,9 @@ func WithBacklogRefillLimit(limit int64) QueueOpt {
 	}
 }
 
-func WithBacklogNormalizationLimit(limit int64) QueueOpt {
+func WithBacklogNormalizationConcurrency(limit int64) QueueOpt {
 	return func(q *queue) {
-		q.backlogNormalizeLimit = limit
+		q.backlogNormalizeConcurrency = limit
 	}
 }
 
@@ -617,8 +617,10 @@ func WithQueueShadowPartitionProcessCount(spc QueueShadowPartitionProcessCount) 
 	}
 }
 
-type NormalizeRefreshItemCustomConcurrencyKeysFn func(ctx context.Context, item *osqueue.QueueItem, existingKeys []state.CustomConcurrency, shadowPartition *QueueShadowPartition) ([]state.CustomConcurrency, error)
-type RefreshItemThrottleFn func(ctx context.Context, item *osqueue.QueueItem) (*osqueue.Throttle, error)
+type (
+	NormalizeRefreshItemCustomConcurrencyKeysFn func(ctx context.Context, item *osqueue.QueueItem, existingKeys []state.CustomConcurrency, shadowPartition *QueueShadowPartition) ([]state.CustomConcurrency, error)
+	RefreshItemThrottleFn                       func(ctx context.Context, item *osqueue.QueueItem) (*osqueue.Throttle, error)
+)
 
 func WithNormalizeRefreshItemCustomConcurrencyKeys(fn NormalizeRefreshItemCustomConcurrencyKeysFn) QueueOpt {
 	return func(q *queue) {
@@ -632,8 +634,10 @@ func WithRefreshItemThrottle(fn RefreshItemThrottleFn) QueueOpt {
 	}
 }
 
-type ActiveSpotChecksProbability func(ctx context.Context, acctID uuid.UUID) (backlogRefillCheckProbability int, accountSpotCheckProbability int)
-type ReadOnlySpotChecks func(ctx context.Context, acctID uuid.UUID) bool
+type (
+	ActiveSpotChecksProbability func(ctx context.Context, acctID uuid.UUID) (backlogRefillCheckProbability int, accountSpotCheckProbability int)
+	ReadOnlySpotChecks          func(ctx context.Context, acctID uuid.UUID) bool
+)
 
 func WithActiveSpotCheckProbability(fn ActiveSpotChecksProbability) QueueOpt {
 	return func(q *queue) {
@@ -675,12 +679,12 @@ func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 		apf: func(_ context.Context, _ uuid.UUID) uint {
 			return PriorityDefault
 		},
-		peekMin:               DefaultQueuePeekMin,
-		peekMax:               DefaultQueuePeekMax,
-		shadowPeekMin:         ShadowPartitionPeekMinBacklogs,
-		shadowPeekMax:         ShadowPartitionPeekMaxBacklogs,
-		backlogRefillLimit:    BacklogRefillHardLimit,
-		backlogNormalizeLimit: defaultBacklogNormalizeLimit,
+		peekMin:                     DefaultQueuePeekMin,
+		peekMax:                     DefaultQueuePeekMax,
+		shadowPeekMin:               ShadowPartitionPeekMinBacklogs,
+		shadowPeekMax:               ShadowPartitionPeekMaxBacklogs,
+		backlogRefillLimit:          BacklogRefillHardLimit,
+		backlogNormalizeConcurrency: defaultBacklogNormalizeConcurrency,
 		runMode: QueueRunMode{
 			Sequential:                        true,
 			Scavenger:                         true,
@@ -968,14 +972,14 @@ type queue struct {
 	continuesLock     *sync.Mutex
 	continuationLimit uint
 
-	shadowContinues         map[string]shadowContinuation
-	shadowContinueCooldown  map[string]time.Time
-	shadowContinuesLock     *sync.Mutex
-	shadowContinuationLimit uint
-	shadowPeekMin           int64
-	shadowPeekMax           int64
-	backlogRefillLimit      int64
-	backlogNormalizeLimit   int64
+	shadowContinues             map[string]shadowContinuation
+	shadowContinueCooldown      map[string]time.Time
+	shadowContinuesLock         *sync.Mutex
+	shadowContinuationLimit     uint
+	shadowPeekMin               int64
+	shadowPeekMax               int64
+	backlogRefillLimit          int64
+	backlogNormalizeConcurrency int64
 
 	normalizeRefreshItemCustomConcurrencyKeys NormalizeRefreshItemCustomConcurrencyKeysFn
 	refreshItemThrottle                       RefreshItemThrottleFn
@@ -2345,7 +2349,8 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 		Tags: map[string]any{
 			"queue_shard": q.primaryQueueShard.Name,
 			"op":          "item",
-		}},
+		},
+	},
 	)
 
 	l := q.log.With("item_delay", itemDelay.String())
@@ -2356,7 +2361,8 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 		Tags: map[string]any{
 			"queue_shard": q.primaryQueueShard.Name,
 			"op":          "refill",
-		}},
+		},
+	},
 	)
 	l = l.With("refill_delay", refillDelay.String())
 
@@ -2367,7 +2373,8 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 		Tags: map[string]any{
 			"queue_shard": q.primaryQueueShard.Name,
 			"op":          "lease",
-		}},
+		},
+	},
 	)
 	l = l.With("lease_delay", leaseDelay.String())
 
@@ -3452,7 +3459,6 @@ func (q *queue) PartitionRequeue(ctx context.Context, shard QueueShard, p *Queue
 		force,
 		p.AccountID.String(),
 	})
-
 	if err != nil {
 		return err
 	}

@@ -100,7 +100,7 @@ if is_normalize then
   redis.call("ZREM", keyNormalizeFromBacklogSet, queueID)
 
   -- Clean up backlog pointers for old backlog
-  updateBacklogPointer(keyShadowPartitionMeta, keyBacklogMeta, keyGlobalShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, keyShadowPartitionSet, keyBacklogSet, keyPartitionNormalizeSet, accountID, partitionID, backlogID)
+  updateBacklogPointer(keyShadowPartitionMeta, keyBacklogMeta, keyGlobalShadowPartitionSet, keyGlobalAccountShadowPartitionSet, keyAccountShadowPartitionSet, keyShadowPartitionSet, keyNormalizeFromBacklogSet, keyPartitionNormalizeSet, accountID, partitionID, normalizeFromBacklogID)
 
   -- Clean up normalize pointers if backlog is empty
   if tonumber(redis.call("ZCARD", keyNormalizeFromBacklogSet)) == 0 then

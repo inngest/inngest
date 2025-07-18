@@ -2,9 +2,10 @@ package redis_state
 
 import (
 	"context"
-	"github.com/inngest/inngest/pkg/util"
 	"testing"
 	"time"
+
+	"github.com/inngest/inngest/pkg/util"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
@@ -210,7 +211,6 @@ func TestQueueBacklogPrepareNormalize(t *testing.T) {
 
 		// no longer expect backlog in shadow partition set
 		require.False(t, hasMember(t, r, kg.ShadowPartitionSet(shadowPartition.PartitionID), expectedBacklog.BacklogID))
-
 	})
 
 	t.Run("should move backlog to normalization set", func(t *testing.T) {
@@ -237,7 +237,6 @@ func TestQueueBacklogPrepareNormalize(t *testing.T) {
 		require.Equal(t, expectedTime, int64(score(t, r, kg.AccountNormalizeSet(accountId), fnID.String())))
 		require.Equal(t, expectedTime, int64(score(t, r, kg.PartitionNormalizeSet(fnID.String()), expectedBacklog.BacklogID)))
 	})
-
 }
 
 func TestQueueBacklogNormalization(t *testing.T) {
@@ -320,6 +319,123 @@ func TestQueueBacklogNormalization(t *testing.T) {
 	require.False(t, hasMember(t, r, kg.GlobalAccountNormalizeSet(), accountId.String()))
 	require.False(t, hasMember(t, r, kg.AccountNormalizeSet(accountId), fnID.String()))
 	require.False(t, hasMember(t, r, kg.PartitionNormalizeSet(fnID.String()), backlog.BacklogID))
+}
+
+func TestBacklogNormalizeItem(t *testing.T) {
+	r, rc := initRedis(t)
+	defer r.Close()
+
+	clock := clockwork.NewFakeClock()
+	defaultShard := QueueShard{
+		Kind:        string(enums.QueueShardKindRedis),
+		RedisClient: NewQueueClient(rc, QueueDefaultKey),
+		Name:        consts.DefaultQueueShardName,
+	}
+
+	kg := defaultShard.RedisClient.kg
+
+	accountID, fnID, wsID := uuid.New(), uuid.New(), uuid.New()
+
+	hashedConcurrencyKeyExpr := hashConcurrencyKey("event.data.customerId")
+	unhashedValue := "customer1"
+	scope := enums.ConcurrencyScopeFn
+	entity := fnID
+	fullKey := util.ConcurrencyKey(scope, entity, unhashedValue)
+
+	customConc := []state.CustomConcurrency{
+		{
+			Key:                       fullKey,
+			Hash:                      hashedConcurrencyKeyExpr,
+			Limit:                     123,
+			UnhashedEvaluatedKeyValue: unhashedValue,
+		},
+	}
+
+	throttleKey := util.XXHash("customer1")
+	throttleKeyExpr := util.XXHash("event.data.customerId")
+
+	throttle := &osqueue.Throttle{
+		Key:                 throttleKey,
+		Limit:               100,
+		Burst:               10,
+		Period:              int(time.Hour.Seconds()),
+		UnhashedThrottleKey: unhashedValue,
+		KeyExpressionHash:   throttleKeyExpr,
+	}
+
+	latestConstraints := PartitionConstraintConfig{}
+
+	q := NewQueue(
+		defaultShard,
+		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+			return true
+		}),
+		WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
+			return false
+		}),
+		WithNormalizeRefreshItemCustomConcurrencyKeys(func(ctx context.Context, item *osqueue.QueueItem, existingKeys []state.CustomConcurrency, shadowPartition *QueueShadowPartition) ([]state.CustomConcurrency, error) {
+			return customConc, nil
+		}),
+		WithRefreshItemThrottle(func(ctx context.Context, item *osqueue.QueueItem) (*osqueue.Throttle, error) {
+			return throttle, nil
+		}),
+		WithPartitionConstraintConfigGetter(func(ctx context.Context, p QueueShadowPartition) (*PartitionConstraintConfig, error) {
+			return &latestConstraints, nil
+		}),
+		WithClock(clock),
+	)
+	ctx := context.Background()
+
+	require.Len(t, r.Keys(), 0)
+
+	item := osqueue.QueueItem{
+		FunctionID:  fnID,
+		WorkspaceID: wsID,
+		Data: osqueue.Item{
+			WorkspaceID: wsID,
+			Kind:        osqueue.KindStart,
+			Identifier: state.Identifier{
+				WorkflowID:  fnID,
+				AccountID:   accountID,
+				WorkspaceID: wsID,
+			},
+			QueueName:             nil,
+			Throttle:              nil,
+			CustomConcurrencyKeys: nil,
+		},
+		QueueName: nil,
+	}
+
+	sp := q.ItemShadowPartition(ctx, item)
+	sourceBacklog := q.ItemBacklog(ctx, item)
+
+	qi, err := q.EnqueueItem(ctx, defaultShard, item, clock.Now(), osqueue.EnqueueOpts{})
+	require.NoError(t, err)
+
+	require.True(t, r.Exists(kg.BacklogSet(sourceBacklog.BacklogID)))
+	require.True(t, hasMember(t, r, kg.ShadowPartitionSet(sp.PartitionID), sourceBacklog.BacklogID))
+	require.True(t, hasMember(t, r, kg.BacklogSet(sourceBacklog.BacklogID), qi.ID))
+
+	normalizedItem, err := q.normalizeItem(ctx, defaultShard, &sp, &latestConstraints, &sourceBacklog, qi)
+	require.NoError(t, err)
+
+	qi.Data.CustomConcurrencyKeys = customConc
+	qi.Data.Throttle = throttle
+
+	require.Equal(t, qi, normalizedItem)
+	targetBacklog := q.ItemBacklog(ctx, qi)
+
+	actualBacklog := q.ItemBacklog(ctx, normalizedItem)
+
+	require.Equal(t, targetBacklog, actualBacklog)
+
+	require.True(t, r.Exists(kg.BacklogSet(targetBacklog.BacklogID)))
+	require.True(t, hasMember(t, r, kg.ShadowPartitionSet(sp.PartitionID), targetBacklog.BacklogID))
+	require.True(t, hasMember(t, r, kg.BacklogSet(targetBacklog.BacklogID), qi.ID))
+
+	require.False(t, r.Exists(kg.BacklogSet(sourceBacklog.BacklogID)))
+	require.False(t, hasMember(t, r, kg.ShadowPartitionSet(sp.PartitionID), sourceBacklog.BacklogID), "backlog %s is in shadow partition", sourceBacklog.BacklogID, r.Dump())
+	require.False(t, hasMember(t, r, kg.BacklogSet(sourceBacklog.BacklogID), qi.ID))
 }
 
 func TestQueueBacklogNormalizationWithRewrite(t *testing.T) {
