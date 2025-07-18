@@ -549,7 +549,6 @@ func TestEventList(t *testing.T) {
 				r.Equal(3, res.TotalCount)
 
 				var runID ulid.ULID
-				var zero ulid.ULID // TODO: replace with IsZero
 				for _, edge := range res.Edges {
 					i := slices.Index(eventIDs, edge.Node.ID.String())
 					r.NotEqual(-1, i) // make sure we found the event id
@@ -557,7 +556,7 @@ func TestEventList(t *testing.T) {
 					r.Len(edge.Node.Runs, 1)
 					r.Equal(edge.Node.Runs[0].Function.Name, fnName)
 					// save the first runID we see and then check that the rest of the events returned the same run
-					if runID == zero {
+					if runID.IsZero() {
 						runID = edge.Node.Runs[0].ID
 					} else {
 						r.Equal(runID, edge.Node.Runs[0].ID)

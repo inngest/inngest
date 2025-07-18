@@ -265,11 +265,11 @@ func sqlToRun(item *sqlc.FunctionRun, finish *sqlc.FunctionFinish) (*history_rea
 		endedAt = &finish.CreatedAt.Time
 	}
 
-	if item.BatchID != nilULID {
+	if !item.BatchID.IsZero() {
 		batchID = &item.BatchID
 	}
 
-	if item.OriginalRunID != nilULID {
+	if !item.OriginalRunID.IsZero() {
 		originalRunID = &item.OriginalRunID
 	}
 

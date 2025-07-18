@@ -12,15 +12,11 @@ import (
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
-	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 )
 
 const DefaultPrefix = "{cancel}"
 
-var (
-	nilID = ulid.ULID{}
-)
 
 // NewRedisWriter writes cancellations to Redis.
 func NewRedisWriter(r rueidis.Client, q queue.Producer, prefix string) cqrs.CancellationWriter {
@@ -50,7 +46,7 @@ type redisWrapper struct {
 }
 
 func (r redisReadWriter) CreateCancellation(ctx context.Context, c cqrs.Cancellation) error {
-	if c.ID == nilID {
+	if c.ID.IsZero() {
 		return fmt.Errorf("A cancellation ID must be created before writing")
 	}
 
