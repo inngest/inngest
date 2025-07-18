@@ -267,6 +267,9 @@ func (q *queue) extendBacklogNormalizationLease(ctx context.Context, now time.Ti
 // NOTE: ideally this is one transaction in a lua script but enqueue_to_backlog is way too much work to
 // utilize
 func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp *QueueShadowPartition, latestConstraints *PartitionConstraintConfig) error {
+	ctx, cancelNormalization := context.WithCancel(ctx)
+	defer cancelNormalization()
+
 	_, file, line, _ := runtime.Caller(1)
 	caller := fmt.Sprintf("%s:%d", file, line)
 
@@ -294,6 +297,8 @@ func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp 
 					switch err {
 					// can't extend since it's already expired
 					case errBacklogNormalizationLeaseExpired:
+						l.Debug("normalization lease expired")
+						cancelNormalization()
 						return
 					}
 					l.Error("error extending backlog normalization lease", "error", err, "backlog", backlog)
@@ -308,10 +313,18 @@ func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp 
 	shard := q.primaryQueueShard
 	var total int64
 	for {
+		// If context is canceled, stop normalizing
+		if ctx.Err() == context.Canceled {
+			return nil
+		}
+
 		var processed int64
 
 		res, err := q.BacklogNormalizePeek(ctx, backlog, NormalizePartitionPeekMax)
 		if err != nil {
+			if errors.Is(err, context.Canceled) {
+				return nil
+			}
 			return fmt.Errorf("could not peek backlog items for normalization: %w", err)
 		}
 
