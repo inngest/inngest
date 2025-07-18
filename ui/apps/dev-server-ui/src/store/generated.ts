@@ -484,6 +484,8 @@ export type MutationInvokeFunctionArgs = {
 
 
 export type MutationRerunArgs = {
+  debugRunID: InputMaybe<Scalars['ULID']>;
+  debugSessionID: InputMaybe<Scalars['ULID']>;
   fromStep: InputMaybe<RerunFromStepInput>;
   runID: Scalars['ULID'];
 };

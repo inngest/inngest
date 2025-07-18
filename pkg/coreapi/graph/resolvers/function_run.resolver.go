@@ -263,7 +263,13 @@ func (r *mutationResolver) Rerun(
 	ctx context.Context,
 	runID ulid.ULID,
 	fromStep *models.RerunFromStepInput,
+	debugSessionID *ulid.ULID,
+	debugRunID *ulid.ULID,
 ) (ulid.ULID, error) {
+	if debugSessionID != nil && debugRunID == nil {
+		debugRunID = &runID
+	}
+
 	zero := ulid.ULID{}
 	accountID := consts.DevServerAccountID
 	workspaceID := consts.DevServerEnvID
@@ -334,10 +340,12 @@ func (r *mutationResolver) Rerun(
 			// will result in the creation of a new ID
 			event.NewOSSTrackedEventWithID(evt.Event(), evt.InternalID()),
 		},
-		OriginalRunID: &fnrun.RunID,
-		AccountID:     consts.DevServerAccountID,
-		FromStep:      fromStepReq,
-		WorkspaceID:   consts.DevServerEnvID,
+		OriginalRunID:  &fnrun.RunID,
+		AccountID:      consts.DevServerAccountID,
+		FromStep:       fromStepReq,
+		WorkspaceID:    consts.DevServerEnvID,
+		DebugSessionID: debugSessionID,
+		DebugRunID:     debugRunID,
 	})
 	if err != nil {
 		return zero, err

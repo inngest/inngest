@@ -196,6 +196,10 @@ type ScheduleRequest struct {
 	// similar to paused in that new functions skip, but current functions continue
 	// to execute.
 	DrainedAt *time.Time
+	// DebugSessionID is the ID of the debugger session that this function is being scheduled from.
+	DebugSessionID *ulid.ULID
+	// DebugRunID is the ID of the debugger run that this function is being scheduled from.
+	DebugRunID *ulid.ULID
 }
 
 func (r ScheduleRequest) SkipReason() enums.SkipReason {
