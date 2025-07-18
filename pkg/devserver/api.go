@@ -152,6 +152,23 @@ func (a devapi) Info(w http.ResponseWriter, r *http.Request) {
 		features[flag] = enabled
 	}
 
+	//
+	// inngest feature flags are a map of arbitrary key value
+	// pairs such that we can use the same feature flag names as cloud
+	if ffEnv := os.Getenv("INNGEST_FEATURE_FLAGS"); ffEnv != "" {
+		pairs := strings.Split(ffEnv, ",")
+		for _, pair := range pairs {
+			kv := strings.SplitN(strings.TrimSpace(pair), "=", 2)
+			if len(kv) == 2 {
+				key := strings.TrimSpace(kv[0])
+				valStr := strings.TrimSpace(kv[1])
+				if enabled, err := strconv.ParseBool(valStr); err == nil {
+					features[key] = enabled
+				}
+			}
+		}
+	}
+
 	ir := InfoResponse{
 		Version:             version.Print(),
 		StartOpts:           a.devserver.Opts,
