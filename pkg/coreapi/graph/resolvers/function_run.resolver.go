@@ -44,7 +44,7 @@ func (r *functionRunResolver) PendingSteps(ctx context.Context, obj *models.Func
 }
 
 func (r *functionRunResolver) Function(ctx context.Context, obj *models.FunctionRun) (*models.Function, error) {
-	fn, err := r.Data.GetFunctionByInternalUUID(ctx, uuid.UUID{}, uuid.MustParse(obj.FunctionID))
+	fn, err := r.Data.GetFunctionByInternalUUID(ctx, consts.DevServerEnvID, uuid.MustParse(obj.FunctionID))
 	if err != nil {
 		return nil, err
 	}
@@ -270,7 +270,6 @@ func (r *mutationResolver) Rerun(
 		debugRunID = &runID
 	}
 
-	zero := ulid.ULID{}
 	accountID := consts.DevServerAccountID
 	workspaceID := consts.DevServerEnvID
 
@@ -281,26 +280,26 @@ func (r *mutationResolver) Rerun(
 		runID,
 	)
 	if err != nil {
-		return zero, err
+		return ulid.Zero, err
 	}
 
 	fnCQRS, err := r.Data.GetFunctionByInternalUUID(
 		ctx,
-		workspaceID,
+		consts.DevServerEnvID,
 		fnrun.FunctionID,
 	)
 	if err != nil {
-		return zero, err
+		return ulid.Zero, err
 	}
 
 	fn, err := fnCQRS.InngestFunction()
 	if err != nil {
-		return zero, err
+		return ulid.Zero, err
 	}
 
 	evt, err := r.Data.GetEventByInternalID(ctx, fnrun.EventID)
 	if err != nil {
-		return zero, fmt.Errorf("failed to get run event: %w", err)
+		return ulid.Zero, fmt.Errorf("failed to get run event: %w", err)
 	}
 
 	ctx, span := run.NewSpan(ctx,
@@ -324,7 +323,7 @@ func (r *mutationResolver) Rerun(
 
 		if fromStep.Input != nil {
 			if len(*fromStep.Input) == 0 || (*fromStep.Input)[0] != '[' {
-				return zero, fmt.Errorf("input is not a valid JSON array")
+				return ulid.Zero, fmt.Errorf("input is not a valid JSON array")
 			}
 
 			fromStepReq.Input = json.RawMessage(*fromStep.Input)
@@ -348,7 +347,7 @@ func (r *mutationResolver) Rerun(
 		DebugRunID:     debugRunID,
 	})
 	if err != nil {
-		return zero, err
+		return ulid.Zero, err
 	}
 
 	return identifier.ID.RunID, nil

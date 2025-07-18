@@ -77,6 +77,8 @@ const (
 	// DefaultConcurrencyLimit is the default concurrency limit applied when not specified
 	DefaultConcurrencyLimit = 1_000
 
+	DefaultSystemConcurrencyLimit = 100_000
+
 	// FunctionIdempotencyPeriod determines how long a specific function remains idempotent
 	// when using idempotency keys.
 	FunctionIdempotencyPeriod = 24 * time.Hour

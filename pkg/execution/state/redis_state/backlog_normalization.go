@@ -38,7 +38,7 @@ var (
 type normalizeWorkerChanMsg struct {
 	b           *QueueBacklog
 	sp          *QueueShadowPartition
-	constraints *PartitionConstraintConfig
+	constraints PartitionConstraintConfig
 }
 
 // backlogNormalizationWorker runs a blocking process that listens to item being pushed into the normalization partition. This allows us to process individual
@@ -163,10 +163,7 @@ func (q *queue) iterateNormalizationShadowPartition(ctx context.Context, shadowP
 			return err
 		}
 
-		constraints, err := q.partitionConstraintConfigGetter(ctx, *partition)
-		if err != nil {
-			return fmt.Errorf("could not get latest partition constraints: %w", err)
-		}
+		constraints := q.partitionConstraintConfigGetter(ctx, partition.Identifier())
 
 		for _, bl := range backlogs {
 			// lease the backlog
@@ -267,7 +264,7 @@ func (q *queue) extendBacklogNormalizationLease(ctx context.Context, now time.Ti
 // normalizeBacklog must be called with exclusive access to the shadow partition
 // NOTE: ideally this is one transaction in a lua script but enqueue_to_backlog is way too much work to
 // utilize
-func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp *QueueShadowPartition, latestConstraints *PartitionConstraintConfig) error {
+func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp *QueueShadowPartition, latestConstraints PartitionConstraintConfig) error {
 	_, file, line, _ := runtime.Caller(1)
 	caller := fmt.Sprintf("%s:%d", file, line)
 

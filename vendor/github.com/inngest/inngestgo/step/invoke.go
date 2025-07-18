@@ -30,6 +30,7 @@ type InvokeOpts struct {
 // If the invoked function can't be found or otherwise errors, the step will
 // fail and the function will stop with a `NoRetryError`.
 func Invoke[T any](ctx context.Context, id string, opts InvokeOpts) (T, error) {
+	targetID := getTargetStepID(ctx)
 	mgr := preflight(ctx)
 	args := map[string]any{
 		"function_id": opts.FunctionId,
@@ -41,8 +42,9 @@ func Invoke[T any](ctx context.Context, id string, opts InvokeOpts) (T, error) {
 	if opts.Timeout > 0 {
 		args["timeout"] = str2duration.String(opts.Timeout)
 	}
-
 	op := mgr.NewOp(enums.OpcodeInvokeFunction, id, args)
+	hashedID := op.MustHash()
+
 	if val, ok := mgr.Step(ctx, op); ok {
 		var output T
 		var valMap map[string]json.RawMessage
@@ -77,11 +79,19 @@ func Invoke[T any](ctx context.Context, id string, opts InvokeOpts) (T, error) {
 		panic(ControlHijack{})
 	}
 
-	mgr.AppendOp(sdkrequest.GeneratorOpcode{
-		ID:   op.MustHash(),
+	if targetID != nil && *targetID != hashedID {
+		// Don't report this step since targeting is happening and it isn't
+		// targeted
+		panic(ControlHijack{})
+	}
+
+	plannedOp := sdkrequest.GeneratorOpcode{
+		ID:   hashedID,
 		Op:   op.Op,
 		Name: id,
 		Opts: op.Opts,
-	})
+	}
+	plannedOp.SetParallelMode(parallelMode(ctx))
+	mgr.AppendOp(plannedOp)
 	panic(ControlHijack{})
 }

@@ -8,7 +8,6 @@ import (
 	"time"
 
 	"github.com/inngest/inngest/pkg/consts"
-	"github.com/oklog/ulid/v2"
 	"github.com/stretchr/testify/require"
 )
 
@@ -80,14 +79,13 @@ func TestInternalIDSeedFromString(t *testing.T) {
 			base64.StdEncoding.EncodeToString(entropy),
 		)
 
-		var zeroULID ulid.ULID
 		uniqueIDs := map[string]struct{}{}
 		for i := 0; i < consts.MaxEvents; i++ {
 			seed := SeededIDFromString(idempotencyKey, i)
 			r.NotNil(seed)
 			id, err := seed.ToULID()
 			r.NoError(err)
-			r.NotEqual(zeroULID.String(), id.String())
+			r.False(id.IsZero())
 			uniqueIDs[id.String()] = struct{}{}
 		}
 

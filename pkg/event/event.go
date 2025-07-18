@@ -61,11 +61,11 @@ type SeededID struct {
 
 func (s *SeededID) ToULID() (ulid.ULID, error) {
 	if len(s.Entropy) != 10 {
-		return ulid.ULID{}, fmt.Errorf("entropy must be 10 bytes")
+		return ulid.Zero, fmt.Errorf("entropy must be 10 bytes")
 	}
 
 	if s.Millis <= 0 {
-		return ulid.ULID{}, fmt.Errorf("millis must be greater than 0")
+		return ulid.Zero, fmt.Errorf("millis must be greater than 0")
 	}
 
 	return ulid.New(uint64(s.Millis), bytes.NewReader(s.Entropy))

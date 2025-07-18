@@ -55,11 +55,11 @@ type SignalResult[T any] struct {
 }
 
 func WaitForSignal[T any](ctx context.Context, stepID string, opts WaitForSignalOpts) (SignalResult[T], error) {
+	targetID := getTargetStepID(ctx)
 	mgr := preflight(ctx)
-
 	args := map[string]any{
-		"signal":     opts.Signal,
-		"timeout":    str2duration.String(opts.Timeout),
+		"signal":   opts.Signal,
+		"timeout":  str2duration.String(opts.Timeout),
 		"conflict": SignalConflictFail,
 	}
 	if opts.Name == "" {
@@ -68,8 +68,8 @@ func WaitForSignal[T any](ctx context.Context, stepID string, opts WaitForSignal
 	if opts.OnConflict != "" {
 		args["conflict"] = opts.OnConflict
 	}
-
 	op := mgr.NewOp(enums.OpcodeWaitForSignal, stepID, args)
+	hashedID := op.MustHash()
 
 	// Check if this exists already.
 	if val, ok := mgr.Step(ctx, op); ok {
@@ -84,12 +84,20 @@ func WaitForSignal[T any](ctx context.Context, stepID string, opts WaitForSignal
 		return output.Data, nil
 	}
 
-	mgr.AppendOp(sdkrequest.GeneratorOpcode{
-		ID:          op.MustHash(),
+	if targetID != nil && *targetID != hashedID {
+		// Don't report this step since targeting is happening and it isn't
+		// targeted
+		panic(ControlHijack{})
+	}
+
+	plannedOp := sdkrequest.GeneratorOpcode{
+		ID:          hashedID,
 		Op:          op.Op,
 		Name:        opts.Name,
 		DisplayName: &opts.Name,
 		Opts:        op.Opts,
-	})
+	}
+	plannedOp.SetParallelMode(parallelMode(ctx))
+	mgr.AppendOp(plannedOp)
 	panic(ControlHijack{})
 }
