@@ -243,7 +243,6 @@ func start(ctx context.Context, opts StartOpts) error {
 	}
 
 	var sm state.Manager
-	t := runner.NewTracker()
 	sm, err = redis_state.New(
 		ctx,
 		redis_state.WithShardedClient(shardedClient),
@@ -470,7 +469,6 @@ func start(ctx context.Context, opts StartOpts) error {
 		runner.WithPauseManager(pauses.NewRedisOnlyManager(sm)),
 		runner.WithStateManager(sm),
 		runner.WithRunnerQueue(rq),
-		runner.WithTracker(t),
 		runner.WithRateLimiter(rl),
 		runner.WithBatchManager(batcher),
 		runner.WithPublisher(pb),
@@ -479,8 +477,6 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	// The devserver embeds the event API.
 	ds := NewService(opts, runner, dbcqrs, pb, stepLimitOverrides, stateSizeLimitOverrides, unshardedRc, hmw, nil)
-	// embed the tracker
-	ds.Tracker = t
 	ds.State = sm
 	ds.Queue = rq
 	ds.Executor = exec
@@ -525,7 +521,6 @@ func start(ctx context.Context, opts StartOpts) error {
 		Config:         ds.Opts.Config,
 		Logger:         l,
 		Runner:         ds.Runner,
-		Tracker:        ds.Tracker,
 		State:          ds.State,
 		Queue:          ds.Queue,
 		EventHandler:   ds.HandleEvent,

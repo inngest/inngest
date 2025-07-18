@@ -83,7 +83,6 @@ type devserver struct {
 
 	// Runner stores the Runner
 	Runner      runner.Runner
-	Tracker     *runner.Tracker
 	State       state.Manager
 	Queue       queue.Queue
 	Executor    execution.Executor
