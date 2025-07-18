@@ -46,9 +46,6 @@ export function CustomEnvironmentListTable({
               <th scope="col" className="text-muted px-4 py-3 text-sm font-semibold">
                 Name
               </th>
-              <th scope="col" className="text-muted px-4 py-3 text-sm font-semibold">
-                Status
-              </th>
               <th scope="col" className="w-0 pr-4"></th>
             </tr>
           </thead>
@@ -89,26 +86,18 @@ function TableRow(props: { env: Environment }) {
 
   const { isArchived, name, slug } = props.env;
 
-  let statusColorClass: string;
-  let statusText: string;
-  if (isArchived) {
-    statusColorClass = 'bg-surfaceMuted';
-    statusText = 'Archived';
-  } else {
-    statusColorClass = 'bg-primary-moderate';
-    statusText = 'Active';
-  }
-
   return (
     <tr>
       <td className="max-w-80 px-4 py-3">
-        <h3 className="text-basis flex items-center gap-2 break-all text-sm">{name}</h3>
-      </td>
-      <td>
-        <div className="flex items-center gap-2 px-4">
-          <span className={cn('block h-2 w-2 rounded-full', statusColorClass)} />
-          <span className="text-basis text-sm">{statusText}</span>
-        </div>
+        <h3 className="text-basis flex items-center gap-2 break-all text-sm">
+          <span
+            className={cn(
+              'block h-2 w-2 rounded-full',
+              isArchived ? 'bg-surfaceMuted' : 'bg-primary-moderate'
+            )}
+          />
+          {name}
+        </h3>
       </td>
 
       <td className="px-4">
