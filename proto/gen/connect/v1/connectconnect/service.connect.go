@@ -47,16 +47,6 @@ const (
 	ConnectExecutorPingProcedure = "/connect.v1.ConnectExecutor/Ping"
 )
 
-// These variables are the protoreflect.Descriptor objects for the RPCs defined in this package.
-var (
-	connectGatewayServiceDescriptor       = v1.File_connect_v1_service_proto.Services().ByName("ConnectGateway")
-	connectGatewayForwardMethodDescriptor = connectGatewayServiceDescriptor.Methods().ByName("Forward")
-	connectGatewayPingMethodDescriptor    = connectGatewayServiceDescriptor.Methods().ByName("Ping")
-	connectExecutorServiceDescriptor      = v1.File_connect_v1_service_proto.Services().ByName("ConnectExecutor")
-	connectExecutorReplyMethodDescriptor  = connectExecutorServiceDescriptor.Methods().ByName("Reply")
-	connectExecutorAckMethodDescriptor    = connectExecutorServiceDescriptor.Methods().ByName("Ack")
-)
-
 // ConnectGatewayClient is a client for the connect.v1.ConnectGateway service.
 type ConnectGatewayClient interface {
 	Forward(context.Context, *connect.Request[v1.ForwardRequest]) (*connect.Response[v1.ForwardResponse], error)
@@ -72,17 +62,18 @@ type ConnectGatewayClient interface {
 // http://api.acme.com or https://acme.com/grpc).
 func NewConnectGatewayClient(httpClient connect.HTTPClient, baseURL string, opts ...connect.ClientOption) ConnectGatewayClient {
 	baseURL = strings.TrimRight(baseURL, "/")
+	connectGatewayMethods := v1.File_connect_v1_service_proto.Services().ByName("ConnectGateway").Methods()
 	return &connectGatewayClient{
 		forward: connect.NewClient[v1.ForwardRequest, v1.ForwardResponse](
 			httpClient,
 			baseURL+ConnectGatewayForwardProcedure,
-			connect.WithSchema(connectGatewayForwardMethodDescriptor),
+			connect.WithSchema(connectGatewayMethods.ByName("Forward")),
 			connect.WithClientOptions(opts...),
 		),
 		ping: connect.NewClient[v1.PingRequest, v1.PingResponse](
 			httpClient,
 			baseURL+ConnectGatewayPingProcedure,
-			connect.WithSchema(connectGatewayPingMethodDescriptor),
+			connect.WithSchema(connectGatewayMethods.ByName("Ping")),
 			connect.WithClientOptions(opts...),
 		),
 	}
@@ -116,16 +107,17 @@ type ConnectGatewayHandler interface {
 // By default, handlers support the Connect, gRPC, and gRPC-Web protocols with the binary Protobuf
 // and JSON codecs. They also support gzip compression.
 func NewConnectGatewayHandler(svc ConnectGatewayHandler, opts ...connect.HandlerOption) (string, http.Handler) {
+	connectGatewayMethods := v1.File_connect_v1_service_proto.Services().ByName("ConnectGateway").Methods()
 	connectGatewayForwardHandler := connect.NewUnaryHandler(
 		ConnectGatewayForwardProcedure,
 		svc.Forward,
-		connect.WithSchema(connectGatewayForwardMethodDescriptor),
+		connect.WithSchema(connectGatewayMethods.ByName("Forward")),
 		connect.WithHandlerOptions(opts...),
 	)
 	connectGatewayPingHandler := connect.NewUnaryHandler(
 		ConnectGatewayPingProcedure,
 		svc.Ping,
-		connect.WithSchema(connectGatewayPingMethodDescriptor),
+		connect.WithSchema(connectGatewayMethods.ByName("Ping")),
 		connect.WithHandlerOptions(opts...),
 	)
 	return "/connect.v1.ConnectGateway/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -167,17 +159,18 @@ type ConnectExecutorClient interface {
 // http://api.acme.com or https://acme.com/grpc).
 func NewConnectExecutorClient(httpClient connect.HTTPClient, baseURL string, opts ...connect.ClientOption) ConnectExecutorClient {
 	baseURL = strings.TrimRight(baseURL, "/")
+	connectExecutorMethods := v1.File_connect_v1_service_proto.Services().ByName("ConnectExecutor").Methods()
 	return &connectExecutorClient{
 		reply: connect.NewClient[v1.ReplyRequest, v1.ReplyResponse](
 			httpClient,
 			baseURL+ConnectExecutorReplyProcedure,
-			connect.WithSchema(connectExecutorReplyMethodDescriptor),
+			connect.WithSchema(connectExecutorMethods.ByName("Reply")),
 			connect.WithClientOptions(opts...),
 		),
 		ack: connect.NewClient[v1.AckMessage, v1.AckResponse](
 			httpClient,
 			baseURL+ConnectExecutorAckProcedure,
-			connect.WithSchema(connectExecutorAckMethodDescriptor),
+			connect.WithSchema(connectExecutorMethods.ByName("Ack")),
 			connect.WithClientOptions(opts...),
 		),
 		ping: connect.NewClient[v1.PingRequest, v1.PingResponse](
@@ -224,16 +217,17 @@ type ConnectExecutorHandler interface {
 // By default, handlers support the Connect, gRPC, and gRPC-Web protocols with the binary Protobuf
 // and JSON codecs. They also support gzip compression.
 func NewConnectExecutorHandler(svc ConnectExecutorHandler, opts ...connect.HandlerOption) (string, http.Handler) {
+	connectExecutorMethods := v1.File_connect_v1_service_proto.Services().ByName("ConnectExecutor").Methods()
 	connectExecutorReplyHandler := connect.NewUnaryHandler(
 		ConnectExecutorReplyProcedure,
 		svc.Reply,
-		connect.WithSchema(connectExecutorReplyMethodDescriptor),
+		connect.WithSchema(connectExecutorMethods.ByName("Reply")),
 		connect.WithHandlerOptions(opts...),
 	)
 	connectExecutorAckHandler := connect.NewUnaryHandler(
 		ConnectExecutorAckProcedure,
 		svc.Ack,
-		connect.WithSchema(connectExecutorAckMethodDescriptor),
+		connect.WithSchema(connectExecutorMethods.ByName("Ack")),
 		connect.WithHandlerOptions(opts...),
 	)
 	connectExecutorPingHandler := connect.NewUnaryHandler(
