@@ -15,6 +15,7 @@ import (
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/run"
+	"github.com/oklog/ulid/v2"
 	"go.opentelemetry.io/otel/attribute"
 )
 
@@ -94,13 +95,17 @@ func (r *mutationResolver) InvokeFunction(
 	data map[string]any,
 	functionSlug string,
 	user map[string]any,
+	debugSessionID *ulid.ULID,
+	debugRunID *ulid.ULID,
 ) (*bool, error) {
 	evt := event.NewInvocationEvent(event.NewInvocationEventOpts{
 		Event: event.Event{
 			Data: data,
 			User: user,
 		},
-		FnID: functionSlug,
+		FnID:           functionSlug,
+		DebugSessionID: debugSessionID,
+		DebugRunID:     debugRunID,
 	})
 
 	ctx, span := run.NewSpan(ctx,

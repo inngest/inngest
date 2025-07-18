@@ -84,6 +84,10 @@ var Attrs = struct {
 	ResponseHeaders    attr[*http.Header]
 	ResponseStatusCode attr[*int]
 	ResponseOutputSize attr[*int]
+
+	// Debugger attributes
+	DebugSessionID attr[*ulid.ULID]
+	DebugRunID     attr[*ulid.ULID]
 }{
 	internalError: StringAttr("internal.error"),
 
@@ -130,4 +134,6 @@ var Attrs = struct {
 	StepWaitForEventIf:                 StringAttr("step.wait_for_event.if"),
 	StepWaitForEventMatchedID:          ULIDAttr("step.wait_for_event.matched_id"),
 	StepWaitForEventName:               StringAttr("step.wait_for_event.name"),
+	DebugSessionID:                     ULIDAttr("debug.session.id"),
+	DebugRunID:                         ULIDAttr("debug.run.id"),
 }

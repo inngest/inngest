@@ -303,8 +303,8 @@ type ComplexityRoot struct {
 		CreateApp       func(childComplexity int, input models.CreateAppInput) int
 		DeleteApp       func(childComplexity int, id string) int
 		DeleteAppByName func(childComplexity int, name string) int
-		InvokeFunction  func(childComplexity int, data map[string]interface{}, functionSlug string, user map[string]interface{}) int
-		Rerun           func(childComplexity int, runID ulid.ULID, fromStep *models.RerunFromStepInput) int
+		InvokeFunction  func(childComplexity int, data map[string]interface{}, functionSlug string, user map[string]interface{}, debugSessionID *ulid.ULID, debugRunID *ulid.ULID) int
+		Rerun           func(childComplexity int, runID ulid.ULID, fromStep *models.RerunFromStepInput, debugSessionID *ulid.ULID, debugRunID *ulid.ULID) int
 		UpdateApp       func(childComplexity int, input models.UpdateAppInput) int
 	}
 
@@ -604,9 +604,9 @@ type MutationResolver interface {
 	UpdateApp(ctx context.Context, input models.UpdateAppInput) (*cqrs.App, error)
 	DeleteApp(ctx context.Context, id string) (string, error)
 	DeleteAppByName(ctx context.Context, name string) (bool, error)
-	InvokeFunction(ctx context.Context, data map[string]interface{}, functionSlug string, user map[string]interface{}) (*bool, error)
+	InvokeFunction(ctx context.Context, data map[string]interface{}, functionSlug string, user map[string]interface{}, debugSessionID *ulid.ULID, debugRunID *ulid.ULID) (*bool, error)
 	CancelRun(ctx context.Context, runID ulid.ULID) (*models.FunctionRun, error)
-	Rerun(ctx context.Context, runID ulid.ULID, fromStep *models.RerunFromStepInput) (ulid.ULID, error)
+	Rerun(ctx context.Context, runID ulid.ULID, fromStep *models.RerunFromStepInput, debugSessionID *ulid.ULID, debugRunID *ulid.ULID) (ulid.ULID, error)
 }
 type QueryResolver interface {
 	Apps(ctx context.Context, filter *models.AppsFilterV1) ([]*cqrs.App, error)
@@ -1878,7 +1878,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Mutation.InvokeFunction(childComplexity, args["data"].(map[string]interface{}), args["functionSlug"].(string), args["user"].(map[string]interface{})), true
+		return e.complexity.Mutation.InvokeFunction(childComplexity, args["data"].(map[string]interface{}), args["functionSlug"].(string), args["user"].(map[string]interface{}), args["debugSessionID"].(*ulid.ULID), args["debugRunID"].(*ulid.ULID)), true
 
 	case "Mutation.rerun":
 		if e.complexity.Mutation.Rerun == nil {
@@ -1890,7 +1890,7 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 			return 0, false
 		}
 
-		return e.complexity.Mutation.Rerun(childComplexity, args["runID"].(ulid.ULID), args["fromStep"].(*models.RerunFromStepInput)), true
+		return e.complexity.Mutation.Rerun(childComplexity, args["runID"].(ulid.ULID), args["fromStep"].(*models.RerunFromStepInput), args["debugSessionID"].(*ulid.ULID), args["debugRunID"].(*ulid.ULID)), true
 
 	case "Mutation.updateApp":
 		if e.complexity.Mutation.UpdateApp == nil {
@@ -3090,10 +3090,17 @@ type Mutation {
     data: Map
     functionSlug: String!
     user: Map
+    debugSessionID: ULID
+    debugRunID: ULID
   ): Boolean
 
   cancelRun(runID: ULID!): FunctionRun!
-  rerun(runID: ULID!, fromStep: RerunFromStepInput): ULID!
+  rerun(
+    runID: ULID!
+    fromStep: RerunFromStepInput
+    debugSessionID: ULID
+    debugRunID: ULID
+  ): ULID!
 }
 
 input CreateAppInput {
@@ -4056,6 +4063,24 @@ func (ec *executionContext) field_Mutation_invokeFunction_args(ctx context.Conte
 		}
 	}
 	args["user"] = arg2
+	var arg3 *ulid.ULID
+	if tmp, ok := rawArgs["debugSessionID"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("debugSessionID"))
+		arg3, err = ec.unmarshalOULID2ᚖgithubᚗcomᚋoklogᚋulidᚋv2ᚐULID(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["debugSessionID"] = arg3
+	var arg4 *ulid.ULID
+	if tmp, ok := rawArgs["debugRunID"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("debugRunID"))
+		arg4, err = ec.unmarshalOULID2ᚖgithubᚗcomᚋoklogᚋulidᚋv2ᚐULID(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["debugRunID"] = arg4
 	return args, nil
 }
 
@@ -4080,6 +4105,24 @@ func (ec *executionContext) field_Mutation_rerun_args(ctx context.Context, rawAr
 		}
 	}
 	args["fromStep"] = arg1
+	var arg2 *ulid.ULID
+	if tmp, ok := rawArgs["debugSessionID"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("debugSessionID"))
+		arg2, err = ec.unmarshalOULID2ᚖgithubᚗcomᚋoklogᚋulidᚋv2ᚐULID(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["debugSessionID"] = arg2
+	var arg3 *ulid.ULID
+	if tmp, ok := rawArgs["debugRunID"]; ok {
+		ctx := graphql.WithPathContext(ctx, graphql.NewPathWithField("debugRunID"))
+		arg3, err = ec.unmarshalOULID2ᚖgithubᚗcomᚋoklogᚋulidᚋv2ᚐULID(ctx, tmp)
+		if err != nil {
+			return nil, err
+		}
+	}
+	args["debugRunID"] = arg3
 	return args, nil
 }
 
@@ -12553,7 +12596,7 @@ func (ec *executionContext) _Mutation_invokeFunction(ctx context.Context, field 
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mutation().InvokeFunction(rctx, fc.Args["data"].(map[string]interface{}), fc.Args["functionSlug"].(string), fc.Args["user"].(map[string]interface{}))
+		return ec.resolvers.Mutation().InvokeFunction(rctx, fc.Args["data"].(map[string]interface{}), fc.Args["functionSlug"].(string), fc.Args["user"].(map[string]interface{}), fc.Args["debugSessionID"].(*ulid.ULID), fc.Args["debugRunID"].(*ulid.ULID))
 	})
 	if err != nil {
 		ec.Error(ctx, err)
@@ -12698,7 +12741,7 @@ func (ec *executionContext) _Mutation_rerun(ctx context.Context, field graphql.C
 	}()
 	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
 		ctx = rctx // use context from middleware stack in children
-		return ec.resolvers.Mutation().Rerun(rctx, fc.Args["runID"].(ulid.ULID), fc.Args["fromStep"].(*models.RerunFromStepInput))
+		return ec.resolvers.Mutation().Rerun(rctx, fc.Args["runID"].(ulid.ULID), fc.Args["fromStep"].(*models.RerunFromStepInput), fc.Args["debugSessionID"].(*ulid.ULID), fc.Args["debugRunID"].(*ulid.ULID))
 	})
 	if err != nil {
 		ec.Error(ctx, err)

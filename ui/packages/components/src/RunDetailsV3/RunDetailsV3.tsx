@@ -107,8 +107,6 @@ export const RunDetailsV3 = (props: Props) => {
   const runRes = useQuery({
     queryKey: ['run', runID, { preview: props.tracesPreviewEnabled }],
     queryFn: useCallback(() => {
-      console.log('lollllyep', { 'props.tracesPreviewEnabled': props.tracesPreviewEnabled });
-
       return getRun(runID, props.tracesPreviewEnabled);
     }, [getRun, runID, props.tracesPreviewEnabled]),
     retry: 3,

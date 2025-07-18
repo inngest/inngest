@@ -58,4 +58,6 @@ type ExtractedValues struct {
 	ResponseHeaders *http.Header
 	ResponseStatusCode *int
 	ResponseOutputSize *int
+	DebugSessionID *ulid.ULID
+	DebugRunID *ulid.ULID
 }

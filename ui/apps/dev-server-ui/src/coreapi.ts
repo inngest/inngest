@@ -330,8 +330,20 @@ export const HISTORY_ITEM_OUTPUT = gql`
 `;
 
 export const INVOKE_FUNCTION = gql`
-  mutation InvokeFunction($functionSlug: String!, $data: Map, $user: Map) {
-    invokeFunction(data: $data, functionSlug: $functionSlug, user: $user)
+  mutation InvokeFunction(
+    $functionSlug: String!
+    $data: Map
+    $user: Map
+    $debugSessionID: ULID = null
+    $debugRunID: ULID = null
+  ) {
+    invokeFunction(
+      data: $data
+      functionSlug: $functionSlug
+      user: $user
+      debugSessionID: $debugSessionID
+      debugRunID: $debugRunID
+    )
   }
 `;
 
@@ -350,8 +362,18 @@ export const RERUN = gql`
 `;
 
 export const RERUN_FROM_STEP = gql`
-  mutation RerunFromStep($runID: ULID!, $fromStep: RerunFromStepInput!) {
-    rerun(runID: $runID, fromStep: $fromStep)
+  mutation RerunFromStep(
+    $runID: ULID!
+    $fromStep: RerunFromStepInput!
+    $debugSessionID: ULID = null
+    $debugRunID: ULID = null
+  ) {
+    rerun(
+      runID: $runID
+      fromStep: $fromStep
+      debugSessionID: $debugSessionID
+      debugRunID: $debugRunID
+    )
   }
 `;
 

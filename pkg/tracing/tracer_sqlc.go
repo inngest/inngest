@@ -36,6 +36,8 @@ func (e *dbExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlyS
 		var functionID string
 		var output interface{}
 		var runID string
+		var debugSessionID string
+		var debugRunID string
 
 		attrs := make(map[string]any)
 		for _, attr := range span.Attributes() {
@@ -92,6 +94,20 @@ func (e *dbExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlyS
 
 			// Omit drop span attribute if we're an extension span
 			if isExtensionSpan && string(attr.Key) == meta.Attrs.DropSpan.Key() {
+				if cleanAttrs {
+					continue
+				}
+			}
+
+			if string(attr.Key) == meta.Attrs.DebugSessionID.Key() {
+				debugSessionID = attr.Value.AsString()
+				if cleanAttrs {
+					continue
+				}
+			}
+
+			if string(attr.Key) == meta.Attrs.DebugRunID.Key() {
+				debugRunID = attr.Value.AsString()
 				if cleanAttrs {
 					continue
 				}
@@ -166,6 +182,14 @@ func (e *dbExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlyS
 			AccountID: accountID,
 			EnvID:     envID,
 			Output:    output,
+			DebugSessionID: sql.NullString{
+				String: debugSessionID,
+				Valid:  debugSessionID != "",
+			},
+			DebugRunID: sql.NullString{
+				String: debugRunID,
+				Valid:  debugRunID != "",
+			},
 		})
 		if err != nil {
 			logger.StdlibLogger(ctx).Error("failed to insert span into database",

@@ -1616,26 +1616,30 @@ INSERT INTO spans (
   dynamic_span_id,
   attributes,
   links,
-  output
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  output,
+  debug_run_id,
+  debug_session_id
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `
 
 type InsertSpanParams struct {
-	SpanID        string
-	TraceID       string
-	ParentSpanID  sql.NullString
-	Name          string
-	StartTime     time.Time
-	EndTime       time.Time
-	RunID         string
-	AccountID     string
-	AppID         string
-	FunctionID    string
-	EnvID         string
-	DynamicSpanID sql.NullString
-	Attributes    interface{}
-	Links         interface{}
-	Output        interface{}
+	SpanID         string
+	TraceID        string
+	ParentSpanID   sql.NullString
+	Name           string
+	StartTime      time.Time
+	EndTime        time.Time
+	RunID          string
+	AccountID      string
+	AppID          string
+	FunctionID     string
+	EnvID          string
+	DynamicSpanID  sql.NullString
+	Attributes     interface{}
+	Links          interface{}
+	Output         interface{}
+	DebugRunID     sql.NullString
+	DebugSessionID sql.NullString
 }
 
 // New
@@ -1656,6 +1660,8 @@ func (q *Queries) InsertSpan(ctx context.Context, arg InsertSpanParams) error {
 		arg.Attributes,
 		arg.Links,
 		arg.Output,
+		arg.DebugRunID,
+		arg.DebugSessionID,
 	)
 	return err
 }

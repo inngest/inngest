@@ -7,6 +7,8 @@ export interface InvokeRunPayload {
   functionSlug: string;
   data: Record<string, unknown>;
   user: Record<string, unknown> | null;
+  debugSessionID?: string;
+  debugRunID?: string;
 }
 export type InvokeRunResult = {
   error?: unknown;
