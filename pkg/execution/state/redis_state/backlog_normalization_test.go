@@ -379,8 +379,8 @@ func TestBacklogNormalizeItem(t *testing.T) {
 		WithRefreshItemThrottle(func(ctx context.Context, item *osqueue.QueueItem) (*osqueue.Throttle, error) {
 			return throttle, nil
 		}),
-		WithPartitionConstraintConfigGetter(func(ctx context.Context, p QueueShadowPartition) (*PartitionConstraintConfig, error) {
-			return &latestConstraints, nil
+		WithPartitionConstraintConfigGetter(func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig {
+			return latestConstraints
 		}),
 		WithClock(clock),
 	)

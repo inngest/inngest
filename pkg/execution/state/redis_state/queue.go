@@ -496,38 +496,6 @@ func WithPeekEWMA(on bool) func(q *queue) {
 	}
 }
 
-// QueueItemConcurrencyKeyLimitRefresher returns concurrency keys with current limits given a queue item.
-//
-// Each queue item can have its own concurrency keys.  For example, you can define
-// concurrency limits for steps within a function.  This ensures that there will never be
-// more than N concurrent items running at once.
-type QueueItemConcurrencyKeyLimitRefresher func(ctx context.Context, i osqueue.QueueItem) []state.CustomConcurrency
-
-type PartitionConcurrencyLimits struct {
-	// AccountLimit returns the current account concurrency limit, which is always applied. Defaults to maximum concurrency.
-	AccountLimit int
-
-	// FunctionLimit returns the function-scoped concurrency limit, if configured. Defaults to maximum concurrency.
-	FunctionLimit int
-
-	// CustomKeyLimit returns the custom concurrency limit for a concurrency key partition. Defaults to maximum concurrency.
-	CustomKeyLimit int
-}
-
-type SystemPartitionConcurrencyLimits struct {
-	// GlobalLimit returns the account-level equivalent concurrency limit for system partitions, which is always applied. Defaults to maximum concurrency.
-	GlobalLimit int
-
-	// PartitionLimit returns the partition-scoped concurrency limit, if configured. Defaults to maximum concurrency.
-	PartitionLimit int
-}
-
-// ConcurrencyLimitGetter returns the fn, account, and custom limits for a given partition.
-type ConcurrencyLimitGetter func(ctx context.Context, p QueuePartition) PartitionConcurrencyLimits
-
-// SystemConcurrencyLimitGetter returns the concurrency limits for a given system partition.
-type SystemConcurrencyLimitGetter func(ctx context.Context, p QueuePartition) SystemPartitionConcurrencyLimits
-
 // PartitionConstraintConfigGetter returns the constraint configuration for a given partition
 type PartitionConstraintConfigGetter func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig
 
