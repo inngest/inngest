@@ -105,7 +105,7 @@ const (
 	defaultNumWorkers                  = 100
 	defaultNumShadowWorkers            = 100
 	defaultBacklogNormalizationWorkers = 10
-	defaultBacklogNormalizeLimit       = int64(500)
+	defaultBacklogNormalizeConcurrency = int64(20)
 
 	defaultPollTick                 = 10 * time.Millisecond
 	defaultShadowPollTick           = 100 * time.Millisecond
@@ -268,9 +268,9 @@ func WithBacklogRefillLimit(limit int64) QueueOpt {
 	}
 }
 
-func WithBacklogNormalizationLimit(limit int64) QueueOpt {
+func WithBacklogNormalizationConcurrency(limit int64) QueueOpt {
 	return func(q *queue) {
-		q.backlogNormalizeLimit = limit
+		q.backlogNormalizeConcurrency = limit
 	}
 }
 
@@ -496,38 +496,6 @@ func WithPeekEWMA(on bool) func(q *queue) {
 	}
 }
 
-// QueueItemConcurrencyKeyLimitRefresher returns concurrency keys with current limits given a queue item.
-//
-// Each queue item can have its own concurrency keys.  For example, you can define
-// concurrency limits for steps within a function.  This ensures that there will never be
-// more than N concurrent items running at once.
-type QueueItemConcurrencyKeyLimitRefresher func(ctx context.Context, i osqueue.QueueItem) []state.CustomConcurrency
-
-type PartitionConcurrencyLimits struct {
-	// AccountLimit returns the current account concurrency limit, which is always applied. Defaults to maximum concurrency.
-	AccountLimit int
-
-	// FunctionLimit returns the function-scoped concurrency limit, if configured. Defaults to maximum concurrency.
-	FunctionLimit int
-
-	// CustomKeyLimit returns the custom concurrency limit for a concurrency key partition. Defaults to maximum concurrency.
-	CustomKeyLimit int
-}
-
-type SystemPartitionConcurrencyLimits struct {
-	// GlobalLimit returns the account-level equivalent concurrency limit for system partitions, which is always applied. Defaults to maximum concurrency.
-	GlobalLimit int
-
-	// PartitionLimit returns the partition-scoped concurrency limit, if configured. Defaults to maximum concurrency.
-	PartitionLimit int
-}
-
-// ConcurrencyLimitGetter returns the fn, account, and custom limits for a given partition.
-type ConcurrencyLimitGetter func(ctx context.Context, p QueuePartition) PartitionConcurrencyLimits
-
-// SystemConcurrencyLimitGetter returns the concurrency limits for a given system partition.
-type SystemConcurrencyLimitGetter func(ctx context.Context, p QueuePartition) SystemPartitionConcurrencyLimits
-
 // PartitionConstraintConfigGetter returns the constraint configuration for a given partition
 type PartitionConstraintConfigGetter func(ctx context.Context, p PartitionIdentifier) PartitionConstraintConfig
 
@@ -648,12 +616,12 @@ func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 		apf: func(_ context.Context, _ uuid.UUID) uint {
 			return PriorityDefault
 		},
-		peekMin:               DefaultQueuePeekMin,
-		peekMax:               DefaultQueuePeekMax,
-		shadowPeekMin:         ShadowPartitionPeekMinBacklogs,
-		shadowPeekMax:         ShadowPartitionPeekMaxBacklogs,
-		backlogRefillLimit:    BacklogRefillHardLimit,
-		backlogNormalizeLimit: defaultBacklogNormalizeLimit,
+		peekMin:                     DefaultQueuePeekMin,
+		peekMax:                     DefaultQueuePeekMax,
+		shadowPeekMin:               ShadowPartitionPeekMinBacklogs,
+		shadowPeekMax:               ShadowPartitionPeekMaxBacklogs,
+		backlogRefillLimit:          BacklogRefillHardLimit,
+		backlogNormalizeConcurrency: defaultBacklogNormalizeConcurrency,
 		runMode: QueueRunMode{
 			Sequential:                        true,
 			Scavenger:                         true,
@@ -907,14 +875,14 @@ type queue struct {
 	continuesLock     *sync.Mutex
 	continuationLimit uint
 
-	shadowContinues         map[string]shadowContinuation
-	shadowContinueCooldown  map[string]time.Time
-	shadowContinuesLock     *sync.Mutex
-	shadowContinuationLimit uint
-	shadowPeekMin           int64
-	shadowPeekMax           int64
-	backlogRefillLimit      int64
-	backlogNormalizeLimit   int64
+	shadowContinues             map[string]shadowContinuation
+	shadowContinueCooldown      map[string]time.Time
+	shadowContinuesLock         *sync.Mutex
+	shadowContinuationLimit     uint
+	shadowPeekMin               int64
+	shadowPeekMax               int64
+	backlogRefillLimit          int64
+	backlogNormalizeConcurrency int64
 
 	normalizeRefreshItemCustomConcurrencyKeys NormalizeRefreshItemCustomConcurrencyKeysFn
 	refreshItemThrottle                       RefreshItemThrottleFn
@@ -2261,7 +2229,8 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 		Tags: map[string]any{
 			"queue_shard": q.primaryQueueShard.Name,
 			"op":          "item",
-		}},
+		},
+	},
 	)
 
 	l := q.log.With("item_delay", itemDelay.String())
@@ -2272,7 +2241,8 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 		Tags: map[string]any{
 			"queue_shard": q.primaryQueueShard.Name,
 			"op":          "refill",
-		}},
+		},
+	},
 	)
 	l = l.With("refill_delay", refillDelay.String())
 
@@ -2283,7 +2253,8 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 		Tags: map[string]any{
 			"queue_shard": q.primaryQueueShard.Name,
 			"op":          "lease",
-		}},
+		},
+	},
 	)
 	l = l.With("lease_delay", leaseDelay.String())
 
