@@ -416,7 +416,7 @@ func TestBacklogNormalizeItem(t *testing.T) {
 	require.True(t, hasMember(t, r, kg.ShadowPartitionSet(sp.PartitionID), sourceBacklog.BacklogID))
 	require.True(t, hasMember(t, r, kg.BacklogSet(sourceBacklog.BacklogID), qi.ID))
 
-	normalizedItem, err := q.normalizeItem(ctx, defaultShard, &sp, &latestConstraints, &sourceBacklog, qi)
+	normalizedItem, err := q.normalizeItem(ctx, defaultShard, &sp, latestConstraints, &sourceBacklog, qi)
 	require.NoError(t, err)
 
 	qi.Data.CustomConcurrencyKeys = customConc
