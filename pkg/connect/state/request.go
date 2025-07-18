@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"time"
@@ -23,6 +24,7 @@ var (
 	ErrRequestLeaseNotFound = fmt.Errorf("request not leased")
 
 	ErrResponseAlreadyBuffered = fmt.Errorf("response already buffered")
+	ErrExecutorNotFound        = fmt.Errorf("executor not found")
 )
 
 type Lease struct {
@@ -186,8 +188,8 @@ func (r *redisConnectionStateManager) GetExecutorIP(ctx context.Context, envID u
 	cmd := r.client.B().Get().Key(r.keyRequestLease(envID, requestID)).Build()
 
 	reply, err := r.client.Do(ctx, cmd).ToString()
-	if err != nil {
-		return nil, err
+	if errors.Is(err, rueidis.Nil) {
+		return nil, ErrExecutorNotFound
 	}
 
 	lease := Lease{}
