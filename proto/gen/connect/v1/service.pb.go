@@ -409,10 +409,11 @@ const file_connect_v1_service_proto_rawDesc = "" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess2\x93\x01\n" +
 	"\x0eConnectGateway\x12D\n" +
 	"\aForward\x12\x1a.connect.v1.ForwardRequest\x1a\x1b.connect.v1.ForwardResponse\"\x00\x12;\n" +
-	"\x04Ping\x12\x17.connect.v1.PingRequest\x1a\x18.connect.v1.PingResponse\"\x002\x8b\x01\n" +
+	"\x04Ping\x12\x17.connect.v1.PingRequest\x1a\x18.connect.v1.PingResponse\"\x002\xc8\x01\n" +
 	"\x0fConnectExecutor\x12>\n" +
 	"\x05Reply\x12\x18.connect.v1.ReplyRequest\x1a\x19.connect.v1.ReplyResponse\"\x00\x128\n" +
-	"\x03Ack\x12\x16.connect.v1.AckMessage\x1a\x17.connect.v1.AckResponse\"\x00B9Z7github.com/inngest/inngest/proto/gen/connect/v1;connectb\x06proto3"
+	"\x03Ack\x12\x16.connect.v1.AckMessage\x1a\x17.connect.v1.AckResponse\"\x00\x12;\n" +
+	"\x04Ping\x12\x17.connect.v1.PingRequest\x1a\x18.connect.v1.PingResponse\"\x00B9Z7github.com/inngest/inngest/proto/gen/connect/v1;connectb\x06proto3"
 
 var (
 	file_connect_v1_service_proto_rawDescOnce sync.Once
@@ -448,12 +449,14 @@ var file_connect_v1_service_proto_depIdxs = []int32{
 	2,  // 4: connect.v1.ConnectGateway.Ping:input_type -> connect.v1.PingRequest
 	4,  // 5: connect.v1.ConnectExecutor.Reply:input_type -> connect.v1.ReplyRequest
 	6,  // 6: connect.v1.ConnectExecutor.Ack:input_type -> connect.v1.AckMessage
-	1,  // 7: connect.v1.ConnectGateway.Forward:output_type -> connect.v1.ForwardResponse
-	3,  // 8: connect.v1.ConnectGateway.Ping:output_type -> connect.v1.PingResponse
-	5,  // 9: connect.v1.ConnectExecutor.Reply:output_type -> connect.v1.ReplyResponse
-	7,  // 10: connect.v1.ConnectExecutor.Ack:output_type -> connect.v1.AckResponse
-	7,  // [7:11] is the sub-list for method output_type
-	3,  // [3:7] is the sub-list for method input_type
+	2,  // 7: connect.v1.ConnectExecutor.Ping:input_type -> connect.v1.PingRequest
+	1,  // 8: connect.v1.ConnectGateway.Forward:output_type -> connect.v1.ForwardResponse
+	3,  // 9: connect.v1.ConnectGateway.Ping:output_type -> connect.v1.PingResponse
+	5,  // 10: connect.v1.ConnectExecutor.Reply:output_type -> connect.v1.ReplyResponse
+	7,  // 11: connect.v1.ConnectExecutor.Ack:output_type -> connect.v1.AckResponse
+	3,  // 12: connect.v1.ConnectExecutor.Ping:output_type -> connect.v1.PingResponse
+	8,  // [8:13] is the sub-list for method output_type
+	3,  // [3:8] is the sub-list for method input_type
 	3,  // [3:3] is the sub-list for extension type_name
 	3,  // [3:3] is the sub-list for extension extendee
 	0,  // [0:3] is the sub-list for field type_name
