@@ -2,11 +2,13 @@ package logger
 
 import (
 	"context"
+	"errors"
 	"io"
 	"log/slog"
 	"os"
 	"strings"
 
+	"github.com/getsentry/sentry-go"
 	"github.com/lmittmann/tint"
 )
 
@@ -69,6 +71,9 @@ type Logger interface {
 	Emergency(msg string, args ...any)
 	EmergencyContext(ctx context.Context, msg string, args ...any)
 	SLog() *slog.Logger
+
+	// ReportError is a wrapper over Error, and will also submit a report to the error report tool
+	ReportError(msg string, tags map[string]string, opts ...ReportErrorOpt)
 }
 
 type LoggerOpt func(o *loggerOpts)
@@ -170,18 +175,21 @@ func newLogger(opts ...LoggerOpt) Logger {
 				},
 			})),
 			level: o.level,
+			attrs: []any{},
 		}
 
 	case TextHandler:
 		return &logger{
 			Logger: slog.New(slog.NewTextHandler(o.writer, &hopts)),
 			level:  o.level,
+			attrs:  []any{},
 		}
 
 	default:
 		return &logger{
 			Logger: slog.New(slog.NewJSONHandler(o.writer, &hopts)),
 			level:  o.level,
+			attrs:  []any{},
 		}
 	}
 }
@@ -246,6 +254,9 @@ func FromSlog(l *slog.Logger, level slog.Level) Logger {
 type logger struct {
 	*slog.Logger
 	level slog.Level
+
+	// attrs represent the additional attributes used for this logger
+	attrs []any
 }
 
 func (l *logger) Level() slog.Level {
@@ -260,6 +271,7 @@ func (l *logger) With(args ...any) Logger {
 	log := l.Logger.With(args...)
 	return &logger{
 		Logger: log,
+		attrs:  append(l.attrs, args...),
 	}
 }
 
@@ -289,4 +301,47 @@ func (l *logger) EmergencyContext(ctx context.Context, msg string, args ...any) 
 
 func (l *logger) SLog() *slog.Logger {
 	return l.Logger
+}
+
+// reportErrorOpt provides options to tweak error reporting behaviors
+type reportErrorOpt struct {
+	log bool
+}
+
+type ReportErrorOpt func(o *reportErrorOpt)
+
+func (l *logger) ReportError(msg string, tags map[string]string, opts ...ReportErrorOpt) {
+	if sentry.CurrentHub().Client() == nil {
+		l.Warn("sentry is not initialized")
+		return
+	}
+
+	opt := reportErrorOpt{
+		log: true, // NOTE: defaults to true for now, can be disabled later
+	}
+	for _, apply := range opts {
+		apply(&opt)
+	}
+
+	// only report to sentry if initialize
+	sentry.WithScope(func(scope *sentry.Scope) {
+		scope.SetTags(tags)
+		scope.SetLevel(sentry.LevelError)
+		sentry.CaptureException(errors.New(msg))
+	})
+
+	if opt.log {
+		args := []any{}
+		for k, v := range tags {
+			args = append(args, k, v)
+		}
+
+		l.Error(msg, args...)
+	}
+}
+
+func WithErrorReportLog(enable bool) ReportErrorOpt {
+	return func(o *reportErrorOpt) {
+		o.log = enable
+	}
 }
