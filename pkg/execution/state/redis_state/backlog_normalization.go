@@ -16,6 +16,7 @@ import (
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
+	"github.com/sourcegraph/conc"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -331,20 +332,18 @@ func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp 
 
 		l.Debug("peeked items to normalize", "count", len(res.Items), "total", res.TotalCount, "removed", res.RemovedCount)
 
-		eg := errgroup.Group{}
+		wg := conc.NewWaitGroup()
 		for _, item := range res.Items {
 			item := item // capture range variable
-			eg.Go(func() error {
+			wg.Go(func() {
 				_, err := q.normalizeItem(ctx, shard, sp, latestConstraints, backlog, *item)
 				if err != nil {
-					return fmt.Errorf("could not normalize item: %w", err)
+					l.Error("could not normalize item", "err", err)
 				}
-
-				return nil
 			})
 		}
 
-		err = eg.Wait()
+		err = wg.WaitAndRecover().AsError()
 		if err != nil {
 			return fmt.Errorf("could not normalize items: %w", err)
 		}
