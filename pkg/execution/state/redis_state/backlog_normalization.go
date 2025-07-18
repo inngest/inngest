@@ -16,7 +16,7 @@ import (
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
-	"github.com/sourcegraph/conc"
+	"github.com/sourcegraph/conc/pool"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -317,7 +317,7 @@ func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp 
 			return nil
 		}
 
-		res, err := q.BacklogNormalizePeek(ctx, backlog, q.backlogNormalizeConcurrency)
+		res, err := q.BacklogNormalizePeek(ctx, backlog, NormalizeBacklogPeekMax)
 		if err != nil {
 			if errors.Is(err, context.Canceled) {
 				return nil
@@ -332,7 +332,7 @@ func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp 
 
 		l.Debug("peeked items to normalize", "count", len(res.Items), "total", res.TotalCount, "removed", res.RemovedCount)
 
-		wg := conc.NewWaitGroup()
+		wg := pool.New().WithMaxGoroutines(int(q.backlogNormalizeConcurrency))
 		for _, item := range res.Items {
 			item := item // capture range variable
 			wg.Go(func() {
@@ -343,10 +343,7 @@ func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp 
 			})
 		}
 
-		err = wg.WaitAndRecover().AsError()
-		if err != nil {
-			return fmt.Errorf("could not normalize items: %w", err)
-		}
+		wg.Wait()
 
 		processed := int64(len(res.Items))
 
