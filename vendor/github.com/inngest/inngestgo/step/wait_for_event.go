@@ -39,6 +39,7 @@ type WaitForEventOpts struct {
 //		Timeout: 24 * time.Hour,
 //	})
 func WaitForEvent[T any](ctx context.Context, stepID string, opts WaitForEventOpts) (T, error) {
+	targetID := getTargetStepID(ctx)
 	mgr := preflight(ctx)
 	args := map[string]any{
 		"timeout": str2duration.String(opts.Timeout),
@@ -50,8 +51,9 @@ func WaitForEvent[T any](ctx context.Context, stepID string, opts WaitForEventOp
 	if opts.Name == "" {
 		opts.Name = stepID
 	}
-
 	op := mgr.NewOp(enums.OpcodeWaitForEvent, stepID, args)
+	hashedID := op.MustHash()
+
 	if val, ok := mgr.Step(ctx, op); ok {
 		var output T
 		if val == nil || bytes.Equal(val, []byte{0x6e, 0x75, 0x6c, 0x6c}) {
@@ -64,11 +66,19 @@ func WaitForEvent[T any](ctx context.Context, stepID string, opts WaitForEventOp
 		return output, nil
 	}
 
-	mgr.AppendOp(sdkrequest.GeneratorOpcode{
-		ID:   op.MustHash(),
+	if targetID != nil && *targetID != hashedID {
+		// Don't report this step since targeting is happening and it isn't
+		// targeted
+		panic(ControlHijack{})
+	}
+
+	plannedOp := sdkrequest.GeneratorOpcode{
+		ID:   hashedID,
 		Op:   op.Op,
 		Name: opts.Name,
 		Opts: op.Opts,
-	})
+	}
+	plannedOp.SetParallelMode(parallelMode(ctx))
+	mgr.AppendOp(plannedOp)
 	panic(ControlHijack{})
 }

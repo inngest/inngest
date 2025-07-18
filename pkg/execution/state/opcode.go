@@ -484,3 +484,36 @@ func (g *GeneratorOpcode) AIGatewayOpts() (aigateway.Request, error) {
 
 	return req, nil
 }
+
+// ParallelMode returns the parallel mode for the step. Defaults to
+// ParallelModeNone (including if there any errors)
+func (g *GeneratorOpcode) ParallelMode() enums.ParallelMode {
+	var optByt []byte
+	switch typ := g.Opts.(type) {
+	case []byte:
+		optByt = typ
+	default:
+		var err error
+		optByt, err = json.Marshal(g.Opts)
+		if err != nil {
+			return enums.ParallelModeNone
+		}
+	}
+
+	var opts map[string]any
+	if err := json.Unmarshal(optByt, &opts); err != nil {
+		return enums.ParallelModeNone
+	}
+
+	raw, ok := opts[enums.OptKeyParallelMode.String()].(string)
+	if !ok {
+		return enums.ParallelModeNone
+	}
+
+	mode, err := enums.ParallelModeString(raw)
+	if err != nil {
+		return enums.ParallelModeNone
+	}
+
+	return mode
+}
