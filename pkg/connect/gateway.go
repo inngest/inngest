@@ -724,7 +724,7 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 			if useGRPC {
 				transport = "grpc"
 
-				grpcClient, err := c.svc.getOrCreateGRPCClient(ctx, c.log, c.conn.EnvID, data.RequestId)
+				grpcClient, err := c.svc.getOrCreateGRPCClient(ctx, c.conn.EnvID, data.RequestId)
 				if err != nil {
 					return &connecterrors.SocketError{
 						SysCode:    syscode.CodeConnectInternal,
@@ -1282,7 +1282,7 @@ func (c *connectionHandler) handleSdkReply(ctx context.Context, msg *connectpb.C
 	}
 
 	if c.svc.shouldUseGRPC(ctx, c.conn.AccountID) {
-		grpcClient, err := c.svc.getOrCreateGRPCClient(ctx, l, c.conn.EnvID, data.RequestId)
+		grpcClient, err := c.svc.getOrCreateGRPCClient(ctx, c.conn.EnvID, data.RequestId)
 		if err != nil {
 			return err
 		}

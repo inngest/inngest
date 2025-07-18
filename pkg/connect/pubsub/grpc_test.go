@@ -12,7 +12,6 @@ import (
 	"github.com/alicebob/miniredis/v2"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/connect/state"
-	"github.com/inngest/inngest/pkg/logger"
 	connectpb "github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
@@ -73,6 +72,10 @@ func setupTestEnvironment(t *testing.T) (context.Context, *mockConnectGatewaySer
 	return ctx, mockServer, bufDialer, gatewayManager, cleanup
 }
 
+func newGatewayGRPCManagerWithDialer(ctx context.Context, stateManager state.GatewayManager, dialer GRPCDialer) GatewayGRPCManager {
+	return NewGatewayGRPCManager(ctx, stateManager, WithDialer(dialer))
+}
+
 type mockConnectGatewayServer struct {
 	connectpb.UnimplementedConnectGatewayServer
 	pingCount    int
@@ -121,7 +124,7 @@ func TestConnectToGateways(t *testing.T) {
 	err := gatewayManager.UpsertGateway(ctx, gateway)
 	require.NoError(t, err)
 
-	forwarder := NewGatewayGRPCManagerWithDialer(ctx, gatewayManager, bufDialer, logger.StdlibLogger(ctx))
+	forwarder := newGatewayGRPCManagerWithDialer(ctx, gatewayManager, bufDialer)
 
 	t.Run("connects to single gateway", func(t *testing.T) {
 		mockServer.reset()
@@ -135,6 +138,8 @@ func TestConnectToGateways(t *testing.T) {
 
 	t.Run("connects to multiple gateways", func(t *testing.T) {
 		mockServer.reset()
+
+		forwarder = newGatewayGRPCManagerWithDialer(ctx, gatewayManager, bufDialer)
 
 		gatewayID2 := ulid.MustNew(ulid.Now(), nil)
 		gateway2 := &state.Gateway{
@@ -172,7 +177,7 @@ func TestForward(t *testing.T) {
 	err := gatewayManager.UpsertGateway(ctx, gateway)
 	require.NoError(t, err)
 
-	forwarder := NewGatewayGRPCManagerWithDialer(ctx, gatewayManager, bufDialer, logger.StdlibLogger(ctx))
+	forwarder := newGatewayGRPCManagerWithDialer(ctx, gatewayManager, bufDialer)
 
 	t.Run("forwards to existing gateway", func(t *testing.T) {
 		mockServer.reset()
@@ -242,7 +247,7 @@ func TestForward(t *testing.T) {
 
 		newGatewayManager, newCleanup := setupRedisGatewayManager(t)
 		defer newCleanup()
-		newForwarder := NewGatewayGRPCManagerWithDialer(ctx, newGatewayManager, bufDialer, logger.StdlibLogger(ctx))
+		newForwarder := newGatewayGRPCManagerWithDialer(ctx, newGatewayManager, bufDialer)
 
 		gatewayID1 := ulid.MustNew(ulid.Now(), rand.Reader)
 		gateway1 := &state.Gateway{
@@ -304,7 +309,7 @@ func TestGarbageCollectClients(t *testing.T) {
 		err := gatewayManager.UpsertGateway(ctx, gateway)
 		require.NoError(t, err)
 
-		forwarder := NewGatewayGRPCManagerWithDialer(ctx, gatewayManager, bufDialer, logger.StdlibLogger(ctx))
+		forwarder := newGatewayGRPCManagerWithDialer(ctx, gatewayManager, bufDialer)
 
 		err = forwarder.ConnectToGateways(ctx)
 		require.NoError(t, err)
@@ -336,7 +341,7 @@ func TestGarbageCollectClients(t *testing.T) {
 
 		newGatewayManager, newCleanup := setupRedisGatewayManager(t)
 		defer newCleanup()
-		newForwarder := NewGatewayGRPCManagerWithDialer(ctx, newGatewayManager, bufDialer, logger.StdlibLogger(ctx))
+		newForwarder := newGatewayGRPCManagerWithDialer(ctx, newGatewayManager, bufDialer)
 
 		gatewayID2 := ulid.MustNew(ulid.Now(), rand.Reader)
 		time.Sleep(1 * time.Millisecond)
@@ -390,7 +395,7 @@ func TestGarbageCollectClients(t *testing.T) {
 		gatewayManager, cleanup := setupRedisGatewayManager(t)
 		defer cleanup()
 
-		forwarder := NewGatewayGRPCManagerWithDialer(ctx, gatewayManager, nil, logger.StdlibLogger(ctx))
+		forwarder := newGatewayGRPCManagerWithDialer(ctx, gatewayManager, nil)
 		forwarderImpl := forwarder.(*gatewayGRPCManager)
 
 		cleanup()
@@ -422,7 +427,7 @@ func TestGatewayGRPCForwarderWithFailingServer(t *testing.T) {
 	err := gatewayManager.UpsertGateway(ctx, gateway)
 	require.NoError(t, err)
 
-	forwarder := NewGatewayGRPCManagerWithDialer(ctx, gatewayManager, failingDialer, logger.StdlibLogger(ctx))
+	forwarder := newGatewayGRPCManagerWithDialer(ctx, gatewayManager, failingDialer)
 
 	t.Run("ConnectToGateways should ignore connection failures", func(t *testing.T) {
 		err := forwarder.ConnectToGateways(ctx)
@@ -445,7 +450,7 @@ func TestReply(t *testing.T) {
 	ctx, _, bufDialer, gatewayManager, cleanup := setupTestEnvironment(t)
 	defer cleanup()
 
-	forwarder := NewGatewayGRPCManagerWithDialer(ctx, gatewayManager, bufDialer, logger.StdlibLogger(ctx))
+	forwarder := newGatewayGRPCManagerWithDialer(ctx, gatewayManager, bufDialer)
 	forwarderImpl := forwarder.(*gatewayGRPCManager)
 
 	t.Run("delivers reply to subscribed channel", func(t *testing.T) {
@@ -531,7 +536,7 @@ func TestSubscribeUnsubscribe(t *testing.T) {
 	ctx, _, bufDialer, gatewayManager, cleanup := setupTestEnvironment(t)
 	defer cleanup()
 
-	forwarder := NewGatewayGRPCManagerWithDialer(ctx, gatewayManager, bufDialer, logger.StdlibLogger(ctx))
+	forwarder := newGatewayGRPCManagerWithDialer(ctx, gatewayManager, bufDialer)
 	forwarderImpl := forwarder.(*gatewayGRPCManager)
 
 	t.Run("subscription lifecycle", func(t *testing.T) {
@@ -647,7 +652,7 @@ func TestSubscribeUnsubscribeWorkerAck(t *testing.T) {
 	ctx, _, bufDialer, gatewayManager, cleanup := setupTestEnvironment(t)
 	defer cleanup()
 
-	forwarder := NewGatewayGRPCManagerWithDialer(ctx, gatewayManager, bufDialer, logger.StdlibLogger(ctx))
+	forwarder := newGatewayGRPCManagerWithDialer(ctx, gatewayManager, bufDialer)
 	forwarderImpl := forwarder.(*gatewayGRPCManager)
 
 	t.Run("worker ack subscription lifecycle", func(t *testing.T) {

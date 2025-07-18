@@ -43,16 +43,8 @@ const (
 	ConnectExecutorReplyProcedure = "/connect.v1.ConnectExecutor/Reply"
 	// ConnectExecutorAckProcedure is the fully-qualified name of the ConnectExecutor's Ack RPC.
 	ConnectExecutorAckProcedure = "/connect.v1.ConnectExecutor/Ack"
-)
-
-// These variables are the protoreflect.Descriptor objects for the RPCs defined in this package.
-var (
-	connectGatewayServiceDescriptor       = v1.File_connect_v1_service_proto.Services().ByName("ConnectGateway")
-	connectGatewayForwardMethodDescriptor = connectGatewayServiceDescriptor.Methods().ByName("Forward")
-	connectGatewayPingMethodDescriptor    = connectGatewayServiceDescriptor.Methods().ByName("Ping")
-	connectExecutorServiceDescriptor      = v1.File_connect_v1_service_proto.Services().ByName("ConnectExecutor")
-	connectExecutorReplyMethodDescriptor  = connectExecutorServiceDescriptor.Methods().ByName("Reply")
-	connectExecutorAckMethodDescriptor    = connectExecutorServiceDescriptor.Methods().ByName("Ack")
+	// ConnectExecutorPingProcedure is the fully-qualified name of the ConnectExecutor's Ping RPC.
+	ConnectExecutorPingProcedure = "/connect.v1.ConnectExecutor/Ping"
 )
 
 // ConnectGatewayClient is a client for the connect.v1.ConnectGateway service.
@@ -70,17 +62,18 @@ type ConnectGatewayClient interface {
 // http://api.acme.com or https://acme.com/grpc).
 func NewConnectGatewayClient(httpClient connect.HTTPClient, baseURL string, opts ...connect.ClientOption) ConnectGatewayClient {
 	baseURL = strings.TrimRight(baseURL, "/")
+	connectGatewayMethods := v1.File_connect_v1_service_proto.Services().ByName("ConnectGateway").Methods()
 	return &connectGatewayClient{
 		forward: connect.NewClient[v1.ForwardRequest, v1.ForwardResponse](
 			httpClient,
 			baseURL+ConnectGatewayForwardProcedure,
-			connect.WithSchema(connectGatewayForwardMethodDescriptor),
+			connect.WithSchema(connectGatewayMethods.ByName("Forward")),
 			connect.WithClientOptions(opts...),
 		),
 		ping: connect.NewClient[v1.PingRequest, v1.PingResponse](
 			httpClient,
 			baseURL+ConnectGatewayPingProcedure,
-			connect.WithSchema(connectGatewayPingMethodDescriptor),
+			connect.WithSchema(connectGatewayMethods.ByName("Ping")),
 			connect.WithClientOptions(opts...),
 		),
 	}
@@ -114,16 +107,17 @@ type ConnectGatewayHandler interface {
 // By default, handlers support the Connect, gRPC, and gRPC-Web protocols with the binary Protobuf
 // and JSON codecs. They also support gzip compression.
 func NewConnectGatewayHandler(svc ConnectGatewayHandler, opts ...connect.HandlerOption) (string, http.Handler) {
+	connectGatewayMethods := v1.File_connect_v1_service_proto.Services().ByName("ConnectGateway").Methods()
 	connectGatewayForwardHandler := connect.NewUnaryHandler(
 		ConnectGatewayForwardProcedure,
 		svc.Forward,
-		connect.WithSchema(connectGatewayForwardMethodDescriptor),
+		connect.WithSchema(connectGatewayMethods.ByName("Forward")),
 		connect.WithHandlerOptions(opts...),
 	)
 	connectGatewayPingHandler := connect.NewUnaryHandler(
 		ConnectGatewayPingProcedure,
 		svc.Ping,
-		connect.WithSchema(connectGatewayPingMethodDescriptor),
+		connect.WithSchema(connectGatewayMethods.ByName("Ping")),
 		connect.WithHandlerOptions(opts...),
 	)
 	return "/connect.v1.ConnectGateway/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -153,6 +147,7 @@ func (UnimplementedConnectGatewayHandler) Ping(context.Context, *connect.Request
 type ConnectExecutorClient interface {
 	Reply(context.Context, *connect.Request[v1.ReplyRequest]) (*connect.Response[v1.ReplyResponse], error)
 	Ack(context.Context, *connect.Request[v1.AckMessage]) (*connect.Response[v1.AckResponse], error)
+	Ping(context.Context, *connect.Request[v1.PingRequest]) (*connect.Response[v1.PingResponse], error)
 }
 
 // NewConnectExecutorClient constructs a client for the connect.v1.ConnectExecutor service. By
@@ -164,17 +159,24 @@ type ConnectExecutorClient interface {
 // http://api.acme.com or https://acme.com/grpc).
 func NewConnectExecutorClient(httpClient connect.HTTPClient, baseURL string, opts ...connect.ClientOption) ConnectExecutorClient {
 	baseURL = strings.TrimRight(baseURL, "/")
+	connectExecutorMethods := v1.File_connect_v1_service_proto.Services().ByName("ConnectExecutor").Methods()
 	return &connectExecutorClient{
 		reply: connect.NewClient[v1.ReplyRequest, v1.ReplyResponse](
 			httpClient,
 			baseURL+ConnectExecutorReplyProcedure,
-			connect.WithSchema(connectExecutorReplyMethodDescriptor),
+			connect.WithSchema(connectExecutorMethods.ByName("Reply")),
 			connect.WithClientOptions(opts...),
 		),
 		ack: connect.NewClient[v1.AckMessage, v1.AckResponse](
 			httpClient,
 			baseURL+ConnectExecutorAckProcedure,
-			connect.WithSchema(connectExecutorAckMethodDescriptor),
+			connect.WithSchema(connectExecutorMethods.ByName("Ack")),
+			connect.WithClientOptions(opts...),
+		),
+		ping: connect.NewClient[v1.PingRequest, v1.PingResponse](
+			httpClient,
+			baseURL+ConnectExecutorPingProcedure,
+			connect.WithSchema(connectExecutorMethods.ByName("Ping")),
 			connect.WithClientOptions(opts...),
 		),
 	}
@@ -184,6 +186,7 @@ func NewConnectExecutorClient(httpClient connect.HTTPClient, baseURL string, opt
 type connectExecutorClient struct {
 	reply *connect.Client[v1.ReplyRequest, v1.ReplyResponse]
 	ack   *connect.Client[v1.AckMessage, v1.AckResponse]
+	ping  *connect.Client[v1.PingRequest, v1.PingResponse]
 }
 
 // Reply calls connect.v1.ConnectExecutor.Reply.
@@ -196,10 +199,16 @@ func (c *connectExecutorClient) Ack(ctx context.Context, req *connect.Request[v1
 	return c.ack.CallUnary(ctx, req)
 }
 
+// Ping calls connect.v1.ConnectExecutor.Ping.
+func (c *connectExecutorClient) Ping(ctx context.Context, req *connect.Request[v1.PingRequest]) (*connect.Response[v1.PingResponse], error) {
+	return c.ping.CallUnary(ctx, req)
+}
+
 // ConnectExecutorHandler is an implementation of the connect.v1.ConnectExecutor service.
 type ConnectExecutorHandler interface {
 	Reply(context.Context, *connect.Request[v1.ReplyRequest]) (*connect.Response[v1.ReplyResponse], error)
 	Ack(context.Context, *connect.Request[v1.AckMessage]) (*connect.Response[v1.AckResponse], error)
+	Ping(context.Context, *connect.Request[v1.PingRequest]) (*connect.Response[v1.PingResponse], error)
 }
 
 // NewConnectExecutorHandler builds an HTTP handler from the service implementation. It returns the
@@ -208,16 +217,23 @@ type ConnectExecutorHandler interface {
 // By default, handlers support the Connect, gRPC, and gRPC-Web protocols with the binary Protobuf
 // and JSON codecs. They also support gzip compression.
 func NewConnectExecutorHandler(svc ConnectExecutorHandler, opts ...connect.HandlerOption) (string, http.Handler) {
+	connectExecutorMethods := v1.File_connect_v1_service_proto.Services().ByName("ConnectExecutor").Methods()
 	connectExecutorReplyHandler := connect.NewUnaryHandler(
 		ConnectExecutorReplyProcedure,
 		svc.Reply,
-		connect.WithSchema(connectExecutorReplyMethodDescriptor),
+		connect.WithSchema(connectExecutorMethods.ByName("Reply")),
 		connect.WithHandlerOptions(opts...),
 	)
 	connectExecutorAckHandler := connect.NewUnaryHandler(
 		ConnectExecutorAckProcedure,
 		svc.Ack,
-		connect.WithSchema(connectExecutorAckMethodDescriptor),
+		connect.WithSchema(connectExecutorMethods.ByName("Ack")),
+		connect.WithHandlerOptions(opts...),
+	)
+	connectExecutorPingHandler := connect.NewUnaryHandler(
+		ConnectExecutorPingProcedure,
+		svc.Ping,
+		connect.WithSchema(connectExecutorMethods.ByName("Ping")),
 		connect.WithHandlerOptions(opts...),
 	)
 	return "/connect.v1.ConnectExecutor/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -226,6 +242,8 @@ func NewConnectExecutorHandler(svc ConnectExecutorHandler, opts ...connect.Handl
 			connectExecutorReplyHandler.ServeHTTP(w, r)
 		case ConnectExecutorAckProcedure:
 			connectExecutorAckHandler.ServeHTTP(w, r)
+		case ConnectExecutorPingProcedure:
+			connectExecutorPingHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -241,4 +259,8 @@ func (UnimplementedConnectExecutorHandler) Reply(context.Context, *connect.Reque
 
 func (UnimplementedConnectExecutorHandler) Ack(context.Context, *connect.Request[v1.AckMessage]) (*connect.Response[v1.AckResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("connect.v1.ConnectExecutor.Ack is not implemented"))
+}
+
+func (UnimplementedConnectExecutorHandler) Ping(context.Context, *connect.Request[v1.PingRequest]) (*connect.Response[v1.PingResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("connect.v1.ConnectExecutor.Ping is not implemented"))
 }

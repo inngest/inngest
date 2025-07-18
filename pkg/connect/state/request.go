@@ -4,7 +4,6 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"net"
 	"time"
@@ -188,9 +187,6 @@ func (r *redisConnectionStateManager) GetExecutorIP(ctx context.Context, envID u
 
 	reply, err := r.client.Do(ctx, cmd).ToString()
 	if err != nil {
-		if errors.Is(err, rueidis.Nil) {
-			return nil, nil
-		}
 		return nil, err
 	}
 
