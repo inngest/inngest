@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/inngest/inngest/cmd/commands/internal/localconfig"
+	"github.com/inngest/inngest/pkg/authn"
 	"github.com/inngest/inngest/pkg/config"
 	"github.com/inngest/inngest/pkg/devserver"
 	"github.com/inngest/inngest/pkg/headers"
@@ -150,6 +151,11 @@ func doStart(cmd *cobra.Command, args []string) {
 	signingKey := viper.GetString("signing-key")
 	if signingKey == "" {
 		fmt.Println("Error: signing-key is required")
+		os.Exit(1)
+	}
+	_, err = authn.HashedSigningKey(signingKey)
+	if err != nil {
+		fmt.Printf("Error: signing-key must be a valid hexadecimal string\n")
 		os.Exit(1)
 	}
 

@@ -2,8 +2,8 @@
 
 import { useRouter } from 'next/navigation';
 import { Button } from '@inngest/components/Button/Button';
+import { EventsActionMenu } from '@inngest/components/Events/EventsActionMenu';
 import { EventsTable } from '@inngest/components/Events/EventsTable';
-import { InternalEventsToggle } from '@inngest/components/Events/InternalEventsToggle';
 import { useReplayModal } from '@inngest/components/Events/useReplayModal';
 import { Header } from '@inngest/components/Header/Header';
 import { RefreshButton } from '@inngest/components/Refresh/RefreshButton';
@@ -47,7 +47,7 @@ export default function EventsPage({
             <div className="flex items-center gap-1.5">
               <RefreshButton />
               <SendEventButton />
-              <InternalEventsToggle />
+              <EventsActionMenu />
             </div>
           }
         />

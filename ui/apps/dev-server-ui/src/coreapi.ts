@@ -603,3 +603,92 @@ export const COUNT_WORKER_CONNECTIONS = gql`
     }
   }
 `;
+
+export const GET_EVENTS = gql`
+  query GetEventsV2(
+    $cursor: String
+    $startTime: Time!
+    $endTime: Time
+    $celQuery: String = null
+    $eventNames: [String!] = null
+    $includeInternalEvents: Boolean = true
+  ) {
+    eventsV2(
+      first: 30
+      after: $cursor
+      filter: {
+        from: $startTime
+        until: $endTime
+        query: $celQuery
+        eventNames: $eventNames
+        includeInternalEvents: $includeInternalEvents
+      }
+    ) {
+      edges {
+        node {
+          name
+          id
+          receivedAt
+          runs {
+            status
+            id
+            startedAt
+            endedAt
+            function {
+              name
+              slug
+            }
+          }
+        }
+      }
+      totalCount
+      pageInfo {
+        hasNextPage
+        endCursor
+        hasPreviousPage
+        startCursor
+      }
+    }
+  }
+`;
+
+export const GET_EVENT = gql`
+  query GetEventV2($eventID: ULID!) {
+    eventV2(id: $eventID) {
+      name
+      id
+      receivedAt
+      idempotencyKey
+      occurredAt
+      version
+      source {
+        name
+      }
+    }
+  }
+`;
+export const GET_EVENT_PAYLOAD = gql`
+  query GetEventV2Payload($eventID: ULID!) {
+    eventV2(id: $eventID) {
+      raw
+    }
+  }
+`;
+
+export const GET_EVENT_RUNS = gql`
+  query GetEventV2Runs($eventID: ULID!) {
+    eventV2(id: $eventID) {
+      name
+      runs {
+        status
+        id
+        startedAt
+        endedAt
+        function {
+          name
+          slug
+        }
+      }
+    }
+  }
+`;

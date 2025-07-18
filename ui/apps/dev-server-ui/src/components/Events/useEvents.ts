@@ -1,54 +1,59 @@
 import { useCallback } from 'react';
 
-type EventsQueryVariables = {
-  eventNames: string[] | null;
-  cursor: string | null;
-  source?: string;
-  startTime: string;
-  endTime: string | null;
-  celQuery?: string;
-  includeInternalEvents?: boolean;
-};
+import { client } from '@/store/baseApi';
+import {
+  GetEventV2Document,
+  GetEventV2PayloadDocument,
+  GetEventV2RunsDocument,
+  GetEventsV2Document,
+  type GetEventV2PayloadQuery,
+  type GetEventV2PayloadQueryVariables,
+  type GetEventV2Query,
+  type GetEventV2QueryVariables,
+  type GetEventV2RunsQuery,
+  type GetEventV2RunsQueryVariables,
+  type GetEventsV2Query,
+  type GetEventsV2QueryVariables,
+} from '@/store/generated';
 
 export function useEvents() {
   return useCallback(
     async ({
       cursor,
       endTime,
-      source,
+      // source,
       eventNames,
       startTime,
       celQuery,
       includeInternalEvents,
-    }: EventsQueryVariables) => {
-      // Mocked fake delay + sample response
-      await new Promise((res) => setTimeout(res, 300));
+    }: GetEventsV2QueryVariables) => {
+      const data: GetEventsV2Query = await client.request(GetEventsV2Document, {
+        cursor,
+        endTime,
+        // source,
+        eventNames,
+        startTime,
+        celQuery,
+        includeInternalEvents,
+      });
+      const eventsData = data.eventsV2;
+      const events = eventsData.edges.map(({ node }) => ({
+        ...node,
+        receivedAt: new Date(node.receivedAt),
+        runs: node.runs.map((run) => ({
+          fnName: run.function.name,
+          fnSlug: run.function.slug,
+          status: run.status,
+          id: run.id,
+          completedAt: run.endedAt ? new Date(run.endedAt) : undefined,
+          startedAt: run.startedAt ? new Date(run.startedAt) : undefined,
+        })),
+      }));
 
       return {
-        events: [
-          {
-            name: 'UserSignedUp',
-            id: 'evt_1',
-            receivedAt: new Date(),
-            runs: [
-              {
-                fnName: 'SendWelcomeEmail',
-                fnSlug: 'send-welcome-email',
-                status: 'COMPLETED',
-                id: 'run_1',
-                startedAt: new Date(),
-                completedAt: new Date(),
-              },
-            ],
-          },
-        ],
-        pageInfo: {
-          hasNextPage: false,
-          endCursor: null,
-          hasPreviousPage: false,
-          startCursor: null,
-        },
-        totalCount: 1,
+        events,
+        pageInfo: eventsData.pageInfo,
+        totalCount: eventsData.totalCount,
       };
     },
     []
@@ -56,49 +61,48 @@ export function useEvents() {
 }
 
 export function useEventDetails() {
-  return useCallback(async ({ eventID }: { eventID: string }) => {
-    await new Promise((res) => setTimeout(res, 200));
-
+  return useCallback(async ({ eventID }: GetEventV2QueryVariables) => {
+    const data: GetEventV2Query = await client.request(GetEventV2Document, {
+      eventID,
+    });
+    const eventData = data.eventV2;
     return {
-      name: 'UserSignedUp',
-      id: eventID,
-      receivedAt: new Date(),
-      idempotencyKey: 'fake-key',
-      occurredAt: new Date(),
-      version: 'v1',
-      source: {
-        name: 'auth-service',
-      },
+      ...eventData,
+      receivedAt: new Date(eventData.receivedAt),
+      occurredAt: eventData.occurredAt ? new Date(eventData.occurredAt) : undefined,
     };
   }, []);
 }
 
 export function useEventPayload() {
-  return useCallback(async ({ eventID }: { eventID: string }) => {
-    await new Promise((res) => setTimeout(res, 150));
+  return useCallback(async ({ eventID }: GetEventV2PayloadQueryVariables) => {
+    const data: GetEventV2PayloadQuery = await client.request(GetEventV2PayloadDocument, {
+      eventID,
+    });
 
-    return {
-      payload: JSON.stringify({ id: eventID, user: 'demo-user', action: 'signup' }),
-    };
+    const eventData = data.eventV2.raw;
+
+    return { payload: eventData };
   }, []);
 }
 
 export function useEventRuns() {
-  return useCallback(async ({ eventID }: { eventID: string }) => {
-    await new Promise((res) => setTimeout(res, 150));
+  return useCallback(async ({ eventID }: GetEventV2RunsQueryVariables) => {
+    const data: GetEventV2RunsQuery = await client.request(GetEventV2RunsDocument, {
+      eventID,
+    });
 
+    const eventData = data.eventV2;
     return {
-      name: 'UserSignedUp',
-      runs: [
-        {
-          fnName: 'SendWelcomeEmail',
-          fnSlug: 'send-welcome-email',
-          status: 'COMPLETED',
-          id: 'run_1',
-          startedAt: new Date(),
-          completedAt: new Date(),
-        },
-      ],
+      ...eventData,
+      runs: eventData.runs.map((run) => ({
+        fnName: run.function.name,
+        fnSlug: run.function.slug,
+        status: run.status,
+        id: run.id,
+        completedAt: run.endedAt ? new Date(run.endedAt) : undefined,
+        startedAt: run.startedAt ? new Date(run.startedAt) : undefined,
+      })),
     };
   }, []);
 }

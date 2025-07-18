@@ -9,6 +9,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@inngest/components/DropdownMenu';
+import { usePaginationUI } from '@inngest/components/Pagination';
 import { Switch } from '@inngest/components/Switch';
 import { AppsIcon } from '@inngest/components/icons/sections/Apps';
 import { cn } from '@inngest/components/utils/classNames';
@@ -21,6 +22,7 @@ import { type Environment } from '@/utils/environments';
 import { notNullish } from '@/utils/typeGuards';
 import { pathCreator } from '@/utils/urls';
 import { EnvironmentArchiveDropdownItem } from './EnvironmentArchiveDropdownItem';
+import { FilterResultDetails } from './FilterResultDetails';
 
 const DisableEnvironmentAutoArchiveDocument = graphql(`
   mutation DisableEnvironmentAutoArchiveDocument($id: ID!) {
@@ -38,75 +40,84 @@ const EnableEnvironmentAutoArchiveDocument = graphql(`
   }
 `);
 
-const PER_PAGE = 10;
+const PER_PAGE = 5;
 
-export default function EnvironmentListTable({ envs }: { envs: Environment[] }) {
-  const [page, setPage] = useState(0);
-  const numPages = Math.ceil(envs.length / PER_PAGE);
-  const pages = Array(numPages)
-    .fill(null)
-    .map((_, i) => i);
+type BranchEnvironmentListTableProps = {
+  envs: Environment[];
+  searchParam: string;
+  unfilteredEnvsCount: number;
+};
 
+export default function BranchEnvironmentListTable({
+  envs,
+  searchParam,
+  unfilteredEnvsCount,
+}: BranchEnvironmentListTableProps) {
   const sortedEnvs = envs.sort(
     (a, b) =>
       new Date(b.lastDeployedAt || b.createdAt).valueOf() -
       new Date(a.lastDeployedAt || a.createdAt).valueOf()
   );
-  const visibleEnvs = sortedEnvs.slice(page * PER_PAGE, (page + 1) * PER_PAGE);
+
+  const {
+    BoundPagination: BranchEnvsPagination,
+    currentPageData: visibleBranchEnvs,
+    totalPages: totalBranchEnvsPages,
+  } = usePaginationUI({ data: sortedEnvs, id: searchParam, pageSize: PER_PAGE });
+
+  const hasFilter = searchParam !== '';
 
   return (
-    <table className="w-full">
-      <thead className="border-subtle border-b text-left">
-        <tr>
-          <th scope="col" className="text-muted px-4 py-3 text-sm font-semibold">
-            Name
-          </th>
-          <th scope="col" className="text-muted px-4 py-3 text-sm font-semibold">
-            Status
-          </th>
+    <div className="w-full">
+      <div className="overflow-x-auto">
+        <table className="w-full">
+          <thead className="border-subtle border-b text-left">
+            <tr>
+              <th scope="col" className="text-muted px-4 py-3 text-sm font-semibold">
+                Name
+              </th>
+              <th scope="col" className="text-muted px-4 py-3 text-sm font-semibold">
+                Status
+              </th>
 
-          <th scope="col" className="text-muted w-0 whitespace-nowrap pl-4 text-sm font-semibold">
-            Auto Archive
-          </th>
+              <th
+                scope="col"
+                className="text-muted w-0 whitespace-nowrap pl-4 text-sm font-semibold"
+              >
+                Auto Archive
+              </th>
 
-          <th scope="col" className="w-0 pr-4"></th>
-        </tr>
-      </thead>
-      <tbody className="divide-subtle divide-y px-4 py-3">
-        {envs.length === 0 ? (
-          <tr>
-            <td colSpan={4} className="text-basis px-4 py-3 text-center text-sm">
-              There are no branch environments
-            </td>
-          </tr>
-        ) : visibleEnvs.length ? (
-          visibleEnvs.map((env, i) => <TableRow env={env} key={i} />)
-        ) : (
-          <tr>
-            <td colSpan={4} className="text-basis px-4 py-3 text-center text-sm">
-              There are no more branch environments
-            </td>
-          </tr>
+              <th scope="col" className="w-0 pr-4"></th>
+            </tr>
+          </thead>
+          <tbody className="divide-subtle divide-y px-4 py-3">
+            {unfilteredEnvsCount === 0 ? (
+              <tr>
+                <td colSpan={4} className="text-muted px-4 py-3 text-center text-sm">
+                  No branch environments exist
+                </td>
+              </tr>
+            ) : visibleBranchEnvs.length === 0 ? (
+              <tr>
+                <td colSpan={4} className="text-muted px-4 py-3 text-center text-sm">
+                  No results found
+                </td>
+              </tr>
+            ) : (
+              visibleBranchEnvs.map((env, i) => <TableRow env={env} key={i} />)
+            )}
+          </tbody>
+        </table>
+      </div>
+      <div className="border-subtle flex border-t px-1 py-1">
+        <FilterResultDetails hasFilter={hasFilter} size={envs.length} />
+        {totalBranchEnvsPages > 1 && (
+          <div className="flex flex-1">
+            <BranchEnvsPagination className="justify-end max-[625px]:justify-center" />
+          </div>
         )}
-      </tbody>
-      {pages.length > 1 && (
-        <tfoot className="border-subtle border-t">
-          <tr>
-            <td colSpan={4} className="px-4 py-1 text-center">
-              {pages.map((_, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => setPage(idx)}
-                  className="transition-color text-link hover:decoration-link mx-1 cursor-pointer px-2 underline decoration-transparent decoration-2 underline-offset-4 duration-300"
-                >
-                  {idx + 1}
-                </button>
-              ))}
-            </td>
-          </tr>
-        </tfoot>
-      )}
-    </table>
+      </div>
+    </div>
   );
 }
 

@@ -49,6 +49,8 @@ export function EventsTable({
   expandedRowActions,
   features,
   standalone = false,
+  pollInterval,
+  autoRefresh,
 }: {
   emptyActions: React.ReactNode;
   expandedRowActions: ({
@@ -82,6 +84,8 @@ export function EventsTable({
   singleEventTypePage?: boolean;
   features: Pick<Features, 'history'>;
   standalone?: boolean;
+  pollInterval?: number;
+  autoRefresh?: boolean;
 }) {
   const { pathCreator } = usePathCreator();
   const columns = useColumns({ pathCreator, singleEventTypePage });
@@ -122,6 +126,7 @@ export function EventsTable({
     data: eventsData,
     isFetching,
     refetch,
+    isRefetching,
     isFetchingNextPage,
   } = useInfiniteQuery({
     queryKey: [
@@ -152,6 +157,7 @@ export function EventsTable({
       return lastPage.pageInfo.endCursor;
     },
     initialPageParam: null,
+    refetchInterval: autoRefresh ? pollInterval : false,
     select: (data) => ({
       ...data,
       events: data.pages.flatMap((page) => page.events),
@@ -322,7 +328,7 @@ export function EventsTable({
         <NewTable
           columns={columns}
           data={eventsData?.events || []}
-          isLoading={isPending || (isFetching && !isFetchingNextPage)}
+          isLoading={isPending || (isFetching && !isFetchingNextPage && !isRefetching)}
           blankState={<TableBlankState actions={emptyActions} />}
           renderSubComponent={({ row }) => {
             const { id, name, runs } = row.original;
@@ -335,6 +341,8 @@ export function EventsTable({
                 expandedRowActions={expandedRowActions}
                 standalone={standalone}
                 eventID={id}
+                pollInterval={pollInterval}
+                autoRefresh={autoRefresh}
               />
             );
           }}
