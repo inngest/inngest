@@ -41,9 +41,9 @@ export function CustomEnvironmentListTable({
     <div className="w-full">
       <div className="overflow-x-auto">
         <table className="w-full">
-          <thead className="border-subtle border-b text-left">
+          <thead className="bg-canvasSubtle border-subtle border-b text-left">
             <tr>
-              <th scope="col" className="text-muted px-4 py-3 text-sm font-semibold">
+              <th scope="col" className="text-muted px-4 py-3 text-xs font-medium">
                 Name
               </th>
               <th scope="col" className="w-0 pr-4"></th>
@@ -89,7 +89,7 @@ function TableRow(props: { env: Environment }) {
   return (
     <tr>
       <td className="max-w-80 px-4 py-3">
-        <h3 className="text-basis flex items-center gap-2 break-all text-sm">
+        <h3 className="text-basis flex items-center gap-2 break-all text-sm font-medium">
           <span
             className={cn(
               'block h-2 w-2 rounded-full',
