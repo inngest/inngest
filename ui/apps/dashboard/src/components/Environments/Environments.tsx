@@ -113,7 +113,12 @@ export default function Environments() {
           <div className="pt-6">
             <div className="mb-2 flex w-full items-center justify-between">
               <h2 className="text-md font-medium">Custom environments</h2>
-              <Button href="create-environment" kind="primary" label="Create environment" />
+              <Button
+                className="text-sm font-normal"
+                href="create-environment"
+                kind="primary"
+                label="Create custom environment"
+              />
             </div>
             <div className="border-subtle overflow-hidden rounded-md border">
               <CustomEnvironmentListTable
