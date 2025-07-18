@@ -154,7 +154,6 @@ type svc struct {
 	rl ratelimit.RateLimiter
 	// cronmanager allows the creation of new scheduled functions.
 	cronmanager *cron.Cron
-	em          *event.Manager
 
 	tracker *Tracker
 
