@@ -336,7 +336,7 @@ func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp 
 		for _, item := range res.Items {
 			item := item // capture range variable
 			wg.Go(func() {
-				_, err := q.normalizeItem(ctx, shard, sp, latestConstraints, backlog, *item)
+				_, err := q.normalizeItem(logger.WithStdlib(ctx, l), shard, sp, latestConstraints, backlog, *item)
 				if err != nil {
 					l.Error("could not normalize item", "err", err)
 				}
@@ -387,15 +387,13 @@ func (q *queue) normalizeItem(
 	sourceBacklog *QueueBacklog,
 	item osqueue.QueueItem,
 ) (osqueue.QueueItem, error) {
-	l := logger.StdlibLogger(ctx)
-
 	// We must modify the queue item to ensure q.ItemBacklog and q.ItemShadowPartition
 	// return the new values properly. Otherwise, we'd enqueue to the same backlog, not
 	// the desired new backlog.
 	existingThrottle := item.Data.Throttle
 	existingKeys := item.Data.GetConcurrencyKeys()
 
-	log := l.With(
+	log := logger.StdlibLogger(ctx).With(
 		"item", item,
 		"existing_concurrency", existingKeys,
 		"existing_throttle", existingThrottle,
