@@ -1,22 +1,13 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { Button } from '@inngest/components/Button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@inngest/components/DropdownMenu';
 import { usePaginationUI } from '@inngest/components/Pagination';
-import { AppsIcon } from '@inngest/components/icons/sections/Apps';
 import { cn } from '@inngest/components/utils/classNames';
-import { RiMore2Line, RiSettingsLine } from '@remixicon/react';
 
 import type { Environment } from '@/utils/environments';
-import { EnvironmentArchiveDropdownItem } from './EnvironmentArchiveDropdownItem';
 import { FilterResultDetails } from './FilterResultDetails';
+import { EnvArchiveButton } from './row-actions/EnvArchiveButton/EnvArchiveButton';
+import { EnvKeysDropdownButton } from './row-actions/EnvKeysDropdownButton';
+import { EnvViewButton } from './row-actions/EnvViewButton';
 
 const PER_PAGE = 5;
 
@@ -84,10 +75,7 @@ export function CustomEnvironmentListTable({
 }
 
 function TableRow(props: { env: Environment }) {
-  const router = useRouter();
-  const [openDropdown, setOpenDropdown] = useState(false);
-
-  const { isArchived, name, slug } = props.env;
+  const { isArchived, name } = props.env;
 
   let statusColorClass: string;
   let statusText: string;
@@ -111,28 +99,12 @@ function TableRow(props: { env: Environment }) {
         </div>
       </td>
 
-      <td className="px-4">
-        <DropdownMenu open={openDropdown} onOpenChange={setOpenDropdown}>
-          <DropdownMenuTrigger asChild>
-            <Button kind="secondary" appearance="outlined" size="medium" icon={<RiMore2Line />} />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent>
-            <DropdownMenuItem onSelect={() => router.push(`/env/${slug}/manage`)}>
-              <RiSettingsLine className="h-4 w-4" />
-              Manage
-            </DropdownMenuItem>
-
-            <DropdownMenuItem onSelect={() => router.push(`/env/${slug}/apps`)}>
-              <AppsIcon className="h-4 w-4" />
-              Go to apps
-            </DropdownMenuItem>
-
-            <EnvironmentArchiveDropdownItem
-              env={props.env}
-              onClose={() => setOpenDropdown(false)}
-            />
-          </DropdownMenuContent>
-        </DropdownMenu>
+      <td>
+        <div className="flex items-center gap-2 px-4">
+          <EnvViewButton env={props.env} />
+          <EnvKeysDropdownButton env={props.env} />
+          <EnvArchiveButton env={props.env} onClose={() => {}} />
+        </div>
       </td>
     </tr>
   );
