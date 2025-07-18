@@ -1,17 +1,22 @@
 package golang
 
 import (
+	"bytes"
 	"context"
 	"crypto/rand"
 	"encoding/json"
+	"fmt"
+	"io"
+	"mime/multipart"
+	"net/http"
+	"testing"
+	"time"
+
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/tests/client"
 	"github.com/inngest/inngestgo"
 	"github.com/oklog/ulid/v2"
-	"testing"
-	"time"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -141,5 +146,66 @@ func TestEvent(t *testing.T) {
 				"v":    nil,
 			}, m)
 		})
+	})
+}
+
+func TestEvent_Multipart(t *testing.T) {
+	// We don't officially support multipart/form-data for non-webhook events.
+	// But to achieve multipart/form-data support for webhooks, we incidentally
+	// implemented partial support for multipart/form-data non-webhook events.
+
+	t.Run("name only", func(t *testing.T) {
+		// This works
+
+		r := require.New(t)
+		ctx := context.Background()
+
+		body := &bytes.Buffer{}
+		writer := multipart.NewWriter(body)
+		r.NoError(writer.WriteField("name", "my-event"))
+		r.NoError(writer.Close())
+
+		req, err := http.NewRequestWithContext(
+			ctx,
+			http.MethodPost,
+			"http://localhost:8288/e/test",
+			body,
+		)
+		r.NoError(err)
+		req.Header.Set("Content-Type", writer.FormDataContentType())
+
+		resp, err := http.DefaultClient.Do(req)
+		r.NoError(err)
+		r.Equal(http.StatusOK, resp.StatusCode)
+	})
+
+	t.Run("data", func(t *testing.T) {
+		// Sending event data doesn't work
+
+		r := require.New(t)
+		ctx := context.Background()
+
+		reqBody := &bytes.Buffer{}
+		writer := multipart.NewWriter(reqBody)
+		r.NoError(writer.WriteField("name", "my-event"))
+		r.NoError(writer.WriteField("data", `{"msg":"hi"}`))
+		r.NoError(writer.Close())
+
+		req, err := http.NewRequestWithContext(
+			ctx,
+			http.MethodPost,
+			"http://localhost:8288/e/test",
+			reqBody,
+		)
+		r.NoError(err)
+		req.Header.Set("Content-Type", writer.FormDataContentType())
+
+		resp, err := http.DefaultClient.Do(req)
+		r.NoError(err)
+		r.Equal(http.StatusBadRequest, resp.StatusCode)
+		respBody, err := io.ReadAll(resp.Body)
+		r.NoError(err)
+		fmt.Println(string(respBody))
+		r.Contains(string(respBody), "cannot unmarshal string into Go struct field Event.data")
 	})
 }
