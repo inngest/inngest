@@ -3483,7 +3483,7 @@ func (q *queue) Instrument(ctx context.Context) error {
 			go func(ctx context.Context, pkey string) {
 				defer wg.Done()
 
-				l := l.With("partitionKey", pkey)
+				log := l.With("partitionKey", pkey)
 
 				// If this is not a fully-qualified key, assume that this is an old (system) partition queue
 				queueKey := pkey
@@ -3494,7 +3494,7 @@ func (q *queue) Instrument(ctx context.Context) error {
 				cntCmd := r.B().Zcount().Key(queueKey).Min("-inf").Max("+inf").Build()
 				count, err := q.primaryQueueShard.RedisClient.unshardedRc.Do(ctx, cntCmd).AsInt64()
 				if err != nil {
-					q.log.Warn("error checking partition count", "pkey", pkey, "context", "instrumentation")
+					log.Warn("error checking partition count", "pkey", pkey, "context", "instrumentation")
 					return
 				}
 
@@ -3515,7 +3515,7 @@ func (q *queue) Instrument(ctx context.Context) error {
 
 				atomic.AddInt64(&total, 1)
 				if err := q.tenantInstrumentor(ctx, pk); err != nil {
-					l.Error("error running tenant instrumentor", "error", err)
+					log.Error("error running tenant instrumentor", "error", err)
 				}
 			}(ctx, pk)
 
