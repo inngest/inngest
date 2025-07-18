@@ -78,6 +78,16 @@ const (
 	DefaultConnectGatewayPort = 8289
 )
 
+var (
+	defaultPartitionConstraintConfig = redis_state.PartitionConstraintConfig{
+		Concurrency: redis_state.PartitionConcurrency{
+			SystemConcurrency:   consts.DefaultConcurrencyLimit,
+			AccountConcurrency:  consts.DefaultConcurrencyLimit,
+			FunctionConcurrency: consts.DefaultConcurrencyLimit,
+		},
+	}
+)
+
 // StartOpts configures the dev server
 type StartOpts struct {
 	Config        config.Config `json:"-"`
@@ -795,34 +805,16 @@ func NormalizeThrottle(smv2 sv2.StateLoader, dbcqrs cqrs.Manager) redis_state.Re
 func PartitionConstraintConfigGetter(dbcqrs cqrs.Manager) redis_state.PartitionConstraintConfigGetter {
 	return func(ctx context.Context, p redis_state.PartitionIdentifier) redis_state.PartitionConstraintConfig {
 		if p.SystemQueueName != nil {
-			return redis_state.PartitionConstraintConfig{
-				Concurrency: redis_state.PartitionConcurrency{
-					SystemConcurrency:   consts.DefaultSystemConcurrencyLimit,
-					AccountConcurrency:  consts.DefaultSystemConcurrencyLimit,
-					FunctionConcurrency: consts.DefaultSystemConcurrencyLimit,
-				},
-			}
+			return defaultPartitionConstraintConfig
 		}
 
 		workflow, err := dbcqrs.GetFunctionByInternalUUID(ctx, p.EnvID, p.FunctionID)
 		if err != nil {
-			return redis_state.PartitionConstraintConfig{
-				Concurrency: redis_state.PartitionConcurrency{
-					SystemConcurrency:   consts.DefaultConcurrencyLimit,
-					AccountConcurrency:  consts.DefaultConcurrencyLimit,
-					FunctionConcurrency: consts.DefaultConcurrencyLimit,
-				},
-			}
+			return defaultPartitionConstraintConfig
 		}
 		fn, err := workflow.InngestFunction()
 		if err != nil {
-			return redis_state.PartitionConstraintConfig{
-				Concurrency: redis_state.PartitionConcurrency{
-					SystemConcurrency:   consts.DefaultConcurrencyLimit,
-					AccountConcurrency:  consts.DefaultConcurrencyLimit,
-					FunctionConcurrency: consts.DefaultConcurrencyLimit,
-				},
-			}
+			return defaultPartitionConstraintConfig
 		}
 
 		// TODO Make this reusable in cloud, it's the same operation with different data sources

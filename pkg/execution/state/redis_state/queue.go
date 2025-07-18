@@ -1074,12 +1074,12 @@ type QueuePartition struct {
 }
 
 func (qp QueuePartition) Identifier() PartitionIdentifier {
-	fnID := uuid.UUID{}
+	fnID := uuid.Nil
 	if qp.FunctionID != nil {
 		fnID = *qp.FunctionID
 	}
 
-	envID := uuid.UUID{}
+	envID := uuid.Nil
 	if qp.EnvID != nil {
 		envID = *qp.EnvID
 	}
@@ -2261,8 +2261,7 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 		Tags: map[string]any{
 			"queue_shard": q.primaryQueueShard.Name,
 			"op":          "item",
-		},
-	},
+		}},
 	)
 
 	l := q.log.With("item_delay", itemDelay.String())
@@ -2273,8 +2272,7 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 		Tags: map[string]any{
 			"queue_shard": q.primaryQueueShard.Name,
 			"op":          "refill",
-		},
-	},
+		}},
 	)
 	l = l.With("refill_delay", refillDelay.String())
 
@@ -2285,8 +2283,7 @@ func (q *queue) Lease(ctx context.Context, item osqueue.QueueItem, leaseDuration
 		Tags: map[string]any{
 			"queue_shard": q.primaryQueueShard.Name,
 			"op":          "lease",
-		},
-	},
+		}},
 	)
 	l = l.With("lease_delay", leaseDelay.String())
 

@@ -112,17 +112,17 @@ type QueueShadowPartition struct {
 }
 
 func (sp QueueShadowPartition) Identifier() PartitionIdentifier {
-	fnID := uuid.UUID{}
+	fnID := uuid.Nil
 	if sp.FunctionID != nil {
 		fnID = *sp.FunctionID
 	}
 
-	accountID := uuid.UUID{}
+	accountID := uuid.Nil
 	if sp.AccountID != nil {
 		accountID = *sp.AccountID
 	}
 
-	envID := uuid.UUID{}
+	envID := uuid.Nil
 	if sp.EnvID != nil {
 		envID = *sp.EnvID
 	}
