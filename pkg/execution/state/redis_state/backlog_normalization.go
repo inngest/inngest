@@ -53,7 +53,6 @@ func (q *queue) backlogNormalizationWorker(ctx context.Context, nc chan normaliz
 			_, err := durationWithTags(ctx, q.primaryQueueShard.Name, "normalize_backlog", q.clock.Now(), func(ctx context.Context) (any, error) {
 				err := q.normalizeBacklog(ctx, msg.b, msg.sp, msg.constraints)
 				return nil, err
-
 			}, map[string]any{
 				"async_processing": true,
 			})
@@ -307,8 +306,10 @@ func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp 
 	l.Debug("starting backlog normalization")
 
 	shard := q.primaryQueueShard
-	var processed int64
+	var total int64
 	for {
+		var processed int64
+
 		res, err := q.BacklogNormalizePeek(ctx, backlog, NormalizePartitionPeekMax)
 		if err != nil {
 			return fmt.Errorf("could not peek backlog items for normalization: %w", err)
@@ -398,6 +399,8 @@ func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp 
 				// "partition_id": backlog.ShadowPartitionID,
 			},
 		})
+
+		total += processed
 	}
 
 	metrics.IncrBacklogNormalizedCounter(ctx, metrics.CounterOpt{
@@ -408,7 +411,7 @@ func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp 
 		},
 	})
 
-	l.Debug("normalized backlog", "processed", processed)
+	l.Debug("normalized backlog", "processed_total", total)
 
 	return nil
 }
