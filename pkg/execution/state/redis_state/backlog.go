@@ -14,7 +14,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
-	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
@@ -22,10 +21,8 @@ import (
 	"gonum.org/v1/gonum/stat/sampleuv"
 )
 
-var (
-	// NOTE: there's no logic behind this number, it's just a random pick for now
-	ThrottleBackoffMultiplierThreshold = 15 * time.Second
-)
+// NOTE: there's no logic behind this number, it's just a random pick for now
+var ThrottleBackoffMultiplierThreshold = 15 * time.Second
 
 var (
 	ErrBacklogNotFound = fmt.Errorf("backlog not found")
@@ -396,9 +393,7 @@ func (q *queue) ItemBacklog(ctx context.Context, i osqueue.QueueItem) QueueBackl
 }
 
 func (q *queue) ItemShadowPartition(ctx context.Context, i osqueue.QueueItem) QueueShadowPartition {
-	var (
-		ckeys = i.Data.GetConcurrencyKeys()
-	)
+	ckeys := i.Data.GetConcurrencyKeys()
 
 	queueName := i.QueueName
 
@@ -452,25 +447,6 @@ func (q *queue) ItemShadowPartition(ctx context.Context, i osqueue.QueueItem) Qu
 	if fnID == uuid.Nil {
 		stack := string(debug.Stack())
 		q.log.Error("unexpected missing functionID in ItemShadowPartition call", "item", i, "stack", stack)
-	}
-
-	// NOTE: This is an optimization that ensures we return *updated* concurrency keys
-	// for any recently published function configuration.  The embeddeed ckeys from the
-	// queue items above may be outdated.
-	if q.customConcurrencyLimitRefresher != nil {
-		// As an optimization, allow fetching updated concurrency limits if desired.
-		updated, _ := duration(ctx, q.primaryQueueShard.Name, "shadow_partition_custom_concurrency_refresher", q.clock.Now(), func(ctx context.Context) ([]state.CustomConcurrency, error) {
-			return q.customConcurrencyLimitRefresher(ctx, i), nil
-		})
-		for _, update := range updated {
-			// This is quadratic, but concurrency keys are limited to 2 so it's
-			// okay.
-			for n, existing := range ckeys {
-				if existing.Key == update.Key {
-					ckeys[n].Limit = update.Limit
-				}
-			}
-		}
 	}
 
 	fnPartition := QueuePartition{
