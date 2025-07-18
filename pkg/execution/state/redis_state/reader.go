@@ -217,8 +217,9 @@ func (q *queue) RunningCount(ctx context.Context, workflowID uuid.UUID) (int64, 
 
 func (q *queue) ItemsByPartition(ctx context.Context, shard QueueShard, partitionID uuid.UUID, from time.Time, until time.Time, opts ...QueueIterOpt) (iter.Seq[*osqueue.QueueItem], error) {
 	opt := queueIterOpt{
-		batchSize: 1000,
-		interval:  500 * time.Millisecond,
+		batchSize:      1000,
+		interval:       500 * time.Millisecond,
+		ignoreBacklogs: false,
 	}
 	for _, apply := range opts {
 		apply(&opt)
@@ -229,6 +230,7 @@ func (q *queue) ItemsByPartition(ctx context.Context, shard QueueShard, partitio
 		"partitionID", partitionID.String(),
 		"from", from,
 		"until", until,
+		"ignoreBacklogs", opt.ignoreBacklogs,
 	)
 
 	// retrieve partition by ID
@@ -283,7 +285,7 @@ func (q *queue) ItemsByPartition(ctx context.Context, shard QueueShard, partitio
 				iterated++
 			}
 
-			l.Debug("iterated items in partition",
+			l.Trace("iterated items in partition",
 				"count", iterated,
 				"start", start.Format(time.StampMilli),
 				"end", end.Format(time.StampMilli),
@@ -301,6 +303,10 @@ func (q *queue) ItemsByPartition(ctx context.Context, shard QueueShard, partitio
 
 			// wait a little before proceeding
 			<-time.After(opt.interval)
+		}
+
+		if opt.ignoreBacklogs {
+			return
 		}
 
 		// NOTE: iterate through backlogs

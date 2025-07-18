@@ -148,11 +148,20 @@ func IncrBatchProcessStartCounter(ctx context.Context, opts CounterOpt) {
 	})
 }
 
-func IncrInstrumentationLeaseClaimsCounter(ctx context.Context, opts CounterOpt) {
+func IncrPartitionIterateLeaseClaimsCounter(ctx context.Context, opts CounterOpt) {
 	RecordCounterMetric(ctx, 1, CounterOpt{
 		PkgName:     opts.PkgName,
-		MetricName:  "queue_instrumentation_lease_claims_total",
-		Description: "Total number of instrumentation lease claimed by executors",
+		MetricName:  "queue_partition_iterate_lease_claims_total",
+		Description: "Total number of partition iterator leases claimed by executors",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrBacklogEnrollLeaseClaimsCounter(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "queue_backlog_enroll_lease_claims_total",
+		Description: "Total number of backlog enrollment lease claimed by executors",
 		Tags:        opts.Tags,
 	})
 }
@@ -578,6 +587,15 @@ func ActiveBacklogNormalizeCount(ctx context.Context, incr int64, opts CounterOp
 		PkgName:     opts.PkgName,
 		MetricName:  "active_backlog_normalize_count",
 		Description: "The number of active backlog normalizations",
+		Tags:        opts.Tags,
+	})
+}
+
+func IncrQueueBacklogItemsEnrolledCount(ctx context.Context, val int64, opts CounterOpt) {
+	RecordCounterMetric(ctx, val, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "queue_backlog_enroll_items_count",
+		Description: "The total number of items enrolled to backlog",
 		Tags:        opts.Tags,
 	})
 }
