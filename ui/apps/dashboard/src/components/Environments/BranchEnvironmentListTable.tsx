@@ -65,9 +65,6 @@ export default function BranchEnvironmentListTable({
     totalPages: totalBranchEnvsPages,
   } = usePaginationUI({ data: sortedEnvs, id: paginationKey, pageSize: PER_PAGE });
 
-  // For now, we always filter by status, so we always have a filter.
-  const hasFilter = true;
-
   return (
     <div className="w-full">
       <div className="overflow-x-auto">
@@ -111,7 +108,7 @@ export default function BranchEnvironmentListTable({
         </table>
       </div>
       <div className="border-subtle flex border-t px-1 py-1">
-        <FilterResultDetails hasFilter={hasFilter} size={envs.length} />
+        <FilterResultDetails size={envs.length} />
         {totalBranchEnvsPages > 1 && (
           <div className="flex flex-1">
             <BranchEnvsPagination className="justify-end max-[625px]:justify-center" />
