@@ -336,7 +336,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	agg := expragg.NewAggregator(ctx, 100, 100, sm.(expragg.EvaluableLoader), expressions.ExprEvaluator, nil, nil)
 
 	executorLogger := connectPubSubLogger.With("svc", "executor")
-	gatewayGRPCForwarder := connectpubsub.NewGatewayGRPCManager(ctx, connectionManager, executorLogger)
+	gatewayGRPCForwarder := connectpubsub.NewGatewayGRPCManager(ctx, connectionManager, connectpubsub.WithLogger(executorLogger))
 
 	executorProxy, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectPubSubRedis, true, connectpubsub.RedisPubSubConnectorOpts{
 		Logger:             executorLogger,

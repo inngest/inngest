@@ -3,17 +3,17 @@ package connectv0
 import (
 	"context"
 	"net/url"
-	"sync"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/connect/auth"
+	"github.com/inngest/inngest/pkg/connect/grpc"
 	"github.com/inngest/inngest/pkg/connect/pubsub"
 	"github.com/inngest/inngest/pkg/connect/state"
 	"github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/telemetry/trace"
-	pb "github.com/inngest/inngest/proto/gen/connect/v1"
+	connectpb "github.com/inngest/inngest/proto/gen/connect/v1"
 )
 
 type Opts struct {
@@ -69,8 +69,7 @@ type connectApiRouter struct {
 	chi.Router
 	Opts
 
-	grpcLock    sync.RWMutex
-	grpcClients map[string]pb.ConnectExecutorClient
+	grpcClientManager *grpc.GRPCClientManager[connectpb.ConnectExecutorClient]
 }
 
 // New creates a v0 connect REST API, which exposes connection states, history, and more.
@@ -78,9 +77,9 @@ type connectApiRouter struct {
 // for rolling out the connect gateway service.
 func New(r chi.Router, opts Opts) *connectApiRouter {
 	api := &connectApiRouter{
-		Router: r,
-		Opts:   opts,
-		grpcClients: make(map[string]pb.ConnectExecutorClient),
+		Router:            r,
+		Opts:              opts,
+		grpcClientManager: grpc.NewGRPCClientManager(connectpb.NewConnectExecutorClient),
 	}
 	api.setup()
 	return api

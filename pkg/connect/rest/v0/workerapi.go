@@ -19,9 +19,7 @@ import (
 	connectConfig "github.com/inngest/inngest/pkg/config/connect"
 	"github.com/inngest/inngest/pkg/connect/auth"
 	"github.com/inngest/inngest/pkg/publicerr"
-	"github.com/inngest/inngest/proto/gen/connect/v1"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
+	connectpb "github.com/inngest/inngest/proto/gen/connect/v1"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -86,7 +84,7 @@ func (cr *connectApiRouter) start(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	reqBody := &connect.StartRequest{}
+	reqBody := &connectpb.StartRequest{}
 	if len(byt) > 0 {
 		if err := proto.Unmarshal(byt, reqBody); err != nil {
 			_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 400, "could not unmarshal request"))
@@ -115,7 +113,7 @@ func (cr *connectApiRouter) start(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	msg, err := proto.Marshal(&connect.StartResponse{
+	msg, err := proto.Marshal(&connectpb.StartResponse{
 		GatewayEndpoint: gatewayURL.String(),
 		GatewayGroup:    gatewayGroup,
 		SessionToken:    token,
@@ -176,7 +174,7 @@ func (cr *connectApiRouter) flushBuffer(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	reqBody := &connect.SDKResponse{}
+	reqBody := &connectpb.SDKResponse{}
 	if err := proto.Unmarshal(byt, reqBody); err != nil {
 		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 400, "could not unmarshal request"))
 		return
@@ -193,7 +191,7 @@ func (cr *connectApiRouter) flushBuffer(w http.ResponseWriter, r *http.Request) 
 	defer span.End()
 
 	// Marshal response before notifying executor, marshaling should never fail
-	msg, err := proto.Marshal(&connect.FlushResponse{
+	msg, err := proto.Marshal(&connectpb.FlushResponse{
 		RequestId: reqBody.RequestId,
 	})
 	if err != nil {
@@ -231,38 +229,17 @@ func (cr *connectApiRouter) flushBuffer(w http.ResponseWriter, r *http.Request) 
 		executorIP := ip.String()
 		grpcURL := net.JoinHostPort(executorIP, fmt.Sprintf("%d", connectConfig.Executor(ctx).GRPCPort))
 
-		var grpcClient connect.ConnectExecutorClient
+		grpcClient, err := cr.grpcClientManager.GetOrCreateClient(ctx, executorIP, grpcURL)
+		if err != nil {
+			l.Error("could not create grpc client", "url", grpcURL, "err", err)
+			span.RecordError(err)
+			span.SetStatus(codes.Error, "could not create grpc client")
 
-		cr.grpcLock.RLock()
-		grpcClient = cr.grpcClients[executorIP]
-		cr.grpcLock.RUnlock()
-
-		if grpcClient == nil {
-			// Upgrade lock to make sure that only one instance is creating a grpc client
-			cr.grpcLock.Lock()
-			defer cr.grpcLock.Unlock()
-			grpcClient = cr.grpcClients[executorIP]
-
-			if grpcClient == nil {
-				l.Info("grpc client not found for executor, creating one dynamically", "url", grpcURL)
-
-				conn, err := grpc.NewClient(grpcURL, grpc.WithTransportCredentials(insecure.NewCredentials()))
-				if err != nil {
-					l.Error("could not create grpc client", "url", grpcURL, "err", err)
-					span.RecordError(err)
-					span.SetStatus(codes.Error, "could not create grpc client")
-
-					_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 500, "could not create grpc client"))
-
-					return
-				}
-
-				grpcClient = connect.NewConnectExecutorClient(conn)
-				cr.grpcClients[executorIP] = grpcClient
-			}
+			_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 500, "could not create grpc client"))
+			return
 		}
 
-		result, err := grpcClient.Reply(ctx, &connect.ReplyRequest{Data: reqBody})
+		result, err := grpcClient.Reply(ctx, &connectpb.ReplyRequest{Data: reqBody})
 		if err != nil || !result.Success {
 			l.Error("could not notify executor to flush connect message", "err", err)
 			span.RecordError(err)

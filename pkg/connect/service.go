@@ -17,6 +17,7 @@ import (
 	"github.com/google/uuid"
 	connectConfig "github.com/inngest/inngest/pkg/config/connect"
 	"github.com/inngest/inngest/pkg/connect/auth"
+	"github.com/inngest/inngest/pkg/connect/grpc"
 	"github.com/inngest/inngest/pkg/connect/pubsub"
 	"github.com/inngest/inngest/pkg/connect/state"
 	"github.com/inngest/inngest/pkg/consts"
@@ -25,8 +26,7 @@ import (
 	pb "github.com/inngest/inngest/proto/gen/connect/v1"
 	"github.com/oklog/ulid/v2"
 	"golang.org/x/sync/errgroup"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/credentials/insecure"
+	grpcLib "google.golang.org/grpc"
 )
 
 const (
@@ -72,7 +72,7 @@ type connectGatewaySvc struct {
 	gatewayRoutes  chi.Router
 	maintenanceApi chi.Router
 
-	grpcServer    *grpc.Server
+	grpcServer    *grpcLib.Server
 	wsConnections sync.Map
 
 	// gatewayId is a unique identifier, generated each time the service is started.
@@ -109,8 +109,7 @@ type connectGatewaySvc struct {
 
 	shouldUseGRPC useGRPCFunc
 
-	grpcLock    sync.RWMutex
-	grpcClients map[string]pb.ConnectExecutorClient
+	grpcClientManager *grpc.GRPCClientManager[pb.ConnectExecutorClient]
 }
 
 func (c *connectGatewaySvc) MaintenanceAPI() http.Handler {
@@ -232,11 +231,10 @@ func NewConnectGatewayService(opts ...gatewayOpt) *connectGatewaySvc {
 		workerRequestLeaseDuration:                            consts.ConnectWorkerRequestLeaseDuration,
 		consecutiveWorkerHeartbeatMissesBeforeConnectionClose: 5,
 
-		grpcServer: grpc.NewServer(),
+		grpcServer: grpcLib.NewServer(),
 		shouldUseGRPC: func(ctx context.Context, accountID uuid.UUID) bool {
 			return false
 		},
-		grpcClients: make(map[string]pb.ConnectExecutorClient),
 	}
 
 	for _, opt := range opts {
@@ -302,6 +300,8 @@ func (c *connectGatewaySvc) Pre(ctx context.Context) error {
 	if err := c.updateGatewayState(state.GatewayStatusStarting); err != nil {
 		return fmt.Errorf("could not set initial gateway state: %w", err)
 	}
+
+	c.grpcClientManager = grpc.NewGRPCClientManager(pb.NewConnectExecutorClient, grpc.WithLogger[pb.ConnectExecutorClient](c.logger))
 
 	// Register gRPC server
 	pb.RegisterConnectGatewayServer(c.grpcServer, c)
@@ -474,7 +474,7 @@ func (c *connectGatewaySvc) Run(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("could not listen for: %w", err)
 		}
-		logger.StdlibLogger(ctx).Info("starting grpc server", "addr", addr)
+		logger.StdlibLogger(ctx).Info("starting connect gateway grpc server", "addr", addr)
 		return c.grpcServer.Serve(l)
 	})
 
@@ -580,7 +580,7 @@ func (c *connectGatewaySvc) ActivateGateway() error {
 
 // getOrCreateGRPCClient gets the executor IP and returns a gRPC client for that executor,
 // creating one if it doesn't exist.
-func (c *connectGatewaySvc) getOrCreateGRPCClient(ctx context.Context, l logger.Logger, envID uuid.UUID, requestId string) (pb.ConnectExecutorClient, error) {
+func (c *connectGatewaySvc) getOrCreateGRPCClient(ctx context.Context, envID uuid.UUID, requestId string) (pb.ConnectExecutorClient, error) {
 	ip, err := c.stateManager.GetExecutorIP(ctx, envID, requestId)
 	if err != nil {
 		return nil, fmt.Errorf("could not get executor IP")
@@ -589,31 +589,5 @@ func (c *connectGatewaySvc) getOrCreateGRPCClient(ctx context.Context, l logger.
 
 	grpcURL := net.JoinHostPort(executorIP, fmt.Sprintf("%d", connectConfig.Executor(ctx).GRPCPort))
 
-	var grpcClient pb.ConnectExecutorClient
-
-	c.grpcLock.RLock()
-	grpcClient = c.grpcClients[executorIP]
-	c.grpcLock.RUnlock()
-
-	if grpcClient == nil {
-		// Upgrade lock to make sure that only one instance is creating a grpc client
-		c.grpcLock.Lock()
-		grpcClient = c.grpcClients[executorIP]
-
-		if grpcClient == nil {
-			l.Info("grpc client not found for executor, creating one dynamically", "url", grpcURL)
-
-			conn, err := grpc.NewClient(grpcURL, grpc.WithTransportCredentials(insecure.NewCredentials()))
-			if err != nil {
-				c.grpcLock.Unlock()
-				return nil, fmt.Errorf("could not create grpc client for %s: %w", grpcURL, err)
-			}
-
-			grpcClient = pb.NewConnectExecutorClient(conn)
-			c.grpcClients[executorIP] = grpcClient
-		}
-		c.grpcLock.Unlock()
-	}
-
-	return grpcClient, nil
+	return c.grpcClientManager.GetOrCreateClient(ctx, executorIP, grpcURL)
 }
