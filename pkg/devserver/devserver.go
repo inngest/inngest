@@ -17,6 +17,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/api"
 	"github.com/inngest/inngest/pkg/api/apiv1"
+	"github.com/inngest/inngest/pkg/authn"
 	"github.com/inngest/inngest/pkg/backoff"
 	"github.com/inngest/inngest/pkg/config"
 	_ "github.com/inngest/inngest/pkg/config/defaults"
@@ -75,6 +76,16 @@ const (
 	DefaultPollInterval       = 5
 	DefaultQueueWorkers       = 100
 	DefaultConnectGatewayPort = 8289
+)
+
+var (
+	defaultPartitionConstraintConfig = redis_state.PartitionConstraintConfig{
+		Concurrency: redis_state.PartitionConcurrency{
+			SystemConcurrency:   consts.DefaultConcurrencyLimit,
+			AccountConcurrency:  consts.DefaultConcurrencyLimit,
+			FunctionConcurrency: consts.DefaultConcurrencyLimit,
+		},
+	}
 )
 
 // StartOpts configures the dev server
@@ -272,73 +283,9 @@ func start(ctx context.Context, opts StartOpts) error {
 		redis_state.WithPollTick(opts.Tick),
 		redis_state.WithShadowPollTick(2 * opts.Tick),
 		redis_state.WithBacklogNormalizePollTick(5 * opts.Tick),
-		redis_state.WithCustomConcurrencyKeyLimitRefresher(func(ctx context.Context, i queue.QueueItem) []state.CustomConcurrency {
-			keys := i.Data.GetConcurrencyKeys()
 
-			fn, err := dbcqrs.GetFunctionByInternalUUID(ctx, i.Data.Identifier.WorkspaceID, i.Data.Identifier.WorkflowID)
-			if err != nil {
-				// Use what's stored in the state store.
-				return keys
-			}
-			f, err := fn.InngestFunction()
-			if err != nil {
-				return keys
-			}
-
-			if f.Concurrency != nil {
-				for _, c := range f.Concurrency.Limits {
-					if !c.IsCustomLimit() {
-						continue
-					}
-					// If there's a concurrency key with the same hash, use the new function's
-					// concurrency limits.
-					//
-					// NOTE:  This is accidentally quadratic but is okay as we bound concurrency
-					// keys to a low value (2-3).
-					for n, actual := range keys {
-						if actual.Hash != "" && actual.Hash == c.Hash {
-							actual.Limit = c.Limit
-							keys[n] = actual
-						}
-					}
-				}
-			}
-
-			return keys
-		}),
 		redis_state.WithLogger(l),
-		redis_state.WithConcurrencyLimitGetter(func(ctx context.Context, p redis_state.QueuePartition) redis_state.PartitionConcurrencyLimits {
-			// In the dev server, there are never account limits.
-			limits := redis_state.PartitionConcurrencyLimits{
-				AccountLimit: redis_state.NoConcurrencyLimit,
-			}
 
-			// Ensure that we return the correct concurrency values per
-			// partition.
-			funcs, err := dbcqrs.GetFunctions(ctx)
-			if err != nil {
-				return redis_state.PartitionConcurrencyLimits{
-					AccountLimit:   redis_state.NoConcurrencyLimit,
-					FunctionLimit:  consts.DefaultConcurrencyLimit,
-					CustomKeyLimit: consts.DefaultConcurrencyLimit,
-				}
-			}
-			for _, fun := range funcs {
-				f, _ := fun.InngestFunction()
-				if f.ID == uuid.Nil {
-					f.ID = f.DeterministicUUID()
-				}
-				// Update the function's concurrency here with latest defaults
-				if p.FunctionID != nil && f.ID == *p.FunctionID && f.Concurrency != nil && f.Concurrency.PartitionConcurrency() > 0 {
-					limits.FunctionLimit = f.Concurrency.PartitionConcurrency()
-				}
-			}
-			if p.EvaluatedConcurrencyKey != "" {
-				limits.CustomKeyLimit = p.ConcurrencyLimit
-			}
-
-			return limits
-		}),
 		redis_state.WithShardSelector(shardSelector),
 		redis_state.WithQueueShardClients(queueShards),
 		//redis_state.WithKindToQueueMapping(map[string]string{
@@ -388,14 +335,15 @@ func start(ctx context.Context, opts StartOpts) error {
 	// Create a new expression aggregator, using Redis to load evaluables.
 	agg := expragg.NewAggregator(ctx, 100, 100, sm.(expragg.EvaluableLoader), expressions.ExprEvaluator, nil, nil)
 
-	gatewayGRPCForwarder := connectpubsub.NewGatewayGRPCForwarder(ctx, connectionManager)
+	executorLogger := connectPubSubLogger.With("svc", "executor")
+	gatewayGRPCForwarder := connectpubsub.NewGatewayGRPCManager(ctx, connectionManager, executorLogger)
 
 	executorProxy, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectPubSubRedis, true, connectpubsub.RedisPubSubConnectorOpts{
-		Logger:               connectPubSubLogger.With("svc", "executor"),
-		Tracer:               conditionalTracer,
-		StateManager:         connectionManager,
-		EnforceLeaseExpiry:   enforceConnectLeaseExpiry,
-		GatewayGRPCForwarder: gatewayGRPCForwarder,
+		Logger:             executorLogger,
+		Tracer:             conditionalTracer,
+		StateManager:       connectionManager,
+		EnforceLeaseExpiry: enforceConnectLeaseExpiry,
+		GatewayGRPCManager: gatewayGRPCForwarder,
 	}))
 	if err != nil {
 		return fmt.Errorf("failed to create connect pubsub connector: %w", err)
@@ -542,7 +490,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	// start the API
 	// Create a new API endpoint which hosts SDK-related functionality for
 	// registering functions.
-	devAPI := NewDevAPI(ds, DevAPIOptions{disableUI: opts.NoUI})
+	devAPI := NewDevAPI(ds, DevAPIOptions{AuthMiddleware: authn.SigningKeyMiddleware(opts.SigningKey), disableUI: opts.NoUI})
 
 	devAPI.Route("/v1", func(r chi.Router) {
 		// Add the V1 API to our dev server API.
@@ -550,6 +498,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		caching := apiv1.NewCacheMiddleware(cache)
 
 		apiv1.AddRoutes(r, apiv1.Opts{
+			AuthMiddleware:     authn.SigningKeyMiddleware(opts.SigningKey),
 			CachingMiddleware:  caching,
 			FunctionReader:     ds.Data,
 			FunctionRunReader:  ds.Data,
@@ -574,6 +523,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	}
 
 	core, err := coreapi.NewCoreApi(coreapi.Options{
+		AuthMiddleware: authn.SigningKeyMiddleware(opts.SigningKey),
 		Data:           ds.Data,
 		Config:         ds.Opts.Config,
 		Logger:         l,
@@ -853,24 +803,18 @@ func NormalizeThrottle(smv2 sv2.StateLoader, dbcqrs cqrs.Manager) redis_state.Re
 }
 
 func PartitionConstraintConfigGetter(dbcqrs cqrs.Manager) redis_state.PartitionConstraintConfigGetter {
-	return func(ctx context.Context, p redis_state.QueueShadowPartition) (*redis_state.PartitionConstraintConfig, error) {
-		if p.EnvID == nil || p.FunctionID == nil {
-			return &redis_state.PartitionConstraintConfig{
-				Concurrency: redis_state.ShadowPartitionConcurrency{
-					SystemConcurrency:   consts.DefaultConcurrencyLimit,
-					AccountConcurrency:  consts.DefaultConcurrencyLimit,
-					FunctionConcurrency: consts.DefaultConcurrencyLimit,
-				},
-			}, nil
+	return func(ctx context.Context, p redis_state.PartitionIdentifier) redis_state.PartitionConstraintConfig {
+		if p.SystemQueueName != nil {
+			return defaultPartitionConstraintConfig
 		}
 
-		workflow, err := dbcqrs.GetFunctionByInternalUUID(ctx, *p.EnvID, *p.FunctionID)
+		workflow, err := dbcqrs.GetFunctionByInternalUUID(ctx, p.EnvID, p.FunctionID)
 		if err != nil {
-			return nil, fmt.Errorf("could not find workflow: %w", err)
+			return defaultPartitionConstraintConfig
 		}
 		fn, err := workflow.InngestFunction()
 		if err != nil {
-			return nil, fmt.Errorf("could not convert workflow to inngest function: %w", err)
+			return defaultPartitionConstraintConfig
 		}
 
 		// TODO Make this reusable in cloud, it's the same operation with different data sources
@@ -884,7 +828,7 @@ func PartitionConstraintConfigGetter(dbcqrs cqrs.Manager) redis_state.PartitionC
 		constraints := redis_state.PartitionConstraintConfig{
 			FunctionVersion: fn.FunctionVersion,
 
-			Concurrency: redis_state.ShadowPartitionConcurrency{
+			Concurrency: redis_state.PartitionConcurrency{
 				SystemConcurrency:     consts.DefaultConcurrencyLimit,
 				AccountConcurrency:    accountLimit,
 				FunctionConcurrency:   fnLimit,
@@ -914,7 +858,7 @@ func PartitionConstraintConfigGetter(dbcqrs cqrs.Manager) redis_state.PartitionC
 				keyExpr = *fn.Throttle.Key
 			}
 
-			constraints.Throttle = &redis_state.ShadowPartitionThrottle{
+			constraints.Throttle = &redis_state.PartitionThrottle{
 				ThrottleKeyExpressionHash: util.XXHash(keyExpr),
 				Limit:                     int(fn.Throttle.Limit),
 				Burst:                     int(fn.Throttle.Burst),
@@ -922,7 +866,7 @@ func PartitionConstraintConfigGetter(dbcqrs cqrs.Manager) redis_state.PartitionC
 			}
 		}
 
-		return &constraints, nil
+		return constraints
 	}
 }
 

@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"iter"
-	"sync"
 	"sync/atomic"
 	"time"
 
@@ -148,12 +147,6 @@ func (q *queue) StatusCount(ctx context.Context, workflowID uuid.UUID, status st
 func (q *queue) RunningCount(ctx context.Context, workflowID uuid.UUID) (int64, error) {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "RunningCount"), redis_telemetry.ScopeQueue)
 
-	l := q.log.With(
-		"method", "RunningCount",
-		"pkg", pkgName,
-		"fn_id", workflowID,
-	)
-
 	iterate := func(client *QueueClient) (int64, error) {
 		rc := client.unshardedRc
 
@@ -176,44 +169,15 @@ func (q *queue) RunningCount(ctx context.Context, workflowID uuid.UUID) (int64, 
 			return 0, fmt.Errorf("error reading partition item: %w", err)
 		}
 
-		var (
-			count int64
-			wg    sync.WaitGroup
-		)
-
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
-
-			// Fetch the concurrency via the partition concurrency name.
-			key := client.kg.Concurrency("p", workflowID.String())
-			cmd = rc.B().Zcard().Key(key).Build()
-			cnt, err := rc.Do(ctx, cmd).AsInt64()
-			if err != nil {
-				l.Error("error inspecting running job count", "error", err)
-				return
-			}
-			atomic.AddInt64(&count, cnt)
-		}()
-
-		// NOTE: this could cause some misalignment in metrics during key queue enrollments
-		if q.allowKeyQueues(ctx, item.AccountID) {
-			wg.Add(1)
-			go func() {
-				defer wg.Done()
-
-				key := client.kg.PartitionQueueSet(enums.PartitionTypeDefault, workflowID.String(), "")
-				cmd := rc.B().Zcard().Key(key).Build()
-				cnt, err := rc.Do(ctx, cmd).AsInt64()
-				if err != nil {
-					l.Error("error inspecting ready queue job count", "error", err)
-					return
-				}
-				atomic.AddInt64(&count, cnt)
-			}()
+		var count int64
+		// Fetch the concurrency via the partition concurrency name.
+		key := client.kg.Concurrency("p", workflowID.String())
+		cmd = rc.B().Zcard().Key(key).Build()
+		cnt, err := rc.Do(ctx, cmd).AsInt64()
+		if err != nil {
+			return 0, fmt.Errorf("error inspecting job count: %w", err)
 		}
-
-		wg.Wait()
+		atomic.AddInt64(&count, cnt)
 		return count, nil
 	}
 

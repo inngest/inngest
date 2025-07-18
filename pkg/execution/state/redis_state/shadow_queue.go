@@ -171,10 +171,7 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 
 	keyQueuesEnabled := shadowPart.keyQueuesEnabled(ctx, q)
 
-	latestConstraints, err := q.partitionConstraintConfigGetter(ctx, *shadowPart)
-	if err != nil {
-		return fmt.Errorf("could not retrieve latest constraints for partition: %w", err)
-	}
+	latestConstraints := q.partitionConstraintConfigGetter(ctx, shadowPart.Identifier())
 
 	// Check if shadow partition cannot be processed (paused/refill disabled, etc.)
 	if shadowPart.PauseRefill {
@@ -337,7 +334,7 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 	}
 }
 
-func (q *queue) processShadowPartitionBacklog(ctx context.Context, shadowPart *QueueShadowPartition, backlog *QueueBacklog, refillUntil time.Time, constraints *PartitionConstraintConfig) (*BacklogRefillResult, bool, error) {
+func (q *queue) processShadowPartitionBacklog(ctx context.Context, shadowPart *QueueShadowPartition, backlog *QueueBacklog, refillUntil time.Time, constraints PartitionConstraintConfig) (*BacklogRefillResult, bool, error) {
 	enableKeyQueues := shadowPart.SystemQueueName != nil && q.enqueueSystemQueuesToBacklog
 	if shadowPart.AccountID != nil {
 		enableKeyQueues = q.allowKeyQueues(ctx, *shadowPart.AccountID)
@@ -495,7 +492,7 @@ func (q *queue) processShadowPartitionBacklog(ctx context.Context, shadowPart *Q
 	switch res.Constraint {
 	// If backlog is concurrency limited by custom key, requeue just this backlog in the future
 	case enums.QueueConstraintCustomConcurrencyKey1, enums.QueueConstraintCustomConcurrencyKey2:
-		forceRequeueBacklogAt = backlog.requeueBackOff(q.clock.Now(), res.Constraint, constraints)
+		forceRequeueBacklogAt = backlog.requeueBackOff(q.clock.Now(), res.Constraint)
 	}
 
 	if !forceRequeueBacklogAt.IsZero() {

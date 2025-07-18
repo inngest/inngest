@@ -6,8 +6,7 @@ export function useReplayModal() {
 
   const openModal = useCallback((eventName: string, payload: string) => {
     try {
-      const parsedData = JSON.stringify(JSON.parse(payload).data);
-      setSelectedEvent({ name: eventName, data: parsedData });
+      setSelectedEvent({ name: eventName, data: payload });
       setIsModalVisible(true);
     } catch (error) {
       console.error('Failed to parse event payload:', error);

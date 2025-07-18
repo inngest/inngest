@@ -172,20 +172,6 @@ WHERE
 ORDER BY e.internal_id DESC
 LIMIT $4;
 
--- name: WorkspaceEvents :many
-SELECT * FROM events WHERE internal_id < $1 AND received_at <= $2 AND received_at >= $3 ORDER BY internal_id DESC LIMIT $4;
-
--- name: WorkspaceNamedEvents :many
-SELECT * FROM events WHERE internal_id < $1 AND received_at <= $2 AND received_at >= $3 AND event_name = $4 ORDER BY internal_id DESC LIMIT $5;
-
--- name: WorkspaceCountEvents :one
-SELECT count(*) FROM events WHERE received_at <= $1 AND received_at >= $2;
-
--- name: WorkspaceCountNamedEvents :one
-SELECT count(*) FROM events WHERE received_at <= $1 AND received_at >= $2 AND event_name = $3;
--- TODO fix this to work with multiple event_names
-
-
 --
 -- History
 --
