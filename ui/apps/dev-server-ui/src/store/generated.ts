@@ -1019,8 +1019,8 @@ export type InvokeFunctionMutationVariables = Exact<{
   functionSlug: Scalars['String'];
   data: InputMaybe<Scalars['Map']>;
   user: InputMaybe<Scalars['Map']>;
-  debugSessionID: InputMaybe<Scalars['ULID']>;
-  debugRunID: InputMaybe<Scalars['ULID']>;
+  debugSessionID?: InputMaybe<Scalars['ULID']>;
+  debugRunID?: InputMaybe<Scalars['ULID']>;
 }>;
 
 
@@ -1516,7 +1516,7 @@ export const GetHistoryItemOutputDocument = `
 }
     `;
 export const InvokeFunctionDocument = `
-    mutation InvokeFunction($functionSlug: String!, $data: Map, $user: Map, $debugSessionID: ULID, $debugRunID: ULID) {
+    mutation InvokeFunction($functionSlug: String!, $data: Map, $user: Map, $debugSessionID: ULID = null, $debugRunID: ULID = null) {
   invokeFunction(
     data: $data
     functionSlug: $functionSlug

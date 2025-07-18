@@ -334,8 +334,8 @@ export const INVOKE_FUNCTION = gql`
     $functionSlug: String!
     $data: Map
     $user: Map
-    $debugSessionID: ULID
-    $debugRunID: ULID
+    $debugSessionID: ULID = null
+    $debugRunID: ULID = null
   ) {
     invokeFunction(
       data: $data
