@@ -69,9 +69,13 @@ if redis.call("EXISTS", idempotencyKey) ~= 0 and not is_normalize then
 end
 
 -- Make these a hash to save on memory usage
-if redis.call("HSETNX", queueKey, queueID, queueItem) == 0 and not is_normalize then
-  -- This already exists;  return an error.
-  return 1
+if redis.call("HSETNX", queueKey, queueID, queueItem) == 0 then
+  if is_normalize then
+    redis.call("HSET", queueKey, queueID, queueItem)
+  else
+    -- This already exists;  return an error.
+    return 1
+  end
 end
 
 -- Check if the item is a singleton and if an existing item already exists
