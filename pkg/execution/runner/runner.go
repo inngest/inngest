@@ -50,7 +50,8 @@ type Runner interface {
 	StateManager() state.Manager
 	InitializeCrons(ctx context.Context) error
 	Runs(ctx context.Context, accountId uuid.UUID, eventId ulid.ULID) ([]state.State, error)
-	Events(ctx context.Context, eventId string) ([]event.Event, error)
+
+	// Events(ctx context.Context, eventId string) ([]event.Event, error)
 }
 
 func WithCQRS(data cqrs.Manager) func(s *svc) {
@@ -74,12 +75,6 @@ func WithExecutionManager(l cqrs.Manager) func(s *svc) {
 func WithPauseManager(pm pauses.Manager) func(s *svc) {
 	return func(s *svc) {
 		s.pm = pm
-	}
-}
-
-func WithEventManager(e event.Manager) func(s *svc) {
-	return func(s *svc) {
-		s.em = &e
 	}
 }
 
@@ -312,7 +307,6 @@ func (s *svc) InitializeCrons(ctx context.Context) error {
 			}
 		}
 	}
-
 	s.cronmanager.Start()
 	return nil
 }
@@ -334,25 +328,6 @@ func (s *svc) StateManager() state.Manager {
 	return s.state
 }
 
-func (s *svc) Events(ctx context.Context, eventId string) ([]event.Event, error) {
-	if eventId != "" {
-		evt := s.em.EventById(eventId)
-		if evt != nil {
-			return []event.Event{evt.GetEvent()}, nil
-		}
-
-		return []event.Event{}, nil
-	}
-
-	trackedEvents := s.em.Events()
-	evts := make([]event.Event, len(trackedEvents))
-	for i, evt := range trackedEvents {
-		evts[i] = evt.GetEvent()
-	}
-
-	return evts, nil
-}
-
 func (s *svc) handleMessage(ctx context.Context, m pubsub.Message) error {
 	if m.Name != event.EventReceivedName {
 		return fmt.Errorf("unknown event type: %s", m.Name)
@@ -367,14 +342,7 @@ func (s *svc) handleMessage(ctx context.Context, m pubsub.Message) error {
 		}
 	}
 
-	var tracked event.TrackedEvent
-	var err error
-
-	if s.em == nil {
-		tracked, err = event.NewOSSTrackedEventFromString(m.Data)
-	} else {
-		tracked, err = s.em.NewEvent(m.Data)
-	}
+	tracked, err := event.NewOSSTrackedEventFromString(m.Data)
 	if err != nil {
 		return fmt.Errorf("error creating event: %w", err)
 	}

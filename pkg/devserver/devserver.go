@@ -78,15 +78,13 @@ const (
 	DefaultConnectGatewayPort = 8289
 )
 
-var (
-	defaultPartitionConstraintConfig = redis_state.PartitionConstraintConfig{
-		Concurrency: redis_state.PartitionConcurrency{
-			SystemConcurrency:   consts.DefaultConcurrencyLimit,
-			AccountConcurrency:  consts.DefaultConcurrencyLimit,
-			FunctionConcurrency: consts.DefaultConcurrencyLimit,
-		},
-	}
-)
+var defaultPartitionConstraintConfig = redis_state.PartitionConstraintConfig{
+	Concurrency: redis_state.PartitionConcurrency{
+		SystemConcurrency:   consts.DefaultConcurrencyLimit,
+		AccountConcurrency:  consts.DefaultConcurrencyLimit,
+		FunctionConcurrency: consts.DefaultConcurrencyLimit,
+	},
+}
 
 // StartOpts configures the dev server
 type StartOpts struct {
@@ -470,7 +468,6 @@ func start(ctx context.Context, opts StartOpts) error {
 		runner.WithExecutor(exec),
 		runner.WithExecutionManager(dbcqrs),
 		runner.WithPauseManager(pauses.NewRedisOnlyManager(sm)),
-		runner.WithEventManager(event.NewManager()),
 		runner.WithStateManager(sm),
 		runner.WithRunnerQueue(rq),
 		runner.WithTracker(t),

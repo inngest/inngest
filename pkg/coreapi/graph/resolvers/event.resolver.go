@@ -87,20 +87,13 @@ func (r *eventResolver) Status(ctx context.Context, obj *models.Event) (*models.
 }
 
 func (r *eventResolver) Raw(ctx context.Context, obj *models.Event) (*string, error) {
-	eventID := obj.ID.String()
-	evts, err := r.Runner.Events(ctx, eventID)
+	evt, err := r.Data.GetEventByInternalID(ctx, obj.ID)
 	if err != nil {
 		return nil, err
 	}
 
-	if len(evts) == 0 {
-		return nil, nil
-	}
-
-	evt := evts[0]
-
 	// Marshall the entire event to JSON and return that string.
-	byt, err := json.Marshal(evt)
+	byt, err := json.Marshal(evt.Event())
 	if err != nil {
 		return nil, err
 	}
