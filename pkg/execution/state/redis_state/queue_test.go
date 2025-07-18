@@ -8419,7 +8419,7 @@ func TestQueueBacklogEnroll(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 0, int(count))
 
-	qp, _ := q.ItemPartition(ctx, defaultShard, item)
+	qp := q.ItemPartition(ctx, defaultShard, item)
 
 	res, err := q.BacklogEnroll(ctx, &qp)
 	require.NoError(t, err)
