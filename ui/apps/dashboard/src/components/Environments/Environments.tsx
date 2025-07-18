@@ -63,31 +63,33 @@ export default function Environments() {
             </p>
           </div>
 
-          <div className="bg-info flex items-center justify-between rounded-md px-4 py-2">
-            <h3 className="flex items-center gap-2 text-sm font-medium tracking-wide">
-              <span className="bg-primary-moderate block h-2 w-2 rounded-full" />
-              Production
-            </h3>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  kind="secondary"
-                  appearance="outlined"
-                  size="medium"
-                  icon={<RiMore2Line />}
-                />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                <DropdownMenuItem onSelect={() => router.push('/env/production/manage')}>
-                  <RiSettingsLine className="h-4 w-4" />
-                  Manage
-                </DropdownMenuItem>
-                <DropdownMenuItem onSelect={() => router.push('/env/production/apps')}>
-                  <AppsIcon className="h-4 w-4" />
-                  Go to apps
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+          <div className="border-muted rounded-md border">
+            <div className="border-l-primary-moderate flex items-center justify-between rounded-[4px] border-l-4 px-4 py-2">
+              <h3 className="flex items-center gap-2 text-sm font-medium tracking-wide">
+                <span className="bg-primary-moderate block h-2 w-2 rounded-full" />
+                Production
+              </h3>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    kind="secondary"
+                    appearance="outlined"
+                    size="medium"
+                    icon={<RiMore2Line />}
+                  />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  <DropdownMenuItem onSelect={() => router.push('/env/production/manage')}>
+                    <RiSettingsLine className="h-4 w-4" />
+                    Manage
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onSelect={() => router.push('/env/production/apps')}>
+                    <AppsIcon className="h-4 w-4" />
+                    Go to apps
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
         </div>
 
