@@ -216,36 +216,34 @@ func (cr *connectApiRouter) flushBuffer(w http.ResponseWriter, r *http.Request) 
 
 	if cr.ShouldUseGRPC(ctx, res.AccountID) {
 		ip, err := cr.ConnectRequestStateManager.GetExecutorIP(ctx, res.EnvID, reqBody.RequestId)
-		if err != nil {
-			// Likely because the request lease has expired
+		switch {
+		case err == nil:
+			executorIP := ip.String()
+			grpcURL := net.JoinHostPort(executorIP, fmt.Sprintf("%d", connectConfig.Executor(ctx).GRPCPort))
+			grpcClient, err := cr.grpcClientManager.GetOrCreateClient(ctx, executorIP, grpcURL)
+			if err != nil {
+				l.Error("could not create grpc client", "url", grpcURL, "err", err)
+				span.RecordError(err)
+				span.SetStatus(codes.Error, "could not create grpc client")
+				_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 500, "could not create grpc client"))
+				return
+			}
+			result, err := grpcClient.Reply(ctx, &connectpb.ReplyRequest{Data: reqBody})
+			if err != nil || !result.Success {
+				l.Error("could not notify executor to flush connect message", "err", err)
+				span.RecordError(err)
+				span.SetStatus(codes.Error, "could not notify executor to flush connect sdk response")
+				_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 500, "could not notify executor"))
+				return
+			}
+		case errors.Is(err, state.ErrExecutorNotFound):
+			l.Debug("executor not found in lease, reply was likely picked up by polling")
+		default:
 			l.Error("could not get executor IP", "err", err)
 			span.RecordError(err)
 			span.SetStatus(codes.Error, "could not get executor IP")
 
 			_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 500, "could not get executor"))
-			return
-		}
-
-		executorIP := ip.String()
-		grpcURL := net.JoinHostPort(executorIP, fmt.Sprintf("%d", connectConfig.Executor(ctx).GRPCPort))
-
-		grpcClient, err := cr.grpcClientManager.GetOrCreateClient(ctx, executorIP, grpcURL)
-		if err != nil {
-			l.Error("could not create grpc client", "url", grpcURL, "err", err)
-			span.RecordError(err)
-			span.SetStatus(codes.Error, "could not create grpc client")
-
-			_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 500, "could not create grpc client"))
-			return
-		}
-
-		result, err := grpcClient.Reply(ctx, &connectpb.ReplyRequest{Data: reqBody})
-		if err != nil || !result.Success {
-			l.Error("could not notify executor to flush connect message", "err", err)
-			span.RecordError(err)
-			span.SetStatus(codes.Error, "could not notify executor to flush connect sdk response")
-
-			_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 500, "could not notify executor"))
 			return
 		}
 
