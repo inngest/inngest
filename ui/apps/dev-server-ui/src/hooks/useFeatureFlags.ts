@@ -36,7 +36,7 @@ export function useFeatureFlags() {
  * Creates a Dev Server URL from a path. If Dev Server host is unknown, it
  * returns the path.
  */
-function createDevServerURL(path: string) {
+export function createDevServerURL(path: string) {
   const host = process.env.NEXT_PUBLIC_API_BASE_URL;
   if (!host) {
     return path;
