@@ -63,7 +63,7 @@ func (tr *traceReader) GetRunTrace(ctx context.Context, keys dataloader.Keys) []
 				return
 			}
 
-			gqlRoot, err := tr.convertRunSpanToGQL(ctx, rootSpan)
+			gqlRoot, err := ConvertRunSpanToGQL(ctx, rootSpan)
 			if err != nil {
 				res.Error = fmt.Errorf("error converting run root to GQL: %w", err)
 				return
@@ -79,7 +79,7 @@ func (tr *traceReader) GetRunTrace(ctx context.Context, keys dataloader.Keys) []
 	return results
 }
 
-func (tr *traceReader) opcodeToGQL(op *enums.Opcode) *models.StepOp {
+func OpcodeToGQL(op *enums.Opcode) *models.StepOp {
 	if op == nil {
 		return nil
 	}
@@ -108,7 +108,7 @@ func (tr *traceReader) opcodeToGQL(op *enums.Opcode) *models.StepOp {
 	return nil
 }
 
-func (tr *traceReader) stepStatusToGQL(status *enums.StepStatus) *models.RunTraceSpanStatus {
+func StepStatusToGQL(status *enums.StepStatus) *models.RunTraceSpanStatus {
 	if status == nil {
 		return nil
 	}
@@ -137,7 +137,7 @@ func (tr *traceReader) stepStatusToGQL(status *enums.StepStatus) *models.RunTrac
 	return nil
 }
 
-func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelSpan) (*models.RunTraceSpan, error) {
+func ConvertRunSpanToGQL(ctx context.Context, span *cqrs.OtelSpan) (*models.RunTraceSpan, error) {
 	var duration *int
 	status := models.RunTraceSpanStatusRunning
 	startedAt := span.GetStartedAtTime()
@@ -150,7 +150,7 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 
 	// Make sure we parse dynamic statuses from updates
 	if span.Attributes.DynamicStatus != nil {
-		if gqlStatus := tr.stepStatusToGQL(span.Attributes.DynamicStatus); gqlStatus != nil {
+		if gqlStatus := StepStatusToGQL(span.Attributes.DynamicStatus); gqlStatus != nil {
 			status = *gqlStatus
 		}
 	}
@@ -183,7 +183,7 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 	showSpan := span.Name != meta.SpanNameStepDiscovery
 
 	if span.Attributes.StepOp != nil {
-		gqlSpan.StepOp = tr.opcodeToGQL(span.Attributes.StepOp)
+		gqlSpan.StepOp = OpcodeToGQL(span.Attributes.StepOp)
 	}
 
 	if span.Attributes.StepID != nil {
@@ -271,7 +271,7 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 		isFirstChild := true
 
 		for i, cs := range span.Children {
-			child, err := tr.convertRunSpanToGQL(ctx, cs)
+			child, err := ConvertRunSpanToGQL(ctx, cs)
 			if err != nil {
 				return nil, fmt.Errorf("error converting child span: %w", err)
 			}
