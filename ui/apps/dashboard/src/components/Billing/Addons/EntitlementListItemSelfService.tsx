@@ -8,9 +8,11 @@ import { RiAlertFill } from '@remixicon/react';
 import { toast } from 'sonner';
 import { useMutation } from 'urql';
 
+import EntitlementListItemSelfServiceBoolean from '@/components/Billing/Addons/EntitlementListItemSelfServiceBoolean';
 import EntitlementListItemSelfServiceNumeric from '@/components/Billing/Addons/EntitlementListItemSelfServiceNumeric';
 import { addonQtyCostString } from '@/components/Billing/Addons/pricing_help';
 import { graphql } from '@/gql';
+import { type CurrentEntitlementValues, type Entitlement } from './EntitlementListItem';
 
 const UpdateAccountAddonQuantityDocument = graphql(`
   mutation UpdateAccountAddonQuantity($addonName: String!, $quantity: Int!) {
@@ -26,22 +28,32 @@ export default function EntitlementListItemSelfService({
   tooltip,
   entitlement,
   addon,
+  addonPurchased,
+  currentEntitlementValues,
   onChange,
 }: {
   title: string;
   description: string | React.ReactNode;
   tooltip?: React.ReactNode;
-  entitlement: {
-    currentValue: number | boolean;
-    displayValue?: string | React.ReactNode;
-    planLimit: number;
-    maxValue: number;
-  };
+  entitlement: Entitlement;
   addon: {
     addonName: string;
     quantityPer: number;
     price: number;
+    entitlements?: {
+      history: {
+        limit: number;
+      };
+      metricsExportFreshness: {
+        limit: number;
+      };
+      metricsExportGranularity: {
+        limit: number;
+      };
+    };
   };
+  addonPurchased?: boolean;
+  currentEntitlementValues?: CurrentEntitlementValues;
   onChange?: () => void;
 }) {
   const router = useRouter();
@@ -69,11 +81,6 @@ export default function EntitlementListItemSelfService({
       } ${title.toLowerCase()} will be ${addonCostStr}.`
     : `Your new charge for ${title.toLowerCase()} will be ${addonCostStr}.`;
 
-  if (switchInput) {
-    // TODO: boolean/switch support: https://linear.app/inngest/issue/INN-4303/addon-ui-component-supports-switchboolean-inputs
-    throw new Error('Switch input is not yet supported');
-  }
-
   const handleSubmit = async () => {
     setOpenConfirmationModal(false);
     const updateResult = await updateAccountAddonQuantity({
@@ -92,6 +99,142 @@ export default function EntitlementListItemSelfService({
       toast.success(`Addon updated successfully`);
     }
   };
+
+  if (switchInput) {
+    const handleBooleanAddClick = () => {
+      const quantity = 1; // Boolean addons are always quantity 1
+      const cost = quantity * addon.price;
+      setAddonQty(quantity);
+      setAddonCost(cost);
+      setOpenConfirmationModal(true);
+    };
+
+    return (
+      <>
+        {err && (
+          <p className="text-error mb-2 text-xs">
+            <RiAlertFill className="-mt-0.5 inline h-4" /> Failed to update addon.{' '}
+            <a href="/support" className="underline">
+              Contact support
+            </a>{' '}
+            if this problem persists.
+          </p>
+        )}
+        <EntitlementListItemSelfServiceBoolean
+          title={title}
+          description={description}
+          tooltip={tooltip}
+          entitlement={entitlement}
+          addonPurchased={addonPurchased}
+          currentEntitlementValues={currentEntitlementValues}
+          addonEntitlements={addon.entitlements}
+          onAddClick={handleBooleanAddClick}
+        />
+        {openConfirmationModal && (
+          <AlertModal
+            isOpen={openConfirmationModal}
+            onClose={() => setOpenConfirmationModal(false)}
+            onSubmit={handleSubmit}
+            title="Add to plan"
+            confirmButtonLabel={addonCost > 0 ? 'Confirm and pay' : 'Confirm'}
+            cancelButtonLabel="Cancel"
+            confirmButtonKind="primary"
+            className="w-full max-w-lg"
+          >
+            <div className="space-y-2 p-6">
+              <p className="text-muted text-sm leading-relaxed">
+                By clicking Confirm and Pay, the amount of{' '}
+                <span className="text-basis font-semibold">${(addonCost / 100).toFixed(2)}</span>{' '}
+                will be added to your subscription, and your credit card will be charged{' '}
+                <span className="text-basis font-semibold">
+                  ${(addonCost / 100).toFixed(2)} immediately
+                </span>{' '}
+                for the remaining days in your billing cycle.
+              </p>
+              <div className="p-2">
+                <div className="border-subtle pb-2">
+                  <h3 className="text-basis text-md font-semibold">{title}</h3>
+                </div>
+
+                <div className="">
+                  {typeof entitlement.currentValue === 'number' && entitlement.planLimit && (
+                    <div className="flex flex-col justify-between py-3">
+                      <span className="text-basis text-sm font-medium">{title}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-muted text-sm line-through">
+                          {entitlement.planLimit.toLocaleString()}
+                        </span>
+                        <span className="text-muted">→</span>
+                        <span className="text-basis text-sm font-medium">
+                          {(entitlement.planLimit + addonQty * addon.quantityPer).toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {currentEntitlementValues && addon.entitlements && (
+                    <>
+                      {currentEntitlementValues.history !== undefined && (
+                        <div className="flex flex-col justify-between border-y py-2">
+                          <span className="text-basis text-sm font-medium">Log retention</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-muted text-sm line-through">
+                              {`${currentEntitlementValues.history} days`}
+                            </span>
+                            <span className="text-muted">→</span>
+                            <span className="text-basis text-sm font-medium">
+                              {`${addon.entitlements.history.limit} days`}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
+                      {currentEntitlementValues.metricsExportGranularity !== undefined && (
+                        <div className="flex flex-col justify-between border-b py-3">
+                          <span className="text-basis text-sm font-medium">
+                            Metrics granularity
+                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-muted text-sm line-through">
+                              {`${currentEntitlementValues.metricsExportGranularity} seconds`}
+                            </span>
+                            <span className="text-muted">→</span>
+                            <span className="text-basis text-sm font-medium">
+                              {`${addon.entitlements.metricsExportGranularity.limit} seconds`}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
+                      {currentEntitlementValues.metricsExportFreshness !== undefined && (
+                        <div className="flex flex-col justify-between border-b py-3">
+                          <span className="text-basis text-sm font-medium">Metrics freshness</span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-muted text-sm line-through">
+                              {`${currentEntitlementValues.metricsExportFreshness} seconds`}
+                            </span>
+                            <span className="text-muted">→</span>
+                            <span className="text-basis text-sm font-medium">
+                              {`${addon.entitlements.metricsExportFreshness.limit} seconds`}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                    </>
+                  )}
+                </div>
+
+                <div className="border-subtle flex items-center justify-between border-t pt-4">
+                  <span className="text-basis">Add on cost</span>
+                  <span className="text-basis">${(addonCost / 100).toFixed(2)}/mo</span>
+                </div>
+              </div>
+            </div>
+          </AlertModal>
+        )}
+      </>
+    );
+  }
 
   return (
     <>
@@ -130,26 +273,30 @@ export default function EntitlementListItemSelfService({
           />
         )}
       </div>
-      {openSelfService && numericInput && typeof entitlement.currentValue === 'number' && (
-        <EntitlementListItemSelfServiceNumeric
-          entitlement={{
-            currentValue: entitlement.currentValue,
-            planLimit: entitlement.planLimit,
-            maxValue: entitlement.maxValue,
-          }}
-          addon={addon}
-          onCancel={() => {
-            setOpenSelfService(false);
-            setErr(null);
-          }}
-          onSubmit={(qty: number, cost: number) => {
-            setAddonQty(qty);
-            setAddonCost(cost);
-            setOpenConfirmationModal(true);
-            setOpenSelfService(false);
-          }}
-        />
-      )}
+      {openSelfService &&
+        numericInput &&
+        typeof entitlement.currentValue === 'number' &&
+        entitlement.planLimit != null &&
+        entitlement.maxValue != null && (
+          <EntitlementListItemSelfServiceNumeric
+            entitlement={{
+              currentValue: entitlement.currentValue,
+              planLimit: entitlement.planLimit,
+              maxValue: entitlement.maxValue,
+            }}
+            addon={addon}
+            onCancel={() => {
+              setOpenSelfService(false);
+              setErr(null);
+            }}
+            onSubmit={(qty: number, cost: number) => {
+              setAddonQty(qty);
+              setAddonCost(cost);
+              setOpenConfirmationModal(true);
+              setOpenSelfService(false);
+            }}
+          />
+        )}
       {openConfirmationModal && (
         <AlertModal
           isOpen={openConfirmationModal}
