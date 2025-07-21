@@ -234,16 +234,21 @@ export function EventDetails({
                     content: prettyPayload,
                   }}
                   allowFullScreen={true}
-                  actions={[
-                    {
-                      label: 'Send to Dev Server',
-                      title: isRunning
-                        ? 'Send event payload to running Dev Server'
-                        : `Dev Server is not running at ${devServerURL}`,
-                      onClick: () => send(eventPayloadData?.payload || ''),
-                      disabled: !isRunning,
-                    },
-                  ]}
+                  actions={
+                    // TODO: extract this action to the cloud layer instead
+                    !autoRefresh
+                      ? [
+                          {
+                            label: 'Send to Dev Server',
+                            title: isRunning
+                              ? 'Send event payload to running Dev Server'
+                              : `Dev Server is not running at ${devServerURL}`,
+                            onClick: () => send(eventPayloadData?.payload || ''),
+                            disabled: !isRunning,
+                          },
+                        ]
+                      : []
+                  }
                 />
               </div>
             )}
