@@ -2,7 +2,6 @@
 
 import React, { createContext, useContext } from 'react';
 
-import type { Run } from '../RunsPage/types';
 import type { BooleanFlag } from './useBooleanFlag';
 import type { CancelRunPayload, CancelRunResult } from './useCancelRun';
 import type { GetRunPayload, GetRunResult } from './useGetRun';

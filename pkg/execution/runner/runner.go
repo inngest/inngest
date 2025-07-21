@@ -29,7 +29,6 @@ import (
 	"github.com/inngest/inngest/pkg/pubsub"
 	"github.com/inngest/inngest/pkg/service"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
-	"github.com/oklog/ulid/v2"
 	"github.com/robfig/cron/v3"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/propagation"
@@ -49,8 +48,6 @@ type Runner interface {
 
 	StateManager() state.Manager
 	InitializeCrons(ctx context.Context) error
-	Runs(ctx context.Context, accountId uuid.UUID, eventId ulid.ULID) ([]state.State, error)
-	Events(ctx context.Context, eventId string) ([]event.Event, error)
 }
 
 func WithCQRS(data cqrs.Manager) func(s *svc) {
@@ -77,12 +74,6 @@ func WithPauseManager(pm pauses.Manager) func(s *svc) {
 	}
 }
 
-func WithEventManager(e event.Manager) func(s *svc) {
-	return func(s *svc) {
-		s.em = &e
-	}
-}
-
 func WithStateManager(sm state.Manager) func(s *svc) {
 	return func(s *svc) {
 		s.state = sm
@@ -104,14 +95,6 @@ func WithBatchManager(b batch.BatchManager) func(s *svc) {
 func WithRateLimiter(rl ratelimit.RateLimiter) func(s *svc) {
 	return func(s *svc) {
 		s.rl = rl
-	}
-}
-
-// WithTracker is used in the dev server to track runs.
-func WithTracker(t *Tracker) func(s *svc) {
-	// XXX: Replace with sqlite
-	return func(s *svc) {
-		s.tracker = t
 	}
 }
 
@@ -159,9 +142,6 @@ type svc struct {
 	rl ratelimit.RateLimiter
 	// cronmanager allows the creation of new scheduled functions.
 	cronmanager *cron.Cron
-	em          *event.Manager
-
-	tracker *Tracker
 
 	log logger.Logger
 }
@@ -312,45 +292,12 @@ func (s *svc) InitializeCrons(ctx context.Context) error {
 			}
 		}
 	}
-
 	s.cronmanager.Start()
 	return nil
 }
 
-func (s *svc) Runs(ctx context.Context, accountId uuid.UUID, eventID ulid.ULID) ([]state.State, error) {
-	items, _ := s.tracker.Runs(ctx, eventID)
-	result := make([]state.State, len(items))
-	for n, i := range items {
-		state, err := s.state.Load(ctx, accountId, i)
-		if err != nil {
-			return nil, err
-		}
-		result[n] = state
-	}
-	return result, nil
-}
-
 func (s *svc) StateManager() state.Manager {
 	return s.state
-}
-
-func (s *svc) Events(ctx context.Context, eventId string) ([]event.Event, error) {
-	if eventId != "" {
-		evt := s.em.EventById(eventId)
-		if evt != nil {
-			return []event.Event{evt.GetEvent()}, nil
-		}
-
-		return []event.Event{}, nil
-	}
-
-	trackedEvents := s.em.Events()
-	evts := make([]event.Event, len(trackedEvents))
-	for i, evt := range trackedEvents {
-		evts[i] = evt.GetEvent()
-	}
-
-	return evts, nil
 }
 
 func (s *svc) handleMessage(ctx context.Context, m pubsub.Message) error {
@@ -367,14 +314,7 @@ func (s *svc) handleMessage(ctx context.Context, m pubsub.Message) error {
 		}
 	}
 
-	var tracked event.TrackedEvent
-	var err error
-
-	if s.em == nil {
-		tracked, err = event.NewOSSTrackedEventFromString(m.Data)
-	} else {
-		tracked, err = s.em.NewEvent(m.Data)
-	}
+	tracked, err := event.NewOSSTrackedEventFromString(m.Data)
 	if err != nil {
 		return fmt.Errorf("error creating event: %w", err)
 	}
@@ -789,40 +729,4 @@ func Initialize(ctx context.Context, opts InitOpts) (*sv2.Metadata, error) {
 		logger.StdlibLogger(ctx).Error("error scheduling function", "error", err)
 	}
 	return md, err
-}
-
-// NewTracker returns a crappy in-memory tracker used for registering function runs.
-func NewTracker() (t *Tracker) {
-	return &Tracker{
-		l:      &sync.RWMutex{},
-		evtIDs: map[string][]ulid.ULID{},
-	}
-}
-
-type Tracker struct {
-	l      *sync.RWMutex
-	evtIDs map[string][]ulid.ULID
-}
-
-func (t *Tracker) Add(evtID string, id state.Identifier) {
-	if t.l == nil {
-		return
-	}
-
-	t.l.Lock()
-	defer t.l.Unlock()
-	if _, ok := t.evtIDs[evtID]; !ok {
-		t.evtIDs[evtID] = []ulid.ULID{id.RunID}
-		return
-	}
-	t.evtIDs[evtID] = append(t.evtIDs[evtID], id.RunID)
-}
-
-func (t *Tracker) Runs(ctx context.Context, eventId ulid.ULID) ([]ulid.ULID, error) {
-	if t.l == nil {
-		return nil, nil
-	}
-	t.l.RLock()
-	defer t.l.RUnlock()
-	return t.evtIDs[eventId.String()], nil
 }

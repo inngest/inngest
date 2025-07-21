@@ -38,7 +38,6 @@ type Options struct {
 	Config         config.Config
 	Logger         logger.Logger
 	Runner         runner.Runner
-	Tracker        *runner.Tracker
 	State          state.Manager
 	Queue          queue.JobQueueReader
 	EventHandler   api.EventHandler
@@ -73,13 +72,12 @@ func NewCoreApi(o Options) (*CoreAPI, error) {
 	}
 
 	a := &CoreAPI{
-		data:    o.Data,
-		config:  o.Config,
-		log:     logger,
-		Router:  chi.NewMux(),
-		runner:  o.Runner,
-		tracker: o.Tracker,
-		state:   o.State,
+		data:   o.Data,
+		config: o.Config,
+		log:    logger,
+		Router: chi.NewMux(),
+		runner: o.Runner,
+		state:  o.State,
 	}
 
 	cors := cors.New(cors.Options{
@@ -128,13 +126,12 @@ func NewCoreApi(o Options) (*CoreAPI, error) {
 
 type CoreAPI struct {
 	chi.Router
-	data    cqrs.Manager
-	config  config.Config
-	log     logger.Logger
-	server  *http.Server
-	state   state.Manager
-	runner  runner.Runner
-	tracker *runner.Tracker
+	data   cqrs.Manager
+	config config.Config
+	log    logger.Logger
+	server *http.Server
+	state  state.Manager
+	runner runner.Runner
 }
 
 func (a *CoreAPI) Start(ctx context.Context) error {

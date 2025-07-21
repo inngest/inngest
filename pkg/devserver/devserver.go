@@ -78,15 +78,13 @@ const (
 	DefaultConnectGatewayPort = 8289
 )
 
-var (
-	defaultPartitionConstraintConfig = redis_state.PartitionConstraintConfig{
-		Concurrency: redis_state.PartitionConcurrency{
-			SystemConcurrency:   consts.DefaultConcurrencyLimit,
-			AccountConcurrency:  consts.DefaultConcurrencyLimit,
-			FunctionConcurrency: consts.DefaultConcurrencyLimit,
-		},
-	}
-)
+var defaultPartitionConstraintConfig = redis_state.PartitionConstraintConfig{
+	Concurrency: redis_state.PartitionConcurrency{
+		SystemConcurrency:   consts.DefaultConcurrencyLimit,
+		AccountConcurrency:  consts.DefaultConcurrencyLimit,
+		FunctionConcurrency: consts.DefaultConcurrencyLimit,
+	},
+}
 
 // StartOpts configures the dev server
 type StartOpts struct {
@@ -245,7 +243,6 @@ func start(ctx context.Context, opts StartOpts) error {
 	}
 
 	var sm state.Manager
-	t := runner.NewTracker()
 	sm, err = redis_state.New(
 		ctx,
 		redis_state.WithShardedClient(shardedClient),
@@ -336,7 +333,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	agg := expragg.NewAggregator(ctx, 100, 100, sm.(expragg.EvaluableLoader), expressions.ExprEvaluator, nil, nil)
 
 	executorLogger := connectPubSubLogger.With("svc", "executor")
-	gatewayGRPCForwarder := connectpubsub.NewGatewayGRPCManager(ctx, connectionManager, executorLogger)
+	gatewayGRPCForwarder := connectpubsub.NewGatewayGRPCManager(ctx, connectionManager, connectpubsub.WithLogger(executorLogger))
 
 	executorProxy, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectPubSubRedis, true, connectpubsub.RedisPubSubConnectorOpts{
 		Logger:             executorLogger,
@@ -470,10 +467,8 @@ func start(ctx context.Context, opts StartOpts) error {
 		runner.WithExecutor(exec),
 		runner.WithExecutionManager(dbcqrs),
 		runner.WithPauseManager(pauses.NewRedisOnlyManager(sm)),
-		runner.WithEventManager(event.NewManager()),
 		runner.WithStateManager(sm),
 		runner.WithRunnerQueue(rq),
-		runner.WithTracker(t),
 		runner.WithRateLimiter(rl),
 		runner.WithBatchManager(batcher),
 		runner.WithPublisher(pb),
@@ -482,8 +477,6 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	// The devserver embeds the event API.
 	ds := NewService(opts, runner, dbcqrs, pb, stepLimitOverrides, stateSizeLimitOverrides, unshardedRc, hmw, nil)
-	// embed the tracker
-	ds.Tracker = t
 	ds.State = sm
 	ds.Queue = rq
 	ds.Executor = exec
@@ -528,7 +521,6 @@ func start(ctx context.Context, opts StartOpts) error {
 		Config:         ds.Opts.Config,
 		Logger:         l,
 		Runner:         ds.Runner,
-		Tracker:        ds.Tracker,
 		State:          ds.State,
 		Queue:          ds.Queue,
 		EventHandler:   ds.HandleEvent,
@@ -546,6 +538,9 @@ func start(ctx context.Context, opts StartOpts) error {
 			Dev:                        true,
 			EntitlementProvider:        ds,
 			ConditionalTracer:          conditionalTracer,
+			ShouldUseGRPC: func(ctx context.Context, accountID uuid.UUID) bool {
+				return false
+			},
 		},
 	})
 	if err != nil {

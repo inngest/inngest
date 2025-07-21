@@ -278,6 +278,49 @@ func TestLeaseRenewalWithInvalidLeaseShouldNotClose(t *testing.T) {
 	exchangeHeartbeat(t, res.ws, 2*time.Second)
 }
 
+func TestExecutorMessageForwardingGRPC(t *testing.T) {
+	params := testingParameters{
+		consecutiveMissesBeforeClose: 10,
+		heartbeatInterval:            1 * time.Second,
+		shouldUseGRPC:                true,
+	}
+	res := createTestingGateway(t, params)
+
+	handshake(t, res)
+
+	expectedPayload := &connect.GatewayExecutorRequestData{
+		RequestId:      "test-req",
+		AccountId:      res.accountID.String(),
+		EnvId:          res.envID.String(),
+		AppId:          res.appID.String(),
+		AppName:        res.appName,
+		FunctionId:     res.fnID.String(),
+		FunctionSlug:   res.fnSlug,
+		StepId:         ptr.String("step"),
+		RequestPayload: []byte("hello world"),
+		RunId:          res.runID.String(),
+		LeaseId:        "lease-test",
+	}
+
+	// Simulate gRPC delivery by directly sending to the connection
+	messageChan, ok := res.svc.wsConnections.Load(res.connID.String())
+	require.True(t, ok, "connection should be registered for gRPC delivery")
+
+	go func() {
+		messageChan.(chan *connect.GatewayExecutorRequestData) <- expectedPayload
+	}()
+
+	// Expect message to be received by gateway and forwarded over WS
+	msg := awaitNextMessage(t, res.ws, 2*time.Second)
+	require.Equal(t, connect.GatewayMessageType_GATEWAY_EXECUTOR_REQUEST, msg.Kind)
+
+	payload := &connect.GatewayExecutorRequestData{}
+	err := proto.Unmarshal(msg.Payload, payload)
+	require.NoError(t, err)
+
+	require.True(t, proto.Equal(expectedPayload, payload))
+}
+
 func TestCloseConnectionOnConsecutiveHeartbeatFail(t *testing.T) {
 	params := testingParameters{
 		consecutiveMissesBeforeClose: 5,
@@ -707,6 +750,7 @@ type testingParameters struct {
 	consecutiveMissesBeforeClose int
 	shouldFailSync               bool
 	disallowConnection           bool
+	shouldUseGRPC                bool
 
 	noConnect bool
 }
@@ -849,6 +893,12 @@ func createTestingGateway(t *testing.T, params ...testingParameters) testingReso
 
 		if params[0].consecutiveMissesBeforeClose > 0 {
 			opts = append(opts, WithConsecutiveWorkerHeartbeatMissesBeforeConnectionClose(params[0].consecutiveMissesBeforeClose))
+		}
+
+		if params[0].shouldUseGRPC {
+			opts = append(opts, WithShouldUseGRPC(func(ctx context.Context, accountID uuid.UUID) bool {
+				return true
+			}))
 		}
 	}
 
