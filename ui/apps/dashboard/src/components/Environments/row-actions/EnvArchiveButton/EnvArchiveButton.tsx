@@ -10,10 +10,9 @@ import { EnvironmentArchiveModal } from './EnvironmentArchiveModal';
 
 type Props = {
   env: Environment;
-  onClose: () => void;
 };
 
-export function EnvArchiveButton({ env, onClose }: Props) {
+export function EnvArchiveButton({ env }: Props) {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   // Need to store local state since the mutations don't invalidate the cache,
@@ -43,12 +42,10 @@ export function EnvArchiveButton({ env, onClose }: Props) {
         isOpen={isModalOpen}
         onCancel={() => {
           setIsModalOpen(false);
-          onClose();
         }}
         onSuccess={() => {
           setIsModalOpen(false);
           setIsArchived(!isArchived);
-          onClose();
         }}
       />
     </>

@@ -206,7 +206,7 @@ function TableRow(props: { env: Environment }) {
       <td>
         <div className="flex items-center gap-2 px-4">
           <EnvViewButton env={props.env} />
-          <EnvArchiveButton env={props.env} onClose={() => {}} />
+          <EnvArchiveButton env={props.env} />
         </div>
       </td>
     </tr>
