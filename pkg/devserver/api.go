@@ -162,8 +162,9 @@ func (a devapi) Info(w http.ResponseWriter, r *http.Request) {
 			if len(kv) == 2 {
 				key := strings.TrimSpace(kv[0])
 				valStr := strings.TrimSpace(kv[1])
-				if enabled, err := strconv.ParseBool(valStr); err == nil {
-					features[key] = enabled
+				if value, err := strconv.ParseBool(valStr); err == nil {
+					a.devserver.log.Info("setting feature flag", "key", key)
+					features[key] = value
 				}
 			}
 		}
