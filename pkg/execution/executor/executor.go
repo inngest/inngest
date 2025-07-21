@@ -1050,6 +1050,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		execParent = tracing.SpanRefFromQueueItem(&item)
 	}
 
+	st := time.Now()
 	instance.execSpan, err = e.tracerProvider.CreateSpan(
 		meta.SpanNameExecution,
 		&tracing.CreateSpanOptions{
@@ -1058,9 +1059,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			Metadata:   &md,
 			QueueItem:  &item,
 			Attributes: tracing.FunctionAttrs(&instance.f),
-			// SpanOptions: []trace.SpanStartOption{
-			// 	tracing.WithFunctionAttrs(&instance.f),
-			// },
+			StartTime:  st,
 		},
 	)
 	if err != nil {
@@ -1070,13 +1069,16 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	return util.CritT(ctx, "run step", func(ctx context.Context) (*state.DriverResponse, error) {
 		resp, err := e.run(ctx, &instance)
 
+		et := st.Add(time.Since(st))
+
 		status := enums.StepStatusCompleted
 		if err != nil || resp.Err != nil || resp.UserError != nil {
 			status = enums.StepStatusFailed
 		}
+
 		_ = e.tracerProvider.UpdateSpan(
 			&tracing.UpdateSpanOptions{
-				EndTime:    time.Now(),
+				EndTime:    et,
 				Debug:      &tracing.SpanDebugData{Location: "executor.Execute"},
 				Metadata:   &md,
 				QueueItem:  &item,
