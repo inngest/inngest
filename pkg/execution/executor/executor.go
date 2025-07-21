@@ -545,6 +545,10 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		&tracing.CreateSpanOptions{
 			Debug:    &tracing.SpanDebugData{Location: "executor.Schedule"},
 			Metadata: &metadata,
+			Attributes: meta.NewAttrSet(
+				meta.Attr(meta.Attrs.DebugSessionID, req.DebugSessionID),
+				meta.Attr(meta.Attrs.DebugRunID, req.DebugRunID),
+			),
 		},
 	)
 	if err != nil {

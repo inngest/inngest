@@ -230,6 +230,8 @@ type InngestMetadata struct {
 	InvokeExpiresAt     int64                `json:"expire"`
 	InvokeGroupID       string               `json:"gid"`
 	InvokeDisplayName   string               `json:"name"`
+	DebugSessionID      *ulid.ULID           `json:"debug_session_id,omitempty"`
+	DebugRunID          *ulid.ULID           `json:"debug_run_id,omitempty"`
 }
 
 func (m *InngestMetadata) Decode(data any) error {
@@ -347,6 +349,8 @@ type NewInvocationEventOpts struct {
 	ExpiresAt       int64
 	GroupID         string
 	DisplayName     string
+	DebugSessionID  *ulid.ULID
+	DebugRunID      *ulid.ULID
 }
 
 func NewInvocationEvent(opts NewInvocationEventOpts) Event {
@@ -378,6 +382,8 @@ func NewInvocationEvent(opts NewInvocationEventOpts) Event {
 		SourceAppID:         opts.SourceAppID,
 		SourceFnID:          opts.SourceFnID,
 		SourceFnVersion:     opts.SourceFnVersion,
+		DebugSessionID:      opts.DebugSessionID,
+		DebugRunID:          opts.DebugRunID,
 	}
 
 	return evt
