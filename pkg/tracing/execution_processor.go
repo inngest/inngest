@@ -141,7 +141,7 @@ func (p *executionProcessor) OnStart(parent context.Context, s sdktrace.ReadWrit
 			}
 
 			// Only overwrite the EndedAt time if we don't already have one
-			if ea == nil {
+			if ea == nil && ds != nil {
 				if ds.Value.Type() == attribute.INT64 && enums.RunStatusEnded(enums.RunStatus(ds.Value.AsInt64())) {
 					meta.AddAttr(rawAttrs, meta.Attrs.EndedAt, &now)
 				}
