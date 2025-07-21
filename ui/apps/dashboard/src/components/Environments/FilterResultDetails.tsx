@@ -1,15 +1,14 @@
 'use client';
 
 type FilterResultDetailsProps = {
-  hasFilter: boolean;
   size: number;
 };
 
-export function FilterResultDetails({ hasFilter, size }: FilterResultDetailsProps) {
+export function FilterResultDetails({ size }: FilterResultDetailsProps) {
   return (
     <div className="flex items-center px-3 py-2 max-[625px]:hidden">
       <span className="text-light whitespace-nowrap text-sm">
-        {size} {hasFilter ? 'Filtered' : 'Total'} {size === 1 ? 'environment' : 'environments'}
+        {size} {size === 1 ? 'Environment' : 'Environments'}
       </span>
     </div>
   );

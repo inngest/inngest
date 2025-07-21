@@ -44,13 +44,13 @@ const PER_PAGE = 5;
 
 type BranchEnvironmentListTableProps = {
   envs: Environment[];
-  searchParam: string;
+  paginationKey: string;
   unfilteredEnvsCount: number;
 };
 
 export default function BranchEnvironmentListTable({
   envs,
-  searchParam,
+  paginationKey,
   unfilteredEnvsCount,
 }: BranchEnvironmentListTableProps) {
   const sortedEnvs = envs.sort(
@@ -63,9 +63,7 @@ export default function BranchEnvironmentListTable({
     BoundPagination: BranchEnvsPagination,
     currentPageData: visibleBranchEnvs,
     totalPages: totalBranchEnvsPages,
-  } = usePaginationUI({ data: sortedEnvs, id: searchParam, pageSize: PER_PAGE });
-
-  const hasFilter = searchParam !== '';
+  } = usePaginationUI({ data: sortedEnvs, id: paginationKey, pageSize: PER_PAGE });
 
   return (
     <div className="w-full">
@@ -110,7 +108,7 @@ export default function BranchEnvironmentListTable({
         </table>
       </div>
       <div className="border-subtle flex border-t px-1 py-1">
-        <FilterResultDetails hasFilter={hasFilter} size={envs.length} />
+        <FilterResultDetails size={envs.length} />
         {totalBranchEnvsPages > 1 && (
           <div className="flex flex-1">
             <BranchEnvsPagination className="justify-end max-[625px]:justify-center" />
