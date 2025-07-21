@@ -41,6 +41,7 @@ export function EventDetails({
   standalone,
   pollInterval,
   autoRefresh,
+  isDev,
 }: {
   initialData?: Pick<Event, 'name' | 'runs'>;
   eventID: string;
@@ -51,6 +52,7 @@ export function EventDetails({
   standalone: boolean;
   pollInterval?: number;
   autoRefresh?: boolean;
+  isDev: boolean;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const leftColumnRef = useRef<HTMLDivElement>(null);
@@ -235,8 +237,7 @@ export function EventDetails({
                   }}
                   allowFullScreen={true}
                   actions={
-                    // TODO: extract this action to the cloud layer instead
-                    !autoRefresh
+                    !isDev
                       ? [
                           {
                             label: 'Send to Dev Server',
