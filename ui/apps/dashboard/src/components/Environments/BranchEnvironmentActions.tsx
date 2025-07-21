@@ -24,7 +24,7 @@ export function BranchEnvironmentActions({ branchParent }: BranchEnvironmentActi
       left={
         <Button
           appearance="solid"
-          className="rounded-r-none border-r-0"
+          className="rounded-r-none border-r-0 text-sm"
           kind="primary"
           label="Sync new app"
           href={`/env/${branchParent.slug || 'branch'}/apps`}
