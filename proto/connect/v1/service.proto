@@ -31,6 +31,7 @@ message PingResponse {
 service ConnectExecutor {
   rpc Reply(ReplyRequest) returns (ReplyResponse) {}
   rpc Ack(AckMessage) returns (AckResponse) {}
+  rpc Ping(PingRequest) returns (PingResponse) {}
 }
 
 message ReplyRequest {

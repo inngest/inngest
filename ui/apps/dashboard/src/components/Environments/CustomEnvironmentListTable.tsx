@@ -1,41 +1,32 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { Button } from '@inngest/components/Button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@inngest/components/DropdownMenu';
 import { usePaginationUI } from '@inngest/components/Pagination';
-import { AppsIcon } from '@inngest/components/icons/sections/Apps';
 import { cn } from '@inngest/components/utils/classNames';
-import { RiMore2Line, RiSettingsLine } from '@remixicon/react';
 
 import type { Environment } from '@/utils/environments';
-import { EnvironmentArchiveDropdownItem } from './EnvironmentArchiveDropdownItem';
 import { FilterResultDetails } from './FilterResultDetails';
+import { EnvArchiveButton } from './row-actions/EnvArchiveButton/EnvArchiveButton';
+import { EnvKeysDropdownButton } from './row-actions/EnvKeysDropdownButton';
+import { EnvViewButton } from './row-actions/EnvViewButton';
 
 const PER_PAGE = 5;
 
 type CustomEnvironmentListTableProps = {
   envs: Environment[];
-  searchParam: string;
+  paginationKey: string;
   unfilteredEnvsCount: number;
 };
 
 export function CustomEnvironmentListTable({
   envs,
-  searchParam,
+  paginationKey,
   unfilteredEnvsCount,
 }: CustomEnvironmentListTableProps) {
   const {
     BoundPagination: CustomEnvsPagination,
     currentPageData: visibleCustomEnvs,
     totalPages: totalCustomEnvsPages,
-  } = usePaginationUI({ data: envs, id: searchParam, pageSize: PER_PAGE });
+  } = usePaginationUI({ data: envs, id: paginationKey, pageSize: PER_PAGE });
 
   return (
     <div className="w-full">
@@ -63,13 +54,13 @@ export function CustomEnvironmentListTable({
                 </td>
               </tr>
             ) : (
-              visibleCustomEnvs.map((env, i) => <TableRow env={env} key={i} />)
+              visibleCustomEnvs.map((env) => <TableRow env={env} key={env.id} />)
             )}
           </tbody>
         </table>
       </div>
       <div className="border-subtle flex border-t px-1 py-1">
-        <FilterResultDetails hasFilter={searchParam !== ''} size={envs.length} />
+        <FilterResultDetails size={envs.length} />
         {totalCustomEnvsPages > 1 && (
           <div className="flex flex-1">
             <CustomEnvsPagination className="justify-end max-[625px]:justify-center" />
@@ -81,10 +72,7 @@ export function CustomEnvironmentListTable({
 }
 
 function TableRow(props: { env: Environment }) {
-  const router = useRouter();
-  const [openDropdown, setOpenDropdown] = useState(false);
-
-  const { isArchived, name, slug } = props.env;
+  const { isArchived, name } = props.env;
 
   return (
     <tr>
@@ -100,28 +88,12 @@ function TableRow(props: { env: Environment }) {
         </h3>
       </td>
 
-      <td className="px-4">
-        <DropdownMenu open={openDropdown} onOpenChange={setOpenDropdown}>
-          <DropdownMenuTrigger asChild>
-            <Button kind="secondary" appearance="outlined" size="medium" icon={<RiMore2Line />} />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent>
-            <DropdownMenuItem onSelect={() => router.push(`/env/${slug}/manage`)}>
-              <RiSettingsLine className="h-4 w-4" />
-              Manage
-            </DropdownMenuItem>
-
-            <DropdownMenuItem onSelect={() => router.push(`/env/${slug}/apps`)}>
-              <AppsIcon className="h-4 w-4" />
-              Go to apps
-            </DropdownMenuItem>
-
-            <EnvironmentArchiveDropdownItem
-              env={props.env}
-              onClose={() => setOpenDropdown(false)}
-            />
-          </DropdownMenuContent>
-        </DropdownMenu>
+      <td>
+        <div className="flex items-center gap-2 px-4">
+          <EnvViewButton env={props.env} />
+          <EnvKeysDropdownButton env={props.env} />
+          <EnvArchiveButton env={props.env} />
+        </div>
       </td>
     </tr>
   );

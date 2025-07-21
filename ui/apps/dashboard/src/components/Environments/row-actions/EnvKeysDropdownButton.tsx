@@ -1,0 +1,43 @@
+'use client';
+
+import { useRouter } from 'next/navigation';
+import { Button } from '@inngest/components/Button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@inngest/components/DropdownMenu';
+import { RiKeyLine } from '@remixicon/react';
+
+import { type Environment } from '@/utils/environments';
+
+type Props = {
+  env: Environment;
+};
+
+export function EnvKeysDropdownButton({ env }: Props) {
+  const router = useRouter();
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button appearance="outlined" icon={<RiKeyLine />} kind="secondary" size="small" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent>
+        <DropdownMenuItem
+          className="text-basis text-sm"
+          onSelect={() => router.push(`/env/${env.slug}/manage/keys`)}
+        >
+          Manage event keys
+        </DropdownMenuItem>
+        <DropdownMenuItem
+          className="text-basis text-sm"
+          onSelect={() => router.push(`/env/${env.slug}/manage/signing-key`)}
+        >
+          Manage signing key
+        </DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}

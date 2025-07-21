@@ -239,6 +239,10 @@ type Pause struct {
 	TriggeringEventID *string `json:"tID,omitempty"`
 	// Metadata is additional metadata that should be stored with the pause
 	Metadata map[string]any
+
+	// ParallelMode controls discovery step scheduling after a parallel step
+	// ends
+	ParallelMode enums.ParallelMode `json:"pm,omitempty"`
 }
 
 func (p Pause) GetOpcode() enums.Opcode {

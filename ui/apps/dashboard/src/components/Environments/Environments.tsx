@@ -12,18 +12,22 @@ import {
 import { Search } from '@inngest/components/Forms/Search';
 import useDebounce from '@inngest/components/hooks/useDebounce';
 import { AppsIcon } from '@inngest/components/icons/sections/Apps';
-import { RiAddLine, RiMore2Line, RiSettingsLine } from '@remixicon/react';
+import { RiMore2Line, RiSettingsLine } from '@remixicon/react';
 
 import Toaster from '@/components/Toaster';
 import LoadingIcon from '@/icons/LoadingIcon';
 import { useEnvironments } from '@/queries';
 import { EnvironmentType, type Environment } from '@/utils/environments';
+import { BranchEnvironmentActions } from './BranchEnvironmentActions';
 import BranchEnvironmentListTable from './BranchEnvironmentListTable';
 import { CustomEnvironmentListTable } from './CustomEnvironmentListTable';
+import { EnvironmentsStatusSelector } from './EnvironmentsStatusSelector';
 
 export default function Environments() {
   const router = useRouter();
   const [{ data: envs = [], fetching }] = useEnvironments();
+
+  const [filterStatus, setFilterStatus] = useState<'active' | 'archived'>('active');
 
   const [searchInput, setSearchInput] = useState<string>('');
   const [searchParam, setSearchParam] = useState<string>('');
@@ -34,12 +38,12 @@ export default function Environments() {
   const branchParent = envs.find((env) => env.type === EnvironmentType.BranchParent);
 
   const branchEnvsData = useMemo(() => {
-    return filterEnvironments(EnvironmentType.BranchChild, searchParam, envs);
-  }, [searchParam, envs]);
+    return filterEnvironments(EnvironmentType.BranchChild, searchParam, filterStatus, envs);
+  }, [searchParam, envs, filterStatus]);
 
   const customEnvsData = useMemo(() => {
-    return filterEnvironments(EnvironmentType.Test, searchParam, envs);
-  }, [searchParam, envs]);
+    return filterEnvironments(EnvironmentType.Test, searchParam, filterStatus, envs);
+  }, [searchParam, envs, filterStatus]);
 
   if (fetching) {
     return (
@@ -97,16 +101,26 @@ export default function Environments() {
           <div className="border-subtle mt-8 flex w-full items-center justify-between border-t pt-8">
             <h2 className="text-xl font-medium">Other environments</h2>
           </div>
-
-          <Search
-            name="search-other-envs"
-            onUpdate={(value) => {
-              setSearchInput(value);
-              debouncedSearch();
-            }}
-            placeholder="Search environments"
-            value={searchInput}
-          />
+          <div className="flex w-full flex-wrap gap-3">
+            <EnvironmentsStatusSelector
+              archived={filterStatus === 'archived'}
+              onChange={(archived: boolean) => {
+                setFilterStatus(archived ? 'archived' : 'active');
+              }}
+            />
+            <div className="min-w-[200px] flex-auto">
+              <Search
+                className="w-full"
+                name="search-other-envs"
+                onUpdate={(value) => {
+                  setSearchInput(value);
+                  debouncedSearch();
+                }}
+                placeholder="Search environments"
+                value={searchInput}
+              />
+            </div>
+          </div>
         </div>
 
         <div className="flex flex-col gap-6">
@@ -114,7 +128,7 @@ export default function Environments() {
             <div className="mb-2 flex w-full items-center justify-between">
               <h2 className="text-md font-medium">Custom environments</h2>
               <Button
-                className="text-sm font-normal"
+                className="text-sm"
                 href="create-environment"
                 kind="primary"
                 label="Create custom environment"
@@ -123,7 +137,7 @@ export default function Environments() {
             <div className="border-subtle overflow-hidden rounded-md border">
               <CustomEnvironmentListTable
                 envs={customEnvsData.filtered}
-                searchParam={searchParam}
+                paginationKey={getPaginationKey(filterStatus, searchParam)}
                 unfilteredEnvsCount={customEnvsData.total}
               />
             </div>
@@ -134,37 +148,13 @@ export default function Environments() {
               <div className="mb-2 flex w-full items-center justify-between">
                 <h2 className="text-md font-medium">Branch environments</h2>
                 <div className="flex items-center gap-2">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        kind="secondary"
-                        appearance="outlined"
-                        size="medium"
-                        icon={<RiMore2Line />}
-                      />
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent>
-                      <DropdownMenuItem
-                        onSelect={() => router.push(`/env/${branchParent?.slug}/manage`)}
-                      >
-                        <RiSettingsLine className="h-4 w-4" />
-                        Manage
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        className="text-success"
-                        onSelect={() => router.push(`/env/${branchParent?.slug || 'branch'}/apps`)}
-                      >
-                        <RiAddLine className="h-4 w-4" />
-                        Sync new app
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                  <BranchEnvironmentActions branchParent={branchParent as Environment} />
                 </div>
               </div>
               <div className="border-subtle overflow-hidden rounded-md border">
                 <BranchEnvironmentListTable
                   envs={branchEnvsData.filtered}
-                  searchParam={searchParam}
+                  paginationKey={getPaginationKey(filterStatus, searchParam)}
                   unfilteredEnvsCount={branchEnvsData.total}
                 />
               </div>
@@ -178,7 +168,17 @@ export default function Environments() {
   );
 }
 
-function filterEnvironments(type: EnvironmentType, searchParam: string, envs: Environment[]) {
+// This is used to reset to page 1 when the filter or search changes.
+function getPaginationKey(filterStatus: 'active' | 'archived', searchParam: string) {
+  return `${filterStatus}:${searchParam}`;
+}
+
+function filterEnvironments(
+  type: EnvironmentType,
+  searchParam: string,
+  filterStatus: 'active' | 'archived',
+  envs: Environment[]
+) {
   const filtered: Environment[] = [];
   let total = 0;
 
@@ -187,9 +187,11 @@ function filterEnvironments(type: EnvironmentType, searchParam: string, envs: En
 
     total++;
 
-    if (searchParam === '' || env.name.toLowerCase().includes(searchParam.toLowerCase())) {
-      filtered.push(env);
-    }
+    const matchesSearch =
+      searchParam === '' || env.name.toLowerCase().includes(searchParam.toLowerCase());
+    const matchesStatus = filterStatus === 'archived' ? env.isArchived : !env.isArchived;
+
+    if (matchesSearch && matchesStatus) filtered.push(env);
   }
 
   return { filtered, total };

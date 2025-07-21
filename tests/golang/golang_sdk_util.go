@@ -3,6 +3,7 @@ package golang
 import (
 	"context"
 	"fmt"
+	"io"
 	"log"
 	"log/slog"
 	"math/rand"
@@ -58,6 +59,9 @@ func NewSDKHandler(t *testing.T, appID string, copts ...opt) (inngestgo.Client, 
 		require.NoError(t, err)
 		resp, err := http.DefaultClient.Do(req)
 		require.NoError(t, err)
+		body, err := io.ReadAll(resp.Body)
+		require.NoError(t, err)
+		fmt.Println(string(body))
 		require.Equal(t, 200, resp.StatusCode)
 		_ = resp.Body.Close()
 	}

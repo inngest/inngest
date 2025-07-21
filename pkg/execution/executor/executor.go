@@ -858,7 +858,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			return nil, err
 		}
 
-		if hasPendingSteps {
+		if !shouldEnqueueDiscovery(hasPendingSteps, item.ParallelMode) {
 			// Other steps are pending before we re-enter the function, so
 			// we're now done with this execution.
 			return nil, nil
@@ -2004,7 +2004,7 @@ func (e *executor) ResumePauseTimeout(ctx context.Context, pause state.Pause, r 
 
 	e.log.Debug("resuming from timeout ", "identifier", id)
 
-	pending, err := e.smv2.SaveStep(ctx, id, pause.DataKey, data)
+	hasPendingSteps, err := e.smv2.SaveStep(ctx, id, pause.DataKey, data)
 	if errors.Is(err, state.ErrDuplicateResponse) {
 		// cannot resume as the pause has already been resumed and consumed.
 		return nil
@@ -2015,7 +2015,7 @@ func (e *executor) ResumePauseTimeout(ctx context.Context, pause state.Pause, r 
 		return err
 	}
 
-	if !pending {
+	if shouldEnqueueDiscovery(hasPendingSteps, pause.ParallelMode) {
 		// If there are no parallel steps ongoing, we must enqueue the next SDK ping to continue on with
 		// execution.
 		jobID := fmt.Sprintf("%s-%s-timeout", md.IdempotencyKey(), pause.DataKey)
@@ -2143,7 +2143,7 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 			Attributes: tracing.ResumeAttrs(&pause, &r),
 		})
 
-		if !consumeResult.HasPendingSteps {
+		if shouldEnqueueDiscovery(consumeResult.HasPendingSteps, pause.ParallelMode) {
 			// Schedule an execution from the pause's entrypoint.  We do this
 			// after consuming the pause to guarantee the event data is
 			// stored via the pause for the next run.  If the ConsumePause
@@ -2454,9 +2454,10 @@ func (e *executor) handleGeneratorStep(ctx context.Context, i *runInstance, gen 
 		MaxAttempts:           i.item.MaxAttempts,
 		Payload:               queue.PayloadEdge{Edge: nextEdge},
 		Metadata:              make(map[string]any),
+		ParallelMode:          gen.ParallelMode(),
 	}
 
-	if !hasPendingSteps {
+	if shouldEnqueueDiscovery(hasPendingSteps, i.item.ParallelMode) {
 		span, err := e.tracerProvider.CreateDroppableSpan(
 			meta.SpanNameStepDiscovery,
 			&tracing.CreateSpanOptions{
@@ -2597,9 +2598,10 @@ func (e *executor) handleStepError(ctx context.Context, i *runInstance, gen stat
 		MaxAttempts:           i.item.MaxAttempts,
 		Payload:               queue.PayloadEdge{Edge: nextEdge},
 		Metadata:              make(map[string]any),
+		ParallelMode:          gen.ParallelMode(),
 	}
 
-	if !hasPendingSteps {
+	if shouldEnqueueDiscovery(hasPendingSteps, i.item.ParallelMode) {
 		span, err := e.tracerProvider.CreateDroppableSpan(
 			meta.SpanNameStepDiscovery,
 			&tracing.CreateSpanOptions{
@@ -2670,7 +2672,8 @@ func (e *executor) handleGeneratorStepPlanned(ctx context.Context, i *runInstanc
 		Payload: queue.PayloadEdge{
 			Edge: nextEdge,
 		},
-		Metadata: make(map[string]any),
+		Metadata:     make(map[string]any),
+		ParallelMode: gen.ParallelMode(),
 	}
 
 	span, err := e.tracerProvider.CreateDroppableSpan(
@@ -2742,6 +2745,7 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, i *runInstance, gen
 		MaxAttempts:           i.item.MaxAttempts,
 		Payload:               queue.PayloadEdge{Edge: nextEdge},
 		Metadata:              make(map[string]any),
+		ParallelMode:          gen.ParallelMode(),
 	}
 
 	span, err := e.tracerProvider.CreateDroppableSpan(
@@ -2878,9 +2882,10 @@ func (e *executor) handleGeneratorGateway(ctx context.Context, i *runInstance, g
 		Attempt:               0,
 		MaxAttempts:           i.item.MaxAttempts,
 		Payload:               queue.PayloadEdge{Edge: nextEdge},
+		ParallelMode:          gen.ParallelMode(),
 	}
 
-	if !hasPendingSteps {
+	if shouldEnqueueDiscovery(hasPendingSteps, gen.ParallelMode()) {
 		err = e.queue.Enqueue(ctx, nextItem, now, queue.EnqueueOpts{})
 		if err == redis_state.ErrQueueItemExists {
 			return nil
@@ -3037,9 +3042,10 @@ func (e *executor) handleGeneratorAIGateway(ctx context.Context, i *runInstance,
 		Attempt:               0,
 		MaxAttempts:           i.item.MaxAttempts,
 		Payload:               queue.PayloadEdge{Edge: nextEdge},
+		ParallelMode:          gen.ParallelMode(),
 	}
 
-	if !hasPendingSteps {
+	if shouldEnqueueDiscovery(hasPendingSteps, i.item.ParallelMode) {
 		err = e.queue.Enqueue(ctx, nextItem, now, queue.EnqueueOpts{})
 		if err == redis_state.ErrQueueItemExists {
 			return nil
@@ -3103,6 +3109,7 @@ func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, i *runInsta
 		Metadata: map[string]any{
 			consts.OtelPropagationKey: carrier,
 		},
+		ParallelMode: gen.ParallelMode(),
 	}
 
 	_, err = e.pm.Write(ctx, pauses.PauseIndex(pause), &pause)
@@ -3133,6 +3140,7 @@ func (e *executor) handleGeneratorWaitForSignal(ctx context.Context, i *runInsta
 			PauseID: pauseID,
 			Pause:   pause,
 		},
+		ParallelMode: gen.ParallelMode(),
 	}, expires, queue.EnqueueOpts{})
 	if err == redis_state.ErrQueueItemExists {
 		return nil
@@ -3220,6 +3228,7 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, i *runInst
 		Metadata: map[string]any{
 			consts.OtelPropagationKey: carrier,
 		},
+		ParallelMode: gen.ParallelMode(),
 	}
 	_, err = e.pm.Write(
 		ctx,
@@ -3250,6 +3259,7 @@ func (e *executor) handleGeneratorInvokeFunction(ctx context.Context, i *runInst
 			PauseID: pauseID,
 			Pause:   pause,
 		},
+		ParallelMode: gen.ParallelMode(),
 	}, expires, queue.EnqueueOpts{})
 	if err == redis_state.ErrQueueItemExists {
 		return nil
@@ -3385,6 +3395,7 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, i *runInstan
 		Metadata: map[string]any{
 			consts.OtelPropagationKey: carrier,
 		},
+		ParallelMode: gen.ParallelMode(),
 	}
 
 	// SDK-based event coordination is called both when an event is received
@@ -3407,7 +3418,8 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, i *runInstan
 			PauseID: pauseID,
 			Pause:   pause,
 		},
-		Metadata: make(map[string]any),
+		Metadata:     make(map[string]any),
+		ParallelMode: gen.ParallelMode(),
 	}
 
 	span, err := e.tracerProvider.CreateDroppableSpan(
@@ -3785,4 +3797,10 @@ func (e *executor) addRequestPublishOpts(ctx context.Context, i *runInstance, sr
 
 	sr.Publish.Token = token
 	sr.Publish.PublishURL = e.rtconfig.PublishURL
+}
+
+// shouldEnqueueDiscovery returns true if the ended step should have a discovery
+// step enqueued
+func shouldEnqueueDiscovery(hasPendingSteps bool, mode enums.ParallelMode) bool {
+	return !hasPendingSteps || mode == enums.ParallelModeRace
 }
