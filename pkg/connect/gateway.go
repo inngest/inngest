@@ -1283,16 +1283,21 @@ func (c *connectionHandler) handleSdkReply(ctx context.Context, msg *connectpb.C
 
 	if c.svc.shouldUseGRPC(ctx, c.conn.AccountID) {
 		grpcClient, err := c.svc.getOrCreateGRPCClient(ctx, c.conn.EnvID, data.RequestId)
-		if err != nil {
+
+		switch {
+		case err == nil:
+			result, err := grpcClient.Reply(ctx, &connectpb.ReplyRequest{Data: data})
+			if err != nil {
+				return fmt.Errorf("could not send response through grpc: %w", err)
+			}
+
+			l.Info("sent response through gRPC", "result", result)
+		case errors.Is(err, state.ErrExecutorNotFound):
+			l.Debug("executor not found in lease, reply was likely picked up by polling")
+		default:
 			return err
 		}
 
-		result, err := grpcClient.Reply(ctx, &connectpb.ReplyRequest{Data: data})
-		if err != nil {
-			return fmt.Errorf("could not send response through grpc: %w", err)
-		}
-
-		l.Info("sent response through gRPC", "result", result)
 	} else {
 		// Send a best-effort PubSub message to fast-track the response,
 		// this is unreliable and must be combined with a reliable store like the buffer above.

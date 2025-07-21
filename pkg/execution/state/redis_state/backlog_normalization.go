@@ -12,16 +12,21 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
+	"github.com/sourcegraph/conc/pool"
 	"golang.org/x/sync/errgroup"
 )
 
 const (
-	NormalizeAccountPeekMax   = int64(30)
+	// NormalizeAccountPeekMax sets the maximum number of accounts that can be peeked from the global normalization index.
+	NormalizeAccountPeekMax = int64(30)
+	// NormalizePartitionPeekMax sets the maximum number of backlogs that can be peeked from the shadow partition.
 	NormalizePartitionPeekMax = int64(100)
-	NormalizeBacklogPeekMax   = int64(300) // same as ShadowPartitionPeekMax
+	// NormalizeBacklogPeekMax sets the maximum number of items that can be peeked from a backlog during normalization.
+	NormalizeBacklogPeekMax = int64(100) // same as ShadowPartitionPeekMax
 
 	// BacklogRefillHardLimit sets the maximum number of items that can be refilled in a single backlogRefill operation.
 	BacklogRefillHardLimit = int64(1000)
@@ -53,7 +58,6 @@ func (q *queue) backlogNormalizationWorker(ctx context.Context, nc chan normaliz
 			_, err := durationWithTags(ctx, q.primaryQueueShard.Name, "normalize_backlog", q.clock.Now(), func(ctx context.Context) (any, error) {
 				err := q.normalizeBacklog(ctx, msg.b, msg.sp, msg.constraints)
 				return nil, err
-
 			}, map[string]any{
 				"async_processing": true,
 			})
@@ -265,6 +269,9 @@ func (q *queue) extendBacklogNormalizationLease(ctx context.Context, now time.Ti
 // NOTE: ideally this is one transaction in a lua script but enqueue_to_backlog is way too much work to
 // utilize
 func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp *QueueShadowPartition, latestConstraints PartitionConstraintConfig) error {
+	ctx, cancelNormalization := context.WithCancel(ctx)
+	defer cancelNormalization()
+
 	_, file, line, _ := runtime.Caller(1)
 	caller := fmt.Sprintf("%s:%d", file, line)
 
@@ -292,6 +299,8 @@ func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp 
 					switch err {
 					// can't extend since it's already expired
 					case errBacklogNormalizationLeaseExpired:
+						l.Debug("normalization lease expired")
+						cancelNormalization()
 						return
 					}
 					l.Error("error extending backlog normalization lease", "error", err, "backlog", backlog)
@@ -304,84 +313,42 @@ func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp 
 	l.Debug("starting backlog normalization")
 
 	shard := q.primaryQueueShard
-	var processed int64
+	var total int64
 	for {
-		res, err := q.BacklogNormalizePeek(ctx, backlog, NormalizePartitionPeekMax)
+		// If context is canceled, stop normalizing
+		if ctx.Err() == context.Canceled {
+			return nil
+		}
+
+		res, err := q.BacklogNormalizePeek(ctx, backlog, NormalizeBacklogPeekMax)
 		if err != nil {
+			if errors.Is(err, context.Canceled) {
+				return nil
+			}
 			return fmt.Errorf("could not peek backlog items for normalization: %w", err)
 		}
 
 		if res.TotalCount == 0 {
-			l.Debug("no more items in backlog", "processed", processed, "removed", res.RemovedCount)
+			l.Debug("no more items in backlog", res.RemovedCount)
 			break
 		}
 
 		l.Debug("peeked items to normalize", "count", len(res.Items), "total", res.TotalCount, "removed", res.RemovedCount)
 
+		wg := pool.New().WithMaxGoroutines(int(q.backlogNormalizeConcurrency))
 		for _, item := range res.Items {
-			// We must modify the queue item to ensure q.ItemBacklog and q.ItemShadowPartition
-			// return the new values properly. Otherwise, we'd enqueue to the same backlog, not
-			// the desired new backlog.
-			existingThrottle := item.Data.Throttle
-			existingKeys := item.Data.GetConcurrencyKeys()
-
-			log := l.With(
-				"item", item,
-				"existing_concurrency", existingKeys,
-				"existing_throttle", existingThrottle,
-			)
-
-			cleanupItem := func() {
-				// If event for item cannot be found, remove it from the backlog
-				err := q.Dequeue(ctx, shard, *item)
+			item := item // capture range variable
+			wg.Go(func() {
+				_, err := q.normalizeItem(logger.WithStdlib(ctx, l), shard, sp, latestConstraints, backlog, *item)
 				if err != nil {
-					log.Warn("could not dequeue queue item with missing event", "err", err)
+					l.Error("could not normalize item", "err", err)
 				}
-			}
-
-			refreshedCustomConcurrencyKeys, err := q.normalizeRefreshItemCustomConcurrencyKeys(ctx, item, existingKeys, sp)
-			if err != nil {
-				// If event for item cannot be found, remove it from the backlog
-				if errors.Is(err, state.ErrEventNotFound) {
-					cleanupItem()
-					continue
-				}
-				return fmt.Errorf("could not refresh custom concurrency keys for item: %w", err)
-			}
-			item.Data.CustomConcurrencyKeys = refreshedCustomConcurrencyKeys
-			item.Data.Identifier.CustomConcurrencyKeys = nil
-			log = log.With("refreshed_concurrency", refreshedCustomConcurrencyKeys)
-
-			refreshedThrottle, err := q.refreshItemThrottle(ctx, item)
-			if err != nil {
-				// If event for item cannot be found, remove it from the backlog
-				if errors.Is(err, state.ErrEventNotFound) {
-					cleanupItem()
-					continue
-				}
-				return fmt.Errorf("could not refresh throttle for item: %w", err)
-			}
-			item.Data.Throttle = refreshedThrottle
-			log = log.With("refreshed_throttle", refreshedThrottle)
-
-			targetBacklog := q.ItemBacklog(ctx, *item)
-			log = log.With("target", targetBacklog)
-
-			if reason := targetBacklog.isOutdated(latestConstraints); reason != enums.QueueNormalizeReasonUnchanged {
-				log.Warn("target backlog in normalization is outdated, this likely causes infinite normalization")
-			}
-
-			log.Debug("retrieved refreshed backlog")
-
-			if _, err := q.EnqueueItem(ctx, shard, *item, time.UnixMilli(item.AtMS), osqueue.EnqueueOpts{
-				PassthroughJobId:       true,
-				NormalizeFromBacklogID: backlog.BacklogID,
-			}); err != nil {
-				return fmt.Errorf("could not re-enqueue backlog item: %w", err)
-			}
-
-			processed += 1
+			})
 		}
+
+		wg.Wait()
+
+		processed := int64(len(res.Items))
 
 		l.Info("processed normalization for backlog",
 			"processed", processed,
@@ -395,6 +362,8 @@ func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp 
 				// "partition_id": backlog.ShadowPartitionID,
 			},
 		})
+
+		total += processed
 	}
 
 	metrics.IncrBacklogNormalizedCounter(ctx, metrics.CounterOpt{
@@ -405,9 +374,83 @@ func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp 
 		},
 	})
 
-	l.Debug("normalized backlog", "processed", processed)
+	l.Debug("normalized backlog", "processed_total", total)
 
 	return nil
+}
+
+func (q *queue) normalizeItem(
+	ctx context.Context,
+	shard QueueShard,
+	sp *QueueShadowPartition,
+	latestConstraints PartitionConstraintConfig,
+	sourceBacklog *QueueBacklog,
+	item osqueue.QueueItem,
+) (osqueue.QueueItem, error) {
+	// We must modify the queue item to ensure q.ItemBacklog and q.ItemShadowPartition
+	// return the new values properly. Otherwise, we'd enqueue to the same backlog, not
+	// the desired new backlog.
+	existingThrottle := item.Data.Throttle
+	existingKeys := item.Data.GetConcurrencyKeys()
+
+	log := logger.StdlibLogger(ctx).With(
+		"item", item,
+		"existing_concurrency", existingKeys,
+		"existing_throttle", existingThrottle,
+	)
+
+	cleanupItem := func() {
+		// If event for item cannot be found, remove it from the backlog
+		err := q.Dequeue(ctx, shard, item)
+		if err != nil {
+			log.Warn("could not dequeue queue item with missing event", "err", err)
+		}
+	}
+
+	refreshedCustomConcurrencyKeys, err := q.normalizeRefreshItemCustomConcurrencyKeys(ctx, &item, existingKeys, sp)
+	if err != nil {
+		// If event for item cannot be found, remove it from the backlog
+		if errors.Is(err, state.ErrEventNotFound) {
+			cleanupItem()
+			return osqueue.QueueItem{}, nil
+		}
+		return osqueue.QueueItem{}, fmt.Errorf("could not refresh custom concurrency keys for item: %w", err)
+	}
+
+	item.Data.CustomConcurrencyKeys = refreshedCustomConcurrencyKeys
+	item.Data.Identifier.CustomConcurrencyKeys = nil
+	log = log.With("refreshed_concurrency", refreshedCustomConcurrencyKeys)
+
+	refreshedThrottle, err := q.refreshItemThrottle(ctx, &item)
+	if err != nil {
+		// If event for item cannot be found, remove it from the backlog
+		if errors.Is(err, state.ErrEventNotFound) {
+			cleanupItem()
+			return osqueue.QueueItem{}, nil
+		}
+		return osqueue.QueueItem{}, fmt.Errorf("could not refresh throttle for item: %w", err)
+	}
+
+	item.Data.Throttle = refreshedThrottle
+	log = log.With("refreshed_throttle", refreshedThrottle)
+
+	targetBacklog := q.ItemBacklog(ctx, item)
+	log = log.With("target", targetBacklog)
+
+	if reason := targetBacklog.isOutdated(latestConstraints); reason != enums.QueueNormalizeReasonUnchanged {
+		log.Warn("target backlog in normalization is outdated, this likely causes infinite normalization")
+	}
+
+	log.Debug("retrieved refreshed backlog")
+
+	if _, err := q.EnqueueItem(ctx, shard, item, time.UnixMilli(item.AtMS), osqueue.EnqueueOpts{
+		PassthroughJobId:       true,
+		NormalizeFromBacklogID: sourceBacklog.BacklogID,
+	}); err != nil {
+		return osqueue.QueueItem{}, fmt.Errorf("could not re-enqueue backlog item: %w", err)
+	}
+
+	return item, nil
 }
 
 func (q *queue) ShadowPartitionPeekNormalizeBacklogs(ctx context.Context, sp *QueueShadowPartition, limit int64) ([]*QueueBacklog, error) {
@@ -454,7 +497,7 @@ func (q *queue) BacklogNormalizePeek(ctx context.Context, b *QueueBacklog, limit
 		q:               q,
 		opName:          "BacklogNormalizePeek",
 		keyMetadataHash: q.primaryQueueShard.RedisClient.kg.QueueItem(),
-		max:             NormalizePartitionPeekMax,
+		max:             NormalizeBacklogPeekMax,
 		maker: func() *osqueue.QueueItem {
 			return &osqueue.QueueItem{}
 		},
