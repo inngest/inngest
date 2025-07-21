@@ -27,7 +27,7 @@ export function BranchEnvironmentActions({ branchParent }: BranchEnvironmentActi
           className="rounded-r-none border-r-0 text-sm"
           kind="primary"
           label="Sync new app"
-          href={`/env/${branchParent.slug || 'branch'}/apps`}
+          href={`/env/${slugOrBranchDefault(branchParent)}/apps`}
           size="medium"
         />
       }
@@ -45,13 +45,15 @@ export function BranchEnvironmentActions({ branchParent }: BranchEnvironmentActi
           <DropdownMenuContent>
             <DropdownMenuItem
               className="text-basis text-sm"
-              onSelect={() => router.push(`/env/${branchParent.slug}/manage/keys`)}
+              onSelect={() => router.push(`/env/${slugOrBranchDefault(branchParent)}/manage/keys`)}
             >
               Manage event keys
             </DropdownMenuItem>
             <DropdownMenuItem
               className="text-basis text-sm"
-              onSelect={() => router.push(`/env/${branchParent.slug}/manage/signing-key`)}
+              onSelect={() =>
+                router.push(`/env/${slugOrBranchDefault(branchParent)}/manage/signing-key`)
+              }
             >
               Manage signing key
             </DropdownMenuItem>
@@ -60,4 +62,8 @@ export function BranchEnvironmentActions({ branchParent }: BranchEnvironmentActi
       }
     />
   );
+}
+
+function slugOrBranchDefault(env: Environment) {
+  return env.slug || 'branch';
 }
