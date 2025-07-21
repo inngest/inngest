@@ -163,7 +163,7 @@ function TableRow(props: { env: Environment }) {
     [disableAutoArchive, enableAutoArchive, env]
   );
 
-  const { id, isArchived, isAutoArchiveEnabled, name, slug, lastDeployedAt } = env;
+  const { id, isArchived, isAutoArchiveEnabled, name, lastDeployedAt } = env;
 
   let statusColorClass: string;
   let statusText: string;
