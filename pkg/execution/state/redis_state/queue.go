@@ -182,6 +182,9 @@ type QueueManager interface {
 	// PartitionBacklogSize returns the point in time backlog size of the partition.
 	// This will sum the size of all backlogs in that partition
 	PartitionBacklogSize(ctx context.Context, partitionID string) (int64, error)
+
+	// Total queue depth of all partitions including backlog and ready state items
+	TotalSystemQueueDepth(ctx context.Context) (int64, error)
 }
 
 // PartitionPriorityFinder returns the priority for a given queue partition.
@@ -2829,6 +2832,21 @@ func (q *queue) partitionSize(ctx context.Context, partitionKey string, until ti
 	return q.primaryQueueShard.RedisClient.Client().Do(ctx, cmd).AsInt64()
 }
 
+// TotalSystemQueueDepth calculates and returns the aggregate queue depth across all                           │ │
+// partitions in the system. This method provides a comprehensive view of system-wide                          │ │
+// queue backlog by collecting size information from every partition queue.
+// The method uses the instrumentation iterator to efficiently gather partition data.
+func (q *queue) TotalSystemQueueDepth(ctx context.Context) (int64, error) {
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "TotalSystemQueueDepth"), redis_telemetry.ScopeQueue)
+
+	_, queueItemCount, err := q.QueueIterator(ctx, QueueIteratorOpts{})
+	if err != nil {
+		return 0, fmt.Errorf("failed to instrument queue: %w", err)
+	}
+
+	return queueItemCount, nil
+}
+
 // cleanupNilPartitionInAccount is invoked when we peek a missing partition in the account partitions pointer zset.
 // This happens when old executors process default function partitions that were enqueued on a new new-runs instance,
 // which, in addition to the global partition pointer, enqueued the partition in the account partitions queue of queues.
@@ -3422,11 +3440,18 @@ func (q *queue) InProgress(ctx context.Context, prefix string, concurrencyKey st
 	return q.primaryQueueShard.RedisClient.unshardedRc.Do(ctx, cmd).AsInt64()
 }
 
-func (q *queue) Instrument(ctx context.Context) error {
+type QueueIteratorOpts struct {
+	// OnPartitionProcessed is called for each partition during instrumentation
+	OnPartitionProcessed func(ctx context.Context, partitionKey string, queueKey string, itemCount int64, queueShard QueueShard)
+	// OnIterationComplete is called after all partitions are processed with the final totals
+	OnIterationComplete func(ctx context.Context, totalPartitions int64, totalQueueItems int64, queueShard QueueShard)
+}
+
+func (q *queue) QueueIterator(ctx context.Context, opts QueueIteratorOpts) (partitionCount int64, queueItemCount int64, err error) {
 	l := logger.StdlibLogger(ctx)
 
 	// Check on global partition and queue partition sizes
-	var offset, total int64
+	var offset, totalPartitions, totalQueueItems int64
 	chunkSize := int64(1000)
 
 	r := q.primaryQueueShard.RedisClient.unshardedRc
@@ -3444,7 +3469,7 @@ func (q *queue) Instrument(ctx context.Context) error {
 
 		pkeys, err := r.Do(ctx, cmd).AsStrSlice()
 		if err != nil {
-			return fmt.Errorf("error retrieving partitions for instrumentation: %w", err)
+			return 0, 0, fmt.Errorf("error retrieving partitions for instrumentation: %w", err)
 		}
 
 		for _, pk := range pkeys {
@@ -3463,28 +3488,19 @@ func (q *queue) Instrument(ctx context.Context) error {
 				}
 
 				cntCmd := r.B().Zcount().Key(queueKey).Min("-inf").Max("+inf").Build()
-				count, err := q.primaryQueueShard.RedisClient.unshardedRc.Do(ctx, cntCmd).AsInt64()
+				itemCount, err := q.primaryQueueShard.RedisClient.unshardedRc.Do(ctx, cntCmd).AsInt64()
 				if err != nil {
 					log.Warn("error checking partition count", "pkey", pkey, "context", "instrumentation")
 					return
 				}
 
-				// NOTE: tmp workaround for cardinality issues
-				// ideally we want to instrument everything, but until there's a better way to do this, we primarily care only
-				// about large size partitions
-				if count > 10_000 {
-					metrics.GaugePartitionSize(ctx, count, metrics.GaugeOpt{
-						PkgName: pkgName,
-						Tags: map[string]any{
-							// NOTE: potentially high cardinality but this gives better clarify of stuff
-							// this is potentially useless for key queues
-							"partition":   pkey,
-							"queue_shard": q.primaryQueueShard.Name,
-						},
-					})
+				// Call the callback if provided
+				if opts.OnPartitionProcessed != nil {
+					opts.OnPartitionProcessed(ctx, pkey, queueKey, itemCount, q.primaryQueueShard)
 				}
 
-				atomic.AddInt64(&total, 1)
+				atomic.AddInt64(&totalQueueItems, itemCount)
+				atomic.AddInt64(&totalPartitions, 1)
 				if err := q.tenantInstrumentor(ctx, pk); err != nil {
 					log.Error("error running tenant instrumentor", "error", err)
 				}
@@ -3499,15 +3515,49 @@ func (q *queue) Instrument(ctx context.Context) error {
 		offset += chunkSize
 	}
 
-	// instrument the total count of global partition
-	metrics.GaugeGlobalPartitionSize(ctx, atomic.LoadInt64(&total), metrics.GaugeOpt{
-		PkgName: pkgName,
-		Tags: map[string]any{
-			"queue_shard": q.primaryQueueShard.Name,
+	wg.Wait()
+
+	// Call the completion callback if provided
+	if opts.OnIterationComplete != nil {
+		opts.OnIterationComplete(ctx, atomic.LoadInt64(&totalPartitions), atomic.LoadInt64(&totalQueueItems), q.primaryQueueShard)
+	}
+
+	return atomic.LoadInt64(&totalPartitions), atomic.LoadInt64(&totalQueueItems), nil
+}
+
+func (q *queue) Instrument(ctx context.Context) error {
+	_, _, err := q.QueueIterator(ctx, QueueIteratorOpts{
+		OnPartitionProcessed: func(ctx context.Context, partitionKey, queueKey string, itemCount int64, queueShard QueueShard) {
+			// Handle individual partition instrumentation
+			// NOTE: tmp workaround for cardinality issues
+			// ideally we want to instrument everything, but until there's a better way to do this, we primarily care only
+			// about large size partitions
+			if itemCount > 10_000 {
+				metrics.GaugePartitionSize(ctx, itemCount, metrics.GaugeOpt{
+					PkgName: pkgName,
+					Tags: map[string]any{
+						// NOTE: potentially high cardinality but this gives better clarify of stuff
+						// this is potentially useless for key queues
+						"partition":   partitionKey,
+						"queue_shard": queueShard.Name,
+					},
+				})
+			}
+		},
+		OnIterationComplete: func(ctx context.Context, totalPartitions, totalQueueItems int64, queueShard QueueShard) {
+			// Handle the final metrics reporting
+			metrics.GaugeGlobalPartitionSize(ctx, totalPartitions, metrics.GaugeOpt{
+				PkgName: pkgName,
+				Tags: map[string]any{
+					"queue_shard": queueShard.Name,
+				},
+			})
 		},
 	})
 
-	wg.Wait()
+	if err != nil {
+		return fmt.Errorf("failed to iterate queue partitions during instrumentation: %w", err)
+	}
 
 	return nil
 }
