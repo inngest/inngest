@@ -18,6 +18,7 @@ import Toaster from '@/components/Toaster';
 import LoadingIcon from '@/icons/LoadingIcon';
 import { useEnvironments } from '@/queries';
 import { EnvironmentType, type Environment } from '@/utils/environments';
+import { BranchEnvironmentActions } from './BranchEnvironmentActions';
 import BranchEnvironmentListTable from './BranchEnvironmentListTable';
 import { CustomEnvironmentListTable } from './CustomEnvironmentListTable';
 import { EnvironmentsStatusSelector } from './EnvironmentsStatusSelector';
@@ -140,31 +141,7 @@ export default function Environments() {
               <div className="mb-2 flex w-full items-center justify-between">
                 <h2 className="text-md font-medium">Branch environments</h2>
                 <div className="flex items-center gap-2">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        kind="secondary"
-                        appearance="outlined"
-                        size="medium"
-                        icon={<RiMore2Line />}
-                      />
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent>
-                      <DropdownMenuItem
-                        onSelect={() => router.push(`/env/${branchParent?.slug}/manage`)}
-                      >
-                        <RiSettingsLine className="h-4 w-4" />
-                        Manage
-                      </DropdownMenuItem>
-                      <DropdownMenuItem
-                        className="text-success"
-                        onSelect={() => router.push(`/env/${branchParent?.slug || 'branch'}/apps`)}
-                      >
-                        <RiAddLine className="h-4 w-4" />
-                        Sync new app
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                  <BranchEnvironmentActions branchParent={branchParent as Environment} />
                 </div>
               </div>
               <div className="border-subtle overflow-hidden rounded-md border">
