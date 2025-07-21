@@ -51,7 +51,7 @@ export function EventsTable({
   standalone = false,
   pollInterval,
   autoRefresh,
-  isDev = false,
+  isDev,
 }: {
   emptyActions: React.ReactNode;
   expandedRowActions: ({

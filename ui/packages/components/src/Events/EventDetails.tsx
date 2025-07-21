@@ -41,7 +41,7 @@ export function EventDetails({
   standalone,
   pollInterval,
   autoRefresh,
-  isDev,
+  isDev = false,
 }: {
   initialData?: Pick<Event, 'name' | 'runs'>;
   eventID: string;
@@ -52,7 +52,7 @@ export function EventDetails({
   standalone: boolean;
   pollInterval?: number;
   autoRefresh?: boolean;
-  isDev: boolean;
+  isDev?: boolean;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const leftColumnRef = useRef<HTMLDivElement>(null);
