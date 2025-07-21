@@ -21,10 +21,8 @@ import (
 	"gonum.org/v1/gonum/stat/sampleuv"
 )
 
-var (
-	// NOTE: there's no logic behind this number, it's just a random pick for now
-	ThrottleBackoffMultiplierThreshold = 15 * time.Second
-)
+// NOTE: there's no logic behind this number, it's just a random pick for now
+var ThrottleBackoffMultiplierThreshold = 15 * time.Second
 
 var (
 	ErrBacklogNotFound = fmt.Errorf("backlog not found")

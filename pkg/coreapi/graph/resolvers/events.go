@@ -6,7 +6,9 @@ import (
 	"sort"
 	"time"
 
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/coreapi/graph/models"
+	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -43,34 +45,36 @@ func (qr *queryResolver) Event(ctx context.Context, query models.EventQuery) (*m
 	}, nil
 }
 
-// TODO Use a dataloader to retrieve events and fetch individual fields in
-// individual resolvers; we shouldn't be mapping any of the fields in this
-// query.
+// deprecated
 func (qr *queryResolver) Events(ctx context.Context, query models.EventsQuery) ([]*models.Event, error) {
-	evts, err := qr.Runner.Events(ctx, "")
+	opts := &cqrs.WorkspaceEventsOpts{
+		Limit: cqrs.MaxEvents,
+	}
+
+	loaded, err := qr.Data.GetEvents(ctx, consts.DevServerAccountID, consts.DevServerEnvID, opts)
 	if err != nil {
 		return nil, err
 	}
 
 	var events []*models.Event
 
-	for _, evt := range evts {
-		name := evt.Name
+	for _, evt := range loaded {
+		name := evt.EventName
 
-		createdAt := time.UnixMilli(evt.Timestamp)
-		if evt.Timestamp == 0 {
-			if id, err := ulid.Parse(evt.ID); err == nil {
+		createdAt := time.UnixMilli(evt.EventTS)
+		if evt.EventTS == 0 {
+			if id, err := ulid.Parse(evt.EventID); err == nil {
 				createdAt = ulid.Time(id.Time())
 			}
 		}
 
-		payloadByt, err := json.Marshal(evt.Data)
+		payloadByt, err := json.Marshal(evt.EventData)
 		if err != nil {
 			continue
 		}
 		payload := string(payloadByt)
 
-		internalID, err := ulid.Parse(evt.ID)
+		internalID, err := ulid.Parse(evt.EventID)
 		if err != nil {
 			continue
 		}

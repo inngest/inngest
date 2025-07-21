@@ -308,6 +308,10 @@ type Item struct {
 	// this run has.  All next steps will use this as the factor when scheduling
 	// future edge jobs (on their first attempt).
 	PriorityFactor *int64 `json:"pf,omitempty"`
+
+	// ParallelMode controls discovery step scheduling after a parallel step
+	// ends
+	ParallelMode enums.ParallelMode `json:"pm,omitempty"`
 }
 
 func (i Item) GetMaxAttempts() int {
@@ -422,6 +426,7 @@ func (i *Item) UnmarshalJSON(b []byte) error {
 		Singleton             *Singleton                `json:"singleton"`
 		CustomConcurrencyKeys []state.CustomConcurrency `json:"cck,omitempty"`
 		PriorityFactor        *int64                    `json:"pf,omitempty"`
+		ParallelMode          enums.ParallelMode        `json:"pm,omitempty"`
 	}
 	temp := &kind{}
 	err := json.Unmarshal(b, temp)
@@ -442,6 +447,7 @@ func (i *Item) UnmarshalJSON(b []byte) error {
 	i.CustomConcurrencyKeys = temp.CustomConcurrencyKeys
 	i.PriorityFactor = temp.PriorityFactor
 	i.QueueName = temp.QueueName
+	i.ParallelMode = temp.ParallelMode
 
 	// Save this for custom unmarshalling of other jobs.  This is overwritten
 	// for known queue kinds.

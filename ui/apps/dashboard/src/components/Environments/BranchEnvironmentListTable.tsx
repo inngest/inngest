@@ -102,7 +102,7 @@ export default function BranchEnvironmentListTable({
                 </td>
               </tr>
             ) : (
-              visibleBranchEnvs.map((env, i) => <TableRow env={env} key={i} />)
+              visibleBranchEnvs.map((env) => <TableRow env={env} key={env.id} />)
             )}
           </tbody>
         </table>

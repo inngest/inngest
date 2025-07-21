@@ -34,9 +34,6 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-var (
-	nilULID = ulid.ULID{}
-)
 
 type Opt func(s *svc)
 
@@ -604,7 +601,7 @@ func (s *svc) handleCancel(ctx context.Context, item queue.Item) error {
 			}
 
 			// Check if it's a run
-			if qi.Data.Identifier.RunID != nilULID {
+			if !qi.Data.Identifier.RunID.IsZero() {
 				if c.If != nil {
 					st, err := s.state.Load(ctx, c.AccountID, qi.Data.Identifier.RunID)
 					if err != nil {

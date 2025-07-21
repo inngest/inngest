@@ -239,6 +239,10 @@ type Pause struct {
 	TriggeringEventID *string `json:"tID,omitempty"`
 	// Metadata is additional metadata that should be stored with the pause
 	Metadata map[string]any
+
+	// ParallelMode controls discovery step scheduling after a parallel step
+	// ends
+	ParallelMode enums.ParallelMode `json:"pm,omitempty"`
 }
 
 func (p Pause) GetOpcode() enums.Opcode {
@@ -323,7 +327,7 @@ func (p Pause) GetResumeData(evt event.Event) ResumeData {
 	isInvokeFunctionOpcode := p.Opcode != nil && *p.Opcode == enums.OpcodeInvokeFunction.String()
 	if isInvokeFunctionOpcode && evt.IsFinishedEvent() {
 		if retRunID, ok := evt.Data["run_id"].(string); ok {
-			if ulidRunID, _ := ulid.Parse(retRunID); ulidRunID != (ulid.ULID{}) {
+			if ulidRunID, _ := ulid.Parse(retRunID); !ulidRunID.IsZero() {
 				ret.RunID = &ulidRunID
 			}
 		}

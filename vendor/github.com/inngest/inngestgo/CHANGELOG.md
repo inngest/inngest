@@ -1,5 +1,17 @@
 # inngestgo
 
+## 0.13.0
+
+### Minor Changes
+
+- f54d7a8: Add step.WaitForSignal
+- 4869295: Rename function options from Fn${Option} to Config${Option}
+- f54d7a8: Add step.WaitForSignal
+
+### Patch Changes
+
+- 36a3186: Add support for cancel mode in function singletons
+
 ## 0.12.0
 
 ### Minor Changes

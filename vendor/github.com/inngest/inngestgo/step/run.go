@@ -82,17 +82,21 @@ func Run[T any](
 	}
 
 	if targetID != nil && *targetID != hashedID {
+		// Don't report this step since targeting is happening and it isn't
+		// targeted
 		panic(ControlHijack{})
 	}
 
 	planParallel := targetID == nil && isParallel(ctx)
 	planBeforeRun := targetID == nil && mgr.Request().CallCtx.DisableImmediateExecution
 	if planParallel || planBeforeRun {
-		mgr.AppendOp(sdkrequest.GeneratorOpcode{
+		plannedOp := sdkrequest.GeneratorOpcode{
 			ID:   hashedID,
 			Op:   enums.OpcodeStepPlanned,
 			Name: id,
-		})
+		}
+		plannedOp.SetParallelMode(parallelMode(ctx))
+		mgr.AppendOp(plannedOp)
 		panic(ControlHijack{})
 	}
 

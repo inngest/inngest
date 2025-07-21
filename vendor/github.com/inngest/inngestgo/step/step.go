@@ -3,6 +3,7 @@ package step
 import (
 	"context"
 
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngestgo/internal/sdkrequest"
 )
 
@@ -13,6 +14,7 @@ type ctxKey string
 const (
 	targetStepIDKey = ctxKey("stepID")
 	ParallelKey     = ctxKey("parallelKey")
+	ParallelModeKey = ctxKey("parallelModeKey")
 	isWithinStepKey = ctxKey("in-step")
 )
 
@@ -79,4 +81,13 @@ func IsWithinStep(ctx context.Context) bool {
 
 func setWithinStep(ctx context.Context) context.Context {
 	return context.WithValue(ctx, isWithinStepKey, &struct{}{})
+}
+
+func parallelMode(ctx context.Context) enums.ParallelMode {
+	if v := ctx.Value(ParallelModeKey); v != nil {
+		if c, ok := v.(enums.ParallelMode); ok {
+			return c
+		}
+	}
+	return enums.ParallelModeNone
 }

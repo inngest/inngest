@@ -3,6 +3,7 @@ package group
 import (
 	"context"
 
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngestgo/step"
 )
 
@@ -29,7 +30,22 @@ func Parallel(
 	ctx context.Context,
 	fns ...func(ctx context.Context) (any, error),
 ) Results {
+	return ParallelWithOpts(ctx, ParallelOpts{}, fns...)
+}
+
+type ParallelOpts struct {
+	// ParallelMode controls "discovery request" scheduling after a parallel
+	// step ends. Defaults to ParallelModeWait.
+	ParallelMode enums.ParallelMode
+}
+
+func ParallelWithOpts(
+	ctx context.Context,
+	opts ParallelOpts,
+	fns ...func(ctx context.Context) (any, error),
+) Results {
 	ctx = context.WithValue(ctx, step.ParallelKey, true)
+	ctx = context.WithValue(ctx, step.ParallelModeKey, opts.ParallelMode)
 
 	results := Results{}
 	isPlanned := false
