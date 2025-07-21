@@ -196,11 +196,11 @@ export default function EntitlementListItemSelfService({
                           </span>
                           <div className="flex items-center gap-2">
                             <span className="text-muted text-sm line-through">
-                              {`${currentEntitlementValues.metricsExportGranularity} seconds`}
+                              {`${currentEntitlementValues.metricsExportGranularity / 60} minutes`}
                             </span>
                             <span className="text-muted">→</span>
                             <span className="text-basis text-sm font-medium">
-                              {`${addon.entitlements.metricsExportGranularity.limit} seconds`}
+                              {`${addon.entitlements.metricsExportGranularity.limit / 60} minutes`}
                             </span>
                           </div>
                         </div>
@@ -211,11 +211,11 @@ export default function EntitlementListItemSelfService({
                           <span className="text-basis text-sm font-medium">Metrics freshness</span>
                           <div className="flex items-center gap-2">
                             <span className="text-muted text-sm line-through">
-                              {`${currentEntitlementValues.metricsExportFreshness} seconds`}
+                              {`${currentEntitlementValues.metricsExportFreshness / 60} minutes`}
                             </span>
                             <span className="text-muted">→</span>
                             <span className="text-basis text-sm font-medium">
-                              {`${addon.entitlements.metricsExportFreshness.limit} seconds`}
+                              {`${addon.entitlements.metricsExportFreshness.limit / 60} minutes`}
                             </span>
                           </div>
                         </div>
