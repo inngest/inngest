@@ -28,7 +28,7 @@ func newExecutionProcessor(md *statev2.Metadata, qi *queue.Item, next sdktrace.S
 
 func (p *executionProcessor) OnStart(parent context.Context, s sdktrace.ReadWriteSpan) {
 	rawAttrs := meta.NewAttrSet()
-	now := time.Now() // TODO This should be something on qi etc
+	now := s.StartTime()
 
 	if p.md != nil {
 		meta.AddAttr(rawAttrs, meta.Attrs.RunID, &p.md.ID.RunID)
@@ -124,17 +124,28 @@ func (p *executionProcessor) OnStart(parent context.Context, s sdktrace.ReadWrit
 
 	case meta.SpanNameDynamicExtension:
 		{
-			for _, attr := range s.Attributes() {
-				if string(attr.Key) == meta.Attrs.DynamicStatus.Key() {
-					if attr.Value.Type() == attribute.INT64 && enums.RunStatusEnded(enums.RunStatus(attr.Value.AsInt64())) {
-						meta.AddAttr(rawAttrs, meta.Attrs.EndedAt, &now)
-					}
+			var (
+				ds *attribute.KeyValue
+				ea *attribute.KeyValue
+			)
 
-					break
+			for _, attr := range s.Attributes() {
+				a := attr
+
+				switch string(attr.Key) {
+				case meta.Attrs.DynamicStatus.Key():
+					ds = &a
+				case meta.Attrs.EndedAt.Key():
+					ea = &a
 				}
 			}
 
-			break
+			// Only overwrite the EndedAt time if we don't already have one
+			if ea == nil {
+				if ds.Value.Type() == attribute.INT64 && enums.RunStatusEnded(enums.RunStatus(ds.Value.AsInt64())) {
+					meta.AddAttr(rawAttrs, meta.Attrs.EndedAt, &now)
+				}
+			}
 		}
 	}
 
