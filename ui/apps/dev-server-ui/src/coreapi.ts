@@ -1,5 +1,33 @@
 import { gql } from 'graphql-request';
 
+export const EVENT = gql`
+  query GetEvent($id: ID!) {
+    event(query: { eventId: $id }) {
+      id
+      name
+      createdAt
+      status
+      pendingRuns
+      raw
+      functionRuns {
+        function {
+          name
+        }
+        id
+        status
+        startedAt
+        pendingSteps
+        output
+        waitingFor {
+          expiryTime
+          eventName
+          expression
+        }
+      }
+    }
+  }
+`;
+
 export const FUNCTIONS = gql`
   query GetFunctions {
     functions {

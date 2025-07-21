@@ -920,6 +920,13 @@ export type Workspace = {
   id: Scalars['ID'];
 };
 
+export type GetEventQueryVariables = Exact<{
+  id: Scalars['ID'];
+}>;
+
+
+export type GetEventQuery = { __typename?: 'Query', event: { __typename?: 'Event', id: any, name: string | null, createdAt: any | null, status: EventStatus | null, pendingRuns: number | null, raw: string | null, functionRuns: Array<{ __typename?: 'FunctionRun', id: string, status: FunctionRunStatus | null, startedAt: any | null, pendingSteps: number | null, output: string | null, function: { __typename?: 'Function', name: string } | null, waitingFor: { __typename?: 'StepEventWait', expiryTime: any, eventName: string | null, expression: string | null } | null }> | null } | null };
+
 export type GetFunctionsQueryVariables = Exact<{ [key: string]: never; }>;
 
 
@@ -1146,6 +1153,33 @@ export const TraceDetailsFragmentDoc = `
       signal
       timeout
       timedOut
+    }
+  }
+}
+    `;
+export const GetEventDocument = `
+    query GetEvent($id: ID!) {
+  event(query: {eventId: $id}) {
+    id
+    name
+    createdAt
+    status
+    pendingRuns
+    raw
+    functionRuns {
+      function {
+        name
+      }
+      id
+      status
+      startedAt
+      pendingSteps
+      output
+      waitingFor {
+        expiryTime
+        eventName
+        expression
+      }
     }
   }
 }
@@ -1566,6 +1600,9 @@ export const GetEventV2RunsDocument = `
 
 const injectedRtkApi = api.injectEndpoints({
   endpoints: (build) => ({
+    GetEvent: build.query<GetEventQuery, GetEventQueryVariables>({
+      query: (variables) => ({ document: GetEventDocument, variables })
+    }),
     GetFunctions: build.query<GetFunctionsQuery, GetFunctionsQueryVariables | void>({
       query: (variables) => ({ document: GetFunctionsDocument, variables })
     }),
@@ -1636,5 +1673,5 @@ const injectedRtkApi = api.injectEndpoints({
 });
 
 export { injectedRtkApi as api };
-export const { useGetFunctionsQuery, useLazyGetFunctionsQuery, useGetFunctionQuery, useLazyGetFunctionQuery, useGetAppsQuery, useLazyGetAppsQuery, useGetAppQuery, useLazyGetAppQuery, useCreateAppMutation, useUpdateAppMutation, useDeleteAppMutation, useInvokeFunctionMutation, useCancelRunMutation, useRerunMutation, useRerunFromStepMutation, useGetRunsQuery, useLazyGetRunsQuery, useCountRunsQuery, useLazyCountRunsQuery, useGetRunQuery, useLazyGetRunQuery, useGetTraceResultQuery, useLazyGetTraceResultQuery, useGetTriggerQuery, useLazyGetTriggerQuery, useGetWorkerConnectionsQuery, useLazyGetWorkerConnectionsQuery, useCountWorkerConnectionsQuery, useLazyCountWorkerConnectionsQuery, useGetEventsV2Query, useLazyGetEventsV2Query, useGetEventV2Query, useLazyGetEventV2Query, useGetEventV2PayloadQuery, useLazyGetEventV2PayloadQuery, useGetEventV2RunsQuery, useLazyGetEventV2RunsQuery } = injectedRtkApi;
+export const { useGetEventQuery, useLazyGetEventQuery, useGetFunctionsQuery, useLazyGetFunctionsQuery, useGetFunctionQuery, useLazyGetFunctionQuery, useGetAppsQuery, useLazyGetAppsQuery, useGetAppQuery, useLazyGetAppQuery, useCreateAppMutation, useUpdateAppMutation, useDeleteAppMutation, useInvokeFunctionMutation, useCancelRunMutation, useRerunMutation, useRerunFromStepMutation, useGetRunsQuery, useLazyGetRunsQuery, useCountRunsQuery, useLazyCountRunsQuery, useGetRunQuery, useLazyGetRunQuery, useGetTraceResultQuery, useLazyGetTraceResultQuery, useGetTriggerQuery, useLazyGetTriggerQuery, useGetWorkerConnectionsQuery, useLazyGetWorkerConnectionsQuery, useCountWorkerConnectionsQuery, useLazyCountWorkerConnectionsQuery, useGetEventsV2Query, useLazyGetEventsV2Query, useGetEventV2Query, useLazyGetEventV2Query, useGetEventV2PayloadQuery, useLazyGetEventV2PayloadQuery, useGetEventV2RunsQuery, useLazyGetEventV2RunsQuery } = injectedRtkApi;
 
