@@ -13,6 +13,7 @@ import { useSearchParam } from '../hooks/useSearchParam';
 import { DragDivider } from '../icons/DragDivider';
 import { StepOver } from '../icons/debug/StepOver';
 import { History } from './History';
+import { Play } from './Play';
 
 export const Debugger = ({ functionSlug }: { functionSlug: string }) => {
   const { pathCreator } = usePathCreator();
@@ -104,7 +105,7 @@ export const Debugger = ({ functionSlug }: { functionSlug: string }) => {
                     {running ? (
                       <RiPauseLine className="text-muted hover:bg-canvasSubtle h-6 w-6 cursor-pointer rounded-md p-1" />
                     ) : (
-                      <RiPlayLine className="text-muted hover:bg-canvasSubtle h-6 w-6 cursor-pointer rounded-md p-1" />
+                      <Play runID={runID} />
                     )}
                   </TooltipTrigger>
                   <TooltipContent className="whitespace-pre-line">

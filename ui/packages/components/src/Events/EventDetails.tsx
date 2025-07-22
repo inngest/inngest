@@ -41,6 +41,7 @@ export function EventDetails({
   standalone,
   pollInterval,
   autoRefresh,
+  isDev = false,
 }: {
   initialData?: Pick<Event, 'name' | 'runs'>;
   eventID: string;
@@ -51,6 +52,7 @@ export function EventDetails({
   standalone: boolean;
   pollInterval?: number;
   autoRefresh?: boolean;
+  isDev?: boolean;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const leftColumnRef = useRef<HTMLDivElement>(null);
@@ -234,16 +236,20 @@ export function EventDetails({
                     content: prettyPayload,
                   }}
                   allowFullScreen={true}
-                  actions={[
-                    {
-                      label: 'Send to Dev Server',
-                      title: isRunning
-                        ? 'Send event payload to running Dev Server'
-                        : `Dev Server is not running at ${devServerURL}`,
-                      onClick: () => send(eventPayloadData?.payload || ''),
-                      disabled: !isRunning,
-                    },
-                  ]}
+                  actions={
+                    !isDev
+                      ? [
+                          {
+                            label: 'Send to Dev Server',
+                            title: isRunning
+                              ? 'Send event payload to running Dev Server'
+                              : `Dev Server is not running at ${devServerURL}`,
+                            onClick: () => send(eventPayloadData?.payload || ''),
+                            disabled: !isRunning,
+                          },
+                        ]
+                      : []
+                  }
                 />
               </div>
             )}

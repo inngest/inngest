@@ -28,81 +28,6 @@ export const EVENT = gql`
   }
 `;
 
-export const FUNCTION_RUN = gql`
-  query GetFunctionRun($id: ID!) {
-    functionRun(query: { functionRunId: $id }) {
-      id
-      status
-      startedAt
-      finishedAt
-      output
-      pendingSteps
-      waitingFor {
-        expiryTime
-        eventName
-        expression
-      }
-      function {
-        name
-        triggers {
-          type
-          value
-        }
-      }
-      event {
-        id
-        raw
-      }
-      batchID
-      batchCreatedAt
-      events {
-        createdAt
-        id
-        name
-        raw
-      }
-      history {
-        attempt
-        cancel {
-          eventID
-          expression
-          userID
-        }
-        createdAt
-        functionVersion
-        groupID
-        id
-        sleep {
-          until
-        }
-        stepName
-        type
-        url
-        waitForEvent {
-          eventName
-          expression
-          timeout
-        }
-        waitResult {
-          eventID
-          timeout
-        }
-        invokeFunction {
-          eventID
-          functionID
-          correlationID
-          timeout
-        }
-        invokeFunctionResult {
-          eventID
-          timeout
-          runID
-        }
-      }
-    }
-  }
-`;
-
 export const FUNCTIONS = gql`
   query GetFunctions {
     functions {
@@ -270,68 +195,21 @@ export const DELETE_APP = gql`
   }
 `;
 
-export const TRIGGERS_STREAM = gql`
-  query GetTriggersStream($limit: Int!, $after: ID, $before: ID, $includeInternalEvents: Boolean!) {
-    stream(
-      query: {
-        limit: $limit
-        after: $after
-        before: $before
-        includeInternalEvents: $includeInternalEvents
-      }
-    ) {
-      createdAt
-      id
-      inBatch
-      trigger
-      type
-      runs {
-        batchID
-        events {
-          id
-        }
-        id
-        function {
-          name
-        }
-      }
-    }
-  }
-`;
-
-export const FUNCTION_RUN_STATUS = gql`
-  query GetFunctionRunStatus($id: ID!) {
-    functionRun(query: { functionRunId: $id }) {
-      id
-      function {
-        name
-      }
-      status
-    }
-  }
-`;
-
-export const FUNCTION_RUN_OUTPUT = gql`
-  query GetFunctionRunOutput($id: ID!) {
-    functionRun(query: { functionRunId: $id }) {
-      id
-      status
-      output
-    }
-  }
-`;
-
-export const HISTORY_ITEM_OUTPUT = gql`
-  query GetHistoryItemOutput($historyItemID: ULID!, $runID: ID!) {
-    functionRun(query: { functionRunId: $runID }) {
-      historyItemOutput(id: $historyItemID)
-    }
-  }
-`;
-
 export const INVOKE_FUNCTION = gql`
-  mutation InvokeFunction($functionSlug: String!, $data: Map, $user: Map) {
-    invokeFunction(data: $data, functionSlug: $functionSlug, user: $user)
+  mutation InvokeFunction(
+    $functionSlug: String!
+    $data: Map
+    $user: Map
+    $debugSessionID: ULID = null
+    $debugRunID: ULID = null
+  ) {
+    invokeFunction(
+      data: $data
+      functionSlug: $functionSlug
+      user: $user
+      debugSessionID: $debugSessionID
+      debugRunID: $debugRunID
+    )
   }
 `;
 
@@ -350,8 +228,18 @@ export const RERUN = gql`
 `;
 
 export const RERUN_FROM_STEP = gql`
-  mutation RerunFromStep($runID: ULID!, $fromStep: RerunFromStepInput!) {
-    rerun(runID: $runID, fromStep: $fromStep)
+  mutation RerunFromStep(
+    $runID: ULID!
+    $fromStep: RerunFromStepInput!
+    $debugSessionID: ULID = null
+    $debugRunID: ULID = null
+  ) {
+    rerun(
+      runID: $runID
+      fromStep: $fromStep
+      debugSessionID: $debugSessionID
+      debugRunID: $debugRunID
+    )
   }
 `;
 

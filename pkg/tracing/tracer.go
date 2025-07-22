@@ -47,6 +47,7 @@ type CreateSpanOptions struct {
 	Parent             *meta.SpanReference
 	QueueItem          *queue.Item
 	RawOtelSpanOptions []trace.SpanStartOption
+	StartTime          time.Time
 }
 
 type UpdateSpanOptions struct {
@@ -120,6 +121,11 @@ func (tp *otelTracerProvider) CreateDroppableSpan(
 	name string,
 	opts *CreateSpanOptions,
 ) (*DroppableSpan, error) {
+	st := opts.StartTime
+	if st.IsZero() {
+		st = time.Now()
+	}
+
 	ctx := context.Background()
 	if opts.Parent != nil {
 		carrier := propagation.MapCarrier{
@@ -142,6 +148,7 @@ func (tp *otelTracerProvider) CreateDroppableSpan(
 	spanOptions := append(
 		[]trace.SpanStartOption{
 			trace.WithAttributes(attrs.Serialize()...),
+			trace.WithTimestamp(st),
 		},
 		opts.RawOtelSpanOptions...,
 	)
@@ -203,6 +210,11 @@ func (tp *otelTracerProvider) CreateDroppableSpan(
 func (tp *otelTracerProvider) UpdateSpan(
 	opts *UpdateSpanOptions,
 ) error {
+	ts := opts.EndTime
+	if ts.IsZero() {
+		ts = time.Now()
+	}
+
 	if opts.TargetSpan == nil {
 		return fmt.Errorf("no target span")
 	}
@@ -223,7 +235,7 @@ func (tp *otelTracerProvider) UpdateSpan(
 	)
 
 	if opts.Status.IsEnded() {
-		meta.AddAttr(attrs, meta.Attrs.EndedAt, &opts.EndTime)
+		meta.AddAttr(attrs, meta.Attrs.EndedAt, &ts)
 	}
 
 	if opts.Debug != nil {
@@ -241,6 +253,7 @@ func (tp *otelTracerProvider) UpdateSpan(
 	spanOpts := append(
 		[]trace.SpanStartOption{
 			trace.WithAttributes(attrs.Serialize()...),
+			trace.WithTimestamp(ts),
 		},
 		opts.RawOtelSpanOptions...,
 	)

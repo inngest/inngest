@@ -10,10 +10,17 @@ type Mutation {
     data: Map
     functionSlug: String!
     user: Map
+    debugSessionID: ULID
+    debugRunID: ULID
   ): Boolean
 
   cancelRun(runID: ULID!): FunctionRun!
-  rerun(runID: ULID!, fromStep: RerunFromStepInput): ULID!
+  rerun(
+    runID: ULID!
+    fromStep: RerunFromStepInput
+    debugSessionID: ULID
+    debugRunID: ULID
+  ): ULID!
 }
 
 input CreateAppInput {

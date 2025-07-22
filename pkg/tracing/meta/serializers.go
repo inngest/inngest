@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"reflect"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -193,8 +194,16 @@ func BoolAttr(key string) attr[*bool] {
 			return attribute.Bool(withPrefix(key), *v)
 		},
 		deserialize: func(v any) (*bool, bool) {
-			b, ok := v.(bool)
-			return &b, ok
+			switch v := v.(type) {
+			case bool:
+				return &v, true
+			case string:
+				if b, err := strconv.ParseBool(v); err == nil {
+					return &b, true
+				}
+			}
+			return nil, false
+
 		},
 	}
 }
@@ -210,11 +219,19 @@ func TimeAttr(key string) attr[*time.Time] {
 			return attribute.Int64(withPrefix(key), v.UnixMilli())
 		},
 		deserialize: func(v any) (*time.Time, bool) {
-			if ms, ok := v.(float64); ok {
-				t := time.UnixMilli(int64(ms))
+			switch v := v.(type) {
+			case int64:
+				t := time.UnixMilli(v)
 				return &t, true
+			case float64:
+				t := time.UnixMilli(int64(v))
+				return &t, true
+			case string:
+				if f, err := strconv.ParseFloat(v, 64); err == nil {
+					t := time.UnixMilli(int64(f))
+					return &t, true
+				}
 			}
-
 			return nil, false
 		},
 	}
@@ -231,12 +248,18 @@ func DurationAttr(key string) attr[*time.Duration] {
 			return attribute.Int64(withPrefix(key), int64(*v/time.Millisecond))
 		},
 		deserialize: func(v any) (*time.Duration, bool) {
-			if ms, ok := v.(float64); ok {
-				d := time.Duration(int64(ms)) * time.Millisecond
+			switch v := v.(type) {
+			case float64:
+				d := time.Duration(int64(v)) * time.Millisecond
 				return &d, true
+			case string:
+				if f, err := strconv.ParseFloat(v, 64); err == nil {
+					d := time.Duration(int64(f)) * time.Millisecond
+					return &d, true
+				}
 			}
-
 			return nil, false
+
 		},
 	}
 }

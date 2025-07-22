@@ -163,7 +163,6 @@ func (a devapi) Info(w http.ResponseWriter, r *http.Request) {
 				key := strings.TrimSpace(kv[0])
 				valStr := strings.TrimSpace(kv[1])
 				if value, err := strconv.ParseBool(valStr); err == nil {
-					a.devserver.log.Info("setting feature flag", "key", key)
 					features[key] = value
 				}
 			}
