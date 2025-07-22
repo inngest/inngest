@@ -22,6 +22,7 @@ import {
   TimeElement,
 } from '../DetailsCard/NewElement';
 import { Link } from '../Link';
+import { useShared } from '../SharedContext/SharedContext';
 import { StatusDot } from '../Status/StatusDot';
 import { DragDivider } from '../icons/DragDivider';
 import { loadingSentinel, type Lazy } from '../utils/lazyLoad';
@@ -41,7 +42,6 @@ export function EventDetails({
   standalone,
   pollInterval,
   autoRefresh,
-  isDev = false,
 }: {
   initialData?: Pick<Event, 'name' | 'runs'>;
   eventID: string;
@@ -52,7 +52,6 @@ export function EventDetails({
   standalone: boolean;
   pollInterval?: number;
   autoRefresh?: boolean;
-  isDev?: boolean;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const leftColumnRef = useRef<HTMLDivElement>(null);
@@ -61,6 +60,7 @@ export function EventDetails({
   const [isDragging, setIsDragging] = useState(false);
   const { isRunning, send } = useDevServer();
   const { pathCreator } = usePathCreator();
+  const { cloud } = useShared();
 
   const {
     isPending, // first load, no data
@@ -237,7 +237,7 @@ export function EventDetails({
                   }}
                   allowFullScreen={true}
                   actions={
-                    !isDev
+                    cloud
                       ? [
                           {
                             label: 'Send to Dev Server',

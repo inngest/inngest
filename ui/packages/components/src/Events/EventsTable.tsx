@@ -50,7 +50,6 @@ export function EventsTable({
   standalone = false,
   pollInterval,
   autoRefresh,
-  isDev,
 }: {
   emptyActions: React.ReactNode;
   expandedRowActions: ({
@@ -86,7 +85,6 @@ export function EventsTable({
   standalone?: boolean;
   pollInterval?: number;
   autoRefresh?: boolean;
-  isDev?: boolean;
 }) {
   const { pathCreator } = usePathCreator();
   const columns = useColumns({ pathCreator, singleEventTypePage });
@@ -330,7 +328,6 @@ export function EventsTable({
             const initialData: Pick<Event, 'name' | 'runs'> = { name, runs };
             return (
               <EventDetails
-                isDev={isDev}
                 initialData={initialData}
                 getEventDetails={getEventDetails}
                 getEventPayload={getEventPayload}
