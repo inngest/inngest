@@ -99,7 +99,7 @@ export default function Keys({ params: { ingestKeys, keyID } }: KeyDetailsProps)
 
   return (
     <div>
-      {environment.type === EnvironmentType.BranchParent && (
+      {ingestKeys === 'keys' && environment.type === EnvironmentType.BranchParent && (
         <Alert className="flex items-center rounded-none text-sm" severity="info">
           Event keys are shared for all branch environments
         </Alert>
