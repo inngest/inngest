@@ -99,7 +99,7 @@ export default function Environments() {
 
         <div className="mb-2 flex flex-col gap-3">
           <div className="border-subtle mt-8 flex w-full items-center justify-between border-t pt-8">
-            <h2 className="text-xl font-medium">Other environments</h2>
+            <h2 className="mt-1 text-xl font-medium">Other environments</h2>
           </div>
           <div className="flex w-full flex-wrap gap-3">
             <EnvironmentsStatusSelector
@@ -124,8 +124,8 @@ export default function Environments() {
         </div>
 
         <div className="flex flex-col gap-6">
-          <div className="pt-6">
-            <div className="mb-2 flex w-full items-center justify-between">
+          <div className="flex flex-col gap-3 pt-6">
+            <div className="flex w-full items-center justify-between">
               <h2 className="text-md font-medium">Custom environments</h2>
               <Button
                 className="text-sm"
@@ -144,8 +144,8 @@ export default function Environments() {
           </div>
 
           {Boolean(branchParent) && (
-            <div>
-              <div className="mb-2 flex w-full items-center justify-between">
+            <div className="flex flex-col gap-3">
+              <div className="flex w-full items-center justify-between">
                 <h2 className="text-md font-medium">Branch environments</h2>
                 <div className="flex items-center gap-2">
                   <BranchEnvironmentActions branchParent={branchParent as Environment} />
