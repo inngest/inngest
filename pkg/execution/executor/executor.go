@@ -839,6 +839,15 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		return nil, fmt.Errorf("no function loader specified running step")
 	}
 
+	l := e.log.With(
+		"account_id", item.Identifier.AccountID,
+		"env_id", item.WorkspaceID,
+		"app_id", item.Identifier.AppID,
+		"fn_id", item.Identifier.WorkflowID,
+		"run_id", id.RunID,
+	)
+	ctx = logger.WithStdlib(ctx, l)
+
 	// If this is of type sleep, ensure that we save "nil" within the state store
 	// for the outgoing edge ID.  This ensures that we properly increase the stack
 	// for `tools.sleep` within generator functions.
@@ -996,7 +1005,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 				ForceStepPlan:  md.Config.ForceStepPlan,
 				RequestVersion: md.Config.RequestVersion,
 			}); err != nil {
-				e.log.Error("error updating metadata on function start", "error", err)
+				l.ReportError(err, "error updating metadata on function start")
 			}
 
 			for _, e := range e.lifecycles {
@@ -1158,7 +1167,7 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 				})
 
 				if err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), e.assignedQueueShard, *i.resp, i.execSpan); err != nil {
-					l.Error("error running finish handler", "error", err)
+					l.ReportError(err, "error running finish handler")
 				}
 
 				// Can be reached multiple times for parallel discovery steps
@@ -1211,7 +1220,7 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 
 		// TODO: Refactor state input
 		if err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), e.assignedQueueShard, *i.resp, i.execSpan); err != nil {
-			l.Error("error running finish handler", "error", err)
+			l.ReportError(err, "error running finish handler")
 		}
 
 		// Can be reached multiple times for parallel discovery steps
@@ -1234,7 +1243,7 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 
 		// This is the function result.
 		if err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), e.assignedQueueShard, *i.resp, i.execSpan); err != nil {
-			l.Error("error running finish handler", "error", err)
+			l.ReportError(err, "error running finish handler")
 		}
 
 		// Can be reached multiple times for parallel discovery steps
@@ -1283,6 +1292,8 @@ func (f functionFinishedData) Map() map[string]any {
 func (e *executor) finalize(ctx context.Context, md sv2.Metadata, evts []json.RawMessage, fnSlug string, queueShard redis_state.QueueShard, resp state.DriverResponse, outputSpanRef *meta.SpanReference) error {
 	ctx = context.WithoutCancel(ctx)
 
+	l := logger.StdlibLogger(ctx)
+
 	runStatus := enums.StepStatusCompleted
 	if resp.Error() != "" {
 		runStatus = enums.StepStatusFailed
@@ -1297,7 +1308,7 @@ func (e *executor) finalize(ctx context.Context, md sv2.Metadata, evts []json.Ra
 		Attributes: tracing.DriverResponseAttrs(&resp, outputSpanRef),
 	})
 	if err != nil {
-		logger.StdlibLogger(ctx).Error(
+		l.Error(
 			"error updating run span end time",
 			"error", err,
 			"run_id", md.ID.RunID.String(),
@@ -1321,7 +1332,7 @@ func (e *executor) finalize(ctx context.Context, md sv2.Metadata, evts []json.Ra
 	// Delete the function state in every case.
 	_, err = e.smv2.Delete(ctx, md.ID)
 	if err != nil {
-		logger.StdlibLogger(ctx).Error(
+		l.Error(
 			"error deleting state in finalize",
 			"error", err,
 			"run_id", md.ID.RunID.String(),
@@ -1345,7 +1356,7 @@ func (e *executor) finalize(ctx context.Context, md sv2.Metadata, evts []json.Ra
 			0,
 		)
 		if err != nil {
-			logger.StdlibLogger(ctx).Error(
+			l.Error(
 				"error fetching run jobs",
 				"error", err,
 				"run_id", md.ID.RunID.String(),
@@ -1366,7 +1377,7 @@ func (e *executor) finalize(ctx context.Context, md sv2.Metadata, evts []json.Ra
 
 			err := q.Dequeue(ctx, queueShard, *qi)
 			if err != nil && !errors.Is(err, redis_state.ErrQueueItemNotFound) {
-				logger.StdlibLogger(ctx).Error(
+				l.Error(
 					"error dequeueing run job",
 					"error", err,
 					"run_id", md.ID.RunID.String(),
