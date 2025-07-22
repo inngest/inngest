@@ -1553,11 +1553,6 @@ func (e *executor) HandlePauses(ctx context.Context, evt event.TrackedEvent) (ex
 		"event_id", evt.GetInternalID(),
 	)
 
-	errTags := map[string]string{
-		"workspace_id": evt.GetWorkspaceID().String(),
-		"event_id":     evt.GetInternalID().String(),
-	}
-
 	idx := pauses.Index{
 		WorkspaceID: evt.GetWorkspaceID(),
 		EventName:   evt.GetEvent().Name,
@@ -1569,9 +1564,7 @@ func (e *executor) HandlePauses(ctx context.Context, evt event.TrackedEvent) (ex
 		consts.AggregatePauseThreshold,
 	)
 	if err != nil {
-		l.ReportError(err, "error checking pause aggregation",
-			logger.WithErrorReportTags(errTags),
-		)
+		l.ReportError(err, "error checking pause aggregation")
 	}
 
 	// Use the aggregator for all funciton finished events, if there are more than
@@ -1580,9 +1573,7 @@ func (e *executor) HandlePauses(ctx context.Context, evt event.TrackedEvent) (ex
 	if aggregated {
 		aggRes, err := e.handleAggregatePauses(ctx, evt)
 		if err != nil {
-			l.ReportError(err, "error handling aggregate pauses",
-				logger.WithErrorReportTags(errTags),
-			)
+			l.ReportError(err, "error handling aggregate pauses")
 		}
 		return aggRes, err
 	}
@@ -1594,9 +1585,7 @@ func (e *executor) HandlePauses(ctx context.Context, evt event.TrackedEvent) (ex
 
 	res, err := e.handlePausesAllNaively(ctx, iter, evt)
 	if err != nil {
-		l.ReportError(err, "error handling naive pauses",
-			logger.WithErrorReportTags(errTags),
-		)
+		l.ReportError(err, "error handling naive pauses")
 	}
 	return res, nil
 }
