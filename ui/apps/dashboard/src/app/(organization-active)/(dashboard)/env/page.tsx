@@ -7,7 +7,7 @@ export default async function EnvsPage() {
   return (
     <Layout>
       <div className="flex-col">
-        <Header backNav={true} breadcrumb={[{ text: 'Environments' }]} />
+        <Header backNav={true} breadcrumb={[{ text: 'All Environments' }]} />
         <div className="no-scrollbar overflow-y-scroll px-6">
           <Environments />
         </div>
