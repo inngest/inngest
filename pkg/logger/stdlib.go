@@ -73,7 +73,7 @@ type Logger interface {
 	SLog() *slog.Logger
 
 	// ReportError is a wrapper over Error, and will also submit a report to the error report tool
-	ReportError(err error, msg string, tags map[string]string, opts ...ReportErrorOpt)
+	ReportError(err error, msg string, opts ...ReportErrorOpt)
 }
 
 type LoggerOpt func(o *loggerOpts)
@@ -305,19 +305,24 @@ func (l *logger) SLog() *slog.Logger {
 
 // reportErrorOpt provides options to tweak error reporting behaviors
 type reportErrorOpt struct {
+	// log indicates if the error report also emit an error log.
+	// defaults to true.
 	log bool
+	// tags provides the additional tags to be added to the error report
+	tags map[string]string
 }
 
 type ReportErrorOpt func(o *reportErrorOpt)
 
-func (l *logger) ReportError(err error, msg string, more_tags map[string]string, opts ...ReportErrorOpt) {
+func (l *logger) ReportError(err error, msg string, opts ...ReportErrorOpt) {
 	if sentry.CurrentHub().Client() == nil {
 		l.Warn("sentry is not initialized")
 		return
 	}
 
 	opt := reportErrorOpt{
-		log: true, // NOTE: defaults to true for now, can be disabled later
+		log:  true, // NOTE: defaults to true for now, can be disabled later
+		tags: map[string]string{},
 	}
 	for _, apply := range opts {
 		apply(&opt)
@@ -326,7 +331,7 @@ func (l *logger) ReportError(err error, msg string, more_tags map[string]string,
 	tags := l.errorTags()
 	tags["msg"] = msg
 	// merge additional tags
-	maps.Copy(tags, more_tags)
+	maps.Copy(tags, opt.tags)
 
 	// only report to sentry if initialize
 	sentry.WithScope(func(scope *sentry.Scope) {
@@ -337,7 +342,7 @@ func (l *logger) ReportError(err error, msg string, more_tags map[string]string,
 
 	if opt.log {
 		args := l.attrs
-		for k, v := range more_tags {
+		for k, v := range opt.tags {
 			args = append(args, k, v)
 		}
 
@@ -357,5 +362,11 @@ func (l *logger) errorTags() map[string]string {
 func WithErrorReportLog(enable bool) ReportErrorOpt {
 	return func(o *reportErrorOpt) {
 		o.log = enable
+	}
+}
+
+func WithErrorReportTags(tags map[string]string) ReportErrorOpt {
+	return func(o *reportErrorOpt) {
+		o.tags = tags
 	}
 }
