@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"maps"
 	"os"
 	"strings"
 
@@ -310,7 +311,7 @@ type reportErrorOpt struct {
 
 type ReportErrorOpt func(o *reportErrorOpt)
 
-func (l *logger) ReportError(msg string, tags map[string]string, opts ...ReportErrorOpt) {
+func (l *logger) ReportError(msg string, more_tags map[string]string, opts ...ReportErrorOpt) {
 	if sentry.CurrentHub().Client() == nil {
 		l.Warn("sentry is not initialized")
 		return
@@ -323,6 +324,10 @@ func (l *logger) ReportError(msg string, tags map[string]string, opts ...ReportE
 		apply(&opt)
 	}
 
+	tags := l.errorTags()
+	// merge additional tags
+	maps.Copy(tags, more_tags)
+
 	// only report to sentry if initialize
 	sentry.WithScope(func(scope *sentry.Scope) {
 		scope.SetTags(tags)
@@ -331,13 +336,22 @@ func (l *logger) ReportError(msg string, tags map[string]string, opts ...ReportE
 	})
 
 	if opt.log {
-		args := []any{}
-		for k, v := range tags {
+		args := l.attrs
+		for k, v := range more_tags {
 			args = append(args, k, v)
 		}
 
 		l.Error(msg, args...)
 	}
+}
+
+// errorTags returns the default list of KV to be used for reporting
+func (l *logger) errorTags() map[string]string {
+	tags := map[string]string{
+		"host": host,
+	}
+
+	return tags
 }
 
 func WithErrorReportLog(enable bool) ReportErrorOpt {
