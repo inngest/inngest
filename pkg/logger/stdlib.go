@@ -2,6 +2,7 @@ package logger
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log/slog"
 	"maps"
@@ -326,6 +327,8 @@ func (l *logger) ReportError(err error, msg string, opts ...ReportErrorOpt) {
 	if sentry.CurrentHub().Client() != nil {
 		tags := l.errorTags()
 		tags["msg"] = msg
+		// merge included attrs
+		l.mergeAttrsWithErrorTags(tags)
 		// merge additional tags
 		maps.Copy(tags, opt.tags)
 
@@ -354,6 +357,30 @@ func (l *logger) errorTags() map[string]string {
 	}
 
 	return tags
+}
+
+func (l *logger) mergeAttrsWithErrorTags(tags map[string]string) {
+	if tags == nil {
+		return
+	}
+
+	// increment by 2 since log attrs are a list where even items are key, and odd items are values
+	for i := 0; i < len(l.attrs)-1; i += 2 {
+		k := l.attrs[i]
+		v := l.attrs[i+1]
+
+		if key, ok := k.(string); ok {
+			switch val := v.(type) {
+			case string:
+				tags[key] = val
+			case fmt.Stringer:
+				tags[key] = val.String()
+
+			default:
+				// no-op
+			}
+		}
+	}
 }
 
 func WithErrorReportLog(enable bool) ReportErrorOpt {
