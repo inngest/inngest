@@ -3,14 +3,17 @@ package redis_state
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"iter"
+	"maps"
 	"sync/atomic"
 	"time"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
@@ -248,6 +251,12 @@ func (q *queue) ItemsByPartition(ctx context.Context, shard QueueShard, partitio
 
 	return func(yield func(*osqueue.QueueItem) bool) {
 		ptFrom := from
+		errTags := map[string]string{
+			"account_id":   pt.AccountID.String(),
+			"partition_id": partitionID.String(),
+			"queue_shard":  shard.Name,
+		}
+
 		for {
 			var iterated int
 
@@ -260,7 +269,11 @@ func (q *queue) ItemsByPartition(ctx context.Context, shard QueueShard, partitio
 				PartitionKey: pt.zsetKey(shard.RedisClient.kg),
 			})
 			if err != nil {
-				l.Error("error peeking items for iterator", "error", err)
+				if !errors.Is(err, context.Canceled) {
+					l.ReportError(err, "error peeking items for partition iterator",
+						logger.WithErrorReportTags(errTags),
+					)
+				}
 				return
 			}
 
@@ -316,7 +329,9 @@ func (q *queue) ItemsByPartition(ctx context.Context, shard QueueShard, partitio
 
 		var spt QueueShadowPartition
 		if err := json.Unmarshal(byt, &spt); err != nil {
-			l.Error("error unmarshalling shadow partition", "error", err)
+			l.ReportError(err, "error unmarshalling shadow partition",
+				logger.WithErrorReportTags(errTags),
+			)
 			return
 		}
 
@@ -330,7 +345,11 @@ func (q *queue) ItemsByPartition(ctx context.Context, shard QueueShard, partitio
 				WithPeekOptQueueShard(&shard),
 			)
 			if err != nil {
-				l.Error("error peeking backlogs for partition", "error", err)
+				if !errors.Is(err, context.Canceled) {
+					l.ReportError(err, "error peeking backlogs for partition",
+						logger.WithErrorReportTags(errTags),
+					)
+				}
 				return
 			}
 
@@ -341,12 +360,21 @@ func (q *queue) ItemsByPartition(ctx context.Context, shard QueueShard, partitio
 
 			latestTimes := []time.Time{}
 			for _, backlog := range backlogs {
+				blErrTags := maps.Copy(
+					map[string]string{
+						"backlog_od": backlog.BacklogID,
+					},
+					errTags,
+				)
+
 				var last time.Time
 				items, _, err := q.backlogPeek(ctx, backlog, backlogFrom, until, opt.batchSize,
 					WithPeekOptQueueShard(&shard),
 				)
 				if err != nil {
-					l.Error("error retrieving queue items from backlog", "error", err)
+					l.ReportError(err, "error retrieving queue items from backlog",
+						logger.WithErrorReportTags(blErrTags),
+					)
 					return
 				}
 
@@ -441,7 +469,13 @@ func (q *queue) ItemsByBacklog(ctx context.Context, shard QueueShard, backlogID 
 				WithPeekOptQueueShard(&shard),
 			)
 			if err != nil {
-				l.Error("error retrieving queue items from backlog", "error", err)
+				l.ReportError(err, "error retrieving queue items from backlog",
+					logger.WithErrorReportTags(map[string]string{
+						"backlog_id":   backlogID,
+						"partition_id": backlog.ShadowPartitionID,
+						"queue_shard":  shard.Name,
+					}),
+				)
 				return
 			}
 
