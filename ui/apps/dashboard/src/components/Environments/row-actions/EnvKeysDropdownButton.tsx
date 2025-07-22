@@ -13,7 +13,7 @@ import { RiKeyLine } from '@remixicon/react';
 import { type Environment } from '@/utils/environments';
 
 type Props = {
-  env: Environment;
+  env: Pick<Environment, 'slug'>;
 };
 
 export function EnvKeysDropdownButton({ env }: Props) {
