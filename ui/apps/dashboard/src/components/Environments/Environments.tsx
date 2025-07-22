@@ -60,12 +60,12 @@ export default function Environments() {
           </div>
 
           <div className="border-muted rounded-md border">
-            <div className="border-l-primary-moderate flex items-center justify-between rounded-[4px] border-l-4 px-4 py-3">
-              <h3 className="flex items-center gap-2 text-sm font-medium tracking-wide">
+            <div className="border-l-primary-moderate flex min-w-0 items-center justify-between overflow-x-auto rounded-[4px] border-l-4 px-4 py-3">
+              <h3 className="flex flex-shrink-0 items-center gap-2 text-sm font-medium tracking-wide">
                 <span className="bg-primary-moderate block h-2 w-2 rounded-full" />
                 Production
               </h3>
-              <div className="flex items-center gap-2 pl-2">
+              <div className="flex flex-shrink-0 items-center gap-2 pl-2">
                 <EnvViewButton env={{ slug: 'production' }} />
                 <EnvKeysDropdownButton env={{ slug: 'production' }} />
               </div>
@@ -121,7 +121,7 @@ export default function Environments() {
 
           {Boolean(branchParent) && (
             <div className="flex flex-col gap-3">
-              <div className="flex w-full items-center justify-between">
+              <div className="flex w-full flex-wrap items-center justify-between gap-3">
                 <h2 className="text-md font-medium">Branch environments</h2>
                 <div className="flex items-center gap-2">
                   <BranchEnvironmentActions branchParent={branchParent as Environment} />

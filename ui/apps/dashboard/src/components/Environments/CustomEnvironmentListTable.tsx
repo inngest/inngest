@@ -34,7 +34,7 @@ export function CustomEnvironmentListTable({
         <table className="w-full">
           <thead className="bg-canvasSubtle border-subtle border-b text-left">
             <tr>
-              <th scope="col" className="text-muted px-4 py-3 text-xs font-medium">
+              <th scope="col" className="text-muted min-w-48 px-4 py-3 text-xs font-medium">
                 Name
               </th>
               <th scope="col" className="w-0 pr-4"></th>
@@ -77,10 +77,10 @@ function TableRow(props: { env: Environment }) {
   return (
     <tr>
       <td className="max-w-80 px-4 py-3">
-        <h3 className="text-basis flex items-center gap-2 break-all text-sm font-medium">
+        <h3 className="text-basis flex items-center gap-2 break-words text-sm font-medium">
           <span
             className={cn(
-              'block h-2 w-2 rounded-full',
+              'block h-2 w-2 flex-shrink-0 rounded-full',
               isArchived ? 'bg-surfaceMuted' : 'bg-primary-moderate'
             )}
           />
