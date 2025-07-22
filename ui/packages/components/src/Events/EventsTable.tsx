@@ -312,6 +312,7 @@ export function EventsTable({
                 onSearch={onSearchChange}
                 placeholder="event.data.userId == “1234” or event.data.billingPlan == 'Enterprise'"
                 value={search}
+                preset="events"
               />
             </div>
           </>
