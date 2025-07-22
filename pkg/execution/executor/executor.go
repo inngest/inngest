@@ -1542,6 +1542,16 @@ func (e *executor) executeDriverForStep(ctx context.Context, i *runInstance) (*s
 
 // HandlePauses handles pauses loaded from an incoming event.
 func (e *executor) HandlePauses(ctx context.Context, evt event.TrackedEvent) (execution.HandlePauseResult, error) {
+	l := e.log.With(
+		"workspace_id", evt.GetWorkspaceID(),
+		"event_id", evt.GetInternalID(),
+	)
+
+	errTags := map[string]string{
+		"workspace_id": evt.GetWorkspaceID().String(),
+		"event_id":     evt.GetInternalID().String(),
+	}
+
 	idx := pauses.Index{
 		WorkspaceID: evt.GetWorkspaceID(),
 		EventName:   evt.GetEvent().Name,
@@ -1553,7 +1563,9 @@ func (e *executor) HandlePauses(ctx context.Context, evt event.TrackedEvent) (ex
 		consts.AggregatePauseThreshold,
 	)
 	if err != nil {
-		e.log.Error("error checking pause aggregation", "error", err)
+		l.ReportError(err, "error checking pause aggregation",
+			logger.WithErrorReportTags(errTags),
+		)
 	}
 
 	// Use the aggregator for all funciton finished events, if there are more than
@@ -1562,7 +1574,9 @@ func (e *executor) HandlePauses(ctx context.Context, evt event.TrackedEvent) (ex
 	if aggregated {
 		aggRes, err := e.handleAggregatePauses(ctx, evt)
 		if err != nil {
-			e.log.Error("error handling aggregate pauses", "error", err)
+			l.ReportError(err, "error handling aggregate pauses",
+				logger.WithErrorReportTags(errTags),
+			)
 		}
 		return aggRes, err
 	}
@@ -1574,7 +1588,9 @@ func (e *executor) HandlePauses(ctx context.Context, evt event.TrackedEvent) (ex
 
 	res, err := e.handlePausesAllNaively(ctx, iter, evt)
 	if err != nil {
-		e.log.Error("error handling naive pauses", "error", err)
+		l.ReportError(err, "error handling naive pauses",
+			logger.WithErrorReportTags(errTags),
+		)
 	}
 	return res, nil
 }
@@ -1644,7 +1660,7 @@ func (e *executor) handlePausesAllNaively(ctx context.Context, iter state.PauseI
 
 				expr, err := expressions.NewExpressionEvaluator(ctx, *pause.Expression)
 				if err != nil {
-					l.Error("error compiling pause expression", "error", err)
+					l.Warn("error compiling pause expression", "error", err)
 					return
 				}
 
