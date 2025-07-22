@@ -445,6 +445,15 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		return nil, fmt.Errorf("app ID is required to schedule a run")
 	}
 
+	l := e.log.With(
+		"account_id", req.AccountID,
+		"env_id", req.WorkspaceID,
+		"app_id", req.AppID,
+		"fn_id", req.Function.ID,
+		"fn_v", req.Function.FunctionVersion,
+		"evt_id", req.Events[0].GetInternalID(),
+	)
+
 	if req.Function.Debounce != nil && !req.PreventDebounce {
 		err := e.debouncer.Debounce(ctx, debounce.DebounceItem{
 			AccountID:        req.AccountID,
@@ -616,7 +625,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 					err = e.Cancel(ctx, runID, execution.CancelRequest{
 						EventID: &eventID,
 					})
-					logger.StdlibLogger(ctx).Error("error canceling singleton run", "error", err)
+					l.ReportError(err, "error canceling singleton run")
 				default:
 					// Immediately end before creating state
 					return nil, ErrFunctionSkipped
@@ -625,7 +634,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 			singletonConfig = &queue.Singleton{Key: singletonKey}
 		case errors.Is(err, singleton.ErrEvaluatingSingletonExpression):
 			// Ignore singleton expressions if we cannot evaluate them
-			logger.StdlibLogger(ctx).Warn("error evaluating singleton expression", "error", err)
+			l.Warn("error evaluating singleton expression", "error", err)
 		case errors.Is(err, singleton.ErrNotASingleton):
 			// We no-op, and we run the function normally not as a singleton
 		default:
@@ -705,7 +714,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 					"event": evtMap,
 				})
 				if err != nil {
-					logger.StdlibLogger(ctx).Warn(
+					l.Warn(
 						"error interpolating cancellation expression",
 						"error", err,
 						"expression", expr,
@@ -784,10 +793,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	case redis_state.ErrQueueItemSingletonExists:
 		_, err := e.smv2.Delete(ctx, sv2.IDFromV1(st.Identifier()))
 		if err != nil {
-			logger.StdlibLogger(ctx).Error(
-				"error deleting function state",
-				"error", err,
-			)
+			l.ReportError(err, "error deleting function state")
 		}
 		return nil, ErrFunctionSkipped
 
