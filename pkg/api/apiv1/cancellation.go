@@ -10,12 +10,12 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/expressions"
+	"github.com/inngest/inngest/pkg/publicerr"
 
 	"github.com/go-chi/chi/v5"
-	"github.com/inngest/inngest/pkg/cqrs"
-	"github.com/inngest/inngest/pkg/publicerr"
 	"github.com/oklog/ulid/v2"
 )
 

@@ -13,6 +13,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/fatih/structs"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
@@ -465,7 +466,13 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	// Run IDs are created embedding the timestamp now, when the function is being scheduled.
 	// When running a cancellation, functions are cancelled at scheduling time based off of
 	// this run ID.
-	runID := ulid.MustNew(ulid.Now(), rand.Reader)
+	var runID ulid.ULID
+
+	if req.RunID == nil {
+		runID = ulid.MustNew(ulid.Now(), rand.Reader)
+	} else {
+		runID = *req.RunID
+	}
 
 	key := idempotencyKey(req, runID)
 
@@ -773,6 +780,18 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		Singleton: singletonConfig,
 	}
 
+	// If this is run mode sync, we do NOT need to create a queue item, as the
+	// Inngest SDK is checkpointing and the execution is happening in a single
+	// external API request.
+	if req.RunMode == enums.RunModeSync {
+
+		for _, e := range e.lifecycles {
+			go e.OnFunctionScheduled(context.WithoutCancel(ctx), metadata, item, req.Events)
+		}
+		return &metadata, nil
+	}
+
+	// Schedule for async functons (the default)
 	err = e.queue.Enqueue(ctx, item, at, queue.EnqueueOpts{})
 
 	switch err {
@@ -1461,6 +1480,8 @@ func (e *executor) run(ctx context.Context, i *runInstance) (*state.DriverRespon
 
 	// Execute the actual step.
 	response, err := e.executeDriverForStep(ctx, i)
+	spew.Dump(err, response)
+
 	if response.Err != nil && err == nil {
 		// This step errored, so always return an error.
 		return response, fmt.Errorf("%s", *response.Err)
