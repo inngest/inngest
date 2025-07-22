@@ -125,7 +125,7 @@ export default function Environments() {
 
         <div className="flex flex-col gap-6">
           <div className="flex flex-col gap-3 pt-6">
-            <div className="flex w-full items-center justify-between">
+            <div className="flex w-full flex-wrap items-center justify-between gap-3">
               <h2 className="text-md font-medium">Custom environments</h2>
               <Button
                 className="text-sm"
