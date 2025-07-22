@@ -8,7 +8,6 @@ import TableBlankState from '@inngest/components/EventTypes/TableBlankState';
 import { TimeFilter } from '@inngest/components/Filter/TimeFilter';
 import { Pill } from '@inngest/components/Pill';
 import NewTable from '@inngest/components/Table/NewTable';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip/Tooltip';
 import {
   DEFAULT_TIME,
   useCalculatedStartTime,
@@ -253,25 +252,19 @@ export function EventsTable({
               selectedEntities={filteredEvent ?? []}
               entities={eventTypesData ?? []}
             /> */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  disabled
-                  icon={<RiSearchLine />}
-                  size="large"
-                  iconSide="left"
-                  appearance="outlined"
-                  label={showSearch ? 'Hide search' : 'Show search'}
-                  onClick={() => setShowSearch((prev) => !prev)}
-                  className={cn(
-                    search
-                      ? 'after:bg-secondary-moderate after:mb-3 after:ml-0.5 after:h-2 after:w-2 after:rounded'
-                      : ''
-                  )}
-                />
-              </TooltipTrigger>
-              <TooltipContent>Coming soon</TooltipContent>
-            </Tooltip>
+            <Button
+              icon={<RiSearchLine />}
+              size="large"
+              iconSide="left"
+              appearance="outlined"
+              label={showSearch ? 'Hide search' : 'Show search'}
+              onClick={() => setShowSearch((prev) => !prev)}
+              className={cn(
+                search
+                  ? 'after:bg-secondary-moderate after:mb-3 after:ml-0.5 after:h-2 after:w-2 after:rounded'
+                  : ''
+              )}
+            />
             <TotalCount totalCount={eventsData?.totalCount} />
           </div>
           <div className="flex">
@@ -311,7 +304,6 @@ export function EventsTable({
                 icon={<RiArrowRightUpLine />}
                 iconSide="right"
                 size="small"
-                // TODO: Create "Inspecting an event" doc in Monitor
                 href="https://www.inngest.com/docs/platform/monitor/inspecting-events?ref=events-table"
               />
             </div>
