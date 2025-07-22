@@ -42,7 +42,7 @@ export default function Page() {
 
   return (
     <div>
-      {[EnvironmentType.BranchChild, EnvironmentType.BranchParent].includes(env.type) && (
+      {env.type === EnvironmentType.BranchParent && (
         <Alert className="flex items-center justify-center rounded-none text-sm" severity="info">
           Signing keys are shared for all branch environments
         </Alert>
