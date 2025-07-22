@@ -40,7 +40,7 @@ const EnableEnvironmentAutoArchiveDocument = graphql(`
   }
 `);
 
-const PER_PAGE = 5;
+const PER_PAGE = 10;
 
 type BranchEnvironmentListTableProps = {
   envs: Environment[];
