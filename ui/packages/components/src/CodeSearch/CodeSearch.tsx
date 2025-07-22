@@ -30,6 +30,19 @@ const EVENT_PATHS = [
   'output.',
 ] as const;
 
+export const EVENT_PATH_PRESETS = {
+  runs: [
+    'event.data.',
+    'event.id',
+    'event.name',
+    'event.ts',
+    'event.v',
+    'output',
+    'output.',
+  ] as const,
+  events: ['event.data.', 'event.id', 'event.name', 'event.ts', 'event.v'] as const,
+};
+
 type EventPath = (typeof EVENT_PATHS)[number];
 
 const EVENT_PATH_DETAILS: Record<
@@ -92,7 +105,11 @@ interface ValidationError {
   lineNumber: number;
 }
 
-function validateExpression(content: string): ValidationError | null {
+function validateExpression(
+  content: string,
+  allowedPaths: readonly EventPath[],
+  preset: keyof typeof EVENT_PATH_PRESETS
+): ValidationError | null {
   const lines = content.split('\n');
 
   for (let lineIndex = 0; lineIndex < lines.length; lineIndex++) {
@@ -110,11 +127,12 @@ function validateExpression(content: string): ValidationError | null {
     const startColumn = currentLine.indexOf(firstWord) + 1;
 
     if (
-      !EVENT_PATHS.includes(firstWord as EventPath) &&
-      !EVENT_PATHS.some((path) => path.endsWith('.') && firstWord.startsWith(path))
+      !allowedPaths.includes(firstWord as EventPath) &&
+      !allowedPaths.some((path) => path.endsWith('.') && firstWord.startsWith(path))
     ) {
+      const availableFields = preset === 'events' ? 'event fields' : 'event or output fields';
       return {
-        message: `Invalid field: ${firstWord}. Search by event or output.`,
+        message: `Invalid field: ${firstWord}. Search by ${availableFields}.`,
         startColumn,
         endColumn: startColumn + firstWord.length,
         lineNumber: lineIndex + 1,
@@ -177,12 +195,15 @@ export default function CodeSearch({
   placeholder,
   value,
   searchError,
+  preset,
 }: {
   onSearch: (content: string) => void;
   placeholder?: string;
   value?: string;
   searchError?: Error;
+  preset: keyof typeof EVENT_PATH_PRESETS;
 }) {
+  const eventPaths = EVENT_PATH_PRESETS[preset];
   const [content, setContent] = useState<string>(value || '');
   const [dark, setDark] = useState(isDark());
   const editorRef = useRef<MonacoEditorType>(null);
@@ -244,8 +265,9 @@ export default function CodeSearch({
         if (parts.length === 0 || (parts.length === 1 && !justTypedSpace)) {
           // Provide path suggestions
           return {
-            suggestions: EVENT_PATHS.filter((path) => path.startsWith(wordAtPosition.word)).map(
-              (path) => ({
+            suggestions: eventPaths
+              .filter((path) => path.startsWith(wordAtPosition.word))
+              .map((path) => ({
                 label: path,
                 kind: EVENT_PATH_DETAILS[path]?.kind || monaco.languages.CompletionItemKind.Field,
                 detail: EVENT_PATH_DETAILS[path]?.detail || 'Field',
@@ -256,8 +278,7 @@ export default function CodeSearch({
                   endLineNumber: position.lineNumber,
                   endColumn: position.column,
                 },
-              })
-            ),
+              })),
           };
         }
 
@@ -265,8 +286,8 @@ export default function CodeSearch({
         if (justTypedSpace && parts.length > 0) {
           const leftSide = parts[0] || '';
           if (
-            EVENT_PATHS.includes(leftSide as EventPath) ||
-            EVENT_PATHS.some((path) => path.endsWith('.') && leftSide.startsWith(path))
+            eventPaths.some((path) => path === leftSide) ||
+            eventPaths.some((path) => path.endsWith('.') && leftSide.startsWith(path))
           ) {
             const operators = getOperatorsForPath(leftSide);
             return {
@@ -368,7 +389,7 @@ export default function CodeSearch({
 
     // Set new timer for validation
     validationTimerRef.current = setTimeout(() => {
-      const error = validateExpression(newContent);
+      const error = validateExpression(newContent, eventPaths, preset);
       updateMarkers(error);
     }, VALIDATION_DELAY);
   };
