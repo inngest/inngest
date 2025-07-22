@@ -8,7 +8,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@inngest/components/DropdownMenu';
-import { RiKeyLine } from '@remixicon/react';
+import { RiKey2Line } from '@remixicon/react';
 
 import { type Environment } from '@/utils/environments';
 
@@ -22,7 +22,7 @@ export function EnvKeysDropdownButton({ env }: Props) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button appearance="outlined" icon={<RiKeyLine />} kind="secondary" size="small" />
+        <Button appearance="outlined" icon={<RiKey2Line />} kind="secondary" size="small" />
       </DropdownMenuTrigger>
       <DropdownMenuContent>
         <DropdownMenuItem
