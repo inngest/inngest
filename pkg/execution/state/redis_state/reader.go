@@ -360,12 +360,10 @@ func (q *queue) ItemsByPartition(ctx context.Context, shard QueueShard, partitio
 
 			latestTimes := []time.Time{}
 			for _, backlog := range backlogs {
-				blErrTags := maps.Copy(
-					map[string]string{
-						"backlog_od": backlog.BacklogID,
-					},
-					errTags,
-				)
+				blErrTags := map[string]string{
+					"backlog_id": backlog.BacklogID,
+				}
+				maps.Copy(blErrTags, errTags)
 
 				var last time.Time
 				items, _, err := q.backlogPeek(ctx, backlog, backlogFrom, until, opt.batchSize,
