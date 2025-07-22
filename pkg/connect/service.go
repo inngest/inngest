@@ -583,7 +583,7 @@ func (c *connectGatewaySvc) ActivateGateway() error {
 func (c *connectGatewaySvc) getOrCreateGRPCClient(ctx context.Context, envID uuid.UUID, requestId string) (pb.ConnectExecutorClient, error) {
 	ip, err := c.stateManager.GetExecutorIP(ctx, envID, requestId)
 	if err != nil {
-		return nil, fmt.Errorf("could not get executor IP")
+		return nil, err
 	}
 	executorIP := ip.String()
 
