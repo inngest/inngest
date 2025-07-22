@@ -48,6 +48,7 @@ type CreateSpanOptions struct {
 	QueueItem          *queue.Item
 	RawOtelSpanOptions []trace.SpanStartOption
 	StartTime          time.Time
+	EndTime            time.Time
 }
 
 type UpdateSpanOptions struct {
@@ -143,6 +144,9 @@ func (tp *otelTracerProvider) CreateDroppableSpan(
 		if opts.Debug.Location != "" {
 			meta.AddAttr(attrs, meta.Attrs.InternalLocation, &opts.Debug.Location)
 		}
+	}
+	if !opts.EndTime.IsZero() {
+		meta.AddAttr(attrs, meta.Attrs.EndedAt, &opts.EndTime)
 	}
 
 	spanOptions := append(
