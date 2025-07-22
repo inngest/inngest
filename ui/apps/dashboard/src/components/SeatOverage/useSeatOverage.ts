@@ -3,17 +3,18 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { trackEvent, useTrackingUser } from '@/utils/tracking';
+import { parseSeatOverageData, useSeatOverageCheck } from './data';
 
 const STORAGE_KEY = 'seatOverageDismissedUntil';
 
-export const shouldShowSeatCTA = (): boolean => {
+const shouldShowSeatCTA = (): boolean => {
   if (typeof window === 'undefined') return true;
 
   const until = localStorage.getItem(STORAGE_KEY);
-  return !until || new Date(until) < new Date(); // expired or never set
+  return !until || new Date(until) < new Date();
 };
 
-export const dismissSeatCTA = (hours = 24): void => {
+const dismissSeatCTA = (hours = 24): void => {
   if (typeof window === 'undefined') return;
 
   const until = new Date();
@@ -21,28 +22,29 @@ export const dismissSeatCTA = (hours = 24): void => {
   localStorage.setItem(STORAGE_KEY, until.toISOString());
 };
 
-export function useSeatOverageDismissal() {
+export function useSeatOverage() {
   const [isReady, setIsReady] = useState(false);
   const [shouldShow, setShouldShow] = useState(true);
   const trackingUser = useTrackingUser();
 
-  // Check dismissal status on mount (SSR safe)
+  const { data: rawData, error } = useSeatOverageCheck();
+  const seatOverageData = parseSeatOverageData(rawData);
+
   useEffect(() => {
     setShouldShow(shouldShowSeatCTA());
     setIsReady(true);
   }, []);
 
   const dismiss = useCallback(
-    (variant: 'banner' | 'toast', hours = 24) => {
+    (hours = 24) => {
       dismissSeatCTA(hours);
       setShouldShow(false);
 
-      // Track dismissal event
       if (trackingUser) {
         trackEvent({
           name: 'app/upsell.seat.overage.dismissed',
           data: {
-            variant,
+            variant: 'widget',
           },
           user: trackingUser,
           v: '2025-07-14.1',
@@ -52,9 +54,15 @@ export function useSeatOverageDismissal() {
     [trackingUser]
   );
 
+  // Determine if widget should be visible
+  const isWidgetVisible = Boolean(
+    !error && seatOverageData && seatOverageData.hasExceeded && isReady && shouldShow
+  );
+
   return {
-    isReady,
-    shouldShow,
+    isWidgetVisible,
+    seatOverageData,
+    error,
     dismiss,
   };
 }

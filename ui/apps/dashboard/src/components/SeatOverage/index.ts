@@ -1,8 +1,3 @@
-export { SeatOveragePrompts } from './SeatOveragePrompts';
+export { default as SeatOverageWidget } from './SeatOverageWidget';
 export type { SeatOverageData } from './data';
-export type { SeatOverageVariant } from './useSeatOverageVariant';
-export {
-  useSeatOverageDismissal,
-  shouldShowSeatCTA,
-  dismissSeatCTA,
-} from './useSeatOverageDismissal';
+export { useSeatOverage } from './useSeatOverage';

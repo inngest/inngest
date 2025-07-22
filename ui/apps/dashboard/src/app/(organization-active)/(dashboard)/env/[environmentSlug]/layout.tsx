@@ -6,7 +6,6 @@ import { ArchivedEnvBanner } from '@/components/ArchivedEnvBanner';
 import { getEnv } from '@/components/Environments/data';
 import { EnvironmentProvider } from '@/components/Environments/environment-context';
 import Layout from '@/components/Layout/Layout';
-import { SeatOveragePrompts } from '@/components/SeatOverage';
 import Toaster from '@/components/Toaster';
 import type { Environment } from '@/utils/environments';
 
@@ -27,7 +26,6 @@ const Env = ({ env, children }: { env?: Environment; children: ReactNode }) =>
   env ? (
     <>
       <ArchivedEnvBanner env={env} />
-      <SeatOveragePrompts />
       <EnvironmentProvider env={env}>{children}</EnvironmentProvider>
     </>
   ) : (
