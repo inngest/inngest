@@ -343,12 +343,13 @@ func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp 
 				if err != nil && !errors.Is(err, context.Canceled) {
 					l.ReportError(err, "could not normalize item",
 						logger.WithErrorReportTags(map[string]string{
-							"item_id":    item.ID,
-							"account_id": item.Data.Identifier.AccountID.String(),
-							"env_id":     item.WorkspaceID.String(),
-							"app_id":     item.Data.Identifier.AppID.String(),
-							"fn_id":      item.FunctionID.String(),
-							"backlog_id": backlog.BacklogID,
+							"item_id":     item.ID,
+							"account_id":  item.Data.Identifier.AccountID.String(),
+							"env_id":      item.WorkspaceID.String(),
+							"app_id":      item.Data.Identifier.AppID.String(),
+							"fn_id":       item.FunctionID.String(),
+							"backlog_id":  backlog.BacklogID,
+							"queue_shard": q.primaryQueueShard.Name,
 						}),
 					)
 				}

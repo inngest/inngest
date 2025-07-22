@@ -288,6 +288,10 @@ func (q *queue) executionScan(ctx context.Context, f osqueue.RunFunc) error {
 
 	backoff := time.Millisecond * 250
 
+	errTags := map[string]string{
+		"queue_shard": q.primaryQueueShard.Name,
+	}
+
 	var err error
 LOOP:
 	for {
@@ -299,7 +303,9 @@ LOOP:
 		case err = <-q.quit:
 			// An inner function received an error which was deemed irrecoverable, so
 			// we're quitting the queue.
-			q.log.ReportError(err, "quitting runner internally")
+			q.log.ReportError(err, "quitting runner internally",
+				logger.WithErrorReportTags(errTags),
+			)
 			tick.Stop()
 			break LOOP
 
@@ -325,7 +331,9 @@ LOOP:
 
 				// On scan errors, halt the worker entirely.
 				if !errors.Is(err, context.Canceled) {
-					q.log.ReportError(err, "error scanning partition pointers")
+					q.log.ReportError(err, "error scanning partition pointers",
+						logger.WithErrorReportTags(errTags),
+					)
 				}
 				break LOOP
 			}
