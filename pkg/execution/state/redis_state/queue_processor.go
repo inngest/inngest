@@ -1756,9 +1756,13 @@ func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error 
 		"env_id":      item.WorkspaceID.String(),
 		"app_id":      item.Data.Identifier.AppID.String(),
 		"fn_id":       item.FunctionID.String(),
-		"lease":       leaseID.String(),
-		"cause":       cause.Error(),
 		"queue_shard": p.queue.primaryQueueShard.Name,
+	}
+	if cause != nil {
+		errTags["cause"] = cause.Error()
+	}
+	if leaseID != nil {
+		errTags["lease"] = leaseID.String()
 	}
 
 	switch cause {

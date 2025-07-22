@@ -315,11 +315,6 @@ type reportErrorOpt struct {
 type ReportErrorOpt func(o *reportErrorOpt)
 
 func (l *logger) ReportError(err error, msg string, opts ...ReportErrorOpt) {
-	if sentry.CurrentHub().Client() == nil {
-		l.Warn("sentry is not initialized")
-		return
-	}
-
 	opt := reportErrorOpt{
 		log:  true, // NOTE: defaults to true for now, can be disabled later
 		tags: map[string]string{},
@@ -328,17 +323,19 @@ func (l *logger) ReportError(err error, msg string, opts ...ReportErrorOpt) {
 		apply(&opt)
 	}
 
-	tags := l.errorTags()
-	tags["msg"] = msg
-	// merge additional tags
-	maps.Copy(tags, opt.tags)
+	if sentry.CurrentHub().Client() != nil {
+		tags := l.errorTags()
+		tags["msg"] = msg
+		// merge additional tags
+		maps.Copy(tags, opt.tags)
 
-	// only report to sentry if initialize
-	sentry.WithScope(func(scope *sentry.Scope) {
-		scope.SetTags(tags)
-		scope.SetLevel(sentry.LevelError)
-		sentry.CaptureException(err)
-	})
+		// only report to sentry if initialize
+		sentry.WithScope(func(scope *sentry.Scope) {
+			scope.SetTags(tags)
+			scope.SetLevel(sentry.LevelError)
+			sentry.CaptureException(err)
+		})
+	}
 
 	if opt.log {
 		args := l.attrs
