@@ -68,6 +68,7 @@ export default function EventsPage({
         }}
         pollInterval={pollInterval}
         autoRefresh={autoRefresh}
+        isDev
         emptyActions={
           <>
             <Button

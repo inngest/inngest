@@ -7,7 +7,7 @@ import { type Environment } from '@/utils/environments';
 import { pathCreator } from '@/utils/urls';
 
 type Props = {
-  env: Environment;
+  env: Pick<Environment, 'slug'>;
 };
 
 export function EnvViewButton({ env }: Props) {
