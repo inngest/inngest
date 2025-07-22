@@ -50,6 +50,9 @@ var Attrs = struct {
 	// separately.
 	StepOutput    attr[*string]
 	StepOutputRef attr[*string]
+	// StepHasOutput is used to mark that a specific span has an output in the
+	// attributes, in place of the output itself.
+	StepHasOutput attr[*bool]
 
 	// step.run attributes
 	StepRunType attr[*string]
