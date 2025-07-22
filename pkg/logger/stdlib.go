@@ -2,7 +2,6 @@ package logger
 
 import (
 	"context"
-	"errors"
 	"io"
 	"log/slog"
 	"maps"
@@ -74,7 +73,7 @@ type Logger interface {
 	SLog() *slog.Logger
 
 	// ReportError is a wrapper over Error, and will also submit a report to the error report tool
-	ReportError(msg string, tags map[string]string, opts ...ReportErrorOpt)
+	ReportError(err error, msg string, tags map[string]string, opts ...ReportErrorOpt)
 }
 
 type LoggerOpt func(o *loggerOpts)
@@ -311,7 +310,7 @@ type reportErrorOpt struct {
 
 type ReportErrorOpt func(o *reportErrorOpt)
 
-func (l *logger) ReportError(msg string, more_tags map[string]string, opts ...ReportErrorOpt) {
+func (l *logger) ReportError(err error, msg string, more_tags map[string]string, opts ...ReportErrorOpt) {
 	if sentry.CurrentHub().Client() == nil {
 		l.Warn("sentry is not initialized")
 		return
@@ -325,6 +324,7 @@ func (l *logger) ReportError(msg string, more_tags map[string]string, opts ...Re
 	}
 
 	tags := l.errorTags()
+	tags["msg"] = msg
 	// merge additional tags
 	maps.Copy(tags, more_tags)
 
@@ -332,7 +332,7 @@ func (l *logger) ReportError(msg string, more_tags map[string]string, opts ...Re
 	sentry.WithScope(func(scope *sentry.Scope) {
 		scope.SetTags(tags)
 		scope.SetLevel(sentry.LevelError)
-		sentry.CaptureException(errors.New(msg))
+		sentry.CaptureException(err)
 	})
 
 	if opt.log {

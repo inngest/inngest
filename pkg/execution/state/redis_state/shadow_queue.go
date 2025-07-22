@@ -603,8 +603,7 @@ func (q *queue) scanShadowPartitions(ctx context.Context, until time.Time, qspc 
 
 				parts, err := q.peekShadowPartitions(ctx, partitionKey, sequential, accountPartitionPeekMax, until)
 				if err != nil {
-					q.log.ReportError("error peeking account partition", map[string]string{
-						"error":      err.Error(),
+					q.log.ReportError(err, "error peeking account partition", map[string]string{
 						"account_id": account.String(),
 					})
 					return
