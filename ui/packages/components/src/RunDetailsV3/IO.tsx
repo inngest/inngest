@@ -5,6 +5,7 @@ export type IOProps = {
   actions?: CodeBlockAction[];
   raw?: string;
   error?: boolean;
+  loading?: boolean;
 };
 
 export const IO = ({ title, actions, raw, error }: IOProps) => {

@@ -20,6 +20,7 @@ import { usePrettyErrorBody, usePrettyJson } from '../hooks/usePrettyJson';
 import { IconCloudArrowDown } from '../icons/CloudArrowDown';
 import type { Result } from '../types/functionRun';
 import { devServerURL, useDevServer } from '../utils/useDevServer';
+import { ErrorInfo } from './ErrorInfo';
 import { IO } from './IO';
 import { Tabs } from './Tabs';
 
@@ -239,8 +240,12 @@ export const TopInfo = ({ slug, getTrigger, runID, result }: TopInfoProps) => {
           )}
         </div>
       )}
-
-      <div className="">
+      {result?.error && (
+        <div>
+          <ErrorInfo error={result.error.message || 'Unknown error'} />
+        </div>
+      )}
+      <div>
         <Tabs
           defaultActive={result?.error ? 'error' : prettyPayload ? 'input' : 'output'}
           tabs={[
@@ -250,7 +255,12 @@ export const TopInfo = ({ slug, getTrigger, runID, result }: TopInfoProps) => {
                     label: 'Input',
                     id: 'input',
                     node: (
-                      <IO title="Function Payload" raw={prettyPayload} actions={codeBlockActions} />
+                      <IO
+                        title="Function Payload"
+                        raw={prettyPayload}
+                        actions={codeBlockActions}
+                        loading={isPending}
+                      />
                     ),
                   },
                 ]
@@ -260,7 +270,7 @@ export const TopInfo = ({ slug, getTrigger, runID, result }: TopInfoProps) => {
                   {
                     label: 'Output',
                     id: 'output',
-                    node: <IO title="Output" raw={prettyOutput} />,
+                    node: <IO title="Output" raw={prettyOutput} loading={isPending} />,
                   },
                 ]
               : []),
@@ -276,6 +286,7 @@ export const TopInfo = ({ slug, getTrigger, runID, result }: TopInfoProps) => {
                         }`}
                         raw={prettyErrorBody ?? ''}
                         error={true}
+                        loading={isPending}
                       />
                     ),
                   },
