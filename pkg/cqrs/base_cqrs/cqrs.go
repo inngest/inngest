@@ -908,13 +908,12 @@ func (w wrapper) GetEventsCount(ctx context.Context, accountID uuid.UUID, worksp
 
 	builder := newEventsQueryBuilder(ctx, opts)
 	filter := builder.filter
-	order := builder.order
+	// ignore builder.order for count queries, it will error on Postgres
 
 	sql, args, err := sq.Dialect(w.dialect()).
 		From("events").
 		Select(sq.COUNT("*").As("count")).
 		Where(filter...).
-		Order(order...).
 		ToSQL()
 	if err != nil {
 		return 0, err
