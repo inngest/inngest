@@ -160,7 +160,10 @@ func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.Ot
 			}
 		}
 
-		newSpan.Attributes = meta.ExtractTypedValues(groupedAttrs)
+		newSpan.Attributes, err = meta.ExtractTypedValues(ctx, groupedAttrs)
+		if err != nil {
+			return nil, fmt.Errorf("error extracting typed values from span attributes: %w", err)
+		}
 
 		if newSpan.Attributes.DynamicStatus != nil {
 			newSpan.Status = *newSpan.Attributes.DynamicStatus

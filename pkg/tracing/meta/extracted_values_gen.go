@@ -40,6 +40,7 @@ type ExtractedValues struct {
 	StepCodeLocation *string
 	StepOutput *string
 	StepOutputRef *string
+	StepHasOutput *bool
 	StepRunType *string
 	StepWaitExpired *bool
 	StepWaitExpiry *time.Time

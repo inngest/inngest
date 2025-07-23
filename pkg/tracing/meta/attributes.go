@@ -50,6 +50,9 @@ var Attrs = struct {
 	// separately.
 	StepOutput    attr[*string]
 	StepOutputRef attr[*string]
+	// StepHasOutput is used to mark that a specific span has an output in the
+	// attributes, in place of the output itself.
+	StepHasOutput attr[*bool]
 
 	// step.run attributes
 	StepRunType attr[*string]
@@ -116,24 +119,27 @@ var Attrs = struct {
 	StepCodeLocation:                   StringAttr("step.code_location"),
 	StepGatewayResponseOutputSizeBytes: IntAttr("step.gateway.response.output_size_bytes"),
 	StepGatewayResponseStatusCode:      IntAttr("step.gateway.response.status_code"),
-	StepID:                             StringAttr("step.id"),
-	StepInvokeFinishEventID:            ULIDAttr("step.invoke.finish.event.id"),
-	StepInvokeFunctionID:               StringAttr("step.invoke.function.id"),
-	StepInvokeRunID:                    ULIDAttr("step.invoke.run.id"),
-	StepInvokeTriggerEventID:           ULIDAttr("step.invoke.trigger.event.id"),
-	StepMaxAttempts:                    IntAttr("step.max_attempts"),
-	StepName:                           StringAttr("step.name"),
-	StepOp:                             StepOpAttr("step.op"),
-	StepOutput:                         StringAttr("step.output"),
-	StepOutputRef:                      StringAttr("step.output_ref"),
-	StepRunType:                        StringAttr("step.run.type"),
-	StepSignalName:                     StringAttr("step.signal.name"),
-	StepSleepDuration:                  DurationAttr("step.sleep.duration"),
-	StepWaitExpired:                    BoolAttr("step.wait.expired"),
-	StepWaitExpiry:                     TimeAttr("step.wait.expiry"),
-	StepWaitForEventIf:                 StringAttr("step.wait_for_event.if"),
-	StepWaitForEventMatchedID:          ULIDAttr("step.wait_for_event.matched_id"),
-	StepWaitForEventName:               StringAttr("step.wait_for_event.name"),
-	DebugSessionID:                     ULIDAttr("debug.session.id"),
-	DebugRunID:                         ULIDAttr("debug.run.id"),
+	// StepHasOutput is used to mark that a specific span has an output in the
+	// attributes, in place of the output itself.
+	StepHasOutput:             BoolAttr("step.has_output"),
+	StepID:                    StringAttr("step.id"),
+	StepInvokeFinishEventID:   ULIDAttr("step.invoke.finish.event.id"),
+	StepInvokeFunctionID:      StringAttr("step.invoke.function.id"),
+	StepInvokeRunID:           ULIDAttr("step.invoke.run.id"),
+	StepInvokeTriggerEventID:  ULIDAttr("step.invoke.trigger.event.id"),
+	StepMaxAttempts:           IntAttr("step.max_attempts"),
+	StepName:                  StringAttr("step.name"),
+	StepOp:                    StepOpAttr("step.op"),
+	StepOutput:                StringAttr("step.output"),
+	StepOutputRef:             StringAttr("step.output_ref"),
+	StepRunType:               StringAttr("step.run.type"),
+	StepSignalName:            StringAttr("step.signal.name"),
+	StepSleepDuration:         DurationAttr("step.sleep.duration"),
+	StepWaitExpired:           BoolAttr("step.wait.expired"),
+	StepWaitExpiry:            TimeAttr("step.wait.expiry"),
+	StepWaitForEventIf:        StringAttr("step.wait_for_event.if"),
+	StepWaitForEventMatchedID: ULIDAttr("step.wait_for_event.matched_id"),
+	StepWaitForEventName:      StringAttr("step.wait_for_event.name"),
+	DebugSessionID:            ULIDAttr("debug.session.id"),
+	DebugRunID:                ULIDAttr("debug.run.id"),
 }
