@@ -13,6 +13,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 	"github.com/oklog/ulid/v2"
@@ -602,8 +603,12 @@ func (q *queue) scanShadowPartitions(ctx context.Context, until time.Time, qspc 
 				partitionKey := q.primaryQueueShard.RedisClient.kg.AccountShadowPartitions(account)
 
 				parts, err := q.peekShadowPartitions(ctx, partitionKey, sequential, accountPartitionPeekMax, until)
-				if err != nil {
-					q.log.Error("error processing account partitions", "error", err)
+				if err != nil && !errors.Is(err, context.Canceled) {
+					q.log.ReportError(err, "error peeking account partition",
+						logger.WithErrorReportTags(map[string]string{
+							"account_id": account.String(),
+						}),
+					)
 					return
 				}
 

@@ -303,7 +303,7 @@ func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp 
 						cancelNormalization()
 						return
 					}
-					l.Error("error extending backlog normalization lease", "error", err, "backlog", backlog)
+					l.Error("error extending backlog normalization lease", "error", err)
 					return
 				}
 			}
@@ -340,8 +340,18 @@ func (q *queue) normalizeBacklog(ctx context.Context, backlog *QueueBacklog, sp 
 			item := item // capture range variable
 			wg.Go(func() {
 				_, err := q.normalizeItem(logger.WithStdlib(ctx, l), shard, sp, latestConstraints, backlog, *item)
-				if err != nil {
-					l.Error("could not normalize item", "err", err)
+				if err != nil && !errors.Is(err, context.Canceled) {
+					l.ReportError(err, "could not normalize item",
+						logger.WithErrorReportTags(map[string]string{
+							"item_id":     item.ID,
+							"account_id":  item.Data.Identifier.AccountID.String(),
+							"env_id":      item.WorkspaceID.String(),
+							"app_id":      item.Data.Identifier.AppID.String(),
+							"fn_id":       item.FunctionID.String(),
+							"backlog_id":  backlog.BacklogID,
+							"queue_shard": q.primaryQueueShard.Name,
+						}),
+					)
 				}
 			})
 		}
