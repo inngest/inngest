@@ -1,28 +1,18 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { Button } from '@inngest/components/Button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@inngest/components/DropdownMenu';
 import { usePaginationUI } from '@inngest/components/Pagination';
 import { Switch } from '@inngest/components/Switch';
-import { AppsIcon } from '@inngest/components/icons/sections/Apps';
 import { cn } from '@inngest/components/utils/classNames';
-import { RiMore2Line } from '@remixicon/react';
 import { toast } from 'sonner';
 import { useMutation } from 'urql';
 
 import { graphql } from '@/gql';
 import { type Environment } from '@/utils/environments';
 import { notNullish } from '@/utils/typeGuards';
-import { pathCreator } from '@/utils/urls';
-import { EnvironmentArchiveDropdownItem } from './EnvironmentArchiveDropdownItem';
 import { FilterResultDetails } from './FilterResultDetails';
+import { EnvArchiveButton } from './row-actions/EnvArchiveButton/EnvArchiveButton';
+import { EnvViewButton } from './row-actions/EnvViewButton';
 
 const DisableEnvironmentAutoArchiveDocument = graphql(`
   mutation DisableEnvironmentAutoArchiveDocument($id: ID!) {
@@ -120,9 +110,6 @@ export default function BranchEnvironmentListTable({
 }
 
 function TableRow(props: { env: Environment }) {
-  const router = useRouter();
-  const [openDropdown, setOpenDropdown] = useState(false);
-
   // Use an internal env object for optimistic updating.
   const [env, setEnv] = useState(props.env);
   useEffect(() => {
@@ -176,7 +163,7 @@ function TableRow(props: { env: Environment }) {
     [disableAutoArchive, enableAutoArchive, env]
   );
 
-  const { id, isArchived, isAutoArchiveEnabled, name, slug, lastDeployedAt } = env;
+  const { id, isArchived, isAutoArchiveEnabled, name, lastDeployedAt } = env;
 
   let statusColorClass: string;
   let statusText: string;
@@ -216,19 +203,11 @@ function TableRow(props: { env: Environment }) {
         )}
       </td>
 
-      <td className="px-4">
-        <DropdownMenu open={openDropdown} onOpenChange={setOpenDropdown}>
-          <DropdownMenuTrigger asChild>
-            <Button kind="secondary" appearance="outlined" size="medium" icon={<RiMore2Line />} />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent>
-            <DropdownMenuItem onSelect={() => router.push(pathCreator.apps({ envSlug: slug }))}>
-              <AppsIcon className="h-4 w-4" />
-              Go to apps
-            </DropdownMenuItem>
-            <EnvironmentArchiveDropdownItem env={env} onClose={() => setOpenDropdown(false)} />
-          </DropdownMenuContent>
-        </DropdownMenu>
+      <td>
+        <div className="flex items-center gap-2 px-4">
+          <EnvViewButton env={props.env} />
+          <EnvArchiveButton env={props.env} />
+        </div>
       </td>
     </tr>
   );

@@ -1,18 +1,18 @@
 'use client';
 
 import { useState } from 'react';
-import { DropdownMenuItem } from '@inngest/components/DropdownMenu';
+import { Button } from '@inngest/components/Button/Button';
 import { RiArchive2Line } from '@remixicon/react';
 
 import { EnvironmentType } from '@/gql/graphql';
+import type { Environment } from '@/utils/environments';
 import { EnvironmentArchiveModal } from './EnvironmentArchiveModal';
 
 type Props = {
-  env: { id: string; isArchived: boolean; name: string; type: EnvironmentType };
-  onClose: () => void;
+  env: Environment;
 };
 
-export function EnvironmentArchiveDropdownItem({ env, onClose }: Props) {
+export function EnvArchiveButton({ env }: Props) {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   // Need to store local state since the mutations don't invalidate the cache,
@@ -20,25 +20,20 @@ export function EnvironmentArchiveDropdownItem({ env, onClose }: Props) {
   // invalidation
   const [isArchived, setIsArchived] = useState(env.isArchived);
 
-  let label;
-  if (isArchived) {
-    label = 'Unarchive';
-  } else {
-    label = 'Archive';
-  }
-
   return (
     <>
-      <DropdownMenuItem
-        onSelect={(e) => {
+      <Button
+        appearance="outlined"
+        className={!isArchived ? 'text-error' : undefined}
+        icon={<RiArchive2Line />}
+        kind="secondary"
+        onClick={(e) => {
           e.preventDefault();
           setIsModalOpen(true);
         }}
-        className={!isArchived ? 'text-error' : undefined}
-      >
-        <RiArchive2Line className="h-4 w-4" />
-        {label}
-      </DropdownMenuItem>
+        size="small"
+        title={isArchived ? 'Unarchive' : 'Archive'}
+      />
 
       <EnvironmentArchiveModal
         envID={env.id}
@@ -47,12 +42,10 @@ export function EnvironmentArchiveDropdownItem({ env, onClose }: Props) {
         isOpen={isModalOpen}
         onCancel={() => {
           setIsModalOpen(false);
-          onClose();
         }}
         onSuccess={() => {
           setIsModalOpen(false);
           setIsArchived(!isArchived);
-          onClose();
         }}
       />
     </>
