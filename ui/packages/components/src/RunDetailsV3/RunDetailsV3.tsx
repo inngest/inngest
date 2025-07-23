@@ -56,6 +56,7 @@ export const RunDetailsV3 = (props: Props) => {
   const [leftWidth, setLeftWidth] = useState(55);
   const [height, setHeight] = useState(MIN_HEIGHT);
   const [isDragging, setIsDragging] = useState(false);
+  const [windowHeight, setWindowHeight] = useState(0);
   const { selectedStep } = useStepSelection(runID);
 
   const handleMouseDown = useCallback(() => {
@@ -83,6 +84,20 @@ export const RunDetailsV3 = (props: Props) => {
     },
     [isDragging]
   );
+
+  useEffect(() => {
+    setWindowHeight(window.innerHeight);
+
+    const handleResize = () => {
+      setWindowHeight(window.innerHeight);
+    };
+
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []);
 
   useLayoutEffect(() => {
     if (!leftColumnRef.current) {
@@ -153,6 +168,10 @@ export const RunDetailsV3 = (props: Props) => {
   const waiting = props.initialRunData?.status === 'QUEUED' && noSpansFoundError;
   const showError = waiting ? false : runRes.error || resultRes.error;
 
+  //
+  // works around a variety of layout and scroll issues with our two column layout
+  const dynamicHeight = height < windowHeight * 0.85 ? height : '85vh';
+
   return (
     <>
       {standalone && run && (
@@ -215,7 +234,7 @@ export const RunDetailsV3 = (props: Props) => {
           className="border-muted sticky top-0 flex flex-col justify-start overflow-y-auto"
           style={{
             width: `${100 - leftWidth}%`,
-            height: standalone ? '85vh' : height,
+            height: dynamicHeight,
             alignSelf: 'flex-start',
           }}
         >
