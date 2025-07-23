@@ -45,7 +45,7 @@ type Run = {
   hasAI: boolean;
 };
 
-const MIN_HEIGHT = 550;
+const MIN_HEIGHT = 586;
 
 export const RunDetailsV3 = (props: Props) => {
   const containerRef = useRef<HTMLDivElement>(null);
