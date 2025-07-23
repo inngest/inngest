@@ -9,7 +9,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/connect/auth"
 	"github.com/inngest/inngest/pkg/connect/grpc"
-	"github.com/inngest/inngest/pkg/connect/pubsub"
 	"github.com/inngest/inngest/pkg/connect/state"
 	"github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/telemetry/trace"
@@ -19,7 +18,6 @@ import (
 type Opts struct {
 	ConnectManager             state.ConnectionManager
 	GroupManager               state.WorkerGroupManager
-	ConnectResponseNotifier    pubsub.ResponseNotifier
 	ConnectRequestStateManager state.RequestStateManager
 
 	Signer                  auth.SessionTokenSigner
@@ -27,8 +25,6 @@ type Opts struct {
 	ConnectGatewayRetriever ConnectGatewayRetriever
 	EntitlementProvider     EntitlementProvider
 	ConditionalTracer       trace.ConditionalTracer
-
-	ShouldUseGRPC pubsub.UseGRPCFunc
 
 	Dev bool
 }
