@@ -3,7 +3,7 @@
 import NextLink from 'next/link';
 import { Listbox } from '@headlessui/react';
 import { Button } from '@inngest/components/Button';
-import { RiEqualizer2Line } from '@remixicon/react';
+import { RiKey2Line } from '@remixicon/react';
 
 import type { Environment as EnvType } from '@/utils/environments';
 
@@ -21,7 +21,7 @@ export default function KeysMenu({
           kind="secondary"
           appearance={collapsed ? 'ghost' : 'outlined'}
           size="medium"
-          icon={<RiEqualizer2Line className="fill-subtle w-[18px]" />}
+          icon={<RiKey2Line className="fill-subtle w-[18px]" />}
           className="group-data-[headlessui-state=open]:border-primary-moderate"
         />
       </Listbox.Button>

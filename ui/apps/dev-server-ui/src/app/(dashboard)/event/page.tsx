@@ -23,7 +23,6 @@ export default function Page() {
   return (
     <>
       <EventDetails
-        isDev
         eventID={eventID}
         standalone
         getEventDetails={getEventDetails}

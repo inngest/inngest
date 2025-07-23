@@ -369,6 +369,7 @@ export function RunsPage({
               placeholder="event.data.userId == “1234” or output.count > 10"
               value={search}
               searchError={searchError}
+              preset="runs"
             />
           </>
         )}
