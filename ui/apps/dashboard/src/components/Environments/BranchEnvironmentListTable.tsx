@@ -1,28 +1,18 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { Button } from '@inngest/components/Button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@inngest/components/DropdownMenu';
 import { usePaginationUI } from '@inngest/components/Pagination';
 import { Switch } from '@inngest/components/Switch';
-import { AppsIcon } from '@inngest/components/icons/sections/Apps';
 import { cn } from '@inngest/components/utils/classNames';
-import { RiMore2Line } from '@remixicon/react';
 import { toast } from 'sonner';
 import { useMutation } from 'urql';
 
 import { graphql } from '@/gql';
 import { type Environment } from '@/utils/environments';
 import { notNullish } from '@/utils/typeGuards';
-import { pathCreator } from '@/utils/urls';
-import { EnvironmentArchiveDropdownItem } from './EnvironmentArchiveDropdownItem';
 import { FilterResultDetails } from './FilterResultDetails';
+import { EnvArchiveButton } from './row-actions/EnvArchiveButton/EnvArchiveButton';
+import { EnvViewButton } from './row-actions/EnvViewButton';
 
 const DisableEnvironmentAutoArchiveDocument = graphql(`
   mutation DisableEnvironmentAutoArchiveDocument($id: ID!) {
@@ -69,20 +59,14 @@ export default function BranchEnvironmentListTable({
     <div className="w-full">
       <div className="overflow-x-auto">
         <table className="w-full">
-          <thead className="border-subtle border-b text-left">
+          <thead className="bg-canvasSubtle border-subtle border-b text-left">
             <tr>
-              <th scope="col" className="text-muted px-4 py-3 text-sm font-semibold">
+              <th scope="col" className="text-muted min-w-48 px-4 py-3 text-xs font-medium">
                 Name
               </th>
-              <th scope="col" className="text-muted px-4 py-3 text-sm font-semibold">
-                Status
-              </th>
 
-              <th
-                scope="col"
-                className="text-muted w-0 whitespace-nowrap pl-4 text-sm font-semibold"
-              >
-                Auto Archive
+              <th scope="col" className="text-muted w-0 whitespace-nowrap pl-4 text-xs font-medium">
+                Auto-archive
               </th>
 
               <th scope="col" className="w-0 pr-4"></th>
@@ -120,9 +104,6 @@ export default function BranchEnvironmentListTable({
 }
 
 function TableRow(props: { env: Environment }) {
-  const router = useRouter();
-  const [openDropdown, setOpenDropdown] = useState(false);
-
   // Use an internal env object for optimistic updating.
   const [env, setEnv] = useState(props.env);
   useEffect(() => {
@@ -176,28 +157,23 @@ function TableRow(props: { env: Environment }) {
     [disableAutoArchive, enableAutoArchive, env]
   );
 
-  const { id, isArchived, isAutoArchiveEnabled, name, slug, lastDeployedAt } = env;
-
-  let statusColorClass: string;
-  let statusText: string;
-  if (isArchived) {
-    statusColorClass = 'bg-surfaceMuted';
-    statusText = 'Archived';
-  } else {
-    statusColorClass = 'bg-primary-moderate';
-    statusText = 'Active';
-  }
+  const { id, isArchived, isAutoArchiveEnabled, name, lastDeployedAt } = env;
 
   return (
     <tr>
       <td className="max-w-80 px-4 py-3">
-        <h3 className="text-basis flex items-center gap-2 break-all text-sm">{name}</h3>
-      </td>
-      <td>
-        <div className="flex items-center gap-2 px-4" title={`Last synced at ${lastDeployedAt}`}>
-          <span className={cn('block h-2 w-2 rounded-full', statusColorClass)} />
-          <span className="text-basis text-sm">{statusText}</span>
-        </div>
+        <h3
+          className="text-basis flex items-center gap-2 break-words text-sm font-medium"
+          title={Boolean(lastDeployedAt) ? `Last synced at ${lastDeployedAt}` : undefined}
+        >
+          <span
+            className={cn(
+              'block h-2 w-2 flex-shrink-0 rounded-full',
+              isArchived ? 'bg-surfaceMuted' : 'bg-primary-moderate'
+            )}
+          />
+          {name}
+        </h3>
       </td>
 
       <td className="pl-4">
@@ -216,19 +192,11 @@ function TableRow(props: { env: Environment }) {
         )}
       </td>
 
-      <td className="px-4">
-        <DropdownMenu open={openDropdown} onOpenChange={setOpenDropdown}>
-          <DropdownMenuTrigger asChild>
-            <Button kind="secondary" appearance="outlined" size="medium" icon={<RiMore2Line />} />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent>
-            <DropdownMenuItem onSelect={() => router.push(pathCreator.apps({ envSlug: slug }))}>
-              <AppsIcon className="h-4 w-4" />
-              Go to apps
-            </DropdownMenuItem>
-            <EnvironmentArchiveDropdownItem env={env} onClose={() => setOpenDropdown(false)} />
-          </DropdownMenuContent>
-        </DropdownMenu>
+      <td>
+        <div className="flex items-center gap-2 px-4">
+          <EnvViewButton env={props.env} />
+          <EnvArchiveButton env={props.env} />
+        </div>
       </td>
     </tr>
   );

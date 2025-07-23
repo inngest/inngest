@@ -1,22 +1,13 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { Button } from '@inngest/components/Button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@inngest/components/DropdownMenu';
 import { usePaginationUI } from '@inngest/components/Pagination';
-import { AppsIcon } from '@inngest/components/icons/sections/Apps';
 import { cn } from '@inngest/components/utils/classNames';
-import { RiMore2Line, RiSettingsLine } from '@remixicon/react';
 
 import type { Environment } from '@/utils/environments';
-import { EnvironmentArchiveDropdownItem } from './EnvironmentArchiveDropdownItem';
 import { FilterResultDetails } from './FilterResultDetails';
+import { EnvArchiveButton } from './row-actions/EnvArchiveButton/EnvArchiveButton';
+import { EnvKeysDropdownButton } from './row-actions/EnvKeysDropdownButton';
+import { EnvViewButton } from './row-actions/EnvViewButton';
 
 const PER_PAGE = 5;
 
@@ -41,13 +32,10 @@ export function CustomEnvironmentListTable({
     <div className="w-full">
       <div className="overflow-x-auto">
         <table className="w-full">
-          <thead className="border-subtle border-b text-left">
+          <thead className="bg-canvasSubtle border-subtle border-b text-left">
             <tr>
-              <th scope="col" className="text-muted px-4 py-3 text-sm font-semibold">
+              <th scope="col" className="text-muted min-w-48 px-4 py-3 text-xs font-medium">
                 Name
-              </th>
-              <th scope="col" className="text-muted px-4 py-3 text-sm font-semibold">
-                Status
               </th>
               <th scope="col" className="w-0 pr-4"></th>
             </tr>
@@ -84,55 +72,28 @@ export function CustomEnvironmentListTable({
 }
 
 function TableRow(props: { env: Environment }) {
-  const router = useRouter();
-  const [openDropdown, setOpenDropdown] = useState(false);
-
-  const { isArchived, name, slug } = props.env;
-
-  let statusColorClass: string;
-  let statusText: string;
-  if (isArchived) {
-    statusColorClass = 'bg-surfaceMuted';
-    statusText = 'Archived';
-  } else {
-    statusColorClass = 'bg-primary-moderate';
-    statusText = 'Active';
-  }
+  const { isArchived, name } = props.env;
 
   return (
     <tr>
       <td className="max-w-80 px-4 py-3">
-        <h3 className="text-basis flex items-center gap-2 break-all text-sm">{name}</h3>
+        <h3 className="text-basis flex items-center gap-2 break-words text-sm font-medium">
+          <span
+            className={cn(
+              'block h-2 w-2 flex-shrink-0 rounded-full',
+              isArchived ? 'bg-surfaceMuted' : 'bg-primary-moderate'
+            )}
+          />
+          {name}
+        </h3>
       </td>
+
       <td>
         <div className="flex items-center gap-2 px-4">
-          <span className={cn('block h-2 w-2 rounded-full', statusColorClass)} />
-          <span className="text-basis text-sm">{statusText}</span>
+          <EnvViewButton env={props.env} />
+          <EnvKeysDropdownButton env={props.env} />
+          <EnvArchiveButton env={props.env} />
         </div>
-      </td>
-
-      <td className="px-4">
-        <DropdownMenu open={openDropdown} onOpenChange={setOpenDropdown}>
-          <DropdownMenuTrigger asChild>
-            <Button kind="secondary" appearance="outlined" size="medium" icon={<RiMore2Line />} />
-          </DropdownMenuTrigger>
-          <DropdownMenuContent>
-            <DropdownMenuItem onSelect={() => router.push(`/env/${slug}/manage`)}>
-              <RiSettingsLine className="h-4 w-4" />
-              Manage
-            </DropdownMenuItem>
-
-            <DropdownMenuItem onSelect={() => router.push(`/env/${slug}/apps`)}>
-              <AppsIcon className="h-4 w-4" />
-              Go to apps
-            </DropdownMenuItem>
-
-            <EnvironmentArchiveDropdownItem
-              env={props.env}
-              onClose={() => setOpenDropdown(false)}
-            />
-          </DropdownMenuContent>
-        </DropdownMenu>
       </td>
     </tr>
   );

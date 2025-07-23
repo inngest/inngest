@@ -1499,6 +1499,9 @@ func (i *bufIter) Next(ctx context.Context) bool {
 			metrics.HistogramAggregatePausesLoadDuration(ctx, dur, metrics.HistogramOpt{
 				PkgName: pkgName,
 				// TODO: tag workspace ID eventually??
+				Tags: map[string]any{
+					"iterator": "buffer",
+				},
 			})
 		}
 		return false
@@ -1621,6 +1624,9 @@ func (i *scanIter) Next(ctx context.Context) bool {
 				metrics.HistogramAggregatePausesLoadDuration(ctx, dur, metrics.HistogramOpt{
 					PkgName: pkgName,
 					// TODO: tag workspace ID eventually??
+					Tags: map[string]any{
+						"iterator": "scan",
+					},
 				})
 			}
 			return false
@@ -1812,6 +1818,9 @@ func (i *keyIter) fetch(ctx context.Context) error {
 		metrics.HistogramAggregatePausesLoadDuration(ctx, dur, metrics.HistogramOpt{
 			PkgName: pkgName,
 			// TODO: tag workspace ID eventually??
+			Tags: map[string]any{
+				"iterator": "key",
+			},
 		})
 		return errScanDone
 	}
