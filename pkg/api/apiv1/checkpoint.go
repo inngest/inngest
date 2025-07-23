@@ -186,10 +186,13 @@ func (a checkpointAPI) CheckpointSteps(w http.ResponseWriter, r *http.Request) {
 			ref, err := a.TracerProvider.CreateSpan(
 				meta.SpanNameStep,
 				&tracing.CreateSpanOptions{
-					Parent: md.Config.NewFunctionTrace(),
+					Parent:    md.Config.NewFunctionTrace(),
+					StartTime: op.Timing.Start(),
+					EndTime:   op.Timing.End(),
 					Attributes: meta.NewAttrSet(
 						meta.Attr(meta.Attrs.StepName, inngestgo.Ptr(op.UserDefinedName())),
 						meta.Attr(meta.Attrs.RunID, &input.RunID),
+						meta.Attr(meta.Attrs.QueuedAt, inngestgo.Ptr(op.Timing.Start())),
 						meta.Attr(meta.Attrs.StartedAt, inngestgo.Ptr(op.Timing.Start())),
 						meta.Attr(meta.Attrs.EndedAt, inngestgo.Ptr(op.Timing.End())),
 					),

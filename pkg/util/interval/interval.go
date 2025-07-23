@@ -28,8 +28,8 @@ type Interval struct {
 func (i Interval) String() string {
 	return fmt.Sprintf(
 		"%s-%s (%d)",
-		i.Start().UTC().Format(time.RFC3339),
-		i.End().UTC().Format(time.RFC3339),
+		i.Start().UTC().Format(time.RFC3339Nano),
+		i.End().UTC().Format(time.RFC3339Nano),
 		time.Duration(i.B).Microseconds(),
 	)
 }

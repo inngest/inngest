@@ -550,8 +550,9 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	runSpanRef, err := e.tracerProvider.CreateSpan(
 		meta.SpanNameRun,
 		&tracing.CreateSpanOptions{
-			Debug:    &tracing.SpanDebugData{Location: "executor.Schedule"},
-			Metadata: &metadata,
+			Debug:     &tracing.SpanDebugData{Location: "executor.Schedule"},
+			Metadata:  &metadata,
+			StartTime: runID.Timestamp(),
 			Attributes: meta.NewAttrSet(
 				meta.Attr(meta.Attrs.DebugSessionID, req.DebugSessionID),
 				meta.Attr(meta.Attrs.DebugRunID, req.DebugRunID),
