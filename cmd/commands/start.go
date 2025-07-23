@@ -3,7 +3,6 @@ package commands
 import (
 	"fmt"
 	"os"
-	"strconv"
 	"time"
 
 	"github.com/inngest/inngest/cmd/commands/internal/localconfig"
@@ -12,6 +11,7 @@ import (
 	"github.com/inngest/inngest/pkg/devserver"
 	"github.com/inngest/inngest/pkg/headers"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
+	"github.com/inngest/inngest/pkg/util"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
@@ -102,7 +102,7 @@ func doStart(cmd *cobra.Command, args []string) {
 		os.Exit(1)
 	}
 
-	port, err := strconv.Atoi(viper.GetString("port"))
+	port, err := util.ParsePort(viper.GetString("port"))
 	if err != nil {
 		fmt.Println(err.Error())
 		os.Exit(1)

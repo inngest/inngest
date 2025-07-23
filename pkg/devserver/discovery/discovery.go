@@ -61,8 +61,9 @@ var (
 func init() {
 	// Use the PORT env variable, if defined.
 	if ps := os.Getenv("PORT"); ps != "" {
-		num, _ := strconv.Atoi(ps)
-		Ports = append(Ports, num)
+		if num, err := util.ParsePort(ps); err == nil {
+			Ports = append(Ports, num)
+		}
 	}
 }
 
