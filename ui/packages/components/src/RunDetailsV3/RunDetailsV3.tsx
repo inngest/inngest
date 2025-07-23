@@ -212,8 +212,12 @@ export const RunDetailsV3 = (props: Props) => {
         </div>
 
         <div
-          className="border-muted flex flex-col justify-start"
-          style={{ width: `${100 - leftWidth}%`, height: standalone ? '85vh' : height }}
+          className="border-muted sticky top-0 flex flex-col justify-start overflow-y-auto"
+          style={{
+            width: `${100 - leftWidth}%`,
+            height: standalone ? '85vh' : height,
+            alignSelf: 'flex-start',
+          }}
         >
           {selectedStep && !selectedStep.trace.isRoot ? (
             <StepInfo

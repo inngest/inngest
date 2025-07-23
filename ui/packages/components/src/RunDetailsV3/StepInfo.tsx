@@ -204,7 +204,7 @@ export const StepInfo = ({
   const prettyErrorBody = usePrettyErrorBody(result?.error);
 
   return (
-    <div className="sticky top-14 flex h-full flex-col justify-start gap-2">
+    <div className="flex h-full flex-col justify-start gap-2">
       <div className="flex min-h-11 w-full flex-row items-center justify-between border-none px-4">
         <div
           className="text-basis flex cursor-pointer items-center justify-start gap-2"
