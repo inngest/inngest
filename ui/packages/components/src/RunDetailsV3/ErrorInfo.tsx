@@ -86,7 +86,7 @@ export const ErrorInfo = ({ error }: ErrorInfoProps) => {
 
   return (
     cloud && (
-      <div>
+      <div className="my-2">
         <NewTable
           data={[
             { system: 'Inngest', status: '' },
