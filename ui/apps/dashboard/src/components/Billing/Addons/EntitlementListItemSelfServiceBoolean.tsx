@@ -75,6 +75,7 @@ export default function EntitlementListItemSelfServiceBoolean({
   currentEntitlementValues,
   addonEntitlements,
   onAddClick,
+  onRemoveClick,
 }: {
   title: string;
   description: string | React.ReactNode;
@@ -88,6 +89,7 @@ export default function EntitlementListItemSelfServiceBoolean({
     metricsExportGranularity: { limit: number };
   };
   onAddClick: () => void;
+  onRemoveClick: () => void;
 }) {
   return (
     <>
@@ -103,13 +105,7 @@ export default function EntitlementListItemSelfServiceBoolean({
           )}
         </div>
         {addonPurchased ? (
-          <Button
-            appearance="ghost"
-            label="Contact us"
-            href={pathCreator.support({
-              ref: `app-billing-page-overview-addon-${title.toLowerCase().replace(/ /g, '-')}`,
-            })}
-          />
+          <Button appearance="outlined" label={`Remove ${title}`} onClick={onRemoveClick} />
         ) : (
           <Button appearance="outlined" label={`Add ${title}`} onClick={onAddClick} />
         )}

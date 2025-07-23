@@ -8,6 +8,7 @@ import { RiAlertFill } from '@remixicon/react';
 import { toast } from 'sonner';
 import { useMutation } from 'urql';
 
+import AdvancedObservabilityModal from '@/components/Billing/Addons/AdvancedObservabilityModal';
 import EntitlementListItemSelfServiceBoolean from '@/components/Billing/Addons/EntitlementListItemSelfServiceBoolean';
 import EntitlementListItemSelfServiceNumeric from '@/components/Billing/Addons/EntitlementListItemSelfServiceNumeric';
 import { addonQtyCostString } from '@/components/Billing/Addons/pricing_help';
@@ -62,6 +63,7 @@ export default function EntitlementListItemSelfService({
   const [openConfirmationModal, setOpenConfirmationModal] = useState(false);
   const [addonCost, setAddonCost] = useState(0);
   const [addonQty, setAddonQty] = useState(0);
+  const [isRemoving, setIsRemoving] = useState(false);
   const [, updateAccountAddonQuantity] = useMutation(UpdateAccountAddonQuantityDocument);
   const [err, setErr] = useState<String | null>(null);
 
@@ -96,15 +98,18 @@ export default function EntitlementListItemSelfService({
         onChange();
       }
       router.refresh();
-      toast.success(`Addon updated successfully`);
+      toast.success(`Addon ${isRemoving ? 'removed' : 'updated'} successfully`);
     }
+    setIsRemoving(false);
   };
 
   if (switchInput) {
-    const handleBooleanAddClick = () => {
-      const quantity = 1; // Boolean addons are always quantity 1
-      const cost = quantity * addon.price;
-      setAddonQty(quantity);
+    const handleBooleanClick = (targetQuantity: number) => {
+      const isRemovalAction = targetQuantity === 0;
+      const cost = targetQuantity * addon.price;
+
+      setIsRemoving(isRemovalAction);
+      setAddonQty(targetQuantity);
       setAddonCost(cost);
       setOpenConfirmationModal(true);
     };
@@ -128,109 +133,23 @@ export default function EntitlementListItemSelfService({
           addonPurchased={addonPurchased}
           currentEntitlementValues={currentEntitlementValues}
           addonEntitlements={addon.entitlements}
-          onAddClick={handleBooleanAddClick}
+          onAddClick={() => handleBooleanClick(1)}
+          onRemoveClick={() => handleBooleanClick(0)}
         />
         {openConfirmationModal && (
-          <AlertModal
+          <AdvancedObservabilityModal
             isOpen={openConfirmationModal}
-            onClose={() => setOpenConfirmationModal(false)}
+            onClose={() => {
+              setOpenConfirmationModal(false);
+              setIsRemoving(false);
+            }}
             onSubmit={handleSubmit}
-            title="Add to plan"
-            confirmButtonLabel={addonCost > 0 ? 'Confirm and pay' : 'Confirm'}
-            cancelButtonLabel="Cancel"
-            confirmButtonKind="primary"
-            className="w-full max-w-lg"
-          >
-            <div className="space-y-2 p-6">
-              <p className="text-muted text-sm leading-relaxed">
-                By clicking Confirm and Pay, the amount of{' '}
-                <span className="text-basis font-semibold">${(addonCost / 100).toFixed(2)}</span>{' '}
-                will be added to your subscription, and your credit card will be charged{' '}
-                <span className="text-basis font-semibold">
-                  ${(addonCost / 100).toFixed(2)} immediately
-                </span>{' '}
-                for the remaining days in your billing cycle.
-              </p>
-              <div className="p-2">
-                <div className="border-subtle pb-2">
-                  <h3 className="text-basis text-md font-semibold">{title}</h3>
-                </div>
-
-                <div className="">
-                  {typeof entitlement.currentValue === 'number' && entitlement.planLimit && (
-                    <div className="flex flex-col justify-between py-3">
-                      <span className="text-basis text-sm font-medium">{title}</span>
-                      <div className="flex items-center gap-2">
-                        <span className="text-muted text-sm line-through">
-                          {entitlement.planLimit.toLocaleString()}
-                        </span>
-                        <span className="text-muted">→</span>
-                        <span className="text-basis text-sm font-medium">
-                          {(entitlement.planLimit + addonQty * addon.quantityPer).toLocaleString()}
-                        </span>
-                      </div>
-                    </div>
-                  )}
-
-                  {currentEntitlementValues && addon.entitlements && (
-                    <>
-                      {currentEntitlementValues.history !== undefined && (
-                        <div className="flex flex-col justify-between border-y py-2">
-                          <span className="text-basis text-sm font-medium">Log retention</span>
-                          <div className="flex items-center gap-2">
-                            <span className="text-muted text-sm line-through">
-                              {`${currentEntitlementValues.history} days`}
-                            </span>
-                            <span className="text-muted">→</span>
-                            <span className="text-basis text-sm font-medium">
-                              {`${addon.entitlements.history.limit} days`}
-                            </span>
-                          </div>
-                        </div>
-                      )}
-
-                      {currentEntitlementValues.metricsExportGranularity !== undefined && (
-                        <div className="flex flex-col justify-between border-b py-3">
-                          <span className="text-basis text-sm font-medium">
-                            Metrics granularity
-                          </span>
-                          <div className="flex items-center gap-2">
-                            <span className="text-muted text-sm line-through">
-                              {`${currentEntitlementValues.metricsExportGranularity / 60} minutes`}
-                            </span>
-                            <span className="text-muted">→</span>
-                            <span className="text-basis text-sm font-medium">
-                              {`${addon.entitlements.metricsExportGranularity.limit / 60} minutes`}
-                            </span>
-                          </div>
-                        </div>
-                      )}
-
-                      {currentEntitlementValues.metricsExportFreshness !== undefined && (
-                        <div className="flex flex-col justify-between border-b py-3">
-                          <span className="text-basis text-sm font-medium">Metrics freshness</span>
-                          <div className="flex items-center gap-2">
-                            <span className="text-muted text-sm line-through">
-                              {`${currentEntitlementValues.metricsExportFreshness / 60} minutes`}
-                            </span>
-                            <span className="text-muted">→</span>
-                            <span className="text-basis text-sm font-medium">
-                              {`${addon.entitlements.metricsExportFreshness.limit / 60} minutes`}
-                            </span>
-                          </div>
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
-
-                <div className="border-subtle flex items-center justify-between border-t pt-4">
-                  <span className="text-basis">Add on cost</span>
-                  <span className="text-basis">${(addonCost / 100).toFixed(2)}/mo</span>
-                </div>
-              </div>
-            </div>
-          </AlertModal>
+            isRemoving={isRemoving}
+            addonCost={addonCost}
+            title={title}
+            currentEntitlementValues={currentEntitlementValues}
+            addonEntitlements={addon.entitlements}
+          />
         )}
       </>
     );
