@@ -15,26 +15,8 @@ import (
 	"github.com/oklog/ulid/v2"
 )
 
-// NewAPIRunRequest represents the entire request payload used to create new
-// API-based runs.
-type CheckpointNewRunRequest struct {
-	// RunID represents the run ID for this request.  This is generated on the
-	// client, and embeds the timestamp that the request started
-	RunID ulid.ULID `json:"run_id"`
-
-	// Idempotency allows the customization of an idempotency key, allowing us to
-	// handle API idempotency using Inngest.
-	Idempotency string `json:"idempotency"`
-
-	// Event embeds the key request information which is used as the triggering
-	// event for API-based runs.
-	Event inngestgo.GenericEvent[NewAPIRunData] `json:"event"`
-
-	// XXX: SDK Version and language??
-}
-
 // NewAPIRunData represents event data stored and used to create new API-based
-// runs.
+// runs.  This is wrapped via CheckpointNewRunRequestr
 type NewAPIRunData struct {
 	// Domain is the domain that served the incoming request.  This must always
 	// include the scheme, ie. "https://" (or "http://" in local dev).
@@ -63,6 +45,24 @@ type NewAPIRunData struct {
 	// NOTE: This is optional;  we do not require that users store the body for
 	// every request, as this may contain data that users choose not to log.
 	Body []byte `json:"body"`
+}
+
+// NewAPIRunRequest represents the entire request payload used to create new
+// API-based runs.
+type CheckpointNewRunRequest struct {
+	// RunID represents the run ID for this request.  This is generated on the
+	// client, and embeds the timestamp that the request started
+	RunID ulid.ULID `json:"run_id"`
+
+	// Idempotency allows the customization of an idempotency key, allowing us to
+	// handle API idempotency using Inngest.
+	Idempotency string `json:"idempotency"`
+
+	// Event embeds the key request information which is used as the triggering
+	// event for API-based runs.
+	Event inngestgo.GenericEvent[NewAPIRunData] `json:"event"`
+
+	// XXX: SDK Version and language??
 }
 
 func (r CheckpointNewRunRequest) AppSlug() string {
@@ -116,6 +116,36 @@ func (r CheckpointNewRunRequest) FnConfig(envID uuid.UUID) string {
 	return string(byt)
 }
 
+// APIResult represents the final result of an API function call
+type APIResult struct {
+	// StatusCode represents the status code for the API result
+	StatusCode int `json:"status_code"`
+	// Headers represents any response headers sent in the server response
+	Headers map[string]string `json:"headers"`
+	// Body represents the API response.  This may be nil by default.  It is only
+	// captured when you manually specify that you want to track the result.
+	Body []byte `json:"body,omitempty"`
+	// Duration represents the duration
+	Duration time.Duration `json:"duration"`
+	// Error represents any error from the API.  This is only for internal errors,
+	// eg. when a step permanently fails
+	Error string `json:"error,omitempty"`
+}
+
+// CheckpointNewRunResponse represents the response payload for a successful run creation.
+type CheckpointNewRunResponse struct {
+	// FnID represents the ID of the function that the checkpoint run relates to.
+	// This is required to be passed back in future step and response checkpoint calls
+	// for proper tracking.
+	FnID uuid.UUID `json:"fn_id"`
+	// AppID represents the ID of the app that the checkpoint run relates to.
+	// This is required to be passed back in future step and response checkpoint calls
+	// for proper tracking.
+	AppID uuid.UUID `json:"app_id"`
+	// RunID is the function run ID created for this execution.
+	RunID string `json:"run_id"`
+}
+
 // runEvent creates a new event.Event from the CheckpointNewRunRequest.  This allows us to
 // record the input params for each API-based run as if it were a regular event-driven app.
 func runEvent(r CheckpointNewRunRequest) event.Event {
@@ -141,18 +171,4 @@ func runEvent(r CheckpointNewRunRequest) event.Event {
 	}
 
 	return evt
-}
-
-// CheckpointNewRunResponse represents the response payload for a successful run creation.
-type CheckpointNewRunResponse struct {
-	// FnID represents the ID of the function that the checkpoint run relates to.
-	// This is required to be passed back in future step and response checkpoint calls
-	// for proper tracking.
-	FnID uuid.UUID `json:"fn_id"`
-	// AppID represents the ID of the app that the checkpoint run relates to.
-	// This is required to be passed back in future step and response checkpoint calls
-	// for proper tracking.
-	AppID uuid.UUID `json:"app_id"`
-	// RunID is the function run ID created for this execution.
-	RunID string `json:"run_id"`
 }
