@@ -37,7 +37,7 @@ export function CustomEnvironmentListTable({
               <th scope="col" className="text-muted min-w-48 px-4 py-3 text-xs font-medium">
                 Name
               </th>
-              <th scope="col" className="w-0 pr-4 text-right"></th>
+              <th scope="col" className="w-24 pr-4 text-right"></th>
             </tr>
           </thead>
           <tbody className="divide-subtle divide-y px-4 py-3">
