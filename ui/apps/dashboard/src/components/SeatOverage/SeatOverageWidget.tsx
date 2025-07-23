@@ -1,68 +1,17 @@
 'use client';
 
-import { useEffect } from 'react';
-import NextLink from 'next/link';
 import Link from 'next/link';
 import { Button } from '@inngest/components/Button';
 import { MenuItem } from '@inngest/components/Menu/MenuItem';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip/Tooltip';
 import { RiCloseLine, RiErrorWarningFill } from '@remixicon/react';
 
-import { trackEvent, useTrackingUser } from '@/utils/tracking';
 import { pathCreator } from '@/utils/urls';
 import { useSeatOverage } from './useSeatOverage';
 
 // TODO: turn into a component for all other upsell widgets
 export default function SeatOverageWidget({ collapsed }: { collapsed: boolean }) {
   const { isWidgetVisible, seatOverageData, dismiss } = useSeatOverage();
-  const trackingUser = useTrackingUser();
-
-  const handleCTAClick = () => {
-    if (trackingUser && seatOverageData) {
-      trackEvent({
-        name: 'app/upsell.seat.overage.cta.clicked',
-        data: {
-          variant: 'widget',
-          userCount: seatOverageData.userCount,
-          userLimit: seatOverageData.userLimit,
-        },
-        user: trackingUser,
-        v: '2025-07-14.1',
-      });
-    }
-  };
-
-  const handleDismiss = () => {
-    if (trackingUser && seatOverageData) {
-      trackEvent({
-        name: 'app/upsell.seat.overage.dismissed',
-        data: {
-          variant: 'widget',
-          userCount: seatOverageData.userCount,
-          userLimit: seatOverageData.userLimit,
-        },
-        user: trackingUser,
-        v: '2025-07-14.1',
-      });
-    }
-    dismiss();
-  };
-
-  // Track when widget is shown
-  useEffect(() => {
-    if (trackingUser && seatOverageData && isWidgetVisible) {
-      trackEvent({
-        name: 'app/upsell.seat.overage.prompt.shown',
-        data: {
-          variant: 'widget',
-          userCount: seatOverageData.userCount,
-          userLimit: seatOverageData.userLimit,
-        },
-        user: trackingUser,
-        v: '2025-07-14.1',
-      });
-    }
-  }, [trackingUser, seatOverageData, isWidgetVisible]);
 
   if (!isWidgetVisible || !seatOverageData) {
     return null;
@@ -84,12 +33,11 @@ export default function SeatOverageWidget({ collapsed }: { collapsed: boolean })
       )}
 
       {!collapsed && (
-        <NextLink
+        <Link
           href={pathCreator.billing({
             ref: 'seat-overage-widget',
           })}
           className="text-basis mb-5 block rounded border border-amber-200 bg-amber-50 p-3 leading-tight"
-          onClick={handleCTAClick}
         >
           <div className="flex min-h-[110px] flex-col justify-between">
             <div>
@@ -105,7 +53,7 @@ export default function SeatOverageWidget({ collapsed }: { collapsed: boolean })
                       className="hover:bg-amber-100"
                       onClick={(e) => {
                         e.preventDefault();
-                        handleDismiss();
+                        dismiss();
                       }}
                     />
                   </TooltipTrigger>
@@ -129,7 +77,7 @@ export default function SeatOverageWidget({ collapsed }: { collapsed: boolean })
               Upgrade plan
             </Link>
           </div>
-        </NextLink>
+        </Link>
       )}
     </>
   );
