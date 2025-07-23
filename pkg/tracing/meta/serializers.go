@@ -3,6 +3,7 @@
 package meta
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -401,7 +402,7 @@ func HttpHeaderAttr(key string) attr[*http.Header] {
 // ExtractTypedValues uses reflection to extract typed pointer values from the
 // Attrs struct given a map of attribute key-value pairs. It returns a properly
 // typed ExtractedValues struct with IDE support and compile-time type checking.
-func ExtractTypedValues(attrs map[string]any) *ExtractedValues {
+func ExtractTypedValues(ctx context.Context, attrs map[string]any) (*ExtractedValues, error) {
 	result := &ExtractedValues{}
 	resultValue := reflect.ValueOf(result).Elem()
 	attrsValue := reflect.ValueOf(Attrs)
@@ -427,7 +428,7 @@ func ExtractTypedValues(attrs map[string]any) *ExtractedValues {
 				// The serializer exists in the struct definition but hasn't
 				// actually been set. This is an operator error and needs to
 				// be addressed!
-				panic(fmt.Sprintf("Span attribute serializer for '%s' is empty - a span attribute has been defined but no (de)serializer has been set; this attribute will never be persisted or deserialized.", fieldName))
+				return nil, fmt.Errorf("span attribute serializer for '%s' is empty - a span attribute has been defined but no (de)serializer has been set; this attribute will never be persisted or deserialized", fieldName)
 			}
 
 			if value, exists := attrs[key]; exists {
@@ -439,5 +440,5 @@ func ExtractTypedValues(attrs map[string]any) *ExtractedValues {
 		}
 	}
 
-	return result
+	return result, nil
 }
