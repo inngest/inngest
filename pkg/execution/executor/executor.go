@@ -445,6 +445,15 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		return nil, fmt.Errorf("app ID is required to schedule a run")
 	}
 
+	l := e.log.With(
+		"account_id", req.AccountID,
+		"env_id", req.WorkspaceID,
+		"app_id", req.AppID,
+		"fn_id", req.Function.ID,
+		"fn_v", req.Function.FunctionVersion,
+		"evt_id", req.Events[0].GetInternalID(),
+	)
+
 	if req.Function.Debounce != nil && !req.PreventDebounce {
 		err := e.debouncer.Debounce(ctx, debounce.DebounceItem{
 			AccountID:        req.AccountID,
@@ -616,7 +625,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 					err = e.Cancel(ctx, runID, execution.CancelRequest{
 						EventID: &eventID,
 					})
-					logger.StdlibLogger(ctx).Error("error canceling singleton run", "error", err)
+					l.ReportError(err, "error canceling singleton run")
 				default:
 					// Immediately end before creating state
 					return nil, ErrFunctionSkipped
@@ -625,7 +634,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 			singletonConfig = &queue.Singleton{Key: singletonKey}
 		case errors.Is(err, singleton.ErrEvaluatingSingletonExpression):
 			// Ignore singleton expressions if we cannot evaluate them
-			logger.StdlibLogger(ctx).Warn("error evaluating singleton expression", "error", err)
+			l.Warn("error evaluating singleton expression", "error", err)
 		case errors.Is(err, singleton.ErrNotASingleton):
 			// We no-op, and we run the function normally not as a singleton
 		default:
@@ -705,7 +714,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 					"event": evtMap,
 				})
 				if err != nil {
-					logger.StdlibLogger(ctx).Warn(
+					l.Warn(
 						"error interpolating cancellation expression",
 						"error", err,
 						"expression", expr,
@@ -784,10 +793,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	case redis_state.ErrQueueItemSingletonExists:
 		_, err := e.smv2.Delete(ctx, sv2.IDFromV1(st.Identifier()))
 		if err != nil {
-			logger.StdlibLogger(ctx).Error(
-				"error deleting function state",
-				"error", err,
-			)
+			l.ReportError(err, "error deleting function state")
 		}
 		return nil, ErrFunctionSkipped
 
@@ -832,6 +838,15 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 	if e.fl == nil {
 		return nil, fmt.Errorf("no function loader specified running step")
 	}
+
+	l := e.log.With(
+		"account_id", item.Identifier.AccountID,
+		"env_id", item.WorkspaceID,
+		"app_id", item.Identifier.AppID,
+		"fn_id", item.Identifier.WorkflowID,
+		"run_id", id.RunID,
+	)
+	ctx = logger.WithStdlib(ctx, l)
 
 	// If this is of type sleep, ensure that we save "nil" within the state store
 	// for the outgoing edge ID.  This ensures that we properly increase the stack
@@ -990,7 +1005,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 				ForceStepPlan:  md.Config.ForceStepPlan,
 				RequestVersion: md.Config.RequestVersion,
 			}); err != nil {
-				e.log.Error("error updating metadata on function start", "error", err)
+				l.ReportError(err, "error updating metadata on function start")
 			}
 
 			for _, e := range e.lifecycles {
@@ -1152,7 +1167,7 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 				})
 
 				if err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), e.assignedQueueShard, *i.resp, i.execSpan); err != nil {
-					l.Error("error running finish handler", "error", err)
+					l.ReportError(err, "error running finish handler")
 				}
 
 				// Can be reached multiple times for parallel discovery steps
@@ -1205,7 +1220,7 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 
 		// TODO: Refactor state input
 		if err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), e.assignedQueueShard, *i.resp, i.execSpan); err != nil {
-			l.Error("error running finish handler", "error", err)
+			l.ReportError(err, "error running finish handler")
 		}
 
 		// Can be reached multiple times for parallel discovery steps
@@ -1228,7 +1243,7 @@ func (e *executor) HandleResponse(ctx context.Context, i *runInstance) error {
 
 		// This is the function result.
 		if err := e.finalize(ctx, i.md, i.events, i.f.GetSlug(), e.assignedQueueShard, *i.resp, i.execSpan); err != nil {
-			l.Error("error running finish handler", "error", err)
+			l.ReportError(err, "error running finish handler")
 		}
 
 		// Can be reached multiple times for parallel discovery steps
@@ -1277,6 +1292,8 @@ func (f functionFinishedData) Map() map[string]any {
 func (e *executor) finalize(ctx context.Context, md sv2.Metadata, evts []json.RawMessage, fnSlug string, queueShard redis_state.QueueShard, resp state.DriverResponse, outputSpanRef *meta.SpanReference) error {
 	ctx = context.WithoutCancel(ctx)
 
+	l := logger.StdlibLogger(ctx)
+
 	runStatus := enums.StepStatusCompleted
 	if resp.Error() != "" {
 		runStatus = enums.StepStatusFailed
@@ -1291,7 +1308,7 @@ func (e *executor) finalize(ctx context.Context, md sv2.Metadata, evts []json.Ra
 		Attributes: tracing.DriverResponseAttrs(&resp, outputSpanRef),
 	})
 	if err != nil {
-		logger.StdlibLogger(ctx).Error(
+		l.Error(
 			"error updating run span end time",
 			"error", err,
 			"run_id", md.ID.RunID.String(),
@@ -1315,7 +1332,7 @@ func (e *executor) finalize(ctx context.Context, md sv2.Metadata, evts []json.Ra
 	// Delete the function state in every case.
 	_, err = e.smv2.Delete(ctx, md.ID)
 	if err != nil {
-		logger.StdlibLogger(ctx).Error(
+		l.Error(
 			"error deleting state in finalize",
 			"error", err,
 			"run_id", md.ID.RunID.String(),
@@ -1339,7 +1356,7 @@ func (e *executor) finalize(ctx context.Context, md sv2.Metadata, evts []json.Ra
 			0,
 		)
 		if err != nil {
-			logger.StdlibLogger(ctx).Error(
+			l.Error(
 				"error fetching run jobs",
 				"error", err,
 				"run_id", md.ID.RunID.String(),
@@ -1360,7 +1377,7 @@ func (e *executor) finalize(ctx context.Context, md sv2.Metadata, evts []json.Ra
 
 			err := q.Dequeue(ctx, queueShard, *qi)
 			if err != nil && !errors.Is(err, redis_state.ErrQueueItemNotFound) {
-				logger.StdlibLogger(ctx).Error(
+				l.Error(
 					"error dequeueing run job",
 					"error", err,
 					"run_id", md.ID.RunID.String(),
@@ -1542,6 +1559,11 @@ func (e *executor) executeDriverForStep(ctx context.Context, i *runInstance) (*s
 
 // HandlePauses handles pauses loaded from an incoming event.
 func (e *executor) HandlePauses(ctx context.Context, evt event.TrackedEvent) (execution.HandlePauseResult, error) {
+	l := e.log.With(
+		"workspace_id", evt.GetWorkspaceID(),
+		"event_id", evt.GetInternalID(),
+	)
+
 	idx := pauses.Index{
 		WorkspaceID: evt.GetWorkspaceID(),
 		EventName:   evt.GetEvent().Name,
@@ -1553,7 +1575,7 @@ func (e *executor) HandlePauses(ctx context.Context, evt event.TrackedEvent) (ex
 		consts.AggregatePauseThreshold,
 	)
 	if err != nil {
-		e.log.Error("error checking pause aggregation", "error", err)
+		l.ReportError(err, "error checking pause aggregation")
 	}
 
 	// Use the aggregator for all funciton finished events, if there are more than
@@ -1562,7 +1584,7 @@ func (e *executor) HandlePauses(ctx context.Context, evt event.TrackedEvent) (ex
 	if aggregated {
 		aggRes, err := e.handleAggregatePauses(ctx, evt)
 		if err != nil {
-			e.log.Error("error handling aggregate pauses", "error", err)
+			l.ReportError(err, "error handling aggregate pauses")
 		}
 		return aggRes, err
 	}
@@ -1574,7 +1596,7 @@ func (e *executor) HandlePauses(ctx context.Context, evt event.TrackedEvent) (ex
 
 	res, err := e.handlePausesAllNaively(ctx, iter, evt)
 	if err != nil {
-		e.log.Error("error handling naive pauses", "error", err)
+		l.ReportError(err, "error handling naive pauses")
 	}
 	return res, nil
 }
@@ -1644,7 +1666,7 @@ func (e *executor) handlePausesAllNaively(ctx context.Context, iter state.PauseI
 
 				expr, err := expressions.NewExpressionEvaluator(ctx, *pause.Expression)
 				if err != nil {
-					l.Error("error compiling pause expression", "error", err)
+					l.Warn("error compiling pause expression", "error", err)
 					return
 				}
 

@@ -2,11 +2,14 @@ package logger
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"log/slog"
+	"maps"
 	"os"
 	"strings"
 
+	"github.com/getsentry/sentry-go"
 	"github.com/lmittmann/tint"
 )
 
@@ -69,6 +72,9 @@ type Logger interface {
 	Emergency(msg string, args ...any)
 	EmergencyContext(ctx context.Context, msg string, args ...any)
 	SLog() *slog.Logger
+
+	// ReportError is a wrapper over Error, and will also submit a report to the error report tool
+	ReportError(err error, msg string, opts ...ReportErrorOpt)
 }
 
 type LoggerOpt func(o *loggerOpts)
@@ -170,18 +176,21 @@ func newLogger(opts ...LoggerOpt) Logger {
 				},
 			})),
 			level: o.level,
+			attrs: []any{},
 		}
 
 	case TextHandler:
 		return &logger{
 			Logger: slog.New(slog.NewTextHandler(o.writer, &hopts)),
 			level:  o.level,
+			attrs:  []any{},
 		}
 
 	default:
 		return &logger{
 			Logger: slog.New(slog.NewJSONHandler(o.writer, &hopts)),
 			level:  o.level,
+			attrs:  []any{},
 		}
 	}
 }
@@ -246,6 +255,9 @@ func FromSlog(l *slog.Logger, level slog.Level) Logger {
 type logger struct {
 	*slog.Logger
 	level slog.Level
+
+	// attrs represent the additional attributes used for this logger
+	attrs []any
 }
 
 func (l *logger) Level() slog.Level {
@@ -260,6 +272,7 @@ func (l *logger) With(args ...any) Logger {
 	log := l.Logger.With(args...)
 	return &logger{
 		Logger: log,
+		attrs:  append(l.attrs, args...),
 	}
 }
 
@@ -289,4 +302,95 @@ func (l *logger) EmergencyContext(ctx context.Context, msg string, args ...any) 
 
 func (l *logger) SLog() *slog.Logger {
 	return l.Logger
+}
+
+// reportErrorOpt provides options to tweak error reporting behaviors
+type reportErrorOpt struct {
+	// log indicates if the error report also emit an error log.
+	// defaults to true.
+	log bool
+	// tags provides the additional tags to be added to the error report
+	tags map[string]string
+}
+
+type ReportErrorOpt func(o *reportErrorOpt)
+
+func (l *logger) ReportError(err error, msg string, opts ...ReportErrorOpt) {
+	opt := reportErrorOpt{
+		log:  true, // NOTE: defaults to true for now, can be disabled later
+		tags: map[string]string{},
+	}
+	for _, apply := range opts {
+		apply(&opt)
+	}
+
+	if sentry.CurrentHub().Client() != nil {
+		tags := l.errorTags()
+		tags["msg"] = msg
+		// merge included attrs
+		l.mergeAttrsWithErrorTags(tags)
+		// merge additional tags
+		maps.Copy(tags, opt.tags)
+
+		// only report to sentry if initialize
+		sentry.WithScope(func(scope *sentry.Scope) {
+			scope.SetTags(tags)
+			scope.SetLevel(sentry.LevelError)
+			sentry.CaptureException(err)
+		})
+	}
+
+	if opt.log {
+		args := l.attrs
+		for k, v := range opt.tags {
+			args = append(args, k, v)
+		}
+
+		l.Error(msg, args...)
+	}
+}
+
+// errorTags returns the default list of KV to be used for reporting
+func (l *logger) errorTags() map[string]string {
+	tags := map[string]string{
+		"host": host,
+	}
+
+	return tags
+}
+
+func (l *logger) mergeAttrsWithErrorTags(tags map[string]string) {
+	if tags == nil {
+		return
+	}
+
+	// increment by 2 since log attrs are a list where even items are key, and odd items are values
+	for i := 0; i < len(l.attrs)-1; i += 2 {
+		k := l.attrs[i]
+		v := l.attrs[i+1]
+
+		if key, ok := k.(string); ok {
+			switch val := v.(type) {
+			case string:
+				tags[key] = val
+			case fmt.Stringer:
+				tags[key] = val.String()
+
+			default:
+				// no-op
+			}
+		}
+	}
+}
+
+func WithErrorReportLog(enable bool) ReportErrorOpt {
+	return func(o *reportErrorOpt) {
+		o.log = enable
+	}
+}
+
+func WithErrorReportTags(tags map[string]string) ReportErrorOpt {
+	return func(o *reportErrorOpt) {
+		o.tags = tags
+	}
 }

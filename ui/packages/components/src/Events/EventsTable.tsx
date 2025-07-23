@@ -22,6 +22,7 @@ import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
 
 import type { RangeChangeProps } from '../DatePicker/RangePicker';
 import EntityFilter from '../Filter/EntityFilter';
+import { useShared } from '../SharedContext/SharedContext';
 import { usePathCreator } from '../SharedContext/usePathCreator';
 import {
   useBatchedSearchParams,
@@ -51,7 +52,6 @@ export function EventsTable({
   standalone = false,
   pollInterval,
   autoRefresh,
-  isDev,
 }: {
   emptyActions: React.ReactNode;
   expandedRowActions: ({
@@ -87,9 +87,9 @@ export function EventsTable({
   standalone?: boolean;
   pollInterval?: number;
   autoRefresh?: boolean;
-  isDev?: boolean;
 }) {
   const { pathCreator } = usePathCreator();
+  const { cloud } = useShared();
   const columns = useColumns({ pathCreator, singleEventTypePage });
   const [showSearch, setShowSearch] = useState(false);
   const [lastDays] = useSearchParam('last');
@@ -253,25 +253,42 @@ export function EventsTable({
               selectedEntities={filteredEvent ?? []}
               entities={eventTypesData ?? []}
             /> */}
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  disabled
-                  icon={<RiSearchLine />}
-                  size="large"
-                  iconSide="left"
-                  appearance="outlined"
-                  label={showSearch ? 'Hide search' : 'Show search'}
-                  onClick={() => setShowSearch((prev) => !prev)}
-                  className={cn(
-                    search
-                      ? 'after:bg-secondary-moderate after:mb-3 after:ml-0.5 after:h-2 after:w-2 after:rounded'
-                      : ''
-                  )}
-                />
-              </TooltipTrigger>
-              <TooltipContent>Coming soon</TooltipContent>
-            </Tooltip>
+            {/* TODO: Remove disabled prop when search is implemented in Dev Server */}
+            {cloud ? (
+              <Button
+                icon={<RiSearchLine />}
+                size="large"
+                iconSide="left"
+                appearance="outlined"
+                label={showSearch ? 'Hide search' : 'Show search'}
+                onClick={() => setShowSearch((prev) => !prev)}
+                className={cn(
+                  search
+                    ? 'after:bg-secondary-moderate after:mb-3 after:ml-0.5 after:h-2 after:w-2 after:rounded'
+                    : ''
+                )}
+              />
+            ) : (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    disabled
+                    icon={<RiSearchLine />}
+                    size="large"
+                    iconSide="left"
+                    appearance="outlined"
+                    label={showSearch ? 'Hide search' : 'Show search'}
+                    onClick={() => setShowSearch((prev) => !prev)}
+                    className={cn(
+                      search
+                        ? 'after:bg-secondary-moderate after:mb-3 after:ml-0.5 after:h-2 after:w-2 after:rounded'
+                        : ''
+                    )}
+                  />
+                </TooltipTrigger>
+                <TooltipContent>Coming soon</TooltipContent>
+              </Tooltip>
+            )}
             <TotalCount totalCount={eventsData?.totalCount} />
           </div>
           <div className="flex">
@@ -311,7 +328,6 @@ export function EventsTable({
                 icon={<RiArrowRightUpLine />}
                 iconSide="right"
                 size="small"
-                // TODO: Create "Inspecting an event" doc in Monitor
                 href="https://www.inngest.com/docs/platform/monitor/inspecting-events?ref=events-table"
               />
             </div>
@@ -320,6 +336,7 @@ export function EventsTable({
                 onSearch={onSearchChange}
                 placeholder="event.data.userId == “1234” or event.data.billingPlan == 'Enterprise'"
                 value={search}
+                preset="events"
               />
             </div>
           </>
@@ -337,7 +354,6 @@ export function EventsTable({
             const initialData: Pick<Event, 'name' | 'runs'> = { name, runs };
             return (
               <EventDetails
-                isDev={isDev}
                 initialData={initialData}
                 getEventDetails={getEventDetails}
                 getEventPayload={getEventPayload}

@@ -11,6 +11,7 @@ import {
 import { RiArrowDownSLine } from '@remixicon/react';
 
 import type { Environment } from '@/utils/environments';
+import { pathCreator } from '@/utils/urls';
 
 type BranchEnvironmentActionsProps = {
   branchParent: Environment;
@@ -27,7 +28,7 @@ export function BranchEnvironmentActions({ branchParent }: BranchEnvironmentActi
           className="rounded-r-none border-r-0 text-sm"
           kind="primary"
           label="Sync new app"
-          href={`/env/${slugOrBranchDefault(branchParent)}/apps`}
+          href={pathCreator.apps({ envSlug: branchParent.slug })}
           size="medium"
         />
       }
@@ -45,15 +46,13 @@ export function BranchEnvironmentActions({ branchParent }: BranchEnvironmentActi
           <DropdownMenuContent>
             <DropdownMenuItem
               className="text-basis text-sm"
-              onSelect={() => router.push(`/env/${slugOrBranchDefault(branchParent)}/manage/keys`)}
+              onSelect={() => router.push(pathCreator.keys({ envSlug: branchParent.slug }))}
             >
               Manage event keys
             </DropdownMenuItem>
             <DropdownMenuItem
               className="text-basis text-sm"
-              onSelect={() =>
-                router.push(`/env/${slugOrBranchDefault(branchParent)}/manage/signing-key`)
-              }
+              onSelect={() => router.push(pathCreator.signingKeys({ envSlug: branchParent.slug }))}
             >
               Manage signing key
             </DropdownMenuItem>
@@ -62,8 +61,4 @@ export function BranchEnvironmentActions({ branchParent }: BranchEnvironmentActi
       }
     />
   );
-}
-
-function slugOrBranchDefault(env: Environment) {
-  return env.slug || 'branch';
 }

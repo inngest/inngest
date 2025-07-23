@@ -11,6 +11,7 @@ import {
 import { RiKey2Line } from '@remixicon/react';
 
 import { type Environment } from '@/utils/environments';
+import { pathCreator } from '@/utils/urls';
 
 type Props = {
   env: Pick<Environment, 'slug'>;
@@ -27,13 +28,13 @@ export function EnvKeysDropdownButton({ env }: Props) {
       <DropdownMenuContent>
         <DropdownMenuItem
           className="text-basis text-sm"
-          onSelect={() => router.push(`/env/${env.slug}/manage/keys`)}
+          onSelect={() => router.push(pathCreator.keys({ envSlug: env.slug }))}
         >
           Manage event keys
         </DropdownMenuItem>
         <DropdownMenuItem
           className="text-basis text-sm"
-          onSelect={() => router.push(`/env/${env.slug}/manage/signing-key`)}
+          onSelect={() => router.push(pathCreator.signingKeys({ envSlug: env.slug }))}
         >
           Manage signing key
         </DropdownMenuItem>

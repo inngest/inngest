@@ -104,9 +104,19 @@ func (q *queue) Enqueue(ctx context.Context, item osqueue.Item, at time.Time, op
 		WallTimeMS:  at.UnixMilli(),
 	}
 
+	l := q.log.With(
+		"item", qi,
+		"account_id", item.Identifier.AccountID,
+		"env_id", item.WorkspaceID,
+		"app_id", item.Identifier.AppID,
+		"fn_id", item.Identifier.WorkflowID,
+		"queue_shard", q.primaryQueueShard.Name,
+	)
+
 	if item.QueueName == nil && qi.FunctionID == uuid.Nil {
-		q.log.Error("attempted to enqueue QueueItem without function ID or queueName override", "item", qi)
-		return fmt.Errorf("queue name or function ID must be set")
+		err := fmt.Errorf("queue name or function ID must be set")
+		l.ReportError(err, "attempted to enqueue QueueItem without function ID or queueName override")
+		return err
 	}
 
 	// Use the queue item's score, ensuring we process older function runs first
@@ -180,7 +190,7 @@ func (q *queue) Enqueue(ctx context.Context, item osqueue.Item, at time.Time, op
 		}, promoteAt, osqueue.EnqueueOpts{})
 		if err != nil && err != ErrQueueItemExists {
 			// This is best effort, and shouldn't fail the OG enqueue.
-			logger.StdlibLogger(ctx).Error("error scheduling promotion job", "error", err)
+			l.ReportError(err, "error scheduling promotion job")
 		}
 		return nil
 	default:
@@ -257,6 +267,10 @@ func (q *queue) Run(ctx context.Context, f osqueue.RunFunc) error {
 }
 
 func (q *queue) executionScan(ctx context.Context, f osqueue.RunFunc) error {
+	l := q.log.With(
+		"queue_shard", q.primaryQueueShard.Name,
+	)
+
 	for i := int32(0); i < q.numWorkers; i++ {
 		go q.worker(ctx, f)
 	}
@@ -266,7 +280,7 @@ func (q *queue) executionScan(ctx context.Context, f osqueue.RunFunc) error {
 	}
 
 	tick := q.clock.NewTicker(q.pollTick)
-	q.log.Debug("starting queue worker", "poll", q.pollTick.String())
+	l.Debug("starting queue worker", "poll", q.pollTick.String())
 
 	backoff := time.Millisecond * 250
 
@@ -281,7 +295,7 @@ LOOP:
 		case err = <-q.quit:
 			// An inner function received an error which was deemed irrecoverable, so
 			// we're quitting the queue.
-			q.log.Error("quitting runner internally", "error", err)
+			q.log.ReportError(err, "quitting runner internally")
 			tick.Stop()
 			break LOOP
 
@@ -307,7 +321,7 @@ LOOP:
 
 				// On scan errors, halt the worker entirely.
 				if !errors.Is(err, context.Canceled) {
-					q.log.Error("error scanning partition pointers", "error", err)
+					q.log.ReportError(err, "error scanning partition pointers")
 				}
 				break LOOP
 			}
@@ -1721,7 +1735,24 @@ func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error 
 		cause = key.cause
 	}
 
-	l = l.With("cause", cause)
+	l = l.With(
+		"cause", cause,
+		"item_id", item.ID,
+		"account_id", item.Data.Identifier.AccountID.String(),
+		"env_id", item.WorkspaceID.String(),
+		"app_id", item.Data.Identifier.AppID.String(),
+		"fn_id", item.FunctionID.String(),
+		"queue_shard", p.queue.primaryQueueShard.Name,
+	)
+
+	// used for error reporting
+	errTags := map[string]string{}
+	if cause != nil {
+		errTags["cause"] = cause.Error()
+	}
+	if leaseID != nil {
+		errTags["lease"] = leaseID.String()
+	}
 
 	switch cause {
 	case ErrQueueItemThrottled:
@@ -1740,7 +1771,9 @@ func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error 
 		if p.queue.itemEnableKeyQueues(ctx, *item) {
 			err := p.queue.Requeue(ctx, p.queue.primaryQueueShard, *item, time.UnixMilli(item.AtMS))
 			if err != nil && !errors.Is(err, ErrQueueItemNotFound) {
-				l.Error("could not requeue item to backlog after hitting throttle limit", "error", err)
+				l.ReportError(err, "could not requeue item to backlog after hitting throttle limit",
+					logger.WithErrorReportTags(errTags),
+				)
 				return fmt.Errorf("could not requeue to backlog: %w", err)
 			}
 
@@ -1797,7 +1830,9 @@ func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error 
 		if p.queue.itemEnableKeyQueues(ctx, *item) {
 			err := p.queue.Requeue(ctx, p.queue.primaryQueueShard, *item, time.UnixMilli(item.AtMS))
 			if err != nil && !errors.Is(err, ErrQueueItemNotFound) {
-				l.Error("could not requeue item to backlog after hitting concurrency limit", "error", err)
+				l.ReportError(err, "could not requeue item to backlog after hitting concurrency limit",
+					logger.WithErrorReportTags(errTags),
+				)
 				return fmt.Errorf("could not requeue to backlog: %w", err)
 			}
 
@@ -1838,7 +1873,9 @@ func (p *processor) process(ctx context.Context, item *osqueue.QueueItem) error 
 		if p.queue.itemEnableKeyQueues(ctx, *item) {
 			err := p.queue.Requeue(ctx, p.queue.primaryQueueShard, *item, time.UnixMilli(item.AtMS))
 			if err != nil && !errors.Is(err, ErrQueueItemNotFound) {
-				l.Error("could not requeue item to backlog after hitting custom concurrency limit", "error", err)
+				l.ReportError(err, "could not requeue item to backlog after hitting custom concurrency limit",
+					logger.WithErrorReportTags(errTags),
+				)
 				return fmt.Errorf("could not requeue to backlog: %w", err)
 			}
 
