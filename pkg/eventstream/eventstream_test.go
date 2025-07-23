@@ -288,4 +288,42 @@ func TestParseStream_Multipart(t *testing.T) {
 		r.NoError(eg.Wait())
 		r.Equal(0, n)
 	})
+
+	t.Run("arbitrary bytes", func(t *testing.T) {
+		// We don't support arbitrary bytes in form fields. This test just
+		// documents that limitation
+
+		r := require.New(t)
+		ctx := context.Background()
+
+		body := &bytes.Buffer{}
+		writer := multipart.NewWriter(body)
+		arbitraryBytes := []byte{0x00, 0xFF, 0xDE, 0xAD, 0xBE, 0xEF, 0x00, 0x42}
+		field, err := writer.CreateFormField("arbitrary_bytes")
+		r.NoError(err)
+		_, err = field.Write(arbitraryBytes)
+		r.NoError(err)
+		r.NoError(writer.Close())
+
+		contentType := writer.FormDataContentType()
+		stream := make(chan StreamItem)
+		eg := errgroup.Group{}
+		eg.Go(func() error {
+			return ParseStream(ctx, body, stream, 512*1024, contentType)
+		})
+
+		n := 0
+		for item := range stream {
+			var result map[string]string
+			r.NoError(json.Unmarshal(item.Item, &result))
+
+			// Intentionally gobbledygook because we don't support arbitrary
+			// bytes in form fields
+			r.Equal("\x00�ޭ��\x00B", result["arbitrary_bytes"])
+
+			n++
+		}
+		r.NoError(eg.Wait())
+		r.Equal(1, n)
+	})
 }
