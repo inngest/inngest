@@ -37,7 +37,7 @@ export function CustomEnvironmentListTable({
               <th scope="col" className="text-muted min-w-48 px-4 py-3 text-xs font-medium">
                 Name
               </th>
-              <th scope="col" className="w-0 pr-4"></th>
+              <th scope="col" className="w-24 pr-4 text-right"></th>
             </tr>
           </thead>
           <tbody className="divide-subtle divide-y px-4 py-3">
@@ -88,8 +88,8 @@ function TableRow(props: { env: Environment }) {
         </h3>
       </td>
 
-      <td>
-        <div className="flex items-center gap-2 px-4">
+      <td className="pr-4 text-right">
+        <div className="inline-flex items-center gap-2">
           <EnvViewButton env={props.env} />
           <EnvKeysDropdownButton env={props.env} />
           <EnvArchiveButton env={props.env} />
