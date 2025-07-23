@@ -105,10 +105,27 @@ export type AddonMulti = {
 export type Addons = {
   __typename?: 'Addons';
   accountID: Maybe<Scalars['UUID']>;
+  advancedObservability: AdvancedObservabilityAddon;
   concurrency: Addon;
   hipaa: Addon;
   planID: Maybe<Scalars['UUID']>;
   userCount: Addon;
+};
+
+export type AdvancedObservabilityAddon = {
+  __typename?: 'AdvancedObservabilityAddon';
+  available: Scalars['Boolean'];
+  entitlements: AdvancedObservabilityEntitlements;
+  name: Scalars['String'];
+  price: Maybe<Scalars['Int']>;
+  purchased: Scalars['Boolean'];
+};
+
+export type AdvancedObservabilityEntitlements = {
+  __typename?: 'AdvancedObservabilityEntitlements';
+  history: EntitlementInt;
+  metricsExportFreshness: EntitlementInt;
+  metricsExportGranularity: EntitlementInt;
 };
 
 export type App = {
