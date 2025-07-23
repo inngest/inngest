@@ -119,6 +119,7 @@ var Attrs = struct {
 	StepCodeLocation:                   StringAttr("step.code_location"),
 	StepGatewayResponseOutputSizeBytes: IntAttr("step.gateway.response.output_size_bytes"),
 	StepGatewayResponseStatusCode:      IntAttr("step.gateway.response.status_code"),
+	StepHasOutput:                      BoolAttr("step.has_output"),
 	StepID:                             StringAttr("step.id"),
 	StepInvokeFinishEventID:            ULIDAttr("step.invoke.finish.event.id"),
 	StepInvokeFunctionID:               StringAttr("step.invoke.function.id"),
