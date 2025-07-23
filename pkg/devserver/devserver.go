@@ -526,17 +526,6 @@ func start(ctx context.Context, opts StartOpts) error {
 		})
 	})
 
-	// ds.opts.Config.EventStream.Service.TopicName()
-	apiConnectProxy, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectPubSubRedis, false, connectpubsub.RedisPubSubConnectorOpts{
-		Logger:             connectPubSubLogger.With("svc", "api"),
-		Tracer:             conditionalTracer,
-		StateManager:       connectionManager,
-		EnforceLeaseExpiry: enforceConnectLeaseExpiry,
-	}))
-	if err != nil {
-		return fmt.Errorf("failed to create connect pubsub connector: %w", err)
-	}
-
 	core, err := coreapi.NewCoreApi(coreapi.Options{
 		AuthMiddleware: authn.SigningKeyMiddleware(opts.SigningKey),
 		Data:           ds.Data,
@@ -552,7 +541,6 @@ func start(ctx context.Context, opts StartOpts) error {
 		ConnectOpts: connectv0.Opts{
 			GroupManager:               connectionManager,
 			ConnectManager:             connectionManager,
-			ConnectResponseNotifier:    apiConnectProxy,
 			ConnectRequestStateManager: connectionManager,
 			Signer:                     auth.NewJWTSessionTokenSigner(consts.DevServerConnectJwtSecret),
 			RequestAuther:              ds,
@@ -560,9 +548,6 @@ func start(ctx context.Context, opts StartOpts) error {
 			Dev:                        true,
 			EntitlementProvider:        ds,
 			ConditionalTracer:          conditionalTracer,
-			ShouldUseGRPC: func(ctx context.Context, accountID uuid.UUID) bool {
-				return false
-			},
 		},
 	})
 	if err != nil {
