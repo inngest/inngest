@@ -65,11 +65,14 @@ export default function BranchEnvironmentListTable({
                 Name
               </th>
 
-              <th scope="col" className="text-muted w-0 whitespace-nowrap pl-4 text-xs font-medium">
+              <th
+                scope="col"
+                className="text-muted w-20 whitespace-nowrap pl-4 text-xs font-medium"
+              >
                 Auto-archive
               </th>
 
-              <th scope="col" className="w-0 pr-4 text-right"></th>
+              <th scope="col" className="w-24 pr-4 text-right"></th>
             </tr>
           </thead>
           <tbody className="divide-subtle divide-y px-4 py-3">
@@ -176,7 +179,7 @@ function TableRow(props: { env: Environment }) {
         </h3>
       </td>
 
-      <td className="pl-4">
+      <td className="w-20 pl-4">
         {notNullish(isAutoArchiveEnabled) && (
           <Switch
             checked={isAutoArchiveEnabled}
