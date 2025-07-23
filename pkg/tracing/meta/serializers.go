@@ -422,6 +422,14 @@ func ExtractTypedValues(attrs map[string]any) *ExtractedValues {
 		attrValue := field.Interface()
 		if serializer, ok := attrValue.(Serializer); ok {
 			key := serializer.Key()
+
+			if key == "" {
+				// The serializer exists in the struct definition but hasn't
+				// actually been set. This is an operator error and needs to
+				// be addressed!
+				panic(fmt.Sprintf("Span attribute serializer for '%s' is empty - a span attribute has been defined but no (de)serializer has been set; this attribute will never be persisted or deserialized.", fieldName))
+			}
+
 			if value, exists := attrs[key]; exists {
 				if deserializedValue, success := serializer.DeserializeValue(value); success {
 					// Set the deserialized value in the result struct
