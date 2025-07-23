@@ -14,8 +14,9 @@ import (
 )
 
 const (
-	EventName   = "cli/command.executed"
-	CIEventName = "cli/ci.command.executed"
+	EventName            = "cli/command.executed"
+	CIEventName          = "cli/ci.command.executed"
+	TimeToFirstSyncEvent = "cli/time-to-first-sync"
 )
 
 var (
@@ -102,6 +103,29 @@ func SendEvent(ctx context.Context, name string, m *Metadata) {
 	}
 	evt := m.Event()
 	evt.Name = name
+	Send(ctx, evt)
+}
+
+func SendTimeToFirstSync(ctx context.Context, m *Metadata, durationMs int64, devStartTime time.Time) {
+	if isCI() {
+		return
+	}
+
+	evt := inngestgo.Event{
+		Name: TimeToFirstSyncEvent,
+		Data: map[string]any{
+			"account_id":     m.AccountID,
+			"device_id":      m.DeviceID,
+			"cli_version":    m.CLIVersion,
+			"os":             m.OS,
+			"duration_ms":    durationMs,
+			"dev_start_time": devStartTime.Unix(),
+			"sync_time":      time.Now().Unix(),
+		},
+		Timestamp: time.Now().UnixMilli(),
+		Version:   "2025-07-11",
+	}
+
 	Send(ctx, evt)
 }
 

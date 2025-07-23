@@ -215,6 +215,9 @@ func (a devapi) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Track time-to-first-sync telemetry if this is the first successful sync
+	a.trackFirstSync(ctx)
+
 	// Re-initialize our cron manager.
 	if err := a.devserver.Runner.InitializeCrons(ctx); err != nil {
 		l.Warn("error initializing crons", "error", err)
@@ -653,4 +656,32 @@ type InfoResponse struct {
 
 	// Features acts as an in-memory feature flag for the UI
 	Features map[string]bool `json:"features"`
+}
+
+// trackFirstSync checks if this is the first app sync and emits telemetry if so
+func (a *devapi) trackFirstSync(ctx context.Context) {
+	a.devserver.firstSyncLock.Lock()
+	defer a.devserver.firstSyncLock.Unlock()
+
+	// Only track the first sync
+	if a.devserver.firstSyncDone {
+		return
+	}
+
+	a.devserver.firstSyncDone = true
+
+	// Only emit telemetry if we have a valid dev start time
+	if a.devserver.Opts.DevStartTime.IsZero() {
+		return
+	}
+
+	// Calculate duration since dev command started
+	now := time.Now()
+	durationMs := now.Sub(a.devserver.Opts.DevStartTime).Milliseconds()
+
+	// Create metadata for telemetry
+	metadata := tel.NewMetadata(ctx)
+
+	// Send the time-to-first-sync event
+	tel.SendTimeToFirstSync(ctx, metadata, durationMs, a.devserver.Opts.DevStartTime)
 }

@@ -57,6 +57,7 @@ func NewService(opts StartOpts, runner runner.Runner, data cqrs.Manager, pb pubs
 		Runner:                  runner,
 		Opts:                    opts,
 		handlerLock:             &sync.Mutex{},
+		firstSyncLock:           &sync.Mutex{},
 		publisher:               pb,
 		stepLimitOverrides:      stepLimitOverrides,
 		stateSizeLimitOverrides: stateSizeLimitOverrides,
@@ -96,6 +97,10 @@ type devserver struct {
 	// handlers are updated by the API (d.apiservice) when registering functions.
 	handlers    []SDKHandler
 	handlerLock *sync.Mutex
+
+	// firstSyncDone tracks whether the first app sync has occurred for telemetry
+	firstSyncDone bool
+	firstSyncLock *sync.Mutex
 
 	// These options are used to configure the server's behaviour as a
 	// single-node service instead of a dev environment.
