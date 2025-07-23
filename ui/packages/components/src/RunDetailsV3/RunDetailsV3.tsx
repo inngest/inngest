@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
 import { ErrorCard } from '../Error/ErrorCard';
@@ -45,7 +45,7 @@ type Run = {
   hasAI: boolean;
 };
 
-const MIN_HEIGHT = 586;
+const MIN_HEIGHT = 550;
 
 export const RunDetailsV3 = (props: Props) => {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -54,7 +54,7 @@ export const RunDetailsV3 = (props: Props) => {
   const { getResult, getRun, getTrigger, runID, standalone } = props;
   const [pollInterval, setPollInterval] = useState(props.pollInterval);
   const [leftWidth, setLeftWidth] = useState(55);
-  const [height, setHeight] = useState(0);
+  const [height, setHeight] = useState(MIN_HEIGHT);
   const [isDragging, setIsDragging] = useState(false);
   const { selectedStep } = useStepSelection(runID);
 
@@ -84,12 +84,22 @@ export const RunDetailsV3 = (props: Props) => {
     [isDragging]
   );
 
-  useEffect(() => {
-    //
-    // left column height is dynamic and should determine right column height
-    const h = leftColumnRef.current?.clientHeight ?? 0;
-    setHeight(h > MIN_HEIGHT ? h : MIN_HEIGHT);
-  }, [leftColumnRef.current?.clientHeight]);
+  useLayoutEffect(() => {
+    if (!leftColumnRef.current) {
+      return;
+    }
+
+    const resizeObserver = new ResizeObserver(() => {
+      const h = leftColumnRef.current?.clientHeight ?? 0;
+      setHeight(h > MIN_HEIGHT ? h : MIN_HEIGHT);
+    });
+
+    resizeObserver.observe(leftColumnRef.current);
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, []);
 
   useEffect(() => {
     if (isDragging) {

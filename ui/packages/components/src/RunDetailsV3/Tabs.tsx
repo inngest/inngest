@@ -37,7 +37,7 @@ export const Tabs = ({ tabs, defaultActive = '' }: { tabs: TabsType; defaultActi
   }, [defaultActive]);
 
   return (
-    <div className="flex w-full flex-col">
+    <div className="flex h-full w-full flex-col">
       <div className="border-muted flex w-full flex-row gap-4 border-b px-4">
         {tabs.map((t: TabType, i: number) => (
           <Tab

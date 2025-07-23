@@ -1,4 +1,5 @@
 import { CodeBlock, type CodeBlockAction } from '../CodeBlock';
+import { NewCodeBlock } from '../NewCodeBlock/NewCodeBlock';
 
 export type IOProps = {
   title: string;
@@ -8,17 +9,18 @@ export type IOProps = {
   loading?: boolean;
 };
 
-export const IO = ({ title, actions, raw, error }: IOProps) => {
+export const IO = ({ title, actions, raw, error, loading }: IOProps) => {
   return (
-    <div className="text-muted h-full overflow-y-scroll" onWheel={(e) => e.stopPropagation()}>
-      <CodeBlock
+    <div className="text-muted bg-codeEditor h-full">
+      <NewCodeBlock
         actions={actions}
         header={{ title, ...(error && { status: 'error' }) }}
         tab={{
           content: raw ?? 'Unknown',
         }}
-        alwaysFullHeight={true}
         allowFullScreen={true}
+        parsed={false}
+        loading={loading}
       />
     </div>
   );

@@ -130,7 +130,7 @@ export const TopInfo = ({ slug, getTrigger, runID, result }: TopInfoProps) => {
   }
 
   return (
-    <div className="sticky top-14 flex flex-col justify-start gap-2 overflow-hidden">
+    <div className="sticky top-14 flex h-full flex-col justify-start gap-2 overflow-hidden">
       <div className="flex h-11 w-full flex-row items-center justify-between border-none px-4 pt-2">
         <div
           className="text-basis flex cursor-pointer items-center justify-start gap-2"
@@ -240,12 +240,8 @@ export const TopInfo = ({ slug, getTrigger, runID, result }: TopInfoProps) => {
           )}
         </div>
       )}
-      {result?.error && (
-        <div>
-          <ErrorInfo error={result.error.message || 'Unknown error'} />
-        </div>
-      )}
-      <div>
+      {result?.error && <ErrorInfo error={result.error.message || 'Unknown error'} />}
+      <div className="flex-1">
         <Tabs
           defaultActive={result?.error ? 'error' : prettyPayload ? 'input' : 'output'}
           tabs={[
@@ -277,13 +273,11 @@ export const TopInfo = ({ slug, getTrigger, runID, result }: TopInfoProps) => {
             ...(result?.error
               ? [
                   {
-                    label: 'Error',
+                    label: 'Error details',
                     id: 'error',
                     node: (
                       <IO
-                        title={`${result.error.name || 'Error'} ${
-                          result.error.message ? `: ${result.error.message}` : ''
-                        }`}
+                        title={result.error.message || 'Unknown error'}
                         raw={prettyErrorBody ?? ''}
                         error={true}
                         loading={isPending}
