@@ -193,7 +193,13 @@ func (a API) ReceiveEvent(w http.ResponseWriter, r *http.Request) {
 	stream := make(chan eventstream.StreamItem)
 	eg, ctx := errgroup.WithContext(ctx)
 	eg.Go(func() error {
-		return eventstream.ParseStream(ctx, r.Body, stream, consts.AbsoluteMaxEventSize)
+		return eventstream.ParseStream(
+			ctx,
+			r.Body,
+			stream,
+			consts.AbsoluteMaxEventSize,
+			r.Header.Get("Content-Type"),
+		)
 	})
 
 	// Create a new channel which holds all event IDs as a slice.
