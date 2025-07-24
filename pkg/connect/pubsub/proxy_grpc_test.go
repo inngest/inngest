@@ -131,14 +131,13 @@ func TestProxyGRPCPath(t *testing.T) {
 	sm := state.NewRedisConnectionStateManager(rc)
 	mockForwarder := &mockGatewayGRPCManager{}
 
-	connector := newRedisPubSubConnector(rc, RedisPubSubConnectorOpts{
+	connector := newGRPCConnector(GRPCConnectorOpts{
 		Logger:       l,
 		Tracer:       trace.NewConditionalTracer(trace.ConnectTracer(), trace.AlwaysTrace),
 		StateManager: sm,
 		EnforceLeaseExpiry: func(ctx context.Context, accountID uuid.UUID) bool {
 			return true
 		},
-		ShouldUseGRPC:      useGRPCAlways,
 		GatewayGRPCManager: mockForwarder,
 	})
 
@@ -334,14 +333,13 @@ func TestProxyGRPCPolling(t *testing.T) {
 	sm := state.NewRedisConnectionStateManager(rc)
 	mockForwarder := &mockGatewayGRPCManager{}
 
-	connector := newRedisPubSubConnector(rc, RedisPubSubConnectorOpts{
+	connector := newGRPCConnector(GRPCConnectorOpts{
 		Logger:       l,
 		Tracer:       trace.NewConditionalTracer(trace.ConnectTracer(), trace.AlwaysTrace),
 		StateManager: sm,
 		EnforceLeaseExpiry: func(ctx context.Context, accountID uuid.UUID) bool {
 			return true
 		},
-		ShouldUseGRPC:      useGRPCAlways,
 		GatewayGRPCManager: mockForwarder,
 	})
 
@@ -534,14 +532,13 @@ func TestProxyGRPCLeaseExpiry(t *testing.T) {
 	sm := state.NewRedisConnectionStateManager(rc)
 	mockForwarder := &mockGatewayGRPCManager{}
 
-	connector := newRedisPubSubConnector(rc, RedisPubSubConnectorOpts{
+	connector := newGRPCConnector(GRPCConnectorOpts{
 		Logger:       l,
 		Tracer:       trace.NewConditionalTracer(trace.ConnectTracer(), trace.AlwaysTrace),
 		StateManager: sm,
 		EnforceLeaseExpiry: func(ctx context.Context, accountID uuid.UUID) bool {
 			return true
 		},
-		ShouldUseGRPC:      useGRPCAlways,
 		GatewayGRPCManager: mockForwarder,
 	})
 

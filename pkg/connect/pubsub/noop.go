@@ -7,10 +7,8 @@ import (
 	connpb "github.com/inngest/inngest/proto/gen/connect/v1"
 )
 
-func WithNoop() ConnectorOpt {
-	return func(ctx context.Context) (Connector, error) {
-		return noopConnector{}, nil
-	}
+func NewNoopConnector() Connector {
+	return noopConnector{}
 }
 
 // noopConnector is a blank implementation of the Connector interface
