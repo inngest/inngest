@@ -247,7 +247,7 @@ func IncrAggregatePausesFoundCounter(ctx context.Context, value int64, opts Coun
 	})
 }
 
-func IncrConnectGatewayReceivedRouterPubSubMessageCounter(ctx context.Context, value int64, opts CounterOpt) {
+func IncrConnectGatewayReceivedRouterGRPCMessageCounter(ctx context.Context, value int64, opts CounterOpt) {
 	RecordCounterMetric(ctx, value, CounterOpt{
 		PkgName:     opts.PkgName,
 		MetricName:  "connect_gateway.router.received_pubsub_messages",
