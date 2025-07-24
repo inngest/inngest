@@ -27,6 +27,7 @@ export const SharedContextProvider = ({ children }: { children: React.ReactNode 
     booleanFlag: useBooleanFlag,
     cloud: false,
     getRun,
+    inngestStatus: null,
   };
 
   return <SharedProvider handlers={handlers}>{children}</SharedProvider>;

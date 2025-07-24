@@ -1,9 +1,11 @@
+import {
+  impactSchema,
+  type Indicator,
+  type InngestStatus as Status,
+} from '@inngest/components/SharedContext/useInngestStatus';
 import { z } from 'zod';
 
-const impactSchema = z.enum(['partial_outage', 'degraded_performance', 'full_outage']);
-
-const indicatorSchema = z.enum(['none', 'maintenance', ...impactSchema.options]);
-type Indicator = z.infer<typeof indicatorSchema>;
+export type { Status };
 
 const statusEventSchema = z.object({
   id: z.string(),
@@ -44,14 +46,6 @@ const statusPageSummaryResponseSchema = z.object({
   in_progress_maintenances: z.array(maintenanceInProgressEventSchema),
   scheduled_maintenances: z.array(maintenanceScheduledEventSchema),
 });
-
-export type Status = {
-  url: string;
-  description: string;
-  impact: Indicator;
-  indicatorColor: string;
-  updated_at: string;
-};
 
 const impactMessage: { [K in Indicator]: string } = {
   none: 'All systems operational',
