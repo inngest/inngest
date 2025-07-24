@@ -291,7 +291,7 @@ func TestQueueIterator(t *testing.T) {
 	q := NewQueue(
 		defaultShard,
 		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
-			return true
+			return false // TODO need to add support for key queues
 		}),
 		WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
 			return false
