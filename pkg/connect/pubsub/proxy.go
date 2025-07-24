@@ -28,7 +28,7 @@ const (
 )
 
 /*
-	This package provides a PubSub-based request forwarding mechanism for the Connect SDK.
+	This package provides a gRPC-based request forwarding mechanism for the Connect SDK.
 
 	Execution requests are forwarded from the executor to the SDK via the connect infrastructure, including the following components:
 
@@ -50,7 +50,7 @@ type RequestForwarder interface {
 
 type EnforceLeaseExpiryFunc func(ctx context.Context, accountID uuid.UUID) bool
 
-type redisPubSubConnector struct {
+type grpcConnector struct {
 	logger logger.Logger
 	tracer trace.ConditionalTracer
 
@@ -60,10 +60,9 @@ type redisPubSubConnector struct {
 	enforceLeaseExpiry EnforceLeaseExpiryFunc
 
 	gatewayGRPCManager GatewayGRPCManager
-
 }
 
-type RedisPubSubConnectorOpts struct {
+type GRPCConnectorOpts struct {
 	Logger             logger.Logger
 	Tracer             trace.ConditionalTracer
 	StateManager       state.StateManager
@@ -72,8 +71,8 @@ type RedisPubSubConnectorOpts struct {
 	GatewayGRPCManager GatewayGRPCManager
 }
 
-func newRedisPubSubConnector(opts RedisPubSubConnectorOpts) *redisPubSubConnector {
-	return &redisPubSubConnector{
+func newGRPCConnector(opts GRPCConnectorOpts) *grpcConnector {
+	return &grpcConnector{
 		logger:             opts.Logger,
 		tracer:             opts.Tracer,
 		enforceLeaseExpiry: opts.EnforceLeaseExpiry,
@@ -99,7 +98,7 @@ type ProxyOpts struct {
 //
 // If the gateway does not ack the message within a 10-second timeout, an error is returned.
 // If no response is received before the context is canceled, an error is returned.
-func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*connectpb.SDKResponse, error) {
+func (i *grpcConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*connectpb.SDKResponse, error) {
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -382,7 +381,7 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 
 		l.Debug("forwarded executor request to gateway", "gateway_id", route.GatewayID, "conn_id", route.ConnectionID)
 
-		metrics.IncrConnectRouterPubSubMessageSentCounter(ctx, 1, metrics.CounterOpt{
+		metrics.IncrConnectRouterGRPCMessageSentCounter(ctx, 1, metrics.CounterOpt{
 			PkgName: pkgName,
 			Tags:    map[string]any{"transport": transport},
 		})

@@ -333,7 +333,6 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	conditionalTracer := itrace.NewConditionalTracer(itrace.ConnectTracer(), itrace.AlwaysTrace)
 
-	connectPubSubRedis := createConnectPubSubRedis()
 	connectPubSubLogger := logger.StdlibLoggerWithCustomVarName(ctx, "CONNECT_PUBSUB_LOG_LEVEL")
 
 	connectionManager := connstate.NewRedisConnectionStateManager(connectRc)
@@ -344,16 +343,13 @@ func start(ctx context.Context, opts StartOpts) error {
 	executorLogger := connectPubSubLogger.With("svc", "executor")
 	gatewayGRPCForwarder := connectpubsub.NewGatewayGRPCManager(ctx, connectionManager, connectpubsub.WithLogger(executorLogger))
 
-	executorProxy, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectPubSubRedis, true, connectpubsub.RedisPubSubConnectorOpts{
+	executorProxy := connectpubsub.NewConnector(connectpubsub.GRPCConnectorOpts{
 		Logger:             executorLogger,
 		Tracer:             conditionalTracer,
 		StateManager:       connectionManager,
 		EnforceLeaseExpiry: enforceConnectLeaseExpiry,
 		GatewayGRPCManager: gatewayGRPCForwarder,
-	}))
-	if err != nil {
-		return fmt.Errorf("failed to create connect pubsub connector: %w", err)
-	}
+	})
 
 	// Before running the development service, ensure that we change the http
 	// driver in development to use our AWS Gateway http client, attempting to
@@ -656,14 +652,6 @@ func createInmemoryRedis(ctx context.Context, tick time.Duration) (rueidis.Clien
 	return rc, r, nil
 }
 
-func createConnectPubSubRedis() rueidis.ClientOption {
-	r := miniredis.NewMiniRedis()
-	_ = r.Start()
-	return rueidis.ClientOption{
-		InitAddress:  []string{r.Addr()},
-		DisableCache: true,
-	}
-}
 
 func getSendingEventHandler(ctx context.Context, pb pubsub.Publisher, topic string) execution.HandleSendingEvent {
 	return func(ctx context.Context, evt event.Event, item queue.Item) error {
