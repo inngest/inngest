@@ -279,3 +279,84 @@ func TestItemsByBacklog(t *testing.T) {
 		})
 	}
 }
+
+func TestQueueIterator(t *testing.T) {
+	r, rc := initRedis(t)
+	defer rc.Close()
+
+	ctx := context.Background()
+	clock := clockwork.NewFakeClock()
+	defaultShard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName}
+
+	q := NewQueue(
+		defaultShard,
+		WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
+			return true
+		}),
+		WithDisableLeaseChecks(func(ctx context.Context, acctID uuid.UUID) bool {
+			return false
+		}),
+		WithClock(clock),
+	)
+
+	acctId, wsID := uuid.New(), uuid.New()
+
+	testcases := []struct {
+		name       string
+		partitions int
+		items      int
+	}{
+		{
+			name:       "one partition",
+			partitions: 1,
+			items:      100,
+		},
+		{
+			name:       "multiple partitions",
+			partitions: 100,
+			items:      500,
+		},
+	}
+
+	for _, tc := range testcases {
+		t.Run(tc.name, func(t *testing.T) {
+			r.FlushAll()
+
+			// construct partition IDs
+			partitions := make([]uuid.UUID, tc.partitions)
+			for i := range tc.partitions {
+				partitions[i] = uuid.New()
+			}
+
+			for i := range tc.items {
+				size := len(partitions)
+				fnID := partitions[i%size]
+
+				item := osqueue.QueueItem{
+					ID:          fmt.Sprintf("test%d", i),
+					FunctionID:  fnID,
+					WorkspaceID: wsID,
+					Data: osqueue.Item{
+						WorkspaceID: wsID,
+						Kind:        osqueue.KindEdge,
+						Identifier: state.Identifier{
+							AccountID:       acctId,
+							WorkspaceID:     wsID,
+							WorkflowID:      fnID,
+							WorkflowVersion: 1,
+						},
+					},
+				}
+
+				_, err := q.EnqueueItem(ctx, defaultShard, item, q.clock.Now(), osqueue.EnqueueOpts{})
+				require.NoError(t, err)
+			}
+
+			ptCnt, piCnt, err := q.QueueIterator(ctx, QueueIteratorOpts{})
+			require.NoError(t, err)
+
+			require.EqualValues(t, tc.partitions, ptCnt)
+			require.EqualValues(t, tc.items, piCnt)
+		})
+	}
+}
