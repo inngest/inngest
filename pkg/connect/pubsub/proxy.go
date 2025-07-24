@@ -108,12 +108,10 @@ type redisPubSubConnector struct {
 	enforceLeaseExpiry EnforceLeaseExpiryFunc
 
 	gatewayGRPCManager GatewayGRPCManager
-	shouldUseGRPC      UseGRPCFunc
 
 	RequestReceiver
 }
 
-type UseGRPCFunc func(ctx context.Context, accountID uuid.UUID) bool
 
 type RedisPubSubConnectorOpts struct {
 	Logger             logger.Logger
@@ -121,20 +119,10 @@ type RedisPubSubConnectorOpts struct {
 	StateManager       state.StateManager
 	EnforceLeaseExpiry EnforceLeaseExpiryFunc
 
-	ShouldUseGRPC      UseGRPCFunc
 	GatewayGRPCManager GatewayGRPCManager
 }
 
 func newRedisPubSubConnector(client rueidis.Client, opts RedisPubSubConnectorOpts) *redisPubSubConnector {
-	var shouldUseGRPC UseGRPCFunc
-	if opts.ShouldUseGRPC == nil {
-		shouldUseGRPC = func(ctx context.Context, accountID uuid.UUID) bool {
-			return false
-		}
-	} else {
-		shouldUseGRPC = opts.ShouldUseGRPC
-	}
-
 	return &redisPubSubConnector{
 		client:             client,
 		subscribers:        make(map[string]map[string]*subscription),
@@ -145,7 +133,6 @@ func newRedisPubSubConnector(client rueidis.Client, opts RedisPubSubConnectorOpt
 		enforceLeaseExpiry: opts.EnforceLeaseExpiry,
 
 		gatewayGRPCManager: opts.GatewayGRPCManager,
-		shouldUseGRPC:      shouldUseGRPC,
 
 		// For routing
 		stateManager: opts.StateManager,
@@ -261,57 +248,8 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 		opts.Data.UserTraceCtx = marshaled
 	}
 
-	// Receive gateway acknowledgement for o11y (this is not a reliable channel - do not depend on it for the critical path)
-	// TODO: Remove this once we fully switch to gRPC
-	if !i.shouldUseGRPC(ctx, opts.AccountID) {
-		var gatewayAcked bool
-		gatewayAckSubscribed := make(chan struct{})
-		withAckTimeout, cancel := context.WithTimeout(ctx, 10*time.Second)
-		defer cancel()
-		go func() {
-			i.subscribe(withAckTimeout, i.channelAppRequestsAck(opts.Data.RequestId, AckSourceGateway), func(_ string) {
-				gatewayAcked = true
-				span.AddEvent("GatewayAck")
-				metrics.HistogramConnectProxyAckTime(ctx, time.Since(proxyStartTime).Milliseconds(), metrics.HistogramOpt{
-					PkgName: pkgName,
-					Tags: map[string]any{
-						"kind": "gateway",
-					},
-				})
-			}, true, gatewayAckSubscribed)
-			if ctx.Err() != nil && !gatewayAcked {
-				span.RecordError(fmt.Errorf("gateway ack not received in time"))
-				l.Warn("gateway did not ack request")
-			}
-		}()
-
-		select {
-		case <-gatewayAckSubscribed:
-		case <-time.After(5 * time.Second):
-			return nil, fmt.Errorf("did not subscribe to gateway ack within 5s")
-		}
-
-		// Receive worker acknowledgement for o11y (this is not a reliable channel - do not depend on it for the critical path)
-		workerAckSubscribed := make(chan struct{})
-		go func() {
-			i.subscribe(ctx, i.channelAppRequestsAck(opts.Data.RequestId, AckSourceWorker), func(_ string) {
-				span.AddEvent("WorkerAck")
-				metrics.HistogramConnectProxyAckTime(ctx, time.Since(proxyStartTime).Milliseconds(), metrics.HistogramOpt{
-					PkgName: pkgName,
-					Tags: map[string]any{
-						"kind":      "worker",
-						"transport": "pubsub",
-					},
-				})
-			}, true, workerAckSubscribed)
-		}()
-
-		select {
-		case <-workerAckSubscribed:
-		case <-time.After(5 * time.Second):
-			return nil, fmt.Errorf("did not subscribe to worker ack within 5s")
-		}
-	} else {
+	{
+		// Receive worker acknowledgement for o11y
 		ch := i.gatewayGRPCManager.SubscribeWorkerAck(ctx, opts.Data.RequestId)
 		defer i.gatewayGRPCManager.UnsubscribeWorkerAck(ctx, opts.Data.RequestId)
 
@@ -369,35 +307,7 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 		}
 	}()
 
-	if !i.shouldUseGRPC(ctx, opts.AccountID) {
-		replySubscribed := make(chan struct{})
-		go func() {
-			// This may take a while: This waits until we receive the SDK response, and we allow for up to 2h in the serverless execution model
-			i.subscribe(waitForResponseCtx, i.channelAppRequestsReply(opts.Data.RequestId), func(msg string) {
-				span.AddEvent("ReplyReceived")
-
-				l.Debug("received response via pubsub")
-
-				err := proto.Unmarshal([]byte(msg), reply)
-				if err != nil {
-					// This should never happen
-					span.SetAttributes(
-						attribute.String("msg", msg),
-					)
-					span.RecordError(err)
-					span.SetStatus(codes.Error, "unmarshaling sdk response proto failed")
-				}
-
-				cancelWaitForResponseCtx()
-			}, true, replySubscribed)
-		}()
-
-		select {
-		case <-replySubscribed:
-		case <-time.After(5 * time.Second):
-			return nil, fmt.Errorf("did not subscribe to reply within 5s")
-		}
-	} else {
+	{
 		// Alternatively, the gateway will send the response as soon as it comes in.
 		// This is unreliable but quicker than polling for the response, so we use this
 		// as a best-effort notification mechanism.
@@ -512,21 +422,15 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 		transport := "grpc"
 
 		// Forward the request
-		if i.shouldUseGRPC(ctx, opts.AccountID) {
-			err = i.gatewayGRPCManager.Forward(ctx, route.GatewayID, route.ConnectionID, opts.Data)
-
-			// Ack here instead of needing a pubsub ack message
-			if err != nil {
-				metrics.HistogramConnectProxyAckTime(ctx, time.Since(proxyStartTime).Milliseconds(), metrics.HistogramOpt{
-					PkgName: pkgName,
-					Tags: map[string]any{
-						"kind": "gateway",
-					},
-				})
-			}
-		} else {
-			transport = "pubsub"
-			err = i.RouteExecutorRequest(ctx, route.GatewayID, route.ConnectionID, opts.Data)
+		err = i.gatewayGRPCManager.Forward(ctx, route.GatewayID, route.ConnectionID, opts.Data)
+		if err != nil {
+			// Handle gateway ack
+			metrics.HistogramConnectProxyAckTime(ctx, time.Since(proxyStartTime).Milliseconds(), metrics.HistogramOpt{
+				PkgName: pkgName,
+				Tags: map[string]any{
+					"kind": "gateway",
+				},
+			})
 		}
 
 		if err != nil {
