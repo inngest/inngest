@@ -2,12 +2,10 @@ package pubsub
 
 import (
 	"context"
-	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
 	mathRand "math/rand"
-	"sync"
 	"time"
 
 	"github.com/google/uuid"
@@ -20,13 +18,9 @@ import (
 	"github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/inngest/inngest/pkg/util"
 	connectpb "github.com/inngest/inngest/proto/gen/connect/v1"
-	"github.com/oklog/ulid/v2"
-	"github.com/redis/rueidis"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/propagation"
-	"google.golang.org/protobuf/proto"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 const (
@@ -54,51 +48,9 @@ type RequestForwarder interface {
 	Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*connectpb.SDKResponse, error)
 }
 
-type AckSource string
-
-const (
-	AckSourceWorker  AckSource = "worker"
-	AckSourceGateway AckSource = "gateway"
-)
-
-type ResponseNotifier interface {
-	// NotifyExecutor sends a response to the executor for a specific request.
-	NotifyExecutor(ctx context.Context, resp *connectpb.SDKResponse) error
-}
-
-type RequestReceiver interface {
-	ResponseNotifier
-
-	// RouteExecutorRequest forwards an executor request to the respective gateway
-	RouteExecutorRequest(ctx context.Context, gatewayId ulid.ULID, connId ulid.ULID, data *connectpb.GatewayExecutorRequestData) error
-
-	// ReceiveRoutedRequest listens for incoming PubSub messages for a specific gateway and app and calls the provided callback.
-	// This is a blocking call which only stops once the context is canceled.
-	ReceiveRoutedRequest(ctx context.Context, gatewayId ulid.ULID, connId ulid.ULID, onMessage func(rawBytes []byte, data *connectpb.GatewayExecutorRequestData), onSubscribed chan struct{}) error
-
-	// AckMessage sends an acknowledgment for a specific request.
-	AckMessage(ctx context.Context, requestId string, source AckSource) error
-
-	// Wait blocks and listens for incoming PubSub messages for the internal subscribers. This must be run before
-	// subscribing to any channels to ensure that the PubSub client is connected and ready to receive messages.
-	Wait(ctx context.Context) error
-}
-
-type subscription struct {
-	ch  chan string
-	ctx context.Context
-}
-
 type EnforceLeaseExpiryFunc func(ctx context.Context, accountID uuid.UUID) bool
 
 type redisPubSubConnector struct {
-	client       rueidis.Client
-	pubSubClient rueidis.DedicatedClient
-	setup        chan struct{}
-
-	subscribers     map[string]map[string]*subscription
-	subscribersLock sync.RWMutex
-
 	logger logger.Logger
 	tracer trace.ConditionalTracer
 
@@ -109,9 +61,7 @@ type redisPubSubConnector struct {
 
 	gatewayGRPCManager GatewayGRPCManager
 
-	RequestReceiver
 }
-
 
 type RedisPubSubConnectorOpts struct {
 	Logger             logger.Logger
@@ -122,14 +72,10 @@ type RedisPubSubConnectorOpts struct {
 	GatewayGRPCManager GatewayGRPCManager
 }
 
-func newRedisPubSubConnector(client rueidis.Client, opts RedisPubSubConnectorOpts) *redisPubSubConnector {
+func newRedisPubSubConnector(opts RedisPubSubConnectorOpts) *redisPubSubConnector {
 	return &redisPubSubConnector{
-		client:             client,
-		subscribers:        make(map[string]map[string]*subscription),
-		subscribersLock:    sync.RWMutex{},
 		logger:             opts.Logger,
 		tracer:             opts.Tracer,
-		setup:              make(chan struct{}),
 		enforceLeaseExpiry: opts.EnforceLeaseExpiry,
 
 		gatewayGRPCManager: opts.GatewayGRPCManager,
@@ -154,12 +100,6 @@ type ProxyOpts struct {
 // If the gateway does not ack the message within a 10-second timeout, an error is returned.
 // If no response is received before the context is canceled, an error is returned.
 func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOpts) (*connectpb.SDKResponse, error) {
-	select {
-	case <-i.setup:
-	case <-time.After(10 * time.Second):
-		return nil, fmt.Errorf("expected setup to be completed within 10s")
-	}
-
 	ctx, cancel := context.WithCancel(ctx)
 	defer cancel()
 
@@ -497,267 +437,4 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 			Message: "The worker stopped responding to the request.",
 		}
 	}
-}
-
-// channelGatewayAppRequests returns the channel name for routed executor requests received by the gateway for a specific app and connection.
-func (i *redisPubSubConnector) channelGatewayAppRequests(gatewayId ulid.ULID, connId ulid.ULID) string {
-	return fmt.Sprintf("app_requests:%s:%s", gatewayId, connId)
-}
-
-func (i *redisPubSubConnector) channelAppRequestsAck(requestId string, source AckSource) string {
-	return fmt.Sprintf("app_requests_ack:%s:%s", requestId, source)
-}
-
-func (i *redisPubSubConnector) channelAppRequestsReply(requestId string) string {
-	return fmt.Sprintf("app_requests_reply:%s", requestId)
-}
-
-// subscribe sets up a subscription to a specific channel and calls the provided callback whenever a message is received.
-// This method is blocking and will only return once the context is canceled.
-//
-// Upon return, the subscription is cleaned up and if the subscription was the last one for the channel, the PubSub client
-// is unsubscribed from the channel.
-func (i *redisPubSubConnector) subscribe(ctx context.Context, channel string, onMessage func(msg string), once bool, onSubscribed chan struct{}) {
-	<-i.setup
-
-	msgs := make(chan string)
-
-	subId := ulid.MustNew(ulid.Now(), rand.Reader).String()
-
-	// Set up internal subscription handler
-	redisSubscribed := false
-	{
-		i.subscribersLock.Lock()
-
-		if _, ok := i.subscribers[channel]; !ok {
-			// subscribe to channel
-			i.subscribers[channel] = make(map[string]*subscription)
-		} else {
-			redisSubscribed = true
-		}
-
-		i.subscribers[channel][subId] = &subscription{
-			ch:  msgs,
-			ctx: ctx,
-		}
-
-		i.subscribersLock.Unlock()
-	}
-
-	// This function is blocking, so whenever we return, we want to clean up the subscription handler and potentially
-	// remove the subscription, if it's no longer used.
-	defer func() {
-		i.subscribersLock.Lock()
-		defer i.subscribersLock.Unlock()
-
-		close(msgs)
-		i.logger.Debug("connect pubsub removing in-memory subscription", "channel", channel, "sub_id", subId)
-		delete(i.subscribers[channel], subId)
-		if len(i.subscribers[channel]) == 0 {
-			i.logger.Debug("unsubscribing pubsub client from channel", "channel", channel)
-			delete(i.subscribers, channel)
-			i.pubSubClient.Do(ctx, i.pubSubClient.B().Unsubscribe().Channel(channel).Build())
-		}
-	}()
-
-	// Set up receiver for incoming messages _before_ subscribing
-	done := make(chan struct{})
-	go func() {
-		defer func() {
-			done <- struct{}{}
-		}()
-
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case msg := <-msgs:
-				onMessage(msg)
-				if once {
-					return
-				}
-			}
-		}
-	}()
-
-	// If Redis client is not subscribed to channel already, send SUBSCRIBE command
-	if !redisSubscribed {
-		i.pubSubClient.Do(ctx, i.pubSubClient.B().Subscribe().Channel(channel).Build())
-		i.logger.Debug("connect pubsub client subscribed to channel", "channel", channel)
-	}
-
-	if onSubscribed != nil {
-		close(onSubscribed)
-	}
-
-	<-done
-}
-
-// ReceiveRoutedRequest listens for incoming PubSub messages for a specific app and calls the provided callback.
-// This is a blocking call which only stops once the context is canceled.
-func (i *redisPubSubConnector) ReceiveRoutedRequest(ctx context.Context, gatewayId ulid.ULID, connId ulid.ULID, onMessage func(rawBytes []byte, data *connectpb.GatewayExecutorRequestData), onSubscribed chan struct{}) error {
-	i.subscribe(ctx, i.channelGatewayAppRequests(gatewayId, connId), func(msg string) {
-		// TODO Test whether this works with marshaled Protobuf bytes
-		msgBytes := []byte(msg)
-
-		var data connectpb.GatewayExecutorRequestData
-		err := proto.Unmarshal(msgBytes, &data)
-		if err != nil {
-			// TODO This should never happen, but PubSub will not redeliver, should we push the message into a dead-letter channel?
-			i.logger.Error("invalid protobuf received by gateway", "err", err, "msg", msgBytes, "gateway_id", gatewayId, "conn_id", connId)
-			return
-		}
-
-		onMessage(msgBytes, &data)
-	}, false, onSubscribed)
-	return nil
-}
-
-// Wait blocks and listens for incoming PubSub messages for the internal subscribers. This must be run before
-// subscribing to any channels to ensure that the PubSub client is connected and ready to receive messages.
-func (i *redisPubSubConnector) Wait(ctx context.Context) error {
-	// If we already set this up, return immediately
-	if i.pubSubClient != nil {
-		return nil
-	}
-
-	c, cancel := i.client.Dedicate()
-	defer cancel()
-
-	go func() {
-		<-ctx.Done()
-
-		i.logger.Debug("gracefully shutting down connect pubsub subscriber")
-
-		i.subscribersLock.Lock()
-		defer i.subscribersLock.Unlock()
-
-		// TODO Should we prevent other executors from subscribing while we're in "shutting down" state?
-
-		// Unsubscribe from all channels
-		subs := i.subscribers
-		for channelName := range subs {
-			c.Do(ctx, c.B().Unsubscribe().Channel(channelName).Build())
-		}
-
-		c.Close()
-	}()
-
-	i.pubSubClient = c
-	close(i.setup)
-
-	wait := c.SetPubSubHooks(rueidis.PubSubHooks{
-		OnMessage: func(m rueidis.PubSubMessage) {
-			i.logger.Debug("connect pubsub received message", "channel", m.Channel)
-
-			// Run in another goroutine to avoid blocking `c`
-			go func() {
-				i.subscribersLock.RLock()
-				// NOTE:  We have to keep this lock as we send in channels, otherwise we may attempt
-				// to send on a closed channel that's unsubscribed.  Therefore, we keep the read lock
-				// until we're done sending to all chans.
-				defer i.subscribersLock.RUnlock()
-
-				subs := i.subscribers[m.Channel]
-				if len(subs) == 0 {
-					// This should not happen: In subscribe, we UNSUBSCRIBE once the last subscriber is removed
-					i.logger.Debug("no subscribers for connect pubsub channel", "channel", m.Channel)
-					return
-				}
-
-				for _, sub := range subs {
-					select {
-					case sub.ch <- m.Message:
-						// Message successfully sent
-					case <-sub.ctx.Done():
-						// Subscriber's context is cancelled; stop processing further
-						continue
-					}
-				}
-			}()
-		},
-	})
-
-	if i.gatewayGRPCManager != nil {
-		if err := i.gatewayGRPCManager.ConnectToGateways(ctx); err != nil {
-			return err
-		}
-	}
-
-	err := <-wait // disconnected with err
-	if err != nil && !errors.Is(err, rueidis.ErrClosing) {
-		return err
-	}
-	return nil
-}
-
-// NotifyExecutor sends a response to the executor for a specific request.
-func (i *redisPubSubConnector) NotifyExecutor(ctx context.Context, resp *connectpb.SDKResponse) error {
-	serialized, err := proto.Marshal(resp)
-	if err != nil {
-		return fmt.Errorf("could not serialize response: %w", err)
-	}
-
-	channelName := i.channelAppRequestsReply(resp.RequestId)
-
-	// TODO Test whether this works with marshaled Protobuf bytes
-	err = i.client.Do(
-		ctx,
-		i.client.B().
-			Publish().
-			Channel(channelName).
-			Message(string(serialized)).
-			Build()).
-		Error()
-	if err != nil {
-		return fmt.Errorf("could not publish response: %w", err)
-	}
-
-	i.logger.Debug("sent connect pubsub reply", "channel", channelName)
-
-	return nil
-}
-
-// AckMessage sends an acknowledgment for a specific request.
-func (i *redisPubSubConnector) AckMessage(ctx context.Context, requestId string, source AckSource) error {
-	msgBytes, err := proto.Marshal(&connectpb.PubSubAckMessage{
-		Ts: timestamppb.Now(),
-	})
-	if err != nil {
-		return fmt.Errorf("could not marshal ack message: %w", err)
-	}
-
-	err = i.client.Do(
-		ctx,
-		i.client.B().
-			Publish().
-			Channel(i.channelAppRequestsAck(requestId, source)).
-			Message(string(msgBytes)).
-			Build()).
-		Error()
-	if err != nil {
-		return fmt.Errorf("could not publish response: %w", err)
-	}
-
-	return nil
-}
-
-// RouteExecutorRequest forwards an executor request to the respective gateway
-func (i *redisPubSubConnector) RouteExecutorRequest(ctx context.Context, gatewayId ulid.ULID, connId ulid.ULID, data *connectpb.GatewayExecutorRequestData) error {
-	dataBytes, err := proto.Marshal(data)
-	if err != nil {
-		return fmt.Errorf("could not marshal executor request: %w", err)
-	}
-
-	channelName := i.channelGatewayAppRequests(gatewayId, connId)
-
-	err = i.client.Do(ctx, i.client.B().Publish().Channel(channelName).Message(string(dataBytes)).Build()).Error()
-	if err != nil {
-		i.logger.Error("could not forward request to gateway", "err", err, "gateway_id", gatewayId, "channel", channelName, "req_id", data.RequestId, "conn_id", connId, "app_id", data.AppId)
-		return fmt.Errorf("could not publish executor request: %w", err)
-	}
-
-	i.logger.Debug("forwarded connect request to gateway", "gateway_id", gatewayId, "channel", channelName, "req_id", data.RequestId, "conn_id", connId, "app_id", data.AppId)
-
-	return nil
 }

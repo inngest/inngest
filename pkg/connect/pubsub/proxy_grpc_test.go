@@ -254,10 +254,6 @@ func TestProxyGRPCPath(t *testing.T) {
 	withTimeout, cancel := context.WithTimeout(ctx, time.Minute*30)
 	defer cancel()
 
-	go func() {
-		_ = connector.Wait(ctx)
-	}()
-
 	respCh := make(chan *connectpb.SDKResponse)
 	go func() {
 		resp, err := connector.Proxy(withTimeout, context.Background(), ProxyOpts{
@@ -454,10 +450,6 @@ func TestProxyGRPCPolling(t *testing.T) {
 	withTimeout, cancel := context.WithTimeout(ctx, time.Minute*30)
 	defer cancel()
 
-	go func() {
-		_ = connector.Wait(ctx)
-	}()
-
 	respCh := make(chan *connectpb.SDKResponse)
 	errCh := make(chan error)
 	go func() {
@@ -653,10 +645,6 @@ func TestProxyGRPCLeaseExpiry(t *testing.T) {
 
 	withTimeout, cancel := context.WithTimeout(ctx, time.Minute*30)
 	defer cancel()
-
-	go func() {
-		_ = connector.Wait(ctx)
-	}()
 
 	respCh := make(chan struct{})
 	go func() {
