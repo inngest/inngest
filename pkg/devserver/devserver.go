@@ -25,7 +25,7 @@ import (
 	"github.com/inngest/inngest/pkg/connect"
 	"github.com/inngest/inngest/pkg/connect/auth"
 	"github.com/inngest/inngest/pkg/connect/lifecycles"
-	connectpubsub "github.com/inngest/inngest/pkg/connect/pubsub"
+	connectgrpc "github.com/inngest/inngest/pkg/connect/grpc"
 	connectv0 "github.com/inngest/inngest/pkg/connect/rest/v0"
 	connstate "github.com/inngest/inngest/pkg/connect/state"
 	"github.com/inngest/inngest/pkg/consts"
@@ -341,15 +341,12 @@ func start(ctx context.Context, opts StartOpts) error {
 	agg := expragg.NewAggregator(ctx, 100, 100, sm.(expragg.EvaluableLoader), expressions.ExprEvaluator, nil, nil)
 
 	executorLogger := connectPubSubLogger.With("svc", "executor")
-	gatewayGRPCForwarder := connectpubsub.NewGatewayGRPCManager(ctx, connectionManager, connectpubsub.WithLogger(executorLogger))
 
-	executorProxy := connectpubsub.NewConnector(connectpubsub.GRPCConnectorOpts{
-		Logger:             executorLogger,
+	executorProxy := connectgrpc.NewConnector(ctx, connectgrpc.GRPCConnectorOpts{
 		Tracer:             conditionalTracer,
 		StateManager:       connectionManager,
 		EnforceLeaseExpiry: enforceConnectLeaseExpiry,
-		GatewayGRPCManager: gatewayGRPCForwarder,
-	})
+	}, connectgrpc.WithConnectorLogger(executorLogger))
 
 	// Before running the development service, ensure that we change the http
 	// driver in development to use our AWS Gateway http client, attempting to

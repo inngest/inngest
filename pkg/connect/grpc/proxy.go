@@ -1,4 +1,4 @@
-package pubsub
+package grpc
 
 import (
 	"context"
@@ -63,26 +63,45 @@ type grpcConnector struct {
 }
 
 type GRPCConnectorOpts struct {
-	Logger             logger.Logger
 	Tracer             trace.ConditionalTracer
 	StateManager       state.StateManager
 	EnforceLeaseExpiry EnforceLeaseExpiryFunc
-
-	GatewayGRPCManager GatewayGRPCManager
 }
 
-func newGRPCConnector(opts GRPCConnectorOpts) *grpcConnector {
-	return &grpcConnector{
-		logger:             opts.Logger,
+type GRPCConnectorOption func(*grpcConnector)
+
+func WithConnectorLogger(logger logger.Logger) GRPCConnectorOption {
+	return func(c *grpcConnector) {
+		c.logger = logger
+	}
+}
+
+func WithGatewayManager(manager GatewayGRPCManager) GRPCConnectorOption {
+	return func(c *grpcConnector) {
+		c.gatewayGRPCManager = manager
+	}
+}
+
+func newGRPCConnector(ctx context.Context, opts GRPCConnectorOpts, options ...GRPCConnectorOption) *grpcConnector {
+	connector := &grpcConnector{
+		logger:             logger.StdlibLogger(ctx), // Default logger
 		tracer:             opts.Tracer,
 		enforceLeaseExpiry: opts.EnforceLeaseExpiry,
-
-		gatewayGRPCManager: opts.GatewayGRPCManager,
-
-		// For routing
-		stateManager: opts.StateManager,
-		rnd:          util.NewFrandRNG(),
+		stateManager:       opts.StateManager,
+		rnd:                util.NewFrandRNG(),
 	}
+	
+	// Apply functional options
+	for _, option := range options {
+		option(connector)
+	}
+	
+	// Create default gateway manager if not provided via options
+	if connector.gatewayGRPCManager == nil {
+		connector.gatewayGRPCManager = newGatewayGRPCManager(ctx, opts.StateManager, WithGatewayLogger(connector.logger))
+	}
+	
+	return connector
 }
 
 type ProxyOpts struct {

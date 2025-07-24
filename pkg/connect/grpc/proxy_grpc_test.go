@@ -1,4 +1,4 @@
-package pubsub
+package grpc
 
 import (
 	"context"
@@ -131,15 +131,13 @@ func TestProxyGRPCPath(t *testing.T) {
 	sm := state.NewRedisConnectionStateManager(rc)
 	mockForwarder := &mockGatewayGRPCManager{}
 
-	connector := newGRPCConnector(GRPCConnectorOpts{
-		Logger:       l,
+	connector := newGRPCConnector(ctx, GRPCConnectorOpts{
 		Tracer:       trace.NewConditionalTracer(trace.ConnectTracer(), trace.AlwaysTrace),
 		StateManager: sm,
 		EnforceLeaseExpiry: func(ctx context.Context, accountID uuid.UUID) bool {
 			return true
 		},
-		GatewayGRPCManager: mockForwarder,
-	})
+	}, WithConnectorLogger(l), WithGatewayManager(mockForwarder))
 
 	fnID, accID, envID, appID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
 
@@ -333,15 +331,13 @@ func TestProxyGRPCPolling(t *testing.T) {
 	sm := state.NewRedisConnectionStateManager(rc)
 	mockForwarder := &mockGatewayGRPCManager{}
 
-	connector := newGRPCConnector(GRPCConnectorOpts{
-		Logger:       l,
+	connector := newGRPCConnector(ctx, GRPCConnectorOpts{
 		Tracer:       trace.NewConditionalTracer(trace.ConnectTracer(), trace.AlwaysTrace),
 		StateManager: sm,
 		EnforceLeaseExpiry: func(ctx context.Context, accountID uuid.UUID) bool {
 			return true
 		},
-		GatewayGRPCManager: mockForwarder,
-	})
+	}, WithConnectorLogger(l), WithGatewayManager(mockForwarder))
 
 	fnID, accID, envID, appID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
 	runID := ulid.MustNew(ulid.Now(), rand.Reader)
@@ -532,15 +528,13 @@ func TestProxyGRPCLeaseExpiry(t *testing.T) {
 	sm := state.NewRedisConnectionStateManager(rc)
 	mockForwarder := &mockGatewayGRPCManager{}
 
-	connector := newGRPCConnector(GRPCConnectorOpts{
-		Logger:       l,
+	connector := newGRPCConnector(ctx, GRPCConnectorOpts{
 		Tracer:       trace.NewConditionalTracer(trace.ConnectTracer(), trace.AlwaysTrace),
 		StateManager: sm,
 		EnforceLeaseExpiry: func(ctx context.Context, accountID uuid.UUID) bool {
 			return true
 		},
-		GatewayGRPCManager: mockForwarder,
-	})
+	}, WithConnectorLogger(l), WithGatewayManager(mockForwarder))
 
 	fnID, accID, envID, appID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
 	runID := ulid.MustNew(ulid.Now(), rand.Reader)

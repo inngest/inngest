@@ -18,7 +18,7 @@ import (
 	"github.com/coder/websocket"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/connect/auth"
-	"github.com/inngest/inngest/pkg/connect/pubsub"
+	"github.com/inngest/inngest/pkg/connect/grpc"
 	"github.com/inngest/inngest/pkg/connect/state"
 	"github.com/inngest/inngest/pkg/connect/types"
 	"github.com/inngest/inngest/pkg/connect/wsproto"
@@ -895,7 +895,7 @@ func createTestingGateway(t *testing.T, params ...testingParameters) testingReso
 
 	testConn := &testingConnector{}
 
-	conn, err := pubsub.NewConnector(ctx, withTestingConnector(testConn))
+	conn, err := grpc.NewConnector(ctx, withTestingConnector(testConn))
 	require.NoError(t, err)
 
 	var fakeApiBaseUrl string
@@ -1267,8 +1267,8 @@ func freePort() int {
 	return l.Addr().(*net.TCPAddr).Port
 }
 
-func withTestingConnector(t *testingConnector) pubsub.ConnectorOpt {
-	return func(ctx context.Context) (pubsub.Connector, error) {
+func withTestingConnector(t *testingConnector) grpc.ConnectorOpt {
+	return func(ctx context.Context) (grpc.Connector, error) {
 		return t, nil
 	}
 }
@@ -1277,10 +1277,10 @@ func withTestingConnector(t *testingConnector) pubsub.ConnectorOpt {
 type testingConnector struct {
 	subsLock            gosync.Mutex
 	executorRequestSubs map[string][]chan *connect.GatewayExecutorRequestData
-	ackSubs             map[string][]chan pubsub.AckSource
+	ackSubs             map[string][]chan grpc.AckSource
 }
 
-func (t *testingConnector) Proxy(ctx, traceCtx context.Context, opts pubsub.ProxyOpts) (*connect.SDKResponse, error) {
+func (t *testingConnector) Proxy(ctx, traceCtx context.Context, opts grpc.ProxyOpts) (*connect.SDKResponse, error) {
 	return nil, fmt.Errorf("not implemented")
 }
 
@@ -1346,7 +1346,7 @@ func (t *testingConnector) ReceiveRoutedRequest(ctx context.Context, gatewayId u
 	}
 }
 
-func (t *testingConnector) AckMessage(ctx context.Context, requestId string, source pubsub.AckSource) error {
+func (t *testingConnector) AckMessage(ctx context.Context, requestId string, source grpc.AckSource) error {
 	ackKey := fmt.Sprintf("ack:%s", requestId)
 
 	t.subsLock.Lock()
