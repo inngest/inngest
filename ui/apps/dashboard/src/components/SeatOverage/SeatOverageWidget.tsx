@@ -33,12 +33,7 @@ export default function SeatOverageWidget({ collapsed }: { collapsed: boolean })
       )}
 
       {!collapsed && (
-        <Link
-          href={pathCreator.billing({
-            ref: 'seat-overage-widget',
-          })}
-          className="text-basis mb-5 block rounded border border-amber-200 bg-amber-50 p-3 leading-tight"
-        >
+        <div className="text-basis mb-5 block rounded border border-amber-200 bg-amber-50 p-3 leading-tight">
           <div className="flex min-h-[110px] flex-col justify-between">
             <div>
               <div className="flex items-center justify-between">
@@ -77,7 +72,7 @@ export default function SeatOverageWidget({ collapsed }: { collapsed: boolean })
               Upgrade plan
             </Link>
           </div>
-        </Link>
+        </div>
       )}
     </>
   );
