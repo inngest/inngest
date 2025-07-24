@@ -18,7 +18,6 @@ import (
 	connectConfig "github.com/inngest/inngest/pkg/config/connect"
 	"github.com/inngest/inngest/pkg/connect/auth"
 	"github.com/inngest/inngest/pkg/connect/grpc"
-	"github.com/inngest/inngest/pkg/connect/pubsub"
 	"github.com/inngest/inngest/pkg/connect/state"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/logger"
@@ -35,7 +34,6 @@ const (
 )
 
 type gatewayOpt func(*connectGatewaySvc)
-type useGRPCFunc func(ctx context.Context, accountID uuid.UUID) bool
 
 type connectionCounter struct {
 	count  uint64
@@ -86,7 +84,6 @@ type connectGatewaySvc struct {
 
 	auther       auth.Handler
 	stateManager state.StateManager
-	receiver     pubsub.RequestReceiver
 	apiBaseUrl   string
 
 	consecutiveWorkerHeartbeatMissesBeforeConnectionClose int
@@ -106,8 +103,6 @@ type connectGatewaySvc struct {
 	connectionCount connectionCounter
 	drainListener   *drainListener
 	stateUpdateLock sync.Mutex
-
-	shouldUseGRPC useGRPCFunc
 
 	grpcClientManager *grpc.GRPCClientManager[pb.ConnectExecutorClient]
 }
@@ -144,12 +139,6 @@ func WithGatewayAuthHandler(auth auth.Handler) gatewayOpt {
 func WithConnectionStateManager(m state.StateManager) gatewayOpt {
 	return func(c *connectGatewaySvc) {
 		c.stateManager = m
-	}
-}
-
-func WithRequestReceiver(r pubsub.RequestReceiver) gatewayOpt {
-	return func(c *connectGatewaySvc) {
-		c.receiver = r
 	}
 }
 
@@ -213,12 +202,6 @@ func WithConsecutiveWorkerHeartbeatMissesBeforeConnectionClose(misses int) gatew
 	}
 }
 
-func WithShouldUseGRPC(fn useGRPCFunc) gatewayOpt {
-	return func(svc *connectGatewaySvc) {
-		svc.shouldUseGRPC = fn
-	}
-}
-
 func NewConnectGatewayService(opts ...gatewayOpt) *connectGatewaySvc {
 	gateway := &connectGatewaySvc{
 		gatewayId:         ulid.MustNew(ulid.Now(), rand.Reader),
@@ -232,9 +215,6 @@ func NewConnectGatewayService(opts ...gatewayOpt) *connectGatewaySvc {
 		consecutiveWorkerHeartbeatMissesBeforeConnectionClose: 5,
 
 		grpcServer: grpcLib.NewServer(),
-		shouldUseGRPC: func(ctx context.Context, accountID uuid.UUID) bool {
-			return false
-		},
 	}
 
 	for _, opt := range opts {
@@ -446,23 +426,6 @@ func (c *connectGatewaySvc) Run(ctx context.Context) error {
 		}
 
 		return err
-	})
-
-	eg.Go(func() error {
-		// TODO Mark gateway as active a couple seconds into the future (how do we make sure PubSub is connected and ready to receive?)
-		// Start listening for messages, this will block until the context is cancelled
-		err := c.receiver.Wait(ctx)
-		if err != nil {
-			if ctx.Err() != nil {
-				return nil
-			}
-			// TODO Should we retry? Exit here? This will interrupt existing connections!
-			return fmt.Errorf("could not listen for pubsub messages: %w", err)
-		}
-
-		c.logger.Debug("receiver wait finished")
-
-		return nil
 	})
 
 	connectConfig := connectConfig.Gateway(ctx)
