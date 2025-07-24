@@ -27,7 +27,7 @@ type Props = {
   getTrigger: React.ComponentProps<typeof TriggerDetails>['getTrigger'];
   pollInterval?: number;
   runID: string;
-  tracesPreviewEnabled?: boolean;
+  tracesPreviewEnabled: boolean;
 };
 
 type Run = {

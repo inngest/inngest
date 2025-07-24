@@ -3,6 +3,7 @@
 import { RunDetailsV3 } from '@inngest/components/RunDetailsV3/RunDetailsV3';
 import { cn } from '@inngest/components/utils/classNames';
 
+import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import { useGetRun } from './useGetRun';
 import { useGetTraceResult } from './useGetTraceResult';
 import { useGetTrigger } from './useGetTrigger';
@@ -17,6 +18,7 @@ export function DashboardRunDetails({ runID, standalone = true }: Props) {
 
   const getTrigger = useGetTrigger();
   const getRun = useGetRun();
+  const { value: tracePreviewEnabled } = useBooleanFlag('traces-preview', false);
 
   return (
     <div className={cn('overflow-y-auto', standalone && 'pt-8')}>
@@ -26,6 +28,7 @@ export function DashboardRunDetails({ runID, standalone = true }: Props) {
         getRun={getRun}
         getTrigger={getTrigger}
         runID={runID}
+        tracesPreviewEnabled={tracePreviewEnabled}
       />
     </div>
   );
