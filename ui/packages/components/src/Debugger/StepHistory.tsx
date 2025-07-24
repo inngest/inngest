@@ -4,7 +4,7 @@ import { RiLightbulbLine } from '@remixicon/react';
 import { AITrace } from '../AI/AITrace';
 import { Button } from '../Button';
 import { Pill } from '../Pill';
-import { NewIO } from '../RunDetailsV3/NewIO';
+import { IO } from '../RunDetailsV3/IO';
 import { Tabs } from '../RunDetailsV3/Tabs';
 import { StatusDot } from '../Status/StatusDot';
 import { getStatusTextClass } from '../Status/statusClasses';
@@ -88,7 +88,7 @@ export const StepHistory = ({
                     {
                       label: 'Input',
                       id: 'input',
-                      node: <NewIO raw={JSON.stringify(input, null, 2)} title="Input" />,
+                      node: <IO raw={JSON.stringify(input, null, 2)} title="Input" />,
                     },
                   ]
                 : []),
@@ -97,7 +97,7 @@ export const StepHistory = ({
                     {
                       label: 'Output',
                       id: 'output',
-                      node: <NewIO title="output" raw={JSON.stringify(output, null, 2)} />,
+                      node: <IO title="output" raw={JSON.stringify(output, null, 2)} />,
                     },
                   ]
                 : []),
@@ -105,13 +105,13 @@ export const StepHistory = ({
               {
                 label: 'Tools',
                 id: 'tools',
-                node: <NewIO title="Tools" raw='{"tools": "coming soon..."}' />,
+                node: <IO title="Tools" raw='{"tools": "coming soon..."}' />,
               },
 
               {
                 label: 'State',
                 id: 'state',
-                node: <NewIO title="State" raw='{"state": "coming soon..."}' />,
+                node: <IO title="State" raw='{"state": "coming soon..."}' />,
               },
             ]}
           />
