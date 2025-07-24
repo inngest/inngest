@@ -99,6 +99,7 @@ export default function AppList() {
               <Link
                 iconAfter={<RiExternalLinkLine className="h-4 w-4" />}
                 size="small"
+                target="_blank"
                 href="https://www.inngest.com/docs/local-development#connecting-apps-to-the-dev-server"
               >
                 Go to specific ports
