@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"iter"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -503,4 +504,89 @@ func (q *queue) ItemsByBacklog(ctx context.Context, shard QueueShard, backlogID 
 			<-time.After(opt.interval)
 		}
 	}, nil
+}
+
+type QueueIteratorOpts struct {
+	// OnPartitionProcessed is called for each partition during instrumentation
+	OnPartitionProcessed func(ctx context.Context, partitionKey string, queueKey string, itemCount int64, queueShard QueueShard)
+	// OnIterationComplete is called after all partitions are processed with the final totals
+	OnIterationComplete func(ctx context.Context, totalPartitions int64, totalQueueItems int64, queueShard QueueShard)
+}
+
+func (q *queue) QueueIterator(ctx context.Context, opts QueueIteratorOpts) (partitionCount int64, queueItemCount int64, err error) {
+	l := q.log.With("method", "QueueIterator")
+
+	// Check on global partition and queue partition sizes
+	var offset, totalPartitions, totalQueueItems int64
+	chunkSize := int64(1000)
+
+	r := q.primaryQueueShard.RedisClient.unshardedRc
+	// iterate through all the partitions in the global partitions in chunks
+	wg := sync.WaitGroup{}
+	for {
+		// grab the global partition by chunks
+		cmd := r.B().Zrange().
+			Key(q.primaryQueueShard.RedisClient.kg.GlobalPartitionIndex()).
+			Min("-inf").
+			Max("+inf").
+			Byscore().
+			Limit(offset, chunkSize).
+			Build()
+
+		pkeys, err := r.Do(ctx, cmd).AsStrSlice()
+		if err != nil {
+			return 0, 0, fmt.Errorf("error retrieving partitions for instrumentation: %w", err)
+		}
+
+		for _, pk := range pkeys {
+			wg.Add(1)
+
+			// check each partition concurrently
+			go func(ctx context.Context, pkey string) {
+				defer wg.Done()
+
+				log := l.With("partitionKey", pkey)
+
+				// If this is not a fully-qualified key, assume that this is an old (system) partition queue
+				queueKey := pkey
+				if !isKeyConcurrencyPointerItem(pkey) {
+					queueKey = q.primaryQueueShard.RedisClient.kg.PartitionQueueSet(enums.PartitionTypeDefault, pkey, "")
+				}
+
+				cntCmd := r.B().Zcount().Key(queueKey).Min("-inf").Max("+inf").Build()
+				itemCount, err := q.primaryQueueShard.RedisClient.unshardedRc.Do(ctx, cntCmd).AsInt64()
+				if err != nil {
+					log.Warn("error checking partition count", "pkey", pkey, "context", "instrumentation")
+					return
+				}
+
+				// Call the callback if provided
+				if opts.OnPartitionProcessed != nil {
+					opts.OnPartitionProcessed(ctx, pkey, queueKey, itemCount, q.primaryQueueShard)
+				}
+
+				atomic.AddInt64(&totalQueueItems, itemCount)
+				atomic.AddInt64(&totalPartitions, 1)
+				if err := q.tenantInstrumentor(ctx, pk); err != nil {
+					log.Error("error running tenant instrumentor", "error", err)
+				}
+			}(ctx, pk)
+
+		}
+		// end of pagination, exit
+		if len(pkeys) < int(chunkSize) {
+			break
+		}
+
+		offset += chunkSize
+	}
+
+	wg.Wait()
+
+	// Call the completion callback if provided
+	if opts.OnIterationComplete != nil {
+		opts.OnIterationComplete(ctx, atomic.LoadInt64(&totalPartitions), atomic.LoadInt64(&totalQueueItems), q.primaryQueueShard)
+	}
+
+	return atomic.LoadInt64(&totalPartitions), atomic.LoadInt64(&totalQueueItems), nil
 }
