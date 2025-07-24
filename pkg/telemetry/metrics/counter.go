@@ -301,7 +301,7 @@ func IncrConnectGatewayGRPCClientFailureCounter(ctx context.Context, value int64
 	})
 }
 
-func IncrConnectRouterPubSubMessageSentCounter(ctx context.Context, value int64, opts CounterOpt) {
+func IncrConnectRouterGRPCMessageSentCounter(ctx context.Context, value int64, opts CounterOpt) {
 	RecordCounterMetric(ctx, value, CounterOpt{
 		PkgName:     opts.PkgName,
 		MetricName:  "connect_gateway.router.sent_pubsub_messages",
