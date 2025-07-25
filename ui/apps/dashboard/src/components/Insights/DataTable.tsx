@@ -53,7 +53,7 @@ function formatColumnHeader(key: string): string {
 
 function RowNumberCell({ children }: { children: React.ReactNode }) {
   return (
-    <div className="bg-tableHeader text-muted -mx-4 flex h-[42px] w-8 items-center justify-center text-xs font-medium">
+    <div className="text-muted flex h-[42px] w-full items-center justify-center text-xs font-medium">
       {children}
     </div>
   );
@@ -84,6 +84,8 @@ function renderCellWithTypeCheck(value: unknown, dataType: DataType): ReactEleme
   }
 }
 
+const SHARED_BORDER_STYLES = 'border-b border-r border-subtle';
+
 function generateColumns(
   data: InsightTableRow[],
   columnHelper: ReturnType<typeof createColumnHelper<InsightTableRow>>
@@ -96,7 +98,11 @@ function generateColumns(
     cell: (info) => <RowNumberCell>{info.getValue()}</RowNumberCell>,
     enableSorting: false,
     header: '#',
-    size: 32,
+    size: 18,
+    meta: {
+      cellClassName: `bg-tableHeader ${SHARED_BORDER_STYLES} !px-0`,
+      headerClassName: `${SHARED_BORDER_STYLES} !px-0 text-center`,
+    },
   });
 
   // Then add all the property columns
@@ -109,6 +115,10 @@ function generateColumns(
       cell: (info) => renderCellWithTypeCheck(info.getValue(), dataType),
       enableSorting: false,
       header: formatColumnHeader(key),
+      meta: {
+        cellClassName: SHARED_BORDER_STYLES,
+        headerClassName: SHARED_BORDER_STYLES,
+      },
     });
   });
 

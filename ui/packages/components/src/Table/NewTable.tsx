@@ -6,6 +6,7 @@ import {
   flexRender,
   getCoreRowModel,
   useReactTable,
+  type Column,
   type ColumnDef,
   type OnChangeFn,
   type Row,
@@ -119,7 +120,8 @@ export default function Table<T>({
                     }}
                     className={cn(
                       isIconOnlyColumn ? '' : tableColumnStyles,
-                      'text-muted text-left text-xs font-medium'
+                      'text-muted text-left text-xs font-medium',
+                      getFromMeta(header.column, 'headerClassName', 'string')
                     )}
                   >
                     {header.isPlaceholder ? null : (
@@ -197,7 +199,8 @@ export default function Table<T>({
                           i === 0 && hasId(row.original) && expandedIDs.includes(row.original.id)
                             ? expandedRowSideBorder
                             : '',
-                          isIconOnlyColumn ? '' : tableColumnStyles
+                          isIconOnlyColumn ? '' : tableColumnStyles,
+                          getFromMeta(cell.column, 'cellClassName', 'string')
                         )}
                       >
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
@@ -237,3 +240,19 @@ export default function Table<T>({
 const loadingRow = {
   isLoadingRow: true,
 } as const;
+
+function getFromMeta<T, Typ>(
+  col: Column<T, unknown>,
+  key: string,
+  requiredType: Typ
+): undefined | Typ {
+  const { meta } = col.columnDef;
+
+  if (meta === undefined) return undefined;
+  if (!Object.hasOwn(meta, key)) return undefined;
+
+  const value = meta[key as keyof typeof meta];
+  if (typeof value !== requiredType) return undefined;
+
+  return value;
+}
