@@ -28,5 +28,5 @@ export function useInsightsQuery() {
     }
   }, []);
 
-  return { isLoading, executeQuery, result };
+  return { executeQuery, isLoading, result };
 }
