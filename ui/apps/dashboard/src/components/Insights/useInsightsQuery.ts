@@ -1,11 +1,12 @@
 import { useCallback, useState } from 'react';
 
-import { generateInsightsMockData, type InsightData } from './mockData';
+import { generateInsightsMockData } from './mockData';
+import type { InsightTableRow } from './types';
 
 const simulateDelay = (millis: number) => new Promise((resolve) => setTimeout(resolve, millis));
 
 type QueryResult = {
-  data: InsightData[];
+  data: InsightTableRow[];
   totalRows: number;
 };
 
@@ -19,7 +20,7 @@ export function useInsightsQuery() {
     try {
       await simulateDelay(1000);
 
-      const mockData = generateInsightsMockData(100);
+      const mockData = generateInsightsMockData(1000);
       setResult({ data: mockData, totalRows: mockData.length });
     } catch (e) {
       // TODO: Handle error.

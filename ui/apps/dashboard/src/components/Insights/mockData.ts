@@ -1,3 +1,5 @@
+import type { InsightTableRow } from './types';
+
 const EVENT_NAMES = [
   'action.created',
   'action.validated',
@@ -36,12 +38,6 @@ export const FIELD_DISPLAY_NAMES = {
   [FIELD_NAMES.RECEIVED_AT]: 'Received At',
 } as const;
 
-export interface InsightData {
-  [FIELD_NAMES.EVENT_NAME]: (typeof EVENT_NAMES)[number];
-  [FIELD_NAMES.FUNCTION_TRIGGERED]: (typeof FUNCTION_NAMES)[number];
-  [FIELD_NAMES.RECEIVED_AT]: string;
-}
-
 function getRandomElement<T>(array: readonly T[]): T {
   const index = Math.floor(Math.random() * array.length);
   return array[index] as T;
@@ -53,14 +49,27 @@ function getRandomRecentDate(): string {
   return new Date(Date.now() - millisecondsAgo).toLocaleString();
 }
 
-export function generateInsightsMockData(n: number): InsightData[] {
-  const data: InsightData[] = [];
+export function generateInsightsMockData(n: number): InsightTableRow[] {
+  const data: InsightTableRow[] = [];
 
   for (let i = 0; i < n; i++) {
     data.push({
-      [FIELD_NAMES.EVENT_NAME]: getRandomElement(EVENT_NAMES),
-      [FIELD_NAMES.FUNCTION_TRIGGERED]: getRandomElement(FUNCTION_NAMES),
-      [FIELD_NAMES.RECEIVED_AT]: getRandomRecentDate(),
+      id: `insight-${i}`,
+      row: i + 1,
+      properties: {
+        [FIELD_NAMES.EVENT_NAME]: {
+          value: getRandomElement(EVENT_NAMES),
+          type: 'string',
+        },
+        [FIELD_NAMES.FUNCTION_TRIGGERED]: {
+          value: getRandomElement(FUNCTION_NAMES),
+          type: 'string',
+        },
+        [FIELD_NAMES.RECEIVED_AT]: {
+          value: getRandomRecentDate(),
+          type: 'date',
+        },
+      },
     });
   }
 
