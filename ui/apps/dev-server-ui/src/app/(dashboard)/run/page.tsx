@@ -27,6 +27,7 @@ export default function Page() {
         getTrigger={getTrigger}
         pollInterval={2500}
         runID={runID}
+        tracesPreviewEnabled={false}
       />
     </div>
   );

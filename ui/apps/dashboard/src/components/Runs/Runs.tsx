@@ -11,6 +11,7 @@ import {
 import { CombinedError, useQuery } from 'urql';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
+import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import { useGetRun } from '@/components/RunDetails/useGetRun';
 import { useGetTraceResult } from '@/components/RunDetails/useGetTraceResult';
 import { useGetTrigger } from '@/components/RunDetails/useGetTrigger';
@@ -61,6 +62,8 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
     query: AppFilterDocument,
     variables: { envSlug: env.slug },
   });
+
+  const { value: tracePreviewEnabled } = useBooleanFlag('traces-preview', false);
 
   const [appIDs] = useStringArraySearchParam('filterApp');
   const [rawFilteredStatus] = useStringArraySearchParam('filterStatus');
@@ -211,6 +214,7 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
       data={runs}
       features={{
         history: features.data?.history ?? 7,
+        tracesPreview: tracePreviewEnabled,
       }}
       hasMore={hasNextPage ?? false}
       isLoadingInitial={firstPageRes.fetching}
