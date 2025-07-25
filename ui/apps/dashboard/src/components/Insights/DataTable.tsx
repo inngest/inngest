@@ -8,7 +8,6 @@ import { createColumnHelper, type ColumnDef } from '@tanstack/react-table';
 import { EmptyState } from './EmptyState';
 import type { InsightTableRow } from './types';
 
-// Extract the data type from our interface for type safety
 type DataType = InsightTableRow['properties'][string]['type'];
 
 const MOCK_SEE_EXAMPLES = () => {
@@ -21,8 +20,9 @@ type DataTableProps = {
 };
 
 export function DataTable({ data, isLoading = false }: DataTableProps) {
-  const columnHelper = createColumnHelper<InsightTableRow>();
-  const columns = useMemo(() => generateColumns(data, columnHelper), [data, columnHelper]);
+  const columns = useMemo(() => {
+    return generateColumns(data, createColumnHelper<InsightTableRow>());
+  }, [data]);
 
   return (
     <div className="border-subtle flex min-h-0 flex-1 flex-col border">
@@ -93,7 +93,6 @@ function generateColumns(
   const sampleRow = data[0];
   if (sampleRow === undefined) return [];
 
-  // Include the row column first
   const rowColumn = columnHelper.accessor('row', {
     cell: (info) => <RowNumberCell>{info.getValue()}</RowNumberCell>,
     enableSorting: false,
@@ -105,7 +104,6 @@ function generateColumns(
     },
   });
 
-  // Then add all the property columns
   const propertyKeys = Object.keys(sampleRow.properties);
   const propertyColumns = propertyKeys.map((key) => {
     const propertyInfo = sampleRow.properties[key];
