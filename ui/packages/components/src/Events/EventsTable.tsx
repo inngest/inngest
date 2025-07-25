@@ -328,6 +328,7 @@ export function EventsTable({
                 icon={<RiArrowRightUpLine />}
                 iconSide="right"
                 size="small"
+                target="_blank"
                 href="https://www.inngest.com/docs/platform/monitor/inspecting-events?ref=events-table"
               />
             </div>

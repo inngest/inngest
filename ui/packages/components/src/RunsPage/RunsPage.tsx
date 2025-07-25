@@ -361,6 +361,7 @@ export function RunsPage({
                 icon={<RiArrowRightUpLine />}
                 iconSide="right"
                 size="small"
+                target="_blank"
                 href="https://www.inngest.com/docs/platform/monitor/inspecting-function-runs#searching-function-runs?ref=app-runs-search"
               />
             </div>

@@ -181,6 +181,7 @@ export function EventDetails({
                 {!standalone && (
                   <Link
                     size="medium"
+                    target="_blank"
                     href={pathCreator.eventPopout({ eventID: eventID })}
                     iconAfter={<RiExternalLinkLine className="h-4 w-4 shrink-0" />}
                   />

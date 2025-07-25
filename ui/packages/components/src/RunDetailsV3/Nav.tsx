@@ -74,6 +74,7 @@ export const Nav = ({ standalone, functionSlug, runID }: NavProps) => {
     <Link
       size="medium"
       href={pathCreator.runPopout({ runID })}
+      target="_blank"
       iconAfter={<RiExternalLinkLine className="h-4 w-4 shrink-0" />}
     />
   ) : null;

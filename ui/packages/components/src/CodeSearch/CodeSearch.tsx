@@ -244,11 +244,19 @@ export default function CodeSearch({
         const lineContent = model.getLineContent(position.lineNumber);
         const wordAtPosition = model.getWordUntilPosition(position);
 
+        // Get the text from start of line to current position
+        const textUntilPosition = lineContent.substring(0, position.column - 1);
+
+        // Find the start of the current path being typed
+        const pathMatch = textUntilPosition.match(/([a-zA-Z_][a-zA-Z0-9_.]*\.?)$/);
+        const currentPath = pathMatch ? pathMatch[1] : wordAtPosition.word;
+        const pathStartColumn =
+          pathMatch && currentPath
+            ? position.column - currentPath.length
+            : position.column - wordAtPosition.word.length;
+
         // Check if we just typed a space
         const justTypedSpace = lineContent[position.column - 2] === ' ';
-
-        // Get the text before the current position
-        const textUntilPosition = lineContent.substring(0, position.column - 1);
 
         // Split by space but keep empty parts to accurately track word count
         const parts = textUntilPosition.split(' ').filter((p) => p !== '');
@@ -266,7 +274,7 @@ export default function CodeSearch({
           // Provide path suggestions
           return {
             suggestions: eventPaths
-              .filter((path) => path.startsWith(wordAtPosition.word))
+              .filter((path) => path.startsWith(currentPath || ''))
               .map((path) => ({
                 label: path,
                 kind: EVENT_PATH_DETAILS[path]?.kind || monaco.languages.CompletionItemKind.Field,
@@ -274,7 +282,7 @@ export default function CodeSearch({
                 insertText: path,
                 range: {
                   startLineNumber: position.lineNumber,
-                  startColumn: position.column - wordAtPosition.word.length,
+                  startColumn: pathStartColumn,
                   endLineNumber: position.lineNumber,
                   endColumn: position.column,
                 },
