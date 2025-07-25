@@ -6,13 +6,7 @@ import { DataTable } from '@/components/Insights/DataTable';
 import { SQLEditor } from '@/components/Insights/SQLEditor';
 import { useInsightsQuery } from '@/components/Insights/useInsightsQuery';
 
-type InsightsPageProps = {
-  params: {
-    environmentSlug: string;
-  };
-};
-
-export default function InsightsPage({ params: { environmentSlug } }: InsightsPageProps) {
+export default function InsightsPage() {
   const {
     executeQuery,
     isLoading,

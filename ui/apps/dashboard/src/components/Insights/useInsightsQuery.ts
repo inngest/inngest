@@ -14,7 +14,7 @@ export function useInsightsQuery() {
   const [result, setResult] = useState<QueryResult>({ data: [], totalRows: 0 });
   const [isLoading, setIsLoading] = useState(false);
 
-  const executeQuery = useCallback(async (_query: string) => {
+  const executeQuery = useCallback(async () => {
     setIsLoading(true);
 
     try {
