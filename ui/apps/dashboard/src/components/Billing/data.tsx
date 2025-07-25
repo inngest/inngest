@@ -31,6 +31,23 @@ export const entitlementUsageDocument = graphql(`
           purchaseCount
           quantityPer
         }
+        advancedObservability {
+          available
+          name
+          price
+          purchased
+          entitlements {
+            history {
+              limit
+            }
+            metricsExportFreshness {
+              limit
+            }
+            metricsExportGranularity {
+              limit
+            }
+          }
+        }
       }
       entitlements {
         runCount {

@@ -13,6 +13,7 @@ import {
   currentPlan as getCurrentPlan,
   entitlementUsage as getEntitlementUsage,
 } from '@/components/Billing/data';
+import { ServerFeatureFlag } from '@/components/FeatureFlags/ServerFeatureFlag';
 import { pathCreator } from '@/utils/urls';
 
 function kbyteDisplayValue(kibibytes: number): string {
@@ -213,6 +214,33 @@ export default async function Page() {
               ),
             }}
           />
+          <ServerFeatureFlag flag="advanced-observability" defaultValue={false}>
+            <EntitlementListItem
+              increaseInHigherPlan={true}
+              planName={currentPlan.name}
+              title="Advanced Observability"
+              description="Export key Inngest metrics into your own monitoring infrastructure"
+              entitlement={{
+                currentValue: addons.advancedObservability.purchased,
+                displayValue: addons.advancedObservability.purchased ? 'Enabled' : 'Not enabled',
+              }}
+              addon={{
+                available: addons.advancedObservability.available,
+                name: addons.advancedObservability.name,
+                baseValue: addons.advancedObservability.purchased ? 1 : 0,
+                maxValue: 1,
+                quantityPer: 1,
+                price: addons.advancedObservability.price,
+                entitlements: addons.advancedObservability.entitlements,
+                purchased: addons.advancedObservability.purchased,
+                currentEntitlementValues: {
+                  history: entitlements.history.limit,
+                  metricsExportFreshness: entitlements.metricsExportFreshness.limit,
+                  metricsExportGranularity: entitlements.metricsExportGranularity.limit,
+                },
+              }}
+            />
+          </ServerFeatureFlag>
           <div className="flex flex-col items-center gap-2 pt-6">
             <p className="text-muted text-xs">Custom needs?</p>
             <Button

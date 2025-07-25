@@ -8,6 +8,20 @@ import EntitlementListItemSelfService from '@/components/Billing/Addons/Entitlem
 import { PlanNames } from '@/components/Billing/Plans/utils';
 import { pathCreator } from '@/utils/urls';
 
+export type Entitlement = {
+  currentValue: number | boolean | null;
+  displayValue: string | React.ReactNode;
+  purchased?: boolean;
+  planLimit?: number;
+  maxValue?: number;
+};
+
+export type CurrentEntitlementValues = {
+  history?: number;
+  metricsExportFreshness?: number;
+  metricsExportGranularity?: number;
+};
+
 export default function EntitlementListItem({
   increaseInHigherPlan = true,
   planName,
@@ -23,10 +37,7 @@ export default function EntitlementListItem({
   title: string; // Title of the addon (e.g. Users, Concurrency)
   description: string;
   tooltipContent?: string | React.ReactNode;
-  entitlement: {
-    currentValue: number | boolean | null; // Current value of the entitlement relevant to this addon, including plan + any addons + account-level overrides
-    displayValue: string | React.ReactNode;
-  };
+  entitlement: Entitlement;
   addon?: {
     available: boolean;
     name: string;
@@ -34,6 +45,20 @@ export default function EntitlementListItem({
     maxValue: number;
     quantityPer: number; // The number of units (e.g. concurrency or users) included in one purchase of this addon
     price: number | null; // Price for one purchase of this addon, in US Cents.
+    purchased?: boolean;
+    // Some addons have nested entitlements (e.g. Advanced Observability)
+    entitlements?: {
+      history: {
+        limit: number;
+      };
+      metricsExportFreshness: {
+        limit: number;
+      };
+      metricsExportGranularity: {
+        limit: number;
+      };
+    };
+    currentEntitlementValues?: CurrentEntitlementValues;
   }; // No addon, or no price, implies self-service is not available.
   onChange?: () => void;
 }) {
@@ -71,7 +96,10 @@ export default function EntitlementListItem({
           price: addon.price,
           quantityPer: addon.quantityPer,
           addonName: addon.name,
+          entitlements: addon.entitlements,
         }}
+        addonPurchased={addon.purchased}
+        currentEntitlementValues={addon.currentEntitlementValues}
         onChange={onChange}
       />
     );
@@ -94,6 +122,9 @@ export default function EntitlementListItem({
     } else if (addon && addon.price === null) {
       // If there isn't an addon price then they need to talk to a human. This
       // is probably rarely hit (e.g. when we haven't added a Stripe price yet).
+      contactHumanToIncrease = true;
+    } else if (addon && addon.purchased) {
+      // If addon is already purchased, contact human for changes
       contactHumanToIncrease = true;
     }
 
