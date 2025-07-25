@@ -4,8 +4,6 @@ const EVENT_NAMES = [
   'action.created',
   'action.validated',
   'auth.login',
-  'brand/manual-add-off-platform-brands-created',
-  'clerk/organization/MembershipDeleted',
   'data.synced',
   'notification.sent',
   'payment.processed',
