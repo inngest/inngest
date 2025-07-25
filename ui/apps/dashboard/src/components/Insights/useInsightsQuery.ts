@@ -1,11 +1,11 @@
 import { useCallback, useState } from 'react';
 
-import { generateInsightsMockData } from './mockData';
+import { generateInsightsMockData, type InsightData } from './mockData';
 
 const simulateDelay = (millis: number) => new Promise((resolve) => setTimeout(resolve, millis));
 
 type QueryResult = {
-  data: Record<string, any>[];
+  data: InsightData[];
   totalRows: number;
 };
 

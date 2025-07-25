@@ -2,6 +2,7 @@
 
 import { Header } from '@inngest/components/Header/Header';
 
+import { DataTable } from '@/components/Insights/DataTable';
 import { SQLEditor } from '@/components/Insights/SQLEditor';
 import { useInsightsQuery } from '@/components/Insights/useInsightsQuery';
 
@@ -12,7 +13,11 @@ type InsightsPageProps = {
 };
 
 export default function InsightsPage({ params: { environmentSlug } }: InsightsPageProps) {
-  const { executeQuery, isLoading } = useInsightsQuery();
+  const {
+    executeQuery,
+    isLoading,
+    result: { data },
+  } = useInsightsQuery();
 
   return (
     <>
@@ -21,6 +26,7 @@ export default function InsightsPage({ params: { environmentSlug } }: InsightsPa
         <div className="flex h-full">
           <div className="flex w-full flex-col">
             <SQLEditor isLoading={isLoading} onRunQuery={executeQuery} />
+            <DataTable data={data} isLoading={isLoading} />
           </div>
         </div>
       </main>
