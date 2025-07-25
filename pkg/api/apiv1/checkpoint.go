@@ -183,6 +183,8 @@ func (a checkpointAPI) CheckpointSteps(w http.ResponseWriter, r *http.Request) {
 	for _, op := range input.Steps {
 		switch op.Op {
 		case enums.OpcodeStepRun, enums.OpcodeStep:
+			// TODO:Save steps to state store for future retries.
+
 			ref, err := a.TracerProvider.CreateSpan(
 				meta.SpanNameStep,
 				&tracing.CreateSpanOptions{
@@ -199,7 +201,6 @@ func (a checkpointAPI) CheckpointSteps(w http.ResponseWriter, r *http.Request) {
 				},
 			)
 			_, _ = ref, err
-
 		default:
 			// This is now async.  For now, do NOT allow this.
 			panic("TODO")
@@ -297,6 +298,8 @@ func (a checkpointAPI) upsertData(ctx context.Context, auth apiv1auth.V1Auth, in
 		)
 		return
 	}
+
+	// TODO: Upsert function.
 
 	_, err = a.FunctionCreator.InsertFunction(ctx, cqrs.InsertFunctionParams{
 		ID:        input.FnID(input.AppID(auth.WorkspaceID())),

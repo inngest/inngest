@@ -785,7 +785,6 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	// Inngest SDK is checkpointing and the execution is happening in a single
 	// external API request.
 	if req.RunMode == enums.RunModeSync {
-
 		for _, e := range e.lifecycles {
 			go e.OnFunctionScheduled(context.WithoutCancel(ctx), metadata, item, req.Events)
 		}
