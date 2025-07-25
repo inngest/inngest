@@ -57,6 +57,7 @@ import (
 	"github.com/inngest/inngest/pkg/history_drivers/memory_reader"
 	"github.com/inngest/inngest/pkg/history_drivers/memory_writer"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/metrics"
 	"github.com/inngest/inngest/pkg/pubsub"
 	"github.com/inngest/inngest/pkg/run"
 	"github.com/inngest/inngest/pkg/service"
@@ -579,6 +580,16 @@ func start(ctx context.Context, opts StartOpts) error {
 			}),
 	)
 
+	// Initialize metrics API for Prometheus-compatible metrics endpoint.
+	// This provides system queue depth metrics via /metrics endpoint.
+	metricsAPI, err := metrics.NewMetricsAPI(metrics.Opts{
+		AuthMiddleware: authn.SigningKeyMiddleware(opts.SigningKey),
+		QueueManager:   rq,
+	})
+	if err != nil {
+		return err
+	}
+
 	// Create a new data API directly in the devserver.  This allows us to inject
 	// the data API into the dev server port, providing a single router for the dev
 	// server UI, events, and API for loading data.
@@ -591,6 +602,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		{At: "/v0", Router: core.Router},
 		{At: "/debug", Handler: middleware.Profiler()},
 		{At: "/dbg", Router: debugapi.Router},
+		{At: "/metrics", Router: metricsAPI.Router},
 	}
 
 	if testapi.ShouldEnable() {
