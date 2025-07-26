@@ -23,7 +23,9 @@ import (
 	"github.com/inngest/inngest/pkg/publicerr"
 	"github.com/inngest/inngest/pkg/tracing"
 	"github.com/inngest/inngest/pkg/tracing/meta"
+	"github.com/inngest/inngest/pkg/util"
 	"github.com/inngest/inngestgo"
+	"github.com/karlseguin/ccache/v2"
 	"github.com/oklog/ulid/v2"
 )
 
@@ -42,12 +44,17 @@ type checkpointAPI struct {
 	Opts
 
 	chi.Router
+
+	// upserted tracks fn IDs and their associated config in memory once upserted, allowing
+	// us to prevent DB queries from hitting the DB each time a sync fn begins.
+	upserted *ccache.Cache
 }
 
 func NewCheckpointAPI(o Opts) CheckpointAPI {
 	api := checkpointAPI{
-		Router: chi.NewRouter(),
-		Opts:   o,
+		Router:   chi.NewRouter(),
+		Opts:     o,
+		upserted: ccache.New(ccache.Configure().MaxSize(10_000)),
 	}
 	api.Post("/", api.CheckpointNewRun)
 	api.Post("/{runID}/steps", api.CheckpointSteps)
@@ -314,8 +321,34 @@ func (a checkpointAPI) finalize(ctx context.Context, md sv2.Metadata, result API
 // we memoize this call via an in-memory map.  Because our API is deployed many times
 // over and this is in-memory, we must make these upserts and not insert N times.
 func (a checkpointAPI) upsertSyncData(ctx context.Context, auth apiv1auth.V1Auth, input *CheckpointNewRunRequest) {
+	envID := auth.WorkspaceID()
+	appID := input.AppID(envID)
+	fnID := input.FnID(appID)
+
+	config := input.FnConfig(auth.WorkspaceID())
+
+	if item := a.upserted.Get(fnID.String()); item != nil {
+		// This item is in the LRU cache and has already been inserted;
+		// don't bother to upsert the app and only update the function configuration.
+		if util.XXHash(config) == item.Value().(string) {
+			return
+		}
+		_, err := a.FunctionCreator.UpdateFunctionConfig(ctx, cqrs.UpdateFunctionConfigParams{
+			Config: config,
+			ID:     fnID,
+		})
+		if err != nil {
+			logger.StdlibLogger(ctx).Error("failed to update fn config",
+				"error", err,
+				"app_id", input.AppID(auth.WorkspaceID()),
+				"app_slug", input.AppSlug(),
+			)
+		}
+		return
+	}
+
 	app, err := a.AppCreator.UpsertApp(ctx, cqrs.UpsertAppParams{
-		ID:     input.AppID(auth.WorkspaceID()),
+		ID:     appID,
 		Name:   input.AppSlug(),
 		Url:    input.AppURL(),
 		Method: enums.AppMethodAPI.String(),
@@ -329,16 +362,35 @@ func (a checkpointAPI) upsertSyncData(ctx context.Context, auth apiv1auth.V1Auth
 		return
 	}
 
-	// TODO: Upsert function.
+	// We may have already added this function, so check if it exists prior to inserting and updating.
+	// XXX: It would be good to add an upsert method to the function CQRS layer.
+	fn, err := a.FunctionReader.GetFunctionByInternalUUID(ctx, envID, fnID)
+	if err == nil && fn != nil {
+		if string(fn.Config) == config {
+			return // no need to update
+		}
+		_, err = a.FunctionCreator.UpdateFunctionConfig(ctx, cqrs.UpdateFunctionConfigParams{
+			Config: config,
+			ID:     fnID,
+		})
+		if err != nil {
+			logger.StdlibLogger(ctx).Error("failed to update fn config",
+				"error", err,
+				"app_id", input.AppID(auth.WorkspaceID()),
+				"app_slug", input.AppSlug(),
+			)
+		}
+		return
+	}
 
 	_, err = a.FunctionCreator.InsertFunction(ctx, cqrs.InsertFunctionParams{
-		ID:        input.FnID(input.AppID(auth.WorkspaceID())),
+		ID:        fnID,
 		AccountID: auth.AccountID(),
 		EnvID:     auth.WorkspaceID(),
 		AppID:     app.ID,
 		Name:      input.FnSlug(),
 		Slug:      input.FnSlug(),
-		Config:    input.FnConfig(auth.WorkspaceID()),
+		Config:    config,
 		CreatedAt: time.UnixMilli(input.Event.Timestamp),
 	})
 	if err != nil {
@@ -350,4 +402,15 @@ func (a checkpointAPI) upsertSyncData(ctx context.Context, auth apiv1auth.V1Auth
 		)
 		return
 	}
+
+	// Hash the config so that we can quickly compare whether we upsert when memoizing
+	// this upsert routine.
+	a.upserted.Set(fnID.String(), util.XXHash(config), time.Hour*24)
+
+	logger.StdlibLogger(ctx).Debug("upserted fn",
+		"error", err,
+		"function_id", input.FnID(input.AppID(auth.WorkspaceID())),
+		"function_slug", input.FnSlug(),
+		"app_id", app.ID,
+	)
 }
