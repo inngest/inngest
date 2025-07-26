@@ -182,6 +182,8 @@ func (a checkpointAPI) CheckpointSteps(w http.ResponseWriter, r *http.Request) {
 	// if the opcodes are sleeps, waitForEvents, inferences, etc. we will be resuming the API endpoint
 	// at some point in the future.
 	for _, op := range input.Steps {
+		attrs := tracing.GeneratorAttrs(&op)
+
 		switch op.Op {
 		case enums.OpcodeStepRun, enums.OpcodeStep:
 			// TODO:Save steps to state store for future retries.
@@ -192,13 +194,13 @@ func (a checkpointAPI) CheckpointSteps(w http.ResponseWriter, r *http.Request) {
 					Parent:    md.Config.NewFunctionTrace(),
 					StartTime: op.Timing.Start(),
 					EndTime:   op.Timing.End(),
-					Attributes: meta.NewAttrSet(
+					Attributes: attrs.Merge(meta.NewAttrSet(
 						meta.Attr(meta.Attrs.StepName, inngestgo.Ptr(op.UserDefinedName())),
 						meta.Attr(meta.Attrs.RunID, &input.RunID),
 						meta.Attr(meta.Attrs.QueuedAt, inngestgo.Ptr(op.Timing.Start())),
 						meta.Attr(meta.Attrs.StartedAt, inngestgo.Ptr(op.Timing.Start())),
 						meta.Attr(meta.Attrs.EndedAt, inngestgo.Ptr(op.Timing.End())),
-					),
+					)),
 				},
 			)
 			_, _ = ref, err
