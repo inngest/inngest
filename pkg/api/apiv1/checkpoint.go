@@ -180,10 +180,18 @@ func (a checkpointAPI) CheckpointSteps(w http.ResponseWriter, r *http.Request) {
 	})
 	// TODO: Handle run not found with 404
 	if err != nil {
+		logger.StdlibLogger(ctx).Warn(
+			"error loading state for background checkpoint steps",
+			"error", err,
+			"run_id", md.ID.RunID.String(),
+		)
 		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 500, "error loading state"))
-		// TODO: log
 		return
 	}
+
+	// TODO: If the opcodes contain a function finished op, we don't need to bother serializing
+	// to the state store.  We only care about serializing state if we switch from sync -> async,
+	// as the state will be used for resuming functions.
 
 	// Depending on the type of steps, we may end up switching the run from sync to async.  For example,
 	// if the opcodes are sleeps, waitForEvents, inferences, etc. we will be resuming the API endpoint
@@ -193,7 +201,21 @@ func (a checkpointAPI) CheckpointSteps(w http.ResponseWriter, r *http.Request) {
 
 		switch op.Op {
 		case enums.OpcodeStepRun, enums.OpcodeStep:
-			// TODO:Save steps to state store for future retries.
+			output, err := op.Output()
+			if err != nil {
+				logger.StdlibLogger(ctx).Error(
+					"error fetching checkpoint step output",
+					"error", err,
+					"run_id", md.ID.RunID.String(),
+				)
+			}
+			if _, err := a.State.SaveStep(ctx, md.ID, op.ID, []byte(output)); err != nil {
+				logger.StdlibLogger(ctx).Error(
+					"error saving checkpointed step state",
+					"error", err,
+					"run_id", md.ID.RunID.String(),
+				)
+			}
 
 			ref, err := a.TracerProvider.CreateSpan(
 				meta.SpanNameStep,
