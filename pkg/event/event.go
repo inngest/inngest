@@ -160,13 +160,13 @@ func (e Event) CronSchedule() *string {
 // and annotated with additional metadata.
 type InternalEvent struct {
 	// ID is the internal ID for the event.
-	ID ulid.ULID
+	ID ulid.ULID `json:"internal_id"`
 	// AccountID is the account ID for the event.
-	AccountID uuid.UUID
+	AccountID uuid.UUID `json:"account_id"`
 	// WorkspaceID is the ID of the environment that the event belongs to
-	WorkspaceID uuid.UUID
+	WorkspaceID uuid.UUID `json:"workspace_id"`
 	// Event is the underlying event received.
-	Event Event
+	Event Event `json:"event"`
 }
 
 func (i InternalEvent) GetWorkspaceID() uuid.UUID {

@@ -51,6 +51,7 @@ func NewOSSTrackedEventFromString(data string) (*ossTrackedEvent, error) {
 
 type ossTrackedEvent struct {
 	ID          ulid.ULID `json:"internal_id"`
+	AccountID   uuid.UUID `json:"account_id"`
 	WorkspaceID uuid.UUID `json:"workspace_id"`
 	Event       Event     `json:"event"`
 }
