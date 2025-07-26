@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/json"
+	"fmt"
 	"io"
 	"net/http"
 	"time"
@@ -95,7 +96,7 @@ func (a checkpointAPI) CheckpointNewRun(w http.ResponseWriter, r *http.Request) 
 	// such that every new run from the same API endpoint produces the same IDs; therefore,
 	// if this fails the next API request will upsert these and we will continue to make
 	// the apps and runs once again.
-	go a.upsertData(ctx, auth, input)
+	go a.upsertSyncData(ctx, auth, input)
 
 	appID := input.AppID(auth.WorkspaceID())
 	fn := input.Fn(appID)
@@ -201,6 +202,16 @@ func (a checkpointAPI) CheckpointSteps(w http.ResponseWriter, r *http.Request) {
 				},
 			)
 			_, _ = ref, err
+		// case enums.OpcodeFunctionComplete:
+		// 	result := APIResult{}
+		// 	if err := json.Unmarshal(op.Data, &result); err != nil {
+		// 		// TODO: err
+		// 		return
+		// 	}
+		// 	if err := a.finalize(ctx, md, result); err != nil {
+		// 		// TODO: err
+		// 		return
+		// 	}
 		default:
 			// This is now async.  For now, do NOT allow this.
 			panic("TODO")
@@ -251,28 +262,40 @@ func (a checkpointAPI) CheckpointResponse(w http.ResponseWriter, r *http.Request
 	})
 	// TODO: Handle run not found with 404
 	if err != nil {
+		logger.StdlibLogger(ctx).Error(
+			"error loading state in sync fn finalize",
+			"error", err,
+			"run_id", md.ID.RunID.String(),
+		)
 		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 500, "error loading state"))
-		// TODO: Log
 		return
 	}
 
+	if err := a.finalize(ctx, md, input.Result); err != nil {
+		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 500, "error finalizing run"))
+		return
+	}
+}
+
+func (a checkpointAPI) finalize(ctx context.Context, md sv2.Metadata, result APIResult) error {
 	// TODO: If the run mode is async (due to background steps, or a switch with waits)
 	// we need to ensure that we do not finish the run.  Finishing will be managed via the
 	// regular async executor.
-
-	err = a.TracerProvider.UpdateSpan(&tracing.UpdateSpanOptions{
+	err := a.TracerProvider.UpdateSpan(&tracing.UpdateSpanOptions{
 		Metadata:   &md,
 		TargetSpan: tracing.RunSpanRefFromMetadata(&md),
-		EndTime:    md.ID.RunID.Timestamp().Add(input.Result.Duration),
+		EndTime:    md.ID.RunID.Timestamp().Add(result.Duration),
 		Status:     enums.StepStatusCompleted, // Optionally set a status for the span
 		Attributes: meta.NewAttrSet(),
 	})
 	if err != nil {
-		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 500, "error updating state"))
-		// TODO: Log
-		return
+		logger.StdlibLogger(ctx).Error(
+			"error finalizing sync api span",
+			"error", err,
+			"run_id", md.ID.RunID.String(),
+		)
+		return fmt.Errorf("error updating span: %w", err)
 	}
-
 	_, err = a.State.Delete(ctx, md.ID)
 	if err != nil {
 		logger.StdlibLogger(ctx).Error(
@@ -281,9 +304,14 @@ func (a checkpointAPI) CheckpointResponse(w http.ResponseWriter, r *http.Request
 			"run_id", md.ID.RunID.String(),
 		)
 	}
+	return nil
 }
 
-func (a checkpointAPI) upsertData(ctx context.Context, auth apiv1auth.V1Auth, input *CheckpointNewRunRequest) {
+// upsertSyncData adds apps and functions to the backing datastore the first time
+// that an API is called.  This is called every time a sync fn is invoked, and
+// we memoize this call via an in-memory map.  Because our API is deployed many times
+// over and this is in-memory, we must make these upserts and not insert N times.
+func (a checkpointAPI) upsertSyncData(ctx context.Context, auth apiv1auth.V1Auth, input *CheckpointNewRunRequest) {
 	app, err := a.AppCreator.UpsertApp(ctx, cqrs.UpsertAppParams{
 		ID:     input.AppID(auth.WorkspaceID()),
 		Name:   input.AppSlug(),

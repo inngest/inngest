@@ -125,11 +125,8 @@ type APIResult struct {
 	// Body represents the API response.  This may be nil by default.  It is only
 	// captured when you manually specify that you want to track the result.
 	Body []byte `json:"body,omitempty"`
-	// Duration represents the duration
+	// Duration represents the overall time that it took for the API to execute.
 	Duration time.Duration `json:"duration"`
-	// Error represents any error from the API.  This is only for internal errors,
-	// eg. when a step permanently fails
-	Error string `json:"error,omitempty"`
 }
 
 // CheckpointNewRunResponse represents the response payload for a successful run creation.
