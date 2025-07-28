@@ -1,9 +1,11 @@
 import { createColumnHelper } from '@tanstack/react-table';
 
+import { LinkElement } from '../DetailsCard/NewElement';
 import { useShared } from '../SharedContext/SharedContext';
 import type { InngestStatus } from '../SharedContext/useInngestStatus';
 import { getStatusBackgroundClass, getStatusTextClass } from '../Status/statusClasses';
 import NewTable from '../Table/NewTable';
+import { OptionalTooltip } from '../Tooltip/OptionalTooltip';
 
 type ErrorTable = {
   system: string;
@@ -16,32 +18,13 @@ type ErrorInfoProps = {
 
 const InngestStatus = ({ inngestStatus }: { inngestStatus: InngestStatus | null }) =>
   inngestStatus && (
-    <a
-      href={inngestStatus.url}
-      target="_blank"
-      className="hover:text-link bg-canvasBase hover:bg-canvasMuted text-basis flex items-center gap-2 rounded text-sm"
-    >
+    <LinkElement href={inngestStatus.url} target="_blank">
       <span
         className={'mx-1 inline-flex h-2.5 w-2.5 rounded-full'}
         style={{ backgroundColor: inngestStatus.indicatorColor }}
       ></span>
       {inngestStatus.description}
-    </a>
-  );
-
-const VercelStatus = ({ inngestStatus }: { inngestStatus: InngestStatus | null }) =>
-  inngestStatus && (
-    <a
-      href={inngestStatus.url}
-      target="_blank"
-      className="hover:text-link bg-canvasBase hover:bg-canvasMuted text-basis flex items-center gap-2 rounded text-sm"
-    >
-      <div
-        className={'mx-1 inline-flex h-2.5 w-2.5 rounded-full'}
-        style={{ backgroundColor: inngestStatus.indicatorColor }}
-      />
-      {inngestStatus.description}
-    </a>
+    </LinkElement>
   );
 
 const SDKError = ({ error }: ErrorInfoProps) => (
@@ -51,7 +34,9 @@ const SDKError = ({ error }: ErrorInfoProps) => (
         'FAILED'
       )}`}
     />
-    <div className="min-w-0 overflow-x-auto whitespace-nowrap">{error}</div>
+    <OptionalTooltip tooltip={error?.length > 55 ? error : ''} side="left">
+      <div className="min-w-0 overflow-x-hidden text-ellipsis whitespace-nowrap">{error}</div>
+    </OptionalTooltip>
   </div>
 );
 
@@ -75,7 +60,7 @@ export const ErrorInfo = ({ error }: ErrorInfoProps) => {
 
         return system === 'Inngest' ? (
           <InngestStatus inngestStatus={inngestStatus} />
-        ) : system === 'Vercel' ? null : ( // <VercelStatus inngestStatus={inngestStatus} />
+        ) : (
           <SDKError error={error} />
         );
       },
@@ -90,7 +75,7 @@ export const ErrorInfo = ({ error }: ErrorInfoProps) => {
         <NewTable
           data={[
             { system: 'Inngest', status: '' },
-            { system: 'SDK', status: '' },
+            { system: 'App', status: '' },
           ]}
           columns={columns}
         />

@@ -9,7 +9,8 @@ import { parseCode } from './utils';
 const LOCAL_STORAGE_KEY = 'lastInvokePayload';
 
 const getInitialCode = () => {
-  const storedPayload = localStorage.getItem(LOCAL_STORAGE_KEY);
+  const storedPayload =
+    typeof window !== 'undefined' ? localStorage.getItem(LOCAL_STORAGE_KEY) : undefined;
   return storedPayload || JSON.stringify({ data: {} }, null, 2);
 };
 
