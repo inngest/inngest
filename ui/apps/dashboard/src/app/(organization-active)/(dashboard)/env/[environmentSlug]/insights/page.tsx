@@ -14,8 +14,10 @@ export default function InsightsPage() {
   return (
     <>
       <Header breadcrumb={[{ text: 'Insights' }]} />
-      <main className="flex h-full w-full flex-1 flex-col">
-        <InsightsSQLEditor />
+      <main className="grid h-full w-full flex-1 grid-rows-[3fr_5fr] gap-0">
+        <div className="min-h-[240px]">
+          <InsightsSQLEditor />
+        </div>
         <InsightsDataTable />
       </main>
     </>
