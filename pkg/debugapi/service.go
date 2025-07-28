@@ -38,6 +38,7 @@ type Opts struct {
 type debugAPI struct {
 	chi.Router
 	Opts
+	pb.DebugServer
 
 	rpc *grpc.Server
 	log logger.Logger
@@ -61,6 +62,7 @@ func (d *debugAPI) Pre(ctx context.Context) error {
 }
 
 func (d *debugAPI) Run(ctx context.Context) error {
+	// TODO: make the port optional
 	addr := fmt.Sprintf(":%d", 7777)
 
 	l, err := net.Listen("tcp", addr)
