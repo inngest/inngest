@@ -31,7 +31,7 @@ export function useMonacoWithTheme(wrapperRef: React.RefObject<HTMLDivElement>) 
       mediaQuery.removeEventListener('change', updateDarkMode);
       observer.disconnect();
     };
-  }, [wrapperRef]);
+  }, []);
 
   useEffect(() => {
     if (!monaco) return;
