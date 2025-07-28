@@ -1,0 +1,12 @@
+syntax = "proto3";
+package debug.v1;
+
+option go_package = "github.com/inngest/inngest/proto/gen/debug/v1;debug";
+
+service Debug {
+  rpc GetPartition(PartitionRequest) returns (PartitionResponse) {}
+}
+
+message PartitionRequest {}
+
+message PartitionResponse {}
