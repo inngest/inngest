@@ -5,6 +5,7 @@ import { MetricsIcon } from '@inngest/components/icons/sections/Metrics';
 import { RunsIcon } from '@inngest/components/icons/sections/Runs';
 
 import type { Environment as EnvType } from '@/utils/environments';
+import { useBooleanFlag } from '../FeatureFlags/hooks';
 import { getNavRoute } from './Navigation';
 
 export default function Monitor({
@@ -14,6 +15,8 @@ export default function Monitor({
   activeEnv: EnvType;
   collapsed: boolean;
 }) {
+  const { value: isInsightsEnabled } = useBooleanFlag('insights');
+
   return (
     <div className={`flex w-full flex-col  ${collapsed ? 'mt-2' : 'mt-5'}`}>
       {collapsed ? (
@@ -21,12 +24,14 @@ export default function Monitor({
       ) : (
         <div className="text-disabled leading-4.5 mx-2.5 mb-1 text-xs font-medium">Monitor</div>
       )}
-      <MenuItem
-        href={getNavRoute(activeEnv, 'insights')}
-        collapsed={collapsed}
-        text="Insights"
-        icon={<InsightsIcon className="h-[18px] w-[18px]" />}
-      />
+      {isInsightsEnabled && (
+        <MenuItem
+          href={getNavRoute(activeEnv, 'insights')}
+          collapsed={collapsed}
+          text="Insights"
+          icon={<InsightsIcon className="h-[18px] w-[18px]" />}
+        />
+      )}
       <MenuItem
         href={getNavRoute(activeEnv, 'metrics')}
         collapsed={collapsed}
