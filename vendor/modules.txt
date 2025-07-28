@@ -644,7 +644,7 @@ github.com/hashicorp/hcl/json/token
 # github.com/inconshreveable/mousetrap v1.1.0
 ## explicit; go 1.18
 github.com/inconshreveable/mousetrap
-# github.com/inngest/expr v0.0.0-20250521221349-ef1dab5028e5
+# github.com/inngest/expr v0.0.0-20250728175740-617972707fc1
 ## explicit; go 1.24
 github.com/inngest/expr
 # github.com/inngest/go-httpstat v0.0.0-20250328150054-dfda91359d48
