@@ -29,10 +29,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func useGRPCAlways(ctx context.Context, accountID uuid.UUID) bool {
-	return true
-}
-
 type mockGatewayGRPCManager struct {
 	forwardCalls  []mockForwardCall
 	subscriptions map[string]chan *connectpb.SDKResponse
