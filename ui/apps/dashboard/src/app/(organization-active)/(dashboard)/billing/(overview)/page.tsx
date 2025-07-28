@@ -4,7 +4,6 @@ import { Card } from '@inngest/components/Card/Card';
 import { formatDayString } from '@inngest/components/utils/date';
 
 import EntitlementListItem from '@/components/Billing/Addons/EntitlementListItem';
-import MetricsExportEntitlementValue from '@/components/Billing/Addons/MetricsExportEntitlementValue';
 import BillingInformation from '@/components/Billing/BillingDetails/BillingInformation';
 import PaymentMethod from '@/components/Billing/BillingDetails/PaymentMethod';
 import { LimitBar, type Data } from '@/components/Billing/LimitBar';
@@ -83,6 +82,22 @@ export default async function Page() {
   const isHobbyPlan =
     currentPlan.slug === 'hobby-free-2025-06-13' || currentPlan.slug === 'hobby-payg-2025-06-13';
 
+  const advancedObservabilityAddon = {
+    available: addons.advancedObservability.available,
+    name: addons.advancedObservability.name,
+    baseValue: addons.advancedObservability.purchased ? 1 : 0,
+    maxValue: 1,
+    quantityPer: 1,
+    price: addons.advancedObservability.price,
+    entitlements: addons.advancedObservability.entitlements,
+    purchased: addons.advancedObservability.purchased,
+    currentEntitlementValues: {
+      history: entitlements.history?.limit,
+      metricsExportFreshness: entitlements.metricsExportFreshness?.limit,
+      metricsExportGranularity: entitlements.metricsExportGranularity?.limit,
+    },
+  };
+
   return (
     <div className="grid grid-cols-3 gap-4">
       <Card className="col-span-2">
@@ -137,15 +152,6 @@ export default async function Page() {
           <div className="border-subtle mb-6 border" />
           <EntitlementListItem
             planName={currentPlan.name}
-            title="Event size"
-            description="The maximum size for a single event"
-            entitlement={{
-              currentValue: entitlements.eventSize.limit,
-              displayValue: kbyteDisplayValue(entitlements.eventSize.limit),
-            }}
-          />
-          <EntitlementListItem
-            planName={currentPlan.name}
             title="Concurrency"
             description="Maximum number of concurrently executing steps"
             tooltipContent="Functions actively sleeping and waiting for events are not counted"
@@ -167,17 +173,53 @@ export default async function Page() {
             addon={addons.userCount}
             onChange={refetch}
           />
-          <EntitlementListItem
-            planName={currentPlan.name}
-            title="Log history"
-            description="View and search function run traces and metrics"
-            entitlement={{
-              currentValue: entitlements.history.limit,
-              displayValue: `${entitlements.history.limit} day${
-                entitlements.history.limit === 1 ? '' : 's'
-              }`,
-            }}
-          />
+          <ServerFeatureFlag flag="advanced-observability" defaultValue={false}>
+            <EntitlementListItem
+              increaseInHigherPlan={true}
+              planName={currentPlan.name}
+              title="Log retention"
+              description="View and search function run traces and metrics"
+              buttonText="advanced observability"
+              entitlement={{
+                currentValue: addons.advancedObservability.purchased,
+                displayValue: `${entitlements.history.limit} day${
+                  entitlements.history.limit === 1 ? '' : 's'
+                }`,
+              }}
+              addon={advancedObservabilityAddon}
+              onChange={refetch}
+            />
+            <EntitlementListItem
+              increaseInHigherPlan={true}
+              planName={currentPlan.name}
+              title="Metrics granularity"
+              description="Granularity of exported metrics data points"
+              buttonText="advanced observability"
+              entitlement={{
+                currentValue: addons.advancedObservability.purchased,
+                displayValue: `${entitlements.metricsExportGranularity.limit / 60} minute${
+                  entitlements.metricsExportGranularity.limit / 60 === 1 ? '' : 's'
+                }`,
+              }}
+              addon={advancedObservabilityAddon}
+              onChange={refetch}
+            />
+            <EntitlementListItem
+              increaseInHigherPlan={true}
+              planName={currentPlan.name}
+              title="Metrics freshness"
+              description="How recent exported metrics data is"
+              buttonText="advanced observability"
+              entitlement={{
+                currentValue: addons.advancedObservability.purchased,
+                displayValue: `${entitlements.metricsExportFreshness.limit / 60} minute${
+                  entitlements.metricsExportFreshness.limit / 60 === 1 ? '' : 's'
+                }`,
+              }}
+              addon={advancedObservabilityAddon}
+              onChange={refetch}
+            />
+          </ServerFeatureFlag>
           <EntitlementListItem
             increaseInHigherPlan={false}
             planName={currentPlan.name}
@@ -186,6 +228,15 @@ export default async function Page() {
             entitlement={{
               currentValue: entitlements.hipaa.enabled,
               displayValue: entitlements.hipaa.enabled ? 'Enabled' : 'Not enabled',
+            }}
+          />
+          <EntitlementListItem
+            planName={currentPlan.name}
+            title="Event size"
+            description="The maximum size for a single event"
+            entitlement={{
+              currentValue: entitlements.eventSize.limit,
+              displayValue: kbyteDisplayValue(entitlements.eventSize.limit),
             }}
           />
           <EntitlementListItem
@@ -198,49 +249,6 @@ export default async function Page() {
               displayValue: 'Not enabled', // TODO: https://linear.app/inngest/issue/INN-4202/add-dedicated-capacity-addon
             }}
           />
-          <EntitlementListItem
-            increaseInHigherPlan={true}
-            planName={currentPlan.name}
-            title="Exportable metrics"
-            description="Export key Inngest metrics into your own monitoring infrastructure"
-            entitlement={{
-              currentValue: entitlements.metricsExport.enabled,
-              displayValue: (
-                <MetricsExportEntitlementValue
-                  metricsExportEnabled={entitlements.metricsExport.enabled}
-                  granularitySeconds={entitlements.metricsExportGranularity.limit}
-                  freshnessSeconds={entitlements.metricsExportFreshness.limit}
-                />
-              ),
-            }}
-          />
-          <ServerFeatureFlag flag="advanced-observability" defaultValue={false}>
-            <EntitlementListItem
-              increaseInHigherPlan={true}
-              planName={currentPlan.name}
-              title="Advanced Observability"
-              description="Export key Inngest metrics into your own monitoring infrastructure"
-              entitlement={{
-                currentValue: addons.advancedObservability.purchased,
-                displayValue: addons.advancedObservability.purchased ? 'Enabled' : 'Not enabled',
-              }}
-              addon={{
-                available: addons.advancedObservability.available,
-                name: addons.advancedObservability.name,
-                baseValue: addons.advancedObservability.purchased ? 1 : 0,
-                maxValue: 1,
-                quantityPer: 1,
-                price: addons.advancedObservability.price,
-                entitlements: addons.advancedObservability.entitlements,
-                purchased: addons.advancedObservability.purchased,
-                currentEntitlementValues: {
-                  history: entitlements.history.limit,
-                  metricsExportFreshness: entitlements.metricsExportFreshness.limit,
-                  metricsExportGranularity: entitlements.metricsExportGranularity.limit,
-                },
-              }}
-            />
-          </ServerFeatureFlag>
           <div className="flex flex-col items-center gap-2 pt-6">
             <p className="text-muted text-xs">Custom needs?</p>
             <Button

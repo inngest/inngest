@@ -31,6 +31,7 @@ export default function EntitlementListItemSelfService({
   addon,
   addonPurchased,
   currentEntitlementValues,
+  buttonText,
   onChange,
 }: {
   title: string;
@@ -55,6 +56,7 @@ export default function EntitlementListItemSelfService({
   };
   addonPurchased?: boolean;
   currentEntitlementValues?: CurrentEntitlementValues;
+  buttonText?: string;
   onChange?: () => void;
 }) {
   const router = useRouter();
@@ -131,10 +133,9 @@ export default function EntitlementListItemSelfService({
           tooltip={tooltip}
           entitlement={entitlement}
           addonPurchased={addonPurchased}
-          currentEntitlementValues={currentEntitlementValues}
-          addonEntitlements={addon.entitlements}
           onAddClick={() => handleBooleanClick(1)}
           onRemoveClick={() => handleBooleanClick(0)}
+          buttonText={buttonText}
         />
         {openConfirmationModal && (
           <AdvancedObservabilityModal

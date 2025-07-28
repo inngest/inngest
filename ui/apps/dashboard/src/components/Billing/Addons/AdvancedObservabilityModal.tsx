@@ -29,7 +29,7 @@ export default function AdvancedObservabilityModal({
     metricsExportGranularity: { limit: number };
   };
 }) {
-  const modalTitle = isRemoving ? `Remove ${title} Addon` : `Add ${title.toLowerCase()} to plan`;
+  const modalTitle = isRemoving ? `Remove ${title} addon` : `Add ${title.toLowerCase()} to plan`;
 
   const confirmButtonLabel = isRemoving
     ? 'Remove addon'

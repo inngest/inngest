@@ -30,6 +30,7 @@ export default function EntitlementListItem({
   tooltipContent,
   entitlement,
   addon,
+  buttonText,
   onChange,
 }: {
   increaseInHigherPlan?: boolean;
@@ -60,6 +61,7 @@ export default function EntitlementListItem({
     };
     currentEntitlementValues?: CurrentEntitlementValues;
   }; // No addon, or no price, implies self-service is not available.
+  buttonText?: string;
   onChange?: () => void;
 }) {
   const tooltip = tooltipContent ? (
@@ -101,6 +103,7 @@ export default function EntitlementListItem({
         addonPurchased={addon.purchased}
         currentEntitlementValues={addon.currentEntitlementValues}
         onChange={onChange}
+        buttonText={buttonText}
       />
     );
   } else {
