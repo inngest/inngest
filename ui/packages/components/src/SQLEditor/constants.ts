@@ -1,6 +1,8 @@
+import type { editor } from 'monaco-editor';
+
 import { FONT, LINE_HEIGHT } from '../utils/monaco';
 
-export const EDITOR_OPTIONS = {
+export const EDITOR_OPTIONS: editor.IEditorOptions = {
   autoClosingBrackets: 'always',
   autoClosingQuotes: 'always',
   contextmenu: false,
@@ -18,7 +20,8 @@ export const EDITOR_OPTIONS = {
   minimap: {
     enabled: false,
   },
-  occurrencesHighlight: 'off',
+  // expected value of 'off' doesn't work as expected
+  occurrencesHighlight: false as any,
   overviewRulerLanes: 0,
   padding: {
     top: 10,
@@ -39,4 +42,4 @@ export const EDITOR_OPTIONS = {
   },
   wordWrap: 'off',
   wrappingStrategy: 'advanced',
-} as const;
+};
