@@ -92,9 +92,9 @@ export default async function Page() {
     entitlements: addons.advancedObservability.entitlements,
     purchased: addons.advancedObservability.purchased,
     currentEntitlementValues: {
-      history: entitlements.history?.limit,
-      metricsExportFreshness: entitlements.metricsExportFreshness?.limit,
-      metricsExportGranularity: entitlements.metricsExportGranularity?.limit,
+      history: entitlements.history.limit,
+      metricsExportFreshness: entitlements.metricsExportFreshness.limit,
+      metricsExportGranularity: entitlements.metricsExportGranularity.limit,
     },
   };
 
