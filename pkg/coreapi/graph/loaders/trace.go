@@ -334,7 +334,7 @@ func (tr *traceReader) convertRunSpanToGQL(ctx context.Context, span *cqrs.OtelS
 		}
 
 		// For the run span, the start is the first child span's start
-		if span.Name == meta.SpanNameRun {
+		if span.Name == meta.SpanNameRun && len(gqlSpan.ChildrenSpans) > 0 {
 			gqlSpan.StartedAt = &gqlSpan.ChildrenSpans[0].QueuedAt
 			if gqlSpan.EndedAt != nil {
 				dur := int(gqlSpan.EndedAt.Sub(*gqlSpan.StartedAt).Milliseconds())

@@ -87,6 +87,7 @@ export const createColors = (isDark: boolean) => ({
   'editorBracketHighlight.foreground2': resolveColor(textColor.codeDelimiterBracketJson, isDark),
   'editorBracketHighlight.foreground3': resolveColor(textColor.codeDelimiterBracketJson, isDark),
   'editorBracketHighlight.foreground4': resolveColor(textColor.codeDelimiterBracketJson, isDark),
+  focusBorder: resolveColor(backgroundColor.codeEditor, isDark),
 });
 
 export const LINE_HEIGHT = 26;

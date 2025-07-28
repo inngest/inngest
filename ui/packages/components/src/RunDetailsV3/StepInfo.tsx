@@ -17,6 +17,7 @@ import { Time } from '../Time';
 import { usePrettyErrorBody, usePrettyJson } from '../hooks/usePrettyJson';
 import type { Result } from '../types/functionRun';
 import { formatMilliseconds, toMaybeDate } from '../utils/date';
+import { ErrorInfo } from './ErrorInfo';
 import { IO } from './IO';
 import { Tabs } from './Tabs';
 import { UserlandAttrs } from './UserlandAttrs';
@@ -134,15 +135,23 @@ export const StepInfo = ({
   const [rerunModalOpen, setRerunModalOpen] = useState(false);
   const { runID, trace } = selectedStep;
   const [result, setResult] = useState<Result>();
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     let intervalId: ReturnType<typeof setInterval> | undefined;
 
-    const refreshResult = () => {
-      if (trace.outputID) {
-        getResult(trace.outputID).then(setResult);
-      } else {
-        setResult(undefined);
+    const refreshResult = async () => {
+      try {
+        setLoading(true);
+        if (trace.outputID) {
+          setResult(await getResult(trace.outputID));
+        } else {
+          setResult(undefined);
+        }
+      } catch (error) {
+        console.error('error loading step result', error);
+      } finally {
+        setLoading(false);
       }
     };
 
@@ -195,7 +204,7 @@ export const StepInfo = ({
   const prettyErrorBody = usePrettyErrorBody(result?.error);
 
   return (
-    <div className="sticky top-14 flex flex-col justify-start gap-2 overflow-hidden">
+    <div className="flex h-full flex-col justify-start gap-2">
       <div className="flex min-h-11 w-full flex-row items-center justify-between border-none px-4">
         <div
           className="text-basis flex cursor-pointer items-center justify-start gap-2"
@@ -272,46 +281,50 @@ export const StepInfo = ({
       {trace.isUserland && trace.userlandSpan ? (
         <UserlandAttrs userlandSpan={trace.userlandSpan} />
       ) : (
-        <Tabs
-          defaultActive={result?.error ? 'error' : prettyInput ? 'input' : 'output'}
-          tabs={[
-            ...(prettyInput
-              ? [
-                  {
-                    label: 'Input',
-                    id: 'input',
-                    node: <IO title="Step Input" raw={prettyInput} />,
-                  },
-                ]
-              : []),
-            ...(prettyOutput
-              ? [
-                  {
-                    label: 'Output',
-                    id: 'output',
-                    node: <IO title="Step Output" raw={prettyOutput} />,
-                  },
-                ]
-              : []),
-            ...(result?.error
-              ? [
-                  {
-                    label: 'Error',
-                    id: 'error',
-                    node: (
-                      <IO
-                        title={`${result.error.name || 'Error'} ${
-                          result.error.message ? `: ${result.error.message}` : ''
-                        }`}
-                        raw={prettyErrorBody ?? ''}
-                        error={true}
-                      />
-                    ),
-                  },
-                ]
-              : []),
-          ]}
-        />
+        <>
+          {result?.error && <ErrorInfo error={result.error.message || 'Unknown error'} />}
+          <div className="flex-1">
+            <Tabs
+              defaultActive={result?.error ? 'error' : 'output'}
+              tabs={[
+                ...(prettyInput
+                  ? [
+                      {
+                        label: 'Input',
+                        id: 'input',
+                        node: <IO title="Step Input" raw={prettyInput} loading={loading} />,
+                      },
+                    ]
+                  : []),
+                ...(prettyOutput
+                  ? [
+                      {
+                        label: 'Output',
+                        id: 'output',
+                        node: <IO title="Step Output" raw={prettyOutput} loading={loading} />,
+                      },
+                    ]
+                  : []),
+                ...(result?.error
+                  ? [
+                      {
+                        label: 'Error details',
+                        id: 'error',
+                        node: (
+                          <IO
+                            title={result.error.message || 'Unknown error'}
+                            raw={prettyErrorBody ?? ''}
+                            error={true}
+                            loading={loading}
+                          />
+                        ),
+                      },
+                    ]
+                  : []),
+              ]}
+            />
+          </div>
+        </>
       )}
     </div>
   );

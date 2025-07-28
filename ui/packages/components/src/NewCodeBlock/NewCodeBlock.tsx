@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Button } from '@inngest/components/Button';
 import { CopyButton } from '@inngest/components/CopyButton';
 import { maxRenderedOutputSizeBytes } from '@inngest/components/constants';
@@ -11,17 +11,16 @@ import { cn } from '@inngest/components/utils/classNames';
 import { FONT, LINE_HEIGHT, createColors, createRules } from '@inngest/components/utils/monaco';
 import Editor, { useMonaco } from '@monaco-editor/react';
 import { RiCollapseDiagonalLine, RiDownload2Line, RiExpandDiagonalLine } from '@remixicon/react';
-import { type editor } from 'monaco-editor';
 import { JSONTree } from 'react-json-tree';
 import { useLocalStorage } from 'react-use';
 
 import { Alert } from '../Alert';
 import { Fullscreen } from '../Fullscreen/Fullscreen';
+import { Pill } from '../Pill';
 import SegmentedControl from '../SegmentedControl/SegmentedControl';
+import { Skeleton } from '../Skeleton';
 import { jsonTreeTheme } from '../utils/jsonTree';
 import { isDark } from '../utils/theme';
-
-const DEFAULT_MAX_HEIGHT = 500;
 
 export type CodeBlockAction = {
   label: string;
@@ -44,29 +43,35 @@ interface CodeBlockProps {
     handleChange?: (value: string) => void;
   };
   actions?: CodeBlockAction[];
-  maxHeight?: number;
+  defaultHeight?: number;
+  height?: number;
   allowFullScreen?: boolean;
   parsed?: boolean;
+  loading?: boolean;
 }
 
 export const NewCodeBlock = ({
   header,
   tab,
   actions = [],
-  maxHeight = DEFAULT_MAX_HEIGHT,
+  height = 0,
   allowFullScreen = false,
   parsed = true,
+  loading = false,
 }: CodeBlockProps) => {
   const [dark, _] = useState(isDark());
-  const [editorHeight, setEditorHeight] = useState(maxHeight);
+  const [editorHeight, setEditorHeight] = useState(height);
   const [fullScreen, setFullScreen] = useState(false);
   const [mode, setMode] = useState<'rich' | 'raw'>('rich');
-  const wrapperRef = useRef<HTMLDivElement>(null);
   const [wordWrap, setWordWrap] = useLocalStorage('wordWrap', false);
 
   const { handleCopyClick, isCopying } = useCopyToClipboard();
-  const updateHeight = (editor: editor.IStandaloneCodeEditor) =>
-    setEditorHeight(editor.getContentHeight());
+  const updateHeight = useCallback(
+    (newHeight?: number) => {
+      newHeight && newHeight !== editorHeight && setEditorHeight(newHeight);
+    },
+    [editorHeight]
+  );
 
   const monaco = useMonaco();
   const { content, readOnly = true, language = 'json' } = tab;
@@ -120,14 +125,8 @@ export const NewCodeBlock = ({
           fullScreen && 'bg-codeEditor fixed inset-0 z-[52]'
         )}
       >
-        <div className={cn('bg-canvasSubtle border-subtle min-h-12 border-b')}>
-          <div
-            className={cn(
-              'bg-canvasBase flex items-center justify-between border-l-4 border-l-transparent',
-              header?.status === 'error' && 'border-l-status-failed',
-              header?.status === 'success' && 'border-l-status-completed'
-            )}
-          >
+        <div className={cn('bg-canvasSubtle')}>
+          <div className={cn('bg-codeEditor flex items-center justify-between')}>
             <p
               className={cn(
                 header?.status === 'error' ? 'text-status-failedText' : 'text-subtle',
@@ -145,7 +144,13 @@ export const NewCodeBlock = ({
                   </SegmentedControl.Button>
                 </SegmentedControl>
               ) : (
-                <>{header?.title}</>
+                <Pill
+                  kind={header?.status === 'error' ? 'error' : 'default'}
+                  appearance="outlined"
+                  className="max-w-96 overflow-x-auto rounded-full p-3"
+                >
+                  {header?.title}
+                </Pill>
               )}
             </p>
             {!isOutputTooLarge && (
@@ -197,12 +202,7 @@ export const NewCodeBlock = ({
             )}
           </div>
         </div>
-        <div
-          ref={wrapperRef}
-          className={`m-0 overflow-y-auto ${
-            fullScreen ? `bg-codeEditor` : `bg-canvasBase max-h-[${maxHeight}px]`
-          }`}
-        >
+        <div className={cn('bg-codeEditor h-full overflow-y-auto')}>
           {isOutputTooLarge ? (
             <>
               <Alert severity="warning">Output size is too large to render {`( > 1MB )`}</Alert>
@@ -216,6 +216,8 @@ export const NewCodeBlock = ({
                 />
               </div>
             </>
+          ) : loading ? (
+            <Skeleton className="h-24 w-full" />
           ) : parsed && mode === 'rich' ? (
             <JSONTree
               hideRoot={true}
@@ -233,24 +235,33 @@ export const NewCodeBlock = ({
             />
           ) : (
             <Editor
+              className={cn('h-full', editorHeight && `h-[${editorHeight}px]`)}
               theme="inngest-theme"
               defaultLanguage={language}
               value={content}
-              height={editorHeight}
               options={{
                 wordWrap: wordWrap ? 'on' : 'off',
                 contextmenu: false,
-                readOnly: readOnly,
+                readOnly,
                 minimap: { enabled: false },
                 fontFamily: FONT.font,
                 fontSize: FONT.size,
                 fontWeight: 'light',
                 lineHeight: LINE_HEIGHT,
+                renderLineHighlight: 'none',
+                renderWhitespace: 'none',
+                automaticLayout: true,
                 scrollBeyondLastLine: false,
+                padding: {
+                  top: 10,
+                  bottom: 10,
+                },
                 scrollbar: {
                   alwaysConsumeMouseWheel: false,
-                  horizontal: 'hidden',
+                  horizontalScrollbarSize: 0,
+                  verticalScrollbarSize: 0,
                   vertical: 'hidden',
+                  horizontal: 'hidden',
                 },
                 guides: {
                   indentation: false,
@@ -258,7 +269,7 @@ export const NewCodeBlock = ({
                   highlightActiveIndentation: false,
                 },
               }}
-              onMount={(editor) => editor.onDidContentSizeChange(() => updateHeight(editor))}
+              onMount={(editor) => updateHeight(editor.getContentHeight())}
             />
           )}
         </div>

@@ -5,6 +5,7 @@ import React, { createContext, useContext } from 'react';
 import type { BooleanFlag } from './useBooleanFlag';
 import type { CancelRunPayload, CancelRunResult } from './useCancelRun';
 import type { GetRunPayload, GetRunResult } from './useGetRun';
+import type { InngestStatus } from './useInngestStatus';
 import type { InvokeRunPayload, InvokeRunResult } from './useInvokeRun';
 import type { PathCreator } from './usePathCreator';
 import type { RerunPayload, RerunResult } from './useRerun';
@@ -20,6 +21,7 @@ export type SharedDefinitions = {
   rerun: (payload: RerunPayload) => Promise<RerunResult>;
   cancelRun: (payload: CancelRunPayload) => Promise<CancelRunResult>;
   booleanFlag: (flag: string, defaultValue?: boolean) => BooleanFlag;
+  inngestStatus: InngestStatus | null;
   pathCreator: PathCreator;
   cloud: boolean;
 };

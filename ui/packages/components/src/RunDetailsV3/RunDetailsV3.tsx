@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
 import { ErrorCard } from '../Error/ErrorCard';
@@ -54,8 +54,9 @@ export const RunDetailsV3 = (props: Props) => {
   const { getResult, getRun, getTrigger, runID, standalone } = props;
   const [pollInterval, setPollInterval] = useState(props.pollInterval);
   const [leftWidth, setLeftWidth] = useState(55);
-  const [height, setHeight] = useState(0);
+  const [height, setHeight] = useState(MIN_HEIGHT);
   const [isDragging, setIsDragging] = useState(false);
+  const [windowHeight, setWindowHeight] = useState(0);
   const { selectedStep } = useStepSelection(runID);
 
   const handleMouseDown = useCallback(() => {
@@ -85,11 +86,35 @@ export const RunDetailsV3 = (props: Props) => {
   );
 
   useEffect(() => {
-    //
-    // left column height is dynamic and should determine right column height
-    const h = leftColumnRef.current?.clientHeight ?? 0;
-    setHeight(h > MIN_HEIGHT ? h : MIN_HEIGHT);
-  }, [leftColumnRef.current?.clientHeight]);
+    setWindowHeight(window.innerHeight);
+
+    const handleResize = () => {
+      setWindowHeight(window.innerHeight);
+    };
+
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!leftColumnRef.current) {
+      return;
+    }
+
+    const resizeObserver = new ResizeObserver(() => {
+      const h = leftColumnRef.current?.clientHeight ?? 0;
+      setHeight(h > MIN_HEIGHT ? h : MIN_HEIGHT);
+    });
+
+    resizeObserver.observe(leftColumnRef.current);
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, []);
 
   useEffect(() => {
     if (isDragging) {
@@ -142,6 +167,10 @@ export const RunDetailsV3 = (props: Props) => {
   const noSpansFoundError = !!runRes.error?.toString().match(/no function run span found/gi);
   const waiting = props.initialRunData?.status === 'QUEUED' && noSpansFoundError;
   const showError = waiting ? false : runRes.error || resultRes.error;
+
+  //
+  // works around a variety of layout and scroll issues with our two column layout
+  const dynamicHeight = height < windowHeight * 0.85 ? height : '85vh';
 
   return (
     <>
@@ -202,8 +231,12 @@ export const RunDetailsV3 = (props: Props) => {
         </div>
 
         <div
-          className="border-muted flex flex-col justify-start"
-          style={{ width: `${100 - leftWidth}%`, height: standalone ? '85vh' : height }}
+          className="border-muted sticky top-0 flex flex-col justify-start overflow-y-auto"
+          style={{
+            width: `${100 - leftWidth}%`,
+            height: dynamicHeight,
+            alignSelf: 'flex-start',
+          }}
         >
           {selectedStep && !selectedStep.trace.isRoot ? (
             <StepInfo
