@@ -3,6 +3,7 @@ package debugapi
 import (
 	"context"
 	"fmt"
+	"net"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
@@ -10,6 +11,7 @@ import (
 	"github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/service"
+	pb "github.com/inngest/inngest/proto/gen/debug/v1"
 	"google.golang.org/grpc"
 )
 
@@ -20,8 +22,9 @@ var (
 func NewDebugAPI(o Opts) service.Service {
 	return &debugAPI{
 		Router: chi.NewRouter(),
-		Server: grpc.NewServer(),
+		rpc:    grpc.NewServer(),
 		Opts:   o,
+		log:    logger.StdlibLogger(context.Background()),
 	}
 }
 
@@ -34,8 +37,10 @@ type Opts struct {
 
 type debugAPI struct {
 	chi.Router
-	*grpc.Server
 	Opts
+
+	rpc *grpc.Server
+	log logger.Logger
 }
 
 func (d *debugAPI) Name() string {
@@ -50,13 +55,31 @@ func (d *debugAPI) Pre(ctx context.Context) error {
 		r.Get("/partitions/{id}", d.partitionByID)
 	})
 
+	pb.RegisterDebugServer(d.rpc, d)
+
 	return nil
 }
 
 func (d *debugAPI) Run(ctx context.Context) error {
-	return errNotImplemented
+	addr := fmt.Sprintf(":%d", 7777)
+
+	l, err := net.Listen("tcp", addr)
+	if err != nil {
+		d.log.Error("could not listen on port for debug api", "error", err, "addr", addr)
+		return err
+	}
+
+	d.log.Info("starting debug api", "addr", addr)
+	err = d.rpc.Serve(l)
+	if err != nil {
+		d.log.Error("error serving debug api", "error", err, "addr", addr)
+		return err
+	}
+
+	return nil
 }
 
 func (d *debugAPI) Stop(ctx context.Context) error {
-	return errNotImplemented
+	d.rpc.GracefulStop() // stop rpc server
+	return nil
 }
