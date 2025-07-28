@@ -14,20 +14,8 @@
 
           config.allowUnfree = true;
         };
-        corepack = pkgs.stdenv.mkDerivation {
-          name = "corepack";
-          buildInputs = [ pkgs.nodejs_22 ];
-          phases = [ "installPhase" ];
-          installPhase = ''
-            mkdir -p $out/bin
-            corepack enable --install-directory=$out/bin
-          '';
-        };
-
       in {
         devShells.default = pkgs.mkShell {
-          packages = [ corepack ];
-
           nativeBuildInputs = with pkgs; [
             # Go
             go
@@ -45,6 +33,7 @@
             # Node
             typescript
             nodejs_22
+            pnpm_8
 
             # LSPs
             gopls
