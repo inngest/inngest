@@ -25,7 +25,7 @@ import (
 	"github.com/inngest/inngest/pkg/connect"
 	"github.com/inngest/inngest/pkg/connect/auth"
 	"github.com/inngest/inngest/pkg/connect/lifecycles"
-	connectpubsub "github.com/inngest/inngest/pkg/connect/pubsub"
+	connectgrpc "github.com/inngest/inngest/pkg/connect/grpc"
 	connectv0 "github.com/inngest/inngest/pkg/connect/rest/v0"
 	connstate "github.com/inngest/inngest/pkg/connect/state"
 	"github.com/inngest/inngest/pkg/consts"
@@ -325,7 +325,6 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	conditionalTracer := itrace.NewConditionalTracer(itrace.ConnectTracer(), itrace.AlwaysTrace)
 
-	connectPubSubRedis := createConnectPubSubRedis()
 	connectPubSubLogger := logger.StdlibLoggerWithCustomVarName(ctx, "CONNECT_PUBSUB_LOG_LEVEL")
 
 	connectionManager := connstate.NewRedisConnectionStateManager(connectRc)
@@ -334,18 +333,12 @@ func start(ctx context.Context, opts StartOpts) error {
 	agg := expragg.NewAggregator(ctx, 100, 100, sm.(expragg.EvaluableLoader), expressions.ExprEvaluator, nil, nil)
 
 	executorLogger := connectPubSubLogger.With("svc", "executor")
-	gatewayGRPCForwarder := connectpubsub.NewGatewayGRPCManager(ctx, connectionManager, connectpubsub.WithLogger(executorLogger))
 
-	executorProxy, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectPubSubRedis, true, connectpubsub.RedisPubSubConnectorOpts{
-		Logger:             executorLogger,
+	executorProxy := connectgrpc.NewConnector(ctx, connectgrpc.GRPCConnectorOpts{
 		Tracer:             conditionalTracer,
 		StateManager:       connectionManager,
 		EnforceLeaseExpiry: enforceConnectLeaseExpiry,
-		GatewayGRPCManager: gatewayGRPCForwarder,
-	}))
-	if err != nil {
-		return fmt.Errorf("failed to create connect pubsub connector: %w", err)
-	}
+	}, connectgrpc.WithConnectorLogger(executorLogger))
 
 	// Before running the development service, ensure that we change the http
 	// driver in development to use our AWS Gateway http client, attempting to
@@ -505,17 +498,6 @@ func start(ctx context.Context, opts StartOpts) error {
 		})
 	})
 
-	// ds.opts.Config.EventStream.Service.TopicName()
-	apiConnectProxy, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectPubSubRedis, false, connectpubsub.RedisPubSubConnectorOpts{
-		Logger:             connectPubSubLogger.With("svc", "api"),
-		Tracer:             conditionalTracer,
-		StateManager:       connectionManager,
-		EnforceLeaseExpiry: enforceConnectLeaseExpiry,
-	}))
-	if err != nil {
-		return fmt.Errorf("failed to create connect pubsub connector: %w", err)
-	}
-
 	core, err := coreapi.NewCoreApi(coreapi.Options{
 		AuthMiddleware: authn.SigningKeyMiddleware(opts.SigningKey),
 		Data:           ds.Data,
@@ -531,7 +513,6 @@ func start(ctx context.Context, opts StartOpts) error {
 		ConnectOpts: connectv0.Opts{
 			GroupManager:               connectionManager,
 			ConnectManager:             connectionManager,
-			ConnectResponseNotifier:    apiConnectProxy,
 			ConnectRequestStateManager: connectionManager,
 			Signer:                     auth.NewJWTSessionTokenSigner(consts.DevServerConnectJwtSecret),
 			RequestAuther:              ds,
@@ -539,9 +520,6 @@ func start(ctx context.Context, opts StartOpts) error {
 			Dev:                        true,
 			EntitlementProvider:        ds,
 			ConditionalTracer:          conditionalTracer,
-			ShouldUseGRPC: func(ctx context.Context, accountID uuid.UUID) bool {
-				return false
-			},
 		},
 	})
 	if err != nil {
@@ -557,19 +535,8 @@ func start(ctx context.Context, opts StartOpts) error {
 		return err
 	}
 
-	connectGatewayProxy, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectPubSubRedis, false, connectpubsub.RedisPubSubConnectorOpts{
-		Logger:             connectPubSubLogger.With("svc", "connect-gateway"),
-		Tracer:             conditionalTracer,
-		StateManager:       connectionManager,
-		EnforceLeaseExpiry: enforceConnectLeaseExpiry,
-	}))
-	if err != nil {
-		return fmt.Errorf("failed to create connect pubsub connector: %w", err)
-	}
-
 	connGateway := connect.NewConnectGatewayService(
 		connect.WithConnectionStateManager(connectionManager),
-		connect.WithRequestReceiver(connectGatewayProxy),
 		connect.WithGatewayAuthHandler(auth.NewJWTAuthHandler(consts.DevServerConnectJwtSecret)),
 		connect.WithDev(),
 		connect.WithGatewayPublicPort(opts.ConnectGatewayPort),
@@ -659,14 +626,6 @@ func createInmemoryRedis(ctx context.Context, tick time.Duration) (rueidis.Clien
 	return rc, r, nil
 }
 
-func createConnectPubSubRedis() rueidis.ClientOption {
-	r := miniredis.NewMiniRedis()
-	_ = r.Start()
-	return rueidis.ClientOption{
-		InitAddress:  []string{r.Addr()},
-		DisableCache: true,
-	}
-}
 
 func getSendingEventHandler(ctx context.Context, pb pubsub.Publisher, topic string) execution.HandleSendingEvent {
 	return func(ctx context.Context, evt event.Event, item queue.Item) error {
