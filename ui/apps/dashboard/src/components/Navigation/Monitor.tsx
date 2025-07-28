@@ -1,5 +1,6 @@
 import { MenuItem } from '@inngest/components/Menu/MenuItem';
 import { EventLogsIcon } from '@inngest/components/icons/sections/EventLogs';
+import { InsightsIcon } from '@inngest/components/icons/sections/Insights';
 import { MetricsIcon } from '@inngest/components/icons/sections/Metrics';
 import { RunsIcon } from '@inngest/components/icons/sections/Runs';
 
@@ -20,6 +21,12 @@ export default function Monitor({
       ) : (
         <div className="text-disabled leading-4.5 mx-2.5 mb-1 text-xs font-medium">Monitor</div>
       )}
+      <MenuItem
+        href={getNavRoute(activeEnv, 'insights')}
+        collapsed={collapsed}
+        text="Insights"
+        icon={<InsightsIcon className="h-[18px] w-[18px]" />}
+      />
       <MenuItem
         href={getNavRoute(activeEnv, 'metrics')}
         collapsed={collapsed}
