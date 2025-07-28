@@ -4,7 +4,7 @@ import { Header } from '@inngest/components/Header/Header';
 
 import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import { InsightsDataTable } from '@/components/Insights/InsightsDataTable';
-import { InsightsSQLEditor } from '@/components/Insights/InsightsSQLEditor';
+import { InsightsSQLEditor } from '@/components/Insights/InsightsSQLEditor/InsightsSQLEditor';
 
 export default function InsightsPage() {
   const { value: isInsightsEnabled } = useBooleanFlag('insights');
