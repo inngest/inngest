@@ -9,6 +9,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/logger"
+	"github.com/inngest/inngest/pkg/service"
 	"google.golang.org/grpc"
 )
 
@@ -16,13 +17,12 @@ var (
 	errNotImplemented = fmt.Errorf("not implemented")
 )
 
-func NewDebugAPI(o Opts) (*debugAPI, error) {
-	api := &debugAPI{
+func NewDebugAPI(o Opts) service.Service {
+	return &debugAPI{
 		Router: chi.NewRouter(),
 		Server: grpc.NewServer(),
 		Opts:   o,
 	}
-	return api, nil
 }
 
 type Opts struct {
