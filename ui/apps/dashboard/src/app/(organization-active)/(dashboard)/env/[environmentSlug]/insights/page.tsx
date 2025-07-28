@@ -2,6 +2,9 @@
 
 import { Header } from '@inngest/components/Header/Header';
 
+import { InsightsDataTable } from '@/components/Insights/InsightsDataTable';
+import { InsightsSQLEditor } from '@/components/Insights/InsightsSQLEditor';
+
 export default function InsightsPage() {
   return (
     <>
@@ -12,12 +15,4 @@ export default function InsightsPage() {
       </main>
     </>
   );
-}
-
-function InsightsSQLEditor() {
-  return null;
-}
-
-function InsightsDataTable() {
-  return null;
 }
