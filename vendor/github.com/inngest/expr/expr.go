@@ -639,7 +639,6 @@ func engineType(p Predicate) EngineType {
 		if p.Operator == operators.NotEquals || p.Operator == operators.In {
 			return EngineTypeNone
 		}
-		// return EngineTypeNone
 		return EngineTypeBTree
 	case string:
 		if len(v) == 0 {

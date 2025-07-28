@@ -145,11 +145,15 @@ func NewExpressionEvaluator(ctx context.Context, expression string) (Evaluator, 
 		if err != nil {
 			return nil, err
 		}
+		var lifted map[string]any
+		if vars != nil {
+			lifted = vars.Map()
+		}
 		eval := &expressionEvaluator{
 			ast:        ast,
 			env:        e,
 			expression: expression,
-			liftedVars: vars.Map(),
+			liftedVars: lifted,
 		}
 		if err := eval.parseAttributes(ctx); err != nil {
 			return nil, err
