@@ -11,7 +11,7 @@ import (
 	"github.com/inngest/inngest/pkg/publicerr"
 )
 
-func (a *debugAPI) partitionByID(w http.ResponseWriter, r *http.Request) {
+func (d *debugAPI) partitionByID(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	partitionID := chi.URLParam(r, "id")
@@ -22,7 +22,7 @@ func (a *debugAPI) partitionByID(w http.ResponseWriter, r *http.Request) {
 		queueName = &partitionID
 	}
 
-	shard, err := a.ShardSelector(ctx, consts.DevServerAccountID, queueName)
+	shard, err := d.ShardSelector(ctx, consts.DevServerAccountID, queueName)
 	if err != nil {
 		_ = publicerr.WriteHTTP(
 			w,
@@ -31,7 +31,7 @@ func (a *debugAPI) partitionByID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	res, err := a.Queue.PartitionByID(ctx, shard, partitionID)
+	res, err := d.Queue.PartitionByID(ctx, shard, partitionID)
 	if err != nil {
 		_ = publicerr.WriteHTTP(
 			w,
