@@ -77,7 +77,7 @@
     "vitest": "^2.1.0"
   },
   "engines": {
-    "node": "20.x",
+    "node": "22.x",
     "pnpm": "8.15.9"
   },
   "packageManager": "pnpm@8.15.9",
