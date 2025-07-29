@@ -2,10 +2,7 @@
 
 import NextLink from 'next/link';
 import { Select } from '@inngest/components/Select/Select';
-
-const StatusIcon = ({ className }: { className: string }) => (
-  <span className={`block h-2 w-2 shrink-0 rounded-full ${className}`} />
-);
+import { StatusDot } from '@inngest/components/Status/StatusDot';
 
 export const StatusMenu = ({ envSlug, archived }: { envSlug: string; archived: boolean }) => {
   const activeOption = { id: 'active', name: 'Active functions' };
@@ -17,11 +14,11 @@ export const StatusMenu = ({ envSlug, archived }: { envSlug: string; archived: b
       label="Pause runs"
       multiple={false}
       value={archived ? archivedOption : activeOption}
-      className="z-20 mr-3 h-[30px]"
+      className="z-20 mr-3"
     >
-      <Select.Button className="h-[28px] w-[142px] py-1 pl-2 pr-3">
-        <div className="mr-2 flex flex-row items-center text-sm">
-          <StatusIcon className={`mr-2 ${archived ? 'bg-surfaceMuted' : 'bg-primary-moderate'}`} />
+      <Select.Button className="w-[142px]" size="small">
+        <div className="flex flex-row items-center gap-2">
+          <StatusDot status={archived ? 'ARCHIVED' : 'ACTIVE'} size="small" />
           {archived ? 'Archived' : 'Active'}
         </div>
       </Select.Button>
@@ -29,16 +26,16 @@ export const StatusMenu = ({ envSlug, archived }: { envSlug: string; archived: b
       <Select.Options>
         <NextLink href={`/env/${envSlug}/functions`}>
           <Select.Option key={activeOption.id} option={activeOption}>
-            <div className="text-basis flex flex-row items-center text-sm font-medium">
-              <StatusIcon className="bg-primary-moderate mr-2" />
+            <div className="text-basis flex flex-row items-center gap-2">
+              <StatusDot status="ACTIVE" size="small" />
               {activeOption.name}
             </div>
           </Select.Option>
         </NextLink>
         <NextLink href={`/env/${envSlug}/functions?archived=true`}>
           <Select.Option key={archivedOption.id} option={archivedOption}>
-            <div className="text-basis flex flex-row items-center text-sm font-medium">
-              <StatusIcon className="bg-surfaceMuted mr-2" />
+            <div className="text-basis flex flex-row items-center gap-2">
+              <StatusDot status="ARCHIVED" size="small" />
               {archivedOption.name}
             </div>
           </Select.Option>

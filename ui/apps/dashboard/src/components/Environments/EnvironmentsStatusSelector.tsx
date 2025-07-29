@@ -1,6 +1,7 @@
 'use client';
 
 import { Select } from '@inngest/components/Select/Select';
+import { StatusDot } from '@inngest/components/Status/StatusDot';
 
 type EnvironmentsStatusSelectorProps = {
   archived: boolean;
@@ -22,31 +23,27 @@ export function EnvironmentsStatusSelector({
       multiple={false}
       value={archived ? ARCHIVED_OPTION : ACTIVE_OPTION}
     >
-      <Select.Button className="h-[28px] w-[200px] shrink-0 px-2 py-1">
-        <div className="text-basis mr-1 flex flex-row items-center overflow-hidden whitespace-nowrap text-sm font-medium leading-tight">
-          <StatusIcon className={`mr-2 ${archived ? 'bg-surfaceMuted' : 'bg-primary-moderate'}`} />
+      <Select.Button className="w-[200px] shrink-0" size="small">
+        <div className="text-basis mr-1 flex flex-row items-center gap-2 overflow-hidden whitespace-nowrap">
+          <StatusDot status={archived ? 'ARCHIVED' : 'ACTIVE'} size="small" />
           {archived ? 'Archived environments' : 'Active environments'}
         </div>
       </Select.Button>
       <Select.Options>
         <Select.Option key={ACTIVE_OPTION.id} option={ACTIVE_OPTION}>
-          <div className="text-basis flex flex-row items-center text-sm font-medium">
-            <StatusIcon className="bg-primary-moderate mr-1" />
+          <div className="text-basis flex flex-row items-center gap-2">
+            <StatusDot status="ACTIVE" size="small" />
             {ACTIVE_OPTION.name}
           </div>
         </Select.Option>
 
         <Select.Option key={ARCHIVED_OPTION.id} option={ARCHIVED_OPTION}>
-          <div className="text-basis flex flex-row items-center text-sm font-medium">
-            <StatusIcon className="bg-surfaceMuted mr-1" />
+          <div className="text-basis flex flex-row items-center gap-2">
+            <StatusDot status="ARCHIVED" size="small" />
             {ARCHIVED_OPTION.name}
           </div>
         </Select.Option>
       </Select.Options>
     </Select>
   );
-}
-
-function StatusIcon({ className }: { className: string }) {
-  return <span className={`block h-2 w-2 shrink-0 rounded-full ${className}`} />;
 }
