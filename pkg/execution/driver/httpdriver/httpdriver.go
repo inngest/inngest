@@ -90,6 +90,9 @@ func (e executor) Execute(ctx context.Context, sl sv2.StateLoader, s sv2.Metadat
 	}
 
 	dr, _, err := ExecuteDriverRequest(ctx, e.Client, Request{
+		AccountID:  s.ID.Tenant.AccountID,
+		WorkflowID: s.ID.FunctionID,
+		RunID:      s.ID.RunID,
 		SigningKey: e.localSigningKey,
 		URL:        *uri,
 		Input:      input,
@@ -273,7 +276,28 @@ func do(ctx context.Context, c exechttp.RequestExecutor, r Request) (*Response, 
 	ctx, cancel := context.WithTimeout(ctx, consts.MaxFunctionTimeout)
 	defer cancel()
 
-	req, err := exechttp.NewRequest(http.MethodPost, r.URL.String(), r.Input)
+	// For regular async functions - exposed via the inngest handler - we always
+	// POST to our own API endpoint.
+	method := http.MethodPost
+
+	// If this is a sync function, ie. a resumbale API request, do NOT send POST data
+	// to the endpoint.  We do not control this handler.  The middleware will fetch
+	// run data via our API.
+	values, _ := url.ParseQuery(r.URL.RawQuery)
+	isSyncFn := values.Get("x-inngest-type") == "sync"
+	if isSyncFn {
+		// Do NOT send the body over.  Instead, this will have to be fetched via thje API,
+		// as we do not control the API endpoint itself.
+		r.Input = nil
+		if r.SigningKey != nil {
+			r.Signature = Sign(ctx, r.SigningKey, r.RunID[:])
+		}
+	}
+	if m := values.Get("x-inngest-method"); m != "" {
+		method = m
+	}
+
+	req, err := exechttp.NewRequest(method, r.URL.String(), r.Input)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error creating request: %w", err)
 	}
@@ -283,9 +307,11 @@ func do(ctx context.Context, c exechttp.RequestExecutor, r Request) (*Response, 
 		req.Header.Add(AccountIDHeader, r.AccountID.String())
 	}
 
-	if len(r.SigningKey) > 0 {
+	if len(r.SigningKey) > 0 && len(r.Signature) == 0 {
+		// Attempt to sign
 		req.Header.Add("X-Inngest-Signature", Sign(ctx, r.SigningKey, r.Input))
 	}
+
 	if len(r.Signature) > 0 {
 		// Use this if provided, and override any sig added.
 		req.Header.Add("X-Inngest-Signature", r.Signature)
@@ -294,6 +320,9 @@ func do(ctx context.Context, c exechttp.RequestExecutor, r Request) (*Response, 
 	for k, v := range r.Headers {
 		req.Header.Add(k, v)
 	}
+
+	// Always add the run ID
+	req.Header.Add("X-Run-ID", r.RunID.String())
 
 	// Perform the request.
 	resp, err := c.DoRequest(ctx, req)

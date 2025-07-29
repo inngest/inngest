@@ -154,6 +154,7 @@ func (s SerializableRequest) HTTPRequest() (*http.Request, error) {
 	req.Header = s.Header
 	// Always close the request after reading the body, ensuring the connection is not recycled.
 	req.Close = true
+	req.Header.Add("user-agent", "Inngest")
 	return req, nil
 }
 
