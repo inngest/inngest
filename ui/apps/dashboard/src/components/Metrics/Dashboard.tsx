@@ -139,7 +139,6 @@ export const Dashboard = ({ envSlug }: { envSlug: string }) => {
   const functions = data?.envBySlug?.workflows.data;
 
   const logRetention = accountData?.account.entitlements.history.limit || 7;
-  const upgradeCutoff = subtractDuration(new Date(), { days: logRetention });
   const concurrencyLimit = accountConcurrencyLimitRes?.account.entitlements.concurrency.limit;
 
   const envLookup = apps?.length !== 1 && !selectedApps?.length && !selectedFns?.length;
