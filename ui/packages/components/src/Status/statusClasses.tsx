@@ -1,3 +1,4 @@
+import { isAppStatus, type AppStatus } from '../types/app';
 import {
   isFunctionRunStatus,
   isReplayRunStatus,
@@ -8,7 +9,12 @@ import { isWorkerStatus, type GroupedWorkerStatus } from '../types/workers';
 import { cn } from '../utils/classNames';
 
 const backgroundClasses: {
-  [key in FunctionRunStatus | ReplayRunStatus | GroupedWorkerStatus | 'UNKNOWN']: string;
+  [key in
+    | FunctionRunStatus
+    | ReplayRunStatus
+    | GroupedWorkerStatus
+    | AppStatus
+    | 'UNKNOWN']: string;
 } = {
   CANCELLED: 'bg-status-cancelled',
   COMPLETED: 'bg-status-completed',
@@ -22,6 +28,7 @@ const backgroundClasses: {
   SKIPPED: 'bg-status-paused',
   INACTIVE: 'bg-accent-subtle dark:bg-accent-intense',
   ACTIVE: 'bg-status-completed',
+  ARCHIVED: 'bg-status-cancelled',
   DISCONNECTED: 'bg-status-cancelled',
 };
 
@@ -34,7 +41,12 @@ export function getStatusBackgroundClass(status: string): string {
 }
 
 const borderClasses: {
-  [key in FunctionRunStatus | ReplayRunStatus | GroupedWorkerStatus | 'UNKNOWN']: string;
+  [key in
+    | FunctionRunStatus
+    | ReplayRunStatus
+    | GroupedWorkerStatus
+    | AppStatus
+    | 'UNKNOWN']: string;
 } = {
   CANCELLED: 'border-status-cancelled',
   COMPLETED: 'border-status-completed',
@@ -48,11 +60,17 @@ const borderClasses: {
   SKIPPED: 'border-accent-paused',
   INACTIVE: 'border-accent-subtle dark:border-accent-intense',
   ACTIVE: 'border-status-completed',
+  ARCHIVED: 'border-status-cancelled',
   DISCONNECTED: 'border-status-cancelled',
 };
 
 export function getStatusBorderClass(status: string): string {
-  if (!isFunctionRunStatus(status) && !isReplayRunStatus(status) && !isWorkerStatus(status)) {
+  if (
+    !isFunctionRunStatus(status) &&
+    !isReplayRunStatus(status) &&
+    !isWorkerStatus(status) &&
+    !isAppStatus(status)
+  ) {
     console.error(`unexpected status: ${status}`);
     return cn('border', borderClasses['UNKNOWN']);
   }
@@ -60,7 +78,12 @@ export function getStatusBorderClass(status: string): string {
 }
 
 const textClasses: {
-  [key in FunctionRunStatus | ReplayRunStatus | GroupedWorkerStatus | 'UNKNOWN']: string;
+  [key in
+    | FunctionRunStatus
+    | ReplayRunStatus
+    | GroupedWorkerStatus
+    | AppStatus
+    | 'UNKNOWN']: string;
 } = {
   CANCELLED: 'text-status-cancelledText',
   COMPLETED: 'text-status-completedText',
@@ -74,11 +97,17 @@ const textClasses: {
   SKIPPED: 'text-status-pausedText',
   INACTIVE: 'text-accent-subtle dark:text-accent-intense',
   ACTIVE: 'text-status-completedText',
+  ARCHIVED: 'bg-status-cancelled',
   DISCONNECTED: 'text-status-cancelledText',
 };
 
 export function getStatusTextClass(status: string): string {
-  if (!isFunctionRunStatus(status) && !isReplayRunStatus(status) && !isWorkerStatus(status)) {
+  if (
+    !isFunctionRunStatus(status) &&
+    !isReplayRunStatus(status) &&
+    !isWorkerStatus(status) &&
+    !isAppStatus(status)
+  ) {
     console.error(`unexpected status: ${status}`);
     return textClasses['UNKNOWN'];
   }
