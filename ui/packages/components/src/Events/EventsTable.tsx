@@ -267,7 +267,7 @@ export function EventsTable({
                   search
                     ? 'after:bg-secondary-moderate after:mb-3 after:ml-0.5 after:h-2 after:w-2 after:rounded'
                     : '',
-                  'h-[26px]'
+                  'h-[26px] rounded'
                 )}
               />
             ) : (
@@ -292,7 +292,6 @@ export function EventsTable({
                 <TooltipContent>Coming soon</TooltipContent>
               </Tooltip>
             )}
-
             <TimeFilter
               daysAgoMax={features.history}
               onDaysChange={onDaysChange}
