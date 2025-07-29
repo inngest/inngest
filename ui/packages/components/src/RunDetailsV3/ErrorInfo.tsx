@@ -10,6 +10,7 @@ import { OptionalTooltip } from '../Tooltip/OptionalTooltip';
 type ErrorTable = {
   system: string;
   status: string;
+  error: string;
 };
 
 type ErrorInfoProps = {
@@ -55,13 +56,13 @@ export const ErrorInfo = ({ error }: ErrorInfoProps) => {
       enableSorting: false,
     }),
     columnHelper.accessor('status', {
-      cell: (row) => {
-        const system = row.row.original.system;
+      cell: ({ row }) => {
+        const system = row.original.system;
 
         return system === 'Inngest' ? (
           <InngestStatus inngestStatus={inngestStatus} />
         ) : (
-          <SDKError error={error} />
+          <SDKError error={row.original.error} />
         );
       },
       header: 'Status',
@@ -74,8 +75,8 @@ export const ErrorInfo = ({ error }: ErrorInfoProps) => {
       <div className="my-2">
         <NewTable
           data={[
-            { system: 'Inngest', status: '' },
-            { system: 'App', status: '' },
+            { system: 'Inngest', status: '', error },
+            { system: 'App', status: '', error },
           ]}
           columns={columns}
         />
