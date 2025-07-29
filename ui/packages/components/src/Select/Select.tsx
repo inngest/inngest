@@ -45,20 +45,23 @@ export function Select({
 }: Props) {
   return (
     <Listbox value={value} onChange={onChange} multiple={multiple}>
-      <span
-        className={cn(
-          isLabelVisible && 'divide-muted bg-canvasSubtle text-basis divide-x',
-          'border-muted flex items-center rounded-md border text-sm',
-          className
-        )}
-      >
-        <Listbox.Label
-          className={cn(!isLabelVisible && 'sr-only', 'rounded-l-[5px] px-2 capitalize')}
+      {({ open }) => (
+        <span
+          className={cn(
+            isLabelVisible && 'divide-muted bg-canvasSubtle text-basis divide-x',
+            'disabled:bg-disabled disabled:text-disabled border-muted flex items-center rounded-md border text-sm',
+            open && 'border-active',
+            className
+          )}
         >
-          {label}
-        </Listbox.Label>
-        <span className="relative w-full">{children}</span>
-      </span>
+          <Listbox.Label
+            className={cn(!isLabelVisible && 'sr-only', 'rounded-l-[5px] px-2 capitalize')}
+          >
+            {label}
+          </Listbox.Label>
+          <span className="relative w-full">{children}</span>
+        </span>
+      )}
     </Listbox>
   );
 }
@@ -78,14 +81,14 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
         ref={ref}
         className={cn(
           !isLabelVisible && 'rounded-l-[5px]',
-          size === 'small' ? 'h-[30px]' : 'h-[38px]',
-          'bg-surfaceBase text-basis flex w-full items-center justify-between rounded-r-[5px] px-2',
+          size === 'small' ? 'h-[26px] text-xs' : 'h-[34px] py-1.5 text-sm',
+          'disabled:bg-disabled disabled:text-disabled bg-surfaceBase text-basis placeholder:text-disabled flex w-full items-center justify-between gap-1 rounded-r-[5px] px-1.5',
           className
         )}
       >
         {children}
         <RiArrowDownSLine
-          className="ui-open:-rotate-180 text-muted h-4 w-4 transition-transform duration-500"
+          className="ui-open:-rotate-180 text-subtle h-4 w-4 transition-transform duration-500"
           aria-hidden="true"
         />
       </Component>
@@ -212,11 +215,12 @@ export function SelectWithSearch({
   multiple,
   className,
 }: Props) {
-  const content = (
+  const renderContent = (open: boolean) => (
     <span
       className={cn(
         isLabelVisible && 'divide-muted bg-canvasSubtle text-basis divide-x',
-        'border-muted flex items-center rounded-md border text-sm',
+        'disabled:bg-disabled disabled:text-disabled border-muted flex items-center rounded-md border text-sm',
+        open && 'border-active',
         className
       )}
     >
@@ -235,14 +239,14 @@ export function SelectWithSearch({
   if (multiple) {
     return (
       <Combobox value={value} onChange={onChange} multiple={multiple}>
-        {content}
+        {({ open }) => renderContent(open)}
       </Combobox>
     );
   }
 
   return (
     <Combobox value={value} onChange={onChange} multiple={multiple}>
-      {content}
+      {({ open }) => renderContent(open)}
     </Combobox>
   );
 }
