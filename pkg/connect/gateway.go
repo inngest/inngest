@@ -208,7 +208,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 					return
 				}
 
-				ch.log.Error("could not send hello", "err", err)
+				ch.log.ReportError(err, "could not send hello")
 				c.closeWithConnectError(ws, &connecterrors.SocketError{
 					SysCode:    syscode.CodeConnectInternal,
 					StatusCode: websocket.StatusInternalError,
@@ -221,7 +221,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 
 		conn, serr := ch.establishConnection(ctx)
 		if serr != nil {
-			ch.log.Error("error establishing connection", "error", serr)
+			ch.log.ReportError(err, "error establishing connection")
 			c.closeWithConnectError(ws, serr)
 
 			return
@@ -254,7 +254,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			// Prevent routing any more messages to this connection
 			err = ch.updateConnStatus(connectpb.ConnectionStatus_DRAINING)
 			if err != nil {
-				ch.log.Error("could not update connection status after context done", "err", err)
+				ch.log.ReportError(err, "could not update connection status after context done")
 			}
 
 			for _, l := range c.lifecycles {
@@ -293,7 +293,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 			// This is a transactional operation, it should always complete regardless of context cancellation
 			err := c.stateManager.DeleteConnection(context.Background(), conn.EnvID, conn.ConnectionId)
 			if err != nil {
-				ch.log.Error("error deleting connection from state", "error", err)
+				ch.log.ReportError(err, "error deleting connection from state")
 			}
 
 			for _, lifecycle := range c.lifecycles {
@@ -321,7 +321,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 					return
 				}
 
-				ch.log.Error("error handling sync", "error", err)
+				ch.log.ReportError(err, "error handling sync")
 
 				// Allow returning user-facing errors to hint about invalid config, etc.
 				serr := connecterrors.SocketError{}
@@ -355,7 +355,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 
 			// upsert connection to update WorkerGroups map
 			if err := c.stateManager.UpsertConnection(context.Background(), conn, connectpb.ConnectionStatus_CONNECTED, time.Now()); err != nil {
-				ch.log.Error("updating connection state after sync failed", "err", err)
+				ch.log.ReportError(err, "updating connection state after sync failed")
 				c.closeWithConnectError(ws, &connecterrors.SocketError{
 					SysCode:    syscode.CodeConnectInternal,
 					StatusCode: websocket.StatusInternalError,
@@ -412,7 +412,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 				if err != nil {
 					// immediately stop routing messages to this connection
 					if err := ch.updateConnStatus(connectpb.ConnectionStatus_DISCONNECTING); err != nil {
-						ch.log.Error("could not update connection status after read error", "err", err)
+						ch.log.ReportError(err, "could not update connection status after read error")
 					}
 
 					for _, l := range c.lifecycles {
@@ -470,7 +470,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 						return nil
 					}
 
-					ch.log.Error("failed to read websocket message", "err", err)
+					ch.log.ReportError(err, "failed to read websocket message")
 
 					// If we failed to read the message for another reason, we should probably reconnect as well.
 					return nil
@@ -503,7 +503,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 				ExtendLeaseInterval: c.workerRequestExtendLeaseInterval.String(),
 			})
 			if err != nil {
-				ch.log.Error("could not marshal connection ready", "err", err)
+				ch.log.ReportError(err, "could not marshal connection ready")
 				c.closeWithConnectError(ws, &connecterrors.SocketError{
 					SysCode:    syscode.CodeConnectInternal,
 					StatusCode: websocket.StatusInternalError,
@@ -527,7 +527,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 					return
 				}
 
-				ch.log.Error("could not send connection ready", "err", err)
+				ch.log.ReportError(err, "could not send connection ready")
 				c.closeWithConnectError(ws, &connecterrors.SocketError{
 					SysCode:    syscode.CodeConnectInternal,
 					StatusCode: websocket.StatusInternalError,
@@ -552,7 +552,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 					return
 				}
 
-				ch.log.Error("could not update connection status", "err", err)
+				ch.log.ReportError(err, "could not update connection status")
 				c.closeWithConnectError(ws, &connecterrors.SocketError{
 					SysCode:    syscode.CodeConnectInternal,
 					StatusCode: websocket.StatusInternalError,
@@ -616,7 +616,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 
 		// The error group returns once the connection is closed
 		if err := eg.Wait(); err != nil {
-			ch.log.Error("error in run loop", "err", err)
+			ch.log.ReportError(err, "error in run loop")
 			return
 		}
 	})
@@ -740,7 +740,7 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 				if err != nil || !reply.Success {
 					// This should never happen: Failing the ack means we will redeliver the same request even though
 					// the worker already started processing it.
-					c.log.Error("failed to ack message through gRPC", "err", err, "reply", reply)
+					c.log.ReportError(err, "failed to ack message through gRPC")
 					return &connecterrors.SocketError{
 						SysCode:    syscode.CodeConnectInternal,
 						StatusCode: websocket.StatusInternalError,
@@ -755,7 +755,7 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 				if err != nil {
 					// This should never happen: Failing the ack means we will redeliver the same request even though
 					// the worker already started processing it.
-					c.log.Error("failed to ack message", "err", err)
+					c.log.ReportError(err, "failed to ack message")
 					return &connecterrors.SocketError{
 						SysCode:    syscode.CodeConnectInternal,
 						StatusCode: websocket.StatusInternalError,
@@ -778,7 +778,7 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 		// Always handle SDK reply, even if gateway is draining
 		err := c.handleSdkReply(context.Background(), msg)
 		if err != nil {
-			c.log.Error("could not handle sdk reply", "err", err)
+			c.log.ReportError(err, "could not handle sdk reply")
 			// TODO Should we actually close the connection here?
 			return &connecterrors.SocketError{
 				SysCode:    syscode.CodeConnectInternal,
@@ -811,7 +811,11 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 			newLeaseID, err := c.svc.stateManager.ExtendRequestLease(ctx, c.conn.EnvID, data.RequestId, leaseID, consts.ConnectWorkerRequestLeaseDuration)
 			if err != nil {
 				if errors.Is(err, state.ErrRequestLeaseExpired) || errors.Is(err, state.ErrRequestLeased) {
-					c.log.Error("lease was claimed by other worker or expired", "err", err, "req_id", data.RequestId, "lease_id", leaseID.String())
+					c.log.ReportError(err, "lease was claimed by other worker or expired",
+						logger.WithErrorReportTags(map[string]string{
+							"req_id":   data.RequestId,
+							"lease_id": leaseID.String(),
+						}))
 
 					// Respond with nack
 					nackPayload, marshalErr := proto.Marshal(&connectpb.WorkerRequestExtendLeaseAckData{
@@ -844,7 +848,7 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 					return nil
 				}
 
-				c.log.Error("unexpected error extending lease", "err", err)
+				c.log.ReportError(err, "unexpected error extending lease")
 
 				// This should never happen
 				return &connecterrors.SocketError{
@@ -923,14 +927,18 @@ func (c *connectionHandler) receiveRouterMessagesFromGRPC(ctx context.Context, o
 
 		case data, ok := <-messageChan:
 			if !ok {
-				c.log.Error("BUG: message channel was closed unexpectedly - this should never happen")
+				c.log.ReportError(fmt.Errorf("close gRPC channel"), "BUG: message channel was closed unexpectedly - this should never happen")
 				return
 			}
 
 			rawBytes, err := proto.Marshal(data)
 			if err != nil {
 				// TODO This should never happen, we should likely push the message into a dead-letter queue.
-				c.log.Error("invalid protobuf received by grpc", "err", err, "msg", rawBytes, "gateway_id", c.conn.GatewayId, "conn_id", c.conn.ConnectionId)
+				c.log.ReportError(err, "invalid protobuf received by grpc",
+					logger.WithErrorReportTags(map[string]string{
+						"gateway_id": c.conn.GatewayId.String(),
+						"conn_id":    c.conn.ConnectionId.String(),
+					}))
 				continue
 			}
 
@@ -965,7 +973,7 @@ func (c *connectionHandler) receiveRouterMessagesFromGRPC(ctx context.Context, o
 				if isConnectionClosedErr(err) {
 					return
 				}
-				log.Error("failed to forward message to worker", "err", err)
+				log.ReportError(err, "failed to forward message to worker")
 				// The connection cannot be used, the next read loop will run into the connection error and close the connection.
 				// If the worker receives the message, it will send an ack through a new connection. Otherwise, the message will be redelivered.
 				continue
@@ -1014,7 +1022,7 @@ func (c *connectionHandler) receiveRouterMessagesFromPubsub(ctx context.Context,
 
 		err := c.svc.receiver.AckMessage(ctx, data.RequestId, pubsub.AckSourceGateway)
 		if err != nil {
-			log.Error("failed to ack message", "err", err)
+			log.ReportError(err, "failed to ack message")
 			// The executor will retry the message if it doesn't receive an ack
 			return
 		}
@@ -1035,7 +1043,7 @@ func (c *connectionHandler) receiveRouterMessagesFromPubsub(ctx context.Context,
 				return
 			}
 
-			log.Error("failed to forward message to worker", "err", err)
+			log.ReportError(err, "failed to forward message to worker")
 
 			// The connection cannot be used, the next read loop will run into the connection error and close the connection.
 			// If the worker receives the message, it will send an ack through a new connection. Otherwise, the message will be redelivered.
@@ -1045,7 +1053,7 @@ func (c *connectionHandler) receiveRouterMessagesFromPubsub(ctx context.Context,
 		log.Debug("forwarded message to worker")
 	}, onSubscribed)
 	if err != nil {
-		c.log.Error("failed to receive routed requests", "err", err)
+		c.log.ReportError(err, "failed to receive routed requests")
 
 		// TODO Log error, retry?
 		return
@@ -1145,7 +1153,7 @@ func (c *connectionHandler) establishConnection(ctx context.Context) (*state.Con
 				return nil, &ErrDraining
 			}
 
-			c.log.Error("connect auth failed", "err", err)
+			c.log.ReportError(err, "connect auth failed")
 			return nil, &connecterrors.SocketError{
 				SysCode:    syscode.CodeConnectInternal,
 				StatusCode: websocket.StatusInternalError,
@@ -1194,7 +1202,7 @@ func (c *connectionHandler) establishConnection(ctx context.Context) (*state.Con
 			eg.Go(func() error {
 				workerGroup, err := state.NewWorkerGroupFromConnRequest(ctx, &initialMessageData, authResp, app)
 				if err != nil {
-					log.Error("could not create worker group for request", "err", err)
+					log.ReportError(err, "could not create worker group for request")
 					return err
 				}
 
@@ -1239,7 +1247,7 @@ func (c *connectionHandler) establishConnection(ctx context.Context) (*state.Con
 
 		// Connection should always be upserted, we don't want inconsistent state
 		if err := c.svc.stateManager.UpsertConnection(context.Background(), &conn, connectpb.ConnectionStatus_CONNECTED, time.Now()); err != nil {
-			log.Error("adding connection state failed", "err", err)
+			log.ReportError(err, "adding connection state failed")
 			return nil, &connecterrors.SocketError{
 				SysCode:    syscode.CodeConnectInternal,
 				StatusCode: websocket.StatusInternalError,

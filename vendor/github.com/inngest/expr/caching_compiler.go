@@ -8,9 +8,7 @@ import (
 	"github.com/karlseguin/ccache/v2"
 )
 
-var (
-	CacheTime = time.Hour
-)
+var CacheTime = time.Hour
 
 // NewCachingCompiler returns a CELCompiler which lifts quoted literals out of the expression
 // as variables and uses caching to cache expression parsing, resulting in improved
@@ -39,6 +37,10 @@ func (c *cachingCompiler) Parse(expr string) (*cel.Ast, *cel.Issues, LiftedArgs)
 	}
 
 	expr, vars := liftLiterals(expr)
+	if vars == nil {
+		// enusre this is never non-nil.
+		vars = regularArgMap{}
+	}
 
 	if cached := c.cache.Get("cc:" + expr); cached != nil {
 		cached.Extend(CacheTime)
