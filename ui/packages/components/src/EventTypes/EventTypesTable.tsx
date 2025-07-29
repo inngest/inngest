@@ -188,21 +188,21 @@ export function EventTypesTable({
 
   return (
     <div className="bg-canvasBase text-basis no-scrollbar flex-1 overflow-hidden focus-visible:outline-none">
-      <div className="bg-canvasBase sticky top-0 z-10 mx-3 my-2 flex h-11 items-center gap-1.5">
-        <EventTypesStatusFilter
-          archived={archived}
-          pathCreator={'/'}
-          onStatusChange={onStatusFilterChange}
-        />
+      <div className="bg-canvasBase sticky top-0 z-10 mx-3 flex h-11 items-center gap-1.5">
         <Search
           name="search"
-          placeholder="Search by event type"
+          placeholder="Search by event name"
           value={searchInput}
-          className="w-56"
+          className="w-[182px]"
           onUpdate={(value) => {
             setSearchInput(value);
             debouncedSearch();
           }}
+        />
+        <EventTypesStatusFilter
+          archived={archived}
+          pathCreator={'/'}
+          onStatusChange={onStatusFilterChange}
         />
       </div>
       <div className="h-[calc(100%-58px)] overflow-y-auto" onScroll={onScroll} ref={containerRef}>

@@ -16,7 +16,7 @@ export const StatusMenu = ({ envSlug, archived }: { envSlug: string; archived: b
       className="z-20"
       size="small"
     >
-      <Select.Button className="" size="small">
+      <Select.Button size="small">
         <div className="flex flex-row items-center gap-2">
           <StatusDot status={archived ? 'ARCHIVED' : 'ACTIVE'} size="small" />
           {archived ? 'Archived' : 'Active'}

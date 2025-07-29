@@ -16,12 +16,13 @@ export default function EventTypesStatusFilter({
   return (
     <Select
       onChange={(value) => onStatusChange(value.id === 'archived')}
-      isLabelVisible={false}
-      label="Select event status"
+      isLabelVisible
+      label="Status"
       multiple={false}
       value={archived ? archivedOption : activeOption}
+      size="small"
     >
-      <Select.Button className="w-[136px]" size="small">
+      <Select.Button size="small">
         <div className="text-basis flex flex-row items-center gap-2">
           <StatusDot status={archived ? 'ARCHIVED' : 'ACTIVE'} size="small" />
           {archived ? 'Archived' : 'Active'}
