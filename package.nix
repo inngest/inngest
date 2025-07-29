@@ -1,28 +1,27 @@
 {
   lib,
   buildGoModule,
-  fetchFromGitHub,
   stdenv,
   pnpm_8,
-  jq,
-  writeScript,
+  nodejs_22,
   shortCommit,
 }: let
   version = "dev";
 
-  src = ./.;
-
   inngest-ui = stdenv.mkDerivation (finalAttrs: {
-    inherit version src;
+    inherit version;
     pname = "inngest-ui";
+
+    src = ./ui;
 
     nativeBuildInputs = [
       pnpm_8
       pnpm_8.configHook
+      nodejs_22
     ];
 
     buildPhase = ''
-      cd ui/apps/dev-server-ui && pnpm build
+      cd apps/dev-server-ui && pnpm build
     '';
 
     installPhase = ''
@@ -34,17 +33,17 @@
     pnpmWorkspaces = ["dev-server-ui"];
 
     pnpmDeps = pnpm_8.fetchDeps {
-      inherit (finalAttrs) pname pnpmWorkspaces;
-      inherit version src;
+      inherit (finalAttrs) pname pnpmWorkspaces src;
+      inherit version;
       hash = "sha256-FrG/Z2frOpDi/6hPunzbGxMJVrbXSfhKhI3VOE1JogM=";
-      sourceRoot = "${finalAttrs.src.name}/ui";
     };
-    pnpmRoot = "ui";
   });
 in
   buildGoModule {
-    inherit version src inngest-ui;
+    inherit version;
     pname = "inngest";
+
+    src = ./.;
 
     vendorHash = null;
 
