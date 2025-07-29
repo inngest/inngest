@@ -14,7 +14,7 @@ export const StatusMenu = ({ envSlug, archived }: { envSlug: string; archived: b
       label="Pause runs"
       multiple={false}
       value={archived ? archivedOption : activeOption}
-      className="z-20 mr-3"
+      className="z-20"
     >
       <Select.Button className="w-[142px]" size="small">
         <div className="flex flex-row items-center gap-2">

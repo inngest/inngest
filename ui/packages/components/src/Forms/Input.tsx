@@ -6,12 +6,13 @@ export type InputProps = InputHTMLAttributes<HTMLInputElement> & {
   allowPasswordManager?: boolean;
   label?: string;
   error?: string | undefined;
-  inngestSize?: 'base' | 'lg';
+  inngestSize?: 'small' | 'base' | 'lg';
   className?: string;
   optional?: boolean;
 };
 
 const sizeStyles = {
+  small: 'text-xs px-2 py-2 h-[26px]',
   base: 'text-sm px-2 py-2 h-8',
   lg: 'text-sm px-3.5 py-3',
 };
@@ -42,7 +43,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(
         <div className="flex">
           <input
             ref={ref}
-            className={cn(`border-muted placeholder-disabled text-basis outline-primary-moderate w-full rounded-md border bg-transparent text-sm leading-none outline-2 transition-all focus:outline
+            className={cn(`border-muted placeholder-disabled text-basis focus:border-active w-full rounded border bg-transparent text-sm leading-none outline-none transition-all
             ${sizeStyles[inngestSize]}
             ${
               props.readOnly &&

@@ -188,7 +188,7 @@ export function EventTypesTable({
 
   return (
     <div className="bg-canvasBase text-basis no-scrollbar flex-1 overflow-hidden focus-visible:outline-none">
-      <div className="bg-canvasBase sticky top-0 z-10 m-3 flex items-center gap-2">
+      <div className="bg-canvasBase sticky top-0 z-10 mx-3 my-2 flex h-11 items-center gap-1.5">
         <EventTypesStatusFilter
           archived={archived}
           pathCreator={'/'}
@@ -198,7 +198,7 @@ export function EventTypesTable({
           name="search"
           placeholder="Search by event type"
           value={searchInput}
-          className="h-[30px] w-56 py-3"
+          className="w-56"
           onUpdate={(value) => {
             setSearchInput(value);
             debouncedSearch();

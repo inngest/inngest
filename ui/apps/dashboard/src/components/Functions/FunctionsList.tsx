@@ -32,15 +32,14 @@ export const FunctionList = ({ envSlug, archived }: FunctionListProps) => {
 
   return (
     <div className="bg-canvasBase flex min-h-0 flex-1 flex-col">
-      <div className="mx-4 my-1 flex h-10 flex-row items-center justify-start">
+      <div className="mx-3 my-2 flex h-11 flex-row items-center justify-start gap-1.5">
         <StatusMenu archived={!!archived} envSlug={envSlug} />
         {isSearchEnabled && (
           <Search
             name="search"
-            placeholder="Search by name"
+            placeholder="Search by function"
             value={searchInput}
-            // Match the height of StatusMenu for now
-            className="h-[30px] w-48 py-3"
+            className="w-48"
             onUpdate={(value) => {
               setSearchInput(value);
               debouncedSearch();
