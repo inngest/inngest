@@ -15,7 +15,7 @@
           config.allowUnfree = true;
         };
       in {
-        packages.default = pkgs.callPackage ./package.nix {};
+        packages.default = pkgs.callPackage ./package.nix { shortCommit = self.dirtyShortRev or self.shortRev or "dirty"; };
         devShells.default = pkgs.mkShell {
           nativeBuildInputs = with pkgs; [
             # Go
