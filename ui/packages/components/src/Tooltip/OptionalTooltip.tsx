@@ -13,7 +13,7 @@ export const OptionalTooltip = ({
   tooltip ? (
     <Tooltip>
       <TooltipTrigger asChild>{children}</TooltipTrigger>
-      <TooltipContent side={side} className="flex h-8 items-center px-4 text-xs leading-[18px]">
+      <TooltipContent side={side} className="flex min-h-8 items-center px-4 text-xs leading-[18px]">
         {tooltip}
       </TooltipContent>
     </Tooltip>
