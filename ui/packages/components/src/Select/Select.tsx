@@ -42,6 +42,7 @@ export function Select({
   onChange,
   multiple,
   className,
+  size = 'medium',
 }: Props) {
   return (
     <Listbox value={value} onChange={onChange} multiple={multiple}>
@@ -55,7 +56,11 @@ export function Select({
           )}
         >
           <Listbox.Label
-            className={cn(!isLabelVisible && 'sr-only', 'rounded-l-[4px] px-2 capitalize')}
+            className={cn(
+              !isLabelVisible && 'sr-only',
+              'rounded-l px-2 capitalize',
+              size === 'small' ? 'text-xs' : 'text-sm'
+            )}
           >
             {label}
           </Listbox.Label>
@@ -80,10 +85,10 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       <Component
         ref={ref}
         className={cn(
-          !isLabelVisible && 'rounded-l-[4px]',
+          !isLabelVisible && 'rounded-l',
           // Real height is 26px and 34px, but we add the 2px border
           size === 'small' ? 'h-[24px] text-xs' : 'h-[32px] py-1.5 text-sm',
-          'disabled:bg-disabled disabled:text-disabled bg-surfaceBase text-basis placeholder:text-disabled flex w-full items-center justify-between gap-1 rounded-r-[4px] px-1.5',
+          'disabled:bg-disabled disabled:text-disabled bg-surfaceBase text-basis placeholder:text-disabled flex w-full items-center justify-between gap-1 rounded-r px-1.5',
           className
         )}
       >
@@ -215,6 +220,7 @@ export function SelectWithSearch({
   onChange,
   multiple,
   className,
+  size,
 }: Props) {
   const renderContent = (open: boolean) => (
     <span
@@ -226,7 +232,11 @@ export function SelectWithSearch({
       )}
     >
       <Combobox.Label
-        className={cn(!isLabelVisible && 'sr-only', 'rounded-l-[4px] px-2 capitalize')}
+        className={cn(
+          !isLabelVisible && 'sr-only',
+          'rounded-l px-2 capitalize',
+          size === 'small' ? 'text-xs' : 'text-sm'
+        )}
       >
         {label}
       </Combobox.Label>
@@ -256,7 +266,7 @@ function Search<T>({ ...props }: ComboboxInputProps<'input', T>) {
   return (
     <div className="mx-2 my-2">
       <Combobox.Input
-        className="border-subtle focus-visible:border-subtle text-basis bg-surfaceBase placeholder:text-disabled focus-visible:outline-primary-moderate w-full rounded border px-4 py-2 text-sm outline-2 focus-visible:outline focus-visible:outline-offset-0"
+        className="border-subtle focus-visible:border-active text-basis bg-surfaceBase placeholder:text-disabled w-full rounded border p-2 text-sm outline-none focus-visible:outline-none focus-visible:ring-0"
         {...props}
       />
     </div>

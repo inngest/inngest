@@ -162,14 +162,12 @@ export const Dashboard = ({ envSlug }: { envSlug: string }) => {
                 onFilterChange={(apps) => (apps.length ? setApps(apps) : removeApps())}
                 selectedEntities={selectedApps || []}
                 entities={apps || []}
-                className="h-8"
               />
               <EntityFilter
                 type="function"
                 onFilterChange={(fns) => (fns.length ? setFns(fns) : removeFns())}
                 selectedEntities={selectedFns || []}
                 entities={functions || []}
-                className="h-8"
               />
             </>
           )}

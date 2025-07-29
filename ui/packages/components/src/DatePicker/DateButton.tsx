@@ -29,7 +29,7 @@ export const DateSelectButton = forwardRef<HTMLButtonElement, DateButtonProps>(
         {...props}
         ref={forwardRef}
         className={cn(
-          'border-muted bg-surfaceBase text-basis group box-content flex h-[32px] w-full items-center justify-between rounded-l-[5px] rounded-r-[5px] border px-2 text-sm',
+          'border-muted bg-surfaceBase text-basis group box-content flex h-[24px] w-full items-center justify-between rounded-l rounded-r border px-2 text-xs',
           className
         )}
       >

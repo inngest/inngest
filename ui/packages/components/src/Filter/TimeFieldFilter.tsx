@@ -32,11 +32,10 @@ export default function TimeFieldFilter({
       label="Time Field"
       isLabelVisible={false}
       className="min-w-[6.8rem]"
+      size="small"
     >
-      <Select.Button>
-        <span className="pr-2 text-sm lowercase first-letter:capitalize">
-          {selectedValue?.name}
-        </span>
+      <Select.Button size="small">
+        <span className="lowercase first-letter:capitalize">{selectedValue?.name}</span>
       </Select.Button>
       <Select.Options>
         {options.map((option) => {

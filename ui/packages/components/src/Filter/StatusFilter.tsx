@@ -78,8 +78,9 @@ export default function StatusFilter<T extends string>({
       }}
       label="Status"
       isLabelVisible
+      size="small"
     >
-      <Select.Button isLabelVisible ref={comboboxRef}>
+      <Select.Button isLabelVisible ref={comboboxRef} size="small">
         <div className="w-7 text-left">
           {temporarySelectedStatuses.length > 0 && !areAllStatusesSelected && (
             <span>{statusDots}</span>

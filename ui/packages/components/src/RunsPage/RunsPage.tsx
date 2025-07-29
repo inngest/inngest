@@ -326,7 +326,8 @@ export function RunsPage({
 
             <Button
               icon={<RiSearchLine />}
-              size="large"
+              size="small"
+              kind="secondary"
               iconSide="left"
               appearance="outlined"
               label={showSearch ? 'Hide search' : 'Show search'}
@@ -334,7 +335,8 @@ export function RunsPage({
               className={cn(
                 search
                   ? 'after:bg-secondary-moderate after:mb-3 after:ml-0.5 after:h-2 after:w-2 after:rounded'
-                  : ''
+                  : '',
+                'h-[26px]'
               )}
             />
             <TotalCount totalCount={totalCount} />
