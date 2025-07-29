@@ -3,7 +3,7 @@
 import { Button } from '@inngest/components/Button';
 import { RiExternalLinkLine, RiTableView } from '@remixicon/react';
 
-import { useInsightsQueryContext } from '../context';
+import { useInsightsQueryContext } from '../../context';
 
 export function NoResultsState() {
   const { seeExamples } = useInsightsQueryContext();

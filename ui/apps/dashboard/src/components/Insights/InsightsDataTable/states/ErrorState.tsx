@@ -2,7 +2,7 @@
 
 import { Alert } from '@inngest/components/Alert';
 
-import { useInsightsQueryContext } from '../context';
+import { useInsightsQueryContext } from '../../context';
 
 const FALLBACK_ERROR = 'Something went wrong. Please try again.';
 
