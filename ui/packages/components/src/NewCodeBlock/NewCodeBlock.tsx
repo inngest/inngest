@@ -19,6 +19,7 @@ import { Fullscreen } from '../Fullscreen/Fullscreen';
 import { Pill } from '../Pill';
 import SegmentedControl from '../SegmentedControl/SegmentedControl';
 import { Skeleton } from '../Skeleton';
+import { OptionalTooltip } from '../Tooltip/OptionalTooltip';
 import { jsonTreeTheme } from '../utils/jsonTree';
 import { isDark } from '../utils/theme';
 
@@ -130,8 +131,8 @@ export const NewCodeBlock = ({
             <p
               className={cn(
                 header?.status === 'error' ? 'text-status-failedText' : 'text-subtle',
-                ' px-5 py-2.5 text-sm',
-                'max-h-24 text-ellipsis break-words'
+                'px-5 pt-2.5 text-sm',
+                'max-h-24 max-w-96 text-ellipsis break-words'
               )}
             >
               {parsed ? (
@@ -147,12 +148,22 @@ export const NewCodeBlock = ({
                 <Pill
                   kind={header?.status === 'error' ? 'error' : 'default'}
                   appearance="outlined"
-                  className="max-w-96 overflow-x-auto rounded-full p-3"
+                  className="my-2 max-w-96 overflow-x-auto rounded-full p-3"
                 >
-                  {header?.title}
+                  <OptionalTooltip
+                    tooltip={
+                      header?.title?.length && header?.title?.length > 55 ? header?.title : ''
+                    }
+                    side="left"
+                  >
+                    <div className="min-w-0 overflow-x-hidden overflow-y-hidden text-ellipsis whitespace-nowrap">
+                      {header?.title}
+                    </div>
+                  </OptionalTooltip>
                 </Pill>
               )}
             </p>
+
             {!isOutputTooLarge && (
               <div className="mr-4 flex items-center gap-2 py-2">
                 {actions.map(({ label, title, icon, onClick, disabled }, idx) => (

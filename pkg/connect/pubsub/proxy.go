@@ -206,7 +206,7 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 		resp, err := i.stateManager.GetResponse(ctx, opts.EnvID, opts.Data.RequestId)
 		if err != nil {
 			span.RecordError(err)
-			l.Error("could not check for buffered response", "err", err)
+			l.ReportError(err, "could not check for buffered response")
 			return nil, fmt.Errorf("could not check for buffered response: %w", err)
 		}
 
@@ -219,7 +219,7 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 			err := i.stateManager.DeleteResponse(ctx, opts.EnvID, opts.Data.RequestId)
 			if err != nil {
 				span.RecordError(err)
-				l.Error("could not delete buffered response", "err", err)
+				l.ReportError(err, "could not delete buffered response")
 			}
 
 			return resp, nil
@@ -350,7 +350,7 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 			resp, err := i.stateManager.GetResponse(ctx, opts.EnvID, opts.Data.RequestId)
 			if err != nil {
 				span.RecordError(err)
-				l.Error("could not check for response", "err", err)
+				l.ReportError(err, "could not check for response")
 				continue
 			}
 
@@ -461,7 +461,7 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 			leased, err := i.stateManager.IsRequestLeased(ctx, opts.EnvID, opts.Data.RequestId)
 			if err != nil {
 				span.RecordError(err)
-				l.Error("could not get lease status", "err", err)
+				l.ReportError(err, "could not get lease status")
 				continue
 			}
 
@@ -560,7 +560,7 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 		err = i.stateManager.DeleteLease(ctx, opts.EnvID, opts.Data.RequestId)
 		if err != nil {
 			span.RecordError(err)
-			l.Error("could not delete lease", "err", err)
+			l.ReportError(err, "could not delete lease")
 		}
 
 		if reply.RequestId == "" {
@@ -574,7 +574,7 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 		err := i.stateManager.DeleteResponse(ctx, opts.EnvID, opts.Data.RequestId)
 		if err != nil {
 			span.RecordError(err)
-			l.Error("could not delete response", "err", err)
+			l.ReportError(err, "could not delete response")
 		}
 
 		l.Debug("returning reply", "status", reply.Status)

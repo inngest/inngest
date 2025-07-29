@@ -346,6 +346,8 @@ func (l *logger) ReportError(err error, msg string, opts ...ReportErrorOpt) {
 			args = append(args, k, v)
 		}
 
+		args = append(args, "err", err)
+
 		l.Error(msg, args...)
 	}
 }

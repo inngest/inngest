@@ -44,3 +44,12 @@ export const usePrettyErrorBody = (error: Result['error'] | undefined): string |
     return body;
   }, [error?.stack, prettyCause]);
 };
+
+export const usePrettyShortError = (error: Result['error'] | undefined): string =>
+  error?.message
+    ? error.message
+    : error?.cause
+    ? error.cause
+    : error?.name
+    ? error.name
+    : 'Unknown error';
