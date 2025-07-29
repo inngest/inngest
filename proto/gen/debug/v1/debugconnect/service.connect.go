@@ -35,11 +35,15 @@ const (
 const (
 	// DebugGetPartitionProcedure is the fully-qualified name of the Debug's GetPartition RPC.
 	DebugGetPartitionProcedure = "/debug.v1.Debug/GetPartition"
+	// DebugGetPartitionStatusProcedure is the fully-qualified name of the Debug's GetPartitionStatus
+	// RPC.
+	DebugGetPartitionStatusProcedure = "/debug.v1.Debug/GetPartitionStatus"
 )
 
 // DebugClient is a client for the debug.v1.Debug service.
 type DebugClient interface {
 	GetPartition(context.Context, *connect.Request[v1.PartitionRequest]) (*connect.Response[v1.PartitionResponse], error)
+	GetPartitionStatus(context.Context, *connect.Request[v1.PartitionRequest]) (*connect.Response[v1.PartitionStatusResponse], error)
 }
 
 // NewDebugClient constructs a client for the debug.v1.Debug service. By default, it uses the
@@ -59,12 +63,19 @@ func NewDebugClient(httpClient connect.HTTPClient, baseURL string, opts ...conne
 			connect.WithSchema(debugMethods.ByName("GetPartition")),
 			connect.WithClientOptions(opts...),
 		),
+		getPartitionStatus: connect.NewClient[v1.PartitionRequest, v1.PartitionStatusResponse](
+			httpClient,
+			baseURL+DebugGetPartitionStatusProcedure,
+			connect.WithSchema(debugMethods.ByName("GetPartitionStatus")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
 // debugClient implements DebugClient.
 type debugClient struct {
-	getPartition *connect.Client[v1.PartitionRequest, v1.PartitionResponse]
+	getPartition       *connect.Client[v1.PartitionRequest, v1.PartitionResponse]
+	getPartitionStatus *connect.Client[v1.PartitionRequest, v1.PartitionStatusResponse]
 }
 
 // GetPartition calls debug.v1.Debug.GetPartition.
@@ -72,9 +83,15 @@ func (c *debugClient) GetPartition(ctx context.Context, req *connect.Request[v1.
 	return c.getPartition.CallUnary(ctx, req)
 }
 
+// GetPartitionStatus calls debug.v1.Debug.GetPartitionStatus.
+func (c *debugClient) GetPartitionStatus(ctx context.Context, req *connect.Request[v1.PartitionRequest]) (*connect.Response[v1.PartitionStatusResponse], error) {
+	return c.getPartitionStatus.CallUnary(ctx, req)
+}
+
 // DebugHandler is an implementation of the debug.v1.Debug service.
 type DebugHandler interface {
 	GetPartition(context.Context, *connect.Request[v1.PartitionRequest]) (*connect.Response[v1.PartitionResponse], error)
+	GetPartitionStatus(context.Context, *connect.Request[v1.PartitionRequest]) (*connect.Response[v1.PartitionStatusResponse], error)
 }
 
 // NewDebugHandler builds an HTTP handler from the service implementation. It returns the path on
@@ -90,10 +107,18 @@ func NewDebugHandler(svc DebugHandler, opts ...connect.HandlerOption) (string, h
 		connect.WithSchema(debugMethods.ByName("GetPartition")),
 		connect.WithHandlerOptions(opts...),
 	)
+	debugGetPartitionStatusHandler := connect.NewUnaryHandler(
+		DebugGetPartitionStatusProcedure,
+		svc.GetPartitionStatus,
+		connect.WithSchema(debugMethods.ByName("GetPartitionStatus")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/debug.v1.Debug/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case DebugGetPartitionProcedure:
 			debugGetPartitionHandler.ServeHTTP(w, r)
+		case DebugGetPartitionStatusProcedure:
+			debugGetPartitionStatusHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -105,4 +130,8 @@ type UnimplementedDebugHandler struct{}
 
 func (UnimplementedDebugHandler) GetPartition(context.Context, *connect.Request[v1.PartitionRequest]) (*connect.Response[v1.PartitionResponse], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("debug.v1.Debug.GetPartition is not implemented"))
+}
+
+func (UnimplementedDebugHandler) GetPartitionStatus(context.Context, *connect.Request[v1.PartitionRequest]) (*connect.Response[v1.PartitionStatusResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("debug.v1.Debug.GetPartitionStatus is not implemented"))
 }

@@ -23,6 +23,7 @@ const (
 
 type PartitionRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -57,8 +58,18 @@ func (*PartitionRequest) Descriptor() ([]byte, []int) {
 	return file_debug_v1_service_proto_rawDescGZIP(), []int{0}
 }
 
+func (x *PartitionRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
 type PartitionResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Tenant        *PartitionTenant       `protobuf:"bytes,2,opt,name=tenant,proto3" json:"tenant,omitempty"`
+	Config        []byte                 `protobuf:"bytes,3,opt,name=config,proto3" json:"config,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -93,15 +104,235 @@ func (*PartitionResponse) Descriptor() ([]byte, []int) {
 	return file_debug_v1_service_proto_rawDescGZIP(), []int{1}
 }
 
+func (x *PartitionResponse) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *PartitionResponse) GetTenant() *PartitionTenant {
+	if x != nil {
+		return x.Tenant
+	}
+	return nil
+}
+
+func (x *PartitionResponse) GetConfig() []byte {
+	if x != nil {
+		return x.Config
+	}
+	return nil
+}
+
+type PartitionStatusResponse struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	Paused            bool                   `protobuf:"varint,1,opt,name=paused,proto3" json:"paused,omitempty"`
+	PauseRefill       bool                   `protobuf:"varint,2,opt,name=pause_refill,json=pauseRefill,proto3" json:"pause_refill,omitempty"`
+	PauseEnqueue      bool                   `protobuf:"varint,3,opt,name=pause_enqueue,json=pauseEnqueue,proto3" json:"pause_enqueue,omitempty"`
+	AccountActive     int64                  `protobuf:"varint,4,opt,name=account_active,json=accountActive,proto3" json:"account_active,omitempty"`
+	AccountInProgress int64                  `protobuf:"varint,5,opt,name=account_in_progress,json=accountInProgress,proto3" json:"account_in_progress,omitempty"`
+	Ready             int64                  `protobuf:"varint,6,opt,name=ready,proto3" json:"ready,omitempty"`
+	InProgress        int64                  `protobuf:"varint,7,opt,name=in_progress,json=inProgress,proto3" json:"in_progress,omitempty"`
+	Active            int64                  `protobuf:"varint,8,opt,name=active,proto3" json:"active,omitempty"`
+	Future            int64                  `protobuf:"varint,9,opt,name=future,proto3" json:"future,omitempty"`
+	Backlogs          int64                  `protobuf:"varint,10,opt,name=backlogs,proto3" json:"backlogs,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *PartitionStatusResponse) Reset() {
+	*x = PartitionStatusResponse{}
+	mi := &file_debug_v1_service_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PartitionStatusResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PartitionStatusResponse) ProtoMessage() {}
+
+func (x *PartitionStatusResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_debug_v1_service_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PartitionStatusResponse.ProtoReflect.Descriptor instead.
+func (*PartitionStatusResponse) Descriptor() ([]byte, []int) {
+	return file_debug_v1_service_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *PartitionStatusResponse) GetPaused() bool {
+	if x != nil {
+		return x.Paused
+	}
+	return false
+}
+
+func (x *PartitionStatusResponse) GetPauseRefill() bool {
+	if x != nil {
+		return x.PauseRefill
+	}
+	return false
+}
+
+func (x *PartitionStatusResponse) GetPauseEnqueue() bool {
+	if x != nil {
+		return x.PauseEnqueue
+	}
+	return false
+}
+
+func (x *PartitionStatusResponse) GetAccountActive() int64 {
+	if x != nil {
+		return x.AccountActive
+	}
+	return 0
+}
+
+func (x *PartitionStatusResponse) GetAccountInProgress() int64 {
+	if x != nil {
+		return x.AccountInProgress
+	}
+	return 0
+}
+
+func (x *PartitionStatusResponse) GetReady() int64 {
+	if x != nil {
+		return x.Ready
+	}
+	return 0
+}
+
+func (x *PartitionStatusResponse) GetInProgress() int64 {
+	if x != nil {
+		return x.InProgress
+	}
+	return 0
+}
+
+func (x *PartitionStatusResponse) GetActive() int64 {
+	if x != nil {
+		return x.Active
+	}
+	return 0
+}
+
+func (x *PartitionStatusResponse) GetFuture() int64 {
+	if x != nil {
+		return x.Future
+	}
+	return 0
+}
+
+func (x *PartitionStatusResponse) GetBacklogs() int64 {
+	if x != nil {
+		return x.Backlogs
+	}
+	return 0
+}
+
+type PartitionTenant struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccountId     string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	EnvId         string                 `protobuf:"bytes,2,opt,name=env_id,json=envId,proto3" json:"env_id,omitempty"`
+	AppId         string                 `protobuf:"bytes,3,opt,name=app_id,json=appId,proto3" json:"app_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PartitionTenant) Reset() {
+	*x = PartitionTenant{}
+	mi := &file_debug_v1_service_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PartitionTenant) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PartitionTenant) ProtoMessage() {}
+
+func (x *PartitionTenant) ProtoReflect() protoreflect.Message {
+	mi := &file_debug_v1_service_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PartitionTenant.ProtoReflect.Descriptor instead.
+func (*PartitionTenant) Descriptor() ([]byte, []int) {
+	return file_debug_v1_service_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *PartitionTenant) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *PartitionTenant) GetEnvId() string {
+	if x != nil {
+		return x.EnvId
+	}
+	return ""
+}
+
+func (x *PartitionTenant) GetAppId() string {
+	if x != nil {
+		return x.AppId
+	}
+	return ""
+}
+
 var File_debug_v1_service_proto protoreflect.FileDescriptor
 
 const file_debug_v1_service_proto_rawDesc = "" +
 	"\n" +
-	"\x16debug/v1/service.proto\x12\bdebug.v1\"\x12\n" +
-	"\x10PartitionRequest\"\x13\n" +
-	"\x11PartitionResponse2R\n" +
+	"\x16debug/v1/service.proto\x12\bdebug.v1\"\"\n" +
+	"\x10PartitionRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"n\n" +
+	"\x11PartitionResponse\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x121\n" +
+	"\x06tenant\x18\x02 \x01(\v2\x19.debug.v1.PartitionTenantR\x06tenant\x12\x16\n" +
+	"\x06config\x18\x03 \x01(\fR\x06config\"\xd3\x02\n" +
+	"\x17PartitionStatusResponse\x12\x16\n" +
+	"\x06paused\x18\x01 \x01(\bR\x06paused\x12!\n" +
+	"\fpause_refill\x18\x02 \x01(\bR\vpauseRefill\x12#\n" +
+	"\rpause_enqueue\x18\x03 \x01(\bR\fpauseEnqueue\x12%\n" +
+	"\x0eaccount_active\x18\x04 \x01(\x03R\raccountActive\x12.\n" +
+	"\x13account_in_progress\x18\x05 \x01(\x03R\x11accountInProgress\x12\x14\n" +
+	"\x05ready\x18\x06 \x01(\x03R\x05ready\x12\x1f\n" +
+	"\vin_progress\x18\a \x01(\x03R\n" +
+	"inProgress\x12\x16\n" +
+	"\x06active\x18\b \x01(\x03R\x06active\x12\x16\n" +
+	"\x06future\x18\t \x01(\x03R\x06future\x12\x1a\n" +
+	"\bbacklogs\x18\n" +
+	" \x01(\x03R\bbacklogs\"^\n" +
+	"\x0fPartitionTenant\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\x12\x15\n" +
+	"\x06env_id\x18\x02 \x01(\tR\x05envId\x12\x15\n" +
+	"\x06app_id\x18\x03 \x01(\tR\x05appId2\xa9\x01\n" +
 	"\x05Debug\x12I\n" +
-	"\fGetPartition\x12\x1a.debug.v1.PartitionRequest\x1a\x1b.debug.v1.PartitionResponse\"\x00B5Z3github.com/inngest/inngest/proto/gen/debug/v1;debugb\x06proto3"
+	"\fGetPartition\x12\x1a.debug.v1.PartitionRequest\x1a\x1b.debug.v1.PartitionResponse\"\x00\x12U\n" +
+	"\x12GetPartitionStatus\x12\x1a.debug.v1.PartitionRequest\x1a!.debug.v1.PartitionStatusResponse\"\x00B5Z3github.com/inngest/inngest/proto/gen/debug/v1;debugb\x06proto3"
 
 var (
 	file_debug_v1_service_proto_rawDescOnce sync.Once
@@ -115,19 +346,24 @@ func file_debug_v1_service_proto_rawDescGZIP() []byte {
 	return file_debug_v1_service_proto_rawDescData
 }
 
-var file_debug_v1_service_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_debug_v1_service_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
 var file_debug_v1_service_proto_goTypes = []any{
-	(*PartitionRequest)(nil),  // 0: debug.v1.PartitionRequest
-	(*PartitionResponse)(nil), // 1: debug.v1.PartitionResponse
+	(*PartitionRequest)(nil),        // 0: debug.v1.PartitionRequest
+	(*PartitionResponse)(nil),       // 1: debug.v1.PartitionResponse
+	(*PartitionStatusResponse)(nil), // 2: debug.v1.PartitionStatusResponse
+	(*PartitionTenant)(nil),         // 3: debug.v1.PartitionTenant
 }
 var file_debug_v1_service_proto_depIdxs = []int32{
-	0, // 0: debug.v1.Debug.GetPartition:input_type -> debug.v1.PartitionRequest
-	1, // 1: debug.v1.Debug.GetPartition:output_type -> debug.v1.PartitionResponse
-	1, // [1:2] is the sub-list for method output_type
-	0, // [0:1] is the sub-list for method input_type
-	0, // [0:0] is the sub-list for extension type_name
-	0, // [0:0] is the sub-list for extension extendee
-	0, // [0:0] is the sub-list for field type_name
+	3, // 0: debug.v1.PartitionResponse.tenant:type_name -> debug.v1.PartitionTenant
+	0, // 1: debug.v1.Debug.GetPartition:input_type -> debug.v1.PartitionRequest
+	0, // 2: debug.v1.Debug.GetPartitionStatus:input_type -> debug.v1.PartitionRequest
+	1, // 3: debug.v1.Debug.GetPartition:output_type -> debug.v1.PartitionResponse
+	2, // 4: debug.v1.Debug.GetPartitionStatus:output_type -> debug.v1.PartitionStatusResponse
+	3, // [3:5] is the sub-list for method output_type
+	1, // [1:3] is the sub-list for method input_type
+	1, // [1:1] is the sub-list for extension type_name
+	1, // [1:1] is the sub-list for extension extendee
+	0, // [0:1] is the sub-list for field type_name
 }
 
 func init() { file_debug_v1_service_proto_init() }
@@ -141,7 +377,7 @@ func file_debug_v1_service_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_debug_v1_service_proto_rawDesc), len(file_debug_v1_service_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   2,
+			NumMessages:   4,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -5,8 +5,33 @@ option go_package = "github.com/inngest/inngest/proto/gen/debug/v1;debug";
 
 service Debug {
   rpc GetPartition(PartitionRequest) returns (PartitionResponse) {}
+  rpc GetPartitionStatus(PartitionRequest) returns (PartitionStatusResponse) {}
 }
 
-message PartitionRequest {}
+message PartitionRequest { string id = 1; }
 
-message PartitionResponse {}
+message PartitionResponse {
+  string id = 1;
+  PartitionTenant tenant = 2;
+  bytes config = 3;
+}
+
+message PartitionStatusResponse {
+  bool paused = 1;
+  bool pause_refill = 2;
+  bool pause_enqueue = 3;
+
+  int64 account_active = 4;
+  int64 account_in_progress = 5;
+  int64 ready = 6;
+  int64 in_progress = 7;
+  int64 active = 8;
+  int64 future = 9;
+  int64 backlogs = 10;
+}
+
+message PartitionTenant {
+  string account_id = 1;
+  string env_id = 2;
+  string app_id = 3;
+}
