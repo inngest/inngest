@@ -1,11 +1,11 @@
 'use client';
 
 import { useCallback, useMemo, type UIEventHandler } from 'react';
-import { Button } from '@inngest/components/Button';
 import Table from '@inngest/components/Table/NewTable';
 
 import { useInsightsQueryContext } from '../../context';
 import { NoResults } from './NoResults';
+import { ResultsTableFooter } from './ResultsTableFooter';
 import { getTableColumns, handleScroll } from './utils';
 
 export function ResultsTable() {
@@ -40,19 +40,7 @@ export function ResultsTable() {
       <div className="flex-1 overflow-auto" id="insights-table-container" onScroll={onScroll}>
         <Table columns={tableColumns} data={data.entries} isLoading={false} />
       </div>
-      <div className="border-subtle border-t px-4 py-3">
-        <div className="flex items-center justify-between">
-          <span className="text-muted text-sm">
-            {data.totalCount === 1 ? '1 row' : `${data.totalCount.toLocaleString()} rows`}
-          </span>
-
-          {state === 'fetchingMore' && (
-            <div className="flex flex-1 justify-center">
-              <Button appearance="outlined" label="Loading more..." loading={true} size="small" />
-            </div>
-          )}
-        </div>
-      </div>
+      <ResultsTableFooter data={data} state={state} />
     </div>
   );
 }
