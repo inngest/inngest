@@ -193,9 +193,9 @@ export const RangePicker = ({
           )}
         </TriggerComponent>
       </PopoverTrigger>
-      <PopoverContent align="start">
+      <PopoverContent align="start" className="border-subtle shadow-primary">
         <div className="bg-canvasBase flex flex-row">
-          <div className={`${showAbsolute && 'min-h-[584px]'} border-muted w-[250px] border-r`}>
+          <div className={`${showAbsolute && 'min-h-[584px]'} border-subtle w-[250px] border-r`}>
             <div className="px-3 py-2">
               <Input
                 ref={durationRef}

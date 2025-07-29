@@ -246,7 +246,7 @@ export function EventsTable({
     <div className="bg-canvasBase text-basis no-scrollbar flex-1 overflow-hidden focus-visible:outline-none">
       <div className="bg-canvasBase sticky top-0 z-10">
         <div className="mx-3 flex h-11 items-center justify-between gap-1.5">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             {/* <EntityFilter
               type="event"
               onFilterChange={onEventFilterChange}

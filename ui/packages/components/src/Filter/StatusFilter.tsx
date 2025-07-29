@@ -95,7 +95,7 @@ export default function StatusFilter<T extends string>({
             <Select.CheckboxOption key={option.id} option={option}>
               <span className="flex items-center gap-1 lowercase">
                 <StatusDot status={option.id} size="small" />
-                <label className="text-sm first-letter:capitalize">{option.name}</label>
+                <label className="first-letter:capitalize">{option.name}</label>
               </span>
             </Select.CheckboxOption>
           );

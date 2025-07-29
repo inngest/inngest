@@ -42,7 +42,7 @@ export default function TimeFieldFilter({
           return (
             <Select.Option key={option.id} option={option}>
               <span className="inline-flex items-center gap-2 lowercase">
-                <label className="text-sm first-letter:capitalize">{option.name}</label>
+                <label className="first-letter:capitalize">{option.name}</label>
               </span>
             </Select.Option>
           );

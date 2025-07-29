@@ -29,7 +29,7 @@ export function TableFilter({ options, columnVisibility, setColumnVisibility }: 
       <Select.Button isLabelVisible={false} size="small">
         <div className="text-left">Table columns</div>
       </Select.Button>
-      <Select.Options>
+      <Select.Options className="right-0">
         {options.map((option) => {
           return (
             <Select.CheckboxOption key={option.id} option={option}>
