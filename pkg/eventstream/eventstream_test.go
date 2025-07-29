@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"math/rand"
 	"mime/multipart"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
@@ -149,7 +150,10 @@ func TestParseStream_JSON(t *testing.T) {
 func TestParseStream_Multipart(t *testing.T) {
 	// multipart/form-data
 
+	t.Parallel()
+
 	t.Run("single form field", func(t *testing.T) {
+		t.Parallel()
 		r := require.New(t)
 		ctx := context.Background()
 
@@ -168,9 +172,11 @@ func TestParseStream_Multipart(t *testing.T) {
 		n := 0
 		for item := range stream {
 			// The multipart parser creates a JSON object with form fields as keys
-			var result map[string]string
+			var result map[string]any
 			r.NoError(json.Unmarshal(item.Item, &result))
-			r.Equal("Alice", result["name"])
+			r.Equal(map[string]any{
+				"name": []any{"Alice"},
+			}, result)
 			n++
 		}
 		r.NoError(eg.Wait())
@@ -178,13 +184,15 @@ func TestParseStream_Multipart(t *testing.T) {
 	})
 
 	t.Run("multiple form fields", func(t *testing.T) {
+		t.Parallel()
 		r := require.New(t)
 		ctx := context.Background()
 
 		body := &bytes.Buffer{}
 		writer := multipart.NewWriter(body)
 		r.NoError(writer.WriteField("name", "Alice"))
-		r.NoError(writer.WriteField("age", "25"))
+		r.NoError(writer.WriteField("messages", "hello"))
+		r.NoError(writer.WriteField("messages", "world"))
 		r.NoError(writer.Close())
 
 		contentType := writer.FormDataContentType()
@@ -196,11 +204,11 @@ func TestParseStream_Multipart(t *testing.T) {
 
 		n := 0
 		for item := range stream {
-			var result map[string]string
+			var result map[string]any
 			r.NoError(json.Unmarshal(item.Item, &result))
-			r.Equal(map[string]string{
-				"name": "Alice",
-				"age":  "25",
+			r.Equal(map[string]any{
+				"name":     []any{"Alice"},
+				"messages": []any{"hello", "world"},
 			}, result)
 			n++
 		}
@@ -209,6 +217,7 @@ func TestParseStream_Multipart(t *testing.T) {
 	})
 
 	t.Run("empty form fields", func(t *testing.T) {
+		t.Parallel()
 		r := require.New(t)
 		ctx := context.Background()
 
@@ -228,10 +237,12 @@ func TestParseStream_Multipart(t *testing.T) {
 
 		n := 0
 		for item := range stream {
-			var result map[string]string
+			var result map[string]any
 			r.NoError(json.Unmarshal(item.Item, &result))
-			r.Equal(map[string]string{
-				"valid": "value",
+			r.Equal(map[string]any{
+				"empty1": []any{""},
+				"empty2": []any{""},
+				"valid":  []any{"value"},
 			}, result)
 			n++
 		}
@@ -240,6 +251,7 @@ func TestParseStream_Multipart(t *testing.T) {
 	})
 
 	t.Run("max size exceeded", func(t *testing.T) {
+		t.Parallel()
 		r := require.New(t)
 		ctx := context.Background()
 
@@ -267,6 +279,7 @@ func TestParseStream_Multipart(t *testing.T) {
 	})
 
 	t.Run("no form fields", func(t *testing.T) {
+		t.Parallel()
 		r := require.New(t)
 		ctx := context.Background()
 
@@ -282,17 +295,21 @@ func TestParseStream_Multipart(t *testing.T) {
 		})
 
 		n := 0
-		for range stream {
+		for item := range stream {
+			var result map[string]any
+			r.NoError(json.Unmarshal(item.Item, &result))
+			r.Equal(map[string]any{}, result)
 			n++
 		}
 		r.NoError(eg.Wait())
-		r.Equal(0, n)
+		r.Equal(1, n)
 	})
 
 	t.Run("arbitrary bytes", func(t *testing.T) {
 		// We don't support arbitrary bytes in form fields. This test just
 		// documents that limitation
 
+		t.Parallel()
 		r := require.New(t)
 		ctx := context.Background()
 
@@ -314,13 +331,164 @@ func TestParseStream_Multipart(t *testing.T) {
 
 		n := 0
 		for item := range stream {
-			var result map[string]string
+			var result map[string]any
 			r.NoError(json.Unmarshal(item.Item, &result))
 
 			// Intentionally gobbledygook because we don't support arbitrary
 			// bytes in form fields
-			r.Equal("\x00�ޭ��\x00B", result["arbitrary_bytes"])
+			r.Equal(map[string]any{
+				"arbitrary_bytes": []any{"\x00�ޭ��\x00B"},
+			}, result)
 
+			n++
+		}
+		r.NoError(eg.Wait())
+		r.Equal(1, n)
+	})
+}
+
+func TestParseStream_FormUrlencoded(t *testing.T) {
+	// application/x-www-form-urlencoded
+
+	t.Parallel()
+	contentType := "application/x-www-form-urlencoded"
+
+	t.Run("single form field", func(t *testing.T) {
+		t.Parallel()
+		r := require.New(t)
+		ctx := context.Background()
+
+		formData := url.Values{}
+		formData.Set("name", "Alice")
+		body := strings.NewReader(formData.Encode())
+
+		stream := make(chan StreamItem)
+		eg := errgroup.Group{}
+		eg.Go(func() error {
+			return ParseStream(ctx, body, stream, 512*1024, contentType)
+		})
+
+		n := 0
+		for item := range stream {
+			// The multipart parser creates a JSON object with form fields as keys
+			var result map[string]any
+			r.NoError(json.Unmarshal(item.Item, &result))
+			r.Equal(map[string]any{
+				"name": []any{"Alice"},
+			}, result)
+			n++
+		}
+		r.NoError(eg.Wait())
+		r.Equal(1, n)
+	})
+
+	t.Run("multiple form fields", func(t *testing.T) {
+		t.Parallel()
+		r := require.New(t)
+		ctx := context.Background()
+
+		formData := url.Values{}
+		formData.Set("name", "Alice")
+		formData.Add("messages", "hello")
+		formData.Add("messages", "world")
+		body := strings.NewReader(formData.Encode())
+
+		stream := make(chan StreamItem)
+		eg := errgroup.Group{}
+		eg.Go(func() error {
+			return ParseStream(ctx, body, stream, 512*1024, contentType)
+		})
+
+		n := 0
+		for item := range stream {
+			var result map[string]any
+			r.NoError(json.Unmarshal(item.Item, &result))
+			r.Equal(map[string]any{
+				"name":     []any{"Alice"},
+				"messages": []any{"hello", "world"},
+			}, result)
+			n++
+		}
+		r.NoError(eg.Wait())
+		r.Equal(1, n)
+	})
+
+	t.Run("empty form fields", func(t *testing.T) {
+		t.Parallel()
+		r := require.New(t)
+		ctx := context.Background()
+
+		formData := url.Values{}
+		formData.Set("empty1", "")
+		formData.Set("valid", "value")
+		formData.Set("empty2", "")
+		body := strings.NewReader(formData.Encode())
+
+		stream := make(chan StreamItem)
+		eg := errgroup.Group{}
+		eg.Go(func() error {
+			return ParseStream(ctx, body, stream, 512*1024, contentType)
+		})
+
+		n := 0
+		for item := range stream {
+			var result map[string]any
+			r.NoError(json.Unmarshal(item.Item, &result))
+			r.Equal(map[string]any{
+				"empty1": []any{""},
+				"empty2": []any{""},
+				"valid":  []any{"value"},
+			}, result)
+			n++
+		}
+		r.NoError(eg.Wait())
+		r.Equal(1, n)
+	})
+
+	t.Run("max size exceeded", func(t *testing.T) {
+		t.Parallel()
+		r := require.New(t)
+		ctx := context.Background()
+
+		formData := url.Values{}
+		formData.Set("large_field", strings.Repeat("x", 300*1024))
+		body := strings.NewReader(formData.Encode())
+
+		stream := make(chan StreamItem)
+		eg := errgroup.Group{}
+		eg.Go(func() error {
+			return ParseStream(ctx, body, stream, 256*1024, contentType) // 256KB limit
+		})
+
+		n := 0
+		for range stream {
+			n++
+		}
+		err := eg.Wait()
+		r.Equal(0, n)
+		r.Error(err)
+		r.Contains(err.Error(), ErrEventTooLarge.Error())
+	})
+
+	t.Run("no form fields", func(t *testing.T) {
+		t.Parallel()
+		r := require.New(t)
+		ctx := context.Background()
+
+		formData := url.Values{}
+		body := strings.NewReader(formData.Encode())
+
+		stream := make(chan StreamItem)
+		eg := errgroup.Group{}
+		eg.Go(func() error {
+			return ParseStream(ctx, body, stream, 512*1024, contentType)
+		})
+
+		n := 0
+		for item := range stream {
+			var result map[string]any
+			r.NoError(json.Unmarshal(item.Item, &result))
+			r.Equal(map[string]any{}, result)
 			n++
 		}
 		r.NoError(eg.Wait())
