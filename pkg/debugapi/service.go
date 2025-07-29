@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"net"
 
+	"github.com/inngest/inngest/pkg/cqrs"
+	"github.com/inngest/inngest/pkg/execution/state"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/service"
@@ -18,25 +20,34 @@ var (
 
 func NewDebugAPI(o Opts) service.Service {
 	return &debugAPI{
-		rpc:  grpc.NewServer(),
-		Opts: o,
-		log:  logger.StdlibLogger(context.Background()),
+		rpc:           grpc.NewServer(),
+		shardSelector: o.ShardSelector,
+		log:           o.Log,
+		db:            o.DB,
+		queue:         o.Queue,
+		state:         o.State,
 	}
 }
 
 type Opts struct {
 	Log   logger.Logger
+	DB    cqrs.Manager
 	Queue redis_state.QueueManager
+	State state.Manager
 
 	ShardSelector redis_state.ShardSelector
 }
 
 type debugAPI struct {
-	Opts
 	pb.DebugServer
 
-	rpc *grpc.Server
-	log logger.Logger
+	rpc       *grpc.Server
+	log       logger.Logger
+	findShard redis_state.ShardSelector
+
+	db    cqrs.Manager
+	queue redis_state.QueueManager
+	state state.Manager
 }
 
 func (d *debugAPI) Name() string {

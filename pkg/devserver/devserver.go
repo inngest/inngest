@@ -572,7 +572,9 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	debugapi := debugapi.NewDebugAPI(debugapi.Opts{
 		Log:           l,
+		DB:            ds.Data,
 		Queue:         rq,
+		State:         ds.State,
 		ShardSelector: shardSelector,
 	})
 

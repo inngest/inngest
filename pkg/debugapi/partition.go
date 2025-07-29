@@ -19,12 +19,12 @@ func (d *debugAPI) GetPartitionStatus(ctx context.Context, req *pb.PartitionRequ
 		queueName = &req.Id
 	}
 
-	shard, err := d.ShardSelector(ctx, consts.DevServerAccountID, queueName)
+	shard, err := d.findShard(ctx, consts.DevServerAccountID, queueName)
 	if err != nil {
 		return nil, fmt.Errorf("error finding shard for GetPartition: %w", err)
 	}
 
-	pt, err := d.Queue.PartitionByID(ctx, shard, req.GetId())
+	pt, err := d.queue.PartitionByID(ctx, shard, req.GetId())
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving partition: %w", err)
 	}
