@@ -1,18 +1,15 @@
 import { type InsightsResult } from './types';
 
 const COLUMNS = [
-  { name: 'hour_bucket', type: 'Date' as const },
+  { name: 'hour_bucket', type: 'date' as const },
   { name: 'event_name', type: 'string' as const },
   { name: 'count', type: 'number' as const },
 ];
 
 const EVENT_NAMES = [
-  'brand/manual-add-off-platform-brands-created',
   'action-created',
-  'clerk/organisation/MembershipDeleted',
   'user/profile-updated',
   'payment/subscription-renewed',
-  'clerk/organisation/MembershipCreated',
   'payment/subscription-cancelled',
   'user/login',
   'user/logout',

@@ -1,4 +1,4 @@
-export type ColumnType = 'Date' | 'string' | 'number';
+export type ColumnType = 'date' | 'string' | 'number';
 
 export interface InsightsColumn {
   name: string;
