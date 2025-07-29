@@ -84,6 +84,7 @@ interface InsightsQueryContextValue {
   content: string;
   data?: InsightsResult;
   error?: string;
+  isEmpty: boolean;
   onChange: (value: string) => void;
   runQuery: () => void;
   seeExamples: () => void;
@@ -123,6 +124,7 @@ export function InsightsQueryContextProvider({ children }: { children: ReactNode
         content: queryState.content,
         data: queryState.data,
         error: queryState.error,
+        isEmpty: queryState.content.trim() === '',
         onChange,
         runQuery,
         seeExamples,

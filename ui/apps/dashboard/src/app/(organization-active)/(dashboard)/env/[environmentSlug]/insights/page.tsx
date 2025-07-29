@@ -7,16 +7,17 @@ import { IconSpinner } from '@inngest/components/icons/Spinner';
 import { RiPlayFill } from '@remixicon/react';
 
 import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
-import { InsightsDataTable } from '@/components/Insights/InsightsDataTable';
+import { InsightsDataTable } from '@/components/Insights/InsightsDataTable/InsightsDataTable';
 import { InsightsSQLEditor } from '@/components/Insights/InsightsSQLEditor/InsightsSQLEditor';
 import { Section } from '@/components/Insights/Section';
-import { useInsightsQuery } from '@/components/Insights/hooks/useInsightsQuery';
+import {
+  InsightsQueryContextProvider,
+  useInsightsQueryContext,
+} from '@/components/Insights/context';
 
-export default function InsightsPage() {
-  const { value: isInsightsEnabled } = useBooleanFlag('insights');
-  const { content, isRunning, onChange, runQuery } = useInsightsQuery();
-
-  if (!isInsightsEnabled) return null;
+function InsightsContent() {
+  const { isEmpty, runQuery, state } = useInsightsQueryContext();
+  const isRunning = state === 'loading';
 
   return (
     <>
@@ -26,7 +27,7 @@ export default function InsightsPage() {
           actions={
             <Button
               className="w-[110px]"
-              disabled={content.trim() === '' || isRunning}
+              disabled={isEmpty || isRunning}
               icon={
                 isRunning ? (
                   <IconSpinner className="fill-white" />
@@ -43,7 +44,7 @@ export default function InsightsPage() {
           className="min-h-[255px]"
           title="Query Editor"
         >
-          <InsightsSQLEditor content={content} onChange={onChange} />
+          <InsightsSQLEditor />
         </Section>
         <Section
           actions={
@@ -71,5 +72,17 @@ export default function InsightsPage() {
         </Section>
       </main>
     </>
+  );
+}
+
+export default function InsightsPage() {
+  const { value: isInsightsEnabled } = useBooleanFlag('insights');
+
+  if (!isInsightsEnabled) return null;
+
+  return (
+    <InsightsQueryContextProvider>
+      <InsightsContent />
+    </InsightsQueryContextProvider>
   );
 }
