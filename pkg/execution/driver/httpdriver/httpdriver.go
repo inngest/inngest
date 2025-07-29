@@ -276,7 +276,28 @@ func do(ctx context.Context, c exechttp.RequestExecutor, r Request) (*Response, 
 	ctx, cancel := context.WithTimeout(ctx, consts.MaxFunctionTimeout)
 	defer cancel()
 
-	req, err := exechttp.NewRequest(http.MethodPost, r.URL.String(), r.Input)
+	// For regular async functions - exposed via the inngest handler - we always
+	// POST to our own API endpoint.
+	method := http.MethodPost
+
+	// If this is a sync function, ie. a resumbale API request, do NOT send POST data
+	// to the endpoint.  We do not control this handler.  The middleware will fetch
+	// run data via our API.
+	values, _ := url.ParseQuery(r.URL.RawQuery)
+	isSyncFn := values.Get("x-inngest-type") == "sync"
+	if isSyncFn {
+		// Do NOT send the body over.  Instead, this will have to be fetched via thje API,
+		// as we do not control the API endpoint itself.
+		r.Input = nil
+		if r.SigningKey != nil {
+			r.Signature = Sign(ctx, r.SigningKey, r.RunID[:])
+		}
+	}
+	if m := values.Get("x-inngest-method"); m != "" {
+		method = m
+	}
+
+	req, err := exechttp.NewRequest(method, r.URL.String(), r.Input)
 	if err != nil {
 		return nil, nil, fmt.Errorf("error creating request: %w", err)
 	}
