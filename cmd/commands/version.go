@@ -4,18 +4,19 @@ import (
 	"fmt"
 
 	"github.com/inngest/inngest/pkg/inngest/version"
-	"github.com/spf13/cobra"
+	"github.com/urfave/cli/v2"
 )
 
-func NewCmdVersion() *cobra.Command {
-	return &cobra.Command{
-		Use: "version",
-		Short: fmt.Sprintf(
+func NewCmdVersion() *cli.Command {
+	return &cli.Command{
+		Name: "version",
+		Usage: fmt.Sprintf(
 			"Shows the inngest CLI version (saving time, it's: %s)",
 			version.Print(),
 		),
-		Run: func(cmd *cobra.Command, args []string) {
+		Action: func(c *cli.Context) error {
 			fmt.Println(version.Print())
+			return nil
 		},
 	}
 }

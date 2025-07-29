@@ -5,10 +5,10 @@ import (
 	"os"
 
 	"github.com/inngest/inngest/pkg/api/tel"
-	"github.com/inngest/inngest/pkg/cli"
+	inncli "github.com/inngest/inngest/pkg/cli"
 	"github.com/inngest/inngest/pkg/inngest/version"
 	isatty "github.com/mattn/go-isatty"
-	"github.com/spf13/cobra"
+	"github.com/urfave/cli/v2"
 	"github.com/spf13/viper"
 )
 
@@ -17,18 +17,16 @@ const (
 )
 
 func Execute() {
-	rootCmd := &cobra.Command{
-		Use: "inngest",
-		Short: cli.TextStyle.Render(fmt.Sprintf(
+	app := &cli.App{
+		Name: "inngest",
+		Usage: inncli.TextStyle.Render(fmt.Sprintf(
 			"%s %s\n\n%s",
 			"Inngest CLI",
 			fmt.Sprintf("v%s", version.Print()),
 			"The durable execution engine with built-in flow control.",
 		)),
-		CompletionOptions: cobra.CompletionOptions{
-			DisableDefaultCmd: true,
-		},
-		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		Version: version.Print(),
+		Before: func(c *cli.Context) error {
 			if viper.IsSet("log-level") {
 				viper.Set(ViperLogLevelKey, viper.GetString("log-level"))
 			} else if viper.GetBool("verbose") {
@@ -37,43 +35,65 @@ func Execute() {
 				viper.Set(ViperLogLevelKey, "info")
 			}
 
-			m := tel.NewMetadata(cmd.Context())
-			m.SetCobraCmd(cmd)
-			tel.SendMetadata(cmd.Context(), m)
+			m := tel.NewMetadata(c.Context)
+			m.SetCliContext(c)
+			tel.SendMetadata(c.Context, m)
+			return nil
 		},
-		PersistentPostRun: func(cmd *cobra.Command, args []string) {
+		After: func(c *cli.Context) error {
 			// Wait for any events to have been sent.
 			tel.Wait()
+			return nil
 		},
+
+		// Add a note to the bottom of the help message
+		CustomAppHelpTemplate: cli.AppHelpTemplate + fmt.Sprintf(
+			"\n%s\n%s\n",
+			"Request features, get help, and chat with us: ",
+			"https://www.inngest.com/discord",
+		),
+
+		Flags: []cli.Flag{
+			&cli.BoolFlag{
+				Name:  "json",
+				Usage: "Output logs as JSON.  Set to true if stdout is not a TTY.",
+			},
+			&cli.BoolFlag{
+				Name:  "verbose",
+				Usage: "Enable verbose logging.",
+			},
+			&cli.StringFlag{
+				Name:    "log-level",
+				Aliases: []string{"l"},
+				Value:   "info",
+				Usage:   "Set the log level.  One of: trace, debug, info, warn, error.",
+			},
+		},
+
 	}
 
-	// Add a note to the bottom of the help message
-	tmpl := rootCmd.HelpTemplate() + fmt.Sprintf(
-		"\n%s\n%s\n",
-		"Request features, get help, and chat with us: ",
-		"https://www.inngest.com/discord",
-	)
-	rootCmd.SetHelpTemplate(tmpl)
+	// Add commands
+	app.Commands = []*cli.Command{
+		NewCmdDev(app),
+		NewCmdVersion(),
+		NewCmdStart(app),
+	}
 
-	rootCmd.PersistentFlags().Bool("json", false, "Output logs as JSON.  Set to true if stdout is not a TTY.")
-	rootCmd.PersistentFlags().BoolP("verbose", "v", false, "Enable verbose logging.")
-	rootCmd.PersistentFlags().StringP("log-level", "l", "info", "Set the log level.  One of: trace, debug, info, warn, error.")
-
-	if err := viper.BindPFlags(rootCmd.PersistentFlags()); err != nil {
-		panic(err)
+	// Set up flag binding with viper
+	for _, flag := range app.Flags {
+		if f, ok := flag.(*cli.BoolFlag); ok {
+			viper.SetDefault(f.Name, false)
+		} else if f, ok := flag.(*cli.StringFlag); ok {
+			viper.SetDefault(f.Name, f.Value)
+		}
 	}
 
 	if !isatty.IsTerminal(os.Stdout.Fd()) {
-		// Alwyas use JSON when not in a terminal
+		// Always use JSON when not in a terminal
 		viper.Set("json", true)
 	}
 
-	// Register Top Level Commands
-	rootCmd.AddCommand(NewCmdDev(rootCmd))
-	rootCmd.AddCommand(NewCmdVersion())
-	rootCmd.AddCommand(NewCmdStart(rootCmd))
-
-	if err := rootCmd.Execute(); err != nil {
+	if err := app.Run(os.Args); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}

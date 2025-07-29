@@ -14,76 +14,87 @@ import (
 	"github.com/inngest/inngest/pkg/devserver"
 	"github.com/inngest/inngest/pkg/headers"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
-	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
-	"github.com/spf13/viper"
+	"github.com/urfave/cli/v2"
 )
 
-func NewCmdDev(rootCmd *cobra.Command) *cobra.Command {
-	cmd := &cobra.Command{
-		Use:     "dev",
-		Short:   "Run the Inngest Dev Server for local development.",
-		Example: "inngest dev -u http://localhost:3000/api/inngest",
-		Run:     doDev,
+func NewCmdDev(app *cli.App) *cli.Command {
+	cmd := &cli.Command{
+		Name:  "dev",
+		Usage: "Run the Inngest Dev Server for local development.",
+		UsageText: "inngest dev [options]",
+		Description: "Example: inngest dev -u http://localhost:3000/api/inngest",
+		Action: doDev,
+
+		Flags: []cli.Flag{
+			// Base flags
+			&cli.StringSliceFlag{
+				Name:    "sdk-url",
+				Aliases: []string{"u"},
+				Usage:   "App serve URLs to sync (ex. http://localhost:3000/api/inngest)",
+			},
+			&cli.BoolFlag{
+				Name:  "no-discovery",
+				Usage: "Disable app auto-discovery",
+			},
+			&cli.BoolFlag{
+				Name:  "no-poll",
+				Usage: "Disable polling of apps for updates",
+			},
+			&cli.StringFlag{
+				Name:  "config",
+				Usage: "Path to an Inngest configuration file",
+			},
+			&cli.StringFlag{
+				Name:  "host",
+				Usage: "Inngest server host",
+			},
+			&cli.StringFlag{
+				Name:    "port",
+				Aliases: []string{"p"},
+				Value:   "8288",
+				Usage:   "Inngest server port",
+			},
+
+			// Advanced flags
+			&cli.IntFlag{
+				Name:  "poll-interval",
+				Value: devserver.DefaultPollInterval,
+				Usage: "Interval in seconds between polling for updates to apps",
+			},
+			&cli.IntFlag{
+				Name:  "retry-interval",
+				Value: 0,
+				Usage: "Retry interval in seconds for linear backoff when retrying functions - must be 1 or above",
+			},
+			&cli.IntFlag{
+				Name:  "queue-workers",
+				Value: devserver.DefaultQueueWorkers,
+				Usage: "Number of executor workers to execute steps from the queue",
+			},
+			&cli.IntFlag{
+				Name:  "tick",
+				Value: devserver.DefaultTick,
+				Usage: "The interval (in milliseconds) at which the executor polls the queue",
+			},
+			&cli.IntFlag{
+				Name:  "connect-gateway-port",
+				Value: devserver.DefaultConnectGatewayPort,
+				Usage: "Port to expose connect gateway endpoint",
+			},
+			&cli.BoolFlag{
+				Name:   "in-memory",
+				Value:  true,
+				Usage:  "Use in memory sqlite db",
+				Hidden: true,
+			},
+		},
+
 	}
-
-	groups := []FlagGroup{}
-
-	baseFlags := pflag.NewFlagSet("base", pflag.ExitOnError)
-	baseFlags.StringSliceP("sdk-url", "u", []string{}, "App serve URLs to sync (ex. http://localhost:3000/api/inngest)")
-	baseFlags.Bool("no-discovery", false, "Disable app auto-discovery")
-	baseFlags.Bool("no-poll", false, "Disable polling of apps for updates")
-	baseFlags.String("config", "", "Path to an Inngest configuration file")
-	baseFlags.String("host", "", "Inngest server host")
-	baseFlags.StringP("port", "p", "8288", "Inngest server port")
-	baseFlags.BoolP("help", "h", false, "Output this help information")
-	cmd.Flags().AddFlagSet(baseFlags)
-	groups = append(groups, FlagGroup{name: "Flags:", fs: baseFlags})
-
-	advancedFlags := pflag.NewFlagSet("advanced", pflag.ExitOnError)
-	advancedFlags.Int("poll-interval", devserver.DefaultPollInterval, "Interval in seconds between polling for updates to apps")
-	advancedFlags.Int("retry-interval", 0, "Retry interval in seconds for linear backoff when retrying functions - must be 1 or above")
-	advancedFlags.Int("queue-workers", devserver.DefaultQueueWorkers, "Number of executor workers to execute steps from the queue")
-	advancedFlags.Int("tick", devserver.DefaultTick, "The interval (in milliseconds) at which the executor polls the queue")
-	advancedFlags.Int("connect-gateway-port", devserver.DefaultConnectGatewayPort, "Port to expose connect gateway endpoint")
-	advancedFlags.Bool("in-memory", true, "Use in memory sqlite db")
-	err := advancedFlags.MarkHidden("in-memory")
-	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-
-	cmd.Flags().AddFlagSet(advancedFlags)
-	groups = append(groups, FlagGroup{name: "Advanced Flags:", fs: advancedFlags})
-
-	groups = append(groups, FlagGroup{name: "Global Flags:", fs: rootCmd.PersistentFlags()})
-
-	cmd.SetUsageFunc(func(c *cobra.Command) error {
-		fmt.Printf("%s\n  %s\n\n%s\n%s\n\n",
-			"Usage:",
-			"inngest dev [flags]",
-			"Examples:",
-			cmd.Example,
-		)
-
-		for _, group := range groups {
-			usage := group.fs.FlagUsages()
-
-			help := ""
-			if group.name != "" {
-				help = help + group.name + "\n"
-			}
-			help = help + usage
-			fmt.Println(help)
-		}
-
-		return nil
-	})
 
 	return cmd
 }
 
-func doDev(cmd *cobra.Command, args []string) {
+func doDev(c *cli.Context) error {
 
 	go func() {
 		ctx, cleanup := signal.NotifyContext(
@@ -98,19 +109,19 @@ func doDev(cmd *cobra.Command, args []string) {
 		os.Exit(0)
 	}()
 
-	ctx := cmd.Context()
+	ctx := c.Context
 	conf, err := config.Dev(ctx)
 	if err != nil {
 		fmt.Println(err.Error())
 		os.Exit(1)
 	}
 
-	if err = localconfig.InitDevConfig(ctx, cmd); err != nil {
+	if err = localconfig.InitDevConfig(ctx, c); err != nil {
 		fmt.Println(err.Error())
 		os.Exit(1)
 	}
 
-	port, err := strconv.Atoi(viper.GetString("port"))
+	port, err := strconv.Atoi(c.String("port"))
 	if err != nil {
 		fmt.Println(err.Error())
 		os.Exit(1)
@@ -118,23 +129,23 @@ func doDev(cmd *cobra.Command, args []string) {
 	conf.EventAPI.Port = port
 	conf.CoreAPI.Port = port
 
-	host := viper.GetString("host")
+	host := c.String("host")
 	if host != "" {
 		conf.EventAPI.Addr = host
 		conf.CoreAPI.Addr = host
 	}
 
-	urls := viper.GetStringSlice("sdk-url")
+	urls := c.StringSlice("sdk-url")
 
 	// Run auto-discovery unless we've explicitly disabled it.
-	noDiscovery := viper.GetBool("no-discovery")
-	noPoll := viper.GetBool("no-poll")
-	pollInterval := viper.GetInt("poll-interval")
-	retryInterval := viper.GetInt("retry-interval")
-	queueWorkers := viper.GetInt("queue-workers")
-	tick := viper.GetInt("tick")
-	connectGatewayPort := viper.GetInt("connect-gateway-port")
-	inMemory := viper.GetBool("in-memory")
+	noDiscovery := c.Bool("no-discovery")
+	noPoll := c.Bool("no-poll")
+	pollInterval := c.Int("poll-interval")
+	retryInterval := c.Int("retry-interval")
+	queueWorkers := c.Int("queue-workers")
+	tick := c.Int("tick")
+	connectGatewayPort := c.Int("connect-gateway-port")
+	inMemory := c.Bool("in-memory")
 
 	traceEndpoint := fmt.Sprintf("localhost:%d", port)
 	if err := itrace.NewUserTracer(ctx, itrace.TracerOpts{
@@ -181,7 +192,7 @@ func doDev(cmd *cobra.Command, args []string) {
 
 	err = devserver.New(ctx, opts)
 	if err != nil {
-		fmt.Println(err)
-		os.Exit(1)
+		return err
 	}
+	return nil
 }
