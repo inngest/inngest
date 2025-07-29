@@ -207,6 +207,7 @@ input[type='number'] {
     --color-border-error: var(--color-ruby-600);
     --color-border-warning: var(--color-honey-600);
     --color-border-info: var(--color-breeze-700);
+    --color-border-active: var(--color-breeze-500);
 
     --color-primary-3xSubtle: var(--color-matcha-100);
     --color-primary-2xSubtle: var(--color-matcha-200);
@@ -324,6 +325,7 @@ input[type='number'] {
     --color-border-error: var(--color-ruby-300);
     --color-border-warning: var(--color-honey-300);
     --color-border-info: var(--color-breeze-300);
+    --color-border-active: var(--color-breeze-500);
 
     --color-primary-3xSubtle: var(--color-matcha-900);
     --color-primary-2xSubtle: var(--color-matcha-800);

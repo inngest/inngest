@@ -90,6 +90,7 @@ export default {
         error: 'rgb(var(--color-border-error) / <alpha-value>)',
         warning: 'rgb(var(--color-border-warning) / <alpha-value>)',
         info: 'rgb(var(--color-border-info) / <alpha-value>)',
+        active: 'rgb(var(--color-border-active) / <alpha-value>)',
       },
       outlineColor: {
         error: 'rgb(var(--color-border-error) / <alpha-value>)',
