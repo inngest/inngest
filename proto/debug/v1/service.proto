@@ -12,8 +12,10 @@ message PartitionRequest { string id = 1; }
 
 message PartitionResponse {
   string id = 1;
-  PartitionTenant tenant = 2;
-  bytes config = 3;
+  string slug = 2;
+  PartitionTenant tenant = 3;
+  bytes config = 4;
+  int64 version = 5;
 }
 
 message PartitionStatusResponse {

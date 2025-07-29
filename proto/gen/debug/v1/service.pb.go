@@ -68,8 +68,10 @@ func (x *PartitionRequest) GetId() string {
 type PartitionResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Tenant        *PartitionTenant       `protobuf:"bytes,2,opt,name=tenant,proto3" json:"tenant,omitempty"`
-	Config        []byte                 `protobuf:"bytes,3,opt,name=config,proto3" json:"config,omitempty"`
+	Slug          string                 `protobuf:"bytes,2,opt,name=slug,proto3" json:"slug,omitempty"`
+	Tenant        *PartitionTenant       `protobuf:"bytes,3,opt,name=tenant,proto3" json:"tenant,omitempty"`
+	Config        []byte                 `protobuf:"bytes,4,opt,name=config,proto3" json:"config,omitempty"`
+	Version       int64                  `protobuf:"varint,5,opt,name=version,proto3" json:"version,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -111,6 +113,13 @@ func (x *PartitionResponse) GetId() string {
 	return ""
 }
 
+func (x *PartitionResponse) GetSlug() string {
+	if x != nil {
+		return x.Slug
+	}
+	return ""
+}
+
 func (x *PartitionResponse) GetTenant() *PartitionTenant {
 	if x != nil {
 		return x.Tenant
@@ -123,6 +132,13 @@ func (x *PartitionResponse) GetConfig() []byte {
 		return x.Config
 	}
 	return nil
+}
+
+func (x *PartitionResponse) GetVersion() int64 {
+	if x != nil {
+		return x.Version
+	}
+	return 0
 }
 
 type PartitionStatusResponse struct {
@@ -323,11 +339,13 @@ const file_debug_v1_service_proto_rawDesc = "" +
 	"\n" +
 	"\x16debug/v1/service.proto\x12\bdebug.v1\"\"\n" +
 	"\x10PartitionRequest\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\"n\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"\x9c\x01\n" +
 	"\x11PartitionResponse\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\x121\n" +
-	"\x06tenant\x18\x02 \x01(\v2\x19.debug.v1.PartitionTenantR\x06tenant\x12\x16\n" +
-	"\x06config\x18\x03 \x01(\fR\x06config\"\xfd\x02\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
+	"\x04slug\x18\x02 \x01(\tR\x04slug\x121\n" +
+	"\x06tenant\x18\x03 \x01(\v2\x19.debug.v1.PartitionTenantR\x06tenant\x12\x16\n" +
+	"\x06config\x18\x04 \x01(\fR\x06config\x12\x18\n" +
+	"\aversion\x18\x05 \x01(\x03R\aversion\"\xfd\x02\n" +
 	"\x17PartitionStatusResponse\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x16\n" +
 	"\x06paused\x18\x02 \x01(\bR\x06paused\x12\x18\n" +
