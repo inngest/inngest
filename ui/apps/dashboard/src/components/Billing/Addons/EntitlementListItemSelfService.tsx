@@ -8,12 +8,10 @@ import { RiAlertFill } from '@remixicon/react';
 import { toast } from 'sonner';
 import { useMutation } from 'urql';
 
-import AdvancedObservabilityModal from '@/components/Billing/Addons/AdvancedObservabilityModal';
-import EntitlementListItemSelfServiceBoolean from '@/components/Billing/Addons/EntitlementListItemSelfServiceBoolean';
+import AdvancedObservabilityComponent from '@/components/Billing/Addons/AdvancedObservabilityModal';
 import EntitlementListItemSelfServiceNumeric from '@/components/Billing/Addons/EntitlementListItemSelfServiceNumeric';
 import { addonQtyCostString } from '@/components/Billing/Addons/pricing_help';
 import { graphql } from '@/gql';
-import { type CurrentEntitlementValues, type Entitlement } from './EntitlementListItem';
 
 const UpdateAccountAddonQuantityDocument = graphql(`
   mutation UpdateAccountAddonQuantity($addonName: String!, $quantity: Int!) {
@@ -30,33 +28,23 @@ export default function EntitlementListItemSelfService({
   entitlement,
   addon,
   addonPurchased,
-  currentEntitlementValues,
-  buttonText,
   onChange,
 }: {
   title: string;
   description: string | React.ReactNode;
   tooltip?: React.ReactNode;
-  entitlement: Entitlement;
+  entitlement: {
+    currentValue: number | boolean;
+    displayValue?: string | React.ReactNode;
+    planLimit: number;
+    maxValue: number;
+  };
   addon: {
     addonName: string;
     quantityPer: number;
     price: number;
-    entitlements?: {
-      history: {
-        limit: number;
-      };
-      metricsExportFreshness: {
-        limit: number;
-      };
-      metricsExportGranularity: {
-        limit: number;
-      };
-    };
   };
   addonPurchased?: boolean;
-  currentEntitlementValues?: CurrentEntitlementValues;
-  buttonText?: string;
   onChange?: () => void;
 }) {
   const router = useRouter();
@@ -71,6 +59,9 @@ export default function EntitlementListItemSelfService({
 
   const switchInput = typeof entitlement.currentValue === 'boolean';
   const numericInput = typeof entitlement.currentValue === 'number';
+
+  const isAdvancedObservability =
+    title === 'Log retention' || title === 'Metrics granularity' || title === 'Metrics freshness';
 
   const addonCostStr = addonQtyCostString(addonQty, addon);
 
@@ -106,54 +97,21 @@ export default function EntitlementListItemSelfService({
   };
 
   if (switchInput) {
-    const handleBooleanClick = (targetQuantity: number) => {
-      const isRemovalAction = targetQuantity === 0;
-      const cost = targetQuantity * addon.price;
-
-      setIsRemoving(isRemovalAction);
-      setAddonQty(targetQuantity);
-      setAddonCost(cost);
-      setOpenConfirmationModal(true);
-    };
-
-    return (
-      <>
-        {err && (
-          <p className="text-error mb-2 text-xs">
-            <RiAlertFill className="-mt-0.5 inline h-4" /> Failed to update addon.{' '}
-            <a href="/support" className="underline">
-              Contact support
-            </a>{' '}
-            if this problem persists.
-          </p>
-        )}
-        <EntitlementListItemSelfServiceBoolean
+    if (isAdvancedObservability) {
+      return (
+        <AdvancedObservabilityComponent
           title={title}
           description={description}
           tooltip={tooltip}
           entitlement={entitlement}
+          addon={addon}
           addonPurchased={addonPurchased}
-          onAddClick={() => handleBooleanClick(1)}
-          onRemoveClick={() => handleBooleanClick(0)}
-          buttonText={buttonText}
+          onChange={onChange}
         />
-        {openConfirmationModal && (
-          <AdvancedObservabilityModal
-            isOpen={openConfirmationModal}
-            onClose={() => {
-              setOpenConfirmationModal(false);
-              setIsRemoving(false);
-            }}
-            onSubmit={handleSubmit}
-            isRemoving={isRemoving}
-            addonCost={addonCost}
-            title={title}
-            currentEntitlementValues={currentEntitlementValues}
-            addonEntitlements={addon.entitlements}
-          />
-        )}
-      </>
-    );
+      );
+    } else {
+      throw new Error('Boolean addons not supported yet');
+    }
   }
 
   return (
@@ -193,30 +151,26 @@ export default function EntitlementListItemSelfService({
           />
         )}
       </div>
-      {openSelfService &&
-        numericInput &&
-        typeof entitlement.currentValue === 'number' &&
-        entitlement.planLimit != null &&
-        entitlement.maxValue != null && (
-          <EntitlementListItemSelfServiceNumeric
-            entitlement={{
-              currentValue: entitlement.currentValue,
-              planLimit: entitlement.planLimit,
-              maxValue: entitlement.maxValue,
-            }}
-            addon={addon}
-            onCancel={() => {
-              setOpenSelfService(false);
-              setErr(null);
-            }}
-            onSubmit={(qty: number, cost: number) => {
-              setAddonQty(qty);
-              setAddonCost(cost);
-              setOpenConfirmationModal(true);
-              setOpenSelfService(false);
-            }}
-          />
-        )}
+      {openSelfService && numericInput && typeof entitlement.currentValue === 'number' && (
+        <EntitlementListItemSelfServiceNumeric
+          entitlement={{
+            currentValue: entitlement.currentValue,
+            planLimit: entitlement.planLimit,
+            maxValue: entitlement.maxValue,
+          }}
+          addon={addon}
+          onCancel={() => {
+            setOpenSelfService(false);
+            setErr(null);
+          }}
+          onSubmit={(qty: number, cost: number) => {
+            setAddonQty(qty);
+            setAddonCost(cost);
+            setOpenConfirmationModal(true);
+            setOpenSelfService(false);
+          }}
+        />
+      )}
       {openConfirmationModal && (
         <AlertModal
           isOpen={openConfirmationModal}

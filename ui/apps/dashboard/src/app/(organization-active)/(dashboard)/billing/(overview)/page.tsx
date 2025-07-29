@@ -89,13 +89,7 @@ export default async function Page() {
     maxValue: 1,
     quantityPer: 1,
     price: addons.advancedObservability.price,
-    entitlements: addons.advancedObservability.entitlements,
     purchased: addons.advancedObservability.purchased,
-    currentEntitlementValues: {
-      history: entitlements.history.limit,
-      metricsExportFreshness: entitlements.metricsExportFreshness.limit,
-      metricsExportGranularity: entitlements.metricsExportGranularity.limit,
-    },
   };
 
   return (
@@ -179,7 +173,6 @@ export default async function Page() {
               planName={currentPlan.name}
               title="Log retention"
               description="View and search function run traces and metrics"
-              buttonText="advanced observability"
               entitlement={{
                 currentValue: addons.advancedObservability.purchased,
                 displayValue: `${entitlements.history.limit} day${
@@ -194,7 +187,6 @@ export default async function Page() {
               planName={currentPlan.name}
               title="Metrics granularity"
               description="Granularity of exported metrics data points"
-              buttonText="advanced observability"
               entitlement={{
                 currentValue: addons.advancedObservability.purchased,
                 displayValue: `${entitlements.metricsExportGranularity.limit / 60} minute${
@@ -209,7 +201,6 @@ export default async function Page() {
               planName={currentPlan.name}
               title="Metrics freshness"
               description="How recent exported metrics data is"
-              buttonText="advanced observability"
               entitlement={{
                 currentValue: addons.advancedObservability.purchased,
                 displayValue: `${entitlements.metricsExportFreshness.limit / 60} minute${
