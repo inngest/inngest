@@ -929,6 +929,7 @@ const (
 	RunTraceSpanStatusCompleted RunTraceSpanStatus = "COMPLETED"
 	RunTraceSpanStatusWaiting   RunTraceSpanStatus = "WAITING"
 	RunTraceSpanStatusCancelled RunTraceSpanStatus = "CANCELLED"
+	RunTraceSpanStatusPaused    RunTraceSpanStatus = "PAUSED"
 )
 
 var AllRunTraceSpanStatus = []RunTraceSpanStatus{
@@ -938,11 +939,12 @@ var AllRunTraceSpanStatus = []RunTraceSpanStatus{
 	RunTraceSpanStatusCompleted,
 	RunTraceSpanStatusWaiting,
 	RunTraceSpanStatusCancelled,
+	RunTraceSpanStatusPaused,
 }
 
 func (e RunTraceSpanStatus) IsValid() bool {
 	switch e {
-	case RunTraceSpanStatusFailed, RunTraceSpanStatusQueued, RunTraceSpanStatusRunning, RunTraceSpanStatusCompleted, RunTraceSpanStatusWaiting, RunTraceSpanStatusCancelled:
+	case RunTraceSpanStatusFailed, RunTraceSpanStatusQueued, RunTraceSpanStatusRunning, RunTraceSpanStatusCompleted, RunTraceSpanStatusWaiting, RunTraceSpanStatusCancelled, RunTraceSpanStatusPaused:
 		return true
 	}
 	return false

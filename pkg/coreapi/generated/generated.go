@@ -3747,6 +3747,7 @@ enum RunTraceSpanStatus {
   # TIMED_OUT # wait for event timed out waiting
   WAITING # sleeping, waiting for an event
   CANCELLED # cancelled run
+  PAUSED # was running when function was paused
 }
 
 enum StepOp {
