@@ -5,10 +5,7 @@ import (
 	"fmt"
 	"net"
 
-	"github.com/go-chi/chi/v5"
-	"github.com/go-chi/chi/v5/middleware"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
-	"github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/service"
 	pb "github.com/inngest/inngest/proto/gen/debug/v1"
@@ -21,10 +18,9 @@ var (
 
 func NewDebugAPI(o Opts) service.Service {
 	return &debugAPI{
-		Router: chi.NewRouter(),
-		rpc:    grpc.NewServer(),
-		Opts:   o,
-		log:    logger.StdlibLogger(context.Background()),
+		rpc:  grpc.NewServer(),
+		Opts: o,
+		log:  logger.StdlibLogger(context.Background()),
 	}
 }
 
@@ -36,7 +32,6 @@ type Opts struct {
 }
 
 type debugAPI struct {
-	chi.Router
 	Opts
 	pb.DebugServer
 
@@ -49,20 +44,13 @@ func (d *debugAPI) Name() string {
 }
 
 func (d *debugAPI) Pre(ctx context.Context) error {
-	d.Use(middleware.AllowContentType("application/json"))
-	d.Use(headers.ContentTypeJsonResponse())
-
-	d.Route("/queue", func(r chi.Router) {
-		r.Get("/partitions/{id}", d.partitionByID)
-	})
-
 	pb.RegisterDebugServer(d.rpc, d)
 
 	return nil
 }
 
 func (d *debugAPI) Run(ctx context.Context) error {
-	// TODO: make the port optional
+	// TODO: make the port overridable
 	addr := fmt.Sprintf(":%d", 7777)
 
 	l, err := net.Listen("tcp", addr)
