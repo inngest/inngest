@@ -1,7 +1,20 @@
 package commands
 
-import "github.com/spf13/cobra"
+import (
+	"fmt"
+
+	"github.com/spf13/cobra"
+)
 
 func NewCmdDebug(rootCmd *cobra.Command) *cobra.Command {
-	return nil
+	cmd := &cobra.Command{
+		Use:     "debug",
+		Aliases: []string{"dbg"},
+		Short:   "Debug commands",
+		Run: func(cmd *cobra.Command, args []string) {
+			fmt.Println("Not implemented")
+		},
+	}
+
+	return cmd
 }
