@@ -4,13 +4,41 @@ import (
 	"context"
 	"fmt"
 
-	"cuelang.org/go/pkg/uuid"
+	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
 	pb "github.com/inngest/inngest/proto/gen/debug/v1"
 )
 
 func (d *debugAPI) GetPartition(ctx context.Context, req *pb.PartitionRequest) (*pb.PartitionResponse, error) {
-	return nil, errNotImplemented
+	id, err := uuid.Parse(req.GetId())
+	if err != nil {
+		// not a user based function, could be system queues
+
+		return &pb.PartitionResponse{
+			Id: req.GetId(),
+			Tenant: &pb.PartitionTenant{
+				AccountId: consts.DevServerAccountID.String(),
+				EnvId:     consts.DevServerEnvID.String(),
+			},
+		}, nil
+	}
+
+	wf, err := d.db.GetFunctionByInternalUUID(ctx, consts.DevServerEnvID, id)
+	if err != nil {
+		return nil, fmt.Errorf("error retrieving function: %w", err)
+	}
+
+	return &pb.PartitionResponse{
+		Id:   req.GetId(),
+		Slug: wf.Slug,
+		Tenant: &pb.PartitionTenant{
+			AccountId: consts.DevServerAccountID.String(),
+			EnvId:     consts.DevServerEnvID.String(),
+			AppId:     wf.AppID.String(),
+		},
+		Config: wf.Config,
+		// TODO: function version
+	}, nil
 }
 
 func (d *debugAPI) GetPartitionStatus(ctx context.Context, req *pb.PartitionRequest) (*pb.PartitionStatusResponse, error) {
