@@ -127,16 +127,18 @@ func (x *PartitionResponse) GetConfig() []byte {
 
 type PartitionStatusResponse struct {
 	state             protoimpl.MessageState `protogen:"open.v1"`
-	Paused            bool                   `protobuf:"varint,1,opt,name=paused,proto3" json:"paused,omitempty"`
-	PauseRefill       bool                   `protobuf:"varint,2,opt,name=pause_refill,json=pauseRefill,proto3" json:"pause_refill,omitempty"`
-	PauseEnqueue      bool                   `protobuf:"varint,3,opt,name=pause_enqueue,json=pauseEnqueue,proto3" json:"pause_enqueue,omitempty"`
-	AccountActive     int64                  `protobuf:"varint,4,opt,name=account_active,json=accountActive,proto3" json:"account_active,omitempty"`
-	AccountInProgress int64                  `protobuf:"varint,5,opt,name=account_in_progress,json=accountInProgress,proto3" json:"account_in_progress,omitempty"`
-	Ready             int64                  `protobuf:"varint,6,opt,name=ready,proto3" json:"ready,omitempty"`
-	InProgress        int64                  `protobuf:"varint,7,opt,name=in_progress,json=inProgress,proto3" json:"in_progress,omitempty"`
-	Active            int64                  `protobuf:"varint,8,opt,name=active,proto3" json:"active,omitempty"`
-	Future            int64                  `protobuf:"varint,9,opt,name=future,proto3" json:"future,omitempty"`
-	Backlogs          int64                  `protobuf:"varint,10,opt,name=backlogs,proto3" json:"backlogs,omitempty"`
+	Id                string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Paused            bool                   `protobuf:"varint,2,opt,name=paused,proto3" json:"paused,omitempty"`
+	Migrate           bool                   `protobuf:"varint,3,opt,name=migrate,proto3" json:"migrate,omitempty"`
+	PauseRefill       bool                   `protobuf:"varint,4,opt,name=pause_refill,json=pauseRefill,proto3" json:"pause_refill,omitempty"`
+	PauseEnqueue      bool                   `protobuf:"varint,5,opt,name=pause_enqueue,json=pauseEnqueue,proto3" json:"pause_enqueue,omitempty"`
+	AccountActive     int64                  `protobuf:"varint,6,opt,name=account_active,json=accountActive,proto3" json:"account_active,omitempty"`
+	AccountInProgress int64                  `protobuf:"varint,7,opt,name=account_in_progress,json=accountInProgress,proto3" json:"account_in_progress,omitempty"`
+	Ready             int64                  `protobuf:"varint,8,opt,name=ready,proto3" json:"ready,omitempty"`
+	InProgress        int64                  `protobuf:"varint,9,opt,name=in_progress,json=inProgress,proto3" json:"in_progress,omitempty"`
+	Active            int64                  `protobuf:"varint,10,opt,name=active,proto3" json:"active,omitempty"`
+	Future            int64                  `protobuf:"varint,11,opt,name=future,proto3" json:"future,omitempty"`
+	Backlogs          int64                  `protobuf:"varint,12,opt,name=backlogs,proto3" json:"backlogs,omitempty"`
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
@@ -171,9 +173,23 @@ func (*PartitionStatusResponse) Descriptor() ([]byte, []int) {
 	return file_debug_v1_service_proto_rawDescGZIP(), []int{2}
 }
 
+func (x *PartitionStatusResponse) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
 func (x *PartitionStatusResponse) GetPaused() bool {
 	if x != nil {
 		return x.Paused
+	}
+	return false
+}
+
+func (x *PartitionStatusResponse) GetMigrate() bool {
+	if x != nil {
+		return x.Migrate
 	}
 	return false
 }
@@ -311,20 +327,22 @@ const file_debug_v1_service_proto_rawDesc = "" +
 	"\x11PartitionResponse\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x121\n" +
 	"\x06tenant\x18\x02 \x01(\v2\x19.debug.v1.PartitionTenantR\x06tenant\x12\x16\n" +
-	"\x06config\x18\x03 \x01(\fR\x06config\"\xd3\x02\n" +
-	"\x17PartitionStatusResponse\x12\x16\n" +
-	"\x06paused\x18\x01 \x01(\bR\x06paused\x12!\n" +
-	"\fpause_refill\x18\x02 \x01(\bR\vpauseRefill\x12#\n" +
-	"\rpause_enqueue\x18\x03 \x01(\bR\fpauseEnqueue\x12%\n" +
-	"\x0eaccount_active\x18\x04 \x01(\x03R\raccountActive\x12.\n" +
-	"\x13account_in_progress\x18\x05 \x01(\x03R\x11accountInProgress\x12\x14\n" +
-	"\x05ready\x18\x06 \x01(\x03R\x05ready\x12\x1f\n" +
-	"\vin_progress\x18\a \x01(\x03R\n" +
+	"\x06config\x18\x03 \x01(\fR\x06config\"\xfd\x02\n" +
+	"\x17PartitionStatusResponse\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x16\n" +
+	"\x06paused\x18\x02 \x01(\bR\x06paused\x12\x18\n" +
+	"\amigrate\x18\x03 \x01(\bR\amigrate\x12!\n" +
+	"\fpause_refill\x18\x04 \x01(\bR\vpauseRefill\x12#\n" +
+	"\rpause_enqueue\x18\x05 \x01(\bR\fpauseEnqueue\x12%\n" +
+	"\x0eaccount_active\x18\x06 \x01(\x03R\raccountActive\x12.\n" +
+	"\x13account_in_progress\x18\a \x01(\x03R\x11accountInProgress\x12\x14\n" +
+	"\x05ready\x18\b \x01(\x03R\x05ready\x12\x1f\n" +
+	"\vin_progress\x18\t \x01(\x03R\n" +
 	"inProgress\x12\x16\n" +
-	"\x06active\x18\b \x01(\x03R\x06active\x12\x16\n" +
-	"\x06future\x18\t \x01(\x03R\x06future\x12\x1a\n" +
-	"\bbacklogs\x18\n" +
-	" \x01(\x03R\bbacklogs\"^\n" +
+	"\x06active\x18\n" +
+	" \x01(\x03R\x06active\x12\x16\n" +
+	"\x06future\x18\v \x01(\x03R\x06future\x12\x1a\n" +
+	"\bbacklogs\x18\f \x01(\x03R\bbacklogs\"^\n" +
 	"\x0fPartitionTenant\x12\x1d\n" +
 	"\n" +
 	"account_id\x18\x01 \x01(\tR\taccountId\x12\x15\n" +
