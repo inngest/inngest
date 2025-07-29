@@ -18,12 +18,12 @@ export const Search = forwardRef<HTMLInputElement, SearchProps>(
     }
     return (
       <div className="relative">
-        <RiSearchLine className="text-light absolute bottom-0 left-2 top-0 my-auto h-4 w-4" />
+        <RiSearchLine className="text-light absolute bottom-0 left-1.5 top-0 my-auto h-4 w-4" />
         <Input
           inngestSize="small"
           ref={ref}
           type="search"
-          className={cn(className, 'px-7')}
+          className={cn(className, 'px-6')}
           {...props}
           value={value}
           onChange={(e) => {

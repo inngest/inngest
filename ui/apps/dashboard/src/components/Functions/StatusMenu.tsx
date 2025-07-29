@@ -10,13 +10,13 @@ export const StatusMenu = ({ envSlug, archived }: { envSlug: string; archived: b
   return (
     <Select
       onChange={() => null}
-      isLabelVisible={false}
-      label="Pause runs"
+      label="Status"
       multiple={false}
       value={archived ? archivedOption : activeOption}
       className="z-20"
+      size="small"
     >
-      <Select.Button className="w-[142px]" size="small">
+      <Select.Button className="" size="small">
         <div className="flex flex-row items-center gap-2">
           <StatusDot status={archived ? 'ARCHIVED' : 'ACTIVE'} size="small" />
           {archived ? 'Archived' : 'Active'}

@@ -49,7 +49,7 @@ export function Select({
       {({ open }) => (
         <span
           className={cn(
-            isLabelVisible && 'divide-muted bg-canvasSubtle text-basis divide-x',
+            isLabelVisible && 'divide-muted text-muted divide-x',
             'disabled:bg-disabled disabled:text-disabled border-muted flex items-center rounded border text-sm',
             open && 'border-active',
             className
@@ -225,7 +225,7 @@ export function SelectWithSearch({
   const renderContent = (open: boolean) => (
     <span
       className={cn(
-        isLabelVisible && 'divide-muted bg-canvasSubtle text-basis divide-x',
+        isLabelVisible && 'divide-muted text-muted divide-x',
         'disabled:bg-disabled disabled:text-disabled border-muted flex items-center rounded border text-sm',
         open && 'border-active',
         className

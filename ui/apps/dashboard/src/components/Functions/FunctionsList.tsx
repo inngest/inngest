@@ -32,22 +32,21 @@ export const FunctionList = ({ envSlug, archived }: FunctionListProps) => {
 
   return (
     <div className="bg-canvasBase flex min-h-0 flex-1 flex-col">
-      <div className="mx-3 my-2 flex h-11 flex-row items-center justify-start gap-1.5">
-        <StatusMenu archived={!!archived} envSlug={envSlug} />
+      <div className="mx-3 flex h-11 flex-row items-center justify-start gap-1.5">
         {isSearchEnabled && (
           <Search
             name="search"
-            placeholder="Search by function"
+            placeholder="Search by function name"
             value={searchInput}
-            className="w-48"
+            className="w-[182px]"
             onUpdate={(value) => {
               setSearchInput(value);
               debouncedSearch();
             }}
           />
         )}
+        <StatusMenu archived={!!archived} envSlug={envSlug} />
       </div>
-
       <FunctionTable rows={rows} isLoading={isFirstLoad} />
 
       {hasMore !== false && !isFirstLoad && rows.length > 0 && (
