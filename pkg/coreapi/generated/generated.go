@@ -413,6 +413,7 @@ type ComplexityRoot struct {
 	}
 
 	RunTraceSpan struct {
+		AccountID     func(childComplexity int) int
 		AppID         func(childComplexity int) int
 		Attempts      func(childComplexity int) int
 		ChildrenSpans func(childComplexity int) int
@@ -436,6 +437,7 @@ type ComplexityRoot struct {
 		StepOp        func(childComplexity int) int
 		TraceID       func(childComplexity int) int
 		UserlandSpan  func(childComplexity int) int
+		WorkspaceID   func(childComplexity int) int
 	}
 
 	RunTraceSpanOutput struct {
@@ -2434,6 +2436,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.RunStepInfo.Type(childComplexity), true
 
+	case "RunTraceSpan.accountID":
+		if e.complexity.RunTraceSpan.AccountID == nil {
+			break
+		}
+
+		return e.complexity.RunTraceSpan.AccountID(childComplexity), true
+
 	case "RunTraceSpan.appID":
 		if e.complexity.RunTraceSpan.AppID == nil {
 			break
@@ -2594,6 +2603,13 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 		}
 
 		return e.complexity.RunTraceSpan.UserlandSpan(childComplexity), true
+
+	case "RunTraceSpan.workspaceID":
+		if e.complexity.RunTraceSpan.WorkspaceID == nil {
+			break
+		}
+
+		return e.complexity.RunTraceSpan.WorkspaceID(childComplexity), true
 
 	case "RunTraceSpanOutput.data":
 		if e.complexity.RunTraceSpanOutput.Data == nil {
@@ -3783,6 +3799,8 @@ type RunStepInfo {
 type RunTraceSpan {
   appID: UUID!
   functionID: UUID!
+  workspaceID: UUID!
+  accountID: UUID!
 
   runID: ULID!
   run: FunctionRun! # the run that generated this span <== links should be here
@@ -11380,6 +11398,10 @@ func (ec *executionContext) fieldContext_FunctionRunV2_trace(ctx context.Context
 				return ec.fieldContext_RunTraceSpan_appID(ctx, field)
 			case "functionID":
 				return ec.fieldContext_RunTraceSpan_functionID(ctx, field)
+			case "workspaceID":
+				return ec.fieldContext_RunTraceSpan_workspaceID(ctx, field)
+			case "accountID":
+				return ec.fieldContext_RunTraceSpan_accountID(ctx, field)
 			case "runID":
 				return ec.fieldContext_RunTraceSpan_runID(ctx, field)
 			case "run":
@@ -16356,6 +16378,94 @@ func (ec *executionContext) fieldContext_RunTraceSpan_functionID(ctx context.Con
 	return fc, nil
 }
 
+func (ec *executionContext) _RunTraceSpan_workspaceID(ctx context.Context, field graphql.CollectedField, obj *models.RunTraceSpan) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RunTraceSpan_workspaceID(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.WorkspaceID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(uuid.UUID)
+	fc.Result = res
+	return ec.marshalNUUID2githubᚗcomᚋgoogleᚋuuidᚐUUID(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RunTraceSpan_workspaceID(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RunTraceSpan",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type UUID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RunTraceSpan_accountID(ctx context.Context, field graphql.CollectedField, obj *models.RunTraceSpan) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RunTraceSpan_accountID(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.AccountID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		if !graphql.HasFieldError(ctx, fc) {
+			ec.Errorf(ctx, "must not be null")
+		}
+		return graphql.Null
+	}
+	res := resTmp.(uuid.UUID)
+	fc.Result = res
+	return ec.marshalNUUID2githubᚗcomᚋgoogleᚋuuidᚐUUID(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RunTraceSpan_accountID(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RunTraceSpan",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type UUID does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
 func (ec *executionContext) _RunTraceSpan_runID(ctx context.Context, field graphql.CollectedField, obj *models.RunTraceSpan) (ret graphql.Marshaler) {
 	fc, err := ec.fieldContext_RunTraceSpan_runID(ctx, field)
 	if err != nil {
@@ -16950,6 +17060,10 @@ func (ec *executionContext) fieldContext_RunTraceSpan_childrenSpans(ctx context.
 				return ec.fieldContext_RunTraceSpan_appID(ctx, field)
 			case "functionID":
 				return ec.fieldContext_RunTraceSpan_functionID(ctx, field)
+			case "workspaceID":
+				return ec.fieldContext_RunTraceSpan_workspaceID(ctx, field)
+			case "accountID":
+				return ec.fieldContext_RunTraceSpan_accountID(ctx, field)
 			case "runID":
 				return ec.fieldContext_RunTraceSpan_runID(ctx, field)
 			case "run":
@@ -17247,6 +17361,10 @@ func (ec *executionContext) fieldContext_RunTraceSpan_parentSpan(ctx context.Con
 				return ec.fieldContext_RunTraceSpan_appID(ctx, field)
 			case "functionID":
 				return ec.fieldContext_RunTraceSpan_functionID(ctx, field)
+			case "workspaceID":
+				return ec.fieldContext_RunTraceSpan_workspaceID(ctx, field)
+			case "accountID":
+				return ec.fieldContext_RunTraceSpan_accountID(ctx, field)
 			case "runID":
 				return ec.fieldContext_RunTraceSpan_runID(ctx, field)
 			case "run":
@@ -25317,6 +25435,20 @@ func (ec *executionContext) _RunTraceSpan(ctx context.Context, sel ast.Selection
 		case "functionID":
 
 			out.Values[i] = ec._RunTraceSpan_functionID(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "workspaceID":
+
+			out.Values[i] = ec._RunTraceSpan_workspaceID(ctx, field, obj)
+
+			if out.Values[i] == graphql.Null {
+				invalids++
+			}
+		case "accountID":
+
+			out.Values[i] = ec._RunTraceSpan_accountID(ctx, field, obj)
 
 			if out.Values[i] == graphql.Null {
 				invalids++

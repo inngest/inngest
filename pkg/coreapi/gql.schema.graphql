@@ -563,6 +563,8 @@ type RunStepInfo {
 type RunTraceSpan {
   appID: UUID!
   functionID: UUID!
+  workspaceID: UUID!
+  accountID: UUID!
 
   runID: ULID!
   run: FunctionRun! # the run that generated this span <== links should be here

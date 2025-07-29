@@ -95,7 +95,11 @@ func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.Ot
 	// A map of dynamic span IDs to the specific span ID that contains an
 	// output
 	outputDynamicRefs := make(map[string]string)
-	var root *cqrs.OtelSpan
+	var (
+		root      *cqrs.OtelSpan
+		accountID *uuid.UUID
+		envID     *uuid.UUID
+	)
 
 	for _, span := range spans {
 		st := strings.Split(span.StartTime.(string), " m=")[0]
@@ -181,6 +185,16 @@ func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.Ot
 			newSpan.RunID = *newSpan.Attributes.RunID
 		}
 
+		if newSpan.Attributes.AccountID != nil {
+			accountID = newSpan.Attributes.AccountID
+			newSpan.AccountID = *newSpan.Attributes.AccountID
+		}
+
+		if newSpan.Attributes.EnvID != nil {
+			envID = newSpan.Attributes.EnvID
+			newSpan.EnvID = *newSpan.Attributes.EnvID
+		}
+
 		if newSpan.Attributes.StartedAt != nil {
 			newSpan.StartTime = *newSpan.Attributes.StartedAt
 		}
@@ -206,6 +220,13 @@ func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.Ot
 	}
 
 	for _, span := range spanMap {
+		if accountID != nil {
+			span.AccountID = *accountID
+		}
+		if envID != nil {
+			span.EnvID = *envID
+		}
+
 		// If we have an output reference for this span, set the appropriate
 		// target span ID here
 		if spanRefStr := span.Attributes.StepOutputRef; spanRefStr != nil && *spanRefStr != "" {

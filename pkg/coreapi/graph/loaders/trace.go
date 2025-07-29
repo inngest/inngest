@@ -158,6 +158,7 @@ func ConvertRunSpanToGQL(ctx context.Context, span *cqrs.OtelSpan) (*models.RunT
 	attempts := span.GetAttempts()
 
 	gqlSpan := &models.RunTraceSpan{
+		AccountID:    span.GetAccountID(),
 		AppID:        span.GetAppID(),
 		Attempts:     &attempts,
 		Duration:     duration,
@@ -173,6 +174,7 @@ func ConvertRunSpanToGQL(ctx context.Context, span *cqrs.OtelSpan) (*models.RunT
 		StartedAt:    span.GetStartedAtTime(),
 		Status:       status,
 		TraceID:      span.GetTraceID(),
+		WorkspaceID:  span.GetEnvID(),
 
 		// IsUserland: , TODO
 		// UserlandSpan: , TODO

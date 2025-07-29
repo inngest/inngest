@@ -52,12 +52,22 @@ type OtelSpan struct {
 	RunID      ulid.ULID `json:"run_id,omitempty,omitzero"`
 	AppID      uuid.UUID `json:"app_id,omitempty,omitzero"`
 	FunctionID uuid.UUID `json:"function_id,omitempty,omitzero"`
+	AccountID  uuid.UUID `json:"account_id,omitempty,omitzero"`
+	EnvID      uuid.UUID `json:"workspace_id,omitempty,omitzero"`
 
 	Children []*OtelSpan `json:"children,omitempty,omitzero"`
 }
 
 func (s *OtelSpan) GetAppID() uuid.UUID {
 	return s.AppID
+}
+
+func (s *OtelSpan) GetAccountID() uuid.UUID {
+	return s.AccountID
+}
+
+func (s *OtelSpan) GetEnvID() uuid.UUID {
+	return s.EnvID
 }
 
 func (s *OtelSpan) GetFunctionID() uuid.UUID {

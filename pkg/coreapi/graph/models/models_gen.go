@@ -325,6 +325,8 @@ func (RunStepInfo) IsStepInfo() {}
 type RunTraceSpan struct {
 	AppID         uuid.UUID          `json:"appID"`
 	FunctionID    uuid.UUID          `json:"functionID"`
+	WorkspaceID   uuid.UUID          `json:"workspaceID"`
+	AccountID     uuid.UUID          `json:"accountID"`
 	RunID         ulid.ULID          `json:"runID"`
 	Run           *FunctionRun       `json:"run"`
 	SpanID        string             `json:"spanID"`
