@@ -477,6 +477,10 @@ func (f Function) RunPriorityFactor(ctx context.Context, event map[string]any) (
 // URI returns the function's URI.  It is expected that the function has already been
 // validated.
 func (f Function) URI() (*url.URL, error) {
+	// XXX: Sync API methods have an "x-inngest-method" override which allows us to override
+	// the method such that we don't always POST to this URL.
+	//
+	// In general, we should attempt to refactor function configs to remove steps where possible.
 	if len(f.Steps) >= 1 {
 		return url.Parse(f.Steps[0].URI)
 	}

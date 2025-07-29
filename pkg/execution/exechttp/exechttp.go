@@ -13,6 +13,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/davecgh/go-spew/spew"
 	"github.com/inngest/go-httpstat"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/execution/realtime"
@@ -175,6 +176,11 @@ func (e ExtendedClient) DoRequest(ctx context.Context, r SerializableRequest) (*
 		ProtoMajor: resp.ProtoMajor,
 		ProtoMinor: resp.ProtoMinor,
 	}
+
+	fmt.Println("")
+	fmt.Println("")
+	fmt.Println("---")
+	spew.Dump(out)
 
 	if len(byt) > consts.MaxSDKResponseBodySize {
 		return out, ErrBodyTooLarge
