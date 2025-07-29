@@ -245,7 +245,7 @@ export function EventsTable({
   return (
     <div className="bg-canvasBase text-basis no-scrollbar flex-1 overflow-hidden focus-visible:outline-none">
       <div className="bg-canvasBase sticky top-0 z-10">
-        <div className="m-3 flex items-center justify-between gap-2">
+        <div className="mx-3 flex h-11 items-center justify-between gap-1.5">
           <div className="flex items-center gap-2">
             {/* <EntityFilter
               type="event"
@@ -292,9 +292,7 @@ export function EventsTable({
                 <TooltipContent>Coming soon</TooltipContent>
               </Tooltip>
             )}
-            <TotalCount totalCount={eventsData?.totalCount} />
-          </div>
-          <div className="flex">
+
             <TimeFilter
               daysAgoMax={features.history}
               onDaysChange={onDaysChange}
@@ -316,6 +314,9 @@ export function EventsTable({
                     }
               }
             />
+          </div>
+          <div className="flex">
+            <TotalCount totalCount={eventsData?.totalCount} />
           </div>
         </div>
         {showSearch && (

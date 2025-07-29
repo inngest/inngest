@@ -27,7 +27,7 @@ export function TableFilter({ options, columnVisibility, setColumnVisibility }: 
       isLabelVisible={false}
     >
       <Select.Button isLabelVisible={false} size="small">
-        <div className="w-24 text-left">Table columns</div>
+        <div className="text-left">Table columns</div>
       </Select.Button>
       <Select.Options>
         {options.map((option) => {
