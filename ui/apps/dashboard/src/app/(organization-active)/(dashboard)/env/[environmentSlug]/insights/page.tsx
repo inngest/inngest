@@ -22,7 +22,7 @@ function InsightsContent() {
   return (
     <>
       <Header breadcrumb={[{ text: 'Insights' }]} />
-      <main className="grid h-full w-full flex-1 grid-rows-[3fr_5fr] gap-0">
+      <main className="grid h-full w-full flex-1 grid-rows-[3fr_5fr] gap-0 overflow-hidden">
         <Section
           actions={
             <Button
@@ -41,7 +41,7 @@ function InsightsContent() {
               size="medium"
             />
           }
-          className="min-h-[255px]"
+          className="flex min-h-[255px] flex-col overflow-hidden"
           title="Query Editor"
         >
           <InsightsSQLEditor />
@@ -66,6 +66,7 @@ function InsightsContent() {
               </Tooltip>
             </>
           }
+          className="flex flex-col overflow-hidden"
           title="Results"
         >
           <InsightsDataTable />

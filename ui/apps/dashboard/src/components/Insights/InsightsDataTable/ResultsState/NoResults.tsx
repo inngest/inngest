@@ -5,7 +5,7 @@ import { RiExternalLinkLine, RiTableView } from '@remixicon/react';
 
 import { useInsightsQueryContext } from '../../context';
 
-export function NoResultsState() {
+export function NoResults() {
   const { seeExamples } = useInsightsQueryContext();
 
   return (
