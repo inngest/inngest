@@ -719,6 +719,11 @@ func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 	q.sem = &trackingSemaphore{Weighted: semaphore.NewWeighted(int64(q.numWorkers))}
 	q.workers = make(chan processItem, q.numWorkers)
 
+	// We only need one signal to exit the executionScan loop but after it exits, it
+	// waits for all workers to finish. And if any other worker would try to send to
+	// this channel we deadlock.
+	q.quit = make(chan error, q.numWorkers)
+
 	return q
 }
 
