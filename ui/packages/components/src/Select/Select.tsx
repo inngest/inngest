@@ -49,13 +49,13 @@ export function Select({
         <span
           className={cn(
             isLabelVisible && 'divide-muted bg-canvasSubtle text-basis divide-x',
-            'disabled:bg-disabled disabled:text-disabled border-muted flex items-center rounded-md border text-sm',
+            'disabled:bg-disabled disabled:text-disabled border-muted flex items-center rounded border text-sm',
             open && 'border-active',
             className
           )}
         >
           <Listbox.Label
-            className={cn(!isLabelVisible && 'sr-only', 'rounded-l-[5px] px-2 capitalize')}
+            className={cn(!isLabelVisible && 'sr-only', 'rounded-l-[4px] px-2 capitalize')}
           >
             {label}
           </Listbox.Label>
@@ -80,9 +80,9 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
       <Component
         ref={ref}
         className={cn(
-          !isLabelVisible && 'rounded-l-[5px]',
+          !isLabelVisible && 'rounded-l-[4px]',
           size === 'small' ? 'h-[26px] text-xs' : 'h-[34px] py-1.5 text-sm',
-          'disabled:bg-disabled disabled:text-disabled bg-surfaceBase text-basis placeholder:text-disabled flex w-full items-center justify-between gap-1 rounded-r-[5px] px-1.5',
+          'disabled:bg-disabled disabled:text-disabled bg-surfaceBase text-basis placeholder:text-disabled flex w-full items-center justify-between gap-1 rounded-r-[4px] px-1.5',
           className
         )}
       >
@@ -104,7 +104,7 @@ function Options({
 }: React.PropsWithChildren<{ as: React.ElementType; className?: string }>) {
   return (
     <Component className={cn('absolute z-10 mt-1 min-w-max', className)}>
-      <div className="border-muted bg-surfaceBase shadow-primary z-10 overflow-hidden rounded-md border py-1">
+      <div className="border-muted bg-surfaceBase shadow-primary z-10 overflow-hidden rounded border py-1">
         {children}
       </div>
     </Component>
@@ -219,13 +219,13 @@ export function SelectWithSearch({
     <span
       className={cn(
         isLabelVisible && 'divide-muted bg-canvasSubtle text-basis divide-x',
-        'disabled:bg-disabled disabled:text-disabled border-muted flex items-center rounded-md border text-sm',
+        'disabled:bg-disabled disabled:text-disabled border-muted flex items-center rounded border text-sm',
         open && 'border-active',
         className
       )}
     >
       <Combobox.Label
-        className={cn(!isLabelVisible && 'sr-only', 'rounded-l-[5px] px-2 capitalize')}
+        className={cn(!isLabelVisible && 'sr-only', 'rounded-l-[4px] px-2 capitalize')}
       >
         {label}
       </Combobox.Label>
@@ -255,7 +255,7 @@ function Search<T>({ ...props }: ComboboxInputProps<'input', T>) {
   return (
     <div className="mx-2 my-2">
       <Combobox.Input
-        className="border-subtle focus-visible:border-subtle text-basis bg-surfaceBase placeholder:text-disabled focus-visible:outline-primary-moderate w-full rounded-md border px-4 py-2 text-sm outline-2 focus-visible:outline focus-visible:outline-offset-0"
+        className="border-subtle focus-visible:border-subtle text-basis bg-surfaceBase placeholder:text-disabled focus-visible:outline-primary-moderate w-full rounded border px-4 py-2 text-sm outline-2 focus-visible:outline focus-visible:outline-offset-0"
         {...props}
       />
     </div>
