@@ -342,6 +342,15 @@ func ConvertRunSpanToGQL(ctx context.Context, span *cqrs.OtelSpan) (*models.RunT
 			}
 		}
 
+		isStep := span.Name == meta.SpanNameStep || span.Name == meta.SpanNameStepDiscovery
+		if isStep {
+			// Step spans should not show attempts if they only have one and
+			// have resolved
+			if len(gqlSpan.ChildrenSpans) == 1 && gqlSpan.ChildrenSpans[0].Status == models.RunTraceSpanStatusCompleted {
+				gqlSpan.ChildrenSpans = []*models.RunTraceSpan{}
+			}
+		}
+
 		// Give spans some more meaningful names if somehow we don't have the
 		// correct information. This shouldn't be possible, but is a final
 		// pass to ensure we filter out internal-looking span names.

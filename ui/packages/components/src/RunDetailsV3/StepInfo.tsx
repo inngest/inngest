@@ -14,7 +14,7 @@ import {
 import { RerunModal } from '../Rerun/RerunModal';
 import { usePathCreator } from '../SharedContext/usePathCreator';
 import { Time } from '../Time';
-import { usePrettyErrorBody, usePrettyJson } from '../hooks/usePrettyJson';
+import { usePrettyErrorBody, usePrettyJson, usePrettyShortError } from '../hooks/usePrettyJson';
 import type { Result } from '../types/functionRun';
 import { formatMilliseconds, toMaybeDate } from '../utils/date';
 import { ErrorInfo } from './ErrorInfo';
@@ -202,6 +202,7 @@ export const StepInfo = ({
   const prettyInput = usePrettyJson(result?.input ?? '') || (result?.input ?? '');
   const prettyOutput = usePrettyJson(result?.data ?? '') || (result?.data ?? '');
   const prettyErrorBody = usePrettyErrorBody(result?.error);
+  const prettyShortError = usePrettyShortError(result?.error);
 
   return (
     <div className="flex h-full flex-col justify-start gap-2">
@@ -282,7 +283,7 @@ export const StepInfo = ({
         <UserlandAttrs userlandSpan={trace.userlandSpan} />
       ) : (
         <>
-          {result?.error && <ErrorInfo error={result.error.message || 'Unknown error'} />}
+          {result?.error && <ErrorInfo error={prettyShortError} />}
           <div className="flex-1">
             <Tabs
               defaultActive={result?.error ? 'error' : 'output'}
@@ -312,7 +313,7 @@ export const StepInfo = ({
                         id: 'error',
                         node: (
                           <IO
-                            title={result.error.message || 'Unknown error'}
+                            title={prettyShortError}
                             raw={prettyErrorBody ?? ''}
                             error={true}
                             loading={loading}
