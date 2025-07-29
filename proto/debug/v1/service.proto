@@ -17,17 +17,20 @@ message PartitionResponse {
 }
 
 message PartitionStatusResponse {
-  bool paused = 1;
-  bool pause_refill = 2;
-  bool pause_enqueue = 3;
+  string id = 1;
 
-  int64 account_active = 4;
-  int64 account_in_progress = 5;
-  int64 ready = 6;
-  int64 in_progress = 7;
-  int64 active = 8;
-  int64 future = 9;
-  int64 backlogs = 10;
+  bool paused = 2;
+  bool migrate = 3;
+  bool pause_refill = 4;
+  bool pause_enqueue = 5;
+
+  int64 account_active = 6;
+  int64 account_in_progress = 7;
+  int64 ready = 8;
+  int64 in_progress = 9;
+  int64 active = 10;
+  int64 future = 11;
+  int64 backlogs = 12;
 }
 
 message PartitionTenant {
