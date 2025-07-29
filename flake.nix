@@ -15,6 +15,7 @@
           config.allowUnfree = true;
         };
       in {
+        packages.default = pkgs.callPackage ./package.nix {};
         devShells.default = pkgs.mkShell {
           nativeBuildInputs = with pkgs; [
             # Go
