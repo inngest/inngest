@@ -14,18 +14,14 @@ import (
 	"google.golang.org/grpc"
 )
 
-var (
-	errNotImplemented = fmt.Errorf("not implemented")
-)
-
 func NewDebugAPI(o Opts) service.Service {
 	return &debugAPI{
-		rpc:           grpc.NewServer(),
-		shardSelector: o.ShardSelector,
-		log:           o.Log,
-		db:            o.DB,
-		queue:         o.Queue,
-		state:         o.State,
+		rpc:       grpc.NewServer(),
+		log:       o.Log,
+		db:        o.DB,
+		queue:     o.Queue,
+		state:     o.State,
+		findShard: o.ShardSelector,
 	}
 }
 
