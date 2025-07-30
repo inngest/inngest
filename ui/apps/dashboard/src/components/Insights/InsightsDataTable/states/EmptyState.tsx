@@ -1,7 +1,7 @@
 'use client';
 
 import { Button } from '@inngest/components/Button';
-import { RiExternalLinkLine, RiTableView } from '@remixicon/react';
+import { RiExternalLinkLine } from '@remixicon/react';
 
 import { IconLayoutWrapper } from './IconLayoutWrapper';
 

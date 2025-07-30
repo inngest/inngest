@@ -10,7 +10,7 @@ import { useColumns } from './useColumns';
 import { useOnScroll } from './useOnScroll';
 
 export function ResultsTable() {
-  const { data: dataRaw, fetchMore, fetchMoreError, state } = useInsightsQueryContext();
+  const { data: dataRaw, fetchMore, state } = useInsightsQueryContext();
   const data = useMemo(() => withLoadingMoreRow(dataRaw, state), [dataRaw, state]);
 
   const { columns } = useColumns(data);
