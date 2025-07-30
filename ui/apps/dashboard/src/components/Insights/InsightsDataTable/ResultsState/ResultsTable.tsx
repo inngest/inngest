@@ -3,7 +3,7 @@
 import Table from '@inngest/components/Table/NewTable';
 
 import { useInsightsQueryContext } from '../../context';
-import { NoResults } from './NoResults';
+import type { InsightsResult } from '../types';
 import { ResultsTableFooter } from './ResultsTableFooter';
 import { useColumns } from './useColumns';
 import { useOnScroll } from './useOnScroll';
@@ -13,7 +13,7 @@ export function ResultsTable() {
   const { columns } = useColumns(data);
   const { onScroll } = useOnScroll(data, state, fetchMore);
 
-  if (data === undefined) return <NoResults />;
+  if (!assertData(data)) return null;
 
   return (
     <div className="flex h-full flex-col overflow-hidden">
@@ -23,4 +23,9 @@ export function ResultsTable() {
       <ResultsTableFooter data={data} state={state} />
     </div>
   );
+}
+
+function assertData(data: undefined | InsightsResult): data is InsightsResult {
+  if (!data?.entries.length) throw new Error('Unexpectedly received empty data in ResultsTable.');
+  return true;
 }

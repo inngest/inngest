@@ -1,12 +1,12 @@
 'use client';
 
 import { Button } from '@inngest/components/Button';
-import { RiExternalLinkLine, RiTableView } from '@remixicon/react';
+import { RiExternalLinkLine } from '@remixicon/react';
 
 import { IconLayoutWrapper } from './IconLayoutWrapper';
 
 // TODO: Add link to examples.
-export function EmptyState() {
+export function NoResultsState() {
   return (
     <IconLayoutWrapper
       action={
@@ -17,10 +17,11 @@ export function EmptyState() {
           iconSide="left"
           kind="primary"
           label="See examples"
+          size="medium"
         />
       }
-      header="Your query results will appear here"
-      subheader="Run a query to analyze your data and the results will be displayed here. If you need a starting point, check out our examples."
+      header="No results found"
+      subheader="We couldn't find any results matching your search. Try adjusting your query or browse our examples for inspiration."
     />
   );
 }

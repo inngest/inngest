@@ -7,7 +7,7 @@ import { useInsightsQueryContext } from '../../context';
 const FALLBACK_ERROR = 'Something went wrong. Please try again.';
 
 export function ErrorState() {
-  const { error, runQuery } = useInsightsQueryContext();
+  const { error } = useInsightsQueryContext();
 
   return (
     <Alert className="text-sm" severity="error">

@@ -86,7 +86,6 @@ interface InsightsQueryContextValue {
   isEmpty: boolean;
   onChange: (value: string) => void;
   runQuery: () => void;
-  seeExamples: () => void;
   state: InsightsState;
 }
 
@@ -114,8 +113,6 @@ export function InsightsQueryContextProvider({ children }: { children: ReactNode
   const onChange = useCallback((value: string) => {
     dispatch({ type: 'UPDATE_CONTENT', payload: value });
   }, []);
-
-  const seeExamples = useCallback(() => console.log('TODO: Show examples'), []);
 
   const fetchMore = useCallback(async () => {
     if (queryState.state !== 'success' || !queryState.data?.pageInfo.hasNextPage) return;
@@ -147,7 +144,6 @@ export function InsightsQueryContextProvider({ children }: { children: ReactNode
         isEmpty: queryState.content.trim() === '',
         onChange,
         runQuery,
-        seeExamples,
         state: queryState.state,
       }}
     >
