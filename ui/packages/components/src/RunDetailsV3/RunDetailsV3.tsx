@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import { ErrorCard } from '../Error/ErrorCard';
 import type { Run as InitialRunData } from '../RunsPage/types';
+import { useGetRun } from '../SharedContext/useGetRun';
 import { StatusCell } from '../Table/Cell';
 import { TriggerDetails } from '../TriggerDetails';
 import { DragDivider } from '../icons/DragDivider';
@@ -15,14 +16,12 @@ import { StepInfo } from './StepInfo';
 import { Tabs } from './Tabs';
 import { Timeline } from './Timeline';
 import { TopInfo } from './TopInfo';
-import type { Trace } from './Trace';
 import { Waiting } from './Waiting';
 import { useStepSelection } from './utils';
 
 type Props = {
   standalone: boolean;
   getResult: (outputID: string, preview?: boolean) => Promise<Result>;
-  getRun: (runID: string, preview?: boolean) => Promise<Run>;
   initialRunData?: InitialRunData;
   getTrigger: React.ComponentProps<typeof TriggerDetails>['getTrigger'];
   pollInterval?: number;
@@ -30,34 +29,29 @@ type Props = {
   tracesPreviewEnabled: boolean;
 };
 
-type Run = {
-  app: {
-    externalID: string;
-    name: string;
-  };
-  fn: {
-    id: string;
-    name: string;
-    slug: string;
-  };
-  id: string;
-  trace: React.ComponentProps<typeof Trace>['trace'];
-  hasAI: boolean;
-};
-
 const MIN_HEIGHT = 586;
 
-export const RunDetailsV3 = (props: Props) => {
+export const RunDetailsV3 = ({
+  getResult,
+  getTrigger,
+  runID,
+  standalone,
+  tracesPreviewEnabled,
+  pollInterval: initialPollInterval,
+  initialRunData,
+}: Props) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const leftColumnRef = useRef<HTMLDivElement>(null);
   const runInfoRef = useRef<HTMLDivElement>(null);
-  const { getResult, getRun, getTrigger, runID, standalone } = props;
-  const [pollInterval, setPollInterval] = useState(props.pollInterval);
+
+  const [pollInterval, setPollInterval] = useState(initialPollInterval);
   const [leftWidth, setLeftWidth] = useState(55);
   const [height, setHeight] = useState(MIN_HEIGHT);
   const [isDragging, setIsDragging] = useState(false);
   const [windowHeight, setWindowHeight] = useState(0);
   const { selectedStep } = useStepSelection(runID);
+
+  const { getRun } = useGetRun();
 
   const handleMouseDown = useCallback(() => {
     setIsDragging(true);
@@ -130,30 +124,30 @@ export const RunDetailsV3 = (props: Props) => {
   }, [isDragging, handleMouseMove, handleMouseUp]);
 
   const runRes = useQuery({
-    queryKey: ['run', runID, { preview: props.tracesPreviewEnabled }],
+    queryKey: ['run', runID, { preview: tracesPreviewEnabled }],
     queryFn: useCallback(() => {
-      return getRun(runID, props.tracesPreviewEnabled);
-    }, [getRun, runID, props.tracesPreviewEnabled]),
+      return getRun({ runID, preview: tracesPreviewEnabled });
+    }, [getRun, runID, tracesPreviewEnabled]),
     retry: 3,
     refetchInterval: pollInterval,
   });
 
-  const outputID = runRes?.data?.trace.outputID;
+  const outputID = runRes?.data?.data?.trace.outputID;
   const resultRes = useQuery({
     enabled: Boolean(outputID),
     refetchInterval: pollInterval,
-    queryKey: ['run-result', runID, { preview: props.tracesPreviewEnabled }],
+    queryKey: ['run-result', runID, { preview: tracesPreviewEnabled }],
     queryFn: useCallback(() => {
       if (!outputID) {
         // Unreachable
         throw new Error('missing outputID');
       }
 
-      return getResult(outputID, props.tracesPreviewEnabled);
-    }, [getResult, outputID, props.tracesPreviewEnabled]),
+      return getResult(outputID, tracesPreviewEnabled);
+    }, [getResult, outputID, tracesPreviewEnabled]),
   });
 
-  const run = runRes.data;
+  const run = runRes.data?.data;
   if (run?.trace.endedAt && pollInterval) {
     //
     // Stop polling for ended runs, but still give it
@@ -165,7 +159,7 @@ export const RunDetailsV3 = (props: Props) => {
 
   // Do not show the error if queued and the error is no spans
   const noSpansFoundError = !!runRes.error?.toString().match(/no function run span found/gi);
-  const waiting = props.initialRunData?.status === 'QUEUED' && noSpansFoundError;
+  const waiting = initialRunData?.status === 'QUEUED' && noSpansFoundError;
   const showError = waiting ? false : runRes.error || resultRes.error;
 
   //
@@ -188,7 +182,7 @@ export const RunDetailsV3 = (props: Props) => {
           <div ref={runInfoRef} className="px-4">
             <RunInfo
               className="mb-4"
-              initialRunData={props.initialRunData}
+              initialRunData={initialRunData}
               run={nullishToLazy(run)}
               runID={runID}
               standalone={standalone}

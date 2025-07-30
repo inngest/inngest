@@ -12,7 +12,6 @@ import { CombinedError, useQuery } from 'urql';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
-import { useGetRun } from '@/components/RunDetails/useGetRun';
 import { useGetTraceResult } from '@/components/RunDetails/useGetTraceResult';
 import { useGetTrigger } from '@/components/RunDetails/useGetTrigger';
 import { GetFunctionPauseStateDocument, RunsOrderByField } from '@/gql/graphql';
@@ -83,7 +82,6 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
 
   const getTraceResult = useGetTraceResult();
   const getTrigger = useGetTrigger();
-  const getRun = useGetRun();
   const features = useAccountFeatures();
 
   const filteredStatus = useMemo(() => {
@@ -219,7 +217,6 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
       hasMore={hasNextPage ?? false}
       isLoadingInitial={firstPageRes.fetching}
       isLoadingMore={nextPageRes.fetching}
-      getRun={getRun}
       onRefresh={onRefresh}
       onScroll={fetchMoreOnScroll}
       onScrollToTop={onScrollToTop}
