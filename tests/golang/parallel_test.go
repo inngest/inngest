@@ -521,5 +521,95 @@ func TestParallelDisabledOptimization(t *testing.T) {
 			})
 		}
 	})
+}
 
+func TestParallelStepsDuplicatePlan(t *testing.T) {
+	// A regression test for a bug where a parallel `step.run` would execute
+	// multiple times. The bug would happen because the SDK asked the Executor
+	// to plan the same step multiple times, and then the Executor would
+	// mistakenly not reuse the same job ID for each (so idempotency didn't
+	// prevent multiple scheduled jobs).
+	//
+	// To replicate this bug, we need to resume the run while the `step.run`
+	// is still executing. We achieve this by using multiple `step.WaitForEvent`
+	// calls with different timeouts.
+
+	t.Parallel()
+	r := require.New(t)
+	ctx := context.Background()
+
+	c := client.New(t)
+	inngestClient, server, registerFuncs := NewSDKHandler(t, randomSuffix("app"))
+	defer server.Close()
+
+	var (
+		counter int32
+		runID   string
+	)
+	eventName := randomSuffix("event")
+	_, err := inngestgo.CreateFunction(
+		inngestClient,
+		inngestgo.FunctionOpts{
+			ID:      "fn",
+			Retries: inngestgo.Ptr(0),
+		},
+		inngestgo.EventTrigger(eventName, nil),
+		func(ctx context.Context, input inngestgo.Input[any]) (any, error) {
+			if runID == "" {
+				runID = input.InputCtx.RunID
+			}
+
+			// Need 2 waits (each with a different timeout) to replicate the bug
+			waitTimeouts := []time.Duration{
+				1 * time.Second,
+				2 * time.Second,
+			}
+
+			steps := []func(ctx context.Context) (any, error){
+				func(ctx context.Context) (any, error) {
+					return step.Run(ctx, "a", func(ctx context.Context) (any, error) {
+						atomic.AddInt32(&counter, 1)
+
+						// Sleep as long as the longest wait timeout to
+						// replicate the bug
+						<-time.After(waitTimeouts[len(waitTimeouts)-1])
+
+						return nil, nil
+					})
+				},
+			}
+
+			for i, timeout := range waitTimeouts {
+				steps = append(steps, func(ctx context.Context) (any, error) {
+					return step.WaitForEvent[any](ctx, fmt.Sprintf("wait-%d", i),
+						step.WaitForEventOpts{
+							Event: randomSuffix("never"),
+
+							// Each wait needs a different timeout to replicate
+							// the bug
+							Timeout: timeout,
+						},
+					)
+				})
+			}
+
+			res := group.ParallelWithOpts(ctx,
+				// Need to use race mode to replicate the bug
+				group.ParallelOpts{ParallelMode: enums.ParallelModeRace},
+				steps...,
+			)
+
+			return res, nil
+		},
+	)
+	r.NoError(err)
+	registerFuncs()
+
+	_, err = inngestClient.Send(ctx, inngestgo.Event{Name: eventName})
+	r.NoError(err)
+	c.WaitForRunStatus(ctx, t, "COMPLETED", &runID, client.WaitForRunStatusOpts{
+		Timeout: 10 * time.Second,
+	})
+
+	r.Equal(1, int(atomic.LoadInt32(&counter)))
 }
