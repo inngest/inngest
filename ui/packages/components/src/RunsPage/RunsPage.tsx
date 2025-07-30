@@ -437,5 +437,7 @@ function TotalCount({
       <span className={cn('text-muted text-xs font-semibold', className)}>{formatted} run</span>
     );
   }
-  return <span className={cn('text-muted font-semiboldtext-xs', className)}>{formatted} runs</span>;
+  return (
+    <span className={cn('text-muted text-xs font-semibold', className)}>{formatted} runs</span>
+  );
 }
