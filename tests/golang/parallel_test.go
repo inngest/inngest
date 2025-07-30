@@ -438,7 +438,7 @@ func TestParallelDisabledOptimization(t *testing.T) {
 		cases := []testCase{
 			{parallelMode: enums.ParallelModeNone, expRequestCount: 4},
 			{parallelMode: enums.ParallelModeWait, expRequestCount: 4},
-			{parallelMode: enums.ParallelModeRace, expRequestCount: 9},
+			{parallelMode: enums.ParallelModeRace, expRequestCount: 8},
 		}
 
 		for _, tc := range cases {
@@ -453,6 +453,7 @@ func TestParallelDisabledOptimization(t *testing.T) {
 				eventName := randomSuffix("event")
 				var (
 					counterRequest int32
+					counterRun     int32
 					runID          string
 				)
 				_, err := inngestgo.CreateFunction(
@@ -485,6 +486,7 @@ func TestParallelDisabledOptimization(t *testing.T) {
 							},
 							func(ctx context.Context) (any, error) {
 								return step.Run(ctx, "run", func(ctx context.Context) (any, error) {
+									atomic.AddInt32(&counterRun, 1)
 									time.Sleep(3 * time.Second)
 									return nil, nil
 								})
@@ -518,6 +520,7 @@ func TestParallelDisabledOptimization(t *testing.T) {
 					Timeout: 20 * time.Second,
 				})
 				r.Equal(tc.expRequestCount, atomic.LoadInt32(&counterRequest))
+				r.Equal(1, int(atomic.LoadInt32(&counterRun)))
 			})
 		}
 	})
