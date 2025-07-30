@@ -1,4 +1,4 @@
-package commands
+package version
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 	"github.com/urfave/cli/v3"
 )
 
-func NewCmdVersion() *cli.Command {
+func Command() *cli.Command {
 	return &cli.Command{
 		Name: "version",
 		Usage: fmt.Sprintf(

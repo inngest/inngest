@@ -1,4 +1,4 @@
-package commands
+package devserver
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/inngest/inngest/cmd/commands/internal/localconfig"
+	"github.com/inngest/inngest/cmd/internal/localconfig"
 	"github.com/inngest/inngest/pkg/config"
 	"github.com/inngest/inngest/pkg/devserver"
 	"github.com/inngest/inngest/pkg/headers"
@@ -17,7 +17,7 @@ import (
 	"github.com/urfave/cli/v3"
 )
 
-func NewCmdDev() *cli.Command {
+func Command() *cli.Command {
 	cmd := &cli.Command{
 		Name:        "dev",
 		Usage:       "Run the Inngest Dev Server for local development.",

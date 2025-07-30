@@ -1,4 +1,4 @@
-package commands
+package start
 
 import (
 	"context"
@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/inngest/inngest/cmd/commands/internal/localconfig"
+	"github.com/inngest/inngest/cmd/internal/localconfig"
 	"github.com/inngest/inngest/pkg/authn"
 	"github.com/inngest/inngest/pkg/config"
 	"github.com/inngest/inngest/pkg/devserver"
@@ -16,13 +16,13 @@ import (
 	"github.com/urfave/cli/v3"
 )
 
-func NewCmdStart() *cli.Command {
+func Command() *cli.Command {
 	cmd := &cli.Command{
 		Name:        "start",
 		Usage:       "[Beta] Run Inngest as a single-node service.",
 		UsageText:   "inngest start [options]",
 		Description: "Example: inngest start",
-		Action:      doStart,
+		Action:      action,
 
 		Flags: []cli.Flag{
 			// Base flags
@@ -104,7 +104,7 @@ func NewCmdStart() *cli.Command {
 	return cmd
 }
 
-func doStart(ctx context.Context, cmd *cli.Command) error {
+func action(ctx context.Context, cmd *cli.Command) error {
 	// TODO Likely need a `Start()`
 	conf, err := config.Dev(ctx)
 	if err != nil {

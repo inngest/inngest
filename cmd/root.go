@@ -1,13 +1,16 @@
-package commands
+package main
 
 import (
 	"context"
 	"fmt"
 	"os"
 
+	"github.com/inngest/inngest/cmd/devserver"
+	"github.com/inngest/inngest/cmd/start"
+	"github.com/inngest/inngest/cmd/version"
 	"github.com/inngest/inngest/pkg/api/tel"
 	inncli "github.com/inngest/inngest/pkg/cli"
-	"github.com/inngest/inngest/pkg/inngest/version"
+	inngestversion "github.com/inngest/inngest/pkg/inngest/version"
 	isatty "github.com/mattn/go-isatty"
 	"github.com/spf13/viper"
 	"github.com/urfave/cli/v3"
@@ -35,17 +38,16 @@ var globalFlags = []cli.Flag{
 	},
 }
 
-
-func Execute() {
+func execute() {
 	app := &cli.Command{
 		Name: "inngest",
 		Usage: inncli.TextStyle.Render(fmt.Sprintf(
 			"%s %s\n\n%s",
 			"Inngest CLI",
-			fmt.Sprintf("v%s", version.Print()),
+			fmt.Sprintf("v%s", inngestversion.Print()),
 			"The durable execution engine with built-in flow control.",
 		)),
-		Version: version.Print(),
+		Version: inngestversion.Print(),
 		Before: func(ctx context.Context, cmd *cli.Command) (context.Context, error) {
 			// Bind global flags to viper
 			if cmd.IsSet("log-level") {
@@ -61,6 +63,21 @@ func Execute() {
 			viper.Set("verbose", cmd.Bool("verbose"))
 			viper.Set("log-level", cmd.String("log-level"))
 
+			// Set LOG_HANDLER environment variable based on --json flag
+			// This ensures the logger respects the JSON output setting
+			if cmd.Bool("json") {
+				os.Setenv("LOG_HANDLER", "json")
+			}
+
+			// Set LOG_LEVEL environment variable so the logger picks it up
+			if cmd.IsSet("log-level") {
+				os.Setenv("LOG_LEVEL", cmd.String("log-level"))
+			} else if cmd.Bool("verbose") {
+				os.Setenv("LOG_LEVEL", "debug")
+			} else {
+				os.Setenv("LOG_LEVEL", "info")
+			}
+
 			m := tel.NewMetadata(ctx)
 			m.SetCliContext(cmd)
 			tel.SendMetadata(ctx, m)
@@ -74,9 +91,9 @@ func Execute() {
 
 		Flags: globalFlags,
 		Commands: []*cli.Command{
-			NewCmdDev(),
-			NewCmdVersion(),
-			NewCmdStart(),
+			devserver.Command(),
+			version.Command(),
+			start.Command(),
 		},
 	}
 
