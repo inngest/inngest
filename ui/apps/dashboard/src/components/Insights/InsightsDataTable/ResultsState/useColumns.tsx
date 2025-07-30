@@ -1,3 +1,5 @@
+'use client';
+
 import { useMemo } from 'react';
 import { TextCell, TimeCell } from '@inngest/components/Table';
 import type { ColumnDef } from '@tanstack/react-table';
@@ -6,18 +8,18 @@ import { type InsightsEntry, type InsightsResult } from '../types';
 
 export function useColumns(data?: InsightsResult): { columns: ColumnDef<InsightsEntry, any>[] } {
   const columns = useMemo(() => {
-    const columns = data?.columns || [];
-    if (columns.length === 0) return [];
+    const cols = data?.columns ?? [];
+    if (cols.length === 0) return [];
 
-    return columns.map(
-      (column): ColumnDef<InsightsEntry, any> => ({
-        accessorKey: `values.${column.name}`,
+    return cols.map(
+      (col): ColumnDef<InsightsEntry, any> => ({
+        accessorKey: `values.${col.name}`,
         cell: ({ getValue }) => {
           const value = getValue();
 
           if (value == null) return <TextCell />;
 
-          switch (column.type) {
+          switch (col.type) {
             case 'date':
               return <TimeCell date={new Date(value)} />;
             case 'number':
@@ -25,8 +27,8 @@ export function useColumns(data?: InsightsResult): { columns: ColumnDef<Insights
               return <TextCell>{String(value)}</TextCell>;
           }
         },
-        header: column.name,
-        id: column.name,
+        header: col.name,
+        id: col.name,
       })
     );
   }, [data?.columns]);
