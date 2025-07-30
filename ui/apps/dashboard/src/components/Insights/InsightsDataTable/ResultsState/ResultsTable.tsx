@@ -5,7 +5,7 @@ import Table from '@inngest/components/Table/NewTable';
 
 import { useInsightsQueryContext } from '../../context';
 import type { InsightsEntry, InsightsResult, InsightsState } from '../types';
-import { ResultsTableFooter } from './ResultsTableFooter';
+import { ResultsTableFooter, assertData } from './ResultsTableFooter';
 import { useColumns } from './useColumns';
 import { useOnScroll } from './useOnScroll';
 
@@ -28,14 +28,9 @@ export function ResultsTable() {
           cellClassName="[&:not(:first-child)]:border-l [&:not(:first-child)]:border-light box-border"
         />
       </div>
-      <ResultsTableFooter data={data} fetchMoreError={fetchMoreError} state={state} />
+      <ResultsTableFooter />
     </div>
   );
-}
-
-function assertData(data: undefined | InsightsResult): data is InsightsResult {
-  if (!data?.entries.length) throw new Error('Unexpectedly received empty data in ResultsTable.');
-  return true;
 }
 
 function withLoadingMoreRow(

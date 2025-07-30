@@ -1,25 +1,38 @@
 'use client';
 
 import { Alert } from '@inngest/components/Alert/Alert';
-import { Button } from '@inngest/components/Button';
+import { Button } from '@inngest/components/Button/Button';
 
-import { type InsightsResult, type InsightsState } from '../types';
+import { useInsightsQueryContext } from '../../context';
+import type { InsightsResult } from '../types';
 
 const FALLBACK_ERROR = 'Something went wrong. Please try again.';
 
-interface ResultsTableFooterProps {
-  data: InsightsResult;
-  fetchMoreError?: string;
-  state: InsightsState;
-}
+export function ResultsTableFooter() {
+  const { data, fetchMore, fetchMoreError, state } = useInsightsQueryContext();
 
-export function ResultsTableFooter({ data, fetchMoreError, state }: ResultsTableFooterProps) {
   if (!['fetchingMore', 'fetchMoreError', 'success'].includes(state)) return null;
+  if (!assertData(data)) return null;
 
   return (
     <div className="border-subtle flex h-[45px] items-center justify-between border-t py-0">
       {state === 'fetchMoreError' && (
-        <Alert className="flex-1 rounded-none text-sm" severity="error">
+        <Alert
+          className="flex-1 rounded-none text-sm"
+          inlineButton={
+            <Button
+              appearance="solid"
+              className="ml-auto h-auto p-0 text-sm font-medium underline"
+              kind="secondary"
+              label="Retry"
+              size="medium"
+              onClick={() => {
+                fetchMore();
+              }}
+            />
+          }
+          severity="error"
+        >
           {fetchMoreError ?? FALLBACK_ERROR}
         </Alert>
       )}
@@ -31,4 +44,9 @@ export function ResultsTableFooter({ data, fetchMoreError, state }: ResultsTable
       )}
     </div>
   );
+}
+
+export function assertData(data: undefined | InsightsResult): data is InsightsResult {
+  if (!data?.entries.length) throw new Error('Unexpectedly received empty data in ResultsTable.');
+  return true;
 }
