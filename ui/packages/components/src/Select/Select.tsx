@@ -52,7 +52,6 @@ export function Select({
             isLabelVisible && 'divide-muted text-muted divide-x',
             'disabled:bg-disabled disabled:text-disabled border-muted flex items-center rounded border',
             size === 'small' ? 'text-[13px]' : 'text-sm',
-            open ? 'border-active' : '',
             className
           )}
         >
@@ -228,7 +227,6 @@ export function SelectWithSearch({
         isLabelVisible && 'divide-muted text-muted divide-x',
         'disabled:bg-disabled disabled:text-disabled border-muted flex items-center rounded border',
         size === 'small' ? 'text-[13px]' : 'text-sm',
-        open ? 'border-active' : '',
         className
       )}
     >
