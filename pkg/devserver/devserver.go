@@ -130,6 +130,9 @@ type StartOpts struct {
 
 	// SQLiteDir specifies where SQLite files should be stored
 	SQLiteDir string `json:"sqlite_dir"`
+
+	// DevStartTime tracks when the dev command was started for telemetry
+	DevStartTime time.Time `json:"-"`
 }
 
 // Create and start a new dev server.  The dev server is used during (surprise surprise)

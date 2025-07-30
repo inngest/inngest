@@ -84,6 +84,7 @@ func NewCmdDev(rootCmd *cobra.Command) *cobra.Command {
 }
 
 func doDev(cmd *cobra.Command, args []string) {
+	devStartTime := time.Now()
 
 	go func() {
 		ctx, cleanup := signal.NotifyContext(
@@ -177,6 +178,7 @@ func doDev(cmd *cobra.Command, args []string) {
 		ConnectGatewayPort: connectGatewayPort,
 		ConnectGatewayHost: conf.CoreAPI.Addr,
 		InMemory:           inMemory,
+		DevStartTime:       devStartTime,
 	}
 
 	err = devserver.New(ctx, opts)
