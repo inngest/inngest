@@ -15,14 +15,12 @@ export function InsightsDataTable() {
         switch (state) {
           case 'error':
             return <ErrorState />;
-          case 'fetchingMore':
-            return <ResultsState />;
           case 'initial':
             return <EmptyState />;
           case 'loading':
             return <LoadingState />;
+          case 'fetchingMore':
           case 'fetchMoreError':
-            return <ResultsState />;
           case 'success': {
             return <ResultsState />;
           }
