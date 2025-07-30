@@ -16,6 +16,31 @@ const (
 	ViperLogLevelKey = "log.level"
 )
 
+// getGlobalFlags returns the global flags that should be available on all commands
+func getGlobalFlags() []cli.Flag {
+	return []cli.Flag{
+		&cli.BoolFlag{
+			Name:  "json",
+			Usage: "Output logs as JSON.  Set to true if stdout is not a TTY.",
+		},
+		&cli.BoolFlag{
+			Name:  "verbose",
+			Usage: "Enable verbose logging.",
+		},
+		&cli.StringFlag{
+			Name:    "log-level",
+			Aliases: []string{"l"},
+			Value:   "info",
+			Usage:   "Set the log level.  One of: trace, debug, info, warn, error.",
+		},
+	}
+}
+
+// mergeFlags combines command-specific flags with global flags
+func mergeFlags(commandFlags []cli.Flag) []cli.Flag {
+	return append(commandFlags, getGlobalFlags()...)
+}
+
 func Execute() {
 	app := &cli.App{
 		Name: "inngest",
@@ -26,14 +51,21 @@ func Execute() {
 			"The durable execution engine with built-in flow control.",
 		)),
 		Version: version.Print(),
+		UseShortOptionHandling: true,
 		Before: func(c *cli.Context) error {
-			if viper.IsSet("log-level") {
-				viper.Set(ViperLogLevelKey, viper.GetString("log-level"))
-			} else if viper.GetBool("verbose") {
+			// Bind global flags to viper
+			if c.IsSet("log-level") {
+				viper.Set(ViperLogLevelKey, c.String("log-level"))
+			} else if c.Bool("verbose") {
 				viper.Set(ViperLogLevelKey, "debug")
 			} else {
 				viper.Set(ViperLogLevelKey, "info")
 			}
+			
+			// Also set the flag values in viper for other parts of the code
+			viper.Set("json", c.Bool("json"))
+			viper.Set("verbose", c.Bool("verbose"))
+			viper.Set("log-level", c.String("log-level"))
 
 			m := tel.NewMetadata(c.Context)
 			m.SetCliContext(c)
@@ -53,22 +85,7 @@ func Execute() {
 			"https://www.inngest.com/discord",
 		),
 
-		Flags: []cli.Flag{
-			&cli.BoolFlag{
-				Name:  "json",
-				Usage: "Output logs as JSON.  Set to true if stdout is not a TTY.",
-			},
-			&cli.BoolFlag{
-				Name:  "verbose",
-				Usage: "Enable verbose logging.",
-			},
-			&cli.StringFlag{
-				Name:    "log-level",
-				Aliases: []string{"l"},
-				Value:   "info",
-				Usage:   "Set the log level.  One of: trace, debug, info, warn, error.",
-			},
-		},
+		Flags: getGlobalFlags(),
 
 	}
 
