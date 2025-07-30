@@ -790,6 +790,7 @@ func (w wrapper) GetEventsByExpressions(ctx context.Context, cel []string) ([]*c
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
 
 	res := []*cqrs.Event{}
 	for rows.Next() {
@@ -1779,6 +1780,7 @@ func (w wrapper) GetTraceRuns(ctx context.Context, opt cqrs.GetTraceRunOpt) ([]*
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
 
 	res := []*cqrs.TraceRun{}
 	var count uint
@@ -2273,6 +2275,7 @@ func (w wrapper) GetWorkerConnections(ctx context.Context, opt cqrs.GetWorkerCon
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
 
 	res := []*cqrs.WorkerConnection{}
 	var count uint
