@@ -17,30 +17,24 @@ const (
 	ViperLogLevelKey = "log.level"
 )
 
-// getGlobalFlags returns the global flags that should be available on all commands
-func getGlobalFlags() []cli.Flag {
-	return []cli.Flag{
-		&cli.BoolFlag{
-			Name:  "json",
-			Usage: "Output logs as JSON.  Set to true if stdout is not a TTY.",
-		},
-		&cli.BoolFlag{
-			Name:  "verbose",
-			Usage: "Enable verbose logging.",
-		},
-		&cli.StringFlag{
-			Name:    "log-level",
-			Aliases: []string{"l"},
-			Value:   "info",
-			Usage:   "Set the log level.  One of: trace, debug, info, warn, error.",
-		},
-	}
+// globalFlags are the flags that should be available on all commands
+var globalFlags = []cli.Flag{
+	&cli.BoolFlag{
+		Name:  "json",
+		Usage: "Output logs as JSON.  Set to true if stdout is not a TTY.",
+	},
+	&cli.BoolFlag{
+		Name:  "verbose",
+		Usage: "Enable verbose logging.",
+	},
+	&cli.StringFlag{
+		Name:    "log-level",
+		Aliases: []string{"l"},
+		Value:   "info",
+		Usage:   "Set the log level.  One of: trace, debug, info, warn, error.",
+	},
 }
 
-// mergeFlags combines command-specific flags with global flags
-func mergeFlags(commandFlags []cli.Flag) []cli.Flag {
-	return append(commandFlags, getGlobalFlags()...)
-}
 
 func Execute() {
 	app := &cli.Command{
@@ -78,7 +72,7 @@ func Execute() {
 			return nil
 		},
 
-		Flags: getGlobalFlags(),
+		Flags: globalFlags,
 		Commands: []*cli.Command{
 			NewCmdDev(),
 			NewCmdVersion(),

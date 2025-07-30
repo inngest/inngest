@@ -15,7 +15,6 @@ func NewCmdVersion() *cli.Command {
 			"Shows the inngest CLI version (saving time, it's: %s)",
 			version.Print(),
 		),
-		Flags: getGlobalFlags(),
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			fmt.Println(version.Print())
 			return nil

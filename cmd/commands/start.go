@@ -24,7 +24,7 @@ func NewCmdStart() *cli.Command {
 		Description: "Example: inngest start",
 		Action:      doStart,
 
-		Flags: mergeFlags([]cli.Flag{
+		Flags: []cli.Flag{
 			// Base flags
 			&cli.StringFlag{
 				Name:  "config",
@@ -98,7 +98,7 @@ func NewCmdStart() *cli.Command {
 				Name:  "no-ui",
 				Usage: "Disable the web UI and GraphQL API endpoint",
 			},
-		}),
+		},
 	}
 
 	return cmd

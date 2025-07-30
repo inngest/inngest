@@ -25,7 +25,7 @@ func NewCmdDev() *cli.Command {
 		Description: "Example: inngest dev -u http://localhost:3000/api/inngest",
 		Action:      doDev,
 
-		Flags: mergeFlags([]cli.Flag{
+		Flags: []cli.Flag{
 			// Base flags
 			&cli.StringSliceFlag{
 				Name:    "sdk-url",
@@ -87,7 +87,7 @@ func NewCmdDev() *cli.Command {
 				Usage:  "Use in memory sqlite db",
 				Hidden: true,
 			},
-		}),
+		},
 	}
 
 	return cmd
