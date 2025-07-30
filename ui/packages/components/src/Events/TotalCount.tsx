@@ -13,7 +13,11 @@ export default function TotalCount({
 
   const formatted = new Intl.NumberFormat().format(totalCount);
   if (totalCount === 1) {
-    return <span className={cn('text-muted text-xs', className)}>{formatted} event</span>;
+    return (
+      <span className={cn('text-muted text-xs font-semibold', className)}>{formatted} event</span>
+    );
   }
-  return <span className={cn('text-muted text-xs', className)}>{formatted} events</span>;
+  return (
+    <span className={cn('text-muted text-xs font-semibold', className)}>{formatted} events</span>
+  );
 }
