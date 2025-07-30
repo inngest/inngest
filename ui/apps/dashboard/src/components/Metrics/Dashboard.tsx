@@ -163,7 +163,7 @@ export const Dashboard = ({ envSlug }: { envSlug: string }) => {
           }}
         />
         {fetching ? (
-          <Skeleton className="block h-8 w-60" />
+          <Skeleton className="block h-6 w-60" />
         ) : (
           <>
             <EntityFilter

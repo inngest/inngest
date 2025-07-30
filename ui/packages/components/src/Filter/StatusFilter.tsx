@@ -79,6 +79,7 @@ export default function StatusFilter<T extends string>({
       label="Status"
       isLabelVisible
       size="small"
+      className="bg-modalBase"
     >
       <Select.Button isLabelVisible ref={comboboxRef} size="small">
         <div className="w-7 text-left">

@@ -70,6 +70,7 @@ export default function EntityFilter({
       label={type}
       isLabelVisible
       size="small"
+      className="bg-modalBase"
     >
       <SelectWithSearch.Button isLabelVisible className={className} ref={comboboxRef} size="small">
         <div className="min-w-7 max-w-24 truncate text-nowrap text-left">

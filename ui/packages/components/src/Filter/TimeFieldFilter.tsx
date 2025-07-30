@@ -31,7 +31,7 @@ export default function TimeFieldFilter({
       }}
       label="Time Field"
       isLabelVisible={false}
-      className="min-w-[90px]"
+      className="bg-modalBase min-w-[90px]"
       size="small"
     >
       <Select.Button size="small">

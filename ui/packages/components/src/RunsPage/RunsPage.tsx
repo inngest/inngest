@@ -286,7 +286,7 @@ export function RunsPage({
                 search
                   ? 'after:bg-secondary-moderate after:mb-3 after:ml-0.5 after:h-2 after:w-2 after:rounded'
                   : '',
-                'h-[26px] rounded'
+                'h-[26px] w-[103px] rounded'
               )}
             />
             <SelectGroup>

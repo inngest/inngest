@@ -88,7 +88,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(
           !isLabelVisible && 'rounded-l',
           // Real height is 26px and 34px, but we add the 2px border
           size === 'small' ? 'h-[24px] text-xs' : 'h-[32px] py-1.5 text-sm',
-          'disabled:bg-disabled disabled:text-disabled bg-surfaceBase text-basis placeholder:text-disabled flex w-full items-center justify-between gap-1 rounded-r px-1.5',
+          'disabled:bg-disabled disabled:text-disabled text-basis placeholder:text-disabled flex w-full items-center justify-between gap-1 rounded-r px-1.5',
           className
         )}
       >
