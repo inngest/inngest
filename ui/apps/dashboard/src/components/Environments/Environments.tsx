@@ -87,7 +87,7 @@ export default function Environments() {
             />
             <div className="min-w-[200px] flex-auto">
               <Search
-                className="w-full"
+                className="h-[34px] w-full"
                 name="search-other-envs"
                 onUpdate={(value) => {
                   setSearchInput(value);
@@ -95,6 +95,7 @@ export default function Environments() {
                 }}
                 placeholder="Search environments"
                 value={searchInput}
+                inngestSize="base"
               />
             </div>
           </div>

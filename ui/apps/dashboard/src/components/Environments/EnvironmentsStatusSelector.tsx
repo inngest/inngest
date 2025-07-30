@@ -22,9 +22,8 @@ export function EnvironmentsStatusSelector({
       label="Select environment status"
       multiple={false}
       value={archived ? ARCHIVED_OPTION : ACTIVE_OPTION}
-      size="small"
     >
-      <Select.Button className="w-[200px] shrink-0" size="small">
+      <Select.Button className="w-[200px] shrink-0">
         <div className="mr-1 flex flex-row items-center gap-2 overflow-hidden whitespace-nowrap">
           <StatusDot status={archived ? 'ARCHIVED' : 'ACTIVE'} size="small" />
           {archived ? 'Archived environments' : 'Active environments'}
