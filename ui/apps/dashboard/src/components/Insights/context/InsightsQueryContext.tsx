@@ -18,7 +18,7 @@ ORDER BY
   hour desc`;
 
 async function simulateQuery(cursor: string | null): Promise<InsightsResult> {
-  await new Promise((resolve) => setTimeout(resolve, 500 + Math.random() * 1000));
+  await new Promise((resolve) => setTimeout(resolve, 3000 + Math.random() * 1000));
 
   if (Math.random() < 0.05) {
     throw new Error('Query timeout - please try a more specific query');
@@ -31,6 +31,7 @@ interface InsightsQueryState {
   content: string;
   data?: InsightsResult;
   error?: string;
+  fetchMoreError?: string;
   state: InsightsState;
 }
 
@@ -40,7 +41,8 @@ type InsightsQueryAction =
   | { type: 'QUERY_SUCCESS'; payload: InsightsResult }
   | { type: 'QUERY_ERROR'; payload: string }
   | { type: 'FETCH_MORE' }
-  | { type: 'FETCH_MORE_SUCCESS'; payload: InsightsResult };
+  | { type: 'FETCH_MORE_SUCCESS'; payload: InsightsResult }
+  | { type: 'FETCH_MORE_ERROR'; payload: string };
 
 function insightsQueryReducer(
   state: InsightsQueryState,
@@ -50,13 +52,31 @@ function insightsQueryReducer(
     case 'UPDATE_CONTENT':
       return { ...state, content: action.payload };
     case 'START_QUERY':
-      return { ...state, data: undefined, error: undefined, state: 'loading' };
+      return {
+        ...state,
+        data: undefined,
+        error: undefined,
+        fetchMoreError: undefined,
+        state: 'loading',
+      };
     case 'QUERY_SUCCESS':
-      return { ...state, data: action.payload, state: 'success' };
+      return {
+        ...state,
+        data: action.payload,
+        error: undefined,
+        fetchMoreError: undefined,
+        state: 'success',
+      };
     case 'QUERY_ERROR':
-      return { ...state, data: undefined, error: action.payload, state: 'error' };
+      return {
+        ...state,
+        data: undefined,
+        error: action.payload,
+        fetchMoreError: undefined,
+        state: 'error',
+      };
     case 'FETCH_MORE':
-      return { ...state, state: 'fetchingMore' };
+      return { ...state, fetchMoreError: undefined, state: 'fetchingMore' };
     case 'FETCH_MORE_SUCCESS':
       return {
         ...state,
@@ -66,8 +86,11 @@ function insightsQueryReducer(
               entries: [...state.data.entries, ...action.payload.entries],
             }
           : action.payload,
+        fetchMoreError: undefined,
         state: 'success',
       };
+    case 'FETCH_MORE_ERROR':
+      return { ...state, fetchMoreError: action.payload, state: 'fetchMoreError' };
     default:
       return state;
   }
@@ -83,6 +106,7 @@ interface InsightsQueryContextValue {
   data?: InsightsResult;
   error?: string;
   fetchMore: () => void;
+  fetchMoreError?: string;
   isEmpty: boolean;
   onChange: (value: string) => void;
   runQuery: () => void;
@@ -95,17 +119,15 @@ export function InsightsQueryContextProvider({ children }: { children: ReactNode
   const [queryState, dispatch] = useReducer(insightsQueryReducer, initialState);
 
   const runQuery = useCallback(async () => {
-    if (queryState.state === 'loading') return;
-
     dispatch({ type: 'START_QUERY' });
 
     try {
-      const result = await simulateQuery(null); // Initial query starts with null cursor
+      const result = await simulateQuery(null);
       dispatch({ type: 'QUERY_SUCCESS', payload: result });
     } catch (error) {
       dispatch({
         type: 'QUERY_ERROR',
-        payload: error instanceof Error ? error.message : 'Unknown error',
+        payload: stringifyError(error),
       });
     }
   }, [queryState.state]);
@@ -115,17 +137,15 @@ export function InsightsQueryContextProvider({ children }: { children: ReactNode
   }, []);
 
   const fetchMore = useCallback(async () => {
-    if (queryState.state !== 'success' || !queryState.data?.pageInfo.hasNextPage) return;
-
     dispatch({ type: 'FETCH_MORE' });
 
     try {
-      const result = await simulateQuery(queryState.data?.pageInfo.endCursor);
+      const result = await simulateQuery(queryState.data?.pageInfo.endCursor ?? null);
       dispatch({ type: 'FETCH_MORE_SUCCESS', payload: result });
     } catch (error) {
       dispatch({
-        type: 'QUERY_ERROR',
-        payload: error instanceof Error ? error.message : 'Unknown error',
+        type: 'FETCH_MORE_ERROR',
+        payload: stringifyError(error),
       });
     }
   }, [
@@ -141,6 +161,7 @@ export function InsightsQueryContextProvider({ children }: { children: ReactNode
         data: queryState.data,
         error: queryState.error,
         fetchMore,
+        fetchMoreError: queryState.fetchMoreError,
         isEmpty: queryState.content.trim() === '',
         onChange,
         runQuery,
@@ -150,6 +171,11 @@ export function InsightsQueryContextProvider({ children }: { children: ReactNode
       {children}
     </InsightsQueryContext.Provider>
   );
+}
+
+function stringifyError(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  return 'Unknown error';
 }
 
 export function useInsightsQueryContext() {

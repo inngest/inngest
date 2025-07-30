@@ -22,6 +22,7 @@ export function InsightsDataTable() {
             return <EmptyState />;
           case 'loading':
             return <LoadingState />;
+          case 'fetchMoreError':
           case 'success': {
             if (!data?.entries.length) return <NoResultsState />;
             return <ResultsState />;

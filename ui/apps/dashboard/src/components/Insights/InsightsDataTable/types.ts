@@ -8,6 +8,7 @@ export interface InsightsColumn {
 export interface InsightsEntry {
   id: string;
   values: Record<string, Date | string | number | null>;
+  isLoadingRow?: boolean;
 }
 
 export interface PageInfo {
@@ -24,4 +25,10 @@ export interface InsightsResult {
   totalCount: number;
 }
 
-export type InsightsState = 'initial' | 'loading' | 'success' | 'error' | 'fetchingMore';
+export type InsightsState =
+  | 'initial'
+  | 'loading'
+  | 'success'
+  | 'error'
+  | 'fetchingMore'
+  | 'fetchMoreError';

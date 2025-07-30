@@ -1,15 +1,18 @@
 'use client';
 
+import { useMemo } from 'react';
 import Table from '@inngest/components/Table/NewTable';
 
 import { useInsightsQueryContext } from '../../context';
-import type { InsightsResult } from '../types';
+import type { InsightsEntry, InsightsResult, InsightsState } from '../types';
 import { ResultsTableFooter } from './ResultsTableFooter';
 import { useColumns } from './useColumns';
 import { useOnScroll } from './useOnScroll';
 
 export function ResultsTable() {
-  const { data, fetchMore, state } = useInsightsQueryContext();
+  const { data: dataRaw, fetchMore, fetchMoreError, state } = useInsightsQueryContext();
+  const data = useMemo(() => withLoadingMoreRow(dataRaw, state), [dataRaw, state]);
+
   const { columns } = useColumns(data);
   const { onScroll } = useOnScroll(data, state, fetchMore);
 
@@ -25,7 +28,7 @@ export function ResultsTable() {
           cellClassName="[&:not(:first-child)]:border-l [&:not(:first-child)]:border-light box-border"
         />
       </div>
-      <ResultsTableFooter data={data} state={state} />
+      <ResultsTableFooter data={data} fetchMoreError={fetchMoreError} state={state} />
     </div>
   );
 }
@@ -33,4 +36,26 @@ export function ResultsTable() {
 function assertData(data: undefined | InsightsResult): data is InsightsResult {
   if (!data?.entries.length) throw new Error('Unexpectedly received empty data in ResultsTable.');
   return true;
+}
+
+function withLoadingMoreRow(
+  data: undefined | InsightsResult,
+  state: InsightsState
+): undefined | InsightsResult {
+  if (data === undefined) return data;
+  if (state !== 'fetchingMore') return data;
+
+  const loadingRow: InsightsEntry = {
+    id: `__loading_row__`,
+    isLoadingRow: true,
+    values: data.columns.reduce((acc, col) => {
+      acc[col.name] = null;
+      return acc;
+    }, {} as Record<string, any>),
+  };
+
+  return {
+    ...data,
+    entries: [...data.entries, loadingRow],
+  };
 }

@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
+import { Skeleton } from '@inngest/components/Skeleton';
 import { TextCell, TimeCell } from '@inngest/components/Table';
 import type { ColumnDef } from '@tanstack/react-table';
 
@@ -14,7 +15,11 @@ export function useColumns(data?: InsightsResult): { columns: ColumnDef<Insights
     return cols.map(
       (col): ColumnDef<InsightsEntry, any> => ({
         accessorKey: `values.${col.name}`,
-        cell: ({ getValue }) => {
+        cell: ({ getValue, row }) => {
+          if (row.original.isLoadingRow) {
+            return <Skeleton className="my-2 block h-3" />;
+          }
+
           const value = getValue();
 
           if (value == null) return <TextCell />;
