@@ -14,16 +14,16 @@ import (
 	"github.com/inngest/inngest/pkg/devserver"
 	"github.com/inngest/inngest/pkg/headers"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
-func NewCmdDev(app *cli.App) *cli.Command {
+func NewCmdDev() *cli.Command {
 	cmd := &cli.Command{
-		Name:  "dev",
-		Usage: "Run the Inngest Dev Server for local development.",
-		UsageText: "inngest dev [options]",
+		Name:        "dev",
+		Usage:       "Run the Inngest Dev Server for local development.",
+		UsageText:   "inngest dev [options]",
 		Description: "Example: inngest dev -u http://localhost:3000/api/inngest",
-		Action: doDev,
+		Action:      doDev,
 
 		Flags: mergeFlags([]cli.Flag{
 			// Base flags
@@ -88,13 +88,12 @@ func NewCmdDev(app *cli.App) *cli.Command {
 				Hidden: true,
 			},
 		}),
-
 	}
 
 	return cmd
 }
 
-func doDev(c *cli.Context) error {
+func doDev(ctx context.Context, cmd *cli.Command) error {
 
 	go func() {
 		ctx, cleanup := signal.NotifyContext(
@@ -109,19 +108,18 @@ func doDev(c *cli.Context) error {
 		os.Exit(0)
 	}()
 
-	ctx := c.Context
 	conf, err := config.Dev(ctx)
 	if err != nil {
 		fmt.Println(err.Error())
 		os.Exit(1)
 	}
 
-	if err = localconfig.InitDevConfig(ctx, c); err != nil {
+	if err = localconfig.InitDevConfig(ctx, cmd); err != nil {
 		fmt.Println(err.Error())
 		os.Exit(1)
 	}
 
-	port, err := strconv.Atoi(c.String("port"))
+	port, err := strconv.Atoi(cmd.String("port"))
 	if err != nil {
 		fmt.Println(err.Error())
 		os.Exit(1)
@@ -129,23 +127,23 @@ func doDev(c *cli.Context) error {
 	conf.EventAPI.Port = port
 	conf.CoreAPI.Port = port
 
-	host := c.String("host")
+	host := cmd.String("host")
 	if host != "" {
 		conf.EventAPI.Addr = host
 		conf.CoreAPI.Addr = host
 	}
 
-	urls := c.StringSlice("sdk-url")
+	urls := cmd.StringSlice("sdk-url")
 
 	// Run auto-discovery unless we've explicitly disabled it.
-	noDiscovery := c.Bool("no-discovery")
-	noPoll := c.Bool("no-poll")
-	pollInterval := c.Int("poll-interval")
-	retryInterval := c.Int("retry-interval")
-	queueWorkers := c.Int("queue-workers")
-	tick := c.Int("tick")
-	connectGatewayPort := c.Int("connect-gateway-port")
-	inMemory := c.Bool("in-memory")
+	noDiscovery := cmd.Bool("no-discovery")
+	noPoll := cmd.Bool("no-poll")
+	pollInterval := cmd.Int("poll-interval")
+	retryInterval := cmd.Int("retry-interval")
+	queueWorkers := cmd.Int("queue-workers")
+	tick := cmd.Int("tick")
+	connectGatewayPort := cmd.Int("connect-gateway-port")
+	inMemory := cmd.Bool("in-memory")
 
 	traceEndpoint := fmt.Sprintf("localhost:%d", port)
 	if err := itrace.NewUserTracer(ctx, itrace.TracerOpts{

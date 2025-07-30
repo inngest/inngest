@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"strconv"
@@ -12,11 +13,10 @@ import (
 	"github.com/inngest/inngest/pkg/devserver"
 	"github.com/inngest/inngest/pkg/headers"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
-
-func NewCmdStart(app *cli.App) *cli.Command {
+func NewCmdStart() *cli.Command {
 	cmd := &cli.Command{
 		Name:        "start",
 		Usage:       "[Beta] Run Inngest as a single-node service.",
@@ -99,14 +99,12 @@ func NewCmdStart(app *cli.App) *cli.Command {
 				Usage: "Disable the web UI and GraphQL API endpoint",
 			},
 		}),
-
 	}
 
 	return cmd
 }
 
-func doStart(c *cli.Context) error {
-	ctx := c.Context
+func doStart(ctx context.Context, cmd *cli.Command) error {
 	// TODO Likely need a `Start()`
 	conf, err := config.Dev(ctx)
 	if err != nil {
@@ -114,12 +112,12 @@ func doStart(c *cli.Context) error {
 		os.Exit(1)
 	}
 
-	if err = localconfig.InitStartConfig(ctx, c); err != nil {
+	if err = localconfig.InitStartConfig(ctx, cmd); err != nil {
 		fmt.Println(err.Error())
 		os.Exit(1)
 	}
 
-	port, err := strconv.Atoi(c.String("port"))
+	port, err := strconv.Atoi(cmd.String("port"))
 	if err != nil {
 		fmt.Println(err.Error())
 		os.Exit(1)
@@ -127,7 +125,7 @@ func doStart(c *cli.Context) error {
 	conf.EventAPI.Port = port
 	conf.CoreAPI.Port = port
 
-	host := c.String("host")
+	host := cmd.String("host")
 	if host != "" {
 		conf.EventAPI.Addr = host
 		conf.CoreAPI.Addr = host
@@ -160,12 +158,12 @@ func doStart(c *cli.Context) error {
 		_ = itrace.CloseSystemTracer(ctx)
 	}()
 
-	tick := c.Int("tick")
+	tick := cmd.Int("tick")
 	if tick < 1 {
 		tick = devserver.DefaultTick
 	}
 
-	signingKey := c.String("signing-key")
+	signingKey := cmd.String("signing-key")
 	if signingKey == "" {
 		fmt.Println("Error: signing-key is required")
 		os.Exit(1)
@@ -176,7 +174,7 @@ func doStart(c *cli.Context) error {
 		os.Exit(1)
 	}
 
-	eventKeys := c.StringSlice("event-key")
+	eventKeys := cmd.StringSlice("event-key")
 	if len(eventKeys) == 0 {
 		fmt.Println("Error: at least one event-key is required")
 		os.Exit(1)
@@ -187,20 +185,20 @@ func doStart(c *cli.Context) error {
 	opts := devserver.StartOpts{
 		Config:             *conf,
 		ConnectGatewayHost: conf.CoreAPI.Addr,
-		ConnectGatewayPort: c.Int("connect-gateway-port"),
+		ConnectGatewayPort: cmd.Int("connect-gateway-port"),
 		EventKeys:          eventKeys,
 		InMemory:           false,
-		NoUI:               c.Bool("no-ui"),
-		PollInterval:       c.Int("poll-interval"),
-		PostgresURI:        c.String("postgres-uri"),
-		QueueWorkers:       c.Int("queue-workers"),
-		RedisURI:           c.String("redis-uri"),
+		NoUI:               cmd.Bool("no-ui"),
+		PollInterval:       cmd.Int("poll-interval"),
+		PostgresURI:        cmd.String("postgres-uri"),
+		QueueWorkers:       cmd.Int("queue-workers"),
+		RedisURI:           cmd.String("redis-uri"),
 		RequireKeys:        true,
-		RetryInterval:      c.Int("retry-interval"),
+		RetryInterval:      cmd.Int("retry-interval"),
 		SigningKey:         &signingKey,
-		SQLiteDir:          c.String("sqlite-dir"),
+		SQLiteDir:          cmd.String("sqlite-dir"),
 		Tick:               time.Duration(tick) * time.Millisecond,
-		URLs:               c.StringSlice("sdk-url"),
+		URLs:               cmd.StringSlice("sdk-url"),
 	}
 
 	err = devserver.New(ctx, opts)

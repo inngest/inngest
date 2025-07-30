@@ -10,7 +10,7 @@ import (
 	"github.com/inngest/inngest/pkg/inngest/clistate"
 	"github.com/inngest/inngest/pkg/inngest/version"
 	"github.com/inngest/inngestgo"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 const (
@@ -69,11 +69,11 @@ func NewMetadata(ctx context.Context) *Metadata {
 	}
 }
 
-func (m *Metadata) SetCliContext(c *cli.Context) {
+func (m *Metadata) SetCliContext(cmd *cli.Command) {
 	// Build command path similar to cobra's CommandPath()
-	cmdPath := c.App.Name
-	if c.Command != nil && c.Command.Name != "" {
-		cmdPath += " " + c.Command.Name
+	cmdPath := "inngest"
+	if cmd != nil && cmd.Name != "" {
+		cmdPath += " " + cmd.Name
 	}
 	m.Cmd = cmdPath
 }

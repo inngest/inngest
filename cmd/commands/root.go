@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"context"
 	"fmt"
 	"os"
 
@@ -8,8 +9,8 @@ import (
 	inncli "github.com/inngest/inngest/pkg/cli"
 	"github.com/inngest/inngest/pkg/inngest/version"
 	isatty "github.com/mattn/go-isatty"
-	"github.com/urfave/cli/v2"
 	"github.com/spf13/viper"
+	"github.com/urfave/cli/v3"
 )
 
 const (
@@ -42,7 +43,7 @@ func mergeFlags(commandFlags []cli.Flag) []cli.Flag {
 }
 
 func Execute() {
-	app := &cli.App{
+	app := &cli.Command{
 		Name: "inngest",
 		Usage: inncli.TextStyle.Render(fmt.Sprintf(
 			"%s %s\n\n%s",
@@ -51,49 +52,38 @@ func Execute() {
 			"The durable execution engine with built-in flow control.",
 		)),
 		Version: version.Print(),
-		UseShortOptionHandling: true,
-		Before: func(c *cli.Context) error {
+		Before: func(ctx context.Context, cmd *cli.Command) (context.Context, error) {
 			// Bind global flags to viper
-			if c.IsSet("log-level") {
-				viper.Set(ViperLogLevelKey, c.String("log-level"))
-			} else if c.Bool("verbose") {
+			if cmd.IsSet("log-level") {
+				viper.Set(ViperLogLevelKey, cmd.String("log-level"))
+			} else if cmd.Bool("verbose") {
 				viper.Set(ViperLogLevelKey, "debug")
 			} else {
 				viper.Set(ViperLogLevelKey, "info")
 			}
-			
-			// Also set the flag values in viper for other parts of the code
-			viper.Set("json", c.Bool("json"))
-			viper.Set("verbose", c.Bool("verbose"))
-			viper.Set("log-level", c.String("log-level"))
 
-			m := tel.NewMetadata(c.Context)
-			m.SetCliContext(c)
-			tel.SendMetadata(c.Context, m)
-			return nil
+			// Also set the flag values in viper for other parts of the code
+			viper.Set("json", cmd.Bool("json"))
+			viper.Set("verbose", cmd.Bool("verbose"))
+			viper.Set("log-level", cmd.String("log-level"))
+
+			m := tel.NewMetadata(ctx)
+			m.SetCliContext(cmd)
+			tel.SendMetadata(ctx, m)
+			return ctx, nil
 		},
-		After: func(c *cli.Context) error {
+		After: func(ctx context.Context, cmd *cli.Command) error {
 			// Wait for any events to have been sent.
 			tel.Wait()
 			return nil
 		},
 
-		// Add a note to the bottom of the help message
-		CustomAppHelpTemplate: cli.AppHelpTemplate + fmt.Sprintf(
-			"\n%s\n%s\n",
-			"Request features, get help, and chat with us: ",
-			"https://www.inngest.com/discord",
-		),
-
 		Flags: getGlobalFlags(),
-
-	}
-
-	// Add commands
-	app.Commands = []*cli.Command{
-		NewCmdDev(app),
-		NewCmdVersion(),
-		NewCmdStart(app),
+		Commands: []*cli.Command{
+			NewCmdDev(),
+			NewCmdVersion(),
+			NewCmdStart(),
+		},
 	}
 
 	// Set up flag binding with viper
@@ -110,7 +100,7 @@ func Execute() {
 		viper.Set("json", true)
 	}
 
-	if err := app.Run(os.Args); err != nil {
+	if err := app.Run(context.Background(), os.Args); err != nil {
 		fmt.Println(err)
 		os.Exit(1)
 	}

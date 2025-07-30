@@ -1,10 +1,11 @@
 package commands
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/inngest/inngest/pkg/inngest/version"
-	"github.com/urfave/cli/v2"
+	"github.com/urfave/cli/v3"
 )
 
 func NewCmdVersion() *cli.Command {
@@ -15,7 +16,7 @@ func NewCmdVersion() *cli.Command {
 			version.Print(),
 		),
 		Flags: getGlobalFlags(),
-		Action: func(c *cli.Context) error {
+		Action: func(ctx context.Context, cmd *cli.Command) error {
 			fmt.Println(version.Print())
 			return nil
 		},

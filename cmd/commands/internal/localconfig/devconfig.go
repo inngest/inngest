@@ -8,31 +8,31 @@ import (
 	"strings"
 
 	"github.com/inngest/inngest/pkg/logger"
-	"github.com/urfave/cli/v2"
 	"github.com/spf13/viper"
+	"github.com/urfave/cli/v3"
 )
 
-func InitDevConfig(ctx context.Context, c *cli.Context) error {
-	if err := mapDevFlags(c); err != nil {
+func InitDevConfig(ctx context.Context, cmd *cli.Command) error {
+	if err := mapDevFlags(cmd); err != nil {
 		return err
 	}
 
-	loadConfigFile(ctx, c)
+	loadConfigFile(ctx, cmd)
 
 	return nil
 }
 
-func InitStartConfig(ctx context.Context, c *cli.Context) error {
-	if err := mapStartFlags(c); err != nil {
+func InitStartConfig(ctx context.Context, cmd *cli.Command) error {
+	if err := mapStartFlags(cmd); err != nil {
 		return err
 	}
 
-	loadConfigFile(ctx, c)
+	loadConfigFile(ctx, cmd)
 
 	return nil
 }
 
-func loadConfigFile(ctx context.Context, c *cli.Context) {
+func loadConfigFile(ctx context.Context, cmd *cli.Command) {
 	l := logger.StdlibLogger(ctx)
 
 	// Automatially bind environment variables
@@ -40,7 +40,7 @@ func loadConfigFile(ctx context.Context, c *cli.Context) {
 	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
 	viper.AutomaticEnv()
 
-	configPath := c.String("config")
+	configPath := cmd.String("config")
 	if configPath != "" {
 		// User specified the config file so we'll use that
 		viper.SetConfigFile(configPath)
@@ -85,7 +85,7 @@ func loadConfigFile(ctx context.Context, c *cli.Context) {
 }
 
 // mapDevFlags binds the command line flags to the viper configuration
-func mapDevFlags(c *cli.Context) error {
+func mapDevFlags(cmd *cli.Command) error {
 	// With urfave/cli, we no longer need to bind flags to viper
 	// since we can access them directly from the context
 	// Keep this function for compatibility but make it a no-op
@@ -93,7 +93,7 @@ func mapDevFlags(c *cli.Context) error {
 }
 
 // mapStartFlags binds the command line flags to the viper configuration
-func mapStartFlags(c *cli.Context) error {
+func mapStartFlags(cmd *cli.Command) error {
 	// With urfave/cli, we no longer need to bind flags to viper
 	// since we can access them directly from the context
 	// Keep this function for compatibility but make it a no-op

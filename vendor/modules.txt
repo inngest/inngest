@@ -958,6 +958,9 @@ github.com/twmb/franz-go/pkg/kmsg/internal/kbin
 # github.com/urfave/cli/v2 v2.25.1
 ## explicit; go 1.18
 github.com/urfave/cli/v2
+# github.com/urfave/cli/v3 v3.3.8
+## explicit; go 1.22
+github.com/urfave/cli/v3
 # github.com/valyala/fastjson v1.6.4
 ## explicit; go 1.12
 github.com/valyala/fastjson
