@@ -18,7 +18,12 @@ export function ResultsTable() {
   return (
     <div className="flex h-full flex-col overflow-hidden">
       <div className="flex-1 overflow-auto" id="insights-table-container" onScroll={onScroll}>
-        <Table columns={columns} data={data.entries} isLoading={false} />
+        <Table
+          columns={columns}
+          data={data.entries}
+          isLoading={false}
+          cellClassName="[&:not(:first-child)]:border-l [&:not(:first-child)]:border-light box-border"
+        />
       </div>
       <ResultsTableFooter data={data} state={state} />
     </div>
