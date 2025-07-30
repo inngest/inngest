@@ -8,6 +8,8 @@ import (
 )
 
 func Command() *cli.Command {
+	// TODO: establish gRPC connection to debug API
+
 	return &cli.Command{
 		Name:    "debug",
 		Aliases: []string{"dbg"},
