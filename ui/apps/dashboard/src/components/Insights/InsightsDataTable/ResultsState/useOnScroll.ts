@@ -2,8 +2,9 @@ import { useCallback, type UIEventHandler } from 'react';
 
 import { type InsightsResult, type InsightsState } from '../types';
 
-// TODO: Handle case where data doesn't fill viewport on tall monitors
-// When content is short and doesn't trigger scroll, users can't access more data.
+// TODO: Handle case where a single page of data doesn't fill the container.
+// When this happens, the user will not be able to scroll, and will not be able to load more data.
+// For now, we'll just fetch 50 entries per page, mitigating the issue on any reasonable screen size.
 
 export function useOnScroll(
   data: InsightsResult | undefined,
