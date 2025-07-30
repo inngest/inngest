@@ -19,7 +19,7 @@ const EVENT_NAMES = [
 ];
 
 function generateEntry(id: number, hourOffset: number): any {
-  const baseTime = new Date('2023-11-22T13:30:01.000Z');
+  const baseTime = new Date('2025-04-22T13:30:00.000Z');
   baseTime.setHours(baseTime.getHours() + hourOffset);
 
   return {
@@ -83,7 +83,6 @@ const EMPTY_PAGE: InsightsResult = {
 };
 
 export function getMockPage(cursor: string | null): InsightsResult {
-  console.log('loading data for cursor:', cursor);
   if (cursor === null) return PAGE_1;
 
   switch (cursor) {
