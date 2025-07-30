@@ -509,6 +509,8 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 			return nil, fmt.Errorf("failed to route message: %w", err)
 		}
 
+		transport := "grpc"
+
 		// Forward the request
 		if i.shouldUseGRPC(ctx, opts.AccountID) {
 			err = i.gatewayGRPCManager.Forward(ctx, route.GatewayID, route.ConnectionID, opts.Data)
@@ -523,6 +525,7 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 				})
 			}
 		} else {
+			transport = "pubsub"
 			err = i.RouteExecutorRequest(ctx, route.GatewayID, route.ConnectionID, opts.Data)
 		}
 
@@ -537,6 +540,7 @@ func (i *redisPubSubConnector) Proxy(ctx, traceCtx context.Context, opts ProxyOp
 
 		metrics.IncrConnectRouterPubSubMessageSentCounter(ctx, 1, metrics.CounterOpt{
 			PkgName: pkgName,
+			Tags:    map[string]any{"transport": transport},
 		})
 	}
 
