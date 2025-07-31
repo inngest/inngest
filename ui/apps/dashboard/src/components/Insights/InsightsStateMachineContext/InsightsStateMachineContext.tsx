@@ -51,7 +51,7 @@ export function InsightsStateMachineContextProvider({ children }: { children: Re
         payload: stringifyError(error),
       });
     }
-  }, [queryState.status]);
+  }, [queryState.query]);
 
   const onChange = useCallback((value: string) => {
     dispatch({ type: 'UPDATE_CONTENT', payload: value });
@@ -72,11 +72,7 @@ export function InsightsStateMachineContextProvider({ children }: { children: Re
         payload: stringifyError(error),
       });
     }
-  }, [
-    queryState.status,
-    queryState.data?.pageInfo.hasNextPage,
-    queryState.data?.pageInfo.endCursor,
-  ]);
+  }, [queryState.data?.pageInfo.endCursor, queryState.lastSentQuery]);
 
   return (
     <InsightsQueryContext.Provider
