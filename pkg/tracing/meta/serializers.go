@@ -73,6 +73,22 @@ func AddAttrIfUnset[T any](r *SerializableAttrs, attr attr[T], value T) {
 	r.Attrs = append(r.Attrs, newAttr)
 }
 
+func GetAttr[T any](r *SerializableAttrs, attr attr[*T]) (*T, bool) {
+	// Attributes that are applied later will override earlier ones, so we
+	// iterate in reverse order.
+	for i := len(r.Attrs) - 1; i >= 0; i-- {
+		if r.Attrs[i].key == attr.Key() {
+			if val, ok := r.Attrs[i].value.(T); ok {
+				return &val, true
+			}
+
+			return nil, false
+		}
+	}
+
+	return nil, false
+}
+
 func (r *SerializableAttrs) AddErr(err error) {
 	if r.es == nil {
 		r.es = util.NewErrSet()
