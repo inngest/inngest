@@ -568,7 +568,7 @@ func (q *queue) QueueIterator(ctx context.Context, opts QueueIteratorOpts) (part
 				atomic.AddInt64(&totalQueueItems, itemCount)
 				atomic.AddInt64(&totalPartitions, 1)
 				if err := q.tenantInstrumentor(ctx, pk); err != nil {
-					log.Error("error running tenant instrumentor", "error", err)
+					log.ReportError(err, "error running tenant instrumentor")
 				}
 			}(ctx, pk)
 

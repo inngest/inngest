@@ -9,4 +9,5 @@ export const statusTitles: Record<string, string> = {
   PAUSED: 'Paused',
   INACTIVE: 'Inactive',
   ACTIVE: 'Active',
+  ARCHIVED: 'Archived',
 };

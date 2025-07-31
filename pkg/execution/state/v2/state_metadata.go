@@ -101,6 +101,11 @@ func (m Metadata) ShouldCoalesceParallelism(resp *statev1.DriverResponse) bool {
 	return reqVersion >= 2
 }
 
+// IdempotencyKey returns a unique key for this run, intended to used as part of
+// an idempotency key when enqueuing steps.
+//
+// NOT to be used for run-level idempotency keys; this is exclusively used for
+// step-level idepotency. For that purpose, use `Identifier.IdempotencyKey()`.
 func (m Metadata) IdempotencyKey() string {
 	key := m.Config.Idempotency
 	if key == "" {
