@@ -370,7 +370,7 @@ func TestParseStream_FormUrlencoded(t *testing.T) {
 
 		n := 0
 		for item := range stream {
-			// The multipart parser creates a JSON object with form fields as keys
+			// The parser creates a JSON object with form fields as keys
 			var result map[string]any
 			r.NoError(json.Unmarshal(item.Item, &result))
 			r.Equal(map[string]any{
