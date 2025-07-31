@@ -1,7 +1,7 @@
 'use client';
 
 import { usePaginationUI } from '@inngest/components/Pagination';
-import { cn } from '@inngest/components/utils/classNames';
+import { StatusDot } from '@inngest/components/Status/StatusDot';
 
 import type { Environment } from '@/utils/environments';
 import { FilterResultDetails } from './FilterResultDetails';
@@ -78,12 +78,7 @@ function TableRow(props: { env: Environment }) {
     <tr>
       <td className="max-w-80 px-4 py-3">
         <h3 className="text-basis flex items-center gap-2 break-words text-sm font-medium">
-          <span
-            className={cn(
-              'block h-2 w-2 flex-shrink-0 rounded-full',
-              isArchived ? 'bg-surfaceMuted' : 'bg-primary-moderate'
-            )}
-          />
+          <StatusDot status={isArchived ? 'ARCHIVED' : 'ACTIVE'} size="small" />
           {name}
         </h3>
       </td>

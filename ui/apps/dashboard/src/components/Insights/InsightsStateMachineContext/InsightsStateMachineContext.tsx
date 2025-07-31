@@ -27,14 +27,14 @@ const INITIAL_STATE: InsightsState = {
   status: 'initial',
 };
 
-interface InsightsQueryContextValue extends InsightsState {
+interface InsightsStateMachineContextValue extends InsightsState {
   fetchMore: () => void;
   isEmpty: boolean;
   onChange: (value: string) => void;
   runQuery: () => void;
 }
 
-const InsightsQueryContext = createContext<InsightsQueryContextValue | null>(null);
+const InsightsStateMachineContext = createContext<InsightsStateMachineContextValue | null>(null);
 
 export function InsightsStateMachineContextProvider({ children }: { children: ReactNode }) {
   const [queryState, dispatch] = useReducer(insightsStateMachineReducer, INITIAL_STATE);
@@ -51,7 +51,7 @@ export function InsightsStateMachineContextProvider({ children }: { children: Re
         payload: stringifyError(error),
       });
     }
-  }, [queryState.status]);
+  }, [queryState.query]);
 
   const onChange = useCallback((value: string) => {
     dispatch({ type: 'UPDATE_CONTENT', payload: value });
@@ -72,14 +72,10 @@ export function InsightsStateMachineContextProvider({ children }: { children: Re
         payload: stringifyError(error),
       });
     }
-  }, [
-    queryState.status,
-    queryState.data?.pageInfo.hasNextPage,
-    queryState.data?.pageInfo.endCursor,
-  ]);
+  }, [queryState.data?.pageInfo.endCursor, queryState.lastSentQuery]);
 
   return (
-    <InsightsQueryContext.Provider
+    <InsightsStateMachineContext.Provider
       value={{
         ...queryState,
         fetchMore,
@@ -89,7 +85,7 @@ export function InsightsStateMachineContextProvider({ children }: { children: Re
       }}
     >
       {children}
-    </InsightsQueryContext.Provider>
+    </InsightsStateMachineContext.Provider>
   );
 }
 
@@ -99,7 +95,7 @@ function stringifyError(error: unknown): string {
 }
 
 export function useInsightsStateMachineContext() {
-  const context = useContext(InsightsQueryContext);
+  const context = useContext(InsightsStateMachineContext);
   if (!context) {
     throw new Error(
       'useInsightsStateMachineContext must be used within InsightsStateMachineContextProvider'
