@@ -1309,7 +1309,7 @@ func (e *executor) finalize(ctx context.Context, md sv2.Metadata, evts []json.Ra
 		Attributes: tracing.DriverResponseAttrs(&resp, outputSpanRef),
 	})
 	if err != nil {
-		l.Error(
+		l.Debug(
 			"error updating run span end time",
 			"error", err,
 			"run_id", md.ID.RunID.String(),
