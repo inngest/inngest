@@ -8,7 +8,12 @@ import (
 
 	"github.com/fatih/structs"
 	"github.com/google/uuid"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
+	"github.com/inngest/inngest/pkg/execution/exechttp"
+	"github.com/inngest/inngest/pkg/execution/queue"
+	"github.com/inngest/inngest/pkg/execution/state"
+	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/inngest/inngestgo"
@@ -93,6 +98,7 @@ func (r CheckpointNewRunRequest) FnID(appID uuid.UUID) uuid.UUID {
 }
 
 func (r CheckpointNewRunRequest) Fn(appID uuid.UUID) inngest.Function {
+	uri := r.Event.Data.Domain + r.Event.Data.Path + "?x-inngest-type=sync&x-inngest-method=" + r.Event.Data.Method
 	return inngest.Function{
 		ID:              r.FnID(appID),
 		ConfigVersion:   1,
@@ -103,7 +109,7 @@ func (r CheckpointNewRunRequest) Fn(appID uuid.UUID) inngest.Function {
 			{
 				ID:      "step",
 				Name:    r.FnSlug(),
-				URI:     r.Event.Data.Domain + r.Event.Data.Path,
+				URI:     uri,
 				Retries: inngestgo.Ptr(0),
 			},
 		},
@@ -168,4 +174,106 @@ func runEvent(r CheckpointNewRunRequest) event.Event {
 	}
 
 	return evt
+}
+
+// checkpointRunContext implements execution.RunContext for use in checkpoint API calls
+type checkpointRunContext struct {
+	md         sv2.Metadata
+	httpClient exechttp.RequestExecutor
+	events     []json.RawMessage
+
+	// Data from queue.Item that we actually need
+	groupID         string
+	attemptCount    int
+	maxAttempts     int
+	priorityFactor  *int64
+	concurrencyKeys []state.CustomConcurrency
+	parallelMode    enums.ParallelMode
+}
+
+func (c *checkpointRunContext) Metadata() *sv2.Metadata {
+	return &c.md
+}
+
+func (c *checkpointRunContext) Events() []json.RawMessage {
+	return c.events
+}
+
+func (c *checkpointRunContext) HTTPClient() exechttp.RequestExecutor {
+	return c.httpClient
+}
+
+func (c *checkpointRunContext) GroupID() string {
+	return c.groupID
+}
+
+func (c *checkpointRunContext) AttemptCount() int {
+	return c.attemptCount
+}
+
+func (c *checkpointRunContext) MaxAttempts() *int {
+	return &c.maxAttempts
+}
+
+func (c *checkpointRunContext) ShouldRetry() bool {
+	return c.attemptCount < c.maxAttempts
+}
+
+func (c *checkpointRunContext) IncrementAttempt() {
+	c.attemptCount++
+}
+
+func (c *checkpointRunContext) PriorityFactor() *int64 {
+	// TODO
+	return c.priorityFactor
+}
+
+func (c *checkpointRunContext) ConcurrencyKeys() []state.CustomConcurrency {
+	// TODO
+	return c.concurrencyKeys
+}
+
+func (c *checkpointRunContext) ParallelMode() enums.ParallelMode {
+	// TODO
+	return c.parallelMode
+}
+
+func (c *checkpointRunContext) LifecycleItem() queue.Item {
+	// For checkpoint context, we create a minimal queue.Item for lifecycle events
+	// This is the one place we still need to construct a queue.Item, but it's much simpler
+	return queue.Item{
+		Identifier: state.Identifier{
+			WorkspaceID: c.md.ID.Tenant.EnvID,
+			AppID:       c.md.ID.Tenant.AppID,
+			WorkflowID:  c.md.ID.FunctionID,
+			RunID:       c.md.ID.RunID,
+		},
+		WorkspaceID:           c.md.ID.Tenant.EnvID,
+		GroupID:               c.groupID,
+		Attempt:               c.attemptCount,
+		PriorityFactor:        c.priorityFactor,
+		CustomConcurrencyKeys: c.concurrencyKeys,
+		ParallelMode:          c.parallelMode,
+		Payload:               queue.PayloadEdge{
+			// TODO
+		},
+	}
+}
+
+func (c *checkpointRunContext) SetStatusCode(code int) {
+	// this is a noop.
+}
+
+func (c *checkpointRunContext) UpdateOpcodeError(op *state.GeneratorOpcode, err state.UserError) {
+	// TODO: Update the error by storing the opcodes in the checkpoint
+	// struct c.
+}
+
+func (c *checkpointRunContext) UpdateOpcodeOutput(op *state.GeneratorOpcode, output json.RawMessage) {
+	// TODO: Update the output by storing the opcodes in the
+	// checkpoint struct c.
+}
+
+func (c *checkpointRunContext) SetError(err error) {
+	// TODO
 }

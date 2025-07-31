@@ -17,6 +17,7 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
+	"github.com/inngest/inngest/pkg/execution/exechttp"
 	"github.com/inngest/inngest/pkg/execution/state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/logger"
@@ -198,6 +199,9 @@ func (a checkpointAPI) CheckpointSteps(w http.ResponseWriter, r *http.Request) {
 	// Depending on the type of steps, we may end up switching the run from sync to async.  For example,
 	// if the opcodes are sleeps, waitForEvents, inferences, etc. we will be resuming the API endpoint
 	// at some point in the future.
+	//
+	// TODO: How many steps are async?  If > 1, we are entering parallelism.
+
 	for _, op := range input.Steps {
 		attrs := tracing.GeneratorAttrs(&op)
 
@@ -235,6 +239,9 @@ func (a checkpointAPI) CheckpointSteps(w http.ResponseWriter, r *http.Request) {
 				},
 			)
 			_, _ = ref, err
+		// TODO: Handle error
+
+		// When we add enums.OpcodeRunComplete, handle this appropriately.
 		// case enums.OpcodeFunctionComplete:
 		// 	result := APIResult{}
 		// 	if err := json.Unmarshal(op.Data, &result); err != nil {
@@ -245,9 +252,36 @@ func (a checkpointAPI) CheckpointSteps(w http.ResponseWriter, r *http.Request) {
 		// 		// TODO: err
 		// 		return
 		// 	}
+
 		default:
-			// This is now async.  For now, do NOT allow this.
-			panic("TODO")
+			// Create HTTP client using exechttp.Client
+			client := exechttp.Client(exechttp.SecureDialerOpts{})
+			httpClient := &client
+
+			// Create the run context with simplified data
+			runCtx := &checkpointRunContext{
+				md:              md,
+				httpClient:      httpClient,
+				events:          []json.RawMessage{}, // Empty for checkpoint context
+				groupID:         uuid.New().String(),
+				attemptCount:    0,
+				maxAttempts:     3,                           // Default retry count
+				priorityFactor:  nil,                         // Use default priority
+				concurrencyKeys: []state.CustomConcurrency{}, // No custom concurrency
+				parallelMode:    enums.ParallelModeWait,      // Default to serial
+			}
+
+			if err := a.Executor.HandleGenerator(ctx, runCtx, op); err != nil {
+				// TODO: log error and handle appropriately
+				logger.StdlibLogger(ctx).Error(
+					"error handling generator in checkpoint",
+					"error", err,
+					"run_id", md.ID.RunID.String(),
+					"opcode", op.Op,
+				)
+			}
+
+			return
 		}
 	}
 }
