@@ -20,8 +20,6 @@ export const EDITOR_OPTIONS: editor.IEditorOptions = {
   minimap: {
     enabled: false,
   },
-  // expected value of 'off' doesn't work as expected
-  occurrencesHighlight: false as any,
   overviewRulerLanes: 0,
   padding: {
     top: 10,

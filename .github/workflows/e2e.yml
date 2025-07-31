@@ -41,7 +41,7 @@ jobs:
         run: make build-ui
       - name: Build dev serve
         run: |
-          go build -cover -o ./inngest-bin ./cmd/main.go
+          go build -cover -o ./inngest-bin ./cmd
       - name: Run E2E tests
         run: |
           cd ./tests/js
@@ -95,7 +95,7 @@ jobs:
           go-version: "1.24"
       - name: Build dev server
         run: |
-          go build -cover -o ./inngest-bin ./cmd/main.go
+          go build -cover -o ./inngest-bin ./cmd
       - name: Run E2E tests
         run: |
           echo "Running dev server"

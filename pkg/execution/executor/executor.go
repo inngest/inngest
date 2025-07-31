@@ -2685,7 +2685,7 @@ func (e *executor) handleGeneratorStepPlanned(ctx context.Context, i *runInstanc
 	ctx = state.WithGroupID(ctx, groupID)
 
 	// Re-enqueue the exact same edge to run now.
-	jobID := fmt.Sprintf("%s-%s", i.item.Identifier.IdempotencyKey(), gen.ID+"-plan")
+	jobID := fmt.Sprintf("%s-%s", i.md.IdempotencyKey(), gen.ID+"-plan")
 	now := time.Now()
 	nextItem := queue.Item{
 		JobID:                 &jobID,

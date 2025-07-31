@@ -4,8 +4,6 @@ import (
 	"os"
 	"time"
 	_ "time/tzdata" // bundles timezone data, required for Windows without Go
-
-	"github.com/inngest/inngest/cmd/commands"
 )
 
 func main() {
@@ -16,5 +14,5 @@ func main() {
 	}
 	time.Local = time.UTC
 
-	commands.Execute()
+	execute()
 }
