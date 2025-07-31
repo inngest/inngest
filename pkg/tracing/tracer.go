@@ -236,13 +236,6 @@ func (tp *otelTracerProvider) CreateDroppableSpan(
 		spanRef.DynamicSpanTraceState = refTs
 	}
 
-	// If this is a userland span, we trust their span ID to be the dynamic
-	// span ID instead of context, so as to preserve their lineage. Also, a
-	// userland span will never be dynamic!
-	if userlandSpanID, ok := meta.GetAttr(attrs, meta.Attrs.UserlandSpanID); ok {
-		spanRef.DynamicSpanID = *userlandSpanID
-	}
-
 	span.SetAttributes(
 		attribute.String(meta.Attrs.DynamicSpanID.Key(), spanRef.DynamicSpanID),
 	)

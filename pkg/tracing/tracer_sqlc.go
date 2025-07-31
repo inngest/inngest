@@ -176,6 +176,7 @@ func (e *dbExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlyS
 		// it's part of a remote lineage.
 		if userlandSpanID != "" {
 			spanID = userlandSpanID
+			dynamicSpanID = userlandSpanID
 		}
 
 		// If we don't have a run ID, we can't store this span
