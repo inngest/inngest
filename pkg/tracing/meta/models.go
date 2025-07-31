@@ -90,12 +90,19 @@ func (sr *SpanReference) SetToCtx(ctx context.Context) context.Context {
 	return context.WithValue(ctx, ctxKey{}, sr)
 }
 
-func (sr *SpanReference) QueryString() (string, error) {
+func (sr *SpanReference) MarshalForSDK() (string, error) {
 	if sr == nil {
 		return "", fmt.Errorf("span reference is nil")
 	}
 
-	byt, err := json.Marshal(sr)
+	// We only want some values; dynamic span information is not needed when
+	// passing this.
+	srForSDK := &SpanReference{
+		TraceParent: sr.TraceParent,
+		TraceState:  sr.TraceState,
+	}
+
+	byt, err := json.Marshal(srForSDK)
 	if err != nil {
 		return "", fmt.Errorf("failed to marshal span reference: %w", err)
 	}
