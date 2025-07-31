@@ -861,7 +861,7 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			TargetSpan: tracing.SpanRefFromQueueItem(&item),
 		})
 		if err != nil {
-			return nil, fmt.Errorf("error updating sleep resume span: %w", err)
+			l.Debug("error updating sleep resume span", "error", err)
 		}
 
 		hasPendingSteps, err := e.smv2.SaveStep(ctx, sv2.ID{
