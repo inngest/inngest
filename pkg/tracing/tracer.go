@@ -161,6 +161,9 @@ func (tp *otelTracerProvider) CreateDroppableSpan(
 	if attrs == nil {
 		attrs = meta.NewAttrSet()
 	}
+
+	meta.AddAttr(attrs, meta.Attrs.StartedAt, &st)
+
 	if opts.Debug != nil {
 		if opts.Debug.Location != "" {
 			meta.AddAttr(attrs, meta.Attrs.InternalLocation, &opts.Debug.Location)
