@@ -25,6 +25,7 @@ export function TableFilter({ options, columnVisibility, setColumnVisibility }: 
       }}
       label="Table columns"
       isLabelVisible={false}
+      size="small"
     >
       <Select.Button isLabelVisible={false} size="small">
         <div className="text-left">Table columns</div>
@@ -34,7 +35,7 @@ export function TableFilter({ options, columnVisibility, setColumnVisibility }: 
           return (
             <Select.CheckboxOption key={option.id} option={option}>
               <span className="flex items-center gap-1 lowercase">
-                <label className="text-sm first-letter:capitalize">{option.name}</label>
+                <label className="first-letter:capitalize">{option.name}</label>
               </span>
             </Select.CheckboxOption>
           );
