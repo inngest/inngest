@@ -1,13 +1,15 @@
+'use client';
+
 import { useCallback, type UIEventHandler } from 'react';
 
-import {
-  type InsightsFetchResult,
-  type InsightsStatus,
-} from '../../InsightsStateMachineContext/types';
+import type {
+  InsightsFetchResult,
+  InsightsStatus,
+} from '@/components/Insights/InsightsStateMachineContext/types';
 
 // TODO: Handle case where a single page of data doesn't fill the container.
 // When this happens, the user will not be able to scroll, and will not be able to load more data.
-// For now, we'll just fetch 50 entries per page, mitigating the issue on any reasonable screen size.
+// For now, we'll just fetch 30 entries per page, mitigating the issue on any reasonable screen size.
 
 export function useOnScroll(
   data: InsightsFetchResult | undefined,
