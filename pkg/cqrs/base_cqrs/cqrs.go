@@ -166,6 +166,7 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 
 	var root *cqrs.OtelSpan
 	var runID ulid.ULID
+	var err error
 
 	for _, span := range spans {
 		// Use interface methods to get the fields directly
@@ -313,8 +314,30 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 		spanMap.Set(dynamicSpanID.String, newSpan)
 	}
 
+	// Build a reverse lookup map for output references
+	outputDynamicRefs := make(map[string]*string)
+	for spanID, ioRef := range dynamicRefs {
+		if ioRef != nil && ioRef.OutputRef != "" {
+			outputDynamicRefs[ioRef.OutputRef] = &spanID
+		}
+	}
+
 	for _, span := range spanMap.AllFromFront() {
-		if span.ParentSpanID == nil || *span.ParentSpanID == "" || *span.ParentSpanID == "0000000000000000" {
+		// If we have an output reference for this span, set the appropriate
+		// target span ID here
+		if spanRefStr := span.Attributes.StepOutputRef; spanRefStr != nil && *spanRefStr != "" {
+			if targetSpanID, ok := outputDynamicRefs[*spanRefStr]; ok {
+				// We've found the span ID that we need to target for
+				// this span. So let's use it!
+				span.OutputID, err = encodeSpanOutputID(targetSpanID, nil)
+				if err != nil {
+					logger.StdlibLogger(ctx).Error("error encoding span output ID", "error", err)
+					return nil, err
+				}
+			}
+		}
+
+		if (span.Attributes.IsUserland == nil || !*span.Attributes.IsUserland) && (span.ParentSpanID == nil || *span.ParentSpanID == "" || *span.ParentSpanID == "0000000000000000") {
 			root, _ = spanMap.Get(span.SpanID)
 			continue
 		}
