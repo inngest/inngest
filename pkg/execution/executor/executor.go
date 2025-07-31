@@ -1299,11 +1299,12 @@ func (e *executor) finalize(ctx context.Context, md sv2.Metadata, evts []json.Ra
 		runStatus = enums.StepStatusFailed
 	}
 
+	targetSpan := tracing.RunSpanRefFromMetadata(&md)
 	err := e.tracerProvider.UpdateSpan(&tracing.UpdateSpanOptions{
 		EndTime:    time.Now(),
 		Debug:      &tracing.SpanDebugData{Location: "executor.finalize"},
 		Metadata:   &md,
-		TargetSpan: tracing.RunSpanRefFromMetadata(&md),
+		TargetSpan: targetSpan,
 		Status:     runStatus,
 		Attributes: tracing.DriverResponseAttrs(&resp, outputSpanRef),
 	})
@@ -1312,6 +1313,7 @@ func (e *executor) finalize(ctx context.Context, md sv2.Metadata, evts []json.Ra
 			"error updating run span end time",
 			"error", err,
 			"run_id", md.ID.RunID.String(),
+			"target_span", targetSpan,
 		)
 	}
 
