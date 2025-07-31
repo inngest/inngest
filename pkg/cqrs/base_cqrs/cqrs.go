@@ -220,7 +220,7 @@ func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.Ot
 
 		}
 
-		if span.ParentSpanID == nil || *span.ParentSpanID == "" || *span.ParentSpanID == "0000000000000000" {
+		if (span.Attributes.IsUserland == nil || !*span.Attributes.IsUserland) && (span.ParentSpanID == nil || *span.ParentSpanID == "" || *span.ParentSpanID == "0000000000000000") {
 			root = spanMap[span.SpanID]
 			continue
 		}
