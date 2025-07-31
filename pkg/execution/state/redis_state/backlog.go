@@ -14,6 +14,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/enums"
 	osqueue "github.com/inngest/inngest/pkg/execution/queue"
+	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 	"github.com/inngest/inngest/pkg/util"
 	"github.com/oklog/ulid/v2"
@@ -1119,9 +1120,11 @@ func (q *queue) PartitionBacklogSize(ctx context.Context, partitionID string) (i
 		go func() {
 			defer wg.Done()
 
+			log := l.With("shard", shard.Name)
+
 			backlogs, err := q.BacklogsByPartition(ctx, shard, partitionID, time.Time{}, until)
 			if err != nil {
-				l.Error("error preparing backlog iterator", "error", err, "shard", shard)
+				log.ReportError(err, "error preparing backlog iterator")
 				return
 			}
 
@@ -1135,7 +1138,12 @@ func (q *queue) PartitionBacklogSize(ctx context.Context, partitionID string) (i
 
 					size, err := q.BacklogSize(ctx, shard, backlogID)
 					if err != nil {
-						l.Error("error retrieving backlog size", "error", err, "backlog", bl)
+						log.ReportError(err, "error retrieving backlog size",
+							logger.WithErrorReportTags(map[string]string{
+								"backlog":   bl.BacklogID,
+								"partition": bl.ShadowPartitionID,
+							}),
+						)
 						return
 					}
 					atomic.AddInt64(&count, size)
