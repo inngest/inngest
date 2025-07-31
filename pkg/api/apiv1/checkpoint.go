@@ -365,7 +365,6 @@ func (a checkpointAPI) upsertSyncData(ctx context.Context, auth apiv1auth.V1Auth
 			logger.StdlibLogger(ctx).Error("failed to update fn config",
 				"error", err,
 				"app_id", input.AppID(auth.WorkspaceID()),
-				"app_slug", input.AppSlug(),
 			)
 		}
 		return
@@ -381,7 +380,6 @@ func (a checkpointAPI) upsertSyncData(ctx context.Context, auth apiv1auth.V1Auth
 		logger.StdlibLogger(ctx).Error("failed to upsert app",
 			"error", err,
 			"app_id", input.AppID(auth.WorkspaceID()),
-			"app_slug", input.AppSlug(),
 		)
 		return
 	}
@@ -401,7 +399,6 @@ func (a checkpointAPI) upsertSyncData(ctx context.Context, auth apiv1auth.V1Auth
 			logger.StdlibLogger(ctx).Error("failed to update fn config",
 				"error", err,
 				"app_id", input.AppID(auth.WorkspaceID()),
-				"app_slug", input.AppSlug(),
 			)
 		}
 		return
@@ -421,7 +418,6 @@ func (a checkpointAPI) upsertSyncData(ctx context.Context, auth apiv1auth.V1Auth
 		logger.StdlibLogger(ctx).Error("failed to insert function",
 			"error", err,
 			"function_id", input.FnID(input.AppID(auth.WorkspaceID())),
-			"function_slug", input.FnSlug(),
 			"app_id", app.ID,
 		)
 		return
@@ -434,7 +430,6 @@ func (a checkpointAPI) upsertSyncData(ctx context.Context, auth apiv1auth.V1Auth
 	logger.StdlibLogger(ctx).Debug("upserted fn",
 		"error", err,
 		"function_id", input.FnID(input.AppID(auth.WorkspaceID())),
-		"function_slug", input.FnSlug(),
 		"app_id", app.ID,
 	)
 }
