@@ -561,7 +561,8 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		},
 	)
 	if err != nil {
-		return nil, fmt.Errorf("error creating run span: %w", err)
+		// return nil, fmt.Errorf("error creating run span: %w", err)
+		l.Debug("error creating run span", "error", err)
 	}
 
 	config.NewSetFunctionTrace(runSpanRef)
@@ -1040,7 +1041,9 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			},
 		)
 		if err != nil {
-			return nil, fmt.Errorf("error creating initial step span: %w", err)
+			// return nil, fmt.Errorf("error creating initial step span: %w",
+			// err)
+			l.Debug("error creating initial step span", "error", err)
 		}
 
 	} else if isSleepResume {
@@ -1057,7 +1060,9 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 			},
 		)
 		if err != nil {
-			return nil, fmt.Errorf("error creating discovery step span after sleep resume: %w", err)
+			// return nil, fmt.Errorf("error creating discovery step span
+			// after sleep resume: %w", err)
+			l.Debug("error creating discovery step span after sleep resume", "error", err)
 		}
 	} else {
 		// If we're here, we assume that the step span has already been
@@ -1078,7 +1083,8 @@ func (e *executor) Execute(ctx context.Context, id state.Identifier, item queue.
 		},
 	)
 	if err != nil {
-		return nil, fmt.Errorf("error creating execution span: %w", err)
+		// return nil, fmt.Errorf("error creating execution span: %w", err)
+		l.Debug("error creating execution span", "error", err)
 	}
 
 	return util.CritT(ctx, "run step", func(ctx context.Context) (*state.DriverResponse, error) {
@@ -2212,7 +2218,9 @@ func (e *executor) Resume(ctx context.Context, pause state.Pause, r execution.Re
 				},
 			)
 			if err != nil {
-				return fmt.Errorf("error creating span for next step after resume: %w", err)
+				// return fmt.Errorf("error creating span for next step
+				// after resume: %w", err)
+				e.log.Debug("error creating span for next step after resume", "error", err)
 			}
 
 			err = e.queue.Enqueue(ctx, nextItem, time.Now(), queue.EnqueueOpts{})
@@ -2501,7 +2509,9 @@ func (e *executor) handleGeneratorStep(ctx context.Context, i *runInstance, gen 
 			},
 		)
 		if err != nil {
-			return fmt.Errorf("error creating span for next step after Step: %w", err)
+			// return fmt.Errorf("error creating span for next step after
+			// Step: %w", err)
+			e.log.Debug("error creating span for next step after Step", "error", err)
 		}
 
 		err = e.queue.Enqueue(ctx, nextItem, now, queue.EnqueueOpts{})
@@ -2645,7 +2655,9 @@ func (e *executor) handleStepError(ctx context.Context, i *runInstance, gen stat
 			},
 		)
 		if err != nil {
-			return fmt.Errorf("error creating span for next step after StepError: %w", err)
+			// return fmt.Errorf("error creating span for next step after
+			// StepError: %w", err)
+			e.log.Debug("error creating span for next step after StepError", "error", err)
 		}
 
 		err = e.queue.Enqueue(ctx, nextItem, now, queue.EnqueueOpts{})
@@ -2720,7 +2732,9 @@ func (e *executor) handleGeneratorStepPlanned(ctx context.Context, i *runInstanc
 		},
 	)
 	if err != nil {
-		return fmt.Errorf("error creating span for next step after StepPlanned: %w", err)
+		// return fmt.Errorf("error creating span for next step after
+		// StepPlanned: %w", err)
+		e.log.Debug("error creating span for next step after StepPlanned", "error", err)
 	}
 
 	err = e.queue.Enqueue(ctx, nextItem, now, queue.EnqueueOpts{})
@@ -2792,7 +2806,9 @@ func (e *executor) handleGeneratorSleep(ctx context.Context, i *runInstance, gen
 		},
 	)
 	if err != nil {
-		return fmt.Errorf("error creating span for next step after Sleep: %w", err)
+		// return fmt.Errorf("error creating span for next step after Sleep:
+		// %w", err)
+		e.log.Debug("error creating span for next step after Sleep", "error", err)
 	}
 
 	err = e.queue.Enqueue(ctx, nextItem, until, queue.EnqueueOpts{
@@ -3466,7 +3482,9 @@ func (e *executor) handleGeneratorWaitForEvent(ctx context.Context, i *runInstan
 		},
 	)
 	if err != nil {
-		return fmt.Errorf("error creating span for next step after WaitForEvent: %w", err)
+		// return fmt.Errorf("error creating span for next step after
+		// WaitForEvent: %w", err)
+		e.log.Debug("error creating span for next step after WaitForEvent", "error", err)
 	}
 
 	idx := pauses.Index{WorkspaceID: i.md.ID.Tenant.EnvID, EventName: opts.Event}
