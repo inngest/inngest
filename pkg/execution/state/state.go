@@ -176,8 +176,11 @@ func (c CustomConcurrency) ParseKey() (scope enums.ConcurrencyScope, id uuid.UUI
 	}
 }
 
-// IdempotencyKey returns the unique key used to represent this single
-// workflow run, across all steps.
+// IdempotencyKey returns the unique key used to represent this single workflow
+// run, across all steps.
+//
+// NOT to be used for step/queue idempotency keys; this is exclusively used for
+// run-level idempotency. For that purpose, use `Metadata.IdempotencyKey()`.
 func (i Identifier) IdempotencyKey() string {
 	key := i.Key
 	if i.Key == "" {

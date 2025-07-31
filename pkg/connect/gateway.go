@@ -221,7 +221,7 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 
 		conn, serr := ch.establishConnection(ctx)
 		if serr != nil {
-			ch.log.ReportError(err, "error establishing connection")
+			ch.log.ReportError(serr, "error establishing connection")
 			c.closeWithConnectError(ws, serr)
 
 			return

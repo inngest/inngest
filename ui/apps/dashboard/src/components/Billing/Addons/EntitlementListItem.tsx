@@ -34,6 +34,7 @@ export default function EntitlementListItem({
     maxValue: number;
     quantityPer: number; // The number of units (e.g. concurrency or users) included in one purchase of this addon
     price: number | null; // Price for one purchase of this addon, in US Cents.
+    purchased?: boolean;
   }; // No addon, or no price, implies self-service is not available.
   onChange?: () => void;
 }) {
@@ -72,6 +73,7 @@ export default function EntitlementListItem({
           quantityPer: addon.quantityPer,
           addonName: addon.name,
         }}
+        addonPurchased={addon.purchased}
         onChange={onChange}
       />
     );

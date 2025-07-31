@@ -5,12 +5,12 @@ dev:
 # specifically for tests
 .PHONY: run
 run:
-	TEST_MODE=true LOG_LEVEL=trace go run ./cmd/main.go dev --tick=50 --no-poll --no-discovery -v $(PARAMS)
+	TEST_MODE=true LOG_LEVEL=trace go run ./cmd dev --tick=50 --no-poll --no-discovery --verbose $(PARAMS)
 
 # Start with debug mode in Delve
 .PHONY: debug
 debug:
-	TEST_MODE=true LOG_LEVEL=trace dlv debug ./cmd/main.go --headless --listen=127.0.0.1:40000 --continue --accept-multiclient --log -- dev --tick=50 --no-poll --no-discovery -v $(PARAMS)
+	TEST_MODE=true LOG_LEVEL=trace dlv debug ./cmd --headless --listen=127.0.0.1:40000 --continue --accept-multiclient --log -- dev --tick=50 --no-poll --no-discovery --verbose $(PARAMS)
 
 xgo:
 	xgo -pkg cmd -ldflags="-s -w" -out build/inngest -targets "linux/arm64,linux/amd64,darwin/arm64,darwin/amd64" .
