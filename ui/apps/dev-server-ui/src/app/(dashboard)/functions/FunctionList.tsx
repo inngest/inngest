@@ -3,6 +3,7 @@
 import { useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { BlankSlate } from '@inngest/components/BlankSlate';
+import { Search } from '@inngest/components/Forms/Search';
 import { Header } from '@inngest/components/Header/Header';
 import { Info } from '@inngest/components/Info/Info';
 import { InvokeButton } from '@inngest/components/InvokeButton';
@@ -22,7 +23,6 @@ import {
 } from '@tanstack/react-table';
 import { toast } from 'sonner';
 
-import SearchInput from '@/components/SearchInput/SearchInput';
 import {
   FunctionTriggerTypes,
   useGetFunctionsQuery,
@@ -207,15 +207,19 @@ export default function FunctionList() {
             }
           />
         }
-        action={
-          <SearchInput
-            placeholder="Search function..."
-            value={searchInput}
-            onChange={setSearchInput}
-            debouncedSearch={debouncedSearch}
-          />
-        }
       />
+      <div className="mx-3 flex h-11 min-h-11 items-center">
+        <Search
+          name="search"
+          placeholder="Search by function name"
+          value={searchInput}
+          className="w-[182px]"
+          onUpdate={(value) => {
+            setSearchInput(value);
+            debouncedSearch();
+          }}
+        />
+      </div>
       <main className="min-h-0 overflow-y-auto" ref={tableContainerRef}>
         <Table
           options={{

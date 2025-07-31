@@ -245,8 +245,8 @@ export function EventsTable({
   return (
     <div className="bg-canvasBase text-basis no-scrollbar flex-1 overflow-hidden focus-visible:outline-none">
       <div className="bg-canvasBase sticky top-0 z-10">
-        <div className="m-3 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
+        <div className="mx-3 flex h-11 items-center justify-between gap-1.5">
+          <div className="flex items-center gap-1.5">
             {/* <EntityFilter
               type="event"
               onFilterChange={onEventFilterChange}
@@ -257,7 +257,8 @@ export function EventsTable({
             {cloud ? (
               <Button
                 icon={<RiSearchLine />}
-                size="large"
+                size="small"
+                kind="secondary"
                 iconSide="left"
                 appearance="outlined"
                 label={showSearch ? 'Hide search' : 'Show search'}
@@ -265,7 +266,8 @@ export function EventsTable({
                 className={cn(
                   search
                     ? 'after:bg-secondary-moderate after:mb-3 after:ml-0.5 after:h-2 after:w-2 after:rounded'
-                    : ''
+                    : '',
+                  'h-[26px] w-[103px] rounded'
                 )}
               />
             ) : (
@@ -274,7 +276,8 @@ export function EventsTable({
                   <Button
                     disabled
                     icon={<RiSearchLine />}
-                    size="large"
+                    size="small"
+                    kind="secondary"
                     iconSide="left"
                     appearance="outlined"
                     label={showSearch ? 'Hide search' : 'Show search'}
@@ -289,9 +292,6 @@ export function EventsTable({
                 <TooltipContent>Coming soon</TooltipContent>
               </Tooltip>
             )}
-            <TotalCount totalCount={eventsData?.totalCount} />
-          </div>
-          <div className="flex">
             <TimeFilter
               daysAgoMax={features.history}
               onDaysChange={onDaysChange}
@@ -313,6 +313,9 @@ export function EventsTable({
                     }
               }
             />
+          </div>
+          <div className="flex">
+            <TotalCount totalCount={eventsData?.totalCount} />
           </div>
         </div>
         {showSearch && (

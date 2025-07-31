@@ -1,9 +1,9 @@
 'use client';
 
-import { RangePicker } from '@inngest/components/DatePicker';
 import type { RangeChangeProps } from '@inngest/components/DatePicker/RangePicker';
 import { Error } from '@inngest/components/Error/Error';
 import EntityFilter from '@inngest/components/Filter/EntityFilter';
+import { TimeFilter } from '@inngest/components/Filter/TimeFilter';
 import { Skeleton } from '@inngest/components/Skeleton/Skeleton';
 import {
   useBatchedSearchParams,
@@ -139,7 +139,6 @@ export const Dashboard = ({ envSlug }: { envSlug: string }) => {
   const functions = data?.envBySlug?.workflows.data;
 
   const logRetention = accountData?.account.entitlements.history.limit || 7;
-  const upgradeCutoff = subtractDuration(new Date(), { days: logRetention });
   const concurrencyLimit = accountConcurrencyLimitRes?.account.entitlements.concurrency.limit;
 
   const envLookup = apps?.length !== 1 && !selectedApps?.length && !selectedFns?.length;
@@ -151,43 +150,36 @@ export const Dashboard = ({ envSlug }: { envSlug: string }) => {
 
   return (
     <div className="flex h-full w-full flex-col">
-      <div className="bg-canvasBase flex h-16 w-full flex-row items-center justify-between px-3 py-5">
-        <div className="flex flex-row items-center justify-start gap-x-2">
-          {fetching ? (
-            <Skeleton className="block h-8 w-60" />
-          ) : (
-            <>
-              <EntityFilter
-                type="app"
-                onFilterChange={(apps) => (apps.length ? setApps(apps) : removeApps())}
-                selectedEntities={selectedApps || []}
-                entities={apps || []}
-                className="h-8"
-              />
-              <EntityFilter
-                type="function"
-                onFilterChange={(fns) => (fns.length ? setFns(fns) : removeFns())}
-                selectedEntities={selectedFns || []}
-                entities={functions || []}
-                className="h-8"
-              />
-            </>
-          )}
-        </div>
-        <div className="flex flex-row items-center justify-end gap-x-2">
-          <RangePicker
-            className="w-full"
-            upgradeCutoff={upgradeCutoff}
-            defaultValue={getDefaultRange(parsedStart, parsedEnd, parsedDuration)}
-            onChange={(range: RangeChangeProps) => {
-              batchUpdate({
-                duration: range.type === 'relative' ? durationToString(range.duration) : null,
-                start: range.type === 'absolute' ? range.start.toISOString() : null,
-                end: range.type === 'absolute' ? range.end.toISOString() : null,
-              });
-            }}
-          />
-        </div>
+      <div className="bg-canvasBase flex flex-row items-center gap-1.5 px-3 py-[9px]">
+        <TimeFilter
+          defaultValue={getDefaultRange(parsedStart, parsedEnd, parsedDuration)}
+          daysAgoMax={logRetention}
+          onDaysChange={(range: RangeChangeProps) => {
+            batchUpdate({
+              duration: range.type === 'relative' ? durationToString(range.duration) : null,
+              start: range.type === 'absolute' ? range.start.toISOString() : null,
+              end: range.type === 'absolute' ? range.end.toISOString() : null,
+            });
+          }}
+        />
+        {fetching ? (
+          <Skeleton className="block h-6 w-60" />
+        ) : (
+          <>
+            <EntityFilter
+              type="app"
+              onFilterChange={(apps) => (apps.length ? setApps(apps) : removeApps())}
+              selectedEntities={selectedApps || []}
+              entities={apps || []}
+            />
+            <EntityFilter
+              type="function"
+              onFilterChange={(fns) => (fns.length ? setFns(fns) : removeFns())}
+              selectedEntities={selectedFns || []}
+              entities={functions || []}
+            />
+          </>
+        )}
       </div>
       {error && <Error message="There was an error fetching metrics filter data." />}
       <div className="bg-canvasSubtle px-6">
