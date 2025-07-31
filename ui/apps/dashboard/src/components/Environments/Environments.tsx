@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import { Button } from '@inngest/components/Button';
 import { Search } from '@inngest/components/Forms/Search';
+import { StatusDot } from '@inngest/components/Status/StatusDot';
 import useDebounce from '@inngest/components/hooks/useDebounce';
 
 import Toaster from '@/components/Toaster';
@@ -62,7 +63,7 @@ export default function Environments() {
           <div className="border-muted rounded-md border">
             <div className="border-l-primary-moderate flex min-w-0 items-center justify-between overflow-x-auto rounded-[4px] border-l-4 px-4 py-3">
               <h3 className="flex flex-shrink-0 items-center gap-2 text-sm font-medium tracking-wide">
-                <span className="bg-primary-moderate block h-2 w-2 rounded-full" />
+                <StatusDot status="ACTIVE" size="small" />
                 Production
               </h3>
               <div className="flex flex-shrink-0 items-center gap-2 pl-2">
@@ -86,7 +87,7 @@ export default function Environments() {
             />
             <div className="min-w-[200px] flex-auto">
               <Search
-                className="w-full"
+                className="h-[34px] w-full"
                 name="search-other-envs"
                 onUpdate={(value) => {
                   setSearchInput(value);
@@ -94,6 +95,7 @@ export default function Environments() {
                 }}
                 placeholder="Search environments"
                 value={searchInput}
+                inngestSize="base"
               />
             </div>
           </div>

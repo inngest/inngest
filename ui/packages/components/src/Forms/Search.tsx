@@ -12,17 +12,18 @@ type SearchProps = Omit<InputProps, 'type'> & {
 };
 
 export const Search = forwardRef<HTMLInputElement, SearchProps>(
-  ({ value, onUpdate, className, ...props }, ref) => {
+  ({ value, onUpdate, className, inngestSize, ...props }, ref) => {
     function clearInput() {
       onUpdate('');
     }
     return (
       <div className="relative">
-        <RiSearchLine className="text-light absolute bottom-0 left-2 top-0 my-auto h-4 w-4" />
+        <RiSearchLine className="text-light absolute bottom-0 left-1.5 top-0 my-auto h-[14px] w-[14px]" />
         <Input
+          inngestSize={inngestSize ?? 'small'}
           ref={ref}
           type="search"
-          className={cn(className, 'px-7')}
+          className={cn(className, 'px-6')}
           {...props}
           value={value}
           onChange={(e) => {
