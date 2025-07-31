@@ -67,6 +67,14 @@ type ExtractedValues struct {
 	ResponseHeaders *http.Header
 	ResponseStatusCode *int
 	ResponseOutputSize *int
+	IsUserland *bool
+	UserlandSpanID *string
+	UserlandName *string
+	UserlandKind *string
+	UserlandServiceName *string
+	UserlandScopeName *string
+	UserlandScopeVersion *string
+	UserlandResourceAttributes *string
 	DebugSessionID *ulid.ULID
 	DebugRunID *ulid.ULID
 	AIRequestMetadata *aigateway.ParsedInferenceRequest
