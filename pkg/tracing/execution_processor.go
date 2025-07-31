@@ -159,6 +159,9 @@ func (p *executionProcessor) OnEnd(s sdktrace.ReadOnlySpan) {
 		for _, attr := range s.Attributes() {
 			if string(attr.Key) == meta.Attrs.DropSpan.Key() && attr.Value.AsBool() {
 				// Toggle this on and off to see or remove dropped spans
+				// Notify that dropped spans have been exported to unblock,
+				// even though we're dropping them here.
+				meta.NotifySpanExported(s.SpanContext().SpanID().String(), nil)
 				return // Don't export dropped spans
 			}
 		}
