@@ -3,8 +3,11 @@
 import { useMemo } from 'react';
 import Table from '@inngest/components/Table/NewTable';
 
-import { useInsightsStateMachineContext } from '../../InsightsStateMachineContext/InsightsStateMachineContext';
-import type { InsightsFetchResult, InsightsStatus } from '../../InsightsStateMachineContext/types';
+import { useInsightsStateMachineContext } from '@/components/Insights/InsightsStateMachineContext/InsightsStateMachineContext';
+import type {
+  InsightsFetchResult,
+  InsightsStatus,
+} from '@/components/Insights/InsightsStateMachineContext/types';
 import { ResultsTableFooter, assertData } from './ResultsTableFooter';
 import { useColumns } from './useColumns';
 import { useOnScroll } from './useOnScroll';

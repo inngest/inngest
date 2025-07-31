@@ -3,8 +3,8 @@
 import { Alert } from '@inngest/components/Alert/Alert';
 import { Button } from '@inngest/components/Button/Button';
 
-import { useInsightsStateMachineContext } from '../../InsightsStateMachineContext/InsightsStateMachineContext';
-import type { InsightsFetchResult } from '../../InsightsStateMachineContext/types';
+import { useInsightsStateMachineContext } from '@/components/Insights/InsightsStateMachineContext/InsightsStateMachineContext';
+import type { InsightsFetchResult } from '@/components/Insights/InsightsStateMachineContext/types';
 
 const FALLBACK_ERROR = 'Something went wrong. Please try again.';
 

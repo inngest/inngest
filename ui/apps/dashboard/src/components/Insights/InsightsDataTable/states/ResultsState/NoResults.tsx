@@ -3,7 +3,7 @@
 import { Button } from '@inngest/components/Button';
 import { RiExternalLinkLine } from '@remixicon/react';
 
-import { IconLayoutWrapper } from '../states/IconLayoutWrapper';
+import { IconLayoutWrapper } from '../IconLayoutWrapper';
 
 // TODO: Add link to examples.
 export function NoResults() {
