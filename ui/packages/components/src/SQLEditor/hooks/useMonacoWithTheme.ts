@@ -6,32 +6,17 @@ import { useMonaco } from '@monaco-editor/react';
 import { createColors, createRules } from '../../utils/monaco';
 import { isDark } from '../../utils/theme';
 
+// TODO: Remove this hook and use the NewCodeBlock component when it's ready.
 export function useMonacoWithTheme(wrapperRef: React.RefObject<HTMLDivElement>) {
   const [dark, setDark] = useState(isDark());
   const monaco = useMonaco();
 
   useEffect(() => {
-    const updateDarkMode = () => {
-      setDark(isDark(wrapperRef.current ?? undefined));
-    };
-
-    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
-    mediaQuery.addEventListener('change', updateDarkMode);
-
-    const observer = new MutationObserver(updateDarkMode);
-    observer.observe(document.documentElement, {
-      attributes: true,
-      attributeFilter: ['class', 'data-theme'],
-    });
-
-    // Initial check
-    updateDarkMode();
-
-    return () => {
-      mediaQuery.removeEventListener('change', updateDarkMode);
-      observer.disconnect();
-    };
-  }, []);
+    // We don't have a DOM ref until we're rendered, so check for dark theme parent classes then
+    if (wrapperRef.current) {
+      setDark(isDark(wrapperRef.current));
+    }
+  });
 
   useEffect(() => {
     if (!monaco) return;
