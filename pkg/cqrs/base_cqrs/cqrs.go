@@ -134,7 +134,6 @@ func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.Ot
 
 		var outputSpanID *string
 		var fragments []map[string]interface{}
-		groupedAttrs := make(map[string]any)
 		_ = json.Unmarshal([]byte(span.SpanFragments.(string)), &fragments)
 
 		for _, fragment := range fragments {
@@ -151,7 +150,7 @@ func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.Ot
 					return nil, err
 				}
 
-				maps.Copy(groupedAttrs, fragmentAttr)
+				maps.Copy(newSpan.RawOtelSpan.Attributes, fragmentAttr)
 
 				if outputRef, ok := fragment["output_span_id"].(string); ok {
 					outputSpanID = &outputRef
@@ -160,7 +159,7 @@ func (w wrapper) GetSpansByRunID(ctx context.Context, runID ulid.ULID) (*cqrs.Ot
 			}
 		}
 
-		newSpan.Attributes, err = meta.ExtractTypedValues(ctx, groupedAttrs)
+		newSpan.Attributes, err = meta.ExtractTypedValues(ctx, newSpan.RawOtelSpan.Attributes)
 		if err != nil {
 			return nil, fmt.Errorf("error extracting typed values from span attributes: %w", err)
 		}
