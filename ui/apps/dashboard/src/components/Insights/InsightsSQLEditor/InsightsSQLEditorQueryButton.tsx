@@ -4,11 +4,11 @@ import { Button } from '@inngest/components/Button/Button';
 import { IconSpinner } from '@inngest/components/icons/Spinner';
 import { RiPlayFill } from '@remixicon/react';
 
-import { useInsightsQueryContext } from '../context';
+import { useInsightsStateMachineContext } from '../InsightsStateMachineContext/InsightsStateMachineContext';
 
 export function InsightsSQLEditorQueryButton() {
-  const { isEmpty, runQuery, state } = useInsightsQueryContext();
-  const isRunning = state === 'loading';
+  const { isEmpty, runQuery, status } = useInsightsStateMachineContext();
+  const isRunning = status === 'loading';
 
   return (
     <Button

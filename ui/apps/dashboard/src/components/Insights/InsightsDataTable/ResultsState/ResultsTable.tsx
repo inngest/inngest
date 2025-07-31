@@ -3,18 +3,18 @@
 import { useMemo } from 'react';
 import Table from '@inngest/components/Table/NewTable';
 
-import { useInsightsQueryContext } from '../../context';
-import type { InsightsEntry, InsightsResult, InsightsState } from '../types';
+import { useInsightsStateMachineContext } from '../../InsightsStateMachineContext/InsightsStateMachineContext';
+import type { InsightsFetchResult, InsightsStatus } from '../../InsightsStateMachineContext/types';
 import { ResultsTableFooter, assertData } from './ResultsTableFooter';
 import { useColumns } from './useColumns';
 import { useOnScroll } from './useOnScroll';
 
 export function ResultsTable() {
-  const { data: dataRaw, fetchMore, state } = useInsightsQueryContext();
-  const data = useMemo(() => withLoadingMoreRow(dataRaw, state), [dataRaw, state]);
+  const { data: dataRaw, fetchMore, status } = useInsightsStateMachineContext();
+  const data = useMemo(() => withLoadingMoreRow(dataRaw, status), [dataRaw, status]);
 
   const { columns } = useColumns(data);
-  const { onScroll } = useOnScroll(data, state, fetchMore);
+  const { onScroll } = useOnScroll(data, status, fetchMore);
 
   if (!assertData(data)) return null;
 
@@ -34,13 +34,13 @@ export function ResultsTable() {
 }
 
 function withLoadingMoreRow(
-  data: undefined | InsightsResult,
-  state: InsightsState
-): undefined | InsightsResult {
+  data: undefined | InsightsFetchResult,
+  status: InsightsStatus
+): undefined | InsightsFetchResult {
   if (data === undefined) return data;
-  if (state !== 'fetchingMore') return data;
+  if (status !== 'fetchingMore') return data;
 
-  const loadingRow: InsightsEntry = {
+  const loadingRow: InsightsFetchResult['entries'][number] = {
     id: `__loading_row__`,
     isLoadingRow: true,
     values: data.columns.reduce((acc, col) => {

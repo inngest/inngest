@@ -3,12 +3,12 @@
 import { Alert } from '@inngest/components/Alert';
 import { Button } from '@inngest/components/Button/Button';
 
-import { useInsightsQueryContext } from '../../context';
+import { useInsightsStateMachineContext } from '../../InsightsStateMachineContext/InsightsStateMachineContext';
 
 const FALLBACK_ERROR = 'Something went wrong. Please try again.';
 
 export function ErrorState() {
-  const { error, runQuery } = useInsightsQueryContext();
+  const { error, runQuery } = useInsightsStateMachineContext();
 
   return (
     <Alert

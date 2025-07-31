@@ -1,11 +1,11 @@
 'use client';
 
-import { useInsightsQueryContext } from '../../context';
+import { useInsightsStateMachineContext } from '../../InsightsStateMachineContext/InsightsStateMachineContext';
 import { NoResults } from './NoResults';
 import { ResultsTable } from './ResultsTable';
 
 export function ResultsState() {
-  const { data } = useInsightsQueryContext();
+  const { data } = useInsightsStateMachineContext();
 
   if (!data?.entries.length) return <NoResults />;
 

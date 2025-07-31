@@ -7,15 +7,15 @@ import { InsightsDataTable } from '@/components/Insights/InsightsDataTable/Insig
 import { InsightsSQLEditor } from '@/components/Insights/InsightsSQLEditor/InsightsSQLEditor';
 import { InsightsSQLEditorDownloadCSVButton } from '@/components/Insights/InsightsSQLEditor/InsightsSQLEditorDownloadCSVButton';
 import { InsightsSQLEditorQueryButton } from '@/components/Insights/InsightsSQLEditor/InsightsSQLEditorQueryButton';
-import { Section } from '@/components/Insights/Section';
 import {
-  InsightsQueryContextProvider,
-  useInsightsQueryContext,
-} from '@/components/Insights/context';
+  InsightsStateMachineContextProvider,
+  useInsightsStateMachineContext,
+} from '@/components/Insights/InsightsStateMachineContext/InsightsStateMachineContext';
+import { Section } from '@/components/Insights/Section';
 
 function InsightsContent() {
-  const { state } = useInsightsQueryContext();
-  const isRunning = state === 'loading';
+  const { status } = useInsightsStateMachineContext();
+  const isRunning = status === 'loading';
 
   return (
     <>
@@ -50,8 +50,8 @@ export default function InsightsPage() {
   if (!isInsightsEnabled) return null;
 
   return (
-    <InsightsQueryContextProvider>
+    <InsightsStateMachineContextProvider>
       <InsightsContent />
-    </InsightsQueryContextProvider>
+    </InsightsStateMachineContextProvider>
   );
 }

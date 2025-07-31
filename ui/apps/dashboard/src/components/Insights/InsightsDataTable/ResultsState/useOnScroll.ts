@@ -1,14 +1,17 @@
 import { useCallback, type UIEventHandler } from 'react';
 
-import { type InsightsResult, type InsightsState } from '../types';
+import {
+  type InsightsFetchResult,
+  type InsightsStatus,
+} from '../../InsightsStateMachineContext/types';
 
 // TODO: Handle case where a single page of data doesn't fill the container.
 // When this happens, the user will not be able to scroll, and will not be able to load more data.
 // For now, we'll just fetch 50 entries per page, mitigating the issue on any reasonable screen size.
 
 export function useOnScroll(
-  data: InsightsResult | undefined,
-  state: InsightsState,
+  data: InsightsFetchResult | undefined,
+  status: InsightsStatus,
   fetchMore: () => void
 ): { onScroll: UIEventHandler<HTMLDivElement> } {
   const onScroll: UIEventHandler<HTMLDivElement> = useCallback(
@@ -17,10 +20,10 @@ export function useOnScroll(
         fetchMore,
         hasEntries: Boolean(data?.entries.length),
         hasNextPage: Boolean(data?.pageInfo.hasNextPage),
-        state,
+        status,
       });
     },
-    [fetchMore, data?.pageInfo.hasNextPage, data?.entries.length, state]
+    [fetchMore, data?.pageInfo.hasNextPage, data?.entries.length, status]
   );
 
   return { onScroll };
@@ -33,13 +36,13 @@ export function handleScroll(
   options: {
     hasEntries: boolean;
     hasNextPage: boolean;
-    state: string;
+    status: string;
     fetchMore: () => void;
   }
 ) {
-  const { hasEntries, hasNextPage, state, fetchMore } = options;
+  const { fetchMore, hasEntries, hasNextPage, status } = options;
 
-  if (hasEntries && hasNextPage && state === 'success') {
+  if (hasEntries && hasNextPage && status === 'success') {
     const { scrollHeight, scrollTop, clientHeight } = event.target as HTMLDivElement;
 
     const reachedBottom = scrollHeight - scrollTop - clientHeight < SCROLL_THRESHOLD;
