@@ -39,6 +39,8 @@ const InsightsStateMachineContext = createContext<InsightsStateMachineContextVal
 export function InsightsStateMachineContextProvider({ children }: { children: ReactNode }) {
   const [queryState, dispatch] = useReducer(insightsStateMachineReducer, INITIAL_STATE);
 
+  // TODO: Ensure runQuery and fetchMore cannot finish out of order
+  // if run in quick succession.
   const runQuery = useCallback(async () => {
     dispatch({ type: 'START_QUERY' });
 

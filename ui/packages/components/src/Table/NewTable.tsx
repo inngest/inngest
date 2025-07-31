@@ -30,6 +30,7 @@ type BaseTableProps<T> = {
   onRowClick?: (row: Row<T>) => void;
   getRowHref?: (row: Row<T>) => string;
   blankState?: React.ReactNode;
+  cellClassName?: string;
 };
 
 type TableProps<T> = BaseTableProps<T> &
@@ -48,6 +49,7 @@ export default function Table<T>({
   blankState,
   columns,
   expandedIDs = [],
+  cellClassName,
 }: TableProps<T>) {
   // Render empty lines for skeletons when data is loading
   const tableData = useMemo(() => {
@@ -197,7 +199,8 @@ export default function Table<T>({
                           i === 0 && hasId(row.original) && expandedIDs.includes(row.original.id)
                             ? expandedRowSideBorder
                             : '',
-                          isIconOnlyColumn ? '' : tableColumnStyles
+                          isIconOnlyColumn ? '' : tableColumnStyles,
+                          cellClassName ?? ''
                         )}
                       >
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
