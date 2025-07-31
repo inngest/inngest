@@ -1,1 +1,0 @@
-export { ResultsState } from './ResultsState';

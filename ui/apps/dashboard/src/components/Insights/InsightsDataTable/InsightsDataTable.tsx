@@ -1,10 +1,10 @@
 'use client';
 
 import { useInsightsStateMachineContext } from '../InsightsStateMachineContext/InsightsStateMachineContext';
-import { ResultsState } from './ResultsState';
 import { EmptyState } from './states/EmptyState';
 import { ErrorState } from './states/ErrorState';
 import { LoadingState } from './states/LoadingState';
+import { ResultsState } from './states/ResultsState/ResultsState';
 
 export function InsightsDataTable() {
   const { status } = useInsightsStateMachineContext();

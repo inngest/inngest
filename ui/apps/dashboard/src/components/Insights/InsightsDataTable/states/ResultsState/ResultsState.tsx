@@ -1,6 +1,6 @@
 'use client';
 
-import { useInsightsStateMachineContext } from '../../InsightsStateMachineContext/InsightsStateMachineContext';
+import { useInsightsStateMachineContext } from '@/components/Insights/InsightsStateMachineContext/InsightsStateMachineContext';
 import { NoResults } from './NoResults';
 import { ResultsTable } from './ResultsTable';
 
