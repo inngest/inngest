@@ -222,7 +222,6 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 			inputSpanID  *string
 			fragments    []map[string]interface{}
 		)
-		groupedAttrs := make(map[string]any)
 		_ = json.Unmarshal([]byte(spanFragments.(string)), &fragments)
 
 		for _, fragment := range fragments {
@@ -239,7 +238,7 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 					return nil, err
 				}
 
-				maps.Copy(groupedAttrs, fragmentAttr)
+				maps.Copy(newSpan.RawOtelSpan.Attributes, fragmentAttr)
 
 				if outputRef, ok := fragment["output_span_id"].(string); ok {
 					outputSpanID = &outputRef
@@ -261,7 +260,7 @@ func mapRootSpansFromRows[T normalizedSpan](ctx context.Context, spans []T) (*cq
 			}
 		}
 
-		newSpan.Attributes, err = meta.ExtractTypedValues(ctx, groupedAttrs)
+		newSpan.Attributes, err = meta.ExtractTypedValues(ctx, newSpan.RawOtelSpan.Attributes)
 		if err != nil {
 			return nil, fmt.Errorf("error extracting typed values from span attributes: %w", err)
 		}
