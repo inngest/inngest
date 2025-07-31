@@ -97,7 +97,7 @@ const textClasses: {
   SKIPPED: 'text-status-pausedText',
   INACTIVE: 'text-accent-subtle dark:text-accent-intense',
   ACTIVE: 'text-status-completedText',
-  ARCHIVED: 'bg-status-cancelled',
+  ARCHIVED: 'text-status-cancelledText',
   DISCONNECTED: 'text-status-cancelledText',
 };
 
