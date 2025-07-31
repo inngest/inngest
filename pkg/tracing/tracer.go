@@ -134,9 +134,16 @@ func (tp *otelTracerProvider) CreateDroppableSpan(
 	name string,
 	opts *CreateSpanOptions,
 ) (*DroppableSpan, error) {
+	attrs := opts.Attributes
+	if attrs == nil {
+		attrs = meta.NewAttrSet()
+	}
+
 	st := opts.StartTime
 	if st.IsZero() {
 		st = time.Now()
+	} else {
+		meta.AddAttr(attrs, meta.Attrs.StartedAt, &st)
 	}
 
 	if opts.Parent != nil {
@@ -156,13 +163,6 @@ func (tp *otelTracerProvider) CreateDroppableSpan(
 		// other tracing.
 		ctx = context.Background()
 	}
-
-	attrs := opts.Attributes
-	if attrs == nil {
-		attrs = meta.NewAttrSet()
-	}
-
-	meta.AddAttr(attrs, meta.Attrs.StartedAt, &st)
 
 	if opts.Debug != nil {
 		if opts.Debug.Location != "" {
