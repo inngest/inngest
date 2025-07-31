@@ -15,6 +15,7 @@ import (
 	"github.com/inngest/inngest/pkg/execution/realtime"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	"github.com/inngest/inngest/pkg/headers"
+	"github.com/inngest/inngest/pkg/tracing"
 )
 
 // Opts represents options for the APIv1 router.
@@ -46,6 +47,8 @@ type Opts struct {
 	TraceReader cqrs.TraceReader
 	// MetricsMiddleware is used to instrument the APIv1 endpoints.
 	MetricsMiddleware MetricsMiddleware
+	// TracerProvider is used to create spans within the APIv1 endpoints.
+	TracerProvider tracing.TracerProvider
 }
 
 // AddRoutes adds a new API handler to the given router.
