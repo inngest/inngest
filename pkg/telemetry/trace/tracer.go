@@ -12,6 +12,7 @@ import (
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/exporters"
+	"github.com/inngest/inngest/pkg/tracing/meta"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/exporters/jaeger"
 	"go.opentelemetry.io/otel/exporters/otlp/otlptrace"
@@ -192,10 +193,10 @@ func HeadersFromTraceState(
 	functionID string,
 ) (map[string]string, error) {
 	headers := make(map[string]string)
-	span := oteltrace.SpanFromContext(ctx)
-	sc := span.SpanContext()
+	legacySpan := oteltrace.SpanFromContext(ctx)
+	lsc := legacySpan.SpanContext()
 
-	ts, err := sc.TraceState().Insert("inngest@app", appID)
+	ts, err := lsc.TraceState().Insert("inngest@app", appID)
 	if err != nil {
 		return headers, fmt.Errorf("failed to add app ID to trace state: %w", err)
 	}
@@ -205,15 +206,23 @@ func HeadersFromTraceState(
 		return headers, fmt.Errorf("failed to add function ID to trace state: %w", err)
 	}
 
-	sc = oteltrace.NewSpanContext(oteltrace.SpanContextConfig{
-		TraceID:    sc.TraceID(),
-		SpanID:     sc.SpanID(),
-		TraceFlags: sc.TraceFlags(),
+	if span, err := meta.GetSpanReferenceFromCtx(ctx); err == nil {
+		if spanStr, err := span.QueryString(); err == nil {
+			if ts, err = ts.Insert("inngest@traceref", spanStr); err != nil {
+				return headers, fmt.Errorf("failed to add trace reference to trace state: %w", err)
+			}
+		}
+	}
+
+	lsc = oteltrace.NewSpanContext(oteltrace.SpanContextConfig{
+		TraceID:    lsc.TraceID(),
+		SpanID:     lsc.SpanID(),
+		TraceFlags: lsc.TraceFlags(),
 		TraceState: ts,
-		Remote:     sc.IsRemote(),
+		Remote:     lsc.IsRemote(),
 	})
 
-	newCtx := oteltrace.ContextWithSpanContext(ctx, sc)
+	newCtx := oteltrace.ContextWithSpanContext(ctx, lsc)
 	UserTracer().Propagator().Inject(newCtx, propagation.MapCarrier(headers))
 
 	if headers["traceparent"] != "" {
