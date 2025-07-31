@@ -1309,6 +1309,7 @@ func (e *executor) finalize(ctx context.Context, md sv2.Metadata, evts []json.Ra
 		Attributes: tracing.DriverResponseAttrs(&resp, outputSpanRef),
 	})
 	if err != nil {
+		// TODO This should be a warning/error once these spans are critical.
 		l.Debug(
 			"error updating run span end time",
 			"error", err,
