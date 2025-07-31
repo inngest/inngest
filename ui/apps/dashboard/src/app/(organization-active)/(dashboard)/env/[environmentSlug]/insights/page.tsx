@@ -9,12 +9,16 @@ import { RiPlayFill } from '@remixicon/react';
 import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import { InsightsDataTable } from '@/components/Insights/InsightsDataTable';
 import { InsightsSQLEditor } from '@/components/Insights/InsightsSQLEditor/InsightsSQLEditor';
+import {
+  InsightsStateMachineContextProvider,
+  useInsightsStateMachineContext,
+} from '@/components/Insights/InsightsStateMachineContext/InsightsStateMachineContext';
 import { Section } from '@/components/Insights/Section';
-import { useInsightsQuery } from '@/components/Insights/hooks/useInsightsQuery';
 
-export default function InsightsPage() {
+function InsightsPageContent() {
   const { value: isInsightsEnabled } = useBooleanFlag('insights');
-  const { content, isRunning, onChange, runQuery } = useInsightsQuery();
+  const { onChange, query, runQuery, status } = useInsightsStateMachineContext();
+  const isRunning = status === 'loading';
 
   if (!isInsightsEnabled) return null;
 
@@ -26,7 +30,7 @@ export default function InsightsPage() {
           actions={
             <Button
               className="w-[110px]"
-              disabled={content.trim() === '' || isRunning}
+              disabled={query.trim() === '' || isRunning}
               icon={
                 isRunning ? (
                   <IconSpinner className="fill-white" />
@@ -43,7 +47,7 @@ export default function InsightsPage() {
           className="min-h-[255px]"
           title="Query Editor"
         >
-          <InsightsSQLEditor content={content} onChange={onChange} />
+          <InsightsSQLEditor content={query} onChange={onChange} />
         </Section>
         <Section
           actions={
@@ -71,5 +75,17 @@ export default function InsightsPage() {
         </Section>
       </main>
     </>
+  );
+}
+
+export default function InsightsPage() {
+  const { value: isInsightsEnabled } = useBooleanFlag('insights');
+
+  if (!isInsightsEnabled) return null;
+
+  return (
+    <InsightsStateMachineContextProvider>
+      <InsightsPageContent />
+    </InsightsStateMachineContextProvider>
   );
 }
