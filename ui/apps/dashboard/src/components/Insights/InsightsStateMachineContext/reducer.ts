@@ -4,8 +4,6 @@ export function insightsStateMachineReducer(
   state: InsightsState,
   action: InsightsAction
 ): InsightsState {
-  console.log(action);
-
   switch (action.type) {
     case 'FETCH_MORE':
       return { ...state, fetchMoreError: undefined, status: 'fetchingMore' };
