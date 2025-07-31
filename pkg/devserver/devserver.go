@@ -404,7 +404,7 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	hmw := memory_writer.NewWriter(ctx, memory_writer.WriterOptions{DumpToFile: false})
 
-	tracer := tracing.NewSqlcTracerProvider(base_cqrs.NewQueries(db, dbDriver, sqlc_postgres.NewNormalizedOpts{
+	tp := tracing.NewSqlcTracerProvider(base_cqrs.NewQueries(db, dbDriver, sqlc_postgres.NewNormalizedOpts{
 		MaxIdleConns:    opts.PostgresMaxIdleConns,
 		MaxOpenConns:    opts.PostgresMaxOpenConns,
 		ConnMaxIdle:     opts.PostgresConnMaxIdleTime,
@@ -469,7 +469,7 @@ func start(ctx context.Context, opts StartOpts) error {
 			Secret:     consts.DevServerRealtimeJWTSecret,
 			PublishURL: fmt.Sprintf("http://%s:%d/v1/realtime/publish", url, opts.Config.CoreAPI.Port),
 		}),
-		executor.WithTracerProvider(tracer),
+		executor.WithTracerProvider(tp),
 	)
 	if err != nil {
 		return err
@@ -517,7 +517,6 @@ func start(ctx context.Context, opts StartOpts) error {
 	// Create a new API endpoint which hosts SDK-related functionality for
 	// registering functions.
 	devAPI := NewDevAPI(ds, DevAPIOptions{AuthMiddleware: authn.SigningKeyMiddleware(opts.SigningKey), disableUI: opts.NoUI})
-
 	core, err := coreapi.NewCoreApi(coreapi.Options{
 		AuthMiddleware: authn.SigningKeyMiddleware(opts.SigningKey),
 		Data:           ds.Data,
@@ -563,11 +562,12 @@ func start(ctx context.Context, opts StartOpts) error {
 			Broadcaster:        broadcaster,
 			TraceReader:        ds.Data,
 
-			AppCreator:        dbcqrs,
-			FunctionCreator:   dbcqrs,
-			EventPublisher:    runner,
-			TracerProvider:    tracer,
-			State:             smv2,
+			AppCreator:      dbcqrs,
+			FunctionCreator: dbcqrs,
+			EventPublisher:  runner,
+			TracerProvider:  tp,
+			State:           smv2,
+			RunOutputReader: devutil.NewLocalOutputReader(core.Resolver(), ds.Data, ds.Data),
 			RealtimeJWTSecret: consts.DevServerRealtimeJWTSecret,
 
 			CheckpointOpts: apiv1.CheckpointAPIOpts{
