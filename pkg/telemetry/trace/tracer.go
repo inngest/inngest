@@ -207,7 +207,7 @@ func HeadersFromTraceState(
 	}
 
 	if span, err := meta.GetSpanReferenceFromCtx(ctx); err == nil {
-		if spanStr, err := span.QueryString(); err == nil {
+		if spanStr, err := span.MarshalForSDK(); err == nil {
 			if ts, err = ts.Insert("inngest@traceref", spanStr); err != nil {
 				return headers, fmt.Errorf("failed to add trace reference to trace state: %w", err)
 			}
