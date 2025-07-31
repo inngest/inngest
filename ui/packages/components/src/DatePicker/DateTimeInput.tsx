@@ -207,7 +207,7 @@ export function DateTimeInput({
   return (
     <div
       className={cn(
-        'border-muted has-[:focus]:border-muted bg-canvasBase text-basis placeholder-disabled flex h-8 items-center rounded-md border px-3.5 text-sm leading-none transition-all',
+        'border-muted has-[:focus]:border-muted bg-canvasBase text-basis placeholder-disabled flex h-8 items-center rounded border px-3.5 text-sm leading-none transition-all',
         !valid && 'border-error has-[:focus]:border-error'
       )}
       onPaste={(e: React.ClipboardEvent<HTMLDivElement>) => {
