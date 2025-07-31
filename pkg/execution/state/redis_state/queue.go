@@ -1659,7 +1659,7 @@ func (q *queue) Migrate(ctx context.Context, sourceShardName string, fnID uuid.U
 		}
 
 		if err := q.Dequeue(ctx, shard, *qi); err != nil {
-			q.log.Error("error dequeueing queue item after migration", "error", err)
+			q.log.ReportError(err, "error dequeueing queue item after migration")
 		}
 
 		atomic.AddInt64(&processed, 1)

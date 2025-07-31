@@ -679,7 +679,7 @@ func (q *queue) shadowScan(ctx context.Context) error {
 				}
 
 				if !errors.Is(err, context.Canceled) {
-					l.Error("error scanning shadow partitions", "error", err)
+					l.ReportError(err, "error scanning shadow partitions")
 				}
 				return fmt.Errorf("error scanning shadow partitions: %w", err)
 			}
