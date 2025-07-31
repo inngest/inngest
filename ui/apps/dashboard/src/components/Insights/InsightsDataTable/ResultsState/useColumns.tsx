@@ -5,9 +5,13 @@ import { Skeleton } from '@inngest/components/Skeleton';
 import { TextCell, TimeCell } from '@inngest/components/Table';
 import type { ColumnDef } from '@tanstack/react-table';
 
-import { type InsightsEntry, type InsightsResult } from '../types';
+import type { InsightsFetchResult } from '../../InsightsStateMachineContext/types';
 
-export function useColumns(data?: InsightsResult): { columns: ColumnDef<InsightsEntry, any>[] } {
+type InsightsEntry = InsightsFetchResult['entries'][number];
+
+export function useColumns(data?: InsightsFetchResult): {
+  columns: ColumnDef<InsightsEntry, any>[];
+} {
   const columns = useMemo(() => {
     const cols = data?.columns ?? [];
     if (cols.length === 0) return [];
