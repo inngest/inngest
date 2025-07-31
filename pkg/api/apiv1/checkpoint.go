@@ -95,7 +95,9 @@ func (a checkpointAPI) CheckpointNewRun(w http.ResponseWriter, r *http.Request) 
 	// Publish the event in a goroutine to lower latency in the API.  This is, while extremely important for
 	// o11y, actually not required to have the function continue to execute.
 	go func() {
-		a.EventPublisher.Publish(ctx, evt)
+		if err := a.EventPublisher.Publish(ctx, evt); err != nil {
+			logger.StdlibLogger(ctx).Error("erorr publishing sync checkpoint event", "error", err)
+		}
 	}()
 
 	// We do upsertions of apps and functions in a goroutine in order to improve
