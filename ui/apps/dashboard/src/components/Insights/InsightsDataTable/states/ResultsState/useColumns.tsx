@@ -5,7 +5,7 @@ import { Skeleton } from '@inngest/components/Skeleton';
 import { TextCell, TimeCell } from '@inngest/components/Table';
 import type { ColumnDef } from '@tanstack/react-table';
 
-import type { InsightsFetchResult } from '../../InsightsStateMachineContext/types';
+import type { InsightsFetchResult } from '@/components/Insights/InsightsStateMachineContext/types';
 
 type InsightsEntry = InsightsFetchResult['entries'][number];
 
