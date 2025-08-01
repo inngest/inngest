@@ -62,6 +62,7 @@ func NewCQRS(db *sql.DB, driver string, o sqlc_postgres.NewNormalizedOpts) cqrs.
 		driver: driver,
 		q:      NewQueries(db, driver, o),
 		db:     db,
+		opts:   o,
 	}
 }
 
@@ -70,6 +71,7 @@ type wrapper struct {
 	q      sqlc.Querier
 	db     *sql.DB
 	tx     *sql.Tx
+	opts   sqlc_postgres.NewNormalizedOpts
 }
 
 func (w wrapper) isPostgres() bool {
@@ -309,14 +311,16 @@ func (w wrapper) WithTx(ctx context.Context) (cqrs.TxManager, error) {
 
 	var q sqlc.Querier
 	if w.isPostgres() {
-		q = sqlc_postgres.NewNormalized(tx, sqlc_postgres.NewNormalizedOpts{})
+		q = sqlc_postgres.NewNormalized(tx, w.opts)
 	} else {
 		q = sqlc.New(tx)
 	}
 
 	return &wrapper{
-		q:  q,
-		tx: tx,
+		driver: w.driver,
+		q:      q,
+		tx:     tx,
+		opts:   w.opts,
 	}, nil
 }
 
