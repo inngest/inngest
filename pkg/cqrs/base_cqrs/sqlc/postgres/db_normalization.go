@@ -4,12 +4,26 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"time"
+
 	"github.com/google/uuid"
 	sqlc_sqlite "github.com/inngest/inngest/pkg/cqrs/base_cqrs/sqlc/sqlite"
 	"github.com/oklog/ulid/v2"
 )
 
-func NewNormalized(db DBTX) sqlc_sqlite.Querier {
+type NewNormalizedOpts struct {
+	MaxIdleConns int
+	MaxOpenConns int
+}
+
+func NewNormalized(db DBTX, o NewNormalizedOpts) sqlc_sqlite.Querier {
+	if sqlDB, ok := db.(*sql.DB); ok {
+		sqlDB.SetMaxIdleConns(o.MaxIdleConns)
+		sqlDB.SetMaxOpenConns(o.MaxOpenConns)
+		sqlDB.SetConnMaxIdleTime(5 * time.Minute)  // Close idle connections after 5 minutes
+		sqlDB.SetConnMaxLifetime(30 * time.Minute) // Close connections after 30 minutes total
+	}
+
 	return &NormalizedQueries{db: New(db)}
 }
 

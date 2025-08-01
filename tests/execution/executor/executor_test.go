@@ -14,6 +14,7 @@ import (
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
 	"github.com/inngest/inngest/pkg/cqrs/base_cqrs"
+	sqlc_postgres "github.com/inngest/inngest/pkg/cqrs/base_cqrs/sqlc/postgres"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
@@ -146,7 +147,7 @@ func TestScheduleRaceCondition(t *testing.T) {
 
 	// Initialize the devserver
 	dbDriver := "sqlite"
-	dbcqrs := base_cqrs.NewCQRS(db, dbDriver)
+	dbcqrs := base_cqrs.NewCQRS(db, dbDriver, sqlc_postgres.NewNormalizedOpts{})
 	loader := dbcqrs.(state.FunctionLoader)
 
 	_, shardedRc, err := createInmemoryRedis(t)
@@ -204,7 +205,7 @@ func TestScheduleRaceCondition(t *testing.T) {
 		executor.WithAssignedQueueShard(queueShard),
 		executor.WithShardSelector(shardSelector),
 		executor.WithTraceReader(dbcqrs),
-		executor.WithTracerProvider(tracing.NewSqlcTracerProvider(base_cqrs.NewQueries(db, dbDriver))),
+		executor.WithTracerProvider(tracing.NewSqlcTracerProvider(base_cqrs.NewQueries(db, dbDriver, sqlc_postgres.NewNormalizedOpts{}))),
 	)
 	require.NoError(t, err)
 
@@ -314,7 +315,7 @@ func TestScheduleRaceConditionWithExistingIdempotencyKey(t *testing.T) {
 
 	// Initialize the devserver
 	dbDriver := "sqlite"
-	dbcqrs := base_cqrs.NewCQRS(db, dbDriver)
+	dbcqrs := base_cqrs.NewCQRS(db, dbDriver, sqlc_postgres.NewNormalizedOpts{})
 	loader := dbcqrs.(state.FunctionLoader)
 
 	stateRedis, shardedRc, err := createInmemoryRedis(t)
@@ -488,7 +489,7 @@ func TestFinalize(t *testing.T) {
 
 	// Initialize the devserver
 	dbDriver := "sqlite"
-	dbcqrs := base_cqrs.NewCQRS(db, dbDriver)
+	dbcqrs := base_cqrs.NewCQRS(db, dbDriver, sqlc_postgres.NewNormalizedOpts{})
 	loader := dbcqrs.(state.FunctionLoader)
 
 	fnID, accountID, wsID, appID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
