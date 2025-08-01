@@ -93,10 +93,24 @@ func (d *DroppableSpan) Drop() {
 	d.span.End()
 }
 
-// TODO Sync send span; might wait for flush channel
 func (d *DroppableSpan) Send() error {
+	spanID := d.span.SpanContext().SpanID().String()
+
+	// Register for notification before ending the span
+	notifyCh := meta.RegisterSpanNotification(spanID)
+
+	// End the span, which triggers the export process
 	d.span.End()
-	return nil
+
+	// Wait for export
+	select {
+	case err := <-notifyCh:
+		return err
+	case <-time.After(5 * time.Second):
+		// Cleanup and return timeout error
+		meta.CleanupSpanNotification(spanID)
+		return fmt.Errorf("timeout waiting for span export")
+	}
 }
 
 func (tp *otelTracerProvider) CreateSpan(
