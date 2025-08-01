@@ -48,7 +48,15 @@ func (p *executionProcessor) OnStart(parent context.Context, s sdktrace.ReadWrit
 	switch s.Name() {
 	case meta.SpanNameRun:
 		{
-			meta.AddAttr(rawAttrs, meta.Attrs.QueuedAt, &now)
+
+			// The "queued at" time should always be the same time as the run ID.  This way,
+			// we ensure there's no drift between run ID creation time and the queued at time.
+			ts := now
+			if p.md != nil {
+				ts = p.md.ID.RunID.Timestamp()
+			}
+
+			meta.AddAttrIfUnset(rawAttrs, meta.Attrs.QueuedAt, &ts)
 
 			if p.md != nil {
 
@@ -83,7 +91,7 @@ func (p *executionProcessor) OnStart(parent context.Context, s sdktrace.ReadWrit
 
 	case meta.SpanNameStep:
 		{
-			meta.AddAttr(rawAttrs, meta.Attrs.QueuedAt, &now)
+			meta.AddAttrIfUnset(rawAttrs, meta.Attrs.QueuedAt, &now)
 
 			if p.qi != nil {
 				meta.AddAttr(rawAttrs, meta.Attrs.StepMaxAttempts, p.qi.MaxAttempts)
@@ -99,7 +107,6 @@ func (p *executionProcessor) OnStart(parent context.Context, s sdktrace.ReadWrit
 								break
 							}
 						}
-
 					}
 				}
 
@@ -113,7 +120,7 @@ func (p *executionProcessor) OnStart(parent context.Context, s sdktrace.ReadWrit
 
 	case meta.SpanNameExecution:
 		{
-			meta.AddAttr(rawAttrs, meta.Attrs.StartedAt, &now)
+			meta.AddAttrIfUnset(rawAttrs, meta.Attrs.StartedAt, &now)
 
 			if p.qi != nil {
 				meta.AddAttr(rawAttrs, meta.Attrs.StepAttempt, &p.qi.Attempt)

@@ -47,6 +47,9 @@ type Opt func(s *svc)
 type Runner interface {
 	service.Service
 
+	// This allows publishing of events to local CQRS for development.
+	event.Publisher
+
 	StateManager() state.Manager
 	InitializeCrons(ctx context.Context) error
 }
@@ -211,6 +214,23 @@ func (s *svc) Stop(ctx context.Context) error {
 		}
 	}
 	return nil
+}
+
+// Publish fulfils the event.Publisher interface for local development.
+func (s *svc) Publish(ctx context.Context, evt event.TrackedEvent) error {
+	byt, err := json.Marshal(evt)
+	if err != nil {
+		return fmt.Errorf("error marshalling event: %w", err)
+	}
+	return s.publisher.Publish(
+		ctx,
+		s.config.EventStream.Service.TopicName(),
+		pubsub.Message{
+			Name:      event.EventReceivedName,
+			Data:      string(byt),
+			Timestamp: time.Now(),
+		},
+	)
 }
 
 func (s *svc) InitializeCrons(ctx context.Context) error {

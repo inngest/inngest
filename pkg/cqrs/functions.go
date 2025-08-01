@@ -53,14 +53,20 @@ type DevFunctionManager interface {
 	DevFunctionWriter
 }
 
+// FunctionCreator creates functions in the backing store.
+type FunctionCreator interface {
+	InsertFunction(ctx context.Context, params InsertFunctionParams) (*Function, error)
+	UpdateFunctionConfig(ctx context.Context, arg UpdateFunctionConfigParams) (*Function, error)
+}
+
 // DevFunctionReader is a development-only function reader.
 type DevFunctionReader interface {
 	GetFunctions(ctx context.Context) ([]*Function, error)
 }
 
 type DevFunctionWriter interface {
-	InsertFunction(ctx context.Context, params InsertFunctionParams) (*Function, error)
-	UpdateFunctionConfig(ctx context.Context, arg UpdateFunctionConfigParams) (*Function, error)
+	FunctionCreator
+
 	// DeleteFunctionsByAppID deletes all functions for a specific app.
 	DeleteFunctionsByAppID(ctx context.Context, appID uuid.UUID) error
 	// DeleteFunctionsByIDs deletes all functions with the given IDs
@@ -69,6 +75,8 @@ type DevFunctionWriter interface {
 
 type InsertFunctionParams struct {
 	ID        uuid.UUID
+	AccountID uuid.UUID
+	EnvID     uuid.UUID
 	AppID     uuid.UUID
 	Name      string
 	Slug      string

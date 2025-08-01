@@ -41,6 +41,15 @@ func AddAttr[T any](r *SerializableAttrs, attr attr[T], value T) {
 	r.Attrs = append(r.Attrs, Attr(attr, value))
 }
 
+func AddAttrIfUnset[T any](r *SerializableAttrs, attr attr[T], value T) {
+	for _, attrs := range r.Attrs {
+		if attrs.key == attr.key {
+			return
+		}
+	}
+	r.Attrs = append(r.Attrs, Attr(attr, value))
+}
+
 func (r *SerializableAttrs) AddErr(err error) {
 	if r.es == nil {
 		r.es = util.NewErrSet()
@@ -204,7 +213,6 @@ func BoolAttr(key string) attr[*bool] {
 				}
 			}
 			return nil, false
-
 		},
 	}
 }
@@ -260,7 +268,6 @@ func DurationAttr(key string) attr[*time.Duration] {
 				}
 			}
 			return nil, false
-
 		},
 	}
 }

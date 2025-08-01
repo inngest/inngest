@@ -286,13 +286,6 @@ func start(ctx context.Context, opts StartOpts) error {
 
 		redis_state.WithShardSelector(shardSelector),
 		redis_state.WithQueueShardClients(queueShards),
-		//redis_state.WithKindToQueueMapping(map[string]string{
-		//	queue.KindPause:           queue.KindPause,
-		//	queue.KindDebounce:        queue.KindDebounce,
-		//	queue.KindQueueMigrate:    queue.KindQueueMigrate,
-		//	queue.KindPauseBlockFlush: queue.KindPauseBlockFlush,
-		//	queue.KindScheduleBatch:   queue.KindScheduleBatch,
-		//}),
 
 		// Key queues
 		redis_state.WithNormalizeRefreshItemCustomConcurrencyKeys(NormalizeConcurrencyKeys(smv2, dbcqrs)),
@@ -502,6 +495,12 @@ func start(ctx context.Context, opts StartOpts) error {
 			Broadcaster:        broadcaster,
 			RealtimeJWTSecret:  consts.DevServerRealtimeJWTSecret,
 			TraceReader:        ds.Data,
+
+			AppCreator:      dbcqrs,
+			FunctionCreator: dbcqrs,
+			EventPublisher:  runner,
+			TracerProvider:  tracing.NewSqlcTracerProvider(base_cqrs.NewQueries(db, dbDriver)),
+			State:           smv2,
 		})
 	})
 
