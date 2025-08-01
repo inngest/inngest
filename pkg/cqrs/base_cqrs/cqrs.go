@@ -45,9 +45,9 @@ var (
 	nilUUID = uuid.UUID{}
 )
 
-func NewQueries(db *sql.DB, driver string) (q sqlc.Querier) {
+func NewQueries(db *sql.DB, driver string, o sqlc_postgres.NewNormalizedOpts) (q sqlc.Querier) {
 	if driver == "postgres" {
-		q = sqlc_postgres.NewNormalized(db)
+		q = sqlc_postgres.NewNormalized(db, o)
 	} else {
 		q = sqlc.New(db)
 	}
@@ -55,12 +55,12 @@ func NewQueries(db *sql.DB, driver string) (q sqlc.Querier) {
 	return q
 }
 
-func NewCQRS(db *sql.DB, driver string) cqrs.Manager {
+func NewCQRS(db *sql.DB, driver string, o sqlc_postgres.NewNormalizedOpts) cqrs.Manager {
 	// Force goqu to use prepared statements for consistency with sqlc
 	sq.SetDefaultPrepared(true)
 	return wrapper{
 		driver: driver,
-		q:      NewQueries(db, driver),
+		q:      NewQueries(db, driver, o),
 		db:     db,
 	}
 }
@@ -309,7 +309,7 @@ func (w wrapper) WithTx(ctx context.Context) (cqrs.TxManager, error) {
 
 	var q sqlc.Querier
 	if w.isPostgres() {
-		q = sqlc_postgres.NewNormalized(tx)
+		q = sqlc_postgres.NewNormalized(tx, sqlc_postgres.NewNormalizedOpts{})
 	} else {
 		q = sqlc.New(tx)
 	}

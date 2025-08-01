@@ -67,6 +67,16 @@ func Command() *cli.Command {
 				Name:  "postgres-uri",
 				Usage: "PostgreSQL database URI for configuration and history persistence. Defaults to SQLite database.",
 			},
+			&cli.IntFlag{
+				Name:  "postgres-max-idle-conns",
+				Usage: "Sets the maximum number of idle database connections in the PostgreSQL connection pool.",
+				Value: 10,
+			},
+			&cli.IntFlag{
+				Name:  "postgres-max-open-conns",
+				Usage: "Sets the maximum number of open database connections allowed in the PostgreSQL connection pool.",
+				Value: 100,
+			},
 
 			// Advanced flags
 			&cli.IntFlag{
@@ -183,22 +193,24 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	conf.ServerKind = headers.ServerKindCloud
 
 	opts := devserver.StartOpts{
-		Config:             *conf,
-		ConnectGatewayHost: conf.CoreAPI.Addr,
-		ConnectGatewayPort: cmd.Int("connect-gateway-port"),
-		EventKeys:          eventKeys,
-		InMemory:           false,
-		NoUI:               cmd.Bool("no-ui"),
-		PollInterval:       cmd.Int("poll-interval"),
-		PostgresURI:        cmd.String("postgres-uri"),
-		QueueWorkers:       cmd.Int("queue-workers"),
-		RedisURI:           cmd.String("redis-uri"),
-		RequireKeys:        true,
-		RetryInterval:      cmd.Int("retry-interval"),
-		SigningKey:         &signingKey,
-		SQLiteDir:          cmd.String("sqlite-dir"),
-		Tick:               time.Duration(tick) * time.Millisecond,
-		URLs:               cmd.StringSlice("sdk-url"),
+		Config:                     *conf,
+		ConnectGatewayHost:         conf.CoreAPI.Addr,
+		ConnectGatewayPort:         cmd.Int("connect-gateway-port"),
+		EventKeys:                  eventKeys,
+		InMemory:                   false,
+		NoUI:                       cmd.Bool("no-ui"),
+		PollInterval:               cmd.Int("poll-interval"),
+		PostgresURI:                cmd.String("postgres-uri"),
+		PostgresMaxIdleConnections: cmd.Int("postgres-max-idle-conns"),
+		PostgresMaxOpenConnections: cmd.Int("postgres-max-open-conns"),
+		QueueWorkers:               cmd.Int("queue-workers"),
+		RedisURI:                   cmd.String("redis-uri"),
+		RequireKeys:                true,
+		RetryInterval:              cmd.Int("retry-interval"),
+		SigningKey:                 &signingKey,
+		SQLiteDir:                  cmd.String("sqlite-dir"),
+		Tick:                       time.Duration(tick) * time.Millisecond,
+		URLs:                       cmd.StringSlice("sdk-url"),
 	}
 
 	err = devserver.New(ctx, opts)
