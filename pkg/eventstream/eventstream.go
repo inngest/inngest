@@ -7,6 +7,7 @@ import (
 	"io"
 	"mime"
 	"mime/multipart"
+	"net/url"
 
 	"github.com/inngest/inngest/pkg/consts"
 )
@@ -25,7 +26,7 @@ type StreamItem struct {
 // ensuring that no individual event is too large.
 //
 // This closes the given channel once the JSON stream in the given reader has been parsed.
-// Supports both JSON and multipart/form-data content types.
+// Supports JSON, multipart/form-data, and application/x-www-form-urlencoded content types.
 //
 // Usage:
 //
@@ -52,10 +53,14 @@ func ParseStream(
 		close(stream)
 	}()
 
-	// Check if content type is multipart/form-data
-	mediaType, params, err := mime.ParseMediaType(contentType)
-	if err == nil && mediaType == "multipart/form-data" {
+	// Ignore the error because we want to default to JSON parsing when that
+	// happens
+	mediaType, params, _ := mime.ParseMediaType(contentType)
+	switch mediaType {
+	case "multipart/form-data":
 		return parseMultipartStream(ctx, r, stream, maxSize, params["boundary"])
+	case "application/x-www-form-urlencoded":
+		return parseFormUrlencodedStream(ctx, r, stream, maxSize)
 	}
 
 	// Default to JSON parsing
@@ -140,7 +145,7 @@ func parseMultipartStream(
 	reader := multipart.NewReader(r, boundary)
 
 	// Collect all form fields
-	formData := make(map[string]string)
+	formData := make(map[string][]string)
 
 	for {
 		part, err := reader.NextPart()
@@ -158,33 +163,65 @@ func parseMultipartStream(
 			return err
 		}
 
-		// Skip empty parts
-		if len(data) == 0 {
-			continue
-		}
-
 		fieldName := part.FormName()
 		if fieldName != "" {
-			formData[fieldName] = string(data)
+			formData[fieldName] = append(formData[fieldName], string(data))
 		}
 	}
 
-	if len(formData) > 0 {
-		byt, err := json.Marshal(formData)
-		if err != nil {
-			return err
-		}
+	byt, err := json.Marshal(formData)
+	if err != nil {
+		return err
+	}
 
-		if len(byt) > maxSize {
-			return fmt.Errorf("%w: Max %d bytes / Size %d bytes", ErrEventTooLarge, maxSize, len(byt))
-		}
+	if len(byt) > maxSize {
+		return fmt.Errorf("%w: Max %d bytes / Size %d bytes", ErrEventTooLarge, maxSize, len(byt))
+	}
 
-		select {
-		case stream <- StreamItem{N: 0, Item: json.RawMessage(byt)}:
-			// Success
-		case <-ctx.Done():
-			return nil
-		}
+	select {
+	case stream <- StreamItem{N: 0, Item: json.RawMessage(byt)}:
+		// Success
+	case <-ctx.Done():
+		return nil
+	}
+
+	return nil
+}
+
+// parseFormUrlencodedStream parses application/x-www-form-urlencoded data and
+// extracts form fields as a JSON event
+func parseFormUrlencodedStream(
+	ctx context.Context,
+	r io.Reader,
+	stream chan StreamItem,
+	maxSize int,
+) error {
+	// Read all data from the reader
+	data, err := io.ReadAll(r)
+	if err != nil {
+		return err
+	}
+
+	// Parse the form data
+	values, err := url.ParseQuery(string(data))
+	if err != nil {
+		return err
+	}
+
+	byt, err := json.Marshal(values)
+	if err != nil {
+		return err
+	}
+
+	if len(byt) > maxSize {
+		return fmt.Errorf("%w: Max %d bytes / Size %d bytes", ErrEventTooLarge, maxSize, len(byt))
+	}
+
+	select {
+	case stream <- StreamItem{N: 0, Item: json.RawMessage(byt)}:
+		// Success
+	case <-ctx.Done():
+		return nil
 	}
 
 	return nil
