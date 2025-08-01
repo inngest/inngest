@@ -101,9 +101,10 @@ func NewKafkaSpanExporter(ctx context.Context, opts ...KafkaSpansExporterOpts) (
 			metrics.IncrSpanExportDataLoss(ctx, metrics.CounterOpt{
 				PkgName: pkgName,
 				Tags: map[string]any{
-					"producer":  "kafka",
-					"topic":     topic,
-					"partition": partition,
+					"producer":      "kafka",
+					"topic":         topic,
+					"partition":     partition,
+					"trace_version": "v1",
 				},
 			})
 		}),
@@ -212,8 +213,9 @@ func (e *kafkaSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadO
 			metrics.IncrSpanExportedCounter(ctx, metrics.CounterOpt{
 				PkgName: pkgName,
 				Tags: map[string]any{
-					"producer": "kafka",
-					"status":   status,
+					"producer":      "kafka",
+					"status":        status,
+					"trace_version": "v1",
 				},
 			})
 		})

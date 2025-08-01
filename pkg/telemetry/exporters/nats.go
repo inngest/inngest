@@ -267,8 +267,9 @@ func (e *natsSpanExporter) flush(ctx context.Context, streams []*StreamConf, dea
 				metrics.IncrSpanExportedCounter(ctx, metrics.CounterOpt{
 					PkgName: pkgName,
 					Tags: map[string]any{
-						"subject": conf.Subject,
-						"status":  status,
+						"subject":       conf.Subject,
+						"status":        status,
+						"trace_version": "v1",
 					},
 				})
 				if deadletter {
@@ -379,9 +380,10 @@ func (e *natsSpanExporter) ExportSpans(ctx context.Context, spans []trace.ReadOn
 				metrics.IncrSpanExportedCounter(ctx, metrics.CounterOpt{
 					PkgName: pkgName,
 					Tags: map[string]any{
-						"producer": "nats",
-						"subject":  conf.Subject,
-						"status":   pstatus,
+						"producer":      "nats",
+						"subject":       conf.Subject,
+						"status":        pstatus,
+						"trace_version": "v1",
 					},
 				})
 			}(ctx, *stream, sp)
