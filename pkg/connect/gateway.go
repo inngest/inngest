@@ -810,7 +810,11 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 
 			newLeaseID, err := c.svc.stateManager.ExtendRequestLease(ctx, c.conn.EnvID, data.RequestId, leaseID, consts.ConnectWorkerRequestLeaseDuration)
 			if err != nil {
-				if errors.Is(err, state.ErrRequestLeaseExpired) || errors.Is(err, state.ErrRequestLeased) {
+				switch {
+				case errors.Is(err, state.ErrRequestLeaseExpired),
+					errors.Is(err, state.ErrRequestLeased),
+					errors.Is(err, state.ErrRequestLeaseNotFound):
+
 					c.log.ReportError(err, "lease was claimed by other worker or expired",
 						logger.WithErrorReportTags(map[string]string{
 							"req_id":   data.RequestId,
@@ -846,15 +850,20 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 					}
 
 					return nil
-				}
 
-				c.log.ReportError(err, "unexpected error extending lease")
+				default:
+					c.log.ReportError(err, "unexpected error extending lease",
+						logger.WithErrorReportTags(map[string]string{
+							"req_id":   data.RequestId,
+							"lease_id": leaseID.String(),
+						}))
 
-				// This should never happen
-				return &connecterrors.SocketError{
-					SysCode:    syscode.CodeConnectInternal,
-					StatusCode: websocket.StatusInternalError,
-					Msg:        "unexpected error extending lease",
+					// This should never happen
+					return &connecterrors.SocketError{
+						SysCode:    syscode.CodeConnectInternal,
+						StatusCode: websocket.StatusInternalError,
+						Msg:        "unexpected error extending lease",
+					}
 				}
 			}
 
