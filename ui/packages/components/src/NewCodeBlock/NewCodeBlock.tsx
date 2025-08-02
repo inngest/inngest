@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Button } from '@inngest/components/Button';
 import { CopyButton } from '@inngest/components/CopyButton';
 import { maxRenderedOutputSizeBytes } from '@inngest/components/constants';
@@ -44,8 +44,6 @@ interface CodeBlockProps {
     handleChange?: (value: string) => void;
   };
   actions?: CodeBlockAction[];
-  defaultHeight?: number;
-  height?: number;
   allowFullScreen?: boolean;
   parsed?: boolean;
   loading?: boolean;
@@ -55,24 +53,16 @@ export const NewCodeBlock = ({
   header,
   tab,
   actions = [],
-  height = 0,
   allowFullScreen = false,
   parsed = true,
   loading = false,
+  className,
 }: CodeBlockProps) => {
   const [dark, _] = useState(isDark());
-  const [editorHeight, setEditorHeight] = useState(height);
   const [fullScreen, setFullScreen] = useState(false);
   const [mode, setMode] = useState<'rich' | 'raw'>('rich');
   const [wordWrap, setWordWrap] = useLocalStorage('wordWrap', false);
-
   const { handleCopyClick, isCopying } = useCopyToClipboard();
-  const updateHeight = useCallback(
-    (newHeight?: number) => {
-      newHeight && newHeight !== editorHeight && setEditorHeight(newHeight);
-    },
-    [editorHeight]
-  );
 
   const monaco = useMonaco();
   const { content, readOnly = true, language = 'json' } = tab;
@@ -138,10 +128,14 @@ export const NewCodeBlock = ({
               {parsed ? (
                 <SegmentedControl defaultValue={mode}>
                   <SegmentedControl.Button value="rich" onClick={() => setMode('rich')}>
-                    Parsed {header?.title}
+                    <div className="overflow-x-hidden overflow-y-hidden text-ellipsis whitespace-nowrap">
+                      Parsed {header?.title}
+                    </div>
                   </SegmentedControl.Button>
                   <SegmentedControl.Button value="raw" onClick={() => setMode('raw')}>
-                    Raw {header?.title}
+                    <div className="overflow-x-hidden overflow-y-hidden text-ellipsis whitespace-nowrap">
+                      Raw {header?.title}
+                    </div>
                   </SegmentedControl.Button>
                 </SegmentedControl>
               ) : (
@@ -156,7 +150,7 @@ export const NewCodeBlock = ({
                     }
                     side="left"
                   >
-                    <div className="min-w-0 overflow-x-hidden overflow-y-hidden text-ellipsis whitespace-nowrap">
+                    <div className="overflow-x-hidden overflow-y-hidden text-ellipsis whitespace-nowrap">
                       {header?.title}
                     </div>
                   </OptionalTooltip>
@@ -213,7 +207,7 @@ export const NewCodeBlock = ({
             )}
           </div>
         </div>
-        <div className={cn('bg-codeEditor h-full overflow-y-auto')}>
+        <div className={cn('bg-codeEditor h-full overflow-y-auto py-3')}>
           {isOutputTooLarge ? (
             <>
               <Alert severity="warning">Output size is too large to render {`( > 1MB )`}</Alert>
@@ -246,7 +240,7 @@ export const NewCodeBlock = ({
             />
           ) : (
             <Editor
-              className={cn('h-full', editorHeight && `h-[${editorHeight}px]`)}
+              className={cn('h-full', className)}
               theme="inngest-theme"
               defaultLanguage={language}
               value={content}
@@ -263,10 +257,6 @@ export const NewCodeBlock = ({
                 renderWhitespace: 'none',
                 automaticLayout: true,
                 scrollBeyondLastLine: false,
-                padding: {
-                  top: 10,
-                  bottom: 10,
-                },
                 scrollbar: {
                   alwaysConsumeMouseWheel: false,
                   horizontalScrollbarSize: 0,
@@ -280,7 +270,6 @@ export const NewCodeBlock = ({
                   highlightActiveIndentation: false,
                 },
               }}
-              onMount={(editor) => updateHeight(editor.getContentHeight())}
             />
           )}
         </div>

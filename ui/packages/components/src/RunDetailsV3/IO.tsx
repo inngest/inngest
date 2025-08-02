@@ -1,4 +1,4 @@
-import { CodeBlock, type CodeBlockAction } from '../CodeBlock';
+import { type CodeBlockAction } from '../CodeBlock';
 import { NewCodeBlock } from '../NewCodeBlock/NewCodeBlock';
 
 export type IOProps = {
@@ -7,9 +7,10 @@ export type IOProps = {
   raw?: string;
   error?: boolean;
   loading?: boolean;
+  parsed?: boolean;
 };
 
-export const IO = ({ title, actions, raw, error, loading }: IOProps) => {
+export const IO = ({ title, actions, raw, error, loading, parsed = false }: IOProps) => {
   return (
     <div className="text-muted bg-codeEditor h-full">
       <NewCodeBlock
@@ -19,7 +20,7 @@ export const IO = ({ title, actions, raw, error, loading }: IOProps) => {
           content: raw ?? 'Unknown',
         }}
         allowFullScreen={true}
-        parsed={false}
+        parsed={parsed}
         loading={loading}
       />
     </div>

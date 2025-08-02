@@ -1,5 +1,8 @@
 import { useCallback } from 'react';
-import type { Result } from '@inngest/components/types/functionRun';
+import type {
+  GetTraceResultPayload,
+  TraceResult,
+} from '@inngest/components/SharedContext/useGetTraceResult';
 import { useClient } from 'urql';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
@@ -22,12 +25,12 @@ const query = graphql(`
   }
 `);
 
-export function useGetTraceResult(): (traceID: string) => Promise<Result> {
+export function useGetTraceResult(): (payload: GetTraceResultPayload) => Promise<TraceResult> {
   const envID = useEnvironment().id;
   const client = useClient();
 
   return useCallback(
-    async (traceID: string) => {
+    async ({ traceID }: GetTraceResultPayload) => {
       let res;
       try {
         res = await client
