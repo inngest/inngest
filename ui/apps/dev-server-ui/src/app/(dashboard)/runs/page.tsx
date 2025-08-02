@@ -21,7 +21,6 @@ import { useInfiniteQuery } from '@tanstack/react-query';
 
 import SendEventButton from '@/components/Event/SendEventButton';
 import { useGetRun } from '@/hooks/useGetRun';
-import { useGetTraceResult } from '@/hooks/useGetTraceResult';
 import { useGetTrigger } from '@/hooks/useGetTrigger';
 import { client } from '@/store/baseApi';
 import {
@@ -49,7 +48,7 @@ export default function Page() {
   const [endTime] = useSearchParam('end');
   const [search] = useSearchParam('search');
   const calculatedStartTime = useCalculatedStartTime({ lastDays, startTime });
-  const appsRes = useGetAppsQuery();
+  const appsRes = useGetAppsQuery(undefined, { pollingInterval: 0 });
 
   const queryFn = useCallback(
     async ({ pageParam }: { pageParam: string | null }) => {
@@ -128,7 +127,6 @@ export default function Page() {
     return out;
   }, [data?.pages]);
 
-  const getTraceResult = useGetTraceResult();
   const getTrigger = useGetTrigger();
   const getRun = useGetRun();
 
@@ -190,7 +188,6 @@ export default function Page() {
         onScroll={onScroll}
         onScrollToTop={onScrollToTop}
         onRefresh={fetchNextPage}
-        getTraceResult={getTraceResult}
         getTrigger={getTrigger}
         pollInterval={pollInterval}
         scope="env"
