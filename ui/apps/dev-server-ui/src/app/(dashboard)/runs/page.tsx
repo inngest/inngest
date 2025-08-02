@@ -48,7 +48,7 @@ export default function Page() {
   const [endTime] = useSearchParam('end');
   const [search] = useSearchParam('search');
   const calculatedStartTime = useCalculatedStartTime({ lastDays, startTime });
-  const appsRes = useGetAppsQuery(undefined, { pollingInterval: 0 });
+  const appsRes = useGetAppsQuery();
 
   const queryFn = useCallback(
     async ({ pageParam }: { pageParam: string | null }) => {
