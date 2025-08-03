@@ -253,6 +253,26 @@ func (g GeneratorOpcode) SignalOpts() (*SignalOpts, error) {
 	return opts, nil
 }
 
+// RunCompleteData unmarshals function output to the given pointer,
+// assuming the opcode has data within the Data field.
+//
+// NOTE: For consistency, the data must always be wrapped within
+// a `data` object, allowing us to add other metadata as non-conflicting
+// top-level keys in the future.
+func (g GeneratorOpcode) RunCompleteData(data any) error {
+	if len(g.Data) == 0 {
+		return nil
+	}
+	res := &RunCompleteData{}
+	if err := json.Unmarshal(g.Data, res); err != nil {
+		return err
+	}
+	if len(res.Data) == 0 {
+		return nil
+	}
+	return json.Unmarshal(res.Data, data)
+}
+
 type SignalOpts struct {
 	Signal     string `json:"signal"`
 	Timeout    string `json:"timeout"`
@@ -389,6 +409,12 @@ func (r *RunOpts) UnmarshalAny(a any) error {
 
 	*r = opts
 	return nil
+}
+
+type RunCompleteData struct {
+	// Data represents the run's resulting data.  Note that
+	// this may be nil.
+	Data json.RawMessage `json:"data"`
 }
 
 type WaitForEventOpts struct {
