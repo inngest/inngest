@@ -88,6 +88,16 @@ var Attrs = struct {
 	ResponseStatusCode attr[*int]
 	ResponseOutputSize attr[*int]
 
+	// Userland attributes
+	IsUserland                 attr[*bool]
+	UserlandSpanID             attr[*string]
+	UserlandName               attr[*string]
+	UserlandKind               attr[*string]
+	UserlandServiceName        attr[*string]
+	UserlandScopeName          attr[*string]
+	UserlandScopeVersion       attr[*string]
+	UserlandResourceAttributes attr[*string]
+
 	// Debugger attributes
 	DebugSessionID attr[*ulid.ULID]
 	DebugRunID     attr[*ulid.ULID]
@@ -121,25 +131,33 @@ var Attrs = struct {
 	StepGatewayResponseStatusCode:      IntAttr("step.gateway.response.status_code"),
 	// StepHasOutput is used to mark that a specific span has an output in the
 	// attributes, in place of the output itself.
-	StepHasOutput:             BoolAttr("step.has_output"),
-	StepID:                    StringAttr("step.id"),
-	StepInvokeFinishEventID:   ULIDAttr("step.invoke.finish.event.id"),
-	StepInvokeFunctionID:      StringAttr("step.invoke.function.id"),
-	StepInvokeRunID:           ULIDAttr("step.invoke.run.id"),
-	StepInvokeTriggerEventID:  ULIDAttr("step.invoke.trigger.event.id"),
-	StepMaxAttempts:           IntAttr("step.max_attempts"),
-	StepName:                  StringAttr("step.name"),
-	StepOp:                    StepOpAttr("step.op"),
-	StepOutput:                StringAttr("step.output"),
-	StepOutputRef:             StringAttr("step.output_ref"),
-	StepRunType:               StringAttr("step.run.type"),
-	StepSignalName:            StringAttr("step.signal.name"),
-	StepSleepDuration:         DurationAttr("step.sleep.duration"),
-	StepWaitExpired:           BoolAttr("step.wait.expired"),
-	StepWaitExpiry:            TimeAttr("step.wait.expiry"),
-	StepWaitForEventIf:        StringAttr("step.wait_for_event.if"),
-	StepWaitForEventMatchedID: ULIDAttr("step.wait_for_event.matched_id"),
-	StepWaitForEventName:      StringAttr("step.wait_for_event.name"),
-	DebugSessionID:            ULIDAttr("debug.session.id"),
-	DebugRunID:                ULIDAttr("debug.run.id"),
+	StepHasOutput:              BoolAttr("step.has_output"),
+	StepID:                     StringAttr("step.id"),
+	StepInvokeFinishEventID:    ULIDAttr("step.invoke.finish.event.id"),
+	StepInvokeFunctionID:       StringAttr("step.invoke.function.id"),
+	StepInvokeRunID:            ULIDAttr("step.invoke.run.id"),
+	StepInvokeTriggerEventID:   ULIDAttr("step.invoke.trigger.event.id"),
+	StepMaxAttempts:            IntAttr("step.max_attempts"),
+	StepName:                   StringAttr("step.name"),
+	StepOp:                     StepOpAttr("step.op"),
+	StepOutput:                 StringAttr("step.output"),
+	StepOutputRef:              StringAttr("step.output_ref"),
+	StepRunType:                StringAttr("step.run.type"),
+	StepSignalName:             StringAttr("step.signal.name"),
+	StepSleepDuration:          DurationAttr("step.sleep.duration"),
+	StepWaitExpired:            BoolAttr("step.wait.expired"),
+	StepWaitExpiry:             TimeAttr("step.wait.expiry"),
+	StepWaitForEventIf:         StringAttr("step.wait_for_event.if"),
+	StepWaitForEventMatchedID:  ULIDAttr("step.wait_for_event.matched_id"),
+	StepWaitForEventName:       StringAttr("step.wait_for_event.name"),
+	UserlandSpanID:             StringAttr("userland.span.id"),
+	IsUserland:                 BoolAttr("userland"),
+	UserlandKind:               StringAttr("userland.kind"),
+	UserlandServiceName:        StringAttr("userland.service.name"),
+	UserlandScopeName:          StringAttr("userland.scope.name"),
+	UserlandScopeVersion:       StringAttr("userland.scope.version"),
+	UserlandResourceAttributes: StringAttr("userland.resource.attributes"),
+	UserlandName:               StringAttr("userland.name"),
+	DebugSessionID:             ULIDAttr("debug.session.id"),
+	DebugRunID:                 ULIDAttr("debug.run.id"),
 }
