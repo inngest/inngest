@@ -474,7 +474,13 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	// Run IDs are created embedding the timestamp now, when the function is being scheduled.
 	// When running a cancellation, functions are cancelled at scheduling time based off of
 	// this run ID.
-	runID := ulid.MustNew(ulid.Now(), rand.Reader)
+	var runID ulid.ULID
+
+	if req.RunID == nil {
+		runID = ulid.MustNew(ulid.Now(), rand.Reader)
+	} else {
+		runID = *req.RunID
+	}
 
 	key := idempotencyKey(req, runID)
 
@@ -548,17 +554,24 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		Config: config,
 	}
 
+	// XXX: If this is a sync run, always add the start time to the span.  We do this
+	// because sync runs have already started by the time we call Schedule;  theyre
+	// in-process, and Schedule gets called via an API endpoint when the run starts.
+	runSpanOpts := &tracing.CreateSpanOptions{
+		Debug:    &tracing.SpanDebugData{Location: "executor.Schedule"},
+		Metadata: &metadata,
+		Attributes: meta.NewAttrSet(
+			meta.Attr(meta.Attrs.DebugSessionID, req.DebugSessionID),
+			meta.Attr(meta.Attrs.DebugRunID, req.DebugRunID),
+		),
+	}
+	if req.RunMode == enums.RunModeSync {
+		runSpanOpts.StartTime = runID.Timestamp()
+	}
 	// Always the root span.
 	runSpanRef, err := e.tracerProvider.CreateSpan(
 		meta.SpanNameRun,
-		&tracing.CreateSpanOptions{
-			Debug:    &tracing.SpanDebugData{Location: "executor.Schedule"},
-			Metadata: &metadata,
-			Attributes: meta.NewAttrSet(
-				meta.Attr(meta.Attrs.DebugSessionID, req.DebugSessionID),
-				meta.Attr(meta.Attrs.DebugRunID, req.DebugRunID),
-			),
-		},
+		runSpanOpts,
 	)
 	if err != nil {
 		// return nil, fmt.Errorf("error creating run span: %w", err)
@@ -783,6 +796,17 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		Singleton: singletonConfig,
 	}
 
+	// If this is run mode sync, we do NOT need to create a queue item, as the
+	// Inngest SDK is checkpointing and the execution is happening in a single
+	// external API request.
+	if req.RunMode == enums.RunModeSync {
+		for _, e := range e.lifecycles {
+			go e.OnFunctionScheduled(context.WithoutCancel(ctx), metadata, item, req.Events)
+		}
+		return &metadata, nil
+	}
+
+	// Schedule for async functons (the default)
 	err = e.queue.Enqueue(ctx, item, at, queue.EnqueueOpts{})
 
 	switch err {
@@ -1487,6 +1511,7 @@ func (e *executor) run(ctx context.Context, i *runInstance) (*state.DriverRespon
 
 	// Execute the actual step.
 	response, err := e.executeDriverForStep(ctx, i)
+
 	if response.Err != nil && err == nil {
 		// This step errored, so always return an error.
 		return response, fmt.Errorf("%s", *response.Err)
