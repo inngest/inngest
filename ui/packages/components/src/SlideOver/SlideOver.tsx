@@ -8,8 +8,19 @@ import { AnimatePresence, motion } from 'framer-motion';
 type SlideOverProps = {
   children?: React.ReactNode;
   onClose: () => void;
-  size?: 'small' | 'large';
+  size?: 'small' | 'large' | 'fixed-500';
 };
+
+function getSizeClassName(size: SlideOverProps['size']) {
+  switch (size) {
+    case 'small':
+      return 'w-2/5';
+    case 'large':
+      return 'w-4/5';
+    case 'fixed-500':
+      return 'max-w-[500px]';
+  }
+}
 
 export function SlideOver({ children, onClose, size = 'large' }: SlideOverProps) {
   // This hack is needed to prevent hydration errors.
@@ -62,7 +73,7 @@ export function SlideOver({ children, onClose, size = 'large' }: SlideOverProps)
                 <Dialog.Content
                   onOpenAutoFocus={(event: Event) => event.preventDefault()}
                   className={cn(
-                    size === 'small' ? 'w-2/5' : 'w-4/5',
+                    getSizeClassName(size),
                     'bg-canvasBase flex h-full flex-col shadow-xl'
                   )}
                 >
