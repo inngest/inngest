@@ -545,17 +545,24 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		Config: config,
 	}
 
+	// XXX: If this is a sync run, always add the start time to the span.  We do this
+	// because sync runs have already started by the time we call Schedule;  theyre
+	// in-process, and Schedule gets called via an API endpoint when the run starts.
+	runSpanOpts := &tracing.CreateSpanOptions{
+		Debug:    &tracing.SpanDebugData{Location: "executor.Schedule"},
+		Metadata: &metadata,
+		Attributes: meta.NewAttrSet(
+			meta.Attr(meta.Attrs.DebugSessionID, req.DebugSessionID),
+			meta.Attr(meta.Attrs.DebugRunID, req.DebugRunID),
+		),
+	}
+	if req.RunMode == enums.RunModeSync {
+		runSpanOpts.StartTime = runID.Timestamp()
+	}
 	// Always the root span.
 	runSpanRef, err := e.tracerProvider.CreateSpan(
 		meta.SpanNameRun,
-		&tracing.CreateSpanOptions{
-			Debug:    &tracing.SpanDebugData{Location: "executor.Schedule"},
-			Metadata: &metadata,
-			Attributes: meta.NewAttrSet(
-				meta.Attr(meta.Attrs.DebugSessionID, req.DebugSessionID),
-				meta.Attr(meta.Attrs.DebugRunID, req.DebugRunID),
-			),
-		},
+		runSpanOpts,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("error creating run span: %w", err)
