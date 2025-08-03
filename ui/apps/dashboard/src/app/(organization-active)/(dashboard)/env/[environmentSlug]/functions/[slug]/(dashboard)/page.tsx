@@ -34,7 +34,11 @@ type FunctionDashboardProps = {
 
 export const DEFAULT_TIME = '1d';
 
-export default function FunctionDashboardPage({ params }: FunctionDashboardProps) {
+export default function Page({ params }: FunctionDashboardProps) {
+  return <FunctionDashboardPage params={params} />;
+}
+
+function FunctionDashboardPage({ params }: FunctionDashboardProps) {
   const [lastDays] = useSearchParam('last');
   const [startTime] = useSearchParam('start');
   const [endTime] = useSearchParam('end');
