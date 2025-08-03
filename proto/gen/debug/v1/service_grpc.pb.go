@@ -19,7 +19,8 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	Debug_GetPartition_FullMethodName = "/debug.v1.Debug/GetPartition"
+	Debug_GetPartition_FullMethodName       = "/debug.v1.Debug/GetPartition"
+	Debug_GetPartitionStatus_FullMethodName = "/debug.v1.Debug/GetPartitionStatus"
 )
 
 // DebugClient is the client API for Debug service.
@@ -27,6 +28,7 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type DebugClient interface {
 	GetPartition(ctx context.Context, in *PartitionRequest, opts ...grpc.CallOption) (*PartitionResponse, error)
+	GetPartitionStatus(ctx context.Context, in *PartitionRequest, opts ...grpc.CallOption) (*PartitionStatusResponse, error)
 }
 
 type debugClient struct {
@@ -47,11 +49,22 @@ func (c *debugClient) GetPartition(ctx context.Context, in *PartitionRequest, op
 	return out, nil
 }
 
+func (c *debugClient) GetPartitionStatus(ctx context.Context, in *PartitionRequest, opts ...grpc.CallOption) (*PartitionStatusResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PartitionStatusResponse)
+	err := c.cc.Invoke(ctx, Debug_GetPartitionStatus_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // DebugServer is the server API for Debug service.
 // All implementations must embed UnimplementedDebugServer
 // for forward compatibility.
 type DebugServer interface {
 	GetPartition(context.Context, *PartitionRequest) (*PartitionResponse, error)
+	GetPartitionStatus(context.Context, *PartitionRequest) (*PartitionStatusResponse, error)
 	mustEmbedUnimplementedDebugServer()
 }
 
@@ -64,6 +77,9 @@ type UnimplementedDebugServer struct{}
 
 func (UnimplementedDebugServer) GetPartition(context.Context, *PartitionRequest) (*PartitionResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetPartition not implemented")
+}
+func (UnimplementedDebugServer) GetPartitionStatus(context.Context, *PartitionRequest) (*PartitionStatusResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetPartitionStatus not implemented")
 }
 func (UnimplementedDebugServer) mustEmbedUnimplementedDebugServer() {}
 func (UnimplementedDebugServer) testEmbeddedByValue()               {}
@@ -104,6 +120,24 @@ func _Debug_GetPartition_Handler(srv interface{}, ctx context.Context, dec func(
 	return interceptor(ctx, in, info, handler)
 }
 
+func _Debug_GetPartitionStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PartitionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DebugServer).GetPartitionStatus(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: Debug_GetPartitionStatus_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DebugServer).GetPartitionStatus(ctx, req.(*PartitionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // Debug_ServiceDesc is the grpc.ServiceDesc for Debug service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -114,6 +148,10 @@ var Debug_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetPartition",
 			Handler:    _Debug_GetPartition_Handler,
+		},
+		{
+			MethodName: "GetPartitionStatus",
+			Handler:    _Debug_GetPartitionStatus_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

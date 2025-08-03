@@ -54,6 +54,9 @@ func Command() *cli.Command {
 			}
 			return nil
 		},
+		Commands: []*cli.Command{
+			partitionCommand(),
+		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			return fmt.Errorf("debug commands not yet implemented - use subcommands")
 		},
