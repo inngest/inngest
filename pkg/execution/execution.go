@@ -173,6 +173,9 @@ type ScheduleRequest struct {
 	// RunID allows specifying a run ID for the scheduled run.  This is entirely
 	// optional, and allows clients to choose a run ID when scheduling.  We need this
 	// for run IDs with API-based checkpointing.
+	//
+	// Note that this should never be provided by the user, as that could welcome
+	// conflicts.
 	RunID *ulid.ULID
 
 	// OriginalRunID is the ID of the ID of the original run, if this a replay.

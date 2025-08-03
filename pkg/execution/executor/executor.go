@@ -13,7 +13,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/davecgh/go-spew/spew"
 	"github.com/fatih/structs"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
@@ -1480,7 +1479,6 @@ func (e *executor) run(ctx context.Context, i *runInstance) (*state.DriverRespon
 
 	// Execute the actual step.
 	response, err := e.executeDriverForStep(ctx, i)
-	spew.Dump(err, response)
 
 	if response.Err != nil && err == nil {
 		// This step errored, so always return an error.

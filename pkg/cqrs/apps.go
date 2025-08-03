@@ -75,7 +75,7 @@ type UpsertAppParams struct {
 	Error       sql.NullString
 	Checksum    string
 	Url         string
-	Method      string // enums.AppMetho
+	Method      string
 	AppVersion  string
 }
 
