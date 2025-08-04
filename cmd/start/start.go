@@ -90,6 +90,19 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		os.Exit(1)
 	}
 
+	// Validate PostgreSQL connection pool settings
+	postgresMaxIdleConns := cmd.Int("postgres-max-idle-conns")
+	postgresMaxOpenConns := cmd.Int("postgres-max-open-conns")
+	if postgresMaxOpenConns <= 1 {
+		fmt.Printf("Error: postgres-max-open-conns (%d) must be greater than 1\n", postgresMaxOpenConns)
+		os.Exit(1)
+	}
+	if postgresMaxIdleConns > postgresMaxOpenConns {
+		fmt.Printf("Error: postgres-max-idle-conns (%d) cannot be greater than postgres-max-open-conns (%d)\n",
+			postgresMaxIdleConns, postgresMaxOpenConns)
+		os.Exit(1)
+	}
+
 	conf.ServerKind = headers.ServerKindCloud
 
 	// Handle configuration options with simplified koanf-based approach
@@ -108,8 +121,8 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		PollInterval:            localconfig.GetIntValue(cmd, "poll-interval", devserver.DefaultPollInterval),
 		PostgresConnMaxIdleTime: cmd.Int("postgres-conn-max-idle-time"),
 		PostgresConnMaxLifetime: cmd.Int("postgres-conn-max-lifetime"),
-		PostgresMaxIdleConns:    cmd.Int("postgres-max-idle-conns"),
-		PostgresMaxOpenConns:    cmd.Int("postgres-max-open-conns"),
+		PostgresMaxIdleConns:    postgresMaxIdleConns,
+		PostgresMaxOpenConns:    postgresMaxOpenConns,
 		PostgresURI:             postgresURI,
 		QueueWorkers:            localconfig.GetIntValue(cmd, "queue-workers", devserver.DefaultQueueWorkers),
 		RedisURI:                redisURI,
