@@ -49,7 +49,6 @@ type Props = {
   data: Run[];
   defaultVisibleColumns?: ColumnID[];
   features: Pick<Features, 'history' | 'tracesPreview'>;
-  getRun: React.ComponentProps<typeof RunDetailsV3>['getRun'];
   getTrigger: React.ComponentProps<typeof RunDetailsV3>['getTrigger'];
   hasMore: boolean;
   isLoadingInitial: boolean;
@@ -68,7 +67,6 @@ type Props = {
 
 export function RunsPage({
   defaultVisibleColumns,
-  getRun,
   getTrigger,
   data,
   features,
@@ -232,18 +230,17 @@ export function RunsPage({
       return (
         <div className={`border-subtle `}>
           <RunDetailsV3
-            getRun={getRun}
             initialRunData={rowData}
             getTrigger={getTrigger}
             pollInterval={pollInterval}
             runID={rowData.id}
             standalone={false}
-            tracesPreviewEnabled={features.tracesPreview}
+            tracesPreviewEnabled={features.tracesPreview ?? false}
           />
         </div>
       );
     },
-    [getRun, getTrigger, pollInterval, features.tracesPreview]
+    [getTrigger, pollInterval, features.tracesPreview]
   );
 
   const options = useMemo(() => {
