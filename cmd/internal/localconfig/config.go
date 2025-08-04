@@ -7,7 +7,6 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/inngest/inngest/cmd/internal/envflags"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/knadh/koanf/parsers/json"
 	"github.com/knadh/koanf/parsers/yaml"
@@ -77,7 +76,10 @@ func loadConfigFile(ctx context.Context, cmd *cli.Command) error {
 
 	// Step 1: Load config file (lowest priority)
 	configLoaded := false
-	configPath := envflags.GetEnvOrFlag(cmd, "config", "INNGEST_CONFIG")
+	configPath := cmd.String("config")
+	if configPath == "" {
+		configPath = os.Getenv("INNGEST_CONFIG")
+	}
 	if configPath != "" {
 		if err := loadConfigFromPath(configPath); err != nil {
 			return fmt.Errorf("error reading config file %s: %w", configPath, err)
@@ -192,11 +194,13 @@ func loadEnvironmentVariables() error {
 			configKey = strings.ToLower(strings.ReplaceAll(key, "_", "-"))
 		}
 
-		// Handle comma-separated values for array fields
+		// Handle array fields - convert single values and comma-separated values to arrays
 		if configKey == "sdk-url" || configKey == "event-key" {
 			if strings.Contains(value, ",") {
 				return configKey, strings.Split(value, ",")
 			}
+			// Single value should also be converted to array for consistency
+			return configKey, []string{value}
 		}
 
 		return configKey, value
@@ -210,5 +214,65 @@ func unmarshalConfig() error {
 		return fmt.Errorf("error unmarshaling config: %w", err)
 	}
 	return nil
+}
+
+// GetValue gets a configuration value with proper priority: CLI flag > env var > config file > default
+// This replaces the need for envflags helpers since koanf handles the priority automatically
+func GetValue(cmd *cli.Command, flagName, configKey, defaultValue string) string {
+	// First check if CLI flag is explicitly set (highest priority)
+	if cmd.IsSet(flagName) {
+		return cmd.String(flagName)
+	}
+	
+	// Then check koanf (which includes env vars and config file in correct priority)
+	if value := k.String(configKey); value != "" {
+		return value
+	}
+	
+	// Finally return default
+	return defaultValue
+}
+
+// GetIntValue gets an integer configuration value with proper priority
+func GetIntValue(cmd *cli.Command, flagName, configKey string, defaultValue int) int {
+	// First check if CLI flag is explicitly set (highest priority)
+	if cmd.IsSet(flagName) {
+		return cmd.Int(flagName)
+	}
+	
+	// Then check koanf (which includes env vars and config file in correct priority)
+	if k.Exists(configKey) {
+		return k.Int(configKey)
+	}
+	
+	// Finally return default
+	return defaultValue
+}
+
+// GetStringSlice gets a string slice configuration value with proper priority
+func GetStringSlice(cmd *cli.Command, flagName, configKey string) []string {
+	// First check if CLI flag is explicitly set (highest priority)
+	if cmd.IsSet(flagName) {
+		return cmd.StringSlice(flagName)
+	}
+	
+	// Then check koanf (which includes env vars and config file in correct priority)
+	return k.Strings(configKey)
+}
+
+// GetBoolValue gets a boolean configuration value with proper priority
+func GetBoolValue(cmd *cli.Command, flagName, configKey string, defaultValue bool) bool {
+	// First check if CLI flag is explicitly set (highest priority)
+	if cmd.IsSet(flagName) {
+		return cmd.Bool(flagName)
+	}
+	
+	// Then check koanf (which includes env vars and config file in correct priority)
+	if k.Exists(configKey) {
+		return k.Bool(configKey)
+	}
+	
+	// Finally return default
+	return defaultValue
 }
 
