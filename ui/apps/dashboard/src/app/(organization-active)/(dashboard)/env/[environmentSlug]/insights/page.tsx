@@ -13,7 +13,6 @@ import {
   useInsightsStateMachineContext,
 } from '@/components/Insights/InsightsStateMachineContext/InsightsStateMachineContext';
 import { Section } from '@/components/Insights/Section';
-import { useInsightsQuery } from '@/components/Insights/hooks/useInsightsQuery';
 
 function InsightsPageContent() {
   const { value: isInsightsEnabled } = useBooleanFlag('insights');
@@ -75,8 +74,6 @@ function InsightsPageContent() {
 
 export default function InsightsPage() {
   const { value: isInsightsEnabled } = useBooleanFlag('insights');
-  const { content, isRunning, onChange, runQuery } = useInsightsQuery();
-
   if (!isInsightsEnabled) return null;
 
   return (
