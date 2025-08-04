@@ -31,7 +31,7 @@ interface InsightsStateMachineContextValue extends InsightsState {
   fetchMore: () => void;
   isEmpty: boolean;
   onChange: (value: string) => void;
-  runQuery: () => void;
+  runQuery: () => Promise<'error' | 'success'>;
 }
 
 const InsightsStateMachineContext = createContext<InsightsStateMachineContextValue | null>(null);
@@ -41,17 +41,21 @@ export function InsightsStateMachineContextProvider({ children }: { children: Re
 
   // TODO: Ensure runQuery and fetchMore cannot finish out of order
   // if run in quick succession.
-  const runQuery = useCallback(async () => {
+  const runQuery = useCallback(async (): Promise<'error' | 'success'> => {
     dispatch({ type: 'START_QUERY' });
 
     try {
       const result = await simulateQuery(queryState.query, null);
       dispatch({ type: 'QUERY_SUCCESS', payload: result });
+
+      return 'success';
     } catch (error) {
       dispatch({
         type: 'QUERY_ERROR',
         payload: stringifyError(error),
       });
+
+      return 'error';
     }
   }, [queryState.query]);
 
