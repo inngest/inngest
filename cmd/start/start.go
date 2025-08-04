@@ -118,7 +118,13 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		os.Exit(1)
 	}
 
+	config := localconfig.GetConfig()
+
 	portStr := envflags.GetEnvOrFlagWithDefault(cmd, "port", "INNGEST_PORT", "8288")
+	// Fallback to config file value if no env var and using default
+	if !cmd.IsSet("port") && os.Getenv("INNGEST_PORT") == "" && config.Port != "" {
+		portStr = config.Port
+	}
 	port, err := strconv.Atoi(portStr)
 	if err != nil {
 		fmt.Println(err.Error())
@@ -128,6 +134,10 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	conf.CoreAPI.Port = port
 
 	host := envflags.GetEnvOrFlag(cmd, "host", "INNGEST_HOST")
+	// Fallback to config file value if no CLI flag or env var is set
+	if host == "" && config.Host != "" {
+		host = config.Host
+	}
 	if host != "" {
 		conf.EventAPI.Addr = host
 		conf.CoreAPI.Addr = host
@@ -166,6 +176,10 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	signingKey := envflags.GetEnvOrFlag(cmd, "signing-key", "INNGEST_SIGNING_KEY")
+	// Fallback to config file value if no CLI flag or env var is set
+	if signingKey == "" && config.SigningKey != "" {
+		signingKey = config.SigningKey
+	}
 	if signingKey == "" {
 		fmt.Println("Error: signing-key is required")
 		os.Exit(1)
@@ -177,6 +191,10 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	eventKeys := envflags.GetEnvOrStringSlice(cmd, "event-key", "INNGEST_EVENT_KEY")
+	// Fallback to config file values if no CLI flags or env vars are set
+	if len(eventKeys) == 0 && len(config.EventKey) > 0 {
+		eventKeys = config.EventKey
+	}
 	if len(eventKeys) == 0 {
 		fmt.Println("Error: at least one event-key is required")
 		os.Exit(1)
@@ -184,11 +202,27 @@ func action(ctx context.Context, cmd *cli.Command) error {
 
 	conf.ServerKind = headers.ServerKindCloud
 
-	// Handle environment variables for other configuration options
+	// Handle configuration options with fallback to config file
 	postgresURI := envflags.GetEnvOrFlag(cmd, "postgres-uri", "INNGEST_POSTGRES_URI")
+	if postgresURI == "" && config.PostgresURI != "" {
+		postgresURI = config.PostgresURI
+	}
+
 	redisURI := envflags.GetEnvOrFlag(cmd, "redis-uri", "INNGEST_REDIS_URI")
+	if redisURI == "" && config.RedisURI != "" {
+		redisURI = config.RedisURI
+	}
+
 	sqliteDir := envflags.GetEnvOrFlag(cmd, "sqlite-dir", "INNGEST_SQLITE_DIR")
+	if sqliteDir == "" && config.SqliteDir != "" {
+		sqliteDir = config.SqliteDir
+	}
+
 	sdkURLs := envflags.GetEnvOrStringSlice(cmd, "sdk-url", "INNGEST_SDK_URL")
+	// Fallback to config file values if no CLI flags or env vars are set
+	if len(sdkURLs) == 0 && len(config.SdkURL) > 0 {
+		sdkURLs = config.SdkURL
+	}
 
 	opts := devserver.StartOpts{
 		Config:             *conf,
