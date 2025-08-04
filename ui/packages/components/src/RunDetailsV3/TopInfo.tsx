@@ -15,10 +15,10 @@ import {
 } from '../DetailsCard/NewElement';
 import { ErrorCard } from '../Error/ErrorCard';
 import { InvokeModal } from '../InvokeButton';
+import type { TraceResult } from '../SharedContext/useGetTraceResult';
 import { useInvokeRun } from '../SharedContext/useInvokeRun';
 import { usePrettyErrorBody, usePrettyJson } from '../hooks/usePrettyJson';
 import { IconCloudArrowDown } from '../icons/CloudArrowDown';
-import type { Result } from '../types/functionRun';
 import { devServerURL, useDevServer } from '../utils/useDevServer';
 import { ErrorInfo } from './ErrorInfo';
 import { IO } from './IO';
@@ -27,7 +27,7 @@ import { Tabs } from './Tabs';
 type TopInfoProps = {
   slug?: string;
   getTrigger: (runID: string) => Promise<Trigger>;
-  result?: Result;
+  result?: TraceResult;
   runID: string;
 };
 

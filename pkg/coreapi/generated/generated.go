@@ -3930,6 +3930,7 @@ type ConnectV1WorkerConnectionEdge {
 enum AppMethod {
   SERVE
   CONNECT
+  API
 }
 
 input AppsFilterV1 {

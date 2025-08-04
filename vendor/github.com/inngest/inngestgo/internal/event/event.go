@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"reflect"
+	"time"
 )
 
 // GenericEvent represents a single event generated from your system to be sent to
@@ -96,6 +97,10 @@ func (ge GenericEvent[D]) Map() map[string]any {
 	}
 
 	return out
+}
+
+func (e GenericEvent[D]) Time() time.Time {
+	return time.UnixMilli(e.Timestamp)
 }
 
 type Event = GenericEvent[map[string]any]

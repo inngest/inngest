@@ -5,10 +5,10 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/json"
-	"fmt"
-	"io"
 	"mime/multipart"
 	"net/http"
+	"net/url"
+	"strings"
 	"testing"
 	"time"
 
@@ -149,14 +149,11 @@ func TestEvent(t *testing.T) {
 	})
 }
 
-func TestEvent_Multipart(t *testing.T) {
-	// We don't officially support multipart/form-data for non-webhook events.
-	// But to achieve multipart/form-data support for webhooks, we incidentally
-	// implemented partial support for multipart/form-data non-webhook events.
+func TestEvent_UnsupportedContentTypes(t *testing.T) {
+	t.Parallel()
 
-	t.Run("name only", func(t *testing.T) {
-		// This works
-
+	t.Run("multipart/form-data", func(t *testing.T) {
+		t.Parallel()
 		r := require.New(t)
 		ctx := context.Background()
 
@@ -176,36 +173,29 @@ func TestEvent_Multipart(t *testing.T) {
 
 		resp, err := http.DefaultClient.Do(req)
 		r.NoError(err)
-		r.Equal(http.StatusOK, resp.StatusCode)
+		r.Equal(http.StatusBadRequest, resp.StatusCode)
 	})
 
-	t.Run("data", func(t *testing.T) {
-		// Sending event data doesn't work
-
+	t.Run("x-www-form-urlencoded", func(t *testing.T) {
+		t.Parallel()
 		r := require.New(t)
 		ctx := context.Background()
 
-		reqBody := &bytes.Buffer{}
-		writer := multipart.NewWriter(reqBody)
-		r.NoError(writer.WriteField("name", "my-event"))
-		r.NoError(writer.WriteField("data", `{"msg":"hi"}`))
-		r.NoError(writer.Close())
+		formData := url.Values{}
+		formData.Set("name", "my-event")
+		body := strings.NewReader(formData.Encode())
 
 		req, err := http.NewRequestWithContext(
 			ctx,
 			http.MethodPost,
 			"http://localhost:8288/e/test",
-			reqBody,
+			body,
 		)
 		r.NoError(err)
-		req.Header.Set("Content-Type", writer.FormDataContentType())
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 
 		resp, err := http.DefaultClient.Do(req)
 		r.NoError(err)
 		r.Equal(http.StatusBadRequest, resp.StatusCode)
-		respBody, err := io.ReadAll(resp.Body)
-		r.NoError(err)
-		fmt.Println(string(respBody))
-		r.Contains(string(respBody), "cannot unmarshal string into Go struct field Event.data")
 	})
 }
