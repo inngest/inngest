@@ -12,16 +12,18 @@ import (
 )
 
 type NewNormalizedOpts struct {
-	MaxIdleConns int
-	MaxOpenConns int
+	MaxIdleConns    int
+	MaxOpenConns    int
+	ConnMaxIdle     int
+	ConnMaxLifetime int
 }
 
 func NewNormalized(db DBTX, o NewNormalizedOpts) sqlc_sqlite.Querier {
 	if sqlDB, ok := db.(*sql.DB); ok {
 		sqlDB.SetMaxIdleConns(o.MaxIdleConns)
 		sqlDB.SetMaxOpenConns(o.MaxOpenConns)
-		sqlDB.SetConnMaxIdleTime(5 * time.Minute)  // Close idle connections after 5 minutes
-		sqlDB.SetConnMaxLifetime(30 * time.Minute) // Close connections after 30 minutes total
+		sqlDB.SetConnMaxIdleTime(time.Duration(o.ConnMaxIdle) * time.Minute)     // Close idle connections after 5 minutes
+		sqlDB.SetConnMaxLifetime(time.Duration(o.ConnMaxLifetime) * time.Minute) // Close connections after 30 minutes total
 	}
 
 	return &NormalizedQueries{db: New(db)}

@@ -127,9 +127,11 @@ type StartOpts struct {
 	RedisURI string `json:"redis_uri"`
 
 	// PostgresURI allows connecting to external Postgres instead of SQLite
-	PostgresURI                string `json:"postgres_uri"`
-	PostgresMaxIdleConnections int    `json:"postgres-max-idle-conns"`
-	PostgresMaxOpenConnections int    `json:"postgres-max-open-conns"`
+	PostgresURI             string `json:"postgres_uri"`
+	PostgresMaxIdleConns    int    `json:"postgres-max-idle-conns"`
+	PostgresMaxOpenConns    int    `json:"postgres-max-open-conns"`
+	PostgresConnMaxIdleTime int    `json:"postgres-conn-max-idle-time"`
+	PostgresConnMaxLifetime int    `json:"postgres-conn-max-lifetime"`
 
 	// SQLiteDir specifies where SQLite files should be stored
 	SQLiteDir string `json:"sqlite_dir"`
@@ -176,12 +178,16 @@ func start(ctx context.Context, opts StartOpts) error {
 		dbDriver = "postgres"
 	}
 	dbcqrs := base_cqrs.NewCQRS(db, dbDriver, sqlc_postgres.NewNormalizedOpts{
-		MaxIdleConns: opts.PostgresMaxIdleConnections,
-		MaxOpenConns: opts.PostgresMaxOpenConnections,
+		MaxIdleConns:    opts.PostgresMaxIdleConns,
+		MaxOpenConns:    opts.PostgresMaxOpenConns,
+		ConnMaxIdle:     opts.PostgresConnMaxIdleTime,
+		ConnMaxLifetime: opts.PostgresConnMaxLifetime,
 	})
 	hd := base_cqrs.NewHistoryDriver(db, dbDriver, sqlc_postgres.NewNormalizedOpts{
-		MaxIdleConns: opts.PostgresMaxIdleConnections,
-		MaxOpenConns: opts.PostgresMaxOpenConnections,
+		MaxIdleConns:    opts.PostgresMaxIdleConns,
+		MaxOpenConns:    opts.PostgresMaxOpenConns,
+		ConnMaxIdle:     opts.PostgresConnMaxIdleTime,
+		ConnMaxLifetime: opts.PostgresConnMaxLifetime,
 	})
 	loader := dbcqrs.(state.FunctionLoader)
 
@@ -390,8 +396,10 @@ func start(ctx context.Context, opts StartOpts) error {
 	hmw := memory_writer.NewWriter(ctx, memory_writer.WriterOptions{DumpToFile: false})
 
 	tracer := tracing.NewSqlcTracerProvider(base_cqrs.NewQueries(db, dbDriver, sqlc_postgres.NewNormalizedOpts{
-		MaxIdleConns: opts.PostgresMaxIdleConnections,
-		MaxOpenConns: opts.PostgresMaxOpenConnections,
+		MaxIdleConns:    opts.PostgresMaxIdleConns,
+		MaxOpenConns:    opts.PostgresMaxOpenConns,
+		ConnMaxIdle:     opts.PostgresConnMaxIdleTime,
+		ConnMaxLifetime: opts.PostgresConnMaxLifetime,
 	}))
 
 	exec, err := executor.NewExecutor(
