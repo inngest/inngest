@@ -158,5 +158,5 @@ func (a router) getEventRuns(w http.ResponseWriter, r *http.Request) {
 		_ = publicerr.WriteHTTP(w, err)
 		return
 	}
-	_ = WriteCachedResponse(w, runs, 5*time.Second)
+	_ = WriteCachedResponse(w, runs, 15*time.Second)
 }

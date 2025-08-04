@@ -26,7 +26,7 @@ type Opts struct {
 	AuthMiddleware func(http.Handler) http.Handler
 	// CachingMiddleware caches API responses, if the handler specifies
 	// a max-age.
-	CachingMiddleware CachingMiddleware
+	CachingMiddleware CachingMiddleware[[]byte]
 	// WorkspaceFinder returns the authenticated workspace given the current context.
 	AuthFinder apiv1auth.AuthFinder
 	// Executor is required to cancel and manage function executions.
