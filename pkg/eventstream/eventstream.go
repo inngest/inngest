@@ -7,7 +7,6 @@ import (
 	"io"
 	"mime"
 	"mime/multipart"
-	"net/url"
 
 	"github.com/inngest/inngest/pkg/consts"
 )
@@ -191,39 +190,39 @@ func parseMultipartStream(
 
 // parseFormUrlencodedStream parses application/x-www-form-urlencoded data and
 // extracts form fields as a JSON event
-func parseFormUrlencodedStream(
-	ctx context.Context,
-	r io.Reader,
-	stream chan StreamItem,
-	maxSize int,
-) error {
-	// Read all data from the reader
-	data, err := io.ReadAll(r)
-	if err != nil {
-		return err
-	}
+// func parseFormUrlencodedStream(
+// 	ctx context.Context,
+// 	r io.Reader,
+// 	stream chan StreamItem,
+// 	maxSize int,
+// ) error {
+// 	// Read all data from the reader
+// 	data, err := io.ReadAll(r)
+// 	if err != nil {
+// 		return err
+// 	}
 
-	// Parse the form data
-	values, err := url.ParseQuery(string(data))
-	if err != nil {
-		return err
-	}
+// 	// Parse the form data
+// 	values, err := url.ParseQuery(string(data))
+// 	if err != nil {
+// 		return err
+// 	}
 
-	byt, err := json.Marshal(values)
-	if err != nil {
-		return err
-	}
+// 	byt, err := json.Marshal(values)
+// 	if err != nil {
+// 		return err
+// 	}
 
-	if len(byt) > maxSize {
-		return fmt.Errorf("%w: Max %d bytes / Size %d bytes", ErrEventTooLarge, maxSize, len(byt))
-	}
+// 	if len(byt) > maxSize {
+// 		return fmt.Errorf("%w: Max %d bytes / Size %d bytes", ErrEventTooLarge, maxSize, len(byt))
+// 	}
 
-	select {
-	case stream <- StreamItem{N: 0, Item: json.RawMessage(byt)}:
-		// Success
-	case <-ctx.Done():
-		return nil
-	}
+// 	select {
+// 	case stream <- StreamItem{N: 0, Item: json.RawMessage(byt)}:
+// 		// Success
+// 	case <-ctx.Done():
+// 		return nil
+// 	}
 
-	return nil
-}
+// 	return nil
+// }
