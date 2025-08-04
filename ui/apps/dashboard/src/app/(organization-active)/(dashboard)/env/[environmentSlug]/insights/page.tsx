@@ -11,6 +11,7 @@ import {
   InsightsStateMachineContextProvider,
   useInsightsStateMachineContext,
 } from '@/components/Insights/InsightsStateMachineContext/InsightsStateMachineContext';
+import { QueryHelperPanel } from '@/components/Insights/QueryHelperPanel/QueryHelperPanel';
 import { Section } from '@/components/Insights/Section';
 
 function InsightsContent() {
@@ -20,25 +21,28 @@ function InsightsContent() {
   return (
     <>
       <Header breadcrumb={[{ text: 'Insights' }]} />
-      <main className="grid h-full w-full flex-1 grid-rows-[3fr_5fr] gap-0 overflow-hidden">
-        <Section
-          actions={<InsightsSQLEditorQueryButton />}
-          className="min-h-[255px]"
-          title="Query Editor"
-        >
-          <InsightsSQLEditor />
-        </Section>
-        <Section
-          actions={
-            <>
-              {isRunning && <span className="text-muted mr-3 text-xs">Running query...</span>}
-              <InsightsSQLEditorDownloadCSVButton />
-            </>
-          }
-          title="Results"
-        >
-          <InsightsDataTable />
-        </Section>
+      <main className="grid h-full w-full flex-1 grid-cols-[225px_1fr] gap-0 overflow-hidden">
+        <QueryHelperPanel />
+        <div className="grid h-full w-full grid-rows-[3fr_5fr] gap-0 overflow-hidden">
+          <Section
+            actions={<InsightsSQLEditorQueryButton />}
+            className="min-h-[255px]"
+            title="Query Editor"
+          >
+            <InsightsSQLEditor />
+          </Section>
+          <Section
+            actions={
+              <>
+                {isRunning && <span className="text-muted mr-3 text-xs">Running query...</span>}
+                <InsightsSQLEditorDownloadCSVButton />
+              </>
+            }
+            title="Results"
+          >
+            <InsightsDataTable />
+          </Section>
+        </div>
       </main>
     </>
   );
