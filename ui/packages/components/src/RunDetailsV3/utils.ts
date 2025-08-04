@@ -1,6 +1,4 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { Route } from 'next';
-import type { Result } from '@inngest/components/types/functionRun';
 
 import type { Trace } from './types';
 

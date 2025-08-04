@@ -13,9 +13,9 @@ import {
   TimeElement,
 } from '../DetailsCard/NewElement';
 import type { Run as InitialRunData } from '../RunsPage/types';
+import type { TraceResult } from '../SharedContext/useGetTraceResult';
 import { usePathCreator } from '../SharedContext/usePathCreator';
 import { AICell } from '../Table/Cell';
-import type { Result } from '../types/functionRun';
 import { toMaybeDate } from '../utils/date';
 import { isLazyDone, type Lazy } from '../utils/lazyLoad';
 import { Actions } from './Actions';
@@ -28,7 +28,7 @@ type Props = {
   initialRunData?: InitialRunData;
   run: Lazy<Run>;
   runID: string;
-  result?: Result;
+  result?: TraceResult;
 };
 
 type Run = {
