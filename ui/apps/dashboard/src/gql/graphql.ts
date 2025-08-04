@@ -973,6 +973,11 @@ export type FunctionRunV2 = {
   workspaceID: Scalars['UUID'];
 };
 
+
+export type FunctionRunV2TraceArgs = {
+  preview: InputMaybe<Scalars['Boolean']>;
+};
+
 export type FunctionRunV2Edge = {
   __typename?: 'FunctionRunV2Edge';
   cursor: Scalars['String'];

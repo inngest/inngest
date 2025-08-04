@@ -28,9 +28,16 @@ export const usePrettyJson = (json: string): string | null => {
  * prefixed with `[cause]: `, as it is in usual JS stack traces.
  */
 export const usePrettyErrorBody = (error: Result['error'] | undefined): string | null => {
+  let cause = '';
+  if (typeof error?.cause === 'string') {
+    cause = error.cause;
+  } else if (error?.cause) {
+    cause = JSON.stringify(error.cause);
+  }
+
   // This may be blank as we attempt to parse it as JSON in case it's an object
   // or something we can show nicely.
-  const prettyCause = usePrettyJson(error?.cause ?? '');
+  const prettyCause = usePrettyJson(cause);
 
   return useMemo(() => {
     if (!error?.stack) {
@@ -45,11 +52,19 @@ export const usePrettyErrorBody = (error: Result['error'] | undefined): string |
   }, [error?.stack, prettyCause]);
 };
 
-export const usePrettyShortError = (error: Result['error'] | undefined): string =>
-  error?.message
+export const usePrettyShortError = (error: Result['error'] | undefined): string => {
+  let cause: string | undefined;
+  if (typeof error?.cause === 'string') {
+    cause = error.cause;
+  } else if (error?.cause) {
+    cause = JSON.stringify(error.cause);
+  }
+
+  return error?.message
     ? error.message
-    : error?.cause
-    ? error.cause
+    : cause
+    ? cause
     : error?.name
     ? error.name
     : 'Unknown error';
+};
