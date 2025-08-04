@@ -354,7 +354,6 @@ func TestParseStream_FormUrlencoded(t *testing.T) {
 	contentType := "application/x-www-form-urlencoded"
 
 	t.Run("single form field", func(t *testing.T) {
-		t.Skip("TODO: Implement in eventstream.go")
 		t.Parallel()
 		r := require.New(t)
 		ctx := context.Background()
@@ -384,7 +383,6 @@ func TestParseStream_FormUrlencoded(t *testing.T) {
 	})
 
 	t.Run("multiple form fields", func(t *testing.T) {
-		t.Skip("TODO: Implement in eventstream.go")
 		t.Parallel()
 		r := require.New(t)
 		ctx := context.Background()
@@ -416,7 +414,6 @@ func TestParseStream_FormUrlencoded(t *testing.T) {
 	})
 
 	t.Run("empty form fields", func(t *testing.T) {
-		t.Skip("TODO: Implement in eventstream.go")
 		t.Parallel()
 		r := require.New(t)
 		ctx := context.Background()
@@ -449,7 +446,6 @@ func TestParseStream_FormUrlencoded(t *testing.T) {
 	})
 
 	t.Run("max size exceeded", func(t *testing.T) {
-		t.Skip("TODO: Implement in eventstream.go")
 		t.Parallel()
 		r := require.New(t)
 		ctx := context.Background()
@@ -475,7 +471,6 @@ func TestParseStream_FormUrlencoded(t *testing.T) {
 	})
 
 	t.Run("no form fields", func(t *testing.T) {
-		t.Skip("TODO: Implement in eventstream.go")
 		t.Parallel()
 		r := require.New(t)
 		ctx := context.Background()

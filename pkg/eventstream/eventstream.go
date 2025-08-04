@@ -13,8 +13,9 @@ import (
 )
 
 var (
-	ErrInvalidRequestBody = fmt.Errorf("Request body must contain an event object or an array of event objects")
-	ErrEventTooLarge      = fmt.Errorf("Event is over the max size")
+	ErrInvalidRequestBody     = fmt.Errorf("Request body must contain an event object or an array of event objects")
+	ErrEventTooLarge          = fmt.Errorf("Event is over the max size")
+	ErrUnsupportedContentType = fmt.Errorf("Unsupported content type")
 )
 
 type StreamItem struct {
@@ -58,12 +59,30 @@ func ParseStream(
 
 	token, err := d.Token()
 	if err == io.EOF {
+		if contentType != "application/json" {
+			// We support empty bodies for non-JSON content-types
+
+			// Reconstruct the full body by combining the buffered reader with
+			// the original reader
+			r := io.MultiReader(d.Buffered(), r)
+
+			return parseNonJSONStream(ctx, r, stream, maxSize, contentType)
+		}
 		return nil
 	}
 
 	delim, ok := token.(json.Delim)
 	if !ok {
-		// Invalid type
+		if contentType != "application/json" {
+			// This is a non-JSON request, so we'll attempt to parse it as
+			// non-JSON
+
+			// Reconstruct the full body by combining the buffered reader with
+			// the original reader
+			r := io.MultiReader(d.Buffered(), r)
+
+			return parseNonJSONStream(ctx, r, stream, maxSize, contentType)
+		}
 		return ErrInvalidRequestBody
 	}
 
@@ -118,19 +137,27 @@ func ParseStream(
 			}
 		}
 	default:
-		// Ignore the error because we want to default to JSON parsing when that
-		// happens
-		mediaType, params, _ := mime.ParseMediaType(contentType)
-		switch mediaType {
-		case "multipart/form-data":
-			return parseMultipartStream(ctx, r, stream, maxSize, params["boundary"])
-		case "application/x-www-form-urlencoded":
-			return parseFormUrlencodedStream(ctx, r, stream, maxSize)
-		}
-
 		return ErrInvalidRequestBody
 	}
 	return nil
+}
+
+func parseNonJSONStream(
+	ctx context.Context,
+	r io.Reader,
+	stream chan StreamItem,
+	maxSize int,
+	contentType string,
+) error {
+	mediaType, params, _ := mime.ParseMediaType(contentType)
+	switch mediaType {
+	case "multipart/form-data":
+		return parseMultipartStream(ctx, r, stream, maxSize, params["boundary"])
+	case "application/x-www-form-urlencoded":
+		return parseFormUrlencodedStream(ctx, r, stream, maxSize)
+	}
+
+	return ErrUnsupportedContentType
 }
 
 // parseMultipartStream parses multipart/form-data and extracts JSON events from
