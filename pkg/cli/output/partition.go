@@ -48,6 +48,7 @@ func PartitionTable(pt *pb.PartitionResponse, pts *pb.PartitionStatusResponse) e
 	t.AppendRow(table.Row{strings.ToUpper("status")}, rowAutoMerge)
 	t.AppendSeparator()
 
+	// TODO: key queues
 	if pts != nil {
 		t.AppendRows([]table.Row{
 			{"Paused", pts.Paused},
