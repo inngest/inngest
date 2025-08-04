@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 
-import type { Result } from '../types/functionRun';
+import type { TraceResult } from '../SharedContext/useGetTraceResult';
 
 /**
  * Given a JSON string, returns a pretty-printed version of it if it's valid
@@ -27,7 +27,7 @@ export const usePrettyJson = (json: string): string | null => {
  * If the error has a `cause`, it will be appended to the end of the body
  * prefixed with `[cause]: `, as it is in usual JS stack traces.
  */
-export const usePrettyErrorBody = (error: Result['error'] | undefined): string | null => {
+export const usePrettyErrorBody = (error: TraceResult['error'] | undefined): string | null => {
   let cause = '';
   if (typeof error?.cause === 'string') {
     cause = error.cause;
@@ -52,7 +52,7 @@ export const usePrettyErrorBody = (error: Result['error'] | undefined): string |
   }, [error?.stack, prettyCause]);
 };
 
-export const usePrettyShortError = (error: Result['error'] | undefined): string => {
+export const usePrettyShortError = (error: TraceResult['error'] | undefined): string => {
   let cause: string | undefined;
   if (typeof error?.cause === 'string') {
     cause = error.cause;

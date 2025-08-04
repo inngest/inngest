@@ -5,6 +5,7 @@ import {
 
 import { useBooleanFlag } from '@/hooks/useBooleanFlag';
 import { useCancelRun } from '@/hooks/useCancelRun';
+import { useGetTraceResult } from '@/hooks/useGetTraceResult';
 import { useInvokeRun } from '@/hooks/useInvokeRun';
 import { useRerun } from '@/hooks/useRerun';
 import { useRerunFromStep } from '@/hooks/useRerunFromStep';
@@ -17,6 +18,7 @@ export const SharedContextProvider = ({ children }: { children: React.ReactNode 
   const rerun = useRerun();
   const cancelRun = useCancelRun();
   const getRun = useRun();
+  const getTraceResult = useGetTraceResult();
 
   const handlers: Partial<SharedHandlers> = {
     invokeRun,
@@ -28,6 +30,7 @@ export const SharedContextProvider = ({ children }: { children: React.ReactNode 
     cloud: false,
     getRun,
     inngestStatus: null,
+    getTraceResult,
   };
 
   return <SharedProvider handlers={handlers}>{children}</SharedProvider>;

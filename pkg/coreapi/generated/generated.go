@@ -3229,7 +3229,6 @@ scalar Uint
 scalar ULID
 scalar UUID
 scalar Bytes
-scalar Any
 scalar Unknown
 
 "The pagination information in a connection."
@@ -3932,6 +3931,7 @@ type ConnectV1WorkerConnectionEdge {
 enum AppMethod {
   SERVE
   CONNECT
+  API
 }
 
 input AppsFilterV1 {

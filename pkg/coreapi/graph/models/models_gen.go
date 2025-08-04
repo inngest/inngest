@@ -481,16 +481,18 @@ type AppMethod string
 const (
 	AppMethodServe   AppMethod = "SERVE"
 	AppMethodConnect AppMethod = "CONNECT"
+	AppMethodAPI     AppMethod = "API"
 )
 
 var AllAppMethod = []AppMethod{
 	AppMethodServe,
 	AppMethodConnect,
+	AppMethodAPI,
 }
 
 func (e AppMethod) IsValid() bool {
 	switch e {
-	case AppMethodServe, AppMethodConnect:
+	case AppMethodServe, AppMethodConnect, AppMethodAPI:
 		return true
 	}
 	return false
