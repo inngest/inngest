@@ -28,7 +28,7 @@ func Command() *cli.Command {
 			addr := cmd.String("addr")
 
 			log := logger.StdlibLogger(ctx)
-			log.Info("connecting to debug API", "addr", addr)
+			log.Debug("connecting to debug API", "addr", addr)
 
 			conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 			if err != nil {
@@ -37,7 +37,7 @@ func Command() *cli.Command {
 
 			client := dbgpb.NewDebugClient(conn)
 
-			log.Info("successfully connected to debug API", "addr", addr)
+			log.Debug("successfully connected to debug API", "addr", addr)
 
 			debugCtx := &DebugContext{
 				Client: client,
