@@ -53,17 +53,6 @@ func ParseStream(
 		close(stream)
 	}()
 
-	// Ignore the error because we want to default to JSON parsing when that
-	// happens
-	mediaType, params, _ := mime.ParseMediaType(contentType)
-	switch mediaType {
-	case "multipart/form-data":
-		return parseMultipartStream(ctx, r, stream, maxSize, params["boundary"])
-		// TODO: Properly implement "application/x-www-form-urlencoded"
-		// case "application/x-www-form-urlencoded":
-		// 	return parseFormUrlencodedStream(ctx, r, stream, maxSize)
-	}
-
 	// Default to JSON parsing
 	d := json.NewDecoder(r)
 
@@ -129,6 +118,16 @@ func ParseStream(
 			}
 		}
 	default:
+		// Ignore the error because we want to default to JSON parsing when that
+		// happens
+		mediaType, params, _ := mime.ParseMediaType(contentType)
+		switch mediaType {
+		case "multipart/form-data":
+			return parseMultipartStream(ctx, r, stream, maxSize, params["boundary"])
+		case "application/x-www-form-urlencoded":
+			return parseFormUrlencodedStream(ctx, r, stream, maxSize)
+		}
+
 		return ErrInvalidRequestBody
 	}
 	return nil
