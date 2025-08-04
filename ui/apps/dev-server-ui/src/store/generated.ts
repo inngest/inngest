@@ -47,6 +47,7 @@ export type App = {
 };
 
 export enum AppMethod {
+  Api = 'API',
   Connect = 'CONNECT',
   Serve = 'SERVE'
 }
