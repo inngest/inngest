@@ -120,7 +120,13 @@ func doDev(ctx context.Context, cmd *cli.Command) error {
 		os.Exit(1)
 	}
 
+	config := localconfig.GetConfig()
+
 	portStr := envflags.GetEnvOrFlagWithDefault(cmd, "port", "INNGEST_PORT", "8288")
+	// Fallback to config file value if no env var and using default
+	if !cmd.IsSet("port") && os.Getenv("INNGEST_PORT") == "" && config.Port != "" {
+		portStr = config.Port
+	}
 	port, err := strconv.Atoi(portStr)
 	if err != nil {
 		fmt.Println(err.Error())
@@ -130,16 +136,33 @@ func doDev(ctx context.Context, cmd *cli.Command) error {
 	conf.CoreAPI.Port = port
 
 	host := envflags.GetEnvOrFlag(cmd, "host", "INNGEST_HOST")
+	// Fallback to config file value if no CLI flag or env var is set
+	if host == "" && config.Host != "" {
+		host = config.Host
+	}
 	if host != "" {
 		conf.EventAPI.Addr = host
 		conf.CoreAPI.Addr = host
 	}
 
 	urls := envflags.GetEnvOrStringSlice(cmd, "sdk-url", "INNGEST_SDK_URL")
+	// Fallback to config file values if no CLI flags or env vars are set
+	if len(urls) == 0 && len(config.SdkURL) > 0 {
+		urls = config.SdkURL
+	}
 
 	// Run auto-discovery unless we've explicitly disabled it.
 	noDiscovery := cmd.Bool("no-discovery")
+	// Check config file if flag wasn't explicitly set
+	if !cmd.IsSet("no-discovery") && config.NoDiscovery != nil {
+		noDiscovery = *config.NoDiscovery
+	}
+
 	noPoll := cmd.Bool("no-poll")
+	// Check config file if flag wasn't explicitly set
+	if !cmd.IsSet("no-poll") && config.NoPoll != nil {
+		noPoll = *config.NoPoll
+	}
 	pollInterval := cmd.Int("poll-interval")
 	retryInterval := cmd.Int("retry-interval")
 	queueWorkers := cmd.Int("queue-workers")
