@@ -358,8 +358,12 @@ func TestParseStream_FormUrlencoded(t *testing.T) {
 		r := require.New(t)
 		ctx := context.Background()
 
+		// Pick a long string to ensure that we don't truncate the body. This is
+		// a good check because of the way ParseStream buffers the body
+		longString := strings.Repeat("x", 10*1024)
+
 		formData := url.Values{}
-		formData.Set("name", "Alice")
+		formData.Set("msg", longString)
 		body := strings.NewReader(formData.Encode())
 
 		stream := make(chan StreamItem)
@@ -374,7 +378,7 @@ func TestParseStream_FormUrlencoded(t *testing.T) {
 			var result map[string]any
 			r.NoError(json.Unmarshal(item.Item, &result))
 			r.Equal(map[string]any{
-				"name": []any{"Alice"},
+				"msg": []any{longString},
 			}, result)
 			n++
 		}
