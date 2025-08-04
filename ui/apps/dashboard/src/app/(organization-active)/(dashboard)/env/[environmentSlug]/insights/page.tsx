@@ -27,15 +27,10 @@ export default function InsightsPage() {
             <Button
               className="w-[110px]"
               disabled={content.trim() === '' || isRunning}
-              icon={
-                isRunning ? (
-                  <IconSpinner className="fill-white" />
-                ) : (
-                  <RiPlayFill className="h-4 w-4" />
-                )
-              }
+              icon={<RiPlayFill className="h-4 w-4" />}
               iconSide="left"
               label={isRunning ? undefined : 'Run query'}
+              loading={isRunning}
               onClick={runQuery}
               size="medium"
             />
