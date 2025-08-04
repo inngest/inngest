@@ -11,6 +11,7 @@ import (
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/util/aigateway"
 	"github.com/inngest/inngest/pkg/util/gateway"
+	"github.com/inngest/inngest/pkg/util/interval"
 	"github.com/xhit/go-str2duration/v2"
 )
 
@@ -41,6 +42,8 @@ type GeneratorOpcode struct {
 	Error *UserError `json:"error"`
 	// SDK versions < 3.?.? don't respond with the display name.
 	DisplayName *string `json:"displayName"`
+	// Timing represents the start and end time for the opcode, in terms of processing.
+	Timing interval.Interval `json:"timing"`
 }
 
 func (g GeneratorOpcode) Validate() error {

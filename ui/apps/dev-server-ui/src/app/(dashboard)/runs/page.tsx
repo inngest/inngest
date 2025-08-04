@@ -21,7 +21,6 @@ import { useInfiniteQuery } from '@tanstack/react-query';
 
 import SendEventButton from '@/components/Event/SendEventButton';
 import { useGetRun } from '@/hooks/useGetRun';
-import { useGetTraceResult } from '@/hooks/useGetTraceResult';
 import { useGetTrigger } from '@/hooks/useGetTrigger';
 import { client } from '@/store/baseApi';
 import {
@@ -128,9 +127,7 @@ export default function Page() {
     return out;
   }, [data?.pages]);
 
-  const getTraceResult = useGetTraceResult();
   const getTrigger = useGetTrigger();
-  const getRun = useGetRun();
 
   const onScroll: React.ComponentProps<typeof RunsPage>['onScroll'] = useCallback(
     (event) => {
@@ -186,11 +183,9 @@ export default function Page() {
         hasMore={hasNextPage ?? false}
         isLoadingInitial={isFetching && runs === undefined}
         isLoadingMore={isFetching && runs !== undefined}
-        getRun={getRun}
         onScroll={onScroll}
         onScrollToTop={onScrollToTop}
         onRefresh={fetchNextPage}
-        getTraceResult={getTraceResult}
         getTrigger={getTrigger}
         pollInterval={pollInterval}
         scope="env"

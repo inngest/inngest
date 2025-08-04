@@ -1,5 +1,5 @@
 import { useCallback } from 'react';
-import type { CancelRunResult } from '@inngest/components/SharedContext/useCancelRun.js';
+import type { CancelRunResult } from '@inngest/components/SharedContext/useCancelRun';
 
 import { useCancelRunMutation } from '@/store/generated';
 

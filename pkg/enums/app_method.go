@@ -7,4 +7,5 @@ type AppMethod int
 const (
 	AppMethodServe AppMethod = iota
 	AppMethodConnect
+	AppMethodAPI
 )

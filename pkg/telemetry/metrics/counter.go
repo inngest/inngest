@@ -581,3 +581,20 @@ func ActiveBacklogNormalizeCount(ctx context.Context, incr int64, opts CounterOp
 		Tags:        opts.Tags,
 	})
 }
+
+func IncrAPICacheHit(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "http_api_cache_hit",
+		Description: "The number of times a HTTP API request is served from cache",
+		Tags:        opts.Tags,
+	})
+}
+func IncrAPICacheMiss(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "http_api_cache_miss",
+		Description: "The number of times a HTTP API request is not served from cache",
+		Tags:        opts.Tags,
+	})
+}
