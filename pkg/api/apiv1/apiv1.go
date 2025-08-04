@@ -10,11 +10,14 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/inngest/inngest/pkg/api/apiv1/apiv1auth"
 	"github.com/inngest/inngest/pkg/cqrs"
+	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/realtime"
 	"github.com/inngest/inngest/pkg/execution/state/redis_state"
+	"github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/headers"
+	"github.com/inngest/inngest/pkg/tracing"
 )
 
 // Opts represents options for the APIv1 router.
@@ -23,7 +26,7 @@ type Opts struct {
 	AuthMiddleware func(http.Handler) http.Handler
 	// CachingMiddleware caches API responses, if the handler specifies
 	// a max-age.
-	CachingMiddleware CachingMiddleware
+	CachingMiddleware CachingMiddleware[[]byte]
 	// WorkspaceFinder returns the authenticated workspace given the current context.
 	AuthFinder apiv1auth.AuthFinder
 	// Executor is required to cancel and manage function executions.
@@ -46,6 +49,17 @@ type Opts struct {
 	TraceReader cqrs.TraceReader
 	// MetricsMiddleware is used to instrument the APIv1 endpoints.
 	MetricsMiddleware MetricsMiddleware
+
+	// AppCreator is used with HTTP/API-based functions to create apps on the fly via checkpointing.
+	AppCreator cqrs.AppCreator
+	// AppCreator is used with HTTP/API-based functions to create functions on the fly via checkpointing.
+	FunctionCreator cqrs.FunctionCreator
+	// EventPublisher publishes events via HTTP/API-based functions
+	EventPublisher event.Publisher
+	// TracerProvider allows the checkpointing API to write traces.
+	TracerProvider tracing.TracerProvider
+	// State allows loading and mutating state from various checkpointing APIs.
+	State state.RunService
 }
 
 // AddRoutes adds a new API handler to the given router.
@@ -107,6 +121,11 @@ func (a *router) setup() {
 			}
 
 			r.Use(headers.ContentTypeJsonResponse())
+
+			// Add the HTTP-based checkpointing API
+			r.Route(CheckpointRoutePrefix, func(sub chi.Router) {
+				sub.Mount("/", NewCheckpointAPI(a.opts))
+			})
 
 			r.Post("/signals", a.receiveSignal)
 

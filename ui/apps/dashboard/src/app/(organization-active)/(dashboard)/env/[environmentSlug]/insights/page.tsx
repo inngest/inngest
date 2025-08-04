@@ -46,7 +46,6 @@ function InsightsContent() {
 
 export default function InsightsPage() {
   const { value: isInsightsEnabled } = useBooleanFlag('insights');
-
   if (!isInsightsEnabled) return null;
 
   return (

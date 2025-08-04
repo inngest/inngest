@@ -1,19 +1,7 @@
 package devserver
 
 import (
-	"context"
-	"fmt"
-	"os"
-	"os/signal"
-	"strconv"
-	"syscall"
-	"time"
-
-	"github.com/inngest/inngest/cmd/internal/localconfig"
-	"github.com/inngest/inngest/pkg/config"
 	"github.com/inngest/inngest/pkg/devserver"
-	"github.com/inngest/inngest/pkg/headers"
-	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/urfave/cli/v3"
 )
 
@@ -23,7 +11,7 @@ func Command() *cli.Command {
 		Usage:       "Run the Inngest Dev Server for local development.",
 		UsageText:   "inngest dev [options]",
 		Description: "Example: inngest dev -u http://localhost:3000/api/inngest",
-		Action:      doDev,
+		Action:      action,
 
 		Flags: []cli.Flag{
 			// Base flags
@@ -91,106 +79,4 @@ func Command() *cli.Command {
 	}
 
 	return cmd
-}
-
-func doDev(ctx context.Context, cmd *cli.Command) error {
-
-	go func() {
-		ctx, cleanup := signal.NotifyContext(
-			context.Background(),
-			os.Interrupt,
-			syscall.SIGTERM,
-			syscall.SIGINT,
-			syscall.SIGQUIT,
-		)
-		defer cleanup()
-		<-ctx.Done()
-		os.Exit(0)
-	}()
-
-	conf, err := config.Dev(ctx)
-	if err != nil {
-		fmt.Println(err.Error())
-		os.Exit(1)
-	}
-
-	if err = localconfig.InitDevConfig(ctx, cmd); err != nil {
-		fmt.Println(err.Error())
-		os.Exit(1)
-	}
-
-	port, err := strconv.Atoi(cmd.String("port"))
-	if err != nil {
-		fmt.Println(err.Error())
-		os.Exit(1)
-	}
-	conf.EventAPI.Port = port
-	conf.CoreAPI.Port = port
-
-	host := cmd.String("host")
-	if host != "" {
-		conf.EventAPI.Addr = host
-		conf.CoreAPI.Addr = host
-	}
-
-	urls := cmd.StringSlice("sdk-url")
-
-	// Run auto-discovery unless we've explicitly disabled it.
-	noDiscovery := cmd.Bool("no-discovery")
-	noPoll := cmd.Bool("no-poll")
-	pollInterval := cmd.Int("poll-interval")
-	retryInterval := cmd.Int("retry-interval")
-	queueWorkers := cmd.Int("queue-workers")
-	tick := cmd.Int("tick")
-	connectGatewayPort := cmd.Int("connect-gateway-port")
-	inMemory := cmd.Bool("in-memory")
-
-	traceEndpoint := fmt.Sprintf("localhost:%d", port)
-	if err := itrace.NewUserTracer(ctx, itrace.TracerOpts{
-		ServiceName:   "tracing",
-		TraceEndpoint: traceEndpoint,
-		TraceURLPath:  "/dev/traces",
-		Type:          itrace.TracerTypeOTLPHTTP,
-	}); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-	defer func() {
-		_ = itrace.CloseUserTracer(ctx)
-	}()
-
-	if err := itrace.NewSystemTracer(ctx, itrace.TracerOpts{
-		ServiceName:   "tracing-system",
-		TraceEndpoint: traceEndpoint,
-		TraceURLPath:  "/dev/traces/system",
-		Type:          itrace.TracerTypeOTLPHTTP,
-	}); err != nil {
-		fmt.Println(err)
-		os.Exit(1)
-	}
-	defer func() {
-		_ = itrace.CloseSystemTracer(ctx)
-	}()
-
-	conf.ServerKind = headers.ServerKindDev
-
-	opts := devserver.StartOpts{
-		Autodiscover:       !noDiscovery,
-		Config:             *conf,
-		Poll:               !noPoll,
-		PollInterval:       pollInterval,
-		RetryInterval:      retryInterval,
-		QueueWorkers:       queueWorkers,
-		Tick:               time.Duration(tick) * time.Millisecond,
-		URLs:               urls,
-		ConnectGatewayPort: connectGatewayPort,
-		ConnectGatewayHost: conf.CoreAPI.Addr,
-		InMemory:           inMemory,
-	}
-
-	err = devserver.New(ctx, opts)
-	if err != nil {
-		return err
-	}
-	return nil
 }

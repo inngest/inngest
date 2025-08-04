@@ -5,6 +5,7 @@ import { useShared } from './SharedContext';
 
 export type GetRunPayload = {
   runID: string;
+  preview?: boolean;
 };
 
 export type GetRunResult = {
