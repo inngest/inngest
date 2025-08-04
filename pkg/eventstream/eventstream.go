@@ -59,8 +59,9 @@ func ParseStream(
 	switch mediaType {
 	case "multipart/form-data":
 		return parseMultipartStream(ctx, r, stream, maxSize, params["boundary"])
-	case "application/x-www-form-urlencoded":
-		return parseFormUrlencodedStream(ctx, r, stream, maxSize)
+		// TODO: Properly implement "application/x-www-form-urlencoded"
+		// case "application/x-www-form-urlencoded":
+		// 	return parseFormUrlencodedStream(ctx, r, stream, maxSize)
 	}
 
 	// Default to JSON parsing
