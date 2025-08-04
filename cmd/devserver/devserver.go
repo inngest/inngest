@@ -42,7 +42,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		os.Exit(1)
 	}
 
-	portStr := localconfig.GetValue(cmd, "port", "port", "8288")
+	portStr := localconfig.GetValue(cmd, "port", "8288")
 	port, err := strconv.Atoi(portStr)
 	if err != nil {
 		fmt.Println(err.Error())
@@ -51,23 +51,23 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	conf.EventAPI.Port = port
 	conf.CoreAPI.Port = port
 
-	host := localconfig.GetValue(cmd, "host", "host", "")
+	host := localconfig.GetValue(cmd, "host", "")
 	if host != "" {
 		conf.EventAPI.Addr = host
 		conf.CoreAPI.Addr = host
 	}
 
-	urls := localconfig.GetStringSlice(cmd, "sdk-url", "sdk-url")
+	urls := localconfig.GetStringSlice(cmd, "sdk-url")
 
 	// Run auto-discovery unless we've explicitly disabled it.
-	noDiscovery := localconfig.GetBoolValue(cmd, "no-discovery", "no-discovery", false)
-	noPoll := localconfig.GetBoolValue(cmd, "no-poll", "no-poll", false)
-	pollInterval := localconfig.GetIntValue(cmd, "poll-interval", "poll-interval", devserver.DefaultPollInterval)
-	retryInterval := localconfig.GetIntValue(cmd, "retry-interval", "retry-interval", 0)
-	queueWorkers := localconfig.GetIntValue(cmd, "queue-workers", "queue-workers", devserver.DefaultQueueWorkers)
-	tick := localconfig.GetIntValue(cmd, "tick", "tick", devserver.DefaultTick)
-	connectGatewayPort := localconfig.GetIntValue(cmd, "connect-gateway-port", "connect-gateway-port", devserver.DefaultConnectGatewayPort)
-	inMemory := localconfig.GetBoolValue(cmd, "in-memory", "in-memory", true)
+	noDiscovery := localconfig.GetBoolValue(cmd, "no-discovery", false)
+	noPoll := localconfig.GetBoolValue(cmd, "no-poll", false)
+	pollInterval := localconfig.GetIntValue(cmd, "poll-interval", devserver.DefaultPollInterval)
+	retryInterval := localconfig.GetIntValue(cmd, "retry-interval", 0)
+	queueWorkers := localconfig.GetIntValue(cmd, "queue-workers", devserver.DefaultQueueWorkers)
+	tick := localconfig.GetIntValue(cmd, "tick", devserver.DefaultTick)
+	connectGatewayPort := localconfig.GetIntValue(cmd, "connect-gateway-port", devserver.DefaultConnectGatewayPort)
+	inMemory := localconfig.GetBoolValue(cmd, "in-memory", true)
 
 	traceEndpoint := fmt.Sprintf("localhost:%d", port)
 	if err := itrace.NewUserTracer(ctx, itrace.TracerOpts{

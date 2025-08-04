@@ -217,14 +217,14 @@ func unmarshalConfig() error {
 
 // GetValue gets a configuration value with proper priority: CLI flag > env var > config file > default
 // This replaces the need for envflags helpers since koanf handles the priority automatically
-func GetValue(cmd *cli.Command, flagName, configKey, defaultValue string) string {
+func GetValue(cmd *cli.Command, key, defaultValue string) string {
 	// First check if CLI flag is explicitly set (highest priority)
-	if cmd.IsSet(flagName) {
-		return cmd.String(flagName)
+	if cmd.IsSet(key) {
+		return cmd.String(key)
 	}
 	
 	// Then check koanf (which includes env vars and config file in correct priority)
-	if value := k.String(configKey); value != "" {
+	if value := k.String(key); value != "" {
 		return value
 	}
 	
@@ -233,15 +233,15 @@ func GetValue(cmd *cli.Command, flagName, configKey, defaultValue string) string
 }
 
 // GetIntValue gets an integer configuration value with proper priority
-func GetIntValue(cmd *cli.Command, flagName, configKey string, defaultValue int) int {
+func GetIntValue(cmd *cli.Command, key string, defaultValue int) int {
 	// First check if CLI flag is explicitly set (highest priority)
-	if cmd.IsSet(flagName) {
-		return cmd.Int(flagName)
+	if cmd.IsSet(key) {
+		return cmd.Int(key)
 	}
 	
 	// Then check koanf (which includes env vars and config file in correct priority)
-	if k.Exists(configKey) {
-		return k.Int(configKey)
+	if k.Exists(key) {
+		return k.Int(key)
 	}
 	
 	// Finally return default
@@ -249,26 +249,26 @@ func GetIntValue(cmd *cli.Command, flagName, configKey string, defaultValue int)
 }
 
 // GetStringSlice gets a string slice configuration value with proper priority
-func GetStringSlice(cmd *cli.Command, flagName, configKey string) []string {
+func GetStringSlice(cmd *cli.Command, key string) []string {
 	// First check if CLI flag is explicitly set (highest priority)
-	if cmd.IsSet(flagName) {
-		return cmd.StringSlice(flagName)
+	if cmd.IsSet(key) {
+		return cmd.StringSlice(key)
 	}
 	
 	// Then check koanf (which includes env vars and config file in correct priority)
-	return k.Strings(configKey)
+	return k.Strings(key)
 }
 
 // GetBoolValue gets a boolean configuration value with proper priority
-func GetBoolValue(cmd *cli.Command, flagName, configKey string, defaultValue bool) bool {
+func GetBoolValue(cmd *cli.Command, key string, defaultValue bool) bool {
 	// First check if CLI flag is explicitly set (highest priority)
-	if cmd.IsSet(flagName) {
-		return cmd.Bool(flagName)
+	if cmd.IsSet(key) {
+		return cmd.Bool(key)
 	}
 	
 	// Then check koanf (which includes env vars and config file in correct priority)
-	if k.Exists(configKey) {
-		return k.Bool(configKey)
+	if k.Exists(key) {
+		return k.Bool(key)
 	}
 	
 	// Finally return default

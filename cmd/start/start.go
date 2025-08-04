@@ -29,7 +29,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		os.Exit(1)
 	}
 
-	portStr := localconfig.GetValue(cmd, "port", "port", "8288")
+	portStr := localconfig.GetValue(cmd, "port", "8288")
 	port, err := strconv.Atoi(portStr)
 	if err != nil {
 		fmt.Println(err.Error())
@@ -38,7 +38,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	conf.EventAPI.Port = port
 	conf.CoreAPI.Port = port
 
-	host := localconfig.GetValue(cmd, "host", "host", "")
+	host := localconfig.GetValue(cmd, "host", "")
 	if host != "" {
 		conf.EventAPI.Addr = host
 		conf.CoreAPI.Addr = host
@@ -71,9 +71,9 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		_ = itrace.CloseSystemTracer(ctx)
 	}()
 
-	tick := localconfig.GetIntValue(cmd, "tick", "tick", devserver.DefaultTick)
+	tick := localconfig.GetIntValue(cmd, "tick", devserver.DefaultTick)
 
-	signingKey := localconfig.GetValue(cmd, "signing-key", "signing-key", "")
+	signingKey := localconfig.GetValue(cmd, "signing-key", "")
 	if signingKey == "" {
 		fmt.Println("Error: signing-key is required")
 		os.Exit(1)
@@ -84,7 +84,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		os.Exit(1)
 	}
 
-	eventKeys := localconfig.GetStringSlice(cmd, "event-key", "event-key")
+	eventKeys := localconfig.GetStringSlice(cmd, "event-key")
 	if len(eventKeys) == 0 {
 		fmt.Println("Error: at least one event-key is required")
 		os.Exit(1)
@@ -93,24 +93,24 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	conf.ServerKind = headers.ServerKindCloud
 
 	// Handle configuration options with simplified koanf-based approach
-	postgresURI := localconfig.GetValue(cmd, "postgres-uri", "postgres-uri", "")
-	redisURI := localconfig.GetValue(cmd, "redis-uri", "redis-uri", "")
-	sqliteDir := localconfig.GetValue(cmd, "sqlite-dir", "sqlite-dir", "")
-	sdkURLs := localconfig.GetStringSlice(cmd, "sdk-url", "sdk-url")
+	postgresURI := localconfig.GetValue(cmd, "postgres-uri", "")
+	redisURI := localconfig.GetValue(cmd, "redis-uri", "")
+	sqliteDir := localconfig.GetValue(cmd, "sqlite-dir", "")
+	sdkURLs := localconfig.GetStringSlice(cmd, "sdk-url")
 
 	opts := devserver.StartOpts{
 		Config:             *conf,
 		ConnectGatewayHost: conf.CoreAPI.Addr,
-		ConnectGatewayPort: localconfig.GetIntValue(cmd, "connect-gateway-port", "connect-gateway-port", devserver.DefaultConnectGatewayPort),
+		ConnectGatewayPort: localconfig.GetIntValue(cmd, "connect-gateway-port", devserver.DefaultConnectGatewayPort),
 		EventKeys:          eventKeys,
 		InMemory:           false,
-		NoUI:               localconfig.GetBoolValue(cmd, "no-ui", "no-ui", false),
-		PollInterval:       localconfig.GetIntValue(cmd, "poll-interval", "poll-interval", devserver.DefaultPollInterval),
+		NoUI:               localconfig.GetBoolValue(cmd, "no-ui", false),
+		PollInterval:       localconfig.GetIntValue(cmd, "poll-interval", devserver.DefaultPollInterval),
 		PostgresURI:        postgresURI,
-		QueueWorkers:       localconfig.GetIntValue(cmd, "queue-workers", "queue-workers", devserver.DefaultQueueWorkers),
+		QueueWorkers:       localconfig.GetIntValue(cmd, "queue-workers", devserver.DefaultQueueWorkers),
 		RedisURI:           redisURI,
 		RequireKeys:        true,
-		RetryInterval:      localconfig.GetIntValue(cmd, "retry-interval", "retry-interval", 0),
+		RetryInterval:      localconfig.GetIntValue(cmd, "retry-interval", 0),
 		SigningKey:         &signingKey,
 		SQLiteDir:          sqliteDir,
 		Tick:               time.Duration(tick) * time.Millisecond,

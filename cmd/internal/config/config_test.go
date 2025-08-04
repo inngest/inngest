@@ -319,25 +319,25 @@ func TestGetValueHelperFunctions(t *testing.T) {
 	// Test GetValue function
 	t.Run("GetValue with env var fallback", func(t *testing.T) {
 		// Should return env var value since CLI flag is not set
-		result := GetValue(cmd, "host", "host", "default-host")
+		result := GetValue(cmd, "host", "default-host")
 		assert.Equal(t, "env-host", result)
 	})
 
 	t.Run("GetValue with default fallback", func(t *testing.T) {
 		// Should return default since neither CLI flag nor env var is set
-		result := GetValue(cmd, "missing", "missing", "default-value")
+		result := GetValue(cmd, "missing", "default-value")
 		assert.Equal(t, "default-value", result)
 	})
 
 	t.Run("GetIntValue with env var fallback", func(t *testing.T) {
 		// Should return env var value since CLI flag is not set
-		result := GetIntValue(cmd, "poll-interval", "poll-interval", 1)
+		result := GetIntValue(cmd, "poll-interval", 1)
 		assert.Equal(t, 10, result)
 	})
 
 	t.Run("GetIntValue with default fallback", func(t *testing.T) {
 		// Should return default since neither CLI flag nor env var is set
-		result := GetIntValue(cmd, "missing-int", "missing-int", 42)
+		result := GetIntValue(cmd, "missing-int", 42)
 		assert.Equal(t, 42, result)
 	})
 }
@@ -444,13 +444,13 @@ no-discovery: false
 	// (This simulates cmd.IsSet() returning true for explicitly set flags)
 
 	// When CLI flag is not set, should get env var value
-	hostValue := GetValue(cmd, "host", "host", "default-host")
+	hostValue := GetValue(cmd, "host", "default-host")
 	assert.Equal(t, "env-host", hostValue) // env var overrides config
 
-	portValue := GetValue(cmd, "port", "port", "8288")
+	portValue := GetValue(cmd, "port", "8288")
 	assert.Equal(t, "8291", portValue) // env var overrides config
 
-	noDiscoveryValue := GetBoolValue(cmd, "no-discovery", "no-discovery", false)
+	noDiscoveryValue := GetBoolValue(cmd, "no-discovery", false)
 	assert.Equal(t, true, noDiscoveryValue) // env var overrides config
 }
 
