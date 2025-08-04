@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Button } from '@inngest/components/Button';
 import { RiArrowRightSLine } from '@remixicon/react';
+import { useQuery } from '@tanstack/react-query';
 
 import { AITrace } from '../AI/AITrace';
 import { parseAIOutput } from '../AI/utils';
@@ -12,10 +13,10 @@ import {
   TimeElement,
 } from '../DetailsCard/NewElement';
 import { RerunModal } from '../Rerun/RerunModal';
+import { useGetTraceResult, type TraceResult } from '../SharedContext/useGetTraceResult';
 import { usePathCreator } from '../SharedContext/usePathCreator';
 import { Time } from '../Time';
-import { usePrettyErrorBody, usePrettyJson } from '../hooks/usePrettyJson';
-import type { Result } from '../types/functionRun';
+import { usePrettyErrorBody, usePrettyJson, usePrettyShortError } from '../hooks/usePrettyJson';
 import { formatMilliseconds, toMaybeDate } from '../utils/date';
 import { ErrorInfo } from './ErrorInfo';
 import { IO } from './IO';
@@ -124,55 +125,34 @@ const getStepKindInfo = (props: StepKindInfoProps): JSX.Element | null =>
 
 export const StepInfo = ({
   selectedStep,
-  getResult,
   pollInterval,
+  tracesPreviewEnabled,
 }: {
   selectedStep: StepInfoType;
-  getResult: (outputID: string) => Promise<Result>;
+
   pollInterval?: number;
+  tracesPreviewEnabled?: boolean;
 }) => {
   const [expanded, setExpanded] = useState(true);
   const [rerunModalOpen, setRerunModalOpen] = useState(false);
   const { runID, trace } = selectedStep;
-  const [result, setResult] = useState<Result>();
-  const [loading, setLoading] = useState(false);
+  const { loading, getTraceResult } = useGetTraceResult();
+  const [result, setResult] = useState<TraceResult | undefined>();
 
-  useEffect(() => {
-    let intervalId: ReturnType<typeof setInterval> | undefined;
-
-    const refreshResult = async () => {
-      try {
-        setLoading(true);
-        if (trace.outputID) {
-          setResult(await getResult(trace.outputID));
-        } else {
-          setResult(undefined);
-        }
-      } catch (error) {
-        console.error('error loading step result', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
+  useQuery({
     //
-    // fetch once on load
-    refreshResult();
-
-    //
-    // while the run is polling, continue polling for output
-    if (pollInterval) {
-      intervalId = setInterval(() => {
-        refreshResult();
-      }, pollInterval);
-    }
-
-    return () => {
-      if (intervalId) {
-        clearInterval(intervalId);
+    // stop polling when we have data
+    refetchInterval: !result && pollInterval ? pollInterval : false,
+    queryKey: ['step-result', trace.outputID, { preview: tracesPreviewEnabled }],
+    queryFn: useCallback(async () => {
+      if (!trace.outputID) {
+        setResult(undefined);
+        return;
       }
-    };
-  }, [getResult, trace.outputID, pollInterval, setResult]);
+
+      setResult(await getTraceResult({ traceID: trace.outputID, preview: tracesPreviewEnabled }));
+    }, [getTraceResult, trace.outputID, tracesPreviewEnabled]),
+  });
 
   const delayText = formatMilliseconds(
     (toMaybeDate(trace.startedAt) ?? new Date()).getTime() - new Date(trace.queuedAt).getTime()
@@ -202,6 +182,7 @@ export const StepInfo = ({
   const prettyInput = usePrettyJson(result?.input ?? '') || (result?.input ?? '');
   const prettyOutput = usePrettyJson(result?.data ?? '') || (result?.data ?? '');
   const prettyErrorBody = usePrettyErrorBody(result?.error);
+  const prettyShortError = usePrettyShortError(result?.error);
 
   return (
     <div className="flex h-full flex-col justify-start gap-2">
@@ -282,7 +263,7 @@ export const StepInfo = ({
         <UserlandAttrs userlandSpan={trace.userlandSpan} />
       ) : (
         <>
-          {result?.error && <ErrorInfo error={result.error.message || 'Unknown error'} />}
+          {result?.error && <ErrorInfo error={prettyShortError} />}
           <div className="flex-1">
             <Tabs
               defaultActive={result?.error ? 'error' : 'output'}
@@ -312,7 +293,7 @@ export const StepInfo = ({
                         id: 'error',
                         node: (
                           <IO
-                            title={result.error.message || 'Unknown error'}
+                            title={prettyShortError}
                             raw={prettyErrorBody ?? ''}
                             error={true}
                             loading={loading}

@@ -6,10 +6,10 @@ import { useQuery } from '@tanstack/react-query';
 import { ErrorCard } from '../Error/ErrorCard';
 import type { Run as InitialRunData } from '../RunsPage/types';
 import { useGetRun } from '../SharedContext/useGetRun';
+import { useGetTraceResult } from '../SharedContext/useGetTraceResult';
 import { StatusCell } from '../Table/Cell';
 import { TriggerDetails } from '../TriggerDetails';
 import { DragDivider } from '../icons/DragDivider';
-import type { Result } from '../types/functionRun';
 import { nullishToLazy } from '../utils/lazyLoad';
 import { RunInfo } from './RunInfo';
 import { StepInfo } from './StepInfo';
@@ -21,7 +21,6 @@ import { useStepSelection } from './utils';
 
 type Props = {
   standalone: boolean;
-  getResult: (outputID: string, preview?: boolean) => Promise<Result>;
   initialRunData?: InitialRunData;
   getTrigger: React.ComponentProps<typeof TriggerDetails>['getTrigger'];
   pollInterval?: number;
@@ -32,7 +31,6 @@ type Props = {
 const MIN_HEIGHT = 586;
 
 export const RunDetailsV3 = ({
-  getResult,
   getTrigger,
   runID,
   standalone,
@@ -43,13 +41,14 @@ export const RunDetailsV3 = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const leftColumnRef = useRef<HTMLDivElement>(null);
   const runInfoRef = useRef<HTMLDivElement>(null);
-
   const [pollInterval, setPollInterval] = useState(initialPollInterval);
+
   const [leftWidth, setLeftWidth] = useState(55);
   const [height, setHeight] = useState(MIN_HEIGHT);
   const [isDragging, setIsDragging] = useState(false);
   const [windowHeight, setWindowHeight] = useState(0);
   const { selectedStep } = useStepSelection(runID);
+  const { getTraceResult } = useGetTraceResult();
 
   const { getRun } = useGetRun();
 
@@ -142,9 +141,8 @@ export const RunDetailsV3 = ({
         // Unreachable
         throw new Error('missing outputID');
       }
-
-      return getResult(outputID, tracesPreviewEnabled);
-    }, [getResult, outputID, tracesPreviewEnabled]),
+      return getTraceResult({ traceID: outputID, preview: tracesPreviewEnabled });
+    }, [getTraceResult, outputID, tracesPreviewEnabled]),
   });
 
   const run = runRes.data?.data;
@@ -235,8 +233,8 @@ export const RunDetailsV3 = ({
           {selectedStep && !selectedStep.trace.isRoot ? (
             <StepInfo
               selectedStep={selectedStep}
-              getResult={getResult}
               pollInterval={pollInterval}
+              tracesPreviewEnabled={tracesPreviewEnabled}
             />
           ) : (
             <TopInfo

@@ -49,7 +49,6 @@ type Props = {
   data: Run[];
   defaultVisibleColumns?: ColumnID[];
   features: Pick<Features, 'history' | 'tracesPreview'>;
-  getTraceResult: React.ComponentProps<typeof RunDetailsV3>['getResult'];
   getTrigger: React.ComponentProps<typeof RunDetailsV3>['getTrigger'];
   hasMore: boolean;
   isLoadingInitial: boolean;
@@ -68,7 +67,6 @@ type Props = {
 
 export function RunsPage({
   defaultVisibleColumns,
-  getTraceResult,
   getTrigger,
   data,
   features,
@@ -232,7 +230,6 @@ export function RunsPage({
       return (
         <div className={`border-subtle `}>
           <RunDetailsV3
-            getResult={getTraceResult}
             initialRunData={rowData}
             getTrigger={getTrigger}
             pollInterval={pollInterval}
@@ -243,7 +240,7 @@ export function RunsPage({
         </div>
       );
     },
-    [getTraceResult, getTrigger, pollInterval, features.tracesPreview]
+    [getTrigger, pollInterval, features.tracesPreview]
   );
 
   const options = useMemo(() => {
@@ -269,8 +266,23 @@ export function RunsPage({
   return (
     <main className="bg-canvasBase text-basis no-scrollbar flex-1 overflow-hidden focus-visible:outline-none">
       <div className="bg-canvasBase sticky top-0 z-10 flex flex-col">
-        <div className="flex h-[58px] items-center justify-between gap-2 px-3">
-          <div className="flex items-center gap-2">
+        <div className="flex h-11 items-center justify-between gap-1.5 px-3">
+          <div className="flex items-center gap-1.5">
+            <Button
+              icon={<RiSearchLine />}
+              size="small"
+              kind="secondary"
+              iconSide="left"
+              appearance="outlined"
+              label={showSearch ? 'Hide search' : 'Show search'}
+              onClick={() => setShowSearch((prev) => !prev)}
+              className={cn(
+                search
+                  ? 'after:bg-secondary-moderate after:mb-3 after:ml-0.5 after:h-2 after:w-2 after:rounded'
+                  : '',
+                'h-[26px] w-[103px] rounded'
+              )}
+            />
             <SelectGroup>
               <TimeFieldFilter
                 selectedTimeField={timeField}
@@ -320,23 +332,9 @@ export function RunsPage({
                 entities={functions}
               />
             )}
-
-            <Button
-              icon={<RiSearchLine />}
-              size="large"
-              iconSide="left"
-              appearance="outlined"
-              label={showSearch ? 'Hide search' : 'Show search'}
-              onClick={() => setShowSearch((prev) => !prev)}
-              className={cn(
-                search
-                  ? 'after:bg-secondary-moderate after:mb-3 after:ml-0.5 after:h-2 after:w-2 after:rounded'
-                  : ''
-              )}
-            />
-            <TotalCount totalCount={totalCount} />
           </div>
           <div className="flex items-center gap-2">
+            <TotalCount totalCount={totalCount} />
             <TableFilter
               columnVisibility={columnVisibility}
               setColumnVisibility={setColumnVisibility}
@@ -429,7 +427,11 @@ function TotalCount({
 
   const formatted = new Intl.NumberFormat().format(totalCount);
   if (totalCount === 1) {
-    return <span className={className}>{formatted} run</span>;
+    return (
+      <span className={cn('text-muted text-xs font-semibold', className)}>{formatted} run</span>
+    );
   }
-  return <span className={className}>{formatted} runs</span>;
+  return (
+    <span className={cn('text-muted text-xs font-semibold', className)}>{formatted} runs</span>
+  );
 }

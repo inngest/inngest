@@ -8,6 +8,7 @@ import (
 	"iter"
 	"math"
 	mrand "math/rand"
+	"math/rand/v2"
 	"strconv"
 	"strings"
 	"sync"
@@ -718,6 +719,11 @@ func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 
 	q.sem = &trackingSemaphore{Weighted: semaphore.NewWeighted(int64(q.numWorkers))}
 	q.workers = make(chan processItem, q.numWorkers)
+
+	// We only need one signal to exit the executionScan loop but after it exits, it
+	// waits for all workers to finish. And if any other worker would try to send to
+	// this channel we deadlock.
+	q.quit = make(chan error, q.numWorkers)
 
 	return q
 }
@@ -1653,7 +1659,7 @@ func (q *queue) Migrate(ctx context.Context, sourceShardName string, fnID uuid.U
 		}
 
 		if err := q.Dequeue(ctx, shard, *qi); err != nil {
-			q.log.Error("error dequeueing queue item after migration", "error", err)
+			q.log.ReportError(err, "error dequeueing queue item after migration")
 		}
 
 		atomic.AddInt64(&processed, 1)
@@ -2470,7 +2476,9 @@ func (q *queue) Dequeue(ctx context.Context, queueShard QueueShard, i osqueue.Qu
 	}
 	switch status {
 	case 0:
-		q.log.Debug("dequeued item", "job_id", i.ID, "item", i)
+		if rand.Float64() < 0.05 {
+			q.log.Debug("dequeued item", "job_id", i.ID, "item", i)
+		}
 
 		return nil
 	case 1:

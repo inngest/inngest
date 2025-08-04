@@ -12,7 +12,6 @@ import { CombinedError, useQuery } from 'urql';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
-import { useGetTraceResult } from '@/components/RunDetails/useGetTraceResult';
 import { useGetTrigger } from '@/components/RunDetails/useGetTrigger';
 import { GetFunctionPauseStateDocument, RunsOrderByField } from '@/gql/graphql';
 import { useAccountFeatures } from '@/utils/useAccountFeatures';
@@ -80,7 +79,6 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
   const [runs, setRuns] = useState<Run[]>([]);
   const [isScrollRequest, setIsScrollRequest] = useState(false);
 
-  const getTraceResult = useGetTraceResult();
   const getTrigger = useGetTrigger();
   const features = useAccountFeatures();
 
@@ -220,7 +218,6 @@ export const Runs = forwardRef<RefreshRunsRef, Props>(function Runs(
       onRefresh={onRefresh}
       onScroll={fetchMoreOnScroll}
       onScrollToTop={onScrollToTop}
-      getTraceResult={getTraceResult}
       getTrigger={getTrigger}
       functionIsPaused={pauseData?.environment.function?.isPaused ?? false}
       scope={scope}

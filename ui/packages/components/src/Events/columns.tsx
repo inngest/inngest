@@ -74,7 +74,7 @@ export function useColumns({
                 key={run_.id}
               >
                 <span className="flex items-center gap-1">
-                  <StatusDot status={run_.status} className="h-2 w-2 shrink-0" />
+                  <StatusDot status={run_.status} size="small" />
                   <p
                     className={cn(
                       'truncate',

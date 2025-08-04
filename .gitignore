@@ -22,3 +22,4 @@ Thumbs.db
 !/tmp/nats/.gitkeep
 
 __debug_bin*
+.claude/

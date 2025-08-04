@@ -286,13 +286,6 @@ func start(ctx context.Context, opts StartOpts) error {
 
 		redis_state.WithShardSelector(shardSelector),
 		redis_state.WithQueueShardClients(queueShards),
-		//redis_state.WithKindToQueueMapping(map[string]string{
-		//	queue.KindPause:           queue.KindPause,
-		//	queue.KindDebounce:        queue.KindDebounce,
-		//	queue.KindQueueMigrate:    queue.KindQueueMigrate,
-		//	queue.KindPauseBlockFlush: queue.KindPauseBlockFlush,
-		//	queue.KindScheduleBatch:   queue.KindScheduleBatch,
-		//}),
 
 		// Key queues
 		redis_state.WithNormalizeRefreshItemCustomConcurrencyKeys(NormalizeConcurrencyKeys(smv2, dbcqrs)),
@@ -387,6 +380,8 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	hmw := memory_writer.NewWriter(ctx, memory_writer.WriterOptions{DumpToFile: false})
 
+	tracer := tracing.NewSqlcTracerProvider(base_cqrs.NewQueries(db, dbDriver))
+
 	exec, err := executor.NewExecutor(
 		executor.WithHTTPClient(httpClient),
 		executor.WithStateManager(smv2),
@@ -440,7 +435,7 @@ func start(ctx context.Context, opts StartOpts) error {
 			Secret:     consts.DevServerRealtimeJWTSecret,
 			PublishURL: fmt.Sprintf("http://%s:%d/v1/realtime/publish", opts.Config.CoreAPI.Addr, opts.Config.CoreAPI.Port),
 		}),
-		executor.WithTracerProvider(tracing.NewSqlcTracerProvider(base_cqrs.NewQueries(db, dbDriver))),
+		executor.WithTracerProvider(tracer),
 	)
 	if err != nil {
 		return err
@@ -502,6 +497,12 @@ func start(ctx context.Context, opts StartOpts) error {
 			Broadcaster:        broadcaster,
 			RealtimeJWTSecret:  consts.DevServerRealtimeJWTSecret,
 			TraceReader:        ds.Data,
+
+			AppCreator:      dbcqrs,
+			FunctionCreator: dbcqrs,
+			EventPublisher:  runner,
+			TracerProvider:  tracer,
+			State:           smv2,
 		})
 	})
 

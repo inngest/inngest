@@ -34,7 +34,7 @@ func (e *dbExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOnlyS
 		var appID string
 		var dynamicSpanID string
 		var functionID string
-		var output interface{}
+		var output any
 		var runID string
 		var debugSessionID string
 		var debugRunID string
