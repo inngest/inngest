@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/inngest/inngest/cmd/internal/envflags"
 	"github.com/inngest/inngest/cmd/internal/localconfig"
 	"github.com/inngest/inngest/pkg/authn"
 	"github.com/inngest/inngest/pkg/config"
@@ -118,13 +117,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		os.Exit(1)
 	}
 
-	config := localconfig.GetConfig()
-
-	portStr := envflags.GetEnvOrFlagWithDefault(cmd, "port", "INNGEST_PORT", "8288")
-	// Fallback to config file value if no env var and using default
-	if !cmd.IsSet("port") && os.Getenv("INNGEST_PORT") == "" && config.Port != "" {
-		portStr = config.Port
-	}
+	portStr := localconfig.GetValue(cmd, "port", "port", "8288")
 	port, err := strconv.Atoi(portStr)
 	if err != nil {
 		fmt.Println(err.Error())
@@ -133,11 +126,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	conf.EventAPI.Port = port
 	conf.CoreAPI.Port = port
 
-	host := envflags.GetEnvOrFlag(cmd, "host", "INNGEST_HOST")
-	// Fallback to config file value if no CLI flag or env var is set
-	if host == "" && config.Host != "" {
-		host = config.Host
-	}
+	host := localconfig.GetValue(cmd, "host", "host", "")
 	if host != "" {
 		conf.EventAPI.Addr = host
 		conf.CoreAPI.Addr = host
@@ -175,11 +164,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		tick = devserver.DefaultTick
 	}
 
-	signingKey := envflags.GetEnvOrFlag(cmd, "signing-key", "INNGEST_SIGNING_KEY")
-	// Fallback to config file value if no CLI flag or env var is set
-	if signingKey == "" && config.SigningKey != "" {
-		signingKey = config.SigningKey
-	}
+	signingKey := localconfig.GetValue(cmd, "signing-key", "signing-key", "")
 	if signingKey == "" {
 		fmt.Println("Error: signing-key is required")
 		os.Exit(1)
@@ -190,11 +175,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		os.Exit(1)
 	}
 
-	eventKeys := envflags.GetEnvOrStringSlice(cmd, "event-key", "INNGEST_EVENT_KEY")
-	// Fallback to config file values if no CLI flags or env vars are set
-	if len(eventKeys) == 0 && len(config.EventKey) > 0 {
-		eventKeys = config.EventKey
-	}
+	eventKeys := localconfig.GetStringSlice(cmd, "event-key", "event-key")
 	if len(eventKeys) == 0 {
 		fmt.Println("Error: at least one event-key is required")
 		os.Exit(1)
@@ -202,27 +183,11 @@ func action(ctx context.Context, cmd *cli.Command) error {
 
 	conf.ServerKind = headers.ServerKindCloud
 
-	// Handle configuration options with fallback to config file
-	postgresURI := envflags.GetEnvOrFlag(cmd, "postgres-uri", "INNGEST_POSTGRES_URI")
-	if postgresURI == "" && config.PostgresURI != "" {
-		postgresURI = config.PostgresURI
-	}
-
-	redisURI := envflags.GetEnvOrFlag(cmd, "redis-uri", "INNGEST_REDIS_URI")
-	if redisURI == "" && config.RedisURI != "" {
-		redisURI = config.RedisURI
-	}
-
-	sqliteDir := envflags.GetEnvOrFlag(cmd, "sqlite-dir", "INNGEST_SQLITE_DIR")
-	if sqliteDir == "" && config.SqliteDir != "" {
-		sqliteDir = config.SqliteDir
-	}
-
-	sdkURLs := envflags.GetEnvOrStringSlice(cmd, "sdk-url", "INNGEST_SDK_URL")
-	// Fallback to config file values if no CLI flags or env vars are set
-	if len(sdkURLs) == 0 && len(config.SdkURL) > 0 {
-		sdkURLs = config.SdkURL
-	}
+	// Handle configuration options with simplified koanf-based approach
+	postgresURI := localconfig.GetValue(cmd, "postgres-uri", "postgres-uri", "")
+	redisURI := localconfig.GetValue(cmd, "redis-uri", "redis-uri", "")
+	sqliteDir := localconfig.GetValue(cmd, "sqlite-dir", "sqlite-dir", "")
+	sdkURLs := localconfig.GetStringSlice(cmd, "sdk-url", "sdk-url")
 
 	opts := devserver.StartOpts{
 		Config:             *conf,

@@ -9,7 +9,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/inngest/inngest/cmd/internal/envflags"
 	"github.com/inngest/inngest/cmd/internal/localconfig"
 	"github.com/inngest/inngest/pkg/config"
 	"github.com/inngest/inngest/pkg/devserver"
@@ -120,13 +119,7 @@ func doDev(ctx context.Context, cmd *cli.Command) error {
 		os.Exit(1)
 	}
 
-	config := localconfig.GetConfig()
-
-	portStr := envflags.GetEnvOrFlagWithDefault(cmd, "port", "INNGEST_PORT", "8288")
-	// Fallback to config file value if no env var and using default
-	if !cmd.IsSet("port") && os.Getenv("INNGEST_PORT") == "" && config.Port != "" {
-		portStr = config.Port
-	}
+	portStr := localconfig.GetValue(cmd, "port", "port", "8288")
 	port, err := strconv.Atoi(portStr)
 	if err != nil {
 		fmt.Println(err.Error())
@@ -135,33 +128,17 @@ func doDev(ctx context.Context, cmd *cli.Command) error {
 	conf.EventAPI.Port = port
 	conf.CoreAPI.Port = port
 
-	host := envflags.GetEnvOrFlag(cmd, "host", "INNGEST_HOST")
-	// Fallback to config file value if no CLI flag or env var is set
-	if host == "" && config.Host != "" {
-		host = config.Host
-	}
+	host := localconfig.GetValue(cmd, "host", "host", "")
 	if host != "" {
 		conf.EventAPI.Addr = host
 		conf.CoreAPI.Addr = host
 	}
 
-	urls := envflags.GetEnvOrStringSlice(cmd, "sdk-url", "INNGEST_SDK_URL")
-	// Fallback to config file values if no CLI flags or env vars are set
-	if len(urls) == 0 && len(config.SdkURL) > 0 {
-		urls = config.SdkURL
-	}
+	urls := localconfig.GetStringSlice(cmd, "sdk-url", "sdk-url")
 
 	// Run auto-discovery unless we've explicitly disabled it.
-	// Priority: CLI flag (if explicitly set) > koanf config (env vars + config file) > CLI default
-	noDiscovery := cmd.Bool("no-discovery")
-	if !cmd.IsSet("no-discovery") && config.NoDiscovery != nil {
-		noDiscovery = *config.NoDiscovery
-	}
-
-	noPoll := cmd.Bool("no-poll")
-	if !cmd.IsSet("no-poll") && config.NoPoll != nil {
-		noPoll = *config.NoPoll
-	}
+	noDiscovery := localconfig.GetBoolValue(cmd, "no-discovery", "no-discovery", false)
+	noPoll := localconfig.GetBoolValue(cmd, "no-poll", "no-poll", false)
 	pollInterval := cmd.Int("poll-interval")
 	retryInterval := cmd.Int("retry-interval")
 	queueWorkers := cmd.Int("queue-workers")
