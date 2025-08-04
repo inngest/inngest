@@ -9,6 +9,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/inngest/inngest/cmd/internal/envflags"
 	"github.com/inngest/inngest/cmd/internal/localconfig"
 	"github.com/inngest/inngest/pkg/config"
 	"github.com/inngest/inngest/pkg/devserver"
@@ -119,7 +120,8 @@ func doDev(ctx context.Context, cmd *cli.Command) error {
 		os.Exit(1)
 	}
 
-	port, err := strconv.Atoi(cmd.String("port"))
+	portStr := envflags.GetEnvOrFlagWithDefault(cmd, "port", "INNGEST_PORT", "8288")
+	port, err := strconv.Atoi(portStr)
 	if err != nil {
 		fmt.Println(err.Error())
 		os.Exit(1)
@@ -127,13 +129,13 @@ func doDev(ctx context.Context, cmd *cli.Command) error {
 	conf.EventAPI.Port = port
 	conf.CoreAPI.Port = port
 
-	host := cmd.String("host")
+	host := envflags.GetEnvOrFlag(cmd, "host", "INNGEST_HOST")
 	if host != "" {
 		conf.EventAPI.Addr = host
 		conf.CoreAPI.Addr = host
 	}
 
-	urls := cmd.StringSlice("sdk-url")
+	urls := envflags.GetEnvOrStringSlice(cmd, "sdk-url", "INNGEST_SDK_URL")
 
 	// Run auto-discovery unless we've explicitly disabled it.
 	noDiscovery := cmd.Bool("no-discovery")

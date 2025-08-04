@@ -7,6 +7,7 @@ import (
 	"strconv"
 	"time"
 
+	"github.com/inngest/inngest/cmd/internal/envflags"
 	"github.com/inngest/inngest/cmd/internal/localconfig"
 	"github.com/inngest/inngest/pkg/authn"
 	"github.com/inngest/inngest/pkg/config"
@@ -117,7 +118,8 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		os.Exit(1)
 	}
 
-	port, err := strconv.Atoi(cmd.String("port"))
+	portStr := envflags.GetEnvOrFlagWithDefault(cmd, "port", "INNGEST_PORT", "8288")
+	port, err := strconv.Atoi(portStr)
 	if err != nil {
 		fmt.Println(err.Error())
 		os.Exit(1)
@@ -125,7 +127,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	conf.EventAPI.Port = port
 	conf.CoreAPI.Port = port
 
-	host := cmd.String("host")
+	host := envflags.GetEnvOrFlag(cmd, "host", "INNGEST_HOST")
 	if host != "" {
 		conf.EventAPI.Addr = host
 		conf.CoreAPI.Addr = host
@@ -163,7 +165,7 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		tick = devserver.DefaultTick
 	}
 
-	signingKey := cmd.String("signing-key")
+	signingKey := envflags.GetEnvOrFlag(cmd, "signing-key", "INNGEST_SIGNING_KEY")
 	if signingKey == "" {
 		fmt.Println("Error: signing-key is required")
 		os.Exit(1)
@@ -174,13 +176,19 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		os.Exit(1)
 	}
 
-	eventKeys := cmd.StringSlice("event-key")
+	eventKeys := envflags.GetEnvOrStringSlice(cmd, "event-key", "INNGEST_EVENT_KEY")
 	if len(eventKeys) == 0 {
 		fmt.Println("Error: at least one event-key is required")
 		os.Exit(1)
 	}
 
 	conf.ServerKind = headers.ServerKindCloud
+
+	// Handle environment variables for other configuration options
+	postgresURI := envflags.GetEnvOrFlag(cmd, "postgres-uri", "INNGEST_POSTGRES_URI")
+	redisURI := envflags.GetEnvOrFlag(cmd, "redis-uri", "INNGEST_REDIS_URI")
+	sqliteDir := envflags.GetEnvOrFlag(cmd, "sqlite-dir", "INNGEST_SQLITE_DIR")
+	sdkURLs := envflags.GetEnvOrStringSlice(cmd, "sdk-url", "INNGEST_SDK_URL")
 
 	opts := devserver.StartOpts{
 		Config:             *conf,
@@ -190,15 +198,15 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		InMemory:           false,
 		NoUI:               cmd.Bool("no-ui"),
 		PollInterval:       cmd.Int("poll-interval"),
-		PostgresURI:        cmd.String("postgres-uri"),
+		PostgresURI:        postgresURI,
 		QueueWorkers:       cmd.Int("queue-workers"),
-		RedisURI:           cmd.String("redis-uri"),
+		RedisURI:           redisURI,
 		RequireKeys:        true,
 		RetryInterval:      cmd.Int("retry-interval"),
 		SigningKey:         &signingKey,
-		SQLiteDir:          cmd.String("sqlite-dir"),
+		SQLiteDir:          sqliteDir,
 		Tick:               time.Duration(tick) * time.Millisecond,
-		URLs:               cmd.StringSlice("sdk-url"),
+		URLs:               sdkURLs,
 	}
 
 	err = devserver.New(ctx, opts)
