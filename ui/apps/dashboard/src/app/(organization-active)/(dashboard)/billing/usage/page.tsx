@@ -8,6 +8,7 @@ import { useQuery } from 'urql';
 
 import UsageMetadata from '@/components/Billing/Usage/Metadata';
 import UsageChart from '@/components/Billing/Usage/UsageChart';
+import { isUsageDimension, type UsageDimension } from '@/components/Billing/Usage/types';
 import useGetUsageChartData from '@/components/Billing/Usage/useGetUsageChartData';
 import { graphql } from '@/gql';
 import { pathCreator } from '@/utils/urls';
@@ -16,12 +17,13 @@ const GetBillingInfoDocument = graphql(`
   query GetBillingInfo {
     account {
       entitlements {
+        executions {
+          limit
+        }
         stepCount {
-          usage
           limit
         }
         runCount {
-          usage
           limit
         }
       }
@@ -54,7 +56,7 @@ export default function Billing({
     query: GetBillingInfoDocument,
   });
 
-  const [currentPage, setCurrentPage] = useState<'run' | 'step'>('step');
+  const [currentPage, setCurrentPage] = useState<UsageDimension>('execution');
   const [selectedPeriod, setSelectedPeriod] = useState<Period>(previous ? options[1] : options[0]);
 
   // Get timeseries to temporarily grab the total usage for previous month, since we don't have history usage on entitlements
@@ -63,16 +65,21 @@ export default function Billing({
     type: currentPage,
   });
 
-  const stepCount = data?.account.entitlements.stepCount || { usage: 0, limit: 0 };
-  const runCount = data?.account.entitlements.runCount || { usage: 0, limit: 0 };
-  const isStepPage = currentPage === 'step';
-  const currentUsage = (() => {
-    if (selectedPeriod.id === 'previous' && billableData.length) {
-      return billableData.reduce((sum, point) => sum + (point.value || 0), 0);
+  const currentUsage = billableData.reduce((sum, point) => {
+    return sum + (point.value || 0);
+  }, 0);
+
+  let currentLimit = Infinity;
+  if (data) {
+    if (currentPage === 'execution') {
+      currentLimit = data.account.entitlements.executions.limit ?? Infinity;
+    } else if (currentPage === 'run') {
+      currentLimit = data.account.entitlements.runCount.limit ?? Infinity;
+    } else {
+      currentLimit = data.account.entitlements.stepCount.limit ?? Infinity;
     }
-    return isStepPage ? stepCount.usage : runCount.usage;
-  })();
-  const currentLimit = isStepPage ? stepCount.limit ?? Infinity : runCount.limit ?? Infinity;
+  }
+
   const additionalUsage = Math.max(0, currentUsage - currentLimit);
 
   function isPeriod(option: Option): option is Period {
@@ -96,11 +103,14 @@ export default function Billing({
               defaultValue={currentPage}
               size="small"
               onValueChange={(value) => {
-                if (value === 'run' || value === 'step') {
-                  setCurrentPage(value);
+                if (!isUsageDimension(value)) {
+                  console.error('invalid usage dimension', value);
+                  return;
                 }
+                setCurrentPage(value);
               }}
             >
+              <ToggleGroup.Item value="execution">Execution</ToggleGroup.Item>
               <ToggleGroup.Item value="step">Step</ToggleGroup.Item>
               <ToggleGroup.Item value="run">Run</ToggleGroup.Item>
             </ToggleGroup>
