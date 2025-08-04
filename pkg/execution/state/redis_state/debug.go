@@ -39,6 +39,10 @@ func (q *queue) PartitionByID(ctx context.Context, shard QueueShard, partitionID
 		cmd := rc.B().Hget().Key(kg.PartitionItem()).Field(partitionID).Build()
 		byt, err := rc.Do(ctx, cmd).AsBytes()
 		if err != nil {
+			if rueidis.IsRedisNil(err) {
+				return nil, ErrPartitionNotFound
+			}
+
 			return nil, fmt.Errorf("error retrieving queue partition: %w", err)
 		}
 

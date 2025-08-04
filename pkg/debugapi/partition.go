@@ -2,11 +2,19 @@ package debugapi
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
+	"github.com/inngest/inngest/pkg/execution/state/redis_state"
 	pb "github.com/inngest/inngest/proto/gen/debug/v1"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
+)
+
+var (
+	ErrPartitionNotAvailable = fmt.Errorf("partition not available")
 )
 
 func (d *debugAPI) GetPartition(ctx context.Context, req *pb.PartitionRequest) (*pb.PartitionResponse, error) {
@@ -54,6 +62,10 @@ func (d *debugAPI) GetPartitionStatus(ctx context.Context, req *pb.PartitionRequ
 
 	pt, err := d.queue.PartitionByID(ctx, shard, req.GetId())
 	if err != nil {
+		if errors.Is(err, redis_state.ErrPartitionNotFound) {
+			return nil, status.Error(codes.NotFound, redis_state.ErrPartitionNotFound.Error())
+		}
+
 		return nil, fmt.Errorf("error retrieving partition: %w", err)
 	}
 

@@ -7,12 +7,14 @@ import (
 	"github.com/inngest/inngest/cmd/internal/table"
 	dbgpb "github.com/inngest/inngest/proto/gen/debug/v1"
 	"github.com/urfave/cli/v3"
+	"google.golang.org/grpc/codes"
+	grpcStatus "google.golang.org/grpc/status"
 )
 
 func partitionCommand() *cli.Command {
 	return &cli.Command{
 		Name:      "partition",
-		Aliases:   []string{"p"},
+		Aliases:   []string{"pt"},
 		Usage:     "Get partition information and status",
 		ArgsUsage: "<partition-uuid>",
 		Action: func(ctx context.Context, cmd *cli.Command) error {
@@ -35,12 +37,6 @@ func partitionCommand() *cli.Command {
 				return fmt.Errorf("failed to get partition: %w", err)
 			}
 
-			// Get partition status
-			status, err := debugCtx.Client.GetPartitionStatus(ctx, partitionReq)
-			if err != nil {
-				return fmt.Errorf("failed to get partition status: %w", err)
-			}
-
 			// Display partition information
 			fmt.Printf("Partition: %s\n", partition.Id)
 			fmt.Printf("Slug: %s\n", partition.Slug)
@@ -50,6 +46,18 @@ func partitionCommand() *cli.Command {
 				fmt.Printf("App ID: %s\n", partition.Tenant.AppId)
 			}
 			fmt.Printf("Version: %d\n", partition.Version)
+
+			// Get partition status
+			status, err := debugCtx.Client.GetPartitionStatus(ctx, partitionReq)
+			if err != nil {
+				if st, ok := grpcStatus.FromError(err); ok {
+					if st.Code() == codes.NotFound {
+						return nil
+					}
+				}
+
+				return fmt.Errorf("failed to get partition status: %w", err)
+			}
 
 			// Display partition status in a table
 			statusTable := table.New(table.Row{"Property", "Value"})
