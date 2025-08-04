@@ -3,7 +3,6 @@
 import { Button } from '@inngest/components/Button';
 import { Header } from '@inngest/components/Header/Header';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip/Tooltip';
-import { IconSpinner } from '@inngest/components/icons/Spinner.jsx';
 import { RiPlayFill } from '@remixicon/react';
 
 import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
