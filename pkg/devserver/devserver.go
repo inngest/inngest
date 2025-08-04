@@ -570,14 +570,6 @@ func start(ctx context.Context, opts StartOpts) error {
 		return err
 	}
 
-	debugapi := debugapi.NewDebugAPI(debugapi.Opts{
-		Log:           l,
-		DB:            ds.Data,
-		Queue:         rq,
-		State:         ds.State,
-		ShardSelector: shardSelector,
-	})
-
 	connectGatewayProxy, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectPubSubRedis, false, connectpubsub.RedisPubSubConnectorOpts{
 		Logger:             connectPubSubLogger.With("svc", "connect-gateway"),
 		Tracer:             conditionalTracer,
@@ -653,7 +645,19 @@ func start(ctx context.Context, opts StartOpts) error {
 		Logger:         l,
 	})
 
-	return service.StartAll(ctx, ds, runner, executorSvc, ds.Apiservice, connGateway, debugapi)
+	services := []service.Service{ds, runner, executorSvc, ds.Apiservice, connGateway}
+
+	if os.Getenv("DEBUG") != "" {
+		services = append(services, debugapi.NewDebugAPI(debugapi.Opts{
+			Log:           l,
+			DB:            ds.Data,
+			Queue:         rq,
+			State:         ds.State,
+			ShardSelector: shardSelector,
+		}))
+	}
+
+	return service.StartAll(ctx, services...)
 }
 
 func createInmemoryRedis(ctx context.Context, tick time.Duration) (rueidis.Client, *miniredis.Miniredis, error) {
