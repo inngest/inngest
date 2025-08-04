@@ -1,4 +1,4 @@
-package devserver
+package start
 
 import (
 	"github.com/inngest/inngest/pkg/devserver"
@@ -7,34 +7,21 @@ import (
 
 func Command() *cli.Command {
 	cmd := &cli.Command{
-		Name:        "dev",
-		Usage:       "Run the Inngest Dev Server for local development.",
-		UsageText:   "inngest dev [options]",
-		Description: "Example: inngest dev -u http://localhost:3000/api/inngest",
+		Name:        "start",
+		Usage:       "[Beta] Run Inngest as a single-node service.",
+		UsageText:   "inngest start [options]",
+		Description: "Example: inngest start",
 		Action:      action,
 
 		Flags: []cli.Flag{
 			// Base flags
-			&cli.StringSliceFlag{
-				Name:    "sdk-url",
-				Aliases: []string{"u"},
-				Usage:   "App serve URLs to sync (ex. http://localhost:3000/api/inngest)",
-			},
-			&cli.BoolFlag{
-				Name:  "no-discovery",
-				Usage: "Disable app auto-discovery",
-			},
-			&cli.BoolFlag{
-				Name:  "no-poll",
-				Usage: "Disable polling of apps for updates",
-			},
 			&cli.StringFlag{
 				Name:  "config",
 				Usage: "Path to an Inngest configuration file",
 			},
 			&cli.StringFlag{
 				Name:  "host",
-				Usage: "Inngest server host",
+				Usage: "Inngest server hostname",
 			},
 			&cli.StringFlag{
 				Name:    "port",
@@ -42,11 +29,38 @@ func Command() *cli.Command {
 				Value:   "8288",
 				Usage:   "Inngest server port",
 			},
+			&cli.StringSliceFlag{
+				Name:    "sdk-url",
+				Aliases: []string{"u"},
+				Usage:   "App serve URLs to sync (ex. http://localhost:3000/api/inngest)",
+			},
+			&cli.StringFlag{
+				Name:  "signing-key",
+				Usage: "Signing key used to sign and validate data between the server and apps.",
+			},
+			&cli.StringSliceFlag{
+				Name:  "event-key",
+				Usage: "Event key(s) that will be used by apps to send events to the server.",
+			},
+
+			// Persistence flags
+			&cli.StringFlag{
+				Name:  "sqlite-dir",
+				Usage: "Directory for where to write SQLite database.",
+			},
+			&cli.StringFlag{
+				Name:  "redis-uri",
+				Usage: "Redis server URI for external queue and run state. Defaults to self-contained, in-memory Redis server with periodic snapshot backups.",
+			},
+			&cli.StringFlag{
+				Name:  "postgres-uri",
+				Usage: "PostgreSQL database URI for configuration and history persistence. Defaults to SQLite database.",
+			},
 
 			// Advanced flags
 			&cli.IntFlag{
 				Name:  "poll-interval",
-				Value: devserver.DefaultPollInterval,
+				Value: 0,
 				Usage: "Interval in seconds between polling for updates to apps",
 			},
 			&cli.IntFlag{
@@ -70,10 +84,8 @@ func Command() *cli.Command {
 				Usage: "Port to expose connect gateway endpoint",
 			},
 			&cli.BoolFlag{
-				Name:   "in-memory",
-				Value:  true,
-				Usage:  "Use in memory sqlite db",
-				Hidden: true,
+				Name:  "no-ui",
+				Usage: "Disable the web UI and GraphQL API endpoint",
 			},
 		},
 	}

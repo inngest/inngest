@@ -1,4 +1,4 @@
-package localconfig
+package config
 
 import (
 	"context"
@@ -85,7 +85,6 @@ func loadConfigFile(ctx context.Context, cmd *cli.Command) error {
 			return fmt.Errorf("error reading config file %s: %w", configPath, err)
 		}
 		l.Info("using config", "file", configPath)
-		configLoaded = true
 	} else {
 		// Search for config files in standard locations
 		searchPaths := getConfigSearchPaths(l)

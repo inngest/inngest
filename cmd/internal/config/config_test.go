@@ -1,4 +1,4 @@
-package localconfig
+package config
 
 import (
 	"context"
@@ -66,8 +66,11 @@ postgres-uri: postgres://localhost:5432/inngest
 
 	// Change to temp directory to test auto-discovery
 	oldWd, _ := os.Getwd()
-	defer os.Chdir(oldWd)
-	os.Chdir(tempDir)
+	defer func() {
+		_ = os.Chdir(oldWd)
+	}()
+	err = os.Chdir(tempDir)
+	require.NoError(t, err)
 
 	ctx := context.Background()
 	cmd := &cli.Command{}
@@ -356,8 +359,11 @@ func TestConfigFileDiscovery(t *testing.T) {
 
 	// Change to subdirectory
 	oldWd, _ := os.Getwd()
-	defer os.Chdir(oldWd)
-	os.Chdir(subDir)
+	defer func() {
+		_ = os.Chdir(oldWd)
+	}()
+	err = os.Chdir(subDir)
+	require.NoError(t, err)
 
 	ctx := context.Background()
 	cmd := &cli.Command{}
