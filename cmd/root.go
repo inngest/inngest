@@ -12,13 +12,9 @@ import (
 	inncli "github.com/inngest/inngest/pkg/cli"
 	inngestversion "github.com/inngest/inngest/pkg/inngest/version"
 	isatty "github.com/mattn/go-isatty"
-	"github.com/spf13/viper"
 	"github.com/urfave/cli/v3"
 )
 
-const (
-	ViperLogLevelKey = "log.level"
-)
 
 // globalFlags are the flags that should be available on all commands
 var globalFlags = []cli.Flag{
@@ -49,20 +45,6 @@ func execute() {
 		)),
 		Version: inngestversion.Print(),
 		Before: func(ctx context.Context, cmd *cli.Command) (context.Context, error) {
-			// Bind global flags to viper
-			if cmd.IsSet("log-level") {
-				viper.Set(ViperLogLevelKey, cmd.String("log-level"))
-			} else if cmd.Bool("verbose") {
-				viper.Set(ViperLogLevelKey, "debug")
-			} else {
-				viper.Set(ViperLogLevelKey, "info")
-			}
-
-			// Also set the flag values in viper for other parts of the code
-			viper.Set("json", cmd.Bool("json"))
-			viper.Set("verbose", cmd.Bool("verbose"))
-			viper.Set("log-level", cmd.String("log-level"))
-
 			// Set LOG_HANDLER environment variable based on --json flag
 			// This ensures the logger respects the JSON output setting
 			if cmd.Bool("json") {
@@ -97,18 +79,9 @@ func execute() {
 		},
 	}
 
-	// Set up flag binding with viper
-	for _, flag := range app.Flags {
-		if f, ok := flag.(*cli.BoolFlag); ok {
-			viper.SetDefault(f.Name, false)
-		} else if f, ok := flag.(*cli.StringFlag); ok {
-			viper.SetDefault(f.Name, f.Value)
-		}
-	}
-
 	if !isatty.IsTerminal(os.Stdout.Fd()) {
 		// Always use JSON when not in a terminal
-		viper.Set("json", true)
+		os.Setenv("LOG_HANDLER", "json")
 	}
 
 	if err := app.Run(context.Background(), os.Args); err != nil {
