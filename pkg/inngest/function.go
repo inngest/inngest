@@ -20,6 +20,7 @@ import (
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/expressions"
 	"github.com/inngest/inngest/pkg/syscode"
+	"github.com/inngest/inngest/pkg/util"
 	"github.com/xhit/go-str2duration/v2"
 )
 
@@ -491,7 +492,7 @@ func DeterministicAppUUID(url string) uuid.UUID {
 // DeterministicSha1UUID returns a deterministic V3 UUID based off of the SHA1
 // hash of the input string.
 func DeterministicSha1UUID(str string) uuid.UUID {
-	return uuid.NewSHA1(uuid.NameSpaceOID, []byte(str))
+	return util.DeterministicUUID([]byte(str))
 }
 
 func RandomID() (string, error) {

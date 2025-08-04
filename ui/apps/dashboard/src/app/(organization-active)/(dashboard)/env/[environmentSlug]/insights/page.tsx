@@ -3,7 +3,7 @@
 import { Button } from '@inngest/components/Button';
 import { Header } from '@inngest/components/Header/Header';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip/Tooltip';
-import { IconSpinner } from '@inngest/components/icons/Spinner';
+import { IconSpinner } from '@inngest/components/icons/Spinner.jsx';
 import { RiPlayFill } from '@remixicon/react';
 
 import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
@@ -14,6 +14,7 @@ import {
   useInsightsStateMachineContext,
 } from '@/components/Insights/InsightsStateMachineContext/InsightsStateMachineContext';
 import { Section } from '@/components/Insights/Section';
+import { useInsightsQuery } from '@/components/Insights/hooks/useInsightsQuery';
 
 function InsightsPageContent() {
   const { value: isInsightsEnabled } = useBooleanFlag('insights');
@@ -31,15 +32,10 @@ function InsightsPageContent() {
             <Button
               className="w-[110px]"
               disabled={query.trim() === '' || isRunning}
-              icon={
-                isRunning ? (
-                  <IconSpinner className="fill-white" />
-                ) : (
-                  <RiPlayFill className="h-4 w-4" />
-                )
-              }
+              icon={<RiPlayFill className="h-4 w-4" />}
               iconSide="left"
               label={isRunning ? undefined : 'Run query'}
+              loading={isRunning}
               onClick={runQuery}
               size="medium"
             />
@@ -80,6 +76,7 @@ function InsightsPageContent() {
 
 export default function InsightsPage() {
   const { value: isInsightsEnabled } = useBooleanFlag('insights');
+  const { content, isRunning, onChange, runQuery } = useInsightsQuery();
 
   if (!isInsightsEnabled) return null;
 

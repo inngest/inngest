@@ -5,6 +5,7 @@ import React, { createContext, useContext } from 'react';
 import type { BooleanFlag } from './useBooleanFlag';
 import type { CancelRunPayload, CancelRunResult } from './useCancelRun';
 import type { GetRunPayload, GetRunResult } from './useGetRun';
+import type { GetTraceResultPayload, TraceResult } from './useGetTraceResult';
 import type { InngestStatus } from './useInngestStatus';
 import type { InvokeRunPayload, InvokeRunResult } from './useInvokeRun';
 import type { PathCreator } from './usePathCreator';
@@ -16,6 +17,7 @@ import type { RerunFromStepPayload, RerunFromStepResult } from './useRerunFromSt
 // one global implementation
 export type SharedDefinitions = {
   getRun: (payload: GetRunPayload) => Promise<GetRunResult>;
+  getTraceResult: (payload: GetTraceResultPayload) => Promise<TraceResult>;
   invokeRun: (payload: InvokeRunPayload) => Promise<InvokeRunResult>;
   rerunFromStep: (payload: RerunFromStepPayload) => Promise<RerunFromStepResult>;
   rerun: (payload: RerunPayload) => Promise<RerunResult>;
