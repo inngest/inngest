@@ -11,6 +11,7 @@ export type Scalars = {
   Boolean: boolean;
   Int: number;
   Float: number;
+  Any: any;
   Bytes: any;
   /** The environment for the function to be run: `"prod"` or `"test"` */
   Environment: any;
@@ -19,6 +20,7 @@ export type Scalars = {
   ULID: any;
   UUID: any;
   Uint: any;
+  Unknown: any;
 };
 
 export type ActionVersionQuery = {
@@ -812,7 +814,7 @@ export type SleepStepInfo = {
 
 export type StepError = {
   __typename?: 'StepError';
-  cause: Maybe<Scalars['Bytes']>;
+  cause: Maybe<Scalars['Unknown']>;
   message: Scalars['String'];
   name: Maybe<Scalars['String']>;
   stack: Maybe<Scalars['String']>;
