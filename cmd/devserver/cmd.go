@@ -152,14 +152,13 @@ func doDev(ctx context.Context, cmd *cli.Command) error {
 	}
 
 	// Run auto-discovery unless we've explicitly disabled it.
+	// Priority: CLI flag (if explicitly set) > koanf config (env vars + config file) > CLI default
 	noDiscovery := cmd.Bool("no-discovery")
-	// Check config file if flag wasn't explicitly set
 	if !cmd.IsSet("no-discovery") && config.NoDiscovery != nil {
 		noDiscovery = *config.NoDiscovery
 	}
 
 	noPoll := cmd.Bool("no-poll")
-	// Check config file if flag wasn't explicitly set
 	if !cmd.IsSet("no-poll") && config.NoPoll != nil {
 		noPoll = *config.NoPoll
 	}

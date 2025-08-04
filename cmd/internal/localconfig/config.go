@@ -5,11 +5,13 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/inngest/inngest/cmd/internal/envflags"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/knadh/koanf/parsers/json"
 	"github.com/knadh/koanf/parsers/yaml"
+	"github.com/knadh/koanf/providers/env"
 	"github.com/knadh/koanf/providers/file"
 	"github.com/knadh/koanf/v2"
 	"github.com/urfave/cli/v3"
@@ -25,11 +27,11 @@ type Config struct {
 	Port        string   `koanf:"port"`
 
 	// Advanced dev command configuration
-	PollInterval       int `koanf:"poll-interval"`
-	RetryInterval      int `koanf:"retry-interval"`
-	QueueWorkers       int `koanf:"queue-workers"`
-	Tick               int `koanf:"tick"`
-	ConnectGatewayPort int `koanf:"connect-gateway-port"`
+	PollInterval       int   `koanf:"poll-interval"`
+	RetryInterval      int   `koanf:"retry-interval"`
+	QueueWorkers       int   `koanf:"queue-workers"`
+	Tick               int   `koanf:"tick"`
+	ConnectGatewayPort int   `koanf:"connect-gateway-port"`
 	InMemory           *bool `koanf:"in-memory"`
 
 	// Start command configuration
@@ -66,42 +68,53 @@ func GetConfig() *Config {
 	return loadedConfig
 }
 
-// loadConfigFile attempts to load configuration from files using koanf
-// Searches in current directory, parent directories, and ~/.config/inngest
+// loadConfigFile loads configuration from multiple sources in priority order:
+// 1. Config files (lowest priority)
+// 2. Environment variables with INNGEST_ prefix
+// 3. CLI flags (handled separately, highest priority)
 func loadConfigFile(ctx context.Context, cmd *cli.Command) error {
 	l := logger.StdlibLogger(ctx)
 
-	// Check if user specified a config file explicitly
+	// Step 1: Load config file (lowest priority)
+	configLoaded := false
 	configPath := envflags.GetEnvOrFlag(cmd, "config", "INNGEST_CONFIG")
 	if configPath != "" {
 		if err := loadConfigFromPath(configPath); err != nil {
 			return fmt.Errorf("error reading config file %s: %w", configPath, err)
 		}
 		l.Info("using config", "file", configPath)
-		return unmarshalConfig()
-	}
+		configLoaded = true
+	} else {
+		// Search for config files in standard locations
+		searchPaths := getConfigSearchPaths(l)
+		configNames := []string{"inngest.json", "inngest.yaml", "inngest.yml"}
 
-	// Search for config files in standard locations
-	searchPaths := getConfigSearchPaths(l)
-	configNames := []string{"inngest.json", "inngest.yaml", "inngest.yml"}
-
-	for _, searchPath := range searchPaths {
-		for _, configName := range configNames {
-			fullPath := filepath.Join(searchPath, configName)
-			if _, err := os.Stat(fullPath); err == nil {
-				if err := loadConfigFromPath(fullPath); err != nil {
-					l.Warn("error reading config file", "file", fullPath, "error", err)
-					continue
+		for _, searchPath := range searchPaths {
+			for _, configName := range configNames {
+				fullPath := filepath.Join(searchPath, configName)
+				if _, err := os.Stat(fullPath); err == nil {
+					if err := loadConfigFromPath(fullPath); err != nil {
+						l.Warn("error reading config file", "file", fullPath, "error", err)
+						continue
+					}
+					l.Info("using config", "file", fullPath)
+					configLoaded = true
+					break
 				}
-				l.Info("using config", "file", fullPath)
-				return unmarshalConfig()
+			}
+			if configLoaded {
+				break
 			}
 		}
 	}
 
-	// No config file found - initialize empty config
-	loadedConfig = &Config{}
-	return nil
+	// Step 2: Load environment variables (higher priority than config files)
+	if err := loadEnvironmentVariables(); err != nil {
+		return fmt.Errorf("error loading environment variables: %w", err)
+	}
+
+	// Step 3: Unmarshal the final configuration
+	return unmarshalConfig()
 }
 
 // getConfigSearchPaths returns directories to search for config files
@@ -136,7 +149,7 @@ func getConfigSearchPaths(l logger.Logger) []string {
 // loadConfigFromPath loads configuration from a specific file path using koanf
 func loadConfigFromPath(path string) error {
 	ext := filepath.Ext(path)
-	
+
 	var parser koanf.Parser
 	switch ext {
 	case ".json":
@@ -161,6 +174,33 @@ func loadConfigFromPath(path string) error {
 	}
 
 	return nil
+}
+
+// loadEnvironmentVariables loads environment variables with INNGEST_ prefix
+func loadEnvironmentVariables() error {
+	// Load environment variables with INNGEST_ prefix
+	// The callback function receives the full env var name, so we need to strip the prefix
+	return k.Load(env.ProviderWithValue("INNGEST_", "", func(key, value string) (string, interface{}) {
+		// Convert environment variable names to config keys
+		// INNGEST_SDK_URL -> sdk-url
+		// INNGEST_NO_DISCOVERY -> no-discovery
+		// INNGEST_POLL_INTERVAL -> poll-interval
+		var configKey string
+		if strings.HasPrefix(key, "INNGEST_") {
+			configKey = strings.ToLower(strings.ReplaceAll(key[8:], "_", "-"))
+		} else {
+			configKey = strings.ToLower(strings.ReplaceAll(key, "_", "-"))
+		}
+
+		// Handle comma-separated values for array fields
+		if configKey == "sdk-url" || configKey == "event-key" {
+			if strings.Contains(value, ",") {
+				return configKey, strings.Split(value, ",")
+			}
+		}
+
+		return configKey, value
+	}), nil)
 }
 
 // unmarshalConfig unmarshals the loaded configuration into the Config struct
