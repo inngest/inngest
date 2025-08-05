@@ -3032,10 +3032,6 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 
 	weights := []float64{}
 	items := make([]*QueuePartition, len(encoded))
-	fnIDs := make(map[uuid.UUID]bool)
-	fnIDsMu := sync.Mutex{}
-
-	migrateIDs := map[uuid.UUID]bool{}
 
 	// Use parallel decoding as per Peek
 	partitions, err := util.ParallelDecode(encoded, func(val any) (*QueuePartition, bool, error) {
@@ -3057,13 +3053,6 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 
 		if err := json.Unmarshal(unsafe.Slice(unsafe.StringData(str), len(str)), item); err != nil {
 			return nil, false, fmt.Errorf("error reading partition item: %w", err)
-		}
-		// Track the fn ID for partitions seen.  This allows us to do fast lookups of paused functions
-		// to prevent peeking/working on these items as an optimization.
-		if item.FunctionID != nil {
-			fnIDsMu.Lock()
-			fnIDs[*item.FunctionID] = false // default not paused
-			fnIDsMu.Unlock()
 		}
 		return item, false, nil
 	})
@@ -3089,46 +3078,6 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 		}
 	}
 
-	// mget all fn metas
-	if len(fnIDs) > 0 {
-		keys := make([]string, len(fnIDs))
-		n := 0
-		for k := range fnIDs {
-			keys[n] = kg.FnMetadata(k)
-			n++
-		}
-		vals, err := client.Do(ctx, client.B().Mget().Key(keys...).Build()).ToAny()
-		if err == nil {
-			// If this is an error, just ignore the error and continue.  The executor should gracefully handle
-			// accidental attempts at paused functions, as we cannot do this optimization for account or env-level
-			// partitions.
-			vals, ok := vals.([]any)
-			if !ok {
-				return nil, fmt.Errorf("unknown return type from mget fnMeta: %T", vals)
-			}
-
-			_, _ = util.ParallelDecode(vals, func(i any) (any, bool, error) {
-				str, ok := i.(string)
-				if !ok {
-					return nil, false, fmt.Errorf("unknown fnMeta type in partition peek: %T", i)
-				}
-				fnMeta := &FnMetadata{}
-				if err := json.Unmarshal(unsafe.Slice(unsafe.StringData(str), len(str)), fnMeta); err != nil {
-					return nil, false, fmt.Errorf("could not unmarshal fnMeta: %w", err)
-				}
-
-				fnIDsMu.Lock()
-				fnIDs[fnMeta.FnID] = fnMeta.Paused
-				if fnMeta.Migrate {
-					migrateIDs[fnMeta.FnID] = true
-				}
-				fnIDsMu.Unlock()
-
-				return nil, true, nil
-			})
-		}
-	}
-
 	ignored := 0
 	for n, item := range partitions {
 		// NOTE: Nil partitions were already reported above. If we got to this point, they're
@@ -3138,28 +3087,6 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 		if item == nil {
 			ignored++
 			continue
-		}
-
-		// check pause
-		if item.FunctionID != nil {
-			if paused := fnIDs[*item.FunctionID]; paused {
-				// Function is pulled up when it is unpaused, so we can push it back for a long time (see SetFunctionPaused)
-				err := q.PartitionRequeue(ctx, shard, item, q.clock.Now().Truncate(time.Second).Add(PartitionPausedRequeueExtension), true)
-				if err != nil && !errors.Is(err, ErrPartitionGarbageCollected) {
-					q.log.Error("failed to push back paused partition", "error", err, "partition", item)
-				} else {
-					q.log.Trace("pushed back paused partition", "partition", item.Queue())
-				}
-
-				ignored++
-				continue
-			}
-
-			if _, ok := migrateIDs[*item.FunctionID]; ok {
-				// skip this since the executor is not responsible for migrating queues
-				ignored++
-				continue
-			}
 		}
 
 		// NOTE: The queue does two conflicting things:  we peek ahead of now() to fetch partitions
@@ -3490,7 +3417,6 @@ func (q *queue) Instrument(ctx context.Context) error {
 			})
 		},
 	})
-
 	if err != nil {
 		return fmt.Errorf("failed to iterate queue partitions during instrumentation: %w", err)
 	}
