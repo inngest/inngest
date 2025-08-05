@@ -2,21 +2,12 @@
 
 import { createContext, useCallback, useContext, useReducer, type ReactNode } from 'react';
 
+import { TEMPLATE_QUERIES } from '../QueryHelperPanel/templates';
 import { simulateQuery } from './mocks';
 import { insightsStateMachineReducer } from './reducer';
 import type { InsightsState } from './types';
 
-const DEFAULT_QUERY = `SELECT 
-  HOUR(ts) as hour, 
-  COUNT(*) as count 
-WHERE 
-  name = 'cli/dev_ui.loaded' 
-  AND data.os != 'linux'
-  AND ts > 1752845983000 
-GROUP BY
-  hour 
-ORDER BY 
-  hour desc`;
+const DEFAULT_QUERY = TEMPLATE_QUERIES[0]?.text ?? '';
 
 const INITIAL_STATE: InsightsState = {
   data: undefined,

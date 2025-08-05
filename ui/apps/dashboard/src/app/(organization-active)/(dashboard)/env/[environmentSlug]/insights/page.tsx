@@ -12,6 +12,7 @@ import {
   useInsightsStateMachineContext,
 } from '@/components/Insights/InsightsStateMachineContext/InsightsStateMachineContext';
 import { QueryHelperPanel } from '@/components/Insights/QueryHelperPanel/QueryHelperPanel';
+import { QueryHelperPanelProvider } from '@/components/Insights/QueryHelperPanel/QueryHelperPanelContext';
 import { Section } from '@/components/Insights/Section';
 
 function InsightsContent() {
@@ -54,7 +55,9 @@ export default function InsightsPage() {
 
   return (
     <InsightsStateMachineContextProvider>
-      <InsightsContent />
+      <QueryHelperPanelProvider>
+        <InsightsContent />
+      </QueryHelperPanelProvider>
     </InsightsStateMachineContextProvider>
   );
 }
