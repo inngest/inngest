@@ -53,10 +53,58 @@ func (tw *TextWriter) Write(data map[string]any, opts ...TextOpt) error {
 
 	indentStr := strings.Repeat(" ", tw.indent)
 	for key, value := range data {
-		fmt.Fprintf(tw.w, "%s%s:\t%s\n", indentStr, key, tw.valueToString(value))
+		if tw.isNestedMap(value) {
+			fmt.Fprintf(tw.w, "%s%s:\n", indentStr, key)
+			tw.w.Flush()
+			
+			nestedWriter := tw.WithIndent(tw.indent + 2)
+			nestedWriter.Write(tw.convertToAnyMap(value))
+		} else {
+			fmt.Fprintf(tw.w, "%s%s:\t%s\n", indentStr, key, tw.valueToString(value))
+		}
 	}
 
 	return tw.w.Flush()
+}
+
+func (tw *TextWriter) isNestedMap(value any) bool {
+	switch value.(type) {
+	case map[string]any, map[string]string, map[string]int, map[string]int64, map[string]float64, map[string]bool:
+		return true
+	default:
+		return false
+	}
+}
+
+func (tw *TextWriter) convertToAnyMap(value any) map[string]any {
+	result := make(map[string]any)
+	
+	switch v := value.(type) {
+	case map[string]any:
+		return v
+	case map[string]string:
+		for k, val := range v {
+			result[k] = val
+		}
+	case map[string]int:
+		for k, val := range v {
+			result[k] = val
+		}
+	case map[string]int64:
+		for k, val := range v {
+			result[k] = val
+		}
+	case map[string]float64:
+		for k, val := range v {
+			result[k] = val
+		}
+	case map[string]bool:
+		for k, val := range v {
+			result[k] = val
+		}
+	}
+	
+	return result
 }
 
 func (tw *TextWriter) valueToString(value any) string {

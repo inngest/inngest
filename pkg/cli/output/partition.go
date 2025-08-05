@@ -17,21 +17,20 @@ func PartitionTable(pt *pb.PartitionResponse, pts *pb.PartitionStatusResponse) e
 			"Type": "Partition",
 			"ID":   pt.Id,
 			"Slug": pt.Slug,
+			"Tenant": map[string]any{
+				"Account":     pt.Tenant.AccountId,
+				"Environment": pt.Tenant.EnvId,
+				"App":         pt.Tenant.AppId,
+				"Queue Shard": "TODO",
+			},
+			// TODO: implement this
+			"Concurrency": map[string]any{
+				"Account":  0,
+				"Function": 0,
+			},
 		},
 			WithTextOptLeadSpace(true),
 		)
-
-		// t.AppendSeparator()
-		// t.AppendRow(table.Row{strings.ToUpper("Tenant")}, rowAutoMerge)
-		// t.AppendSeparator()
-		// t.AppendRows([]table.Row{
-		// 	{"Account", pt.Tenant.AccountId},
-		// 	{"Environment", pt.Tenant.EnvId},
-		// 	{"App", pt.Tenant.AppId},
-		// 	{"Queue Shard", "TODO"},
-		// 	{"Account Concurrency", "TODO"},
-		// 	{"Function Concurrency", "TODO"},
-		// })
 	}
 
 	// Status
