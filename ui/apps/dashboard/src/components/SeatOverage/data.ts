@@ -18,7 +18,7 @@ const seatOverageQuery = graphql(`
 export type SeatOverageData = {
   hasExceeded: boolean;
   userCount: number;
-  userLimit: number;
+  userLimit: number | null;
 };
 
 export function useSeatOverageCheck() {
@@ -35,10 +35,10 @@ export function parseSeatOverageData(data: any): SeatOverageData | null {
   const { userCount } = entitlements;
 
   const usage = userCount.usage;
-  const limit = userCount.limit || 0;
+  const limit = userCount.limit;
 
-  // limit of -1 means no limit
-  const hasExceeded = limit >= 0 && usage > limit;
+  // null limit means no limit
+  const hasExceeded = limit !== null && usage > limit;
 
   return {
     hasExceeded,

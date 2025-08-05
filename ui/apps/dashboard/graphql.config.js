@@ -51,6 +51,7 @@ const config = {
               Timerange: 'unknown',
               ULID: 'string',
               Upload: 'unknown',
+              Unknown: 'unknown',
               UUID: 'string',
             },
           },

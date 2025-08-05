@@ -2,8 +2,8 @@
 
 import { Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { SlideOver } from '@inngest/components/SlideOver/SlideOver';
 
-import SlideOver from '@/components/SlideOver';
 import { FunctionConfigurationContainer } from './FunctionConfigurationContainer';
 
 const FunctionSlideOver = () => {

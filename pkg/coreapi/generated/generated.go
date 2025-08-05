@@ -3229,6 +3229,7 @@ scalar Uint
 scalar ULID
 scalar UUID
 scalar Bytes
+scalar Unknown
 
 "The pagination information in a connection."
 type PageInfo {
@@ -3833,7 +3834,7 @@ type StepError {
   message: String!
   name: String
   stack: String
-  cause: Bytes
+  cause: Unknown
 }
 
 type RunTraceTrigger {
@@ -18256,9 +18257,9 @@ func (ec *executionContext) _StepError_cause(ctx context.Context, field graphql.
 	if resTmp == nil {
 		return graphql.Null
 	}
-	res := resTmp.(*string)
+	res := resTmp.(interface{})
 	fc.Result = res
-	return ec.marshalOBytes2ᚖstring(ctx, field.Selections, res)
+	return ec.marshalOUnknown2interface(ctx, field.Selections, res)
 }
 
 func (ec *executionContext) fieldContext_StepError_cause(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
@@ -18268,7 +18269,7 @@ func (ec *executionContext) fieldContext_StepError_cause(ctx context.Context, fi
 		IsMethod:   false,
 		IsResolver: false,
 		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
-			return nil, errors.New("field of type Bytes does not have child fields")
+			return nil, errors.New("field of type Unknown does not have child fields")
 		},
 	}
 	return fc, nil
@@ -28811,6 +28812,22 @@ func (ec *executionContext) marshalOUUID2ᚖgithubᚗcomᚋgoogleᚋuuidᚐUUID(
 		return graphql.Null
 	}
 	res := types.MarshalUUID(*v)
+	return res
+}
+
+func (ec *executionContext) unmarshalOUnknown2interface(ctx context.Context, v interface{}) (interface{}, error) {
+	if v == nil {
+		return nil, nil
+	}
+	res, err := types.UnmarshalUnknown(v)
+	return res, graphql.ErrorOnPath(ctx, err)
+}
+
+func (ec *executionContext) marshalOUnknown2interface(ctx context.Context, sel ast.SelectionSet, v interface{}) graphql.Marshaler {
+	if v == nil {
+		return graphql.Null
+	}
+	res := types.MarshalUnknown(v)
 	return res
 }
 

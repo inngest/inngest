@@ -46,10 +46,10 @@ function getMockPage(cursor: string | null): InsightsFetchResult {
 }
 
 export async function simulateQuery(
-  query: string,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  _query: string,
   cursor: string | null
 ): Promise<InsightsFetchResult> {
-  console.log('Running simulateQuery for:\n', query, cursor);
   await new Promise((resolve) => setTimeout(resolve, 3000 + Math.random() * 1000));
 
   if (Math.random() <= 0.3) {

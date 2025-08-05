@@ -70,11 +70,12 @@ func (a *devapi) addRoutes(AuthMiddleware func(http.Handler) http.Handler) {
 	})
 	a.Use(headers.StaticHeadersMiddleware(a.devserver.Opts.Config.GetServerKind()))
 
-	a.Get("/dev", a.Info)              // appears to be used by the front end, should this be turned off when the --no-ui flag is enabled?
-	a.Post("/dev/traces", a.OTLPTrace) // this breaks when the AuthMiddleware is applied to it so I removed it
+	a.Post("/dev/traces", a.OTLPTrace) // Intentionally outside the AuthMiddleware
 
 	a.Group(func(r chi.Router) {
 		r.Use(AuthMiddleware)
+
+		r.Get("/dev", a.Info)
 
 		r.Post("/fn/register", a.Register)
 		// This allows tests to remove apps by URL

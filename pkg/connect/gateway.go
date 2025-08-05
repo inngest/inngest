@@ -616,7 +616,11 @@ func (c *connectGatewaySvc) Handler() http.Handler {
 
 		// The error group returns once the connection is closed
 		if err := eg.Wait(); err != nil {
-			ch.log.ReportError(err, "error in run loop")
+			if err != ErrDraining {
+				ch.log.ReportError(err, "error in run loop")
+			} else {
+				ch.log.Warn("error in run loop", "err", err)
+			}
 			return
 		}
 	})
@@ -726,6 +730,10 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 
 				grpcClient, err := c.svc.getOrCreateGRPCClient(ctx, c.conn.EnvID, data.RequestId)
 				if err != nil {
+					c.log.ReportError(err, "failed to create grpc client",
+						logger.WithErrorReportTags(map[string]string{
+							"req_id": data.RequestId,
+						}))
 					return &connecterrors.SocketError{
 						SysCode:    syscode.CodeConnectInternal,
 						StatusCode: websocket.StatusInternalError,
@@ -737,7 +745,7 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 					RequestId: data.RequestId,
 					Ts:        timestamppb.Now()})
 
-				if err != nil || !reply.Success {
+				if err != nil {
 					// This should never happen: Failing the ack means we will redeliver the same request even though
 					// the worker already started processing it.
 					c.log.ReportError(err, "failed to ack message through gRPC")
@@ -746,6 +754,9 @@ func (c *connectionHandler) handleIncomingWebSocketMessage(ctx context.Context, 
 						StatusCode: websocket.StatusInternalError,
 						Msg:        "could not ack message through gRPC",
 					}
+				}
+				if !reply.Success {
+					c.log.Warn("failed to ack, executor was likely done with the request")
 				}
 			} else {
 				transport = "pubsub"

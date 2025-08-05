@@ -4,12 +4,28 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"time"
+
 	"github.com/google/uuid"
 	sqlc_sqlite "github.com/inngest/inngest/pkg/cqrs/base_cqrs/sqlc/sqlite"
 	"github.com/oklog/ulid/v2"
 )
 
-func NewNormalized(db DBTX) sqlc_sqlite.Querier {
+type NewNormalizedOpts struct {
+	MaxIdleConns    int
+	MaxOpenConns    int
+	ConnMaxIdle     int
+	ConnMaxLifetime int
+}
+
+func NewNormalized(db DBTX, o NewNormalizedOpts) sqlc_sqlite.Querier {
+	if sqlDB, ok := db.(*sql.DB); ok {
+		sqlDB.SetMaxIdleConns(o.MaxIdleConns)
+		sqlDB.SetMaxOpenConns(o.MaxOpenConns)
+		sqlDB.SetConnMaxIdleTime(time.Duration(o.ConnMaxIdle) * time.Minute)
+		sqlDB.SetConnMaxLifetime(time.Duration(o.ConnMaxLifetime) * time.Minute)
+	}
+
 	return &NormalizedQueries{db: New(db)}
 }
 

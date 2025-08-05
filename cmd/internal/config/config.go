@@ -38,9 +38,13 @@ type Config struct {
 	EventKey   []string `koanf:"event-key"`
 
 	// Database configuration
-	RedisURI    string `koanf:"redis-uri"`
-	PostgresURI string `koanf:"postgres-uri"`
-	SqliteDir   string `koanf:"sqlite-dir"`
+	RedisURI                    string `koanf:"redis-uri"`
+	PostgresURI                 string `koanf:"postgres-uri"`
+	PostgresMaxIdleConns        int    `koanf:"postgres-max-idle-conns"`
+	PostgresMaxOpenConns        int    `koanf:"postgres-max-open-conns"`
+	PostgresConnMaxIdleTime     int    `koanf:"postgres-conn-max-idle-time"`
+	PostgresConnMaxLifetime     int    `koanf:"postgres-conn-max-lifetime"`
+	SqliteDir                   string `koanf:"sqlite-dir"`
 }
 
 // Global variables to store koanf instance and loaded configuration

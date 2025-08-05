@@ -133,3 +133,5 @@ models:
     model: github.com/inngest/inngest/pkg/gql_scalars.ULID
   UUID:
     model: github.com/inngest/inngest/pkg/gql_scalars.UUID
+  Unknown:
+    model: github.com/inngest/inngest/pkg/gql_scalars.Unknown
