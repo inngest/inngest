@@ -4,7 +4,13 @@ import { memo } from 'react';
 import Table from '@inngest/components/Table/NewTable';
 import { type ColumnDef } from '@tanstack/react-table';
 
-const LOADING_COLUMNS: ColumnDef<any, any>[] = [
+type LoadingRowData = {
+  col1?: unknown;
+  col2?: unknown;
+  col3?: unknown;
+};
+
+const LOADING_COLUMNS: ColumnDef<LoadingRowData, unknown>[] = [
   { id: 'col1', header: undefined, accessorKey: 'col1' },
   { id: 'col2', header: undefined, accessorKey: 'col2' },
   { id: 'col3', header: undefined, accessorKey: 'col3' },

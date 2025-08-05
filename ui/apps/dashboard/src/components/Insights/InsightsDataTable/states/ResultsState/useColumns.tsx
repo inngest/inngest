@@ -8,16 +8,16 @@ import type { ColumnDef } from '@tanstack/react-table';
 import type { InsightsFetchResult } from '@/components/Insights/InsightsStateMachineContext/types';
 
 type InsightsEntry = InsightsFetchResult['entries'][number];
+type InsightsColumnValue = InsightsEntry['values'][string];
+type Column = ColumnDef<InsightsEntry, InsightsColumnValue>;
 
-export function useColumns(data?: InsightsFetchResult): {
-  columns: ColumnDef<InsightsEntry, any>[];
-} {
+export function useColumns(data?: InsightsFetchResult): { columns: Column[] } {
   const columns = useMemo(() => {
     const cols = data?.columns ?? [];
     if (cols.length === 0) return [];
 
     return cols.map(
-      (col): ColumnDef<InsightsEntry, any> => ({
+      (col): ColumnDef<InsightsEntry, InsightsColumnValue> => ({
         accessorKey: `values.${col.name}`,
         cell: ({ getValue, row }) => {
           if (row.original.isLoadingRow) {
