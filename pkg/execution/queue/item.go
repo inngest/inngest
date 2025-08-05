@@ -495,6 +495,15 @@ func (i *Item) UnmarshalJSON(b []byte) error {
 			return err
 		}
 		i.Payload = *p
+	case KindFunctionSuspend:
+		if len(temp.Payload) == 0 {
+			return nil
+		}
+		p := &PayloadFunctionSuspend{}
+		if err := json.Unmarshal(temp.Payload, p); err != nil {
+			return err
+		}
+		i.Payload = *p
 	}
 	return nil
 }
@@ -522,6 +531,14 @@ type PayloadPauseBlockFlush struct {
 type PayloadJobPromote struct {
 	PromoteJobID string `json:"sjid"`
 	ScheduledAt  int64  `json:"su"`
+}
+
+type PayloadFunctionSuspend struct {
+	AccountID  uuid.UUID `json:"aid"`
+	FunctionID uuid.UUID `json:"fid"`
+
+	SuspendReason int  `json:"sr"`
+	Suspended     bool `json:"sus"`
 }
 
 // PayloadPauseTimeout is the payload stored when enqueueing a pause timeout, eg.
