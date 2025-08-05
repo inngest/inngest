@@ -13,15 +13,12 @@ func PartitionTable(pt *pb.PartitionResponse, pts *pb.PartitionStatusResponse) e
 		// 	return fmt.Errorf("error marshalling partition config: %w", err)
 		// }
 
-		w.Write([]Row{
-			{Key: "ID", Value: pt.Id},
-			{Key: "Slug", Value: pt.Slug},
+		w.Write(map[string]any{
+			"Type": "Partition",
+			"ID":   pt.Id,
+			"Slug": pt.Slug,
 		})
 
-		// t.AppendRows([]table.Row{
-		// 	{"ID", pt.Id},
-		// 	{"Slug", pt.Slug},
-		// })
 		// t.AppendSeparator()
 		// t.AppendRow(table.Row{strings.ToUpper("Tenant")}, rowAutoMerge)
 		// t.AppendSeparator()

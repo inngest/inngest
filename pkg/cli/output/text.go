@@ -29,13 +29,38 @@ func (tw *TextWriter) WithIndent(indent int) *TextWriter {
 	}
 }
 
-func (tw *TextWriter) Write(rows []Row) error {
+func (tw *TextWriter) Write(data map[string]any) error {
 	indentStr := strings.Repeat(" ", tw.indent)
-	for _, r := range rows {
-		fmt.Fprintf(tw.w, "%s%s:\t%s\n", indentStr, r.Key, r.ToString())
+	for key, value := range data {
+		fmt.Fprintf(tw.w, "%s%s:\t%s\n", indentStr, key, tw.valueToString(value))
 	}
 
 	return tw.w.Flush()
+}
+
+func (tw *TextWriter) valueToString(value any) string {
+	if value == nil {
+		return ""
+	}
+
+	switch v := value.(type) {
+	case string:
+		return v
+	case int, int8, int16, int32, int64:
+		return fmt.Sprintf("%d", v)
+	case uint, uint8, uint16, uint32, uint64:
+		return fmt.Sprintf("%d", v)
+	case float32, float64:
+		return fmt.Sprintf("%.2f", v)
+	case bool:
+		return fmt.Sprintf("%t", v)
+	case fmt.Stringer:
+		return v.String()
+	case error:
+		return v.Error()
+	default:
+		return fmt.Sprintf("%v", value)
+	}
 }
 
 type Row struct {
