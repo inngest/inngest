@@ -2,9 +2,11 @@ package testapi
 
 import (
 	"encoding/json"
+	"net/http"
+
+	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/redis/rueidis"
-	"net/http"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -225,7 +227,7 @@ func (t *TestAPI) PauseFunction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = t.Queue.SetFunctionPaused(ctx, parsedAccountId, parsedFnId, true)
+	err = t.Queue.SuspendFunction(ctx, consts.DefaultQueueShardName, parsedAccountId, parsedFnId)
 	if err != nil {
 		w.WriteHeader(500)
 		_, _ = w.Write([]byte("Internal server error"))
@@ -262,7 +264,7 @@ func (t *TestAPI) CancelFunctionRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = t.Queue.SetFunctionPaused(ctx, parsedAccountId, parsedFnId, true)
+	err = t.Queue.SuspendFunction(ctx, consts.DefaultQueueShardName, parsedAccountId, parsedFnId)
 	if err != nil {
 		w.WriteHeader(500)
 		_, _ = w.Write([]byte("Internal server error"))

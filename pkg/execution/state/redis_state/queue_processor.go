@@ -889,8 +889,8 @@ func (q *queue) UnsuspendPartition(ctx context.Context, shard QueueShard, p *Que
 // such that we can attempt to work on other jobs not blocked by heading concurrency key issues.
 func (q *queue) processPartition(ctx context.Context, p *QueuePartition, continuationCount uint, randomOffset bool) error {
 	// Check if partition is suspended (paused, migrating, etc.) before leasing
-	if isSuspended := q.psg(ctx, *p); isSuspended {
-		err := q.SuspendPartition(ctx, p)
+	if isSuspended := q.psg(ctx, q.primaryQueueShard, *p); isSuspended {
+		err := q.SuspendPartition(ctx, q.primaryQueueShard, p)
 		if err != nil {
 			return fmt.Errorf("could not suspend partition: %w", err)
 		}

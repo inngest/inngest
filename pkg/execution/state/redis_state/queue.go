@@ -194,8 +194,8 @@ type PartitionPriorityFinder func(ctx context.Context, part QueuePartition) uint
 // AccountPriorityFinder returns the priority for a given account.
 type AccountPriorityFinder func(ctx context.Context, accountId uuid.UUID) uint
 
-// PartitionSuspendedGetter returns whether the supplied partition is suspended and should not be executed.
-type PartitionSuspendedGetter func(ctx context.Context, part QueuePartition) bool
+// PartitionSuspendedGetter returns whether the supplied partition is suspended and should not be executed on the given queue shard.
+type PartitionSuspendedGetter func(ctx context.Context, shard QueueShard, part QueuePartition) bool
 
 type QueueOpt func(q *queue)
 
@@ -629,7 +629,7 @@ func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 		apf: func(_ context.Context, _ uuid.UUID) uint {
 			return PriorityDefault
 		},
-		psg: func(ctx context.Context, part QueuePartition) bool {
+		psg: func(ctx context.Context, shard QueueShard, part QueuePartition) bool {
 			return false
 		},
 		peekMin:                     DefaultQueuePeekMin,
