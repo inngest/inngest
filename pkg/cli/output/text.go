@@ -3,6 +3,7 @@ package output
 import (
 	"fmt"
 	"os"
+	"strings"
 	"text/tabwriter"
 )
 
@@ -23,14 +24,15 @@ type TextWriter struct {
 
 func (tw *TextWriter) WithIndent(indent int) *TextWriter {
 	return &TextWriter{
-		indent: tw.indent,
+		indent: indent,
 		w:      newTabWriter(),
 	}
 }
 
 func (tw *TextWriter) Write(rows []Row) error {
+	indentStr := strings.Repeat(" ", tw.indent)
 	for _, r := range rows {
-		fmt.Fprintf(tw.w, "%s:\t%s\n", r.Key, r.ToString())
+		fmt.Fprintf(tw.w, "%s%s:\t%s\n", indentStr, r.Key, r.ToString())
 	}
 
 	return tw.w.Flush()
