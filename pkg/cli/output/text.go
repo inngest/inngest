@@ -70,7 +70,9 @@ func (tw *TextWriter) WriteOrdered(data *OrderedMap, opts ...TextOpt) error {
 				indent: tw.indent + 2,
 				w:      tw.w, // Use the same tabwriter
 			}
-			nestedWriter.WriteOrdered(tw.convertToOrderedMap(value))
+			if err := nestedWriter.WriteOrdered(tw.convertToOrderedMap(value)); err != nil {
+				return err
+			}
 		} else {
 			fmt.Fprintf(tw.w, "%s%s:\t%s\n", indentStr, key, tw.valueToString(value))
 		}

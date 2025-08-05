@@ -376,7 +376,7 @@ func TestTextWriter_Write_MultipleCallsOrdering(t *testing.T) {
 		t.Fatalf("Could not find all expected lines in output: %s", output)
 	}
 
-	if !(firstPos < secondPos && secondPos < thirdPos) {
+	if firstPos >= secondPos || secondPos >= thirdPos {
 		t.Errorf("Expected order: First < Second < Third, got positions: First=%d, Second=%d, Third=%d",
 			firstPos, secondPos, thirdPos)
 	}
