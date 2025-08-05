@@ -86,85 +86,74 @@ export default function Billing({
     return ['current', 'previous'].includes(option.id);
   }
 
-  const isNewPlan =
-    data?.account.plan?.slug === 'hobby-free-2025-06-13' ||
-    data?.account.plan?.slug === 'hobby-payg-2025-06-13' ||
-    data?.account.plan?.slug === 'pro-2025-06-04';
-
   return (
     <div className="bg-canvasBase border-subtle rounded-md border px-4 py-6">
-      {isNewPlan ? (
-        <>Coming soon..</>
-      ) : (
-        <>
-          <div className="flex items-center justify-between">
-            <ToggleGroup
-              type="single"
-              defaultValue={currentPage}
-              size="small"
-              onValueChange={(value) => {
-                if (!isUsageDimension(value)) {
-                  console.error('invalid usage dimension', value);
-                  return;
-                }
-                setCurrentPage(value);
-              }}
-            >
-              <ToggleGroup.Item value="execution">Execution</ToggleGroup.Item>
-              <ToggleGroup.Item value="step">Step</ToggleGroup.Item>
-              <ToggleGroup.Item value="run">Run</ToggleGroup.Item>
-            </ToggleGroup>
-            <Select
-              onChange={(value: Option) => {
-                if (isPeriod(value)) {
-                  setSelectedPeriod(value);
-                }
-              }}
-              isLabelVisible
-              label="Period"
-              multiple={false}
-              value={selectedPeriod}
-            >
-              <Select.Button isLabelVisible size="small">
-                <div className="text-basis text-sm font-medium">{selectedPeriod.name}</div>
-              </Select.Button>
-              <Select.Options>
-                <NextLink href={pathCreator.billing({ tab: 'usage' })}>
-                  <Select.Option option={options[0]}>{options[0].name}</Select.Option>
-                </NextLink>
-                <NextLink href={pathCreator.billing({ tab: 'usage' }) + '?previous=true'}>
-                  <Select.Option option={options[1]}>{options[1].name}</Select.Option>
-                </NextLink>
-              </Select.Options>
-            </Select>
-          </div>
-          <dl className="my-6 grid grid-cols-3">
-            <UsageMetadata
-              className="justify-self-start"
-              fetching={fetching}
-              title={`Plan-included ${currentPage}s`}
-              value={new Intl.NumberFormat().format(currentLimit)}
-            />
-            <UsageMetadata
-              className="justify-self-center"
-              fetching={fetching}
-              title={`Additional ${currentPage}s`}
-              value={new Intl.NumberFormat().format(additionalUsage)}
-            />
-            <UsageMetadata
-              className="justify-self-end"
-              fetching={fetching || fetchingBillableData}
-              title={`Total ${currentPage}s`}
-              value={new Intl.NumberFormat().format(currentUsage)}
-            />
-          </dl>
-          <UsageChart
-            selectedPeriod={selectedPeriod.id}
-            includedCountLimit={currentLimit}
-            type={currentPage}
-          />
-        </>
-      )}
+      <div className="flex items-center justify-between">
+        <ToggleGroup
+          type="single"
+          defaultValue={currentPage}
+          size="small"
+          onValueChange={(value) => {
+            if (!isUsageDimension(value)) {
+              console.error('invalid usage dimension', value);
+              return;
+            }
+            setCurrentPage(value);
+          }}
+        >
+          <ToggleGroup.Item value="execution">Execution</ToggleGroup.Item>
+          <ToggleGroup.Item value="step">Step</ToggleGroup.Item>
+          <ToggleGroup.Item value="run">Run</ToggleGroup.Item>
+        </ToggleGroup>
+        <Select
+          onChange={(value: Option) => {
+            if (isPeriod(value)) {
+              setSelectedPeriod(value);
+            }
+          }}
+          isLabelVisible
+          label="Period"
+          multiple={false}
+          value={selectedPeriod}
+        >
+          <Select.Button isLabelVisible size="small">
+            <div className="text-basis text-sm font-medium">{selectedPeriod.name}</div>
+          </Select.Button>
+          <Select.Options>
+            <NextLink href={pathCreator.billing({ tab: 'usage' })}>
+              <Select.Option option={options[0]}>{options[0].name}</Select.Option>
+            </NextLink>
+            <NextLink href={pathCreator.billing({ tab: 'usage' }) + '?previous=true'}>
+              <Select.Option option={options[1]}>{options[1].name}</Select.Option>
+            </NextLink>
+          </Select.Options>
+        </Select>
+      </div>
+      <dl className="my-6 grid grid-cols-3">
+        <UsageMetadata
+          className="justify-self-start"
+          fetching={fetching}
+          title={`Plan-included ${currentPage}s`}
+          value={new Intl.NumberFormat().format(currentLimit)}
+        />
+        <UsageMetadata
+          className="justify-self-center"
+          fetching={fetching}
+          title={`Additional ${currentPage}s`}
+          value={new Intl.NumberFormat().format(additionalUsage)}
+        />
+        <UsageMetadata
+          className="justify-self-end"
+          fetching={fetching || fetchingBillableData}
+          title={`Total ${currentPage}s`}
+          value={new Intl.NumberFormat().format(currentUsage)}
+        />
+      </dl>
+      <UsageChart
+        selectedPeriod={selectedPeriod.id}
+        includedCountLimit={currentLimit}
+        type={currentPage}
+      />
     </div>
   );
 }
