@@ -1,6 +1,6 @@
 'use client';
 
-import { Alert } from '@inngest/components/Alert/Alert';
+import { Banner } from '@inngest/components/Banner/Banner';
 import { Button } from '@inngest/components/Button/Button';
 
 import { useInsightsStateMachineContext } from '@/components/Insights/InsightsStateMachineContext/InsightsStateMachineContext';
@@ -17,15 +17,12 @@ export function ResultsTableFooter() {
   return (
     <div className="border-subtle flex h-[45px] items-center justify-between border-t py-0">
       {status === 'fetchMoreError' && (
-        <Alert
-          className="flex-1 rounded-none text-sm"
-          inlineButton={
+        <Banner
+          cta={
             <Button
-              appearance="solid"
-              className="ml-auto h-auto p-0 text-sm font-medium underline"
-              kind="secondary"
+              appearance="ghost"
+              kind="danger"
               label="Retry"
-              size="medium"
               onClick={() => {
                 fetchMore();
               }}
@@ -34,7 +31,7 @@ export function ResultsTableFooter() {
           severity="error"
         >
           {fetchMoreError ?? FALLBACK_ERROR}
-        </Alert>
+        </Banner>
       )}
 
       {(status === 'success' || status === 'fetchingMore') && (

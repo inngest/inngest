@@ -72,7 +72,6 @@ type Props = {
    * Additional button CTA.
    */
   button?: React.ReactNode;
-  inlineButton?: React.ReactNode;
 
   /**
    * Additional link CTA.
@@ -80,15 +79,7 @@ type Props = {
   link?: React.ReactNode;
 };
 
-export function Alert({
-  children,
-  className,
-  inlineButton,
-  severity,
-  showIcon = true,
-  button,
-  link,
-}: Props) {
+export function Alert({ children, className, severity, showIcon = true, button, link }: Props) {
   const Icon = severityStyles[severity].icon;
 
   return (
@@ -101,8 +92,6 @@ export function Alert({
         )}
 
         <div className="leading-5">{children}</div>
-
-        {inlineButton}
       </div>
       {button && <div className={cn('mt-4', showIcon && 'ml-7')}>{button}</div>}
       {link}

@@ -1,6 +1,6 @@
 'use client';
 
-import { Alert } from '@inngest/components/Alert';
+import { Banner } from '@inngest/components/Banner/Banner';
 import { Button } from '@inngest/components/Button/Button';
 
 import { useInsightsStateMachineContext } from '../../InsightsStateMachineContext/InsightsStateMachineContext';
@@ -11,15 +11,12 @@ export function ErrorState() {
   const { error, runQuery } = useInsightsStateMachineContext();
 
   return (
-    <Alert
-      className="rounded-none text-sm"
-      inlineButton={
+    <Banner
+      cta={
         <Button
-          appearance="solid"
-          className="ml-auto h-auto p-0 text-sm font-medium underline"
-          kind="secondary"
+          appearance="ghost"
+          kind="danger"
           label="Retry"
-          size="medium"
           onClick={() => {
             runQuery();
           }}
@@ -28,6 +25,6 @@ export function ErrorState() {
       severity="error"
     >
       {error ?? FALLBACK_ERROR}
-    </Alert>
+    </Banner>
   );
 }
