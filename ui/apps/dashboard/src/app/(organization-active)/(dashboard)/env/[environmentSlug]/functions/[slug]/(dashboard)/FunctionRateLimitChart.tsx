@@ -3,7 +3,6 @@
 import colors from 'tailwindcss/colors';
 import { useQuery } from 'urql';
 
-import type { TimeRange } from '@/types/TimeRangeFilter';
 import SimpleLineChart from '@/components/Charts/SimpleLineChart';
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { graphql } from '@/gql';
@@ -35,12 +34,14 @@ const GetFunctionRateLimitDocument = graphql(`
 
 type FunctionRateLimitChartProps = {
   functionSlug: string;
-  timeRange: TimeRange;
+  startTime: string;
+  endTime: string;
 };
 
 export default function FunctionRunRateLimitChart({
   functionSlug,
-  timeRange,
+  startTime,
+  endTime,
 }: FunctionRateLimitChartProps) {
   const environment = useEnvironment();
 
@@ -49,8 +50,8 @@ export default function FunctionRunRateLimitChart({
     variables: {
       environmentID: environment.id,
       fnSlug: functionSlug,
-      startTime: timeRange.start.toISOString(),
-      endTime: timeRange.end.toISOString(),
+      startTime,
+      endTime,
     },
   });
 
