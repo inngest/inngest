@@ -14,9 +14,9 @@ type Queue interface {
 	Consumer
 
 	JobQueueReader
-	Migrator
 
-	SetFunctionPaused(ctx context.Context, accountId uuid.UUID, fnID uuid.UUID, paused bool) error
+	Suspender
+	Migrator
 }
 
 type RunInfo struct {
@@ -79,12 +79,14 @@ type Consumer interface {
 type QueueMigrationHandler func(ctx context.Context, qi *QueueItem) error
 
 type Migrator interface {
-	// SetFunctionMigrate updates the function metadata to signal it's being migrated to
-	// another queue shard
-	SetFunctionMigrate(ctx context.Context, sourceShard string, fnID uuid.UUID, migrate bool) error
 	// Migration does a peek operation like the normal peek, but ignores leases and other conditions a normal peek cares about.
 	// The sore goal is to grab things and migrate them to somewhere else
 	Migrate(ctx context.Context, shard string, fnID uuid.UUID, limit int64, concurrency int, handler QueueMigrationHandler) (int64, error)
+}
+
+type Suspender interface {
+	SuspendFunction(ctx context.Context, shardName string, accountID, functionID uuid.UUID) error
+	UnsuspendFunction(ctx context.Context, shardName string, accountID, functionID uuid.UUID) error
 }
 
 type QueueDirectAccess interface {

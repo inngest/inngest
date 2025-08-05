@@ -1460,102 +1460,11 @@ func (q *queue) EnqueueItem(ctx context.Context, shard QueueShard, i osqueue.Que
 	}
 }
 
-// SetFunctionPaused sets the "Paused" flag (represented in JSON as "off") for the given
-// function ID's queue partition.
-// If a function is unpaused, we requeue the partition with a score of "now" to ensure that it is processed.
-func (q *queue) SetFunctionPaused(ctx context.Context, accountId uuid.UUID, fnID uuid.UUID, paused bool) error {
-	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "SetFunctionPaused"), redis_telemetry.ScopeQueue)
-
-	iterate := func(shard QueueShard) error {
-		// TODO Support other storage backends
-		if shard.Kind != string(enums.QueueShardKindRedis) {
-			return nil
-		}
-
-		pausedArg := "0"
-		if paused {
-			pausedArg = "1"
-		}
-
-		// This is written to the store if fn metadata doesn't exist.
-		defaultFnMetadata := FnMetadata{
-			FnID:   fnID,
-			Paused: paused,
-		}
-
-		keys := []string{
-			shard.RedisClient.kg.FnMetadata(fnID),
-			shard.RedisClient.kg.ShadowPartitionMeta(),
-		}
-		args, err := StrSlice([]any{
-			pausedArg,
-			defaultFnMetadata,
-			fnID.String(),
-		})
-		if err != nil {
-			return err
-		}
-
-		status, err := scripts["queue/fnSetPaused"].Exec(
-			redis_telemetry.WithScriptName(ctx, "fnSetPaused"),
-			shard.RedisClient.unshardedRc,
-			keys,
-			args,
-		).AsInt64()
-		if err != nil {
-			return fmt.Errorf("error updating paused state: %w", err)
-		}
-		switch status {
-		case 0:
-			// If a function was paused, there's no need to process it. We can push back paused partitions for a long time.
-			// Instead of doing this here, we push back paused partitions in partitionPeek to prevent racing a currently processing partition.
-			if !paused {
-				fnPart := QueuePartition{
-					ID:         fnID.String(),
-					FunctionID: &fnID,
-					AccountID:  accountId,
-				}
-
-				// When it does get unpaused, we should immediately start processing it again
-				err := q.PartitionRequeue(ctx, shard, &fnPart, time.Now(), false)
-				if err != nil && !errors.Is(err, ErrPartitionNotFound) && !errors.Is(err, ErrPartitionGarbageCollected) {
-					return fmt.Errorf("could not requeue partition after modifying paused state to %t: %w", paused, err)
-				}
-			}
-
-			return nil
-		default:
-			return fmt.Errorf("unknown response updating paused state: %d", status)
-		}
-	}
-
-	if q.queueShardClients != nil {
-		eg := errgroup.Group{}
-		for _, shard := range q.queueShardClients {
-			shard := shard
-			eg.Go(func() error {
-				err := iterate(shard)
-				if err != nil {
-					return fmt.Errorf("could not update paused state for shard %s: %w", shard.Name, err)
-				}
-
-				return nil
-			})
-		}
-
-		if err := eg.Wait(); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
 // dropPartitionPointerIfEmpty atomically drops a pointer queue member if the associated
 // ZSET is empty. This is used to ensure that we don't have pointers to empty ZSETs, in case
 // the cleanup process fails.
 func (q *queue) dropPartitionPointerIfEmpty(ctx context.Context, shard QueueShard, keyIndex, keyPartition, indexMember string) error {
-	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "SetFunctionPaused"), redis_telemetry.ScopeQueue)
+	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "dropPartitionPointerIfEmpty"), redis_telemetry.ScopeQueue)
 
 	if shard.Kind != string(enums.QueueShardKindRedis) {
 		return nil
@@ -1583,60 +1492,6 @@ func (q *queue) dropPartitionPointerIfEmpty(ctx context.Context, shard QueueShar
 		return nil
 	default:
 		return fmt.Errorf("unknown response dropping pointer if empty: %d", status)
-	}
-}
-
-func (q *queue) SetFunctionMigrate(ctx context.Context, sourceShard string, fnID uuid.UUID, migrate bool) error {
-	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "SetFunctionMigrate"), redis_telemetry.ScopeQueue)
-
-	defaultMeta := FnMetadata{
-		FnID:    fnID,
-		Migrate: migrate,
-	}
-
-	if q.queueShardClients == nil {
-		return fmt.Errorf("no queue shard clients are available")
-	}
-
-	shard, ok := q.queueShardClients[sourceShard]
-	if !ok {
-		return fmt.Errorf("no queue shard available for '%s'", sourceShard)
-	}
-
-	flag := 0
-	if migrate {
-		flag = 1
-	}
-
-	keys := []string{
-		shard.RedisClient.kg.FnMetadata(fnID),
-		shard.RedisClient.kg.ShadowPartitionMeta(),
-	}
-	args, err := StrSlice([]any{
-		flag,
-		defaultMeta,
-		fnID.String(),
-	})
-	if err != nil {
-		return err
-	}
-
-	status, err := scripts["queue/fnSetMigrate"].Exec(
-		ctx,
-		shard.RedisClient.unshardedRc,
-		keys,
-		args,
-	).AsInt64()
-	if err != nil {
-		return fmt.Errorf("error updating queue migrate state: %w", err)
-	}
-
-	switch status {
-	case 0:
-		return nil
-
-	default:
-		return fmt.Errorf("unknown response updating queue migration state: %d", err)
 	}
 }
 

@@ -824,10 +824,38 @@ func (q *queue) scanContinuations(ctx context.Context) error {
 	return eg.Wait()
 }
 
+// SuspendFunction is a thin wrapper around SuspendPartition to satisfy osqueue.Suspender
+func (q *queue) SuspendFunction(ctx context.Context, shardName string, accountID, functionID uuid.UUID) error {
+	shard, ok := q.queueShardClients[shardName]
+	if !ok {
+		return fmt.Errorf("invalid shard %q", shardName)
+	}
+	part := &QueuePartition{
+		ID:         functionID.String(),
+		FunctionID: &functionID,
+		AccountID:  accountID,
+	}
+	return q.SuspendPartition(ctx, shard, part)
+}
+
+// UnsuspendFunction is a thin wrapper around UnsuspendPartition to satisfy osqueue.Suspender
+func (q *queue) UnsuspendFunction(ctx context.Context, shardName string, accountID, functionID uuid.UUID) error {
+	shard, ok := q.queueShardClients[shardName]
+	if !ok {
+		return fmt.Errorf("invalid shard %q", shardName)
+	}
+	part := &QueuePartition{
+		ID:         functionID.String(),
+		FunctionID: &functionID,
+		AccountID:  accountID,
+	}
+	return q.UnsuspendPartition(ctx, shard, part)
+}
+
 // SuspendPartition pushes back a suspended partition by a constant time.
 // This can be repeated periodically to keep pushing back the partition if still suspended.
-func (q *queue) SuspendPartition(ctx context.Context, p *QueuePartition) error {
-	err := q.PartitionRequeue(ctx, q.primaryQueueShard, p, q.clock.Now().Truncate(time.Second).Add(PartitionPausedRequeueExtension), true)
+func (q *queue) SuspendPartition(ctx context.Context, shard QueueShard, p *QueuePartition) error {
+	err := q.PartitionRequeue(ctx, shard, p, q.clock.Now().Truncate(time.Second).Add(PartitionPausedRequeueExtension), true)
 	if err != nil && !errors.Is(err, ErrPartitionGarbageCollected) {
 		q.log.Error("failed to push back suspended partition", "error", err, "partition", p)
 		return fmt.Errorf("could not suspend partition: %w", err)
@@ -839,8 +867,8 @@ func (q *queue) SuspendPartition(ctx context.Context, p *QueuePartition) error {
 
 // UnsuspendPartition requeues a suspended partition to its earliest item.
 // Requeueing the partition does not guarantee it to be processed, but makes it visible to peeking executors.
-func (q *queue) UnsuspendPartition(ctx context.Context, p *QueuePartition) error {
-	err := q.PartitionRequeue(ctx, q.primaryQueueShard, p, q.clock.Now(), false)
+func (q *queue) UnsuspendPartition(ctx context.Context, shard QueueShard, p *QueuePartition) error {
+	err := q.PartitionRequeue(ctx, shard, p, q.clock.Now(), false)
 	if err != nil && !errors.Is(err, ErrPartitionGarbageCollected) {
 		q.log.Error("failed to requeue unsuspended partition", "error", err, "partition", p)
 		return fmt.Errorf("could not unsuspend partition: %w", err)
