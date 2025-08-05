@@ -266,7 +266,7 @@ func (qr *queryResolver) RunTraceSpanOutputByID(ctx context.Context, outputID st
 
 			// This may have been the `cause`, as that's any JSON value, but
 			// needs to be a string when parsed here. Let's try to save it.
-			if stepErr.Cause == nil || *stepErr.Cause == "" {
+			if stepErr.Cause == nil {
 				var rawErr map[string]any
 				if err := json.Unmarshal(spanData.Data, &rawErr); err == nil {
 					var causeStr *string

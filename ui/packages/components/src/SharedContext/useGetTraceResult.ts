@@ -14,7 +14,7 @@ export type TraceResult = {
     message: string;
     name: string | null;
     stack: string | null;
-    cause: string | null;
+    cause: unknown;
   } | null;
 };
 

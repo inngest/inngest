@@ -69,10 +69,10 @@ func ParseStream(
 			// be dealing with a non-JSON request that we need to parse in a
 			// different way
 
-			// Reconstruct the full body by combining the buffered reader with
+			// Reconstruct the full body by combining the decoder's buffer with
 			// the original reader. We can assume that the decoder buffer has 0
 			// consumed bytes because `Decoder.Token()` does not consume bytes
-			// of the returned value would be invalid JSON
+			// if the returned value would be invalid JSON
 			r := io.MultiReader(d.Buffered(), r)
 
 			mediaType, params, _ := mime.ParseMediaType(contentType)

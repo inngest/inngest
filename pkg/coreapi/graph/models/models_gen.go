@@ -391,10 +391,10 @@ type SleepStepInfo struct {
 func (SleepStepInfo) IsStepInfo() {}
 
 type StepError struct {
-	Message string  `json:"message"`
-	Name    *string `json:"name,omitempty"`
-	Stack   *string `json:"stack,omitempty"`
-	Cause   *string `json:"cause,omitempty"`
+	Message string      `json:"message"`
+	Name    *string     `json:"name,omitempty"`
+	Stack   *string     `json:"stack,omitempty"`
+	Cause   interface{} `json:"cause,omitempty"`
 }
 
 type StepEvent struct {
