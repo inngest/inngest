@@ -194,6 +194,9 @@ type PartitionPriorityFinder func(ctx context.Context, part QueuePartition) uint
 // AccountPriorityFinder returns the priority for a given account.
 type AccountPriorityFinder func(ctx context.Context, accountId uuid.UUID) uint
 
+// PartitionSuspendedGetter returns whether the supplied partition is suspended and should not be executed.
+type PartitionSuspendedGetter func(ctx context.Context, part QueuePartition) bool
+
 type QueueOpt func(q *queue)
 
 func WithName(name string) func(q *queue) {
@@ -217,6 +220,12 @@ func WithPartitionPriorityFinder(ppf PartitionPriorityFinder) QueueOpt {
 func WithAccountPriorityFinder(apf AccountPriorityFinder) QueueOpt {
 	return func(q *queue) {
 		q.apf = apf
+	}
+}
+
+func WithPartitionSuspendedGetter(psg PartitionSuspendedGetter) QueueOpt {
+	return func(q *queue) {
+		q.psg = psg
 	}
 }
 
@@ -620,6 +629,9 @@ func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 		apf: func(_ context.Context, _ uuid.UUID) uint {
 			return PriorityDefault
 		},
+		psg: func(ctx context.Context, part QueuePartition) bool {
+			return false
+		},
 		peekMin:                     DefaultQueuePeekMin,
 		peekMax:                     DefaultQueuePeekMax,
 		shadowPeekMin:               ShadowPartitionPeekMinBacklogs,
@@ -753,6 +765,7 @@ type queue struct {
 
 	ppf PartitionPriorityFinder
 	apf AccountPriorityFinder
+	psg PartitionSuspendedGetter
 
 	lifecycles QueueLifecycleListeners
 
