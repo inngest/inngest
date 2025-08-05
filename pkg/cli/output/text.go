@@ -56,7 +56,7 @@ func (tw *TextWriter) Write(data map[string]any, opts ...TextOpt) error {
 		if tw.isNestedMap(value) {
 			fmt.Fprintf(tw.w, "%s%s:\n", indentStr, key)
 			tw.w.Flush()
-			
+
 			nestedWriter := tw.WithIndent(tw.indent + 2)
 			nestedWriter.Write(tw.convertToAnyMap(value))
 		} else {
@@ -78,7 +78,7 @@ func (tw *TextWriter) isNestedMap(value any) bool {
 
 func (tw *TextWriter) convertToAnyMap(value any) map[string]any {
 	result := make(map[string]any)
-	
+
 	switch v := value.(type) {
 	case map[string]any:
 		return v
@@ -103,7 +103,7 @@ func (tw *TextWriter) convertToAnyMap(value any) map[string]any {
 			result[k] = val
 		}
 	}
-	
+
 	return result
 }
 
