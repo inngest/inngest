@@ -128,7 +128,6 @@ export default function Page() {
   }, [data?.pages]);
 
   const getTrigger = useGetTrigger();
-  const getRun = useGetRun();
 
   const onScroll: React.ComponentProps<typeof RunsPage>['onScroll'] = useCallback(
     (event) => {
@@ -184,7 +183,6 @@ export default function Page() {
         hasMore={hasNextPage ?? false}
         isLoadingInitial={isFetching && runs === undefined}
         isLoadingMore={isFetching && runs !== undefined}
-        getRun={getRun}
         onScroll={onScroll}
         onScrollToTop={onScrollToTop}
         onRefresh={fetchNextPage}

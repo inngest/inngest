@@ -3,7 +3,6 @@
 import colors from 'tailwindcss/colors';
 import { useQuery } from 'urql';
 
-import type { TimeRange } from '@/types/TimeRangeFilter';
 import SimpleLineChart from '@/components/Charts/SimpleLineChart';
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { graphql } from '@/gql';
@@ -42,10 +41,15 @@ const GetStepBacklogDocument = graphql(`
 
 type StepBacklogChartProps = {
   functionSlug: string;
-  timeRange: TimeRange;
+  startTime: string;
+  endTime: string;
 };
 
-export default function StepBacklogChart({ functionSlug, timeRange }: StepBacklogChartProps) {
+export default function StepBacklogChart({
+  functionSlug,
+  startTime,
+  endTime,
+}: StepBacklogChartProps) {
   const environment = useEnvironment();
 
   const [{ data, error: metricsError, fetching: isFetchingMetrics }] = useQuery({
@@ -53,8 +57,8 @@ export default function StepBacklogChart({ functionSlug, timeRange }: StepBacklo
     variables: {
       environmentID: environment.id,
       fnSlug: functionSlug,
-      startTime: timeRange.start.toISOString(),
-      endTime: timeRange.end.toISOString(),
+      startTime,
+      endTime,
     },
   });
 

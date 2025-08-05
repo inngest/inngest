@@ -9,6 +9,7 @@ scalar Uint
 scalar ULID
 scalar UUID
 scalar Bytes
+scalar Unknown
 
 "The pagination information in a connection."
 type PageInfo {
@@ -613,7 +614,7 @@ type StepError {
   message: String!
   name: String
   stack: String
-  cause: Bytes
+  cause: Unknown
 }
 
 type RunTraceTrigger {

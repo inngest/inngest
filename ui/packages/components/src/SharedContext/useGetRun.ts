@@ -5,6 +5,10 @@ import { useShared } from './SharedContext';
 
 export type GetRunPayload = {
   runID: string;
+
+  /**
+   * If `true`, traces will be fetched using the incoming tracing data.
+   */
   preview?: boolean;
 };
 

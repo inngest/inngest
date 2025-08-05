@@ -2,7 +2,6 @@
 
 import { useQuery } from 'urql';
 
-import type { TimeRange } from '@/types/TimeRangeFilter';
 import StackedBarChart from '@/components/Charts/StackedBarChart';
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { graphql } from '@/gql';
@@ -49,10 +48,15 @@ const GetFunctionRunsMetricsDocument = graphql(`
 
 type FunctionRunsChartProps = {
   functionSlug: string;
-  timeRange: TimeRange;
+  startTime: string;
+  endTime: string;
 };
 
-export default function FunctionRunsChart({ functionSlug, timeRange }: FunctionRunsChartProps) {
+export default function FunctionRunsChart({
+  functionSlug,
+  startTime,
+  endTime,
+}: FunctionRunsChartProps) {
   const environment = useEnvironment();
 
   const [{ data, error: functionRunsMetricsError, fetching: isFetchingFunctionRunsMetrics }] =
@@ -61,8 +65,8 @@ export default function FunctionRunsChart({ functionSlug, timeRange }: FunctionR
       variables: {
         environmentID: environment.id,
         functionSlug,
-        startTime: timeRange.start.toISOString(),
-        endTime: timeRange.end.toISOString(),
+        startTime,
+        endTime,
       },
     });
 

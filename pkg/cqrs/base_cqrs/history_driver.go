@@ -6,15 +6,16 @@ import (
 	"encoding/json"
 	"strings"
 
+	sqlc_postgres "github.com/inngest/inngest/pkg/cqrs/base_cqrs/sqlc/postgres"
 	sqlc "github.com/inngest/inngest/pkg/cqrs/base_cqrs/sqlc/sqlite"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/history"
 	"github.com/oklog/ulid/v2"
 )
 
-func NewHistoryDriver(db *sql.DB, driver string) history.Driver {
+func NewHistoryDriver(db *sql.DB, driver string, o sqlc_postgres.NewNormalizedOpts) history.Driver {
 	return historyDriver{
-		q: NewQueries(db, driver),
+		q: NewQueries(db, driver, o),
 	}
 }
 

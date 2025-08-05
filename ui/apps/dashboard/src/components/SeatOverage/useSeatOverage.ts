@@ -54,10 +54,8 @@ export function useSeatOverage() {
     [trackingUser]
   );
 
-  // Determine if widget should be visible
-  const isWidgetVisible = Boolean(
-    !error && seatOverageData && seatOverageData.hasExceeded && isReady && shouldShow
-  );
+  const isWidgetVisible =
+    !error && seatOverageData && seatOverageData.hasExceeded && isReady && shouldShow;
 
   return {
     isWidgetVisible,
