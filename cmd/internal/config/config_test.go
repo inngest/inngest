@@ -528,6 +528,146 @@ sdk-url:
 	assert.Equal(t, []string{"http://config:3000/api/inngest"}, config.SdkURL)
 }
 
+func TestPostgreSQLConnectionPoolOptions(t *testing.T) {
+	setupTest()
+
+	// Test YAML config with PostgreSQL connection pool options
+	tempDir := t.TempDir()
+	configFile := filepath.Join(tempDir, "inngest.yml")
+
+	yamlContent := `
+postgres-uri: postgres://localhost:5432/inngest
+postgres-max-idle-conns: 5
+postgres-max-open-conns: 50
+postgres-conn-max-idle-time: 3
+postgres-conn-max-lifetime: 15
+`
+
+	err := os.WriteFile(configFile, []byte(yamlContent), 0644)
+	require.NoError(t, err)
+
+	err = loadConfigFromPath(configFile)
+	require.NoError(t, err)
+
+	err = unmarshalConfig()
+	require.NoError(t, err)
+
+	config := GetConfig()
+	assert.Equal(t, "postgres://localhost:5432/inngest", config.PostgresURI)
+	assert.Equal(t, 5, config.PostgresMaxIdleConns)
+	assert.Equal(t, 50, config.PostgresMaxOpenConns)
+	assert.Equal(t, 3, config.PostgresConnMaxIdleTime)
+	assert.Equal(t, 15, config.PostgresConnMaxLifetime)
+}
+
+func TestPostgreSQLConnectionPoolEnvironmentVariables(t *testing.T) {
+	setupTest()
+
+	// Set PostgreSQL connection pool environment variables
+	os.Setenv("INNGEST_POSTGRES_URI", "postgres://env:5432/testdb")
+	os.Setenv("INNGEST_POSTGRES_MAX_IDLE_CONNS", "8")
+	os.Setenv("INNGEST_POSTGRES_MAX_OPEN_CONNS", "80")
+	os.Setenv("INNGEST_POSTGRES_CONN_MAX_IDLE_TIME", "7")
+	os.Setenv("INNGEST_POSTGRES_CONN_MAX_LIFETIME", "25")
+
+	defer func() {
+		os.Unsetenv("INNGEST_POSTGRES_URI")
+		os.Unsetenv("INNGEST_POSTGRES_MAX_IDLE_CONNS")
+		os.Unsetenv("INNGEST_POSTGRES_MAX_OPEN_CONNS")
+		os.Unsetenv("INNGEST_POSTGRES_CONN_MAX_IDLE_TIME")
+		os.Unsetenv("INNGEST_POSTGRES_CONN_MAX_LIFETIME")
+	}()
+
+	err := loadEnvironmentVariables()
+	require.NoError(t, err)
+
+	err = unmarshalConfig()
+	require.NoError(t, err)
+
+	config := GetConfig()
+	assert.Equal(t, "postgres://env:5432/testdb", config.PostgresURI)
+	assert.Equal(t, 8, config.PostgresMaxIdleConns)
+	assert.Equal(t, 80, config.PostgresMaxOpenConns)
+	assert.Equal(t, 7, config.PostgresConnMaxIdleTime)
+	assert.Equal(t, 25, config.PostgresConnMaxLifetime)
+}
+
+func TestPostgreSQLConnectionPoolDefaultValues(t *testing.T) {
+	setupTest()
+
+	// Create CLI command with PostgreSQL flags to test defaults
+	app := &cli.Command{
+		Flags: []cli.Flag{
+			&cli.IntFlag{Name: "postgres-max-idle-conns", Value: 10},
+			&cli.IntFlag{Name: "postgres-max-open-conns", Value: 100},
+			&cli.IntFlag{Name: "postgres-conn-max-idle-time", Value: 5},
+			&cli.IntFlag{Name: "postgres-conn-max-lifetime", Value: 30},
+		},
+	}
+
+	cmd := &cli.Command{}
+	cmd.Flags = app.Flags
+
+	// Test default values when no config or env vars are set
+	maxIdleConns := GetIntValue(cmd, "postgres-max-idle-conns", 10)
+	maxOpenConns := GetIntValue(cmd, "postgres-max-open-conns", 100)
+	connMaxIdleTime := GetIntValue(cmd, "postgres-conn-max-idle-time", 5)
+	connMaxLifetime := GetIntValue(cmd, "postgres-conn-max-lifetime", 30)
+
+	assert.Equal(t, 10, maxIdleConns)
+	assert.Equal(t, 100, maxOpenConns)
+	assert.Equal(t, 5, connMaxIdleTime)
+	assert.Equal(t, 30, connMaxLifetime)
+}
+
+func TestPostgreSQLConnectionPoolPrecedence(t *testing.T) {
+	setupTest()
+
+	// Create config file with PostgreSQL settings
+	tempDir := t.TempDir()
+	configFile := filepath.Join(tempDir, "inngest.yml")
+
+	yamlContent := `
+postgres-max-idle-conns: 15
+postgres-max-open-conns: 150
+postgres-conn-max-idle-time: 10
+postgres-conn-max-lifetime: 60
+`
+
+	err := os.WriteFile(configFile, []byte(yamlContent), 0644)
+	require.NoError(t, err)
+
+	// Set environment variables (should override config file)
+	os.Setenv("INNGEST_POSTGRES_MAX_IDLE_CONNS", "20")
+	os.Setenv("INNGEST_POSTGRES_MAX_OPEN_CONNS", "200")
+
+	defer func() {
+		os.Unsetenv("INNGEST_POSTGRES_MAX_IDLE_CONNS")
+		os.Unsetenv("INNGEST_POSTGRES_MAX_OPEN_CONNS")
+	}()
+
+	// Load config file first
+	err = loadConfigFromPath(configFile)
+	require.NoError(t, err)
+
+	// Then load environment variables (higher priority)
+	err = loadEnvironmentVariables()
+	require.NoError(t, err)
+
+	err = unmarshalConfig()
+	require.NoError(t, err)
+
+	config := GetConfig()
+
+	// Environment variables should override config file
+	assert.Equal(t, 20, config.PostgresMaxIdleConns)
+	assert.Equal(t, 200, config.PostgresMaxOpenConns)
+
+	// Config file values should remain where no env var is set
+	assert.Equal(t, 10, config.PostgresConnMaxIdleTime)
+	assert.Equal(t, 60, config.PostgresConnMaxLifetime)
+}
+
 func TestInvalidConfigFile(t *testing.T) {
 	setupTest()
 
