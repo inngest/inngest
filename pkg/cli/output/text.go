@@ -22,6 +22,18 @@ type TextWriter struct {
 	w      *tabwriter.Writer
 }
 
+type TextOpt func(o *txtOpt)
+
+type txtOpt struct {
+	leadSpace bool
+}
+
+func WithTextOptLeadSpace(space bool) TextOpt {
+	return func(o *txtOpt) {
+		o.leadSpace = space
+	}
+}
+
 func (tw *TextWriter) WithIndent(indent int) *TextWriter {
 	return &TextWriter{
 		indent: indent,
@@ -29,7 +41,16 @@ func (tw *TextWriter) WithIndent(indent int) *TextWriter {
 	}
 }
 
-func (tw *TextWriter) Write(data map[string]any) error {
+func (tw *TextWriter) Write(data map[string]any, opts ...TextOpt) error {
+	o := txtOpt{}
+	for _, apply := range opts {
+		apply(&o)
+	}
+
+	if o.leadSpace {
+		fmt.Println()
+	}
+
 	indentStr := strings.Repeat(" ", tw.indent)
 	for key, value := range data {
 		fmt.Fprintf(tw.w, "%s%s:\t%s\n", indentStr, key, tw.valueToString(value))

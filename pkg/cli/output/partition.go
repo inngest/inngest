@@ -17,7 +17,9 @@ func PartitionTable(pt *pb.PartitionResponse, pts *pb.PartitionStatusResponse) e
 			"Type": "Partition",
 			"ID":   pt.Id,
 			"Slug": pt.Slug,
-		})
+		},
+			WithTextOptLeadSpace(true),
+		)
 
 		// t.AppendSeparator()
 		// t.AppendRow(table.Row{strings.ToUpper("Tenant")}, rowAutoMerge)
