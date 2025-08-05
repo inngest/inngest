@@ -17,7 +17,6 @@ func newTestTextWriter(buf *bytes.Buffer, indent int) *TextWriter {
 	}
 }
 
-
 func TestTextWriter_Write_SimpleMap(t *testing.T) {
 	var buf bytes.Buffer
 	tw := newTestTextWriter(&buf, 0)
@@ -31,6 +30,11 @@ func TestTextWriter_Write_SimpleMap(t *testing.T) {
 	err := tw.Write(data)
 	if err != nil {
 		t.Fatalf("Write failed: %v", err)
+	}
+
+	err = tw.Flush()
+	if err != nil {
+		t.Fatalf("Flush failed: %v", err)
 	}
 
 	output := buf.String()
@@ -71,6 +75,11 @@ func TestTextWriter_Write_NestedMap(t *testing.T) {
 		t.Fatalf("Write failed: %v", err)
 	}
 
+	err = tw.Flush()
+	if err != nil {
+		t.Fatalf("Flush failed: %v", err)
+	}
+
 	w.Close()
 	os.Stdout = oldStdout
 
@@ -108,6 +117,11 @@ func TestTextWriter_Write_WithIndent(t *testing.T) {
 		t.Fatalf("Write failed: %v", err)
 	}
 
+	err = tw.Flush()
+	if err != nil {
+		t.Fatalf("Flush failed: %v", err)
+	}
+
 	output := buf.String()
 	// tabwriter processes the spaces, so let's just check that Key: appears
 	// and that we have some leading whitespace
@@ -142,6 +156,11 @@ func TestTextWriter_Write_DifferentMapTypes(t *testing.T) {
 	err := tw.Write(data)
 	if err != nil {
 		t.Fatalf("Write failed: %v", err)
+	}
+
+	err = tw.Flush()
+	if err != nil {
+		t.Fatalf("Flush failed: %v", err)
 	}
 
 	w.Close()
@@ -182,6 +201,11 @@ func TestTextWriter_Write_WithLeadSpace(t *testing.T) {
 	err := tw.Write(data, WithTextOptLeadSpace(true))
 	if err != nil {
 		t.Fatalf("Write failed: %v", err)
+	}
+
+	err = tw.Flush()
+	if err != nil {
+		t.Fatalf("Flush failed: %v", err)
 	}
 
 	w.Close()
@@ -282,5 +306,156 @@ func TestTextWriter_convertToAnyMap(t *testing.T) {
 	result = tw.convertToAnyMap(anyMap)
 	if len(result) != 1 || result["key"] != "value" {
 		t.Errorf("Expected map[string]any to be returned as-is with key='value'")
+	}
+}
+
+func TestTextWriter_Write_MultipleCallsOrdering(t *testing.T) {
+	var buf bytes.Buffer
+	tw := newTestTextWriter(&buf, 0)
+
+	// Make multiple Write calls in a specific order
+	err := tw.Write(map[string]any{
+		"First": "Block A",
+	})
+	if err != nil {
+		t.Fatalf("First Write failed: %v", err)
+	}
+
+	err = tw.Write(map[string]any{
+		"Second": "Block B",
+	})
+	if err != nil {
+		t.Fatalf("Second Write failed: %v", err)
+	}
+
+	err = tw.Write(map[string]any{
+		"Third": "Block C",
+	})
+	if err != nil {
+		t.Fatalf("Third Write failed: %v", err)
+	}
+
+	// Flush once at the end
+	err = tw.Flush()
+	if err != nil {
+		t.Fatalf("Flush failed: %v", err)
+	}
+
+	output := buf.String()
+	lines := strings.Split(strings.TrimSpace(output), "\n")
+
+	// Verify all content appears
+	if !strings.Contains(output, "First:") {
+		t.Errorf("Expected output to contain 'First:', got: %s", output)
+	}
+	if !strings.Contains(output, "Second:") {
+		t.Errorf("Expected output to contain 'Second:', got: %s", output)
+	}
+	if !strings.Contains(output, "Third:") {
+		t.Errorf("Expected output to contain 'Third:', got: %s", output)
+	}
+
+	// Verify order by checking line positions
+	firstPos := -1
+	secondPos := -1
+	thirdPos := -1
+
+	for i, line := range lines {
+		if strings.Contains(line, "First:") {
+			firstPos = i
+		}
+		if strings.Contains(line, "Second:") {
+			secondPos = i
+		}
+		if strings.Contains(line, "Third:") {
+			thirdPos = i
+		}
+	}
+
+	if firstPos == -1 || secondPos == -1 || thirdPos == -1 {
+		t.Fatalf("Could not find all expected lines in output: %s", output)
+	}
+
+	if !(firstPos < secondPos && secondPos < thirdPos) {
+		t.Errorf("Expected order: First < Second < Third, got positions: First=%d, Second=%d, Third=%d",
+			firstPos, secondPos, thirdPos)
+	}
+}
+
+func TestTextWriter_WriteOrdered_PreservesKeyOrder(t *testing.T) {
+	var buf bytes.Buffer
+	tw := newTestTextWriter(&buf, 0)
+
+	// Create OrderedData with specific key order
+	data := OrderedData(
+		"Zebra", "should be first",
+		"Alpha", "should be second",
+		"Beta", "should be third",
+		"Gamma", "should be fourth",
+	)
+
+	err := tw.WriteOrdered(data)
+	if err != nil {
+		t.Fatalf("WriteOrdered failed: %v", err)
+	}
+
+	err = tw.Flush()
+	if err != nil {
+		t.Fatalf("Flush failed: %v", err)
+	}
+
+	output := buf.String()
+	lines := strings.Split(strings.TrimSpace(output), "\n")
+
+	// Verify order - should appear in the exact order specified in OrderedData
+	expectedOrder := []string{"Zebra:", "Alpha:", "Beta:", "Gamma:"}
+
+	if len(lines) != len(expectedOrder) {
+		t.Fatalf("Expected %d lines, got %d: %v", len(expectedOrder), len(lines), lines)
+	}
+
+	for i, expectedKey := range expectedOrder {
+		if !strings.Contains(lines[i], expectedKey) {
+			t.Errorf("Expected line %d to contain '%s', got: '%s'", i, expectedKey, lines[i])
+		}
+	}
+
+	// Verify the actual values appear in correct order too
+	if !strings.Contains(lines[0], "should be first") {
+		t.Errorf("Expected first line to contain 'should be first', got: '%s'", lines[0])
+	}
+	if !strings.Contains(lines[1], "should be second") {
+		t.Errorf("Expected second line to contain 'should be second', got: '%s'", lines[1])
+	}
+}
+
+func TestOrderedData_HelperFunction(t *testing.T) {
+	// Test the OrderedData helper function
+	om := OrderedData(
+		"key3", "value3",
+		"key1", "value1",
+		"key2", "value2",
+	)
+
+	if om.Len() != 3 {
+		t.Errorf("Expected length 3, got %d", om.Len())
+	}
+
+	keys := om.Keys()
+	expectedKeys := []string{"key3", "key1", "key2"}
+
+	for i, expectedKey := range expectedKeys {
+		if keys[i] != expectedKey {
+			t.Errorf("Expected key %d to be '%s', got '%s'", i, expectedKey, keys[i])
+		}
+	}
+
+	// Test retrieval
+	value, exists := om.Get("key2")
+	if !exists {
+		t.Error("Expected key2 to exist")
+	}
+	if value != "value2" {
+		t.Errorf("Expected value2, got %v", value)
 	}
 }
