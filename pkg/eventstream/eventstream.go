@@ -13,9 +13,8 @@ import (
 )
 
 var (
-	ErrInvalidRequestBody     = fmt.Errorf("Request body must contain an event object or an array of event objects")
-	ErrEventTooLarge          = fmt.Errorf("Event is over the max size")
-	ErrUnsupportedContentType = fmt.Errorf("Unsupported content type")
+	ErrInvalidRequestBody = fmt.Errorf("Request body must contain an event object or an array of event objects")
+	ErrEventTooLarge      = fmt.Errorf("Event is over the max size")
 )
 
 type StreamItem struct {
@@ -54,45 +53,35 @@ func ParseStream(
 		close(stream)
 	}()
 
-	// Ignore the error because we want to default to JSON parsing when that
-	// happens
-	mediaType, params, _ := mime.ParseMediaType(contentType)
-	switch mediaType {
-	case "multipart/form-data":
-		return parseMultipartStream(ctx, r, stream, maxSize, params["boundary"])
-		// TODO: Properly implement "application/x-www-form-urlencoded"
-		// case "application/x-www-form-urlencoded":
-		// 	return parseFormUrlencodedStream(ctx, r, stream, maxSize)
-	}
-
 	// Default to JSON parsing
 	d := json.NewDecoder(r)
 
 	token, err := d.Token()
 	if err == io.EOF {
-		if contentType != "application/json" {
-			// We support empty bodies for non-JSON content-types
-
-			// Reconstruct the full body by combining the buffered reader with
-			// the original reader
-			r := io.MultiReader(d.Buffered(), r)
-
-			return parseNonJSONStream(ctx, r, stream, maxSize, contentType)
-		}
 		return nil
 	}
 
 	delim, ok := token.(json.Delim)
 	if !ok {
 		if contentType != "application/json" {
-			// This is a non-JSON request, so we'll attempt to parse it as
-			// non-JSON
+			// We get here if the first token is not a JSON delimiter and the
+			// request's content-type is not explicitly JSON. This means we may
+			// be dealing with a non-JSON request that we need to parse in a
+			// different way
 
 			// Reconstruct the full body by combining the buffered reader with
-			// the original reader
+			// the original reader. We can assume that the decoder buffer has 0
+			// consumed bytes because `Decoder.Token()` does not consume bytes
+			// of the returned value would be invalid JSON
 			r := io.MultiReader(d.Buffered(), r)
 
-			return parseNonJSONStream(ctx, r, stream, maxSize, contentType)
+			mediaType, params, _ := mime.ParseMediaType(contentType)
+			switch mediaType {
+			case "multipart/form-data":
+				return parseMultipartStream(ctx, r, stream, maxSize, params["boundary"])
+			case "application/x-www-form-urlencoded":
+				return parseFormUrlencodedStream(ctx, r, stream, maxSize)
+			}
 		}
 		return ErrInvalidRequestBody
 	}
@@ -151,24 +140,6 @@ func ParseStream(
 		return ErrInvalidRequestBody
 	}
 	return nil
-}
-
-func parseNonJSONStream(
-	ctx context.Context,
-	r io.Reader,
-	stream chan StreamItem,
-	maxSize int,
-	contentType string,
-) error {
-	mediaType, params, _ := mime.ParseMediaType(contentType)
-	switch mediaType {
-	case "multipart/form-data":
-		return parseMultipartStream(ctx, r, stream, maxSize, params["boundary"])
-	case "application/x-www-form-urlencoded":
-		return parseFormUrlencodedStream(ctx, r, stream, maxSize)
-	}
-
-	return ErrUnsupportedContentType
 }
 
 // parseMultipartStream parses multipart/form-data and extracts JSON events from

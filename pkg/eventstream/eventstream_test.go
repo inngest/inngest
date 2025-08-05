@@ -475,6 +475,8 @@ func TestParseStream_FormUrlencoded(t *testing.T) {
 	})
 
 	t.Run("no form fields", func(t *testing.T) {
+		// Reject requests with no form fields
+
 		t.Parallel()
 		r := require.New(t)
 		ctx := context.Background()
@@ -496,7 +498,7 @@ func TestParseStream_FormUrlencoded(t *testing.T) {
 			n++
 		}
 		r.NoError(eg.Wait())
-		r.Equal(1, n)
+		r.Equal(0, n)
 	})
 
 	t.Run("JSON", func(t *testing.T) {
