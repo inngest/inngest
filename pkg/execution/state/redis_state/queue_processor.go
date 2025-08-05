@@ -824,6 +824,32 @@ func (q *queue) scanContinuations(ctx context.Context) error {
 	return eg.Wait()
 }
 
+// SuspendPartition pushes back a suspended partition by a constant time.
+// This can be repeated periodically to keep pushing back the partition if still suspended.
+func (q *queue) SuspendPartition(ctx context.Context, p *QueuePartition) error {
+	err := q.PartitionRequeue(ctx, q.primaryQueueShard, p, q.clock.Now().Truncate(time.Second).Add(PartitionPausedRequeueExtension), true)
+	if err != nil && !errors.Is(err, ErrPartitionGarbageCollected) {
+		q.log.Error("failed to push back suspended partition", "error", err, "partition", p)
+		return fmt.Errorf("could not suspend partition: %w", err)
+	}
+
+	q.log.Trace("pushed back suspended partition", "partition", p.Queue())
+	return nil
+}
+
+// UnsuspendPartition requeues a suspended partition to its earliest item.
+// Requeueing the partition does not guarantee it to be processed, but makes it visible to peeking executors.
+func (q *queue) UnsuspendPartition(ctx context.Context, p *QueuePartition) error {
+	err := q.PartitionRequeue(ctx, q.primaryQueueShard, p, q.clock.Now(), false)
+	if err != nil && !errors.Is(err, ErrPartitionGarbageCollected) {
+		q.log.Error("failed to requeue unsuspended partition", "error", err, "partition", p)
+		return fmt.Errorf("could not unsuspend partition: %w", err)
+	}
+
+	q.log.Trace("requeued unsuspended partition", "partition", p.Queue())
+	return nil
+}
+
 // processPartition processes a given partition, peeking jobs from the partition to run.
 //
 // It accepts a uint continuationCount which represents the number of times that the partition
@@ -834,6 +860,16 @@ func (q *queue) scanContinuations(ctx context.Context) error {
 // randomOffset allows us to peek jobs out-of-order, and occurs when we hit concurrency key issues
 // such that we can attempt to work on other jobs not blocked by heading concurrency key issues.
 func (q *queue) processPartition(ctx context.Context, p *QueuePartition, continuationCount uint, randomOffset bool) error {
+	// Check if partition is suspended (paused, migrating, etc.) before leasing
+	if isSuspended := q.psg(ctx, *p); isSuspended {
+		err := q.SuspendPartition(ctx, p)
+		if err != nil {
+			return fmt.Errorf("could not suspend partition: %w", err)
+		}
+
+		return ErrPartitionPaused
+	}
+
 	// Attempt to lease items.  This checks partition-level concurrency limits
 	//
 	// For optimization, because this is the only thread that can be leasing
