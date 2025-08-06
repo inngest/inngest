@@ -1,7 +1,6 @@
 import { useQuery } from 'urql';
 
 import { graphql } from '@/gql';
-import { type GetBillableRunsQuery, type GetBillableStepsQuery } from '@/gql/graphql';
 import { type UsageDimension } from './types';
 
 const GetBillableSteps = graphql(`
@@ -63,7 +62,7 @@ export default function useGetUsageChartData({
     },
   };
 
-  const [{ data, fetching }] = useQuery<GetBillableStepsQuery | GetBillableRunsQuery>({
+  const [{ data, fetching }] = useQuery({
     query: queries[type],
     variables: {
       month: options[selectedPeriod].month,
