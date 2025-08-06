@@ -542,12 +542,16 @@ type PayloadFunctionSuspend struct {
 	// any suspension operation.
 	StartMS int64 `json:"st"`
 
+	// PauseCancelImmediately determines whether pending runs should be canceled immediately or deferred.
+	// For more details, see the internal function "cancelPausedFnSuspendedRunsAfterTimeout"
+	PauseCancelImmediately bool `json:"pci,omitempty"`
+
 	// MigrateFromShard identifies the source shard in a queue migration
 	// Including this is necessary to avoid having to iterate over all queue shards.
-	MigrateFromShard string `json:"mfs"`
+	MigrateFromShard string `json:"mfs,omitempty"`
 
 	// MigrateToShard identifies the destination shard in a queue migration
-	MigrateToShard string `json:"mts"`
+	MigrateToShard string `json:"mts,omitempty"`
 }
 
 // PayloadPauseTimeout is the payload stored when enqueueing a pause timeout, eg.
