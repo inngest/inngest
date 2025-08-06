@@ -53,7 +53,7 @@ func partitionCommand() *cli.Command {
 				}
 			}
 
-			return output.PartitionTable(partition, status)
+			return output.Partition(partition, status)
 		},
 	}
 }

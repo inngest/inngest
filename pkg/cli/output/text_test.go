@@ -459,3 +459,114 @@ func TestOrderedData_HelperFunction(t *testing.T) {
 		t.Errorf("Expected value2, got %v", value)
 	}
 }
+
+func TestTextWriter_formatAsJSON(t *testing.T) {
+	tests := []struct {
+		name     string
+		indent   int
+		input    any
+		expected string
+	}{
+		{
+			name:     "simple object single line",
+			indent:   0,
+			input:    map[string]string{"key": "value"},
+			expected: "{\n\t  \"key\": \"value\"\n\t}",
+		},
+		{
+			name:   "complex object multi-line with indent 0",
+			indent: 0,
+			input: map[string]any{
+				"name": "test",
+				"nested": map[string]int{
+					"count": 42,
+				},
+			},
+			expected: "{\n\t  \"name\": \"test\",\n\t  \"nested\": {\n\t    \"count\": 42\n\t  }\n\t}",
+		},
+		{
+			name:   "complex object multi-line with indent 2",
+			indent: 2,
+			input: map[string]any{
+				"name": "test",
+				"nested": map[string]int{
+					"count": 42,
+				},
+			},
+			expected: "{\n  \t  \"name\": \"test\",\n  \t  \"nested\": {\n  \t    \"count\": 42\n  \t  }\n  \t}",
+		},
+		{
+			name:   "array multi-line",
+			indent: 0,
+			input:  []string{"first", "second", "third"},
+			expected: "[\n\t  \"first\",\n\t  \"second\",\n\t  \"third\"\n\t]",
+		},
+		{
+			name:     "non-serializable value",
+			indent:   0,
+			input:    make(chan int),
+			expected: "",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			tw := &TextWriter{indent: test.indent}
+			result := tw.formatAsJSON(test.input)
+			if result != test.expected {
+				t.Errorf("formatAsJSON() = %q, expected %q", result, test.expected)
+			}
+		})
+	}
+}
+
+func TestTextWriter_valueToString_WithJSONSerialization(t *testing.T) {
+	tw := &TextWriter{indent: 0}
+
+	// Test JSON serializable struct
+	type TestStruct struct {
+		Name  string `json:"name"`
+		Count int    `json:"count"`
+	}
+
+	tests := []struct {
+		name     string
+		input    any
+		expected string
+	}{
+		{
+			name:     "JSON serializable struct",
+			input:    TestStruct{Name: "test", Count: 42},
+			expected: "{\n\t  \"name\": \"test\",\n\t  \"count\": 42\n\t}",
+		},
+		{
+			name: "slice with multi-line JSON",
+			input: []map[string]string{
+				{"key": "value1"},
+				{"key": "value2"},
+			},
+			expected: "[\n\t  {\n\t    \"key\": \"value1\"\n\t  },\n\t  {\n\t    \"key\": \"value2\"\n\t  }\n\t]",
+		},
+		{
+			name:     "non-JSON serializable falls back",
+			input:    make(chan int),
+			expected: "0x", // starts with channel address format
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			result := tw.valueToString(test.input)
+			if test.name == "non-JSON serializable falls back" {
+				// For channel, just check it starts with expected pattern
+				if !strings.HasPrefix(result, test.expected) {
+					t.Errorf("valueToString() = %q, expected to start with %q", result, test.expected)
+				}
+			} else {
+				if result != test.expected {
+					t.Errorf("valueToString() = %q, expected %q", result, test.expected)
+				}
+			}
+		})
+	}
+}

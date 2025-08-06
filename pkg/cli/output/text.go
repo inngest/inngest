@@ -1,6 +1,7 @@
 package output
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"strings"
@@ -77,7 +78,7 @@ func (tw *TextWriter) WriteOrdered(data *OrderedMap, opts ...TextOpt) error {
 			fmt.Fprintf(tw.w, "%s%s:\t%s\n", indentStr, key, tw.valueToString(value))
 		}
 	}
-	
+
 	// Don't auto-flush to allow multiple Write calls to accumulate
 	return nil
 }
@@ -128,7 +129,7 @@ func (tw *TextWriter) convertToAnyMap(value any) map[string]any {
 
 func (tw *TextWriter) convertToOrderedMap(value any) *OrderedMap {
 	om := NewOrderedMap()
-	
+
 	switch v := value.(type) {
 	case *OrderedMap:
 		return v
@@ -157,7 +158,7 @@ func (tw *TextWriter) convertToOrderedMap(value any) *OrderedMap {
 			om.Set(key, val)
 		}
 	}
-	
+
 	return om
 }
 
@@ -182,8 +183,32 @@ func (tw *TextWriter) valueToString(value any) string {
 	case error:
 		return v.Error()
 	default:
+		// Try JSON serialization for complex types
+		if jsonStr := tw.formatAsJSON(value); jsonStr != "" {
+			return jsonStr
+		}
 		return fmt.Sprintf("%v", value)
 	}
+}
+
+// formatAsJSON attempts to format a value as indented JSON with proper alignment
+func (tw *TextWriter) formatAsJSON(value any) string {
+	jsonBytes, err := json.MarshalIndent(value, "", "  ")
+	if err != nil {
+		return ""
+	}
+	
+	jsonStr := string(jsonBytes)
+	// For multi-line JSON, indent continuation lines to align with value column
+	lines := strings.Split(jsonStr, "\n")
+	if len(lines) > 1 {
+		indentStr := strings.Repeat(" ", tw.indent) + "\t"
+		for i := 1; i < len(lines); i++ {
+			lines[i] = indentStr + lines[i]
+		}
+		return strings.Join(lines, "\n")
+	}
+	return jsonStr
 }
 
 type Row struct {
@@ -234,7 +259,7 @@ func OrderedData(pairs ...any) *OrderedMap {
 	if len(pairs)%2 != 0 {
 		panic("OrderedData requires an even number of arguments (key-value pairs)")
 	}
-	
+
 	om := NewOrderedMap()
 	for i := 0; i < len(pairs); i += 2 {
 		key, ok := pairs[i].(string)
