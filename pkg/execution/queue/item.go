@@ -541,6 +541,13 @@ type PayloadFunctionSuspend struct {
 	// This should be passed to calculate the end-to-end latency for
 	// any suspension operation.
 	StartMS int64 `json:"st"`
+
+	// MigrateFromShard identifies the source shard in a queue migration
+	// Including this is necessary to avoid having to iterate over all queue shards.
+	MigrateFromShard string `json:"mfs"`
+
+	// MigrateToShard identifies the destination shard in a queue migration
+	MigrateToShard string `json:"mts"`
 }
 
 // PayloadPauseTimeout is the payload stored when enqueueing a pause timeout, eg.
