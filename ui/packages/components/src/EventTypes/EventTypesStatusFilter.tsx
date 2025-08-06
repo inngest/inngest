@@ -7,7 +7,6 @@ export default function EventTypesStatusFilter({
   archived,
   onStatusChange,
 }: {
-  pathCreator: string;
   archived: boolean;
   onStatusChange: (archived: boolean) => void;
 }) {

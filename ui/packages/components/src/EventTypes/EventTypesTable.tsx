@@ -199,11 +199,7 @@ export function EventTypesTable({
             debouncedSearch();
           }}
         />
-        <EventTypesStatusFilter
-          archived={archived}
-          pathCreator={'/'}
-          onStatusChange={onStatusFilterChange}
-        />
+        <EventTypesStatusFilter archived={archived} onStatusChange={onStatusFilterChange} />
       </div>
       <div className="h-[calc(100%-58px)] overflow-y-auto" onScroll={onScroll} ref={containerRef}>
         <NewTable
