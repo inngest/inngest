@@ -4,12 +4,13 @@ import { Alert } from '@inngest/components/Alert';
 import { Chart } from '@inngest/components/Chart/Chart';
 
 import { createChartOptions } from './transformData';
+import type { UsageDimension } from './types';
 import useGetUsageChartData from './useGetUsageChartData';
 
 type Props = {
   includedCountLimit?: number;
   selectedPeriod: 'current' | 'previous';
-  type: 'run' | 'step';
+  type: UsageDimension;
 };
 
 export default function BillableUsageChart({ includedCountLimit, selectedPeriod, type }: Props) {
