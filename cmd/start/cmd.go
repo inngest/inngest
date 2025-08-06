@@ -36,7 +36,7 @@ func Command() *cli.Command {
 			},
 			&cli.StringFlag{
 				Name:  "signing-key",
-				Usage: "Signing key used to sign and validate data between the server and apps.",
+				Usage: "Signing key used to sign and validate data between the server and apps. Must be hex string with even number of chars",
 			},
 			&cli.StringSliceFlag{
 				Name:  "event-key",

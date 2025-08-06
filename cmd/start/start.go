@@ -78,9 +78,14 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		fmt.Println("Error: signing-key is required")
 		os.Exit(1)
 	}
+	// Check if the signing key has an even number of characters (required for hex decoding)
+	if len(signingKey)%2 != 0 {
+		fmt.Printf("Error: signing-key must be hex string with even number of chars\n")
+		os.Exit(1)
+	}
 	_, err = authn.HashedSigningKey(signingKey)
 	if err != nil {
-		fmt.Printf("Error: signing-key must be a valid hexadecimal string\n")
+		fmt.Printf("Error: signing-key must be valid hex string: %v\n", err)
 		os.Exit(1)
 	}
 
