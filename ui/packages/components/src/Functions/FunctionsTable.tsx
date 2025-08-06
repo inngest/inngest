@@ -99,6 +99,8 @@ export function FunctionsTable({
     queryFn: ({ pageParam = 1 }: { pageParam: number }) =>
       getFunctions({ cursor: pageParam, archived, nameSearch }),
     placeholderData: keepPreviousData,
+    refetchOnWindowFocus: false,
+    staleTime: 5 * 60 * 1000, // 5min
     getNextPageParam: (lastPage) => {
       const { currentPage, totalPages } = lastPage.pageInfo;
       if (typeof totalPages === 'number' && currentPage < totalPages) {

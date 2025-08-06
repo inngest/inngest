@@ -120,6 +120,8 @@ export function EventTypesTable({
     queryFn: ({ pageParam }: { pageParam: string | null }) =>
       getEventTypes({ orderBy, cursor: pageParam, archived, nameSearch }),
     placeholderData: keepPreviousData,
+    refetchOnWindowFocus: false,
+    staleTime: 5 * 60 * 1000, // 5min
     getNextPageParam: (lastPage) => {
       if (!lastPage || !lastPage.pageInfo.hasNextPage) {
         return undefined;
