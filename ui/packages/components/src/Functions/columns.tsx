@@ -156,7 +156,7 @@ export function useColumns({
             <div className="w-16">
               <NumberCell
                 value={data.usage.totalVolume}
-                term={data.usage.totalVolume === 1 ? 'function' : 'functions'}
+                term={data.usage.totalVolume === 1 ? 'run' : 'runs'}
               />
             </div>
             <div className="hidden md:block [&_*]:cursor-pointer">
