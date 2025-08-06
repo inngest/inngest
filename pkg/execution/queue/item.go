@@ -539,6 +539,11 @@ type PayloadFunctionSuspend struct {
 
 	SuspendReason int  `json:"sr"`
 	Suspended     bool `json:"sus"`
+
+	// StartMS is the unix timestamp recording the operation start.
+	// This should be passed to calculate the end-to-end latency for
+	// any suspension operation.
+	StartMS int64 `json:"st"`
 }
 
 // PayloadPauseTimeout is the payload stored when enqueueing a pause timeout, eg.
