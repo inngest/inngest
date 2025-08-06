@@ -121,11 +121,12 @@ export function useColumns({
     }),
     columnHelper.accessor('failureRate', {
       cell: (info) => {
-        const value = info.getValue();
-        if (value === undefined) {
+        const functionID = info.row.original.id;
+        const { data, isLoading } = useFunctionVolume(functionID, getFunctionVolume);
+        if (isLoading) {
           return <Skeleton className="my-2 block h-3 w-32" />;
         }
-        if (value === 0) {
+        if (data?.failureRate === 0) {
           return (
             <TextCell>
               <span className="text-light">—</span>
@@ -135,7 +136,7 @@ export function useColumns({
 
         return (
           <TextCell>
-            <span className="text-tertiary-intense">{value}%</span>
+            <span className="text-tertiary-intense">{data?.failureRate}%</span>
           </TextCell>
         );
       },
