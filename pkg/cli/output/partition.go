@@ -19,6 +19,15 @@ func Partition(pt *pb.PartitionResponse, pts *pb.PartitionStatusResponse) error 
 			}
 		}
 
+		var shard *OrderedMap
+		if pt.GetQueueShard() != nil {
+			s := pt.GetQueueShard()
+			shard = OrderedData(
+				"Name", s.GetName(),
+				"Kind", s.GetKind(),
+			)
+		}
+
 		if err := w.WriteOrdered(OrderedData(
 			"Type", "Partition",
 			"ID", pt.Id,
@@ -27,7 +36,7 @@ func Partition(pt *pb.PartitionResponse, pts *pb.PartitionStatusResponse) error 
 				"Account", pt.Tenant.AccountId,
 				"Environment", pt.Tenant.EnvId,
 				"App", pt.Tenant.AppId,
-				"Queue Shard", "TODO",
+				"Queue Shard", shard,
 			),
 			"Triggers", fn.Triggers,
 			"Concurrency", OrderedData(

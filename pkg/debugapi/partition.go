@@ -36,6 +36,11 @@ func (d *debugAPI) GetPartition(ctx context.Context, req *pb.PartitionRequest) (
 		return nil, fmt.Errorf("error retrieving function: %w", err)
 	}
 
+	shard, err := d.findShard(ctx, consts.DevServerAccountID, nil)
+	if err != nil {
+		return nil, fmt.Errorf("error finding shard: %w", err)
+	}
+
 	return &pb.PartitionResponse{
 		Id:   req.GetId(),
 		Slug: wf.Slug,
@@ -45,7 +50,10 @@ func (d *debugAPI) GetPartition(ctx context.Context, req *pb.PartitionRequest) (
 			AppId:     wf.AppID.String(),
 		},
 		Config: wf.Config,
-		// TODO: function version
+		QueueShard: &pb.QueueShard{
+			Name: shard.Name,
+			Kind: shard.Kind,
+		},
 	}, nil
 }
 
