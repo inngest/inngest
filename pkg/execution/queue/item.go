@@ -534,9 +534,6 @@ type PayloadJobPromote struct {
 }
 
 type PayloadFunctionSuspend struct {
-	AccountID  uuid.UUID `json:"aid"`
-	FunctionID uuid.UUID `json:"fid"`
-
 	SuspendReason int  `json:"sr"`
 	Suspended     bool `json:"sus"`
 
