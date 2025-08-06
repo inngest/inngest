@@ -71,7 +71,7 @@ type PartitionResponse struct {
 	Slug          string                 `protobuf:"bytes,2,opt,name=slug,proto3" json:"slug,omitempty"`
 	Tenant        *PartitionTenant       `protobuf:"bytes,3,opt,name=tenant,proto3" json:"tenant,omitempty"`
 	Config        []byte                 `protobuf:"bytes,4,opt,name=config,proto3" json:"config,omitempty"`
-	Version       int64                  `protobuf:"varint,5,opt,name=version,proto3" json:"version,omitempty"`
+	QueueShard    *QueueShard            `protobuf:"bytes,5,opt,name=queue_shard,json=queueShard,proto3" json:"queue_shard,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -134,11 +134,11 @@ func (x *PartitionResponse) GetConfig() []byte {
 	return nil
 }
 
-func (x *PartitionResponse) GetVersion() int64 {
+func (x *PartitionResponse) GetQueueShard() *QueueShard {
 	if x != nil {
-		return x.Version
+		return x.QueueShard
 	}
-	return 0
+	return nil
 }
 
 type PartitionStatusResponse struct {
@@ -333,19 +333,72 @@ func (x *PartitionTenant) GetAppId() string {
 	return ""
 }
 
+type QueueShard struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Name          string                 `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	Kind          string                 `protobuf:"bytes,2,opt,name=kind,proto3" json:"kind,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *QueueShard) Reset() {
+	*x = QueueShard{}
+	mi := &file_debug_v1_service_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *QueueShard) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*QueueShard) ProtoMessage() {}
+
+func (x *QueueShard) ProtoReflect() protoreflect.Message {
+	mi := &file_debug_v1_service_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use QueueShard.ProtoReflect.Descriptor instead.
+func (*QueueShard) Descriptor() ([]byte, []int) {
+	return file_debug_v1_service_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *QueueShard) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *QueueShard) GetKind() string {
+	if x != nil {
+		return x.Kind
+	}
+	return ""
+}
+
 var File_debug_v1_service_proto protoreflect.FileDescriptor
 
 const file_debug_v1_service_proto_rawDesc = "" +
 	"\n" +
 	"\x16debug/v1/service.proto\x12\bdebug.v1\"\"\n" +
 	"\x10PartitionRequest\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\"\x9c\x01\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"\xb9\x01\n" +
 	"\x11PartitionResponse\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04slug\x18\x02 \x01(\tR\x04slug\x121\n" +
 	"\x06tenant\x18\x03 \x01(\v2\x19.debug.v1.PartitionTenantR\x06tenant\x12\x16\n" +
-	"\x06config\x18\x04 \x01(\fR\x06config\x12\x18\n" +
-	"\aversion\x18\x05 \x01(\x03R\aversion\"\xfd\x02\n" +
+	"\x06config\x18\x04 \x01(\fR\x06config\x125\n" +
+	"\vqueue_shard\x18\x05 \x01(\v2\x14.debug.v1.QueueShardR\n" +
+	"queueShard\"\xfd\x02\n" +
 	"\x17PartitionStatusResponse\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x16\n" +
 	"\x06paused\x18\x02 \x01(\bR\x06paused\x12\x18\n" +
@@ -365,7 +418,11 @@ const file_debug_v1_service_proto_rawDesc = "" +
 	"\n" +
 	"account_id\x18\x01 \x01(\tR\taccountId\x12\x15\n" +
 	"\x06env_id\x18\x02 \x01(\tR\x05envId\x12\x15\n" +
-	"\x06app_id\x18\x03 \x01(\tR\x05appId2\xa9\x01\n" +
+	"\x06app_id\x18\x03 \x01(\tR\x05appId\"4\n" +
+	"\n" +
+	"QueueShard\x12\x12\n" +
+	"\x04name\x18\x01 \x01(\tR\x04name\x12\x12\n" +
+	"\x04kind\x18\x02 \x01(\tR\x04kind2\xa9\x01\n" +
 	"\x05Debug\x12I\n" +
 	"\fGetPartition\x12\x1a.debug.v1.PartitionRequest\x1a\x1b.debug.v1.PartitionResponse\"\x00\x12U\n" +
 	"\x12GetPartitionStatus\x12\x1a.debug.v1.PartitionRequest\x1a!.debug.v1.PartitionStatusResponse\"\x00B5Z3github.com/inngest/inngest/proto/gen/debug/v1;debugb\x06proto3"
@@ -382,24 +439,26 @@ func file_debug_v1_service_proto_rawDescGZIP() []byte {
 	return file_debug_v1_service_proto_rawDescData
 }
 
-var file_debug_v1_service_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_debug_v1_service_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
 var file_debug_v1_service_proto_goTypes = []any{
 	(*PartitionRequest)(nil),        // 0: debug.v1.PartitionRequest
 	(*PartitionResponse)(nil),       // 1: debug.v1.PartitionResponse
 	(*PartitionStatusResponse)(nil), // 2: debug.v1.PartitionStatusResponse
 	(*PartitionTenant)(nil),         // 3: debug.v1.PartitionTenant
+	(*QueueShard)(nil),              // 4: debug.v1.QueueShard
 }
 var file_debug_v1_service_proto_depIdxs = []int32{
 	3, // 0: debug.v1.PartitionResponse.tenant:type_name -> debug.v1.PartitionTenant
-	0, // 1: debug.v1.Debug.GetPartition:input_type -> debug.v1.PartitionRequest
-	0, // 2: debug.v1.Debug.GetPartitionStatus:input_type -> debug.v1.PartitionRequest
-	1, // 3: debug.v1.Debug.GetPartition:output_type -> debug.v1.PartitionResponse
-	2, // 4: debug.v1.Debug.GetPartitionStatus:output_type -> debug.v1.PartitionStatusResponse
-	3, // [3:5] is the sub-list for method output_type
-	1, // [1:3] is the sub-list for method input_type
-	1, // [1:1] is the sub-list for extension type_name
-	1, // [1:1] is the sub-list for extension extendee
-	0, // [0:1] is the sub-list for field type_name
+	4, // 1: debug.v1.PartitionResponse.queue_shard:type_name -> debug.v1.QueueShard
+	0, // 2: debug.v1.Debug.GetPartition:input_type -> debug.v1.PartitionRequest
+	0, // 3: debug.v1.Debug.GetPartitionStatus:input_type -> debug.v1.PartitionRequest
+	1, // 4: debug.v1.Debug.GetPartition:output_type -> debug.v1.PartitionResponse
+	2, // 5: debug.v1.Debug.GetPartitionStatus:output_type -> debug.v1.PartitionStatusResponse
+	4, // [4:6] is the sub-list for method output_type
+	2, // [2:4] is the sub-list for method input_type
+	2, // [2:2] is the sub-list for extension type_name
+	2, // [2:2] is the sub-list for extension extendee
+	0, // [0:2] is the sub-list for field type_name
 }
 
 func init() { file_debug_v1_service_proto_init() }
@@ -413,7 +472,7 @@ func file_debug_v1_service_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_debug_v1_service_proto_rawDesc), len(file_debug_v1_service_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   4,
+			NumMessages:   5,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

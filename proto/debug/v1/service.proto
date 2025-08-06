@@ -15,7 +15,7 @@ message PartitionResponse {
   string slug = 2;
   PartitionTenant tenant = 3;
   bytes config = 4;
-  int64 version = 5;
+  QueueShard queue_shard = 5;
 }
 
 message PartitionStatusResponse {
@@ -39,4 +39,9 @@ message PartitionTenant {
   string account_id = 1;
   string env_id = 2;
   string app_id = 3;
+}
+
+message QueueShard {
+  string name = 1;
+  string kind = 2;
 }
