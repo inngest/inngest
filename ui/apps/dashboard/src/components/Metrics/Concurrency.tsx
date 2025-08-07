@@ -118,7 +118,7 @@ export const AccountConcurrency = ({
           label="Increase Concurrency"
           kind="secondary"
           appearance="outlined"
-          href={`${pathCreator.billing({ ref: 'app-concurrency-chart' })}&highlight=concurrency`}
+          href={pathCreator.billing({ ref: 'app-concurrency-chart', highlight: 'concurrency' })}
         />
       </div>
       <div className="flex h-full flex-row items-center">
