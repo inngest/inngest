@@ -175,20 +175,27 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 	latestConstraints := q.partitionConstraintConfigGetter(ctx, shadowPart.Identifier())
 
 	// Check if shadow partition cannot be processed (paused/refill disabled, etc.)
-	if shadowPart.PauseRefill {
-		q.removeShadowContinue(ctx, shadowPart, false)
+	if shadowPart.FunctionID != nil {
+		if info := q.partitionPausedGetter(ctx, *shadowPart.FunctionID); info.Paused {
 
-		forceRequeueAt := q.clock.Now().Add(ShadowPartitionRefillPausedRequeueExtension)
-		_, err = durationWithTags(ctx, q.primaryQueueShard.Name, durOpShadowPartitionRequeue, q.clock.Now(), func(ctx context.Context) (any, error) {
-			err := q.ShadowPartitionRequeue(ctx, shadowPart, &forceRequeueAt)
-			return nil, err
-		}, map[string]any{"reason": "paused"})
-		switch err {
-		case nil, ErrShadowPartitionNotFound:
-			return nil
-		default:
-			return fmt.Errorf("could not requeue shadow partition: %w", err)
+			q.removeShadowContinue(ctx, shadowPart, false)
+
+			if !info.Stale {
+				forceRequeueAt := q.clock.Now().Add(ShadowPartitionRefillPausedRequeueExtension)
+				_, err = durationWithTags(ctx, q.primaryQueueShard.Name, durOpShadowPartitionRequeue, q.clock.Now(), func(ctx context.Context) (any, error) {
+					err := q.ShadowPartitionRequeue(ctx, shadowPart, &forceRequeueAt)
+					return nil, err
+				}, map[string]any{"reason": "paused"})
+				switch err {
+				case nil, ErrShadowPartitionNotFound:
+					return nil
+				default:
+					return fmt.Errorf("could not requeue shadow partition: %w", err)
+				}
+			}
 		}
+
+		return nil
 	}
 
 	limit := ShadowPartitionPeekMaxBacklogs

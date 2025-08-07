@@ -317,11 +317,8 @@ func start(ctx context.Context, opts StartOpts) error {
 			return enableKeyQueues
 		}),
 		redis_state.WithBacklogRefillLimit(10),
-		redis_state.WithPartitionPausedGetter(func(ctx context.Context, part redis_state.QueuePartition) redis_state.PartitionPausedInfo {
-			if part.FunctionID == nil {
-				return redis_state.PartitionPausedInfo{}
-			}
-			if paused, ok := pauseOverrides[*part.FunctionID]; ok && paused {
+		redis_state.WithPartitionPausedGetter(func(ctx context.Context, functionID uuid.UUID) redis_state.PartitionPausedInfo {
+			if paused, ok := pauseOverrides[functionID]; ok && paused {
 				return redis_state.PartitionPausedInfo{
 					Stale:  false,
 					Paused: true,

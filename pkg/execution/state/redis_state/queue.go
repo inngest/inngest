@@ -199,7 +199,7 @@ type PartitionPausedInfo struct {
 	Stale  bool
 	Paused bool
 }
-type PartitionPausedGetter func(ctx context.Context, part QueuePartition) PartitionPausedInfo
+type PartitionPausedGetter func(ctx context.Context, fnID uuid.UUID) PartitionPausedInfo
 
 type QueueOpt func(q *queue)
 
@@ -633,7 +633,7 @@ func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 		apf: func(_ context.Context, _ uuid.UUID) uint {
 			return PriorityDefault
 		},
-		partitionPausedGetter: func(ctx context.Context, part QueuePartition) PartitionPausedInfo {
+		partitionPausedGetter: func(ctx context.Context, fnID uuid.UUID) PartitionPausedInfo {
 			return PartitionPausedInfo{}
 		},
 		peekMin:                     DefaultQueuePeekMin,
@@ -1505,9 +1505,23 @@ func (q *queue) UnpauseFunction(ctx context.Context, shardName string, acctID, f
 	}
 
 	err := q.PartitionRequeue(ctx, shard, part, q.clock.Now(), false)
-	if err != nil && !errors.Is(err, ErrPartitionGarbageCollected) {
+	if err != nil && !errors.Is(err, ErrPartitionNotFound) && !errors.Is(err, ErrPartitionGarbageCollected) {
 		q.log.Error("failed to requeue unpaused partition", "error", err, "partition", part)
 		return fmt.Errorf("could not unpause partition: %w", err)
+	}
+
+	// Also unpause shadow partition if key queues enabled
+	if q.allowKeyQueues(ctx, acctID) {
+		shadowPart := &QueueShadowPartition{
+			PartitionID: fnID.String(),
+			FunctionID:  &fnID,
+			AccountID:   &acctID,
+		}
+		// requeue to earliest item
+		err = q.ShadowPartitionRequeue(ctx, shadowPart, nil)
+		if err != nil && !errors.Is(err, ErrShadowPartitionNotFound) {
+			return fmt.Errorf("could not unpause shadow partition: %w", err)
+		}
 	}
 
 	q.log.Trace("requeued unpaused partition", "partition", part.Queue())
@@ -3047,7 +3061,7 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 
 		if item.FunctionID != nil {
 			// Check paused status from database
-			if info := q.partitionPausedGetter(ctx, *item); info.Paused {
+			if info := q.partitionPausedGetter(ctx, *item.FunctionID); info.Paused {
 				// Only push back partition if the partition is marked as paused in the database.
 				// If the in-memory cache is stale, we don't want to accidentally push back the partition
 				// in case the function was unpaused in the last 60s.
