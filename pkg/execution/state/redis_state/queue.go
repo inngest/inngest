@@ -3011,9 +3011,9 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 	// mget all migrating states
 	if len(fnIDs) > 0 {
 		migrateLockKeys := make([]string, len(fnIDs))
-		for _, fnID := range fnIDs {
+		for i, fnID := range fnIDs {
 			key := kg.QueueMigrationLock(fnID)
-			migrateLockKeys = append(migrateLockKeys, key)
+			migrateLockKeys[i] = key
 		}
 
 		vals, err := client.Do(ctx, client.B().Mget().Key(migrateLockKeys...).Build()).ToAny()
