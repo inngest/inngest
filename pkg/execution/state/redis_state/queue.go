@@ -2,6 +2,7 @@ package redis_state
 
 import (
 	"context"
+	crand "crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -194,6 +195,8 @@ type PartitionPriorityFinder func(ctx context.Context, part QueuePartition) uint
 // AccountPriorityFinder returns the priority for a given account.
 type AccountPriorityFinder func(ctx context.Context, accountId uuid.UUID) uint
 
+type PartitionPausedGetter func(ctx context.Context, part QueuePartition) bool
+
 type QueueOpt func(q *queue)
 
 func WithName(name string) func(q *queue) {
@@ -211,6 +214,12 @@ func WithQueueLifecycles(l ...QueueLifecycleListener) QueueOpt {
 func WithPartitionPriorityFinder(ppf PartitionPriorityFinder) QueueOpt {
 	return func(q *queue) {
 		q.ppf = ppf
+	}
+}
+
+func WithPartitionPausedGetter(partitionPausedGetter PartitionPausedGetter) QueueOpt {
+	return func(q *queue) {
+		q.partitionPausedGetter = partitionPausedGetter
 	}
 }
 
@@ -620,6 +629,9 @@ func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 		apf: func(_ context.Context, _ uuid.UUID) uint {
 			return PriorityDefault
 		},
+		partitionPausedGetter: func(ctx context.Context, part QueuePartition) bool {
+			return false
+		},
 		peekMin:                     DefaultQueuePeekMin,
 		peekMax:                     DefaultQueuePeekMax,
 		shadowPeekMin:               ShadowPartitionPeekMinBacklogs,
@@ -751,8 +763,9 @@ type queue struct {
 	queueShardClients map[string]QueueShard
 	shardSelector     ShardSelector
 
-	ppf PartitionPriorityFinder
-	apf AccountPriorityFinder
+	ppf                   PartitionPriorityFinder
+	apf                   AccountPriorityFinder
+	partitionPausedGetter PartitionPausedGetter
 
 	lifecycles QueueLifecycleListeners
 
@@ -1447,97 +1460,6 @@ func (q *queue) EnqueueItem(ctx context.Context, shard QueueShard, i osqueue.Que
 	}
 }
 
-// SetFunctionPaused sets the "Paused" flag (represented in JSON as "off") for the given
-// function ID's queue partition.
-// If a function is unpaused, we requeue the partition with a score of "now" to ensure that it is processed.
-func (q *queue) SetFunctionPaused(ctx context.Context, accountId uuid.UUID, fnID uuid.UUID, paused bool) error {
-	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "SetFunctionPaused"), redis_telemetry.ScopeQueue)
-
-	iterate := func(shard QueueShard) error {
-		// TODO Support other storage backends
-		if shard.Kind != string(enums.QueueShardKindRedis) {
-			return nil
-		}
-
-		pausedArg := "0"
-		if paused {
-			pausedArg = "1"
-		}
-
-		// This is written to the store if fn metadata doesn't exist.
-		defaultFnMetadata := FnMetadata{
-			FnID:   fnID,
-			Paused: paused,
-		}
-
-		keys := []string{
-			shard.RedisClient.kg.FnMetadata(fnID),
-			shard.RedisClient.kg.ShadowPartitionMeta(),
-		}
-		args, err := StrSlice([]any{
-			pausedArg,
-			defaultFnMetadata,
-			fnID.String(),
-		})
-		if err != nil {
-			return err
-		}
-
-		status, err := scripts["queue/fnSetPaused"].Exec(
-			redis_telemetry.WithScriptName(ctx, "fnSetPaused"),
-			shard.RedisClient.unshardedRc,
-			keys,
-			args,
-		).AsInt64()
-		if err != nil {
-			return fmt.Errorf("error updating paused state: %w", err)
-		}
-		switch status {
-		case 0:
-			// If a function was paused, there's no need to process it. We can push back paused partitions for a long time.
-			// Instead of doing this here, we push back paused partitions in partitionPeek to prevent racing a currently processing partition.
-			if !paused {
-				fnPart := QueuePartition{
-					ID:         fnID.String(),
-					FunctionID: &fnID,
-					AccountID:  accountId,
-				}
-
-				// When it does get unpaused, we should immediately start processing it again
-				err := q.PartitionRequeue(ctx, shard, &fnPart, time.Now(), false)
-				if err != nil && !errors.Is(err, ErrPartitionNotFound) && !errors.Is(err, ErrPartitionGarbageCollected) {
-					return fmt.Errorf("could not requeue partition after modifying paused state to %t: %w", paused, err)
-				}
-			}
-
-			return nil
-		default:
-			return fmt.Errorf("unknown response updating paused state: %d", status)
-		}
-	}
-
-	if q.queueShardClients != nil {
-		eg := errgroup.Group{}
-		for _, shard := range q.queueShardClients {
-			shard := shard
-			eg.Go(func() error {
-				err := iterate(shard)
-				if err != nil {
-					return fmt.Errorf("could not update paused state for shard %s: %w", shard.Name, err)
-				}
-
-				return nil
-			})
-		}
-
-		if err := eg.Wait(); err != nil {
-			return err
-		}
-	}
-
-	return nil
-}
-
 // dropPartitionPointerIfEmpty atomically drops a pointer queue member if the associated
 // ZSET is empty. This is used to ensure that we don't have pointers to empty ZSETs, in case
 // the cleanup process fails.
@@ -1573,13 +1495,8 @@ func (q *queue) dropPartitionPointerIfEmpty(ctx context.Context, shard QueueShar
 	}
 }
 
-func (q *queue) SetFunctionMigrate(ctx context.Context, sourceShard string, fnID uuid.UUID, migrate bool) error {
+func (q *queue) SetFunctionMigrate(ctx context.Context, sourceShard string, fnID uuid.UUID, migrateLockUntil *time.Time) error {
 	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "SetFunctionMigrate"), redis_telemetry.ScopeQueue)
-
-	defaultMeta := FnMetadata{
-		FnID:    fnID,
-		Migrate: migrate,
-	}
 
 	if q.queueShardClients == nil {
 		return fmt.Errorf("no queue shard clients are available")
@@ -1590,41 +1507,30 @@ func (q *queue) SetFunctionMigrate(ctx context.Context, sourceShard string, fnID
 		return fmt.Errorf("no queue shard available for '%s'", sourceShard)
 	}
 
-	flag := 0
-	if migrate {
-		flag = 1
+	client := shard.RedisClient.Client()
+	kg := shard.RedisClient.KeyGenerator()
+
+	key := kg.QueueMigrationLock(fnID)
+	if migrateLockUntil == nil {
+		cmd := client.B().Del().Key(key).Build()
+		err := client.Do(ctx, cmd).Error()
+		if err != nil {
+			return fmt.Errorf("could not set migration lock: %w", err)
+		}
+	} else {
+		lockID, err := ulid.New(ulid.Timestamp(*migrateLockUntil), crand.Reader)
+		if err != nil {
+			return fmt.Errorf("could not generate lockID: %w", err)
+		}
+
+		cmd := client.B().Set().Key(key).Value(lockID.String()).Exat(*migrateLockUntil).Build()
+		err = client.Do(ctx, cmd).Error()
+		if err != nil {
+			return fmt.Errorf("could not remove migration lock: %w", err)
+		}
 	}
 
-	keys := []string{
-		shard.RedisClient.kg.FnMetadata(fnID),
-		shard.RedisClient.kg.ShadowPartitionMeta(),
-	}
-	args, err := StrSlice([]any{
-		flag,
-		defaultMeta,
-		fnID.String(),
-	})
-	if err != nil {
-		return err
-	}
-
-	status, err := scripts["queue/fnSetMigrate"].Exec(
-		ctx,
-		shard.RedisClient.unshardedRc,
-		keys,
-		args,
-	).AsInt64()
-	if err != nil {
-		return fmt.Errorf("error updating queue migrate state: %w", err)
-	}
-
-	switch status {
-	case 0:
-		return nil
-
-	default:
-		return fmt.Errorf("unknown response updating queue migration state: %d", err)
-	}
+	return nil
 }
 
 func (q *queue) Migrate(ctx context.Context, sourceShardName string, fnID uuid.UUID, limit int64, concurrency int, handler osqueue.QueueMigrationHandler) (int64, error) {
@@ -1948,7 +1854,7 @@ func (q *queue) peek(ctx context.Context, shard QueueShard, opts peekOpts) ([]*o
 		}
 	}
 
-	return util.ParallelDecode(items, func(val any) (*osqueue.QueueItem, bool, error) {
+	return util.ParallelDecode(items, func(val any, _ int) (*osqueue.QueueItem, bool, error) {
 		if val == nil {
 			q.log.Error("nil item value in peek response", "partition", opts.PartitionKey)
 			return nil, true, nil
@@ -3019,13 +2925,11 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 
 	weights := []float64{}
 	items := make([]*QueuePartition, len(encoded))
-	fnIDs := make(map[uuid.UUID]bool)
+	fnIDs := make([]uuid.UUID, 0, len(encoded))
 	fnIDsMu := sync.Mutex{}
 
-	migrateIDs := map[uuid.UUID]bool{}
-
 	// Use parallel decoding as per Peek
-	partitions, err := util.ParallelDecode(encoded, func(val any) (*QueuePartition, bool, error) {
+	partitions, err := util.ParallelDecode(encoded, func(val any, _ int) (*QueuePartition, bool, error) {
 		if val == nil {
 			q.log.Error("encountered nil partition item in pointer queue",
 				"encoded", encoded,
@@ -3049,7 +2953,7 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 		// to prevent peeking/working on these items as an optimization.
 		if item.FunctionID != nil {
 			fnIDsMu.Lock()
-			fnIDs[*item.FunctionID] = false // default not paused
+			fnIDs = append(fnIDs, *item.FunctionID)
 			fnIDsMu.Unlock()
 		}
 		return item, false, nil
@@ -3076,15 +2980,18 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 		}
 	}
 
-	// mget all fn metas
+	migrateLocks := make(map[uuid.UUID]time.Time)
+	migrateLocksMu := &sync.Mutex{}
+
+	// mget all migrating states
 	if len(fnIDs) > 0 {
-		keys := make([]string, len(fnIDs))
-		n := 0
-		for k := range fnIDs {
-			keys[n] = kg.FnMetadata(k)
-			n++
+		migrateLockKeys := make([]string, len(fnIDs))
+		for _, fnID := range fnIDs {
+			key := kg.QueueMigrationLock(fnID)
+			migrateLockKeys = append(migrateLockKeys, key)
 		}
-		vals, err := client.Do(ctx, client.B().Mget().Key(keys...).Build()).ToAny()
+
+		vals, err := client.Do(ctx, client.B().Mget().Key(migrateLockKeys...).Build()).ToAny()
 		if err == nil {
 			// If this is an error, just ignore the error and continue.  The executor should gracefully handle
 			// accidental attempts at paused functions, as we cannot do this optimization for account or env-level
@@ -3094,22 +3001,22 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 				return nil, fmt.Errorf("unknown return type from mget fnMeta: %T", vals)
 			}
 
-			_, _ = util.ParallelDecode(vals, func(i any) (any, bool, error) {
-				str, ok := i.(string)
+			_, _ = util.ParallelDecode(vals, func(encoded any, idx int) (any, bool, error) {
+				str, ok := encoded.(string)
 				if !ok {
-					return nil, false, fmt.Errorf("unknown fnMeta type in partition peek: %T", i)
-				}
-				fnMeta := &FnMetadata{}
-				if err := json.Unmarshal(unsafe.Slice(unsafe.StringData(str), len(str)), fnMeta); err != nil {
-					return nil, false, fmt.Errorf("could not unmarshal fnMeta: %w", err)
+					// the lock did not exist, no need to return anything
+					return nil, true, nil
 				}
 
-				fnIDsMu.Lock()
-				fnIDs[fnMeta.FnID] = fnMeta.Paused
-				if fnMeta.Migrate {
-					migrateIDs[fnMeta.FnID] = true
+				lockedUntil, err := ulid.Parse(str)
+				if err != nil {
+					return nil, false, fmt.Errorf("could not parse lock ULID: %w", err)
 				}
-				fnIDsMu.Unlock()
+
+				migrateLocksMu.Lock()
+				fnID := fnIDs[idx]
+				migrateLocks[fnID] = lockedUntil.Timestamp()
+				migrateLocksMu.Unlock()
 
 				return nil, true, nil
 			})
@@ -3127,9 +3034,9 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 			continue
 		}
 
-		// check pause
 		if item.FunctionID != nil {
-			if paused := fnIDs[*item.FunctionID]; paused {
+			// Check paused status from database
+			if paused := q.partitionPausedGetter(ctx, *item); paused {
 				// Function is pulled up when it is unpaused, so we can push it back for a long time (see SetFunctionPaused)
 				err := q.PartitionRequeue(ctx, shard, item, q.clock.Now().Truncate(time.Second).Add(PartitionPausedRequeueExtension), true)
 				if err != nil && !errors.Is(err, ErrPartitionGarbageCollected) {
@@ -3142,7 +3049,13 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 				continue
 			}
 
-			if _, ok := migrateIDs[*item.FunctionID]; ok {
+			if lockedUntil, ok := migrateLocks[*item.FunctionID]; ok {
+				err := q.PartitionRequeue(ctx, shard, item, lockedUntil, true)
+				if err != nil && !errors.Is(err, ErrPartitionGarbageCollected) {
+					q.log.Error("failed to push back migrating partition", "error", err, "partition", item)
+				} else {
+					q.log.Trace("pushed back migrating partition", "partition", item.Queue())
+				}
 				// skip this since the executor is not responsible for migrating queues
 				ignored++
 				continue
@@ -3477,7 +3390,6 @@ func (q *queue) Instrument(ctx context.Context) error {
 			})
 		},
 	})
-
 	if err != nil {
 		return fmt.Errorf("failed to iterate queue partitions during instrumentation: %w", err)
 	}

@@ -193,6 +193,7 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	stepLimitOverrides := make(map[string]int)
 	stateSizeLimitOverrides := make(map[string]int)
+	pauseOverrides := make(map[uuid.UUID]bool)
 
 	var shardedRc, unshardedRc, connectRc rueidis.Client
 	var shardedCluster, unshardedCluster, connectCluster *miniredis.Miniredis
@@ -316,6 +317,15 @@ func start(ctx context.Context, opts StartOpts) error {
 			return enableKeyQueues
 		}),
 		redis_state.WithBacklogRefillLimit(10),
+		redis_state.WithPartitionPausedGetter(func(ctx context.Context, part redis_state.QueuePartition) bool {
+			if part.FunctionID == nil {
+				return false
+			}
+			if paused, ok := pauseOverrides[*part.FunctionID]; ok && paused {
+				return true
+			}
+			return false
+		}),
 	}
 	if opts.RetryInterval > 0 {
 		queueOpts = append(queueOpts, redis_state.WithBackoffFunc(
@@ -644,6 +654,12 @@ func start(ctx context.Context, opts StartOpts) error {
 				if connectCluster != nil {
 					connectCluster.FlushAll()
 				}
+			},
+			PauseFunction: func(id uuid.UUID) {
+				pauseOverrides[id] = true
+			},
+			UnpauseFunction: func(id uuid.UUID) {
+				delete(pauseOverrides, id)
 			},
 		})})
 	}
