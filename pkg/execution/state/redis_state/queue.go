@@ -195,7 +195,11 @@ type PartitionPriorityFinder func(ctx context.Context, part QueuePartition) uint
 // AccountPriorityFinder returns the priority for a given account.
 type AccountPriorityFinder func(ctx context.Context, accountId uuid.UUID) uint
 
-type PartitionPausedGetter func(ctx context.Context, part QueuePartition) bool
+type PartitionPausedInfo struct {
+	Stale  bool
+	Paused bool
+}
+type PartitionPausedGetter func(ctx context.Context, part QueuePartition) PartitionPausedInfo
 
 type QueueOpt func(q *queue)
 
@@ -629,8 +633,8 @@ func NewQueue(primaryQueueShard QueueShard, opts ...QueueOpt) *queue {
 		apf: func(_ context.Context, _ uuid.UUID) uint {
 			return PriorityDefault
 		},
-		partitionPausedGetter: func(ctx context.Context, part QueuePartition) bool {
-			return false
+		partitionPausedGetter: func(ctx context.Context, part QueuePartition) PartitionPausedInfo {
+			return PartitionPausedInfo{}
 		},
 		peekMin:                     DefaultQueuePeekMin,
 		peekMax:                     DefaultQueuePeekMax,
@@ -3036,13 +3040,18 @@ func (q *queue) partitionPeek(ctx context.Context, partitionKey string, sequenti
 
 		if item.FunctionID != nil {
 			// Check paused status from database
-			if paused := q.partitionPausedGetter(ctx, *item); paused {
-				// Function is pulled up when it is unpaused, so we can push it back for a long time (see SetFunctionPaused)
-				err := q.PartitionRequeue(ctx, shard, item, q.clock.Now().Truncate(time.Second).Add(PartitionPausedRequeueExtension), true)
-				if err != nil && !errors.Is(err, ErrPartitionGarbageCollected) {
-					q.log.Error("failed to push back paused partition", "error", err, "partition", item)
-				} else {
-					q.log.Trace("pushed back paused partition", "partition", item.Queue())
+			if info := q.partitionPausedGetter(ctx, *item); info.Paused {
+				// Only push back partition if the partition is marked as paused in the database.
+				// If the in-memory cache is stale, we don't want to accidentally push back the partition
+				// in case the function was unpaused in the last 60s.
+				if !info.Stale {
+					// Function is pulled up when it is unpaused, so we can push it back for a long time (see SetFunctionPaused)
+					err := q.PartitionRequeue(ctx, shard, item, q.clock.Now().Truncate(time.Second).Add(PartitionPausedRequeueExtension), true)
+					if err != nil && !errors.Is(err, ErrPartitionGarbageCollected) {
+						q.log.Error("failed to push back paused partition", "error", err, "partition", item)
+					} else {
+						q.log.Trace("pushed back paused partition", "partition", item.Queue())
+					}
 				}
 
 				ignored++
