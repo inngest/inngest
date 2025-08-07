@@ -1514,7 +1514,7 @@ func (q *queue) UnpauseFunction(ctx context.Context, shardName string, acctID, f
 	err := q.PartitionRequeue(ctx, shard, part, q.clock.Now(), false)
 	if err != nil && !errors.Is(err, ErrPartitionGarbageCollected) {
 		q.log.Error("failed to requeue unpaused partition", "error", err, "partition", part)
-		return fmt.Errorf("could not unsuspend partition: %w", err)
+		return fmt.Errorf("could not unpause partition: %w", err)
 	}
 
 	q.log.Trace("requeued unpaused partition", "partition", part.Queue())
