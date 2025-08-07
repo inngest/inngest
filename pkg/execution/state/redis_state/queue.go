@@ -2650,11 +2650,6 @@ func (q *queue) PartitionLease(ctx context.Context, p *QueuePartition, duration 
 		return nil, 0, fmt.Errorf("error generating id: %w", err)
 	}
 
-	fnMetaKey := uuid.Nil
-	if p.FunctionID != nil {
-		fnMetaKey = *p.FunctionID
-	}
-
 	disableLeaseChecks := p.IsSystem() && q.disableLeaseChecksForSystemQueues
 	if !p.IsSystem() && q.disableLeaseChecks != nil && p.AccountID != uuid.Nil {
 		disableLeaseChecks = q.disableLeaseChecks(ctx, p.AccountID)
@@ -2673,7 +2668,6 @@ func (q *queue) PartitionLease(ctx context.Context, p *QueuePartition, duration 
 		// Until this, we may not use account queues at all, as we cannot properly clean up
 		// here without knowing the Account ID
 		kg.AccountPartitionIndex(p.AccountID),
-		kg.FnMetadata(fnMetaKey),
 
 		// These concurrency keys are for fast checking of partition
 		// concurrency limits prior to leasing, as an optimization.
@@ -2725,8 +2719,6 @@ func (q *queue) PartitionLease(ctx context.Context, p *QueuePartition, duration 
 		return nil, 0, ErrPartitionNotFound
 	case -4:
 		return nil, 0, ErrPartitionAlreadyLeased
-	case -5:
-		return nil, 0, ErrPartitionPaused
 	default:
 		limit := functionLimit
 		if len(result) == 2 {
