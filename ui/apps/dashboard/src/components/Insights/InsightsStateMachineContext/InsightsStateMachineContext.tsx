@@ -36,7 +36,13 @@ interface InsightsStateMachineContextValue extends InsightsState {
 
 const InsightsStateMachineContext = createContext<InsightsStateMachineContextValue | null>(null);
 
-export function InsightsStateMachineContextProvider({ children }: { children: ReactNode }) {
+export function InsightsStateMachineContextProvider({
+  children,
+  renderChildren = true,
+}: {
+  children: ReactNode;
+  renderChildren?: boolean;
+}) {
   const [queryState, dispatch] = useReducer(insightsStateMachineReducer, INITIAL_STATE);
 
   // TODO: Ensure runQuery and fetchMore cannot finish out of order
@@ -86,7 +92,7 @@ export function InsightsStateMachineContextProvider({ children }: { children: Re
         runQuery,
       }}
     >
-      {children}
+      {renderChildren ? children : null}
     </InsightsStateMachineContext.Provider>
   );
 }
