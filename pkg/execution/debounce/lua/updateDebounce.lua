@@ -3,10 +3,10 @@
 Updates a debounce to use new data.
 
 Return values:
-- [0, newTTL (int), prevEventID (string)]: OK, and the new TTL from our debounce, and the previous event ID.
-- [-1]: Debounce is already in progress, as the queue item is leased.
-- [-2]: Event is out of order and has no effect
-- [-3]: Debounce queue item is not found.
+- >=0 (int): OK, and the new TTL from our debounce.
+- -1: Debounce is already in progress, as the queue item is leased.
+- -2: Event is out of order and has no effect
+- -3: Debounce queue item is not found.
 ]]--
 
 local keyPtr = KEYS[1] -- fn -> debounce ptr
@@ -59,15 +59,13 @@ if item == nil then
   -- for lookup
   redis.call("SETEX", keyPtr, ttl, debounceID)
   redis.call("HSET", keyDbc, debounceID, debounce)
-  return { -3 }
+  return -3
 end
 
 if item.leaseID ~= nil and item.leaseID ~= cjson.null and decode_ulid_time(item.leaseID) > currentTime then
 	-- The debounce queue item is leased.
-	return { -1 }
+	return -1
 end
-
-local prevEventID = ""
 
 -- Get the debounce
 local existing = redis.call("HGET", keyDbc, debounceID)
@@ -75,13 +73,9 @@ if existing ~= false then
 	-- Decode the debounce, and check whether the existing event ID is > the current event ID.  If so,
 	-- don't update the debounce.
 	local item = cjson.decode(existing)
-	if item ~= nil and item.eID ~= nil and item.eID ~= "" then
-		prevEventID = item.eID
-	end
-
 	if item ~= nil and item.e ~= nil and item.e.ts > eventTime then
 		-- The stored event occurs after the event we're updating, so do nothing.
-		return { -2 }
+		return -2
 	end
 
 	-- Also, if there's an existing debounce, ensure that we respect the max timeout
@@ -116,10 +110,4 @@ redis.call("HSET", keyDbc, debounceID, debounce)
 
 -- TODO: This should also reschedule the job directly in an atomic transaction.
 
--- We return the prevEventID of the overwritten debounce, so that the caller can
--- perform any cleanup needed for the previous event, like cleaning up invokes.
-if prevEventID ~= "" then
-	return { 0, ttl, prevEventID }
-end
-
-return { 0, ttl }
+return ttl

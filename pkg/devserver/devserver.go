@@ -414,7 +414,6 @@ func start(ctx context.Context, opts StartOpts) error {
 		executor.WithLogger(l),
 		executor.WithFunctionLoader(loader),
 		executor.WithRealtimePublisher(broadcaster),
-		executor.WithEventReader(dbcqrs),
 		executor.WithLifecycleListeners(
 			history.NewLifecycleListener(
 				nil,

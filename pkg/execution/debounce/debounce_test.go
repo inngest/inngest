@@ -4,9 +4,6 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/json"
-	"testing"
-	"time"
-
 	"github.com/alicebob/miniredis/v2"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
@@ -20,6 +17,8 @@ import (
 	"github.com/oklog/ulid/v2"
 	"github.com/redis/rueidis"
 	"github.com/stretchr/testify/require"
+	"testing"
+	"time"
 )
 
 // TestDebounce ensures the debounce feature works in general.
@@ -89,7 +88,7 @@ func TestDebounce(t *testing.T) {
 			},
 		}
 
-		_, err := redisDebouncer.Debounce(ctx, expectedDi, fn)
+		err := redisDebouncer.Debounce(ctx, expectedDi, fn)
 		require.NoError(t, err)
 
 		expectedDi.Timeout = eventTime.Add(60 * time.Second).UnixMilli()
@@ -136,8 +135,8 @@ func TestDebounce(t *testing.T) {
 			itemScore, err := unshardedCluster.ZScore(defaultQueueShard.RedisClient.KeyGenerator().PartitionQueueSet(enums.PartitionTypeDefault, queue.KindDebounce, ""), qi.ID)
 			require.NoError(t, err)
 			expectedQueueScore := eventTime.
-				Add(10 * time.Second).       // Debounce period
-				Add(buffer).                 // Buffer
+				Add(10 * time.Second). // Debounce period
+				Add(buffer). // Buffer
 				Add(time.Second).UnixMilli() // Allow updateDebounce on TTL 0
 			require.Equal(t, expectedQueueScore, int64(itemScore))
 		}
@@ -168,7 +167,7 @@ func TestDebounce(t *testing.T) {
 		ttl := unshardedCluster.TTL(debounceClient.KeyGenerator().DebouncePointer(ctx, functionId, functionId.String()))
 		require.Equal(t, 5*time.Second, ttl, "expected ttl to match", unshardedCluster.Keys())
 
-		_, err := redisDebouncer.Debounce(ctx, expectedDi, fn)
+		err := redisDebouncer.Debounce(ctx, expectedDi, fn)
 		require.NoError(t, err)
 
 		expectedDi.Timeout = evt0Time.Add(60 * time.Second).UnixMilli() // Must match initial event, timeout may never change
@@ -217,12 +216,12 @@ func TestDebounce(t *testing.T) {
 			require.NoError(t, err)
 
 			initialScore := evt0Time.
-				Add(10 * time.Second).       // Debounce period
-				Add(buffer).                 // Buffer
+				Add(10 * time.Second). // Debounce period
+				Add(buffer). // Buffer
 				Add(time.Second).UnixMilli() // Allow updateDebounce on TTL 0
 			expectedRequeueScore := eventTime.
-				Add(10 * time.Second).       // Debounce period
-				Add(buffer).                 // Buffer
+				Add(10 * time.Second). // Debounce period
+				Add(buffer). // Buffer
 				Add(time.Second).UnixMilli() // Allow updateDebounce on TTL 0
 
 			require.NotEqual(t, initialScore, expectedRequeueScore)
@@ -390,7 +389,7 @@ func TestJITDebounceMigration(t *testing.T) {
 			},
 		}
 
-		_, err := oldRedisDebouncer.Debounce(ctx, expectedDi, fn)
+		err := oldRedisDebouncer.Debounce(ctx, expectedDi, fn)
 		require.NoError(t, err)
 
 		expectedDi.Timeout = eventTime.Add(60 * time.Second).UnixMilli()
@@ -437,8 +436,8 @@ func TestJITDebounceMigration(t *testing.T) {
 			itemScore, err := unshardedCluster.ZScore(defaultQueueShard.RedisClient.KeyGenerator().PartitionQueueSet(enums.PartitionTypeDefault, queue.KindDebounce, ""), qi.ID)
 			require.NoError(t, err)
 			expectedQueueScore := eventTime.
-				Add(10 * time.Second).       // Debounce period
-				Add(buffer).                 // Buffer
+				Add(10 * time.Second). // Debounce period
+				Add(buffer). // Buffer
 				Add(time.Second).UnixMilli() // Allow updateDebounce on TTL 0
 			require.Equal(t, expectedQueueScore, int64(itemScore))
 		}
@@ -469,7 +468,7 @@ func TestJITDebounceMigration(t *testing.T) {
 		ttl := unshardedCluster.TTL(unshardedDebounceClient.KeyGenerator().DebouncePointer(ctx, functionId, functionId.String()))
 		require.Equal(t, 5*time.Second, ttl, "expected ttl to match", unshardedCluster.Keys())
 
-		_, err := newRedisDebouncer.Debounce(ctx, expectedDi, fn)
+		err := newRedisDebouncer.Debounce(ctx, expectedDi, fn)
 		require.NoError(t, err)
 
 		expectedDi.Timeout = evt0Time.Add(60 * time.Second).UnixMilli() // Must match initial event, timeout may never change
@@ -522,8 +521,8 @@ func TestJITDebounceMigration(t *testing.T) {
 				Add(buffer).
 				Add(time.Second).UnixMilli() // Allow updateDebounce on TTL 0
 			expectedRequeueScore := eventTime.
-				Add(10 * time.Second).       // Debounce period
-				Add(buffer).                 // Buffer
+				Add(10 * time.Second). // Debounce period
+				Add(buffer). // Buffer
 				Add(time.Second).UnixMilli() // Allow updateDebounce on TTL 0
 
 			require.NotEqual(t, initialScore, expectedRequeueScore)
@@ -661,7 +660,7 @@ func TestDebounceMigrationWithoutTimeout(t *testing.T) {
 			},
 		}
 
-		_, err := oldRedisDebouncer.Debounce(ctx, expectedDi, fn)
+		err := oldRedisDebouncer.Debounce(ctx, expectedDi, fn)
 		require.NoError(t, err)
 
 		ttl := unshardedCluster.TTL(unshardedDebounceClient.KeyGenerator().DebouncePointer(ctx, functionId, functionId.String()))
@@ -706,8 +705,8 @@ func TestDebounceMigrationWithoutTimeout(t *testing.T) {
 			itemScore, err := unshardedCluster.ZScore(defaultQueueShard.RedisClient.KeyGenerator().PartitionQueueSet(enums.PartitionTypeDefault, queue.KindDebounce, ""), qi.ID)
 			require.NoError(t, err)
 			expectedQueueScore := eventTime.
-				Add(10 * time.Second).       // Debounce period
-				Add(buffer).                 // Buffer
+				Add(10 * time.Second). // Debounce period
+				Add(buffer). // Buffer
 				Add(time.Second).UnixMilli() // Allow updateDebounce on TTL 0
 			require.Equal(t, expectedQueueScore, int64(itemScore))
 		}
@@ -738,7 +737,7 @@ func TestDebounceMigrationWithoutTimeout(t *testing.T) {
 		ttl := unshardedCluster.TTL(unshardedDebounceClient.KeyGenerator().DebouncePointer(ctx, functionId, functionId.String()))
 		require.Equal(t, 5*time.Second, ttl, "expected ttl to match", unshardedCluster.Keys())
 
-		_, err := newRedisDebouncer.Debounce(ctx, expectedDi, fn)
+		err := newRedisDebouncer.Debounce(ctx, expectedDi, fn)
 		require.NoError(t, err)
 
 		// TTL is reset
@@ -785,12 +784,12 @@ func TestDebounceMigrationWithoutTimeout(t *testing.T) {
 			require.NoError(t, err)
 
 			initialScore := evt0Time.
-				Add(10 * time.Second).       // Debounce period
-				Add(buffer).                 // Buffer
+				Add(10 * time.Second). // Debounce period
+				Add(buffer). // Buffer
 				Add(time.Second).UnixMilli() // Allow updateDebounce on TTL 0
 			expectedRequeueScore := eventTime.
-				Add(10 * time.Second).       // Debounce period
-				Add(buffer).                 // Buffer
+				Add(10 * time.Second). // Debounce period
+				Add(buffer). // Buffer
 				Add(time.Second).UnixMilli() // Allow updateDebounce on TTL 0
 
 			require.NotEqual(t, initialScore, expectedRequeueScore)
@@ -903,7 +902,7 @@ func TestDebounceTimeoutIsPreserved(t *testing.T) {
 
 		eventId := ulid.MustNew(ulid.Timestamp(eventTime), rand.Reader)
 
-		_, err := oldRedisDebouncer.Debounce(ctx, DebounceItem{
+		err := oldRedisDebouncer.Debounce(ctx, DebounceItem{
 			AccountID:   accountId,
 			WorkspaceID: workspaceId,
 			AppID:       appId,
@@ -958,7 +957,7 @@ func TestDebounceTimeoutIsPreserved(t *testing.T) {
 		ttl := unshardedCluster.TTL(unshardedDebounceClient.KeyGenerator().DebouncePointer(ctx, functionId, functionId.String()))
 		require.Equal(t, 1*time.Second, ttl, "expected ttl to match", unshardedCluster.Keys())
 
-		_, err := newRedisDebouncer.Debounce(ctx, expectedDi, fn)
+		err := newRedisDebouncer.Debounce(ctx, expectedDi, fn)
 		require.NoError(t, err)
 
 		// TTL on new cluster must be adjusted (6s to timeout, 3s already passed, renew by 4s is greater so we set an upper bound to the 6-3=3s remaining seconds)
@@ -1008,8 +1007,8 @@ func TestDebounceTimeoutIsPreserved(t *testing.T) {
 			require.NoError(t, err)
 
 			expectedRequeueScore := eventTime.
-				Add(3 * time.Second).        // Remaining TTL applied
-				Add(buffer).                 // Buffer
+				Add(3 * time.Second). // Remaining TTL applied
+				Add(buffer). // Buffer
 				Add(time.Second).UnixMilli() // Allow updateDebounce on TTL 0
 
 			require.Equal(t, expectedRequeueScore, int64(itemScore))
@@ -1120,7 +1119,7 @@ func TestDebounceExplicitMigration(t *testing.T) {
 
 		eventId := ulid.MustNew(ulid.Timestamp(eventTime), rand.Reader)
 
-		_, err := oldRedisDebouncer.Debounce(ctx, DebounceItem{
+		err := oldRedisDebouncer.Debounce(ctx, DebounceItem{
 			AccountID:   accountId,
 			WorkspaceID: workspaceId,
 			AppID:       appId,
@@ -1197,8 +1196,8 @@ func TestDebounceExplicitMigration(t *testing.T) {
 			require.NoError(t, err)
 
 			expectedRequeueScore := eventTime.
-				Add(5 * time.Second).        // Remaining TTL applied
-				Add(buffer).                 // Buffer
+				Add(5 * time.Second). // Remaining TTL applied
+				Add(buffer). // Buffer
 				Add(time.Second).UnixMilli() // Allow updateDebounce on TTL 0
 
 			require.Equal(t, expectedRequeueScore, int64(itemScore))
@@ -1491,7 +1490,7 @@ func TestDebounceExecutionDuringMigrationWorks(t *testing.T) {
 			},
 		}
 
-		_, err := oldRedisDebouncer.Debounce(ctx, expectedDi, fn)
+		err := oldRedisDebouncer.Debounce(ctx, expectedDi, fn)
 		require.NoError(t, err)
 
 		expectedDi.Timeout = eventTime.Add(60 * time.Second).UnixMilli()
@@ -1538,8 +1537,8 @@ func TestDebounceExecutionDuringMigrationWorks(t *testing.T) {
 			itemScore, err := unshardedCluster.ZScore(defaultQueueShard.RedisClient.KeyGenerator().PartitionQueueSet(enums.PartitionTypeDefault, queue.KindDebounce, ""), qi.ID)
 			require.NoError(t, err)
 			expectedQueueScore := eventTime.
-				Add(10 * time.Second).       // Debounce period
-				Add(buffer).                 // Buffer
+				Add(10 * time.Second). // Debounce period
+				Add(buffer). // Buffer
 				Add(time.Second).UnixMilli() // Allow updateDebounce on TTL 0
 			require.Equal(t, expectedQueueScore, int64(itemScore))
 		}
@@ -1704,7 +1703,7 @@ func TestDebounceExecutionShouldNotRaceMigration(t *testing.T) {
 			},
 		}
 
-		_, err := oldRedisDebouncer.Debounce(ctx, expectedDi, fn)
+		err := oldRedisDebouncer.Debounce(ctx, expectedDi, fn)
 		require.NoError(t, err)
 
 		expectedDi.Timeout = eventTime.Add(60 * time.Second).UnixMilli()
@@ -1751,8 +1750,8 @@ func TestDebounceExecutionShouldNotRaceMigration(t *testing.T) {
 			itemScore, err := unshardedCluster.ZScore(defaultQueueShard.RedisClient.KeyGenerator().PartitionQueueSet(enums.PartitionTypeDefault, queue.KindDebounce, ""), qi.ID)
 			require.NoError(t, err)
 			expectedQueueScore := eventTime.
-				Add(10 * time.Second).       // Debounce period
-				Add(buffer).                 // Buffer
+				Add(10 * time.Second). // Debounce period
+				Add(buffer). // Buffer
 				Add(time.Second).UnixMilli() // Allow updateDebounce on TTL 0
 			require.Equal(t, expectedQueueScore, int64(itemScore))
 		}

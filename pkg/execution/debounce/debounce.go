@@ -143,7 +143,7 @@ type DebounceMigrator interface {
 // Debouncer represents an implementation-agnostic function debouncer, delaying function runs
 // until a specific time period passes when no more events matching a key are received.
 type Debouncer interface {
-	Debounce(ctx context.Context, d DebounceItem, fn inngest.Function) (*ulid.ULID, error)
+	Debounce(ctx context.Context, d DebounceItem, fn inngest.Function) error
 	GetDebounceItem(ctx context.Context, debounceID ulid.ULID, accountID uuid.UUID) (*DebounceItem, error)
 	DeleteDebounceItem(ctx context.Context, debounceID ulid.ULID, d DebounceItem, accountID uuid.UUID) error
 	StartExecution(ctx context.Context, d DebounceItem, fn inngest.Function, debounceID ulid.ULID) error
@@ -496,18 +496,17 @@ func (d debouncer) Migrate(ctx context.Context, debounceId ulid.ULID, di Debounc
 		return fmt.Errorf("expected migration mode to be enable")
 	}
 
-	_, err := d.debounce(ctx, di, fn, remainingTtl, 0, shouldMigrate)
-	return err
+	return d.debounce(ctx, di, fn, remainingTtl, 0, shouldMigrate)
 }
 
 // Debounce debounces a given function with the given DebounceItem.
-func (d debouncer) Debounce(ctx context.Context, di DebounceItem, fn inngest.Function) (*ulid.ULID, error) {
+func (d debouncer) Debounce(ctx context.Context, di DebounceItem, fn inngest.Function) error {
 	if fn.Debounce == nil {
-		return nil, fmt.Errorf("fn has no debounce config")
+		return fmt.Errorf("fn has no debounce config")
 	}
 	ttl, err := str2duration.ParseDuration(fn.Debounce.Period)
 	if err != nil {
-		return nil, fmt.Errorf("invalid debounce duration: %w", err)
+		return fmt.Errorf("invalid debounce duration: %w", err)
 	}
 
 	// Determine the flag value once and pass down to prevent inconsistent values while debouncing
@@ -516,7 +515,7 @@ func (d debouncer) Debounce(ctx context.Context, di DebounceItem, fn inngest.Fun
 	return d.debounce(ctx, di, fn, ttl, 0, shouldMigrate)
 }
 
-func (d debouncer) debounce(ctx context.Context, di DebounceItem, fn inngest.Function, ttl time.Duration, n int, shouldMigrate bool) (*ulid.ULID, error) {
+func (d debouncer) debounce(ctx context.Context, di DebounceItem, fn inngest.Function, ttl time.Duration, n int, shouldMigrate bool) error {
 	newDebounceID := ulid.MustNew(ulid.Timestamp(d.c.Now()), rand.Reader)
 	var foundDebounce bool
 
@@ -546,7 +545,7 @@ func (d debouncer) debounce(ctx context.Context, di DebounceItem, fn inngest.Fun
 	if shouldMigrate && hasSecondary {
 		debounceID, debounceTimeout, err := d.prepareMigration(ctx, di, fn)
 		if err != nil {
-			return nil, fmt.Errorf("could not prepare debounce migration: %w", err)
+			return fmt.Errorf("could not prepare debounce migration: %w", err)
 		}
 
 		if debounceID != nil {
@@ -567,7 +566,7 @@ func (d debouncer) debounce(ctx context.Context, di DebounceItem, fn inngest.Fun
 			err := d.deleteDebounceItem(ctx, newDebounceID, d.secondaryDebounceClient)
 			if err != nil {
 				l.Error("unable to delete old debounce after migration", "err", err)
-				return nil, nil
+				return nil
 			}
 
 			// Delete debounce timeout from old cluster
@@ -605,7 +604,7 @@ func (d debouncer) debounce(ctx context.Context, di DebounceItem, fn inngest.Fun
 	// is atomic, and two individual threads/workers cannot create debounces simultaneously.
 	existingDebounceID, err := d.newDebounce(ctx, di, fn, ttl, shouldMigrate, newDebounceID)
 	if err == nil {
-		return nil, nil
+		return nil
 	}
 	if err != ErrDebounceExists {
 		if shouldMigrate && foundDebounce {
@@ -613,23 +612,23 @@ func (d debouncer) debounce(ctx context.Context, di DebounceItem, fn inngest.Fun
 		}
 
 		// There was an unkown error creating the debounce.
-		return nil, err
+		return err
 	}
 	if existingDebounceID == nil {
 		if shouldMigrate && foundDebounce {
 			l.Error("unexpected missing existing debounce ID after creating on primary cluster", "err", err)
 		}
 
-		return nil, fmt.Errorf("expected debounce ID when debounce exists")
+		return fmt.Errorf("expected debounce ID when debounce exists")
 	}
 
 	// A debounce must already exist for this fn.  Update it.
-	prevEventID, err := d.updateDebounce(ctx, di, fn, ttl, *existingDebounceID, shouldMigrate)
+	err = d.updateDebounce(ctx, di, fn, ttl, *existingDebounceID, shouldMigrate)
 	if err == context.DeadlineExceeded || err == ErrDebounceInProgress || err == ErrDebounceNotFound {
 		if n == 5 {
 			l.Error("unable to update debounce", "error", err)
 			// Only recurse 5 times.
-			return nil, fmt.Errorf("unable to update debounce: %w", err)
+			return fmt.Errorf("unable to update debounce: %w", err)
 		}
 		// Re-invoke this to see if we need to extend the debounce or continue.
 		// Wait 50 milliseconds for the current lock and job to have evaluated.
@@ -640,7 +639,7 @@ func (d debouncer) debounce(ctx context.Context, di DebounceItem, fn inngest.Fun
 		return d.debounce(ctx, di, fn, ttl, n+1, shouldMigrate)
 	}
 
-	return prevEventID, err
+	return err
 }
 
 func (d debouncer) queueItem(ctx context.Context, di DebounceItem, debounceID ulid.ULID) queue.Item {
@@ -835,12 +834,12 @@ func (d debouncer) prepareMigration(ctx context.Context, di DebounceItem, fn inn
 
 // updateDebounce updates the currently pending debounce to point to the new event ID.  It pushes
 // out the debounce's TTL, and re-enqueues the job to initialize fns from the debounce.
-func (d debouncer) updateDebounce(ctx context.Context, di DebounceItem, fn inngest.Function, ttl time.Duration, debounceID ulid.ULID, shouldMigrate bool) (*ulid.ULID, error) {
+func (d debouncer) updateDebounce(ctx context.Context, di DebounceItem, fn inngest.Function, ttl time.Duration, debounceID ulid.ULID, shouldMigrate bool) error {
 	now := d.c.Now()
 
 	key, err := d.debounceKey(ctx, di, fn)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	// NOTE: This function has a deadline to complete.  If this fn doesn't complete within the deadline,
@@ -851,24 +850,24 @@ func (d debouncer) updateDebounce(ctx context.Context, di DebounceItem, fn innge
 
 	client := d.client(shouldMigrate)
 	if client == nil {
-		return nil, fmt.Errorf("client did not return DebounceClient")
+		return fmt.Errorf("client did not return DebounceClient")
 	}
 
 	queueManager := d.queueManager(shouldMigrate)
 	if queueManager == nil {
-		return nil, fmt.Errorf("queueManager did not return QueueManager")
+		return fmt.Errorf("queueManager did not return QueueManager")
 	}
 
 	queueShard := d.queueShard(shouldMigrate)
 	if queueShard.Name == "" {
-		return nil, fmt.Errorf("queueShard did not return QueueShard")
+		return fmt.Errorf("queueShard did not return QueueShard")
 	}
 
 	keyPtr := client.KeyGenerator().DebouncePointer(ctx, fn.ID, key)
 	keyDbc := client.KeyGenerator().Debounce(ctx)
 	byt, err := json.Marshal(di)
 	if err != nil {
-		return nil, fmt.Errorf("error marshalling debounce: %w", err)
+		return fmt.Errorf("error marshalling debounce: %w", err)
 	}
 
 	out, err := scripts["updateDebounce"].Exec(
@@ -887,66 +886,31 @@ func (d debouncer) updateDebounce(ctx context.Context, di DebounceItem, fn innge
 			strconv.Itoa(int(now.UnixMilli())),
 			strconv.Itoa(int(di.Event.Timestamp)),
 		},
-	).ToAny()
+	).AsInt64()
 	if err != nil {
-		return nil, fmt.Errorf("error creating debounce: %w", err)
+		return fmt.Errorf("error creating debounce: %w", err)
 	}
-
-	returnedSet, ok := out.([]any)
-	if !ok {
-		return nil, fmt.Errorf("expected to receive one or more set items")
-	}
-
-	if len(returnedSet) < 1 {
-		return nil, fmt.Errorf("expected at least one items")
-	}
-
-	status, ok := returnedSet[0].(int64)
-	if !ok {
-		return nil, fmt.Errorf("unexpected return value, expected status int")
-	}
-
-	switch status {
+	switch out {
 	case -1:
 		// The debounce is in progress or has just finished.  Requeue.
-		return nil, ErrDebounceInProgress
+		return ErrDebounceInProgress
 	case -2:
 		// The event is out-of-order and a newer event exists within the debounce.
 		// Do nothing.
-		return nil, nil
+		return nil
 	case -3:
 		// The queue item is not found with the debounceID
 		// enqueue a new item
 		qi := d.queueItem(ctx, di, debounceID)
 
-		return nil, queueManager.Enqueue(ctx, qi, now.Add(ttl).Add(buffer).Add(time.Second), queue.EnqueueOpts{
+		return queueManager.Enqueue(ctx, qi, now.Add(ttl).Add(buffer).Add(time.Second), queue.EnqueueOpts{
 			// Debounce timeout items must live on the same Redis instance as the state.
 			ForceQueueShardName: queueShard.Name,
 		})
-	case 0:
-		if len(returnedSet) < 3 {
-			return nil, fmt.Errorf("expected at least three items when updating debounce")
-		}
-
-		rawTTL, ok := returnedSet[1].(int64)
-		if !ok {
-			return nil, fmt.Errorf("expected TTL as second item")
-		}
-
-		rawPrevEventID, ok := returnedSet[2].(string)
-		if !ok {
-			return nil, fmt.Errorf("expected previous event ID as third item")
-		}
-
-		// Make sure the prev event ID parses to a valid ULID
-		prevEventID, err := ulid.Parse(rawPrevEventID)
-		if err != nil {
-			return nil, fmt.Errorf("expected previous event ID to be a valid ULID: %w", err)
-		}
-
+	default:
 		// Debounces should have a maximum timeout;  updating the debounce returns
 		// the timeout to use.
-		actualTTL := time.Second * time.Duration(rawTTL)
+		actualTTL := time.Second * time.Duration(out)
 		err = queueManager.RequeueByJobID(
 			ctx,
 			queueShard,
@@ -959,10 +923,10 @@ func (d debouncer) updateDebounce(ctx context.Context, di DebounceItem, fn innge
 				"ttl", out,
 			)
 			// This is in progress.
-			return nil, ErrDebounceInProgress
+			return ErrDebounceInProgress
 		}
 		if err != nil {
-			return nil, fmt.Errorf("error requeueing debounce job '%s': %w", debounceID, err)
+			return fmt.Errorf("error requeueing debounce job '%s': %w", debounceID, err)
 		}
 
 		metrics.IncrQueueDebounceOperationCounter(ctx, metrics.CounterOpt{
@@ -973,10 +937,7 @@ func (d debouncer) updateDebounce(ctx context.Context, di DebounceItem, fn innge
 			},
 		})
 
-		return &prevEventID, nil
-	default:
-		// Unknown status
-		return nil, fmt.Errorf("unknown status returned when updating debounce: %d", status)
+		return nil
 	}
 }
 
