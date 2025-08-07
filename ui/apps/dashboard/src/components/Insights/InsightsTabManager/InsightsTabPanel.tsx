@@ -12,7 +12,7 @@ export function InsightsTabPanel() {
   const isRunning = status === 'loading';
 
   return (
-    <main className="grid h-full w-full flex-1 grid-rows-[3fr_5fr] gap-0 overflow-hidden">
+    <>
       <Section
         actions={<InsightsSQLEditorQueryButton />}
         className="min-h-[255px]"
@@ -31,6 +31,6 @@ export function InsightsTabPanel() {
       >
         <InsightsDataTable />
       </Section>
-    </main>
+    </>
   );
 }

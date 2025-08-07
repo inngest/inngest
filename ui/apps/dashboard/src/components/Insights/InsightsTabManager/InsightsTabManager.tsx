@@ -73,14 +73,14 @@ interface InsightsTabManagerInternalProps {
 
 function InsightsTabManagerInternal({ tabs, activeTabId }: InsightsTabManagerInternalProps) {
   return (
-    <div className="h-full w-full">
+    <main className="grid h-full w-full flex-1 grid-rows-[3fr_5fr] gap-0 overflow-hidden">
       {/* TODO: Tab navigation UI */}
       {tabs.map((tab) => (
         <InsightsStateMachineContextProvider key={tab.id} renderChildren={tab.id === activeTabId}>
           <InsightsTabPanel />
         </InsightsStateMachineContextProvider>
       ))}
-    </div>
+    </main>
   );
 }
 
