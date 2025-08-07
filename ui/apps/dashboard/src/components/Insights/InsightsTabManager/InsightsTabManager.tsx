@@ -4,6 +4,7 @@ import { useMemo, useState } from 'react';
 
 import { InsightsStateMachineContextProvider } from '@/components/Insights/InsightsStateMachineContext/InsightsStateMachineContext';
 import { InsightsTabPanel } from './InsightsTabPanel';
+import { InsightsTabsList } from './InsightsTabsList';
 
 const HOME_TAB = { id: '__home', name: 'Home' } as const;
 
@@ -59,8 +60,8 @@ export function useInsightsTabManager(): UseInsightsTabManagerReturn {
   );
 
   const tabManager = useMemo(
-    () => <InsightsTabManagerInternal activeTabId={activeTabId} tabs={tabs} />,
-    [tabs, activeTabId]
+    () => <InsightsTabManagerInternal actions={actions} activeTabId={activeTabId} tabs={tabs} />,
+    [actions, activeTabId, tabs]
   );
 
   return { actions, activeTabId, tabManager, tabs };
@@ -69,18 +70,25 @@ export function useInsightsTabManager(): UseInsightsTabManagerReturn {
 interface InsightsTabManagerInternalProps {
   activeTabId: string;
   tabs: TabConfig[];
+  actions: TabManagerActions;
 }
 
-function InsightsTabManagerInternal({ tabs, activeTabId }: InsightsTabManagerInternalProps) {
+function InsightsTabManagerInternal({
+  tabs,
+  activeTabId,
+  actions,
+}: InsightsTabManagerInternalProps) {
   return (
-    <main className="grid h-full w-full flex-1 grid-rows-[3fr_5fr] gap-0 overflow-hidden">
-      {/* TODO: Tab navigation UI */}
-      {tabs.map((tab) => (
-        <InsightsStateMachineContextProvider key={tab.id} renderChildren={tab.id === activeTabId}>
-          <InsightsTabPanel />
-        </InsightsStateMachineContextProvider>
-      ))}
-    </main>
+    <div className="flex h-full w-full flex-1 flex-col overflow-hidden">
+      <InsightsTabsList actions={actions} activeTabId={activeTabId} hide tabs={tabs} />
+      <div className="grid h-full w-full flex-1 grid-rows-[3fr_5fr] gap-0 overflow-hidden">
+        {tabs.map((tab) => (
+          <InsightsStateMachineContextProvider key={tab.id} renderChildren={tab.id === activeTabId}>
+            <InsightsTabPanel />
+          </InsightsStateMachineContextProvider>
+        ))}
+      </div>
+    </div>
   );
 }
 
