@@ -36,13 +36,15 @@ interface InsightsStateMachineContextValue extends InsightsState {
 
 const InsightsStateMachineContext = createContext<InsightsStateMachineContextValue | null>(null);
 
+type InsightsStateMachineContextProviderProps = {
+  children: ReactNode;
+  renderChildren: boolean;
+};
+
 export function InsightsStateMachineContextProvider({
   children,
-  renderChildren = true,
-}: {
-  children: ReactNode;
-  renderChildren?: boolean;
-}) {
+  renderChildren,
+}: InsightsStateMachineContextProviderProps) {
   const [queryState, dispatch] = useReducer(insightsStateMachineReducer, INITIAL_STATE);
 
   // TODO: Ensure runQuery and fetchMore cannot finish out of order
