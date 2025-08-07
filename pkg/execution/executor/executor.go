@@ -313,13 +313,6 @@ func WithRealtimePublisher(b realtime.Publisher) ExecutorOpt {
 	}
 }
 
-func WithEventReader(r cqrs.EventReader) ExecutorOpt {
-	return func(e execution.Executor) error {
-		e.(*executor).eventReader = r
-		return nil
-	}
-}
-
 // WithRealtimeAPIPublisher adds JWT configuration which allows publishing of data to the
 // realtime API, without connecting to the backing realtime service directly.
 func WithRealtimeConfig(config ExecutorRealtimeConfig) ExecutorOpt {
@@ -376,8 +369,6 @@ type executor struct {
 	assignedQueueShard redis_state.QueueShard
 	shardFinder        redis_state.ShardSelector
 
-	// eventReader is used to read events from the backing store.
-	eventReader    cqrs.EventReader
 	traceReader    cqrs.TraceReader
 	tracerProvider tracing.TracerProvider
 }
@@ -464,7 +455,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	)
 
 	if req.Function.Debounce != nil && !req.PreventDebounce {
-		prevEventID, err := e.debouncer.Debounce(ctx, debounce.DebounceItem{
+		err := e.debouncer.Debounce(ctx, debounce.DebounceItem{
 			AccountID:        req.AccountID,
 			WorkspaceID:      req.WorkspaceID,
 			AppID:            req.AppID,
@@ -477,35 +468,6 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		if err != nil {
 			return nil, err
 		}
-
-		// If we have a previous event ID, that means that debouncing
-		// overwrote the execution for that event. If it's an invoke, we need
-		// to clean that up and send a finished event to stop the run from
-		// hanging.
-		//
-		// We have to make sure that we load the overwritten event here, as
-		// the new event that triggered the run could be a different type.
-		if prevEventID != nil {
-			evt, err := e.eventReader.GetEvent(ctx, *prevEventID, req.AccountID, req.WorkspaceID)
-			if err != nil {
-				return nil, fmt.Errorf("error finding previous event for debounced function: %w", err)
-			}
-
-			if evt != nil && evt.GetEvent().IsInvokeEvent() {
-				if err := e.InvokeFailHandler(ctx, execution.InvokeFailHandlerOpts{
-					OriginalEvent: evt,
-					FunctionID:    req.Function.ID.String(),
-					RunID:         "",
-					Err: map[string]any{
-						"name":    "Error",
-						"message": "Invoke was debounced",
-					},
-				}); err != nil {
-					return nil, fmt.Errorf("error handling invoke fail: %w", err)
-				}
-			}
-		}
-
 		return nil, ErrFunctionDebounced
 	}
 
