@@ -119,6 +119,7 @@ export function EventTypesTable({
     queryKey: ['event-types', { orderBy, archived, nameSearch }],
     queryFn: ({ pageParam }: { pageParam: string | null }) =>
       getEventTypes({ orderBy, cursor: pageParam, archived, nameSearch }),
+    refetchOnWindowFocus: false,
     getNextPageParam: (lastPage) => {
       if (!lastPage || !lastPage.pageInfo.hasNextPage) {
         return undefined;

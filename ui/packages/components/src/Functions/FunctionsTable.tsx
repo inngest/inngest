@@ -98,6 +98,7 @@ export function FunctionsTable({
     queryKey: ['functions', { archived, nameSearch }],
     queryFn: ({ pageParam = 1 }: { pageParam: number }) =>
       getFunctions({ cursor: pageParam, archived, nameSearch }),
+    refetchOnWindowFocus: false,
     getNextPageParam: (lastPage) => {
       const { currentPage, totalPages } = lastPage.pageInfo;
       if (typeof totalPages === 'number' && currentPage < totalPages) {
