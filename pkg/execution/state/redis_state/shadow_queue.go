@@ -17,6 +17,7 @@ import (
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
 	"github.com/inngest/inngest/pkg/telemetry/redis_telemetry"
 	"github.com/oklog/ulid/v2"
+	"github.com/redis/rueidis"
 	"golang.org/x/sync/errgroup"
 )
 
@@ -82,12 +83,77 @@ func (q *queue) shadowWorker(ctx context.Context, qspc chan shadowPartitionChanM
 	}
 }
 
+func (q *queue) isMigrationLocked(ctx context.Context, shard QueueShard, fnID uuid.UUID) (*time.Time, error) {
+	client := shard.RedisClient.Client()
+	kg := shard.RedisClient.KeyGenerator()
+	cmd := client.B().Get().Key(kg.QueueMigrationLock(fnID)).Build()
+	exists, err := client.Do(ctx, cmd).ToString()
+	if err != nil {
+		if rueidis.IsRedisNil(err) {
+			return nil, nil
+		}
+		return nil, fmt.Errorf("could not check for migration lock: %w", err)
+	}
+
+	parsed, err := ulid.Parse(exists)
+	if err != nil {
+		return nil, fmt.Errorf("invalid lock format: %w", err)
+	}
+
+	lockUntil := parsed.Timestamp()
+	return &lockUntil, nil
+}
+
 func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueShadowPartition, continuationCount uint) error {
-	metrics.ActiveShadowScannerCount(ctx, 1, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name}})
-	defer metrics.ActiveShadowScannerCount(ctx, -1, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": q.primaryQueueShard.Name}})
+	shard := q.primaryQueueShard
+
+	metrics.ActiveShadowScannerCount(ctx, 1, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": shard.Name}})
+	defer metrics.ActiveShadowScannerCount(ctx, -1, metrics.CounterOpt{PkgName: pkgName, Tags: map[string]any{"queue_shard": shard.Name}})
+
+	// Check if shadow partition cannot be processed (paused/refill disabled, etc.)
+	if shadowPart.FunctionID != nil {
+		lockedUntil, err := q.isMigrationLocked(ctx, shard, *shadowPart.FunctionID)
+		if err != nil {
+			return fmt.Errorf("could not check for migration lock: %w", err)
+		}
+
+		if lockedUntil != nil {
+			q.removeShadowContinue(ctx, shadowPart, false)
+			_, err := durationWithTags(ctx, shard.Name, durOpShadowPartitionRequeue, q.clock.Now(), func(ctx context.Context) (any, error) {
+				err := q.ShadowPartitionRequeue(ctx, shadowPart, lockedUntil)
+				return nil, err
+			}, map[string]any{"reason": "migrating"})
+			switch err {
+			case nil, ErrShadowPartitionNotFound:
+				return nil
+			default:
+				return fmt.Errorf("could not requeue migrating shadow partition: %w", err)
+			}
+		}
+
+		if info := q.partitionPausedGetter(ctx, *shadowPart.FunctionID); info.Paused {
+			q.removeShadowContinue(ctx, shadowPart, false)
+
+			if !info.Stale {
+				forceRequeueAt := q.clock.Now().Add(ShadowPartitionRefillPausedRequeueExtension)
+				_, err := durationWithTags(ctx, shard.Name, durOpShadowPartitionRequeue, q.clock.Now(), func(ctx context.Context) (any, error) {
+					err := q.ShadowPartitionRequeue(ctx, shadowPart, &forceRequeueAt)
+					return nil, err
+				}, map[string]any{"reason": "paused"})
+				switch err {
+				case nil, ErrShadowPartitionNotFound:
+					return nil
+				default:
+					return fmt.Errorf("could not requeue shadow partition: %w", err)
+				}
+			}
+		}
+
+		return nil
+	}
 
 	// acquire lease for shadow partition
-	leaseID, err := duration(ctx, q.primaryQueueShard.Name, "shadow_partition_lease", q.clock.Now(), func(ctx context.Context) (*ulid.ULID, error) {
+	leaseID, err := duration(ctx, shard.Name, "shadow_partition_lease", q.clock.Now(), func(ctx context.Context) (*ulid.ULID, error) {
 		leaseID, err := q.ShadowPartitionLease(ctx, shadowPart, ShadowPartitionLeaseDuration)
 		return leaseID, err
 	})
@@ -97,7 +163,7 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 			metrics.IncrQueueShadowPartitionLeaseContentionCounter(ctx, metrics.CounterOpt{
 				PkgName: pkgName,
 				Tags: map[string]any{
-					"queue_shard": q.primaryQueueShard.Name,
+					"queue_shard": shard.Name,
 					// "partition_id": shadowPart.PartitionID,
 					"action": "lease",
 				},
@@ -108,7 +174,7 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 			metrics.IncrQueueShadowPartitionGoneCounter(ctx, metrics.CounterOpt{
 				PkgName: pkgName,
 				Tags: map[string]any{
-					"queue_shard": q.primaryQueueShard.Name,
+					"queue_shard": shard.Name,
 					// "partition_id": shadowPart.PartitionID,
 				},
 			})
@@ -150,7 +216,7 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 						metrics.IncrQueueShadowPartitionLeaseContentionCounter(ctx, metrics.CounterOpt{
 							PkgName: pkgName,
 							Tags: map[string]any{
-								"queue_shard": q.primaryQueueShard.Name,
+								"queue_shard": shard.Name,
 								// "partition_id": shadowPart.PartitionID,
 								"action": "extend_lease",
 							},
@@ -173,30 +239,6 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 	keyQueuesEnabled := shadowPart.keyQueuesEnabled(ctx, q)
 
 	latestConstraints := q.partitionConstraintConfigGetter(ctx, shadowPart.Identifier())
-
-	// Check if shadow partition cannot be processed (paused/refill disabled, etc.)
-	if shadowPart.FunctionID != nil {
-		if info := q.partitionPausedGetter(ctx, *shadowPart.FunctionID); info.Paused {
-
-			q.removeShadowContinue(ctx, shadowPart, false)
-
-			if !info.Stale {
-				forceRequeueAt := q.clock.Now().Add(ShadowPartitionRefillPausedRequeueExtension)
-				_, err = durationWithTags(ctx, q.primaryQueueShard.Name, durOpShadowPartitionRequeue, q.clock.Now(), func(ctx context.Context) (any, error) {
-					err := q.ShadowPartitionRequeue(ctx, shadowPart, &forceRequeueAt)
-					return nil, err
-				}, map[string]any{"reason": "paused"})
-				switch err {
-				case nil, ErrShadowPartitionNotFound:
-					return nil
-				default:
-					return fmt.Errorf("could not requeue shadow partition: %w", err)
-				}
-			}
-		}
-
-		return nil
-	}
 
 	limit := ShadowPartitionPeekMaxBacklogs
 
@@ -264,7 +306,7 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 
 			forceRequeueShadowPartitionAt := q.clock.Now().Add(PartitionConcurrencyLimitRequeueExtension)
 
-			_, err = durationWithTags(ctx, q.primaryQueueShard.Name, durOpShadowPartitionRequeue, q.clock.Now(), func(ctx context.Context) (any, error) {
+			_, err = durationWithTags(ctx, shard.Name, durOpShadowPartitionRequeue, q.clock.Now(), func(ctx context.Context) (any, error) {
 				err := q.ShadowPartitionRequeue(ctx, shadowPart, &forceRequeueShadowPartitionAt)
 				return nil, err
 			}, map[string]any{"reason": "concurrency_limited", "cause": res.Constraint.String()})
@@ -282,7 +324,7 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 	metrics.IncrQueueShadowPartitionProcessedCounter(ctx, metrics.CounterOpt{
 		PkgName: pkgName,
 		Tags: map[string]any{
-			"queue_shard": q.primaryQueueShard.Name,
+			"queue_shard": shard.Name,
 		},
 	})
 
@@ -291,7 +333,7 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 		// No more backlogs right now, we can continue the scan loop until new items are added
 		q.removeShadowContinue(ctx, shadowPart, false)
 
-		_, err = durationWithTags(ctx, q.primaryQueueShard.Name, durOpShadowPartitionRequeue, q.clock.Now(), func(ctx context.Context) (any, error) {
+		_, err = durationWithTags(ctx, shard.Name, durOpShadowPartitionRequeue, q.clock.Now(), func(ctx context.Context) (any, error) {
 			err := q.ShadowPartitionRequeue(ctx, shadowPart, nil)
 			return nil, err
 		}, map[string]any{"reason": "empty"})
@@ -330,7 +372,7 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 		}
 	}
 
-	_, err = durationWithTags(ctx, q.primaryQueueShard.Name, durOpShadowPartitionRequeue, q.clock.Now(), func(ctx context.Context) (any, error) {
+	_, err = durationWithTags(ctx, shard.Name, durOpShadowPartitionRequeue, q.clock.Now(), func(ctx context.Context) (any, error) {
 		err := q.ShadowPartitionRequeue(ctx, shadowPart, nil)
 		return nil, err
 	}, map[string]any{"reason": "handled"})
@@ -1032,8 +1074,6 @@ func (q *queue) ShadowPartitionLease(ctx context.Context, sp *QueueShadowPartiti
 		return nil, ErrShadowPartitionNotFound
 	case -2:
 		return nil, ErrShadowPartitionAlreadyLeased
-	case -3:
-		return nil, ErrShadowPartitionPaused
 	default:
 		return nil, fmt.Errorf("unknown response leasing shadow partition: %v (%T)", status, status)
 	}
