@@ -29,6 +29,7 @@ type Props = {
 };
 
 const MIN_HEIGHT = 586;
+const NO_SPANS_ERROR = /no function run span found/gi;
 
 export const RunDetailsV3 = ({
   getTrigger,
@@ -50,7 +51,7 @@ export const RunDetailsV3 = ({
   const { selectedStep } = useStepSelection(runID);
   const { getTraceResult } = useGetTraceResult();
 
-  const { getRun } = useGetRun();
+  const { getRun, error: runError } = useGetRun();
 
   const handleMouseDown = useCallback(() => {
     setIsDragging(true);
@@ -156,7 +157,8 @@ export const RunDetailsV3 = ({
   }
 
   // Do not show the error if queued and the error is no spans
-  const noSpansFoundError = !!runRes.error?.toString().match(/no function run span found/gi);
+  const noSpansFoundError =
+    !!runRes.error?.toString().match(NO_SPANS_ERROR) || !!runError?.message.match(NO_SPANS_ERROR);
   const waiting = initialRunData?.status === 'QUEUED' && noSpansFoundError;
   const showError = waiting ? false : runRes.error || resultRes.error;
 
