@@ -10,7 +10,7 @@ import TableBlankState from '@inngest/components/Functions/TableBlankState';
 import NewTable from '@inngest/components/Table/NewTable';
 import useDebounce from '@inngest/components/hooks/useDebounce';
 import { type Function, type PageInfo } from '@inngest/components/types/function';
-import { keepPreviousData, useInfiniteQuery } from '@tanstack/react-query';
+import { useInfiniteQuery } from '@tanstack/react-query';
 
 import { useSearchParam } from '../hooks/useSearchParam';
 import FunctionsStatusFilter from './StatusMenu';
@@ -98,9 +98,6 @@ export function FunctionsTable({
     queryKey: ['functions', { archived, nameSearch }],
     queryFn: ({ pageParam = 1 }: { pageParam: number }) =>
       getFunctions({ cursor: pageParam, archived, nameSearch }),
-    placeholderData: keepPreviousData,
-    refetchOnWindowFocus: false,
-    staleTime: 5 * 60 * 1000, // 5min
     getNextPageParam: (lastPage) => {
       const { currentPage, totalPages } = lastPage.pageInfo;
       if (typeof totalPages === 'number' && currentPage < totalPages) {

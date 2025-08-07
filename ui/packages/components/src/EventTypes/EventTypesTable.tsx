@@ -16,7 +16,7 @@ import {
   type EventTypesOrderBy,
   type PageInfo,
 } from '@inngest/components/types/eventType';
-import { keepPreviousData, useInfiniteQuery } from '@tanstack/react-query';
+import { useInfiniteQuery } from '@tanstack/react-query';
 import { type Row, type SortingState } from '@tanstack/react-table';
 
 import { useSearchParam } from '../hooks/useSearchParam';
@@ -119,9 +119,6 @@ export function EventTypesTable({
     queryKey: ['event-types', { orderBy, archived, nameSearch }],
     queryFn: ({ pageParam }: { pageParam: string | null }) =>
       getEventTypes({ orderBy, cursor: pageParam, archived, nameSearch }),
-    placeholderData: keepPreviousData,
-    refetchOnWindowFocus: false,
-    staleTime: 5 * 60 * 1000, // 5min
     getNextPageParam: (lastPage) => {
       if (!lastPage || !lastPage.pageInfo.hasNextPage) {
         return undefined;
