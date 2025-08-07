@@ -15,6 +15,7 @@ type Queue interface {
 
 	JobQueueReader
 	Migrator
+	Unpauser
 }
 
 type RunInfo struct {
@@ -83,6 +84,10 @@ type Migrator interface {
 	// Migration does a peek operation like the normal peek, but ignores leases and other conditions a normal peek cares about.
 	// The sore goal is to grab things and migrate them to somewhere else
 	Migrate(ctx context.Context, shard string, fnID uuid.UUID, limit int64, concurrency int, handler QueueMigrationHandler) (int64, error)
+}
+
+type Unpauser interface {
+	UnpauseFunction(ctx context.Context, shard string, acctID, fnID uuid.UUID) error
 }
 
 type QueueDirectAccess interface {
