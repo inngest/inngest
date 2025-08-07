@@ -1364,7 +1364,6 @@ func (q *queue) EnqueueItem(ctx context.Context, shard QueueShard, i osqueue.Que
 		kg.GlobalAccountIndex(),
 		kg.AccountPartitionIndex(i.Data.Identifier.AccountID), // new queue items always contain the account ID
 		kg.Idempotency(i.ID),
-		kg.FnMetadata(i.FunctionID),
 
 		// Add all 3 partition sets
 		defaultPartition.zsetKey(kg),
@@ -1406,12 +1405,6 @@ func (q *queue) EnqueueItem(ctx context.Context, shard QueueShard, i osqueue.Que
 		at.UnixMilli(),
 		partitionTime.Unix(),
 		now.UnixMilli(),
-		FnMetadata{
-			// enqueue.lua only writes function metadata if it doesn't already exist.
-			// if it doesn't exist, and we're enqueuing something, this implies the fn is not currently paused.
-			FnID:   i.FunctionID,
-			Paused: false,
-		},
 		defaultPartition,
 		defaultPartition.ID,
 		i.Data.Identifier.AccountID.String(),
