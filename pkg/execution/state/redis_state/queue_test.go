@@ -3328,6 +3328,8 @@ func TestQueuePartitionPeek(t *testing.T) {
 
 		// After unpausing A, it should be included in the peek:
 		paused[idA] = false
+		require.NoError(t, q.UnpauseFunction(ctx, q.primaryQueueShard.Name, accountId, idA))
+
 		require.NoError(t, err)
 		items, err = q.PartitionPeek(ctx, true, time.Now().Add(time.Hour), PartitionPeekMax)
 		require.NoError(t, err)
