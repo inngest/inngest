@@ -6,10 +6,22 @@ import { InsightsStateMachineContextProvider } from '@/components/Insights/Insig
 import { InsightsTabPanel } from './InsightsTabPanel';
 import { InsightsTabsList } from './InsightsTabsList';
 
+const DEFAULT_QUERY = `SELECT 
+  HOUR(ts) as hour, 
+  COUNT(*) as count 
+WHERE 
+  name = 'cli/dev_ui.loaded' 
+  AND data.os != 'linux'
+  AND ts > 1752845983000 
+GROUP BY
+  hour 
+ORDER BY 
+  hour desc`;
+
 const HOME_TAB = {
   id: '__home',
   name: 'Home',
-  query: '',
+  query: DEFAULT_QUERY,
 } as const;
 
 export interface TabConfig {
@@ -93,7 +105,12 @@ function InsightsTabManagerInternal({
       <InsightsTabsList actions={actions} activeTabId={activeTabId} hide tabs={tabs} />
       <div className="grid h-full w-full flex-1 grid-rows-[3fr_5fr] gap-0 overflow-hidden">
         {tabs.map((tab) => (
-          <InsightsStateMachineContextProvider key={tab.id} renderChildren={tab.id === activeTabId}>
+          <InsightsStateMachineContextProvider
+            key={tab.id}
+            onQueryChange={(query) => actions.updateTabQuery(tab.id, query)}
+            query={tab.query}
+            renderChildren={tab.id === activeTabId}
+          >
             <InsightsTabPanel />
           </InsightsStateMachineContextProvider>
         ))}
