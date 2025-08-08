@@ -5,9 +5,15 @@ import { graphql } from '@/gql';
 import { InsightsColumnType, type InsightsQuery } from '@/gql/graphql';
 import type { InsightsFetchResult } from './types';
 
+export interface FetchInsightsParams {
+  after?: string | null;
+  first: number;
+  query: string;
+}
+
 const insightsQuery = graphql(`
-  query Insights($query: String!) {
-    insights(query: $query) {
+  query Insights($query: String!, $first: Int!, $after: String) {
+    insights(query: $query, first: $first, after: $after) {
       columns {
         name
         columnType
@@ -32,8 +38,8 @@ export function useFetchInsights() {
   const client = useClient();
 
   const fetchInsights = useCallback(
-    async (query: string): Promise<InsightsFetchResult> => {
-      const res = await client.query(insightsQuery, { query }).toPromise();
+    async ({ query, first, after = null }: FetchInsightsParams): Promise<InsightsFetchResult> => {
+      const res = await client.query(insightsQuery, { after, first, query }).toPromise();
       if (res.error) throw res.error;
       if (!res.data) throw new Error('No data');
 
