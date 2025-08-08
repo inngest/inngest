@@ -6,11 +6,17 @@ import { InsightsStateMachineContextProvider } from '@/components/Insights/Insig
 import { InsightsTabPanel } from './InsightsTabPanel';
 import { InsightsTabsList } from './InsightsTabsList';
 
-const HOME_TAB = { id: '__home', name: 'Home' } as const;
+const HOME_TAB = {
+  id: '__home',
+  name: 'Home',
+  query: '',
+} as const;
 
 export interface TabConfig {
   id: string;
   name: string;
+  query: string;
+  savedQueryId?: string;
 }
 
 export interface TabManagerActions {
@@ -48,7 +54,7 @@ export function useInsightsTabManager(): UseInsightsTabManagerReturn {
       createTab: (id: string, name = 'Untitled query') => {
         if (tabs.some((tab) => tab.id === id)) return;
 
-        setTabs((prevTabs) => [...prevTabs, { id, name }]);
+        setTabs((prevTabs) => [...prevTabs, { id, name, query: '' }]);
         setActiveTabId(id);
       },
       focusTab: (id: string) => {
