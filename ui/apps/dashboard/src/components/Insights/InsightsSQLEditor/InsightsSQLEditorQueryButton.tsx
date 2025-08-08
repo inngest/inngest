@@ -17,7 +17,10 @@ export function InsightsSQLEditorQueryButton() {
       iconSide="left"
       label={isRunning ? undefined : 'Run query'}
       loading={isRunning}
-      onClick={runQuery}
+      onClick={(e) => {
+        runQuery();
+        e.currentTarget.blur();
+      }}
       size="medium"
     />
   );
