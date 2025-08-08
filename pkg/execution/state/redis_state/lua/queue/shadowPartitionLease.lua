@@ -7,7 +7,6 @@
   0 - Leased shadow partition
   -1 - Shadow partition not found
   -2 - Shadow partition already leased
-  -3 - Shadow partition paused
 
 ]]
 
@@ -36,11 +35,6 @@ end
 -- Check for an existing lease.
 if existing.leaseID ~= nil and existing.leaseID ~= cjson.null and decode_ulid_time(existing.leaseID) > nowMS then
   return -2
-end
-
--- If shadow partition is paused (no refill), skip
-if existing.norefill then
-  return -3
 end
 
 -- Set lease ID

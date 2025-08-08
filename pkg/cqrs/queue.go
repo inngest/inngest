@@ -13,8 +13,10 @@ type SnapshotValue struct {
 	Value interface{} `json:"value"`
 }
 
-type QueueSnapshot = map[string]SnapshotValue
-type SnapshotID = ulid.ULID
+type (
+	QueueSnapshot = map[string]SnapshotValue
+	SnapshotID    = ulid.ULID
+)
 
 // QueueSnapshotManager is a manager for queue snapshots.
 type QueueSnapshotManager interface {
@@ -56,9 +58,7 @@ type QueuePartition struct {
 	Config *inngest.Function `json:"config.omitempty"`
 
 	// Paused shows if the partition is paused or not
-	Paused       bool `json:"paused"`
-	PauseRefill  bool `json:"pause_refill"`
-	PauseEnqueue bool `json:"pause_enqueue"`
+	Paused bool `json:"paused"`
 
 	// AccountActive shows the active count value for the account, this is used in key queues
 	AccountActive int `json:"acct_active"`

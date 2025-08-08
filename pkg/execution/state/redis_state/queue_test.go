@@ -423,56 +423,6 @@ func TestQueueEnqueueItem(t *testing.T) {
 		require.Equal(t, 1, len(keys))
 	})
 
-	t.Run("Enqueueing to a paused partition does not affect the partition's pause state", func(t *testing.T) {
-		now := time.Now()
-		workflowId := uuid.New()
-		accountId := uuid.New()
-
-		item, err := q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{
-			FunctionID: workflowId,
-			Data: osqueue.Item{
-				Identifier: state.Identifier{
-					WorkflowID: workflowId,
-					AccountID:  accountId,
-				},
-			},
-		}, now.Add(10*time.Second), osqueue.EnqueueOpts{})
-		require.NoError(t, err)
-
-		err = q.SetFunctionPaused(ctx, accountId, item.FunctionID, true)
-		require.NoError(t, err)
-
-		item, err = q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{
-			FunctionID: workflowId,
-			Data: osqueue.Item{
-				Identifier: state.Identifier{
-					WorkflowID: workflowId,
-					AccountID:  accountId,
-				},
-			},
-		}, now, osqueue.EnqueueOpts{})
-		require.NoError(t, err)
-
-		fnMeta, err := getFnMetadata(t, r, item.FunctionID)
-		require.NoError(t, err)
-		require.True(t, fnMeta.Paused)
-
-		item, err = q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{
-			FunctionID: workflowId,
-			Data: osqueue.Item{
-				Identifier: state.Identifier{
-					WorkflowID: workflowId,
-					AccountID:  accountId,
-				},
-			},
-		}, now.Add(-10*time.Second), osqueue.EnqueueOpts{})
-		require.NoError(t, err)
-
-		fnMeta, err = getFnMetadata(t, r, item.FunctionID)
-		require.NoError(t, err)
-		require.True(t, fnMeta.Paused)
-	})
-
 	t.Run("Custom concurrency key queues", func(t *testing.T) {
 		now := time.Now()
 		fnID := uuid.New()
@@ -3004,109 +2954,6 @@ func TestQueuePartitionLease(t *testing.T) {
 		requirePartitionScoreEquals(t, r, &idA, time.Now().Add(time.Second*5))
 	})
 
-	t.Run("Partition pausing", func(t *testing.T) {
-		r.FlushAll() // reset everything
-		q := NewQueue(QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName})
-		ctx := context.Background()
-
-		_, err = q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{FunctionID: idA}, atA, osqueue.EnqueueOpts{})
-		require.NoError(t, err)
-		_, err = q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{FunctionID: idB}, atB, osqueue.EnqueueOpts{})
-		require.NoError(t, err)
-		_, err = q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{FunctionID: idC}, atC, osqueue.EnqueueOpts{})
-		require.NoError(t, err)
-
-		t.Run("Fails to lease a paused partition", func(t *testing.T) {
-			// pause fn A's partition:
-			err = q.SetFunctionPaused(ctx, uuid.Nil, idA, true)
-			require.NoError(t, err)
-
-			// attempt to lease the paused partition:
-			id, capacity, err := q.PartitionLease(ctx, &pA, time.Second*5)
-			require.Nil(t, id)
-			require.Error(t, err)
-			require.Zero(t, capacity)
-			require.ErrorIs(t, err, ErrPartitionPaused)
-		})
-
-		t.Run("Succeeds to lease a previously paused partition", func(t *testing.T) {
-			// unpause fn A's partition:
-			err = q.SetFunctionPaused(ctx, uuid.Nil, idA, false)
-			require.NoError(t, err)
-
-			// attempt to lease the unpaused partition:
-			id, capacity, err := q.PartitionLease(ctx, &pA, time.Second*5)
-			require.NotNil(t, id)
-			require.NoError(t, err)
-			require.NotZero(t, capacity)
-		})
-	})
-
-	t.Run("Partition pausing with key queues", func(t *testing.T) {
-		r.FlushAll() // reset everything
-		q := NewQueue(
-			QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey), Name: consts.DefaultQueueShardName},
-			WithAllowKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
-				return true
-			}))
-		ctx := context.Background()
-
-		acctID := uuid.New()
-		_, err = q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{FunctionID: idA, Data: osqueue.Item{Identifier: state.Identifier{AccountID: acctID, WorkflowID: idA}}}, atA, osqueue.EnqueueOpts{})
-		require.NoError(t, err)
-		_, err = q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{FunctionID: idB, Data: osqueue.Item{Identifier: state.Identifier{AccountID: acctID, WorkflowID: idB}}}, atB, osqueue.EnqueueOpts{})
-		require.NoError(t, err)
-		_, err = q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{FunctionID: idC, Data: osqueue.Item{Identifier: state.Identifier{AccountID: acctID, WorkflowID: idC}}}, atC, osqueue.EnqueueOpts{})
-		require.NoError(t, err)
-
-		getShadowPartition := func(fnID uuid.UUID) QueueShadowPartition {
-			var sp QueueShadowPartition
-
-			str, err := rc.Do(ctx, rc.B().Hget().Key(q.primaryQueueShard.RedisClient.kg.ShadowPartitionMeta()).Field(fnID.String()).Build()).ToString()
-			require.NoError(t, err, r.Dump())
-
-			require.NoError(t, json.Unmarshal([]byte(str), &sp))
-			return sp
-		}
-
-		t.Run("Fails to lease a paused partition", func(t *testing.T) {
-			sp := getShadowPartition(idA)
-			require.False(t, sp.PauseRefill)
-
-			// pause fn A's partition:
-			err = q.SetFunctionPaused(ctx, uuid.Nil, idA, true)
-			require.NoError(t, err)
-
-			sp = getShadowPartition(idA)
-			require.True(t, sp.PauseRefill)
-
-			// attempt to lease the paused partition:
-			id, capacity, err := q.PartitionLease(ctx, &pA, time.Second*5)
-			require.Nil(t, id)
-			require.Error(t, err)
-			require.Zero(t, capacity)
-			require.ErrorIs(t, err, ErrPartitionPaused)
-		})
-
-		t.Run("Succeeds to lease a previously paused partition", func(t *testing.T) {
-			sp := getShadowPartition(idA)
-			require.True(t, sp.PauseRefill)
-
-			// unpause fn A's partition:
-			err = q.SetFunctionPaused(ctx, uuid.Nil, idA, false)
-			require.NoError(t, err)
-
-			sp = getShadowPartition(idA)
-			require.False(t, sp.PauseRefill)
-
-			// attempt to lease the unpaused partition:
-			id, capacity, err := q.PartitionLease(ctx, &pA, time.Second*5)
-			require.NotNil(t, id)
-			require.NoError(t, err)
-			require.NotZero(t, capacity)
-		})
-	})
-
 	t.Run("With key partitions", func(t *testing.T) {
 		fnID := uuid.New()
 
@@ -3450,10 +3297,16 @@ func TestQueuePartitionPeek(t *testing.T) {
 		require.NoError(t, err)
 		defer rc.Close()
 
+		paused := make(map[uuid.UUID]bool)
 		q := NewQueue(
 			QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey)},
 			WithPartitionPriorityFinder(func(_ context.Context, _ QueuePartition) uint {
 				return PriorityDefault
+			}),
+			WithPartitionPausedGetter(func(ctx context.Context, fnID uuid.UUID) PartitionPausedInfo {
+				return PartitionPausedInfo{
+					Paused: paused[fnID],
+				}
 			}),
 		)
 		now := time.Now()
@@ -3461,8 +3314,7 @@ func TestQueuePartitionPeek(t *testing.T) {
 		requirePartitionScoreEquals(t, r, &idA, now)
 
 		// Pause A, excluding it from peek:
-		err = q.SetFunctionPaused(ctx, uuid.Nil, idA, true)
-		require.NoError(t, err)
+		paused[idA] = true
 
 		// This should only select B and C, as id A is ignored:
 		items, err := q.PartitionPeek(ctx, true, now.Add(time.Hour), PartitionPeekMax)
@@ -3475,7 +3327,9 @@ func TestQueuePartitionPeek(t *testing.T) {
 		requirePartitionScoreEquals(t, r, &idA, now.Add(24*time.Hour))
 
 		// After unpausing A, it should be included in the peek:
-		err = q.SetFunctionPaused(ctx, uuid.Nil, idA, false)
+		paused[idA] = false
+		require.NoError(t, q.UnpauseFunction(ctx, q.primaryQueueShard.Name, accountId, idA))
+
 		require.NoError(t, err)
 		items, err = q.PartitionPeek(ctx, true, time.Now().Add(time.Hour), PartitionPeekMax)
 		require.NoError(t, err)
@@ -3612,24 +3466,6 @@ func TestQueuePartitionRequeue(t *testing.T) {
 
 			err = q.PartitionRequeue(ctx, q.primaryQueueShard, &p, time.Now().Add(time.Minute), false)
 			require.Equal(t, ErrPartitionNotFound, err)
-		})
-
-		t.Run("Requeueing a paused partition does not affect the partition's pause state", func(t *testing.T) {
-			_, err := q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{FunctionID: idA}, now, osqueue.EnqueueOpts{})
-			require.NoError(t, err)
-
-			_, _, err = q.PartitionLease(ctx, &QueuePartition{FunctionID: &idA}, time.Minute)
-			require.NoError(t, err)
-
-			err = q.SetFunctionPaused(ctx, uuid.Nil, idA, true)
-			require.NoError(t, err)
-
-			err = q.PartitionRequeue(ctx, q.primaryQueueShard, &p, next, true)
-			require.NoError(t, err)
-
-			fnMeta, err := getFnMetadata(t, r, idA)
-			require.NoError(t, err)
-			require.True(t, fnMeta.Paused)
 		})
 
 		// We no longer delete queues on requeue when the concurrency queue is not empty;  this should happen on a final dequeue.
@@ -3800,7 +3636,8 @@ func TestQueuePartitionRequeue(t *testing.T) {
 		require.True(t, r.Exists(shard.RedisClient.kg.AccountPartitionIndex(accountID)))
 		require.True(t, r.Exists(shard.RedisClient.kg.GlobalAccountIndex()))
 
-		require.True(t, r.Exists(shard.RedisClient.kg.FnMetadata(*p.FunctionID)), r.Keys())
+		// do not expect function metadata to be set anymore
+		require.False(t, r.Exists(shard.RedisClient.kg.FnMetadata(*p.FunctionID)), r.Keys())
 
 		//
 		// PartitionRequeue should drop pointers but not partition metadata
@@ -3814,8 +3651,10 @@ func TestQueuePartitionRequeue(t *testing.T) {
 		require.False(t, r.Exists(shard.RedisClient.kg.AccountPartitionIndex(accountID)))
 		require.False(t, r.Exists(shard.RedisClient.kg.GlobalAccountIndex()))
 
-		// ensure gc does not drop fn metadata
-		require.True(t, r.Exists(shard.RedisClient.kg.FnMetadata(*p.FunctionID)), r.Keys())
+		// fn metadata still should not exist
+		require.False(t, r.Exists(shard.RedisClient.kg.FnMetadata(*p.FunctionID)), r.Keys())
+
+		// ensure gc does not drop partition item yet
 		require.True(t, r.Exists(shard.RedisClient.kg.PartitionItem()))
 		keys, err := r.HKeys(shard.RedisClient.kg.PartitionItem())
 		require.NoError(t, err)
@@ -3850,10 +3689,19 @@ func TestQueueFunctionPause(t *testing.T) {
 	require.NoError(t, err)
 	defer rc.Close()
 
+	var paused bool
+
+	shard := QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey)}
+	kg := shard.RedisClient.KeyGenerator()
 	q := NewQueue(
-		QueueShard{Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey)},
+		shard,
 		WithPartitionPriorityFinder(func(_ context.Context, _ QueuePartition) uint {
 			return PriorityDefault
+		}),
+		WithPartitionPausedGetter(func(ctx context.Context, fnID uuid.UUID) PartitionPausedInfo {
+			return PartitionPausedInfo{
+				Paused: paused,
+			}
 		}),
 	)
 	ctx := context.Background()
@@ -3863,19 +3711,21 @@ func TestQueueFunctionPause(t *testing.T) {
 	_, err = q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{FunctionID: idA}, now, osqueue.EnqueueOpts{})
 	require.NoError(t, err)
 
-	err = q.SetFunctionPaused(ctx, uuid.Nil, idA, true)
+	paused = true
+
+	peeked, err := q.partitionPeek(ctx, kg.GlobalPartitionIndex(), true, now.Add(5*time.Minute), 100, nil)
+	require.NoError(t, err)
+	require.Len(t, peeked, 0)
+
+	paused = false
+
+	err = q.UnpauseFunction(ctx, shard.Name, uuid.Nil, idA)
 	require.NoError(t, err)
 
-	fnMeta, err := getFnMetadata(t, r, idA)
+	peeked, err = q.partitionPeek(ctx, kg.GlobalPartitionIndex(), true, now.Add(5*time.Minute), 100, nil)
 	require.NoError(t, err)
-	require.True(t, fnMeta.Paused)
-
-	err = q.SetFunctionPaused(ctx, uuid.Nil, idA, false)
-	require.NoError(t, err)
-
-	fnMeta, err = getFnMetadata(t, r, idA)
-	require.NoError(t, err)
-	require.False(t, fnMeta.Paused)
+	require.Len(t, peeked, 1)
+	require.Equal(t, idA, *peeked[0].FunctionID)
 }
 
 func TestQueueScavenge(t *testing.T) {
@@ -4009,8 +3859,10 @@ func TestQueueSetFunctionMigrate(t *testing.T) {
 	defer rc.Close()
 
 	t.Run("with default shard", func(t *testing.T) {
+		shard := QueueShard{Name: "default", Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey)}
+		kg := shard.RedisClient.kg
 		q := NewQueue(
-			QueueShard{Name: "default", Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey)},
+			shard,
 			WithPartitionPriorityFinder(func(ctx context.Context, part QueuePartition) uint {
 				return PriorityDefault
 			}),
@@ -4024,25 +3876,26 @@ func TestQueueSetFunctionMigrate(t *testing.T) {
 		_, err = q.EnqueueItem(ctx, q.primaryQueueShard, osqueue.QueueItem{FunctionID: fnID, Data: osqueue.Item{Identifier: id}}, now, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 
-		err = q.SetFunctionMigrate(ctx, "default", fnID, true)
+		lockUntil := now.Add(10 * time.Minute)
+		err = q.SetFunctionMigrate(ctx, "default", fnID, &lockUntil)
 		require.NoError(t, err)
 
-		meta, err := getFnMetadata(t, r, fnID)
+		require.True(t, r.Exists(kg.QueueMigrationLock(fnID)))
+		lockValue, err := r.Get(kg.QueueMigrationLock(fnID))
 		require.NoError(t, err)
-		require.True(t, meta.Migrate)
+		require.Equal(t, lockUntil, ulid.MustParse(lockValue).Timestamp())
 
 		// disable migration flag
-		err = q.SetFunctionMigrate(ctx, "default", fnID, false)
+		err = q.SetFunctionMigrate(ctx, "default", fnID, nil)
 		require.NoError(t, err)
 
-		meta, err = getFnMetadata(t, r, fnID)
-		require.NoError(t, err)
-		require.False(t, meta.Migrate)
+		require.False(t, r.Exists(kg.QueueMigrationLock(fnID)))
 	})
 
 	t.Run("with key queues", func(t *testing.T) {
+		shard := QueueShard{Name: "default", Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey)}
 		q := NewQueue(
-			QueueShard{Name: "default", Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey)},
+			shard,
 			WithPartitionPriorityFinder(func(ctx context.Context, part QueuePartition) uint {
 				return PriorityDefault
 			}),
@@ -4071,30 +3924,27 @@ func TestQueueSetFunctionMigrate(t *testing.T) {
 
 		sp := getShadowPartition()
 		require.Equal(t, fnID.String(), sp.PartitionID)
-		require.False(t, sp.PauseRefill)
 
-		err = q.SetFunctionMigrate(ctx, "default", fnID, true)
+		lockedUntil, err := q.isMigrationLocked(ctx, shard, fnID)
+		require.NoError(t, err)
+		require.Nil(t, lockedUntil)
+
+		lockUntil := now.Add(10 * time.Minute)
+		err = q.SetFunctionMigrate(ctx, "default", fnID, &lockUntil)
 		require.NoError(t, err)
 
-		meta, err := getFnMetadata(t, r, fnID)
+		lockedUntil, err = q.isMigrationLocked(ctx, shard, fnID)
 		require.NoError(t, err)
-		require.True(t, meta.Migrate)
-
-		sp = getShadowPartition()
-		require.Equal(t, fnID.String(), sp.PartitionID)
-		require.True(t, sp.PauseRefill)
+		require.NotNil(t, lockedUntil)
+		require.Equal(t, lockUntil, *lockedUntil)
 
 		// disable migration flag
-		err = q.SetFunctionMigrate(ctx, "default", fnID, false)
+		err = q.SetFunctionMigrate(ctx, "default", fnID, nil)
 		require.NoError(t, err)
 
-		meta, err = getFnMetadata(t, r, fnID)
+		lockedUntil, err = q.isMigrationLocked(ctx, shard, fnID)
 		require.NoError(t, err)
-		require.False(t, meta.Migrate)
-
-		sp = getShadowPartition()
-		require.Equal(t, fnID.String(), sp.PartitionID)
-		require.False(t, sp.PauseRefill)
+		require.Nil(t, lockedUntil)
 	})
 
 	t.Run("with other shards", func(t *testing.T) {
@@ -4104,11 +3954,13 @@ func TestQueueSetFunctionMigrate(t *testing.T) {
 		defer rc2.Close()
 
 		yoloShard := QueueShard{Name: "yolo", Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc2, QueueDefaultKey)}
+		defaultShard := QueueShard{Name: "default", Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey)}
 
 		q := NewQueue(
-			QueueShard{Name: "default", Kind: string(enums.QueueShardKindRedis), RedisClient: NewQueueClient(rc, QueueDefaultKey)},
+			defaultShard,
 			WithQueueShardClients(map[string]QueueShard{
-				"yolo": yoloShard,
+				"yolo":                       yoloShard,
+				consts.DefaultQueueShardName: defaultShard,
 			}),
 			WithPartitionPriorityFinder(func(ctx context.Context, part QueuePartition) uint {
 				return PriorityDefault
@@ -4123,18 +3975,19 @@ func TestQueueSetFunctionMigrate(t *testing.T) {
 		_, err = q.EnqueueItem(ctx, yoloShard, osqueue.QueueItem{FunctionID: fnID, Data: osqueue.Item{Identifier: id}}, now, osqueue.EnqueueOpts{})
 		require.NoError(t, err)
 
-		err = q.SetFunctionMigrate(ctx, "yolo", fnID, true)
+		lockUntil := now.Add(10 * time.Minute)
+		err = q.SetFunctionMigrate(ctx, "yolo", fnID, &lockUntil)
 		require.NoError(t, err)
 
 		// should not find it in the default shard
-		_, err = getFnMetadata(t, r, fnID)
-		require.Error(t, err)
-		require.ErrorContains(t, err, "no such key")
+		lockedUntil, err := q.isMigrationLocked(ctx, defaultShard, fnID)
+		require.NoError(t, err)
+		require.Nil(t, lockedUntil)
 
 		// should find metadata in the other shard
-		meta, err := getFnMetadata(t, other, fnID)
+		lockedUntil, err = q.isMigrationLocked(ctx, yoloShard, fnID)
 		require.NoError(t, err)
-		require.True(t, meta.Migrate)
+		require.Equal(t, lockUntil, *lockedUntil)
 	})
 }
 
@@ -4182,16 +4035,6 @@ func TestQueuePartitionReprioritize(t *testing.T) {
 		require.Equal(t, ErrPriorityTooLow, err)
 	})
 
-	t.Run("Changing priority does not affect the partition's pause state", func(t *testing.T) {
-		err = q.SetFunctionPaused(ctx, idA, true)
-		require.NoError(t, err)
-
-		err = q.PartitionReprioritize(ctx, idA.String(), PriorityDefault)
-		require.NoError(t, err)
-
-		fnMeta := getFnMetadata(t, r, idA)
-		require.True(t, fnMeta.Paused)
-	})
 }
 */
 
@@ -4755,7 +4598,8 @@ func TestMigrate(t *testing.T) {
 			}
 
 			// Don't really need it since there are no executors to process the enqueued items
-			err = q1.SetFunctionMigrate(ctx, shard1Name, fnID, true)
+			lockUntil := clock.Now().Add(10 * time.Minute)
+			err = q1.SetFunctionMigrate(ctx, shard1Name, fnID, &lockUntil)
 			require.NoError(t, err)
 
 			// Verify that there are expected number of items in it
@@ -4922,20 +4766,6 @@ func getPartition(t *testing.T, r *miniredis.Miniredis, pType enums.PartitionTyp
 	err := json.Unmarshal([]byte(val), &qp)
 	require.NoError(t, err)
 	return qp
-}
-
-func getFnMetadata(t *testing.T, r *miniredis.Miniredis, id uuid.UUID) (*FnMetadata, error) {
-	t.Helper()
-	kg := &queueKeyGenerator{queueDefaultKey: QueueDefaultKey}
-	valJSON, err := r.Get(kg.FnMetadata(id))
-	if err != nil {
-		return nil, err
-	}
-
-	retv := FnMetadata{}
-	err = json.Unmarshal([]byte(valJSON), &retv)
-	require.NoError(t, err)
-	return &retv, nil
 }
 
 func requireItemScoreEquals(t *testing.T, r *miniredis.Miniredis, item osqueue.QueueItem, expected time.Time) {

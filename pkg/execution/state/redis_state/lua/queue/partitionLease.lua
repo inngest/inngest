@@ -6,7 +6,6 @@ Output:
    -2: No fn capacity left, not leased
    -3: Partition item not found
    -4: Partition item already leased
-   -5: Fn paused
 
 ]]
 
@@ -14,9 +13,8 @@ local keyPartitionMap         = KEYS[1] -- key storing all partitions
 local keyGlobalPartitionPtr   = KEYS[2] -- global top-level partitioned queue
 local keyGlobalAccountPointer = KEYS[3] -- accounts:sorted - zset
 local keyAccountPartitions    = KEYS[4] -- accounts:$accountID:partition:sorted - zset
-local keyFnMeta               = KEYS[5]
-local keyAcctConcurrency      = KEYS[6] -- in progress queue for account
-local keyFnConcurrency        = KEYS[7] -- in progress queue for partition
+local keyAcctConcurrency      = KEYS[5] -- in progress queue for account
+local keyFnConcurrency        = KEYS[6] -- in progress queue for partition
 
 local partitionID             = ARGV[1]
 local leaseID                 = ARGV[2]
@@ -32,7 +30,6 @@ local disableLeaseChecks = tonumber(ARGV[9])
 
 -- $include(check_concurrency.lua)
 -- $include(get_partition_item.lua)
--- $include(get_fn_meta.lua)
 -- $include(decode_ulid_time.lua)
 -- $include(update_pointer_score.lua)
 -- $include(ends_with.lua)
@@ -46,15 +43,6 @@ end
 -- Check for an existing lease.
 if existing.leaseID ~= nil and existing.leaseID ~= cjson.null and decode_ulid_time(existing.leaseID) > currentTime then
     return { -4 }
-end
-
--- Check whether the partition is currently paused.
--- We only need to do this if the queue item is for a function.
-if existing.wid ~= nil and existing.wid ~= cjson.null then
-    local fnMeta = get_fn_meta(keyFnMeta)
-    if fnMeta ~= nil and fnMeta.off then
-        return {  -5 }
-    end
 end
 
 local existingTime = existing.last -- store a ref to the last time we successfully checked this partition

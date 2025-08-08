@@ -50,13 +50,6 @@ func (a *debugAPI) partitionByID(w http.ResponseWriter, r *http.Request) {
 		partition.FunctionID = qp.FunctionID
 	}
 
-	if res.QueueShadowPartition != nil {
-		sqp := res.QueueShadowPartition
-
-		partition.PauseRefill = sqp.PauseRefill
-		partition.PauseEnqueue = sqp.PauseEnqueue
-	}
-
 	resp := DebugResponse{
 		Data: partition,
 	}

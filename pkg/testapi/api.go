@@ -2,9 +2,10 @@ package testapi
 
 import (
 	"encoding/json"
+	"net/http"
+
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/redis/rueidis"
-	"net/http"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -20,12 +21,7 @@ import (
 type TestAPI struct {
 	chi.Router
 
-	QueueShardSelector redis_state.ShardSelector
-	Queue              queue.Queue
-	Executor           execution.Executor
-	StateManager       statev2.RunService
-
-	ResetAll func()
+	options Options
 }
 
 type Options struct {
@@ -34,6 +30,8 @@ type Options struct {
 	Executor           execution.Executor
 	StateManager       statev2.RunService
 	ResetAll           func()
+	PauseFunction      func(id uuid.UUID)
+	UnpauseFunction    func(id uuid.UUID)
 }
 
 func ShouldEnable() bool {
@@ -42,12 +40,8 @@ func ShouldEnable() bool {
 
 func New(o Options) http.Handler {
 	test := TestAPI{
-		Router:             chi.NewRouter(),
-		QueueShardSelector: o.QueueShardSelector,
-		Queue:              o.Queue,
-		Executor:           o.Executor,
-		StateManager:       o.StateManager,
-		ResetAll:           o.ResetAll,
+		Router:  chi.NewRouter(),
+		options: o,
 	}
 
 	test.Get("/", func(writer http.ResponseWriter, request *http.Request) {
@@ -68,7 +62,7 @@ func New(o Options) http.Handler {
 }
 
 func (t *TestAPI) Reset(w http.ResponseWriter, r *http.Request) {
-	t.ResetAll()
+	t.options.ResetAll()
 	logger.StdlibLogger(r.Context()).Info("Reset all data stores")
 	_, _ = w.Write([]byte("ok"))
 }
@@ -92,7 +86,7 @@ func (t *TestAPI) GetQueueSize(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	shard, err := t.QueueShardSelector(ctx, parsedAccountId, nil)
+	shard, err := t.options.QueueShardSelector(ctx, parsedAccountId, nil)
 	if err != nil {
 		w.WriteHeader(500)
 		_, _ = w.Write([]byte("Internal server error"))
@@ -148,7 +142,7 @@ func (t *TestAPI) GetQueueActiveCounter(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	shard, err := t.QueueShardSelector(ctx, parsedAccountId, nil)
+	shard, err := t.options.QueueShardSelector(ctx, parsedAccountId, nil)
 	if err != nil {
 		logger.StdlibLogger(ctx).Error("failed to select queue shard", "err", err)
 		w.WriteHeader(500)
@@ -207,16 +201,7 @@ func (t *TestAPI) GetQueueActiveCounter(w http.ResponseWriter, r *http.Request) 
 }
 
 func (t *TestAPI) PauseFunction(w http.ResponseWriter, r *http.Request) {
-	ctx := r.Context()
-	accountId := r.FormValue("accountId")
 	fnId := r.FormValue("fnId")
-
-	parsedAccountId, err := uuid.Parse(accountId)
-	if err != nil {
-		w.WriteHeader(400)
-		_, _ = w.Write([]byte("Invalid accountId"))
-		return
-	}
 
 	parsedFnId, err := uuid.Parse(fnId)
 	if err != nil {
@@ -225,11 +210,7 @@ func (t *TestAPI) PauseFunction(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = t.Queue.SetFunctionPaused(ctx, parsedAccountId, parsedFnId, true)
-	if err != nil {
-		w.WriteHeader(500)
-		_, _ = w.Write([]byte("Internal server error"))
-	}
+	t.options.PauseFunction(parsedFnId)
 
 	w.WriteHeader(200)
 	_, _ = w.Write([]byte("OK"))
@@ -262,13 +243,9 @@ func (t *TestAPI) CancelFunctionRun(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = t.Queue.SetFunctionPaused(ctx, parsedAccountId, parsedFnId, true)
-	if err != nil {
-		w.WriteHeader(500)
-		_, _ = w.Write([]byte("Internal server error"))
-	}
+	t.options.PauseFunction(parsedFnId)
 
-	md, err := t.StateManager.LoadMetadata(ctx, statev2.ID{
+	md, err := t.options.StateManager.LoadMetadata(ctx, statev2.ID{
 		RunID:      parsedRunId,
 		FunctionID: parsedFnId,
 		Tenant: statev2.Tenant{
@@ -280,7 +257,7 @@ func (t *TestAPI) CancelFunctionRun(w http.ResponseWriter, r *http.Request) {
 		_, _ = w.Write([]byte("Internal server error"))
 	}
 
-	err = t.Executor.Cancel(ctx, md.ID, execution.CancelRequest{})
+	err = t.options.Executor.Cancel(ctx, md.ID, execution.CancelRequest{})
 	if err != nil {
 		w.WriteHeader(500)
 		_, _ = w.Write([]byte("Internal server error"))

@@ -148,7 +148,6 @@ func TestQueueItemBacklogs(t *testing.T) {
 		kg := queueKeyGenerator{queueDefaultKey: QueueDefaultKey}
 		require.Equal(t, kg.Concurrency("", ""), backlog.customKeyInProgress(kg, 1))
 		require.Equal(t, kg.Concurrency("", ""), backlog.customKeyInProgress(kg, 2))
-
 	})
 
 	t.Run("throttle", func(t *testing.T) {
@@ -693,8 +692,6 @@ func TestQueueItemShadowPartition(t *testing.T) {
 			EnvID:           &wsID,
 			AccountID:       &accID,
 			SystemQueueName: nil,
-			PauseRefill:     false,
-			PauseEnqueue:    false,
 		}
 
 		shadowPart := q.ItemShadowPartition(ctx, osqueue.QueueItem{
@@ -732,8 +729,6 @@ func TestQueueItemShadowPartition(t *testing.T) {
 			EnvID:           nil,
 			AccountID:       nil,
 			SystemQueueName: &sysQueueName,
-			PauseRefill:     false,
-			PauseEnqueue:    false,
 		}
 
 		shadowPart := q.ItemShadowPartition(ctx, osqueue.QueueItem{
@@ -767,8 +762,6 @@ func TestQueueItemShadowPartition(t *testing.T) {
 			EnvID:           &wsID,
 			AccountID:       &accID,
 			SystemQueueName: nil,
-			PauseRefill:     false,
-			PauseEnqueue:    false,
 		}
 
 		shadowPart := q.ItemShadowPartition(ctx, osqueue.QueueItem{
@@ -814,8 +807,6 @@ func TestQueueItemShadowPartition(t *testing.T) {
 			EnvID:           &wsID,
 			AccountID:       &accID,
 			SystemQueueName: nil,
-			PauseRefill:     false,
-			PauseEnqueue:    false,
 		}
 
 		shadowPart := q.ItemShadowPartition(ctx, osqueue.QueueItem{
@@ -868,8 +859,6 @@ func TestQueueItemShadowPartition(t *testing.T) {
 			EnvID:           &wsID,
 			AccountID:       &accID,
 			SystemQueueName: nil,
-			PauseRefill:     false,
-			PauseEnqueue:    false,
 		}
 
 		shadowPart := q.ItemShadowPartition(ctx, osqueue.QueueItem{
