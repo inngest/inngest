@@ -148,8 +148,6 @@ func (q *queue) processShadowPartition(ctx context.Context, shadowPart *QueueSha
 				}
 			}
 		}
-
-		return nil
 	}
 
 	// acquire lease for shadow partition
