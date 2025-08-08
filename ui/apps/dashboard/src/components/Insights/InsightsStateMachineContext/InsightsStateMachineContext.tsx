@@ -118,7 +118,7 @@ function makeQueryKey(activeQuery: string) {
 function selectInsightsData(
   infiniteData: InfiniteData<InsightsFetchResult, unknown>
 ): undefined | InsightsFetchResult {
-  if (!infiniteData?.pages?.length) return undefined;
+  if (infiniteData.pages.length === 0) return undefined;
 
   const firstPage = infiniteData.pages[0];
   const lastPage = infiniteData.pages[infiniteData.pages.length - 1];
