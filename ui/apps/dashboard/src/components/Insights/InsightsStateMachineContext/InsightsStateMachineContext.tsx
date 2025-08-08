@@ -31,7 +31,7 @@ const InsightsStateMachineContext = createContext<InsightsStateMachineContextVal
 
 export function InsightsStateMachineContextProvider({ children }: { children: ReactNode }) {
   const [query, setQuery] = useState(DEFAULT_QUERY);
-  const [activeQuery, setLastSentQuery] = useState('');
+  const [activeQuery, setActiveQuery] = useState('');
   const { fetchInsights } = useFetchInsights();
 
   const { data, error, fetchNextPage, isError, isFetching, isLoading, refetch } = useInfiniteQuery({
@@ -53,7 +53,7 @@ export function InsightsStateMachineContextProvider({ children }: { children: Re
         onChange: setQuery,
         query,
         retry: refetch,
-        runQuery: setLastSentQuery,
+        runQuery: setActiveQuery,
         status: getInsightsStatus({ data, isError, isFetching, isLoading }),
       }}
     >
