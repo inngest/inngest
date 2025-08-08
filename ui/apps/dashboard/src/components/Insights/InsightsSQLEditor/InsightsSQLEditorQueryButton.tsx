@@ -6,7 +6,7 @@ import { RiPlayFill } from '@remixicon/react';
 import { useInsightsStateMachineContext } from '../InsightsStateMachineContext/InsightsStateMachineContext';
 
 export function InsightsSQLEditorQueryButton() {
-  const { isEmpty, runQuery, status } = useInsightsStateMachineContext();
+  const { isEmpty, query, runQuery, status } = useInsightsStateMachineContext();
   const isRunning = status === 'loading';
 
   return (
@@ -18,7 +18,7 @@ export function InsightsSQLEditorQueryButton() {
       label={isRunning ? undefined : 'Run query'}
       loading={isRunning}
       onClick={(e) => {
-        runQuery();
+        runQuery(query);
         e.currentTarget.blur();
       }}
       size="medium"

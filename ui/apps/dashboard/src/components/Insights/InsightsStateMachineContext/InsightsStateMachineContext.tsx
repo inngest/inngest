@@ -19,7 +19,6 @@ ORDER BY hour DESC, event_name ASC`;
 interface InsightsStateMachineContextValue {
   data: InsightsFetchResult | undefined;
   error: string | undefined;
-  fetchMoreError: string | undefined;
   activeQuery: string;
   query: string;
   status: InsightsStatus;
@@ -27,7 +26,7 @@ interface InsightsStateMachineContextValue {
   isEmpty: boolean;
   onChange: (value: string) => void;
   retry: () => void;
-  runQuery: () => void;
+  runQuery: (query: string) => void;
 }
 
 const InsightsStateMachineContext = createContext<InsightsStateMachineContextValue | null>(null);
@@ -35,7 +34,6 @@ const InsightsStateMachineContext = createContext<InsightsStateMachineContextVal
 export function InsightsStateMachineContextProvider({ children }: { children: ReactNode }) {
   const [query, setQuery] = useState(DEFAULT_QUERY);
   const [activeQuery, setLastSentQuery] = useState('');
-  const [fetchMoreError, setFetchMoreError] = useState<string | undefined>();
   const { fetchInsights } = useFetchInsights();
 
   const { data, error, fetchNextPage, isFetching, isLoading, isError, refetch } = useInfiniteQuery({
@@ -49,36 +47,21 @@ export function InsightsStateMachineContextProvider({ children }: { children: Re
     select: selectInsightsData,
   });
 
-  const status = getInsightsStatus(isError, isLoading, isFetching, data, fetchMoreError);
-
-  const runQuery = useCallback(() => {
-    setFetchMoreError(undefined);
-    setLastSentQuery(query);
-  }, [query]);
-
-  const fetchMore = useCallback(async () => {
-    setFetchMoreError(undefined);
-    try {
-      await fetchNextPage();
-    } catch (error) {
-      setFetchMoreError(stringifyError(error));
-    }
-  }, [fetchNextPage]);
+  const status = getInsightsStatus(isError, isLoading, isFetching, data);
 
   return (
     <InsightsStateMachineContext.Provider
       value={{
         data,
         error: error ? stringifyError(error) : undefined,
-        fetchMoreError,
         activeQuery,
         query,
         status,
-        fetchMore,
+        fetchMore: fetchNextPage,
         isEmpty: query.trim() === '',
         onChange: setQuery,
         retry: refetch,
-        runQuery,
+        runQuery: setLastSentQuery,
       }}
     >
       {children}

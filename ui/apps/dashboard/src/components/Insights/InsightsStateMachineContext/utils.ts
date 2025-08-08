@@ -6,13 +6,12 @@ export function getInsightsStatus(
   isError: boolean,
   isLoading: boolean,
   isFetching: boolean,
-  data: InsightsFetchResult | undefined,
-  fetchMoreError: string | undefined
+  data: InsightsFetchResult | undefined
 ): InsightsStatus {
-  if (isError) return 'error';
+  if (isError && data === undefined) return 'error';
+  if (isError && data !== undefined) return 'fetchMoreError';
   if (isLoading) return 'loading';
   if (isFetching && data !== undefined) return 'fetchingMore';
-  if (fetchMoreError) return 'fetchMoreError';
   if (data !== undefined) return 'success';
   return 'initial';
 }
