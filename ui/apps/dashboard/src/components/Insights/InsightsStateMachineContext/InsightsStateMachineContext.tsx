@@ -1,33 +1,28 @@
 'use client';
 
-import { createContext, useCallback, useContext, useReducer, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useState, type ReactNode } from 'react';
+import { useInfiniteQuery } from '@tanstack/react-query';
 
-import { simulateQuery } from './mocks';
-import { insightsStateMachineReducer } from './reducer';
-import type { InsightsState } from './types';
+import type { InsightsFetchResult, InsightsStatus } from './types';
+import { useFetchInsights } from './useFetchInsights';
+import { getInsightsStatus, selectInsightsData } from './utils';
 
-const DEFAULT_QUERY = `SELECT 
-  HOUR(ts) as hour, 
-  COUNT(*) as count 
-WHERE 
-  name = 'cli/dev_ui.loaded' 
-  AND data.os != 'linux'
-  AND ts > 1752845983000 
-GROUP BY
-  hour 
-ORDER BY 
-  hour desc`;
+const DEFAULT_QUERY = `SELECT
+  toStartOfHour(toDateTime(event_ts / 1000)) AS hour,
+  event_name,
+  COUNT(*) AS event_count
+FROM events
+WHERE event_ts > 1754609958000
+GROUP BY hour, event_name
+ORDER BY hour DESC, event_name ASC`;
 
-const INITIAL_STATE: InsightsState = {
-  data: undefined,
-  error: undefined,
-  fetchMoreError: undefined,
-  lastSentQuery: '',
-  query: DEFAULT_QUERY,
-  status: 'initial',
-};
-
-interface InsightsStateMachineContextValue extends InsightsState {
+interface InsightsStateMachineContextValue {
+  data: InsightsFetchResult | undefined;
+  error: string | undefined;
+  fetchMoreError: string | undefined;
+  lastSentQuery: string;
+  query: string;
+  status: InsightsStatus;
   fetchMore: () => void;
   isEmpty: boolean;
   onChange: (value: string) => void;
@@ -37,52 +32,50 @@ interface InsightsStateMachineContextValue extends InsightsState {
 const InsightsStateMachineContext = createContext<InsightsStateMachineContextValue | null>(null);
 
 export function InsightsStateMachineContextProvider({ children }: { children: ReactNode }) {
-  const [queryState, dispatch] = useReducer(insightsStateMachineReducer, INITIAL_STATE);
+  const [query, setQuery] = useState(DEFAULT_QUERY);
+  const [lastSentQuery, setLastSentQuery] = useState('');
+  const [fetchMoreError, setFetchMoreError] = useState<string | undefined>();
+  const { fetchInsights } = useFetchInsights();
 
-  // TODO: Ensure runQuery and fetchMore cannot finish out of order
-  // if run in quick succession.
-  const runQuery = useCallback(async () => {
-    dispatch({ type: 'START_QUERY' });
+  const { data, error, fetchNextPage, isFetching, isLoading, isError } = useInfiniteQuery({
+    queryKey: ['insights', lastSentQuery],
+    queryFn: () => fetchInsights(lastSentQuery),
+    enabled: lastSentQuery !== '', // Auto-fetch when lastSentQuery changes and isn't empty
+    initialPageParam: null,
+    getNextPageParam: (lastPage) => {
+      return lastPage.pageInfo.hasNextPage ? lastPage.pageInfo.endCursor : undefined;
+    },
+    select: selectInsightsData,
+  });
 
-    try {
-      const result = await simulateQuery(queryState.query, null);
-      dispatch({ type: 'QUERY_SUCCESS', payload: result });
-    } catch (error) {
-      dispatch({
-        type: 'QUERY_ERROR',
-        payload: stringifyError(error),
-      });
-    }
-  }, [queryState.query]);
+  const status = getInsightsStatus(isError, isLoading, isFetching, data, fetchMoreError);
 
-  const onChange = useCallback((value: string) => {
-    dispatch({ type: 'UPDATE_CONTENT', payload: value });
-  }, []);
+  const runQuery = useCallback(() => {
+    setFetchMoreError(undefined);
+    setLastSentQuery(query);
+  }, [query]);
 
   const fetchMore = useCallback(async () => {
-    dispatch({ type: 'FETCH_MORE' });
-
+    setFetchMoreError(undefined);
     try {
-      const result = await simulateQuery(
-        queryState.lastSentQuery,
-        queryState.data?.pageInfo.endCursor ?? null
-      );
-      dispatch({ type: 'FETCH_MORE_SUCCESS', payload: result });
+      await fetchNextPage();
     } catch (error) {
-      dispatch({
-        type: 'FETCH_MORE_ERROR',
-        payload: stringifyError(error),
-      });
+      setFetchMoreError(stringifyError(error));
     }
-  }, [queryState.data?.pageInfo.endCursor, queryState.lastSentQuery]);
+  }, [fetchNextPage]);
 
   return (
     <InsightsStateMachineContext.Provider
       value={{
-        ...queryState,
+        data,
+        error: error ? stringifyError(error) : undefined,
+        fetchMoreError,
+        lastSentQuery,
+        query,
+        status,
         fetchMore,
-        isEmpty: queryState.query.trim() === '',
-        onChange,
+        isEmpty: query.trim() === '',
+        onChange: setQuery,
         runQuery,
       }}
     >
