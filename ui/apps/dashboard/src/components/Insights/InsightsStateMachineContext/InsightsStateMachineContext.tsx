@@ -26,6 +26,7 @@ interface InsightsStateMachineContextValue {
   fetchMore: () => void;
   isEmpty: boolean;
   onChange: (value: string) => void;
+  retry: () => void;
   runQuery: () => void;
 }
 
@@ -37,14 +38,15 @@ export function InsightsStateMachineContextProvider({ children }: { children: Re
   const [fetchMoreError, setFetchMoreError] = useState<string | undefined>();
   const { fetchInsights } = useFetchInsights();
 
-  const { data, error, fetchNextPage, isFetching, isLoading, isError } = useInfiniteQuery({
+  const { data, error, fetchNextPage, isFetching, isLoading, isError, refetch } = useInfiniteQuery({
     queryKey: ['insights', lastSentQuery],
-    queryFn: () => fetchInsights(lastSentQuery),
-    enabled: lastSentQuery !== '', // Auto-fetch when lastSentQuery changes and isn't empty
-    initialPageParam: null,
+    queryFn: ({ pageParam }) =>
+      fetchInsights({ after: pageParam, first: 30, query: lastSentQuery }),
+    enabled: lastSentQuery !== '',
     getNextPageParam: (lastPage) => {
       return lastPage.pageInfo.hasNextPage ? lastPage.pageInfo.endCursor : undefined;
     },
+    initialPageParam: null as string | null,
     select: selectInsightsData,
   });
 
@@ -76,6 +78,7 @@ export function InsightsStateMachineContextProvider({ children }: { children: Re
         fetchMore,
         isEmpty: query.trim() === '',
         onChange: setQuery,
+        retry: refetch,
         runQuery,
       }}
     >
