@@ -20,7 +20,7 @@ interface InsightsStateMachineContextValue {
   data: InsightsFetchResult | undefined;
   error: string | undefined;
   fetchMoreError: string | undefined;
-  lastSentQuery: string;
+  activeQuery: string;
   query: string;
   status: InsightsStatus;
   fetchMore: () => void;
@@ -34,17 +34,16 @@ const InsightsStateMachineContext = createContext<InsightsStateMachineContextVal
 
 export function InsightsStateMachineContextProvider({ children }: { children: ReactNode }) {
   const [query, setQuery] = useState(DEFAULT_QUERY);
-  const [lastSentQuery, setLastSentQuery] = useState('');
+  const [activeQuery, setLastSentQuery] = useState('');
   const [fetchMoreError, setFetchMoreError] = useState<string | undefined>();
   const { fetchInsights } = useFetchInsights();
 
   const { data, error, fetchNextPage, isFetching, isLoading, isError, refetch } = useInfiniteQuery({
-    queryKey: ['insights', lastSentQuery],
-    queryFn: ({ pageParam }) =>
-      fetchInsights({ after: pageParam, first: 30, query: lastSentQuery }),
-    enabled: lastSentQuery !== '',
+    queryKey: ['insights', activeQuery],
+    queryFn: ({ pageParam }) => fetchInsights({ after: pageParam, first: 30, query: activeQuery }),
+    enabled: activeQuery !== '',
     getNextPageParam: (lastPage) => {
-      return lastPage.pageInfo.hasNextPage ? lastPage.pageInfo.endCursor : undefined;
+      return lastPage.pageInfo.hasNextPage ? lastPage.pageInfo.endCursor : null;
     },
     initialPageParam: null as string | null,
     select: selectInsightsData,
@@ -72,7 +71,7 @@ export function InsightsStateMachineContextProvider({ children }: { children: Re
         data,
         error: error ? stringifyError(error) : undefined,
         fetchMoreError,
-        lastSentQuery,
+        activeQuery,
         query,
         status,
         fetchMore,

@@ -25,14 +25,14 @@ export interface InsightsFetchResult {
 }
 
 export interface InsightsState {
-  data: InsightsFetchResult | undefined;
-  error: string | undefined;
-  fetchMoreError: string | undefined;
   /**
    * The query that was last sent to the server. The user may have edited the
    * query in the editor, but fetching more data should still use this query.
    */
-  lastSentQuery: string;
+  activeQuery: string;
+  data: InsightsFetchResult | undefined;
+  error: string | undefined;
+  fetchMoreError: string | undefined;
   query: string;
   status: InsightsStatus;
 }
