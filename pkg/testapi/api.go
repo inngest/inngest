@@ -244,10 +244,6 @@ func (t *TestAPI) CancelFunctionRun(w http.ResponseWriter, r *http.Request) {
 	}
 
 	t.options.PauseFunction(parsedFnId)
-	if err != nil {
-		w.WriteHeader(500)
-		_, _ = w.Write([]byte("Internal server error"))
-	}
 
 	md, err := t.options.StateManager.LoadMetadata(ctx, statev2.ID{
 		RunID:      parsedRunId,
