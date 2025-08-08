@@ -3636,7 +3636,8 @@ func TestQueuePartitionRequeue(t *testing.T) {
 		require.True(t, r.Exists(shard.RedisClient.kg.AccountPartitionIndex(accountID)))
 		require.True(t, r.Exists(shard.RedisClient.kg.GlobalAccountIndex()))
 
-		require.True(t, r.Exists(shard.RedisClient.kg.FnMetadata(*p.FunctionID)), r.Keys())
+		// do not expect function metadata to be set anymore
+		require.False(t, r.Exists(shard.RedisClient.kg.FnMetadata(*p.FunctionID)), r.Keys())
 
 		//
 		// PartitionRequeue should drop pointers but not partition metadata
@@ -3650,8 +3651,10 @@ func TestQueuePartitionRequeue(t *testing.T) {
 		require.False(t, r.Exists(shard.RedisClient.kg.AccountPartitionIndex(accountID)))
 		require.False(t, r.Exists(shard.RedisClient.kg.GlobalAccountIndex()))
 
-		// ensure gc does not drop fn metadata
-		require.True(t, r.Exists(shard.RedisClient.kg.FnMetadata(*p.FunctionID)), r.Keys())
+		// fn metadata still should not exist
+		require.False(t, r.Exists(shard.RedisClient.kg.FnMetadata(*p.FunctionID)), r.Keys())
+
+		// ensure gc does not drop partition item yet
 		require.True(t, r.Exists(shard.RedisClient.kg.PartitionItem()))
 		keys, err := r.HKeys(shard.RedisClient.kg.PartitionItem())
 		require.NoError(t, err)
