@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 
 import CheckoutModal, { type CheckoutItem } from '@/components/Billing/Plans/CheckoutModal';
 import ConfirmPlanChangeModal from '@/components/Billing/Plans/ConfirmPlanChangeModal';
-import { type Plan } from './utils';
+import { isHobbyFreePlan, isHobbyPaygPlan, type Plan } from './utils';
 
 type ChangePlanArgs = {
   item: CheckoutItem;
@@ -35,7 +35,7 @@ export default function PayAsGoButton({
 
   let buttonLabel: string | undefined;
 
-  if (currentPlan.slug === 'hobby-free-2025-06-13') {
+  if (isHobbyFreePlan(currentPlan)) {
     buttonLabel = 'Change to pay-as-you-go';
   } else {
     buttonLabel = 'Remove pay-as-you-go';
@@ -59,7 +59,7 @@ export default function PayAsGoButton({
         label={buttonLabel}
         onClick={() => {
           onClickChangePlan({
-            action: currentPlan.slug === 'hobby-payg-2025-06-13' ? 'cancel' : 'upgrade',
+            action: isHobbyPaygPlan(currentPlan) ? 'cancel' : 'upgrade',
             item: { planSlug: plan.slug, name: plan.name, quantity: 1, amount: plan.amount },
           });
         }}
