@@ -1,7 +1,14 @@
 import { Pill } from '@inngest/components/Pill/Pill';
 import { RiCheckLine } from '@remixicon/react';
 
-import { isActive, isTrialPlan, processPlan, type Plan } from '@/components/Billing/Plans/utils';
+import {
+  isActive,
+  isHobbyFreePlan,
+  isHobbyPaygPlan,
+  isTrialPlan,
+  processPlan,
+  type Plan,
+} from '@/components/Billing/Plans/utils';
 import PayAsGoButton from './PayAsGoButton';
 import UpgradeButton from './UpgradeButton';
 
@@ -24,15 +31,14 @@ export function VerticalPlanCard({
           {transformedPlan.name}
           {displayTrialPill && <Pill>Trial</Pill>}
         </h4>
-        {(currentPlan.slug === 'hobby-free-2025-06-13' ||
-          currentPlan.slug === 'hobby-payg-2025-06-13') &&
-          transformedPlan.slug === 'hobby-free-2025-06-13' && (
+        {(isHobbyFreePlan(currentPlan) || isHobbyPaygPlan(currentPlan)) &&
+          isHobbyFreePlan(plan) && (
             <PayAsGoButton
               plan={
-                currentPlan.slug === 'hobby-free-2025-06-13'
+                isHobbyFreePlan(currentPlan)
                   ? {
                       ...plan,
-                      slug: 'hobby-payg-2025-06-13',
+                      slug: 'hobby-payg-2025-08-08',
                       name: 'Hobby (Pay-as-you-go)',
                     }
                   : plan
@@ -42,7 +48,7 @@ export function VerticalPlanCard({
             />
           )}
       </div>
-      {transformedPlan.slug === 'hobby-free-2025-06-13' ? (
+      {isHobbyFreePlan(plan) ? (
         <div className="mb-1 text-xs font-bold uppercase">Always</div>
       ) : (
         <div className="mb-1 text-xs font-bold uppercase">From</div>
@@ -50,10 +56,9 @@ export function VerticalPlanCard({
       <div className="text-2xl">
         <span className="text-4xl font-medium">{transformedPlan.price}</span>
         {transformedPlan.price !== 'Contact us' && <>/{transformedPlan.billingPeriod}</>}
-        {currentPlan.slug === 'hobby-payg-2025-06-13' &&
-          transformedPlan.slug === 'hobby-free-2025-06-13' && (
-            <span className="text-base"> + additional usage billed</span>
-          )}
+        {isHobbyPaygPlan(currentPlan) && isHobbyFreePlan(plan) && (
+          <span className="text-base"> + additional usage billed</span>
+        )}
       </div>
       <UpgradeButton plan={plan} currentPlan={currentPlan} onPlanChange={onPlanChange} />
       <hr className="mb-6" />

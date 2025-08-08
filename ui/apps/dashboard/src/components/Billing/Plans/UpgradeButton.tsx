@@ -8,7 +8,7 @@ import { toast } from 'sonner';
 import CheckoutModal, { type CheckoutItem } from '@/components/Billing/Plans/CheckoutModal';
 import ConfirmPlanChangeModal from '@/components/Billing/Plans/ConfirmPlanChangeModal';
 import { pathCreator } from '@/utils/urls';
-import { PlanNames, isEnterprisePlan, type Plan } from './utils';
+import { PlanNames, isEnterprisePlan, isHobbyFreePlan, isHobbyPaygPlan, type Plan } from './utils';
 
 type ChangePlanArgs = {
   item: CheckoutItem;
@@ -46,7 +46,7 @@ export default function UpgradeButton({
   const isActive =
     currentPlan.slug === plan.slug ||
     (cardPlanName === PlanNames.Enterprise && isEnterprise) ||
-    (currentPlan.slug === 'hobby-payg-2025-06-13' && plan.slug === 'hobby-free-2025-06-13');
+    (isHobbyPaygPlan(currentPlan) && isHobbyFreePlan(plan));
 
   const isLowerPlan = (() => {
     if (isEnterprise) {
@@ -55,7 +55,7 @@ export default function UpgradeButton({
     }
     // For legacy plans, only Free Tier is a downgrade
     if (currentPlan.isLegacy && !currentPlan.isFree) {
-      return isFreeCard || plan.slug === 'hobby-free-2025-06-13';
+      return isFreeCard || isHobbyFreePlan(plan);
     }
     // For non-enterprise plans, compare the amounts
     return cardPlanAmount < currentPlanAmount;

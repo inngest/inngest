@@ -101,7 +101,7 @@ function getFeatureDescriptions(planName: string, entitlements: Plan['entitlemen
     case PlanNames.Hobby:
       return [
         '100k executions, hard limited',
-        '25 concurrent steps',
+        '5 concurrent steps',
         '3 realtime connections',
         '3 users',
         'Basic alerting',
@@ -136,4 +136,18 @@ export function isEnterprisePlan(plan: Plan | (Partial<BillingPlan> & { name: st
 
 export function isTrialPlan(plan: Plan | (Partial<BillingPlan> & { name: string })): boolean {
   return Boolean(plan.name.match(/Trial/i));
+}
+
+export function isHobbyFreePlan(plan: Plan | (Partial<BillingPlan> & { name: string })): boolean {
+  if (!plan.slug) return false;
+  return plan.slug.startsWith('hobby-free-');
+}
+
+export function isHobbyPaygPlan(plan: Plan | (Partial<BillingPlan> & { name: string })): boolean {
+  if (!plan.slug) return false;
+  return plan.slug.startsWith('hobby-payg-');
+}
+
+export function isHobbyPlan(plan: Plan | (Partial<BillingPlan> & { name: string })): boolean {
+  return isHobbyFreePlan(plan) || isHobbyPaygPlan(plan);
 }
