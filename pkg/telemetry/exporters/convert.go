@@ -17,7 +17,6 @@ type spanEvtType int
 
 const (
 	spanEvtTypeUnknown spanEvtType = iota
-	spanEvtTypeEvent
 	spanEvtTypeOutput
 )
 
@@ -58,7 +57,7 @@ func SpanToProto(ctx context.Context, sp trace.ReadOnlySpan) (*runv2.Span, error
 		}
 	}
 
-	events, triggers, output, err := parseSpanEvents(sp.Events())
+	events, output, err := parseSpanEvents(sp.Events())
 	if err != nil {
 		logger.StdlibLogger(ctx).Error("error parsing span events",
 			"error", err,
@@ -86,7 +85,6 @@ func SpanToProto(ctx context.Context, sp trace.ReadOnlySpan) (*runv2.Span, error
 		Timestamp:  timestamppb.New(ts),
 		DurationMs: dur.Milliseconds(),
 		Attributes: attr,
-		Triggers:   triggers,
 		Output:     output,
 		Events:     events,
 		Links:      links,
@@ -175,18 +173,14 @@ func toProtoKind(code string) runv2.SpanStepOp {
 	}
 }
 
-// parseSpanEvents iterates through the otel span events and extract out
-// embedded data
-// - run triggers (events and crons)
-// - output
-func parseSpanEvents(spanEvents []trace.Event) ([]*runv2.SpanEvent, []*runv2.Trigger, []byte, error) {
+// parseSpanEvents iterates through the otel span events and extracts out
+// embedded data.
+func parseSpanEvents(spanEvents []trace.Event) ([]*runv2.SpanEvent, []byte, error) {
 	events := []*runv2.SpanEvent{} // actual span events
-	triggers := []*runv2.Trigger{}
 	var output []byte
 
 	for _, evt := range spanEvents {
 		attr := map[string]string{}
-		var evtID string
 
 		// iterates over the list of attributes in this span event
 		// and set the type.
@@ -197,14 +191,7 @@ func parseSpanEvents(spanEvents []trace.Event) ([]*runv2.SpanEvent, []*runv2.Tri
 			if kv.Valid() {
 				key := string(kv.Key)
 				val := attributeValueAsString(kv.Value)
-
-				switch key {
-				case consts.OtelSysEventData:
-					typ = spanEvtTypeEvent
-				case consts.OtelSysEventInternalID:
-					typ = spanEvtTypeEvent
-					evtID = kv.Value.AsString()
-				case consts.OtelSysFunctionOutput, consts.OtelSysStepOutput:
+				if key == consts.OtelSysFunctionOutput || key == consts.OtelSysStepOutput {
 					typ = spanEvtTypeOutput
 				}
 				// TODO: move this into the default case section
@@ -212,26 +199,20 @@ func parseSpanEvents(spanEvents []trace.Event) ([]*runv2.SpanEvent, []*runv2.Tri
 			}
 		}
 
-		// update the relevant data based on type found
-		switch typ {
-		case spanEvtTypeEvent:
-			triggers = append(triggers, &runv2.Trigger{
-				InternalId: evtID,
-				Body:       []byte(evt.Name),
-			})
-		case spanEvtTypeOutput:
+		// update the relevant output data based on type found
+		if typ == spanEvtTypeOutput {
+			// When type is `spanEvtTypeOutput`, evt is added both to `output` here and `events` below.
+			// For particularly large outputs, this duplication can cause the span to exceed the kafka
+			// message size limit which will result in publish failures.
 			output = []byte(evt.Name)
 		}
-
-		// TODO: should be moved into the default case for switch
 		events = append(events, &runv2.SpanEvent{
 			Name:       evt.Name,
 			Timestamp:  timestamppb.New(evt.Time),
 			Attributes: attr,
 		})
 	}
-
-	return events, triggers, output, nil
+	return events, output, nil
 }
 
 func attributeValueAsString(v attribute.Value) string {
