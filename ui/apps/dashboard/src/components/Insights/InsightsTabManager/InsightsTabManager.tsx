@@ -23,6 +23,7 @@ export interface TabManagerActions {
   closeTab: (id: string) => void;
   createTab: (id: string, name?: string) => void;
   focusTab: (id: string) => void;
+  updateTabQuery: (id: string, query: string) => void;
 }
 
 export interface UseInsightsTabManagerReturn {
@@ -60,6 +61,9 @@ export function useInsightsTabManager(): UseInsightsTabManagerReturn {
       focusTab: (id: string) => {
         const tab = tabs.find((tab) => tab.id === id);
         if (tab !== undefined) setActiveTabId(id);
+      },
+      updateTabQuery: (id: string, query: string) => {
+        setTabs((prevTabs) => prevTabs.map((tab) => (tab.id === id ? { ...tab, query } : tab)));
       },
     }),
     [activeTabId, tabs]
