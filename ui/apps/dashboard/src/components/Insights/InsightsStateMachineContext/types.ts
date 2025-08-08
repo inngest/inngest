@@ -20,8 +20,6 @@ export interface InsightsFetchResult {
   pageInfo: {
     endCursor: string | null;
     hasNextPage: boolean;
-    hasPreviousPage: boolean;
-    startCursor: string | null;
   };
   totalCount: number;
 }
