@@ -30,9 +30,9 @@ export interface InsightsState {
    * query in the editor, but fetching more data should still use this query.
    */
   activeQuery: string;
-  data: InsightsFetchResult | undefined;
-  error: string | undefined;
-  fetchMoreError: string | undefined;
+  data: undefined | InsightsFetchResult;
+  error: undefined | string;
+  fetchMoreError: undefined | string;
   query: string;
   status: InsightsStatus;
 }

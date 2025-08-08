@@ -24,7 +24,7 @@ export function ErrorState() {
       }
       severity="error"
     >
-      {error ?? FALLBACK_ERROR}
+      {error?.message ?? FALLBACK_ERROR}
     </Banner>
   );
 }

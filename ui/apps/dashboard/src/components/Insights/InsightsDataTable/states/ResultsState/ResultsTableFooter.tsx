@@ -9,7 +9,7 @@ import type { InsightsFetchResult } from '@/components/Insights/InsightsStateMac
 const FALLBACK_ERROR = 'Something went wrong. Please try again.';
 
 export function ResultsTableFooter() {
-  const { data, fetchMore, fetchMoreError, status } = useInsightsStateMachineContext();
+  const { data, error, fetchMore, status } = useInsightsStateMachineContext();
 
   if (!['fetchingMore', 'fetchMoreError', 'success'].includes(status)) return null;
   if (!assertData(data)) return null;
@@ -30,7 +30,7 @@ export function ResultsTableFooter() {
           }
           severity="error"
         >
-          {fetchMoreError ?? FALLBACK_ERROR}
+          {error?.message ?? FALLBACK_ERROR}
         </Banner>
       )}
 

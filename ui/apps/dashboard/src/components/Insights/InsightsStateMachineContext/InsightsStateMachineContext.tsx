@@ -1,11 +1,10 @@
 'use client';
 
-import { createContext, useCallback, useContext, useState, type ReactNode } from 'react';
-import { useInfiniteQuery } from '@tanstack/react-query';
+import { createContext, useContext, useState, type ReactNode } from 'react';
+import { useInfiniteQuery, type InfiniteData } from '@tanstack/react-query';
 
 import type { InsightsFetchResult, InsightsStatus } from './types';
 import { useFetchInsights } from './useFetchInsights';
-import { getInsightsStatus, selectInsightsData } from './utils';
 
 const DEFAULT_QUERY = `SELECT
   toStartOfHour(toDateTime(event_ts / 1000)) AS hour,
@@ -17,16 +16,15 @@ GROUP BY hour, event_name
 ORDER BY hour DESC, event_name ASC`;
 
 interface InsightsStateMachineContextValue {
-  data: InsightsFetchResult | undefined;
-  error: string | undefined;
   activeQuery: string;
+  data: InsightsFetchResult | undefined;
+  error: null | Error;
   query: string;
-  status: InsightsStatus;
   fetchMore: () => void;
-  isEmpty: boolean;
   onChange: (value: string) => void;
   retry: () => void;
   runQuery: (query: string) => void;
+  status: InsightsStatus;
 }
 
 const InsightsStateMachineContext = createContext<InsightsStateMachineContextValue | null>(null);
@@ -36,42 +34,32 @@ export function InsightsStateMachineContextProvider({ children }: { children: Re
   const [activeQuery, setLastSentQuery] = useState('');
   const { fetchInsights } = useFetchInsights();
 
-  const { data, error, fetchNextPage, isFetching, isLoading, isError, refetch } = useInfiniteQuery({
-    queryKey: ['insights', activeQuery],
+  const { data, error, fetchNextPage, isError, isFetching, isLoading, refetch } = useInfiniteQuery({
+    enabled: hasActiveQuery(activeQuery),
+    getNextPageParam,
+    initialPageParam: null,
+    queryKey: makeQueryKey(activeQuery),
     queryFn: ({ pageParam }) => fetchInsights({ after: pageParam, first: 30, query: activeQuery }),
-    enabled: activeQuery !== '',
-    getNextPageParam: (lastPage) => {
-      return lastPage.pageInfo.hasNextPage ? lastPage.pageInfo.endCursor : null;
-    },
-    initialPageParam: null as string | null,
     select: selectInsightsData,
   });
-
-  const status = getInsightsStatus(isError, isLoading, isFetching, data);
 
   return (
     <InsightsStateMachineContext.Provider
       value={{
-        data,
-        error: error ? stringifyError(error) : undefined,
         activeQuery,
-        query,
-        status,
+        data,
+        error,
         fetchMore: fetchNextPage,
-        isEmpty: query.trim() === '',
         onChange: setQuery,
+        query,
         retry: refetch,
         runQuery: setLastSentQuery,
+        status: getInsightsStatus({ data, isError, isFetching, isLoading }),
       }}
     >
       {children}
     </InsightsStateMachineContext.Provider>
   );
-}
-
-function stringifyError(error: unknown): string {
-  if (error instanceof Error) return error.message;
-  return 'Unknown error';
 }
 
 export function useInsightsStateMachineContext() {
@@ -83,4 +71,65 @@ export function useInsightsStateMachineContext() {
   }
 
   return context;
+}
+
+interface GetInsightsStatusParams {
+  data: undefined | InsightsFetchResult;
+  isError: boolean;
+  isFetching: boolean;
+  isLoading: boolean;
+}
+
+export function getInsightsStatus({
+  data,
+  isError,
+  isFetching,
+  isLoading,
+}: GetInsightsStatusParams): InsightsStatus {
+  if (isError && data === undefined) return 'error';
+  if (isError && data !== undefined) return 'fetchMoreError';
+  if (isLoading) return 'loading';
+  if (isFetching && data !== undefined) return 'fetchingMore';
+  if (data !== undefined) return 'success';
+  return 'initial';
+}
+
+function getNextPageParam(lastPage: InsightsFetchResult) {
+  return lastPage.pageInfo.hasNextPage ? lastPage.pageInfo.endCursor : null;
+}
+
+/**
+ * This prevents the query from fetching until the user runs a query,
+ * since `activeQuery` is not updated until that button is clicked.
+ */
+function hasActiveQuery(activeQuery: string) {
+  return activeQuery.trim() !== '';
+}
+
+/**
+ * `activeQuery` changes only when the user runs a new query.
+ * Thus, a new fetch will be triggered when the user clicks the "Run query"
+ * button, but not automatically when the user types something else in the editor.
+ */
+function makeQueryKey(activeQuery: string) {
+  return ['insights', activeQuery];
+}
+
+function selectInsightsData(
+  infiniteData: InfiniteData<InsightsFetchResult, unknown>
+): undefined | InsightsFetchResult {
+  if (!infiniteData?.pages?.length) return undefined;
+
+  const firstPage = infiniteData.pages[0];
+  const lastPage = infiniteData.pages[infiniteData.pages.length - 1];
+  if (firstPage === undefined || lastPage === undefined) {
+    return undefined;
+  }
+
+  return {
+    columns: firstPage.columns,
+    entries: infiniteData.pages.flatMap((page) => page.entries),
+    pageInfo: lastPage.pageInfo,
+    totalCount: firstPage.totalCount,
+  };
 }
