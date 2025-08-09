@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -191,9 +192,10 @@ func (a checkpointAPI) CheckpointSteps(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: If the opcodes contain a function finished op, we don't need to bother serializing
+	// If the opcodes contain a function finished op, we don't need to bother serializing
 	// to the state store.  We only care about serializing state if we switch from sync -> async,
 	// as the state will be used for resuming functions.
+	finished := isFinished(input.Steps)
 
 	// Depending on the type of steps, we may end up switching the run from sync to async.  For example,
 	// if the opcodes are sleeps, waitForEvents, inferences, etc. we will be resuming the API endpoint
@@ -211,12 +213,17 @@ func (a checkpointAPI) CheckpointSteps(w http.ResponseWriter, r *http.Request) {
 					"run_id", md.ID.RunID.String(),
 				)
 			}
-			if _, err := a.State.SaveStep(ctx, md.ID, op.ID, []byte(output)); err != nil {
-				logger.StdlibLogger(ctx).Error(
-					"error saving checkpointed step state",
-					"error", err,
-					"run_id", md.ID.RunID.String(),
-				)
+
+			if !finished {
+				// Note that if a fn has finished there is never re-entry, therefore
+				// we don't need to save state for the run.
+				if _, err := a.State.SaveStep(ctx, md.ID, op.ID, []byte(output)); err != nil {
+					logger.StdlibLogger(ctx).Error(
+						"error saving checkpointed step state",
+						"error", err,
+						"run_id", md.ID.RunID.String(),
+					)
+				}
 			}
 
 			ref, err := a.TracerProvider.CreateSpan(
@@ -235,16 +242,27 @@ func (a checkpointAPI) CheckpointSteps(w http.ResponseWriter, r *http.Request) {
 				},
 			)
 			_, _ = ref, err
-		// case enums.OpcodeFunctionComplete:
-		// 	result := APIResult{}
-		// 	if err := json.Unmarshal(op.Data, &result); err != nil {
-		// 		// TODO: err
-		// 		return
-		// 	}
-		// 	if err := a.finalize(ctx, md, result); err != nil {
-		// 		// TODO: err
-		// 		return
-		// 	}
+
+		case enums.OpcodeRunComplete:
+			// OpcodeRunComplete allows us to finish runs within a single API request when checkpointing steps.
+			result := &APIResult{}
+			if err := op.RunCompleteData(result); err != nil {
+				logger.StdlibLogger(ctx).Error(
+					"error fetching run output",
+					"error", err,
+					"run_id", md.ID.RunID.String(),
+				)
+				return
+			}
+			if err := a.finalize(ctx, md, *result); err != nil {
+				logger.StdlibLogger(ctx).Error(
+					"error completing run",
+					"error", err,
+					"run_id", md.ID.RunID.String(),
+				)
+				return
+			}
+
 		default:
 			// This is now async.  For now, do NOT allow this.
 			panic("TODO")
@@ -314,6 +332,17 @@ func (a checkpointAPI) finalize(ctx context.Context, md sv2.Metadata, result API
 	// TODO: If the run mode is async (due to background steps, or a switch with waits)
 	// we need to ensure that we do not finish the run.  Finishing will be managed via the
 	// regular async executor.
+	//
+	// This is only required when we introduce background steps, eg. `step.defer`.
+
+	if result.Duration == 0 {
+		// XXX: Sometimes we may fail to unmarshal API responses due to network errors.  In this
+		// case we ALWAYS need a run duration, so use the current time as when the run ended.
+		//
+		// This, as a fallback, is rare but important.
+		result.Duration = time.Since(md.ID.RunID.Timestamp())
+	}
+
 	err := a.TracerProvider.UpdateSpan(&tracing.UpdateSpanOptions{
 		Metadata:   &md,
 		TargetSpan: tracing.RunSpanRefFromMetadata(&md),
@@ -432,4 +461,10 @@ func (a checkpointAPI) upsertSyncData(ctx context.Context, auth apiv1auth.V1Auth
 		"function_id", input.FnID(input.AppID(auth.WorkspaceID())),
 		"app_id", app.ID,
 	)
+}
+
+func isFinished(steps []state.GeneratorOpcode) bool {
+	return slices.ContainsFunc(steps, func(op state.GeneratorOpcode) bool {
+		return op.Op == enums.OpcodeRunComplete
+	})
 }
