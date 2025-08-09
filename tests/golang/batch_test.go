@@ -19,6 +19,7 @@ import (
 
 type BatchEventData struct {
 	Time time.Time `json:"time"`
+	Num  int       `json:"num"`
 }
 
 type BatchEvent = inngestgo.GenericEvent[BatchEventData]
@@ -101,6 +102,50 @@ func TestBatchEvents(t *testing.T) {
 			rid := ulid.MustParse(runID)
 			assert.True(t, trigger.Timestamp.Before(ulid.Time(rid.Time())))
 		})
+	})
+}
+
+func TestBatchWithConditionalTrigger(t *testing.T) {
+	ctx := context.Background()
+	inngestClient, server, registerFuncs := NewSDKHandler(t, "batch")
+	defer server.Close()
+
+	var (
+		counter     int32
+		totalEvents int32
+		runID       string
+	)
+
+	_, err := inngestgo.CreateFunction(
+		inngestClient,
+		inngestgo.FunctionOpts{ID: "batch-test", BatchEvents: &inngestgo.ConfigBatchEvents{MaxSize: 5, Timeout: 5 * time.Second}},
+		inngestgo.EventTrigger("test/batch", inngestgo.StrPtr("has(event.data.num) && event.data.num % 2 == 0")),
+		func(ctx context.Context, input inngestgo.Input[BatchEvent]) (any, error) {
+			if runID == "" {
+				runID = input.InputCtx.RunID
+			}
+			atomic.AddInt32(&counter, 1)
+			atomic.AddInt32(&totalEvents, int32(len(input.Events)))
+			return "batched!!", nil
+		},
+	)
+	require.NoError(t, err)
+	registerFuncs()
+
+	t.Run("trigger batch", func(t *testing.T) {
+		for i := 0; i < 10; i++ {
+			_, err := inngestClient.Send(ctx, BatchEvent{
+				Name: "test/batch",
+				Data: BatchEventData{Num: i},
+			})
+			require.NoError(t, err)
+		}
+
+		// Wait for trigger to run
+		<-time.After(6 * time.Second)
+		assert.EqualValues(t, 1, atomic.LoadInt32(&counter))
+		assert.EqualValues(t, 5, atomic.LoadInt32(&totalEvents))
+
 	})
 }
 
