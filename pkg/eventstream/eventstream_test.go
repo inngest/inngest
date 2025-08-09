@@ -354,13 +354,16 @@ func TestParseStream_FormUrlencoded(t *testing.T) {
 	contentType := "application/x-www-form-urlencoded"
 
 	t.Run("single form field", func(t *testing.T) {
-		t.Skip("TODO: Implement in eventstream.go")
 		t.Parallel()
 		r := require.New(t)
 		ctx := context.Background()
 
+		// Pick a long string to ensure that we don't truncate the body. This is
+		// a good check because of the way ParseStream buffers the body
+		longString := strings.Repeat("x", 10*1024)
+
 		formData := url.Values{}
-		formData.Set("name", "Alice")
+		formData.Set("msg", longString)
 		body := strings.NewReader(formData.Encode())
 
 		stream := make(chan StreamItem)
@@ -375,7 +378,7 @@ func TestParseStream_FormUrlencoded(t *testing.T) {
 			var result map[string]any
 			r.NoError(json.Unmarshal(item.Item, &result))
 			r.Equal(map[string]any{
-				"name": []any{"Alice"},
+				"msg": []any{longString},
 			}, result)
 			n++
 		}
@@ -384,7 +387,6 @@ func TestParseStream_FormUrlencoded(t *testing.T) {
 	})
 
 	t.Run("multiple form fields", func(t *testing.T) {
-		t.Skip("TODO: Implement in eventstream.go")
 		t.Parallel()
 		r := require.New(t)
 		ctx := context.Background()
@@ -416,7 +418,6 @@ func TestParseStream_FormUrlencoded(t *testing.T) {
 	})
 
 	t.Run("empty form fields", func(t *testing.T) {
-		t.Skip("TODO: Implement in eventstream.go")
 		t.Parallel()
 		r := require.New(t)
 		ctx := context.Background()
@@ -449,7 +450,6 @@ func TestParseStream_FormUrlencoded(t *testing.T) {
 	})
 
 	t.Run("max size exceeded", func(t *testing.T) {
-		t.Skip("TODO: Implement in eventstream.go")
 		t.Parallel()
 		r := require.New(t)
 		ctx := context.Background()
@@ -475,7 +475,8 @@ func TestParseStream_FormUrlencoded(t *testing.T) {
 	})
 
 	t.Run("no form fields", func(t *testing.T) {
-		t.Skip("TODO: Implement in eventstream.go")
+		// Reject requests with no form fields
+
 		t.Parallel()
 		r := require.New(t)
 		ctx := context.Background()
@@ -497,7 +498,7 @@ func TestParseStream_FormUrlencoded(t *testing.T) {
 			n++
 		}
 		r.NoError(eg.Wait())
-		r.Equal(1, n)
+		r.Equal(0, n)
 	})
 
 	t.Run("JSON", func(t *testing.T) {
