@@ -46,8 +46,24 @@ export const pathCreator = {
   appSyncs({ envSlug, externalAppID }: { envSlug: string; externalAppID: string }): Route {
     return `/env/${envSlug}/apps/${encodeURIComponent(externalAppID)}/syncs` as Route;
   },
-  billing({ ref, tab }: { ref?: string; tab?: string } = {}): Route {
-    return `/billing${tab ? `/${tab}` : ''}${ref ? `?ref=${ref}` : ''}` as Route;
+  billing({ ref, tab, highlight }: { ref?: string; tab?: string; highlight?: string } = {}): Route {
+    let path = '/billing';
+    if (tab) {
+      path += `/${tab}`;
+    }
+
+    const query = new URLSearchParams();
+    if (highlight) {
+      query.set('highlight', highlight);
+    }
+    if (ref) {
+      query.set('ref', ref);
+    }
+    if (query.toString()) {
+      path += `?${query.toString()}`;
+    }
+
+    return path as Route;
   },
   createApp({ envSlug }: { envSlug: string }): Route {
     return `/env/${envSlug}/apps/sync-new` as Route;

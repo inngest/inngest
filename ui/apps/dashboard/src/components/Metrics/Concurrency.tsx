@@ -1,3 +1,4 @@
+import { Button } from '@inngest/components/Button';
 import { Chart } from '@inngest/components/Chart/Chart';
 import { Info } from '@inngest/components/Info/Info';
 import { Link } from '@inngest/components/Link/Link';
@@ -6,6 +7,7 @@ import { isDark } from '@inngest/components/utils/theme';
 import resolveConfig from 'tailwindcss/resolveConfig';
 
 import type { VolumeMetricsQuery } from '@/gql/graphql';
+import { pathCreator } from '@/utils/urls';
 import tailwindConfig from '../../../tailwind.config';
 import type { EntityLookup } from './Dashboard';
 import { getLineChartOptions, getXAxis, lineColors, seriesOptions } from './utils';
@@ -112,6 +114,12 @@ export const AccountConcurrency = ({
             }
           />
         </div>
+        <Button
+          label="Increase Concurrency"
+          kind="secondary"
+          appearance="outlined"
+          href={pathCreator.billing({ ref: 'app-concurrency-chart', highlight: 'concurrency' })}
+        />
       </div>
       <div className="flex h-full flex-row items-center">
         <Chart
