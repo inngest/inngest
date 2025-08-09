@@ -1,18 +1,14 @@
-import {
-  auth,
-  clerkClient,
-  currentUser,
-  type Organization,
-  type OrganizationMembership,
-  type User,
-} from '@clerk/nextjs/server';
+import { auth } from '@clerk/nextjs/server';
 
 import { graphql } from '@/gql';
 import graphqlAPI from '../graphqlAPI';
 
 export type ProfileType = {
-  user: User;
-  org?: Organization;
+  username?: string;
+  fullName?: string;
+  orgName?: string;
+  orgHasImage?: boolean;
+  orgImageUrl?: string;
 };
 
 export type ProfileDisplayType = {
@@ -44,13 +40,16 @@ export const getProfileDisplay = async (): Promise<ProfileDisplayType> => {
     displayName = 'System';
     orgProfilePic = null;
   } else {
-    const { user, org } = await getProfile();
-    orgName = org?.name;
-    displayName =
-      user.firstName || user.lastName
-        ? `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim()
-        : user.username ?? '';
-    orgProfilePic = org?.hasImage ? org.imageUrl : null;
+    const {
+      username,
+      fullName,
+      orgName: orgNameFromClaims,
+      orgHasImage,
+      orgImageUrl,
+    } = await getProfile();
+    orgName = orgNameFromClaims;
+    displayName = fullName ?? username ?? '';
+    orgProfilePic = orgHasImage ? orgImageUrl ?? null : null;
   }
 
   return {
@@ -62,26 +61,17 @@ export const getProfileDisplay = async (): Promise<ProfileDisplayType> => {
 };
 
 export const getProfile = async (): Promise<ProfileType> => {
-  const user = await currentUser();
+  const { userId, sessionClaims } = auth();
 
-  if (!user) {
+  if (!userId) {
     throw new Error('User is not logged in');
   }
 
-  const { orgId } = auth();
-  return { user, org: orgId ? await getOrg(orgId) : undefined };
-};
-
-export const getOrg = async (organizationId: string): Promise<Organization | undefined> => {
-  if (!organizationId) {
-    return undefined;
-  }
-
-  const orgs = (
-    await clerkClient().organizations.getOrganizationMembershipList({
-      organizationId,
-    })
-  ).data.map((o: OrganizationMembership) => o.organization);
-
-  return orgs.find((o: Organization) => o.id === organizationId);
+  return {
+    username: sessionClaims.username,
+    fullName: sessionClaims.fullName,
+    orgName: sessionClaims.orgName,
+    orgHasImage: sessionClaims.orgHasImage,
+    orgImageUrl: sessionClaims.orgImageUrl,
+  };
 };
