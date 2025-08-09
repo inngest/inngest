@@ -63,6 +63,10 @@
             claude-code
             gemini-cli
           ];
+
+          shellHook = ''
+            export GOBIN=$PWD/bin
+          '';
         };
       });
 }
