@@ -29,6 +29,10 @@ vendor:
 lint:
 	golangci-lint run --verbose
 
+.PHONY: install-tool
+install-tool:
+	go install tool
+
 .PHONY: e2e
 e2e:
 	./tests.sh

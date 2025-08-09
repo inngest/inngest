@@ -6,3 +6,8 @@ plugins:
   - local: protoc-gen-connect-go
     out: proto/gen
     opt: paths=source_relative
+  - local: protoc-gen-grpc-gateway
+    out: proto/gen
+    opt:
+      - paths=source_relative
+      - generate_unbound_methods=true
