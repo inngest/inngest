@@ -1,4 +1,9 @@
 export type Trigger = {
-  type: 'CRON' | 'EVENT';
+  type: TriggerTypes;
   value: string;
 };
+
+export enum TriggerTypes {
+  Event = 'EVENT',
+  Cron = 'CRON',
+}

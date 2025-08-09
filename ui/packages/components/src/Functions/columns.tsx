@@ -1,77 +1,42 @@
-'use client';
-
-import { useMemo } from 'react';
-import { useRouter } from 'next/navigation';
 import MiniStackedBarChart from '@inngest/components/Chart/MiniStackedBarChart';
 import { HorizontalPillList, Pill, PillContent } from '@inngest/components/Pill';
 import { Skeleton } from '@inngest/components/Skeleton/Skeleton';
 import { NumberCell, TextCell } from '@inngest/components/Table';
-import NewTable from '@inngest/components/Table/NewTable';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@inngest/components/Tooltip';
 import { getHumanReadableCron } from '@inngest/components/hooks/useCron';
-import { type Trigger } from '@inngest/components/types/trigger';
+import { type Function } from '@inngest/components/types/function';
+import { TriggerTypes } from '@inngest/components/types/trigger';
 import { cn } from '@inngest/components/utils/classNames';
-import { createColumnHelper } from '@tanstack/react-table';
+import { createColumnHelper, type Row } from '@tanstack/react-table';
 
-import { useEnvironment } from '@/components/Environments/environment-context';
-import { FunctionTriggerTypes } from '@/gql/graphql';
-import { pathCreator } from '@/utils/urls';
+import { FunctionsTable } from './FunctionsTable';
+import { useFunctionVolume } from './useFunctionVolume';
 
-export type FunctionTableRow = {
-  app: { name: string };
-  name: string;
-  isArchived: boolean;
-  isPaused: boolean;
-  slug: string;
-  triggers: Trigger[];
-  failureRate: number | undefined;
-  usage:
-    | {
-        total: number;
-        slots: { failureCount: number; startCount: number }[];
-      }
-    | undefined;
-};
+const columnHelper = createColumnHelper<Function>();
 
-type Props = {
-  rows: FunctionTableRow[] | undefined;
-  isLoading?: boolean;
-};
-
-export function FunctionTable({ rows = [], isLoading }: Props) {
-  const env = useEnvironment();
-  const router = useRouter();
-
-  const columns = useMemo(() => {
-    return createColumns(env.slug);
-  }, [env.slug]);
-
-  return (
-    <main className="bg-canvasBase flex min-h-0 flex-col overflow-y-auto">
-      <NewTable
-        columns={columns}
-        data={rows}
-        isLoading={isLoading}
-        blankState={rows.length === 0 ? 'No functions' : null}
-        onRowClick={(row) =>
-          router.push(pathCreator.function({ envSlug: env.slug, functionSlug: row.original.slug }))
-        }
-        getRowHref={(row) =>
-          pathCreator.function({ envSlug: env.slug, functionSlug: row.original.slug })
-        }
-      />
-    </main>
-  );
+const columnsIDs = ['name', 'functions', 'usage'] as const;
+export type ColumnID = (typeof columnsIDs)[number];
+export function isColumnID(value: unknown): value is ColumnID {
+  return columnsIDs.includes(value as ColumnID);
 }
 
-const columnHelper = createColumnHelper<FunctionTableRow>();
+// Ensure that the column ID is valid at compile time
+function ensureColumnID(id: ColumnID): ColumnID {
+  return id;
+}
 
-function createColumns(environmentSlug: string) {
+export function useColumns({
+  pathCreator,
+  getFunctionVolume,
+}: {
+  pathCreator: React.ComponentProps<typeof FunctionsTable>['pathCreator'];
+  getFunctionVolume: React.ComponentProps<typeof FunctionsTable>['getFunctionVolume'];
+}) {
   const columns = [
     columnHelper.accessor('name', {
-      cell: (info) => {
-        const name = info.getValue();
-        const { isPaused, isArchived } = info.row.original;
+      cell: ({ row }: { row: Row<Function> }) => {
+        const name = row.original.name;
+        const { isPaused, isArchived } = row.original;
 
         return (
           <div className="flex items-center gap-2">
@@ -90,6 +55,8 @@ function createColumns(environmentSlug: string) {
         );
       },
       header: 'Function name',
+      enableSorting: false,
+      id: ensureColumnID('name'),
     }),
     columnHelper.accessor('triggers', {
       cell: (props) => {
@@ -102,16 +69,15 @@ function createColumns(environmentSlug: string) {
                 <Pill
                   appearance="outlined"
                   href={
-                    trigger.type === FunctionTriggerTypes.Event
+                    trigger.type === TriggerTypes.Event
                       ? pathCreator.eventType({
-                          envSlug: environmentSlug,
                           eventName: trigger.value,
                         })
                       : undefined
                   }
                   key={trigger.type + trigger.value}
                 >
-                  {trigger.type === FunctionTriggerTypes.Cron ? (
+                  {trigger.type === TriggerTypes.Cron ? (
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <span>
@@ -131,7 +97,7 @@ function createColumns(environmentSlug: string) {
       },
       header: 'Triggers',
     }),
-    columnHelper.accessor((row) => row.app.name, {
+    columnHelper.accessor((row) => row.app?.name, {
       cell: (info) => {
         const appExternalID = info.getValue();
         if (!appExternalID) {
@@ -143,7 +109,6 @@ function createColumns(environmentSlug: string) {
             <Pill
               appearance="outlined"
               href={pathCreator.app({
-                envSlug: environmentSlug,
                 externalAppID: appExternalID,
               })}
             >
@@ -156,11 +121,12 @@ function createColumns(environmentSlug: string) {
     }),
     columnHelper.accessor('failureRate', {
       cell: (info) => {
-        const value = info.getValue();
-        if (value === undefined) {
+        const functionID = info.row.original.id;
+        const { data, isLoading } = useFunctionVolume(functionID, getFunctionVolume);
+        if (isLoading) {
           return <Skeleton className="my-2 block h-3 w-32" />;
         }
-        if (value === 0) {
+        if (data?.failureRate === 0) {
           return (
             <TextCell>
               <span className="text-light">—</span>
@@ -170,33 +136,38 @@ function createColumns(environmentSlug: string) {
 
         return (
           <TextCell>
-            <span className="text-tertiary-intense">{value}%</span>
+            <span className="text-tertiary-intense">{data?.failureRate}%</span>
           </TextCell>
         );
       },
       header: 'Failure rate (24hr)',
     }),
+
     columnHelper.accessor('usage', {
       cell: (info) => {
-        const value = info.getValue();
+        const functionID = info.row.original.id;
+        const { data, isLoading } = useFunctionVolume(functionID, getFunctionVolume);
 
-        if (value === undefined) {
-          return <Skeleton className="my-2 block h-3 w-32" />;
-        }
+        if (isLoading) return <Skeleton className="my-2 block h-3 w-48" />;
+        if (!data || !data.usage) return <TextCell>—</TextCell>;
 
         return (
           <div className="flex items-center">
             <div className="w-16">
-              <NumberCell value={value.total} term={value.total === 1 ? 'function' : 'functions'} />
+              <NumberCell
+                value={data.usage.totalVolume}
+                term={data.usage.totalVolume === 1 ? 'run' : 'runs'}
+              />
             </div>
-
-            <div className="hidden lg:block [&_*]:cursor-pointer">
-              <MiniStackedBarChart key="volume-chart" className="shrink-0" data={value.slots} />
+            <div className="hidden md:block [&_*]:cursor-pointer">
+              <MiniStackedBarChart data={data.usage.dailyVolumeSlots} />
             </div>
           </div>
         );
       },
-      header: 'Volume (24hr)',
+      header: 'Volume (24h)',
+      enableSorting: false,
+      id: ensureColumnID('usage'),
     }),
   ];
 

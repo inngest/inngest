@@ -7,4 +7,22 @@ export type Function = {
     value: string;
   }[];
   version?: number | null;
+  usage?: {
+    totalVolume: number;
+    dailyVolumeSlots: {
+      startCount: number;
+      failureCount: number;
+    }[];
+  };
+  app?: {
+    name: string;
+  };
+  isArchived?: boolean;
+  isPaused?: boolean;
+  failureRate?: number;
+};
+
+export type PageInfo = {
+  currentPage: number;
+  totalPages: number | null;
 };

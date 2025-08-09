@@ -3,15 +3,15 @@
 import { Select } from '@inngest/components/Select/Select';
 import { StatusDot } from '@inngest/components/Status/StatusDot';
 
-export default function EventTypesStatusFilter({
+export default function FunctionsStatusFilter({
   archived,
   onStatusChange,
 }: {
   archived: boolean;
   onStatusChange: (archived: boolean) => void;
 }) {
-  const activeOption = { id: 'active', name: 'Active events' };
-  const archivedOption = { id: 'archived', name: 'Archived events' };
+  const activeOption = { id: 'active', name: 'Active functions' };
+  const archivedOption = { id: 'archived', name: 'Archived functions' };
   return (
     <Select
       onChange={(value) => onStatusChange(value.id === 'archived')}
