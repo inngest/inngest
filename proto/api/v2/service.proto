@@ -3,12 +3,27 @@ package api.v2;
 
 option go_package = "github.com/inngest/inngest/proto/gen/api/v2;api";
 
+import "google/api/annotations.proto";
 import "api/v2/hello.proto";
 import "api/v2/greet.proto";
 import "api/v2/echo.proto";
 
 service V2 {
-  rpc Hello(HelloRequest) returns (HelloResponse) {}
-  rpc Greetings(GreetRequest) returns (GreetResponse) {}
-  rpc Echo(EchoRequest) returns (EchoResponse) {}
+  rpc Hello(HelloRequest) returns (HelloResponse) {
+    option (google.api.http) = {
+      get : "/v2/hello"
+    };
+  }
+  rpc Greetings(GreetRequest) returns (GreetResponse) {
+    option (google.api.http) = {
+      get : "/v2/greet"
+      additional_bindings {get : "/v2/greet/{name}"}
+    };
+  }
+  rpc Echo(EchoRequest) returns (EchoResponse) {
+    option (google.api.http) = {
+      post : "/v2/echo"
+      body : "*"
+    };
+  }
 }
