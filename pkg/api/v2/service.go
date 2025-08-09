@@ -64,3 +64,27 @@ func (a *api) Stop(ctx context.Context) error {
 	a.rpc.GracefulStop()
 	return nil
 }
+
+// APIs
+func (a *api) Hello(ctx context.Context, req *pb.HelloRequest) (*pb.HelloResponse, error) {
+	return &pb.HelloResponse{
+		Msg: "Hello from API v2!",
+	}, nil
+}
+
+func (a *api) Greetings(ctx context.Context, req *pb.GreetRequest) (*pb.GreetResponse, error) {
+	msg := "Hello, World!"
+	if req.Name != "" {
+		msg = fmt.Sprintf("Hello, %s!", req.Name)
+	}
+
+	return &pb.GreetResponse{
+		Msg: msg,
+	}, nil
+}
+
+func (a *api) Echo(ctx context.Context, req *pb.EchoRequest) (*pb.EchoResponse, error) {
+	return &pb.EchoResponse{
+		Data: []byte("Echo response"),
+	}, nil
+}
