@@ -21,6 +21,7 @@ const _ = grpc.SupportPackageIsVersion9
 const (
 	V2_Hello_FullMethodName     = "/api.v2.V2/Hello"
 	V2_Greetings_FullMethodName = "/api.v2.V2/Greetings"
+	V2_Echo_FullMethodName      = "/api.v2.V2/Echo"
 )
 
 // V2Client is the client API for V2 service.
@@ -29,6 +30,7 @@ const (
 type V2Client interface {
 	Hello(ctx context.Context, in *HelloRequest, opts ...grpc.CallOption) (*HelloResponse, error)
 	Greetings(ctx context.Context, in *GreetRequest, opts ...grpc.CallOption) (*GreetResponse, error)
+	Echo(ctx context.Context, in *EchoRequest, opts ...grpc.CallOption) (*EchoResponse, error)
 }
 
 type v2Client struct {
@@ -59,12 +61,23 @@ func (c *v2Client) Greetings(ctx context.Context, in *GreetRequest, opts ...grpc
 	return out, nil
 }
 
+func (c *v2Client) Echo(ctx context.Context, in *EchoRequest, opts ...grpc.CallOption) (*EchoResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(EchoResponse)
+	err := c.cc.Invoke(ctx, V2_Echo_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // V2Server is the server API for V2 service.
 // All implementations must embed UnimplementedV2Server
 // for forward compatibility.
 type V2Server interface {
 	Hello(context.Context, *HelloRequest) (*HelloResponse, error)
 	Greetings(context.Context, *GreetRequest) (*GreetResponse, error)
+	Echo(context.Context, *EchoRequest) (*EchoResponse, error)
 	mustEmbedUnimplementedV2Server()
 }
 
@@ -80,6 +93,9 @@ func (UnimplementedV2Server) Hello(context.Context, *HelloRequest) (*HelloRespon
 }
 func (UnimplementedV2Server) Greetings(context.Context, *GreetRequest) (*GreetResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Greetings not implemented")
+}
+func (UnimplementedV2Server) Echo(context.Context, *EchoRequest) (*EchoResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Echo not implemented")
 }
 func (UnimplementedV2Server) mustEmbedUnimplementedV2Server() {}
 func (UnimplementedV2Server) testEmbeddedByValue()            {}
@@ -138,6 +154,24 @@ func _V2_Greetings_Handler(srv interface{}, ctx context.Context, dec func(interf
 	return interceptor(ctx, in, info, handler)
 }
 
+func _V2_Echo_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(EchoRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(V2Server).Echo(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: V2_Echo_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(V2Server).Echo(ctx, req.(*EchoRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // V2_ServiceDesc is the grpc.ServiceDesc for V2 service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -152,6 +186,10 @@ var V2_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Greetings",
 			Handler:    _V2_Greetings_Handler,
+		},
+		{
+			MethodName: "Echo",
+			Handler:    _V2_Echo_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
