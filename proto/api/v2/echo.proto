@@ -1,0 +1,8 @@
+syntax = "proto3";
+package api.v2;
+
+option go_package = "github.com/inngest/inngest/proto/gen/api/v2;api";
+
+message EchoRequest {}
+
+message EchoResponse { bytes data = 1; }

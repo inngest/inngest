@@ -1,0 +1,14 @@
+syntax = "proto3";
+package api.v2;
+
+option go_package = "github.com/inngest/inngest/proto/gen/api/v2;api";
+
+import "api/v2/hello.proto";
+import "api/v2/greet.proto";
+import "api/v2/echo.proto";
+
+service V2 {
+  rpc Hello(HelloRequest) returns (HelloResponse) {}
+  rpc Greetings(GreetRequest) returns (GreetResponse) {}
+  rpc Echo(EchoRequest) returns (EchoResponse) {}
+}
