@@ -119,7 +119,7 @@ func TestBatchWithConditionalTrigger(t *testing.T) {
 	_, err := inngestgo.CreateFunction(
 		inngestClient,
 		inngestgo.FunctionOpts{ID: "batch-test", BatchEvents: &inngestgo.ConfigBatchEvents{MaxSize: 5, Timeout: 5 * time.Second}},
-		inngestgo.EventTrigger("test/batch", inngestgo.StrPtr("has(event.data.num) && event.data.num % 2 == 0")),
+		inngestgo.EventTrigger("test/batch", inngestgo.StrPtr("has(event.data.num) && int(event.data.num) % 2 == 0")),
 		func(ctx context.Context, input inngestgo.Input[BatchEvent]) (any, error) {
 			if runID == "" {
 				runID = input.InputCtx.RunID
