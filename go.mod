@@ -43,7 +43,6 @@ require (
 	github.com/inngest/go-httpstat v0.0.0-20250328150054-dfda91359d48
 	github.com/inngest/inngestgo v0.13.1-0.20250717140054-f122af6b1d15
 	github.com/jackc/pgx/v5 v5.5.4
-	github.com/jedib0t/go-pretty/v6 v6.3.0
 	github.com/jinzhu/copier v0.3.5
 	github.com/jonboulle/clockwork v0.4.0
 	github.com/karlseguin/ccache/v2 v2.0.8
