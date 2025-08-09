@@ -17,6 +17,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/api"
 	"github.com/inngest/inngest/pkg/api/apiv1"
+	apiv2 "github.com/inngest/inngest/pkg/api/v2"
 	"github.com/inngest/inngest/pkg/authn"
 	"github.com/inngest/inngest/pkg/backoff"
 	"github.com/inngest/inngest/pkg/config"
@@ -655,6 +656,10 @@ func start(ctx context.Context, opts StartOpts) error {
 			ShardSelector: shardSelector,
 		}))
 	}
+
+	services = append(services, apiv2.NewAPIV2(apiv2.Opts{
+		Log: l,
+	}))
 
 	return service.StartAll(ctx, services...)
 }
