@@ -89,8 +89,8 @@ func (a *api) basicAuthMiddleware(next http.Handler) http.Handler {
 			return
 		}
 
-		// Skip auth for /v2/hello endpoint
-		if r.URL.Path == "/v2/hello" {
+		// Skip auth for /v2/hello and /v3/hello endpoints
+		if r.URL.Path == "/v2/hello" || r.URL.Path == "/v3/hello" {
 			next.ServeHTTP(w, r)
 			return
 		}

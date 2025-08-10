@@ -12,6 +12,8 @@ service V2 {
   rpc Hello(HelloRequest) returns (HelloResponse) {
     option (google.api.http) = {
       get : "/v2/hello"
+      // multi binding example
+      additional_bindings {get : "/v3/hello"}
     };
   }
   rpc Greetings(GreetRequest) returns (GreetResponse) {

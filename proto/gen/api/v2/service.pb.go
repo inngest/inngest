@@ -25,9 +25,9 @@ var File_api_v2_service_proto protoreflect.FileDescriptor
 
 const file_api_v2_service_proto_rawDesc = "" +
 	"\n" +
-	"\x14api/v2/service.proto\x12\x06api.v2\x1a\x1cgoogle/api/annotations.proto\x1a\x12api/v2/hello.proto\x1a\x12api/v2/greet.proto\x1a\x11api/v2/echo.proto2\xf6\x01\n" +
-	"\x02V2\x12G\n" +
-	"\x05Hello\x12\x14.api.v2.HelloRequest\x1a\x15.api.v2.HelloResponse\"\x11\x82\xd3\xe4\x93\x02\v\x12\t/v2/hello\x12_\n" +
+	"\x14api/v2/service.proto\x12\x06api.v2\x1a\x1cgoogle/api/annotations.proto\x1a\x12api/v2/hello.proto\x1a\x12api/v2/greet.proto\x1a\x11api/v2/echo.proto2\x83\x02\n" +
+	"\x02V2\x12T\n" +
+	"\x05Hello\x12\x14.api.v2.HelloRequest\x1a\x15.api.v2.HelloResponse\"\x1e\x82\xd3\xe4\x93\x02\x18Z\v\x12\t/v3/hello\x12\t/v2/hello\x12_\n" +
 	"\tGreetings\x12\x14.api.v2.GreetRequest\x1a\x15.api.v2.GreetResponse\"%\x82\xd3\xe4\x93\x02\x1fZ\x12\x12\x10/v2/greet/{name}\"\t/v2/greet\x12F\n" +
 	"\x04Echo\x12\x13.api.v2.EchoRequest\x1a\x14.api.v2.EchoResponse\"\x13\x82\xd3\xe4\x93\x02\r:\x01*\"\b/v2/echoB1Z/github.com/inngest/inngest/proto/gen/api/v2;apib\x06proto3"
 
