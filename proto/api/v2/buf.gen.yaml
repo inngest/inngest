@@ -11,3 +11,8 @@ plugins:
     opt:
       - paths=source_relative
       - generate_unbound_methods=true
+  - local: protoc-gen-openapiv2
+    out: docs/api/v2
+    opt:
+      - openapi_naming_strategy=fqn
+      - generate_unbound_methods=true
