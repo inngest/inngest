@@ -78,6 +78,28 @@ api := NewAPIV2(Opts{
 
 If no credentials are provided, authentication is disabled for all endpoints.
 
+## Prerequisites
+
+### Using Nix (Recommended)
+
+If you're using Nix with flakes, all required tools (including grpc-gateway binaries) are automatically available in the development shell:
+
+```bash
+nix develop
+# or if using direnv
+direnv allow
+```
+
+### Manual Installation
+
+If not using Nix, install the required tools:
+
+```bash
+go install tool
+```
+
+NOTE: This assumes you have `$GOBIN` in your `PATH`, which is where the tool binaries will be installed.
+
 ## Running the Service
 
 Start the service using:
