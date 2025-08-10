@@ -12,6 +12,7 @@ import (
 	pb "github.com/inngest/inngest/proto/gen/api/v2"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
 )
 
 func NewAPIV2(o Opts) service.Service {
@@ -117,7 +118,18 @@ func (a *api) Greetings(ctx context.Context, req *pb.GreetRequest) (*pb.GreetRes
 }
 
 func (a *api) Echo(ctx context.Context, req *pb.EchoRequest) (*pb.EchoResponse, error) {
+	// Extract HTTP headers from gRPC metadata
+	headers := make(map[string]string)
+	if md, ok := metadata.FromIncomingContext(ctx); ok {
+		for key, values := range md {
+			if len(values) > 0 {
+				headers[key] = values[0]
+			}
+		}
+	}
+
 	return &pb.EchoResponse{
-		Data: []byte("Echo response"),
+		Data:    req.Data,
+		Headers: headers,
 	}, nil
 }

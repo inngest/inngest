@@ -16,7 +16,7 @@ service V2 {
   }
   rpc Greetings(GreetRequest) returns (GreetResponse) {
     option (google.api.http) = {
-      get : "/v2/greet"
+      post : "/v2/greet"
       additional_bindings {get : "/v2/greet/{name}"}
     };
   }

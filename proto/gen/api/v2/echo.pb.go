@@ -23,6 +23,7 @@ const (
 
 type EchoRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
+	Data          map[string]string      `protobuf:"bytes,1,rep,name=data,proto3" json:"data,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -57,9 +58,17 @@ func (*EchoRequest) Descriptor() ([]byte, []int) {
 	return file_api_v2_echo_proto_rawDescGZIP(), []int{0}
 }
 
+func (x *EchoRequest) GetData() map[string]string {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
 type EchoResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Data          []byte                 `protobuf:"bytes,1,opt,name=data,proto3" json:"data,omitempty"`
+	Data          map[string]string      `protobuf:"bytes,1,rep,name=data,proto3" json:"data,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
+	Headers       map[string]string      `protobuf:"bytes,2,rep,name=headers,proto3" json:"headers,omitempty" protobuf_key:"bytes,1,opt,name=key" protobuf_val:"bytes,2,opt,name=value"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -94,9 +103,16 @@ func (*EchoResponse) Descriptor() ([]byte, []int) {
 	return file_api_v2_echo_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *EchoResponse) GetData() []byte {
+func (x *EchoResponse) GetData() map[string]string {
 	if x != nil {
 		return x.Data
+	}
+	return nil
+}
+
+func (x *EchoResponse) GetHeaders() map[string]string {
+	if x != nil {
+		return x.Headers
 	}
 	return nil
 }
@@ -105,10 +121,21 @@ var File_api_v2_echo_proto protoreflect.FileDescriptor
 
 const file_api_v2_echo_proto_rawDesc = "" +
 	"\n" +
-	"\x11api/v2/echo.proto\x12\x06api.v2\"\r\n" +
-	"\vEchoRequest\"\"\n" +
-	"\fEchoResponse\x12\x12\n" +
-	"\x04data\x18\x01 \x01(\fR\x04dataB1Z/github.com/inngest/inngest/proto/gen/api/v2;apib\x06proto3"
+	"\x11api/v2/echo.proto\x12\x06api.v2\"y\n" +
+	"\vEchoRequest\x121\n" +
+	"\x04data\x18\x01 \x03(\v2\x1d.api.v2.EchoRequest.DataEntryR\x04data\x1a7\n" +
+	"\tDataEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\"\xf4\x01\n" +
+	"\fEchoResponse\x122\n" +
+	"\x04data\x18\x01 \x03(\v2\x1e.api.v2.EchoResponse.DataEntryR\x04data\x12;\n" +
+	"\aheaders\x18\x02 \x03(\v2!.api.v2.EchoResponse.HeadersEntryR\aheaders\x1a7\n" +
+	"\tDataEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01\x1a:\n" +
+	"\fHeadersEntry\x12\x10\n" +
+	"\x03key\x18\x01 \x01(\tR\x03key\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\tR\x05value:\x028\x01B1Z/github.com/inngest/inngest/proto/gen/api/v2;apib\x06proto3"
 
 var (
 	file_api_v2_echo_proto_rawDescOnce sync.Once
@@ -122,17 +149,23 @@ func file_api_v2_echo_proto_rawDescGZIP() []byte {
 	return file_api_v2_echo_proto_rawDescData
 }
 
-var file_api_v2_echo_proto_msgTypes = make([]protoimpl.MessageInfo, 2)
+var file_api_v2_echo_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
 var file_api_v2_echo_proto_goTypes = []any{
 	(*EchoRequest)(nil),  // 0: api.v2.EchoRequest
 	(*EchoResponse)(nil), // 1: api.v2.EchoResponse
+	nil,                  // 2: api.v2.EchoRequest.DataEntry
+	nil,                  // 3: api.v2.EchoResponse.DataEntry
+	nil,                  // 4: api.v2.EchoResponse.HeadersEntry
 }
 var file_api_v2_echo_proto_depIdxs = []int32{
-	0, // [0:0] is the sub-list for method output_type
-	0, // [0:0] is the sub-list for method input_type
-	0, // [0:0] is the sub-list for extension type_name
-	0, // [0:0] is the sub-list for extension extendee
-	0, // [0:0] is the sub-list for field type_name
+	2, // 0: api.v2.EchoRequest.data:type_name -> api.v2.EchoRequest.DataEntry
+	3, // 1: api.v2.EchoResponse.data:type_name -> api.v2.EchoResponse.DataEntry
+	4, // 2: api.v2.EchoResponse.headers:type_name -> api.v2.EchoResponse.HeadersEntry
+	3, // [3:3] is the sub-list for method output_type
+	3, // [3:3] is the sub-list for method input_type
+	3, // [3:3] is the sub-list for extension type_name
+	3, // [3:3] is the sub-list for extension extendee
+	0, // [0:3] is the sub-list for field type_name
 }
 
 func init() { file_api_v2_echo_proto_init() }
@@ -146,7 +179,7 @@ func file_api_v2_echo_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_api_v2_echo_proto_rawDesc), len(file_api_v2_echo_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   2,
+			NumMessages:   5,
 			NumExtensions: 0,
 			NumServices:   0,
 		},

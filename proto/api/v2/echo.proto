@@ -3,6 +3,9 @@ package api.v2;
 
 option go_package = "github.com/inngest/inngest/proto/gen/api/v2;api";
 
-message EchoRequest {}
+message EchoRequest { map<string, string> data = 1; }
 
-message EchoResponse { bytes data = 1; }
+message EchoResponse {
+  map<string, string> data = 1;
+  map<string, string> headers = 2;
+}
