@@ -1,0 +1,29 @@
+openapi: 3.0.1
+info:
+  title: api/v2/hello.proto
+  version: version not set
+servers:
+- url: /
+paths: {}
+components:
+  schemas:
+    google.protobuf.Any:
+      type: object
+      properties:
+        '@type':
+          type: string
+      additionalProperties:
+        type: object
+    google.rpc.Status:
+      type: object
+      properties:
+        code:
+          type: integer
+          format: int32
+        message:
+          type: string
+        details:
+          type: array
+          items:
+            $ref: '#/components/schemas/google.protobuf.Any'
+x-original-swagger-version: "2.0"

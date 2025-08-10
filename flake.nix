@@ -109,6 +109,7 @@
             protoc-gen-connect-go
             claude-code
             gemini-cli
+            swagger-codegen3
           ];
 
           shellHook = ''
