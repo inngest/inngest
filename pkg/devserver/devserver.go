@@ -658,7 +658,9 @@ func start(ctx context.Context, opts StartOpts) error {
 	}
 
 	services = append(services, apiv2.NewAPIV2(apiv2.Opts{
-		Log: l,
+		Log:      l,
+		Username: "admin",
+		Password: "password",
 	}))
 
 	return service.StartAll(ctx, services...)
