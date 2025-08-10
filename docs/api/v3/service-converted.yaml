@@ -1,0 +1,172 @@
+openapi: 3.0.1
+info:
+  title: api/v2/service.proto
+  version: version not set
+servers:
+- url: /
+tags:
+- name: V2
+paths:
+  /v2/echo:
+    post:
+      tags:
+      - V2
+      operationId: V2_Echo
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/api.v2.EchoRequest'
+        required: true
+      responses:
+        "200":
+          description: A successful response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.v2.EchoResponse'
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/google.rpc.Status'
+      x-codegen-request-body-name: body
+  /v2/greet:
+    post:
+      tags:
+      - V2
+      operationId: V2_Greetings
+      parameters:
+      - name: name
+        in: query
+        required: false
+        style: form
+        explode: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: A successful response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.v2.GreetResponse'
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/google.rpc.Status'
+  /v2/greet/{name}:
+    get:
+      tags:
+      - V2
+      operationId: V2_Greetings2
+      parameters:
+      - name: name
+        in: path
+        required: true
+        style: simple
+        explode: false
+        schema:
+          type: string
+      responses:
+        "200":
+          description: A successful response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.v2.GreetResponse'
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/google.rpc.Status'
+  /v2/hello:
+    get:
+      tags:
+      - V2
+      operationId: V2_Hello
+      responses:
+        "200":
+          description: A successful response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.v2.HelloResponse'
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/google.rpc.Status'
+  /v3/hello:
+    get:
+      tags:
+      - V2
+      operationId: V2_Hello2
+      responses:
+        "200":
+          description: A successful response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/api.v2.HelloResponse'
+        default:
+          description: An unexpected error response.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/google.rpc.Status'
+components:
+  schemas:
+    api.v2.EchoRequest:
+      type: object
+      properties:
+        data:
+          type: object
+          additionalProperties:
+            type: string
+    api.v2.EchoResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          additionalProperties:
+            type: string
+        headers:
+          type: object
+          additionalProperties:
+            type: string
+    api.v2.GreetResponse:
+      type: object
+      properties:
+        msg:
+          type: string
+    api.v2.HelloResponse:
+      type: object
+      properties:
+        msg:
+          type: string
+    google.protobuf.Any:
+      type: object
+      properties:
+        '@type':
+          type: string
+      additionalProperties:
+        type: object
+    google.rpc.Status:
+      type: object
+      properties:
+        code:
+          type: integer
+          format: int32
+        message:
+          type: string
+        details:
+          type: array
+          items:
+            $ref: '#/components/schemas/google.protobuf.Any'
+x-original-swagger-version: "2.0"

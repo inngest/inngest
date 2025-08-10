@@ -255,6 +255,18 @@ grpcurl -plaintext localhost:10551 api.v2.V2/Greetings
 # Returns: Code: Unauthenticated
 ```
 
+## OpenAPI Spec Generation
+
+To generate OpenAPI specifications from the protobuf definitions:
+
+- **Generate v2 specs**: `make openapi-v2` - Creates OpenAPI v2 JSON specs in `docs/api/v2/`
+- **Generate v3 specs**: `make openapi-v3` - Converts v2 specs to OpenAPI v3 YAML format in `docs/api/v3/`
+
+The generated specifications can be used for:
+- Client SDK generation
+- API documentation
+- Testing with tools like Swagger UI or Postman
+
 ## Development
 
 The service uses:

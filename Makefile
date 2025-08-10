@@ -59,6 +59,14 @@ openapi-v2:
 	mkdir -p docs/api/v2
 	buf generate --path proto/api/v2 --template proto/api/v2/buf.gen.yaml
 
+.PHONY: openapi-v3
+openapi-v3:
+	mkdir -p docs/api/v3
+	for file in docs/api/v2/api/v2/*.swagger.json; do \
+		basename=$$(basename "$$file" .swagger.json); \
+		swagger-codegen3 generate -i "$$file" -g openapi-yaml -o docs/api/v3 --additional-properties=outputFile=$$basename.yaml; \
+	done
+
 # $GOBIN must be set and be in your path for this to work
 .PHONY: queries
 queries:
