@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useCallback } from 'react';
+import { useQuery } from '@tanstack/react-query';
 
 import type { Trace } from '../RunDetailsV3/types';
 import { useShared } from './SharedContext';
@@ -12,46 +13,63 @@ export type GetRunPayload = {
   preview?: boolean;
 };
 
+export type GetRunData = {
+  app: {
+    externalID: string;
+    name: string;
+  };
+  fn: {
+    id: string;
+    name: string;
+    slug: string;
+  };
+  id: string;
+  trace: Trace;
+  hasAI: boolean;
+};
+
 export type GetRunResult = {
   error?: Error;
   loading: boolean;
-  data?: {
-    app: {
-      externalID: string;
-      name: string;
-    };
-    fn: {
-      id: string;
-      name: string;
-      slug: string;
-    };
-    id: string;
-    trace: Trace;
-    hasAI: boolean;
-  };
+  data?: GetRunData;
 };
 
-export const useGetRun = () => {
-  const shared = useShared();
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<Error | null>(null);
+type UseGetRunOptions = {
+  runID?: string;
+  preview?: boolean;
+  refetchInterval?: number;
+  enabled?: boolean;
+};
 
-  const getRun = async (payload: GetRunPayload) => {
-    try {
-      setLoading(true);
-      setError(null);
-      return await shared.getRun(payload);
-    } catch (err) {
-      console.error('error gettting function run', err);
-      setError(err instanceof Error ? err : new Error('Error getting function run'));
-    } finally {
-      setLoading(false);
-    }
-  };
+export const useGetRun = ({
+  runID,
+  preview,
+  refetchInterval,
+  enabled = true,
+}: UseGetRunOptions) => {
+  const shared = useShared();
+
+  const queryResult = useQuery({
+    queryKey: ['run', runID, { preview }],
+    queryFn: useCallback(async () => {
+      if (!runID) {
+        return undefined;
+      }
+      const result = await shared.getRun({ runID, preview });
+      if (result.error) {
+        throw result.error;
+      }
+      return result.data;
+    }, [shared.getRun, runID, preview]),
+    retry: 3,
+    refetchInterval,
+    enabled,
+  });
 
   return {
-    loading,
-    error,
-    getRun,
+    data: queryResult.data,
+    loading: queryResult.isPending,
+    error: queryResult.error,
+    refetch: queryResult.refetch,
   };
 };
