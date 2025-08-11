@@ -2,6 +2,7 @@
 
 import { useCallback } from 'react';
 import { AccordionList } from '@inngest/components/AccordionCard/AccordionList';
+import { RiAddCircleFill, RiAddLine, RiBookReadLine, RiFileTextLine } from '@remixicon/react';
 import { ulid } from 'ulid';
 
 import type { TabManagerActions } from '@/components/Insights/InsightsTabManager/InsightsTabManager';
@@ -52,7 +53,43 @@ export function QueryHelperPanel({ tabManagerActions }: QueryHelperPanelProps) {
 
   return (
     <div className="border-subtle flex h-full w-full flex-col border-r">
-      <AccordionList className="border-0" defaultValue={DEFAULT_ACCORDION_VALUES} type="multiple">
+      <div className="border-subtle border-b p-4">
+        <h2 className="text-md mb-4 font-medium">Insights</h2>
+        <div>
+          <button
+            className="hover:bg-canvasSubtle text-subtle hover:text-basis my-1 flex h-8 w-full flex-row items-center rounded px-1.5 text-left transition-colors"
+            onClick={() => {
+              tabManagerActions.createTab({
+                id: ulid(),
+                name: 'Untitled query',
+                query: '',
+                type: 'new',
+              });
+            }}
+          >
+            <RiAddCircleFill className="text-primary-intense h-4 w-4" />
+            <span className="text-primary-intense ml-2.5 text-sm font-medium leading-tight">
+              New insight
+            </span>
+          </button>
+          <button
+            className="hover:bg-canvasSubtle text-subtle hover:text-basis my-1 flex h-8 w-full flex-row items-center rounded px-1.5 text-left transition-colors"
+            onClick={() => {
+              tabManagerActions.focusTab('__home');
+            }}
+          >
+            <RiBookReadLine className="h-4 w-4" />
+            <span className="ml-2.5 text-sm font-medium leading-tight">Browse templates</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Accordion sections */}
+      <AccordionList
+        className="flex-1 border-0"
+        defaultValue={DEFAULT_ACCORDION_VALUES}
+        type="multiple"
+      >
         <QueryHelperPanelSection
           onQuerySelect={handleQuerySelect}
           queries={templates}

@@ -1,7 +1,5 @@
 'use client';
 
-import { Header } from '@inngest/components/Header/Header';
-
 import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import { useInsightsTabManager } from '@/components/Insights/InsightsTabManager/InsightsTabManager';
 import { QueryHelperPanel } from '@/components/Insights/QueryHelperPanel';
@@ -10,15 +8,12 @@ function InsightsContent() {
   const { actions, tabManager } = useInsightsTabManager();
 
   return (
-    <>
-      <Header breadcrumb={[{ text: 'Insights' }]} />
-      <div className="flex h-full w-full flex-1 overflow-hidden">
-        <div className="w-[280px] flex-shrink-0">
-          <QueryHelperPanel tabManagerActions={actions} />
-        </div>
-        <div className="flex h-full w-full flex-1 flex-col overflow-hidden">{tabManager}</div>
+    <div className="flex h-full w-full flex-1 overflow-hidden">
+      <div className="w-[280px] flex-shrink-0">
+        <QueryHelperPanel tabManagerActions={actions} />
       </div>
-    </>
+      <div className="flex h-full w-full flex-1 flex-col overflow-hidden">{tabManager}</div>
+    </div>
   );
 }
 
