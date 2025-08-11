@@ -23,7 +23,14 @@ ORDER BY
 const HOME_TAB = {
   id: '__home',
   name: 'Home',
+  query: '',
+} as const;
+
+const INITIAL_TAB = {
+  id: '__initial',
+  name: 'Untitled query',
   query: DEFAULT_QUERY,
+  type: 'new',
 } as const;
 
 export interface TabConfig {
@@ -49,8 +56,8 @@ export interface UseInsightsTabManagerReturn {
 }
 
 export function useInsightsTabManager(): UseInsightsTabManagerReturn {
-  const [tabs, setTabs] = useState<TabConfig[]>([HOME_TAB]);
-  const [activeTabId, setActiveTabId] = useState<string>(HOME_TAB.id);
+  const [tabs, setTabs] = useState<TabConfig[]>([HOME_TAB, INITIAL_TAB]);
+  const [activeTabId, setActiveTabId] = useState<string>(INITIAL_TAB.id);
 
   const actions = useMemo(
     () => ({
@@ -128,7 +135,7 @@ function InsightsTabManagerInternal({
             query={tab.query}
             renderChildren={tab.id === activeTabId}
           >
-            <InsightsTabPanel />
+            <InsightsTabPanel isHome={tab.id === '__home'} />
           </InsightsStateMachineContextProvider>
         ))}
       </div>

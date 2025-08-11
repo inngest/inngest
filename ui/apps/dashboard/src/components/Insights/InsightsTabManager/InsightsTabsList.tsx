@@ -1,9 +1,9 @@
 'use client';
 
-import { RiAddLine } from '@remixicon/react';
 import { ulid } from 'ulid';
 
 import { InsightsTab } from './InsightsTab';
+import { InsightsTabActionIcon } from './InsightsTabActionIcon';
 import type { TabConfig, TabManagerActions } from './InsightsTabManager';
 
 interface InsightsTabsListProps {
@@ -17,36 +17,45 @@ export function InsightsTabsList({ actions, activeTabId, hide, tabs }: InsightsT
   if (hide) return null;
 
   return (
-    <div className="flex items-center overflow-x-auto [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-      <div className="flex flex-shrink-0 items-center">
-        {tabs.map((tab, index) => (
-          <div key={tab.id} className={index > 0 ? '-ml-px' : ''}>
-            <InsightsTab
-              isActive={tab.id === activeTabId}
-              isFirst={index === 0}
-              name={tab.name}
+    <div className="border-subtle overflow-x-auto border-b [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="flex items-center">
+        <div className="flex flex-shrink-0 items-center">
+          <InsightsTabActionIcon
+            isActive={activeTabId === '__home'}
+            isFirst={true}
+            onClick={() => actions.focusTab('__home')}
+            tooltip="Home"
+            type="home"
+          />
+          {tabs
+            .filter((tab) => tab.id !== '__home')
+            .map((tab) => (
+              <div key={tab.id} className="-ml-px">
+                <InsightsTab
+                  isActive={tab.id === activeTabId}
+                  isFirst={false}
+                  name={tab.name}
+                  onClick={() => {
+                    actions.focusTab(tab.id);
+                  }}
+                  onClose={() => actions.closeTab(tab.id)}
+                  showCloseButton={true}
+                />
+              </div>
+            ))}
+          <div className="-ml-px">
+            <InsightsTabActionIcon
               onClick={() => {
-                actions.focusTab(tab.id);
+                actions.createTab({
+                  id: ulid(),
+                  name: 'Untitled query',
+                  query: '',
+                  type: 'new',
+                });
               }}
-              onClose={tab.id !== '__home' ? () => actions.closeTab(tab.id) : undefined}
-              showCloseButton={tab.id !== '__home'}
+              type="add"
             />
           </div>
-        ))}
-        <div className="-ml-px">
-          <button
-            className="bg-canvasBase border-subtle hover:bg-canvasMuted hover:border-muted border-b-subtle flex h-12 w-12 items-center justify-center border-b border-l border-r transition-colors"
-            onClick={() => {
-              actions.createTab({
-                id: ulid(),
-                name: 'Untitled query',
-                query: '',
-                type: 'new',
-              });
-            }}
-          >
-            <RiAddLine className="h-4 w-4 text-slate-500" />
-          </button>
         </div>
       </div>
     </div>

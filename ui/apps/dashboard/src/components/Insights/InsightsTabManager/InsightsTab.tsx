@@ -42,7 +42,7 @@ export function InsightsTab({
     <OptionalTooltip side="top" tooltip={isTruncated ? name : ''}>
       <button
         className={cn(
-          'bg-canvasBase border-subtle hover:bg-canvasMuted hover:border-muted border-b-subtle relative flex h-12 w-[200px] items-center gap-2 border-b border-r px-2 transition-colors',
+          'bg-canvasBase border-subtle hover:bg-canvasMuted hover:border-muted relative flex h-12 w-[200px] items-center gap-2 border-r px-2 transition-colors',
           !isFirst && 'border-l'
         )}
         onClick={onClick}
