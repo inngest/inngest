@@ -27,7 +27,7 @@ export function QueryHelperPanel({ tabManagerActions }: QueryHelperPanelProps) {
         case 'recent':
         case 'template': {
           // Use a new ID to effectively clone the query.
-          tabManagerActions.createTab({ ...query, id: ulid() });
+          tabManagerActions.createTab({ ...query, id: ulid(), name: 'Untitled query' });
           break;
         }
         case 'saved': {
