@@ -97,9 +97,9 @@ export function useColumns({
       },
       header: 'Triggers',
     }),
-    columnHelper.accessor((row) => row.app?.name, {
+    columnHelper.accessor('app', {
       cell: (info) => {
-        const appExternalID = info.getValue();
+        const appExternalID = info.getValue()?.externalID;
         if (!appExternalID) {
           return null;
         }
@@ -126,7 +126,7 @@ export function useColumns({
         if (isLoading) {
           return <Skeleton className="my-2 block h-3 w-32" />;
         }
-        if (data?.failureRate === 0) {
+        if (data?.failureRate === 0 || !data?.failureRate) {
           return (
             <TextCell>
               <span className="text-light">—</span>
@@ -136,7 +136,7 @@ export function useColumns({
 
         return (
           <TextCell>
-            <span className="text-tertiary-intense">{data?.failureRate}%</span>
+            <span className="text-tertiary-intense">{data.failureRate}%</span>
           </TextCell>
         );
       },

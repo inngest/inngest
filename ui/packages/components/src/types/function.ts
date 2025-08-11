@@ -16,6 +16,7 @@ export type Function = {
   };
   app?: {
     name: string;
+    externalID: string;
   };
   isArchived?: boolean;
   isPaused?: boolean;
