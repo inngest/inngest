@@ -53,6 +53,7 @@ export const useGetRun = ({
     queryKey: ['run', runID, { preview }],
     queryFn: useCallback(async () => {
       if (!runID) {
+        console.info('no runID provided, skipping getRun');
         return undefined;
       }
       const result = await shared.getRun({ runID, preview });
@@ -61,7 +62,6 @@ export const useGetRun = ({
       }
       return result.data;
     }, [shared.getRun, runID, preview]),
-    retry: 3,
     refetchInterval,
     enabled,
   });

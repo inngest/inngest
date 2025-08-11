@@ -1,9 +1,5 @@
 import { useCallback } from 'react';
-import type {
-  GetRunData,
-  GetRunPayload,
-  GetRunResult,
-} from '@inngest/components/SharedContext/useGetRun';
+import type { GetRunPayload, GetRunResult } from '@inngest/components/SharedContext/useGetRun';
 import { useClient } from 'urql';
 
 import { useEnvironment } from '@/components/Environments/environment-context';

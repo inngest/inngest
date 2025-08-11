@@ -57,9 +57,7 @@ export const RunDetailsV3 = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const leftColumnRef = useRef<HTMLDivElement>(null);
   const runInfoRef = useRef<HTMLDivElement>(null);
-  const [pollInterval, setPollInterval] = useState(
-    initialPollInterval ? initialPollInterval : standalone ? 1000 : undefined
-  );
+  const [pollInterval, setPollInterval] = useState(initialPollInterval);
 
   const [leftWidth, setLeftWidth] = useState(55);
   const [height, setHeight] = useState(MIN_HEIGHT);
