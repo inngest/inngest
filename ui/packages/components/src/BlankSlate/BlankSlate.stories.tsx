@@ -8,7 +8,6 @@ const meta = {
   parameters: {
     layout: 'centered',
   },
-  tags: ['autodocs'],
   args: {
     imageUrl: '/images/no-results.png',
     title: 'This is a title',

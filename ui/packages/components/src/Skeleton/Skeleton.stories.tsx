@@ -15,7 +15,6 @@ const meta = {
       </div>
     ),
   ],
-  tags: ['autodocs'],
 } satisfies Meta<typeof Skeleton>;
 
 export default meta;
