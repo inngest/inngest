@@ -3811,19 +3811,6 @@ func (q *queue) removeContinue(ctx context.Context, p *QueuePartition, cooldown 
 	}
 }
 
-//nolint:all
-func (q *queue) readFnMetadata(ctx context.Context, fnID uuid.UUID) (*FnMetadata, error) {
-	ctx = redis_telemetry.WithScope(redis_telemetry.WithOpName(ctx, "readFnMetadata"), redis_telemetry.ScopeQueue)
-
-	cmd := q.primaryQueueShard.RedisClient.unshardedRc.B().Get().Key(q.primaryQueueShard.RedisClient.kg.FnMetadata(fnID)).Build()
-	retv := FnMetadata{}
-	err := q.primaryQueueShard.RedisClient.unshardedRc.Do(ctx, cmd).DecodeJSON(&retv)
-	if err != nil {
-		return nil, fmt.Errorf("error reading function metadata: %w", err)
-	}
-	return &retv, nil
-}
-
 func newLeaseDenyList() *leaseDenies {
 	return &leaseDenies{
 		lock:        &sync.RWMutex{},
