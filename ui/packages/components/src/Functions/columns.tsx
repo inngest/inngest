@@ -25,6 +25,61 @@ function ensureColumnID(id: ColumnID): ColumnID {
   return id;
 }
 
+function FailureRateCell({
+  functionID,
+  getFunctionVolume,
+}: {
+  functionID: string;
+  getFunctionVolume: React.ComponentProps<typeof FunctionsTable>['getFunctionVolume'];
+}) {
+  const { data, isLoading } = useFunctionVolume(functionID, getFunctionVolume);
+
+  if (isLoading) {
+    return <Skeleton className="my-2 block h-3 w-32" />;
+  }
+
+  if (data?.failureRate === 0 || !data?.failureRate) {
+    return (
+      <TextCell>
+        <span className="text-light">—</span>
+      </TextCell>
+    );
+  }
+
+  return (
+    <TextCell>
+      <span className="text-tertiary-intense">{data.failureRate}%</span>
+    </TextCell>
+  );
+}
+
+function UsageCell({
+  functionID,
+  getFunctionVolume,
+}: {
+  functionID: string;
+  getFunctionVolume: React.ComponentProps<typeof FunctionsTable>['getFunctionVolume'];
+}) {
+  const { data, isLoading } = useFunctionVolume(functionID, getFunctionVolume);
+
+  if (isLoading) return <Skeleton className="my-2 block h-3 w-48" />;
+  if (!data || !data.usage) return <TextCell>—</TextCell>;
+
+  return (
+    <div className="flex items-center">
+      <div className="w-16">
+        <NumberCell
+          value={data.usage.totalVolume}
+          term={data.usage.totalVolume === 1 ? 'run' : 'runs'}
+        />
+      </div>
+      <div className="hidden md:block [&_*]:cursor-pointer">
+        <MiniStackedBarChart data={data.usage.dailyVolumeSlots} />
+      </div>
+    </div>
+  );
+}
+
 export function useColumns({
   pathCreator,
   getFunctionVolume,
@@ -122,23 +177,7 @@ export function useColumns({
     columnHelper.accessor('failureRate', {
       cell: (info) => {
         const functionID = info.row.original.id;
-        const { data, isLoading } = useFunctionVolume(functionID, getFunctionVolume);
-        if (isLoading) {
-          return <Skeleton className="my-2 block h-3 w-32" />;
-        }
-        if (data?.failureRate === 0 || !data?.failureRate) {
-          return (
-            <TextCell>
-              <span className="text-light">—</span>
-            </TextCell>
-          );
-        }
-
-        return (
-          <TextCell>
-            <span className="text-tertiary-intense">{data.failureRate}%</span>
-          </TextCell>
-        );
+        return <FailureRateCell functionID={functionID} getFunctionVolume={getFunctionVolume} />;
       },
       header: 'Failure rate (24hr)',
     }),
@@ -146,24 +185,7 @@ export function useColumns({
     columnHelper.accessor('usage', {
       cell: (info) => {
         const functionID = info.row.original.id;
-        const { data, isLoading } = useFunctionVolume(functionID, getFunctionVolume);
-
-        if (isLoading) return <Skeleton className="my-2 block h-3 w-48" />;
-        if (!data || !data.usage) return <TextCell>—</TextCell>;
-
-        return (
-          <div className="flex items-center">
-            <div className="w-16">
-              <NumberCell
-                value={data.usage.totalVolume}
-                term={data.usage.totalVolume === 1 ? 'run' : 'runs'}
-              />
-            </div>
-            <div className="hidden md:block [&_*]:cursor-pointer">
-              <MiniStackedBarChart data={data.usage.dailyVolumeSlots} />
-            </div>
-          </div>
-        );
+        return <UsageCell functionID={functionID} getFunctionVolume={getFunctionVolume} />;
       },
       header: 'Volume (24h)',
       enableSorting: false,
