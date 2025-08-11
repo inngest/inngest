@@ -9,7 +9,7 @@ function InsightsContent() {
 
   return (
     <div className="flex h-full w-full flex-1 overflow-hidden">
-      <div className="w-[280px] flex-shrink-0">
+      <div className="w-[240px] flex-shrink-0">
         <QueryHelperPanel tabManagerActions={actions} />
       </div>
       <div className="flex h-full w-full flex-1 flex-col overflow-hidden">{tabManager}</div>

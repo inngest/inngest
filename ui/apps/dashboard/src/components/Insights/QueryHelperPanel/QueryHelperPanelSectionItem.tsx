@@ -17,14 +17,14 @@ export function QueryHelperPanelSectionItem({
   onQuerySelect,
   sectionType,
 }: QueryHelperPanelSectionItemProps) {
-  const buttonRef = useRef<HTMLButtonElement>(null);
+  const textRef = useRef<HTMLSpanElement>(null);
   const [isTruncated, setIsTruncated] = useState(false);
 
   const displayText = query.name;
   const Icon = sectionType === 'saved' ? RiBookmarkLine : RiHistoryLine;
 
   useEffect(() => {
-    const el = buttonRef.current;
+    const el = textRef.current;
     if (el === null) return;
 
     setIsTruncated(el.scrollWidth > el.clientWidth);
@@ -37,10 +37,9 @@ export function QueryHelperPanelSectionItem({
         onClick={() => {
           onQuerySelect(query);
         }}
-        ref={buttonRef}
       >
         <Icon className="h-4 w-4 flex-shrink-0" />
-        <span className="overflow-hidden truncate text-ellipsis whitespace-nowrap">
+        <span ref={textRef} className="overflow-hidden truncate text-ellipsis whitespace-nowrap">
           {displayText}
         </span>
       </button>
