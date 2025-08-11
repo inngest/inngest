@@ -28,7 +28,12 @@ export function InsightsTabsList({ actions, activeTabId, hide, tabs }: InsightsT
     e.preventDefault();
     e.stopPropagation();
 
-    actions.createTab(ulid());
+    actions.createTab({
+      id: ulid(),
+      name: 'Untitled query',
+      query: '',
+      type: 'new',
+    });
   };
 
   return (

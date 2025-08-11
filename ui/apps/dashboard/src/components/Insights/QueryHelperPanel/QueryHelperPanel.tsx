@@ -23,7 +23,29 @@ export function QueryHelperPanel({ tabManagerActions }: QueryHelperPanelProps) {
   // TODO: Implement intended logic.
   const handleQuerySelect = useCallback(
     (query: Query) => {
-      tabManagerActions.createTab(ulid(), query.name);
+      switch (query.type) {
+        case 'recent':
+        case 'template': {
+          // Use a new ID to effectively clone the query.
+          tabManagerActions.createTab({ ...query, id: ulid() });
+          break;
+        }
+        case 'saved': {
+          // Allow only one instance of a saved query to be open at a time.
+          const existingTabId = tabManagerActions.getTabIdForSavedQuery(query.id);
+          if (existingTabId) {
+            tabManagerActions.focusTab(existingTabId);
+            return;
+          }
+
+          tabManagerActions.createTab(query);
+          break;
+        }
+        default: {
+          console.warn('Attempted to create a tab for an unknown query type', query);
+          break;
+        }
+      }
     },
     [tabManagerActions]
   );

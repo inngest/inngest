@@ -1,8 +1,10 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { ulid } from 'ulid';
 
 import { InsightsStateMachineContextProvider } from '@/components/Insights/InsightsStateMachineContext/InsightsStateMachineContext';
+import type { Query } from '../QueryHelperPanel';
 import { InsightsTabPanel } from './InsightsTabPanel';
 import { InsightsTabsList } from './InsightsTabsList';
 
@@ -33,8 +35,9 @@ export interface TabConfig {
 
 export interface TabManagerActions {
   closeTab: (id: string) => void;
-  createTab: (id: string, name?: string) => void;
+  createTab: (query: Query) => void;
   focusTab: (id: string) => void;
+  getTabIdForSavedQuery: (savedQueryId: string) => undefined | string;
   updateTabQuery: (id: string, query: string) => void;
 }
 
@@ -64,15 +67,29 @@ export function useInsightsTabManager(): UseInsightsTabManagerReturn {
           return prevTabs.filter((tab) => tab.id !== id);
         });
       },
-      createTab: (id: string, name = 'Untitled query') => {
-        if (tabs.some((tab) => tab.id === id)) return;
+      createTab: (query: Query) => {
+        if (tabs.some((tab) => tab.savedQueryId === query.id)) return;
 
-        setTabs((prevTabs) => [...prevTabs, { id, name, query: '' }]);
-        setActiveTabId(id);
+        const newTabId = ulid();
+
+        setTabs((prevTabs) => [
+          ...prevTabs,
+          {
+            id: newTabId,
+            name: query.name,
+            query: query.query,
+            savedQueryId: query.type === 'saved' ? query.id : undefined,
+          },
+        ]);
+
+        setActiveTabId(newTabId);
       },
       focusTab: (id: string) => {
         const tab = tabs.find((tab) => tab.id === id);
         if (tab !== undefined) setActiveTabId(id);
+      },
+      getTabIdForSavedQuery: (savedQueryId: string) => {
+        return tabs.find((tab) => tab.savedQueryId === savedQueryId)?.id;
       },
       updateTabQuery: (id: string, query: string) => {
         setTabs((prevTabs) => prevTabs.map((tab) => (tab.id === id ? { ...tab, query } : tab)));
@@ -102,7 +119,7 @@ function InsightsTabManagerInternal({
 }: InsightsTabManagerInternalProps) {
   return (
     <div className="flex h-full w-full flex-1 flex-col overflow-hidden">
-      <InsightsTabsList actions={actions} activeTabId={activeTabId} hide tabs={tabs} />
+      <InsightsTabsList actions={actions} activeTabId={activeTabId} tabs={tabs} />
       <div className="grid h-full w-full flex-1 grid-rows-[3fr_5fr] gap-0 overflow-hidden">
         {tabs.map((tab) => (
           <InsightsStateMachineContextProvider
