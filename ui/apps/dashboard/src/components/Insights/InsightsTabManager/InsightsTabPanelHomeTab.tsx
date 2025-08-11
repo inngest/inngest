@@ -3,7 +3,6 @@
 import { ulid } from 'ulid';
 
 import { useTemplates } from '@/components/Insights/QueryHelperPanel/mock';
-import type { Query } from '@/components/Insights/QueryHelperPanel/types';
 import type { TabManagerActions } from './InsightsTabManager';
 
 interface InsightsTabPanelHomeTabProps {
@@ -12,14 +11,6 @@ interface InsightsTabPanelHomeTabProps {
 
 export function InsightsTabPanelHomeTab({ tabManagerActions }: InsightsTabPanelHomeTabProps) {
   const templates = useTemplates();
-
-  const handleTemplateSelect = (template: Query) => {
-    tabManagerActions.createTab({
-      ...template,
-      id: ulid(),
-      name: 'Untitled query',
-    });
-  };
 
   return (
     <div className="col-span-1 row-span-2 flex h-full w-full flex-col bg-gray-50 p-8 dark:bg-gray-900">
