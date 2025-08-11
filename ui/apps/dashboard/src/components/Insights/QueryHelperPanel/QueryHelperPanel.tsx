@@ -85,11 +85,13 @@ export function QueryHelperPanel({ tabManagerActions }: QueryHelperPanelProps) {
           onQuerySelect={handleQuerySelect}
           queries={savedQueries}
           title="Saved queries"
+          sectionType="saved"
         />
         <QueryHelperPanelCollapsibleSection
           onQuerySelect={handleQuerySelect}
           queries={recentQueries}
           title="Query history"
+          sectionType="history"
         />
       </div>
     </div>

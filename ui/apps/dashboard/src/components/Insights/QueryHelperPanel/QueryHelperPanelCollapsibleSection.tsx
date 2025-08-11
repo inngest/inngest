@@ -14,12 +14,14 @@ interface QueryHelperPanelCollapsibleSectionProps {
     isLoading: boolean;
   };
   title: string;
+  sectionType?: 'saved' | 'history';
 }
 
 export function QueryHelperPanelCollapsibleSection({
   onQuerySelect,
   queries,
   title,
+  sectionType,
 }: QueryHelperPanelCollapsibleSectionProps) {
   const [isOpen, setIsOpen] = useState(true);
 
@@ -36,7 +38,11 @@ export function QueryHelperPanelCollapsibleSection({
       </button>
       {isOpen && (
         <div className="px-4 pb-3">
-          <QueryHelperPanelSectionContent onQuerySelect={onQuerySelect} queries={queries} />
+          <QueryHelperPanelSectionContent
+            onQuerySelect={onQuerySelect}
+            queries={queries}
+            sectionType={sectionType}
+          />
         </div>
       )}
     </div>

@@ -11,11 +11,13 @@ interface QueryHelperPanelSectionContentProps {
     error: undefined | string;
     isLoading: boolean;
   };
+  sectionType?: 'history' | 'saved';
 }
 
 export function QueryHelperPanelSectionContent({
   onQuerySelect,
   queries,
+  sectionType,
 }: QueryHelperPanelSectionContentProps) {
   const { data, error, isLoading } = queries;
 
@@ -34,7 +36,12 @@ export function QueryHelperPanelSectionContent({
   return (
     <div className="flex flex-col gap-1">
       {data.map((query) => (
-        <QueryHelperPanelSectionItem key={query.id} onQuerySelect={onQuerySelect} query={query} />
+        <QueryHelperPanelSectionItem
+          key={query.id}
+          onQuerySelect={onQuerySelect}
+          query={query}
+          sectionType={sectionType}
+        />
       ))}
     </div>
   );
