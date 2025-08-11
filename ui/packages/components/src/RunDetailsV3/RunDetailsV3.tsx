@@ -1,7 +1,6 @@
 'use client';
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
 
 import { ErrorCard } from '../Error/ErrorCard';
 import type { Run as InitialRunData } from '../RunsPage/types';
@@ -64,7 +63,6 @@ export const RunDetailsV3 = ({
   const [isDragging, setIsDragging] = useState(false);
   const [windowHeight, setWindowHeight] = useState(0);
   const { selectedStep } = useStepSelection(runID);
-  const { getTraceResult } = useGetTraceResult();
 
   const handleMouseDown = useCallback(() => {
     setIsDragging(true);
@@ -148,17 +146,16 @@ export const RunDetailsV3 = ({
   });
 
   const outputID = runData?.trace?.outputID;
-  const resultRes = useQuery({
-    enabled: Boolean(outputID),
+  const {
+    data: resultData,
+    loading: resultLoading,
+    error: resultError,
+    refetch: refetchResult,
+  } = useGetTraceResult({
+    traceID: outputID,
+    preview: tracesPreviewEnabled,
     refetchInterval: pollInterval,
-    queryKey: ['run-result', runID, { preview: tracesPreviewEnabled }],
-    queryFn: useCallback(() => {
-      if (!outputID) {
-        // Unreachable
-        throw new Error('missing outputID');
-      }
-      return getTraceResult({ traceID: outputID, preview: tracesPreviewEnabled });
-    }, [getTraceResult, outputID, tracesPreviewEnabled]),
+    enabled: Boolean(outputID),
   });
 
   if (runData?.trace.endedAt && pollInterval) {
@@ -173,9 +170,9 @@ export const RunDetailsV3 = ({
   const waiting = isWaiting(
     initialRunData?.status || runData?.trace?.status,
     runError,
-    resultRes.error
+    resultError
   );
-  const showError = waiting ? false : runError || resultRes.error;
+  const showError = waiting ? false : runError || resultError;
 
   //
   // works around a variety of layout and scroll issues with our two column layout
@@ -202,12 +199,12 @@ export const RunDetailsV3 = ({
               run={nullishToLazy(runData)}
               runID={runID}
               standalone={standalone}
-              result={resultRes?.data}
+              result={resultData}
             />
             {showError && (
               <ErrorCard
-                error={runError || resultRes.error}
-                reset={runError ? () => refetchRun() : () => resultRes.refetch()}
+                error={runError || resultError}
+                reset={runError ? () => refetchRun() : () => refetchResult()}
               />
             )}
           </div>
@@ -259,7 +256,8 @@ export const RunDetailsV3 = ({
               slug={runData?.fn.slug}
               getTrigger={getTrigger}
               runID={runID}
-              result={resultRes?.data}
+              result={resultData}
+              resultLoading={resultLoading}
             />
           )}
         </div>
