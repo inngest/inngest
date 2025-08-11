@@ -42,9 +42,8 @@ export function InsightsTab({
     <OptionalTooltip side="top" tooltip={isTruncated ? name : ''}>
       <button
         className={cn(
-          'bg-canvasBase border-subtle hover:bg-canvasMuted hover:border-muted relative box-border flex h-12 w-[200px] items-center gap-2 border-b-2 border-r border-b-transparent px-2 transition-colors',
-          !isFirst && 'border-l',
-          isActive ? 'border-b-primary-intense hover:border-b-primary-intense' : 'border-b-subtle'
+          'bg-canvasBase border-subtle hover:bg-canvasMuted hover:border-muted border-b-subtle relative flex h-12 w-[200px] items-center gap-2 border-b border-r px-2 transition-colors',
+          !isFirst && 'border-l'
         )}
         onClick={onClick}
       >
@@ -60,6 +59,7 @@ export function InsightsTab({
             <RiCloseLine className="h-4 w-4 text-slate-500" />
           </span>
         )}
+        {isActive && <div className="bg-primary-intense absolute bottom-0 left-0 right-0 h-0.5" />}
       </button>
     </OptionalTooltip>
   );

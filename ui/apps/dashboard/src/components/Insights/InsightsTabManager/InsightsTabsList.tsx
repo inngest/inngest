@@ -35,7 +35,7 @@ export function InsightsTabsList({ actions, activeTabId, hide, tabs }: InsightsT
         ))}
         <div className="-ml-px">
           <button
-            className="bg-canvasBase border-subtle hover:bg-canvasMuted hover:border-muted border-b-subtle box-border flex h-12 w-12 items-center justify-center border-b-2 border-l border-r transition-colors"
+            className="bg-canvasBase border-subtle hover:bg-canvasMuted hover:border-muted border-b-subtle flex h-12 w-12 items-center justify-center border-b border-l border-r transition-colors"
             onClick={() => {
               actions.createTab({
                 id: ulid(),
