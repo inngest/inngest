@@ -39,7 +39,6 @@ const meta = {
   parameters: {
     layout: 'centered',
   },
-  tags: ['autodocs'],
 } satisfies Meta<typeof MetadataGrid>;
 
 export default meta;

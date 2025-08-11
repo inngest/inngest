@@ -1,5 +1,5 @@
 import { Button } from '@inngest/components/Button';
-import { Canvas, Meta, Story } from '@storybook/blocks';
+import { Canvas, Meta, Story } from '@storybook/addon-docs/blocks';
 
 import * as ButtonStories from './Button.stories';
 
@@ -10,9 +10,9 @@ import * as ButtonStories from './Button.stories';
 ## By Kind
 
 <div style={{ padding: '3rem 1rem' }} className="bg-canvasBase">
-  <p className="text-basis font-semibold">Primary</p>
+  <p className="!text-basis font-semibold">Primary</p>
   <div className="align-center items-center flex gap-1 pb-4">
-    <p className="text-basis pr-2">Solid appearance:</p>
+    <p className="!text-basis pr-2">Solid appearance:</p>
     <Story of={ButtonStories.PrimarySolid} />
     <Story of={ButtonStories.PrimarySolidWithIcon} />
     <Story of={ButtonStories.PrimarySolidOnlyIcon} />
@@ -21,7 +21,7 @@ import * as ButtonStories from './Button.stories';
     <Story of={ButtonStories.PrimarySolidDisabled} />
   </div>
   <div className="align-center items-center flex gap-1 pb-4">
-    <p className="text-basis pr-2">Outlined appearance:</p>
+    <p className="!text-basis pr-2">Outlined appearance:</p>
     <Story of={ButtonStories.PrimaryOutlined} />
     <Story of={ButtonStories.PrimaryOutlinedWithIcon} />
     <Story of={ButtonStories.PrimaryOutlinedOnlyIcon} />
@@ -30,7 +30,7 @@ import * as ButtonStories from './Button.stories';
     <Story of={ButtonStories.PrimaryOutlinedDisabled} />
   </div>
   <div className="align-center items-center flex gap-1 pb-4">
-    <p className="text-basis pr-2">Ghost appearance:</p>
+    <p className="!text-basis pr-2">Ghost appearance:</p>
     <Story of={ButtonStories.PrimaryGhost} />
     <Story of={ButtonStories.PrimaryGhostWithIcon} />
     <Story of={ButtonStories.PrimaryGhostOnlyIcon} />
@@ -38,9 +38,9 @@ import * as ButtonStories from './Button.stories';
     <Story of={ButtonStories.PrimaryGhostWithShortcut} />
     <Story of={ButtonStories.PrimaryGhostDisabled} />
   </div>
-  <p className="text-basis font-semibold">Secondary</p>
+  <p className="!text-basis font-semibold">Secondary</p>
   <div className="align-center items-center flex gap-1">
-    <p className="text-basis pr-2">Outlined appearance:</p>
+    <p className="!text-basis pr-2">Outlined appearance:</p>
     <Story of={ButtonStories.SecondaryOutlined} />
     <Story of={ButtonStories.SecondaryOutlinedWithIcon} />
     <Story of={ButtonStories.SecondaryOutlinedOnlyIcon} />
@@ -49,7 +49,7 @@ import * as ButtonStories from './Button.stories';
     <Story of={ButtonStories.SecondaryOutlinedDisabled} />
   </div>
   <div className="align-center items-center flex gap-1 pb-4">
-    <p className="text-basis pr-2">Ghost appearance:</p>
+    <p className="!text-basis pr-2">Ghost appearance:</p>
     <Story of={ButtonStories.SecondaryGhost} />
     <Story of={ButtonStories.SecondaryGhostWithIcon} />
     <Story of={ButtonStories.SecondaryGhostOnlyIcon} />
@@ -57,9 +57,9 @@ import * as ButtonStories from './Button.stories';
     <Story of={ButtonStories.SecondaryGhostWithShortcut} />
     <Story of={ButtonStories.SecondaryGhostDisabled} />
   </div>
-  <p className="text-basis font-semibold">Danger</p>
+  <p className="!text-basis font-semibold">Danger</p>
   <div className="align-center items-center flex gap-1 pb-4">
-    <p className="text-basis pr-2">Solid appearance:</p>
+    <p className="!text-basis pr-2">Solid appearance:</p>
     <Story of={ButtonStories.DangerSolid} />
     <Story of={ButtonStories.DangerSolidWithIcon} />
     <Story of={ButtonStories.DangerSolidOnlyIcon} />
@@ -68,7 +68,7 @@ import * as ButtonStories from './Button.stories';
     <Story of={ButtonStories.DangerSolidDisabled} />
   </div>
   <div className="align-center items-center flex gap-1 pb-4">
-    <p className="text-basis pr-2">Outlined appearance:</p>
+    <p className="!text-basis pr-2">Outlined appearance:</p>
     <Story of={ButtonStories.DangerOutlined} />
     <Story of={ButtonStories.DangerOutlinedWithIcon} />
     <Story of={ButtonStories.DangerOutlinedOnlyIcon} />
@@ -77,7 +77,7 @@ import * as ButtonStories from './Button.stories';
     <Story of={ButtonStories.DangerOutlinedDisabled} />
   </div>
   <div className="align-center items-center flex gap-1 pb-4">
-    <p className="text-basis pr-2">Ghost appearance:</p>
+    <p className="!text-basis pr-2">Ghost appearance:</p>
     <Story of={ButtonStories.DangerGhost} />
     <Story of={ButtonStories.DangerGhostWithIcon} />
     <Story of={ButtonStories.DangerGhostOnlyIcon} />
