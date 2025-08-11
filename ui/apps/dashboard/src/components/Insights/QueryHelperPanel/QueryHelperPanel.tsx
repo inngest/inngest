@@ -1,16 +1,13 @@
 'use client';
 
 import { useCallback } from 'react';
-import { AccordionList } from '@inngest/components/AccordionCard/AccordionList';
-import { RiAddCircleFill, RiAddLine, RiBookReadLine, RiFileTextLine } from '@remixicon/react';
+import { RiAddCircleFill, RiBookReadLine } from '@remixicon/react';
 import { ulid } from 'ulid';
 
 import type { TabManagerActions } from '@/components/Insights/InsightsTabManager/InsightsTabManager';
-import { QueryHelperPanelSection } from './QueryHelperPanelSection';
+import { QueryHelperPanelCollapsibleSection } from './QueryHelperPanelCollapsibleSection';
 import { useRecentQueries, useSavedQueries, useTemplates } from './mock';
 import type { Query } from './types';
-
-const DEFAULT_ACCORDION_VALUES = ['TEMPLATES', 'RECENT QUERIES', 'SAVED QUERIES'];
 
 type QueryHelperPanelProps = {
   tabManagerActions: TabManagerActions;
@@ -53,7 +50,7 @@ export function QueryHelperPanel({ tabManagerActions }: QueryHelperPanelProps) {
 
   return (
     <div className="border-subtle flex h-full w-full flex-col border-r">
-      <div className="border-subtle border-b p-4">
+      <div className="px-4 pb-1 pt-4">
         <h2 className="text-md mb-4 font-medium">Insights</h2>
         <div>
           <button
@@ -83,29 +80,18 @@ export function QueryHelperPanel({ tabManagerActions }: QueryHelperPanelProps) {
           </button>
         </div>
       </div>
-
-      {/* Accordion sections */}
-      <AccordionList
-        className="flex-1 border-0"
-        defaultValue={DEFAULT_ACCORDION_VALUES}
-        type="multiple"
-      >
-        <QueryHelperPanelSection
-          onQuerySelect={handleQuerySelect}
-          queries={templates}
-          title="TEMPLATES"
-        />
-        <QueryHelperPanelSection
-          onQuerySelect={handleQuerySelect}
-          queries={recentQueries}
-          title="RECENT QUERIES"
-        />
-        <QueryHelperPanelSection
+      <div className="flex-1">
+        <QueryHelperPanelCollapsibleSection
           onQuerySelect={handleQuerySelect}
           queries={savedQueries}
-          title="SAVED QUERIES"
+          title="Saved queries"
         />
-      </AccordionList>
+        <QueryHelperPanelCollapsibleSection
+          onQuerySelect={handleQuerySelect}
+          queries={recentQueries}
+          title="Query history"
+        />
+      </div>
     </div>
   );
 }

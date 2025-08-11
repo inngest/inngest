@@ -21,11 +21,11 @@ export function QueryHelperPanelSection({
   title,
 }: QueryHelperPanelSectionProps) {
   return (
-    <AccordionList.Item value={title}>
-      <AccordionList.Trigger>
+    <AccordionList.Item className="border-0" value={title}>
+      <AccordionList.Trigger className="data-[state=open]:border-0">
         <span className="text-light text-xs font-medium">{title}</span>
       </AccordionList.Trigger>
-      <AccordionList.Content>
+      <AccordionList.Content className="!py-1">
         <QueryHelperPanelSectionContent onQuerySelect={onQuerySelect} queries={queries} />
       </AccordionList.Content>
     </AccordionList.Item>
