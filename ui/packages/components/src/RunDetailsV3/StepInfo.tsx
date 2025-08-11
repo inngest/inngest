@@ -199,7 +199,7 @@ export const StepInfo = ({
 
           <span className="text-basis text-sm font-normal">{trace.name}</span>
         </div>
-        {runID && trace.stepID && prettyInput && (
+        {runID && trace.stepID && (
           <>
             <Button
               kind="primary"
@@ -213,7 +213,7 @@ export const StepInfo = ({
               setOpen={setRerunModalOpen}
               runID={runID}
               stepID={trace.stepID}
-              input={prettyInput}
+              input={prettyInput || result?.input || ''}
             />
           </>
         )}

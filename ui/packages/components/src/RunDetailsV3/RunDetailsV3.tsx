@@ -29,7 +29,20 @@ type Props = {
 };
 
 const MIN_HEIGHT = 586;
-const NO_SPANS_ERROR = /no function run span found/gi;
+const NO_SPANS_OR_TRACE_ERROR = /no function run span found|trace run not found/gi;
+
+//
+// Do not show the error if queued and can't find the trace or spans (backend timing issue)
+const isWaiting = (status?: string, runError?: Error | null, traceResultError?: Error | null) => {
+  if (status && status !== 'QUEUED') {
+    return false;
+  }
+
+  return (
+    !!runError?.toString().match(NO_SPANS_OR_TRACE_ERROR) ||
+    !!traceResultError?.toString().match(NO_SPANS_OR_TRACE_ERROR)
+  );
+};
 
 export const RunDetailsV3 = ({
   getTrigger,
@@ -42,7 +55,9 @@ export const RunDetailsV3 = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const leftColumnRef = useRef<HTMLDivElement>(null);
   const runInfoRef = useRef<HTMLDivElement>(null);
-  const [pollInterval, setPollInterval] = useState(initialPollInterval);
+  const [pollInterval, setPollInterval] = useState(
+    initialPollInterval ? initialPollInterval : standalone ? 1000 : undefined
+  );
 
   const [leftWidth, setLeftWidth] = useState(55);
   const [height, setHeight] = useState(MIN_HEIGHT);
@@ -132,7 +147,7 @@ export const RunDetailsV3 = ({
     refetchInterval: pollInterval,
   });
 
-  const outputID = runRes?.data?.data?.trace.outputID;
+  const outputID = runRes?.data?.data?.trace?.outputID;
   const resultRes = useQuery({
     enabled: Boolean(outputID),
     refetchInterval: pollInterval,
@@ -156,15 +171,16 @@ export const RunDetailsV3 = ({
     }, 6000);
   }
 
-  // Do not show the error if queued and the error is no spans
-  const noSpansFoundError =
-    !!runRes.error?.toString().match(NO_SPANS_ERROR) || !!runError?.message.match(NO_SPANS_ERROR);
-  const waiting = initialRunData?.status === 'QUEUED' && noSpansFoundError;
+  const waiting = isWaiting(
+    initialRunData?.status || runRes?.data?.data?.trace?.status,
+    runError || runRes.error,
+    resultRes.error
+  );
   const showError = waiting ? false : runRes.error || resultRes.error;
 
   //
   // works around a variety of layout and scroll issues with our two column layout
-  const dynamicHeight = height < windowHeight * 0.85 ? height : '85vh';
+  const dynamicHeight = standalone ? '85vh' : height < windowHeight * 0.85 ? height : '85vh';
 
   return (
     <>
@@ -186,7 +202,7 @@ export const RunDetailsV3 = ({
               run={nullishToLazy(run)}
               runID={runID}
               standalone={standalone}
-              result={resultRes.data}
+              result={resultRes?.data}
             />
             {showError && (
               <ErrorCard
@@ -243,7 +259,7 @@ export const RunDetailsV3 = ({
               slug={run?.fn.slug}
               getTrigger={getTrigger}
               runID={runID}
-              result={resultRes.data}
+              result={resultRes?.data}
             />
           )}
         </div>
