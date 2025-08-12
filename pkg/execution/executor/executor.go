@@ -1603,6 +1603,11 @@ func (e *executor) HandlePauses(ctx context.Context, evt event.TrackedEvent) (ex
 		EventName:   evt.GetEvent().Name,
 	}
 
+	if bufferCount, _ := e.pm.BufferLen(ctx, idx); bufferCount > 0 {
+		// Log the total number of items in the buffer at any point.
+		l = l.With("buffer_count", bufferCount)
+	}
+
 	aggregated, err := e.pm.Aggregated(
 		ctx,
 		idx,
