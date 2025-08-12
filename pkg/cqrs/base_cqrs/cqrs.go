@@ -613,9 +613,8 @@ func (w wrapper) GetFunctions(ctx context.Context) ([]*cqrs.Function, error) {
 	return copyInto(ctx, w.q.GetFunctions, []*cqrs.Function{})
 }
 
-func (w wrapper) GetFunctionsByAppInternalID(ctx context.Context, workspaceID, appID uuid.UUID) ([]*cqrs.Function, error) {
+func (w wrapper) GetFunctionsByAppInternalID(ctx context.Context, appID uuid.UUID) ([]*cqrs.Function, error) {
 	f := func(ctx context.Context) ([]*sqlc.Function, error) {
-		// Ingore the workspace ID for now.
 		return w.q.GetAppFunctions(ctx, appID)
 	}
 	return copyInto(ctx, f, []*cqrs.Function{})
