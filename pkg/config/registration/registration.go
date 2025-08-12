@@ -3,7 +3,7 @@ package registration
 import (
 	"context"
 
-	"github.com/inngest/inngest/pkg/connect/pubsub"
+	"github.com/inngest/inngest/pkg/connect/grpc"
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/exechttp"
 	"github.com/inngest/inngest/pkg/execution/queue"
@@ -62,7 +62,7 @@ type NewDriverOpts struct {
 	LocalSigningKey        *string
 	RequireLocalSigningKey bool
 
-	ConnectForwarder  pubsub.RequestForwarder
+	ConnectForwarder  grpc.RequestForwarder
 	ConditionalTracer trace.ConditionalTracer
 	HTTPClient        exechttp.RequestExecutor
 }
