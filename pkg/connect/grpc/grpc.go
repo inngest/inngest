@@ -1,4 +1,4 @@
-package pubsub
+package grpc
 
 import (
 	"context"
@@ -8,7 +8,6 @@ import (
 	"time"
 
 	connectConfig "github.com/inngest/inngest/pkg/config/connect"
-	"github.com/inngest/inngest/pkg/connect/grpc"
 	"github.com/inngest/inngest/pkg/connect/state"
 	"github.com/inngest/inngest/pkg/logger"
 	"github.com/inngest/inngest/pkg/telemetry/metrics"
@@ -40,7 +39,7 @@ type gatewayGRPCManager struct {
 	logger         logger.Logger
 
 	// Request forwarding
-	grpcClientManager *grpc.GRPCClientManager[connectpb.ConnectGatewayClient]
+	grpcClientManager *GRPCClientManager[connectpb.ConnectGatewayClient]
 	dialer            GRPCDialer
 
 	// Request receiver
@@ -54,13 +53,13 @@ type GRPCDialer func(target string, opts ...grpcLib.DialOption) (*grpcLib.Client
 
 type GatewayGRPCManagerOption func(*gatewayGRPCManager)
 
-func WithDialer(dialer GRPCDialer) GatewayGRPCManagerOption {
+func WithGatewayDialer(dialer GRPCDialer) GatewayGRPCManagerOption {
 	return func(m *gatewayGRPCManager) {
 		m.dialer = dialer
 	}
 }
 
-func WithLogger(logger logger.Logger) GatewayGRPCManagerOption {
+func WithGatewayLogger(logger logger.Logger) GatewayGRPCManagerOption {
 	return func(m *gatewayGRPCManager) {
 		m.logger = logger
 	}
@@ -71,7 +70,7 @@ func gatewayURL(ctx context.Context, gateway *state.Gateway) string {
 	return net.JoinHostPort(gateway.IPAddress.String(), fmt.Sprintf("%d", connectConfig.Gateway(ctx).GRPCPort))
 }
 
-func NewGatewayGRPCManager(ctx context.Context, stateManager state.GatewayManager, opts ...GatewayGRPCManagerOption) GatewayGRPCManager {
+func newGatewayGRPCManager(ctx context.Context, stateManager state.GatewayManager, opts ...GatewayGRPCManagerOption) GatewayGRPCManager {
 	mgr := &gatewayGRPCManager{
 		gatewayManager: stateManager,
 		dialer:         grpcLib.NewClient,
@@ -83,14 +82,14 @@ func NewGatewayGRPCManager(ctx context.Context, stateManager state.GatewayManage
 		opt(mgr)
 	}
 
-	var grpcOpts []grpc.GRPCClientManagerOption[connectpb.ConnectGatewayClient]
+	var grpcOpts []GRPCClientManagerOption[connectpb.ConnectGatewayClient]
 	if mgr.logger != nil {
-		grpcOpts = append(grpcOpts, grpc.WithLogger[connectpb.ConnectGatewayClient](mgr.logger))
+		grpcOpts = append(grpcOpts, WithLogger[connectpb.ConnectGatewayClient](mgr.logger))
 	}
 	if mgr.dialer != nil {
-		grpcOpts = append(grpcOpts, grpc.WithDialer[connectpb.ConnectGatewayClient](mgr.dialer))
+		grpcOpts = append(grpcOpts, WithDialer[connectpb.ConnectGatewayClient](mgr.dialer))
 	}
-	mgr.grpcClientManager = grpc.NewGRPCClientManager(connectpb.NewConnectGatewayClient, grpcOpts...)
+	mgr.grpcClientManager = NewGRPCClientManager(connectpb.NewConnectGatewayClient, grpcOpts...)
 
 	connectpb.RegisterConnectExecutorServer(mgr.grpcServer, mgr)
 
@@ -219,7 +218,7 @@ func (i *gatewayGRPCManager) ConnectToGateways(ctx context.Context) error {
 
 func (i *gatewayGRPCManager) Forward(ctx context.Context, gatewayID ulid.ULID, connectionID ulid.ULID, data *connectpb.GatewayExecutorRequestData) error {
 	grpcClient, err := i.grpcClientManager.GetClient(ctx, gatewayID.String())
-	if err != nil && err != grpc.ErrGatewayNotFound {
+	if err != nil && err != ErrGatewayNotFound {
 		logger.StdlibLogger(ctx).Error("could not get grpc client", "gatewayID", gatewayID.String(), "err", err)
 	}
 

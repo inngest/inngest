@@ -1,4 +1,4 @@
-package pubsub
+package grpc
 
 import (
 	"context"
@@ -73,7 +73,7 @@ func setupTestEnvironment(t *testing.T) (context.Context, *mockConnectGatewaySer
 }
 
 func newGatewayGRPCManagerWithDialer(ctx context.Context, stateManager state.GatewayManager, dialer GRPCDialer) GatewayGRPCManager {
-	return NewGatewayGRPCManager(ctx, stateManager, WithDialer(dialer))
+	return newGatewayGRPCManager(ctx, stateManager, WithGatewayDialer(dialer))
 }
 
 type mockConnectGatewayServer struct {

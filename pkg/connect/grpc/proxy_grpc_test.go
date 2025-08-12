@@ -1,13 +1,17 @@
-package pubsub
+package grpc
 
 import (
 	"context"
 	"crypto/rand"
 	"encoding/json"
 	"fmt"
+	"net"
 	"os"
+	"sync"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/alicebob/miniredis/v2"
 	"github.com/google/uuid"
@@ -25,7 +29,84 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestProxyPubSubPath(t *testing.T) {
+type mockGatewayGRPCManager struct {
+	forwardCalls  []mockForwardCall
+	subscriptions map[string]chan *connectpb.SDKResponse
+	mu            sync.Mutex
+}
+
+type mockForwardCall struct {
+	gatewayID    ulid.ULID
+	connectionID ulid.ULID
+	data         *connectpb.GatewayExecutorRequestData
+}
+
+func (m *mockGatewayGRPCManager) Forward(ctx context.Context, gatewayID ulid.ULID, connectionID ulid.ULID, data *connectpb.GatewayExecutorRequestData) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.forwardCalls = append(m.forwardCalls, mockForwardCall{
+		gatewayID:    gatewayID,
+		connectionID: connectionID,
+		data:         data,
+	})
+	return nil
+}
+
+func (m *mockGatewayGRPCManager) ConnectToGateways(ctx context.Context) error {
+	return nil
+}
+
+func (m *mockGatewayGRPCManager) Subscribe(ctx context.Context, requestID string) chan *connectpb.SDKResponse {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.subscriptions == nil {
+		m.subscriptions = make(map[string]chan *connectpb.SDKResponse)
+	}
+	channel := make(chan *connectpb.SDKResponse, 1)
+	m.subscriptions[requestID] = channel
+	return channel
+}
+
+func (m *mockGatewayGRPCManager) SubscribeWorkerAck(ctx context.Context, requestID string) chan *connectpb.AckMessage {
+	// Empty mock
+	return nil
+}
+
+func (m *mockGatewayGRPCManager) Unsubscribe(ctx context.Context, requestID string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.subscriptions != nil {
+		delete(m.subscriptions, requestID)
+	}
+}
+
+func (m *mockGatewayGRPCManager) UnsubscribeWorkerAck(ctx context.Context, requestID string) {
+	// Empty mock
+}
+
+func (m *mockGatewayGRPCManager) getForwardCalls() []mockForwardCall {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	calls := make([]mockForwardCall, len(m.forwardCalls))
+	copy(calls, m.forwardCalls)
+	return calls
+}
+
+func (m *mockGatewayGRPCManager) sendResponse(requestID string, response *connectpb.SDKResponse) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.subscriptions != nil {
+		if channel, exists := m.subscriptions[requestID]; exists {
+			select {
+			case channel <- response:
+			default:
+				// Channel is full or closed, ignore
+			}
+		}
+	}
+}
+
+func TestProxyGRPCPath(t *testing.T) {
 	r := miniredis.RunT(t)
 	rc, err := rueidis.NewClient(rueidis.ClientOption{
 		InitAddress:  []string{r.Addr()},
@@ -44,15 +125,15 @@ func TestProxyPubSubPath(t *testing.T) {
 	defer cancel()
 
 	sm := state.NewRedisConnectionStateManager(rc)
+	mockForwarder := &mockGatewayGRPCManager{}
 
-	connector := newRedisPubSubConnector(rc, RedisPubSubConnectorOpts{
-		Logger:       l,
+	connector := newGRPCConnector(ctx, GRPCConnectorOpts{
 		Tracer:       trace.NewConditionalTracer(trace.ConnectTracer(), trace.AlwaysTrace),
 		StateManager: sm,
 		EnforceLeaseExpiry: func(ctx context.Context, accountID uuid.UUID) bool {
 			return true
 		},
-	})
+	}, WithConnectorLogger(l), WithGatewayManager(mockForwarder))
 
 	fnID, accID, envID, appID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
 
@@ -155,6 +236,7 @@ func TestProxyPubSubPath(t *testing.T) {
 		Status:            state.GatewayStatusActive,
 		LastHeartbeatAtMS: time.Now().UnixMilli(),
 		Hostname:          "gw-host",
+		IPAddress:         net.ParseIP("127.0.0.1"),
 	})
 	require.NoError(t, err)
 
@@ -164,10 +246,6 @@ func TestProxyPubSubPath(t *testing.T) {
 
 	withTimeout, cancel := context.WithTimeout(ctx, time.Minute*30)
 	defer cancel()
-
-	go func() {
-		_ = connector.Wait(ctx)
-	}()
 
 	respCh := make(chan *connectpb.SDKResponse)
 	go func() {
@@ -191,30 +269,20 @@ func TestProxyPubSubPath(t *testing.T) {
 			},
 			logger: l,
 		})
-		fmt.Println("proxy done")
 		require.NoError(t, err)
 		require.NotNil(t, resp)
 		respCh <- resp
 	}()
 
-	received := make(chan bool)
+	require.EventuallyWithT(t, func(t *assert.CollectT) {
+		calls := mockForwarder.getForwardCalls()
+		require.Len(t, calls, 1, "expected gRPC Forward to be called once")
+		require.Equal(t, gwID, calls[0].gatewayID)
+		require.Equal(t, connID, calls[0].connectionID)
+		require.Equal(t, reqID, calls[0].data.RequestId)
+	}, 3*time.Second, 100*time.Millisecond)
 
-	onSubscribed := make(chan struct{})
-	go func() {
-		connector.subscribe(ctx, connector.channelGatewayAppRequests(gwID, connID), func(msg string) {
-			fmt.Println("received msg")
-			received <- true
-		}, true, onSubscribed)
-	}()
-	<-onSubscribed
-
-	select {
-	case <-received:
-	case <-time.After(10 * time.Second):
-		require.Fail(t, "did not receive message")
-	}
-
-	err = connector.NotifyExecutor(ctx, &connectpb.SDKResponse{
+	mockForwarder.sendResponse(reqID, &connectpb.SDKResponse{
 		RequestId:      reqID,
 		AccountId:      accID.String(),
 		EnvId:          envID.String(),
@@ -229,7 +297,6 @@ func TestProxyPubSubPath(t *testing.T) {
 		UserTraceCtx:   nil,
 		RunId:          runID.String(),
 	})
-	require.NoError(t, err)
 
 	select {
 	case r := <-respCh:
@@ -239,7 +306,7 @@ func TestProxyPubSubPath(t *testing.T) {
 	}
 }
 
-func TestProxyPolling(t *testing.T) {
+func TestProxyGRPCPolling(t *testing.T) {
 	r := miniredis.RunT(t)
 	rc, err := rueidis.NewClient(rueidis.ClientOption{
 		InitAddress:  []string{r.Addr()},
@@ -258,22 +325,20 @@ func TestProxyPolling(t *testing.T) {
 	defer cancel()
 
 	sm := state.NewRedisConnectionStateManager(rc)
+	mockForwarder := &mockGatewayGRPCManager{}
 
-	connector := newRedisPubSubConnector(rc, RedisPubSubConnectorOpts{
-		Logger:       l,
+	connector := newGRPCConnector(ctx, GRPCConnectorOpts{
 		Tracer:       trace.NewConditionalTracer(trace.ConnectTracer(), trace.AlwaysTrace),
 		StateManager: sm,
 		EnforceLeaseExpiry: func(ctx context.Context, accountID uuid.UUID) bool {
 			return true
 		},
-	})
+	}, WithConnectorLogger(l), WithGatewayManager(mockForwarder))
 
 	fnID, accID, envID, appID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
-
 	runID := ulid.MustNew(ulid.Now(), rand.Reader)
 	connID := ulid.MustNew(ulid.Now(), rand.Reader)
 	gwID := ulid.MustNew(ulid.Now(), rand.Reader)
-
 	reqID := "reqid-test"
 	appName := "test-app"
 	fnName := "test-fn"
@@ -292,7 +357,7 @@ func TestProxyPolling(t *testing.T) {
 				},
 			},
 			Steps: map[string]sdk.SDKStep{
-				"step": sdk.SDKStep{
+				"step": {
 					ID:   "step",
 					Name: fnName,
 					Runtime: map[string]any{
@@ -343,7 +408,6 @@ func TestProxyPolling(t *testing.T) {
 	require.NoError(t, err)
 
 	syncID := uuid.New()
-
 	wg.AppID = &appID
 	wg.SyncID = &syncID
 
@@ -352,11 +416,7 @@ func TestProxyPolling(t *testing.T) {
 		EnvID:        envID,
 		ConnectionId: connID,
 		WorkerIP:     "10.0.1.2",
-		Data: &connectpb.WorkerConnectRequestData{
-			ConnectionId: connID.String(),
-			InstanceId:   "test-worker",
-			Apps:         []*connectpb.AppConfiguration{appConfig},
-		},
+		Data:         reqData,
 		Groups: map[string]*state.WorkerGroup{
 			wg.Hash: wg,
 		},
@@ -369,6 +429,7 @@ func TestProxyPolling(t *testing.T) {
 		Status:            state.GatewayStatusActive,
 		LastHeartbeatAtMS: time.Now().UnixMilli(),
 		Hostname:          "gw-host",
+		IPAddress:         net.ParseIP("127.0.0.1"),
 	})
 	require.NoError(t, err)
 
@@ -379,11 +440,8 @@ func TestProxyPolling(t *testing.T) {
 	withTimeout, cancel := context.WithTimeout(ctx, time.Minute*30)
 	defer cancel()
 
-	go func() {
-		_ = connector.Wait(ctx)
-	}()
-
 	respCh := make(chan *connectpb.SDKResponse)
+	errCh := make(chan error)
 	go func() {
 		resp, err := connector.Proxy(withTimeout, context.Background(), ProxyOpts{
 			AccountID: accID,
@@ -405,28 +463,12 @@ func TestProxyPolling(t *testing.T) {
 			},
 			logger: l,
 		})
-		fmt.Println("proxy done")
-		require.NoError(t, err)
-		require.NotNil(t, resp)
-		respCh <- resp
+		if err != nil {
+			errCh <- err
+		} else {
+			respCh <- resp
+		}
 	}()
-
-	received := make(chan bool)
-
-	onSubscribed := make(chan struct{})
-	go func() {
-		connector.subscribe(ctx, connector.channelGatewayAppRequests(gwID, connID), func(msg string) {
-			fmt.Println("received msg")
-			received <- true
-		}, true, onSubscribed)
-	}()
-	<-onSubscribed
-
-	select {
-	case <-received:
-	case <-time.After(10 * time.Second):
-		require.Fail(t, "did not receive message")
-	}
 
 	err = sm.SaveResponse(ctx, envID, reqID, &connectpb.SDKResponse{
 		RequestId:      reqID,
@@ -445,25 +487,23 @@ func TestProxyPolling(t *testing.T) {
 	})
 	require.NoError(t, err)
 
+	select {
+	case err := <-errCh:
+		require.NoError(t, err)
+	case resp := <-respCh:
+		require.NotNil(t, resp)
+		require.Equal(t, connectpb.SDKResponseStatus_DONE, resp.Status)
+	case <-time.After(5 * time.Second):
+		require.Fail(t, "proxy call timed out")
+	}
+
+	// No response was sent through gRPC, but we still picked up the buffered response
 	buffered, err := sm.GetResponse(ctx, envID, reqID)
 	require.NoError(t, err)
-	require.NotNil(t, buffered)
-
-	select {
-	case r := <-respCh:
-		require.Equal(t, connectpb.SDKResponseStatus_DONE, r.Status)
-
-		// expect buffered response to be deleted
-		buffered, err := sm.GetResponse(ctx, envID, reqID)
-		require.NoError(t, err)
-		require.Nil(t, buffered)
-
-	case <-time.After(10 * time.Second):
-		require.Fail(t, "no response received")
-	}
+	require.Nil(t, buffered, "buffered response should be cleaned up")
 }
 
-func TestProxyLeaseExpiry(t *testing.T) {
+func TestProxyGRPCLeaseExpiry(t *testing.T) {
 	r := miniredis.RunT(t)
 	rc, err := rueidis.NewClient(rueidis.ClientOption{
 		InitAddress:  []string{r.Addr()},
@@ -482,22 +522,20 @@ func TestProxyLeaseExpiry(t *testing.T) {
 	defer cancel()
 
 	sm := state.NewRedisConnectionStateManager(rc)
+	mockForwarder := &mockGatewayGRPCManager{}
 
-	connector := newRedisPubSubConnector(rc, RedisPubSubConnectorOpts{
-		Logger:       l,
+	connector := newGRPCConnector(ctx, GRPCConnectorOpts{
 		Tracer:       trace.NewConditionalTracer(trace.ConnectTracer(), trace.AlwaysTrace),
 		StateManager: sm,
 		EnforceLeaseExpiry: func(ctx context.Context, accountID uuid.UUID) bool {
 			return true
 		},
-	})
+	}, WithConnectorLogger(l), WithGatewayManager(mockForwarder))
 
 	fnID, accID, envID, appID := uuid.New(), uuid.New(), uuid.New(), uuid.New()
-
 	runID := ulid.MustNew(ulid.Now(), rand.Reader)
 	connID := ulid.MustNew(ulid.Now(), rand.Reader)
 	gwID := ulid.MustNew(ulid.Now(), rand.Reader)
-
 	reqID := "reqid-test"
 	appName := "test-app"
 	fnName := "test-fn"
@@ -516,7 +554,7 @@ func TestProxyLeaseExpiry(t *testing.T) {
 				},
 			},
 			Steps: map[string]sdk.SDKStep{
-				"step": sdk.SDKStep{
+				"step": {
 					ID:   "step",
 					Name: fnName,
 					Runtime: map[string]any{
@@ -567,7 +605,6 @@ func TestProxyLeaseExpiry(t *testing.T) {
 	require.NoError(t, err)
 
 	syncID := uuid.New()
-
 	wg.AppID = &appID
 	wg.SyncID = &syncID
 
@@ -576,11 +613,7 @@ func TestProxyLeaseExpiry(t *testing.T) {
 		EnvID:        envID,
 		ConnectionId: connID,
 		WorkerIP:     "10.0.1.2",
-		Data: &connectpb.WorkerConnectRequestData{
-			ConnectionId: connID.String(),
-			InstanceId:   "test-worker",
-			Apps:         []*connectpb.AppConfiguration{appConfig},
-		},
+		Data:         reqData,
 		Groups: map[string]*state.WorkerGroup{
 			wg.Hash: wg,
 		},
@@ -593,19 +626,12 @@ func TestProxyLeaseExpiry(t *testing.T) {
 		Status:            state.GatewayStatusActive,
 		LastHeartbeatAtMS: time.Now().UnixMilli(),
 		Hostname:          "gw-host",
+		IPAddress:         net.ParseIP("127.0.0.1"),
 	})
 	require.NoError(t, err)
 
-	conns, err := sm.GetConnectionsByAppID(ctx, envID, appID)
-	require.NoError(t, err)
-	require.Len(t, conns, 1)
-
 	withTimeout, cancel := context.WithTimeout(ctx, time.Minute*30)
 	defer cancel()
-
-	go func() {
-		_ = connector.Wait(ctx)
-	}()
 
 	respCh := make(chan struct{})
 	go func() {
@@ -618,9 +644,9 @@ func TestProxyLeaseExpiry(t *testing.T) {
 				AccountId:      accID.String(),
 				EnvId:          envID.String(),
 				AppId:          appID.String(),
-				AppName:        appName,
+				AppName:        "test-app",
 				FunctionId:     fnID.String(),
-				FunctionSlug:   fnSlug,
+				FunctionSlug:   "test-app-test-fn",
 				StepId:         nil,
 				RequestPayload: []byte("request payload"),
 				SystemTraceCtx: nil,
@@ -636,26 +662,15 @@ func TestProxyLeaseExpiry(t *testing.T) {
 		respCh <- struct{}{}
 	}()
 
-	received := make(chan bool)
+	require.EventuallyWithT(t, func(t *assert.CollectT) {
+		calls := mockForwarder.getForwardCalls()
+		require.Len(t, calls, 1, "expected gRPC Forward to be called once")
+		require.Equal(t, gwID, calls[0].gatewayID)
+		require.Equal(t, connID, calls[0].connectionID)
+		require.Equal(t, reqID, calls[0].data.RequestId)
+	}, 3*time.Second, 100*time.Millisecond)
 
-	onSubscribed := make(chan struct{})
-	go func() {
-		connector.subscribe(ctx, connector.channelGatewayAppRequests(gwID, connID), func(msg string) {
-			fmt.Println("received msg")
-
-			// simulate the lease being dropped
-			require.NoError(t, sm.DeleteLease(ctx, envID, reqID))
-
-			received <- true
-		}, true, onSubscribed)
-	}()
-	<-onSubscribed
-
-	select {
-	case <-received:
-	case <-time.After(10 * time.Second):
-		require.Fail(t, "did not receive message")
-	}
+	require.NoError(t, sm.DeleteLease(ctx, envID, reqID))
 
 	<-time.After(consts.ConnectWorkerRequestExtendLeaseInterval + time.Second)
 
