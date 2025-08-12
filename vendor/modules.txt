@@ -692,10 +692,6 @@ github.com/jackc/pgx/v5/stdlib
 ## explicit; go 1.19
 github.com/jackc/puddle/v2
 github.com/jackc/puddle/v2/internal/genstack
-# github.com/jedib0t/go-pretty/v6 v6.3.0
-## explicit; go 1.16
-github.com/jedib0t/go-pretty/v6/table
-github.com/jedib0t/go-pretty/v6/text
 # github.com/jinzhu/copier v0.3.5
 ## explicit; go 1.13
 github.com/jinzhu/copier

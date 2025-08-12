@@ -5,12 +5,12 @@ dev:
 # specifically for tests
 .PHONY: run
 run:
-	TEST_MODE=true LOG_LEVEL=trace go run ./cmd dev --tick=50 --no-poll --no-discovery --verbose $(PARAMS)
+	TEST_MODE=true LOG_LEVEL=trace DEBUG=1 go run ./cmd dev --tick=50 --no-poll --verbose $(PARAMS)
 
 # Start with debug mode in Delve
 .PHONY: debug
 debug:
-	TEST_MODE=true LOG_LEVEL=trace dlv debug ./cmd --headless --listen=127.0.0.1:40000 --continue --accept-multiclient --log -- dev --tick=50 --no-poll --no-discovery --verbose $(PARAMS)
+	TEST_MODE=true LOG_LEVEL=trace DEBUG=1 dlv debug ./cmd --headless --listen=127.0.0.1:40000 --continue --accept-multiclient --log -- dev --tick=50 --no-poll --no-discovery --verbose $(PARAMS)
 
 xgo:
 	xgo -pkg cmd -ldflags="-s -w" -out build/inngest -targets "linux/arm64,linux/amd64,darwin/arm64,darwin/amd64" .
@@ -47,6 +47,7 @@ gen:
 protobuf:
 	buf generate
 	buf generate --path proto/connect/v1 --template proto/connect/v1/buf.gen.yaml
+	buf generate --path proto/debug/v1 --template proto/debug/v1/buf.gen.yaml
 
 # $GOBIN must be set and be in your path for this to work
 .PHONY: queries

@@ -569,15 +569,6 @@ func start(ctx context.Context, opts StartOpts) error {
 		return err
 	}
 
-	debugapi, err := debugapi.NewDebugAPI(debugapi.Opts{
-		Log:           l,
-		Queue:         rq,
-		ShardSelector: shardSelector,
-	})
-	if err != nil {
-		return err
-	}
-
 	connectGatewayProxy, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectPubSubRedis, false, connectpubsub.RedisPubSubConnectorOpts{
 		Logger:             connectPubSubLogger.With("svc", "connect-gateway"),
 		Tracer:             conditionalTracer,
@@ -622,7 +613,6 @@ func start(ctx context.Context, opts StartOpts) error {
 		{At: "/", Router: devAPI},
 		{At: "/v0", Router: core.Router},
 		{At: "/debug", Handler: middleware.Profiler()},
-		{At: "/dbg", Router: debugapi.Router},
 		{At: "/metrics", Router: metricsAPI.Router},
 	}
 
@@ -654,7 +644,19 @@ func start(ctx context.Context, opts StartOpts) error {
 		Logger:         l,
 	})
 
-	return service.StartAll(ctx, ds, runner, executorSvc, ds.Apiservice, connGateway)
+	services := []service.Service{ds, runner, executorSvc, ds.Apiservice, connGateway}
+
+	if os.Getenv("DEBUG") != "" {
+		services = append(services, debugapi.NewDebugAPI(debugapi.Opts{
+			Log:           l,
+			DB:            ds.Data,
+			Queue:         rq,
+			State:         ds.State,
+			ShardSelector: shardSelector,
+		}))
+	}
+
+	return service.StartAll(ctx, services...)
 }
 
 func createInmemoryRedis(ctx context.Context, tick time.Duration) (rueidis.Client, *miniredis.Miniredis, error) {
