@@ -284,7 +284,7 @@ func sorter(span *cqrs.OtelSpan) {
 // LoadFunction implements the state.FunctionLoader interface.
 func (w wrapper) LoadFunction(ctx context.Context, envID, fnID uuid.UUID) (*state.ExecutorFunction, error) {
 	// XXX: This doesn't store versions, as the dev server is currently ignorant to version.s
-	fn, err := w.GetFunctionByInternalUUID(ctx, envID, fnID)
+	fn, err := w.GetFunctionByInternalUUID(ctx, fnID)
 	if err != nil {
 		return nil, err
 	}
@@ -602,7 +602,7 @@ func (w wrapper) GetFunctionByExternalID(ctx context.Context, wsID uuid.UUID, ap
 	return copyInto(ctx, f, &cqrs.Function{})
 }
 
-func (w wrapper) GetFunctionByInternalUUID(ctx context.Context, wsID, fnID uuid.UUID) (*cqrs.Function, error) {
+func (w wrapper) GetFunctionByInternalUUID(ctx context.Context, fnID uuid.UUID) (*cqrs.Function, error) {
 	f := func(ctx context.Context) (*sqlc.Function, error) {
 		return w.q.GetFunctionByID(ctx, fnID)
 	}

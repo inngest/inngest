@@ -37,8 +37,8 @@ type FunctionReader interface {
 	// GetFunctionByExternalID returns a function given a workspace ID and the SDK's client ID / function ID,
 	// defined as a string.
 	GetFunctionByExternalID(ctx context.Context, wsID uuid.UUID, appID string, functionID string) (*Function, error)
-	// GetFunctionByInternalUUID returns a function given a worksapce ID and the internal ID.
-	GetFunctionByInternalUUID(ctx context.Context, wsID uuid.UUID, fnID uuid.UUID) (*Function, error)
+	// GetFunctionByInternalUUID returns a function given the internal ID.
+	GetFunctionByInternalUUID(ctx context.Context, fnID uuid.UUID) (*Function, error)
 }
 
 // DevFunctionManager is a development-only function manager
