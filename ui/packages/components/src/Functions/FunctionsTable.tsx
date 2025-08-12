@@ -5,72 +5,51 @@ import type { Route } from 'next';
 import { useRouter } from 'next/navigation';
 import { Button } from '@inngest/components/Button/Button';
 import { ErrorCard } from '@inngest/components/Error/ErrorCard';
-import TableBlankState from '@inngest/components/EventTypes/TableBlankState';
 import { Search } from '@inngest/components/Forms/Search';
+import TableBlankState from '@inngest/components/Functions/TableBlankState';
 import NewTable from '@inngest/components/Table/NewTable';
 import useDebounce from '@inngest/components/hooks/useDebounce';
-import {
-  EventTypesOrderByDirection,
-  EventTypesOrderByField,
-  type EventType,
-  type EventTypesOrderBy,
-  type PageInfo,
-} from '@inngest/components/types/eventType';
+import { type Function, type PageInfo } from '@inngest/components/types/function';
 import { useInfiniteQuery } from '@tanstack/react-query';
-import { type Row, type SortingState } from '@tanstack/react-table';
 
 import { useSearchParam } from '../hooks/useSearchParam';
-import EventTypesStatusFilter from './EventTypesStatusFilter';
+import FunctionsStatusFilter from './StatusMenu';
 import { useColumns } from './columns';
 
-export function EventTypesTable({
-  getEventTypes,
-  getEventTypeVolume,
+export function FunctionsTable({
+  getFunctions,
+  getFunctionVolume,
   pathCreator,
   emptyActions,
-  eventTypeActions,
 }: {
   emptyActions: React.ReactNode;
-  eventTypeActions: (props: Row<EventType>) => React.ReactElement;
   pathCreator: {
     function: (params: { functionSlug: string }) => Route;
     eventType: (params: { eventName: string }) => Route;
+    app: (params: { externalAppID: string }) => Route;
   };
-  getEventTypes: ({
+  getFunctions: ({
     cursor,
     archived,
   }: {
-    cursor: string | null;
+    cursor: number | null;
     nameSearch: string | null;
     archived: boolean;
-    orderBy: EventTypesOrderBy[];
-  }) => Promise<{ events: Omit<EventType, 'volume'>[]; pageInfo: PageInfo }>;
-  getEventTypeVolume: ({
-    eventName,
+  }) => Promise<{ functions: Omit<Function, 'usage'>[]; pageInfo: PageInfo }>;
+  getFunctionVolume: ({
+    functionID,
   }: {
-    eventName: string;
-  }) => Promise<Pick<EventType, 'volume' | 'name'>>;
+    functionID: string;
+  }) => Promise<Pick<Function, 'usage' | 'failureRate'>>;
 }) {
   const router = useRouter();
-  const columns = useColumns({ pathCreator, eventTypeActions, getEventTypeVolume });
-  const [sorting, setSorting] = useState<SortingState>([
-    {
-      id: 'name',
-      desc: true,
-    },
-  ]);
+  const columns = useColumns({ pathCreator, getFunctionVolume });
 
   const [filteredStatus, setFilteredStatus, removeFilteredStatus] = useSearchParam('archived');
   const archived = filteredStatus === 'true';
   const [isScrollable, setIsScrollable] = useState(false);
   const [nameSearch = null, setNameSearch, removeNameSearch] = useSearchParam('nameSearch');
   const [searchInput, setSearchInput] = useState<string>(nameSearch || '');
-  const [orderBy, setOrderBy] = useState<EventTypesOrderBy[]>([
-    {
-      field: EventTypesOrderByField.Name,
-      direction: EventTypesOrderByDirection.Asc,
-    },
-  ]);
   const containerRef = useRef<HTMLDivElement>(null);
 
   const scrollToTop = useCallback(
@@ -111,36 +90,36 @@ export function EventTypesTable({
     error,
     fetchNextPage,
     hasNextPage,
-    data: eventTypesData,
+    data: functionsData,
     isFetching,
     refetch,
     isFetchingNextPage,
   } = useInfiniteQuery({
-    queryKey: ['event-types', { orderBy, archived, nameSearch }],
-    queryFn: ({ pageParam }: { pageParam: string | null }) =>
-      getEventTypes({ orderBy, cursor: pageParam, archived, nameSearch }),
+    queryKey: ['functions', { archived, nameSearch }],
+    queryFn: ({ pageParam = 1 }: { pageParam: number }) =>
+      getFunctions({ cursor: pageParam, archived, nameSearch }),
     refetchOnWindowFocus: false,
     getNextPageParam: (lastPage) => {
-      if (!lastPage || !lastPage.pageInfo.hasNextPage) {
-        return undefined;
+      const { currentPage, totalPages } = lastPage.pageInfo;
+      if (typeof totalPages === 'number' && currentPage < totalPages) {
+        return currentPage + 1;
       }
-      return lastPage.pageInfo.endCursor;
     },
-    initialPageParam: null,
+    initialPageParam: 1,
   });
 
   const mergedData = useMemo(() => {
     return (
-      eventTypesData?.pages.flatMap((page) =>
-        page.events.map((e) => ({
+      functionsData?.pages.flatMap((page) =>
+        page.functions.map((e) => ({
           ...e,
-          volume: undefined,
+          usage: undefined,
         }))
       ) ?? []
     );
-  }, [eventTypesData]);
+  }, [functionsData]);
 
-  const hasEventTypesData = mergedData && mergedData.length > 0;
+  const hasFunctionsData = mergedData && mergedData.length > 0;
 
   useEffect(() => {
     const el = containerRef.current;
@@ -151,7 +130,7 @@ export function EventTypesTable({
 
   const onScroll: UIEventHandler<HTMLDivElement> = useCallback(
     (event) => {
-      if (hasEventTypesData && hasNextPage) {
+      if (hasFunctionsData && hasNextPage) {
         const { scrollHeight, scrollTop, clientHeight } = event.target as HTMLDivElement;
 
         // Check if scrolled to the bottom
@@ -161,26 +140,8 @@ export function EventTypesTable({
         }
       }
     },
-    [fetchNextPage, hasNextPage, isFetchingNextPage, hasEventTypesData, isFetching]
+    [fetchNextPage, hasNextPage, isFetchingNextPage, hasFunctionsData, isFetching]
   );
-
-  useEffect(() => {
-    const sortEntry = sorting[0];
-    if (!sortEntry) return;
-
-    const sortColumn = sortEntry.id;
-    if (sortColumn) {
-      const orderBy: EventTypesOrderBy[] = [
-        {
-          field: EventTypesOrderByField.Name,
-          direction: sortEntry.desc
-            ? EventTypesOrderByDirection.Desc
-            : EventTypesOrderByDirection.Asc,
-        },
-      ];
-      setOrderBy(orderBy);
-    }
-  }, [sorting, setOrderBy]);
 
   if (error) {
     return <ErrorCard error={error} reset={() => refetch()} />;
@@ -191,7 +152,7 @@ export function EventTypesTable({
       <div className="bg-canvasBase sticky top-0 z-10 mx-3 flex h-11 items-center gap-1.5">
         <Search
           name="search"
-          placeholder="Search by event name"
+          placeholder="Search by function name"
           value={searchInput}
           className="w-[182px]"
           onUpdate={(value) => {
@@ -199,16 +160,13 @@ export function EventTypesTable({
             debouncedSearch();
           }}
         />
-        <EventTypesStatusFilter archived={archived} onStatusChange={onStatusFilterChange} />
+        <FunctionsStatusFilter archived={archived} onStatusChange={onStatusFilterChange} />
       </div>
       <div className="h-[calc(100%-58px)] overflow-y-auto" onScroll={onScroll} ref={containerRef}>
         <NewTable
           columns={columns}
           data={mergedData || []}
           isLoading={isPending || (isFetching && !isFetchingNextPage)}
-          // TODO: Re-enable this when API supports sorting by event name
-          // sorting={sorting}
-          // setSorting={setSorting}
           blankState={
             <TableBlankState
               actions={emptyActions}
@@ -216,29 +174,27 @@ export function EventTypesTable({
                 nameSearch
                   ? `No results found for "${nameSearch}"`
                   : archived
-                  ? 'No archived events found'
+                  ? 'No archived functions found'
                   : undefined
               }
             />
           }
-          onRowClick={(row) => router.push(pathCreator.eventType({ eventName: row.original.name }))}
-          getRowHref={(row) => pathCreator.eventType({ eventName: row.original.name })}
+          onRowClick={(row) =>
+            router.push(pathCreator.function({ functionSlug: row.original.slug }))
+          }
+          getRowHref={(row) => pathCreator.function({ functionSlug: row.original.slug })}
         />
-        {!hasNextPage &&
-          hasEventTypesData &&
-          isScrollable &&
-          !isFetchingNextPage &&
-          !isFetching && (
-            <div className="flex flex-col items-center pb-4 pt-8">
-              <p className="text-muted text-sm">No additional event types found.</p>
-              <Button
-                label="Back to top"
-                kind="primary"
-                appearance="ghost"
-                onClick={() => scrollToTop(true)}
-              />
-            </div>
-          )}
+        {!hasNextPage && hasFunctionsData && isScrollable && !isFetchingNextPage && !isFetching && (
+          <div className="flex flex-col items-center pb-4 pt-8">
+            <p className="text-muted text-sm">No additional functions found.</p>
+            <Button
+              label="Back to top"
+              kind="primary"
+              appearance="ghost"
+              onClick={() => scrollToTop(true)}
+            />
+          </div>
+        )}
         {isFetchingNextPage && (
           <div className="flex flex-col items-center">
             <Button appearance="outlined" label="loading" loading={true} />

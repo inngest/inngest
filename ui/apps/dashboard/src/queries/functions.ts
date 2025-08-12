@@ -67,6 +67,7 @@ const GetFunctionsDocument = graphql(`
         data {
           app {
             name
+            externalID
           }
           id
           slug

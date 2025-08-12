@@ -22,6 +22,33 @@ function ensureColumnID(id: ColumnID): ColumnID {
   return id;
 }
 
+function VolumeCell({
+  eventName,
+  getEventTypeVolume,
+}: {
+  eventName: string;
+  getEventTypeVolume: React.ComponentProps<typeof EventTypesTable>['getEventTypeVolume'];
+}) {
+  const { data, isLoading } = useEventTypeVolume(eventName, getEventTypeVolume);
+
+  if (isLoading) return <Skeleton className="my-2 block h-3 w-48" />;
+  if (!data || !data.volume) return <TextCell>—</TextCell>;
+
+  return (
+    <div className="flex items-center">
+      <div className="w-16">
+        <NumberCell
+          value={data.volume.totalVolume}
+          term={data.volume.totalVolume === 1 ? 'event' : 'events'}
+        />
+      </div>
+      <div className="hidden md:block [&_*]:cursor-pointer">
+        <MiniStackedBarChart data={data.volume.dailyVolumeSlots} />
+      </div>
+    </div>
+  );
+}
+
 export function useColumns({
   pathCreator,
   eventTypeActions,
@@ -89,24 +116,7 @@ export function useColumns({
     columnHelper.accessor('volume', {
       cell: (info) => {
         const name = info.row.original.name;
-        const { data, isLoading } = useEventTypeVolume(name, getEventTypeVolume);
-
-        if (isLoading) return <Skeleton className="my-2 block h-3 w-48" />;
-        if (!data || !data.volume) return <TextCell>—</TextCell>;
-
-        return (
-          <div className="flex items-center">
-            <div className="w-16">
-              <NumberCell
-                value={data.volume.totalVolume}
-                term={data.volume.totalVolume === 1 ? 'event' : 'events'}
-              />
-            </div>
-            <div className="hidden md:block [&_*]:cursor-pointer">
-              <MiniStackedBarChart data={data.volume.dailyVolumeSlots} />
-            </div>
-          </div>
-        );
+        return <VolumeCell eventName={name} getEventTypeVolume={getEventTypeVolume} />;
       },
       header: 'Volume (24h)',
       size: 100,
