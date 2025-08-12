@@ -117,6 +117,17 @@ func HistogramRedisCommandDuration(ctx context.Context, value int64, opts Histog
 	})
 }
 
+func HistogramStateStoreOperationDuration(ctx context.Context, value int64, opts HistogramOpt) {
+	RecordIntHistogramMetric(ctx, value, HistogramOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "state_store_op_duration",
+		Description: "State store operation duration",
+		Tags:        opts.Tags,
+		Unit:        "ms",
+		Boundaries:  DefaultBoundaries,
+	})
+}
+
 func HistogramAggregatePausesLoadDuration(ctx context.Context, dur int64, opts HistogramOpt) {
 	RecordIntHistogramMetric(ctx, dur, HistogramOpt{
 		PkgName:     opts.PkgName,

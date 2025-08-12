@@ -37,6 +37,12 @@ type v2 struct {
 
 // Create creates new state in the store for the given run ID.
 func (v v2) Create(ctx context.Context, s state.CreateState) (statev1.State, error) {
+	start := time.Now()
+	defer func() {
+		dur := time.Since(start).Milliseconds()
+		metrics.HistogramStateStoreOperationDuration(ctx, dur, metrics.HistogramOpt{PkgName: pkgName, Tags: map[string]any{"op": "create"}})
+	}()
+
 	batchData := make([]map[string]any, len(s.Events))
 	for n, evt := range s.Events {
 		data := map[string]any{}
@@ -84,6 +90,12 @@ func (v v2) Create(ctx context.Context, s state.CreateState) (statev1.State, err
 // for the run from the store.  Nothing referencing the run should exist in the state
 // store after.
 func (v v2) Delete(ctx context.Context, id state.ID) (bool, error) {
+	start := time.Now()
+	defer func() {
+		dur := time.Since(start).Milliseconds()
+		metrics.HistogramStateStoreOperationDuration(ctx, dur, metrics.HistogramOpt{PkgName: pkgName, Tags: map[string]any{"op": "delete"}})
+	}()
+
 	return v.mgr.Delete(ctx, statev1.Identifier{
 		RunID:      id.RunID,
 		WorkflowID: id.FunctionID,
@@ -92,21 +104,45 @@ func (v v2) Delete(ctx context.Context, id state.ID) (bool, error) {
 }
 
 func (v v2) Exists(ctx context.Context, id state.ID) (bool, error) {
+	start := time.Now()
+	defer func() {
+		dur := time.Since(start).Milliseconds()
+		metrics.HistogramStateStoreOperationDuration(ctx, dur, metrics.HistogramOpt{PkgName: pkgName, Tags: map[string]any{"op": "exists"}})
+	}()
+
 	return v.mgr.Exists(ctx, id.Tenant.AccountID, id.RunID)
 }
 
 // LoadEvents returns all events for a run.
 func (v v2) LoadEvents(ctx context.Context, id state.ID) ([]json.RawMessage, error) {
+	start := time.Now()
+	defer func() {
+		dur := time.Since(start).Milliseconds()
+		metrics.HistogramStateStoreOperationDuration(ctx, dur, metrics.HistogramOpt{PkgName: pkgName, Tags: map[string]any{"op": "loadevents"}})
+	}()
+
 	return v.mgr.LoadEvents(ctx, id.Tenant.AccountID, id.FunctionID, id.RunID)
 }
 
 // LoadEvents returns all events for a run.
 func (v v2) LoadSteps(ctx context.Context, id state.ID) (map[string]json.RawMessage, error) {
+	start := time.Now()
+	defer func() {
+		dur := time.Since(start).Milliseconds()
+		metrics.HistogramStateStoreOperationDuration(ctx, dur, metrics.HistogramOpt{PkgName: pkgName, Tags: map[string]any{"op": "loadsteps"}})
+	}()
+
 	return v.mgr.LoadSteps(ctx, id.Tenant.AccountID, id.FunctionID, id.RunID)
 }
 
 // LoadState returns all state for a run.
 func (v v2) LoadState(ctx context.Context, id state.ID) (state.State, error) {
+	start := time.Now()
+	defer func() {
+		dur := time.Since(start).Milliseconds()
+		metrics.HistogramStateStoreOperationDuration(ctx, dur, metrics.HistogramOpt{PkgName: pkgName, Tags: map[string]any{"op": "loadstate"}})
+	}()
+
 	var (
 		err   error
 		state = state.State{}
@@ -137,6 +173,14 @@ func (v v2) StreamState(ctx context.Context, id state.ID) (io.Reader, error) {
 
 // Metadata returns metadata for a given run
 func (v v2) LoadMetadata(ctx context.Context, id state.ID) (state.Metadata, error) {
+	start := time.Now()
+	defer func() {
+		dur := time.Since(start).Milliseconds()
+		metrics.HistogramStateStoreOperationDuration(ctx, dur, metrics.HistogramOpt{
+			PkgName: pkgName,
+			Tags:    map[string]any{"op": "loadmetadata"}})
+	}()
+
 	md, err := v.mgr.metadata(ctx, id.Tenant.AccountID, id.RunID)
 	if err != nil {
 		return state.Metadata{}, err
@@ -195,6 +239,14 @@ func (v v2) LoadMetadata(ctx context.Context, id state.ID) (state.Metadata, erro
 // Update updates configuration on the state, eg. setting the execution
 // version after communicating with the SDK.
 func (v v2) UpdateMetadata(ctx context.Context, id state.ID, mutation state.MutableConfig) error {
+	start := time.Now()
+	defer func() {
+		dur := time.Since(start).Milliseconds()
+		metrics.HistogramStateStoreOperationDuration(ctx, dur, metrics.HistogramOpt{
+			PkgName: pkgName,
+			Tags:    map[string]any{"op": "updatemetadata"}})
+	}()
+
 	_, err := util.WithRetry(
 		ctx,
 		"state.UpdateMetadata",
@@ -216,6 +268,14 @@ func (v v2) UpdateMetadata(ctx context.Context, id state.ID, mutation state.Muta
 
 // SaveStep saves step output for the given run ID and step ID.
 func (v v2) SaveStep(ctx context.Context, id state.ID, stepID string, data []byte) (bool, error) {
+	start := time.Now()
+	defer func() {
+		dur := time.Since(start).Milliseconds()
+		metrics.HistogramStateStoreOperationDuration(ctx, dur, metrics.HistogramOpt{
+			PkgName: pkgName,
+			Tags:    map[string]any{"op": "savestep"}})
+	}()
+
 	v1id := statev1.Identifier{
 		RunID:      id.RunID,
 		WorkflowID: id.FunctionID,
@@ -278,6 +338,14 @@ func (v v2) SaveStep(ctx context.Context, id state.ID, stepID string, data []byt
 
 // SavePending saves pending step IDs for the given run ID.
 func (v v2) SavePending(ctx context.Context, id state.ID, pending []string) error {
+	start := time.Now()
+	defer func() {
+		dur := time.Since(start).Milliseconds()
+		metrics.HistogramStateStoreOperationDuration(ctx, dur, metrics.HistogramOpt{
+			PkgName: pkgName,
+			Tags:    map[string]any{"op": "savepending"}})
+	}()
+
 	v1id := statev1.Identifier{
 		RunID:      id.RunID,
 		WorkflowID: id.FunctionID,
