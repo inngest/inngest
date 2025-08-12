@@ -277,8 +277,13 @@ func TestLeaseRenewalWithDeletedLeaseShouldNotClose(t *testing.T) {
 		LeaseId:        leaseID.String(),
 	}
 
-	// Publish message to "PubSub"
-	_ = res.testConn.RouteExecutorRequest(context.Background(), res.svc.gatewayId, res.connID, expectedPayload)
+	// Simulate gRPC delivery by directly sending to the connection
+	messageChan, ok := res.svc.wsConnections.Load(res.connID.String())
+	require.True(t, ok, "connection should be registered for gRPC delivery")
+
+	go func() {
+		messageChan.(chan *connect.GatewayExecutorRequestData) <- expectedPayload
+	}()
 
 	// Expect message to be received by gateway and forwarded over WebSocket
 	msg := awaitNextMessage(t, res.ws, 2*time.Second)
