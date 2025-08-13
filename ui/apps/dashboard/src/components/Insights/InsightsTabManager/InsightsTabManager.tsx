@@ -42,6 +42,7 @@ export interface TabConfig {
 
 export interface TabManagerActions {
   closeTab: (id: string) => void;
+  createNewTab: () => void;
   createTab: (query: Query) => void;
   focusTab: (id: string) => void;
   getTabIdForSavedQuery: (savedQueryId: string) => undefined | string;
@@ -80,6 +81,20 @@ export function useInsightsTabManager(
 
           return prevTabs.filter((tab) => tab.id !== id);
         });
+      },
+      createNewTab: () => {
+        const newTabId = ulid();
+
+        setTabs((prevTabs) => [
+          ...prevTabs,
+          {
+            id: newTabId,
+            name: 'Untitled query',
+            query: '',
+          },
+        ]);
+
+        setActiveTabId(newTabId);
       },
       createTab: (query: Query) => {
         if (tabs.some((tab) => tab.savedQueryId === query.id)) return;

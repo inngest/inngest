@@ -2,7 +2,6 @@
 
 import { Tabs } from '@inngest/components/Tabs';
 import { RiAddLine, RiCodeLine, RiContractLeftLine, RiExpandRightLine } from '@remixicon/react';
-import { ulid } from 'ulid';
 
 import type { TabConfig, TabManagerActions } from './InsightsTabManager';
 
@@ -51,14 +50,7 @@ export function InsightsTabsList({
         ))}
         <Tabs.IconTab
           icon={<RiAddLine size={16} />}
-          onClick={() => {
-            actions.createTab({
-              id: ulid(),
-              name: 'Untitled query',
-              query: '',
-              type: 'new',
-            });
-          }}
+          onClick={actions.createNewTab}
           title="Add new tab"
         />
       </Tabs.List>
