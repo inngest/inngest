@@ -5,11 +5,13 @@ import { ulid } from 'ulid';
 import { useTemplates } from '@/components/Insights/QueryHelperPanel/mock';
 import type { TabManagerActions } from './InsightsTabManager';
 
-interface InsightsTabPanelHomeTabProps {
+interface InsightsTabPanelTemplatesTabProps {
   tabManagerActions: TabManagerActions;
 }
 
-export function InsightsTabPanelHomeTab({ tabManagerActions }: InsightsTabPanelHomeTabProps) {
+export function InsightsTabPanelTemplatesTab({
+  tabManagerActions,
+}: InsightsTabPanelTemplatesTabProps) {
   const templates = useTemplates();
 
   return (

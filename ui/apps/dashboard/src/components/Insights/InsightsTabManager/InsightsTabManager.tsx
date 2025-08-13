@@ -165,7 +165,10 @@ function InsightsTabManagerInternal({
             query={tab.query}
             renderChildren={tab.id === activeTabId}
           >
-            <InsightsTabPanel isHome={tab.id === TEMPLATES_TAB.id} tabManagerActions={actions} />
+            <InsightsTabPanel
+              isTemplatesTab={tab.id === TEMPLATES_TAB.id}
+              tabManagerActions={actions}
+            />
           </InsightsStateMachineContextProvider>
         ))}
       </div>

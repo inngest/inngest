@@ -7,19 +7,19 @@ import { InsightsSQLEditorQueryButton } from '@/components/Insights/InsightsSQLE
 import { useInsightsStateMachineContext } from '@/components/Insights/InsightsStateMachineContext/InsightsStateMachineContext';
 import { Section } from '@/components/Insights/Section';
 import type { TabManagerActions } from './InsightsTabManager';
-import { InsightsTabPanelHomeTab } from './InsightsTabPanelHomeTab';
+import { InsightsTabPanelTemplatesTab } from './InsightsTabPanelTemplatesTab';
 
 type InsightsTabPanelProps = {
-  isHome?: boolean;
+  isTemplatesTab?: boolean;
   tabManagerActions?: TabManagerActions;
 };
 
-export function InsightsTabPanel({ isHome, tabManagerActions }: InsightsTabPanelProps) {
+export function InsightsTabPanel({ isTemplatesTab, tabManagerActions }: InsightsTabPanelProps) {
   const { status } = useInsightsStateMachineContext();
   const isRunning = status === 'loading';
 
-  if (isHome && tabManagerActions) {
-    return <InsightsTabPanelHomeTab tabManagerActions={tabManagerActions} />;
+  if (isTemplatesTab && tabManagerActions) {
+    return <InsightsTabPanelTemplatesTab tabManagerActions={tabManagerActions} />;
   }
 
   return (

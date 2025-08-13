@@ -14,8 +14,7 @@ function InsightsContent() {
 
   const { actions, tabManager } = useInsightsTabManager({
     isQueryHelperPanelVisible,
-    onToggleQueryHelperPanelVisibility: () =>
-      setIsQueryHelperPanelVisible(!isQueryHelperPanelVisible),
+    onToggleQueryHelperPanelVisibility: () => setIsQueryHelperPanelVisible((visible) => !visible),
   });
 
   return (
