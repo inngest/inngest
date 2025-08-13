@@ -36,7 +36,7 @@ func Command() *cli.Command {
 			},
 			&cli.StringFlag{
 				Name:  "signing-key",
-				Usage: "Signing key used to sign and validate data between the server and apps.",
+				Usage: "Signing key used to sign and validate data between the server and apps. Must be hex string with even number of chars",
 			},
 			&cli.StringSliceFlag{
 				Name:  "event-key",
@@ -55,6 +55,26 @@ func Command() *cli.Command {
 			&cli.StringFlag{
 				Name:  "postgres-uri",
 				Usage: "PostgreSQL database URI for configuration and history persistence. Defaults to SQLite database.",
+			},
+			&cli.IntFlag{
+				Name:  "postgres-max-idle-conns",
+				Usage: "Sets the maximum number of idle database connections in the PostgreSQL connection pool.",
+				Value: 10,
+			},
+			&cli.IntFlag{
+				Name:  "postgres-max-open-conns",
+				Usage: "Sets the maximum number of open database connections allowed in the PostgreSQL connection pool.",
+				Value: 100,
+			},
+			&cli.IntFlag{
+				Name:  "postgres-conn-max-idle-time",
+				Usage: "Sets the maximum amount of time, in minutes, a PostgreSQL connection may be idle.",
+				Value: 5,
+			},
+			&cli.IntFlag{
+				Name:  "postgres-conn-max-lifetime",
+				Usage: "Sets the maximum amount of time, in minutes, a PostgreSQL connection may be reused.",
+				Value: 30,
 			},
 
 			// Advanced flags

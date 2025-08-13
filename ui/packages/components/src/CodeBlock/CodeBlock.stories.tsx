@@ -16,7 +16,6 @@ const meta = {
   parameters: {
     layout: 'centered',
   },
-  tags: ['autodocs'],
 } satisfies Meta<typeof CodeBlock>;
 
 export default meta;

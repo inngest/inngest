@@ -70,11 +70,12 @@ func (a *devapi) addRoutes(AuthMiddleware func(http.Handler) http.Handler) {
 	})
 	a.Use(headers.StaticHeadersMiddleware(a.devserver.Opts.Config.GetServerKind()))
 
-	a.Get("/dev", a.Info)              // appears to be used by the front end, should this be turned off when the --no-ui flag is enabled?
-	a.Post("/dev/traces", a.OTLPTrace) // this breaks when the AuthMiddleware is applied to it so I removed it
+	a.Post("/dev/traces", a.OTLPTrace) // Intentionally outside the AuthMiddleware
 
 	a.Group(func(r chi.Router) {
 		r.Use(AuthMiddleware)
+
+		r.Get("/dev", a.Info)
 
 		r.Post("/fn/register", a.Register)
 		// This allows tests to remove apps by URL
@@ -315,7 +316,7 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 	}()
 
 	// Get a list of all functions
-	existing, _ := tx.GetFunctionsByAppInternalID(ctx, consts.DevServerEnvID, appID)
+	existing, _ := tx.GetFunctionsByAppInternalID(ctx, appID)
 	// And get a list of functions that we've upserted.  We'll delete all existing functions not in
 	// this set.
 	seen := map[uuid.UUID]struct{}{}
@@ -340,7 +341,7 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 			return nil, publicerr.Wrap(err, 500, "Error marshalling function")
 		}
 
-		if _, err := tx.GetFunctionByInternalUUID(ctx, consts.DevServerEnvID, fn.ID); err == nil {
+		if _, err := tx.GetFunctionByInternalUUID(ctx, fn.ID); err == nil {
 			// Update the function config.
 			_, err = tx.UpdateFunctionConfig(ctx, cqrs.UpdateFunctionConfigParams{
 				ID:     fn.ID,

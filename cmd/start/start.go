@@ -78,15 +78,33 @@ func action(ctx context.Context, cmd *cli.Command) error {
 		fmt.Println("Error: signing-key is required")
 		os.Exit(1)
 	}
+	// Check if the signing key has an even number of characters (required for hex decoding)
+	if len(signingKey)%2 != 0 {
+		fmt.Printf("Error: signing-key must be hex string with even number of chars\n")
+		os.Exit(1)
+	}
 	_, err = authn.HashedSigningKey(signingKey)
 	if err != nil {
-		fmt.Printf("Error: signing-key must be a valid hexadecimal string\n")
+		fmt.Printf("Error: signing-key must be valid hex string: %v\n", err)
 		os.Exit(1)
 	}
 
 	eventKeys := localconfig.GetStringSlice(cmd, "event-key")
 	if len(eventKeys) == 0 {
 		fmt.Println("Error: at least one event-key is required")
+		os.Exit(1)
+	}
+
+	// Validate PostgreSQL connection pool settings
+	postgresMaxIdleConns := cmd.Int("postgres-max-idle-conns")
+	postgresMaxOpenConns := cmd.Int("postgres-max-open-conns")
+	if postgresMaxOpenConns <= 1 {
+		fmt.Printf("Error: postgres-max-open-conns (%d) must be greater than 1\n", postgresMaxOpenConns)
+		os.Exit(1)
+	}
+	if postgresMaxIdleConns > postgresMaxOpenConns {
+		fmt.Printf("Error: postgres-max-idle-conns (%d) cannot be greater than postgres-max-open-conns (%d)\n",
+			postgresMaxIdleConns, postgresMaxOpenConns)
 		os.Exit(1)
 	}
 
@@ -99,22 +117,26 @@ func action(ctx context.Context, cmd *cli.Command) error {
 	sdkURLs := localconfig.GetStringSlice(cmd, "sdk-url")
 
 	opts := devserver.StartOpts{
-		Config:             *conf,
-		ConnectGatewayHost: conf.CoreAPI.Addr,
-		ConnectGatewayPort: localconfig.GetIntValue(cmd, "connect-gateway-port", devserver.DefaultConnectGatewayPort),
-		EventKeys:          eventKeys,
-		InMemory:           false,
-		NoUI:               localconfig.GetBoolValue(cmd, "no-ui", false),
-		PollInterval:       localconfig.GetIntValue(cmd, "poll-interval", devserver.DefaultPollInterval),
-		PostgresURI:        postgresURI,
-		QueueWorkers:       localconfig.GetIntValue(cmd, "queue-workers", devserver.DefaultQueueWorkers),
-		RedisURI:           redisURI,
-		RequireKeys:        true,
-		RetryInterval:      localconfig.GetIntValue(cmd, "retry-interval", 0),
-		SigningKey:         &signingKey,
-		SQLiteDir:          sqliteDir,
-		Tick:               time.Duration(tick) * time.Millisecond,
-		URLs:               sdkURLs,
+		Config:                  *conf,
+		ConnectGatewayHost:      conf.CoreAPI.Addr,
+		ConnectGatewayPort:      localconfig.GetIntValue(cmd, "connect-gateway-port", devserver.DefaultConnectGatewayPort),
+		EventKeys:               eventKeys,
+		InMemory:                false,
+		NoUI:                    localconfig.GetBoolValue(cmd, "no-ui", false),
+		PollInterval:            localconfig.GetIntValue(cmd, "poll-interval", devserver.DefaultPollInterval),
+		PostgresConnMaxIdleTime: cmd.Int("postgres-conn-max-idle-time"),
+		PostgresConnMaxLifetime: cmd.Int("postgres-conn-max-lifetime"),
+		PostgresMaxIdleConns:    postgresMaxIdleConns,
+		PostgresMaxOpenConns:    postgresMaxOpenConns,
+		PostgresURI:             postgresURI,
+		QueueWorkers:            localconfig.GetIntValue(cmd, "queue-workers", devserver.DefaultQueueWorkers),
+		RedisURI:                redisURI,
+		RequireKeys:             true,
+		RetryInterval:           localconfig.GetIntValue(cmd, "retry-interval", 0),
+		SigningKey:              &signingKey,
+		SQLiteDir:               sqliteDir,
+		Tick:                    time.Duration(tick) * time.Millisecond,
+		URLs:                    sdkURLs,
 	}
 
 	err = devserver.New(ctx, opts)

@@ -3,7 +3,6 @@
 import colors from 'tailwindcss/colors';
 import { useQuery } from 'urql';
 
-import type { TimeRange } from '@/types/TimeRangeFilter';
 import SimpleLineChart from '@/components/Charts/SimpleLineChart';
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { graphql } from '@/gql';
@@ -50,12 +49,14 @@ const GetFnRunMetricsDocument = graphql(`
 
 type FunctionThroughputChartProps = {
   functionSlug: string;
-  timeRange: TimeRange;
+  startTime: string;
+  endTime: string;
 };
 
 export default function FunctionThroughputChart({
   functionSlug,
-  timeRange,
+  startTime,
+  endTime,
 }: FunctionThroughputChartProps) {
   const environment = useEnvironment();
 
@@ -64,8 +65,8 @@ export default function FunctionThroughputChart({
     variables: {
       environmentID: environment.id,
       fnSlug: functionSlug,
-      startTime: timeRange.start.toISOString(),
-      endTime: timeRange.end.toISOString(),
+      startTime,
+      endTime,
     },
   });
 

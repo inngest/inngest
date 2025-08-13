@@ -45,9 +45,9 @@ var (
 	nilUUID = uuid.UUID{}
 )
 
-func NewQueries(db *sql.DB, driver string) (q sqlc.Querier) {
+func NewQueries(db *sql.DB, driver string, o sqlc_postgres.NewNormalizedOpts) (q sqlc.Querier) {
 	if driver == "postgres" {
-		q = sqlc_postgres.NewNormalized(db)
+		q = sqlc_postgres.NewNormalized(db, o)
 	} else {
 		q = sqlc.New(db)
 	}
@@ -55,13 +55,14 @@ func NewQueries(db *sql.DB, driver string) (q sqlc.Querier) {
 	return q
 }
 
-func NewCQRS(db *sql.DB, driver string) cqrs.Manager {
+func NewCQRS(db *sql.DB, driver string, o sqlc_postgres.NewNormalizedOpts) cqrs.Manager {
 	// Force goqu to use prepared statements for consistency with sqlc
 	sq.SetDefaultPrepared(true)
 	return wrapper{
 		driver: driver,
-		q:      NewQueries(db, driver),
+		q:      NewQueries(db, driver, o),
 		db:     db,
+		opts:   o,
 	}
 }
 
@@ -70,6 +71,7 @@ type wrapper struct {
 	q      sqlc.Querier
 	db     *sql.DB
 	tx     *sql.Tx
+	opts   sqlc_postgres.NewNormalizedOpts
 }
 
 func (w wrapper) isPostgres() bool {
@@ -282,7 +284,7 @@ func sorter(span *cqrs.OtelSpan) {
 // LoadFunction implements the state.FunctionLoader interface.
 func (w wrapper) LoadFunction(ctx context.Context, envID, fnID uuid.UUID) (*state.ExecutorFunction, error) {
 	// XXX: This doesn't store versions, as the dev server is currently ignorant to version.s
-	fn, err := w.GetFunctionByInternalUUID(ctx, envID, fnID)
+	fn, err := w.GetFunctionByInternalUUID(ctx, fnID)
 	if err != nil {
 		return nil, err
 	}
@@ -309,14 +311,16 @@ func (w wrapper) WithTx(ctx context.Context) (cqrs.TxManager, error) {
 
 	var q sqlc.Querier
 	if w.isPostgres() {
-		q = sqlc_postgres.NewNormalized(tx)
+		q = sqlc_postgres.NewNormalized(tx, w.opts)
 	} else {
 		q = sqlc.New(tx)
 	}
 
 	return &wrapper{
-		q:  q,
-		tx: tx,
+		driver: w.driver,
+		q:      q,
+		tx:     tx,
+		opts:   w.opts,
 	}, nil
 }
 
@@ -598,7 +602,7 @@ func (w wrapper) GetFunctionByExternalID(ctx context.Context, wsID uuid.UUID, ap
 	return copyInto(ctx, f, &cqrs.Function{})
 }
 
-func (w wrapper) GetFunctionByInternalUUID(ctx context.Context, wsID, fnID uuid.UUID) (*cqrs.Function, error) {
+func (w wrapper) GetFunctionByInternalUUID(ctx context.Context, fnID uuid.UUID) (*cqrs.Function, error) {
 	f := func(ctx context.Context) (*sqlc.Function, error) {
 		return w.q.GetFunctionByID(ctx, fnID)
 	}
@@ -609,9 +613,8 @@ func (w wrapper) GetFunctions(ctx context.Context) ([]*cqrs.Function, error) {
 	return copyInto(ctx, w.q.GetFunctions, []*cqrs.Function{})
 }
 
-func (w wrapper) GetFunctionsByAppInternalID(ctx context.Context, workspaceID, appID uuid.UUID) ([]*cqrs.Function, error) {
+func (w wrapper) GetFunctionsByAppInternalID(ctx context.Context, appID uuid.UUID) ([]*cqrs.Function, error) {
 	f := func(ctx context.Context) ([]*sqlc.Function, error) {
-		// Ingore the workspace ID for now.
 		return w.q.GetAppFunctions(ctx, appID)
 	}
 	return copyInto(ctx, f, []*cqrs.Function{})

@@ -611,7 +611,7 @@ func (s *svc) initialize(ctx context.Context, fn inngest.Function, evt event.Tra
 	var appID uuid.UUID
 	wsID := evt.GetWorkspaceID()
 	{
-		fn, err := s.cqrs.GetFunctionByInternalUUID(ctx, wsID, fn.ID)
+		fn, err := s.cqrs.GetFunctionByInternalUUID(ctx, fn.ID)
 		if err != nil {
 			return err
 		}

@@ -82,26 +82,28 @@ export function InvokeModal({ doesFunctionAcceptPayload, isOpen, onCancel, onCon
 
   return (
     <Modal className="w-full max-w-3xl" isOpen={isOpen} onClose={onCancel}>
-      <Modal.Header description="Invoke this function, triggering a function run">
-        Invoke Function
-      </Modal.Header>
+      <div onClick={(e) => e.stopPropagation()}>
+        <Modal.Header description="Invoke this function, triggering a function run">
+          Invoke Function
+        </Modal.Header>
 
-      <form onSubmit={onSubmit}>
-        <Modal.Body>
-          {content}
+        <form onSubmit={onSubmit}>
+          <Modal.Body>
+            {content}
 
-          {error && (
-            <Alert className="mt-6" severity="error">
-              {error}
-            </Alert>
-          )}
-        </Modal.Body>
+            {error && (
+              <Alert className="mt-6" severity="error">
+                {error}
+              </Alert>
+            )}
+          </Modal.Body>
 
-        <Modal.Footer className="flex justify-end gap-2">
-          <Button kind="secondary" appearance="outlined" onClick={onCancel} label="Cancel" />
-          <Button appearance="solid" kind="primary" label="Invoke Function" type="submit" />
-        </Modal.Footer>
-      </form>
+          <Modal.Footer className="flex justify-end gap-2">
+            <Button kind="secondary" appearance="outlined" onClick={onCancel} label="Cancel" />
+            <Button appearance="solid" kind="primary" label="Invoke Function" type="submit" />
+          </Modal.Footer>
+        </form>
+      </div>
     </Modal>
   );
 }

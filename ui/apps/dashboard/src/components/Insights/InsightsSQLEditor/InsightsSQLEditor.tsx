@@ -2,11 +2,10 @@
 
 import { SQLEditor } from '@inngest/components/SQLEditor/SQLEditor';
 
-interface InsightsSQLEditorProps {
-  content: string;
-  onChange: (value: string) => void;
-}
+import { useInsightsStateMachineContext } from '../InsightsStateMachineContext/InsightsStateMachineContext';
 
-export function InsightsSQLEditor({ content, onChange }: InsightsSQLEditorProps) {
-  return <SQLEditor content={content} onChange={onChange} />;
+export function InsightsSQLEditor() {
+  const { onChange, query } = useInsightsStateMachineContext();
+
+  return <SQLEditor content={query} onChange={onChange} />;
 }
