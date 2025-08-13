@@ -210,6 +210,102 @@ func TestBatchWithConditionalTrigger(t *testing.T) {
 	})
 }
 
+func TestConditionalBatching(t *testing.T) {
+	ctx := context.Background()
+	inngestClient, server, registerFuncs := NewSDKHandler(t, "batch")
+	defer server.Close()
+
+	var (
+		counter     int32
+		totalEvents int32
+		runID       string
+	)
+
+	_, err := inngestgo.CreateFunction(
+		inngestClient,
+		// only even values of event.data.num are eligible for batching. Other events are scheduled for execution immediately.
+		inngestgo.FunctionOpts{ID: "conditional-batch-test", BatchEvents: &inngestgo.ConfigBatchEvents{MaxSize: 5, Timeout: 5 * time.Second, If: inngestgo.StrPtr("int(event.data.num) % 2 == 0")}},
+		inngestgo.EventTrigger("test/batch", nil),
+		func(ctx context.Context, input inngestgo.Input[BatchEvent]) (any, error) {
+			if runID == "" {
+				runID = input.InputCtx.RunID
+			}
+			atomic.AddInt32(&counter, 1)
+			atomic.AddInt32(&totalEvents, int32(len(input.Events)))
+			return "batched!!", nil
+		},
+	)
+	require.NoError(t, err)
+	registerFuncs()
+
+	t.Run("trigger batch", func(t *testing.T) {
+		for i := 0; i < 10; i++ {
+			_, err := inngestClient.Send(ctx, BatchEvent{
+				Name: "test/batch",
+				Data: BatchEventData{Num: i},
+			})
+			require.NoError(t, err)
+		}
+
+		// Wait for trigger to run
+		// Half of the 10 events match the batching expression and are execited as a batch of 5 events.
+		// The other 5 events are executed immediately.
+		<-time.After(6 * time.Second)
+		assert.EqualValues(t, 6, atomic.LoadInt32(&counter))
+		assert.EqualValues(t, 10, atomic.LoadInt32(&totalEvents))
+
+	})
+}
+
+func TestConditionalBatchingWithEventTriggerCondition(t *testing.T) {
+	ctx := context.Background()
+	inngestClient, server, registerFuncs := NewSDKHandler(t, "batch")
+	defer server.Close()
+
+	var (
+		counter     int32
+		totalEvents int32
+		runID       string
+	)
+
+	_, err := inngestgo.CreateFunction(
+		inngestClient,
+		inngestgo.FunctionOpts{ID: "conditional-batch-test-with-event-trigger", BatchEvents: &inngestgo.ConfigBatchEvents{MaxSize: 5, Timeout: 5 * time.Second, If: inngestgo.StrPtr("has(event.data.num) && int(event.data.num) % 2 == 0")}},
+		inngestgo.EventTrigger("test/batch", inngestgo.StrPtr("event.data.promotional")),
+		func(ctx context.Context, input inngestgo.Input[BatchEvent]) (any, error) {
+			if runID == "" {
+				runID = input.InputCtx.RunID
+			}
+			atomic.AddInt32(&counter, 1)
+			atomic.AddInt32(&totalEvents, int32(len(input.Events)))
+			return "batched!!", nil
+		},
+	)
+	require.NoError(t, err)
+	registerFuncs()
+
+	t.Run("trigger batch", func(t *testing.T) {
+		// send 20 events, 10 with promotional=true and 10 with promotional=false.
+		for i := 0; i < 10; i++ {
+			for _, promotional := range []bool{true, false} {
+				_, err := inngestClient.Send(ctx, BatchEvent{
+					Name: "test/batch",
+					Data: BatchEventData{Num: i, Promotional: promotional},
+				})
+				require.NoError(t, err)
+			}
+		}
+
+		// Wait for trigger to run
+		// The 10 events with promotional=false do not run as the event trigger is false.
+		// Out of the 10 events with promotional=true, the even `num`s are executed in a single batch, and the other 5 are executed immeditaly
+		<-time.After(6 * time.Second)
+		assert.EqualValues(t, 6, atomic.LoadInt32(&counter))
+		assert.EqualValues(t, 10, atomic.LoadInt32(&totalEvents))
+
+	})
+}
+
 func TestBatchInvoke(t *testing.T) {
 	ctx := context.Background()
 	inngestClient, server, registerFuncs := NewSDKHandler(t, "batchinvoke")

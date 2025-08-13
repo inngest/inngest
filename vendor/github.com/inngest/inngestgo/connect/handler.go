@@ -45,10 +45,6 @@ type WorkerConnection interface {
 func Connect(ctx context.Context, opts Opts, invokers map[string]FunctionInvoker, logger *slog.Logger) (WorkerConnection, error) {
 	apiClient := newWorkerApiClient(opts.APIBaseUrl, opts.Env)
 
-	// While the worker is starting, it can be canceled using the passed context
-	startCtx, cancelStart := context.WithTimeout(ctx, time.Second*30)
-	defer cancelStart()
-
 	// Once the worker is running, it can only be stopped by calling Close()
 	doneCtx, cancelDone := context.WithCancel(context.Background())
 
@@ -74,7 +70,7 @@ func Connect(ctx context.Context, opts Opts, invokers map[string]FunctionInvoker
 		// TODO Push remaining messages to another destination for processing?
 	}()
 
-	conn, err := ch.Connect(startCtx)
+	conn, err := ch.Connect(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("could not establish connection: %w", err)
 	}
@@ -155,6 +151,10 @@ type authContext struct {
 }
 
 func (h *connectHandler) Connect(ctx context.Context) (WorkerConnection, error) {
+	// While the worker is starting, it can be canceled using the passed context
+	startCtx, cancelStart := context.WithTimeout(ctx, time.Second*30)
+	defer cancelStart()
+
 	signingKey := h.opts.HashedSigningKey
 	if len(signingKey) == 0 && !h.opts.IsDev {
 		return nil, fmt.Errorf("hashed signing key is required")
@@ -349,7 +349,12 @@ func (h *connectHandler) Connect(ctx context.Context) (WorkerConnection, error) 
 
 			attempts++
 
-			go h.connect(ctx, connectionEstablishData{
+			connectCtx := ctx
+			if isInitialConnection {
+				connectCtx = startCtx
+			}
+
+			go h.connect(connectCtx, connectionEstablishData{
 				hashedSigningKey:      h.auth.hashedSigningKey,
 				numCpuCores:           int32(numCpuCores),
 				totalMem:              int64(totalMem),
@@ -399,7 +404,7 @@ func (h *connectHandler) Connect(ctx context.Context) (WorkerConnection, error) 
 
 	// Wait until connected (or context is closed)
 	select {
-	case <-ctx.Done():
+	case <-startCtx.Done():
 		_ = h.Close()
 
 		return nil, fmt.Errorf("context canceled while establishing connection")

@@ -182,9 +182,13 @@ type EventBatchConfig struct {
 	// included in a batch
 	MaxSize int `json:"maxSize"`
 
-	// Timeout is the maximum number of time the batch will
+	// Timeout is the maximum amount of time the batch will
 	// wait before being consumed.
 	Timeout time.Duration `json:"timeout"`
+
+	// If is an optional boolean expression which must evaluate to true for the event to be eligible for batching.
+	// For events where this expression evaluates to false, the event will be scheduled for execution immediately in a non-batched mode
+	If *string `json:"if,omitempty"`
 }
 
 func (t EventBatchConfig) MarshalJSON() ([]byte, error) {
