@@ -24,8 +24,10 @@ export interface TabProps extends React.ComponentPropsWithoutRef<typeof TabsPrim
 
 export const Tab = forwardRef<React.ElementRef<typeof TabsPrimitive.Trigger>, TabProps>(
   ({ children, className, iconBefore, value, ...props }, ref) => {
-    const { onClose } = useContext(TabsContext);
+    const { defaultIconBefore, onClose } = useContext(TabsContext);
     const { isOverflowing, textRef } = useOverflowTooltip(children);
+
+    const finalIconBefore = iconBefore ?? defaultIconBefore;
 
     return (
       <TabsPrimitive.Trigger
@@ -46,7 +48,7 @@ export const Tab = forwardRef<React.ElementRef<typeof TabsPrimitive.Trigger>, Ta
         value={value}
         {...props}
       >
-        {iconBefore && <span className="flex-shrink-0">{iconBefore}</span>}
+        {finalIconBefore && <span className="flex-shrink-0">{finalIconBefore}</span>}
         <span ref={textRef} className="flex-1 truncate text-left">
           {children}
         </span>

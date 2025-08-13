@@ -4,6 +4,7 @@ import { createContext } from 'react';
 type TabsVariant = 'dynamic';
 
 export interface TabsContextValue {
+  defaultIconBefore?: React.ReactNode;
   onClose?: (value: string) => void;
   variant?: TabsVariant;
 }
