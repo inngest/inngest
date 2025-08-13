@@ -55,7 +55,14 @@ export interface UseInsightsTabManagerReturn {
   tabs: TabConfig[];
 }
 
-export function useInsightsTabManager(): UseInsightsTabManagerReturn {
+export interface UseInsightsTabManagerProps {
+  isQueryHelperPanelVisible: boolean;
+  onToggleQueryHelperPanelVisibility: () => void;
+}
+
+export function useInsightsTabManager(
+  props: UseInsightsTabManagerProps
+): UseInsightsTabManagerReturn {
   const [tabs, setTabs] = useState<TabConfig[]>([HOME_TAB, INITIAL_TAB]);
   const [activeTabId, setActiveTabId] = useState<string>(INITIAL_TAB.id);
 
@@ -106,27 +113,51 @@ export function useInsightsTabManager(): UseInsightsTabManagerReturn {
   );
 
   const tabManager = useMemo(
-    () => <InsightsTabManagerInternal actions={actions} activeTabId={activeTabId} tabs={tabs} />,
-    [actions, activeTabId, tabs]
+    () => (
+      <InsightsTabManagerInternal
+        actions={actions}
+        activeTabId={activeTabId}
+        tabs={tabs}
+        isQueryHelperPanelVisible={props.isQueryHelperPanelVisible}
+        onToggleQueryHelperPanelVisibility={props.onToggleQueryHelperPanelVisibility}
+      />
+    ),
+    [
+      actions,
+      activeTabId,
+      tabs,
+      props.isQueryHelperPanelVisible,
+      props.onToggleQueryHelperPanelVisibility,
+    ]
   );
 
   return { actions, activeTabId, tabManager, tabs };
 }
 
 interface InsightsTabManagerInternalProps {
-  activeTabId: string;
-  tabs: TabConfig[];
   actions: TabManagerActions;
+  activeTabId: string;
+  isQueryHelperPanelVisible: boolean;
+  onToggleQueryHelperPanelVisibility: () => void;
+  tabs: TabConfig[];
 }
 
 function InsightsTabManagerInternal({
   tabs,
   activeTabId,
   actions,
+  isQueryHelperPanelVisible,
+  onToggleQueryHelperPanelVisibility,
 }: InsightsTabManagerInternalProps) {
   return (
     <div className="flex h-full w-full flex-1 flex-col overflow-hidden">
-      <InsightsTabsList actions={actions} activeTabId={activeTabId} tabs={tabs} />
+      <InsightsTabsList
+        actions={actions}
+        activeTabId={activeTabId}
+        isQueryHelperPanelVisible={isQueryHelperPanelVisible}
+        onToggleQueryHelperPanelVisibility={onToggleQueryHelperPanelVisibility}
+        tabs={tabs}
+      />
       <div className="grid h-full w-full flex-1 grid-rows-[3fr_5fr] gap-0 overflow-hidden">
         {tabs.map((tab) => (
           <InsightsStateMachineContextProvider

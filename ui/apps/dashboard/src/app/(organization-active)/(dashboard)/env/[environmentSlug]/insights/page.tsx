@@ -1,17 +1,30 @@
 'use client';
 
+import { useState } from 'react';
+
 import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import { useInsightsTabManager } from '@/components/Insights/InsightsTabManager/InsightsTabManager';
 import { QueryHelperPanel } from '@/components/Insights/QueryHelperPanel';
 
+// NOTE: The usage of isQueryHelperPanelVisible causes re-fetching when toggled,
+// but this is okay for now because the fetching shouldn't be that low anyway.
+
 function InsightsContent() {
-  const { actions, tabManager } = useInsightsTabManager();
+  const [isQueryHelperPanelVisible, setIsQueryHelperPanelVisible] = useState(true);
+
+  const { actions, tabManager } = useInsightsTabManager({
+    isQueryHelperPanelVisible,
+    onToggleQueryHelperPanelVisibility: () =>
+      setIsQueryHelperPanelVisible(!isQueryHelperPanelVisible),
+  });
 
   return (
     <div className="flex h-full w-full flex-1 overflow-hidden">
-      <div className="w-[240px] flex-shrink-0">
-        <QueryHelperPanel tabManagerActions={actions} />
-      </div>
+      {isQueryHelperPanelVisible && (
+        <div className="w-[240px] flex-shrink-0">
+          <QueryHelperPanel tabManagerActions={actions} />
+        </div>
+      )}
       <div className="flex h-full w-full flex-1 flex-col overflow-hidden">{tabManager}</div>
     </div>
   );
