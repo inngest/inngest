@@ -258,13 +258,15 @@ func (h *connectHandler) connectInvoke(ctx context.Context, preparedConn *connec
 		// function and manage state appropriately.  Any opcode here takes precedence
 		// over function return values as the function has not yet finished.
 		return &connectproto.SDKResponse{
-			RequestId:  body.RequestId,
-			EnvId:      body.EnvId,
-			AppId:      body.AppId,
-			Status:     connectproto.SDKResponseStatus_NOT_COMPLETED,
-			Body:       serializedOps,
-			NoRetry:    noRetry,
-			RetryAfter: retryAfterVal,
+			RequestId:      body.RequestId,
+			EnvId:          body.EnvId,
+			AppId:          body.AppId,
+			Status:         connectproto.SDKResponseStatus_NOT_COMPLETED,
+			Body:           serializedOps,
+			NoRetry:        noRetry,
+			RetryAfter:     retryAfterVal,
+			SystemTraceCtx: body.SystemTraceCtx,
+			UserTraceCtx:   body.UserTraceCtx,
 		}, nil
 	}
 
@@ -277,12 +279,14 @@ func (h *connectHandler) connectInvoke(ctx context.Context, preparedConn *connec
 
 	// Return the function response.
 	return &connectproto.SDKResponse{
-		RequestId:  body.RequestId,
-		EnvId:      body.EnvId,
-		AppId:      body.AppId,
-		Status:     connectproto.SDKResponseStatus_DONE,
-		Body:       serializedResp,
-		NoRetry:    noRetry,
-		RetryAfter: retryAfterVal,
+		RequestId:      body.RequestId,
+		EnvId:          body.EnvId,
+		AppId:          body.AppId,
+		Status:         connectproto.SDKResponseStatus_DONE,
+		Body:           serializedResp,
+		NoRetry:        noRetry,
+		RetryAfter:     retryAfterVal,
+		SystemTraceCtx: body.SystemTraceCtx,
+		UserTraceCtx:   body.UserTraceCtx,
 	}, nil
 }
