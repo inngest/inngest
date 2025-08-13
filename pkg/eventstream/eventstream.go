@@ -7,6 +7,7 @@ import (
 	"io"
 	"mime"
 	"mime/multipart"
+	"net/url"
 
 	"github.com/inngest/inngest/pkg/consts"
 )
@@ -52,17 +53,6 @@ func ParseStream(
 		close(stream)
 	}()
 
-	// Ignore the error because we want to default to JSON parsing when that
-	// happens
-	mediaType, params, _ := mime.ParseMediaType(contentType)
-	switch mediaType {
-	case "multipart/form-data":
-		return parseMultipartStream(ctx, r, stream, maxSize, params["boundary"])
-		// TODO: Properly implement "application/x-www-form-urlencoded"
-		// case "application/x-www-form-urlencoded":
-		// 	return parseFormUrlencodedStream(ctx, r, stream, maxSize)
-	}
-
 	// Default to JSON parsing
 	d := json.NewDecoder(r)
 
@@ -73,7 +63,26 @@ func ParseStream(
 
 	delim, ok := token.(json.Delim)
 	if !ok {
-		// Invalid type
+		if contentType != "application/json" {
+			// We get here if the first token is not a JSON delimiter and the
+			// request's content-type is not explicitly JSON. This means we may
+			// be dealing with a non-JSON request that we need to parse in a
+			// different way
+
+			// Reconstruct the full body by combining the decoder's buffer with
+			// the original reader. We can assume that the decoder buffer has 0
+			// consumed bytes because `Decoder.Token()` does not consume bytes
+			// if the returned value would be invalid JSON
+			r := io.MultiReader(d.Buffered(), r)
+
+			mediaType, params, _ := mime.ParseMediaType(contentType)
+			switch mediaType {
+			case "multipart/form-data":
+				return parseMultipartStream(ctx, r, stream, maxSize, params["boundary"])
+			case "application/x-www-form-urlencoded":
+				return parseFormUrlencodedStream(ctx, r, stream, maxSize)
+			}
+		}
 		return ErrInvalidRequestBody
 	}
 
@@ -190,39 +199,39 @@ func parseMultipartStream(
 
 // parseFormUrlencodedStream parses application/x-www-form-urlencoded data and
 // extracts form fields as a JSON event
-// func parseFormUrlencodedStream(
-// 	ctx context.Context,
-// 	r io.Reader,
-// 	stream chan StreamItem,
-// 	maxSize int,
-// ) error {
-// 	// Read all data from the reader
-// 	data, err := io.ReadAll(r)
-// 	if err != nil {
-// 		return err
-// 	}
+func parseFormUrlencodedStream(
+	ctx context.Context,
+	r io.Reader,
+	stream chan StreamItem,
+	maxSize int,
+) error {
+	// Read all data from the reader
+	data, err := io.ReadAll(r)
+	if err != nil {
+		return err
+	}
 
-// 	// Parse the form data
-// 	values, err := url.ParseQuery(string(data))
-// 	if err != nil {
-// 		return err
-// 	}
+	// Parse the form data
+	values, err := url.ParseQuery(string(data))
+	if err != nil {
+		return err
+	}
 
-// 	byt, err := json.Marshal(values)
-// 	if err != nil {
-// 		return err
-// 	}
+	byt, err := json.Marshal(values)
+	if err != nil {
+		return err
+	}
 
-// 	if len(byt) > maxSize {
-// 		return fmt.Errorf("%w: Max %d bytes / Size %d bytes", ErrEventTooLarge, maxSize, len(byt))
-// 	}
+	if len(byt) > maxSize {
+		return fmt.Errorf("%w: Max %d bytes / Size %d bytes", ErrEventTooLarge, maxSize, len(byt))
+	}
 
-// 	select {
-// 	case stream <- StreamItem{N: 0, Item: json.RawMessage(byt)}:
-// 		// Success
-// 	case <-ctx.Done():
-// 		return nil
-// 	}
+	select {
+	case stream <- StreamItem{N: 0, Item: json.RawMessage(byt)}:
+		// Success
+	case <-ctx.Done():
+		return nil
+	}
 
-// 	return nil
-// }
+	return nil
+}
