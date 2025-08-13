@@ -1,19 +1,23 @@
 'use client';
 
-import React, { useMemo, useRef } from 'react';
+import React from 'react';
+import { useRouter } from 'next/navigation';
 import { Alert } from '@inngest/components/Alert/Alert';
-import { Link } from '@inngest/components/Link';
+import { Button } from '@inngest/components/Button/Button';
 import { ReplayStatusIcon } from '@inngest/components/ReplayStatusIcon';
-import { Table } from '@inngest/components/Table';
+import Table from '@inngest/components/Table/NewTable';
+import TableBlankState from '@inngest/components/Table/TableBlankState';
 import { Time } from '@inngest/components/Time';
+import { IconReplay } from '@inngest/components/icons/Replay';
 import type { Replay } from '@inngest/components/types/replay';
 import { differenceInMilliseconds, formatMilliseconds } from '@inngest/components/utils/date';
-import { createColumnHelper, getCoreRowModel } from '@tanstack/react-table';
+import { RiExternalLinkLine, RiRefreshLine } from '@remixicon/react';
+import { useQuery } from '@tanstack/react-query';
+import { createColumnHelper } from '@tanstack/react-table';
+import { useClient } from 'urql';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
 import { graphql } from '@/gql';
-import LoadingIcon from '@/icons/LoadingIcon';
-import { useGraphQLQuery } from '@/utils/useGraphQLQuery';
 
 const GetReplaysDocument = graphql(`
   query GetReplays($environmentID: ID!, $functionSlug: String!) {
@@ -37,7 +41,7 @@ const columnHelper = createColumnHelper<Replay>();
 
 const columns = [
   columnHelper.accessor('name', {
-    header: () => <span>Replay Name</span>,
+    header: () => <span>Replay name</span>,
     cell: (props) => {
       const name = props.row.original.name;
       const status = props.row.original.status;
@@ -49,15 +53,17 @@ const columns = [
         </div>
       );
     },
+    enableSorting: false,
   }),
   columnHelper.accessor('createdAt', {
-    header: () => <span>Created At</span>,
+    header: () => <span>Created at</span>,
     cell: (props) => <Time value={props.getValue()} />,
     size: 250,
     minSize: 250,
+    enableSorting: false,
   }),
   columnHelper.accessor('endedAt', {
-    header: () => <span>Ended At</span>,
+    header: () => <span>Ended at</span>,
     cell: (props) => {
       const replayEndedAt = props.getValue();
       if (!replayEndedAt) {
@@ -67,6 +73,7 @@ const columns = [
     },
     size: 250,
     minSize: 250,
+    enableSorting: false,
   }),
   columnHelper.accessor('duration', {
     header: () => <span>Duration</span>,
@@ -79,12 +86,14 @@ const columns = [
     },
     size: 250,
     minSize: 250,
+    enableSorting: false,
   }),
   columnHelper.accessor('runsCount', {
-    header: () => <span>Total Runs</span>,
+    header: () => <span>Runs queued</span>,
     cell: (props) => props.getValue(),
     size: 250,
     minSize: 250,
+    enableSorting: false,
   }),
 ];
 
@@ -94,49 +103,56 @@ type Props = {
 
 export function ReplayList({ functionSlug }: Props) {
   const environment = useEnvironment();
-  const { data, isLoading, error } = useGraphQLQuery({
-    query: GetReplaysDocument,
-    variables: {
-      environmentID: environment.id,
-      functionSlug: functionSlug,
-    },
-    context: useMemo(() => ({ additionalTypenames: ['Replay'] }), []),
-    pollIntervalInMilliseconds: 5_000,
-  });
+  const router = useRouter();
+  const client = useClient();
 
-  const tableContainerRef = useRef<HTMLDivElement>(null);
+  const {
+    data: replays,
+    isLoading,
+    error,
+  } = useQuery({
+    queryKey: ['replays', environment.id],
+    queryFn: async () => {
+      const result = await client
+        .query(GetReplaysDocument, { environmentID: environment.id, functionSlug })
+        .toPromise();
 
-  if (isLoading && !data) {
-    return (
-      <div className="flex h-full w-full items-center justify-center">
-        <LoadingIcon />
-      </div>
-    );
-  }
-
-  const replays: Replay[] =
-    data?.environment.function?.replays.map((replay) => {
-      const baseReplay = {
-        ...replay,
-        createdAt: new Date(replay.createdAt),
-        runsCount: replay.functionRunsScheduledCount,
-      };
-
-      if (replay.endedAt) {
-        return {
-          ...baseReplay,
-          status: 'ENDED',
-          endedAt: new Date(replay.endedAt),
-          duration: differenceInMilliseconds(new Date(replay.endedAt), new Date(replay.createdAt)),
-        };
+      if (result.error) {
+        throw result.error;
       }
 
-      return {
-        ...baseReplay,
-        status: 'CREATED',
-        endedAt: undefined, // Convert from `null` to `undefined` to match the expected type
-      };
-    }) ?? [];
+      // Map and transform into Replay[]
+      const replays: Replay[] =
+        result.data?.environment.function?.replays.map((replay) => {
+          const baseReplay = {
+            ...replay,
+            createdAt: new Date(replay.createdAt),
+            runsCount: replay.functionRunsScheduledCount,
+          };
+
+          if (replay.endedAt) {
+            return {
+              ...baseReplay,
+              status: 'ENDED',
+              endedAt: new Date(replay.endedAt),
+              duration: differenceInMilliseconds(
+                new Date(replay.endedAt),
+                new Date(replay.createdAt)
+              ),
+            };
+          }
+
+          return {
+            ...baseReplay,
+            status: 'CREATED',
+            endedAt: undefined, // Convert from `null` to `undefined` to match the expected type
+          };
+        }) ?? [];
+
+      return replays;
+    },
+    refetchInterval: 5000,
+  });
 
   if (error) {
     return <Alert severity="error">Could not load replays</Alert>;
@@ -144,20 +160,32 @@ export function ReplayList({ functionSlug }: Props) {
 
   return (
     <Table
-      tableContainerRef={tableContainerRef}
-      options={{
-        data: replays,
-        columns,
-        getCoreRowModel: getCoreRowModel(),
-        enableSorting: false,
-      }}
+      data={replays}
+      columns={columns}
+      isLoading={isLoading}
       blankState={
-        <p>
-          You have no replays for this function.{' '}
-          <Link target="_blank" className="inline" href="https://inngest.com/docs/platform/replay">
-            Learn about Replay
-          </Link>
-        </p>
+        <TableBlankState
+          title="You have no replays for this function."
+          icon={<IconReplay />}
+          actions={
+            <>
+              <Button
+                appearance="outlined"
+                label="Refresh"
+                onClick={() => router.refresh()}
+                icon={<RiRefreshLine />}
+                iconSide="left"
+              />
+              <Button
+                label="Go to docs"
+                href="https://inngest.com/docs/platform/replay"
+                target="_blank"
+                icon={<RiExternalLinkLine />}
+                iconSide="left"
+              />
+            </>
+          }
+        />
       }
     />
   );
