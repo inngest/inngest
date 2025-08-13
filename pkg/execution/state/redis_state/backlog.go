@@ -102,12 +102,6 @@ type QueueShadowPartition struct {
 	EnvID           *uuid.UUID `json:"eid,omitempty"`
 	AccountID       *uuid.UUID `json:"aid,omitempty"`
 	SystemQueueName *string    `json:"queueName,omitempty"`
-
-	// Flag to pause refilling to the ready queue.
-	PauseRefill bool `json:"norefill,omitempty"`
-
-	// Flag to pause enqueues to the shadow partition.
-	PauseEnqueue bool `json:"noenqueue,omitempty"`
 }
 
 func (sp QueueShadowPartition) Identifier() PartitionIdentifier {
