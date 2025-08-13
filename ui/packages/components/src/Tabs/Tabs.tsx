@@ -1,6 +1,7 @@
 import { cn } from '@inngest/components/utils/classNames';
 import * as TabsPrimitive from '@radix-ui/react-tabs';
 
+import { IconTab } from './IconTab';
 import { Tab } from './Tab';
 import { TabsContent } from './TabsContent';
 import { TabsContext, type TabsContextValue } from './TabsContext';
@@ -30,6 +31,7 @@ function Tabs({
 }
 
 Tabs.Content = TabsContent;
+Tabs.IconTab = IconTab;
 Tabs.List = TabsList;
 Tabs.Tab = Tab;
 
