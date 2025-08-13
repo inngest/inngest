@@ -50,9 +50,7 @@ type peeker[T any] struct {
 	fromTime *time.Time
 }
 
-var (
-	ErrPeekerPeekExceedsMaxLimits = fmt.Errorf("provided limit exceeds max configured limit")
-)
+var ErrPeekerPeekExceedsMaxLimits = fmt.Errorf("provided limit exceeds max configured limit")
 
 type peekResult[T any] struct {
 	Items        []*T
@@ -200,7 +198,7 @@ func (p *peeker[T]) peek(ctx context.Context, keyOrderedPointerSet string, seque
 	}
 
 	// Use parallel decoding as per Peek
-	items, err := util.ParallelDecode(encoded, func(val any) (*T, bool, error) {
+	items, err := util.ParallelDecode(encoded, func(val any, _ int) (*T, bool, error) {
 		if val == nil {
 			p.q.log.Error("encountered nil item in pointer queue",
 				"encoded", encoded,
