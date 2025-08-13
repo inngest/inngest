@@ -71,9 +71,7 @@ export function QueryHelperPanel({ tabManagerActions }: QueryHelperPanelProps) {
           </button>
           <button
             className="hover:bg-canvasSubtle text-subtle hover:text-basis my-1 flex h-8 w-full flex-row items-center rounded px-1.5 text-left transition-colors"
-            onClick={() => {
-              tabManagerActions.focusTab('__home');
-            }}
+            onClick={tabManagerActions.focusOrCreateTemplatesTab}
           >
             <RiBookReadLine className="h-4 w-4" />
             <span className="ml-2.5 text-sm font-medium leading-tight">Browse templates</span>

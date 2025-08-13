@@ -1,9 +1,16 @@
 'use client';
 
 import { Tabs } from '@inngest/components/Tabs';
-import { RiAddLine, RiCodeLine, RiContractLeftLine, RiExpandRightLine } from '@remixicon/react';
+import {
+  RiAddLine,
+  RiBookReadLine,
+  RiCodeLine,
+  RiContractLeftLine,
+  RiExpandRightLine,
+} from '@remixicon/react';
 
 import type { TabConfig, TabManagerActions } from './InsightsTabManager';
+import { TEMPLATES_TAB } from './constants';
 
 interface InsightsTabsListProps {
   actions: TabManagerActions;
@@ -26,10 +33,10 @@ export function InsightsTabsList({
 
   return (
     <Tabs
-      value={activeTabId}
-      onValueChange={actions.focusTab}
-      onClose={actions.closeTab}
       defaultIconBefore={<RiCodeLine size={16} />}
+      onClose={actions.closeTab}
+      onValueChange={actions.focusTab}
+      value={activeTabId}
     >
       <Tabs.List>
         <Tabs.IconTab
@@ -44,7 +51,11 @@ export function InsightsTabsList({
           title={`${isQueryHelperPanelVisible ? 'Hide' : 'Show'} sidebar`}
         />
         {tabs.map((tab) => (
-          <Tabs.Tab key={tab.id} value={tab.id}>
+          <Tabs.Tab
+            iconBefore={tab.id === TEMPLATES_TAB.id ? <RiBookReadLine size={16} /> : undefined}
+            key={tab.id}
+            value={tab.id}
+          >
             {tab.name}
           </Tabs.Tab>
         ))}

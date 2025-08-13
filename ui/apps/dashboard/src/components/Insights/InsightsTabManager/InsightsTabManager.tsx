@@ -7,31 +7,7 @@ import { InsightsStateMachineContextProvider } from '@/components/Insights/Insig
 import type { Query } from '../QueryHelperPanel';
 import { InsightsTabPanel } from './InsightsTabPanel';
 import { InsightsTabsList } from './InsightsTabsList';
-
-const DEFAULT_QUERY = `SELECT 
-  HOUR(ts) as hour, 
-  COUNT(*) as count 
-WHERE 
-  name = 'cli/dev_ui.loaded' 
-  AND data.os != 'linux'
-  AND ts > 1752845983000 
-GROUP BY
-  hour 
-ORDER BY 
-  hour desc`;
-
-const HOME_TAB = {
-  id: '__home',
-  name: 'Home',
-  query: '',
-} as const;
-
-const INITIAL_TAB = {
-  id: '__initial',
-  name: 'Untitled query',
-  query: DEFAULT_QUERY,
-  type: 'new',
-} as const;
+import { TEMPLATES_TAB } from './constants';
 
 export interface TabConfig {
   id: string;
@@ -44,6 +20,7 @@ export interface TabManagerActions {
   closeTab: (id: string) => void;
   createNewTab: () => void;
   createTab: (query: Query) => void;
+  focusOrCreateTemplatesTab: () => void;
   focusTab: (id: string) => void;
   getTabIdForSavedQuery: (savedQueryId: string) => undefined | string;
   updateTabQuery: (id: string, query: string) => void;
@@ -64,14 +41,12 @@ export interface UseInsightsTabManagerProps {
 export function useInsightsTabManager(
   props: UseInsightsTabManagerProps
 ): UseInsightsTabManagerReturn {
-  const [tabs, setTabs] = useState<TabConfig[]>([HOME_TAB, INITIAL_TAB]);
-  const [activeTabId, setActiveTabId] = useState<string>(INITIAL_TAB.id);
+  const [tabs, setTabs] = useState<TabConfig[]>([TEMPLATES_TAB]);
+  const [activeTabId, setActiveTabId] = useState<string>(TEMPLATES_TAB.id);
 
   const actions = useMemo(
     () => ({
       closeTab: (id: string) => {
-        if (id === HOME_TAB.id) return;
-
         setTabs((prevTabs) => {
           const tabIndex = prevTabs.findIndex((tab) => tab.id === id);
           if (tabIndex === -1) return prevTabs;
@@ -112,6 +87,15 @@ export function useInsightsTabManager(
         ]);
 
         setActiveTabId(newTabId);
+      },
+      focusOrCreateTemplatesTab: () => {
+        const existingTab = tabs.find((tab) => tab.id === TEMPLATES_TAB.id);
+        if (existingTab) {
+          setActiveTabId(TEMPLATES_TAB.id);
+        } else {
+          setTabs((prevTabs) => [TEMPLATES_TAB, ...prevTabs]);
+          setActiveTabId(TEMPLATES_TAB.id);
+        }
       },
       focusTab: (id: string) => {
         const tab = tabs.find((tab) => tab.id === id);
@@ -181,7 +165,7 @@ function InsightsTabManagerInternal({
             query={tab.query}
             renderChildren={tab.id === activeTabId}
           >
-            <InsightsTabPanel isHome={tab.id === '__home'} tabManagerActions={actions} />
+            <InsightsTabPanel isHome={tab.id === TEMPLATES_TAB.id} tabManagerActions={actions} />
           </InsightsStateMachineContextProvider>
         ))}
       </div>
@@ -201,9 +185,9 @@ function getNewActiveTabAfterClose(
 
   // 1: Try to select the next tab (now where the closed tab was).
   // 2: Try to select the tab before the closed tab.
-  // 3: Fallback to the home tab.
+  // 3: Fallback to empty string if no tabs remain.
   const remainingTabs = existingTabs.filter((tab) => tab.id !== tabIdToClose);
   const newlySelectedTabId =
-    remainingTabs[closingTabIndex]?.id ?? remainingTabs[closingTabIndex - 1]?.id ?? HOME_TAB.id;
+    remainingTabs[closingTabIndex]?.id ?? remainingTabs[closingTabIndex - 1]?.id ?? '';
   return newlySelectedTabId;
 }
