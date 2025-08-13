@@ -334,6 +334,41 @@ func TestEvaluateExpression(t *testing.T) {
 			false,
 			"",
 		},
+		{
+			// a, b, c must all be false
+			"!((has(event.data.a) && event.data.a) || (has(event.data.b) && event.data.b) || (has(event.data.c) && event.data.c))",
+			map[string]interface{}{
+				"event": event.Event{
+					Data: map[string]interface{}{
+						"a": false,
+						"b": false,
+						"c": false,
+					},
+				},
+			},
+			true,
+			nil,
+			false,
+			"",
+		},
+		{
+			// a, b, c must all be false
+			"!((has(event.data.a) && event.data.a) || (has(event.data.b) && event.data.b) || (has(event.data.c) && event.data.c))",
+			map[string]interface{}{
+				"event": event.Event{
+					Data: map[string]interface{}{
+						"a": true,
+						"b": false,
+						"c": false,
+					},
+				},
+			},
+			false,
+			nil,
+			false,
+			"",
+		},
+
 		// For more information on available macros and overloads, look at
 		// cel-go/common/operators/operators.go and
 		// cel-go/common/overloads/overloads.go.

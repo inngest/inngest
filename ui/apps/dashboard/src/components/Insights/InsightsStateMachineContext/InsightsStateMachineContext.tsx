@@ -29,7 +29,15 @@ interface InsightsStateMachineContextValue {
 
 const InsightsStateMachineContext = createContext<InsightsStateMachineContextValue | null>(null);
 
-export function InsightsStateMachineContextProvider({ children }: { children: ReactNode }) {
+type InsightsStateMachineContextProviderProps = {
+  children: ReactNode;
+  renderChildren: boolean;
+};
+
+export function InsightsStateMachineContextProvider({
+  children,
+  renderChildren,
+}: InsightsStateMachineContextProviderProps) {
   const [query, setQuery] = useState(DEFAULT_QUERY);
   const [activeQuery, setActiveQuery] = useState('');
   const { fetchInsights } = useFetchInsights();
@@ -57,7 +65,7 @@ export function InsightsStateMachineContextProvider({ children }: { children: Re
         status: getInsightsStatus({ data, isError, isFetching, isLoading }),
       }}
     >
-      {children}
+      {renderChildren ? children : null}
     </InsightsStateMachineContext.Provider>
   );
 }

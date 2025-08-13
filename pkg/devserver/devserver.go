@@ -25,7 +25,7 @@ import (
 	"github.com/inngest/inngest/pkg/connect"
 	"github.com/inngest/inngest/pkg/connect/auth"
 	"github.com/inngest/inngest/pkg/connect/lifecycles"
-	connectpubsub "github.com/inngest/inngest/pkg/connect/pubsub"
+	connectgrpc "github.com/inngest/inngest/pkg/connect/grpc"
 	connectv0 "github.com/inngest/inngest/pkg/connect/rest/v0"
 	connstate "github.com/inngest/inngest/pkg/connect/state"
 	"github.com/inngest/inngest/pkg/consts"
@@ -193,6 +193,7 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	stepLimitOverrides := make(map[string]int)
 	stateSizeLimitOverrides := make(map[string]int)
+	pauseOverrides := make(map[uuid.UUID]bool)
 
 	var shardedRc, unshardedRc, connectRc rueidis.Client
 	var shardedCluster, unshardedCluster, connectCluster *miniredis.Miniredis
@@ -316,6 +317,15 @@ func start(ctx context.Context, opts StartOpts) error {
 			return enableKeyQueues
 		}),
 		redis_state.WithBacklogRefillLimit(10),
+		redis_state.WithPartitionPausedGetter(func(ctx context.Context, functionID uuid.UUID) redis_state.PartitionPausedInfo {
+			if paused, ok := pauseOverrides[functionID]; ok && paused {
+				return redis_state.PartitionPausedInfo{
+					Stale:  false,
+					Paused: true,
+				}
+			}
+			return redis_state.PartitionPausedInfo{}
+		}),
 	}
 	if opts.RetryInterval > 0 {
 		queueOpts = append(queueOpts, redis_state.WithBackoffFunc(
@@ -333,7 +343,6 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	conditionalTracer := itrace.NewConditionalTracer(itrace.ConnectTracer(), itrace.AlwaysTrace)
 
-	connectPubSubRedis := createConnectPubSubRedis()
 	connectPubSubLogger := logger.StdlibLoggerWithCustomVarName(ctx, "CONNECT_PUBSUB_LOG_LEVEL")
 
 	connectionManager := connstate.NewRedisConnectionStateManager(connectRc)
@@ -342,18 +351,12 @@ func start(ctx context.Context, opts StartOpts) error {
 	agg := expragg.NewAggregator(ctx, 100, 100, sm.(expragg.EvaluableLoader), expressions.ExprEvaluator, nil, nil)
 
 	executorLogger := connectPubSubLogger.With("svc", "executor")
-	gatewayGRPCForwarder := connectpubsub.NewGatewayGRPCManager(ctx, connectionManager, connectpubsub.WithLogger(executorLogger))
 
-	executorProxy, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectPubSubRedis, true, connectpubsub.RedisPubSubConnectorOpts{
-		Logger:             executorLogger,
+	executorProxy := connectgrpc.NewConnector(ctx, connectgrpc.GRPCConnectorOpts{
 		Tracer:             conditionalTracer,
 		StateManager:       connectionManager,
 		EnforceLeaseExpiry: enforceConnectLeaseExpiry,
-		GatewayGRPCManager: gatewayGRPCForwarder,
-	}))
-	if err != nil {
-		return fmt.Errorf("failed to create connect pubsub connector: %w", err)
-	}
+	}, connectgrpc.WithConnectorLogger(executorLogger))
 
 	// Before running the development service, ensure that we change the http
 	// driver in development to use our AWS Gateway http client, attempting to
@@ -526,17 +529,6 @@ func start(ctx context.Context, opts StartOpts) error {
 		})
 	})
 
-	// ds.opts.Config.EventStream.Service.TopicName()
-	apiConnectProxy, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectPubSubRedis, false, connectpubsub.RedisPubSubConnectorOpts{
-		Logger:             connectPubSubLogger.With("svc", "api"),
-		Tracer:             conditionalTracer,
-		StateManager:       connectionManager,
-		EnforceLeaseExpiry: enforceConnectLeaseExpiry,
-	}))
-	if err != nil {
-		return fmt.Errorf("failed to create connect pubsub connector: %w", err)
-	}
-
 	core, err := coreapi.NewCoreApi(coreapi.Options{
 		AuthMiddleware: authn.SigningKeyMiddleware(opts.SigningKey),
 		Data:           ds.Data,
@@ -552,7 +544,6 @@ func start(ctx context.Context, opts StartOpts) error {
 		ConnectOpts: connectv0.Opts{
 			GroupManager:               connectionManager,
 			ConnectManager:             connectionManager,
-			ConnectResponseNotifier:    apiConnectProxy,
 			ConnectRequestStateManager: connectionManager,
 			Signer:                     auth.NewJWTSessionTokenSigner(consts.DevServerConnectJwtSecret),
 			RequestAuther:              ds,
@@ -560,37 +551,14 @@ func start(ctx context.Context, opts StartOpts) error {
 			Dev:                        true,
 			EntitlementProvider:        ds,
 			ConditionalTracer:          conditionalTracer,
-			ShouldUseGRPC: func(ctx context.Context, accountID uuid.UUID) bool {
-				return false
-			},
 		},
 	})
 	if err != nil {
 		return err
 	}
 
-	debugapi, err := debugapi.NewDebugAPI(debugapi.Opts{
-		Log:           l,
-		Queue:         rq,
-		ShardSelector: shardSelector,
-	})
-	if err != nil {
-		return err
-	}
-
-	connectGatewayProxy, err := connectpubsub.NewConnector(ctx, connectpubsub.WithRedis(connectPubSubRedis, false, connectpubsub.RedisPubSubConnectorOpts{
-		Logger:             connectPubSubLogger.With("svc", "connect-gateway"),
-		Tracer:             conditionalTracer,
-		StateManager:       connectionManager,
-		EnforceLeaseExpiry: enforceConnectLeaseExpiry,
-	}))
-	if err != nil {
-		return fmt.Errorf("failed to create connect pubsub connector: %w", err)
-	}
-
 	connGateway := connect.NewConnectGatewayService(
 		connect.WithConnectionStateManager(connectionManager),
-		connect.WithRequestReceiver(connectGatewayProxy),
 		connect.WithGatewayAuthHandler(auth.NewJWTAuthHandler(consts.DevServerConnectJwtSecret)),
 		connect.WithDev(),
 		connect.WithGatewayPublicPort(opts.ConnectGatewayPort),
@@ -622,7 +590,6 @@ func start(ctx context.Context, opts StartOpts) error {
 		{At: "/", Router: devAPI},
 		{At: "/v0", Router: core.Router},
 		{At: "/debug", Handler: middleware.Profiler()},
-		{At: "/dbg", Router: debugapi.Router},
 		{At: "/metrics", Router: metricsAPI.Router},
 	}
 
@@ -644,6 +611,12 @@ func start(ctx context.Context, opts StartOpts) error {
 					connectCluster.FlushAll()
 				}
 			},
+			PauseFunction: func(id uuid.UUID) {
+				pauseOverrides[id] = true
+			},
+			UnpauseFunction: func(id uuid.UUID) {
+				delete(pauseOverrides, id)
+			},
 		})})
 	}
 
@@ -654,7 +627,19 @@ func start(ctx context.Context, opts StartOpts) error {
 		Logger:         l,
 	})
 
-	return service.StartAll(ctx, ds, runner, executorSvc, ds.Apiservice, connGateway)
+	services := []service.Service{ds, runner, executorSvc, ds.Apiservice, connGateway}
+
+	if os.Getenv("DEBUG") != "" {
+		services = append(services, debugapi.NewDebugAPI(debugapi.Opts{
+			Log:           l,
+			DB:            ds.Data,
+			Queue:         rq,
+			State:         ds.State,
+			ShardSelector: shardSelector,
+		}))
+	}
+
+	return service.StartAll(ctx, services...)
 }
 
 func createInmemoryRedis(ctx context.Context, tick time.Duration) (rueidis.Client, *miniredis.Miniredis, error) {
@@ -680,14 +665,6 @@ func createInmemoryRedis(ctx context.Context, tick time.Duration) (rueidis.Clien
 	return rc, r, nil
 }
 
-func createConnectPubSubRedis() rueidis.ClientOption {
-	r := miniredis.NewMiniRedis()
-	_ = r.Start()
-	return rueidis.ClientOption{
-		InitAddress:  []string{r.Addr()},
-		DisableCache: true,
-	}
-}
 
 func getSendingEventHandler(ctx context.Context, pb pubsub.Publisher, topic string) execution.HandleSendingEvent {
 	return func(ctx context.Context, evt event.Event, item queue.Item) error {
@@ -758,7 +735,7 @@ func NormalizeConcurrencyKeys(smv2 sv2.StateLoader, dbcqrs cqrs.Manager) redis_s
 	return func(ctx context.Context, item *queue.QueueItem, existingKeys []state.CustomConcurrency, shadowPartition *redis_state.QueueShadowPartition) ([]state.CustomConcurrency, error) {
 		id := sv2.IDFromV1(item.Data.Identifier)
 
-		workflow, err := dbcqrs.GetFunctionByInternalUUID(ctx, id.Tenant.EnvID, id.FunctionID)
+		workflow, err := dbcqrs.GetFunctionByInternalUUID(ctx, id.FunctionID)
 		if err != nil {
 			return nil, fmt.Errorf("could not find workflow: %w", err)
 		}
@@ -796,7 +773,7 @@ func NormalizeThrottle(smv2 sv2.StateLoader, dbcqrs cqrs.Manager) redis_state.Re
 	return func(ctx context.Context, item *queue.QueueItem) (*queue.Throttle, error) {
 		id := sv2.IDFromV1(item.Data.Identifier)
 
-		workflow, err := dbcqrs.GetFunctionByInternalUUID(ctx, id.Tenant.EnvID, id.FunctionID)
+		workflow, err := dbcqrs.GetFunctionByInternalUUID(ctx, id.FunctionID)
 		if err != nil {
 			return nil, fmt.Errorf("could not find workflow: %w", err)
 		}
@@ -836,7 +813,7 @@ func PartitionConstraintConfigGetter(dbcqrs cqrs.Manager) redis_state.PartitionC
 			return defaultPartitionConstraintConfig
 		}
 
-		workflow, err := dbcqrs.GetFunctionByInternalUUID(ctx, p.EnvID, p.FunctionID)
+		workflow, err := dbcqrs.GetFunctionByInternalUUID(ctx, p.FunctionID)
 		if err != nil {
 			return defaultPartitionConstraintConfig
 		}

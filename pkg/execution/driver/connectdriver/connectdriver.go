@@ -9,7 +9,7 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/inngest/inngest/pkg/connect/pubsub"
+	"github.com/inngest/inngest/pkg/connect/grpc"
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/driver/httpdriver"
 	"github.com/inngest/inngest/pkg/execution/queue"
@@ -30,7 +30,7 @@ const (
 	pkgName = "connect.execution.driver"
 )
 
-func NewDriver(ctx context.Context, psf pubsub.RequestForwarder, tracer itrace.ConditionalTracer) driver.Driver {
+func NewDriver(ctx context.Context, psf grpc.RequestForwarder, tracer itrace.ConditionalTracer) driver.Driver {
 	return &executor{
 		forwarder: psf,
 		tracer:    tracer,
@@ -38,7 +38,7 @@ func NewDriver(ctx context.Context, psf pubsub.RequestForwarder, tracer itrace.C
 }
 
 type executor struct {
-	forwarder pubsub.RequestForwarder
+	forwarder grpc.RequestForwarder
 	tracer    itrace.ConditionalTracer
 }
 
@@ -102,7 +102,7 @@ func (e executor) Execute(ctx context.Context, sl sv2.StateLoader, s sv2.Metadat
 }
 
 // ProxyRequest proxies the request to the SDK over a long-lived connection with the given input.
-func ProxyRequest(ctx, traceCtx context.Context, forwarder pubsub.RequestForwarder, id sv2.ID, item queue.Item, r httpdriver.Request) (*state.DriverResponse, error) {
+func ProxyRequest(ctx, traceCtx context.Context, forwarder grpc.RequestForwarder, id sv2.ID, item queue.Item, r httpdriver.Request) (*state.DriverResponse, error) {
 	l := logger.StdlibLogger(ctx)
 
 	var requestID string
@@ -139,7 +139,7 @@ func ProxyRequest(ctx, traceCtx context.Context, forwarder pubsub.RequestForward
 		attribute.String("step_id", requestToForward.GetStepId()),
 	)
 
-	opts := pubsub.ProxyOpts{
+	opts := grpc.ProxyOpts{
 		AccountID: id.Tenant.AccountID,
 		EnvID:     id.Tenant.EnvID,
 		AppID:     id.Tenant.AppID,
@@ -163,7 +163,7 @@ func ProxyRequest(ctx, traceCtx context.Context, forwarder pubsub.RequestForward
 	return httpdriver.HandleHttpResponse(ctx, r, resp)
 }
 
-func do(ctx, traceCtx context.Context, forwarder pubsub.RequestForwarder, opts pubsub.ProxyOpts) (*httpdriver.Response, error) {
+func do(ctx, traceCtx context.Context, forwarder grpc.RequestForwarder, opts grpc.ProxyOpts) (*httpdriver.Response, error) {
 	span := trace.SpanFromContext(traceCtx)
 
 	pre := time.Now()

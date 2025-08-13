@@ -646,7 +646,6 @@ func TestQueueShadowPartitionLease(t *testing.T) {
 		FunctionID:  &fnID,
 		EnvID:       &envID,
 		AccountID:   &accountID,
-		PauseRefill: false,
 	}
 
 	marshaled, err := json.Marshal(shadowPart)

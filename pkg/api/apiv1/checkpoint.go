@@ -386,7 +386,7 @@ func (a checkpointAPI) upsertSyncData(ctx context.Context, auth apiv1auth.V1Auth
 
 	// We may have already added this function, so check if it exists prior to inserting and updating.
 	// XXX: It would be good to add an upsert method to the function CQRS layer.
-	fn, err := a.FunctionReader.GetFunctionByInternalUUID(ctx, envID, fnID)
+	fn, err := a.FunctionReader.GetFunctionByInternalUUID(ctx, fnID)
 	if err == nil && fn != nil {
 		if string(fn.Config) == config {
 			return // no need to update

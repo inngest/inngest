@@ -66,7 +66,7 @@ func (a appResolver) Functions(ctx context.Context, obj *cqrs.App) ([]*models.Fu
 		return nil, fmt.Errorf("no app defined")
 	}
 	// Local dev doesn't have a workspace ID.
-	funcs, err := a.Data.GetFunctionsByAppInternalID(ctx, consts.DevServerEnvID, obj.ID)
+	funcs, err := a.Data.GetFunctionsByAppInternalID(ctx, obj.ID)
 	if err != nil {
 		return nil, err
 	}
@@ -92,7 +92,7 @@ func (a appResolver) Autodiscovered(ctx context.Context, obj *cqrs.App) (bool, e
 }
 
 func (a appResolver) FunctionCount(ctx context.Context, obj *cqrs.App) (int, error) {
-	funcs, err := a.Data.GetFunctionsByAppInternalID(ctx, consts.DevServerEnvID, obj.ID)
+	funcs, err := a.Data.GetFunctionsByAppInternalID(ctx, obj.ID)
 	if err != nil {
 		return 0, err
 	}

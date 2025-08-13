@@ -147,6 +147,8 @@ const (
 
 	ConnectWorkerRequestLeaseDuration = 20 * time.Second
 	ConnectWorkerRequestGracePeriod   = 5 * time.Second
+
+	KafkaMsgTooLargeError = "MESSAGE_TOO_LARGE"
 )
 
 var (
