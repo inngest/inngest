@@ -316,7 +316,7 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 	}()
 
 	// Get a list of all functions
-	existing, _ := tx.GetFunctionsByAppInternalID(ctx, consts.DevServerEnvID, appID)
+	existing, _ := tx.GetFunctionsByAppInternalID(ctx, appID)
 	// And get a list of functions that we've upserted.  We'll delete all existing functions not in
 	// this set.
 	seen := map[uuid.UUID]struct{}{}
@@ -341,7 +341,7 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 			return nil, publicerr.Wrap(err, 500, "Error marshalling function")
 		}
 
-		if _, err := tx.GetFunctionByInternalUUID(ctx, consts.DevServerEnvID, fn.ID); err == nil {
+		if _, err := tx.GetFunctionByInternalUUID(ctx, fn.ID); err == nil {
 			// Update the function config.
 			_, err = tx.UpdateFunctionConfig(ctx, cqrs.UpdateFunctionConfigParams{
 				ID:     fn.ID,

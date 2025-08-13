@@ -44,7 +44,7 @@ func (r *functionRunResolver) PendingSteps(ctx context.Context, obj *models.Func
 }
 
 func (r *functionRunResolver) Function(ctx context.Context, obj *models.FunctionRun) (*models.Function, error) {
-	fn, err := r.Data.GetFunctionByInternalUUID(ctx, consts.DevServerEnvID, uuid.MustParse(obj.FunctionID))
+	fn, err := r.Data.GetFunctionByInternalUUID(ctx, uuid.MustParse(obj.FunctionID))
 	if err != nil {
 		return nil, err
 	}
@@ -285,7 +285,6 @@ func (r *mutationResolver) Rerun(
 
 	fnCQRS, err := r.Data.GetFunctionByInternalUUID(
 		ctx,
-		consts.DevServerEnvID,
 		fnrun.FunctionID,
 	)
 	if err != nil {

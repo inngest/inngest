@@ -719,7 +719,7 @@ func NormalizeConcurrencyKeys(smv2 sv2.StateLoader, dbcqrs cqrs.Manager) redis_s
 	return func(ctx context.Context, item *queue.QueueItem, existingKeys []state.CustomConcurrency, shadowPartition *redis_state.QueueShadowPartition) ([]state.CustomConcurrency, error) {
 		id := sv2.IDFromV1(item.Data.Identifier)
 
-		workflow, err := dbcqrs.GetFunctionByInternalUUID(ctx, id.Tenant.EnvID, id.FunctionID)
+		workflow, err := dbcqrs.GetFunctionByInternalUUID(ctx, id.FunctionID)
 		if err != nil {
 			return nil, fmt.Errorf("could not find workflow: %w", err)
 		}
@@ -757,7 +757,7 @@ func NormalizeThrottle(smv2 sv2.StateLoader, dbcqrs cqrs.Manager) redis_state.Re
 	return func(ctx context.Context, item *queue.QueueItem) (*queue.Throttle, error) {
 		id := sv2.IDFromV1(item.Data.Identifier)
 
-		workflow, err := dbcqrs.GetFunctionByInternalUUID(ctx, id.Tenant.EnvID, id.FunctionID)
+		workflow, err := dbcqrs.GetFunctionByInternalUUID(ctx, id.FunctionID)
 		if err != nil {
 			return nil, fmt.Errorf("could not find workflow: %w", err)
 		}
@@ -797,7 +797,7 @@ func PartitionConstraintConfigGetter(dbcqrs cqrs.Manager) redis_state.PartitionC
 			return defaultPartitionConstraintConfig
 		}
 
-		workflow, err := dbcqrs.GetFunctionByInternalUUID(ctx, p.EnvID, p.FunctionID)
+		workflow, err := dbcqrs.GetFunctionByInternalUUID(ctx, p.FunctionID)
 		if err != nil {
 			return defaultPartitionConstraintConfig
 		}

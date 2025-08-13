@@ -31,7 +31,7 @@ func (d *debugAPI) GetPartition(ctx context.Context, req *pb.PartitionRequest) (
 		}, nil
 	}
 
-	wf, err := d.db.GetFunctionByInternalUUID(ctx, consts.DevServerEnvID, id)
+	wf, err := d.db.GetFunctionByInternalUUID(ctx, id)
 	if err != nil {
 		return nil, fmt.Errorf("error retrieving function: %w", err)
 	}
