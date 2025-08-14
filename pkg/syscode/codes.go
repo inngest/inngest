@@ -17,6 +17,7 @@ const (
 	CodeSyncAlreadyPending        = "sync_already_pending"
 	CodePlanUpgradeRequired       = "plan_upgrade_required"
 	CodeRequestTooLong            = "request_duration_too_long"
+	CodeBatchIfExpressionInvalid  = "batch_if_expression_invalid"
 
 	// Connect
 	CodeConnectWorkerHelloTimeout                     = "connect_worker_hello_timeout"

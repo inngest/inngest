@@ -19,7 +19,6 @@ const meta = {
       control: false,
     },
   },
-  tags: ['autodocs'],
 } satisfies Meta<typeof Link>;
 
 export default meta;

@@ -39,6 +39,10 @@ func (q *queue) PartitionByID(ctx context.Context, shard QueueShard, partitionID
 		cmd := rc.B().Hget().Key(kg.PartitionItem()).Field(partitionID).Build()
 		byt, err := rc.Do(ctx, cmd).AsBytes()
 		if err != nil {
+			if rueidis.IsRedisNil(err) {
+				return nil, ErrPartitionNotFound
+			}
+
 			return nil, fmt.Errorf("error retrieving queue partition: %w", err)
 		}
 
@@ -100,24 +104,16 @@ func (q *queue) PartitionByID(ctx context.Context, shard QueueShard, partitionID
 		}
 	}
 
+	// Fetch paused + migrating state
 	if qp.FunctionID != nil {
-		cmd := rc.B().Get().Key(kg.FnMetadata(*qp.FunctionID)).Build()
-		byt, err := rc.Do(ctx, cmd).AsBytes()
-		switch err {
-		case nil:
-			meta := FnMetadata{}
-			if err := json.Unmarshal(byt, &meta); err != nil {
-				return nil, fmt.Errorf("error unmarshaling function metadata: %w", err)
-			}
-			result.Paused = meta.Paused
-			result.Migrate = meta.Migrate
+		paused := q.partitionPausedGetter(ctx, *qp.FunctionID)
+		result.Paused = paused.Paused
 
-		case rueidis.Nil:
-			// no-op
-
-		default:
-			return nil, fmt.Errorf("error retrieving function metadata: %w", err)
+		locked, err := q.isMigrationLocked(ctx, shard, *qp.FunctionID)
+		if err != nil {
+			return nil, fmt.Errorf("could not get locked state: %w", err)
 		}
+		result.Migrate = locked != nil
 	}
 
 	return &result, nil

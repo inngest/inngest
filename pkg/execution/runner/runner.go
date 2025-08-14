@@ -611,7 +611,7 @@ func (s *svc) initialize(ctx context.Context, fn inngest.Function, evt event.Tra
 	var appID uuid.UUID
 	wsID := evt.GetWorkspaceID()
 	{
-		fn, err := s.cqrs.GetFunctionByInternalUUID(ctx, wsID, fn.ID)
+		fn, err := s.cqrs.GetFunctionByInternalUUID(ctx, fn.ID)
 		if err != nil {
 			return err
 		}
@@ -629,11 +629,24 @@ func (s *svc) initialize(ctx context.Context, fn inngest.Function, evt event.Tra
 			AccountID:       consts.DevServerAccountID,
 		}
 
-		if err := s.executor.AppendAndScheduleBatch(ctx, fn, bi, nil); err != nil {
-			return fmt.Errorf("could not append and schedule batch item: %w", err)
+		// When conditional batching is requested based on `EventBatch.If`, batching is enabled only for events that successfully evaluate to true.
+		// If the conditional expression evaluation fails or the expression evaluates to false, then the event is scheduled for immediate execution without waiting for a batch to fill up.
+		eligibleForBatching := true
+		if batchCondition := fn.EventBatch.If; batchCondition != nil {
+			ok, _, evalerr := expressions.EvaluateBoolean(ctx, *batchCondition, map[string]interface{}{
+				"event": evt.GetEvent().Map(),
+			})
+			if evalerr != nil || !ok {
+				eligibleForBatching = false
+			}
 		}
 
-		return nil
+		if eligibleForBatching {
+			if err := s.executor.AppendAndScheduleBatch(ctx, fn, bi, nil); err != nil {
+				return fmt.Errorf("could not append and schedule batch item: %w", err)
+			}
+			return nil
+		}
 	}
 
 	// Attempt to rate-limit the incoming function.

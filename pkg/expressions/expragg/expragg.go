@@ -301,6 +301,12 @@ func (b *bookkeeper) update(ctx context.Context, l EvaluableLoader) error {
 	at := time.Now()
 	count := 0
 
+	logger.StdlibLogger(ctx).Debug(
+		"updating evaluator",
+		"workspace_id", b.wsID,
+		"event", b.event,
+	)
+
 	err := l.LoadEvaluablesSince(ctx, b.wsID, b.event, b.updatedAt, func(ctx context.Context, eval expr.Evaluable) error {
 		if eval == nil {
 			return fmt.Errorf("adding nil pause")
@@ -314,6 +320,8 @@ func (b *bookkeeper) update(ctx context.Context, l EvaluableLoader) error {
 
 	logger.StdlibLogger(ctx).Debug(
 		"updated evaluator",
+		"workspace_id", b.wsID,
+		"event", b.event,
 		"delta_ms", at.Sub(b.updatedAt).Milliseconds(),
 		"count", count,
 		"error", err,

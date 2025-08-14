@@ -1,5 +1,12 @@
 # inngestgo
 
+## 0.13.1
+
+### Patch Changes
+
+- f122af6: Add parallel mode option. Fix parallel step reporting when not targeted
+- 6c3b145: Fix SDK failing to reconnect when gateways are rotated
+
 ## 0.13.0
 
 ### Minor Changes

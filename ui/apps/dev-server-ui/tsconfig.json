@@ -13,8 +13,7 @@
     ".next/types/**/*.ts",
     "./dist/types/**/*.ts",
     "./next.config.js",
-    "./tailwind.config.ts",
-    "./.storybook/**/preview.tsx"
+    "./tailwind.config.ts"
   ],
   "exclude": ["node_modules"]
 }

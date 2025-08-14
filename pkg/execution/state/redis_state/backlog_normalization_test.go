@@ -44,7 +44,6 @@ func TestBacklogNormalizationLease(t *testing.T) {
 		FunctionID:  &fnID,
 		EnvID:       &envID,
 		AccountID:   &accountID,
-		PauseRefill: false,
 	}
 
 	backlog := &QueueBacklog{
@@ -94,7 +93,6 @@ func TestExtendBacklogNormalizationLease(t *testing.T) {
 		FunctionID:  &fnID,
 		EnvID:       &envID,
 		AccountID:   &accountID,
-		PauseRefill: false,
 	}
 
 	backlog := &QueueBacklog{

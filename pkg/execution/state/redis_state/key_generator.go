@@ -255,6 +255,7 @@ type QueueKeyGenerator interface {
 	// FnMetadata returns the key for a function's metadata.
 	// This is a JSON object; see queue.FnMetadata.
 	FnMetadata(fnID uuid.UUID) string
+	QueueMigrationLock(fnID uuid.UUID) string
 	// Status returns the key used for status queue for the provided function.
 	Status(status string, fnID uuid.UUID) string
 
@@ -373,7 +374,6 @@ func (u queueKeyGenerator) AccountPartitionIndex(accountId uuid.UUID) string {
 
 func (u queueKeyGenerator) GlobalAccountIndex() string {
 	return fmt.Sprintf("{%s}:accounts:sorted", u.queueDefaultKey)
-
 }
 
 func (u queueKeyGenerator) FnQueueSet(id string) string {
@@ -457,7 +457,6 @@ func (u queueKeyGenerator) AccountShadowPartitions(accountID uuid.UUID) string {
 	}
 
 	return fmt.Sprintf("{%s}:accounts:%s:shadows:sorted", u.queueDefaultKey, accountID)
-
 }
 
 func (u queueKeyGenerator) GlobalAccountShadowPartitions() string {
@@ -482,7 +481,6 @@ func (u queueKeyGenerator) PartitionNormalizeSet(partitionID string) string {
 	}
 
 	return fmt.Sprintf("{%s}:normalize:partition:%s:sorted", u.queueDefaultKey, partitionID)
-
 }
 
 func (u queueKeyGenerator) BacklogActiveCheckSet() string {
@@ -527,6 +525,14 @@ func (u queueKeyGenerator) FnMetadata(fnID uuid.UUID) string {
 		return fmt.Sprintf("{%s}:fnMeta:-", u.queueDefaultKey)
 	}
 	return fmt.Sprintf("{%s}:fnMeta:%s", u.queueDefaultKey, fnID)
+}
+
+func (u queueKeyGenerator) QueueMigrationLock(fnID uuid.UUID) string {
+	if fnID == uuid.Nil {
+		// None supplied; this means ignore.
+		return fmt.Sprintf("{%s}:migrate-lock:-", u.queueDefaultKey)
+	}
+	return fmt.Sprintf("{%s}:migrate-lock:%s", u.queueDefaultKey, fnID)
 }
 
 type BatchKeyGenerator interface {

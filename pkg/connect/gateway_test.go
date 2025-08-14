@@ -18,7 +18,6 @@ import (
 	"github.com/coder/websocket"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/connect/auth"
-	"github.com/inngest/inngest/pkg/connect/pubsub"
 	"github.com/inngest/inngest/pkg/connect/state"
 	"github.com/inngest/inngest/pkg/connect/types"
 	"github.com/inngest/inngest/pkg/connect/wsproto"
@@ -67,44 +66,6 @@ func TestConnectionEstablished(t *testing.T) {
 	require.Equal(t, connect.ConnectionStatus_READY, conn.Status)
 }
 
-func TestExecutorMessageForwarding(t *testing.T) {
-	params := testingParameters{
-		consecutiveMissesBeforeClose: 10,
-		heartbeatInterval:            1 * time.Second,
-	}
-	res := createTestingGateway(t, params)
-
-	handshake(t, res)
-
-	expectedPayload := &connect.GatewayExecutorRequestData{
-		RequestId:      "test-req",
-		AccountId:      res.accountID.String(),
-		EnvId:          res.envID.String(),
-		AppId:          res.appID.String(),
-		AppName:        res.appName,
-		FunctionId:     res.fnID.String(),
-		FunctionSlug:   res.fnSlug,
-		StepId:         ptr.String("step"),
-		RequestPayload: []byte("hello world"),
-		RunId:          res.runID.String(),
-		LeaseId:        "lease-test",
-	}
-
-	// Publish message to "PubSub"
-	_ = res.testConn.RouteExecutorRequest(context.Background(), res.svc.gatewayId, res.connID, expectedPayload)
-
-	// Expect message to be received by gateway and forwarded over WebSocket
-	msg := awaitNextMessage(t, res.ws, 2*time.Second)
-	require.Equal(t, connect.GatewayMessageType_GATEWAY_EXECUTOR_REQUEST, msg.Kind)
-
-	payload := &connect.GatewayExecutorRequestData{}
-	err := proto.Unmarshal(msg.Payload, payload)
-	require.NoError(t, err)
-
-	// Expect messages to match
-	require.True(t, proto.Equal(expectedPayload, payload))
-}
-
 func TestLeaseRenewal(t *testing.T) {
 	params := testingParameters{
 		consecutiveMissesBeforeClose: 10,
@@ -133,8 +94,13 @@ func TestLeaseRenewal(t *testing.T) {
 		LeaseId:        leaseID.String(),
 	}
 
-	// Publish message to "PubSub"
-	_ = res.testConn.RouteExecutorRequest(context.Background(), res.svc.gatewayId, res.connID, expectedPayload)
+	// Simulate gRPC delivery by directly sending to the connection
+	messageChan, ok := res.svc.wsConnections.Load(res.connID.String())
+	require.True(t, ok, "connection should be registered for gRPC delivery")
+
+	go func() {
+		messageChan.(chan *connect.GatewayExecutorRequestData) <- expectedPayload
+	}()
 
 	// Expect message to be received by gateway and forwarded over WebSocket
 	msg := awaitNextMessage(t, res.ws, 2*time.Second)
@@ -206,8 +172,13 @@ func TestLeaseRenewalWithInvalidLeaseShouldNotClose(t *testing.T) {
 		LeaseId:        leaseID.String(),
 	}
 
-	// Publish message to "PubSub"
-	_ = res.testConn.RouteExecutorRequest(context.Background(), res.svc.gatewayId, res.connID, expectedPayload)
+	// Simulate gRPC delivery by directly sending to the connection
+	messageChan, ok := res.svc.wsConnections.Load(res.connID.String())
+	require.True(t, ok, "connection should be registered for gRPC delivery")
+
+	go func() {
+		messageChan.(chan *connect.GatewayExecutorRequestData) <- expectedPayload
+	}()
 
 	// Expect message to be received by gateway and forwarded over WebSocket
 	msg := awaitNextMessage(t, res.ws, 2*time.Second)
@@ -306,8 +277,13 @@ func TestLeaseRenewalWithDeletedLeaseShouldNotClose(t *testing.T) {
 		LeaseId:        leaseID.String(),
 	}
 
-	// Publish message to "PubSub"
-	_ = res.testConn.RouteExecutorRequest(context.Background(), res.svc.gatewayId, res.connID, expectedPayload)
+	// Simulate gRPC delivery by directly sending to the connection
+	messageChan, ok := res.svc.wsConnections.Load(res.connID.String())
+	require.True(t, ok, "connection should be registered for gRPC delivery")
+
+	go func() {
+		messageChan.(chan *connect.GatewayExecutorRequestData) <- expectedPayload
+	}()
 
 	// Expect message to be received by gateway and forwarded over WebSocket
 	msg := awaitNextMessage(t, res.ws, 2*time.Second)
@@ -824,7 +800,6 @@ type testingResources struct {
 	redis        *miniredis.Miniredis
 	rc           rueidis.Client
 	stateManager state.StateManager
-	testConn     *testingConnector
 
 	ws         *websocket.Conn
 	lifecycles *testRecorderLifecycles
@@ -892,11 +867,6 @@ func createTestingGateway(t *testing.T, params ...testingParameters) testingReso
 	})
 
 	connManager := state.NewRedisConnectionStateManager(rc)
-
-	testConn := &testingConnector{}
-
-	conn, err := pubsub.NewConnector(ctx, withTestingConnector(testConn))
-	require.NoError(t, err)
 
 	var fakeApiBaseUrl string
 	{
@@ -979,7 +949,6 @@ func createTestingGateway(t *testing.T, params ...testingParameters) testingReso
 		}),
 		WithConnectionStateManager(connManager),
 		WithGroupName("gw-1"),
-		WithRequestReceiver(conn),
 		WithLifeCycles([]ConnectGatewayLifecycleListener{lifecycles}),
 		WithApiBaseUrl(fakeApiBaseUrl),
 		WithGatewayPublicPort(gwPort),
@@ -1002,11 +971,6 @@ func createTestingGateway(t *testing.T, params ...testingParameters) testingReso
 			opts = append(opts, WithConsecutiveWorkerHeartbeatMissesBeforeConnectionClose(params[0].consecutiveMissesBeforeClose))
 		}
 
-		if params[0].shouldUseGRPC {
-			opts = append(opts, WithShouldUseGRPC(func(ctx context.Context, accountID uuid.UUID) bool {
-				return true
-			}))
-		}
 	}
 
 	svc := NewConnectGatewayService(
@@ -1136,7 +1100,6 @@ func createTestingGateway(t *testing.T, params ...testingParameters) testingReso
 		redis:        r,
 		rc:           rc,
 		stateManager: connManager,
-		testConn:     testConn,
 		ws:           ws,
 		lifecycles:   lifecycles,
 		envID:        envID,
@@ -1267,108 +1230,5 @@ func freePort() int {
 	return l.Addr().(*net.TCPAddr).Port
 }
 
-func withTestingConnector(t *testingConnector) pubsub.ConnectorOpt {
-	return func(ctx context.Context) (pubsub.Connector, error) {
-		return t, nil
-	}
-}
 
-// testingConnector is a blank implementation of the Connector interface
-type testingConnector struct {
-	subsLock            gosync.Mutex
-	executorRequestSubs map[string][]chan *connect.GatewayExecutorRequestData
-	ackSubs             map[string][]chan pubsub.AckSource
-}
 
-func (t *testingConnector) Proxy(ctx, traceCtx context.Context, opts pubsub.ProxyOpts) (*connect.SDKResponse, error) {
-	return nil, fmt.Errorf("not implemented")
-}
-
-func (t *testingConnector) RouteExecutorRequest(ctx context.Context, gatewayId ulid.ULID, connId ulid.ULID, data *connect.GatewayExecutorRequestData) error {
-	t.subsLock.Lock()
-	defer t.subsLock.Unlock()
-
-	subKey := fmt.Sprintf("%s-%s", gatewayId.String(), connId.String())
-
-	sub, ok := t.executorRequestSubs[subKey]
-	if !ok {
-		return nil
-	}
-
-	for _, ch := range sub {
-		ch <- data
-	}
-	return nil
-}
-
-func (t *testingConnector) ReceiveRoutedRequest(ctx context.Context, gatewayId ulid.ULID, connId ulid.ULID, onMessage func(rawBytes []byte, data *connect.GatewayExecutorRequestData), onSubscribed chan struct{}) error {
-	logger.StdlibLogger(ctx).Error("using no-op connector receive routed request", "gateway_id", gatewayId, "conn_id", connId)
-
-	t.subsLock.Lock()
-	if t.executorRequestSubs == nil {
-		t.executorRequestSubs = make(map[string][]chan *connect.GatewayExecutorRequestData)
-	}
-	subKey := fmt.Sprintf("%s-%s", gatewayId.String(), connId.String())
-
-	sub := make(chan *connect.GatewayExecutorRequestData)
-	t.executorRequestSubs[subKey] = append(t.executorRequestSubs[subKey], sub)
-
-	t.subsLock.Unlock()
-
-	onSubscribed <- struct{}{} // Notify that subscription is ready
-	for {
-		select {
-		case <-ctx.Done():
-			t.subsLock.Lock()
-			defer t.subsLock.Unlock()
-
-			// Remove the subscription
-			if subs, ok := t.executorRequestSubs[subKey]; ok {
-				for i, s := range subs {
-					if s == sub {
-						t.executorRequestSubs[subKey] = append(subs[:i], subs[i+1:]...)
-						break
-					}
-				}
-				if len(t.executorRequestSubs[subKey]) == 0 {
-					delete(t.executorRequestSubs, subKey)
-				}
-			}
-
-			return nil
-		case msg := <-sub:
-			marshaled, err := proto.Marshal(msg)
-			if err != nil {
-				return err
-			}
-			onMessage(marshaled, msg)
-		}
-	}
-}
-
-func (t *testingConnector) AckMessage(ctx context.Context, requestId string, source pubsub.AckSource) error {
-	ackKey := fmt.Sprintf("ack:%s", requestId)
-
-	t.subsLock.Lock()
-	defer t.subsLock.Unlock()
-
-	subs, ok := t.ackSubs[ackKey]
-	if !ok {
-		return nil
-	}
-
-	for _, ch := range subs {
-		ch <- source
-	}
-
-	return nil
-}
-
-func (t *testingConnector) NotifyExecutor(ctx context.Context, resp *connect.SDKResponse) error {
-	return fmt.Errorf("not implemented")
-}
-
-func (t *testingConnector) Wait(ctx context.Context) error {
-	<-ctx.Done()
-	return nil
-}
