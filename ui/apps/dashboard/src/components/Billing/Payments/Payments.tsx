@@ -4,10 +4,9 @@ import { useMemo, useRef } from 'react';
 import { type Route } from 'next';
 import { Link } from '@inngest/components/Link';
 import { Skeleton } from '@inngest/components/Skeleton/Skeleton';
-import { TextCell } from '@inngest/components/Table';
-import Table from '@inngest/components/Table/NewTable';
+import { Table, TextCell } from '@inngest/components/Table';
 import { formatDayString } from '@inngest/components/utils/date';
-import { createColumnHelper, getCoreRowModel } from '@tanstack/react-table';
+import { createColumnHelper } from '@tanstack/react-table';
 import { useQuery } from 'urql';
 
 import PaymentStatusPill from '@/components/Billing/Payments/PaymentStatusPill';

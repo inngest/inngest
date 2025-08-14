@@ -7,7 +7,7 @@ import { Button } from '@inngest/components/Button/Button';
 import { ErrorCard } from '@inngest/components/Error/ErrorCard';
 import TableBlankState from '@inngest/components/EventTypes/TableBlankState';
 import { Search } from '@inngest/components/Forms/Search';
-import NewTable from '@inngest/components/Table/NewTable';
+import { Table } from '@inngest/components/Table';
 import useDebounce from '@inngest/components/hooks/useDebounce';
 import {
   EventTypesOrderByDirection,
@@ -202,7 +202,7 @@ export function EventTypesTable({
         <EventTypesStatusFilter archived={archived} onStatusChange={onStatusFilterChange} />
       </div>
       <div className="h-[calc(100%-58px)] overflow-y-auto" onScroll={onScroll} ref={containerRef}>
-        <NewTable
+        <Table
           columns={columns}
           data={mergedData || []}
           isLoading={isPending || (isFetching && !isFetchingNextPage)}

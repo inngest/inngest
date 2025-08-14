@@ -7,12 +7,7 @@ type TableBlankStateProps = {
   description?: React.ReactNode;
 };
 
-export default function TableBlankState({
-  actions,
-  title,
-  description,
-  icon,
-}: TableBlankStateProps) {
+export function TableBlankState({ actions, title, description, icon }: TableBlankStateProps) {
   const iconElement = React.isValidElement(icon)
     ? React.cloneElement(icon as React.ReactElement, {
         className: 'h-7 w-7',
