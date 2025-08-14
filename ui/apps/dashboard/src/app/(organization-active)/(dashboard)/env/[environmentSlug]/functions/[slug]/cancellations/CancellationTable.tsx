@@ -65,7 +65,7 @@ export function CancellationTable({ envSlug, fnSlug }: Props) {
   return (
     <>
       <div className="bg-canvasBase text-basis no-scrollbar flex-1 overflow-hidden">
-        <div className="h-[calc(100%-58px)] overflow-y-auto pb-2" onScroll={onScroll}>
+        <div className="h-full overflow-y-auto pb-2" onScroll={onScroll}>
           <Table
             blankState={
               <TableBlankState
