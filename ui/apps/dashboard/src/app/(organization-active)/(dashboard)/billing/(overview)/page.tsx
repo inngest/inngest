@@ -7,6 +7,7 @@ import EntitlementListItem from '@/components/Billing/Addons/EntitlementListItem
 import BillingInformation from '@/components/Billing/BillingDetails/BillingInformation';
 import PaymentMethod from '@/components/Billing/BillingDetails/PaymentMethod';
 import { LimitBar, type Data } from '@/components/Billing/LimitBar';
+import { isHobbyFreePlan, isHobbyPlan } from '@/components/Billing/Plans/utils';
 import {
   billingDetails as getBillingDetails,
   currentPlan as getCurrentPlan,
@@ -76,11 +77,10 @@ export default async function Page() {
     : 'Free';
   const overageAllowed =
     (entitlements.runCount.overageAllowed || entitlements.stepCount.overageAllowed) &&
-    currentPlan.slug !== 'hobby-free-2025-06-13';
+    !isHobbyFreePlan(currentPlan);
 
   const paymentMethod = billing.paymentMethods?.[0] || null;
-  const isHobbyPlan =
-    currentPlan.slug === 'hobby-free-2025-06-13' || currentPlan.slug === 'hobby-payg-2025-06-13';
+  const isCurrentHobbyPlan = isHobbyPlan(currentPlan);
 
   const advancedObservabilityAddon = {
     available: addons.advancedObservability.available,
@@ -95,7 +95,7 @@ export default async function Page() {
   return (
     <div className="grid grid-cols-3 gap-4">
       <Card className="col-span-2">
-        {!overageAllowed && currentPlan.slug !== 'hobby-free-2025-06-13' && (
+        {!overageAllowed && !isHobbyFreePlan(currentPlan) && (
           <Alert
             severity="info"
             className="flex items-center justify-between text-sm"
@@ -111,7 +111,7 @@ export default async function Page() {
             For usage beyond the limits of this plan, upgrade to a new plan.
           </Alert>
         )}
-        {currentPlan.slug === 'hobby-free-2025-06-13' && (
+        {isHobbyFreePlan(currentPlan) && (
           <Alert
             severity="info"
             className="flex items-center justify-between text-sm"
@@ -119,30 +119,27 @@ export default async function Page() {
               <Button
                 appearance="outlined"
                 kind="secondary"
-                label="Enable pay-as-you-go"
+                label="Upgrade plan"
                 href={pathCreator.billing({ tab: 'plans', ref: 'app-billing-page-overview' })}
               />
             }
           >
-            For usage beyond the limits of this plan, enable pay-as-you-go or upgrade to a new plan.
+            For usage beyond the limits of this plan, upgrade to a new plan.
           </Alert>
         )}
 
         <Card.Content>
           <p className="text-muted mb-1">Your plan</p>
           <div className="flex items-center justify-between">
-            <p className="text-basis text-xl">
-              {currentPlan.name}{' '}
-              {currentPlan.slug === 'hobby-payg-2025-06-13' ? '(Pay-as-you-go)' : undefined}
-            </p>
+            <p className="text-basis text-xl">{currentPlan.name}</p>
             <Button
               appearance="ghost"
               label="Change plan"
               href={pathCreator.billing({ tab: 'plans', ref: 'app-billing-page-overview' })}
             />
           </div>
-          {!legacyNoRunsPlan && !isHobbyPlan && <LimitBar data={runs} className="my-4" />}
-          {!isHobbyPlan && <LimitBar data={steps} className="mb-6" />}
+          {!legacyNoRunsPlan && !isCurrentHobbyPlan && <LimitBar data={runs} className="my-4" />}
+          {!isCurrentHobbyPlan && <LimitBar data={steps} className="mb-6" />}
           <div className="border-subtle mb-6 border" />
           <EntitlementListItem
             planName={currentPlan.name}

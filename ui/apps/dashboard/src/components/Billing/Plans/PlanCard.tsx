@@ -1,8 +1,13 @@
 import { Pill } from '@inngest/components/Pill/Pill';
 import { RiCheckLine } from '@remixicon/react';
 
-import { isActive, isTrialPlan, processPlan, type Plan } from '@/components/Billing/Plans/utils';
-import PayAsGoButton from './PayAsGoButton';
+import {
+  isActive,
+  isHobbyFreePlan,
+  isTrialPlan,
+  processPlan,
+  type Plan,
+} from '@/components/Billing/Plans/utils';
 import UpgradeButton from './UpgradeButton';
 
 export function VerticalPlanCard({
@@ -24,25 +29,8 @@ export function VerticalPlanCard({
           {transformedPlan.name}
           {displayTrialPill && <Pill>Trial</Pill>}
         </h4>
-        {(currentPlan.slug === 'hobby-free-2025-06-13' ||
-          currentPlan.slug === 'hobby-payg-2025-06-13') &&
-          transformedPlan.slug === 'hobby-free-2025-06-13' && (
-            <PayAsGoButton
-              plan={
-                currentPlan.slug === 'hobby-free-2025-06-13'
-                  ? {
-                      ...plan,
-                      slug: 'hobby-payg-2025-06-13',
-                      name: 'Hobby (Pay-as-you-go)',
-                    }
-                  : plan
-              }
-              currentPlan={currentPlan}
-              onPlanChange={onPlanChange}
-            />
-          )}
       </div>
-      {transformedPlan.slug === 'hobby-free-2025-06-13' ? (
+      {isHobbyFreePlan(plan) ? (
         <div className="mb-1 text-xs font-bold uppercase">Always</div>
       ) : (
         <div className="mb-1 text-xs font-bold uppercase">From</div>
@@ -50,10 +38,6 @@ export function VerticalPlanCard({
       <div className="text-2xl">
         <span className="text-4xl font-medium">{transformedPlan.price}</span>
         {transformedPlan.price !== 'Contact us' && <>/{transformedPlan.billingPeriod}</>}
-        {currentPlan.slug === 'hobby-payg-2025-06-13' &&
-          transformedPlan.slug === 'hobby-free-2025-06-13' && (
-            <span className="text-base"> + additional usage billed</span>
-          )}
       </div>
       <UpgradeButton plan={plan} currentPlan={currentPlan} onPlanChange={onPlanChange} />
       <hr className="mb-6" />
