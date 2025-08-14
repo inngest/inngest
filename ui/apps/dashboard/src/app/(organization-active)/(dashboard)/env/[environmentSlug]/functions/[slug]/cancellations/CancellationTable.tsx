@@ -69,7 +69,7 @@ export function CancellationTable({ envSlug, fnSlug }: Props) {
           <Table
             blankState={
               <TableBlankState
-                title="You have no cancellations for this function."
+                title="No cancellations found"
                 icon={<RiCloseCircleLine />}
                 actions={
                   <>

@@ -164,7 +164,7 @@ export function ReplayList({ functionSlug }: Props) {
       isLoading={isLoading}
       blankState={
         <TableBlankState
-          title="You have no replays for this function."
+          title="No replays found"
           icon={<IconReplay />}
           actions={
             <>
