@@ -1,5 +1,6 @@
 'use client';
 
+import { QueryHelperPanelSectionContentNoData } from './QueryHelperPanelSectionContentNoData';
 import { QueryHelperPanelSectionItem } from './QueryHelperPanelSectionItem';
 import { QueryHelperPanelStaticMessage } from './QueryHelperPanelStaticMessage';
 import type { Query } from './types';
@@ -11,7 +12,7 @@ interface QueryHelperPanelSectionContentProps {
     error: undefined | string;
     isLoading: boolean;
   };
-  sectionType?: 'history' | 'saved';
+  sectionType: 'history' | 'saved';
 }
 
 export function QueryHelperPanelSectionContent({
@@ -30,7 +31,17 @@ export function QueryHelperPanelSectionContent({
   }
 
   if (!data?.length) {
-    return <QueryHelperPanelStaticMessage>No queries found</QueryHelperPanelStaticMessage>;
+    return (
+      <QueryHelperPanelSectionContentNoData
+        primary={sectionType === 'history' ? 'No query history' : 'No saved queries'}
+        secondary={
+          sectionType === 'history'
+            ? 'You will find the last 10 queries that ran successfully here.'
+            : 'Click the save query button to easily access your queries later.'
+        }
+        sectionType={sectionType}
+      />
+    );
   }
 
   return (

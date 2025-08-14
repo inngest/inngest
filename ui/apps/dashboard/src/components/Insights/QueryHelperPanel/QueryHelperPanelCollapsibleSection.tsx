@@ -14,7 +14,7 @@ interface QueryHelperPanelCollapsibleSectionProps {
     isLoading: boolean;
   };
   title: string;
-  sectionType?: 'saved' | 'history';
+  sectionType: 'history' | 'saved';
 }
 
 export function QueryHelperPanelCollapsibleSection({
@@ -26,9 +26,9 @@ export function QueryHelperPanelCollapsibleSection({
   const [isOpen, setIsOpen] = useState(true);
 
   return (
-    <div>
+    <div className="px-4 pb-3">
       <button
-        className="hover:bg-canvasSubtle flex w-full items-center justify-between px-3 py-2 text-left transition-colors"
+        className="hover:bg-canvasSubtle flex w-full items-center justify-between py-2 text-left transition-colors"
         onClick={() => setIsOpen(!isOpen)}
       >
         <span className="text-light text-xs font-medium">{title}</span>
@@ -37,13 +37,11 @@ export function QueryHelperPanelCollapsibleSection({
         />
       </button>
       {isOpen && (
-        <div className="px-4 pb-3">
-          <QueryHelperPanelSectionContent
-            onQuerySelect={onQuerySelect}
-            queries={queries}
-            sectionType={sectionType}
-          />
-        </div>
+        <QueryHelperPanelSectionContent
+          onQuerySelect={onQuerySelect}
+          queries={queries}
+          sectionType={sectionType}
+        />
       )}
     </div>
   );
