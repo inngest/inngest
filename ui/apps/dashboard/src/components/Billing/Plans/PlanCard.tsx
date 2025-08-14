@@ -4,12 +4,10 @@ import { RiCheckLine } from '@remixicon/react';
 import {
   isActive,
   isHobbyFreePlan,
-  isHobbyPaygPlan,
   isTrialPlan,
   processPlan,
   type Plan,
 } from '@/components/Billing/Plans/utils';
-import PayAsGoButton from './PayAsGoButton';
 import UpgradeButton from './UpgradeButton';
 
 export function VerticalPlanCard({
@@ -31,22 +29,6 @@ export function VerticalPlanCard({
           {transformedPlan.name}
           {displayTrialPill && <Pill>Trial</Pill>}
         </h4>
-        {(isHobbyFreePlan(currentPlan) || isHobbyPaygPlan(currentPlan)) &&
-          isHobbyFreePlan(plan) && (
-            <PayAsGoButton
-              plan={
-                isHobbyFreePlan(currentPlan)
-                  ? {
-                      ...plan,
-                      slug: 'hobby-payg-2025-08-08',
-                      name: 'Hobby (Pay-as-you-go)',
-                    }
-                  : plan
-              }
-              currentPlan={currentPlan}
-              onPlanChange={onPlanChange}
-            />
-          )}
       </div>
       {isHobbyFreePlan(plan) ? (
         <div className="mb-1 text-xs font-bold uppercase">Always</div>
@@ -56,9 +38,6 @@ export function VerticalPlanCard({
       <div className="text-2xl">
         <span className="text-4xl font-medium">{transformedPlan.price}</span>
         {transformedPlan.price !== 'Contact us' && <>/{transformedPlan.billingPeriod}</>}
-        {isHobbyPaygPlan(currentPlan) && isHobbyFreePlan(plan) && (
-          <span className="text-base"> + additional usage billed</span>
-        )}
       </div>
       <UpgradeButton plan={plan} currentPlan={currentPlan} onPlanChange={onPlanChange} />
       <hr className="mb-6" />

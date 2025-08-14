@@ -7,7 +7,7 @@ import EntitlementListItem from '@/components/Billing/Addons/EntitlementListItem
 import BillingInformation from '@/components/Billing/BillingDetails/BillingInformation';
 import PaymentMethod from '@/components/Billing/BillingDetails/PaymentMethod';
 import { LimitBar, type Data } from '@/components/Billing/LimitBar';
-import { isHobbyFreePlan, isHobbyPaygPlan, isHobbyPlan } from '@/components/Billing/Plans/utils';
+import { isHobbyFreePlan, isHobbyPlan } from '@/components/Billing/Plans/utils';
 import {
   billingDetails as getBillingDetails,
   currentPlan as getCurrentPlan,
@@ -119,21 +119,19 @@ export default async function Page() {
               <Button
                 appearance="outlined"
                 kind="secondary"
-                label="Enable pay-as-you-go"
+                label="Upgrade plan"
                 href={pathCreator.billing({ tab: 'plans', ref: 'app-billing-page-overview' })}
               />
             }
           >
-            For usage beyond the limits of this plan, enable pay-as-you-go or upgrade to a new plan.
+            For usage beyond the limits of this plan, upgrade to a new plan.
           </Alert>
         )}
 
         <Card.Content>
           <p className="text-muted mb-1">Your plan</p>
           <div className="flex items-center justify-between">
-            <p className="text-basis text-xl">
-              {currentPlan.name} {isHobbyPaygPlan(currentPlan) ? '(Pay-as-you-go)' : undefined}
-            </p>
+            <p className="text-basis text-xl">{currentPlan.name}</p>
             <Button
               appearance="ghost"
               label="Change plan"

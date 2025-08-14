@@ -8,7 +8,7 @@ import { toast } from 'sonner';
 import CheckoutModal, { type CheckoutItem } from '@/components/Billing/Plans/CheckoutModal';
 import ConfirmPlanChangeModal from '@/components/Billing/Plans/ConfirmPlanChangeModal';
 import { pathCreator } from '@/utils/urls';
-import { PlanNames, isEnterprisePlan, isHobbyFreePlan, isHobbyPaygPlan, type Plan } from './utils';
+import { PlanNames, isEnterprisePlan, isHobbyFreePlan, type Plan } from './utils';
 
 type ChangePlanArgs = {
   item: CheckoutItem;
@@ -46,7 +46,7 @@ export default function UpgradeButton({
   const isActive =
     currentPlan.slug === plan.slug ||
     (cardPlanName === PlanNames.Enterprise && isEnterprise) ||
-    (isHobbyPaygPlan(currentPlan) && isHobbyFreePlan(plan));
+    false;
 
   const isLowerPlan = (() => {
     if (isEnterprise) {

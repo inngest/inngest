@@ -155,11 +155,6 @@ export function isHobbyFreePlan(plan: Plan | (Partial<BillingPlan> & { name: str
   return plan.slug.startsWith('hobby-free-');
 }
 
-export function isHobbyPaygPlan(plan: Plan | (Partial<BillingPlan> & { name: string })): boolean {
-  if (!plan.slug) return false;
-  return plan.slug.startsWith('hobby-payg-');
-}
-
 export function isHobbyPlan(plan: Plan | (Partial<BillingPlan> & { name: string })): boolean {
-  return isHobbyFreePlan(plan) || isHobbyPaygPlan(plan);
+  return isHobbyFreePlan(plan);
 }
