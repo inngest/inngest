@@ -28,14 +28,14 @@ export default async function Page() {
       entitlements: {
         concurrency: { limit: 5 },
         history: { limit: 1 }, // 24h
-        runCount: { limit: 100_000 },
+        runCount: { limit: 50_000 },
       },
       isLegacy: false,
       isFree: true,
     },
     {
       id: 'n/a',
-      slug: 'pro-2025-06-04',
+      slug: 'pro-2025-08-08',
       name: 'Pro',
       amount: 7_500, // $75.00
       billingPeriod: 'month',
@@ -51,7 +51,7 @@ export default async function Page() {
       id: 'n/a',
       slug: 'enterprise',
       name: 'Enterprise',
-      amount: Infinity, // $75.00
+      amount: Infinity,
       billingPeriod: 'month',
       entitlements: {
         concurrency: { limit: 100 },

@@ -6,6 +6,7 @@ import type {
   EntitlementInt,
   EntitlementRunCount,
 } from '@/gql/graphql';
+import { pathCreator } from '@/utils/urls';
 
 export type Plan = Omit<BillingPlan, 'entitlements' | 'features' | 'availableAddons' | 'addons'> & {
   entitlements: {
@@ -46,7 +47,10 @@ export function processPlan(plan: Plan) {
   };
 }
 
-function getFeatureDescriptions(planName: string, entitlements: Plan['entitlements']): string[] {
+function getFeatureDescriptions(
+  planName: string,
+  entitlements: Plan['entitlements']
+): (string | React.ReactNode)[] {
   const numberFormatter = new Intl.NumberFormat('en-US', {
     notation: 'compact',
     compactDisplay: 'short',
@@ -82,7 +86,15 @@ function getFeatureDescriptions(planName: string, entitlements: Plan['entitlemen
         'Starts at 1,000,000+ executions',
         '100+ concurrent steps',
         '1,000+ realtime connections',
-        '15+ users',
+        <>
+          10 users included
+          <a
+            className="hover:underline"
+            href={pathCreator.billing({ ref: 'app-billing-plans-pro-addons', highlight: 'users' })}
+          >
+            (add-ons available)
+          </a>
+        </>,
         'Granular metrics',
         'Higher usage limits',
       ];
