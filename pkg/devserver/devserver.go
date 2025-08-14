@@ -24,8 +24,8 @@ import (
 	"github.com/inngest/inngest/pkg/config/registration"
 	"github.com/inngest/inngest/pkg/connect"
 	"github.com/inngest/inngest/pkg/connect/auth"
-	"github.com/inngest/inngest/pkg/connect/lifecycles"
 	connectgrpc "github.com/inngest/inngest/pkg/connect/grpc"
+	"github.com/inngest/inngest/pkg/connect/lifecycles"
 	connectv0 "github.com/inngest/inngest/pkg/connect/rest/v0"
 	connstate "github.com/inngest/inngest/pkg/connect/state"
 	"github.com/inngest/inngest/pkg/consts"
@@ -665,7 +665,6 @@ func createInmemoryRedis(ctx context.Context, tick time.Duration) (rueidis.Clien
 	return rc, r, nil
 }
 
-
 func getSendingEventHandler(ctx context.Context, pb pubsub.Publisher, topic string) execution.HandleSendingEvent {
 	return func(ctx context.Context, evt event.Event, item queue.Item) error {
 		trackedEvent := event.NewOSSTrackedEvent(evt, nil)
@@ -897,6 +896,15 @@ func connectToOrCreateRedisOption(redisURI string) (rueidis.ClientOption, error)
 	opt, err := rueidis.ParseURL(redisURI)
 	if err != nil {
 		return rueidis.ClientOption{}, fmt.Errorf("error parsing redis uri: %w", err)
+	}
+
+	// Fix for Redis Sentinel authentication: rueidis.ParseURL correctly identifies
+	// Sentinel configurations but fails to populate Sentinel credentials.
+	// When a master_set is configured but Sentinel credentials are empty,
+	// copy the main credentials to Sentinel authentication.
+	if opt.Sentinel.MasterSet != "" && opt.Sentinel.Username == "" && opt.Username != "" {
+		opt.Sentinel.Username = opt.Username
+		opt.Sentinel.Password = opt.Password
 	}
 
 	// Set default overrides
