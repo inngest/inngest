@@ -4,12 +4,11 @@ import { RiAddCircleFill, RiBookReadLine } from '@remixicon/react';
 
 import { useTabManagerActions } from '@/components/Insights/InsightsTabManager/TabManagerContext';
 import { QueryHelperPanelCollapsibleSection } from './QueryHelperPanelCollapsibleSection';
-import { useRecentQueries, useSavedQueries } from './mock';
+import { useStoredQueries } from './StoredQueriesContext';
 
 export function QueryHelperPanel() {
   const { tabManagerActions } = useTabManagerActions();
-  const recentQueries = useRecentQueries();
-  const savedQueries = useSavedQueries();
+  const { recentQueries, savedQueries } = useStoredQueries();
 
   return (
     <div className="border-subtle flex h-full w-full flex-col border-r">

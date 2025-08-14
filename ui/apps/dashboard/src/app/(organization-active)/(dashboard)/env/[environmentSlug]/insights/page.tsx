@@ -6,9 +6,7 @@ import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import { useInsightsTabManager } from '@/components/Insights/InsightsTabManager/InsightsTabManager';
 import { TabManagerProvider } from '@/components/Insights/InsightsTabManager/TabManagerContext';
 import { QueryHelperPanel } from '@/components/Insights/QueryHelperPanel';
-
-// NOTE: The usage of isQueryHelperPanelVisible causes re-fetching when toggled,
-// but this is okay for now because the fetching shouldn't be that low anyway.
+import { StoredQueriesProvider } from '@/components/Insights/QueryHelperPanel/StoredQueriesContext';
 
 function InsightsContent() {
   const [isQueryHelperPanelVisible, setIsQueryHelperPanelVisible] = useState(true);
@@ -19,16 +17,18 @@ function InsightsContent() {
   });
 
   return (
-    <TabManagerProvider actions={actions}>
-      <div className="flex h-full w-full flex-1 overflow-hidden">
-        {isQueryHelperPanelVisible && (
-          <div className="w-[240px] flex-shrink-0">
-            <QueryHelperPanel />
-          </div>
-        )}
-        <div className="flex h-full w-full flex-1 flex-col overflow-hidden">{tabManager}</div>
-      </div>
-    </TabManagerProvider>
+    <StoredQueriesProvider>
+      <TabManagerProvider actions={actions}>
+        <div className="flex h-full w-full flex-1 overflow-hidden">
+          {isQueryHelperPanelVisible && (
+            <div className="w-[240px] flex-shrink-0">
+              <QueryHelperPanel />
+            </div>
+          )}
+          <div className="flex h-full w-full flex-1 flex-col overflow-hidden">{tabManager}</div>
+        </div>
+      </TabManagerProvider>
+    </StoredQueriesProvider>
   );
 }
 
