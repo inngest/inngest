@@ -1,3 +1,5 @@
+'use client';
+
 import { Button } from '@inngest/components/Button/Button';
 import { RiChatPollLine, RiExternalLinkLine, RiQuillPenLine } from '@remixicon/react';
 
