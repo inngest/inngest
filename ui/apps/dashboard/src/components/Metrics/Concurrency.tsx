@@ -67,7 +67,7 @@ export const Concurrency = ({
         <div className="text-subtle flex w-full flex-row items-center gap-x-2 text-lg">
           Concurrency{' '}
           <Info
-            text="The number of concurrently running steps"
+            text="The number of concurrently running steps within this environment"
             action={
               <Link
                 arrowOnHover
