@@ -28,12 +28,16 @@ export function QueryHelperPanelCollapsibleSection({
   return (
     <div className="px-4 pb-3">
       <button
-        className="flex w-full items-center justify-between py-2 text-left transition-colors"
+        className="group flex w-full items-center justify-between py-2 text-left transition-colors"
         onClick={() => setIsOpen(!isOpen)}
       >
-        <span className="text-light text-xs font-medium">{title}</span>
+        <span className="text-muted group-hover:text-basis text-xs font-medium transition-colors">
+          {title}
+        </span>
         <RiArrowDownSLine
-          className={`h-4 w-4 transition-transform duration-200 ${isOpen ? 'rotate-180' : ''}`}
+          className={`text-muted group-hover:text-basis h-4 w-4 transition-all duration-200 ${
+            isOpen ? 'rotate-180' : ''
+          }`}
         />
       </button>
       {isOpen && (
