@@ -5,4 +5,10 @@ export interface Query {
   query: string;
 }
 
-export type Template = Omit<Query, 'type'> & { explanation: string; type: 'template' };
+export type TemplateKind = 'warning' | 'error' | 'time';
+
+export type Template = Omit<Query, 'type'> & {
+  explanation: string;
+  templateKind: TemplateKind;
+  type: 'template';
+};

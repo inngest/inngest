@@ -2,21 +2,6 @@ import { useEffect, useState } from 'react';
 
 import type { Query } from './types';
 
-const MOCK_TEMPLATES: Query[] = [
-  {
-    id: 'template-1',
-    isSavedQuery: false,
-    name: 'Template 1',
-    query: 'Template 1 Query Text',
-  },
-  {
-    id: 'template-2',
-    isSavedQuery: false,
-    name: 'Template 2',
-    query: 'Template 2 Query Text',
-  },
-];
-
 const MOCK_RECENT_QUERIES: Query[] = [
   {
     id: 'recent-query-1',
@@ -65,10 +50,6 @@ function simulateAsyncLoad<T>(
       setState({ data, error: undefined, isLoading: false });
     }
   }, delay);
-}
-
-export function useTemplates(): QueryResult<Query[]> {
-  return { data: MOCK_TEMPLATES, error: undefined, isLoading: false };
 }
 
 export function useRecentQueries(): QueryResult<Query[]> {
