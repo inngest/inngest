@@ -5,45 +5,45 @@ import type { Query } from './types';
 const MOCK_TEMPLATES: Query[] = [
   {
     id: 'template-1',
+    isSavedQuery: false,
     name: 'Template 1',
     query: 'Template 1 Query Text',
-    type: 'template',
   },
   {
     id: 'template-2',
+    isSavedQuery: false,
     name: 'Template 2',
     query: 'Template 2 Query Text',
-    type: 'template',
   },
 ];
 
 const MOCK_RECENT_QUERIES: Query[] = [
   {
     id: 'recent-query-1',
+    isSavedQuery: false,
     name: 'SELECT COUNT(*) FROM events WHERE ts > NOW() - INTERVAL 1 HOUR',
     query: 'SELECT COUNT(*) FROM events WHERE ts > NOW() - INTERVAL 1 HOUR',
-    type: 'recent',
   },
   {
     id: 'recent-query-2',
+    isSavedQuery: false,
     name: 'SELECT status, COUNT(*) FROM function_runs GROUP BY status',
     query: 'SELECT status, COUNT(*) FROM function_runs GROUP BY status',
-    type: 'recent',
   },
 ];
 
 const MOCK_SAVED_QUERIES: Query[] = [
   {
     id: 'saved-query-1',
+    isSavedQuery: true,
     name: 'Saved Query 1',
     query: 'Saved Query 1 Query Text',
-    type: 'saved',
   },
   {
     id: 'saved-query-2',
+    isSavedQuery: true,
     name: 'Saved Query 2',
     query: 'Saved Query 2 Query Text',
-    type: 'saved',
   },
 ];
 

@@ -1,6 +1,8 @@
 export interface Query {
   id: string;
+  isSavedQuery: boolean;
   name: string;
   query: string;
-  type: 'new' | 'recent' | 'saved' | 'template';
 }
+
+export type Template = Omit<Query, 'type'> & { explanation: string; type: 'template' };
