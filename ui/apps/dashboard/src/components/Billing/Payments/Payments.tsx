@@ -4,7 +4,8 @@ import { useMemo, useRef } from 'react';
 import { type Route } from 'next';
 import { Link } from '@inngest/components/Link';
 import { Skeleton } from '@inngest/components/Skeleton/Skeleton';
-import { Table, TextCell } from '@inngest/components/Table';
+import { TextCell } from '@inngest/components/Table';
+import Table from '@inngest/components/Table/NewTable';
 import { formatDayString } from '@inngest/components/utils/date';
 import { createColumnHelper, getCoreRowModel } from '@tanstack/react-table';
 import { useQuery } from 'urql';
@@ -40,6 +41,7 @@ const columns = [
   columnHelper.accessor('status', {
     header: () => <span>Status</span>,
     cell: (props) => <PaymentStatusPill status={props.getValue()} />,
+    enableSorting: false,
   }),
   columnHelper.accessor('description', {
     header: () => <span>Description</span>,
@@ -55,10 +57,12 @@ const columns = [
         </TextCell>
       );
     },
+    enableSorting: false,
   }),
   columnHelper.accessor('createdAt', {
     header: () => <span>Created at</span>,
     cell: (props) => <TextCell>{props.getValue()}</TextCell>,
+    enableSorting: false,
   }),
   columnHelper.accessor('url', {
     header: () => <span />,
@@ -74,6 +78,7 @@ const columns = [
       }
       return null;
     },
+    enableSorting: false,
   }),
 ];
 
@@ -125,14 +130,9 @@ export default function Payments() {
       ref={tableContainerRef}
     >
       <Table
-        tableContainerRef={tableContainerRef}
-        isVirtualized={false}
-        options={{
-          data: paymentTableData,
-          columns: tableColumns,
-          getCoreRowModel: getCoreRowModel(),
-          enableSorting: false,
-        }}
+        isLoading={fetching}
+        columns={tableColumns}
+        data={paymentTableData}
         blankState={!fetching && <p>You have no prior payments</p>}
       />
     </main>
