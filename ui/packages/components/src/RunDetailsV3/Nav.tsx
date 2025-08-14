@@ -10,6 +10,7 @@ import {
   DropdownMenuTrigger,
 } from '../DropdownMenu';
 import { Link } from '../Link';
+import { useShared } from '../SharedContext/SharedContext';
 import { useBooleanFlag } from '../SharedContext/useBooleanFlag';
 import { usePathCreator } from '../SharedContext/usePathCreator';
 
@@ -50,13 +51,14 @@ export const Standalone = ({ standalone, runID }: NavProps) => {
 export const Nav = ({ standalone, functionSlug, runID }: NavProps) => {
   const { booleanFlag } = useBooleanFlag();
   const { pathCreator } = usePathCreator();
+  const { cloud } = useShared();
 
   const { value: debuggerEnabled, isReady: debuggerFlagReady } = booleanFlag(
     'step-over-debugger',
     false
   );
 
-  return debuggerFlagReady && debuggerEnabled ? (
+  return !cloud && debuggerFlagReady && debuggerEnabled ? (
     <SplitButton
       left={
         <Button

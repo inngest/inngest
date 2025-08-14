@@ -413,29 +413,31 @@ type ComplexityRoot struct {
 	}
 
 	RunTraceSpan struct {
-		AppID         func(childComplexity int) int
-		Attempts      func(childComplexity int) int
-		ChildrenSpans func(childComplexity int) int
-		Duration      func(childComplexity int) int
-		EndedAt       func(childComplexity int) int
-		FunctionID    func(childComplexity int) int
-		IsRoot        func(childComplexity int) int
-		IsUserland    func(childComplexity int) int
-		Name          func(childComplexity int) int
-		OutputID      func(childComplexity int) int
-		ParentSpan    func(childComplexity int) int
-		ParentSpanID  func(childComplexity int) int
-		QueuedAt      func(childComplexity int) int
-		Run           func(childComplexity int) int
-		RunID         func(childComplexity int) int
-		SpanID        func(childComplexity int) int
-		StartedAt     func(childComplexity int) int
-		Status        func(childComplexity int) int
-		StepID        func(childComplexity int) int
-		StepInfo      func(childComplexity int) int
-		StepOp        func(childComplexity int) int
-		TraceID       func(childComplexity int) int
-		UserlandSpan  func(childComplexity int) int
+		AppID          func(childComplexity int) int
+		Attempts       func(childComplexity int) int
+		ChildrenSpans  func(childComplexity int) int
+		DebugRunID     func(childComplexity int) int
+		DebugSessionID func(childComplexity int) int
+		Duration       func(childComplexity int) int
+		EndedAt        func(childComplexity int) int
+		FunctionID     func(childComplexity int) int
+		IsRoot         func(childComplexity int) int
+		IsUserland     func(childComplexity int) int
+		Name           func(childComplexity int) int
+		OutputID       func(childComplexity int) int
+		ParentSpan     func(childComplexity int) int
+		ParentSpanID   func(childComplexity int) int
+		QueuedAt       func(childComplexity int) int
+		Run            func(childComplexity int) int
+		RunID          func(childComplexity int) int
+		SpanID         func(childComplexity int) int
+		StartedAt      func(childComplexity int) int
+		Status         func(childComplexity int) int
+		StepID         func(childComplexity int) int
+		StepInfo       func(childComplexity int) int
+		StepOp         func(childComplexity int) int
+		TraceID        func(childComplexity int) int
+		UserlandSpan   func(childComplexity int) int
 	}
 
 	RunTraceSpanOutput struct {
@@ -2455,6 +2457,20 @@ func (e *executableSchema) Complexity(typeName, field string, childComplexity in
 
 		return e.complexity.RunTraceSpan.ChildrenSpans(childComplexity), true
 
+	case "RunTraceSpan.debugRunID":
+		if e.complexity.RunTraceSpan.DebugRunID == nil {
+			break
+		}
+
+		return e.complexity.RunTraceSpan.DebugRunID(childComplexity), true
+
+	case "RunTraceSpan.debugSessionID":
+		if e.complexity.RunTraceSpan.DebugSessionID == nil {
+			break
+		}
+
+		return e.complexity.RunTraceSpan.DebugSessionID(childComplexity), true
+
 	case "RunTraceSpan.duration":
 		if e.complexity.RunTraceSpan.Duration == nil {
 			break
@@ -3812,6 +3828,8 @@ type RunTraceSpan {
   parentSpan: RunTraceSpan # the parent span of this span
   isUserland: Boolean! # whether this span is a userland span
   userlandSpan: UserlandSpan
+  debugRunID: String
+  debugSessionID: String
 }
 
 type UserlandSpan {
@@ -11424,6 +11442,10 @@ func (ec *executionContext) fieldContext_FunctionRunV2_trace(ctx context.Context
 				return ec.fieldContext_RunTraceSpan_isUserland(ctx, field)
 			case "userlandSpan":
 				return ec.fieldContext_RunTraceSpan_userlandSpan(ctx, field)
+			case "debugRunID":
+				return ec.fieldContext_RunTraceSpan_debugRunID(ctx, field)
+			case "debugSessionID":
+				return ec.fieldContext_RunTraceSpan_debugSessionID(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type RunTraceSpan", field.Name)
 		},
@@ -16994,6 +17016,10 @@ func (ec *executionContext) fieldContext_RunTraceSpan_childrenSpans(ctx context.
 				return ec.fieldContext_RunTraceSpan_isUserland(ctx, field)
 			case "userlandSpan":
 				return ec.fieldContext_RunTraceSpan_userlandSpan(ctx, field)
+			case "debugRunID":
+				return ec.fieldContext_RunTraceSpan_debugRunID(ctx, field)
+			case "debugSessionID":
+				return ec.fieldContext_RunTraceSpan_debugSessionID(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type RunTraceSpan", field.Name)
 		},
@@ -17291,6 +17317,10 @@ func (ec *executionContext) fieldContext_RunTraceSpan_parentSpan(ctx context.Con
 				return ec.fieldContext_RunTraceSpan_isUserland(ctx, field)
 			case "userlandSpan":
 				return ec.fieldContext_RunTraceSpan_userlandSpan(ctx, field)
+			case "debugRunID":
+				return ec.fieldContext_RunTraceSpan_debugRunID(ctx, field)
+			case "debugSessionID":
+				return ec.fieldContext_RunTraceSpan_debugSessionID(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type RunTraceSpan", field.Name)
 		},
@@ -17394,6 +17424,88 @@ func (ec *executionContext) fieldContext_RunTraceSpan_userlandSpan(ctx context.C
 				return ec.fieldContext_UserlandSpan_spanAttrs(ctx, field)
 			}
 			return nil, fmt.Errorf("no field named %q was found under type UserlandSpan", field.Name)
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RunTraceSpan_debugRunID(ctx context.Context, field graphql.CollectedField, obj *models.RunTraceSpan) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RunTraceSpan_debugRunID(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.DebugRunID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RunTraceSpan_debugRunID(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RunTraceSpan",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
+		},
+	}
+	return fc, nil
+}
+
+func (ec *executionContext) _RunTraceSpan_debugSessionID(ctx context.Context, field graphql.CollectedField, obj *models.RunTraceSpan) (ret graphql.Marshaler) {
+	fc, err := ec.fieldContext_RunTraceSpan_debugSessionID(ctx, field)
+	if err != nil {
+		return graphql.Null
+	}
+	ctx = graphql.WithFieldContext(ctx, fc)
+	defer func() {
+		if r := recover(); r != nil {
+			ec.Error(ctx, ec.Recover(ctx, r))
+			ret = graphql.Null
+		}
+	}()
+	resTmp, err := ec.ResolverMiddleware(ctx, func(rctx context.Context) (interface{}, error) {
+		ctx = rctx // use context from middleware stack in children
+		return obj.DebugSessionID, nil
+	})
+	if err != nil {
+		ec.Error(ctx, err)
+		return graphql.Null
+	}
+	if resTmp == nil {
+		return graphql.Null
+	}
+	res := resTmp.(*string)
+	fc.Result = res
+	return ec.marshalOString2ᚖstring(ctx, field.Selections, res)
+}
+
+func (ec *executionContext) fieldContext_RunTraceSpan_debugSessionID(ctx context.Context, field graphql.CollectedField) (fc *graphql.FieldContext, err error) {
+	fc = &graphql.FieldContext{
+		Object:     "RunTraceSpan",
+		Field:      field,
+		IsMethod:   false,
+		IsResolver: false,
+		Child: func(ctx context.Context, field graphql.CollectedField) (*graphql.FieldContext, error) {
+			return nil, errors.New("field of type String does not have child fields")
 		},
 	}
 	return fc, nil
@@ -25436,6 +25548,14 @@ func (ec *executionContext) _RunTraceSpan(ctx context.Context, sel ast.Selection
 		case "userlandSpan":
 
 			out.Values[i] = ec._RunTraceSpan_userlandSpan(ctx, field, obj)
+
+		case "debugRunID":
+
+			out.Values[i] = ec._RunTraceSpan_debugRunID(ctx, field, obj)
+
+		case "debugSessionID":
+
+			out.Values[i] = ec._RunTraceSpan_debugSessionID(ctx, field, obj)
 
 		default:
 			panic("unknown field " + strconv.Quote(field.Name))

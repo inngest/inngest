@@ -1,6 +1,6 @@
 type Query {
   apps(filter: AppsFilterV1): [App!]!
-	app(id: UUID!): App
+  app(id: UUID!): App
 
   stream(query: StreamQuery!): [StreamItem!]!
 
@@ -37,13 +37,16 @@ type Query {
   runTraceSpanOutputByID(outputID: String!): RunTraceSpanOutput!
   runTrigger(runID: String!): RunTraceTrigger!
 
+  debugRun(query: DebugRunQuery!): RunTraceSpan
+  debugSession(query: DebugSessionQuery!): [RunTraceSpan]
+
   workerConnections(
-      first: Int! = 100
-      after: String
-      orderBy: [ConnectV1WorkerConnectionsOrderBy!]!
-      filter: ConnectV1WorkerConnectionsFilter!
-    ): ConnectV1WorkerConnectionsConnection!
-	workerConnection(connectionId: ULID!): ConnectV1WorkerConnection
+    first: Int! = 100
+    after: String
+    orderBy: [ConnectV1WorkerConnectionsOrderBy!]!
+    filter: ConnectV1WorkerConnectionsFilter!
+  ): ConnectV1WorkerConnectionsConnection!
+  workerConnection(connectionId: ULID!): ConnectV1WorkerConnection
 }
 
 input ActionVersionQuery {
@@ -65,6 +68,20 @@ input EventsQuery {
 input FunctionQuery {
   workspaceId: ID! = "local"
   functionSlug: String!
+}
+
+input DebugRunQuery {
+  workspaceId: ID! = "local"
+  functionSlug: String!
+  debugRunID: String
+  runID: String
+}
+
+input DebugSessionQuery {
+  workspaceId: ID! = "local"
+  functionSlug: String!
+  debugSessionID: String
+  runID: String
 }
 
 input FunctionRunQuery {

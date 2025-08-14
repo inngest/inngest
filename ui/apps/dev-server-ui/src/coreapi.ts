@@ -329,6 +329,8 @@ export const TRACE_DETAILS_FRAGMENT = gql`
       resourceAttrs
     }
     outputID
+    debugRunID
+    debugSessionID
     spanID
     stepID
     stepOp
