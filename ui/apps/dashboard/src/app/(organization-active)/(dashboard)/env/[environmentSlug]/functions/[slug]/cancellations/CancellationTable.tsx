@@ -115,18 +115,21 @@ function useColumns({ setPendingDelete }: { setPendingDelete: (obj: PendingDelet
         cell: (props) => {
           return <TextCell>{props.getValue()}</TextCell>;
         },
+        enableSorting: false,
       }),
       columnHelper.accessor('createdAt', {
         header: 'Created at',
         cell: (props) => {
           return <TimeCell date={props.getValue()} />;
         },
+        enableSorting: false,
       }),
       columnHelper.accessor('id', {
         header: 'ID',
         cell: (props) => {
           return <IDCell>{props.getValue()}</IDCell>;
         },
+        enableSorting: false,
       }),
       columnHelper.accessor('queuedAtMin', {
         header: 'Minimum queued at (filter)',
@@ -138,15 +141,19 @@ function useColumns({ setPendingDelete }: { setPendingDelete: (obj: PendingDelet
 
           return <TimeCell date={value} />;
         },
+        enableSorting: false,
       }),
       columnHelper.accessor('queuedAtMax', {
         header: 'Maximum queued at (filter)',
         cell: (props) => {
           return <TimeCell date={props.getValue()} />;
         },
+        enableSorting: false,
       }),
       columnHelper.display({
         id: 'actions',
+        header: undefined, // Needed to enable the iconOnly styles in the table
+        size: 20,
         cell: (props) => {
           const data = props.row.original;
 
@@ -159,6 +166,7 @@ function useColumns({ setPendingDelete }: { setPendingDelete: (obj: PendingDelet
             />
           );
         },
+        enableSorting: false,
       }),
     ];
   }, [setPendingDelete]);
