@@ -28,7 +28,7 @@ export function QueryHelperPanelCollapsibleSection({
   return (
     <div className="px-4 pb-3">
       <button
-        className="hover:bg-canvasSubtle flex w-full items-center justify-between py-2 text-left transition-colors"
+        className="flex w-full items-center justify-between py-2 text-left transition-colors"
         onClick={() => setIsOpen(!isOpen)}
       >
         <span className="text-light text-xs font-medium">{title}</span>
