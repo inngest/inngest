@@ -3,7 +3,7 @@
 import { RiAlertLine, RiErrorWarningLine, RiTimeLine } from '@remixicon/react';
 
 import type { Template, TemplateKind } from '../../QueryHelperPanel/types';
-import type { TabManagerActions } from '../InsightsTabManager';
+import { useTabManagerActions } from '../TabManagerContext';
 
 const APPEARANCE_CLASSES = 'bg-canvasBase border-subtle rounded-[4px] border';
 const CONTENT_LAYOUT_CLASSES = 'flex flex-col gap-1';
@@ -44,14 +44,13 @@ const TEMPLATE_KIND_CONFIG: Record<
 };
 
 interface InsightsTabPanelTemplatesTabCardProps {
-  tabManagerActions: TabManagerActions;
   template: Template;
 }
 
 export function InsightsTabPanelTemplatesTabCard({
-  tabManagerActions,
   template,
 }: InsightsTabPanelTemplatesTabCardProps) {
+  const { tabManagerActions } = useTabManagerActions();
   const config = TEMPLATE_KIND_CONFIG[template.templateKind];
   const IconComponent = config.icon;
 

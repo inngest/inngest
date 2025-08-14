@@ -9,11 +9,11 @@ import {
   RiExpandRightLine,
 } from '@remixicon/react';
 
-import type { TabConfig, TabManagerActions } from './InsightsTabManager';
+import type { TabConfig } from './InsightsTabManager';
+import { useTabManagerActions } from './TabManagerContext';
 import { TEMPLATES_TAB } from './constants';
 
 interface InsightsTabsListProps {
-  actions: TabManagerActions;
   activeTabId: string;
   hide?: boolean;
   isQueryHelperPanelVisible: boolean;
@@ -22,20 +22,21 @@ interface InsightsTabsListProps {
 }
 
 export function InsightsTabsList({
-  actions,
   activeTabId,
   hide,
   isQueryHelperPanelVisible,
   onToggleQueryHelperPanelVisibility,
   tabs,
 }: InsightsTabsListProps) {
+  const { tabManagerActions } = useTabManagerActions();
+
   if (hide) return null;
 
   return (
     <Tabs
       defaultIconBefore={<RiCodeLine size={16} />}
-      onClose={actions.closeTab}
-      onValueChange={actions.focusTab}
+      onClose={tabManagerActions.closeTab}
+      onValueChange={tabManagerActions.focusTab}
       value={activeTabId}
     >
       <Tabs.List>
@@ -61,7 +62,7 @@ export function InsightsTabsList({
         ))}
         <Tabs.IconTab
           icon={<RiAddLine size={16} />}
-          onClick={actions.createNewTab}
+          onClick={tabManagerActions.createNewTab}
           title="Add new tab"
         />
       </Tabs.List>

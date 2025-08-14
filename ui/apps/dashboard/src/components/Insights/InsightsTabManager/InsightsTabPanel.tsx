@@ -6,21 +6,17 @@ import { InsightsSQLEditorDownloadCSVButton } from '@/components/Insights/Insigh
 import { InsightsSQLEditorQueryButton } from '@/components/Insights/InsightsSQLEditor/InsightsSQLEditorQueryButton';
 import { useInsightsStateMachineContext } from '@/components/Insights/InsightsStateMachineContext/InsightsStateMachineContext';
 import { Section } from '@/components/Insights/Section';
-import type { TabManagerActions } from './InsightsTabManager';
 import { InsightsTabPanelTemplatesTab } from './InsightsTabPanelTemplatesTab/InsightsTabPanelTemplatesTab';
 
 type InsightsTabPanelProps = {
   isTemplatesTab?: boolean;
-  tabManagerActions: TabManagerActions;
 };
 
-export function InsightsTabPanel({ isTemplatesTab, tabManagerActions }: InsightsTabPanelProps) {
+export function InsightsTabPanel({ isTemplatesTab }: InsightsTabPanelProps) {
   const { status } = useInsightsStateMachineContext();
   const isRunning = status === 'loading';
 
-  if (isTemplatesTab) {
-    return <InsightsTabPanelTemplatesTab tabManagerActions={tabManagerActions} />;
-  }
+  if (isTemplatesTab) return <InsightsTabPanelTemplatesTab />;
 
   return (
     <>

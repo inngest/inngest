@@ -1,7 +1,7 @@
 import { Button } from '@inngest/components/Button/Button';
 import { RiChatPollLine, RiExternalLinkLine, RiQuillPenLine } from '@remixicon/react';
 
-import type { TabManagerActions } from '../InsightsTabManager';
+import { useTabManagerActions } from '../TabManagerContext';
 
 const BASE_DOCS_URL = 'https://docs.inngest.com/';
 
@@ -12,13 +12,8 @@ const RESOURCES = [
   { href: BASE_DOCS_URL, label: 'Send us feedback', icon: RiChatPollLine },
 ];
 
-interface InsightsTabPanelTemplatesTabRightProps {
-  tabManagerActions: TabManagerActions;
-}
-
-export function InsightsTabPanelTemplatesTabRight({
-  tabManagerActions,
-}: InsightsTabPanelTemplatesTabRightProps) {
+export function InsightsTabPanelTemplatesTabRight() {
+  const { tabManagerActions } = useTabManagerActions();
   return (
     <div className="flex w-[360px] flex-shrink-0 flex-col">
       <div className="border-subtle flex flex-col gap-3 border-b">

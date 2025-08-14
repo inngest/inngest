@@ -163,7 +163,6 @@ function InsightsTabManagerInternal({
   return (
     <div className="flex h-full w-full flex-1 flex-col overflow-hidden">
       <InsightsTabsList
-        actions={actions}
         activeTabId={activeTabId}
         isQueryHelperPanelVisible={isQueryHelperPanelVisible}
         onToggleQueryHelperPanelVisibility={onToggleQueryHelperPanelVisibility}
@@ -177,10 +176,7 @@ function InsightsTabManagerInternal({
             query={tab.query}
             renderChildren={tab.id === activeTabId}
           >
-            <InsightsTabPanel
-              isTemplatesTab={tab.id === TEMPLATES_TAB.id}
-              tabManagerActions={actions}
-            />
+            <InsightsTabPanel isTemplatesTab={tab.id === TEMPLATES_TAB.id} />
           </InsightsStateMachineContextProvider>
         ))}
       </div>

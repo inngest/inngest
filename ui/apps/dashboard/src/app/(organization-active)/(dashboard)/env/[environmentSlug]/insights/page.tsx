@@ -4,6 +4,7 @@ import { useState } from 'react';
 
 import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import { useInsightsTabManager } from '@/components/Insights/InsightsTabManager/InsightsTabManager';
+import { TabManagerProvider } from '@/components/Insights/InsightsTabManager/TabManagerContext';
 import { QueryHelperPanel } from '@/components/Insights/QueryHelperPanel';
 
 // NOTE: The usage of isQueryHelperPanelVisible causes re-fetching when toggled,
@@ -18,14 +19,16 @@ function InsightsContent() {
   });
 
   return (
-    <div className="flex h-full w-full flex-1 overflow-hidden">
-      {isQueryHelperPanelVisible && (
-        <div className="w-[240px] flex-shrink-0">
-          <QueryHelperPanel tabManagerActions={actions} />
-        </div>
-      )}
-      <div className="flex h-full w-full flex-1 flex-col overflow-hidden">{tabManager}</div>
-    </div>
+    <TabManagerProvider actions={actions}>
+      <div className="flex h-full w-full flex-1 overflow-hidden">
+        {isQueryHelperPanelVisible && (
+          <div className="w-[240px] flex-shrink-0">
+            <QueryHelperPanel />
+          </div>
+        )}
+        <div className="flex h-full w-full flex-1 flex-col overflow-hidden">{tabManager}</div>
+      </div>
+    </TabManagerProvider>
   );
 }
 
