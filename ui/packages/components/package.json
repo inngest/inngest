@@ -50,7 +50,6 @@
     "react-dom": "^18.2.0",
     "react-json-tree": "^0.20.0",
     "react-use": "^17.4.0",
-    "react-virtual": "^2.10.4",
     "recharts": "^2.4.3",
     "sonner": "^1.2.0",
     "tailwind-merge": "^1.10.0",

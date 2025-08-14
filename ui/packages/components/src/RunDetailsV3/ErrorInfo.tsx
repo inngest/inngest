@@ -4,7 +4,7 @@ import { LinkElement } from '../DetailsCard/NewElement';
 import { useShared } from '../SharedContext/SharedContext';
 import type { InngestStatus } from '../SharedContext/useInngestStatus';
 import { getStatusBackgroundClass, getStatusTextClass } from '../Status/statusClasses';
-import NewTable from '../Table/NewTable';
+import { Table } from '../Table';
 import { OptionalTooltip } from '../Tooltip/OptionalTooltip';
 
 type ErrorTable = {
@@ -73,7 +73,7 @@ export const ErrorInfo = ({ error }: ErrorInfoProps) => {
   return (
     cloud && (
       <div className="my-2">
-        <NewTable
+        <Table
           data={[
             { system: 'Inngest', status: '', error },
             { system: 'App', status: '', error },
