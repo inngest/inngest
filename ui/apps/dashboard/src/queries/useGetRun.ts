@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import type { GetRunPayload } from '@inngest/components/SharedContext/useGetRun';
+import { useCallback } from 'react';
+import type { GetRunPayload, GetRunResult } from '@inngest/components/SharedContext/useGetRun';
 import { useClient } from 'urql';
 
 import { useEnvironment } from '@/components/Environments/environment-context';
@@ -83,45 +83,65 @@ const query = graphql(`
 export function useGetRun() {
   const envID = useEnvironment().id;
   const client = useClient();
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<Error>();
 
-  return async ({ runID, preview }: GetRunPayload) => {
-    setLoading(true);
-    setError(undefined);
-    const res = await client
-      .query(query, { envID, runID, preview: preview ?? false }, { requestPolicy: 'network-only' })
-      .toPromise();
+  return useCallback(
+    async ({ runID, preview }: GetRunPayload): Promise<GetRunResult> => {
+      const result = await client
+        .query(
+          query,
+          { envID, runID, preview: preview ?? false },
+          { requestPolicy: 'network-only' }
+        )
+        .toPromise();
 
-    if (res.error) {
-      throw res.error;
-    }
-    if (!res.data) {
-      throw new Error('no data returned');
-    }
+      if (result.error) {
+        return {
+          loading: false,
+          error: result.error,
+          data: undefined,
+        };
+      }
 
-    const { run } = res.data.workspace;
-    if (!run) {
-      throw new Error('missing run');
-    }
+      if (!result.data) {
+        return {
+          loading: false,
+          error: new Error('no data returned'),
+          data: undefined,
+        };
+      }
 
-    const fn = run.function;
+      const { run } = result.data.workspace;
+      if (!run) {
+        return {
+          loading: false,
+          error: new Error('missing run'),
+          data: undefined,
+        };
+      }
 
-    const trace = getFragmentData(traceDetailsFragment, run.trace);
-    if (!trace) {
-      throw new Error('missing trace');
-    }
+      const fn = run.function;
+      const trace = getFragmentData(traceDetailsFragment, run.trace);
 
-    return {
-      loading,
-      error,
-      data: {
-        ...run,
-        app: fn.app,
-        id: runID,
-        fn,
-        trace,
-      },
-    };
-  };
+      if (!trace) {
+        return {
+          loading: false,
+          error: new Error('missing trace'),
+          data: undefined,
+        };
+      }
+
+      return {
+        loading: false,
+        error: undefined,
+        data: {
+          ...run,
+          app: fn.app,
+          id: runID,
+          fn,
+          trace,
+        },
+      };
+    },
+    [envID, client]
+  );
 }

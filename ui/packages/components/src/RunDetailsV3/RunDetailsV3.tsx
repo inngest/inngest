@@ -1,12 +1,12 @@
 'use client';
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
 
 import { ErrorCard } from '../Error/ErrorCard';
 import type { Run as InitialRunData } from '../RunsPage/types';
 import { useGetRun } from '../SharedContext/useGetRun';
 import { useGetTraceResult } from '../SharedContext/useGetTraceResult';
+import { Skeleton } from '../Skeleton';
 import { StatusCell } from '../Table/Cell';
 import { TriggerDetails } from '../TriggerDetails';
 import { DragDivider } from '../icons/DragDivider';
@@ -29,7 +29,21 @@ type Props = {
 };
 
 const MIN_HEIGHT = 586;
-const NO_SPANS_ERROR = /no function run span found/gi;
+const NO_SPANS_OR_TRACE_ERROR = /no function run span found|trace run not found/gi;
+
+//
+// Do not show the error if queued and can't find the trace or spans (backend timing issue)
+// TODO: do this properly in the backend resolver
+const isWaiting = (status?: string, runError?: Error | null, traceResultError?: Error | null) => {
+  if (status && status !== 'QUEUED') {
+    return false;
+  }
+
+  return (
+    !!runError?.toString().match(NO_SPANS_OR_TRACE_ERROR) ||
+    !!traceResultError?.toString().match(NO_SPANS_OR_TRACE_ERROR)
+  );
+};
 
 export const RunDetailsV3 = ({
   getTrigger,
@@ -49,9 +63,6 @@ export const RunDetailsV3 = ({
   const [isDragging, setIsDragging] = useState(false);
   const [windowHeight, setWindowHeight] = useState(0);
   const { selectedStep } = useStepSelection(runID);
-  const { getTraceResult } = useGetTraceResult();
-
-  const { getRun, error: runError } = useGetRun();
 
   const handleMouseDown = useCallback(() => {
     setIsDragging(true);
@@ -123,31 +134,31 @@ export const RunDetailsV3 = ({
     };
   }, [isDragging, handleMouseMove, handleMouseUp]);
 
-  const runRes = useQuery({
-    queryKey: ['run', runID, { preview: tracesPreviewEnabled }],
-    queryFn: useCallback(() => {
-      return getRun({ runID, preview: tracesPreviewEnabled });
-    }, [getRun, runID, tracesPreviewEnabled]),
-    retry: 3,
+  const {
+    data: runData,
+    loading: runLoading,
+    error: runError,
+    refetch: refetchRun,
+  } = useGetRun({
+    runID,
+    preview: tracesPreviewEnabled,
     refetchInterval: pollInterval,
   });
 
-  const outputID = runRes?.data?.data?.trace.outputID;
-  const resultRes = useQuery({
+  const outputID = runData?.trace?.outputID;
+  const {
+    data: resultData,
+    loading: resultLoading,
+    error: resultError,
+    refetch: refetchResult,
+  } = useGetTraceResult({
+    traceID: outputID,
+    preview: tracesPreviewEnabled,
+    refetchInterval: pollInterval,
     enabled: Boolean(outputID),
-    refetchInterval: pollInterval,
-    queryKey: ['run-result', runID, { preview: tracesPreviewEnabled }],
-    queryFn: useCallback(() => {
-      if (!outputID) {
-        // Unreachable
-        throw new Error('missing outputID');
-      }
-      return getTraceResult({ traceID: outputID, preview: tracesPreviewEnabled });
-    }, [getTraceResult, outputID, tracesPreviewEnabled]),
   });
 
-  const run = runRes.data?.data;
-  if (run?.trace.endedAt && pollInterval) {
+  if (runData?.trace.endedAt && pollInterval) {
     //
     // Stop polling for ended runs, but still give it
     // a few seconds for any lingering userland traces.
@@ -156,23 +167,25 @@ export const RunDetailsV3 = ({
     }, 6000);
   }
 
-  // Do not show the error if queued and the error is no spans
-  const noSpansFoundError =
-    !!runRes.error?.toString().match(NO_SPANS_ERROR) || !!runError?.message.match(NO_SPANS_ERROR);
-  const waiting = initialRunData?.status === 'QUEUED' && noSpansFoundError;
-  const showError = waiting ? false : runRes.error || resultRes.error;
+  const waiting = isWaiting(
+    initialRunData?.status || runData?.trace?.status,
+    runError,
+    resultError
+  );
+  const showError = waiting ? false : runError || resultError;
 
   //
   // works around a variety of layout and scroll issues with our two column layout
-  const dynamicHeight = height < windowHeight * 0.85 ? height : '85vh';
+  const dynamicHeight = standalone ? '85vh' : height < windowHeight * 0.85 ? height : '85vh';
 
   return (
     <>
-      {standalone && run && (
+      {runLoading && <Skeleton className="h-24 w-full" />}
+      {standalone && runData && (
         <div className="border-muted flex flex-row items-start justify-between border-b px-4 pb-4">
           <div className="flex flex-col gap-1">
-            <StatusCell status={run.trace.status} />
-            <p className="text-basis text-2xl font-medium">{run.fn.name}</p>
+            <StatusCell status={runData.trace.status} />
+            <p className="text-basis text-2xl font-medium">{runData.fn.name}</p>
             <p className="text-subtle font-mono">{runID}</p>
           </div>
         </div>
@@ -183,15 +196,15 @@ export const RunDetailsV3 = ({
             <RunInfo
               className="mb-4"
               initialRunData={initialRunData}
-              run={nullishToLazy(run)}
+              run={nullishToLazy(runData)}
               runID={runID}
               standalone={standalone}
-              result={resultRes.data}
+              result={resultData}
             />
             {showError && (
               <ErrorCard
-                error={runRes.error || resultRes.error}
-                reset={runRes.error ? () => runRes.refetch() : () => resultRes.refetch()}
+                error={runError || resultError}
+                reset={runError ? () => refetchRun() : () => refetchResult()}
               />
             )}
           </div>
@@ -202,8 +215,8 @@ export const RunDetailsV3 = ({
                 id: 'trace',
                 node: waiting ? (
                   <Waiting />
-                ) : run ? (
-                  <Timeline runID={runID} trace={run?.trace} />
+                ) : runData ? (
+                  <Timeline runID={runID} trace={runData?.trace} />
                 ) : null,
               },
             ]}
@@ -240,10 +253,11 @@ export const RunDetailsV3 = ({
             />
           ) : (
             <TopInfo
-              slug={run?.fn.slug}
+              slug={runData?.fn.slug}
               getTrigger={getTrigger}
               runID={runID}
-              result={resultRes.data}
+              result={resultData}
+              resultLoading={resultLoading}
             />
           )}
         </div>

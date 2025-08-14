@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { RiCloseLine } from '@remixicon/react';
 
@@ -46,6 +46,10 @@ export const RerunModal = ({ open, setOpen, runID, stepID, input }: RerunModalTy
     setError(null);
     setOpen(false);
   };
+
+  useEffect(() => {
+    setNewInput(input);
+  }, [input]);
 
   return (
     <Modal className="flex max-w-[1200px] flex-col p-6" isOpen={open} onClose={close}>
@@ -98,11 +102,15 @@ export const RerunModal = ({ open, setOpen, runID, stepID, input }: RerunModalTy
             setLoading(true);
             const result = await rerun({
               runID,
-              fromStep: { stepID, input: patchInput(newInput) },
+              fromStep: { stepID, ...(newInput ? { input: patchInput(newInput) } : {}) },
             });
 
+            setLoading(false);
+
             if (result.error) {
-              console.error('rerun from step error', error);
+              console.error('rerun from step error', result.error);
+              setError(result.error);
+              return;
             }
 
             if (result.redirect) {
