@@ -5,7 +5,7 @@ import { useState } from 'react';
 import { useBooleanFlag } from '@/components/FeatureFlags/hooks';
 import { useInsightsTabManager } from '@/components/Insights/InsightsTabManager/InsightsTabManager';
 import { TabManagerProvider } from '@/components/Insights/InsightsTabManager/TabManagerContext';
-import { QueryHelperPanel } from '@/components/Insights/QueryHelperPanel';
+import { QueryHelperPanel } from '@/components/Insights/QueryHelperPanel/QueryHelperPanel';
 import { StoredQueriesProvider } from '@/components/Insights/QueryHelperPanel/StoredQueriesContext';
 
 function InsightsContent() {

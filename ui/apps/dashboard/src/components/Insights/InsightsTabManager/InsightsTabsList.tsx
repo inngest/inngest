@@ -1,6 +1,6 @@
 'use client';
 
-import { Tabs } from '@inngest/components/Tabs';
+import Tabs from '@inngest/components/Tabs/Tabs';
 import {
   RiAddLine,
   RiBookReadLine,
