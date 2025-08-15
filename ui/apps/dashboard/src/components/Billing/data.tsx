@@ -48,6 +48,15 @@ export const entitlementUsageDocument = graphql(`
             }
           }
         }
+        slackChannel {
+          available
+          baseValue
+          maxValue
+          name
+          price
+          purchaseCount
+          quantityPer
+        }
       }
       entitlements {
         runCount {
@@ -85,6 +94,9 @@ export const entitlementUsageDocument = graphql(`
         }
         metricsExportGranularity {
           limit
+        }
+        slackChannel {
+          enabled
         }
       }
       plan {
@@ -151,6 +163,12 @@ export const currentPlanDocument = graphql(`
             quantityPer
           }
           userCount {
+            available
+            price
+            purchaseCount
+            quantityPer
+          }
+          slackChannel {
             available
             price
             purchaseCount
