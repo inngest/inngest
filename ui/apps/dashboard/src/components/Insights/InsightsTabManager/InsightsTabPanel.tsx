@@ -4,16 +4,19 @@ import { InsightsDataTable } from '@/components/Insights/InsightsDataTable/Insig
 import { InsightsSQLEditor } from '@/components/Insights/InsightsSQLEditor/InsightsSQLEditor';
 import { InsightsSQLEditorDownloadCSVButton } from '@/components/Insights/InsightsSQLEditor/InsightsSQLEditorDownloadCSVButton';
 import { InsightsSQLEditorQueryButton } from '@/components/Insights/InsightsSQLEditor/InsightsSQLEditorQueryButton';
+import { InsightsSQLEditorQueryTitle } from '@/components/Insights/InsightsSQLEditor/InsightsSQLEditorQueryTitle';
 import { InsightsSQLEditorSaveQueryButton } from '@/components/Insights/InsightsSQLEditor/InsightsSQLEditorSaveQueryButton';
 import { useInsightsStateMachineContext } from '@/components/Insights/InsightsStateMachineContext/InsightsStateMachineContext';
 import { Section } from '@/components/Insights/Section';
+import type { TabConfig } from './InsightsTabManager';
 import { InsightsTabPanelTemplatesTab } from './InsightsTabPanelTemplatesTab/InsightsTabPanelTemplatesTab';
 
 type InsightsTabPanelProps = {
   isTemplatesTab?: boolean;
+  tab: TabConfig;
 };
 
-export function InsightsTabPanel({ isTemplatesTab }: InsightsTabPanelProps) {
+export function InsightsTabPanel({ isTemplatesTab, tab }: InsightsTabPanelProps) {
   const { status } = useInsightsStateMachineContext();
   const isRunning = status === 'loading';
 
@@ -29,7 +32,7 @@ export function InsightsTabPanel({ isTemplatesTab }: InsightsTabPanelProps) {
           </>
         }
         className="min-h-[255px]"
-        title="Query Editor"
+        title={<InsightsSQLEditorQueryTitle tab={tab} />}
       >
         <InsightsSQLEditor />
       </Section>
