@@ -6,10 +6,17 @@ import { InsightsSQLEditorDownloadCSVButton } from '@/components/Insights/Insigh
 import { InsightsSQLEditorQueryButton } from '@/components/Insights/InsightsSQLEditor/InsightsSQLEditorQueryButton';
 import { useInsightsStateMachineContext } from '@/components/Insights/InsightsStateMachineContext/InsightsStateMachineContext';
 import { Section } from '@/components/Insights/Section';
+import { InsightsTabPanelTemplatesTab } from './InsightsTabPanelTemplatesTab/InsightsTabPanelTemplatesTab';
 
-export function InsightsTabPanel() {
+type InsightsTabPanelProps = {
+  isTemplatesTab?: boolean;
+};
+
+export function InsightsTabPanel({ isTemplatesTab }: InsightsTabPanelProps) {
   const { status } = useInsightsStateMachineContext();
   const isRunning = status === 'loading';
+
+  if (isTemplatesTab) return <InsightsTabPanelTemplatesTab />;
 
   return (
     <>

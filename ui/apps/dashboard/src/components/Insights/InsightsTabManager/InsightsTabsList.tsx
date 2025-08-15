@@ -1,48 +1,63 @@
 'use client';
 
-import TabCards from '@inngest/components/TabCards/TabCards';
-import { ulid } from 'ulid';
+import Tabs from '@inngest/components/Tabs/Tabs';
+import {
+  RiAddLine,
+  RiBookReadLine,
+  RiCodeLine,
+  RiContractLeftLine,
+  RiExpandRightLine,
+} from '@remixicon/react';
 
-import type { TabConfig, TabManagerActions } from './InsightsTabManager';
-
-// TODO: Complete implementation and remove "hide" prop.
+import type { TabConfig } from './InsightsTabManager';
+import { useTabManagerActions } from './TabManagerContext';
+import { TEMPLATES_TAB } from './constants';
 
 interface InsightsTabsListProps {
-  actions: TabManagerActions;
   activeTabId: string;
-  hide?: boolean;
+  isQueryHelperPanelVisible: boolean;
+  onToggleQueryHelperPanelVisibility: () => void;
   tabs: TabConfig[];
 }
 
-export function InsightsTabsList({ actions, activeTabId, hide, tabs }: InsightsTabsListProps) {
-  if (hide) return null;
+export function InsightsTabsList({
+  activeTabId,
+  isQueryHelperPanelVisible,
+  onToggleQueryHelperPanelVisibility,
+  tabs,
+}: InsightsTabsListProps) {
+  const { tabManagerActions } = useTabManagerActions();
 
-  const handleTabChange = (value: string) => {
-    // Don't change the active tab, just create a new one
-    if (value === '__plus') return;
-
-    actions.focusTab(value);
-  };
-
-  const handlePlusClick = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-
-    actions.createTab(ulid());
-  };
+  const ActionTabIcon = isQueryHelperPanelVisible ? RiContractLeftLine : RiExpandRightLine;
 
   return (
-    <TabCards value={activeTabId} onValueChange={handleTabChange}>
-      <TabCards.ButtonList>
+    <Tabs
+      defaultIconBefore={<RiCodeLine size={16} />}
+      onClose={tabManagerActions.closeTab}
+      onValueChange={tabManagerActions.focusTab}
+      value={activeTabId}
+    >
+      <Tabs.List>
+        <Tabs.IconTab
+          icon={<ActionTabIcon size={16} />}
+          onClick={onToggleQueryHelperPanelVisibility}
+          title={`${isQueryHelperPanelVisible ? 'Hide' : 'Show'} sidebar`}
+        />
         {tabs.map((tab) => (
-          <TabCards.Button key={tab.id} value={tab.id}>
+          <Tabs.Tab
+            iconBefore={tab.id === TEMPLATES_TAB.id ? <RiBookReadLine size={16} /> : undefined}
+            key={tab.id}
+            value={tab.id}
+          >
             {tab.name}
-          </TabCards.Button>
+          </Tabs.Tab>
         ))}
-        <TabCards.Button key="__plus" value="__plus" onClick={handlePlusClick}>
-          +
-        </TabCards.Button>
-      </TabCards.ButtonList>
-    </TabCards>
+        <Tabs.IconTab
+          icon={<RiAddLine size={16} />}
+          onClick={tabManagerActions.createNewTab}
+          title="Add new tab"
+        />
+      </Tabs.List>
+    </Tabs>
   );
 }

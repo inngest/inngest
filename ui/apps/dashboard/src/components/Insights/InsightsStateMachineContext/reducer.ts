@@ -45,12 +45,9 @@ export function insightsStateMachineReducer(
         data: undefined,
         error: undefined,
         fetchMoreError: undefined,
-        lastSentQuery: state.query,
+        lastSentQuery: action.payload,
         status: 'loading',
       };
-
-    case 'UPDATE_CONTENT':
-      return { ...state, query: action.payload };
 
     default:
       return state;
