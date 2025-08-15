@@ -28,6 +28,8 @@ export function InsightsTabsList({
 }: InsightsTabsListProps) {
   const { tabManagerActions } = useTabManagerActions();
 
+  const ActionTabIcon = isQueryHelperPanelVisible ? RiContractLeftLine : RiExpandRightLine;
+
   return (
     <Tabs
       defaultIconBefore={<RiCodeLine size={16} />}
@@ -37,13 +39,7 @@ export function InsightsTabsList({
     >
       <Tabs.List>
         <Tabs.IconTab
-          icon={
-            isQueryHelperPanelVisible ? (
-              <RiContractLeftLine size={16} />
-            ) : (
-              <RiExpandRightLine size={16} />
-            )
-          }
+          icon={<ActionTabIcon size={16} />}
           onClick={onToggleQueryHelperPanelVisibility}
           title={`${isQueryHelperPanelVisible ? 'Hide' : 'Show'} sidebar`}
         />

@@ -21,8 +21,8 @@ const BUTTON_CARD_STYLES = `${LAYOUT_CLASSES} ${APPEARANCE_CLASSES} ${INTERACTIO
 const TEMPLATE_KIND_CONFIG: Record<
   TemplateKind,
   {
-    icon: React.ComponentType<{ className?: string }>;
     backgroundColor: string;
+    icon: React.ComponentType<{ className?: string }>;
     textColor: string;
   }
 > = {
