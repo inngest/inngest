@@ -44,10 +44,10 @@ func Command() *cli.Command {
 				Conn:   conn,
 			}
 
-			return context.WithValue(ctx, dbgCtxKey, debugCtx), nil
+			return context.WithValue(ctx, DbgCtxKey, debugCtx), nil
 		},
 		After: func(ctx context.Context, cmd *cli.Command) error {
-			if debugCtx := ctx.Value(dbgCtxKey); debugCtx != nil {
+			if debugCtx := ctx.Value(DbgCtxKey); debugCtx != nil {
 				if dc, ok := debugCtx.(*DebugContext); ok && dc.Conn != nil {
 					return dc.Conn.Close()
 				}
@@ -55,7 +55,7 @@ func Command() *cli.Command {
 			return nil
 		},
 		Commands: []*cli.Command{
-			partitionCommand(),
+			queueCommand(),
 		},
 		Action: func(ctx context.Context, cmd *cli.Command) error {
 			return fmt.Errorf("debug commands not yet implemented - use subcommands")
