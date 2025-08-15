@@ -7,7 +7,7 @@ export interface SectionProps {
   actions?: ReactNode;
   children: ReactNode;
   className?: string;
-  title: string;
+  title: ReactNode;
 }
 
 export function Section({ actions, children, className, title }: SectionProps) {
