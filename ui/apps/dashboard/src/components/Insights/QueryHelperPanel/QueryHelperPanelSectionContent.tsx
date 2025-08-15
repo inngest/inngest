@@ -2,7 +2,6 @@
 
 import { QueryHelperPanelSectionContentNoData } from './QueryHelperPanelSectionContentNoData';
 import { QueryHelperPanelSectionItem } from './QueryHelperPanelSectionItem';
-import { QueryHelperPanelStaticMessage } from './QueryHelperPanelStaticMessage';
 import type { Query } from './types';
 
 interface QueryHelperPanelSectionContentProps {
@@ -54,6 +53,14 @@ export function QueryHelperPanelSectionContent({
           sectionType={sectionType}
         />
       ))}
+    </div>
+  );
+}
+
+function QueryHelperPanelStaticMessage({ children }: React.PropsWithChildren) {
+  return (
+    <div className="text-subtle w-full cursor-default overflow-x-hidden truncate text-ellipsis whitespace-nowrap rounded px-2 py-1.5 text-left text-sm font-medium opacity-60">
+      {children}
     </div>
   );
 }

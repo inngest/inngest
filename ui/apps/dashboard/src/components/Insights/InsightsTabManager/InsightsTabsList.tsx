@@ -15,7 +15,6 @@ import { TEMPLATES_TAB } from './constants';
 
 interface InsightsTabsListProps {
   activeTabId: string;
-  hide?: boolean;
   isQueryHelperPanelVisible: boolean;
   onToggleQueryHelperPanelVisibility: () => void;
   tabs: TabConfig[];
@@ -23,14 +22,11 @@ interface InsightsTabsListProps {
 
 export function InsightsTabsList({
   activeTabId,
-  hide,
   isQueryHelperPanelVisible,
   onToggleQueryHelperPanelVisibility,
   tabs,
 }: InsightsTabsListProps) {
   const { tabManagerActions } = useTabManagerActions();
-
-  if (hide) return null;
 
   return (
     <Tabs
