@@ -4,7 +4,8 @@ import { useCallback, useMemo, useState } from 'react';
 import { ulid } from 'ulid';
 
 import { InsightsStateMachineContextProvider } from '@/components/Insights/InsightsStateMachineContext/InsightsStateMachineContext';
-import type { Query } from '../QueryHelperPanel/types';
+import type { Query, QuerySnapshot, QueryTemplate } from '@/components/Insights/types';
+import { isQuerySnapshot } from '../queries';
 import { InsightsTabPanel } from './InsightsTabPanel';
 import { InsightsTabsList } from './InsightsTabsList';
 import { TEMPLATES_TAB } from './constants';
@@ -19,7 +20,8 @@ export interface TabConfig {
 export interface TabManagerActions {
   closeTab: (id: string) => void;
   createNewTab: () => void;
-  createTabFromQuery: (query: Query) => void;
+  createTabFromQuery: (query: Query | QuerySnapshot) => void;
+  createTabFromTemplate: (template: QueryTemplate) => void;
   focusTab: (id: string) => void;
   openTemplatesTab: () => void;
   updateTabQuery: (id: string, query: string) => void;
@@ -60,7 +62,7 @@ export function useInsightsTabManager(
 
   const createTabBase = useCallback(
     (query: Query): TabConfig[] => {
-      const savedQueryId = query.isSavedQuery ? query.id : undefined;
+      const savedQueryId = query.saved ? query.id : undefined;
       const tabWithSameSavedQueryId =
         savedQueryId !== undefined
           ? tabs.find((tab) => tab.savedQueryId === savedQueryId)
@@ -99,18 +101,40 @@ export function useInsightsTabManager(
         });
       },
       createNewTab: () => {
-        createTabBase({ id: ulid(), isSavedQuery: false, name: 'Untitled query', query: '' });
+        createTabBase({
+          id: ulid(),
+          name: 'Untitled query',
+          query: '',
+          saved: false,
+        });
       },
-      createTabFromQuery: (query: Query) => {
-        const id = query.isSavedQuery ? query.id : ulid();
-        const name = query.isSavedQuery ? query.name : 'Untitled query';
-        createTabBase({ ...query, id, name });
+      createTabFromQuery: (query: Query | QuerySnapshot) => {
+        if (isQuerySnapshot(query)) {
+          createTabBase({
+            id: ulid(),
+            name: 'Untitled query',
+            query: query.query,
+            saved: false,
+          });
+
+          return;
+        }
+
+        createTabBase(query);
+      },
+      createTabFromTemplate: (template: QueryTemplate) => {
+        createTabBase({
+          id: ulid(),
+          name: 'Untitled query',
+          query: template.query,
+          saved: false,
+        });
       },
       focusTab: focusTabBase,
       openTemplatesTab: () => {
         const existingTab = tabs.find((tab) => tab.id === TEMPLATES_TAB.id);
         if (existingTab === undefined) {
-          const newTabs = createTabBase({ ...TEMPLATES_TAB, isSavedQuery: false });
+          const newTabs = createTabBase({ ...TEMPLATES_TAB, saved: false });
           focusTabBase(TEMPLATES_TAB.id, newTabs);
         } else {
           focusTabBase(TEMPLATES_TAB.id);

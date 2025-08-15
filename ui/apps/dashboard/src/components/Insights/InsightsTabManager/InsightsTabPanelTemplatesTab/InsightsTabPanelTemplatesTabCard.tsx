@@ -2,7 +2,7 @@
 
 import { RiAlertLine, RiErrorWarningLine, RiTimeLine } from '@remixicon/react';
 
-import type { Template, TemplateKind } from '../../QueryHelperPanel/types';
+import type { QueryTemplate } from '@/components/Insights/types';
 import { useTabManagerActions } from '../TabManagerContext';
 
 const APPEARANCE_CLASSES = 'bg-canvasBase border-subtle rounded-[4px] border';
@@ -19,7 +19,7 @@ const TITLE_CLASSES = 'text-basis';
 const BUTTON_CARD_STYLES = `${LAYOUT_CLASSES} ${APPEARANCE_CLASSES} ${INTERACTION_CLASSES} ${SPACING_CLASSES} ${TEXT_CLASSES} ${SHADOW_CLASSES}`;
 
 const TEMPLATE_KIND_CONFIG: Record<
-  TemplateKind,
+  QueryTemplate['templateKind'],
   {
     backgroundColor: string;
     icon: React.ComponentType<{ className?: string }>;
@@ -44,7 +44,7 @@ const TEMPLATE_KIND_CONFIG: Record<
 };
 
 interface InsightsTabPanelTemplatesTabCardProps {
-  template: Template;
+  template: QueryTemplate;
 }
 
 export function InsightsTabPanelTemplatesTabCard({
@@ -58,7 +58,7 @@ export function InsightsTabPanelTemplatesTabCard({
     <button
       className={BUTTON_CARD_STYLES}
       onClick={() => {
-        tabManagerActions.createTabFromQuery(template);
+        tabManagerActions.createTabFromTemplate(template);
       }}
     >
       <div

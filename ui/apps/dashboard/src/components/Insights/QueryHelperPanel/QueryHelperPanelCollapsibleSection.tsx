@@ -3,18 +3,13 @@
 import { useState } from 'react';
 import { RiArrowDownSLine } from '@remixicon/react';
 
-import { QueryHelperPanelSectionContent } from './QueryHelperPanelSectionContent';
-import type { Query } from './types';
+import {
+  QueryHelperPanelSectionContent,
+  type QueryHelperPanelSectionContentProps,
+} from './QueryHelperPanelSectionContent';
 
-interface QueryHelperPanelCollapsibleSectionProps {
-  onQuerySelect: (query: Query) => void;
-  queries: {
-    data: undefined | Query[];
-    error: undefined | string;
-    isLoading: boolean;
-  };
+interface QueryHelperPanelCollapsibleSectionProps extends QueryHelperPanelSectionContentProps {
   title: string;
-  sectionType: 'history' | 'saved';
 }
 
 export function QueryHelperPanelCollapsibleSection({

@@ -1,13 +1,13 @@
 'use client';
 
+import type { Query, QuerySnapshot } from '../types';
 import { QueryHelperPanelSectionContentNoData } from './QueryHelperPanelSectionContentNoData';
 import { QueryHelperPanelSectionItem } from './QueryHelperPanelSectionItem';
-import type { Query } from './types';
 
-interface QueryHelperPanelSectionContentProps {
-  onQuerySelect: (query: Query) => void;
+export interface QueryHelperPanelSectionContentProps {
+  onQuerySelect: (query: Query | QuerySnapshot) => void;
   queries: {
-    data: undefined | Query[];
+    data: undefined | Array<Query | QuerySnapshot>;
     error: undefined | string;
     isLoading: boolean;
   };
