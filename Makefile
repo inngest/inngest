@@ -29,6 +29,10 @@ vendor:
 lint:
 	golangci-lint run --verbose
 
+.PHONY: install-tool
+install-tool:
+	go install tool
+
 .PHONY: e2e
 e2e:
 	./tests.sh
@@ -48,6 +52,20 @@ protobuf:
 	buf generate
 	buf generate --path proto/connect/v1 --template proto/connect/v1/buf.gen.yaml
 	buf generate --path proto/debug/v1 --template proto/debug/v1/buf.gen.yaml
+	buf generate --path proto/api/v2 --template proto/api/v2/buf.gen.yaml
+
+.PHONY: openapi-v2
+openapi-v2:
+	mkdir -p docs/api/v2
+	buf generate --path proto/api/v2 --template proto/api/v2/buf.gen.yaml
+
+.PHONY: openapi-v3
+openapi-v3:
+	mkdir -p docs/api/v3
+	for file in docs/api/v2/api/v2/*.swagger.json; do \
+		basename=$$(basename "$$file" .swagger.json); \
+		swagger-codegen3 generate -i "$$file" -l openapi-yaml -o docs/api/v3 --additional-properties=outputFile=$$basename.yaml; \
+	done
 
 # $GOBIN must be set and be in your path for this to work
 .PHONY: queries
