@@ -4,7 +4,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { ulid } from 'ulid';
 
 import { InsightsStateMachineContextProvider } from '@/components/Insights/InsightsStateMachineContext/InsightsStateMachineContext';
-import type { Query } from '../QueryHelperPanel';
+import type { Query } from '../QueryHelperPanel/types';
 import { InsightsTabPanel } from './InsightsTabPanel';
 import { InsightsTabsList } from './InsightsTabsList';
 import { TEMPLATES_TAB } from './constants';
