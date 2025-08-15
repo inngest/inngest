@@ -4,11 +4,11 @@ import { useEffect, useRef, useState } from 'react';
 import { OptionalTooltip } from '@inngest/components/Tooltip/OptionalTooltip';
 import { RiBookmarkLine, RiHistoryLine } from '@remixicon/react';
 
-import type { Query } from './types';
+import type { Query, QuerySnapshot } from '../types';
 
 interface QueryHelperPanelSectionItemProps {
-  onQuerySelect: (query: Query) => void;
-  query: Query;
+  onQuerySelect: (query: Query | QuerySnapshot) => void;
+  query: Query | QuerySnapshot;
   sectionType: 'history' | 'saved';
 }
 
