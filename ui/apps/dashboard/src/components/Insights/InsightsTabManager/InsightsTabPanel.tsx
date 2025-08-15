@@ -4,6 +4,7 @@ import { InsightsDataTable } from '@/components/Insights/InsightsDataTable/Insig
 import { InsightsSQLEditor } from '@/components/Insights/InsightsSQLEditor/InsightsSQLEditor';
 import { InsightsSQLEditorDownloadCSVButton } from '@/components/Insights/InsightsSQLEditor/InsightsSQLEditorDownloadCSVButton';
 import { InsightsSQLEditorQueryButton } from '@/components/Insights/InsightsSQLEditor/InsightsSQLEditorQueryButton';
+import { InsightsSQLEditorSaveQueryButton } from '@/components/Insights/InsightsSQLEditor/InsightsSQLEditorSaveQueryButton';
 import { useInsightsStateMachineContext } from '@/components/Insights/InsightsStateMachineContext/InsightsStateMachineContext';
 import { Section } from '@/components/Insights/Section';
 import { InsightsTabPanelTemplatesTab } from './InsightsTabPanelTemplatesTab/InsightsTabPanelTemplatesTab';
@@ -21,7 +22,12 @@ export function InsightsTabPanel({ isTemplatesTab }: InsightsTabPanelProps) {
   return (
     <>
       <Section
-        actions={<InsightsSQLEditorQueryButton />}
+        actions={
+          <>
+            <InsightsSQLEditorSaveQueryButton />
+            <InsightsSQLEditorQueryButton />
+          </>
+        }
         className="min-h-[255px]"
         title="Query Editor"
       >
