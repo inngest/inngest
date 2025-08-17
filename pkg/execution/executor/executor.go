@@ -84,7 +84,7 @@ var (
 // can be directly executed next and saves a state.Pause for edges that have async conditions.
 func NewExecutor(opts ...ExecutorOpt) (execution.Executor, error) {
 	m := &executor{
-		runtimeDrivers: map[string]driver.Driver{},
+		runtimeDrivers: map[string]driver.DriverV1{},
 	}
 
 	for _, o := range opts {
@@ -253,16 +253,16 @@ func WithEvaluatorFactory(f func(ctx context.Context, expr string) (expressions.
 // WithRuntimeDrivers specifies the drivers available to use when executing steps
 // of a function.
 //
-// When invoking a step in a function, we find the registered driver with the step's
-// RuntimeType() and use that driver to execute the step.
-func WithRuntimeDrivers(drivers ...driver.Driver) ExecutorOpt {
+// When invoking a step in a function, we find the registered driver with the step's URI
+// and use that driver to execute the step.
+func WithRuntimeDrivers(drivers ...driver.DriverV1) ExecutorOpt {
 	return func(exec execution.Executor) error {
 		e := exec.(*executor)
 		for _, d := range drivers {
-			if _, ok := e.runtimeDrivers[d.RuntimeType()]; ok {
+			if _, ok := e.runtimeDrivers[d.Name()]; ok {
 				return ErrRuntimeRegistered
 			}
-			e.runtimeDrivers[d.RuntimeType()] = d
+			e.runtimeDrivers[d.Name()] = d
 
 		}
 		return nil
@@ -344,7 +344,7 @@ type executor struct {
 	singletonMgr        singleton.Singleton
 	fl                  state.FunctionLoader
 	evalFactory         func(ctx context.Context, expr string) (expressions.Evaluator, error)
-	runtimeDrivers      map[string]driver.Driver
+	runtimeDrivers      map[string]driver.DriverV1
 	finishHandler       execution.FinalizePublisher
 	invokeFailHandler   execution.InvokeFailHandler
 	handleSendingEvent  execution.HandleSendingEvent
@@ -1519,12 +1519,12 @@ func (e *executor) executeDriverForStep(ctx context.Context, i *runInstance) (*s
 
 	response, err := d.Execute(ctx, e.smv2, i.md, i.item, i.edge, *step, i.stackIndex, i.item.Attempt)
 
-	// TODO: Steps.
 	if response == nil {
 		response = &state.DriverResponse{
 			Step: *step,
 		}
 	}
+
 	if err != nil && response.Err == nil {
 		var serr syscode.Error
 		if errors.As(err, &serr) {

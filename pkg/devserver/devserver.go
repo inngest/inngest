@@ -378,7 +378,7 @@ func start(ctx context.Context, opts StartOpts) error {
 	httpClient.Client.Transport = awsgateway.NewTransformTripper(httpClient.Client.Transport)
 	deploy.Client.Transport = awsgateway.NewTransformTripper(deploy.Client.Transport)
 
-	drivers := []driver.Driver{}
+	drivers := []driver.DriverV1{}
 	for _, driverConfig := range opts.Config.Execution.Drivers {
 		d, err := driverConfig.NewDriver(registration.NewDriverOpts{
 			ConnectForwarder:       executorProxy,
