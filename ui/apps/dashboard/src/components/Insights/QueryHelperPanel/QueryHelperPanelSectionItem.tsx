@@ -78,7 +78,7 @@ export function QueryHelperPanelSectionItem({
                 e.stopPropagation();
 
                 if (sectionType === 'saved') setShowDeleteModal(true);
-                else onQueryDelete?.(query.id);
+                else onQueryDelete(query.id);
               }}
               size="small"
               tooltip="Delete query"
@@ -94,7 +94,7 @@ export function QueryHelperPanelSectionItem({
         isOpen={showDeleteModal}
         onClose={() => setShowDeleteModal(false)}
         onSubmit={() => {
-          onQueryDelete?.(query.id);
+          onQueryDelete(query.id);
           setShowDeleteModal(false);
         }}
         title="Remove query"
