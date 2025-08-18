@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Input } from '@inngest/components/Forms/Input';
 import { cn } from '@inngest/components/utils/classNames';
 
+import { useInsightsStateMachineContext } from '@/components/Insights/InsightsStateMachineContext/InsightsStateMachineContext';
 import type { TabConfig } from '../InsightsTabManager/InsightsTabManager';
 
 type InsightsSQLEditorQueryTitleProps = {
@@ -11,9 +12,9 @@ type InsightsSQLEditorQueryTitleProps = {
 };
 
 export function InsightsSQLEditorQueryTitle({ tab }: InsightsSQLEditorQueryTitleProps) {
+  const { queryName, onNameChange } = useInsightsStateMachineContext();
   const [isEditing, setIsEditing] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
-  const [queryTitle, setQueryTitle] = useState(tab.name);
   const inputRef = useRef<HTMLInputElement>(null);
 
   // Auto-focus and select all text when entering edit mode
@@ -33,7 +34,7 @@ export function InsightsSQLEditorQueryTitle({ tab }: InsightsSQLEditorQueryTitle
           setIsEditing(false);
           setIsHovered(false);
         }}
-        onChange={(e) => setQueryTitle(e.target.value)}
+        onChange={(e) => onNameChange(e.target.value)}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === 'Escape') {
             e.preventDefault();
@@ -41,7 +42,7 @@ export function InsightsSQLEditorQueryTitle({ tab }: InsightsSQLEditorQueryTitle
           }
         }}
         ref={inputRef}
-        value={queryTitle}
+        value={queryName}
       />
     );
   }
@@ -60,7 +61,7 @@ export function InsightsSQLEditorQueryTitle({ tab }: InsightsSQLEditorQueryTitle
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
-      {queryTitle}
+      {queryName}
     </div>
   );
 }

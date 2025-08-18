@@ -25,6 +25,7 @@ export interface TabManagerActions {
   focusTab: (id: string) => void;
   openTemplatesTab: () => void;
   updateTabQuery: (id: string, query: string) => void;
+  updateTabName: (id: string, name: string) => void;
 }
 
 export interface UseInsightsTabManagerReturn {
@@ -140,6 +141,9 @@ export function useInsightsTabManager(
           focusTabBase(TEMPLATES_TAB.id);
         }
       },
+      updateTabName: (id: string, name: string) => {
+        setTabs((prevTabs) => prevTabs.map((tab) => (tab.id === id ? { ...tab, name } : tab)));
+      },
       updateTabQuery: (id: string, query: string) => {
         setTabs((prevTabs) => prevTabs.map((tab) => (tab.id === id ? { ...tab, query } : tab)));
       },
@@ -197,7 +201,9 @@ function InsightsTabManagerInternal({
           <InsightsStateMachineContextProvider
             key={tab.id}
             onQueryChange={(query) => actions.updateTabQuery(tab.id, query)}
+            onQueryNameChange={(name) => actions.updateTabName(tab.id, name)}
             query={tab.query}
+            queryName={tab.name}
             renderChildren={tab.id === activeTabId}
           >
             <InsightsTabPanel isTemplatesTab={tab.id === TEMPLATES_TAB.id} tab={tab} />

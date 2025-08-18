@@ -27,7 +27,7 @@ export function InsightsTabPanel({ isTemplatesTab, tab }: InsightsTabPanelProps)
       <Section
         actions={
           <>
-            <InsightsSQLEditorSaveQueryButton />
+            <InsightsSQLEditorSaveQueryButton tab={tab} />
             <InsightsSQLEditorQueryButton />
           </>
         }

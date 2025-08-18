@@ -20,7 +20,9 @@ interface InsightsStateMachineContextValue extends InsightsState {
   fetchMore: () => void;
   isEmpty: boolean;
   onChange: (value: string) => void;
+  onNameChange: (name: string) => void;
   query: string;
+  queryName: string;
   runQuery: () => void;
 }
 
@@ -29,14 +31,18 @@ const InsightsStateMachineContext = createContext<InsightsStateMachineContextVal
 type InsightsStateMachineContextProviderProps = {
   children: ReactNode;
   onQueryChange: (query: string) => void;
+  onQueryNameChange: (name: string) => void;
   query: string;
+  queryName: string;
   renderChildren: boolean;
 };
 
 export function InsightsStateMachineContextProvider({
   children,
   onQueryChange,
+  onQueryNameChange,
   query,
+  queryName,
   renderChildren,
 }: InsightsStateMachineContextProviderProps) {
   const [queryState, dispatch] = useReducer(insightsStateMachineReducer, INITIAL_STATE);
@@ -81,9 +87,11 @@ export function InsightsStateMachineContextProvider({
       value={{
         ...queryState,
         query,
+        queryName,
         fetchMore,
         isEmpty: query.trim() === '',
         onChange: onQueryChange,
+        onNameChange: onQueryNameChange,
         runQuery,
       }}
     >
