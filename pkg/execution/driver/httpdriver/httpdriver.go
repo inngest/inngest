@@ -90,6 +90,9 @@ func (e executor) Execute(ctx context.Context, sl sv2.StateLoader, s sv2.Metadat
 	}
 
 	dr, _, err := ExecuteDriverRequest(ctx, e.Client, Request{
+		AccountID:  s.ID.Tenant.AccountID,
+		WorkflowID: s.ID.FunctionID,
+		RunID:      s.ID.RunID,
 		SigningKey: e.localSigningKey,
 		URL:        *uri,
 		Input:      input,
@@ -283,9 +286,11 @@ func do(ctx context.Context, c exechttp.RequestExecutor, r Request) (*Response, 
 		req.Header.Add(AccountIDHeader, r.AccountID.String())
 	}
 
-	if len(r.SigningKey) > 0 {
+	if len(r.SigningKey) > 0 && len(r.Signature) == 0 {
+		// Attempt to sign
 		req.Header.Add("X-Inngest-Signature", Sign(ctx, r.SigningKey, r.Input))
 	}
+
 	if len(r.Signature) > 0 {
 		// Use this if provided, and override any sig added.
 		req.Header.Add("X-Inngest-Signature", r.Signature)
@@ -294,6 +299,9 @@ func do(ctx context.Context, c exechttp.RequestExecutor, r Request) (*Response, 
 	for k, v := range r.Headers {
 		req.Header.Add(k, v)
 	}
+
+	// Always add the run ID
+	req.Header.Add("X-Run-ID", r.RunID.String())
 
 	// Perform the request.
 	resp, err := c.DoRequest(ctx, req)
