@@ -495,6 +495,24 @@ func (i *Item) UnmarshalJSON(b []byte) error {
 			return err
 		}
 		i.Payload = *p
+	case KindFunctionPause:
+		if len(temp.Payload) == 0 {
+			return nil
+		}
+		p := &PayloadPauseFunction{}
+		if err := json.Unmarshal(temp.Payload, p); err != nil {
+			return err
+		}
+		i.Payload = *p
+	case KindFunctionUnpause:
+		if len(temp.Payload) == 0 {
+			return nil
+		}
+		p := &PayloadUnpauseFunction{}
+		if err := json.Unmarshal(temp.Payload, p); err != nil {
+			return err
+		}
+		i.Payload = *p
 	}
 	return nil
 }
@@ -538,6 +556,14 @@ type PayloadPauseTimeout struct {
 	// should not exist in the pause, as it already exists in the queue item.
 	Pause state.Pause `json:"pause"`
 }
+
+// PayloadPauseFunction represents the queue item payload for the internal system queue for
+// pausing functions reliably. The IDs are retrieved from the identifier.
+type PayloadPauseFunction struct{}
+
+// PayloadUnpauseFunction represents the queue item payload for the internal system queue for
+// unpausing functions reliably. The IDs are retrieved from the identifier.
+type PayloadUnpauseFunction struct{}
 
 func HashID(_ context.Context, id string) string {
 	ui := xxhash.Sum64String(id)
