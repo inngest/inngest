@@ -5,7 +5,7 @@
 In the root directory of this repository, start the CLI using the `dev` command. For example:
 
 ```sh
-go run ./cmd/main.go dev -u http://localhost:3000/api/inngest
+go run ./cmd dev -u http://localhost:3000/api/inngest
 ```
 
 Then in this directory, run the UI in dev mode. This will run Next.js and GraphQL codegen concurrently:
@@ -25,7 +25,7 @@ To force running the codegen run `pnpm dev:codegen`.
 You can pass feature flags to the dev server locally like so:
 
 ```
-INNGEST_FEATURE_FLAGS="step-over-debugger=true,some-other-flag=false" go run ./cmd/main.go dev
+INNGEST_FEATURE_FLAGS="step-over-debugger=true,some-other-flag=false" go run ./cmd dev
 ```
 
 Then, in shared components you can use the share `useBooleanFlag` hook and the flag will be checked in the appropriate place in either the dev server or cloud:
