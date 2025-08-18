@@ -79,6 +79,12 @@ func WithServiceBatcher(b batch.BatchManager) func(s *svc) {
 	}
 }
 
+func WithServiceCroner(c cron.CronManager) func(s *svc) {
+	return func(s *svc) {
+		s.croner = c
+	}
+}
+
 func WithServiceLogger(l logger.Logger) func(s *svc) {
 	return func(s *svc) {
 		s.log = l
@@ -128,6 +134,7 @@ type svc struct {
 	exec          execution.Executor
 	debouncer     debounce.Debouncer
 	batcher       batch.BatchManager
+	croner        cron.CronManager
 	log           logger.Logger
 	shardSelector redis_state.ShardSelector
 

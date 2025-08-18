@@ -9,7 +9,8 @@ import (
 
 // CronManager represents the handling of cron
 type CronManager interface {
-	ScheduleNext(ctx context.Context)
+	ScheduleNext(ctx context.Context) error
+	UpsertSchedule(ctx context.Context, fnID uuid.UUID) error
 }
 
 // CronItem represent an item that can be scheduled via the cron expression
