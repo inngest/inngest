@@ -2,11 +2,10 @@ package redis_state
 
 import (
 	"context"
+	"crypto/rand"
 	"fmt"
 	"testing"
 	"time"
-
-	"crypto/rand"
 
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/consts"
