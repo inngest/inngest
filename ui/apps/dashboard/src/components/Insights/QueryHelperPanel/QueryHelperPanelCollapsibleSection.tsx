@@ -11,12 +11,14 @@ import {
 
 interface QueryHelperPanelCollapsibleSectionProps extends QueryHelperPanelSectionContentProps {
   activeTabId: string;
+  onQueryDelete?: (queryId: string) => void;
   tabs: TabConfig[];
   title: string;
 }
 
 export function QueryHelperPanelCollapsibleSection({
   activeTabId,
+  onQueryDelete,
   onQuerySelect,
   queries,
   sectionType,
@@ -43,6 +45,7 @@ export function QueryHelperPanelCollapsibleSection({
       {isOpen && (
         <QueryHelperPanelSectionContent
           activeTabId={activeTabId}
+          onQueryDelete={onQueryDelete}
           onQuerySelect={onQuerySelect}
           queries={queries}
           sectionType={sectionType}

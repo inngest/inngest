@@ -1,14 +1,17 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { Button } from '@inngest/components/Button/Button';
 import { OptionalTooltip } from '@inngest/components/Tooltip/OptionalTooltip';
-import { RiBookmarkLine, RiHistoryLine } from '@remixicon/react';
+import { cn } from '@inngest/components/utils/classNames';
+import { RiBookmarkLine, RiCloseLargeLine, RiHistoryLine } from '@remixicon/react';
 
 import type { TabConfig } from '@/components/Insights/InsightsTabManager/InsightsTabManager';
 import type { Query, QuerySnapshot } from '../types';
 
 interface QueryHelperPanelSectionItemProps {
   activeTabId: string;
+  onQueryDelete?: (queryId: string) => void;
   onQuerySelect: (query: Query | QuerySnapshot) => void;
   query: Query | QuerySnapshot;
   sectionType: 'history' | 'saved';
@@ -17,18 +20,21 @@ interface QueryHelperPanelSectionItemProps {
 
 export function QueryHelperPanelSectionItem({
   activeTabId,
-  query,
+  onQueryDelete,
   onQuerySelect,
+  query,
   sectionType,
   tabs,
 }: QueryHelperPanelSectionItemProps) {
   const textRef = useRef<HTMLSpanElement>(null);
   const [isTruncated, setIsTruncated] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
 
   const displayText = query.name;
   const Icon = sectionType === 'saved' ? RiBookmarkLine : RiHistoryLine;
 
   const isActiveTab = getIsActiveTab(activeTabId, tabs, query);
+  const canDelete = sectionType === 'saved' && onQueryDelete;
 
   useEffect(() => {
     const el = textRef.current;
@@ -37,21 +43,49 @@ export function QueryHelperPanelSectionItem({
     setIsTruncated(el.scrollWidth > el.clientWidth);
   }, [displayText]);
 
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onQueryDelete) {
+      onQueryDelete(query.id);
+    }
+  };
+
   return (
     <OptionalTooltip side="right" tooltip={isTruncated ? displayText : ''}>
-      <button
-        className={`text-subtle flex w-full cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-left text-sm transition-colors ${
+      <div
+        className={cn(
+          'text-subtle flex w-full cursor-pointer items-center gap-2 rounded px-2 py-1.5 text-left text-sm transition-colors',
           isActiveTab ? 'bg-canvasSubtle' : 'hover:bg-canvasSubtle'
-        }`}
+        )}
         onClick={() => {
           onQuerySelect(query);
         }}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
       >
         <Icon className="h-4 w-4 flex-shrink-0" />
-        <span ref={textRef} className="overflow-hidden truncate text-ellipsis whitespace-nowrap">
+        <span
+          ref={textRef}
+          className="flex-1 overflow-hidden truncate text-ellipsis whitespace-nowrap"
+        >
           {displayText}
         </span>
-      </button>
+        <div className="flex h-4 w-4 flex-shrink-0 items-center justify-center">
+          {canDelete ? (
+            <Button
+              appearance="ghost"
+              className={cn(
+                'text-subtle h-4 w-4 p-0 transition-all',
+                isHovered ? 'opacity-100' : 'opacity-0'
+              )}
+              icon={<RiCloseLargeLine className="h-3 w-3" />}
+              onClick={handleDelete}
+              size="small"
+              tooltip="Delete query"
+            />
+          ) : null}
+        </div>
+      </div>
     </OptionalTooltip>
   );
 }

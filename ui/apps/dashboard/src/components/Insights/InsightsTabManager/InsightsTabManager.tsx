@@ -18,6 +18,7 @@ export interface TabConfig {
 }
 
 export interface TabManagerActions {
+  breakQueryAssociation: (savedQueryId: string) => void;
   closeTab: (id: string) => void;
   createNewTab: () => void;
   createTabFromQuery: (query: Query | QuerySnapshot) => void;
@@ -85,6 +86,13 @@ export function useInsightsTabManager(
 
   const actions = useMemo(
     () => ({
+      breakQueryAssociation: (savedQueryId: string) => {
+        setTabs((prevTabs) =>
+          prevTabs.map((tab) =>
+            tab.savedQueryId === savedQueryId ? { ...tab, savedQueryId: undefined } : tab
+          )
+        );
+      },
       closeTab: (id: string) => {
         setTabs((prevTabs) => {
           if (prevTabs.find((tab) => tab.id === id) === undefined) {

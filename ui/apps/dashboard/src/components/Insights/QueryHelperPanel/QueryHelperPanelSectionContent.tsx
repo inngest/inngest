@@ -7,6 +7,7 @@ import { QueryHelperPanelSectionItem } from './QueryHelperPanelSectionItem';
 
 export interface QueryHelperPanelSectionContentProps {
   activeTabId: string;
+  onQueryDelete?: (queryId: string) => void;
   onQuerySelect: (query: Query | QuerySnapshot) => void;
   queries: {
     data: undefined | Array<Query | QuerySnapshot>;
@@ -19,6 +20,7 @@ export interface QueryHelperPanelSectionContentProps {
 
 export function QueryHelperPanelSectionContent({
   activeTabId,
+  onQueryDelete,
   onQuerySelect,
   queries,
   sectionType,
@@ -54,6 +56,7 @@ export function QueryHelperPanelSectionContent({
         <QueryHelperPanelSectionItem
           activeTabId={activeTabId}
           key={query.id}
+          onQueryDelete={onQueryDelete}
           onQuerySelect={onQuerySelect}
           query={query}
           sectionType={sectionType}
