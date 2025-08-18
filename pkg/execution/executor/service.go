@@ -16,6 +16,7 @@ import (
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/batch"
+	"github.com/inngest/inngest/pkg/execution/cron"
 	"github.com/inngest/inngest/pkg/execution/debounce"
 	"github.com/inngest/inngest/pkg/execution/queue"
 	"github.com/inngest/inngest/pkg/execution/state"
@@ -257,6 +258,8 @@ func (s *svc) Run(ctx context.Context) error {
 			err = s.handleScheduledBatch(ctx, item)
 		case queue.KindCancel:
 			err = s.handleCancel(ctx, item)
+		case queue.KindCronSync:
+			err = s.handleCronSync(ctx, item)
 		case queue.KindCron:
 			err = s.handleCron(ctx, item)
 		case queue.KindQueueMigrate:
@@ -643,13 +646,30 @@ func (s *svc) handleCancel(ctx context.Context, item queue.Item) error {
 	return nil
 }
 
+func (s *svc) handleCronSync(ctx context.Context, item queue.Item) error {
+	l := s.log.With("handler", "cron-sync")
+
+	var ci cron.CronItem
+	if err := json.Unmarshal(item.Payload.(json.RawMessage), &ci); err != nil {
+		return fmt.Errorf("error unmarshalling cron item: %w", err)
+	}
+	l.Info("cron sync", "item", ci) // TODO change to trace
+
+	// TODO
+	// 2. delete and dequeue existing queue item
+	// 3. enqueue item for next schedule
+	// 4. update hash map for reference
+	return nil
+}
+
 func (s *svc) handleCron(ctx context.Context, item queue.Item) error {
 	// TODO
 	// 1. unmarshall payload
-	// 2. retrieve latest function config
-	// 3. if version is lower than config, return
+	// 2. check against latest hash mapping
+	// 3. if item is not included, return
 	// 4. schedule cron item to run
 	// 5. enqueue next schedule
+	// 6. update hash with queue item ID
 	return fmt.Errorf("not implemented")
 }
 

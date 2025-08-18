@@ -18,6 +18,8 @@ import (
 	"github.com/inngest/inngest/pkg/cqrs/sync"
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/cron"
+	"github.com/inngest/inngest/pkg/execution/queue"
+	"github.com/inngest/inngest/pkg/execution/state"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -319,8 +321,32 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 			l.Error("error registering functions", "error", err)
 		}
 
-		// TODO
 		// enqueue cron sync to system queue
+		maxAttempts := consts.MaxRetries + 1
+		queueName := queue.KindCronSync
+		for _, ci := range crons {
+			at := ulid.Time(ci.ID.Time())
+			jobID := ci.ID.String()
+			if err := a.devserver.Queue.Enqueue(ctx, queue.Item{
+				JobID:       &jobID,
+				GroupID:     uuid.New().String(),
+				WorkspaceID: ci.WorkspaceID,
+				Kind:        queue.KindCronSync,
+				Identifier: state.Identifier{
+					AccountID:       ci.AccountID,
+					WorkspaceID:     ci.WorkspaceID,
+					AppID:           ci.AppID,
+					WorkflowID:      ci.FunctionID,
+					WorkflowVersion: ci.FunctionVersion,
+					Key:             ci.ID.String(),
+				},
+				MaxAttempts: &maxAttempts,
+				Payload:     ci,
+				QueueName:   &queueName,
+			}, at, queue.EnqueueOpts{}); err != nil {
+				l.Error("error enqueueing cron sync job", "error", err, "cron_item", ci)
+			}
+		}
 	}()
 
 	// Get a list of all functions
