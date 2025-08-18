@@ -42,6 +42,7 @@ import (
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/batch"
+	"github.com/inngest/inngest/pkg/execution/cron"
 	"github.com/inngest/inngest/pkg/execution/debounce"
 	"github.com/inngest/inngest/pkg/execution/driver"
 	"github.com/inngest/inngest/pkg/execution/driver/httpv2"
@@ -342,6 +343,7 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	batcher := batch.NewRedisBatchManager(shardedClient.Batch(), rq, batch.WithLogger(l))
 	debouncer := debounce.NewRedisDebouncer(unshardedClient.Debounce(), queueShard, rq)
+	croner := cron.NewRedisCronManager()
 
 	sn := singleton.New(ctx, queueShards, shardSelector)
 
@@ -481,6 +483,7 @@ func start(ctx context.Context, opts StartOpts) error {
 		executor.WithServiceExecutor(exec),
 		executor.WithServiceBatcher(batcher),
 		executor.WithServiceDebouncer(debouncer),
+		executor.WithServiceCroner(croner),
 		executor.WithServiceLogger(l),
 		executor.WithServiceShardSelector(shardSelector),
 		executor.WithServiceEnableKeyQueues(func(ctx context.Context, acctID uuid.UUID) bool {
