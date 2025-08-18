@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useReducer, type ReactNode } from 'react';
 
-import { useStoredQueries } from '../InsightsProvider';
+import { useStoredQueries } from '../QueryHelperPanel/StoredQueriesContext';
 import { makeQuerySnapshot } from '../queries';
 import { simulateQuery } from './mocks';
 import { insightsStateMachineReducer } from './reducer';
