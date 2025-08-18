@@ -9,16 +9,19 @@ import { ulid } from 'ulid';
 import { useInsightsStateMachineContext } from '@/components/Insights/InsightsStateMachineContext/InsightsStateMachineContext';
 import type { TabConfig } from '@/components/Insights/InsightsTabManager/InsightsTabManager';
 import { useStoredQueries } from '@/components/Insights/QueryHelperPanel/StoredQueriesContext';
+import { hasSavedQueryWithUnsavedChanges } from '../InsightsTabManager/InsightsTabManager';
 
 type InsightsSQLEditorSaveQueryButtonProps = {
   tab: TabConfig;
 };
 
 export function InsightsSQLEditorSaveQueryButton({ tab }: InsightsSQLEditorSaveQueryButtonProps) {
-  const { saveQuery } = useStoredQueries();
+  const { queries, saveQuery } = useStoredQueries();
   const { query, queryName } = useInsightsStateMachineContext();
 
-  const disabled = queryName === '';
+  const isSavedQuery = tab.savedQueryId !== undefined;
+  const disabled =
+    queryName === '' || (isSavedQuery && !hasSavedQueryWithUnsavedChanges(tab, queries));
   const Icon = tab.savedQueryId ? RiBookmarkFill : RiBookmarkLine;
 
   return (

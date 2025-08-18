@@ -246,7 +246,10 @@ function getNewActiveTabAfterClose(
   return newlySelectedTabId;
 }
 
-export function hasUnsavedChanges(tab: TabConfig, savedQueries: Record<string, Query>): boolean {
+export function hasSavedQueryWithUnsavedChanges(
+  tab: TabConfig,
+  savedQueries: Record<string, Query>
+): boolean {
   if (tab.savedQueryId === undefined) return false;
 
   const savedQuery = savedQueries[tab.savedQueryId];
