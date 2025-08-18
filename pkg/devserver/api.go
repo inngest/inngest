@@ -2,6 +2,7 @@ package devserver
 
 import (
 	"context"
+	"crypto/rand"
 	"database/sql"
 	_ "embed"
 	"encoding/json"
@@ -16,6 +17,7 @@ import (
 
 	"github.com/inngest/inngest/pkg/cqrs/sync"
 	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/execution/cron"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
@@ -267,6 +269,9 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 		}
 	}
 
+	// setup a list of crons to be upserted into the queue for scheduling
+	var crons []cron.CronItem
+
 	// Attempt to get the existing app by URL, and delete it if possible.
 	// We're going to recreate it below.
 	//
@@ -313,6 +318,9 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 		if err != nil {
 			l.Error("error registering functions", "error", err)
 		}
+
+		// TODO
+		// enqueue cron sync to system queue
 	}()
 
 	// Get a list of all functions
@@ -350,6 +358,17 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 			if err != nil {
 				return nil, publicerr.Wrap(err, 500, "Error updating function config")
 			}
+			if fn.IsScheduled() {
+				crons = append(crons, cron.CronItem{
+					ID:              ulid.MustNew(ulid.Now(), rand.Reader),
+					AccountID:       consts.DevServerAccountID,
+					WorkspaceID:     consts.DevServerEnvID,
+					AppID:           appID,
+					FunctionID:      fn.ID,
+					FunctionVersion: fn.FunctionVersion, // TODO set the next function version
+					Expression:      fn.ScheduleExpression(),
+				})
+			}
 			continue
 		}
 
@@ -364,6 +383,18 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 		if err != nil {
 			err = fmt.Errorf("Function %s is invalid: %w", fn.Slug, err)
 			return nil, publicerr.Wrap(err, 500, "Error saving function")
+		}
+
+		if fn.IsScheduled() {
+			crons = append(crons, cron.CronItem{
+				ID:              ulid.MustNew(ulid.Now(), rand.Reader),
+				AccountID:       consts.DevServerAccountID,
+				WorkspaceID:     consts.DevServerEnvID,
+				AppID:           appID,
+				FunctionID:      fn.ID,
+				FunctionVersion: fn.FunctionVersion, // TODO set the next function version
+				Expression:      fn.ScheduleExpression(),
+			})
 		}
 	}
 
