@@ -115,10 +115,6 @@ export function Table<T>({
                 return (
                   <th
                     key={header.id}
-                    style={{
-                      width: header.getSize(),
-                      maxWidth: header.getSize(),
-                    }}
                     className={cn(
                       isIconOnlyColumn ? '' : tableColumnStyles,
                       'text-muted text-left text-xs font-medium'
@@ -191,10 +187,6 @@ export function Table<T>({
                     return (
                       <td
                         key={cell.id}
-                        style={{
-                          width: cell.column.getSize(),
-                          maxWidth: cell.column.getSize(),
-                        }}
                         className={cn(
                           i === 0 && hasId(row.original) && expandedIDs.includes(row.original.id)
                             ? expandedRowSideBorder
