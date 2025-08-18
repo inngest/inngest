@@ -559,11 +559,17 @@ type PayloadPauseTimeout struct {
 
 // PayloadPauseFunction represents the queue item payload for the internal system queue for
 // pausing functions reliably. The IDs are retrieved from the identifier.
-type PayloadPauseFunction struct{}
+type PayloadPauseFunction struct {
+	// PausedAt represents the unix timestamp in milliseconds when the user requested to pause the function.
+	PausedAt int64 `json:"pat"`
+}
 
 // PayloadUnpauseFunction represents the queue item payload for the internal system queue for
 // unpausing functions reliably. The IDs are retrieved from the identifier.
-type PayloadUnpauseFunction struct{}
+type PayloadUnpauseFunction struct {
+	// UnpausedAt represents the unix timestamp in milliseconds when the user requested to unpause the function.
+	UnpausedAt int64 `json:"upat"`
+}
 
 func HashID(_ context.Context, id string) string {
 	ui := xxhash.Sum64String(id)
