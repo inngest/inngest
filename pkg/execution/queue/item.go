@@ -562,6 +562,9 @@ type PayloadPauseTimeout struct {
 type PayloadPauseFunction struct {
 	// PausedAt represents the unix timestamp in milliseconds when the user requested to pause the function.
 	PausedAt int64 `json:"pat"`
+
+	// CancelRunningImmediately determines whether pending jobs should be cancelled immediately or after a set duration.
+	CancelRunningImmediately bool `json:"cri,omitempty"`
 }
 
 // PayloadUnpauseFunction represents the queue item payload for the internal system queue for
