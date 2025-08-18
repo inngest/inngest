@@ -2,6 +2,7 @@ package devserver
 
 import (
 	"context"
+	"crypto/rand"
 	"database/sql"
 	_ "embed"
 	"encoding/json"
@@ -14,14 +15,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/inngest/inngest/pkg/cqrs/sync"
-	"github.com/inngest/inngest/pkg/enums"
-
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 	"github.com/inngest/inngest/pkg/api/tel"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
+	"github.com/inngest/inngest/pkg/cqrs/sync"
+	"github.com/inngest/inngest/pkg/enums"
+	"github.com/inngest/inngest/pkg/execution/cron"
 	"github.com/inngest/inngest/pkg/headers"
 	"github.com/inngest/inngest/pkg/inngest"
 	"github.com/inngest/inngest/pkg/inngest/version"
@@ -216,13 +217,6 @@ func (a devapi) Register(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Re-initialize our cron manager.
-	if err := a.devserver.Runner.InitializeCrons(ctx); err != nil {
-		l.Warn("error initializing crons", "error", err)
-		a.err(ctx, w, 400, err)
-		return
-	}
-
 	resp, err := json.Marshal(reply)
 	if err != nil {
 		_ = publicerr.WriteHTTP(w, err)
@@ -266,6 +260,9 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 			return nil, publicerr.Wrap(err, 500, "Error updating app error")
 		}
 	}
+
+	// setup a list of crons to be upserted into the queue for scheduling
+	var crons []cron.CronItem
 
 	// Attempt to get the existing app by URL, and delete it if possible.
 	// We're going to recreate it below.
@@ -312,6 +309,13 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 		err = tx.Commit(ctx)
 		if err != nil {
 			l.Error("error registering functions", "error", err)
+		}
+
+		// handle cron sync to system queue
+		for _, ci := range crons {
+			if err := a.devserver.CronSyncer.Sync(ctx, ci); err != nil {
+				l.Error("error on cron sync", "error", err)
+			}
 		}
 	}()
 
@@ -366,6 +370,18 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 			if err != nil {
 				return nil, publicerr.Wrap(err, 500, "Error updating function config")
 			}
+			if fn.IsScheduled() {
+				crons = append(crons, cron.CronItem{
+					ID:              ulid.MustNew(ulid.Now(), rand.Reader),
+					AccountID:       consts.DevServerAccountID,
+					WorkspaceID:     consts.DevServerEnvID,
+					AppID:           appID,
+					FunctionID:      fn.ID,
+					FunctionVersion: fn.FunctionVersion, // TODO set the next function version
+					Expression:      fn.ScheduleExpression(),
+					Op:              enums.CronOpUpdate,
+				})
+			}
 			continue
 		}
 
@@ -381,6 +397,19 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 			err = fmt.Errorf("function %s is invalid: %w", fn.Slug, err)
 			return nil, publicerr.Wrap(err, 500, "Error saving function")
 		}
+
+		if fn.IsScheduled() {
+			crons = append(crons, cron.CronItem{
+				ID:              ulid.MustNew(ulid.Now(), rand.Reader),
+				AccountID:       consts.DevServerAccountID,
+				WorkspaceID:     consts.DevServerEnvID,
+				AppID:           appID,
+				FunctionID:      fn.ID,
+				FunctionVersion: fn.FunctionVersion, // TODO set the next function version
+				Expression:      fn.ScheduleExpression(),
+				Op:              enums.CronOpNew,
+			})
+		}
 	}
 
 	reply := &sync.Reply{
@@ -395,12 +424,19 @@ func (a devapi) register(ctx context.Context, r sdk.RegisterRequest) (*sync.Repl
 	for _, fn := range existing {
 		if _, ok := seen[fn.ID]; !ok {
 			deletes = append(deletes, fn.ID)
+			crons = append(crons, cron.CronItem{
+				ID:          ulid.MustNew(ulid.Now(), rand.Reader),
+				AccountID:   consts.DevServerAccountID,
+				WorkspaceID: consts.DevServerEnvID,
+				AppID:       appID,
+				FunctionID:  fn.ID,
+				Op:          enums.CronOpArchive,
+			})
 		}
 	}
 	if len(deletes) == 0 {
 		return reply, nil
 	}
-
 	if err = tx.DeleteFunctionsByIDs(ctx, deletes); err != nil {
 		return nil, publicerr.Wrap(err, 500, "Error deleting removed function")
 	}

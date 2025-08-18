@@ -3,6 +3,7 @@ package runner
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"fmt"
 	"runtime/debug"
@@ -14,13 +15,16 @@ import (
 	"github.com/inngest/inngest/pkg/config"
 	"github.com/inngest/inngest/pkg/consts"
 	"github.com/inngest/inngest/pkg/cqrs"
+	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/event"
 	"github.com/inngest/inngest/pkg/event_trigger_patterns"
 	"github.com/inngest/inngest/pkg/execution"
 	"github.com/inngest/inngest/pkg/execution/batch"
+	"github.com/inngest/inngest/pkg/execution/cron"
 	"github.com/inngest/inngest/pkg/execution/executor"
 	"github.com/inngest/inngest/pkg/execution/pauses"
 	"github.com/inngest/inngest/pkg/execution/queue"
+	"github.com/inngest/inngest/pkg/execution/ratelimit"
 	"github.com/inngest/inngest/pkg/execution/state"
 	sv2 "github.com/inngest/inngest/pkg/execution/state/v2"
 	"github.com/inngest/inngest/pkg/expressions"
@@ -30,10 +34,7 @@ import (
 	"github.com/inngest/inngest/pkg/service"
 	itrace "github.com/inngest/inngest/pkg/telemetry/trace"
 	"github.com/oklog/ulid/v2"
-	"github.com/robfig/cron/v3"
-	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/propagation"
-	"go.opentelemetry.io/otel/trace"
 )
 
 const (
@@ -96,6 +97,12 @@ func WithBatchManager(b batch.BatchManager) func(s *svc) {
 	}
 }
 
+func WithCronManager(c cron.CronManager) func(s *svc) {
+	return func(s *svc) {
+		s.croner = c
+	}
+}
+
 func WithPublisher(p pubsub.Publisher) func(s *svc) {
 	return func(s *svc) {
 		s.publisher = p
@@ -136,8 +143,10 @@ type svc struct {
 	queue queue.Queue
 	// batcher handles batch operations
 	batcher batch.BatchManager
-	// cronmanager allows the creation of new scheduled functions.
-	cronmanager *cron.Cron
+	// rl rate-limits functions.
+	rl ratelimit.RateLimiter
+	// croner handles cron operations
+	croner cron.CronManager
 
 	log logger.Logger
 }
@@ -173,17 +182,10 @@ func (s *svc) Pre(ctx context.Context) error {
 }
 
 func (s *svc) Run(ctx context.Context) error {
-	// Each runner service is responsible for initializing cron-based executions.
-	// As the runners are shared-nothing, there is contention when running multiple
-	// services;  each individual service will attempt to create a new cron execution
-	// simultaneously.  We currently rely on idempotency within the state store to
-	// ensure that only one run can execute.
+	// initialize crons from data store.
 	//
-	// In the future, we may want to add distributed locking and/or a limit on the
-	// number of concurrent services that can schedule crons.  We don't really want
-	// to rely on a single executor to 'claim' ownership:  we'd have to implement
-	// more complex logic to check for the last heartbeat and valid cron scheduled,
-	// then backtrack to re-execute in the case of node downtime.  This is simple.
+	// this is more relevant for persisted environment like lite, where there's an external data store
+	// persisting function configuration.
 	if err := s.InitializeCrons(ctx); err != nil {
 		return err
 	}
@@ -197,14 +199,6 @@ func (s *svc) Run(ctx context.Context) error {
 }
 
 func (s *svc) Stop(ctx context.Context) error {
-	if s.cronmanager != nil {
-		cronCtx := s.cronmanager.Stop()
-		select {
-		case <-cronCtx.Done():
-		case <-ctx.Done():
-			return fmt.Errorf("error waiting for scheduled executions to finish")
-		}
-	}
 	return nil
 }
 
@@ -225,87 +219,62 @@ func (s *svc) Publish(ctx context.Context, evt event.TrackedEvent) error {
 	)
 }
 
+// InitializeCrons initializes cron schedules for all scheduled functions in the system.
+// This method is called during service startup to ensure that all functions with
+// cron triggers are properly scheduled and ready to execute.
+//
+// The initialization process:
+// 1. Retrieves all functions that have scheduled triggers from the data store
+// 2. For each scheduled function, creates a CronItem with CronInit operation
+// 3. Enqueues the CronItem as a sync job to initialize the cron schedule
+//
+// The CronInit operation ensures that:
+// - If no schedule exists for the function, a new one is created
+// - If a schedule already exists, no changes are made (idempotent)
+//
+// This approach allows for safe restarts and prevents duplicate schedules while
+// ensuring all scheduled functions are properly initialized.
 func (s *svc) InitializeCrons(ctx context.Context) error {
-	// If a previous cron manager exists, cancel it.
-	if s.cronmanager != nil {
-		s.cronmanager.Stop()
-	}
+	l := s.log.With("action", "executor.InitializeCrons")
 
-	s.cronmanager = cron.New(
-		cron.WithParser(
-			cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow),
-		),
-	)
-
-	// Set the functions within the engine, then iterate through each function's
-	// triggers so that we can easily invoke them.  We also need to immediately
-	// set up cron timers to invoke functions on a schedule.
+	// Retrieve all functions that have scheduled triggers from the data store.
+	// This includes functions with cron expressions that need to be executed
+	// on a periodic basis.
 	fns, err := s.data.FunctionsScheduled(ctx)
 	if err != nil {
 		return err
 	}
 
+	// Process each function to initialize its cron schedule
 	for _, f := range fns {
 		fn := f
-		// Set up a cron schedule for the current function.
-		for _, t := range f.Triggers {
-			if t.CronTrigger == nil {
-				continue
-			}
-			cron := t.CronTrigger.Cron
-			_, err := s.cronmanager.AddFunc(cron, func() {
-				// Create a new context to avoid "context canceled" errors. This
-				// callback is run as a non-blocking goroutine in Cron.Start, so
-				// contexts from outside its scope will likely be cancelled
-				// before the function is run
-				ctx := context.Background()
-
-				ctx, span := itrace.UserTracer().Provider().
-					Tracer(consts.OtelScopeCron).
-					Start(ctx, "cron", trace.WithAttributes(
-						attribute.String(consts.OtelSysFunctionID, fn.ID.String()),
-						attribute.Int(consts.OtelSysFunctionVersion, fn.FunctionVersion),
-					))
-				defer span.End()
-
-				trackedEvent := event.NewOSSTrackedEvent(event.Event{
-					Data: map[string]any{
-						"cron": cron,
-					},
-					ID:        time.Now().UTC().Format(time.RFC3339),
-					Name:      event.FnCronName,
-					Timestamp: time.Now().UnixMilli(),
-				}, nil)
-
-				byt, err := json.Marshal(trackedEvent)
-				if err == nil {
-					err := s.publisher.Publish(
-						ctx,
-						s.config.EventStream.Service.TopicName(),
-						pubsub.Message{
-							Name:      event.EventReceivedName,
-							Data:      string(byt),
-							Timestamp: time.Now(),
-						},
-					)
-					if err != nil {
-						s.log.Error("error publishing cron event", "error", err)
-					}
-				} else {
-					s.log.Error("error marshaling cron event", "error", err)
-				}
-
-				err = s.initialize(ctx, fn, trackedEvent)
-				if err != nil {
-					s.log.Error("error initializing scheduled function", "error", err)
-				}
-			})
-			if err != nil {
-				return err
-			}
+		// Skip functions that don't have scheduled triggers to avoid
+		// unnecessary processing
+		if !fn.IsScheduled() {
+			continue
 		}
+
+		// Launch each cron initialization in a separate goroutine to avoid
+		// blocking the startup process. This allows multiple functions to be
+		// initialized concurrently.
+		go func(ctx context.Context, fn inngest.Function) {
+			// Configure queue item parameters for the cron sync job
+			//
+			// This will trigger the cron manager's UpdateSchedule method with the
+			// CronInit operation to initialize the schedule if needed.
+			if err := s.croner.Sync(ctx, cron.CronItem{
+				ID:              ulid.MustNew(ulid.Now(), rand.Reader),
+				AccountID:       consts.DevServerAccountID,
+				WorkspaceID:     consts.DevServerEnvID,
+				FunctionID:      fn.ID,
+				FunctionVersion: fn.FunctionVersion,
+				Expression:      fn.ScheduleExpression(),
+				Op:              enums.CronInit, // Initialize operation
+			}); err != nil {
+				l.Error("error initializing cron sync job", "error", err)
+			}
+		}(ctx, fn)
 	}
-	s.cronmanager.Start()
 	return nil
 }
 

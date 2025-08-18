@@ -644,3 +644,12 @@ func IncrPausesDeletedAfterBlockFlush(ctx context.Context, value int64, opts Cou
 		Tags:        opts.Tags,
 	})
 }
+
+func IncrCronProcessingDiffCheck(ctx context.Context, opts CounterOpt) {
+	RecordCounterMetric(ctx, 1, CounterOpt{
+		PkgName:     opts.PkgName,
+		MetricName:  "cron_item_process_diff_check_total",
+		Description: "The number of times cron process check is evaluating different cron items",
+		Tags:        opts.Tags,
+	})
+}

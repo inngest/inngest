@@ -35,7 +35,6 @@ func PartitionCommand() *cli.Command {
 
 			partition, err := debugCtx.Client.GetPartition(ctx, partitionReq)
 			if err != nil {
-
 				return fmt.Errorf("failed to get partition: %w", err)
 			}
 
