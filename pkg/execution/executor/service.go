@@ -34,7 +34,6 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-
 type Opt func(s *svc)
 
 func WithExecutionManager(l cqrs.Manager) func(s *svc) {
@@ -258,6 +257,8 @@ func (s *svc) Run(ctx context.Context) error {
 			err = s.handleScheduledBatch(ctx, item)
 		case queue.KindCancel:
 			err = s.handleCancel(ctx, item)
+		case queue.KindCron:
+			err = s.handleCron(ctx, item)
 		case queue.KindQueueMigrate:
 			// NOOP:
 			// this kind don't work in the Dev server
@@ -640,6 +641,16 @@ func (s *svc) handleCancel(ctx context.Context, item queue.Item) error {
 	}
 
 	return nil
+}
+
+func (s *svc) handleCron(ctx context.Context, item queue.Item) error {
+	// TODO
+	// 1. unmarshall payload
+	// 2. retrieve latest function config
+	// 3. if version is lower than config, return
+	// 4. schedule cron item to run
+	// 5. enqueue next schedule
+	return fmt.Errorf("not implemented")
 }
 
 func (s *svc) findFunctionByID(ctx context.Context, fnID uuid.UUID) (*inngest.Function, error) {
