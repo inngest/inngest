@@ -50,6 +50,6 @@ export async function simulateQuery(
   _query: string,
   cursor: string | null
 ): Promise<InsightsFetchResult> {
-  await new Promise((resolve) => setTimeout(resolve, 3000 + Math.random() * 1000));
+  await new Promise((resolve) => setTimeout(resolve, 500 + Math.random() * 1000));
   return getMockPage(cursor);
 }

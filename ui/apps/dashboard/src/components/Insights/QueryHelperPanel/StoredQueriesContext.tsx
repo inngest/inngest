@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useMemo, useState, type ReactNo
 import { useLocalStorage } from 'react-use';
 
 import type { Query, QuerySnapshot, UnsavedQuery } from '@/components/Insights/types';
+import { getOrderedQuerySnapshots } from '../queries';
 import { MOCK_QUERY_SNAPSHOTS, MOCK_SAVED_QUERIES } from './mocks';
 
 type ID = string;
@@ -57,7 +58,9 @@ export function StoredQueriesProvider({ children }: StoredQueriesProviderProps) 
 
   const saveQuerySnapshot = useCallback(
     (snapshot: QuerySnapshot) => {
-      setQuerySnapshots(withId(querySnapshots, snapshot.id, snapshot));
+      setQuerySnapshots(
+        withId(removeQuerySnapshotIfOverLimit(querySnapshots, 10), snapshot.id, snapshot)
+      );
     },
     [setQuerySnapshots, querySnapshots]
   );
@@ -103,4 +106,17 @@ function withoutId<T>(obj: Record<string, T>, id: string): Record<string, T> {
   const newObj = { ...obj };
   delete newObj[id];
   return newObj;
+}
+
+export function removeQuerySnapshotIfOverLimit(
+  querySnapshots: QueryRecord<QuerySnapshot>,
+  limit: number
+): QueryRecord<QuerySnapshot> {
+  if (Object.keys(querySnapshots).length < limit) return querySnapshots;
+
+  const snapshots = getOrderedQuerySnapshots(querySnapshots);
+  const oldestSnapshot = snapshots[snapshots.length - 1];
+  if (oldestSnapshot === undefined) return querySnapshots;
+
+  return withoutId(querySnapshots, oldestSnapshot.id);
 }
