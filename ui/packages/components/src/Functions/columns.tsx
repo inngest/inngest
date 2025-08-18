@@ -73,7 +73,7 @@ function UsageCell({
           term={data.usage.totalVolume === 1 ? 'run' : 'runs'}
         />
       </div>
-      <div className="hidden md:block [&_*]:cursor-pointer">
+      <div className="[&_*]:cursor-pointer">
         <MiniStackedBarChart data={data.usage.dailyVolumeSlots} />
       </div>
     </div>

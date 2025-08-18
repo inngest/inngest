@@ -1,10 +1,16 @@
 'use client';
 
-import { useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useState, type UIEventHandler } from 'react';
+import { useRouter } from 'next/navigation';
 import { Button } from '@inngest/components/Button';
-import { IDCell, Table, TextCell, TimeCell } from '@inngest/components/Table';
-import { RiDeleteBinLine } from '@remixicon/react';
-import { createColumnHelper, getCoreRowModel } from '@tanstack/react-table';
+import { IDCell, Table, TableBlankState, TextCell, TimeCell } from '@inngest/components/Table';
+import {
+  RiCloseCircleLine,
+  RiDeleteBinLine,
+  RiExternalLinkLine,
+  RiRefreshLine,
+} from '@remixicon/react';
+import { createColumnHelper } from '@tanstack/react-table';
 
 import { DeleteCancellationModal } from './DeleteCancellationModal';
 import { useCancellations } from './useCancellations';
@@ -30,8 +36,8 @@ type PendingDelete = {
 
 export function CancellationTable({ envSlug, fnSlug }: Props) {
   const [pendingDelete, setPendingDelete] = useState<PendingDelete>();
-  const tableContainerRef = useRef<HTMLDivElement>(null);
   const columns = useColumns({ setPendingDelete });
+  const router = useRouter();
 
   const {
     data: items,
@@ -41,37 +47,55 @@ export function CancellationTable({ envSlug, fnSlug }: Props) {
     isInitiallyFetching,
   } = useCancellations({ envSlug, fnSlug });
 
-  let blankSlate = <p>No results</p>;
-  if (isInitiallyFetching) {
-    blankSlate = <p>Loading...</p>;
-  }
+  const onScroll: UIEventHandler<HTMLDivElement> = useCallback(
+    (event) => {
+      if (items.length > 0 && hasNextPage) {
+        const { scrollHeight, scrollTop, clientHeight } = event.target as HTMLDivElement;
+
+        // Check if scrolled to the bottom
+        const reachedBottom = scrollHeight - scrollTop - clientHeight < 200;
+        if (reachedBottom && !isFetching) {
+          fetchNextPage();
+        }
+      }
+    },
+    [fetchNextPage, hasNextPage, items, isFetching]
+  );
 
   return (
     <>
-      <div className="flex flex-col items-center">
-        <div className="mb-8 self-stretch">
+      <div className="bg-canvasBase text-basis no-scrollbar flex-1 overflow-hidden">
+        <div className="h-full overflow-y-auto pb-2" onScroll={onScroll}>
           <Table
-            blankState={blankSlate}
-            options={{
-              columns,
-              data: items,
-              enableSorting: false,
-              getCoreRowModel: getCoreRowModel(),
-            }}
-            tableContainerRef={tableContainerRef}
+            blankState={
+              <TableBlankState
+                title="No cancellations found"
+                icon={<RiCloseCircleLine />}
+                actions={
+                  <>
+                    <Button
+                      appearance="outlined"
+                      label="Refresh"
+                      onClick={() => router.refresh()}
+                      icon={<RiRefreshLine />}
+                      iconSide="left"
+                    />
+                    <Button
+                      label="Go to docs"
+                      href="https://www.inngest.com/docs/platform/manage/bulk-cancellation"
+                      target="_blank"
+                      icon={<RiExternalLinkLine />}
+                      iconSide="left"
+                    />
+                  </>
+                }
+              />
+            }
+            columns={columns}
+            data={items}
+            isLoading={isInitiallyFetching}
           />
         </div>
-
-        {!isInitiallyFetching && (
-          <span>
-            <Button
-              appearance="outlined"
-              disabled={isFetching || !hasNextPage}
-              label="Load More"
-              onClick={() => fetchNextPage()}
-            />
-          </span>
-        )}
       </div>
       <DeleteCancellationModal
         onClose={() => setPendingDelete(undefined)}
@@ -91,18 +115,21 @@ function useColumns({ setPendingDelete }: { setPendingDelete: (obj: PendingDelet
         cell: (props) => {
           return <TextCell>{props.getValue()}</TextCell>;
         },
+        enableSorting: false,
       }),
       columnHelper.accessor('createdAt', {
         header: 'Created at',
         cell: (props) => {
           return <TimeCell date={props.getValue()} />;
         },
+        enableSorting: false,
       }),
       columnHelper.accessor('id', {
         header: 'ID',
         cell: (props) => {
           return <IDCell>{props.getValue()}</IDCell>;
         },
+        enableSorting: false,
       }),
       columnHelper.accessor('queuedAtMin', {
         header: 'Minimum queued at (filter)',
@@ -114,15 +141,18 @@ function useColumns({ setPendingDelete }: { setPendingDelete: (obj: PendingDelet
 
           return <TimeCell date={value} />;
         },
+        enableSorting: false,
       }),
       columnHelper.accessor('queuedAtMax', {
         header: 'Maximum queued at (filter)',
         cell: (props) => {
           return <TimeCell date={props.getValue()} />;
         },
+        enableSorting: false,
       }),
       columnHelper.display({
         id: 'actions',
+        header: undefined, // Needed to enable the iconOnly styles in the table
         cell: (props) => {
           const data = props.row.original;
 
@@ -135,6 +165,7 @@ function useColumns({ setPendingDelete }: { setPendingDelete: (obj: PendingDelet
             />
           );
         },
+        enableSorting: false,
       }),
     ];
   }, [setPendingDelete]);
