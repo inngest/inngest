@@ -72,8 +72,8 @@ func NewMetadata(ctx context.Context) *Metadata {
 func (m *Metadata) SetCliContext(cmd *cli.Command) {
 	// Build command path similar to cobra's CommandPath()
 	cmdPath := "inngest"
-	if cmd != nil && cmd.Name != "" {
-		cmdPath += " " + cmd.Name
+	if cmd != nil && cmd.Args().Len() > 0 {
+		cmdPath += " " + cmd.Args().Get(0)
 	}
 	m.Cmd = cmdPath
 }
