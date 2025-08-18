@@ -3,20 +3,25 @@
 import { useState } from 'react';
 import { RiArrowDownSLine } from '@remixicon/react';
 
+import type { TabConfig } from '@/components/Insights/InsightsTabManager/InsightsTabManager';
 import {
   QueryHelperPanelSectionContent,
   type QueryHelperPanelSectionContentProps,
 } from './QueryHelperPanelSectionContent';
 
 interface QueryHelperPanelCollapsibleSectionProps extends QueryHelperPanelSectionContentProps {
+  activeTabId: string;
+  tabs: TabConfig[];
   title: string;
 }
 
 export function QueryHelperPanelCollapsibleSection({
+  activeTabId,
   onQuerySelect,
   queries,
-  title,
   sectionType,
+  tabs,
+  title,
 }: QueryHelperPanelCollapsibleSectionProps) {
   const [isOpen, setIsOpen] = useState(true);
 
@@ -37,9 +42,11 @@ export function QueryHelperPanelCollapsibleSection({
       </button>
       {isOpen && (
         <QueryHelperPanelSectionContent
+          activeTabId={activeTabId}
           onQuerySelect={onQuerySelect}
           queries={queries}
           sectionType={sectionType}
+          tabs={tabs}
         />
       )}
     </div>

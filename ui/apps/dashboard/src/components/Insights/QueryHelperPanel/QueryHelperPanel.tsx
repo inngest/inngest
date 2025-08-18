@@ -3,12 +3,18 @@
 import { useMemo } from 'react';
 import { RiAddCircleFill, RiBookReadLine } from '@remixicon/react';
 
+import type { TabConfig } from '@/components/Insights/InsightsTabManager/InsightsTabManager';
 import { useTabManagerActions } from '@/components/Insights/InsightsTabManager/TabManagerContext';
 import { getOrderedQuerySnapshots, getOrderedSavedQueries } from '../queries';
 import { QueryHelperPanelCollapsibleSection } from './QueryHelperPanelCollapsibleSection';
 import { useStoredQueries } from './StoredQueriesContext';
 
-export function QueryHelperPanel() {
+interface QueryHelperPanelProps {
+  activeTabId: string;
+  tabs: TabConfig[];
+}
+
+export function QueryHelperPanel({ activeTabId, tabs }: QueryHelperPanelProps) {
   const { tabManagerActions } = useTabManagerActions();
   const { queries, querySnapshots } = useStoredQueries();
 
@@ -45,14 +51,18 @@ export function QueryHelperPanel() {
       </div>
       <div className="no-scrollbar flex-1 overflow-y-auto [&::-webkit-scrollbar]:hidden">
         <QueryHelperPanelCollapsibleSection
+          activeTabId={activeTabId}
           onQuerySelect={tabManagerActions.createTabFromQuery}
           queries={savedQueries}
+          tabs={tabs}
           title="Saved queries"
           sectionType="saved"
         />
         <QueryHelperPanelCollapsibleSection
+          activeTabId={activeTabId}
           onQuerySelect={tabManagerActions.createTabFromQuery}
           queries={orderedQuerySnapshots}
+          tabs={tabs}
           title="Query history"
           sectionType="history"
         />

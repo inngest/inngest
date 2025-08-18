@@ -11,7 +11,7 @@ import { StoredQueriesProvider } from '@/components/Insights/QueryHelperPanel/St
 function InsightsContent() {
   const [isQueryHelperPanelVisible, setIsQueryHelperPanelVisible] = useState(true);
 
-  const { actions, tabManager } = useInsightsTabManager({
+  const { actions, activeTabId, tabManager, tabs } = useInsightsTabManager({
     isQueryHelperPanelVisible,
     onToggleQueryHelperPanelVisibility: () => setIsQueryHelperPanelVisible((visible) => !visible),
   });
@@ -22,7 +22,7 @@ function InsightsContent() {
         <div className="flex h-full w-full flex-1 overflow-hidden">
           {isQueryHelperPanelVisible && (
             <div className="w-[240px] flex-shrink-0">
-              <QueryHelperPanel />
+              <QueryHelperPanel activeTabId={activeTabId} tabs={tabs} />
             </div>
           )}
           <div className="flex h-full w-full flex-1 flex-col overflow-hidden">{tabManager}</div>

@@ -4,7 +4,8 @@ import Tabs from '@inngest/components/Tabs/Tabs';
 import {
   RiAddLine,
   RiBookReadLine,
-  RiCodeLine,
+  RiCircleFill,
+  RiCodeSSlashLine,
   RiContractLeftLine,
   RiExpandRightLine,
 } from '@remixicon/react';
@@ -33,7 +34,6 @@ export function InsightsTabsList({
 
   return (
     <Tabs
-      defaultIconBefore={<RiCodeLine size={16} />}
       onClose={tabManagerActions.closeTab}
       onValueChange={tabManagerActions.focusTab}
       value={activeTabId}
@@ -65,10 +65,10 @@ function IndicatorTabIcon({ tab }: { tab: TabConfig }) {
   if (tab.id === TEMPLATES_TAB.id) return <RiBookReadLine size={16} />;
 
   const savedQuery = tab.savedQueryId ? queries[tab.savedQueryId] : undefined;
-  if (savedQuery === undefined) return <RiCodeLine size={16} />;
+  if (savedQuery === undefined) return <RiCodeSSlashLine size={16} />;
 
   const hasChanged = savedQuery.name !== tab.name || savedQuery.query !== tab.query;
-  if (!hasChanged) return <RiCodeLine size={16} />;
+  if (!hasChanged) return <RiCodeSSlashLine size={16} />;
 
-  return <div className="h-2 w-2 rounded-full bg-amber-500" />;
+  return <RiCircleFill className="fill-amber-500" size={16} />;
 }
