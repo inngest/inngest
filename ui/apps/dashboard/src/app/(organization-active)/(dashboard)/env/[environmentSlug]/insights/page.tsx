@@ -17,7 +17,7 @@ function InsightsContent() {
   });
 
   return (
-    <StoredQueriesProvider>
+    <StoredQueriesProvider tabManagerActions={actions}>
       <TabManagerProvider actions={actions}>
         <div className="flex h-full w-full flex-1 overflow-hidden">
           {isQueryHelperPanelVisible && (

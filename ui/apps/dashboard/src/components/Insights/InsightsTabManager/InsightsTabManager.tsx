@@ -26,6 +26,7 @@ export interface TabManagerActions {
   openTemplatesTab: () => void;
   updateTabQuery: (id: string, query: string) => void;
   updateTabName: (id: string, name: string) => void;
+  updateTabSavedQueryId: (id: string, savedQueryId: string) => void;
 }
 
 export interface UseInsightsTabManagerReturn {
@@ -146,6 +147,11 @@ export function useInsightsTabManager(
       },
       updateTabQuery: (id: string, query: string) => {
         setTabs((prevTabs) => prevTabs.map((tab) => (tab.id === id ? { ...tab, query } : tab)));
+      },
+      updateTabSavedQueryId: (id: string, savedQueryId: string) => {
+        setTabs((prevTabs) =>
+          prevTabs.map((tab) => (tab.id === id ? { ...tab, savedQueryId } : tab))
+        );
       },
     }),
     [activeTabId, tabs]

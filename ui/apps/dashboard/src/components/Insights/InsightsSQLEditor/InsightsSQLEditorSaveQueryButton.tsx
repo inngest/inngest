@@ -1,7 +1,8 @@
 'use client';
 
 import { Button } from '@inngest/components/Button/Button';
-import { RiBookmarkLine } from '@remixicon/react';
+import { cn } from '@inngest/components/utils/classNames';
+import { RiBookmarkFill, RiBookmarkLine } from '@remixicon/react';
 import { ulid } from 'ulid';
 
 import { useInsightsStateMachineContext } from '@/components/Insights/InsightsStateMachineContext/InsightsStateMachineContext';
@@ -16,18 +17,26 @@ export function InsightsSQLEditorSaveQueryButton({ tab }: InsightsSQLEditorSaveQ
   const { saveQuery } = useStoredQueries();
   const { query, queryName } = useInsightsStateMachineContext();
 
+  const disabled = query === '' || queryName === '';
+  const Icon = tab.savedQueryId ? RiBookmarkFill : RiBookmarkLine;
+
   return (
     <Button
       appearance="outlined"
-      icon={<RiBookmarkLine className="h-4 w-4" />}
+      disabled={disabled}
+      icon={<Icon className={cn('h-4 w-4', disabled ? 'text-disabled' : 'text-muted')} size={16} />}
       kind="secondary"
       onClick={() => {
-        saveQuery({
-          id: tab.savedQueryId ?? ulid(),
-          name: queryName,
-          query,
-          saved: true,
-        });
+        const queryId = tab.savedQueryId ?? ulid();
+        saveQuery(
+          {
+            id: queryId,
+            name: queryName,
+            query,
+            saved: true,
+          },
+          tab.id
+        );
       }}
       size="medium"
       title="Save query"

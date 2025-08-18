@@ -3,6 +3,7 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
 import { useLocalStorage } from 'react-use';
 
+import type { TabManagerActions } from '@/components/Insights/InsightsTabManager/InsightsTabManager';
 import type { Query, QuerySnapshot, UnsavedQuery } from '@/components/Insights/types';
 import { getOrderedQuerySnapshots } from '../queries';
 import { MOCK_QUERY_SNAPSHOTS, MOCK_SAVED_QUERIES } from './mocks';
@@ -15,7 +16,7 @@ interface StoredQueriesContextValue {
   queries: QueryRecord<Query>;
   querySnapshots: QueryRecord<QuerySnapshot>;
   removeUnsavedQuery: (id: ID) => void;
-  saveQuery: (query: Query) => void;
+  saveQuery: (query: Query, tabId: string) => void;
   saveQuerySnapshot: (snapshot: QuerySnapshot) => void;
 }
 
@@ -23,9 +24,10 @@ const StoredQueriesContext = createContext<undefined | StoredQueriesContextValue
 
 interface StoredQueriesProviderProps {
   children: ReactNode;
+  tabManagerActions: TabManagerActions;
 }
 
-export function StoredQueriesProvider({ children }: StoredQueriesProviderProps) {
+export function StoredQueriesProvider({ children, tabManagerActions }: StoredQueriesProviderProps) {
   const [querySnapshots = {}, setQuerySnapshots] = useLocalStorage<QueryRecord<QuerySnapshot>>(
     'insights-query-snapshots',
     MOCK_QUERY_SNAPSHOTS
@@ -48,12 +50,13 @@ export function StoredQueriesProvider({ children }: StoredQueriesProviderProps) 
   }, []);
 
   const saveQuery = useCallback(
-    (query: Query) => {
+    (query: Query, tabId: string) => {
       const savedQuery: Query = { ...query, saved: true };
       setSavedQueries(withId(savedQueries, query.id, savedQuery));
       setUnsavedQueries((prev) => withoutId(prev, query.id));
+      tabManagerActions.updateTabSavedQueryId(tabId, query.id);
     },
-    [setSavedQueries, savedQueries]
+    [setSavedQueries, savedQueries, tabManagerActions]
   );
 
   const saveQuerySnapshot = useCallback(
