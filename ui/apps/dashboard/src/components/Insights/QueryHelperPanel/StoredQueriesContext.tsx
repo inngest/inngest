@@ -14,6 +14,7 @@ type QueryRecord<T> = Record<ID, T>;
 interface StoredQueriesContextValue {
   addUnsavedQuery: (query: UnsavedQuery) => void;
   deleteQuery: (queryId: string) => void;
+  deleteQuerySnapshot: (snapshotId: string) => void;
   queries: QueryRecord<Query>;
   querySnapshots: QueryRecord<QuerySnapshot>;
   removeUnsavedQuery: (id: ID) => void;
@@ -68,6 +69,13 @@ export function StoredQueriesProvider({ children, tabManagerActions }: StoredQue
     [savedQueries, setSavedQueries, tabManagerActions]
   );
 
+  const deleteQuerySnapshot = useCallback(
+    (snapshotId: string) => {
+      setQuerySnapshots(withoutId(querySnapshots, snapshotId));
+    },
+    [querySnapshots, setQuerySnapshots]
+  );
+
   const saveQuerySnapshot = useCallback(
     (snapshot: QuerySnapshot) => {
       setQuerySnapshots(
@@ -86,6 +94,7 @@ export function StoredQueriesProvider({ children, tabManagerActions }: StoredQue
       value={{
         addUnsavedQuery,
         deleteQuery,
+        deleteQuerySnapshot,
         queries,
         querySnapshots,
         removeUnsavedQuery,

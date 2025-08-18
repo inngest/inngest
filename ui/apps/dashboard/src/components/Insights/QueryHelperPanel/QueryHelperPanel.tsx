@@ -16,7 +16,7 @@ interface QueryHelperPanelProps {
 
 export function QueryHelperPanel({ activeTabId, tabs }: QueryHelperPanelProps) {
   const { tabManagerActions } = useTabManagerActions();
-  const { deleteQuery, queries, querySnapshots } = useStoredQueries();
+  const { deleteQuery, deleteQuerySnapshot, queries, querySnapshots } = useStoredQueries();
 
   const savedQueries = useMemo(() => {
     return temporarilyWrapData(getOrderedSavedQueries(queries));
@@ -61,6 +61,7 @@ export function QueryHelperPanel({ activeTabId, tabs }: QueryHelperPanelProps) {
         />
         <QueryHelperPanelCollapsibleSection
           activeTabId={activeTabId}
+          onQueryDelete={deleteQuerySnapshot}
           onQuerySelect={tabManagerActions.createTabFromQuery}
           queries={orderedQuerySnapshots}
           tabs={tabs}

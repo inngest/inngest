@@ -37,7 +37,7 @@ export function QueryHelperPanelSectionItem({
   const Icon = sectionType === 'saved' ? RiBookmarkLine : RiHistoryLine;
 
   const isActiveTab = getIsActiveTab(activeTabId, tabs, query);
-  const canDelete = sectionType === 'saved' && onQueryDelete;
+  const canDelete = onQueryDelete !== undefined;
 
   useEffect(() => {
     const el = textRef.current;
@@ -48,7 +48,9 @@ export function QueryHelperPanelSectionItem({
 
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
-    setShowDeleteModal(true);
+
+    if (sectionType === 'saved') setShowDeleteModal(true);
+    else onQueryDelete?.(query.id);
   };
 
   return (
