@@ -35,7 +35,7 @@ type RunService interface {
 	StateLoader
 
 	// Create creates new state in the store for the given run ID.
-	Create(ctx context.Context, s CreateState) (state.State, error)
+	Create(ctx context.Context, s CreateState) (State, error)
 	// Delete deletes state, metadata, and - when pauses are included - associated pauses
 	// for the run from the store.  Nothing referencing the run should exist in the state
 	// store after.

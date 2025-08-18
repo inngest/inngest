@@ -680,15 +680,14 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	default:
 		return nil, fmt.Errorf("error creating run state: %w", err)
 	}
-	if st == nil {
-		return nil, fmt.Errorf("missing state after create: %w", err)
-	}
+
+	stv1ID := sv2.V1FromMetadata(st.Metadata)
 
 	// NOTE: if the runID mismatches, it means there's already a state available
 	// and we need to override the one we already have to make sure we're using
 	// the correct metedata values
-	if metadata.ID.RunID != st.Identifier().RunID {
-		id := sv2.IDFromV1(st.Identifier())
+	if metadata.ID.RunID != stv1ID.RunID {
+		id := sv2.IDFromV1(stv1ID)
 		metadata, err = e.smv2.LoadMetadata(ctx, id)
 		if err != nil {
 			return nil, err
@@ -741,7 +740,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 			// NOTE: making this deterministic so pause creation is also idempotent
 			pauseID := inngest.DeterministicSha1UUID(idSrc)
 			pause := state.Pause{
-				WorkspaceID:       st.Identifier().WorkspaceID,
+				WorkspaceID:       stv1ID.WorkspaceID,
 				Identifier:        sv2.NewPauseIdentifier(metadata.ID),
 				ID:                pauseID,
 				Expires:           state.Time(expires),
@@ -781,9 +780,9 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 	item := queue.Item{
 		JobID:                 &queueKey,
 		GroupID:               uuid.New().String(),
-		WorkspaceID:           st.Identifier().WorkspaceID,
+		WorkspaceID:           stv1ID.WorkspaceID,
 		Kind:                  queue.KindStart,
-		Identifier:            st.Identifier(),
+		Identifier:            stv1ID,
 		CustomConcurrencyKeys: metadata.Config.CustomConcurrencyKeys,
 		PriorityFactor:        metadata.Config.PriorityFactor,
 		Attempt:               0,
@@ -816,7 +815,7 @@ func (e *executor) Schedule(ctx context.Context, req execution.ScheduleRequest) 
 		return nil, state.ErrIdentifierExists
 
 	case redis_state.ErrQueueItemSingletonExists:
-		_, err := e.smv2.Delete(ctx, sv2.IDFromV1(st.Identifier()))
+		_, err := e.smv2.Delete(ctx, sv2.IDFromV1(stv1ID))
 		if err != nil {
 			l.ReportError(err, "error deleting function state")
 		}
