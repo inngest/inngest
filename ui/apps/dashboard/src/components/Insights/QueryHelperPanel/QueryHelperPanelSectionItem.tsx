@@ -45,13 +45,6 @@ export function QueryHelperPanelSectionItem({
     setIsTruncated(el.scrollWidth > el.clientWidth);
   }, [displayText]);
 
-  const handleDelete = (e: React.MouseEvent) => {
-    e.stopPropagation();
-
-    if (sectionType === 'saved') setShowDeleteModal(true);
-    else onQueryDelete?.(query.id);
-  };
-
   return (
     <>
       <OptionalTooltip side="right" tooltip={isTruncated ? displayText : ''}>
@@ -81,7 +74,12 @@ export function QueryHelperPanelSectionItem({
                 isHovered ? 'opacity-100' : 'opacity-0'
               )}
               icon={<RiCloseLargeLine className="h-3 w-3" />}
-              onClick={handleDelete}
+              onClick={(e: React.MouseEvent) => {
+                e.stopPropagation();
+
+                if (sectionType === 'saved') setShowDeleteModal(true);
+                else onQueryDelete?.(query.id);
+              }}
               size="small"
               tooltip="Delete query"
             />
