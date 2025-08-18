@@ -2,6 +2,8 @@
 
 import { createContext, useCallback, useContext, useReducer, type ReactNode } from 'react';
 
+import { useStoredQueries } from '../QueryHelperPanel/StoredQueriesContext';
+import { makeQuerySnapshot } from '../queries';
 import { simulateQuery } from './mocks';
 import { insightsStateMachineReducer } from './reducer';
 import type { InsightsState } from './types';
@@ -38,6 +40,7 @@ export function InsightsStateMachineContextProvider({
   renderChildren,
 }: InsightsStateMachineContextProviderProps) {
   const [queryState, dispatch] = useReducer(insightsStateMachineReducer, INITIAL_STATE);
+  const { saveQuerySnapshot } = useStoredQueries();
 
   // TODO: Ensure runQuery and fetchMore cannot finish out of order
   // if run in quick succession.
@@ -47,13 +50,14 @@ export function InsightsStateMachineContextProvider({
     try {
       const result = await simulateQuery(query, null);
       dispatch({ type: 'QUERY_SUCCESS', payload: result });
+      saveQuerySnapshot(makeQuerySnapshot(query));
     } catch (error) {
       dispatch({
         type: 'QUERY_ERROR',
         payload: stringifyError(error),
       });
     }
-  }, [query]);
+  }, [query, saveQuerySnapshot]);
 
   const fetchMore = useCallback(async () => {
     dispatch({ type: 'FETCH_MORE' });
