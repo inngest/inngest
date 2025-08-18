@@ -1,39 +1,59 @@
 package apiv2
 
 import (
+	"net/http"
+
 	apiv2 "github.com/inngest/inngest/proto/gen/api/v2"
 	"google.golang.org/genproto/googleapis/api/annotations"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
-// getHTTPPath extracts the HTTP path from google.api.http annotation
-func getHTTPPath(method protoreflect.MethodDescriptor) string {
+// getHTTPRule extracts the HttpRule from google.api.http annotation
+func getHTTPRule(method protoreflect.MethodDescriptor) *annotations.HttpRule {
 	opts := method.Options()
 	if !proto.HasExtension(opts, annotations.E_Http) {
-		return ""
+		return nil
 	}
 	
 	httpRule := proto.GetExtension(opts, annotations.E_Http).(*annotations.HttpRule)
+	return httpRule
+}
+
+// getHTTPMethodAndPath extracts both HTTP method and path from google.api.http annotation
+func getHTTPMethodAndPath(method protoreflect.MethodDescriptor) (httpMethod, path string) {
+	httpRule := getHTTPRule(method)
 	if httpRule == nil {
-		return ""
+		return http.MethodPost, "" // Default for gRPC
 	}
 	
-	// Extract path from the appropriate HTTP method
+	// Extract both method and path from the annotation pattern
 	switch pattern := httpRule.Pattern.(type) {
 	case *annotations.HttpRule_Get:
-		return pattern.Get
+		return http.MethodGet, pattern.Get
 	case *annotations.HttpRule_Post:
-		return pattern.Post
+		return http.MethodPost, pattern.Post
 	case *annotations.HttpRule_Put:
-		return pattern.Put
+		return http.MethodPut, pattern.Put
 	case *annotations.HttpRule_Delete:
-		return pattern.Delete
+		return http.MethodDelete, pattern.Delete
 	case *annotations.HttpRule_Patch:
-		return pattern.Patch
+		return http.MethodPatch, pattern.Patch
+	default:
+		return http.MethodPost, "" // Default fallback
 	}
-	
-	return ""
+}
+
+// getHTTPPath extracts the HTTP path from google.api.http annotation
+func getHTTPPath(method protoreflect.MethodDescriptor) string {
+	_, path := getHTTPMethodAndPath(method)
+	return path
+}
+
+// getHTTPMethod extracts the HTTP method from google.api.http annotation
+func getHTTPMethod(method protoreflect.MethodDescriptor) string {
+	httpMethod, _ := getHTTPMethodAndPath(method)
+	return httpMethod
 }
 
 // hasAuthzAnnotation checks if a method has the authz annotation requiring authorization
