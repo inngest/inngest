@@ -2,7 +2,7 @@
 
 import { createContext, useCallback, useContext, useReducer, type ReactNode } from 'react';
 
-import { useStoredQueries } from '../QueryHelperPanel/StoredQueriesContext';
+import { useStoredQueries } from '../InsightsProvider';
 import { makeQuerySnapshot } from '../queries';
 import { simulateQuery } from './mocks';
 import { insightsStateMachineReducer } from './reducer';
@@ -56,14 +56,16 @@ export function InsightsStateMachineContextProvider({
     try {
       const result = await simulateQuery(query, null);
       dispatch({ type: 'QUERY_SUCCESS', payload: result });
-      saveQuerySnapshot(makeQuerySnapshot(query));
+      saveQuerySnapshot(
+        makeQuerySnapshot(query, queryName === 'Untitled query' ? undefined : queryName)
+      );
     } catch (error) {
       dispatch({
         type: 'QUERY_ERROR',
         payload: stringifyError(error),
       });
     }
-  }, [query, saveQuerySnapshot]);
+  }, [query, queryName, saveQuerySnapshot]);
 
   const fetchMore = useCallback(async () => {
     dispatch({ type: 'FETCH_MORE' });
