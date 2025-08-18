@@ -5,8 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Alert } from '@inngest/components/Alert/Alert';
 import { Button } from '@inngest/components/Button/Button';
 import { ReplayStatusIcon } from '@inngest/components/ReplayStatusIcon';
-import { Table, TableBlankState } from '@inngest/components/Table';
-import { Time } from '@inngest/components/Time';
+import { NumberCell, Table, TableBlankState, TextCell, TimeCell } from '@inngest/components/Table';
 import { IconReplay } from '@inngest/components/icons/Replay';
 import type { Replay } from '@inngest/components/types/replay';
 import { differenceInMilliseconds, formatMilliseconds } from '@inngest/components/utils/date';
@@ -48,7 +47,7 @@ const columns = [
       return (
         <div className="flex items-center gap-2">
           <ReplayStatusIcon status={status} className="h-5 w-5" />
-          <span>{name}</span>
+          <TextCell>{name}</TextCell>
         </div>
       );
     },
@@ -56,9 +55,7 @@ const columns = [
   }),
   columnHelper.accessor('createdAt', {
     header: () => <span>Created at</span>,
-    cell: (props) => <Time value={props.getValue()} />,
-    size: 250,
-    minSize: 250,
+    cell: (props) => <TimeCell date={props.getValue()} />,
     enableSorting: false,
   }),
   columnHelper.accessor('endedAt', {
@@ -66,12 +63,10 @@ const columns = [
     cell: (props) => {
       const replayEndedAt = props.getValue();
       if (!replayEndedAt) {
-        return <span>-</span>;
+        return <TextCell>-</TextCell>;
       }
-      return <Time value={replayEndedAt} />;
+      return <TimeCell date={replayEndedAt} />;
     },
-    size: 250,
-    minSize: 250,
     enableSorting: false,
   }),
   columnHelper.accessor('duration', {
@@ -79,19 +74,17 @@ const columns = [
     cell: (props) => {
       const replayDuration = props.getValue();
       if (!replayDuration) {
-        return <span>-</span>;
+        return <TextCell>-</TextCell>;
       }
-      return <time dateTime={replayDuration.toString()}>{formatMilliseconds(replayDuration)}</time>;
+      return <TextCell>{formatMilliseconds(replayDuration)}</TextCell>;
     },
-    size: 250,
-    minSize: 250,
     enableSorting: false,
   }),
   columnHelper.accessor('runsCount', {
     header: () => <span>Runs queued</span>,
-    cell: (props) => props.getValue(),
-    size: 250,
-    minSize: 250,
+    cell: (props) => (
+      <NumberCell term={props.getValue() === 1 ? 'run' : 'runs'} value={props.getValue()} />
+    ),
     enableSorting: false,
   }),
 ];
