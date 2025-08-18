@@ -570,6 +570,9 @@ type PayloadPauseFunction struct {
 // PayloadUnpauseFunction represents the queue item payload for the internal system queue for
 // unpausing functions reliably. The IDs are retrieved from the identifier.
 type PayloadUnpauseFunction struct {
+	// PausedAt represents the unix timestamp in milliseconds when the user originally requested to pause the function.
+	// This is included in the unpause job to create a consistent identifier for pause periods and make unpausing idempotent.
+	PausedAt int64 `json:"pat"`
 	// UnpausedAt represents the unix timestamp in milliseconds when the user requested to unpause the function.
 	UnpausedAt int64 `json:"upat"`
 }
