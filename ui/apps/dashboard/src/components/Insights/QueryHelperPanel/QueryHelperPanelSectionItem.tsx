@@ -13,7 +13,7 @@ import type { Query, QuerySnapshot } from '../types';
 
 interface QueryHelperPanelSectionItemProps {
   activeTabId: string;
-  onQueryDelete?: (queryId: string) => void;
+  onQueryDelete: (queryId: string) => void;
   onQuerySelect: (query: Query | QuerySnapshot) => void;
   query: Query | QuerySnapshot;
   sectionType: 'history' | 'saved';
@@ -37,7 +37,6 @@ export function QueryHelperPanelSectionItem({
   const Icon = sectionType === 'saved' ? RiBookmarkLine : RiHistoryLine;
 
   const isActiveTab = getIsActiveTab(activeTabId, tabs, query);
-  const canDelete = onQueryDelete !== undefined;
 
   useEffect(() => {
     const el = textRef.current;
@@ -75,19 +74,17 @@ export function QueryHelperPanelSectionItem({
             {displayText}
           </span>
           <div className="flex h-4 w-4 flex-shrink-0 items-center justify-center">
-            {canDelete ? (
-              <Button
-                appearance="ghost"
-                className={cn(
-                  'text-subtle h-4 w-4 p-0 transition-all',
-                  isHovered ? 'opacity-100' : 'opacity-0'
-                )}
-                icon={<RiCloseLargeLine className="h-3 w-3" />}
-                onClick={handleDelete}
-                size="small"
-                tooltip="Delete query"
-              />
-            ) : null}
+            <Button
+              appearance="ghost"
+              className={cn(
+                'text-subtle h-4 w-4 p-0 transition-all',
+                isHovered ? 'opacity-100' : 'opacity-0'
+              )}
+              icon={<RiCloseLargeLine className="h-3 w-3" />}
+              onClick={handleDelete}
+              size="small"
+              tooltip="Delete query"
+            />
           </div>
         </div>
       </OptionalTooltip>

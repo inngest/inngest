@@ -11,7 +11,7 @@ import {
 
 interface QueryHelperPanelCollapsibleSectionProps extends QueryHelperPanelSectionContentProps {
   activeTabId: string;
-  onQueryDelete?: (queryId: string) => void;
+  onQueryDelete: (queryId: string) => void;
   tabs: TabConfig[];
   title: string;
 }
