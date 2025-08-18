@@ -17,20 +17,21 @@ export function InsightsSQLEditorSaveQueryButton({ tab }: InsightsSQLEditorSaveQ
   const { saveQuery } = useStoredQueries();
   const { query, queryName } = useInsightsStateMachineContext();
 
-  const disabled = query === '' || queryName === '';
+  const disabled = queryName === '';
   const Icon = tab.savedQueryId ? RiBookmarkFill : RiBookmarkLine;
 
   return (
     <Button
       appearance="outlined"
       disabled={disabled}
-      icon={<Icon className={cn('h-4 w-4', disabled ? 'text-disabled' : 'text-muted')} size={16} />}
+      icon={<Icon className={cn(disabled ? 'text-disabled' : 'text-muted')} size={16} />}
+      iconSide="left"
       kind="secondary"
+      label="Save"
       onClick={() => {
-        const queryId = tab.savedQueryId ?? ulid();
         saveQuery(
           {
-            id: queryId,
+            id: tab.savedQueryId ?? ulid(),
             name: queryName,
             query,
             saved: true,
@@ -39,7 +40,6 @@ export function InsightsSQLEditorSaveQueryButton({ tab }: InsightsSQLEditorSaveQ
         );
       }}
       size="medium"
-      title="Save query"
     />
   );
 }
