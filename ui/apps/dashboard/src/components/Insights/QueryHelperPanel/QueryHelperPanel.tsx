@@ -43,7 +43,7 @@ export function QueryHelperPanel() {
           </button>
         </div>
       </div>
-      <div className="flex-1">
+      <div className="no-scrollbar flex-1 overflow-y-auto [&::-webkit-scrollbar]:hidden">
         <QueryHelperPanelCollapsibleSection
           onQuerySelect={tabManagerActions.createTabFromQuery}
           queries={savedQueries}
