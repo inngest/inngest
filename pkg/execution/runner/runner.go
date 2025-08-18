@@ -144,6 +144,8 @@ type svc struct {
 	batcher batch.BatchManager
 	// rl rate-limits functions.
 	rl ratelimit.RateLimiter
+
+	// TODO deprecate this
 	// cronmanager allows the creation of new scheduled functions.
 	cronmanager *cron.Cron
 
