@@ -582,7 +582,7 @@ func start(ctx context.Context, opts StartOpts) error {
 
 	// Create the API v2 service handler
 	apiv2Handler, err := apiv2.NewHTTPHandler(ctx, apiv2.HTTPHandlerOptions{
-		AuthMiddleware: authn.SigningKeyMiddleware(opts.SigningKey),
+		AuthnMiddleware: authn.SigningKeyMiddleware(opts.SigningKey),
 	})
 	if err != nil {
 		return fmt.Errorf("failed to create v2 handler: %w", err)
