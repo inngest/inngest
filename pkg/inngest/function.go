@@ -293,6 +293,7 @@ func (f Function) GetSlug() string {
 	return strings.ToLower(slug.Make(f.Name))
 }
 
+// IsScheduled indicates if the function is a cron function or not
 func (f Function) IsScheduled() bool {
 	for _, t := range f.Triggers {
 		if t.CronTrigger != nil {
@@ -300,6 +301,15 @@ func (f Function) IsScheduled() bool {
 		}
 	}
 	return false
+}
+
+func (f Function) ScheduleExpression() string {
+	for _, t := range f.Triggers {
+		if t.CronTrigger != nil {
+			return t.CronTrigger.Cron
+		}
+	}
+	return ""
 }
 
 func (f Function) IsBatchEnabled() bool {
