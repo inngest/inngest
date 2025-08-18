@@ -3,6 +3,7 @@
 import { Button } from '@inngest/components/Button/Button';
 import { cn } from '@inngest/components/utils/classNames';
 import { RiBookmarkFill, RiBookmarkLine } from '@remixicon/react';
+import { toast } from 'sonner';
 import { ulid } from 'ulid';
 
 import { useInsightsStateMachineContext } from '@/components/Insights/InsightsStateMachineContext/InsightsStateMachineContext';
@@ -29,6 +30,8 @@ export function InsightsSQLEditorSaveQueryButton({ tab }: InsightsSQLEditorSaveQ
       kind="secondary"
       label="Save"
       onClick={() => {
+        const isUpdate = tab.savedQueryId !== undefined;
+
         saveQuery(
           {
             id: tab.savedQueryId ?? ulid(),
@@ -38,6 +41,8 @@ export function InsightsSQLEditorSaveQueryButton({ tab }: InsightsSQLEditorSaveQ
           },
           tab.id
         );
+
+        toast.success(`Successfully ${isUpdate ? 'updated' : 'saved'} query`);
       }}
       size="medium"
     />
