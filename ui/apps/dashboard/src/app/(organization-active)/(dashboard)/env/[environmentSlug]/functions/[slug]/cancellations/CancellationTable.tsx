@@ -153,7 +153,6 @@ function useColumns({ setPendingDelete }: { setPendingDelete: (obj: PendingDelet
       columnHelper.display({
         id: 'actions',
         header: undefined, // Needed to enable the iconOnly styles in the table
-        size: 20,
         cell: (props) => {
           const data = props.row.original;
 
