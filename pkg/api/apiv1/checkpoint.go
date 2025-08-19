@@ -4,9 +4,11 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
 	"time"
 
 	"github.com/go-chi/chi/v5"
@@ -166,9 +168,8 @@ func (a checkpointAPI) CheckpointSteps(w http.ResponseWriter, r *http.Request) {
 		Steps []state.GeneratorOpcode `json:"steps"`
 	}{}
 
-	// Load the state from the state store.
 	if err = json.NewDecoder(r.Body).Decode(&input); err != nil {
-		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 400, "Invalid request body"))
+		_ = publicerr.WriteHTTP(w, publicerr.Wrapf(err, 400, "invalid request body: %s", err))
 		return
 	}
 
@@ -181,27 +182,29 @@ func (a checkpointAPI) CheckpointSteps(w http.ResponseWriter, r *http.Request) {
 			AppID:     input.AppID,
 		},
 	})
-	// TODO: Handle run not found with 404
+	if errors.Is(err, state.ErrRunNotFound) || errors.Is(err, sv2.ErrMetadataNotFound) {
+		// Handle run not found with 404
+		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 404, "run not found"))
+		return
+	}
 	if err != nil {
-		logger.StdlibLogger(ctx).Warn(
-			"error loading state for background checkpoint steps",
-			"error", err,
-			"run_id", md.ID.RunID.String(),
-		)
-		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 500, "error loading state"))
+		logger.StdlibLogger(ctx).Warn("error loading state for background checkpoint steps", "error", err)
+		_ = publicerr.WriteHTTP(w, publicerr.Wrap(err, 500, "error loading run state"))
 		return
 	}
 
-	// TODO: If the opcodes contain a function finished op, we don't need to bother serializing
+	l := logger.StdlibLogger(ctx).With("run_id", md.ID.RunID)
+
+	// If the opcodes contain a function finished op, we don't need to bother serializing
 	// to the state store.  We only care about serializing state if we switch from sync -> async,
 	// as the state will be used for resuming functions.
+	complete := slices.ContainsFunc(input.Steps, func(s state.GeneratorOpcode) bool {
+		return s.Op == enums.OpcodeRunComplete
+	})
 
 	// Depending on the type of steps, we may end up switching the run from sync to async.  For example,
 	// if the opcodes are sleeps, waitForEvents, inferences, etc. we will be resuming the API endpoint
 	// at some point in the future.
-	//
-	// TODO: How many steps are async?  If > 1, we are entering parallelism.
-
 	for _, op := range input.Steps {
 		attrs := tracing.GeneratorAttrs(&op)
 
@@ -209,21 +212,19 @@ func (a checkpointAPI) CheckpointSteps(w http.ResponseWriter, r *http.Request) {
 		case enums.OpcodeStepRun, enums.OpcodeStep:
 			output, err := op.Output()
 			if err != nil {
-				logger.StdlibLogger(ctx).Error(
-					"error fetching checkpoint step output",
-					"error", err,
-					"run_id", md.ID.RunID.String(),
-				)
-			}
-			if _, err := a.State.SaveStep(ctx, md.ID, op.ID, []byte(output)); err != nil {
-				logger.StdlibLogger(ctx).Error(
-					"error saving checkpointed step state",
-					"error", err,
-					"run_id", md.ID.RunID.String(),
-				)
+				l.Error("error fetching checkpoint step output", "error", err)
 			}
 
-			ref, err := a.TracerProvider.CreateSpan(
+			if !complete {
+				// Checkpointing happens in this API when either the function finishes or we move to
+				// async.  Therefore, we onl want to save state if we don't have a complete opcode,
+				// as all complete functions will never re-enter.
+				if _, err := a.State.SaveStep(ctx, md.ID, op.ID, []byte(output)); err != nil {
+					l.Error("error saving checkpointed step state", "error", err)
+				}
+			}
+
+			_, err = a.TracerProvider.CreateSpan(
 				meta.SpanNameStep,
 				&tracing.CreateSpanOptions{
 					Parent:    md.Config.NewFunctionTrace(),
@@ -238,20 +239,19 @@ func (a checkpointAPI) CheckpointSteps(w http.ResponseWriter, r *http.Request) {
 					)),
 				},
 			)
-			_, _ = ref, err
-		// TODO: Handle error
+			if err != nil {
+				// We should never hit a blocker creating a span.  If so, warn loudly.
+				l.Error("error saving span for checkpoint op", "error", err)
+			}
 
-		// When we add enums.OpcodeRunComplete, handle this appropriately.
-		// case enums.OpcodeFunctionComplete:
-		// 	result := APIResult{}
-		// 	if err := json.Unmarshal(op.Data, &result); err != nil {
-		// 		// TODO: err
-		// 		return
-		// 	}
-		// 	if err := a.finalize(ctx, md, result); err != nil {
-		// 		// TODO: err
-		// 		return
-		// 	}
+		case enums.OpcodeRunComplete:
+			result := APIResult{}
+			if err := json.Unmarshal(op.Data, &result); err != nil {
+				l.Error("error unmarshalling api result from sync RunComplete op", "error", err)
+			}
+			if err := a.finalize(ctx, md, result); err != nil {
+				l.Error("error finalizing sync run", "error", err)
+			}
 
 		default:
 			// Create HTTP client using exechttp.Client
@@ -272,18 +272,12 @@ func (a checkpointAPI) CheckpointSteps(w http.ResponseWriter, r *http.Request) {
 			}
 
 			if err := a.Executor.HandleGenerator(ctx, runCtx, op); err != nil {
-				// TODO: log error and handle appropriately
-				logger.StdlibLogger(ctx).Error(
-					"error handling generator in checkpoint",
-					"error", err,
-					"run_id", md.ID.RunID.String(),
-					"opcode", op.Op,
-				)
+				l.Error("error handling generator in checkpoint", "error", err, "opcode", op.Op)
 			}
-
-			return
 		}
 	}
+
+	l.Info("handled sync checkpoint", "ops", len(input.Steps), "complete", complete)
 }
 
 // CheckpointResponse is called from the SDK when the API responds to the user. This indicates
@@ -344,10 +338,9 @@ func (a checkpointAPI) CheckpointResponse(w http.ResponseWriter, r *http.Request
 	}
 }
 
+// finalize finishes a run after receiving a RunComplete opcode.  This assumes that all prior
+// work has finished, and eg. step.Defer items are not running.
 func (a checkpointAPI) finalize(ctx context.Context, md sv2.Metadata, result APIResult) error {
-	// TODO: If the run mode is async (due to background steps, or a switch with waits)
-	// we need to ensure that we do not finish the run.  Finishing will be managed via the
-	// regular async executor.
 	err := a.TracerProvider.UpdateSpan(&tracing.UpdateSpanOptions{
 		Metadata:   &md,
 		TargetSpan: tracing.RunSpanRefFromMetadata(&md),

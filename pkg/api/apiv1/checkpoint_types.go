@@ -98,13 +98,20 @@ func (r CheckpointNewRunRequest) FnID(appID uuid.UUID) uuid.UUID {
 }
 
 func (r CheckpointNewRunRequest) Fn(appID uuid.UUID) inngest.Function {
-	uri := r.Event.Data.Domain + r.Event.Data.Path + "?x-inngest-type=sync&x-inngest-method=" + r.Event.Data.Method
+	uri := r.Event.Data.Domain + r.Event.Data.Path
 	return inngest.Function{
 		ID:              r.FnID(appID),
 		ConfigVersion:   1,
 		FunctionVersion: 1,
 		Name:            r.FnSlug(),
 		Slug:            r.FnSlug(),
+		Driver: inngest.FunctionDriver{
+			URI: uri,
+			Metadata: map[string]any{
+				"type":   "sync", // This is a sync function
+				"method": r.Event.Data.Method,
+			},
+		},
 		Steps: []inngest.Step{
 			{
 				ID:      "step",

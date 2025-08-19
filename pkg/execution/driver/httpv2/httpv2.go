@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"net/url"
 
 	"github.com/inngest/inngest/pkg/enums"
 	"github.com/inngest/inngest/pkg/execution/driver"
@@ -41,16 +40,13 @@ type HTTPV2Config struct {
 	// This is important:  sync functions never have state sent to them, whereas
 	// async functions can have a specific amount of state sent to them to
 	// initialize the run re-entry.
-	Type string
-
-	// URL is the URL that we're hitting.
-	URL url.URL
+	Type string `json:"type"`
 
 	// Method ios the optional HTTP method to use when hitting the URL.  This is
 	// only used in sync functions so that we can resume any specific sync API.
 	//
 	// For async functions, this is always a POST request.
-	Method string
+	Method string `json:"method"`
 }
 
 func (d httpv2) Name() string {
