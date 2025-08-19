@@ -11,6 +11,11 @@ plugins:
     opt: 
       - paths=source_relative
       - allow_delete_body=true
+  - plugin: openapiv2
+    out: ../../docs/openapi/v2
+    opt:
+      - allow_delete_body=true
+      - json_names_for_fields=false
   - plugin: connect-go
     out: gen
     opt: paths=source_relative
